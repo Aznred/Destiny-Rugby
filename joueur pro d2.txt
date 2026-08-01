@@ -1,0 +1,8775 @@
+pro d2 joueur Club
+
+Poste
+
+Kolinio RAMOKA
+
+FidjiSU Agen
+
+Kolinio RAMOKA
+
+Ailier
+
+
+Matthieu BONNET
+
+FranceSU Agen
+
+Matthieu BONNET
+
+2ème ligne
+
+
+Dorian BELLOT
+
+FranceSU Agen
+
+Dorian BELLOT
+
+Demi de mêlée
+
+
+Julien LEBIAN
+
+FranceSU Agen
+
+Julien LEBIAN
+
+3ème ligne
+
+
+Bastien DARRE
+
+FranceSU Agen
+
+Bastien DARRE
+
+1ère ligne
+
+
+Tomasi FINEANGANOFO
+
+TongaSU Agen
+
+Tomasi FINEANGANOFO
+
+3ème ligne
+
+
+Iban ETCHEVERRY
+
+FranceSU Agen
+
+Iban ETCHEVERRY
+
+Arrière
+
+
+Florent GUION
+
+FranceSU Agen
+
+Florent GUION
+
+1ère ligne
+
+
+Clément MARTINEZ
+
+FranceNissa Rugby
+
+Clément MARTINEZ
+
+1ère ligne
+
+
+Arnaud DUPUTS
+
+FranceSU Agen
+
+Arnaud DUPUTS
+
+3ème ligne
+
+
+William DEMOTTE
+
+FranceSU Agen
+
+William DEMOTTE
+
+2ème ligne
+
+
+Baptiste LAFOND
+
+FranceNissa Rugby
+
+Baptiste LAFOND
+
+Centre
+
+
+Hans LOMBARD BURET
+
+FranceSU Agen
+
+Hans LOMBARD BURET
+
+1ère ligne
+
+
+Beau FARRANCE
+
+Grande-BretagneNissa Rugby
+
+Beau FARRANCE
+
+1ère ligne
+
+
+Inoke KURUKURUVAKATINI
+
+FidjiNissa Rugby
+
+Inoke KURUKURUVAKATINI
+
+Ailier
+
+
+Evan OLMSTEAD
+
+AustralieNissa Rugby
+
+Evan OLMSTEAD
+
+2ème ligne
+
+
+Thomas VINCENT
+
+FranceOyonnax Rugby
+
+Thomas VINCENT
+
+Demi d'ouverture
+
+
+Theo IDJELLIDAINE
+
+FranceNissa Rugby
+
+Theo IDJELLIDAINE
+
+Demi de mêlée
+
+
+Clément GARRIGUES
+
+FranceSU Agen
+
+Clément GARRIGUES
+
+Demi d'ouverture
+
+
+Gillian BENOY
+
+BelgiqueAS Béziers Hérault
+
+Gillian BENOY Club
+
+Poste
+
+Raffaele COSTA STORTI
+
+PortugalFC Grenoble Rugby
+
+Raffaele COSTA STORTI
+
+Arrière
+
+
+Pierre COURTAUD
+
+FranceAS Béziers Hérault
+
+Pierre COURTAUD
+
+Centre
+
+
+Sias KOEN
+
+Afrique du SudAS Béziers Hérault
+
+Sias KOEN
+
+3ème ligne
+
+
+Apisalome tegumailagi KURUISAQILA
+
+FidjiAS Béziers Hérault
+
+Apisalome tegumailagi KURUISAQILA
+
+3ème ligne
+
+
+Thomas CANALETA
+
+FranceAS Béziers Hérault
+
+Thomas CANALETA
+
+3ème ligne
+
+
+Antoine PAYRASTRE
+
+FranceAS Béziers Hérault
+
+Antoine PAYRASTRE
+
+3ème ligne
+
+
+Yannick ARROYO
+
+FranceOyonnax Rugby
+
+Yannick ARROYO
+
+1ère ligne
+
+
+Victor DREUILLE
+
+FranceAS Béziers Hérault
+
+Victor DREUILLE
+
+Demi d'ouverture
+
+
+William VAN BOST
+
+BelgiqueAS Béziers Hérault
+
+William VAN BOST
+
+3ème ligne
+
+
+Yvann LALEVÉE
+
+FranceAS Béziers Hérault
+
+Yvann LALEVÉE
+
+1ère ligne
+
+
+Maxence LEMARDELET
+
+FranceSoyaux-Angoulême XV
+
+Maxence LEMARDELET
+
+3ème ligne
+
+
+Charly MALIE
+
+FranceAS Béziers Hérault
+
+Charly MALIE
+
+Arrière
+
+
+Jean baptiste BARRERE
+
+FranceUS Dax
+
+Jean baptiste BARRERE
+
+3ème ligne
+
+
+John MADIGAN
+
+IrlandeSU Agen
+
+John MADIGAN
+
+2ème ligne
+
+
+Maxime ESPEUT
+
+FranceUS Montauban
+
+Maxime ESPEUT
+
+Centre
+
+
+Paul RECOR
+
+FranceAS Béziers Hérault
+
+Paul RECOR
+
+Centre
+
+
+Nicolas PLAZY
+
+FranceAS Béziers Hérault
+
+Nicolas PLAZY
+
+Arrière
+
+
+Clément BITZ
+
+FranceRC Narbonnais
+
+Clément BITZ
+
+2ème ligne
+
+
+Paul REAU
+
+FranceAS Béziers Hérault
+
+Paul REAU
+
+Centre
+
+
+Julien RASAMOELINA
+
+FranceAS Béziers Hérault
+
+Julien RASAMOELINA
+
+1ère ligne
+
+
+Club
+
+Poste
+
+Ekain IMAZ AGIRRE
+
+EspagneBiarritz Olympique PB
+
+Ekain IMAZ AGIRRE
+
+3ème ligne
+
+
+Youssouf SOUCOUNA
+
+FranceUS Montauban
+
+Youssouf SOUCOUNA
+
+2ème ligne
+
+
+Yanis BRILLANT
+
+FranceUSON Nevers
+
+Yanis BRILLANT
+
+Demi d'ouverture
+
+
+Tyler MORGAN
+
+Grande-BretagneNissa Rugby
+
+Tyler MORGAN
+
+Centre
+
+
+Imanol BISCAY
+
+FranceRC Narbonnais
+
+Imanol BISCAY
+
+Demi de mêlée
+
+
+Charlie FRANCOZ
+
+FranceUSON Nevers
+
+Charlie FRANCOZ
+
+3ème ligne
+
+
+Adrian MOTOC
+
+RoumanieNissa Rugby
+
+Adrian MOTOC
+
+2ème ligne
+
+
+Luka AZARIASHVILI
+
+GéorgieAS Béziers Hérault
+
+Luka AZARIASHVILI
+
+1ère ligne
+
+
+Quentin SAMARAN
+
+FranceBiarritz Olympique PB
+
+Quentin SAMARAN
+
+1ère ligne
+
+
+Bastien SOURY
+
+FranceFC Grenoble Rugby
+
+Bastien SOURY
+
+1ère ligne
+
+
+Zakaria EL FAKIR
+
+FranceBiarritz Olympique PB
+
+Zakaria EL FAKIR
+
+1ère ligne
+
+
+Lasha TABIDZE
+
+GéorgieStade Aurillacois
+
+Lasha TABIDZE
+
+1ère ligne
+
+
+Nafitalai owen MAAFU
+
+Etats-UnisUS Montauban
+
+Nafitalai owen MAAFU
+
+2ème ligne
+
+
+Killian TAOFIFENUA
+
+FranceAS Béziers Hérault
+
+Killian TAOFIFENUA
+
+1ère ligne
+
+
+Barnabé COUILLOUD
+
+FranceFC Grenoble Rugby
+
+Barnabé COUILLOUD
+
+Demi de mêlée
+
+
+Kerman AURREKOETXEA ALEGRIA
+
+EspagneBiarritz Olympique PB
+
+Kerman AURREKOETXEA ALEGRIA
+
+Demi de mêlée
+
+
+Thomas HEBERT
+
+FranceBiarritz Olympique PB
+
+Thomas HEBERT
+
+3ème ligne
+
+
+John DYER
+
+FidjiBiarritz Olympique PB
+
+John DYER
+
+3ème ligne
+
+
+Baptiste FARISCOT
+
+FranceBiarritz Olympique PB
+
+Baptiste FARISCOT
+
+Arrière
+
+
+Tornike JALAGONIA
+
+GéorgieProvence Rugby
+
+Tornike JALAGONIA
+
+3ème ligne
+
+
+Club
+
+Poste
+
+François VERGNAUD
+
+FranceStade Aurillacois
+
+François VERGNAUD
+
+Centre
+
+
+Giorgi NUTSUBIDZE
+
+GéorgieBiarritz Olympique PB
+
+Giorgi NUTSUBIDZE
+
+1ère ligne
+
+
+Gatien MASSE
+
+FranceCA Brive
+
+Gatien MASSE
+
+Centre
+
+
+Corentin COULARIS
+
+FranceUS Montauban
+
+Corentin COULARIS
+
+3ème ligne
+
+
+Pablo DIMCHEFF
+
+ArgentineColomiers Rugby
+
+Pablo DIMCHEFF
+
+1ère ligne
+
+
+Leo CHAUVIN
+
+FranceNissa Rugby
+
+Leo CHAUVIN
+
+1ère ligne
+
+
+Yahnis EL MASLOUHI
+
+FranceAS Béziers Hérault
+
+Yahnis EL MASLOUHI
+
+1ère ligne
+
+
+Christopher VAOTOA
+
+FranceUS Montauban
+
+Christopher VAOTOA
+
+1ère ligne
+
+
+Alban ROUSSEL
+
+FranceOyonnax Rugby
+
+Alban ROUSSEL
+
+2ème ligne
+
+
+Antoine MIQUEL
+
+FranceOyonnax Rugby
+
+Antoine MIQUEL
+
+3ème ligne
+
+
+Yann LESGOURGUES
+
+FranceBiarritz Olympique PB
+
+Yann LESGOURGUES
+
+Demi de mêlée
+
+
+Geoffrey CROS
+
+FranceCA Brive
+
+Geoffrey CROS
+
+Arrière
+
+
+Jules GIMBERT
+
+FranceNissa Rugby
+
+Jules GIMBERT
+
+Demi de mêlée
+
+
+Caleb kalisi TIMU
+
+AustralieRC Narbonnais
+
+Caleb kalisi TIMU
+
+3ème ligne
+
+
+Hugo ZABALZA
+
+FranceUS Montauban
+
+Hugo ZABALZA
+
+Demi de mêlée
+
+
+Oskar konstantin RIXEN
+
+AllemagneUSON Nevers
+
+Oskar konstantin RIXEN
+
+2ème ligne
+
+
+Benjamin LEFRANC
+
+FranceCA Brive
+
+Benjamin LEFRANC
+
+3ème ligne
+
+
+Geoffrey MALATERRE
+
+FranceCA Brive
+
+Geoffrey MALATERRE
+
+3ème ligne
+
+
+Maxence BIASOTTO
+
+FranceCA Brive
+
+Maxence BIASOTTO
+
+Centre
+
+
+Francisco CORIA MARCHETTI
+
+ArgentineCA Brive
+
+Francisco CORIA MARCHETTI
+
+1ère ligne
+
+
+Club
+
+Poste
+
+Loan LAVERGNE
+
+FranceRC Narbonnais
+
+Loan LAVERGNE
+
+3ème ligne
+
+
+Tom RAFFY
+
+FranceCA Brive
+
+Tom RAFFY
+
+Demi d'ouverture
+
+
+Teun KARST
+
+Pays-BasCA Brive
+
+Teun KARST
+
+2ème ligne
+
+
+Lewis NOON
+
+FranceCA Brive
+
+Lewis NOON
+
+Arrière
+
+
+Nicolas christian KRONE
+
+AngleterreCA Brive
+
+Nicolas christian KRONE
+
+Centre
+
+
+Bastien MASSE
+
+FranceCA Brive
+
+Bastien MASSE
+
+Centre
+
+
+Vasil LOBZHANIDZE
+
+GéorgieOyonnax Rugby
+
+Vasil LOBZHANIDZE
+
+Demi de mêlée
+
+
+Andrès ZAFRA TARAZONA
+
+FranceProvence Rugby
+
+Andrès ZAFRA TARAZONA
+
+2ème ligne
+
+
+Marcel VAN DER MERWE
+
+Afrique du SudCA Brive
+
+Marcel VAN DER MERWE
+
+1ère ligne
+
+
+Retief MARAIS
+
+Afrique du SudCA Brive
+
+Retief MARAIS
+
+3ème ligne
+
+
+Arthur BONNEVAL
+
+FranceBiarritz Olympique PB
+
+Arthur BONNEVAL
+
+Ailier
+
+
+Setareki BITUNIYATA
+
+FidjiProvence Rugby
+
+Setareki BITUNIYATA
+
+Ailier
+
+
+Enzo HERVE
+
+FranceUS Montauban
+
+Enzo HERVE
+
+Demi d'ouverture
+
+
+Guillaume GALLETIER
+
+FranceAS Béziers Hérault
+
+Guillaume GALLETIER
+
+Centre
+
+
+Daniel BRENNAN
+
+IrlandeUS Montauban
+
+Daniel BRENNAN
+
+1ère ligne
+
+
+Lucas DA SILVA
+
+FranceCA Brive
+
+Lucas DA SILVA
+
+1ère ligne
+
+
+Renger VAN EERTEN
+
+Pays-BasProvence Rugby
+
+Renger VAN EERTEN
+
+2ème ligne
+
+
+Sasha GUE
+
+FranceCA Brive
+
+Sasha GUE
+
+3ème ligne
+
+
+Vano KARKADZE
+
+GéorgieOyonnax Rugby
+
+Vano KARKADZE
+
+1ère ligne
+
+
+Stuart OLDING
+
+IrlandeCA Brive
+
+Stuart OLDING
+
+Centre
+
+
+Club
+
+Poste
+
+David GENESTE
+
+FranceCA Brive
+
+David GENESTE
+
+3ème ligne
+
+
+Jules MARTINEZ
+
+FranceNissa Rugby
+
+Jules MARTINEZ
+
+1ère ligne
+
+
+Nugzari SOMKHISVHILI
+
+GéorgieUS Montauban
+
+Nugzari SOMKHISVHILI
+
+1ère ligne
+
+
+Martin DULON
+
+FranceColomiers Rugby
+
+Martin DULON
+
+Centre
+
+
+Baptiste MOUCHOUS
+
+FranceUS Montauban
+
+Baptiste MOUCHOUS
+
+Demi d'ouverture
+
+
+Damien ANON
+
+FranceAS Béziers Hérault
+
+Damien ANON
+
+Demi de mêlée
+
+
+Clément CLAVIERES
+
+FranceRC Narbonnais
+
+Clément CLAVIERES
+
+Arrière
+
+
+Stefan marko BURUIANA
+
+FranceRC Narbonnais
+
+Stefan marko BURUIANA
+
+1ère ligne
+
+
+Tyler ARDRON
+
+CanadaProvence Rugby
+
+Tyler ARDRON
+
+2ème ligne
+
+
+Ratu osea WAQANINAVATU
+
+FidjiValence Romans
+
+Ratu osea WAQANINAVATU
+
+Demi de mêlée
+
+
+Aurelien AZAR
+
+FranceProvence Rugby
+
+Aurelien AZAR
+
+1ère ligne
+
+
+Alex NEWSOME
+
+AustralieOyonnax Rugby
+
+Alex NEWSOME
+
+Arrière
+
+
+Lucas DESSAIGNE
+
+FranceUS Montauban
+
+Lucas DESSAIGNE
+
+3ème ligne
+
+
+Etienne FALGOUX
+
+FranceNissa Rugby
+
+Etienne FALGOUX
+
+1ère ligne
+
+
+Yohan BEHEREGARAY
+
+FranceBiarritz Olympique PB
+
+Yohan BEHEREGARAY
+
+1ère ligne
+
+
+Julien HERITEAU
+
+FranceFC Grenoble Rugby
+
+Julien HERITEAU
+
+Centre
+
+
+Loic GODENER
+
+FranceOyonnax Rugby
+
+Loic GODENER
+
+3ème ligne
+
+
+Jean pascal BARRAQUE
+
+FranceNissa Rugby
+
+Jean pascal BARRAQUE
+
+Centre
+
+
+Apisai NAQALEVU
+
+FidjiRC Narbonnais
+
+Apisai NAQALEVU
+
+Centre
+
+
+Enzo SALLES
+
+FranceColomiers Rugby
+
+Enzo SALLES
+
+Centre
+
+
+Club
+
+Poste
+
+Thomas LARRIEU
+
+FranceColomiers Rugby
+
+Thomas LARRIEU
+
+1ère ligne
+
+
+Jean THOMAS
+
+FranceColomiers Rugby
+
+Jean THOMAS
+
+3ème ligne
+
+
+Hugo PIRLET
+
+FranceBiarritz Olympique PB
+
+Hugo PIRLET
+
+1ère ligne
+
+
+Maxime GRANOUILLET
+
+FranceColomiers Rugby
+
+Maxime GRANOUILLET
+
+2ème ligne
+
+
+Anthony COLETTA
+
+FranceCA Brive
+
+Anthony COLETTA
+
+3ème ligne
+
+
+Romuald SEGUY
+
+FranceUS Dax
+
+Romuald SEGUY
+
+Demi d'ouverture
+
+
+Pierre PACHECO
+
+FranceOyonnax Rugby
+
+Pierre PACHECO
+
+3ème ligne
+
+
+Guillaume TARTAS
+
+FranceColomiers Rugby
+
+Guillaume TARTAS
+
+1ère ligne
+
+
+Yann PEYSSON
+
+FranceCA Brive
+
+Yann PEYSSON
+
+3ème ligne
+
+
+Alexandre RICARD
+
+FranceCA Brive
+
+Alexandre RICARD
+
+2ème ligne
+
+
+Georgy BALAKAREV
+
+RussieSoyaux-Angoulême XV
+
+Georgy BALAKAREV
+
+1ère ligne
+
+
+Germain BURGAUD GRIMART
+
+FranceSoyaux-Angoulême XV
+
+Germain BURGAUD GRIMART
+
+3ème ligne
+
+
+Benjamin BOTICA
+
+Grande-BretagneSoyaux-Angoulême XV
+
+Benjamin BOTICA
+
+Demi d'ouverture
+
+
+Matthew BEUKEBOOM
+
+CanadaSoyaux-Angoulême XV
+
+Matthew BEUKEBOOM
+
+2ème ligne
+
+
+Yassin BOUTEMMANI
+
+FranceSoyaux-Angoulême XV
+
+Yassin BOUTEMMANI
+
+1ère ligne
+
+
+Rémi BROSSET
+
+FranceSoyaux-Angoulême XV
+
+Rémi BROSSET
+
+Arrière
+
+
+Ledua MAU
+
+FidjiSoyaux-Angoulême XV
+
+Ledua MAU
+
+Ailier
+
+
+Adrien BAU
+
+FranceSoyaux-Angoulême XV
+
+Adrien BAU
+
+Demi de mêlée
+
+
+Elias EL ANSARI
+
+FranceColomiers Rugby
+
+Elias EL ANSARI
+
+1ère ligne
+
+
+Ian KITWANGA
+
+République Démocratique du CongoAS Béziers Hérault
+
+Ian KITWANGA
+
+2ème ligne
+
+
+Club
+
+Poste
+
+Hubert TEXIER
+
+FranceSoyaux-Angoulême XV
+
+Hubert TEXIER
+
+3ème ligne
+
+
+Mathis LAFON
+
+FranceSoyaux-Angoulême XV
+
+Mathis LAFON
+
+Centre
+
+
+Iñaki AYARZA
+
+EspagneOyonnax Rugby
+
+Iñaki AYARZA
+
+Centre
+
+
+Mathis BARET
+
+FranceFC Grenoble Rugby
+
+Mathis BARET
+
+3ème ligne
+
+
+Bautista EZCURRA
+
+FranceNissa Rugby
+
+Bautista EZCURRA
+
+Ailier
+
+
+Pierre STRIPPOLI
+
+FranceNissa Rugby
+
+Pierre STRIPPOLI
+
+1ère ligne
+
+
+Zack GAUTHIER
+
+FranceFC Grenoble Rugby
+
+Zack GAUTHIER
+
+1ère ligne
+
+
+Noe THERAUBE
+
+FranceFC Grenoble Rugby
+
+Noe THERAUBE
+
+2ème ligne
+
+
+Sascha MISTRULLI
+
+FranceFC Grenoble Rugby
+
+Sascha MISTRULLI
+
+1ère ligne
+
+
+Theo LAVOINE
+
+FranceFC Grenoble Rugby
+
+Theo LAVOINE
+
+1ère ligne
+
+
+Corentin PECCAUD
+
+FranceFC Grenoble Rugby
+
+Corentin PECCAUD
+
+Centre
+
+
+Vincent VIAL
+
+FranceValence Romans
+
+Vincent VIAL
+
+1ère ligne
+
+
+Hugo TROUILLOUD
+
+FranceFC Grenoble Rugby
+
+Hugo TROUILLOUD
+
+Arrière
+
+
+Antonin BERRUYER
+
+FranceFC Grenoble Rugby
+
+Antonin BERRUYER
+
+3ème ligne
+
+
+Thomas FORTUNEL
+
+FranceUS Montauban
+
+Thomas FORTUNEL
+
+Demi d'ouverture
+
+
+Eric ESCANDE
+
+FranceFC Grenoble Rugby
+
+Eric ESCANDE
+
+Demi de mêlée
+
+
+Julien FARNOUX
+
+FranceNissa Rugby
+
+Julien FARNOUX
+
+Arrière
+
+
+Mohamed karim QADIRI
+
+FranceOyonnax Rugby
+
+Mohamed karim QADIRI
+
+Ailier
+
+
+Clément ANCELY
+
+FranceAS Béziers Hérault
+
+Clément ANCELY
+
+3ème ligne
+
+
+Corentin GLENAT
+
+FranceSoyaux-Angoulême XV
+
+Corentin GLENAT
+
+Demi d'ouverture
+
+
+Club
+
+Poste
+
+Victor GUILLAUMOND
+
+FranceFC Grenoble Rugby
+
+Victor GUILLAUMOND
+
+3ème ligne
+
+
+Romain TROUILLOUD
+
+FranceProvence Rugby
+
+Romain TROUILLOUD
+
+Demi d'ouverture
+
+
+Romain FUSIER
+
+FranceFC Grenoble Rugby
+
+Romain FUSIER
+
+Ailier
+
+
+Eli EGLAINE
+
+FranceFC Grenoble Rugby
+
+Eli EGLAINE
+
+1ère ligne
+
+
+Lilian ROSSI
+
+FranceFC Grenoble Rugby
+
+Lilian ROSSI
+
+1ère ligne
+
+
+Thibaut MARTEL
+
+FranceProvence Rugby
+
+Thibaut MARTEL
+
+3ème ligne
+
+
+Morrison MABOPE
+
+FranceRC Narbonnais
+
+Morrison MABOPE
+
+Centre
+
+
+Simon HUCHET
+
+FranceRC Narbonnais
+
+Simon HUCHET
+
+2ème ligne
+
+
+Edouard RICHER
+
+FranceRC Narbonnais
+
+Edouard RICHER
+
+Ailier
+
+
+Sacha IDOUMI
+
+FranceValence Romans
+
+Sacha IDOUMI
+
+1ère ligne
+
+
+Remi BOURDEAU
+
+FranceBiarritz Olympique PB
+
+Remi BOURDEAU
+
+3ème ligne
+
+
+Leo AOUF
+
+FranceUS Montauban
+
+Leo AOUF
+
+1ère ligne
+
+
+Hayden THOMPSON-STRINGER
+
+AngleterreNissa Rugby
+
+Hayden THOMPSON-STRINGER
+
+1ère ligne
+
+
+Martin ALONSO MUÑOZ
+
+EspagneColomiers Rugby
+
+Martin ALONSO MUÑOZ
+
+Centre
+
+
+Ugo VIGNOLLES
+
+FranceUSON Nevers
+
+Ugo VIGNOLLES
+
+2ème ligne
+
+
+Paul DUMAS
+
+FranceValence Romans
+
+Paul DUMAS
+
+Demi de mêlée
+
+
+Noa POMMELET
+
+FranceUSON Nevers
+
+Noa POMMELET
+
+Centre
+
+
+Sacha COURTHALIAC
+
+FranceOyonnax Rugby
+
+Sacha COURTHALIAC
+
+Arrière
+
+
+Joel KPOKU
+
+AngleterreNissa Rugby
+
+Joel KPOKU
+
+2ème ligne
+
+
+Arno BOTHA
+
+Afrique du SudUSON Nevers
+
+Arno BOTHA
+
+3ème ligne
+
+
+Club
+
+Poste
+
+Victor GUILLAUMOND
+
+FranceFC Grenoble Rugby
+
+Victor GUILLAUMOND
+
+3ème ligne
+
+
+Romain TROUILLOUD
+
+FranceProvence Rugby
+
+Romain TROUILLOUD
+
+Demi d'ouverture
+
+
+Romain FUSIER
+
+FranceFC Grenoble Rugby
+
+Romain FUSIER
+
+Ailier
+
+
+Eli EGLAINE
+
+FranceFC Grenoble Rugby
+
+Eli EGLAINE
+
+1ère ligne
+
+
+Lilian ROSSI
+
+FranceFC Grenoble Rugby
+
+Lilian ROSSI
+
+1ère ligne
+
+
+Thibaut MARTEL
+
+FranceProvence Rugby
+
+Thibaut MARTEL
+
+3ème ligne
+
+
+Morrison MABOPE
+
+FranceRC Narbonnais
+
+Morrison MABOPE
+
+Centre
+
+
+Simon HUCHET
+
+FranceRC Narbonnais
+
+Simon HUCHET
+
+2ème ligne
+
+
+Edouard RICHER
+
+FranceRC Narbonnais
+
+Edouard RICHER
+
+Ailier
+
+
+Sacha IDOUMI
+
+FranceValence Romans
+
+Sacha IDOUMI
+
+1ère ligne
+
+
+Remi BOURDEAU
+
+FranceBiarritz Olympique PB
+
+Remi BOURDEAU
+
+3ème ligne
+
+
+Leo AOUF
+
+FranceUS Montauban
+
+Leo AOUF
+
+1ère ligne
+
+
+Hayden THOMPSON-STRINGER
+
+AngleterreNissa Rugby
+
+Hayden THOMPSON-STRINGER
+
+1ère ligne
+
+
+Martin ALONSO MUÑOZ
+
+EspagneColomiers Rugby
+
+Martin ALONSO MUÑOZ
+
+Centre
+
+
+Ugo VIGNOLLES
+
+FranceUSON Nevers
+
+Ugo VIGNOLLES
+
+2ème ligne
+
+
+Paul DUMAS
+
+FranceValence Romans
+
+Paul DUMAS
+
+Demi de mêlée
+
+
+Noa POMMELET
+
+FranceUSON Nevers
+
+Noa POMMELET
+
+Centre
+
+
+Sacha COURTHALIAC
+
+FranceOyonnax Rugby
+
+Sacha COURTHALIAC
+
+Arrière
+
+
+Joel KPOKU
+
+AngleterreNissa Rugby
+
+Joel KPOKU
+
+2ème ligne
+
+
+Arno BOTHA
+
+Afrique du SudUSON Nevers
+
+Arno BOTHA
+
+3ème ligne
+
+
+Club
+
+Poste
+
+Xavier MIGNOT
+
+FranceValence Romans
+
+Xavier MIGNOT
+
+Centre
+
+
+Sébastien TAOFIFENUA
+
+FranceProvence Rugby
+
+Sébastien TAOFIFENUA
+
+1ère ligne
+
+
+Yanis CHARCOSSET
+
+FranceCA Brive
+
+Yanis CHARCOSSET
+
+1ère ligne
+
+
+Nathan FARISSIER
+
+FranceSoyaux-Angoulême XV
+
+Nathan FARISSIER
+
+Ailier
+
+
+Thomas ROZIERE
+
+FranceValence Romans
+
+Thomas ROZIERE
+
+Arrière
+
+
+Jean maurice DECUBBER
+
+FranceSoyaux-Angoulême XV
+
+Jean maurice DECUBBER
+
+3ème ligne
+
+
+Mathieu GUILLOMOT
+
+FranceValence Romans
+
+Mathieu GUILLOMOT
+
+Demi d'ouverture
+
+
+Massimo ORTOLAN
+
+FranceNissa Rugby
+
+Massimo ORTOLAN
+
+Demi d'ouverture
+
+
+Tom DELEUZE
+
+FranceUSON Nevers
+
+Tom DELEUZE
+
+Demi d'ouverture
+
+
+Samuel NOLLET
+
+FranceSoyaux-Angoulême XV
+
+Samuel NOLLET
+
+3ème ligne
+
+
+Simão BROEIRO BENTO
+
+PortugalColomiers Rugby
+
+Simão BROEIRO BENTO
+
+Arrière
+
+
+Aston brad FORTUIN
+
+Afrique du SudBiarritz Olympique PB
+
+Aston brad FORTUIN
+
+2ème ligne
+
+
+Lucas MENSA
+
+ArgentineOyonnax Rugby
+
+Lucas MENSA
+
+Centre
+
+
+Kaminieli RASAKU
+
+FidjiSoyaux-Angoulême XV
+
+Kaminieli RASAKU
+
+Ailier
+
+
+Romain LATTERRADE
+
+FranceProvence Rugby
+
+Romain LATTERRADE
+
+1ère ligne
+
+
+Simon RENDA
+
+FranceUS Montauban
+
+Simon RENDA
+
+Centre
+
+
+Bastien GUILLEMIN
+
+FranceBiarritz Olympique PB
+
+Bastien GUILLEMIN
+
+Ailier
+
+
+Tyrone VIIGA
+
+Nouvelle ZélandeUS Montauban
+
+Tyrone VIIGA
+
+3ème ligne
+
+
+Alexandre MANUKULA
+
+FranceUS Dax
+
+Alexandre MANUKULA
+
+2ème ligne
+
+
+Kevin FIRMIN
+
+FranceUS Montauban
+
+Kevin FIRMIN
+
+1ère ligne
+Club
+
+Poste
+
+Marco TAULEIGNE
+
+FranceValence Romans
+
+Marco TAULEIGNE
+
+3ème ligne
+
+
+Thomas DARMON
+
+FranceOyonnax Rugby
+
+Thomas DARMON
+
+Demi d'ouverture
+
+
+Gela APRASIDZE
+
+GéorgieSoyaux-Angoulême XV
+
+Gela APRASIDZE
+
+Demi de mêlée
+
+
+Romain MACURDY
+
+FranceUS Montauban
+
+Romain MACURDY
+
+2ème ligne
+
+
+Ro masivesi DAKUWAQA
+
+FidjiNissa Rugby
+
+Ro masivesi DAKUWAQA
+
+3ème ligne
+
+
+Farai tapuwa MUDARIKI
+
+ZimbabweNissa Rugby
+
+Farai tapuwa MUDARIKI
+
+1ère ligne
+
+
+Johan georg WASSERMAN
+
+FranceUSON Nevers
+
+Johan georg WASSERMAN
+
+Arrière
+
+
+Philippus petrus KLEYNHANS
+
+Afrique du SudUSON Nevers
+
+Philippus petrus KLEYNHANS
+
+3ème ligne
+
+
+Shaun REYNOLDS
+
+Afrique du SudUSON Nevers
+
+Shaun REYNOLDS
+
+Demi d'ouverture
+
+
+Nicolas RAGOEVI
+
+FranceUSON Nevers
+
+Nicolas RAGOEVI
+
+Centre
+
+
+Perry MAYO
+
+FranceUSON Nevers
+
+Perry MAYO
+
+Ailier
+
+
+Rati ZAZADZE
+
+GéorgieUSON Nevers
+
+Rati ZAZADZE
+
+3ème ligne
+
+
+Kylian JAMINET
+
+FranceBiarritz Olympique PB
+
+Kylian JAMINET
+
+Centre
+
+
+Rudy DERRIEUX
+
+FranceUSON Nevers
+
+Rudy DERRIEUX
+
+Centre
+
+
+Kamaliele TUFELE
+
+FranceUSON Nevers
+
+Kamaliele TUFELE
+
+1ère ligne
+
+
+Maxence BARJAUD
+
+FranceUSON Nevers
+
+Maxence BARJAUD
+
+2ème ligne
+
+
+Christiaan VAN DER MERWE
+
+Afrique du SudNissa Rugby
+
+Christiaan VAN DER MERWE
+
+2ème ligne
+
+
+Issam HAMEL
+
+FranceValence Romans
+
+Issam HAMEL
+
+1ère ligne
+
+
+Julien KAZUBEK
+
+FranceUSON Nevers
+
+Julien KAZUBEK
+
+3ème ligne
+
+
+Lucas BLANC
+
+FranceUSON Nevers
+
+Lucas BLANC
+
+Ailier
+
+
+Club
+
+Poste
+
+Cyril DELIGNY
+
+FranceSU Agen
+
+Cyril DELIGNY
+
+1ère ligne
+
+
+Fred QUERCY
+
+FranceUS Montauban
+
+Fred QUERCY
+
+3ème ligne
+
+
+Lucas SEYROLLE
+
+FranceUS Montauban
+
+Lucas SEYROLLE
+
+1ère ligne
+
+
+Mirian BURDULI
+
+GéorgieStade Aurillacois
+
+Mirian BURDULI
+
+1ère ligne
+
+
+Josua VICI
+
+FidjiUS Montauban
+
+Josua VICI
+
+Ailier
+
+
+Raphael SANCHEZ
+
+FranceUSON Nevers
+
+Raphael SANCHEZ
+
+Demi d'ouverture
+
+
+Tedo ABZHANDADZE
+
+GéorgieStade Aurillacois
+
+Tedo ABZHANDADZE
+
+Demi d'ouverture
+
+
+Adrien SONZOGNI
+
+FranceBiarritz Olympique PB
+
+Adrien SONZOGNI
+
+1ère ligne
+
+
+Axel BEVIA
+
+FranceRC Narbonnais
+
+Axel BEVIA
+
+Arrière
+
+
+Sidi mohamed DIALLO
+
+FranceUS Montauban
+
+Sidi mohamed DIALLO
+
+1ère ligne
+
+
+Paul VALLEE
+
+FranceUS Montauban
+
+Paul VALLEE
+
+Centre
+
+
+Jules VEYRIER
+
+FranceRC Narbonnais
+
+Jules VEYRIER
+
+1ère ligne
+
+
+Adam mountaga BOUARE
+
+FranceSU Agen
+
+Adam mountaga BOUARE
+
+1ère ligne
+
+
+Gabin ROCHER
+
+FranceUSON Nevers
+
+Gabin ROCHER
+
+Ailier
+
+
+Romain DELEMARLE
+
+FranceSU Agen
+
+Romain DELEMARLE
+
+3ème ligne
+
+
+Pierre LUCAS
+
+FranceProvence Rugby
+
+Pierre LUCAS
+
+Centre
+
+
+Julien TISSERON
+
+FranceCA Brive
+
+Julien TISSERON
+
+Arrière
+
+
+Simon-pierre CHAUVAC
+
+FranceCA Brive
+
+Simon-pierre CHAUVAC
+
+1ère ligne
+
+
+Vincent GIUDICELLI
+
+FranceProvence Rugby
+
+Vincent GIUDICELLI
+
+1ère ligne
+
+
+Vincent RATTEZ
+
+FranceNissa Rugby
+
+Vincent RATTEZ
+
+Centre
+Club
+
+Poste
+
+Marco TAULEIGNE
+
+FranceValence Romans
+
+Marco TAULEIGNE
+
+3ème ligne
+
+
+Thomas DARMON
+
+FranceOyonnax Rugby
+
+Thomas DARMON
+
+Demi d'ouverture
+
+
+Gela APRASIDZE
+
+GéorgieSoyaux-Angoulême XV
+
+Gela APRASIDZE
+
+Demi de mêlée
+
+
+Romain MACURDY
+
+FranceUS Montauban
+
+Romain MACURDY
+
+2ème ligne
+
+
+Ro masivesi DAKUWAQA
+
+FidjiNissa Rugby
+
+Ro masivesi DAKUWAQA
+
+3ème ligne
+
+
+Farai tapuwa MUDARIKI
+
+ZimbabweNissa Rugby
+
+Farai tapuwa MUDARIKI
+
+1ère ligne
+
+
+Johan georg WASSERMAN
+
+FranceUSON Nevers
+
+Johan georg WASSERMAN
+
+Arrière
+
+
+Philippus petrus KLEYNHANS
+
+Afrique du SudUSON Nevers
+
+Philippus petrus KLEYNHANS
+
+3ème ligne
+
+
+Shaun REYNOLDS
+
+Afrique du SudUSON Nevers
+
+Shaun REYNOLDS
+
+Demi d'ouverture
+
+
+Nicolas RAGOEVI
+
+FranceUSON Nevers
+
+Nicolas RAGOEVI
+
+Centre
+
+
+Perry MAYO
+
+FranceUSON Nevers
+
+Perry MAYO
+
+Ailier
+
+
+Rati ZAZADZE
+
+GéorgieUSON Nevers
+
+Rati ZAZADZE
+
+3ème ligne
+
+
+Kylian JAMINET
+
+FranceBiarritz Olympique PB
+
+Kylian JAMINET
+
+Centre
+
+
+Rudy DERRIEUX
+
+FranceUSON Nevers
+
+Rudy DERRIEUX
+
+Centre
+
+
+Kamaliele TUFELE
+
+FranceUSON Nevers
+
+Kamaliele TUFELE
+
+1ère ligne
+
+
+Maxence BARJAUD
+
+FranceUSON Nevers
+
+Maxence BARJAUD
+
+2ème ligne
+
+
+Christiaan VAN DER MERWE
+
+Afrique du SudNissa Rugby
+
+Christiaan VAN DER MERWE
+
+2ème ligne
+
+
+Issam HAMEL
+
+FranceValence Romans
+
+Issam HAMEL
+
+1ère ligne
+
+
+Julien KAZUBEK
+
+FranceUSON Nevers
+
+Julien KAZUBEK
+
+3ème ligne
+
+
+Lucas BLANC
+
+FranceUSON Nevers
+
+Lucas BLANC
+
+Ailier
+
+
+Club
+
+Poste
+
+Steven DAVID
+
+FranceFC Grenoble Rugby
+
+Steven DAVID
+
+3ème ligne
+
+
+Jason-colin FRASER
+
+FranceUSON Nevers
+
+Jason-colin FRASER
+
+3ème ligne
+
+
+Hugues BASTIDE
+
+FranceUSON Nevers
+
+Hugues BASTIDE
+
+3ème ligne
+
+
+Luka PLATARET
+
+FranceColomiers Rugby
+
+Luka PLATARET
+
+3ème ligne
+
+
+Guillaume MANEVY
+
+FranceUSON Nevers
+
+Guillaume MANEVY
+
+Demi de mêlée
+
+
+Thomas ZENON
+
+FranceValence Romans
+
+Thomas ZENON
+
+Arrière
+
+
+Aselo IKAHEHEGI
+
+FranceUSON Nevers
+
+Aselo IKAHEHEGI
+
+1ère ligne
+
+
+Aitor KITUTU
+
+FranceUSON Nevers
+
+Aitor KITUTU
+
+1ère ligne
+
+
+Basa KHONELIDZE
+
+GéorgieStade Aurillacois
+
+Basa KHONELIDZE
+
+1ère ligne
+
+
+Tim DE JONG
+
+Pays-BasStade Aurillacois
+
+Tim DE JONG
+
+3ème ligne
+
+
+Aleksandre BURDULI
+
+GéorgieStade Aurillacois
+
+Aleksandre BURDULI
+
+2ème ligne
+
+
+Ronald PIETERS
+
+Pays-BasStade Aurillacois
+
+Ronald PIETERS
+
+Centre
+
+
+Boris HADINEGORO
+
+Pays-BasStade Aurillacois
+
+Boris HADINEGORO
+
+Demi de mêlée
+
+
+Skip JONGEJAN
+
+Pays-BasStade Aurillacois
+
+Skip JONGEJAN
+
+2ème ligne
+
+
+Hugo BASTARD
+
+FranceStade Aurillacois
+
+Hugo BASTARD
+
+Centre
+
+
+Henzo KITEAU
+
+FranceUSON Nevers
+
+Henzo KITEAU
+
+1ère ligne
+
+
+Alexandre PLANTIER
+
+FranceBiarritz Olympique PB
+
+Alexandre PLANTIER
+
+1ère ligne
+
+
+Eoghan gerard MASTERSON
+
+IrlandeStade Aurillacois
+
+Eoghan gerard MASTERSON
+
+3ème ligne
+
+
+Mehdi SLAMANI
+
+FranceStade Aurillacois
+
+Mehdi SLAMANI
+
+2ème ligne
+
+
+Ronan patrick LOUGHNANE
+
+IrlandeStade Aurillacois
+
+Ronan patrick LOUGHNANE
+
+1ère ligne
+
+
+Club
+
+Poste
+
+Gymael JEAN-JACQUES
+
+FranceStade Aurillacois
+
+Gymael JEAN-JACQUES
+
+1ère ligne
+
+
+Didier TISON
+
+FranceStade Aurillacois
+
+Didier TISON
+
+1ère ligne
+
+
+Jean baptiste SINGER
+
+FranceUS Dax
+
+Jean baptiste SINGER
+
+2ème ligne
+
+
+David DELARUE
+
+FranceAS Béziers Hérault
+
+David DELARUE
+
+Demi de mêlée
+
+
+Hugo BOUYSSOU
+
+FranceSU Agen
+
+Hugo BOUYSSOU
+
+Demi de mêlée
+
+
+Giorgi JAVAKHIA
+
+GéorgieSoyaux-Angoulême XV
+
+Giorgi JAVAKHIA
+
+3ème ligne
+
+
+Jordon JANSE VAN RENSBURG
+
+Afrique du SudAS Béziers Hérault
+
+Jordon JANSE VAN RENSBURG
+
+Demi d'ouverture
+
+
+Marc PALMIER
+
+FranceFC Grenoble Rugby
+
+Marc PALMIER
+
+Demi d'ouverture
+
+
+Robert RODGERS
+
+Afrique du SudStade Aurillacois
+
+Robert RODGERS
+
+1ère ligne
+
+
+Théo CAMBON
+
+FranceStade Aurillacois
+
+Théo CAMBON
+
+3ème ligne
+
+
+Dachi PAPUNASHVILI
+
+GéorgieUS Montauban
+
+Dachi PAPUNASHVILI
+
+Demi d'ouverture
+
+
+Luka NIORADZE
+
+GéorgieStade Aurillacois
+
+Luka NIORADZE
+
+1ère ligne
+
+
+Hugo HUURMAN
+
+Pays-BasStade Aurillacois
+
+Hugo HUURMAN
+
+3ème ligne
+
+
+Martial ROLLAND
+
+FranceStade Aurillacois
+
+Martial ROLLAND
+
+2ème ligne
+
+
+Theo LACHAUD
+
+FranceColomiers Rugby
+
+Theo LACHAUD
+
+1ère ligne
+
+
+Siméli gordon YABAKI
+
+FidjiStade Aurillacois
+
+Siméli gordon YABAKI
+
+Centre
+
+
+Irakli MTCHEDLIDZE
+
+GéorgieStade Aurillacois
+
+Irakli MTCHEDLIDZE
+
+1ère ligne
+
+
+Mathis LOCATELLI
+
+FranceOyonnax Rugby
+
+Mathis LOCATELLI
+
+2ème ligne
+
+
+Valentin CHAMBERAUD
+
+FranceOyonnax Rugby
+
+Valentin CHAMBERAUD
+
+3ème ligne
+
+
+Jules SOULAN
+
+FranceSU Agen
+
+Jules SOULAN
+
+Demi d'ouverture
+Club
+
+Poste
+
+Wandrille PICAULT
+
+FranceOyonnax Rugby
+
+Wandrille PICAULT
+
+3ème ligne
+
+
+Aurélien CALLANDRET
+
+FranceFC Grenoble Rugby
+
+Aurélien CALLANDRET
+
+Centre
+
+
+Kevin LEBRETON
+
+FranceOyonnax Rugby
+
+Kevin LEBRETON
+
+3ème ligne
+
+
+Phoenix damon BATTYE
+
+AustralieOyonnax Rugby
+
+Phoenix damon BATTYE
+
+2ème ligne
+
+
+Tommy RAYNAUD
+
+FranceFC Grenoble Rugby
+
+Tommy RAYNAUD
+
+1ère ligne
+
+
+Hugo FABREGUE
+
+FranceValence Romans
+
+Hugo FABREGUE
+
+3ème ligne
+
+
+Antoine ABRAHAM
+
+FranceOyonnax Rugby
+
+Antoine ABRAHAM
+
+1ère ligne
+
+
+Nail AUDOIRE
+
+FranceSU Agen
+
+Nail AUDOIRE
+
+1ère ligne
+
+
+Gavin STARK
+
+Nouvelle ZélandeOyonnax Rugby
+
+Gavin STARK
+
+Ailier
+
+
+Antonin CORSO
+
+FranceOyonnax Rugby
+
+Antonin CORSO
+
+2ème ligne
+
+
+Stéphane AHMED
+
+FranceUS Montauban
+
+Stéphane AHMED
+
+Ailier
+
+
+Noa-isaac KANIKA-BILONDA
+
+FranceUS Montauban
+
+Noa-isaac KANIKA-BILONDA
+
+2ème ligne
+
+
+Charles LALOI
+
+FranceSU Agen
+
+Charles LALOI
+
+Ailier
+
+
+Arthur COVILLE
+
+FranceProvence Rugby
+
+Arthur COVILLE
+
+Demi de mêlée
+
+
+Nadir MEGDOUD
+
+FranceFC Grenoble Rugby
+
+Nadir MEGDOUD
+
+Ailier
+
+
+Sione feofa'aki TUI
+
+AustralieProvence Rugby
+
+Sione feofa'aki TUI
+
+Ailier
+
+
+Thomas CRETU
+
+FranceRC Narbonnais
+
+Thomas CRETU
+
+1ère ligne
+
+
+Mamoudou alain MEITE
+
+FranceSoyaux-Angoulême XV
+
+Mamoudou alain MEITE
+
+1ère ligne
+
+
+Paul AURADOU
+
+FranceOyonnax Rugby
+
+Paul AURADOU
+
+Centre
+
+
+Steven barry CUMMINS
+
+AustralieColomiers Rugby
+
+Steven barry CUMMINS
+
+2ème ligne
+Club
+
+Poste
+
+Victor TEMPLIER
+
+FranceUSON Nevers
+
+Victor TEMPLIER
+
+2ème ligne
+
+
+Adrian MITU
+
+FranceSoyaux-Angoulême XV
+
+Adrian MITU
+
+3ème ligne
+
+
+Paulo tauiliili PELESASA
+
+AustralieStade Aurillacois
+
+Paulo tauiliili PELESASA
+
+2ème ligne
+
+
+Ebenezer TSHIMANGA
+
+République Démocratique du CongoUSON Nevers
+
+Ebenezer TSHIMANGA
+
+Centre
+
+
+Romain FONNICOLA
+
+FranceUS Montauban
+
+Romain FONNICOLA
+
+Ailier
+
+
+Vincent PINTO
+
+FranceColomiers Rugby
+
+Vincent PINTO
+
+Ailier
+
+
+Romain RUFFENACH
+
+FranceFC Grenoble Rugby
+
+Romain RUFFENACH
+
+1ère ligne
+
+
+Yvan REILHAC
+
+FranceUS Montauban
+
+Yvan REILHAC
+
+Centre
+
+
+Mathias COLOMBET
+
+FranceProvence Rugby
+
+Mathias COLOMBET
+
+Ailier
+
+
+Paul TAILHADES
+
+FranceSoyaux-Angoulême XV
+
+Paul TAILHADES
+
+1ère ligne
+
+
+Thibault DEBAES
+
+FranceColomiers Rugby
+
+Thibault DEBAES
+
+Demi d'ouverture
+
+
+Alexis LEVRON
+
+FranceSoyaux-Angoulême XV
+
+Alexis LEVRON
+
+Demi de mêlée
+
+
+Thomas CAROL
+
+FranceStade Aurillacois
+
+Thomas CAROL
+
+Arrière
+
+
+Eoghan BARRETT
+
+IrlandeSoyaux-Angoulême XV
+
+Eoghan BARRETT
+
+Centre
+
+
+Nicolas CIANCIO
+
+ItalieNissa Rugby
+
+Nicolas CIANCIO
+
+1ère ligne
+
+
+Boris GOUTARD
+
+FranceNissa Rugby
+
+Boris GOUTARD
+
+Demi d'ouverture
+
+
+Sadek DEGHMACHE
+
+FranceProvence Rugby
+
+Sadek DEGHMACHE
+
+Demi de mêlée
+
+
+Matteo RODOR
+
+FranceValence Romans
+
+Matteo RODOR
+
+Demi de mêlée
+
+
+Mathieu ACEBES
+
+FranceBiarritz Olympique PB
+
+Mathieu ACEBES
+
+Arrière
+
+
+Tristan LABOUTELEY
+
+FranceFC Grenoble Rugby
+
+Tristan LABOUTELEY
+
+2ème ligne
+Club
+
+PosteClub
+
+Poste
+
+Enzo SELPONI
+
+FranceBiarritz Olympique PB
+
+Enzo SELPONI
+
+Demi d'ouverture
+
+
+Louis MARROU
+
+FranceValence Romans
+
+Louis MARROU
+
+Centre
+
+
+Joris CAZENAVE
+
+FranceProvence Rugby
+
+Joris CAZENAVE
+
+Demi de mêlée
+
+
+Thomas VERNET
+
+FranceRC Narbonnais
+
+Thomas VERNET
+
+1ère ligne
+
+
+Jessy JEGERLEHNER
+
+FranceBiarritz Olympique PB
+
+Jessy JEGERLEHNER
+
+3ème ligne
+
+
+Hugo NAVIZET
+
+FranceRC Narbonnais
+
+Hugo NAVIZET
+
+Centre
+
+
+Adrien LAPEGUE - LAFAYE
+
+FranceProvence Rugby
+
+Adrien LAPEGUE - LAFAYE
+
+Ailier
+
+
+Guillaume PIAZZOLI
+
+FranceProvence Rugby
+
+Guillaume PIAZZOLI
+
+3ème ligne
+
+
+David LOLOHEA
+
+AustralieUS Dax
+
+David LOLOHEA
+
+1ère ligne
+
+
+Francis SAILI
+
+Nouvelle ZélandeNissa Rugby
+
+Francis SAILI
+
+Centre
+
+
+Mahamadou COULIBALY
+
+FranceUSON Nevers
+
+Mahamadou COULIBALY
+
+3ème ligne
+
+
+Jonathan MAIAU
+
+FranceAS Béziers Hérault
+
+Jonathan MAIAU
+
+1ère ligne
+
+
+Asaeli TUIVUAKA
+
+FidjiCA Brive
+
+Asaeli TUIVUAKA
+
+Ailier
+
+
+Ali OZ
+
+FranceOyonnax Rugby
+
+Ali OZ
+
+1ère ligne
+
+
+Louis DUPICHOT
+
+FranceSU Agen
+
+Louis DUPICHOT
+
+Ailier
+
+
+Lucas COSTA
+
+FranceSoyaux-Angoulême XV
+
+Lucas COSTA
+
+3ème ligne
+
+
+John thomas JACKSON
+
+Afrique du SudUS Montauban
+
+John thomas JACKSON
+
+Centre
+
+
+Efitusi tupola MA'AFU
+
+AustralieUSON Nevers
+
+Efitusi tupola MA'AFU
+
+1ère ligne
+
+
+Zalan KADE
+
+HongrieUS Montauban
+
+Zalan KADE
+
+3ème ligne
+
+
+Peter LYDON
+
+IrlandeSoyaux-Angoulême XV
+
+Peter LYDON
+
+Arrière
+
+
+
+
+Lucas BACHELIER
+
+FranceNissa Rugby
+
+Lucas BACHELIER
+
+3ème ligne
+
+
+Dorian LABORDE
+
+FranceBiarritz Olympique PB
+
+Dorian LABORDE
+
+Ailier
+
+
+Victor MOREAUX
+
+FranceRC Narbonnais
+
+Victor MOREAUX
+
+2ème ligne
+
+
+Shahn ERU
+
+Nouvelle ZélandeAS Béziers Hérault
+
+Shahn ERU
+
+2ème ligne
+
+
+George TILSLEY
+
+Nouvelle ZélandeSoyaux-Angoulême XV
+
+George TILSLEY
+
+Ailier
+
+
+Edward dratai SAWAILAU
+
+FidjiFC Grenoble Rugby
+
+Edward dratai SAWAILAU
+
+Centre
+
+
+Akato FAKATIKA
+
+FranceSU Agen
+
+Akato FAKATIKA
+
+1ère ligne
+
+
+Paul CELLIO ZWILER
+
+FranceProvence Rugby
+
+Paul CELLIO ZWILER
+
+Ailier
+
+
+Malohi SUTA
+
+FranceProvence Rugby
+
+Malohi SUTA
+
+3ème ligne
+
+
+Simon TAREL
+
+FranceUSON Nevers
+
+Simon TAREL
+
+Demi de mêlée
+
+
+Federico WEGRZYN
+
+ArgentineProvence Rugby
+
+Federico WEGRZYN
+
+1ère ligne
+
+
+Léo DROUET
+
+FranceProvence Rugby
+
+Léo DROUET
+
+Arrière
+
+
+Nadir BOUHEDJEUR
+
+FranceProvence Rugby
+
+Nadir BOUHEDJEUR
+
+Arrière
+
+
+Teimana HARRISON
+
+AngleterreProvence Rugby
+
+Teimana HARRISON
+
+3ème ligne
+
+
+Kaveinga FINAU
+
+Nouvelle ZélandeProvence Rugby
+
+Kaveinga FINAU
+
+Centre
+
+
+Cyprien KILEZTKY
+
+FranceProvence Rugby
+
+Cyprien KILEZTKY
+
+2ème ligne
+
+
+Valentin IBANEZ
+
+FranceProvence Rugby
+
+Valentin IBANEZ
+
+Centre
+
+
+Charly GAMBINI
+
+FranceProvence Rugby
+
+Charly GAMBINI
+
+2ème ligne
+
+
+Julius NOSTADT
+
+AllemagneProvence Rugby
+
+Julius NOSTADT
+
+1ère ligne
+
+
+Jérôme DUFOUR
+
+FranceAS Béziers Hérault
+
+Jérôme DUFOUR
+
+2ème ligne
+
+
+
+
+Club
+
+Poste
+
+Enzo SELPONI
+
+FranceBiarritz Olympique PB
+
+Enzo SELPONI
+
+Demi d'ouverture
+
+
+Louis MARROU
+
+FranceValence Romans
+
+Louis MARROU
+
+Centre
+
+
+Joris CAZENAVE
+
+FranceProvence Rugby
+
+Joris CAZENAVE
+
+Demi de mêlée
+
+
+Thomas VERNET
+
+FranceRC Narbonnais
+
+Thomas VERNET
+
+1ère ligne
+
+
+Jessy JEGERLEHNER
+
+FranceBiarritz Olympique PB
+
+Jessy JEGERLEHNER
+
+3ème ligne
+
+
+Hugo NAVIZET
+
+FranceRC Narbonnais
+
+Hugo NAVIZET
+
+Centre
+
+
+Adrien LAPEGUE - LAFAYE
+
+FranceProvence Rugby
+
+Adrien LAPEGUE - LAFAYE
+
+Ailier
+
+
+Guillaume PIAZZOLI
+
+FranceProvence Rugby
+
+Guillaume PIAZZOLI
+
+3ème ligne
+
+
+David LOLOHEA
+
+AustralieUS Dax
+
+David LOLOHEA
+
+1ère ligne
+
+
+Francis SAILI
+
+Nouvelle ZélandeNissa Rugby
+
+Francis SAILI
+
+Centre
+
+
+Mahamadou COULIBALY
+
+FranceUSON Nevers
+
+Mahamadou COULIBALY
+
+3ème ligne
+
+
+Jonathan MAIAU
+
+FranceAS Béziers Hérault
+
+Jonathan MAIAU
+
+1ère ligne
+
+
+Asaeli TUIVUAKA
+
+FidjiCA Brive
+
+Asaeli TUIVUAKA
+
+Ailier
+
+
+Ali OZ
+
+FranceOyonnax Rugby
+
+Ali OZ
+
+1ère ligne
+
+
+Louis DUPICHOT
+
+FranceSU Agen
+
+Louis DUPICHOT
+
+Ailier
+
+
+Lucas COSTA
+
+FranceSoyaux-Angoulême XV
+
+Lucas COSTA
+
+3ème ligne
+
+
+John thomas JACKSON
+
+Afrique du SudUS Montauban
+
+John thomas JACKSON
+
+Centre
+
+
+Efitusi tupola MA'AFU
+
+AustralieUSON Nevers
+
+Efitusi tupola MA'AFU
+
+1ère ligne
+
+
+Zalan KADE
+
+HongrieUS Montauban
+
+Zalan KADE
+
+3ème ligne
+
+
+Peter LYDON
+
+IrlandeSoyaux-Angoulême XV
+
+Peter LYDON
+
+Arrière
+
+
+Club
+
+PosteClubClub
+
+Poste
+
+Patrick LEAFA
+
+Nouvelle ZélandeNissa RugbClub
+
+Poste
+
+Atonio ULUTUIPALELEI
+
+FranceColomiers Rugby
+
+Atonio ULUTUIPALELEI
+
+1ère ligne
+
+
+Yoni TUATAANE
+
+FranceBiarritz Olympique PB
+
+Yoni TUATAANE
+
+3ème ligne
+
+
+Mathis GALTHIE
+
+FranceCA Brive
+
+Mathis GALTHIE
+
+Demi de mêlée
+
+
+Luka PETRIASHVILI
+
+GéorgieUSON Nevers
+
+Luka PETRIASHVILI
+
+1ère ligne
+
+
+Lucas OUDARD
+
+FranceCA Brive
+
+Lucas OUDARD
+
+3ème ligne
+
+
+Ahmed tidiane KANE
+
+SuisseUSON Nevers
+
+Ahmed tidiane KANE
+
+2ème ligne
+
+
+Esteban CHOUTEAU
+
+FranceValence Romans
+
+Esteban CHOUTEAU
+
+1ère ligne
+
+
+Arthur DIAZ
+
+FranceColomiers Rugby
+
+Arthur DIAZ
+
+Demi de mêlée
+
+
+Jeremy BECHU
+
+FranceColomiers Rugby
+
+Jeremy BECHU
+
+3ème ligne
+
+
+Baptiste SERRANO
+
+FranceColomiers Rugby
+
+Baptiste SERRANO
+
+Centre
+
+
+Valentin GAYRAUD
+
+FranceSU Agen
+
+Valentin GAYRAUD
+
+3ème ligne
+
+
+Baptiste ABESCAT LEROY
+
+FranceFC Grenoble Rugby
+
+Baptiste ABESCAT LEROY
+
+3ème ligne
+
+
+Gabriel ATLAN
+
+FranceRC Narbonnais
+
+Gabriel ATLAN
+
+1ère ligne
+
+
+Pablo BARBASTE
+
+FranceRC Narbonnais
+
+Pablo BARBASTE
+
+Demi de mêlée
+
+
+Mamik MSTOIAN
+
+GéorgieColomiers Rugby
+
+Mamik MSTOIAN
+
+1ère ligne
+
+
+Varian PASQUET
+
+FranceUSON Nevers
+
+Varian PASQUET
+
+Centre
+
+
+Pierre emmanuel PACHECO
+
+FranceColomiers Rugby
+
+Pierre emmanuel PACHECO
+
+1ère ligne
+
+
+Izack RODDA
+
+AustralieProvence Rugby
+
+Izack RODDA
+
+2ème ligne
+
+
+Bastien DAGUERRE
+
+FranceUS Dax
+
+Bastien DAGUERRE
+
+Centre
+
+
+Victor HANNOUN
+
+FranceRC Narbonnais
+
+Victor HANNOUN
+
+Ailier
+
+
+y
+
+Patrick LEAFA
+
+1ère ligne
+
+
+Phillip KITE
+
+Nouvelle ZélandeColomiers Rugby
+
+Phillip KITE
+
+1ère ligne
+
+
+Charles henri BERGUET
+
+BelgiqueRC Narbonnais
+
+Charles henri BERGUET
+
+1ère ligne
+
+
+Grégoire BAZIN
+
+FranceColomiers Rugby
+
+Grégoire BAZIN
+
+3ème ligne
+
+
+Alexandre BORIE
+
+FranceColomiers Rugby
+
+Alexandre BORIE
+
+Arrière
+
+
+Uzair CASSIEM
+
+Afrique du SudOyonnax Rugby
+
+Uzair CASSIEM
+
+3ème ligne
+
+
+Hugo FOURQUET
+
+FranceUS Dax
+
+Hugo FOURQUET
+
+Demi d'ouverture
+
+
+Konstantine MIKAUTADZE
+
+FranceCA Brive
+
+Konstantine MIKAUTADZE
+
+2ème ligne
+
+
+Peyo MUSCARDITZ
+
+FranceSU Agen
+
+Peyo MUSCARDITZ
+
+Centre
+
+
+Pascal COTET
+
+FranceProvence Rugby
+
+Pascal COTET
+
+1ère ligne
+
+
+Denis MARCHOIS
+
+FranceSU Agen
+
+Denis MARCHOIS
+
+2ème ligne
+
+
+Guillaume ROUET
+
+FranceNissa Rugby
+
+Guillaume ROUET
+
+Demi de mêlée
+
+
+Manuel LEINDEKAR VIRGINIO
+
+ItalieFC Grenoble Rugby
+
+Manuel LEINDEKAR VIRGINIO
+
+2ème ligne
+
+
+Aitor HOURCADE
+
+FranceBiarritz Olympique PB
+
+Aitor HOURCADE
+
+3ème ligne
+
+
+Thomas DOLHAGARAY
+
+FranceBiarritz Olympique PB
+
+Thomas DOLHAGARAY
+
+Demi d'ouverture
+
+
+Yanis LOCKWOOD
+
+FranceAS Béziers Hérault
+
+Yanis LOCKWOOD
+
+1ère ligne
+
+
+Eliott MAUREL
+
+FranceColomiers Rugby
+
+Eliott MAUREL
+
+3ème ligne
+
+
+Axel BRUCHET
+
+FranceValence Romans
+
+Axel BRUCHET
+
+3ème ligne
+
+
+Jules SOLINAS
+
+FranceOyonnax Rugby
+
+Jules SOLINAS
+
+Demi de mêlée
+
+
+Max CLEMENT
+
+FranceFC Grenoble Rugby
+
+Max CLEMENT
+
+Demi d'ouverture
+
+
+
+
+Poste
+
+Ruben COURTIES
+
+FranceStade Aurillacois
+
+Ruben COURTIES
+
+Demi de mêlée
+
+
+Raphaël PORTAT
+
+FranceProvence Rugby
+
+Raphaël PORTAT
+
+2ème ligne
+
+
+Leo LABARTHE
+
+FranceSoyaux-Angoulême XV
+
+Leo LABARTHE
+
+2ème ligne
+
+
+Clement SENTUBERY
+
+FranceSoyaux-Angoulême XV
+
+Clement SENTUBERY
+
+3ème ligne
+
+
+Hugo DESCUBE
+
+FranceValence Romans
+
+Hugo DESCUBE
+
+3ème ligne
+
+
+Lomig JOUANNY
+
+FranceUS Montauban
+
+Lomig JOUANNY
+
+3ème ligne
+
+
+Thomas ALARY
+
+FranceFC Grenoble Rugby
+
+Thomas ALARY
+
+Arrière
+
+
+Lucas VIGNERES
+
+FranceColomiers Rugby
+
+Lucas VIGNERES
+
+Centre
+
+
+Naim BEN ALLA
+
+FranceUS Dax
+
+Naim BEN ALLA
+
+Ailier
+
+
+Sialevailea TOLOFUA
+
+FranceSU Agen
+
+Sialevailea TOLOFUA
+
+3ème ligne
+
+
+Loic VARENNE
+
+FranceRC Narbonnais
+
+Loic VARENNE
+
+1ère ligne
+
+
+Etonia durugalo BAINIVALU
+
+FidjiCA Brive
+
+Etonia durugalo BAINIVALU
+
+Centre
+
+
+Lucas TAUZIN
+
+FranceFC Grenoble Rugby
+
+Lucas TAUZIN
+
+Ailier
+
+
+Alban PLACINES
+
+FranceBiarritz Olympique PB
+
+Alban PLACINES
+
+3ème ligne
+
+
+Yannick YOUYOUTTE
+
+FranceProvence Rugby
+
+Yannick YOUYOUTTE
+
+2ème ligne
+
+
+Edgar RETIERE
+
+FranceBiarritz Olympique PB
+
+Edgar RETIERE
+
+Demi d'ouverture
+
+
+Marco miguel TRAUTH
+
+FranceValence Romans
+
+Marco miguel TRAUTH
+
+1ère ligne
+
+
+Hugo REILHES
+
+FranceCA Brive
+
+Hugo REILHES
+
+1ère ligne
+
+
+Richard tamanui ARNOLD
+
+AustralieSoyaux-Angoulême XV
+
+Richard tamanui ARNOLD
+
+2ème ligne
+
+
+Myles EDWARDS
+
+AngleterreColomiers Rugby
+
+Myles EDWARDS
+
+2ème ligne
+
+
+
+
+Mathieu BONNOT
+
+FranceSoyaux-Angoulême XV
+
+Mathieu BONNOT
+
+1ère ligne
+
+
+Cody THOMAS
+
+Afrique du SudFC Grenoble Rugby
+
+Cody THOMAS
+
+1ère ligne
+
+
+Samuel MAXIMIN
+
+FranceCA Brive
+
+Samuel MAXIMIN
+
+2ème ligne
+
+
+Ru-hann GREYLING
+
+Afrique du SudUS Montauban
+
+Ru-hann GREYLING
+
+1ère ligne
+
+
+Hugo NDIAYE
+
+FranceProvence Rugby
+
+Hugo NDIAYE
+
+1ère ligne
+
+
+Fabio GONZALEZ
+
+FranceNissa Rugby
+
+Fabio GONZALEZ
+
+1ère ligne
+
+
+Yanis BOULASSEL
+
+FranceAS Béziers Hérault
+
+Yanis BOULASSEL
+
+1ère ligne
+
+
+Jules DANGLOT
+
+FranceColomiers Rugby
+
+Jules DANGLOT
+
+Demi de mêlée
+
+
+Clément EGIZIANO
+
+FranceNissa Rugby
+
+Clément EGIZIANO
+
+3ème ligne
+
+
+Alberto CARMONA MOLINA
+
+EspagneColomiers Rugby
+
+Alberto CARMONA MOLINA
+
+Arrière
+
+
+Karsen TALALUA
+
+FranceStade Aurillacois
+
+Karsen TALALUA
+
+Centre
+
+
+Wendemi VIELLARD
+
+FranceUSON Nevers
+
+Wendemi VIELLARD
+
+3ème ligne
+
+
+Louis MORLAND
+
+FranceOyonnax Rugby
+
+Louis MORLAND
+
+Centre
+
+
+Nathan AZAIS
+
+FranceStade Aurillacois
+
+Nathan AZAIS
+
+Demi d'ouverture
+
+
+Aymeric LUC
+
+FranceCA Brive
+
+Aymeric LUC
+
+Demi de mêlée
+
+
+Atila SEPTAR
+
+FranceNissa Rugby
+
+Atila SEPTAR
+
+Centre
+
+
+Thomas SALLES
+
+FranceProvence Rugby
+
+Thomas SALLES
+
+Demi d'ouverture
+
+
+Duncan PAIA'AUA
+
+AustralieBiarritz Olympique PB
+
+Duncan PAIA'AUA
+
+Centre
+
+
+Eliott YEMSI
+
+FranceProvence Rugby
+
+Eliott YEMSI
+
+1ère ligne
+
+
+Ian BOUBILA
+
+FranceUS Dax
+
+Ian BOUBILA
+
+1ère ligne
+
+
+
+
+Club
+
+Poste
+
+Andréa PONTANIER
+
+FranceProvence Rugby
+
+Andréa PONTANIER
+
+1ère ligne
+
+
+Théo DUPRAT
+
+FranceUS Dax
+
+Théo DUPRAT
+
+Arrière
+
+
+Seydou DIAKITE
+
+FranceSoyaux-Angoulême XV
+
+Seydou DIAKITE
+
+1ère ligne
+
+
+Patxi BIDART
+
+FranceSoyaux-Angoulême XV
+
+Patxi BIDART
+
+1ère ligne
+
+
+Jean-yves LIUFAU
+
+FranceSoyaux-Angoulême XV
+
+Jean-yves LIUFAU
+
+1ère ligne
+
+
+Gareth MILASINOVICH
+
+IrlandeValence Romans
+
+Gareth MILASINOVICH
+
+1ère ligne
+
+
+Pierre JOUVIN
+
+FranceSU Agen
+
+Pierre JOUVIN
+
+1ère ligne
+
+
+Paolo PARPAGIOLA
+
+FranceColomiers Rugby
+
+Paolo PARPAGIOLA
+
+3ème ligne
+
+
+Mathias JEAN
+
+FranceSU Agen
+
+Mathias JEAN
+
+Demi d'ouverture
+
+
+Yvan DAVID
+
+FranceOyonnax Rugby
+
+Yvan DAVID
+
+Demi de mêlée
+
+
+Hugo GOYENECH
+
+FranceRC Narbonnais
+
+Hugo GOYENECH
+
+Demi d'ouverture
+
+
+Theo GOMEZ
+
+FranceRC Narbonnais
+
+Theo GOMEZ
+
+Demi d'ouverture
+
+
+Morgan MAGA
+
+FranceRC Narbonnais
+
+Morgan MAGA
+
+2ème ligne
+
+
+Danny TOALA
+
+Nouvelle ZélandeOyonnax Rugby
+
+Danny TOALA
+
+Centre
+
+
+Thibault SANTORO
+
+FranceRC Narbonnais
+
+Thibault SANTORO
+
+Arrière
+
+
+Martin BOGADO
+
+ArgentineProvence Rugby
+
+Martin BOGADO
+
+Arrière
+
+
+Cameron DODSON
+
+Grande-BretagneAS Béziers Hérault
+
+Cameron DODSON
+
+2ème ligne
+
+
+Lucio SORDONI
+
+ItalieUS Montauban
+
+Lucio SORDONI
+
+1ère ligne
+
+
+Nael SOUID
+
+FranceRC Narbonnais
+
+Nael SOUID
+
+3ème ligne
+
+
+Jonathan RURU
+
+Nouvelle ZélandeOyonnax Rugby
+
+Jonathan RURU
+
+Demi de mêlée
+
+
+Club
+
+Poste
+
+Vakhtang ABDALADZE
+
+IrlandeCA Brive
+
+Vakhtang ABDALADZE
+
+1ère ligne
+
+
+Lewis BEAN
+
+AngleterreUS Montauban
+
+Lewis BEAN
+
+2ème ligne
+
+
+Calum RANDLE
+
+FranceValence Romans
+
+Calum RANDLE
+
+Arrière
+
+
+Florian GOUMAT
+
+FranceValence Romans
+
+Florian GOUMAT
+
+2ème ligne
+
+
+Arthur VIGNOLLES
+
+FranceNissa Rugby
+
+Arthur VIGNOLLES
+
+3ème ligne
+
+
+Dorian MARCO-PENA
+
+FranceValence Romans
+
+Dorian MARCO-PENA
+
+1ère ligne
+
+
+Maxime OLTMANN
+
+AllemagneUS Dax
+
+Maxime OLTMANN
+
+Ailier
+
+
+Etienne LOIRET
+
+FranceUS Dax
+
+Etienne LOIRET
+
+2ème ligne
+
+
+Arnaud ALETTI
+
+FranceUS Dax
+
+Arnaud ALETTI
+
+3ème ligne
+
+
+Lucas MERET
+
+FranceValence Romans
+
+Lucas MERET
+
+Demi d'ouverture
+
+
+Jean baptiste DE CLERCQ
+
+BelgiqueStade Aurillacois
+
+Jean baptiste DE CLERCQ
+
+1ère ligne
+
+
+Samuel DAVIES
+
+Grande-BretagneFC Grenoble Rugby
+
+Samuel DAVIES
+
+Demi d'ouverture
+
+
+Karl WILKINS
+
+AngleterreUS Montauban
+
+Karl WILKINS
+
+2ème ligne
+
+
+Bastien BERENGUEL
+
+FranceNissa Rugby
+
+Bastien BERENGUEL
+
+3ème ligne
+
+
+Thibaud REY
+
+FranceNissa Rugby
+
+Thibaud REY
+
+2ème ligne
+
+
+Thibaud DREAN
+
+FranceUS Dax
+
+Thibaud DREAN
+
+1ère ligne
+
+
+Paul BELZONS
+
+FranceRC Narbonnais
+
+Paul BELZONS
+
+3ème ligne
+
+
+Michael SIMUTOGA
+
+FranceColomiers Rugby
+
+Michael SIMUTOGA
+
+1ère ligne
+
+
+Anatole PAUVERT
+
+FranceValence Romans
+
+Anatole PAUVERT
+
+Centre
+
+
+Thomas LHUSERO
+
+FranceValence Romans
+
+Thomas LHUSERO
+
+Demi de mêlée
+
+
+Club
+
+Poste
+
+Cameron WRIGHT
+
+Afrique du SudRC Narbonnais
+
+Cameron WRIGHT
+
+Demi de mêlée
+
+
+Sami ZOUHAIR
+
+FranceSoyaux-Angoulême XV
+
+Sami ZOUHAIR
+
+1ère ligne
+
+
+Maxime SIDOBRE
+
+FranceCA Brive
+
+Maxime SIDOBRE
+
+Demi de mêlée
+
+
+Sione langi VAILANU
+
+TongaBiarritz Olympique PB
+
+Sione langi VAILANU
+
+3ème ligne
+
+
+Heath BACKHOUSE
+
+Afrique du SudBiarritz Olympique PB
+
+Heath BACKHOUSE
+
+2ème ligne
+
+
+Nephi LEATIGAGA
+
+Nouvelle ZélandeUS Dax
+
+Nephi LEATIGAGA
+
+1ère ligne
+
+
+Théo GATELIER
+
+FranceUS Dax
+
+Théo GATELIER
+
+Arrière
+
+
+Benjamin PUNTOUS
+
+FranceUS Dax
+
+Benjamin PUNTOUS
+
+Centre
+
+
+Jeff GOUFAN
+
+FranceRC Narbonnais
+
+Jeff GOUFAN
+
+3ème ligne
+
+
+Malakai fonokalafi FEKITOA
+
+TongaAS Béziers Hérault
+
+Malakai fonokalafi FEKITOA
+
+Centre
+
+
+Sylvère RETEAU
+
+FranceUS Dax
+
+Sylvère RETEAU
+
+Demi de mêlée
+
+
+Johannes JONKER
+
+Afrique du SudFC Grenoble Rugby
+
+Johannes JONKER
+
+1ère ligne
+
+
+Brandon julio tiute NANSEN
+
+Nouvelle ZélandeFC Grenoble Rugby
+
+Brandon julio tiute NANSEN
+
+2ème ligne
+
+
+Facundo POMPONIO
+
+ArgentineRC Narbonnais
+
+Facundo POMPONIO
+
+1ère ligne
+
+
+Valentin SIMUTOGA
+
+FranceUS Montauban
+
+Valentin SIMUTOGA
+
+1ère ligne
+
+
+Luka BEGIC
+
+FranceBiarritz Olympique PB
+
+Luka BEGIC
+
+1ère ligne
+
+
+Louis BARRERE
+
+FranceUS Dax
+
+Louis BARRERE
+
+1ère ligne
+
+
+Arthur PROULT
+
+FranceSoyaux-Angoulême XV
+
+Arthur PROULT
+
+Centre
+
+
+Tom CHAUVET
+
+FranceRC Narbonnais
+
+Tom CHAUVET
+
+Demi d'ouverture
+
+
+Jules DUBECQ
+
+FranceSoyaux-Angoulême XV
+
+Jules DUBECQ
+
+Arrière
+Club
+
+Poste
+
+Anthony ALEO
+
+FranceValence Romans
+
+Anthony ALEO
+
+1ère ligne
+
+
+Ugo SEGUELA
+
+FranceColomiers Rugby
+
+Ugo SEGUELA
+
+Demi de mêlée
+
+
+Matteo COUSTALAT
+
+FranceStade Aurillacois
+
+Matteo COUSTALAT
+
+3ème ligne
+
+
+Théo GIRAL
+
+FranceColomiers Rugby
+
+Théo GIRAL
+
+Demi d'ouverture
+
+
+Enzo MORAND BRUYAT
+
+FranceSoyaux-Angoulême XV
+
+Enzo MORAND BRUYAT
+
+3ème ligne
+
+
+Leo MORAND BRUYAT
+
+FranceSoyaux-Angoulême XV
+
+Leo MORAND BRUYAT
+
+3ème ligne
+
+
+Louis DESCOUX
+
+FranceRC Narbonnais
+
+Louis DESCOUX
+
+2ème ligne
+
+
+Robin BELLEMAND
+
+FranceColomiers Rugby
+
+Robin BELLEMAND
+
+1ère ligne
+
+
+Paul GADEA
+
+FranceAS Béziers Hérault
+
+Paul GADEA
+
+Centre
+
+
+Hugo HERMET
+
+FranceOyonnax Rugby
+
+Hugo HERMET
+
+3ème ligne
+
+
+Joris MOURA
+
+FranceValence Romans
+
+Joris MOURA
+
+Demi d'ouverture
+
+
+Paul arnaud AUSSET
+
+FranceUS Dax
+
+Paul arnaud AUSSET
+
+3ème ligne
+
+
+Koen BLOEMEN
+
+Pays-BasOyonnax Rugby
+
+Koen BLOEMEN
+
+2ème ligne
+
+
+Vazha KAPANADZE
+
+GéorgieNissa Rugby
+
+Vazha KAPANADZE
+
+1ère ligne
+
+
+Enzo REYBIER
+
+FranceOyonnax Rugby
+
+Enzo REYBIER
+
+Centre
+
+
+Mattéo LALANNE
+
+FranceRC Narbonnais
+
+Mattéo LALANNE
+
+1ère ligne
+
+
+Paul RAVIER
+
+FranceUS Dax
+
+Paul RAVIER
+
+Demi de mêlée
+
+
+Remi DI PIETRO
+
+FranceOyonnax Rugby
+
+Remi DI PIETRO
+
+1ère ligne
+
+
+Julien RATAJCZAK
+
+FranceOyonnax Rugby
+
+Julien RATAJCZAK
+
+1ère ligne
+
+
+Hugo SARRASIN
+
+FranceNissa Rugby
+
+Hugo SARRASIN
+
+3ème ligne
+Club
+
+Poste
+
+Jean-maxence JULES ROSETTE
+
+FranceUSON Nevers
+
+Jean-maxence JULES ROSETTE
+
+1ère ligne
+
+
+Cyriac GUILLY
+
+FranceOyonnax Rugby
+
+Cyriac GUILLY
+
+3ème ligne
+
+
+Edward CONDON
+
+AustralieUSON Nevers
+
+Edward CONDON
+
+2ème ligne
+
+
+Farell DELOURMEL
+
+FranceColomiers Rugby
+
+Farell DELOURMEL
+
+Ailier
+
+
+Thomas BIDABE
+
+FranceBiarritz Olympique PB
+
+Thomas BIDABE
+
+Centre
+
+
+Martin VILLAR
+
+ArgentineOyonnax Rugby
+
+Martin VILLAR
+
+1ère ligne
+
+
+Dylan JAMINET
+
+FranceUSON Nevers
+
+Dylan JAMINET
+
+Ailier
+
+
+Alexis CAUMEL
+
+FranceColomiers Rugby
+
+Alexis CAUMEL
+
+3ème ligne
+
+
+Théo MERCADIER
+
+FranceUS Dax
+
+Théo MERCADIER
+
+2ème ligne
+
+
+Zinedine AOUAD
+
+FranceNissa Rugby
+
+Zinedine AOUAD
+
+1ère ligne
+
+
+Luka UNGIADZE
+
+GéorgieUSON Nevers
+
+Luka UNGIADZE
+
+1ère ligne
+
+
+Mael CASTEL
+
+FranceUS Montauban
+
+Mael CASTEL
+
+Demi de mêlée
+
+
+Joseph LAHARRAGUE
+
+FranceAS Béziers Hérault
+
+Joseph LAHARRAGUE
+
+Demi d'ouverture
+
+
+Jioji KOROINAWAI
+
+FidjiUSON Nevers
+
+Jioji KOROINAWAI
+
+Ailier
+
+
+Manaia LAPE
+
+FranceUSON Nevers
+
+Manaia LAPE
+
+3ème ligne
+
+
+Rémy LANEN
+
+FranceUSON Nevers
+
+Rémy LANEN
+
+2ème ligne
+
+
+Dylan IDRISSI
+
+FranceValence Romans
+
+Dylan IDRISSI
+
+Centre
+
+
+Jules BOUSQUET
+
+FranceUSON Nevers
+
+Jules BOUSQUET
+
+Demi de mêlée
+
+
+Giga TUTISANI
+
+GéorgieValence Romans
+
+Giga TUTISANI
+
+1ère ligne
+
+
+Francesco GANDOSSI
+
+ItalieOyonnax Rugby
+
+Francesco GANDOSSI
+
+1ère ligne
+Club
+
+Poste
+
+Pablo PATILLA
+
+FranceNissa Rugby
+
+Pablo PATILLA
+
+Centre
+
+
+Quentin ALGAY
+
+FranceCA Brive
+
+Quentin ALGAY
+
+1ère ligne
+
+
+Otunuku PAUTA
+
+Nouvelle ZélandeFC Grenoble Rugby
+
+Otunuku PAUTA
+
+3ème ligne
+
+
+Ellande SANDERSON
+
+FranceBiarritz Olympique PB
+
+Ellande SANDERSON
+
+2ème ligne
+
+
+Carlo MIGNOT
+
+FranceBiarritz Olympique PB
+
+Carlo MIGNOT
+
+Centre
+
+
+Georges SHVELIDZE
+
+FranceCA Brive
+
+Georges SHVELIDZE
+
+Centre
+
+
+Valerio SICILIANO
+
+ItalieCA Brive
+
+Valerio SICILIANO
+
+1ère ligne
+
+
+Mathis GRANGIER
+
+FranceColomiers Rugby
+
+Mathis GRANGIER
+
+2ème ligne
+
+
+Noe DARRELATOUR
+
+FranceSoyaux-Angoulême XV
+
+Noe DARRELATOUR
+
+Demi d'ouverture
+
+
+Herman COETZEE
+
+NamibieUSON Nevers
+
+Herman COETZEE
+
+1ère ligne
+
+
+Barnabé MECHENTEL
+
+FranceAS Béziers Hérault
+
+Barnabé MECHENTEL
+
+Arrière
+
+
+Loan REAL
+
+FranceValence Romans
+
+Loan REAL
+
+3ème ligne
+
+
+Thembelani BHOLI
+
+Afrique du SudValence Romans
+
+Thembelani BHOLI
+
+3ème ligne
+
+
+Ryan MCCAULEY
+
+AustralieValence Romans
+
+Ryan MCCAULEY
+
+2ème ligne
+
+
+Adrien ROUX
+
+FranceValence Romans
+
+Adrien ROUX
+
+3ème ligne
+
+
+Adrien MARTIN
+
+FranceValence Romans
+
+Adrien MARTIN
+
+Demi d'ouverture
+
+
+Brice FERRER
+
+FranceUS Dax
+
+Brice FERRER
+
+3ème ligne
+
+
+Diogo JOEL DE ALMEIDA HASSE FERREIRA
+
+PortugalUS Dax
+
+Diogo JOEL DE ALMEIDA HASSE FERREIRA
+
+1ère ligne
+
+
+Hugo CERISIER
+
+FranceUS Dax
+
+Hugo CERISIER
+
+Demi d'ouverture
+
+
+Samuel derek WASLEY
+
+Nouvelle ZélandeUS Dax
+
+Samuel derek WASLEY
+
+3ème ligne
+
+
+Club
+
+Poste
+
+Ratu josaia NACIKA
+
+FidjiUS Dax
+
+Ratu josaia NACIKA
+
+2ème ligne
+
+
+Louis MARY
+
+FranceCA Brive
+
+Louis MARY
+
+1ère ligne
+
+
+Jope NASEARA
+
+FidjiUS Dax
+
+Jope NASEARA
+
+Ailier
+
+
+Charles MATTHEWS
+
+Grande-BretagneUS Dax
+
+Charles MATTHEWS
+
+2ème ligne
+
+
+Raphael LABOILLE
+
+FranceUS Dax
+
+Raphael LABOILLE
+
+1ère ligne
+
+
+Paul LAPERNE
+
+FranceUS Dax
+
+Paul LAPERNE
+
+1ère ligne
+
+
+Iban HIRIART URRUTY
+
+FranceBiarritz Olympique PB
+
+Iban HIRIART URRUTY
+
+1ère ligne
+
+
+Taniela SADRUGU
+
+FidjiCA Brive
+
+Taniela SADRUGU
+
+Centre
+
+
+Ofa-ki-muli MANUOFETOA
+
+Nouvelle ZélandeStade Aurillacois
+
+Ofa-ki-muli MANUOFETOA
+
+Centre
+
+
+Mael NAVIZET
+
+FranceFC Grenoble Rugby
+
+Mael NAVIZET
+
+Demi d'ouverture
+
+
+Katende TUMBA
+
+FranceSoyaux-Angoulême XV
+
+Katende TUMBA
+
+Arrière
+
+
+Mateo LAVASELE
+
+FranceRC Narbonnais
+
+Mateo LAVASELE
+
+3ème ligne
+
+
+Hanru SIRGEL
+
+Afrique du SudNissa Rugby
+
+Hanru SIRGEL
+
+3ème ligne
+
+
+Kleo LABARBE
+
+FranceStade Aurillacois
+
+Kleo LABARBE
+
+Demi de mêlée
+
+
+Joseph patrick POWELL
+
+IrlandeUS Montauban
+
+Joseph patrick POWELL
+
+Demi de mêlée
+
+
+Sacha LONCHAMPT
+
+FranceOyonnax Rugby
+
+Sacha LONCHAMPT
+
+1ère ligne
+
+
+Camille BAZ MARCOS
+
+FranceFC Grenoble Rugby
+
+Camille BAZ MARCOS
+
+3ème ligne
+
+
+Giorgi PERTAIA
+
+GéorgieFC Grenoble Rugby
+
+Giorgi PERTAIA
+
+1ère ligne
+
+
+Matthieu VACHON
+
+FranceValence Romans
+
+Matthieu VACHON
+
+3ème ligne
+
+
+Christian james JUDGE
+
+AngleterreCA Brive
+
+Christian james JUDGE
+
+1ère ligne
+Club
+
+Poste
+
+Richard HARDWICK
+
+AustralieColomiers Rugby
+
+Richard HARDWICK
+
+3ème ligne
+
+
+Remi COUTY
+
+FranceStade Aurillacois
+
+Remi COUTY
+
+3ème ligne
+
+
+Gerswin MOUTON
+
+NamibieFC Grenoble Rugby
+
+Gerswin MOUTON
+
+Ailier
+
+
+Tom NOBLE
+
+FranceProvence Rugby
+
+Tom NOBLE
+
+Demi de mêlée
+
+
+Alessio CONTIGLIANI MAILLET
+
+FranceOyonnax Rugby
+
+Alessio CONTIGLIANI MAILLET
+
+3ème ligne
+
+
+Baptiste LENOIR
+
+FranceProvence Rugby
+
+Baptiste LENOIR
+
+Centre
+
+
+Santiago SOCINO
+
+ItalieSU Agen
+
+Santiago SOCINO
+
+1ère ligne
+
+
+Nathan POZIN
+
+FranceFC Grenoble Rugby
+
+Nathan POZIN
+
+Centre
+
+
+Samuel BIELLE BIARREY
+
+FranceNissa Rugby
+
+Samuel BIELLE BIARREY
+
+Centre
+
+
+Jules CHAFFIOTTE
+
+FranceFC Grenoble Rugby
+
+Jules CHAFFIOTTE
+
+Arrière
+
+
+Lucas MARTINS
+
+FranceSU Agen
+
+Lucas MARTINS
+
+Ailier
+
+
+Oliver CUMMINS
+
+AustralieSU Agen
+
+Oliver CUMMINS
+
+Centre
+
+
+Dylan CAZEMAJOU
+
+FranceSU Agen
+
+Dylan CAZEMAJOU
+
+Ailier
+
+
+Tyreese ROBIN
+
+FranceFC Grenoble Rugby
+
+Tyreese ROBIN
+
+Centre
+
+
+Sireli MASIWINI
+
+FidjiProvence Rugby
+
+Sireli MASIWINI
+
+Ailier
+
+
+Jean PENETRO
+
+FranceUS Montauban
+
+Jean PENETRO
+
+Demi de mêlée
+
+
+Ilia SPANDERASHVILI
+
+GéorgieValence Romans
+
+Ilia SPANDERASHVILI
+
+3ème ligne
+
+
+Alexandre EVERAERT
+
+FranceSU Agen
+
+Alexandre EVERAERT
+
+1ère ligne
+
+
+Tanguy JAILLON
+
+FranceAS Béziers Hérault
+
+Tanguy JAILLON
+
+3ème ligne
+
+
+Camille VALLEE
+
+FranceUSON Nevers
+
+Camille VALLEE
+
+3ème ligne
+
+
+Club
+
+Poste
+
+Josefa taito UBITAU
+
+FidjiUSON Nevers
+
+Josefa taito UBITAU
+
+Centre
+
+
+Lucas DELORT
+
+FranceStade Aurillacois
+
+Lucas DELORT
+
+3ème ligne
+
+
+Curwin BOSCH
+
+Afrique du SudCA Brive
+
+Curwin BOSCH
+
+Demi d'ouverture
+
+
+Alexandre LANGLOIS
+
+FranceFC Grenoble Rugby
+
+Alexandre LANGLOIS
+
+1ère ligne
+
+
+Theo PEDEMONS
+
+FranceColomiers Rugby
+
+Theo PEDEMONS
+
+2ème ligne
+
+
+Natan CULINAT
+
+FranceColomiers Rugby
+
+Natan CULINAT
+
+Demi de mêlée
+
+
+Ratu nemani naitoninicagi KURUCAKE
+
+FidjiSoyaux-Angoulême XV
+
+Ratu nemani naitoninicagi KURUCAKE
+
+2ème ligne
+
+
+Regis desire OMBY
+
+FranceCA Brive
+
+Regis desire OMBY
+
+2ème ligne
+
+
+Johan cilliers VILJOEN
+
+Afrique du SudUSON Nevers
+
+Johan cilliers VILJOEN
+
+1ère ligne
+
+
+Luke GRIFFITHS
+
+FranceCA Brive
+
+Luke GRIFFITHS
+
+3ème ligne
+
+
+Jeremy TUIMA
+
+Grande-BretagneProvence Rugby
+
+Jeremy TUIMA
+
+Centre
+
+
+Louis SUAUD
+
+FranceValence Romans
+
+Louis SUAUD
+
+3ème ligne
+
+
+Luvuyo PUPUMA
+
+Afrique du SudNissa Rugby
+
+Luvuyo PUPUMA
+
+1ère ligne
+
+
+Kylian LAURANS
+
+FranceNissa Rugby
+
+Kylian LAURANS
+
+3ème ligne
+
+
+Simote MOALA
+
+FranceCA Brive
+
+Simote MOALA
+
+1ère ligne
+
+
+Enoal JOGUET
+
+FranceUSON Nevers
+
+Enoal JOGUET
+
+Arrière
+
+
+Thomas ROSS
+
+AustralieValence Romans
+
+Thomas ROSS
+
+1ère ligne
+
+
+Flavio ASQUINI
+
+FranceNissa Rugby
+
+Flavio ASQUINI
+
+Demi d'ouverture
+
+
+Fasio TAALO
+
+FranceUSON Nevers
+
+Fasio TAALO
+
+3ème ligne
+
+
+Temur TSULUKIDZE
+
+GéorgieOyonnax Rugby
+
+Temur TSULUKIDZE
+
+2ème ligne
+Club
+
+Poste
+
+Mateo salvador LORENZO
+
+ArgentineUS Montauban
+
+Mateo salvador LORENZO
+
+2ème ligne
+
+
+Nikoloz KUMARITOVI
+
+GéorgieStade Aurillacois
+
+Nikoloz KUMARITOVI
+
+1ère ligne
+
+
+Nathan james CLAASSEN
+
+Afrique du SudCA Brive
+
+Nathan james CLAASSEN
+
+2ème ligne
+
+
+Angus STANIFORTH
+
+AustralieStade Aurillacois
+
+Angus STANIFORTH
+
+Arrière
+
+
+Martino PUCCIARIELLO
+
+ItalieProvence Rugby
+
+Martino PUCCIARIELLO
+
+Demi d'ouverture
+
+
+Louis COUGET
+
+FranceUS Dax
+
+Louis COUGET
+
+Ailier
+
+
+Yohan TAPIE
+
+FranceBiarritz Olympique PB
+
+Yohan TAPIE
+
+Centre
+
+
+François MUR
+
+FranceBiarritz Olympique PB
+
+François MUR
+
+1ère ligne
+
+
+Anoa LAURENT
+
+FranceBiarritz Olympique PB
+
+Anoa LAURENT
+
+Demi de mêlée
+
+
+Nicolas ELISSONDO
+
+FranceBiarritz Olympique PB
+
+Nicolas ELISSONDO
+
+Ailier
+
+
+Avakuki NIUSALELEKITOGA
+
+FidjiSoyaux-Angoulême XV
+
+Avakuki NIUSALELEKITOGA
+
+Ailier
+
+
+Nama abdallah COULIBALY
+
+FranceValence Romans
+
+Nama abdallah COULIBALY
+
+3ème ligne
+
+
+Malo HANNOYER
+
+FranceUS Dax
+
+Malo HANNOYER
+
+Arrière
+
+
+Luka MATKAVA
+
+GéorgieOyonnax Rugby
+
+Luka MATKAVA
+
+Demi d'ouverture
+
+
+Giorgi KHAINDRAVA
+
+GéorgieNissa Rugby
+
+Giorgi KHAINDRAVA
+
+Centre
+
+
+Enzo SERIEYSSOL
+
+FranceSU Agen
+
+Enzo SERIEYSSOL
+
+3ème ligne
+
+
+Paul MARSAN
+
+FranceValence Romans
+
+Paul MARSAN
+
+Centre
+
+
+Enrique PIERETTO HEILAND
+
+ArgentineSU Agen
+
+Enrique PIERETTO HEILAND
+
+1ère ligne
+
+
+Alifeleti tu'ifua KAITU'U
+
+AustralieOyonnax Rugby
+
+Alifeleti tu'ifua KAITU'U
+
+1ère ligne
+
+
+Daniel viljoen JOOSTE
+
+Afrique du SudRC Narbonnais
+
+Daniel viljoen JOOSTE
+
+1ère ligne
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Club
+Poste
+Javier EISSMANN
+ChiliSU Agen
+Javier EISSMANN
+2ème ligne0 minute jouée
+Cameron HOLT
+AustralieFC Grenoble Rugby
+Cameron HOLT
+2ème ligne0 minute jouée
+Mosese DAWAI
+FidjiBiarritz Olympique PB
+Mosese DAWAI
+Ailier0 minute jouée
+Wesley MASIMA
+FranceProvence Rugby
+Wesley MASIMA
+1ère ligne0 minute jouée
+Izaiha MOORE
+Nouvelle ZélandeValence Romans
+Izaiha MOORE
+3ème ligne0 minute jouée
+Mohamed MEGHERBI
+FranceOyonnax Rugby
+Mohamed MEGHERBI
+1ère ligne0 minute jouée
+Kapeliele PIFELETI JR
+Etats-UnisProvence Rugby
+Kapeliele PIFELETI JR
+1ère ligne0 minute jouée
+George SMITH
+Grande-BretagneUSON Nevers
+George SMITH
+2ème ligne0 minute jouée
+Jake STRACHAN
+AustralieStade Aurillacois
+Jake STRACHAN
+Demi de mêlée0 minute jouée
+Charlton HOLWILL
+Afrique du SudFC Grenoble Rugby
+Charlton HOLWILL
+2ème ligne0 minute jouée
+Lucien RICHARDIS
+FranceSU Agen
+Lucien RICHARDIS
+Demi d'ouverture0 minute jouée
+Germain marie eric ROQUES DE BORDA
+FranceFC Grenoble Rugby
+Germain marie eric ROQUES DE BORDA
+Demi de mêlée0 minute jouée
+Guillaume LAFFONT
+FranceColomiers Rugby
+Guillaume LAFFONT
+Demi de mêlée0 minute jouée
+Bobby BISSU
+FranceProvence Rugby
+Bobby BISSU
+3ème ligne0 minute jouée
+Taniela MATAKAIONGO
+Nouvelle ZélandeSU Agen
+Taniela MATAKAIONGO
+3ème ligne0 minute jouée
+Lylian ZELIOLI
+FranceNissa Rugby
+Lylian ZELIOLI
+Demi de mêlée0 minute jouée
+Albert TUISUE
+FidjiProvence Rugby
+Albert TUISUE
+3ème ligne0 minute jouée
+Noah CHAMPET
+FranceProvence Rugby
+Noah CHAMPET
+Demi d'ouverture0 minute jouée
+Tom FRELAUT
+FranceProvence Rugby
+Tom FRELAUT
+Centre0 minute jouée
+Rayan HOUARI
+FranceColomiers Rugby
+Rayan HOUARI
+Centre0 minute jouée
+Club
+Poste
+Ratu jekope tubeimomo SOVAU
+FidjiUS Dax
+Ratu jekope tubeimomo SOVAU
+Centre0 minute jouée
+Kaliova BULAI
+FidjiSoyaux-Angoulême XV
+Kaliova BULAI
+1ère ligne0 minute jouée
+Mohamed imran DHAOUADI
+FranceProvence Rugby
+Mohamed imran DHAOUADI
+Centre0 minute jouée
+Idris ABID
+FranceProvence Rugby
+Idris ABID
+1ère ligne0 minute jouée
+Hendrik VENTER
+Afrique du SudCA Brive
+Hendrik VENTER
+3ème ligne0 minute jouée
+James SHILLCOCK
+AngleterreCA Brive
+James SHILLCOCK
+Demi d'ouverture0 minute jouée
+Owen WILLIAMS
+Grande-BretagneNissa Rugby
+Owen WILLIAMS
+Demi d'ouverture0 minute jouée
+Yan ARNOLD
+FranceUSON Nevers
+Yan ARNOLD
+1ère ligne0 minute jouée
+Baptiste ESCOFFRE
+FranceSoyaux-Angoulême XV
+Baptiste ESCOFFRE
+Demi de mêlée0 minute jouée
+Paul BERGES
+FranceSoyaux-Angoulême XV
+Paul BERGES
+Demi d'ouverture0 minute jouée
+Lukas DOYHENARD
+FranceBiarritz Olympique PB
+Lukas DOYHENARD
+Centre0 minute jouée
+Manuel PORTELA MORAIS VAREIRO
+PortugalProvence Rugby
+Manuel PORTELA MORAIS VAREIRO
+Demi d'ouverture0 minute jouée
+Iban LACLAU
+FranceBiarritz Olympique PB
+Iban LACLAU
+Demi d'ouverture0 minute jouée
+Baptiste MORENO
+FranceNissa Rugby
+Baptiste MORENO
+1ère ligne0 minute jouée
+Merlin LEFLAMAND
+FranceUS Montauban
+Merlin LEFLAMAND
+Demi d'ouverture0 minute jouée
+Issa carlo MENDY
+FranceCA Brive
+Issa carlo MENDY
+3ème ligne0 minute jouée
+Victor RAYEUR
+FranceCA Brive
+Victor RAYEUR
+Centre0 minute jouée
+Saba NOZADZE
+GéorgieUSON Nevers
+Saba NOZADZE
+1ère ligne0 minute jouée
+Ilyes SEDDI
+FranceBiarritz Olympique PB
+Ilyes SEDDI
+1ère ligne0 minute jouée
+Ratu leone ROTUISOLIA
+FidjiOyonnax Rugby
+Ratu leone ROTUISOLIA
+2ème ligne0 minute jouée
+Club
+Poste
+Mayco VIVAS
+ArgentineOyonnax Rugby
+Mayco VIVAS
+1ère ligne0 minute jouée
+Alvaro GARCIA IANDOLINO
+ItalieBiarritz Olympique PB
+Alvaro GARCIA IANDOLINO
+2ème ligne0 minute jouée
+Baptiste COLLET
+FranceRC Narbonnais
+Baptiste COLLET
+1ère ligne0 minute jouée
+Enzo MARZOCCA
+FranceStade Aurillacois
+Enzo MARZOCCA
+Arrière0 minute jouée
+Iliesa nakoveda lomani ERENAVULA
+FidjiSoyaux-Angoulême XV
+Iliesa nakoveda lomani ERENAVULA
+2ème ligne0 minute jouée
+Andoni ECHEGARAY
+FranceBiarritz Olympique PB
+Andoni ECHEGARAY
+Centre0 minute jouée
+Federico ignacio LAVANINI
+ArgentineColomiers Rugby
+Federico ignacio LAVANINI
+2ème ligne0 minute jouée
+Craig WILLIS
+Grande-BretagneSU Agen
+Craig WILLIS
+Demi d'ouverture0 minute jouée
+Julien KOTEUREU
+FranceSU Agen
+Julien KOTEUREU
+1ère ligne0 minute jouée
+Nicoloz KORAKHASHVILI
+GéorgieOyonnax Rugby
+Nicoloz KORAKHASHVILI
+1ère ligne0 minute jouée
+Irné HERBST
+Afrique du SudCA Brive
+Irné HERBST
+2ème ligne0 minute jouée
+John COONEY
+IrlandeCA Brive
+John COONEY
+Demi d'ouverture0 minute jouée
+Paul DAUGUET
+FranceStade Aurillacois
+Paul DAUGUET
+1ère ligne0 minute jouée
+Enslin wilfred CLAASEN
+Afrique du SudAS Béziers Hérault
+Enslin wilfred CLAASEN
+Ailier0 minute jouée
+Leny BRONCAN
+FranceCA Brive
+Leny BRONCAN
+Demi d'ouverture0 minute jouée
+Benjamin O'DONNELL
+AustralieStade Aurillacois
+Benjamin O'DONNELL
+Centre0 minute jouée
+Gigi SIRBILADZE
+GéorgieOyonnax Rugby
+Gigi SIRBILADZE
+Demi d'ouverture0 minute jouée
+Asaeli pacolo GADE
+FidjiUS Montauban
+Asaeli pacolo GADE
+Ailier0 minute jouée
+Andréa SACCO
+FranceBiarritz Olympique PB
+Andréa SACCO
+3ème ligne0 minute jouée
+Millian OULDJI
+FranceBiarritz Olympique PB
+Millian OULDJI
+1ère ligne0 minute jouée
+Club
+Poste
+Olivier HULL
+Grande-BretagneCA Brive
+Olivier HULL
+2ème ligne0 minute jouée
+Tevita ROKOSUKA
+FidjiUS Montauban
+Tevita ROKOSUKA
+3ème ligne0 minute jouée
+Viliami TAULANI
+TongaStade Aurillacois
+Viliami TAULANI
+3ème ligne0 minute jouée
+Joshua john THOMPSON
+FidjiFC Grenoble Rugby
+Joshua john THOMPSON
+3ème ligne0 minute jouée
+Hugo matthew ross LOGGENBERG
+Afrique du SudAS Béziers Hérault
+Hugo matthew ross LOGGENBERG
+Demi de mêlée0 minute jouée
+Duacake VULAINABUWAHA
+FidjiUS Dax
+Duacake VULAINABUWAHA
+Ailier0 minute jouée
+Vaea tangitau lapota FIFITA
+TongaUS Montauban
+Vaea tangitau lapota FIFITA
+3ème ligne0 minute jouée
+Duran ryan KOEVORT
+Afrique du SudAS Béziers Hérault
+Duran ryan KOEVORT
+Arrière0 minute jouée
+Jonathan RYAN
+AustralieStade Aurillacois
+Jonathan RYAN
+3ème ligne0 minute jouée
+Giorgi ZAZADZE
+GéorgieUSON Nevers
+Giorgi ZAZADZE
+3ème ligne0 minute jouée
+Caleb MUNTZ
+Nouvelle ZélandeProvence Rugby
+Caleb MUNTZ
+Demi d'ouverture0 minute jouée
+Patelesio fatuloa TOMKINSON
+Nouvelle ZélandeSU Agen
+Patelesio fatuloa TOMKINSON
+Centre0 minute jouée
+Pone FAAMAUSILI
+AustralieSoyaux-Angoulême XV
+Pone FAAMAUSILI
+1ère ligne0 minute jouée
+Rémi ROUX
+FranceProvence Rugby
+Rémi ROUX
+2ème ligne0 minute jouée
+Jean SEUX
+FranceUS Montauban
+Jean SEUX
+Demi d'ouverture0 minute jouée
+Tom DELALAIN
+FranceSU Agen
+Tom DELALAIN
+Arrière0 minute jouée
+Camille GERMAIN
+FranceSU Agen
+Camille GERMAIN
+2ème ligne0 minute jouée
+Stephan LE ROUX
+Afrique du SudStade Aurillacois
+Stephan LE ROUX
+2ème ligne0 minute jouée
+Maxime BELLETERRE
+FranceOyonnax Rugby
+Maxime BELLETERRE
+Arrière0 minute jouée
+Francois JOLY
+FranceOyonnax Rugby
+Francois JOLY
+Centre0 minute jouée
+Club
+Poste
+Hugo CLAUZEL
+FranceRC Narbonnais
+Hugo CLAUZEL
+Arrière0 minute jouée
+Noam PION
+FranceProvence Rugby
+Noam PION
+1ère ligne0 minute jouée
+Fergus LEE WARNER
+AustralieFC Grenoble Rugby
+Fergus LEE WARNER
+3ème ligne0 minute jouée
+Liam TURNER
+IrlandeUSON Nevers
+Liam TURNER
+Ailier0 minute jouée
+Kakhaber DARBAIDZE
+GéorgieBiarritz Olympique PB
+Kakhaber DARBAIDZE
+1ère ligne0 minute jouée
+James FENDER
+Pays de GallesFC Grenoble Rugby
+James FENDER
+2ème ligne0 minute jouée
+Enzo LABADIE
+FranceNissa Rugby
+Enzo LABADIE
+3ème ligne0 minute jouée
+Damien BOZIC
+FranceSU Agen
+Damien BOZIC
+2ème ligne0 minute jouée
+Valentino REGGIARDO
+FranceSU Agen
+Valentino REGGIARDO
+Demi de mêlée0 minute jouée
+Mackenzie MARTIN
+Pays de GallesAS Béziers Hérault
+Mackenzie MARTIN
+3ème ligne0 minute jouée
+Aporosa baleikasavu bativaga MAKA
+AngleterreAS Béziers Hérault
+Aporosa baleikasavu bativaga MAKA
+1ère ligne0 minute jouée
+Louie WADE
+AngleterreAS Béziers Hérault
+Louie WADE
+Demi de mêlée0 minute jouée
+Montgomery saul LOGGENBERG
+Afrique du SudAS Béziers Hérault
+Montgomery saul LOGGENBERG
+3ème ligne0 minute jouée
+Reginald CHURCHWARD
+Nouvelle ZélandeBiarritz Olympique PB
+Reginald CHURCHWARD
+1ère ligne0 minute jouée
+Raynard ROETS
+Afrique du SudBiarritz Olympique PB
+Raynard ROETS
+2ème ligne0 minute jouée
+Tuaina TUALIMA
+AustralieColomiers Rugby
+Tuaina TUALIMA
+3ème ligne0 minute jouée
+Viliami 'amanaki lelei he lotu FINE
+Nouvelle ZélandeColomiers Rugby
+Viliami 'amanaki lelei he lotu FINE
+Ailier0 minute jouée
+Benjamin so'o SA'U
+Nouvelle ZélandeUS Dax
+Benjamin so'o SA'U
+3ème ligne0 minute jouée
+Elias COULIBALY
+FranceSoyaux-Angoulême XV
+Elias COULIBALY
+1ère ligne0 minute jouée
+James nu'u'alita TUITUBA
+FidjiSoyaux-Angoulême XV
+James nu'u'alita TUITUBA
+Centre0 minute jouée
+Club
+Poste
+Sakaraia junior SERU
+FidjiSoyaux-Angoulême XV
+Sakaraia junior SERU
+Ailier0 minute jouée
+Lalomilo LALOMILO
+Nouvelle ZélandeFC Grenoble Rugby
+Lalomilo LALOMILO
+Centre0 minute jouée
+Vaiolini petelo EKUASI
+Nouvelle ZélandeUS Montauban
+Vaiolini petelo EKUASI
+3ème ligne0 minute jouée
+Johnathan MATTHEWS
+AngleterreUS Montauban
+Johnathan MATTHEWS
+1ère ligne0 minute jouée
+Joey james WALTON
+FranceUS Montauban
+Joey james WALTON
+Centre0 minute jouée
+Jack william WALSH
+AustralieUS Montauban
+Jack william WALSH
+Demi d'ouverture0 minute jouée
+Paula rasaqa TUVALO
+FidjiUS Montauban
+Paula rasaqa TUVALO
+2ème ligne0 minute jouée
+Suliano komai savai SAVENACA
+FidjiUSON Nevers
+Suliano komai savai SAVENACA
+2ème ligne0 minute jouée
+Charlie murray HELLER
+Nouvelle ZélandeUSON Nevers
+Charlie murray HELLER
+2ème ligne0 minute jouée
+Anselme CELLIER
+FranceUSON Nevers
+Anselme CELLIER
+Demi d'ouverture0 minute jouée
+Guillem CALMON
+FranceUSON Nevers
+Guillem CALMON
+3ème ligne0 minute jouée
+Fred ryan GUILLET
+FranceUSON Nevers
+Fred ryan GUILLET
+Demi d'ouverture0 minute jouée
+Erik MEROI
+ItalieUSON Nevers
+Erik MEROI
+1ère ligne0 minute jouée
+Benjamin HOUSTON
+AustralieStade Aurillacois
+Benjamin HOUSTON
+3ème ligne0 minute jouée
+Isoa rageci waqausalewa KOROINAWAI
+FidjiStade Aurillacois
+Isoa rageci waqausalewa KOROINAWAI
+3ème ligne0 minute jouée
+Guram GANIASHVILI
+GéorgieStade Aurillacois
+Guram GANIASHVILI
+2ème ligne0 minute jouée
+Liam COOMBES-FABLING
+Nouvelle ZélandeOyonnax Rugby
+Liam COOMBES-FABLING
+Arrière0 minute jouée
+Sjoerd BAKKER
+Pays-BasProvence Rugby
+Sjoerd BAKKER
+2ème ligne0 minute jouée
+Aubin GEFFRAY
+FranceProvence Rugby
+Aubin GEFFRAY
+Demi d'ouverture0 minute jouée
+Noah BROWN
+Afrique du SudCA Brive
+Noah BROWN
+2ème ligne0 minute jouée
+Club
+Poste
+Bertus wynand VERSFELD
+Afrique du SudUS Montauban
+Bertus wynand VERSFELD
+2ème ligne0 minute jouée
+Etonia WAQA
+FidjiProvence Rugby
+Etonia WAQA
+2ème ligne0 minute jouée
+Abraham anthony POLE
+Nouvelle ZélandeRC Narbonnais
+Abraham anthony POLE
+1ère ligne0 minute jouée
+Solomon ALAIMALO
+Nouvelle ZélandeRC Narbonnais
+Solomon ALAIMALO
+Centre0 minute jouée
+Lubabalo DOBELA
+Afrique du SudRC Narbonnais
+Lubabalo DOBELA
+Demi d'ouverture0 minute jouée
+Faalae faletoi PENI
+Nouvelle ZélandeRC Narbonnais
+Faalae faletoi PENI
+Arrière0 minute jouée
+Chlayton danre FRANS
+Nouvelle ZélandeRC Narbonnais
+Chlayton danre FRANS
+3ème ligne0 minute jouée
+Ruben SCHOEMAN
+Afrique du SudRC Narbonnais
+Ruben SCHOEMAN
+2ème ligne0 minute jouée
+Aphiwe DYANTYI
+Afrique du SudRC Narbonnais
+Aphiwe DYANTYI
+Ailier0 minute jouée
+Théo BEVIA
+FranceRC Narbonnais
+Théo BEVIA
+Demi de mêlée0 minute jouée
+Kylian DESTARAC-CUSSAT
+FranceRC Narbonnais
+Kylian DESTARAC-CUSSAT
+Arrière0 minute jouée
+Hugo ZAMORA
+FranceNissa Rugby
+Hugo ZAMORA
+Demi de mêlée0 minute jouée
+Seamus ranier BARDOUL
+Nouvelle ZélandeColomiers Rugby
+Seamus ranier BARDOUL
+Centre0 minute jouée
+
+
+
+
+Statstiques
+
+Rang
+Joueur
+1
+Lucas MERET
+Lucas MERET
+2
+James SHILLCOCK
+James SHILLCOCK
+3
+Justin BOURAUX
+Justin BOURAUX
+4
+Samuel MARQUES
+Samuel MARQUES
+5
+Valentin DELPY
+Valentin DELPY
+6
+Craig WILLIS
+Craig WILLIS
+7
+Maxime LAFAGE
+Maxime LAFAGE
+8
+Romain TROUILLOUD
+Romain TROUILLOUD
+9
+Théo GIRAL
+Théo GIRAL
+10
+Tedo ABZHANDADZE
+Tedo ABZHANDADZE
+11
+Edgar RETIERE
+Edgar RETIERE
+12
+John MCPHILLIPS
+John MCPHILLIPS
+13
+Hugo CERISIER
+Hugo CERISIER
+14
+Manuel PORTELA MORAIS VAREIRO
+Manuel PORTELA MORAIS VAREIRO
+15
+Romuald SEGUY
+Romuald SEGUY
+16
+Thibault DEBAES
+Thibault DEBAES
+17
+Iban LACLAU
+Iban LACLAU
+18
+Christophe LOUSTALOT
+Christophe LOUSTALOT
+19
+Dachi PAPUNASHVILI
+Dachi PAPUNASHVILI
+20
+Benjamin BOTICA
+Benjamin BOTICA
+Club
+Poste
+Points marqués
+Essais marqués
+Pénalités marquées
+Drops
+Transfo. marquées
+Matches joués
+Minutes jouées
+Valence Romans
+Valence Romans
+Demi d'ouverture
+334
+2
+70
+0
+57
+26
+2 056
+CA Brive
+CA Brive
+Demi d'ouverture
+260
+2
+34
+2
+71
+24
+1 922
+Oyonnax Rugby
+Oyonnax Rugby
+Demi d'ouverture
+253
+4
+37
+0
+61
+28
+1 850
+AS Béziers Hérault
+AS Béziers Hérault
+Demi de mêlée
+232
+10
+36
+0
+37
+26
+1 790
+Colomiers Rugby
+Colomiers Rugby
+Demi d'ouverture
+206
+2
+32
+0
+50
+20
+1 509
+SU Agen
+SU Agen
+Demi d'ouverture
+202
+1
+31
+0
+52
+27
+1 714
+RC Vannes
+RC Vannes
+Demi d'ouverture
+178
+1
+17
+0
+61
+20
+1 366
+FC Grenoble Rugby
+FC Grenoble Rugby
+Demi d'ouverture
+164
+1
+29
+0
+36
+19
+1 328
+Colomiers Rugby
+Colomiers Rugby
+Demi d'ouverture
+138
+4
+23
+1
+23
+24
+1 664
+Stade Aurillacois
+Stade Aurillacois
+Demi d'ouverture
+138
+1
+26
+1
+26
+21
+1 447
+Biarritz Olympique PB
+Biarritz Olympique PB
+Demi d'ouverture
+138
+3
+21
+0
+30
+22
+1 072
+US Carcassonnaise
+US Carcassonnaise
+Arrière
+127
+0
+23
+0
+29
+17
+1 189
+US Dax
+US Dax
+Demi d'ouverture
+124
+0
+24
+0
+26
+30
+1 264
+Provence Rugby
+Provence Rugby
+Demi d'ouverture
+121
+4
+13
+0
+31
+17
+1 358
+US Dax
+US Dax
+Demi d'ouverture
+120
+0
+19
+1
+30
+22
+1 226
+RC Vannes
+RC Vannes
+Demi d'ouverture
+119
+1
+8
+0
+45
+20
+867
+Stade Montois Rugby
+Stade Montois Rugby
+Demi d'ouverture
+112
+1
+19
+0
+25
+27
+1 227
+Stade Montois Rugby
+Stade Montois Rugby
+Demi de mêlée
+110
+2
+20
+0
+20
+21
+926
+Stade Aurillacois
+Stade Aurillacois
+Demi d'ouverture
+108
+5
+19
+0
+13
+15
+972
+Soyaux-Angoulême XV
+Soyaux-Angoulême XV
+Demi d'ouverture
+101
+1
+18
+0
+21
+16
+963
+
+Rang
+Joueur
+21
+Caleb MUNTZ
+Caleb MUNTZ
+22
+Yohan LE BOURHIS
+Yohan LE BOURHIS
+23
+Thomas SALLES
+Thomas SALLES
+24
+Willem DU PLESSIS
+Willem DU PLESSIS
+25
+Lucas MARTINS
+Lucas MARTINS
+26
+Paul BERGES
+Paul BERGES
+27
+Enzo SELPONI
+Enzo SELPONI
+28
+Mohamed Karim QADIRI
+Mohamed Karim QADIRI
+29
+Clément MARTINEZ
+Clément MARTINEZ
+30
+Anthony BOUTHIER
+Anthony BOUTHIER
+31
+Zack HOLMES
+Zack HOLMES
+32
+Dorian MARCO-PENA
+Dorian MARCO-PENA
+33
+Raffaele COSTA STORTI
+Raffaele COSTA STORTI
+34
+John COONEY
+John COONEY
+35
+Marc PALMIER
+Marc PALMIER
+36
+Thomas DOLHAGARAY
+Thomas DOLHAGARAY
+37
+Setareki BITUNIYATA
+Setareki BITUNIYATA
+38
+Samuel TUIFUA
+Samuel TUIFUA
+39
+Michael RURU
+Michael RURU
+40
+Jake STRACHAN
+Jake STRACHAN
+Club
+Poste
+Points marqués
+Essais marqués
+Pénalités marquées
+Drops
+Transfo. marquées
+Matches joués
+Minutes jouées
+Rang
+Joueur
+41
+Iban HIRIART URRUTY
+Iban HIRIART URRUTY
+42
+Louis MORLAND
+Louis MORLAND
+43
+Shaun REYNOLDS
+Shaun REYNOLDS
+44
+Franck POURTEAU
+Franck POURTEAU
+45
+Jules SOULAN
+Jules SOULAN
+46
+Curwin BOSCH
+Curwin BOSCH
+47
+Joris CAZENAVE
+Joris CAZENAVE
+48
+Léo DROUET
+Léo DROUET
+49
+Paul SURANO
+Paul SURANO
+50
+Perry MAYO
+Perry MAYO
+51
+Enzo BENMEGAL
+Enzo BENMEGAL
+52
+Rodrigo DE BIVAR WEINHOLTZ CARDOSO MARTA
+Rodrigo DE BIVAR WEINHOLTZ CARDOSO MARTA
+53
+Romain LATTERRADE
+Romain LATTERRADE
+54
+Tom DELEUZE
+Tom DELEUZE
+55
+Gabin MICHET
+Gabin MICHET
+56
+Corentin GLENAT
+Corentin GLENAT
+57
+Alexandre DE NARDI
+Alexandre DE NARDI
+58
+Luka PETRIASHVILI
+Luka PETRIASHVILI
+59
+Erwan DRIDI
+Erwan DRIDI
+60
+Simon TAREL
+Simon TAREL
+Club
+Poste
+Points marqués
+Essais marqués
+Pénalités marquées
+Drops
+Transfo. marquées
+Matches joués
+Minutes jouées
+US Dax
+US Dax
+1ère ligne
+65
+13
+0
+0
+0
+23
+1 335
+Oyonnax Rugby
+Oyonnax Rugby
+Centre
+65
+13
+0
+0
+0
+19
+1 202
+USON Nevers
+USON Nevers
+Demi d'ouverture
+64
+0
+6
+0
+23
+11
+724
+SU Agen
+SU Agen
+Demi d'ouverture
+63
+1
+6
+0
+20
+10
+449
+Provence Rugby
+Provence Rugby
+Demi d'ouverture
+59
+1
+11
+1
+9
+12
+470
+CA Brive
+CA Brive
+Demi d'ouverture
+58
+5
+5
+0
+9
+14
+1 027
+Provence Rugby
+Provence Rugby
+Demi de mêlée
+58
+6
+4
+0
+8
+25
+782
+Provence Rugby
+Provence Rugby
+Arrière
+55
+11
+0
+0
+0
+24
+1 783
+RC Vannes
+RC Vannes
+Ailier
+55
+11
+0
+0
+0
+27
+1 745
+USON Nevers
+USON Nevers
+Ailier
+55
+11
+0
+0
+0
+22
+1 711
+RC Vannes
+RC Vannes
+Ailier
+55
+11
+0
+0
+0
+19
+1 421
+Colomiers Rugby
+Colomiers Rugby
+Ailier
+55
+11
+0
+0
+0
+18
+1 385
+Provence Rugby
+Provence Rugby
+1ère ligne
+55
+11
+0
+0
+0
+23
+1 030
+USON Nevers
+USON Nevers
+Demi d'ouverture
+54
+2
+8
+0
+10
+15
+761
+US Carcassonnaise
+US Carcassonnaise
+Demi d'ouverture
+51
+0
+9
+0
+12
+21
+901
+Soyaux-Angoulême XV
+Soyaux-Angoulême XV
+Demi d'ouverture
+51
+0
+12
+1
+6
+10
+673
+Stade Montois Rugby
+Stade Montois Rugby
+Arrière
+50
+10
+0
+0
+0
+20
+1 622
+USON Nevers
+USON Nevers
+1ère ligne
+50
+10
+0
+0
+0
+26
+1 140
+CA Brive
+CA Brive
+Arrière
+50
+10
+0
+0
+0
+13
+996
+USON Nevers
+USON Nevers
+Demi de mêlée
+48
+5
+5
+0
+4
+24
+944Rang
+Joueur
+61
+Pierre BOUDEHENT
+Pierre BOUDEHENT
+62
+Caleb Kalisi TIMU
+Caleb Kalisi TIMU
+63
+Adrien LAPEGUE - LAFAYE
+Adrien LAPEGUE - LAFAYE
+64
+Robin TACCOLA
+Robin TACCOLA
+65
+Asaeli TUIVUAKA
+Asaeli TUIVUAKA
+66
+Dorian LABORDE
+Dorian LABORDE
+67
+Jope NASEARA
+Jope NASEARA
+68
+Benjamin BOUDOU
+Benjamin BOUDOU
+69
+Emmanuel SAUBUSSE
+Emmanuel SAUBUSSE
+70
+Adrien SONZOGNI
+Adrien SONZOGNI
+71
+Maxime OLTMANN
+Maxime OLTMANN
+72
+Gaetan PICHON
+Gaetan PICHON
+73
+Hugo TROUILLOUD
+Hugo TROUILLOUD
+74
+Gatien MASSE
+Gatien MASSE
+75
+Benjamin Thomas STEVENSON
+Benjamin Thomas STEVENSON
+76
+Iban ETCHEVERRY
+Iban ETCHEVERRY
+77
+Gavin STARK
+Gavin STARK
+78
+Edward Dratai SAWAILAU
+Edward Dratai SAWAILAU
+79
+Santiago SOCINO
+Santiago SOCINO
+80
+Vano KARKADZE
+Vano KARKADZE
+Club
+Poste
+Points marqués
+Essais marqués
+Pénalités marquées
+Drops
+Transfo. marquées
+Matches joués
+Minutes jouées
+RC Vannes
+RC Vannes
+Demi d'ouverture
+45
+9
+0
+0
+0
+24
+1 634
+Colomiers Rugby
+Colomiers Rugby
+3ème ligne
+45
+9
+0
+0
+0
+24
+1 602
+Provence Rugby
+Provence Rugby
+Ailier
+45
+9
+0
+0
+0
+20
+1 527
+RC Vannes
+RC Vannes
+Centre
+45
+9
+0
+0
+0
+23
+1 495
+CA Brive
+CA Brive
+Ailier
+45
+9
+0
+0
+0
+18
+1 358
+Biarritz Olympique PB
+Biarritz Olympique PB
+Ailier
+45
+6
+5
+0
+0
+19
+1 344
+US Dax
+US Dax
+Ailier
+45
+9
+0
+0
+0
+22
+1 343
+CA Brive
+CA Brive
+1ère ligne
+45
+9
+0
+0
+0
+28
+1 155
+Soyaux-Angoulême XV
+Soyaux-Angoulême XV
+Demi de mêlée
+45
+1
+10
+0
+5
+15
+1 058
+Biarritz Olympique PB
+Biarritz Olympique PB
+1ère ligne
+45
+9
+0
+0
+0
+21
+771
+US Dax
+US Dax
+Ailier
+43
+8
+1
+0
+0
+20
+1 438
+US Carcassonnaise
+US Carcassonnaise
+Demi de mêlée
+41
+4
+7
+0
+0
+19
+1 040
+FC Grenoble Rugby
+FC Grenoble Rugby
+Arrière
+40
+8
+0
+0
+0
+27
+1 930
+Stade Montois Rugby
+Stade Montois Rugby
+Centre
+40
+8
+0
+0
+0
+26
+1 926
+RC Vannes
+RC Vannes
+Ailier
+40
+8
+0
+0
+0
+21
+1 611
+SU Agen
+SU Agen
+Arrière
+40
+8
+0
+0
+0
+20
+1 355
+Oyonnax Rugby
+Oyonnax Rugby
+Ailier
+40
+8
+0
+0
+0
+17
+1 296
+Oyonnax Rugby
+Oyonnax Rugby
+Centre
+40
+8
+0
+0
+0
+20
+1 279
+SU Agen
+SU Agen
+1ère ligne
+40
+8
+0
+0
+0
+24
+1 223
+Oyonnax Rugby
+Oyonnax Rugby
+1ère ligne
+40
+8
+0
+0
+0
+20
+1 100   Rang
+Joueur
+81
+Lucas DA SILVA
+Lucas DA SILVA
+82
+Jules DANGLOT
+Jules DANGLOT
+83
+Théo BEZIAT
+Théo BEZIAT
+84
+Paul AURADOU
+Paul AURADOU
+85
+Aurélien BARREAU
+Aurélien BARREAU
+86
+Nils CHALIES
+Nils CHALIES
+87
+Louis MARROU
+Louis MARROU
+88
+Albert TUISUE
+Albert TUISUE
+89
+Arthur COVILLE
+Arthur COVILLE
+90
+Hugo BOUYSSOU
+Hugo BOUYSSOU
+91
+Ioane IASHAGASHVILI
+Ioane IASHAGASHVILI
+92
+Barnabé COUILLOUD
+Barnabé COUILLOUD
+93
+Lucas OUDARD
+Lucas OUDARD
+94
+Uzair CASSIEM
+Uzair CASSIEM
+95
+Lisati MILO-HARRIS
+Lisati MILO-HARRIS
+96
+Dylan IDRISSI
+Dylan IDRISSI
+97
+Bastien SOURY
+Bastien SOURY
+98
+Baptiste MORENO
+Baptiste MORENO
+99
+Sione Feofa'aki TUI
+Sione Feofa'aki TUI
+100
+Benjamin LEFRANC
+Benjamin LEFRANC
+Club
+Poste
+Points marqués
+Essais marqués
+Pénalités marquées
+Drops
+Transfo. marquées
+Matches joués
+Minutes jouées
+CA Brive
+CA Brive
+1ère ligne
+40
+8
+0
+0
+0
+23
+1 039
+Colomiers Rugby
+Colomiers Rugby
+Demi de mêlée
+40
+8
+0
+0
+0
+22
+1 000
+RC Vannes
+RC Vannes
+1ère ligne
+40
+8
+0
+0
+0
+18
+829
+Oyonnax Rugby
+Oyonnax Rugby
+Centre
+38
+4
+0
+0
+9
+19
+999
+Stade Aurillacois
+Stade Aurillacois
+Demi d'ouverture
+38
+3
+4
+1
+4
+21
+979
+US Carcassonnaise
+US Carcassonnaise
+Demi d'ouverture
+36
+5
+1
+0
+4
+12
+669
+Valence Romans
+Valence Romans
+Centre
+35
+7
+0
+0
+0
+24
+1 809
+Provence Rugby
+Provence Rugby
+3ème ligne
+35
+7
+0
+0
+0
+30
+1 786
+Provence Rugby
+Provence Rugby
+Demi de mêlée
+35
+7
+0
+0
+0
+28
+1 683
+USON Nevers
+USON Nevers
+Demi de mêlée
+35
+7
+0
+0
+0
+21
+1 454
+Stade Montois Rugby
+Stade Montois Rugby
+3ème ligne
+35
+7
+0
+0
+0
+20
+1 403
+FC Grenoble Rugby
+FC Grenoble Rugby
+Demi de mêlée
+35
+7
+0
+0
+0
+27
+1 402
+Stade Aurillacois
+Stade Aurillacois
+3ème ligne
+35
+7
+0
+0
+0
+22
+1 389
+Oyonnax Rugby
+Oyonnax Rugby
+3ème ligne
+35
+7
+0
+0
+0
+21
+1 254
+Stade Montois Rugby
+Stade Montois Rugby
+Demi de mêlée
+35
+7
+0
+0
+0
+26
+1 219
+Valence Romans
+Valence Romans
+Centre
+35
+7
+0
+0
+0
+21
+1 204
+FC Grenoble Rugby
+FC Grenoble Rugby
+1ère ligne
+35
+7
+0
+0
+0
+25
+1 169
+US Carcassonnaise
+US Carcassonnaise
+1ère ligne
+35
+7
+0
+0
+0
+21
+1 071
+Provence Rugby
+Provence Rugby
+Ailier
+35
+7
+0
+0
+0
+16
+883
+CA Brive
+CA Brive
+3ème ligne
+35
+7
+0
+0
+0
+10
+804
+
+
+
+Stats Clubs
+
+Saison
+Journée
+Rang
+Club
+1
+RC Vannes
+2
+Oyonnax Rugby
+3
+CA Brive
+4
+Provence Rugby
+5
+Colomiers Rugby
+6
+Valence Romans
+7
+SU Agen
+8
+Biarritz Olympique PB
+9
+USON Nevers
+10
+FC Grenoble Rugby
+11
+Stade Aurillacois
+12
+US Dax
+13
+Stade Montois Rugby
+14
+AS Béziers Hérault
+15
+Soyaux-Angoulême XV
+16
+US Carcassonnaise
+Meilleure attaque
+Matches joués
+RC Vannes
+1 092
+30
+Oyonnax Rugby
+953
+30
+CA Brive
+906
+30
+Provence Rugby
+905
+30
+Colomiers Rugby
+847
+30
+Valence Romans
+803
+30
+SU Agen
+796
+30
+Biarritz Olympique PB
+762
+30
+USON Nevers
+760
+30
+FC Grenoble Rugby
+739
+30
+Stade Aurillacois
+718
+30
+US Dax
+706
+30
+Stade Montois Rugby
+701
+30
+AS Béziers Hérault
+657
+30
+Soyaux-Angoulême XV
+576
+30
+US Carcassonnaise
+572
+30
+
+Rang
+Club
+1
+Colomiers Rugby
+2
+RC Vannes
+3
+CA Brive
+4
+Oyonnax Rugby
+5
+Provence Rugby
+6
+US Dax
+7
+SU Agen
+8
+Valence Romans
+9
+Soyaux-Angoulême XV
+10
+AS Béziers Hérault
+11
+FC Grenoble Rugby
+12
+Biarritz Olympique PB
+13
+Stade Aurillacois
+14
+Stade Montois Rugby
+15
+US Carcassonnaise
+16
+USON Nevers
+Meilleure défense
+Matches joués
+Colomiers Rugby
+522
+30
+RC Vannes
+543
+30
+CA Brive
+642
+30
+Oyonnax Rugby
+659
+30
+Provence Rugby
+726
+30
+US Dax
+742
+30
+SU Agen
+750
+30
+Valence Romans
+760
+30
+Soyaux-Angoulême XV
+770
+30
+AS Béziers Hérault
+804
+30
+FC Grenoble Rugby
+829
+30
+Biarritz Olympique PB
+879
+30
+Stade Aurillacois
+908
+30
+Stade Montois Rugby
+950
+30
+US Carcassonnaise
+985
+30
+USON Nevers
+1 024
+30
+
+Rang
+Club
+1
+US Dax
+2
+CA Brive
+3
+FC Grenoble Rugby
+4
+RC Vannes
+5
+AS Béziers Hérault
+6
+SU Agen
+7
+Biarritz Olympique PB
+8
+Oyonnax Rugby
+9
+Provence Rugby
+10
+USON Nevers
+11
+Valence Romans
+12
+Stade Aurillacois
+13
+US Carcassonnaise
+14
+Soyaux-Angoulême XV
+15
+Colomiers Rugby
+16
+Stade Montois Rugby
+Temps de possession
+Matches joués
+US Dax
+53,9 %
+30
+CA Brive
+52,7 %
+30
+FC Grenoble Rugby
+52,4 %
+30
+RC Vannes
+52,0 %
+30
+AS Béziers Hérault
+51,4 %
+30
+SU Agen
+51,2 %
+30
+Biarritz Olympique PB
+50,4 %
+30
+Oyonnax Rugby
+50 %
+30
+Provence Rugby
+48,8 %
+30
+USON Nevers
+48,6 %
+30
+Valence Romans
+48,6 %
+30
+Stade Aurillacois
+48,4 %
+30
+US Carcassonnaise
+48,4 %
+30
+Soyaux-Angoulême XV
+48,0 %
+30
+Colomiers Rugby
+47,7 %
+30
+Stade Montois Rugby
+47,6 %
+30
+
+Rang
+Club
+1
+RC Vannes
+2
+Biarritz Olympique PB
+3
+CA Brive
+4
+FC Grenoble Rugby
+5
+Oyonnax Rugby
+6
+AS Béziers Hérault
+7
+US Dax
+8
+Colomiers Rugby
+9
+Stade Montois Rugby
+10
+Provence Rugby
+11
+Stade Aurillacois
+12
+USON Nevers
+13
+Soyaux-Angoulême XV
+14
+SU Agen
+15
+Valence Romans
+16
+US Carcassonnaise
+Occupation terrain
+Matches joués
+RC Vannes
+54,5 %
+30
+Biarritz Olympique PB
+52,1 %
+30
+CA Brive
+51,9 %
+30
+FC Grenoble Rugby
+51,7 %
+30
+Oyonnax Rugby
+51,6 %
+30
+AS Béziers Hérault
+51,4 %
+30
+US Dax
+50,7 %
+30
+Colomiers Rugby
+50,7 %
+30
+Stade Montois Rugby
+50,4 %
+30
+Provence Rugby
+49,1 %
+30
+Stade Aurillacois
+48,8 %
+30
+USON Nevers
+47,8 %
+30
+Soyaux-Angoulême XV
+47,5 %
+30
+SU Agen
+47,5 %
+30
+Valence Romans
+47,4 %
+30
+US Carcassonnaise
+46,7 %
+30
+ang
+Club
+1
+Oyonnax Rugby
+2
+RC Vannes
+3
+SU Agen
+4
+FC Grenoble Rugby
+5
+US Dax
+6
+USON Nevers
+7
+CA Brive
+8
+Provence Rugby
+9
+Biarritz Olympique PB
+10
+Valence Romans
+11
+Stade Aurillacois
+12
+Stade Montois Rugby
+13
+AS Béziers Hérault
+14
+US Carcassonnaise
+15
+Soyaux-Angoulême XV
+16
+Colomiers Rugby
+Cartons jaunes
+Matches joués
+Oyonnax Rugby
+17
+30
+RC Vannes
+18
+30
+SU Agen
+21
+30
+FC Grenoble Rugby
+21
+30
+US Dax
+22
+30
+USON Nevers
+23
+30
+CA Brive
+26
+30
+Provence Rugby
+26
+30
+Biarritz Olympique PB
+29
+30
+Valence Romans
+30
+30
+Stade Aurillacois
+31
+30
+Stade Montois Rugby
+31
+30
+AS Béziers Hérault
+31
+30
+US Carcassonnaise
+32
+30
+Soyaux-Angoulême XV
+34
+30
+Colomiers Rugby
+38
+30
+Statistiques offensives
+Essais marqués
+RC Vannes
+
+    1
+    RC Vannes
+    160
+    essais
+    2
+    Oyonnax Rugby
+    Oyonnax Rugby
+    128
+    essais
+    3
+    Provence Rugby
+    Provence Rugby
+    128
+    essais
+
+Tout voir
+Pénalités obtenues
+Valence Romans
+
+    1
+    Valence Romans
+    86
+    pénalités
+    2
+    Colomiers Rugby
+    Colomiers Rugby
+    74
+    pénalités
+    3
+    CA Brive
+    CA Brive
+    71
+    pénalités
+
+Tout voir
+Offloads
+SU Agen
+
+    1
+    SU Agen
+    341
+    offloads
+    2
+    FC Grenoble Rugby
+    FC Grenoble Rugby
+    303
+    offloads
+    3
+    US Dax
+    US Dax
+    287
+    offloads
+
+Tout voir
+Drops
+Stade Montois Rugby
+
+    1
+    Stade Montois Rugby
+    3
+    drops
+    2
+    AS Béziers Hérault
+    AS Béziers Hérault
+    3
+    drops
+    3
+    Stade Aurillacois
+    Stade Aurillacois
+    2
+    drops
+
+Tout voir
+Mètres parcourus
+FC Grenoble Rugby
+
+    1
+    FC Grenoble Rugby
+    25 772,4
+    mètres
+    2
+    Provence Rugby
+    Provence Rugby
+    25 468,1
+    mètres
+    3
+    RC Vannes
+    RC Vannes
+    24 903,5
+    mètres
+
+Tout voir
+Franchissements
+Colomiers Rugby
+
+    1
+    Colomiers Rugby
+    176
+    franch.
+    2
+    Provence Rugby
+    Provence Rugby
+    166
+    franch.
+    3
+    Oyonnax Rugby
+    Oyonnax Rugby
+    164
+    franch.
+
+Tout voir
+Plaquages cassés
+FC Grenoble Rugby
+
+    1
+    FC Grenoble Rugby
+    709
+    plaquages
+    2
+    SU Agen
+    SU Agen
+    708
+    plaquages
+    3
+    AS Béziers Hérault
+    AS Béziers Hérault
+    678
+    plaquages
+
+Tout voir
+Meilleur taux de transfo
+SU Agen
+
+    1
+    SU Agen
+    83,5
+    2
+    RC Vannes
+    RC Vannes
+    83,4
+    3
+    Valence Romans
+    Valence Romans
+    81,8
+
+Tout voir
+Statistiques défensives
+Ballons grattés
+Provence Rugby
+
+    1
+    Provence Rugby
+    107
+    ballons
+    2
+    Soyaux-Angoulême XV
+    Soyaux-Angoulême XV
+    103
+    ballons
+    3
+    Colomiers Rugby
+    Colomiers Rugby
+    103
+    ballons
+
+Tout voir
+Plaquages réussis
+Valence Romans
+
+    1
+    Valence Romans
+    4 646
+    plaquages
+    2
+    Colomiers Rugby
+    Colomiers Rugby
+    4 494
+    plaquages
+    3
+    Provence Rugby
+    Provence Rugby
+    4 363
+    plaquages
+
+Tout voir
+Pénalités concédées
+FC Grenoble Rugby
+
+    1
+    FC Grenoble Rugby
+    278
+    pénalités
+    2
+    Stade Aurillacois
+    Stade Aurillacois
+    304
+    pénalités
+    3
+    RC Vannes
+    RC Vannes
+    305
+    pén

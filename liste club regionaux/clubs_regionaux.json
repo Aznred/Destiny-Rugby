@@ -1,0 +1,927 @@
+[
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Champagnole",
+        "Fichier_Logo":"champagnole.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Pierrefeucain",
+        "Fichier_Logo":"pierrefeucain.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Saintes",
+        "Fichier_Logo":"saintes.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Cercle Jules Ferry Rugby Fleury les Aubrais",
+        "Fichier_Logo":"cercle_jules_ferry_rugby_fleury_les_aubrais.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"L Agglomeration Cergy Pontoise",
+        "Fichier_Logo":"l_agglomeration_cergy_pontoise.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"RHONE SPORTI",
+        "Fichier_Logo":"rhone_sporti.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Marseillais",
+        "Fichier_Logo":"marseillais.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Billomois",
+        "Fichier_Logo":"billomois.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Pons",
+        "Fichier_Logo":"pons.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Arcol",
+        "Fichier_Logo":"arcol.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"St Genis Laval",
+        "Fichier_Logo":"st_genis_laval.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Lisle-sur-Tarn",
+        "Fichier_Logo":"lisle-sur-tarn.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Bassoues Lupiac",
+        "Fichier_Logo":"bassoues_lupiac.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Arudy",
+        "Fichier_Logo":"arudy.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Lège Cap-Ferret",
+        "Fichier_Logo":"lge_cap-ferret.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Sainte Foy la Grande",
+        "Fichier_Logo":"sainte_foy_la_grande.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Foix",
+        "Fichier_Logo":"foix.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"R C Riom Es Montagnes",
+        "Fichier_Logo":"r_c_riom_es_montagnes.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Chagny",
+        "Fichier_Logo":"chagny.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Eyrieux",
+        "Fichier_Logo":"eyrieux.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Loudun",
+        "Fichier_Logo":"loudun.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Maurs",
+        "Fichier_Logo":"maurs.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Sainte-Geneviève-des-Bois",
+        "Fichier_Logo":"sainte-genevive-des-bois.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Labastide-Beauvoir",
+        "Fichier_Logo":"labastide-beauvoir.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Chabeuillois",
+        "Fichier_Logo":"chabeuillois.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Montréjeau",
+        "Fichier_Logo":"montrjeau.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"RUGBY UNION",
+        "Fichier_Logo":"rugby_union.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Deolois",
+        "Fichier_Logo":"deolois.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Garches Vaucresson",
+        "Fichier_Logo":"garches_vaucresson.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Lalinde",
+        "Fichier_Logo":"lalinde.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"XV CREPYNOIS",
+        "Fichier_Logo":"xv_crepynois.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Labastide-Saint-Georges",
+        "Fichier_Logo":"labastide-saint-georges.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"SC Rhétais",
+        "Fichier_Logo":"sc_rhtais.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Herouvillais",
+        "Fichier_Logo":"herouvillais.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Espalion",
+        "Fichier_Logo":"espalion.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Aurore de Vitre",
+        "Fichier_Logo":"aurore_de_vitre.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"RUGBY SUD 77",
+        "Fichier_Logo":"rugby_sud_77.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Buxynoise",
+        "Fichier_Logo":"buxynoise.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Labatut",
+        "Fichier_Logo":"labatut.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Broceliande Rugby Paimpont",
+        "Fichier_Logo":"broceliande_rugby_paimpont.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Sainte-Bazeille",
+        "Fichier_Logo":"sainte-bazeille.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Chartreuse",
+        "Fichier_Logo":"chartreuse.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Sigean-Port La Nouvelle",
+        "Fichier_Logo":"sigean-port_la_nouvelle.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Le Beausset",
+        "Fichier_Logo":"le_beausset.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Thann",
+        "Fichier_Logo":"thann.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Sare Izarra",
+        "Fichier_Logo":"sare_izarra.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Terres de France",
+        "Fichier_Logo":"terres_de_france.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"E M D  Plaine de L Ain",
+        "Fichier_Logo":"e_m_d__plaine_de_l_ain.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Dole",
+        "Fichier_Logo":"dole.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Nontron",
+        "Fichier_Logo":"nontron.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Bastia",
+        "Fichier_Logo":"bastia.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Montréal",
+        "Fichier_Logo":"montral.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"St Simon",
+        "Fichier_Logo":"st_simon.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Joue",
+        "Fichier_Logo":"joue.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Fleury Salles Coursan",
+        "Fichier_Logo":"fleury_salles_coursan.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Penne Saint-Sylvestre",
+        "Fichier_Logo":"penne_saint-sylvestre.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Saint-Maixent-l&#039;Ecole",
+        "Fichier_Logo":"saint-maixent-l039ecole.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Plaisance",
+        "Fichier_Logo":"plaisance.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Quimper",
+        "Fichier_Logo":"quimper.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"St Brieuc",
+        "Fichier_Logo":"st_brieuc.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Pessac",
+        "Fichier_Logo":"pessac.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Antony",
+        "Fichier_Logo":"antony.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Landivisien",
+        "Fichier_Logo":"landivisien.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Mézin",
+        "Fichier_Logo":"mzin.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Saint-André-de-Cubzac",
+        "Fichier_Logo":"saint-andr-de-cubzac.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Capdenac",
+        "Fichier_Logo":"capdenac.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Vesoul",
+        "Fichier_Logo":"vesoul.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Ramonville",
+        "Fichier_Logo":"ramonville.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Alfortville",
+        "Fichier_Logo":"alfortville.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Entente St Jean du Var - Corse 83",
+        "Fichier_Logo":"entente_st_jean_du_var_-_corse_83.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Les 3 Clochers",
+        "Fichier_Logo":"les_3_clochers.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Trélissac",
+        "Fichier_Logo":"trlissac.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Dampniat",
+        "Fichier_Logo":"dampniat.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"RUGBY OUEST",
+        "Fichier_Logo":"rugby_ouest.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"UNION RUGBY",
+        "Fichier_Logo":"union_rugby.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Saint-Symphorien-d&#039;Ozon",
+        "Fichier_Logo":"saint-symphorien-d039ozon.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"M Montargis",
+        "Fichier_Logo":"m_montargis.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"St Aulaire",
+        "Fichier_Logo":"st_aulaire.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"La Barguillère",
+        "Fichier_Logo":"la_barguillre.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Stade de Reims",
+        "Fichier_Logo":"stade_de_reims.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"R O CHOLETAI",
+        "Fichier_Logo":"r_o_choletai.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Saint-Herblain",
+        "Fichier_Logo":"saint-herblain.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Mont Saint Aignan",
+        "Fichier_Logo":"mont_saint_aignan.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Rives d&#039;Orb",
+        "Fichier_Logo":"rives_d039orb.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Faverges",
+        "Fichier_Logo":"faverges.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Vallée du Girou",
+        "Fichier_Logo":"valle_du_girou.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Iroise Saint Renan",
+        "Fichier_Logo":"iroise_saint_renan.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Privadois",
+        "Fichier_Logo":"privadois.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Donatien",
+        "Fichier_Logo":"donatien.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Touvet Pontcharra",
+        "Fichier_Logo":"touvet_pontcharra.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"La Ravoire",
+        "Fichier_Logo":"la_ravoire.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Parentis",
+        "Fichier_Logo":"parentis.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Argentan",
+        "Fichier_Logo":"argentan.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Monteux",
+        "Fichier_Logo":"monteux.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"RUGBY VAL D",
+        "Fichier_Logo":"rugby_val_d.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Nancy-Seichams",
+        "Fichier_Logo":"nancy-seichams.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Orsay",
+        "Fichier_Logo":"orsay.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"US Aspoise Bedous",
+        "Fichier_Logo":"us_aspoise_bedous.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"RUBGY CLUB M",
+        "Fichier_Logo":"rubgy_club_m.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Digne-les-Bains",
+        "Fichier_Logo":"digne-les-bains.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Canton de Marsanne",
+        "Fichier_Logo":"canton_de_marsanne.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Daglan",
+        "Fichier_Logo":"daglan.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Villeneuve d&#039;Asq\/Lille",
+        "Fichier_Logo":"villeneuve_d039asqlille.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"TLA",
+        "Fichier_Logo":"tla.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Tauch Corbières XV",
+        "Fichier_Logo":"tauch_corbires_xv.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Sidobre Montagne",
+        "Fichier_Logo":"sidobre_montagne.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Ciboure",
+        "Fichier_Logo":"ciboure.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Grace Guenrouet",
+        "Fichier_Logo":"grace_guenrouet.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"RC Domes Sioule",
+        "Fichier_Logo":"rc_domes_sioule.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"La Couronne",
+        "Fichier_Logo":"la_couronne.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Villers-les-Nancy",
+        "Fichier_Logo":"villers-les-nancy.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Val XV",
+        "Fichier_Logo":"val_xv.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Bassin Sud Minervois",
+        "Fichier_Logo":"bassin_sud_minervois.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"C LEO LAGRAN",
+        "Fichier_Logo":"c_leo_lagran.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Bar-le-Duc",
+        "Fichier_Logo":"bar-le-duc.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Saint-Flour",
+        "Fichier_Logo":"saint-flour.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Orange",
+        "Fichier_Logo":"orange.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Egletons",
+        "Fichier_Logo":"egletons.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Ass Anciens Eleves de Leforest",
+        "Fichier_Logo":"ass_anciens_eleves_de_leforest.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Maureilhan",
+        "Fichier_Logo":"maureilhan.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Noves-Eyragues",
+        "Fichier_Logo":"noves-eyragues.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Arbois",
+        "Fichier_Logo":"arbois.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Saint-Apollinaire",
+        "Fichier_Logo":"saint-apollinaire.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Hayange",
+        "Fichier_Logo":"hayange.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Confluent RC",
+        "Fichier_Logo":"confluent_rc.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Millas",
+        "Fichier_Logo":"millas.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Cœur de Lomagne",
+        "Fichier_Logo":"cur_de_lomagne.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Paris XV",
+        "Fichier_Logo":"paris_xv.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Paris XO",
+        "Fichier_Logo":"paris_xo.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Mions",
+        "Fichier_Logo":"mions.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"RUGBY OLYMPI",
+        "Fichier_Logo":"rugby_olympi.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Lapalissois",
+        "Fichier_Logo":"lapalissois.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Laon",
+        "Fichier_Logo":"laon.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Pays de Thiers",
+        "Fichier_Logo":"pays_de_thiers.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Amicale Laique des Jeunes de Limay",
+        "Fichier_Logo":"amicale_laique_des_jeunes_de_limay.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Mazères-Cassagne",
+        "Fichier_Logo":"mazres-cassagne.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Du Bocage Virois",
+        "Fichier_Logo":"du_bocage_virois.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Chameyrat",
+        "Fichier_Logo":"chameyrat.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"ES Lembeye",
+        "Fichier_Logo":"es_lembeye.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Pouyastruc",
+        "Fichier_Logo":"pouyastruc.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Beaune",
+        "Fichier_Logo":"beaune.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Saint-Gaudens",
+        "Fichier_Logo":"saint-gaudens.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"La Tour-du-Crieu",
+        "Fichier_Logo":"la_tour-du-crieu.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Saint-Céré",
+        "Fichier_Logo":"saint-cr.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Saint-Jean d&#039;Angely",
+        "Fichier_Logo":"saint-jean_d039angely.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Saint-Martin-de-Seignanx",
+        "Fichier_Logo":"saint-martin-de-seignanx.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Saint-Lary",
+        "Fichier_Logo":"saint-lary.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Moissac",
+        "Fichier_Logo":"moissac.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Lesperon Onesse",
+        "Fichier_Logo":"lesperon_onesse.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Ascain",
+        "Fichier_Logo":"ascain.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Villeneuve-lès-Maguelone",
+        "Fichier_Logo":"villeneuve-ls-maguelone.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Saint-Juery",
+        "Fichier_Logo":"saint-juery.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Orleans la Source",
+        "Fichier_Logo":"orleans_la_source.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Juillac Objat",
+        "Fichier_Logo":"juillac_objat.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Saint-Jory",
+        "Fichier_Logo":"saint-jory.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Blanc Mesnil Sports",
+        "Fichier_Logo":"blanc_mesnil_sports.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Tartas",
+        "Fichier_Logo":"tartas.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Coulommiers Pays de Brie",
+        "Fichier_Logo":"coulommiers_pays_de_brie.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Le Passage",
+        "Fichier_Logo":"le_passage.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Épinal-Golbey",
+        "Fichier_Logo":"pinal-golbey.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Vaulnaveys\/Vizille",
+        "Fichier_Logo":"vaulnaveysvizille.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Pomarez Amou",
+        "Fichier_Logo":"pomarez_amou.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"St Genes Champanelle",
+        "Fichier_Logo":"st_genes_champanelle.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Folles",
+        "Fichier_Logo":"folles.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Seine &amp; Oise Triel sur Seine",
+        "Fichier_Logo":"seine_amp_oise_triel_sur_seine.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"La Têt",
+        "Fichier_Logo":"la_tt.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Salaise-sur-Sanne",
+        "Fichier_Logo":"salaise-sur-sanne.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"XV SURANAIS",
+        "Fichier_Logo":"xv_suranais.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"ENTENTE R C",
+        "Fichier_Logo":"entente_r_c.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Mimizan",
+        "Fichier_Logo":"mimizan.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Sainte-Florine",
+        "Fichier_Logo":"sainte-florine.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Montaigut Besse",
+        "Fichier_Logo":"montaigut_besse.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Bessan",
+        "Fichier_Logo":"bessan.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Olonzac",
+        "Fichier_Logo":"olonzac.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Aureilhan",
+        "Fichier_Logo":"aureilhan.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Biganos",
+        "Fichier_Logo":"biganos.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"La Motte-Servolex",
+        "Fichier_Logo":"la_motte-servolex.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"BUGEY OL CLU",
+        "Fichier_Logo":"bugey_ol_clu.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Vic-Fezensac",
+        "Fichier_Logo":"vic-fezensac.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"Lavallois",
+        "Fichier_Logo":"lavallois.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Vallée du Gapeau",
+        "Fichier_Logo":"valle_du_gapeau.png"
+    },
+    {
+        "Division":"Regionale 2",
+        "Équipe":"Jarnac Rouillac",
+        "Fichier_Logo":"jarnac_rouillac.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Valréas",
+        "Fichier_Logo":"valras.png"
+    },
+    {
+        "Division":"Regionale 3",
+        "Équipe":"P Nogent le Rotrou",
+        "Fichier_Logo":"p_nogent_le_rotrou.png"
+    },
+    {
+        "Division":"Regionale 1",
+        "Équipe":"Saint-Sever",
+        "Fichier_Logo":"saint-sever.png"
+    }
+]

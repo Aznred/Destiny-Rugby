@@ -1,0 +1,86 @@
+1. Création du Joueur et Début de Carrière
+
+    Niveau de départ : Le joueur commence avec une note générale (GEN) très basse entre 30 et 40.
+
+    Séparation des postes : Les postes sont désormais strictement séparés et identifiés par les numéros traditionnels du rugby (de 1 à 15).
+
+    Nationalités : Ajout de l'ensemble des nations mondiales dans l'outil de création (198 pays disponibles).
+
+    Système de Traits de Caractère : Lors de la création, le joueur doit choisir des "Traits" qui influenceront sa carrière et bonus malus (ex : Sang chaud, Peur de se faire mal, Fêtard, Professionnel, etc.).
+
+2. Gameplay et Événements (Système Groq)
+
+    Blocage de la progression : Impossible de passer à la suite de la saison tant que les actions de la journée n'ont pas été effectuées (boutons désactivés).
+
+    Boucle d'événements : Chaque itération comprend 1 situation à vivre.
+
+    Intégration de l'IA (Groq) :
+        Si Groq est inactif : Lancement automatique de situations et d'événements pré-écrits.
+        Si Groq est actif : Le jeu envoie les statistiques et les informations du joueur à l'IA pour générer une situation textuelle sur mesure. Le joueur doit écrire sa propre réponse.
+
+    Blessures dynamiques : Mise en place d'un système de blessures (mineures, fin de saison, ou fin de carrière) dont la probabilité et la gravité dépendent de la forme physique et du moral du joueur.
+
+    Retraite : Le jeu force la retraite du joueur une fois un certain âge atteint, peut continuer ou arrêter à partir de 33 ans et fin à 40 ans.
+
+3. Simulation et Structure des Compétitions (Grosse MAJ)
+
+    Rythme de simulation au choix :
+        Avancée journée par journée : Écran de simulation détaillé pour suivre les matchs semaine après semaine (une situation par semaine) (stats mises à jour chaque semaine).
+        Simulation rapide : Possibilité de simuler saison par saison pour les joueurs qui veulent avancer plus vite (3 situations dans la saison) (3 étapes de stats).
+
+    Ligue dynamique : Les championnats gèrent les montées et les descentes (promotions/relégations) entre les divisions supérieures et inférieures.
+
+    Sélections Nationales : Les équipes nationales sélectionnent automatiquement les meilleurs joueurs et espoirs actuels du pays en fonction de leurs statistiques, de leur note générale et de leur poste (système de calendrier avec mois et année et jour qui suit les dates officielles des compétitions).
+
+    Récompenses : Le titre de "Joueur de l'année" est attribué logiquement en fonction des statistiques individuelles et des trophées remportés par le joueur.
+
+4. Statistiques Avancées
+
+    Profondeur des stats individuelles : En plus des matchs joués et des essais, ajout des points totaux, pourcentage de réussite au pied (transformations/pénalités), plaquages réussis/ratés, grattages, passes décisives, etc.
+
+    Stats mondiales : Chaque joueur géré par le jeu (PNJ) possède ses propres statistiques générées dynamiquement en fonction de sa note générale (GEN) et de son poste (1 à 15).
+
+5. Immersion et Fonctionnalités Annexes
+
+    Réseaux Sociaux (Twitter) :
+        Possibilité de poster des messages.
+        L'IA Groq génère des réponses (fans, journalistes, haters) basées sur le contenu du message et les performances récentes du joueur sur le terrain.
+        Influence directement la réputation et le nombre d'abonnés (peut entrainer des sanctions pour le club et le joueur si dérapages racisme etc).
+
+    Ajout de nouvelles ligues et de nouvelles data.
+
+    Défis et Succès : Ajout de succès à débloquer (Achievements) et de défis quotidiens à réussir pour gagner des récompenses.
+
+6. Interface (UI), Graphismes et Boutique
+
+    Boutique : Ajout de nouveaux achats possibles et changement des skins/icônes des ballons dans la boutique.
+
+    Blasons de club : Remplacement des icônes génériques (éclair pour l'énergie, bouclier pour la défense/moral) par le blason officiel de l'équipe actuelle du joueur.
+
+    Intégration d'images :
+        Création d'une base de données d'images dynamiques qui s'affichent en fonction des événements rencontrés.
+        Mise à jour de tous les blasons par les logos officiels des équipes (via la base de données d'images libres de droit à fournir ultérieurement).
+
+7. Gestion Avancée des Contrats et Transferts (Nouvelle MAJ)
+
+    Négociations via l'IA : Utilisation de Groq pour négocier les contrats (salaire, prime à la signature, rôle dans l'équipe).
+    Gestion de l'Agent : Choix entre différents agents (commission variable, accès aux meilleures ligues ou risque de drames).
+
+8. Évolution, Vétérance et Retraite (Nouvelle MAJ)
+
+    Mentorat : Passé 30 ans, possibilité de prendre un jeune sous son aile (ralentit la baisse des stats physiques et booste le moral).
+    Reconversion Post-Carrière : Choix final textuel à la retraite (entraîneur, consultant TV, patron de bar) influencé par les traits du joueur.
+
+9. Vie Extra-Sportive et Économie / Lifestyle (Nouvelle MAJ)
+
+    Sponsoring et Dépenses : Achat d'équipements (caisson hyperbare) pour réduire les blessures, ou biens de luxe influençant la notoriété et le risque de dérapages.
+    Interviews d'Après-Match : Conférences de presse post-match avec questions de journalistes générées par l'IA. Les réponses impactent la confiance du coach et des fans.
+
+10. Dynamique de Vestiaire et Rivalités (Nouvelle MAJ)
+
+    Affinités et Némésis : Les événements textuels créent des liens avec les PNJ (bonus en match avec un ami, ou risque de blessure/carton contre une Némésis).
+    Rôle de Capitaine : Gagner le brassard débloque des options de boost d'équipe en cours de match.
+
+11. Immersion en Match / Simulation (Nouvelle MAJ)
+
+    Moments Décisifs (Clutch Moments) : Ajout d'événements textuels en direct lors des matchs tendus (ex: choix crucial à la 80ème minute basé sur les stats du joueur).

@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  /* Palette — stade nocturne, cuir & pelouse */
+  --pelouse-900: #08160f;
+  --pelouse-800: #0c2418;
+  --pelouse-700: #123420;
+  --pelouse-600: #1a4a2e;
+  --pelouse-500: #237a44;
+  --pelouse-400: #34a35a;
+
+  --cuir-600: #6d3a1f;
+  --cuir-500: #8a4b2a;
+  --cuir-400: #b3653a;
+
+  --or-500: #e8b23a;
+  --or-400: #f4cd63;
+
+  --craie: #f5f7f2;
+  --craie-dim: #c7d1c6;
+  --brume: #8ea394;
+
+  --danger: #e05a4d;
+  --succes: #48c47a;
+
+  --bg: var(--pelouse-900);
+  --surface: rgba(18, 52, 32, 0.55);
+  --surface-solid: #0f2a1b;
+  --bordure: rgba(232, 178, 58, 0.18);
+  --bordure-forte: rgba(232, 178, 58, 0.4);
+
+  --ombre: 0 18px 50px -12px rgba(0, 0, 0, 0.7);
+  --rayon: 16px;
+  --rayon-sm: 10px;
+
+  --police-titre: 'Anton', 'Archivo', sans-serif;
+  --police-forte: 'Archivo', system-ui, sans-serif;
+  --police: 'Inter', system-ui, sans-serif;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--police);
+  color: var(--craie);
+  background:
+    radial-gradient(1200px 700px at 50% -10%, rgba(52, 163, 90, 0.18), transparent 60%),
+    radial-gradient(900px 600px at 90% 110%, rgba(232, 178, 58, 0.08), transparent 55%),
+    linear-gradient(180deg, var(--pelouse-900), #050d09 90%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Motif de lignes de terrain, discret */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 119px, rgba(245, 247, 242, 0.02) 119px 120px);
+  z-index: 0;
+}
+
+h1, h2, h3 {
+  font-family: var(--police-forte);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+
+a { color: var(--or-400); text-decoration: none; }
+
+button { font-family: var(--police-forte); cursor: pointer; }
+
+::selection { background: var(--or-500); color: #1a1305; }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--pelouse-500) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--pelouse-500);
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.eyebrow {
+  font-family: var(--police-forte);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.72rem;
+  color: var(--or-400);
+}
+
+.section {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, 92vw);
+  margin: 0 auto;
+}

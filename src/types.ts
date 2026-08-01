@@ -1,0 +1,372 @@
+// Types du domaine — Destiny Rugby 🏉
+
+// Les 15 postes du rugby, du pilier gauche (1) à l'arrière (15).
+export type PosteId =
+  | 'pilier_gauche' | 'talonneur' | 'pilier_droit'
+  | 'deuxieme_ligne_g' | 'deuxieme_ligne_d'
+  | 'troisieme_aile_g' | 'troisieme_aile_d' | 'numero_8'
+  | 'demi_melee' | 'demi_ouverture'
+  | 'ailier_gauche' | 'premier_centre' | 'deuxieme_centre' | 'ailier_droit'
+  | 'arriere';
+
+// « Famille » de postes : c'est ce que donnent les données réelles, qui ne
+// distinguent pas le pilier gauche du pilier droit.
+export type FamillePoste =
+  | 'pilier' | 'talonneur' | 'deuxieme_ligne' | 'troisieme_ligne'
+  | 'demi_melee' | 'demi_ouverture' | 'centre' | 'ailier' | 'arriere';
+
+export interface Poste {
+  id: PosteId;
+  nom: string;
+  numero: number; // le numéro du maillot, 1 à 15
+  famille: FamillePoste;
+  categorie: 'Avant' | 'Arrière';
+  description: string;
+  // Attributs mis en avant pour ce poste (utilisés pour la génération de base)
+  cles: (keyof Attributs)[];
+}
+
+export interface Attributs {
+  vitesse: number;
+  force: number;
+  endurance: number;
+  plaquage: number;
+  passe: number;
+  jeuAuPied: number;
+  vision: number;
+  mental: number;
+}
+
+export type AttributId = keyof Attributs;
+
+// Clés numériques du joueur que l'IA peut faire varier
+export type StatVariable =
+  | AttributId
+  | 'forme'
+  | 'moral'
+  | 'reputation'
+  | 'argent';
+
+// Contrat en cours du joueur : durée restante et salaire annuel.
+export interface Contrat {
+  club: string;
+  division: string;
+  saisons: number; // saisons restantes (0 = fin de contrat)
+  salaire: number; // € par saison
+}
+
+// Une proposition reçue au mercato (panneau « Choix de carrière »).
+export interface OffreContrat {
+  id: string;
+  club: string;
+  division: string;
+  divisionNom: string;
+  pays: string;
+  noteClub: number;
+  salaire: number;
+  prime: number;
+  saisons: number;
+  etranger: boolean;
+  argumentaire: string;
+  negociee?: boolean; // on ne renégocie pas deux fois la même offre
+}
+
+export interface Joueur {
+  nom: string;
+  poste: PosteId;
+  nation: string;
+  club: string;
+  division?: string; // id de division ('top14'…'reg3') — absent sur vieilles sauvegardes
+  age: number;
+  attributs: Attributs;
+  forme: number; // 0-100
+  moral: number; // 0-100
+  reputation: number; // 0-100
+  argent: number; // €
+  saison: number;
+  matchsJoues: number;
+  essais: number;
+  titres: string[];
+  // --- Évolution dynamique (ajoutés en cours de route : optionnels pour les
+  // sauvegardes antérieures, complétés à la volée par le store) ---
+  potentiel?: number; // note générale visée au pic de carrière
+  noteSaison?: number; // note moyenne (sur 10) de la saison écoulée
+  contrat?: Contrat;
+  // --- Mode « journée par journée » (calendrier réel) ---
+  semaine?: number; // semaine en cours dans le calendrier (1 = fin août)
+  saisonEnCours?: BilanEnCours;
+  selections?: number; // nombre de capes internationales
+  stats?: StatsDetaillees; // cumul de carrière
+  blessure?: Blessure | null; // blessure en cours
+  mentorat?: boolean; // a pris un jeune sous son aile (30 ans et +)
+  traits?: string[]; // traits de caractère choisis à la création
+  capitaine?: boolean; // porte le brassard
+  relations?: Relation[]; // amitiés et rivalités du vestiaire
+  entrainementSemaine?: number; // dernière semaine où l'on s'est entraîné
+  // --- Lot 6 : ce que le staff et le public pensent de toi ---
+  confianceCoach?: number; // 0-100, 50 par défaut — pèse sur le temps de jeu
+  popularite?: number; // 0-100, 50 par défaut — pèse sur la réputation et le marché
+  agent?: string; // id de l'agent choisi (data/agents.ts)
+  // Poids du joueur sur les résultats de son club, figé pour la saison
+  // (voir `calculerApportClub` dans le store).
+  apportClub?: number;
+  // --- Lot 7 : réseau social ---
+  pseudo?: string; // identifiant @ sur L'Ovale
+  abonnes?: number; // nombre d'abonnés
+  profilSocial?: ProfilSocial; // nom affiché, photo, bio, bannière
+}
+
+// Ce que le joueur a accumulé depuis le début de la saison, semaine après
+// semaine. Sert de base au bilan de fin de saison (au lieu d'une simulation).
+export interface BilanEnCours {
+  matchs: number;
+  titularisations: number;
+  essais: number;
+  notes: number[]; // note de chaque match joué, sur 10
+  capes: number; // sélections honorées cette saison
+  stats: StatsDetaillees; // cumul de la saison en cours
+}
+
+// Statistiques détaillées, cumulées sur une saison ou sur toute la carrière.
+export interface StatsDetaillees {
+  points: number;
+  butsTentes: number;
+  butsReussis: number;
+  plaquages: number;
+  plaquagesManques: number;
+  grattages: number;
+  passesDecisives: number;
+  cartonsJaunes: number;
+  cartonsRouges: number;
+}
+
+// --- BLESSURES ---
+export type GraviteBlessure = 'legere' | 'moyenne' | 'saison' | 'carriere';
+
+export interface Blessure {
+  nom: string;
+  gravite: GraviteBlessure;
+  semaines: number; // indisponibilité restante
+}
+
+// Ce que devient le joueur une fois les crampons raccrochés.
+export interface Reconversion {
+  id: string;
+  nom: string;
+  emoji: string;
+  desc: string;
+}
+
+// Lien noué avec un autre joueur : un ami dans le vestiaire, une rivalité qui
+// dure. Les relations naissent des saisons passées ensemble et des transferts.
+export interface Relation {
+  nom: string;
+  club: string;
+  type: 'ami' | 'nemesis';
+  depuis: number; // saison où le lien est né
+}
+
+// --- RÉSEAU SOCIAL « L'Ovale » (lot 7) ---
+export interface PostSocial {
+  id: string;
+  auteur: string;
+  pseudo: string; // sans @
+  avatar: string; // emoji, ou 'moi' pour le joueur
+  certifie?: boolean;
+  texte: string;
+  saison: number;
+  semaine: number;
+  date: string; // libellé court (« 12 oct. »)
+  moi?: boolean; // publié par le joueur
+  ton?: string; // id du ton employé (posts du joueur)
+  likes: number;
+  reposts: number;
+  vues: number;
+  aime?: boolean; // le joueur a aimé ce post
+  repostee?: boolean; // le joueur a reposté (apparaît sur son profil)
+  hostile?: boolean; // réponse négative
+  reponses?: PostSocial[];
+  // Ce que le post PROVOQUE dans le monde du jeu (généré par l'IA) : un
+  // transfert annoncé se fait vraiment, une offre arrive vraiment.
+  action?: {
+    type: 'transfert' | 'offre' | 'rumeur' | 'conference' | 'drama';
+    joueur?: string;
+    de?: string;
+    vers?: string;
+    poste?: string;
+    age?: number;
+    note?: number;
+  };
+  type?: string; // type de compte auteur
+  media?: { url: string; gif?: boolean; legende?: string }; // image ou GIF joint
+}
+
+// Un compte que le joueur suit sur L'Ovale : un coéquipier, un rival, un club,
+// un journaliste. Les vrais noms viennent des effectifs et des championnats.
+export interface CompteSuivi {
+  pseudo: string; // sans @
+  nom: string;
+  // Avatar : un emoji, 'club:<nom du club>' (écusson officiel),
+  // 'compet:<id>' (logo de championnat) ou 'moi' (le joueur).
+  avatar: string;
+  type: 'joueur' | 'club' | 'journaliste' | 'media' | 'fan' | 'hater' | 'selection' | 'competition';
+  club?: string;
+  bio?: string;
+  certifie?: boolean;
+  abonnes: number;
+  banniere?: string; // dégradé de la bannière de profil
+}
+
+// Ce que le joueur peut personnaliser sur SON profil.
+export interface ProfilSocial {
+  nomAffiche?: string;
+  pseudo?: string;
+  bio?: string;
+  avatar?: string; // 'club' (écusson) ou un emoji
+  banniere?: string;
+}
+
+// Un message privé échangé avec un compte (Groq répond à sa place).
+export interface MessageDM {
+  id: string;
+  pseudo: string; // interlocuteur
+  de: 'moi' | 'lui';
+  texte: string;
+  saison: number;
+}
+
+// Un transfert ANNONCÉ sur L'Ovale — et réellement appliqué au monde du jeu.
+export interface TransfertAnnonce {
+  nom: string; // joueur concerné
+  de: string; // club quitté
+  vers: string; // club rejoint
+  saison: number;
+  poste?: string;
+  age?: number;
+  note?: number;
+  nation?: string;
+}
+
+export interface NotifSocial {
+  id: string;
+  emoji: string;
+  titre: string;
+  texte: string;
+  saison: number;
+  lue?: boolean;
+}
+
+// Un succès débloqué : id → saison où il est tombé.
+export type SuccesDebloques = Record<string, number>;
+
+// Rythme de jeu choisi par le joueur.
+export type Rythme = 'semaine' | 'saison';
+
+export interface EntreeJournal {
+  id: string;
+  saison: number;
+  role: 'joueur' | 'mj' | 'systeme';
+  titre?: string;
+  texte: string;
+  deltas?: Partial<Record<StatVariable, number>>;
+  evenement?: string;
+}
+
+// Réponse structurée attendue du Maître du Jeu (Groq)
+export interface ReponseMJ {
+  recit: string;
+  evenement?: string;
+  deltas?: Partial<Record<StatVariable, number>>;
+  consequences?: string;
+  choix?: string[];
+}
+
+export type Ecran =
+  | 'accueil'
+  | 'creation'
+  | 'carriere'
+  | 'profil'
+  | 'boutique'
+  | 'pantheon'
+  | 'classement'
+  | 'championnats'
+  | 'effectif'
+  | 'tableau'
+  | 'social';
+
+// ---------------------------------------------------------------------------
+// CLUBS & CHAMPIONNATS
+// (définis ici plutôt que dans data/clubs.ts : le fichier généré
+// data/mondeReel.ts en a besoin, et clubs.ts importe ce fichier généré.)
+// ---------------------------------------------------------------------------
+export interface Club {
+  nom: string;
+  ville?: string;
+  c1: string; // couleurs du blason généré (repli quand il n'y a pas de logo)
+  c2: string;
+  logo?: string; // logo officiel (public/logos/*.png)
+}
+
+export interface Competition {
+  id: string;
+  nom: string;
+  pays: string;
+  drapeaux: string[]; // codes flag-icons (ex. 'fr', 'gb-eng')
+  emoji: string;
+  niveau: number; // 1 = élite France ; 7 = Fédérale 3 (0 = étranger/élite)
+  zone: 'France' | 'Monde';
+  clubs: Club[];
+  note?: string;
+}
+
+// Une ligne de classement (championnat de clubs OU compétition de sélections).
+export interface LigneClassement {
+  position: number;
+  equipe: string;
+  logo?: string;
+  points: number;
+  joues: number;
+  gagnes: number;
+  nuls: number;
+  perdus: number;
+  difference: number;
+  bonus: number;
+}
+
+// Coupe : pas de championnat propre, ses clubs viennent des championnats.
+export interface CompetitionCoupe {
+  id: string;
+  nom: string;
+  pays: string;
+  drapeaux: string[];
+  emoji: string;
+  desc: string;
+  clubs: Club[];
+}
+
+// Compétition de sélections nationales (6 Nations, tournée d'automne…).
+export interface CompetitionNations {
+  id: string;
+  nom: string;
+  emoji: string;
+  desc: string;
+  classement: LigneClassement[];
+}
+
+// Une carrière figée dans le Hall des Légendes.
+export interface LegendeSauvegardee {
+  id: string;
+  nom: string;
+  poste: PosteId;
+  nation: string;
+  age: number;
+  saisons: number;
+  note: number; // moyenne des attributs
+  reputation: number;
+  matchsJoues: number;
+  essais: number;
+  titres: string[];
+  score: number;
+  fictif?: boolean; // légende pré-générée (pour peupler le classement)
+  reconversion?: string; // ce qu'il est devenu après sa carrière
+}

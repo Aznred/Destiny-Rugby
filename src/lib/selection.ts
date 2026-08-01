@@ -1,0 +1,95 @@
+// SÉLECTION NATIONALE
+//
+// On n'est pas appelé en équipe nationale parce qu'on l'a demandé : il faut
+// être, à son poste, au niveau qu'exige sa nation. Une place chez les Bleus ne
+// se joue pas au même niveau qu'une place chez les Belges — d'où les paliers
+// ci-dessous, calqués sur la hiérarchie mondiale.
+
+import type { Joueur } from '../types';
+import { nomNation } from '../components/Drapeau';
+import { EFFECTIFS_REELS } from '../data/effectifsReels';
+import { POSTE_PAR_ID } from '../data/rugby';
+import { noteALAge } from './effectif';
+
+// Niveau (générale + réputation) exigé pour être appelé, par nation.
+const NIVEAU_EXIGE: Record<string, number> = {
+  // Le gratin mondial : il faut être parmi les tout meilleurs de son poste.
+  France: 84, 'Nouvelle-Zélande': 84, 'Afrique du Sud': 84, Irlande: 83,
+  Angleterre: 82, Australie: 81, Argentine: 79, Écosse: 79, 'Pays de Galles': 78,
+  // Le deuxième cercle
+  Italie: 75, Fidji: 75, Japon: 74, Géorgie: 72, Samoa: 72, Tonga: 71,
+  Uruguay: 68, Portugal: 68, Espagne: 65, Roumanie: 64, 'États-Unis': 64,
+  Canada: 64, Chili: 63, Namibie: 62, 'Hong Kong': 60, Zimbabwe: 60,
+};
+
+// Toutes les autres nations : le vivier est plus mince, la porte plus large.
+const NIVEAU_PAR_DEFAUT = 55;
+
+export function niveauExige(nation: string): number {
+  return NIVEAU_EXIGE[nomNation(nation)] ?? NIVEAU_PAR_DEFAUT;
+}
+
+// Niveau personnel retenu pour une sélection : le jeu, d'abord.
+export function niveauInternational(j: Joueur): number {
+  const vals = Object.values(j.attributs);
+  const gen = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return gen * 0.8 + j.reputation * 0.2;
+}
+
+// --- LA CONCURRENCE À TON POSTE ---
+// Une sélection, ce n'est pas seulement « être bon » : c'est être meilleur que
+// les autres joueurs de ton pays À TON POSTE. On indexe donc, une fois pour
+// toutes, les meilleurs joueurs réels par nation et par famille de poste.
+const cacheConcurrence = new Map<string, number[]>();
+
+function meilleursDuPays(nation: string, famille: string, saison: number): number[] {
+  const cle = nation + '#' + famille + '#' + saison;
+  const memo = cacheConcurrence.get(cle);
+  if (memo) return memo;
+  const notes: number[] = [];
+  for (const effectif of Object.values(EFFECTIFS_REELS)) {
+    for (const joueur of effectif) {
+      if (joueur.poste !== famille) continue;
+      if (nomNation(joueur.nation) !== nation) continue;
+      // Le concurrent vieillit lui aussi d'une saison à l'autre.
+      notes.push(noteALAge(joueur.note, joueur.age, joueur.potentiel, joueur.age + saison - 1, 0.5));
+    }
+  }
+  notes.sort((a, b) => b - a);
+  cacheConcurrence.set(cle, notes);
+  return notes;
+}
+
+// Deux joueurs par poste dans un groupe international.
+const PLACES_PAR_POSTE = 2;
+
+export interface Convocation {
+  selectionne: boolean;
+  niveau: number;
+  exige: number;
+  marge: number; // > 0 = titulaire indiscutable, < 0 = trop juste
+}
+
+// Le sélectionneur tranche : au-dessus du palier c'est oui, juste en dessous
+// c'est une question de forme et de concurrence (part de hasard).
+export function convocation(j: Joueur, alea = Math.random(), saison = j.saison): Convocation {
+  const niveau = niveauInternational(j);
+  const nation = nomNation(j.nation);
+  const famille = POSTE_PAR_ID[j.poste].famille;
+
+  // Le palier de la nation ET la concurrence réelle à ton poste : le plus
+  // exigeant des deux l'emporte. Être 3e ouvreur français ne suffit pas.
+  const concurrents = meilleursDuPays(nation, famille, saison);
+  const barreConcurrence = concurrents.length >= PLACES_PAR_POSTE
+    ? concurrents[PLACES_PAR_POSTE - 1] - 1
+    : 0;
+  const exige = Math.max(niveauExige(j.nation), barreConcurrence);
+  const marge = niveau - exige;
+  let selectionne: boolean;
+  if (marge >= 3) selectionne = true;
+  else if (marge <= -6) selectionne = false;
+  else selectionne = alea < 0.5 + marge / 12; // zone de concurrence
+  // La forme et le moral pèsent : un cadre méforme reste à la maison.
+  if (selectionne && (j.forme < 45 || j.moral < 35)) selectionne = alea > 0.6;
+  return { selectionne, niveau, exige, marge };
+}
