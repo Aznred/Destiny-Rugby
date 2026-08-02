@@ -175,6 +175,7 @@ export function placementRuck(
 }
 
 // --- LE COUP D'ENVOI --------------------------------------------------------
+// --- LE COUP D'ENVOI --------------------------------------------------------
 export function placementCoupEnvoi(pions: Pion[], milieu: number, possession: Cote): Placement {
   const placement: Placement = {};
   for (const p of pions) {
@@ -191,7 +192,9 @@ export function placementCoupEnvoi(pions: Pion[], milieu: number, possession: Co
       // L'équipe qui reçoit s'étage : les avants devant, les arrières au fond.
       const profondeur = p.avant ? 12 : 22 + (p.numero === 15 ? 8 : 0);
       placement[p.id] = {
-        x: milieu + s * profondeur,
+        // 🛠️ CORRECTION ICI : "milieu - s * profondeur" au lieu du "+"
+        // Cela garantit que chaque équipe reste bien dans son propre camp.
+        x: milieu - s * profondeur,
         y: borner(8 + p.numero * 3.6, 4, LARGEUR - 4),
       };
     }

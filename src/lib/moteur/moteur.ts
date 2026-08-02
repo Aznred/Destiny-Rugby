@@ -431,12 +431,13 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const defenseurs = surLeTerrain(e, adverse(porteur.cote));
 
   // Où est l'espace ? Le porteur vise l'intervalle le plus large devant lui.
+  // Où est l'espace ? Le porteur vise l'intervalle le plus large devant lui.
   const menace = plusProche(porteur.pos, defenseurs);
   const pression = menace ? distance(porteur.pos, menace.pos) : 99;
   let viseeY = porteur.pos.y;
-  if (menace && pression < 12) {
-    // On évite le défenseur le plus proche en allant dans son dos libre.
-    viseeY += menace.pos.y > porteur.pos.y ? -6 : 6;
+  if (menace && pression < 18) { // 🛠️ Analyse le danger de plus loin
+    // 🛠️ Appuis plus francs pour tenter de casser la ligne
+    viseeY += menace.pos.y > porteur.pos.y ? -9 : 9;
   }
   porteur.cible = {
     x: porteur.pos.x + s * 12,
@@ -528,8 +529,9 @@ function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): Decision 
   if (minutesRestantes <= 5 && ecart(e, p.cote) > 7) return 'porter';
 
   // 6. Sous pression, on passe. Sinon on porte, d'autant plus qu'on est fort.
-  if (pression < 5 && r < 0.9) return 'passe'; // au contact, on libère
-  if (r < 0.6 + p.passe / 500) return 'passe'; // sinon on fait vivre le ballon
+  // 6. Sous pression, on passe. Sinon on porte, d'autant plus qu'on est fort.
+  if (pression < 7 && r < 0.85) return 'passe'; // 🛠️ Joue plus avant contact
+  if (r < 0.65 + p.passe / 500) return 'passe'; // 🛠️ Fait vivre le ballon
   // Mené en fin de match : on garde le ballon à la main, on joue.
   if (mene && minutesRestantes < 10) return r < 0.2 ? 'passe' : 'porter';
   return 'porter';
@@ -760,11 +762,9 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
   if (!reussi) {
     defenseur.stats.plaquagesManques += 1;
     dire(e, 'plaquage', porteur.cote,
-      `${porteur.nom} casse le plaquage de ${defenseur.nom} !`, 0, porteur.moi || defenseur.moi);
-    // Le défenseur est effacé : il repart de derrière.
+        `${porteur.nom} casse le plaquage de ${defenseur.nom} !`, 0, porteur.moi || defenseur.moi);
     defenseur.pos.x -= sens(porteur.cote) * 4;
-    defenseur.recuperation = 4; // il est effacé, il doit revenir
-    // Le porteur est passé : on ne lui saute pas dessus à cinq dans la foulée.
+    defenseur.recuperation = 4;
     porteur.recuperation = 1.2;
     return;
   }
@@ -773,12 +773,12 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
   porteur.stats.courses += 0;
   const dur = e.rng() < 0.12;
   dire(e, 'plaquage', adverse(porteur.cote),
-    dur
-      ? `Énorme plaquage de ${defenseur.nom} sur ${porteur.nom} ! Le choc s’entend d’ici.`
-      : `${defenseur.nom} stoppe ${porteur.nom}.`,
-    0, porteur.moi || defenseur.moi);
+      dur
+          ? `Énorme plaquage de ${defenseur.nom} sur ${porteur.nom} ! Le choc s’entend d’ici.`
+          : `${defenseur.nom} stoppe ${porteur.nom}.`,
+      0, porteur.moi || defenseur.moi);
 
-  // PÉNALITÉ ? Un plaquage sur trente est fautif (haut, sans les bras…).
+  // PÉNALITÉ ?
   if (e.rng() < 0.016) {
     dire(e, 'penalite', porteur.cote, `Pénalité ! ${defenseur.nom} est sanctionné pour un plaquage haut.`, 0, defenseur.moi);
     if (e.rng() < 0.07) {
@@ -788,6 +788,37 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
     }
     return gererPenalite(e, porteur.cote, { ...porteur.pos });
   }
+
+  // 🏉 NOUVEAU : OFFLOAD (Passe après contact)
+  const chanceOffload = 0.12 + (porteur.passe / 800) + (porteur.puissance / 1000);
+  if (e.rng() < chanceOffload) {
+    const s = sens(porteur.cote);
+    // Recherche d'un soutien proche et dans l'axe ou légèrement en retrait
+    const soutiens = surLeTerrain(e, porteur.cote).filter(q =>
+        q !== porteur &&
+        (q.pos.x - porteur.pos.x) * s <= 1.0 &&
+        distance(q.pos, porteur.pos) < 10
+    );
+
+    if (soutiens.length > 0) {
+      const receveur = soutiens.sort((a, b) => distance(porteur.pos, a.pos) - distance(porteur.pos, b.pos))[0];
+      dire(e, 'jeu', porteur.cote, `🪄 Offload magnifique de ${porteur.nom} pour ${receveur.nom} !`, 0, porteur.moi || receveur.moi);
+
+      e.vol = {
+        de: { ...porteur.pos },
+        vers: { ...receveur.pos },
+        duree: 0.4,
+        ecoule: 0,
+        type: 'passe',
+        intention: 'passe',
+        auteur: porteur,
+        receveur: receveur,
+      };
+      e.porteur = null;
+      return; // On esquive la formation du ruck !
+    }
+  }
+
   formerRuck(e, { ...porteur.pos });
 }
 

@@ -91,7 +91,7 @@ function cibleDefense(p: Pion, ctx: Contexte, index: number): Vec {
   const b = ctx.ballon;
   const maLigne = ligneDefendue(p.cote);
   // La ligne défensive se place DEVANT le ballon, côté de son propre en-but.
-  const avancee = ctx.systeme === 'blitz' ? 3.5 : 1.5;
+  const avancee = ctx.systeme === 'blitz' ? 4.5 : 2.0; // 🛠️ Montée plus franche
 
   // TROISIÈME RIDEAU — le pendule. Le 15 couvre l'axe, l'ailier du côté
   // opposé au ballon redescend, l'ailier côté ballon reste haut.
@@ -152,7 +152,7 @@ export function placer(pions: Pion[], ctx: Contexte): void {
               Math.hypot(a.pos.x - cible.x, a.pos.y - cible.y)
               - Math.hypot(b.pos.x - cible.x, b.pos.y - cible.y)
           )
-          .slice(0, 1)
+          .slice(0, 2)
           .forEach((p) => chasseurs.add(p));
     }
 
