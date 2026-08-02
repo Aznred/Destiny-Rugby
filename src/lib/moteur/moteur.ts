@@ -470,9 +470,12 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // ---- DÉCISIONS DU PORTEUR ----
   // ⚠️ Une fois toutes les 0,9 s de jeu, pas à chaque tick : sinon la moindre
   // probabilité de 5 % se déclenche cinq fois par seconde.
+  // ---- DÉCISIONS DU PORTEUR ----
   e.prochaineDecision -= dt;
   if (e.prochaineDecision > 0) return;
-  e.prochaineDecision = 2.5;
+
+  // 🛠️ AVANT IL ATTENDAIT 2.5 SECONDES (et se faisait plaquer). MAINTENANT 0.8s !
+  e.prochaineDecision = 0.8;
   const decision = deciderAvecLeBallon(e, porteur, pression);
   if (decision === 'pied') return taperAuPied(e, porteur);
   if (decision === 'passe') return passerLeBallon(e, porteur, pression);
@@ -529,13 +532,16 @@ function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): Decision 
   //    pick and go, on garde le ballon au ras, on ne prend aucun risque.
   if (minutesRestantes <= 5 && ecart(e, p.cote) > 7) return 'porter';
 
-  // 6. Sous pression, on passe. Sinon on porte, d'autant plus qu'on est fort.
-  // 6. Sous pression, on passe. Sinon on porte, d'autant plus qu'on est fort.
-  if (pression < 7 && r < 0.85) return 'passe'; // 🛠️ Joue plus avant contact
-  if (r < 0.65 + p.passe / 500) return 'passe'; // 🛠️ Fait vivre le ballon
-  // Mené en fin de match : on garde le ballon à la main, on joue.
-  if (mene && minutesRestantes < 10) return r < 0.2 ? 'passe' : 'porter';
-  return 'porter';
+  // 🛠️ 6. DIFFERENCIATION AVANTS / 3/4
+  if (!p.avant) {
+    // Les 3/4 font vivre le ballon massivement pour écarter sur les ailes
+    if (pression < 12) return e.rng() < 0.95 ? 'passe' : 'porter';
+    return e.rng() < 0.70 ? 'passe' : 'porter'; // Même sous pression, ils tentent la passe
+  } else {
+    // Les avants percutent davantage au ras
+    if (pression < 6) return e.rng() < 0.60 ? 'passe' : 'porter';
+    return 'porter';
+  }
 }
 
 function estDansSes22(p: Pion): boolean {
@@ -549,18 +555,21 @@ function arriereGardeMontee(e: EtatMatch, defenseur: Cote): boolean {
 }
 
 // --- PASSE ------------------------------------------------------------------
+// --- PASSE ------------------------------------------------------------------
 function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   const partenaires = surLeTerrain(e, p.cote).filter((q) => q !== p);
   const s = sens(p.cote);
 
-  // 🛠️ Augmentation de la portée (28m pour les 3/4) pour atteindre les ailiers !
-  const distMax = p.avant ? 12 : 28;
+  // 🛠️ Portée augmentée pour les 3/4 pour trouver les ailiers loin
+  const distMax = p.avant ? 15 : 30;
 
   const valides = partenaires.filter((q) => {
-    const profondeur = (q.pos.x - p.pos.x) * s;
+    const profondeur = (q.pos.x - p.pos.x) * s; // Négatif si en arrière
     const ecartLateral = Math.abs(q.pos.y - p.pos.y);
-    return profondeur <= 0.5 &&
-        profondeur >= -(ecartLateral * 0.8 + 2) &&
+
+    return profondeur <= 0.5 && // Pas de passe en avant
+        // 🛠️ Cône de passe élargi pour tolérer le placement de la tactique
+        profondeur >= -(ecartLateral * 1.0 + 3) &&
         distance(q.pos, p.pos) < distMax;
   });
   if (!valides.length) return;
@@ -568,23 +577,29 @@ function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   let receveur: Pion | undefined;
 
   if (p.numero === 9) {
+    // Le 9 sert le 10 en priorité, sinon un avant lancé
     const troisQuarts = valides.filter((q) => !q.avant && q.numero !== 9);
-    receveur = troisQuarts.find((q) => q.numero === 10) ?? troisQuarts[0];
+    receveur = troisQuarts.find((q) => q.numero === 10) ?? valides[0];
   } else if (!p.avant) {
-    // 🛠️ 1. On cherche explicitement un Ailier pour une passe sautée
-    const ailier = valides.find(q => q.numero === 11 || q.numero === 14);
-    if (ailier && distance(p.pos, ailier.pos) > 10 && pression < 6) {
-      receveur = ailier; // Passe sautée activée !
-    } else {
-      // 2. Sinon on cherche le joueur le plus écarté
-      const versLeLarge = p.pos.y < LARGEUR / 2 ? 1 : -1;
-      receveur = valides
-          .filter((q) => !q.avant && (q.pos.y - p.pos.y) * versLeLarge > 1.5)
-          .sort((a, b) => Math.abs(b.pos.y - p.pos.y) - Math.abs(a.pos.y - p.pos.y))[0];
+    // 🛠️ LA CORRECTION EST ICI : On respecte l'ordre naturel d'une ligne de 3/4
+    const ordreLigne = [10, 12, 13, 11, 14];
+    const monIndex = ordreLigne.indexOf(p.numero);
+
+    if (monIndex >= 0 && monIndex < ordreLigne.length - 1) {
+      // On cherche en priorité les joueurs "suivants" dans la ligne
+      const ciblesIdeales = ordreLigne.slice(monIndex + 1);
+      receveur = valides.find(q => ciblesIdeales.includes(q.numero));
+    }
+
+    // Si la ligne est cassée, on cherche l'ailier pour une passe sautée
+    if (!receveur) {
+      const ailier = valides.find(q => q.numero === 11 || q.numero === 14);
+      if (ailier && distance(p.pos, ailier.pos) > 10) receveur = ailier;
     }
   }
 
-  receveur ??= valides.sort((a, b) => distance(p.pos, a.pos) - distance(p.pos, b.pos))[0];
+  // Sécurité : le joueur le plus loin possible
+  receveur ??= valides.sort((a, b) => distance(p.pos, b.pos) - distance(p.pos, a.pos))[0];
   if (!receveur) return;
 
   p.stats.passes += 1;
@@ -615,14 +630,13 @@ function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   };
   e.perceeEnCours = espace > 11;
   if (espace > 11) {
-    dire(e, 'jeu', p.cote, `${p.nom} trouve ${receveur.nom} dans l’intervalle — il est lancé !`, 0, p.moi || receveur.moi);
+    dire(e, 'jeu', p.cote, `${p.nom} trouve ${receveur.nom} lancé !`, 0, p.moi || receveur.moi);
     for (const d of marqueurs) {
       if (d.numero === 15) continue;
       if (distance(d.pos, receveur.pos) < 16) d.recuperation = Math.max(d.recuperation, 2.6);
     }
   }
 }
-
 // --- COUP DE PIED -----------------------------------------------------------
 
 function taperAuPied(e: EtatMatch, p: Pion): void {
