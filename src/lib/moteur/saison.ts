@@ -17,7 +17,6 @@ export function ligneVide(nom: string, club: string, numero: number, poste: Post
 }
 
 export interface Avatar { club: string; nom: string; poste: PosteId; attributs: AttributsPion; titulaire?: boolean; }
-
 export const MAX_MATCHS_PAR_JOURNEE = 8;
 
 export function estTitulaire(j: Joueur, cle: string): boolean {

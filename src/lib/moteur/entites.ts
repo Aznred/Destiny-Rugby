@@ -4,12 +4,10 @@ import { LARGEUR, type Cote, type Vec } from './terrain';
 
 export interface Pion {
   id: string; nom: string; numero: number; poste: PosteId; cote: Cote;
-  avant: boolean; moi: boolean;
-  pos: Vec; cible: Vec; vitesseMax: number;
+  avant: boolean; moi: boolean; pos: Vec; cible: Vec; vitesseMax: number;
   endurance: number; recuperation: number; surLeTerrain: boolean; minutesJouees: number;
   acceleration: number; plaquage: number; evitement: number; passe: number;
-  pied: number; vision: number; puissance: number;
-  stats: StatsMatch;
+  pied: number; vision: number; puissance: number; stats: StatsMatch;
 }
 
 export interface StatsMatch {
@@ -45,11 +43,8 @@ export interface AttributsPion {
 
 export function creerPion(c: Coequipier, index: number, cote: Cote, moi = false, attributs?: AttributsPion): Pion {
   const poste = ORDRE_MAILLOTS[index] ?? c.poste;
-  const avant = index < 8;
-  const g = c.note;
-  const a = attributs ?? {};
-  const vitesse = note(a.vitesse, avant ? g - 6 : g + 4);
-  const base = VITESSE_BASE[poste] ?? 7;
+  const avant = index < 8; const g = c.note; const a = attributs ?? {};
+  const vitesse = note(a.vitesse, avant ? g - 6 : g + 4); const base = VITESSE_BASE[poste] ?? 7;
   return {
     id: `${cote}${index}`, nom: c.nom, numero: index + 1, poste, cote, avant, moi,
     pos: { x: 0, y: LARGEUR / 2 }, cible: { x: 0, y: LARGEUR / 2 },
@@ -68,8 +63,7 @@ export function vitesseActuelle(p: Pion): number {
 
 export function deplacer(p: Pion, dt: number): number {
   const dx = p.cible.x - p.pos.x; const dy = p.cible.y - p.pos.y;
-  const d = Math.hypot(dx, dy);
-  if (d < 0.15) return 0;
+  const d = Math.hypot(dx, dy); if (d < 0.15) return 0;
   const v = Math.min(vitesseActuelle(p), d / dt);
   const pas = v * dt;
   p.pos.x += (dx / d) * pas; p.pos.y += (dy / d) * pas;

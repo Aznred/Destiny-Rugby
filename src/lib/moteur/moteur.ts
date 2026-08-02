@@ -9,10 +9,7 @@ import { placementCoupEnvoi, placementMelee, placementRuck, placementTouche } fr
 
 export type Phase = 'coupEnvoi' | 'jeuCourant' | 'ruck' | 'melee' | 'touche' | 'maul' | 'coupDePied' | 'tirAuBut' | 'apresEssai' | 'miTemps' | 'fini';
 
-export interface Commentaire {
-  minute: number; texte: string; type: 'essai' | 'but' | 'butRate' | 'plaquage' | 'ruck' | 'melee' | 'touche' | 'maul' | 'pied' | 'penalite' | 'carton' | 'remplacement' | 'jalon' | 'jeu';
-  cote: Cote | null; points: number; scoreA: number; scoreB: number; moi?: boolean;
-}
+export interface Commentaire { minute: number; texte: string; type: 'essai' | 'but' | 'butRate' | 'plaquage' | 'ruck' | 'melee' | 'touche' | 'maul' | 'pied' | 'penalite' | 'carton' | 'remplacement' | 'jalon' | 'jeu'; cote: Cote | null; points: number; scoreA: number; scoreB: number; moi?: boolean; }
 
 export interface EtatMatch {
   clubA: string; clubB: string; t: number; minute: number; periode: 1 | 2; sirene: boolean; phase: Phase; minuteur: number;
@@ -30,63 +27,35 @@ export interface Vol {
 
 const DT = 0.2; const DUREE_PERIODE = 40 * 60; const RAYON_PLAQUAGE = 1.4;
 
-export function creerMatch(
-    clubA: string, clubB: string, effectifA: Coequipier[], effectifB: Coequipier[], scoreCibleA: number, scoreCibleB: number, cle: string,
-    avatar?: { club: string; nom: string; poste: PosteId; attributs: AttributsPion; titulaire?: boolean },
-): EtatMatch {
-  const rng = graine('moteur#' + cle);
-  const pions: Pion[] = [];
+export function creerMatch(clubA: string, clubB: string, effectifA: Coequipier[], effectifB: Coequipier[], scoreCibleA: number, scoreCibleB: number, cle: string, avatar?: { club: string; nom: string; poste: PosteId; attributs: AttributsPion; titulaire?: boolean }): EtatMatch {
+  const rng = graine('moteur#' + cle); const pions: Pion[] = [];
   const monter = (eff: Coequipier[], cote: Cote, club: string) => {
-    const dispo = [...eff].sort((a, b) => b.note - a.note);
-    const pris = new Set<Coequipier>();
-    const titulaires: Coequipier[] = [];
-    for (const poste of ORDRE_MAILLOTS) {
-      const famille = POSTE_PAR_ID[poste]?.famille;
-      const choisi = dispo.find((c) => !pris.has(c) && c.poste === poste) ?? dispo.find((c) => !pris.has(c) && POSTE_PAR_ID[c.poste]?.famille === famille) ?? dispo.find((c) => !pris.has(c));
-      if (!choisi) break; pris.add(choisi); titulaires.push({ ...choisi, poste });
-    }
-    const banc = dispo.filter((c) => !pris.has(c)).slice(0, 8);
-    const liste = [...titulaires, ...banc];
-    if (avatar && avatar.club === club) {
-      const place = ORDRE_MAILLOTS.indexOf(avatar.poste);
-      const index = avatar.titulaire === false ? 15 + Math.max(0, Math.min(7, place >= 0 ? place % 8 : 3)) : (place >= 0 ? place : 9);
-      if (liste[index]) liste[index] = { ...liste[index], nom: avatar.nom, poste: avatar.poste };
-    }
+    const dispo = [...eff].sort((a, b) => b.note - a.note); const pris = new Set<Coequipier>(); const titulaires: Coequipier[] = [];
+    for (const poste of ORDRE_MAILLOTS) { const choisi = dispo.find((c) => !pris.has(c) && c.poste === poste) ?? dispo.find((c) => !pris.has(c) && POSTE_PAR_ID[c.poste]?.famille === POSTE_PAR_ID[poste]?.famille) ?? dispo.find((c) => !pris.has(c)); if (!choisi) break; pris.add(choisi); titulaires.push({ ...choisi, poste }); }
+    const banc = dispo.filter((c) => !pris.has(c)).slice(0, 8); const liste = [...titulaires, ...banc];
+    if (avatar && avatar.club === club) { const place = ORDRE_MAILLOTS.indexOf(avatar.poste); const index = avatar.titulaire === false ? 15 + Math.max(0, Math.min(7, place >= 0 ? place % 8 : 3)) : (place >= 0 ? place : 9); if (liste[index]) liste[index] = { ...liste[index], nom: avatar.nom, poste: avatar.poste }; }
     liste.forEach((c, i) => { const moi = !!avatar && avatar.club === club && c.nom === avatar.nom; pions.push(creerPion(c, i, cote, moi, moi ? avatar!.attributs : undefined)); });
   };
   monter(effectifA, 'A', clubA); monter(effectifB, 'B', clubB);
   const etat: EtatMatch = {
-    clubA, clubB, t: 0, minute: 0, periode: 1, sirene: false, phase: 'coupEnvoi', minuteur: 2,
-    pions, ballon: { x: MILIEU, y: LARGEUR / 2 }, porteur: null, possession: rng() < 0.5 ? 'A' : 'B', systeme: 'blitz',
-    scoreA: 0, scoreB: 0, resteA: scoreCibleA, resteB: scoreCibleB, cibleA: scoreCibleA, cibleB: scoreCibleB,
-    phasesDeJeu: 0, prochaineDecision: 1, perceeEnCours: false, vol: null, placementFige: null, tir: null,
-    commentaires: [], fini: false, rng, remplacementsA: 0, remplacementsB: 0,
+    clubA, clubB, t: 0, minute: 0, periode: 1, sirene: false, phase: 'coupEnvoi', minuteur: 2, pions, ballon: { x: MILIEU, y: LARGEUR / 2 }, porteur: null, possession: rng() < 0.5 ? 'A' : 'B', systeme: 'blitz',
+    scoreA: 0, scoreB: 0, resteA: scoreCibleA, resteB: scoreCibleB, cibleA: scoreCibleA, cibleB: scoreCibleB, phasesDeJeu: 0, prochaineDecision: 1, perceeEnCours: false, vol: null, placementFige: null, tir: null, commentaires: [], fini: false, rng, remplacementsA: 0, remplacementsB: 0,
   };
   placerPourCoupEnvoi(etat, true); dire(etat, 'jalon', null, `Coup d’envoi ! ${clubA} reçoit ${clubB}.`); return etat;
 }
 
-function dire(e: EtatMatch, type: Commentaire['type'], cote: Cote | null, texte: string, points = 0, moi = false): void {
-  e.commentaires.push({ minute: Math.floor(e.t / 60), texte, type, cote, points, scoreA: e.scoreA, scoreB: e.scoreB, moi });
-}
-
+function dire(e: EtatMatch, type: Commentaire['type'], cote: Cote | null, texte: string, points = 0, moi = false): void { e.commentaires.push({ minute: Math.floor(e.t / 60), texte, type, cote, points, scoreA: e.scoreA, scoreB: e.scoreB, moi }); }
 function surLeTerrain(e: EtatMatch, cote: Cote): Pion[] { return e.pions.filter((p) => p.cote === cote && p.surLeTerrain); }
 function nomClub(e: EtatMatch, cote: Cote): string { return cote === 'A' ? e.clubA : e.clubB; }
 function adverse(cote: Cote): Cote { return cote === 'A' ? 'B' : 'A'; }
 
-function placerPourCoupEnvoi(e: EtatMatch, instantane = false): void {
-  e.ballon = { x: MILIEU, y: LARGEUR / 2 }; e.placementFige = placementCoupEnvoi(e.pions, MILIEU, e.possession);
-  if (instantane) for (const p of e.pions) { const c = e.placementFige[p.id]; if (c) { p.pos = { ...c }; p.cible = { ...c }; } }
-}
+function placerPourCoupEnvoi(e: EtatMatch, instantane = false): void { e.ballon = { x: MILIEU, y: LARGEUR / 2 }; e.placementFige = placementCoupEnvoi(e.pions, MILIEU, e.possession); if (instantane) for (const p of e.pions) { const c = e.placementFige[p.id]; if (c) { p.pos = { ...c }; p.cible = { ...c }; } } }
 
-export function avancer(e: EtatMatch, secondesDeJeu: number): void {
-  if (e.fini) return; let reste = secondesDeJeu;
-  while (reste > 0 && !e.fini) { const pas = Math.min(DT, reste); tick(e, pas); reste -= pas; }
-}
+export function avancer(e: EtatMatch, secondesDeJeu: number): void { if (e.fini) return; let reste = secondesDeJeu; while (reste > 0 && !e.fini) { const pas = Math.min(DT, reste); tick(e, pas); reste -= pas; } }
 
 function tick(e: EtatMatch, dt: number): void {
   const jeuVivant = e.phase !== 'apresEssai' && e.phase !== 'tirAuBut' && e.phase !== 'miTemps';
   if (jeuVivant) e.t += dt; e.minute = Math.floor(e.t / 60);
-
   const finPeriode = e.periode * DUREE_PERIODE;
   if (e.sirene && e.t > finPeriode + 180) return clorePeriode(e);
   if (!e.sirene && e.t >= finPeriode) { e.sirene = true; dire(e, 'jalon', null, e.periode === 1 ? '🔔 La sirène retentit. On joue jusqu’à la sortie du ballon.' : '🔔 Sirène ! Le temps est écoulé — ballon mort et c’est terminé.'); }
@@ -101,32 +70,22 @@ function tick(e: EtatMatch, dt: number): void {
 
   e.minuteur -= dt;
   switch (e.phase) {
-    case 'coupEnvoi': return phaseCoupEnvoi(e); case 'jeuCourant': return phaseJeuCourant(e, dt);
-    case 'ruck': return phaseRuck(e); case 'melee': return phaseMelee(e); case 'touche': return phaseTouche(e);
-    case 'maul': return phaseMaul(e, dt); case 'coupDePied': return phaseCoupDePied(e); case 'tirAuBut': return phaseTirAuBut(e);
-    case 'apresEssai': return phaseApresEssai(e); case 'miTemps': return phaseMiTemps(e); default: return;
+    case 'coupEnvoi': return phaseCoupEnvoi(e); case 'jeuCourant': return phaseJeuCourant(e, dt); case 'ruck': return phaseRuck(e); case 'melee': return phaseMelee(e); case 'touche': return phaseTouche(e); case 'maul': return phaseMaul(e, dt); case 'coupDePied': return phaseCoupDePied(e); case 'tirAuBut': return phaseTirAuBut(e); case 'apresEssai': return phaseApresEssai(e); case 'miTemps': return phaseMiTemps(e); default: return;
   }
 }
 
 function phaseCoupEnvoi(e: EtatMatch): void {
-  if (e.minuteur > 0) return;
-  const campQuiEngage = e.possession; const s = sens(campQuiEngage);
+  if (e.minuteur > 0) return; const campQuiEngage = e.possession; const s = sens(campQuiEngage);
   const buteur = surLeTerrain(e, campQuiEngage).find((p) => p.numero === 10) ?? choisirPorteur(e, campQuiEngage);
   const arrivee = { x: e.ballon.x + s * (30 + e.rng() * 15), y: borner(e.ballon.y + (e.rng() * 24 - 12), 10, LARGEUR - 10) };
-  const defenseurs = surLeTerrain(e, adverse(campQuiEngage));
-  const receveur = plusProche(arrivee, defenseurs) ?? defenseurs[0];
+  const defenseurs = surLeTerrain(e, adverse(campQuiEngage)); const receveur = plusProche(arrivee, defenseurs) ?? defenseurs[0];
   e.vol = { de: { ...e.ballon }, vers: arrivee, duree: 2.8, ecoule: 0, type: 'passe', intention: 'passe', auteur: buteur, receveur: receveur };
   e.porteur = null; e.phase = 'jeuCourant'; e.phasesDeJeu = 0; buteur.stats.coupsDePied += 1;
   dire(e, 'pied', campQuiEngage, `${buteur.nom} donne le coup d'envoi long et haut !`, 0, buteur.moi);
 }
 
 function choisirPorteur(e: EtatMatch, cote: Cote): Pion { const liste = surLeTerrain(e, cote); return liste.find((p) => p.numero === 10) ?? liste.find((p) => p.numero === 9) ?? liste[0]; }
-
-function donnerBallon(e: EtatMatch, p: Pion): void {
-  e.placementFige = null; e.porteur = p; e.possession = p.cote; e.ballon = { ...p.pos }; p.stats.courses += 1;
-  e.prochaineDecision = 0.3 + e.rng() * 0.4; e.systeme = choisirSysteme(e.ballon, adverse(p.cote), e.minute, ecart(e, adverse(p.cote)));
-}
-
+function donnerBallon(e: EtatMatch, p: Pion): void { e.placementFige = null; e.porteur = p; e.possession = p.cote; e.ballon = { ...p.pos }; p.stats.courses += 1; e.prochaineDecision = 0.3 + e.rng() * 0.3; e.systeme = choisirSysteme(e.ballon, adverse(p.cote), e.minute, ecart(e, adverse(p.cote))); }
 function ecart(e: EtatMatch, cote: Cote): number { return cote === 'A' ? e.scoreA - e.scoreB : e.scoreB - e.scoreA; }
 
 function phaseJeuCourant(e: EtatMatch, dt: number): void {
@@ -135,7 +94,7 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
     const receveur = e.vol.receveur; e.vol = null;
     if (receveur && receveur.surLeTerrain) {
       const libre = e.perceeEnCours; e.perceeEnCours = false; donnerBallon(e, receveur);
-      e.prochaineDecision = libre ? 1.2 : 0.2 + e.rng() * 0.3; return;
+      e.prochaineDecision = libre ? 1.5 : 0.4 + e.rng() * 0.4; return;
     }
     return formerRuck(e, e.ballon);
   }
@@ -143,13 +102,14 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const porteur = e.porteur; if (!porteur) { formerRuck(e, e.ballon); return; }
   const s = sens(porteur.cote); const defenseurs = surLeTerrain(e, adverse(porteur.cote));
   const menace = plusProche(porteur.pos, defenseurs); const pression = menace ? distance(porteur.pos, menace.pos) : 99;
-  let viseeY = porteur.pos.y; if (menace && pression < 12) viseeY += menace.pos.y > porteur.pos.y ? -6 : 6;
-  porteur.cible = { x: porteur.pos.x + s * 12, y: borner(viseeY, 2, LARGEUR - 2) };
+
+  // 🧠 Le joueur fonce tout droit et accélère !
+  let viseeY = porteur.pos.y; if (menace && pression < 8) viseeY += menace.pos.y > porteur.pos.y ? -5 : 5;
+  porteur.cible = { x: porteur.pos.x + s * 15, y: borner(viseeY, 2, LARGEUR - 2) };
   const parcouru = deplacer(porteur, dt); porteur.stats.metres += parcouru; e.ballon = { ...porteur.pos };
 
   const ligne = ligneAdverse(porteur.cote); if (porteur.cote === 'A' ? porteur.pos.x >= ligne : porteur.pos.x <= ligne) return conclureEssai(e, porteur);
   if (enTouche(porteur.pos)) { dire(e, 'touche', porteur.cote, `${porteur.nom} poussé en touche.`, 0, porteur.moi); return arretDeJeu(e, 'touche', adverse(porteur.cote), porteur.pos); }
-
   for (const d of defenseurs) { if (porteur.recuperation > 0) break; if (d.recuperation > 0) continue; if (distance(d.pos, porteur.pos) > RAYON_PLAQUAGE) continue; return resoudrePlaquage(e, porteur, d); }
 
   e.prochaineDecision -= dt; if (e.prochaineDecision > 0) return;
@@ -165,26 +125,21 @@ type Decision = 'porter' | 'passe' | 'pied';
 function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): Decision {
   const distLigne = Math.abs(ligneAdverse(p.cote) - p.pos.x);
   if (distLigne < 15 && pression > 8) return 'porter';
-
   const r = e.rng(); const mene = ecart(e, p.cote) < 0; if (e.sirene && !mene) return 'pied';
   const minutesRestantes = 80 - e.minute;
 
-  if (estDansSes22(p) && r < 0.35) return 'pied';
+  if (estDansSes22(p) && r < 0.25) return 'pied';
   if (p.numero === 9 && e.phasesDeJeu >= 3 && r < 0.15) return 'pied';
   if ((p.numero === 10 || p.numero === 15) && p.pied > 60) {
-    if (dansSonCamp(p.pos, p.cote) && e.phasesDeJeu >= 2 && r < 0.10) return 'pied';
+    if (dansSonCamp(p.pos, p.cote) && e.phasesDeJeu >= 2 && arriereGardeMontee(e, adverse(p.cote)) && r < 0.10) return 'pied';
     if (!dansSonCamp(p.pos, p.cote) && distLigne < 35 && r < 0.15) return 'pied';
   }
   if (minutesRestantes <= 5 && ecart(e, p.cote) > 7) return 'porter';
 
-  // 🛠️ Différenciation : Les avants percutent (cellules), les 3/4 écartent.
-  if (p.avant) {
-    if (pression < 5) return e.rng() < 0.20 ? 'passe' : 'porter';
-    return 'porter';
-  } else {
-    if (pression < 12) return e.rng() < 0.90 ? 'passe' : 'porter';
-    return e.rng() < 0.80 ? 'passe' : 'porter';
-  }
+  // 🧠 FIXER ET DONNER : S'il y a de l'espace on COURS, sinon on LÂCHE LA BALLE.
+  if (pression > 8) return 'porter';
+  if (p.avant) return e.rng() < 0.25 ? 'passe' : 'porter';
+  else return e.rng() < 0.80 ? 'passe' : 'porter';
 }
 
 function estDansSes22(p: Pion): boolean { return p.cote === 'A' ? p.pos.x < LIGNE_A + 22 : p.pos.x > LIGNE_B - 22; }
@@ -192,32 +147,31 @@ function arriereGardeMontee(e: EtatMatch, defenseur: Cote): boolean { const fond
 
 function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   const partenaires = surLeTerrain(e, p.cote).filter((q) => q !== p); const s = sens(p.cote);
-  const distMax = p.avant ? 15 : 35;
+  const distMax = p.avant ? 12 : 30;
 
   const valides = partenaires.filter((q) => {
     const profondeur = (q.pos.x - p.pos.x) * s; const ecartLateral = Math.abs(q.pos.y - p.pos.y);
-    return profondeur <= 1.0 && profondeur >= -(4 + ecartLateral * 0.4) && distance(q.pos, p.pos) < distMax;
+    // Tolérance 1.5m en avant (course lancée), interdit plus de 3.5m en arrière
+    return profondeur <= 1.5 && profondeur >= -(3.5 + ecartLateral * 0.3) && distance(q.pos, p.pos) < distMax;
   });
   if (!valides.length) return;
 
   let receveur: Pion | undefined;
 
-  // 🛠️ MIX : Le 9 sert soit un pod d'avants pour casser la ligne, soit le 10.
   if (p.numero === 9) {
     if (e.rng() < 0.4) {
       const avants = valides.filter((q) => q.avant);
       receveur = avants.length > 0 ? avants[Math.floor(e.rng() * Math.min(3, avants.length))] : valides.find((q) => q.numero === 10);
-    } else {
-      receveur = valides.find((q) => q.numero === 10) ?? valides.find((q) => !q.avant);
-    }
+    } else receveur = valides.find((q) => q.numero === 10) ?? valides.find((q) => !q.avant);
   } else if (!p.avant) {
     const ordreLigne = [10, 12, 13, 11, 14]; const monIndex = ordreLigne.indexOf(p.numero);
-    if (monIndex >= 0 && monIndex < ordreLigne.length - 1) {
-      const ciblesIdeales = ordreLigne.slice(monIndex + 1);
-      for (const cible of ciblesIdeales) { const found = valides.find(q => q.numero === cible); if (found) { receveur = found; break; } }
+    if (monIndex >= 0) {
+      const numCible = ordreLigne[monIndex + 1];
+      if (numCible) { const potentiel = valides.find(q => q.numero === numCible); if (potentiel && distance(p.pos, potentiel.pos) > 2) receveur = potentiel; }
+      if (!receveur) { const numSaute = ordreLigne[monIndex + 2]; if (numSaute) receveur = valides.find(q => q.numero === numSaute); }
     }
   }
-  receveur ??= valides.sort((a, b) => distance(p.pos, a.pos) - distance(p.pos, b.pos))[0];
+  receveur ??= valides.sort((a, b) => distance(p.pos, b.pos) - distance(p.pos, a.pos))[0]; // fallback : le plus loin
   if (!receveur) return;
 
   p.stats.passes += 1;
@@ -231,8 +185,7 @@ function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   const engages = surLeTerrain(e, adverse(p.cote)).filter((d) => distance(d.pos, p.pos) < 6).sort((a, b) => distance(a.pos, p.pos) - distance(b.pos, p.pos)).slice(0, 2);
   for (const d of engages) d.recuperation = pres ? 2.2 : 1.4;
 
-  const marqueurs = surLeTerrain(e, adverse(p.cote));
-  const garde = plusProche(receveur.pos, marqueurs.filter((d) => d.recuperation <= 0));
+  const marqueurs = surLeTerrain(e, adverse(p.cote)); const garde = plusProche(receveur.pos, marqueurs.filter((d) => d.recuperation <= 0));
   const espace = garde ? distance(receveur.pos, garde.pos) : 99;
 
   const d = distance(p.pos, receveur.pos); e.porteur = null;
@@ -265,25 +218,17 @@ function taperAuPied(e: EtatMatch, p: Pion): void {
   else if (p.numero === 9 && e.phasesDeJeu >= 3) {
     intention = 'chandelle'; arrivee = { x: p.pos.x + s * 22, y: borner(p.pos.y + (e.rng() * 16 - 8), 4, LARGEUR - 4) }; duree = 3.6;
   }
-  // 🛠️ CORRECTION : C'est ici qu'on UTILISE arriereGardeMontee !
   else if (dansSonCamp(p.pos, p.cote) && arriereGardeMontee(e, adverse(p.cote)) && p.pied > 62) {
-    intention = '50/22';
-    const cibleX = p.cote === 'A' ? LIGNE_B - 12 : LIGNE_A + 12;
-    arrivee = { x: cibleX, y: p.pos.y < LARGEUR / 2 ? 1 : LARGEUR - 1 };
-    duree = 3;
-  }
-  else {
-    arrivee = { x: borner(p.pos.x + s * (34 + p.pied / 3), LIGNE_A - 4, LIGNE_B + 4), y: p.pos.y < LARGEUR / 2 ? -1 : LARGEUR + 1 };
-    duree = 3.2;
-  }
+    intention = '50/22'; const cibleX = p.cote === 'A' ? LIGNE_B - 12 : LIGNE_A + 12; arrivee = { x: cibleX, y: p.pos.y < LARGEUR / 2 ? 1 : LARGEUR - 1 }; duree = 3;
+  } else { arrivee = { x: borner(p.pos.x + s * (34 + p.pied / 3), LIGNE_A - 4, LIGNE_B + 4), y: p.pos.y < LARGEUR / 2 ? -1 : LARGEUR + 1 }; duree = 3.2; }
 
   e.vol = { de: { ...p.pos }, vers: arrivee, duree, ecoule: 0, type: 'pied', intention, auteur: p };
   e.porteur = null; e.phase = 'coupDePied'; e.minuteur = duree;
-
   if (intention === 'transversale') dire(e, 'pied', p.cote, `🪄 ${p.nom} tente une transversale !`, 0, p.moi);
   else if (intention === 'grubber') dire(e, 'pied', p.cote, `⚡ ${p.nom} glisse un coup de pied rasant...`, 0, p.moi);
   else dire(e, 'pied', p.cote, `${p.nom} tape au pied.`, 0, p.moi);
 }
+
 function phaseCoupDePied(e: EtatMatch): void {
   const v = e.vol; if (!v) { formerRuck(e, e.ballon); return; } if (v.ecoule < v.duree) return;
   const auteur = v.auteur; const camp = auteur.cote; e.vol = null;
@@ -292,47 +237,39 @@ function phaseCoupDePied(e: EtatMatch): void {
     if (e.rng() < 0.34 + auteur.pied / 260 + auteur.vision / 400) { dire(e, 'pied', camp, `🎯 50/22 RÉUSSI !`, 0, auteur.moi); return arretDeJeu(e, 'touche', camp, e.ballon); }
     return arretDeJeu(e, 'melee', adverse(camp), { x: e.ballon.x, y: LARGEUR / 2 });
   }
-
   if (v.intention === 'grubber') {
     const mien = e.pions.filter((p) => p.surLeTerrain && distance(p.pos, e.ballon) < 10 && p.cote === camp);
     if (mien.length > 0 && e.rng() < 0.55) { dire(e, 'pied', camp, `🔥 Magnifique ! ${mien[0].nom} récupère le ballon !`, 0, mien[0].moi); donnerBallon(e, mien[0]); e.phase = 'jeuCourant'; e.phasesDeJeu = 0; return; }
     return formerRuck(e, e.ballon);
   }
-
   if (v.intention === 'transversale') {
     const mien = e.pions.filter((p) => p.surLeTerrain && distance(p.pos, e.ballon) < 14 && p.cote === camp);
     if (mien.length > 0 && e.rng() < 0.65) { dire(e, 'pied', camp, `🏉 Transversale captée !`, 0, mien[0].moi); donnerBallon(e, mien[0]); e.phase = 'jeuCourant'; e.phasesDeJeu = 0; return; }
     return formerRuck(e, e.ballon);
   }
-
   if (v.intention === 'chandelle') {
     const mien = e.pions.filter((p) => p.surLeTerrain && distance(p.pos, e.ballon) < 14 && p.cote === camp);
     if (mien.length > 0 && e.rng() < 0.42) { donnerBallon(e, mien[0]); e.phase = 'jeuCourant'; e.phasesDeJeu = 0; return; }
     return formerRuck(e, e.ballon);
   }
-
   return arretDeJeu(e, 'touche', v.intention === 'penaltouche' ? camp : adverse(camp), e.ballon);
 }
 
 function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
   const force = defenseur.plaquage * (0.7 + defenseur.endurance / 330); const resistance = porteur.evitement * 0.6 + porteur.puissance * 0.4;
-  if (e.rng() >= 0.93 + (force - resistance) / 320) {
-    defenseur.stats.plaquagesManques += 1; defenseur.pos.x -= sens(porteur.cote) * 4; defenseur.recuperation = 4; porteur.recuperation = 1.2; return;
-  }
+  if (e.rng() >= 0.93 + (force - resistance) / 320) { defenseur.stats.plaquagesManques += 1; defenseur.pos.x -= sens(porteur.cote) * 4; defenseur.recuperation = 4; porteur.recuperation = 1.2; return; }
   defenseur.stats.plaquages += 1; porteur.stats.courses += 0;
   if (e.rng() < 0.016) {
     dire(e, 'penalite', porteur.cote, `Pénalité ! Plaquage haut.`, 0, defenseur.moi);
     if (e.rng() < 0.07) defenseur.surLeTerrain = false;
     return gererPenalite(e, porteur.cote, { ...porteur.pos });
   }
-
-  if (e.rng() < 0.12 + (porteur.passe / 800) + (porteur.puissance / 1000)) {
+  if (e.rng() < 0.08) {
     const soutiens = surLeTerrain(e, porteur.cote).filter(q => q !== porteur && (q.pos.x - porteur.pos.x) * sens(porteur.cote) <= 1.0 && distance(q.pos, porteur.pos) < 10);
     if (soutiens.length > 0) {
       const receveur = soutiens.sort((a, b) => distance(porteur.pos, a.pos) - distance(porteur.pos, b.pos))[0];
       dire(e, 'jeu', porteur.cote, `🪄 Offload de ${porteur.nom} !`, 0, porteur.moi || receveur.moi);
-      e.vol = { de: { ...porteur.pos }, vers: { ...receveur.pos }, duree: 0.4, ecoule: 0, type: 'passe', intention: 'passe', auteur: porteur, receveur };
-      e.porteur = null; return;
+      e.vol = { de: { ...porteur.pos }, vers: { ...receveur.pos }, duree: 0.4, ecoule: 0, type: 'passe', intention: 'passe', auteur: porteur, receveur }; e.porteur = null; return;
     }
   }
   formerRuck(e, { ...porteur.pos });
@@ -346,13 +283,10 @@ function formerRuck(e: EtatMatch, lieu: Vec): void {
 
 function phaseRuck(e: EtatMatch): void {
   if (e.minuteur > 0) return;
-
   if (e.rng() < 0.08) {
     const pourAttaque = e.rng() < 0.5; const equipeBeneficiaire = pourAttaque ? e.possession : adverse(e.possession);
-    dire(e, 'penalite', equipeBeneficiaire, pourAttaque ? `Pénalité ! Plaqueur au sol.` : `Pénalité ! Ballon gardé.`, 0);
-    return gererPenalite(e, equipeBeneficiaire, e.ballon);
+    dire(e, 'penalite', equipeBeneficiaire, pourAttaque ? `Pénalité ! Plaqueur au sol.` : `Pénalité ! Ballon gardé.`, 0); return gererPenalite(e, equipeBeneficiaire, e.ballon);
   }
-
   const proches = e.pions.filter((p) => p.surLeTerrain && p.avant).sort((a, b) => distance(a.pos, e.ballon) - distance(b.pos, e.ballon)).slice(0, 6);
   const gratteur = proches.filter((p) => p.cote !== e.possession).find((p) => p.numero === 7 || p.numero === 6 || p.numero === 2);
   if (gratteur && e.rng() < 0.15 + gratteur.plaquage / 500) {
@@ -388,8 +322,7 @@ function phaseTouche(e: EtatMatch): void {
     e.vol = { de: { ...lanceur.pos }, vers: { ...sauteur.pos }, duree: 1.5, ecoule: 0, type: 'passe', intention: 'passe', auteur: lanceur, receveur: sauteur }; e.porteur = null; return;
   }
   const lanceur = surLeTerrain(e, cote).find((p) => p.numero === 2) || choisirPorteur(e, cote);
-  e.vol = { de: { ...lanceur.pos }, vers: { ...sauteur.pos }, duree: 1.5, ecoule: 0, type: 'passe', intention: 'passe', auteur: lanceur, receveur: sauteur };
-  e.porteur = null; e.phase = 'jeuCourant'; e.phasesDeJeu = 0;
+  e.vol = { de: { ...lanceur.pos }, vers: { ...sauteur.pos }, duree: 1.5, ecoule: 0, type: 'passe', intention: 'passe', auteur: lanceur, receveur: sauteur }; e.porteur = null; e.phase = 'jeuCourant'; e.phasesDeJeu = 0;
 }
 
 function phaseMaul(e: EtatMatch, dt: number): void {
@@ -410,7 +343,6 @@ function phaseMelee(e: EtatMatch): void {
   if (e.minuteur > 0) return; const cote = e.possession;
   const mien = surLeTerrain(e, cote).filter((p) => p.avant); const adv = surLeTerrain(e, adverse(cote)).filter((p) => p.avant);
   const dom = (mien.length ? mien.reduce((a, b) => a + b.puissance, 0) / mien.length : 50) - (adv.length ? adv.reduce((a, b) => a + b.puissance, 0) / adv.length : 50);
-
   if (dom < -8 && e.rng() < 0.4) return gererPenalite(e, adverse(cote), { ...e.ballon });
   const huit = mien.find((p) => p.numero === 8);
   if (huit && dom > 4 && e.rng() < 0.45) { donnerBallon(e, huit); e.phase = 'jeuCourant'; e.phasesDeJeu = 0; return; }
@@ -431,9 +363,7 @@ function phaseTirAuBut(e: EtatMatch): void {
   if (e.minuteur > 0) return; const tir = e.tir; e.tir = null;
   if (!tir) return arretDeJeu(e, 'coupEnvoi', e.possession, e.ballon);
   const { buteur, distance: d, valeur } = tir; buteur.stats.butsTentes += 1;
-  if (e.rng() < borner(0.95 - d / 70 + buteur.pied / 320, 0.35, 0.96)) {
-    buteur.stats.butsReussis += 1; marquer(e, buteur.cote, valeur); dire(e, 'but', buteur.cote, `But de ${buteur.nom} !`, valeur, buteur.moi);
-  }
+  if (e.rng() < borner(0.95 - d / 70 + buteur.pied / 320, 0.35, 0.96)) { buteur.stats.butsReussis += 1; marquer(e, buteur.cote, valeur); dire(e, 'but', buteur.cote, `But de ${buteur.nom} !`, valeur, buteur.moi); }
   if (e.sirene) return clorePeriode(e); arretDeJeu(e, 'coupEnvoi', adverse(buteur.cote), { x: MILIEU, y: LARGEUR / 2 });
 }
 
@@ -441,15 +371,9 @@ function marquer(e: EtatMatch, cote: Cote, points: number): void { if (cote === 
 
 function conclureEssai(e: EtatMatch, marqueur: Pion, precision = ''): void {
   const cote = marqueur.cote; marqueur.stats.essais += 1; marquer(e, cote, 5);
-  // 🛠️ CORRECTION : On utilise la variable "precision" ici !
   dire(e, 'essai', cote, `ESSAI ! ${marqueur.nom} aplatit ${precision || 'en force'} !`, 5, marqueur.moi);
-
   const buteur = choisirButeur(e, cote); buteur.stats.butsTentes += 1;
-  if (e.rng() < borner(0.92 - (Math.abs(marqueur.pos.y - LARGEUR / 2) / (LARGEUR / 2)) * 0.35 + buteur.pied / 400, 0.4, 0.97)) {
-    buteur.stats.butsReussis += 1; marquer(e, cote, 2); dire(e, 'but', cote, `Transformation réussie.`, 2, buteur.moi);
-  } else {
-    dire(e, 'butRate', cote, `Transformation manquée.`, 0, buteur.moi);
-  }
+  if (e.rng() < borner(0.92 - (Math.abs(marqueur.pos.y - LARGEUR / 2) / (LARGEUR / 2)) * 0.35 + buteur.pied / 400, 0.4, 0.97)) { buteur.stats.butsReussis += 1; marquer(e, cote, 2); dire(e, 'but', cote, `Transformation réussie.`, 2, buteur.moi); } else { dire(e, 'butRate', cote, `Transformation manquée.`, 0, buteur.moi); }
   e.phase = 'apresEssai'; e.minuteur = 70; e.possession = adverse(cote);
 }
 
@@ -465,8 +389,7 @@ function phaseMiTemps(e: EtatMatch): void { if (e.minuteur <= 0) { e.possession 
 function gererRemplacements(e: EtatMatch): void {
   for (const cote of ['A', 'B'] as Cote[]) {
     if ((cote === 'A' ? e.remplacementsA : e.remplacementsB) >= 6) continue;
-    const sur = surLeTerrain(e, cote);
-    const fatigues = sur.filter((p) => p.endurance < (p.avant ? 34 : 26) && (!p.moi || e.minute >= 65)).sort((a, b) => a.endurance - b.endurance);
+    const sur = surLeTerrain(e, cote); const fatigues = sur.filter((p) => p.endurance < (p.avant ? 34 : 26) && (!p.moi || e.minute >= 65)).sort((a, b) => a.endurance - b.endurance);
     const surLeBanc = e.pions.find((p) => p.cote === cote && p.moi && !p.surLeTerrain && p.minutesJouees === 0);
     const familleDe = (x: Pion) => POSTE_PAR_ID[x.poste]?.famille;
     const epuise = surLeBanc ? (fatigues.find((p) => p.poste === surLeBanc.poste) ?? fatigues.find((p) => familleDe(p) === familleDe(surLeBanc)) ?? fatigues.find((p) => p.avant === surLeBanc.avant) ?? fatigues[0]) : fatigues[0];
