@@ -291,6 +291,7 @@ function tick(e: EtatMatch, dt: number): void {
   const ctx: Contexte = {
     ballon: e.ballon, possession: e.possession, systeme: e.systeme,
     porteur: e.porteur ? e.porteur.pos : null, consigne: e.consigne,
+    perceeEnCours: e.perceeEnCours,
   };
   if (e.placementFige) {
     // Phase arrêtée : chacun rejoint SA place, calculée une fois pour toutes à
@@ -341,10 +342,45 @@ function tick(e: EtatMatch, dt: number): void {
 
 function phaseCoupEnvoi(e: EtatMatch): void {
   if (e.minuteur > 0) return;
-  const receveur = choisirPorteur(e, e.possession);
-  donnerBallon(e, receveur);
+
+  const campQuiEngage = e.possession;
+  const campQuiRecoit = adverse(campQuiEngage);
+  const s = sens(campQuiEngage);
+
+  // Le 10 tape le coup d'envoi
+  const buteur = surLeTerrain(e, campQuiEngage).find((p) => p.numero === 10)
+      ?? choisirPorteur(e, campQuiEngage);
+
+  // Le ballon atterrit entre 30 et 45 mètres plus loin, avec un décalage aléatoire
+  const arrivee = {
+    x: e.ballon.x + s * (30 + e.rng() * 15),
+    y: borner(e.ballon.y + (e.rng() * 24 - 12), 10, LARGEUR - 10)
+  };
+
+  // On trouve le joueur adverse le plus proche du point de chute pour réceptionner
+  const defenseurs = surLeTerrain(e, campQuiRecoit);
+  const receveur = plusProche(arrivee, defenseurs) ?? defenseurs[0];
+
+  // Le ballon vole vraiment dans les airs pendant 2.8 secondes !
+  // Astuce : on utilise intention: 'passe' pour que phaseJeuCourant gère
+  // la réception proprement sans déclarer de sortie en touche.
+  e.vol = {
+    de: { ...e.ballon },
+    vers: arrivee,
+    duree: 2.8,
+    ecoule: 0,
+    type: 'passe',
+    intention: 'passe',
+    auteur: buteur,
+    receveur: receveur
+  };
+
+  e.porteur = null;
   e.phase = 'jeuCourant';
   e.phasesDeJeu = 0;
+
+  buteur.stats.coupsDePied += 1;
+  dire(e, 'pied', campQuiEngage, `${buteur.nom} donne le coup d'envoi long et haut !`, 0, buteur.moi);
 }
 
 // Qui prend le ballon à la sortie d'une phase ? Le 9 ressort, le 10 lance le jeu.
@@ -454,6 +490,10 @@ function plusProche(p: Vec, liste: Pion[]): Pion | null {
 type Decision = 'porter' | 'passe' | 'pied';
 
 function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): Decision {
+  const distLigne = Math.abs(ligneAdverse(p.cote) - p.pos.x);
+
+  // NOUVEAU : Le joueur a le champ libre vers l'en-but, il y va tout seul !
+  if (distLigne < 15 && pression > 8) return 'porter';
   const r = e.rng();
   const mene = ecart(e, p.cote) < 0;
   if (e.sirene && !mene) return 'pied'; // on met le ballon dehors, c'est fini
@@ -534,17 +574,24 @@ function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   // qui rentrait aussitôt dans la défense et créait un nouveau ruck. Le demi de
   // mêlée cherche donc ses TROIS-QUARTS — l'ouvreur d'abord, les centres
   // ensuite. C'est comme ça qu'on écarte le jeu.
+  // Remplace la recherche du receveur par ceci :
   let receveur: Pion | undefined;
+
   if (p.numero === 9) {
+    // Le 9 sert le 10 en priorité
     const troisQuarts = valides.filter((q) => !q.avant && q.numero !== 9);
-    receveur =
-      troisQuarts.find((q) => q.numero === 10)
-      ?? troisQuarts.find((q) => q.numero === 12)
-      ?? troisQuarts.find((q) => q.numero === 13)
-      ?? troisQuarts.sort((a, b) => distance(p.pos, a.pos) - distance(p.pos, b.pos))[0];
+    receveur = troisQuarts.find((q) => q.numero === 10) ?? troisQuarts[0];
+  } else if (!p.avant) {
+    // Les trois-quarts (10, 12, 13) DOIVENT chercher vers l'aile
+    const versLeLarge = p.pos.y < LARGEUR / 2 ? 1 : -1;
+    const ext = valides
+        .filter((q) => !q.avant && (q.pos.y - p.pos.y) * versLeLarge > 2)
+        .sort((a, b) => Math.abs(b.pos.y - p.pos.y) - Math.abs(a.pos.y - p.pos.y)); // Le plus écarté
+
+    receveur = ext[0] ?? dehors[0];
   }
-  receveur ??= dehors[0]
-    ?? valides.sort((a, b) => distance(p.pos, a.pos) - distance(p.pos, b.pos))[0];
+
+  receveur ??= valides.sort((a, b) => distance(p.pos, a.pos) - distance(p.pos, b.pos))[0];
   if (!receveur) return;
 
   p.stats.passes += 1;
@@ -858,7 +905,19 @@ function phaseTouche(e: EtatMatch): void {
     dire(e, 'maul', cote, `${sauteur.nom} capte en touche — ${nomClub(e, cote)} lance le ballon porté !`, 0, sauteur.moi);
     e.phase = 'maul';
     e.minuteur = 6;
-    donnerBallon(e, sauteur);
+    const lanceur = surLeTerrain(e, cote).find((p) => p.numero === 2) || choisirPorteur(e, cote);
+    e.vol = {
+      de: { ...lanceur.pos },
+      vers: { ...sauteur.pos },
+      duree: 1.5,
+      ecoule: 0,
+      type: 'passe',
+      intention: 'passe',
+      auteur: lanceur,
+      receveur: sauteur
+    };
+    e.porteur = null;
+    e.phase = 'jeuCourant';
     return;
   }
 
@@ -867,7 +926,19 @@ function phaseTouche(e: EtatMatch): void {
       ? `Touche réduite de ${nomClub(e, cote)} : ${sauteur.nom} capte, les trois-quarts sont lancés.`
       : `${sauteur.nom} assure sa touche, ballon propre pour ${nomClub(e, cote)}.`,
     0, sauteur.moi);
-  donnerBallon(e, fond ? choisirPorteur(e, cote) : sauteur);
+  const lanceur = surLeTerrain(e, cote).find((p) => p.numero === 2) || choisirPorteur(e, cote);
+  e.vol = {
+    de: { ...lanceur.pos },
+    vers: { ...sauteur.pos },
+    duree: 1.5,
+    ecoule: 0,
+    type: 'passe',
+    intention: 'passe',
+    auteur: lanceur,
+    receveur: sauteur
+  };
+  e.porteur = null;
+  e.phase = 'jeuCourant';
   e.phase = 'jeuCourant';
   e.phasesDeJeu = 0;
 }

@@ -33,6 +33,7 @@ export interface Contexte {
   porteur?: Vec | null;
   // Consigne du joueur humain (coaching en direct) : décale SON pion.
   consigne?: ConsigneJoueur;
+  perceeEnCours?: boolean;
 }
 
 // Ce que le coaching en direct peut changer sur l'avatar.
@@ -145,12 +146,14 @@ export function placer(pions: Pion[], ctx: Contexte): void {
     if (!attaque && ctx.porteur) {
       const cible = ctx.porteur;
       [...liste]
-        .filter((p) => p.numero !== 15)
-        .sort((a, b) =>
-          Math.hypot(a.pos.x - cible.x, a.pos.y - cible.y)
-          - Math.hypot(b.pos.x - cible.x, b.pos.y - cible.y))
-        .slice(0, 1)
-        .forEach((p) => chasseurs.add(p));
+          .filter((p) => p.numero !== 15 || ctx.perceeEnCours)
+          // REMPLACE LE .sort PAR CELUI-CI :
+          .sort((a, b) =>
+              Math.hypot(a.pos.x - cible.x, a.pos.y - cible.y)
+              - Math.hypot(b.pos.x - cible.x, b.pos.y - cible.y)
+          )
+          .slice(0, 1)
+          .forEach((p) => chasseurs.add(p));
     }
 
     liste.forEach((p, i) => {
