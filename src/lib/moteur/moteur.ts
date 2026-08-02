@@ -110,7 +110,8 @@ export interface Vol {
   duree: number;
   ecoule: number;
   type: 'passe' | 'pied';
-  intention: '50/22' | 'occupation' | 'chandelle' | 'drop' | 'penaltouche' | 'passe';
+  // 🛠️ NOUVEAU : Ajout de la transversale
+  intention: '50/22' | 'occupation' | 'chandelle' | 'drop' | 'penaltouche' | 'passe' | 'transversale';
   auteur: Pion;
   receveur?: Pion;
 }
@@ -551,53 +552,42 @@ function arriereGardeMontee(e: EtatMatch, defenseur: Cote): boolean {
 function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   const partenaires = surLeTerrain(e, p.cote).filter((q) => q !== p);
   const s = sens(p.cote);
-  // On passe vers l'arrière : le receveur doit être derrière le porteur.
-  const valides = partenaires.filter((q) => {
-    const profondeur = (q.pos.x - p.pos.x) * s; // Négatif si en arrière
-    const ecartLateral = Math.abs(q.pos.y - p.pos.y);
 
-    return profondeur <= 0.5 && // Pas de passe en avant
-        profondeur >= -(ecartLateral * 0.7 + 2) && // Cône : interdit d'être trop profond sans être écarté
-        distance(q.pos, p.pos) < 15;
+  // 🛠️ Augmentation de la portée (28m pour les 3/4) pour atteindre les ailiers !
+  const distMax = p.avant ? 12 : 28;
+
+  const valides = partenaires.filter((q) => {
+    const profondeur = (q.pos.x - p.pos.x) * s;
+    const ecartLateral = Math.abs(q.pos.y - p.pos.y);
+    return profondeur <= 0.5 &&
+        profondeur >= -(ecartLateral * 0.8 + 2) &&
+        distance(q.pos, p.pos) < distMax;
   });
   if (!valides.length) return;
 
-  // ⚠️ ON ÉCARTE LE JEU. La première version passait au partenaire le plus
-  // proche : le ballon tournait sur trois mètres et tout le monde restait
-  // agglutiné. Ici on cherche le joueur suivant DANS LA LIGNE, du côté ouvert —
-  // c'est comme ça qu'on déplace la défense et qu'on ouvre des brèches.
-  const versLeLarge = p.pos.y < LARGEUR / 2 ? 1 : -1;
-  const dehors = valides
-    .filter((q) => (q.pos.y - p.pos.y) * versLeLarge > 1.5)
-    .sort((a, b) => Math.abs(a.pos.y - p.pos.y) - Math.abs(b.pos.y - p.pos.y));
-
-  // ⚠️ LE 9 NE SERT PAS LE PACK. À la sortie du ruck, les avants sont juste à
-  // côté de lui : le « partenaire le plus à l'extérieur » était donc un avant,
-  // qui rentrait aussitôt dans la défense et créait un nouveau ruck. Le demi de
-  // mêlée cherche donc ses TROIS-QUARTS — l'ouvreur d'abord, les centres
-  // ensuite. C'est comme ça qu'on écarte le jeu.
-  // Remplace la recherche du receveur par ceci :
   let receveur: Pion | undefined;
 
   if (p.numero === 9) {
-    // Le 9 sert le 10 en priorité
     const troisQuarts = valides.filter((q) => !q.avant && q.numero !== 9);
     receveur = troisQuarts.find((q) => q.numero === 10) ?? troisQuarts[0];
   } else if (!p.avant) {
-    // Les trois-quarts (10, 12, 13) DOIVENT chercher vers l'aile
-    const versLeLarge = p.pos.y < LARGEUR / 2 ? 1 : -1;
-    const ext = valides
-        .filter((q) => !q.avant && (q.pos.y - p.pos.y) * versLeLarge > 2)
-        .sort((a, b) => Math.abs(b.pos.y - p.pos.y) - Math.abs(a.pos.y - p.pos.y)); // Le plus écarté
-
-    receveur = ext[0] ?? dehors[0];
+    // 🛠️ 1. On cherche explicitement un Ailier pour une passe sautée
+    const ailier = valides.find(q => q.numero === 11 || q.numero === 14);
+    if (ailier && distance(p.pos, ailier.pos) > 10 && pression < 6) {
+      receveur = ailier; // Passe sautée activée !
+    } else {
+      // 2. Sinon on cherche le joueur le plus écarté
+      const versLeLarge = p.pos.y < LARGEUR / 2 ? 1 : -1;
+      receveur = valides
+          .filter((q) => !q.avant && (q.pos.y - p.pos.y) * versLeLarge > 1.5)
+          .sort((a, b) => Math.abs(b.pos.y - p.pos.y) - Math.abs(a.pos.y - p.pos.y))[0];
+    }
   }
 
   receveur ??= valides.sort((a, b) => distance(p.pos, a.pos) - distance(p.pos, b.pos))[0];
   if (!receveur) return;
 
   p.stats.passes += 1;
-  // La réussite dépend de la note de passe ET de la pression adverse.
   const difficulte = 0.012 + Math.max(0, 4 - pression) * 0.012 + distance(p.pos, receveur.pos) / 900;
   if (e.rng() < difficulte * (1 - p.passe / 260)) {
     p.stats.passes -= 1;
@@ -606,45 +596,28 @@ function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
     return arretDeJeu(e, 'melee', adverse(p.cote), p.pos);
   }
 
-  // ⚠️ LES DÉFENSEURS QUI S'ÉTAIENT ENGAGÉS SUR LE PORTEUR SONT BATTUS.
-  // C'est ce qui crée les brèches : sans ce délai de réaction, les trois
-  // chasseurs se recollaient instantanément au nouveau porteur et aucune passe
-  // ne débouchait sur quoi que ce soit.
   const pres = Math.abs(ligneAdverse(p.cote) - p.pos.x) < 30;
   const engages = surLeTerrain(e, adverse(p.cote))
-    .filter((d) => distance(d.pos, p.pos) < 6)
-    .sort((a, b) => distance(a.pos, p.pos) - distance(b.pos, p.pos))
-    .slice(0, 2);
+      .filter((d) => distance(d.pos, p.pos) < 6)
+      .sort((a, b) => distance(a.pos, p.pos) - distance(b.pos, p.pos))
+      .slice(0, 2);
   for (const d of engages) d.recuperation = pres ? 2.2 : 1.4;
 
-  // Une passe qui trouve un homme lancé dans un intervalle, c'est la brèche.
   const marqueurs = surLeTerrain(e, adverse(p.cote));
   const garde = plusProche(receveur.pos, marqueurs.filter((d) => d.recuperation <= 0));
   const espace = garde ? distance(receveur.pos, garde.pos) : 99;
 
-  // ⚠️ LE BALLON VOLE VERS LE RECEVEUR. Il ne change pas de mains d'un tick à
-  // l'autre : on le voit partir, traverser, arriver. Une passe de 12 m met
-  // ~0,6 s. Le porteur n'existe plus pendant ce temps — c'est LE moment où
-  // l'action devient lisible.
   const d = distance(p.pos, receveur.pos);
   e.porteur = null;
   e.vol = {
-    de: { ...p.pos },
-    vers: { ...receveur.pos },
-    duree: Math.max(0.3, d / 16),
-    ecoule: 0,
-    type: 'passe',
-    intention: 'passe',
-    auteur: p,
-    receveur,
+    de: { ...p.pos }, vers: { ...receveur.pos }, duree: Math.max(0.3, d / 16),
+    ecoule: 0, type: 'passe', intention: 'passe', auteur: p, receveur,
   };
   e.perceeEnCours = espace > 11;
   if (espace > 11) {
-    dire(e, 'jeu', p.cote,
-      `${p.nom} trouve ${receveur.nom} dans l’intervalle — il est lancé !`, 0, p.moi || receveur.moi);
-    // Le rideau est traversé : ceux qui étaient montés sont hors du coup.
+    dire(e, 'jeu', p.cote, `${p.nom} trouve ${receveur.nom} dans l’intervalle — il est lancé !`, 0, p.moi || receveur.moi);
     for (const d of marqueurs) {
-      if (d.numero === 15) continue; // l'arrière couvre toujours
+      if (d.numero === 15) continue;
       if (distance(d.pos, receveur.pos) < 16) d.recuperation = Math.max(d.recuperation, 2.6);
     }
   }
@@ -660,7 +633,6 @@ function taperAuPied(e: EtatMatch, p: Pion): void {
   let duree = 2.4;
 
   if (p.numero === 10 && dansLes22(p.pos, adverse(p.cote)) && e.phasesDeJeu >= 5) {
-    // DROP GOAL : l'ouvreur arme depuis la poche.
     intention = 'drop';
     const reussi = e.rng() < 0.32 + p.pied / 300;
     p.stats.butsTentes += 1;
@@ -674,19 +646,27 @@ function taperAuPied(e: EtatMatch, p: Pion): void {
     return arretDeJeu(e, 'coupEnvoi', adverse(p.cote), { x: MILIEU, y: LARGEUR / 2 });
   }
 
-  if (p.numero === 9 && e.phasesDeJeu >= 4) {
-    // CHANDELLE : haute et courte, pour contester à la retombée.
+  // 🛠️ NOUVEAU : Passe au pied Transversale de l'Ouvreur vers l'ailier
+  if (p.numero === 10 && e.phasesDeJeu >= 2 && p.pied > 65 && e.rng() < 0.15) {
+    intention = 'transversale';
+    const ailiers = surLeTerrain(e, p.cote).filter(q => q.numero === 11 || q.numero === 14);
+    const ailier = ailiers.sort((a, b) => Math.abs(b.pos.y - p.pos.y) - Math.abs(a.pos.y - p.pos.y))[0] ?? p;
+    arrivee = {
+      x: borner(p.pos.x + s * 22, LIGNE_A + 5, LIGNE_B - 5), // 20m devant
+      y: ailier.pos.y // Pile sur l'aile
+    };
+    duree = 2.5; // Ballon en cloche, ça laisse le temps de courir
+  }
+  else if (p.numero === 9 && e.phasesDeJeu >= 4) {
     intention = 'chandelle';
     arrivee = { x: p.pos.x + s * 22, y: borner(p.pos.y + (e.rng() * 16 - 8), 4, LARGEUR - 4) };
     duree = 3.6;
   } else if (dansSonCamp(p.pos, p.cote) && arriereGardeMontee(e, adverse(p.cote)) && p.pied > 62) {
-    // 50/22 : rasant vers la touche adverse, dans les 22.
     intention = '50/22';
     const cibleX = p.cote === 'A' ? LIGNE_B - 12 : LIGNE_A + 12;
     arrivee = { x: cibleX, y: p.pos.y < LARGEUR / 2 ? 1 : LARGEUR - 1 };
     duree = 3;
   } else {
-    // OCCUPATION : on gagne du terrain, on cherche la touche.
     arrivee = {
       x: borner(p.pos.x + s * (34 + p.pied / 3), LIGNE_A - 4, LIGNE_B + 4),
       y: p.pos.y < LARGEUR / 2 ? -1 : LARGEUR + 1,
@@ -698,7 +678,12 @@ function taperAuPied(e: EtatMatch, p: Pion): void {
   e.porteur = null;
   e.phase = 'coupDePied';
   e.minuteur = duree;
-  dire(e, 'pied', p.cote, libellePied(e, p, intention), 0, p.moi);
+
+  if(intention === 'transversale') {
+    dire(e, 'pied', p.cote, `${p.nom} voit l'espace et tente une transversale au pied !`, 0, p.moi);
+  } else {
+    dire(e, 'pied', p.cote, libellePied(e, p, intention), 0, p.moi);
+  }
 }
 
 function libellePied(e: EtatMatch, p: Pion, i: Vol['intention']): string {
@@ -729,8 +714,24 @@ function phaseCoupDePied(e: EtatMatch): void {
     return arretDeJeu(e, 'melee', adverse(camp), { x: e.ballon.x, y: LARGEUR / 2 });
   }
 
+  // 🛠️ NOUVEAU : Réception de la Transversale
+  if (v.intention === 'transversale') {
+    const contestants = e.pions.filter((p) => p.surLeTerrain && distance(p.pos, e.ballon) < 14);
+    const mien = contestants.filter((p) => p.cote === camp);
+    const gagne = mien.length > 0 && e.rng() < 0.65; // L'attaque a l'avantage sur une belle transversale
+    const vainqueur = gagne ? mien[0] : plusProche(e.ballon, contestants.filter((p) => p.cote !== camp));
+
+    if (vainqueur) {
+      dire(e, 'pied', vainqueur.cote, `🏉 Transversale millimétrée captée par ${vainqueur.nom} !`, 0, vainqueur.moi);
+      donnerBallon(e, vainqueur);
+      e.phase = 'jeuCourant';
+      e.phasesDeJeu = 0;
+      return;
+    }
+    return formerRuck(e, e.ballon);
+  }
+
   if (v.intention === 'chandelle') {
-    // Contest aérien : les ailiers ont ajusté leur course pour arriver dessus.
     const contestants = e.pions.filter((p) => p.surLeTerrain && distance(p.pos, e.ballon) < 14);
     const mien = contestants.filter((p) => p.cote === camp);
     const gagne = mien.length > 0 && e.rng() < 0.42;
@@ -745,8 +746,6 @@ function phaseCoupDePied(e: EtatMatch): void {
     return formerRuck(e, e.ballon);
   }
 
-  // Occupation / pénaltouche : sortie en touche, remise en jeu à l'adversaire
-  // (ou à soi-même après une pénalité).
   const pourQui = v.intention === 'penaltouche' ? camp : adverse(camp);
   return arretDeJeu(e, 'touche', pourQui, e.ballon);
 }

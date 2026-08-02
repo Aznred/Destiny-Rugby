@@ -131,6 +131,8 @@ function cibleDefense(p: Pion, ctx: Contexte, index: number): Vec {
 
 // Applique le placement à tous les pions. Appelé à chaque tick : c'est ce qui
 // donne l'impression que l'équipe « respire » avec le ballon.
+// Applique le placement à tous les pions. Appelé à chaque tick : c'est ce qui
+// donne l'impression que l'équipe « respire » avec le ballon.
 export function placer(pions: Pion[], ctx: Contexte): void {
   const parCote: Record<string, Pion[]> = { A: [], B: [] };
   for (const p of pions) if (p.surLeTerrain) parCote[p.cote].push(p);
@@ -138,21 +140,30 @@ export function placer(pions: Pion[], ctx: Contexte): void {
   for (const cote of ['A', 'B'] as Cote[]) {
     const liste = parCote[cote];
     const attaque = ctx.possession === cote;
-    // LES TROIS PLUS PROCHES MONTENT SUR LE PORTEUR. C'est ce qui déclenche les
-    // plaquages : une ligne défensive qui garde sagement ses distances ne touche
-    // jamais personne (mesuré avant correction : 15 plaquages par match au lieu
-    // de 200). Les autres tiennent le rideau et ferment les espaces.
     const chasseurs = new Set<Pion>();
+
     if (!attaque && ctx.porteur) {
       const cible = ctx.porteur;
+      const ligneADefendre = ligneDefendue(cote);
+      const distAttaquantLigne = Math.abs(ligneADefendre - cible.x);
+
+      // 🛠️ DÉFENSE INTELLIGENTE
       [...liste]
-          .filter((p) => p.numero !== 15 || ctx.perceeEnCours)
-          // REMPLACE LE .sort PAR CELUI-CI :
-          .sort((a, b) =>
-              Math.hypot(a.pos.x - cible.x, a.pos.y - cible.y)
-              - Math.hypot(b.pos.x - cible.x, b.pos.y - cible.y)
-          )
-          .slice(0, 2)
+          .filter((p) => p.recuperation <= 0) // N'envoie JAMAIS un joueur à terre ou battu
+          .filter((p) => p.numero !== 15 || ctx.perceeEnCours) // Le 15 monte si ça perce
+          .sort((a, b) => {
+            // Calcule la distance de base
+            let distA = Math.hypot(a.pos.x - cible.x, a.pos.y - cible.y);
+            let distB = Math.hypot(b.pos.x - cible.x, b.pos.y - cible.y);
+
+            // 🧠 PÉNALITÉ : Si le défenseur est plus loin de sa ligne que l'attaquant,
+            // ça veut dire qu'il est en retard (dans son dos). On le pénalise lourdement !
+            if (Math.abs(ligneADefendre - a.pos.x) > distAttaquantLigne) distA += 15;
+            if (Math.abs(ligneADefendre - b.pos.x) > distAttaquantLigne) distB += 15;
+
+            return distA - distB;
+          })
+          .slice(0, 2) // 2 joueurs sécurisent le plaquage
           .forEach((p) => chasseurs.add(p));
     }
 
@@ -161,17 +172,13 @@ export function placer(pions: Pion[], ctx: Contexte): void {
         p.cible = { x: ctx.porteur.x, y: ctx.porteur.y };
         return;
       }
+
       const cible = attaque ? cibleAttaque(p, ctx, i) : cibleDefense(p, ctx, i);
-      // COACHING EN DIRECT : la consigne du joueur décale SON pion, sans jamais
-      // le sortir du terrain ni casser la structure de l'équipe.
+
       if (p.moi && ctx.consigne) {
         const s = sens(p.cote);
         cible.x += s * ctx.consigne.profondeur;
-        cible.y = borner(
-          cible.y + ctx.consigne.largeur * (cible.y < LARGEUR / 2 ? -1 : 1),
-          3, LARGEUR - 3,
-        );
-        // Un joueur qui « se propose au ras » vient chercher le ballon.
+        cible.y = borner(cible.y + ctx.consigne.largeur * (cible.y < LARGEUR / 2 ? -1 : 1), 3, LARGEUR - 3);
         if (attaque && ctx.consigne.agressivite > 0.6) {
           cible.x = cible.x * 0.55 + ctx.ballon.x * 0.45;
           cible.y = cible.y * 0.55 + ctx.ballon.y * 0.45;
@@ -181,7 +188,6 @@ export function placer(pions: Pion[], ctx: Contexte): void {
     });
   }
 }
-
 // Choix du système défensif : on blitze quand on est loin de son en-but ou
 // qu'il faut récupérer le ballon ; on glisse près de sa ligne, pour ne pas
 // se faire déborder.
