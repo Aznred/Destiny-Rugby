@@ -2,7 +2,6 @@ import type { Pion } from './entites';
 import { LARGEUR, borner, ligneDefendue, sens, distance, type Cote, type Vec } from './terrain';
 
 export type SystemeDefensif = 'blitz' | 'glissee';
-const POD_PROFONDEUR = [-1.5, -3, -4, -3.5, -5, -6, -8, -12];
 
 export interface Contexte {
   ballon: Vec; possession: Cote; systeme: SystemeDefensif;
@@ -13,36 +12,34 @@ export interface ConsigneJoueur { profondeur: number; largeur: number; agressivi
 
 function cibleAttaque(p: Pion, ctx: Contexte, index: number): Vec {
   const s = sens(p.cote);
-
-  // 🧠 MAGIE ICI : Toute l'équipe s'aligne sur l'axe X du porteur pour courir avec lui à plat !
-  const refY = ctx.ballon.y;
-  const refX = ctx.porteur ? ctx.porteur.x : ctx.ballon.x;
-  const grandCote = refY < LARGEUR / 2 ? 1 : -1;
+  const refX = ctx.ballon.x; // La ligne d'avantage virtuelle
+  const grandCote = ctx.ballon.y < LARGEUR / 2 ? 1 : -1;
 
   if (p.avant) {
-    const prof = ctx.porteur ? -2 : (POD_PROFONDEUR[index] ?? -4);
     const bloc = index < 3 ? 0 : index < 6 ? 1 : 2;
     const ecart = [3, 11, 22][bloc] * grandCote;
     const decalage = ((index % 3) - 1) * 3.5;
-    return { x: refX + s * prof, y: borner(refY + ecart + decalage, 3, LARGEUR - 3) };
+    // 🏉 L'attaque arrive LANÇÉE (seulement 2m derrière la ligne, plus de recul !)
+    return { x: refX - s * 2.0, y: borner(ctx.ballon.y + ecart + decalage, 3, LARGEUR - 3) };
   }
 
-  // Les 3/4 gardent une diagonale très plate (-2, -3, -4) par rapport au porteur
+  // 🏉 Les 3/4 s'alignent à plat et avancent EN MÊME TEMPS que le porteur
   switch (p.numero) {
     case 9: return { x: ctx.ballon.x - s * 1.5, y: ctx.ballon.y };
-    case 10: return { x: refX - s * (ctx.porteur ? 2 : 6), y: borner(refY + grandCote * 12, 4, LARGEUR - 4) };
-    case 12: return { x: refX - s * (ctx.porteur ? 3 : 7.5), y: borner(refY + grandCote * 19, 4, LARGEUR - 4) };
-    case 13: return { x: refX - s * (ctx.porteur ? 4 : 9), y: borner(refY + grandCote * 26, 4, LARGEUR - 4) };
-    case 11: return { x: refX - s * (ctx.porteur ? 5 : 10), y: 5 };
-    case 14: return { x: refX - s * (ctx.porteur ? 5 : 10), y: LARGEUR - 5 };
-    default: return { x: refX - s * 12, y: borner(refY + grandCote * 4, 5, LARGEUR - 5) };
+    case 10: return { x: refX - s * 2.0, y: borner(ctx.ballon.y + grandCote * 10, 4, LARGEUR - 4) };
+    case 12: return { x: refX - s * 2.5, y: borner(ctx.ballon.y + grandCote * 17, 4, LARGEUR - 4) };
+    case 13: return { x: refX - s * 3.0, y: borner(ctx.ballon.y + grandCote * 24, 4, LARGEUR - 4) };
+    case 11: return { x: refX - s * 3.5, y: 5 };
+    case 14: return { x: refX - s * 3.5, y: LARGEUR - 5 };
+    default: return { x: refX - s * 12, y: borner(ctx.ballon.y + grandCote * 4, 5, LARGEUR - 5) };
   }
 }
 
 function cibleDefense(p: Pion, ctx: Contexte, index: number): Vec {
   const s = sens(p.cote); const b = ctx.ballon;
-  const avancee = ctx.systeme === 'blitz' ? 3.5 : 1.5;
+  const avancee = ctx.systeme === 'blitz' ? 4.5 : 1.5;
 
+  // 🛡️ CORRECTION : "b.x - s * distance" place bien le joueur ENTRE le ballon et la ligne d'essai !
   if (p.numero === 15) return { x: b.x - s * 26, y: borner(b.y * 0.35 + (LARGEUR / 2) * 0.65, 8, LARGEUR - 8) };
   if (p.numero === 11 || p.numero === 14) {
     const monCote = p.numero === 11 ? 0 : LARGEUR;
@@ -53,6 +50,7 @@ function cibleDefense(p: Pion, ctx: Contexte, index: number): Vec {
   const rang = p.avant ? index : index - 6;
   const centre = ctx.systeme === 'glissee' ? b.y + (b.y < LARGEUR / 2 ? 6 : -6) : b.y;
   const decalage = (rang - (p.avant ? 3.5 : 2)) * (p.avant ? 5.5 : 8.5);
+  // 🛡️ CORRECTION : Le mur défensif se dresse bien DEVANT l'attaque (b.x - s * avancee)
   return { x: b.x - s * avancee - (p.avant ? 0 : s * 1.5), y: borner(centre + decalage, 3, LARGEUR - 3) };
 }
 
@@ -66,18 +64,20 @@ export function placer(pions: Pion[], ctx: Contexte): void {
 
     if (!attaque && ctx.porteur) {
       const cible = ctx.porteur;
-      const distLigne = Math.abs(ligneDefendue(cote) - cible.x);
+      const ligneADefendre = ligneDefendue(cote);
+      const distAttaquantLigne = Math.abs(ligneADefendre - cible.x);
 
       [...liste]
           .filter((p) => p.recuperation <= 0 && (p.numero !== 15 || ctx.perceeEnCours))
           .sort((a, b) => {
-            // Pénalise les défenseurs qui sont dans le dos du porteur
-            const aBattu = Math.abs(ligneDefendue(cote) - a.pos.x) > distLigne;
-            const bBattu = Math.abs(ligneDefendue(cote) - b.pos.x) > distLigne;
+            // Si le défenseur est plus près de sa propre ligne que l'attaquant, c'est bon.
+            // S'il est plus loin (dans le dos), on l'exclut du plaquage direct.
+            const aBattu = Math.abs(ligneADefendre - a.pos.x) > distAttaquantLigne;
+            const bBattu = Math.abs(ligneADefendre - b.pos.x) > distAttaquantLigne;
             if (aBattu !== bBattu) return aBattu ? 1 : -1;
             return distance(a.pos, cible) - distance(b.pos, cible);
           })
-          .slice(0, 1) // UN SEUL chasseur direct, la ligne fait le reste !
+          .slice(0, 2)
           .forEach((p) => chasseurs.add(p));
     }
 

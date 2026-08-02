@@ -8,7 +8,6 @@ import { LARGEUR, LIGNE_A, LIGNE_B, MILIEU, borner, dansLes22, dansSonCamp, dist
 import { placementCoupEnvoi, placementMelee, placementRuck, placementTouche } from './phasesArretees';
 
 export type Phase = 'coupEnvoi' | 'jeuCourant' | 'ruck' | 'melee' | 'touche' | 'maul' | 'coupDePied' | 'tirAuBut' | 'apresEssai' | 'miTemps' | 'fini';
-
 export interface Commentaire { minute: number; texte: string; type: 'essai' | 'but' | 'butRate' | 'plaquage' | 'ruck' | 'melee' | 'touche' | 'maul' | 'pied' | 'penalite' | 'carton' | 'remplacement' | 'jalon' | 'jeu'; cote: Cote | null; points: number; scoreA: number; scoreB: number; moi?: boolean; }
 
 export interface EtatMatch {
@@ -103,9 +102,9 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const s = sens(porteur.cote); const defenseurs = surLeTerrain(e, adverse(porteur.cote));
   const menace = plusProche(porteur.pos, defenseurs); const pression = menace ? distance(porteur.pos, menace.pos) : 99;
 
-  // 🧠 Le joueur fonce tout droit et accélère !
+  // 🏉 Le joueur sprinte TOUT DROIT en attaque
   let viseeY = porteur.pos.y; if (menace && pression < 8) viseeY += menace.pos.y > porteur.pos.y ? -5 : 5;
-  porteur.cible = { x: porteur.pos.x + s * 15, y: borner(viseeY, 2, LARGEUR - 2) };
+  porteur.cible = { x: porteur.pos.x + s * 25, y: borner(viseeY, 2, LARGEUR - 2) };
   const parcouru = deplacer(porteur, dt); porteur.stats.metres += parcouru; e.ballon = { ...porteur.pos };
 
   const ligne = ligneAdverse(porteur.cote); if (porteur.cote === 'A' ? porteur.pos.x >= ligne : porteur.pos.x <= ligne) return conclureEssai(e, porteur);
@@ -113,7 +112,7 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   for (const d of defenseurs) { if (porteur.recuperation > 0) break; if (d.recuperation > 0) continue; if (distance(d.pos, porteur.pos) > RAYON_PLAQUAGE) continue; return resoudrePlaquage(e, porteur, d); }
 
   e.prochaineDecision -= dt; if (e.prochaineDecision > 0) return;
-  e.prochaineDecision = 0.8;
+  e.prochaineDecision = 0.6;
   const decision = deciderAvecLeBallon(e, porteur, pression);
   if (decision === 'pied') return taperAuPied(e, porteur);
   if (decision === 'passe') return passerLeBallon(e, porteur, pression);
@@ -124,7 +123,7 @@ type Decision = 'porter' | 'passe' | 'pied';
 
 function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): Decision {
   const distLigne = Math.abs(ligneAdverse(p.cote) - p.pos.x);
-  if (distLigne < 15 && pression > 8) return 'porter';
+  if (distLigne < 15 && pression > 5) return 'porter';
   const r = e.rng(); const mene = ecart(e, p.cote) < 0; if (e.sirene && !mene) return 'pied';
   const minutesRestantes = 80 - e.minute;
 
@@ -136,10 +135,13 @@ function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): Decision 
   }
   if (minutesRestantes <= 5 && ecart(e, p.cote) > 7) return 'porter';
 
-  // 🧠 FIXER ET DONNER : S'il y a de l'espace on COURS, sinon on LÂCHE LA BALLE.
-  if (pression > 8) return 'porter';
-  if (p.avant) return e.rng() < 0.25 ? 'passe' : 'porter';
-  else return e.rng() < 0.80 ? 'passe' : 'porter';
+  // 🏉 LA RÈGLE DU "FIXER ET DONNER"
+  if (pression < 2.5) return 'porter'; // Trop tard pour passer, on prend l'impact !
+  if (pression > 10) return 'porter';  // Espace libre, on court !
+
+  // Entre 2.5m et 10m de pression : on passe le ballon
+  if (p.avant) return e.rng() < 0.4 ? 'passe' : 'porter';
+  else return e.rng() < 0.85 ? 'passe' : 'porter';
 }
 
 function estDansSes22(p: Pion): boolean { return p.cote === 'A' ? p.pos.x < LIGNE_A + 22 : p.pos.x > LIGNE_B - 22; }
@@ -150,14 +152,13 @@ function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   const distMax = p.avant ? 12 : 30;
 
   const valides = partenaires.filter((q) => {
-    const profondeur = (q.pos.x - p.pos.x) * s; const ecartLateral = Math.abs(q.pos.y - p.pos.y);
-    // Tolérance 1.5m en avant (course lancée), interdit plus de 3.5m en arrière
-    return profondeur <= 1.5 && profondeur >= -(3.5 + ecartLateral * 0.3) && distance(q.pos, p.pos) < distMax;
+    const profondeur = (q.pos.x - p.pos.x) * s;
+    // 🚫 ZERO RECULADE ! La passe doit être max 3m derrière et peut être 1.5m devant (course)
+    return profondeur <= 1.5 && profondeur >= -3.0 && distance(q.pos, p.pos) < distMax;
   });
   if (!valides.length) return;
 
   let receveur: Pion | undefined;
-
   if (p.numero === 9) {
     if (e.rng() < 0.4) {
       const avants = valides.filter((q) => q.avant);
@@ -171,7 +172,7 @@ function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
       if (!receveur) { const numSaute = ordreLigne[monIndex + 2]; if (numSaute) receveur = valides.find(q => q.numero === numSaute); }
     }
   }
-  receveur ??= valides.sort((a, b) => distance(p.pos, b.pos) - distance(p.pos, a.pos))[0]; // fallback : le plus loin
+  receveur ??= valides.sort((a, b) => distance(p.pos, b.pos) - distance(p.pos, a.pos))[0];
   if (!receveur) return;
 
   p.stats.passes += 1;

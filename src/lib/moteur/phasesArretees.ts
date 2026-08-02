@@ -60,28 +60,31 @@ export function placementRuck(pions: Pion[], ballon: Vec, possession: Cote): Pla
   return placement;
 }
 
+// 🛠️ CORRECTION MAGISTRALE DU COUP D'ENVOI : Le "moins" au lieu du "plus"
 export function placementCoupEnvoi(pions: Pion[], milieu: number, possession: Cote): Placement {
   const placement: Placement = {};
   for (const p of pions) {
     if (!p.surLeTerrain) continue;
-    const s = sens(p.cote); const engage = p.cote === possession;
+    const s = sens(p.cote);
+    const engage = p.cote === possession;
 
     if (engage) {
+      // L'équipe qui tape avance jusqu'à la ligne
       placement[p.id] = { x: milieu - s * (2 + (p.numero % 4) * 1.5), y: borner(LARGEUR / 2 + ((p.numero % 2 === 0 ? 1 : -1) * (p.numero * 2)), 4, LARGEUR - 4) };
     } else {
-      // 🧠 QUADRILLAGE DE RECEPTION PARFAIT
+      // L'équipe qui reçoit : Le quadrillage se fait bien en RECULANT dans SON camp ("milieu - s * prof")
       let profondeur = 0; let ecartY = LARGEUR / 2;
       if (p.avant) {
-        profondeur = 10 + (p.numero % 3) * 5; // Avants entre 10 et 20m
+        profondeur = 12 + (p.numero % 3) * 5; // Rideau 1 (Avants)
         ecartY = (LARGEUR / 8) * p.numero;
       } else if (p.numero === 11 || p.numero === 14 || p.numero === 15) {
-        profondeur = 35; // Fond du terrain
+        profondeur = 35; // Rideau 3 (Arrières)
         ecartY = p.numero === 15 ? LARGEUR / 2 : (p.numero === 11 ? 15 : LARGEUR - 15);
       } else {
-        profondeur = 22; // 3/4 au milieu
+        profondeur = 24; // Rideau 2 (Centres)
         ecartY = (LARGEUR / 5) * (p.numero - 8);
       }
-      placement[p.id] = { x: milieu + s * profondeur, y: borner(ecartY, 4, LARGEUR - 4) }; // "+" car on est dans l'autre camp
+      placement[p.id] = { x: milieu - s * profondeur, y: borner(ecartY, 4, LARGEUR - 4) };
     }
   }
   return placement;
