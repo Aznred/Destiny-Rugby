@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import './App.css';
+import { Analytics } from "@vercel/analytics/next"
 import { useGame } from './store/useGame';
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
@@ -103,6 +104,7 @@ export default function App() {
           </Suspense>
         )}
       </AnimatePresence>
+      <Analytics/>
     </>
   );
 }
