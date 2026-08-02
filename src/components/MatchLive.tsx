@@ -20,6 +20,7 @@ import {
   appliquerConsigne, avancer, bilan, creerMatch, type Commentaire, type EtatMatch,
 } from '../lib/moteur/moteur';
 import { LARGEUR, LONGUEUR } from '../lib/moteur/terrain';
+import { estTitulaire } from '../lib/moteur/saison';
 import { CONSIGNE_NEUTRE, lireConsigneGroq, lireConsigneLocale } from '../lib/moteur/consignes';
 import type { Pion } from '../lib/moteur/entites';
 import { graine, type MatchChampionnat } from '../lib/championnat';
@@ -87,7 +88,14 @@ export function MatchLive({
       effectifDuClub(match.domicile, saison), effectifDuClub(match.exterieur, saison),
       match.scoreD, match.scoreE, cle,
       joueur && (joueur.club === match.domicile || joueur.club === match.exterieur)
-        ? { club: joueur.club, nom: joueur.nom, poste: joueur.poste, attributs: joueur.attributs }
+        ? {
+            club: joueur.club, nom: joueur.nom, poste: joueur.poste,
+            attributs: joueur.attributs,
+            // ⚠️ Titulaire ou remplaçant ? La confiance du staff et le niveau
+            // décident, comme pour le reste du jeu. Déterministe : rouvrir le
+            // match ne change pas la compo.
+            titulaire: estTitulaire(joueur, cle),
+          }
         : undefined,
     );
   }
@@ -337,20 +345,35 @@ export function MatchLive({
         {/* ---------- COMMENTAIRE / BILAN ---------- */}
         {e.fini && stats ? (
           <div className="ml-fil">
-            <div className="ml-bilan-tete">📋 Feuille de match</div>
-            {[...stats.parJoueur]
-              .sort((a, b) => b.stats.metres - a.stats.metres)
-              .slice(0, 12)
-              .map((j) => (
-                <div key={`${j.club}-${j.nom}`} className="ml-bilan-ligne">
-                  <span className="ml-bilan-num">{j.numero}</span>
-                  <span className="ml-bilan-nom">{j.nom}<i>{j.club}</i></span>
-                  <span>{Math.round(j.stats.metres)} m</span>
-                  <span>{j.stats.plaquages} plq.</span>
-                  <span>{j.stats.passes} passes</span>
-                  <span>{j.minutes}′</span>
+            {/* ⚠️ TOUS les joueurs qui ont foulé le terrain, équipe par équipe —
+                et plus seulement les douze meilleurs porteurs. */}
+            {[e.clubA, e.clubB].map((club) => (
+              <div key={club}>
+                <div className="ml-bilan-tete">📋 {club}</div>
+                <div className="ml-bilan-entete">
+                  <span /><span>Joueur</span><span>m</span><span>plq.</span>
+                  <span>ess.</span><span>pas.</span><span>min</span>
                 </div>
-              ))}
+                {stats.parJoueur
+                  .filter((j) => j.club === club)
+                  .sort((a, b) => a.numero - b.numero)
+                  .map((j) => (
+                    <div
+                      key={`${j.club}-${j.nom}`}
+                      className="ml-bilan-ligne"
+                      data-moi={monPion && j.nom === monPion.nom ? 'oui' : undefined}
+                    >
+                      <span className="ml-bilan-num">{j.numero}</span>
+                      <span className="ml-bilan-nom">{j.nom}</span>
+                      <span>{Math.round(j.stats.metres)}</span>
+                      <span>{j.stats.plaquages}</span>
+                      <span>{j.stats.essais || '–'}</span>
+                      <span>{j.stats.passes}</span>
+                      <span>{j.minutes}′</span>
+                    </div>
+                  ))}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="ml-fil" ref={filRef}>

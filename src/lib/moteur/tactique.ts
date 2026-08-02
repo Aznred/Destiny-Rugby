@@ -149,7 +149,7 @@ export function placer(pions: Pion[], ctx: Contexte): void {
         .sort((a, b) =>
           Math.hypot(a.pos.x - cible.x, a.pos.y - cible.y)
           - Math.hypot(b.pos.x - cible.x, b.pos.y - cible.y))
-        .slice(0, 2)
+        .slice(0, 1)
         .forEach((p) => chasseurs.add(p));
     }
 

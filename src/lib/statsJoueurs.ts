@@ -20,6 +20,7 @@ import type { Joueur, PosteId, StatsDetaillees } from '../types';
 import { graine, journeesALaSemaine, nombreJournees, poulesDe } from './championnat';
 import { effectifDuClub, forceEffectif, type Coequipier } from './effectif';
 import { POSTE_PAR_ID } from '../data/rugby';
+import type { LigneReelle } from './moteur/saison';
 
 export interface LigneStats {
   nom: string;
@@ -214,14 +215,45 @@ export function oublierStats(): void {
 
 // Le classement d'une catégorie. Le joueur humain y entre avec SES VRAIES
 // statistiques quand il évolue dans cette compétition.
+// ⚠️ QUAND LE MOTEUR A TOURNÉ, C'EST LUI QUI FAIT FOI.
+// Le store rejoue en fond toutes les affiches de la poule (lib/moteur/saison.ts).
+// Dès qu'au moins une journée a été simulée, le classement se construit sur ces
+// chiffres RÉELS plutôt que sur l'estimation par poste — pour TOUT LE MONDE, pas
+// seulement pour le joueur humain. On ne mélange jamais les deux sources : ce
+// serait comparer un match joué à vingt-cinq matchs devinés.
+function depuisLeMoteur(reelles: Record<string, LigneReelle>): LigneStats[] {
+  return Object.values(reelles).map((l) => ({
+    nom: l.nom,
+    club: l.club,
+    poste: l.poste,
+    age: 0,
+    note: 0,
+    matchs: l.matchs,
+    titularisations: l.matchs,
+    minutes: l.minutes,
+    essais: l.essais,
+    points: l.essais * 5 + l.butsReussis * 2,
+    butsTentes: l.butsTentes,
+    butsReussis: l.butsReussis,
+    plaquages: l.plaquages,
+    plaquagesManques: l.plaquagesManques,
+    grattages: l.grattages,
+    turnovers: l.turnovers,
+    passesDecisives: l.passes,
+    cartons: l.cartons,
+  }));
+}
+
 export function classementJoueurs(
   divisionId: string, saison: number, journees: number,
   cat: Categorie, joueur?: Joueur | null, numeroPoule?: number, max = 20,
+  reelles?: Record<string, LigneReelle>,
 ): LigneStats[] {
-  const base = statsCompetition(divisionId, saison, journees, numeroPoule);
+  const auMoteur = reelles && Object.keys(reelles).length > 0;
+  const base = auMoteur ? depuisLeMoteur(reelles) : statsCompetition(divisionId, saison, journees, numeroPoule);
   let lignes = base;
 
-  if (joueur && joueur.division === divisionId) {
+  if (!auMoteur && joueur && joueur.division === divisionId) {
     const vecu = joueur.saisonEnCours;
     const stats: StatsDetaillees | undefined = vecu?.stats;
     const mien: LigneStats = {

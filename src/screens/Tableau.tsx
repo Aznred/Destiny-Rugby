@@ -167,9 +167,12 @@ function ClassementsJoueurs({
   joueur: Joueur;
 }) {
   const [cat, setCat] = useState<Categorie>('essais');
+  // Les statistiques produites par le moteur pour CETTE division et CETTE
+  // saison, si des journées ont déjà été rejouées en fond.
+  const reelles = useGame((s) => s.statsReelles[`${divisionId}#${saison}`]);
   const lignes = useMemo(
-    () => classementJoueurs(divisionId, saison, journees, cat, joueur, numeroPoule, 20),
-    [divisionId, saison, journees, cat, joueur, numeroPoule],
+    () => classementJoueurs(divisionId, saison, journees, cat, joueur, numeroPoule, 20, reelles),
+    [divisionId, saison, journees, cat, joueur, numeroPoule, reelles],
   );
   const info = CATEGORIES.find((c) => c.id === cat)!;
 
@@ -177,7 +180,9 @@ function ClassementsJoueurs({
     <div className="carte bloc-competition">
       <div className="comp-tete">
         <b>🥇 Classements des joueurs</b>
-        <span className="comp-count">{journees} journée{journees > 1 ? 's' : ''}</span>
+        <span className="comp-count">
+          {reelles ? 'matchs joués' : 'estimation'} · {journees} journée{journees > 1 ? 's' : ''}
+        </span>
       </div>
       <div className="cats-stats">
         {CATEGORIES.map((c) => (

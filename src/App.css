@@ -267,7 +267,9 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-
+.pion {
+  transition: transform 0.2s linear; /* Lisse le mouvement entre chaque tick du moteur */
+}
 /* ---- Classement latéral : le championnat en permanence sous les yeux ---- */
 .classement-lateral {
   padding: 0.9rem 0.85rem;
@@ -2774,9 +2776,21 @@
   color: var(--or-clair);
   padding: 0.2rem 0 0.5rem;
 }
+.ml-bilan-entete {
+  display: grid;
+  grid-template-columns: 26px 1fr 42px 38px 34px 38px 40px;
+  gap: 0.4rem;
+  padding: 0.1rem 0.3rem 0.3rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--craie-dim);
+  opacity: 0.7;
+}
+.ml-bilan-entete span:not(:nth-child(2)) { text-align: right; }
 .ml-bilan-ligne {
   display: grid;
-  grid-template-columns: 26px 1fr auto auto auto auto;
+  grid-template-columns: 26px 1fr 42px 38px 34px 38px 40px;
   gap: 0.5rem;
   align-items: center;
   padding: 0.28rem 0.3rem;
@@ -2786,10 +2800,15 @@
   font-variant-numeric: tabular-nums;
 }
 .ml-bilan-num { color: var(--or-clair); text-align: center; }
-.ml-bilan-nom { display: flex; flex-direction: column; min-width: 0; color: var(--craie); }
+.ml-bilan-ligne span:not(.ml-bilan-num):not(.ml-bilan-nom) { text-align: right; }
+.ml-bilan-ligne[data-moi='oui'] { background: rgba(212, 175, 55, 0.16); border-radius: 6px; }
+.ml-bilan-nom {
+  min-width: 0; color: var(--craie);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .ml-bilan-nom i { font-style: normal; font-size: 0.68rem; color: var(--craie-dim); }
 
 @media (max-width: 700px) {
-  .ml-bilan-ligne { grid-template-columns: 22px 1fr auto auto; font-size: 0.75rem; }
-  .ml-bilan-ligne span:nth-child(5) { display: none; }
+  .ml-bilan-ligne, .ml-bilan-entete { grid-template-columns: 22px 1fr 36px 32px 30px 36px; font-size: 0.74rem; }
+  .ml-bilan-ligne span:nth-child(6), .ml-bilan-entete span:nth-child(6) { display: none; }
 }

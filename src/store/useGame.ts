@@ -28,6 +28,8 @@ import {
 } from '../lib/social';
 import { filGroq, reponsesGroq, comptesGroq, messageGroq } from '../lib/groqSocial';
 import { annuaire, bassinSocial } from '../lib/comptes';
+import { cumuler, estTitulaire, simulerJournee, type LigneReelle } from '../lib/moteur/saison';
+import { matchDeLaSemaine } from '../lib/matchLive';
 import {
   filDeLaSemaine, messageSpontane, effetSurRelation, reponseLocale, tonDuMessage, reactionsPour,
 } from '../lib/vie';
@@ -59,7 +61,7 @@ import { setMouvementsClubs } from '../lib/divisions';
 import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFinale';
 import {
   championnatEnDirect, journeesApres, nombreJournees, graine,
-  estAmateur, weekEndsJoues, totalWeekEnds,
+  estAmateur, weekEndsJoues, totalWeekEnds, poulesDe, indexPoule,
 } from '../lib/championnat';
 import { risqueDeBlessure, tirerBlessure, messageBlessure, deltasBlessure } from '../lib/blessures';
 import { effetsTraits, MAX_TRAITS } from '../data/traits';
@@ -289,6 +291,13 @@ interface GameState {
     butsTentes: number; butsReussis: number; cartons: number; minutes: number;
   }) => void;
   matchRegarde: string; // « saison#semaine » du dernier match suivi en direct
+  // ⚠️ LES VRAIES STATISTIQUES DE LA POULE. Le moteur rejoue en fond TOUTES les
+  // affiches de la journée (sans rendu) : le classement des joueurs n'est plus
+  // une estimation, ce sont les chiffres des matchs réellement simulés.
+  // Clé : « division#saison » → « club|nom » → cumul.
+  statsReelles: Record<string, Record<string, LigneReelle>>;
+  journeesReelles: Record<string, number>;
+  simulerStatsJournee: () => void;
   // boutique
   acheterSkin: (id: string) => boolean;
   choisirSkin: (id: string) => void;
@@ -315,6 +324,8 @@ export const useGame = create<GameState>()(
       posts: [],
       filSemaine: '',
       matchRegarde: '',
+      statsReelles: {},
+      journeesReelles: {},
       notifsSocial: [],
       comptesSuivis: [],
       suggestionsComptes: [],
@@ -972,6 +983,11 @@ export const useGame = create<GameState>()(
         if ((resultat.stats?.plaquages ?? 0) >= 8) get().signalerDefi('plaquages');
         if ((resultat.stats?.butsReussis ?? 0) > 0) get().signalerDefi('transformation');
         set({ joueur: j });
+        // ---- LA JOURNÉE EST REJOUÉE EN FOND ----
+        // C'est ici que les statistiques individuelles de toute la poule sont
+        // produites, juste après le match du joueur.
+        get().simulerStatsJournee();
+
         // ---- L'OVALE SUIT LE CALENDRIER ----
         // Une semaine jouée = une nouvelle fournée de publications, datée.
         get().vivreSemaineSociale();
@@ -1855,6 +1871,42 @@ export const useGame = create<GameState>()(
         });
       },
 
+      // ---- SIMULATION DE FOND DE LA JOURNÉE ----
+      // Toutes les affiches de la poule sont rejouées par le MÊME moteur que le
+      // match qu'on regarde, mais sans aucun rendu. Comme la graine est celle du
+      // championnat, le match suivi en direct et celui rejoué ici sont
+      // rigoureusement identiques : rien n'est compté deux fois.
+      simulerStatsJournee: () => {
+        const joueur = get().joueur;
+        const division = joueur?.division;
+        if (!joueur || !division) return;
+        const affiche = matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur));
+        if (!affiche) return; // pas de journée cette semaine
+        const cle = `${division}#${joueur.saison}`;
+        const dejaFaites = get().journeesReelles[cle] ?? 0;
+        if (dejaFaites >= affiche.journee) return; // journée déjà simulée
+
+        const poules = poulesDe(division);
+        const numeroPoule = poules.length > 1
+          ? Math.max(0, indexPoule(division, joueur.club)) : undefined;
+        const lignes = simulerJournee(
+          division, joueur.saison, affiche.journee, joueur.club,
+          bonusClubDuJoueur(joueur), numeroPoule,
+          {
+            club: joueur.club, nom: joueur.nom, poste: joueur.poste,
+            attributs: joueur.attributs,
+            // Même décision que dans le direct : le match rejoué est le même.
+            titulaire: estTitulaire(joueur, affiche.cle),
+          },
+        );
+        set((s) => ({
+          // On ne garde QUE la division et la saison en cours : accumuler tout
+          // l'historique ferait exploser le quota du localStorage.
+          statsReelles: { [cle]: cumuler(s.statsReelles[cle] ?? {}, lignes) },
+          journeesReelles: { [cle]: affiche.journee },
+        }));
+      },
+
       signalerDefi: (evenement) => {
         const { joueur, defis } = get();
         if (!joueur) return;
@@ -1945,6 +1997,8 @@ export const useGame = create<GameState>()(
           posts?: PostSocial[];
           filSemaine?: string;
           matchRegarde?: string;
+          statsReelles?: Record<string, Record<string, LigneReelle>>;
+          journeesReelles?: Record<string, number>;
           notifsSocial?: NotifSocial[];
           succesDebloques?: SuccesDebloques;
           defis?: { cle: string; faits: string[] };
@@ -1977,6 +2031,8 @@ export const useGame = create<GameState>()(
         s.posts ??= [];
         s.filSemaine ??= '';
         s.matchRegarde ??= '';
+        s.statsReelles ??= {};
+        s.journeesReelles ??= {};
         s.notifsSocial ??= [];
         s.comptesSuivis ??= [];
         s.conversations ??= {};
@@ -2009,6 +2065,8 @@ export const useGame = create<GameState>()(
         posts: s.posts,
         filSemaine: s.filSemaine,
         matchRegarde: s.matchRegarde,
+        statsReelles: s.statsReelles,
+        journeesReelles: s.journeesReelles,
         notifsSocial: s.notifsSocial,
         comptesSuivis: s.comptesSuivis,
         conversations: s.conversations,
