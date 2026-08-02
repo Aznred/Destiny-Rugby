@@ -70,17 +70,17 @@ function cibleAttaque(p: Pion, ctx: Contexte, index: number): Vec {
     case 9: // le demi de mêlée, à la sortie du ruck
       return { x: b.x + s * -1.5, y: borner(b.y - grandCote * 2, 2, LARGEUR - 2) };
     case 10: // l'ouvreur, en profondeur : c'est lui qui anime
-      return { x: b.x + s * -11, y: borner(b.y + grandCote * 9, 4, LARGEUR - 4) };
+      return { x: b.x + s * -7, y: borner(b.y + grandCote * 9, 4, LARGEUR - 4) };
     case 12:
-      return { x: b.x + s * -13, y: borner(b.y + grandCote * 17, 4, LARGEUR - 4) };
+      return { x: b.x + s * -8.5, y: borner(b.y + grandCote * 17, 4, LARGEUR - 4) };
     case 13:
-      return { x: b.x + s * -14, y: borner(b.y + grandCote * 25, 4, LARGEUR - 4) };
+      return { x: b.x + s * -9.5, y: borner(b.y + grandCote * 25, 4, LARGEUR - 4) };
     case 11: // les ailiers, aux extrémités
-      return { x: b.x + s * -15, y: 4 };
+      return { x: b.x + s * -10, y: 4 };
     case 14:
-      return { x: b.x + s * -15, y: LARGEUR - 4 };
+      return { x: b.x + s * -10, y: LARGEUR - 4 };
     default: // 15 : il vient en soutien, dans l'axe, un peu en retrait
-      return { x: b.x + s * -20, y: borner(b.y + grandCote * 4, 5, LARGEUR - 5) };
+      return { x: b.x + s * -16, y: borner(b.y + grandCote * 4, 5, LARGEUR - 5) };
   }
 }
 

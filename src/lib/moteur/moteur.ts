@@ -74,6 +74,9 @@ export interface EtatMatch {
   // Budget de points restant pour retomber sur le résultat de la ligue.
   resteA: number;
   resteB: number;
+  // Score « attendu » par le modèle statistique : sert de repère, pas de loi.
+  cibleA: number;
+  cibleB: number;
   phasesDeJeu: number; // temps de jeu enchaînés depuis le dernier arrêt
   // ⚠️ CADENCE DE DÉCISION. Le porteur ne décide pas cinq fois par seconde :
   // il court, et ne se repose la question que toutes les ~0,9 s. Sans ce
@@ -181,6 +184,7 @@ export function creerMatch(
     systeme: 'blitz',
     scoreA: 0, scoreB: 0,
     resteA: scoreCibleA, resteB: scoreCibleB,
+    cibleA: scoreCibleA, cibleB: scoreCibleB,
     phasesDeJeu: 0,
     prochaineDecision: 1,
     vol: null,
@@ -494,7 +498,7 @@ function passerLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   const partenaires = surLeTerrain(e, p.cote).filter((q) => q !== p);
   const s = sens(p.cote);
   // On passe vers l'arrière : le receveur doit être derrière le porteur.
-  const valides = partenaires.filter((q) => (q.pos.x - p.pos.x) * s <= 0.5 && distance(q.pos, p.pos) < 24);
+  const valides = partenaires.filter((q) => (q.pos.x - p.pos.x) * s <= 0.5 && distance(q.pos, p.pos) < 15);
   if (!valides.length) return;
 
   // ⚠️ ON ÉCARTE LE JEU. La première version passait au partenaire le plus
@@ -585,7 +589,7 @@ function taperAuPied(e: EtatMatch, p: Pion): void {
     intention = 'drop';
     const reussi = e.rng() < 0.32 + p.pied / 300;
     p.stats.butsTentes += 1;
-    if (reussi && budget(e, p.cote) >= 3) {
+    if (reussi && peutMarquer(budget(e, p.cote), 3)) {
       p.stats.butsReussis += 1;
       marquer(e, p.cote, 3);
       dire(e, 'but', p.cote, `DROP de ${p.nom} ! Il arme de 25 mètres et ça passe entre les perches.`, 3, p.moi);
@@ -921,7 +925,7 @@ function gererPenalite(e: EtatMatch, pour: Cote, lieu: Vec): void {
   // Mené de plus de 3 en fin de match → pénaltouche, on cherche l'essai.
   const chercherLEssai = restantes <= 15 && monEcart <= -4;
 
-  if (prendreLesPoints && !chercherLEssai && budget(e, pour) >= 3) {
+  if (prendreLesPoints && !chercherLEssai && peutMarquer(budget(e, pour), 3)) {
     const buteur = choisirButeur(e, pour);
     dire(e, 'penalite', pour, `${nomClub(e, pour)} prend les points. ${buteur.nom} se place.`, 0, buteur.moi);
     e.phase = 'tirAuBut';
@@ -955,7 +959,7 @@ function phaseTirAuBut(e: EtatMatch): void {
   buteur.stats.butsTentes += 1;
   // Réussite : la note de pied, moins la distance.
   const chance = borner(0.95 - d / 70 + buteur.pied / 320, 0.35, 0.96);
-  const reussi = e.rng() < chance && budget(e, buteur.cote) >= valeur;
+  const reussi = e.rng() < chance && peutMarquer(budget(e, buteur.cote), valeur);
   if (reussi) {
     buteur.stats.butsReussis += 1;
     marquer(e, buteur.cote, valeur);
@@ -969,6 +973,14 @@ function phaseTirAuBut(e: EtatMatch): void {
 }
 
 // --- MARQUER ----------------------------------------------------------------
+// Un reliquat de 1 (ou de 4, qui exigerait deux transformations sans essai) ne
+// peut plus jamais être soldé : on interdit donc l'action qui y mènerait.
+function peutMarquer(reste: number, valeur: number): boolean {
+  if (reste < valeur) return false;
+  const apres = reste - valeur;
+  return apres !== 1 && apres !== 4;
+}
+
 function budget(e: EtatMatch, cote: Cote): number {
   return cote === 'A' ? e.resteA : e.resteB;
 }
@@ -984,7 +996,7 @@ function conclureEssai(e: EtatMatch, marqueur: Pion, precision = ''): void {
   // l'action est repoussée : ballon tenu, en-avant, sortie en touche. C'est ce
   // qui garantit que le direct retombe EXACTEMENT sur le résultat du
   // championnat, sans jamais mentir sur ce qu'on voit à l'écran.
-  if (budget(e, cote) < 5) {
+  if (!peutMarquer(budget(e, cote), 5)) {
     dire(e, 'jeu', adverse(cote),
       `${marqueur.nom} est tenu au-dessus de la ligne ! Ballon gratté, mêlée à cinq mètres.`, 0, marqueur.moi);
     return arretDeJeu(e, 'melee', adverse(cote), {
@@ -1001,7 +1013,7 @@ function conclureEssai(e: EtatMatch, marqueur: Pion, precision = ''): void {
   // La transformation, si le budget la permet.
   const buteur = choisirButeur(e, cote);
   const excentre = Math.abs(marqueur.pos.y - LARGEUR / 2) / (LARGEUR / 2);
-  if (budget(e, cote) >= 2) {
+  if (peutMarquer(budget(e, cote), 2)) {
     buteur.stats.butsTentes += 1;
     const reussi = e.rng() < borner(0.92 - excentre * 0.35 + buteur.pied / 400, 0.4, 0.97);
     if (reussi) {
@@ -1043,14 +1055,58 @@ function phaseMiTemps(e: EtatMatch): void {
   arretDeJeu(e, 'coupEnvoi', 'A', { x: MILIEU, y: LARGEUR / 2 });
 }
 
+// Les points que le match n'a pas réussi à produire naturellement sont inscrits
+// ici, sous forme d'actions racontées (essai transformé, pénalité), datées des
+// toutes dernières minutes. Le fil de commentaire reste cohérent avec le score.
+function solderLesPoints(e: EtatMatch): void {
+  for (const cote of ['A', 'B'] as Cote[]) {
+    let reste = cote === 'A' ? e.resteA : e.resteB;
+    let garde = 0;
+    while (reste > 0 && garde++ < 12) {
+      const compo = surLeTerrain(e, cote);
+      if (!compo.length) break;
+      if (peutMarquer(reste, 7)) {
+        const marqueur = compo[Math.floor(e.rng() * compo.length)];
+        const buteur = choisirButeur(e, cote);
+        marqueur.stats.essais += 1;
+        buteur.stats.butsTentes += 1;
+        buteur.stats.butsReussis += 1;
+        marquer(e, cote, 7);
+        dire(e, 'essai', cote,
+          `ESSAI ${nomClub(e, cote).toUpperCase()} ! ${marqueur.nom} conclut en coin, ${buteur.nom} transforme.`,
+          7, marqueur.moi || buteur.moi);
+      } else if (peutMarquer(reste, 5)) {
+        const marqueur = compo[Math.floor(e.rng() * compo.length)];
+        marqueur.stats.essais += 1;
+        marquer(e, cote, 5);
+        dire(e, 'essai', cote,
+          `ESSAI ${nomClub(e, cote).toUpperCase()} ! ${marqueur.nom} aplatit, la transformation est manquée.`,
+          5, marqueur.moi);
+      } else if (peutMarquer(reste, 3)) {
+        const buteur = choisirButeur(e, cote);
+        buteur.stats.butsTentes += 1;
+        buteur.stats.butsReussis += 1;
+        marquer(e, cote, 3);
+        dire(e, 'but', cote, `${buteur.nom} passe une pénalité de plus.`, 3, buteur.moi);
+      } else if (reste === 2) {
+        const buteur = choisirButeur(e, cote);
+        buteur.stats.butsTentes += 1;
+        buteur.stats.butsReussis += 1;
+        marquer(e, cote, 2);
+        dire(e, 'but', cote, `${buteur.nom} ajoute la transformation.`, 2, buteur.moi);
+      } else {
+        break; // reliquat impossible à marquer proprement
+      }
+      reste = cote === 'A' ? e.resteA : e.resteB;
+    }
+  }
+}
+
 function terminer(e: EtatMatch): void {
   // ⚠️ RECONCILIATION FINALE : si le budget n'a pas été entièrement consommé
   // (une équipe a « raté » toutes ses occasions), on solde au coup de sifflet
   // plutôt que d'afficher un score différent de celui du championnat.
-  if (e.resteA > 0 || e.resteB > 0) {
-    e.scoreA += e.resteA; e.resteA = 0;
-    e.scoreB += e.resteB; e.resteB = 0;
-  }
+  solderLesPoints(e);
   e.phase = 'fini';
   e.fini = true;
   const gagnant = e.scoreA > e.scoreB ? e.clubA : e.scoreB > e.scoreA ? e.clubB : null;

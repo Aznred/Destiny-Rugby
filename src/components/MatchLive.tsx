@@ -197,14 +197,14 @@ export function MatchLive({
     const y = (p.pos.y / LARGEUR) * LARGEUR;
     return (
       <g key={p.id} className={`ml-pion${p.moi ? ' moi' : ''}`} transform={`translate(${x} ${y})`}>
-        {p.moi && <circle r="3.4" className="ml-aura" />}
+        {p.moi && <circle r="1.9" className="ml-aura" />}
         <circle
-          r="1.65"
+          r="0.85"
           fill={p.cote === 'A' ? couleurA : couleurB}
           stroke={p.moi ? '#ffd45e' : p.cote === 'A' ? 'rgba(255,255,255,.8)' : 'rgba(0,0,0,.6)'}
-          strokeWidth={p.moi ? 0.55 : 0.3}
+          strokeWidth={p.moi ? 0.3 : 0.16}
         />
-        <text y="0.62" textAnchor="middle" fontSize="1.85" fill="#fff" fontWeight="700">
+        <text y="0.34" textAnchor="middle" fontSize="1.05" fill="#fff" fontWeight="700">
           {p.numero}
         </text>
       </g>
@@ -283,7 +283,7 @@ export function MatchLive({
           {surLeTerrain.filter((p) => p.cote === 'B').map(pion)}
           {surLeTerrain.filter((p) => p.cote === 'A').map(pion)}
           <ellipse className="ml-ballon" cx={e.ballon.x} cy={e.ballon.y}
-            rx="1.4" ry="0.95" fill="#f4e3c0" stroke="#3a2410" strokeWidth="0.28" />
+            rx="0.85" ry="0.58" fill="#f4e3c0" stroke="#3a2410" strokeWidth="0.28" />
         </svg>
 
         {/* ---------- COMMANDES ---------- */}

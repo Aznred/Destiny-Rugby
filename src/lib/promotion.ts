@@ -202,12 +202,17 @@ export function resultatDivision(divisionId: string, saison: number): ResultatDi
     if (!t) {
       res = { divisionId, champions: [], derniers: [], vainqueurTournoi: null };
     } else {
-      // Ordre de montée : le vainqueur du tournoi, puis le finaliste, puis les
-      // autres vainqueurs de poule dans l'ordre du tableau.
+      // TOUS les vainqueurs de poule montent. Le vainqueur du tournoi passe en
+      // tête de liste (c'est lui le champion de la division), mais l'ordre
+      // n'exclut plus personne : il y a autant de places que de poules.
+      const vainqueursDePoule = t.poules
+        .map((poule) => poule.classement[0]?.club)
+        .filter((c): c is string => !!c);
       const champions = [
-        ...(t.champion ? [t.champion] : []),
-        ...(t.finaliste ? [t.finaliste] : []),
-        ...t.qualifies.filter((q) => q.rang === 1).map((q) => q.club),
+        // Le champion de la division d'abord, à condition d'avoir gagné sa poule.
+        ...(t.champion && vainqueursDePoule.includes(t.champion) ? [t.champion] : []),
+        ...vainqueursDePoule,
+        ...(t.champion && !vainqueursDePoule.includes(t.champion) ? [t.champion] : []),
       ].filter((c, i, liste) => liste.indexOf(c) === i);
       res = { divisionId, champions, derniers: t.relegues, vainqueurTournoi: t.champion };
     }
@@ -221,9 +226,11 @@ export function oublierResultats(): void {
 }
 
 // Combien de clubs s'échangent entre deux étages voisins.
+// Autant de places que de poules : chaque vainqueur de poule monte, chaque
+// dernier de poule descend. Une division à poule unique n'échange qu'un club
+// (plus le match d'accès, géré par `resoudrePyramide`).
 function placesEchangees(haut: string, bas: string): number {
-  const n = Math.min(poulesDe(haut).length, poulesDe(bas).length);
-  return Math.max(1, Math.min(3, n));
+  return Math.max(1, Math.min(poulesDe(haut).length, poulesDe(bas).length));
 }
 
 export interface BilanPyramideComplete {
