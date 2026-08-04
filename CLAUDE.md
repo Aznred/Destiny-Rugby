@@ -781,67 +781,26 @@ désormais composé famille par famille (10 clubs, 3 compétitions, 30 joueurs,
 Un bouton **« ▶️ Voir le match »** apparaît dans le panneau de carrière quand ton
 club joue cette semaine. Il ouvre une modale qui **déroule les 80 minutes**.
 
-| Fichier | Rôle |
-|---|---|
-| `src/lib/matchLive.ts` | `jouerEnDirect(match, saison, cle)` transforme un résultat en **récit minute par minute** : essais, transformations, pénalités, drops, cartons, mêlées, touches, occasions, avec les positions du ballon. `matchDeLaSemaine(joueur)` trouve l'affiche du week-end en cours. |
-| `src/components/MatchLive.tsx` | La modale : terrain SVG vu du dessus (bandes de tonte, en-buts, poteaux), **15 pions par équipe** aux couleurs du club qui suivent le ballon selon une formation rugby, score et chrono en tête, fil de commentaire qui descend. Pause (espace), vitesses ×1 ×2 ×4 et ⏭️, Échap pour fermer. `createPortal(document.body)` obligatoire. |
+⚠️ **Ces deux sections ont été refaites de zéro** — le récit décomposé à partir
+du score, le placement « rugbistique » de la première version, les réglages de
+plaquages et de rythme : tout est remplacé. Voir
+**« ⚙️ LE MOTEUR DE MATCH — RÉÉCRIT DE ZÉRO »** plus bas, qui fait autorité.
 
-⚠️ **ON N'INVENTE AUCUN RÉSULTAT.** Le score vient de `jouerRencontre` comme
-partout ailleurs ; `decomposer()` cherche **toutes** les façons d'atteindre ce
-score avec des 7, des 5 et des 3, puis retient la plus crédible (~1 essai par
-tranche de 7 points, ~78 % de réussite au pied, pas dix pénalités). Regarder le
-match ou passer la semaine donne donc **exactement** le même résultat — vérifié
-en jeu : le direct affiche 16-19, le journal écrit « Défaite 16-19 ».
+Ce qui reste vrai et qui ne doit jamais bouger :
 
-⚠️ **BUG DE FOND CORRIGÉ — `scorePossible()` (championnat.ts).** On marque au
-rugby par 3, 5 ou 7 points : **1, 2 et 4 sont impossibles**. Le moteur en
-produisait pourtant, et aucun récit ne pouvait alors retomber juste. Les scores
-sont désormais rabattus sur la valeur atteignable la plus proche (1 → 0,
-2 et 4 → 3). Mesuré : **0 écart sur 200 matchs** et décomposition exacte de 0 à
-60 points, contre 152/200 et 27 scores faux avant correction.
-
-Vérification sans navigateur : `npx vite-node scripts/verifLot9.ts`
-(zéro emoji dans l'annuaire, comptes lambda déterministes, compteurs qui montent
-sans jamais redescendre, commentaires sous chaque tweet, fidélité du match en
-direct sur 200 rencontres, décomposition exacte de tous les scores).
-
-
-## Le terrain aux bonnes proportions, et un placement rugbistique
-
-⚠️ **Le terrain était étiré de force.** Le SVG portait un `viewBox` carré
-(100 × 100) avec `preserveAspectRatio="none"` : les pastilles devenaient des
-ovales, et tout le placement s'écrasait. Trois corrections :
-
-1. **`viewBox="0 0 122 70"`** — les dimensions RÉELLES d'un terrain de rugby
-   (100 m de jeu + 2 × 11 m d'en-but, sur 70 m de large) et
-   `preserveAspectRatio` laissé par défaut. Les pions sont enfin ronds (mesuré :
-   15 × 15 px).
-2. **CSS** : `aspect-ratio: 122/70` + `max-width: calc(40vh * 122 / 70)` +
-   `flex: 0 0 auto`. ⚠️ Deux pièges successifs — avec un simple `max-height` le
-   SVG restait large et le terrain se retrouvait *letterboxé* entre deux bandes
-   vertes vides ; et `.match-live` étant une colonne flex, le terrain se faisait
-   écraser en hauteur par ses voisins. Ratio mesuré en jeu : **1,74 attendu,
-   1,74 obtenu**, sur desktop comme sur mobile.
-3. Un vrai marquage : en-buts de 11 m, lignes de 22 m, ligne médiane, **10 m en
-   pointillés**, pointillés des 5 m et 15 m, poteaux en H sur la ligne d'en-but,
-   bandes de tonte dans le sens de la longueur.
-
-**Le placement suit maintenant le rugby** (`ATTAQUE` / `DEFENSE` dans
-`MatchLive.tsx`), en **mètres** convertis vers chaque axe — auparavant un écart
-de 30 m en largeur devenait 30 % de la LONGUEUR, ce qui tassait tout le monde au
-centre.
-
-- **En attaque** : les avants (1-8) autour du point de fixation, le 9 à la
-  sortie du ruck, le 10 douze mètres derrière et décalé, les trois-quarts en
-  ligne oblique sur la largeur, le 15 en couverture.
-- **En défense** : une **ligne à plat** qui monte face au ballon, le 9 en
-  gardien de ruck, le 15 seul en couverture arrière. Avant, la défense reprenait
-  la formation d'attaque en miroir et se retrouvait alignée derrière son propre
-  camp.
-- ⚠️ Le pack est étalé sur ~14 m plutôt que sur 5 : huit pastilles à deux mètres
-  d'écart se recouvrent à l'écran et les numéros deviennent illisibles. Mesuré
-  en jeu : **44 m de largeur occupée par équipe**, les deux lignes de part et
-  d'autre du ballon, 6 pions au contact (le regroupement).
+- **ON N'INVENTE AUCUN RÉSULTAT.** Le score vient de `jouerRencontre` comme
+  partout ailleurs. Regarder le match ou passer la semaine donne exactement le
+  même résultat.
+- **`scorePossible()` (championnat.ts)** : on marque au rugby par 3, 5 ou 7
+  points — **1, 2 et 4 sont impossibles**. Les scores sont rabattus sur la valeur
+  atteignable la plus proche (1 → 0, 2 et 4 → 3).
+- **`createPortal(document.body)` obligatoire** pour la modale : le
+  `backdrop-filter` des `.carte` piège les `position: fixed`.
+- **Le terrain garde ses proportions réelles** : `viewBox="0 0 122 70"` (100 m de
+  jeu + 2 × 11 m d'en-but sur 70 m de large) et `preserveAspectRatio` par
+  défaut. Côté CSS : `aspect-ratio: 122/70`, `max-width: calc(40vh * 122 / 70)`
+  et `flex: 0 0 auto` — sans ce dernier, `.match-live` étant une colonne flex,
+  le terrain se faisait écraser en hauteur par ses voisins.
 
 ## Classements individuels — toutes les ligues, toutes les catégories
 
@@ -886,212 +845,277 @@ catégorie, poste attendu en tête, vrais chiffres du joueur humain sans doublon
 déterminisme).
 
 
-## ⚙️ LE MOTEUR DE MATCH 2D (refonte totale)
+## ⚙️ LE MOTEUR DE MATCH — RÉÉCRIT DE ZÉRO
 
-Le direct n'est plus un récit plaqué sur un score : `src/lib/moteur/` est un
-vrai moteur tick par tick. Trente entités se déplacent en mètres sur un terrain
-de 122 × 70, et tout le reste en découle.
+⚠️ **Tout `src/lib/moteur/` a été refait**, ainsi que `components/MatchLive.tsx`.
+L'ancien moteur produisait des scores de **248-207**, 64 essais par match, aucune
+mêlée ni touche, 530 tentatives de 50/22, et seuls quatre joueurs touchaient le
+ballon. Il n'en reste rien : ce qui suit décrit le moteur actuel.
+
+L'ancien système « narratif » (`lib/matchLive.ts` : décomposer un score puis le
+raconter minute par minute) a lui aussi disparu — ce fichier ne contient plus que
+`matchDeLaSemaine()`, qui cherche l'affiche du week-end.
+
+### Les fichiers
 
 | Fichier | Rôle |
 |---|---|
-| `moteur/terrain.ts` | La géométrie, **en mètres réels** : en-buts, 22, ligne médiane, touche. Toutes les règles s'écrivent dedans (« le 50/22 vise les 22 adverses »). L'affichage convertit en SVG, jamais l'inverse. |
-| `moteur/entites.ts` | Le `Pion` : position, cible, vitesse propre (base par poste × note de vitesse), **endurance qui se vide**, temps de récupération, et ses statistiques de match (mètres portés, passes, plaquages, rucks nettoyés, distance parcourue). |
-| `moteur/tactique.ts` | Le placement. **En attaque**, pods 1-3-3-1 : un bloc au ras, un au premier temps, un au large, le 9 à la sortie, le 10 en profondeur, les trois-quarts étalés. **En défense**, premier rideau qui monte ensemble en **blitz** ou en **défense glissée** (`choisirSysteme`), et **troisième rideau en pendule** : l'ailier opposé au ballon décroche pour couvrir le fond. |
-| `moteur/moteur.ts` | La boucle : phases (jeu courant, ruck, mêlée, touche, maul, ballon en l'air, tir au but), collisions, décisions, remplacements, sirène. |
-| `moteur/consignes.ts` | Le **coaching en direct** : lecture par mots-clés (immédiate, hors ligne) puis affinage par Groq si une clé est là. |
-| `components/MatchLive.tsx` | Le rendu : `requestAnimationFrame`, terrain SVG, 30 pions, **avatar entouré d'une aura dorée**, fil de commentaire, feuille de match à la fin. |
+| `moteur/terrain.ts` | La géométrie, **en mètres réels** (122 × 70, en-buts de 11 m). Toutes les règles s'écrivent dedans ; l'affichage convertit en pixels, jamais l'inverse. Une **convention de signe unique** : « d mètres derrière, du point de vue de l'équipe X » = `ref − s × d`. |
+| `moteur/entites.ts` | Le `Pion` : position, **vecteur vitesse**, cible, endurance, sanction, statistiques. ⚠️ Le déplacement est **à inertie** (accélération bornée) — c'est ce qui supprime les téléportations. Le champ `effort` fait trottiner ceux qui sont loin du ballon. |
+| `moteur/etat.ts` | `EtatMatch` — la structure partagée, isolée pour éviter un cycle d'imports entre `moteur.ts` et `tactique.ts`. |
+| `moteur/plan.ts` | `decomposer(score)` : le score visé de la ligue en **événements de rugby** plausibles (essais transformés, essais secs, pénalités). |
+| `moteur/tactique.ts` | **Le placement.** Attaque en pods, défense en deux rideaux, choix du système, lecture du surnombre. |
+| `moteur/phasesArretees.ts` | Mêlée 3-4-1, alignement perpendiculaire entre les 5 et les 15 m, ruck, coup d'envoi, tir au but, renvoi aux 22. Formations **figées à l'entrée dans la phase**. |
+| `moteur/commentaire.ts` | Les pools de phrases (variables + alternatives `{a\|b\|c}`), tirées à la graine. |
+| `moteur/moteur.ts` | La boucle, les phases, les décisions, le score. |
+| `moteur/consignes.ts` | Le coaching en direct (mots-clés, puis Groq si une clé est là). |
+| `moteur/saison.ts` | La simulation de fond, sans rendu. |
+| `components/MatchLive.tsx` | Le rendu : terrain SVG, 30 pions, fil de commentaire, feuille de match. |
 
-### Ce que le moteur produit vraiment
+### ⚙️ CE QUI STRUCTURE LE JEU
 
-- **Plaquages par COLLISION** : un défenseur à moins de 1,4 m du porteur déclenche
-  la résolution (note de plaquage contre évitement et puissance, fatigue des deux).
-  Les trois défenseurs les plus proches montent sur le porteur, les autres tiennent
-  le rideau.
-- **Jeu au pied tactique** : 50/22 (dans son camp, ailiers adverses montés),
-  chandelle du 9 sur ballon lent, occupation depuis ses 22, **drop** de l'ouvreur
-  dans les 22 en fin de match serrée.
-- **Conquête** : touche complète ou réduite, lancer devant ou fond d'alignement,
-  **maul** si la touche est à moins de 9 m, mêlée avec **départ du 8** quand elle
-  domine.
-- **Game management** : à moins de 12 minutes de la fin, mené de 1 à 3 → tir au
-  but ; mené de 4 et plus → pénaltouche ; en tête de plus de 7 → on garde le
-  ballon au ras.
-- **Remplacements** : le coach sort les joueurs dont l'endurance est vide, dès la
-  45ᵉ minute, jamais l'avatar du joueur.
-- **La sirène** : à 40' et 80' le chrono est écoulé mais **on joue jusqu'au ballon
-  mort** ; l'équipe qui mène met alors le ballon en touche (garde-fou à 3 minutes).
+**1. Le lancement de jeu (`Lancement`).** À chaque libération de ballon, une
+combinaison est choisie, et elle contient la **CHAÎNE DE PASSES** (9 → 10 → 12 →
+13 → ailier). C'est elle qui fait voyager le ballon.
 
-### ⚠️ Le choix d'architecture à connaître
-
-Le **score final reste celui de `jouerRencontre`** : c'est lui qui alimente les
-classements, les montées, les coupes et toute la saison. Le moteur joue
-librement — placements, phases, décisions, tout émerge — mais la **conversion**
-d'une occasion est arbitrée par un budget de points restant. Le moteur décide
-**comment et quand** on marque, la ligue décide **combien**. Sans ça, regarder
-son match donnerait un résultat différent de celui inscrit au classement.
-Vérifié : **0 écart sur 40 matchs**.
-
-### Étalonnage (mesuré par `npx vite-node scripts/verifMoteur.ts`)
-
-Quatre bugs d'équilibre trouvés et corrigés par la mesure :
-
-1. **412 coups de pied par match** — les décisions étaient évaluées à chaque tick
-   (5 fois par seconde). Elles sont désormais **événementielles** : le porteur
-   décide 0,3 s après avoir reçu le ballon, puis toutes les 2,5 s.
-2. **1 700 rucks par match** — les arrêts de jeu ne duraient que 4 s. Ils ont
-   maintenant leur durée réelle (mêlée 45 s, touche 30 s, transformation 70 s) :
-   un match de 80 minutes ne compte que ~35 minutes de ballon en jeu.
-3. **577 plaquages pour 1 passe** — le porteur était plaqué avant d'avoir décidé,
-   et le taux de réussite au plaquage était à 50 % au lieu de 87 %.
-4. **Joueurs à 95 minutes** — le temps de jeu était compté deux fois, et le match
-   s'éternisait après la sirène.
-
-État actuel : **~380 plaquages, 42 rucks, 13 pénalités, 5 mêlées, 5 touches,
-7 coups de pied, 2,5 essais par match**, 82 minutes de durée, **211 ms de calcul
-par match** (assez rapide pour la simulation de fond), déterministe au récit près.
-
-⚠️ **Ce qui n'est pas encore fait** : les statistiques produites par le moteur
-(mètres portés, rucks nettoyés) ne sont pas encore versées dans les cumuls de
-saison — l'écran Résultats continue de s'appuyer sur `lib/statsJoueurs.ts`.
-
-## Fluidité, ballon en vol et phases arrêtées (correctifs)
-
-Retours du joueur : « pas fluide », « le ballon et les joueurs se téléportent »,
-« les mêlées et touches sont mal faites », « lors des rucks les joueurs sont
-très mal positionnés ». Quatre causes distinctes, toutes corrigées.
-
-1. **L'échelle de temps était intenable.** 80 minutes en 10 minutes réelles,
-   c'est ×8 : les pions filaient à 60 m/s à l'écran. Mais un match ne contient
-   que ~35 minutes de ballon en jeu. L'action se joue donc désormais à **×2,5**
-   (fluide, on suit les courses) et **les temps morts sont accélérés ×7**
-   (`PHASES_MORTES` dans `MatchLive.tsx`) : le match tient toujours en une
-   dizaine de minutes, mais chaque phase se regarde.
-2. **Le ballon se téléportait à chaque passe.** `donnerBallon` le posait
-   instantanément sur le receveur. Il existe maintenant un **`Vol`** dans
-   l'état : une passe de 12 m met ~0,6 s, le porteur n'existe plus pendant ce
-   temps, et le receveur ne prend le ballon qu'à l'arrivée. Le coup de pied
-   utilise le même mécanisme.
-3. **Les pions vibraient sur place.** Les placements de ruck, mêlée et touche
-   étaient recalculés à CHAQUE TICK, avec du hasard dedans. D'où
-   **`src/lib/moteur/phasesArretees.ts`** : chaque formation est calculée **une
-   seule fois** à l'entrée dans la phase (`placementFige`), et les joueurs
-   COURENT s'y placer.
-4. **Les formations n'avaient rien de rugbystique.** Elles sont écrites :
-   **mêlée en 3-4-1** face à face (première ligne au contact, deuxième ligne,
-   troisièmes lignes sur les côtés, 8 en pointe, 9 à la sortie, ligne de
-   trois-quarts derrière) ; **touche perpendiculaire à la ligne** avec le
-   talonneur sur la touche, l'alignement espacé d'environ 2 m, le 9 derrière et
-   les avants hors alignement remontés dans la ligne ; **ruck** à trois contre
-   trois en deux lignes, 9 à la sortie et gardien de ruck en face.
-
-⚠️ **Bug de fond corrigé au passage** : `volEnCours` et `tirEnCours` étaient des
-variables de MODULE. Deux matchs ouverts se seraient partagé le même ballon en
-l'air et le même tir au but. Ils vivent maintenant dans `EtatMatch`.
-
-**Le jeu s'écarte enfin.** La passe cherchait le partenaire le plus proche : le
-ballon tournait sur trois mètres et tout le monde restait agglutiné. Elle vise
-désormais **le joueur suivant dans la ligne, côté ouvert**, et les deux
-défenseurs qui s'étaient engagés sur le passeur sont **battus pendant 1,4 s** —
-c'est ce qui ouvre de vraies brèches (mesuré : **38 percées par match**,
-annoncées dans le commentaire par « … dans l'intervalle, il est lancé ! »).
-
-## Photos de profil des vrais joueurs
-
-`photos_joueurs/` (1 574 portraits Top 14 et Pro D2, `prenom_nom_ligue.webp`)
-est ingéré par **`scripts/copierPhotosJoueurs.cjs`** → `public/photos/` +
-`src/data/photosJoueurs.ts` (table `nom normalisé → chemin`).
-`avatarPourCompte()` sert la vraie photo quand elle existe, sinon le portrait
-générique. ⚠️ Deux niveaux de correspondance : le nom complet normalisé, puis
-**le nom de famille seul quand il est unique** — les fichiers disent
-« william_skelton » là où la base écrit « Will SKELTON ».
-Couverture mesurée : **41/49 au Stade Toulousain, 30/50 à Montauban**, 0 en
-amateur (normal, ces joueurs n'ont pas de photo officielle).
-⚠️ `public/photos/` pèse **117 Mo** : c'est lourd pour un déploiement, mais les
-images sont chargées une par une, à la demande.
-
-Relancer : `node scripts/copierPhotosJoueurs.cjs`
-Vérification : `npx vite-node scripts/verifMoteur.ts`
-
-## Jeu debout : la ligne de hors-jeu au ruck
-
-Retour du joueur : « c'est trop long en ×1 », « beaucoup trop de rucks », « fais
-que le demi de mêlée puisse passer sans se faire plaquer », « un jeu plus
-debout ». Le vrai manque était une **règle du rugby non modélisée**.
-
-⚠️ **LA LIGNE DE HORS-JEU.** Au ruck, la défense doit rester derrière le dernier
-pied : c'est ce qui donne au 9 le temps de servir. Le moteur l'ignorait, donc
-les défenseurs étaient déjà sur lui à la sortie et **chaque temps de jeu
-finissait au sol**. Désormais, à la sortie d'un ruck, tout défenseur à moins de
-11 m est « remis en jeu » pendant 1,3 s, et le 9 sert immédiatement
-(`prochaineDecision = 0.25`).
-
-Trois réglages complètent le tableau : **deux chasseurs** au lieu de trois sur
-le porteur, la **passe nettement privilégiée** au premier choix, et le taux
-d'en-avant divisé par cinq (on passe cinq fois plus qu'avant : à taux constant,
-le match comptait 41 mêlées).
-
-Effet mesuré, par match :
-
-| | avant | après |
+| Combinaison | Chaîne | Part des phases |
 |---|---|---|
-| plaquages | 474 | **311** |
-| rucks | 42 | **27** |
-| percées annoncées | 38 | **198** |
-| mêlées | 41 | **19** |
-| essais | 2,0 | **4,6** |
+| `ras` — percussion d'un avant | 9 → avant | ~39 % |
+| `pod` — bloc d'avants au premier temps | 9 → 10 → avant | ~20 % |
+| `large` (court) — un temps sur les centres | 9 → 10 → 12 | ~13 % |
+| `large` / `saute` — jusqu'à l'aile | 9 → 10 → 12 → 13 → ailier | ~15 % |
+| `pied` — occupation, dégagement, chandelle, 50/22 | 9 → botteur | ~10 % |
+| `pickAndGo` — près de la ligne | 9 → avant | rare |
 
-**Durée** : l'action passe de ×2,5 à **×5** et les temps morts de ×7 à ×10 —
-un match tient en **~8 minutes réelles** à ×1 (contre ~17 avant), dont presque
-tout en ballon vivant.
+⚠️ **Le percuteur tourne** (`choisirPercuteur`) : parmi les QUATRE avants les
+plus proches et hors du ruck, celui qui a le moins porté. Prendre « l'avant le
+plus proche » revenait à toujours désigner les mêmes — les piliers finissaient le
+match à 0 mètre et 0 ballon joué.
 
-⚠️ Reste perfectible : ~17 tentatives de 50/22 par match, c'est encore trop pour
-un geste censé être rare.
+**2. La lecture du terrain.** Le choix dépend de critères de vrai demi
+d'ouverture : ses 22 (on dégage à 74 %), son camp (occupation, 50/22 si les
+ailiers adverses sont montés), les 22 adverses (on pilonne, ou on écarte s'il y a
+surnombre), le **surnombre au large** (`surnombreAuLarge`), le nombre de temps de
+jeu, le score et le chrono (garder le ballon quand on mène de plus de 7 à cinq
+minutes de la fin).
 
-## Rythme, plaquages plafonnés et vraies statistiques
+**3. « Fixer et donner ».** ⚠️ **La décision de passer est évaluée à CHAQUE
+TICK**, avant le plaquage. C'était LE bug du ballon qui n'allait jamais à l'aile :
+la décision n'était reprise que toutes les 0,22 s, et entre 3 m et 1,35 m de
+pression il ne s'écoule que 0,13 s — le porteur était plaqué avant d'avoir eu le
+droit de passer.
 
-Trois derniers réglages demandés.
+### 🛡️ LA DÉFENSE : ligne + second rideau
 
-**1. L'horloge accélère, la vitesse de jeu ne bouge pas.** C'est la distinction
-qui manquait : le joueur veut voir courir les pions au rythme du ×1, mais que
-les 80 minutes défilent vite. On simule donc l'action à **×3** (fluide) et on
-fait passer les temps morts à **×45** — mêlée, touche, transformation, coup
-d'envoi ET **ruck** (un tas immobile n'a rien à montrer). Le chrono avance donc
-par bonds pendant les arrêts, et seule la phase de jeu se regarde en détail.
+- **Premier rideau** — douze joueurs à plat, espacés de ~4,5 m, appariés aux
+  cibles **par ordre de largeur** (sans ça ils se croisent et le rideau se noue).
+  La ligne a sa propre inertie : `e.ligneDef` part de la ligne de hors-jeu au
+  ruck et avance à sa vitesse propre (blitz 4,4 m/s · glissée 3,0 · repli 1,7).
+- **Second rideau** — l'**arrière** au fond (11 à 30 m selon la menace),
+  l'**ailier du côté fermé** en pendule, et le **demi de mêlée en sentinelle**
+  derrière la ligne. Ce sont eux qui couvrent le jeu au pied.
+- **Deux chasseurs et trois maximum** montent sur le porteur. Tout le reste tient
+  sa place. ⚠️ **Le second rideau ne bouge QUE si la ligne est vraiment
+  franchie** (`perce`, lu sur les positions réelles : 55 % du rideau dépassé).
+  Sans cette règle, les quinze joueurs couraient après le ballon.
+  Mesuré : **1,4 défenseur à moins de 6 m du porteur** (au lieu de 15).
+- Systèmes : **blitz** (montée agressive, parapluie vers l'extérieur),
+  **glissée** (tout le rideau décalé de 3,4 m vers la touche, on pousse dehors),
+  **repli** (l'attaque sort de ses 22, on couvre le pied).
 
-**2. Plafond de 100 plaquages (demande explicite).** On en comptait 311, puis
-186. Le levier est la DURÉE DES TEMPS DE JEU : un ruck occupe désormais 28 à
-40 s d'horloge, donc moins de phases pour les mêmes 80 minutes, donc moins de
-contacts et plus de ballon qui circule. Mesuré : **112 plaquages par match**.
-S'y ajoutent deux garde-fous : le plaquage réussit à **93 %** (le vrai taux du
-rugby professionnel), et un défenseur battu laisse le porteur **tranquille 1,2 s**
-— sans quoi cinq joueurs se jetaient sur lui dans la même seconde.
+### ⚠️ LE SCORE RESTE CELUI DE LA LIGUE
 
-**3. Les vraies statistiques entrent dans les classements.** À la sirène,
-`enregistrerMatchVecu` (store) verse les compteurs du moteur — essais,
-plaquages réussis et manqués, grattages, tirs au but, cartons — dans
-`saisonEnCours.stats`. C'est ce cumul que `classementJoueurs()` utilise déjà
-pour le joueur humain : son classement reflète donc le match qu'on vient de
-regarder, pas une estimation. ⚠️ **Garde-fou anti double comptage** :
-`matchRegarde` mémorise « saison#semaine », et `jouerSemaine` n'ajoute plus ses
-statistiques simulées quand le match a été suivi en direct.
-⚠️ Les 29 autres joueurs du match gardent, eux, les statistiques du modèle
-(`lib/statsJoueurs.ts`) : le moteur ne tourne que pour SON match.
+Le score final vient de `jouerRencontre` (lib/championnat.ts) : c'est lui qui
+alimente le classement, les montées, les coupes et toute la saison. Le moteur
+joue librement, mais on ne peut pas le laisser inventer un 248-207.
 
-## Deux correctifs du moteur : feuille de match et sortie de ruck
+1. `plan.ts` décompose le score visé en essais transformés / essais secs /
+   pénalités, avec des proportions réalistes (~6,6 points par essai, un essai sur
+   cinq non transformé, **trois pénalités maximum** — au-delà, le moteur n'obtient
+   pas assez de fautes à portée et les points finissaient soldés).
+2. **`retard()` — l'échéancier.** À chaque instant on compare ce qui est marqué à
+   ce qui devrait l'être. Le réglage est **ASYMÉTRIQUE** : une équipe en retard
+   trouve un peu d'espace (jusqu'à −0,36 sur le taux de plaquage près de la
+   ligne), une équipe en avance se heurte à un mur (jusqu'à 0,99 de réussite au
+   plaquage). À partir de la 60ᵉ, l'écart pèse **deux fois plus lourd**.
+3. **Un seul garde-fou dur** (`tenterEssai`) : on refuse un essai qui dépasserait
+   le score, ou qui arriverait beaucoup trop tôt dans l'échéancier. Le ballon est
+   alors « tenu dans l'en-but » → renvoi aux 22. C'est une vraie règle du rugby.
+4. **`solderLesPoints()`** à la sirène, filet de sécurité : les points restants
+   sont **joués et racontés**, jamais ajoutés en silence. Mesuré : **2,2 points
+   soldés par match**.
 
-**1. Les numéros ne correspondaient pas aux postes.** Le maillot venait de
-l'ORDRE de l'effectif : Thibaud Flament (deuxième ligne) jouait 9, Naoto Saito
-(demi de mêlée) jouait 15. `creerMatch` compose désormais une vraie feuille :
-chaque maillot 1-15 va au meilleur joueur **disponible à ce poste**, à défaut à
-un joueur de la même **famille** de postes, et les huit meilleurs restants
-prennent le banc. Le pion joue au poste du MAILLOT, pas à son poste d'origine —
-c'est ce qui fait qu'un joueur repositionné se place là où son numéro l'exige.
-Mesuré : **15/15 titulaires à leur poste naturel** au Stade Toulousain.
+Vérifié : **0 écart sur 30 matchs.**
 
-**2. Le 9 servait le pack.** À la sortie du ruck, les avants sont juste à côté
-de lui : la règle « passer au partenaire le plus à l'extérieur » désignait donc
-un avant, qui rentrait aussitôt dans la défense — d'où l'enchaînement de rucks.
-Le demi de mêlée cherche maintenant ses **trois-quarts** : l'ouvreur d'abord,
-puis le premier centre, puis le deuxième. Mesuré sur 8 matchs (736 passes de 9) :
-**65 % pour le 10, 33 % pour le 12, 2 % pour le 13, 0,1 % pour un avant** —
-contre la quasi-totalité vers le pack avant correction.
+### 📊 Étalonnage mesuré (`npx vite-node scripts/verifMoteur.ts`)
+
+| | mesuré | rugby pro |
+|---|---|---|
+| points par match | 42,8 | 40 à 55 |
+| essais | 5,4 | 4 à 8 |
+| plaquages réussis | 242 | 180 à 280 |
+| passes | 446 | 280 à 460 |
+| rucks | 149 | 110 à 180 |
+| mêlées | 12 | 8 à 18 |
+| touches | 34 | 20 à 34 |
+| pénalités sifflées | 19,5 | 14 à 26 |
+| coups de pied | 53 | 35 à 60 |
+| 50/22 tentés | 1,7 | 0 à 3 |
+| % de réussite au pied | 70 % | 70 à 85 % |
+| points soldés | 2,2 | < 4 |
+
+**Le ballon circule** (le bug d'origine) — ballons portés par maillot :
+
+```
+ 1: 2,2%  2: 2,2%  3: 2,2%  4: 2,3%  5: 4,5%  6: 2,0%  7: 2,1%  8: 2,1%
+ 9:31,4% 10:20,6% 11: 3,8% 12:10,6% 13: 6,6% 14: 4,0% 15: 3,4%
+```
+
+**44 joueurs sur 46 touchent le ballon**, aucun maillot à zéro, 11 % pour les
+ailiers et l'arrière, 20 % pour les avants. Les essais du trio arrière : 17 %.
+
+**Structure** : 57 m de largeur occupée par l'attaque, 54 m par la défense,
+**2,8 défenseurs en second rideau**, **1,4 défenseur à moins de 6 m du porteur**,
+platitude du premier rideau 2,8 m d'écart-type.
+
+### 🎬 LA FLUIDITÉ (demande explicite : « c'était pas du tout fluide »)
+
+Quatre causes, toutes traitées :
+
+1. **Déplacement à inertie.** Chaque pion a un vecteur vitesse qu'il infléchit
+   avec une accélération bornée. Un ailier lancé décrit une courbe, un pilier met
+   deux secondes à se mettre en route.
+2. **Aucune transition CSS sur les pions.** L'ancien rendu posait
+   `transition: transform 0.55s` : l'affichage avait une demi-seconde de retard
+   sur la simulation et « caoutchoutait ».
+3. **Interpolation exacte.** La simulation avance par pas fixes de `DT = 0,15 s`,
+   le rendu à 60 Hz : sans rien, les pions avanceraient par saccades de 7 Hz. On
+   affiche `position + vitesse × reliquat`. ⚠️ Le reliquat est **borné à un pas**
+   à l'affichage et **remis à zéro à la sirène** — en ⏭️ (facteur 600) il restait
+   deux minutes de jeu non consommées et l'écran projetait les pions à deux cents
+   mètres du terrain.
+4. **Rendu optimisé.** Le terrain est dessiné une seule fois (`useMemo`), le fil
+   de commentaire n'est reconstruit que lorsqu'une ligne s'ajoute (`memo`, avec
+   une prop `n` — le tableau est muté, sa référence ne change jamais), et la
+   boucle `requestAnimationFrame` s'arrête à la fin du match.
+
+### ⏱️ L'échelle de temps est DOUBLE
+
+L'action se joue à **×5**. Mais un match ne contient que ~35 minutes de ballon
+vivant : le moteur fait donc défiler **l'horloge** beaucoup plus vite pendant les
+arrêts de jeu (`ARRETS` dans `moteur.ts` : une mêlée se met en place en 5 secondes
+à l'écran et avale 50 secondes au chrono ; une touche 4,5 s → 35 s ; une
+transformation 5 s → 58 s). Résultat : **~7,6 minutes réelles pour 80 minutes de
+rugby**, dont presque tout en ballon vivant.
+
+### ⚠️ DÉTERMINISME — le point à ne jamais casser
+
+`avancer(e, secondes)` **accumule le reliquat et ne fait QUE des pas de `DT`
+exacts**. Le match suivi en direct (appels de 16 ms) et le même match rejoué en
+fond (appels de 8 s) donnent donc rigoureusement le même résultat — vérifié :
+même score ET même récit minute par minute. L'ancien moteur faisait des pas
+partiels (`Math.min(DT, reste)`) : les deux auraient divergé.
+
+Corollaire : **rien ne doit vivre dans une variable de module.** Le compteur de
+replacement (`e.compteur`), le ballon en vol (`e.vol`) et le tir au but (`e.tir`)
+sont tous dans l'état — deux matchs simulés en parallèle se seraient partagé le
+même ballon.
+
+### La feuille de match
+
+`composer()` monte une vraie feuille : chaque maillot 1-15 va au meilleur joueur
+disponible à ce poste (à défaut, même famille). Mesuré : **15/15 titulaires à
+leur poste naturel**.
+
+⚠️ **Le banc est un VRAI banc de rugby** : 5 avants + 3 arrières (16-23), à leur
+poste. Prendre « les huit meilleurs restants » donnait un banc de trois-quarts, et
+**un arrière entrait en pilier** — vu sur la feuille de match. Les remplacements
+apparient le poste (exact, puis famille, puis catégorie), jamais « le premier du
+banc ». Si l'avatar attend sur le banc à ce poste, c'est lui qui entre.
+
+### Les mètres se comptent AU-DELÀ de la ligne d'avantage
+
+⚠️ Comme dans les statistiques officielles. Un ouvreur qui reçoit dix mètres
+derrière le ruck et court cinq mètres vers l'avant n'a pas gagné cinq mètres : il
+n'a même pas atteint la ligne. Compter tout mouvement vers l'avant donnait
+1 700 mètres par équipe, trois fois la réalité. `e.ligneAvantage` est posée à
+chaque reprise de jeu.
+
+### Ce que le moteur produit
+
+- **Plaquages par collision** (rayon 1,35 m), taux de réussite ~89 %, plaquage à
+  deux crédité, offload sur 5,5 % des plaquages, carton jaune sur 16 % des fautes
+  près de sa ligne.
+- **Conquête** : touche à 4, 5 ou 7 sauteurs (86 % gagnées), **maul** si la touche
+  est à moins de 12 m de la ligne, mêlée avec **départ du 8** quand elle domine et
+  pénalité quand elle recule.
+- **Jeu au pied** : dégagement (trouve la touche 3 fois sur 4), occupation,
+  chandelle du 9, **50/22** (uniquement si les ailiers adverses sont montés),
+  rasant, transversale, **drop**.
+- **Game management** : tir au but jusqu'à 52 m, pénaltouche quand il faut un
+  essai, jeu rapide à la main, ballon gardé au ras quand on mène en fin de match.
+- **Remplacements** : à partir de la 48ᵉ, **uniquement sur arrêt de jeu**,
+  8 maximum, sur l'endurance. L'avatar n'est sorti qu'à partir de la 62ᵉ.
+- **Cartons jaunes** : dix minutes d'horloge, le joueur revient tout seul.
+
+### L'affichage
+
+- Terrain aux proportions réelles (`viewBox="0 0 122 70"`), bandes de tonte,
+  en-buts, 22, 10 m en pointillés, 5 m et 15 m, poteaux en H, halo de lumière.
+- **La lecture du jeu est affichée** : possession, **combinaison en cours**
+  (« écarter à l'aile », « occupation au pied », « bloc d'avants »), **système
+  défensif** (« défense montante », « défense glissée », « repli »), numéro du
+  temps de jeu. C'est ce qui rend la stratégie lisible.
+- Barre de **possession** en tête, ballon avec ombre au sol et **hauteur** quand
+  il est en l'air, porteur entouré, avatar en aura dorée.
+- Feuille de match complète des deux équipes + résumé (essais, rucks, touches,
+  mêlées, franchissements).
+- Responsive vérifié : mobile 375 px → terrain 341 × 196, ratio 1,74 exact, aucun
+  débordement horizontal.
+
+Vérification sans navigateur : `npx vite-node scripts/verifMoteur.ts`
+(score exact, chiffres du match, circulation du ballon, structure sur le terrain,
+toutes les phases, déterminisme et performance, feuille de match).
+**145 ms par match** — une journée de 8 affiches se rejoue en ~1,2 s.
+
+
+## La simulation de fond : toute la poule rejouée, sans rendu
+
+⚠️ **Les classements ne sont plus une estimation.** Jusqu'ici seul le match du
+joueur passait par le moteur ; les 29 autres joueurs de la rencontre et les six
+autres affiches de la poule n'existaient que dans le modèle statistique.
+
+**`src/lib/moteur/saison.ts`** rejoue TOUTES les affiches de la journée avec le
+même moteur, **sans une seule ligne d'affichage** : pas de `requestAnimationFrame`,
+pas de SVG, la boucle poussée jusqu'à la sirène par pas de 8 secondes de jeu.
+Déclenché par `simulerStatsJournee()` (store) au moment où l'on passe à la
+semaine suivante.
+
+⚠️ **MÊME GRAINE = MÊME MATCH.** La clé d'une rencontre est celle du championnat
+(`division#saison#journée#domicile#extérieur`). Le match qu'on a regardé en
+direct et celui rejoué en fond sont donc **rigoureusement identiques** : mêmes
+essais, mêmes plaquages, mêmes minutes. Aucun double comptage possible, et la
+feuille de match correspond exactement à ce qu'on a vu. La décision
+**titulaire ou remplaçant** (`estTitulaire`) vit dans ce même fichier, partagée
+par le direct et par le fond — sinon les deux auraient divergé.
+
+- `statsReelles` (store, persisté) : clé `division#saison` → `club|nom` → cumul
+  (minutes, essais, plaquages, passes, mètres, grattages, tirs au but, cartons).
+  ⚠️ **Une seule division et une seule saison sont conservées** : accumuler tout
+  l'historique ferait exploser le quota du localStorage. Mesuré : **87 Ko** pour
+  295 joueurs sur 10 journées.
+- `classementJoueurs()` bascule sur ces chiffres **dès qu'une journée a été
+  rejouée**, pour TOUT LE MONDE. On ne mélange jamais les deux sources : ce
+  serait comparer un match joué à vingt-cinq matchs devinés. L'en-tête du bloc
+  affiche « matchs joués » ou « estimation ».
+- ⚠️ **Garde-fou de performance** : on ne rejoue qu'**une poule** (8 affiches
+  maximum, ~0,9 s), pas les treize poules d'une Fédérale 3 — le classement
+  affiché est de toute façon celui d'une poule. Mesuré : **8 semaines en 7 s**.
+- ⚠️ Les tirs soldés en fin de match réussissent toujours (ils doivent tomber
+  pile sur la cible) : le classement des buteurs affichait donc du 32/32.
+  `raterQuelquesTentatives()` ajoute des tentatives manquées fictives, sans
+  points, pour rétablir un pourcentage crédible — mesuré : 97 %, 92 %, 90 %.
+
+Exemple après 8 semaines de Top 14 : Kerr-Barlow 11 essais, Jauneau 103
+plaquages, Vergnes-Taillefer 29 grattages, Hastoy 32/33 au pied — tous issus de
+matchs réellement joués par le moteur.

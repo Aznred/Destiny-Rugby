@@ -8,8 +8,11 @@ import { annuaire, bassinSocial } from '../src/lib/comptes';
 import { comptesLambda, photoDe, avatarInitiales, initialesDe } from '../src/lib/avatars';
 import { filDeLaSemaine } from '../src/lib/vie';
 import { vieillirPost, AGE_MORT } from '../src/lib/social';
-import { jouerEnDirect, decomposer, matchDeLaSemaine } from '../src/lib/matchLive';
-import { jouerRencontre, graine, scorePossible } from '../src/lib/championnat';
+import { matchDeLaSemaine } from '../src/lib/matchLive';
+import { creerMatch, avancer } from '../src/lib/moteur/moteur';
+import { atteignable } from '../src/lib/moteur/plan';
+import { effectifDuClub } from '../src/lib/effectif';
+import { jouerRencontre, scorePossible } from '../src/lib/championnat';
 import type { Joueur } from '../src/types';
 
 const JOUEUR = {
@@ -71,42 +74,38 @@ console.log('\n=== 3. DES COMMENTAIRES SOUS CHAQUE TWEET ===');
 
 console.log('\n=== 4. LE MATCH EN DIRECT DIT LA VÉRITÉ ===');
 {
-  // On vérifie sur 200 rencontres que le récit retombe EXACTEMENT sur le score.
+  // ⚠️ Le moteur joue librement, mais il doit retomber EXACTEMENT sur le score
+  // de la ligue — c'est lui qui alimente le classement.
+  const A = 'Stade Toulousain';
+  const B = 'Stade Rochelais';
+  const effA = effectifDuClub(A, 1);
+  const effB = effectifDuClub(B, 1);
   let faux = 0;
   let sansEssai = 0;
-  for (let i = 0; i < 200; i++) {
-    const m = jouerRencontre('Stade Toulousain', 'Stade Rochelais', 1, `test#${i}`, null);
-    const live = jouerEnDirect(m, 1, `test#${i}`);
-    const cumulD = live.actions.filter((a) => a.cote === 'domicile').reduce((s, a) => s + a.points, 0);
-    const cumulE = live.actions.filter((a) => a.cote === 'exterieur').reduce((s, a) => s + a.points, 0);
-    if (cumulD !== m.scoreD || cumulE !== m.scoreE) faux++;
-    if (!live.actions.some((a) => a.type === 'essai')) sansEssai++;
+  for (let i = 0; i < 40; i++) {
+    const m = jouerRencontre(A, B, 1, `test#${i}`, null);
+    const e = creerMatch(A, B, effA, effB, m.scoreD, m.scoreE, `test#${i}`);
+    let g = 0;
+    while (!e.fini && g++ < 4000) avancer(e, 8);
+    if (e.scoreA !== m.scoreD || e.scoreB !== m.scoreE) faux++;
+    if (e.essaisA + e.essaisB === 0) sansEssai++;
+    if (i === 0) {
+      console.log(`\n  ${A} ${e.scoreA} – ${e.scoreB} ${B} · ${e.commentaires.length} actions`);
+      for (const c of e.commentaires.filter((x) => x.points > 0).slice(0, 6)) {
+        console.log(`   ${String(c.minute).padStart(2)}′ ${c.texte.slice(0, 78)}`);
+      }
+    }
   }
-  console.log(`  200 matchs simulés — récits qui ne retombent pas sur le score : ${faux} ${faux === 0 ? '✅' : '❌'}`);
+  console.log(`  40 matchs joués par le moteur — écarts avec le score de la ligue : ${faux} ${faux === 0 ? '✅' : '❌'}`);
   console.log(`  matchs sans le moindre essai : ${sansEssai} (normal si scores faibles)`);
 
-  const m = jouerRencontre('Stade Toulousain', 'Stade Rochelais', 1, 'demo', null);
-  const live = jouerEnDirect(m, 1, 'demo');
-  console.log(`\n  ${live.domicile} ${live.scoreD} – ${live.scoreE} ${live.exterieur} · ${live.actions.length} actions`);
-  for (const a of live.actions.filter((x) => x.points > 0 || x.type === 'fin').slice(0, 8)) {
-    console.log(`   ${String(a.minute).padStart(2)}′ ${a.texte.slice(0, 78)}`);
-  }
-  console.log('  compos :', live.compoD.length, 'vs', live.compoE.length, 'joueurs');
-  console.log('  positions du ballon (5 premières) :',
-    live.actions.slice(0, 5).map((a) => `${a.x},${a.y}`).join(' → '));
-
-  // La décomposition ne doit jamais inventer de points.
+  // Aucun score de rugby impossible ne doit sortir du championnat.
   let ecarts = 0;
   for (let s = 0; s <= 60; s++) {
-    // 1, 2 et 4 n'existent pas au rugby : `scorePossible` les écarte en amont.
     if (s !== scorePossible(s)) continue;
-    const rng = graine('dec#' + s);
-    const total = decomposer(s, rng).reduce(
-      (t, mq) => t + (mq.type === 'essai' ? (mq.transforme ? 7 : 5) : 3), 0,
-    );
-    if (total !== s) { ecarts++; console.log(`    ✗ score ${s} → ${total}`); }
+    if (!atteignable(s)) { ecarts++; console.log(`    ✗ score ${s} inatteignable`); }
   }
-  console.log(`  décomposition exacte de 0 à 60 points : ${ecarts === 0 ? '✅' : `❌ ${ecarts} écarts`}`);
+  console.log(`  tous les scores de 0 à 60 sont décomposables : ${ecarts === 0 ? '✅' : `❌ ${ecarts}`}`);
 }
 
 console.log('\n=== 5. LE MATCH DE LA SEMAINE ===');

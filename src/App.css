@@ -2529,14 +2529,50 @@
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-/* Les pions glissent d'une action à l'autre plutôt que de sauter. */
-.ml-pion { transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.ml-ballon {
-  transition: cx 0.55s cubic-bezier(0.2, 0.8, 0.2, 1), cy 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+/* ⚠️ AUCUNE TRANSITION CSS SUR LES PIONS. Le moteur les déplace 60 fois par
+   seconde avec interpolation exacte ; une transition de 0,55 s ajoutait une
+   demi-seconde de retard sur la simulation et faisait « caoutchouter » tout le
+   terrain. C'est ce qui donnait l'impression que ça n'était pas fluide. */
+.ml-ballon { filter: drop-shadow(0 0.4px 0.6px rgba(0, 0, 0, 0.55)); }
+
+/* Barre de possession, sous le score */
+.ml-possession {
+  display: flex;
+  height: 4px;
+  margin: 0 1rem 0.5rem;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
 }
-@media (prefers-reduced-motion: reduce) {
-  .ml-pion, .ml-ballon { transition: none; }
+.ml-possession span { transition: width 0.6s ease; }
+
+/* La lecture du jeu : combinaison en cours et système défensif */
+.ml-lecture {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem 0;
+  justify-content: center;
+}
+.ml-tag {
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: var(--craie-dim);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  white-space: nowrap;
+}
+.ml-resume {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--craie-dim);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.4rem;
 }
 
 .ml-commandes {
@@ -2720,18 +2756,18 @@
 
 
 /* --- Moteur de match : avatar mis en évidence, coaching, feuille de match --- */
-.ml-pion.moi .ml-aura {
-  fill: rgba(255, 212, 94, 0.22);
+.ml-aura {
+  fill: rgba(255, 212, 94, 0.2);
   stroke: rgba(255, 212, 94, 0.7);
-  stroke-width: 0.3;
+  stroke-width: 0.28;
   animation: ml-pulse 1.6s ease-in-out infinite;
 }
 @keyframes ml-pulse {
-  0%, 100% { opacity: 0.55; }
+  0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ml-pion.moi .ml-aura { animation: none; }
+  .ml-aura { animation: none; }
 }
 
 .ml-phase { color: var(--or-clair); }

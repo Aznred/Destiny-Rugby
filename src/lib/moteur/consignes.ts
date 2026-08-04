@@ -11,7 +11,7 @@
 //      mots-clés rateraient.
 
 import { appelGroqJSON, MODELE_DEFAUT, type MessageGroq } from '../groq';
-import type { ConsigneJoueur } from './tactique';
+import type { ConsigneJoueur } from './etat';
 
 export const CONSIGNE_NEUTRE: ConsigneJoueur = {
   profondeur: 0, largeur: 0, agressivite: 0.3, libelle: 'Jeu normal',

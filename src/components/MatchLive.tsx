@@ -1,25 +1,34 @@
-// LE MATCH EN DIRECT — vue 2D de dessus, 30 pions, 80 minutes
+// LE MATCH EN DIRECT — le moteur (lib/moteur/) rendu à l'écran.
 //
-// L'écran ne raconte plus un score : il AFFICHE le moteur (lib/moteur/) qui
-// joue vraiment le match. Les pions se placent en pods, la défense monte en
-// ligne, le ballon circule, les plaquages naissent d'une collision.
+// L'écran ne raconte pas un score : il AFFICHE trente pions qui jouent
+// vraiment. Les pods se forment, la ligne défensive monte, le second rideau
+// couvre le fond, le ballon voyage jusqu'à l'aile.
 //
-// ÉCHELLE DE TEMPS VARIABLE : l'action se joue à ×5, les temps morts défilent
-// à ×50 — un match tient en ~8 minutes réelles à ×1, dont l'essentiel en ballon
-// vivant. Le rendu tourne au rythme de `requestAnimationFrame` (60 fps), la
-// simulation avance par pas de 0,2 s de jeu : le mouvement reste fluide sans
-// que la physique dépende du framerate.
+// ⚠️ TROIS CHOIX QUI FONT LA FLUIDITÉ
+// 1. AUCUNE TRANSITION CSS sur les pions. L'ancien rendu posait une transition
+//    de 0,55 s sur `transform` : chaque position affichée avait une demi-seconde
+//    de retard sur la simulation, et le mouvement « caoutchoutait ». Le moteur
+//    tourne à 60 images par seconde, il n'a besoin d'aucune aide.
+// 2. INTERPOLATION EXACTE. La simulation avance par pas fixes de 0,15 s, le
+//    rendu à 60 Hz : sans rien, les pions avanceraient par saccades de 7 Hz. On
+//    affiche donc `position + vitesse × reliquat` — le reliquat étant le temps
+//    déjà écoulé mais pas encore simulé. C'est exact, ça ne coûte rien, et ça
+//    ne retarde rien.
+// 3. LE TERRAIN EST DESSINÉ UNE FOIS (`useMemo`) et le fil de commentaire n'est
+//    reconstruit que lorsqu'une ligne s'ajoute. Seuls les 30 pions et le ballon
+//    sont recalculés à chaque image.
 //
 // ⚠️ `createPortal(document.body)` obligatoire : le `backdrop-filter` des
 // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import {
-  appliquerConsigne, avancer, bilan, creerMatch, type Commentaire, type EtatMatch,
+  appliquerConsigne, avancer, bilan, creerMatch, DT, type EtatMatch,
 } from '../lib/moteur/moteur';
-import { LARGEUR, LONGUEUR } from '../lib/moteur/terrain';
+import type { Commentaire, TypeCommentaire } from '../lib/moteur/etat';
+import { LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, AXE } from '../lib/moteur/terrain';
 import { estTitulaire } from '../lib/moteur/saison';
 import { CONSIGNE_NEUTRE, lireConsigneGroq, lireConsigneLocale } from '../lib/moteur/consignes';
 import type { Pion } from '../lib/moteur/entites';
@@ -31,26 +40,20 @@ import { useGame } from '../store/useGame';
 import { Blason } from './Blason';
 import type { Joueur } from '../types';
 
-// ⚠️ L'ÉCHELLE DE TEMPS EST VARIABLE, et c'est ce qui rend le direct regardable.
+// ⚠️ L'ÉCHELLE DE TEMPS EST DOUBLE, et c'est ce qui rend le direct regardable.
 //
-// Faire défiler 80 minutes en 10 minutes réelles, c'est ×8 : les pions filent
-// à 60 m/s à l'écran, ça saute et on ne voit rien. Mais un match ne contient
-// que ~35 minutes de BALLON EN JEU — le reste, ce sont des mêlées qui se
-// forment, des touches qui s'alignent, des transformations.
-//
-// On joue donc l'action à ×5 (on suit les courses sans que ça saute) et on
-// ACCÉLÈRE les temps morts ×10. Résultat : ~8 minutes de match, dont presque
-// tout en ballon vivant.
+// L'ACTION se joue à ×5 : on suit les courses sans que ça saute. Mais un match
+// ne contient que ~35 minutes de ballon vivant — le reste, ce sont des mêlées
+// qui se forment et des transformations. Le moteur fait donc défiler l'horloge
+// beaucoup plus vite pendant les arrêts de jeu (une mêlée : 5 secondes à
+// l'écran, 50 secondes au chrono). Résultat : ~7 minutes réelles pour 80
+// minutes de rugby, dont presque tout en ballon vivant.
 const VITESSES = [
-  { label: '×1', facteur: 3 },
-  { label: '×2', facteur: 6 },
-  { label: '×4', facteur: 12 },
-  { label: '⏭️', facteur: 400 },
+  { label: '×1', facteur: 5 },
+  { label: '×2', facteur: 10 },
+  { label: '×4', facteur: 20 },
+  { label: '⏭️', facteur: 600 },
 ];
-// Multiplicateur appliqué pendant les arrêts de jeu : on ne regarde pas une
-// mêlée se former pendant 45 secondes.
-const ACCELERATION_TEMPS_MORT = 45;
-const PHASES_MORTES = new Set(['melee', 'touche', 'apresEssai', 'tirAuBut', 'miTemps', 'coupEnvoi', 'ruck']);
 
 function couleursDe(nom: string): [string, string] {
   const club = clubParNom(nom);
@@ -59,28 +62,125 @@ function couleursDe(nom: string): [string, string] {
   return [`hsl(${Math.floor(rng() * 360)} 62% 42%)`, '#ffffff'];
 }
 
-const EMOJI: Record<Commentaire['type'], string> = {
-  essai: '🏉', but: '🎯', butRate: '❌', plaquage: '💥', ruck: '🔒', melee: '🌀',
-  touche: '🙌', maul: '🚂', pied: '🦶', penalite: '⚖️', carton: '🟨',
-  remplacement: '🔄', jalon: '🔔', jeu: '⚡',
+const EMOJI: Record<TypeCommentaire, string> = {
+  essai: '🏉', but: '🎯', butRate: '❌', plaquage: '💥', franchissement: '⚡',
+  ruck: '🔒', melee: '🌀', touche: '🙌', maul: '🚂', pied: '🦶', penalite: '⚖️',
+  carton: '🟨', remplacement: '🔄', jalon: '🔔', jeu: '•',
 };
 
+const LIBELLE_PHASE: Record<string, string> = {
+  coupEnvoi: 'coup d’envoi', renvoi22: 'renvoi aux 22', ruck: 'ruck',
+  melee: 'mêlée', touche: 'touche', maul: 'ballon porté',
+  ballonEnLAir: 'ballon en l’air', tirAuBut: 'tir au but',
+  transformation: 'transformation', penalite: 'pénalité',
+  apresEssai: 'après l’essai', miTemps: 'mi-temps',
+};
+
+const LIBELLE_SYSTEME: Record<string, string> = {
+  blitz: 'défense montante', glissee: 'défense glissée', repli: 'repli, couverture du pied',
+};
+
+// ---------------------------------------------------------------------------
+// LE TERRAIN — dessiné une seule fois
+// ---------------------------------------------------------------------------
+function Terrain() {
+  return (
+    <>
+      <defs>
+        <linearGradient id="ml-pelouse" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#1c5a37" />
+          <stop offset="0.5" stopColor="#164a2c" />
+          <stop offset="1" stopColor="#0f3a22" />
+        </linearGradient>
+        <radialGradient id="ml-lumiere" cx="0.5" cy="0.42" r="0.72">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.10" />
+          <stop offset="1" stopColor="#000000" stopOpacity="0.18" />
+        </radialGradient>
+      </defs>
+      <rect width={LONGUEUR} height={LARGEUR} fill="url(#ml-pelouse)" />
+      {/* Bandes de tonte, dans le sens de la longueur */}
+      {Array.from({ length: 10 }, (_, i) => (
+        <rect key={i} x="0" y={(i * LARGEUR) / 10} width={LONGUEUR} height={LARGEUR / 10}
+          fill={i % 2 ? 'rgba(255,255,255,.035)' : 'transparent'} />
+      ))}
+      {/* En-buts */}
+      <rect x="0" y="0" width={LIGNE_A} height={LARGEUR} fill="rgba(0,0,0,.28)" />
+      <rect x={LIGNE_B} y="0" width={LIGNE_A} height={LARGEUR} fill="rgba(0,0,0,.28)" />
+      {/* Lignes pleines : essai, 22, médiane */}
+      {[LIGNE_A, M22_A, MILIEU, M22_B, LIGNE_B].map((x) => (
+        <line key={x} x1={x} y1="0" x2={x} y2={LARGEUR}
+          stroke="rgba(255,255,255,.58)" strokeWidth={x === MILIEU ? 0.5 : 0.4} />
+      ))}
+      {/* Les 10 mètres, en pointillés */}
+      {[MILIEU - 10, MILIEU + 10].map((x) => (
+        <line key={x} x1={x} y1="0" x2={x} y2={LARGEUR} stroke="rgba(255,255,255,.32)"
+          strokeWidth="0.3" strokeDasharray="1.6 2.4" />
+      ))}
+      {/* Pointillés des 5 m et 15 m */}
+      {[5, 15, LARGEUR - 15, LARGEUR - 5].map((y) => (
+        <line key={y} x1={LIGNE_A} y1={y} x2={LIGNE_B} y2={y} stroke="rgba(255,255,255,.15)"
+          strokeWidth="0.22" strokeDasharray="1 4" />
+      ))}
+      <rect x="0.2" y="0.2" width={LONGUEUR - 0.4} height={LARGEUR - 0.4}
+        fill="none" stroke="rgba(255,255,255,.42)" strokeWidth="0.35" />
+      {/* Poteaux en H, sur la ligne d'en-but */}
+      {[LIGNE_A, LIGNE_B].map((x) => (
+        <g key={x} stroke="#f6f2e6" strokeWidth="0.55" fill="none">
+          <line x1={x} y1={AXE - 2.8} x2={x} y2={AXE - 9.5} />
+          <line x1={x} y1={AXE + 2.8} x2={x} y2={AXE + 9.5} />
+          <line x1={x} y1={AXE - 2.8} x2={x} y2={AXE + 2.8} strokeWidth="0.75" />
+        </g>
+      ))}
+      <rect width={LONGUEUR} height={LARGEUR} fill="url(#ml-lumiere)" pointerEvents="none" />
+    </>
+  );
+}
+const TerrainMemo = memo(Terrain);
+
+// ---------------------------------------------------------------------------
+// LE FIL DE COMMENTAIRE — reconstruit seulement quand une ligne s'ajoute
+// ---------------------------------------------------------------------------
+// ⚠️ `n` est indispensable : `lignes` est le MÊME tableau muté par le moteur,
+// donc sa référence ne change jamais et `memo` ne verrait aucune différence.
+const Fil = memo(function Fil({ lignes }: { lignes: Commentaire[]; n: number }) {
+  return (
+    <>
+      {lignes.map((c, i) => (
+        <div
+          key={i}
+          className={`ml-action${c.points > 0 ? ' marque' : ''}${c.type === 'jalon' ? ' jalon' : ''}`}
+          data-moi={c.moi ? 'oui' : undefined}
+        >
+          <span className="ml-minute">{c.minute}′</span>
+          <span className="ml-emoji">{EMOJI[c.type] ?? '•'}</span>
+          <span className="ml-texte">{c.texte}</span>
+          {c.points > 0 && <b className="ml-points">+{c.points}</b>}
+        </div>
+      ))}
+    </>
+  );
+});
+
+// ---------------------------------------------------------------------------
 export function MatchLive({
-  match, saison, cle, titre, onFermer, joueur,
+  match, saison, cle, titre, onFermer, onTermine, joueur,
 }: {
   match: MatchChampionnat;
   saison: number;
   cle: string;
   titre: string;
   onFermer: () => void;
+  /** Appelé UNE FOIS à la sirène : c'est ce qui autorise le passage à la
+   *  semaine suivante quand on referme la fenêtre. */
+  onTermine?: () => void;
   joueur?: Joueur | null;
 }) {
   const groqKey = useGame((s) => s.groqKey);
   const modele = useGame((s) => s.modele);
   const enregistrerMatchVecu = useGame((s) => s.enregistrerMatchVecu);
 
-  // Le moteur vit dans une ref : c'est un objet muté 5 fois par seconde de jeu,
-  // le passer par l'état de React ferait 300 rendus par seconde.
+  // Le moteur vit dans une ref : c'est un objet muté sept fois par seconde de
+  // jeu, le passer par l'état de React ferait des centaines de rendus.
   const moteur = useRef<EtatMatch>(null as unknown as EtatMatch);
   if (!moteur.current) {
     moteur.current = creerMatch(
@@ -91,9 +191,8 @@ export function MatchLive({
         ? {
             club: joueur.club, nom: joueur.nom, poste: joueur.poste,
             attributs: joueur.attributs,
-            // ⚠️ Titulaire ou remplaçant ? La confiance du staff et le niveau
-            // décident, comme pour le reste du jeu. Déterministe : rouvrir le
-            // match ne change pas la compo.
+            // Titulaire ou remplaçant ? La confiance du staff et le niveau
+            // décident, comme pour le reste du jeu. Déterministe.
             titulaire: estTitulaire(joueur, cle),
           }
         : undefined,
@@ -101,8 +200,6 @@ export function MatchLive({
   }
   const e = moteur.current;
 
-  // Ce que l'affichage relit à chaque image. On ne stocke qu'un compteur : le
-  // rendu lit ensuite directement l'état du moteur.
   const [, redessiner] = useState(0);
   const [enPause, setEnPause] = useState(false);
   const [vitesse, setVitesse] = useState(0);
@@ -120,13 +217,13 @@ export function MatchLive({
       brut = requestAnimationFrame(image);
       const precedent = dernierTemps.current || ms;
       dernierTemps.current = ms;
-      if (enPause || e.fini) { redessiner((n) => n + 1); return; }
+      // Match terminé : on arrête la boucle, plus rien ne bouge.
+      if (e.fini) { redessiner((n) => n + 1); actif = false; cancelAnimationFrame(brut); return; }
+      if (enPause) { return; }
       // Le delta réel est plafonné : revenir sur l'onglet ne doit pas faire
       // avancer le match de trois minutes d'un coup.
-      const dtReel = Math.min(0.25, (ms - precedent) / 1000);
-      const mort = PHASES_MORTES.has(e.phase);
-      const facteur = VITESSES[vitesse].facteur * (mort && vitesse < 3 ? ACCELERATION_TEMPS_MORT : 1);
-      avancer(e, dtReel * facteur);
+      const dtReel = Math.min(0.2, (ms - precedent) / 1000);
+      avancer(e, dtReel * VITESSES[vitesse].facteur);
       redessiner((n) => n + 1);
     };
     brut = requestAnimationFrame(image);
@@ -155,7 +252,6 @@ export function MatchLive({
     if (!t) return;
     setConsigneTexte('');
     setEnvoiConsigne(true);
-    // Réponse immédiate par mots-clés, puis affinage par l'IA si une clé existe.
     appliquerConsigne(e, lireConsigneLocale(t));
     const cleIA = groqKey || CLE_ENV;
     if (cleIA) {
@@ -174,18 +270,21 @@ export function MatchLive({
   const [couleurB] = couleursDe(e.clubB);
   const clubA = clubParNom(e.clubA);
   const clubB = clubParNom(e.clubB);
-  const surLeTerrain = e.pions.filter((p) => p.surLeTerrain);
   const monPion = e.pions.find((p) => p.moi);
-  const stats = useMemo(() => (e.fini ? bilan(e) : null), [e.fini, e]);
+  // La feuille de match n'est calculée qu'une fois, à la sirène.
+  const bilanRef = useRef<ReturnType<typeof bilan> | null>(null);
+  if (e.fini && !bilanRef.current) bilanRef.current = bilan(e);
+  const stats = bilanRef.current;
 
   // ⚠️ À LA SIRÈNE, LES VRAIES STATS DE TON JOUEUR PARTENT DANS LA SAISON.
-  // Elles alimentent ensuite le classement des joueurs (écran Résultats) : ce
-  // ne sont plus des chiffres estimés, ce sont ceux du match qu'on vient de
-  // regarder. L'action se protège elle-même contre le double comptage.
+  // Elles alimentent le classement des joueurs (écran Résultats) : ce ne sont
+  // plus des chiffres estimés, ce sont ceux du match qu'on vient de regarder.
   const dejaEnregistre = useRef(false);
   useEffect(() => {
-    if (!e.fini || dejaEnregistre.current || !monPion) return;
+    if (!e.fini || dejaEnregistre.current) return;
     dejaEnregistre.current = true;
+    onTermine?.();
+    if (!monPion) return;
     enregistrerMatchVecu({
       essais: monPion.stats.essais,
       plaquages: monPion.stats.plaquages,
@@ -196,28 +295,61 @@ export function MatchLive({
       butsTentes: monPion.stats.butsTentes,
       butsReussis: monPion.stats.butsReussis,
       cartons: monPion.stats.cartons,
-      minutes: Math.round(monPion.minutesJouees),
+      minutes: Math.min(80, Math.round(monPion.minutes)),
     });
-  }, [e.fini, monPion, enregistrerMatchVecu]);
+  }, [e.fini, monPion, enregistrerMatchVecu, onTermine]);
+
+  // --- LE RENDU DES PIONS ---------------------------------------------------
+  // ⚠️ Interpolation exacte : le moteur avance par pas de 0,15 s, l'écran à
+  // 60 Hz. On affiche la position à l'instant réel, `pos + vitesse × reliquat`.
+  // ⚠️ Borné à un pas de simulation : en ⏭️ le reliquat peut valoir plusieurs
+  // secondes de jeu non consommées, et projeter les pions hors du terrain.
+  const r = Math.min(DT, Math.max(0, e.reliquat));
+  const surLeTerrain = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0);
 
   const pion = (p: Pion) => {
-    const x = (p.pos.x / LONGUEUR) * LONGUEUR;
-    const y = (p.pos.y / LARGEUR) * LARGEUR;
+    const x = p.pos.x + p.vitesse.x * r;
+    const y = p.pos.y + p.vitesse.y * r;
+    const porte = e.porteur === p;
     return (
-      <g key={p.id} className={`ml-pion${p.moi ? ' moi' : ''}`} transform={`translate(${x} ${y})`}>
-        {p.moi && <circle r="1.9" className="ml-aura" />}
+      <g key={p.id} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})`}>
+        {p.moi && <circle r="1.75" className="ml-aura" />}
+        <ellipse cx="0.12" cy="0.3" rx="0.85" ry="0.6" fill="rgba(0,0,0,.35)" />
         <circle
-          r="0.85"
+          r="0.86"
           fill={p.cote === 'A' ? couleurA : couleurB}
-          stroke={p.moi ? '#ffd45e' : p.cote === 'A' ? 'rgba(255,255,255,.8)' : 'rgba(0,0,0,.6)'}
-          strokeWidth={p.moi ? 0.3 : 0.16}
+          stroke={p.moi ? '#ffd45e' : porte ? '#fff6d8' : p.cote === 'A' ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)'}
+          strokeWidth={p.moi || porte ? 0.3 : 0.16}
         />
-        <text y="0.34" textAnchor="middle" fontSize="1.05" fill="#fff" fontWeight="700">
+        <text y="0.33" textAnchor="middle" fontSize="1" fill="#fff" fontWeight="700"
+          style={{ paintOrder: 'stroke', stroke: 'rgba(0,0,0,.45)', strokeWidth: 0.22 }}>
           {p.numero}
         </text>
       </g>
     );
   };
+
+  // Le ballon : porté, en vol, ou au sol. En vol on l'agrandit et on garde son
+  // ombre au sol — c'est ce qui donne la sensation de hauteur.
+  const vol = e.vol;
+  const ballon = e.porteur
+    ? { x: e.porteur.pos.x + e.porteur.vitesse.x * r, y: e.porteur.pos.y + e.porteur.vitesse.y * r, h: 0 }
+    : vol
+      ? (() => {
+          const k = Math.min(1, (vol.ecoule + r) / vol.duree);
+          return {
+            x: vol.de.x + (vol.vers.x - vol.de.x) * k,
+            y: vol.de.y + (vol.vers.y - vol.de.y) * k,
+            h: vol.hauteur * Math.sin(Math.PI * k),
+          };
+        })()
+      : { x: e.ballon.x, y: e.ballon.y, h: 0 };
+
+  const possession = e.compteurs.tempsA + e.compteurs.tempsB > 0
+    ? Math.round((e.compteurs.tempsA / (e.compteurs.tempsA + e.compteurs.tempsB)) * 100)
+    : 50;
+
+  const terrain = useMemo(() => <TerrainMemo />, []);
 
   return createPortal(
     <div className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) onFermer(); }}>
@@ -245,6 +377,7 @@ export function MatchLive({
           </div>
           <button className="ml-fermer" onClick={onFermer} title="Fermer (Échap)">✕</button>
         </header>
+
         <div className="ml-sous-titre">
           {titre}
           {e.phase !== 'jeuCourant' && e.phase !== 'fini' && (
@@ -252,47 +385,41 @@ export function MatchLive({
           )}
         </div>
 
+        {/* ---------- LA BARRE DE POSSESSION ---------- */}
+        <div className="ml-possession" title="Possession">
+          <span style={{ width: `${possession}%`, background: couleurA }} />
+          <span style={{ width: `${100 - possession}%`, background: couleurB }} />
+        </div>
+
         {/* ---------- LE TERRAIN, AUX PROPORTIONS RÉELLES ---------- */}
         <svg className="ml-terrain" viewBox={`0 0 ${LONGUEUR} ${LARGEUR}`} aria-label="terrain">
-          <defs>
-            <linearGradient id="ml-pelouse" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#1a5232" />
-              <stop offset="1" stopColor="#0f3a22" />
-            </linearGradient>
-          </defs>
-          <rect width={LONGUEUR} height={LARGEUR} fill="url(#ml-pelouse)" />
-          {Array.from({ length: 8 }, (_, i) => (
-            <rect key={i} x="0" y={(i * LARGEUR) / 8} width={LONGUEUR} height={LARGEUR / 8}
-              fill={i % 2 ? 'rgba(255,255,255,.04)' : 'transparent'} />
-          ))}
-          <rect x="0" y="0" width="11" height={LARGEUR} fill="rgba(0,0,0,.3)" />
-          <rect x={LONGUEUR - 11} y="0" width="11" height={LARGEUR} fill="rgba(0,0,0,.3)" />
-          {[11, 33, 61, 89, LONGUEUR - 11].map((x) => (
-            <line key={x} x1={x} y1="0" x2={x} y2={LARGEUR}
-              stroke="rgba(255,255,255,.55)" strokeWidth={x === 61 ? 0.5 : 0.4} />
-          ))}
-          {[51, 71].map((x) => (
-            <line key={x} x1={x} y1="0" x2={x} y2={LARGEUR} stroke="rgba(255,255,255,.3)"
-              strokeWidth="0.3" strokeDasharray="1.6 2.4" />
-          ))}
-          <rect x="0.2" y="0.2" width={LONGUEUR - 0.4} height={LARGEUR - 0.4}
-            fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="0.35" />
-          {[5, 15, LARGEUR - 15, LARGEUR - 5].map((y) => (
-            <line key={y} x1="11" y1={y} x2={LONGUEUR - 11} y2={y} stroke="rgba(255,255,255,.16)"
-              strokeWidth="0.22" strokeDasharray="1 4" />
-          ))}
-          {[11, LONGUEUR - 11].map((x) => (
-            <g key={x} stroke="#f5f5f5" strokeWidth="0.6" fill="none">
-              <line x1={x} y1={LARGEUR / 2 - 2.8} x2={x} y2={LARGEUR / 2 - 9} />
-              <line x1={x} y1={LARGEUR / 2 + 2.8} x2={x} y2={LARGEUR / 2 + 9} />
-              <line x1={x} y1={LARGEUR / 2 - 2.8} x2={x} y2={LARGEUR / 2 + 2.8} strokeWidth="0.8" />
-            </g>
-          ))}
+          {terrain}
           {surLeTerrain.filter((p) => p.cote === 'B').map(pion)}
           {surLeTerrain.filter((p) => p.cote === 'A').map(pion)}
-          <ellipse className="ml-ballon" cx={e.ballon.x} cy={e.ballon.y}
-            rx="0.85" ry="0.58" fill="#f4e3c0" stroke="#3a2410" strokeWidth="0.28" />
+          {ballon.h > 0.02 && (
+            <ellipse cx={ballon.x} cy={ballon.y} rx="0.7" ry="0.45" fill="rgba(0,0,0,.3)" />
+          )}
+          <ellipse
+            className="ml-ballon"
+            cx={ballon.x}
+            cy={ballon.y - ballon.h * 2.2}
+            rx={0.85 + ballon.h * 0.35}
+            ry={0.58 + ballon.h * 0.25}
+            fill="#f4e3c0" stroke="#3a2410" strokeWidth="0.26"
+          />
         </svg>
+
+        {/* ---------- LA LECTURE DU JEU ---------- */}
+        {!e.fini && (
+          <div className="ml-lecture">
+            <span className="ml-tag" style={{ borderColor: e.possession === 'A' ? couleurA : couleurB }}>
+              🏉 {e.possession === 'A' ? e.clubA : e.clubB}
+            </span>
+            {e.lancement && <span className="ml-tag">▶ {e.lancement.libelle}</span>}
+            <span className="ml-tag">🛡️ {LIBELLE_SYSTEME[e.systeme]}</span>
+            {e.phasesDepuisArret > 0 && <span className="ml-tag">temps {e.phasesDepuisArret}</span>}
+          </div>
+        )}
 
         {/* ---------- COMMANDES ---------- */}
         <div className="ml-commandes">
@@ -342,11 +469,16 @@ export function MatchLive({
           </div>
         )}
 
-        {/* ---------- COMMENTAIRE / BILAN ---------- */}
+        {/* ---------- COMMENTAIRE / FEUILLE DE MATCH ---------- */}
         {e.fini && stats ? (
           <div className="ml-fil">
-            {/* ⚠️ TOUS les joueurs qui ont foulé le terrain, équipe par équipe —
-                et plus seulement les douze meilleurs porteurs. */}
+            <div className="ml-resume">
+              <span>🏉 {stats.essaisA} – {stats.essaisB} essais</span>
+              <span>🔒 {e.compteurs.rucks} rucks</span>
+              <span>🙌 {e.compteurs.touches} touches</span>
+              <span>🌀 {e.compteurs.melees} mêlées</span>
+              <span>⚡ {e.compteurs.percees} franchissements</span>
+            </div>
             {[e.clubA, e.clubB].map((club) => (
               <div key={club}>
                 <div className="ml-bilan-tete">📋 {club}</div>
@@ -359,9 +491,9 @@ export function MatchLive({
                   .sort((a, b) => a.numero - b.numero)
                   .map((j) => (
                     <div
-                      key={`${j.club}-${j.nom}`}
+                      key={`${j.club}-${j.numero}-${j.nom}`}
                       className="ml-bilan-ligne"
-                      data-moi={monPion && j.nom === monPion.nom ? 'oui' : undefined}
+                      data-moi={j.moi ? 'oui' : undefined}
                     >
                       <span className="ml-bilan-num">{j.numero}</span>
                       <span className="ml-bilan-nom">{j.nom}</span>
@@ -377,18 +509,7 @@ export function MatchLive({
           </div>
         ) : (
           <div className="ml-fil" ref={filRef}>
-            {e.commentaires.map((c, i) => (
-              <div
-                key={i}
-                className={`ml-action${c.points > 0 ? ' marque' : ''}${c.type === 'jalon' ? ' jalon' : ''}`}
-                data-moi={c.moi ? 'oui' : undefined}
-              >
-                <span className="ml-minute">{c.minute}′</span>
-                <span className="ml-emoji">{EMOJI[c.type] ?? '•'}</span>
-                <span className="ml-texte">{c.texte}</span>
-                {c.points > 0 && <b className="ml-points">+{c.points}</b>}
-              </div>
-            ))}
+            <Fil lignes={e.commentaires} n={e.commentaires.length} />
           </div>
         )}
       </motion.div>
@@ -396,9 +517,3 @@ export function MatchLive({
     document.body,
   );
 }
-
-const LIBELLE_PHASE: Record<string, string> = {
-  coupEnvoi: 'coup d’envoi', ruck: 'ruck', melee: 'mêlée', touche: 'touche',
-  maul: 'ballon porté', coupDePied: 'ballon en l’air', tirAuBut: 'tir au but',
-  apresEssai: 'après l’essai', miTemps: 'mi-temps',
-};

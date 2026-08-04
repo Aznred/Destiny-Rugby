@@ -51,8 +51,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const entrainer = useGame((st) => st.entrainer);
   const dejaEntraine = joueur.entrainementSemaine === (joueur.semaine ?? 1);
   const blesse = !!joueur.blessure && joueur.blessure.semaines > 0;
-  // LE MATCH DE LA SEMAINE : s'il y en a un, on peut le regarder se jouer.
+  // LE MATCH DE LA SEMAINE : s'il y en a un, c'est LUI qu'on joue, et c'est lui
+  // qui fait passer à la semaine suivante une fois la sirène tombée.
   const [matchOuvert, setMatchOuvert] = useState(false);
+  const [matchTermine, setMatchTermine] = useState(false);
+  const matchRegarde = useGame((s) => s.matchRegarde);
   const affiche = useMemo(
     () => (rythme === 'semaine' ? matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur)) : null),
     [joueur, rythme],
@@ -60,6 +63,9 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const adversaire = affiche
     ? (affiche.match.domicile === joueur.club ? affiche.match.exterieur : affiche.match.domicile)
     : null;
+  // Déjà suivi cette semaine ? Alors on repasse sur les boutons classiques.
+  const matchAJouer = !!affiche && !blesse
+    && matchRegarde !== `${joueur.saison}#${joueur.semaine ?? 1}`;
 
   return (
     <aside className="carte panneau-joueur">
@@ -216,34 +222,37 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               </div>
             )}
           </button>
-          {/* LE MATCH DE LA SEMAINE, à regarder se jouer minute par minute. */}
-          {affiche && (
+          {/* ⚠️ QUAND IL Y A MATCH, C'EST LE MATCH QUI FAIT AVANCER LA SEMAINE.
+              On ne propose plus « Semaine suivante » à côté : on joue le match,
+              et la semaine passe toute seule à la sirène. */}
+          {matchAJouer ? (
             <button
               type="button"
               className="btn match-semaine"
               onClick={() => setMatchOuvert(true)}
-              title={`Suivre ${affiche.match.domicile} – ${affiche.match.exterieur} en direct`}
+              title={`Suivre ${affiche!.match.domicile} – ${affiche!.match.exterieur} en direct`}
             >
-              ▶️ <b>Voir le match</b>
-              <span>J{affiche.journee} · {affiche.match.domicile === joueur.club ? 'reçoit' : 'à'} {adversaire}</span>
+              ▶️ <b>Jouer le match</b>
+              <span>J{affiche!.journee} · {affiche!.match.domicile === joueur.club ? 'reçoit' : 'à'} {adversaire}</span>
             </button>
+          ) : (
+            <div className="pj-avancer">
+              <button
+                className="btn vert"
+                onClick={semaineSuivante}
+                title="Jouer la semaine suivante du calendrier"
+              >
+                {semaineActuelle.type === 'treve' ? 'Clore la saison →' : 'Semaine suivante →'}
+              </button>
+              <button
+                className="btn fantome"
+                onClick={saisonSuivante}
+                title="Passer directement au bilan de la saison"
+              >
+                ⏩ Fin de saison
+              </button>
+            </div>
           )}
-          <div className="pj-avancer">
-            <button
-              className="btn vert"
-              onClick={semaineSuivante}
-              title="Jouer la semaine suivante du calendrier"
-            >
-              {semaineActuelle.type === 'treve' ? 'Clore la saison →' : 'Semaine suivante →'}
-            </button>
-            <button
-              className="btn fantome"
-              onClick={saisonSuivante}
-              title="Passer directement au bilan de la saison"
-            >
-              ⏩ Fin de saison
-            </button>
-          </div>
         </>
       ) : (
         <div className="pj-avancer">
@@ -347,7 +356,13 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           cle={affiche.cle}
           joueur={joueur}
           titre={`${division?.nom ?? 'Championnat'} · ${libelleDate(semaineActuelle)} · journée ${affiche.journee}`}
-          onFermer={() => setMatchOuvert(false)}
+          onTermine={() => setMatchTermine(true)}
+          onFermer={() => {
+            setMatchOuvert(false);
+            // ⚠️ La semaine n'avance QUE si le match est allé au bout. Fermer en
+            // cours de match (Échap) ne doit rien faire passer.
+            if (matchTermine) { setMatchTermine(false); semaineSuivante(); }
+          }}
         />
       )}
     </aside>

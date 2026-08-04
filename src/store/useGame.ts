@@ -36,6 +36,7 @@ import {
 import { evaluerSucces, defisDeLaSemaine, cleSemaine } from '../lib/succes';
 import { DEFI_PAR_ID, SUCCES_PAR_ID, type EvenementDefi } from '../data/succes';
 import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS } from '../data/rugby';
+import { retourDeMatch, BUDGET_MATCHS_PAR_SAISON } from '../lib/moteur/apresMatch';
 import { MODELE_DEFAUT, plafonnerDeltas, ressembleATriche, CLE_ENV } from '../lib/groq';
 import { EVENEMENTS } from '../data/evenements';
 import { SKIN_PAR_ID, BOOSTS, CIBLES_COACH } from '../data/boutique';
@@ -213,7 +214,7 @@ interface GameState {
   skinActif: string;
   pantheon: LegendeSauvegardee[];
   scenarioActif: Scenario | null;
-  compteurs: { evenements: number; situations: number; gainsIA: number };
+  compteurs: { evenements: number; situations: number; gainsIA: number; gainsMatchs?: number };
   tropheesEnAttente: string[]; // file des trophées à afficher en 3D
   offres: OffreContrat[]; // propositions de contrat en attente de réponse
   offresOuvertes: boolean; // panneau « Choix de carrière » affiché
@@ -315,7 +316,7 @@ export const useGame = create<GameState>()(
       skinActif: 'classique',
       pantheon: [],
       scenarioActif: null,
-      compteurs: { evenements: 0, situations: 0, gainsIA: 0 },
+      compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
       tropheesEnAttente: [],
       offres: [],
       offresOuvertes: false,
@@ -394,7 +395,7 @@ export const useGame = create<GameState>()(
           ecran: 'carriere',
           scenarioActif: null,
           mouvementsClubs: {},
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
           // Nouvelle carrière : timeline et défis repartent de zéro. Les SUCCÈS,
           // eux, sont un palmarès de joueur — ils traversent les carrières (et
           // ne peuvent donc pas être refarmés pour des Ovas).
@@ -821,7 +822,7 @@ export const useGame = create<GameState>()(
         set((s) => ({
           joueur: j,
           coins: s.coins + gain,
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
           tropheesEnAttente: [...s.tropheesEnAttente, ...gagnes],
           offres,
           offresOuvertes: offres.length > 0,
@@ -898,7 +899,12 @@ export const useGame = create<GameState>()(
         }
 
         const resultat = jouerSemaine(joueur, sem);
-        let j = appliquerDeltas(joueur, resultat.deltas);
+        // ⚠️ Si le match vient d'être suivi en direct, `enregistrerMatchVecu` a
+        // DÉJÀ payé la forme, le moral et la réputation à partir de la vraie
+        // performance. On n'applique pas une seconde fois ceux de l'estimation.
+        const matchDejaVecu = resultat.aJoue
+          && get().matchRegarde === `${joueur.saison}#${numero}`;
+        let j = appliquerDeltas(joueur, matchDejaVecu ? {} : resultat.deltas);
 
         // Suivi de l'infirmerie : on décompte, ou on encaisse une nouvelle blessure.
         if (resultat.soinBlessure && j.blessure) {
@@ -910,19 +916,20 @@ export const useGame = create<GameState>()(
         const vecu: BilanEnCours = joueur.saisonEnCours ?? {
           matchs: 0, titularisations: 0, essais: 0, notes: [], capes: 0, stats: STATS_VIDES,
         };
+        // ⚠️ Si le match a été REGARDÉ en direct, TOUT est déjà comptabilisé
+        // par `enregistrerMatchVecu` : le match, les essais, la note et les
+        // statistiques viennent du moteur — les vraies. On ne les simule pas
+        // une seconde fois par-dessus, sinon le joueur compterait double.
         j = {
           ...j,
           semaine: numero + 1,
           saisonEnCours: {
-            matchs: vecu.matchs + (resultat.aJoue ? 1 : 0),
+            matchs: vecu.matchs + (resultat.aJoue && !matchDejaVecu ? 1 : 0),
             titularisations: vecu.titularisations + (resultat.titulaire ? 1 : 0),
-            essais: vecu.essais + resultat.essais,
-            notes: resultat.note != null ? [...vecu.notes, resultat.note] : vecu.notes,
+            essais: vecu.essais + (matchDejaVecu ? 0 : resultat.essais),
+            notes: resultat.note != null && !matchDejaVecu ? [...vecu.notes, resultat.note] : vecu.notes,
             capes: vecu.capes + (resultat.cape ? 1 : 0),
-            // ⚠️ Si le match a été REGARDÉ en direct, ses statistiques sont déjà
-            // celles du moteur — les vraies. On ne les simule pas une seconde
-            // fois par-dessus, sinon le joueur compterait double.
-            stats: resultat.stats && get().matchRegarde !== `${joueur.saison}#${numero}`
+            stats: resultat.stats && !matchDejaVecu
               ? additionnerStats(vecu.stats, resultat.stats)
               : vecu.stats,
           },
@@ -1310,7 +1317,7 @@ export const useGame = create<GameState>()(
           offres: [],
           offresOuvertes: false,
           mouvementsClubs: {},
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
           posts: [],
           filSemaine: '',
           notifsSocial: [],
@@ -1842,33 +1849,79 @@ export const useGame = create<GameState>()(
       // verse dans la saison, et `jouerSemaine` saura ne pas les simuler une
       // deuxième fois (`matchRegarde`).
       enregistrerMatchVecu: (s) => {
-        const joueur = get().joueur;
+        const { joueur, compteurs } = get();
         if (!joueur) return;
         const cle = `${joueur.saison}#${joueur.semaine ?? 1}`;
         if (get().matchRegarde === cle) return; // déjà comptabilisé
         const vecu = joueur.saisonEnCours ?? {
           matchs: 0, titularisations: 0, essais: 0, notes: [], capes: 0, stats: STATS_VIDES,
         };
-        set({
-          matchRegarde: cle,
-          joueur: {
-            ...joueur,
-            saisonEnCours: {
-              ...vecu,
-              stats: additionnerStats(vecu.stats, {
-                points: s.essais * 5 + s.butsReussis * 2,
-                butsTentes: s.butsTentes,
-                butsReussis: s.butsReussis,
-                plaquages: s.plaquages,
-                plaquagesManques: s.plaquagesManques,
-                grattages: s.grattages,
-                passesDecisives: 0,
-                cartonsJaunes: s.cartons,
-                cartonsRouges: 0,
-              }),
-            },
+
+        // ⚠️ LA PERFORMANCE PAIE TOUT DE SUITE (demande explicite). La note du
+        // match fait bouger la forme, le moral, la réputation et la confiance
+        // du staff — et, si le match a été gros, un point d'attribut. Le budget
+        // de saison (`BUDGET_MATCHS_PAR_SAISON`) empêche d'en faire une machine
+        // à progresser : voir `lib/moteur/apresMatch.ts`.
+        const budget = Math.max(0, BUDGET_MATCHS_PAR_SAISON - (compteurs.gainsMatchs ?? 0));
+        const retour = retourDeMatch(joueur, s, budget, Math.random);
+
+        let j = appliquerDeltas(joueur, retour.deltas);
+        j = {
+          ...j,
+          confianceCoach: Math.max(0, Math.min(100,
+            (j.confianceCoach ?? 50) + Math.round((retour.note - 6) * 1.6))),
+          saisonEnCours: {
+            ...vecu,
+            matchs: vecu.matchs + 1,
+            essais: vecu.essais + s.essais,
+            notes: [...vecu.notes, retour.note],
+            stats: additionnerStats(vecu.stats, {
+              points: s.essais * 5 + s.butsReussis * 2,
+              butsTentes: s.butsTentes,
+              butsReussis: s.butsReussis,
+              plaquages: s.plaquages,
+              plaquagesManques: s.plaquagesManques,
+              grattages: s.grattages,
+              passesDecisives: 0,
+              cartonsJaunes: s.cartons,
+              cartonsRouges: 0,
+            }),
           },
-        });
+        };
+        if (retour.attribut) {
+          j = {
+            ...j,
+            attributs: {
+              ...j.attributs,
+              [retour.attribut]: Math.min(99, (j.attributs?.[retour.attribut] ?? 50) + 1),
+            },
+          };
+        }
+
+        const gagne = retour.attribut
+          ? ` **+1 ${ATTRIBUTS_LABELS[retour.attribut]}** — le staff a vu ce qu'il voulait voir.`
+          : '';
+        set((st) => ({
+          matchRegarde: cle,
+          joueur: j,
+          compteurs: {
+            ...st.compteurs,
+            gainsMatchs: (st.compteurs.gainsMatchs ?? 0) + (retour.attribut ? 1 : 0),
+          },
+          journal: [...st.journal, {
+            id: idUnique(),
+            saison: j.saison,
+            role: 'systeme' as const,
+            titre: `📋 Feuille de match — ${retour.note}/10`,
+            texte: `${retour.texte} ${s.minutes}′ jouées · ${s.plaquages} plaquage${s.plaquages > 1 ? 's' : ''} · `
+              + `${Math.round(s.metres)} m portés · ${s.essais} essai${s.essais > 1 ? 's' : ''}.${gagne}`,
+            deltas: retour.deltas,
+          }],
+        }));
+        if (s.essais > 0) get().signalerDefi('essai');
+        if (s.plaquages >= 8) get().signalerDefi('plaquages');
+        if (s.butsReussis > 0) get().signalerDefi('transformation');
+        get().signalerDefi('match');
       },
 
       // ---- SIMULATION DE FOND DE LA JOURNÉE ----
