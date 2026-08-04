@@ -1,49 +1,153 @@
 // LE CLASSEMENT, TOUJOURS SOUS LES YEUX
 //
 // Demande explicite : pas de bouton à cliquer pour voir où en est son club —
-// le classement du championnat vit en permanence sur le côté de l'écran de
-// carrière, et se met à jour journée après journée.
+// le classement vit en permanence sur le côté de l'écran de carrière, et se met
+// à jour journée après journée.
+//
+// ⚠️ IL SUIT LA COMPÉTITION DE LA SEMAINE. Il affichait TOUJOURS le championnat,
+// même un week-end de Coupe d'Europe ou de Tournoi des 6 Nations : pendant huit
+// semaines de la saison, le panneau montrait un classement qui ne bougeait pas
+// pendant qu'on jouait ailleurs. Désormais :
+//   · semaine de coupe   → la POULE européenne du club, s'il y est engagé ;
+//   · fenêtre internationale → le classement de la compétition de SA sélection ;
+//   · le reste du temps  → son championnat.
+// Les divisions amateurs, elles, jouent leur championnat toute l'année
+// (`estAmateur`) : pour elles, rien ne change.
 
 import { useMemo } from 'react';
 import { LogoCompet } from './LogoCompet';
 import { useGame, bonusClubDuJoueur } from '../store/useGame';
-import { championnatEnDirect, journeesALaSemaine, nombreJournees } from '../lib/championnat';
+import {
+  championnatEnDirect, estAmateur, journeesALaSemaine, nombreJournees,
+} from '../lib/championnat';
 import { phaseFinale } from '../lib/phaseFinale';
+import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
+import {
+  fenetreInternationale, internationalEnDirect, journeesInternationalesA,
+} from '../lib/international';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
-import { Blason } from './Blason';
-import { semaine } from '../data/calendrier';
+import { Blason, LogoEquipe } from './Blason';
+import { nomNation } from './Drapeau';
+import { semaine, CALENDRIER } from '../data/calendrier';
 import type { Joueur } from '../types';
+import type { LigneTableau } from '../lib/championnat';
+
+// Nombre de semaines d'un type donné déjà passées avant celle-ci.
+function passees(numero: number, type: string): number {
+  return CALENDRIER.slice(0, Math.max(0, numero - 1)).filter((s) => s.type === type).length;
+}
+
+interface Vue {
+  titre: string;
+  logo?: string;      // id de compétition pour <LogoCompet>
+  emoji?: string;
+  sousTitre: string;  // « J7/26 », « Poule B », « 6 Nations »
+  classement: LigneTableau[];
+  /** true = des équipes nationales, pas des clubs (pas de blason de club). */
+  nations: boolean;
+  moi: string;        // la ligne à surligner
+  pied: { domicile: string; scoreD: number; scoreE: number; exterieur: string } | null;
+  phase: { libelle: string; domicile: string; scoreD: number; scoreE: number; exterieur: string }[];
+}
 
 export function ClassementLateral({ joueur }: { joueur: Joueur }) {
   const setEcran = useGame((s) => s.setEcran);
   const rythme = useGame((s) => s.rythme);
   const division = joueur.division;
 
-  const vue = useMemo(() => {
+  const vue = useMemo<Vue | null>(() => {
     if (!division) return null;
-    const total = nombreJournees(division, joueur.club);
+    const numero = joueur.semaine ?? 1;
+    const sem = semaine(numero);
     const bonus = bonusClubDuJoueur(joueur);
-    // En « saison rapide » il n'y a pas de semaine : on affiche la saison
-    // écoulée, la seule vraiment jouée. En « journée par journée », le
-    // championnat en cours, arrêté à la dernière journée disputée.
     const rapide = rythme === 'saison';
     const saison = rapide ? Math.max(1, joueur.saison - 1) : joueur.saison;
-    // ⚠️ Les divisions amateurs jouent AUSSI les week-ends de coupe d'Europe et
-    // de Tournoi : `journeesALaSemaine` connaît le calendrier de chaque étage.
+    // En bas de la pyramide, on joue le championnat TOUS les week-ends : le
+    // panneau ne bascule jamais sur une coupe d'Europe qu'on ne dispute pas.
+    const amateur = estAmateur(division);
+
+    // ---- FENÊTRE INTERNATIONALE : le classement de MA sélection ----
+    if (!rapide && !amateur && sem.type === 'international') {
+      const fenetre = fenetreInternationale(numero, joueur.saison);
+      const nation = nomNation(joueur.nation);
+      if (fenetre && fenetre.competition.equipes.includes(nation)) {
+        const id = fenetre.competition.id;
+        const etat = internationalEnDirect(
+          id, joueur.saison, journeesInternationalesA(id, numero, joueur.saison),
+          { nation, bonus },
+        );
+        if (etat) {
+          const derniere = etat.journees[etat.journees.length - 1] ?? [];
+          const notre = derniere.find((m) => m.domicile === nation || m.exterieur === nation);
+          return {
+            titre: etat.nom,
+            logo: etat.id,
+            emoji: etat.emoji,
+            sousTitre: `J${Math.min(etat.journeesJouees, etat.totalJournees)}/${etat.totalJournees}`,
+            classement: etat.classement,
+            nations: true,
+            moi: nation,
+            pied: notre ?? null,
+            phase: [],
+          };
+        }
+      }
+    }
+
+    // ---- SEMAINE DE COUPE D'EUROPE : la poule de MON club ----
+    if (!rapide && !amateur && sem.type === 'coupe') {
+      const mienne = coupesDuClub(joueur.club)[0];
+      if (mienne) {
+        const etat = coupeEnDirect(mienne, joueur.saison, joueur.club, passees(numero, 'coupe'));
+        const poule = etat?.poules.find((p) => p.clubs.includes(joueur.club));
+        if (etat && poule) {
+          const derniere = poule.journees[poule.journees.length - 1] ?? [];
+          const notre = derniere.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club);
+          return {
+            titre: etat.nom,
+            logo: etat.id,
+            emoji: etat.emoji,
+            sousTitre: `${poule.nom} · J${etat.journeesJouees}/${etat.totalJournees}`,
+            classement: poule.classement,
+            nations: false,
+            moi: joueur.club,
+            pied: notre ?? null,
+            phase: etat.bracket.slice(-3).map((m) => ({
+              libelle: m.libelle, domicile: m.domicile, scoreD: m.scoreD,
+              scoreE: m.scoreE, exterieur: m.exterieur,
+            })),
+          };
+        }
+      }
+    }
+
+    // ---- LE RESTE DU TEMPS : son championnat ----
+    const total = nombreJournees(division, joueur.club);
     const jouees = rapide && joueur.saison > 1
       ? total
-      : journeesALaSemaine(division, joueur.semaine ?? 1, total);
-    const etat = championnatEnDirect(division, saison, joueur.club, jouees, bonus);
-    // La phase finale n'a de sens qu'une fois la saison régulière bouclée.
+      : journeesALaSemaine(division, numero, total);
+    const champ = championnatEnDirect(division, saison, joueur.club, jouees, bonus);
     const phase = jouees >= total ? phaseFinale(division, saison, joueur.club, bonus) : null;
-    return { etat, total, jouees, phase, saison, rapide };
+    const derniere = champ.journees[champ.journees.length - 1] ?? [];
+    const notre = derniere.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club);
+    const competition = COMPETITIONS.find((c) => c.id === division);
+    return {
+      titre: competition?.nom ?? 'Championnat',
+      logo: competition?.id,
+      emoji: competition?.emoji,
+      sousTitre: rapide ? `S${saison}` : `J${Math.min(jouees, total)}/${total}`,
+      classement: champ.classement,
+      nations: false,
+      moi: joueur.club,
+      pied: notre ?? null,
+      phase: (phase?.matchs ?? []).map((m) => ({
+        libelle: m.libelle, domicile: m.domicile, scoreD: m.scoreD,
+        scoreE: m.scoreE, exterieur: m.exterieur,
+      })),
+    };
   }, [division, joueur, rythme]);
 
   if (!division || !vue) return null;
-  const competition = COMPETITIONS.find((c) => c.id === division);
-  const { etat, total, jouees, phase, saison, rapide } = vue;
-  const dernieres = etat.journees[etat.journees.length - 1] ?? [];
-  const notre = dernieres.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club);
   const sem = semaine(joueur.semaine ?? 1);
 
   return (
@@ -55,26 +159,27 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
       <div className="cl-lat-tete">
         <div>
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <LogoCompet id={competition?.id} emoji={competition?.emoji} taille={18} /> Classement
+            <LogoCompet id={vue.logo} emoji={vue.emoji} taille={18} /> Classement
           </div>
-          <b>{competition?.nom ?? 'Championnat'}</b>
+          <b>{vue.titre}</b>
         </div>
-        <span className="cl-lat-journee" title={rapide ? `Saison ${saison}` : undefined}>
-          {rapide ? `S${saison}` : `J${Math.min(jouees, total)}`}
-          <em>{rapide ? '' : `/${total}`}</em>
-        </span>
+        <span className="cl-lat-journee">{vue.sousTitre}</span>
       </div>
 
       <div className="cl-lat-grille">
-        {etat.classement.map((l) => {
-          const club = clubParNom(l.club);
-          const moi = l.club === joueur.club;
+        {vue.classement.map((l) => {
+          const club = vue.nations ? undefined : clubParNom(l.club);
+          const moi = l.club === vue.moi;
           return (
             <div key={l.club} className="cl-lat-ligne" data-moi={moi ? 'oui' : undefined}>
               <span className="cl-lat-pos" data-tete={l.position <= 6 ? 'oui' : undefined}>
                 {l.position}
               </span>
-              {club ? <Blason club={club} taille={16} /> : <span />}
+              {/* ⚠️ Les sélections n'ont pas de fiche club : leur écusson vient
+                  de `LOGO_PAR_EQUIPE` via <LogoEquipe>. */}
+              {vue.nations
+                ? <LogoEquipe nom={l.club} taille={16} />
+                : club ? <Blason club={club} taille={16} /> : <span />}
               <span className="cl-lat-nom">{l.club}</span>
               <span className="cl-lat-j">{l.joues}</span>
               <span className="cl-lat-pts">{l.points}</span>
@@ -83,14 +188,14 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
         })}
       </div>
 
-      {phase ? (
+      {vue.phase.length ? (
         <div className="cl-lat-pied">
           <div className="eyebrow" style={{ marginBottom: '0.3rem' }}>🔥 Phase finale</div>
-          {phase.matchs.map((m) => (
+          {vue.phase.map((m) => (
             <div
               key={m.libelle}
               className="cl-lat-affiche"
-              data-moi={m.domicile === joueur.club || m.exterieur === joueur.club ? 'oui' : undefined}
+              data-moi={m.domicile === vue.moi || m.exterieur === vue.moi ? 'oui' : undefined}
             >
               <span>{m.domicile}</span>
               <b>{m.scoreD}-{m.scoreE}</b>
@@ -98,13 +203,13 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
             </div>
           ))}
         </div>
-      ) : notre ? (
+      ) : vue.pied ? (
         <div className="cl-lat-pied">
           <div className="eyebrow" style={{ marginBottom: '0.3rem' }}>Dernier match</div>
           <div className="cl-lat-affiche" data-moi="oui">
-            <span>{notre.domicile}</span>
-            <b>{notre.scoreD}-{notre.scoreE}</b>
-            <span>{notre.exterieur}</span>
+            <span>{vue.pied.domicile}</span>
+            <b>{vue.pied.scoreD}-{vue.pied.scoreE}</b>
+            <span>{vue.pied.exterieur}</span>
           </div>
           <div className="cl-lat-note">{sem.libelle}</div>
         </div>

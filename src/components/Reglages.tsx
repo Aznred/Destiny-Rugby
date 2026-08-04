@@ -1,12 +1,22 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
-import { MODELE_DEFAUT, CLE_ENV } from '../lib/groq';
+import { MODELE_DEFAUT, CLE_ENV, consoGroq, reinitialiserConsoGroq } from '../lib/groq';
+import type { Theme } from '../types';
+import { LANGUES, t } from '../lib/i18n';
 
 const MODELES = [
   { id: 'llama-3.3-70b-versatile', nom: 'Llama 3.3 70B (recommandé)' },
   { id: 'llama-3.1-8b-instant', nom: 'Llama 3.1 8B (rapide)' },
   { id: 'openai/gpt-oss-120b', nom: 'GPT-OSS 120B' },
+];
+
+// Les trois ambiances. `apercu` est le dégradé montré sur la pastille — il
+// reprend exactement les deux extrémités de la rampe de fond du thème.
+const AMBIANCES: { id: Theme; nom: string; apercu: string }[] = [
+  { id: 'vert', nom: 'Pelouse', apercu: 'linear-gradient(135deg,#08160f,#237a44)' },
+  { id: 'bleu', nom: 'Nuit', apercu: 'linear-gradient(135deg,#060f1c,#1f5c9c)' },
+  { id: 'rouge', nom: 'Grenat', apercu: 'linear-gradient(135deg,#1a0709,#8f2733)' },
 ];
 
 interface Props {
@@ -18,6 +28,10 @@ export function Reglages({ onFermer }: Props) {
   const modele = useGame((s) => s.modele);
   const rythme = useGame((s) => s.rythme);
   const setRythme = useGame((s) => s.setRythme);
+  const theme = useGame((s) => s.theme);
+  const langue = useGame((s) => s.langue);
+  const setLangue = useGame((s) => s.setLangue);
+  const setTheme = useGame((s) => s.setTheme);
   const setGroqKey = useGame((s) => s.setGroqKey);
   const setModele = useGame((s) => s.setModele);
   const tenorKey = useGame((s) => s.tenorKey);
@@ -25,6 +39,11 @@ export function Reglages({ onFermer }: Props) {
 
   const [cleLocale, setCleLocale] = useState(groqKey);
   const [voir, setVoir] = useState(false);
+  // Le compteur vit dans un module : on le lit à l'ouverture du panneau, et on
+  // force un rendu quand on le remet à zéro.
+  const [, rafraichir] = useState(0);
+  const conso = consoGroq();
+  const remettreAZero = () => { reinitialiserConsoGroq(); rafraichir((n) => n + 1); };
 
   const valide = cleLocale.trim().startsWith('gsk_');
 
@@ -94,7 +113,7 @@ export function Reglages({ onFermer }: Props) {
         </div>
 
         <div className="champ">
-          <label htmlFor="modele">Modèle</label>
+          <label htmlFor="modele">{t('reg.modele')}</label>
           <select
             id="modele"
             value={modele || MODELE_DEFAUT}
@@ -107,6 +126,28 @@ export function Reglages({ onFermer }: Props) {
             ))}
           </select>
         </div>
+
+        {/* ⚠️ LA CONSOMMATION, SOUS LES YEUX. La clé du site est partagée par
+            tous les joueurs : on ne peut pas économiser ce qu'on ne mesure pas.
+            Compteur de SESSION (lib/groq.ts), remis à zéro au rechargement. */}
+        {conso.appels > 0 && (
+          <div className="champ">
+            <label>{t('reg.conso')}</label>
+            <div className="conso-groq">
+              <span><b>{conso.appels}</b> appel{conso.appels > 1 ? 's' : ''}</span>
+              <span><b>{conso.entree.toLocaleString('fr-FR')}</b> tokens envoyés</span>
+              <span><b>{conso.sortie.toLocaleString('fr-FR')}</b> reçus</span>
+              <button type="button" className="btn fantome mini" onClick={remettreAZero}>
+                Remettre à zéro
+              </button>
+            </div>
+            <p className="aide">
+              Une semaine de jeu coûte <b>un seul appel</b> pour tout L’Ovale (fil et
+              commentaires réunis) : les comptes à suivre, eux, sortent de l’annuaire du
+              jeu et ne coûtent rien.
+            </p>
+          </div>
+        )}
 
         {/* GIFs dans les publications de L'Ovale. Facultatif : sans cette clé,
             les posts s'illustrent quand même avec des photos libres. */}
@@ -125,8 +166,57 @@ export function Reglages({ onFermer }: Props) {
           </p>
         </div>
 
+        {/* ⚠️ LA LANGUE CHANGE TOUT, pas seulement les boutons. Le Maître du
+            Jeu, les situations, les tweets et les messages privés sont écrits à
+            l'exécution : on demande au modèle d'écrire directement dans cette
+            langue (`consigneDeLangue`), plutôt que de traduire après coup. */}
         <div className="champ">
-          <label>Rythme de jeu</label>
+          <label htmlFor="langue">{t('reg.langue')}</label>
+          <div className="choix-langue">
+            {LANGUES.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                className={langue === l.id ? 'actif' : ''}
+                onClick={() => setLangue(l.id)}
+                aria-pressed={langue === l.id}
+                lang={l.id}
+              >
+                <span className={`fi fi-${l.drapeau}`} aria-hidden="true" />
+                {l.nom}
+              </button>
+            ))}
+          </div>
+          <p className="aide">{t('reg.langueAide')}</p>
+        </div>
+
+        {/* ⚠️ L'AMBIANCE (demande explicite). Elle ne repeint que le FOND :
+            l'or, le cuir et la craie ne bougent pas, sinon on perdrait
+            l'identité du jeu. Le changement est immédiat — le CSS fait tout. */}
+        <div className="champ">
+          <label>{t('reg.ambiance')}</label>
+          <div className="choix-theme">
+            {AMBIANCES.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className={theme === a.id ? 'actif' : ''}
+                onClick={() => setTheme(a.id)}
+                aria-pressed={theme === a.id}
+                title={a.nom}
+              >
+                <span className="pastille-theme" style={{ background: a.apercu }} />
+                {a.nom}
+              </button>
+            ))}
+          </div>
+          <p className="aide">
+            {t('reg.ambianceAide')}
+          </p>
+        </div>
+
+        <div className="champ">
+          <label>{t('reg.rythme')}</label>
           <div className="choix-rythme">
             <button
               type="button"

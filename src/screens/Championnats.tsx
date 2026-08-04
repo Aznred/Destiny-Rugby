@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import 'flag-icons/css/flag-icons.min.css';
+
 import { useGame } from '../store/useGame';
 import { COMPETITIONS } from '../data/clubs';
 import { COUPES_EUROPE } from '../data/mondeReel';

@@ -421,3 +421,34 @@ export function messageSpontane(relation: number, cleUnique: string): string {
   const pool = AMORCES[humeur(relation)] ?? AMORCES.neutre;
   return pool[Math.floor(rng() * pool.length)];
 }
+
+// ---------------------------------------------------------------------------
+// LES COÉQUIPIERS PROPOSENT DES CHOSES
+// ---------------------------------------------------------------------------
+// Demande explicite : « fais aussi que les coéquipiers ou autres joueurs
+// peuvent envoyer des messages pour faire des activités ». Un vestiaire, ce
+// n'est pas que des matchs — c'est un barbecue le lundi, une séance vidéo en
+// plus, un padel le mardi, une virée à la salle avec le costaud du groupe.
+export const INVITATIONS = [
+  'Salut ! On fait un barbecue chez moi {quand}, tout le groupe vient. Tu passes ?',
+  'Séance vidéo en plus {quand} avec le coach des lignes arrière. Je te réserve une place ?',
+  'Padel {quand} avec deux ou trois gars du vestiaire. T’es chaud ?',
+  'Je vais à la salle {quand}, séance haut du corps. Tu viens avec moi ?',
+  'On se fait un restaurant {quand} avec les anciens. Tu manques jamais ça normalement.',
+  'Le club organise une visite à l’hôpital des enfants {quand}. Ça fait du bien, viens.',
+  'Tu veux qu’on bosse tes touches {quand} avant l’entraînement collectif ?',
+  'Sortie vélo {quand} pour récupérer. Rythme tranquille, promis.',
+  'Je passe voir le match des jeunes du club {quand}. Ils seraient contents de te voir.',
+  'On mange ensemble {quand} ? J’ai deux ou trois trucs à te dire sur le jeu au pied.',
+  'Le kiné a une place libre {quand}. Je te la laisse, t’en as plus besoin que moi.',
+  'Petit tournoi de belote au club-house {quand}. Tu joues ou t’as peur ?',
+];
+
+export const QUAND = ['lundi', 'mardi soir', 'mercredi', 'jeudi midi', 'ce week-end', 'après l’entraînement'];
+
+// Un coéquipier t'écrit pour proposer quelque chose. Déterministe.
+export function invitationCoequipier(cleUnique: string): string {
+  const rng = graine('invit#' + cleUnique);
+  const texte = INVITATIONS[Math.floor(rng() * INVITATIONS.length)];
+  return texte.split('{quand}').join(QUAND[Math.floor(rng() * QUAND.length)]);
+}

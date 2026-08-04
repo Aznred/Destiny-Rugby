@@ -75,14 +75,21 @@ export function noterSaison(j: Joueur, s: SaisonJouee): number {
   return Math.round(Math.max(3, Math.min(9.8, finale)) * 10) / 10;
 }
 
-// Facteur d'âge : on progresse vite avant 24 ans, plus du tout après 30.
+// ⚠️ ON PROGRESSE JUSQU'À 31 ANS (demande explicite : « potentiel jusqu'à 31 »).
+// La courbe s'arrêtait net à 27 ans (×1 → ×0,7 puis ×0,45) : un joueur qui
+// perçait tard n'avait plus aucun moyen d'atteindre son plafond, alors même que
+// `AGE_DECLIN` place le déclin à 31 ans. La marche haute court désormais
+// jusqu'à 28 ans, et il reste de la vitesse jusqu'à 31 — le déclin, lui, ne
+// bouge pas d'un an. Et parce que la limite d'âge est passée à 44 ans, la queue
+// de courbe descend plus doucement qu'avant plutôt que de tomber à zéro.
 function facteurAge(age: number): number {
   if (age <= 21) return 1.5;
   if (age <= 24) return 1.25;
-  if (age <= 27) return 1;
-  if (age <= 30) return 0.7;
-  if (age <= 33) return 0.45;
-  return 0.3;
+  if (age <= 28) return 1;
+  if (age <= 31) return 0.8;
+  if (age <= 34) return 0.45;
+  if (age <= 38) return 0.3;
+  return 0.2;
 }
 
 export function evoluer(j: Joueur, s: SaisonJouee): Evolution {
@@ -110,7 +117,15 @@ export function evoluer(j: Joueur, s: SaisonJouee): Evolution {
   // sur 100 carrières plafonnait à 76. La marge au potentiel compte désormais
   // beaucoup plus — mais elle reste la SEULE porte : un joueur né sans talent
   // ne perce toujours pas, il n'a rien à rattraper.
-  if (j.age < 27) points += Math.min(5.5, Math.max(0, potentiel - gen) / 4.5);
+  //
+  // ⚠️ OUVERT JUSQU'À 31 ANS (demande explicite). Le levier se coupait à 27 :
+  // un joueur à 68 pour un potentiel de 84 n'avait plus rien pour combler
+  // l'écart passé son 27ᵉ anniversaire, et son potentiel restait lettre morte.
+  // Après 28 ans il rapporte moins — on rattrape, on n'explose plus.
+  if (j.age <= 31) {
+    const marge = Math.max(0, potentiel - gen);
+    points += Math.min(5.5, marge / 4.5) * (j.age < 27 ? 1 : j.age <= 29 ? 0.7 : 0.45);
+  }
   if (j.age <= 21) points = Math.max(points, 1.2);
   else if (j.age <= 23) points = Math.max(points, 0.7);
   else if (j.age <= 25) points = Math.max(points, 0.35);
@@ -134,9 +149,12 @@ export function evoluer(j: Joueur, s: SaisonJouee): Evolution {
 
   // Le potentiel lui-même bouge : une saison énorme relève le plafond d'un
   // jeune, une saison ratée le rabote.
+  // ⚠️ Le plafond peut encore monter jusqu'à 29 ans (et plus seulement 26) :
+  // c'est le pendant de « potentiel jusqu'à 31 » — une saison énorme à 28 ans
+  // doit pouvoir repousser la limite, pas seulement la remplir.
   let gainPotentiel = 0;
-  if (j.age <= 26 && noteSaison >= 8.2) gainPotentiel = noteSaison >= 9 ? 2 : 1;
-  else if (j.age <= 26 && noteSaison <= 4.5) gainPotentiel = -1;
+  if (j.age <= 29 && noteSaison >= 8.2) gainPotentiel = noteSaison >= 9 && j.age <= 26 ? 2 : 1;
+  else if (j.age <= 29 && noteSaison <= 4.5) gainPotentiel = -1;
   else if (j.age >= 32) gainPotentiel = -1;
 
   // Répartition sur les attributs : les points clés du poste prennent le plus.

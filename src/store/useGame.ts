@@ -10,6 +10,7 @@ import type {
   OffreContrat,
   Blessure,
   Rythme,
+  Theme,
   StatsDetaillees,
   PosteId,
   ReponseMJ,
@@ -26,12 +27,31 @@ import {
   publierPost, pseudoDe, feedAmbiance, suggestionsLocales,
   estCertifie, statsDepuisVues, LIMITE_CARACTERES, vieillirPost,
 } from '../lib/social';
-import { filGroq, reponsesGroq, comptesGroq, messageGroq } from '../lib/groqSocial';
-import { annuaire, bassinSocial } from '../lib/comptes';
-import { cumuler, estTitulaire, simulerJournee, type LigneReelle } from '../lib/moteur/saison';
+import { filGroq, reponsesGroq, messageGroq } from '../lib/groqSocial';
+import {
+  abonnesCible, annuaire, bassinSocial, pseudoStable, rapprocherAbonnes,
+} from '../lib/comptes';
+// ⚠️ LE MOTEUR DE MATCH N'EST PAS IMPORTÉ ICI (économie de chargement).
+// `moteur/saison.ts` tire derrière lui les 3 500 lignes du moteur ; le store
+// étant chargé dès la page d'accueil, tout partait dans le chunk principal
+// alors que rien n'en a besoin avant la première semaine jouée.
+// `simulerStatsJournee` le charge donc À LA DEMANDE (`import()`), et seule la
+// petite fonction `estTitulaire` — qui n'a aucune dépendance — reste statique.
+import { estTitulaire } from '../lib/moteur/titulaire';
+import { definirLangue, langueDuNavigateur, type Langue } from '../lib/i18n';
+import type { LigneReelle } from '../lib/moteur/saison';
+import { coupesDuClub } from '../lib/coupe';
+import { fenetreInternationale } from '../lib/international';
+import { CALENDRIER as SEMAINES } from '../data/calendrier';
+
+// Combien de week-ends de ce type se sont écoulés AVANT cette semaine.
+function passeesDuType(numeroSemaine: number, type: string): number {
+  return SEMAINES.slice(0, Math.max(0, numeroSemaine - 1)).filter((s) => s.type === type).length;
+}
 import { matchDeLaSemaine } from '../lib/matchLive';
 import {
-  filDeLaSemaine, messageSpontane, effetSurRelation, reponseLocale, tonDuMessage, reactionsPour,
+  filDeLaSemaine, messageSpontane, invitationCoequipier, effetSurRelation, reponseLocale,
+  tonDuMessage, reactionsPour,
 } from '../lib/vie';
 import { evaluerSucces, defisDeLaSemaine, cleSemaine } from '../lib/succes';
 import { DEFI_PAR_ID, SUCCES_PAR_ID, type EvenementDefi } from '../data/succes';
@@ -39,11 +59,13 @@ import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS } from '../data/rugby';
 import { retourDeMatch, BUDGET_MATCHS_PAR_SAISON } from '../lib/moteur/apresMatch';
 import { MODELE_DEFAUT, plafonnerDeltas, ressembleATriche, CLE_ENV } from '../lib/groq';
 import { EVENEMENTS } from '../data/evenements';
+import { situationPour, versScenario, type ConsequenceDure } from '../data/situations';
+import { appliquerConsequence, lireDerapage, consequenceDuDerapage } from '../lib/consequences';
 import { SKIN_PAR_ID, BOOSTS, CIBLES_COACH } from '../data/boutique';
 import { LEGENDES_FICTIVES } from '../data/legendes';
 import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
-import { forceEffectif, forceMoyenneDivision, noteDuClub, setTransfertsSociaux } from '../lib/effectif';
+import { forceEffectif, forceMoyenneDivision, noteDuClub, setTransfertsSociaux, effectifDuClub } from '../lib/effectif';
 import { evoluer } from '../lib/progression';
 import { genererOffres, offreProlongation, cote } from '../lib/offres';
 import {
@@ -53,7 +75,9 @@ import {
   NATIONS_6N,
 } from '../data/trophees';
 import { nomNation } from '../components/Drapeau';
-import { semaine, libelleDate, type Semaine } from '../data/calendrier';
+import {
+  semaine, libelleDate, SEMAINES_PAR_SAISON, type Semaine,
+} from '../data/calendrier';
 import { convocation } from '../lib/selection';
 import {
   resoudrePyramide, nomDivision, resoudreToutesDivisions, oublierResultats,
@@ -161,9 +185,51 @@ export interface CreationInput {
 // dialogue avec l'IA — sinon il suffirait d'enchaîner les actions.
 export const BUDGET_IA_PAR_SAISON = 4;
 
-// Fin de carrière : libre à partir de 33 ans, imposée à 40.
+// ---------------------------------------------------------------------------
+// L'AMBIANCE DU SITE
+// ---------------------------------------------------------------------------
+// On pose l'attribut sur <html> et le CSS fait tout le reste (`index.css`,
+// blocs `:root[data-theme=…]`). Aucun composant n'est re-rendu : c'est le
+// navigateur qui repeint. Le thème par défaut — le vert pelouse — ne pose
+// aucun attribut, pour que `:root` reste la source de vérité.
+export function appliquerTheme(theme: Theme): void {
+  if (typeof document === 'undefined') return;
+  if (theme === 'vert') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', theme);
+  // La barre d'adresse du téléphone suit la couleur du fond : sans ça, elle
+  // reste verte sur un thème rouge, et la découpe se voit.
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const fond = { vert: '#08160f', bleu: '#060f1c', rouge: '#1a0709' }[theme];
+  if (meta && fond) meta.setAttribute('content', fond);
+}
+
+// Fin de carrière : libre à partir de 33 ans, imposée à 44.
+// ⚠️ Demande explicite : « limite d'âge à 44 ans ». Elle est désormais VRAIMENT
+// appliquée — `saisonSuivante` raccroche d'office quand on l'atteint, là où le
+// jeu se contentait d'afficher « dernière ligne droite » sans jamais arrêter.
 export const AGE_RETRAITE_LIBRE = 33;
-export const AGE_RETRAITE_FORCEE = 40;
+export const AGE_RETRAITE_FORCEE = 44;
+
+// ---------------------------------------------------------------------------
+// UNE SÉANCE D'ENTRAÎNEMENT
+// ---------------------------------------------------------------------------
+// Isolée pour être rejouable EN LOT : quand on passe la saison d'un bloc (mode
+// « saison rapide », ou clic sur la trêve avant la dernière journée), les
+// séances hebdomadaires n'étaient tout simplement jamais jouées — la moitié de
+// la progression du joueur disparaissait avec le mode de jeu choisi.
+// `valeur` est la valeur COURANTE de l'attribut (elle bouge d'une séance à
+// l'autre), `forme` la fraîcheur du moment.
+function gainDUneSeance(
+  age: number, potentiel: number, valeur: number, forme: number, tirage: () => number,
+): number {
+  const marge = Math.max(0, potentiel - valeur);
+  // ⚠️ Aligné sur `potentiel jusqu'à 31` : on travaille encore utilement après
+  // 27 ans, ce qui n'était pas le cas (0,65 dès 28 ans).
+  const facteurAge = age <= 23 ? 1.4 : age <= 28 ? 1 : age <= 31 ? 0.8 : age <= 35 ? 0.5 : 0.3;
+  const fraicheur = Math.max(0.3, forme / 100);
+  const chance = Math.min(0.95, (0.25 + marge / 45) * facteurAge * fraicheur);
+  return tirage() < chance ? 1 + (tirage() < 0.12 ? 1 : 0) : 0;
+}
 
 // Les reconversions proposées quand on raccroche. La plus crédible dépend de
 // ce qu'a été la carrière (palmarès, réputation, mental).
@@ -219,6 +285,13 @@ interface GameState {
   offres: OffreContrat[]; // propositions de contrat en attente de réponse
   offresOuvertes: boolean; // panneau « Choix de carrière » affiché
   rythme: Rythme; // « semaine » = calendrier réel, « saison » = simulation rapide
+  // ⚠️ L'AMBIANCE DU SITE (demande explicite). Elle ne touche QUE la rampe de
+  // fond (les variables `--pelouse-*` d'index.css) : l'or, le cuir et la craie
+  // ne bougent pas, sinon on perdrait l'identité « stade nocturne » du jeu.
+  theme: Theme;
+  // La langue de TOUT : l'interface (data/textes.ts) et le contenu écrit par
+  // l'IA (consigneDeLangue, ajoutée à chaque prompt).
+  langue: Langue;
   mouvementsClubs: Record<string, string>; // club → division après montées/descentes
   // Lot 7 — réseau social « L'Ovale », succès et défis
   posts: PostSocial[]; // fil : publications du joueur ET du monde (récentes en tête)
@@ -246,7 +319,11 @@ interface GameState {
   saisonSuivante: () => void;
   semaineSuivante: () => void;
   setRythme: (r: Rythme) => void;
+  setTheme: (t: Theme) => void;
+  setLangue: (l: Langue) => void;
   entrainer: (attribut: keyof Attributs) => void;
+  // Le secteur travaillé chaque semaine, modifiable à tout moment.
+  choisirFocus: (attribut: keyof Attributs) => void;
   evenementAleatoire: () => void;
   lancerScenario: () => void;
   // Lot 6 — boucle unifiée : une situation posée, d'où qu'elle vienne (pool ou IA)
@@ -286,19 +363,29 @@ interface GameState {
   verifierSucces: () => void;
   signalerDefi: (evenement: EvenementDefi) => void;
   // Les VRAIES statistiques du match regardé en direct, versées dans la saison.
-  enregistrerMatchVecu: (stats: {
-    essais: number; plaquages: number; plaquagesManques: number;
-    passes: number; metres: number; grattages: number;
-    butsTentes: number; butsReussis: number; cartons: number; minutes: number;
-  }) => void;
+  // `contexte` porte le résultat de la rencontre : c'est lui qui permet à la
+  // feuille de match d'être la SEULE entrée du journal pour ce week-end.
+  enregistrerMatchVecu: (
+    stats: {
+      essais: number; plaquages: number; plaquagesManques: number;
+      passes: number; metres: number; grattages: number;
+      butsTentes: number; butsReussis: number; cartons: number; minutes: number;
+    },
+    contexte?: {
+      adversaire: string; scorePour: number; scoreContre: number;
+      domicile: boolean; libelle: string;
+    },
+  ) => void;
   matchRegarde: string; // « saison#semaine » du dernier match suivi en direct
+  // Situations déjà vécues cette carrière : on ne repropose pas la même.
+  situationsVues: string[];
   // ⚠️ LES VRAIES STATISTIQUES DE LA POULE. Le moteur rejoue en fond TOUTES les
   // affiches de la journée (sans rendu) : le classement des joueurs n'est plus
   // une estimation, ce sont les chiffres des matchs réellement simulés.
   // Clé : « division#saison » → « club|nom » → cumul.
   statsReelles: Record<string, Record<string, LigneReelle>>;
   journeesReelles: Record<string, number>;
-  simulerStatsJournee: () => void;
+  simulerStatsJournee: () => Promise<void>;
   // boutique
   acheterSkin: (id: string) => boolean;
   choisirSkin: (id: string) => void;
@@ -321,10 +408,13 @@ export const useGame = create<GameState>()(
       offres: [],
       offresOuvertes: false,
       rythme: 'semaine',
+      theme: 'vert',
+      langue: langueDuNavigateur(),
       mouvementsClubs: {},
       posts: [],
       filSemaine: '',
       matchRegarde: '',
+      situationsVues: [],
       statsReelles: {},
       journeesReelles: {},
       notifsSocial: [],
@@ -496,6 +586,53 @@ export const useGame = create<GameState>()(
           ? vecu.notes.reduce((a, b) => a + b, 0) / vecu.notes.length
           : undefined;
 
+        // ---- CE QUE LA SAISON A VÉCU, MÊME QUAND ON LA PASSE D'UN BLOC ----
+        // ⚠️ Trois choses restaient figées quand la saison n'était pas jouée
+        // semaine après semaine (mode « saison rapide », ou passage direct à la
+        // trêve) :
+        //   · la BLESSURE gardait son compte de semaines — on repartait blessé
+        //     pour la même durée, saison après saison, sans jamais guérir ;
+        //   · la FORME ne remontait que de +10, alors qu'une intersaison
+        //     complète (repos puis préparation) remet un joueur d'aplomb ;
+        //   · les SÉANCES HEBDOMADAIRES n'étaient jamais jouées : choisir le
+        //     mode rapide, c'était renoncer à toute la progression à
+        //     l'entraînement (mesurée à ~+7 de générale sur six saisons).
+        const semainesSautees = Math.max(0, SEMAINES_PAR_SAISON - (joueur.semaine ?? 1));
+
+        // 1. L'infirmerie tourne pendant ces semaines-là.
+        const blessureRestante = joueur.blessure
+          ? Math.max(0, joueur.blessure.semaines - semainesSautees)
+          : 0;
+        const blessure = joueur.blessure && blessureRestante > 0
+          ? { ...joueur.blessure, semaines: blessureRestante }
+          : null;
+        const guerie = !!joueur.blessure && !blessure;
+
+        // 2. La préparation d'été. Un vétéran remonte moins haut qu'un espoir,
+        // et un joueur encore à l'infirmerie ne fait pas de préparation.
+        const plancherForme = blessure ? 55 : Math.max(62, 88 - Math.max(0, joueur.age - 29) * 2);
+        const forme = borne(Math.max(joueur.forme + 10, plancherForme));
+
+        // 3. Les séances non jouées, rattrapées d'un bloc — mêmes règles qu'en
+        // semaine (`gainDUneSeance`), une séance par semaine sautée, et jamais
+        // pendant les semaines d'indisponibilité.
+        const focus = joueur.entrainementFocus;
+        const seances = focus
+          ? Math.max(0, semainesSautees - Math.min(semainesSautees, joueur.blessure?.semaines ?? 0))
+          : 0;
+        let gainEntrainement = 0;
+        if (focus && seances > 0) {
+          const potentielCible = joueur.potentiel ?? noteGlobale(joueur) + 10;
+          let valeur = joueur.attributs[focus];
+          // La fraîcheur baisse au fil des semaines de travail, puis remonte.
+          for (let n = 0; n < seances; n++) {
+            const fraicheur = Math.max(45, joueur.forme - (n % 4) * 4);
+            const g = gainDUneSeance(joueur.age, potentielCible, valeur, fraicheur, Math.random);
+            valeur = Math.min(99, valeur + g);
+            gainEntrainement += g;
+          }
+        }
+
         let j: Joueur = {
           ...joueur,
           division: joueur.division ?? divisionDuClub(joueur.club)?.id ?? 'fed3',
@@ -503,15 +640,50 @@ export const useGame = create<GameState>()(
           age: joueur.age + 1,
           matchsJoues: joueur.matchsJoues + matchsSaison,
           essais: joueur.essais + essaisSaison,
-          forme: borne(joueur.forme + 10),
+          forme,
+          blessure,
           semaine: 1,
+          entrainementSemaine: undefined,
           saisonEnCours: undefined,
           selections: (joueur.selections ?? 0) + (vecu?.capes ?? 0),
           stats: vecu ? additionnerStats(joueur.stats ?? STATS_VIDES, vecu.stats) : joueur.stats,
+          attributs: gainEntrainement
+            ? { ...joueur.attributs, [focus!]: Math.min(99, joueur.attributs[focus!] + gainEntrainement) }
+            : joueur.attributs,
         };
 
         const entrees: EntreeJournal[] = [];
         let gain = 3;
+
+        if (guerie) {
+          entrees.push({
+            id: idUnique(),
+            saison: joueur.saison,
+            role: 'systeme',
+            titre: '🩺 Sorti de l’infirmerie',
+            texte: `Ta blessure est derrière toi : tu as repris la course, puis le contact, puis le ballon. Tu attaques la saison ${j.saison} apte.`,
+            deltas: { moral: 6 },
+          });
+          j = appliquerDeltas(j, { moral: 6 });
+        } else if (blessure) {
+          entrees.push({
+            id: idUnique(),
+            saison: joueur.saison,
+            role: 'systeme',
+            titre: `🚑 Toujours indisponible — ${blessure.nom}`,
+            texte: `Tu reprends la saison à l'infirmerie : encore ${blessure.semaines} semaine${blessure.semaines > 1 ? 's' : ''} avant de retoucher un ballon.`,
+          });
+        }
+        if (gainEntrainement > 0 && focus) {
+          entrees.push({
+            id: idUnique(),
+            saison: joueur.saison,
+            role: 'systeme',
+            titre: `💪 Une saison de travail — +${gainEntrainement} ${ATTRIBUTS_LABELS[focus]}`,
+            texte: `${seances} séances ciblées sur ton ${ATTRIBUTS_LABELS[focus].toLowerCase()} au fil de la saison. Le staff a vu la différence.`,
+            deltas: { [focus]: gainEntrainement },
+          });
+        }
 
         // ---- Saison passée sans rien faire ? Le destin joue à ta place. ----
         const rienFait =
@@ -816,6 +988,28 @@ export const useGame = create<GameState>()(
           }
         }
 
+        // ---- L'AUDIENCE DE LA SAISON ÉCOULÉE ----
+        // Une saison au niveau, c'est un compte qui grossit. Le compteur avance
+        // par un gros pas vers l'audience qu'un joueur de ce niveau, dans ce
+        // club-là, aurait sur L'Ovale (`abonnesCible`, lib/comptes.ts).
+        const cibleAbonnes = abonnesCible(j.nom, j.club, noteGlobale(j), j.reputation);
+        const abonnesApresSaison = rapprocherAbonnes(j.abonnes ?? 0, cibleAbonnes, 0.22);
+        const deltaAbonnes = abonnesApresSaison - (j.abonnes ?? 0);
+        j = { ...j, abonnes: abonnesApresSaison };
+        if (Math.abs(deltaAbonnes) >= 100) {
+          entrees.push({
+            id: idUnique(),
+            saison: joueur.saison,
+            role: 'systeme',
+            titre: deltaAbonnes > 0 ? '𝕏 Ton audience grimpe' : '𝕏 Ton audience s’érode',
+            texte: deltaAbonnes > 0
+              ? `Ta saison à ${joueur.club} a fait parler : **+${deltaAbonnes.toLocaleString('fr-FR')} abonnés** sur L'Ovale, `
+                + `pour un total de ${abonnesApresSaison.toLocaleString('fr-FR')}.`
+              : `Moins exposé cette saison, ton compte perd ${Math.abs(deltaAbonnes).toLocaleString('fr-FR')} abonnés `
+                + `(${abonnesApresSaison.toLocaleString('fr-FR')} au total).`,
+          });
+        }
+
         // Ce que tu pèseras sur ton club la saison qui s'ouvre, figé maintenant.
         j = { ...j, apportClub: calculerApportClub(j) };
 
@@ -830,6 +1024,24 @@ export const useGame = create<GameState>()(
           journal: [...s.journal, ...entrees],
         }));
         get().verifierSucces();
+
+        // ---- LA LIMITE D'ÂGE, VRAIMENT APPLIQUÉE ----
+        // ⚠️ `AGE_RETRAITE_FORCEE` n'était qu'un texte : on pouvait jouer
+        // jusqu'à 60 ans. À 44 ans révolus, le corps a dit non — la carrière se
+        // referme et entre au Panthéon.
+        if (j.age >= AGE_RETRAITE_FORCEE) {
+          set((s) => ({
+            journal: [...s.journal, {
+              id: idUnique(),
+              saison: j.saison,
+              role: 'mj' as const,
+              titre: `🏛️ ${AGE_RETRAITE_FORCEE} ans — le rideau tombe`,
+              texte: `Tu as ${j.age} ans. Aucune fédération ne délivre plus de licence de joueur `
+                + `professionnel à cet âge : ta carrière s'arrête ici, et elle s'arrête debout.`,
+            }],
+          }));
+          get().prendreRetraite();
+        }
       },
 
       fermerTrophee: () =>
@@ -837,10 +1049,39 @@ export const useGame = create<GameState>()(
 
       setRythme: (rythme) => set({ rythme }),
 
+      // Le thème vit sur <html data-theme="…"> : le CSS fait tout le reste,
+      // et le fond change sans qu'un seul composant soit re-rendu.
+      // Le module i18n garde la langue courante HORS de React : `t()` est
+      // appelée depuis des fonctions pures (libellés de postes, formatage de
+      // dates) qui n'ont pas accès à un hook.
+      setLangue: (langue) => {
+        definirLangue(langue);
+        set({ langue });
+      },
+
+      setTheme: (theme) => {
+        appliquerTheme(theme);
+        set({ theme });
+      },
+
       // ---- ENTRAÎNEMENT DE LA SEMAINE ----
       // Une séance ciblée par semaine : c'est le seul levier direct du joueur
       // sur ses stats. Le gain dépend de l'âge, de la marge au potentiel et de
       // la fraîcheur — et il coûte de la forme.
+      choisirFocus: (attribut) => {
+        const joueur = get().joueur;
+        if (!joueur) return;
+        set((st) => ({
+          joueur: { ...joueur, entrainementFocus: attribut },
+          journal: [...st.journal, {
+            id: idUnique(), saison: joueur.saison, role: 'systeme' as const,
+            titre: `🎯 Secteur de travail — ${ATTRIBUTS_LABELS[attribut]}`,
+            texte: `Tu préviens le préparateur physique : chaque semaine, tu travailleras ton `
+              + `${ATTRIBUTS_LABELS[attribut].toLowerCase()}. Tu peux en changer quand tu veux.`,
+          }],
+        }));
+      },
+
       entrainer: (attribut) => {
         const joueur = get().joueur;
         if (!joueur) return;
@@ -850,12 +1091,10 @@ export const useGame = create<GameState>()(
 
         const gen = noteGlobale(joueur);
         const potentiel = joueur.potentiel ?? gen + 10;
-        const marge = Math.max(0, potentiel - joueur.attributs[attribut]);
-        const facteurAge = joueur.age <= 23 ? 1.4 : joueur.age <= 27 ? 1 : joueur.age <= 31 ? 0.65 : 0.35;
-        const fraicheur = Math.max(0.3, joueur.forme / 100);
         // Espérance ~0,6 point : il faut plusieurs séances pour gagner 1 point.
-        const chance = Math.min(0.95, (0.25 + marge / 45) * facteurAge * fraicheur);
-        const gagne = Math.random() < chance ? 1 + (Math.random() < 0.12 ? 1 : 0) : 0;
+        const gagne = gainDUneSeance(
+          joueur.age, potentiel, joueur.attributs[attribut], joueur.forme, Math.random,
+        );
 
         const j = appliquerDeltas(
           { ...joueur, entrainementSemaine: numero },
@@ -899,18 +1138,22 @@ export const useGame = create<GameState>()(
         }
 
         const resultat = jouerSemaine(joueur, sem);
-        // ⚠️ Si le match vient d'être suivi en direct, `enregistrerMatchVecu` a
-        // DÉJÀ payé la forme, le moral et la réputation à partir de la vraie
-        // performance. On n'applique pas une seconde fois ceux de l'estimation.
-        const matchDejaVecu = resultat.aJoue
-          && get().matchRegarde === `${joueur.saison}#${numero}`;
+        // ⚠️ SI LE MATCH A ÉTÉ REGARDÉ, L'ESTIMATION N'EXISTE PLUS DU TOUT.
+        // `enregistrerMatchVecu` a déjà payé la forme, le moral, la réputation,
+        // la blessure éventuelle et les statistiques à partir de la VRAIE
+        // performance. La condition portait sur `resultat.aJoue` : quand le
+        // tirage de `jouerMatch` (indépendant de celui du moteur) décidait que
+        // le joueur n'était pas dans le groupe, le journal affichait DEUX
+        // résumés contradictoires — une feuille de match à 32 minutes suivie de
+        // « tu n'es pas retenu dans le groupe ».
+        const matchDejaVecu = get().matchRegarde === `${joueur.saison}#${numero}`;
         let j = appliquerDeltas(joueur, matchDejaVecu ? {} : resultat.deltas);
 
         // Suivi de l'infirmerie : on décompte, ou on encaisse une nouvelle blessure.
         if (resultat.soinBlessure && j.blessure) {
           const reste = j.blessure.semaines - 1;
           j = { ...j, blessure: reste > 0 ? { ...j.blessure, semaines: reste } : null };
-        } else if (resultat.blessure) {
+        } else if (resultat.blessure && !matchDejaVecu) {
           j = appliquerDeltas({ ...j, blessure: resultat.blessure }, deltasBlessure(resultat.blessure));
         }
         const vecu: BilanEnCours = joueur.saisonEnCours ?? {
@@ -920,12 +1163,27 @@ export const useGame = create<GameState>()(
         // par `enregistrerMatchVecu` : le match, les essais, la note et les
         // statistiques viennent du moteur — les vraies. On ne les simule pas
         // une seconde fois par-dessus, sinon le joueur compterait double.
+        // ---- L'AUDIENCE SUIT LA CARRIÈRE ----
+        // Une semaine de plus au haut niveau, c'est des abonnés en plus : le
+        // compteur avance vers l'audience que mérite le joueur à son niveau,
+        // dans SON club (`abonnesCible`). Sans ça, il ne bougeait qu'en publiant.
+        // ⚠️ Pas plus de 1,2 % par semaine : sur les 43 semaines d'une saison,
+        // c'est déjà 40 % de l'écart comblé. Plus vite, l'audience atteignait sa
+        // cible en une demi-saison et le compteur ne racontait plus rien.
+        const abonnes = rapprocherAbonnes(
+          j.abonnes ?? 0,
+          abonnesCible(j.nom, j.club, noteGlobale(j), j.reputation),
+          0.012,
+        );
+
         j = {
           ...j,
           semaine: numero + 1,
+          abonnes,
           saisonEnCours: {
             matchs: vecu.matchs + (resultat.aJoue && !matchDejaVecu ? 1 : 0),
-            titularisations: vecu.titularisations + (resultat.titulaire ? 1 : 0),
+            titularisations: vecu.titularisations
+              + (resultat.titulaire && !matchDejaVecu ? 1 : 0),
             essais: vecu.essais + (matchDejaVecu ? 0 : resultat.essais),
             notes: resultat.note != null && !matchDejaVecu ? [...vecu.notes, resultat.note] : vecu.notes,
             capes: vecu.capes + (resultat.cape ? 1 : 0),
@@ -939,14 +1197,24 @@ export const useGame = create<GameState>()(
         // Un moment décisif (le choix de la 80ᵉ) ou le micro d'après-match.
         // Rien d'obligatoire : ça ne tombe que de temps en temps, et jamais
         // deux choses à la fois.
+        // ⚠️ Quand le match a été REGARDÉ, c'est la vraie note du moteur qui
+        // décide de l'après-match, pas celle de l'estimation qu'on vient de
+        // neutraliser — sinon on décrochait une interview « exploit » après une
+        // feuille de match à 4/10.
+        const notesVecues = j.saisonEnCours?.notes ?? [];
+        const aJoue = matchDejaVecu ? true : resultat.aJoue;
+        const note = matchDejaVecu
+          ? notesVecues[notesVecues.length - 1]
+          : resultat.note;
+
         let suite: Scenario | null = null;
         if (!get().scenarioActif) {
-          if (resultat.aJoue && Math.random() < 0.22) {
+          if (aJoue && Math.random() < 0.22) {
             suite = momentAleatoire(j);
-          } else if (resultat.aJoue && resultat.note != null && Math.random() < 0.3) {
-            if (resultat.note >= 7.8) suite = interviewAleatoire('exploit');
-            else if (resultat.note <= 4.5) suite = interviewAleatoire('defaite');
-          } else if (!resultat.aJoue && sem.type === 'championnat' && Math.random() < 0.12) {
+          } else if (aJoue && note != null && Math.random() < 0.3) {
+            if (note >= 7.8) suite = interviewAleatoire('exploit');
+            else if (note <= 4.5) suite = interviewAleatoire('defaite');
+          } else if (!aJoue && sem.type === 'championnat' && Math.random() < 0.12) {
             suite = interviewAleatoire('banc');
           }
         }
@@ -956,14 +1224,18 @@ export const useGame = create<GameState>()(
           scenarioActif: suite ?? s.scenarioActif,
           journal: [
             ...s.journal,
-            {
+            // ⚠️ Si le match vient d'être JOUÉ en direct, on n'ajoute PAS le
+            // récit simulé : il racontait une autre histoire que la feuille de
+            // match (« tu es resté sur le banc » alors qu'on venait de jouer
+            // 80 minutes). La feuille de match, elle, est déjà au journal.
+            ...(matchDejaVecu ? [] : [{
               id: idUnique(),
               saison: j.saison,
-              role: 'systeme',
+              role: 'systeme' as const,
               titre: `${resultat.emoji} ${libelleDate(sem)} — ${resultat.titre}`,
               texte: resultat.texte,
               deltas: resultat.deltas,
-            },
+            }]),
             ...(suite
               ? [{
                   id: idUnique(),
@@ -980,20 +1252,32 @@ export const useGame = create<GameState>()(
         // ⚠️ On signale AVANT que la semaine ne change vraiment de numéro dans
         // l'esprit du joueur : `signalerDefi` lit `j.semaine`, déjà incrémenté,
         // donc on repasse par la semaine qui vient d'être jouée.
+        // ⚠️ Rien à re-signaler quand le match a été regardé : `enregistrerMatchVecu`
+        // l'a déjà fait sur les VRAIS chiffres du moteur.
         const enJeu = { ...j, semaine: numero };
         set({ joueur: enJeu });
-        if (resultat.aJoue) get().signalerDefi('match');
-        if (resultat.essais > 0) get().signalerDefi('essai');
-        if ((resultat.note ?? 0) >= 7) get().signalerDefi('note7');
-        if ((resultat.note ?? 0) >= 8) get().signalerDefi('note8');
-        if (resultat.victoire) get().signalerDefi('victoire');
-        if ((resultat.stats?.plaquages ?? 0) >= 8) get().signalerDefi('plaquages');
-        if ((resultat.stats?.butsReussis ?? 0) > 0) get().signalerDefi('transformation');
+        if (!matchDejaVecu) {
+          if (resultat.aJoue) get().signalerDefi('match');
+          if (resultat.essais > 0) get().signalerDefi('essai');
+          if ((resultat.note ?? 0) >= 7) get().signalerDefi('note7');
+          if ((resultat.note ?? 0) >= 8) get().signalerDefi('note8');
+          if (resultat.victoire) get().signalerDefi('victoire');
+          if ((resultat.stats?.plaquages ?? 0) >= 8) get().signalerDefi('plaquages');
+          if ((resultat.stats?.butsReussis ?? 0) > 0) get().signalerDefi('transformation');
+        }
         set({ joueur: j });
         // ---- LA JOURNÉE EST REJOUÉE EN FOND ----
         // C'est ici que les statistiques individuelles de toute la poule sont
         // produites, juste après le match du joueur.
         get().simulerStatsJournee();
+
+        // ---- LA SÉANCE DE LA SEMAINE SE FAIT TOUTE SEULE ----
+        // ⚠️ On ne clique plus sur un secteur chaque semaine : on choisit une
+        // fois ce qu'on travaille (`entrainementFocus`), et la séance tombe
+        // automatiquement. On peut changer de secteur quand on veut.
+        if (j.entrainementFocus && !(j.blessure && j.blessure.semaines > 0)) {
+          get().entrainer(j.entrainementFocus);
+        }
 
         // ---- L'OVALE SUIT LE CALENDRIER ----
         // Une semaine jouée = une nouvelle fournée de publications, datée.
@@ -1027,8 +1311,22 @@ export const useGame = create<GameState>()(
             salaire: offre.salaire,
           },
         };
+        // ⚠️ CHANGER DE CLUB, C'EST CHANGER D'AUDIENCE. Signer en Top 14 fait
+        // grimper le compteur d'abonnés vers celui d'un joueur de ce niveau ;
+        // descendre d'un étage le fait refluer, plus lentement.
+        const abonnesApres = rapprocherAbonnes(
+          arrive.abonnes ?? 0,
+          abonnesCible(arrive.nom, arrive.club, noteGlobale(arrive), arrive.reputation),
+          0.45,
+        );
+        const gagnes = abonnesApres - (arrive.abonnes ?? 0);
+
         // Nouveau club, nouveau groupe : ce que tu y pèses se recalcule.
-        const j: Joueur = { ...arrive, apportClub: calculerApportClub(arrive) };
+        const j: Joueur = {
+          ...arrive,
+          abonnes: abonnesApres,
+          apportClub: calculerApportClub(arrive),
+        };
         set((s) => ({
           joueur: j,
           offres: [],
@@ -1040,9 +1338,16 @@ export const useGame = create<GameState>()(
               saison: j.saison,
               role: 'systeme',
               titre: reste ? `✍️ Prolongation à ${offre.club}` : `✍️ Signature à ${offre.club}`,
-              texte: reste
+              texte: (reste
                 ? `Tu prolonges de ${offre.saisons} saison${offre.saisons > 1 ? 's' : ''} à ${offre.club} (${offre.divisionNom}) pour ${offre.salaire.toLocaleString('fr-FR')} € par saison.`
-                : `${offre.club} (${offre.divisionNom}${offre.etranger ? `, ${offre.pays}` : ''}) t'engage pour ${offre.saisons} saison${offre.saisons > 1 ? 's' : ''} : ${offre.salaire.toLocaleString('fr-FR')} € par saison et ${offre.prime.toLocaleString('fr-FR')} € à la signature.${offre.etranger ? ' Direction l’étranger — nouvelle langue, nouveau rugby.' : ''}`,
+                : `${offre.club} (${offre.divisionNom}${offre.etranger ? `, ${offre.pays}` : ''}) t'engage pour ${offre.saisons} saison${offre.saisons > 1 ? 's' : ''} : ${offre.salaire.toLocaleString('fr-FR')} € par saison et ${offre.prime.toLocaleString('fr-FR')} € à la signature.${offre.etranger ? ' Direction l’étranger — nouvelle langue, nouveau rugby.' : ''}`)
+                // L'annonce se voit sur L'Ovale : un club plus exposé, c'est
+                // une audience qui bascule du jour au lendemain.
+                + (gagnes >= 50
+                  ? ` 𝕏 L'annonce tourne : **+${gagnes.toLocaleString('fr-FR')} abonnés** sur L'Ovale.`
+                  : gagnes <= -50
+                    ? ` 𝕏 Un étage plus bas, les projecteurs s'éloignent : ${gagnes.toLocaleString('fr-FR')} abonnés.`
+                    : ''),
             },
           ],
         }));
@@ -1121,6 +1426,17 @@ export const useGame = create<GameState>()(
       lancerScenario: () => {
         const { joueur, scenarioActif, compteurs } = get();
         if (!joueur || scenarioActif || compteurs.situations >= MAX_PAR_SAISON) return;
+        // ⚠️ LA SITUATION EST CONTEXTUELLE. On ne propose plus « ton premier
+        // contrat pro » à un joueur de 33 ans : `situationPour` filtre sur
+        // l'âge, la forme, le moral, la division, le contrat (data/situations.ts),
+        // et on évite celles déjà vues cette saison.
+        const vues = get().situationsVues ?? [];
+        const s = situationPour(joueur, vues);
+        if (s) {
+          set((st) => ({ situationsVues: [...(st.situationsVues ?? []), s.id].slice(-30) }));
+          get().poserSituation(versScenario(s));
+          return;
+        }
         get().poserSituation(scenarioDuPool());
       },
 
@@ -1244,6 +1560,22 @@ export const useGame = create<GameState>()(
             popularite: borne((j.popularite ?? 50) + (choix.issue.fans ?? 0)),
           };
         }
+        // ⚠️ LES CONSÉQUENCES DURES. Certaines issues ne se paient pas en points
+        // de moral : prison, accident, exclusion, fin de carrière. Elles ne
+        // tombent JAMAIS au hasard — toujours à la suite d'un choix explicite.
+        const dur = (choix.issue as { dur?: { type: ConsequenceDure; semaines?: number; motif: string } }).dur;
+        let entreeDure: EntreeJournal | null = null;
+        let finale = false;
+        if (dur) {
+          const effet = appliquerConsequence(j, dur.type, dur.motif, dur.semaines ?? 8);
+          j = effet.joueur;
+          finale = effet.finale;
+          entreeDure = {
+            id: idUnique(), saison: j.saison, role: 'systeme',
+            titre: `${effet.emoji} ${effet.titre}`, texte: effet.texte,
+          };
+        }
+
         set((s) => ({
           joueur: j,
           scenarioActif: null,
@@ -1258,10 +1590,13 @@ export const useGame = create<GameState>()(
               texte: choix.issue.recit,
               deltas: choix.issue.deltas,
             },
+            ...(entreeDure ? [entreeDure] : []),
           ],
         }));
         get().signalerDefi('situation');
         get().verifierSucces();
+        // Fin de carrière imposée : on fige la carrière dans le panthéon.
+        if (finale) get().prendreRetraite();
       },
 
       prendreRetraite: (reconversion?: string) => {
@@ -1361,7 +1696,7 @@ export const useGame = create<GameState>()(
             set({ chargementSocial: false });
           }
         }
-        const j = appliquerDeltas(
+        let j = appliquerDeltas(
           {
             ...joueur,
             abonnes: Math.max(0, (joueur.abonnes ?? 0) + r.gainAbonnes),
@@ -1371,6 +1706,26 @@ export const useGame = create<GameState>()(
           },
           r.deltas,
         );
+
+        // ⚠️ UN TWEET PEUT COÛTER UNE CARRIÈRE. Le clash, la punchline et le
+        // règlement de comptes restent autorisés — c'est le ton du réseau. Mais
+        // les propos discriminatoires, les menaces et l'apologie des produits
+        // interdits passent en commission de discipline, comme dans la vraie
+        // vie (lib/consequences.ts).
+        const derapage = lireDerapage(propre);
+        let entreeDure: EntreeJournal | null = null;
+        let carriereFinie = false;
+        if (derapage) {
+          const c = consequenceDuDerapage(derapage);
+          const effet = appliquerConsequence(j, c.type, c.motif, c.semaines);
+          j = effet.joueur;
+          carriereFinie = effet.finale;
+          entreeDure = {
+            id: idUnique(), saison: j.saison, role: 'systeme',
+            titre: `${effet.emoji} ${c.titre}`,
+            texte: `${effet.texte} La publication est capturée, relayée, et ne disparaîtra jamais.`,
+          };
+        }
 
         const notifs: NotifSocial[] = [
           {
@@ -1393,22 +1748,24 @@ export const useGame = create<GameState>()(
           joueur: j,
           posts: [r.post, ...s.posts].slice(0, 60),
           notifsSocial: [...notifs, ...s.notifsSocial].slice(0, 40),
-          journal: r.sanction
-            ? [
-                ...s.journal,
-                {
+          journal: [
+            ...s.journal,
+            ...(r.sanction
+              ? [{
                   id: idUnique(),
                   saison: j.saison,
                   role: 'systeme' as const,
                   titre: r.sanction.titre,
                   texte: r.sanction.texte,
                   deltas: { argent: -r.sanction.amende, moral: -6 },
-                },
-              ]
-            : s.journal,
+                }]
+              : []),
+            ...(entreeDure ? [entreeDure] : []),
+          ],
         }));
         get().signalerDefi('post');
         get().verifierSucces();
+        if (carriereFinie) get().prendreRetraite();
       },
 
       // ---- LE FIL DU MONDE, ÉCRIT PAR L'IA ----
@@ -1431,11 +1788,13 @@ export const useGame = create<GameState>()(
             .slice(-6)
             .map((e) => e.titre ?? e.texte.slice(0, 60))
             .filter(Boolean) as string[];
+          // ⚠️ UN SEUL APPEL PAR SEMAINE (économie de tokens, demande explicite).
+          // Il y en avait TROIS : le fil, puis un appel de commentaires pour
+          // chacune des deux publications les plus lues. `filGroq` rend
+          // désormais les commentaires DANS la même réponse. Les publications
+          // qu'il n'a pas commentées reçoivent les réactions locales, qui sont
+          // gratuites et jamais vides.
           const posts = await filGroq({ joueur, cle, modele, suivis: comptesSuivis }, sujets, 6);
-          // DES COMMENTAIRES ÉCRITS SOUS CHAQUE TWEET, pas seulement sous les
-          // tiens. On sert d'abord les réactions locales (immédiates, jamais
-          // vides), puis l'IA remplace celles des deux posts les plus lus —
-          // deux appels par semaine, pas un par publication.
           const bassinReac = bassinSocial(joueur, comptesSuivis);
           for (const p of posts) {
             if (!p.reponses?.length) p.reponses = reactionsPour(p, bassinReac, 2);
@@ -1443,22 +1802,6 @@ export const useGame = create<GameState>()(
           set((s) => ({ posts: fusionner(posts, s.posts) }));
           // Les annonces ne sont pas que du texte : on les applique au monde.
           for (const p of posts) get().appliquerAnnonce(p);
-
-          const vedettes = [...posts].sort((a, b) => b.vues - a.vues).slice(0, 2);
-          await Promise.all(vedettes.map(async (p) => {
-            try {
-              const reps = await reponsesGroq(
-                { joueur, cle, modele, suivis: comptesSuivis }, p.texte, p.type ?? 'club', 3,
-              );
-              if (reps.length) {
-                set((s) => ({
-                  posts: s.posts.map((x) => (x.id === p.id ? { ...x, reponses: reps } : x)),
-                }));
-              }
-            } catch {
-              // On garde les réactions locales : le fil n'est jamais vide.
-            }
-          }));
         } catch (e) {
           set({ erreurSocial: (e as Error).message });
         } finally {
@@ -1539,6 +1882,41 @@ export const useGame = create<GameState>()(
           ),
           filSemaine: cle,
         }));
+
+        // 1 bis. UN COÉQUIPIER TE PROPOSE QUELQUE CHOSE. Une semaine sur deux,
+        // quelqu'un du vestiaire écrit — barbecue, séance vidéo, padel, visite
+        // à l'hôpital. C'est ce qui fait qu'un club est un groupe et pas une
+        // liste de noms.
+        {
+          const rngV = graine(`vestiaire#${cle}#${joueur.club}`);
+          const groupe = effectifDuClub(joueur.club, joueur.saison)
+            .filter((c) => c.nom !== joueur.nom);
+          if (groupe.length && rngV() < 0.5) {
+            const co = groupe[Math.floor(rngV() * groupe.length)];
+            const pseudo = pseudoStable(co.nom);
+            const fil = conversations[pseudo] ?? [];
+            if (fil[fil.length - 1]?.de !== 'lui') {
+              const texte = invitationCoequipier(`${pseudo}#${cle}`);
+              set((s) => ({
+                conversations: {
+                  ...s.conversations,
+                  [pseudo]: [
+                    ...(s.conversations[pseudo] ?? []),
+                    { id: idUnique(), pseudo, de: 'lui' as const, texte, saison: joueur.saison },
+                  ],
+                },
+                notifsSocial: [
+                  {
+                    id: idUnique(), emoji: '💬',
+                    titre: `${co.nom} t’a écrit`,
+                    texte, saison: joueur.saison, lue: false,
+                  },
+                  ...s.notifsSocial,
+                ].slice(0, 40),
+              }));
+            }
+          }
+        }
 
         // 2. Une fois sur trois, un compte suivi t'écrit dans la semaine.
         if (comptesSuivis.length) {
@@ -1697,27 +2075,18 @@ export const useGame = create<GameState>()(
           : s)),
 
       // ---- COMPTES À SUIVRE ----
+      // ⚠️ PLUS D'APPEL IA ICI (économie de tokens, et exactitude). L'IA
+      // inventait des comptes AVEC LEUR NOMBRE D'ABONNÉS : Explorer affichait
+      // « 12 000 abonnés » pour un compte qui, ouvert, en annonçait 400 — et
+      // souvent un compte qui n'existait nulle part ailleurs dans le jeu.
+      // L'annuaire (`lib/comptes.ts`) contient déjà tout le monde : les clubs,
+      // les championnats, les 6 306 joueurs réels, la presse et les supporters,
+      // chacun avec son audience calibrée sur son étage. C'est gratuit, c'est
+      // déterministe, et le chiffre est le même partout.
       chargerSuggestions: async () => {
-        const { joueur, comptesSuivis, modele } = get();
+        const { joueur, comptesSuivis } = get();
         if (!joueur) return;
-        const cle = get().groqKey || CLE_ENV;
-        if (!cle) {
-          set({ suggestionsComptes: suggestionsLocales(joueur, comptesSuivis) });
-          return;
-        }
-        set({ chargementSocial: true, erreurSocial: null });
-        try {
-          const comptes = await comptesGroq({ joueur, cle, modele, suivis: comptesSuivis }, 6);
-          const connus = new Set(comptesSuivis.map((c) => c.pseudo));
-          set({ suggestionsComptes: comptes.filter((c) => !connus.has(c.pseudo)) });
-        } catch (e) {
-          set({
-            erreurSocial: (e as Error).message,
-            suggestionsComptes: suggestionsLocales(joueur, comptesSuivis),
-          });
-        } finally {
-          set({ chargementSocial: false });
-        }
+        set({ suggestionsComptes: suggestionsLocales(joueur, comptesSuivis) });
       },
 
       suivreCompte: (c) =>
@@ -1848,7 +2217,7 @@ export const useGame = create<GameState>()(
       // moteur a compté chaque plaquage, chaque passe, chaque mètre. On les
       // verse dans la saison, et `jouerSemaine` saura ne pas les simuler une
       // deuxième fois (`matchRegarde`).
-      enregistrerMatchVecu: (s) => {
+      enregistrerMatchVecu: (s, contexte) => {
         const { joueur, compteurs } = get();
         if (!joueur) return;
         const cle = `${joueur.saison}#${joueur.semaine ?? 1}`;
@@ -1873,6 +2242,9 @@ export const useGame = create<GameState>()(
           saisonEnCours: {
             ...vecu,
             matchs: vecu.matchs + 1,
+            // Entré d'entrée de jeu = titularisation. Le moteur donne les vraies
+            // minutes : au-delà d'une heure, on était sur la feuille de départ.
+            titularisations: vecu.titularisations + (s.minutes >= 55 ? 1 : 0),
             essais: vecu.essais + s.essais,
             notes: [...vecu.notes, retour.note],
             stats: additionnerStats(vecu.stats, {
@@ -1898,9 +2270,35 @@ export const useGame = create<GameState>()(
           };
         }
 
+        // ⚠️ LE CORPS PEUT LÂCHER ICI AUSSI. Le tirage de blessure vivait dans
+        // `jouerMatch` (l'estimation) : comme le récit simulé est désormais
+        // supprimé quand on a regardé le match, il ne se serait plus jamais
+        // produit — regarder ses matchs aurait rendu invulnérable. Le risque est
+        // calculé sur les MINUTES RÉELLEMENT jouées.
+        const tr = effetsTraits(j.traits);
+        const brute = Math.random() < risqueDeBlessure(j, s.minutes, 1) * tr.risqueBlessure
+          ? tirerBlessure()
+          : null;
+        const blessure = brute
+          ? { ...brute, semaines: Math.max(1, Math.round(brute.semaines * tr.graviteBlessure)) }
+          : null;
+        if (blessure) j = appliquerDeltas({ ...j, blessure }, deltasBlessure(blessure));
+
         const gagne = retour.attribut
           ? ` **+1 ${ATTRIBUTS_LABELS[retour.attribut]}** — le staff a vu ce qu'il voulait voir.`
           : '';
+        // ⚠️ UNE SEULE ENTRÉE POUR LE WEEK-END. Le résultat de la rencontre est
+        // porté par la feuille de match : `semaineSuivante` n'ajoute plus son
+        // récit simulé par-dessus (« tu n'es pas retenu dans le groupe » juste
+        // à côté d'une feuille de match à 32 minutes).
+        const c = contexte;
+        const resultat = !c
+          ? ''
+          : c.scorePour > c.scoreContre
+            ? `Victoire ${c.scorePour}-${c.scoreContre}`
+            : c.scorePour < c.scoreContre
+              ? `Défaite ${c.scorePour}-${c.scoreContre}`
+              : `Match nul ${c.scorePour}-${c.scoreContre}`;
         set((st) => ({
           matchRegarde: cle,
           joueur: j,
@@ -1912,15 +2310,21 @@ export const useGame = create<GameState>()(
             id: idUnique(),
             saison: j.saison,
             role: 'systeme' as const,
-            titre: `📋 Feuille de match — ${retour.note}/10`,
+            titre: c
+              ? `📋 ${c.libelle} — ${resultat} ${c.domicile ? 'contre' : 'à'} ${c.adversaire} · ${retour.note}/10`
+              : `📋 Feuille de match — ${retour.note}/10`,
             texte: `${retour.texte} ${s.minutes}′ jouées · ${s.plaquages} plaquage${s.plaquages > 1 ? 's' : ''} · `
-              + `${Math.round(s.metres)} m portés · ${s.essais} essai${s.essais > 1 ? 's' : ''}.${gagne}`,
+              + `${Math.round(s.metres)} m portés · ${s.essais} essai${s.essais > 1 ? 's' : ''}.${gagne}`
+              + (blessure ? ` 🚑 ${messageBlessure(blessure)}` : ''),
             deltas: retour.deltas,
           }],
         }));
         if (s.essais > 0) get().signalerDefi('essai');
         if (s.plaquages >= 8) get().signalerDefi('plaquages');
         if (s.butsReussis > 0) get().signalerDefi('transformation');
+        if (retour.note >= 7) get().signalerDefi('note7');
+        if (retour.note >= 8) get().signalerDefi('note8');
+        if (contexte && contexte.scorePour > contexte.scoreContre) get().signalerDefi('victoire');
         get().signalerDefi('match');
       },
 
@@ -1929,10 +2333,59 @@ export const useGame = create<GameState>()(
       // match qu'on regarde, mais sans aucun rendu. Comme la graine est celle du
       // championnat, le match suivi en direct et celui rejoué ici sont
       // rigoureusement identiques : rien n'est compté deux fois.
-      simulerStatsJournee: () => {
+      simulerStatsJournee: async () => {
         const joueur = get().joueur;
         const division = joueur?.division;
         if (!joueur || !division) return;
+        const sem = semaine(joueur.semaine ?? 1);
+        // ⚠️ LE MOTEUR EST CHARGÉ ICI, PAS AU DÉMARRAGE. C'est le seul endroit
+        // du store qui en a besoin : le sortir du chunk principal enlève
+        // 3 500 lignes du premier chargement, pour un import qui arrive bien
+        // avant que la simulation ne soit visible.
+        const { cumuler, simulerJournee, simulerJourneeCoupe, simulerJourneeInternationale }
+          = await import('../lib/moteur/saison');
+        const avatar = {
+          club: joueur.club, nom: joueur.nom, poste: joueur.poste,
+          attributs: joueur.attributs,
+        };
+
+        // ⚠️ UNE SEMAINE EUROPÉENNE OU INTERNATIONALE A AUSSI SES STATISTIQUES.
+        // Elles n'existaient pas : le joueur était le seul de la compétition à
+        // avoir des chiffres après un match de coupe ou de sélection.
+        if (sem.type === 'coupe' && !estAmateur(division)) {
+          const coupes = coupesDuClub(joueur.club);
+          if (!coupes.length) return;
+          const journee = passeesDuType(joueur.semaine ?? 1, 'coupe') + 1;
+          const cleC = `${coupes[0]}#${joueur.saison}`;
+          if ((get().journeesReelles[cleC] ?? 0) >= journee) return;
+          const lignesC = simulerJourneeCoupe(coupes[0], joueur.saison, journee, joueur.club, {
+            ...avatar, titulaire: estTitulaire(joueur, `${coupes[0]}#${joueur.saison}#${journee}`),
+          });
+          set((s) => ({
+            statsReelles: { ...s.statsReelles, [cleC]: cumuler(s.statsReelles[cleC] ?? {}, lignesC) },
+            journeesReelles: { ...s.journeesReelles, [cleC]: journee },
+          }));
+          return;
+        }
+        if (sem.type === 'international' && !estAmateur(division)) {
+          const fen = fenetreInternationale(joueur.semaine ?? 1, joueur.saison);
+          if (!fen) return;
+          const cleI = `${fen.competition.id}#${joueur.saison}`;
+          if ((get().journeesReelles[cleI] ?? 0) >= fen.journee) return;
+          const nation = nomNation(joueur.nation);
+          const selectionne = fen.competition.equipes.includes(nation)
+            && convocation(joueur).selectionne;
+          const lignesI = simulerJourneeInternationale(
+            fen.competition.id, joueur.saison, fen.journee,
+            selectionne ? { ...avatar, club: nation, titulaire: true } : undefined,
+          );
+          set((s) => ({
+            statsReelles: { ...s.statsReelles, [cleI]: cumuler(s.statsReelles[cleI] ?? {}, lignesI) },
+            journeesReelles: { ...s.journeesReelles, [cleI]: fen.journee },
+          }));
+          return;
+        }
+
         const affiche = matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur));
         if (!affiche) return; // pas de journée cette semaine
         const cle = `${division}#${joueur.saison}`;
@@ -1953,10 +2406,11 @@ export const useGame = create<GameState>()(
           },
         );
         set((s) => ({
-          // On ne garde QUE la division et la saison en cours : accumuler tout
-          // l'historique ferait exploser le quota du localStorage.
-          statsReelles: { [cle]: cumuler(s.statsReelles[cle] ?? {}, lignes) },
-          journeesReelles: { [cle]: affiche.journee },
+          // ⚠️ On ne garde que la saison EN COURS : accumuler tout l'historique
+          // ferait exploser le quota du localStorage. La coupe et la sélection
+          // ont chacune leur clé, elles cohabitent avec le championnat.
+          statsReelles: { ...s.statsReelles, [cle]: cumuler(s.statsReelles[cle] ?? {}, lignes) },
+          journeesReelles: { ...s.journeesReelles, [cle]: affiche.journee },
         }));
       },
 
@@ -2100,6 +2554,11 @@ export const useGame = create<GameState>()(
       onRehydrateStorage: () => (etat) => {
         setMouvementsClubs(etat?.mouvementsClubs ?? {});
         setTransfertsSociaux(etat?.transfertsSociaux ?? []);
+        // ⚠️ Le thème vit sur <html>, pas dans React : il faut le reposer à la
+        // réhydratation, sinon le site repart en vert à chaque rechargement.
+        appliquerTheme(etat?.theme ?? 'vert');
+        // Idem pour la langue : elle vit dans un module, pas dans React.
+        definirLangue(etat?.langue ?? langueDuNavigateur());
       },
       partialize: (s) => ({
         joueur: s.joueur,
@@ -2114,6 +2573,8 @@ export const useGame = create<GameState>()(
         offres: s.offres,
         offresOuvertes: s.offresOuvertes,
         rythme: s.rythme,
+        theme: s.theme,
+        langue: s.langue,
         mouvementsClubs: s.mouvementsClubs,
         posts: s.posts,
         filSemaine: s.filSemaine,
@@ -2431,11 +2892,16 @@ function jouerMatch(j: Joueur, intensite: number): ResultatSemaine {
   const finition = essais > 0 ? ` Tu marques ${essais === 1 ? 'un essai' : `${essais} essais`} !` : '';
   const bobo = blessure ? ` 🚑 ${messageBlessure(blessure)}` : '';
   const details = ` (${stats.plaquages} plaquages${stats.butsTentes ? `, ${stats.butsReussis}/${stats.butsTentes} au pied` : ''}${stats.grattages ? `, ${stats.grattages} grattage` : ''}${stats.cartonsJaunes ? ', carton jaune 🟨' : ''})`;
-  const jugement = note >= 8
+  // ⚠️ Demande explicite : des résumés PLUS POSITIFS. Un 6/10 est une bonne
+  // sortie, pas un match raté — les paliers étaient calés trop haut et le
+  // joueur avait l'impression de passer à côté de toutes ses rencontres.
+  const jugement = note >= 8.4
     ? ' La presse te désigne homme du match.'
-    : note >= 6.5 ? ' Une prestation sérieuse.'
-      : note >= 5 ? ' Sans éclat, mais tu tiens ton rang.'
-        : ' Tu passes complètement à côté.';
+    : note >= 7.4 ? ' Tu sors sous les applaudissements du stade.'
+      : note >= 6.5 ? ' Une prestation pleine, saluée par le staff.'
+        : note >= 5.6 ? ' Du travail sérieux, sans un mot plus haut que l’autre.'
+          : note >= 4.6 ? ' Tu tiens ton rang, sans éclat.'
+            : ' Ce n’était pas ton jour.';
 
   return {
     emoji: essais > 0 ? '🎯' : '🏉',

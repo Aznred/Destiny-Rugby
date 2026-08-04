@@ -103,6 +103,9 @@ export interface Joueur {
   capitaine?: boolean; // porte le brassard
   relations?: Relation[]; // amitiés et rivalités du vestiaire
   entrainementSemaine?: number; // dernière semaine où l'on s'est entraîné
+  // ⚠️ LE SECTEUR TRAVAILLÉ EN PERMANENCE. On le choisit une fois, la séance
+  // se fait TOUTE SEULE chaque semaine, et on peut en changer quand on veut.
+  entrainementFocus?: AttributId;
   // --- Lot 6 : ce que le staff et le public pensent de toi ---
   confianceCoach?: number; // 0-100, 50 par défaut — pèse sur le temps de jeu
   popularite?: number; // 0-100, 50 par défaut — pèse sur la réputation et le marché
@@ -261,6 +264,11 @@ export type SuccesDebloques = Record<string, number>;
 
 // Rythme de jeu choisi par le joueur.
 export type Rythme = 'semaine' | 'saison';
+
+// L'ambiance du site. Elle ne repeint que le FOND (la rampe `--pelouse-*` du
+// design system) : l'or, le cuir et la craie restent, quelle que soit la
+// couleur choisie. Voir `index.css` et `appliquerTheme` (store/useGame.ts).
+export type Theme = 'vert' | 'bleu' | 'rouge';
 
 export interface EntreeJournal {
   id: string;

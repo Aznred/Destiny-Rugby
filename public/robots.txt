@@ -1,0 +1,13 @@
+# Destiny Rugby — https://destiny-rugby.fr
+# Le jeu est entièrement public : tout est indexable.
+
+User-agent: *
+Allow: /
+
+# Ces dossiers pèsent lourd (1 574 portraits, 715 écussons, les modèles 3D) et
+# n'apportent rien à l'indexation : on économise le budget de crawl.
+Disallow: /photos/
+Disallow: /m3d/
+Disallow: /assets/
+
+Sitemap: https://destiny-rugby.fr/sitemap.xml

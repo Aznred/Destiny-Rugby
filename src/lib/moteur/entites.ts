@@ -10,7 +10,7 @@
 
 import type { Coequipier } from '../effectif';
 import type { PosteId } from '../../types';
-import { AXE, LARGEUR, borner, type Cote, type Vec } from './terrain';
+import { AXE, LARGEUR, LONGUEUR, borner, type Cote, type Vec } from './terrain';
 
 export interface StatsMatch {
   metres: number;            // mètres gagnés ballon en main
@@ -124,11 +124,21 @@ function n(v: number | undefined, defaut: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : defaut;
 }
 
+// Les huit avants portent les maillots 1 à 8 : c'est ce qui décide si un pion
+// est un avant, y compris pour le banc (où le maillot ne dit plus rien).
+const AVANTS = new Set<PosteId>(ORDRE_MAILLOTS.slice(0, 8));
+
 export function creerPion(
   c: Coequipier, index: number, cote: Cote, moi: boolean, attributs?: AttributsPion,
 ): Pion {
-  const poste = ORDRE_MAILLOTS[index % 15] ?? c.poste;
-  const avant = (index % 15) < 8;
+  // ⚠️ LE BANC GARDE SON POSTE. `ORDRE_MAILLOTS[index % 15]` renvoyait le
+  // remplaçant n°21 (un demi de mêlée, choisi comme tel par `composer`) au
+  // poste de troisième ligne, et le n°23 au poste de numéro 8 — d'où le « demi
+  // de mêlée en 8 » vu sur la feuille de match, et un banc entièrement composé
+  // d'avants (`index % 15 < 8`). Au-delà du quinze de départ, le poste est
+  // celui que la composition a attribué.
+  const poste = index < 15 ? (ORDRE_MAILLOTS[index] ?? c.poste) : c.poste;
+  const avant = index < 15 ? index < 8 : AVANTS.has(poste);
   const g = borner(c.note, 20, 99);
   const a = attributs ?? {};
 
@@ -200,6 +210,11 @@ export function deplacer(p: Pion, dt: number): number {
   const pas = Math.hypot(p.vitesse.x, p.vitesse.y) * dt;
   p.pos.x += p.vitesse.x * dt;
   p.pos.y += p.vitesse.y * dt;
+  // ⚠️ ON BORNE LES DEUX AXES. Seule la largeur l'était : un porteur pouvait
+  // dériver derrière la ligne de ballon mort (mesuré : ballon à x = −9 sur un
+  // terrain de 0 à 122), le ruck se formait là, et les trente joueurs se
+  // rassemblaient dans le coin — c'est ça, la « boule ».
+  p.pos.x = borner(p.pos.x, -1.5, LONGUEUR + 1.5);
   p.pos.y = borner(p.pos.y, -1.5, LARGEUR + 1.5);
 
   p.stats.distanceParcourue += pas;

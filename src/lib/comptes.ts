@@ -17,7 +17,10 @@ import { COMPTES } from '../data/social';
 import { graine } from './championnat';
 import { avatarPourCompte, comptesLambda } from './avatars';
 
-// Bannières possibles (dégradés) — choisies de façon déterministe.
+// Bannières possibles — choisies de façon déterministe. ⚠️ Elles étaient six :
+// une bannière sur six comptes était identique à la précédente. Vingt motifs,
+// dont des dégradés à trois arrêts et des trames, plus la bannière AUX COULEURS
+// DU CLUB pour les clubs et leurs joueurs (voir `banniereDuClub`).
 export const BANNIERES = [
   'linear-gradient(135deg,#0c2418,#237a44)',
   'linear-gradient(135deg,#1a1305,#e8b23a)',
@@ -25,11 +28,124 @@ export const BANNIERES = [
   'linear-gradient(135deg,#2b0a0a,#c1121f)',
   'linear-gradient(135deg,#160b2b,#7a3ff5)',
   'linear-gradient(135deg,#0b2b28,#00ba7c)',
+  'linear-gradient(160deg,#04121c,#0d5c6b,#9ae6b4)',
+  'linear-gradient(160deg,#1c0407,#7a1027,#f2a25c)',
+  'linear-gradient(200deg,#101418,#2c3e50,#95a5a6)',
+  'linear-gradient(135deg,#0d1b0f,#3f7a1e,#d9e64a)',
+  'linear-gradient(135deg,#1b0f22,#54276f,#e0a6ff)',
+  'linear-gradient(120deg,#00131f,#00527a,#7fd4ff)',
+  'linear-gradient(120deg,#241a05,#8a6a12,#ffd97a)',
+  'linear-gradient(135deg,#0a0a0a,#333333,#8c8c8c)',
+  'linear-gradient(135deg,#12261f,#1f6f52,#7be2b8)',
+  'linear-gradient(135deg,#2a1206,#a5490d,#ffb266)',
+  'repeating-linear-gradient(45deg,#0c2418,#0c2418 12px,#123324 12px,#123324 24px)',
+  'repeating-linear-gradient(-45deg,#1a0d1f,#1a0d1f 10px,#2a1533 10px,#2a1533 20px)',
+  'radial-gradient(circle at 30% 20%,#1d9bf0,#0a1a2b 70%)',
+  'radial-gradient(circle at 70% 30%,#e8b23a,#1a1305 70%)',
 ];
 
 export function banniereDe(cle: string): string {
   const rng = graine('banniere#' + cle);
   return BANNIERES[Math.floor(rng() * BANNIERES.length)];
+}
+
+// La bannière AUX COULEURS DU CLUB : un compte de club ou de joueur porte les
+// couleurs de son maillot, comme sur un vrai réseau.
+export function banniereDuClub(nom: string): string {
+  const club = competitionDuClub(nom)?.clubs.find((c) => c.nom === nom) as
+    { c1?: string; c2?: string } | undefined;
+  if (!club?.c1) return banniereDe(nom);
+  const rng = graine('bcl#' + nom);
+  const angle = 110 + Math.floor(rng() * 90);
+  return `linear-gradient(${angle}deg, #0a0f0c, ${club.c1}, ${club.c2 ?? club.c1})`;
+}
+
+// ---------------------------------------------------------------------------
+// ⚠️ LA NOTORIÉTÉ SUIT LA DIVISION, ET SEULEMENT ELLE
+// ---------------------------------------------------------------------------
+// Un club de Régionale 3 affichait jusqu'à 400 000 abonnés, autant que le Stade
+// Toulousain, et un supporter anonyme 200 000. Demande explicite : « les clubs
+// de régionale, fédérale ou nationale ne sont pas connus — 500 abonnés max en
+// régionale, 3 000 en fédérale, 20 000 en nationale ».
+//
+// La table est indexée par le NIVEAU de la compétition (0 = élite mondiale,
+// 1 = Top 14, 3 = Nationale, 5-7 = Fédérales, 8-10 = Régionales).
+const ABONNES_CLUB: Record<number, [number, number]> = {
+  0: [40_000, 600_000], 1: [60_000, 900_000], 2: [15_000, 90_000],
+  3: [4_000, 20_000], 4: [1_200, 7_000], 5: [600, 3_000],
+  6: [400, 2_000], 7: [250, 1_400], 8: [120, 700],
+  9: [80, 550], 10: [60, 500],
+};
+
+// Un joueur ne dépasse jamais l'audience de son club — sauf les stars, qui la
+// débordent largement. Facteur appliqué à l'audience du club.
+function fourchette(niveau: number): [number, number] {
+  return ABONNES_CLUB[Math.max(0, Math.min(10, niveau))] ?? ABONNES_CLUB[10];
+}
+
+export function niveauDuClub(nom: string): number {
+  return competitionDuClub(nom)?.niveau ?? 8;
+}
+
+export function abonnesClub(nom: string): number {
+  const [bas, haut] = fourchette(niveauDuClub(nom));
+  const rng = graine('abonnesclub#' + nom);
+  // Racine du tirage : la plupart des clubs sont près du bas de la fourchette,
+  // quelques-uns tirent vers le haut. C'est la vraie forme d'une audience.
+  return Math.round(bas + (haut - bas) * Math.pow(rng(), 1.7));
+}
+
+// L'audience d'un JOUEUR : sa note pèse, mais son étage pèse plus. Un pilier de
+// Fédérale 2 noté 55 n'a pas 3 000 abonnés — il en a deux cents.
+export function abonnesJoueur(nom: string, club: string, note: number): number {
+  const [bas, haut] = fourchette(niveauDuClub(club));
+  const rng = graine('abonnes#' + nom);
+  // ⚠️ La courbe est TRÈS raide : seules les stars débordent l'audience de leur
+  // club. Un joueur noté 60 au Stade Toulousain n'a pas 150 000 abonnés — il en
+  // a quelques milliers. C'est l'exposant qui fait ça.
+  const part = Math.min(1.4, Math.pow(Math.max(0, note - 25) / 62, 5.5)) * (0.5 + rng());
+  const base = (bas + (haut - bas) * 0.45) * part;
+  return Math.round(Math.max(30, base));
+}
+
+// ---------------------------------------------------------------------------
+// L'AUDIENCE DU JOUEUR INCARNÉ
+// ---------------------------------------------------------------------------
+// ⚠️ Demande explicite : « les abonnements de notre joueur doivent augmenter en
+// fonction du niveau et de la popularité du club où il va ». Son compteur ne
+// bougeait QUE lorsqu'il publiait : on pouvait signer au Stade Toulousain et
+// rester à 300 abonnés, ou descendre en Régionale 3 en en gardant 80 000.
+//
+// `abonnesCible` donne l'audience que MÉRITE le joueur — celle qu'aurait un
+// joueur réel de son niveau, dans ce club-là (donc dans ce championnat-là),
+// pondérée par sa réputation. Le store fait converger le compteur vers elle :
+// vite à la hausse (on gagne des abonnés en signant à Toulouse), lentement à la
+// baisse (une audience acquise ne s'évapore pas en une saison).
+// ⚠️ Ce n'est PAS `abonnesJoueur` : la courbe de celui-ci est volontairement
+// très raide (exposant 5,5) pour que les 6 306 joueurs réels restent anonymes
+// — mais elle est plancherée à 30, si bien qu'un joueur incarné débutant en
+// Top 14 et le même en Régionale 3 affichaient exactement le même chiffre, et
+// que rien ne bougeait jamais. Ici, l'AUDIENCE DU CLUB (donc son étage) est le
+// socle, et le niveau puis la réputation en prennent une part croissante.
+export function abonnesCible(nom: string, club: string, note: number, reputation: number): number {
+  const [bas, haut] = fourchette(niveauDuClub(club));
+  const audienceClub = bas + (haut - bas) * 0.45;
+  const niveau = Math.max(0, Math.min(1, (note - 25) / 60));
+  const renom = Math.max(0, Math.min(1, (reputation ?? 0) / 100));
+  // 0,4 % de l'audience du club pour un joueur du groupe, jusqu'à ~80 % pour
+  // une star internationale : la hiérarchie tient à tous les étages.
+  const part = 0.004 + Math.pow(niveau, 3.2) * 0.55 + Math.pow(renom, 3) * 0.25;
+  const rng = graine('abonnesmoi#' + nom);
+  return Math.round(Math.max(25, audienceClub * part * (0.8 + rng() * 0.4)));
+}
+
+// Un pas vers la cible. `part` = vitesse de rattrapage (0 à 1). La descente est
+// trois fois plus lente que la montée.
+export function rapprocherAbonnes(
+  actuel: number, cible: number, part: number,
+): number {
+  const vitesse = cible >= actuel ? part : part / 3;
+  return Math.max(0, Math.round(actuel + (cible - actuel) * vitesse));
 }
 
 // Identifiant @ propre et stable pour un nom donné.
@@ -44,8 +160,55 @@ export function pseudoStable(nom: string, suffixe = ''): string {
   return (base || 'compte') + suffixe;
 }
 
+// ⚠️ PLUS DE BIO IDENTIQUE POUR TOUT LE MONDE. Chaque joueur avait « poste ·
+// club · âge » et chaque supporter « Supporter. » : sur un réseau calqué sur X,
+// ça se voit immédiatement. Les bios sont désormais tirées d'un pool, à la
+// graine du nom — donc uniques, variées et stables.
+const BIOS_JOUEUR = [
+  '{poste} au {club}. {age} ans. Le rugby, rien d’autre.',
+  '{poste} · {club} · formé au club, et fier de l’être.',
+  '{age} ans, {poste}. On lâche rien. 🏉',
+  '{poste} du {club}. Famille, boulot, rugby — dans le désordre.',
+  '{club} · {poste}. Chaque dimanche, on remet ça.',
+  '{poste}. {club}. Le maillot avant tout.',
+  '{age} ans · {poste} au {club}. Toujours prêt.',
+  '{poste} · {club}. Un jour à la fois, un match à la fois.',
+  'Je joue {poste} au {club}. Le reste, c’est du bruit.',
+  '{club} 🏉 {poste} · troisième mi-temps comprise.',
+];
+
+const BIOS_SUPPORTER = [
+  'Abonné depuis {annees} ans. Tribune {tribune}, place {place}.',
+  'Supporter du {club} de père en fils. On y croit toujours.',
+  'Je râle, je gueule, je reviens dimanche. {club} à vie.',
+  'Rugby, apéro, et {club}. Dans cet ordre.',
+  '{annees} ans d’abonnement, zéro regret. Allez le {club} !',
+  'Tribune {tribune}. Je crie plus fort que l’arbitre.',
+  'Le rugby c’était mieux avant, mais je regarde quand même tout.',
+  'Supporter, pas expert. Mais j’ai un avis sur tout.',
+  'Maillot du {club} au placard depuis {annees} ans. Il sent le souvenir.',
+  'Je viens pour le jeu. Je reste pour la buvette.',
+];
+
+const BIOS_HATER = [
+  'Je dis ce que tout le monde pense. Ça dérange ? Tant mieux.',
+  'Analyste du dimanche. Sans filtre, sans pitié.',
+  'On me dit trop dur. Je réponds : trop lucide.',
+  'Je note les joueurs. Ils n’aiment pas mes notes.',
+  'Ancien joueur (niveau départemental). Donc j’ai le droit.',
+  'Le rugby français va mal et je vous explique pourquoi.',
+];
+
+const TRIBUNES = ['Nord', 'Sud', 'Est', 'Ouest', 'Présidentielle', 'Populaire'];
+
+function bioDe(pool: string[], cle: string, vars: Record<string, string | number>): string {
+  const rng = graine('bio#' + cle);
+  let t = pool[Math.floor(rng() * pool.length)];
+  for (const k of Object.keys(vars)) t = t.split(`{${k}}`).join(String(vars[k]));
+  return t;
+}
+
 function compteJoueur(nom: string, club: string, poste: string, note: number, age: number): CompteSuivi {
-  const rng = graine('abonnes#' + nom);
   return {
     pseudo: pseudoStable(nom),
     nom,
@@ -53,19 +216,22 @@ function compteJoueur(nom: string, club: string, poste: string, note: number, ag
     avatar: avatarPourCompte(nom, 'joueur'),
     type: 'joueur',
     club,
-    bio: `${poste} · ${club} · ${age} ans`,
-    certifie: note >= 78,
-    abonnes: Math.round(300 + note * note * (1 + rng())),
-    banniere: banniereDe(nom),
+    bio: bioDe(BIOS_JOUEUR, nom, { poste: poste.toLowerCase(), club, age }),
+    // ⚠️ La certification suit la NOTORIÉTÉ, pas seulement la note : un très
+    // bon joueur de Fédérale n'est pas certifié sur X.
+    certifie: note >= 78 && niveauDuClub(club) <= 2,
+    abonnes: abonnesJoueur(nom, club, note),
+    // Le joueur porte les couleurs de son club.
+    banniere: banniereDuClub(club),
   };
 }
 
 function compteClub(nom: string): CompteSuivi {
   const comp = competitionDuClub(nom);
-  const rng = graine('abonnesclub#' + nom);
   // La VILLE entre dans la bio : c'est ce qui permet de trouver le Stade
   // Toulousain en cherchant « Toulouse ».
   const ville = comp?.clubs.find((c) => c.nom === nom)?.ville;
+  const niveau = niveauDuClub(nom);
   return {
     pseudo: pseudoStable(nom, '_officiel'),
     nom,
@@ -73,22 +239,31 @@ function compteClub(nom: string): CompteSuivi {
     type: 'club',
     club: nom,
     bio: `Compte officiel du ${nom}${ville ? ` · ${ville}` : ''}. ${comp?.nom ?? ''}`,
-    certifie: true,
-    abonnes: Math.round(8000 + rng() * 400_000),
-    banniere: banniereDe(nom),
+    // Un club amateur n'a pas de coche bleue.
+    certifie: niveau <= 3,
+    abonnes: abonnesClub(nom),
+    banniere: banniereDuClub(nom),
   };
 }
 
-function compteCompetition(id: string, nom: string, desc: string): CompteSuivi {
+const ABONNES_COMPETITION: Record<number, [number, number]> = {
+  0: [200_000, 1_400_000], 1: [300_000, 900_000], 2: [60_000, 200_000],
+  3: [20_000, 60_000], 4: [6_000, 20_000], 5: [3_000, 12_000],
+  6: [2_000, 8_000], 7: [1_500, 6_000], 8: [800, 3_000],
+  9: [600, 2_200], 10: [400, 1_800],
+};
+
+function compteCompetition(id: string, nom: string, desc: string, niveau = 1): CompteSuivi {
   const rng = graine('abonnescomp#' + id);
+  const [bas, haut] = ABONNES_COMPETITION[Math.max(0, Math.min(10, niveau))] ?? ABONNES_COMPETITION[10];
   return {
     pseudo: pseudoStable(nom),
     nom,
     avatar: `compet:${id}`,
     type: 'competition',
     bio: desc,
-    certifie: true,
-    abonnes: Math.round(50_000 + rng() * 900_000),
+    certifie: niveau <= 3,
+    abonnes: Math.round(bas + (haut - bas) * Math.pow(rng(), 1.4)),
     banniere: banniereDe(id),
   };
 }
@@ -110,8 +285,8 @@ export function annuaire(j: Joueur): CompteSuivi[] {
   };
 
   // 1. Les championnats et les coupes.
-  for (const c of COMPETITIONS) ajouter(compteCompetition(c.id, c.nom, `Compte officiel · ${c.pays}`));
-  for (const c of COUPES_EUROPE) ajouter(compteCompetition(c.id, c.nom, c.desc));
+  for (const c of COMPETITIONS) ajouter(compteCompetition(c.id, c.nom, `Compte officiel · ${c.pays}`, c.niveau));
+  for (const c of COUPES_EUROPE) ajouter(compteCompetition(c.id, c.nom, c.desc, 1));
 
   // 2. Les clubs du championnat du joueur, puis les autres clubs français.
   const sienne = COMPETITIONS.find((c) => c.id === j.division);
@@ -132,16 +307,41 @@ export function annuaire(j: Joueur): CompteSuivi[] {
   }
 
   // 4. La presse et les supporters (pool pré-écrit).
+  // ⚠️ Un supporter anonyme affichait jusqu'à 200 000 abonnés, autant qu'un
+  // média national. Chaque famille a maintenant sa propre fourchette.
+  const ABONNES: Record<string, [number, number]> = {
+    media: [40_000, 500_000], journaliste: [4_000, 90_000],
+    joueur: [500, 20_000], hater: [60, 4_000], fan: [30, 2_500],
+  };
   for (const c of COMPTES) {
     const type = (c.type === 'coequipier' ? 'joueur' : c.type) as CompteSuivi['type'];
+    const [bas, haut] = ABONNES[type] ?? ABONNES.fan;
+    const rng = graine('ab#' + c.pseudo);
+    const bio = c.type === 'journaliste'
+      ? bioDe(
+        ['Journaliste rugby. Je raconte, je ne juge pas (souvent).',
+          'Suit le Top 14 depuis {annees} ans. Terrain, vestiaire, buvette.',
+          'Rugby. Reportages, portraits, coulisses.',
+          'Journaliste. Les chiffres ne mentent pas, les joueurs si.'],
+        c.pseudo, { annees: 5 + Math.floor(rng() * 20) })
+      : c.type === 'media'
+        ? 'Toute l’actualité du rugby, en direct.'
+        : c.type === 'hater'
+          ? bioDe(BIOS_HATER, c.pseudo, {})
+          : bioDe(BIOS_SUPPORTER, c.pseudo, {
+            club: j.club,
+            annees: 2 + Math.floor(rng() * 30),
+            tribune: TRIBUNES[Math.floor(rng() * TRIBUNES.length)],
+            place: 1 + Math.floor(rng() * 40),
+          });
     ajouter({
       pseudo: c.pseudo,
       nom: c.nom,
       avatar: avatarPourCompte(c.nom, type),
       type,
-      bio: c.type === 'journaliste' ? 'Journaliste rugby.' : c.type === 'media' ? 'Média rugby.' : 'Supporter.',
+      bio,
       certifie: c.certifie,
-      abonnes: Math.round(2000 + graine('ab#' + c.pseudo)() * 200_000),
+      abonnes: Math.round(bas + (haut - bas) * Math.pow(rng(), 1.8)),
       banniere: banniereDe(c.pseudo),
     });
   }

@@ -10,13 +10,24 @@ import { Accueil } from './screens/Accueil';
 import { Creation } from './screens/Creation';
 import { Carriere } from './screens/Carriere';
 import { Profil } from './screens/Profil';
-import { Boutique } from './screens/Boutique';
-import { Pantheon } from './screens/Pantheon';
-import { Classement } from './screens/Classement';
-import { Championnats } from './screens/Championnats';
-import { Effectif } from './screens/Effectif';
-import { Tableau } from './screens/Tableau';
-import { Social } from './screens/Social';
+
+// ---------------------------------------------------------------------------
+// ⚠️ CE QUI N'EST PAS SUR LE CHEMIN D'ARRIVÉE EST CHARGÉ À LA DEMANDE
+// ---------------------------------------------------------------------------
+// Le premier écran d'un visiteur, c'est l'Accueil — puis la Création, puis la
+// Carrière. Les six autres écrans étaient pourtant importés en dur dans le
+// chunk principal : L'Ovale (1 156 lignes et tout l'annuaire), l'écran
+// Résultats (711 lignes, les coupes, les classements individuels), l'atlas des
+// 655 clubs… Tout cela était téléchargé et analysé AVANT le premier pixel,
+// alors qu'on n'y accède qu'après avoir créé un joueur. Chacun part désormais
+// dans son propre fichier, chargé au moment où on clique dessus.
+const Boutique = lazy(() => import('./screens/Boutique').then((m) => ({ default: m.Boutique })));
+const Pantheon = lazy(() => import('./screens/Pantheon').then((m) => ({ default: m.Pantheon })));
+const Classement = lazy(() => import('./screens/Classement').then((m) => ({ default: m.Classement })));
+const Championnats = lazy(() => import('./screens/Championnats').then((m) => ({ default: m.Championnats })));
+const Effectif = lazy(() => import('./screens/Effectif').then((m) => ({ default: m.Effectif })));
+const Tableau = lazy(() => import('./screens/Tableau').then((m) => ({ default: m.Tableau })));
+const Social = lazy(() => import('./screens/Social').then((m) => ({ default: m.Social })));
 // La cérémonie 3D tire tout Three.js derrière elle : on ne la charge qu'au
 // moment où un trophée est remporté (sinon elle alourdit le chunk principal).
 const TropheeGagne = lazy(() =>
@@ -24,12 +35,29 @@ const TropheeGagne = lazy(() =>
 );
 import { Offres } from './components/Offres';
 
+// Le temps qu'un écran arrive : quelques dixièmes de seconde, jamais une page
+// blanche. Le fond du stade reste en place, seul le contenu attend.
+function EcranEnRoute() {
+  return (
+    <div className="ecran-en-route" role="status" aria-live="polite">
+      <span className="ballon-attente" aria-hidden="true" />
+      <span>Chargement…</span>
+    </div>
+  );
+}
+
 export default function App() {
   const ecran = useGame((s) => s.ecran);
   const joueur = useGame((s) => s.joueur);
   const setEcran = useGame((s) => s.setEcran);
   const tropheesEnAttente = useGame((s) => s.tropheesEnAttente);
   const fermerTrophee = useGame((s) => s.fermerTrophee);
+  // ⚠️ CHANGER DE LANGUE REDESSINE TOUT. `t()` lit une variable de module (elle
+  // est appelée depuis des fonctions pures sans hook) : React n'a donc aucun
+  // moyen de savoir qu'un texte a changé. On s'abonne à la langue ici et on
+  // s'en sert comme `key` sur l'arbre — un seul remontage, instantané, plutôt
+  // qu'un contexte à traverser dans les cent fichiers de l'interface.
+  const langue = useGame((s) => s.langue);
   const [reglagesOuverts, setReglagesOuverts] = useState(false);
   // Nombre de trophées de la « salve » en cours, figé à l'ouverture de la file
   const [totalTrophees, setTotalTrophees] = useState(0);
@@ -53,7 +81,7 @@ export default function App() {
   }, [ecran, joueur, setEcran]);
 
   return (
-    <>
+    <div key={langue} className="racine">
       <Nav onReglages={() => setReglagesOuverts(true)} />
 
       <main>
@@ -71,13 +99,15 @@ export default function App() {
             {ecran === 'creation' && <Creation />}
             {ecran === 'carriere' && <Carriere onReglages={() => setReglagesOuverts(true)} />}
             {ecran === 'profil' && <Profil />}
-            {ecran === 'boutique' && <Boutique />}
-            {ecran === 'pantheon' && <Pantheon />}
-            {ecran === 'classement' && <Classement />}
-            {ecran === 'championnats' && <Championnats />}
-            {ecran === 'effectif' && <Effectif />}
-            {ecran === 'tableau' && <Tableau />}
-            {ecran === 'social' && <Social />}
+            <Suspense fallback={<EcranEnRoute />}>
+              {ecran === 'boutique' && <Boutique />}
+              {ecran === 'pantheon' && <Pantheon />}
+              {ecran === 'classement' && <Classement />}
+              {ecran === 'championnats' && <Championnats />}
+              {ecran === 'effectif' && <Effectif />}
+              {ecran === 'tableau' && <Tableau />}
+              {ecran === 'social' && <Social />}
+            </Suspense>
           </motion.div>
         </AnimatePresence>
         </Garde>
@@ -105,6 +135,6 @@ export default function App() {
         )}
       </AnimatePresence>
       <Analytics/>
-    </>
+    </div>
   );
 }

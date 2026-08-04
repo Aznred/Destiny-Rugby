@@ -126,24 +126,69 @@ export function retourDeMatch(
   };
 
   // ⚠️ LE POINT D'ATTRIBUT. Il faut une VRAIE bonne performance, il en reste au
-  // budget de la saison, on n'a pas 33 ans, et l'attribut n'est pas déjà au
-  // niveau du potentiel.
-  const facteurAge = j.age < 21 ? 1.5 : j.age < 25 ? 1.2 : j.age < 29 ? 0.9 : j.age < 32 ? 0.5 : 0.15;
+  // budget de la saison, et l'attribut n'est pas déjà au niveau du potentiel.
+  // ⚠️ L'ÂGE : aligné sur « potentiel jusqu'à 31 » — on progresse encore
+  // franchement jusqu'à 31 ans, et la porte ne se ferme complètement qu'à 36
+  // (elle claquait à 33, ce qui n'a plus de sens avec une limite d'âge à 44).
+  const facteurAge = j.age < 21 ? 1.5 : j.age < 25 ? 1.2 : j.age < 29 ? 0.9
+    : j.age < 32 ? 0.7 : j.age < 36 ? 0.3 : 0.1;
   const cible = attributTravaille(j.poste, s);
   const valeur = j.attributs?.[cible] ?? 50;
   const plafond = Math.min(99, j.potentiel ?? 99);
-  const possible = budgetRestant > 0 && j.age < 33 && note >= 7.2 && valeur < plafond;
+  const possible = budgetRestant > 0 && j.age < 36 && note >= 7.2 && valeur < plafond;
   const chance = borner((note - 7) / 9, 0, 0.45) * facteurAge;
   const attribut = possible && tirage() < chance ? cible : null;
 
-  const libellePoste = POSTE_PAR_ID[j.poste]?.nom ?? '';
-  const texte = note >= 8
-    ? `Match référence de ${j.nom} (${libellePoste}) : ${note}/10.`
-    : note >= 6.5
-      ? `Bonne prestation de ${j.nom} : ${note}/10.`
-      : note >= 5
-        ? `Match sans relief pour ${j.nom} : ${note}/10.`
-        : `Soirée compliquée pour ${j.nom} : ${note}/10.`;
+  return { note, deltas, attribut, texte: resume(j.nom, j.poste, note, s) };
+}
 
-  return { note, deltas, attribut, texte };
+// ---------------------------------------------------------------------------
+// LE RÉSUMÉ D'APRÈS-MATCH
+// ---------------------------------------------------------------------------
+// ⚠️ Demande explicite : « des résumés de match plus positifs ». Quatre phrases
+// couvraient toute l'échelle, et un 6,2/10 — soit une prestation tout à fait
+// correcte — s'affichait « Match sans relief » : le joueur avait l'impression
+// de rater tous ses matchs. Les paliers sont resserrés vers le haut, le ton est
+// celui d'un journaliste bienveillant, et surtout LE RÉSUMÉ CITE CE QU'ON A
+// BIEN FAIT (l'essai, les plaquages, les mètres, le pied) plutôt que de juger
+// dans le vide. La note, elle, ne bouge pas d'un dixième : l'étalonnage de
+// difficulté (`scripts/verifDifficulte.ts`) reste intact.
+const PALIERS: [number, string[]][] = [
+  [8.6, ['Match immense de {nom} ({poste})', 'Récital de {nom} ({poste})', '{nom} a survolé la rencontre']],
+  [7.6, ['Très grand match de {nom}', '{nom} a fait basculer la rencontre', 'Prestation majuscule de {nom}']],
+  [6.8, ['Belle prestation de {nom}', '{nom} a tenu son rang, et bien au-delà', 'Match plein de {nom}']],
+  [6.0, ['Prestation solide de {nom}', '{nom} a fait le travail', 'Match sérieux de {nom}']],
+  [5.2, ['Match honnête de {nom}', '{nom} a tenu sa place', 'Sortie appliquée de {nom}']],
+  [4.2, ['Match discret de {nom}', '{nom} est resté dans l’ombre', 'Sortie en demi-teinte pour {nom}']],
+  [0, ['Soirée compliquée pour {nom}', '{nom} n’y est jamais entré', 'Match à oublier pour {nom}']],
+];
+
+// Ce qu'on retient de la copie : on cherche le fait marquant AVANT de juger.
+function faitMarquant(poste: PosteId, s: StatsMatchJoueur): string {
+  const att = ATTENDU[poste] ?? ATTENDU.premier_centre;
+  const part = borner(s.minutes / 80, 0.1, 1);
+  if (s.essais >= 2) return `Un doublé, rien que ça.`;
+  if (s.essais === 1) return `Et un essai au bout.`;
+  if (s.butsTentes > 0 && s.butsReussis === s.butsTentes && s.butsReussis >= 3) {
+    return `${s.butsReussis}/${s.butsTentes} au pied : sans faute.`;
+  }
+  if (s.grattages >= 2) return `${s.grattages} ballons arrachés au sol.`;
+  if (s.plaquages >= att.plaquages * part * 1.35) return `Un abattage énorme en défense.`;
+  if (s.metres >= att.metres * part * 1.5) return `${Math.round(s.metres)} mètres avalés ballon en main.`;
+  if (s.cartons > 0) return `Le carton jaune coûte cher.`;
+  if (s.plaquagesManques >= 4) return `Trop de plaquages dans le vide, en revanche.`;
+  return '';
+}
+
+function resume(nom: string, poste: PosteId, note: number, s: StatsMatchJoueur): string {
+  const palier = PALIERS.find(([seuil]) => note >= seuil) ?? PALIERS[PALIERS.length - 1];
+  // Tirage stable : le même match donne toujours la même phrase, mais deux
+  // matchs voisins n'ont pas la même.
+  const cle = Math.abs(Math.round(note * 10) + s.minutes * 7 + s.plaquages * 13 + nom.length);
+  const modele = palier[1][cle % palier[1].length];
+  const tete = modele
+    .replace('{nom}', nom)
+    .replace('{poste}', POSTE_PAR_ID[poste]?.nom ?? '');
+  const fait = faitMarquant(poste, s);
+  return `${tete} : ${note}/10.${fait ? ` ${fait}` : ''}`;
 }

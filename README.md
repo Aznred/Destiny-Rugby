@@ -19,7 +19,7 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   renvoie un récit + des variations de stats structurées. Il est **sévère** :
   par défaut une action ne change presque rien, l'échec est fréquent, et on ne
   progresse jamais en le demandant — les gains passent par un plafond côté code
-  (+2 max par action, 4 points d'attributs par saison, rien après 33 ans) que
+  (+2 max par action, 4 points d'attributs par saison, plus rien après 36 ans) que
   ni le joueur ni l'IA ne peuvent contourner.
 - **Création de joueur** : nom, âge, **202 nations** (groupées par continent,
   avec leur vrai drapeau), championnat et club de départ (France ou étranger),
@@ -228,6 +228,57 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   swooshes, coutures) — chargé à la demande.
 - **100 % responsive** (mobile → desktop), thème « stade nocturne » soigné.
 - **Sauvegarde locale** automatique (localStorage).
+
+## 🌍 Le monde du jeu s'agrandit — 18 championnats de plus
+
+Aux 20 compétitions déjà présentes s'ajoutent **18 championnats et coupes** et
+**13 compétitions de sélections**, tirés du dossier `new league/` :
+
+| | |
+|---|---|
+| Europe de l'Ouest | Serie A Elite (Italie), División de Honor (Espagne), CN Honra (Portugal), All-Ireland League, Super Series (Écosse), Welsh Premiership, Super Rygbi Cymru, Welsh Challenge Cup, Championship Cup (Angleterre), Ereklasse (Pays-Bas) |
+| Europe de l'Est | Didi 10 (Géorgie), Liga Națională (Roumanie), Ekstraliga (Pologne), Extraliga (Tchéquie), Premier League (Russie), SM-sarja (Finlande) |
+| Hors d'Europe | Top 12 argentin, Heartland Championship (Nouvelle-Zélande) |
+| Sélections | Rugby Europe Championship / Trophy / Conference, Oceania Cup, Americas Championship, Americas Pacific Challenge, Autumn Nations Cup, IRB Tbilisi Cup, Nations Cup, Pacific Challenge, The Rugby Championship (+ U20), World Rugby U20 Trophy |
+
+**183 clubs, 247 écussons officiels, 5 070 joueurs et 86 équipes nationales.**
+Les clubs et leur hiérarchie sont **réels** (la note de chaque club est calculée
+sur les points et la différence de points par match de la vraie saison) ; les
+**joueurs sont générés**, avec des noms du pays et une part d'étrangers propre à
+chaque championnat — un club géorgien aligne des Giorgi Chkhaidze, pas des Léo
+Etcheverry, mais on y croise quand même un Argentin et un Australien.
+
+Régénérer : `node scripts/genNouvellesLigues.cjs` (la table des ligues et leur
+calibrage sont dans `scripts/nouvellesLigues.cjs`).
+
+## 🔍 Référencement et vitesse
+
+- **Balises complètes** : Open Graph, Twitter Card, canonique, JSON-LD
+  `VideoGame`, et une **image de partage 1200×630** générée sans dépendance
+  (`node scripts/genOgImage.cjs`). Plus `robots.txt`, `sitemap.xml` et un
+  manifeste web pour l'installation sur mobile.
+- **Premier chargement allégé** : la feuille de style passe de **503 à 112 Ko**
+  (les 250 drapeaux ne sont plus recopiés dedans en base 64), et sept écrans
+  plus le moteur de match ne sont téléchargés qu'au moment où l'on s'en sert.
+
+## 💸 Consommation de l'IA divisée par trois
+
+Une semaine de jeu coûtait **trois appels** à Groq (le fil, puis deux salves de
+commentaires) : elle en coûte **un seul**, commentaires compris. Les comptes à
+suivre ne passent plus par l'IA du tout — ils viennent de l'annuaire du jeu.
+Le compteur exact (appels, tokens envoyés, tokens reçus) s'affiche dans ⚙️.
+
+## 🌐 Sept langues, une ambiance au choix, et le téléphone d'abord
+
+- **Français, anglais, espagnol, italien, allemand, portugais, japonais.** La
+  langue du navigateur est détectée toute seule. Et ce n'est pas qu'un habillage :
+  le Maître du Jeu, les situations, les tweets et les messages privés sont ÉCRITS
+  dans ta langue, pas traduits après coup.
+- **Trois ambiances** — Pelouse, Nuit, Grenat. La couleur du stade change, les
+  dorures et le cuir restent.
+- **Jouable au pouce** : l'action principale reste en bas de l'écran en
+  permanence, la navigation défile d'un doigt, le match passe en plein écran et
+  rien ne déborde. Vérifié à 375 × 812.
 
 ## 🔑 Clé API Groq (pour le Maître du Jeu)
 

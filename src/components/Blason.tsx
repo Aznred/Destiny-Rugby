@@ -1,4 +1,16 @@
 import type { Club } from '../types';
+import { LOGO_PAR_EQUIPE } from '../data/mondeReel';
+import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
+
+// ⚠️ DEUX SOURCES D'ÉCUSSONS DE SÉLECTION. Les compétitions historiques
+// viennent de `mondeReel.ts`, les treize nouvelles (Rugby Europe Conference,
+// Oceania Cup, Americas Championship…) de `nouvellesLigues.ts` — elles
+// apportent 86 équipes nationales de plus, dont l'Andorre, le Kosovo ou les
+// Îles Salomon, qui n'existaient nulle part ailleurs.
+const LOGOS_EQUIPE: Record<string, string> = { ...LOGO_PAR_EQUIPE };
+for (const comp of COMPETITIONS_NATIONS_NOUVELLES) {
+  for (const e of comp.equipes) if (e.logo && !LOGOS_EQUIPE[e.nom]) LOGOS_EQUIPE[e.nom] = e.logo;
+}
 
 // Écusson d'un club. Les clubs couverts par la base réelle (Top 14, Pro D2,
 // Nationale et championnats du monde) affichent leur VRAI logo ; les autres
@@ -67,12 +79,39 @@ export function Blason({ club, taille = 40 }: { club: Club; taille?: number }) {
 }
 
 // Logo d'une équipe dont on n'a que le nom (sélections nationales, classements).
+//
+// ⚠️ IL VA LE CHERCHER TOUT SEUL. Les appelants passaient `nom` sans `logo`
+// (classement des sélections, en-tête d'un match international) et le composant
+// rendait un carré vide : aucune icône ne s'affichait dans les classements de
+// sélections. `LOGO_PAR_EQUIPE` (data/mondeReel.ts) contient l'écusson de
+// toutes les équipes des compétitions de nations — on s'en sert par défaut, et
+// à défaut on retombe sur les initiales plutôt que sur du vide.
 export function LogoEquipe({ nom, logo, taille = 28 }: { nom: string; logo?: string; taille?: number }) {
-  if (!logo) return <span className="blason-vide" style={{ width: taille, height: taille }} />;
+  const src = logo ?? LOGOS_EQUIPE[nom];
+  if (!src) {
+    const initiales = nom
+      .replace(/[^A-Za-zÀ-ÿ ]/g, '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((m) => m[0]?.toUpperCase())
+      .join('') || nom.slice(0, 2).toUpperCase();
+    return (
+      <svg width={taille} height={taille} viewBox="0 0 40 40" aria-label={nom}>
+        <circle cx="20" cy="20" r="19" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.22)" />
+        <text
+          x="20" y="26" textAnchor="middle" fontFamily="Archivo, sans-serif"
+          fontSize="16" fontWeight="700" fill="rgba(246,242,230,.85)"
+        >
+          {initiales}
+        </text>
+      </svg>
+    );
+  }
   return (
     <img
       className="blason-logo"
-      src={logo}
+      src={src}
       alt={nom}
       title={nom}
       width={taille}

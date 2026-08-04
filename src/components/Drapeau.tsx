@@ -1,4 +1,4 @@
-import 'flag-icons/css/flag-icons.min.css';
+
 import { CODE_PAR_NATION } from '../data/nations';
 
 // Vrai drapeau SVG (lib flag-icons, locale — les emojis drapeaux ne s'affichent

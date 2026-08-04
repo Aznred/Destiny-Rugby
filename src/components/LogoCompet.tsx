@@ -8,6 +8,13 @@
 // L'emoji reste le repli : une compétition sans logo fourni ne disparaît pas.
 
 import { LOGO_COMPETITION } from '../data/logosCompetitions';
+import { LOGO_COMPETITION_NOUVEAU } from '../data/nouvellesLigues';
+
+// ⚠️ DEUX TABLES, DEUX GÉNÉRATEURS. Les compétitions historiques viennent de
+// `logo league/` (scripts/copierLogosCompetitions.cjs), les 31 nouvelles ligues
+// et coupes de `new league/` (scripts/genNouvellesLigues.cjs). On les fusionne
+// ici plutôt que de faire écrire un générateur dans le fichier de l'autre.
+const LOGOS: Record<string, string> = { ...LOGO_COMPETITION, ...LOGO_COMPETITION_NOUVEAU };
 
 interface Props {
   id?: string; // id de compétition (top14, championsCup, sixNations…)
@@ -17,7 +24,7 @@ interface Props {
 }
 
 export function LogoCompet({ id, emoji = '🏉', taille = 26, titre }: Props) {
-  const src = id ? LOGO_COMPETITION[id] : undefined;
+  const src = id ? LOGOS[id] : undefined;
   if (!src) {
     return (
       <span className="logo-compet vide" style={{ fontSize: `${taille * 0.8}px` }} title={titre}>

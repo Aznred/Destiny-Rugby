@@ -1119,3 +1119,481 @@ par le direct et par le fond — sinon les deux auraient divergé.
 Exemple après 8 semaines de Top 14 : Kerr-Barlow 11 essais, Jauneau 103
 plaquages, Vergnes-Taillefer 29 grattages, Hastoy 32/33 au pied — tous issus de
 matchs réellement joués par le moteur.
+
+## Le match paie : feuille de match, progression, et passage de semaine
+
+Demande explicite : « fais que quand on termine voir le match ça passe à la
+semaine suivante » et « que notre joueur augmente ses stats en fonction de sa
+perf dans le match ».
+
+- **`src/lib/moteur/apresMatch.ts`** — `noterMatch()` note la prestation sur 10
+  en comparant ce qu'a fait le joueur à ce qu'on attend de SON POSTE
+  (`ATTENDU` : plaquages, mètres, essais par 80 min), au prorata du temps de
+  jeu. `retourDeMatch()` en tire la forme, le moral, la réputation, et **au plus
+  un point d'attribut**, sur l'attribut que la performance a mis en avant.
+  ⚠️ **Budget de 3 points par saison** (`BUDGET_MATCHS_PAR_SAISON`), rien après
+  33 ans, jamais au-delà du potentiel. C'est calibré pour ne PAS déplacer
+  l'étalonnage de difficulté (médiane 58) : ne pas l'augmenter sans relancer
+  `scripts/verifDifficulte.ts`.
+- **Le match remplace le bouton « Semaine suivante »** (`PanneauJoueur`) : quand
+  il y a une affiche, on ne voit plus que « ▶️ Jouer le match ». `MatchLive`
+  appelle `onTermine()` à la sirène, et refermer la fenêtre déclenche
+  `semaineSuivante()`. Fermer en cours de match (Échap) ne fait rien passer.
+- ⚠️ **Plus de récit contradictoire.** `semaineSuivante` n'ajoutait pas ses
+  statistiques simulées quand le match avait été regardé, mais il ajoutait quand
+  même SON RÉCIT — d'où « tu es resté sur le banc » juste à côté d'une feuille
+  de match à 80 minutes. Désormais `matchDejaVecu` neutralise aussi le récit,
+  les deltas, le compteur de matchs, les essais et la note.
+
+Vérification : `npx vite-node scripts/verifApresMatch.ts` (note par poste,
+budget d'attributs, plafonds d'âge et de potentiel, absence de double comptage).
+
+### Correctifs du moteur suite aux retours en jeu
+
+- ⚠️ **Les positions sont bornées SUR LES DEUX AXES.** Seule la largeur l'était :
+  un porteur pouvait dériver derrière la ligne de ballon mort (mesuré : ballon à
+  **x = −9** sur un terrain de 0 à 122), le ruck se formait là et les trente
+  joueurs s'agglutinaient dans le coin. `formerRuck` borne aussi le regroupement
+  dans l'aire de jeu.
+- **Force de séparation** (`separer`, tactique.ts) : toute paire à moins de
+  1,8 m est écartée, sauf au ruck, en mêlée, en touche et au maul. Joueurs
+  superposés : **4,3 → 1,8** sur 30.
+- **La largeur des pods est ancrée au POINT DE DÉPART de la phase** (`e.origine`),
+  pas au porteur : un bloc d'avants ne traverse plus le terrain derrière le
+  ballon. La profondeur, elle, suit le porteur.
+- **Les formations de phase arrêtée sont atteintes** : durées visuelles portées à
+  9 s (coup d'envoi, touche, après-essai) et 7 s (mêlée, renvoi), plein effort
+  pendant les arrêts, et `installerPlacement()` replace directement ceux qui ont
+  plus de 26 m à parcourir. Mesuré : **96 % des coups d'envoi et 90 % des touches
+  avec tout le monde à moins de 4 m de sa place** (contre 11 % et 3 % avant).
+- **Les avants touchent enfin le ballon** : `relais()` ajoute une passe au ras
+  entre avants deux fois sur cinq, et un temps de jeu sur trois repart sans
+  passer par le 9 (« pick and go »). Passes par équipe et par match : avants
+  1 à 2,4 · 9 → 86 · 10 → 55 · centres → 30 · ailiers → 1 à 2.
+
+## Sélections jouées, L'Ovale crédible, vie hors du terrain
+
+Cinq chantiers demandés en bloc. Tout est vérifiable sans navigateur :
+`npx vite-node scripts/verifInternational.ts`, `scripts/verifOvale.ts`,
+`scripts/verifSituations.ts`.
+
+### 1. Les compétitions de sélections se JOUENT (`src/lib/international.ts`)
+
+⚠️ `COMPETITIONS_NATIONS` (mondeReel.ts) ne contenait qu'un **classement figé**
+recopié de la saison réelle : pendant une fenêtre internationale, on ne voyait
+ni affiche, ni résultat, ni évolution.
+
+- `FORCE_NATION` (32 nations) donne la hiérarchie ; `jouerTestMatch()` en tire
+  un score, avec `scorePossible` — **0 score impossible sur toutes les journées**.
+- Trois compétitions tournantes calées sur le calendrier : **6 Nations**
+  (6 équipes, 5 journées, aller simple), **The Rugby Championship**, **tournée
+  d'automne** (12 équipes, 3 journées). Une saison sur quatre, la **Coupe du
+  monde** remplace la tournée (`estAnneeDeCoupeDuMonde`).
+- `fenetreInternationale(semaine, saison)` dit quelle compétition et quelle
+  journée se jouent — vérifié sur les 8 semaines internationales du calendrier.
+- **`effectifNational(nation, saison)`** compose un XV national à partir des
+  MEILLEURS joueurs réels du pays, tous clubs confondus (2 par poste, 30 au
+  total, vieillis à la saison). Mesuré : France 86,5 de moyenne sur les 23,
+  Italie 72,7. C'est ce qui permet de **jouer un match international avec le
+  moteur 2D**, exactement comme un match de club.
+- Écran 📊 Résultats : nouveau groupe **Sélections** dans le sélecteur, puce
+  **« Ma sélection »**, classement + programme journée par journée, et la
+  compétition s'ouvre d'office pendant une fenêtre internationale.
+- Panneau de carrière : **« ▶️ Jouer avec ta sélection »** remplace le match de
+  club quand on est convoqué (`MatchLive` reçoit `selection` et bascule sur les
+  effectifs nationaux).
+
+### 2. Les statistiques de fond couvrent coupes et sélections
+
+`simulerJourneeCoupe()` et `simulerJourneeInternationale()` (moteur/saison.ts)
+rejouent la journée avec le même moteur, sans rendu. `simulerStatsJournee()`
+(store) aiguille selon le type de semaine. ⚠️ `statsReelles` et
+`journeesReelles` **fusionnent** désormais les clés au lieu de les écraser : le
+championnat, la coupe et la sélection cohabitent. Mesuré : 6 Nations J1 →
+116 lignes en 0,7 s ; Champions Cup J1 → 363 lignes en 1,4 s.
+
+### 3. L'Ovale : audience réaliste, profils uniques
+
+⚠️ **Un club de Régionale 3 affichait jusqu'à 400 000 abonnés**, autant que le
+Stade Toulousain, et un supporter anonyme 200 000. `ABONNES_CLUB` (comptes.ts)
+indexe la fourchette sur le **niveau de la compétition** :
+
+| | mesuré (médiane / max) |
+|---|---|
+| Top 14 | 305 k / 818 k |
+| Pro D2 | 54 k / 85 k |
+| Nationale | 11 k / 18 k |
+| Fédérale 1 | 1,9 k / 3 k |
+| Régionale 1 | 346 / 686 |
+| Régionale 3 | 188 / 495 |
+
+- `abonnesJoueur()` : courbe **très raide** (exposant 5,5) — seules les stars
+  débordent l'audience de leur club. Toulouse noté 90 → 377 k ; noté 60 → 24 k ;
+  Pro D2 noté 70 → 5,2 k.
+- `statsDepuisVues()` **borne la cascade** : likes ≤ 34 % des vues, reposts ≤
+  likes. Mesuré : **0 incohérence sur 400 publications**.
+- **Bios tirées d'un pool par famille** (joueur, supporter, hater, journaliste)
+  avec variables (`{tribune}`, `{annees}`, `{place}`) : 326 bios distinctes sur
+  374 comptes, contre trois phrases recopiées avant.
+- **20 motifs de bannière** au lieu de 6, plus `banniereDuClub()` : un club et
+  ses joueurs portent **les couleurs du maillot**. 163 bannières distinctes.
+- La **certification** suit la notoriété : un club amateur ou un très bon joueur
+  de Fédérale n'a pas de coche bleue.
+- **`invitationCoequipier()`** (vie.ts) : une semaine sur deux, quelqu'un du
+  vestiaire écrit — barbecue, séance vidéo, padel, salle, visite à l'hôpital des
+  enfants, belote au club-house. 12 gabarits × 6 moments = 37 messages distincts
+  sur 60 tirages.
+
+### 4. Le panneau central : entraînement permanent, situations contextuelles
+
+- ⚠️ **On ne clique plus sur un secteur chaque semaine.** `entrainementFocus`
+  (types.ts) est le secteur travaillé EN PERMANENCE : `choisirFocus()` le pose,
+  `semaineSuivante()` déclenche la séance toute seule, et on en change quand on
+  veut. Le bouton actif est surligné.
+- **« 🎲 Évènement aléatoire » a disparu** : il faisait double emploi. Il ne
+  reste que **« 📖 La vie hors du terrain »**.
+- **`src/data/situations.ts`** — la grosse base : **30 situations, 85 choix**,
+  réparties en 8 catégories (vestiaire, argent, médias, perso, corps, nuit,
+  club, carrière). ⚠️ **Aucune ne parle du match en cours** : le match se joue
+  dans le moteur.
+- **Chaque situation est CONTEXTUELLE** (`quand`) : âge, forme, moral, division,
+  argent, contrat, confiance du staff. Mesuré : un espoir de 19 ans en Fédérale 2
+  voit 15 situations sur 30, un vétéran de 34 ans en voit 25 ; « le rituel du
+  vestiaire » n'est jamais proposé à 35 ans, « le corps parle » jamais à 19 ans.
+- `situationsVues` (store, persisté) évite les répétitions : **20 tirages
+  successifs → 20 situations distinctes**.
+- Avec une clé Groq, c'est le MJ qui écrit la situation ; sans clé, on pioche
+  dans la base. Même bouton, même rendu.
+
+### 5. Les conséquences dures (`src/lib/consequences.ts`)
+
+⚠️ **Une conséquence dure ne tombe JAMAIS par surprise** : elle est toujours la
+suite d'un choix explicite du joueur. Le jeu ne punit pas au hasard.
+
+| Conséquence | Effet |
+|---|---|
+| `suspension` | indisponible N semaines, réputation et confiance du staff en chute |
+| `prison` | idem + salaire suspendu, popularité effondrée |
+| `accident` | très longue indisponibilité, **vitesse et endurance perdues, potentiel raboté** |
+| `finDeCarriere` | blessure `carriere` → retraite immédiate |
+| `deces` | fin de carrière, hommage, entrée au Hall |
+| `exclusionClub` | **contrat rompu**, plus de club ni de salaire |
+| `relegationFinanciere` | le club est rétrogradé, salaires à −40 % |
+
+Huit issues de la base y mènent : parier sur sa propre compétition, prendre un
+produit non identifié, cacher une commotion, prendre le volant ivre, frapper
+quelqu'un en boîte, alerter la fédération sur les comptes du club, hausser le
+ton devant le président, braquer sec sous la pluie.
+
+**Les tweets aussi.** `lireDerapage()` distingue trois familles et **seulement
+trois** : propos discriminatoires → **rupture de contrat**, menaces →
+**12 semaines de suspension**, apologie des produits interdits → **18 semaines**.
+⚠️ Le clash, la punchline et le règlement de comptes restent autorisés : c'est
+le ton du réseau voulu par le projet. Vérifié : « L'arbitre est une
+catastrophe » ne déclenche rien, « sale race, retourne dans ton pays » rompt le
+contrat.
+
+
+## Correctifs de jeu (banc, double résumé, L'Ovale, saison passée)
+
+### ⚠️ LE BANC PORTE ENFIN LES MAILLOTS 16 À 23
+
+Deux bugs cumulés, visibles sur la feuille de match :
+
+- **`creerPion` écrasait le poste du banc.** `ORDRE_MAILLOTS[index % 15]`
+  renvoyait le remplaçant n°21 — un demi de mêlée choisi comme tel par
+  `composer` — au poste de troisième ligne, et le n°23 au poste de **numéro 8**
+  (« demi de mêlée en 8 »). Pire, `avant = index % 15 < 8` faisait des HUIT
+  remplaçants des avants. Au-delà du quinze de départ, le poste est désormais
+  celui que la composition a attribué (`entites.ts`).
+- **`gererRemplacements` donnait à l'entrant le numéro du sortant.** Plus aucun
+  maillot 16-23 n'apparaissait sur la feuille. Au rugby, le 18 qui remplace le 3
+  reste le 18 : il prend sa PLACE, pas son numéro.
+- **`BANC_TYPE` suit l'ordre conventionnel** : 16 talonneur, 17 et 18 piliers,
+  19 deuxième ligne, 20 troisième ligne, 21 demi de mêlée, 22 ouvreur,
+  23 trois-quarts. L'index + 16 EST le numéro de maillot.
+- **Le banc entre vraiment** (`MINUTE_ENTREE`) : le seul critère était
+  l'endurance, et dans un club aux gros moteurs (mesuré au Stade Toulousain)
+  **aucun** remplaçant ne foulait le terrain. Les changements suivent maintenant
+  l'HORLOGE — première ligne vers la 50ᵉ, gros de devant vers la 58ᵉ, lignes
+  arrière dans le dernier quart d'heure — la fatigue ne faisant qu'avancer
+  l'échéance de dix minutes. Mesuré : 16 remplacements par match (cible 10-16).
+
+Vérification : `npx vite-node scripts/verifBanc.ts`.
+
+### ⚠️ UN SEUL RÉSUMÉ DE MATCH PAR WEEK-END
+
+Le journal affichait **deux résumés contradictoires** : une feuille de match à
+32 minutes, suivie de « Tu n'es pas retenu dans le groupe ». `matchDejaVecu`
+exigeait `resultat.aJoue`, or `jouerMatch` (l'estimation) tire sa titularisation
+avec `Math.random()` tandis que le moteur utilise `estTitulaire` — les deux
+divergeaient forcément.
+
+- `matchDejaVecu` ne regarde plus que `matchRegarde` : dès que le match a été
+  suivi en direct, l'estimation est **entièrement** neutralisée (récit, deltas,
+  blessure, compteurs, défis, interviews d'après-match).
+- Le RÉSULTAT part avec les statistiques (`enregistrerMatchVecu(stats, contexte)`) :
+  l'entrée du journal devient « 📋 30 août · journée 1 — Victoire 34-11 contre
+  RC Vannes · 5/10 ». Une seule entrée, et le score y figure.
+- ⚠️ **Le tirage de blessure a déménagé** dans `enregistrerMatchVecu`, sur les
+  MINUTES RÉELLEMENT jouées : sans ça, regarder ses matchs rendait invulnérable.
+
+### Résumés de match plus positifs (demande explicite)
+
+Quatre phrases couvraient toute l'échelle, et un 6,2/10 — une prestation tout à
+fait correcte — s'affichait « Match sans relief ». Sept paliers désormais, trois
+formulations chacun, et **le résumé cite ce qu'on a bien fait** (`faitMarquant` :
+le doublé, le sans-faute au pied, les ballons grattés, l'abattage en défense).
+⚠️ **La note ne bouge pas d'un dixième** : l'étalonnage de difficulté est intact.
+
+### Limite d'âge 44 ans, potentiel jusqu'à 31 (demande explicite)
+
+- `AGE_RETRAITE_FORCEE` passe de 40 à **44 ans**, et elle est **vraiment
+  appliquée** : `saisonSuivante` raccroche d'office (le jeu se contentait
+  d'afficher « dernière ligne droite » sans jamais arrêter la carrière).
+- **On progresse vers son potentiel jusqu'à 31 ans** : le levier de TALENT BRUT
+  (`progression.ts`) se coupait à 27 ; il court jusqu'à 31, dégressif après 28.
+  `facteurAge` garde sa marche haute jusqu'à 28 ans. Le potentiel lui-même peut
+  encore monter jusqu'à 29 ans (26 avant). Le déclin, lui, reste à 31 ans.
+- Aligné partout : `apresMatch` (porte fermée à 36 ans, plus 33), `entrainer`
+  (`gainDUneSeance`), et `plafonnerDeltas` du MJ (36 / 32, plus 33 / 30).
+- ⚠️ **Réétalonné** (`npx vite-node scripts/verifDifficulte.ts`, 100 carrières) :
+  médiane **58 → 63**, 90ᵉ centile 80, maximum 86, carrières ≥ 80 : 12/100
+  (13 avant), ≥ 85 : 1/100. Le milieu de tableau monte, le sommet ne bouge pas.
+
+### Passer la saison n'escamote plus rien
+
+Trois choses restaient figées en mode « saison rapide » (ou en sautant à la trêve) :
+
+| | avant | maintenant |
+|---|---|---|
+| blessure | gardait son compte de semaines, à vie | décomptée des semaines sautées, guérison annoncée |
+| forme | +10 seulement | vraie préparation d'été (plancher 88, dégressif après 29 ans) |
+| entraînement | **jamais joué** | les 43 séances rattrapées d'un bloc (`gainDUneSeance`) |
+
+Mesuré : mode semaine 36 → 100 de plaquage sur 6 saisons, mode saison 32 → 100.
+Vérification : `npx vite-node scripts/verifSaison.ts`.
+
+### L'Ovale : un seul nombre d'abonnés, et une audience qui vit
+
+- ⚠️ **`suggestionsLocales` fabriquait ses propres comptes** — pseudo calculé
+  autrement (`pseudoDe` au lieu de `pseudoStable`), abonnés inventés sur place
+  (« 20 000 à 320 000 » pour un club, quel que soit son étage). Explorer
+  annonçait un chiffre, le profil du même compte en annonçait un autre — quand
+  il s'ouvrait. Les suggestions viennent maintenant **de l'annuaire**.
+- **`comptesGroq` a été supprimé** : l'IA inventait des comptes AVEC leur nombre
+  d'abonnés. L'annuaire en contient 374, gratuits, cohérents et déterministes.
+- **`abonnesCible(nom, club, note, réputation)`** (comptes.ts) : l'audience que
+  MÉRITE le joueur incarné, indexée sur l'audience de son club (donc son étage)
+  puis sur son niveau et sa réputation. `rapprocherAbonnes` fait converger le
+  compteur — 1,2 % par semaine, 22 % par saison, 45 % à la signature d'un
+  contrat — **vite à la hausse, trois fois plus lentement à la baisse**.
+  Mesuré : Top 14 débutant 5 900 · star 272 000 ; Nationale débutant 151 · star 6 950.
+
+### Le classement latéral suit la compétition de la semaine
+
+Il affichait TOUJOURS le championnat, même un week-end de Coupe d'Europe ou de
+Tournoi : pendant huit semaines de la saison, le panneau montrait un classement
+figé pendant qu'on jouait ailleurs. Désormais : semaine de coupe → la POULE
+européenne du club ; fenêtre internationale → la compétition de SA sélection ;
+le reste du temps → son championnat. Les divisions amateurs, qui jouent toute
+l'année, ne changent pas.
+
+### `LogoEquipe` va chercher l'écusson tout seul
+
+Les appelants passaient `nom` sans `logo` et le composant rendait un carré vide :
+**aucune icône dans les classements de sélections**. Il lit maintenant
+`LOGO_PAR_EQUIPE` (plus les 86 sélections des nouvelles compétitions), et
+retombe sur une pastille d'initiales plutôt que sur du vide.
+
+## ⚠️ ÉCONOMIE DE TOKENS GROQ (demande explicite)
+
+| | avant | maintenant |
+|---|---|---|
+| appels par semaine de jeu | **3** (fil + 2 salves de commentaires) | **1** (les commentaires sont dans la même réponse) |
+| comptes à suivre | 1 appel IA | **0** — l'annuaire du jeu |
+| `REGLES` (envoyé à chaque appel) | ~350 tokens | ~150 |
+| décor du monde | 12 coéquipiers détaillés + 10 rivaux, **à chaque appel** | `decorCourt` (1 ligne) partout sauf pour le fil |
+| `maxTokens` fil / réponses / message privé | 1300 / 900 / 400 | 1100 / 480 / 220 |
+| historique du MJ | 8 messages entiers | 6, tronqués à 600 caractères |
+| fiche du joueur | 9 lignes | 4, palmarès borné aux 3 derniers titres |
+
+**La consommation est mesurée** : `consoGroq()` (lib/groq.ts) cumule l'`usage`
+exact renvoyé par l'API, et ⚙️ Réglages l'affiche (appels, tokens envoyés,
+tokens reçus, remise à zéro). On ne peut pas économiser ce qu'on ne mesure pas.
+
+## SEO et premier chargement (destiny-rugby.fr)
+
+- **`index.html`** : titre sans emoji (Google le retire de ses résultats),
+  description réécrite, `canonical`, `robots`, **Open Graph et Twitter Card**
+  complets, **JSON-LD `VideoGame`**, `preconnect`. Et un bloc **`<noscript>`**
+  qui décrit le jeu : l'application est rendue par React, la page servie à un
+  crawler qui n'exécute pas JavaScript était littéralement vide.
+- **`public/robots.txt`** (les 117 Mo de `photos/` et les `.glb` sont exclus du
+  budget de crawl), **`public/sitemap.xml`**, **`public/site.webmanifest`**.
+- **`public/og.png`** — 1200×630, **généré** par `node scripts/genOgImage.cjs` :
+  un encodeur PNG écrit avec `zlib` (aucune dépendance), pelouse nocturne,
+  ballon de cuir liseré d'or, superéchantillonné ×3 pour l'anti-aliasing.
+- ⚠️ **Les drapeaux ne sont plus inlinés** (`assetsInlineLimit: 0`) :
+  `flag-icons` recopiait ses 250 SVG en `data:` URI dans la feuille de style —
+  **503 Ko de CSS (102 Ko gzip) à analyser avant le premier pixel**. Mesuré
+  après : **112 Ko (24 Ko gzip)**, les drapeaux étant devenus des fichiers
+  chargés à la vue. ⚠️ L'import de `flag-icons` a déménagé dans `main.tsx` :
+  rattaché à un écran paresseux, il laissait les drapeaux sans style sur
+  l'écran de création.
+- **Écrans chargés à la demande** : Boutique, Panthéon, Classement, Championnats,
+  Effectif, Résultats, L'Ovale, plus `MatchLive`. Et **le moteur de match**
+  (chunk `moteur`, 106 Ko) : `estTitulaire` a déménagé dans
+  `moteur/titulaire.ts` et `simulerStatsJournee` fait un `import()` — le store
+  étant chargé dès l'accueil, les 3 500 lignes du moteur partaient sinon dans
+  le chunk principal.
+
+## Le reste du monde : 18 championnats et 13 compétitions de sélections
+
+Source : le dossier **`new league/`** (flashscore_rugby_data.json + un dossier
+de logos par compétition).
+
+| Fichier | Rôle |
+|---|---|
+| `scripts/nouvellesLigues.cjs` | **LA table** : id, nom, pays, dossier de logos, clé dans le JSON, `niveau` (0-10), `echelle` [note du dernier, note du premier], nation des joueurs, part d'étrangers. C'est ici — et nulle part ailleurs — qu'on ajoute ou recalibre une ligue. |
+| `scripts/nomsPays.cjs` | Les pools de prénoms et de noms par pays (22 nations) et la table des nations qui exportent des joueurs. |
+| `scripts/genNouvellesLigues.cjs` | Le générateur : copie les écussons, calcule la note de chaque club depuis son classement réel, **génère un effectif de 30 joueurs par club**, calcule la force de chaque sélection. **Relancer** : `node scripts/genNouvellesLigues.cjs`. |
+| `src/data/nouvellesLigues.ts` | ⚠️ **GÉNÉRÉ**. 18 compétitions, **183 clubs**, **5 070 joueurs**, 13 compétitions de sélections, 86 équipes nationales. Encodage compact, comme `effectifsReels.ts`. |
+
+**Ce qui est réel** : les clubs, leur hiérarchie (calculée moitié rang, moitié
+valeur — points et différence de points par match de la vraie saison) et leurs
+**247 écussons**. **Ce qui est généré** : les joueurs — les données ne
+fournissent aucun effectif.
+
+⚠️ **La mixité est voulue** (demande explicite) : chaque championnat tire ses
+noms dans le pool de SON pays, plus une part d'étrangers propre à la ligue
+(6 % en Argentine, 32 % en Serie A Elite). Mesuré : Batumi = 27 Géorgiens,
+1 Argentin, 1 Français, 1 Australien ; El Salvador = 24 Espagnols et 6 étrangers
+de 5 nations différentes.
+
+Les 18 championnats : Championship Cup (Angleterre), Top 12 argentin, Super
+Series (Écosse), División de Honor, SM-sarja (Finlande), Didi 10 (Géorgie),
+All-Ireland League, Serie A Elite, Heartland Championship (NZ), Ereklasse
+(Pays-Bas), Welsh Premiership, Super Rygbi Cymru, Welsh Challenge Cup,
+Ekstraliga (Pologne), CN Honra (Portugal), Extraliga (Tchéquie), Liga Națională
+(Roumanie), Premier League russe.
+
+Les 13 compétitions de sélections : Oceania Cup, Rugby Europe Championship /
+Trophy / Conference, Americas Championship, Americas Pacific Challenge, Autumn
+Nations Cup, IRB Tbilisi Cup, Nations Cup, Pacific Challenge, The Rugby
+Championship (et son U20), World Rugby U20 Trophy.
+
+⚠️ **`forceNation` et la liste des compétitions sont MÉMOÏSÉES À LA DEMANDE**,
+jamais construites en tête de module : une boucle exécutée à l'évaluation de
+l'import laissait la constante dans sa zone morte au moindre cycle
+(`ReferenceError` au démarrage, écran blanc). Les 32 nations calibrées à la
+main gardent la priorité sur les forces calculées.
+
+
+## Ambiance de couleur et confort sur téléphone
+
+### Trois ambiances (demande explicite)
+
+⚠️ **Tout le thème tient dans six variables.** Le design system entier est bâti
+sur la rampe `--pelouse-*` (le fond, les cartes, les bordures, les jauges) : il
+suffit de la redéfinir dans un bloc `:root[data-theme=…]` d'`index.css` pour
+repeindre le site, sans toucher une seule règle ailleurs. **Pelouse** (défaut),
+**Nuit** (bleu), **Grenat** (rouge). L'or, le cuir et la craie ne bougent pas —
+ce sont eux qui donnent au jeu son identité « stade nocturne », quelle que soit
+la couleur choisie.
+
+- Le nom des variables reste `--pelouse-*` : ce sont des NIVEAUX de fond, pas
+  une couleur, et les renommer casserait 2 900 lignes de CSS pour rien.
+- `appliquerTheme()` (store) pose `data-theme` sur `<html>` et met à jour la
+  balise `theme-color` : sans elle, la barre d'adresse du téléphone reste verte
+  sur un thème rouge et la découpe se voit. Elle est **reposée à la
+  réhydratation**, sinon le site repart en vert à chaque rechargement.
+- Le choix se fait dans ⚙️ Réglages (« Ambiance »), et il est persisté.
+
+### Téléphone d'abord (demande explicite)
+
+Le jeu TENAIT sur mobile — rien ne débordait — mais il n'y était pas AGRÉABLE :
+l'écran de carrière devient un long défilement (fiche du joueur, classement,
+journal), et le bouton qui fait avancer le jeu se retrouvait à plusieurs écrans
+du fil qu'on est en train de lire.
+
+- **`.barre-jouer`** — une barre FIXE en bas de l'écran, sous 900 px, avec la
+  semaine en cours et l'action principale (▶️ Jouer le match, ou Semaine
+  suivante). ⚠️ Rendue par `createPortal(document.body)` : le `backdrop-filter`
+  des `.carte` crée un bloc conteneur qui piège les `position: fixed`.
+- **La navigation devient une bande qui défile** au lieu de passer sur deux
+  rangées de boutons de 28 px de haut.
+- **Rien à viser en dessous de 44 px** : barre d'actions du panneau à
+  3 colonnes (56 px de haut), secteurs d'entraînement à 2 colonnes, suggestions
+  et champs à 46 px. ⚠️ **16 px sur tous les champs de saisie** : en dessous,
+  iOS zoome automatiquement à la mise au point et laisse la page décalée.
+- **Le match en direct passe en plein écran** (`100dvh`, sans marge ni coin
+  arrondi) : le terrain gagne 25 % de largeur. Son en-tête passe en flex — en
+  grille, la croix de fermeture (absolue) gardait sa colonne et renvoyait
+  l'équipe visiteuse à la ligne.
+- **Encoches et barre de gestes** respectées (`env(safe-area-inset-*)`), et
+  `background-attachment: scroll` sous 900 px : un fond fixe est recomposé à
+  chaque image et saute avec la barre d'adresse iOS.
+- **L'atlas des clubs passe à deux colonnes** (une seule sous 420 px), les
+  classements masquent leurs colonnes secondaires, et les tableaux larges
+  (poules de coupe, arbre de phase finale) défilent DANS leur conteneur plutôt
+  que d'emporter la page entière de côté.
+
+Vérifié à 375 × 812 : **aucun débordement horizontal**, barre d'action toujours
+sous le pouce, match lisible en plein écran.
+
+## Le jeu en sept langues
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/i18n.ts` | Le socle, **sans aucune dépendance** (40 lignes ; i18next pèserait plus lourd que tous les textes réunis) : `t()`, `tn()`, la détection de la langue du navigateur, et **`consigneDeLangue()`**. |
+| `src/data/textes.ts` | Le dictionnaire. Clés `zone.element`, **le français obligatoire** (le type l'impose), les six autres langues facultatives. |
+
+Langues : **français, anglais, espagnol, italien, allemand, portugais, japonais**.
+La langue du navigateur est détectée au premier lancement — un joueur italien qui
+arrive sur destiny-rugby.fr n'a pas à chercher le sélecteur.
+
+### ⚠️ CE QUI REND LE JEU RÉELLEMENT MULTILINGUE
+
+Traduire les boutons ne sert à rien ici : **l'essentiel de ce qu'on lit est écrit
+à l'exécution** par Groq — le récit du Maître du Jeu, les situations, les tweets,
+les messages privés, le coaching en direct. On ne les traduit donc pas : on
+demande au modèle d'écrire DIRECTEMENT dans la langue du joueur.
+
+`consigneDeLangue()` est ajoutée en tête de **chaque** prompt (`lib/groq.ts`,
+`lib/ia.ts`, `lib/groqSocial.ts`, `lib/moteur/consignes.ts`). Elle est rédigée en
+anglais — c'est la langue dans laquelle les modèles suivent le mieux une
+instruction de langue, y compris pour produire du japonais — et elle protège
+explicitement les noms propres : clubs, compétitions et joueurs ne se traduisent
+jamais. **Elle est vide en français** : pas un token gaspillé pour le cas par
+défaut.
+
+### Les règles du socle
+
+- **Le français est la source.** Une clé absente d'une langue retombe sur le
+  français : jamais de trou à l'écran, jamais de `missing.translation.key`. On
+  peut donc ajouter un écran sans traduire sept langues dans la même respiration.
+- **La langue vit dans un module, pas dans React** : `t()` est appelée depuis des
+  fonctions pures (libellés de postes, formatage) qui n'ont pas de hook. Le store
+  la synchronise (`setLangue` → `definirLangue`), et la repose à la
+  réhydratation.
+- ⚠️ **Changer de langue redessine tout** : `App` s'abonne à `langue` et s'en
+  sert comme `key` sur l'arbre. Un seul remontage, instantané — plutôt qu'un
+  contexte à faire traverser les cent fichiers de l'interface.
+- `document.documentElement.lang` suit la langue choisie : c'est ce que lisent
+  les lecteurs d'écran et les moteurs de recherche.
+
+### Couverture, honnêtement
+
+**Traduit dans les sept langues** : la navigation, l'accueil, les réglages, le
+panneau de carrière, le classement latéral, le match en direct, L'Ovale, la
+boutique, le Hall, la création — soit l'ossature de l'interface.
+
+**Écrit dans la langue du joueur par l'IA** (avec une clé Groq) : tout le récit,
+les situations, les interviews, les tweets, les messages privés, le coaching.
+
+**Encore en français** : le contenu HORS LIGNE pré-écrit (`data/situations.ts`,
+`data/evenements.ts`, `data/scenarios.ts`, `data/moments.ts`, les pools de
+commentaires de `moteur/commentaire.ts` et les gabarits de `lib/vie.ts`), soit
+~1 500 phrases qui ne servent qu'en mode sans clé. C'est le prochain lot : ajouter
+une clé et sa traduction dans `data/textes.ts` suffit, le socle est en place.

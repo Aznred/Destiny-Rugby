@@ -10,6 +10,7 @@
 import type { Club, Competition } from '../types';
 import { COMPETITIONS_REELLES } from './mondeReel';
 import { CLUBS_REGIONAUX, LOGO_AMATEUR } from './amateurs';
+import { COMPETITIONS_NOUVELLES } from './nouvellesLigues';
 
 export type { Club, Competition };
 
@@ -436,12 +437,35 @@ const AMATEURS: Competition[] = [
   { id: 'reg3', nom: 'Régionale 3', pays: 'France', drapeaux: ['fr'], emoji: '🥉', niveau: 10, zone: 'France', clubs: regionale('reg3'), note: 'Tout en bas de la pyramide — c\'est ici que naissent les légendes.' },
 ];
 
+// ---------- LE RESTE DU MONDE (dossier « new league ») ----------
+// 18 championnats et coupes de plus — Espagne, Italie, Géorgie, Irlande,
+// Écosse, Galles, Pologne, Roumanie, Russie, Argentine, Portugal, Pays-Bas,
+// Tchéquie, Finlande, Nouvelle-Zélande. Les clubs, leur hiérarchie et leurs
+// écussons sont RÉELS ; leurs effectifs sont générés (les données ne
+// fournissent aucun joueur) — voir `src/data/nouvellesLigues.ts`.
+const NOUVELLES: Competition[] = COMPETITIONS_NOUVELLES.map((c) => ({
+  id: c.id,
+  nom: c.nom,
+  pays: c.pays,
+  drapeaux: [],
+  emoji: c.emoji,
+  niveau: c.niveau,
+  zone: 'Monde',
+  clubs: c.clubs.map((cl) => ({
+    nom: cl.nom,
+    c1: cl.c1,
+    c2: cl.c2,
+    ...(cl.logo ? { logo: cl.logo } : {}),
+  })),
+}));
+
 // Toutes les compétitions : les trois divisions professionnelles françaises et
 // les championnats du monde viennent de la base réelle, le reste est saisi ici.
 export const COMPETITIONS: Competition[] = [
   ...COMPETITIONS_REELLES.filter((c) => c.zone === 'France'),
   ...AMATEURS,
   ...COMPETITIONS_REELLES.filter((c) => c.zone === 'Monde'),
+  ...NOUVELLES,
 ];
 
 // Divisions françaises, de l'élite (indice 0) vers le bas de la pyramide.

@@ -137,6 +137,10 @@ export interface EtatMatch {
   ouvert: 1 | -1;            // côté ouvert choisi pour la phase
   phasesDepuisArret: number; // nombre de temps de jeu depuis la dernière phase arrêtée
   ligneAvantage: number;     // X où la phase a démarré : les mètres se comptent AU-DELÀ
+  origine: Vec;              // ⚠️ le point de départ de la phase (ruck, mêlée, touche).
+                             // C'est LUI qui ancre la largeur des pods, PAS le porteur :
+                             // sinon toute l'attaque suit le ballon en travers du terrain
+                             // et les trente joueurs finissent en paquet.
   metresGagnesPhase: number; // terrain gagné au-delà de la ligne d'avantage
   ballonLent: boolean;       // sortie de ruck lente : la défense a le temps
   derniereTouche: Pion | null;

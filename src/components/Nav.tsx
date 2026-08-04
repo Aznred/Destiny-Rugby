@@ -1,4 +1,5 @@
 import { useGame } from '../store/useGame';
+import { t } from '../lib/i18n';
 import { clubParNom } from '../data/clubs';
 import { Blason } from './Blason';
 import type { Ecran } from '../types';
@@ -37,35 +38,35 @@ export function Nav({ onReglages }: NavProps) {
         </span>
       </button>
       <div className="liens">
-        {lien('accueil', 'Accueil')}
+        {lien('accueil', t('nav.accueil'))}
         {joueur
           ? lien(
               'carriere',
-              'Carrière',
+              t('nav.carriere'),
               clubData ? (
                 <span className="nav-logo" title={joueur.club}>
                   <Blason club={clubData} taille={20} />
                 </span>
               ) : undefined,
             )
-          : lien('creation', 'Créer')}
-        {joueur && lien('profil', 'Profil')}
+          : lien('creation', t('nav.creer'))}
+        {joueur && lien('profil', t('nav.profil'))}
         {joueur && (
           <button
             className={ecran === 'social' ? 'actif' : ''}
             onClick={() => setEcran('social')}
-            title="L’Ovale — le réseau social"
+            title={t('nav.ovale')}
           >
             <span className="nav-x">𝕏</span>
             L’Ovale
             {nonLues > 0 && <i className="nav-badge">{nonLues > 9 ? '9+' : nonLues}</i>}
           </button>
         )}
-        {lien('championnats', 'Clubs')}
-        {lien('classement', 'Classement')}
-        {lien('pantheon', 'Hall')}
-        {lien('boutique', 'Boutique')}
-        <button onClick={onReglages} title="Réglages IA">⚙️</button>
+        {lien('championnats', t('nav.clubs'))}
+        {lien('classement', t('nav.classement'))}
+        {lien('pantheon', t('nav.hall'))}
+        {lien('boutique', t('nav.boutique'))}
+        <button onClick={onReglages} title={t('nav.reglages')}>⚙️</button>
       </div>
     </nav>
   );

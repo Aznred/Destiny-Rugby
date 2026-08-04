@@ -19,6 +19,12 @@ import {
 import { phaseFinale, type MatchFinal } from '../lib/phaseFinale';
 import { tournoiDeFinDAnnee } from '../lib/tournoi';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
+import {
+  internationalEnDirect, affichesInternationales, competitionsDeLaSaison,
+  fenetreInternationale, journeesInternationalesA,
+} from '../lib/international';
+import { LogoEquipe } from '../components/Blason';
+import { nomNation } from '../components/Drapeau';
 import { COUPES_EUROPE } from '../data/mondeReel';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { Blason } from '../components/Blason';
@@ -273,16 +279,38 @@ export function Tableau() {
   const maDivision = joueur?.division ?? '';
   const mesCoupes = useMemo(() => (joueur ? coupesDuClub(joueur.club) : []), [joueur]);
 
-  // Compétition affichée par défaut : la sienne — sauf pendant une semaine de
-  // coupe d'Europe, où c'est la coupe que le club dispute qui s'ouvre.
-  const [choix, setChoix] = useState<string>(
-    semActuelle.type === 'coupe' && mesCoupes.length ? mesCoupes[0] : maDivision,
+  // ⚠️ LES SÉLECTIONS SONT DES COMPÉTITIONS COMME LES AUTRES. Pendant une
+  // fenêtre internationale, on n'y voyait ni affiche ni classement : le Tournoi
+  // n'était qu'un tableau figé recopié de la vraie saison. Il se joue
+  // maintenant pour de vrai (lib/international.ts).
+  const saison = joueur?.saison ?? 1;
+  const internationales = useMemo(() => competitionsDeLaSaison(saison), [saison]);
+  const maNation = nomNation(joueur?.nation ?? '');
+  const fenetre = useMemo(() => fenetreInternationale(numero, saison), [numero, saison]);
+  const maSelection = useMemo(
+    () => internationales.find((c) => c.equipes.includes(maNation))?.id ?? '',
+    [internationales, maNation],
   );
+
+  // Compétition affichée par défaut : la sienne — sauf pendant une semaine de
+  // coupe d'Europe (la coupe de son club s'ouvre) ou une fenêtre internationale
+  // (sa sélection s'ouvre, si sa nation joue).
+  const [choix, setChoix] = useState<string>(() => {
+    if (semActuelle.type === 'coupe' && mesCoupes.length) return mesCoupes[0];
+    if (semActuelle.type === 'international' && fenetre
+      && fenetre.competition.equipes.includes(maNation)) return fenetre.competition.id;
+    if (semActuelle.type === 'international' && fenetre) return fenetre.competition.id;
+    return maDivision;
+  });
   const estCoupe = COUPES_EUROPE.some((c) => c.id === choix);
+  const estInternational = internationales.some((c) => c.id === choix);
 
   // Les grandes divisions amateurs sont découpées en poules : on peut les
   // parcourir toutes, pas seulement la sienne.
-  const poules = useMemo(() => (estCoupe ? [] : poulesDe(choix)), [choix, estCoupe]);
+  const poules = useMemo(
+    () => (estCoupe || estInternational ? [] : poulesDe(choix)),
+    [choix, estCoupe, estInternational],
+  );
   const [pouleVue, setPouleVue] = useState<number | null>(null);
   const maPoule = useMemo(
     () => (joueur && choix === maDivision ? Math.max(0, indexPoule(choix, joueur.club)) : 0),
@@ -291,7 +319,7 @@ export function Tableau() {
   const poule = pouleVue ?? maPoule;
 
   const donnees = useMemo(() => {
-    if (!joueur || estCoupe || !choix) return null;
+    if (!joueur || estCoupe || estInternational || !choix) return null;
     // ⚠️ On ne s'ancre sur SON club que dans SA division ET dans SA poule :
     // sinon le Stade Toulousain apparaissait dans le classement de la Régionale 3.
     const sien = choix === maDivision && poule === maPoule;
@@ -307,7 +335,21 @@ export function Tableau() {
       phase: jouees >= total ? phaseFinale(choix, joueur.saison, ancre, bonus, numeroPoule) : null,
       jouees, total, ancre, bonus, numeroPoule,
     };
-  }, [joueur, choix, estCoupe, maDivision, numero, poule, maPoule, poules.length]);
+  }, [joueur, choix, estCoupe, estInternational, maDivision, numero, poule, maPoule, poules.length]);
+
+  // ---------- LA COMPÉTITION DE SÉLECTIONS ----------
+  const inter = useMemo(() => {
+    if (!joueur || !estInternational) return null;
+    const jouees = journeesInternationalesA(choix, numero, joueur.saison);
+    const etatInter = internationalEnDirect(choix, joueur.saison, jouees, null);
+    if (!etatInter) return null;
+    const vueInter = Math.max(1, Math.min(journeeVue ?? Math.max(1, jouees), etatInter.totalJournees));
+    return {
+      etat: etatInter,
+      vue: vueInter,
+      affiches: affichesInternationales(choix, joueur.saison, vueInter, jouees, null),
+    };
+  }, [joueur, choix, estInternational, numero, journeeVue]);
 
   // Le TOURNOI DE FIN D'ANNÉE : dans les divisions à poules multiples, c'est lui
   // qui désigne le champion — les meilleurs de chaque poule s'affrontent en
@@ -360,8 +402,21 @@ export function Tableau() {
       const c = COUPES_EUROPE.find((x) => x.id === id)!;
       return { valeur: id, label: c.nom, sous: 'Ton club y est engagé', vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: 'Mes compétitions' };
     }),
+    ...(maSelection
+      ? [{
+          valeur: maSelection,
+          label: internationales.find((c) => c.id === maSelection)!.nom,
+          sous: `Ta sélection — ${maNation}`,
+          vignette: <LogoCompet id={maSelection} emoji="🏳️" taille={22} />,
+          groupe: 'Mes compétitions',
+        }]
+      : []),
     ...COUPES_EUROPE.filter((c) => !mesCoupes.includes(c.id)).map((c) => ({
       valeur: c.id, label: c.nom, sous: c.pays, vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: 'Coupes d’Europe',
+    })),
+    ...internationales.filter((c) => c.id !== maSelection).map((c) => ({
+      valeur: c.id, label: c.nom, sous: `${c.equipes.length} sélections`,
+      vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: 'Sélections',
     })),
     ...COMPETITIONS.filter((c) => c.id !== maDivision).map((c) => ({
       valeur: c.id, label: c.nom, sous: c.pays, vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: 'Championnats',
@@ -396,6 +451,15 @@ export function Tableau() {
             onClick={() => { setChoix(maDivision); setJourneeVue(null); setPouleVue(null); }}
           >
             <LogoCompet id={maDivision} emoji="⭐" taille={18} /> Mon championnat
+          </button>
+        )}
+        {maSelection && (
+          <button
+            className={`chip-comp${choix === maSelection ? ' actif' : ''}`}
+            onClick={() => { setChoix(maSelection); setJourneeVue(null); setPouleVue(null); }}
+            title={`${maNation} dispute cette compétition`}
+          >
+            <LogoCompet id={maSelection} emoji="🏳️" taille={18} /> Ma sélection
           </button>
         )}
         {mesCoupes.map((id) => {
@@ -456,6 +520,74 @@ export function Tableau() {
                 )}
               </div>
             ))}
+          </div>
+        </>
+      )}
+
+      {/* ---------- SÉLECTIONS NATIONALES ---------- */}
+      {inter && (
+        <>
+          <p className="intro-comp">
+            <LogoCompet id={inter.etat.id} emoji={inter.etat.emoji} taille={20} /> <b>{inter.etat.nom}</b> —{' '}
+            {inter.etat.journeesJouees > 0
+              ? `${inter.etat.journeesJouees} journée${inter.etat.journeesJouees > 1 ? 's' : ''} sur ${inter.etat.totalJournees}.`
+              : 'la compétition n’a pas encore commencé.'}
+            {inter.etat.equipes.includes(maNation) && ` Ta sélection : ${maNation}.`}
+          </p>
+
+          <div className="carte bloc-competition">
+            <div className="comp-tete">
+              <b>{inter.etat.emoji} Classement</b>
+              <span className="comp-count">{inter.etat.equipes.length} sélections</span>
+            </div>
+            <div className="classement-tableau tableau-live">
+              <div className="classement-entete">
+                <span /><span /><span className="cl-nom">Sélection</span>
+                <span title="Points">Pts</span><span title="Joués">J</span>
+                <span title="Gagnés">G</span><span title="Nuls">N</span><span title="Perdus">P</span>
+                <span title="Différence de points">Diff</span><span title="Bonus">B</span>
+              </div>
+              {inter.etat.classement.map((l) => (
+                <div key={l.club} className="classement-ligne" data-moi={l.club === maNation ? 'oui' : undefined}>
+                  <span className="cl-pos" data-tete={l.position === 1 ? 'oui' : undefined}>{l.position}</span>
+                  <LogoEquipe nom={l.club} taille={22} />
+                  <span className="cl-nom">{l.club}{l.club === maNation && ' 🫵'}</span>
+                  <span className="cl-pts">{l.points}</span>
+                  <span>{l.joues}</span><span>{l.gagnes}</span><span>{l.nuls}</span><span>{l.perdus}</span>
+                  <span className={l.difference >= 0 ? 'cl-plus' : 'cl-moins'}>
+                    {l.difference > 0 ? `+${l.difference}` : l.difference}
+                  </span>
+                  <span>{l.bonus}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="carte bloc-competition">
+            <div className="comp-tete">
+              <b>{inter.affiches.some((a) => a.jouee) ? 'Résultats' : 'Programme'} — journée {inter.vue}</b>
+              <div className="nav-journee">
+                <button className="btn fantome mini" disabled={inter.vue <= 1}
+                  onClick={() => setJourneeVue(inter.vue - 1)}>←</button>
+                <span>J{inter.vue} / {inter.etat.totalJournees}</span>
+                <button className="btn fantome mini" disabled={inter.vue >= inter.etat.totalJournees}
+                  onClick={() => setJourneeVue(inter.vue + 1)}>→</button>
+              </div>
+            </div>
+            <div className="grille-resultats">
+              {inter.affiches.map((a) => (
+                <div key={a.domicile} className="resultat"
+                  data-moi={a.domicile === maNation || a.exterieur === maNation ? 'oui' : undefined}>
+                  <span className={`res-equipe${a.match && a.match.scoreD > a.match.scoreE ? ' gagnant' : ''}`}>
+                    {a.domicile}
+                  </span>
+                  <b className="res-score">{a.match ? `${a.match.scoreD} - ${a.match.scoreE}` : 'à venir'}</b>
+                  <span className={`res-equipe droite${a.match && a.match.scoreE > a.match.scoreD ? ' gagnant' : ''}`}>
+                    {a.exterieur}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}

@@ -4,7 +4,7 @@ import { useGame, MAX_PAR_SAISON } from '../store/useGame';
 import { PanneauJoueur } from '../components/PanneauJoueur';
 import { ClassementLateral } from '../components/ClassementLateral';
 import { demanderAuMJ, CLE_ENV } from '../lib/groq';
-import { genererSituation, scenarioDuPool } from '../lib/ia';
+import { genererSituation } from '../lib/ia';
 import { ATTRIBUTS_LABELS } from '../data/rugby';
 import type { EntreeJournal } from '../types';
 
@@ -25,8 +25,8 @@ export function Carriere({ onReglages }: Props) {
   const groqKey = useGame((s) => s.groqKey);
   const modele = useGame((s) => s.modele);
   const appliquerReponse = useGame((s) => s.appliquerReponse);
-  const evenementAleatoire = useGame((s) => s.evenementAleatoire);
   const poserSituation = useGame((s) => s.poserSituation);
+  const lancerScenario = useGame((s) => s.lancerScenario);
   const resoudreChoix = useGame((s) => s.resoudreChoix);
   const scenarioActif = useGame((s) => s.scenarioActif);
   const compteurs = useGame((s) => s.compteurs);
@@ -91,7 +91,10 @@ export function Carriere({ onReglages }: Props) {
   const vivreUneSituation = async () => {
     if (enCours || scenarioActif) return;
     if (!cle) {
-      poserSituation(scenarioDuPool());
+      // ⚠️ Sans clé, on passe par le store : c'est LUI qui choisit une
+      // situation CONTEXTUELLE dans `data/situations.ts` (âge, forme, moral,
+      // division, contrat) et qui évite celles déjà vécues cette carrière.
+      lancerScenario();
       return;
     }
     setErreur(null);
@@ -107,7 +110,7 @@ export function Carriere({ onReglages }: Props) {
       poserSituation(sc);
     } catch {
       // L'IA a flanché : le jeu ne s'arrête jamais pour autant.
-      poserSituation(scenarioDuPool());
+      lancerScenario();
     } finally {
       setEnCours(false);
     }
@@ -162,6 +165,12 @@ export function Carriere({ onReglages }: Props) {
         ) : (
           !enCours && (
             <div className="choix-rapides" style={{ padding: '0 1.2rem' }}>
+              {/* ⚠️ UN SEUL BOUTON DE VIE. « Vivre une situation » et
+                  « Évènement aléatoire » faisaient double emploi et sonnaient
+                  comme deux menus de test. Il n'en reste qu'un : la vie hors du
+                  terrain, contextuelle (âge, forme, moral, division, contrat),
+                  écrite par le MJ si une clé est là, tirée de la grosse base
+                  `data/situations.ts` sinon. */}
               <button
                 className="evt-aleatoire"
                 onClick={vivreUneSituation}
@@ -170,19 +179,11 @@ export function Carriere({ onReglages }: Props) {
                   compteurs.situations >= MAX_PAR_SAISON
                     ? 'Limite atteinte — passe à la saison suivante'
                     : cle
-                      ? 'Une situation écrite pour toi par le Maître du Jeu'
-                      : 'Une situation à choix, sans IA'
+                      ? 'Le Maître du Jeu te pose une situation, écrite pour ta saison'
+                      : 'Une situation de vie à choix, hors du terrain'
                 }
               >
-                📖 Vivre une situation ({compteurs.situations}/{MAX_PAR_SAISON})
-              </button>
-              <button
-                className="evt-aleatoire"
-                onClick={evenementAleatoire}
-                disabled={compteurs.evenements >= MAX_PAR_SAISON}
-                title={compteurs.evenements >= MAX_PAR_SAISON ? 'Limite atteinte — passe à la saison suivante' : 'Un évènement imprévu'}
-              >
-                🎲 Évènement aléatoire ({compteurs.evenements}/{MAX_PAR_SAISON})
+                📖 La vie hors du terrain ({compteurs.situations}/{MAX_PAR_SAISON})
               </button>
               {suggestions.slice(0, 4).map((c, i) => (
                 <button key={i} onClick={() => envoyer(c)}>{c}</button>

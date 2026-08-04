@@ -22,10 +22,9 @@ import { libelleDate, semaine } from '../data/calendrier';
 import { effetsTraits } from '../data/traits';
 import { nomDivision } from './promotion';
 import { POSTE_PAR_ID } from '../data/rugby';
-import { COMPETITIONS } from '../data/clubs';
-import { effectifDuClub } from './effectif';
 import { nomNation } from '../components/Drapeau';
 import { avatarPourCompte } from './avatars';
+import { annuaire } from './comptes';
 
 export const LIMITE_CARACTERES = 280;
 
@@ -77,9 +76,12 @@ export function compact(n: number): string {
 // CASCADE : audience → vues → likes → reposts. Chaque étage est un pourcentage
 // de celui du dessus, donc l'ordre de grandeur est toujours crédible.
 
+// ⚠️ Repli seulement : un compte a normalement ses propres abonnés, calculés
+// selon SA DIVISION (lib/comptes.ts). Ces valeurs ne servent qu'aux comptes
+// inventés par l'IA, qui n'ont pas de fiche.
 export const AUDIENCE_PAR_TYPE: Record<string, number> = {
-  selection: 320_000, competition: 240_000, media: 120_000, club: 70_000,
-  journaliste: 45_000, joueur: 18_000, hater: 1_600, fan: 900,
+  selection: 320_000, competition: 90_000, media: 120_000, club: 25_000,
+  journaliste: 20_000, joueur: 4_000, hater: 900, fan: 500,
 };
 
 export function audienceDe(type: string | undefined, abonnes?: number): number {
@@ -91,8 +93,12 @@ export interface StatsPost { vues: number; likes: number; reposts: number }
 
 export function statsDepuisVues(vues: number, rng: () => number): StatsPost {
   const v = Math.max(12, Math.round(vues));
-  const likes = Math.round(v * (0.025 + rng() * 0.04));
-  return { vues: v, likes, reposts: Math.round(likes * (0.08 + rng() * 0.16)) };
+  // ⚠️ La cascade est BORNÉE : un like suppose une vue, un repost suppose un
+  // like. Sans ces bornes, un petit compte pouvait afficher plus de likes que
+  // de vues — c'est le genre d'incohérence qui saute aux yeux sur un fil.
+  const likes = Math.min(Math.round(v * 0.34), Math.round(v * (0.025 + rng() * 0.04)));
+  const reposts = Math.min(likes, Math.round(likes * (0.08 + rng() * 0.16)));
+  return { vues: v, likes: Math.max(0, likes), reposts: Math.max(0, reposts) };
 }
 
 // UN POST NE MEURT PAS LE JOUR OÙ IL EST PUBLIÉ. Les compteurs continuent de
@@ -299,57 +305,45 @@ export function suggestions(j: Joueur): Compte[] {
   return choisis;
 }
 
-// --- COMPTES À SUIVRE, SANS IA --------------------------------------------
-// Le repli hors ligne de `comptesGroq` : de VRAIS comptes, construits à partir
-// du monde du jeu — tes coéquipiers, les clubs de ton championnat, la presse.
+// --- COMPTES À SUIVRE ------------------------------------------------------
+//
+// ⚠️ UNE SEULE SOURCE DE VÉRITÉ : L'ANNUAIRE (`lib/comptes.ts`).
+// Cette fonction fabriquait ses propres comptes — pseudo calculé autrement
+// (`pseudoDe` au lieu de `pseudoStable`) et abonnés inventés sur place
+// (`600 + note²×3` pour un joueur, « 20 000 à 320 000 » pour un club, quel que
+// soit son étage). Résultat vu en jeu : Explorer annonçait un chiffre, et le
+// profil du même compte en annonçait un autre — quand il s'ouvrait, car le
+// pseudo ne correspondait à aucune fiche de l'annuaire.
+// On pioche désormais DANS l'annuaire : mêmes pseudos, mêmes abonnés, mêmes
+// bios, mêmes bannières que partout ailleurs.
 export function suggestionsLocales(j: Joueur, deja: CompteSuivi[]): CompteSuivi[] {
   const connus = new Set(deja.map((c) => c.pseudo));
   const rng = graine(`comptes#${j.saison}#${j.club}#${j.semaine ?? 1}`);
+  const monde = annuaire(j).filter((c) => !connus.has(c.pseudo));
   const sortie: CompteSuivi[] = [];
-
-  const ajouter = (c: CompteSuivi) => {
-    if (!connus.has(c.pseudo) && !sortie.some((x) => x.pseudo === c.pseudo)) sortie.push(c);
+  const ajouter = (c?: CompteSuivi) => {
+    if (c && !sortie.some((x) => x.pseudo === c.pseudo)) sortie.push(c);
+  };
+  // Un tirage stable dans une famille, pour ne pas proposer six fois le même.
+  const piocherParmi = (liste: CompteSuivi[], combien: number) => {
+    const copie = [...liste];
+    for (let i = 0; i < combien && copie.length; i++) {
+      ajouter(copie.splice(Math.floor(rng() * copie.length), 1)[0]);
+    }
   };
 
-  // Trois coéquipiers, dont les cadres du groupe.
-  const groupe = [...effectifDuClub(j.club, j.saison)].sort((a, b) => b.note - a.note);
-  for (const co of groupe.slice(0, 8).sort(() => rng() - 0.5).slice(0, 3)) {
-    ajouter({
-      pseudo: pseudoDe(co.nom).replace(/_\d+$/, ''),
-      nom: co.nom,
-      avatar: avatarPourCompte(co.nom, 'joueur'),
-      type: 'joueur',
-      club: j.club,
-      bio: `${POSTE_PAR_ID[co.poste].nom} de ${j.club}. ${co.age} ans.`,
-      certifie: co.note >= 78,
-      abonnes: Math.round(600 + co.note * co.note * 3),
-    });
-  }
+  // Trois coéquipiers (les cadres du groupe passent devant : l'annuaire range
+  // l'effectif du joueur en tête de la famille « joueur »).
+  piocherParmi(monde.filter((c) => c.type === 'joueur' && c.club === j.club).slice(0, 10), 2);
+  // Un joueur d'un club rival.
+  piocherParmi(monde.filter((c) => c.type === 'joueur' && c.club !== j.club).slice(0, 20), 1);
+  // Son club, puis un rival de son championnat.
+  ajouter(monde.find((c) => c.type === 'club' && c.nom === j.club));
+  piocherParmi(monde.filter((c) => c.type === 'club' && c.nom !== j.club).slice(0, 12), 1);
+  // La presse.
+  piocherParmi(monde.filter((c) => c.type === 'journaliste' || c.type === 'media'), 1);
+  // Et un supporter, pour que le fil ne soit pas qu'institutionnel.
+  piocherParmi(monde.filter((c) => c.type === 'fan').slice(0, 20), 1);
 
-  // Deux clubs du championnat : le sien et un rival.
-  const division = COMPETITIONS.find((c) => c.id === j.division);
-  const clubs = [j.club, ...(division?.clubs ?? []).map((c) => c.nom).filter((n) => n !== j.club)];
-  for (const nom of [clubs[0], clubs[1 + Math.floor(rng() * Math.max(1, clubs.length - 1))]]) {
-    if (!nom) continue;
-    ajouter({
-      pseudo: pseudoDe(nom).replace(/_\d+$/, '') + '_officiel',
-      nom,
-      avatar: `club:${nom}`,
-      type: 'club',
-      club: nom,
-      bio: `Compte officiel · ${division?.nom ?? 'Championnat'}`,
-      certifie: true,
-      abonnes: Math.round(20_000 + rng() * 300_000),
-    });
-  }
-
-  // Un journaliste et un média.
-  for (const c of COMPTES.filter((c) => c.type === 'journaliste' || c.type === 'media').slice(0, 6)) {
-    ajouter({
-      pseudo: c.pseudo, nom: c.nom, avatar: c.avatar, type: c.type as CompteSuivi['type'],
-      bio: 'Suit le championnat au quotidien.', certifie: c.certifie, abonnes: Math.round(30_000 + rng() * 150_000),
-    });
-    if (sortie.length >= 6) break;
-  }
   return sortie.slice(0, 6);
 }

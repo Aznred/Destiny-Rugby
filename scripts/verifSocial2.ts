@@ -1,7 +1,7 @@
 // Vérification SANS NAVIGATEUR de L'Ovale vivant : annuaire, recherche,
 // battement automatique, relations et ripostes.
 import { useGame } from '../src/store/useGame';
-import { annuaire, chercherComptes, chercherPosts } from '../src/lib/comptes';
+import { abonnesCible, annuaire, chercherComptes, chercherPosts } from '../src/lib/comptes';
 import { humeur, tonDuMessage, effetSurRelation } from '../src/lib/vie';
 
 const g = useGame.getState();
@@ -56,3 +56,43 @@ console.log('\n=== PROFIL PERSONNALISÉ ===');
 useGame.getState().majProfilSocial({ nomAffiche: 'Le Patron', pseudo: 'le_patron_10', bio: 'Ouvreur. Tête froide.', avatar: '👑' });
 const j = joueur();
 console.log(`  ${j.profilSocial?.nomAffiche} @${j.pseudo} — « ${j.profilSocial?.bio} » photo ${j.profilSocial?.avatar}`);
+
+// ---------------------------------------------------------------------------
+// ⚠️ EXPLORER ET LE PROFIL DOIVENT DIRE LE MÊME CHIFFRE
+// ---------------------------------------------------------------------------
+// `suggestionsLocales` fabriquait ses propres comptes — pseudo calculé
+// autrement, abonnés inventés sur place. Explorer annonçait « 340 000 abonnés »
+// et le profil du même compte en affichait 400, quand il s'ouvrait.
+console.log('\n=== EXPLORER ↔ PROFIL : LE MÊME NOMBRE D’ABONNÉS ===');
+{
+  const moi = joueur();
+  const annuaireComplet = annuaire(moi);
+  await useGame.getState().chargerSuggestions();
+  const suggestions = useGame.getState().suggestionsComptes;
+  let ecarts = 0;
+  let orphelins = 0;
+  for (const c of suggestions) {
+    const fiche = annuaireComplet.find((x) => x.pseudo === c.pseudo);
+    if (!fiche) { orphelins += 1; continue; }
+    if (fiche.abonnes !== c.abonnes) ecarts += 1;
+    console.log(`  @${c.pseudo.padEnd(30)} ${String(c.abonnes).padStart(8)} abonnés  ${fiche.abonnes === c.abonnes ? '✅' : `❌ (profil : ${fiche.abonnes})`}`);
+  }
+  console.log(`  ${orphelins === 0 ? '✅' : '❌'} comptes absents de l’annuaire : ${orphelins}`);
+  console.log(`  ${ecarts === 0 ? '✅' : '❌'} écarts de compteur : ${ecarts}`);
+}
+
+console.log('\n=== L’AUDIENCE DU JOUEUR SUIT SON CLUB ===');
+{
+  const moi = joueur();
+  const paliers: [string, string][] = [
+    ['Stade Toulousain', 'Top 14'],
+    ['Provence Rugby', 'Pro D2'],
+    ['SC Albi', 'Nationale'],
+  ];
+  for (const [club, etage] of paliers) {
+    const debutant = abonnesCible('Test Joueur', club, 42, 20);
+    const star = abonnesCible('Test Joueur', club, 88, 88);
+    console.log(`  ${etage.padEnd(12)} débutant ${String(debutant).padStart(8)} · star ${String(star).padStart(9)}`);
+  }
+  console.log(`  joueur en cours : ${(moi.abonnes ?? 0).toLocaleString('fr-FR')} abonnés`);
+}

@@ -3,6 +3,9 @@ import { POSTE_PAR_ID, posteDepuisFamille } from '../data/rugby';
 import { COMPETITIONS, competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs';
 import { EFFECTIFS_REELS, NOTE_CLUB_REEL } from '../data/effectifsReels';
 import { EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../data/amateurs';
+import {
+  effectifNouveau, NOTE_CLUB_NOUVEAU, type JoueurNouveau,
+} from '../data/nouvellesLigues';
 import { mercatoReel, type RecrueReelle } from './mercato';
 
 // Génération DÉTERMINISTE de l'effectif d'un club : même club + même saison
@@ -211,6 +214,10 @@ function courbeAge(age: number): number {
 export function noteDuClub(nomClub: string): number {
   const reelle = NOTE_CLUB_REEL[nomClub];
   if (reelle !== undefined) return reelle;
+  // Les nouvelles ligues ont leur propre table, calculée sur leur classement
+  // réel (voir scripts/genNouvellesLigues.cjs).
+  const nouvelle = NOTE_CLUB_NOUVEAU[nomClub];
+  if (nouvelle !== undefined) return nouvelle;
   const niveau = competitionDuClub(nomClub)?.niveau ?? 6;
   return NOTE_PAR_NIVEAU[niveau] ?? 50;
 }
@@ -252,6 +259,58 @@ function effectifReel(nomClub: string, saison: number, niveau: number): Coequipi
     // sinon un espoir de Kintetsu s'appellerait « Léo Etcheverry ».
     const rngNom = graine(`regen#${nomClub}#${i}#${generation}`);
     const source = EFFECTIFS_REELS[nomClub];
+    const prenom = source[Math.floor(rngNom() * source.length)].nom.split(' ')[0];
+    const parrain = source[Math.floor(rngNom() * source.length)];
+    j.nom = `${prenom} ${parrain.nom.split(' ').slice(1).join(' ')}`.trim();
+    j.nation = parrain.nation;
+    return j;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// EFFECTIFS DES NOUVELLES LIGUES (Espagne, Italie, Géorgie, Galles, Pologne…)
+//
+// Les données de `new league/` donnent les CLUBS et leurs classements, jamais
+// les joueurs : `scripts/genNouvellesLigues.cjs` en fabrique un effectif de 30
+// joueurs avec des noms du pays et une part d'étrangers. Ils vieillissent,
+// progressent vers leur potentiel et laissent la place à des regens exactement
+// comme les joueurs réels — c'est la même mécanique que `effectifReel`.
+// ---------------------------------------------------------------------------
+function effectifDesNouvellesLigues(
+  nomClub: string, saison: number, source: JoueurNouveau[],
+): Coequipier[] {
+  const niveau = competitionDuClub(nomClub)?.niveau ?? 5;
+  const noteBase = NOTE_CLUB_NOUVEAU[nomClub] ?? NOTE_PAR_NIVEAU[niveau] ?? 45;
+
+  return source.map((reel, i) => {
+    const rng = graine(`nouveau#${nomClub}#${reel.nom}#${i}`);
+    // Même règle que pour les effectifs réels : jamais de retraite avant l'âge
+    // de départ, sinon la saison 1 n'afficherait pas l'effectif annoncé.
+    const retraite = Math.max(reel.age, 33 + Math.floor(rng() * 5));
+    const vitesseDeclin = rng();
+    const age = reel.age + (saison - 1);
+    const poste = posteConcret(reel.poste, nomClub + reel.nom);
+
+    if (age <= retraite) {
+      return {
+        id: `${nomClub}-nl-${i}`,
+        nom: reel.nom,
+        poste,
+        age,
+        note: noteALAge(reel.note, reel.age, reel.potentiel, age, vitesseDeclin),
+        potentiel: reel.potentiel,
+        nation: reel.nation,
+        regen: false,
+      };
+    }
+
+    // Retraité : un jeune du cru le remplace, avec un nom du même vivier — un
+    // espoir de Batumi ne s'appelle pas « Léo Etcheverry ».
+    const generation = Math.max(1, Math.ceil((age - retraite) / 15));
+    const j = genJoueur(nomClub, 4000 + i, generation, ((age - retraite - 1) % 15) + 1, noteBase, niveau);
+    j.id = `${nomClub}-nl-regen-${i}-${generation}`;
+    j.poste = poste;
+    const rngNom = graine(`regennl#${nomClub}#${i}#${generation}`);
     const prenom = source[Math.floor(rngNom() * source.length)].nom.split(' ')[0];
     const parrain = source[Math.floor(rngNom() * source.length)];
     j.nom = `${prenom} ${parrain.nom.split(' ').slice(1).join(' ')}`.trim();
@@ -410,6 +469,8 @@ function construireEffectif(nomClub: string, saison: number): Coequipier[] {
   const niveau = division?.niveau ?? 6;
   if (EFFECTIFS_REELS[nomClub]) return effectifReel(nomClub, saison, niveau);
   if (EFFECTIFS_AMATEURS[nomClub]) return effectifAmateur(nomClub, saison, niveau);
+  const nouveau = effectifNouveau(nomClub);
+  if (nouveau) return effectifDesNouvellesLigues(nomClub, saison, nouveau);
   const noteBase = NOTE_PAR_NIVEAU[niveau] ?? 50;
   const joueurs: Coequipier[] = [];
   let slot = 0;

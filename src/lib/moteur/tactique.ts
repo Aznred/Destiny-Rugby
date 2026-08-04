@@ -70,8 +70,15 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
   const s = sens(cote);
   const ouvert = e.ouvert;
   const porteur = e.porteur && e.porteur.cote === cote ? e.porteur : null;
-  // La ligne d'avantage : le porteur s'il y en a un, sinon le ballon.
+  // La ligne d'avantage : le porteur s'il y en a un, sinon le ballon. Elle donne
+  // la PROFONDEUR.
   const ancre: Vec = porteur ? porteur.pos : e.ballon;
+  // ⚠️ LA LARGEUR, elle, est ancrée au POINT DE DÉPART DE LA PHASE. Un pod
+  // d'avants ne traverse pas le terrain derrière le ballon : il est posé au
+  // lancement et il tient sa position. Sans ça, les huit avants suivaient le
+  // porteur d'un bord à l'autre et les trente joueurs finissaient en paquet
+  // (mesuré : 11 joueurs en moyenne dans un cercle de 8 m, jusqu'à 23).
+  const largeur = e.origine ? e.origine.y : ancre.y;
   const lancement = e.lancement;
 
   // ── Qui est déjà dans la chaîne de passes ? Ceux-là courent une ligne de
@@ -94,15 +101,19 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
   // Les plus proches du ballon percutent au ras, les autres s'étagent au large.
   avants.sort((a, b) => distance2(ancre, a.pos) - distance2(ancre, b.pos));
   // 2 au ras côté fermé · 2 au ras côté ouvert · 3 au premier temps · 1 au large
+  // ⚠️ Les pods sont ÉCARTÉS. Un bloc à six mètres du ruck, ça fait un tas :
+  // avec les cinq joueurs du regroupement, les deux gardiens adverses et le 9,
+  // on comptait onze joueurs dans un cercle de huit mètres. Le premier bloc est
+  // donc à dix mètres, le deuxième à vingt-deux, le troisième au large.
   const GABARIT: { dy: number; dx: number; role: Pion['role'] }[] = [
-    { dy: 6, dx: 2.4, role: 'podRas' },
-    { dy: 9, dx: 3.0, role: 'podRas' },
-    { dy: -6, dx: 2.4, role: 'aileFerme' },
-    { dy: -10, dx: 3.4, role: 'aileFerme' },
-    { dy: 19, dx: 4.6, role: 'podMilieu' },
-    { dy: 22.5, dx: 5.2, role: 'podMilieu' },
-    { dy: 26, dx: 5.8, role: 'podMilieu' },
-    { dy: 34, dx: 6.6, role: 'podLarge' },
+    { dy: 10, dx: 2.4, role: 'podRas' },
+    { dy: 14, dx: 3.0, role: 'podRas' },
+    { dy: -10, dx: 2.4, role: 'aileFerme' },
+    { dy: -15, dx: 3.4, role: 'aileFerme' },
+    { dy: 22, dx: 4.6, role: 'podMilieu' },
+    { dy: 26, dx: 5.2, role: 'podMilieu' },
+    { dy: 30, dx: 5.8, role: 'podMilieu' },
+    { dy: 38, dx: 6.6, role: 'podLarge' },
   ];
   for (let i = 0; i < avants.length; i++) {
     const p = avants[i];
@@ -112,12 +123,12 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
     p.role = g.role;
     p.cible = {
       x: ancre.x - s * g.dx,
-      y: bornerY(ancre.y + ouvert * g.dy),
+      y: bornerY(largeur + ouvert * g.dy),
     };
   }
 
   // ── LA LIGNE DE TROIS-QUARTS ─────────────────────────────────────────────
-  const largeOuvert = ouvert === 1 ? LARGEUR - ancre.y : ancre.y; // espace jusqu'à la touche ouverte
+  const largeOuvert = ouvert === 1 ? LARGEUR - largeur : largeur; // espace jusqu'à la touche ouverte
   const compression = borner(largeOuvert / 42, 0.45, 1); // ballon près de la touche = ligne resserrée
   const quinzeIntercale = !!lancement && (lancement.type === 'large' || lancement.type === 'saute');
 
@@ -156,7 +167,9 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
         continue;
       }
     }
-    p.cible = { x: ancre.x - s * prof, y: bornerY(ancre.y + ouvert * dy) };
+    // ⚠️ Largeur ancrée au point de départ de la phase, profondeur au porteur :
+    // la ligne de trois-quarts MONTE avec le ballon sans se recoller dessus.
+    p.cible = { x: ancre.x - s * prof, y: bornerY(largeur + ouvert * dy) };
   }
 }
 
@@ -338,6 +351,40 @@ export function placerEquipes(e: EtatMatch): void {
     p.effort = d2 < 400 ? 1 : d2 < 1600 ? 0.76 : 0.5;
   }
   if (e.porteur) e.porteur.effort = 1;
+  separer(e, arret);
+}
+
+// ⚠️ ON NE SE MARCHE PAS DESSUS. Deux joueurs peuvent viser des cibles proches,
+// se croiser, ou converger sur le même ballon : sans force de séparation ils
+// finissent superposés et l'écran donne des « paquets » de pions. Chaque paire
+// à moins de 1,8 m est écartée d'un demi-écart — c'est invisible à l'œil, mais
+// ça suffit à garder un terrain lisible. Le ruck, la mêlée, la touche et le
+// maul en sont exemptés : là, on est censé être au contact.
+const SERRE = 1.8;
+function separer(e: EtatMatch, arret: boolean): void {
+  const libres: Pion[] = [];
+  for (const p of e.pions) {
+    if (!p.surLeTerrain || p.sanction > 0) continue;
+    if (p.role === 'ruck' || p.role === 'melee' || p.role === 'alignement' || p.role === 'maul') continue;
+    if (arret && (e.phase === 'melee' || e.phase === 'touche')) continue;
+    libres.push(p);
+  }
+  for (let i = 0; i < libres.length; i++) {
+    const a = libres[i];
+    for (let j = i + 1; j < libres.length; j++) {
+      const b = libres[j];
+      const dx = b.pos.x - a.pos.x;
+      const dy = b.pos.y - a.pos.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= SERRE * SERRE) continue;
+      const d = Math.sqrt(d2) || 0.001;
+      const pousse = (SERRE - d) * 0.5;
+      const ux = dx / d; const uy = dy / d;
+      a.pos.x -= ux * pousse; a.pos.y -= uy * pousse;
+      b.pos.x += ux * pousse; b.pos.y += uy * pousse;
+      a.pos.y = bornerY(a.pos.y); b.pos.y = bornerY(b.pos.y);
+    }
+  }
 }
 
 // LE COACHING EN DIRECT : la consigne du joueur infléchit SON placement.

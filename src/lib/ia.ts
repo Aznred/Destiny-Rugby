@@ -16,6 +16,7 @@ import { SCENARIOS } from '../data/scenarios';
 import { MOMENTS, type MomentDecisif } from '../data/moments';
 import { interviewPour, type Interview } from '../data/interviews';
 import { appelGroqJSON, fichePersonnage, nettoyerDeltas, plafonnerDeltas, MODELE_DEFAUT } from './groq';
+import { consigneDeLangue } from './i18n';
 import { POSTE_PAR_ID } from '../data/rugby';
 
 // --------------------------------------------------------------------------
@@ -129,7 +130,7 @@ export async function genererSituation(opts: ContexteSituation): Promise<Scenari
     opts.cle,
     opts.modele || MODELE_DEFAUT,
     [
-      { role: 'system', content: SYSTEME_SITUATION },
+      { role: 'system', content: SYSTEME_SITUATION + consigneDeLangue() },
       { role: 'system', content: `FICHE DU JOUEUR :\n${fichePersonnage(j)}\nPoste : ${POSTE_PAR_ID[j.poste].nom}` },
       {
         role: 'user',
@@ -139,7 +140,8 @@ export async function genererSituation(opts: ContexteSituation): Promise<Scenari
           `Nous sommes à la saison ${j.saison}, ${j.club} évolue dans sa division.`,
       },
     ],
-    { temperature: 0.95, maxTokens: 1100 },
+    // Une situation à trois choix tient largement en 850 tokens.
+    { temperature: 0.95, maxTokens: 850 },
   );
   return parserSituation(brut, j, genre);
 }
@@ -214,12 +216,13 @@ export async function raconterNegociation(
         content:
           'Tu racontes, en français et à la 2e personne, une scène de négociation de contrat de rugby ' +
           '(bureau du club, agent, café en face du stade). 2 à 4 phrases, concret, sans emphase. ' +
-          'Réponds en JSON : { "recit": "…" }',
+          'Réponds en JSON : { "recit": "…" }' + consigneDeLangue(),
       },
       { role: 'system', content: fichePersonnage(opts.joueur) },
       { role: 'user', content: `Club : ${club}. Agent : ${agent}. ${consigne}` },
     ],
-    { temperature: 0.9, maxTokens: 400 },
+    // « 2 à 4 phrases » : 260 tokens suffisent, 400 étaient payés pour rien.
+    { temperature: 0.9, maxTokens: 260 },
   );
   try {
     const o = JSON.parse(brut) as { recit?: unknown };

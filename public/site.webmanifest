@@ -1,0 +1,17 @@
+{
+  "name": "Destiny Rugby — RPG de carrière de rugby",
+  "short_name": "Destiny Rugby",
+  "description": "Crée ton rugbyman, signe dans un club réel, joue tes matchs en direct et écris ta légende.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#08160f",
+  "theme_color": "#08160f",
+  "categories": ["games", "sports"],
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/og.png", "sizes": "1200x630", "type": "image/png" }
+  ]
+}

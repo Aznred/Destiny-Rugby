@@ -34,10 +34,13 @@ import { CONSIGNE_NEUTRE, lireConsigneGroq, lireConsigneLocale } from '../lib/mo
 import type { Pion } from '../lib/moteur/entites';
 import { graine, type MatchChampionnat } from '../lib/championnat';
 import { effectifDuClub } from '../lib/effectif';
+import { effectifNational } from '../lib/international';
+import { nomNation } from './Drapeau';
 import { clubParNom } from '../data/clubs';
+import { POSTE_PAR_ID } from '../data/rugby';
 import { CLE_ENV } from '../lib/groq';
 import { useGame } from '../store/useGame';
-import { Blason } from './Blason';
+import { Blason, LogoEquipe } from './Blason';
 import type { Joueur } from '../types';
 
 // ⚠️ L'ÉCHELLE DE TEMPS EST DOUBLE, et c'est ce qui rend le direct regardable.
@@ -163,12 +166,15 @@ const Fil = memo(function Fil({ lignes }: { lignes: Commentaire[]; n: number }) 
 
 // ---------------------------------------------------------------------------
 export function MatchLive({
-  match, saison, cle, titre, onFermer, onTermine, joueur,
+  match, saison, cle, titre, onFermer, onTermine, joueur, selection,
 }: {
   match: MatchChampionnat;
   saison: number;
   cle: string;
   titre: string;
+  /** Match de sélection : les « clubs » sont des nations, et leurs effectifs
+   *  sont les meilleurs joueurs réels du pays (lib/international.ts). */
+  selection?: boolean;
   onFermer: () => void;
   /** Appelé UNE FOIS à la sirène : c'est ce qui autorise le passage à la
    *  semaine suivante quand on referme la fenêtre. */
@@ -183,17 +189,23 @@ export function MatchLive({
   // jeu, le passer par l'état de React ferait des centaines de rendus.
   const moteur = useRef<EtatMatch>(null as unknown as EtatMatch);
   if (!moteur.current) {
+    const effectif = (equipe: string) =>
+      (selection ? effectifNational(equipe, saison) : effectifDuClub(equipe, saison));
+    // En sélection, « son club » est sa NATION.
+    const monEquipe = joueur ? (selection ? nomNation(joueur.nation) : joueur.club) : '';
     moteur.current = creerMatch(
       match.domicile, match.exterieur,
-      effectifDuClub(match.domicile, saison), effectifDuClub(match.exterieur, saison),
+      effectif(match.domicile), effectif(match.exterieur),
       match.scoreD, match.scoreE, cle,
-      joueur && (joueur.club === match.domicile || joueur.club === match.exterieur)
+      joueur && (monEquipe === match.domicile || monEquipe === match.exterieur)
         ? {
-            club: joueur.club, nom: joueur.nom, poste: joueur.poste,
+            club: monEquipe, nom: joueur.nom, poste: joueur.poste,
             attributs: joueur.attributs,
             // Titulaire ou remplaçant ? La confiance du staff et le niveau
-            // décident, comme pour le reste du jeu. Déterministe.
-            titulaire: estTitulaire(joueur, cle),
+            // décident, comme pour le reste du jeu. Déterministe. ⚠️ En
+            // sélection, on est toujours titulaire : on n'y est appelé que si
+            // on est au niveau.
+            titulaire: selection ? true : estTitulaire(joueur, cle),
           }
         : undefined,
     );
@@ -285,19 +297,35 @@ export function MatchLive({
     dejaEnregistre.current = true;
     onTermine?.();
     if (!monPion) return;
-    enregistrerMatchVecu({
-      essais: monPion.stats.essais,
-      plaquages: monPion.stats.plaquages,
-      plaquagesManques: monPion.stats.plaquagesManques,
-      passes: monPion.stats.passes,
-      metres: Math.round(monPion.stats.metres),
-      grattages: monPion.stats.grattages,
-      butsTentes: monPion.stats.butsTentes,
-      butsReussis: monPion.stats.butsReussis,
-      cartons: monPion.stats.cartons,
-      minutes: Math.min(80, Math.round(monPion.minutes)),
-    });
-  }, [e.fini, monPion, enregistrerMatchVecu, onTermine]);
+    // ⚠️ Le RÉSULTAT part avec les statistiques : c'est ce qui permet à la
+    // feuille de match d'être la seule entrée du journal pour ce week-end
+    // (`semaineSuivante` n'ajoute plus son récit simulé par-dessus).
+    const chezMoi = monPion.cote === 'A';
+    enregistrerMatchVecu(
+      {
+        essais: monPion.stats.essais,
+        plaquages: monPion.stats.plaquages,
+        plaquagesManques: monPion.stats.plaquagesManques,
+        passes: monPion.stats.passes,
+        metres: Math.round(monPion.stats.metres),
+        grattages: monPion.stats.grattages,
+        butsTentes: monPion.stats.butsTentes,
+        butsReussis: monPion.stats.butsReussis,
+        cartons: monPion.stats.cartons,
+        minutes: Math.min(80, Math.round(monPion.minutes)),
+      },
+      {
+        adversaire: chezMoi ? e.clubB : e.clubA,
+        scorePour: chezMoi ? e.scoreA : e.scoreB,
+        scoreContre: chezMoi ? e.scoreB : e.scoreA,
+        domicile: chezMoi,
+        // « Top 14 · 22 novembre · journée 7 » → « 22 novembre · journée 7 » :
+        // le nom de la compétition est déjà partout ailleurs dans le journal.
+        libelle: titre.split('·').slice(1).map((m) => m.trim()).filter(Boolean).join(' · ')
+          || 'Feuille de match',
+      },
+    );
+  }, [e.fini, e, monPion, enregistrerMatchVecu, onTermine, titre]);
 
   // --- LE RENDU DES PIONS ---------------------------------------------------
   // ⚠️ Interpolation exacte : le moteur avance par pas de 0,15 s, l'écran à
@@ -361,7 +389,7 @@ export function MatchLive({
       >
         <header className="ml-tete">
           <div className="ml-equipe">
-            {clubA && <Blason club={clubA} taille={30} />}
+            {clubA ? <Blason club={clubA} taille={30} /> : <LogoEquipe nom={e.clubA} taille={30} />}
             <b>{e.clubA}</b>
           </div>
           <div className="ml-score">
@@ -373,7 +401,7 @@ export function MatchLive({
           </div>
           <div className="ml-equipe droite">
             <b>{e.clubB}</b>
-            {clubB && <Blason club={clubB} taille={30} />}
+            {clubB ? <Blason club={clubB} taille={30} /> : <LogoEquipe nom={e.clubB} taille={30} />}
           </div>
           <button className="ml-fermer" onClick={onFermer} title="Fermer (Échap)">✕</button>
         </header>
@@ -494,8 +522,10 @@ export function MatchLive({
                       key={`${j.club}-${j.numero}-${j.nom}`}
                       className="ml-bilan-ligne"
                       data-moi={j.moi ? 'oui' : undefined}
+                      /* Les maillots 16 à 23 sont le banc : on les distingue. */
+                      data-banc={j.numero > 15 ? 'oui' : undefined}
                     >
-                      <span className="ml-bilan-num">{j.numero}</span>
+                      <span className="ml-bilan-num" title={POSTE_PAR_ID[j.poste]?.nom}>{j.numero}</span>
                       <span className="ml-bilan-nom">{j.nom}</span>
                       <span>{Math.round(j.stats.metres)}</span>
                       <span>{j.stats.plaquages}</span>

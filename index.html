@@ -2,17 +2,100 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#08160f" />
+
+    <!-- ===== IDENTITÉ ===== -->
+    <!-- ⚠️ Pas d'emoji dans le <title> : Google le retire de ses résultats et
+         il consomme des caractères sur les 60 qui s'affichent vraiment. -->
+    <title>Destiny Rugby — le RPG de carrière de rugby en français</title>
     <meta
       name="description"
-      content="Destiny Rugby — le RPG de carrière de rugby où une IA joue le Maître du Jeu et juge chacune de tes décisions. Des espoirs au sommet, écris ta légende."
+      content="Crée ton rugbyman, signe dans l'un des 655 clubs français réels, joue tes matchs en direct et écris ta légende. RPG de carrière de rugby gratuit, en français, avec un Maître du Jeu IA."
     />
-    <title>Destiny Rugby 🏉 — RPG de carrière de rugby</title>
+    <!-- Le canonique évite que destiny-rugby.fr, www.destiny-rugby.fr et l'URL
+         .vercel.app soient indexés comme trois sites concurrents. -->
+    <link rel="canonical" href="https://destiny-rugby.fr/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="theme-color" content="#08160f" />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- ===== ICÔNES ET INSTALLATION ===== -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/og.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- ===== PARTAGE (Open Graph / X) ===== -->
+    <!-- Sans ces balises, coller le lien dans un message affiche une carte
+         vide : c'est pourtant le premier canal de découverte d'un jeu. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Destiny Rugby" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:url" content="https://destiny-rugby.fr/" />
+    <meta property="og:title" content="Destiny Rugby — écris ta légende de l’ovalie" />
+    <meta
+      property="og:description"
+      content="Des espoirs au sommet : crée ton rugbyman, signe dans un vrai club, joue tes matchs en direct et vis ta carrière. Gratuit, en français, dans le navigateur."
+    />
+    <meta property="og:image" content="https://destiny-rugby.fr/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Un ballon de rugby en cuir sur la pelouse d’un stade nocturne" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Destiny Rugby — écris ta légende de l’ovalie" />
+    <meta
+      name="twitter:description"
+      content="RPG de carrière de rugby : 655 clubs français réels, des matchs joués en direct, un Maître du Jeu IA. Gratuit, dans le navigateur."
+    />
+    <meta name="twitter:image" content="https://destiny-rugby.fr/og.png" />
+
+    <!-- ===== PERFORMANCE ===== -->
+    <!-- Les avatars de L'Ovale et les images des publications partent vers ces
+         deux domaines : ouvrir la connexion à l'avance économise ~200 ms. -->
+    <link rel="preconnect" href="https://randomuser.me" crossorigin />
+    <link rel="dns-prefetch" href="https://commons.wikimedia.org" />
+
+    <!-- ===== DONNÉES STRUCTURÉES ===== -->
+    <!-- Google présente alors le site comme un JEU (nom, genre, plateforme,
+         gratuité) et non comme une page quelconque. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "Destiny Rugby",
+        "url": "https://destiny-rugby.fr/",
+        "image": "https://destiny-rugby.fr/og.png",
+        "description": "RPG de carrière de rugby en français : crée ton joueur, signe dans un club réel, joue tes matchs en direct et écris ta légende.",
+        "inLanguage": "fr",
+        "genre": ["Jeu de rôle", "Simulation sportive", "Gestion de carrière"],
+        "gamePlatform": ["Navigateur web", "PC", "Mobile"],
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Tout navigateur moderne",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "EUR",
+          "availability": "https://schema.org/InStock"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <!-- ⚠️ DU CONTENU POUR LES ROBOTS. L'application est rendue entièrement par
+         React : sans ce bloc, la page servie à un crawler qui n'exécute pas le
+         JavaScript est littéralement vide, et il n'y a rien à indexer. Il
+         disparaît dès que React monte (et n'est jamais vu par un joueur). -->
+    <noscript>
+      <h1>Destiny Rugby — le RPG de carrière de rugby</h1>
+      <p>
+        Destiny Rugby est un jeu de rôle de carrière de rugby, en français et gratuit.
+        Tu crées ton joueur, tu choisis ton poste et ton club parmi les 655 clubs
+        français réels — du Top 14 à la Régionale 3 — puis tu vis ta carrière saison
+        après saison : matchs joués en direct sur un vrai terrain, entraînement,
+        blessures, transferts, sélection nationale, réseau social et palmarès.
+      </p>
+      <p>Ce jeu a besoin de JavaScript. Active-le, puis recharge la page.</p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

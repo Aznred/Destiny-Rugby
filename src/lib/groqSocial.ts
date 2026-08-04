@@ -25,6 +25,7 @@ import { imagePourRequete } from './images';
 import { audienceDe, statsDePost } from './social';
 import { graine } from './championnat';
 import { avatarPourCompte } from './avatars';
+import { consigneDeLangue } from './i18n';
 
 export interface ContexteSocial {
   joueur: Joueur;
@@ -33,54 +34,62 @@ export interface ContexteSocial {
   suivis: CompteSuivi[];
 }
 
-// Ce que l'IA doit savoir du monde pour écrire juste.
+// ---------------------------------------------------------------------------
+// ⚠️ ÉCONOMIE DE TOKENS (demande explicite)
+// ---------------------------------------------------------------------------
+// Le décor était envoyé À CHAQUE APPEL avec douze coéquipiers détaillés (poste,
+// âge, note), dix clubs rivaux et la liste complète des comptes suivis — plus
+// de 300 tokens d'entrée, répétés quatre fois par semaine de jeu, pour une
+// information dont l'IA n'a besoin QUE lorsqu'elle écrit le fil du monde.
+// Deux décors désormais : le complet pour `filGroq`, et un décor court (une
+// ligne) pour tout le reste. Mesuré : ~70 % d'entrée en moins sur les
+// commentaires et les messages privés.
+function decorCourt(j: Joueur): string {
+  const division = competitionDuClub(j.club);
+  const sem = semaine(j.semaine ?? 1);
+  return `${j.nom} (@${j.pseudo}), ${POSTE_PAR_ID[j.poste].nom} de ${j.club}, `
+    + `${j.age} ans, ${nomNation(j.nation)}. ${division?.nom ?? 'championnat inconnu'}, `
+    + `saison ${j.saison}, ${libelleDate(sem)}. Réputation ${j.reputation}/100.`;
+}
+
+// Le décor complet : réservé à l'écriture du fil, qui a besoin de noms propres
+// pour ne rien inventer.
 function decor(j: Joueur, suivis: CompteSuivi[]): string {
-  const poste = POSTE_PAR_ID[j.poste];
   const division = competitionDuClub(j.club);
   const sem = semaine(j.semaine ?? 1);
   const groupe = effectifDuClub(j.club, j.saison)
-    .slice(0, 12)
-    .map((c) => `${c.nom} (${POSTE_PAR_ID[c.poste].nom}, ${c.age} ans, ${c.note})`)
-    .join(' · ');
+    .slice(0, 8)
+    .map((c) => c.nom)
+    .join(', ');
   const rivaux = (division?.clubs ?? [])
     .filter((c) => c.nom !== j.club)
-    .slice(0, 10)
+    .slice(0, 6)
     .map((c) => c.nom)
-    .join(' · ');
+    .join(', ');
   return [
-    `JOUEUR HUMAIN : ${j.nom} (@${j.pseudo}), ${poste.nom} de ${j.club}, ${j.age} ans, ${nomNation(j.nation)}.`,
-    `Championnat : ${division?.nom ?? 'inconnu'} (${division?.pays ?? 'France'}). Saison ${j.saison}, ${libelleDate(sem)} — ${sem.libelle}.`,
-    `Réputation ${j.reputation}/100, popularité ${j.popularite ?? 50}/100, ${j.abonnes ?? 0} abonnés.`,
+    decorCourt(j),
+    `Semaine : ${sem.libelle}.`,
     `Coéquipiers : ${groupe || 'inconnus'}.`,
-    `Clubs rivaux du championnat : ${rivaux || 'inconnus'}.`,
+    `Clubs rivaux : ${rivaux || 'inconnus'}.`,
     suivis.length
-      ? `Comptes déjà suivis : ${suivis.map((s) => `@${s.pseudo} (${s.nom})`).join(', ')}.`
-      : 'Le joueur ne suit encore personne.',
-  ].join('\n');
+      ? `Comptes suivis : ${suivis.slice(0, 8).map((s) => `@${s.pseudo}`).join(', ')}.`
+      : '',
+  ].filter(Boolean).join('\n');
 }
 
-const REGLES = `Tu écris le contenu d'un réseau social de rugby appelé « L'Ovale », copie de X.
-Tu écris en FRANÇAIS, avec le ton des VRAIS comptes rugby : phrases courtes, emojis
-mesurés, hashtags occasionnels, fautes de frappe chez les supporters.
-
-LES COMPTES SONT DÉBRIDÉS. Ce n'est pas un réseau aseptisé :
-- un supporter en colère insulte franchement (« t'es une catastrophe », « clown »,
-  « rends le maillot »), un hater est méchant et personnel, un joueur chambré
-  répond du tac au tac et peut envoyer très fort ;
-- si le joueur humain a insulté quelqu'un, ON LUI RÉPOND — sèchement, avec du
-  mépris ou une menace sportive (« on se retrouve dimanche »), jamais en tendant
-  l'autre joue ;
-- on peut lâcher une énormité, une punchline, une rumeur folle, un règlement de
-  comptes public entre joueurs.
-SEULE LIMITE, non négociable : aucune insulte discriminatoire (racisme, sexisme,
-homophobie, religion, handicap), aucune menace de violence réelle hors terrain,
-rien de sexuel. Le clash reste sportif et personnel, pas haineux.
-
-Les comptes de clubs et de championnats restent institutionnels, même fâchés.
-Les journalistes sourcent (« selon nos informations »).
-N'invente jamais de club qui n'existe pas dans le contexte fourni.
-Un post fait au maximum 280 caractères.
-TU RÉPONDS UNIQUEMENT EN JSON VALIDE, sans texte autour.`;
+// ⚠️ Les règles disaient trois fois la même chose en quinze lignes. Elles sont
+// resserrées sans rien perdre de ce qui compte : le ton débridé voulu par le
+// projet, et la seule limite non négociable.
+const REGLES = `Tu écris « L'Ovale », un réseau social de rugby calqué sur X, en FRANÇAIS.
+Ton : celui des vrais comptes rugby — phrases courtes, emojis mesurés, fautes de frappe chez les supporters.
+DÉBRIDÉ : un supporter en colère insulte franchement, un hater est méchant et personnel, un joueur
+chambré répond du tac au tac. Si le joueur humain agresse quelqu'un, ON LUI RÉPOND sèchement.
+Punchlines, rumeurs et règlements de comptes publics sont permis.
+SEULE LIMITE : rien de discriminatoire (racisme, sexisme, homophobie, religion, handicap),
+aucune menace de violence réelle, rien de sexuel.
+Clubs et championnats restent institutionnels. Les journalistes sourcent.
+N'invente aucun club absent du contexte. 280 caractères maximum par publication.
+Réponds UNIQUEMENT en JSON valide.`;
 
 function extraire<T>(brut: string, cle: string): T[] {
   try {
@@ -111,44 +120,51 @@ export async function filGroq(
   ctx: ContexteSocial, sujets: string[], combien = 6,
 ): Promise<PostSocial[]> {
   const j = ctx.joueur;
-  const sem = semaine(j.semaine ?? 1);
   const messages: MessageGroq[] = [
-    { role: 'system', content: `${REGLES}
+    { role: 'system', content: `${REGLES}${consigneDeLangue()}
 
-Format EXACT attendu :
-{"posts":[{
-  "auteur":"nom affiché du compte",
-  "pseudo":"identifiant sans @, sans espace",
-  "type":"joueur|club|journaliste|media|fan|hater",
-  "certifie":true|false,
-  "avatar":"un seul emoji",
-  "texte":"le post",
-  "image":"FACULTATIF ET RARE — mots-clés en anglais, ex. rugby scrum stadium. La PLUPART des posts n'ont PAS d'image : n'en mets qu'à une publication sur cinq au maximum, et seulement quand ça a du sens (résumé de match, photo officielle). Un supporter qui râle ne joint pas de photo.",
-  "action":{"type":"transfert","joueur":"nom","de":"club","vers":"club","poste":"Ailier","age":24,"note":72}
-}]}
+Format EXACT :
+{"posts":[{"auteur":"…","pseudo":"sans @ ni espace","type":"joueur|club|journaliste|media|fan|hater",
+"certifie":true|false,"texte":"…","image":"facultatif, RARE","reponses":[{"auteur":"…","pseudo":"…","type":"fan|hater|joueur|journaliste","hostile":true|false,"texte":"…"}],
+"action":{"type":"transfert","joueur":"nom","de":"club","vers":"club","poste":"Ailier","age":24,"note":72}}]}
 
-RÈGLES DES ACTIONS (facultatives, au maximum UNE par salve) :
-- "transfert" : un joueur NON-HUMAIN change de club. Les deux clubs doivent exister dans le
-  contexte. Ce transfert sera VRAIMENT appliqué au jeu : reste crédible (niveau, poste, âge).
-- N'annonce JAMAIS de transfert concernant ${j.nom} : pour lui, écris "type":"rumeur".
-- Sans action, omets simplement le champ.` },
+- "reponses" : 2 commentaires de comptes DIFFÉRENTS sous les DEUX publications les plus marquantes
+  seulement (les autres n'en ont pas). Mélange soutien et critique, "hostile":true pour les négatifs.
+- "image" : mots-clés en anglais, UNE publication sur cinq au maximum, et jamais sous un supporter
+  qui râle. Sans image, omets le champ.
+- "action" : au maximum UNE par salve. "transfert" déplace VRAIMENT un joueur NON-HUMAIN entre deux
+  clubs du contexte — reste crédible. N'annonce JAMAIS de transfert de ${j.nom}.` },
     { role: 'user', content: `${decor(j, ctx.suivis)}
 
-Actualité du moment : ${sujets.join(' · ') || 'vie ordinaire du club'}.
-Semaine : ${sem.libelle}.
+Actualité : ${sujets.slice(0, 4).join(' · ') || 'vie ordinaire du club'}.
 
-Écris ${combien} publications VARIÉES et indépendantes : annonces officielles de club,
-infos mercato, conférence de presse, petite polémique, réaction de supporters, post d'un
-coéquipier ou d'un adversaire. Elles ne parlent pas toutes du joueur humain.` },
+Écris ${combien} publications variées et indépendantes : annonce de club, mercato, conférence de
+presse, polémique, réaction de supporters, post d'un coéquipier ou d'un adversaire. Elles ne
+parlent pas toutes du joueur humain.` },
   ];
 
+  // ⚠️ UN SEUL APPEL PAR SEMAINE. Il y en avait TROIS : le fil, puis un
+  // `reponsesGroq` pour chacune des deux publications les plus lues. Les
+  // commentaires sont désormais demandés DANS la même réponse — même contenu,
+  // un tiers du coût, et une seule latence.
   const brut = await appelGroqJSON(ctx.cle, ctx.modele ?? MODELE_DEFAUT, messages, {
-    temperature: 0.95, maxTokens: 1300,
+    temperature: 0.95, maxTokens: 1100,
   });
   const posts = extraire<PostGenere>(brut, 'posts')
     .filter((p) => p && typeof p.texte === 'string' && p.texte.trim())
     .slice(0, combien)
     .map((p) => normaliser(p, j));
+
+  // Les commentaires écrits dans la même salve, remis en forme comme des posts.
+  const avecReponses = extraire<PostGenere & { reponses?: (PostGenere & { hostile?: boolean })[] }>(brut, 'posts');
+  posts.forEach((post, i) => {
+    const reps = avecReponses[i]?.reponses;
+    if (!Array.isArray(reps) || !reps.length) return;
+    post.reponses = reps
+      .filter((r) => r && typeof r.texte === 'string' && r.texte.trim())
+      .slice(0, 3)
+      .map((r) => ({ ...normaliser(r, j), hostile: !!r.hostile }));
+  });
 
   // L'IA n'a donné que des MOTS-CLÉS d'illustration : on les résout en vraies
   // images ici, en parallèle, et une image qui ne se trouve pas ne bloque rien.
@@ -202,20 +218,22 @@ export async function reponsesGroq(
 ): Promise<PostSocial[]> {
   const j = ctx.joueur;
   const messages: MessageGroq[] = [
-    { role: 'system', content: `${REGLES}
+    { role: 'system', content: `${REGLES}${consigneDeLangue()}
 
-Format EXACT : {"reponses":[{"auteur":"…","pseudo":"…","avatar":"🏉","type":"fan|hater|journaliste|media|joueur|club","certifie":false,"hostile":true|false,"texte":"…"}]}` },
-    { role: 'user', content: `${decor(j, ctx.suivis)}
+Format EXACT : {"reponses":[{"auteur":"…","pseudo":"…","type":"fan|hater|journaliste|media|joueur|club","certifie":false,"hostile":true|false,"texte":"…"}]}` },
+    // ⚠️ Décor COURT : pour commenter un tweet, l'IA n'a pas besoin de la liste
+    // des coéquipiers ni des clubs rivaux.
+    { role: 'user', content: `${decorCourt(j)}
 
-${j.nom} vient de publier (ton employé : ${ton}) :
+${j.nom} vient de publier (ton : ${ton}) :
 « ${texteDuPost} »
 
-Écris ${combien} réponses de comptes DIFFÉRENTS et réalistes. Mélange les avis : au moins un
-soutien et au moins une critique. Marque "hostile":true pour les réponses négatives.` },
+Écris ${combien} réponses de comptes DIFFÉRENTS. Mélange soutien et critique.
+"hostile":true pour les réponses négatives.` },
   ];
 
   const brut = await appelGroqJSON(ctx.cle, ctx.modele ?? MODELE_DEFAUT, messages, {
-    temperature: 1, maxTokens: 900,
+    temperature: 1, maxTokens: 480,
   });
   return extraire<PostGenere & { hostile?: boolean }>(brut, 'reponses')
     .filter((r) => r && typeof r.texte === 'string' && r.texte.trim())
@@ -224,35 +242,13 @@ soutien et au moins une critique. Marque "hostile":true pour les réponses néga
 }
 
 // --- LES COMPTES À SUIVRE --------------------------------------------------
-
-export async function comptesGroq(
-  ctx: ContexteSocial, combien = 6,
-): Promise<CompteSuivi[]> {
-  const j = ctx.joueur;
-  const messages: MessageGroq[] = [
-    { role: 'system', content: `${REGLES}
-
-Format EXACT : {"comptes":[{"nom":"…","pseudo":"…","avatar":"🏉","type":"joueur|club|journaliste|media|fan|selection","club":"nom du club ou vide","bio":"une phrase","certifie":true|false,"abonnes":12000}]}` },
-    { role: 'user', content: `${decor(j, ctx.suivis)}
-
-Propose ${combien} comptes à suivre, crédibles et VARIÉS : des coéquipiers cités plus haut,
-des joueurs de clubs rivaux, le compte officiel d'un club du championnat, un journaliste
-spécialisé, un média, un compte de supporters. Pas de doublon avec les comptes déjà suivis.` },
-  ];
-
-  const brut = await appelGroqJSON(ctx.cle, ctx.modele ?? MODELE_DEFAUT, messages, {
-    temperature: 0.9, maxTokens: 900,
-  });
-  return extraire<CompteSuivi>(brut, 'comptes')
-    .filter((c) => c && c.nom && c.pseudo)
-    .slice(0, combien)
-    .map((c) => ({
-      ...c,
-      pseudo: String(c.pseudo).replace(/[^A-Za-z0-9_]/g, '').slice(0, 20),
-      avatar: avatarPourCompte(String(c.nom), (c.type ?? 'fan') as never, c.club),
-      abonnes: Number.isFinite(c.abonnes) ? Math.max(0, Math.round(c.abonnes)) : 5000,
-    }));
-}
+//
+// ⚠️ `comptesGroq` A ÉTÉ SUPPRIMÉ. L'IA inventait des comptes — avec leur
+// nombre d'abonnés, tiré de nulle part — qui n'existaient nulle part ailleurs
+// dans le jeu : Explorer annonçait « 12 000 abonnés », le profil du même compte
+// en affichait 400, et suivre ce compte ne menait à rien. L'annuaire
+// (`lib/comptes.ts`) contient déjà 374 comptes réels et cohérents, gratuitement.
+// Voir `suggestionsLocales` dans `lib/social.ts`.
 
 // --- LES MESSAGES PRIVÉS ---------------------------------------------------
 // Groq répond à la place du compte, en gardant son caractère et l'historique.
@@ -268,34 +264,35 @@ export async function messageGroq(
         : relation > -50 ? 'Il y a du froid entre vous : tu es sec, distant, un peu méprisant.'
           : 'Vous êtes en conflit ouvert : tu es cinglant, tu ne lâches rien, tu réponds coup pour coup.';
   const j = ctx.joueur;
+  // ⚠️ Quatre messages d'historique suffisent à tenir le fil d'une conversation
+  // privée : au-delà, on repayait à chaque envoi des échanges que personne ne
+  // relit. Chaque message est aussi tronqué — un pavé ne change pas la réponse.
   const fil = historique
-    .slice(-8)
-    .map((m) => `${m.de === 'moi' ? j.nom : compte.nom} : ${m.texte}`)
+    .slice(-4)
+    .map((m) => `${m.de === 'moi' ? j.nom : compte.nom} : ${m.texte.slice(0, 180)}`)
     .join('\n');
   const messages: MessageGroq[] = [
-    { role: 'system', content: `${REGLES}
+    { role: 'system', content: `${REGLES}${consigneDeLangue()}
 
 Tu incarnes UN SEUL compte et tu réponds en message privé, à la première personne, sans
-guillemets, en 1 à 3 phrases. Tu restes dans ton rôle : un joueur parle boulot et vestiaire,
-un club reste institutionnel, un journaliste cherche une info, un supporter est direct.
-Tu peux refuser, plaisanter, relancer, t'énerver, couper court.
-Si on t'insulte, tu RÉPONDS — sèchement, avec mépris ou une menace sportive.
+guillemets, en 1 à 3 phrases. Tu restes dans ton rôle. Tu peux refuser, plaisanter, relancer,
+t'énerver, couper court. Si on t'insulte, tu RÉPONDS sèchement.
 Format EXACT : {"reponse":"…"}` },
-    { role: 'user', content: `${decor(j, ctx.suivis)}
+    // ⚠️ Décor COURT : répondre en privé ne demande ni l'effectif ni les rivaux.
+    { role: 'user', content: `${decorCourt(j)}
 
 Tu es ${compte.nom} (@${compte.pseudo}), ${compte.type}${compte.club ? ` de ${compte.club}` : ''}.
-VOTRE RELATION : ${etat} (indice ${Math.round(relation)}/100)
-${compte.bio ?? ''}
+RELATION : ${etat}
+${(compte.bio ?? '').slice(0, 120)}
 
-Conversation jusqu'ici :
 ${fil || '(aucun message)'}
 
-${j.nom} vient de t'écrire : « ${envoye} »
+${j.nom} vient de t'écrire : « ${envoye.slice(0, 300)} »
 Réponds.` },
   ];
 
   const brut = await appelGroqJSON(ctx.cle, ctx.modele ?? MODELE_DEFAUT, messages, {
-    temperature: 0.95, maxTokens: 400,
+    temperature: 0.95, maxTokens: 220,
   });
   try {
     const data = JSON.parse(brut);

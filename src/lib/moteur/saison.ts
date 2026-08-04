@@ -6,11 +6,13 @@
 // regardé en direct et celui rejoué ici sont rigoureusement identiques — mêmes
 // essais, mêmes plaquages, mêmes minutes. Aucun double comptage possible.
 
-import { affichesDeLaJournee, graine } from '../championnat';
+import { affichesDeLaJournee } from '../championnat';
 import { effectifDuClub } from '../effectif';
+import { coupeEnDirect } from '../coupe';
+import { affichesInternationales, effectifNational } from '../international';
 import { avancer, bilan, creerMatch } from './moteur';
 import type { AttributsPion } from './entites';
-import type { Joueur, PosteId } from '../../types';
+import type { PosteId } from '../../types';
 
 export interface LigneReelle {
   nom: string; club: string; numero: number; poste: PosteId; minutes: number;
@@ -33,15 +35,10 @@ export interface Avatar {
 
 export const MAX_MATCHS_PAR_JOURNEE = 8;
 
-// Titulaire ou remplaçant ? La confiance du staff et le niveau décident, de
-// façon déterministe. ⚠️ Cette fonction est partagée par le direct et par la
-// simulation de fond : sinon les deux divergeraient.
-export function estTitulaire(j: Joueur, cle: string): boolean {
-  const valeurs = Object.values(j.attributs ?? {});
-  const general = valeurs.length ? valeurs.reduce((a, b) => a + b, 0) / valeurs.length : 45;
-  const chance = 0.18 + (j.confianceCoach ?? 50) / 190 + (general - 45) / 120;
-  return graine('titu#' + cle + j.nom)() < Math.max(0.08, Math.min(0.95, chance));
-}
+// ⚠️ `estTitulaire` vit dans `moteur/titulaire.ts` : le store l'appelle à chaque
+// semaine, et l'importer d'ici tirait TOUT le moteur dans le chunk principal.
+// On la ré-exporte pour les appelants historiques.
+export { estTitulaire } from './titulaire';
 
 // Joue un match complet sans rendu et renvoie l'état final.
 export function jouerSansRendu(
@@ -58,6 +55,21 @@ export function jouerSansRendu(
   return e;
 }
 
+// Verse le bilan d'un match joué dans les lignes de statistiques.
+function verser(sortie: LigneReelle[], e: ReturnType<typeof jouerSansRendu>): void {
+  for (const j of bilan(e).parJoueur) {
+    sortie.push({
+      nom: j.nom, club: j.club, numero: j.numero, poste: j.poste,
+      minutes: j.minutes, essais: j.stats.essais, plaquages: j.stats.plaquages,
+      plaquagesManques: j.stats.plaquagesManques, passes: j.stats.passes,
+      metres: Math.round(j.stats.metres), grattages: j.stats.grattages,
+      rucksNettoyes: j.stats.rucksNettoyes, turnovers: j.stats.passesRatees,
+      butsTentes: j.stats.butsTentes, butsReussis: j.stats.butsReussis,
+      cartons: j.stats.cartons, matchs: 1,
+    });
+  }
+}
+
 export function simulerJournee(
   divisionId: string, saison: number, journee: number, clubJoueur: string,
   bonusJoueur: number, numeroPoule: number | undefined, avatar?: Avatar,
@@ -71,22 +83,68 @@ export function simulerJournee(
     if (!a.match) continue;
     const cle = `${divisionId}#${saison}#${journee - 1}#${a.domicile}#${a.exterieur}`;
     const concerne = avatar && (avatar.club === a.domicile || avatar.club === a.exterieur);
-    const e = jouerSansRendu(
+    verser(sortie, jouerSansRendu(
       a.domicile, a.exterieur, saison, a.match.scoreD, a.match.scoreE, cle,
       concerne ? avatar : undefined,
-    );
+    ));
+  }
+  return sortie;
+}
 
-    for (const j of bilan(e).parJoueur) {
-      sortie.push({
-        nom: j.nom, club: j.club, numero: j.numero, poste: j.poste,
-        minutes: j.minutes, essais: j.stats.essais, plaquages: j.stats.plaquages,
-        plaquagesManques: j.stats.plaquagesManques, passes: j.stats.passes,
-        metres: Math.round(j.stats.metres), grattages: j.stats.grattages,
-        rucksNettoyes: j.stats.rucksNettoyes, turnovers: j.stats.passesRatees,
-        butsTentes: j.stats.butsTentes, butsReussis: j.stats.butsReussis,
-        cartons: j.stats.cartons, matchs: 1,
-      });
+// ---------------------------------------------------------------------------
+// LES COUPES D'EUROPE
+// ---------------------------------------------------------------------------
+// ⚠️ Une journée de coupe se rejoue exactement comme une journée de championnat.
+// Sans ça, les statistiques d'une semaine européenne n'existaient tout
+// simplement pas : le joueur regardait son match, et le lendemain il était le
+// seul de la compétition à avoir des chiffres.
+export function simulerJourneeCoupe(
+  coupeId: string, saison: number, journee: number, clubJoueur: string, avatar?: Avatar,
+): LigneReelle[] {
+  const etat = coupeEnDirect(coupeId, saison, clubJoueur, journee);
+  if (!etat) return [];
+  const sortie: LigneReelle[] = [];
+  let joues = 0;
+  for (let p = 0; p < etat.poules.length; p++) {
+    const journees = etat.poules[p].journees;
+    const matchs = journees[journee - 1];
+    if (!matchs) continue;
+    for (const m of matchs) {
+      if (joues++ >= MAX_MATCHS_PAR_JOURNEE) break;
+      const cle = `${coupeId}#${saison}#${p}#${journee - 1}#${m.domicile}#${m.exterieur}`;
+      const concerne = avatar && (avatar.club === m.domicile || avatar.club === m.exterieur);
+      verser(sortie, jouerSansRendu(
+        m.domicile, m.exterieur, saison, m.scoreD, m.scoreE, cle,
+        concerne ? avatar : undefined,
+      ));
     }
+  }
+  return sortie;
+}
+
+// ---------------------------------------------------------------------------
+// LES SÉLECTIONS NATIONALES
+// ---------------------------------------------------------------------------
+// Un test-match se joue avec le MÊME moteur, à ceci près que les « clubs » sont
+// des sélections : leur effectif est composé des meilleurs joueurs réels de la
+// nation (`effectifNational`).
+export function simulerJourneeInternationale(
+  competitionId: string, saison: number, journee: number, avatar?: Avatar,
+): LigneReelle[] {
+  const affiches = affichesInternationales(competitionId, saison, journee, journee, null);
+  const sortie: LigneReelle[] = [];
+  for (const a of affiches.slice(0, MAX_MATCHS_PAR_JOURNEE)) {
+    if (!a.match) continue;
+    const cle = `${competitionId}#${saison}#${journee - 1}#${a.domicile}#${a.exterieur}`;
+    const concerne = avatar && (avatar.club === a.domicile || avatar.club === a.exterieur);
+    const e = creerMatch(
+      a.domicile, a.exterieur,
+      effectifNational(a.domicile, saison), effectifNational(a.exterieur, saison),
+      a.match.scoreD, a.match.scoreE, cle, concerne ? avatar : undefined,
+    );
+    let garde = 0;
+    while (!e.fini && garde++ < 4000) avancer(e, 8);
+    verser(sortie, e);
   }
   return sortie;
 }

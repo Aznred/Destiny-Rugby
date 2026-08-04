@@ -103,13 +103,15 @@ function planVide(total: number, rng: () => number): PlanDeScore {
   };
 }
 
-// ⚠️ LE BANC EST UN VRAI BANC DE RUGBY : 5 avants + 3 arrières (16-23), à leur
-// poste. Prendre « les huit meilleurs restants » donnait un banc de
-// trois-quarts, et un arrière entrait en pilier — vu à l'écran : Blair
-// Kinghorn avec le n°1 sur la feuille de match.
+// ⚠️ LE BANC EST UN VRAI BANC DE RUGBY : 5 avants + 3 arrières, dans l'ordre
+// CONVENTIONNEL des maillots 16 à 23 — 16 talonneur, 17 et 18 piliers,
+// 19 deuxième ligne, 20 troisième ligne, 21 demi de mêlée, 22 ouvreur,
+// 23 trois-quarts polyvalent. Prendre « les huit meilleurs restants » donnait
+// un banc de trois-quarts, et un arrière entrait en pilier.
+// L'index dans ce tableau + 16 EST le numéro de maillot du remplaçant.
 const BANC_TYPE: PosteId[] = [
-  'pilier_gauche', 'talonneur', 'pilier_droit', 'deuxieme_ligne_g',
-  'troisieme_aile_g', 'demi_melee', 'demi_ouverture', 'premier_centre',
+  'talonneur', 'pilier_gauche', 'pilier_droit', 'deuxieme_ligne_d',
+  'troisieme_aile_d', 'demi_melee', 'demi_ouverture', 'deuxieme_centre',
 ];
 
 // La feuille de match : chaque maillot 1-15 va au meilleur joueur DISPONIBLE à
@@ -188,7 +190,8 @@ export function creerMatch(
     t: 0, sim: 0, reliquat: 0, minute: 0, periode: 1, sirene: false,
     phase: 'coupEnvoi', minuteur: ARRETS.coupEnvoi.visuel,
     pions, ballon: { x: MILIEU, y: AXE }, porteur: null, possession, vol: null,
-    lancement: null, ouvert: 1, phasesDepuisArret: 0, ligneAvantage: MILIEU, metresGagnesPhase: 0,
+    lancement: null, ouvert: 1, phasesDepuisArret: 0, ligneAvantage: MILIEU,
+    origine: { x: MILIEU, y: AXE }, metresGagnesPhase: 0,
     ballonLent: false, derniereTouche: null, perceeSignalee: false, aide: 0,
     systeme: 'blitz', ligneDef: MILIEU, horsJeu: MILIEU, gardeRuck: 0,
     scoreA: 0, scoreB: 0,
@@ -642,7 +645,7 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const lancement = e.lancement;
   const suivant = lancement && lancement.index + 1 < lancement.chaine.length
     ? lancement.chaine[lancement.index + 1] : null;
-  if (suivant && suivant.surLeTerrain && pression <= (porteur.avant ? 2.6 : 3.7)) {
+  if (suivant && suivant.surLeTerrain && pression <= (porteur.avant ? 3.4 : 3.7)) {
     return passerLeBallon(e, porteur, suivant, pression);
   }
 
@@ -869,7 +872,13 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
 }
 
 function formerRuck(e: EtatMatch, lieu: Vec): void {
-  e.ballon = { x: lieu.x, y: lieu.y };
+  // ⚠️ UN RUCK NE SE FORME JAMAIS DANS L'EN-BUT ni sur la ligne de touche : là
+  // c'est un essai, un renvoi ou une touche. Sans cette borne, le regroupement
+  // se formait derrière la ligne de ballon mort et tout le monde s'y agglutinait.
+  e.ballon = {
+    x: borner(lieu.x, LIGNE_A + 0.5, LIGNE_B - 0.5),
+    y: borner(lieu.y, 1.2, LARGEUR - 1.2),
+  };
   e.porteur = null;
   e.vol = null;
   e.phase = 'ruck';
@@ -1279,6 +1288,7 @@ function reprendreJeu(e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?
   e.perceeSignalee = false;
   e.cibleRenvoi = null; // le ballon est vivant : plus de coup d'envoi en attente
   e.ligneAvantage = lieu.x;
+  e.origine = { x: lieu.x, y: lieu.y };
   e.metresGagnesPhase = 0;
 
   // ⚠️ LA LIGNE DÉFENSIVE DOIT ÊTRE REPOSÉE À CHAQUE REPRISE. Sans ça elle
@@ -1455,10 +1465,22 @@ function choisirLancement(
   // Temps de jeu suivants : les deux tiers se jouent au ras ou au premier
   // temps — comme dans un vrai match, où l'on n'écarte qu'une phase sur cinq.
   if (envie < 0.52) {
-    return { type: 'ras', chaine: [neuf, percuteur].filter(Boolean) as Pion[], index: 0, libelle: 'percussion au ras' };
+    // ⚠️ UN TEMPS AU RAS NE PASSE PAS TOUJOURS PAR LE 9 : une fois sur trois,
+    // l'avant ramasse lui-même au pied du ruck (« pick and go »). Sans ça le
+    // demi de mêlée touchait 80 ballons et faisait 80 passes par match, là où
+    // les avants n'en faisaient aucune.
+    const pick = e.rng() < 0.34;
+    return {
+      type: pick ? 'pickAndGo' : 'ras',
+      chaine: relais(e, pick ? [percuteur] : [neuf, percuteur], liste),
+      index: 0, libelle: pick ? 'le ballon repart au ras' : 'percussion au ras',
+    };
   }
   if (envie < 0.72) {
-    return { type: 'pod', chaine: [neuf, dix, percuteur].filter(Boolean) as Pion[], index: 0, libelle: 'bloc d’avants' };
+    return {
+      type: 'pod', chaine: relais(e, [neuf, dix, percuteur], liste), index: 0,
+      libelle: 'bloc d’avants',
+    };
   }
   if (envie < 0.85) {
     return { type: 'large', chaine: chaineCourte, index: 0, libelle: 'un temps sur les centres' };
@@ -1474,6 +1496,20 @@ function choisirLancement(
     return { type: 'ras', chaine: [porteurImpose], index: 0, libelle: 'percussion' };
   }
   return { type: 'large', chaine: chaineLarge, index: 0, libelle: 'écarter à l’aile' };
+}
+
+// LA PASSE AU RAS ENTRE AVANTS (« tip-on »). Deux fois sur cinq, le porteur du
+// bloc redonne à l'avant qui suit au lieu de rentrer seul dans la défense.
+// C'est ce qui donne aux avants leurs deux passes par match — sans ça, un
+// pilier finissait la saison à zéro passe.
+function relais(e: EtatMatch, chaine: (Pion | undefined)[], liste: Pion[]): Pion[] {
+  const base = chaine.filter(Boolean) as Pion[];
+  const dernier = base[base.length - 1];
+  if (!dernier || !dernier.avant || e.rng() > 0.55) return base;
+  const suivant = liste
+    .filter((p) => p.avant && p !== dernier && !base.includes(p) && p.role !== 'ruck')
+    .sort((a, b) => distance2(a.pos, dernier.pos) - distance2(b.pos, dernier.pos))[0];
+  return suivant ? [...base, suivant] : base;
 }
 
 // ⚠️ LE PERCUTEUR TOURNE. Prendre systématiquement « l'avant le plus proche du
@@ -1591,8 +1627,21 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
 // REMPLACEMENTS, FIN DE PÉRIODE
 // ---------------------------------------------------------------------------
 
+// ⚠️ LE BANC ENTRE VRAIMENT, ET À L'HEURE. Le seul critère était l'endurance :
+// dans un club aux gros moteurs (mesuré au Stade Toulousain), aucun titulaire ne
+// passait sous le seuil et les HUIT remplaçants finissaient le match sur la
+// touche — un banc pour rien, et jamais un maillot 16-23 sur la feuille.
+// Au rugby, les changements suivent d'abord L'HORLOGE : la première ligne
+// tourne autour de la 50ᵉ, les gros de devant vers la 58ᵉ, les lignes arrière
+// dans le dernier quart d'heure. La fatigue ne fait qu'avancer l'échéance.
+const MINUTE_ENTREE: Record<number, number> = {
+  16: 52, 17: 50, 18: 50, 19: 58, 20: 56, 21: 63, 22: 66, 23: 62,
+};
+
 function gererRemplacements(e: EtatMatch): void {
   if (!PHASES_ARRETEES.has(e.phase)) return; // on ne change qu'à l'arrêt de jeu
+  const famille = (x: Pion) => POSTE_PAR_ID[x.poste]?.famille;
+
   for (const cote of ['A', 'B'] as Cote[]) {
     const faits = cote === 'A' ? e.remplacementsA : e.remplacementsB;
     if (faits >= 8) continue;
@@ -1600,34 +1649,43 @@ function gererRemplacements(e: EtatMatch): void {
     const banc = e.pions.filter((p) => p.cote === cote && !p.surLeTerrain && p.sanction <= 0 && p.minutes === 0);
     if (!banc.length) continue;
 
-    // On sort d'abord ceux qui n'ont plus de jambes. L'avatar n'est remplacé
-    // qu'à partir de la 62ᵉ, et seulement s'il est vraiment cuit.
-    const fatigues = sur
-      .filter((p) => p.endurance < (p.avant ? 36 : 28) && (!p.moi || e.minute >= 62))
-      .sort((a, b) => a.endurance - b.endurance);
-    if (!fatigues.length) continue;
+    // ⚠️ ON APPARIE LE POSTE. Le remplaçant prend la place d'un titulaire de son
+    // poste (à défaut de sa famille, à défaut de sa catégorie), jamais « le
+    // premier venu » : un arrière est déjà entré pilier. Seuls les TITULAIRES
+    // sortent — on ne remplace pas un remplaçant. L'avatar n'est sorti qu'à
+    // partir de la 62ᵉ.
+    const remplacable = (p: Pion) => p.numero <= 15 && (!p.moi || e.minute >= 62);
+    const chercherSortant = (entrant: Pion): Pion | undefined => {
+      const exact = sur.filter((p) => remplacable(p) && p.poste === entrant.poste);
+      const proche = sur.filter((p) => remplacable(p) && famille(p) === famille(entrant));
+      const large = sur.filter((p) => remplacable(p) && p.avant === entrant.avant);
+      const pool = exact.length ? exact : proche.length ? proche : large;
+      // Dans le secteur concerné, c'est le plus émoussé qui cède sa place.
+      return pool.sort((a, b) => a.endurance - b.endurance)[0];
+    };
 
-    // ⚠️ ON APPARIE LE POSTE. Un remplaçant n'entre qu'à son poste (ou dans sa
-    // famille), jamais « le premier du banc » : un arrière est entré pilier.
-    const famille = (x: Pion) => POSTE_PAR_ID[x.poste]?.famille;
-    let sortant: Pion | undefined;
-    let entrant: Pion | undefined;
-    for (const f of fatigues) {
-      const e2 = banc.find((p) => p.poste === f.poste)
-        ?? banc.find((p) => famille(p) === famille(f))
-        ?? banc.find((p) => p.avant === f.avant);
-      if (e2) { sortant = f; entrant = e2; break; }
-    }
-    // Si l'avatar attend sur le banc à ce poste, c'est lui qui entre.
-    if (sortant) {
-      const moi = banc.find((p) => p.moi && (p.poste === sortant!.poste || famille(p) === famille(sortant!)));
-      if (moi) entrant = moi;
-    }
+    // Qui a le droit d'entrer maintenant ? L'heure prévue pour son maillot —
+    // avancée de dix minutes si celui qu'il doit relayer est déjà cuit.
+    const pret = banc
+      .map((p) => ({ p, cible: chercherSortant(p), heure: MINUTE_ENTREE[p.numero] ?? 60 }))
+      .filter((x) => {
+        if (!x.cible) return false;
+        const cuit = x.cible.endurance < (x.cible.avant ? 42 : 34);
+        return e.minute >= (cuit ? x.heure - 10 : x.heure);
+      })
+      .sort((a, b) => a.heure - b.heure || a.p.numero - b.p.numero);
+    if (!pret.length) continue;
+
+    const entrant = pret[0].p;
+    const sortant = pret[0].cible;
     if (!sortant || !entrant) continue;
 
     sortant.surLeTerrain = false;
     entrant.surLeTerrain = true;
-    entrant.numero = sortant.numero;
+    // ⚠️ LE REMPLAÇANT GARDE SON NUMÉRO (16 à 23). Il héritait de celui du
+    // sortant : sur la feuille de match, huit joueurs entraient avec un maillot
+    // de 1 à 15 et le banc n'apparaissait nulle part. Au rugby, le 18 qui
+    // remplace le 3 reste le 18 — il prend juste sa PLACE sur le terrain.
     entrant.poste = sortant.poste;
     entrant.avant = sortant.avant;
     entrant.pos = { x: sortant.pos.x, y: sortant.pos.y };

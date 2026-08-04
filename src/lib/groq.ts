@@ -1,5 +1,6 @@
 import type { Joueur, ReponseMJ } from '../types';
 import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
+import { consigneDeLangue } from './i18n';
 
 // Appel direct à l'API Groq (compatible OpenAI). La clé est saisie par le
 // joueur dans l'app et stockée en localStorage — JAMAIS codée en dur.
@@ -12,21 +13,22 @@ export const MODELE_DEFAUT = 'llama-3.3-70b-versatile';
 export const CLE_ENV: string =
   (import.meta.env.VITE_GROQ_KEY as string | undefined)?.trim() || '';
 
+// ⚠️ COMPACTÉE (économie de tokens). Une fiche sur neuf lignes, renvoyée à
+// CHAQUE action, pour une information qui tient en trois. Les titres sont
+// bornés aux trois derniers : au bout de dix saisons, le palmarès pesait plus
+// lourd que l'action du joueur.
 function fichePersonnage(j: Joueur): string {
   const poste = POSTE_PAR_ID[j.poste];
   const attrs = Object.entries(j.attributs)
-    .map(([k, v]) => `${ATTRIBUTS_LABELS[k] ?? k}: ${v}`)
+    .map(([k, v]) => `${ATTRIBUTS_LABELS[k] ?? k} ${v}`)
     .join(', ');
+  const titres = j.titres.slice(-3);
   return [
-    `Nom: ${j.nom}`,
-    `Poste: ${poste.nom} (${poste.numero})`,
-    `Nation: ${j.nation}`,
-    `Club: ${j.club}`,
-    `Âge: ${j.age} ans — Saison ${j.saison}`,
-    `Forme: ${j.forme}/100 — Moral: ${j.moral}/100 — Réputation: ${j.reputation}/100`,
-    `Argent: ${j.argent} €`,
-    `Attributs — ${attrs}`,
-    `Matchs joués: ${j.matchsJoues} — Essais: ${j.essais} — Titres: ${j.titres.join(', ') || 'aucun'}`,
+    `${j.nom}, ${poste.nom} (${poste.numero}) de ${j.club}, ${j.age} ans, ${j.nation}. Saison ${j.saison}.`,
+    `Forme ${j.forme} · Moral ${j.moral} · Réputation ${j.reputation} · ${j.argent} €.`,
+    `Attributs : ${attrs}.`,
+    `${j.matchsJoues} matchs, ${j.essais} essais.`
+      + (titres.length ? ` Derniers titres : ${titres.join(', ')}.` : ' Aucun titre.'),
   ].join('\n');
 }
 
@@ -39,7 +41,8 @@ PRINCIPES DE SÉVÉRITÉ (non négociables) :
 - Par DÉFAUT, une action ne change presque rien : {} ou un seul point. Une semaine
   d'entraînement ne transforme personne.
 - Un gain d'attribut se mérite : action précise, répétée, cohérente avec le poste, et
-  compatible avec l'âge (après 30 ans on ne progresse quasiment plus, on entretient).
+  compatible avec l'âge (on progresse jusqu'à 31 ans, on entretient ensuite, et
+  après 36 ans on ne fait plus que limiter la casse).
 - L'ÉCHEC est fréquent et normal : fatigue, blessure, contre-performance, coach qui ne
   te retient pas. Une action ambitieuse tentée avec une forme basse échoue souvent.
 - L'argent vient d'un salaire ou d'un sponsor crédible pour le NIVEAU du joueur, jamais
@@ -100,8 +103,35 @@ export interface MessageGroq {
   content: string;
 }
 
-// Un appel Groq qui renvoie du JSON. Mutualisé : le MJ (actions libres) et la
-// couche « situations » (lib/ia.ts) passent tous les deux par ici.
+// ---------------------------------------------------------------------------
+// LA CONSOMMATION, MESURÉE
+// ---------------------------------------------------------------------------
+// ⚠️ Demande explicite : « économie de tokens Groq ». On ne peut pas économiser
+// ce qu'on ne mesure pas — Groq renvoie l'`usage` exact de chaque appel, on le
+// cumule ici et ⚙️ Réglages l'affiche. Le compteur vit dans un module (pas dans
+// la sauvegarde) : il compte la SESSION, ce qui est exactement ce qu'on veut
+// surveiller quand on joue.
+export interface ConsoGroq {
+  appels: number;
+  entree: number;  // tokens de prompt
+  sortie: number;  // tokens générés
+}
+
+const conso: ConsoGroq = { appels: 0, entree: 0, sortie: 0 };
+
+export function consoGroq(): ConsoGroq {
+  return { ...conso };
+}
+
+export function reinitialiserConsoGroq(): void {
+  conso.appels = 0;
+  conso.entree = 0;
+  conso.sortie = 0;
+}
+
+// Un appel Groq qui renvoie du JSON. Mutualisé : le MJ (actions libres), les
+// situations (lib/ia.ts), L'Ovale (lib/groqSocial.ts) et le coaching en direct
+// passent tous par ici — c'est donc LE point où l'on mesure et où l'on borne.
 export async function appelGroqJSON(
   cle: string,
   modele: string,
@@ -118,7 +148,7 @@ export async function appelGroqJSON(
       model: modele,
       messages,
       temperature: options.temperature ?? 0.85,
-      max_tokens: options.maxTokens ?? 900,
+      max_tokens: options.maxTokens ?? 700,
       response_format: { type: 'json_object' },
     }),
   });
@@ -135,6 +165,10 @@ export async function appelGroqJSON(
   }
 
   const data = await res.json();
+  const usage = data?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+  conso.appels += 1;
+  conso.entree += usage?.prompt_tokens ?? 0;
+  conso.sortie += usage?.completion_tokens ?? 0;
   return (data?.choices?.[0]?.message?.content as string) ?? '{}';
 }
 
@@ -148,15 +182,21 @@ export async function demanderAuMJ({
   action,
 }: OptionsAppel): Promise<ReponseMJ> {
   const messages: MessageGroq[] = [
-    { role: 'system', content: SYSTEME },
+    // ⚠️ LA LANGUE EN TÊTE DE PROMPT. Traduire les boutons ne sert à rien si
+    // le récit du MJ — c'est-à-dire l'essentiel de ce qu'on lit — reste en
+    // français. Vide quand on joue en français : pas un token gaspillé.
+    { role: 'system', content: SYSTEME + consigneDeLangue() },
     {
       role: 'system',
       content: `FICHE ACTUELLE DU JOUEUR :\n${fichePersonnage(joueur)}`,
     },
-    ...historique.slice(-8),
+    // ⚠️ SIX MESSAGES D'HISTORIQUE, TRONQUÉS (économie de tokens). Huit récits
+    // complets du MJ, c'était plus de 1 200 tokens d'entrée à chaque action —
+    // pour un contexte dont seules les dernières lignes servent vraiment.
+    ...historique.slice(-6).map((m) => ({ ...m, content: m.content.slice(0, 600) })),
     { role: 'user', content: action },
   ];
-  return parserReponse(await appelGroqJSON(cle, modele, messages));
+  return parserReponse(await appelGroqJSON(cle, modele, messages, { maxTokens: 700 }));
 }
 
 function parserReponse(brut: string): ReponseMJ {
@@ -248,8 +288,11 @@ export function plafonnerDeltas(
   const deltas: Record<string, number> = {};
   let attributsGagnes = 0;
   let recadre = false;
-  // Après 30 ans on n'ajoute plus grand-chose ; les pertes, elles, passent toujours.
-  const facteurAge = limites.age >= 33 ? 0 : limites.age >= 30 ? 0.5 : 1;
+  // ⚠️ Aligné sur « potentiel jusqu'à 31 » : on progresse encore à plein
+  // jusqu'à 31 ans, à moitié jusqu'à 35, et plus du tout ensuite. Le seuil
+  // était à 30/33, incohérent depuis que la carrière peut aller jusqu'à 44 ans.
+  // Les PERTES, elles, passent toujours, à tout âge.
+  const facteurAge = limites.age >= 36 ? 0 : limites.age >= 32 ? 0.5 : 1;
 
   for (const [cle, valeurBrute] of Object.entries(bruts)) {
     let v = Math.round(valeurBrute);

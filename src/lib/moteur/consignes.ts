@@ -11,6 +11,7 @@
 //      mots-clés rateraient.
 
 import { appelGroqJSON, MODELE_DEFAUT, type MessageGroq } from '../groq';
+import { consigneDeLangue } from '../i18n';
 import type { ConsigneJoueur } from './etat';
 
 export const CONSIGNE_NEUTRE: ConsigneJoueur = {
@@ -62,7 +63,7 @@ Réponds UNIQUEMENT en JSON valide :
 - largeur : négatif = il se recentre dans l'axe, positif = il cherche le large, l'aile.
 - agressivite : 0 = il attend, il temporise ; 1 = il se propose systématiquement au
   ras du ruck, il réclame le ballon.
-- libelle : la consigne reformulée en 5 mots maximum, en français.`,
+- libelle : la consigne reformulée en 5 mots maximum.` + consigneDeLangue(),
     },
     { role: 'user', content: `${contexte}\n\nConsigne du joueur : « ${texte} »` },
   ];

@@ -69,10 +69,17 @@ console.log('\n=== 3. PAS DE DOUBLE COMPTAGE ===');
   const avant = useGame.getState().joueur!;
   console.log(`  départ : ${avant.saisonEnCours?.matchs ?? 0} match, générale ${Math.round(Object.values(avant.attributs).reduce((a, b) => a + b, 0) / 8)}`);
 
-  useGame.getState().enregistrerMatchVecu({
-    essais: 2, plaquages: 5, plaquagesManques: 0, passes: 4, metres: 130,
-    grattages: 0, butsTentes: 0, butsReussis: 0, cartons: 0, minutes: 80,
-  });
+  const journalAvant = useGame.getState().journal.length;
+  useGame.getState().enregistrerMatchVecu(
+    {
+      essais: 2, plaquages: 5, plaquagesManques: 0, passes: 4, metres: 130,
+      grattages: 0, butsTentes: 0, butsReussis: 0, cartons: 0, minutes: 80,
+    },
+    {
+      adversaire: 'Stade Rochelais', scorePour: 27, scoreContre: 22,
+      domicile: true, libelle: '6 septembre · journée 2',
+    },
+  );
   const apresMatch = useGame.getState().joueur!;
   console.log(`  après le match vécu : ${apresMatch.saisonEnCours?.matchs} match · ${apresMatch.saisonEnCours?.essais} essais · note ${apresMatch.saisonEnCours?.notes.join(', ')}`);
 
@@ -82,7 +89,16 @@ console.log('\n=== 3. PAS DE DOUBLE COMPTAGE ===');
   const ok = apresSemaine.saisonEnCours?.matchs === 1 && apresSemaine.saisonEnCours?.notes.length === 1;
   console.log(`  pas de doublon : ${ok ? '✅' : '❌'}`);
   console.log(`  semaine : ${avant.semaine} → ${apresSemaine.semaine}`);
-  const feuille = useGame.getState().journal.filter((x) => x.titre?.includes('Feuille de match'));
+  const journal = useGame.getState().journal;
+  const feuille = journal.filter((x) => x.titre?.startsWith('📋'));
   console.log(`  entrée de journal : ${feuille.length ? '« ' + feuille[0].titre + ' » ✅' : '❌ absente'}`);
   if (feuille.length) console.log(`    ${feuille[0].texte}`);
+
+  // ⚠️ UN SEUL RÉSUMÉ DE MATCH POUR LE WEEK-END. Le bug vu en jeu : la feuille
+  // de match (32′ jouées) était suivie du récit simulé « tu n'es pas retenu
+  // dans le groupe » — deux résumés contradictoires pour la même journée.
+  const ajoutees = journal.slice(journalAvant);
+  const resumes = ajoutees.filter((x) => /📋|🏉|🎯|👕|🏳️/.test(x.titre ?? ''));
+  console.log(`  résumés de match ajoutés cette semaine : ${resumes.length} ${resumes.length === 1 ? '✅' : '❌'}`);
+  for (const r of resumes) console.log(`    · ${r.titre}`);
 }

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
 import { Jauge } from './Jauge';
 import { useGame, noteGlobale, bonusClubDuJoueur } from '../store/useGame';
@@ -13,7 +14,14 @@ import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store
 import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID } from '../data/traits';
 import { matchDeLaSemaine } from '../lib/matchLive';
-import { MatchLive } from './MatchLive';
+import { matchInternationalDuJoueur } from '../lib/international';
+import { convocation } from '../lib/selection';
+// ⚠️ LE MATCH EN DIRECT ARRIVE AU CLIC, pas au chargement de la page. Ce
+// composant tire derrière lui tout `lib/moteur/` (le terrain, la tactique, les
+// phases arrêtées, les pools de commentaire) : il pesait dans le chunk
+// principal alors qu'on ne l'ouvre qu'un week-end sur deux, et jamais avant
+// d'avoir créé un joueur.
+const MatchLive = lazy(() => import('./MatchLive').then((m) => ({ default: m.MatchLive })));
 import type { Joueur } from '../types';
 
 const EMOJI_POSTE: Record<string, string> = {
@@ -48,7 +56,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const [reconversion, setReconversion] = useState(RECONVERSIONS[0].id);
   const finDeCarriere = joueur.age >= AGE_RETRAITE_LIBRE;
   const amis = amisPresents(joueur, joueur.saison);
-  const entrainer = useGame((st) => st.entrainer);
+  const choisirFocus = useGame((st) => st.choisirFocus);
   const dejaEntraine = joueur.entrainementSemaine === (joueur.semaine ?? 1);
   const blesse = !!joueur.blessure && joueur.blessure.semaines > 0;
   // LE MATCH DE LA SEMAINE : s'il y en a un, c'est LUI qu'on joue, et c'est lui
@@ -56,12 +64,26 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const [matchOuvert, setMatchOuvert] = useState(false);
   const [matchTermine, setMatchTermine] = useState(false);
   const matchRegarde = useGame((s) => s.matchRegarde);
+  // ⚠️ UNE SEMAINE INTERNATIONALE A AUSSI SON MATCH. On ne voyait ni affiche ni
+  // compétition pendant le Tournoi ou la tournée d'automne : la sélection se
+  // joue maintenant comme un match de club (lib/international.ts).
+  const inter = useMemo(() => {
+    if (rythme !== 'semaine' || semaineActuelle.type !== 'international') return null;
+    if (!convocation(joueur).selectionne) return null;
+    return matchInternationalDuJoueur(joueur, bonusClubDuJoueur(joueur));
+  }, [joueur, rythme, semaineActuelle.type]);
+
   const affiche = useMemo(
-    () => (rythme === 'semaine' ? matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur)) : null),
-    [joueur, rythme],
+    () => (rythme === 'semaine' && !inter
+      ? matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur))
+      : inter
+        ? { journee: inter.journee, match: inter.match, cle: inter.cle }
+        : null),
+    [joueur, rythme, inter],
   );
+  const monEquipe = inter ? nomNation(joueur.nation) : joueur.club;
   const adversaire = affiche
-    ? (affiche.match.domicile === joueur.club ? affiche.match.exterieur : affiche.match.domicile)
+    ? (affiche.match.domicile === monEquipe ? affiche.match.exterieur : affiche.match.domicile)
     : null;
   // Déjà suivi cette semaine ? Alors on repasse sur les boutons classiques.
   const matchAJouer = !!affiche && !blesse
@@ -174,19 +196,29 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       </div>
       {rythme === 'semaine' ? (
         <>
+          {/* ⚠️ L'ENTRAÎNEMENT EST PERMANENT. On ne clique plus sur un secteur
+              chaque semaine : on choisit ce qu'on travaille, la séance se fait
+              toute seule à chaque semaine jouée, et on peut changer quand on
+              veut. */}
           <div className="entrainement">
             <div className="entr-tete">
-              💪 <b>Séance de la semaine</b>
-              <span>{dejaEntraine ? 'déjà faite' : blesse ? 'à l’infirmerie' : 'choisis un secteur'}</span>
+              💪 <b>Ce que tu travailles</b>
+              <span>
+                {blesse ? 'à l’infirmerie'
+                  : joueur.entrainementFocus
+                    ? `${ATTRIBUTS_LABELS[joueur.entrainementFocus]}${dejaEntraine ? ' · séance faite' : ' · chaque semaine'}`
+                    : 'choisis un secteur'}
+              </span>
             </div>
             <div className="entr-boutons">
               {(Object.keys(joueur.attributs) as (keyof Joueur['attributs'])[]).map((k) => (
                 <button
                   key={k}
                   type="button"
-                  disabled={dejaEntraine || blesse}
-                  onClick={() => entrainer(k)}
-                  title={`Travailler ${ATTRIBUTS_LABELS[k].toLowerCase()} (−4 de forme)`}
+                  className={joueur.entrainementFocus === k ? 'actif' : undefined}
+                  disabled={blesse}
+                  onClick={() => choisirFocus(k)}
+                  title={`Travailler ${ATTRIBUTS_LABELS[k].toLowerCase()} chaque semaine (−4 de forme par séance)`}
                 >
                   {ATTRIBUTS_LABELS[k]}
                 </button>
@@ -232,8 +264,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               onClick={() => setMatchOuvert(true)}
               title={`Suivre ${affiche!.match.domicile} – ${affiche!.match.exterieur} en direct`}
             >
-              ▶️ <b>Jouer le match</b>
-              <span>J{affiche!.journee} · {affiche!.match.domicile === joueur.club ? 'reçoit' : 'à'} {adversaire}</span>
+              ▶️ <b>{inter ? 'Jouer avec ta sélection' : 'Jouer le match'}</b>
+              <span>
+                {inter ? `${inter.competition.emoji} ${inter.competition.nom}` : `J${affiche!.journee}`}
+                {' · '}{affiche!.match.domicile === monEquipe ? 'reçoit' : 'à'} {adversaire}
+              </span>
             </button>
           ) : (
             <div className="pj-avancer">
@@ -350,12 +385,16 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       </AnimatePresence>
 
       {matchOuvert && affiche && (
+        <Suspense fallback={null}>
         <MatchLive
           match={affiche.match}
           saison={joueur.saison}
           cle={affiche.cle}
           joueur={joueur}
-          titre={`${division?.nom ?? 'Championnat'} · ${libelleDate(semaineActuelle)} · journée ${affiche.journee}`}
+          selection={!!inter}
+          titre={inter
+            ? `${inter.competition.nom} · ${libelleDate(semaineActuelle)} · journée ${inter.journee}`
+            : `${division?.nom ?? 'Championnat'} · ${libelleDate(semaineActuelle)} · journée ${affiche.journee}`}
           onTermine={() => setMatchTermine(true)}
           onFermer={() => {
             setMatchOuvert(false);
@@ -364,6 +403,38 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             if (matchTermine) { setMatchTermine(false); semaineSuivante(); }
           }}
         />
+        </Suspense>
+      )}
+
+      {/* ---------------------------------------------------------------
+          ⚠️ SUR TÉLÉPHONE, L'ACTION PRINCIPALE RESTE SOUS LE POUCE.
+          L'écran de carrière devient un long défilement sur mobile : la
+          fiche du joueur, puis le classement, puis le journal. Le bouton
+          qui fait AVANCER LE JEU — jouer le match, passer la semaine —
+          se retrouvait à huit écrans de défilement du fil de lecture.
+          Cette barre le remet en bas de l'écran, en permanence, avec la
+          semaine en cours pour se repérer. Elle n'existe qu'en dessous de
+          900 px (voir `.barre-jouer` dans App.css).
+          ⚠️ `createPortal(document.body)` obligatoire : le `backdrop-filter`
+          des `.carte` crée un bloc conteneur qui piège les `position: fixed`.
+          --------------------------------------------------------------- */}
+      {!matchOuvert && createPortal(
+        <div className="barre-jouer">
+          <span className="barre-jouer-info">
+            <b>S{joueur.saison}</b> · {libelleDate(semaineActuelle)}
+            {matchAJouer && adversaire ? ` · ${adversaire}` : ` · ${semaineActuelle.libelle}`}
+          </span>
+          {matchAJouer ? (
+            <button type="button" className="btn primaire" onClick={() => setMatchOuvert(true)}>
+              ▶️ {inter ? 'Jouer en sélection' : 'Jouer le match'}
+            </button>
+          ) : (
+            <button type="button" className="btn vert" onClick={semaineSuivante}>
+              {semaineActuelle.type === 'treve' ? 'Clore la saison →' : 'Semaine suivante →'}
+            </button>
+          )}
+        </div>,
+        document.body,
       )}
     </aside>
   );

@@ -37,7 +37,47 @@
   --police-forte: 'Archivo', system-ui, sans-serif;
   --police: 'Inter', system-ui, sans-serif;
 
+  /* La lueur d'ambiance du fond : elle suit la couleur du thème. */
+  --ambiance: rgba(52, 163, 90, 0.18);
+  --fond-bas: #050d09;
+
   color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------------
+   LES TROIS AMBIANCES — vert pelouse, bleu nuit, rouge grenat
+   ---------------------------------------------------------------------------
+   ⚠️ TOUT LE THÈME TIENT DANS SIX VARIABLES. Le design system entier est bâti
+   sur la rampe `--pelouse-*` (le fond, les cartes, les bordures, les jauges) :
+   il suffit de la redéfinir pour repeindre le site, sans toucher une seule
+   règle ailleurs. L'or, le cuir et la craie ne bougent pas — ce sont eux qui
+   donnent au jeu son identité « stade nocturne », quelle que soit l'ambiance.
+   Le nom des variables reste `--pelouse-*` : ce sont des NIVEAUX de fond, pas
+   une couleur, et les renommer casserait 2 900 lignes de CSS pour rien. */
+:root[data-theme='bleu'] {
+  --pelouse-900: #060f1c;
+  --pelouse-800: #0b1c33;
+  --pelouse-700: #102845;
+  --pelouse-600: #17395f;
+  --pelouse-500: #1f5c9c;
+  --pelouse-400: #3a86d6;
+  --surface: rgba(16, 40, 69, 0.55);
+  --surface-solid: #0d2039;
+  --ambiance: rgba(58, 134, 214, 0.20);
+  --fond-bas: #040a13;
+}
+
+:root[data-theme='rouge'] {
+  --pelouse-900: #1a0709;
+  --pelouse-800: #2a0d11;
+  --pelouse-700: #3a1218;
+  --pelouse-600: #571a22;
+  --pelouse-500: #8f2733;
+  --pelouse-400: #c4404f;
+  --surface: rgba(58, 18, 24, 0.55);
+  --surface-solid: #2d0f14;
+  --ambiance: rgba(196, 64, 79, 0.18);
+  --fond-bas: #120507;
 }
 
 * {
@@ -56,13 +96,21 @@ body {
   font-family: var(--police);
   color: var(--craie);
   background:
-    radial-gradient(1200px 700px at 50% -10%, rgba(52, 163, 90, 0.18), transparent 60%),
+    radial-gradient(1200px 700px at 50% -10%, var(--ambiance), transparent 60%),
     radial-gradient(900px 600px at 90% 110%, rgba(232, 178, 58, 0.08), transparent 55%),
-    linear-gradient(180deg, var(--pelouse-900), #050d09 90%);
+    linear-gradient(180deg, var(--pelouse-900), var(--fond-bas) 90%);
+  /* ⚠️ `fixed` coûte cher au défilement sur mobile (le fond est recomposé à
+     chaque image, et sur iOS il saute avec la barre d'adresse) : le fond est
+     donc posé une fois pour toutes, et seul le contenu défile. */
   background-attachment: fixed;
   min-height: 100vh;
+  min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+}
+
+@media (max-width: 900px) {
+  body { background-attachment: scroll; }
 }
 
 /* Motif de lignes de terrain, discret */

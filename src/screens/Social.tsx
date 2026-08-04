@@ -158,8 +158,15 @@ function Avatar({
 // Retrouve un compte par son @ — dans l'annuaire, sinon reconstruit depuis les
 // publications (comptes inventés par l'IA), sinon une fiche minimale. Un profil
 // s'ouvre TOUJOURS.
-function compteDepuis(joueur: Joueur, pseudo: string, posts: PostSocial[]): CompteSuivi {
-  const connu = annuaire(joueur).find((c) => c.pseudo === pseudo);
+function compteDepuis(
+  joueur: Joueur, pseudo: string, posts: PostSocial[], fiches: CompteSuivi[] = [],
+): CompteSuivi {
+  const connu = annuaire(joueur).find((c) => c.pseudo === pseudo)
+    // ⚠️ Puis les fiches DÉJÀ AFFICHÉES (comptes suivis, suggestions d'Explorer).
+    // Sans elles, ouvrir un compte hors annuaire recalculait ses abonnés à
+    // partir des vues d'un post : le chiffre du profil ne collait pas à celui
+    // qu'on venait de lire dans la liste.
+    ?? fiches.find((c) => c.pseudo === pseudo);
   if (connu) return connu;
   const tous = posts.flatMap((p) => [p, ...(p.reponses ?? [])]);
   const vu = tous.find((p) => p.pseudo === pseudo);
@@ -931,7 +938,9 @@ export function Social() {
   // ⚠️ Le profil doit s'ouvrir pour N'IMPORTE QUEL compte : ceux de l'annuaire,
   // mais aussi ceux inventés par l'IA ou croisés dans une réponse. Sans ce
   // repli, cliquer sur un joueur n'affichait rien du tout.
-  const compteVu = profilVu ? compteDepuis(joueur, profilVu, posts) : undefined;
+  const compteVu = profilVu
+    ? compteDepuis(joueur, profilVu, posts, [...suivis, ...suggestions])
+    : undefined;
   const monPseudo = joueur.pseudo ?? pseudoDe(joueur.nom);
 
   const ouvrirProfil = (pseudo: string) => {

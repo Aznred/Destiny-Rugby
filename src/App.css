@@ -402,7 +402,38 @@
 }
 .modale { width: min(560px, 94vw); padding: 1.8rem; }
 .modale h2 { font-family: var(--police-forte); font-size: 1.5rem; margin-bottom: 0.3rem; }
+/* Attente d'un écran chargé à la demande : un ballon qui tourne, rien de plus. */
+.ecran-en-route {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.9rem; min-height: 42vh; color: var(--craie-dim); font-size: 0.9rem;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.ballon-attente {
+  width: 46px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #c06e3c, #5f3017);
+  box-shadow: inset 0 0 0 2px rgba(242, 240, 230, 0.25);
+  animation: ballon-roule 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes ballon-roule {
+  0% { transform: rotate(-28deg) scale(1); }
+  50% { transform: rotate(152deg) scale(1.08); }
+  100% { transform: rotate(332deg) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ballon-attente { animation-duration: 4s; }
+}
+
 .modale .aide { color: var(--craie-dim); font-size: 0.9rem; line-height: 1.55; margin-bottom: 1.2rem; }
+/* Consommation Groq de la session : trois compteurs et un bouton de remise à zéro. */
+.conso-groq {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem;
+  padding: 0.6rem 0.75rem; margin-bottom: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.86rem; color: var(--craie-dim); font-variant-numeric: tabular-nums;
+}
+.conso-groq b { color: var(--or-clair); font-family: 'Archivo', sans-serif; }
+.conso-groq .btn.mini { margin-left: auto; padding: 0.28rem 0.6rem; font-size: 0.76rem; }
 .modale .aide a { text-decoration: underline; }
 .rangee-fin { display: flex; justify-content: flex-end; gap: 0.7rem; margin-top: 1.4rem; }
 .badge-cle {
@@ -715,6 +746,23 @@
   box-shadow: 0 0 0 1px rgba(232, 178, 58, 0.35) inset;
 }
 @media (max-width: 560px) { .choix-rythme { grid-template-columns: 1fr; } }
+
+/* Les trois ambiances : une pastille de dégradé et un nom, rien de plus. */
+.choix-theme { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+.choix-theme button {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  padding: 0.6rem 0.5rem; border-radius: var(--rayon-sm);
+  border: 1px solid var(--bordure); background: rgba(255, 255, 255, 0.03);
+  color: var(--craie-dim); font-size: 0.85rem; font-weight: 600;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.18s, color 0.18s;
+}
+.choix-theme button:hover { transform: translateY(-2px); border-color: var(--bordure-forte); }
+.choix-theme button.actif { border-color: var(--or-500); color: var(--craie); background: rgba(232, 178, 58, 0.10); }
+.pastille-theme {
+  width: 20px; height: 20px; border-radius: 50%; flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+@media (max-width: 380px) { .choix-theme button { flex-direction: column; gap: 0.3rem; font-size: 0.76rem; } }
 
 /* ---------------------------------------------------------------------------
    CALENDRIER — mode « journée par journée »
@@ -2451,6 +2499,8 @@
   max-height: 94vh;
   display: flex;
   flex-direction: column;
+  /* Repère pour la croix de fermeture, posée en absolu sur mobile. */
+  position: relative;
   background: linear-gradient(180deg, #0e1a13, #0a1410);
   border: 1px solid rgba(212, 175, 55, 0.28);
   border-radius: 18px;
@@ -2838,6 +2888,9 @@
 .ml-bilan-num { color: var(--or-clair); text-align: center; }
 .ml-bilan-ligne span:not(.ml-bilan-num):not(.ml-bilan-nom) { text-align: right; }
 .ml-bilan-ligne[data-moi='oui'] { background: rgba(212, 175, 55, 0.16); border-radius: 6px; }
+/* Le banc (maillots 16-23) : entrés en cours de match, on les lit d'un coup d'œil. */
+.ml-bilan-ligne[data-banc='oui'] .ml-bilan-num { color: var(--craie-dim); }
+.ml-bilan-ligne[data-banc='oui'] .ml-bilan-nom { font-style: italic; }
 .ml-bilan-nom {
   min-width: 0; color: var(--craie);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -2848,3 +2901,203 @@
   .ml-bilan-ligne, .ml-bilan-entete { grid-template-columns: 22px 1fr 36px 32px 30px 36px; font-size: 0.74rem; }
   .ml-bilan-ligne span:nth-child(6), .ml-bilan-entete span:nth-child(6) { display: none; }
 }
+
+/* Le secteur travaillé en permanence : un bouton actif, les autres en veille. */
+.entr-boutons button.actif {
+  background: rgba(35, 122, 68, 0.25);
+  border-color: var(--pelouse-clair, #3fa96a);
+  color: var(--craie);
+  font-weight: 600;
+}
+
+
+/* ===========================================================================
+   TÉLÉPHONE D'ABORD — « je veux qu'on puisse jouer facilement »
+   ===========================================================================
+   Le jeu tenait sur mobile (rien ne débordait), mais il n'y était pas
+   AGRÉABLE : l'écran de carrière devient un long défilement — fiche du joueur,
+   classement, journal — et le bouton qui fait avancer le jeu se retrouvait à
+   plusieurs écrans du fil qu'on est en train de lire. Trois principes ici :
+
+     1. l'action principale reste TOUJOURS sous le pouce ;
+     2. rien à viser en dessous de 44 px (la taille d'un doigt) ;
+     3. on respecte les encoches et la barre de gestes (`env(safe-area-*)`).
+   =========================================================================== */
+
+/* --- 1. LA BARRE D'ACTION, EN BAS, EN PERMANENCE --- */
+/* Rendue par `PanneauJoueur` dans un portail (le backdrop-filter des cartes
+   piège les `position: fixed`). Invisible au-dessus de 900 px : sur grand
+   écran, le bouton est déjà dans le panneau, sous les yeux. */
+.barre-jouer { display: none; }
+
+@media (max-width: 900px) {
+  .barre-jouer {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    padding: 0.6rem 0.9rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(5, 13, 9, 0.72), rgba(5, 13, 9, 0.96));
+    border-top: 1px solid var(--bordure);
+    backdrop-filter: blur(14px);
+  }
+  .barre-jouer-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.74rem;
+    line-height: 1.25;
+    color: var(--craie-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .barre-jouer-info b { color: var(--or-400); }
+  .barre-jouer .btn {
+    flex: 0 0 auto;
+    min-height: 46px;
+    padding: 0.55rem 1rem;
+    font-size: 0.92rem;
+    white-space: nowrap;
+  }
+  /* On dégage la hauteur de la barre pour que rien ne finisse dessous. */
+  .carriere { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* --- 2. LA NAVIGATION : UNE BANDE QUI DÉFILE, PAS DEUX RANGÉES --- */
+/* Elle passait à la ligne dès 560 px et mangeait deux fois plus de hauteur,
+   avec des boutons de 28 px de haut impossibles à viser. */
+@media (max-width: 700px) {
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  }
+  .nav .liens {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    justify-content: flex-start;
+    padding-bottom: 2px;
+  }
+  .nav .liens::-webkit-scrollbar { display: none; }
+  .nav .liens button {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.82rem;
+  }
+  .nav .marque { flex: 0 0 auto; }
+}
+
+/* --- 3. DES CIBLES QU'ON ATTEINT DU POUCE --- */
+@media (max-width: 700px) {
+  /* La barre d'actions du panneau (Équipe, Marché, Résultats, L'Ovale…) était
+     en quatre colonnes de 56 px : on passe à trois, plus hautes. */
+  .pj-actions { grid-template-columns: repeat(3, 1fr); gap: 0.45rem; }
+  .pj-actions button { min-height: 56px; font-size: 1.05rem; }
+  .pj-actions button span { font-size: 0.66rem; }
+
+  /* Les secteurs d'entraînement : quatre par ligne, c'était 70 px de large. */
+  .entr-boutons { grid-template-columns: repeat(2, 1fr); gap: 0.4rem; }
+  .entr-boutons button { min-height: 44px; font-size: 0.8rem; }
+
+  /* Les suggestions d'action et la zone de saisie du MJ. */
+  .suggestions button { min-height: 44px; padding: 0.6rem 0.9rem; }
+  .saisie input, .saisie textarea { min-height: 46px; font-size: 16px; }
+  .saisie .btn { min-height: 46px; }
+
+  /* ⚠️ 16 px SUR TOUS LES CHAMPS. En dessous, iOS zoome automatiquement à la
+     mise au point et la page reste décalée après la saisie. */
+  input, textarea, select { font-size: 16px; }
+
+  /* Les cartes de club de l'atlas : deux colonnes plutôt qu'une liste sans fin. */
+  .grille-clubs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .club-carte { padding: 0.5rem; gap: 0.45rem; }
+  .club-carte .club-nom { font-size: 0.78rem; }
+  .club-carte .club-ville { display: none; }
+}
+
+@media (max-width: 420px) {
+  .grille-clubs { grid-template-columns: 1fr; }
+  .pj-actions { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* --- 4. LE MATCH EN DIRECT, PLEIN ÉCRAN SUR TÉLÉPHONE --- */
+/* La modale gardait ses marges et son coin arrondi : sur 375 px de large, le
+   terrain tombait à 300 px et les pions devenaient illisibles. */
+@media (max-width: 700px) {
+  .overlay-match { padding: 0; align-items: stretch; }
+  .match-live {
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    height: 100dvh;
+    border-radius: 0;
+    padding: calc(0.6rem + env(safe-area-inset-top, 0px)) 0.6rem
+             calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  }
+  .ml-terrain { max-width: none; }
+  /* ⚠️ L'en-tête tenait sur quatre colonnes : à 375 px, le nom du club
+     visiteur passait à la ligne et le bouton de fermeture se retrouvait
+     seul sur une troisième rangée. On garde UNE rangée — écusson, score,
+     écusson — et la croix va se poser en absolu dans le coin. */
+  .ml-tete {
+    /* En flex plutôt qu'en grille : la croix sort du flux (absolue) et une
+       grille de trois colonnes lui gardait quand même sa place, ce qui
+       renvoyait l'équipe visiteuse à la ligne. */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0.6rem 2.6rem 0.3rem 0.6rem;
+  }
+  .ml-tete .ml-equipe { flex: 1 1 0; }
+  .ml-tete .ml-score { flex: 0 0 auto; }
+  .ml-equipe b { font-size: 0.76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ml-fermer { position: absolute; top: calc(0.5rem + env(safe-area-inset-top, 0px)); right: 0.6rem; width: 34px; height: 34px; }
+  .ml-sous-titre { font-size: 0.7rem; }
+  .ml-commandes { flex-wrap: wrap; gap: 0.5rem; }
+  .ml-vitesse { min-width: 42px; min-height: 38px; }
+  .ml-coaching { flex-wrap: wrap; }
+  .ml-coaching input { min-height: 44px; }
+}
+
+/* --- 5. LES CLASSEMENTS : ON GARDE L'ESSENTIEL --- */
+@media (max-width: 560px) {
+  .classement-tableau .classement-entete span:nth-child(n + 6),
+  .classement-tableau .classement-ligne span:nth-child(n + 6) { display: none; }
+  .classement-ligne, .classement-entete { grid-template-columns: 1.6rem 22px minmax(0, 1fr) 2.2rem 1.8rem; }
+  /* Le tableau des poules de coupe et l'arbre défilent plutôt que de déborder. */
+  .grille-poules { grid-template-columns: 1fr; }
+  .arbre { overflow-x: auto; padding-bottom: 0.5rem; }
+}
+
+/* --- 6. RIEN NE DOIT JAMAIS DÉBORDER EN LARGEUR --- */
+/* Un tableau ou un arbre trop large fait défiler la PAGE entière de côté, et
+   le site paraît cassé. Chacun défile désormais dans son propre conteneur. */
+.classement-tableau, .grille-resultats, .ml-fil { max-width: 100%; overflow-x: auto; }
+img, svg, canvas { max-width: 100%; }
+
+/* Le sélecteur de langue : sept drapeaux, deux ou trois par ligne. */
+.choix-langue { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem; }
+.choix-langue button {
+  display: flex; align-items: center; justify-content: center; gap: 0.45rem;
+  padding: 0.55rem 0.4rem; border-radius: var(--rayon-sm);
+  border: 1px solid var(--bordure); background: rgba(255, 255, 255, 0.03);
+  color: var(--craie-dim); font-size: 0.82rem; font-weight: 600;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.18s, color 0.18s;
+}
+.choix-langue button:hover { transform: translateY(-2px); border-color: var(--bordure-forte); }
+.choix-langue button.actif { border-color: var(--or-500); color: var(--craie); background: rgba(232, 178, 58, 0.10); }
+.choix-langue .fi { border-radius: 3px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); flex: 0 0 auto; }
+@media (max-width: 560px) { .choix-langue { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) { .choix-langue button { min-height: 44px; } }
