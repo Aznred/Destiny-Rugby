@@ -45,8 +45,8 @@ import { decomposer } from './plan';
 import * as C from './commentaire';
 import {
   AXE, LARGEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
-  dansSes22, dansSonCamp, distance, distance2, franchieLigne, horsDuTerrain,
-  melanger, metresAvantLaLigne, sens, type Cote, type Vec,
+  dansLes22Adverses, dansSes22, dansSonCamp, distance, distance2, franchieLigne,
+  horsDuTerrain, melanger, metresAvantLaLigne, sens, type Cote, type Vec,
 } from './terrain';
 
 export type { EtatMatch, Commentaire } from './etat';
@@ -493,19 +493,40 @@ function phaseBallonEnLAir(e: EtatMatch): void {
   const arrivee = e.ballon;
 
   // ── Sortie en touche ─────────────────────────────────────────────────────
+  //
+  // ⚠️ LES TROIS RÈGLES DE LA TOUCHE SUR COUP DE PIED, ET ELLES SONT
+  // GÉOMÉTRIQUES — pas déclaratives. Le moteur ne regardait que l'INTENTION du
+  // botteur : un dégagement d'occupation qui finissait en touche dans les 22
+  // adverses rendait le ballon à l'adversaire, alors que c'est exactement la
+  // définition du 50/22. À l'inverse, un « 50/22 » raté mais annoncé aurait été
+  // récompensé. On lit donc le terrain, comme un arbitre.
   if (horsDuTerrain(arrivee)) {
     if (v.intention === 'penaltouche') {
       dire(e, 'touche', camp, `Touche à suivre pour ${nomClub(e, camp)}.`);
       return arret(e, 'touche', camp, arrivee);
     }
-    if (v.intention === 'cinquanteVingtDeux') {
+    // 1. LE 50/22 — le coup de pied part de SON CAMP (les 50 ou en deçà) et
+    //    sort en touche DANS LES 22 ADVERSES : la touche est pour l'équipe qui
+    //    a botté. C'est la seule façon de gagner le ballon en le rendant.
+    const deSonCamp = dansSonCamp(v.de, camp) || Math.abs(v.de.x - MILIEU) < 0.5;
+    const sortDansLes22 = dansLes22Adverses(arrivee, camp) && !franchieLigne(arrivee, camp);
+    if (deSonCamp && sortDansLes22) {
       dire(e, 'pied', camp, C.phrase(e.rng, C.PIED_5022, { nom: v.auteur.nom }), 0, v.auteur.moi);
       return arret(e, 'touche', camp, arrivee);
     }
-    // Coup de pied direct depuis l'extérieur de ses 22 : touche au point du coup
-    // de pied. Depuis ses 22 : là où le ballon sort.
+    if (v.intention === 'cinquanteVingtDeux') {
+      // Tenté mais pas trouvé : c'est une touche ordinaire pour l'adversaire.
+      dire(e, 'pied', camp, C.phrase(e.rng, C.PIED_5022_RATE, { nom: v.auteur.nom }), 0, v.auteur.moi);
+    }
+    // 2. DIRECT EN TOUCHE DEPUIS L'EXTÉRIEUR DE SES 22 : aucun gain de terrain,
+    //    la touche se joue à l'ENDROIT DU COUP DE PIED, pour l'adversaire.
+    // 3. DEPUIS SES 22 : le gain de terrain est acquis, la touche se joue là où
+    //    le ballon est sorti.
     const direct = !dansSes22(v.de, camp);
     const lieu = direct ? { x: v.de.x, y: arrivee.y } : arrivee;
+    if (direct) {
+      dire(e, 'touche', adverse(camp), `${v.auteur.nom} trouve la touche directement : pas de gain de terrain, touche à l’endroit du coup de pied.`, 0, v.auteur.moi);
+    }
     return arret(e, 'touche', adverse(camp), lieu);
   }
 
@@ -725,7 +746,7 @@ function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   }
   // Rasant derrière une défense montée, tout près de la ligne.
   if (!p.avant && metresAvantLaLigne(p.pos, p.cote) < 26 && pression < 6
-    && p.pied > 55 && e.rng() < 0.05) {
+    && p.pied > 55 && e.rng() < 0.032) {
     return taperAuPied(e, p, 'rasant');
   }
 }
@@ -1126,8 +1147,11 @@ function phasePenalite(e: EtatMatch): void {
   // ⚠️ Le taux de réussite au pied du rugby pro est de ~78 %. On l'obtient en
   // laissant l'équipe tenter quelques pénalités qu'elle n'a PAS au plan : ce
   // sont les tirs manqués. Sans elles, tous les tirs seraient bons.
+  // ⚠️ Moins de coups de pied de sortie = plus de temps de jeu, donc plus de
+  // pénalités à portée : à 11 % de tentatives « hors plan », le pourcentage de
+  // réussite au pied du match tombait sous les 68 %. 7 % le remet à ~72 %.
   const veutTirer = aPortee && !besoinEssai
-    && (plan.penalites > 0 ? e.rng() < 0.93 : e.rng() < 0.11);
+    && (plan.penalites > 0 ? e.rng() < 0.93 : e.rng() < 0.07);
 
   if (veutTirer) {
     e.tir = { buteur, distance: dist, angle: ecartAxe, valeur: 3, suite: 'coupEnvoi' };
@@ -1285,6 +1309,12 @@ function reprendreJeu(e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?
   e.systeme = choisirSysteme(e, adverse(cote));
   e.phase = 'jeuCourant';
   e.placement = null;
+  // ⚠️ NE PAS forcer ici un recalcul immédiat du placement (`e.compteur = 0`).
+  // Testé : la défense se remettait aussitôt sur sa ligne théorique — lue sur le
+  // 4ᵉ défenseur, donc parfois trente mètres en arrière après un coup de pied —
+  // au lieu de rester au contact une demi-seconde de plus. Mesuré : percées
+  // 20 → 29 par match (cible ≤ 25), plaquages manqués 19 → 11, coups de pied
+  // 51 → 61. L'étalonnage du moteur tient à ce demi-temps de retard.
   e.perceeSignalee = false;
   e.cibleRenvoi = null; // le ballon est vivant : plus de coup d'envoi en attente
   e.ligneAvantage = lieu.x;
@@ -1380,9 +1410,13 @@ function choisirLancement(
   // ── 1. DANS SES 22 : on dégage, sauf urgence ────────────────────────────
   // C'EST LE JEU D'OCCUPATION : on rend le ballon mais on gagne 45 mètres.
   // Une équipe qui court après le score, elle, garde le ballon en main.
+  // ⚠️ MOINS DE JEU AU PIED (retour de jeu : « un peu trop de coups de pied »).
+  // On dégageait de ses 22 trois fois sur quatre : à ce rythme, la sortie de
+  // camp devenait un réflexe et le match comptait près de 60 coups de pied.
+  // 58 % laisse le jeu d'occupation lisible tout en autorisant les relances.
   if (chezSoi && pousse < 0.32 && !(diff < 0 && restantes < 8)) {
     const botteur = (dix && dix.pied > 55 ? dix : neuf) ?? liste[0];
-    if (r < 0.74) {
+    if (r < 0.60) {
       return {
         type: 'pied', chaine: [neuf, botteur].filter(Boolean) as Pion[], index: 0,
         intention: botteur === neuf ? 'chandelle' : 'degagement', botteur,
@@ -1395,14 +1429,15 @@ function choisirLancement(
   if (sonCamp && !chezSoi) {
     const botteur = dix ?? neuf ?? liste[0];
     // Le 50/22 : geste RARE, et seulement si les ailiers adverses sont montés.
-    if (botteur && botteur.pied > 66 && phases >= 1
-      && arriereGardeMontee(e, adverse(cote)) && r < 0.045) {
+    if (botteur && botteur.pied > 65 && phases >= 1
+      && arriereGardeMontee(e, adverse(cote)) && r < 0.014) {
       return {
         type: 'pied', chaine: [neuf, botteur].filter(Boolean) as Pion[], index: 0,
         intention: 'cinquanteVingtDeux', botteur, libelle: '50/22',
       };
     }
-    if (phases >= 2 && r < 0.20 - pousse * 0.12) {
+    // Occupation depuis son camp : une phase sur huit, plus une sur cinq.
+    if (phases >= 2 && r < 0.13 - pousse * 0.08) {
       return {
         type: 'pied', chaine: [neuf, botteur].filter(Boolean) as Pion[], index: 0,
         intention: e.ballonLent ? 'chandelle' : 'occupation', botteur,
@@ -1544,7 +1579,11 @@ function arriereGardeMontee(e: EtatMatch, defenseur: Cote): boolean {
 function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
   const s = sens(p.cote);
   p.stats.coupsDePied += 1;
-  const portee = 26 + p.pied / 2.2;
+  // ⚠️ PORTÉE RÉALISTE. À `26 + pied/2,2`, un buteur noté 85 tapait à 65 mètres :
+  // un dégagement pris sur sa ligne des 22 finissait alors DANS les 22 adverses,
+  // et la règle géométrique du 50/22 le récompensait — six « 50/22 » par match.
+  // Un dégagement de touche du rugby professionnel fait 40 à 55 mètres.
+  const portee = 24 + p.pied / 3.2;
 
   switch (intention) {
     case 'drop': {

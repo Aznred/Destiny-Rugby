@@ -62,27 +62,49 @@ export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
   const notoriete =
     j.reputation + (j.noteSaison ?? 6) * 3 + agent.ouverture + ((j.popularite ?? 50) - 50) / 5;
 
-  // Clubs candidats : niveau compatible avec la cote du joueur.
-  const candidats: { comp: Competition; club: (typeof COMPETITIONS)[number]['clubs'][number]; note: number }[] = [];
+  // ⚠️⚠️ LE BUG DU JOUEUR TROP FORT POUR TOUT LE MONDE.
+  // Le plancher était ABSOLU : « un club ne recrute pas à plus de 16 points en
+  // dessous de la cote du joueur ». À partir d'une cote de 98 — atteignable avec
+  // 99 de générale et 100 de réputation — le meilleur étage du jeu
+  // (`NOTE_PAR_NIVEAU[0] = 82`) tombait sous ce plancher : la boucle jetait
+  // TOUTES les compétitions, `candidats` restait vide, et plus AUCUN club ne
+  // faisait d'offre. Le joueur devenu meilleur du monde se retrouvait sans
+  // marché — exactement l'inverse de ce qui devrait arriver.
+  //
+  // Le plancher est donc devenu RELATIF : 16 points sous la cote, mais jamais au
+  // point d'écarter les meilleurs clubs qui restent à portée. On fait donc deux
+  // passes : on ramasse d'abord tout ce qui n'est pas hors de portée par le
+  // HAUT, puis on calcule le plancher à partir du meilleur club trouvé.
+  const plafond = c + (ctx.demande ? 2 : 5);
+  type Candidat = { comp: Competition; club: (typeof COMPETITIONS)[number]['clubs'][number]; note: number };
+  const possibles: Candidat[] = [];
   for (const comp of COMPETITIONS) {
     const etranger = comp.zone === 'Monde';
     // L'expatriation demande un vrai nom : sinon personne ne va chercher un
     // joueur à l'autre bout du monde.
     if (etranger && notoriete < 55) continue;
-    // Un club ne recrute pas un joueur très en dessous de son niveau, et ne
-    // fait pas rêver un joueur bien au-dessus du sien.
-    const niveauDiv = NOTE_PAR_NIVEAU[comp.niveau] ?? 50;
-    if (niveauDiv > c + (ctx.demande ? 2 : 5)) continue;
-    if (niveauDiv < c - 16) continue;
+    // Un club ne fait pas rêver un joueur bien au-dessus de son niveau.
+    if ((NOTE_PAR_NIVEAU[comp.niveau] ?? 50) > plafond + 12) continue;
 
     for (const club of comp.clubs) {
       if (club.nom === j.club) continue;
       const note = noteDuClub(club.nom);
-      if (note > c + (ctx.demande ? 2 : 5) || note < c - 16) continue;
-      candidats.push({ comp, club, note });
+      if (note > plafond) continue;
+      possibles.push({ comp, club, note });
     }
   }
+  if (!possibles.length) return [];
+
+  let meilleure = -Infinity;
+  for (const p of possibles) if (p.note > meilleure) meilleure = p.note;
+  // Le plancher normal, SAUF s'il vidait le marché : dans ce cas on descend
+  // jusqu'à huit points sous le meilleur club encore accessible.
+  const plancher = Math.min(c - 16, meilleure - 8);
+  const candidats = possibles.filter((p) => p.note >= plancher);
   if (!candidats.length) return [];
+  // L'amplitude sert au tirage pondéré : sans elle, un joueur à 105 de cote
+  // voyait tous les clubs à « proximité 0 » et ne recevait presque rien.
+  const amplitude = Math.max(16, c - plancher);
 
   // Tirage : on privilégie les clubs proches de la cote du joueur.
   // « Ambitieux » fait sonner le téléphone, « Fidèle au maillot » le fait taire.
@@ -96,7 +118,7 @@ export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
     const cand = candidats[Math.floor(Math.random() * candidats.length)];
     if (pris.has(cand.club.nom)) continue;
     // Plus le club est proche du niveau du joueur, plus il est probable.
-    const proximite = 1 - Math.min(1, Math.abs(cand.note - c) / 16);
+    const proximite = 1 - Math.min(1, Math.abs(cand.note - c) / amplitude);
     if (Math.random() > 0.25 + proximite * 0.75) continue;
     pris.add(cand.club.nom);
     choisis.push(cand);

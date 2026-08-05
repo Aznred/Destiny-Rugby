@@ -98,6 +98,27 @@ export function tn(cle: string, n: number, vars?: Record<string, string | number
 }
 
 // ---------------------------------------------------------------------------
+// LES NOMBRES
+// ---------------------------------------------------------------------------
+// ⚠️ Le jeu écrivait `toLocaleString('fr-FR')` PARTOUT : un joueur anglais lisait
+// « 1 200 000 € » avec des espaces insécables là où il attend « 1,200,000 », et
+// un Allemand « 1.200.000 ». C'est le genre de détail qui trahit une traduction
+// posée par-dessus un jeu français.
+const LOCALES: Record<Langue, string> = {
+  fr: 'fr-FR', en: 'en-GB', es: 'es-ES', it: 'it-IT',
+  de: 'de-DE', pt: 'pt-PT', ja: 'ja-JP',
+};
+
+export function locale(l: Langue = courante): string {
+  return LOCALES[l] ?? LOCALES.fr;
+}
+
+/** Un nombre dans la langue du joueur : `nombre(1200000)` → « 1 200 000 ». */
+export function nombre(n: number): string {
+  return n.toLocaleString(locale());
+}
+
+// ---------------------------------------------------------------------------
 // LA LANGUE DE L'IA
 // ---------------------------------------------------------------------------
 // ⚠️ C'est LA pièce qui rend le jeu multilingue pour de bon. Traduire les

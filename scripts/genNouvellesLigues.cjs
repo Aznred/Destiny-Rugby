@@ -97,7 +97,9 @@ const logoParEquipe = new Map();
 const logosCompetition = {};
 
 function copierLogos(ligne) {
-  const dossier = path.join(SRC, ligne.dossier);
+  // `base` permet de ranger une compétition ailleurs que dans « new league/ ».
+  const racine = ligne.base ? path.join(RACINE, ligne.base) : SRC;
+  const dossier = path.join(racine, ligne.dossier);
   if (!fs.existsSync(dossier)) {
     avertissements.push(`dossier de logos absent : ${ligne.dossier}`);
     return [];
@@ -114,13 +116,19 @@ function copierLogos(ligne) {
       logosCompetition[ligne.id] = '/logos-competitions/' + ligne.id + ext;
       continue;
     }
-    const cible = slug(base) + ext;
-    if (!logoParEquipe.has(base)) {
+    // ⚠️ Le préfixe n'est pas cosmétique : « Bulls.png » de la Currie Cup et
+    // « bulls.png » des Vodacom Bulls partagent le même slug. Sans préfixe, le
+    // second écrase le premier — et cinq clubs de l'URC perdent leur écusson.
+    const cible = (ligne.prefixeLogo ? ligne.prefixeLogo + '_' : '') + slug(base) + ext;
+    // La clé reste le nom de fichier BRUT, préfixé par la ligue quand il y a
+    // ambiguïté : deux compétitions peuvent avoir un fichier « Bulls.png ».
+    const cle = ligne.prefixeLogo ? `${ligne.prefixeLogo}#${base}` : base;
+    if (!logoParEquipe.has(cle)) {
       fs.copyFileSync(path.join(dossier, fichier), path.join(DEST_LOGOS, cible));
       logosCopies += 1;
     }
-    logoParEquipe.set(base, '/logos/' + cible);
-    noms.push(base);
+    logoParEquipe.set(cle, '/logos/' + cible);
+    noms.push(cle);
   }
   return noms;
 }
@@ -205,7 +213,10 @@ function genererEffectif(club, noteClub, ligne) {
     for (let n = 0; n < PAR_FAMILLE[famille]; n++) {
       slot += 1;
       const nation = tirerNation(rng, ligne.nation, ligne.etrangers);
-      const pool = NOMS[nation] ?? NOMS[ligne.nation] ?? NOMS.France;
+      // Le joueur du cru pioche dans le pool LOCAL de la ligue s'il en a un
+      // (`poolLocal`) ; l'étranger garde le pool d'export de son pays.
+      const clePool = nation === ligne.nation ? (ligne.poolLocal ?? ligne.nation) : nation;
+      const pool = NOMS[clePool] ?? NOMS[ligne.nation] ?? NOMS.France;
       const prenom = pool.prenoms[Math.floor(rng() * pool.prenoms.length)];
       const nom = pool.noms[Math.floor(rng() * pool.noms.length)];
 
@@ -247,6 +258,21 @@ for (const ligne of CLUBS) {
   let classement;
   if (source) {
     classement = noterClubs(source.equipes, ligne.echelle);
+  } else if (ligne.equipes) {
+    // Hiérarchie DÉCLARÉE (Bundesliga, Currie Cup) : l'ordre de `equipes` fait
+    // foi, et les notes s'étalent linéairement sur l'échelle de la ligue.
+    const [bas, haut] = ligne.echelle;
+    const prefixe = ligne.prefixeLogo ? ligne.prefixeLogo + '#' : '';
+    classement = ligne.equipes.map(([fichier, nomJeu], i) => ({
+      nom: nomJeu,
+      cleLogo: prefixe + fichier,
+      note: Math.round(haut - ((haut - bas) * i) / Math.max(1, ligne.equipes.length - 1)),
+    }));
+    // Un fichier de logo laissé de côté est une erreur de saisie, pas un choix.
+    const declares = new Set(classement.map((c) => c.cleLogo));
+    for (const n of noms) {
+      if (!declares.has(n)) avertissements.push(`club non déclaré dans « equipes » : ${n} (${ligne.nom})`);
+    }
   } else {
     // Pas de classement fourni (Portugal) : on étale les clubs du dossier de
     // logos sur l'échelle, dans un ordre déterministe.
@@ -261,7 +287,7 @@ for (const ligne of CLUBS) {
 
   const clubs = [];
   for (const c of classement) {
-    const logo = trouverLogo(c.nom, noms);
+    const logo = c.cleLogo ? logoParEquipe.get(c.cleLogo) : trouverLogo(c.nom, noms);
     if (!logo) avertissements.push(`logo manquant : ${c.nom} (${ligne.nom})`);
     const [c1, c2] = couleurs(c.nom);
     clubs.push({ nom: c.nom, note: c.note, logo, c1, c2 });

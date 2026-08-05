@@ -5,8 +5,23 @@
 // que lire cette table.
 //
 // • `dossier`   : le dossier de logos, dans `new league/`.
+// • `base`      : le dossier RACINE qui contient `dossier` (défaut : `new league`).
+//                 Les compétitions livrées plus tard ont leur propre dossier —
+//                 `2 new leagues/` pour la Bundesliga et la Currie Cup.
 // • `src`       : [pays, nom_ligue] tels qu'écrits dans flashscore_rugby_data.json.
-//                 `null` = pas de classement fourni (on répartit les notes à plat).
+//                 `null` = pas de classement fourni (on répartit les notes à plat,
+//                 ou on suit l'ordre de `equipes` s'il est donné).
+// • `equipes`   : [nom du fichier de logo, nom dans le jeu], DANS L'ORDRE de la
+//                 hiérarchie. À n'utiliser que quand `src` est `null` : les noms
+//                 de fichiers ne sont pas des noms de clubs (« Heidelberger »,
+//                 « Hanovre 78 »), et l'ordre alphabétique n'est pas un classement.
+// • `prefixeLogo` : préfixe des fichiers copiés vers `public/logos/`. ⚠️ SANS LUI,
+//                 « Bulls.png » de la Currie Cup ÉCRASE le logo des Vodacom Bulls
+//                 de l'URC (même slug) — pareil pour Sharks, Lions, Cheetahs et
+//                 Stormers. Cinq écussons perdus en silence.
+// • `poolLocal` : pool de noms des joueurs du pays, si différent de `nation`
+//                 (clé de `scripts/nomsPays.cjs`). Sert à donner à un championnat
+//                 son propre vivier sans toucher au pool d'export partagé.
 // • `niveau`    : 0-10, l'échelle du jeu (1 = Top 14, 3 = Nationale, 7 = Fédérale 3,
 //                 10 = Régionale 3). Il pilote l'audience sur L'Ovale, le salaire
 //                 et la note par défaut d'un club.
@@ -108,6 +123,49 @@ const CLUBS = [
     id: 'russie', nom: 'Premier League russe', pays: 'Russie', emoji: '🇷🇺',
     dossier: 'Logos Rugby-Russie - Premier League', src: ['Russie', 'Premier League'],
     niveau: 4, echelle: [44, 56], nation: 'Russie', etrangers: 0.22,
+  },
+
+  // --- Livrées à part, dans « 2 new leagues/ » --------------------------------
+  // Aucun classement n'accompagne ces deux-là (le JSON fourni est vide) : leur
+  // hiérarchie est donc DÉCLARÉE ici, dans l'ordre de `equipes`.
+  {
+    id: 'bundesliga', nom: 'Rugby-Bundesliga', pays: 'Allemagne', emoji: '🇩🇪',
+    base: '2 new leagues', dossier: '1 Bundesliga', src: null,
+    niveau: 6, echelle: [34, 47], nation: 'Allemagne', etrangers: 0.34,
+    // Le rugby allemand tient sur Heidelberg : quatre des dix clubs y sont, et
+    // les deux premiers (RG Heidelberg et le HRK) se partagent les titres.
+    equipes: [
+      ['Heidelberg', 'RG Heidelberg'],
+      ['Heidelberger', 'Heidelberger RK'],
+      ['Neuenheim', 'SC Neuenheim'],
+      ['Handschuhsheim', 'TSV Handschuhsheim'],
+      ['Frankfurt', 'SC Frankfurt 1880'],
+      ['Luxemburg', 'RC Luxembourg'],
+      ['Hanovre 78', 'DSV 78 Hannover'],
+      ['Berliner', 'Berliner RC'],
+      ['Munchen', 'StuSta München'],
+      ['Germania List', 'SV Germania List'],
+    ],
+  },
+  {
+    id: 'currieCup', nom: 'Currie Cup', pays: 'Afrique du Sud', emoji: '🇿🇦',
+    base: '2 new leagues', dossier: 'Currie Cup', src: null, prefixeLogo: 'currie',
+    niveau: 2, echelle: [57, 69], nation: 'Afrique du Sud', etrangers: 0.13,
+    poolLocal: 'Afrique du Sud (mixte)',
+    // ⚠️ CE NE SONT PAS LES FRANCHISES DE L'URC. La Currie Cup se joue avec les
+    // UNIONS, sous leur nom propre : les Vodacom Bulls de l'URC deviennent les
+    // Blue Bulls, les Emirates Lions les Golden Lions, la Western Province les
+    // Stormers XXIII. Des noms distincts, donc aucune collision d'effectif.
+    equipes: [
+      ['Bulls', 'Blue Bulls'],
+      ['Sharks', 'Sharks XV'],
+      ['Lions', 'Golden Lions'],
+      ['Stormers XXIII', 'Stormers XXIII'],
+      ['Cheetahs', 'Toyota Cheetahs'],
+      ['Pumas', 'Airlink Pumas'],
+      ['Griquas', 'Griquas'],
+      ['Boland Cavaliers', 'Boland Cavaliers'],
+    ],
   },
 ];
 

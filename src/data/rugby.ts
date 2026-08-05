@@ -1,5 +1,6 @@
 import type { FamillePoste, Poste, PosteId } from '../types';
 import { ZONES } from './nations';
+import { t } from '../lib/i18n';
 
 // LES 15 POSTES DU RUGBY, numérotés comme sur le maillot (1 à 15).
 // Chaque poste garde sa « famille » : c'est elle que les données réelles
@@ -111,3 +112,39 @@ export const ATTRIBUTS_LABELS: Record<string, string> = {
   reputation: 'Réputation',
   argent: 'Argent',
 };
+
+// ---------------------------------------------------------------------------
+// LES MÊMES LIBELLÉS, DANS LA LANGUE DU JOUEUR
+// ---------------------------------------------------------------------------
+// ⚠️ POURQUOI DES FONCTIONS ET PAS UNE TABLE PAR LANGUE. `ATTRIBUTS_LABELS` et
+// `POSTES` sont lus depuis une trentaine d'endroits, dont des fonctions PURES
+// (prompts, journal) qui n'ont pas de hook React. On garde donc les constantes
+// françaises — elles restent la source, et `lib/groq.ts` s'en sert telles quelles
+// pour décrire le joueur au MJ — et on ajoute à côté trois accesseurs traduits,
+// à utiliser partout où le texte est AFFICHÉ.
+//
+// Le repli sur le français n'est pas décoratif : une clé absente rendrait
+// « poste.arriere » en toutes lettres à l'écran (`t()` renvoie la clé inconnue).
+
+/** « Jeu au pied », « Kicking », « Juego al pie »… */
+export function labelAttribut(cle: string): string {
+  const traduit = t(`attr.${cle}`);
+  return traduit === `attr.${cle}` ? (ATTRIBUTS_LABELS[cle] ?? cle) : traduit;
+}
+
+/** « Demi de mêlée », « Scrum-half », « Mediano de melé »… */
+export function nomPoste(id: PosteId): string {
+  const traduit = t(`poste.${id}`);
+  return traduit === `poste.${id}` ? (POSTE_PAR_ID[id]?.nom ?? id) : traduit;
+}
+
+/** La description d'un poste (écran de création). */
+export function descriptionPoste(id: PosteId): string {
+  const traduit = t(`poste.${id}.desc`);
+  return traduit === `poste.${id}.desc` ? (POSTE_PAR_ID[id]?.description ?? '') : traduit;
+}
+
+/** « Avant » / « Arrière », traduits. */
+export function categoriePoste(id: PosteId): string {
+  return POSTE_PAR_ID[id]?.categorie === 'Avant' ? t('poste.cat.avant') : t('poste.cat.arriere');
+}

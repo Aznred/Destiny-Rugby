@@ -1,5 +1,3 @@
-import type { AttributId } from '../types';
-
 export interface SkinBallon {
   id: string;
   nom: string;
@@ -79,42 +77,13 @@ export const SKIN_PAR_ID: Record<string, SkinBallon> = Object.fromEntries(
   SKINS.map((s) => [s.id, s]),
 );
 
-// Boosts consommables : effet immédiat sur les attributs.
-export interface Boost {
-  id: string;
-  nom: string;
-  desc: string;
-  emoji: string;
-  prix: number;
-  effet: { attributs?: number; forme?: number; moral?: number };
-}
-
-export const BOOSTS: Boost[] = [
-  {
-    id: 'stage',
-    nom: 'Stage intensif',
-    desc: '+2 à tous les attributs. Une semaine de sueur.',
-    emoji: '🏋️',
-    prix: 80,
-    effet: { attributs: 2 },
-  },
-  {
-    id: 'reeduc',
-    nom: 'Soins de pointe',
-    desc: 'Forme et moral au maximum. Comme neuf.',
-    emoji: '🧊',
-    prix: 60,
-    effet: { forme: 100, moral: 100 },
-  },
-  {
-    id: 'mental',
-    nom: 'Coach mental',
-    desc: '+5 Mental, +5 Vision, +10 Moral.',
-    emoji: '🧠',
-    prix: 70,
-    effet: { moral: 10 },
-  },
-];
+// ⚠️ LES BOOSTS ONT ÉTÉ SUPPRIMÉS (demande explicite).
+// Ils vendaient « +2 à tous les attributs » et « forme et moral au maximum »
+// pour 60 à 80 Ovas. C'était en contradiction directe avec l'étalonnage de
+// difficulté (`lib/progression.ts`, `scripts/verifDifficulte.ts`) : une carrière
+// se construit sur le terrain, pas au comptoir. La boutique ne vend plus que
+// des ballons — du cosmétique, et rien qui touche à la progression.
+// Ne pas les réintroduire sans relancer `npx vite-node scripts/verifDifficulte.ts`.
 
 // Packs d'Ovas (achat en argent réel — NON branché, purement indicatif).
 export interface PackOvas {
@@ -129,6 +98,3 @@ export const PACKS: PackOvas[] = [
   { id: 'p2', ovas: 550, prix: '4,99 €', bonus: '+10 %' },
   { id: 'p3', ovas: 1200, prix: '9,99 €', bonus: '+20 %' },
 ];
-
-// Bonus d'attribut ciblé pour le coach mental (appliqué à la main dans le store)
-export const CIBLES_COACH: AttributId[] = ['mental', 'vision'];

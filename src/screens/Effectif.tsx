@@ -4,7 +4,8 @@ import { useGame, noteGlobale } from '../store/useGame';
 import { effectifDuClub, noteDuClub, forceEffectif, estEspoir, estDeclinant } from '../lib/effectif';
 import { EFFECTIFS_REELS } from '../data/effectifsReels';
 import { POSTES } from '../data/rugby';
-import { competitionDuClub, clubParNom } from '../data/clubs';
+import { clubParNom } from '../data/clubs';
+import { competitionEffective } from '../lib/divisions';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { Drapeau } from '../components/Drapeau';
@@ -19,7 +20,7 @@ export function Effectif() {
   );
 
   if (!joueur) return null;
-  const division = competitionDuClub(joueur.club);
+  const division = competitionEffective(joueur.club, joueur.division);
   const clubData = clubParNom(joueur.club);
   const maNote = noteGlobale(joueur);
   const reel = joueur.club in EFFECTIFS_REELS;

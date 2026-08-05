@@ -15,6 +15,7 @@
 
 import type { Joueur, StatVariable } from '../types';
 import type { Scenario } from './scenarios';
+import { t } from '../lib/i18n';
 
 // Ce que peut déclencher un choix, en plus des stats. C'est LE point d'entrée
 // des évènements durs (voir `lib/consequences.ts`).
@@ -467,12 +468,29 @@ export function situationPour(j: Joueur, dejaVues: string[], alea = Math.random)
 }
 
 // Conversion vers le format `Scenario` utilisé par l'écran de carrière.
+//
+// ⚠️ C'EST ICI QUE LA TRADUCTION SE FAIT, et nulle part ailleurs. La situation
+// traverse ensuite le store (`poserSituation`, `resoudreChoix`) puis le journal,
+// où elle devient du texte figé : traduire plus tard reviendrait à traduire une
+// entrée de journal déjà écrite. `traduit()` retombe sur le français dès qu'une
+// clé manque — jamais de « sit.bizutage.titre » à l'écran.
+function traduit(cle: string, defaut: string): string {
+  const valeur = t(cle);
+  return valeur === cle ? defaut : valeur;
+}
+
 export function versScenario(s: Situation): Scenario {
   return {
     id: s.id,
     emoji: s.emoji,
-    titre: s.titre,
-    situation: s.situation,
-    choix: s.choix.map((c) => ({ texte: c.texte, issue: c.issue })),
+    titre: traduit(`sit.${s.id}.titre`, s.titre),
+    situation: traduit(`sit.${s.id}.txt`, s.situation),
+    choix: s.choix.map((c, i) => ({
+      texte: traduit(`sit.${s.id}.c${i}`, c.texte),
+      // ⚠️ On ne recopie QUE le récit : les deltas, les Ovas et la conséquence
+      // dure (`dur`) restent l'objet d'origine. Une traduction ne doit jamais
+      // pouvoir déplacer l'équilibre du jeu.
+      issue: { ...c.issue, recit: traduit(`sit.${s.id}.r${i}`, c.issue.recit) },
+    })),
   };
 }

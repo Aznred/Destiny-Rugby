@@ -29,6 +29,7 @@ import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { Blason, LogoEquipe } from './Blason';
 import { nomNation } from './Drapeau';
 import { semaine, CALENDRIER } from '../data/calendrier';
+import { t } from '../lib/i18n';
 import type { Joueur } from '../types';
 import type { LigneTableau } from '../lib/championnat';
 
@@ -154,12 +155,12 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
     <aside
       className="carte classement-lateral"
       onClick={() => setEcran('tableau')}
-      title="Voir tous les résultats, journée par journée"
+      title={t('cl.voirTout')}
     >
       <div className="cl-lat-tete">
         <div>
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <LogoCompet id={vue.logo} emoji={vue.emoji} taille={18} /> Classement
+            <LogoCompet id={vue.logo} emoji={vue.emoji} taille={18} /> {t('cl.titre')}
           </div>
           <b>{vue.titre}</b>
         </div>
@@ -190,7 +191,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
 
       {vue.phase.length ? (
         <div className="cl-lat-pied">
-          <div className="eyebrow" style={{ marginBottom: '0.3rem' }}>🔥 Phase finale</div>
+          <div className="eyebrow" style={{ marginBottom: '0.3rem' }}>🔥 {t('cl.phaseFinale')}</div>
           {vue.phase.map((m) => (
             <div
               key={m.libelle}
@@ -205,7 +206,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
         </div>
       ) : vue.pied ? (
         <div className="cl-lat-pied">
-          <div className="eyebrow" style={{ marginBottom: '0.3rem' }}>Dernier match</div>
+          <div className="eyebrow" style={{ marginBottom: '0.3rem' }}>{t('cl.dernierMatch')}</div>
           <div className="cl-lat-affiche" data-moi="oui">
             <span>{vue.pied.domicile}</span>
             <b>{vue.pied.scoreD}-{vue.pied.scoreE}</b>

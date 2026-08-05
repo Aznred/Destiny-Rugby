@@ -67,6 +67,53 @@ function ancreDe(divisionId: string): string {
   return clubsDeDivision(divisionId)[0] ?? '';
 }
 
+// ---------------------------------------------------------------------------
+// ⚠️⚠️ UNE SEULE FIN DE SAISON PAR DIVISION — LE BUG DU « TOP 14 À 16 CLUBS »
+// ---------------------------------------------------------------------------
+// La fin de saison était calculée DEUX FOIS, et pas de la même façon :
+//
+//   • `resoudrePyramide()` jouait la division du joueur AVEC son apport
+//     (`bonusJoueur`), ancrée sur SON club ;
+//   • `resoudreToutesDivisions()` la rejouait SANS apport, ancrée sur le premier
+//     club du fichier.
+//
+// Deux championnats différents, donc deux champions et deux derniers différents.
+// Le store fusionnait les deux listes en dédoublonnant PAR NOM DE CLUB : quand
+// les deux calculs ne désignaient pas le même club, les DEUX montaient. Le
+// Top 14 gagnait un club par saison et la Pro D2 en perdait un — d'où le
+// « Top 14 à 16 équipes et Pro D2 à 14 » signalé en jeu.
+//
+// Désormais il n'y a QU'UN calcul, mémoïsé, et il connaît le contexte du joueur :
+// tout le monde lit le même championnat.
+let CONTEXTE: { club: string; bonus: number } = { club: '', bonus: 0 };
+
+export function setContexteJoueur(club: string, bonus: number): void {
+  if (CONTEXTE.club === club && CONTEXTE.bonus === bonus) return;
+  CONTEXTE = { club, bonus };
+  oublierResultats();
+}
+
+const cachePhases = new Map<string, PhaseFinale>();
+
+/** La fin de saison d'une division — LA source unique. */
+export function phaseFinaleDe(
+  divisionId: string, saison: number, numeroPoule?: number,
+): PhaseFinale {
+  const cle = `${divisionId}#${saison}#${numeroPoule ?? '-'}`;
+  const enCache = cachePhases.get(cle);
+  if (enCache) return enCache;
+  // Le club du joueur n'est l'ancre que dans SA division, et sans numéro de
+  // poule imposé : ailleurs, on prend le premier club de la poule visée.
+  const sienne = numeroPoule == null && !!CONTEXTE.club
+    && clubsDeDivision(divisionId).includes(CONTEXTE.club);
+  const ancre = sienne
+    ? CONTEXTE.club
+    : (poulesDe(divisionId)[numeroPoule ?? 0]?.[0] ?? ancreDe(divisionId));
+  const r = phaseFinale(divisionId, saison, ancre, sienne ? CONTEXTE.bonus : 0, numeroPoule);
+  cachePhases.set(cle, r);
+  return r;
+}
+
 export interface BilanPyramide {
   mouvements: MouvementClub[];
   phase: PhaseFinale; // la fin de saison de la division du joueur
@@ -81,7 +128,10 @@ export function resoudrePyramide(
   clubJoueur: string,
   bonusJoueur = 0,
 ): BilanPyramide {
-  const phase = phaseFinale(divisionId, saison, clubJoueur, bonusJoueur);
+  // ⚠️ On POSE le contexte avant de lire quoi que ce soit : `resultatDivision`
+  // et `phaseFinaleDe` doivent voir exactement le même championnat.
+  setContexteJoueur(clubJoueur, bonusJoueur);
+  const phase = phaseFinaleDe(divisionId, saison);
   const mouvements: MouvementClub[] = [];
   const recits: string[] = [];
   const haut = divisionAuDessus(divisionId);
@@ -96,7 +146,7 @@ export function resoudrePyramide(
 
   // ---- Vers le haut : notre champion monte, notre finaliste joue l'accès ----
   if (haut) {
-    const phaseHaut = phaseFinale(haut, saison, ancreDe(haut));
+    const phaseHaut = phaseFinaleDe(haut, saison);
     if (phase.champion) {
       bouger(phase.champion, divisionId, haut, 'montee', 'champion');
       recits.push(`${phase.champion}, champion de ${nomDivision(divisionId)}, accède à la ${nomDivision(haut)}.`);
@@ -124,7 +174,7 @@ export function resoudrePyramide(
 
   // ---- Vers le bas : le dernier descend, l'avant-dernier défend sa place ----
   if (bas) {
-    const phaseBas = phaseFinale(bas, saison, ancreDe(bas));
+    const phaseBas = phaseFinaleDe(bas, saison);
     if (phase.dernier) {
       bouger(phase.dernier, divisionId, bas, 'descente', 'dernier');
       recits.push(`${phase.dernier} termine dernier de ${nomDivision(divisionId)} et descend en ${nomDivision(bas)}.`);
@@ -190,7 +240,7 @@ export function resultatDivision(divisionId: string, saison: number): ResultatDi
   const poules = poulesDe(divisionId);
   let res: ResultatDivision;
   if (poules.length <= 1) {
-    const phase = phaseFinale(divisionId, saison, poules[0]?.[0] ?? '');
+    const phase = phaseFinaleDe(divisionId, saison);
     res = {
       divisionId,
       champions: phase.champion ? [phase.champion, ...(phase.finaliste ? [phase.finaliste] : [])] : [],
@@ -223,6 +273,50 @@ export function resultatDivision(divisionId: string, saison: number): ResultatDi
 
 export function oublierResultats(): void {
   cacheChampions.clear();
+  cachePhases.clear();
+}
+
+// ---------------------------------------------------------------------------
+// ⚠️ LE GARDE-FOU : UNE DIVISION NE CHANGE JAMAIS DE TAILLE
+// ---------------------------------------------------------------------------
+// Même avec une source unique, deux résolutions se superposent : celle de la
+// division du joueur (match d'accès compris) et celle de toute la pyramide.
+// Un jour ou l'autre, un cas limite les fera diverger — un club champion de sa
+// poule ET vainqueur du match d'accès, une division amateur dont le tournoi
+// final ne désigne pas le premier de poule…
+//
+// Ce filtre est la ceinture ET les bretelles : pour CHAQUE division, autant de
+// clubs doivent entrer que de clubs doivent sortir. Si ce n'est pas le cas, on
+// retire le mouvement le moins prioritaire (les derniers de la liste sont ceux
+// des étages où le joueur ne joue pas) jusqu'à ce que tout s'équilibre.
+// Résultat : le Top 14 compte 14 clubs à la saison 12 comme à la saison 1.
+export function equilibrerMouvements(mouvements: MouvementClub[]): MouvementClub[] {
+  const garde = [...mouvements];
+  const soldes = () => {
+    const s = new Map<string, number>();
+    for (const m of garde) {
+      s.set(m.de, (s.get(m.de) ?? 0) - 1);
+      s.set(m.vers, (s.get(m.vers) ?? 0) + 1);
+    }
+    return s;
+  };
+  // Chaque tour retire au plus un mouvement : la boucle termine forcément.
+  for (let tour = 0; tour <= mouvements.length; tour++) {
+    const s = soldes();
+    let desequilibre = false;
+    for (const v of s.values()) if (v !== 0) { desequilibre = true; break; }
+    if (!desequilibre) return garde;
+    // On annule en priorité un mouvement qui ALIMENTE une division en surnombre
+    // ou qui VIDE une division en sous-nombre, en partant de la fin de liste.
+    let index = -1;
+    for (let i = garde.length - 1; i >= 0; i--) {
+      const m = garde[i];
+      if ((s.get(m.vers) ?? 0) > 0 || (s.get(m.de) ?? 0) < 0) { index = i; break; }
+    }
+    if (index < 0) return garde;
+    garde.splice(index, 1);
+  }
+  return garde;
 }
 
 // Combien de clubs s'échangent entre deux étages voisins.

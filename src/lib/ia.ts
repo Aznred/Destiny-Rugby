@@ -16,33 +16,46 @@ import { SCENARIOS } from '../data/scenarios';
 import { MOMENTS, type MomentDecisif } from '../data/moments';
 import { interviewPour, type Interview } from '../data/interviews';
 import { appelGroqJSON, fichePersonnage, nettoyerDeltas, plafonnerDeltas, MODELE_DEFAUT } from './groq';
-import { consigneDeLangue } from './i18n';
+import { consigneDeLangue, t } from './i18n';
 import { POSTE_PAR_ID } from '../data/rugby';
 
 // --------------------------------------------------------------------------
 // Pré-écrit → Scenario (le mode SANS CLÉ, qui doit rester complet)
 // --------------------------------------------------------------------------
+// ⚠️ LA TRADUCTION SE FAIT ICI, à la conversion. Avec une clé Groq, l'IA écrit
+// déjà dans la langue du joueur (`consigneDeLangue`) ; sans clé, c'est ce pool
+// pré-écrit qu'on lit, et il faut donc aller chercher sa version traduite
+// (`data/textesMoments.ts`, `data/textesContenu.ts`). Plus tard serait trop
+// tard : le scénario part dans le journal, où le texte est figé.
+function traduit(cle: string, defaut: string): string {
+  const valeur = t(cle);
+  return valeur === cle ? defaut : valeur;
+}
 
 // Un moment décisif devient une situation à choix. La réussite de chaque geste
 // est tirée à la CONSTRUCTION (le joueur ne la voit pas : c'est équivalent à un
 // tirage au clic, et ça garde le format commun).
 export function momentEnScenario(j: Joueur, moment: MomentDecisif): Scenario {
-  const choix: ChoixScenario[] = moment.options.map((o) => {
+  const choix: ChoixScenario[] = moment.options.map((o, i) => {
     const niveau = j.attributs[o.attribut];
     // 50 % au seuil, ~85 % quinze points au-dessus, ~15 % quinze en dessous.
     const chance = Math.max(0.08, Math.min(0.92, 0.5 + (niveau - o.seuil) / 30));
     const reussi = Math.random() < chance;
     const issue = reussi ? o.reussite : o.echec;
     return {
-      texte: o.texte,
-      issue: { recit: issue.recit, deltas: issue.deltas, ovas: reussi ? 14 : 5 },
+      texte: traduit(`mom.${moment.id}.o${i}`, o.texte),
+      issue: {
+        recit: traduit(`mom.${moment.id}.o${i}.${reussi ? 'ok' : 'ko'}`, issue.recit),
+        deltas: issue.deltas,
+        ovas: reussi ? 14 : 5,
+      },
     };
   });
   return {
     id: `moment-${moment.id}`,
     emoji: moment.emoji,
-    titre: moment.titre,
-    situation: moment.situation,
+    titre: traduit(`mom.${moment.id}.titre`, moment.titre),
+    situation: traduit(`mom.${moment.id}.txt`, moment.situation),
     choix,
   };
 }
@@ -71,7 +84,17 @@ export function interviewAleatoire(contexte: Interview['contexte']): Scenario {
 }
 
 export function scenarioDuPool(): Scenario {
-  return SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)];
+  const s = SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)];
+  return {
+    ...s,
+    titre: traduit(`scn.${s.id}.titre`, s.titre),
+    situation: traduit(`scn.${s.id}.txt`, s.situation),
+    choix: s.choix.map((c, i) => ({
+      texte: traduit(`scn.${s.id}.c${i}`, c.texte),
+      // Les deltas, les Ovas et le transfert éventuel restent intacts.
+      issue: { ...c.issue, recit: traduit(`scn.${s.id}.r${i}`, c.issue.recit) },
+    })),
+  };
 }
 
 // --------------------------------------------------------------------------

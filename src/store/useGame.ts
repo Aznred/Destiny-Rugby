@@ -8,6 +8,7 @@ import type {
   LegendeSauvegardee,
   BilanEnCours,
   OffreContrat,
+  TitreGagne,
   Blessure,
   Rythme,
   Theme,
@@ -41,7 +42,7 @@ import { estTitulaire } from '../lib/moteur/titulaire';
 import { definirLangue, langueDuNavigateur, type Langue } from '../lib/i18n';
 import type { LigneReelle } from '../lib/moteur/saison';
 import { coupesDuClub } from '../lib/coupe';
-import { fenetreInternationale } from '../lib/international';
+import { fenetreInternationale, fenetreU20, equipeU20 } from '../lib/international';
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
 
 // Combien de week-ends de ce type se sont écoulés AVANT cette semaine.
@@ -58,11 +59,10 @@ import { DEFI_PAR_ID, SUCCES_PAR_ID, type EvenementDefi } from '../data/succes';
 import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS } from '../data/rugby';
 import { retourDeMatch, BUDGET_MATCHS_PAR_SAISON } from '../lib/moteur/apresMatch';
 import { MODELE_DEFAUT, plafonnerDeltas, ressembleATriche, CLE_ENV } from '../lib/groq';
-import { EVENEMENTS } from '../data/evenements';
+import { EVENEMENTS, traduireEvenement } from '../data/evenements';
 import { situationPour, versScenario, type ConsequenceDure } from '../data/situations';
 import { appliquerConsequence, lireDerapage, consequenceDuDerapage } from '../lib/consequences';
-import { SKIN_PAR_ID, BOOSTS, CIBLES_COACH } from '../data/boutique';
-import { LEGENDES_FICTIVES } from '../data/legendes';
+import { SKIN_PAR_ID } from '../data/boutique';
 import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
 import { forceEffectif, forceMoyenneDivision, noteDuClub, setTransfertsSociaux, effectifDuClub } from '../lib/effectif';
@@ -73,14 +73,16 @@ import {
   TROPHEE_PAR_DIVISION,
   COUPE_EUROPE_PAR_DIVISION,
   NATIONS_6N,
+  NATIONS_REC,
 } from '../data/trophees';
 import { nomNation } from '../components/Drapeau';
 import {
   semaine, libelleDate, SEMAINES_PAR_SAISON, type Semaine,
 } from '../data/calendrier';
-import { convocation } from '../lib/selection';
+import { convocation, convocationU20 } from '../lib/selection';
 import {
   resoudrePyramide, nomDivision, resoudreToutesDivisions, oublierResultats,
+  equilibrerMouvements, setContexteJoueur,
 } from '../lib/promotion';
 import { setMouvementsClubs } from '../lib/divisions';
 import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFinale';
@@ -265,10 +267,55 @@ function normaliserNom(nom: string): string {
 }
 
 // Nouvelles publications en tête du fil, sans doublon, taille bornée.
+// ⚠️ TES PUBLICATIONS NE S'EFFACENT JAMAIS.
+// Le fil était simplement tronqué aux 80 (ou 60) posts les plus récents. Or
+// chaque semaine jouée y déverse 8 publications du monde : au bout de dix
+// semaines — typiquement le temps d'un changement de club — TES tweets étaient
+// poussés dehors et disparaissaient de ton profil. D'où « les posts X se
+// suppriment quand on change de club ».
+// On sépare donc les deux fils : les tiens (plafonnés à 120, largement de quoi
+// tenir une carrière) et ceux du monde (60, c'est de l'actualité).
+const MES_POSTS_MAX = 120;
+const POSTS_MONDE_MAX = 60;
+
+function limiterPosts(liste: PostSocial[]): PostSocial[] {
+  const miens: PostSocial[] = [];
+  const monde: PostSocial[] = [];
+  for (const p of liste) (p.moi ? miens : monde).push(p);
+  const gardes = new Set([
+    ...miens.slice(0, MES_POSTS_MAX),
+    // Un post du monde sous lequel tu as commenté ou que tu as reposté fait
+    // partie de ton histoire : il reste, lui aussi.
+    ...monde.filter((p) => p.repostee || p.reponses?.some((r) => r.moi)).slice(0, 40),
+    ...monde.slice(0, POSTS_MONDE_MAX),
+  ]);
+  return liste.filter((p) => gardes.has(p));
+}
+
 function fusionner(nouveaux: PostSocial[], existants: PostSocial[]): PostSocial[] {
   const vus = new Set(existants.map((p) => `${p.pseudo}|${p.texte}`));
   const inedits = nouveaux.filter((p) => !vus.has(`${p.pseudo}|${p.texte}`));
-  return [...inedits, ...existants].slice(0, 80);
+  return limiterPosts([...inedits, ...existants]);
+}
+
+// Reconstruit un palmarès exploitable depuis les libellés d'une vieille
+// sauvegarde : « Bouclier de Brennus (S4) » → { trophee: 'brennus', saison: 4 }.
+// Le club n'y figurait pas, il reste donc vide (voir `migrate`).
+// ⚠️ EXPORTÉE : l'armoire à trophées (components/ArmoireTrophees) en a besoin
+// pour les légendes du Panthéon, qui ne gardent que des LIBELLÉS (« Bouclier de
+// Brennus (S4) ») et pas le palmarès structuré — celui-ci n'existe que sur la
+// carrière en cours.
+export function palmaresDepuisLibelles(titres: string[]): TitreGagne[] {
+  const parNom = new Map(Object.values(TROPHEES).map((t) => [t.nom, t.id]));
+  const sortie: TitreGagne[] = [];
+  for (const libelle of titres) {
+    const m = /^(.*?)\s*\(S(\d+)\)$/.exec(libelle);
+    if (!m) continue;
+    const id = parNom.get(m[1].trim());
+    if (!id) continue;
+    sortie.push({ trophee: id, nom: m[1].trim(), saison: Number(m[2]), club: '' });
+  }
+  return sortie;
 }
 
 interface GameState {
@@ -389,7 +436,8 @@ interface GameState {
   // boutique
   acheterSkin: (id: string) => boolean;
   choisirSkin: (id: string) => void;
-  acheterBoost: (id: string) => boolean;
+  // ⚠️ `acheterBoost` a été supprimé : la boutique ne vend plus de bonus
+  // d'attributs (demande explicite). Voir `src/data/boutique.ts`.
 }
 
 export const useGame = create<GameState>()(
@@ -479,6 +527,10 @@ export const useGame = create<GameState>()(
         // Nouvelle carrière = pyramide remise à son état d'origine, et plus
         // aucun transfert annoncé sur L'Ovale ne traîne.
         setMouvementsClubs({});
+        // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
+        // du joueur précédent sont périmés (voir lib/promotion.ts).
+        oublierResultats();
+        setContexteJoueur('', 0);
         setTransfertsSociaux([]);
         set({
           joueur,
@@ -565,6 +617,71 @@ export const useGame = create<GameState>()(
       saisonSuivante: () => {
         const { joueur, compteurs, journal } = get();
         if (!joueur) return;
+
+        // ═══ ON NE JOUE PAS UNE SAISON SANS CONTRAT ═══════════════════════
+        // ⚠️ Bug signalé en jeu : « si on est sans contrat on reste dans le
+        // club alors qu'on n'a plus de contrat avec ». Le contrat tombait à
+        // zéro, des offres arrivaient, et si on les ignorait le jeu continuait
+        // comme si de rien n'était : salaire versé, place de titulaire, tout.
+        // Un contrat terminé, c'est un joueur libre — et un joueur libre n'a
+        // plus de club tant qu'il n'a pas signé.
+        // ⚠️ Une vieille sauvegarde peut ne PAS avoir de contrat du tout (le
+        // champ est arrivé en cours de route) : on lui en fabrique un plutôt que
+        // de la mettre au chômage rétroactivement.
+        if (!joueur.contrat) {
+          set({
+            joueur: {
+              ...joueur,
+              contrat: {
+                club: joueur.club,
+                division: joueur.division ?? divisionDuClub(joueur.club)?.id ?? 'fed3',
+                saisons: 2,
+                salaire: Math.round(noteDuClub(joueur.club) * 60),
+              },
+            },
+          });
+          return get().saisonSuivante();
+        }
+        if (joueur.contrat.saisons <= 0) {
+          let dispo = get().offres;
+          if (!dispo.length) {
+            // Personne sur la table : on relance le marché, barre abaissée.
+            dispo = genererOffres(joueur, { saison: joueur.saison, maximum: 4, demande: true });
+          }
+          if (dispo.length) {
+            set((s) => ({
+              offres: dispo,
+              offresOuvertes: true,
+              journal: s.journal.some((e) => e.evenement === `libre-${joueur.saison}`)
+                ? s.journal
+                : [...s.journal, {
+                    id: idUnique(),
+                    saison: joueur.saison,
+                    role: 'mj' as const,
+                    titre: '📄 Tu es libre de tout contrat',
+                    texte: `Ton contrat à ${joueur.club} est arrivé à son terme. `
+                      + `Tant que tu n'as pas signé, tu n'as plus de club, plus de salaire et plus de match : `
+                      + `ouvre « Choix de carrière » et tranche.`,
+                    evenement: `libre-${joueur.saison}`,
+                  }],
+            }));
+            return; // la saison ne démarre pas tant qu'on n'a pas signé
+          }
+          // ⚠️ AUCUN CLUB N'EN VEUT. On ne laisse pas le joueur en suspens : le
+          // rugby s'arrête là, comme pour des milliers de joueurs réels.
+          set((s) => ({
+            journal: [...s.journal, {
+              id: idUnique(),
+              saison: joueur.saison,
+              role: 'mj' as const,
+              titre: '🚪 Plus aucun club',
+              texte: `Ton contrat est terminé et le téléphone ne sonne plus. `
+                + `À ${joueur.age} ans, aucune formation ne te propose de place : la carrière s'arrête ici.`,
+            }],
+          }));
+          get().prendreRetraite();
+          return;
+        }
         // Matchs et essais DE LA SAISON écoulée : le temps de jeu dépend du
         // niveau du joueur face à son groupe, les essais de son poste et de sa
         // finition. Ces deux chiffres pèsent ensuite sur le résultat du club.
@@ -691,7 +808,7 @@ export const useGame = create<GameState>()(
           compteurs.situations === 0 &&
           !journal.some((e) => e.saison === joueur.saison && e.role === 'joueur');
         if (rienFait) {
-          const evt = EVENEMENTS[Math.floor(Math.random() * EVENEMENTS.length)];
+          const evt = traduireEvenement(EVENEMENTS[Math.floor(Math.random() * EVENEMENTS.length)]);
           j = appliquerDeltas(j, evt.deltas);
           gain += gainOvas(evt.ovas);
           entrees.push({
@@ -788,7 +905,24 @@ export const useGame = create<GameState>()(
         }
         for (const id of gagnes) {
           const t = TROPHEES[id];
-          j = { ...j, titres: [...j.titres, `${t.nom} (S${joueur.saison})`] };
+          // ⚠️ On garde le libellé POUR L'AFFICHAGE et on enregistre en plus le
+          // titre sous forme structurée : c'est ce qui permet les succès de
+          // palmarès (« champion avec trois clubs différents », « trois
+          // Boucliers de Brennus »…). Voir `TitreGagne` dans types.ts.
+          j = {
+            ...j,
+            titres: [...j.titres, `${t.nom} (S${joueur.saison})`],
+            palmares: [
+              ...(j.palmares ?? []),
+              {
+                trophee: t.id,
+                nom: t.nom,
+                saison: joueur.saison,
+                club: joueur.club,
+                division: joueur.division,
+              },
+            ],
+          };
           gain += t.ovas;
           entrees.push({
             id: idUnique(),
@@ -929,12 +1063,16 @@ export const useGame = create<GameState>()(
         // compris (lib/tournoi.ts). Les mouvements de la division du joueur
         // (match d'accès inclus) passent devant : c'est sa saison à lui.
         const complete = resoudreToutesDivisions(joueur.saison);
-        const mouvements = [
+        // ⚠️ `equilibrerMouvements` est le garde-fou de TAILLE DES DIVISIONS.
+        // Sans lui, la fusion des deux résolutions pouvait faire monter deux
+        // clubs pour une seule descente : le Top 14 se retrouvait à 16 équipes
+        // et la Pro D2 à 14 (bug signalé en jeu). Voir lib/promotion.ts.
+        const mouvements = equilibrerMouvements([
           ...pyramide.mouvements,
           ...complete.mouvements.filter(
             (m) => !pyramide.mouvements.some((p) => p.club === m.club),
           ),
-        ];
+        ]);
         // ⚠️ On enregistre les mouvements ET on les publie à lib/divisions.ts :
         // sans ça, la division du club promu ne changeait nulle part et le
         // championnat de la saison suivante était identique au précédent.
@@ -993,9 +1131,29 @@ export const useGame = create<GameState>()(
         // par un gros pas vers l'audience qu'un joueur de ce niveau, dans ce
         // club-là, aurait sur L'Ovale (`abonnesCible`, lib/comptes.ts).
         const cibleAbonnes = abonnesCible(j.nom, j.club, noteGlobale(j), j.reputation);
-        const abonnesApresSaison = rapprocherAbonnes(j.abonnes ?? 0, cibleAbonnes, 0.22);
+        // ⚠️ UNE MAUVAISE SAISON COÛTE DES ABONNÉS (demande explicite). Le
+        // compteur ne suivait que le NIVEAU du club : on pouvait faire une
+        // saison à 3/10 et continuer de grossir parce qu'on jouait en Top 14.
+        // En dessous de 5/10, le public s'en va — d'autant plus vite que la
+        // saison a été mauvaise (jusqu'à −18 % à 2/10), et le staff qui ne te
+        // fait plus confiance n'arrange rien.
+        const note = evolution.noteSaison;
+        const decu = note < 5 ? Math.min(0.18, (5 - note) * 0.045) : 0;
+        const boude = (j.confianceCoach ?? 50) < 35 ? 0.05 : 0;
+        const apresErosion = Math.round((j.abonnes ?? 0) * (1 - decu - boude));
+        const abonnesApresSaison = rapprocherAbonnes(apresErosion, cibleAbonnes, 0.22);
         const deltaAbonnes = abonnesApresSaison - (j.abonnes ?? 0);
         j = { ...j, abonnes: abonnesApresSaison };
+        if (decu > 0 && (j.abonnes ?? 0) > 0) {
+          entrees.push({
+            id: idUnique(),
+            saison: joueur.saison,
+            role: 'systeme',
+            titre: '𝕏 Saison décevante, audience en berne',
+            texte: `Une saison notée ${note.toFixed(1)}/10, ça se voit sur ton compte : `
+              + `${Math.round(decu * 100)} % de tes abonnés te lâchent avant même le mercato.`,
+          });
+        }
         if (Math.abs(deltaAbonnes) >= 100) {
           entrees.push({
             id: idUnique(),
@@ -1402,7 +1560,7 @@ export const useGame = create<GameState>()(
       evenementAleatoire: () => {
         const { joueur, compteurs } = get();
         if (!joueur || compteurs.evenements >= MAX_PAR_SAISON) return;
-        const evt = EVENEMENTS[Math.floor(Math.random() * EVENEMENTS.length)];
+        const evt = traduireEvenement(EVENEMENTS[Math.floor(Math.random() * EVENEMENTS.length)]);
         const j = appliquerDeltas(joueur, evt.deltas);
         set((s) => ({
           joueur: j,
@@ -1618,6 +1776,10 @@ export const useGame = create<GameState>()(
           reconversion,
         };
         setMouvementsClubs({});
+        // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
+        // du joueur précédent sont périmés (voir lib/promotion.ts).
+        oublierResultats();
+        setContexteJoueur('', 0);
         set((s) => ({
           pantheon: [...s.pantheon, legende],
           // Le succès « Entrer au Hall » se décerne ici : juste après, il n'y a
@@ -1644,6 +1806,10 @@ export const useGame = create<GameState>()(
 
       reinitialiser: () => {
         setMouvementsClubs({});
+        // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
+        // du joueur précédent sont périmés (voir lib/promotion.ts).
+        oublierResultats();
+        setContexteJoueur('', 0);
         set({
           joueur: null,
           journal: [],
@@ -1687,7 +1853,7 @@ export const useGame = create<GameState>()(
             set({ chargementSocial: true, erreurSocial: null });
             const reponses = await reponsesGroq(
               { joueur, cle, modele: get().modele, suivis: get().comptesSuivis },
-              propre, ton, 4,
+              propre, ton, 8,
             );
             if (reponses.length) r.post.reponses = reponses;
           } catch (e) {
@@ -1720,19 +1886,29 @@ export const useGame = create<GameState>()(
           const effet = appliquerConsequence(j, c.type, c.motif, c.semaines);
           j = effet.joueur;
           carriereFinie = effet.finale;
+          // ⚠️ Un propos discriminatoire, une menace : ce n'est pas une
+          // « polémique », c'est un compte qui se vide. La moitié de l'audience
+          // part dans la journée — c'est ce qui arrive dans la vraie vie.
+          j = { ...j, abonnes: Math.round((j.abonnes ?? 0) * 0.5) };
           entreeDure = {
             id: idUnique(), saison: j.saison, role: 'systeme',
             titre: `${effet.emoji} ${c.titre}`,
-            texte: `${effet.texte} La publication est capturée, relayée, et ne disparaîtra jamais.`,
+            texte: `${effet.texte} La publication est capturée, relayée, et ne disparaîtra jamais. `
+              + `La moitié de tes abonnés se désabonnent dans la journée.`,
           };
         }
 
         const notifs: NotifSocial[] = [
           {
             id: idUnique(),
-            emoji: '📈',
-            titre: `+${r.gainAbonnes.toLocaleString('fr-FR')} abonnés`,
-            texte: `Ta publication a été vue ${r.post.vues.toLocaleString('fr-FR')} fois.`,
+            emoji: r.gainAbonnes >= 0 ? '📈' : '📉',
+            titre: r.gainAbonnes >= 0
+              ? `+${r.gainAbonnes.toLocaleString('fr-FR')} abonnés`
+              : `${r.gainAbonnes.toLocaleString('fr-FR')} abonnés`,
+            texte: `Ta publication a été vue ${r.post.vues.toLocaleString('fr-FR')} fois.`
+              + (r.desabonnes > 0
+                ? ` ${r.desabonnes.toLocaleString('fr-FR')} comptes se sont désabonnés.`
+                : ''),
             saison: j.saison,
           },
           ...(r.post.reponses ?? []).slice(0, 3).map((rep) => ({
@@ -1746,7 +1922,7 @@ export const useGame = create<GameState>()(
 
         set((s) => ({
           joueur: j,
-          posts: [r.post, ...s.posts].slice(0, 60),
+          posts: limiterPosts([r.post, ...s.posts]),
           notifsSocial: [...notifs, ...s.notifsSocial].slice(0, 40),
           journal: [
             ...s.journal,
@@ -2048,16 +2224,24 @@ export const useGame = create<GameState>()(
       // ---- REPOSTER ----
       // Un repost apparaît sur TON profil, avec la mention de qui l'a écrit à
       // l'origine, et fait gagner un peu de portée à l'auteur.
+      // ⚠️ REPOSTER EST RÉVERSIBLE — ET LE COMPTEUR AUSSI.
+      // L'ancien code ajoutait 4 % de vues à CHAQUE activation et n'en retirait
+      // jamais (`Math.max(p.vues, …)`). Reposter / dé-reposter en boucle faisait
+      // donc grimper les vues à l'infini — bug signalé en jeu. On mémorise
+      // maintenant le bonus exact accordé (`bonusRepost`) pour pouvoir le
+      // reprendre au dé-repost : l'opération est parfaitement symétrique.
       reposter: (id) =>
         set((s) => ({
           posts: s.posts.map((p) => {
             if (p.id !== id) return p;
             const actif = !p.repostee;
+            const bonus = p.bonusRepost ?? Math.round(p.vues * 0.04);
             return {
               ...p,
               repostee: actif,
+              bonusRepost: bonus,
               reposts: Math.max(0, p.reposts + (actif ? 1 : -1)),
-              vues: Math.max(p.vues, p.vues + (actif ? Math.round(p.vues * 0.04) : 0)),
+              vues: Math.max(1, p.vues + (actif ? bonus : -bonus)),
             };
           }),
         })),
@@ -2368,16 +2552,27 @@ export const useGame = create<GameState>()(
           return;
         }
         if (sem.type === 'international' && !estAmateur(division)) {
-          const fen = fenetreInternationale(joueur.semaine ?? 1, joueur.saison);
+          // ⚠️ On rejoue la fenêtre où le joueur est RÉELLEMENT engagé : chez les
+          // A s'il y est appelé, sinon chez les U20 s'il y a l'âge et le niveau.
+          const nation = nomNation(joueur.nation);
+          const fenA = fenetreInternationale(joueur.semaine ?? 1, joueur.saison);
+          const chezLesA = !!fenA && fenA.competition.equipes.includes(nation)
+            && convocation(joueur).selectionne;
+          const fenJ = chezLesA ? null : fenetreU20(joueur.semaine ?? 1, joueur.saison);
+          const equipeJeune = equipeU20(joueur.nation);
+          const chezLesJeunes = !chezLesA && !!fenJ
+            && fenJ.competition.equipes.includes(equipeJeune)
+            && convocationU20(joueur).selectionne;
+          const fen = chezLesJeunes ? fenJ : fenA;
           if (!fen) return;
           const cleI = `${fen.competition.id}#${joueur.saison}`;
           if ((get().journeesReelles[cleI] ?? 0) >= fen.journee) return;
-          const nation = nomNation(joueur.nation);
-          const selectionne = fen.competition.equipes.includes(nation)
-            && convocation(joueur).selectionne;
+          const monEquipe = chezLesJeunes ? equipeJeune : nation;
           const lignesI = simulerJourneeInternationale(
             fen.competition.id, joueur.saison, fen.journee,
-            selectionne ? { ...avatar, club: nation, titulaire: true } : undefined,
+            (chezLesA || chezLesJeunes)
+              ? { ...avatar, club: monEquipe, titulaire: true }
+              : undefined,
           );
           set((s) => ({
             statsReelles: { ...s.statsReelles, [cleI]: cumuler(s.statsReelles[cleI] ?? {}, lignesI) },
@@ -2459,35 +2654,6 @@ export const useGame = create<GameState>()(
         if (get().inventaire.includes(id)) set({ skinActif: id });
       },
 
-      acheterBoost: (id) => {
-        const joueur = get().joueur;
-        const boost = BOOSTS.find((b) => b.id === id);
-        if (!joueur || !boost || get().coins < boost.prix) return false;
-        let j: Joueur = { ...joueur, attributs: { ...joueur.attributs } };
-        if (boost.effet.attributs) {
-          for (const k of ATTRS_KEYS) j.attributs[k] = borne(j.attributs[k] + boost.effet.attributs);
-        }
-        if (boost.id === 'mental') {
-          for (const k of CIBLES_COACH) j.attributs[k] = borne(j.attributs[k] + 5);
-        }
-        if (boost.effet.forme != null) j.forme = borne(boost.effet.forme);
-        if (boost.effet.moral != null) j.moral = borne(j.moral + boost.effet.moral);
-        set((s) => ({
-          coins: s.coins - boost.prix,
-          joueur: j,
-          journal: [
-            ...s.journal,
-            {
-              id: idUnique(),
-              saison: j.saison,
-              role: 'systeme',
-              titre: `${boost.emoji} ${boost.nom}`,
-              texte: `Boutique : ${boost.desc}`,
-            },
-          ],
-        }));
-        return true;
-      },
     }),
     {
       name: 'destin-ovalie',
@@ -2524,6 +2690,15 @@ export const useGame = create<GameState>()(
             poste: migrerPoste(s.joueur.poste as string),
             nation: s.joueur.nation ?? 'France',
             titres: s.joueur.titres ?? [],
+            // ⚠️ PALMARÈS RECONSTRUIT POUR LES VIEILLES SAUVEGARDES.
+            // Les succès de palmarès lisent `Joueur.palmares`, qui n'existait
+            // pas : sans ça, une carrière déjà titrée n'aurait rien débloqué.
+            // On le rebâtit depuis les libellés (« Bouclier de Brennus (S4) »).
+            // ⚠️ Le CLUB reste inconnu — il n'a jamais été enregistré : les
+            // succès « champion avec deux clubs » ne comptent donc que les
+            // titres gagnés à partir de maintenant. C'est volontaire : mieux
+            // vaut ne rien débloquer que de débloquer sur une donnée inventée.
+            palmares: s.joueur.palmares ?? palmaresDepuisLibelles(s.joueur.titres ?? []),
           };
         }
         s.pantheon = (s.pantheon ?? []).map((l) => ({
@@ -2553,6 +2728,9 @@ export const useGame = create<GameState>()(
       // module : au retour d'une sauvegarde, il faut la lui rendre.
       onRehydrateStorage: () => (etat) => {
         setMouvementsClubs(etat?.mouvementsClubs ?? {});
+        // Les fins de saison mémoïsées (lib/promotion.ts) sont calculées sur la
+        // composition des divisions : elles doivent être purgées en même temps.
+        oublierResultats();
         setTransfertsSociaux(etat?.transfertsSociaux ?? []);
         // ⚠️ Le thème vit sur <html>, pas dans React : il faut le reposer à la
         // réhydratation, sinon le site repart en vert à chaque rechargement.
@@ -2700,6 +2878,15 @@ function resoudreTrophees(
   const nation = nomNation(j.nation);
   if (NATIONS_6N.includes(nation) && perso >= 78 && tire((perso - 78) / 220)) {
     trophees.push('sixNations');
+  }
+
+  // Le « Tournoi des 6 Nations B » — Rugby Europe Championship. ⚠️ Sans lui, un
+  // Géorgien ou un Portugais ne pouvait remporter AUCUN titre international :
+  // `NATIONS_6N` ne le contenait pas, et sa carrière plafonnait au club. La
+  // barre est plus basse que pour le Tournoi (ces sélections valent 60 à 78,
+  // contre 84 pour la France), mais gagner reste l'exception.
+  if (NATIONS_REC.includes(nation) && perso >= 66 && tire((perso - 66) / 200)) {
+    trophees.push('recEurope');
   }
 
   // Coupe du monde tous les 4 ans : le sommet absolu d'une carrière.
@@ -2982,9 +3169,35 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
     case 'international': {
       const conv = convocation(j);
       if (!conv.selectionne) {
+        // ⚠️ PAS CHEZ LES A ? RESTE LES U20 (demande explicite). Un espoir de
+        // 19 ans ne sera jamais appelé chez les séniors — mais il peut porter le
+        // maillot de son pays chez les moins de 20 ans, et c'est souvent LE
+        // moment où une carrière décolle.
+        const jeune = convocationU20(j);
+        if (jeune.selectionne) {
+          const rj = jouerMatch({ ...j, reputation: Math.max(0, j.reputation - 10) }, 1.6);
+          return {
+            ...rj,
+            emoji: '🌱',
+            titre: `${semaineJouee.libelle} — sélection U20`,
+            texte: `Tu es appelé chez les moins de 20 ans de ${nomNation(j.nation)} ! ${rj.texte}`,
+            deltas: {
+              ...rj.deltas,
+              reputation: (rj.deltas.reputation ?? 0) + (rj.aJoue ? 3 : 1),
+              moral: (rj.deltas.moral ?? 0) + 5,
+            },
+            // ⚠️ Une cape U20 n'est PAS une cape internationale : elle ne compte
+            // pas dans `Joueur.selections`, qui est le palmarès des séniors.
+            cape: false,
+          };
+        }
         return {
           emoji: '📺', titre: `${semaineJouee.libelle} — pas convoqué`,
-          texte: `Le groupe est annoncé sans toi (il faut ${Math.round(conv.exige)} de niveau international, tu es à ${Math.round(conv.niveau)}). Tu restes au club pour travailler.`,
+          texte: `Le groupe est annoncé sans toi (il faut ${Math.round(conv.exige)} de niveau international, tu es à ${Math.round(conv.niveau)}).`
+            + (j.age <= 20
+              ? ` Chez les U20 non plus (${Math.round(jeune.exige)} exigé).`
+              : '')
+            + ' Tu restes au club pour travailler.',
           deltas: { forme: 6, moral: conv.marge > -4 ? -4 : -1 },
           aJoue: false, titulaire: false, essais: 0,
         };
@@ -3130,13 +3343,19 @@ function appliquerDeltas(joueur: Joueur, deltas: Partial<Record<StatVariable, nu
   return j;
 }
 
-// Classement combiné : légendes fictives + panthéon du joueur + carrière en cours.
+// ⚠️ LE CLASSEMENT PART VIERGE (demande explicite).
+// Il était pré-rempli de LÉGENDES FICTIVES (`data/legendes.ts`) : un joueur qui
+// arrivait voyait vingt carrières inventées au-dessus de la sienne, et croyait
+// jouer contre du vrai monde. Un classement, ça se construit — il ne contient
+// donc plus que ce qui a VRAIMENT été joué sur cet appareil : le panthéon (les
+// carrières menées à leur terme) et la carrière en cours.
+// Le pas suivant — le classement partagé entre tous les joueurs — demande un
+// backend : voir la marche à suivre affichée dans `src/screens/Classement.tsx`.
 export function classementComplet(
   pantheon: LegendeSauvegardee[],
   joueur: Joueur | null,
 ): (LegendeSauvegardee & { enCours?: boolean; joueur?: boolean })[] {
   const liste: (LegendeSauvegardee & { enCours?: boolean; joueur?: boolean })[] = [
-    ...LEGENDES_FICTIVES,
     ...pantheon.map((l) => ({ ...l, joueur: true })),
   ];
   if (joueur) {

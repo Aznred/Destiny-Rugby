@@ -4,7 +4,8 @@ import { AnimatePresence } from 'framer-motion';
 import { Jauge } from './Jauge';
 import { useGame, noteGlobale, bonusClubDuJoueur } from '../store/useGame';
 import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
-import { competitionDuClub, clubParNom } from '../data/clubs';
+import { clubParNom } from '../data/clubs';
+import { competitionEffective } from '../lib/divisions';
 import { Blason } from './Blason';
 import { LogoCompet } from './LogoCompet';
 import { Drapeau, nomNation } from './Drapeau';
@@ -13,9 +14,10 @@ import { semaine, libelleDate, SEMAINES_PAR_SAISON } from '../data/calendrier';
 import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store/useGame';
 import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID } from '../data/traits';
+import { t, tn } from '../lib/i18n';
 import { matchDeLaSemaine } from '../lib/matchLive';
-import { matchInternationalDuJoueur } from '../lib/international';
-import { convocation } from '../lib/selection';
+import { matchInternationalDuJoueur, equipeU20 } from '../lib/international';
+import { convocation, convocationU20 } from '../lib/selection';
 // ⚠️ LE MATCH EN DIRECT ARRIVE AU CLIC, pas au chargement de la page. Ce
 // composant tire derrière lui tout `lib/moteur/` (le terrain, la tactique, les
 // phases arrêtées, les pools de commentaire) : il pesait dans le chunk
@@ -47,7 +49,9 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const offres = useGame((s) => s.offres);
   const poste = POSTE_PAR_ID[joueur.poste];
   const generale = noteGlobale(joueur);
-  const division = competitionDuClub(joueur.club);
+  // ⚠️ La division EFFECTIVE, pas celle du fichier de données : sinon un club
+  // qui vient de monter reste affiché dans son ancien championnat.
+  const division = competitionEffective(joueur.club, joueur.division);
   const clubData = clubParNom(joueur.club);
   const contrat = joueur.contrat;
   const [confirmerRetraite, setConfirmerRetraite] = useState(false);
@@ -67,21 +71,32 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   // ⚠️ UNE SEMAINE INTERNATIONALE A AUSSI SON MATCH. On ne voyait ni affiche ni
   // compétition pendant le Tournoi ou la tournée d'automne : la sélection se
   // joue maintenant comme un match de club (lib/international.ts).
+  // ⚠️ ET SI TU N'ES PAS (ENCORE) CHEZ LES A, IL Y A LES U20.
+  // Un espoir de 19 ans n'a aucune chance d'être appelé chez les séniors, mais
+  // il peut porter le maillot de son pays chez les moins de 20 ans — Tournoi
+  // U20 et Championnat du monde U20 (lib/international.ts).
   const inter = useMemo(() => {
     if (rythme !== 'semaine' || semaineActuelle.type !== 'international') return null;
-    if (!convocation(joueur).selectionne) return null;
-    return matchInternationalDuJoueur(joueur, bonusClubDuJoueur(joueur));
+    if (convocation(joueur).selectionne) {
+      const senior = matchInternationalDuJoueur(joueur, bonusClubDuJoueur(joueur));
+      if (senior) return { affiche: senior, u20: false };
+    }
+    if (convocationU20(joueur).selectionne) {
+      const jeune = matchInternationalDuJoueur(joueur, bonusClubDuJoueur(joueur), true);
+      if (jeune) return { affiche: jeune, u20: true };
+    }
+    return null;
   }, [joueur, rythme, semaineActuelle.type]);
 
   const affiche = useMemo(
     () => (rythme === 'semaine' && !inter
       ? matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur))
       : inter
-        ? { journee: inter.journee, match: inter.match, cle: inter.cle }
+        ? { journee: inter.affiche.journee, match: inter.affiche.match, cle: inter.affiche.cle }
         : null),
     [joueur, rythme, inter],
   );
-  const monEquipe = inter ? nomNation(joueur.nation) : joueur.club;
+  const monEquipe = inter ? (inter.u20 ? equipeU20(joueur.nation) : nomNation(joueur.nation)) : joueur.club;
   const adversaire = affiche
     ? (affiche.match.domicile === monEquipe ? affiche.match.exterieur : affiche.match.domicile)
     : null;
@@ -118,17 +133,17 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         <div className="ressources" style={{ marginBottom: '0.2rem' }}>
           {joueur.capitaine && <span className="pastille pastille-capitaine">©️ Capitaine</span>}
           {(joueur.traits ?? []).map((id) => {
-            const t = TRAIT_PAR_ID[id];
-            return t ? (
-              <span key={id} className="pastille" title={t.desc}>{t.emoji} {t.nom}</span>
+            const trait = TRAIT_PAR_ID[id];
+            return trait ? (
+              <span key={id} className="pastille" title={trait.desc}>{trait.emoji} {trait.nom}</span>
             ) : null;
           })}
         </div>
       )}
 
       <div className="ressources">
-        <span className="pastille">Saison <b>{joueur.saison}</b></span>
-        <span className="pastille">{joueur.age} ans</span>
+        <span className="pastille">{t('gen.saison')} <b>{joueur.saison}</b></span>
+        <span className="pastille">{joueur.age} {t('gen.ans')}</span>
         <span className="pastille">💰 <b>{joueur.argent.toLocaleString('fr-FR')} €</b></span>
       </div>
       <div className="ressources" style={{ marginTop: '-0.4rem' }}>
@@ -149,8 +164,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           🚑 <b>{joueur.blessure.nom}</b>
           <span>
             {joueur.blessure.gravite === 'carriere'
-              ? 'Carrière terminée'
-              : `Indisponible ${joueur.blessure.semaines} semaine${joueur.blessure.semaines > 1 ? 's' : ''}`}
+              ? t('pj.carriereTerminee')
+              : tn('pj.indisponible', joueur.blessure.semaines)}
           </span>
         </div>
       )}
@@ -158,16 +173,16 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       {/* Jauges sur deux colonnes : demande explicite — tout doit tenir dans
           l'écran, sans défilement du panneau. */}
       <div className="pj-jauges">
-        <Jauge label="Forme" valeur={joueur.forme} variante="vert" />
-        <Jauge label="Moral" valeur={joueur.moral} variante="or" />
-        <Jauge label="Réputation" valeur={joueur.reputation} variante="cuir" />
+        <Jauge label={t('pj.forme')} valeur={joueur.forme} variante="vert" />
+        <Jauge label={t('pj.moral')} valeur={joueur.moral} variante="or" />
+        <Jauge label={t('pj.reputation')} valeur={joueur.reputation} variante="cuir" />
         {/* Lot 6 : ce que le staff et le public pensent de toi. La confiance du
             coach pèse vraiment sur le temps de jeu, la popularité sur le marché. */}
-        <Jauge label="Staff" valeur={joueur.confianceCoach ?? 50} variante="vert" />
-        <Jauge label="Popularité" valeur={joueur.popularite ?? 50} variante="or" />
+        <Jauge label={t('pj.staff')} valeur={joueur.confianceCoach ?? 50} variante="vert" />
+        <Jauge label={t('pj.popularite')} valeur={joueur.popularite ?? 50} variante="or" />
       </div>
 
-      <div className="pj-titre eyebrow">Attributs</div>
+      <div className="pj-titre eyebrow">{t('pj.attributs')}</div>
       <div className="attrs-grille pj-attrs">
         {(Object.keys(joueur.attributs) as (keyof Joueur['attributs'])[]).map((k) => (
           <Jauge key={k} label={ATTRIBUTS_LABELS[k]} valeur={joueur.attributs[k]} />
@@ -202,12 +217,12 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               veut. */}
           <div className="entrainement">
             <div className="entr-tete">
-              💪 <b>Ce que tu travailles</b>
+              💪 <b>{t('pj.travailles')}</b>
               <span>
-                {blesse ? 'à l’infirmerie'
+                {blesse ? t('pj.infirmerie')
                   : joueur.entrainementFocus
-                    ? `${ATTRIBUTS_LABELS[joueur.entrainementFocus]}${dejaEntraine ? ' · séance faite' : ' · chaque semaine'}`
-                    : 'choisis un secteur'}
+                    ? `${ATTRIBUTS_LABELS[joueur.entrainementFocus]} · ${dejaEntraine ? t('pj.seanceFaite') : t('pj.chaqueSemaine')}`
+                    : t('pj.choisirSecteur')}
               </span>
             </div>
             <div className="entr-boutons">
@@ -236,11 +251,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           >
             <div className="cal-date">
               <b>{libelleDate(semaineActuelle)}</b>
-              <span>Semaine {semaineActuelle.numero} / {SEMAINES_PAR_SAISON}</span>
+              <span>{t('pj.semaine', { n: semaineActuelle.numero, total: SEMAINES_PAR_SAISON })}</span>
             </div>
             <div className="cal-libelle">
               {EMOJI_SEMAINE[semaineActuelle.type]} {semaineActuelle.libelle}
-              <i className="cal-lien">🗓️ tout le calendrier →</i>
+              <i className="cal-lien">🗓️ {t('pj.calendrier')}</i>
             </div>
             <div className="cal-barre">
               <span style={{ width: `${(semaineActuelle.numero / SEMAINES_PAR_SAISON) * 100}%` }} />
@@ -264,9 +279,9 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               onClick={() => setMatchOuvert(true)}
               title={`Suivre ${affiche!.match.domicile} – ${affiche!.match.exterieur} en direct`}
             >
-              ▶️ <b>{inter ? 'Jouer avec ta sélection' : 'Jouer le match'}</b>
+              ▶️ <b>{inter ? t(inter.u20 ? 'pj.jouerU20' : 'pj.jouerSelection') : t('pj.jouerMatch')}</b>
               <span>
-                {inter ? `${inter.competition.emoji} ${inter.competition.nom}` : `J${affiche!.journee}`}
+                {inter ? `${inter.affiche.competition.emoji} ${inter.affiche.competition.nom}` : `J${affiche!.journee}`}
                 {' · '}{affiche!.match.domicile === monEquipe ? 'reçoit' : 'à'} {adversaire}
               </span>
             </button>
@@ -277,14 +292,14 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
                 onClick={semaineSuivante}
                 title="Jouer la semaine suivante du calendrier"
               >
-                {semaineActuelle.type === 'treve' ? 'Clore la saison →' : 'Semaine suivante →'}
+                {semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
               </button>
               <button
                 className="btn fantome"
                 onClick={saisonSuivante}
                 title="Passer directement au bilan de la saison"
               >
-                ⏩ Fin de saison
+                ⏩ {t('pj.finSaison')}
               </button>
             </div>
           )}
@@ -292,7 +307,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       ) : (
         <div className="pj-avancer">
           <button className="btn vert" onClick={saisonSuivante} title="Clore la saison et récupérer">
-            Saison suivante →
+            {t('pj.saisonSuivante')}
           </button>
         </div>
       )}
@@ -300,17 +315,17 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       {/* Barre d'actions : tout est atteignable sans faire défiler le panneau. */}
       <div className="pj-actions">
         <button onClick={() => setEcran('effectif')} title="Voir les joueurs de ton club">
-          👥<span>Équipe</span>
+          👥<span>{t('pj.equipe')}</span>
         </button>
         <button
           onClick={() => (offres.length ? ouvrirOffres() : setConfirmerTransfert(true))}
           title="Offres de contrat et marché des transferts"
         >
-          ✈️<span>Marché</span>
+          ✈️<span>{t('pj.marche')}</span>
           {offres.length > 0 && <i className="badge-offres">{offres.length}</i>}
         </button>
         <button onClick={() => setEcran('tableau')} title="Classement et résultats en direct">
-          📊<span>Résultats</span>
+          📊<span>{t('pj.resultats')}</span>
         </button>
         <button onClick={() => setEcran('social')} title="L’Ovale — réseau social, succès et défis">
           𝕏<span>L’Ovale</span>
@@ -321,7 +336,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             onClick={prendreMentorat}
             title="Prendre un jeune sous ton aile : ton déclin ralentit et le moral remonte"
           >
-            🧑‍🏫<span>Mentor</span>
+            🧑‍🏫<span>{t('pj.mentor')}</span>
           </button>
         )}
         {joueur.mentorat && (
@@ -333,7 +348,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           onClick={() => setConfirmerRetraite(true)}
           title="Terminer la carrière et rejoindre le Hall des Légendes"
         >
-          🏛️<span>Retraite</span>
+          🏛️<span>{t('pj.retraite')}</span>
         </button>
       </div>
 
@@ -393,7 +408,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           joueur={joueur}
           selection={!!inter}
           titre={inter
-            ? `${inter.competition.nom} · ${libelleDate(semaineActuelle)} · journée ${inter.journee}`
+            ? `${inter.affiche.competition.nom} · ${libelleDate(semaineActuelle)} · journée ${inter.affiche.journee}`
             : `${division?.nom ?? 'Championnat'} · ${libelleDate(semaineActuelle)} · journée ${affiche.journee}`}
           onTermine={() => setMatchTermine(true)}
           onFermer={() => {
@@ -426,11 +441,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           </span>
           {matchAJouer ? (
             <button type="button" className="btn primaire" onClick={() => setMatchOuvert(true)}>
-              ▶️ {inter ? 'Jouer en sélection' : 'Jouer le match'}
+              ▶️ {inter ? t(inter.u20 ? 'pj.jouerU20Court' : 'pj.jouerSelectionCourt') : t('pj.jouerMatch')}
             </button>
           ) : (
             <button type="button" className="btn vert" onClick={semaineSuivante}>
-              {semaineActuelle.type === 'treve' ? 'Clore la saison →' : 'Semaine suivante →'}
+              {semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
             </button>
           )}
         </div>,

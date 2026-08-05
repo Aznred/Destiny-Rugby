@@ -42,6 +42,7 @@ import { CLE_ENV } from '../lib/groq';
 import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
 import type { Joueur } from '../types';
+import { t } from '../lib/i18n';
 
 // ⚠️ L'ÉCHELLE DE TEMPS EST DOUBLE, et c'est ce qui rend le direct regardable.
 //
@@ -452,7 +453,7 @@ export function MatchLive({
         {/* ---------- COMMANDES ---------- */}
         <div className="ml-commandes">
           <button className="btn fantome" onClick={() => setEnPause((p) => !p)} disabled={e.fini}>
-            {enPause ? '▶️ Reprendre' : '⏸️ Pause'}
+            {enPause ? `▶️ ${t('ml.reprendre')}` : `⏸️ ${t('ml.pause')}`}
           </button>
           <div className="ml-vitesses">
             {VITESSES.map((v, i) => (
@@ -474,7 +475,7 @@ export function MatchLive({
               🫁 {Math.round(monPion.endurance)}%
             </span>
           )}
-          {e.fini && <button className="btn vert" onClick={onFermer}>Terminer</button>}
+          {e.fini && <button className="btn vert" onClick={onFermer}>{t('ml.terminer')}</button>}
         </div>
 
         {/* ---------- COACHING EN DIRECT ---------- */}
@@ -482,14 +483,14 @@ export function MatchLive({
           <div className="ml-coaching">
             <input
               value={consigneTexte}
-              placeholder="Consigne à ton joueur — « défends plus bas », « propose-toi au ras du ruck »…"
+              placeholder={t('ml.consigne')}
               onChange={(ev) => setConsigneTexte(ev.target.value)}
               onKeyDown={(ev) => { if (ev.key === 'Enter') void envoyerConsigne(); }}
               maxLength={120}
             />
             <button className="x-poster" disabled={!consigneTexte.trim() || envoiConsigne}
               onClick={() => void envoyerConsigne()}>
-              {envoiConsigne ? '…' : '📣 Transmettre'}
+              {envoiConsigne ? '…' : `📣 ${t('ml.transmettre')}`}
             </button>
             {e.consigne && e.consigne !== CONSIGNE_NEUTRE && (
               <span className="ml-consigne">{e.consigne.libelle}</span>
@@ -501,17 +502,17 @@ export function MatchLive({
         {e.fini && stats ? (
           <div className="ml-fil">
             <div className="ml-resume">
-              <span>🏉 {stats.essaisA} – {stats.essaisB} essais</span>
-              <span>🔒 {e.compteurs.rucks} rucks</span>
-              <span>🙌 {e.compteurs.touches} touches</span>
-              <span>🌀 {e.compteurs.melees} mêlées</span>
-              <span>⚡ {e.compteurs.percees} franchissements</span>
+              <span>🏉 {stats.essaisA} – {stats.essaisB} {t('ml.essais')}</span>
+              <span>🔒 {e.compteurs.rucks} {t('ml.rucks')}</span>
+              <span>🙌 {e.compteurs.touches} {t('ml.touches')}</span>
+              <span>🌀 {e.compteurs.melees} {t('ml.melees')}</span>
+              <span>⚡ {e.compteurs.percees} {t('ml.percees')}</span>
             </div>
             {[e.clubA, e.clubB].map((club) => (
               <div key={club}>
                 <div className="ml-bilan-tete">📋 {club}</div>
                 <div className="ml-bilan-entete">
-                  <span /><span>Joueur</span><span>m</span><span>plq.</span>
+                  <span /><span>{t('ml.joueur')}</span><span>m</span><span>plq.</span>
                   <span>ess.</span><span>pas.</span><span>min</span>
                 </div>
                 {stats.parJoueur

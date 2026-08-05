@@ -88,6 +88,24 @@ const NOMS = {
     prenoms: ['Pieter', 'Johan', 'Ruan', 'Jaco', 'Wian', 'Stefan', 'Marnus', 'Hanro', 'Wilco', 'Dewald', 'Gerhard', 'Andre'],
     noms: ['van der Merwe', 'du Plessis', 'Botha', 'Kriel', 'Steenkamp', 'Venter', 'Nel', 'Coetzee', 'Louw', 'Snyman', 'Fourie', 'Jantjies', 'Mostert', 'Wiese'],
   },
+  Allemagne: {
+    prenoms: ['Lukas', 'Jonas', 'Maximilian', 'Felix', 'Moritz', 'Tobias', 'Sebastian', 'Niklas', 'Florian', 'Julian', 'Philipp', 'Jannik'],
+    noms: ['Müller', 'Schneider', 'Fischer', 'Weber', 'Wagner', 'Becker', 'Hoffmann', 'Schäfer', 'Krämer', 'Bauer', 'Zimmermann', 'Brandt', 'Keßler', 'Lindemann'],
+  },
+  // ⚠️ POOL À PART, VOLONTAIREMENT. Le pool « Afrique du Sud » ci-dessus sert
+  // d'EXPORT : c'est celui dans lequel les autres championnats piochent leurs
+  // Sud-Africains, et le toucher rebattrait les noms de 5 000 joueurs déjà
+  // générés. La Currie Cup, elle, est un championnat sud-africain de bout en
+  // bout : ses effectifs doivent ressembler à ceux d'une vraie union — afrikaans,
+  // anglophones et xhosa/zoulou mêlés — d'où ce pool élargi, réservé au `poolLocal`.
+  'Afrique du Sud (mixte)': {
+    prenoms: ['Pieter', 'Ruan', 'Jaco', 'Wian', 'Marnus', 'Dewald', 'Gerhard', 'Stefan',
+      'Siya', 'Lukhanyo', 'Aphelele', 'Sbu', 'Makazole', 'Thembelani', 'Wandisile', 'Hacjivah',
+      'Grant', 'Curwin', 'Zachary', 'Asenathi'],
+    noms: ['van der Merwe', 'du Plessis', 'Botha', 'Kriel', 'Steenkamp', 'Venter', 'Coetzee', 'Snyman',
+      'Kolisi', 'Am', 'Fassi', 'Mapimpi', 'Nkosi', 'Dyantyi', 'Mbonambi', 'Moerat',
+      'Ntlabakanye', 'Zas', 'Masuku', 'Sithole'],
+  },
   Fidji: {
     prenoms: ['Semi', 'Josua', 'Waisea', 'Api', 'Levani', 'Sireli', 'Vilimoni', 'Eroni', 'Peni', 'Mesake', 'Jiuta', 'Ratu'],
     noms: ['Radradra', 'Tuisova', 'Nayacalevu', 'Ratuniyarawa', 'Botia', 'Masiwini', 'Botitu', 'Mawi', 'Ravouvou', 'Doge', 'Wainiqolo', 'Tagitagivalu'],

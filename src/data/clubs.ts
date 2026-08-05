@@ -11,6 +11,7 @@ import type { Club, Competition } from '../types';
 import { COMPETITIONS_REELLES } from './mondeReel';
 import { CLUBS_REGIONAUX, LOGO_AMATEUR } from './amateurs';
 import { COMPETITIONS_NOUVELLES } from './nouvellesLigues';
+import { CODE_PAR_NATION } from './nations';
 
 export type { Club, Competition };
 
@@ -443,11 +444,22 @@ const AMATEURS: Competition[] = [
 // Tchéquie, Finlande, Nouvelle-Zélande. Les clubs, leur hiérarchie et leurs
 // écussons sont RÉELS ; leurs effectifs sont générés (les données ne
 // fournissent aucun joueur) — voir `src/data/nouvellesLigues.ts`.
+// ⚠️ LE DRAPEAU DU PAYS, À CÔTÉ DU NOM (retour de jeu : « manque les drapeaux
+// sur les nouvelles ligues à côté des pays »). Les 18 championnats ajoutés
+// arrivaient avec `drapeaux: []` : l'atlas affichait « Didi 10 — Géorgie » sans
+// le moindre drapeau, là où le Top 14 en avait un. Le code vient de
+// `data/nations.ts` — la même table que `<Drapeau>`, donc les nations
+// britanniques ont bien leur drapeau propre (`gb-sct`, `gb-wls`, `gb-eng`).
+function drapeauDuPays(pays: string): string[] {
+  const code = CODE_PAR_NATION[pays];
+  return code ? [code] : [];
+}
+
 const NOUVELLES: Competition[] = COMPETITIONS_NOUVELLES.map((c) => ({
   id: c.id,
   nom: c.nom,
   pays: c.pays,
-  drapeaux: [],
+  drapeaux: drapeauDuPays(c.pays),
   emoji: c.emoji,
   niveau: c.niveau,
   zone: 'Monde',

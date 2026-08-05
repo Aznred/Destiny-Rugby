@@ -87,6 +87,12 @@ export interface Joueur {
   matchsJoues: number;
   essais: number;
   titres: string[];
+  // ⚠️ LE PALMARÈS STRUCTURÉ. `titres` est une liste de libellés (« Bouclier de
+  // Brennus (S4) ») : parfait pour l'affichage, inexploitable pour un succès du
+  // type « champion avec trois clubs différents ». On double donc la mise avec
+  // une trace exploitable — id du trophée, saison ET club. Absent des vieilles
+  // sauvegardes : toujours lire avec `?? []`.
+  palmares?: TitreGagne[];
   // --- Évolution dynamique (ajoutés en cours de route : optionnels pour les
   // sauvegardes antérieures, complétés à la volée par le store) ---
   potentiel?: number; // note générale visée au pic de carrière
@@ -117,6 +123,16 @@ export interface Joueur {
   pseudo?: string; // identifiant @ sur L'Ovale
   abonnes?: number; // nombre d'abonnés
   profilSocial?: ProfilSocial; // nom affiché, photo, bio, bannière
+}
+
+// Un titre remporté, avec ce qu'il faut pour construire un palmarès : quel
+// trophée, quelle saison, et surtout AVEC QUEL CLUB.
+export interface TitreGagne {
+  trophee: string; // id dans data/trophees.ts
+  nom: string;
+  saison: number;
+  club: string;
+  division?: string;
 }
 
 // Ce que le joueur a accumulé depuis le début de la saison, semaine après
@@ -187,6 +203,10 @@ export interface PostSocial {
   vues: number;
   aime?: boolean; // le joueur a aimé ce post
   repostee?: boolean; // le joueur a reposté (apparaît sur son profil)
+  // ⚠️ Vues gagnées grâce à TON repost, mémorisées pour être reprises si tu le
+  // retires. Sans ça, reposter/dé-reposter en boucle gonflait les vues à
+  // l'infini (le compteur montait à chaque activation, jamais à la baisse).
+  bonusRepost?: number;
   hostile?: boolean; // réponse négative
   reponses?: PostSocial[];
   // Ce que le post PROVOQUE dans le monde du jeu (généré par l'IA) : un

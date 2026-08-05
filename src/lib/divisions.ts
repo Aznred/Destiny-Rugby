@@ -14,7 +14,8 @@
 // accès au store. Le store appelle `setMouvementsClubs()` à la création, à la
 // réhydratation et à chaque fin de saison.
 
-import { COMPETITIONS } from '../data/clubs';
+import { COMPETITIONS, competitionDuClub } from '../data/clubs';
+import type { Competition } from '../types';
 
 let MOUVEMENTS: Record<string, string> = {};
 const cacheCompo = new Map<string, string[]>();
@@ -31,6 +32,24 @@ export function mouvementsClubs(): Record<string, string> {
 // Division réellement occupée par un club, montées/descentes comprises.
 export function divisionEffective(club: string, divisionDeBase?: string): string | undefined {
   return MOUVEMENTS[club] ?? divisionDeBase;
+}
+
+// ⚠️ LA DIVISION AFFICHÉE DOIT ÊTRE CELLE OÙ L'ON JOUE VRAIMENT.
+// `competitionDuClub()` lit `data/clubs.ts`, c'est-à-dire la pyramide FIGÉE au
+// moment où les données ont été générées : le panneau de carrière annonçait
+// donc encore « Pro D2 » pour un club qui venait de monter en Top 14 (bug
+// signalé en jeu). L'ordre de priorité est : la division que le joueur porte
+// dans sa fiche (mise à jour à la montée et à la signature), puis le registre
+// des mouvements, puis les données d'origine.
+export function competitionEffective(
+  club: string, divisionDeclaree?: string,
+): Competition | undefined {
+  const id = divisionDeclaree ?? MOUVEMENTS[club];
+  if (id) {
+    const trouvee = COMPETITIONS.find((c) => c.id === id);
+    if (trouvee) return trouvee;
+  }
+  return competitionDuClub(club);
 }
 
 // Les clubs qui composent VRAIMENT la division aujourd'hui : ceux d'origine qui

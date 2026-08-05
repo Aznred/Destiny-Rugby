@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { t } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { POSTES, NATIONS, NATIONS_PAR_ZONE } from '../data/rugby';
@@ -92,8 +93,8 @@ export function Creation() {
       <button className="btn fantome" onClick={() => setEcran('accueil')} style={{ marginBottom: '1rem' }}>
         ← Retour
       </button>
-      <div className="eyebrow">Nouvelle carrière</div>
-      <h1>Crée ton rugbyman</h1>
+      <div className="eyebrow">{t('cr.eyebrow')}</div>
+      <h1>{t('cr.titre')}</h1>
       <p style={{ color: 'var(--craie-dim)', margin: '0.6rem 0 2rem', maxWidth: '60ch' }}>
         Choisis ton identité et ton poste. Tes attributs de départ dépendent du
         poste choisi — le reste, tu le construiras sur le terrain.
@@ -102,7 +103,7 @@ export function Creation() {
       <div className="carte" style={{ padding: '1.6rem' }}>
         <div className="grille-2">
           <div className="champ">
-            <label htmlFor="nom">Nom du joueur</label>
+            <label htmlFor="nom">{t('cr.nom')}</label>
             <input
               id="nom"
               type="text"
@@ -113,7 +114,7 @@ export function Creation() {
             />
           </div>
           <div className="champ">
-            <label htmlFor="age">Âge de départ</label>
+            <label htmlFor="age">{t('cr.age')}</label>
             <input
               id="age"
               type="number"
@@ -127,7 +128,7 @@ export function Creation() {
 
         <div className="grille-2">
           <div className="champ">
-            <label htmlFor="nation">Nation</label>
+            <label htmlFor="nation">{t('cr.nation')}</label>
             <Selecteur
               id="nation"
               options={optionsNations}
@@ -136,7 +137,7 @@ export function Creation() {
             />
           </div>
           <div className="champ">
-            <label htmlFor="division">Championnat de départ</label>
+            <label htmlFor="division">{t('cr.championnat')}</label>
             <Selecteur
               id="division"
               options={optionsDivisions}
@@ -147,7 +148,7 @@ export function Creation() {
         </div>
 
         <div className="champ">
-          <label htmlFor="club">Club de départ ({division.nom})</label>
+          <label htmlFor="club">{t('cr.club')} ({division.nom})</label>
           <Selecteur
             id="club"
             options={optionsClubs}
@@ -157,7 +158,7 @@ export function Creation() {
         </div>
 
         <div className="champ">
-          <label>Poste</label>
+          <label>{t('cr.poste')}</label>
           <div className="postes-grille">
             {POSTES.map((p) => (
               <button

@@ -187,7 +187,135 @@ export const SUCCES: Succes[] = [
     desc: 'Publier un message dépassant le million de vues.',
     atteint: (c) => c.posts.some((p) => p.moi && p.vues >= 1_000_000),
   },
+
+  // ═══ PALMARÈS — LES TROPHÉES, ET AVEC QUI ON LES A GAGNÉS ═══════════════
+  // ⚠️ Demande explicite : « rajouter des achievements au niveau de gagner
+  // certains trophées, faire des palmarès avec certains clubs etc. »
+  // Ces succès-là lisent `Joueur.palmares` (types.ts), qui enregistre pour
+  // chaque titre son trophée, sa saison ET son club — `titres` n'était qu'une
+  // liste de libellés, on ne pouvait rien en tirer.
+  {
+    id: 'brennus', emoji: '🛡️', nom: 'Le Bouclier', ovas: 16,
+    desc: 'Soulever le Bouclier de Brennus.',
+    atteint: (c) => aGagne(c, 'brennus'),
+  },
+  {
+    id: 'brennus_trois', emoji: '🏰', nom: 'Dynastie', ovas: 30, secret: true,
+    desc: 'Remporter trois fois le Bouclier de Brennus.',
+    atteint: (c) => combien(c, 'brennus') >= 3,
+  },
+  {
+    id: 'champions_cup', emoji: '⭐', nom: 'Roi d’Europe', ovas: 18,
+    desc: 'Remporter la Champions Cup.',
+    atteint: (c) => aGagne(c, 'champions'),
+  },
+  {
+    id: 'doublette_europe', emoji: '🌍', nom: 'Les deux coupes', ovas: 20,
+    desc: 'Remporter la Champions Cup ET la Challenge Cup au cours de sa carrière.',
+    atteint: (c) => aGagne(c, 'champions') && aGagne(c, 'challenge'),
+  },
+  {
+    id: 'doublette_saison', emoji: '💫', nom: 'Le doublé', ovas: 26, secret: true,
+    desc: 'Remporter le championnat ET une coupe d’Europe la même saison.',
+    atteint: (c) => {
+      const p = palmares(c);
+      return p.some((t) => TITRES_NATIONAUX.has(t.trophee)
+        && p.some((u) => u.saison === t.saison && TITRES_EUROPE.has(u.trophee)));
+    },
+  },
+  {
+    id: 'six_nations', emoji: '🎽', nom: 'Vainqueur du Tournoi', ovas: 20,
+    desc: 'Remporter le Tournoi des 6 Nations avec ta sélection.',
+    atteint: (c) => aGagne(c, 'sixNations'),
+  },
+  {
+    id: 'coupe_du_monde', emoji: '🏆', nom: 'Champion du monde', ovas: 40, secret: true,
+    desc: 'Soulever la Coupe du monde.',
+    atteint: (c) => aGagne(c, 'monde'),
+  },
+  {
+    id: 'meilleur_joueur', emoji: '🥇', nom: 'Meilleur joueur du monde', ovas: 35, secret: true,
+    desc: 'Être élu meilleur joueur du monde.',
+    atteint: (c) => aGagne(c, 'meilleurJoueur'),
+  },
+  {
+    id: 'palmares_deux_clubs', emoji: '🧳', nom: 'Champion partout', ovas: 18,
+    desc: 'Remporter un titre avec deux clubs différents.',
+    atteint: (c) => clubsTitres(c).size >= 2,
+  },
+  {
+    id: 'palmares_trois_clubs', emoji: '🗺️', nom: 'Mercenaire couronné', ovas: 28, secret: true,
+    desc: 'Remporter un titre avec trois clubs différents.',
+    atteint: (c) => clubsTitres(c).size >= 3,
+  },
+  {
+    id: 'fidele_trois_titres', emoji: '❤️', nom: 'Homme d’un seul club', ovas: 24,
+    desc: 'Remporter trois titres avec le MÊME club.',
+    atteint: (c) => {
+      const parClub = new Map<string, number>();
+      for (const t of palmares(c)) if (t.club) parClub.set(t.club, (parClub.get(t.club) ?? 0) + 1);
+      return [...parClub.values()].some((n) => n >= 3);
+    },
+  },
+  {
+    id: 'gravir_pyramide', emoji: '🪜', nom: 'De la Fédérale à l’élite', ovas: 30, secret: true,
+    desc: 'Être champion d’au moins trois divisions françaises différentes.',
+    atteint: (c) => {
+      const etages = new Set(
+        palmares(c).filter((t) => TITRES_FRANCE.has(t.trophee)).map((t) => t.trophee),
+      );
+      return etages.size >= 3;
+    },
+  },
+  {
+    id: 'dix_titres', emoji: '🏛️', nom: 'Collectionneur', ovas: 30,
+    desc: 'Remporter 10 titres en carrière.',
+    atteint: (c) => c.joueur.titres.length >= 10,
+  },
+  {
+    id: 'titre_a_letranger', emoji: '🌐', nom: 'Champion hors de France', ovas: 20,
+    desc: 'Être champion d’un championnat étranger.',
+    atteint: (c) => palmares(c).some((t) => TITRES_MONDE.has(t.trophee)),
+  },
+  {
+    id: 'trois_saisons_de_suite', emoji: '🔁', nom: 'Trois de suite', ovas: 26, secret: true,
+    desc: 'Remporter un titre trois saisons consécutives.',
+    atteint: (c) => {
+      const saisons = [...new Set(palmares(c).map((t) => t.saison))].sort((a, b) => a - b);
+      for (let i = 0; i + 2 < saisons.length; i++) {
+        if (saisons[i + 1] === saisons[i] + 1 && saisons[i + 2] === saisons[i] + 2) return true;
+      }
+      return false;
+    },
+  },
 ];
+
+// --- Aides de lecture du palmarès ------------------------------------------
+function palmares(c: ContexteSucces) {
+  return c.joueur.palmares ?? [];
+}
+function combien(c: ContexteSucces, trophee: string): number {
+  return palmares(c).filter((t) => t.trophee === trophee).length;
+}
+function aGagne(c: ContexteSucces, trophee: string): boolean {
+  return combien(c, trophee) > 0;
+}
+function clubsTitres(c: ContexteSucces): Set<string> {
+  // Les titres INTERNATIONAUX (Tournoi, Coupe du monde, meilleur joueur) ne se
+  // gagnent pas avec un club : ils ne comptent pas ici.
+  return new Set(
+    palmares(c)
+      .filter((t) => t.club && !TITRES_INTERNATIONAUX.has(t.trophee))
+      .map((t) => t.club),
+  );
+}
+
+// Les familles de trophées (ids de `data/trophees.ts`).
+const TITRES_FRANCE = new Set(['brennus', 'prod2', 'nationale', 'nationale2', 'federale', 'regionale']);
+const TITRES_EUROPE = new Set(['champions', 'challenge', 'premCup']);
+const TITRES_MONDE = new Set(['premiership', 'championship', 'urc', 'super', 'npc', 'japon', 'mlr']);
+const TITRES_INTERNATIONAUX = new Set(['sixNations', 'monde', 'meilleurJoueur']);
+const TITRES_NATIONAUX = new Set([...TITRES_FRANCE, ...TITRES_MONDE]);
 
 // Divisions françaises : sert au succès « Expatrié ».
 const DIVISIONS_FRANCE = new Set([

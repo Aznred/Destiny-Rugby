@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
+import { t } from '../lib/i18n';
 
 // La 3D (Three.js) est lourde : on la charge à la demande pour un premier
 // affichage immédiat du texte, puis la scène apparaît en fondu.
@@ -17,25 +18,14 @@ const apparait = {
   }),
 };
 
+// ⚠️ Les trois arguments de la page d'accueil sont des CLÉS de traduction, pas
+// du texte : ils sont résolus au rendu par `t()`, donc ils changent de langue
+// avec le reste. La page d'accueil était le premier écran vu par un joueur
+// étranger, et elle restait entièrement en français.
 const FEATURES = [
-  {
-    ico: '🧠',
-    titre: 'Un MJ qui juge vraiment',
-    texte:
-      "Le Maître du Jeu (IA Groq) évalue chacune de tes décisions selon tes stats, ta forme et le contexte. Rien n'est scripté.",
-  },
-  {
-    ico: '📈',
-    titre: 'Une progression vivante',
-    texte:
-      'Entraîne-toi, joue les matchs, gère ta vie : chaque action fait monter ou chuter tes attributs. Tu écris ta trajectoire.',
-  },
-  {
-    ico: '🏆',
-    titre: 'Ta légende sur 15 ans',
-    texte:
-      'Des espoirs au Tournoi, de la Fédérale au Top 14 : négocie tes contrats, gère la pression et vise les titres.',
-  },
+  { ico: '🧠', titre: 'acc.f1.titre', texte: 'acc.f1.texte' },
+  { ico: '📈', titre: 'acc.f2.titre', texte: 'acc.f2.texte' },
+  { ico: '🏆', titre: 'acc.f3.titre', texte: 'acc.f3.texte' },
 ];
 
 export function Accueil() {
@@ -48,36 +38,34 @@ export function Accueil() {
       <section className="hero">
         <div className="hero-texte">
           <motion.div custom={0} variants={apparait} initial="hidden" animate="show" className="eyebrow">
-            RPG de carrière • Rugby
+            {t('accueil.eyebrow')}
           </motion.div>
           <motion.h1 custom={1} variants={apparait} initial="hidden" animate="show">
-            Deviens une <span className="surligne">légende</span> du rugby
+            {t('accueil.titre1')} <span className="surligne">{t('accueil.titre2')}</span> {t('accueil.titre3')}
           </motion.h1>
           <motion.p custom={2} variants={apparait} initial="hidden" animate="show" className="accroche">
-            Incarne un rugbyman de ses débuts jusqu'au sommet. Parle au Maître du
-            Jeu, décris tes choix, et laisse l'IA juger le destin de ta carrière —
-            match après match, saison après saison.
+            {t('accueil.chapo')}
           </motion.p>
           <motion.div custom={3} variants={apparait} initial="hidden" animate="show" className="cta-groupe">
             {joueur ? (
               <>
                 <button className="btn primaire grand" onClick={() => setEcran('carriere')}>
-                  Reprendre ma carrière →
+                  {t('accueil.reprendre')}
                 </button>
                 <button className="btn fantome grand" onClick={() => setEcran('profil')}>
-                  Voir mon profil
+                  {t('accueil.voirProfil')}
                 </button>
               </>
             ) : (
               <button className="btn primaire grand" onClick={() => setEcran('creation')}>
-                Commencer ma carrière →
+                {t('accueil.commencer')}
               </button>
             )}
           </motion.div>
           <motion.div custom={4} variants={apparait} initial="hidden" animate="show" className="stats-bandeau">
-            <div className="stat"><b>15</b><span>postes jouables</span></div>
-            <div className="stat"><b>∞</b><span>scénarios IA</span></div>
-            <div className="stat"><b>15</b><span>saisons à écrire</span></div>
+            <div className="stat"><b>15</b><span>{t('accueil.postes')}</span></div>
+            <div className="stat"><b>∞</b><span>{t('accueil.scenarios')}</span></div>
+            <div className="stat"><b>15</b><span>{t('accueil.saisons')}</span></div>
           </motion.div>
         </div>
 
@@ -100,8 +88,8 @@ export function Accueil() {
             viewport={{ once: true, margin: '-60px' }}
           >
             <div className="ico">{f.ico}</div>
-            <h3>{f.titre}</h3>
-            <p>{f.texte}</p>
+            <h3>{t(f.titre)}</h3>
+            <p>{t(f.texte)}</p>
           </motion.div>
         ))}
       </section>

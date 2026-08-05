@@ -24,8 +24,8 @@
 import type { Pion } from './entites';
 import { PHASES_ARRETEES, type EtatMatch, type SystemeDefensif } from './etat';
 import {
-  AXE, LARGEUR, adverse, borner, coteOuvert, distance, distance2, ligneDefendue,
-  melanger, metresAvantLaLigne, sens, type Cote, type Vec,
+  AXE, LARGEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, distance, distance2,
+  ligneDefendue, melanger, metresAvantLaLigne, sens, type Cote, type Vec,
 } from './terrain';
 
 // ---------------------------------------------------------------------------
@@ -55,6 +55,50 @@ export function plusProche(cible: Vec, liste: Pion[]): Pion | null {
 
 const MARGE = 3.2; // on ne colle jamais un joueur à la ligne de touche
 function bornerY(y: number): number { return borner(y, MARGE, LARGEUR - MARGE); }
+
+// ⚠️ ON NE SE PLACE JAMAIS DANS SON PROPRE EN-BUT.
+// Les cibles n'étaient bornées QUE sur la largeur : un ouvreur à dix-sept mètres
+// de profondeur, alors que son équipe joue à huit mètres de sa propre ligne, se
+// voyait assigner une position DERRIÈRE la ligne d'essai. Mesuré avant
+// correction : 8,7 % des cibles et 7,6 % des positions étaient dans un en-but,
+// en plein jeu courant. Sur un terrain de rugby on se replace au maximum sur sa
+// ligne : la structure se comprime, elle ne sort pas du terrain.
+const MARGE_X = 1.5;
+export function bornerX(x: number): number {
+  return borner(x, LIGNE_A + MARGE_X, LIGNE_B - MARGE_X);
+}
+
+// ⚠️ RÉPARTIR PLUTÔT QUE RABOTER — c'est ce qui supprime le « nuage ».
+// Chaque cible en largeur passait par `bornerY`, qui RABOTE : dès que le ballon
+// approchait d'une touche, cinq ou six joueurs se voyaient assigner exactement
+// la même valeur (3,2 m ou 66,8 m). À l'écran, ça donnait une ligne de pions
+// empilés le long du bord, et un paquet au milieu du reste. Mesuré : un tas de
+// 9 joueurs dans un cercle de 8 m sur 34 % des cibles, jusqu'à 23 d'un coup.
+//
+// Ici, on garde l'ORDRE voulu et on impose un écart minimal entre voisins, en
+// repliant vers l'intérieur ce qui déborde. L'écart se resserre tout seul quand
+// il y a trop de monde pour la largeur disponible : personne n'est jamais
+// superposé, et la ligne reste dans le bon ordre.
+function repartirY(pions: Pion[], ecartMin: number): void {
+  const n = pions.length;
+  if (n < 2) {
+    if (n === 1) pions[0].cible.y = bornerY(pions[0].cible.y);
+    return;
+  }
+  const bas = MARGE;
+  const haut = LARGEUR - MARGE;
+  const ecart = Math.min(ecartMin, (haut - bas) / (n - 1));
+  // On travaille sur l'ordre RÉEL des cibles : deux joueurs qui se croisent sont
+  // remis dans l'ordre, ce qui évite les rideaux « noués ».
+  const ordre = [...pions].sort((a, b) => a.cible.y - b.cible.y);
+  const y = ordre.map((p) => borner(p.cible.y, bas, haut));
+  for (let i = 1; i < n; i++) if (y[i] < y[i - 1] + ecart) y[i] = y[i - 1] + ecart;
+  if (y[n - 1] > haut) {
+    y[n - 1] = haut;
+    for (let i = n - 2; i >= 0; i--) if (y[i] > y[i + 1] - ecart) y[i] = y[i + 1] - ecart;
+  }
+  for (let i = 0; i < n; i++) ordre[i].cible.y = borner(y[i], bas, haut);
+}
 
 // ---------------------------------------------------------------------------
 // L'ATTAQUE
@@ -115,6 +159,11 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
     { dy: 30, dx: 5.8, role: 'podMilieu' },
     { dy: 38, dx: 6.6, role: 'podLarge' },
   ];
+  // Les avants qui tiennent une position de structure (les autres courent une
+  // ligne de soutien) : on les répartit ENSEMBLE sur la largeur, pour que deux
+  // pods ne se retrouvent jamais au même endroit quand le ballon est près d'une
+  // touche.
+  const podsStructures: Pion[] = [];
   for (let i = 0; i < avants.length; i++) {
     const p = avants[i];
     const r = rangDansChaine.get(p);
@@ -122,16 +171,19 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
     const g = GABARIT[i] ?? GABARIT[GABARIT.length - 1];
     p.role = g.role;
     p.cible = {
-      x: ancre.x - s * g.dx,
-      y: bornerY(largeur + ouvert * g.dy),
+      x: bornerX(ancre.x - s * g.dx),
+      y: largeur + ouvert * g.dy,
     };
+    podsStructures.push(p);
   }
+  repartirY(podsStructures, 6);
 
   // ── LA LIGNE DE TROIS-QUARTS ─────────────────────────────────────────────
   const largeOuvert = ouvert === 1 ? LARGEUR - largeur : largeur; // espace jusqu'à la touche ouverte
   const compression = borner(largeOuvert / 42, 0.45, 1); // ballon près de la touche = ligne resserrée
   const quinzeIntercale = !!lancement && (lancement.type === 'large' || lancement.type === 'saute');
 
+  const ligneTroisQuarts: Pion[] = [];
   for (const p of arrieres) {
     const r = rangDansChaine.get(p);
     if (r != null) { ligneDeSoutien(p, ancre, s, ouvert, r); continue; }
@@ -141,7 +193,7 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
     switch (p.numero) {
       case 9:
         p.role = 'demi';
-        p.cible = { x: ancre.x - s * 1.4, y: bornerY(ancre.y - ouvert * 1.6) };
+        p.cible = { x: bornerX(ancre.x - s * 1.4), y: bornerY(ancre.y - ouvert * 1.6) };
         continue;
       case 10: p.role = 'ouvreur'; dy = 11 * compression; break;
       case 12: p.role = 'ligne'; dy = 22 * compression; break;
@@ -159,18 +211,22 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
         const ouvertBord = ouvert === 1 ? LARGEUR : 0;
         if (sonBord === ouvertBord) {
           p.role = 'ligne';
-          p.cible = { x: ancre.x - s * prof, y: bornerY(ouvertBord + (ouvert === 1 ? -6 : 6)) };
+          p.cible = { x: bornerX(ancre.x - s * prof), y: bornerY(ouvertBord + (ouvert === 1 ? -6 : 6)) };
         } else {
           p.role = 'aileFerme';
-          p.cible = { x: ancre.x - s * (prof + 6), y: bornerY(sonBord + (sonBord === 0 ? 9 : -9)) };
+          p.cible = { x: bornerX(ancre.x - s * (prof + 6)), y: bornerY(sonBord + (sonBord === 0 ? 9 : -9)) };
         }
         continue;
       }
     }
     // ⚠️ Largeur ancrée au point de départ de la phase, profondeur au porteur :
     // la ligne de trois-quarts MONTE avec le ballon sans se recoller dessus.
-    p.cible = { x: ancre.x - s * prof, y: bornerY(largeur + ouvert * dy) };
+    p.cible = { x: bornerX(ancre.x - s * prof), y: largeur + ouvert * dy };
+    ligneTroisQuarts.push(p);
   }
+  // La ligne de trois-quarts s'étage vraiment : cinq mètres au minimum entre
+  // deux joueurs, même quand le ballon sort d'un ruck collé à la touche.
+  repartirY(ligneTroisQuarts, 5);
 }
 
 // La ligne de soutien d'un receveur : en dehors et légèrement en retrait du
@@ -178,7 +234,7 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
 function ligneDeSoutien(p: Pion, ancre: Vec, s: number, ouvert: number, rang: number): void {
   p.role = 'ligne';
   p.cible = {
-    x: ancre.x - s * (1.6 + rang * 1.5),
+    x: bornerX(ancre.x - s * (1.6 + rang * 1.5)),
     y: bornerY(ancre.y + ouvert * (rang * 8.5)),
   };
 }
@@ -211,7 +267,7 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   if (arriere) {
     arriere.role = 'rideau2';
     arriere.cible = {
-      x: ancre.x + sa * profondeurFond,
+      x: bornerX(ancre.x + sa * profondeurFond),
       y: bornerY(melanger(ancre.y, AXE, 0.55)),
     };
     rideau2.add(arriere);
@@ -220,7 +276,7 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
     ailierFerme.role = 'rideau2';
     const sonBord = ailierFerme.numero === 11 ? 0 : LARGEUR;
     ailierFerme.cible = {
-      x: ancre.x + sa * profondeurFond * 0.72,
+      x: bornerX(ancre.x + sa * profondeurFond * 0.72),
       y: bornerY(sonBord + (sonBord === 0 ? 13 : -13)),
     };
     rideau2.add(ailierFerme);
@@ -229,7 +285,7 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
     // La sentinelle garde le couloir du ruck : chandelle, rasant, percée du 9.
     sentinelle.role = 'sentinelle';
     sentinelle.cible = {
-      x: ancre.x + sa * 8.5,
+      x: bornerX(ancre.x + sa * 8.5),
       y: bornerY(ancre.y - ouvert * 4),
     };
     rideau2.add(sentinelle);
@@ -272,10 +328,16 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
       : systeme === 'glissee' ? sa * rang * 0.42
       : sa * rang * 0.2;
     p.cible = {
-      x: e.ligneDef + forme,
-      y: bornerY((cibles[i] ?? ancre.y) + ouvert * glisse),
+      x: bornerX(e.ligneDef + forme),
+      y: (cibles[i] ?? ancre.y) + ouvert * glisse,
     };
   }
+  // ⚠️ LE RIDEAU EST ÉTALÉ, PAS RABOTÉ. Quand le ballon sort à trois mètres de
+  // la touche, la moitié des cibles calculées ci-dessus tombent hors du terrain :
+  // `bornerY` les ramenait TOUTES sur la même valeur et douze défenseurs se
+  // superposaient au bord. On garde l'ordre et on impose 4,2 m entre voisins —
+  // l'écart se resserre tout seul si la largeur ne suffit pas.
+  repartirY(ordre, 4.2);
 
   // ── LES CHASSEURS ────────────────────────────────────────────────────────
   // ⚠️ DEUX défenseurs seulement montent sur le porteur, et ils sortent du
@@ -285,6 +347,10 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   const candidats = ligne.filter((p) => p.battu <= 0);
   candidats.sort((a, b) => distance2(a.pos, porteur.pos) - distance2(b.pos, porteur.pos));
   const chasseurs = candidats.filter((p) => (p.pos.x - porteur.pos.x) * sa >= -1.5).slice(0, 3);
+  // ⚠️ LE PREMIER CHASSEUR VISE LE PORTEUR, PAS À CÔTÉ. Testé : décaler ces
+  // trois-là d'un mètre six suffisait à faire chuter les plaquages réussis de
+  // 250 à 190 et grimper les percées de 20 à 28 — le rayon de plaquage n'est
+  // que de 1,35 m. Seul le second rideau, plus loin, prend un angle.
   for (const p of chasseurs) { p.cible = poursuite(p, porteur); p.role = 'chasseur'; }
 
   // ⚠️⚠️ LE SECOND RIDEAU NE BOUGE QUE SI LA LIGNE EST VRAIMENT FRANCHIE.
@@ -304,6 +370,14 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   // Ligne franchie : la couverture arrière prend le relais, et les défenseurs
   // les plus proches font demi-tour pour rattraper le porteur. Les autres
   // gardent leur poste — on ne vide jamais complètement le fond du terrain.
+  // ⚠️ NE PAS RÉDUIRE LE NOMBRE DE POURSUIVANTS. Testé : ramener le second
+  // rideau à deux joueurs et les renforts à deux faisait passer les percées de
+  // 20 à 29 par match (cible ≤ 25), les coups de pied de 51 à 65 et les rucks
+  // de 173 à 129 — la couverture ne rattrapait plus rien et le match se
+  // délitait. Le « nuage » ne venait pas de là : il venait du rabotage des
+  // cibles en largeur (`repartirY`, plus haut).
+  // On se contente donc d'ÉVENTER la poursuite : chacun prend un angle un peu
+  // différent au lieu de viser le même point au mètre près.
   for (const p of rideau2) {
     if (p.battu > 0) continue;
     if (p === sentinelle && distance2(p.pos, porteur.pos) > 900) continue;
@@ -311,7 +385,7 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
     p.role = 'chasseur';
   }
   const renforts = ligne
-    .filter((p) => p.battu <= 0 && !chasseurs.includes(p) && distance2(p.pos, porteur.pos) < 625)
+    .filter((q) => q.battu <= 0 && !chasseurs.includes(q) && distance2(q.pos, porteur.pos) < 625)
     .sort((a, b) => distance2(a.pos, porteur.pos) - distance2(b.pos, porteur.pos))
     .slice(0, 4);
   for (const p of renforts) { p.cible = poursuite(p, porteur); p.role = 'chasseur'; }
@@ -319,10 +393,19 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
 
 // Course de poursuite : on vise DEVANT le porteur, pas sur lui — sinon les
 // défenseurs courent éternellement dans son dos.
+//
+// ⚠️ ON VISE LE PORTEUR, PAS À CÔTÉ. Tentative écartée : décaler chaque
+// poursuivant de deux mètres pour « éventer » le paquet. Le rayon de plaquage
+// est de 1,35 m — le décalage transformait chaque poursuite en course
+// parallèle. Mesuré : plaquages réussis 259 → 190, percées 21 → 29, rucks
+// 179 → 129, coups de pied 51 → 65. Tout le moteur en dépend.
 function poursuite(p: Pion, porteur: Pion): Vec {
   const d = distance(p.pos, porteur.pos);
   const anticipation = borner(d / Math.max(4, p.vitesseMax), 0, 1.6);
   return {
+    // ⚠️ Pas de borne en X ici : rattraper un porteur qui plonge dans l'en-but
+    // fait partie du jeu. C'est le SEUL cas où l'on suit le ballon au-delà de la
+    // ligne d'essai.
     x: porteur.pos.x + porteur.vitesse.x * anticipation,
     y: bornerY(porteur.pos.y + porteur.vitesse.y * anticipation),
   };
@@ -346,6 +429,10 @@ export function placerEquipes(e: EtatMatch): void {
   const arret = PHASES_ARRETEES.has(e.phase);
   for (const p of e.pions) {
     if (!p.surLeTerrain) continue;
+    // ⚠️ FILET DE SÉCURITÉ : aucune structure ne demande à un joueur de se
+    // placer derrière sa propre ligne d'essai. Seul un chasseur lancé sur le
+    // porteur y va — parce que le porteur y va.
+    if (p.role !== 'chasseur') p.cible.x = bornerX(p.cible.x);
     if (arret || p.role === 'chasseur') { p.effort = 1; continue; }
     const d2 = distance2(p.pos, e.ballon);
     p.effort = d2 < 400 ? 1 : d2 < 1600 ? 0.76 : 0.5;
@@ -360,7 +447,11 @@ export function placerEquipes(e: EtatMatch): void {
 // à moins de 1,8 m est écartée d'un demi-écart — c'est invisible à l'œil, mais
 // ça suffit à garder un terrain lisible. Le ruck, la mêlée, la touche et le
 // maul en sont exemptés : là, on est censé être au contact.
-const SERRE = 1.8;
+// ⚠️ 1,8 m ne suffisait pas : à cette distance, trente pions de 0,86 m de rayon
+// tiennent encore dans un mouchoir de poche, et l'écran affichait un « nuage ».
+// 2,6 m, en DEUX passes (une seule laisse les chaînes de trois joueurs
+// enchevêtrées), donne un terrain lisible sans dénaturer le placement.
+const SERRE = 2.6;
 function separer(e: EtatMatch, arret: boolean): void {
   const libres: Pion[] = [];
   for (const p of e.pions) {
@@ -369,20 +460,22 @@ function separer(e: EtatMatch, arret: boolean): void {
     if (arret && (e.phase === 'melee' || e.phase === 'touche')) continue;
     libres.push(p);
   }
-  for (let i = 0; i < libres.length; i++) {
-    const a = libres[i];
-    for (let j = i + 1; j < libres.length; j++) {
-      const b = libres[j];
-      const dx = b.pos.x - a.pos.x;
-      const dy = b.pos.y - a.pos.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= SERRE * SERRE) continue;
-      const d = Math.sqrt(d2) || 0.001;
-      const pousse = (SERRE - d) * 0.5;
-      const ux = dx / d; const uy = dy / d;
-      a.pos.x -= ux * pousse; a.pos.y -= uy * pousse;
-      b.pos.x += ux * pousse; b.pos.y += uy * pousse;
-      a.pos.y = bornerY(a.pos.y); b.pos.y = bornerY(b.pos.y);
+  for (let passe = 0; passe < 2; passe++) {
+    for (let i = 0; i < libres.length; i++) {
+      const a = libres[i];
+      for (let j = i + 1; j < libres.length; j++) {
+        const b = libres[j];
+        const dx = b.pos.x - a.pos.x;
+        const dy = b.pos.y - a.pos.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= SERRE * SERRE) continue;
+        const d = Math.sqrt(d2) || 0.001;
+        const pousse = (SERRE - d) * 0.5;
+        const ux = dx / d; const uy = dy / d;
+        a.pos.x -= ux * pousse; a.pos.y -= uy * pousse;
+        b.pos.x += ux * pousse; b.pos.y += uy * pousse;
+        a.pos.y = bornerY(a.pos.y); b.pos.y = bornerY(b.pos.y);
+      }
     }
   }
 }

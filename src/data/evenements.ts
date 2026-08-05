@@ -1,4 +1,5 @@
 import type { StatVariable } from '../types';
+import { t } from '../lib/i18n';
 
 // Évènements aléatoires jouables SANS IA : un pool crédible avec récit, bonus,
 // malus et récompense en Ovas. Le MJ IA reste dispo pour les actions libres.
@@ -122,3 +123,17 @@ export const EVENEMENTS: EvenementAleatoire[] = [
     positif: true,
   },
 ];
+
+// L'évènement dans la langue du joueur. ⚠️ À appeler AU MOMENT où l'évènement
+// est tiré (store) : il part ensuite dans le journal, où le texte est figé.
+// Les deltas et les Ovas ne sont pas touchés — une traduction ne change jamais
+// l'équilibre du jeu. Une clé absente retombe sur le français.
+export function traduireEvenement(e: EvenementAleatoire): EvenementAleatoire {
+  const titre = t(`evt.${e.id}.titre`);
+  const recit = t(`evt.${e.id}.txt`);
+  return {
+    ...e,
+    titre: titre === `evt.${e.id}.titre` ? e.titre : titre,
+    recit: recit === `evt.${e.id}.txt` ? e.recit : recit,
+  };
+}

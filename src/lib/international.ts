@@ -36,8 +36,41 @@ export const FORCE_NATION: Record<string, number> = {
   Suisse: 58, Brésil: 68, 'Corée du Sud': 60, Kenya: 62,
 };
 
+// ⚠️ « France U20 » n'est pas dans `FORCE_NATION` — et n'a pas à y être : sa
+// force se DÉDUIT de celle des séniors. Une équipe de moins de 20 ans joue une
+// quinzaine de points en dessous de son équipe première, partout dans le monde.
+// Sans ça, toutes les sélections U20 seraient retombées sur la valeur par
+// défaut (55) et l'Italie U20 aurait battu la Nouvelle-Zélande U20 une fois sur
+// deux.
+export const SUFFIXE_U20 = ' U20';
+const ECART_U20 = 15;
+
+// ⚠️ Les données réelles nomment l'équipe galloise « Galles U20 » (c'est la clé
+// de `LOGO_PAR_EQUIPE`) alors que la sélection sénior s'appelle « Pays de
+// Galles ». Sans cette table, l'écusson gallois U20 n'était jamais trouvé et la
+// force de l'équipe retombait sur la valeur par défaut.
+const NOM_U20: Record<string, string> = { 'Pays de Galles': 'Galles' };
+const NOM_SENIOR: Record<string, string> = { Galles: 'Pays de Galles' };
+
+export function estEquipeU20(equipe: string): boolean {
+  return equipe.endsWith(SUFFIXE_U20);
+}
+
+export function nationDeLEquipeU20(equipe: string): string {
+  const nom = equipe.slice(0, -SUFFIXE_U20.length);
+  return NOM_SENIOR[nom] ?? nom;
+}
+
+export function equipeU20(nation: string): string {
+  const nom = nomNation(nation);
+  return (NOM_U20[nom] ?? nom) + SUFFIXE_U20;
+}
+
 export function forceNation(nation: string): number {
   const nom = nomNation(nation);
+  if (estEquipeU20(nom)) {
+    return Math.max(35, forceNation(nationDeLEquipeU20(nom)) - ECART_U20);
+  }
   return FORCE_NATION[nom] ?? forcesDesNouvellesNations()[nom] ?? 55;
 }
 
@@ -71,7 +104,33 @@ export const COMPETITIONS_INTERNATIONALES: CompetitionInternationale[] = [
     ],
     journees: 3,
   },
+  // ═══ LES MOINS DE 20 ANS ═══════════════════════════════════════════════
+  // ⚠️ Demande explicite : « rajoute les compétitions U20 ». Elles se jouent sur
+  // les MÊMES fenêtres que les séniors (c'est la réalité : le Tournoi U20 se
+  // dispute en parallèle du Tournoi, le Championnat du monde U20 à l'été). Le
+  // nom des équipes porte le suffixe « U20 » — c'est la clé de `LOGO_PAR_EQUIPE`
+  // et celle que `forceNation` reconnaît pour appliquer l'écart d'âge.
+  {
+    id: 'sixNationsU20', nom: 'Tournoi des 6 Nations U20', emoji: '🌱', fenetre: 'tournoi',
+    equipes: [
+      'France U20', 'Irlande U20', 'Angleterre U20', 'Écosse U20',
+      'Galles U20', 'Italie U20',
+    ],
+    journees: 5,
+  },
+  {
+    id: 'mondialU20', nom: 'Championnat du monde U20', emoji: '🎓', fenetre: 'automne',
+    equipes: [
+      'France U20', 'Irlande U20', 'Angleterre U20', 'Écosse U20', 'Galles U20',
+      'Italie U20', 'Afrique du Sud U20', 'Nouvelle-Zélande U20', 'Argentine U20',
+      'Australie U20', 'Géorgie U20', 'Uruguay U20',
+    ],
+    journees: 3,
+  },
 ];
+
+// Les compétitions réservées aux moins de 20 ans.
+export const COMPETITIONS_U20 = new Set(['sixNationsU20', 'mondialU20']);
 
 // ---------------------------------------------------------------------------
 // LES COMPÉTITIONS DE SÉLECTIONS DU DOSSIER « new league »
@@ -225,9 +284,10 @@ export function affichesInternationales(
 
 // --- LA FENÊTRE EN COURS ----------------------------------------------------
 // Quelle compétition se joue cette semaine, et quelle journée ?
-export function fenetreInternationale(numeroSemaine: number, saison: number): {
-  competition: CompetitionInternationale; journee: number;
-} | null {
+function fenetreDe(
+  numeroSemaine: number, saison: number,
+  retenir: (c: CompetitionInternationale) => boolean,
+): { competition: CompetitionInternationale; journee: number } | null {
   const sem = semaine(numeroSemaine);
   if (sem.type !== 'international') return null;
   const fenetre: 'automne' | 'tournoi' = sem.competitionInternationale === 'autumn' ? 'automne' : 'tournoi';
@@ -235,9 +295,21 @@ export function fenetreInternationale(numeroSemaine: number, saison: number): {
   const memeFenetre = (s: typeof sem) => s.type === 'international'
     && ((s.competitionInternationale === 'autumn') === (fenetre === 'automne'));
   const dejaFaites = CALENDRIER.slice(0, numeroSemaine - 1).filter(memeFenetre).length;
-  const competition = competitionsDeLaSaison(saison).find((c) => c.fenetre === fenetre);
+  const competition = competitionsDeLaSaison(saison).find((c) => c.fenetre === fenetre && retenir(c));
   if (!competition) return null;
   return { competition, journee: Math.min(competition.journees, dejaFaites + 1) };
+}
+
+export function fenetreInternationale(numeroSemaine: number, saison: number) {
+  // ⚠️ On écarte explicitement les compétitions U20 : sinon, une saison de Coupe
+  // du monde (où la tournée d'automne disparaît), le Championnat du monde U20
+  // serait devenu la compétition « séniors » de la fenêtre.
+  return fenetreDe(numeroSemaine, saison, (c) => !COMPETITIONS_U20.has(c.id));
+}
+
+/** La compétition U20 qui se joue cette semaine-là, s'il y en a une. */
+export function fenetreU20(numeroSemaine: number, saison: number) {
+  return fenetreDe(numeroSemaine, saison, (c) => COMPETITIONS_U20.has(c.id));
 }
 
 // Journées déjà disputées par une compétition à cette semaine du calendrier.
@@ -259,12 +331,16 @@ export interface AfficheInternationale {
 
 // L'affiche de SA sélection cette semaine, s'il est appelé et que sa nation
 // dispute la compétition.
-export function matchInternationalDuJoueur(j: Joueur, bonus = 0): AfficheInternationale | null {
+export function matchInternationalDuJoueur(
+  j: Joueur, bonus = 0, u20 = false,
+): AfficheInternationale | null {
   const sem = semaine(j.semaine ?? 1);
   if (sem.type !== 'international') return null;
-  const fen = fenetreInternationale(j.semaine ?? 1, j.saison);
+  const fen = u20
+    ? fenetreU20(j.semaine ?? 1, j.saison)
+    : fenetreInternationale(j.semaine ?? 1, j.saison);
   if (!fen) return null;
-  const nation = nomNation(j.nation);
+  const nation = u20 ? equipeU20(j.nation) : nomNation(j.nation);
   if (!fen.competition.equipes.includes(nation)) return null;
 
   const affiches = grille(fen.competition)[fen.journee - 1] ?? [];
@@ -293,24 +369,50 @@ export function effectifNational(nation: string, saison: number): Coequipier[] {
   const memo = cacheSelections.get(cle);
   if (memo) return memo;
 
-  const candidats: Coequipier[] = [];
-  for (const [club, effectif] of Object.entries(EFFECTIFS_REELS)) {
-    for (const joueur of effectif) {
-      if (nomNation(joueur.nation) !== nom) continue;
-      const age = joueur.age + saison - 1;
-      if (age > 36) continue;
-      candidats.push({
-        id: `${nom}-${club}-${joueur.nom}`,
-        nom: joueur.nom,
-        // ⚠️ Les données réelles ne donnent que la FAMILLE de poste ; on tire
-        // un numéro concret de façon déterministe, comme `effectif.ts`.
-        poste: posteDepuisFamille(joueur.poste, Math.floor(graine('poste#' + club + joueur.nom)() * 1000)),
-        age,
-        note: noteALAge(joueur.note, joueur.age, joueur.potentiel, age, 0.5),
-        potentiel: joueur.potentiel,
-        nation: joueur.nation,
-        regen: false,
-      });
+  // ⚠️ « France U20 » compose son groupe dans le MÊME vivier que « France »,
+  // mais borné à 20 ans : ce sont bien les meilleurs joueurs U20 du pays, pas
+  // des joueurs inventés. Au-delà de l'âge, la logique est identique.
+  const u20 = estEquipeU20(nom);
+  const paysSource = u20 ? nationDeLEquipeU20(nom) : nom;
+
+  // ⚠️ LES BASES DE DONNÉES NE LISTENT PAS LES ACADÉMIES. Beaucoup de pays
+  // n'ont qu'une poignée de joueurs de 20 ans ou moins dans les effectifs
+  // professionnels — l'Irlande n'en comptait que douze, pas de quoi aligner un
+  // XV. On élargit donc l'âge source par paliers (20, puis 21, 22, 23) jusqu'à
+  // avoir de quoi composer une feuille de match, et on RAMÈNE ces joueurs à
+  // vingt ans : leur note est recalculée à cet âge-là (`noteALAge`), donc c'est
+  // bien le niveau qu'ils avaient chez les U20, pas celui d'aujourd'hui.
+  const construire = (ageMax: number): Coequipier[] => {
+    const liste: Coequipier[] = [];
+    for (const [club, effectif] of Object.entries(EFFECTIFS_REELS)) {
+      for (const joueur of effectif) {
+        if (nomNation(joueur.nation) !== paysSource) continue;
+        const age = joueur.age + saison - 1;
+        if (age > ageMax) continue;
+        // Chez les U20, personne n'a plus de vingt ans sur la feuille.
+        const ageRetenu = u20 ? Math.min(20, age) : age;
+        liste.push({
+          id: `${nom}-${club}-${joueur.nom}`,
+          nom: joueur.nom,
+          // ⚠️ Les données réelles ne donnent que la FAMILLE de poste ; on tire
+          // un numéro concret de façon déterministe, comme `effectif.ts`.
+          poste: posteDepuisFamille(joueur.poste, Math.floor(graine('poste#' + club + joueur.nom)() * 1000)),
+          age: ageRetenu,
+          note: noteALAge(joueur.note, joueur.age, joueur.potentiel, ageRetenu, 0.5),
+          potentiel: joueur.potentiel,
+          nation: joueur.nation,
+          regen: false,
+        });
+      }
+    }
+    return liste;
+  };
+
+  let candidats = construire(u20 ? 20 : 36);
+  if (u20) {
+    for (const limite of [21, 22, 23]) {
+      if (candidats.length >= 26) break;
+      candidats = construire(limite);
     }
   }
   candidats.sort((a, b) => b.note - a.note);
@@ -329,6 +431,41 @@ export function effectifNational(nation: string, saison: number): Coequipier[] {
     if (groupe.length >= 30) break;
     if (!pris.has(c)) { pris.add(c); groupe.push(c); }
   }
+
+  // ⚠️ ON COMPLÈTE TOUJOURS JUSQU'À 23. La base ne couvre que les championnats
+  // professionnels : l'Uruguay n'y a qu'une poignée de joueurs, l'Uruguay U20
+  // un seul. Sans complément, la feuille de match était impossible à monter et
+  // le moteur jouait à deux contre quinze. Les joueurs ajoutés empruntent leurs
+  // NOM ET PRÉNOM au vivier réel du pays (comme les regens des clubs réels,
+  // voir `lib/effectif.ts`) et leur niveau vient de la force de la sélection —
+  // ils sont donc crédibles, et parfaitement déterministes.
+  if (groupe.length < 23) {
+    const force = forceNation(nom);
+    const donneurs = candidats.length ? candidats : construire(36);
+    const postes15 = (Object.keys(POSTE_PAR_ID) as PosteId[]);
+    for (let i = groupe.length; i < 23; i++) {
+      const rng = graine(`selection#${nom}#${saison}#${i}`);
+      const modele = donneurs.length
+        ? donneurs[Math.floor(rng() * donneurs.length)]
+        : null;
+      const poste = postes15[i % postes15.length];
+      const note = Math.round(force - 6 + rng() * 8);
+      groupe.push({
+        id: `${nom}-complement-${i}`,
+        nom: modele
+          // On recompose un nom du pays : prénom de l'un, nom d'un autre.
+          ? `${modele.nom.split(' ')[0]} ${donneurs[Math.floor(rng() * donneurs.length)].nom.split(' ').slice(-1)[0]}`
+          : `Joueur ${i + 1}`,
+        poste,
+        age: u20 ? 19 + Math.floor(rng() * 2) : 22 + Math.floor(rng() * 10),
+        note: Math.max(30, Math.min(92, note)),
+        potentiel: Math.max(35, Math.min(94, note + 4)),
+        nation: modele?.nation ?? paysSource,
+        regen: true,
+      });
+    }
+  }
+
   cacheSelections.set(cle, groupe);
   return groupe;
 }

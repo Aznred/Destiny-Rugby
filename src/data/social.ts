@@ -115,6 +115,10 @@ export const TON_PAR_ID: Record<string, TonPost> = Object.fromEntries(
 // --- Gabarits de réponses --------------------------------------------------
 // Variables : {joueur}, {club}, {poste}.
 
+// ⚠️ POOL ÉLARGI (demande explicite). Il tenait en trois à cinq phrases par
+// famille : sous une publication qui récolte huit à douze réponses, on lisait
+// forcément deux fois la même. Chaque famille en compte maintenant douze à
+// vingt — et `publierPost` écarte déjà les doublons dans une même fournée.
 export const REPONSES_POSITIVES: Record<TypeCompte, string[]> = {
   fan: [
     'ALLEZ {joueur} 💚 On est derrière toi !',
@@ -122,25 +126,60 @@ export const REPONSES_POSITIVES: Record<TypeCompte, string[]> = {
     'Mon fils a ton nom floqué dans le dos, il va être content.',
     'Enfin quelqu’un qui parle vrai chez nous.',
     'Le genre de mec qu’on veut garder dix ans au club.',
+    'Toujours là {joueur}, dans les bons comme dans les mauvais jours. 🤝',
+    'Franchement ça fait du bien de lire ça un lundi matin.',
+    'On te suit depuis la {division}, on lâchera pas. 💪',
+    'Le maillot floqué {joueur}, il est déjà commandé.',
+    'Voilà pourquoi j’ai repris mon abonnement. Merci.',
+    'Ma fille veut jouer {poste} à cause de toi. Bravo. 🥹',
+    'Tribune Nord derrière toi dimanche, prépare tes oreilles. 🔊',
+    'Ça, c’est un joueur de {club}. Le reste, c’est du bruit.',
+    'On en a vu passer, mais toi t’as quelque chose en plus.',
+    'Continue de parler comme ça, ça fait un bien fou.',
+    'Respect {joueur}. Vraiment. 👏',
   ],
   journaliste: [
     'Discours assumé de {joueur}, à retrouver en intégralité demain matin.',
     'On dit ce qu’on veut, mais {joueur} est un des dossiers les plus intéressants du championnat.',
     'Le genre de sortie qui vaut trois pages. Merci {joueur}.',
+    'Rare de lire un {poste} aussi clair sur son propre jeu. À suivre.',
+    'Je confirme ce que dit {joueur} : le vestiaire de {club} est derrière lui.',
+    'Message qui va tourner. Et pour de bonnes raisons, pour une fois.',
+    'On m’avait dit que {joueur} était de ceux qui parlent vrai. Confirmé.',
+    'Portrait de {joueur} à lire dans nos colonnes cette semaine.',
+    'Ce genre de prise de parole change l’image d’un championnat.',
+    'Je note. Et je reviendrai vers vous, {joueur}. 📝',
   ],
   hater: [
     'Bon. Là, je peux rien dire. 🤝',
     'Ok, tu marques un point. Un seul.',
+    'Je reste sur mes positions, mais celle-là est correcte.',
+    'Tiens, pour une fois. Note que je l’ai écrit.',
+    'Admettons. Mais on rediscute dans six mois.',
+    'Bien joué. Ça ne change pas ce que je pense du reste.',
   ],
   media: [
-    '🚨 {joueur} ({club}) : « ' + '…' + ' » — Le message qui fait réagir tout le championnat.',
+    '🚨 {joueur} ({club}) : le message qui fait réagir tout le championnat.',
     'La publication de {joueur} dépasse déjà les 200 000 vues.',
+    '💬 {joueur} sort du silence — notre analyse à lire ici.',
+    '📈 Le compte de {joueur} explose depuis ce message.',
+    '🎙️ {joueur} sera notre invité cette semaine. Rendez-vous jeudi.',
+    'Rarement vu un joueur de {division} faire autant parler en une phrase.',
   ],
-  club: ['💚 Notre {poste} a parlé. On avance ensemble.'],
+  club: [
+    '💚 Notre {poste} a parlé. On avance ensemble.',
+    '🤝 Le club soutient {joueur}, comme toujours.',
+    '💬 Voilà l’état d’esprit que nous voulons voir à {club}.',
+    '👏 Merci {joueur}. Rendez-vous dimanche.',
+  ],
   coequipier: [
     'Mon frère 🤝',
     'Il a dit ce qu’il fallait. 👏',
     'On te suit là-dessus, capitaine ou pas.',
+    'Voilà. Merci de l’avoir dit à voix haute. 💪',
+    'Vestiaire à 100 % derrière toi. Comme toujours.',
+    'Bien parlé. On en reparle à la séance. 😄',
+    'Tu sais que je suis d’accord. Depuis le début.',
   ],
 };
 
@@ -149,26 +188,58 @@ export const REPONSES_NEGATIVES: Record<TypeCompte, string[]> = {
     'Bof. Concentre-toi sur le terrain avant de faire l’influenceur.',
     'On a perdu 4 matchs de suite et il tweete. 🤡',
     'Moins de téléphone, plus de plaquages.',
+    'Franchement {joueur}, c’est pas le moment de l’ouvrir.',
+    'Le maillot de {club} mérite mieux que des posts.',
+    'J’ai payé ma place pour voir ça ? Sérieusement ?',
+    'Et les supporters, tu y penses quand exactement ?',
+    'Parle moins, cours plus. C’est tout ce qu’on demande.',
+    'On était derrière toi. Là, tu nous perds.',
+    'Reste humble deux minutes, ça fera pas de mal.',
+    'Mon gamin te suivait. Il a arrêté ce matin.',
+    'Le club a besoin de joueurs, pas de commentateurs.',
   ],
   journaliste: [
     'Sortie très maladroite de {joueur}. Le club va devoir gérer ça en interne.',
     'Communication risquée pour un joueur de son statut.',
     'Le vestiaire de {club} apprécie moyennement, d’après nos informations.',
+    'Ce message va laisser des traces. Le staff n’était pas prévenu.',
+    'On me dit que la direction de {club} a été surprise. Euphémisme.',
+    'Difficile de défendre {joueur} sur ce coup-là. Vraiment.',
+    'Le genre de publication qu’un agent supprime dans l’heure.',
+    'Un {poste} de {division} qui parle comme ça, ça se paie sur le terrain.',
   ],
   hater: [
     'Statistiquement, tu n’as strictement rien fait cette saison. 🔻',
     'Le mec est au-dessus de tout le monde… dans les stats de fautes.',
     'Poste ton bilan de la saison pour voir. Ah non, mauvaise idée.',
     'Ratio + tu joues en {club} + personne ne t’a demandé.',
+    'Combien de minutes jouées ce mois-ci ? Je pose la question.',
+    'Le niveau de {division} explique beaucoup de choses. 😴',
+    'On peut avoir le nombre de ballons touchés dimanche ? Merci.',
+    'Chaque semaine il parle, chaque semaine il déçoit.',
+    'La confiance en soi, c’est bien. Le talent, c’est mieux.',
+    'Je vais garder ce message pour la fin de saison. 📌',
+    'Tu devrais mettre ton compte en privé, sincèrement.',
+    'Encore un qui se croit arrivé. Classique.',
   ],
   media: [
     '⚠️ La publication de {joueur} fait polémique. La commission pourrait se saisir du dossier.',
     'Tempête sur les réseaux après le message de {joueur}.',
+    '🚨 {club} sous pression après la sortie de son {poste}.',
+    '📉 Plusieurs partenaires s’interrogent après le message de {joueur}.',
+    'Le message a été supprimé… mais capturé. Notre article.',
   ],
-  club: ['Le club rappelle que la parole des joueurs engage l’institution.'],
+  club: [
+    'Le club rappelle que la parole des joueurs engage l’institution.',
+    'Une mise au point sera faite en interne. Nous n’en dirons pas plus.',
+    'Ce message n’engage que son auteur.',
+  ],
   coequipier: [
     'Bro… on en parle au vestiaire plutôt ? 😬',
     'Fallait peut-être pas écrire ça.',
+    'Appelle-moi. Tout de suite.',
+    'On est une équipe. Là, tu joues perso.',
+    'J’ai rien vu, j’ai rien lu. Pour ton bien. 🙈',
   ],
 };
 

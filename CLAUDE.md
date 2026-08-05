@@ -1597,3 +1597,244 @@ les situations, les interviews, les tweets, les messages privés, le coaching.
 commentaires de `moteur/commentaire.ts` et les gabarits de `lib/vie.ts`), soit
 ~1 500 phrases qui ne servent qu'en mode sans clé. C'est le prochain lot : ajouter
 une clé et sa traduction dans `data/textes.ts` suffit, le socle est en place.
+
+
+## Retours de jeu — la passe de correction (dernier lot)
+
+Douze bugs et demandes signalés en jeu, traités d'un bloc. Chaque section dit
+**ce qui n'allait pas**, **pourquoi**, et **comment le vérifier**.
+
+### ⚠️ « Top 14 avec 16 équipes, Pro D2 à 14 » — LA FIN DE SAISON ÉTAIT CALCULÉE DEUX FOIS
+
+C'est le bug le plus profond du lot. La fin de saison passait par **deux
+chemins** qui ne donnaient pas le même résultat :
+
+| | ancre | apport du joueur |
+|---|---|---|
+| `resoudrePyramide()` (division du joueur) | son club | **oui** (`bonusJoueur`) |
+| `resoudreToutesDivisions()` (les 10 étages) | premier club du fichier | non |
+
+Deux championnats différents → deux champions différents. Le store fusionnait
+les deux listes en **dédoublonnant par nom de club** : quand les deux calculs ne
+désignaient pas le même, **les deux montaient**. Le Top 14 gagnait un club par
+saison, la Pro D2 en perdait un.
+
+- **`phaseFinaleDe(division, saison)`** (`lib/promotion.ts`) est désormais LA
+  source unique, mémoïsée, et elle connaît le contexte du joueur
+  (`setContexteJoueur`, posé par `resoudrePyramide`). Tout le monde lit le même
+  championnat.
+- **`equilibrerMouvements()`** est la ceinture ET les bretelles : pour chaque
+  division, autant de clubs doivent entrer que sortir, sinon le mouvement le
+  moins prioritaire est annulé. Un cas limite futur ne pourra plus faire dériver
+  la taille d'un étage.
+- **La division AFFICHÉE** venait de `competitionDuClub()`, c'est-à-dire de la
+  pyramide FIGÉE dans `data/clubs.ts` : un club promu restait affiché en Pro D2.
+  `competitionEffective(club, divisionDeclaree)` (`lib/divisions.ts`) lit dans
+  l'ordre la fiche du joueur, le registre des mouvements, puis les données.
+
+Vérification : `npx vite-node scripts/verifPyramide.ts` — **douze saisons, dix
+étages, aucune division ne change de taille**.
+
+### ⚠️ LE PLACEMENT SUR LE TERRAIN — « les joueurs font un nuage »
+
+Deux causes, mesurées avant/après (`scripts/verifPlacementPied.ts`) :
+
+| | avant | après |
+|---|---|---|
+| cibles dans un en-but | 8,7 % | **0,3 %** |
+| positions dans un en-but | 7,6 % | **0,7 %** |
+| cibles à moins de 4 m d'une touche | 12,9 % | **7,0 %** |
+| plus gros tas de cibles (rayon 8 m), moyenne | 9,7 | **6,9** |
+| 95ᵉ centile | 17 | **10** |
+
+1. **Les cibles en largeur étaient RABOTÉES.** `bornerY` ramène une valeur hors
+   terrain sur la bordure : dès que le ballon approchait d'une touche, six
+   joueurs recevaient exactement la même valeur (3,2 m ou 66,8 m) et
+   s'empilaient. **`repartirY(pions, ecartMin)`** garde l'ordre voulu et impose
+   un écart minimal entre voisins, en repliant vers l'intérieur — l'écart se
+   resserre tout seul quand la largeur ne suffit pas. Appliqué aux pods
+   d'avants (6 m), à la ligne de trois-quarts (5 m) et au premier rideau (4,2 m).
+2. **Les cibles n'étaient bornées QUE sur la largeur.** Un ouvreur à 17 m de
+   profondeur, alors que son équipe joue à 8 m de sa propre ligne, se voyait
+   assigner une position DERRIÈRE sa ligne d'essai. **`bornerX`** l'interdit
+   partout, sauf pour un chasseur lancé sur le porteur (rattraper un joueur qui
+   plonge dans l'en-but, c'est le jeu).
+3. La force de séparation passe de 1,8 à **2,6 m**, en deux passes.
+
+⚠️ **DEUX PISTES TESTÉES ET ÉCARTÉES**, chiffres à l'appui — ne pas les
+reproposer :
+
+- **Décaler les poursuivants** pour « éventer » le paquet : le rayon de plaquage
+  n'est que de 1,35 m, un décalage de 1,6 m transforme la poursuite en course
+  parallèle. Mesuré : plaquages 259 → 190, percées 21 → 29, rucks 179 → 129.
+- **Forcer le recalcul du placement à chaque reprise de jeu** (`e.compteur = 0`
+  dans `reprendreJeu`) : la défense se remettait aussitôt sur sa ligne théorique
+  — lue sur le 4ᵉ défenseur, donc parfois trente mètres en arrière — au lieu de
+  rester au contact une demi-seconde de plus. Mesuré : coups de pied 51 → 65.
+  L'étalonnage du moteur tient à ce demi-temps de retard.
+
+### ⚠️ LE JEU AU PIED : moins de coups de pied, et les VRAIES règles de touche
+
+- **Fréquence** : le dégagement de ses 22 passe de 74 % à **60 %** des phases,
+  l'occupation depuis son camp de 20 % à **13 %**, le rasant de 5 % à 3,2 %.
+  Résultat : **52 coups de pied par match** (57,6 avant, cible 35-60).
+- **Portée réaliste** : `26 + pied/2,2` donnait 65 mètres à un bon buteur — un
+  dégagement pris sur sa ligne des 22 finissait DANS les 22 adverses. C'est
+  maintenant `24 + pied/3,2`, soit 40 à 55 m comme dans le rugby professionnel.
+- **Les trois règles sont GÉOMÉTRIQUES**, plus déclaratives. Le moteur ne
+  regardait que l'INTENTION du botteur : un dégagement d'occupation qui finissait
+  en touche dans les 22 adverses rendait le ballon à l'adversaire, alors que
+  c'est la définition même du 50/22.
+  1. **50/22** — coup de pied parti de SON CAMP, sorti en touche DANS LES 22
+     adverses → **touche pour l'équipe qui a botté** ;
+  2. **direct en touche depuis l'extérieur de ses 22** → aucun gain de terrain,
+     **touche à l'endroit du coup de pied**, pour l'adversaire ;
+  3. **depuis ses 22** → le gain est acquis, touche là où le ballon est sorti.
+
+Vérification : `npx vite-node scripts/verifPlacementPied.ts` et
+`scripts/verifMoteur.ts` (tous les chiffres du moteur restent dans leur cible).
+
+### L'Ovale : commentaires, reposts, posts qui restent, abonnés qui partent
+
+- ⚠️ **Le plafond de commentaires était de QUATRE**, quel que soit le post : un
+  tweet de club à 800 000 vues en récoltait autant qu'un post à 40 000. Le
+  barème monte maintenant à **douze**, indexé sur les vues — et le pool de
+  phrases a été multiplié par cinq (`lib/vie.ts`, `data/social.ts`) pour tenir
+  la charge sans jamais se répéter : ~30 gabarits par famille, chacun à deux ou
+  trois alternatives.
+- ⚠️ **Reposter/dé-reposter gonflait les vues à l'infini** : `reposter()`
+  ajoutait 4 % de vues à chaque activation et n'en retirait jamais
+  (`Math.max`). Le bonus exact est mémorisé (`PostSocial.bonusRepost`) et repris
+  au dé-repost. Vérifié : trois allers-retours, compteurs identiques.
+- ⚠️ **Tes publications disparaissaient.** Le fil était tronqué aux 80 posts les
+  plus récents, or chaque semaine y déverse 8 publications du monde : au bout de
+  dix semaines — le temps d'un changement de club — tes tweets étaient poussés
+  dehors. `limiterPosts()` sépare les deux fils : **les tiens (120) ne sont
+  jamais évincés**, ceux du monde tournent (60). Les posts que tu as commentés
+  ou repostés restent aussi.
+- **On perd des abonnés quand on dit n'importe quoi** (demande explicite) :
+  `publierPost` retourne désormais un gain NET. Trois causes cumulables — le
+  dérapage qui fait convoquer par le club, les mots interdits, une timeline
+  hostile — jusqu'à 22 % de l'audience. Un propos discriminatoire ou une menace
+  (`lireDerapage`) vide **la moitié du compte** dans la journée. Et une **saison
+  ratée** coûte jusqu'à 18 % des abonnés à l'intersaison (sous 5/10), 5 % de plus
+  si le staff ne te fait plus confiance.
+
+### Le marché : plus personne ne voulait du meilleur joueur du monde
+
+Le plancher de recrutement était ABSOLU (« pas plus de 16 points sous la cote
+du joueur »). À partir d'une cote de 98 — atteignable avec 99 de générale et
+100 de réputation — le meilleur étage du jeu (`NOTE_PAR_NIVEAU[0] = 82`) tombait
+sous ce plancher : la boucle jetait TOUTES les compétitions et **plus aucun club
+ne faisait d'offre**. Le plancher est devenu RELATIF (`min(cote − 16,
+meilleur club accessible − 8)`), en deux passes.
+
+⚠️ **ON NE JOUE PLUS UNE SAISON SANS CONTRAT.** Le contrat tombait à zéro, des
+offres arrivaient, et si on les ignorait la saison suivante se jouait comme si
+de rien n'était — salaire compris. `saisonSuivante()` s'arrête maintenant net et
+rouvre « Choix de carrière » ; si personne ne veut de toi, la carrière s'arrête.
+⚠️ **Conséquence pour les scripts** : un test qui enchaîne des saisons doit
+signer PUIS relancer (voir `scripts/verifDifficulte.ts`), sinon il compte des
+saisons qui n'ont pas été jouées.
+
+Vérification : `npx vite-node scripts/verifMarche.ts`.
+
+### Les moins de 20 ans
+
+- **Deux compétitions** dans `COMPETITIONS_INTERNATIONALES` : Tournoi des
+  6 Nations U20 (fenêtre du Tournoi) et Championnat du monde U20 (fenêtre
+  d'automne). Les équipes portent le suffixe `U20` — c'est la clé de
+  `LOGO_PAR_EQUIPE` ET ce que `forceNation` reconnaît pour appliquer l'écart
+  d'âge (**−15 points** sur la sélection A). ⚠️ L'équipe galloise s'appelle
+  « Galles U20 » dans les données alors que les séniors sont « Pays de Galles » :
+  `NOM_U20` / `NOM_SENIOR` font le pont.
+- **`convocationU20()`** (`lib/selection.ts`) : éligible jusqu'à 20 ans, barre
+  abaissée de 15 points par rapport aux séniors, et une concurrence comptée
+  **uniquement parmi les joueurs de 20 ans ou moins du pays** (3 places par
+  poste). À 21 ans la porte se ferme, définitivement.
+- **`effectifNational('France U20', saison)`** puise dans le même vivier réel,
+  borné à 20 ans. ⚠️ Les bases ne listent pas les académies : l'Irlande n'avait
+  que douze joueurs de moins de 20 ans. On élargit donc l'âge source par paliers
+  (20 → 23) en RAMENANT les joueurs à vingt ans (note recalculée à cet âge), puis
+  on complète jusqu'à 23 avec des joueurs générés qui empruntent leurs nom et
+  nationalité au vivier du pays. Une cape U20 ne compte **pas** dans
+  `Joueur.selections`.
+- Dans le panneau de carrière, « ▶️ Jouer avec les U20 » remplace le match de
+  club quand on est appelé chez les jeunes et pas chez les A.
+
+Vérification : `npx vite-node scripts/verifU20.ts`.
+
+### Boutique, classement, réglages
+
+- ⚠️ **Les boosts ont été supprimés.** Ils vendaient « +2 à tous les attributs »
+  pour 80 Ovas : en contradiction directe avec l'étalonnage de difficulté. La
+  boutique ne vend plus que du cosmétique. Ne pas les réintroduire sans relancer
+  `scripts/verifDifficulte.ts`.
+- **Les articles montrent le VRAI ballon en 3D** (`components/VignetteBallon.tsx`)
+  et non plus une pastille de couleur : canvas sans décor, `dpr` plafonné à 1,5,
+  repli sur la pastille en `modeAllege()` (≤ 4 cœurs ou `prefers-reduced-motion`).
+- **Le classement part VIERGE** : `classementComplet` ne verse plus les
+  `LEGENDES_FICTIVES`. Un dépliant explique, dans l'écran, comment le brancher
+  sur un vrai backend (table `carrieres`, envoi à la retraite, lecture au
+  chargement) **et les deux garde-fous indispensables** — recalculer le score
+  côté serveur, limiter les envois par appareil.
+- ⚠️ **La modale de réglages ne défilait pas.** Deux causes : `place-items:
+  center` sur une grille dont l'élément dépasse la hauteur déborde des DEUX côtés
+  (le haut de la modale passait hors fenêtre, hors d'atteinte), et ni l'overlay
+  ni la modale n'avaient d'`overflow`. Corrigé par `align-items: safe center` +
+  `max-height: 100dvh` + `overflow-y: auto`. La fiche de club, qui a déjà son
+  ascenseur interne, passe en `overflow: hidden` pour ne pas en avoir deux.
+  Vérifié en jeu : contenu 1 235 px dans 686 px de fenêtre, défilement complet,
+  boutons Annuler/Enregistrer atteignables — desktop comme mobile.
+
+### Écussons, drapeaux, notes de club et traductions
+
+- **Les écussons de sélections** viennent du dossier `bonne selection/`
+  (`node scripts/copierLogosSelections.cjs`). Les anciens pesaient 150 à 1 200
+  octets — de simples vignettes ; les nouveaux, 3 à 12 Ko, sont les vrais
+  écussons. ⚠️ `LogoEquipe` perd son `loading="lazy"` : même leçon que pour les
+  avatars de L'Ovale, sur des vignettes de 40 px dans un conteneur en
+  `content-visibility: auto`, le chargement ne se déclenche jamais. Vérifié en
+  jeu : 41 écussons sur 41 affichés.
+- **Les drapeaux des 18 nouvelles ligues** : elles arrivaient avec
+  `drapeaux: []`. Le code vient de `data/nations.ts`, la même table que
+  `<Drapeau>` — donc `gb-sct`, `gb-wls` et `gb-eng` pour les nations
+  britanniques. 28 championnats du monde sur 28 ont leur drapeau.
+- **La note des clubs des nouvelles ligues** ne s'affichait pas : l'atlas ne
+  lisait que `NOTE_CLUB_REEL` (les 143 clubs de la base d'origine). Les 183 clubs
+  ajoutés ont leur propre table, `NOTE_CLUB_NOUVEAU`.
+- **Les traductions** : le dictionnaire existait mais **seuls `Nav` et
+  `Réglages` appelaient `t()`**. Sont désormais branchés : l'accueil (y compris
+  ses trois arguments), le panneau de carrière, le classement latéral, le match
+  en direct, la boutique, l'atlas, la création, le Hall, l'écran Résultats, le
+  panneau d'offres et la navigation de L'Ovale. **160 clés, 100 % dans les sept
+  langues.** Restent en français : `Profil`, `Effectif`, `Classement`, `Carrière`
+  et les modales secondaires.
+
+Vérification : `npx vite-node scripts/verifTraductions.ts` (clés inconnues,
+couverture par langue, écrans encore non branchés).
+
+### Palmarès et succès
+
+`Joueur.titres` n'était qu'une liste de libellés (« Bouclier de Brennus (S4) ») :
+impossible d'en tirer un succès du type « champion avec trois clubs différents ».
+**`Joueur.palmares`** (`TitreGagne[]`) enregistre en plus l'id du trophée, la
+saison ET **le club**. Quinze succès de palmarès s'appuient dessus : le Bouclier,
+la dynastie (3 Brennus), les deux coupes d'Europe, le doublé championnat + Europe
+la même saison, le Tournoi, la Coupe du monde, meilleur joueur du monde, champion
+avec 2 puis 3 clubs, trois titres avec le même club, champion de trois divisions
+françaises, dix titres, un titre à l'étranger, trois saisons de suite.
+⚠️ Les vieilles sauvegardes voient leur palmarès **reconstruit depuis les
+libellés** (`palmaresDepuisLibelles`) — mais sans le club, qui n'a jamais été
+enregistré : les succès « avec N clubs » ne comptent que les titres à venir.
+
+### Les scripts de vérification ajoutés
+
+```bash
+npx vite-node scripts/verifPyramide.ts        # tailles de divisions sur 12 saisons
+npx vite-node scripts/verifPlacementPied.ts   # placement, en-buts, 50/22 et touches
+npx vite-node scripts/verifMarche.ts          # offres à tous les niveaux, fin de contrat
+npx vite-node scripts/verifU20.ts             # compétitions U20, écussons, drapeaux
+npx vite-node scripts/verifTraductions.ts     # clés, couverture, écrans branchés
+node scripts/copierLogosSelections.cjs        # « bonne selection/ » → public/logos/
+```

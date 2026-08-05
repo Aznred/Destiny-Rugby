@@ -382,6 +382,36 @@ node scripts/genMonde.cjs      # → src/data/mondeReel.ts + src/data/effectifsR
 
 Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les conventions.
 
+## 🩹 Derniers correctifs (retours de jeu)
+
+| Ce qui n'allait pas | Ce qui a changé |
+|---|---|
+| Top 14 à 16 clubs, Pro D2 à 14 | La fin de saison était calculée **deux fois** avec des résultats différents, et les deux champions montaient. Source unique (`phaseFinaleDe`) + garde-fou d'équilibre. Vérifié sur 12 saisons. |
+| Club promu encore affiché dans son ancienne division | Le panneau lisait la pyramide figée des données ; il lit maintenant la division **effective**. |
+| « Les joueurs font un nuage, en bas du terrain » | Les cibles en largeur étaient **rabotées** sur la bordure : elles sont désormais **réparties** avec un écart minimal. Tas moyen 9,7 → 6,9 joueurs. |
+| Joueurs qui reculent dans leur en-but | Les cibles n'étaient bornées que sur la largeur. 7,6 % → **0,7 %** des positions. |
+| Trop de coups de pied | 57,6 → **52** par match, et une portée réaliste (40-55 m au lieu de 65). |
+| Le 50/22 ne marchait pas | Les trois règles de touche sont maintenant **géométriques** : 50/22, touche directe hors des 22 (pas de gain de terrain), touche depuis ses 22. |
+| Max 4 commentaires sous un post | Jusqu'à **12**, indexés sur les vues — avec cinq fois plus de phrases pour ne pas se répéter. |
+| Republier / dé-republier gonflait les vues | Opération **réversible** : le bonus de vues est mémorisé et repris. |
+| Posts perdus en changeant de club | Tes publications ne sont **plus jamais évincées** du fil. |
+| On ne perdait jamais d'abonnés | Dérapages, propos interdits et **mauvaise saison** coûtent des abonnés — jusqu'à la moitié du compte. |
+| Générale trop haute = plus aucune offre | Le plancher de recrutement est devenu **relatif** : le marché reste ouvert à 99 de générale. |
+| On restait au club sans contrat | La saison **ne démarre plus** tant qu'on n'a pas signé. |
+| Réglages : impossible de faire défiler | La modale a une hauteur maximale et un ascenseur ; l'overlay ne la coupe plus par le haut. |
+| Boutique | **Boosts supprimés**, articles affichés avec le **vrai ballon 3D**. |
+| Classement | **Vierge au départ**, avec la marche à suivre pour le brancher en ligne. |
+| Logos de sélections faux | Remplacés par ceux de « bonne selection » (39 écussons). |
+| Pas de drapeau ni de note sur les nouvelles ligues | 28 championnats sur 28 ont leur drapeau, 183 clubs ont leur note. |
+| Pas de compétitions U20 | **Tournoi des 6 Nations U20** et **Championnat du monde U20**, avec convocation des meilleurs joueurs U20 de chaque pays. |
+| Traductions inachevées | 160 clés, 100 % dans les 7 langues, branchées sur tous les écrans principaux. |
+| Pas de succès de palmarès | **15 succès** liés aux trophées et aux titres par club. |
+
+Le détail de chaque correction — la cause, la mesure avant/après et le script de
+vérification — est dans [`CLAUDE.md`](CLAUDE.md), section
+« Retours de jeu — la passe de correction ».
+
+
 ## 🗺️ Idées d'évolution
 
 👉 La liste complète et **ordonnée** des évolutions prévues (9 lots, des
@@ -389,7 +419,12 @@ fondations vers le confort) est dans **[ROADMAP.md](ROADMAP.md)**.
 
 - **Classement multijoueur en ligne** : nécessite un **backend** (ex. Supabase
   ou Firebase) pour synchroniser les carrières entre joueurs. Aujourd'hui le
-  classement est **local** (tes carrières + des légendes pré-générées).
+  classement est **local et part vierge** — il ne contient que les carrières
+  menées à leur terme sur cet appareil. La marche à suivre pour le rendre
+  mondial (table `carrieres`, envoi à la retraite, lecture au chargement, et
+  surtout le recalcul du score côté serveur) est **expliquée dans l'écran
+  Classement lui-même**, dans le dépliant « 🌍 Comment rendre ce classement
+  mondial ».
 - **Proxy backend pour Groq** : petit serveur qui garde la clé côté serveur et
   applique un quota par joueur — permet une mise en ligne publique sans exposer
   la clé ni saturer le quota.

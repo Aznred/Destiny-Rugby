@@ -1,6 +1,8 @@
 // Trophées gagnables en fin de saison. Chaque trophée a un modèle 3D
 // (public/m3d/*.glb, compressé Draco) affiché en animation quand on le remporte.
 
+import { COMPETITIONS_NATIONS_NOUVELLES } from './nouvellesLigues';
+
 export interface Trophee {
   id: string;
   nom: string;
@@ -165,6 +167,187 @@ export const TROPHEES: Record<string, Trophee> = {
     desc: 'Le bouclier américain. Tu as conquis le Nouveau Monde.',
     ovas: 9,
   },
+
+  // --- Les vingt championnats et coupes du dossier « nouvellecoupe » ---------
+  // ⚠️ Jusqu'ici, les 18 championnats ajoutés par `data/nouvellesLigues.ts` ne
+  // décernaient RIEN : on pouvait signer à Batumi, y être champion, et repartir
+  // les mains vides. Chacun a désormais son trophée, avec son modèle 3D.
+  // Le montant en Ovas suit le `niveau` de la compétition — l'économie reste
+  // dure (voir CLAUDE.md), un titre finlandais ne vaut pas un Brennus.
+  currieCup: {
+    id: 'currieCup',
+    nom: 'Currie Cup',
+    modele: '/m3d/currieCup.glb',
+    couleur: '#0a7a3b',
+    desc: 'La plus vieille coupe du rugby sud-africain. Les unions se la disputent depuis 1892 — et cette année, elle est à toi.',
+    ovas: 9,
+  },
+  italie: {
+    id: 'italie',
+    nom: 'Scudetto',
+    modele: '/m3d/italie.glb',
+    couleur: '#0a2a6b',
+    desc: 'Champion d’Italie. Le Scudetto se coud sur le maillot, et il ne se rend pas sans se battre.',
+    ovas: 6,
+  },
+  argentine: {
+    id: 'argentine',
+    nom: 'Top 12 argentin',
+    modele: '/m3d/argentine.glb',
+    couleur: '#74acdf',
+    desc: 'Champion d’Argentine, au pays des Pumas : le vivier le plus rude de l’hémisphère sud.',
+    ovas: 6,
+  },
+  ecosseSuper: {
+    id: 'ecosseSuper',
+    nom: 'Super Series',
+    modele: '/m3d/ecosseSuper.glb',
+    couleur: '#2b4a8b',
+    desc: 'Le titre écossais, arraché sous la pluie et devant deux mille personnes qui n’ont pas bougé.',
+    ovas: 6,
+  },
+  espagne: {
+    id: 'espagne',
+    nom: 'División de Honor',
+    modele: '/m3d/espagne.glb',
+    couleur: '#c8102e',
+    desc: 'Champion d’Espagne. Les Leones montent, et tu montes avec eux.',
+    ovas: 6,
+  },
+  georgie: {
+    id: 'georgie',
+    nom: 'Didi 10',
+    modele: '/m3d/georgie.glb',
+    couleur: '#b02a2a',
+    desc: 'Champion de Géorgie : un pays où la mêlée est une affaire d’honneur, et où tu viens de la gagner.',
+    ovas: 6,
+  },
+  irlandeAIL: {
+    id: 'irlandeAIL',
+    nom: 'All-Ireland League',
+    modele: '/m3d/irlandeAIL.glb',
+    couleur: '#0a7a3b',
+    desc: 'Le championnat des clubs irlandais, celui où tout commence. Ton nom rejoint la plaque du club-house.',
+    ovas: 6,
+  },
+  gallesSRC: {
+    id: 'gallesSRC',
+    nom: 'Super Rygbi Cymru',
+    modele: '/m3d/gallesSRC.glb',
+    couleur: '#c1121f',
+    desc: 'Le sommet du rugby de club gallois. Toute une vallée a chanté pour toi.',
+    ovas: 6,
+  },
+  gallesPrem: {
+    id: 'gallesPrem',
+    nom: 'Welsh Premiership',
+    modele: '/m3d/gallesPrem.glb',
+    couleur: '#7a1020',
+    desc: 'Champion du deuxième étage gallois : la marche qui mène à la Super Rygbi Cymru.',
+    ovas: 5,
+  },
+  gallesChall: {
+    id: 'gallesChall',
+    nom: 'Welsh Challenge Cup',
+    modele: '/m3d/gallesChall.glb',
+    couleur: '#3f8f5f',
+    desc: 'La coupe du Pays de Galles : un tableau sec, des terrains impossibles, et une finale à Cardiff.',
+    ovas: 5,
+  },
+  nzHeartland: {
+    id: 'nzHeartland',
+    nom: 'Meads Cup',
+    modele: '/m3d/nzHeartland.glb',
+    couleur: '#1f1f1f',
+    desc: 'Le trophée du Heartland Championship, la Nouvelle-Zélande rurale. Colin Meads a donné son nom à la coupe ; toi, tu l’as levée.',
+    ovas: 5,
+  },
+  portugal: {
+    id: 'portugal',
+    nom: 'Campeonato Nacional de Honra',
+    modele: '/m3d/portugal.glb',
+    couleur: '#0a7a3b',
+    desc: 'Champion du Portugal, la nation qui monte. Os Lobos t’ont dans un coin de la tête.',
+    ovas: 5,
+  },
+  roumanie: {
+    id: 'roumanie',
+    nom: 'Liga Națională',
+    modele: '/m3d/roumanie.glb',
+    couleur: '#f2c200',
+    desc: 'Champion de Roumanie, au pays des Chênes : un rugby de devants, et un titre qui se prend au corps.',
+    ovas: 5,
+  },
+  russie: {
+    id: 'russie',
+    nom: 'Premier League russe',
+    modele: '/m3d/russie.glb',
+    couleur: '#5a2d82',
+    desc: 'Champion de Russie. Des déplacements interminables, des hivers durs, et une coupe au bout.',
+    ovas: 5,
+  },
+  paysBas: {
+    id: 'paysBas',
+    nom: 'Ereklasse',
+    modele: '/m3d/paysBas.glb',
+    couleur: '#d96a00',
+    desc: 'Champion des Pays-Bas. Le rugby néerlandais est confidentiel — ceux qui le suivent connaissent ton nom.',
+    ovas: 4,
+  },
+  pologne: {
+    id: 'pologne',
+    nom: 'Ekstraliga',
+    modele: '/m3d/pologne.glb',
+    couleur: '#c8102e',
+    desc: 'Champion de Pologne, dans un championnat que personne n’attendait — et qui t’a pris deux saisons.',
+    ovas: 4,
+  },
+  bundesliga: {
+    id: 'bundesliga',
+    nom: 'Rugby-Bundesliga',
+    modele: '/m3d/bundesliga.glb',
+    couleur: '#d9a441',
+    desc: 'Champion d’Allemagne. Tout le rugby du pays tient dans un quartier de Heidelberg, et tu y as gagné.',
+    ovas: 4,
+  },
+  tcheque: {
+    id: 'tcheque',
+    nom: 'Extraliga',
+    modele: '/m3d/tcheque.glb',
+    couleur: '#1a4b8c',
+    desc: 'Champion de Tchéquie. Un titre de l’ombre, gagné dans le froid, devant les fidèles.',
+    ovas: 3,
+  },
+  finlande: {
+    id: 'finlande',
+    nom: 'SM-sarja',
+    modele: '/m3d/finlande.glb',
+    couleur: '#5b9bd5',
+    desc: 'Champion de Finlande : la saison la plus courte du monde, et la seule où l’on déneige le terrain avant de jouer.',
+    ovas: 3,
+  },
+  // ⚠️ MODÈLE RÉUTILISÉ, ASSUMÉ. Aucun `.glb` n'a été livré pour la coupe de la
+  // deuxième division anglaise ; elle emprunte celui de la Premiership Rugby
+  // Cup, dont elle est le pendant d'un étage en dessous. Même principe que le
+  // bouclier de Nationale, partagé par les quatre étages amateurs.
+  engChampCup: {
+    id: 'engChampCup',
+    nom: 'Championship Cup',
+    modele: '/m3d/prem-cup.glb',
+    couleur: '#7f9ab5',
+    desc: 'La coupe de la deuxième division anglaise : peu de monde en tribunes, beaucoup de jeunes affamés sur le terrain.',
+    ovas: 5,
+  },
+
+  // --- Sélections ------------------------------------------------------------
+  recEurope: {
+    id: 'recEurope',
+    nom: 'Rugby Europe Championship',
+    modele: '/m3d/recEurope.glb',
+    couleur: '#1a5fb4',
+    desc: 'Le « Tournoi des 6 Nations B » : Géorgie, Portugal, Roumanie, Espagne… Le titre des nations qui frappent à la porte du Tournoi.',
+    ovas: 10,
+  },
 };
 
 // Trophée national décerné selon la division du club. Les clés sont les ids de
@@ -192,6 +375,30 @@ export const TROPHEE_PAR_DIVISION: Record<string, string> = {
   japon2: 'japon',
   japon3: 'japon',
   mlr: 'mlr',
+  // Les 20 compétitions de `data/nouvellesLigues.ts`. Elles sont dans
+  // `COMPETITIONS` comme les autres, `genererOffres()` y envoie donc de vraies
+  // offres dès 55 de notoriété : on peut y signer, y être champion — et
+  // désormais y gagner quelque chose. L'id de trophée = l'id de compétition.
+  currieCup: 'currieCup',
+  bundesliga: 'bundesliga',
+  italie: 'italie',
+  argentine: 'argentine',
+  ecosseSuper: 'ecosseSuper',
+  espagne: 'espagne',
+  georgie: 'georgie',
+  irlandeAIL: 'irlandeAIL',
+  gallesSRC: 'gallesSRC',
+  gallesPrem: 'gallesPrem',
+  gallesChall: 'gallesChall',
+  engChampCup: 'engChampCup',
+  nzHeartland: 'nzHeartland',
+  portugal: 'portugal',
+  roumanie: 'roumanie',
+  russie: 'russie',
+  paysBas: 'paysBas',
+  pologne: 'pologne',
+  tcheque: 'tcheque',
+  finlande: 'finlande',
 };
 
 // Trophée d'une coupe (COUPES_EUROPE de data/mondeReel.ts).
@@ -214,3 +421,13 @@ export const COUPE_EUROPE_PAR_DIVISION: Record<string, boolean> = {
 export const NATIONS_6N = [
   'France', 'Angleterre', 'Écosse', 'Pays de Galles', 'Irlande', 'Italie',
 ];
+
+// Nations disputant le Rugby Europe Championship — le « Tournoi des 6 Nations B »
+// (Portugal, Géorgie, Espagne, Roumanie, Belgique, Allemagne, Suisse, Pays-Bas).
+// ⚠️ LA LISTE EST DÉRIVÉE, PAS RECOPIÉE : c'est la même compétition que celle
+// jouée journée par journée dans l'écran Résultats (`COMPETITIONS_NATIONS_NOUVELLES`).
+// La recopier, c'est se garantir un jour deux vérités différentes.
+// Ces nations sont disjointes des six du Tournoi : un joueur n'est jamais
+// éligible aux deux.
+export const NATIONS_REC: string[] =
+  COMPETITIONS_NATIONS_NOUVELLES.find((c) => c.id === 'recEurope')?.equipes.map((e) => e.nom) ?? [];

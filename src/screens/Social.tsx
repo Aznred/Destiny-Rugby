@@ -20,6 +20,7 @@
 //     les comptes sont débridés : insulte-les, ils répondent.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { t } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { clubParNom } from '../data/clubs';
@@ -1021,22 +1022,22 @@ export function Social() {
       <div className="x-centre">
         <header className="x-tetes">
           <button className={onglet === 'timeline' ? 'actif' : ''} onClick={() => setOnglet('timeline')}>
-            Pour vous
+            {t('ov.pourVous')}
           </button>
           <button className={onglet === 'explorer' ? 'actif' : ''} onClick={() => setOnglet('explorer')}>
-            Explorer
+            {t('ov.explorer')}
           </button>
           <button className={onglet === 'messages' ? 'actif' : ''} onClick={() => setOnglet('messages')}>
-            Messages
+            {t('ov.messages')}
           </button>
           <button
             className={onglet === 'notifs' ? 'actif' : ''}
             onClick={() => { setOnglet('notifs'); marquerNotifsLues(); }}
           >
-            Notifs{nonLues > 0 && <i className="x-point" />}
+            {t('ov.notifs')}{nonLues > 0 && <i className="x-point" />}
           </button>
           <button className={onglet === 'profil' ? 'actif' : ''} onClick={() => setOnglet('profil')}>
-            Profil
+            {t('nav.profil')}
           </button>
         </header>
 
@@ -1049,12 +1050,12 @@ export function Social() {
               <span className={`x-vivant${chargement ? ' occupe' : ''}`}>
                 ● {chargement ? 'le réseau écrit…' : `semaine ${joueur.semaine ?? 1} · ${semaine(joueur.semaine ?? 1).libelle}`}
               </span>
-              <span>Le fil se renouvelle à chaque semaine jouée.</span>
+              <span>{t('ov.filSemaine')}</span>
               {!avecIA && <span>Ajoute une clé Groq dans ⚙️ pour un fil écrit par l’IA.</span>}
             </div>
             <div className="x-fil">
               {fil.map((p) => <Post key={p.id} post={p} onProfil={ouvrirProfil} onRecherche={chercher} />)}
-              {fil.length === 0 && <p className="x-vide">Le fil se remplit…</p>}
+              {fil.length === 0 && <p className="x-vide">{t('ov.filVide')}</p>}
             </div>
           </>
         )}

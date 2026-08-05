@@ -59,21 +59,48 @@ const RIPOSTES = [
   'Ok. Noté. On se retrouve sur le terrain, tranquille.',
   'Franchement ? Va t’entraîner au lieu d’écrire des messages.',
   'Mec, t’es en train de te griller tout seul, et devant tout le monde.',
+  'T’as vraiment pris le temps d’écrire ça. C’est fascinant.',
+  'Je garde le message. On en reparlera au moment où il faudra.',
+  'Continue. Sincèrement, continue. Ça m’aide.',
+  'Le pire, c’est que tu penses que ça m’atteint.',
+  'Y’a des gens qui bossent, et y’a toi.',
+  'Capture d’écran faite. Bonne soirée quand même.',
+  'Dimanche, 15h. Viens, on en discute.',
+  'Tu veux qu’on compare nos palmarès ou t’as compris tout seul ?',
+  'Je réponds une fois, et une seule : t’es hors sujet.',
+  'Le respect, ça se demande pas, ça se mérite. Toi t’as raté les deux.',
 ];
 const FROIDES = [
   'Je préfère qu’on en reste là.',
   'Ouais. Bref.',
   'On n’a pas grand-chose à se dire je crois.',
+  'Écoute, j’ai une semaine chargée. On verra plus tard.',
+  'Reçu.',
+  'Je vais pas m’étendre.',
+  'D’accord. Bonne journée.',
+  'Franchement, je vois pas où tu veux en venir.',
 ];
 const CORDIALES = [
   'Ça marche, on se capte à l’entraînement. 👊',
   'Toujours un plaisir. Bon courage pour le week-end.',
   'Merci pour le message, ça fait plaisir.',
+  'Sympa d’avoir pris le temps d’écrire, vraiment.',
+  'On se croise dimanche ? Passe me voir après le match.',
+  'Ça va, et toi ? La reprise se passe bien ?',
+  'Nickel. Je note et je te tiens au courant. 👍',
+  'C’est gentil. Ce genre de message, ça aide plus qu’on croit.',
+  'Bien reçu, merci. On en reparle vite.',
 ];
 const AMICALES = [
   'Toujours là frérot 🤝 Tu sais que je te suis.',
   'Ahah t’es un grand malade. On mange ensemble cette semaine ?',
   'Je t’ai dit, je te suis les yeux fermés. On va tout casser.',
+  'Mon gars 😂 Tu me fais toujours rire, change rien.',
+  'Franchement heureux pour toi. Sincèrement. ❤️',
+  'On se fait une séance vidéo ensemble ? J’ai deux trois trucs à te montrer.',
+  'Je t’ai vu dimanche, énorme. Continue comme ça. 💪',
+  'Tu passes à la maison ce week-end ? Ma femme fait à manger.',
+  'Rappelle-moi quand t’as cinq minutes, faut que je te raconte un truc. 😂',
 ];
 
 // Un club ou un championnat ne répond pas comme un joueur chambré : il reste
@@ -82,6 +109,10 @@ const INSTITUTIONNELLES = [
   'Votre message a été transmis au service juridique du club. Bonne journée.',
   'Nous vous invitons à relire la charte de bonne conduite des licenciés.',
   'Ce type de message est archivé. Nous en resterons là.',
+  'Le club rappelle que la parole des joueurs engage l’institution.',
+  'Votre demande a bien été enregistrée sous la référence CL-2481.',
+  'Nous ne donnerons pas suite à ce message.',
+  'La commission de discipline a été informée. Cordialement.',
 ];
 
 export function reponseLocale(compte: CompteSuivi, relation: number, texteRecu: string): string {
@@ -130,6 +161,24 @@ const CLUB = [
   '🚌 Départ pour {le déplacement|l’extérieur} {ce matin|à l’aube}. {Longue route, gros défi.|On y va pour gagner.}',
   '🏉 {Fin de match|Coup de sifflet final} à {adverse}. {On prend le point de bonus.|Rien à ramener.|On s’accroche jusqu’au bout.}',
   '📣 Le président : « {Le club est serein|On assume nos choix|Les résultats viendront}. {Le projet est à trois ans.|Il faut de la patience.} »',
+  '🎂 {Joyeux anniversaire|Bon anniversaire} à {l’un des nôtres|un cadre du groupe} ! {Toute la famille du club te souhaite le meilleur.|Belle journée à toi.}',
+  '🏫 {Nos éducateurs|L’école de rugby} étaient {dans les écoles|au collège} {cette semaine|hier}. {200 gamins initiés.|La relève est là.}',
+  '🛠️ {Travaux|Réfection} {en tribune|sur la pelouse} cette semaine. {Merci de votre patience.|Tout sera prêt pour dimanche.}',
+  '🥇 {Trois|Deux|Quatre} de nos joueurs {retenus|convoqués} {en sélection|avec les jeunes}. {Fierté.|Bravo à eux.}',
+  '📺 {Le match|La rencontre} sera {diffusée|retransmise} {sur la chaîne du club|en direct}. {À {15h|18h05}.|Coup d’envoi à 14h30.}',
+  '🤝 {Nouveau partenaire|Signature} {au club|dans la famille}. {Bienvenue à eux.|Un soutien de plus.}',
+  '😔 {Défaite|Revers} {qui fait mal|difficile à avaler}. {On se reverra.|On travaille dès lundi.}',
+  '🔥 {QUELLE|SUPERBE} {VICTOIRE|SOIRÉE} ! {Merci à tous.|Le stade a poussé jusqu’au bout.} 💚',
+  '📷 {Les coulisses|L’envers du décor} du {vestiaire|match} sont {en ligne|à découvrir}.',
+  '🧵 {Retour|Zoom} sur {la semaine|l’entraînement} : {mêlée, touche, et beaucoup de vidéo.|beaucoup de conquête.}',
+  '⚕️ {Bonne nouvelle|Bon retour} : {un cadre|un titulaire} {reprend la course|est de retour à l’entraînement}.',
+  '🚑 {Mauvaise|Triste} nouvelle — {opération réussie|intervention} {pour l’un des nôtres|hier}. {Bon rétablissement.|On est avec toi.}',
+  '👏 {Merci|Bravo} aux {bénévoles|volontaires} {du week-end|de tous les dimanches}. {Sans eux, rien n’existe.|Le club, c’est eux.}',
+  '🏉 {Nos féminines|L’équipe féminine} {s’imposent|l’emportent} {dimanche|ce week-end}. {Bravo à elles !|Quelle performance.}',
+  '📊 {Chiffres|Statistiques} du match : {88 % de plaquages réussis|12 turnovers gagnés|6 essais inscrits}. {On regarde devant.|On corrige le reste.}',
+  '🎙️ {Réaction|Interview} d’après-match {à écouter|en ligne} : « {On a manqué de patience|Le résultat compte, le contenu aussi} ».',
+  '⚖️ {Commission de discipline|Décision} : {un de nos joueurs suspendu|appel déposé}. {Le club prend acte.|Nous ne commenterons pas.}',
+  '🗺️ {Déplacement|Voyage} des supporters {organisé|en bus} {dimanche|le week-end prochain}. {Inscriptions au club-house.|Il reste des places.}',
 ];
 
 const JOUEUR = [
@@ -143,6 +192,28 @@ const JOUEUR = [
   'Merci pour {tous les messages|le soutien}. {Vous êtes des dingues.|Ça compte plus que vous croyez.} 🙏',
   'Objectif {dimanche|du week-end} : {le point de bonus|gagner, point}. {Rien d’autre.|On parle après.}',
   'On me demande souvent {si je suis prêt|ce que je vise}. Réponse : {je bosse, c’est tout|regardez dimanche}.',
+  '{Réveil|Debout} à {5h30|6h}, {glace|bain froid}, {route|kiné}, {séance|muscu}. {La vie de rêve qu’on imagine. 😴|On adore vraiment.}',
+  '{Les jeunes|Les nouveaux} du groupe {sont impressionnants|poussent fort}. {Ça pique en interne.|Tant mieux, ça tire tout le monde.}',
+  'Petite pensée pour {ma famille|mes parents} qui {font 400 bornes|traversent la France} {chaque week-end|pour me voir jouer}. ❤️',
+  'On a {revu la vidéo|analysé} {trois fois|en boucle}. {Y’a du boulot.|On sait quoi faire.}',
+  '{Le troisième|Le deuxième} {mi-temps|repas} {du dimanche|d’après-match}, {c’est sacré|personne n’y touche}. 🍽️',
+  'Je {lis tout|vois tout} {ce qui se dit|ce que vous écrivez}. {Vraiment tout.|Même les trucs pas sympas.} 👀',
+  '{Objectif|But} de la semaine : {ne pas rater un plaquage|gagner mes duels}. {Simple.|Basique.}',
+  '{Mon kiné|Le doc} me déteste, {je crois|j’en suis sûr}. 😅',
+  'Quand {le stade|la tribune} {chante|pousse} {comme ça|à ce point}, {t’as plus mal nulle part|tu cours deux fois plus vite}.',
+  '{Grosse|Dure} semaine de {reprise|préparation}. {Les cuisses parlent.|Je marche en canard.} 🦆',
+  '{Fier|Heureux} de {porter ce maillot|représenter ce club}. {Vraiment.|Ça n’a pas de prix.}',
+  'On m’a dit {que j’étais trop petit|que je n’y arriverais pas} {à 16 ans|au centre de formation}. {Bref.|Voilà.} 😌',
+  '{Le rugby|Ce sport} c’est {des hauts et des bas|jamais linéaire}. {Là, c’est un bas.|Là, on savoure.}',
+  '{Deux heures|Une heure} de {touches|passes} {en plus|après la séance} {avec le talonneur|avec l’ouvreur}. {Ça paiera.|On verra dimanche.}',
+  '{Repos|Off} {aujourd’hui|ce lundi}. {Canapé, série, rien.|Je bouge pas.} 🛋️',
+  '{Bienvenue|Bon courage} {au petit nouveau|aux recrues}, {le vestiaire est chaud|on va bien s’occuper de lui}. 😈',
+  '{Anniversaire|Fête} {d’un coéquipier|dans le groupe} : {gâteau|chants} {imposés|obligatoires}. {Tradition.|On ne discute pas.} 🎂',
+  'Les {gars|potes} qui {m’écrivent|me soutiennent} {depuis le début|depuis la Fédérale}, {je les oublie pas|vous êtes là}. 🤝',
+  '{Le plus dur|Le vrai boulot} c’est {la semaine|entre les matchs}, {pas dimanche|pas devant les caméras}.',
+  '{Franchement|Sincèrement} {merci|respect} aux {arbitres|éducateurs} {amateurs|bénévoles}. {Sans eux, rien.|On oublie trop souvent.}',
+  '{Je crois|J’ai l’impression} qu’on {tient quelque chose|construit un truc} {cette année|dans ce groupe}.',
+  '{Trois|Deux} {semaines|matchs} sans {marquer|toucher un ballon}, {ça travaille la tête|c’est long}. {On reste sur le boulot.|Ça va revenir.}',
 ];
 
 const JOURNALISTE = [
@@ -153,6 +224,17 @@ const JOURNALISTE = [
   '📌 Ce que j’entends sur {club} : {le staff sera jugé sur les six prochains matchs|la cellule recrutement est déjà au travail}.',
   '{Confirmé|On peut le dire} : {club} a bien pris {contact|des renseignements} pour un {pilier|ouvreur|ailier}. Dossier {loin d’être bouclé|bien avancé}.',
   'Personne n’en parle mais {moi} fait {une saison très solide|des choses intéressantes} en {division}. {Ça se saura.|À suivre de près.}',
+  '🧵 {Enquête|Dossier} — {les finances|le modèle économique} de {club} : {ce qu’on sait|les chiffres que j’ai pu consulter}.',
+  'On me confirme {deux départs|un départ majeur} à {club} {en fin de saison|cet été}. {Noms à venir.|Rien d’officiel pour l’instant.}',
+  '{Le staff|Le manager} de {club} {sera fixé|jouera son avenir} {après la trêve|sur les cinq prochains matchs}.',
+  '{Petite|Grosse} info : {un international|un joueur libre} {s’est entraîné|a visité les installations} à {club} {cette semaine|hier}.',
+  'Ce que {personne ne dit|j’entends} sur {division} : {les budgets s’envolent|l’écart se creuse}. {Ça va casser.|Un jour ou l’autre.}',
+  '🎙️ Mon {entretien|portrait} avec {moi} {est en ligne|paraît demain}. {Un joueur qui parle vrai.|Il ne s’est rien interdit.}',
+  '{Rumeur|Bruit} de couloir : {un dossier chaud|une piste} entre {club} et un club de {division}. {Prudence.|À confirmer.}',
+  '{Ce week-end|Dimanche}, {le match à ne pas rater|l’affiche} : {club} reçoit {adverse}. {J’y serai.|Je vous raconterai.}',
+  '{Formation|Centre de formation} : {club} {sort|a sorti} {trois|quatre} joueurs {du cru|du club} cette saison. {C’est rare.|Ça mérite d’être dit.}',
+  '{Discipline|Commission} : {un dossier|deux dossiers} {en cours|à l’étude} du côté de {club}. {Décision jeudi.|On saura vite.}',
+  '{Attention|À noter} — {la billetterie|le guichet} de {club} {est déjà à sec|part très vite}. {Le club revit.|Ça faisait longtemps.}',
 ];
 
 const MEDIA = [
@@ -162,6 +244,16 @@ const MEDIA = [
   '⭐ Notre équipe type de la journée. {Un joueur de {club} y figure.|Trois clubs sur-représentés.}',
   '💰 {Enquête|Dossier} — combien pèsent vraiment les budgets de {division} ? {Les écarts font peur.|Du simple au quintuple.}',
   '🎙️ Interview à lire : « {On sous-estime le niveau de la {division}|Le rugby amateur tient le pays debout} ».',
+  '📈 {Les chiffres|Le bilan} de la journée : {5,4 essais par match|43 points de moyenne}. {Le rugby n’a jamais été aussi ouvert.|On marque de partout.}',
+  '🏥 {Le point blessures|Infirmerie} de {division} : {douze|neuf} joueurs {absents|sur le flanc} {ce week-end|cette semaine}.',
+  '🔍 {Zoom|Analyse} — {pourquoi la touche|comment la mêlée} {décide|fait basculer} {tant de matchs|les fins de rencontre}.',
+  '🎬 {À revoir|Rediffusion} : {l’essai de la journée|le geste du week-end}. {On ne s’en lasse pas.|Chef-d’œuvre.}',
+  '📚 {Portrait|Rencontre} — {le joueur dont tout le monde parle|celui qu’on n’attendait pas}, {à lire ici|dans nos colonnes}.',
+  '🧢 {Les jeunes|La nouvelle génération} de {division} : {les dix noms à retenir|notre sélection}.',
+  '⚖️ {Arbitrage|Règlement} — {ce qui change|les nouvelles consignes} {cette saison|à partir de janvier}.',
+  '🗓️ {Calendrier|Programme} — {la trêve|la reprise} {tombe le {week-end du 20|premier week-end de janvier}|dans quinze jours}.',
+  '🌍 {Coupes d’Europe|International} — {les clubs français|nos représentants} {ont rendez-vous|jouent gros} {ce week-end|dès vendredi}.',
+  '💬 {La phrase|Le mot} de la semaine : « {On ne gagne pas avec du talent seulement|Le rugby ne pardonne rien} ».',
 ];
 
 const COMPETITION = [
@@ -170,6 +262,12 @@ const COMPETITION = [
   '📈 {Affluence record|Audience en hausse} ce week-end. {Le rugby n’a jamais autant attiré.|Merci à tous.}',
   '⚖️ Décisions de la commission de discipline : {deux|trois} matchs de suspension prononcés.',
   '🗓️ {Calendrier|Programmation} — les horaires de la prochaine journée viennent d’être publiés.',
+  '🎫 {Affluence|Fréquentation} : {plus de 200 000|180 000} spectateurs {ce week-end|sur la journée}. {Record battu.|Merci à tous.}',
+  '🏆 {Le trophée|La coupe} {sera exposé|part en tournée} {dans les clubs amateurs|à la rencontre des écoles de rugby}.',
+  '👶 {Journée|Opération} {école de rugby|jeunes} {ce week-end|dimanche} : {entrée gratuite pour les moins de 12 ans|les licenciés entrent libres}.',
+  '📋 {Désignations|Arbitres} de la prochaine journée {publiées|en ligne}.',
+  '💚 {Fair-play|Respect} — {le geste|l’attitude} de la journée {à revoir ici|est à saluer}.',
+  '🔁 {Modification|Report} — {un match est décalé|une rencontre change d’horaire}. {Détails en ligne.|Merci de votre compréhension.}',
 ];
 
 const FAN = [
@@ -180,6 +278,20 @@ const FAN = [
   '{Arbitrage|L’arbitre} encore {scandaleux|à sens unique} aujourd’hui. {On nous vole.|Ça devient insupportable.}',
   'Mon fils de {6|8|10} ans a demandé le maillot de {moi} pour Noël. {Voilà où on en est.|Fierté.} 🥹',
   'Sérieusement, {qui a validé cette compo|à quoi joue le staff} ? {Je comprends pas.|Expliquez-moi.}',
+  '{45|38|52} ans d’abonnement et {jamais vu ça|toujours là}. {On mourra en {club}.|C’est plus fort que moi.}',
+  '{Debout à 5h|Parti à l’aube} pour {600|450} bornes {aller-retour|de route}. {Et je recommencerai.|Aucun regret.} 🚗',
+  'Ma femme {ne comprend pas|dit que c’est une maladie}. {Elle a raison.|Elle n’a pas tort.} 😅',
+  'Le {pâté|casse-croûte} de la buvette {vaut le déplacement|à lui seul}. {Je le dis.|Vérité.} 🥖',
+  '{L’ambiance|Le stade} {était incroyable|a poussé} {hier|dimanche}. {Merci les gars.|Frissons.} 🔊',
+  '{Faut arrêter|On peut arrêter} de {taper sur les jeunes|critiquer les jeunes}. {Ils font ce qu’ils peuvent.|Ils ont 19 ans.}',
+  '{Quand j’étais gamin|Dans les années 90}, {on jouait sur un terrain en pente|le vestiaire c’était une cabane}. {Bon souvenir.|Vraie époque.}',
+  'Mon {grand-père|père} m’a {emmené ici|abonné} {en 1987|à 6 ans}. {Voilà.|Tout est dit.} ❤️',
+  '{J’ai crié|On a hurlé} {tout le match|pendant 80 minutes}, {plus de voix|extinction de voix} {ce matin|au boulot}. 🗣️',
+  'Ils {peuvent perdre|peuvent tout perdre}, {je serai là|je viendrai quand même}. {Toujours.|C’est comme ça.}',
+  '{Sincèrement|Franchement}, {qui parie sur nous|personne ne nous attend} ? {Tant mieux.|C’est notre force.}',
+  '{Le maillot extérieur|La nouvelle tunique} {est splendide|est une horreur}. {Je le prends.|Je passe mon tour.} 👕',
+  '{Trois|Deux} générations {dans la même tribune|dans la voiture} {ce dimanche|hier}. {C’est ça, le rugby.|Voilà pourquoi on vient.}',
+  '{Ma fille|Mon fils} vient de {prendre sa licence|s’inscrire à l’école de rugby}. {Fier.|Le début d’une longue histoire.} 🥹',
 ];
 
 const HATER = [
@@ -188,11 +300,27 @@ const HATER = [
   'Vous allez voir qu’ils vont encore {perdre|se saborder}. Comme d’habitude.',
   '{moi} qui fait des stories à la salle mais qui est {sur le banc|en tribune} le dimanche. 😂',
   'On m’explique pourquoi {moi} est {titulaire|dans le groupe} ? {Je pose la question.|Non parce que là…}',
+  '{Les chiffres|Les statistiques} de {moi} {sont truquées|ne veulent rien dire}, {regardez les minutes|regardez le contexte}.',
+  'Moi {j’analyse|je regarde} {froidement|objectivement} : {c’est faible|ça ne tient pas}. {Désolé.|C’est comme ça.}',
+  '{Encore|Toujours} {un joueur surcoté|de la surcote} {en {division}|dans ce championnat}.',
+  '{Vous verrez|Rappelez-vous de moi} {dans six mois|en fin de saison}. {Je note tout.|J’aurai raison.}',
+  'Le {niveau|championnat} {baisse|s’effondre} {chaque année|d’année en année}, {et personne ne le dit|silence général}.',
+  '{Le vrai problème|Ce que personne ne veut voir}, c’est {le manque de travail|l’absence d’exigence}. {Point.|Fin du débat.}',
+  '{Bravo|Chapeau} pour {la story à la salle|la photo de muscu}. {Et sur le terrain ?|Et dimanche ?} 🙃',
+  'On m’a bloqué {pour avoir dit la vérité|parce que je dérange}. {Ça en dit long.|Continuez.}',
+  '{J’ai joué|Je jouais} {en Fédérale|au niveau régional}, {donc je sais de quoi je parle|donc si, j’ai le droit}.',
+  '{Zéro|Aucun} {leader|patron} dans cette équipe. {Voilà le fond du problème.|C’est tout.}',
 ];
 
 const SELECTION = [
   '🏳️ Le groupe pour {la prochaine échéance|la tournée} sera annoncé {jeudi|en fin de semaine}.',
   '💬 Le sélectionneur : « {La porte est ouverte à tout le monde|On regarde tous les championnats}. »',
+  '🏳️ {Rassemblement|Mise au vert} {lundi|dès dimanche soir} à {Marcoussis|au centre national}. {31 joueurs convoqués.|Groupe élargi.}',
+  '🩺 {Forfait|Coup dur} — {un cadre|un titulaire} {déclare forfait|quitte le groupe}. {Il est remplacé.|Un jeune est appelé.}',
+  '🎂 {Première|Première convocation} pour {un joueur de {division}|un espoir}. {Belle histoire.|Le travail paie.}',
+  '📣 {Billetterie|Places} {ouvertes|en vente} pour {le prochain test|la tournée d’automne}.',
+  '🏆 {Objectif affiché|Ambition} : {le Grand Chelem|le titre}. {On ne s’en cache pas.|Rien de moins.}',
+  '💬 Le capitaine : « {Porter ce maillot ne se négocie pas|On joue pour ceux qui nous regardent}. »',
 ];
 
 const POOLS: Record<string, string[]> = {
@@ -246,6 +374,11 @@ function contexteDe(sem: Semaine): string[] {
 // le repli hors ligne ; avec une clé, `reponsesGroq` écrit du sur-mesure et
 // vient les remplacer.
 
+// ⚠️ LE POOL A ÉTÉ MULTIPLIÉ PAR CINQ (demande explicite : « rajoute une énorme
+// base de texte »). Avec six gabarits par famille et jusqu'à douze commentaires
+// sous un post, on lisait deux fois la même phrase à l'écran. Ici : une
+// trentaine de gabarits par famille, chacun à deux ou trois alternatives — soit
+// plusieurs centaines de phrases distinctes, et un fil qui ne se répète pas.
 const REACTIONS_POUR = [
   '{Allez|Vamos} ! 💪 {On est derrière vous.|On lâche rien.}',
   '{Enfin|Ça fait plaisir} une bonne nouvelle. 🙌',
@@ -253,6 +386,30 @@ const REACTIONS_POUR = [
   '{Présent|J’y serai} {dimanche|samedi} ! 🎟️',
   'Ça {sent bon|prend forme} cette saison. 🔥',
   '{Meilleur club du monde|Fier du maillot}, point. 💚',
+  '{Voilà|Ça}, c’est du rugby. {Rien à ajouter.|Le reste, c’est du bruit.}',
+  'Je {le dis depuis le début|l’avais dit} : {ce groupe a quelque chose|il y a un truc à faire cette année}.',
+  'Mon {fils|neveu|filleul} va être {fou|content}. {Il ne parle que de ça.|Merci pour lui.}',
+  '{Grosse|Belle} mentalité. {C’est ça qu’on veut voir.|Ça change tout.}',
+  '{Chapeau|Bravo} pour {le boulot de l’ombre|tout ce qu’on ne voit pas}. 🙏',
+  'On {en a bavé|a douté}, mais {on est toujours là|on ne lâche rien}. 💚',
+  '{Abonnement repris|Place réservée} {sans hésiter|les yeux fermés}.',
+  '{Le club|Ce club} mérite {mieux que ce qu’on lit|plus de respect}. Franchement.',
+  '{Ambiance de folie|Stade en fusion} {dimanche|ce week-end}, je le sens. 🔊',
+  'Ceux qui {râlaient|critiquaient} {le mois dernier|en septembre}, on vous entend plus. 😌',
+  '{Bien joué|Beau geste}. {Ça se remarque.|On note.}',
+  'Voilà pourquoi {j’aime ce sport|on aime ce club}. {Simple.|Point final.}',
+  '{Merci|Un grand merci} pour {la fierté|les émotions}. {Vraiment.|Sincèrement.}',
+  'Ça faisait {longtemps|des années} qu’on n’avait pas vu ça {ici|au club}.',
+  '{Le plus dur|La suite} commence maintenant. {On y croit.|Un match à la fois.}',
+  'Je {prends ma carte|renouvelle} {cette semaine|demain}. 🎫',
+  '{Costaud|Solide}. {On construit.|Il y a une base.}',
+  'La {tribune|buvette} va {chanter|trembler} {dimanche|samedi}. 🍺',
+  'Franchement {ça fait plaisir|c’est mérité}, {après tout ce qu’on a pris|vu la saison}.',
+  '{Génération|Groupe} {attachante|attachant}, {rien à dire|c’est tout}.',
+  'Y’a {du cœur|de l’envie} là-dedans. {Ça se voit.|C’est le principal.}',
+  '{On y croit|On y va} {tous ensemble|jusqu’au bout}. 🤝',
+  '{Superbe|Excellente} nouvelle {pour le club|pour la région}. 👏',
+  'Bon bah {plus qu’à|allez}, {on gagne dimanche|on confirme}. 😉',
 ];
 const REACTIONS_CONTRE = [
   '{Mouais|Bof}. {On a déjà entendu ça.|Les paroles c’est bien, les résultats c’est mieux.}',
@@ -261,6 +418,30 @@ const REACTIONS_CONTRE = [
   '{Scandaleux|Honteux}. {J’ai payé pour voir ça.|Remboursez.}',
   'Le {staff|coach} {devrait dégager|est dépassé}, faut le dire.',
   '{Ratio|C’est non}.',
+  '{Ça fait trois ans|Chaque année} qu’on nous {sort ça|raconte la même chose}.',
+  '{Le budget|L’argent} part {où|dans quoi} exactement ? {Question sérieuse.|Je demande.}',
+  'On {est derniers|galère} et {vous communiquez|on fait des stories}. {Bravo.|Génial.}',
+  '{La touche|La mêlée|La défense} {est une catastrophe|ne tient pas} et {personne n’en parle|on regarde ailleurs}.',
+  'Moi je {dis ça|note}, mais {le classement parle|les chiffres sont là}.',
+  '{Franchement|Sérieusement}, {y’a plus d’ambition|on joue pour quoi} ?',
+  '{Encore|Toujours} {des excuses|les mêmes discours}. {Ça suffit.|On s’en lasse.}',
+  'Le {président|club} {ferait mieux de se taire|devrait s’expliquer}. {C’est mon avis.|Point.}',
+  'Quand {on voit le prix des places|on paye 30 balles}, {c’est une insulte|c’est du vol}.',
+  'Ils {sont où|font quoi} les {leaders|cadres} dans ces moments-là ?',
+  '{Zéro|Aucune} {intensité|envie} {depuis septembre|depuis le début}. 🥱',
+  'On me {parle de projet|dit patience} depuis {quatre|cinq} ans. {Le projet, c’est quoi ?|Concrètement ?}',
+  '{Nul|Faible}, et {tout le monde le pense|personne n’ose le dire}.',
+  '{Ça|Le niveau} baisse {chaque saison|d’année en année}, {faut le dire|assumons}.',
+  'Le {marketing|service com} tourne mieux que {l’équipe|le pack}. 😂',
+  'Vous {allez encore|allez sûrement} {perdre|craquer} {en fin de match|dans le money time}.',
+  '{Vraiment|Sincèrement} {déçu|dégoûté}. {Je décroche.|J’arrête de suivre.}',
+  '{Discours|Communiqué} de {façade|circonstance}. {Rien de neuf.|On connaît.}',
+  'On {recrute mal|se trompe} depuis {trois ans|des années} et {ça se voit|voilà le résultat}.',
+  '{Deux|Trois} matchs et {on parlera|on jugera}. {Pas avant.|D’ici là, silence.}',
+  'Le pire c’est que {certains y croient encore|des gens likent}. 🤦',
+  'Y’a {plus d’âme|zéro identité de jeu} dans cette équipe.',
+  '{Bon courage|Bonne chance} aux {abonnés|supporters}, {vraiment|sincèrement}.',
+  '{Aucun|Pas un} {cadre|leader} n’assume {publiquement|devant les caméras}.',
 ];
 const REACTIONS_NEUTRES = [
   '{Quelqu’un sait|On sait} si c’est diffusé quelque part ?',
@@ -268,6 +449,21 @@ const REACTIONS_NEUTRES = [
   '{Info|Vu} ✍️',
   'Ça se joue à quelle heure {déjà|du coup} ?',
   'On verra bien {dimanche|sur le terrain}.',
+  '{Quelqu’un|Y’a quelqu’un qui} y va {en voiture|en bus} ? {Je cherche une place.|Covoiturage ?}',
+  '{Le groupe|La compo} est {sortie|annoncée} ?',
+  'C’est {payant|gratuit} pour les {enfants|moins de 12 ans} ?',
+  '{Rendez-vous|On se retrouve} {à la buvette|au club-house}. 🍻',
+  'Il {pleut|fait froid} {là-bas|chez eux}, {prévoyez|couvrez-vous}. 🌧️',
+  '{Objectivement|Franchement}, {ça se tient|c’est un match ouvert}.',
+  '{Bonne|Belle} {question|remarque}, {j’attends la réponse|je me la posais aussi}.',
+  '{On verra|À voir} {ce que ça donne|sur la durée}.',
+  '{Quelqu’un|On} sait {qui arbitre|s’il y a l’arbitrage vidéo} ?',
+  '{Noté|Enregistré}. {Merci.|Nickel.}',
+  'Y’a {une billetterie en ligne|un guichet sur place} ?',
+  '{Je m’attendais|On s’attendait} à {autre chose|plus}, mais {pourquoi pas|ok}.',
+  '{Première fois|Je viens pour la première fois} {au stade|voir un match}, {des conseils|on se gare où} ?',
+  '{Personne|Quelqu’un} ne parle {des jeunes|du centre de formation} ? {Ils cartonnent.|Ça vaut le coup d’œil.}',
+  '{Match|Rencontre} à {ne pas rater|suivre}, {clairement|c’est sûr}.',
 ];
 
 export function reactionsPour(
@@ -382,8 +578,18 @@ export function filDeLaSemaine(
       ...statsDePost(audienceDe(compte.type, compte.abonnes), rng),
     };
     // Chaque publication a ses commentaires : plus le compte est suivi, plus il
-    // y en a. Un post de club en récolte 4, un supporter anonyme parfois aucun.
-    const nb = post.vues > 40_000 ? 4 : post.vues > 8000 ? 3 : post.vues > 1500 ? 2 : rng() < 0.5 ? 1 : 0;
+    // y en a.
+    // ⚠️ LE PLAFOND ÉTAIT DE QUATRE, QUEL QUE SOIT LE POST (bug signalé en
+    // jeu) : un tweet de club à 800 000 vues affichait autant de réponses qu'un
+    // post à 40 000. Le barème monte maintenant jusqu'à douze, et le pool de
+    // phrases a été multiplié pour tenir la charge sans se répéter.
+    const nb = post.vues > 300_000 ? 12
+      : post.vues > 120_000 ? 10
+        : post.vues > 40_000 ? 8
+          : post.vues > 15_000 ? 6
+            : post.vues > 5000 ? 4
+              : post.vues > 1500 ? 3
+                : rng() < 0.6 ? 2 : 1;
     post.reponses = reactionsPour(post, comptes, nb);
     posts.push(post);
   }
@@ -398,21 +604,41 @@ const AMORCES: Record<string, string[]> = {
     'Salut ! Tu fais quoi cette semaine ? On se cale une séance vidéo ensemble ?',
     'Je viens de voir ton dernier match, t’étais énorme. Continue comme ça. 💪',
     'Franchement le vestiaire parle bien de toi en ce moment. Profite.',
+    'Hé, t’as une minute ? J’ai un truc à te demander, rien de grave. 😅',
+    'Je pensais à toi ce matin. Ça va, la tête ? On sait que c’est dur en ce moment.',
+    'Mon frère, ma mère demande de tes nouvelles. Elle t’adore. 😂',
+    'Dis, tu connais un bon kiné dans le coin ? Le mien me lâche.',
+    'On se fait un padel jeudi ? J’ai réservé au cas où.',
+    'J’ai vu ton nom dans le journal. Fier de toi, sincèrement.',
   ],
   cordial: [
     'Salut, ça va ? Bien remis du week-end ?',
     'Hey, on m’a parlé de toi en bien. Content de te suivre.',
+    'Bonjour ! Petite question : c’est quoi ton programme de muscu en saison ?',
+    'Salut, je voulais juste te dire que ton match de dimanche m’a marqué.',
+    'Tu joues à quel poste exactement ? On m’a dit deux choses différentes. 😅',
+    'Bon courage pour la fin de saison, ça se joue à pas grand-chose.',
   ],
   neutre: [
     'Salut, on ne se connaît pas vraiment mais je suis ton parcours. Bon courage.',
     'Bonjour, une petite question rapide : tu prolonges avec ton club ?',
+    'Bonjour, je fais un travail sur les jeunes joueurs. Vous auriez cinq minutes ?',
+    'Salut. Sans vouloir déranger : tu conseillerais quoi à un gamin de 16 ans ?',
+    'Bonjour, mon fils est un grand fan. Un petit message le rendrait heureux.',
+    'Salut, on a joué l’un contre l’autre en cadets je crois. Tu te souviens ?',
   ],
   froid: [
     'Bon. On va pas se mentir, y’a un froid. Tu comptes faire quelque chose ?',
+    'Je vais être direct : ce que t’as dit, ça ne passe pas.',
+    'On devrait peut-être se parler avant que ça parte plus loin.',
+    'J’espère que t’assumes, parce que moi j’ai pas oublié.',
   ],
   ennemi: [
     'Continue de parler dans les médias, tu vas voir ce que ça donne dimanche.',
     'T’as toujours pas compris à qui tu parlais visiblement.',
+    'On se croise bientôt. J’espère que tu seras aussi bavard.',
+    'Tout le monde a vu ce que t’as écrit. Tout le monde.',
+    'Sérieusement, tu te crois où ? Redescends.',
   ],
 };
 
@@ -442,9 +668,29 @@ export const INVITATIONS = [
   'On mange ensemble {quand} ? J’ai deux ou trois trucs à te dire sur le jeu au pied.',
   'Le kiné a une place libre {quand}. Je te la laisse, t’en as plus besoin que moi.',
   'Petit tournoi de belote au club-house {quand}. Tu joues ou t’as peur ?',
+  'Karting {quand} avec les trois-quarts. Les avants sont pas invités. 😂',
+  'Je passe chercher les nouveaux crampons {quand}, tu veux que je te prenne les tiens ?',
+  'Séance piscine {quand} pour la récup. Ça fait un bien fou, viens.',
+  'On monte voir le match des espoirs {quand}. Y’a deux gamins qui valent le coup.',
+  'Repas des partenaires {quand}, le club cherche des joueurs pour représenter. T’es dispo ?',
+  'Randonnée {quand} avec les familles. Ça décompresse, promis c’est pas une séance.',
+  'Le club-house diffuse le match international {quand}. On se cale devant ?',
+  'Je fais un barbecue de fin de bloc {quand}. Tu ramènes juste la salade.',
+  'Séance touches {quand} avec le talonneur. Il a besoin d’un sauteur, ça te dit ?',
+  'On va dédicacer des maillots à la boutique {quand}. Deux heures, pas plus.',
+  'Petit foot en salle {quand}, interdit aux piliers (règle du club). 😄',
+  'Je vais chez le coiffeur {quand}, celui qui coupe toute l’équipe. Je te cale un créneau ?',
+  'Le coach des jeunes cherche un parrain pour les moins de 14 ans {quand}. J’ai pensé à toi.',
+  'Concert au village {quand}. Faut sortir du rugby cinq minutes, viens.',
+  'On répare la buvette {quand}, le club a besoin de bras. Une heure suffit.',
+  'Session vidéo perso {quand} : j’ai monté tes vingt derniers ballons. Ça t’intéresse ?',
 ];
 
-export const QUAND = ['lundi', 'mardi soir', 'mercredi', 'jeudi midi', 'ce week-end', 'après l’entraînement'];
+export const QUAND = [
+  'lundi', 'mardi soir', 'mercredi', 'jeudi midi', 'ce week-end',
+  'après l’entraînement', 'dimanche soir', 'vendredi', 'demain matin',
+  'la semaine prochaine', 'ce soir', 'samedi midi',
+];
 
 // Un coéquipier t'écrit pour proposer quelque chose. Déterministe.
 export function invitationCoequipier(cleUnique: string): string {

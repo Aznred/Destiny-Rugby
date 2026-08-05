@@ -120,20 +120,37 @@ console.log('\n=== 7. COMMENTAIRES ET REPOSTS ===');
   const cible = useGame.getState().posts.find((p) => !p.moi)!;
   console.log(`  post visé : @${cible.pseudo} — « ${cible.texte.slice(0, 50)}… »`);
 
+  const avantCommentaires = cible.reponses?.length ?? 0;
   await useGame.getState().repondreAuPost(cible.id, 'Franchement t’es nul, ferme-la.');
   const apres = useGame.getState().posts.find((p) => p.id === cible.id)!;
-  console.log(`  → ${apres.reponses?.length ?? 0} réponses ; la mienne : « ${apres.reponses?.[0]?.texte} »`);
-  console.log(`  ← riposte : « ${apres.reponses?.[1]?.texte} » (hostile : ${apres.reponses?.[1]?.hostile})`);
+  const fil = apres.reponses ?? [];
+  // ⚠️ Les deux DERNIÈRES réponses sont la mienne puis la riposte : le post
+  // arrive maintenant avec ses propres commentaires (jusqu'à douze), on ne peut
+  // plus lire les index 0 et 1.
+  const mienne = fil[fil.length - 2];
+  const riposte = fil[fil.length - 1];
+  console.log(`  → ${fil.length} réponses (${avantCommentaires} avant la mienne)`);
+  console.log(`  ma réponse : « ${mienne?.texte} » (moi : ${mienne?.moi})`);
+  console.log(`  ← riposte : « ${riposte?.texte} » (hostile : ${riposte?.hostile})`);
   console.log(`  relation avec @${cible.pseudo} : ${useGame.getState().relationsSociales[cible.pseudo]}`);
-  const rep = apres.reponses![0];
+  const rep = fil[0];
   console.log(`  compteurs de la réponse : ${rep.vues} vues / ${rep.likes} likes / ${rep.reposts} reposts — cohérents : ${rep.vues >= rep.likes && rep.likes >= rep.reposts}`);
 
+  // ⚠️ REPOSTER PUIS DÉ-REPOSTER DOIT TOUT REMETTRE EN PLACE — vues comprises.
+  // Bug signalé en jeu : « on peut republier / dé-republier et ça augmente les
+  // vues à l'infini ». On fait donc trois allers-retours et on compare.
   const avantR = apres.reposts;
-  useGame.getState().reposter(cible.id);
-  const r1 = useGame.getState().posts.find((p) => p.id === cible.id)!;
-  useGame.getState().reposter(cible.id);
-  const r2 = useGame.getState().posts.find((p) => p.id === cible.id)!;
-  console.log(`  repost : ${avantR} → ${r1.reposts} (repostée=${r1.repostee}) → ${r2.reposts} (repostée=${r2.repostee})`);
+  const avantV = apres.vues;
+  let pic = 0;
+  for (let i = 0; i < 3; i++) {
+    useGame.getState().reposter(cible.id);
+    pic = Math.max(pic, useGame.getState().posts.find((p) => p.id === cible.id)!.vues);
+    useGame.getState().reposter(cible.id);
+  }
+  const fin = useGame.getState().posts.find((p) => p.id === cible.id)!;
+  const stable = fin.reposts === avantR && fin.vues === avantV;
+  console.log(`  repost ×3 aller-retour : ${avantR} → pic ${pic} vues → retour ${fin.reposts} reposts / ${fin.vues} vues`);
+  console.log(`  ${stable ? '✅' : '❌'} compteurs revenus à l’identique (vues ${avantV}, reposts ${avantR})`);
 }
 
 console.log('\n=== 8. IMAGES : REPLI SANS RÉSEAU ===');

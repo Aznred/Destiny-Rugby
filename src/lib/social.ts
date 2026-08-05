@@ -133,7 +133,8 @@ export function statsDePost(abonnes: number, rng: () => number, viralite = 1): S
 
 export interface Retombees {
   post: PostSocial;
-  gainAbonnes: number;
+  gainAbonnes: number; // NET : il peut être négatif après un dérapage
+  desabonnes: number; // combien de comptes t'ont lâché à cause de ce post
   deltas: { reputation: number; moral: number; argent: number };
   coach: number;
   fans: number;
@@ -164,23 +165,42 @@ export function publierPost(
 
   const hostiles = Math.min(0.9, ton.ratio + (grossier ? 0.25 : 0) - (j.popularite ?? 50) / 400);
 
-  // Réponses : entre 3 et 5, choisies parmi des comptes distincts.
-  const nb = 3 + Math.floor(rng() * 3);
+  // ⚠️ LE NOMBRE DE RÉPONSES SUIT L'AUDIENCE (bug signalé : « max 4 commentaires
+  // sous les posts »). C'était 3 à 5, quel que soit le nombre de vues : une
+  // star à 500 000 vues récoltait autant de réponses qu'un joueur de Fédérale.
+  // On monte jusqu'à douze, ce que le pool élargi de `data/social.ts` peut
+  // maintenant alimenter sans se répéter.
+  const nb = Math.min(
+    COMPTES.length,
+    vues > 200_000 ? 10 + Math.floor(rng() * 3)
+      : vues > 60_000 ? 8 + Math.floor(rng() * 3)
+        : vues > 15_000 ? 6 + Math.floor(rng() * 3)
+          : vues > 4000 ? 4 + Math.floor(rng() * 3)
+            : 3 + Math.floor(rng() * 3),
+  );
   const dispo = [...COMPTES];
   const reponses: PostSocial[] = [];
+  const dejaDit = new Set<string>();
   for (let i = 0; i < nb && dispo.length; i++) {
     const compte = dispo.splice(Math.floor(rng() * dispo.length), 1)[0];
     const hostile =
       compte.type === 'hater' ? rng() < 0.85 : compte.type === 'fan' ? rng() < hostiles * 0.7 : rng() < hostiles;
     const pool = hostile ? REPONSES_NEGATIVES[compte.type] : REPONSES_POSITIVES[compte.type];
     if (!pool?.length) continue;
+    // Deux fois la même phrase sous le même post, ça se voit tout de suite.
+    let texte = remplacer(piocher(pool, rng), j);
+    for (let essai = 0; essai < 6 && dejaDit.has(texte); essai++) {
+      texte = remplacer(piocher(pool, rng), j);
+    }
+    if (dejaDit.has(texte)) continue;
+    dejaDit.add(texte);
     reponses.push({
       id: `${idPost}-r${i}`,
       auteur: compte.nom,
       pseudo: compte.pseudo,
       avatar: avatarPourCompte(compte.nom, compte.type === 'coequipier' ? 'joueur' : compte.type),
       certifie: compte.certifie,
-      texte: remplacer(piocher(pool, rng), j),
+      texte,
       saison: j.saison,
       semaine: j.semaine ?? 1,
       date: libelleDate(sem),
@@ -206,9 +226,27 @@ export function publierPost(
     reponses,
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // ⚠️ ON PERD DES ABONNÉS QUAND ON DIT N'IMPORTE QUOI (demande explicite).
+  // Publier ne faisait QUE gagner des abonnés, quel que soit le contenu : on
+  // pouvait insulter la terre entière et voir son compte grossir. Trois causes
+  // de désabonnement, cumulables :
+  //   • le DÉRAPAGE (le club convoque) : une vraie hémorragie ;
+  //   • les MOTS INTERDITS, même sans dérapage : ça se voit tout de suite ;
+  //   • une TIMELINE HOSTILE (un ton clivant sur un joueur peu populaire) :
+  //     l'érosion lente, celle qu'on ne remarque qu'à la fin de la saison.
+  // La perte est proportionnelle à l'audience : plus on est suivi, plus on a à
+  // perdre. Un débutant à 200 abonnés ne perd pas 20 000 personnes.
+  const partPerdue =
+    (derape ? 0.06 + rng() * 0.07 : 0)
+    + (grossier ? 0.03 + rng() * 0.04 : 0)
+    + Math.max(0, hostiles - 0.4) * 0.06;
+  const desabonnes = Math.round(abonnes * Math.min(0.22, partPerdue));
+
   const retombees: Retombees = {
     post,
-    gainAbonnes,
+    gainAbonnes: gainAbonnes - desabonnes,
+    desabonnes,
     deltas: {
       reputation: ton.deltas.reputation ?? 0,
       moral: ton.deltas.moral ?? 0,

@@ -2,6 +2,7 @@
 // ⚠️ createPortal(document.body) obligatoire : le backdrop-filter des .carte
 // crée un bloc conteneur qui piègerait la modale en position: fixed.
 import { createPortal } from 'react-dom';
+import { t } from '../lib/i18n';
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../store/useGame';
@@ -72,8 +73,8 @@ export function Offres() {
           >
             <div className="offres-tete">
               <div>
-                <div className="eyebrow">Marché des transferts</div>
-                <h2>✈️ Choix de carrière</h2>
+                <div className="eyebrow">{t('of.eyebrow')}</div>
+                <h2>✈️ {t('of.titre')}</h2>
               </div>
               <button className="offres-fermer" onClick={fermer} title="Fermer">✕</button>
             </div>
@@ -97,7 +98,7 @@ export function Offres() {
 
             {/* LOT 6 — ton agent : il prend sa part, mais il ouvre les portes. */}
             <div className="agents-choix">
-              <div className="eyebrow">🤝 Ton agent</div>
+              <div className="eyebrow">🤝 {t('of.agent')}</div>
               <div className="agents-liste">
                 {AGENTS.map((a) => (
                   <button
@@ -169,7 +170,7 @@ function CarteOffre({
           <div className="offre-division">
             <LogoCompet id={offre.division} emoji="🏉" taille={16} /> {offre.divisionNom}
             {offre.etranger && <span className="offre-tag">🌍 {offre.pays}</span>}
-            {actuel && <span className="offre-tag offre-tag-fidele">Ton club</span>}
+            {actuel && <span className="offre-tag offre-tag-fidele">{t('of.tonClub')}</span>}
           </div>
         </div>
         <span className="club-note" title="Note générale du club">{offre.noteClub}</span>
@@ -179,7 +180,7 @@ function CarteOffre({
 
       <div className="offre-chiffres">
         <div>
-          <span>Salaire</span>
+          <span>{t('of.salaire')}</span>
           <b>{offre.salaire.toLocaleString('fr-FR')} €</b>
         </div>
         <div>
@@ -187,7 +188,7 @@ function CarteOffre({
           <b>{offre.prime.toLocaleString('fr-FR')} €</b>
         </div>
         <div>
-          <span>Durée</span>
+          <span>{t('of.duree')}</span>
           <b>{offre.saisons} saison{offre.saisons > 1 ? 's' : ''}</b>
         </div>
       </div>

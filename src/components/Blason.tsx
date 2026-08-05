@@ -116,7 +116,12 @@ export function LogoEquipe({ nom, logo, taille = 28 }: { nom: string; logo?: str
       title={nom}
       width={taille}
       height={taille}
-      loading="lazy"
+      // ⚠️ PAS DE `loading="lazy"` ICI. Même leçon que pour les avatars de
+      // L'Ovale : sur des vignettes de 40 px empilées dans un conteneur en
+      // `content-visibility: auto` (les blocs de l'atlas), le navigateur ne
+      // déclenche jamais le chargement et la liste des sélections reste pleine
+      // de cases vides. Il n'y a que ~41 écussons de sélection dans tout le
+      // jeu : les charger tout de suite ne coûte rien.
       decoding="async"
       style={{ width: taille, height: taille }}
     />

@@ -7,9 +7,20 @@ for (let n = 0; n < 100; n++) {
   g().reinitialiser();
   g().creerJoueur({ nom: 'T', poste: 'deuxieme_centre', nation: 'France', club: 'Stade Nantais', division: 'nationale2', age: 18 });
   for (let s = 0; s < 12; s++) {
+    // ⚠️ UN CONTRAT ARRIVÉ À TERME BLOQUE LA SAISON tant qu'on n'a pas signé
+    // (voir `saisonSuivante` : « on ne joue pas une saison sans contrat »). En
+    // jeu, le joueur signe dans le panneau puis relance ; le script doit faire
+    // pareil, sinon il compte une saison qui n'a jamais été jouée et
+    // l'étalonnage de difficulté s'effondre artificiellement.
+    const avant = g().joueur?.saison ?? 0;
     g().saisonSuivante();
-    const o = g().offres;
+    let o = g().offres;
     if (o.length) g().signerOffre(o[0].id);
+    if ((g().joueur?.saison ?? 0) === avant) {
+      g().saisonSuivante();
+      o = g().offres;
+      if (o.length) g().signerOffre(o[0].id);
+    }
     useGame.setState({ tropheesEnAttente: [], offresOuvertes: false });
   }
   const j = g().joueur!;

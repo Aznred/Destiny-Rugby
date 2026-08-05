@@ -1,20 +1,25 @@
 import { Suspense, lazy, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
-import { SKINS, BOOSTS, PACKS } from '../data/boutique';
+import { SKINS, PACKS } from '../data/boutique';
+import { t } from '../lib/i18n';
 
 const Apercu3D = lazy(() =>
   import('../components/Hero3D').then((m) => ({ default: m.Hero3D })),
+);
+// ⚠️ Une vignette par article, chargée à la demande comme le grand aperçu : la
+// boutique est déjà un écran paresseux, on ne veut pas que ses cinq petits
+// canvas partent dans le chunk principal.
+const Vignette = lazy(() =>
+  import('../components/VignetteBallon').then((m) => ({ default: m.VignetteBallon })),
 );
 
 export function Boutique() {
   const coins = useGame((s) => s.coins);
   const inventaire = useGame((s) => s.inventaire);
   const skinActif = useGame((s) => s.skinActif);
-  const joueur = useGame((s) => s.joueur);
   const acheterSkin = useGame((s) => s.acheterSkin);
   const choisirSkin = useGame((s) => s.choisirSkin);
-  const acheterBoost = useGame((s) => s.acheterBoost);
   const [apercu, setApercu] = useState(skinActif);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -32,8 +37,8 @@ export function Boutique() {
     >
       <div className="tete-boutique">
         <div>
-          <div className="eyebrow">Boutique</div>
-          <h1>Personnalise ta légende</h1>
+          <div className="eyebrow">{t('bo.titre')}</div>
+          <h1>{t('bo.chapo')}</h1>
         </div>
         <div className="solde">🪙 <b>{coins}</b> Ovas</div>
       </div>
@@ -48,24 +53,24 @@ export function Boutique() {
           </Suspense>
         </div>
         <div className="apercu-info">
-          <div className="eyebrow">Aperçu</div>
+          <div className="eyebrow">{t('bo.apercu')}</div>
           <h2>{SKINS.find((s) => s.id === apercu)?.nom}</h2>
           <p style={{ color: 'var(--craie-dim)' }}>
-            Le skin choisi s'affiche partout dans le jeu (accueil & boutique).
+            {t('bo.apercuAide')}
           </p>
           {inventaire.includes(apercu) ? (
             skinActif === apercu ? (
-              <span className="badge-cle ok">✓ Équipé</span>
+              <span className="badge-cle ok">✓ {t('bo.equipe')}</span>
             ) : (
-              <button className="btn primaire" onClick={() => { choisirSkin(apercu); message('Skin équipé !'); }}>
-                Équiper
+              <button className="btn primaire" onClick={() => { choisirSkin(apercu); message(t('bo.equipeMsg')); }}>
+                {t('bo.equiper')}
               </button>
             )
           ) : null}
         </div>
       </div>
 
-      <div className="eyebrow section-titre">Ballons</div>
+      <div className="eyebrow section-titre">{t('bo.ballons')}</div>
       <div className="grille-boutique">
         {SKINS.map((s) => {
           const possede = inventaire.includes(s.id);
@@ -77,13 +82,18 @@ export function Boutique() {
               onMouseEnter={() => setApercu(s.id)}
               onClick={() => setApercu(s.id)}
             >
-              <div className="pastille-couleur" style={{ background: `linear-gradient(135deg, ${s.corps}, ${s.bande})` }} />
+              {/* Le VRAI ballon, en 3D, qui tourne — plus une pastille de couleur. */}
+              <Suspense fallback={
+                <div className="pastille-couleur" style={{ background: `linear-gradient(135deg, ${s.corps}, ${s.bande})` }} />
+              }>
+                <Vignette skinId={s.id} />
+              </Suspense>
               <div className="article-nom">{s.nom}</div>
               {equipe ? (
-                <span className="badge-cle ok">Équipé</span>
+                <span className="badge-cle ok">{t('bo.equipe')}</span>
               ) : possede ? (
-                <button className="btn fantome petit" onClick={(e) => { e.stopPropagation(); choisirSkin(s.id); message('Skin équipé !'); }}>
-                  Équiper
+                <button className="btn fantome petit" onClick={(e) => { e.stopPropagation(); choisirSkin(s.id); message(t('bo.equipeMsg')); }}>
+                  {t('bo.equiper')}
                 </button>
               ) : (
                 <button
@@ -92,7 +102,7 @@ export function Boutique() {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (acheterSkin(s.id)) message(`${s.nom} débloqué et équipé !`);
-                    else message('Pas assez d’Ovas.');
+                    else message(t('bo.pasAssez'));
                   }}
                 >
                   🪙 {s.prix}
@@ -103,32 +113,14 @@ export function Boutique() {
         })}
       </div>
 
-      <div className="eyebrow section-titre">Boosts (nécessitent une carrière en cours)</div>
-      <div className="grille-boutique">
-        {BOOSTS.map((b) => (
-          <div key={b.id} className="carte article boost">
-            <div className="boost-emoji">{b.emoji}</div>
-            <div className="article-nom">{b.nom}</div>
-            <p className="boost-desc">{b.desc}</p>
-            <button
-              className="btn vert petit"
-              disabled={!joueur || coins < b.prix}
-              onClick={() => {
-                if (acheterBoost(b.id)) message(`${b.nom} appliqué !`);
-                else message(joueur ? 'Pas assez d’Ovas.' : 'Commence une carrière d’abord.');
-              }}
-            >
-              🪙 {b.prix}
-            </button>
-          </div>
-        ))}
-      </div>
+      {/* ⚠️ LES BOOSTS ONT ÉTÉ RETIRÉS (demande explicite). Acheter +2 à tous
+          les attributs contredisait frontalement la difficulté du jeu, calibrée
+          au dixième de point dans `lib/progression.ts` : on ne monte pas sa
+          générale à la caisse. La boutique ne vend plus que du cosmétique. */}
 
-      <div className="eyebrow section-titre">Recharges d’Ovas</div>
+      <div className="eyebrow section-titre">{t('bo.recharges')}</div>
       <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
-        Le paiement réel n'est pas activé (démo). Les Ovas sont <b>rares</b> :
-        elles se gagnent petit à petit en jouant — actions, situations, saisons,
-        et carrières menées au bout. Chaque achat se mérite&nbsp;!
+        {t('bo.demoAide')}
       </p>
       <div className="grille-boutique">
         {PACKS.map((p) => (

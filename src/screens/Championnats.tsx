@@ -8,11 +8,20 @@ import { SELECTIONS_SENIOR, SELECTIONS_U20, type Selection } from '../data/selec
 import { Drapeau, aDrapeau } from '../components/Drapeau';
 import { LogoCompet } from '../components/LogoCompet';
 import { NOTE_CLUB_REEL } from '../data/effectifsReels';
+import { NOTE_CLUB_NOUVEAU } from '../data/nouvellesLigues';
 import { Blason, LogoEquipe } from '../components/Blason';
 import { FicheClub } from '../components/FicheClub';
 import type { Club } from '../types';
+import { t, tn } from '../lib/i18n';
 
 type Zone = 'France' | 'Monde' | 'Nations';
+
+// La note affichée sur la carte d'un club : celle de la base d'origine, sinon
+// celle des nouvelles ligues. Rien pour les clubs amateurs — leur « note » ne
+// serait que le niveau de leur division, ça n'apprendrait rien.
+function noteAffichee(nom: string): number | undefined {
+  return NOTE_CLUB_REEL[nom] ?? NOTE_CLUB_NOUVEAU[nom];
+}
 
 export function Championnats() {
   const [zone, setZone] = useState<Zone>('France');
@@ -29,23 +38,21 @@ export function Championnats() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="eyebrow">Clubs & Championnats</div>
-      <h1>🌍 L'atlas de l'ovalie</h1>
+      <div className="eyebrow">{t('ch.eyebrow')}</div>
+      <h1>🌍 {t('ch.titre')}</h1>
       <p style={{ color: 'var(--craie-dim)', maxWidth: '64ch', margin: '0.6rem 0 1.2rem' }}>
-        La pyramide française du Top 14 à la Fédérale 3, les grands championnats
-        du monde et les sélections nationales. <b>Clique sur un club</b> pour
-        ouvrir son effectif complet.
+        {t('ch.chapo')}
       </p>
 
       <div className="onglets">
         <button className={zone === 'France' ? 'actif' : ''} onClick={() => setZone('France')}>
-          🇫🇷 France
+          🇫🇷 {t('ch.france')}
         </button>
         <button className={zone === 'Monde' ? 'actif' : ''} onClick={() => setZone('Monde')}>
-          🌐 Monde
+          🌐 {t('ch.monde')}
         </button>
         <button className={zone === 'Nations' ? 'actif' : ''} onClick={() => setZone('Nations')}>
-          🏳️ Sélections
+          🏳️ {t('ch.selections')}
         </button>
       </div>
 
@@ -82,15 +89,15 @@ export function Championnats() {
       {zone === 'Nations' && (
         <>
           <BlocSelections
-            titre="Sélections séniors"
+            titre={t('ch.seniors')}
             emoji="🏳️"
-            note="Les équipes nationales premières — une seule par pays : ni équipes A, ni XV, ni sélections d'invitation."
+            note={t('ch.noteSeniors')}
             selections={SELECTIONS_SENIOR}
           />
           <BlocSelections
-            titre="Sélections U20"
+            titre={t('ch.u20')}
             emoji="🌱"
-            note="Les moins de 20 ans : la pépinière où se repèrent les futurs internationaux."
+            note={t('ch.noteU20')}
             selections={SELECTIONS_U20}
           />
         </>
@@ -123,7 +130,7 @@ function BlocSelections({
           <span className="comp-emoji">{emoji}</span>
           <b>{titre}</b>
         </div>
-        <span className="comp-count">{selections.length} sélections</span>
+        <span className="comp-count">{selections.length} {t('ch.selections')}</span>
       </div>
       <div className="comp-note">ℹ️ {note}</div>
 
@@ -134,7 +141,7 @@ function BlocSelections({
             <div style={{ minWidth: 0 }}>
               <div className="club-nom">{sel.nom}</div>
               <div className="club-ville">
-                {sel.competitions.length} compétition{sel.competitions.length > 1 ? 's' : ''}
+                {tn('ch.competitions', sel.competitions.length, { n: sel.competitions.length })}
               </div>
             </div>
             {aDrapeau(sel.nation) && <Drapeau nation={sel.nation} taille={1.15} />}
@@ -170,7 +177,7 @@ function BlocCompetition({
             {pays}
           </span>
         </div>
-        <span className="comp-count">{clubs.length} clubs</span>
+        <span className="comp-count">{clubs.length} {t('gen.clubs')}</span>
       </div>
       {note && <div className="comp-note">ℹ️ {note}</div>}
 
@@ -181,16 +188,22 @@ function BlocCompetition({
             type="button"
             className="club-carte"
             onClick={() => onClub(club)}
-            title={`Voir l'effectif de ${club.nom}`}
+            title={`${t('ch.voirEffectif')} — ${club.nom}`}
           >
             <Blason club={club} taille={40} />
             <div style={{ minWidth: 0 }}>
               <div className="club-nom">{club.nom}</div>
               {club.ville && <div className="club-ville">{club.ville}</div>}
             </div>
-            {NOTE_CLUB_REEL[club.nom] !== undefined && (
-              <span className="club-note" title="Note générale du club">
-                {NOTE_CLUB_REEL[club.nom]}
+            {/* ⚠️ LA NOTE DES CLUBS DES NOUVELLES LIGUES MANQUAIT (retour de
+                jeu). L'atlas ne lisait que `NOTE_CLUB_REEL` — les 143 clubs de
+                la base d'origine. Les 183 clubs des 18 championnats ajoutés ont
+                leur propre table, `NOTE_CLUB_NOUVEAU`, calculée sur leur vrai
+                classement : la Didi 10 et la Serie A Elite s'affichaient donc
+                sans aucune note. */}
+            {noteAffichee(club.nom) !== undefined && (
+              <span className="club-note" title={t('ch.noteClub')}>
+                {noteAffichee(club.nom)}
               </span>
             )}
           </button>

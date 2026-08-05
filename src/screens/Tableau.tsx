@@ -9,6 +9,7 @@
 //      en coupe), affiché dès que la phase régulière est terminée.
 
 import { useMemo, useState } from 'react';
+import { t } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame, bonusClubDuJoueur } from '../store/useGame';
 import {
@@ -433,8 +434,8 @@ export function Tableau() {
       <button className="btn fantome" onClick={() => setEcran('carriere')} style={{ marginBottom: '1rem' }}>
         ← Retour à la carrière
       </button>
-      <div className="eyebrow">{semActuelle.libelle} · saison {joueur.saison}</div>
-      <h1>📊 Résultats en direct</h1>
+      <div className="eyebrow">{semActuelle.libelle} · {t('gen.saison').toLowerCase()} {joueur.saison}</div>
+      <h1>📊 {t('tb.titre')}</h1>
 
       <div className="barre-competitions">
         <div className="barre-selecteur">

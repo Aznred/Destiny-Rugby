@@ -70,6 +70,71 @@ export interface Convocation {
   marge: number; // > 0 = titulaire indiscutable, < 0 = trop juste
 }
 
+// ---------------------------------------------------------------------------
+// LES MOINS DE 20 ANS
+// ---------------------------------------------------------------------------
+// ⚠️ Demande explicite : « rajoute les compétitions U20, convocation des joueurs
+// U20 donc les meilleurs joueurs U20 de chaque pays ».
+//
+// C'est une VRAIE sélection, pas un lot de consolation : on y entre parce qu'on
+// est parmi les meilleurs de son âge dans son pays, et on en sort mécaniquement
+// à 21 ans. Deux différences avec les séniors :
+//   • la concurrence ne se compte que parmi les joueurs de 20 ans ou moins ;
+//   • le palier de la nation est abaissé — un U20 français n'a pas le niveau
+//     d'un titulaire du XV de France, et c'est normal.
+export const AGE_MAX_U20 = 20;
+
+// Un espoir n'a pas à valoir un international A. L'écart mesuré entre un XV
+// national et son équipe U20 tourne autour de quinze points de note.
+const REMISE_U20 = 15;
+
+const cacheEspoirs = new Map<string, number[]>();
+
+function meilleursEspoirs(nation: string, famille: string, saison: number): number[] {
+  const cle = 'u20#' + nation + '#' + famille + '#' + saison;
+  const memo = cacheEspoirs.get(cle);
+  if (memo) return memo;
+  const notes: number[] = [];
+  for (const effectif of Object.values(EFFECTIFS_REELS)) {
+    for (const joueur of effectif) {
+      if (joueur.poste !== famille) continue;
+      if (nomNation(joueur.nation) !== nation) continue;
+      const age = joueur.age + saison - 1;
+      if (age > AGE_MAX_U20) continue;
+      notes.push(noteALAge(joueur.note, joueur.age, joueur.potentiel, age, 0.5));
+    }
+  }
+  notes.sort((a, b) => b - a);
+  cacheEspoirs.set(cle, notes);
+  return notes;
+}
+
+export function estEligibleU20(j: Joueur): boolean {
+  return j.age <= AGE_MAX_U20;
+}
+
+/** La convocation chez les moins de 20 ans. Renvoie `selectionne: false` d'office
+ *  passé l'âge : à 21 ans, la porte est fermée, définitivement. */
+export function convocationU20(j: Joueur, alea = Math.random(), saison = j.saison): Convocation {
+  const niveau = niveauInternational(j);
+  if (!estEligibleU20(j)) {
+    return { selectionne: false, niveau, exige: Infinity, marge: -Infinity };
+  }
+  const nation = nomNation(j.nation);
+  const famille = POSTE_PAR_ID[j.poste].famille;
+  const concurrents = meilleursEspoirs(nation, famille, saison);
+  // Trois places par poste : un groupe U20 tourne plus qu'un XV national.
+  const barreConcurrence = concurrents.length >= 3 ? concurrents[2] - 1 : 0;
+  const exige = Math.max(niveauExige(j.nation) - REMISE_U20, barreConcurrence);
+  const marge = niveau - exige;
+  let selectionne: boolean;
+  if (marge >= 3) selectionne = true;
+  else if (marge <= -6) selectionne = false;
+  else selectionne = alea < 0.5 + marge / 12;
+  if (selectionne && j.forme < 40) selectionne = alea > 0.6;
+  return { selectionne, niveau, exige, marge };
+}
+
 // Le sélectionneur tranche : au-dessus du palier c'est oui, juste en dessous
 // c'est une question de forme et de concurrence (part de hasard).
 export function convocation(j: Joueur, alea = Math.random(), saison = j.saison): Convocation {
