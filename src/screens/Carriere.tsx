@@ -1,10 +1,27 @@
+// L'ÉCRAN DE CARRIÈRE — le récit, semaine après semaine
+//
+// ⚠️ LA BOUCLE A CHANGÉ (demande explicite) : « au lieu d'avoir des boutons,
+// chaque semaine Groq sort un évènement ; le joueur répond en écrivant et Groq
+// juge la réponse — il doit être très sévère et prendre en compte les stats ;
+// sinon, juste des scénarios et des réponses à choix multiples ».
+//
+// Trois états possibles, jamais deux à la fois :
+//   · `evenementHebdo`  → une scène attend une RÉPONSE ÉCRITE (mode avec clé) ;
+//   · `scenarioActif`   → une situation attend un CLIC (mode hors ligne) ;
+//   · rien              → le joueur écrit l'action libre de son choix.
+//
+// ⚠️ C'est l'ÉCRAN qui fabrique la scène, pas le store : l'appel à Groq est
+// asynchrone et le store est synchrone. `semaineSuivante()` lève donc un
+// drapeau (`attenteEvenement`) que cet écran consomme.
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useGame, MAX_PAR_SAISON } from '../store/useGame';
+import { useGame, BUDGET_IA_PAR_SAISON } from '../store/useGame';
 import { PanneauJoueur } from '../components/PanneauJoueur';
 import { ClassementLateral } from '../components/ClassementLateral';
 import { demanderAuMJ, CLE_ENV } from '../lib/groq';
-import { genererSituation } from '../lib/ia';
+import { genererEvenementHebdo, jugerReaction } from '../lib/ia';
+import { semaine, libelleDate } from '../data/calendrier';
 import { ATTRIBUTS_LABELS } from '../data/rugby';
 import type { EntreeJournal } from '../types';
 
@@ -25,11 +42,17 @@ export function Carriere({ onReglages }: Props) {
   const groqKey = useGame((s) => s.groqKey);
   const modele = useGame((s) => s.modele);
   const appliquerReponse = useGame((s) => s.appliquerReponse);
-  const poserSituation = useGame((s) => s.poserSituation);
   const lancerScenario = useGame((s) => s.lancerScenario);
   const resoudreChoix = useGame((s) => s.resoudreChoix);
   const scenarioActif = useGame((s) => s.scenarioActif);
   const compteurs = useGame((s) => s.compteurs);
+  // Le récit de la semaine
+  const attenteEvenement = useGame((s) => s.attenteEvenement);
+  const evenementHebdo = useGame((s) => s.evenementHebdo);
+  const evenementsVus = useGame((s) => s.evenementsVus);
+  const poserEvenementHebdo = useGame((s) => s.poserEvenementHebdo);
+  const appliquerJugement = useGame((s) => s.appliquerJugement);
+  const abandonnerEvenement = useGame((s) => s.abandonnerEvenement);
   const cle = groqKey || CLE_ENV;
 
   const [texte, setTexte] = useState('');
@@ -37,6 +60,10 @@ export function Carriere({ onReglages }: Props) {
   const [erreur, setErreur] = useState<string | null>(null);
   const [choix, setChoix] = useState<string[]>([]);
   const finRef = useRef<HTMLDivElement>(null);
+  // ⚠️ Verrou de ré-entrée. Sans lui, le moindre re-rendu pendant l'appel à Groq
+  // relançait une génération : deux scènes pour la même semaine, et deux fois
+  // le coût en tokens.
+  const fabrique = useRef(false);
 
   const historique = useMemo(
     () =>
@@ -53,8 +80,58 @@ export function Carriere({ onReglages }: Props) {
     finRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [journal, enCours]);
 
+  // ═══ LA SCÈNE DE LA SEMAINE ═════════════════════════════════════════════
+  useEffect(() => {
+    if (!joueur || !attenteEvenement || evenementHebdo || scenarioActif) return;
+    if (fabrique.current) return;
+
+    // Sans clé, le jeu reste ENTIER : on pose une situation à choix multiples
+    // du pool pré-écrit, contextuelle (âge, forme, moral, division, contrat).
+    if (!cle) {
+      abandonnerEvenement();
+      lancerScenario(false);
+      return;
+    }
+
+    fabrique.current = true;
+    let annule = false;
+    setEnCours(true);
+    (async () => {
+      try {
+        const sem = semaine(joueur.semaine ?? 1);
+        const derniere = [...journal].reverse().find((e) => e.role !== 'joueur');
+        const evt = await genererEvenementHebdo({
+          cle,
+          modele,
+          joueur,
+          semaine: `${libelleDate(sem)} — ${sem.libelle}`,
+          contexte: derniere
+            ? `${derniere.titre ?? ''} — ${derniere.texte}`.slice(0, 240)
+            : undefined,
+          dejaVus: evenementsVus,
+        });
+        if (!annule) poserEvenementHebdo(evt);
+      } catch {
+        // L'IA a flanché : le jeu ne s'arrête jamais pour autant, on retombe
+        // sur le pool pré-écrit.
+        if (!annule) {
+          abandonnerEvenement();
+          lancerScenario(false);
+        }
+      } finally {
+        if (!annule) setEnCours(false);
+        fabrique.current = false;
+      }
+    })();
+    return () => { annule = true; };
+    // `journal` et `evenementsVus` sont volontairement hors dépendances : ils
+    // changent à chaque entrée écrite, et relanceraient la génération en boucle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joueur, attenteEvenement, evenementHebdo, scenarioActif, cle, modele]);
+
   if (!joueur) return null;
 
+  // ═══ ENVOYER : soit on répond à la scène, soit on agit librement ═════════
   const envoyer = async (action: string) => {
     const contenu = action.trim();
     if (!contenu || enCours) return;
@@ -68,49 +145,34 @@ export function Carriere({ onReglages }: Props) {
     setChoix([]);
     setEnCours(true);
     try {
-      const reponse = await demanderAuMJ({
-        cle,
-        modele,
-        joueur,
-        historique,
-        action: contenu,
-      });
-      appliquerReponse(reponse, contenu);
-      setChoix(reponse.choix ?? []);
+      if (evenementHebdo) {
+        // ⚠️ LE JUGEMENT PASSE PAR LE BUDGET DE SAISON, comme une action libre :
+        // quarante-trois semaines de récit ne doivent pas déplacer l'étalonnage
+        // de difficulté (voir CLAUDE.md).
+        const jugement = await jugerReaction({
+          cle,
+          modele,
+          joueur,
+          evenement: evenementHebdo,
+          reponse: contenu,
+          budgetAttributs: Math.max(0, BUDGET_IA_PAR_SAISON - compteurs.gainsIA),
+        });
+        appliquerJugement(jugement, contenu);
+      } else {
+        const reponse = await demanderAuMJ({
+          cle,
+          modele,
+          joueur,
+          historique,
+          action: contenu,
+        });
+        appliquerReponse(reponse, contenu);
+        setChoix(reponse.choix ?? []);
+      }
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur inconnue.');
       // On garde l'action dans la barre pour réessayer
       setTexte(contenu);
-    } finally {
-      setEnCours(false);
-    }
-  };
-
-  // BOUCLE UNIFIÉE (lot 6) : une situation par itération. Écrite par Groq si
-  // une clé est là — sinon tirée du pool pré-écrit. Même bouton, même rendu.
-  const vivreUneSituation = async () => {
-    if (enCours || scenarioActif) return;
-    if (!cle) {
-      // ⚠️ Sans clé, on passe par le store : c'est LUI qui choisit une
-      // situation CONTEXTUELLE dans `data/situations.ts` (âge, forme, moral,
-      // division, contrat) et qui évite celles déjà vécues cette carrière.
-      lancerScenario();
-      return;
-    }
-    setErreur(null);
-    setEnCours(true);
-    try {
-      const derniere = [...journal].reverse().find((e) => e.role !== 'joueur');
-      const sc = await genererSituation({
-        cle,
-        modele,
-        joueur,
-        contexte: derniere ? `${derniere.titre ?? ''} — ${derniere.texte}`.slice(0, 300) : undefined,
-      });
-      poserSituation(sc);
-    } catch {
-      // L'IA a flanché : le jeu ne s'arrête jamais pour autant.
-      lancerScenario();
     } finally {
       setEnCours(false);
     }
@@ -163,28 +225,12 @@ export function Carriere({ onReglages }: Props) {
             ))}
           </div>
         ) : (
-          !enCours && (
+          !enCours && !evenementHebdo && (
             <div className="choix-rapides" style={{ padding: '0 1.2rem' }}>
-              {/* ⚠️ UN SEUL BOUTON DE VIE. « Vivre une situation » et
-                  « Évènement aléatoire » faisaient double emploi et sonnaient
-                  comme deux menus de test. Il n'en reste qu'un : la vie hors du
-                  terrain, contextuelle (âge, forme, moral, division, contrat),
-                  écrite par le MJ si une clé est là, tirée de la grosse base
-                  `data/situations.ts` sinon. */}
-              <button
-                className="evt-aleatoire"
-                onClick={vivreUneSituation}
-                disabled={compteurs.situations >= MAX_PAR_SAISON}
-                title={
-                  compteurs.situations >= MAX_PAR_SAISON
-                    ? 'Limite atteinte — passe à la saison suivante'
-                    : cle
-                      ? 'Le Maître du Jeu te pose une situation, écrite pour ta saison'
-                      : 'Une situation de vie à choix, hors du terrain'
-                }
-              >
-                📖 La vie hors du terrain ({compteurs.situations}/{MAX_PAR_SAISON})
-              </button>
+              {/* ⚠️ PLUS DE BOUTON « La vie hors du terrain ». Le récit ne se
+                  déclenche plus à la demande : il TOMBE, chaque semaine, comme
+                  la vie. Il ne reste ici que des pistes d'action libre — et
+                  seulement quand aucune scène n'attend de réponse. */}
               {suggestions.slice(0, 4).map((c, i) => (
                 <button key={i} onClick={() => envoyer(c)}>{c}</button>
               ))}
@@ -192,9 +238,28 @@ export function Carriere({ onReglages }: Props) {
           )
         )}
 
+        {/* La consigne quand une scène attend : sans elle, on ne comprend pas
+            que le champ de saisie sert à RÉPONDRE, pas à agir librement. */}
+        {evenementHebdo && !enCours && (
+          <div className="scenario-consigne" style={{ padding: '0 1.2rem 0.4rem' }}>
+            ✍️ À toi : qu’est-ce que tu fais ?{' '}
+            {evenementHebdo.risque && (
+              <span style={{ color: 'var(--or)' }}>
+                — attention, ça peut mal tourner.
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="saisie">
           <textarea
-            placeholder={scenarioActif ? 'Réponds au choix ci-dessus…' : 'Décris ton action… (ex. « Je négocie une prolongation de contrat »)'}
+            placeholder={
+              scenarioActif
+                ? 'Réponds au choix ci-dessus…'
+                : evenementHebdo
+                  ? 'Raconte ce que tu fais… (le MJ juge sur tes stats, et il est sévère)'
+                  : 'Décris ton action… (ex. « Je négocie une prolongation de contrat »)'
+            }
             value={texte}
             onChange={(e) => setTexte(e.target.value)}
             onKeyDown={gererClavier}
@@ -206,7 +271,7 @@ export function Carriere({ onReglages }: Props) {
             onClick={() => envoyer(texte)}
             disabled={enCours || !!scenarioActif || !texte.trim()}
           >
-            {enCours ? '…' : 'Jouer'}
+            {enCours ? '…' : evenementHebdo ? 'Répondre' : 'Jouer'}
           </button>
         </div>
       </div>

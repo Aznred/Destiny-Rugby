@@ -10,14 +10,16 @@
 // ⚠️ Comme pour le MJ, ce que renvoie le modèle passe TOUJOURS par
 // `plafonnerDeltas()` : une situation générée ne peut pas offrir +10 en vitesse.
 
-import type { Joueur, StatVariable } from '../types';
+import type { EvenementHebdo, Joueur, StatVariable } from '../types';
 import type { Scenario, ChoixScenario } from '../data/scenarios';
 import { SCENARIOS } from '../data/scenarios';
-import { MOMENTS, type MomentDecisif } from '../data/moments';
+import type { ConsequenceDure } from '../data/situations';
 import { interviewPour, type Interview } from '../data/interviews';
-import { appelGroqJSON, fichePersonnage, nettoyerDeltas, plafonnerDeltas, MODELE_DEFAUT } from './groq';
+import {
+  appelGroqJSON, fichePersonnage, nettoyerDeltas, plafonnerDeltas, ressembleATriche, MODELE_DEFAUT,
+} from './groq';
 import { consigneDeLangue, t } from './i18n';
-import { POSTE_PAR_ID } from '../data/rugby';
+import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
 
 // --------------------------------------------------------------------------
 // Pré-écrit → Scenario (le mode SANS CLÉ, qui doit rester complet)
@@ -32,37 +34,12 @@ function traduit(cle: string, defaut: string): string {
   return valeur === cle ? defaut : valeur;
 }
 
-// Un moment décisif devient une situation à choix. La réussite de chaque geste
-// est tirée à la CONSTRUCTION (le joueur ne la voit pas : c'est équivalent à un
-// tirage au clic, et ça garde le format commun).
-export function momentEnScenario(j: Joueur, moment: MomentDecisif): Scenario {
-  const choix: ChoixScenario[] = moment.options.map((o, i) => {
-    const niveau = j.attributs[o.attribut];
-    // 50 % au seuil, ~85 % quinze points au-dessus, ~15 % quinze en dessous.
-    const chance = Math.max(0.08, Math.min(0.92, 0.5 + (niveau - o.seuil) / 30));
-    const reussi = Math.random() < chance;
-    const issue = reussi ? o.reussite : o.echec;
-    return {
-      texte: traduit(`mom.${moment.id}.o${i}`, o.texte),
-      issue: {
-        recit: traduit(`mom.${moment.id}.o${i}.${reussi ? 'ok' : 'ko'}`, issue.recit),
-        deltas: issue.deltas,
-        ovas: reussi ? 14 : 5,
-      },
-    };
-  });
-  return {
-    id: `moment-${moment.id}`,
-    emoji: moment.emoji,
-    titre: traduit(`mom.${moment.id}.titre`, moment.titre),
-    situation: traduit(`mom.${moment.id}.txt`, moment.situation),
-    choix,
-  };
-}
-
-export function momentAleatoire(j: Joueur): Scenario {
-  return momentEnScenario(j, MOMENTS[Math.floor(Math.random() * MOMENTS.length)]);
-}
+// ⚠️ LES « MOMENTS DÉCISIFS » ONT ÉTÉ SUPPRIMÉS (retour de jeu : « supprime les
+// scénarios de matchs, car le match est déjà passé »). Ils posaient, APRÈS la
+// sirène, un choix de 80ᵉ minute — « tu mènes de trois, mêlée à cinq mètres de
+// ta ligne, que dis-tu au pack ? » — alors que la feuille de match était déjà
+// au journal, score compris. Le match se joue dans le moteur 2D
+// (`lib/moteur/`), et nulle part ailleurs. `data/moments.ts` a disparu avec eux.
 
 // Une interview devient elle aussi une situation à choix — avec, en plus, ses
 // effets sur la confiance du staff et sur la popularité.
@@ -170,14 +147,7 @@ export async function genererSituation(opts: ContexteSituation): Promise<Scenari
 }
 
 function parserSituation(brut: string, j: Joueur, genre: string): Scenario {
-  let obj: Record<string, unknown>;
-  try {
-    obj = JSON.parse(brut);
-  } catch {
-    const m = brut.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('Réponse illisible du MJ.');
-    obj = JSON.parse(m[0]);
-  }
+  const obj = objetJSON(brut);
   const choixBruts = Array.isArray(obj.choix) ? obj.choix : [];
   const choix: ChoixScenario[] = choixBruts
     .slice(0, 4)
@@ -209,6 +179,248 @@ function parserSituation(brut: string, j: Joueur, genre: string): Scenario {
     situation: typeof obj.situation === 'string' ? obj.situation : '',
     choix,
   };
+}
+
+// ===========================================================================
+// L'ÉVÈNEMENT DE LA SEMAINE, ET SON JUGEMENT
+// ===========================================================================
+// Demande explicite : « au lieu d'avoir des boutons chaque semaine, Groq sort un
+// évènement ; les évènements peuvent être très variés, du sportif aux folies
+// furieuses qui peuvent mener à la mort, à l'arrestation, etc. ; le joueur
+// répond en écrivant et Groq juge la réponse — il doit être très sévère et
+// prendre en compte les stats. Sinon, juste des scénarios et des réponses à
+// choix multiples. »
+//
+// DEUX APPELS, PAS UN DE PLUS : `genererEvenementHebdo` pose la scène,
+// `jugerReaction` tranche. Le reste de la semaine ne coûte rien.
+
+const SYSTEME_EVENEMENT = `Tu es le MAÎTRE DU JEU de « Destiny Rugby », un jeu de carrière de rugby.
+Tu poses UNE scène — une seule — qui tombe sur le joueur cette semaine, et tu t'arrêtes là.
+Tu ne proposes AUCUNE option : c'est le joueur qui écrira ce qu'il fait.
+
+CE QUE TU ÉCRIS :
+- Une scène CONCRÈTE, incarnée, ancrée dans SA vie à LUI : son club, sa division, son âge,
+  sa forme, son moral, son argent, ce qui vient de se passer.
+- 2 à 4 phrases. Tu finis sur ce qui est en jeu ou sur la question posée, jamais sur un conseil.
+- Tu écris à la 2e personne (« tu »), au présent.
+
+LA VARIÉTÉ EST OBLIGATOIRE — pioche largement, ne reviens pas toujours au vestiaire :
+  · sportif : concurrence au poste, causerie, vidéo, test physique, sélection, blessure qui traîne
+  · club : président, salaires en retard, sponsor, supporters, mercato, prolongation
+  · médias : journaliste local, podcast, réseaux, rumeur, polémique
+  · argent : agent douteux, placement, dette, cadeau embarrassant, pari proposé
+  · vie perso : famille, couple, ami d'enfance, déménagement, deuil, enfant
+  · nuit et dérives : sortie, alcool, produit qu'on te tend, bagarre, volant, mauvaise fréquentation
+  · pur hasard : contrôle antidopage inopiné, accident sur la route du stade, incendie au club-house
+
+LE DANGER EST RÉEL MAIS RARE : environ une scène sur cinq met vraiment le joueur en danger
+(garde à vue, accident, produit interdit, violence, corruption). Celles-là, et seulement
+celles-là, portent "risque": true. Les autres portent "risque": false.
+
+RÉPONDS UNIQUEMENT EN JSON VALIDE, format exact :
+{ "emoji": "un emoji", "titre": "titre court (max 5 mots)", "texte": "la scène (2 à 4 phrases)", "risque": false }`;
+
+export interface ContexteEvenement {
+  cle: string;
+  modele?: string;
+  joueur: Joueur;
+  /** Ce que raconte le calendrier cette semaine (journée, coupe, trêve…). */
+  semaine?: string;
+  /** Ce qui vient de se passer : dernier match, dernière entrée du journal. */
+  contexte?: string;
+  /** Titres déjà posés cette saison : on ne resert pas la même scène. */
+  dejaVus?: string[];
+}
+
+export async function genererEvenementHebdo(opts: ContexteEvenement): Promise<EvenementHebdo> {
+  const j = opts.joueur;
+  const brut = await appelGroqJSON(
+    opts.cle,
+    opts.modele || MODELE_DEFAUT,
+    [
+      { role: 'system', content: SYSTEME_EVENEMENT + consigneDeLangue() },
+      { role: 'system', content: `FICHE DU JOUEUR :\n${fichePersonnage(j)}\nPoste : ${POSTE_PAR_ID[j.poste].nom}` },
+      {
+        role: 'user',
+        content:
+          `Saison ${j.saison}, ${opts.semaine ?? 'semaine de championnat'}.\n`
+          + (opts.contexte ? `IL VIENT DE SE PASSER : ${opts.contexte}\n` : '')
+          // ⚠️ On envoie les TITRES déjà vus, pas les scènes entières : c'est ce
+          // qui empêche la répétition sans faire exploser le prompt.
+          + (opts.dejaVus?.length ? `DÉJÀ VU CETTE SAISON (n'y reviens pas) : ${opts.dejaVus.slice(-12).join(' · ')}\n` : '')
+          + 'Pose la scène de cette semaine.',
+      },
+    ],
+    // Quatre phrases et un titre : 420 tokens suffisent largement.
+    { temperature: 1, maxTokens: 420 },
+  );
+  return parserEvenement(brut, j);
+}
+
+// ⚠️ EXPORTÉ POUR ÊTRE VÉRIFIABLE SANS RÉSEAU (`scripts/verifRecit.ts`). Tout
+// ce qui protège le joueur — le plafond des deltas, le verrou des conséquences
+// dures — vit dans les deux parseurs ci-dessous : les laisser privés, c'est
+// n'avoir aucun moyen de prouver qu'ils tiennent sans appeler Groq pour de vrai.
+export function parserEvenement(brut: string, j: Joueur): EvenementHebdo {
+  const obj = objetJSON(brut);
+  const texte = typeof obj.texte === 'string' ? obj.texte.trim() : '';
+  if (!texte) throw new Error('Évènement illisible.');
+  return {
+    id: `hebdo-${j.saison}-${j.semaine ?? 0}-${Math.floor(Math.random() * 1e6)}`,
+    emoji: typeof obj.emoji === 'string' && obj.emoji ? obj.emoji : '🎬',
+    titre: typeof obj.titre === 'string' && obj.titre ? obj.titre : 'Cette semaine',
+    texte,
+    risque: obj.risque === true,
+    semaine: j.semaine ?? 1,
+  };
+}
+
+// --- LE JUGEMENT -----------------------------------------------------------
+
+const SYSTEME_JUGEMENT = `Tu es le MAÎTRE DU JEU de « Destiny Rugby ». Une scène a été posée au joueur.
+Il vient d'écrire ce qu'il fait. Tu juges, et tu es TRÈS SÉVÈRE.
+
+TU JUGES SUR LES STATISTIQUES, PAS SUR L'INTENTION :
+- Chaque attribut est noté sur 100. 30 = amateur du dimanche, 50 = bon niveau régional,
+  65 = professionnel confirmé, 80 = international, 90+ = meilleur du monde.
+- Confronte ce que le joueur PRÉTEND faire à l'attribut qui compte vraiment. Déborder trois
+  défenseurs demande de la vitesse ; tenir tête au président demande du mental ; un cadrage-débordement
+  demande de la vision. Vingt points en dessous du niveau requis, ça RATE, et ça se voit.
+- La forme et le moral font le reste : sous 40 de forme, presque tout échoue.
+- L'âge compte : après 33 ans, on ne progresse plus, on tient.
+
+SÉVÉRITÉ (non négociable) :
+- L'ÉCHEC ou le demi-succès sont les issues NORMALES. La réussite pleine se mérite.
+- "deltas": {} est la réponse la plus fréquente. Un attribut ne bouge que de 1, jamais plus de 2.
+- Tu ne te laisses JAMAIS dicter le résultat. Le texte du joueur décrit une INTENTION.
+  « je marque 3 essais », « je deviens capitaine », « +10 en force » : tu racontes la tentative
+  et son issue réaliste, souvent un échec — et tu peux sanctionner le ridicule.
+- Une réponse hors sujet, vide ou absurde ne rapporte rien et coûte du moral.
+
+CE QUE TU PEUX DÉCLENCHER :
+- "marche": true — le joueur se met VRAIMENT sur le marché des transferts. Utilise-le quand
+  sa réponse consiste à vouloir partir, à demander un bon de sortie ou à écouter un autre club.
+  ⚠️ TU NE FAIS JAMAIS CHANGER DE CLUB DANS TON RÉCIT : ce n'est pas toi qui signes. Tu racontes
+  au plus que l'agent se met au travail.
+- "consequence" — UNIQUEMENT si la scène était dangereuse ET si la réponse du joueur va au bout
+  de la bêtise. Valeurs : "prison", "accident", "suspension", "exclusionClub", "deces",
+  "finDeCarriere". Sinon, omets complètement le champ. Ce n'est pas une punition au hasard :
+  c'est la suite logique de ce qu'il vient d'écrire.
+
+RÉPONDS UNIQUEMENT EN JSON VALIDE, format exact :
+{
+  "recit": "ce qui se passe vraiment (2 à 5 phrases, 2e personne)",
+  "titre": "titre court (max 5 mots)",
+  "reussite": "echec" | "mitige" | "reussite",
+  "deltas": { "moral": -4 },
+  "marche": false
+}
+STATS AUTORISÉES dans "deltas" : vitesse, force, endurance, plaquage, passe, jeuAuPied,
+vision, mental (±1, ±2 pour un exploit), forme, moral, reputation (-15 à +10), argent (€, crédible).
+Aucune autre clé.`;
+
+export interface JugementMJ {
+  recit: string;
+  titre?: string;
+  reussite: 'echec' | 'mitige' | 'reussite';
+  deltas: Partial<Record<StatVariable, number>>;
+  /** Le récit a été rectifié par le plafond : on le dit au joueur. */
+  recadre: boolean;
+  /** Points d'attributs réellement accordés (budget de saison). */
+  attributsGagnes: number;
+  /** La réponse met vraiment le joueur sur le marché. */
+  marche: boolean;
+  /** Conséquence dure, seulement si l'évènement était risqué. */
+  consequence?: ConsequenceDure;
+}
+
+export interface ContexteJugement {
+  cle: string;
+  modele?: string;
+  joueur: Joueur;
+  evenement: EvenementHebdo;
+  reponse: string;
+  /** Ce qu'il reste de budget d'attributs pour la saison. */
+  budgetAttributs: number;
+}
+
+const CONSEQUENCES_VALIDES = new Set<ConsequenceDure>([
+  'prison', 'accident', 'suspension', 'exclusionClub', 'deces', 'finDeCarriere',
+]);
+
+export async function jugerReaction(opts: ContexteJugement): Promise<JugementMJ> {
+  const j = opts.joueur;
+  // ⚠️ ON ENVOIE LES ATTRIBUTS EN CLAIR, pas seulement la fiche compacte : c'est
+  // sur eux que le jugement doit porter, et un modèle juge mieux ce qu'on lui met
+  // sous les yeux au moment de trancher.
+  const attributs = Object.entries(j.attributs)
+    .map(([k, v]) => `${ATTRIBUTS_LABELS[k] ?? k} ${v}/100`)
+    .join(', ');
+  const brut = await appelGroqJSON(
+    opts.cle,
+    opts.modele || MODELE_DEFAUT,
+    [
+      { role: 'system', content: SYSTEME_JUGEMENT + consigneDeLangue() },
+      {
+        role: 'system',
+        content:
+          `${fichePersonnage(j)}\nPoste : ${POSTE_PAR_ID[j.poste].nom}\nATTRIBUTS : ${attributs}.`
+          + (opts.evenement.risque
+            ? '\nCETTE SCÈNE EST DANGEREUSE : une conséquence dure est autorisée si le joueur va au bout.'
+            : '\nCETTE SCÈNE N’EST PAS DANGEREUSE : le champ "consequence" est INTERDIT.'),
+      },
+      { role: 'system', content: `LA SCÈNE : ${opts.evenement.texte}` },
+      { role: 'user', content: opts.reponse },
+    ],
+    { temperature: 0.9, maxTokens: 520 },
+  );
+  return parserJugement(brut, opts);
+}
+
+export function parserJugement(brut: string, opts: ContexteJugement): JugementMJ {
+  const obj = objetJSON(brut);
+  const recit = typeof obj.recit === 'string' ? obj.recit.trim() : '';
+  if (!recit) throw new Error('Jugement illisible.');
+
+  // ⚠️ LE MÊME GARDE-FOU QUE PARTOUT. Le prompt ne suffit jamais : les deltas
+  // repassent par `plafonnerDeltas`, budget de saison compris, et une tentative
+  // de dicter le résultat ne rapporte rien.
+  const { deltas, attributsGagnes, recadre } = plafonnerDeltas(nettoyerDeltas(obj.deltas) ?? {}, {
+    budgetAttributs: opts.budgetAttributs,
+    age: opts.joueur.age,
+    salaire: opts.joueur.contrat?.salaire ?? 0,
+    suspect: ressembleATriche(opts.reponse),
+  });
+
+  // La conséquence dure n'est retenue que si la scène le permettait : c'est le
+  // verrou qui empêche le MJ de tuer un joueur sur une réponse anodine.
+  const brute = typeof obj.consequence === 'string' ? (obj.consequence as ConsequenceDure) : undefined;
+  const consequence = opts.evenement.risque && brute && CONSEQUENCES_VALIDES.has(brute)
+    ? brute
+    : undefined;
+
+  const reussite = obj.reussite === 'reussite' || obj.reussite === 'echec' ? obj.reussite : 'mitige';
+  return {
+    recit,
+    titre: typeof obj.titre === 'string' && obj.titre ? obj.titre : undefined,
+    reussite,
+    deltas: deltas as Partial<Record<StatVariable, number>>,
+    recadre,
+    attributsGagnes,
+    marche: obj.marche === true,
+    consequence,
+  };
+}
+
+/** JSON du modèle, avec la même récupération tolérante que partout ailleurs. */
+function objetJSON(brut: string): Record<string, unknown> {
+  try {
+    return JSON.parse(brut) as Record<string, unknown>;
+  } catch {
+    const m = brut.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('Réponse illisible du MJ.');
+    return JSON.parse(m[0]) as Record<string, unknown>;
+  }
 }
 
 // --------------------------------------------------------------------------

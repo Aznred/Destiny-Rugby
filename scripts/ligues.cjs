@@ -235,9 +235,16 @@ const LIGUES = [
     srcLigue: null, echelle: [62, 66],
     note: 'Engagés en Challenge Cup sans championnat renseigné dans la base.',
     // 4e valeur = note imposée (ces deux clubs n'ont pas de classement).
+    // ⚠️ « TOYOTA CHEETAHS », PAS « FREE STATE CHEETAHS ». Les deux existent
+    // vraiment et ne sont PAS la même équipe : la FRANCHISE professionnelle
+    // (Toyota Cheetahs) dispute les coupes d'Europe — c'est elle qu'on trouve
+    // ici, avec son effectif réel — tandis que l'UNION (Free State Cheetahs)
+    // joue la Currie Cup, où elle est déclarée dans `nouvellesLigues.cjs`. Les
+    // deux noms étaient inversés : le club de coupe d'Europe portait le nom de
+    // l'équipe de Currie Cup, et réciproquement.
     clubs: [
       ['Black Lion', 'Black Lion', 'Tbilissi', 63],
-      ['Cheetahs', 'Free State Cheetahs', 'Bloemfontein', 66],
+      ['Cheetahs', 'Toyota Cheetahs', 'Bloemfontein', 66],
     ],
   },
 ];

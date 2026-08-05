@@ -209,8 +209,37 @@ function courbeAge(age: number): number {
   return Math.round(4 - Math.abs(Math.min(age, 34) - 27) * 0.9);
 }
 
+// ---------------------------------------------------------------------------
+// LA NOTE D'UN CLUB AMATEUR
+// ---------------------------------------------------------------------------
+// ⚠️ Retour de jeu : « les clubs de Nationale 2 à Régionale 3 n'ont pas leur
+// générale marquée dans la section Clubs ». Elle n'y était pas parce qu'elle
+// n'existait pas : TOUS les clubs d'un étage partageaient `NOTE_PAR_NIVEAU`,
+// donc afficher la note revenait à répéter le niveau de la division sur les
+// 512 cartes de la Fédérale 3 — l'atlas préférait ne rien montrer.
+//
+// Les sources amateurs (rugbyamateur.fr) ne donnent ni classement ni niveau :
+// il n'y a rien à recopier. On TIRE donc la note du club, une fois pour toutes,
+// à partir de son nom — comme on tire déjà l'âge et la note de ses joueurs
+// (`effectifAmateur`). C'est déterministe : le même club a toujours la même
+// note, aujourd'hui et dans douze saisons, sans rien sauvegarder.
+//
+// L'étalement (±4) est volontairement ÉTROIT et la loi TRIANGULAIRE (deux
+// tirages moyennés) : la hiérarchie des étages ne doit jamais se brouiller —
+// le meilleur club de Régionale 1 reste sous le pire club de Fédérale 3 — mais
+// à l'intérieur d'une poule, on distingue enfin celui qui vise la montée de
+// celui qui lutte pour rester.
+const ETALEMENT_AMATEUR = 4;
+
+export function noteAmateur(nomClub: string, niveau: number): number {
+  const base = NOTE_PAR_NIVEAU[niveau] ?? 45;
+  const rng = graine(`noteClub#${nomClub}`);
+  const tirage = (rng() + rng()) / 2; // loi triangulaire, centrée
+  return Math.round(base + (tirage * 2 - 1) * ETALEMENT_AMATEUR);
+}
+
 // Note générale d'un club : la vraie note issue des stats 25-26 si on l'a
-// (Top 14), sinon le niveau moyen de sa division.
+// (Top 14), celle des nouvelles ligues ensuite, sinon celle qu'on lui tire.
 export function noteDuClub(nomClub: string): number {
   const reelle = NOTE_CLUB_REEL[nomClub];
   if (reelle !== undefined) return reelle;
@@ -219,7 +248,7 @@ export function noteDuClub(nomClub: string): number {
   const nouvelle = NOTE_CLUB_NOUVEAU[nomClub];
   if (nouvelle !== undefined) return nouvelle;
   const niveau = competitionDuClub(nomClub)?.niveau ?? 6;
-  return NOTE_PAR_NIVEAU[niveau] ?? 50;
+  return noteAmateur(nomClub, niveau);
 }
 
 // Effectif RÉEL (Top 14 2025-26) vieilli jusqu'à la saison demandée : les
@@ -348,7 +377,9 @@ function listeAmateur(nomClub: string): JoueurAmateur[] {
 const POSTES_ROTATION: PosteId[] = COMPOSITION.flatMap(([p, n]) => Array<PosteId>(n).fill(p));
 
 function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequipier[] {
-  const noteBase = NOTE_PAR_NIVEAU[niveau] ?? 45;
+  // ⚠️ La note du CLUB, pas celle de la division : c'est ce qui fait qu'un
+  // effectif de Fédérale 2 n'est pas le clone de son voisin de poule.
+  const noteBase = noteAmateur(nomClub, niveau);
   const source = listeAmateur(nomClub);
 
   return source.map((brut, i) => {
@@ -471,7 +502,9 @@ function construireEffectif(nomClub: string, saison: number): Coequipier[] {
   if (EFFECTIFS_AMATEURS[nomClub]) return effectifAmateur(nomClub, saison, niveau);
   const nouveau = effectifNouveau(nomClub);
   if (nouveau) return effectifDesNouvellesLigues(nomClub, saison, nouveau);
-  const noteBase = NOTE_PAR_NIVEAU[niveau] ?? 50;
+  // Un club français dont la source amateur ne donne aucun licencié : effectif
+  // entièrement généré, mais autour de SA note, comme les autres.
+  const noteBase = noteAmateur(nomClub, niveau);
   const joueurs: Coequipier[] = [];
   let slot = 0;
 

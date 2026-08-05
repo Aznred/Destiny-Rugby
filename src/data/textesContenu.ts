@@ -4,7 +4,7 @@
 // Le jeu doit rester jouable SANS clé Groq — c'est une règle du projet. Dans ce
 // mode, tout ce qu'on lit vient de pools pré-écrits : les situations de vie
 // (`data/situations.ts`), les scénarios (`data/scenarios.ts`), les évènements
-// aléatoires (`data/evenements.ts`) et les moments décisifs (`data/moments.ts`).
+// aléatoires (`data/evenements.ts`).
 // Avec une clé, l'IA écrit directement dans la langue du joueur
 // (`consigneDeLangue`) ; sans clé, il n'y avait RIEN — un joueur japonais
 // tombait sur du français. C'est ce trou que ce fichier bouche.
@@ -25,7 +25,7 @@
 // d'origine intact : jamais de trou, jamais de « sit.bizutage.titre » à l'écran.
 
 import type { Traduction } from '../lib/i18n';
-import { TEXTES_MOMENTS } from './textesMoments';
+
 import { TEXTES_SITUATIONS } from './textesSituations';
 
 export const TEXTES_CONTENU: Record<string, Traduction> = {
@@ -428,11 +428,15 @@ export const TEXTES_CONTENU: Record<string, Traduction> = {
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MOMENTS DÉCISIFS ET SITUATIONS DE VIE
+  // SITUATIONS DE VIE
   // ═══════════════════════════════════════════════════════════════════════════
-  // Ils vivent dans leurs propres fichiers — 3 moments et 30 situations, c'est
-  // déjà plus long que tout ce qui précède. Fusionnés ici, donc invisibles pour
-  // les appelants : `t('sit.bizutage.titre')` marche sans rien savoir de tout ça.
-  ...TEXTES_MOMENTS,
+  // Elles vivent dans leur propre fichier — 30 situations, c'est déjà plus long
+  // que tout ce qui précède. Fusionnées ici, donc invisibles pour les appelants :
+  // `t('sit.bizutage.titre')` marche sans rien savoir de tout ça.
+  //
+  // ⚠️ `TEXTES_MOMENTS` a disparu avec `data/moments.ts` : les « moments
+  // décisifs » posaient un choix de 80ᵉ minute APRÈS le coup de sifflet final
+  // (retour de jeu : « supprime les scénarios de matchs, le match est déjà
+  // passé »). Le match se joue dans le moteur 2D, et nulle part ailleurs.
   ...TEXTES_SITUATIONS,
 };

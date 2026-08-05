@@ -19,6 +19,10 @@ export interface ContexteSucces {
   posts: PostSocial[];
   abonnes: number;
   pantheon: LegendeSauvegardee[];
+  /** Solde d'Ovas. Optionnel : les vieux appelants ne le passaient pas. */
+  coins?: number;
+  /** Nombre de succès déjà débloqués — pour le succès « collectionneur ». */
+  succesFaits?: number;
 }
 
 export interface Succes {
@@ -287,6 +291,150 @@ export const SUCCES: Succes[] = [
       }
       return false;
     },
+  },
+
+  // ═══ LE MÉTIER : ce que disent les statistiques ════════════════════════════
+  // ⚠️ Ces succès-là lisent `Joueur.stats` (types.ts), le cumul de carrière
+  // alimenté par le moteur de match. Ils n'existent donc VRAIMENT qu'en mode
+  // « journée par journée » — c'est le seul mode où les statistiques détaillées
+  // sont réellement accumulées. `?? 0` partout : une vieille sauvegarde ou une
+  // carrière jouée en mode rapide ne doit rien casser.
+  {
+    id: 'mille_points', emoji: '🎯', nom: 'Mille points', ovas: 14,
+    desc: 'Inscrire 1 000 points en carrière.',
+    atteint: (c) => (c.joueur.stats?.points ?? 0) >= 1000,
+  },
+  {
+    id: 'buteur_precis', emoji: '🥅', nom: 'Le pied sûr', ovas: 16,
+    desc: 'Tenir 80 % de réussite au pied sur au moins 100 tentatives.',
+    atteint: (c) => {
+      const t = c.joueur.stats?.butsTentes ?? 0;
+      return t >= 100 && (c.joueur.stats?.butsReussis ?? 0) / t >= 0.8;
+    },
+  },
+  {
+    id: 'cent_passes_d', emoji: '🅿️', nom: 'Dernière passe', ovas: 12,
+    desc: 'Délivrer 100 passes décisives.',
+    atteint: (c) => (c.joueur.stats?.passesDecisives ?? 0) >= 100,
+  },
+  {
+    id: 'deux_mille_plaquages', emoji: '🧱', nom: 'Mur de soutènement', ovas: 18,
+    desc: 'Réussir 2 000 plaquages en carrière.',
+    atteint: (c) => (c.joueur.stats?.plaquages ?? 0) >= 2000,
+  },
+  {
+    id: 'discipline', emoji: '😇', nom: 'Casier vierge', ovas: 14,
+    desc: 'Disputer 100 matchs sans prendre le moindre carton.',
+    atteint: (c) => c.joueur.matchsJoues >= 100
+      && (c.joueur.stats?.cartonsJaunes ?? 0) === 0
+      && (c.joueur.stats?.cartonsRouges ?? 0) === 0,
+  },
+  {
+    id: 'carton_rouge', emoji: '🟥', nom: 'Vingt minutes de folie', ovas: 4, secret: true,
+    desc: 'Prendre un carton rouge.',
+    atteint: (c) => (c.joueur.stats?.cartonsRouges ?? 0) >= 1,
+  },
+  {
+    id: 'cent_essais', emoji: '⚡', nom: 'Machine à essais', ovas: 18,
+    desc: 'Inscrire 100 essais en carrière.',
+    atteint: (c) => c.joueur.essais >= 100,
+  },
+
+  // ═══ LA DURÉE : une carrière, ce n'est pas un pic ══════════════════════════
+  {
+    id: 'veteran', emoji: '🧓', nom: 'Increvable', ovas: 16,
+    desc: 'Jouer encore à 38 ans.',
+    atteint: (c) => c.joueur.age >= 38 && c.joueur.matchsJoues >= 1,
+  },
+  {
+    id: 'quinze_saisons', emoji: '📅', nom: 'Quinze saisons', ovas: 20,
+    desc: 'Mener une carrière de 15 saisons.',
+    atteint: (c) => c.joueur.saison >= 15,
+  },
+  {
+    id: 'blessure_saison', emoji: '🩼', nom: 'La saison blanche', ovas: 5, secret: true,
+    desc: 'Subir une blessure qui te coûte une saison entière.',
+    atteint: (c) => c.joueur.blessure?.gravite === 'saison',
+  },
+  {
+    id: 'potentiel_atteint', emoji: '🎓', nom: 'Au bout de soi-même', ovas: 22, secret: true,
+    desc: 'Atteindre le potentiel avec lequel tu es né.',
+    atteint: (c) => c.joueur.potentiel != null && gen(c.joueur) >= c.joueur.potentiel,
+  },
+
+  // ═══ LA SÉLECTION ══════════════════════════════════════════════════════════
+  {
+    id: 'cent_capes', emoji: '🏅', nom: 'Centenaire international', ovas: 30, secret: true,
+    desc: 'Atteindre 100 sélections nationales.',
+    atteint: (c) => (c.joueur.selections ?? 0) >= 100,
+  },
+  {
+    id: 'cape_jeune', emoji: '🌱', nom: 'Trop jeune pour ça', ovas: 14,
+    desc: 'Honorer une sélection nationale avant 21 ans.',
+    atteint: (c) => (c.joueur.selections ?? 0) >= 1 && c.joueur.age <= 20,
+  },
+  {
+    id: 'rec_europe', emoji: '🛡️', nom: 'Le Tournoi de l’ombre', ovas: 16,
+    desc: 'Remporter le Rugby Europe Championship.',
+    atteint: (c) => aGagne(c, 'recEurope'),
+  },
+
+  // ═══ LE PALMARÈS, SUITE ════════════════════════════════════════════════════
+  {
+    id: 'titre_saison_un', emoji: '🚀', nom: 'Tout de suite', ovas: 12, secret: true,
+    desc: 'Remporter un titre dès ta première saison.',
+    atteint: (c) => palmares(c).some((t) => t.saison === 1),
+  },
+  {
+    id: 'trois_championnats', emoji: '🌐', nom: 'Champion sans frontières', ovas: 26, secret: true,
+    desc: 'Être champion de trois championnats nationaux différents.',
+    atteint: (c) => new Set(
+      palmares(c).filter((t) => TITRES_NATIONAUX.has(t.trophee)).map((t) => t.trophee),
+    ).size >= 3,
+  },
+  {
+    id: 'europe_complete', emoji: '⭐', nom: 'L’Europe au complet', ovas: 28, secret: true,
+    desc: 'Remporter les trois coupes d’Europe : Champions, Challenge et Premiership Rugby Cup.',
+    atteint: (c) => [...TITRES_EUROPE].every((t) => aGagne(c, t)),
+  },
+
+  // ═══ HORS DU TERRAIN ═══════════════════════════════════════════════════════
+  {
+    id: 'fortune', emoji: '💎', nom: 'Cinq millions', ovas: 18,
+    desc: 'Posséder cinq millions d’euros.',
+    atteint: (c) => c.joueur.argent >= 5_000_000,
+  },
+  {
+    id: 'tresor_ovas', emoji: '🪙', nom: 'Le magot', ovas: 10,
+    desc: 'Avoir 500 Ovas en poche.',
+    atteint: (c) => (c.coins ?? 0) >= 500,
+  },
+  {
+    id: 'chouchou', emoji: '❤️', nom: 'Chouchou du public', ovas: 12,
+    desc: 'Atteindre 90 de popularité.',
+    atteint: (c) => (c.joueur.popularite ?? 50) >= 90,
+  },
+  {
+    id: 'homme_du_staff', emoji: '🤝', nom: 'L’homme du coach', ovas: 12,
+    desc: 'Atteindre 90 de confiance du staff.',
+    atteint: (c) => (c.joueur.confianceCoach ?? 50) >= 90,
+  },
+  {
+    id: 'rivalites', emoji: '⚔️', nom: 'On ne plaît pas à tout le monde', ovas: 6, secret: true,
+    desc: 'Compter trois inimitiés dans le vestiaire.',
+    atteint: (c) => (c.joueur.relations ?? []).filter((r) => r.type === 'nemesis').length >= 3,
+  },
+
+  // ═══ MÉTA ══════════════════════════════════════════════════════════════════
+  {
+    id: 'hall_trois', emoji: '🏛️', nom: 'Trois vies', ovas: 20,
+    desc: 'Faire entrer trois carrières au Hall des Légendes.',
+    atteint: (c) => c.pantheon.filter((l) => !l.fictif).length >= 3,
+  },
+  {
+    id: 'presque_tout', emoji: '🧩', nom: 'Presque tout', ovas: 40, secret: true,
+    desc: 'Débloquer 50 succès.',
+    atteint: (c) => (c.succesFaits ?? 0) >= 50,
   },
 ];
 

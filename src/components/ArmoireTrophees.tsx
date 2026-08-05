@@ -4,43 +4,53 @@
 // légendes on puisse accéder à l'armoire avec tous les trophées dedans, ou
 // autour s'ils sont trop grands ».
 //
-// ⚠️ LE PLACEMENT EST CALCULÉ, PAS CODÉ EN DUR. On ne connaît pas la position
-// des étagères du modèle : on part de sa BOÎTE ENGLOBANTE, une fois le meuble
-// normalisé, et on y découpe une grille de casiers. Si un jour l'armoire est
-// remplacée par un autre `.glb`, la grille suit — rien à re-mesurer à la main.
-// La règle elle-même vit dans `lib/armoire.ts`, en fonction pure : c'est la
-// seule façon de la vérifier sans GPU (`scripts/verifArmoire.ts`).
+// ⚠️ LES ÉTAGÈRES SONT LUES SUR LE MODÈLE. La première version découpait la
+// boîte englobante du meuble en une grille de 4 × 4 : le `.glb` fourni a SIX
+// tablettes, à des hauteurs irrégulières, donc une rangée sur deux flottait
+// entre deux étagères. `detecterEtageres()` (lib/armoire.ts) cherche maintenant
+// les faces horizontales de la géométrie et en déduit les vraies tablettes ET
+// la hauteur libre au-dessus de chacune. Si un jour l'armoire est remplacée par
+// un autre `.glb`, la vitrine suit — rien à re-mesurer à la main.
+//
+// ⚠️ LES PIÈCES DE PRESTIGE SONT AU SOL, PAS DANS LA VITRINE (demande
+// explicite). Les tablettes du meuble sont hautes de ~13 cm à l'échelle réelle :
+// tout ce qu'on y pose est minuscule. Le Bouclier de Brennus, les autres
+// boucliers et les grandes coupes se dressent donc au sol, à hauteur de buste
+// de rugbyman, adossés au meuble ou à côté.
 //
 // ⚠️ TOUS LES MODÈLES SONT CHARGÉS PAR LA SCÈNE, pas par chaque trophée. C'est
 // ce qui permet de disposer l'ensemble d'un seul coup : un composant par
 // trophée ne connaît que sa propre taille, et ne peut donc pas savoir combien
-// de casiers sont déjà pris — la vitrine se retrouvait trouée.
+// de tablettes sont déjà prises — la vitrine se retrouvait trouée.
 //
 // ⚠️ `createPortal(document.body)` obligatoire, comme toutes les modales du jeu :
 // le `backdrop-filter` des `.carte` crée un bloc conteneur qui piège les
 // `position: fixed`.
 
-import { Suspense, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, ContactShadows, OrbitControls, Sparkles } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import type { Group, Object3D } from 'three';
-import { TROPHEES, type Trophee } from '../data/trophees';
+import { TROPHEES, OVAS_PIECE_MAJEURE, type Trophee } from '../data/trophees';
 import type { TitreGagne } from '../types';
 import { t } from '../lib/i18n';
-import { disposerArmoire, CASIERS, type DimensionsArmoire, type Place } from '../lib/armoire';
+import {
+  cadrage, disposerArmoire, detecterEtageres, estBouclier, MAX_PIECES,
+  type Boite, type DimensionsArmoire, type Geometrie, type Modele, type Place, type TailleModele,
+} from '../lib/armoire';
 
 const MODELE_ARMOIRE = '/m3d/armoire.glb';
-// Le meuble est ramené à cette hauteur : toute la scène (caméra, sol, casiers)
+// Le meuble est ramené à cette hauteur : toute la scène (caméra, sol, tablettes)
 // est réglée dessus.
 const HAUTEUR_ARMOIRE = 4;
 // Au-delà, on n'affiche plus : chaque trophée est un `.glb` de ~1,4 Mo, et
 // trente modèles chargés d'un coup mettraient une machine modeste à genoux.
 // ⚠️ Ce qui est écarté est DIT au joueur (voir le pied de la modale), jamais
 // escamoté en silence.
-const MAX_MODELES = CASIERS;
+const MAX_MODELES = MAX_PIECES;
 
 // Machine modeste ou « prefers-reduced-motion » : on coupe les particules,
 // exactement comme dans la cérémonie de trophée.
@@ -75,6 +85,33 @@ function regrouper(palmares: TitreGagne[]): Piece[] {
   return [...parId.values()].sort((a, b) => b.fois - a.fois || b.trophee.ovas - a.trophee.ovas);
 }
 
+/**
+ * Les sommets du meuble, exprimés dans le repère de la scène (posé en y = 0,
+ * centré en x/z) : c'est ce que `detecterEtageres()` attend. On applique la
+ * matrice monde de chaque maillage — le `.glb` peut très bien porter sa propre
+ * hiérarchie de nœuds.
+ */
+function geometriesMonde(meuble: Object3D): Geometrie[] {
+  const geos: Geometrie[] = [];
+  const v = new THREE.Vector3();
+  meuble.updateWorldMatrix(true, true);
+  meuble.traverse((o) => {
+    const maillage = o as THREE.Mesh;
+    if (!maillage.isMesh) return;
+    const attribut = maillage.geometry.getAttribute('position');
+    if (!attribut) return;
+    const positions = new Float32Array(attribut.count * 3);
+    for (let i = 0; i < attribut.count; i++) {
+      v.fromBufferAttribute(attribut as THREE.BufferAttribute, i).applyMatrix4(maillage.matrixWorld);
+      positions[i * 3] = v.x;
+      positions[i * 3 + 1] = v.y;
+      positions[i * 3 + 2] = v.z;
+    }
+    geos.push({ positions, index: maillage.geometry.index?.array ?? null });
+  });
+  return geos;
+}
+
 // --- UN TROPHÉE POSÉ ---------------------------------------------------------
 // Il ne décide de rien : la scène lui donne son objet déjà mis à l'échelle et sa
 // place. Il ne gère que le survol et la rotation.
@@ -97,7 +134,10 @@ function TropheePose({
   });
 
   return (
-    <group position={place.position}>
+    // ⚠️ L'INCLINAISON EST SUR LE GROUPE EXTÉRIEUR, la rotation de survol sur
+    // l'intérieur : sinon un bouclier adossé se redresserait au passage de la
+    // souris.
+    <group position={place.position} rotation={place.rotation}>
       <group
         ref={pivot}
         onPointerOver={(e) => { e.stopPropagation(); onSurvol(true); }}
@@ -127,7 +167,7 @@ function Scene({
   const urls = pieces.map((p) => p.trophee.modele);
   const gltfs = useGLTF(urls, true) as { scene: THREE.Group }[];
 
-  const { meuble, dims, objets, places } = useMemo(() => {
+  const { meuble, dims, objets, places, etageres, boites } = useMemo(() => {
     // Le meuble : recentré horizontalement, POSÉ SUR LE SOL (y = 0). On veut
     // pouvoir aligner les trophées du sol sur la même base, pas sur son centre.
     const meuble = armoireGltf.scene.clone(true);
@@ -144,29 +184,64 @@ function Scene({
       profondeur: taille.z * echelle,
       hauteur: HAUTEUR_ARMOIRE,
     };
+    const etageres = detecterEtageres(geometriesMonde(meuble), dims);
 
     // Les trophées : on mesure d'abord TOUT, puis on dispose l'ensemble.
     const objets = gltfs.map((g) => g.scene.clone(true));
-    const boites = objets.map((o) => new THREE.Box3().setFromObject(o));
-    const tailles = boites.map((b) => {
+    const englobantes = objets.map((o) => new THREE.Box3().setFromObject(o));
+    const tailles: TailleModele[] = englobantes.map((b) => {
       const v = new THREE.Vector3();
       b.getSize(v);
       return { x: v.x, y: v.y, z: v.z };
     });
-    const places = disposerArmoire(tailles, dims);
+    const modeles: Modele[] = tailles.map((t, i) => ({
+      taille: t,
+      majeur: pieces[i].trophee.ovas >= OVAS_PIECE_MAJEURE,
+      bouclier: pieces[i].trophee.forme === 'bouclier' || estBouclier(t),
+    }));
+    const places = disposerArmoire(modeles, dims, etageres);
 
     objets.forEach((o, i) => {
       const c = new THREE.Vector3();
-      boites[i].getCenter(c);
+      englobantes[i].getCenter(c);
       const e = places[i].echelle;
       o.scale.setScalar(e);
       // Recentré en x/z, mais POSÉ sur sa base en y : un trophée doit toucher
       // l'étagère, pas flotter au-dessus.
-      o.position.set(-c.x * e, -boites[i].min.y * e, -c.z * e);
+      o.position.set(-c.x * e, -englobantes[i].min.y * e, -c.z * e);
     });
 
-    return { meuble, dims, objets, places };
-  }, [armoireGltf, gltfs]);
+    // Ce qu'il faut cadrer : le meuble ET tout ce qui l'entoure.
+    const boites: Boite[] = places.map((p, i) => ({
+      x: p.position[0],
+      y: p.position[1],
+      z: p.position[2] + (tailles[i].z * p.echelle) / 2,
+      demiLargeur: (tailles[i].x * p.echelle) / 2,
+      hauteur: tailles[i].y * p.echelle,
+    }));
+
+    return { meuble, dims, objets, places, etageres, boites };
+  }, [armoireGltf, gltfs, pieces]);
+
+  // ⚠️ LE CADRAGE EST CALCULÉ, PAS CONSTANT — voir `cadrage()` (lib/armoire.ts).
+  const taillePlan = useThree((s) => s.size);
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  const { distance, centreY } = useMemo(
+    () => cadrage(boites, dims, camera.fov, taillePlan.width / Math.max(1, taillePlan.height)),
+    [boites, dims, camera, taillePlan],
+  );
+
+  useEffect(() => {
+    camera.position.set(0, centreY + dims.hauteur * 0.1, distance);
+    camera.updateProjectionMatrix();
+  }, [camera, distance, centreY, dims]);
+
+  const demiLargeurScene = boites.reduce(
+    (a, b) => Math.max(a, Math.abs(b.x) + b.demiLargeur),
+    dims.largeur / 2,
+  );
+
+  const basEtagere = etageres[etageres.length - 1];
 
   return (
     <>
@@ -175,6 +250,9 @@ function Scene({
       <directionalLight position={[-5, 3, -4]} intensity={1.1} color="#8ad6a8" />
       {/* La lumière chaude de la vitrine, à l'intérieur du meuble. */}
       <pointLight position={[0, dims.hauteur * 0.6, dims.profondeur * 0.5]} intensity={3.2} distance={9} color="#ffdf9e" />
+      {/* Et une lumière rasante pour les pièces posées au sol, que la vitrine
+          n'éclaire pas. */}
+      <pointLight position={[0, (basEtagere?.y ?? 0) * 0.5, dims.profondeur * 2.4]} intensity={2.2} distance={12} color="#ffe9c4" />
 
       <group position={[0, -dims.hauteur / 2, 0]}>
         <primitive object={meuble} />
@@ -190,20 +268,21 @@ function Scene({
           />
         ))}
         <ContactShadows
-          position={[0, 0.01, 0]} opacity={0.45} scale={dims.largeur * 4}
+          position={[0, 0.01, 0]} opacity={0.45} scale={demiLargeurScene * 3}
           blur={2.6} far={5} color="#04120a" frames={1}
         />
       </group>
 
       {!allege && (
-        <Sparkles count={26} scale={[dims.largeur * 2, dims.hauteur, 3]} size={3} speed={0.32} color="#e8b23a" opacity={0.55} />
+        <Sparkles count={26} scale={[demiLargeurScene * 2, dims.hauteur, 3]} size={3} speed={0.32} color="#e8b23a" opacity={0.55} />
       )}
       {/* ⚠️ Zoom borné et pas de translation : sans ça on se retrouve à
           l'intérieur du meuble ou à cent mètres, sans moyen de revenir. */}
       <OrbitControls
         enablePan={false}
-        minDistance={4.5}
-        maxDistance={12}
+        target={[0, centreY, 0]}
+        minDistance={distance * 0.5}
+        maxDistance={distance * 1.6}
         minPolarAngle={Math.PI * 0.18}
         maxPolarAngle={Math.PI * 0.52}
         autoRotate={actif === null}
@@ -225,7 +304,7 @@ export function ArmoireTrophees({ palmares, nom, onFermer }: Props) {
   const allege = useMemo(modeAllege, []);
   const [actif, setActif] = useState<number | null>(null);
   const toutes = useMemo(() => regrouper(palmares), [palmares]);
-  const pieces = toutes.slice(0, MAX_MODELES);
+  const pieces = useMemo(() => toutes.slice(0, MAX_MODELES), [toutes]);
   const restantes = toutes.slice(MAX_MODELES);
   const total = palmares.length;
   const enAvant = actif !== null ? pieces[actif] : null;
@@ -258,7 +337,7 @@ export function ArmoireTrophees({ palmares, nom, onFermer }: Props) {
             <>
               <div className="trophee-chargement"><span /><span /><span /></div>
               <Canvas
-                camera={{ position: [0, 0.8, 7.4], fov: 42 }}
+                camera={{ position: [0, 0.8, 8.4], fov: 42 }}
                 dpr={[1, 1.5]}
                 gl={{ alpha: true, antialias: false, powerPreference: 'high-performance' }}
               >

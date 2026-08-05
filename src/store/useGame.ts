@@ -4,6 +4,7 @@ import type {
   Attributs,
   Ecran,
   EntreeJournal,
+  EvenementHebdo,
   Joueur,
   LegendeSauvegardee,
   BilanEnCours,
@@ -42,6 +43,7 @@ import { estTitulaire } from '../lib/moteur/titulaire';
 import { definirLangue, langueDuNavigateur, type Langue } from '../lib/i18n';
 import type { LigneReelle } from '../lib/moteur/saison';
 import { coupesDuClub } from '../lib/coupe';
+import { scoreDeLaFiche } from '../lib/classementMondial';
 import { fenetreInternationale, fenetreU20, equipeU20 } from '../lib/international';
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
 
@@ -93,7 +95,7 @@ import {
 import { risqueDeBlessure, tirerBlessure, messageBlessure, deltasBlessure } from '../lib/blessures';
 import { effetsTraits, MAX_TRAITS } from '../data/traits';
 import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiaire';
-import { momentAleatoire, interviewAleatoire, scenarioDuPool } from '../lib/ia';
+import { interviewAleatoire, scenarioDuPool, type JugementMJ } from '../lib/ia';
 import { agentDe } from '../data/agents';
 
 // Essais marqués par match, par poste : un ailier finit, un pilier non.
@@ -131,15 +133,20 @@ export function noteGlobale(j: Pick<Joueur, 'attributs'>): number {
   return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
 }
 
+// ⚠️ UNE SEULE DÉFINITION DU SCORE DANS TOUT LE PROJET. Le barème vit dans
+// `lib/classementMondial.ts` parce que le SERVEUR devra le recalculer à
+// l'identique pour valider un envoi : deux exemplaires, c'est la garantie
+// d'avoir un jour deux vérités, et un serveur qui refuse des scores légitimes
+// (ou en accepte d'impossibles).
 export function scoreCarriere(j: Joueur): number {
-  return Math.round(
-    noteGlobale(j) * 12 +
-      j.reputation * 3 +
-      j.saison * 20 +
-      j.titres.length * 120 +
-      j.essais * 6 +
-      j.matchsJoues * 2,
-  );
+  return scoreDeLaFiche({
+    note: noteGlobale(j),
+    reputation: j.reputation,
+    saisons: j.saison,
+    titres: j.titres,
+    essais: j.essais,
+    matchs: j.matchsJoues,
+  });
 }
 
 // APPORT DU JOUEUR AU CHAMPIONNAT DE SON CLUB.
@@ -253,6 +260,13 @@ export interface ResultatNegociation {
 }
 
 // Nombre max d'évènements 🎲 et de situations 📖 par saison.
+//
+// ⚠️ NE GOUVERNE PLUS LE RÉCIT. Depuis que la scène tombe CHAQUE semaine, elle
+// passe par `lancerScenario(false)` et n'est pas rationnée — 43 semaines dans un
+// compteur calibré pour deux situations par an, ça se serait tu dès la
+// troisième. Ce plafond ne s'applique plus qu'aux appels manuels
+// (`evenementAleatoire`, `lancerScenario()`), qu'aucun écran ne déclenche
+// aujourd'hui : ils restent là pour un futur bouton, pas pour la boucle.
 export const MAX_PAR_SAISON = 2;
 
 // Économie volontairement DURE : les Ovas se méritent. Les valeurs "ovas" des
@@ -327,6 +341,17 @@ interface GameState {
   skinActif: string;
   pantheon: LegendeSauvegardee[];
   scenarioActif: Scenario | null;
+  // ═══ LE RÉCIT DE LA SEMAINE ═════════════════════════════════════════════
+  // ⚠️ Demande explicite : « au lieu d'avoir des boutons chaque semaine, Groq
+  // sort un évènement ; le joueur répond en écrivant et Groq juge ». D'où deux
+  // champs et non un : `attenteEvenement` dit qu'il FAUT en poser un (c'est le
+  // store qui le sait, à la fin de `semaineSuivante`), `evenementHebdo` est
+  // celui qui attend une réponse (c'est l'écran qui l'a fabriqué, parce que
+  // l'appel à Groq est asynchrone et que le store, lui, est synchrone).
+  attenteEvenement: boolean;
+  evenementHebdo: EvenementHebdo | null;
+  /** Titres déjà posés cette saison : envoyés à l'IA pour qu'elle se répète moins. */
+  evenementsVus: string[];
   compteurs: { evenements: number; situations: number; gainsIA: number; gainsMatchs?: number };
   tropheesEnAttente: string[]; // file des trophées à afficher en 3D
   offres: OffreContrat[]; // propositions de contrat en attente de réponse
@@ -372,10 +397,18 @@ interface GameState {
   // Le secteur travaillé chaque semaine, modifiable à tout moment.
   choisirFocus: (attribut: keyof Attributs) => void;
   evenementAleatoire: () => void;
-  lancerScenario: () => void;
+  /** @param compter false pour le récit hebdomadaire, qui n'est pas rationné. */
+  lancerScenario: (compter?: boolean) => void;
   // Lot 6 — boucle unifiée : une situation posée, d'où qu'elle vienne (pool ou IA)
   poserSituation: (sc: Scenario, compter?: boolean) => void;
   resoudreChoix: (index: number) => void;
+  // ═══ L'ÉVÈNEMENT DE LA SEMAINE ═══════════════════════════════════════════
+  /** L'écran a obtenu une scène de Groq : on la pose et on attend la réponse écrite. */
+  poserEvenementHebdo: (evt: EvenementHebdo) => void;
+  /** Le MJ a jugé la réponse écrite : on l'applique (deltas, marché, conséquence dure). */
+  appliquerJugement: (jugement: JugementMJ, reponse: string) => void;
+  /** Pas de clé, ou l'IA a flanché : on renonce à la scène de cette semaine. */
+  abandonnerEvenement: () => void;
   // Lot 6 — agent et négociation de contrat
   choisirAgent: (id: string) => void;
   negocierOffre: (id: string) => ResultatNegociation | null;
@@ -451,6 +484,9 @@ export const useGame = create<GameState>()(
       skinActif: 'classique',
       pantheon: [],
       scenarioActif: null,
+      attenteEvenement: false,
+      evenementHebdo: null,
+      evenementsVus: [],
       compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
       tropheesEnAttente: [],
       offres: [],
@@ -536,6 +572,9 @@ export const useGame = create<GameState>()(
           joueur,
           ecran: 'carriere',
           scenarioActif: null,
+          attenteEvenement: false,
+          evenementHebdo: null,
+          evenementsVus: [],
           mouvementsClubs: {},
           compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
           // Nouvelle carrière : timeline et défis repartent de zéro. Les SUCCÈS,
@@ -1365,21 +1404,34 @@ export const useGame = create<GameState>()(
           ? notesVecues[notesVecues.length - 1]
           : resultat.note;
 
+        // ═══ LE RÉCIT DE LA SEMAINE ═══════════════════════════════════════
+        // ⚠️ LES « MOMENTS DÉCISIFS » ONT SAUTÉ (retour de jeu : « supprime les
+        // scénarios de matchs car le match est déjà passé »). On posait ici, une
+        // fois sur cinq, un choix de 80ᵉ minute — alors que la feuille de match
+        // venait d'être écrite au journal, score compris. Absurde, et ça ne
+        // pouvait pas l'être moins : `resultatSemaine` a déjà tout tranché.
+        //
+        // À la place : on DEMANDE une scène pour la semaine qui commence.
+        // L'écran s'en charge (l'appel à Groq est asynchrone) et rappelle
+        // `poserEvenementHebdo`. Sans clé, il retombe sur les scénarios à choix
+        // multiples du pool — le jeu reste entier hors ligne.
+        //
+        // L'interview d'après-match, elle, reste : elle arrive APRÈS le match,
+        // c'est sa raison d'être. Mais seulement quand aucune scène n'attend,
+        // pour ne jamais empiler deux choses à répondre.
         let suite: Scenario | null = null;
-        if (!get().scenarioActif) {
-          if (aJoue && Math.random() < 0.22) {
-            suite = momentAleatoire(j);
-          } else if (aJoue && note != null && Math.random() < 0.3) {
-            if (note >= 7.8) suite = interviewAleatoire('exploit');
-            else if (note <= 4.5) suite = interviewAleatoire('defaite');
-          } else if (!aJoue && sem.type === 'championnat' && Math.random() < 0.12) {
-            suite = interviewAleatoire('banc');
-          }
+        const rienEnCours = !get().scenarioActif && !get().evenementHebdo;
+        if (rienEnCours && aJoue && note != null && Math.random() < 0.18) {
+          if (note >= 7.8) suite = interviewAleatoire('exploit');
+          else if (note <= 4.5) suite = interviewAleatoire('defaite');
         }
 
         set((s) => ({
           joueur: j,
           scenarioActif: suite ?? s.scenarioActif,
+          // Une seule scène à la fois : si une interview vient de tomber, la
+          // semaine n'en réclame pas une deuxième.
+          attenteEvenement: rienEnCours && !suite,
           journal: [
             ...s.journal,
             // ⚠️ Si le match vient d'être JOUÉ en direct, on n'ajoute PAS le
@@ -1581,9 +1633,13 @@ export const useGame = create<GameState>()(
         }));
       },
 
-      lancerScenario: () => {
-        const { joueur, scenarioActif, compteurs } = get();
-        if (!joueur || scenarioActif || compteurs.situations >= MAX_PAR_SAISON) return;
+      lancerScenario: (compter = true) => {
+        const { joueur, scenarioActif, evenementHebdo, compteurs } = get();
+        if (!joueur || scenarioActif || evenementHebdo) return;
+        // ⚠️ LE RATIONNEMENT NE VAUT QUE POUR LE BOUTON MANUEL. Le récit
+        // hebdomadaire tombe chaque semaine — 43 fois par saison — et n'a rien à
+        // faire dans un compteur calibré pour deux situations par an.
+        if (compter && compteurs.situations >= MAX_PAR_SAISON) return;
         // ⚠️ LA SITUATION EST CONTEXTUELLE. On ne propose plus « ton premier
         // contrat pro » à un joueur de 33 ans : `situationPour` filtre sur
         // l'âge, la forme, le moral, la division, le contrat (data/situations.ts),
@@ -1620,6 +1676,103 @@ export const useGame = create<GameState>()(
             },
           ],
         }));
+      },
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // L'ÉVÈNEMENT DE LA SEMAINE
+      // ═══════════════════════════════════════════════════════════════════════
+      // Demande explicite : « chaque semaine Groq sort un évènement, le joueur
+      // répond en écrivant, et Groq juge la réponse — très sévère, en tenant
+      // compte des stats ».
+
+      poserEvenementHebdo: (evt) => {
+        const { joueur, scenarioActif, evenementHebdo } = get();
+        // Deux scènes en même temps, jamais : le joueur ne saurait plus à quoi
+        // il répond, et le MJ non plus.
+        if (!joueur || scenarioActif || evenementHebdo) return;
+        set((s) => ({
+          evenementHebdo: evt,
+          attenteEvenement: false,
+          // Les titres servent à l'IA pour ne pas se répéter ; douze suffisent.
+          evenementsVus: [...s.evenementsVus, evt.titre].slice(-12),
+          journal: [
+            ...s.journal,
+            {
+              id: idUnique(),
+              saison: joueur.saison,
+              role: 'mj',
+              titre: `${evt.emoji} ${evt.titre}`,
+              texte: evt.texte,
+            },
+          ],
+        }));
+      },
+
+      abandonnerEvenement: () => set({ attenteEvenement: false }),
+
+      appliquerJugement: (jugement, reponse) => {
+        const { joueur, evenementHebdo } = get();
+        if (!joueur || !evenementHebdo) return;
+
+        let j = appliquerDeltas(joueur, jugement.deltas);
+
+        // ⚠️ LA CONSÉQUENCE DURE N'EST JAMAIS UNE SURPRISE. `lib/ia.ts` ne l'a
+        // laissée passer que si la scène était marquée `risque` ET si la réponse
+        // du joueur allait au bout. C'est la traduction de la demande : « des
+        // folies furieuses qui peuvent mener à la mort, l'arrestation, etc. ».
+        let entreeDure: EntreeJournal | null = null;
+        let finale = false;
+        if (jugement.consequence) {
+          const effet = appliquerConsequence(
+            j, jugement.consequence, evenementHebdo.titre, 10,
+          );
+          j = effet.joueur;
+          finale = effet.finale;
+          entreeDure = {
+            id: idUnique(), saison: j.saison, role: 'systeme',
+            titre: `${effet.emoji} ${effet.titre}`, texte: effet.texte,
+          };
+        }
+
+        const entrees: EntreeJournal[] = [
+          { id: idUnique(), saison: j.saison, role: 'joueur', texte: reponse },
+          {
+            id: idUnique(),
+            saison: j.saison,
+            role: 'mj',
+            titre: jugement.titre,
+            texte: jugement.recit,
+            deltas: jugement.deltas,
+          },
+        ];
+        if (jugement.recadre) {
+          entrees.push({
+            id: idUnique(), saison: j.saison, role: 'systeme', titre: '⚖️ Réalisme',
+            texte:
+              'Le récit est joué, mais les gains ont été ramenés à ce qu’une carrière réelle permet. '
+              + 'On ne progresse pas en le demandant : entraîne-toi, joue, et laisse les saisons faire.',
+          });
+        }
+        if (entreeDure) entrees.push(entreeDure);
+
+        set((s) => ({
+          joueur: j,
+          evenementHebdo: null,
+          attenteEvenement: false,
+          coins: s.coins + 1,
+          compteurs: { ...s.compteurs, gainsIA: s.compteurs.gainsIA + jugement.attributsGagnes },
+          journal: [...s.journal, ...entrees],
+        }));
+
+        // ⚠️ UN TRANSFERT ANNONCÉ DOIT SE PRODUIRE. Le MJ ne change jamais de
+        // club dans son récit (le prompt le lui interdit) : quand la réponse du
+        // joueur revient à vouloir partir, on ouvre le VRAI marché — celui qui
+        // change le club, la division, le salaire et la durée quand on signe.
+        if (jugement.marche && !finale) get().demanderTransfert();
+
+        get().signalerDefi('situation');
+        get().verifierSucces();
+        if (finale) get().prendreRetraite();
       },
 
       // ---- AGENT (lot 6) : il prélève sa commission, mais ouvre les portes ----
@@ -1705,10 +1858,6 @@ export const useGame = create<GameState>()(
         const choix = scenarioActif.choix[index];
         if (!choix) return;
         let j = appliquerDeltas(joueur, choix.issue.deltas);
-        // Changement de club éventuel (offre de transfert acceptée)
-        if (choix.issue.transfert) {
-          j = { ...j, club: choix.issue.transfert.club, division: choix.issue.transfert.division };
-        }
         // Interviews (lot 6) : ce que tu dis change ce que le staff et le
         // public pensent de toi — et ces deux jauges-là ont des dents.
         if (choix.issue.coach != null || choix.issue.fans != null) {
@@ -1751,6 +1900,13 @@ export const useGame = create<GameState>()(
             ...(entreeDure ? [entreeDure] : []),
           ],
         }));
+        // ⚠️ UN CHOIX QUI DIT « JE PARS » OUVRE LE VRAI MARCHÉ. Avant, une issue
+        // pouvait porter `transfert: { club, division }` et réécrire la fiche du
+        // joueur : club changé, mais contrat, salaire et durée inchangés — et en
+        // pratique aucun scénario ne le remplissait, si bien que « Offre d'un
+        // club plus huppé » racontait un départ qui n'arrivait jamais.
+        if (choix.issue.marche && !finale) get().demanderTransfert();
+
         get().signalerDefi('situation');
         get().verifierSucces();
         // Fin de carrière imposée : on fige la carrière dans le panthéon.
@@ -1797,6 +1953,9 @@ export const useGame = create<GameState>()(
           mouvementsClubs: {},
           journal: [],
           scenarioActif: null,
+          attenteEvenement: false,
+          evenementHebdo: null,
+          evenementsVus: [],
           tropheesEnAttente: [],
           offres: [],
           offresOuvertes: false,
@@ -1814,6 +1973,9 @@ export const useGame = create<GameState>()(
           joueur: null,
           journal: [],
           scenarioActif: null,
+          attenteEvenement: false,
+          evenementHebdo: null,
+          evenementsVus: [],
           tropheesEnAttente: [],
           offres: [],
           offresOuvertes: false,
@@ -2356,10 +2518,13 @@ export const useGame = create<GameState>()(
       // Appelé après chaque action qui fait bouger la carrière. Un succès ne
       // tombe qu'une fois, et rapporte ses Ovas au moment où il tombe.
       verifierSucces: () => {
-        const { joueur, posts, pantheon, succesDebloques } = get();
+        const { joueur, posts, pantheon, succesDebloques, coins } = get();
         if (!joueur) return;
         const nouveaux = evaluerSucces(
-          { joueur, posts, abonnes: joueur.abonnes ?? 0, pantheon },
+          {
+            joueur, posts, abonnes: joueur.abonnes ?? 0, pantheon, coins,
+            succesFaits: Object.keys(succesDebloques).length,
+          },
           succesDebloques,
         );
         if (!nouveaux.length) return;
@@ -2555,11 +2720,11 @@ export const useGame = create<GameState>()(
           // ⚠️ On rejoue la fenêtre où le joueur est RÉELLEMENT engagé : chez les
           // A s'il y est appelé, sinon chez les U20 s'il y a l'âge et le niveau.
           const nation = nomNation(joueur.nation);
-          const fenA = fenetreInternationale(joueur.semaine ?? 1, joueur.saison);
+          const equipeJeune = equipeU20(joueur.nation);
+          const fenA = fenetreInternationale(joueur.semaine ?? 1, joueur.saison, nation);
           const chezLesA = !!fenA && fenA.competition.equipes.includes(nation)
             && convocation(joueur).selectionne;
-          const fenJ = chezLesA ? null : fenetreU20(joueur.semaine ?? 1, joueur.saison);
-          const equipeJeune = equipeU20(joueur.nation);
+          const fenJ = chezLesA ? null : fenetreU20(joueur.semaine ?? 1, joueur.saison, equipeJeune);
           const chezLesJeunes = !chezLesA && !!fenJ
             && fenJ.competition.equipes.includes(equipeJeune)
             && convocationU20(joueur).selectionne;
@@ -2679,6 +2844,8 @@ export const useGame = create<GameState>()(
           conversations?: Record<string, MessageDM[]>;
           transfertsSociaux?: TransfertAnnonce[];
           relationsSociales?: Record<string, number>;
+          evenementHebdo?: EvenementHebdo | null;
+          evenementsVus?: string[];
         };
         if (!s) return s;
         if (version < 2 && s.joueur) {
@@ -2722,6 +2889,9 @@ export const useGame = create<GameState>()(
         s.relationsSociales ??= {};
         s.succesDebloques ??= {};
         s.defis ??= { cle: '', faits: [] };
+        // Le récit hebdomadaire : absent des sauvegardes d'avant.
+        s.evenementHebdo ??= null;
+        s.evenementsVus ??= [];
         return s;
       },
       // La pyramide (qui joue dans quelle division) vit dans un registre de
@@ -2746,6 +2916,13 @@ export const useGame = create<GameState>()(
         skinActif: s.skinActif,
         pantheon: s.pantheon,
         scenarioActif: s.scenarioActif,
+        // La scène de la semaine est persistée : fermer l'onglet en plein
+        // milieu ne doit pas escamoter la question qui attend une réponse.
+        evenementHebdo: s.evenementHebdo,
+        evenementsVus: s.evenementsVus,
+        // `attenteEvenement`, lui, ne l'est PAS : c'est un ordre donné à l'écran,
+        // pas un état du monde. Le persister ferait rejouer un appel Groq à
+        // chaque rechargement de page.
         compteurs: s.compteurs,
         tropheesEnAttente: s.tropheesEnAttente,
         offres: s.offres,

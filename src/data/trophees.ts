@@ -10,7 +10,23 @@ export interface Trophee {
   couleur: string; // teinte de l'aura dans la modale
   desc: string;
   ovas: number; // récompense (économie dure : reste modeste)
+  /**
+   * ⚠️ N'À RENSEIGNER QUE POUR LES BOUCLIERS QUI N'EN ONT PAS LA FORME.
+   * L'armoire à trophées reconnaît un bouclier à sa boîte englobante (plat et
+   * large, `estBouclier()` dans `lib/armoire.ts`) : elle l'adosse au meuble au
+   * lieu de le poser sur une tablette. Le Brennus est livré AVEC son socle —
+   * mesuré, il est aussi épais qu'une coupe — d'où cette déclaration.
+   */
+  forme?: 'bouclier';
 }
+
+/**
+ * À partir de ce montant d'Ovas, un trophée est une PIÈCE MAJEURE : il quitte la
+ * vitrine et se dresse au sol, à hauteur de buste (voir `lib/armoire.ts`). Les
+ * Ovas sont la seule mesure de prestige du jeu, et elle est calibrée pour ça :
+ * pas besoin d'une deuxième liste à tenir à jour.
+ */
+export const OVAS_PIECE_MAJEURE = 12;
 
 export const TROPHEES: Record<string, Trophee> = {
   brennus: {
@@ -20,6 +36,7 @@ export const TROPHEES: Record<string, Trophee> = {
     couleur: '#e8b23a',
     desc: 'Champion de France — Top 14. Le Graal du rugby français.',
     ovas: 12,
+    forme: 'bouclier',
   },
   prod2: {
     id: 'prod2',
@@ -36,6 +53,7 @@ export const TROPHEES: Record<string, Trophee> = {
     couleur: '#b3653a',
     desc: 'Champion de Nationale. Le tremplin vers le monde pro.',
     ovas: 6,
+    forme: 'bouclier',
   },
   nationale2: {
     id: 'nationale2',
@@ -44,6 +62,7 @@ export const TROPHEES: Record<string, Trophee> = {
     couleur: '#a8703f',
     desc: 'Champion de Nationale 2. La dernière marche avant le monde pro.',
     ovas: 5,
+    forme: 'bouclier',
   },
   federale: {
     id: 'federale',
@@ -52,6 +71,7 @@ export const TROPHEES: Record<string, Trophee> = {
     couleur: '#9a6b45',
     desc: 'Champion de Fédérale : le vrai rugby de clocher, et un titre qui compte.',
     ovas: 4,
+    forme: 'bouclier',
   },
   regionale: {
     id: 'regionale',
@@ -60,6 +80,7 @@ export const TROPHEES: Record<string, Trophee> = {
     couleur: '#8d7350',
     desc: 'Champion de Régionale. Le bouclier du dimanche après-midi — on s’en souvient toute une vie.',
     ovas: 3,
+    forme: 'bouclier',
   },
   champions: {
     id: 'champions',
@@ -166,6 +187,7 @@ export const TROPHEES: Record<string, Trophee> = {
     couleur: '#3f7fd6',
     desc: 'Le bouclier américain. Tu as conquis le Nouveau Monde.',
     ovas: 9,
+    forme: 'bouclier',
   },
 
   // --- Les vingt championnats et coupes du dossier « nouvellecoupe » ---------

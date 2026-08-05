@@ -287,7 +287,10 @@ export function Tableau() {
   const saison = joueur?.saison ?? 1;
   const internationales = useMemo(() => competitionsDeLaSaison(saison), [saison]);
   const maNation = nomNation(joueur?.nation ?? '');
-  const fenetre = useMemo(() => fenetreInternationale(numero, saison), [numero, saison]);
+  const fenetre = useMemo(
+    () => fenetreInternationale(numero, saison, maNation),
+    [numero, saison, maNation],
+  );
   const maSelection = useMemo(
     () => internationales.find((c) => c.equipes.includes(maNation))?.id ?? '',
     [internationales, maNation],

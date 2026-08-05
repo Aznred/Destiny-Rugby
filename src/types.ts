@@ -309,6 +309,31 @@ export interface ReponseMJ {
   choix?: string[];
 }
 
+/**
+ * L'ÉVÈNEMENT DE LA SEMAINE — le cœur du récit.
+ *
+ * Demande explicite : « au lieu d'avoir des boutons, chaque semaine Groq sort un
+ * évènement ; le joueur répond en écrivant et Groq juge la réponse ». Ce n'est
+ * donc PAS un scénario à choix : il n'y a pas d'options, seulement une situation
+ * et un champ de saisie. Les choix multiples restent le mode hors ligne.
+ */
+export interface EvenementHebdo {
+  id: string;
+  emoji: string;
+  titre: string;
+  texte: string;
+  /**
+   * ⚠️ LE PERMIS DE TUER, ET RIEN D'AUTRE. Une conséquence dure (prison,
+   * accident, décès, exclusion) n'est acceptée du juge QUE si l'évènement
+   * lui-même mettait le joueur en danger. Sans ce garde-fou, une réponse
+   * maladroite à « le kiné te propose un massage » pouvait finir à la morgue :
+   * le jeu ne punit jamais au hasard (voir `lib/consequences.ts`).
+   */
+  risque: boolean;
+  /** Semaine de jeu où il a été posé : sert à ne pas en poser deux d'affilée. */
+  semaine: number;
+}
+
 export type Ecran =
   | 'accueil'
   | 'creation'

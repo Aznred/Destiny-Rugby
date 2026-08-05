@@ -69,8 +69,8 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
 
     // ---- FENÊTRE INTERNATIONALE : le classement de MA sélection ----
     if (!rapide && !amateur && sem.type === 'international') {
-      const fenetre = fenetreInternationale(numero, joueur.saison);
       const nation = nomNation(joueur.nation);
+      const fenetre = fenetreInternationale(numero, joueur.saison, nation);
       if (fenetre && fenetre.competition.equipes.includes(nation)) {
         const id = fenetre.competition.id;
         const etat = internationalEnDirect(

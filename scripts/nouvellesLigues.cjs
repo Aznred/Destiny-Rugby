@@ -156,12 +156,16 @@ const CLUBS = [
     // UNIONS, sous leur nom propre : les Vodacom Bulls de l'URC deviennent les
     // Blue Bulls, les Emirates Lions les Golden Lions, la Western Province les
     // Stormers XXIII. Des noms distincts, donc aucune collision d'effectif.
+    // ⚠️ Idem pour Bloemfontein, et la règle avait été appliquée À L'ENVERS :
+    // l'union s'appelle « Free State Cheetahs » et c'est ELLE qui joue la Currie
+    // Cup ; la franchise « Toyota Cheetahs » dispute les coupes d'Europe et est
+    // déclarée dans `scripts/ligues.cjs`.
     equipes: [
       ['Bulls', 'Blue Bulls'],
       ['Sharks', 'Sharks XV'],
       ['Lions', 'Golden Lions'],
       ['Stormers XXIII', 'Stormers XXIII'],
-      ['Cheetahs', 'Toyota Cheetahs'],
+      ['Cheetahs', 'Free State Cheetahs'],
       ['Pumas', 'Airlink Pumas'],
       ['Griquas', 'Griquas'],
       ['Boland Cavaliers', 'Boland Cavaliers'],

@@ -287,6 +287,7 @@ export function affichesInternationales(
 function fenetreDe(
   numeroSemaine: number, saison: number,
   retenir: (c: CompetitionInternationale) => boolean,
+  equipe?: string,
 ): { competition: CompetitionInternationale; journee: number } | null {
   const sem = semaine(numeroSemaine);
   if (sem.type !== 'international') return null;
@@ -295,21 +296,37 @@ function fenetreDe(
   const memeFenetre = (s: typeof sem) => s.type === 'international'
     && ((s.competitionInternationale === 'autumn') === (fenetre === 'automne'));
   const dejaFaites = CALENDRIER.slice(0, numeroSemaine - 1).filter(memeFenetre).length;
-  const competition = competitionsDeLaSaison(saison).find((c) => c.fenetre === fenetre && retenir(c));
+  const ouvertes = competitionsDeLaSaison(saison).filter((c) => c.fenetre === fenetre && retenir(c));
+  // ⚠️ LA COMPÉTITION DE **TON** PAYS D'ABORD (correctif signalé en jeu :
+  // « c'est dur d'atteindre des sélections pour des nations faibles alors qu'on
+  // est très bon »). On prenait la PREMIÈRE compétition de la fenêtre, toujours
+  // la même : le Tournoi des 6 Nations en février, la tournée d'automne en
+  // novembre. Un Belge, un Portugais ou un Roumain n'y figure pas — sa
+  // convocation était donc refusée à CHAQUE fenêtre de sa carrière, quel que
+  // soit son niveau, alors que le Rugby Europe Championship existait juste à
+  // côté et qu'il n'y avait personne pour le lui ouvrir.
+  const competition = (equipe && ouvertes.find((c) => c.equipes.includes(equipe))) || ouvertes[0];
   if (!competition) return null;
   return { competition, journee: Math.min(competition.journees, dejaFaites + 1) };
 }
 
-export function fenetreInternationale(numeroSemaine: number, saison: number) {
+/**
+ * La compétition de sélections qui se joue cette semaine-là.
+ *
+ * @param equipe si elle est fournie, on retient EN PRIORITÉ la compétition où
+ *               cette sélection est engagée — c'est ce qui permet à un joueur
+ *               d'une nation hors 6 Nations d'être appelé chez lui.
+ */
+export function fenetreInternationale(numeroSemaine: number, saison: number, equipe?: string) {
   // ⚠️ On écarte explicitement les compétitions U20 : sinon, une saison de Coupe
   // du monde (où la tournée d'automne disparaît), le Championnat du monde U20
   // serait devenu la compétition « séniors » de la fenêtre.
-  return fenetreDe(numeroSemaine, saison, (c) => !COMPETITIONS_U20.has(c.id));
+  return fenetreDe(numeroSemaine, saison, (c) => !COMPETITIONS_U20.has(c.id), equipe);
 }
 
 /** La compétition U20 qui se joue cette semaine-là, s'il y en a une. */
-export function fenetreU20(numeroSemaine: number, saison: number) {
-  return fenetreDe(numeroSemaine, saison, (c) => COMPETITIONS_U20.has(c.id));
+export function fenetreU20(numeroSemaine: number, saison: number, equipe?: string) {
+  return fenetreDe(numeroSemaine, saison, (c) => COMPETITIONS_U20.has(c.id), equipe);
 }
 
 // Journées déjà disputées par une compétition à cette semaine du calendrier.
@@ -336,11 +353,11 @@ export function matchInternationalDuJoueur(
 ): AfficheInternationale | null {
   const sem = semaine(j.semaine ?? 1);
   if (sem.type !== 'international') return null;
-  const fen = u20
-    ? fenetreU20(j.semaine ?? 1, j.saison)
-    : fenetreInternationale(j.semaine ?? 1, j.saison);
-  if (!fen) return null;
   const nation = u20 ? equipeU20(j.nation) : nomNation(j.nation);
+  const fen = u20
+    ? fenetreU20(j.semaine ?? 1, j.saison, nation)
+    : fenetreInternationale(j.semaine ?? 1, j.saison, nation);
+  if (!fen) return null;
   if (!fen.competition.equipes.includes(nation)) return null;
 
   const affiches = grille(fen.competition)[fen.journee - 1] ?? [];

@@ -585,6 +585,22 @@
   background: rgba(255, 255, 255, 0.07); border-radius: 5px;
   padding: 0.05em 0.35em; font-size: 0.86em;
 }
+/* ⚠️ LE BLOC DÉFILE DANS SON CONTENEUR, jamais la page. Une fiche JSON ou un
+   schéma SQL est plus large qu'un téléphone : sans ça, l'écran entier partait
+   de côté (même règle que les poules de coupe et l'arbre de phase finale). */
+.fiche-envoi {
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--bordure);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  margin: 0.6rem 0;
+  overflow-x: auto;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: var(--craie-dim);
+  white-space: pre;
+  tab-size: 2;
+}
 .ligne-classement {
   display: grid; grid-template-columns: 3rem 1fr 3.4rem 4rem 5.4rem; align-items: center;
   gap: 0.5rem; padding: 0.7rem 0.8rem; border-radius: 10px; font-size: 0.92rem;

@@ -1838,3 +1838,350 @@ npx vite-node scripts/verifU20.ts             # compétitions U20, écussons, dr
 npx vite-node scripts/verifTraductions.ts     # clés, couverture, écrans branchés
 node scripts/copierLogosSelections.cjs        # « bonne selection/ » → public/logos/
 ```
+
+
+## 📖 LE RÉCIT HEBDOMADAIRE — la boucle de jeu a changé
+
+⚠️ **C'est la modification la plus structurante depuis le moteur de match.**
+Demande explicite : « au lieu d'avoir des boutons chaque semaine, Groq sort un
+évènement ; les évènements peuvent être très variés, du sportif aux folies
+furieuses qui peuvent mener à la mort, à l'arrestation, etc. ; le joueur répond
+en **écrivant** et Groq juge la réponse — il doit être **très sévère** et prendre
+en compte les stats. Sinon, juste des scénarios et des réponses à choix
+multiples. »
+
+### La boucle
+
+| Avant | Maintenant |
+|---|---|
+| un bouton « 📖 La vie hors du terrain », **2 fois par saison** | une scène **chaque semaine**, automatique |
+| des choix multiples, toujours | on **écrit** sa réponse (avec clé) · choix multiples (sans clé) |
+| un « moment décisif » de 80ᵉ minute posé **après** le coup de sifflet | supprimé |
+| un transfert **raconté** qui n'arrivait jamais | le **vrai marché** s'ouvre, et signer déplace vraiment le joueur |
+
+Trois états, **jamais deux à la fois** : `evenementHebdo` (une réponse écrite est
+attendue), `scenarioActif` (un clic est attendu), ou rien (action libre).
+
+| Fichier | Ce qui change |
+|---|---|
+| `src/lib/ia.ts` | **`genererEvenementHebdo()`** pose la scène (2-4 phrases, aucune option, un champ `risque`) et **`jugerReaction()`** tranche. Les prompts imposent la variété (sportif, club, médias, argent, vie perso, nuit et dérives, pur hasard) et la sévérité (l'échec est l'issue normale, `deltas: {}` la réponse la plus fréquente). |
+| `src/store/useGame.ts` | `attenteEvenement` (un ordre donné à l'écran, **non persisté**), `evenementHebdo` et `evenementsVus` (persistés). `poserEvenementHebdo`, `appliquerJugement`, `abandonnerEvenement`. |
+| `src/screens/Carriere.tsx` | La boucle. ⚠️ C'est l'**écran** qui fabrique la scène : l'appel Groq est asynchrone, le store est synchrone. Un verrou de ré-entrée (`fabrique`) empêche deux générations pour la même semaine. |
+| `src/components/PanneauJoueur.tsx` | **On n'avance plus en laissant une question en plan** : « Semaine suivante » et « Fin de saison » sont bloqués tant qu'on n'a pas répondu. |
+
+### ⚠️ CE QUI PROTÈGE LE JOUEUR
+
+- **Les deltas repassent par `plafonnerDeltas`**, budget de saison compris
+  (`BUDGET_IA_PAR_SAISON` = 4). Quarante-trois semaines de récit ne déplacent
+  donc **pas** l'étalonnage de difficulté : mesuré après la bascule, médiane 63,
+  90ᵉ centile 80, maximum 85, ≥ 80 : 10/100. Inchangé.
+- **`ressembleATriche()` s'applique aussi ici** : « donne-moi +10 en vitesse »
+  garde son récit et ne rapporte rien.
+- **UNE CONSÉQUENCE DURE EXIGE UNE SCÈNE DANGEREUSE.** Le générateur marque
+  environ une scène sur cinq `risque: true` ; `parserJugement` **refuse**
+  `consequence` sur toutes les autres. Sans ce verrou, une réponse maladroite à
+  « le kiné te propose un massage » pouvait finir à la morgue. Une valeur
+  inventée (« teleportation ») est ignorée.
+- **LE MJ NE CHANGE JAMAIS DE CLUB DANS SON RÉCIT.** Le prompt le lui interdit ;
+  il peut seulement lever `marche: true`, ce qui ouvre le **vrai** panneau
+  « Choix de carrière » (`demanderTransfert`). Le club, la division, le salaire
+  et la durée ne bougent qu'à la **signature**.
+
+### ⚠️ LES TRANSFERTS DE FAÇADE ONT DISPARU
+
+`IssueChoix.transfert: { club, division }` a été **supprimé** au profit de
+`marche?: boolean`. L'ancien champ écrivait le nom du nouveau club dans la fiche
+sans toucher au contrat, au salaire ni à la division — et **aucun scénario ne le
+remplissait**, si bien que « Offre d'un club plus huppé » racontait un départ qui
+n'arrivait jamais. C'est le bug signalé : « les transferts marchent pas ».
+
+### ⚠️ LES MOMENTS DÉCISIFS SONT SUPPRIMÉS
+
+`data/moments.ts` et `data/textesMoments.ts` ont été **effacés**. Ils posaient un
+choix de 80ᵉ minute (« mêlée à cinq mètres de ta ligne, que dis-tu au pack ? »)
+**après** la sirène, alors que la feuille de match était déjà au journal, score
+compris. Le match se joue dans le moteur 2D (`lib/moteur/`), et nulle part
+ailleurs. L'**interview d'après-match**, elle, reste : elle arrive après le
+match, c'est sa raison d'être — mais seulement quand aucune scène n'attend.
+
+### 💸 CE QUE ÇA COÛTE, HONNÊTEMENT
+
+La section « ÉCONOMIE DE TOKENS GROQ » plus haut annonçait **1 appel par semaine
+de jeu** (le fil de L'Ovale). Ce n'est plus vrai : le récit en ajoute **2** — la
+scène (`maxTokens` 420) et son jugement (520). Soit **3 appels par semaine**,
+~130 par saison. C'est le prix demandé, il est assumé, et il reste mesuré :
+`consoGroq()` le compte et ⚙️ Réglages l'affiche. Sans clé, le coût est nul et le
+jeu reste **entier** (choix multiples tirés de `data/scenarios.ts` et
+`data/situations.ts`, sans rationnement — `lancerScenario(false)`).
+
+Vérification sans navigateur : `npx vite-node scripts/verifRecit.ts`
+(scène demandée chaque semaine, dix semaines hors ligne, plafonds et budget,
+verrou des conséquences dures, transfert réellement appliqué, zéro moment
+décisif sur 40 semaines).
+
+
+## 🩹 Trois correctifs de données (mêmes retours de jeu)
+
+### ⚠️ LES SÉLECTIONS DES PETITES NATIONS ÉTAIENT INATTEIGNABLES
+
+« C'est dur d'atteindre des sélections pour des nations faibles alors qu'on est
+très bon. » **La cause n'était pas le palier, c'était le calendrier.**
+`convocation()` ouvrait grand la porte (palier par défaut 55, quasi aucune
+concurrence dans les effectifs professionnels)… mais `fenetreDe()` retenait la
+**PREMIÈRE** compétition de la fenêtre, toujours la même : le Tournoi des
+6 Nations en février, la tournée d'automne en novembre. Un Belge, un Portugais ou
+un Roumain n'y figure pas — il n'était donc **jamais** aligné, quel que soit son
+niveau, alors que le Rugby Europe Championship se jouait sur la même fenêtre.
+
+`fenetreInternationale(semaine, saison, equipe)` retient désormais en priorité la
+compétition où **sa** sélection est engagée. Mesuré : Portugal, Roumanie,
+Espagne, Belgique, Pays-Bas, Allemagne et Suisse ont **5 fenêtres sur 8** (Rugby
+Europe Championship) et un joueur à 78 de générale y est **convoqué et aligné**.
+Les grandes nations ne bougent pas : un joueur moyen reste dehors, une star est
+prise. Vérification : `npx vite-node scripts/verifSelection.ts`.
+
+⚠️ Les 3 fenêtres d'automne restent sans compétition pour ces nations : la
+tournée d'automne est un plateau Nord/Sud fermé. C'est voulu, pas un oubli.
+
+### ⚠️ LES CLUBS AMATEURS N'AVAIENT PAS DE NOTE
+
+« Les clubs de Nationale 2 à Régionale 3 n'ont pas leur générale marquée dans la
+section Clubs. » Elle n'y était pas parce qu'elle **n'existait pas** : tous les
+clubs d'un étage partageaient `NOTE_PAR_NIVEAU`, donc l'afficher revenait à
+répéter le niveau de la division sur les 157 cartes de la Fédérale 3.
+
+**`noteAmateur(nomClub, niveau)`** (`lib/effectif.ts`) la tire du **nom du club**,
+de façon déterministe — comme on tire déjà l'âge et la note de ses joueurs.
+Étalement **±4**, loi **triangulaire** : la hiérarchie des étages ne se brouille
+jamais, mais dans une poule on distingue enfin celui qui vise la montée de celui
+qui lutte. ⚠️ **C'est la MÊME note qui compose l'effectif du club**
+(`effectifAmateur`), donc la carte de l'atlas et la fiche du club disent la même
+chose. Mesuré en jeu : Nationale 2 58-60, Fédérale 3 39-45, Régionale 3 29-32.
+
+⚠️ **Étalonnage revérifié** : `verifDifficulte.ts` → médiane 63, max 85,
+≥ 80 : 10/100 ; `verifPyramide.ts` → aucune division ne change de taille sur
+12 saisons.
+
+### ⚠️ LES DEUX CHEETAHS ÉTAIENT INVERSÉS
+
+« Les Cheetahs sont dans la Currie Cup. » Bloemfontein a **deux** entités, et le
+jeu leur avait donné le mauvais nom chacune :
+
+| | Avant | Maintenant |
+|---|---|---|
+| Coupes d'Europe (effectif réel, note 66) | *Free State Cheetahs* | **Toyota Cheetahs** — la franchise |
+| Currie Cup (effectif généré, note 62) | *Toyota Cheetahs* | **Free State Cheetahs** — l'union |
+
+La Currie Cup se joue avec les **unions** sous leur nom propre (Blue Bulls,
+Golden Lions, Sharks XV…) : la règle existait déjà dans `nouvellesLigues.cjs`,
+elle était simplement appliquée à l'envers pour Bloemfontein. Corrigé dans les
+deux tables sources (`scripts/ligues.cjs` et `scripts/nouvellesLigues.cjs`), puis
+`node scripts/genMonde.cjs` et `node scripts/genNouvellesLigues.cjs`.
+
+⚠️ **Bug de générateur corrigé au passage** : `genMonde.cjs` écrivait
+`import type { PosteId }` alors qu'il émet des **familles** de poste
+(« pilier », « deuxieme_ligne »…). `PosteId`, ce sont les quinze maillots
+numérotés : le fichier généré ne compilait pas tant qu'on ne le rectifiait pas à
+la main après chaque régénération. Il écrit maintenant `FamillePoste`.
+
+### Les scripts de vérification ajoutés
+
+```bash
+npx vite-node scripts/verifRecit.ts       # récit hebdomadaire, plafonds, transferts réels
+npx vite-node scripts/verifSelection.ts   # sélections atteignables, petites nations comprises
+```
+
+
+## 🗄️ L'ARMOIRE À TROPHÉES — les étagères sont MESURÉES, plus devinées
+
+Retour de jeu : « les trophées font minuscules et certains sont entre deux
+étagères ; j'aimerais que le bouclier de Brennus soit grand à côté de l'armoire
+et certains boucliers contre l'armoire, posés ; le bouclier fait la taille d'un
+buste de rugbyman, et les grosses coupes pareil ».
+
+### ⚠️ LA GRILLE INVENTÉE ÉTAIT LE BUG
+
+La première version découpait la boîte englobante du meuble en **4 × 4** et
+espérait tomber juste. Le `.glb` fourni a **six** tablettes, à des hauteurs
+irrégulières : une rangée sur deux flottait donc en l'air. Mesuré sur le modèle
+réel (hauteur normalisée à 4) — la grille tombait sur 3,01 / 2,25 / 1,49 / 0,73,
+les vraies tablettes sont à **3,04 / 2,51 / 2,00 / 1,47 / 1,00 / 0,59**. Une fois
+sur deux, ça tombait juste ; l'autre fois, le trophée était en l'air.
+
+**`detecterEtageres(geos, dims)`** (`lib/armoire.ts`) lit la géométrie : elle
+accumule l'aire des faces **horizontales tournées vers le haut** par tranche de
+hauteur, regroupe les tranches voisines, et ne garde que les surfaces qui
+traversent le meuble. ⚠️ Le dessus du meuble est horizontal lui aussi : on
+l'écarte parce qu'il n'a **rien au-dessus** — une étagère se définit par son
+plafond (les faces tournées vers le **bas**), pas par une liste codée en dur.
+Chaque tablette connaît donc sa hauteur libre, et c'est elle qui donne sa taille
+au trophée (90 % du vide). Repli sur une grille régulière si un futur `.glb`
+n'est pas lisible.
+
+### Les pièces de prestige sont AU SOL, à hauteur de buste
+
+Les tablettes font ~13 cm à l'échelle réelle : **tout** ce qu'on y pose est petit,
+c'est mécanique. Les boucliers et les grandes coupes se dressent donc au sol,
+à **34 % de la hauteur du meuble** (~70 cm : un buste), la pièce maîtresse à
+39 %. Soit **1,55 contre 0,52** pour un trophée de vitrine — trois fois plus
+imposant.
+
+- **Qui sort** : `ovas ≥ OVAS_PIECE_MAJEURE` (12 — les Ovas sont la mesure de
+  prestige du jeu, pas besoin d'une deuxième liste) **ou** un bouclier.
+- **Qui est un bouclier** : la boîte englobante (`estBouclier`, plat et large)
+  **ou** `forme: 'bouclier'` dans `data/trophees.ts`. ⚠️ Le Brennus est livré
+  avec son socle — mesuré, il est aussi épais qu'une coupe : la géométrie seule
+  ne le reconnaît pas, d'où la déclaration.
+- **Où** : trois rangs par côté, le rang 0 collé au flanc. Les boucliers passent
+  devant dans la file (`sort` stable) et s'inclinent de 0,15 rad : ce sont eux
+  qu'on adosse au meuble.
+- ⚠️ **LE SOL EST BORNÉ À SIX PIÈCES** (`MAX_SOL`). Une version intermédiaire
+  sortait tout : sur un palmarès complet, douze pièces s'alignaient, la scène
+  faisait **18 unités de large** et la caméra reculait si loin que le meuble
+  devenait un timbre-poste. Au-delà de six, les pièces majeures restent en
+  vitrine — et le pied de la modale dit déjà ce qui n'est pas montré.
+
+### Le cadrage est calculé
+
+**`cadrage(boites, dims, fov, rapport)`** place la caméra. ⚠️ **La profondeur
+compte** : une pièce posée devant le meuble est plus PRÈS de la caméra, donc plus
+large à l'écran. Ne cadrer que sur `x` la faisait sortir par les côtés. Chaque
+pièce doit tenir **à sa distance** (`d − z`). Et le format du canvas aussi :
+790 px de large sur ordinateur, 337 px sur téléphone — une distance figée
+laissait les pièces du sol hors champ sur mobile. Mesuré : caméra à 8,07 sur
+ordinateur, 11,76 sur téléphone, **0 pièce hors champ**.
+
+### Le script de vérification décode vraiment la géométrie
+
+⚠️ L'ancienne version se contentait des bornes `min`/`max` de l'accesseur
+POSITION, lisibles dans le chunk JSON du GLB : de quoi mesurer une boîte, pas de
+quoi trouver des étagères. `scripts/verifArmoire.ts` passe maintenant le maillage
+au **décodeur Draco livré avec `three`** (aucune dépendance de plus). ⚠️ `three`
+se déclare `"type": "module"`, si bien qu'un `require()` de
+`draco_decoder.js` renvoie un espace de noms ESM **vide** : on lit le fichier et
+on l'évalue nous-mêmes.
+
+```bash
+npx vite-node scripts/verifArmoire.ts   # 6 tablettes, rien ne flotte, rien ne déborde, cadrage mobile
+```
+
+
+## 🏆 SUCCÈS (68) ET CLASSEMENT MONDIAL INFALSIFIABLE
+
+Demande explicite : « rajoute une vingtaine de succès, prépare le classement
+mondial, et protège à fond pour que ce soit incassable à falsifier son score ;
+dans la DB je veux retenir juste le score ».
+
+### 24 succès de plus — 44 → **68**
+
+`ContexteSucces` gagne deux champs optionnels (`coins`, `succesFaits`) : sans
+eux, impossible de récompenser le magot ou la collection. Les nouveaux couvrent
+ce qu'aucun succès ne lisait encore :
+
+| Famille | Ce qu'ils lisent |
+|---|---|
+| **Le métier** (7) | `Joueur.stats` — 1 000 points, 80 % au pied sur 100 tentatives, 100 passes décisives, 2 000 plaquages, 100 matchs sans carton, carton rouge, 100 essais |
+| **La durée** (4) | 38 ans, 15 saisons, blessure d'une saison, atteindre son potentiel |
+| **La sélection** (3) | 100 capes, cape avant 21 ans, Rugby Europe Championship |
+| **Le palmarès** (3) | titre dès la saison 1, champion de 3 championnats, les 3 coupes d'Europe |
+| **Hors du terrain** (5) | 5 M€, 500 Ovas, popularité 90, confiance du staff 90, 3 inimitiés |
+| **Méta** (2) | trois carrières au Hall, 50 succès débloqués |
+
+⚠️ **Les succès de statistiques n'existent vraiment qu'en mode « journée par
+journée »** : c'est le seul mode où `Joueur.stats` est réellement accumulé. `?? 0`
+partout — une carrière jouée en mode rapide ne débloque rien, mais ne plante pas.
+Mesuré : **0 plantage et 0 succès décerné** sur une carrière vierge.
+
+### ⚠️ LE CLASSEMENT : la vérité avant l'architecture
+
+Destiny Rugby tourne **entièrement dans le navigateur**. Le joueur possède la
+machine qui calcule : il peut éditer son `localStorage`, modifier le bundle,
+appeler l'API à la main. **Aucun code livré au navigateur ne peut garantir un
+score**, et un secret embarqué dans le bundle se lit en vingt secondes.
+
+La seule protection réelle : **le serveur ne fait jamais confiance au score
+envoyé — il le RECALCULE.** D'où une architecture qui satisfait aussi « dans la
+DB juste le score » :
+
+```
+   navigateur                    Edge Function                     base
+┌──────────────────┐      ┌───────────────────────────┐     ┌────────────┐
+│ FicheCarriere    │ POST │ 1. débit (1/h, 10/j)      │     │ pseudo     │
+│ saisons, matchs, │  →   │ 2. verifierFiche()        │  →  │ score      │
+│ essais, titres…  │      │ 3. score = scoreDeLaFiche │     │ cree_le    │
+└──────────────────┘      │ 4. jette la fiche         │     └────────────┘
+                          └───────────────────────────┘
+```
+
+La **requête** porte les faits (pour pouvoir recalculer), la **base** ne garde
+que le score. La fiche est jetée aussitôt vérifiée.
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/classementMondial.ts` | ⚠️ **AUCUNE DÉPENDANCE, AUCUN IMPORT DU STORE, AUCUN DOM** — il est fait pour tourner des DEUX côtés. `scoreDeLaFiche()` (le barème), `verifierFiche()` (le crible), `LIMITES`, `SCORE_MAX`, `ficheDepuisJoueur()`, et le sceau. Les imports de types disparaissent à la compilation : le fichier reste copiable tel quel côté serveur. |
+| `serveur/classement.ts` | L'Edge Function Deno. Elle **importe** le barème du jeu — elle ne le recopie pas. |
+| `serveur/schema.sql` | La table (`pseudo`, `score`, `cree_le`), RLS **sans policy d'insertion**, et `poser_score()` qui ne garde que le meilleur. |
+| `serveur/README.md` | Le déploiement, et ce que ce dossier ne fait PAS. |
+
+⚠️ **`scoreCarriere()` (store) DÉLÈGUE désormais à `scoreDeLaFiche()`.** C'était la
+condition non négociable : deux exemplaires du barème, c'est un jour deux
+vérités — un serveur qui refuse des scores légitimes, ou en accepte
+d'impossibles. Le test `scoreCarriere() == scoreDeLaFiche()` verrouille ça.
+
+### ⚠️ CE QUI ARRÊTE VRAIMENT UN TRICHEUR : la cohérence interne
+
+Le plafond global (`SCORE_MAX` = **64 488**) ne sert presque à rien tout seul :
+il autorise encore « 30 saisons, 1 500 matchs ». Ce qui coince, c'est que **chaque
+chiffre est borné par les autres** :
+
+| Règle | Pourquoi |
+|---|---|
+| `âge = âgeDébut + saisons − 1` | une saison de jeu = un an de vie, partout dans le moteur |
+| âgeDébut 15-24, âge ≤ 44 | donc **30 saisons maximum**, pas 300 |
+| ≤ 50 matchs / saison | le calendrier fait 44 semaines |
+| ≤ 5 essais / match | un quadruplé est déjà exceptionnel |
+| ≤ 4 titres / saison | championnat + Europe + Tournoi + titre individuel |
+| ≤ 12 capes / saison | les fenêtres internationales |
+| note ≤ `40 + 6 × saisons` | on démarre à 30-40 et on progresse d'environ 5/saison |
+| chaque trophée doit **exister** | sinon on annonce 40 titres inventés × 120 points |
+| score annoncé == score recalculé | le contrôle final |
+
+Résultat : on ne peut plus « mettre un gros nombre ». Il faut fabriquer une
+**carrière entière qui tient debout** — et à ce moment-là, autant la jouer.
+
+⚠️ **Le cas subtil, celui qui compte** : 900 matchs passe sous le plafond absolu
+(1 500) et n'est refusé QUE parce que 12 saisons ont été déclarées. C'est
+exactement le genre d'attaque « cohérente en surface » qu'un simple plafond
+laisse passer.
+
+### Le sceau : de la DÉTECTION, pas de la sécurité
+
+`sceller()` / `sceauValide()` posent une empreinte FNV-1a sur la sauvegarde.
+⚠️ **La clé vit dans le bundle : quelqu'un de motivé la lira.** Ce n'est pas le
+but. Le but est d'attraper le geste le plus courant de très loin — ouvrir
+l'onglet Application, changer `essais: 12` en `essais: 9999`, recharger. La vraie
+barrière reste `verifierFiche()`, côté serveur. Ne jamais présenter le sceau
+comme une protection.
+
+### Ce que le serveur ajoute (une fonction pure ne peut pas le voir)
+
+Débit (1 envoi/h, 10/j par appareil — **haché**, jamais l'IP en clair), unicité
+du pseudo, meilleur score conservé, écriture réservée à l'Edge Function, et
+journalisation des refus : c'est là qu'on voit arriver les scripts.
+
+### L'écran Classement montre tout
+
+Un dépliant **« 🔐 Ma fiche d'envoi »** affiche en clair le JSON qui partirait et
+le verdict qu'un serveur rendrait. Rien n'est caché : la protection ne repose pas
+sur le secret du format, elle repose sur le recalcul. Vérifié à 375 px — le SQL
+et le JSON défilent **dans leur bloc**, la page ne part jamais de côté.
+
+Vérification sans navigateur : `npx vite-node scripts/verifClassement.ts`
+— il **joue le tricheur** : score gonflé, score recalculé proprement sur des
+chiffres gonflés, 300 saisons, carrière commencée à 4 ans, 900 matchs en
+12 saisons, note 99 dès la première saison, trophées inventés, `NaN`, `Infinity`,
+types injectés… Chaque attaque doit être refusée **avec un motif lisible**.
+
+```bash
+npx vite-node scripts/verifClassement.ts   # 68 succès + toutes les attaques du classement
+```

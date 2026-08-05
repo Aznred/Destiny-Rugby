@@ -245,7 +245,7 @@ export const COMPETITIONS_REELLES: Competition[] = [
     niveau: 0, zone: 'Monde', note: 'Engagés en Challenge Cup sans championnat renseigné dans la base.',
     clubs: [
       { nom: 'Black Lion', ville: 'Tbilissi', logo: '/logos/black_lion.png', c1: '#0a7a3b', c2: '#f2c200' },
-      { nom: 'Free State Cheetahs', ville: 'Bloemfontein', logo: '/logos/cheetahs.png', c1: '#0a2a6b', c2: '#000000' },
+      { nom: 'Toyota Cheetahs', ville: 'Bloemfontein', logo: '/logos/cheetahs.png', c1: '#0a5a5a', c2: '#1a6bb5' },
     ],
   },
 ];
@@ -288,7 +288,7 @@ export const COUPES_EUROPE: CompetitionCoupe[] = [
     clubs: [
       { nom: 'Black Lion', ville: 'Tbilissi', logo: '/logos/black_lion.png', c1: '#0a7a3b', c2: '#f2c200' },
       { nom: 'Cardiff Rugby', ville: 'Cardiff', logo: '/logos/cardiff.png', c1: '#0a2a6b', c2: '#f2c200' },
-      { nom: 'Free State Cheetahs', ville: 'Bloemfontein', logo: '/logos/cheetahs.png', c1: '#0a2a6b', c2: '#000000' },
+      { nom: 'Toyota Cheetahs', ville: 'Bloemfontein', logo: '/logos/cheetahs.png', c1: '#0a5a5a', c2: '#1a6bb5' },
       { nom: 'Connacht', ville: 'Galway', logo: '/logos/connacht.png', c1: '#0a7a3b', c2: '#ffffff' },
       { nom: 'Dragons RFC', ville: 'Newport', logo: '/logos/dragons.png', c1: '#000000', c2: '#5a2d82' },
       { nom: 'Exeter Chiefs', ville: 'Exeter', logo: '/logos/exeter.png', c1: '#000000', c2: '#f2c200' },
@@ -525,7 +525,6 @@ export const LOGO_PAR_EQUIPE: Record<string, string> = {
   'France A': '/logos/france_a.png',
   'France U20': '/logos/france_u20.png',
   'France': '/logos/france.png',
-  'Free State Cheetahs': '/logos/cheetahs.png',
   'Galles U20': '/logos/galles_u20.png',
   'Galles': '/logos/galles.png',
   'Glasgow Warriors': '/logos/glasgow.png',
@@ -626,6 +625,7 @@ export const LOGO_PAR_EQUIPE: Record<string, string> = {
   'Tokyo Sungoliath': '/logos/tokyo_sungoliath.png',
   'Tonga': '/logos/tonga.png',
   'Toshiba Brave Lupus': '/logos/brave_lupus.png',
+  'Toyota Cheetahs': '/logos/cheetahs.png',
   'Toyota Industries Shuttles': '/logos/toyota_industries_shuttles.png',
   'Toyota Verblitz': '/logos/toyota_verblitz.png',
   'US Bressane': '/logos/bourg-en-bresse.png',

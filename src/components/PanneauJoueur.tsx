@@ -39,6 +39,16 @@ const EMOJI_SEMAINE: Record<string, string> = {
 export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const saisonSuivante = useGame((s) => s.saisonSuivante);
   const semaineSuivante = useGame((s) => s.semaineSuivante);
+  // ⚠️ ON N'AVANCE PAS EN LAISSANT UNE QUESTION EN PLAN. Depuis que le récit
+  // tombe CHAQUE semaine, pouvoir enchaîner sans répondre remplissait le journal
+  // de scènes orphelines — et le MJ ne posait plus rien, puisqu'une scène
+  // attendait déjà. Le bouton se bloque donc tant qu'on n'a pas répondu.
+  const scenarioActif = useGame((s) => s.scenarioActif);
+  const evenementHebdo = useGame((s) => s.evenementHebdo);
+  const aRepondre = !!scenarioActif || !!evenementHebdo;
+  const motifAttente = evenementHebdo
+    ? 'Réponds d’abord à la situation en cours'
+    : 'Fais d’abord ton choix';
   const rythme = useGame((s) => s.rythme);
   const semaineActuelle = semaine(joueur.semaine ?? 1);
   const vecu = joueur.saisonEnCours;
@@ -290,14 +300,16 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               <button
                 className="btn vert"
                 onClick={semaineSuivante}
-                title="Jouer la semaine suivante du calendrier"
+                disabled={aRepondre}
+                title={aRepondre ? motifAttente : 'Jouer la semaine suivante du calendrier'}
               >
                 {semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
               </button>
               <button
                 className="btn fantome"
                 onClick={saisonSuivante}
-                title="Passer directement au bilan de la saison"
+                disabled={aRepondre}
+                title={aRepondre ? motifAttente : 'Passer directement au bilan de la saison'}
               >
                 ⏩ {t('pj.finSaison')}
               </button>
@@ -444,8 +456,14 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               ▶️ {inter ? t(inter.u20 ? 'pj.jouerU20Court' : 'pj.jouerSelectionCourt') : t('pj.jouerMatch')}
             </button>
           ) : (
-            <button type="button" className="btn vert" onClick={semaineSuivante}>
-              {semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
+            <button
+              type="button"
+              className="btn vert"
+              onClick={semaineSuivante}
+              disabled={aRepondre}
+              title={aRepondre ? motifAttente : undefined}
+            >
+              {aRepondre ? '✍️ À toi de répondre' : semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
             </button>
           )}
         </div>,

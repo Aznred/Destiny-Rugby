@@ -526,11 +526,16 @@ function ecrireEffectifs() {
 // • potentiel : la note visée au pic de carrière (27 ans) — c'est elle qui
 //   fait progresser les espoirs saison après saison (voir lib/effectif.ts).
 
-import type { PosteId } from '../types';
+// ⚠️ « FamillePoste », PAS « PosteId ». Les données réelles ne distinguent pas
+// le pilier gauche du pilier droit : elles donnent des FAMILLES (« pilier »,
+// « deuxieme_ligne »…). \`PosteId\`, ce sont les quinze maillots numérotés — le
+// générateur écrivait donc un type que les valeurs ne respectaient pas, et le
+// fichier généré ne compilait plus tant qu'on ne le rectifiait pas à la main.
+import type { FamillePoste } from '../types';
 
 export interface JoueurReel {
   nom: string;
-  poste: PosteId;
+  poste: FamillePoste;
   age: number;
   note: number;
   potentiel: number;
@@ -543,7 +548,7 @@ export const NOTE_CLUB_REEL: Record<string, number> = {
   for (const [k, v] of Object.entries(NOTE_CLUB).sort((a, b) => b[1] - a[1])) ts += `  ${esc(k)}: ${v},\n`;
   ts += `};
 
-const POSTES: PosteId[] = [${POSTES.map((p) => `'${p}'`).join(', ')}];
+const POSTES: FamillePoste[] = [${POSTES.map((p) => `'${p}'`).join(', ')}];
 const NATIONS: string[] = [\n`;
   for (const n of nations) ts += `  ${esc(n)},\n`;
   ts += `];

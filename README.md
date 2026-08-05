@@ -14,13 +14,24 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
 
 ## ✨ Fonctionnalités
 
+- **Une scène par semaine, écrite pour toi.** Il n'y a plus de bouton à cliquer
+  pour « vivre quelque chose » : chaque semaine de calendrier, le Maître du Jeu
+  pose une situation — un test physique, un président qui traîne à payer, un
+  journaliste, un ami d'enfance, une soirée qui dérape, des clés de voiture qu'on
+  te tend à 23 h. **Tu réponds en écrivant ce que tu fais**, et il juge. Environ
+  une scène sur cinq est réellement dangereuse : là, et seulement là, ça peut
+  finir en suspension, en garde à vue, à l'hôpital — ou pire.
+  *Sans clé Groq, le jeu reste entier : la même scène arrive chaque semaine, avec
+  des réponses à choix multiples.*
 - **Maître du Jeu IA** via l'API **Groq** (gratuite). Il juge chaque décision
   selon les attributs, la forme, le moral, la réputation et le contexte, puis
   renvoie un récit + des variations de stats structurées. Il est **sévère** :
   par défaut une action ne change presque rien, l'échec est fréquent, et on ne
   progresse jamais en le demandant — les gains passent par un plafond côté code
   (+2 max par action, 4 points d'attributs par saison, plus rien après 36 ans) que
-  ni le joueur ni l'IA ne peuvent contourner.
+  ni le joueur ni l'IA ne peuvent contourner. Il ne peut pas non plus te faire
+  changer de club dans son récit : quand tu dis que tu veux partir, c'est le
+  **vrai marché** qui s'ouvre, et rien ne bouge tant que tu n'as pas signé.
 - **Création de joueur** : nom, âge, **202 nations** (groupées par continent,
   avec leur vrai drapeau), championnat et club de départ (France ou étranger),
   les **15 postes** numérotés 1 à 15, et **2 traits de caractère** à choisir
@@ -102,9 +113,9 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   ⚠️ **Les annonces sont réelles** : quand un compte annonce un transfert, le
   joueur change vraiment de club dans le jeu (mais personne ne peut te
   transférer par un tweet : pour toi, ça reste une offre à accepter).
-  Le même écran regroupe tes **notifications**, tes **succès** (28, qui
-  rapportent des Ovas et traversent tes carrières) et les **3 défis de la
-  semaine**. Sans clé Groq, un repli hors ligne prend le relais.
+  Le même écran regroupe tes **notifications**, tes **succès** (**68**, dont 18
+  secrets — ils rapportent des Ovas et traversent tes carrières) et les **3 défis
+  de la semaine**. Sans clé Groq, un repli hors ligne prend le relais.
 - **Séance d'entraînement hebdomadaire** (💪) : chaque semaine, tu choisis un
   secteur à travailler. Ça coûte 4 de forme, ça ne réussit pas à tous les coups,
   et ça ne dépasse jamais ton potentiel — mais sur une carrière, ça change tout.
@@ -261,12 +272,16 @@ calibrage sont dans `scripts/nouvellesLigues.cjs`).
   (les 250 drapeaux ne sont plus recopiés dedans en base 64), et sept écrans
   plus le moteur de match ne sont téléchargés qu'au moment où l'on s'en sert.
 
-## 💸 Consommation de l'IA divisée par trois
+## 💸 Consommation de l'IA, mesurée
 
-Une semaine de jeu coûtait **trois appels** à Groq (le fil, puis deux salves de
-commentaires) : elle en coûte **un seul**, commentaires compris. Les comptes à
-suivre ne passent plus par l'IA du tout — ils viennent de l'annuaire du jeu.
-Le compteur exact (appels, tokens envoyés, tokens reçus) s'affiche dans ⚙️.
+L'Ovale a été ramené de **trois appels par semaine à un seul**, commentaires
+compris, et les comptes à suivre ne passent plus par l'IA du tout — ils viennent
+de l'annuaire du jeu.
+
+Le **récit hebdomadaire** en ajoute deux : la scène, puis son jugement. Soit
+**trois appels par semaine de jeu**, ~130 par saison. C'est le prix de la boucle
+narrative, et il est assumé. Le compteur exact (appels, tokens envoyés, tokens
+reçus) s'affiche dans ⚙️ — et sans clé, le coût est nul.
 
 ## 🌐 Sept langues, une ambiance au choix, et le téléphone d'abord
 
@@ -279,6 +294,39 @@ Le compteur exact (appels, tokens envoyés, tokens reçus) s'affiche dans ⚙️
 - **Jouable au pouce** : l'action principale reste en bas de l'écran en
   permanence, la navigation défile d'un doigt, le match passe en plein écran et
   rien ne déborde. Vérifié à 375 × 812.
+
+## 🏆 Le classement mondial, et pourquoi on ne peut pas le truquer
+
+Le tableau part **vierge** et ne contient que ce qui a vraiment été joué. Tout
+est prêt pour le brancher en ligne — il ne manque que l'URL du serveur
+(`serveur/`).
+
+Le principe tient en une phrase : **le navigateur envoie les faits, le serveur
+recalcule le score, et la base ne garde que lui.**
+
+⚠️ **Disons-le franchement** : un jeu qui tourne entièrement dans le navigateur
+ne peut rien garantir tout seul. Le joueur possède la machine qui calcule — il
+peut éditer son `localStorage` ou appeler l'API à la main, et un secret embarqué
+dans le bundle se lit en vingt secondes. La protection ne repose donc pas sur le
+secret, mais sur le fait que le serveur **ne croit jamais le score reçu**.
+
+Ce qui arrête réellement un tricheur, ce n'est pas le plafond global : c'est que
+**chaque chiffre est borné par les autres**. Une saison de jeu = un an de vie
+(donc 30 saisons maximum), 50 matchs par saison, 5 essais par match, 4 titres par
+saison, une note atteignable en ce nombre de saisons, et chaque trophée doit
+exister dans le jeu. On ne peut plus « mettre un gros nombre » : il faut
+fabriquer une carrière entière qui tient debout — et à ce moment-là, autant la
+jouer.
+
+Chaque attaque est testée une par une (score gonflé, 300 saisons, carrière
+commencée à 4 ans, 900 matchs en 12 saisons, trophées inventés, `NaN`…) :
+
+```bash
+npx vite-node scripts/verifClassement.ts
+```
+
+L'écran Classement affiche **en clair** la fiche qui partirait et le verdict que
+le serveur rendrait : rien n'est caché, parce que rien n'a besoin de l'être.
 
 ## 🔑 Clé API Groq (pour le Maître du Jeu)
 
@@ -344,13 +392,23 @@ src/
   data/mondeReel.ts     # GÉNÉRÉ : 143 clubs (nom, ville, logo), coupes, sélections + classements
   data/effectifsReels.ts # GÉNÉRÉ : 6 306 joueurs réels 25-26 + note générale des clubs
   lib/groq.ts           # appel API Groq + prompt système + parsing JSON + clé env
-  lib/effectif.ts       # effectif réel ou généré, progression/déclin, force d'effectif
+  lib/ia.ts             # la scène de la semaine + son jugement (sévère), situations, interviews
+  lib/armoire.ts        # étagères mesurées sur le modèle 3D, pièces de prestige au sol, cadrage
+  lib/effectif.ts       # effectif réel ou généré, progression/déclin, force d'effectif, note des clubs
 scripts/
   genMonde.cjs          # génère mondeReel.ts + effectifsReels.ts depuis les JSON fournis
   ligues.cjs            # table des championnats : nom de club dans le jeu, ville, échelle
   vedettes.cjs          # notes calibrées à la main des internationaux identifiés
   genAmateurs.cjs       # génère amateurs.ts + mercato.ts (clubs régionaux, 12 086 licenciés, mercato)
   verif.ts              # banc d'essai hors navigateur : npx vite-node scripts/verif.ts
+  verifRecit.ts         # récit hebdomadaire : plafonds, conséquences dures, transferts réels
+  verifSelection.ts     # sélections atteignables, petites nations comprises
+  verifArmoire.ts       # armoire à trophées : étagères décodées du .glb, cadrage mobile
+  verifClassement.ts    # joue le tricheur : chaque attaque du classement doit être refusée
+serveur/                # le classement en ligne (Deno, déployé à part — pas dans le bundle)
+  classement.ts         # Edge Function : vérifie la fiche, RECALCULE le score, n'écrit que lui
+  schema.sql            # table (pseudo, score, cree_le), RLS sans droit d'insertion
+  README.md             # déploiement, et ce que la protection ne peut pas faire
   copierLogos.cjs       # logos_equipes/**.png → public/logos/*.png (à plat, dédoublonnés)
   store/useGame.ts      # store Zustand (joueur, journal, Ovas, panthéon, scénarios, offres…)
   lib/progression.ts    # note de saison + évolution des attributs et du potentiel
@@ -406,10 +464,17 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 | Pas de compétitions U20 | **Tournoi des 6 Nations U20** et **Championnat du monde U20**, avec convocation des meilleurs joueurs U20 de chaque pays. |
 | Traductions inachevées | 160 clés, 100 % dans les 7 langues, branchées sur tous les écrans principaux. |
 | Pas de succès de palmarès | **15 succès** liés aux trophées et aux titres par club. |
+| Un transfert annoncé n'arrivait jamais | Le champ `transfert` n'était rempli par **aucun** scénario, et quand il l'était il ne changeait que le nom du club — ni contrat, ni salaire, ni division. Un choix « je pars » ouvre maintenant le **vrai marché** ; c'est la signature qui déplace le joueur. |
+| Un choix de 80ᵉ minute posé **après** le match | Les « moments décisifs » sont supprimés : le match se joue dans le moteur 2D, et nulle part ailleurs. |
+| Sélection inatteignable avec une petite nation | Ce n'était pas le palier, c'était le **calendrier** : la fenêtre internationale retenait toujours le Tournoi ou la tournée d'automne, où ces nations ne figurent pas. Elle retient désormais la compétition **de ta sélection** (Rugby Europe Championship…). |
+| Clubs de Nationale 2 à Régionale 3 sans note | Ils n'en avaient pas : tout un étage partageait la même. Chacun a maintenant **sa** note, tirée de son nom — et c'est elle qui compose son effectif. |
+| Deux « Cheetahs » aux noms inversés | La franchise **Toyota Cheetahs** joue les coupes d'Europe, l'union **Free State Cheetahs** la Currie Cup. |
+| Trophées minuscules, certains entre deux étagères | Les étagères sont **mesurées sur le modèle 3D** (elles sont six, pas quatre). Boucliers et grandes coupes se dressent **au sol**, à hauteur de buste. |
 
 Le détail de chaque correction — la cause, la mesure avant/après et le script de
-vérification — est dans [`CLAUDE.md`](CLAUDE.md), section
-« Retours de jeu — la passe de correction ».
+vérification — est dans [`CLAUDE.md`](CLAUDE.md), sections
+« Retours de jeu — la passe de correction », « LE RÉCIT HEBDOMADAIRE » et
+« L'ARMOIRE À TROPHÉES ».
 
 
 ## 🗺️ Idées d'évolution

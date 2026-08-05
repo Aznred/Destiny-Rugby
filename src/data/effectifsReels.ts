@@ -12,6 +12,11 @@
 // • potentiel : la note visée au pic de carrière (27 ans) — c'est elle qui
 //   fait progresser les espoirs saison après saison (voir lib/effectif.ts).
 
+// ⚠️ « FamillePoste », PAS « PosteId ». Les données réelles ne distinguent pas
+// le pilier gauche du pilier droit : elles donnent des FAMILLES (« pilier »,
+// « deuxieme_ligne »…). `PosteId`, ce sont les quinze maillots numérotés — le
+// générateur écrivait donc un type que les valeurs ne respectaient pas, et le
+// fichier généré ne compilait plus tant qu'on ne le rectifiait pas à la main.
 import type { FamillePoste } from '../types';
 
 export interface JoueurReel {
@@ -103,7 +108,7 @@ export const NOTE_CLUB_REEL: Record<string, number> = {
   'Manawatū': 66,
   'Sagamihara Dynaboars': 66,
   'Chicago Hounds': 66,
-  'Free State Cheetahs': 66,
+  'Toyota Cheetahs': 66,
   'FC Grenoble': 65,
   'North Harbour': 65,
   'Urayasu D-Rocks': 65,
@@ -6782,41 +6787,41 @@ const BRUT: Record<string, string[]> = {
     'Giorgi SPANDERASHVILI|4|19|41|46|17',
     'Giorgi BOLKVADZE|8|20|41|46|17',
   ],
-  'Free State Cheetahs': [
+  'Toyota Cheetahs': [
     'Aranos COETZEE|0|39|67|67|26',
-    'Carl WEGNER|2|34|67|67|0',
     'Munier HARTZENBERG|7|29|67|67|0',
-    'Michael ANNIES|8|23|66|70|0',
-    'Louis VAN DER WESTHUIZEN|1|31|65|65|26',
+    'Carl WEGNER|2|34|66|66|0',
+    'Gideon VAN DER MERWE|3|30|65|65|0',
     'Marco JANSEN VAN VUREN|4|28|65|65|0',
     'De-an ACKERMANN|6|29|65|65|0',
-    'Pierre-Raymond UYS|2|25|64|68|0',
-    'Juan VENTER|2|22|63|67|0',
-    'Gideon VAN DER MERWE|3|30|63|63|0',
-    'Prince NKABINDE|7|27|61|61|0',
-    'Jaco VAN DER WALT|5|32|60|60|0',
-    'Daniel MAARTENS|3|30|57|57|0',
-    'Zander DU PLESSIS|5|25|57|58|0',
-    'Frankie DOS REIS|0|22|56|61|0',
+    'Michael ANNIES|8|23|65|72|0',
+    'Louis VAN DER WESTHUIZEN|1|31|64|64|26',
+    'Juan VENTER|2|22|63|72|0',
+    'Pierre-Raymond UYS|2|25|63|64|0',
+    'Jaco VAN DER WALT|5|32|61|61|0',
+    'Prince NKABINDE|7|27|60|60|0',
+    'Zander DU PLESSIS|5|25|57|60|0',
+    'Frankie DOS REIS|0|22|56|59|0',
+    'Curtly THOMAS|2|30|56|56|0',
+    'Daniel MAARTENS|3|30|56|56|0',
     'Cohen JASPER|8|26|56|57|0',
-    'Curtly THOMAS|2|30|55|55|0',
-    'Sisonke VUMAZONKE|3|23|55|60|0',
+    'Sisonke VUMAZONKE|3|23|54|59|0',
     'Matome MANYAMA|0|24|53|57|0',
     'George LOURENS|5|29|53|53|0',
-    'Franco (JR) SMITH|6|25|53|56|0',
+    'Franco (JR) SMITH|6|25|53|54|0',
     'Rewan KRUGER|4|27|52|52|0',
     'Litha NKULA|8|29|52|52|0',
     'Tielman NIEUWOUDT|0|25|51|52|0',
-    'Neels VOLSCHENK|3|22|51|58|0',
-    'Victor SEKEKETE|3|31|51|51|0',
-    'Jandré NEL|4|25|51|53|0',
+    'Neels VOLSCHENK|3|22|50|57|0',
+    'Victor SEKEKETE|3|31|50|50|0',
+    'Jandré NEL|4|25|50|51|0',
     'James VERITY-AMM|7|32|50|50|0',
+    'Clayton BLOMMETJIES|8|34|50|50|0',
     'Thabang MAHLASI|3|25|49|51|0',
-    'Clayton BLOMMETJIES|8|34|49|49|0',
-    'Marko JANSE VAN RENSBURG|1|34|48|48|0',
-    'Pieter JANSEN VAN VUREN|2|34|48|48|0',
-    'Arno VAN DER MERWE|2|22|46|50|0',
-    'Ben PITOUT|1|20|45|49|0',
+    'Arno VAN DER MERWE|2|22|48|50|0',
+    'Pieter JANSEN VAN VUREN|2|34|47|47|0',
+    'Marko JANSE VAN RENSBURG|1|34|46|46|0',
+    'Ben PITOUT|1|20|44|49|0',
   ],
 };
 

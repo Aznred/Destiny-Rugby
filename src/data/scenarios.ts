@@ -10,8 +10,25 @@ export interface IssueChoix {
   // Effets « lot 6 » : ce que le staff et le public retiennent de ton choix.
   coach?: number; // confiance du staff (pèse sur le temps de jeu)
   fans?: number; // popularité (pèse sur la réputation et le marché)
-  // Transfert éventuel déclenché par ce choix (offres de fin de saison).
-  transfert?: { club: string; division: string };
+  /**
+   * ⚠️ CE CHOIX TE MET VRAIMENT SUR LE MARCHÉ.
+   *
+   * Il y avait avant un champ `transfert: { club, division }` qui écrivait
+   * directement le nouveau club dans la fiche du joueur. Personne ne s'en
+   * servait — aucun scénario ne le remplissait — si bien qu'une situation
+   * intitulée « Offre d'un club plus huppé » racontait un départ qui n'avait
+   * JAMAIS lieu : le joueur lisait « tu rejoins le club », et restait où il
+   * était. Retour de jeu : « les transferts marchent pas ».
+   *
+   * Et quand il était rempli, ce n'était pas mieux : le club changeait, mais
+   * pas le contrat, pas le salaire, pas la division — un transfert de façade.
+   *
+   * Désormais un choix ne PROMET plus un transfert, il l'ENCLENCHE : le panneau
+   * « Choix de carrière » s'ouvre avec de vraies offres (`genererOffres`), et
+   * c'est en signant que le club, la division, le salaire et la durée changent
+   * pour de bon. Le joueur reste libre de refuser.
+   */
+  marche?: boolean;
 }
 export interface ChoixScenario {
   texte: string;
@@ -123,7 +140,11 @@ export const SCENARIOS: Scenario[] = [
     choix: [
       {
         texte: 'Partir pour le grand club.',
-        issue: { recit: 'Nouveau standing, mais tu ronges ton frein sur le banc.', deltas: { reputation: 10, argent: 8000, moral: -6 }, ovas: 25 },
+        // `marche` : le club ne change pas ici, il change quand tu SIGNES.
+        issue: {
+          recit: 'Tu dis oui à ton agent. Il décroche son téléphone, et les propositions arrivent — à toi de choisir.',
+          deltas: { reputation: 4, moral: 2 }, ovas: 25, marche: true,
+        },
       },
       {
         texte: 'Rester titulaire et t’imposer.',
