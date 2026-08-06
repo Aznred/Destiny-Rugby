@@ -20,8 +20,8 @@
 // Déploiement : voir `serveur/VERCEL.md`.
 
 import { neon } from '@neondatabase/serverless';
-import { verifierFiche } from '../src/lib/classementMondial.js';
-import { TROPHEES } from '../src/data/trophees.js';
+import { verifierFiche } from '../src/lib/classementMondial.ts';
+import { TROPHEES } from '../src/data/trophees.ts';
 
 export const config = { runtime: 'nodejs' };
 

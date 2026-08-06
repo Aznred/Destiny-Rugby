@@ -8,7 +8,7 @@
 // nom du club), avec des NOMS DU PAYS et une part d'étrangers pour la mixité.
 // Les CLUBS, leurs écussons et leur hiérarchie, eux, sont réels.
 
-import type { FamillePoste } from '../types';
+import type { FamillePoste } from '../types.ts';
 
 export interface ClubNouveau {
   nom: string;
