@@ -98,21 +98,46 @@ console.log('\n=== 4. LES TITRES DE SÉLECTION ===');
 
 console.log('\n=== 5. AUCUN MODÈLE LIVRÉ OUBLIÉ ===');
 {
-  const livres = fs.existsSync('nouvellecoupe')
-    ? fs.readdirSync('nouvellecoupe').filter((f) => f.toLowerCase().endsWith('.glb'))
-    : [];
-  // 20 modèles livrés → 20 trophées branchés (le 21ᵉ, Championship Cup,
-  // réutilise volontairement le modèle de la Premiership Rugby Cup).
+  // Un lot livré = un dossier de `.glb` bruts et la liste des trophées qu'il
+  // doit alimenter (`scripts/copierTrophees.cjs`). Un modèle qui reste sur le
+  // disque sans être branché, c'est un trophée qui n'existe pas en jeu.
   const utilises = new Set(Object.values(TROPHEES).map((t) => path.basename(t.modele, '.glb')));
-  const branches = ['bundesliga', 'currieCup', 'ecosseSuper', 'espagne', 'finlande', 'gallesSRC',
-    'gallesPrem', 'gallesChall', 'georgie', 'irlandeAIL', 'argentine', 'paysBas', 'nzHeartland',
-    'pologne', 'portugal', 'tcheque', 'roumanie', 'russie', 'italie', 'recEurope'];
-  const manquants = branches.filter((b) => !utilises.has(b));
-  ligne('modèles livrés branchés',
-    `${branches.length - manquants.length}/${branches.length}`
-    + (livres.length ? ` (${livres.length} fichiers dans nouvellecoupe/)` : ' (dossier source absent)')
-    + (manquants.length ? ` — manquants : ${manquants.join(', ')}` : ''),
-    manquants.length === 0);
+  const LOTS: [string, string[]][] = [
+    // 20 modèles → 20 trophées (le 21ᵉ, Championship Cup, réutilise
+    // volontairement le modèle de la Premiership Rugby Cup).
+    ['nouvellecoupe', ['bundesliga', 'currieCup', 'ecosseSuper', 'espagne', 'finlande', 'gallesSRC',
+      'gallesPrem', 'gallesChall', 'georgie', 'irlandeAIL', 'argentine', 'paysBas', 'nzHeartland',
+      'pologne', 'portugal', 'tcheque', 'roumanie', 'russie', 'italie', 'recEurope']],
+    // Les honneurs individuels, plus les deux modèles relivrés en correction
+    // (le trophée allemand et celui du meilleur joueur du monde).
+    ['trophe correct et new trophee', ['bundesliga', 'meilleur-joueur', 'meilleurTop14',
+      'meilleurPremiership', 'meilleurUrc', 'meilleurNZ', 'meilleurChampionsCup',
+      'meilleurSixNations', 'hommeDuMatchMonde']],
+  ];
+  for (const [dossier, branches] of LOTS) {
+    const livres = fs.existsSync(dossier)
+      ? fs.readdirSync(dossier).filter((f) => f.toLowerCase().endsWith('.glb'))
+      : [];
+    const manquants = branches.filter((b) => !utilises.has(b));
+    ligne(`modèles branchés — ${dossier}/`,
+      `${branches.length - manquants.length}/${branches.length}`
+      + (livres.length ? ` (${livres.length} fichiers livrés)` : ' (dossier source absent)')
+      + (manquants.length ? ` — manquants : ${manquants.join(', ')}` : ''),
+      manquants.length === 0);
+    // ⚠️ ET LA CORRECTION EST-ELLE VRAIMENT PARTIE ? Un modèle relivré doit être
+    // PLUS RÉCENT dans public/m3d/ que dans le dossier source, sinon la version
+    // embarquée est encore l'ancienne — et rien ne le dirait à l'écran.
+    for (const b of branches) {
+      const src = livres.map((f) => path.join(dossier, f))
+        .filter((f) => fs.statSync(f).size > 0);
+      if (!src.length) break;
+      const cible = path.join('public', 'm3d', `${b}.glb`);
+      if (!fs.existsSync(cible)) continue;
+      const plusRecent = src.some((f) => fs.statSync(f).mtimeMs > fs.statSync(cible).mtimeMs
+        && path.basename(f, '.glb').toLowerCase().includes(b.slice(0, 6).toLowerCase()));
+      if (plusRecent) ligne(`  ${b} : source plus récente que l’embarqué`, 'relancer copierTrophees.cjs', false);
+    }
+  }
 }
 
 console.log(echecs === 0 ? '\n✅ Trophées conformes.' : `\n❌ ${echecs} contrôle(s) en échec.`);

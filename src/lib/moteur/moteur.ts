@@ -192,7 +192,8 @@ export function creerMatch(
     pions, ballon: { x: MILIEU, y: AXE }, porteur: null, possession, vol: null,
     lancement: null, ouvert: 1, phasesDepuisArret: 0, ligneAvantage: MILIEU,
     origine: { x: MILIEU, y: AXE }, metresGagnesPhase: 0,
-    ballonLent: false, derniereTouche: null, perceeSignalee: false, aide: 0,
+    ballonLent: false, derniereTouche: null, dernierPasseur: null,
+    perceeSignalee: false, aide: 0,
     systeme: 'blitz', ligneDef: MILIEU, horsJeu: MILIEU, gardeRuck: 0,
     scoreA: 0, scoreB: 0,
     planA: planVide(scoreCibleA, rng), planB: planVide(scoreCibleB, rng),
@@ -512,6 +513,12 @@ function phaseBallonEnLAir(e: EtatMatch): void {
     const sortDansLes22 = dansLes22Adverses(arrivee, camp) && !franchieLigne(arrivee, camp);
     if (deSonCamp && sortDansLes22) {
       dire(e, 'pied', camp, C.phrase(e.rng, C.PIED_5022, { nom: v.auteur.nom }), 0, v.auteur.moi);
+      // ⚠️ ON COMPTE LE 50/22 SUR LA GÉOMÉTRIE, PAS SUR L'INTENTION. Un
+      // dégagement d'occupation qui finit en touche dans les 22 adverses EST un
+      // 50/22 : c'est le règlement, et c'est déjà ainsi que le moteur en tire
+      // la conséquence deux lignes plus bas. Compter l'intention aurait donné
+      // un classement des « 50/22 » où manquent la moitié des vrais.
+      v.auteur.stats.cinquanteVingtDeux += 1;
       return arret(e, 'touche', camp, arrivee);
     }
     if (v.intention === 'cinquanteVingtDeux') {
@@ -720,6 +727,12 @@ function donnerBallon(e: EtatMatch, p: Pion, delai: number): void {
   e.possession = p.cote;
   e.ballon = { x: p.pos.x, y: p.pos.y };
   p.stats.courses += 1;
+  // ⚠️ LE PICK AND GO SE COMPTE À LA PRISE DE BALLON, pas au choix du lancement.
+  // Un lancement choisi n'est pas un ballon porté : la combinaison peut être
+  // interrompue avant que l'avant ne parte. Et le filtre `avant` n'est pas
+  // cosmétique — le 9 fait partie de la chaîne d'un pick and go, mais quand il
+  // sert le ballon au pied du ruck ce n'est pas lui qui « pique et va ».
+  if (e.lancement?.type === 'pickAndGo' && p.avant) p.stats.pickAndGo += 1;
   e.prochaineDecision = delai;
   e.vol = null;
 }
@@ -772,6 +785,10 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
     }), 0, p.moi);
     return arret(e, 'melee', adverse(p.cote), p.pos);
   }
+
+  // La passe est partie et elle est bonne : si un essai tombe avant le
+  // prochain regroupement, elle sera la passe décisive.
+  e.dernierPasseur = p;
 
   // Les défenseurs engagés sur le passeur sont battus : c'est le décalage.
   const marqueurs = surLeTerrain(e, adverse(p.cote));
@@ -878,6 +895,13 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
       const recu = soutiens.sort((a, b) => distance2(porteur.pos, a.pos) - distance2(porteur.pos, b.pos))[0];
       dire(e, 'jeu', porteur.cote, `Offload de ${porteur.nom} pour ${recu.nom} !`, 0, porteur.moi || recu.moi);
       porteur.stats.passes += 1;
+      // ⚠️ L'OFFLOAD EST COMPTÉ À PART, EN PLUS de la passe. C'est une passe
+      // APRÈS contact, la marque des grands centres et des troisièmes lignes :
+      // la noyer dans le total des passes, c'est perdre exactement ce qui
+      // distingue un joueur qui fait vivre le ballon d'un joueur qui le donne.
+      porteur.stats.offloads += 1;
+      // Un offload amène l'essai aussi souvent qu'une passe classique.
+      e.dernierPasseur = porteur;
       if (e.lancement) { e.lancement.chaine = []; e.lancement.index = 0; }
       e.porteur = null;
       e.vol = {
@@ -893,6 +917,8 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
 }
 
 function formerRuck(e: EtatMatch, lieu: Vec): void {
+  // Le porteur est allé au sol : la passe précédente n'amènera plus rien.
+  e.dernierPasseur = null;
   // ⚠️ UN RUCK NE SE FORME JAMAIS DANS L'EN-BUT ni sur la ligne de touche : là
   // c'est un essai, un renvoi ou une touche. Sans cette borne, le regroupement
   // se formait derrière la ligne de ballon mort et tout le monde s'y agglutinait.
@@ -1000,6 +1026,8 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec): void {
   e.porteur = null;
   e.vol = null;
   e.lancement = null;
+  // Le jeu s'arrête : ce qui a été passé avant n'amènera plus d'essai.
+  e.dernierPasseur = null;
   e.phasesDepuisArret = 0;
   e.metresGagnesPhase = 0;
   e.perceeSignalee = false;
@@ -1048,6 +1076,11 @@ function phaseMelee(e: EtatMatch): void {
     return siffler(e, cote, e.ballon, 'faute technique en mêlée');
   }
   dire(e, 'melee', cote, C.phrase(e.rng, C.MELEE_GAGNEE, { club: nomClub(e, cote) }));
+  // ⚠️ LA MÊLÉE GAGNÉE EST CRÉDITÉE AUX HUIT, pas au numéro 8. Une mêlée se
+  // gagne à huit ou ne se gagne pas : la porter au seul joueur qui ramasse le
+  // ballon donnerait un classement de « mêlées » composé uniquement de numéros
+  // 8. C'est aussi ce qui permet à un pilier d'exister dans les statistiques.
+  for (const p of mien) p.stats.melees += 1;
   e.placement = null;
   e.gardeRuck = 0.4;
   // Départ du 8 quand la mêlée avance.
@@ -1082,6 +1115,10 @@ function phaseTouche(e: EtatMatch): void {
   }
 
   dire(e, 'touche', cote, C.phrase(e.rng, C.TOUCHE_GAGNEE, { club: nomClub(e, cote), nom: sauteur.nom }), 0, sauteur.moi);
+  // La touche, elle, se crédite au SAUTEUR : c'est lui qui capte, et c'est la
+  // statistique officielle (« lineouts won »). Deuxièmes lignes en tête, comme
+  // dans la réalité — `detente` les y met.
+  sauteur.stats.touchesGagnees += 1;
   e.placement = null;
 
   // Ballon porté près de la ligne : l'arme n°1 des avants.
@@ -1104,15 +1141,39 @@ function phaseTouche(e: EtatMatch): void {
 
 function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pion): void {
   dire(e, 'penalite', pour, C.phrase(e.rng, C.PENALITE, { club: nomClub(e, pour), motif }));
+
+  // ⚠️ UNE PÉNALITÉ A TOUJOURS UN FAUTIF. Trois appels sur quatre n'en
+  // désignaient aucun — dont celui du ruck, de loin le plus fréquent : le
+  // carton n'était donc tiré que sur une poignée de fautes, et le moteur
+  // produisait 0,25 carton par match au lieu des 1,3 annoncés. Un classement
+  // des cartons vide, et une discipline qui ne coûtait jamais rien.
+  // À défaut de coupable nommé, c'est le joueur de l'équipe sanctionnée le plus
+  // proche du ballon : au rugby, c'est presque toujours lui.
+  const coupable = fautif ?? (() => {
+    const camp = surLeTerrain(e, adverse(pour)).filter((p) => p.sanction <= 0);
+    if (!camp.length) return undefined;
+    return camp.reduce((a, b) => (distance2(b.pos, lieu) < distance2(a.pos, lieu) ? b : a));
+  })();
+
   // Carton jaune : rare (≈ 1,3 par match), plus probable près de sa ligne.
   const pres = metresAvantLaLigne(lieu, pour) < 22;
-  if (fautif && e.rng() < (pres ? 0.16 : 0.05)) {
+  if (coupable && e.rng() < (pres ? 0.16 : 0.05)) {
+    const fautif = coupable;
+    // ⚠️ LE CARTON ROUGE EXISTE ENFIN. Le moteur n'en donnait aucun : la
+    // discipline se résumait à un compteur de jaunes, et un joueur ne risquait
+    // jamais rien de grave. Un jaune sur quatorze devient rouge, soit ~0,09 par
+    // match — l'ordre de grandeur du rugby professionnel. Un rouge, c'est le
+    // match terminé : `sanction` couvre les 80 minutes et le joueur ne revient
+    // pas (la relève est gérée par les remplacements, comme dans la réalité).
+    const rouge = e.rng() < 0.07;
     fautif.surLeTerrain = false;
-    fautif.sanction = 600; // dix minutes d'horloge
-    fautif.stats.cartons += 1;
-    dire(e, 'carton', fautif.cote, C.phrase(e.rng, C.CARTON, {
-      nom: fautif.nom, motif, club: nomClub(e, fautif.cote),
-    }), 0, fautif.moi);
+    fautif.sanction = rouge ? 99_999 : 600; // dix minutes, ou le reste du match
+    if (rouge) fautif.stats.cartonsRouges += 1; else fautif.stats.cartonsJaunes += 1;
+    dire(e, 'carton', fautif.cote, rouge
+      ? `🟥 CARTON ROUGE pour ${fautif.nom} (${motif}) — ${nomClub(e, fautif.cote)} finit à quatorze.`
+      : C.phrase(e.rng, C.CARTON, {
+        nom: fautif.nom, motif, club: nomClub(e, fautif.cote),
+      }), 0, fautif.moi);
   }
   arret(e, 'penalite', pour, lieu);
   e.penalite = { pour, lieu: { x: lieu.x, y: lieu.y }, motif };
@@ -1240,6 +1301,13 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   }
 
   marqueur.stats.essais += 1;
+  // ⚠️ LA PASSE DÉCISIVE — et le garde-fou qui va avec : on ne se crédite pas
+  // soi-même. Un joueur qui passe, récupère son propre coup de pied et aplatit
+  // n'a pas fait de passe décisive ; sans ce test, il en aurait une.
+  if (e.dernierPasseur && e.dernierPasseur !== marqueur && e.dernierPasseur.cote === cote) {
+    e.dernierPasseur.stats.passesDecisives += 1;
+  }
+  e.dernierPasseur = null;
   marquer(e, cote, 5);
   if (cote === 'A') e.essaisA += 1; else e.essaisB += 1;
 
@@ -1579,6 +1647,8 @@ function arriereGardeMontee(e: EtatMatch, defenseur: Cote): boolean {
 function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
   const s = sens(p.cote);
   p.stats.coupsDePied += 1;
+  // Un coup de pied rebat les cartes : la passe d'avant ne compte plus.
+  e.dernierPasseur = null;
   // ⚠️ PORTÉE RÉALISTE. À `26 + pied/2,2`, un buteur noté 85 tapait à 65 mètres :
   // un dégagement pris sur sa ligne des 22 finissait alors DANS les 22 adverses,
   // et la règle géométrique du 50/22 le récompensait — six « 50/22 » par match.

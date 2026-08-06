@@ -14,19 +14,31 @@ export interface Trophee {
    * ⚠️ N'À RENSEIGNER QUE POUR LES BOUCLIERS QUI N'EN ONT PAS LA FORME.
    * L'armoire à trophées reconnaît un bouclier à sa boîte englobante (plat et
    * large, `estBouclier()` dans `lib/armoire.ts`) : elle l'adosse au meuble au
-   * lieu de le poser sur une tablette. Le Brennus est livré AVEC son socle —
-   * mesuré, il est aussi épais qu'une coupe — d'où cette déclaration.
+   * lieu de le poser sur une tablette. Le Brennus, le trophée de Pro D2 et la
+   * coupe russe sont livrés AVEC leur socle — mesurés, ils sont aussi épais
+   * qu'une coupe — d'où cette déclaration.
    */
   forme?: 'bouclier';
+  /**
+   * ⚠️ UNE DISTINCTION PERSONNELLE, PAS UN TITRE D'ÉQUIPE. Absent = collectif
+   * (un championnat, une coupe, un tournoi gagné AVEC un club ou une sélection).
+   *
+   * Ce champ commande deux choses, et c'est le seul endroit où on en décide :
+   *   1. **L'ARMOIRE** (demande explicite) — « les trophées individuels dans
+   *      l'armoire et les trophées collectifs à côté, plus gros ». Les
+   *      distinctions vont en vitrine, les titres se dressent au sol autour du
+   *      meuble (`lib/armoire.ts`).
+   *   2. **COMMENT ON LES GAGNE** — un titre collectif se joue (`phaseFinale`,
+   *      `coupe`), une distinction se MÉRITE : elle est décernée sur la note de
+   *      saison, les statistiques et le palmarès de l'année (`lib/honneurs.ts`).
+   */
+  individuel?: true;
 }
 
-/**
- * À partir de ce montant d'Ovas, un trophée est une PIÈCE MAJEURE : il quitte la
- * vitrine et se dresse au sol, à hauteur de buste (voir `lib/armoire.ts`). Les
- * Ovas sont la seule mesure de prestige du jeu, et elle est calibrée pour ça :
- * pas besoin d'une deuxième liste à tenir à jour.
- */
-export const OVAS_PIECE_MAJEURE = 12;
+/** Vrai pour une distinction personnelle, faux pour un titre d'équipe. */
+export function estIndividuel(t: Trophee | undefined): boolean {
+  return t?.individuel === true;
+}
 
 export const TROPHEES: Record<string, Trophee> = {
   brennus: {
@@ -45,6 +57,9 @@ export const TROPHEES: Record<string, Trophee> = {
     couleur: '#c0c8d0',
     desc: 'Champion de Pro D2 : la montée dans l’élite se joue ici.',
     ovas: 8,
+    // Mesuré : 1,67 × 1,90 × 0,60 — le socle le rend trop épais pour que
+    // `estBouclier()` le reconnaisse, mais c'en est un, et il s'adosse.
+    forme: 'bouclier',
   },
   nationale: {
     id: 'nationale',
@@ -114,13 +129,94 @@ export const TROPHEES: Record<string, Trophee> = {
     desc: 'Champion du monde. Ton nom entre dans l’histoire.',
     ovas: 30,
   },
+  // --- LES HONNEURS INDIVIDUELS ----------------------------------------------
+  // ⚠️ Jusqu'ici, UNE SEULE distinction personnelle existait (meilleur joueur du
+  // monde), et elle tombait sur un tirage au sort conditionné au seul niveau
+  // général. Toute une saison pouvait se jouer sans qu'aucun honneur ne
+  // récompense la PERFORMANCE. Les sept trophées ci-dessous s'y emploient : ils
+  // se méritent sur la note de saison, les statistiques et le palmarès de
+  // l'année (`lib/honneurs.ts`), jamais sur un coup de dé.
+  //
+  // ⚠️ ILS NE SE GAGNENT QUE LÀ OÙ ILS EXISTENT. Un championnat amateur n'élit
+  // pas de joueur de l'année : `MEILLEUR_JOUEUR_PAR_DIVISION` ne couvre que les
+  // cinq championnats qui le font vraiment. C'est volontaire — la rareté est ce
+  // qui donne sa valeur à une distinction.
   meilleurJoueur: {
     id: 'meilleurJoueur',
+    // ⚠️ NE PAS RENOMMER : `palmaresDepuisLibelles()` (store) reconstruit le
+    // palmarès des vieilles sauvegardes en rapprochant le libellé du NOM.
     nom: 'Meilleur joueur de l’année',
     modele: '/m3d/meilleur-joueur.glb',
     couleur: '#f4cd63',
-    desc: 'Élu meilleur joueur du monde. Personne ne t’a surpassé.',
+    desc: 'Élu meilleur joueur du monde. Personne ne t’a surpassé cette saison.',
     ovas: 20,
+    individuel: true,
+  },
+  meilleurTop14: {
+    id: 'meilleurTop14',
+    nom: 'Meilleur joueur du Top 14',
+    modele: '/m3d/meilleurTop14.glb',
+    couleur: '#e8b23a',
+    desc: 'Élu meilleur joueur de la saison de Top 14 par tes pairs et par la presse.',
+    ovas: 11,
+    individuel: true,
+  },
+  meilleurPremiership: {
+    id: 'meilleurPremiership',
+    nom: 'Meilleur joueur de la Premiership',
+    modele: '/m3d/meilleurPremiership.glb',
+    couleur: '#8e6bd6',
+    desc: 'Joueur de la saison en Angleterre. Toute la Premiership a regardé dans ta direction.',
+    ovas: 10,
+    individuel: true,
+  },
+  meilleurUrc: {
+    id: 'meilleurUrc',
+    nom: 'Meilleur joueur de l’URC',
+    modele: '/m3d/meilleurUrc.glb',
+    couleur: '#3ad1c0',
+    desc: 'Joueur de la saison de l’United Rugby Championship — quatre pays, une seule référence : toi.',
+    ovas: 10,
+    individuel: true,
+  },
+  // ⚠️ UN SEUL TROPHÉE POUR LES DEUX COMPÉTITIONS NÉO-ZÉLANDAISES, ET C'EST
+  // FIDÈLE : la distinction de joueur de l'année est décernée par la fédération
+  // néo-zélandaise, sur l'ensemble de la saison — Super Rugby ET NPC.
+  meilleurNZ: {
+    id: 'meilleurNZ',
+    nom: 'Meilleur joueur de Nouvelle-Zélande',
+    modele: '/m3d/meilleurNZ.glb',
+    couleur: '#1f1f1f',
+    desc: 'Joueur néo-zélandais de l’année. Au pays des All Blacks, cette ligne-là vaut toutes les autres.',
+    ovas: 10,
+    individuel: true,
+  },
+  meilleurChampionsCup: {
+    id: 'meilleurChampionsCup',
+    nom: 'Meilleur joueur de la Champions Cup',
+    modele: '/m3d/meilleurChampionsCup.glb',
+    couleur: '#3fa9f5',
+    desc: 'Homme fort de la campagne européenne. Six matchs pour marquer l’Europe, et tu les as tous marqués.',
+    ovas: 13,
+    individuel: true,
+  },
+  meilleurSixNations: {
+    id: 'meilleurSixNations',
+    nom: 'Meilleur joueur du Tournoi',
+    modele: '/m3d/meilleurSixNations.glb',
+    couleur: '#d4a017',
+    desc: 'Joueur du Tournoi des 6 Nations. Cinq week-ends de février, et un nom qui revient dans toutes les bouches.',
+    ovas: 14,
+    individuel: true,
+  },
+  hommeDuMatchMonde: {
+    id: 'hommeDuMatchMonde',
+    nom: 'Homme du match — finale de Coupe du monde',
+    modele: '/m3d/hommeDuMatchMonde.glb',
+    couleur: '#f4cd63',
+    desc: 'Meilleur joueur de la finale de la Coupe du monde. Une soirée que le rugby entier a regardée, et c’est toi qu’il a vu.',
+    ovas: 18,
+    individuel: true,
   },
 
   // --- Championnats du monde -------------------------------------------------
@@ -307,6 +403,8 @@ export const TROPHEES: Record<string, Trophee> = {
     couleur: '#5a2d82',
     desc: 'Champion de Russie. Des déplacements interminables, des hivers durs, et une coupe au bout.',
     ovas: 5,
+    // Même cas que le Pro D2 : un bouclier sur un socle épais (1,48 × 1,90 × 0,91).
+    forme: 'bouclier',
   },
   paysBas: {
     id: 'paysBas',
@@ -429,6 +527,36 @@ export const TROPHEE_PAR_COUPE: Record<string, string> = {
   challengeCup: 'challenge',
   premCup: 'premCup',
 };
+
+// ---------------------------------------------------------------------------
+// LES DISTINCTIONS INDIVIDUELLES, ET OÙ ELLES SE DÉCERNENT
+// ---------------------------------------------------------------------------
+// ⚠️ VOLONTAIREMENT COURTES. Cinq championnats sur trente-trois élisent un
+// joueur de l'année, parce que c'est le cas dans la réalité : personne ne
+// décerne d'Oscar en Fédérale 3, ni en Ekstraliga polonaise. Un honneur qui
+// tomberait partout ne serait plus un honneur, et ferait exploser le compteur
+// de titres du classement mondial (voir `LIMITES` dans `lib/classementMondial.ts`).
+
+/** Championnat (id de compétition) → sa distinction de meilleur joueur de la saison. */
+export const MEILLEUR_JOUEUR_PAR_DIVISION: Record<string, string> = {
+  top14: 'meilleurTop14',
+  premiership: 'meilleurPremiership',
+  urc: 'meilleurUrc',
+  // Les deux compétitions néo-zélandaises partagent LA distinction du pays.
+  super: 'meilleurNZ',
+  npc: 'meilleurNZ',
+};
+
+/**
+ * Distinctions attachées à une campagne (coupe d'Europe, tournoi, Coupe du
+ * monde) plutôt qu'à un championnat. Elles ont chacune leur condition d'accès,
+ * écrite dans `lib/honneurs.ts` — être engagé en Champions Cup, être sélectionné
+ * pour le Tournoi, avoir disputé (et gagné) la finale du monde.
+ */
+export const HONNEUR_CHAMPIONS_CUP = 'meilleurChampionsCup';
+export const HONNEUR_TOURNOI = 'meilleurSixNations';
+export const HONNEUR_FINALE_MONDE = 'hommeDuMatchMonde';
+export const HONNEUR_MONDIAL = 'meilleurJoueur';
 
 // Championnats qui donnent accès aux coupes d'Europe : les 8 premiers jouent
 // la Champions Cup, les autres la Challenge Cup (voir le store). Le Top 14, la

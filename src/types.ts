@@ -147,6 +147,13 @@ export interface BilanEnCours {
 }
 
 // Statistiques détaillées, cumulées sur une saison ou sur toute la carrière.
+//
+// ⚠️ TOUT LE JEU EST COMPTÉ (demande explicite : « pour les notes il faut
+// prendre en compte tout le jeu »). Les champs ajoutés sont OPTIONNELS et
+// toujours lus avec `?? 0` : une sauvegarde antérieure ne les a pas, et elle ne
+// doit ni planter ni afficher `NaN`. Ils sont remplis par le moteur de match
+// (`moteur/entites.ts` → `enregistrerMatchVecu`), jamais estimés pour le joueur
+// humain — c'est toute la différence avec `lib/statsJoueurs.ts`.
 export interface StatsDetaillees {
   points: number;
   butsTentes: number;
@@ -157,6 +164,17 @@ export interface StatsDetaillees {
   passesDecisives: number;
   cartonsJaunes: number;
   cartonsRouges: number;
+  // --- Ajoutés avec la feuille de match complète ---------------------------
+  passes?: number;          // passes réussies (toutes)
+  offloads?: number;        // passes après contact
+  metres?: number;          // mètres gagnés ballon en main
+  franchissements?: number; // défenseurs battus
+  turnovers?: number;       // ballons concédés
+  melees?: number;          // mêlées gagnées par son pack (avants)
+  touchesGagnees?: number;  // touches captées (avants)
+  pickAndGo?: number;       // ballons portés au ras (avants)
+  coupsDePied?: number;
+  cinquanteVingtDeux?: number; // 50/22 réussis
 }
 
 // --- BLESSURES ---

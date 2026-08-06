@@ -144,6 +144,14 @@ export interface EtatMatch {
   metresGagnesPhase: number; // terrain gagné au-delà de la ligne d'avantage
   ballonLent: boolean;       // sortie de ruck lente : la défense a le temps
   derniereTouche: Pion | null;
+  // ⚠️ LE DERNIER PASSEUR, pour créditer la PASSE DÉCISIVE. Il doit vivre dans
+  // l'état et nulle part ailleurs : deux matchs simulés en parallèle se
+  // partageraient une variable de module, et le déterminisme du moteur — sur
+  // lequel repose l'égalité entre le match regardé en direct et le même match
+  // rejoué en fond — tomberait. Remis à `null` dès qu'un ruck, une phase
+  // arrêtée ou un coup de pied s'intercale : l'essai qui suit n'est alors la
+  // conséquence de la passe de personne.
+  dernierPasseur: Pion | null;
   perceeSignalee: boolean;   // une percée a déjà été annoncée sur cette phase
   aide: number;              // rythme de marque de l'équipe qui attaque (voir `retard`)
 

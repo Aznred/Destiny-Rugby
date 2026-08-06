@@ -12,11 +12,12 @@
 // la hauteur libre au-dessus de chacune. Si un jour l'armoire est remplacée par
 // un autre `.glb`, la vitrine suit — rien à re-mesurer à la main.
 //
-// ⚠️ LES PIÈCES DE PRESTIGE SONT AU SOL, PAS DANS LA VITRINE (demande
-// explicite). Les tablettes du meuble sont hautes de ~13 cm à l'échelle réelle :
-// tout ce qu'on y pose est minuscule. Le Bouclier de Brennus, les autres
-// boucliers et les grandes coupes se dressent donc au sol, à hauteur de buste
-// de rugbyman, adossés au meuble ou à côté.
+// ⚠️ LES DISTINCTIONS EN VITRINE, LES TITRES AU SOL (demande explicite : « les
+// trophées individuels dans l'armoire et les trophées collectifs à côté, plus
+// gros »). Les tablettes du meuble sont hautes de ~13 cm à l'échelle réelle :
+// tout ce qu'on y pose est petit — parfait pour un trophée de meilleur joueur.
+// Les titres d'équipe, eux, se dressent au sol à hauteur de buste de rugbyman,
+// et les boucliers s'appuient sur le coin avant du meuble.
 //
 // ⚠️ TOUS LES MODÈLES SONT CHARGÉS PAR LA SCÈNE, pas par chaque trophée. C'est
 // ce qui permet de disposer l'ensemble d'un seul coup : un composant par
@@ -34,7 +35,7 @@ import { useGLTF, ContactShadows, OrbitControls, Sparkles } from '@react-three/d
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import type { Group, Object3D } from 'three';
-import { TROPHEES, OVAS_PIECE_MAJEURE, type Trophee } from '../data/trophees';
+import { TROPHEES, estIndividuel, type Trophee } from '../data/trophees';
 import type { TitreGagne } from '../types';
 import { t } from '../lib/i18n';
 import {
@@ -196,7 +197,7 @@ function Scene({
     });
     const modeles: Modele[] = tailles.map((t, i) => ({
       taille: t,
-      majeur: pieces[i].trophee.ovas >= OVAS_PIECE_MAJEURE,
+      individuel: estIndividuel(pieces[i].trophee),
       bouclier: pieces[i].trophee.forme === 'bouclier' || estBouclier(t),
     }));
     const places = disposerArmoire(modeles, dims, etageres);

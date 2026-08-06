@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame, classementComplet } from '../store/useGame';
 import { POSTE_PAR_ID, migrerPoste } from '../data/rugby';
@@ -8,6 +8,9 @@ import {
   ficheDepuisJoueur, verifierFiche, SCORE_MAX, SAISONS_MAX, LIMITES,
   RECOMMANDATIONS_SERVEUR_LISTE,
 } from '../lib/classementMondial';
+import {
+  envoyerAuClassement, lireClassementMondial, type LigneMondiale, type ResultatEnvoi,
+} from '../lib/classementEnLigne';
 
 export function Classement() {
   const pantheon = useGame((s) => s.pantheon);
@@ -15,6 +18,19 @@ export function Classement() {
   const setEcran = useGame((s) => s.setEcran);
 
   const liste = classementComplet(pantheon, joueur);
+
+  // ⚠️ LE TABLEAU MONDIAL EST UN BONUS, JAMAIS UNE DÉPENDANCE. Sans serveur
+  // déployé, `lireClassementMondial()` renvoie une liste vide sans lever
+  // d'erreur, et l'écran garde son classement local. Voir `serveur/VERCEL.md`.
+  const [mondial, setMondial] = useState<LigneMondiale[] | null>(null);
+  const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  const [verdictServeur, setVerdictServeur] = useState<ResultatEnvoi | null>(null);
+
+  useEffect(() => {
+    let vivant = true;
+    lireClassementMondial().then((l) => { if (vivant) setMondial(l); });
+    return () => { vivant = false; };
+  }, []);
 
   // ⚠️ LA FICHE QUI PARTIRAIT AU SERVEUR, ET SON VERDICT. On la montre en clair :
   // c'est exactement ce que le jeu enverrait, et exactement ce que le serveur
@@ -67,7 +83,51 @@ export function Classement() {
               {envoi.verdict.anomalies.map((a) => <li key={a}>⛔ {a}</li>)}
             </ul>
           )}
+
+          {/* L'envoi réel. Le bouton reste là même sans serveur : la réponse
+              explique alors qu'aucun classement en ligne n'est branché — plutôt
+              qu'un bouton absent, qui ne dit rien du tout. */}
+          <button
+            className="btn primaire"
+            disabled={envoiEnCours || !envoi.verdict.valide}
+            onClick={async () => {
+              setEnvoiEnCours(true);
+              setVerdictServeur(null);
+              const r = await envoyerAuClassement(envoi.fiche);
+              setVerdictServeur(r);
+              setEnvoiEnCours(false);
+              if (r.ok) setMondial(await lireClassementMondial());
+            }}
+          >
+            {envoiEnCours ? 'Envoi…' : '🌍 Envoyer ma carrière au classement mondial'}
+          </button>
+          {verdictServeur && (
+            <p className="aide" style={{ marginTop: '0.6rem' }}>
+              {verdictServeur.ok
+                ? `✅ Enregistré. Score retenu par le serveur : ${verdictServeur.score?.toLocaleString('fr-FR')}.`
+                : `⛔ ${verdictServeur.erreur}`}
+              {verdictServeur.anomalies?.length ? ` (${verdictServeur.anomalies.join(' · ')})` : ''}
+            </p>
+          )}
         </details>
+      )}
+
+      {/* ═══ LE TABLEAU MONDIAL, s'il y a un serveur ═════════════════════ */}
+      {mondial && mondial.length > 0 && (
+        <div className="carte tuto-classement">
+          <h2 style={{ marginTop: 0 }}>🌍 Classement mondial</h2>
+          <p className="aide">
+            Les scores ci-dessous ont été <b>recalculés par le serveur</b> à partir des
+            faits de chaque carrière. Aucun n'a été cru sur parole.
+          </p>
+          <ol className="tuto-etapes">
+            {mondial.slice(0, 20).map((l, i) => (
+              <li key={l.pseudo}>
+                <b>#{i + 1}</b> {l.pseudo} — {l.score.toLocaleString('fr-FR')} pts
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
       <details className="carte tuto-classement">

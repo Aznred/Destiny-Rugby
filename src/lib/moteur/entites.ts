@@ -12,31 +12,57 @@ import type { Coequipier } from '../effectif';
 import type { PosteId } from '../../types';
 import { AXE, LARGEUR, LONGUEUR, borner, type Cote, type Vec } from './terrain';
 
+// ⚠️ LA FEUILLE DE MATCH COMPLÈTE, JOUEUR PAR JOUEUR (demande explicite : « je
+// veux que chaque joueur ait de vraies stats, pas des stats simulées ; pour les
+// avants mêlée, touche gagnée, grattages, turnovers, pick and go, essais, passes
+// décisives, passes normales, minutes jouées, mètres parcourus avec le ballon,
+// cartons jaunes et rouges ; pour les arrières pareil + coups de pied, 50/22
+// réussis, offloads, et sans mêlée ni touche ni pick and go »).
+//
+// ⚠️ TOUT CE QUI EST ICI EST COMPTÉ PAR LE MOTEUR, À L'ÉVÉNEMENT. Rien n'est
+// déduit d'une formule après coup : une mêlée gagnée l'est parce que le pack a
+// gagné la poussée à la 34ᵉ minute, un offload parce que la passe après contact
+// est arrivée. C'est ce qui rend les classements individuels vrais — et ce qui
+// permet de noter une performance sur autre chose que les essais.
 export interface StatsMatch {
   metres: number;            // mètres gagnés ballon en main
   courses: number;           // ballons portés
   passes: number;
+  passesDecisives: number;   // la passe qui amène l'essai
   passesRatees: number;      // en-avant et passes au sol
+  offloads: number;          // passe APRÈS contact, la marque des grands centres
   franchissements: number;   // défenseurs battus / lignes franchies
   plaquages: number;
   plaquagesManques: number;
   rucksNettoyes: number;
-  grattages: number;
+  grattages: number;         // ballons volés au sol
+  // --- Conquête : réservée aux avants (un ailier n'y participe pas) ---------
+  melees: number;            // mêlées gagnées par son pack, lui sur le terrain
+  touchesGagnees: number;    // touches captées (le sauteur)
+  pickAndGo: number;         // ballons portés au ras depuis un ruck ou le 8
+  // --- Jeu au pied ---------------------------------------------------------
   coupsDePied: number;
   metresAuPied: number;
+  cinquanteVingtDeux: number; // 50/22 RÉUSSIS (trouvés en touche dans les 22)
   essais: number;
   butsTentes: number;
   butsReussis: number;
-  cartons: number;
+  // ⚠️ LES DEUX CARTONS SONT SÉPARÉS. Un jaune coûte dix minutes, un rouge coûte
+  // le match — les confondre dans un seul compteur rendait la discipline
+  // illisible dans les classements comme dans la note de match.
+  cartonsJaunes: number;
+  cartonsRouges: number;
   distanceParcourue: number; // effort total, pour l'endurance et la feuille
 }
 
 export function statsVides(): StatsMatch {
   return {
-    metres: 0, courses: 0, passes: 0, passesRatees: 0, franchissements: 0,
-    plaquages: 0, plaquagesManques: 0, rucksNettoyes: 0, grattages: 0,
-    coupsDePied: 0, metresAuPied: 0, essais: 0, butsTentes: 0, butsReussis: 0,
-    cartons: 0, distanceParcourue: 0,
+    metres: 0, courses: 0, passes: 0, passesDecisives: 0, passesRatees: 0,
+    offloads: 0, franchissements: 0, plaquages: 0, plaquagesManques: 0,
+    rucksNettoyes: 0, grattages: 0, melees: 0, touchesGagnees: 0, pickAndGo: 0,
+    coupsDePied: 0, metresAuPied: 0, cinquanteVingtDeux: 0, essais: 0,
+    butsTentes: 0, butsReussis: 0, cartonsJaunes: 0, cartonsRouges: 0,
+    distanceParcourue: 0,
   };
 }
 

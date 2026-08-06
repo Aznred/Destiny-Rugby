@@ -35,6 +35,23 @@ function ligne(libelle: string, valeur: string, ok: boolean): void {
 
 const IDS_TROPHEES = Object.keys(TROPHEES);
 
+/**
+ * `n` titres qui respectent la borne « un trophée au plus une fois par saison ».
+ * ⚠️ Sans elle, un palmarès de test se contentait de répéter `brennus` — ce que
+ * `verifierFiche` refuse désormais, à raison : on ne gagne pas deux Boucliers
+ * la même année. On répartit donc sur tous les trophées du jeu, en tournant.
+ */
+function palmaresCredible(n: number, saisons: number): string[] {
+  const titres: string[] = [];
+  for (let k = 0; k < n; k++) {
+    // Autant de tours que nécessaire, chaque id revenant au plus `saisons` fois.
+    const tour = Math.floor(k / IDS_TROPHEES.length);
+    if (tour >= saisons) break; // impossible d'aller plus loin sans tricher
+    titres.push(IDS_TROPHEES[k % IDS_TROPHEES.length]);
+  }
+  return titres;
+}
+
 /** Une carrière honnête et solide : douze saisons, quelques titres. */
 function fiche(modif: Partial<FicheCarriere> = {}): FicheCarriere {
   const base = {
@@ -123,8 +140,25 @@ console.log('\n=== 3. LES ATTAQUES « COHÉRENTES » SONT REFUSÉES AUSSI ===');
   attaque('note au-dessus de 100', fiche({ note: 140 }), /note hors bornes/);
   attaque('réputation à 500', fiche({ reputation: 500 }), /reputation hors bornes/);
   attaque('300 sélections en 12 saisons', fiche({ selections: 300 }), /sélections en 12 saison/);
-  attaque('80 titres en 12 saisons',
-    fiche({ titres: new Array(80).fill('brennus') }), /titres en 12 saison/);
+  // ⚠️ LE PLAFOND DE TITRES A ÉTÉ OUVERT (4 → 9 par saison) pour laisser passer
+  // les distinctions individuelles. C'est donc la borne PAR TROPHÉE qui fait
+  // désormais le travail — et elle est bien plus serrée : 80 Boucliers de
+  // Brennus passaient sous l'ancien total (80 < 108) et sont maintenant refusés,
+  // parce qu'un championnat ne se gagne qu'une fois par an.
+  attaque('80 fois le même trophée en 12 saisons',
+    fiche({ titres: new Array(80).fill('brennus') }), /plus d'une fois par saison/);
+  attaque('13 Boucliers de Brennus en 12 saisons',
+    fiche({ titres: new Array(13).fill('brennus') }), /brennus ×13/);
+  // Et le total tient toujours, avec des trophées tous différents.
+  attaque('200 titres tous différents en 12 saisons',
+    fiche({ titres: palmaresCredible(200, 12) }), /titres en 12 saison/);
+  // Douze saisons parfaites — neuf trophées distincts chacune — doivent PASSER.
+  {
+    const max = fiche({ titres: palmaresCredible(12 * LIMITES.titresParSaison, 12) });
+    const v = verifierFiche(max, IDS_TROPHEES);
+    ligne('12 saisons à 9 trophées distincts : accepté',
+      v.anomalies.join(' | ') || `${v.score} pts`, v.valide);
+  }
   attaque('des essais sans avoir joué',
     fiche({ matchs: 0, essais: 40, selections: 0, titres: [] }), /sans le moindre match/);
   attaque('des titres sans avoir joué',
@@ -157,7 +191,11 @@ console.log('\n=== 5. LE PLAFOND ABSOLU ===');
     matchs: SAISONS_MAX * LIMITES.matchsParSaison,
     essais: SAISONS_MAX * LIMITES.matchsParSaison * LIMITES.essaisParMatch,
     selections: SAISONS_MAX * LIMITES.capesParSaison,
-    titres: new Array(SAISONS_MAX * LIMITES.titresParSaison).fill('brennus'),
+    // ⚠️ DES TROPHÉES DIFFÉRENTS, et c'est le sujet : la carrière maximale doit
+    // rester CRÉDIBLE ligne à ligne. 270 fois le Bouclier de Brennus ne l'est
+    // pas, et `verifierFiche` le refuse depuis qu'on borne chaque trophée à une
+    // fois par saison.
+    titres: palmaresCredible(SAISONS_MAX * LIMITES.titresParSaison, SAISONS_MAX),
   });
   const v = verifierFiche(parfaite, IDS_TROPHEES);
   ligne('la carrière théorique maximale est acceptée',

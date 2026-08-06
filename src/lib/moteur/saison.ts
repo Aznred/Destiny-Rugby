@@ -14,18 +14,31 @@ import { avancer, bilan, creerMatch } from './moteur';
 import type { AttributsPion } from './entites';
 import type { PosteId } from '../../types';
 
+// ⚠️ LA FEUILLE COMPLÈTE REMONTE JUSQU'AUX CLASSEMENTS. Ce qui n'est pas dans
+// cette structure n'existe pas pour l'écran Résultats, même si le moteur l'a
+// compté : c'est ici que les statistiques d'un match deviennent celles d'une
+// saison. Les champs suivent `StatsMatch` (moteur/entites.ts) — quand on en
+// ajoute un là-bas, il faut le faire traverser ICI, dans `verser` ET dans
+// `cumuler`, sinon il se perd en silence.
 export interface LigneReelle {
   nom: string; club: string; numero: number; poste: PosteId; minutes: number;
   essais: number; plaquages: number; plaquagesManques: number; passes: number;
-  metres: number; grattages: number; rucksNettoyes: number; turnovers: number;
-  butsTentes: number; butsReussis: number; cartons: number; matchs: number;
+  passesDecisives: number; offloads: number; metres: number; grattages: number;
+  rucksNettoyes: number; turnovers: number; franchissements: number;
+  melees: number; touchesGagnees: number; pickAndGo: number;
+  coupsDePied: number; cinquanteVingtDeux: number;
+  butsTentes: number; butsReussis: number;
+  cartonsJaunes: number; cartonsRouges: number; matchs: number;
 }
 
 export function ligneVide(nom: string, club: string, numero: number, poste: PosteId): LigneReelle {
   return {
     nom, club, numero, poste, minutes: 0, essais: 0, plaquages: 0, plaquagesManques: 0,
-    passes: 0, metres: 0, grattages: 0, rucksNettoyes: 0, turnovers: 0,
-    butsTentes: 0, butsReussis: 0, cartons: 0, matchs: 0,
+    passes: 0, passesDecisives: 0, offloads: 0, metres: 0, grattages: 0,
+    rucksNettoyes: 0, turnovers: 0, franchissements: 0,
+    melees: 0, touchesGagnees: 0, pickAndGo: 0,
+    coupsDePied: 0, cinquanteVingtDeux: 0,
+    butsTentes: 0, butsReussis: 0, cartonsJaunes: 0, cartonsRouges: 0, matchs: 0,
   };
 }
 
@@ -62,10 +75,16 @@ function verser(sortie: LigneReelle[], e: ReturnType<typeof jouerSansRendu>): vo
       nom: j.nom, club: j.club, numero: j.numero, poste: j.poste,
       minutes: j.minutes, essais: j.stats.essais, plaquages: j.stats.plaquages,
       plaquagesManques: j.stats.plaquagesManques, passes: j.stats.passes,
+      passesDecisives: j.stats.passesDecisives, offloads: j.stats.offloads,
       metres: Math.round(j.stats.metres), grattages: j.stats.grattages,
       rucksNettoyes: j.stats.rucksNettoyes, turnovers: j.stats.passesRatees,
+      franchissements: j.stats.franchissements,
+      melees: j.stats.melees, touchesGagnees: j.stats.touchesGagnees,
+      pickAndGo: j.stats.pickAndGo, coupsDePied: j.stats.coupsDePied,
+      cinquanteVingtDeux: j.stats.cinquanteVingtDeux,
       butsTentes: j.stats.butsTentes, butsReussis: j.stats.butsReussis,
-      cartons: j.stats.cartons, matchs: 1,
+      cartonsJaunes: j.stats.cartonsJaunes, cartonsRouges: j.stats.cartonsRouges,
+      matchs: 1,
     });
   }
 }
@@ -155,15 +174,26 @@ export function cumuler(
   const sortie = { ...total };
   for (const l of journee) {
     const cle = `${l.club}|${l.nom}`;
-    const a = sortie[cle] ?? ligneVide(l.nom, l.club, l.numero, l.poste);
+    // ⚠️ `statsReelles` EST PERSISTÉ : une sauvegarde d'avant la feuille de
+    // match complète contient des lignes sans `melees`, `offloads`… Additionner
+    // `undefined` donne `NaN`, et un `NaN` dans un classement contamine tout le
+    // tri en silence. On repart donc d'une ligne vide et on écrase avec ce qui
+    // existe : les anciens champs sont repris, les nouveaux démarrent à zéro.
+    const a = { ...ligneVide(l.nom, l.club, l.numero, l.poste), ...sortie[cle] };
     sortie[cle] = {
       ...a, numero: l.numero, poste: l.poste,
       minutes: a.minutes + l.minutes, essais: a.essais + l.essais,
       plaquages: a.plaquages + l.plaquages, plaquagesManques: a.plaquagesManques + l.plaquagesManques,
-      passes: a.passes + l.passes, metres: a.metres + l.metres,
+      passes: a.passes + l.passes, passesDecisives: a.passesDecisives + l.passesDecisives,
+      offloads: a.offloads + l.offloads, metres: a.metres + l.metres,
       grattages: a.grattages + l.grattages, rucksNettoyes: a.rucksNettoyes + l.rucksNettoyes,
-      turnovers: a.turnovers + l.turnovers, butsTentes: a.butsTentes + l.butsTentes,
-      butsReussis: a.butsReussis + l.butsReussis, cartons: a.cartons + l.cartons,
+      turnovers: a.turnovers + l.turnovers, franchissements: a.franchissements + l.franchissements,
+      melees: a.melees + l.melees, touchesGagnees: a.touchesGagnees + l.touchesGagnees,
+      pickAndGo: a.pickAndGo + l.pickAndGo, coupsDePied: a.coupsDePied + l.coupsDePied,
+      cinquanteVingtDeux: a.cinquanteVingtDeux + l.cinquanteVingtDeux,
+      butsTentes: a.butsTentes + l.butsTentes, butsReussis: a.butsReussis + l.butsReussis,
+      cartonsJaunes: a.cartonsJaunes + l.cartonsJaunes,
+      cartonsRouges: a.cartonsRouges + l.cartonsRouges,
       matchs: a.matchs + l.matchs,
     };
   }

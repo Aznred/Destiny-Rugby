@@ -122,9 +122,21 @@ export function evoluer(j: Joueur, s: SaisonJouee): Evolution {
   // un joueur à 68 pour un potentiel de 84 n'avait plus rien pour combler
   // l'écart passé son 27ᵉ anniversaire, et son potentiel restait lettre morte.
   // Après 28 ans il rapporte moins — on rattrape, on n'explose plus.
+  //
+  // ⚠️ RÉÉTALONNÉ APRÈS LA RÉFORME DU MARCHÉ (4,5 → 5,4 ; plafond 5,5 → 4,6).
+  // Ce n'est PAS un durcissement gratuit, c'est une compensation mesurée. En
+  // interdisant de sauter deux étages d'un coup (`lib/offres.ts`), on a rendu
+  // les transferts réalistes — et, sans le vouloir, le jeu bien plus facile :
+  // un joueur qui ne se retrouve plus parachuté dans un club trop fort pour lui
+  // reste AU NIVEAU DE SON GROUPE, ce que `noterSaison` récompense
+  // (`perso − forceGroupe`). Mesuré : carrières ≥ 80 passées de 10/100 à 23/100,
+  // ≥ 85 de 2 à 12, maximum de 86 à 92. La médiane, elle, n'avait pas bougé —
+  // c'est donc la QUEUE qu'il fallait reprendre, et le talent brut est
+  // précisément le levier qui n'agit que sur elle (il ne profite qu'aux joueurs
+  // qui ont de la marge à rattraper).
   if (j.age <= 31) {
     const marge = Math.max(0, potentiel - gen);
-    points += Math.min(5.5, marge / 4.5) * (j.age < 27 ? 1 : j.age <= 29 ? 0.7 : 0.45);
+    points += Math.min(3.6, marge / 7.2) * (j.age < 27 ? 1 : j.age <= 29 ? 0.7 : 0.45);
   }
   if (j.age <= 21) points = Math.max(points, 1.2);
   else if (j.age <= 23) points = Math.max(points, 0.7);

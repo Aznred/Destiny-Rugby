@@ -40,39 +40,85 @@ export interface LigneStats {
   grattages: number; // ballons grattés au sol
   turnovers: number; // ballons rendus à l'adversaire
   passesDecisives: number;
-  cartons: number;
+  // ⚠️ TOUT LE JEU, PAS SEULEMENT CE QUI SE VOIT (demande explicite : « pour les
+  // notes il faut prendre en compte tout le jeu »). Un pilier ne marque pas
+  // d'essai et ne fait pas de passe décisive : sans ces lignes-là, il n'existait
+  // dans aucun classement, et sa saison ne se jugeait sur rien.
+  passes: number;          // passes réussies (toutes)
+  offloads: number;        // passes APRÈS contact
+  metres: number;          // mètres gagnés ballon en main
+  franchissements: number; // défenseurs battus
+  melees: number;          // mêlées gagnées par son pack (avants)
+  touchesGagnees: number;  // touches captées (avants)
+  pickAndGo: number;       // ballons portés au ras (avants)
+  coupsDePied: number;
+  cinquanteVingtDeux: number; // 50/22 réussis
+  cartonsJaunes: number;
+  cartonsRouges: number;
   moi?: boolean; // le joueur humain
 }
 
 // --- LES REPÈRES PAR POSTE --------------------------------------------------
 // Par match complet (80 minutes), pour un joueur de niveau moyen. Chiffres
 // calés sur les moyennes réelles du rugby professionnel.
-interface Profil {
+export interface Profil {
   essais: number; // essais par match
   plaquages: number; // plaquages réussis par match
   grattages: number; // ballons grattés
   turnovers: number; // ballons concédés
   passesD: number;
   buteur: number; // part des tirs au but de l'équipe assurée par ce poste
+  // --- Le reste du jeu, par match complet ----------------------------------
+  passes: number;   // passes réussies
+  metres: number;   // mètres gagnés ballon en main
+  offloads: number; // passes après contact
+  pieds: number;    // coups de pied
+  /**
+   * ⚠️ `avant` COMMANDE TROIS COLONNES ENTIÈRES (demande explicite : les
+   * arrières, « sans mêlée et touche et pick and go »). Un ailier ne pousse pas
+   * en mêlée et ne saute pas en touche : lui attribuer ne serait-ce qu'une
+   * valeur estimée le ferait apparaître dans un classement où il n'a rien à
+   * faire. C'est donc ici, et une seule fois, qu'on décide qui participe à la
+   * conquête.
+   */
+  avant: boolean;
 }
 
-const PROFILS: Record<PosteId, Profil> = {
-  pilier_gauche: { essais: 0.05, plaquages: 9, grattages: 0.25, turnovers: 1.1, passesD: 0.1, buteur: 0 },
-  talonneur: { essais: 0.09, plaquages: 10, grattages: 0.4, turnovers: 1.2, passesD: 0.15, buteur: 0 },
-  pilier_droit: { essais: 0.05, plaquages: 9, grattages: 0.25, turnovers: 1.1, passesD: 0.1, buteur: 0 },
-  deuxieme_ligne_g: { essais: 0.08, plaquages: 13, grattages: 0.5, turnovers: 0.9, passesD: 0.15, buteur: 0 },
-  deuxieme_ligne_d: { essais: 0.08, plaquages: 13, grattages: 0.5, turnovers: 0.9, passesD: 0.15, buteur: 0 },
-  troisieme_aile_g: { essais: 0.13, plaquages: 14, grattages: 1.5, turnovers: 1, passesD: 0.25, buteur: 0 },
-  troisieme_aile_d: { essais: 0.13, plaquages: 14, grattages: 1.9, turnovers: 1, passesD: 0.25, buteur: 0 },
-  numero_8: { essais: 0.18, plaquages: 11, grattages: 0.9, turnovers: 1.3, passesD: 0.35, buteur: 0 },
-  demi_melee: { essais: 0.16, plaquages: 6, grattages: 0.4, turnovers: 1.4, passesD: 0.8, buteur: 0.04 },
-  demi_ouverture: { essais: 0.12, plaquages: 5, grattages: 0.2, turnovers: 1.2, passesD: 0.7, buteur: 0.62 },
-  ailier_gauche: { essais: 0.42, plaquages: 4, grattages: 0.2, turnovers: 0.8, passesD: 0.3, buteur: 0.02 },
-  premier_centre: { essais: 0.2, plaquages: 9, grattages: 0.4, turnovers: 1, passesD: 0.4, buteur: 0.03 },
-  deuxieme_centre: { essais: 0.26, plaquages: 8, grattages: 0.35, turnovers: 1, passesD: 0.45, buteur: 0.05 },
-  ailier_droit: { essais: 0.42, plaquages: 4, grattages: 0.2, turnovers: 0.8, passesD: 0.3, buteur: 0.02 },
-  arriere: { essais: 0.3, plaquages: 6, grattages: 0.3, turnovers: 1.1, passesD: 0.5, buteur: 0.22 },
+// ⚠️ EXPORTÉ : `lib/honneurs.ts` juge une saison individuelle en comparant ce
+// qu'a fait le joueur à ce qu'on attend de SON POSTE. Recopier ces chiffres
+// ailleurs, c'est se garantir un jour deux barèmes — un classement de meilleur
+// marqueur qui dit une chose, un trophée de meilleur joueur qui en dit une autre.
+// ⚠️ LES QUATRE COLONNES AJOUTÉES SONT CALÉES SUR LE MOTEUR, pas inventées.
+// Mesuré par `verifMoteur.ts` sur une saison : le 9 fait ~86 passes par match,
+// le 10 ~55, les centres ~30, les ailiers 1 à 2, les avants 1 à 2,4. Les mètres
+// suivent `ATTENDU` (moteur/apresMatch.ts), la seule table du projet qui les
+// donnait déjà. L'estimation et le moteur doivent produire des ordres de
+// grandeur comparables, sinon le classement change de nature le jour où une
+// journée est rejouée.
+export const PROFILS: Record<PosteId, Profil> = {
+  pilier_gauche: { essais: 0.05, plaquages: 9, grattages: 0.25, turnovers: 1.1, passesD: 0.1, buteur: 0, passes: 1.4, metres: 18, offloads: 0.15, pieds: 0, avant: true },
+  talonneur: { essais: 0.09, plaquages: 10, grattages: 0.4, turnovers: 1.2, passesD: 0.15, buteur: 0, passes: 1.8, metres: 22, offloads: 0.2, pieds: 0, avant: true },
+  pilier_droit: { essais: 0.05, plaquages: 9, grattages: 0.25, turnovers: 1.1, passesD: 0.1, buteur: 0, passes: 1.4, metres: 18, offloads: 0.15, pieds: 0, avant: true },
+  deuxieme_ligne_g: { essais: 0.08, plaquages: 13, grattages: 0.5, turnovers: 0.9, passesD: 0.15, buteur: 0, passes: 1.6, metres: 22, offloads: 0.2, pieds: 0, avant: true },
+  deuxieme_ligne_d: { essais: 0.08, plaquages: 13, grattages: 0.5, turnovers: 0.9, passesD: 0.15, buteur: 0, passes: 1.6, metres: 22, offloads: 0.2, pieds: 0, avant: true },
+  troisieme_aile_g: { essais: 0.13, plaquages: 14, grattages: 1.5, turnovers: 1, passesD: 0.25, buteur: 0, passes: 2.2, metres: 32, offloads: 0.45, pieds: 0.05, avant: true },
+  troisieme_aile_d: { essais: 0.13, plaquages: 14, grattages: 1.9, turnovers: 1, passesD: 0.25, buteur: 0, passes: 2.2, metres: 32, offloads: 0.45, pieds: 0.05, avant: true },
+  numero_8: { essais: 0.18, plaquages: 11, grattages: 0.9, turnovers: 1.3, passesD: 0.35, buteur: 0, passes: 2.4, metres: 45, offloads: 0.6, pieds: 0.1, avant: true },
+  demi_melee: { essais: 0.16, plaquages: 6, grattages: 0.4, turnovers: 1.4, passesD: 0.8, buteur: 0.04, passes: 86, metres: 30, offloads: 0.3, pieds: 5.5, avant: false },
+  demi_ouverture: { essais: 0.12, plaquages: 5, grattages: 0.2, turnovers: 1.2, passesD: 0.7, buteur: 0.62, passes: 55, metres: 30, offloads: 0.35, pieds: 12, avant: false },
+  ailier_gauche: { essais: 0.42, plaquages: 4, grattages: 0.2, turnovers: 0.8, passesD: 0.3, buteur: 0.02, passes: 2, metres: 75, offloads: 0.5, pieds: 1.6, avant: false },
+  premier_centre: { essais: 0.2, plaquages: 9, grattages: 0.4, turnovers: 1, passesD: 0.4, buteur: 0.03, passes: 30, metres: 55, offloads: 0.8, pieds: 0.9, avant: false },
+  deuxieme_centre: { essais: 0.26, plaquages: 8, grattages: 0.35, turnovers: 1, passesD: 0.45, buteur: 0.05, passes: 30, metres: 60, offloads: 0.9, pieds: 1.1, avant: false },
+  ailier_droit: { essais: 0.42, plaquages: 4, grattages: 0.2, turnovers: 0.8, passesD: 0.3, buteur: 0.02, passes: 2, metres: 75, offloads: 0.5, pieds: 1.6, avant: false },
+  arriere: { essais: 0.3, plaquages: 6, grattages: 0.3, turnovers: 1.1, passesD: 0.5, buteur: 0.22, passes: 6, metres: 80, offloads: 0.6, pieds: 6, avant: false },
 };
+
+// La conquête, par match complet et pour un avant. Un pack gagne ~11 mêlées et
+// ~14 touches par match ; la touche revient au sauteur (donc surtout aux
+// deuxièmes lignes), la mêlée se crédite aux huit.
+const MELEES_PAR_MATCH = 11;
+const TOUCHES_PAR_MATCH = 14;
+const PICK_AND_GO_PAR_MATCH = 4.5; // par avant : le pack en fait ~36
 
 // --- LA SAISON D'UN JOUEUR --------------------------------------------------
 //
@@ -126,6 +172,39 @@ export function statsDeSaison(
   const butsReussis = Math.round(butsTentes * reussite);
 
   const cartons = rng() < 0.16 + Math.max(0, -marge) / 90 ? 1 + (rng() < 0.15 ? 1 : 0) : 0;
+  // ⚠️ Un rouge est bien plus rare qu'un jaune : ~0,09 par match dans le rugby
+  // professionnel, soit un carton sur quatorze. Le moteur applique le même taux
+  // (`siffler`), il faut que l'estimation le suive — sinon le classement des
+  // cartons rouges change de nature dès qu'une journée est rejouée.
+  const cartonsRouges = cartons > 0 && rng() < 0.07 ? 1 : 0;
+  const cartonsJaunes = Math.max(0, cartons - cartonsRouges);
+
+  const passes = Math.max(0, Math.round(profil.passes * matchsEquivalents * bruit(0.3)));
+  const metres = Math.max(0, Math.round(profil.metres * matchsEquivalents * talent * bruit(0.45)));
+  const offloads = Math.max(0, Math.round(profil.offloads * matchsEquivalents * talent * bruit(0.9)));
+  const coupsDePied = Math.max(0, Math.round(profil.pieds * matchsEquivalents * bruit(0.4)));
+  // Le 50/22 est un geste rare et difficile : ~1,7 tenté par match pour toute
+  // une équipe, et un sur trois trouve la touche. Réservé à ceux qui tapent.
+  const cinquanteVingtDeux = profil.pieds >= 1.5
+    ? Math.max(0, Math.round(matchsEquivalents * 0.12 * (c.note / 70) * bruit(1.2)))
+    : 0;
+  const franchissements = Math.max(0, Math.round(matchsEquivalents * (profil.metres / 42) * talent * bruit(0.8)));
+
+  // ⚠️ LA CONQUÊTE N'EXISTE QUE POUR LES AVANTS. Un ailier à qui l'on
+  // attribuerait « 3 mêlées » polluerait le classement de la mêlée avec des
+  // trois-quarts — exactement ce que la demande écarte.
+  const melees = profil.avant ? Math.max(0, Math.round(MELEES_PAR_MATCH * matchsEquivalents * bruit(0.25))) : 0;
+  // La touche revient au SAUTEUR : la détente compte, d'où l'avantage des
+  // deuxièmes lignes (grattages élevés = troisième ligne, pas sauteur).
+  const partSauteur = c.poste.startsWith('deuxieme_ligne') ? 0.42
+    : c.poste === 'numero_8' || c.poste.startsWith('troisieme') ? 0.14
+      : c.poste === 'talonneur' ? 0.02 : 0.05;
+  const touchesGagnees = profil.avant
+    ? Math.max(0, Math.round(TOUCHES_PAR_MATCH * partSauteur * matchsEquivalents * talent * bruit(0.5)))
+    : 0;
+  const pickAndGo = profil.avant
+    ? Math.max(0, Math.round(PICK_AND_GO_PAR_MATCH * matchsEquivalents * bruit(0.6)))
+    : 0;
 
   return {
     nom: c.nom, club, poste: c.poste, age: c.age, note: c.note,
@@ -135,7 +214,10 @@ export function statsDeSaison(
     // on prend 2,4 en moyenne, la proportion réelle des deux).
     points: essais * 5 + Math.round(butsReussis * 2.4),
     butsTentes, butsReussis,
-    plaquages, plaquagesManques, grattages, turnovers, passesDecisives, cartons,
+    plaquages, plaquagesManques, grattages, turnovers, passesDecisives,
+    passes, offloads, metres, franchissements,
+    melees, touchesGagnees, pickAndGo, coupsDePied, cinquanteVingtDeux,
+    cartonsJaunes, cartonsRouges,
   };
 }
 
@@ -143,19 +225,44 @@ export function statsDeSaison(
 
 export type Categorie =
   | 'essais' | 'points' | 'buteurs' | 'plaquages' | 'grattages'
-  | 'turnovers' | 'passes' | 'cartons' | 'minutes';
+  | 'turnovers' | 'passes' | 'passesTotal' | 'offloads' | 'metres'
+  | 'franchissements' | 'melees' | 'touches' | 'pickAndGo'
+  | 'pieds' | 'cinquanteVingtDeux' | 'cartons' | 'minutes';
 
-export const CATEGORIES: { id: Categorie; nom: string; emoji: string; desc: string }[] = [
+/**
+ * ⚠️ `famille` DÉCIDE QUI FIGURE DANS LE CLASSEMENT (demande explicite : la
+ * conquête pour les avants, le jeu au pied et les offloads mis en avant chez les
+ * arrières). Un classement de la mêlée où figure un ailier n'est pas un
+ * classement, c'est une liste. Absente = tout le monde concourt.
+ */
+export const CATEGORIES: {
+  id: Categorie; nom: string; emoji: string; desc: string;
+  famille?: 'avants' | 'arrieres';
+}[] = [
   { id: 'essais', nom: 'Essais', emoji: '🏉', desc: 'Les meilleurs marqueurs du championnat.' },
   { id: 'points', nom: 'Points', emoji: '💯', desc: 'Essais et coups de pied confondus.' },
   { id: 'buteurs', nom: 'Buteurs', emoji: '🎯', desc: 'Pourcentage de réussite au pied (10 tentatives minimum).' },
   { id: 'plaquages', nom: 'Plaquages', emoji: '🛡️', desc: 'Plaquages réussis, et taux de réussite.' },
   { id: 'grattages', nom: 'Grattages', emoji: '🪝', desc: 'Ballons volés au sol.' },
   { id: 'turnovers', nom: 'Turnovers', emoji: '🔄', desc: 'Ballons concédés à l’adversaire — moins il y en a, mieux c’est.' },
+  { id: 'metres', nom: 'Mètres', emoji: '📏', desc: 'Mètres gagnés ballon en main, au-delà de la ligne d’avantage.' },
+  { id: 'franchissements', nom: 'Franchissements', emoji: '💨', desc: 'Défenseurs battus et lignes franchies.' },
   { id: 'passes', nom: 'Passes déc.', emoji: '🅰️', desc: 'La dernière passe avant l’essai.' },
-  { id: 'cartons', nom: 'Cartons', emoji: '🟨', desc: 'Les plus sanctionnés du championnat.' },
+  { id: 'passesTotal', nom: 'Passes', emoji: '🤾', desc: 'Toutes les passes réussies — le domaine des demis.' },
+  { id: 'offloads', nom: 'Offloads', emoji: '🤝', desc: 'Les passes APRÈS contact : faire vivre le ballon dans le plaquage.' },
+  { id: 'melees', nom: 'Mêlées', emoji: '🐏', desc: 'Mêlées gagnées par son pack. Réservé aux avants.', famille: 'avants' },
+  { id: 'touches', nom: 'Touches', emoji: '🙌', desc: 'Ballons captés en touche. Réservé aux avants.', famille: 'avants' },
+  { id: 'pickAndGo', nom: 'Pick and go', emoji: '🪨', desc: 'Ballons portés au ras du ruck. Réservé aux avants.', famille: 'avants' },
+  { id: 'pieds', nom: 'Coups de pied', emoji: '🦵', desc: 'Le jeu au pied : dégagements, occupation, chandelles.', famille: 'arrieres' },
+  { id: 'cinquanteVingtDeux', nom: '50/22', emoji: '🎯', desc: 'Les 50/22 réussis — trouver la touche dans les 22 adverses depuis son camp.', famille: 'arrieres' },
+  { id: 'cartons', nom: 'Cartons', emoji: '🟨', desc: 'Les plus sanctionnés du championnat (rouges en tête).' },
   { id: 'minutes', nom: 'Temps de jeu', emoji: '⏱️', desc: 'Les increvables.' },
 ];
+
+/** Un avant, au sens de la conquête : les maillots 1 à 8. */
+export function estAvant(poste: PosteId): boolean {
+  return PROFILS[poste]?.avant ?? false;
+}
 
 // La valeur triée pour chaque catégorie.
 export function valeurDe(l: LigneStats, cat: Categorie): number {
@@ -167,7 +274,17 @@ export function valeurDe(l: LigneStats, cat: Categorie): number {
     case 'grattages': return l.grattages;
     case 'turnovers': return l.turnovers;
     case 'passes': return l.passesDecisives;
-    case 'cartons': return l.cartons;
+    case 'passesTotal': return l.passes;
+    case 'offloads': return l.offloads;
+    case 'metres': return l.metres;
+    case 'franchissements': return l.franchissements;
+    case 'melees': return l.melees;
+    case 'touches': return l.touchesGagnees;
+    case 'pickAndGo': return l.pickAndGo;
+    case 'pieds': return l.coupsDePied;
+    case 'cinquanteVingtDeux': return l.cinquanteVingtDeux;
+    // Un rouge pèse plus lourd qu'un jaune : le tri le reflète.
+    case 'cartons': return l.cartonsJaunes + l.cartonsRouges * 3;
     case 'minutes': return l.minutes;
   }
 }
@@ -180,6 +297,9 @@ export function afficherValeur(l: LigneStats, cat: Categorie): string {
       return `${l.plaquages} · ${total ? Math.round((l.plaquages / total) * 100) : 0} %`;
     }
     case 'minutes': return `${l.minutes.toLocaleString('fr-FR')} min`;
+    case 'metres': return `${l.metres.toLocaleString('fr-FR')} m`;
+    // On montre les deux couleurs : « 3 🟨 » ou « 2 🟨 · 1 🟥 ».
+    case 'cartons': return `${l.cartonsJaunes} 🟨${l.cartonsRouges ? ` · ${l.cartonsRouges} 🟥` : ''}`;
     default: return String(valeurDe(l, cat));
   }
 }
@@ -239,8 +359,23 @@ function depuisLeMoteur(reelles: Record<string, LigneReelle>): LigneStats[] {
     plaquagesManques: l.plaquagesManques,
     grattages: l.grattages,
     turnovers: l.turnovers,
-    passesDecisives: l.passes,
-    cartons: l.cartons,
+    // ⚠️ CORRECTION : cette ligne renvoyait `l.passes`, c'est-à-dire TOUTES les
+    // passes, dans la colonne « passes décisives ». Le classement des passeurs
+    // décisifs était donc un classement des demis de mêlée — 86 « passes
+    // décisives » par match. Le moteur compte maintenant la vraie passe qui
+    // amène l'essai (`StatsMatch.passesDecisives`), et les deux sont distinctes.
+    passesDecisives: l.passesDecisives,
+    passes: l.passes,
+    offloads: l.offloads,
+    metres: l.metres,
+    franchissements: l.franchissements,
+    melees: l.melees,
+    touchesGagnees: l.touchesGagnees,
+    pickAndGo: l.pickAndGo,
+    coupsDePied: l.coupsDePied,
+    cinquanteVingtDeux: l.cinquanteVingtDeux,
+    cartonsJaunes: l.cartonsJaunes,
+    cartonsRouges: l.cartonsRouges,
   }));
 }
 
@@ -273,18 +408,40 @@ export function classementJoueurs(
       plaquages: stats?.plaquages ?? 0,
       plaquagesManques: stats?.plaquagesManques ?? 0,
       grattages: stats?.grattages ?? 0,
-      // Les turnovers ne sont pas comptés pour le joueur humain : on les déduit
-      // de son poste et de son temps de jeu, comme pour les autres.
-      turnovers: Math.round((PROFILS[joueur.poste]?.turnovers ?? 1) * ((vecu?.matchs ?? 0) * 0.8)),
+      turnovers: stats?.turnovers ?? 0,
       passesDecisives: stats?.passesDecisives ?? 0,
-      cartons: (stats?.cartonsJaunes ?? 0) + (stats?.cartonsRouges ?? 0),
+      // ⚠️ TOUT LE JEU DU JOUEUR HUMAIN EST MAINTENANT COMPTÉ. Ces lignes
+      // étaient absentes : il apparaissait à zéro dans les classements de la
+      // mêlée, de la touche, des mètres et des offloads — c'est-à-dire dans
+      // tout ce qui fait le match d'un avant.
+      passes: stats?.passes ?? 0,
+      offloads: stats?.offloads ?? 0,
+      metres: stats?.metres ?? 0,
+      franchissements: stats?.franchissements ?? 0,
+      melees: stats?.melees ?? 0,
+      touchesGagnees: stats?.touchesGagnees ?? 0,
+      pickAndGo: stats?.pickAndGo ?? 0,
+      coupsDePied: stats?.coupsDePied ?? 0,
+      cinquanteVingtDeux: stats?.cinquanteVingtDeux ?? 0,
+      cartonsJaunes: stats?.cartonsJaunes ?? 0,
+      cartonsRouges: stats?.cartonsRouges ?? 0,
       moi: true,
     };
     // On remplace l'estimation faite pour lui par ses vrais chiffres.
     lignes = base.filter((l) => !(l.club === joueur.club && l.nom === joueur.nom)).concat(mien);
   }
 
-  return lignes
+  // ⚠️ LE FILTRE PAR FAMILLE DE POSTE. La mêlée, la touche et le pick and go
+  // sont des classements d'AVANTS ; le jeu au pied et le 50/22, des classements
+  // de trois-quarts. Sans ce filtre, un troisième ligne qui dégage une fois se
+  // retrouvait au classement des botteurs, et le tableau ne voulait plus rien
+  // dire.
+  const famille = CATEGORIES.find((c) => c.id === cat)?.famille;
+  const concernes = famille
+    ? lignes.filter((l) => (famille === 'avants') === estAvant(l.poste))
+    : lignes;
+
+  return concernes
     .filter((l) => valeurDe(l, cat) >= 0 && l.matchs > 0)
     .sort((a, b) => valeurDe(b, cat) - valeurDe(a, cat) || b.matchs - a.matchs || a.nom.localeCompare(b.nom))
     .slice(0, max);

@@ -312,8 +312,20 @@ export function MatchLive({
         grattages: monPion.stats.grattages,
         butsTentes: monPion.stats.butsTentes,
         butsReussis: monPion.stats.butsReussis,
-        cartons: monPion.stats.cartons,
+        cartons: monPion.stats.cartonsJaunes + monPion.stats.cartonsRouges,
         minutes: Math.min(80, Math.round(monPion.minutes)),
+        // ⚠️ TOUTE LA FEUILLE REMONTE, pas seulement ce qui se voit. C'est ce
+        // qui permet à la note de match de juger un avant sur son vrai travail
+        // (mêlée, touche, ballons portés au ras) et pas sur ses essais.
+        passesDecisives: monPion.stats.passesDecisives,
+        offloads: monPion.stats.offloads,
+        franchissements: monPion.stats.franchissements,
+        turnovers: monPion.stats.passesRatees,
+        melees: monPion.stats.melees,
+        touchesGagnees: monPion.stats.touchesGagnees,
+        pickAndGo: monPion.stats.pickAndGo,
+        cinquanteVingtDeux: monPion.stats.cinquanteVingtDeux,
+        cartonsRouges: monPion.stats.cartonsRouges,
       },
       {
         adversaire: chezMoi ? e.clubB : e.clubA,

@@ -57,7 +57,12 @@ Three.js (@react-three/fiber + @react-three/drei) · API Groq (compatible OpenAI
 | `src/components/FicheClub.tsx` | Modale « effectif du club », ouverte au **clic sur un club** dans Championnats. Affiche note du club, force d'effectif et tous les joueurs poste par poste, pour la **saison en cours** de la carrière. Échap ou clic hors modale ferment. ⚠️ `createPortal(document.body)` obligatoire (backdrop-filter des `.carte`). |
 | `src/components/Selecteur.tsx` | **Liste déroulante maison** (un `<select>` natif ne peut ni afficher de drapeau ni être stylé : son menu est rendu par l'OS). Gère vignettes, groupes, recherche (auto > 10 options), clavier (↑↓/Entrée/Échap), clic extérieur. Utilisée dans `Creation` (nation, division, club). ⚠️ Le défilement auto ne s'applique qu'au clavier (`parClavier`) — sinon la liste saute sous le curseur à l'ouverture. |
 | `src/data/boutique.ts` | `SKINS` de ballon (`glb?` = modèle 3D dédié), `BOOSTS`, `PACKS` d'Ovas (achat réel non branché). |
-| `src/data/trophees.ts` | `TROPHEES` (**16** : 8 France/international + 8 championnats du monde) + `TROPHEE_PAR_DIVISION` (clé = id de compétition), `TROPHEE_PAR_COUPE`, `COUPE_EUROPE_PAR_DIVISION`, `NATIONS_6N`. Chaque trophée pointe un `.glb` de `public/m3d/`. ⚠️ Les trophées du monde (Premiership, RFU Championship, Prem. Rugby Cup, URC, Super Rugby, NPC, League One, MLR) sont **en place mais pas encore décernés** : la carrière reste française. |
+| `src/data/trophees.ts` | `TROPHEES` (**47** : 39 titres d'équipe + **8 distinctions individuelles**) + `TROPHEE_PAR_DIVISION` (clé = id de compétition), `TROPHEE_PAR_COUPE`, `COUPE_EUROPE_PAR_DIVISION`, `MEILLEUR_JOUEUR_PAR_DIVISION`, `NATIONS_6N`. Chaque trophée pointe un `.glb` de `public/m3d/`. ⚠️ **`Trophee.individuel` est LE champ qui range un trophée** : il commande sa place dans l'armoire ET la façon dont on le gagne (`lib/honneurs.ts` au lieu du terrain). |
+| `api/classement.ts` | **La fonction serverless Vercel du classement mondial** (à la racine, à côté de `src/` : c'est la convention Vercel, et c'est ce qui lui permet d'importer le barème du jeu au lieu de le recopier). `GET` = top 100, `POST` = débit, `verifierFiche`, RECALCUL du score, écriture du seul score. Déploiement : `serveur/VERCEL.md`. |
+| `src/lib/classementEnLigne.ts` | Le côté navigateur : `envoyerAuClassement()`, `lireClassementMondial()`. ⚠️ Sans serveur, il renvoie une liste vide **sans lever d'erreur** — le classement local continue. |
+| `scripts/traduire.ts` | **La traduction automatique du dictionnaire.** Repère les (clé, langue) manquantes, les fait traduire par Groq avec le vocabulaire du rugby imposé, et écrit `src/data/textesAuto.ts` (GÉNÉRÉ, fusionné avec la priorité la plus BASSE : une traduction humaine gagne toujours). ⚠️ Une traduction qui perd une variable `{n}` est **rejetée**. |
+| `src/lib/honneurs.ts` | **Les distinctions individuelles.** `noterSaisonIndividuelle()` cote la saison sur ~100 (note de saison ×7, statistiques comparées au poste, palmarès de l'année, rang du club, notoriété, au prorata des matchs joués) et `decernerHonneurs()` la compare aux barres. **Pure, déterministe, aucun tirage au sort** : le seul aléa est la barre, qui bouge de ±3,5 par saison (le rival de l'année). Appelée par `saisonSuivante` APRÈS `evoluer()` — c'est le seul moment où la note de saison ET le palmarès existent tous les deux. |
+| `src/lib/armoire.ts` | La disposition de l'armoire, **fonction pure** (testable sans GPU). `detecterEtageres()` lit les tablettes sur la géométrie du `.glb`, `disposerArmoire()` place tout d'un coup — **distinctions en vitrine, titres d'équipe au sol**, boucliers adossés au coin avant du meuble — et `cadrage()` calcule la caméra pour l'ordinateur comme pour le téléphone. |
 | `src/data/selections.ts` | Dérive de `COMPETITIONS_NATIONS` la liste dédoublonnée des **sélections** : `SELECTIONS_SENIOR` (une équipe par pays : les A/XV/Barbarians/Māori sont écartés par `RESERVES`) et `SELECTIONS_U20` (nom, logo, nation de base pour le drapeau, compétitions disputées). Alimente l'onglet 🏳️ Sélections. |
 | `src/components/TropheeGagne.tsx` | Cérémonie : modale + Canvas R3F, modèle recentré/normalisé **en rotation continue**, Sparkles, aura colorée. |
 | `src/components/Confirmation.tsx` | Modale de confirmation maison. ⚠️ **Ne jamais utiliser `window.confirm()`** (bloqué/inconstant) et **toujours passer par `createPortal(document.body)`** : le `backdrop-filter` des `.carte` crée un bloc conteneur qui piège les `position: fixed`. |
@@ -2184,4 +2189,544 @@ types injectés… Chaque attaque doit être refusée **avec un motif lisible**.
 
 ```bash
 npx vite-node scripts/verifClassement.ts   # 68 succès + toutes les attaques du classement
+```
+
+
+## 🥇 LES HONNEURS INDIVIDUELS, ET L'ARMOIRE REPENSÉE
+
+Trois demandes en bloc : « je t'ai mis des nouveaux trophées individuels, et des
+trophées à corriger — celui de la Bundesliga et meilleur joueur au monde » ·
+« les trophées individuels dans l'armoire et les trophées collectifs à côté, plus
+gros ; mets les boucliers de Régionale, Fédérale, Nationale, Pro D et Russie plus
+contre l'armoire, un peu penchés, tu sais, car là ils tiennent droit comme par
+magie » · « mets en place les trophées individuels in game, qu'on puisse les
+gagner, et que ça soit par rapport à notre note de saison, nos stats et notre
+palmarès — ce qu'on a gagné dans l'année ».
+
+### 1. Les modèles : deux corrections, sept nouveautés
+
+`scripts/copierTrophees.cjs` accepte désormais **plusieurs dossiers sources**
+(`LOTS`), et surtout **refait un modèle dès que sa source est plus récente que
+la version embarquée**. Sans cette règle de date, une correction ne partait
+jamais en production : le script sautait tout fichier déjà présent dans
+`public/m3d/`, et rien ne le signalait.
+
+| Livré | Devient | |
+|---|---|---|
+| `bon trophée bundes.glb` | `bundesliga.glb` | ♻ correction |
+| `bestplayerintheworld.glb` | `meilleur-joueur.glb` | ♻ correction |
+| `meilleurjoueurtop14.glb` | `meilleurTop14.glb` | nouveau |
+| `premiershipbestplayer.glb` | `meilleurPremiership.glb` | nouveau |
+| `urcbestplayer.glb` | `meilleurUrc.glb` | nouveau |
+| `meilleurjoueurnouvellezelande.glb` | `meilleurNZ.glb` | nouveau |
+| `championscup best player.glb` | `meilleurChampionsCup.glb` | nouveau |
+| `meilleurjoueursixnations.glb` | `meilleurSixNations.glb` | nouveau |
+| `manofthematchworldcup.glb` | `hommeDuMatchMonde.glb` | nouveau |
+
+**320 Mo livrés → 11,5 Mo embarqués** (−96 %), tous sous le plafond de 2,2 Mo du
+parc existant. Le pipeline n'a pas changé : Draco sur la géométrie, textures
+ramenées à 1024², décimation **seulement** au-delà de 130 000 sommets (le modèle
+du Top 14 en comptait 1 090 000, celui du Tournoi 1 052 000).
+
+```bash
+node scripts/copierTrophees.cjs        # ne refait que ce qui a changé
+```
+
+### 2. `Trophee.individuel` : un seul champ, deux conséquences
+
+`data/trophees.ts` gagne un champ, et c'est le **seul endroit** où l'on décide
+qu'un trophée est une distinction personnelle plutôt qu'un titre d'équipe. Il
+commande **la place dans l'armoire** ET **la façon dont on le gagne**. Une
+deuxième liste, quelque part, finirait par dire le contraire de la première.
+
+⚠️ `OVAS_PIECE_MAJEURE` **a disparu**. Il servait à décider qui sortait du meuble
+(« ≥ 12 Ovas ») : la répartition ne dépend plus du prestige mais de la NATURE du
+trophée. Le laisser en place, c'était garder un critère mort qui semble encore
+faire autorité.
+
+⚠️ **`prod2` et `russie` déclarent `forme: 'bouclier'`.** Mesurés, ils sont trop
+épais pour que `estBouclier()` les reconnaisse (Pro D2 : 1,67 × 1,90 × 0,60 ;
+Russie : 1,48 × 1,90 × 0,91) — leur socle fausse la boîte englobante, exactement
+comme celui du Brennus. Les quatre boucliers amateurs (Nationale, Nationale 2,
+Fédérale, Régionale) partagent `nationale.glb`, que la géométrie reconnaît seule.
+
+### 3. L'armoire : les distinctions dedans, les titres autour
+
+| | avant | maintenant |
+|---|---|---|
+| critère de répartition | Ovas ≥ 12 **ou** bouclier | **individuel → vitrine · collectif → sol** |
+| pièces au sol | 6 | **8** |
+| hauteur d'une pièce au sol | 34 % du meuble (1,36) | **40 % (1,60 à 1,79)** |
+| rapport sol / vitrine | 3,1 | **3,4** |
+| inclinaison d'un bouclier | 0,15 rad (8,6°) | **0,30 rad (17°)** |
+| point d'appui du bouclier | *aucun* | **la face avant du meuble** |
+
+⚠️ **POURQUOI LES BOUCLIERS SEMBLAIENT TENIR PAR MAGIE.** Ils étaient bien
+inclinés — mais posés à `z = 0,1 × la profondeur`, c'est-à-dire **à côté** du
+meuble et non devant lui. Un bouclier basculé en arrière dans le vide ne
+s'appuie sur rien, et l'œil le lit comme droit. Ils sont maintenant avancés de
+`sin(θ) × hauteur` **devant la face avant** : le point le plus en arrière de la
+pièce — son arête haute et arrière, `z − sin(θ)·h − cos(θ)·e/2` — tombe alors
+**exactement** sur le plan du meuble. Vérifié au millionième par
+`verifArmoire.ts`, sur les deux files.
+
+⚠️ **L'AVANCÉE D'UN RANG AU SUIVANT N'EST PLUS FORFAITAIRE.** Un pas fixe
+marchait tant que toutes les pièces se ressemblaient ; un bouclier incliné
+occupe en profondeur son épaisseur **plus** le débord de son arête haute (près
+d'un demi-mètre), et chevauchait la pièce d'après. On empile désormais les
+emprises réelles, file par file.
+
+⚠️ **ON S'ÉTALE EN PROFONDEUR, PAS EN LARGEUR**, et c'est un calcul, pas un
+goût : un mètre de profondeur coûte un mètre de recul à la caméra, un mètre de
+largeur en coûte 1,4 sur ordinateur et **2,5 sur téléphone** (le canvas y est
+presque carré, 337 × 320).
+
+Mesuré sur les vrais modèles (`npx vite-node scripts/verifArmoire.ts`) :
+
+| | palmarès maximal (16 pièces) | palmarès de carrière (6 pièces) |
+|---|---|---|
+| scène | 7,59 de large | — |
+| caméra ordinateur (714 × 344) | 10,37 | 8,68 · **le meuble occupe 60 % de la hauteur** |
+| caméra téléphone (299 × 294) | 15,33 | 11,72 · **44 %** |
+| pièces hors champ | 0 | 0 |
+
+⚠️ **LES TAILLES DE CANVAS DU SCRIPT SONT MESURÉES DANS LE NAVIGATEUR**, plus
+déduites du CSS. Les anciennes (790 × 420 et 337 × 320) venaient de la lecture
+d'`App.css` ; relevées en jeu sur `.armoire-canvas`, elles font **714 × 344** à
+1280 px et **299 × 294** sur un téléphone de 375 px. Le rapport passe de 1,053 à
+1,017 sur mobile — et c'est lui qui commande le recul de la caméra. Cadrer sur un
+canvas plus large que le vrai, c'est se croire au large et laisser des pièces
+hors champ.
+
+Le second cas est celui qui compte : personne n'atteint seize trophées
+distincts. Le script le teste nommément, et exige que le meuble reste au-dessus
+de 40 % de la hauteur de l'écran — en dessous, la vitrine n'est plus lisible.
+
+⚠️ **UN PALMARÈS SANS DISTINCTION LAISSE LE MEUBLE VIDE**, et c'est voulu : les
+titres se voient de loin, la vitrine se remplit à mesure qu'on est élu. Au-delà
+de huit titres, le débordement revient garnir les tablettes.
+
+### 4. `lib/honneurs.ts` — comment on devient meilleur joueur de quelque chose
+
+⚠️ **CE QUI EXISTAIT NE MÉRITAIT PAS SON NOM.** Une seule distinction était
+décernée, sur cette ligne :
+
+```ts
+if (perso >= 88 && trophees.length > 0 && tire((perso - 88) / 140))
+```
+
+Un seuil de niveau **général**, puis un tirage au sort. La saison n'entrait
+nulle part : on pouvait passer l'année à 4/10, ne rien marquer, ne rien plaquer,
+et décrocher le titre parce qu'on avait 90 de générale. Ici, c'est la **saison**
+qu'on juge, pas la fiche du joueur — et **il n'y a plus aucun dé**.
+
+La cote, sur ~100 :
+
+| Entrée | Poids | D'où elle vient |
+|---|---|---|
+| **note de saison** | × 7 (21 à 68,6) | `noterSaison` — elle intègre déjà temps de jeu, finition, forme, écart au groupe |
+| **statistiques** | 0 à 16 | comparées à `PROFILS[poste]` (`lib/statsJoueurs.ts`, la table des classements individuels) |
+| **palmarès de l'année** | 0 à 14 | prestige en Ovas des titres collectifs de la saison, ÷ 2,2 |
+| **résultat du club** | 0 à 6 | rang dans la poule |
+| **notoriété** | 0 à 6 | réputation |
+| **présence** | × 0,35 à 1 | prorata de matchs joués |
+
+Repères mesurés : saison correcte (6,0/10, 5ᵉ) **47** · bonne saison (7,5/10, 3ᵉ)
+**59** · grande saison (8,5/10, champion) **78** · saison historique (9,5/10,
+doublé Brennus + Europe) **102**.
+
+Barres : championnat **76** · Champions Cup **82** · Tournoi **84** · finale du
+monde **80** · meilleur joueur du monde **94**. Le seul aléa est la barre
+elle-même, qui bouge de ±3,5 d'une saison à l'autre — c'est le meilleur RIVAL de
+l'année, et c'est **déterministe** (graine = compétition + saison).
+
+⚠️ **LES BARRES ONT ÉTÉ DESCENDUES APRÈS MESURE.** Le premier réglage plaçait le
+championnat à 82 : sur 560 saisons réellement jouées, **aucune** ne l'atteignait.
+Une saison à 8,5/10 en étant champion de France, c'est déjà le sommet de ce que
+le moteur produit. Une barre au-dessus de ce plafond, c'est un trophée qui
+n'existe que dans les données — la même erreur que l'ancienne difficulté
+(« 0 carrière sur 100 au-dessus de 80 »). On ne recommence pas.
+
+⚠️ **LE PLANCHER DE 3 SUR LES ÉVÉNEMENTS RARES.** Sans lui, on divise par
+l'attendu : un pilier gauche n'est attendu qu'à 1,1 essai sur la saison. En
+marquer **un de plus** — un ballon poussé en mêlée — le faisait bondir de +82 %
+et lui donnait 3,3 sur 4, mieux qu'un ailier auteur de 15 essais. On rapporte
+donc l'écart au plus grand des deux, l'attendu ou ce plancher. Un avant reste élu
+sur ses plaquages et ses grattages, c'est-à-dire sur son vrai match.
+
+⚠️ **LE MODE « SAISON RAPIDE » NE FERME PLUS LA PORTE.** Les statistiques
+détaillées n'existent qu'en jouant journée par journée. Le premier réglage
+plafonnait alors la note de statistiques à la moitié — mesuré : **aucun** titre
+de meilleur joueur en 560 saisons. On ESTIME désormais les axes manquants à
+partir de la note de saison, qui les intègre déjà et ne favorise aucun poste.
+
+⚠️ **PAS DE COURONNE MONDIALE DEPUIS LE BAS DE LA PYRAMIDE.** Bug attrapé à la
+mesure : `noterSaison` est **relative au groupe**. Un joueur trop fort pour la
+Fédérale 2 y obtient 9,8/10 sans effort — et décrochait le titre de meilleur
+joueur du MONDE avec un bouclier de Fédérale. Il faut désormais jouer là où le
+monde regarde : un championnat qui élit son joueur de l'année, la Champions Cup,
+ou une sélection du Tournoi.
+
+⚠️ **CINQ CHAMPIONNATS SUR TRENTE-TROIS ÉLISENT UN JOUEUR DE L'ANNÉE**
+(`MEILLEUR_JOUEUR_PAR_DIVISION`) : Top 14, Premiership, URC, Super Rugby et NPC.
+C'est le cas dans la réalité, et la rareté est ce qui donne sa valeur à une
+distinction. Super Rugby et NPC partagent la **même** distinction : elle est
+décernée par la fédération néo-zélandaise sur l'ensemble de la saison.
+
+⚠️ **ELLES SE JUGENT APRÈS L'ÉVOLUTION, dans `saisonSuivante`**, et c'est
+structurel : elles dépendent de la note de saison (que `evoluer()` ne calcule
+qu'une fois le rang connu) ET du palmarès de l'année (que `resoudreTrophees`
+vient de remplir). C'est le seul point du programme où les deux entrées
+existent. Les calculer dans `resoudreTrophees` obligerait à noter la saison deux
+fois, avec deux résultats possibles.
+
+**Le joueur voit sa cote**, gagnée ou non : une entrée « 🗳️ Vote du meilleur
+joueur — ta saison cotée N/100 » tombe au bilan dès qu'une distinction est en
+jeu. Un système de récompense qu'on ne voit pas venir n'est pas un objectif.
+
+**Mesuré en jeu** (60 carrières de 14 saisons, départ Nationale 2 à 18 ans — la
+population de référence du projet) : **5 carrières sur 60** décrochent au moins
+une distinction, **0,13 par carrière**. Cote médiane 23, 90ᵉ centile 65,
+maximum 98 sur les saisons disputées dans une compétition qui élit.
+
+### 5. Ce que ça change pour le classement mondial
+
+`LIMITES.titresParSaison` passe de **4 à 9** — le compte est fait à la main et il
+est serré : championnat national, coupe d'Europe, Tournoi, Coupe du monde (4
+collectifs) et les 5 distinctions. Personne n'a jamais fait les neuf, mais rien
+dans le moteur ne l'interdit, et une borne qui refuse une carrière légitime est
+pire qu'une borne large.
+
+⚠️ **UNE BORNE PLUS SERRÉE PREND LE RELAIS** : `verifierFiche` refuse désormais
+qu'un **même trophée** apparaisse plus de `saisons` fois. On ne gagne pas deux
+Boucliers de Brennus la même année. Cette règle attrape ce que l'ancien total
+laissait passer — 80 Brennus en 12 saisons tenaient sous 108 — sans rien
+interdire à une carrière réelle. `SCORE_MAX` passe de 64 488 à **82 488**, et la
+carrière théorique maximale doit maintenant présenter des trophées **différents**.
+
+### 6. Difficulté : remesurée
+
+Deux tirages de 100 carrières après la bascule (`verifDifficulte.ts` tire avec
+`Math.random()` : deux exécutions ne donnent jamais le même chiffre) — médiane
+**59 et 61**, maximum **86 et 91**, carrières ≥ 80 : **6 et 12 sur 100**. La
+référence documentée (médiane 63, ≥ 80 : 10/100) est dans cet intervalle :
+l'étalonnage n'a pas bougé. C'est attendu — les honneurs ne touchent ni à la
+progression ni au potentiel, ils ajoutent seulement 8 points de réputation quand
+ils tombent, soit 0,13 fois par carrière.
+
+### Les scripts
+
+```bash
+node scripts/copierTrophees.cjs           # compresse les modèles livrés (multi-lots, refait si la source a changé)
+npx vite-node scripts/verifHonneurs.ts    # barème, équité entre postes, conditions, 60 carrières jouées
+npx vite-node scripts/verifArmoire.ts     # distinctions en vitrine, titres au sol, boucliers adossés, cadrage
+npx vite-node scripts/verifTrophees.ts    # 47 modèles présents, au poids, branchés, aucun lot oublié
+npx vite-node scripts/verifClassement.ts  # le plafond ouvert et la nouvelle borne par trophée
+```
+
+
+## 🌍 LE CLASSEMENT EN LIGNE, SUR VERCEL
+
+Demande : « fais-moi un README pour m'expliquer comment déployer la DB du
+classement sur Vercel ». Le guide est **[`serveur/VERCEL.md`](serveur/VERCEL.md)**
+— mais un guide qui décrit du code inexistant ne sert à rien : la fonction, le
+schéma et le côté navigateur ont été écrits avec.
+
+| Fichier | Rôle |
+|---|---|
+| `api/classement.ts` | **La fonction serverless.** `GET` rend le top 100, `POST` reçoit une carrière : débit → `verifierFiche` → RECALCUL du score → écriture du seul score → la fiche est jetée. |
+| `serveur/schema-vercel.sql` | Les deux tables (`classement`, `envois`), sans RLS. |
+| `src/lib/classementEnLigne.ts` | `envoyerAuClassement()` et `lireClassementMondial()`. |
+| `serveur/VERCEL.md` | Le pas à pas : base Neon, tables, sel d'appareil, déploiement, vérification, erreurs fréquentes. |
+
+⚠️ **`api/` EST À LA RACINE, À CÔTÉ DE `src/`**, et c'est ce qui permet
+`import { verifierFiche } from '../src/lib/classementMondial'` : le serveur et le
+jeu **partagent** le barème au lieu de le recopier. Vite ne part que
+d'`index.html` : ce dossier lui est invisible et n'entre pas dans le bundle.
+
+⚠️ **PAS DE ROW LEVEL SECURITY, contrairement à la version Supabase**, et ce
+n'est pas un oubli. Sur Supabase, le navigateur parle directement à la base avec
+une clé publique : il FAUT des politiques pour lui interdire d'écrire. Ici la
+chaîne de connexion vit dans les variables d'environnement de la fonction — le
+navigateur n'a aucun accès à la base. Moins de surface, moins à verrouiller.
+
+⚠️ **`SCORE_MAX` est en dur dans le schéma** (`check (score <= 82488)`). Il a
+changé avec les distinctions individuelles (64 488 → 82 488). À remettre à jour à
+chaque retouche de `LIMITES`, sinon la base refuse des scores légitimes — c'est
+écrit dans les deux fichiers SQL et dans le guide.
+
+Le jeu reste **entier sans serveur** : `lireClassementMondial()` renvoie une
+liste vide sans lever d'erreur, et le classement local continue de fonctionner.
+
+Une dépendance ajoutée : `@neondatabase/serverless`, utilisée **uniquement** par
+`api/`. Elle n'apparaît pas dans le bundle du navigateur.
+
+
+## 🌐 TRADUIRE SANS TOUT TRADUIRE À LA MAIN
+
+Demande : « au lieu de tout traduire en 7 langues, y'a pas une extension ou quoi
+qui peut le faire automatiquement ? »
+
+⚠️ **RÉPONSE HONNÊTE : IL N'Y A PAS D'EXTENSION À INSTALLER ICI**, et il ne faut
+pas en chercher une. Les outils du marché — i18next-parser, Weblate, Crowdin,
+Lokalise, l'extension VS Code « i18n Ally » — supposent tous des fichiers de
+ressources séparés (`en.json`, `es.json`…). Ce projet range les sept langues
+**côte à côte sur la même ligne** (`{ fr: …, en: …, es: … }`), ce qui est bien
+plus lisible quand on écrit une clé, et incompatible avec eux. Les brancher
+voudrait dire réécrire tout `data/textes*.ts`, ajouter une dépendance et un
+compte en ligne payant — pour six cents chaînes.
+
+**`scripts/traduire.ts`** fait le même travail en 200 lignes, sans compte et sans
+abonnement, avec la clé Groq que le jeu utilise déjà.
+
+```bash
+npx vite-node scripts/traduire.ts --verifier      # liste les trous, ne traduit rien
+VITE_GROQ_KEY=gsk_... npx vite-node scripts/traduire.ts
+```
+
+- **Il n'écrit jamais dans les fichiers écrits à la main.** La sortie est
+  `src/data/textesAuto.ts`, GÉNÉRÉ, fusionné dans `TEXTES` avec la priorité la
+  **plus basse** : une traduction humaine gagne toujours, relancer le script ne
+  peut rien écraser, et supprimer le fichier annule tout.
+- **Le prompt porte le vocabulaire du rugby**, pas seulement « traduis ». Sans
+  ça, une machine rend « Essais » par « Attempts » — le mot juste en français
+  courant, le contre-sens absolu au rugby (« Tries »). Vingt termes sont imposés,
+  ainsi que les noms propres à ne jamais traduire (clubs, compétitions, Ovas,
+  Brennus).
+- ⚠️ **Une traduction qui perd une variable est REJETÉE.** Un modèle qui
+  « améliore » un texte en supprimant `{n}` casse le jeu en silence — le compteur
+  affiche « matchs joués » sans le nombre. La clé retombe alors sur le français,
+  ce qui est le comportement sain du socle.
+
+État actuel : **599 clés × 7 langues, 0 trou**. `textesAuto.ts` est donc vide, et
+c'est normal — le script sert à partir de la prochaine clé ajoutée. On écrit la
+ligne avec le seul `fr:`, on relance, et les six autres arrivent.
+
+⚠️ **L'appel réseau n'a pas pu être testé** : aucune clé Groq n'est présente
+localement (`.env.local` absent). Ce qui est vérifié : la détection des trous
+(éprouvée sur une clé incomplète ajoutée puis retirée), la fusion à priorité
+basse, et la compilation.
+
+
+## 📊 LA FEUILLE DE MATCH COMPLÈTE — plus une seule statistique estimée
+
+Demande : « je veux que chaque joueur, y compris le nôtre, ait de vraies stats
+pour le classement, pas des stats simulées ; pour les notes il faut prendre en
+compte tout le jeu — pour les avants mêlée, touche gagnée, grattages, turnovers,
+pick and go, essai, passe décisive, passe normale, minutes jouées, mètres
+parcourus avec le ballon, cartons jaunes et rouges ; pour les arrières pareil +
+coup de pied, 50/22 réussi, offload, et sans mêlée ni touche ni pick and go ».
+
+### Ce que le moteur compte désormais, à l'événement
+
+`StatsMatch` (moteur/entites.ts) passe de 16 à **23 compteurs**. Chacun est
+incrémenté **là où l'action se produit**, jamais déduit après coup :
+
+| Ajouté | Où c'est compté | Mesuré |
+|---|---|---|
+| `melees` | mêlée gagnée → **créditée aux huit avants** | 86,5/match |
+| `touchesGagnees` | touche captée → **au sauteur** | 26,6/match |
+| `pickAndGo` | ballon pris au ras (`donnerBallon`, avants seulement) | 26,2/match |
+| `passesDecisives` | la passe qui précède l'essai | 4,5/match |
+| `offloads` | passe APRÈS contact | 14,0/match |
+| `cinquanteVingtDeux` | 50/22 **réussi**, sur la géométrie | 2,8/match |
+| `cartonsJaunes` / `cartonsRouges` | séparés ; le rouge existe enfin | 1,4 · 2 rouges sur 25 matchs |
+
+⚠️ **LA MÊLÉE VA AUX HUIT, LA TOUCHE AU SAUTEUR.** Une mêlée se gagne à huit ou
+ne se gagne pas : la créditer au seul joueur qui ramasse donnerait un classement
+composé uniquement de numéros 8, et un pilier n'existerait toujours nulle part.
+La touche, elle, est une statistique individuelle (« lineouts won ») : elle
+revient à celui qui capte, d'où les deuxièmes lignes en tête.
+
+⚠️ **LE PICK AND GO SE COMPTE À LA PRISE DE BALLON**, pas au choix du lancement :
+une combinaison peut être interrompue avant que l'avant ne parte. Et le filtre
+« avant » n'est pas cosmétique — le 9 fait partie de la chaîne, mais quand il
+sert le ballon au pied du ruck ce n'est pas lui qui pique et va.
+
+⚠️ **`e.dernierPasseur` VIT DANS L'ÉTAT, pas dans une variable de module.** C'est
+la règle de détermininisme du moteur : deux matchs simulés en parallèle se
+partageraient la variable, et l'égalité entre le match regardé en direct et le
+même match rejoué en fond — sur laquelle repose tout le système — tomberait. Il
+est remis à `null` dès qu'un ruck, une phase arrêtée ou un coup de pied
+s'intercale : l'essai qui suit n'est alors la conséquence de la passe de personne.
+
+⚠️ **LE 50/22 EST COMPTÉ SUR LA GÉOMÉTRIE, PAS SUR L'INTENTION.** Un dégagement
+d'occupation qui finit en touche dans les 22 adverses EST un 50/22 : c'est le
+règlement, et c'est déjà ainsi que le moteur en tire la conséquence. Compter
+l'intention aurait donné un classement où manque la moitié des vrais.
+
+### ⚠️ LE CARTON N'EXISTAIT QUASIMENT PAS
+
+Le moteur produisait **0,25 carton par match** là où la documentation en
+annonçait 1,3 — et **aucun rouge, jamais**. La cause : `siffler()` ne tirait un
+carton que si un fautif était NOMMÉ, or trois appels sur quatre n'en désignaient
+aucun, dont celui du ruck, de loin le plus fréquent. Une pénalité a désormais
+toujours un fautif : à défaut de coupable nommé, le joueur de l'équipe
+sanctionnée le plus proche du ballon — au rugby, c'est presque toujours lui.
+Mesuré après : **1,4 carton jaune par match** (cible 1 à 3), et un jaune sur
+quatorze devient rouge, soit **0,08 rouge par match**, l'ordre de grandeur du
+rugby professionnel. Un rouge, c'est le match terminé.
+
+### Neuf classements de plus, et un filtre par famille de poste
+
+L'écran 📊 Résultats passe de 9 à **18 catégories** : Essais, Points, Buteurs,
+Plaquages, Grattages, Turnovers, **Mètres**, **Franchissements**, Passes déc.,
+**Passes**, **Offloads**, **Mêlées**, **Touches**, **Pick and go**, **Coups de
+pied**, **50/22**, Cartons, Temps de jeu.
+
+⚠️ **`CATEGORIES[].famille` DÉCIDE QUI CONCOURT.** La mêlée, la touche et le pick
+and go sont des classements d'AVANTS ; le jeu au pied et le 50/22, des
+classements de trois-quarts. Sans ce filtre, un troisième ligne qui dégage une
+fois se retrouvait au classement des botteurs, et le tableau ne voulait plus rien
+dire. C'est la demande, littéralement : « pour les arrières, sans mêlée et touche
+et pick and go ».
+
+⚠️ **BUG CORRIGÉ AU PASSAGE** : `depuisLeMoteur()` renvoyait `l.passes` — le
+TOTAL des passes — dans la colonne « passes décisives ». Le classement des
+passeurs décisifs était donc un classement des demis de mêlée, avec 86 « passes
+décisives » par match. Les deux sont maintenant distinctes, et le moteur compte
+la vraie.
+
+Contrôle de bon sens (`npx vite-node scripts/verifStats.ts`) : essais → ailier ·
+plaquages → deuxième ligne · grattages → troisième ligne aile · passes → demi de
+mêlée · offloads → centre · mêlées, touches et pick and go → avants · coups de
+pied → ouvreur. **10/10 des meilleurs marqueurs sont des trois-quarts, 10/10 des
+meilleurs plaqueurs sont des avants.**
+
+### Le joueur humain n'est plus une exception
+
+`StatsDetaillees` (types.ts) gagne dix champs **optionnels** — une vieille
+sauvegarde ne les a pas et ne doit ni planter ni afficher `NaN`, d'où le `?? 0`
+partout. `enregistrerMatchVecu` reçoit désormais la feuille COMPLÈTE
+(`StatsMatchJoueur` partagé, au lieu d'une copie tronquée) : la mêlée, la touche,
+les offloads et les passes décisives du joueur arrivent enfin jusqu'au store.
+
+⚠️ Deux valeurs étaient écrites **en dur à zéro** dans le cumul :
+`passesDecisives: 0` et `cartonsRouges: 0`. Le joueur finissait donc sa carrière
+avec zéro passe décisive et zéro carton rouge, quoi qu'il ait fait — et deux
+succès du jeu ne pouvaient pas se débloquer.
+
+⚠️ **`statsReelles` EST PERSISTÉ**, et une sauvegarde d'avant ce lot contient des
+lignes sans les nouveaux champs. `cumuler()` repart d'une ligne vide et écrase
+avec ce qui existe : les anciens champs sont repris, les nouveaux démarrent à
+zéro. Sans ça, `undefined + 1` donne `NaN`, et un `NaN` contamine tout un tri en
+silence.
+
+### La note de match juge enfin le match entier
+
+`noterMatch()` ne regardait que plaquages, mètres, essais, grattages et tirs au
+but. **Une première ligne qui domine la mêlée, gagne ses ballons au ras et offre
+un essai obtenait exactement la même note qu'un pilier qui n'a rien fait.**
+
+Sept termes ajoutés, **tous bornés** pour que le total ne s'envole pas : passe
+décisive (+1,6 max), offloads au-dessus de l'attendu (+0,9), franchissements
+(+1,0), ballons rendus (−1,5), mêlée (±0,9), touche (±0,9), pick and go (±0,7),
+50/22 (+1,4), et un carton rouge à −4 au lieu de −1,4. La table `ATTENDU` porte
+désormais la conquête, à zéro pour un trois-quarts : la ligne est donc
+naturellement neutre pour lui, sans test de poste.
+
+
+## 🔁 LE MARCHÉ DES TRANSFERTS — deux reproches, quatre causes
+
+Demande : « c'est trop facile d'avoir de gros clubs et de gros salaires » et
+« j'ai l'impression que c'est toujours les mêmes clubs qui proposent ».
+
+### « C'est toujours les mêmes clubs »
+
+Le tirage ne pondérait que **la proximité de niveau**. Comme la note d'un club ne
+bouge presque pas d'une saison à l'autre, les mêmes cinq ou six noms revenaient à
+chaque intersaison, pendant douze saisons. Deux ajouts :
+
+1. **L'humeur de la saison.** `graine('marche#club#saison')` donne à chaque club
+   un intérêt propre, stable pour l'année et différent la suivante. Un club
+   scoute quelques joueurs par an, et pas les mêmes. Déterministe : rouvrir le
+   panneau ne change rien (pas de save-scumming).
+2. **Le besoin au poste** (`besoinAuPoste`). Un club qui possède déjà deux
+   joueurs nettement meilleurs à ton poste ne recrute pas un troisième. C'est LA
+   question qu'aucune version ne posait, et elle écarte des clubs **différents
+   pour chaque poste et chaque saison**.
+
+Mesuré sur douze intersaisons du même joueur : **22 à 24 clubs différents pour
+48 offres**, le plus assidu revenant 4 fois. Et un ouvreur et un pilier de même
+niveau ne reçoivent pas la même liste.
+
+### « Trop facile d'avoir de gros clubs et de gros salaires »
+
+3. **Le plafond dépend de l'ÂGE.** Il était fixe (« cote + 5 ») : un joueur de
+   32 ans recevait des offres de clubs 5 points au-dessus de lui, exactement
+   comme un espoir de 19 ans. Or un club ne paie au-dessus du niveau constaté que
+   pour du POTENTIEL. La marge passe de **7 points avant 21 ans à 0,5 après 29**.
+4. **On ne saute plus deux étages.** Un joueur de Fédérale 1 ne signe pas en
+   Top 14 : il passe par la Nationale et la Pro D2. Les très jeunes font
+   exception (trois étages avant 22 ans) — un club professionnel va vraiment
+   chercher un espoir de 20 ans plus bas.
+5. **La notoriété ne fait plus le niveau.** La cote est plafonnée à
+   `générale + RENOM_MAX` (7). Un joueur moyen (générale 60) très connu
+   (réputation 95) affichait 68,75 : de quoi intéresser le bas du Top 14 sans y
+   avoir jamais joué.
+6. **Le salaire tient compte de l'âge** : ×0,55 à 20 ans, plein tarif de 25 à 31,
+   ×0,72 après 34. Et le multiplicateur d'écart passe de 2,2 à 1,8 — c'est un
+   salaire, pas une prime de transfert. Mesuré à cote égale : **230 000 € à
+   19 ans, 420 000 € à 27 ans, 305 000 € à 36 ans**.
+
+⚠️ **LA PONDÉRATION 75/25 DE LA COTE EST CONSERVÉE, APRÈS MESURE.** Une version
+intermédiaire faisait de la générale la base et de la réputation un simple
+bonus : ça paraissait plus juste, et ça a fait sauter l'étalonnage de difficulté
+(carrières ≥ 80 : 10/100 → **24/100**). La raison est une BOUCLE — dans ce jeu la
+réputation traîne derrière la générale, si bien que le mélange 75/25 freinait la
+cote des bons joueurs ; en le retirant, ils signaient plus haut, gagnaient plus
+de titres, gagnaient donc de la réputation, et remontaient encore. Ne pas
+« simplifier » cette ligne sans relancer `verifDifficulte.ts`.
+
+### ⚠️ ET LE RÉALISME A RENDU LE JEU PLUS FACILE — compensé
+
+Effet de bord mesuré, et il est instructif : en **empêchant les sauts de deux
+étages**, on empêche aussi le joueur d'être parachuté dans un club trop fort pour
+lui. Il reste donc AU NIVEAU DE SON GROUPE — ce que `noterSaison` récompense
+(`perso − forceGroupe`). Résultat : carrières ≥ 80 passées de 10/100 à **23/100**,
+≥ 85 de 2 à 12, maximum de 86 à **92**. La médiane, elle, n'avait pas bougé.
+
+C'est donc la QUEUE qu'il fallait reprendre, et le **talent brut**
+(`lib/progression.ts`) est précisément le levier qui n'agit que sur elle : il ne
+profite qu'aux joueurs qui ont de la marge à rattraper. `marge/4,5` plafonné à
+5,5 devient `marge/7,2` plafonné à 3,6.
+
+Réétalonné sur **trois tirages de 100 carrières** (le script tire avec
+`Math.random()` : deux exécutions ne donnent jamais le même chiffre) :
+
+| | référence | après ce lot |
+|---|---|---|
+| médiane | 63 | **58 · 60 · 63** |
+| 90ᵉ centile | 80 | 80 · 82 · 82 |
+| maximum | 85 | 89 · 90 · 91 |
+| carrières ≥ 80 | 10/100 | **10 · 15 · 12** |
+| carrières ≥ 85 | 1-3/100 | **4 · 4 · 3** |
+
+Le sommet reste un peu plus accessible qu'avant (max 90 contre 85) : c'est la
+part de l'effet de réalisme qu'on garde volontairement — se développer au niveau
+de son groupe DOIT payer, c'est ce qui rend une carrière lisible.
+
+### 🩹 Régression retrouvée en passant : les écussons de sélections
+
+`verifU20.ts` refusait les écussons nationaux : France 210 octets, Angleterre
+291, Japon 383 — de simples vignettes, là où les bons fichiers font 4 à 12 Ko.
+La cause : **`copierLogos.cjs` réécrase `copierLogosSelections.cjs`**.
+`logos_equipes/nations_championship/` contient `france.png` et `angleterre.png`,
+et le balayage récursif du pack de clubs passe par-dessus les bons fichiers.
+L'ordre est désormais écrit en tête du script, et il n'est pas négociable :
+
+```bash
+node scripts/copierLogos.cjs             # le pack complet des clubs
+node scripts/copierLogosSelections.cjs   # PUIS les vrais écussons nationaux
+```
+
+### Les scripts
+
+```bash
+npx vite-node scripts/verifMoteur.ts      # + section 8 : chaque compteur ajouté est non nul, et au bon poste
+npx vite-node scripts/verifStats.ts       # les 18 classements, le poste attendu en tête
+npx vite-node scripts/verifMarche.ts      # + variété des clubs, saut d'étage, salaires par âge
+npx vite-node scripts/verifDifficulte.ts  # ⚠️ à relancer après TOUTE retouche du marché ou de la progression
+npx vite-node scripts/traduire.ts --verifier
+npx vite-node scripts/verifU20.ts         # dont la taille des écussons de sélections
 ```

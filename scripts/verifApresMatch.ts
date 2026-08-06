@@ -42,7 +42,12 @@ console.log('\n=== 2. LE POINT D’ATTRIBUT, ET SON BUDGET ===');
   const vieux = { ...base, age: 34 };
   let gainsVieux = 0;
   for (let i = 0; i < 200; i++) if (retourDeMatch(vieux, gros, 5, Math.random).attribut) gainsVieux++;
-  console.log(`  à 34 ans : ${gainsVieux}/200 (doit être 0)`);
+  // ⚠️ L'ÉTIQUETTE DISAIT « doit être 0 » ET C'ÉTAIT FAUX depuis le lot qui a
+  // repoussé la limite d'âge (33 → 36 ans, « on progresse vers son potentiel
+  // jusqu'à 31 ans »). À 34 ans on progresse encore, trois fois plus lentement :
+  // ~10 % des gros matchs rapportent un point. Un commentaire périmé dans un
+  // script de vérification est pire qu'absent — il fait douter d'un chiffre juste.
+  console.log(`  à 34 ans : ${gainsVieux}/200 (attendu : rare mais non nul — la porte ferme à 36 ans)`);
 
   const sansBudget = retourDeMatch(base, gros, 0, () => 0).attribut;
   console.log(`  budget épuisé : ${sansBudget ?? 'aucun gain'} (budget saison = ${BUDGET_MATCHS_PAR_SAISON})`);

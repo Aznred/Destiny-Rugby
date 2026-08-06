@@ -24,6 +24,11 @@ import { POSTE_PAR_ID } from '../../data/rugby';
 // CLAUDE.md). Ne pas augmenter sans relancer `scripts/verifDifficulte.ts`.
 export const BUDGET_MATCHS_PAR_SAISON = 3;
 
+// ⚠️ LA FEUILLE COMPLÈTE ENTRE DANS LA NOTE (demande explicite : « pour les
+// notes il faut prendre en compte tout le jeu »). Les champs ajoutés sont
+// OPTIONNELS : un appelant qui ne les fournit pas obtient exactement l'ancienne
+// note, ce qui garantit qu'aucun chemin existant ne change de comportement sans
+// qu'on l'ait voulu.
 export interface StatsMatchJoueur {
   essais: number;
   plaquages: number;
@@ -35,26 +40,43 @@ export interface StatsMatchJoueur {
   butsReussis: number;
   cartons: number;
   minutes: number;
+  // --- Le reste du jeu ------------------------------------------------------
+  passesDecisives?: number;
+  offloads?: number;
+  franchissements?: number;
+  turnovers?: number;       // ballons concédés : ça retire
+  melees?: number;          // conquête (avants)
+  touchesGagnees?: number;
+  pickAndGo?: number;
+  cinquanteVingtDeux?: number;
+  cartonsRouges?: number;   // un rouge coûte bien plus cher qu'un jaune
 }
 
-// Ce qu'on attend d'un poste sur 80 minutes : plaquages, mètres, essais.
-// Chiffres calés sur les moyennes du rugby professionnel.
-const ATTENDU: Record<PosteId, { plaquages: number; metres: number; essais: number }> = {
-  pilier_gauche: { plaquages: 9, metres: 18, essais: 0.05 },
-  talonneur: { plaquages: 10, metres: 22, essais: 0.12 },
-  pilier_droit: { plaquages: 9, metres: 18, essais: 0.05 },
-  deuxieme_ligne_g: { plaquages: 12, metres: 22, essais: 0.06 },
-  deuxieme_ligne_d: { plaquages: 12, metres: 22, essais: 0.06 },
-  troisieme_aile_g: { plaquages: 13, metres: 32, essais: 0.12 },
-  troisieme_aile_d: { plaquages: 13, metres: 32, essais: 0.12 },
-  numero_8: { plaquages: 11, metres: 45, essais: 0.16 },
-  demi_melee: { plaquages: 7, metres: 30, essais: 0.14 },
-  demi_ouverture: { plaquages: 6, metres: 30, essais: 0.10 },
-  ailier_gauche: { plaquages: 4, metres: 75, essais: 0.42 },
-  premier_centre: { plaquages: 9, metres: 55, essais: 0.18 },
-  deuxieme_centre: { plaquages: 8, metres: 60, essais: 0.24 },
-  ailier_droit: { plaquages: 4, metres: 75, essais: 0.42 },
-  arriere: { plaquages: 5, metres: 80, essais: 0.28 },
+// Ce qu'on attend d'un poste sur 80 minutes. Chiffres calés sur les moyennes du
+// rugby professionnel — et sur ce que le moteur produit réellement, mesuré par
+// `verifMoteur.ts`.
+interface Attendu {
+  plaquages: number; metres: number; essais: number;
+  // Conquête et jeu au ras : nuls pour un trois-quarts, c'est le point.
+  melees: number; touches: number; pickAndGo: number;
+  offloads: number;
+}
+const ATTENDU: Record<PosteId, Attendu> = {
+  pilier_gauche: { plaquages: 9, metres: 18, essais: 0.05, melees: 11, touches: 0.7, pickAndGo: 4.5, offloads: 0.15 },
+  talonneur: { plaquages: 10, metres: 22, essais: 0.12, melees: 11, touches: 0.3, pickAndGo: 4.5, offloads: 0.2 },
+  pilier_droit: { plaquages: 9, metres: 18, essais: 0.05, melees: 11, touches: 0.7, pickAndGo: 4.5, offloads: 0.15 },
+  deuxieme_ligne_g: { plaquages: 12, metres: 22, essais: 0.06, melees: 11, touches: 5.9, pickAndGo: 4.5, offloads: 0.2 },
+  deuxieme_ligne_d: { plaquages: 12, metres: 22, essais: 0.06, melees: 11, touches: 5.9, pickAndGo: 4.5, offloads: 0.2 },
+  troisieme_aile_g: { plaquages: 13, metres: 32, essais: 0.12, melees: 11, touches: 2, pickAndGo: 4.5, offloads: 0.45 },
+  troisieme_aile_d: { plaquages: 13, metres: 32, essais: 0.12, melees: 11, touches: 2, pickAndGo: 4.5, offloads: 0.45 },
+  numero_8: { plaquages: 11, metres: 45, essais: 0.16, melees: 11, touches: 2, pickAndGo: 4.5, offloads: 0.6 },
+  demi_melee: { plaquages: 7, metres: 30, essais: 0.14, melees: 0, touches: 0, pickAndGo: 0, offloads: 0.3 },
+  demi_ouverture: { plaquages: 6, metres: 30, essais: 0.10, melees: 0, touches: 0, pickAndGo: 0, offloads: 0.35 },
+  ailier_gauche: { plaquages: 4, metres: 75, essais: 0.42, melees: 0, touches: 0, pickAndGo: 0, offloads: 0.5 },
+  premier_centre: { plaquages: 9, metres: 55, essais: 0.18, melees: 0, touches: 0, pickAndGo: 0, offloads: 0.8 },
+  deuxieme_centre: { plaquages: 8, metres: 60, essais: 0.24, melees: 0, touches: 0, pickAndGo: 0, offloads: 0.9 },
+  ailier_droit: { plaquages: 4, metres: 75, essais: 0.42, melees: 0, touches: 0, pickAndGo: 0, offloads: 0.5 },
+  arriere: { plaquages: 5, metres: 80, essais: 0.28, melees: 0, touches: 0, pickAndGo: 0, offloads: 0.6 },
 };
 
 function borner(v: number, min: number, max: number): number {
@@ -84,7 +106,36 @@ export function noterMatch(poste: PosteId, s: StatsMatchJoueur): number {
   note += s.essais * 1.25;
   note += s.grattages * 0.45;
   if (s.butsTentes > 0) note += s.butsReussis * 0.32 - (s.butsTentes - s.butsReussis) * 0.4;
-  note -= s.cartons * 1.4;
+
+  // ═══ TOUT LE RESTE DU JEU ═══════════════════════════════════════════════
+  // ⚠️ SANS CETTE SECTION, UN PILIER NE POUVAIT PAS FAIRE UN GRAND MATCH. La
+  // note ne regardait que plaquages, mètres, essais, grattages et tirs au but :
+  // une première ligne qui domine la mêlée, gagne ses ballons au ras et offre
+  // un essai obtenait exactement la même note qu'un pilier qui n'a rien fait.
+  // Chaque ligne ci-dessous est bornée : le total ne peut pas s'envoler, et
+  // l'étalonnage de difficulté (médiane 63) ne bouge pas — vérifié.
+  note += borner((s.passesDecisives ?? 0) * 0.8, 0, 1.6);
+  note += borner(((s.offloads ?? 0) - att.offloads * part) * 0.35, -0.3, 0.9);
+  note += borner((s.franchissements ?? 0) * 0.22, 0, 1);
+  // Les ballons rendus se paient : un porteur qui perd trois ballons a coûté
+  // trois possessions, quoi qu'il ait fait par ailleurs.
+  note -= borner((s.turnovers ?? 0) * 0.3, 0, 1.5);
+
+  // La conquête. `att.melees` vaut 0 pour un trois-quarts : la ligne est donc
+  // neutre pour lui, sans avoir besoin d'un test de poste ici.
+  if (att.melees > 0) {
+    note += borner(((s.melees ?? 0) - att.melees * part) / Math.max(4, att.melees * part) * 0.8, -0.7, 0.9);
+    note += borner(((s.touchesGagnees ?? 0) - att.touches * part) * 0.22, -0.4, 0.9);
+    note += borner(((s.pickAndGo ?? 0) - att.pickAndGo * part) * 0.10, -0.4, 0.7);
+  }
+  // Le 50/22 est un coup de maître : il retourne une position, on le paie cher.
+  note += borner((s.cinquanteVingtDeux ?? 0) * 0.7, 0, 1.4);
+
+  // ⚠️ Le rouge n'est pas un jaune. `cartons` reste le total pour compatibilité
+  // (les appelants historiques ne fournissent que lui) ; quand la couleur est
+  // connue, un rouge coûte trois fois plus — il a mis son équipe à quatorze.
+  const rouges = s.cartonsRouges ?? 0;
+  note -= (s.cartons - rouges) * 1.4 + rouges * 4;
 
   return Math.round(borner(note, 1, 10) * 10) / 10;
 }

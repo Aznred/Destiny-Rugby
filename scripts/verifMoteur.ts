@@ -241,3 +241,60 @@ console.log('\n=== 7. LA FEUILLE DE MATCH ===');
   const centre = matchs[0].pions.filter((p) => Math.abs(p.pos.y - AXE) < 1).length;
   console.log(`  pions collés à l’axe en fin de match : ${centre} (empilement)`);
 }
+
+console.log('\n=== 8. LA FEUILLE COMPLÈTE : TOUT LE JEU EST COMPTÉ ===');
+{
+  // ⚠️ CE CONTRÔLE EXISTE PARCE QU'UNE STATISTIQUE QUI RESTE À ZÉRO NE SE VOIT
+  // PAS. Le moteur peut très bien tourner parfaitement et ne jamais incrémenter
+  // `melees` — le classement afficherait alors une colonne de zéros, et rien ne
+  // le signalerait. On exige donc que CHAQUE compteur ajouté soit non nul sur un
+  // échantillon de matchs, et qu'il aille aux bons postes.
+  const AVANTS = new Set(['pilier_gauche', 'talonneur', 'pilier_droit', 'deuxieme_ligne_g',
+    'deuxieme_ligne_d', 'troisieme_aile_g', 'troisieme_aile_d', 'numero_8']);
+  const cumul = {
+    melees: 0, touchesGagnees: 0, pickAndGo: 0, passesDecisives: 0,
+    offloads: 0, cinquanteVingtDeux: 0, cartonsJaunes: 0, cartonsRouges: 0,
+  };
+  // Fuites : une statistique de conquête chez un trois-quarts, c'est un bug.
+  let conquetteChezLesArrieres = 0;
+  let essaisTotal = 0;
+  // ⚠️ 25 MATCHS, PAS 12 : le carton rouge tombe une fois sur cinquante
+  // environ (7 % des jaunes, eux-mêmes à 1,5 par match). Sur douze matchs, en
+  // voir zéro ne prouve rien — ni que le mécanisme marche, ni qu'il est cassé.
+  const N = 25;
+  for (let k = 0; k < N; k++) {
+    const e = jouer(`feuille#${k}`, false);
+    for (const j of bilan(e).parJoueur) {
+      for (const c of Object.keys(cumul) as (keyof typeof cumul)[]) {
+        cumul[c] += (j.stats as unknown as Record<string, number>)[c] ?? 0;
+      }
+      essaisTotal += j.stats.essais;
+      if (!AVANTS.has(j.poste)) {
+        conquetteChezLesArrieres += j.stats.melees + j.stats.touchesGagnees + j.stats.pickAndGo;
+      }
+    }
+  }
+  const parMatch = (v: number) => (v / N).toFixed(2);
+  const CIBLES: [keyof typeof cumul, string, number, number][] = [
+    ['melees', 'mêlées gagnées (créditées aux 8)', 40, 200],
+    ['touchesGagnees', 'touches captées', 8, 40],
+    ['pickAndGo', 'ballons portés au ras', 10, 120],
+    ['passesDecisives', 'passes décisives', 1, 8],
+    ['offloads', 'offloads', 1, 30],
+    ['cinquanteVingtDeux', '50/22 réussis', 0, 4],
+    ['cartonsJaunes', 'cartons jaunes', 0.8, 3],
+  ];
+  for (const [c, nom, min, max] of CIBLES) {
+    const v = Number(parMatch(cumul[c]));
+    const ok = v >= min && v <= max;
+    console.log(`  ${ok ? '✅' : '❌'} ${nom.padEnd(34)} ${String(v).padStart(6)}/match  (cible ${min} à ${max})`);
+  }
+  // Le rouge se compte SUR L'ÉCHANTILLON, pas par match : à 0,1 par match, un
+  // taux « par match » ne dit rien. Ce qu'on vérifie, c'est qu'il tombe.
+  console.log(`  ${cumul.cartonsRouges >= 1 && cumul.cartonsRouges <= N ? '✅' : '❌'} `
+    + `${'cartons rouges (le rouge existe)'.padEnd(34)} ${cumul.cartonsRouges} sur ${N} matchs`);
+  console.log(`  ${conquetteChezLesArrieres === 0 ? '✅' : '❌'} ${'aucune conquête chez un trois-quarts'.padEnd(34)} ${conquetteChezLesArrieres}`);
+  // Une passe décisive par essai environ : on ne peut pas en avoir plus.
+  const ratio = cumul.passesDecisives / Math.max(1, essaisTotal);
+  console.log(`  ${ratio <= 1 ? '✅' : '❌'} ${'jamais plus d’une passe déc. par essai'.padEnd(34)} ${(ratio * 100).toFixed(0)} % des essais`);
+}

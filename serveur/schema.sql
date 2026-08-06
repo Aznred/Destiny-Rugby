@@ -15,7 +15,10 @@ create table if not exists classement (
   -- Le plafond vient de `SCORE_MAX` (src/lib/classementMondial.ts) : la carrière
   -- théorique maximale du jeu. Une valeur au-dessus est mathématiquement
   -- impossible — la base elle-même la refuse, même si le code se trompait.
-  score    integer not null check (score >= 0 and score <= 64488),
+  -- ⚠️ Il a changé quand les distinctions individuelles sont arrivées (4 → 9
+  -- titres possibles par saison) : 64 488 → 82 488. À remettre à jour à chaque
+  -- retouche de `LIMITES`, sinon la base rejette des scores légitimes.
+  score    integer not null check (score >= 0 and score <= 82488),
   cree_le  timestamptz not null default now(),
   maj_le   timestamptz not null default now()
 );

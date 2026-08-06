@@ -169,7 +169,27 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   | Challenge Cup | Top 14, club classé dans les **6 derniers** |
   | Tournoi des 6 Nations | Sélectionné avec une nation du Tournoi |
   | Coupe du monde | Tous les 4 ans, si sélectionné |
-  | Meilleur joueur de l'année | Au sommet mondial, après une saison titrée |
+
+- **Les honneurs individuels** 🥇 : huit distinctions personnelles, qui ne se
+  jouent pas — elles se **méritent**. Elles sont décernées sur **ta note de
+  saison** (les deux tiers de la cote), **tes statistiques comparées à ce qu'on
+  attend de ton poste**, et **le palmarès de ton année**. Aucun tirage au sort :
+  la même saison rejouée donne toujours le même verdict.
+  | Distinction | Où, et à quelles conditions |
+  |---|---|
+  | Meilleur joueur du Top 14 | Top 14 |
+  | Meilleur joueur de la Premiership | Gallagher Premiership |
+  | Meilleur joueur de l'URC | United Rugby Championship |
+  | Meilleur joueur de Nouvelle-Zélande | Super Rugby Pacific **ou** Bunnings NPC |
+  | Meilleur joueur de la Champions Cup | Il faut disputer l'épreuve (top 8) |
+  | Meilleur joueur du Tournoi | Il faut être sélectionné |
+  | Homme du match — finale de Coupe du monde | Il faut avoir gagné la finale |
+  | Meilleur joueur de l'année | Le sommet : une saison énorme **et** un titre |
+
+  ⚠️ **Seuls cinq championnats élisent un joueur de l'année**, parce que c'est le
+  cas dans la réalité : on ne décerne pas d'Oscar en Fédérale 3. Mesuré sur
+  60 carrières de 14 saisons partant de Nationale 2 : **5 carrières sur 60** en
+  décrochent au moins une, soit 0,13 par carrière. C'est un objectif, pas un dû.
 
   Les **8 trophées des championnats du monde** (Gallagher Premiership, RFU
   Championship, Premiership Rugby Cup, URC, Super Rugby Pacific, Bunnings NPC,
@@ -393,7 +413,10 @@ src/
   data/effectifsReels.ts # GÉNÉRÉ : 6 306 joueurs réels 25-26 + note générale des clubs
   lib/groq.ts           # appel API Groq + prompt système + parsing JSON + clé env
   lib/ia.ts             # la scène de la semaine + son jugement (sévère), situations, interviews
-  lib/armoire.ts        # étagères mesurées sur le modèle 3D, pièces de prestige au sol, cadrage
+  lib/armoire.ts        # étagères mesurées sur le modèle 3D, titres au sol, boucliers adossés, cadrage
+  lib/honneurs.ts       # les distinctions individuelles : note de saison + stats + palmarès de l'année
+  lib/classementEnLigne.ts # envoi / lecture du classement mondial (sans serveur : le jeu continue)
+api/classement.ts       # la fonction serverless Vercel — voir serveur/VERCEL.md
   lib/effectif.ts       # effectif réel ou généré, progression/déclin, force d'effectif, note des clubs
 scripts/
   genMonde.cjs          # génère mondeReel.ts + effectifsReels.ts depuis les JSON fournis
@@ -403,7 +426,10 @@ scripts/
   verif.ts              # banc d'essai hors navigateur : npx vite-node scripts/verif.ts
   verifRecit.ts         # récit hebdomadaire : plafonds, conséquences dures, transferts réels
   verifSelection.ts     # sélections atteignables, petites nations comprises
-  verifArmoire.ts       # armoire à trophées : étagères décodées du .glb, cadrage mobile
+  verifArmoire.ts       # armoire à trophées : étagères décodées du .glb, boucliers adossés, cadrage mobile
+  verifHonneurs.ts      # honneurs individuels : barème, équité entre postes, 60 carrières jouées
+  verifMarche.ts        # marché : variété des clubs, saut d'étage interdit, salaires par âge
+  traduire.ts           # remplit les langues manquantes du dictionnaire (Groq), sans rien écraser
   verifClassement.ts    # joue le tricheur : chaque attaque du classement doit être refusée
 serveur/                # le classement en ligne (Deno, déployé à part — pas dans le bundle)
   classement.ts         # Edge Function : vérifie la fiche, RECALCULE le score, n'écrit que lui
@@ -419,7 +445,7 @@ serveur/                # le classement en ligne (Deno, déployé à part — pa
   data/trophees.ts      # trophées + conditions d'attribution + modèles 3D
   index.css / App.css   # design system (thème stade) + styles composants
 public/ballon.glb       # ballon France Rugby, compressé Draco (453 Ko)
-public/m3d/*.glb        # poteaux, 16 trophées, skins de ballon (26 Mo au total)
+public/m3d/*.glb        # poteaux, 47 trophées (dont 8 distinctions), skins de ballon (57 Mo)
 public/logos/*.png      # 715 logos de clubs et de sélections (5,5 Mo)
 ```
 
@@ -470,6 +496,18 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 | Clubs de Nationale 2 à Régionale 3 sans note | Ils n'en avaient pas : tout un étage partageait la même. Chacun a maintenant **sa** note, tirée de son nom — et c'est elle qui compose son effectif. |
 | Deux « Cheetahs » aux noms inversés | La franchise **Toyota Cheetahs** joue les coupes d'Europe, l'union **Free State Cheetahs** la Currie Cup. |
 | Trophées minuscules, certains entre deux étagères | Les étagères sont **mesurées sur le modèle 3D** (elles sont six, pas quatre). Boucliers et grandes coupes se dressent **au sol**, à hauteur de buste. |
+| Vitrine et sol mélangés | **Les distinctions individuelles vont dans l'armoire, les titres d'équipe au sol**, à 40 % de la hauteur du meuble — trois fois et demie une pièce de vitrine. |
+| Les boucliers « tenaient droit comme par magie » | Ils étaient bien inclinés, mais posés **à côté** du meuble, dans le vide. Ils sont maintenant avancés de `sin(θ) × hauteur` devant la face avant : leur arête haute tombe **pile sur le meuble**. Et l'angle a doublé (8,6° → 17°). |
+| Trophée allemand et « meilleur joueur du monde » : mauvais modèles | Remplacés par les modèles relivrés. Le pipeline refait un modèle dès que **sa source est plus récente que la version embarquée**. |
+| Le Pro D2 et la coupe russe ne s'adossaient pas | Leur socle les rendait trop épais pour être reconnus comme boucliers : ils le déclarent maintenant, comme le Brennus. |
+| Un seul trophée individuel, tiré au sort sur le niveau général | **Huit distinctions**, décernées sur la note de saison, les statistiques et le palmarès de l'année. Plus aucun dé. |
+| Statistiques estimées, et incomplètes | Le moteur compte **23 lignes par joueur**, à l'événement : mêlées, touches gagnées, pick and go, offloads, passes décisives, 50/22 réussis, mètres, franchissements, cartons jaunes ET rouges. **18 classements** au lieu de 9. |
+| Un pilier ne pouvait pas faire un grand match | La note de match ne regardait que plaquages, mètres, essais et tirs au but. Elle juge maintenant **la conquête et le jeu au ras** — le vrai travail d'un avant. |
+| Les cartons n'existaient quasiment pas | 0,25 par match au lieu des 1,3 annoncés, et **aucun rouge**, jamais : trois pénalités sur quatre ne désignaient pas de fautif. Corrigé — **1,4 jaune et 0,08 rouge par match**. |
+| Le classement des passeurs décisifs était un classement de demis de mêlée | Il affichait le TOTAL des passes (86 par match). Le moteur compte désormais **la vraie passe qui amène l'essai**. |
+| « C'est toujours les mêmes clubs qui proposent » | Chaque club a son **humeur de la saison** et un **besoin à ton poste**. Mesuré : **22 à 24 clubs différents** pour 48 offres sur douze saisons, contre cinq ou six avant. |
+| « Trop facile d'avoir de gros clubs et de gros salaires » | Le plafond dépend de l'**âge** (7 points de marge à 20 ans, 0,5 après 29), on ne **saute plus deux étages**, la notoriété est plafonnée à +7, et le salaire suit l'âge (230 k€ à 19 ans, 420 k€ à 27, 305 k€ à 36). |
+| Écussons de sélections redevenus des vignettes | `copierLogos.cjs` réécrasait `copierLogosSelections.cjs`. L'ordre des deux scripts est maintenant écrit noir sur blanc. |
 
 Le détail de chaque correction — la cause, la mesure avant/après et le script de
 vérification — est dans [`CLAUDE.md`](CLAUDE.md), sections
@@ -482,14 +520,17 @@ vérification — est dans [`CLAUDE.md`](CLAUDE.md), sections
 👉 La liste complète et **ordonnée** des évolutions prévues (9 lots, des
 fondations vers le confort) est dans **[ROADMAP.md](ROADMAP.md)**.
 
-- **Classement multijoueur en ligne** : nécessite un **backend** (ex. Supabase
-  ou Firebase) pour synchroniser les carrières entre joueurs. Aujourd'hui le
-  classement est **local et part vierge** — il ne contient que les carrières
-  menées à leur terme sur cet appareil. La marche à suivre pour le rendre
-  mondial (table `carrieres`, envoi à la retraite, lecture au chargement, et
-  surtout le recalcul du score côté serveur) est **expliquée dans l'écran
-  Classement lui-même**, dans le dépliant « 🌍 Comment rendre ce classement
-  mondial ».
+- ~~**Classement multijoueur en ligne**~~ — **fait, et prêt à déployer.** Le code
+  est là : `api/classement.ts` (fonction serverless Vercel),
+  `serveur/schema-vercel.sql` (les deux tables) et `src/lib/classementEnLigne.ts`
+  (côté navigateur). Le pas à pas complet — base Neon, tables, sel d'appareil,
+  déploiement, vérification et erreurs fréquentes — est dans
+  **[`serveur/VERCEL.md`](serveur/VERCEL.md)**. **20 minutes**, gratuit dans les
+  quotas de départ.
+  Tant que rien n'est déployé, le classement reste **local et part vierge** : le
+  jeu ne casse pas, l'écran le dit. Le principe tient en une phrase — *le
+  navigateur envoie les faits d'une carrière, le serveur RECALCULE le score et
+  n'écrit que lui*.
 - **Proxy backend pour Groq** : petit serveur qui garde la clé côté serveur et
   applique un quota par joueur — permet une mise en ligne publique sans exposer
   la clé ni saturer le quota.

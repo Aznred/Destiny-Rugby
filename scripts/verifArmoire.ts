@@ -31,7 +31,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { TROPHEES, OVAS_PIECE_MAJEURE } from '../src/data/trophees';
+import { TROPHEES, estIndividuel } from '../src/data/trophees';
 import {
   cadrage, disposerArmoire, detecterEtageres, estBouclier, COLONNES, MAX_PIECES,
   type Boite, type DimensionsArmoire, type Geometrie, type Modele, type TailleModele,
@@ -40,11 +40,16 @@ import {
 // Doivent rester alignés sur `components/ArmoireTrophees.tsx`.
 const HAUTEUR_ARMOIRE = 4;
 const FOV = 42;
-// Les deux tailles de canvas réelles (App.css : `min(820px, 95vw)` × `min(52vh,
-// 420px)`, et `min(44vh, 320px)` sous 560 px).
+// ⚠️ TAILLES MESURÉES DANS LE NAVIGATEUR, pas déduites du CSS. Les valeurs
+// précédentes (790 × 420 et 337 × 320) étaient lues dans `App.css` ; relevées en
+// jeu sur `.armoire-canvas`, elles font **714 × 344** à 1280 px de large et
+// **299 × 294** sur un téléphone de 375 px. L'écart n'est pas anodin : le
+// rapport passe de 1,053 à 1,017 sur mobile, et c'est LUI qui commande le recul
+// de la caméra. Cadrer sur un canvas plus large que le vrai, c'est se croire au
+// large et laisser des pièces hors champ.
 const ECRANS: [string, number, number][] = [
-  ['ordinateur', 790, 420],
-  ['téléphone', 337, 320],
+  ['ordinateur', 714, 344],
+  ['téléphone', 299, 294],
 ];
 
 let echecs = 0;
@@ -227,13 +232,22 @@ const mesures: Mesure[] = Object.values(TROPHEES)
 function modeles(liste: Mesure[]): Modele[] {
   return liste.map((m) => ({
     taille: m.taille,
-    majeur: m.tr.ovas >= OVAS_PIECE_MAJEURE,
+    individuel: estIndividuel(m.tr),
     bouclier: m.tr.forme === 'bouclier' || estBouclier(m.taille),
   }));
 }
 
 // Le cas RÉEL : la modale n'affiche jamais plus de `MAX_PIECES` pièces.
-const affiches = mesures.slice(0, MAX_PIECES);
+// ⚠️ ON PANACHE VOLONTAIREMENT. `Object.values(TROPHEES)` sort les collectifs en
+// premier : en prendre les seize premiers donnait une vitrine VIDE et un test
+// qui ne prouvait rien de la nouvelle répartition. On prend donc les
+// distinctions ET des titres, comme un vrai palmarès de haut niveau.
+const individuels = mesures.filter((m) => estIndividuel(m.tr));
+const collectifs = mesures.filter((m) => !estIndividuel(m.tr));
+const affiches = [
+  ...collectifs.slice(0, MAX_PIECES - individuels.length),
+  ...individuels,
+];
 const mods = modeles(affiches);
 const places = disposerArmoire(mods, dims, etageres);
 
@@ -245,6 +259,17 @@ console.log('\n=== 2. CHAQUE TROPHÉE A UNE PLACE ===');
   ligne('positions et échelles calculables', `${places.length - cassees.length}/${places.length}`, cassees.length === 0);
   const dedans = places.filter((p) => !p.dehors).length;
   ligne('répartition vitrine / sol', `${dedans} en vitrine · ${places.length - dedans} au sol`, dedans > 0);
+
+  // ⚠️ LA DEMANDE, VÉRIFIÉE NOMMÉMENT : « les trophées individuels dans
+  // l'armoire et les trophées collectifs à côté ».
+  const individuelsDehors = affiches.filter((m, i) => estIndividuel(m.tr) && places[i].dehors);
+  ligne('toutes les distinctions sont en vitrine',
+    individuelsDehors.length ? individuelsDehors.map((m) => m.tr.id).join(', ') : `${affiches.filter((m) => estIndividuel(m.tr)).length} distinction(s)`,
+    individuelsDehors.length === 0);
+  const collectifsSortis = affiches.filter((m, i) => !estIndividuel(m.tr) && places[i].dehors).length;
+  ligne('les titres d’équipe sortent du meuble',
+    `${collectifsSortis} au sol sur ${affiches.filter((m) => !estIndividuel(m.tr)).length} titres`,
+    collectifsSortis === Math.min(8, affiches.filter((m) => !estIndividuel(m.tr)).length));
 }
 
 console.log('\n=== 3. PLUS RIEN NE FLOTTE ENTRE DEUX ÉTAGÈRES ===');
@@ -299,15 +324,15 @@ console.log('\n=== 4. RIEN NE DÉBORDE ===');
     `${(Math.min(...parts) * 100).toFixed(0)} à ${(Math.max(...parts) * 100).toFixed(0)} %`, mini >= 0.6);
 }
 
-console.log('\n=== 5. BOUCLIERS ET GRANDES COUPES AU SOL, À HAUTEUR DE BUSTE ===');
+console.log('\n=== 5. LES TITRES AU SOL, À HAUTEUR DE BUSTE, ADOSSÉS AU MEUBLE ===');
 {
-  // ⚠️ Le sol est borné à six pièces (voir MAX_SOL) : au-delà, une pièce
-  // majeure reste en vitrine. C'est le prix à payer pour que le meuble ne
-  // devienne pas un timbre-poste sur un palmarès complet.
-  const candidates = mods.filter((m) => m.majeur || m.bouclier).length;
+  // ⚠️ Le sol est borné à huit pièces (voir MAX_SOL) : au-delà, un titre reste
+  // en vitrine. C'est le prix à payer pour que le meuble ne devienne pas un
+  // timbre-poste sur un palmarès complet.
+  const candidates = mods.filter((m) => !m.individuel).length;
   const dehorsReel = places.filter((p) => p.dehors).length;
-  ligne('les pièces majeures sortent, dans la limite du sol',
-    `${dehorsReel} au sol sur ${candidates} candidates`, dehorsReel === Math.min(candidates, 6));
+  ligne('les titres sortent, dans la limite du sol',
+    `${dehorsReel} au sol sur ${candidates} candidats`, dehorsReel === Math.min(candidates, 8));
 
   // Le Brennus, nommément : c'est la demande.
   const iBrennus = affiches.findIndex((m) => m.tr.id === 'brennus');
@@ -336,9 +361,57 @@ console.log('\n=== 5. BOUCLIERS ET GRANDES COUPES AU SOL, À HAUTEUR DE BUSTE ==
     `${Math.min(...hauteursSol).toFixed(2)} contre ${hautVitrine.toFixed(2)} en rayon`,
     Math.min(...hauteursSol) > hautVitrine * 2);
 
-  const inclines = affiches.filter((m, i) => places[i].dehors && mods[i].bouclier && places[i].rotation[0] < 0).length;
+  // ⚠️ LE REPROCHE EXACT : « là ils tiennent droit comme par magie ». Un
+  // bouclier incliné ne suffit pas — il faut qu'il TOUCHE quelque chose. On
+  // calcule donc où tombe son arête haute, et on exige qu'elle atteigne le plan
+  // de la face avant du meuble (rang 0) ou la pièce précédente de sa file.
+  const bouclierSol = affiches
+    .map((m, i) => ({ m, i, p: places[i] }))
+    .filter(({ i, p }) => p.dehors && mods[i].bouclier);
   const boucliers = mods.filter((m) => m.bouclier).length;
-  ligne('les boucliers sont adossés (inclinés)', `${inclines}/${boucliers}`, inclines === boucliers);
+  const inclines = bouclierSol.filter(({ p }) => p.rotation[0] <= -0.25).length;
+  ligne('les boucliers penchent franchement (≥ 14°)',
+    `${inclines}/${bouclierSol.length} au sol · ${boucliers} boucliers au total`,
+    inclines === bouclierSol.length && bouclierSol.length > 0);
+
+  // ⚠️ ET SURTOUT : SUR QUOI S'APPUIE-T-IL ? Le point le plus en arrière d'une
+  // pièce basculée de θ est son arête HAUTE et ARRIÈRE :
+  //     z − sin(θ) × hauteur − cos(θ) × épaisseur / 2
+  // (le sommet part vers le fond, moins la demi-épaisseur). Ce point doit
+  // tomber soit sur la face avant du meuble, soit sur la pièce posée derrière.
+  const emprise = affiches
+    .map((m, i) => ({ m, p: places[i], bouclier: mods[i].bouclier }))
+    .filter(({ p }) => p.dehors)
+    .map(({ m, p, bouclier }) => {
+      const angle = -p.rotation[0];
+      const h = m.taille.y * p.echelle;
+      const e = m.taille.z * p.echelle;
+      return {
+        id: m.tr.id, bouclier, cote: Math.sign(p.position[0]),
+        arriere: p.position[2] - Math.sin(angle) * h - (Math.cos(angle) * e) / 2,
+        avant: p.position[2] + (Math.cos(angle) * e) / 2,
+      };
+    });
+
+  const sansAppui = emprise.filter((b) => {
+    if (!b.bouclier) return false;
+    // Le meuble lui-même ?
+    if (Math.abs(b.arriere - dims.profondeur / 2) < 1e-6) return false;
+    // Sinon, une pièce de sa file, juste derrière.
+    return !emprise.some((autre) => autre !== b && autre.cote === b.cote
+      && b.arriere - autre.avant >= -1e-6 && b.arriere - autre.avant < 0.2);
+  });
+  ligne('aucun bouclier ne s’appuie sur le vide',
+    sansAppui.length ? sansAppui.map((b) => b.id).join(', ') : `${emprise.filter((b) => b.bouclier).length}/${emprise.filter((b) => b.bouclier).length} adossés`,
+    sansAppui.length === 0);
+
+  // Et le premier de chaque file touche le meuble AU CONTACT, pas « à peu près ».
+  const premiers = [1, -1].map((c) => emprise.filter((b) => b.cote === c)[0]).filter(Boolean);
+  const colles = premiers.filter((b) => Math.abs(b.arriere - dims.profondeur / 2) < 1e-6);
+  ligne('la tête de chaque file touche le meuble',
+    premiers.map((b) => `${b.id} à ${b.arriere.toFixed(3)}`).join(' · ')
+    + ` (face avant à ${(dims.profondeur / 2).toFixed(3)})`,
+    colles.length === premiers.length && premiers.length === 2);
 }
 
 console.log('\n=== 6. AUCUN CHEVAUCHEMENT ===');
@@ -412,24 +485,57 @@ console.log('\n=== 7. TOUT TIENT DANS LE CHAMP ===');
       `caméra à ${distance.toFixed(2)}, cible y ${centreY.toFixed(2)} · ${dehors.length} pièce(s) hors champ`,
       dehors.length === 0);
   }
+
+  // ⚠️ LE CAS QUI COMPTE VRAIMENT n'est pas le palmarès maximal (16 trophées
+  // distincts : personne ne l'atteint), c'est une belle carrière — un titre
+  // national, une coupe d'Europe, un tournoi, et deux ou trois distinctions.
+  // C'est CE cadrage-là que le joueur verra, et le meuble doit y rester lisible.
+  const carriere = ['brennus', 'champions', 'sixNations', 'prod2', 'meilleurTop14', 'meilleurJoueur']
+    .map((id) => mesures.find((m) => m.tr.id === id))
+    .filter((m): m is Mesure => m !== undefined);
+  const modsC = modeles(carriere);
+  const placesC = disposerArmoire(modsC, dims, etageres);
+  const boitesC: Boite[] = carriere.map((m, i) => ({
+    x: placesC[i].position[0],
+    y: placesC[i].position[1],
+    z: placesC[i].position[2] + (m.taille.z * placesC[i].echelle) / 2,
+    demiLargeur: (m.taille.x * placesC[i].echelle) / 2,
+    hauteur: m.taille.y * placesC[i].echelle,
+  }));
+  for (const [nom, l, h] of ECRANS) {
+    const { distance } = cadrage(boitesC, dims, FOV, l / h);
+    // La part de la hauteur de l'écran qu'occupe le meuble : en dessous de
+    // 40 %, il devient un timbre-poste et la vitrine n'est plus lisible.
+    const champ = 2 * Math.tan((FOV * Math.PI) / 360) * distance;
+    ligne(`palmarès de carrière — lisibilité ${nom}`,
+      `caméra à ${distance.toFixed(2)} · le meuble occupe ${((dims.hauteur / champ) * 100).toFixed(0)} % de la hauteur`,
+      dims.hauteur / champ >= 0.4);
+  }
 }
 
 console.log('\n=== 8. LES CAS LIMITES ===');
 {
-  // Que des boucliers : six s'adossent au meuble, les autres restent en vitrine
-  // — c'est la borne qui empêche la scène de s'étaler sur vingt unités.
-  const bouclier: Modele = { taille: { x: 1.4, y: 1.9, z: 0.17 }, majeur: false, bouclier: true };
+  // Que des boucliers : huit s'adossent au meuble, les autres restent en
+  // vitrine — c'est la borne qui empêche la scène de s'étaler sur vingt unités.
+  const bouclier: Modele = { taille: { x: 1.4, y: 1.9, z: 0.17 }, individuel: false, bouclier: true };
   const tous = disposerArmoire(Array.from({ length: MAX_PIECES }, () => bouclier), dims, etageres);
   const loin = tous.reduce((a, p) => Math.max(a, Math.abs(p.position[0])), 0);
   ligne('seize boucliers : le sol reste borné',
     `${tous.filter((p) => p.dehors).length} au sol, ${tous.filter((p) => !p.dehors).length} en vitrine, le plus loin à x = ${loin.toFixed(2)}`,
-    tous.filter((p) => p.dehors).length === 6 && loin < dims.largeur * 1.2);
+    tous.filter((p) => p.dehors).length === 8 && loin < dims.largeur * 1.6);
 
   // Rien du tout : la fonction ne doit pas exploser.
   ligne('palmarès vide', `${disposerArmoire([], dims, etageres).length} place(s)`, disposerArmoire([], dims, etageres).length === 0);
 
+  // Que des distinctions : personne au sol, et le meuble se remplit.
+  const medaille: Modele = { taille: { x: 0.9, y: 1.9, z: 0.9 }, individuel: true, bouclier: false };
+  const queDesHonneurs = disposerArmoire(Array.from({ length: 8 }, () => medaille), dims, etageres);
+  ligne('que des distinctions : rien au sol',
+    `${queDesHonneurs.filter((p) => p.dehors).length} au sol sur 8`,
+    queDesHonneurs.every((p) => !p.dehors));
+
   // Une vitrine pleine à ras bord : aucun trou, et le débordement part au sol.
-  const petit: Modele = { taille: { x: 0.9, y: 1.9, z: 0.9 }, majeur: false, bouclier: false };
+  const petit: Modele = { taille: { x: 0.9, y: 1.9, z: 0.9 }, individuel: true, bouclier: false };
   const capacite = etageres.length * COLONNES;
   const pleine = disposerArmoire(Array.from({ length: capacite + 3 }, () => petit), dims, etageres);
   const enVitrine = pleine.filter((p) => !p.dehors).length;

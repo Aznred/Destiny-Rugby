@@ -114,8 +114,19 @@ export const LIMITES = {
   matchsParSaison: 50,
   /** Un quadruplé est déjà exceptionnel ; 5 est une borne large. */
   essaisParMatch: 5,
-  /** Championnat + coupe d'Europe + tournoi/Coupe du monde + titre individuel. */
-  titresParSaison: 4,
+  /**
+   * ⚠️ RELEVÉ DE 4 À 9 AVEC LES HONNEURS INDIVIDUELS. Le compte se fait à la
+   * main, et il est SERRÉ — c'est ce qui rend la borne utile :
+   *   collectifs (4) · championnat national · coupe d'Europe · Tournoi (ou
+   *     Rugby Europe Championship) · Coupe du monde (une saison sur quatre) ;
+   *   individuels (5) · meilleur joueur du championnat · de la Champions Cup ·
+   *     du Tournoi · homme du match de la finale du monde · meilleur joueur du
+   *     monde.
+   * Personne n'a jamais fait les neuf dans la même saison, mais rien dans le
+   * moteur ne l'interdit — et une borne qui refuse une carrière légitime est
+   * pire qu'une borne large.
+   */
+  titresParSaison: 9,
   /** Un international ne dépasse pas une douzaine de capes par an. */
   capesParSaison: 12,
   noteMax: 99,
@@ -223,6 +234,19 @@ export function verifierFiche(f: unknown, trophees?: Iterable<string>): Verdict 
   }
   if (titres.length > saisons * LIMITES.titresParSaison) {
     rejet(`${titres.length} titres en ${saisons} saison(s) : maximum ${saisons * LIMITES.titresParSaison}`);
+  }
+  // ⚠️ ET SURTOUT : ON NE GAGNE PAS DEUX FOIS LE MÊME TROPHÉE LA MÊME SAISON.
+  // Cette borne-là est bien plus serrée que le total, et c'est elle qui reprend
+  // le travail que le plafond de titres faisait avant qu'on l'ouvre aux
+  // distinctions individuelles (4 → 9). Elle refuse « 40 Boucliers de Brennus
+  // en 12 saisons » — que le total, lui, laissait passer (40 < 108) — sans rien
+  // interdire à une carrière réelle : un championnat se gagne une fois par an.
+  const parTrophee = new Map<string, number>();
+  for (const t of titres) parTrophee.set(t, (parTrophee.get(t) ?? 0) + 1);
+  const repetes = [...parTrophee].filter(([, n]) => n > saisons);
+  if (repetes.length) {
+    rejet(`trophée(s) gagné(s) plus d'une fois par saison : `
+      + repetes.map(([id, n]) => `${id} ×${n} en ${saisons} saison(s)`).join(', '));
   }
   if (selections > saisons * LIMITES.capesParSaison) {
     rejet(`${selections} sélections en ${saisons} saison(s) : maximum ${saisons * LIMITES.capesParSaison}`);

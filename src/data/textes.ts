@@ -19,8 +19,32 @@
 import type { Traduction } from '../lib/i18n';
 import { TEXTES_ECRANS } from './textesEcrans';
 import { TEXTES_CONTENU } from './textesContenu';
+import { TEXTES_AUTO } from './textesAuto';
 
-export const TEXTES: Record<string, Traduction> = {
+// ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
+// écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
+// manquantes en interrogeant Groq et écrit `textesAuto.ts` ; le fusionner ici
+// avec la priorité la plus BASSE garantit deux choses : une traduction écrite à
+// la main gagne toujours, et relancer le script ne peut rien abîmer. Corriger
+// une tournure, c'est simplement l'écrire dans le fichier normal.
+//
+// ⚠️ On ne fusionne PAS clé par clé : une entrée automatique complète une clé
+// qui n'a que son français, elle ne vient jamais se mêler à une entrée
+// existante. Le `Object.assign` ci-dessous respecte ça — la valeur de droite
+// remplace entièrement celle de gauche.
+function fusionner(base: Record<string, Traduction>): Record<string, Traduction> {
+  const sortie: Record<string, Traduction> = {};
+  for (const [k, auto] of Object.entries(TEXTES_AUTO)) {
+    const humaine = base[k];
+    // Une clé automatique sans français dans la base n'existe pas : on l'ignore
+    // plutôt que d'inventer une entrée sans source.
+    if (!humaine) continue;
+    sortie[k] = { ...auto, ...humaine };
+  }
+  return { ...base, ...sortie };
+}
+
+const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   // ⚠️ DEUX ANNEXES, UN SEUL DICTIONNAIRE. Les écrans bavards (Profil,
   // Effectif, Classement, Carrière) et le contenu hors ligne pré-écrit
   // (situations, évènements, commentaires de match) vivent dans leurs propres
@@ -501,3 +525,5 @@ export const TEXTES: Record<string, Traduction> = {
   },
 
 };
+
+export const TEXTES: Record<string, Traduction> = fusionner(ECRIT_A_LA_MAIN);

@@ -12,6 +12,22 @@
 // `copierLogos.cjs` : minuscules, accents retirés, espaces en `_`, tirets
 // conservés. Aucun code à modifier, seulement des fichiers à écraser.
 //
+// ⚠️⚠️ CE SCRIPT DOIT PASSER **APRÈS** `copierLogos.cjs`, TOUJOURS. C'est la
+// cause d'une régression retrouvée en jeu : les écussons de sélections étaient
+// redevenus de minuscules vignettes (France 210 octets, Angleterre 291, Japon
+// 383 — au lieu de 4 à 12 Ko). `logos_equipes/nations_championship/` contient
+// `france.png` et `angleterre.png` : `copierLogos.cjs`, qui balaie tout le pack
+// de façon récursive, réécrit donc par-dessus les bons fichiers. Le désordre ne
+// se voit nulle part au build — seulement à l'écran, sur des vignettes de 40 px
+// que l'œil accepte trop facilement.
+//
+// L'ordre correct, dans cet ordre :
+//   node scripts/copierLogos.cjs             # le pack complet des clubs
+//   node scripts/copierLogosSelections.cjs   # PUIS les vrais écussons nationaux
+//
+// `npx vite-node scripts/verifU20.ts` le contrôle : il refuse tout écusson de
+// sélection sous 2 Ko.
+//
 // Relancer : node scripts/copierLogosSelections.cjs
 
 const fs = require('fs');

@@ -59,7 +59,9 @@ import {
 import { evaluerSucces, defisDeLaSemaine, cleSemaine } from '../lib/succes';
 import { DEFI_PAR_ID, SUCCES_PAR_ID, type EvenementDefi } from '../data/succes';
 import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS } from '../data/rugby';
-import { retourDeMatch, BUDGET_MATCHS_PAR_SAISON } from '../lib/moteur/apresMatch';
+import {
+  retourDeMatch, BUDGET_MATCHS_PAR_SAISON, type StatsMatchJoueur,
+} from '../lib/moteur/apresMatch';
 import { MODELE_DEFAUT, plafonnerDeltas, ressembleATriche, CLE_ENV } from '../lib/groq';
 import { EVENEMENTS, traduireEvenement } from '../data/evenements';
 import { situationPour, versScenario, type ConsequenceDure } from '../data/situations';
@@ -74,9 +76,12 @@ import {
   TROPHEES,
   TROPHEE_PAR_DIVISION,
   COUPE_EUROPE_PAR_DIVISION,
+  MEILLEUR_JOUEUR_PAR_DIVISION,
   NATIONS_6N,
   NATIONS_REC,
+  estIndividuel,
 } from '../data/trophees';
+import { decernerHonneurs, noterSaisonIndividuelle, BARRES_HONNEURS } from '../lib/honneurs';
 import { nomNation } from '../components/Drapeau';
 import {
   semaine, libelleDate, SEMAINES_PAR_SAISON, type Semaine,
@@ -446,11 +451,12 @@ interface GameState {
   // `contexte` porte le résultat de la rencontre : c'est lui qui permet à la
   // feuille de match d'être la SEULE entrée du journal pour ce week-end.
   enregistrerMatchVecu: (
-    stats: {
-      essais: number; plaquages: number; plaquagesManques: number;
-      passes: number; metres: number; grattages: number;
-      butsTentes: number; butsReussis: number; cartons: number; minutes: number;
-    },
+    // ⚠️ LA FEUILLE COMPLÈTE, pas un extrait. C'est `StatsMatchJoueur`
+    // (moteur/apresMatch.ts) : la partager plutôt que d'en recopier une version
+    // tronquée était le vrai correctif — l'ancienne signature s'arrêtait aux
+    // essais et aux plaquages, si bien que la mêlée, la touche, les offloads et
+    // les passes décisives du joueur humain n'arrivaient jamais jusqu'ici.
+    stats: StatsMatchJoueur,
     contexte?: {
       adversaire: string; scorePour: number; scoreContre: number;
       domicile: boolean; libelle: string;
@@ -900,6 +906,54 @@ export const useGame = create<GameState>()(
               : 'Tes attributs ne bougent pas cette saison.'),
           deltas: evolution.deltas,
         });
+        // ---- LES DISTINCTIONS INDIVIDUELLES ----
+        // ⚠️ ICI ET PAS PLUS HAUT : elles se jugent sur la NOTE DE SAISON, qui
+        // vient d'être calculée par `evoluer()`. Et sur le palmarès de l'année,
+        // que `resoudreTrophees` vient de remplir. Les deux entrées existent
+        // enfin — c'est le seul point du programme où c'est vrai.
+        //
+        // ⚠️ Plus aucun tirage au sort (demande explicite : « que ça soit par
+        // rapport à notre note de saison, nos stats et notre palmarès »).
+        // `lib/honneurs.ts` est pure et déterministe : rejouer la saison
+        // redonne exactement le même verdict.
+        const saisonJugee = {
+          note: evolution.noteSaison,
+          reputation: j.reputation,
+          poste: j.poste,
+          matchs: matchsSaison,
+          essais: essaisSaison,
+          // N'existe qu'en mode « journée par journée » : le module s'en accommode.
+          stats: joueur.saisonEnCours?.stats,
+          rang: bilan.rang,
+          taillePoule: bilan.taillePoule,
+          titres: bilan.trophees,
+          competition: bilan.competition,
+          championsCup: bilan.enChampionsCup,
+          tournoi: bilan.selectionne6N,
+          saison: joueur.saison,
+        };
+        const honneurs = decernerHonneurs(saisonJugee);
+        bilan.trophees.push(...honneurs.map((h) => h.trophee));
+
+        // Le joueur doit pouvoir SUIVRE sa cote. Un système de récompense qu'on
+        // ne voit pas venir n'est pas un objectif, c'est une surprise — et on ne
+        // travaille pas pour une surprise. La note s'affiche donc dès qu'une
+        // distinction est en jeu, gagnée ou non.
+        if (MEILLEUR_JOUEUR_PAR_DIVISION[bilan.competition] || bilan.enChampionsCup || bilan.selectionne6N) {
+          const cote = noterSaisonIndividuelle(saisonJugee);
+          entrees.push({
+            id: idUnique(),
+            saison: joueur.saison,
+            role: 'systeme',
+            titre: `🗳️ Vote du meilleur joueur — ta saison cotée ${Math.round(cote)}/100`,
+            texte: honneurs.length
+              ? `Note de saison, statistiques, palmarès : tu passes devant tout le monde. `
+                + `${honneurs.length > 1 ? `${honneurs.length} distinctions` : 'Une distinction'} pour toi.`
+              : `Il fallait environ ${Math.round(BARRES_HONNEURS.championnat)} pour être élu meilleur joueur du championnat. `
+                + `La note de saison compte pour les deux tiers, les statistiques et les titres de l'année font le reste.`,
+          });
+        }
+
         const gagnes = bilan.trophees;
         entrees.push({
           id: idUnique(),
@@ -963,15 +1017,24 @@ export const useGame = create<GameState>()(
             ],
           };
           gain += t.ovas;
+          // ⚠️ ON NE RACONTE PAS UNE DISTINCTION COMME UN TITRE D'ÉQUIPE. « Tu
+          // soulèves le trophée devant ton public » n'a aucun sens pour un
+          // trophée de meilleur joueur — et surtout, le joueur doit voir CE QUI
+          // le lui a valu, sinon la récompense tombe du ciel.
+          const perso = estIndividuel(t);
           entrees.push({
             id: idUnique(),
             saison: joueur.saison,
             role: 'mj',
-            titre: `🏆 ${t.nom}`,
-            texte: `${t.desc} Tu soulèves le trophée devant ton public !`,
-            deltas: { reputation: 6, moral: 10 },
+            titre: `${perso ? '🥇' : '🏆'} ${t.nom}`,
+            texte: perso
+              ? `${t.desc} Ta saison notée ${evolution.noteSaison.toFixed(1)}/10`
+                + (matchsSaison ? `, ${matchsSaison} match${matchsSaison > 1 ? 's' : ''} et ${essaisSaison} essai${essaisSaison > 1 ? 's' : ''}` : '')
+                + `${bilan.trophees.length > 1 ? ', et un palmarès qui parle pour toi' : ''} : le jury n'a pas hésité.`
+              : `${t.desc} Tu soulèves le trophée devant ton public !`,
+            deltas: { reputation: perso ? 8 : 6, moral: 10 },
           });
-          j = appliquerDeltas(j, { reputation: 6, moral: 10 });
+          j = appliquerDeltas(j, { reputation: perso ? 8 : 6, moral: 10 });
         }
 
         entrees.push({
@@ -2596,6 +2659,11 @@ export const useGame = create<GameState>()(
             titularisations: vecu.titularisations + (s.minutes >= 55 ? 1 : 0),
             essais: vecu.essais + s.essais,
             notes: [...vecu.notes, retour.note],
+            // ⚠️ TOUTE LA FEUILLE EST CUMULÉE. `passesDecisives: 0` et
+            // `cartonsRouges: 0` étaient écrits en dur : le joueur humain
+            // finissait sa carrière avec zéro passe décisive et zéro carton
+            // rouge, quoi qu'il ait fait sur le terrain — et deux succès du jeu
+            // ne pouvaient donc pas se débloquer.
             stats: additionnerStats(vecu.stats, {
               points: s.essais * 5 + s.butsReussis * 2,
               butsTentes: s.butsTentes,
@@ -2603,9 +2671,19 @@ export const useGame = create<GameState>()(
               plaquages: s.plaquages,
               plaquagesManques: s.plaquagesManques,
               grattages: s.grattages,
-              passesDecisives: 0,
-              cartonsJaunes: s.cartons,
-              cartonsRouges: 0,
+              passesDecisives: s.passesDecisives ?? 0,
+              cartonsRouges: s.cartonsRouges ?? 0,
+              cartonsJaunes: Math.max(0, s.cartons - (s.cartonsRouges ?? 0)),
+              passes: s.passes,
+              offloads: s.offloads ?? 0,
+              metres: s.metres,
+              franchissements: s.franchissements ?? 0,
+              turnovers: s.turnovers ?? 0,
+              melees: s.melees ?? 0,
+              touchesGagnees: s.touchesGagnees ?? 0,
+              pickAndGo: s.pickAndGo ?? 0,
+              coupsDePied: 0,
+              cinquanteVingtDeux: s.cinquanteVingtDeux ?? 0,
             }),
           },
         };
@@ -2998,6 +3076,12 @@ export interface BilanSaison {
   champion: boolean; // le club du joueur a gagné la finale
   finaliste: boolean; // battu en finale — il jouera le match d'accès
   qualifie: boolean; // a disputé la phase finale
+  // --- Ce qu'il faut pour décerner les distinctions individuelles, une fois la
+  // note de saison connue (voir `lib/honneurs.ts` et l'appel dans `saisonSuivante`).
+  competition: string;
+  taillePoule: number;
+  enChampionsCup: boolean; // le club dispute la Champions Cup
+  selectionne6N: boolean; // le joueur est retenu pour le Tournoi
 }
 
 function resoudreTrophees(
@@ -3037,8 +3121,9 @@ function resoudreTrophees(
 
   // Coupe d'Europe — réservée au Top 14, selon le classement :
   // 8 premiers → Champions Cup ; 6 derniers → Challenge Cup.
+  const enChampionsCup = !!COUPE_EUROPE_PAR_DIVISION[divisionId] && rang <= 8;
   if (COUPE_EUROPE_PAR_DIVISION[divisionId]) {
-    if (rang <= 8) {
+    if (enChampionsCup) {
       if (tire((9 - rang) / 48)) trophees.push('champions');
     } else if (tire((15 - rang) / 40)) {
       trophees.push('challenge');
@@ -3053,7 +3138,11 @@ function resoudreTrophees(
   // Il faut d'abord ÊTRE SÉLECTIONNÉ : seuls les tout meilleurs le sont, et
   // gagner le Tournoi derrière relève encore de l'exception.
   const nation = nomNation(j.nation);
-  if (NATIONS_6N.includes(nation) && perso >= 78 && tire((perso - 78) / 220)) {
+  // ⚠️ Le même critère sert deux fois : gagner le Tournoi, et pouvoir en être
+  // élu meilleur joueur. Deux expressions différentes finiraient par diverger —
+  // on serait meilleur joueur d'un tournoi qu'on n'a pas disputé.
+  const selectionne6N = NATIONS_6N.includes(nation) && perso >= 78;
+  if (selectionne6N && tire((perso - 78) / 220)) {
     trophees.push('sixNations');
   }
 
@@ -3071,10 +3160,12 @@ function resoudreTrophees(
     trophees.push('monde');
   }
 
-  // Meilleur joueur du monde : au sommet, et seulement si la saison fut titrée
-  if (perso >= 88 && trophees.length > 0 && tire((perso - 88) / 140)) {
-    trophees.push('meilleurJoueur');
-  }
+  // ⚠️ LES DISTINCTIONS INDIVIDUELLES NE SE DÉCIDENT PAS ICI, et c'est
+  // structurel : elles dépendent de la NOTE DE SAISON, que `evoluer()` ne
+  // calcule qu'une fois le rang connu — donc après cette fonction. Les décerner
+  // ici obligerait à noter la saison deux fois, avec deux résultats possibles.
+  // C'est `saisonSuivante` qui appelle `decernerHonneurs`, juste après
+  // l'évolution, et qui complète `trophees`. On lui laisse donc le contexte.
 
   return {
     rang,
@@ -3085,6 +3176,10 @@ function resoudreTrophees(
     champion,
     finaliste,
     qualifie,
+    competition: divisionId,
+    taillePoule: taille,
+    enChampionsCup,
+    selectionne6N,
   };
 }
 

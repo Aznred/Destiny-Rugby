@@ -1,6 +1,6 @@
-// LES TROPHÉES DES NOUVELLES COMPÉTITIONS
+// LES TROPHÉES — COMPRESSION DES MODÈLES LIVRÉS
 //
-// Entrée : `nouvellecoupe/` — 20 modèles 3D livrés bruts (sortie Meshy).
+// Entrée : un ou plusieurs dossiers de modèles 3D livrés bruts (sortie Meshy).
 // Sortie : `public/m3d/<id>.glb`, au poids des trophées déjà en place.
 //
 // ⚠️ ON NE COPIE PAS TEL QUEL. Les fichiers fournis pèsent 9 à 49 Mo pièce,
@@ -34,11 +34,16 @@
 // c'est ce qui arrive au modèle allemand, qui garde plus de sommets que demandé.
 // En dessous du seuil, on ne touche à rien.
 //
-// CORRESPONDANCE est le SEUL endroit à modifier pour ajouter ou remplacer un
-// trophée : nom du fichier livré → id de compétition (`data/clubs.ts`), qui est
-// aussi le nom du fichier de sortie et la clé de `data/trophees.ts`.
+// `LOTS` est le SEUL endroit à modifier pour ajouter ou remplacer un trophée :
+// un lot = un dossier livré + sa table « nom du fichier livré → id du trophée »
+// (`data/trophees.ts`), qui est aussi le nom du fichier de sortie.
 //
-// Relancer : node scripts/copierTrophees.cjs        (saute ce qui existe déjà)
+// ⚠️ UN MODÈLE EST REFAIT SI SA SOURCE EST PLUS RÉCENTE QUE SA SORTIE. C'est ce
+// qui permet de CORRIGER un trophée déjà embarqué — le modèle allemand et celui
+// du meilleur joueur du monde ont été relivrés — sans avoir à tout recompresser
+// (les vingt modèles de `nouvellecoupe/` prennent une bonne dizaine de minutes).
+//
+// Relancer : node scripts/copierTrophees.cjs        (ne refait que ce qui a changé)
 //            node scripts/copierTrophees.cjs --force (tout refaire)
 
 const fs = require('fs');
@@ -50,7 +55,6 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const RACINE = path.join(__dirname, '..');
-const SRC = path.join(RACINE, 'nouvellecoupe');
 const DEST = path.join(RACINE, 'public', 'm3d');
 const TAILLE_TEXTURE = 1024;
 // La densité des trophées historiques (86 000 à 104 000 sommets). Au-delà, on
@@ -59,8 +63,11 @@ const SOMMETS_MAX = 130_000;
 const SOMMETS_CIBLE = 120_000;
 const ERREUR_MAX = 0.002;
 
-// fichier livré (sans extension) → id de compétition
-const CORRESPONDANCE = {
+// Un lot = un dossier livré + sa table « fichier livré (sans extension) → id ».
+const LOTS = [{
+  dossier: 'nouvellecoupe',
+  intitule: 'les 20 championnats et coupes du monde',
+  correspondance: {
   // Championnats et coupes de clubs
   'bundesliga': 'bundesliga',
   'cury cup south africa': 'currieCup',
@@ -83,7 +90,30 @@ const CORRESPONDANCE = {
   'seria league': 'italie',
   // Sélections : « Six Nations B » est le surnom du Rugby Europe Championship.
   'Six Nations B cup': 'recEurope',
-};
+  },
+}, {
+  // ⚠️ DEUX CORRECTIONS ET SEPT NOUVEAUTÉS. Le modèle allemand et celui du
+  // meilleur joueur du monde ont été relivrés (les précédents ne représentaient
+  // pas le bon trophée) : ils écrasent les fichiers en place, parce que leur
+  // source est plus récente. Les sept autres ouvrent une famille entière —
+  // les HONNEURS INDIVIDUELS, qui n'existaient pas en jeu (`lib/honneurs.ts`).
+  dossier: 'trophe correct et new trophee',
+  intitule: 'les honneurs individuels (+ 2 corrections)',
+  correspondance: {
+    // Corrections de modèles déjà embarqués
+    'bon trophée bundes': 'bundesliga',
+    'bestplayerintheworld': 'meilleur-joueur',
+    // Meilleur joueur d'un championnat
+    'meilleurjoueurtop14': 'meilleurTop14',
+    'premiershipbestplayer': 'meilleurPremiership',
+    'urcbestplayer': 'meilleurUrc',
+    'meilleurjoueurnouvellezelande': 'meilleurNZ',
+    // Meilleur joueur d'une coupe ou d'un tournoi
+    'championscup best player': 'meilleurChampionsCup',
+    'meilleurjoueursixnations': 'meilleurSixNations',
+    'manofthematchworldcup': 'hommeDuMatchMonde',
+  },
+}];
 
 const force = process.argv.includes('--force');
 const ko = (n) => `${(n / 1024).toFixed(0)} Ko`;
@@ -113,31 +143,44 @@ let sortie = 0;
 let traites = 0;
 let sautes = 0;
 
-// Un modèle livré mais absent de la table, c'est une compétition qu'on oublie
-// de récompenser : ça ne doit pas passer en silence.
+for (const lot of LOTS) {
+const SRC = path.join(RACINE, lot.dossier);
+console.log(`\n▸ ${lot.dossier}/ — ${lot.intitule}`);
+if (!fs.existsSync(SRC)) {
+  avertissements.push(`dossier source absent : ${lot.dossier}/`);
+  continue;
+}
+
+// Un modèle livré mais absent de la table, c'est un trophée qu'on oublie de
+// brancher : ça ne doit pas passer en silence.
 for (const f of fs.readdirSync(SRC).filter((n) => n.toLowerCase().endsWith('.glb'))) {
-  if (!(path.basename(f, path.extname(f)) in CORRESPONDANCE)) {
-    avertissements.push(`modèle livré non déclaré dans CORRESPONDANCE : ${f}`);
+  if (!(path.basename(f, path.extname(f)) in lot.correspondance)) {
+    avertissements.push(`modèle livré non déclaré dans LOTS : ${lot.dossier}/${f}`);
   }
 }
 
-for (const [fichier, id] of Object.entries(CORRESPONDANCE)) {
+for (const [fichier, id] of Object.entries(lot.correspondance)) {
   const source = path.join(SRC, `${fichier}.glb`);
   if (!fs.existsSync(source)) {
-    avertissements.push(`modèle absent : ${fichier}.glb (${id})`);
+    avertissements.push(`modèle absent : ${lot.dossier}/${fichier}.glb (${id})`);
     continue;
   }
   const cible = path.join(DEST, `${id}.glb`);
   const tailleSource = fs.statSync(source).size;
   entree += tailleSource;
 
-  if (fs.existsSync(cible) && !force) {
+  // ⚠️ LA DATE COMMANDE, PAS LA SEULE PRÉSENCE. Un modèle relivré doit écraser
+  // celui qui est embarqué — sinon la correction ne part jamais en production,
+  // et rien ne le signale. Ce qui n'a pas bougé n'est pas recompressé.
+  const aJour = fs.existsSync(cible) && fs.statSync(source).mtimeMs <= fs.statSync(cible).mtimeMs;
+  if (aJour && !force) {
     sortie += fs.statSync(cible).size;
     sautes += 1;
     continue;
   }
+  const remplace = fs.existsSync(cible);
 
-  process.stdout.write(`   ${id.padEnd(14)} ${mo(tailleSource).padStart(8)} → `);
+  process.stdout.write(`   ${id.padEnd(20)} ${mo(tailleSource).padStart(8)} → `);
   const atelier = fs.mkdtempSync(path.join(os.tmpdir(), 'trophee-'));
   try {
     // 1. dépaquetage : le .gltf sort ses textures en fichiers séparés
@@ -175,7 +218,8 @@ for (const [fichier, id] of Object.entries(CORRESPONDANCE)) {
   const tailleCible = fs.statSync(cible).size;
   sortie += tailleCible;
   traites += 1;
-  console.log(`${ko(tailleCible).padStart(9)}  (−${(100 - (tailleCible / tailleSource) * 100).toFixed(1)} %)`);
+  console.log(`${ko(tailleCible).padStart(9)}  (−${(100 - (tailleCible / tailleSource) * 100).toFixed(1)} %)${remplace ? '  ♻ remplacé' : ''}`);
+}
 }
 
 console.log(`\n✅ ${traites} trophée(s) traité(s)${sautes ? `, ${sautes} déjà à jour` : ''} → public/m3d/`);
