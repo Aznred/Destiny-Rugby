@@ -1,7 +1,7 @@
 // Trophées gagnables en fin de saison. Chaque trophée a un modèle 3D
 // (public/m3d/*.glb, compressé Draco) affiché en animation quand on le remporte.
 
-import { COMPETITIONS_NATIONS_NOUVELLES } from './nouvellesLigues.ts';
+import { COMPETITIONS_NATIONS_NOUVELLES } from './nouvellesLigues.js';
 
 export interface Trophee {
   id: string;
