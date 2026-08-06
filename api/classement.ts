@@ -63,36 +63,40 @@ function reponse(corps: unknown, statut = 200): Response {
   return new Response(JSON.stringify(corps), { status: statut, headers: ENTETES });
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: ENTETES });
 
+// ============================================================================
+// ROUTES VERCEL DÉCOUPÉES (OPTIONS, GET, POST)
+// ============================================================================
+
+export async function OPTIONS(req: Request): Promise<Response> {
+  return new Response(null, { headers: ENTETES });
+}
+
+export async function GET(req: Request): Promise<Response> {
   if (!process.env.DATABASE_URL) {
-    // Message explicite plutôt qu'une erreur de connexion illisible : c'est
-    // l'oubli le plus fréquent au premier déploiement.
     return reponse({ erreur: 'DATABASE_URL absente des variables d’environnement' }, 500);
   }
 
-  // ---- LECTURE : le tableau, ouvert à tous ---------------------------------
-  if (req.method === 'GET') {
-    try {
-      const lignes = await sql`
-        select pseudo, score, maj_le
-        from classement
-        order by score desc, maj_le asc
-        limit ${TOP}
-      `;
-      return reponse({ classement: lignes });
-    } catch (e) {
-      console.error('[classement] lecture', e);
-      return reponse({ erreur: 'Lecture impossible' }, 500);
-    }
+  try {
+    const lignes = await sql`
+      select pseudo, score, maj_le
+      from classement
+      order by score desc, maj_le asc
+      limit ${TOP}
+    `;
+    return reponse({ classement: lignes });
+  } catch (e) {
+    console.error('[classement] lecture', e);
+    return reponse({ erreur: 'Lecture impossible' }, 500);
+  }
+}
+
+export async function POST(req: Request): Promise<Response> {
+  if (!process.env.DATABASE_URL) {
+    return reponse({ erreur: 'DATABASE_URL absente des variables d’environnement' }, 500);
   }
 
-  if (req.method !== 'POST') return reponse({ erreur: 'GET ou POST attendu' }, 405);
-
   // ---- 1. LE DÉBIT, AVANT TOUT LE RESTE ------------------------------------
-  // Le contrôle le moins cher passe en premier : inutile de valider une fiche
-  // envoyée par un script qui en balance mille à la seconde.
   const appareil = await empreinteAppareil(req);
   let heure = 0;
   let jour = 0;
@@ -109,6 +113,7 @@ export default async function handler(req: Request): Promise<Response> {
     console.error('[classement] débit', e);
     return reponse({ erreur: 'Base indisponible' }, 500);
   }
+
   if (heure >= PAR_HEURE) return reponse({ erreur: 'Trop d’envois. Réessaie dans une heure.' }, 429);
   if (jour >= PAR_JOUR) return reponse({ erreur: 'Quota quotidien atteint.' }, 429);
 
@@ -120,14 +125,8 @@ export default async function handler(req: Request): Promise<Response> {
     return reponse({ erreur: 'JSON illisible' }, 400);
   }
 
-  // ⚠️ ICI, ET NULLE PART AILLEURS : on ne croit PAS le score reçu, on le
-  // RECALCULE. `verifierFiche` refuse aussi tout ce qui ne tient pas debout —
-  // âge et saisons incohérents, 900 matchs en 12 saisons, trophée inventé, un
-  // même trophée gagné deux fois dans la même saison…
   const verdict = verifierFiche(fiche, IDS_TROPHEES);
 
-  // On journalise l'envoi qu'il soit accepté ou non : les refus sont exactement
-  // là où l'on voit arriver les scripts.
   try {
     await sql`insert into envois (appareil) values (${appareil})`;
   } catch (e) {
@@ -142,8 +141,6 @@ export default async function handler(req: Request): Promise<Response> {
   // ---- 3. L'ÉCRITURE : le score, et RIEN d'autre ---------------------------
   const pseudo = String((fiche as { pseudo: string }).pseudo).trim().slice(0, 24);
   try {
-    // ⚠️ `on conflict` fait tout côté base : pas de course entre deux envois
-    // simultanés, et un score MOINS BON n'écrase jamais le record.
     await sql`
       insert into classement (pseudo, score) values (${pseudo}, ${verdict.score})
       on conflict (pseudo) do update
@@ -155,6 +152,5 @@ export default async function handler(req: Request): Promise<Response> {
     return reponse({ erreur: 'Écriture impossible' }, 500);
   }
 
-  // La fiche sort de la mémoire ici. Elle n'a jamais touché la base.
   return reponse({ ok: true, score: verdict.score });
 }
