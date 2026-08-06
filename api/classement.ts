@@ -21,7 +21,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { verifierFiche } from '../src/lib/classementMondial.js';
-import { TROPHEES } from '../src/data/trophees.ts';
+import { TROPHEES } from '../src/data/trophees.js';
 
 export const config = { runtime: 'nodejs' };
 
