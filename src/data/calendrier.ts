@@ -17,6 +17,13 @@ export type TypeSemaine =
   | 'phaseFinale'
   | 'treve';
 
+// ⚠️ CE QU'UNE DATE EUROPÉENNE FAIT DISPUTER. Le calendrier réserve 8 week-ends
+// à la Coupe d'Europe : les QUATRE premiers sont des journées de poules, les
+// QUATRE suivants sont le tableau final. Sans cette information, `lib/coupe.ts`
+// devait deviner — et il révélait tout le tableau d'un coup dès que les poules
+// étaient finies (quarts, demies ET finale avec leurs scores, le même week-end).
+export type TourCoupe = 'poule' | 'huitieme' | 'quart' | 'demie' | 'finale';
+
 export interface Semaine {
   numero: number; // 1 = première semaine d'août
   jour: number;
@@ -29,6 +36,8 @@ export interface Semaine {
   finale?: boolean;
   // Tour de la phase finale disputé cette semaine (voir lib/phaseFinale.ts)
   tourFinal?: 'barrage' | 'demie' | 'finale' | 'acces';
+  // Tour de coupe d'Europe disputé cette semaine (voir lib/coupe.ts)
+  tourCoupe?: TourCoupe;
 }
 
 const MOIS = [
@@ -77,13 +86,13 @@ function construire(): Semaine[] {
   ajouter(29, 11, 'championnat', 'Journée de championnat');
   // --- Décembre : coupes d'Europe ---
   ajouter(6, 12, 'championnat', 'Journée de championnat');
-  ajouter(13, 12, 'coupe', 'Coupe d’Europe — 1re journée');
-  ajouter(20, 12, 'coupe', 'Coupe d’Europe — 2e journée');
+  ajouter(13, 12, 'coupe', 'Coupe d’Europe — 1re journée', { tourCoupe: 'poule' });
+  ajouter(20, 12, 'coupe', 'Coupe d’Europe — 2e journée', { tourCoupe: 'poule' });
   ajouter(27, 12, 'championnat', 'Journée des fêtes');
   // --- Janvier ---
   ajouter(3, 1, 'championnat', 'Journée de championnat');
-  ajouter(10, 1, 'coupe', 'Coupe d’Europe — 3e journée');
-  ajouter(17, 1, 'coupe', 'Coupe d’Europe — 4e journée');
+  ajouter(10, 1, 'coupe', 'Coupe d’Europe — 3e journée', { tourCoupe: 'poule' });
+  ajouter(17, 1, 'coupe', 'Coupe d’Europe — 4e journée', { tourCoupe: 'poule' });
   ajouter(24, 1, 'championnat', 'Journée de championnat');
   ajouter(31, 1, 'championnat', 'Journée de championnat');
   // --- Février / mars : Tournoi des 6 Nations ---
@@ -99,14 +108,14 @@ function construire(): Semaine[] {
   ajouter(28, 3, 'championnat', 'Journée de championnat');
   // --- Avril : sprint final + phases finales européennes ---
   ajouter(4, 4, 'championnat', 'Journée de championnat');
-  ajouter(11, 4, 'coupe', 'Coupe d’Europe — huitièmes');
+  ajouter(11, 4, 'coupe', 'Coupe d’Europe — huitièmes', { tourCoupe: 'huitieme' });
   ajouter(18, 4, 'championnat', 'Journée de championnat');
-  ajouter(25, 4, 'coupe', 'Coupe d’Europe — quarts');
+  ajouter(25, 4, 'coupe', 'Coupe d’Europe — quarts', { tourCoupe: 'quart' });
   // --- Mai ---
   ajouter(2, 5, 'championnat', 'Journée de championnat');
-  ajouter(9, 5, 'coupe', 'Coupe d’Europe — demi-finales');
+  ajouter(9, 5, 'coupe', 'Coupe d’Europe — demi-finales', { tourCoupe: 'demie' });
   ajouter(16, 5, 'championnat', 'Journée de championnat');
-  ajouter(23, 5, 'coupe', 'Finale de la Coupe d’Europe', { finale: true });
+  ajouter(23, 5, 'coupe', 'Finale de la Coupe d’Europe', { tourCoupe: 'finale', finale: true });
   ajouter(30, 5, 'championnat', 'Dernière journée');
   // --- Juin : phase finale du championnat ---
   ajouter(6, 6, 'phaseFinale', 'Barrages', { tourFinal: 'barrage' });
@@ -123,6 +132,45 @@ function construire(): Semaine[] {
 export const CALENDRIER: Semaine[] = construire();
 export const SEMAINES_PAR_SAISON = CALENDRIER.length;
 export const NB_JOURNEES = CALENDRIER.filter((s) => s.type === 'championnat').length;
+
+// --- LES REPÈRES DES COMPÉTITIONS À ÉLIMINATION DIRECTE ---------------------
+// ⚠️ CES QUATRE CONSTANTES SONT LA SOURCE UNIQUE. `lib/coupe.ts` dimensionne
+// ses poules et son tableau dessus, `screens/Tableau.tsx` décide ce qu'il a le
+// droit d'afficher dessus, et le store sait quel tour se joue ce week-end. Les
+// recalculer ailleurs, c'est se garantir un jour un tableau qui montre une
+// finale qui ne s'est pas encore jouée.
+
+/** Journées de POULES de coupe d'Europe réservées au calendrier (4). */
+export const JOURNEES_POULES_COUPE =
+  CALENDRIER.filter((s) => s.tourCoupe === 'poule').length;
+
+/** Les tours du tableau final européen, dans l'ordre du calendrier. */
+export const TOURS_COUPE: Exclude<TourCoupe, 'poule'>[] =
+  CALENDRIER.filter((s) => s.tourCoupe && s.tourCoupe !== 'poule')
+    .map((s) => s.tourCoupe as Exclude<TourCoupe, 'poule'>);
+
+/** Les tours de phase finale du championnat, hors match d'accès (3). */
+export const TOURS_PHASE_FINALE: ('barrage' | 'demie' | 'finale')[] =
+  CALENDRIER.filter((s) => s.type === 'phaseFinale' && s.tourFinal && s.tourFinal !== 'acces')
+    .map((s) => s.tourFinal as 'barrage' | 'demie' | 'finale');
+
+/** Week-ends d'un type de tour déjà PASSÉS avant cette semaine. */
+export function weekEndsCoupePasses(numeroSemaine: number): number {
+  return CALENDRIER.slice(0, Math.max(0, numeroSemaine - 1))
+    .filter((s) => s.type === 'coupe').length;
+}
+
+/** Week-ends de phase finale (hors accès) déjà PASSÉS avant cette semaine. */
+export function weekEndsPhaseFinalePasses(numeroSemaine: number): number {
+  return CALENDRIER.slice(0, Math.max(0, numeroSemaine - 1))
+    .filter((s) => s.type === 'phaseFinale' && s.tourFinal !== 'acces').length;
+}
+
+/** Le match d'accès a-t-il déjà été disputé ? */
+export function accesJoue(numeroSemaine: number): boolean {
+  return CALENDRIER.slice(0, Math.max(0, numeroSemaine - 1))
+    .some((s) => s.tourFinal === 'acces');
+}
 
 export function semaine(numero: number): Semaine {
   return CALENDRIER[Math.max(0, Math.min(CALENDRIER.length - 1, numero - 1))];

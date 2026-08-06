@@ -15,7 +15,7 @@ import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store
 import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID } from '../data/traits';
 import { t, tn } from '../lib/i18n';
-import { matchDeLaSemaine } from '../lib/matchLive';
+import { afficheDeLaSemaine } from '../lib/matchLive';
 import { matchInternationalDuJoueur, equipeU20 } from '../lib/international';
 import { convocation, convocationU20 } from '../lib/selection';
 // ⚠️ LE MATCH EN DIRECT ARRIVE AU CLIC, pas au chargement de la page. Ce
@@ -98,11 +98,21 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
     return null;
   }, [joueur, rythme, semaineActuelle.type]);
 
+  // ⚠️ TOUTES LES COMPÉTITIONS, PAS SEULEMENT LE CHAMPIONNAT (bug signalé en
+  // jeu). `afficheDeLaSemaine` couvre la coupe d'Europe — poules ET tableau
+  // final — la phase finale, le tournoi de fin d'année et le match d'accès.
   const affiche = useMemo(
     () => (rythme === 'semaine' && !inter
-      ? matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur))
+      ? afficheDeLaSemaine(joueur, bonusClubDuJoueur(joueur))
       : inter
-        ? { journee: inter.affiche.journee, match: inter.affiche.match, cle: inter.affiche.cle }
+        ? {
+            type: 'international' as const,
+            competition: inter.affiche.competition.nom,
+            tour: `journée ${inter.affiche.journee}`,
+            journee: inter.affiche.journee,
+            match: inter.affiche.match,
+            cle: inter.affiche.cle,
+          }
         : null),
     [joueur, rythme, inter],
   );
@@ -291,7 +301,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             >
               ▶️ <b>{inter ? t(inter.u20 ? 'pj.jouerU20' : 'pj.jouerSelection') : t('pj.jouerMatch')}</b>
               <span>
-                {inter ? `${inter.affiche.competition.emoji} ${inter.affiche.competition.nom}` : `J${affiche!.journee}`}
+                {inter
+                  ? `${inter.affiche.competition.emoji} ${inter.affiche.competition.nom}`
+                  : affiche!.type === 'championnat'
+                    ? `J${affiche!.journee}`
+                    : `${affiche!.competition} · ${affiche!.tour}`}
                 {' · '}{affiche!.match.domicile === monEquipe ? 'reçoit' : 'à'} {adversaire}
               </span>
             </button>
@@ -421,7 +435,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           selection={!!inter}
           titre={inter
             ? `${inter.affiche.competition.nom} · ${libelleDate(semaineActuelle)} · journée ${inter.affiche.journee}`
-            : `${division?.nom ?? 'Championnat'} · ${libelleDate(semaineActuelle)} · journée ${affiche.journee}`}
+            : `${affiche.competition} · ${libelleDate(semaineActuelle)} · ${affiche.tour}`}
           onTermine={() => setMatchTermine(true)}
           onFermer={() => {
             setMatchOuvert(false);

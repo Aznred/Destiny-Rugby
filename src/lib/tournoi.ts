@@ -109,10 +109,17 @@ export function tournoiDeFinDAnnee(
       const b = tour[taille - 1 - i];
       // Le mieux classé reçoit — sauf en finale, terrain neutre.
       const finale = taille === 2;
+      // ⚠️ UN TOUR = UN NOM DISTINCT. Les tours à 16 et 32 partageaient
+      // l'étiquette « barrage » : impossible, alors, de n'en révéler qu'un par
+      // week-end — l'arbre affichait les deux d'un coup, donc le résultat du
+      // tour suivant avant qu'il ne se joue.
       const m = duel(
         a, b, saison,
         `tournoi#${divisionId}#${saison}#${taille}#${a}#${b}`,
-        finale ? 'finale' : taille === 4 ? 'demie' : taille === 8 ? 'quart' : 'barrage',
+        finale ? 'finale'
+          : taille === 4 ? 'demie'
+            : taille === 8 ? 'quart'
+              : taille === 16 ? 'huitieme' : 'seizieme',
         `${finale ? 'FINALE' : libelleTour} : ${a} – ${b}`,
         finale ? 0 : 3,
       );
