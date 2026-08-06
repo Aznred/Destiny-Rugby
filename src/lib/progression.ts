@@ -134,9 +134,19 @@ export function evoluer(j: Joueur, s: SaisonJouee): Evolution {
   // c'est donc la QUEUE qu'il fallait reprendre, et le talent brut est
   // précisément le levier qui n'agit que sur elle (il ne profite qu'aux joueurs
   // qui ont de la marge à rattraper).
+  // ⚠️ RESSERRÉ APRÈS LA RÉCUPÉRATION DE FORME (`recuperationHebdo`, store).
+  // Tant que la forme s'effondrait à 0 en milieu de saison, chaque note de match
+  // portait un malus permanent de −0,84 (`(forme − 70) × 0,012`). En réparant la
+  // forme, on a mécaniquement relevé toutes les notes de saison — et la QUEUE de
+  // la distribution avec : mesuré, les carrières ≥ 85 passaient de 3-4 sur 100 à
+  // 7-9. Le talent brut est le levier qui n'agit QUE sur cette queue (il ne
+  // profite qu'aux joueurs qui ont de la marge à rattraper) : on le rabote de
+  // `marge/7,2` plafonné à 3,6 vers `marge/8,6` plafonné à 3,0, ce qui remet la
+  // mesure dans son intervalle documenté. La médiane, elle, ne bouge pas —
+  // c'est le plancher de formation qui la tient.
   if (j.age <= 31) {
     const marge = Math.max(0, potentiel - gen);
-    points += Math.min(3.6, marge / 7.2) * (j.age < 27 ? 1 : j.age <= 29 ? 0.7 : 0.45);
+    points += Math.min(3.0, marge / 8.6) * (j.age < 27 ? 1 : j.age <= 29 ? 0.7 : 0.45);
   }
   if (j.age <= 21) points = Math.max(points, 1.2);
   else if (j.age <= 23) points = Math.max(points, 0.7);

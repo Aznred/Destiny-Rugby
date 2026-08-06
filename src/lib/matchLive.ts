@@ -30,7 +30,9 @@ export function matchDeLaSemaine(j: Joueur, bonus = 0): AfficheSemaine | null {
   const debut = journeesALaSemaine(division, sem, total) + 1;
   if (fin < debut) return null; // pas de journée ce week-end
 
-  const grille = calendrier(pouleDe(division, j.club));
+  // ⚠️ MÊME CLÉ DE TIRAGE QUE `championnatEnDirect` : c'est ce qui garantit que
+  // l'affiche annoncée dans le panneau est celle du tableau des résultats.
+  const grille = calendrier(pouleDe(division, j.club), `${division}#${j.saison}`);
   for (let journee = debut; journee <= fin; journee++) {
     const affiche = (grille[journee - 1] ?? []).find(([d, e]) => d === j.club || e === j.club);
     if (!affiche) continue;

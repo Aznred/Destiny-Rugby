@@ -136,8 +136,28 @@ export function pouleDe(divisionId: string, clubJoueur: string, numeroPoule?: nu
 }
 
 // Calendrier aller-retour par la méthode du carrousel (Berger).
-export function calendrier(clubs: string[]): [string, string][][] {
+/**
+ * Le calendrier aller-retour d'une poule (méthode du carrousel).
+ *
+ * @param cle graine du TIRAGE AU SORT du calendrier. ⚠️ SANS ELLE, LE
+ *   CALENDRIER EST LE MÊME TOUS LES ANS — c'est le retour de jeu « j'ai
+ *   l'impression que c'est toujours le même calendrier des matchs ». Le
+ *   carrousel part de l'ordre du fichier de données, qui ne bouge pas : la J1
+ *   opposait éternellement les deux mêmes clubs, et un club recevait toujours
+ *   les mêmes adversaires à la même date. Avec une clé (`division#saison`), on
+ *   mélange la liste AVANT de dérouler le carrousel : chaque saison a son
+ *   tirage, et il reste parfaitement déterministe.
+ */
+export function calendrier(clubs: string[], cle?: string): [string, string][][] {
   const liste = [...clubs];
+  if (cle) {
+    // Fisher-Yates seedé : le seul mélange qui ne favorise aucune position.
+    const rng = graine(`tirage#${cle}`);
+    for (let i = liste.length - 1; i > 0; i--) {
+      const k = Math.floor(rng() * (i + 1));
+      [liste[i], liste[k]] = [liste[k], liste[i]];
+    }
+  }
   if (liste.length % 2) liste.push('—'); // exempt
   const n = liste.length;
   const aller: [string, string][][] = [];
@@ -246,7 +266,11 @@ export function championnatEnDirect(
   numeroPoule?: number,
 ): EtatChampionnat {
   const poule = pouleDe(divisionId, clubJoueur, numeroPoule);
-  const grille = calendrier(poule);
+  // ⚠️ LA CLÉ DU TIRAGE EST `division#saison`, ET ELLE DOIT ÊTRE LA MÊME
+  // PARTOUT (`matchDeLaSemaine`, `affichesDeLaJournee`, la simulation de fond).
+  // Deux clés différentes, et le panneau de carrière annoncerait un adversaire
+  // que le tableau des résultats ne connaît pas.
+  const grille = calendrier(poule, `${divisionId}#${saison}`);
   const total = grille.length;
   const jusqua = Math.max(0, Math.min(total, journeesJouees));
 
@@ -282,7 +306,7 @@ export function affichesDeLaJournee(
   journeesJouees: number, bonusJoueur = 0, numeroPoule?: number,
 ): AfficheCalendrier[] {
   const poule = pouleDe(divisionId, clubJoueur, numeroPoule);
-  const grille = calendrier(poule);
+  const grille = calendrier(poule, `${divisionId}#${saison}`);
   const affiches = grille[journee - 1];
   if (!affiches) return [];
   const jouee = journee <= journeesJouees;

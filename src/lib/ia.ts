@@ -89,13 +89,13 @@ RÈGLES :
 - Tu écris l'issue de CHAQUE choix : ce qui se passe vraiment, avec ses conséquences.
 - SÉVÉRITÉ : les gains sont petits, les échecs fréquents. Un attribut ne bouge que de 1
   (2 pour un exploit), la forme/le moral de -15 à +12, l'argent reste cohérent avec le niveau.
-- Écris à la 2e personne (« tu »), 2 à 4 phrases par issue. Français uniquement.
+- Écris à la 2e personne (« tu »), 2 phrases MAXIMUM par issue. Français uniquement.
 
 RÉPONDS UNIQUEMENT EN JSON VALIDE, format exact :
 {
   "emoji": "un emoji",
   "titre": "titre court (max 5 mots)",
-  "situation": "la situation posée au joueur (2 à 4 phrases)",
+  "situation": "la situation posée au joueur, 2 phrases maximum",
   "choix": [
     { "texte": "l'option, à la 1re personne", "recit": "ce qui arrive", "deltas": { "moral": -4 } }
   ]
@@ -141,7 +141,7 @@ export async function genererSituation(opts: ContexteSituation): Promise<Scenari
       },
     ],
     // Une situation à trois choix tient largement en 850 tokens.
-    { temperature: 0.95, maxTokens: 850 },
+    { temperature: 0.95, maxTokens: 620 },
   );
   return parserSituation(brut, j, genre);
 }
@@ -201,7 +201,8 @@ Tu ne proposes AUCUNE option : c'est le joueur qui écrira ce qu'il fait.
 CE QUE TU ÉCRIS :
 - Une scène CONCRÈTE, incarnée, ancrée dans SA vie à LUI : son club, sa division, son âge,
   sa forme, son moral, son argent, ce qui vient de se passer.
-- 2 à 4 phrases. Tu finis sur ce qui est en jeu ou sur la question posée, jamais sur un conseil.
+- 2 phrases MAXIMUM, 45 mots au total. Tu poses la scène et tu t'arrêtes : pas de décor, pas de
+  météo, pas de rappel de ce qu'il a déjà vécu. Tu finis sur ce qui est en jeu, jamais sur un conseil.
 - Tu écris à la 2e personne (« tu »), au présent.
 
 LA VARIÉTÉ EST OBLIGATOIRE — pioche largement, ne reviens pas toujours au vestiaire :
@@ -218,7 +219,7 @@ LE DANGER EST RÉEL MAIS RARE : environ une scène sur cinq met vraiment le joue
 celles-là, portent "risque": true. Les autres portent "risque": false.
 
 RÉPONDS UNIQUEMENT EN JSON VALIDE, format exact :
-{ "emoji": "un emoji", "titre": "titre court (max 5 mots)", "texte": "la scène (2 à 4 phrases)", "risque": false }`;
+{ "emoji": "un emoji", "titre": "titre court (max 5 mots)", "texte": "la scène, 2 phrases maximum", "risque": false }`;
 
 export interface ContexteEvenement {
   cle: string;
@@ -251,8 +252,8 @@ export async function genererEvenementHebdo(opts: ContexteEvenement): Promise<Ev
           + 'Pose la scène de cette semaine.',
       },
     ],
-    // Quatre phrases et un titre : 420 tokens suffisent largement.
-    { temperature: 1, maxTokens: 420 },
+    // Deux phrases et un titre : 240 tokens suffisent largement.
+    { temperature: 1, maxTokens: 240 },
   );
   return parserEvenement(brut, j);
 }
@@ -279,6 +280,10 @@ export function parserEvenement(brut: string, j: Joueur): EvenementHebdo {
 
 const SYSTEME_JUGEMENT = `Tu es le MAÎTRE DU JEU de « Destiny Rugby ». Une scène a été posée au joueur.
 Il vient d'écrire ce qu'il fait. Tu juges, et tu es TRÈS SÉVÈRE.
+
+⚠️ TU ÉCRIS COURT. Deux phrases, pas une de plus. On lit une réponse par semaine de jeu :
+un pavé à chaque fois, et le joueur arrête de lire. Pas de décor, pas de ressenti, pas de
+morale finale — ce qui se passe, et ce que ça change.
 
 TU JUGES SUR LES STATISTIQUES, PAS SUR L'INTENTION :
 - Chaque attribut est noté sur 100. 30 = amateur du dimanche, 50 = bon niveau régional,
@@ -309,7 +314,7 @@ CE QUE TU PEUX DÉCLENCHER :
 
 RÉPONDS UNIQUEMENT EN JSON VALIDE, format exact :
 {
-  "recit": "ce qui se passe vraiment (2 à 5 phrases, 2e personne)",
+  "recit": "ce qui se passe vraiment, 2 phrases maximum, 2e personne",
   "titre": "titre court (max 5 mots)",
   "reussite": "echec" | "mitige" | "reussite",
   "deltas": { "moral": -4 },
@@ -372,7 +377,7 @@ export async function jugerReaction(opts: ContexteJugement): Promise<JugementMJ>
       { role: 'system', content: `LA SCÈNE : ${opts.evenement.texte}` },
       { role: 'user', content: opts.reponse },
     ],
-    { temperature: 0.9, maxTokens: 520 },
+    { temperature: 0.9, maxTokens: 300 },
   );
   return parserJugement(brut, opts);
 }
@@ -450,14 +455,14 @@ export async function raconterNegociation(
         role: 'system',
         content:
           'Tu racontes, en français et à la 2e personne, une scène de négociation de contrat de rugby ' +
-          '(bureau du club, agent, café en face du stade). 2 à 4 phrases, concret, sans emphase. ' +
+          '(bureau du club, agent, café en face du stade). 2 phrases maximum, concret, sans emphase. ' +
           'Réponds en JSON : { "recit": "…" }' + consigneDeLangue(),
       },
       { role: 'system', content: fichePersonnage(opts.joueur) },
       { role: 'user', content: `Club : ${club}. Agent : ${agent}. ${consigne}` },
     ],
-    // « 2 à 4 phrases » : 260 tokens suffisent, 400 étaient payés pour rien.
-    { temperature: 0.9, maxTokens: 260 },
+    // « 2 phrases » : 180 tokens suffisent.
+    { temperature: 0.9, maxTokens: 180 },
   );
   try {
     const o = JSON.parse(brut) as { recit?: unknown };

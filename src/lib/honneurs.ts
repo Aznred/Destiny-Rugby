@@ -221,6 +221,30 @@ const BARRES = {
  */
 const AMPLITUDE_RIVAL = 3.5;
 
+/**
+ * Ce que vaut, POUR LA COURONNE MONDIALE UNIQUEMENT, chaque distinction déjà
+ * remportée dans la saison.
+ *
+ * ⚠️ POURQUOI ELLE EXISTE — bug signalé en jeu : « je n'ai pas eu meilleur
+ * joueur de l'année en ayant eu le Brennus, meilleur joueur du Top 14, meilleur
+ * joueur des 6 Nations et meilleur joueur de la Champions Cup ». Mesuré, cette
+ * saison-là cote **91,2** : au-dessus des trois barres qu'elle a franchies,
+ * mais sous les 94 du monde. Autrement dit, on pouvait rafler TOUTES les
+ * distinctions de l'année et se voir refuser celle qui les couronne. Ce n'est
+ * pas une barre haute, c'est une incohérence.
+ *
+ * Le titre mondial n'est pas une quatrième récompense indépendante : dans la
+ * réalité, il va à celui qui a dominé la saison des votes. On lit donc ce que
+ * les autres jurys viennent de décider — ce qui reste une mesure du jeu, pas un
+ * tirage au sort.
+ *
+ * ⚠️ CALIBRÉ POUR NE RIEN OUVRIR D'AUTRE. Deux distinctions (grande saison, sans
+ * plus) valent +6 : mesuré, une saison à 7,8/10 avec le doublé championnat +
+ * Europe monte alors à 88,1, toujours sous la barre. Il en faut TROIS — donc le
+ * championnat, l'Europe et le Tournoi la même année — pour franchir les 94.
+ */
+const BONUS_PAR_DISTINCTION = 3;
+
 function barre(base: number, cle: string, saison: number): number {
   return base + (graine(`honneur#${cle}#${saison}`)() * 2 - 1) * AMPLITUDE_RIVAL;
 }
@@ -248,10 +272,13 @@ export interface Honneur {
 export function decernerHonneurs(s: SaisonJugee): Honneur[] {
   const score = noterSaisonIndividuelle(s);
   const obtenus: Honneur[] = [];
-  const tenter = (trophee: string | undefined, base: number, cle: string, possible: boolean) => {
+  const tenter = (
+    trophee: string | undefined, base: number, cle: string, possible: boolean, bonus = 0,
+  ) => {
     if (!trophee || !possible) return;
     const seuil = barre(base, cle, s.saison);
-    if (score >= seuil) obtenus.push({ trophee, score, barre: seuil });
+    const note = score + bonus;
+    if (note >= seuil) obtenus.push({ trophee, score: note, barre: seuil });
   };
 
   // 1. Le championnat — là où il existe une distinction (5 championnats).
@@ -279,8 +306,18 @@ export function decernerHonneurs(s: SaisonJugee): Honneur[] {
   // MONDE avec un bouclier de Fédérale. Il faut désormais jouer là où le monde
   // regarde : un championnat qui élit son joueur de l'année, la Champions Cup,
   // ou une sélection du Tournoi.
+  //
+  // ⚠️ ET ON LIT LES VOTES DE L'ANNÉE. Les quatre distinctions ci-dessus ont
+  // déjà été tranchées : celui qui les a toutes ne peut pas se voir refuser
+  // celle qui les couronne (voir `BONUS_PAR_DISTINCTION`). C'est le seul endroit
+  // du barème où une distinction en regarde une autre, et c'est volontaire —
+  // c'est ce qui distingue « le meilleur joueur du monde » d'un cinquième vote
+  // indépendant.
   const vitrineMondiale = !!MEILLEUR_JOUEUR_PAR_DIVISION[s.competition] || s.championsCup || s.tournoi;
-  tenter(HONNEUR_MONDIAL, BARRES.mondial, 'mondial', s.titres.length > 0 && vitrineMondiale);
+  tenter(
+    HONNEUR_MONDIAL, BARRES.mondial, 'mondial', s.titres.length > 0 && vitrineMondiale,
+    obtenus.length * BONUS_PAR_DISTINCTION,
+  );
 
   return obtenus;
 }

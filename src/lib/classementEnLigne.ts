@@ -35,6 +35,14 @@ export const URL_CLASSEMENT: string = URL_CONFIGUREE || '/api/classement';
  */
 const ACTIF = import.meta.env.PROD || !!URL_CONFIGUREE;
 
+/**
+ * Le classement en ligne est-il joignable depuis cette installation ?
+ * ⚠️ L'ÉCRAN DOIT LE DIRE. Tant qu'il ne l'affichait pas, un tableau vide en
+ * développement était impossible à distinguer d'un serveur en panne ou d'un
+ * classement réellement vide — d'où « le classement fonctionne pas ».
+ */
+export const CLASSEMENT_EN_LIGNE = ACTIF;
+
 /** Une ligne du classement mondial, telle que la base la rend. */
 export interface LigneMondiale {
   pseudo: string;
@@ -65,18 +73,35 @@ async function appeler(url: string, init?: RequestInit): Promise<Response> {
   }
 }
 
-/** Les meilleurs scores. Renvoie une liste vide si aucun serveur n'est branché. */
-export async function lireClassementMondial(): Promise<LigneMondiale[]> {
-  if (!ACTIF) return [];
+/**
+ * L'état de la lecture du tableau mondial.
+ *
+ * ⚠️ ON DISTINGUE LES TROIS CAS, et c'est tout l'intérêt. L'ancienne version
+ * renvoyait `[]` pour « pas de serveur », « serveur en panne » ET « personne n'a
+ * encore envoyé » : l'écran ne pouvait donc rien expliquer, et n'affichait rien
+ * du tout. Un tableau absent se lit « le classement est cassé ».
+ */
+export type EtatMondial =
+  | { etat: 'hors-ligne' }                       // aucun serveur sur cette installation
+  | { etat: 'panne'; erreur: string }            // serveur injoignable ou en erreur
+  | { etat: 'ok'; lignes: LigneMondiale[] };     // lu (la liste peut être vide)
+
+/** Les meilleurs scores, avec l'état de la lecture. Ne lève jamais. */
+export async function lireClassementMondial(): Promise<EtatMondial> {
+  if (!ACTIF) return { etat: 'hors-ligne' };
   try {
     const r = await appeler(URL_CLASSEMENT);
-    if (!r.ok) return [];
+    if (!r.ok) return { etat: 'panne', erreur: `Le serveur a répondu ${r.status}` };
     const data = (await r.json()) as { classement?: LigneMondiale[] };
-    return Array.isArray(data.classement) ? data.classement : [];
-  } catch {
+    return { etat: 'ok', lignes: Array.isArray(data.classement) ? data.classement : [] };
+  } catch (e) {
     // Pas de serveur, hors ligne, ou fonction pas encore déployée : le jeu
-    // continue avec son classement local. On ne remonte pas d'erreur ici.
-    return [];
+    // continue avec son classement local. On ne lève pas — on le DIT.
+    const abandonne = e instanceof DOMException && e.name === 'AbortError';
+    return {
+      etat: 'panne',
+      erreur: abandonne ? 'Le serveur n’a pas répondu à temps.' : 'Serveur injoignable.',
+    };
   }
 }
 

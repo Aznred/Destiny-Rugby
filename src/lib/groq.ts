@@ -64,7 +64,8 @@ Le joueur incarne un rugbyman et te décrit, en français, les actions qu'il veu
 TON RÔLE :
 1. Juger de façon RÉALISTE et JUSTE si l'action réussit, échoue ou a des conséquences mitigées,
    en fonction des attributs du joueur, de sa forme, de son moral, de sa réputation et du contexte.
-2. Raconter le résultat de façon vivante et immersive (2 à 5 phrases), à la 2e personne ("tu").
+2. Raconter le résultat en 2 phrases MAXIMUM, à la 2e personne ("tu"). COURT et concret : pas de
+   mise en ambiance, pas de météo, pas de description du stade. On va droit au fait.
 3. Faire évoluer ses statistiques en conséquence (gains ET pertes possibles). Les progrès sont
    progressifs : un entraînement fait gagner 1 à 3 points, une blessure ou un excès peut faire perdre
    plusieurs points de forme/moral. Sois crédible, pas complaisant. L'échec est possible et formateur.
@@ -72,11 +73,11 @@ TON RÔLE :
 
 RÈGLES DE SORTIE — TU RÉPONDS UNIQUEMENT EN JSON VALIDE, sans texte autour, au format exact :
 {
-  "recit": "récit immersif du résultat de l'action",
+  "recit": "le résultat, 2 phrases maximum",
   "evenement": "titre court de l'évènement (max 6 mots)",
   "deltas": { "<stat>": <entier positif ou négatif> },
-  "consequences": "résumé bref des conséquences",
-  "choix": ["piste 1", "piste 2", "piste 3"]
+  "consequences": "une demi-phrase, ou vide",
+  "choix": ["piste 1 (5 mots max)", "piste 2", "piste 3"]
 }
 
 STATS AUTORISÉES dans "deltas" (mets seulement celles qui changent) :
@@ -148,7 +149,7 @@ export async function appelGroqJSON(
       model: modele,
       messages,
       temperature: options.temperature ?? 0.85,
-      max_tokens: options.maxTokens ?? 700,
+      max_tokens: options.maxTokens ?? 420,
       response_format: { type: 'json_object' },
     }),
   });
@@ -196,7 +197,7 @@ export async function demanderAuMJ({
     ...historique.slice(-6).map((m) => ({ ...m, content: m.content.slice(0, 600) })),
     { role: 'user', content: action },
   ];
-  return parserReponse(await appelGroqJSON(cle, modele, messages, { maxTokens: 700 }));
+  return parserReponse(await appelGroqJSON(cle, modele, messages, { maxTokens: 420 }));
 }
 
 function parserReponse(brut: string): ReponseMJ {

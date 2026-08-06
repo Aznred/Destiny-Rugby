@@ -2730,3 +2730,451 @@ npx vite-node scripts/verifDifficulte.ts  # ⚠️ à relancer après TOUTE reto
 npx vite-node scripts/traduire.ts --verifier
 npx vite-node scripts/verifU20.ts         # dont la taille des écussons de sélections
 ```
+
+
+## 🏆 LES TITRES SUIVENT ENFIN LES COMPÉTITIONS JOUÉES
+
+Trois bugs signalés en jeu d'un seul coup : « j'ai fait le Grand Chelem avec
+l'équipe de France et j'ai pas eu les six nations », « pareil pas eu la Champions
+Cup alors qu'on a gagné », « et pas eu meilleur joueur de l'année en ayant eu
+Brennus, meilleur joueur Top 14, meilleur joueur six nations et meilleur joueur
+Champions Cup ». **Les trois n'en font qu'un.**
+
+### ⚠️ LE TITRE ÉTAIT TIRÉ AU SORT PENDANT QUE LA COMPÉTITION SE JOUAIT
+
+`resoudreTrophees` (store) décernait le Tournoi et la coupe d'Europe sur un
+`Math.random()` pondéré par la fiche du joueur :
+
+```ts
+if (selectionne6N && tire((perso - 78) / 220))   trophees.push('sixNations');
+if (enChampionsCup && tire((9 - rang) / 48))     trophees.push('champions');
+```
+
+Or ces deux compétitions sont **réellement jouées** depuis longtemps —
+`lib/international.ts` (5 journées, classement au barème rugby) et `lib/coupe.ts`
+(4 poules, quarts, demies, finale) — et le joueur en suit les résultats toute la
+saison dans l'écran 📊 Résultats et le classement latéral. **Deux vérités
+parallèles qui ne se parlaient pas** : cinq victoires sur cinq pouvaient ne rien
+rapporter, une quatrième place pouvait tout rafler.
+
+| | avant | maintenant |
+|---|---|---|
+| Tournoi des 6 Nations | `tire((perso − 78) / 220)` | **1ᵉʳ du classement réel** |
+| Rugby Europe Championship | `tire((perso − 66) / 200)` | idem, via `TROPHEE_PAR_INTERNATIONAL` |
+| Coupe du monde | `saison % 4 === 0` + tirage | `estAnneeDeCoupeDuMonde` + 1ᵉʳ du classement |
+| Champions / Challenge Cup | `tire((9 − rang) / 48)` | **vainqueur de la FINALE** (`coupeEnDirect`) |
+| « mon club joue l'Europe ? » | `COUPE_EUROPE_PAR_DIVISION[division]` | `coupesDuClub(club)` — la liste des engagés |
+
+- **`TROPHEE_PAR_INTERNATIONAL`** (`data/trophees.ts`) fait le lien compétition →
+  trophée. Seules celles qui ont un modèle 3D y figurent : le Tournoi, le Rugby
+  Europe Championship et la Coupe du monde. En ajouter une demande d'abord son
+  `.glb` et son entrée dans `TROPHEES`.
+- ⚠️ **`apport: null`, COMME L'ÉCRAN.** `vainqueurInternational()` appelle
+  `internationalEnDirect(id, saison, journees, null)` — exactement l'appel de
+  `Tableau.tsx` et de `ClassementLateral.tsx`. Passer un apport du joueur ici
+  donnerait un autre classement que celui qu'il a sous les yeux, donc un
+  champion qui n'est pas celui qu'il a vu gagner. C'est la forme exacte du bug
+  d'origine, et c'est ce qu'il ne faut pas réintroduire.
+- ⚠️ **ÊTRE SÉLECTIONNÉ SE PROUVE DE DEUX FAÇONS**, et il en faut deux : les
+  **capes réellement jouées** (`saisonEnCours.capes`, la vérité du terrain) — qui
+  n'existent qu'en mode « journée par journée » — et à défaut la **convocation au
+  niveau**, tranchée sans hasard (`convocation(j, 0.5, saison)`). Sans le second
+  chemin, choisir le rythme « saison » fermait la porte à tous les titres
+  internationaux sans jamais le dire.
+- ⚠️ **Le mot « coupe d'Europe » a UNE seule source désormais.** La semaine de
+  coupe en mode rapide lisait encore `COUPE_EUROPE_PAR_DIVISION`, l'écran
+  Résultats lisait `coupesDuClub` : deux réponses possibles à « mon club
+  joue-t-il l'Europe ? », donc un titre fantôme en puissance.
+
+### ⚠️ ET LA COURONNE MONDIALE ÉTAIT INATTEIGNABLE — MESURÉ
+
+Le correctif ci-dessus ne suffisait pas. Mesuré sur la saison exactement
+rapportée (Brennus + Champions Cup + Grand Chelem, 8,6/10, 24 matchs) :
+
+| | cote | distinctions |
+|---|---|---|
+| avant (seul le Brennus comptait au palmarès) | **82,7** | Top 14, Champions Cup, Tournoi |
+| après le correctif des titres | **91,2** | les mêmes — toujours pas la mondiale (barre 94) |
+| après `BONUS_PAR_DISTINCTION` | **100,2** | **+ meilleur joueur du monde** |
+
+On pouvait donc rafler **toutes** les distinctions de l'année et se voir refuser
+celle qui les couronne. Ce n'est pas une barre haute, c'est une incohérence : le
+titre mondial n'est pas un cinquième vote indépendant, il va dans la réalité à
+celui qui a dominé la saison des votes. `decernerHonneurs` (lib/honneurs.ts) lit
+donc, **pour ce seul test**, les distinctions déjà décernées : `+3` chacune.
+
+⚠️ **CALIBRÉ POUR NE RIEN OUVRIR D'AUTRE.** Deux distinctions valent +6 : mesuré,
+une saison à 7,8/10 avec le doublé championnat + Europe monte à 88,1, toujours
+sous la barre. Il faut **trois** distinctions — championnat, Europe et Tournoi la
+même année — pour franchir 94.
+
+**Étalonnage revérifié** (les scripts tirent avec `Math.random()`, deux
+exécutions ne donnent jamais le même chiffre) : `verifDifficulte.ts` → médiane
+**65**, max 89, ≥ 80 : 11/100, ≥ 85 : 6/100 — dans l'intervalle documenté.
+`verifHonneurs.ts` → **0,17 distinction par carrière de 14 saisons**, inchangé.
+
+### 🌍 ET LE CLASSEMENT MONDIAL : « la table se remplit pas »
+
+Diagnostic fait de bout en bout sur le site déployé — `GET /api/classement`
+répond `{"classement":[]}`, un `POST` invalide répond bien `422` avec le motif
+recalculé. **Le serveur, la base et le barème étaient bons. Rien n'envoyait.**
+
+L'envoi était **entièrement manuel** et rangé dans un `<details>` replié, alors
+que l'écran promet noir sur blanc « mène une carrière à son terme et elle y
+entrera ». Et le tableau mondial n'était **rendu que s'il contenait au moins une
+ligne** (`{mondial && mondial.length > 0 && …}`) : sans serveur, en panne, ou
+simplement vide, l'écran n'affichait **rien du tout**, pas même un titre. Il n'y
+avait littéralement pas de table à remplir.
+
+- **`prendreRetraite` envoie la carrière** (`ficheDepuisJoueur`), sans attendre
+  la réponse et sans jamais échouer : hors ligne, sans serveur ou quota atteint,
+  la retraite reste instantanée. Le bouton manuel reste, pour une carrière en
+  cours ou une deuxième tentative.
+- **`lireClassementMondial()` renvoie un `EtatMondial`** (`hors-ligne` · `panne` ·
+  `ok`) au lieu d'un tableau vide indistinct. L'écran affiche les quatre cas :
+  chargement, pas de serveur (avec la commande `VITE_CLASSEMENT_URL=…`), serveur
+  en panne, et « personne n'y figure encore ».
+- **Le tableau mondial est un vrai tableau** (`.tableau-classement.mondial`,
+  3 colonnes — la base ne garde que pseudo et score), la ligne du joueur
+  surlignée. Vérifié 1280 px et 375 px : aucun débordement horizontal.
+- **`LegendeSauvegardee.tropheeIds`** : le Hall mémorise les IDS des trophées.
+  `ficheDepuisLegende` envoyait `titres.map(() => 'titre')` — un identifiant qui
+  n'existe dans aucun `TROPHEES`, donc un refus **systématique** de toute
+  carrière terminée (« trophée(s) inconnu(s) : titre »). Les vieilles sauvegardes
+  sont rattrapées depuis les libellés.
+- **`api/classement.ts`** : connexion Neon **paresseuse** (`neon('')` lève à
+  l'import — une `DATABASE_URL` manquante faisait échouer le module et le message
+  clair prévu n'était jamais atteint), et **un refus ne consomme plus le quota**
+  (une fiche refusée n'écrit rien ; la compter enfermait le joueur honnête une
+  heure avec pour seule explication « Trop d'envois »).
+
+### Les scripts
+
+```bash
+npx vite-node scripts/verifTitres.ts      # aucun titre fantôme, aucun titre oublié, sur 48 saisons jouées
+npx vite-node scripts/verifClassement.ts  # + section 9 : la retraite envoie vraiment, et la fiche est acceptée
+npx vite-node scripts/verifHonneurs.ts    # la couronne mondiale est atteignable, et reste rare
+npx vite-node scripts/verifDifficulte.ts  # ⚠️ l'étalonnage n'a pas bougé
+```
+
+
+## 🗓️ LA SAISON NE SE SIMULE PLUS — ELLE SE JOUE
+
+Six retours de jeu en un bloc. Les trois premiers tenaient au même endroit : le
+**mode « saison rapide »**, qui court-circuitait la boucle de jeu.
+
+### ⚠️ LE MODE « SAISON PAR SAISON » A ÉTÉ SUPPRIMÉ
+
+Demande explicite : « il faut pas qu'on puisse simuler la saison mais plus qu'on
+puisse cliquer sur une date dans le calendrier et que ça nous y amène en simulant
+tous les matchs ; car si on simule, nos stats marchent pas, on a toujours
+2 matchs 0 essais ».
+
+Le constat était exact et la cause nette : en mode rapide, `saisonSuivante`
+n'utilisait aucun match joué. Il **tirait** l'année entière :
+
+```ts
+const matchsSaison = Math.round((6 + Math.random() * 16) * titularisation);
+```
+
+`titularisation` s'effondrant dès que le joueur était sous le niveau de son
+groupe, le résultat tournait à 2 ou 3 matchs et zéro essai — quelle que soit la
+saison, quelle que soit la performance. Ni forme, ni blessure, ni cape, ni
+statistique détaillée : le mode de jeu décidait de la carrière.
+
+| | avant | maintenant |
+|---|---|---|
+| choix du rythme (⚙️) | « journée par journée » / « saison par saison » | **retiré** — il n'y a qu'un rythme |
+| bouton « ⏩ Fin de saison » | saute au bilan tiré au sort | **retiré**, remplacé par 🗓️ Calendrier |
+| avancer vite | simuler l'année d'un bloc | **cliquer une date**, tout est joué |
+
+- **`avancerJusqua(semaine)`** (store) rejoue `semaineSuivante()` autant de fois
+  qu'il faut. Rien n'est estimé : matchs, statistiques, forme, blessures,
+  sélections et classement en découlent comme si on avait cliqué à la main.
+  Mesuré en jeu : **12 semaines en 75 ms**.
+- ⚠️ **ON S'ARRÊTE À LA PREMIÈRE CHOSE QUI DEMANDE LE JOUEUR** — une scène du MJ,
+  une offre de contrat, la fin de saison, la retraite. Enjamber ces moments-là,
+  c'est exactement ce que faisait l'ancien mode rapide. `avancerJusqua` renvoie
+  le motif d'arrêt, et l'écran le dit.
+- ⚠️ **`avanceRapide` (non persisté) coupe la demande de scène hebdomadaire.**
+  `semaineSuivante` lève `attenteEvenement`, que l'écran Carrière consomme en
+  appelant Groq : sans ce drapeau, un saut de quinze semaines faisait quinze
+  appels et empilait quinze questions. Le drapeau est levé **une seule fois**, à
+  l'arrivée.
+- **La frise du calendrier (📊 Résultats) est une destination.** Une semaine
+  passée se consulte ; une semaine à venir (`▶`, bordure verte pointillée) se
+  JOUE, après une confirmation qui annonce combien de semaines partent.
+- ⚠️ **`simulerStatsJournee` RATTRAPE les journées manquantes.** Elle est
+  asynchrone : sur un saut, toutes ses invocations s'exécutaient après la boucle
+  et lisaient donc la même semaine d'arrivée — une seule journée était rejouée,
+  et `journeesReelles` sautait à J18 avec les statistiques d'UNE journée (le
+  meilleur marqueur du championnat affichait 2 essais au mois de mars). Elle
+  rejoue maintenant de la dernière journée connue jusqu'à la journée courante,
+  **bornée à 6** (≈ 0,9 s la journée) — et elle **écrit dans la console** ce
+  qu'elle a laissé de côté, parce qu'un plafond silencieux se lit « tout est
+  couvert ».
+
+### ⚠️ LA FORME NE REMONTAIT JAMAIS
+
+« Impossible de récupérer de la forme, on en perd trop et à la moitié de la
+saison on est à 0. » Le bilan d'une semaine de match était **structurellement
+négatif**, et rien ne le compensait :
+
+```
+match regardé  −(3 + minutes/14) ≈ −9    ·    match estimé −(minutes/12) ≈ −6
+séance de la semaine                 −4
+─────────────────────────────────────────
+                          −10 à −13 par semaine de match
+```
+
+Seuls les week-ends SANS match rendaient quelque chose (+6 à +8). Sur les
+~30 semaines de match d'une saison de Top 14 : −300 contre +90. Le joueur
+touchait le fond avant Noël et n'en ressortait plus — et comme la note de match
+porte `(forme − 70) × 0,012`, il traînait un malus permanent.
+
+**`recuperationHebdo(j)`** (store) applique, chaque semaine et **au même endroit
+pour les deux chemins** (match regardé ou non), une **convergence** vers une
+condition de base :
+
+```ts
+conditionDeBase = 72 + (endurance − 60) × 0,2 − max(0, âge − 28) × 1,5   (52…94)
+récupération    = (cible − forme) × 0,45 + 4
+```
+
+⚠️ **CE N'EST PAS UN BONUS FIXE, ET C'EST LE POINT.** Un bonus fixe a le même
+défaut que l'ancien système, à l'envers : trop petit il ne change rien, trop
+grand tout le monde reste à 100 et la forme ne veut plus rien dire. La
+convergence trouve son équilibre toute seule. Mesuré sur une saison complète :
+
+| | forme min | max | fin |
+|---|---|---|---|
+| Top 14, 22 ans | 70 | 82 | 81 |
+| Top 14, **34 ans** | **60** | 73 | 70 |
+| Nationale 2, 24 ans (joue tout) | 65 | 82 | 73 |
+
+Les bonus forfaitaires des semaines creuses ont été **réduits en conséquence**
+(+7/+8 → +2/+3) : cumulés à la convergence, ils renvoyaient tout le monde à 100.
+
+⚠️ **EFFET DE BORD MESURÉ ET COMPENSÉ.** Réparer la forme relève toutes les notes
+de match, donc les notes de saison, donc la progression : les carrières ≥ 85
+passaient de 3-4 sur 100 à **7-9**. Le **talent brut** (`lib/progression.ts`) est
+le levier qui n'agit que sur cette queue — `marge/7,2` plafonné à 3,6 devient
+`marge/8,6` plafonné à 3,0. Réétalonné sur trois tirages : médiane **57 · 60 ·
+56**, max 88 · 88 · 90, ≥ 80 : **9 · 10 · 8**, ≥ 85 : **4 · 4 · 3**. Conforme à
+la référence documentée.
+
+### ⚠️ LE MATCH N'ÉTAIT PAS BLOQUÉ PAR UNE SCÈNE EN ATTENTE
+
+« Si on a un événement en cours on peut jouer le match, le bouton est pas bloqué
+aussi. » `disabled={aRepondre}` était posé sur « Semaine suivante » mais pas sur
+« ▶️ Jouer le match » — or c'est LUI qui fait passer la semaine à la sirène. Il
+suffisait donc d'avoir un match au programme pour enjamber la question du MJ.
+Corrigé sur les deux surfaces : le bouton du panneau ET la barre fixe mobile.
+
+### Les textes de l'IA sont plus courts (demande explicite)
+
+| | avant | maintenant |
+|---|---|---|
+| récit du MJ (`groq.ts`) | 2 à 5 phrases · 700 tokens | **2 phrases** · 420 |
+| scène hebdomadaire (`ia.ts`) | 2 à 4 phrases · 420 | **2 phrases, 45 mots** · 240 |
+| jugement de la réponse | 2 à 5 phrases · 520 | **2 phrases** · 300 |
+| situation à choix | 2 à 4 phrases · 850 | **2 phrases** · 620 |
+| interview | 2 à 4 phrases · 260 | **2 phrases** · 180 |
+| post de L'Ovale | 280 caractères · 1100 | **180 caractères** · 900 |
+| message privé | 1 à 3 phrases · 220 | **1 à 2 phrases** · 160 |
+
+⚠️ Le prompt le DIT en plus de le borner : « on lit une réponse par semaine de
+jeu ; un pavé à chaque fois, et le joueur arrête de lire ». Baisser `maxTokens`
+seul produit des phrases coupées net, pas des phrases courtes.
+
+## 🥇 LES GÉNÉRATIONS DORÉES — un championnat qui respire
+
+« J'ai l'impression que c'est toujours le même calendrier des matchs et que les
+équipes font toujours les mêmes générales, en mode ça sera toujours le Stade
+premier ; fais qu'il puisse y avoir des générations dorées dans tous les clubs,
+qu'on puisse gagner un Top 14 avec un outsider — mais que ça reste rare. »
+
+**Les deux reproches étaient exacts, et mécaniques.**
+
+### 1. Le calendrier était le même TOUS LES ANS
+
+`calendrier(clubs)` déroulait un carrousel sur l'ordre du fichier de données, qui
+ne bouge pas : la J1 opposait éternellement les deux mêmes clubs, et chaque club
+recevait les mêmes adversaires aux mêmes dates, saison après saison. Le paramètre
+`cle` mélange la liste (Fisher-Yates seedé) **avant** de dérouler le carrousel :
+un tirage par saison, toujours déterministe.
+
+⚠️ **LA CLÉ DOIT ÊTRE LA MÊME PARTOUT** : `division#saison`. Trois endroits
+construisent la grille — le panneau de carrière (`matchDeLaSemaine`), l'écran
+Résultats (`affichesDeLaJournee`) et le classement (`championnatEnDirect`). Deux
+clés différentes, et le panneau annonce un adversaire que le tableau ne connaît
+pas. Les coupes (`coupe#saison#poule`) et les sélections (`competition#saison`)
+ont la leur.
+
+### 2. La hiérarchie ne bougeait pas — `src/lib/generations.ts`
+
+La force d'un club est la moyenne pondérée de ses 23 meilleurs joueurs, qui
+vieillissent d'un an par saison : la hiérarchie de 2025-26 se reconduisait
+presque à l'identique pendant douze ans. Le Stade Toulousain part à 86, personne
+d'autre au-dessus de 80 : il finissait premier **toutes** les saisons.
+
+Trois couches se superposent, **déterministes** (graine = nom du club) :
+
+1. **le cycle ordinaire** (toujours actif) — sinusoïde ±2,2, période 7 à 11
+   saisons, phase propre au club ;
+2. **la génération dorée** (rare) — jusqu'à +8 sur 4 à 6 saisons, en cloche :
+   elle arrive, elle culmine, elle s'en va ;
+3. **la traversée du désert** (rare) — jusqu'à −6. Indispensable : sans elle, les
+   gros clubs ne redescendent jamais et un outsider ne peut gagner qu'en étant
+   meilleur dans l'absolu.
+
+⚠️ **LA GÉNÉRATION DORÉE EST TEMPÉRÉE POUR LES GROS CLUBS**
+(`(88 − noteBase) / 12`, plancher 0,3). Mesuré sans ce tempérament : Toulouse,
+déjà premier à 86, montait à **92,8** et prenait **11 titres sur 20** — la
+mécanique renforçait celui qui n'en avait pas besoin, à rebours de la demande. Le
+CREUX, lui, n'est pas tempéré : un gros club doit pouvoir s'effondrer.
+
+⚠️ **ON L'APPLIQUE À UN SEUL ENDROIT** — `effectifDuClub`, sur la note de CHAQUE
+joueur. Tout en découle : force d'effectif, classement, montées, marché, feuille
+de match, et l'écran 👥 qui montre bien des joueurs meilleurs. Poser le bonus sur
+`forceEffectif` seul aurait donné un club qui joue comme 82 avec un effectif
+affiché à 75 — deux vérités, et le joueur a raison de ne pas y croire.
+
+**La fiche d'un club l'affiche** (`🥇 Génération dorée` / `📉 Traversée du
+désert`) : un effectif qui prend cinq points sans explication, c'est du bruit ;
+annoncé, c'est une histoire.
+
+Mesuré (`npx vite-node scripts/verifGenerations.ts`) :
+
+| | |
+|---|---|
+| calendrier | **12 tirages distincts sur 12 saisons**, déterministes |
+| accord panneau / écran / classement | **0 écart sur 48 journées** |
+| générations dorées | **6,1 %** des couples (club, saison) — cible 5 à 14 % |
+| traversées du désert | 4,4 % |
+| clubs concernés | **253 sur 833** en 12 saisons |
+| variation d'un club sur 12 saisons | écart médian **7,3 points** |
+| champions du Top 14 sur 20 saisons | **5 clubs différents**, le meilleur en prend 8 |
+| titres hors du top 4 de départ | **6 sur 20** |
+
+Et la pyramide tient : `verifPyramide.ts` → aucune division ne change de taille
+sur 12 saisons.
+
+### Les scripts
+
+```bash
+npx vite-node scripts/verifGenerations.ts  # calendrier tiré, générations rares, outsiders
+npx vite-node scripts/verifDifficulte.ts   # à relancer après TOUTE retouche de la forme
+npx vite-node scripts/verifSaison.ts       # forme, blessures et entraînement sur une saison
+npx vite-node scripts/verifPyramide.ts     # les divisions gardent leur taille
+```
+
+
+## 📊 LES STATISTIQUES, ENFIN TOUTES VISIBLES ET COHÉRENTES
+
+Trois retours de jeu qui tiennent ensemble : « le classement des stats joueurs
+marche pas bien, des fois il perd des stats », « en match on a pas accès à tous
+les stats », « notre joueur est jugé que sur plaquage, mètres parcourus et essai,
+ce qui est dommage ».
+
+### ⚠️ DEUX COMPTABILITÉS PARALLÈLES POUR LE MÊME JOUEUR
+
+C'était ça, « il perd des stats ». Le joueur incarné était compté DEUX FOIS, à
+deux endroits qui ne se parlaient pas :
+
+| | alimenté par | lu par |
+|---|---|---|
+| `saisonEnCours` | match par match (moteur si regardé, estimation sinon) | panneau de carrière, profil, bilan de saison |
+| `statsReelles` | la simulation de fond, journée par journée | les 18 classements de l'écran Résultats |
+
+Tant qu'on regardait chaque match, les deux coïncidaient (même graine). Depuis
+qu'on peut sauter des semaines, elles divergent : le panneau annonce 5 matchs, le
+classement en montre 2. **Le joueur a raison — il perd des stats, et ce sont les
+siennes.** `classementJoueurs` substitue désormais **toujours** ses vrais
+chiffres accumulés ; la condition `!auMoteur` qui l'en empêchait a sauté. Une
+carrière n'a qu'une seule vérité.
+
+Deux corrections l'accompagnent :
+
+- **Le rattrapage passe de 6 à 12 journées** (`simulerStatsJournee`) — depuis
+  que l'avance par le calendrier est LE moyen d'aller vite, sauter dix journées
+  est courant, et borner à 6 laissait des trous systématiques. Et **on rend la
+  main entre deux journées** (`setTimeout(0)`) : douze journées d'affilée, c'est
+  ~11 s de JavaScript synchrone — l'onglet se figeait au lieu de se remplir.
+- **L'en-tête dit combien de journées ont VRAIMENT été rejouées** (« matchs
+  joués · 6 journées sur 12 »). Il annonçait le nombre de journées disputées par
+  le championnat : des chiffres de 6 journées présentés comme ceux de 12, c'est
+  exactement ce qui donne l'impression que le classement perd des statistiques.
+
+### La feuille de match montre les 23 compteurs, pas 5
+
+Le moteur tient **vingt-trois** statistiques par joueur ; la feuille en affichait
+cinq (mètres, plaquages, essais, passes, minutes). Le match d'un avant était donc
+invisible : ni mêlée, ni touche, ni pick and go, ni grattage.
+
+⚠️ **ET ON NE FAIT PAS UN TABLEAU DE VINGT-TROIS COLONNES.** Six vues, une par
+famille — 📋 Général · ⚡ Attaque · 🛡️ Défense · 🌀 Conquête · 🦵 Pied ·
+🟨 Discipline — et un clic pour basculer. Chaque en-tête dit au survol ce qu'elle
+compte.
+
+⚠️ **BUG ATTRAPÉ EN JEU** : avec cinq colonnes (vue « Pied »), les largeurs fixes
+consommaient exactement la place et la colonne du nom tombait à **0 px** — une
+feuille de match sans noms. `minmax(74px, 1fr)` la force à déborder, et le bloc
+défile alors DANS son conteneur (`.ml-bilan-groupe`). Vérifié 1280 px et 375 px :
+noms lisibles, page jamais de côté.
+
+### Le barème de la note s'affiche
+
+`noterMatch` juge sur **quinze** critères depuis longtemps (mêlée, touche, pick
+and go, offloads, passes décisives, franchissements, ballons rendus, 50/22…).
+Mais rien ne le montrait : le résumé ne citait que les essais, les plaquages et
+les mètres. **Un barème qu'on ne voit pas est un barème qui n'existe pas pour le
+joueur.**
+
+⚠️ **`detailNote()` EST DÉSORMAIS LA SEULE IMPLÉMENTATION DU BARÈME** :
+`noterMatch` ne fait qu'additionner ses lignes. Recopier le calcul pour
+l'affichage aurait garanti qu'un jour la note montrée ne soit plus celle qui
+compte. Vérifié : `verifApresMatch.ts` redonne exactement les mêmes notes.
+
+Le dépliant « ⭐ Ma note — d'où elle vient » s'ouvre sous la feuille de match.
+Relevé en jeu sur un talonneur : Base +5,8 · Temps de jeu +0,4 · Plaquages −0,1 ·
+Mètres −0,5 · **Ballons grattés (4) +1,8** · **Passes décisives (1) +0,8** ·
+Offloads −0,1 · **Mêlée −0,7** · Touches −0,1 · **Pick and go −0,4** → 7/10.
+
+### Le mode d'emploi du classement a été retiré de l'écran
+
+Demande explicite : « supprime la case dans le classement qui explique comment le
+setup ». Le dépliant « 🌍 Rendre ce classement mondial — et impossible à truquer »
+(schéma de table SQL, liste des bornes de `verifierFiche`, recommandations
+serveur) était de la **documentation de développeur affichée à un joueur**. Elle
+a sa place dans `serveur/VERCEL.md` et dans ce fichier — pas dans le jeu.
+Le dépliant « 🔐 Ma fiche d'envoi », lui, reste : c'est ce que le joueur envoie,
+et le voir en clair fait partie du contrat de confiance.
+
+
+### L'envoi au classement est AUTOMATIQUE, et l'écran ne demande plus rien
+
+Demande explicite : « la fiche d'envoi, il faut que ça s'envoie automatiquement ».
+
+| | avant | maintenant |
+|---|---|---|
+| dépliant « 🔐 Ma fiche d'envoi » (JSON en clair) | affiché | **retiré** |
+| bouton « 🌍 Envoyer ma carrière » | à cliquer | **retiré** |
+| déclenchement | manuel | **fin de saison** + **retraite**, tout seul |
+| ce qui reste à l'écran | un pli et un bouton | **une ligne d'état** sous le tableau |
+
+- `saisonSuivante` et `prendreRetraite` appellent `envoyerAuClassement` sans
+  attendre la réponse et sans jamais échouer : hors ligne, sans serveur, fiche
+  refusée ou quota atteint, la saison se referme exactement pareil.
+- ⚠️ **Renvoyer chaque année ne peut rien dégrader** : la base garde le MEILLEUR
+  score (`on conflict … where excluded.score > classement.score`).
+- ⚠️ **LE DÉBIT SERVEUR A ÉTÉ DESSERRÉ EN CONSÉQUENCE** : 1 envoi/heure était
+  calibré pour un bouton cliqué à la main. Avec l'envoi automatique, une session
+  normale en produit plusieurs par heure — le joueur honnête se prenait des 429
+  et son meilleur score n'arrivait jamais. **6/heure et 40/jour** ; ça reste sans
+  intérêt pour un script, puisque la vraie barrière n'est pas le débit mais le
+  RECALCUL.
+
+Vérifié : `VITE_CLASSEMENT_URL=… npx vite-node scripts/verifClassement.ts` →
+3 saisons jouées + retraite = **4 requêtes**, scores 554 → 654 → 714 → 714,
+la dernière étant bien celle de la retraite.

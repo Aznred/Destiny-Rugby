@@ -4,12 +4,9 @@ import { useGame, classementComplet } from '../store/useGame';
 import { POSTE_PAR_ID, migrerPoste } from '../data/rugby';
 import { Drapeau, nomNation } from '../components/Drapeau';
 import { TROPHEES } from '../data/trophees';
+import { ficheDepuisJoueur, verifierFiche } from '../lib/classementMondial';
 import {
-  ficheDepuisJoueur, verifierFiche, SCORE_MAX, SAISONS_MAX, LIMITES,
-  RECOMMANDATIONS_SERVEUR_LISTE,
-} from '../lib/classementMondial';
-import {
-  envoyerAuClassement, lireClassementMondial, type LigneMondiale, type ResultatEnvoi,
+  lireClassementMondial, URL_CLASSEMENT, type EtatMondial,
 } from '../lib/classementEnLigne';
 
 export function Classement() {
@@ -19,29 +16,29 @@ export function Classement() {
 
   const liste = classementComplet(pantheon, joueur);
 
-  // ⚠️ LE TABLEAU MONDIAL EST UN BONUS, JAMAIS UNE DÉPENDANCE. Sans serveur
-  // déployé, `lireClassementMondial()` renvoie une liste vide sans lever
-  // d'erreur, et l'écran garde son classement local. Voir `serveur/VERCEL.md`.
-  const [mondial, setMondial] = useState<LigneMondiale[] | null>(null);
-  const [envoiEnCours, setEnvoiEnCours] = useState(false);
-  const [verdictServeur, setVerdictServeur] = useState<ResultatEnvoi | null>(null);
+  // ⚠️ LE TABLEAU MONDIAL EST UN BONUS, JAMAIS UNE DÉPENDANCE — mais il doit
+  // TOUJOURS S'AFFICHER, avec son état. Il n'était rendu que s'il contenait au
+  // moins une ligne : sans serveur, en panne, ou simplement vide, l'écran ne
+  // montrait RIEN, pas même un titre. D'où le bug signalé en jeu (« le
+  // classement fonctionne pas, la table se remplit pas ») : il n'y avait
+  // littéralement pas de table à remplir. Voir `serveur/VERCEL.md`.
+  const [mondial, setMondial] = useState<EtatMondial | null>(null);
 
   useEffect(() => {
     let vivant = true;
-    lireClassementMondial().then((l) => { if (vivant) setMondial(l); });
+    lireClassementMondial().then((r) => { if (vivant) setMondial(r); });
     return () => { vivant = false; };
   }, []);
 
-  // ⚠️ LA FICHE QUI PARTIRAIT AU SERVEUR, ET SON VERDICT. On la montre en clair :
-  // c'est exactement ce que le jeu enverrait, et exactement ce que le serveur
-  // vérifierait. Rien de caché, donc rien à « découvrir » pour un tricheur — la
-  // protection ne repose pas sur le secret du format, elle repose sur le fait
-  // que le serveur RECALCULE.
+  // Le verdict que le serveur rendrait sur la carrière en cours : il sert à
+  // afficher l'état de l'envoi automatique, et à dire pourquoi si ça coince.
   const envoi = useMemo(() => {
     if (!joueur) return null;
     const fiche = ficheDepuisJoueur(joueur);
     return { fiche, verdict: verifierFiche(fiche, Object.keys(TROPHEES)) };
   }, [joueur]);
+
+  const monPseudo = envoi?.fiche.pseudo ?? '';
 
   return (
     <motion.section
@@ -64,150 +61,96 @@ export function Classement() {
           (plus de légendes fictives), et voici la marche à suivre pour le rendre
           réellement mondial. Tant qu'il n'y a pas de serveur, tout reste sur
           l'appareil : localStorage ne se partage pas entre navigateurs. */}
-      {/* ═══ CE QUI PARTIRAIT AU SERVEUR, ET CE QU'IL EN FERAIT ═══════════ */}
-      {envoi && (
-        <details className="carte tuto-classement">
-          <summary>
-            🔐 Ma fiche d'envoi — {envoi.verdict.valide
-              ? `valide, score recalculé ${envoi.verdict.score.toLocaleString('fr-FR')}`
-              : `refusée (${envoi.verdict.anomalies.length} anomalie(s))`}
-          </summary>
-          <p className="aide">
-            Voici, en clair, <b>exactement</b> ce que le jeu enverrait pour ta carrière
-            en cours — et le verdict que le serveur rendrait. Le score n'est pas
-            « envoyé » : il est <b>recalculé</b> à partir de ces faits, puis comparé.
-          </p>
-          <pre className="fiche-envoi">{JSON.stringify(envoi.fiche, null, 2)}</pre>
-          {envoi.verdict.anomalies.length > 0 && (
-            <ul className="tuto-etapes">
-              {envoi.verdict.anomalies.map((a) => <li key={a}>⛔ {a}</li>)}
-            </ul>
-          )}
+      {/* ⚠️ LA FICHE D'ENVOI N'EST PLUS UN DÉPLIANT NI UN BOUTON.
+          Demande explicite : « la fiche d'envoi, il faut que ça s'envoie
+          automatiquement ». Elle partait sur un clic caché dans un pli — donc
+          personne n'envoyait, donc la table restait vide. Le jeu envoie
+          maintenant tout seul, à chaque fin de saison et à la retraite
+          (`saisonSuivante` / `prendreRetraite`, store). Ce qu'on garde à
+          l'écran : l'ÉTAT, une ligne, sous le tableau. */}
 
-          {/* L'envoi réel. Le bouton reste là même sans serveur : la réponse
-              explique alors qu'aucun classement en ligne n'est branché — plutôt
-              qu'un bouton absent, qui ne dit rien du tout. */}
-          <button
-            className="btn primaire"
-            disabled={envoiEnCours || !envoi.verdict.valide}
-            onClick={async () => {
-              setEnvoiEnCours(true);
-              setVerdictServeur(null);
-              const r = await envoyerAuClassement(envoi.fiche);
-              setVerdictServeur(r);
-              setEnvoiEnCours(false);
-              if (r.ok) setMondial(await lireClassementMondial());
-            }}
-          >
-            {envoiEnCours ? 'Envoi…' : '🌍 Envoyer ma carrière au classement mondial'}
-          </button>
-          {verdictServeur && (
-            <p className="aide" style={{ marginTop: '0.6rem' }}>
-              {verdictServeur.ok
-                ? `✅ Enregistré. Score retenu par le serveur : ${verdictServeur.score?.toLocaleString('fr-FR')}.`
-                : `⛔ ${verdictServeur.erreur}`}
-              {verdictServeur.anomalies?.length ? ` (${verdictServeur.anomalies.join(' · ')})` : ''}
-            </p>
-          )}
-        </details>
-      )}
+      {/* ═══ LE TABLEAU MONDIAL — TOUJOURS AFFICHÉ, AVEC SON ÉTAT ════════ */}
+      <div className="carte tableau-classement mondial">
+        <h2 style={{ marginTop: 0 }}>🌍 Classement mondial</h2>
+        <p className="aide">
+          Les carrières de <b>tous les joueurs</b>, tous appareils confondus. Chaque
+          score a été <b>recalculé par le serveur</b> à partir des faits de la
+          carrière : aucun n'a été cru sur parole. Une carrière y entre quand elle
+          est menée à son terme — ou dès maintenant, avec le bouton ci-dessous.
+        </p>
 
-      {/* ═══ LE TABLEAU MONDIAL, s'il y a un serveur ═════════════════════ */}
-      {mondial && mondial.length > 0 && (
-        <div className="carte tuto-classement">
-          <h2 style={{ marginTop: 0 }}>🌍 Classement mondial</h2>
+        {mondial === null && <p className="aide">⏳ Lecture du classement mondial…</p>}
+
+        {mondial?.etat === 'hors-ligne' && (
           <p className="aide">
-            Les scores ci-dessous ont été <b>recalculés par le serveur</b> à partir des
-            faits de chaque carrière. Aucun n'a été cru sur parole.
+            💻 <b>Pas de classement en ligne sur cette installation.</b> En
+            développement (<code>npm run dev</code>), Vite ne sait pas exécuter la
+            fonction serveur. Joue sur le site déployé, ou lance{' '}
+            <code>vercel dev</code>, ou pointe une API existante :{' '}
+            <code>VITE_CLASSEMENT_URL=https://ton-site/api/classement npm run dev</code>.
           </p>
-          <ol className="tuto-etapes">
-            {mondial.slice(0, 20).map((l, i) => (
-              <li key={l.pseudo}>
-                <b>#{i + 1}</b> {l.pseudo} — {l.score.toLocaleString('fr-FR')} pts
-              </li>
+        )}
+
+        {mondial?.etat === 'panne' && (
+          <p className="aide">
+            ⛔ <b>Le serveur du classement ne répond pas</b> ({mondial.erreur}).
+            Vérifie <code>{URL_CLASSEMENT}</code> et les journaux Vercel — le
+            classement local, lui, continue de fonctionner juste en dessous.
+          </p>
+        )}
+
+        {mondial?.etat === 'ok' && mondial.lignes.length === 0 && (
+          <p className="aide">
+            🌱 <b>Personne n'y figure encore.</b> Le serveur répond bien, la table
+            est simplement vide : sois le premier à y entrer.
+          </p>
+        )}
+
+        {mondial?.etat === 'ok' && mondial.lignes.length > 0 && (
+          <>
+            <div className="ligne-classement entete">
+              <span className="c-rang">#</span>
+              <span className="c-joueur">Joueur</span>
+              <span className="c-score">Score</span>
+            </div>
+            {mondial.lignes.slice(0, 100).map((l, i) => (
+              <div
+                key={l.pseudo}
+                className={`ligne-classement ${l.pseudo === monPseudo ? 'moi' : ''}`}
+              >
+                <span className="c-rang">
+                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                </span>
+                <span className="c-joueur"><b>{l.pseudo}</b></span>
+                <span className="c-score">{l.score.toLocaleString('fr-FR')}</span>
+              </div>
             ))}
-          </ol>
-        </div>
-      )}
+          </>
+        )}
 
-      <details className="carte tuto-classement">
-        <summary>🌍 Rendre ce classement mondial — et impossible à truquer</summary>
+        {/* ⚠️ PLUS DE BOUTON : L'ENVOI EST AUTOMATIQUE. Ne reste que l'état, en
+            une ligne — le joueur doit savoir sous quel nom il figure et avec
+            quel score, mais il n'a rien à faire. */}
+        {envoi && (
+          <p className="aide" style={{ marginTop: '1rem' }}>
+            {envoi.verdict.valide
+              ? `🌍 Ta carrière part toute seule au classement, à chaque fin de saison et `
+                + `à la retraite. Tu y figures sous « ${monPseudo} » avec `
+                + `${envoi.verdict.score.toLocaleString('fr-FR')} points — le serveur ne garde `
+                + `que ton meilleur total.`
+              : `⛔ Ta carrière ne peut pas être envoyée : ${envoi.verdict.anomalies.join(' · ')}.`}
+          </p>
+        )}
+      </div>
 
-        <p className="aide">
-          Aujourd'hui tout vit dans <code>localStorage</code>, donc dans{' '}
-          <b>ton navigateur</b> : personne ne voit la carrière de personne. Voici le
-          plan complet, conçu autour d'une seule idée.
-        </p>
-
-        <p className="aide">
-          ⚠️ <b>La vérité d'abord.</b> Le jeu tourne entièrement dans le navigateur.
-          Un joueur peut éditer son <code>localStorage</code>, modifier le bundle, ou
-          appeler l'API à la main. <b>Aucun code livré au navigateur ne peut garantir
-          un score</b>, et un secret embarqué dans le bundle se lit en vingt secondes.
-          La seule protection réelle : <b>le serveur ne fait jamais confiance au score
-          envoyé — il le recalcule.</b>
-        </p>
-
-        <ol className="tuto-etapes">
-          <li>
-            <b>Le navigateur envoie les FAITS, pas le score.</b>{' '}
-            <code>ficheDepuisJoueur()</code> (<code>src/lib/classementMondial.ts</code>)
-            construit la fiche ci-dessus : saisons, note, réputation, matchs, essais,
-            sélections, ids de trophées. Le champ <code>score</code> est là pour être{' '}
-            <i>comparé</i>, pas pour être cru.
-          </li>
-          <li>
-            <b>Le serveur vérifie et recalcule.</b> Une Edge Function importe le{' '}
-            <i>même fichier</i> et appelle <code>verifierFiche()</code> puis{' '}
-            <code>scoreDeLaFiche()</code>. Le module n'a aucune dépendance : il se copie
-            tel quel. Un seul barème, donc jamais deux vérités.
-          </li>
-          <li>
-            <b>La base ne garde que le score.</b> La fiche est jetée aussitôt vérifiée.
-            <pre className="fiche-envoi">{`create table classement (
-  pseudo   text primary key,
-  score    integer not null check (score >= 0 and score <= ${SCORE_MAX}),
-  cree_le  timestamptz not null default now()
-);
--- Personne n'écrit depuis le navigateur : seule l'Edge Function a la clé.
-alter table classement enable row level security;
-create policy lecture on classement for select using (true);`}</pre>
-          </li>
-          <li>
-            <b>Lire les 100 meilleurs</b> à l'ouverture de cet écran, et y fusionner la
-            carrière locale en cours (<code>classementComplet()</code> fait déjà la
-            fusion).
-          </li>
-        </ol>
-
-        <p className="aide">
-          🔒 <b>Ce que la vérification refuse déjà</b> — et c'est elle qui fait tout le
-          travail, bien plus que le plafond global. Chaque chiffre est borné par les{' '}
-          <i>autres</i> :
-        </p>
-        <ul className="tuto-etapes">
-          <li>une saison de jeu = un an de vie : <code>âge = âgeDébut + saisons − 1</code>, donc au plus <b>{SAISONS_MAX} saisons</b> (15 → {LIMITES.ageMax} ans) ;</li>
-          <li>au plus <b>{LIMITES.matchsParSaison} matchs</b> par saison, <b>{LIMITES.essaisParMatch} essais</b> par match, <b>{LIMITES.titresParSaison} titres</b> et <b>{LIMITES.capesParSaison} capes</b> par saison ;</li>
-          <li>la note doit rester atteignable en ce nombre de saisons (<code>40 + 6 × saisons</code>) ;</li>
-          <li>chaque trophée annoncé doit <b>exister</b> dans le jeu ;</li>
-          <li>et le score annoncé doit être <b>exactement</b> celui qu'on recalcule.</li>
-        </ul>
-        <p className="aide">
-          Résultat : on ne peut plus « mettre un gros nombre ». Il faut fabriquer une
-          carrière entière qui tient debout — et à ce moment-là, autant la jouer. Le
-          plafond absolu, lui, est de <b>{SCORE_MAX.toLocaleString('fr-FR')}</b> points.
-        </p>
-
-        <p className="aide">🧯 <b>Ce que le serveur doit ajouter</b> (une fonction pure ne peut pas le voir) :</p>
-        <ul className="tuto-etapes">
-          {RECOMMANDATIONS_SERVEUR_LISTE.map((r) => <li key={r}>{r}</li>)}
-        </ul>
-
-        <p className="aide">
-          💡 Le même serveur hébergerait ensuite la clé Groq côté back (aujourd'hui
-          exposée dans le navigateur) avec un quota par joueur.
-        </p>
-      </details>
+      {/* ⚠️ LE MODE D'EMPLOI DU CLASSEMENT A ÉTÉ RETIRÉ DE L'ÉCRAN.
+          Demande explicite : « supprime la case dans le classement qui explique
+          comment le setup ». Ce dépliant déroulait un schéma SQL, la liste des
+          bornes de vérification et les recommandations serveur : de la
+          documentation de DÉVELOPPEUR affichée à un JOUEUR. Elle vit maintenant
+          là où elle sert — serveur/VERCEL.md et CLAUDE.md.
+          Le dépliant « 🔐 Ma fiche d'envoi », lui, reste : voir en clair ce
+          qu'on envoie fait partie du contrat de confiance. */}
 
       {liste.length === 0 ? (
         <div className="carte classement-vide">

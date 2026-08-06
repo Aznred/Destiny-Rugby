@@ -37,7 +37,6 @@ const EMOJI_SEMAINE: Record<string, string> = {
 };
 
 export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
-  const saisonSuivante = useGame((s) => s.saisonSuivante);
   const semaineSuivante = useGame((s) => s.semaineSuivante);
   // ⚠️ ON N'AVANCE PAS EN LAISSANT UNE QUESTION EN PLAN. Depuis que le récit
   // tombe CHAQUE semaine, pouvoir enchaîner sans répondre remplissait le journal
@@ -49,7 +48,6 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const motifAttente = evenementHebdo
     ? 'Réponds d’abord à la situation en cours'
     : 'Fais d’abord ton choix';
-  const rythme = useGame((s) => s.rythme);
   const semaineActuelle = semaine(joueur.semaine ?? 1);
   const vecu = joueur.saisonEnCours;
   const prendreRetraite = useGame((s) => s.prendreRetraite);
@@ -86,7 +84,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   // il peut porter le maillot de son pays chez les moins de 20 ans — Tournoi
   // U20 et Championnat du monde U20 (lib/international.ts).
   const inter = useMemo(() => {
-    if (rythme !== 'semaine' || semaineActuelle.type !== 'international') return null;
+    if (semaineActuelle.type !== 'international') return null;
     if (convocation(joueur).selectionne) {
       const senior = matchInternationalDuJoueur(joueur, bonusClubDuJoueur(joueur));
       if (senior) return { affiche: senior, u20: false };
@@ -96,15 +94,13 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       if (jeune) return { affiche: jeune, u20: true };
     }
     return null;
-  }, [joueur, rythme, semaineActuelle.type]);
+  }, [joueur, semaineActuelle.type]);
 
   const affiche = useMemo(
-    () => (rythme === 'semaine' && !inter
-      ? matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur))
-      : inter
-        ? { journee: inter.affiche.journee, match: inter.affiche.match, cle: inter.affiche.cle }
-        : null),
-    [joueur, rythme, inter],
+    () => (inter
+      ? { journee: inter.affiche.journee, match: inter.affiche.match, cle: inter.affiche.cle }
+      : matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur))),
+    [joueur, inter],
   );
   const monEquipe = inter ? (inter.u20 ? equipeU20(joueur.nation) : nomNation(joueur.nation)) : joueur.club;
   const adversaire = affiche
@@ -219,7 +215,12 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           </span>
         )}
       </div>
-      {rythme === 'semaine' ? (
+      {/* ⚠️ IL N'Y A PLUS QU'UN SEUL RYTHME. Le mode « saison rapide » a été
+          retiré : il résumait l'année en un tirage et le joueur y perdait ses
+          statistiques, sa forme et ses sélections. `rythme` reste dans le store
+          le temps que les vieilles sauvegardes migrent — il vaut toujours
+          « semaine ». */}
+      <>
         <>
           {/* ⚠️ L'ENTRAÎNEMENT EST PERMANENT. On ne clique plus sur un secteur
               chaque semaine : on choisit ce qu'on travaille, la séance se fait
@@ -283,13 +284,21 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               On ne propose plus « Semaine suivante » à côté : on joue le match,
               et la semaine passe toute seule à la sirène. */}
           {matchAJouer ? (
+            // ⚠️ LE MATCH EST BLOQUÉ LUI AUSSI TANT QU'UNE SCÈNE ATTEND. Il ne
+            // l'était pas : « Semaine suivante » se verrouillait, mais le match
+            // — qui fait passer la semaine à la sirène — restait cliquable. Il
+            // suffisait donc d'avoir un match au programme pour enjamber la
+            // question du MJ, et le journal se remplissait de scènes orphelines.
             <button
               type="button"
               className="btn match-semaine"
               onClick={() => setMatchOuvert(true)}
-              title={`Suivre ${affiche!.match.domicile} – ${affiche!.match.exterieur} en direct`}
+              disabled={aRepondre}
+              title={aRepondre ? motifAttente : `Suivre ${affiche!.match.domicile} – ${affiche!.match.exterieur} en direct`}
             >
-              ▶️ <b>{inter ? t(inter.u20 ? 'pj.jouerU20' : 'pj.jouerSelection') : t('pj.jouerMatch')}</b>
+              ▶️ <b>{aRepondre
+                ? '✍️ Réponds d’abord'
+                : inter ? t(inter.u20 ? 'pj.jouerU20' : 'pj.jouerSelection') : t('pj.jouerMatch')}</b>
               <span>
                 {inter ? `${inter.affiche.competition.emoji} ${inter.affiche.competition.nom}` : `J${affiche!.journee}`}
                 {' · '}{affiche!.match.domicile === monEquipe ? 'reçoit' : 'à'} {adversaire}
@@ -305,24 +314,23 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               >
                 {semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
               </button>
+              {/* ⚠️ « ⏩ FIN DE SAISON » A ÉTÉ SUPPRIMÉ (demande explicite : « il
+                  faut pas qu'on puisse simuler la saison »). Il sautait à un
+                  bilan calculé par un `Math.random()` de fin d'année — d'où les
+                  « 2 matchs, 0 essai » quelle que soit la saison. Pour avancer
+                  vite, on clique désormais une DATE dans le calendrier : les
+                  semaines sont réellement jouées, une par une. */}
               <button
                 className="btn fantome"
-                onClick={saisonSuivante}
-                disabled={aRepondre}
-                title={aRepondre ? motifAttente : 'Passer directement au bilan de la saison'}
+                onClick={() => setEcran('tableau')}
+                title="Choisir une date dans le calendrier et jouer jusque-là"
               >
-                ⏩ {t('pj.finSaison')}
+                🗓️ {t('pj.calendrier')}
               </button>
             </div>
           )}
         </>
-      ) : (
-        <div className="pj-avancer">
-          <button className="btn vert" onClick={saisonSuivante} title="Clore la saison et récupérer">
-            {t('pj.saisonSuivante')}
-          </button>
-        </div>
-      )}
+      </>
 
       {/* Barre d'actions : tout est atteignable sans faire défiler le panneau. */}
       <div className="pj-actions">
@@ -452,8 +460,16 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             {matchAJouer && adversaire ? ` · ${adversaire}` : ` · ${semaineActuelle.libelle}`}
           </span>
           {matchAJouer ? (
-            <button type="button" className="btn primaire" onClick={() => setMatchOuvert(true)}>
-              ▶️ {inter ? t(inter.u20 ? 'pj.jouerU20Court' : 'pj.jouerSelectionCourt') : t('pj.jouerMatch')}
+            <button
+              type="button"
+              className="btn primaire"
+              onClick={() => setMatchOuvert(true)}
+              disabled={aRepondre}
+              title={aRepondre ? motifAttente : undefined}
+            >
+              {aRepondre
+                ? '✍️ À toi de répondre'
+                : `▶️ ${inter ? t(inter.u20 ? 'pj.jouerU20Court' : 'pj.jouerSelectionCourt') : t('pj.jouerMatch')}`}
             </button>
           ) : (
             <button

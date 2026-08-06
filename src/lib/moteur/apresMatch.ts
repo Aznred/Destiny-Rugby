@@ -85,27 +85,55 @@ function borner(v: number, min: number, max: number): number {
 
 // LA NOTE DU MATCH, sur 10. Elle compare ce qu'a fait le joueur à ce qu'on
 // attend de SON POSTE, au prorata de son temps de jeu.
-export function noterMatch(poste: PosteId, s: StatsMatchJoueur): number {
+/** Une ligne du barème : ce que tel aspect du match a rapporté ou coûté. */
+export interface PostNote {
+  libelle: string;
+  points: number;
+}
+
+/**
+ * LE DÉTAIL DE LA NOTE, poste par poste du barème.
+ *
+ * ⚠️ C'EST LA SEULE IMPLÉMENTATION DU BARÈME — `noterMatch` ne fait qu'en
+ * additionner les lignes. Retour de jeu : « notre joueur est jugé que sur
+ * plaquage, mètres parcourus et essai, ce qui est dommage ». C'était FAUX depuis
+ * un moment (la note regarde quinze choses), mais rigoureusement l'impression
+ * qu'on en avait : le résumé affiché ne citait que ces trois-là. Un barème qu'on
+ * ne voit pas est un barème qui n'existe pas pour le joueur — d'où cette
+ * fonction, et l'affichage qui va avec.
+ *
+ * ⚠️ NE JAMAIS RECOPIER CE CALCUL AILLEURS pour l'affichage : deux exemplaires,
+ * et un jour la note montrée ne sera plus celle qui compte.
+ */
+export function detailNote(poste: PosteId, s: StatsMatchJoueur): PostNote[] {
   const att = ATTENDU[poste] ?? ATTENDU.premier_centre;
   const part = borner(s.minutes / 80, 0.1, 1);
-  let note = 5.8;
+  const lignes: PostNote[] = [{ libelle: 'Base', points: 5.8 }];
+  const ajouter = (libelle: string, points: number) => {
+    if (Math.abs(points) >= 0.05) lignes.push({ libelle, points });
+  };
 
   // Entrer en jeu et tenir sa place, ça compte déjà.
-  note += part >= 0.75 ? 0.35 : part <= 0.3 ? -0.35 : 0;
+  ajouter('Temps de jeu', part >= 0.75 ? 0.35 : part <= 0.3 ? -0.35 : 0);
 
   // Défense
   const plqAttendus = att.plaquages * part;
-  note += borner((s.plaquages - plqAttendus) / Math.max(3, plqAttendus) * 1.3, -1.2, 1.6);
-  note -= s.plaquagesManques * 0.28;
+  ajouter(`Plaquages (${s.plaquages} pour ${plqAttendus.toFixed(1)} attendus)`,
+    borner((s.plaquages - plqAttendus) / Math.max(3, plqAttendus) * 1.3, -1.2, 1.6));
+  ajouter(`Plaquages manqués (${s.plaquagesManques})`, -s.plaquagesManques * 0.28);
 
   // Avancée ballon en main
   const mAttendus = att.metres * part;
-  note += borner((s.metres - mAttendus) / Math.max(15, mAttendus) * 1.1, -1, 1.8);
+  ajouter(`Mètres gagnés (${Math.round(s.metres)} pour ${Math.round(mAttendus)} attendus)`,
+    borner((s.metres - mAttendus) / Math.max(15, mAttendus) * 1.1, -1, 1.8));
 
   // Ce qui fait gagner un match
-  note += s.essais * 1.25;
-  note += s.grattages * 0.45;
-  if (s.butsTentes > 0) note += s.butsReussis * 0.32 - (s.butsTentes - s.butsReussis) * 0.4;
+  ajouter(`Essais (${s.essais})`, s.essais * 1.25);
+  ajouter(`Ballons grattés (${s.grattages})`, s.grattages * 0.45);
+  if (s.butsTentes > 0) {
+    ajouter(`Tirs au but (${s.butsReussis}/${s.butsTentes})`,
+      s.butsReussis * 0.32 - (s.butsTentes - s.butsReussis) * 0.4);
+  }
 
   // ═══ TOUT LE RESTE DU JEU ═══════════════════════════════════════════════
   // ⚠️ SANS CETTE SECTION, UN PILIER NE POUVAIT PAS FAIRE UN GRAND MATCH. La
@@ -113,31 +141,45 @@ export function noterMatch(poste: PosteId, s: StatsMatchJoueur): number {
   // une première ligne qui domine la mêlée, gagne ses ballons au ras et offre
   // un essai obtenait exactement la même note qu'un pilier qui n'a rien fait.
   // Chaque ligne ci-dessous est bornée : le total ne peut pas s'envoler, et
-  // l'étalonnage de difficulté (médiane 63) ne bouge pas — vérifié.
-  note += borner((s.passesDecisives ?? 0) * 0.8, 0, 1.6);
-  note += borner(((s.offloads ?? 0) - att.offloads * part) * 0.35, -0.3, 0.9);
-  note += borner((s.franchissements ?? 0) * 0.22, 0, 1);
+  // l'étalonnage de difficulté ne bouge pas — vérifié.
+  ajouter(`Passes décisives (${s.passesDecisives ?? 0})`,
+    borner((s.passesDecisives ?? 0) * 0.8, 0, 1.6));
+  ajouter(`Offloads (${s.offloads ?? 0})`,
+    borner(((s.offloads ?? 0) - att.offloads * part) * 0.35, -0.3, 0.9));
+  ajouter(`Franchissements (${s.franchissements ?? 0})`,
+    borner((s.franchissements ?? 0) * 0.22, 0, 1));
   // Les ballons rendus se paient : un porteur qui perd trois ballons a coûté
   // trois possessions, quoi qu'il ait fait par ailleurs.
-  note -= borner((s.turnovers ?? 0) * 0.3, 0, 1.5);
+  ajouter(`Ballons rendus (${s.turnovers ?? 0})`, -borner((s.turnovers ?? 0) * 0.3, 0, 1.5));
 
   // La conquête. `att.melees` vaut 0 pour un trois-quarts : la ligne est donc
-  // neutre pour lui, sans avoir besoin d'un test de poste ici.
+  // absente pour lui, sans avoir besoin d'un test de poste ici.
   if (att.melees > 0) {
-    note += borner(((s.melees ?? 0) - att.melees * part) / Math.max(4, att.melees * part) * 0.8, -0.7, 0.9);
-    note += borner(((s.touchesGagnees ?? 0) - att.touches * part) * 0.22, -0.4, 0.9);
-    note += borner(((s.pickAndGo ?? 0) - att.pickAndGo * part) * 0.10, -0.4, 0.7);
+    ajouter(`Mêlée (${s.melees ?? 0})`,
+      borner(((s.melees ?? 0) - att.melees * part) / Math.max(4, att.melees * part) * 0.8, -0.7, 0.9));
+    ajouter(`Touches captées (${s.touchesGagnees ?? 0})`,
+      borner(((s.touchesGagnees ?? 0) - att.touches * part) * 0.22, -0.4, 0.9));
+    ajouter(`Pick and go (${s.pickAndGo ?? 0})`,
+      borner(((s.pickAndGo ?? 0) - att.pickAndGo * part) * 0.10, -0.4, 0.7));
   }
   // Le 50/22 est un coup de maître : il retourne une position, on le paie cher.
-  note += borner((s.cinquanteVingtDeux ?? 0) * 0.7, 0, 1.4);
+  ajouter(`50/22 réussis (${s.cinquanteVingtDeux ?? 0})`,
+    borner((s.cinquanteVingtDeux ?? 0) * 0.7, 0, 1.4));
 
   // ⚠️ Le rouge n'est pas un jaune. `cartons` reste le total pour compatibilité
   // (les appelants historiques ne fournissent que lui) ; quand la couleur est
   // connue, un rouge coûte trois fois plus — il a mis son équipe à quatorze.
   const rouges = s.cartonsRouges ?? 0;
-  note -= (s.cartons - rouges) * 1.4 + rouges * 4;
+  ajouter('Cartons', -((s.cartons - rouges) * 1.4 + rouges * 4));
 
-  return Math.round(borner(note, 1, 10) * 10) / 10;
+  return lignes;
+}
+
+// LA NOTE DU MATCH, sur 10. Elle compare ce qu'a fait le joueur à ce qu'on
+// attend de SON POSTE, au prorata de son temps de jeu.
+export function noterMatch(poste: PosteId, s: StatsMatchJoueur): number {
+  const total = detailNote(poste, s).reduce((a, l) => a + l.points, 0);
+  return Math.round(borner(total, 1, 10) * 10) / 10;
 }
 
 // L'attribut que la performance a mis en avant : c'est CELUI-LÀ qui progresse.

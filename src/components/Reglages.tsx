@@ -26,8 +26,6 @@ interface Props {
 export function Reglages({ onFermer }: Props) {
   const groqKey = useGame((s) => s.groqKey);
   const modele = useGame((s) => s.modele);
-  const rythme = useGame((s) => s.rythme);
-  const setRythme = useGame((s) => s.setRythme);
   const theme = useGame((s) => s.theme);
   const langue = useGame((s) => s.langue);
   const setLangue = useGame((s) => s.setLangue);
@@ -215,26 +213,21 @@ export function Reglages({ onFermer }: Props) {
           </p>
         </div>
 
+        {/* ⚠️ LE CHOIX DU RYTHME A ÉTÉ RETIRÉ (demande explicite : « il faut pas
+            qu'on puisse simuler la saison »). Le mode « saison par saison »
+            résumait l'année en un tirage de fin d'exercice : les compteurs
+            affichaient « 2 matchs, 0 essai » quoi qu'il arrive, la forme ne
+            bougeait pas, et aucune sélection n'était comptée. Pour avancer
+            vite, on clique une DATE dans le calendrier (📊 Résultats) : les
+            semaines sont réellement jouées, une par une. */}
         <div className="champ">
           <label>{t('reg.rythme')}</label>
-          <div className="choix-rythme">
-            <button
-              type="button"
-              className={rythme === 'semaine' ? 'actif' : ''}
-              onClick={() => setRythme('semaine')}
-            >
-              📅 Journée par journée
-              <span>Le vrai calendrier, d’août à juin : chaque match se joue, avec sa note.</span>
-            </button>
-            <button
-              type="button"
-              className={rythme === 'saison' ? 'actif' : ''}
-              onClick={() => setRythme('saison')}
-            >
-              ⏩ Saison par saison
-              <span>Pour avancer vite : la saison entière est simulée d’un bloc.</span>
-            </button>
-          </div>
+          <p className="aide">
+            📅 <b>Journée par journée</b>, et c’est le seul rythme. Le vrai
+            calendrier, d’août à juin : chaque match se joue, avec sa note.
+            Pour sauter plusieurs semaines, ouvre <b>📊 Résultats</b> et clique la
+            date où tu veux arriver — tout ce qu’il y a entre les deux est joué.
+          </p>
         </div>
 
         <details className="tuto">

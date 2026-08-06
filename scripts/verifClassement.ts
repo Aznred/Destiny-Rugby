@@ -21,10 +21,12 @@
 import { TROPHEES } from '../src/data/trophees';
 import { SUCCES, SUCCES_PAR_ID } from '../src/data/succes';
 import {
-  ficheDepuisJoueur, scoreDeLaFiche, verifierFiche, sceller, sceauValide, canonique,
+  ficheDepuisJoueur, ficheDepuisLegende, scoreDeLaFiche, verifierFiche,
+  sceller, sceauValide, canonique,
   SCORE_MAX, SAISONS_MAX, LIMITES, VERSION_BAREME, type FicheCarriere,
 } from '../src/lib/classementMondial';
 import { scoreCarriere } from '../src/store/useGame';
+import { CLASSEMENT_EN_LIGNE } from '../src/lib/classementEnLigne';
 import type { Joueur } from '../src/types';
 
 let echecs = 0;
@@ -294,6 +296,104 @@ console.log('\n=== 8. LES SUCCÈS ===');
 
   const secrets = SUCCES.filter((s) => s.secret).length;
   console.log(`     ${secrets} succès secrets · ${SUCCES.reduce((a, s) => a + s.ovas, 0)} Ovas au total`);
+}
+
+console.log('\n=== 9. LA TABLE SE REMPLIT VRAIMENT (retraite → envoi) ===');
+{
+  // ⚠️ CE TEST EXISTE À CAUSE D'UN BUG SIGNALÉ EN JEU : « le classement
+  // fonctionne pas, la table se remplit pas ». Le serveur, la base et le barème
+  // étaient bons — vérifiés un par un — mais RIEN N'ENVOYAIT JAMAIS. L'envoi
+  // était entièrement manuel et caché dans un dépliant replié de l'écran
+  // Classement, alors que ce même écran promet « mène une carrière à son terme
+  // et elle y entrera ». Un test sur le barème seul ne pouvait pas l'attraper :
+  // il faut vérifier que la RETRAITE déclenche l'envoi.
+  //
+  // `fetch` est remplacé le temps du test : zéro requête réseau, et on lit
+  // exactement ce que le jeu aurait envoyé.
+  const vraiFetch = globalThis.fetch;
+  const envois: { url: string; corps: FicheCarriere }[] = [];
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    envois.push({ url: String(url), corps: JSON.parse(String(init?.body ?? '{}')) });
+    return new Response(JSON.stringify({ ok: true, score: 0 }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  try {
+    const { useGame } = await import('../src/store/useGame');
+    const g = () => useGame.getState();
+    g().reinitialiser();
+    g().creerJoueur({
+      nom: 'Retraité Test', poste: 'demi_melee', nation: 'France',
+      club: 'Stade Nantais', division: 'nationale2', age: 18,
+    });
+    for (let s = 0; s < 3; s++) {
+      const avant = g().joueur?.saison ?? 0;
+      g().saisonSuivante();
+      if (g().offres.length) g().signerOffre(g().offres[0].id);
+      if ((g().joueur?.saison ?? 0) === avant) {
+        g().saisonSuivante();
+        if (g().offres.length) g().signerOffre(g().offres[0].id);
+      }
+      useGame.setState({ tropheesEnAttente: [], offresOuvertes: false });
+    }
+    const avantRetraite = g().joueur!;
+    g().prendreRetraite('entraîneur');
+    // L'envoi est volontairement « au fil de l'eau » (on n'attend pas la
+    // réponse) : on laisse la micro-tâche se dérouler.
+    await new Promise((r) => setTimeout(r, 0));
+
+    // ⚠️ CE QUI EST VÉRIFIÉ DANS TOUS LES CAS : la fiche qui partirait est
+    // valide. C'est le vrai risque — une fiche refusée par le serveur, et la
+    // carrière n'entre jamais au classement, quelle que soit la plomberie.
+    const fichePartante = ficheDepuisJoueur(avantRetraite);
+    ligne('la fiche produite à la retraite est acceptable',
+      verifierFiche(fichePartante, IDS_TROPHEES).anomalies.join(' | ') || 'valide',
+      verifierFiche(fichePartante, IDS_TROPHEES).valide);
+    ligne('… et son score est celui du jeu',
+      `${fichePartante.score} vs ${scoreCarriere(avantRetraite)}`,
+      fichePartante.score === scoreCarriere(avantRetraite));
+
+    // ⚠️ L'ENVOI RÉEL NE PEUT ÊTRE OBSERVÉ QUE SI UNE URL EST CONFIGURÉE.
+    // `envoyerAuClassement` refuse volontairement de partir en développement
+    // sans `VITE_CLASSEMENT_URL` (voir `lib/classementEnLigne.ts`) : la
+    // plomberie se teste donc en la fournissant. On le DIT au lieu de sauter le
+    // contrôle en silence — un test qui s'esquive se lit comme un test qui
+    // passe.
+    if (CLASSEMENT_EN_LIGNE) {
+      // ⚠️ L'ENVOI EST AUTOMATIQUE ET RÉPÉTÉ (demande explicite : « il faut que
+      // ça s'envoie automatiquement »). Une par fin de saison, plus une à la
+      // retraite : sur trois saisons jouées, on attend QUATRE requêtes. Le
+      // serveur ne garde que le meilleur score, renvoyer ne dégrade rien.
+      ligne('chaque fin de saison envoie la carrière', `${envois.length} requête(s) pour 3 saisons + retraite`,
+        envois.length === 4);
+      const dernier = envois[envois.length - 1];
+      ligne('… et la dernière est bien celle de la retraite', dernier?.url ?? '—',
+        dernier?.corps?.score === fichePartante.score);
+      // Les scores ne peuvent que monter : une carrière ne perd pas de matchs.
+      const croissants = envois.every((e, i) => i === 0 || e.corps.score >= envois[i - 1].corps.score);
+      ligne('les scores envoyés ne reculent jamais',
+        envois.map((e) => e.corps.score).join(' → '), croissants);
+    } else {
+      console.log('  ⏭️  envoi réseau non observé : aucune URL de classement configurée.');
+      console.log('     Pour le contrôler : '
+        + 'VITE_CLASSEMENT_URL=https://exemple.test/api/classement npx vite-node scripts/verifClassement.ts');
+    }
+
+    // Le Hall garde les IDS des trophées : sans eux, une carrière terminée était
+    // refusée par le serveur (« trophée(s) inconnu(s) : titre »).
+    const legende = g().pantheon[g().pantheon.length - 1];
+    ligne('le Hall mémorise les ids de trophées',
+      `${legende?.tropheeIds?.length ?? 'ABSENT'} id(s) pour ${legende?.titres.length ?? 0} titre(s)`,
+      Array.isArray(legende?.tropheeIds)
+        && legende.tropheeIds.length === (avantRetraite.palmares ?? []).length);
+    const f = ficheDepuisLegende(legende, 'Aznred');
+    ligne('… et la fiche d’une légende est acceptée',
+      verifierFiche(f, IDS_TROPHEES).anomalies.join(' | ') || `score ${f.score}`,
+      verifierFiche(f, IDS_TROPHEES).valide);
+  } finally {
+    globalThis.fetch = vraiFetch;
+  }
 }
 
 console.log(echecs === 0 ? '\n✅ Classement protégé, succès conformes.' : `\n❌ ${echecs} contrôle(s) en échec.`);

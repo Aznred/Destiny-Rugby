@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { effectifDuClub, forceEffectif, noteDuClub, estEspoir, estDeclinant } from '../lib/effectif';
 import { aEffectifReel } from '../data/effectifsReels';
+import { generationDuClub, libelleGeneration } from '../lib/generations';
 import { POSTES } from '../data/rugby';
 import { Blason } from './Blason';
 import { Drapeau } from './Drapeau';
@@ -27,6 +28,8 @@ export function FicheClub({
   const noteClub = noteDuClub(club.nom);
   const force = Math.round(forceEffectif(club.nom, saison));
   const reel = aEffectifReel(club.nom);
+  const gen = generationDuClub(club.nom, saison, noteDuClub(club.nom));
+  const generation = libelleGeneration(gen);
 
   // Échap ferme la fiche.
   useEffect(() => {
@@ -60,6 +63,20 @@ export function FicheClub({
               Note du club <b>{noteClub}</b> · effectif noté <b>{force}</b> ·{' '}
               {effectif.length} joueurs{reel ? ' · effectif réel' : ' · effectif simulé'}
             </p>
+            {/* ⚠️ LA GÉNÉRATION DU CLUB SE VOIT. Un effectif qui prend cinq
+                points sans explication, c'est du bruit ; annoncé, c'est une
+                histoire — et c'est ce qui rend un outsider crédible quand il
+                vient chercher le Bouclier. */}
+            {generation && (
+              <p className={`pastille-generation${gen.doree ? ' doree' : ' creuse'}`}>
+                {generation}
+                <span>
+                  {gen.doree
+                    ? `Une promotion entière a éclos en même temps : +${Math.round(gen.bonus)} sur tout l’effectif cette saison.`
+                    : `Le vivier s’est tari : ${Math.round(gen.bonus)} sur tout l’effectif cette saison.`}
+                </span>
+              </p>
+            )}
           </div>
           <button className="btn fantome petit fiche-club-fermer" onClick={onFermer} aria-label="Fermer">
             ✕

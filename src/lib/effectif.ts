@@ -7,6 +7,7 @@ import {
   effectifNouveau, NOTE_CLUB_NOUVEAU, type JoueurNouveau,
 } from '../data/nouvellesLigues';
 import { mercatoReel, type RecrueReelle } from './mercato';
+import { generationDuClub } from './generations';
 
 // Génération DÉTERMINISTE de l'effectif d'un club : même club + même saison
 // => même équipe. Les joueurs vieillissent d'un an par saison ; passé leur âge
@@ -428,9 +429,26 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
 export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
   // ⚠️ Les transferts annoncés sur L'Ovale s'appliquent APRÈS le mercato, et
   // dès la saison 1 (le mercato, lui, ne démarre qu'en saison 2).
-  return appliquerTransfertsSociaux(
+  const liste = appliquerTransfertsSociaux(
     nomClub, saison, appliquerMercato(nomClub, saison, effectifBrut(nomClub, saison)),
   );
+
+  // ═══ LA GÉNÉRATION DU CLUB ════════════════════════════════════════════════
+  // ⚠️ C'EST LE SEUL ENDROIT OÙ ELLE S'APPLIQUE, et c'est délibéré (voir
+  // `lib/generations.ts`). Le bonus porte sur la NOTE DE CHAQUE JOUEUR, pas sur
+  // la force du club : tout en découle alors sans rien d'autre à toucher — le
+  // classement, les montées, le marché, la feuille de match, et l'écran 👥 qui
+  // montre bien des joueurs meilleurs. L'appliquer sur `forceEffectif` seul
+  // aurait donné un club qui joue comme 82 avec un effectif affiché à 75.
+  const { bonus } = generationDuClub(nomClub, saison, noteDuClub(nomClub));
+  if (Math.abs(bonus) < 0.05) return liste;
+  return liste.map((j) => ({
+    ...j,
+    note: Math.max(20, Math.min(99, Math.round(j.note + bonus))),
+    // Le potentiel suit : une génération dorée, ce sont des joueurs qui
+    // dépassent ce qu'on attendait d'eux, pas seulement une bonne saison.
+    potentiel: Math.max(20, Math.min(99, Math.round(j.potentiel + bonus * 0.6))),
+  }));
 }
 
 // Un groupe doit pouvoir aligner un XV et son banc. Les données réelles vont de

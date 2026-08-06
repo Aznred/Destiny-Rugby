@@ -82,8 +82,9 @@ export function coupeEnDirect(
   // européennes. Un aller-retour (10 journées de poules) ne laisserait aucune
   // place au tableau final — on joue donc la poule à l'aller, et les trois
   // dernières dates servent aux quarts, demies et finale.
-  const grilles = groupes.map((g) => {
-    const complet = calendrier(g);
+  const grilles = groupes.map((g, p) => {
+    // Le tirage de la poule change d'une saison à l'autre, comme en vrai.
+    const complet = calendrier(g, `${coupeId}#${saison}#${p}`);
     return complet.slice(0, Math.ceil(complet.length / 2));
   });
   const total = Math.max(...grilles.map((g) => g.length));

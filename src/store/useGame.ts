@@ -42,9 +42,13 @@ import {
 import { estTitulaire } from '../lib/moteur/titulaire';
 import { definirLangue, langueDuNavigateur, type Langue } from '../lib/i18n';
 import type { LigneReelle } from '../lib/moteur/saison';
-import { coupesDuClub } from '../lib/coupe';
-import { scoreDeLaFiche } from '../lib/classementMondial';
-import { fenetreInternationale, fenetreU20, equipeU20 } from '../lib/international';
+import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
+import { ficheDepuisJoueur, scoreDeLaFiche } from '../lib/classementMondial';
+import { envoyerAuClassement } from '../lib/classementEnLigne';
+import {
+  COMPETITIONS_U20, competitionsDeLaSaison, fenetreInternationale, fenetreU20,
+  internationalEnDirect, equipeU20,
+} from '../lib/international';
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
 
 // Combien de week-ends de ce type se sont écoulés AVANT cette semaine.
@@ -75,16 +79,15 @@ import { genererOffres, offreProlongation, cote } from '../lib/offres';
 import {
   TROPHEES,
   TROPHEE_PAR_DIVISION,
-  COUPE_EUROPE_PAR_DIVISION,
+  TROPHEE_PAR_COUPE,
+  TROPHEE_PAR_INTERNATIONAL,
   MEILLEUR_JOUEUR_PAR_DIVISION,
-  NATIONS_6N,
-  NATIONS_REC,
   estIndividuel,
 } from '../data/trophees';
 import { decernerHonneurs, noterSaisonIndividuelle, BARRES_HONNEURS } from '../lib/honneurs';
 import { nomNation } from '../components/Drapeau';
 import {
-  semaine, libelleDate, SEMAINES_PAR_SAISON, type Semaine,
+  semaine, libelleDate, SEMAINES_PAR_SAISON, estAnneeDeCoupeDuMonde, type Semaine,
 } from '../data/calendrier';
 import { convocation, convocationU20 } from '../lib/selection';
 import {
@@ -225,6 +228,52 @@ export const AGE_RETRAITE_LIBRE = 33;
 export const AGE_RETRAITE_FORCEE = 44;
 
 // ---------------------------------------------------------------------------
+// LA RÉCUPÉRATION HEBDOMADAIRE
+// ---------------------------------------------------------------------------
+// ⚠️ ELLE N'EXISTAIT PAS, ET C'ÉTAIT LE BUG signalé en jeu : « impossible de
+// récupérer de la forme, on en perd trop et à la moitié de la saison on est
+// à 0 ». Le bilan d'une semaine de match était STRUCTURELLEMENT négatif :
+//
+//     match regardé  −(3 + minutes/14) ≈ −9   ·   match estimé −(minutes/12) ≈ −6
+//     séance de la semaine                −4
+//     ────────────────────────────────────────
+//     total                        −10 à −13 par semaine de match
+//
+// …et la seule remontée venait des week-ends SANS match (+6 à +8). Sur les
+// ~30 semaines de match d'une saison de Top 14, ça fait −300 pour +90 : le
+// joueur touchait le fond avant Noël, et n'en ressortait plus.
+//
+// ⚠️ CE N'EST PAS UN BONUS FIXE, C'EST UNE CONVERGENCE, et c'est ce qui rend le
+// réglage stable. Le corps revient vers une CONDITION DE BASE, d'autant plus
+// vite qu'il en est loin — comme dans la réalité. Un bonus fixe aurait le même
+// défaut que l'ancien système, à l'envers : trop petit il ne change rien, trop
+// grand tout le monde reste à 100 et la forme cesse de vouloir dire quelque
+// chose. Ici, l'équilibre se cale tout seul :
+//
+//   · joueur qui enchaîne les matchs ....... plafonne vers « base − 20 »
+//   · joueur qui ne joue pas ............... remonte à sa condition de base
+//   · vétéran de 35 ans .................... base plus basse, donc plus fragile
+//
+/** La condition de base d'un joueur : là où son corps revient au repos. */
+export function conditionDeBase(j: Joueur): number {
+  // L'endurance et la jeunesse font tout : un ailier de 22 ans à 90 d'endurance
+  // se remet d'une semaine à l'autre, un pilier de 35 ans traîne sa fatigue.
+  return borne(
+    72 + (j.attributs.endurance - 60) * 0.2 - Math.max(0, j.age - 28) * 1.5,
+    52, 94,
+  );
+}
+
+/** Ce que le corps regagne en une semaine, avant l'effort de cette semaine-là. */
+export function recuperationHebdo(j: Joueur): number {
+  // ⚠️ Un joueur à l'infirmerie ne « récupère » pas sa condition de match : il
+  // soigne une blessure. On vise plus bas, sinon on revenait de six semaines
+  // d'arrêt plus frais qu'en sortant d'un week-end de repos.
+  const cible = conditionDeBase(j) - (j.blessure && j.blessure.semaines > 0 ? 18 : 0);
+  return Math.max(0, Math.round((cible - j.forme) * 0.45 + 4));
+}
+
+// ---------------------------------------------------------------------------
 // UNE SÉANCE D'ENTRAÎNEMENT
 // ---------------------------------------------------------------------------
 // Isolée pour être rejouable EN LOT : quand on passe la saison d'un bloc (mode
@@ -354,6 +403,14 @@ interface GameState {
   // celui qui attend une réponse (c'est l'écran qui l'a fabriqué, parce que
   // l'appel à Groq est asynchrone et que le store, lui, est synchrone).
   attenteEvenement: boolean;
+  /**
+   * Une avance rapide est en cours (`avancerJusqua`). Non persisté — c'est un
+   * état de la seconde qui passe, pas de la sauvegarde.
+   * ⚠️ Il sert à NE PAS demander une scène du MJ à chaque semaine sautée : sans
+   * lui, un saut de quinze semaines déclenchait quinze appels à Groq et empilait
+   * quinze questions sans réponse.
+   */
+  avanceRapide: boolean;
   evenementHebdo: EvenementHebdo | null;
   /** Titres déjà posés cette saison : envoyés à l'IA pour qu'elle se répète moins. */
   evenementsVus: string[];
@@ -395,6 +452,15 @@ interface GameState {
   appliquerReponse: (r: ReponseMJ, actionJoueur: string) => void;
   saisonSuivante: () => void;
   semaineSuivante: () => void;
+  /**
+   * Avance jusqu'à cette semaine du calendrier EN JOUANT tout ce qu'il y a
+   * entre les deux. Renvoie ce qui a réellement été joué et pourquoi on s'est
+   * arrêté — l'écran s'en sert pour le dire au joueur.
+   */
+  avancerJusqua: (numeroSemaine: number) => {
+    semaines: number;
+    arret: 'arrive' | 'question' | 'saison' | 'contrat' | 'fin';
+  };
   setRythme: (r: Rythme) => void;
   setTheme: (t: Theme) => void;
   setLangue: (l: Langue) => void;
@@ -491,6 +557,7 @@ export const useGame = create<GameState>()(
       pantheon: [],
       scenarioActif: null,
       attenteEvenement: false,
+      avanceRapide: false,
       evenementHebdo: null,
       evenementsVus: [],
       compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
@@ -877,7 +944,9 @@ export const useGame = create<GameState>()(
         );
 
         // ---- Bilan sportif : classement du club puis titres remportés ----
-        const bilan = resoudreTrophees(j, joueur.saison, matchsSaison, essaisSaison, pyramide.phase);
+        const bilan = resoudreTrophees(
+          j, joueur.saison, matchsSaison, essaisSaison, pyramide.phase, vecu?.capes ?? 0,
+        );
 
         // ---- ÉVOLUTION : la saison jouée fait progresser (ou régresser) ----
         const evolution = evoluer(
@@ -1285,6 +1354,19 @@ export const useGame = create<GameState>()(
         }));
         get().verifierSucces();
 
+        // ═══ LE CLASSEMENT MONDIAL SE MET À JOUR TOUT SEUL ═══════════════════
+        // ⚠️ Demande explicite : « la fiche d'envoi, il faut que ça s'envoie
+        // automatiquement ». L'envoi tenait à un bouton caché dans un dépliant
+        // de l'écran Classement : personne ne le trouvait, donc la table restait
+        // vide. Une fin de saison est le bon moment — la carrière vient de
+        // gagner ses titres, ses matchs et ses essais de l'année.
+        //
+        // Fait exprès : on n'attend pas la réponse et on n'échoue jamais. Sans
+        // serveur, hors ligne, fiche refusée ou quota atteint, la saison se
+        // referme exactement pareil. Le serveur ne garde que le MEILLEUR score :
+        // renvoyer chaque année ne peut donc rien dégrader.
+        void envoyerAuClassement(ficheDepuisJoueur(j)).catch(() => {});
+
         // ---- LA LIMITE D'ÂGE, VRAIMENT APPLIQUÉE ----
         // ⚠️ `AGE_RETRAITE_FORCEE` n'était qu'un texte : on pouvait jouer
         // jusqu'à 60 ans. À 44 ans révolus, le corps a dit non — la carrière se
@@ -1385,6 +1467,57 @@ export const useGame = create<GameState>()(
       // Une semaine du calendrier réel : un match de championnat, une affiche
       // de coupe d'Europe, une fenêtre internationale ou une trêve. À la
       // dernière semaine, la saison se clôt d'elle-même.
+      // ═══ AVANCER JUSQU'À UNE DATE DU CALENDRIER ════════════════════════════
+      //
+      // ⚠️ CE QUI REMPLACE LA « SIMULATION DE SAISON ». Demande explicite :
+      // « il faut pas qu'on puisse simuler la saison mais plus qu'on puisse
+      // cliquer sur une date dans le calendrier et que ça nous y amène en
+      // simulant tous les matchs ». Le mode rapide résumait l'année d'un trait
+      // de plume — d'où « on a toujours 2 matchs, 0 essai » : les compteurs
+      // venaient d'un `Math.random()` de fin de saison, pas de matchs joués.
+      // Ici on JOUE chaque semaine, une par une, exactement comme si on avait
+      // cliqué « semaine suivante » à la main. Les statistiques, la forme, les
+      // blessures, les sélections et le classement en découlent naturellement.
+      //
+      // ⚠️ ON S'ARRÊTE À LA PREMIÈRE CHOSE QUI DEMANDE LE JOUEUR — une scène du
+      // MJ, une offre de contrat à signer, la fin de saison, la retraite.
+      // Enjamber ces moments-là, c'est exactement ce que faisait l'ancien mode
+      // rapide, et c'est ce qu'on ne veut plus.
+      avancerJusqua: (cible) => {
+        const depart = get().joueur?.semaine ?? 1;
+        let semaines = 0;
+        if (!get().joueur || cible <= depart) return { semaines, arret: 'arrive' };
+
+        // ⚠️ PAS UNE SCÈNE PAR SEMAINE SAUTÉE. `semaineSuivante` lève
+        // `attenteEvenement`, et l'écran Carrière fabrique alors une scène avec
+        // Groq. Sur un saut de quinze semaines, ce serait quinze appels — et
+        // quinze questions empilées à l'arrivée. On lève le drapeau une seule
+        // fois, à destination.
+        set({ avanceRapide: true });
+        let arret: 'arrive' | 'question' | 'saison' | 'contrat' | 'fin' = 'arrive';
+        try {
+          while ((get().joueur?.semaine ?? 1) < cible) {
+            const avant = get().joueur!;
+            if (get().evenementHebdo || get().scenarioActif) { arret = 'question'; break; }
+            get().semaineSuivante();
+            const apres = get().joueur;
+            if (!apres) { arret = 'fin'; break; }                     // retraite
+            semaines++;
+            if (apres.saison !== avant.saison) { arret = 'saison'; break; }
+            if (get().offresOuvertes) { arret = 'contrat'; break; }
+            // Garde-fou : si la semaine n'a pas bougé, on ne boucle pas à vide.
+            if (apres.semaine === avant.semaine) { arret = 'question'; break; }
+          }
+        } finally {
+          set({ avanceRapide: false });
+        }
+        // La scène de la semaine est demandée UNE fois, à l'arrivée.
+        if (get().joueur && !get().evenementHebdo && !get().scenarioActif) {
+          set({ attenteEvenement: true });
+        }
+        return { semaines, arret };
+      },
+
       semaineSuivante: () => {
         const { joueur } = get();
         if (!joueur) return;
@@ -1407,7 +1540,14 @@ export const useGame = create<GameState>()(
         // résumés contradictoires — une feuille de match à 32 minutes suivie de
         // « tu n'es pas retenu dans le groupe ».
         const matchDejaVecu = get().matchRegarde === `${joueur.saison}#${numero}`;
-        let j = appliquerDeltas(joueur, matchDejaVecu ? {} : resultat.deltas);
+        // ⚠️ LA SEMAINE COMMENCE PAR LA RÉCUPÉRATION, ET ELLE EST LA MÊME POUR
+        // LES DEUX CHEMINS. Elle est appliquée ici, en un seul endroit, qu'on
+        // ait regardé le match (la fatigue a déjà été payée par
+        // `enregistrerMatchVecu`) ou non : c'est le seul moyen d'avoir un
+        // barème de forme unique. Voir `recuperationHebdo`.
+        const recuperation = recuperationHebdo(joueur);
+        let j = appliquerDeltas(joueur, { forme: recuperation });
+        j = appliquerDeltas(j, matchDejaVecu ? {} : resultat.deltas);
 
         // Suivi de l'infirmerie : on décompte, ou on encaisse une nouvelle blessure.
         if (resultat.soinBlessure && j.blessure) {
@@ -1482,9 +1622,15 @@ export const useGame = create<GameState>()(
         // L'interview d'après-match, elle, reste : elle arrive APRÈS le match,
         // c'est sa raison d'être. Mais seulement quand aucune scène n'attend,
         // pour ne jamais empiler deux choses à répondre.
+        // ⚠️ PENDANT UNE AVANCE RAPIDE, ON NE POSE RIEN. Ni scène du MJ, ni
+        // interview : on traverse les semaines pour arriver à une date, et
+        // `avancerJusqua` lèvera le drapeau une seule fois, à l'arrivée. Sans
+        // ça, chaque semaine sautée déclenchait un appel Groq — et une
+        // interview d'après-match tombée en route bloquait le saut net.
+        const enAvance = get().avanceRapide;
         let suite: Scenario | null = null;
         const rienEnCours = !get().scenarioActif && !get().evenementHebdo;
-        if (rienEnCours && aJoue && note != null && Math.random() < 0.18) {
+        if (!enAvance && rienEnCours && aJoue && note != null && Math.random() < 0.18) {
           if (note >= 7.8) suite = interviewAleatoire('exploit');
           else if (note <= 4.5) suite = interviewAleatoire('defaite');
         }
@@ -1494,7 +1640,7 @@ export const useGame = create<GameState>()(
           scenarioActif: suite ?? s.scenarioActif,
           // Une seule scène à la fois : si une interview vient de tomber, la
           // semaine n'en réclame pas une deuxième.
-          attenteEvenement: rienEnCours && !suite,
+          attenteEvenement: !enAvance && rienEnCours && !suite,
           journal: [
             ...s.journal,
             // ⚠️ Si le match vient d'être JOUÉ en direct, on n'ajoute PAS le
@@ -1507,7 +1653,13 @@ export const useGame = create<GameState>()(
               role: 'systeme' as const,
               titre: `${resultat.emoji} ${libelleDate(sem)} — ${resultat.titre}`,
               texte: resultat.texte,
-              deltas: resultat.deltas,
+              // ⚠️ La récupération EST dans les deltas affichés. Un gain qu'on
+              // ne voit pas n'existe pas pour le joueur : c'est ce qui donnait
+              // l'impression qu'on ne récupérait jamais.
+              deltas: {
+                ...resultat.deltas,
+                forme: (resultat.deltas.forme ?? 0) + recuperation,
+              },
             }]),
             ...(suite
               ? [{
@@ -1991,9 +2143,25 @@ export const useGame = create<GameState>()(
           matchsJoues: joueur.matchsJoues,
           essais: joueur.essais,
           titres: joueur.titres,
+          // Les ids servent au classement mondial : voir `LegendeSauvegardee`.
+          tropheeIds: (joueur.palmares ?? []).map((t) => t.trophee),
           score: scoreCarriere(joueur),
           reconversion,
         };
+        // ═══ LE CLASSEMENT MONDIAL SE REMPLIT ICI ════════════════════════════
+        // ⚠️ BUG SIGNALÉ EN JEU : « le classement fonctionne pas, la table se
+        // remplit pas ». La fonction serveur, la base et le barème étaient bons
+        // — mais RIEN N'ENVOYAIT JAMAIS. L'envoi était entièrement manuel, et
+        // caché dans un dépliant replié de l'écran Classement. L'écran promet
+        // pourtant, noir sur blanc : « Mène une carrière à son terme et elle y
+        // entrera ». C'est ici que ça se tient.
+        //
+        // Fait exprès : on n'attend PAS la réponse et on n'échoue jamais. Sans
+        // serveur, hors ligne, ou quota atteint, `envoyerAuClassement` renvoie
+        // une erreur qu'on ignore — la retraite reste instantanée, et le
+        // classement local n'a besoin de personne. Le bouton manuel de l'écran
+        // Classement reste là pour renvoyer une carrière en cours ou réessayer.
+        void envoyerAuClassement(ficheDepuisJoueur(joueur)).catch(() => {});
         setMouvementsClubs({});
         // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
         // du joueur précédent sont périmés (voir lib/promotion.ts).
@@ -2830,26 +2998,67 @@ export const useGame = create<GameState>()(
         const dejaFaites = get().journeesReelles[cle] ?? 0;
         if (dejaFaites >= affiche.journee) return; // journée déjà simulée
 
+        // ⚠️ ON RATTRAPE LES JOURNÉES MANQUANTES, ON NE SAUTE PLUS À LA
+        // DERNIÈRE. Depuis qu'on peut avancer de plusieurs semaines d'un coup
+        // (`avancerJusqua`), cette fonction est appelée une fois par semaine
+        // mais ne s'EXÉCUTE qu'après la boucle — donc toutes les invocations
+        // lisent la même semaine d'arrivée, et une seule journée était rejouée.
+        // Le compteur `journeesReelles` sautait alors à J18 avec les
+        // statistiques d'UNE journée : le classement des marqueurs affichait
+        // « 2 essais » en tête au mois de mars.
+        //
+        // ⚠️ ET ON BORNE, EN LE DISANT. Rejouer une journée coûte ~0,9 s (huit
+        // matchs par le moteur complet). Au-delà de `MAX_RATTRAPAGE`, on prend
+        // les plus récentes et on écrit dans la console ce qui a été laissé de
+        // côté — un plafond silencieux se lit « tout est couvert » alors que
+        // non.
+        // ⚠️ RELEVÉ DE 6 À 12 APRÈS RETOUR DE JEU (« des fois il perd des
+        // stats »). Depuis que l'avance par le calendrier est LE moyen d'aller
+        // vite, sauter dix journées est courant : borner à 6 laissait des trous
+        // systématiques. Douze journées couvrent un saut d'une demi-saison.
+        const MAX_RATTRAPAGE = 12;
+        const premiere = Math.max(dejaFaites + 1, affiche.journee - MAX_RATTRAPAGE + 1);
+        if (premiere > dejaFaites + 1) {
+          console.info(
+            `[stats] journées ${dejaFaites + 1} à ${premiere - 1} non rejouées `
+            + `(rattrapage borné à ${MAX_RATTRAPAGE} journées).`,
+          );
+        }
+
         const poules = poulesDe(division);
         const numeroPoule = poules.length > 1
           ? Math.max(0, indexPoule(division, joueur.club)) : undefined;
-        const lignes = simulerJournee(
-          division, joueur.saison, affiche.journee, joueur.club,
-          bonusClubDuJoueur(joueur), numeroPoule,
-          {
-            club: joueur.club, nom: joueur.nom, poste: joueur.poste,
-            attributs: joueur.attributs,
-            // Même décision que dans le direct : le match rejoué est le même.
-            titulaire: estTitulaire(joueur, affiche.cle),
-          },
-        );
-        set((s) => ({
-          // ⚠️ On ne garde que la saison EN COURS : accumuler tout l'historique
-          // ferait exploser le quota du localStorage. La coupe et la sélection
-          // ont chacune leur clé, elles cohabitent avec le championnat.
-          statsReelles: { ...s.statsReelles, [cle]: cumuler(s.statsReelles[cle] ?? {}, lignes) },
-          journeesReelles: { ...s.journeesReelles, [cle]: affiche.journee },
-        }));
+        for (let journee = premiere; journee <= affiche.journee; journee++) {
+          // ⚠️ ON REND LA MAIN ENTRE DEUX JOURNÉES. Rejouer une journée, c'est
+          // huit matchs par le moteur complet : ~0,9 s de JavaScript synchrone.
+          // Douze d'affilée, et l'onglet se fige dix secondes sans rien
+          // afficher. Un `setTimeout(0)` laisse React peindre entre chaque : le
+          // classement se remplit sous les yeux du joueur au lieu de le geler.
+          if (journee > premiere) await new Promise((r) => setTimeout(r, 0));
+          // ⚠️ La clé du match de CETTE journée-là, pas celle de la semaine en
+          // cours : c'est elle qui décide de la titularisation, et c'est ce qui
+          // garantit qu'un match rejoué ici est identique à celui du direct.
+          const cleMatch = journee === affiche.journee
+            ? affiche.cle
+            : `${division}#${joueur.saison}#${journee}`;
+          const lignes = simulerJournee(
+            division, joueur.saison, journee, joueur.club,
+            bonusClubDuJoueur(joueur), numeroPoule,
+            {
+              club: joueur.club, nom: joueur.nom, poste: joueur.poste,
+              attributs: joueur.attributs,
+              // Même décision que dans le direct : le match rejoué est le même.
+              titulaire: estTitulaire(joueur, cleMatch),
+            },
+          );
+          set((s) => ({
+            // ⚠️ On ne garde que la saison EN COURS : accumuler tout l'historique
+            // ferait exploser le quota du localStorage. La coupe et la sélection
+            // ont chacune leur clé, elles cohabitent avec le championnat.
+            statsReelles: { ...s.statsReelles, [cle]: cumuler(s.statsReelles[cle] ?? {}, lignes) },
+            journeesReelles: { ...s.journeesReelles, [cle]: journee },
+          }));
+        }
       },
 
       signalerDefi: (evenement) => {
@@ -3084,12 +3293,46 @@ export interface BilanSaison {
   selectionne6N: boolean; // le joueur est retenu pour le Tournoi
 }
 
+/**
+ * Combien de week-ends de coupe d'Europe compte une saison. Sert à demander à
+ * `coupeEnDirect` la compétition ENTIÈRE (poules + tableau final) : en fin de
+ * saison, tout a été joué.
+ */
+const WEEKENDS_COUPE = SEMAINES.filter((s) => s.type === 'coupe').length;
+
+/**
+ * Le vainqueur d'une compétition de sélections, tel que le classement le donne.
+ *
+ * ⚠️ `apport: null`, COMME PARTOUT AILLEURS. L'écran Résultats et le classement
+ * latéral lisent ces compétitions sans bonus du joueur (`internationalEnDirect(
+ * …, null)`). Passer un apport ici donnerait un autre classement que celui que
+ * le joueur a sous les yeux pendant toute la saison — donc un champion qui n'est
+ * pas celui qu'il a vu gagner. C'est exactement le genre d'écart qui a produit
+ * le bug d'origine.
+ */
+function vainqueurInternational(id: string, saison: number): string | null {
+  const comp = competitionsDeLaSaison(saison).find((c) => c.id === id);
+  if (!comp) return null;
+  const etat = internationalEnDirect(id, saison, comp.journees, null);
+  return etat?.classement[0]?.club ?? null;
+}
+
+/** La compétition de sélections que SA nation dispute sur une fenêtre donnée. */
+function competitionDeSaNation(
+  nation: string, saison: number, fenetre: 'automne' | 'tournoi',
+) {
+  return competitionsDeLaSaison(saison).find(
+    (c) => c.fenetre === fenetre && !COMPETITIONS_U20.has(c.id) && c.equipes.includes(nation),
+  );
+}
+
 function resoudreTrophees(
   j: Joueur,
   saisonEcoulee: number,
   matchsSaison: number,
   essaisSaison: number,
   phase: PhaseFinale,
+  capesSaison: number,
 ): BilanSaison {
   const trophees: string[] = [];
   const divisionId = j.division ?? divisionDuClub(j.club)?.id ?? 'fed3';
@@ -3108,7 +3351,6 @@ function resoudreTrophees(
   const rang =
     phase.classement.find((l) => l.club === j.club)?.position ??
     Math.max(1, Math.min(taille, rangDuClub(force, reference, taille) - Math.round(apport)));
-  const tire = (chance: number) => Math.random() < Math.max(0, Math.min(0.6, chance));
 
   // ---- TITRE NATIONAL : plus aucun tirage au sort ----
   // Le champion est celui qui a gagné LA FINALE (lib/phaseFinale.ts), après
@@ -3119,45 +3361,66 @@ function resoudreTrophees(
   const qualifie = phase.qualifies.includes(j.club);
   if (tropheeNational && champion) trophees.push(tropheeNational);
 
-  // Coupe d'Europe — réservée au Top 14, selon le classement :
-  // 8 premiers → Champions Cup ; 6 derniers → Challenge Cup.
-  const enChampionsCup = !!COUPE_EUROPE_PAR_DIVISION[divisionId] && rang <= 8;
-  if (COUPE_EUROPE_PAR_DIVISION[divisionId]) {
-    if (enChampionsCup) {
-      if (tire((9 - rang) / 48)) trophees.push('champions');
-    } else if (tire((15 - rang) / 40)) {
-      trophees.push('challenge');
+  // ---- COUPES D'EUROPE : le VRAI vainqueur, plus un tirage au sort ----
+  //
+  // ⚠️ BUG SIGNALÉ EN JEU : « j'ai gagné la Champions Cup et je ne l'ai pas
+  // eue ». La coupe est jouée pour de vrai depuis longtemps (`lib/coupe.ts` :
+  // quatre poules, quarts, demies, finale) et le joueur en suit le tableau dans
+  // l'écran Résultats — mais le TITRE, lui, était tiré au sort à partir du rang
+  // en championnat (`tire((9 − rang) / 48)`). Deux vérités parallèles : on
+  // pouvait soulever le trophée à l'écran et repartir les mains vides, ou
+  // l'inverse. On lit maintenant le vainqueur de la finale, et rien d'autre.
+  //
+  // ⚠️ ET ON LIT LES COUPES QUE LE CLUB DISPUTE VRAIMENT (`coupesDuClub`, la
+  // liste des engagés de `COUPES_EUROPE`), pas celles que son classement lui
+  // « donnerait ». C'est déjà ce que montrent l'écran Résultats et le classement
+  // latéral : le trophée doit sortir de la même source qu'eux.
+  for (const coupeId of coupesDuClub(j.club)) {
+    const tropheeCoupe = TROPHEE_PAR_COUPE[coupeId];
+    if (!tropheeCoupe) continue;
+    const etat = coupeEnDirect(coupeId, saisonEcoulee, j.club, WEEKENDS_COUPE);
+    if (etat?.vainqueur === j.club) trophees.push(tropheeCoupe);
+  }
+  const enChampionsCup = coupesDuClub(j.club).includes('championsCup');
+
+  // ---- SÉLECTION NATIONALE : le VRAI vainqueur, là aussi ----
+  //
+  // ⚠️ MÊME BUG, MÊME CAUSE : « j'ai fait le Grand Chelem avec l'équipe de
+  // France et je n'ai pas eu les 6 Nations ». Le Tournoi se joue journée par
+  // journée (`lib/international.ts`), son classement est affiché tout au long de
+  // la saison — et le titre était décidé par `tire((perso − 78) / 220)`, sans
+  // jamais regarder ce classement. Cinq victoires sur cinq pouvaient donc ne
+  // rien rapporter, et une quatrième place tout rafler.
+  const nation = nomNation(j.nation);
+
+  // Être sélectionné, d'abord. Deux façons de l'établir, et c'est voulu : les
+  // CAPES réellement jouées en mode « journée par journée » (la vérité du
+  // terrain), et à défaut — mode « saison rapide », où aucune cape n'est
+  // simulée — la convocation au niveau, tranchée sans hasard (`alea = 0,5`).
+  // ⚠️ Le même booléen sert à gagner le Tournoi ET à pouvoir en être élu
+  // meilleur joueur : deux expressions différentes finiraient par diverger, et
+  // on serait meilleur joueur d'un tournoi qu'on n'a pas disputé.
+  const selectionne = capesSaison > 0 || convocation(j, 0.5, saisonEcoulee).selectionne;
+
+  const sonTournoi = competitionDeSaNation(nation, saisonEcoulee, 'tournoi');
+  const selectionne6N = selectionne && !!sonTournoi;
+  if (sonTournoi && selectionne) {
+    const trophee = TROPHEE_PAR_INTERNATIONAL[sonTournoi.id];
+    if (trophee && vainqueurInternational(sonTournoi.id, saisonEcoulee) === nation) {
+      trophees.push(trophee);
     }
   }
 
-  // Les honneurs INDIVIDUELS dépendent du joueur, pas de son club : c'est son
-  // niveau personnel (générale + réputation) qui compte.
-  const perso = noteGlobale(j) * 0.7 + j.reputation * 0.3;
-
-  // Sélection nationale : Tournoi des 6 Nations (si la nation le dispute)
-  // Il faut d'abord ÊTRE SÉLECTIONNÉ : seuls les tout meilleurs le sont, et
-  // gagner le Tournoi derrière relève encore de l'exception.
-  const nation = nomNation(j.nation);
-  // ⚠️ Le même critère sert deux fois : gagner le Tournoi, et pouvoir en être
-  // élu meilleur joueur. Deux expressions différentes finiraient par diverger —
-  // on serait meilleur joueur d'un tournoi qu'on n'a pas disputé.
-  const selectionne6N = NATIONS_6N.includes(nation) && perso >= 78;
-  if (selectionne6N && tire((perso - 78) / 220)) {
-    trophees.push('sixNations');
-  }
-
-  // Le « Tournoi des 6 Nations B » — Rugby Europe Championship. ⚠️ Sans lui, un
-  // Géorgien ou un Portugais ne pouvait remporter AUCUN titre international :
-  // `NATIONS_6N` ne le contenait pas, et sa carrière plafonnait au club. La
-  // barre est plus basse que pour le Tournoi (ces sélections valent 60 à 78,
-  // contre 84 pour la France), mais gagner reste l'exception.
-  if (NATIONS_REC.includes(nation) && perso >= 66 && tire((perso - 66) / 200)) {
-    trophees.push('recEurope');
-  }
-
-  // Coupe du monde tous les 4 ans : le sommet absolu d'une carrière.
-  if (saisonEcoulee % 4 === 0 && perso >= 82 && tire((perso - 82) / 240)) {
-    trophees.push('monde');
+  // La Coupe du monde : le sommet absolu d'une carrière. Elle remplace la
+  // tournée d'automne une saison sur quatre — `estAnneeDeCoupeDuMonde` est LA
+  // source (le vieux `saison % 4 === 0` en était une deuxième, et les deux ne
+  // tombaient pas forcément sur la même année).
+  if (estAnneeDeCoupeDuMonde(saisonEcoulee) && selectionne) {
+    const mondial = competitionDeSaNation(nation, saisonEcoulee, 'automne');
+    const trophee = mondial && TROPHEE_PAR_INTERNATIONAL[mondial.id];
+    if (trophee && vainqueurInternational(mondial.id, saisonEcoulee) === nation) {
+      trophees.push(trophee);
+    }
   }
 
   // ⚠️ LES DISTINCTIONS INDIVIDUELLES NE SE DÉCIDENT PAS ICI, et c'est
@@ -3386,7 +3649,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       texte: reste > 0
         ? `Soins, kiné, salle. Encore ${reste} semaine${reste > 1 ? 's' : ''} avant de retoucher un ballon.`
         : 'Dernière séance de rééducation : tu es apte pour la semaine prochaine. Le retour va piquer.',
-      deltas: { forme: reste > 0 ? 4 : 10, moral: reste > 0 ? -2 : 6 },
+      deltas: { forme: reste > 0 ? 0 : 6, moral: reste > 0 ? -2 : 6 },
       aJoue: false, titulaire: false, essais: 0,
       soinBlessure: true,
     };
@@ -3410,7 +3673,12 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
         return {
           emoji: '🏋️', titre: `${semaineJouee.libelle} — pas de match`,
           texte: 'Aucun adversaire au programme ce week-end : semaine complète à l’entraînement, et le corps respire.',
-          deltas: { forme: 7, moral: 1 },
+          // ⚠️ Le gros de la remontée vient maintenant de `recuperationHebdo`
+          // (convergence vers la condition de base). Ce qui reste ici n'est que
+          // le petit plus d'un week-end sans choc — cumuler les deux renvoyait
+          // tout le monde à 100 dès la première semaine creuse, et la forme
+          // cessait de vouloir dire quoi que ce soit.
+          deltas: { forme: 2, moral: 1 },
           aJoue: false, titulaire: false, essais: 0,
         };
       }
@@ -3425,12 +3693,15 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
 
     case 'coupe': {
       // Encore faut-il que le club dispute la coupe d'Europe.
-      const division = j.division ?? 'fed3';
-      if (!COUPE_EUROPE_PAR_DIVISION[division]) {
+      // ⚠️ ON LIT LA LISTE DES ENGAGÉS (`coupesDuClub`), pas la division. C'est
+      // la même source que l'écran Résultats, le classement latéral et le
+      // palmarès de fin de saison — trois vérités différentes sur « mon club
+      // joue-t-il l'Europe ? », c'est le bug du titre fantôme en puissance.
+      if (coupesDuClub(j.club).length === 0) {
         return {
           emoji: '🛌', titre: semaineJouee.libelle,
           texte: 'Week-end sans match : ton club ne dispute pas la coupe d’Europe. Semaine d’entraînement et de récupération.',
-          deltas: { forme: 8, moral: 1 },
+          deltas: { forme: 3, moral: 1 },
           aJoue: false, titulaire: false, essais: 0,
         };
       }
@@ -3470,7 +3741,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
               ? ` Chez les U20 non plus (${Math.round(jeune.exige)} exigé).`
               : '')
             + ' Tu restes au club pour travailler.',
-          deltas: { forme: 6, moral: conv.marge > -4 ? -4 : -1 },
+          deltas: { forme: 2, moral: conv.marge > -4 ? -4 : -1 },
           aJoue: false, titulaire: false, essais: 0,
         };
       }
@@ -3492,7 +3763,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       const tour = semaineJouee.tourFinal ?? 'finale';
       const repos = (texte: string, emoji = '🏖️'): ResultatSemaine => ({
         emoji, titre: semaineJouee.libelle, texte,
-        deltas: { forme: 10 },
+        deltas: { forme: 4 },
         aJoue: false, titulaire: false, essais: 0,
       });
 

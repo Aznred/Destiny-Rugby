@@ -389,9 +389,36 @@ export function ficheDepuisJoueur(j: Joueur, pseudo?: string): FicheCarriere {
   return { ...base, score: scoreDeLaFiche(base) };
 }
 
-/** La fiche d'une carrière TERMINÉE (une légende du Hall). */
-export function ficheDepuisLegende(l: LegendeSauvegardee, pseudo?: string): FicheCarriere {
+/**
+ * La fiche d'une carrière TERMINÉE (une légende du Hall).
+ *
+ * @param idsConnus table `nom du trophée → id` (`data/trophees.ts`), pour
+ *   retrouver les ids des sauvegardes d'avant `LegendeSauvegardee.tropheeIds`.
+ *   Passée en paramètre — et pas importée — pour que ce fichier reste copiable
+ *   tel quel côté serveur.
+ */
+export function ficheDepuisLegende(
+  l: LegendeSauvegardee, pseudo?: string, idsConnus?: Map<string, string>,
+): FicheCarriere {
   const saisons = Math.max(1, l.saisons);
+  // ⚠️ ON ENVOIE DE VRAIS IDS, SINON LE SERVEUR REFUSE TOUT. L'ancienne version
+  // envoyait `titres.map(() => 'titre')` : un identifiant qui n'existe dans
+  // aucun `TROPHEES`, donc un refus systématique (« trophée(s) inconnu(s) :
+  // titre ») pour TOUTE carrière du Hall. On lit d'abord les ids mémorisés à la
+  // retraite, sinon on les retrouve dans les libellés (« Bouclier de Brennus
+  // (S4) » → `brennus`), et on ne garde que ce qui a été reconnu : un titre
+  // qu'on ne sait pas nommer vaut mieux perdu que rejeté avec toute la fiche.
+  const depuisLibelles = (): string[] => {
+    if (!idsConnus) return [];
+    const sortie: string[] = [];
+    for (const libelle of l.titres ?? []) {
+      const m = /^(.*?)\s*\(S\d+\)$/.exec(libelle);
+      const id = idsConnus.get((m ? m[1] : libelle).trim());
+      if (id) sortie.push(id);
+    }
+    return sortie;
+  };
+  const titres = l.tropheeIds?.length ? l.tropheeIds : depuisLibelles();
   const base = {
     v: VERSION_BAREME,
     pseudo: (pseudo ?? l.nom).slice(0, LIMITES.pseudoMax),
@@ -406,13 +433,7 @@ export function ficheDepuisLegende(l: LegendeSauvegardee, pseudo?: string): Fich
     matchs: l.matchsJoues,
     essais: l.essais,
     selections: 0,
-    // ⚠️ Une légende ne garde que des LIBELLÉS (« Bouclier de Brennus (S4) ») :
-    // on ne peut pas en tirer d'ids vérifiables. On envoie donc une liste de
-    // marqueurs neutres, de la bonne LONGUEUR — c'est elle qui compte dans le
-    // barème — et le serveur ne pourra pas vérifier la nature des trophées.
-    // C'est le prix des sauvegardes d'avant `Joueur.palmares` ; les carrières
-    // menées depuis, elles, envoient de vrais ids.
-    titres: (l.titres ?? []).map(() => 'titre'),
+    titres,
   };
   return { ...base, score: scoreDeLaFiche(base) };
 }

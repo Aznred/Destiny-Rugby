@@ -31,6 +31,7 @@ import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { Selecteur, type OptionSelecteur } from '../components/Selecteur';
+import { Confirmation } from '../components/Confirmation';
 import { semaine, libelleDate, CALENDRIER } from '../data/calendrier';
 import {
   classementJoueurs, CATEGORIES, afficherValeur, nomPoste, type Categorie,
@@ -104,12 +105,14 @@ function Arbre({ matchs, club }: { matchs: MatchFinal[]; club: string }) {
 // journée, jouée ou à venir, et on voit TOUTES les affiches. Le calendrier
 // existe entièrement dès le coup d'envoi — seuls les scores attendent.
 function Frise({
-  divisionId, semaineActuelle, journeeVue, onJournee, total,
+  divisionId, semaineActuelle, journeeVue, onJournee, onAller, total,
 }: {
   divisionId: string;
   semaineActuelle: number;
   journeeVue: number;
   onJournee: (journee: number) => void;
+  /** Cliquer une date À VENIR : on y va, en jouant tout ce qu'il y a entre. */
+  onAller: ((numeroSemaine: number) => void) | null;
   total: number;
 }) {
   // On associe à chaque semaine du calendrier la (ou les) journée(s) qu'elle
@@ -129,15 +132,28 @@ function Frise({
       {cases.map(({ sem: s, joue, premiere, derniere }) => {
         const aDesMatchs = joue && derniere >= premiere;
         const active = aDesMatchs && journeeVue >= premiere && journeeVue <= derniere;
+        // ═══ LA DATE EST UNE DESTINATION ═══════════════════════════════════
+        // ⚠️ Demande explicite : « qu'on puisse cliquer sur une date dans le
+        // calendrier et que ça nous y amène en simulant tous les matchs ».
+        // Une semaine À VENIR n'est plus seulement quelque chose à consulter,
+        // c'est un endroit où aller. Une semaine passée reste une consultation.
+        const aVenir = !!onAller && s.numero > semaineActuelle;
         return (
           <button
             key={s.numero}
-            className={`frise-case${active ? ' actif' : ''}${s.numero === semaineActuelle ? ' aujourdhui' : ''}`}
-            disabled={!aDesMatchs}
-            onClick={() => onJournee(premiere)}
-            title={`${libelleDate(s)} — ${s.libelle}${aDesMatchs ? ` (J${premiere}${derniere > premiere ? `-${derniere}` : ''})` : ''}`}
+            className={`frise-case${active ? ' actif' : ''}`
+              + `${s.numero === semaineActuelle ? ' aujourdhui' : ''}`
+              + `${aVenir ? ' a-venir' : ''}`}
+            // ⚠️ Une semaine sans match reste cliquable si elle est à venir :
+            // c'est une date du calendrier, on doit pouvoir s'y rendre même
+            // s'il ne s'y joue rien dans CETTE division.
+            disabled={!aDesMatchs && !aVenir}
+            onClick={() => (aVenir ? onAller!(s.numero) : onJournee(premiere))}
+            title={aVenir
+              ? `Jouer jusqu’au ${libelleDate(s)} (${s.numero - semaineActuelle} semaine(s))`
+              : `${libelleDate(s)} — ${s.libelle}${aDesMatchs ? ` (J${premiere}${derniere > premiere ? `-${derniere}` : ''})` : ''}`}
           >
-            <span className="frise-emoji">{EMOJI_SEMAINE[s.type] ?? '🏉'}</span>
+            <span className="frise-emoji">{aVenir ? '▶' : EMOJI_SEMAINE[s.type] ?? '🏉'}</span>
             <b>{aDesMatchs ? `J${premiere}` : '—'}</b>
             <i>{libelleDate(s)}</i>
           </button>
@@ -177,6 +193,13 @@ function ClassementsJoueurs({
   // Les statistiques produites par le moteur pour CETTE division et CETTE
   // saison, si des journées ont déjà été rejouées en fond.
   const reelles = useGame((s) => s.statsReelles[`${divisionId}#${saison}`]);
+  // ⚠️ COMBIEN DE JOURNÉES ONT VRAIMENT ÉTÉ REJOUÉES. L'en-tête annonçait le
+  // nombre de journées DISPUTÉES par le championnat : après un saut de plusieurs
+  // semaines, il affichait « matchs joués · 12 journées » alors que le moteur
+  // n'en avait rejoué que 6. Des chiffres de 6 journées présentés comme ceux de
+  // 12, c'est exactement ce qui donne l'impression que le classement perd des
+  // statistiques.
+  const rejouees = useGame((s) => s.journeesReelles[`${divisionId}#${saison}`] ?? 0);
   const lignes = useMemo(
     () => classementJoueurs(divisionId, saison, journees, cat, joueur, numeroPoule, 20, reelles),
     [divisionId, saison, journees, cat, joueur, numeroPoule, reelles],
@@ -188,7 +211,10 @@ function ClassementsJoueurs({
       <div className="comp-tete">
         <b>🥇 Classements des joueurs</b>
         <span className="comp-count">
-          {reelles ? 'matchs joués' : 'estimation'} · {journees} journée{journees > 1 ? 's' : ''}
+          {reelles
+            ? `matchs joués · ${rejouees} journée${rejouees > 1 ? 's' : ''}`
+              + (rejouees < journees ? ` sur ${journees}` : '')
+            : `estimation · ${journees} journée${journees > 1 ? 's' : ''}`}
         </span>
       </div>
       <div className="cats-stats">
@@ -274,6 +300,18 @@ export function Tableau() {
   const joueur = useGame((s) => s.joueur);
   const setEcran = useGame((s) => s.setEcran);
   const [journeeVue, setJourneeVue] = useState<number | null>(null);
+
+  // ═══ AVANCER JUSQU'À UNE DATE ═══════════════════════════════════════════
+  // ⚠️ Ce qui remplace la « simulation de saison ». On ne saute plus l'année :
+  // on choisit une date, et toutes les semaines qui séparent sont JOUÉES.
+  const avancerJusqua = useGame((s) => s.avancerJusqua);
+  const evenementHebdo = useGame((s) => s.evenementHebdo);
+  const scenarioActif = useGame((s) => s.scenarioActif);
+  const [destination, setDestination] = useState<number | null>(null);
+  const [bilanAvance, setBilanAvance] = useState<string | null>(null);
+  // Une question du MJ en plan bloque l'avance, exactement comme elle bloque
+  // « semaine suivante » : on ne saute pas par-dessus une scène sans réponse.
+  const peutAvancer = !!joueur && !evenementHebdo && !scenarioActif;
 
   const numero = joueur?.semaine ?? 1;
   const semActuelle = semaine(numero);
@@ -677,8 +715,11 @@ export function Tableau() {
               <span className="comp-count">{total} journées</span>
             </div>
             <p className="intro-comp" style={{ margin: '0 0 0.6rem' }}>
-              Clique n’importe quelle semaine pour voir ses affiches — celles qui sont
-              jouées comme celles à venir.
+              Clique une semaine <b>passée</b> pour voir ses affiches.
+              {peutAvancer
+                ? <> Clique une semaine <b>à venir</b> (▶) et le jeu <b>joue jusque-là</b> :
+                  tous les matchs, tes statistiques, ta forme et tes sélections comprises.</>
+                : ' Les semaines à venir affichent le programme.'}
               {estAmateur(choix) && ' Ici, pas de trêve : on joue aussi pendant la Coupe d’Europe et le Tournoi.'}
             </p>
             <Frise
@@ -686,6 +727,7 @@ export function Tableau() {
               semaineActuelle={numero}
               journeeVue={vue}
               onJournee={(jr) => setJourneeVue(jr)}
+              onAller={peutAvancer ? (n) => setDestination(n) : null}
               total={total}
             />
           </div>
@@ -709,6 +751,51 @@ export function Tableau() {
             </div>
           )}
         </>
+      )}
+
+      {/* ═══ ALLER À UNE DATE ══════════════════════════════════════════════ */}
+      {/* ⚠️ On CONFIRME, parce que l'action n'est pas annulable : les semaines
+          sautées sont jouées pour de bon (matchs, blessures, sélections). Et on
+          dit combien il y en a — « ça avance » n'est pas une information. */}
+      {destination != null && (
+        <Confirmation
+          titre={`Jouer jusqu’au ${libelleDate(semaine(destination))} ?`}
+          message={
+            `${destination - numero} semaine(s) vont être jouées, une par une : matchs, `
+            + `statistiques, forme, blessures et sélections comprises. Tu ne verras pas ces `
+            + `matchs en direct — ils sont simulés par le même moteur. Le jeu s’arrêtera avant `
+            + `si une scène du Maître du Jeu t’attend, s’il faut signer un contrat, ou si la `
+            + `saison se termine.`
+          }
+          libelleOui="▶️ Jouer jusque-là"
+          onNon={() => setDestination(null)}
+          onOui={() => {
+            const cible = destination;
+            setDestination(null);
+            const r = avancerJusqua(cible);
+            setJourneeVue(null);
+            setBilanAvance(
+              r.semaines === 0
+                ? 'Aucune semaine n’a pu être jouée.'
+                : `${r.semaines} semaine(s) jouée(s). `
+                  + (r.arret === 'question' ? 'Une scène du Maître du Jeu t’attend.'
+                    : r.arret === 'contrat' ? 'Il faut répondre aux offres de contrat.'
+                      : r.arret === 'saison' ? 'La saison s’est terminée en chemin.'
+                        : r.arret === 'fin' ? 'Ta carrière s’est arrêtée là.'
+                          : 'Te voilà arrivé.'),
+            );
+          }}
+        />
+      )}
+      {bilanAvance && (
+        <Confirmation
+          titre="🗓️ Avance terminée"
+          message={bilanAvance}
+          libelleOui="Retour à la carrière"
+          libelleNon="Rester ici"
+          onNon={() => setBilanAvance(null)}
+          onOui={() => { setBilanAvance(null); setEcran('carriere'); }}
+        />
       )}
     </motion.section>
   );

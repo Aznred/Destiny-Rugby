@@ -230,8 +230,11 @@ export function jouerTestMatch(
 
 // --- LE CALENDRIER ----------------------------------------------------------
 // Aller simple : le Tournoi, c'est cinq journées, pas dix.
-function grille(c: CompetitionInternationale): [string, string][][] {
-  const complet = calendrier(c.equipes);
+// ⚠️ Le tirage change chaque saison (`competition#saison`) : sans clé, la J1 du
+// Tournoi opposait éternellement les deux mêmes nations, et chaque équipe
+// recevait toujours les mêmes adversaires à la même date.
+function grille(c: CompetitionInternationale, saison: number): [string, string][][] {
+  const complet = calendrier(c.equipes, `${c.id}#${saison}`);
   return complet.slice(0, c.journees);
 }
 
@@ -252,7 +255,7 @@ export function internationalEnDirect(
 ): EtatInternational | null {
   const c = competitionInternationaleParId(id, saison);
   if (!c) return null;
-  const g = grille(c);
+  const g = grille(c, saison);
   const jusqua = Math.max(0, Math.min(g.length, journeesJouees));
   const journees: MatchChampionnat[][] = [];
   for (let j = 0; j < jusqua; j++) {
@@ -273,7 +276,7 @@ export function affichesInternationales(
 ): { domicile: string; exterieur: string; jouee: boolean; match: MatchChampionnat | null }[] {
   const c = competitionInternationaleParId(id, saison);
   if (!c) return [];
-  const affiches = grille(c)[journee - 1];
+  const affiches = grille(c, saison)[journee - 1];
   if (!affiches) return [];
   const jouee = journee <= journeesJouees;
   return affiches.map(([d, e]) => ({
@@ -360,7 +363,7 @@ export function matchInternationalDuJoueur(
   if (!fen) return null;
   if (!fen.competition.equipes.includes(nation)) return null;
 
-  const affiches = grille(fen.competition)[fen.journee - 1] ?? [];
+  const affiches = grille(fen.competition, j.saison)[fen.journee - 1] ?? [];
   const mien = affiches.find(([d, e]) => d === nation || e === nation);
   if (!mien) return null;
   const [d, e] = mien;

@@ -437,6 +437,17 @@ export interface LegendeSauvegardee {
   matchsJoues: number;
   essais: number;
   titres: string[];
+  /**
+   * Les IDS des trophées remportés (`data/trophees.ts`), un par titre.
+   *
+   * ⚠️ INDISPENSABLE POUR LE CLASSEMENT MONDIAL, et c'est la raison de ce
+   * champ : `titres` ne contient que des LIBELLÉS (« Bouclier de Brennus (S4) »)
+   * que le serveur ne peut pas vérifier. Il refusait donc toute carrière du Hall
+   * (« trophée(s) inconnu(s) »). Optionnel : les sauvegardes d'avant ce champ ne
+   * l'ont pas, et `ficheDepuisLegende` sait alors le reconstruire depuis les
+   * libellés.
+   */
+  tropheeIds?: string[];
   score: number;
   fictif?: boolean; // légende pré-générée (pour peupler le classement)
   reconversion?: string; // ce qu'il est devenu après sa carrière

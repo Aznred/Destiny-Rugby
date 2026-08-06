@@ -27,13 +27,32 @@ export const config = { runtime: 'nodejs' };
 
 const IDS_TROPHEES = Object.keys(TROPHEES);
 
-// Débit : un envoi par heure et dix par jour pour un même appareil. Une carrière
-// de douze saisons demande des heures de jeu — personne d'honnête n'est gêné.
-const PAR_HEURE = 1;
-const PAR_JOUR = 10;
+// Débit par appareil.
+//
+// ⚠️ DESSERRÉ AVEC L'ENVOI AUTOMATIQUE. Un envoi par heure était calibré pour un
+// bouton qu'on cliquait à la main. Depuis que la carrière part toute seule à
+// chaque fin de saison et à la retraite, une session de jeu normale en produit
+// plusieurs par heure : le joueur honnête se prenait des 429 et son meilleur
+// score n'arrivait jamais. Six par heure couvre une bonne session, quarante par
+// jour couvre la journée la plus intense — et ça reste sans intérêt pour un
+// script, puisque la vraie barrière n'est pas le débit mais le RECALCUL.
+const PAR_HEURE = 6;
+const PAR_JOUR = 40;
 const TOP = 100;
 
-const sql = neon(process.env.DATABASE_URL ?? '');
+/**
+ * ⚠️ CONNEXION PARESSEUSE, ET C'EST IMPORTANT. `neon('')` LÈVE à l'appel (« No
+ * database connection string was provided »). Créée en tête de module, une
+ * variable d'environnement manquante faisait donc échouer l'IMPORT de la
+ * fonction : Vercel renvoyait une 500 opaque, et le message clair prévu plus bas
+ * (« DATABASE_URL absente… ») n'était jamais atteint. Un diagnostic qu'on
+ * n'atteint pas ne sert à rien.
+ */
+let connexion: ReturnType<typeof neon> | null = null;
+function sqlClient() {
+  connexion ??= neon(process.env.DATABASE_URL as string);
+  return connexion;
+}
 
 /**
  * Haché de l'appareil : on ne stocke JAMAIS l'IP en clair.
@@ -68,16 +87,17 @@ function reponse(corps: unknown, statut = 200): Response {
 // ROUTES VERCEL DÉCOUPÉES (OPTIONS, GET, POST)
 // ============================================================================
 
-export async function OPTIONS(req: Request): Promise<Response> {
+export async function OPTIONS(): Promise<Response> {
   return new Response(null, { headers: ENTETES });
 }
 
-export async function GET(req: Request): Promise<Response> {
+export async function GET(): Promise<Response> {
   if (!process.env.DATABASE_URL) {
     return reponse({ erreur: 'DATABASE_URL absente des variables d’environnement' }, 500);
   }
 
   try {
+    const sql = sqlClient();
     const lignes = await sql`
       select pseudo, score, maj_le
       from classement
@@ -97,6 +117,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ---- 1. LE DÉBIT, AVANT TOUT LE RESTE ------------------------------------
+  const sql = sqlClient();
   const appareil = await empreinteAppareil(req);
   let heure = 0;
   let jour = 0;
@@ -127,15 +148,22 @@ export async function POST(req: Request): Promise<Response> {
 
   const verdict = verifierFiche(fiche, IDS_TROPHEES);
 
+  // ⚠️ UN REFUS NE CONSOMME PAS LE QUOTA, et ce n'est pas une faiblesse. Le
+  // débit protège la table `classement` ; une fiche refusée n'y écrit rien, et
+  // `verifierFiche` est pure, publique et sans coût. La compter, en revanche,
+  // enfermait le joueur honnête : une première tentative refusée (une vieille
+  // sauvegarde, un trophée non reconnu) le bloquait UNE HEURE, avec pour seule
+  // explication « Trop d'envois ». On journalise le refus — c'est là qu'on voit
+  // arriver les scripts — mais on ne le facture pas.
+  if (!verdict.valide) {
+    console.warn('[classement] refus', appareil, verdict.anomalies.join(' | '));
+    return reponse({ erreur: 'Fiche refusée', anomalies: verdict.anomalies }, 422);
+  }
+
   try {
     await sql`insert into envois (appareil) values (${appareil})`;
   } catch (e) {
     console.error('[classement] journal', e);
-  }
-
-  if (!verdict.valide) {
-    console.warn('[classement] refus', appareil, verdict.anomalies.join(' | '));
-    return reponse({ erreur: 'Fiche refusée', anomalies: verdict.anomalies }, 422);
   }
 
   // ---- 3. L'ÉCRITURE : le score, et RIEN d'autre ---------------------------

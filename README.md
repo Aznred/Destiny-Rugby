@@ -470,6 +470,19 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 
 | Ce qui n'allait pas | Ce qui a changé |
 |---|---|
+| **« Le classement des stats perd des stats »** | Le joueur incarné était compté **deux fois** — `saisonEnCours` (panneau, profil) et `statsReelles` (classements) — et les deux divergeaient dès qu'on sautait des semaines. Ses vrais chiffres gagnent **toujours**. Le rattrapage des journées passe de 6 à 12, et l'en-tête dit combien ont **vraiment** été rejouées. |
+| **« En match on a pas accès à tous les stats »** | Le moteur en compte **23**, la feuille en montrait **5**. Six vues — Général · Attaque · Défense · Conquête · Pied · Discipline. |
+| **« On est jugé que sur plaquage, mètres et essai »** | Le barème en regardait déjà **quinze**, mais rien ne le montrait. Le dépliant **« ⭐ Ma note — d'où elle vient »** liste chaque ligne avec ce qu'elle a rapporté ou coûté. |
+| Mode d'emploi du classement affiché en jeu | Retiré : c'était de la doc de développeur (schéma SQL, bornes) dans un écran de joueur. Elle vit dans [`serveur/VERCEL.md`](serveur/VERCEL.md). |
+| **« Si on simule la saison, on a toujours 2 matchs 0 essai »** | Le mode « saison rapide » **tirait** l'année au sort au lieu de la jouer. Il est **supprimé**. On clique désormais une **date du calendrier** (📊 Résultats) et le jeu **joue** toutes les semaines qui séparent — matchs, stats, forme, blessures, sélections. Mesuré : 12 semaines en 75 ms. |
+| **« Impossible de récupérer de la forme, à mi-saison on est à 0 »** | Le bilan d'une semaine de match était structurellement négatif (−10 à −13) et rien ne compensait. Une **récupération hebdomadaire** ramène le corps vers sa condition de base, d'autant plus vite qu'il en est loin. Mesuré sur une saison : 70-82 à 22 ans, **60-73 à 34 ans**. |
+| **Le match jouable alors qu'une scène attend une réponse** | « Semaine suivante » était bloqué, pas « ▶️ Jouer le match » — or c'est lui qui fait passer la semaine. Bloqué sur les deux surfaces, panneau et barre mobile. |
+| **« Toujours le même calendrier, et le Stade toujours premier »** | Le calendrier est **tiré chaque saison** (12 tirages distincts sur 12). Et les clubs ont des **générations dorées** (jusqu'à +8 sur 4-6 saisons) et des traversées du désert : **5 champions différents sur 20 saisons**, 6 titres hors du top 4 de départ. Rare (6,1 % des clubs à un instant donné) et affiché sur la fiche du club. |
+| Textes de l'IA trop longs | Récits, scènes, jugements et messages ramenés à **2 phrases**, budgets de tokens baissés d'autant. |
+| **Grand Chelem avec la France, pas de trophée des 6 Nations** | Le Tournoi était **joué pour de vrai** (classement à l'écran toute la saison) mais le titre était **tiré au sort** sur la note du joueur. On lit maintenant le **1ᵉʳ du classement**. Idem Rugby Europe Championship et Coupe du monde. |
+| **Champions Cup gagnée, pas de trophée** | Même bug : le titre venait du rang en championnat (`tire((9 − rang) / 48)`), pas de la finale. C'est le **vainqueur de la finale** (`coupeEnDirect`) qui l'emporte, dans la coupe que le club **dispute vraiment**. |
+| **Pas meilleur joueur de l'année malgré Brennus + 3 distinctions** | Mesuré : la saison cotait 82,7 (barre 94). Les deux correctifs ci-dessus la montent à 91,2 — toujours pas assez. Le titre mondial **lit désormais les distinctions déjà décernées** (+3 chacune) : 100,2. Il en faut **trois** pour franchir la barre. |
+| **Le classement mondial ne se remplissait pas** | Le serveur, la base et le barème étaient bons : **rien n'envoyait jamais**. La **retraite envoie la carrière**, et le tableau mondial s'affiche **toujours**, avec son état (chargement · pas de serveur · panne · encore vide). |
 | Top 14 à 16 clubs, Pro D2 à 14 | La fin de saison était calculée **deux fois** avec des résultats différents, et les deux champions montaient. Source unique (`phaseFinaleDe`) + garde-fou d'équilibre. Vérifié sur 12 saisons. |
 | Club promu encore affiché dans son ancienne division | Le panneau lisait la pyramide figée des données ; il lit maintenant la division **effective**. |
 | « Les joueurs font un nuage, en bas du terrain » | Les cibles en largeur étaient **rabotées** sur la bordure : elles sont désormais **réparties** avec un écart minimal. Tas moyen 9,7 → 6,9 joueurs. |
@@ -528,17 +541,16 @@ fondations vers le confort) est dans **[ROADMAP.md](ROADMAP.md)**.
   **[`serveur/VERCEL.md`](serveur/VERCEL.md)**. **20 minutes**, gratuit dans les
   quotas de départ.
   Tant que rien n'est déployé, le classement reste **local et part vierge** : le
-  jeu ne casse pas, l'écran le dit. Le principe tient en une phrase — *le
-  navigateur envoie les faits d'une carrière, le serveur RECALCULE le score et
-  n'écrit que lui*.
+  jeu ne casse pas, **et l'écran le dit** — le tableau mondial affiche désormais
+  son état (chargement · pas de serveur · serveur en panne · personne n'y figure
+  encore) au lieu de disparaître. Une carrière y part **toute seule à la
+  retraite** ; le bouton d'envoi reste là pour une carrière en cours. Le principe
+  tient en une phrase — *le navigateur envoie les faits d'une carrière, le
+  serveur RECALCULE le score et n'écrit que lui*.
 - **Proxy backend pour Groq** : petit serveur qui garde la clé côté serveur et
   applique un quota par joueur — permet une mise en ligne publique sans exposer
   la clé ni saturer le quota.
-- **Coupes nationales et phases finales détaillées** : le titre se joue encore
-  sur un tirage pondéré par le classement, pas sur une demi-finale et une finale
-  disputées match par match.
 - Matchs simulés tour par tour avec adversaires générés.
-- Sélection en équipe nationale et coupes (Tournoi, Coupe du monde).
 - Logo FFR officiel en PNG sur le ballon (aujourd'hui : coq tracé en code).
 
 ---

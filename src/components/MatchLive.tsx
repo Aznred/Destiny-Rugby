@@ -32,6 +32,9 @@ import { LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, AXE } from '
 import { estTitulaire } from '../lib/moteur/saison';
 import { CONSIGNE_NEUTRE, lireConsigneGroq, lireConsigneLocale } from '../lib/moteur/consignes';
 import type { Pion } from '../lib/moteur/entites';
+import {
+  detailNote, noterMatch, type StatsMatchJoueur,
+} from '../lib/moteur/apresMatch';
 import { graine, type MatchChampionnat } from '../lib/championnat';
 import { effectifDuClub } from '../lib/effectif';
 import { effectifNational } from '../lib/international';
@@ -43,6 +46,118 @@ import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
 import type { Joueur } from '../types';
 import { t } from '../lib/i18n';
+
+// ---------------------------------------------------------------------------
+// LA FEUILLE DE MATCH — TOUT CE QUE LE MOTEUR COMPTE
+// ---------------------------------------------------------------------------
+// ⚠️ Retour de jeu : « en match on a pas accès à tous les stats ». Le moteur
+// tient VINGT-TROIS compteurs par joueur (`StatsMatch`, moteur/entites.ts) et la
+// feuille n'en montrait que cinq — mètres, plaquages, essais, passes, minutes.
+// Autant dire que le match d'un avant était invisible : ni mêlée, ni touche, ni
+// pick and go, ni grattage.
+//
+// ⚠️ ET ON NE FAIT PAS UN TABLEAU DE VINGT-TROIS COLONNES. Sur un téléphone de
+// 375 px, c'est illisible, et sur ordinateur ça ne se lit pas mieux. On range
+// par FAMILLE — comme les classements de l'écran Résultats — et on bascule d'un
+// clic. Chaque colonne dit à quoi elle correspond au survol.
+interface ColonneFeuille {
+  cle: string;
+  entete: string;
+  titre: string;
+  valeur: (s: import('../lib/moteur/entites').StatsMatch) => number;
+}
+
+const VUES_FEUILLE: { id: string; nom: string; emoji: string; colonnes: ColonneFeuille[] }[] = [
+  {
+    id: 'general', nom: 'Général', emoji: '📋',
+    colonnes: [
+      { cle: 'metres', entete: 'm', titre: 'Mètres gagnés ballon en main', valeur: (s) => s.metres },
+      { cle: 'plaquages', entete: 'plq', titre: 'Plaquages réussis', valeur: (s) => s.plaquages },
+      { cle: 'essais', entete: 'ess', titre: 'Essais', valeur: (s) => s.essais },
+      { cle: 'passes', entete: 'pas', titre: 'Passes', valeur: (s) => s.passes },
+    ],
+  },
+  {
+    id: 'attaque', nom: 'Attaque', emoji: '⚡',
+    colonnes: [
+      { cle: 'courses', entete: 'crs', titre: 'Ballons portés', valeur: (s) => s.courses },
+      { cle: 'franchissements', entete: 'frn', titre: 'Franchissements / défenseurs battus', valeur: (s) => s.franchissements },
+      { cle: 'offloads', entete: 'off', titre: 'Offloads (passe après contact)', valeur: (s) => s.offloads },
+      { cle: 'passesDecisives', entete: 'p.d', titre: 'Passes décisives', valeur: (s) => s.passesDecisives },
+      { cle: 'passesRatees', entete: 'en-av', titre: 'En-avant et passes ratées', valeur: (s) => s.passesRatees },
+    ],
+  },
+  {
+    id: 'defense', nom: 'Défense', emoji: '🛡️',
+    colonnes: [
+      { cle: 'plaquages', entete: 'plq', titre: 'Plaquages réussis', valeur: (s) => s.plaquages },
+      { cle: 'plaquagesManques', entete: 'mqs', titre: 'Plaquages manqués', valeur: (s) => s.plaquagesManques },
+      { cle: 'grattages', entete: 'grt', titre: 'Ballons grattés au sol', valeur: (s) => s.grattages },
+      { cle: 'rucksNettoyes', entete: 'rck', titre: 'Rucks nettoyés', valeur: (s) => s.rucksNettoyes },
+    ],
+  },
+  {
+    id: 'conquete', nom: 'Conquête', emoji: '🌀',
+    colonnes: [
+      { cle: 'melees', entete: 'mêl', titre: 'Mêlées gagnées par son pack', valeur: (s) => s.melees },
+      { cle: 'touchesGagnees', entete: 'tch', titre: 'Touches captées', valeur: (s) => s.touchesGagnees },
+      { cle: 'pickAndGo', entete: 'p&g', titre: 'Pick and go (ballons portés au ras)', valeur: (s) => s.pickAndGo },
+    ],
+  },
+  {
+    id: 'pied', nom: 'Pied', emoji: '🦵',
+    colonnes: [
+      { cle: 'coupsDePied', entete: 'cdp', titre: 'Coups de pied', valeur: (s) => s.coupsDePied },
+      { cle: 'metresAuPied', entete: 'm/p', titre: 'Mètres au pied', valeur: (s) => s.metresAuPied },
+      { cle: 'cinquanteVingtDeux', entete: '50/22', titre: '50/22 réussis', valeur: (s) => s.cinquanteVingtDeux },
+      { cle: 'buts', entete: 'buts', titre: 'Tirs au but réussis', valeur: (s) => s.butsReussis },
+      { cle: 'butsTentes', entete: 'tent', titre: 'Tirs au but tentés', valeur: (s) => s.butsTentes },
+    ],
+  },
+  {
+    id: 'discipline', nom: 'Discipline', emoji: '🟨',
+    colonnes: [
+      { cle: 'cartonsJaunes', entete: '🟨', titre: 'Cartons jaunes', valeur: (s) => s.cartonsJaunes },
+      { cle: 'cartonsRouges', entete: '🟥', titre: 'Cartons rouges', valeur: (s) => s.cartonsRouges },
+      { cle: 'plaquagesManques', entete: 'mqs', titre: 'Plaquages manqués', valeur: (s) => s.plaquagesManques },
+      { cle: 'distance', entete: 'km', titre: 'Distance parcourue (km)', valeur: (s) => s.distanceParcourue / 1000 },
+    ],
+  },
+];
+
+/**
+ * La feuille du joueur incarné, au format attendu par le barème.
+ *
+ * ⚠️ UNE SEULE EXTRACTION, DEUX USAGES : ce qui part dans la saison
+ * (`enregistrerMatchVecu`) et ce qui s'affiche en détail de note. Deux copies,
+ * et le détail montré finirait par ne plus correspondre à la note calculée.
+ */
+function statsPourLaNote(p: Pion): StatsMatchJoueur {
+  return {
+    essais: p.stats.essais,
+    plaquages: p.stats.plaquages,
+    plaquagesManques: p.stats.plaquagesManques,
+    passes: p.stats.passes,
+    metres: Math.round(p.stats.metres),
+    grattages: p.stats.grattages,
+    butsTentes: p.stats.butsTentes,
+    butsReussis: p.stats.butsReussis,
+    cartons: p.stats.cartonsJaunes + p.stats.cartonsRouges,
+    minutes: Math.min(80, Math.round(p.minutes)),
+    // ⚠️ TOUTE LA FEUILLE REMONTE, pas seulement ce qui se voit. C'est ce qui
+    // permet à la note de juger un avant sur son vrai travail (mêlée, touche,
+    // ballons portés au ras) et pas sur ses essais.
+    passesDecisives: p.stats.passesDecisives,
+    offloads: p.stats.offloads,
+    franchissements: p.stats.franchissements,
+    turnovers: p.stats.passesRatees,
+    melees: p.stats.melees,
+    touchesGagnees: p.stats.touchesGagnees,
+    pickAndGo: p.stats.pickAndGo,
+    cinquanteVingtDeux: p.stats.cinquanteVingtDeux,
+    cartonsRouges: p.stats.cartonsRouges,
+  };
+}
 
 // ⚠️ L'ÉCHELLE DE TEMPS EST DOUBLE, et c'est ce qui rend le direct regardable.
 //
@@ -284,10 +399,30 @@ export function MatchLive({
   const clubA = clubParNom(e.clubA);
   const clubB = clubParNom(e.clubB);
   const monPion = e.pions.find((p) => p.moi);
+  // Quelle famille de statistiques la feuille de match affiche (voir VUES_FEUILLE).
+  const [vueFeuille, setVueFeuille] = useState<string>('general');
+  const colonnes = (VUES_FEUILLE.find((v) => v.id === vueFeuille) ?? VUES_FEUILLE[0]).colonnes;
+  // La grille suit le nombre de colonnes : numéro, nom, les stats, les minutes.
+  // ⚠️ `minmax(74px, 1fr)` SUR LE NOM, PAS `1fr`. Mesuré en jeu : avec cinq
+  // colonnes de statistiques (vue « Pied »), les largeurs fixes consommaient
+  // exactement la place disponible et la colonne du nom tombait à **0 px** —
+  // une feuille de match sans noms. Le plancher la force à déborder, et le bloc
+  // défile alors horizontalement DANS son conteneur (`.ml-bilan-groupe`) :
+  // c'est la règle du projet pour les tableaux larges, la page ne part jamais
+  // de côté.
+  const grilleColonnes = `26px minmax(74px, 1fr) ${colonnes.map(() => '38px').join(' ')} 38px`;
   // La feuille de match n'est calculée qu'une fois, à la sirène.
   const bilanRef = useRef<ReturnType<typeof bilan> | null>(null);
   if (e.fini && !bilanRef.current) bilanRef.current = bilan(e);
   const stats = bilanRef.current;
+
+  // Le détail de MA note. Calculé à partir de la même feuille que celle qui
+  // part dans la saison — donc rigoureusement la note qui compte.
+  const maNote = useMemo(() => {
+    if (!e.fini || !monPion) return null;
+    const s = statsPourLaNote(monPion);
+    return { note: noterMatch(monPion.poste, s), detail: detailNote(monPion.poste, s) };
+  }, [e.fini, monPion]);
 
   // ⚠️ À LA SIRÈNE, LES VRAIES STATS DE TON JOUEUR PARTENT DANS LA SAISON.
   // Elles alimentent le classement des joueurs (écran Résultats) : ce ne sont
@@ -303,30 +438,7 @@ export function MatchLive({
     // (`semaineSuivante` n'ajoute plus son récit simulé par-dessus).
     const chezMoi = monPion.cote === 'A';
     enregistrerMatchVecu(
-      {
-        essais: monPion.stats.essais,
-        plaquages: monPion.stats.plaquages,
-        plaquagesManques: monPion.stats.plaquagesManques,
-        passes: monPion.stats.passes,
-        metres: Math.round(monPion.stats.metres),
-        grattages: monPion.stats.grattages,
-        butsTentes: monPion.stats.butsTentes,
-        butsReussis: monPion.stats.butsReussis,
-        cartons: monPion.stats.cartonsJaunes + monPion.stats.cartonsRouges,
-        minutes: Math.min(80, Math.round(monPion.minutes)),
-        // ⚠️ TOUTE LA FEUILLE REMONTE, pas seulement ce qui se voit. C'est ce
-        // qui permet à la note de match de juger un avant sur son vrai travail
-        // (mêlée, touche, ballons portés au ras) et pas sur ses essais.
-        passesDecisives: monPion.stats.passesDecisives,
-        offloads: monPion.stats.offloads,
-        franchissements: monPion.stats.franchissements,
-        turnovers: monPion.stats.passesRatees,
-        melees: monPion.stats.melees,
-        touchesGagnees: monPion.stats.touchesGagnees,
-        pickAndGo: monPion.stats.pickAndGo,
-        cinquanteVingtDeux: monPion.stats.cinquanteVingtDeux,
-        cartonsRouges: monPion.stats.cartonsRouges,
-      },
+      statsPourLaNote(monPion),
       {
         adversaire: chezMoi ? e.clubB : e.clubA,
         scorePour: chezMoi ? e.scoreA : e.scoreB,
@@ -520,12 +632,62 @@ export function MatchLive({
               <span>🌀 {e.compteurs.melees} {t('ml.melees')}</span>
               <span>⚡ {e.compteurs.percees} {t('ml.percees')}</span>
             </div>
+            {/* ⚠️ TOUTES LES STATISTIQUES SONT ACCESSIBLES (retour de jeu : « en
+                match on a pas accès à tous les stats »). Le moteur en compte
+                VINGT-TROIS et la feuille n'en montrait que cinq — un pilier qui
+                dominait la mêlée et gagnait ses touches lisait une ligne à
+                « 12 m, 9 plaquages » et rien d'autre. Plutôt qu'un tableau de
+                vingt-trois colonnes illisible sur téléphone, on range par
+                FAMILLE et on bascule d'un clic. */}
+            {/* ═══ MA NOTE, ET D'OÙ ELLE VIENT ═══════════════════════════
+                ⚠️ Retour de jeu : « notre joueur est jugé que sur plaquage,
+                mètres parcourus et essai, ce qui est dommage ». Le barème en
+                regarde quinze depuis longtemps — mais rien ne le montrait, et
+                le résumé ne citait que ces trois-là. Ici, chaque ligne du
+                barème est affichée avec ce qu'elle a rapporté ou coûté ; c'est
+                `detailNote` qui les produit, la fonction que `noterMatch`
+                additionne, donc ce qu'on lit EST la note. */}
+            {maNote && (
+              <details className="ml-ma-note">
+                <summary>
+                  ⭐ Ma note — <b>{maNote.note}/10</b>
+                  <span> · d’où elle vient</span>
+                </summary>
+                <div className="ml-note-detail">
+                  {maNote.detail.map((l) => (
+                    <div key={l.libelle} className="ml-note-ligne">
+                      <span>{l.libelle}</span>
+                      <b data-signe={l.points > 0 ? 'plus' : l.points < 0 ? 'moins' : undefined}>
+                        {l.points > 0 ? '+' : ''}{Math.round(l.points * 10) / 10}
+                      </b>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            <div className="cats-stats ml-vues">
+              {VUES_FEUILLE.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  className={`chip-cat${vueFeuille === v.id ? ' actif' : ''}`}
+                  onClick={() => setVueFeuille(v.id)}
+                >
+                  {v.emoji} {v.nom}
+                </button>
+              ))}
+            </div>
             {[e.clubA, e.clubB].map((club) => (
-              <div key={club}>
+              <div key={club} className="ml-bilan-groupe">
                 <div className="ml-bilan-tete">📋 {club}</div>
-                <div className="ml-bilan-entete">
-                  <span /><span>{t('ml.joueur')}</span><span>m</span><span>plq.</span>
-                  <span>ess.</span><span>pas.</span><span>min</span>
+                <div
+                  className="ml-bilan-entete"
+                  style={{ gridTemplateColumns: grilleColonnes }}
+                >
+                  <span /><span>{t('ml.joueur')}</span>
+                  {colonnes.map((c) => <span key={c.cle} title={c.titre}>{c.entete}</span>)}
+                  <span>min</span>
                 </div>
                 {stats.parJoueur
                   .filter((j) => j.club === club)
@@ -534,16 +696,17 @@ export function MatchLive({
                     <div
                       key={`${j.club}-${j.numero}-${j.nom}`}
                       className="ml-bilan-ligne"
+                      style={{ gridTemplateColumns: grilleColonnes }}
                       data-moi={j.moi ? 'oui' : undefined}
                       /* Les maillots 16 à 23 sont le banc : on les distingue. */
                       data-banc={j.numero > 15 ? 'oui' : undefined}
                     >
                       <span className="ml-bilan-num" title={POSTE_PAR_ID[j.poste]?.nom}>{j.numero}</span>
                       <span className="ml-bilan-nom">{j.nom}</span>
-                      <span>{Math.round(j.stats.metres)}</span>
-                      <span>{j.stats.plaquages}</span>
-                      <span>{j.stats.essais || '–'}</span>
-                      <span>{j.stats.passes}</span>
+                      {colonnes.map((c) => {
+                        const v = c.valeur(j.stats);
+                        return <span key={c.cle}>{v ? Math.round(v * 10) / 10 : '–'}</span>;
+                      })}
                       <span>{j.minutes}′</span>
                     </div>
                   ))}

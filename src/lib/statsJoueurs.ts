@@ -388,7 +388,23 @@ export function classementJoueurs(
   const base = auMoteur ? depuisLeMoteur(reelles) : statsCompetition(divisionId, saison, journees, numeroPoule);
   let lignes = base;
 
-  if (!auMoteur && joueur && joueur.division === divisionId) {
+  // ⚠️ LE JOUEUR HUMAIN A TOUJOURS SES PROPRES CHIFFRES, quelle que soit la
+  // source des autres. C'est le bug signalé en jeu : « le classement des stats
+  // joueurs marche pas bien, des fois il perd des stats ».
+  //
+  // Il y avait DEUX comptabilités parallèles pour lui :
+  //   · `saisonEnCours` — ce que le panneau de carrière et le profil affichent,
+  //     alimenté match par match (par le moteur s'il a regardé, par l'estimation
+  //     sinon) ;
+  //   · `statsReelles` — la simulation de fond, alimentée journée par journée.
+  // Tant qu'on regardait chaque match, les deux coïncidaient (même graine). Dès
+  // qu'on saute des semaines, ou qu'une journée n'est pas rattrapée, elles
+  // divergent : le panneau annonce 5 matchs, le classement en montre 2. Le
+  // joueur a raison — il perd des stats, et ce sont les siennes.
+  //
+  // Une carrière n'a qu'une seule vérité : `saisonEnCours`, celle qui a
+  // réellement fait progresser le joueur. C'est elle qui gagne, toujours.
+  if (joueur && joueur.division === divisionId) {
     const vecu = joueur.saisonEnCours;
     const stats: StatsDetaillees | undefined = vecu?.stats;
     const mien: LigneStats = {

@@ -528,6 +528,27 @@ export const TROPHEE_PAR_COUPE: Record<string, string> = {
   premCup: 'premCup',
 };
 
+/**
+ * Trophée d'une compétition de SÉLECTIONS (`lib/international.ts`).
+ *
+ * ⚠️ C'EST CETTE TABLE QUI A MANQUÉ PENDANT LONGTEMPS, et c'est ce qui a produit
+ * le bug signalé en jeu : « j'ai fait le Grand Chelem avec l'équipe de France et
+ * je n'ai pas eu les 6 Nations ». Le Tournoi était RÉELLEMENT joué journée par
+ * journée (on en voyait le classement dans l'écran Résultats), mais le titre,
+ * lui, était TIRÉ AU SORT à partir de la note du joueur — les deux n'avaient
+ * aucun rapport. Désormais `resoudreTrophees` lit le vrai vainqueur du vrai
+ * classement, et cette table dit quel trophée lui correspond.
+ *
+ * Toutes les compétitions n'ont pas de modèle 3D : celles qui n'en ont pas
+ * n'apparaissent pas ici, et ne décernent donc rien. Pour en ajouter une, il
+ * faut d'abord son `.glb` dans `public/m3d/` et son entrée dans `TROPHEES`.
+ */
+export const TROPHEE_PAR_INTERNATIONAL: Record<string, string> = {
+  sixNations: 'sixNations',
+  recEurope: 'recEurope',
+  coupeDuMonde: 'monde',
+};
+
 // ---------------------------------------------------------------------------
 // LES DISTINCTIONS INDIVIDUELLES, ET OÙ ELLES SE DÉCERNENT
 // ---------------------------------------------------------------------------

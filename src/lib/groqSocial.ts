@@ -88,7 +88,8 @@ Punchlines, rumeurs et règlements de comptes publics sont permis.
 SEULE LIMITE : rien de discriminatoire (racisme, sexisme, homophobie, religion, handicap),
 aucune menace de violence réelle, rien de sexuel.
 Clubs et championnats restent institutionnels. Les journalistes sourcent.
-N'invente aucun club absent du contexte. 280 caractères maximum par publication.
+N'invente aucun club absent du contexte. 180 caractères maximum par publication : sur un
+réseau social, un pavé ne ressemble à rien.
 Réponds UNIQUEMENT en JSON valide.`;
 
 function extraire<T>(brut: string, cle: string): T[] {
@@ -148,7 +149,7 @@ parlent pas toutes du joueur humain.` },
   // commentaires sont désormais demandés DANS la même réponse — même contenu,
   // un tiers du coût, et une seule latence.
   const brut = await appelGroqJSON(ctx.cle, ctx.modele ?? MODELE_DEFAUT, messages, {
-    temperature: 0.95, maxTokens: 1100,
+    temperature: 0.95, maxTokens: 900,
   });
   const posts = extraire<PostGenere>(brut, 'posts')
     .filter((p) => p && typeof p.texte === 'string' && p.texte.trim())
@@ -233,7 +234,7 @@ ${j.nom} vient de publier (ton : ${ton}) :
   ];
 
   const brut = await appelGroqJSON(ctx.cle, ctx.modele ?? MODELE_DEFAUT, messages, {
-    temperature: 1, maxTokens: 480,
+    temperature: 1, maxTokens: 380,
   });
   return extraire<PostGenere & { hostile?: boolean }>(brut, 'reponses')
     .filter((r) => r && typeof r.texte === 'string' && r.texte.trim())
@@ -275,7 +276,7 @@ export async function messageGroq(
     { role: 'system', content: `${REGLES}${consigneDeLangue()}
 
 Tu incarnes UN SEUL compte et tu réponds en message privé, à la première personne, sans
-guillemets, en 1 à 3 phrases. Tu restes dans ton rôle. Tu peux refuser, plaisanter, relancer,
+guillemets, en 1 à 2 phrases COURTES. Tu restes dans ton rôle. Tu peux refuser, plaisanter, relancer,
 t'énerver, couper court. Si on t'insulte, tu RÉPONDS sèchement.
 Format EXACT : {"reponse":"…"}` },
     // ⚠️ Décor COURT : répondre en privé ne demande ni l'effectif ni les rivaux.
@@ -292,7 +293,7 @@ Réponds.` },
   ];
 
   const brut = await appelGroqJSON(ctx.cle, ctx.modele ?? MODELE_DEFAUT, messages, {
-    temperature: 0.95, maxTokens: 220,
+    temperature: 0.95, maxTokens: 160,
   });
   try {
     const data = JSON.parse(brut);
