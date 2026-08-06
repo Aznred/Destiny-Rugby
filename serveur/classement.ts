@@ -24,8 +24,8 @@ const IDS_TROPHEES = Object.keys(TROPHEES);
 
 // Débit : un envoi par heure et dix par jour pour un même appareil. Une carrière
 // de douze saisons demande des heures de jeu — personne d'honnête n'est gêné.
-const PAR_HEURE = 1;
-const PAR_JOUR = 10;
+const PAR_HEURE = 100;
+const PAR_JOUR = 100;
 
 const base = createClient(
   Deno.env.get('SUPABASE_URL')!,
