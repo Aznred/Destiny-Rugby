@@ -14,60 +14,8 @@
 
 import { championnatEnDirect, graine, type LigneTableau } from './championnat';
 import { forceEffectif } from './effectif';
-import {
-  TOURS_PHASE_FINALE, accesJoue, weekEndsPhaseFinalePasses,
-} from '../data/calendrier';
 
-export type TourFinal =
-  | 'seizieme' | 'huitieme' | 'quart' | 'barrage' | 'demie' | 'finale' | 'accession';
-
-// L'ordre d'un tableau, du premier tour à la finale. `accession` est à part :
-// il ne se joue qu'après la finale, sur sa propre date.
-export const ORDRE_TOURS: TourFinal[] = [
-  'seizieme', 'huitieme', 'quart', 'barrage', 'demie', 'finale',
-];
-
-/**
- * ⚠️ NE MONTRER QUE CE QUI A ÉTÉ JOUÉ (bug signalé en jeu : « j'ai joué que les
- * quarts et le tableau est rempli jusqu'à la finale avec les scores »).
- *
- * Tout le bracket est calculé d'un bloc — il le faut, le champion conditionne
- * les montées, les trophées et la saison suivante. Mais l'AFFICHAGE, lui, doit
- * suivre le calendrier : un tour par week-end de phase finale.
- *
- * Les tours sont alignés sur la FIN : la finale tombe toujours le dernier
- * week-end. Un tableau à deux tours (poule de 8, pas de barrages) commence donc
- * une semaine plus tard qu'un tableau à trois, et un tournoi amateur à cinq
- * tours en dévoile plusieurs dès le premier week-end.
- */
-export function toursRevelesA(matchs: MatchFinal[], numeroSemaine: number): MatchFinal[] {
-  const presents = ORDRE_TOURS.filter((t) => matchs.some((m) => m.tour === t));
-  const joues = weekEndsPhaseFinalePasses(numeroSemaine);
-  const decalage = TOURS_PHASE_FINALE.length - presents.length;
-  const montres = Math.max(0, Math.min(presents.length, joues - decalage));
-  const visibles = new Set(presents.slice(0, montres));
-  // Le match d'accès a sa propre date, une semaine après la finale.
-  if (accesJoue(numeroSemaine)) visibles.add('accession');
-  return matchs.filter((m) => visibles.has(m.tour));
-}
-
-/** La finale a-t-elle été disputée ? (sinon, pas de champion à annoncer) */
-export function finaleJouee(matchs: MatchFinal[], numeroSemaine: number): boolean {
-  return toursRevelesA(matchs, numeroSemaine).some((m) => m.tour === 'finale');
-}
-
-/**
- * Le tour qui se joue CETTE semaine dans ce tableau — celui qu'on peut donc
- * disputer en direct. `null` hors phase finale, ou quand le tableau est plus
- * court que le calendrier (une poule de 8 n'a pas de barrages : sa semaine de
- * barrages est une semaine sans match).
- */
-export function tourDeLaSemaine(matchs: MatchFinal[], numeroSemaine: number): TourFinal | null {
-  const presents = ORDRE_TOURS.filter((t) => matchs.some((m) => m.tour === t));
-  const decalage = TOURS_PHASE_FINALE.length - presents.length;
-  const index = weekEndsPhaseFinalePasses(numeroSemaine) - decalage;
-  return index >= 0 && index < presents.length ? presents[index] : null;
-}
+export type TourFinal = 'barrage' | 'quart' | 'demie' | 'finale' | 'accession';
 
 export interface MatchFinal {
   tour: TourFinal;
