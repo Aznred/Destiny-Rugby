@@ -20,6 +20,7 @@
 // Déploiement : voir `serveur/VERCEL.md`.
 
 import { neon } from '@neondatabase/serverless';
+import { createHash } from 'node:crypto';
 import { verifierFiche } from '../src/lib/classementMondial.js';
 import { TROPHEES } from '../src/data/trophees.js';
 
@@ -60,15 +61,13 @@ function sqlClient() {
  * Sans sel, l'empreinte d'une IP donnée se retrouve par force brute en quelques
  * secondes — le haché ne protégerait plus rien.
  */
-async function empreinteAppareil(req: Request): Promise<string> {
+function empreinteAppareil(req: Request): string {
   const brut = [
     req.headers.get('x-forwarded-for') ?? '',
     req.headers.get('user-agent') ?? '',
     process.env.SEL_APPAREIL ?? 'sel-par-defaut',
   ].join('|');
-  const octets = new TextEncoder().encode(brut);
-  const condense = await crypto.subtle.digest('SHA-256', octets);
-  return [...new Uint8Array(condense)].map((o) => o.toString(16).padStart(2, '0')).join('').slice(0, 32);
+  return createHash('sha256').update(brut).digest('hex').slice(0, 32);
 }
 
 const ENTETES = {
@@ -117,11 +116,13 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ---- 1. LE DÉBIT, AVANT TOUT LE RESTE ------------------------------------
-  const sql = sqlClient();
-  const appareil = await empreinteAppareil(req);
+  let sql: ReturnType<typeof neon>;
+  let appareil: string;
   let heure = 0;
   let jour = 0;
   try {
+    sql = sqlClient();
+    appareil = empreinteAppareil(req);
     const [c] = await sql`
       select
         count(*) filter (where envoye_le > now() - interval '1 hour') as heure,
@@ -200,28 +201,34 @@ type ReponseVercel = {
 };
 
 export default async function classementVercel(req: RequeteVercel, res: ReponseVercel): Promise<void> {
-  const methode = (req.method ?? 'GET').toUpperCase();
-  const headers = new Headers();
-  for (const [nom, valeur] of Object.entries(req.headers ?? {})) {
-    if (Array.isArray(valeur)) headers.set(nom, valeur.join(', '));
-    else if (valeur) headers.set(nom, valeur);
+  try {
+    const methode = (req.method ?? 'GET').toUpperCase();
+    const headers = new Headers();
+    for (const [nom, valeur] of Object.entries(req.headers ?? {})) {
+      if (Array.isArray(valeur)) headers.set(nom, valeur.join(', '));
+      else if (valeur) headers.set(nom, valeur);
+    }
+
+    const corps = methode === 'GET' || methode === 'OPTIONS'
+      ? undefined
+      : typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
+    const demande = new Request(`https://destiny-rugby.local${req.url ?? '/api/classement'}`, {
+      method: methode,
+      headers,
+      body: corps,
+    });
+
+    let resultat: Response;
+    if (methode === 'GET') resultat = await GET();
+    else if (methode === 'POST') resultat = await POST(demande);
+    else if (methode === 'OPTIONS') resultat = await OPTIONS();
+    else resultat = reponse({ erreur: 'Méthode non autorisée' }, 405);
+
+    resultat.headers.forEach((valeur, nom) => res.setHeader(nom, valeur));
+    res.status(resultat.status).send(await resultat.text());
+  } catch (e) {
+    console.error('[classement] invocation Vercel', e);
+    for (const [nom, valeur] of Object.entries(ENTETES)) res.setHeader(nom, valeur);
+    res.status(500).send(JSON.stringify({ erreur: 'Erreur interne du classement' }));
   }
-
-  const corps = methode === 'GET' || methode === 'OPTIONS'
-    ? undefined
-    : typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
-  const demande = new Request(`https://destiny-rugby.local${req.url ?? '/api/classement'}`, {
-    method: methode,
-    headers,
-    body: corps,
-  });
-
-  let resultat: Response;
-  if (methode === 'GET') resultat = await GET();
-  else if (methode === 'POST') resultat = await POST(demande);
-  else if (methode === 'OPTIONS') resultat = await OPTIONS();
-  else resultat = reponse({ erreur: 'Méthode non autorisée' }, 405);
-
-  resultat.headers.forEach((valeur, nom) => res.setHeader(nom, valeur));
-  res.status(resultat.status).send(await resultat.text());
 }
