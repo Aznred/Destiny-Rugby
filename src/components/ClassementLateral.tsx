@@ -38,6 +38,8 @@ function passees(numero: number, type: string): number {
   return CALENDRIER.slice(0, Math.max(0, numero - 1)).filter((s) => s.type === type).length;
 }
 
+const TOUR_TERMINE: Record<string, number> = { barrage: 1, quart: 1, demie: 2, finale: 3, accession: 4 };
+
 interface Vue {
   titre: string;
   logo?: string;      // id de compétition pour <LogoCompet>
@@ -113,10 +115,12 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
             nations: false,
             moi: joueur.club,
             pied: notre ?? null,
-            phase: etat.bracket.slice(-3).map((m) => ({
+            phase: etat.bracket
+              .filter((m) => TOUR_TERMINE[m.tour] <= Math.max(0, passees(numero, 'coupe') - etat.totalJournees))
+              .map((m) => ({
               libelle: m.libelle, domicile: m.domicile, scoreD: m.scoreD,
               scoreE: m.scoreE, exterieur: m.exterieur,
-            })),
+              })),
           };
         }
       }
@@ -141,10 +145,12 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
       nations: false,
       moi: joueur.club,
       pied: notre ?? null,
-      phase: (phase?.matchs ?? []).map((m) => ({
+      phase: (phase?.matchs ?? [])
+        .filter((m) => TOUR_TERMINE[m.tour] <= passees(numero, 'phaseFinale'))
+        .map((m) => ({
         libelle: m.libelle, domicile: m.domicile, scoreD: m.scoreD,
         scoreE: m.scoreE, exterieur: m.exterieur,
-      })),
+        })),
     };
   }, [division, joueur, rythme]);
 

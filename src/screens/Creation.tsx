@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { t } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
-import { POSTES, NATIONS, NATIONS_PAR_ZONE } from '../data/rugby';
+import { POSTES, NATIONS, NATIONS_PAR_ZONE, nomPoste } from '../data/rugby';
 import { COMPETITIONS, CLUBS_FRANCE_PAR_DIVISION } from '../data/clubs';
-import { TRAITS, MAX_TRAITS } from '../data/traits';
+import { TRAITS, MAX_TRAITS, descriptionTrait, nomTrait } from '../data/traits';
 import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
-import { Drapeau } from '../components/Drapeau';
+import { Drapeau, nomNationTraduit } from '../components/Drapeau';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import type { PosteId } from '../types';
@@ -51,8 +51,8 @@ export function Creation() {
       NATIONS_PAR_ZONE.flatMap((g) =>
         g.nations.map((n) => ({
           valeur: n,
-          label: n,
-          groupe: g.zone,
+          label: nomNationTraduit(n),
+          groupe: t(`cr.zone.${g.zone}`),
           vignette: <Drapeau nation={n} taille={1.05} />,
         })),
       ),
@@ -64,9 +64,9 @@ export function Creation() {
       championnats.map((d) => ({
         valeur: d.id,
         label: d.nom,
-        sous: `${d.clubs.length} clubs`,
+        sous: `${d.clubs.length} ${t('gen.clubs')}`,
         vignette: <LogoCompet id={d.id} emoji={d.emoji} taille={24} />,
-        groupe: d.zone === 'France' ? '🇫🇷 Pyramide française' : `🌍 ${d.pays}`,
+        groupe: d.zone === 'France' ? `🇫🇷 ${t('cr.pyramide')}` : `🌍 ${nomNationTraduit(d.pays)}`,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -91,13 +91,12 @@ export function Creation() {
       transition={{ duration: 0.4 }}
     >
       <button className="btn fantome" onClick={() => setEcran('accueil')} style={{ marginBottom: '1rem' }}>
-        ← Retour
+        ← {t('gen.retour')}
       </button>
       <div className="eyebrow">{t('cr.eyebrow')}</div>
       <h1>{t('cr.titre')}</h1>
       <p style={{ color: 'var(--craie-dim)', margin: '0.6rem 0 2rem', maxWidth: '60ch' }}>
-        Choisis ton identité et ton poste. Tes attributs de départ dépendent du
-        poste choisi — le reste, tu le construiras sur le terrain.
+        {t('cr.chapo')}
       </p>
 
       <div className="carte" style={{ padding: '1.6rem' }}>
@@ -168,8 +167,8 @@ export function Creation() {
                 onClick={() => setPoste(p.id)}
               >
                 <div className="num">{p.numero}</div>
-                <div className="nom">{p.nom}</div>
-                <div className="cat">{p.categorie}</div>
+                <div className="nom">{nomPoste(p.id)}</div>
+                <div className="cat">{t(`poste.cat.${p.categorie}`)}</div>
                 <div className="desc">{p.description}</div>
               </button>
             ))}
@@ -179,9 +178,9 @@ export function Creation() {
         {/* Traits de caractère : deux au maximum, pour toute la carrière. */}
         <div className="champ">
           <label>
-            Traits de caractère{' '}
+            {t('cr.traits')}{' '}
             <span style={{ fontWeight: 400, color: 'var(--brume)', fontSize: '0.85rem' }}>
-              — choisis-en {MAX_TRAITS} ({traits.length}/{MAX_TRAITS}). Ils te suivront toute ta carrière.
+              — {t('cr.traitsAide', { max: MAX_TRAITS, choisis: traits.length })}
             </span>
           </label>
           <div className="traits-grille">
@@ -202,10 +201,10 @@ export function Creation() {
                 >
                   <div className="trait-tete">
                     <span className="trait-emoji">{t.emoji}</span>
-                    <b>{t.nom}</b>
+                    <b>{nomTrait(t.id)}</b>
                     {choisi && <span className="trait-check">✓</span>}
                   </div>
-                  <div className="trait-desc">{t.desc}</div>
+                  <div className="trait-desc">{descriptionTrait(t.id)}</div>
                 </button>
               );
             })}
@@ -214,7 +213,7 @@ export function Creation() {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
           <button className="btn primaire grand" onClick={valider}>
-            Lancer la carrière 🏉
+            {t('cr.lancer')} 🏉
           </button>
         </div>
       </div>

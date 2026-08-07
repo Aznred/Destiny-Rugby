@@ -3,23 +3,24 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
 import { Jauge } from './Jauge';
 import { useGame, noteGlobale, bonusClubDuJoueur } from '../store/useGame';
-import { POSTE_PAR_ID, labelAttribut } from '../data/rugby';
+import { POSTE_PAR_ID, labelAttribut, nomPoste } from '../data/rugby';
 import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
 import { Blason } from './Blason';
 import { LogoCompet } from './LogoCompet';
-import { Drapeau, nomNation } from './Drapeau';
+import { Drapeau, nomNation, nomNationTraduit } from './Drapeau';
 import { Confirmation } from './Confirmation';
 import { semaine, libelleDate, SEMAINES_PAR_SAISON, CALENDRIER } from '../data/calendrier';
 import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store/useGame';
 import { amisPresents } from '../lib/vestiaire';
-import { TRAIT_PAR_ID } from '../data/traits';
+import { TRAIT_PAR_ID, descriptionTrait, nomTrait } from '../data/traits';
 import { nombre, t, tn } from '../lib/i18n';
 import { matchDeLaSemaine } from '../lib/matchLive';
 import { matchInternationalDuJoueur, equipeU20 } from '../lib/international';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import { matchPhaseFinaleDuJoueur } from '../lib/phaseFinale';
 import { convocation, convocationU20 } from '../lib/selection';
+import { nomBlessure } from '../lib/blessures';
 // ⚠️ LE MATCH EN DIRECT ARRIVE AU CLIC, pas au chargement de la page. Ce
 // composant tire derrière lui tout `lib/moteur/` (le terrain, la tactique, les
 // phases arrêtées, les pools de commentaire) : il pesait dans le chunk
@@ -155,7 +156,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="nom">{joueur.nom}</div>
           <div className="sous" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            {poste.nom} · <Drapeau nation={joueur.nation} taille={0.8} /> {nomNation(joueur.nation)}
+            {nomPoste(joueur.poste)} · <Drapeau nation={joueur.nation} taille={0.8} /> {nomNationTraduit(joueur.nation)}
           </div>
         </div>
         <div
@@ -176,7 +177,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           {(joueur.traits ?? []).map((id) => {
             const trait = TRAIT_PAR_ID[id];
             return trait ? (
-              <span key={id} className="pastille" title={trait.desc}>{trait.emoji} {trait.nom}</span>
+              <span key={id} className="pastille" title={descriptionTrait(id)}>{trait.emoji} {nomTrait(id)}</span>
             ) : null;
           })}
         </div>
@@ -202,7 +203,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
 
       {joueur.blessure && (
         <div className="bandeau-blessure" data-gravite={joueur.blessure.gravite}>
-          🚑 <b>{joueur.blessure.nom}</b>
+          🚑 <b>{nomBlessure(joueur.blessure)}</b>
           <span>
             {joueur.blessure.gravite === 'carriere'
               ? t('pj.carriereTerminee')

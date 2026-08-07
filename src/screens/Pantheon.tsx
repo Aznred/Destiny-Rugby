@@ -3,8 +3,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { t, nombre } from '../lib/i18n';
 import { useGame, palmaresDepuisLibelles } from '../store/useGame';
 import { POSTE_PAR_ID, migrerPoste, nomPoste } from '../data/rugby';
-import { Drapeau, nomNation } from '../components/Drapeau';
+import { Drapeau, nomNationTraduit } from '../components/Drapeau';
 import type { TitreGagne } from '../types';
+import { titreTraduit } from '../data/trophees';
 
 // ⚠️ CHARGÉE À LA DEMANDE. L'armoire tire tout Three.js ET un modèle 3D par
 // trophée : la mettre en import direct la ferait entrer dans le chunk du Hall,
@@ -92,7 +93,7 @@ export function Pantheon() {
               <div style={{ flex: 1 }}>
                 <div className="legende-nom">{l.nom}</div>
                 <div className="legende-sous" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  {nomPoste(migrerPoste(l.poste))} · <Drapeau nation={l.nation} taille={0.75} /> {nomNation(l.nation)} · {l.saisons} {t('clst.saisons').toLowerCase()}
+                  {nomPoste(migrerPoste(l.poste))} · <Drapeau nation={l.nation} taille={0.75} /> {nomNationTraduit(l.nation)} · {l.saisons} {t('clst.saisons').toLowerCase()}
                 </div>
                 <div className="legende-stats">
                   <span>{t('clst.note')} <b>{l.note}</b></span>
@@ -104,7 +105,7 @@ export function Pantheon() {
                   <>
                     <div className="legende-titres">
                       {(l.titres ?? []).map((titre, j) => (
-                        <span key={j} className="medaille">🏆 {titre}</span>
+                        <span key={j} className="medaille">🏆 {titreTraduit(titre)}</span>
                       ))}
                     </div>
                     <button

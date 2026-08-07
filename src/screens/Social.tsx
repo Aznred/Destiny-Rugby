@@ -33,7 +33,7 @@ import { cote } from '../lib/offres';
 import { compact, estCertifie, LIMITE_CARACTERES, pseudoDe, tendances } from '../lib/social';
 import { annuaire, chercherComptes, chercherPosts, banniereDe, BANNIERES } from '../lib/comptes';
 import { humeur } from '../lib/vie';
-import { SUCCES } from '../data/succes';
+import { SUCCES, descriptionSucces, nomSucces, texteDefi } from '../data/succes';
 import { defisDeLaSemaine, cleSemaine, progression } from '../lib/succes';
 import { CLE_ENV } from '../lib/groq';
 import { chercherMedias, reduirePourAvatar, vignetteLocale, type Media as MediaTrouve } from '../lib/images';
@@ -746,14 +746,14 @@ function PanneauSucces() {
   return (
     <div className="x-succes">
       <div className="x-defis">
-        <h3>🎯 Défis de la semaine</h3>
-        <p className="x-note">Trois objectifs renouvelés chaque semaine de jeu. Ils rapportent des Ovas.</p>
+        <h3>🎯 {t('ov.defisHebdo')}</h3>
+        <p className="x-note">{t('ov.defisAide')}</p>
         {actifs.map((d) => {
           const fait = coches.includes(d.id);
           return (
             <div key={d.id} className={`x-defi${fait ? ' fait' : ''}`}>
               <span className="x-defi-emoji">{d.emoji}</span>
-              <span className="x-defi-texte">{d.texte}</span>
+              <span className="x-defi-texte">{texteDefi(d.id, d.texte)}</span>
               <span className="x-defi-gain">{fait ? '✅' : `+${d.ovas} 🪙`}</span>
             </div>
           );
@@ -761,7 +761,7 @@ function PanneauSucces() {
       </div>
 
       <div className="x-succes-tete">
-        <h3>🏅 Succès</h3>
+        <h3>🏅 {t('ov.succes')}</h3>
         <span>{faits} / {total}</span>
       </div>
       <div className="x-barre"><i style={{ width: `${(faits / total) * 100}%` }} /></div>
@@ -774,10 +774,10 @@ function PanneauSucces() {
             <div key={s.id} className={`x-succes-carte${ok ? ' obtenu' : ''}`}>
               <span className="x-succes-emoji">{cache ? '❔' : s.emoji}</span>
               <div>
-                <b>{cache ? 'Succès secret' : s.nom}</b>
-                <p>{cache ? 'Continue de jouer pour le découvrir.' : s.desc}</p>
+                <b>{cache ? t('ov.succesSecret') : nomSucces(s)}</b>
+                <p>{cache ? t('ov.succesSecretAide') : descriptionSucces(s)}</p>
               </div>
-              <span className="x-succes-gain">{ok ? `Saison ${debloques[s.id]}` : `+${s.ovas} 🪙`}</span>
+              <span className="x-succes-gain">{ok ? `${t('gen.saison')} ${debloques[s.id]}` : `+${s.ovas} 🪙`}</span>
             </div>
           );
         })}

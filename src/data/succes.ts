@@ -13,6 +13,7 @@
 // dure (voir CLAUDE.md). Un succès = 2 à 20 Ovas, un défi = 1 à 3.
 
 import type { Joueur, PostSocial, LegendeSauvegardee } from '../types';
+import { langueCourante } from '../lib/i18n';
 
 export interface ContexteSucces {
   joueur: Joueur;
@@ -474,6 +475,62 @@ const DIVISIONS_FRANCE = new Set([
 export const SUCCES_PAR_ID: Record<string, Succes> = Object.fromEntries(
   SUCCES.map((s) => [s.id, s]),
 );
+
+const SUCCES_ANGLAIS: Record<string, { nom: string; desc: string }> = {
+  premier_match: { nom: 'First cap', desc: 'Play your first official match.' }, premier_essai: { nom: 'First try', desc: 'Score your first try.' },
+  cinquante_matchs: { nom: 'Fifty team sheets', desc: 'Reach 50 career matches.' }, cent_matchs: { nom: 'Centurion', desc: 'Reach 100 career matches.' },
+  deux_cents_matchs: { nom: 'Fixture in the squad', desc: 'Reach 200 career matches.' }, cinquante_essais: { nom: 'Finisher', desc: 'Score 50 career tries.' },
+  general_60: { nom: 'Established player', desc: 'Reach an overall rating of 60.' }, general_75: { nom: 'League mainstay', desc: 'Reach an overall rating of 75.' },
+  general_88: { nom: 'World class', desc: 'Reach an overall rating of 88.' }, saison_parfaite: { nom: 'Benchmark season', desc: 'Finish a season rated 8.5 or higher.' },
+  premier_titre: { nom: 'First trophy', desc: 'Win a title.' }, cinq_titres: { nom: 'Trophy cabinet', desc: 'Win five career titles.' },
+  top14: { nom: 'The elite', desc: 'Play in the Top 14.' }, international: { nom: 'First cap', desc: 'Earn an international cap.' },
+  cinquante_capes: { nom: 'Fifty caps', desc: 'Reach 50 international caps.' }, capitaine: { nom: 'The armband', desc: 'Become your club captain.' },
+  expatrie: { nom: 'Expat', desc: 'Sign for a foreign league.' }, millionnaire: { nom: 'The deal of a lifetime', desc: 'Own one million euros.' },
+  mille_plaquages: { nom: 'Load-bearing wall', desc: 'Make 1,000 career tackles.' }, cent_grattages: { nom: 'Ruck predator', desc: 'Win 100 turnovers in your career.' },
+  mentor: { nom: 'Passing the torch', desc: 'Take a young player under your wing.' }, vestiaire: { nom: 'Soul of the dressing room', desc: 'Have five friends in the squad.' },
+  legende: { nom: 'Enter the Hall', desc: 'Hang up your boots and join the Hall of Fame.' }, premier_post: { nom: 'Welcome to The Oval', desc: 'Publish your first message.' },
+  dix_mille: { nom: 'Followed', desc: 'Pass 10,000 followers.' }, cent_mille: { nom: 'Social star', desc: 'Pass 100,000 followers.' },
+  million_abonnes: { nom: 'Phenomenon', desc: 'Pass one million followers.' }, clash: { nom: 'It went around', desc: 'Post a message that earns you a club summons.' },
+  viral: { nom: 'One million views', desc: 'Publish a message with more than one million views.' }, brennus: { nom: 'The Shield', desc: 'Lift the Brennus Shield.' },
+  brennus_trois: { nom: 'Dynasty', desc: 'Win the Brennus Shield three times.' }, champions_cup: { nom: 'King of Europe', desc: 'Win the Champions Cup.' },
+  doublette_europe: { nom: 'Both cups', desc: 'Win the Champions Cup and Challenge Cup in one career.' }, doublette_saison: { nom: 'The double', desc: 'Win the league and a European cup in the same season.' },
+  six_nations: { nom: 'Tournament winner', desc: 'Win the Six Nations with your national team.' }, coupe_du_monde: { nom: 'World champion', desc: 'Lift the World Cup.' },
+  meilleur_joueur: { nom: 'World Player of the Year', desc: 'Be named world player of the year.' }, palmares_deux_clubs: { nom: 'Champion everywhere', desc: 'Win a title with two different clubs.' },
+  palmares_trois_clubs: { nom: 'Crowned mercenary', desc: 'Win a title with three different clubs.' }, fidele_trois_titres: { nom: 'One-club man', desc: 'Win three titles with the same club.' },
+  gravir_pyramide: { nom: 'From Fédérale to the elite', desc: 'Become champion in at least three different French divisions.' }, dix_titres: { nom: 'Collector', desc: 'Win ten career titles.' },
+  titre_a_letranger: { nom: 'Champion abroad', desc: 'Win a foreign league title.' }, trois_saisons_de_suite: { nom: 'Three in a row', desc: 'Win a title three consecutive seasons.' },
+  mille_points: { nom: 'One thousand points', desc: 'Score 1,000 career points.' }, buteur_precis: { nom: 'Sure-footed', desc: 'Keep 80% kicking success over at least 100 attempts.' },
+  cent_passes_d: { nom: 'Final pass', desc: 'Make 100 try assists.' }, deux_mille_plaquages: { nom: 'Retaining wall', desc: 'Make 2,000 career tackles.' },
+  discipline: { nom: 'Clean record', desc: 'Play 100 matches without receiving a card.' }, carton_rouge: { nom: 'Twenty wild minutes', desc: 'Receive a red card.' },
+  cent_essais: { nom: 'Try machine', desc: 'Score 100 career tries.' }, veteran: { nom: 'Unbreakable', desc: 'Still be playing at age 38.' },
+  quinze_saisons: { nom: 'Fifteen seasons', desc: 'Complete a 15-season career.' }, blessure_saison: { nom: 'Lost season', desc: 'Suffer an injury that costs you a full season.' },
+  potentiel_atteint: { nom: 'Become yourself', desc: 'Reach the potential you were born with.' }, cent_capes: { nom: 'International centurion', desc: 'Reach 100 international caps.' },
+  cape_jeune: { nom: 'Too young for this', desc: 'Earn an international cap before turning 21.' }, rec_europe: { nom: 'The shadow tournament', desc: 'Win the Rugby Europe Championship.' },
+  titre_saison_un: { nom: 'Straight away', desc: 'Win a title in your first season.' }, trois_championnats: { nom: 'Champion without borders', desc: 'Win three different national leagues.' },
+  europe_complete: { nom: 'All of Europe', desc: 'Win all three European cups: Champions, Challenge and Premiership Rugby Cup.' }, fortune: { nom: 'Five million', desc: 'Own five million euros.' },
+  tresor_ovas: { nom: 'The hoard', desc: 'Hold 500 Ovas.' }, chouchou: { nom: 'Crowd favourite', desc: 'Reach 90 popularity.' },
+  homme_du_staff: { nom: 'Coach’s favourite', desc: 'Reach 90 coach trust.' }, rivalites: { nom: 'Not everyone likes you', desc: 'Have three enemies in the squad.' },
+  hall_trois: { nom: 'Three lives', desc: 'Send three careers to the Hall of Fame.' }, presque_tout: { nom: 'Almost everything', desc: 'Unlock 50 achievements.' },
+};
+
+export function nomSucces(succes: Succes): string {
+  return langueCourante() === 'en' ? SUCCES_ANGLAIS[succes.id]?.nom ?? succes.nom : succes.nom;
+}
+
+export function descriptionSucces(succes: Succes): string {
+  return langueCourante() === 'en' ? SUCCES_ANGLAIS[succes.id]?.desc ?? succes.desc : succes.desc;
+}
+
+const DEFIS_ANGLAIS: Record<string, string> = {
+  match: 'Play a match this week', essai: 'Score a try', note7: 'Earn a rating of 7 or higher',
+  note8: 'Earn a rating of 8 or higher', victoire: 'Win with your club', entrainement: 'Complete your training session',
+  post: 'Post on The Oval', plaquages: 'Make 8 tackles in one match', transformation: 'Kick a goal',
+  situation: 'Experience a career situation',
+};
+
+export function texteDefi(id: string, texte: string): string {
+  return langueCourante() === 'en' ? DEFIS_ANGLAIS[id] ?? texte : texte;
+}
 
 // --- DÉFIS DE LA SEMAINE ---------------------------------------------------
 // Chaque défi est validé par un ÉVÉNEMENT signalé par le store (le joueur a

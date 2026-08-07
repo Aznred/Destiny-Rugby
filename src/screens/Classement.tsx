@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame, classementComplet } from '../store/useGame';
-import { POSTE_PAR_ID, migrerPoste } from '../data/rugby';
-import { Drapeau, nomNation } from '../components/Drapeau';
-import { TROPHEES } from '../data/trophees';
+import { POSTE_PAR_ID, migrerPoste, nomPoste } from '../data/rugby';
+import { Drapeau, nomNationTraduit } from '../components/Drapeau';
+import { TROPHEES, titreTraduit } from '../data/trophees';
 import { ficheDepuisJoueur, verifierFiche } from '../lib/classementMondial';
+import { nombre, t } from '../lib/i18n';
+import type { LegendeSauvegardee } from '../types';
 import {
-  lireClassementMondial, URL_CLASSEMENT, type EtatMondial,
+  lireClassementMondial, type EtatMondial,
 } from '../lib/classementEnLigne';
 
 export function Classement() {
@@ -23,6 +25,7 @@ export function Classement() {
   // classement fonctionne pas, la table se remplit pas ») : il n'y avait
   // littéralement pas de table à remplir. Voir `serveur/VERCEL.md`.
   const [mondial, setMondial] = useState<EtatMondial | null>(null);
+  const [ficheOuverte, setFicheOuverte] = useState<LegendeSauvegardee | null>(null);
 
   useEffect(() => {
     let vivant = true;
@@ -47,12 +50,10 @@ export function Classement() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="eyebrow">Classement mondial</div>
-      <h1>🏆 Les plus grandes carrières</h1>
+      <div className="eyebrow">{t('clst.eyebrow')}</div>
+      <h1>🏆 {t('clst.h1')}</h1>
       <p style={{ color: 'var(--craie-dim)', maxWidth: '64ch', margin: '0.6rem 0 1.4rem' }}>
-        Chaque carrière est notée par un score global (niveau, réputation, longévité,
-        titres, essais). Le tableau <b>part vierge</b> : il ne contient que ce qui a
-        vraiment été joué. Mène une carrière à son terme et elle y entrera.
+        {t('clst.chapo')}
       </p>
 
       {/* ⚠️ COMMENT BRANCHER CE CLASSEMENT SUR TOUS LES JOUEURS.
@@ -71,47 +72,29 @@ export function Classement() {
 
       {/* ═══ LE TABLEAU MONDIAL — TOUJOURS AFFICHÉ, AVEC SON ÉTAT ════════ */}
       <div className="carte tableau-classement mondial">
-        <h2 style={{ marginTop: 0 }}>🌍 Classement mondial</h2>
-        <p className="aide">
-          Les carrières de <b>tous les joueurs</b>, tous appareils confondus. Chaque
-          score a été <b>recalculé par le serveur</b> à partir des faits de la
-          carrière : aucun n'a été cru sur parole. Une carrière y entre quand elle
-          est menée à son terme — ou dès maintenant, avec le bouton ci-dessous.
-        </p>
+        <h2 style={{ marginTop: 0 }}>🌍 {t('clst.mondialTitre')}</h2>
+        <p className="aide">{t('clst.mondialIntro')}</p>
 
-        {mondial === null && <p className="aide">⏳ Lecture du classement mondial…</p>}
+        {mondial === null && <p className="aide">⏳ {t('clst.chargement')}</p>}
 
         {mondial?.etat === 'hors-ligne' && (
-          <p className="aide">
-            💻 <b>Pas de classement en ligne sur cette installation.</b> En
-            développement (<code>npm run dev</code>), Vite ne sait pas exécuter la
-            fonction serveur. Joue sur le site déployé, ou lance{' '}
-            <code>vercel dev</code>, ou pointe une API existante :{' '}
-            <code>VITE_CLASSEMENT_URL=https://ton-site/api/classement npm run dev</code>.
-          </p>
+          <p className="aide">💻 {t('clst.horsLigne')}</p>
         )}
 
         {mondial?.etat === 'panne' && (
-          <p className="aide">
-            ⛔ <b>Le serveur du classement ne répond pas</b> ({mondial.erreur}).
-            Vérifie <code>{URL_CLASSEMENT}</code> et les journaux Vercel — le
-            classement local, lui, continue de fonctionner juste en dessous.
-          </p>
+          <p className="aide">⛔ {t('clst.panne', { erreur: mondial.erreur })}</p>
         )}
 
         {mondial?.etat === 'ok' && mondial.lignes.length === 0 && (
-          <p className="aide">
-            🌱 <b>Personne n'y figure encore.</b> Le serveur répond bien, la table
-            est simplement vide : sois le premier à y entrer.
-          </p>
+          <p className="aide">🌱 {t('clst.mondialVide')}</p>
         )}
 
         {mondial?.etat === 'ok' && mondial.lignes.length > 0 && (
           <>
             <div className="ligne-classement entete">
               <span className="c-rang">#</span>
-              <span className="c-joueur">Joueur</span>
-              <span className="c-score">Score</span>
+              <span className="c-joueur">{t('clst.joueur')}</span>
+              <span className="c-score">{t('clst.score')}</span>
             </div>
             {mondial.lignes.slice(0, 100).map((l, i) => (
               <div
@@ -122,7 +105,7 @@ export function Classement() {
                   {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                 </span>
                 <span className="c-joueur"><b>{l.pseudo}</b></span>
-                <span className="c-score">{l.score.toLocaleString('fr-FR')}</span>
+                <span className="c-score">{nombre(l.score)}</span>
               </div>
             ))}
           </>
@@ -134,11 +117,8 @@ export function Classement() {
         {envoi && (
           <p className="aide" style={{ marginTop: '1rem' }}>
             {envoi.verdict.valide
-              ? `🌍 Ta carrière part toute seule au classement, à chaque fin de saison et `
-                + `à la retraite. Tu y figures sous « ${monPseudo} » avec `
-                + `${envoi.verdict.score.toLocaleString('fr-FR')} points — le serveur ne garde `
-                + `que ton meilleur total.`
-              : `⛔ Ta carrière ne peut pas être envoyée : ${envoi.verdict.anomalies.join(' · ')}.`}
+              ? t('clst.publie', { pseudo: monPseudo, score: nombre(envoi.verdict.score) })
+              : t('clst.rejete', { erreurs: envoi.verdict.anomalies.join(' · ') })}
           </p>
         )}
       </div>
@@ -155,7 +135,7 @@ export function Classement() {
       {liste.length === 0 ? (
         <div className="carte classement-vide">
           <p>
-            🏟️ <b>Le classement est encore vide.</b>
+            🏟️ <b>{t('clst.vide')}</b>
           </p>
           <p className="aide">
             Aucune carrière n'a encore été menée à son terme sur cet appareil.
@@ -166,15 +146,18 @@ export function Classement() {
       <div className="carte tableau-classement">
         <div className="ligne-classement entete">
           <span className="c-rang">#</span>
-          <span className="c-joueur">Joueur</span>
-          <span className="c-note">Note</span>
-          <span className="c-saisons">Saisons</span>
-          <span className="c-score">Score</span>
+          <span className="c-joueur">{t('clst.joueur')}</span>
+          <span className="c-note">{t('clst.note')}</span>
+          <span className="c-saisons">{t('clst.saisons')}</span>
+          <span className="c-score">{t('clst.score')}</span>
         </div>
         {liste.map((l, i) => (
-          <div
+          <button
+            type="button"
             key={l.id}
-            className={`ligne-classement ${l.joueur ? 'moi' : ''} ${l.enCours ? 'en-cours' : ''}`}
+            className={`ligne-classement ouvrable ${l.joueur ? 'moi' : ''} ${l.enCours ? 'en-cours' : ''}`}
+            onClick={() => setFicheOuverte(l)}
+            title={t('clst.voirDetails')}
           >
             <span className="c-rang">
               {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
@@ -186,30 +169,56 @@ export function Classement() {
               <span>
                 <b>{l.nom}</b>
                 <small style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  {POSTE_PAR_ID[migrerPoste(l.poste)].nom} · <Drapeau nation={l.nation} taille={0.72} /> {nomNation(l.nation)}
+                  {nomPoste(migrerPoste(l.poste))} · <Drapeau nation={l.nation} taille={0.72} /> {nomNationTraduit(l.nation)}
                 </small>
               </span>
             </span>
             <span className="c-note">{l.note}</span>
             <span className="c-saisons">{l.saisons}</span>
-            <span className="c-score">{(l.score ?? 0).toLocaleString('fr-FR')}</span>
-          </div>
+            <span className="c-score">{nombre(l.score ?? 0)}</span>
+          </button>
         ))}
       </div>
+      )}
+
+      {ficheOuverte && (
+        <section className="carte fiche-classement" aria-label={t('clst.details')}>
+          <div>
+            <div className="eyebrow">{t('clst.details')}</div>
+            <h2 style={{ margin: '0.2rem 0' }}>{ficheOuverte.nom}</h2>
+            <p className="aide" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              {nomPoste(migrerPoste(ficheOuverte.poste))} · <Drapeau nation={ficheOuverte.nation} taille={0.8} /> {nomNationTraduit(ficheOuverte.nation)} · {ficheOuverte.age} {t('gen.ans')}
+            </p>
+          </div>
+          <button type="button" className="btn fantome" onClick={() => setFicheOuverte(null)}>{t('clst.fermer')}</button>
+          <div className="ressources fiche-classement-stats">
+            <span className="pastille">{t('clst.note')} <b>{ficheOuverte.note}</b></span>
+            <span className="pastille">{t('clst.saisons')} <b>{ficheOuverte.saisons}</b></span>
+            <span className="pastille">🏉 <b>{ficheOuverte.matchsJoues}</b> {t('prof.matchs')}</span>
+            <span className="pastille">🎯 <b>{ficheOuverte.essais}</b> {t('ml.essais')}</span>
+            <span className="pastille">⭐ <b>{ficheOuverte.reputation}</b> {t('pj.reputation')}</span>
+            <span className="pastille">{t('clst.score')} <b>{nombre(ficheOuverte.score)}</b></span>
+          </div>
+          {ficheOuverte.titres.length > 0 && (
+            <div className="bloc-titres">
+              {ficheOuverte.titres.map((titre, i) => <span className="medaille" key={`${titre}-${i}`}>🏆 {titreTraduit(titre)}</span>)}
+            </div>
+          )}
+        </section>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.8rem', marginTop: '2rem' }}>
         {joueur ? (
           <button className="btn primaire" onClick={() => setEcran('carriere')}>
-            Faire grimper ma carrière →
+            {t('clst.grimper')}
           </button>
         ) : (
           <button className="btn primaire" onClick={() => setEcran('creation')}>
-            Commencer une carrière →
+            {t('clst.commencer')}
           </button>
         )}
         <button className="btn fantome" onClick={() => setEcran('pantheon')}>
-          Hall des Légendes
+          {t('clst.hall')}
         </button>
       </div>
     </motion.section>

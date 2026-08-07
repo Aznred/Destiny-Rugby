@@ -5,7 +5,7 @@ import { useGame } from '../store/useGame';
 import { COMPETITIONS } from '../data/clubs';
 import { COUPES_EUROPE } from '../data/mondeReel';
 import { SELECTIONS_SENIOR, SELECTIONS_U20, type Selection } from '../data/selections';
-import { Drapeau, aDrapeau } from '../components/Drapeau';
+import { Drapeau, aDrapeau, nomNationTraduit } from '../components/Drapeau';
 import { LogoCompet } from '../components/LogoCompet';
 import { NOTE_CLUB_REEL } from '../data/effectifsReels';
 import { NOTE_CLUB_NOUVEAU } from '../data/nouvellesLigues';
@@ -151,7 +151,7 @@ function BlocSelections({
           <div key={sel.nom} className="club-carte carte-selection">
             <LogoEquipe nom={sel.nom} logo={sel.logo} taille={40} />
             <div style={{ minWidth: 0 }}>
-              <div className="club-nom">{sel.nom}</div>
+              <div className="club-nom">{nomSelectionTraduit(sel.nom, sel.nation)}</div>
               <div className="club-ville">
                 {tn('ch.competitions', sel.competitions.length, { n: sel.competitions.length })}
               </div>
@@ -189,7 +189,7 @@ function BlocCompetition({
             {drapeaux.map((d) => (
               <span key={d} className={`fi fi-${d}`} style={{ borderRadius: '2px' }} />
             ))}
-            {pays}
+            {nomNationTraduit(pays)}
           </span>
         </div>
         <span className="comp-count">{clubs.length} {t('gen.clubs')}</span>
@@ -224,4 +224,8 @@ function BlocCompetition({
       </div>
     </div>
   );
+}
+
+function nomSelectionTraduit(nom: string, nation: string): string {
+  return /\bU20\b/.test(nom) ? `${nomNationTraduit(nation)} U20` : nomNationTraduit(nation);
 }

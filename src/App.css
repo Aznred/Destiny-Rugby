@@ -609,6 +609,8 @@
 .ligne-classement:not(.entete):nth-child(even) { background: rgba(255, 255, 255, 0.02); }
 .ligne-classement.moi { background: rgba(232, 178, 58, 0.1); border: 1px solid var(--bordure-forte); }
 .ligne-classement.en-cours { background: rgba(52, 163, 90, 0.14); border: 1px solid rgba(52,163,90,0.45); }
+.ligne-classement.ouvrable { width: 100%; border: 0; color: inherit; text-align: inherit; font: inherit; cursor: pointer; }
+.ligne-classement.ouvrable:hover, .ligne-classement.ouvrable:focus-visible { outline: none; background: rgba(232, 178, 58, 0.12); }
 .c-rang { font-family: var(--police-forte); font-weight: 800; text-align: center; }
 .c-joueur { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
 .c-joueur small { display: block; color: var(--brume); font-size: 0.72rem; }
@@ -620,6 +622,8 @@
    le score (poste, nation et saisons sont jetés après vérification). */
 .tableau-classement.mondial .ligne-classement { grid-template-columns: 3rem 1fr 5.4rem; }
 .tableau-classement.mondial { margin-bottom: 1.4rem; }
+.fiche-classement { margin-top: 1.2rem; display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: start; }
+.fiche-classement-stats, .fiche-classement .bloc-titres { grid-column: 1 / -1; }
 
 /* ====== SCÉNARIOS À CHOIX ====== */
 .scenario-choix { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.4rem 1.2rem 0; }

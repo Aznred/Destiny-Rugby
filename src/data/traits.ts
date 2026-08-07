@@ -5,6 +5,8 @@
 // match, cartons, marché). Un trait donne toujours quelque chose ET coûte
 // quelque chose — sinon ce serait un bonus déguisé.
 
+import { langueCourante } from '../lib/i18n';
+
 export interface Trait {
   id: string;
   nom: string;
@@ -90,6 +92,32 @@ export const TRAITS: Trait[] = [
 export const TRAIT_PAR_ID: Record<string, Trait> = Object.fromEntries(
   TRAITS.map((t) => [t.id, t]),
 );
+
+const TRAITS_ANGLAIS: Record<string, { nom: string; desc: string }> = {
+  professionnel: { nom: 'Professional', desc: 'Impeccable habits and first into the gym. You develop faster and recover better — without the wild streak.' },
+  sang_chaud: { nom: 'Hot-headed', desc: 'You play on instinct and never back down. Big nights suit you; referees, less so.' },
+  fetard: { nom: 'Party animal', desc: 'Third halves are compulsory. The squad loves you; the fitness coach much less.' },
+  peur_du_choc: { nom: 'Risk-averse', desc: 'You protect your body, sometimes at the cost of impact. Fewer injuries, fewer highlights.' },
+  guerrier: { nom: 'Warrior', desc: 'You would play on one leg. The crowd loves it; your medical record does not.' },
+  clutch: { nom: 'Big-game player', desc: 'The bigger the match, the hotter you run. In league play, you can coast.' },
+  leader: { nom: 'Natural leader', desc: 'People listen before you even speak. The captaincy is within reach and the group follows you.' },
+  fragile: { nom: 'Injury-prone', desc: 'Your body takes punishment badly. In return, you have developed a game-reading others lack.' },
+  ambitieux: { nom: 'Ambitious', desc: 'Your agent has you on speed dial. Clubs watch you — yours is a little wary.' },
+  fidele: { nom: 'One-club loyal', desc: 'One club, one story. You are at home there, but the market looks at you less often.' },
+  travailleur: { nom: 'Hard worker', desc: 'Last to leave the training field. You may never be a genius, but you never stop improving.' },
+  charismatique: { nom: 'Charismatic', desc: 'Media and sponsors love you. The squad is still waiting to see it on the pitch.' },
+};
+
+/** Libellés d'interface : les identifiants et les effets restent inchangés. */
+export function nomTrait(id: string): string {
+  const trait = TRAIT_PAR_ID[id];
+  return langueCourante() === 'en' ? TRAITS_ANGLAIS[id]?.nom ?? trait?.nom ?? id : trait?.nom ?? id;
+}
+
+export function descriptionTrait(id: string): string {
+  const trait = TRAIT_PAR_ID[id];
+  return langueCourante() === 'en' ? TRAITS_ANGLAIS[id]?.desc ?? trait?.desc ?? '' : trait?.desc ?? '';
+}
 
 // Cumul des effets des traits d'un joueur : les multiplicateurs se multiplient,
 // les bonus s'additionnent.

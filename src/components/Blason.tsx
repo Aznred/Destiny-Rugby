@@ -1,6 +1,7 @@
 import type { Club } from '../types';
 import { LOGO_PAR_EQUIPE } from '../data/mondeReel';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
+import { nomNation } from './Drapeau';
 
 // ⚠️ DEUX SOURCES D'ÉCUSSONS DE SÉLECTION. Les compétitions historiques
 // viennent de `mondeReel.ts`, les treize nouvelles (Rugby Europe Conference,
@@ -10,6 +11,15 @@ import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
 const LOGOS_EQUIPE: Record<string, string> = { ...LOGO_PAR_EQUIPE };
 for (const comp of COMPETITIONS_NATIONS_NOUVELLES) {
   for (const e of comp.equipes) if (e.logo && !LOGOS_EQUIPE[e.nom]) LOGOS_EQUIPE[e.nom] = e.logo;
+}
+// Le moteur emploie les noms canoniques (« Écosse », « Pays de Galles »,
+// « États-Unis ») alors que certaines sources de logos écrivent Ecosse, Galles
+// ou USA. On indexe donc chaque logo aussi sous sa nation canonique.
+for (const [nom, logo] of Object.entries({ ...LOGOS_EQUIPE })) {
+  const canonique = nomNation(nom);
+  if (canonique && !/\s+(?:U20|A|B|C|XV|-20)$/i.test(nom) && !LOGOS_EQUIPE[canonique]) {
+    LOGOS_EQUIPE[canonique] = logo;
+  }
 }
 
 // Écusson d'un club. Les clubs couverts par la base réelle (Top 14, Pro D2,

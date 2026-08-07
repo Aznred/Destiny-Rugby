@@ -15,13 +15,12 @@
 // sauvegarder, rouvrir l'écran ne rejoue rien.
 
 import { calendrier, classer, graine, scorePossible, type LigneTableau, type MatchChampionnat } from './championnat';
-import { noteALAge } from './effectif';
-import type { Coequipier } from './effectif';
-import { EFFECTIFS_REELS } from '../data/effectifsReels';
-import { POSTE_PAR_ID, posteDepuisFamille } from '../data/rugby';
+import { effectifDuClub, type Coequipier } from './effectif';
+import { POSTE_PAR_ID } from '../data/rugby';
 import { nomNation } from '../components/Drapeau';
 import { semaine, CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
+import { COMPETITIONS } from '../data/clubs';
 import type { Joueur, PosteId } from '../types';
 
 // La hiérarchie mondiale, en « note d'équipe » sur la même échelle que les
@@ -92,10 +91,19 @@ export function classementMondial(saison: number): LigneClassementMondial[] {
   // Le classement mondial est celui des sélections A uniquement. Les U20 et
   // équipes réserves peuvent jouer leurs propres compétitions, mais ne doivent
   // jamais voler une place dans le Top 12 senior ou les qualifications.
-  const estSelectionSenior = (nom: string) => !estEquipeU20(nom) && !/\s+[BC]$/.test(nom);
+  // Les sources mélangent « Ecosse » / « Écosse », « USA » / « États-Unis »,
+  // les U20 écrits « U20 » ou « -20 » et les équipes A/B/C. Le classement
+  // senior ne doit contenir qu'UNE équipe première par pays.
+  const estSelectionSenior = (nom: string) => {
+    const compact = nom.trim().replace(/\s+/g, ' ');
+    return !estEquipeU20(compact)
+      && !/(?:\s|-)20$/i.test(compact)
+      && !/\s+(?:A|B|C|XV)$/i.test(compact);
+  };
   const nations = new Set<string>(
     [...Object.keys(FORCE_NATION), ...Object.keys(forcesDesNouvellesNations())]
-      .filter(estSelectionSenior),
+      .filter(estSelectionSenior)
+      .map((nom) => nomNation(nom)),
   );
   const points = new Map<string, number>([...nations].map((n) => [n, 1000 + forceNation(n) * 10]));
   const competitions = [...COMPETITIONS_INTERNATIONALES, ...competitionsNouvellesNations()]
@@ -459,6 +467,7 @@ export function matchInternationalDuJoueur(
 // jouer un match international avec le moteur 2D, exactement comme un match de
 // championnat.
 const cacheSelections = new Map<string, Coequipier[]>();
+const CLUBS_SELECTION = [...new Set(COMPETITIONS.flatMap((competition) => competition.clubs.map((club) => club.nom)))];
 
 export function effectifNational(nation: string, saison: number): Coequipier[] {
   const nom = nomNation(nation);
@@ -466,39 +475,38 @@ export function effectifNational(nation: string, saison: number): Coequipier[] {
   const memo = cacheSelections.get(cle);
   if (memo) return memo;
 
-  // ⚠️ « France U20 » compose son groupe dans le MÊME vivier que « France »,
-  // mais borné à 20 ans : ce sont bien les meilleurs joueurs U20 du pays, pas
-  // des joueurs inventés. Au-delà de l'âge, la logique est identique.
+  // « France U20 » compose son groupe dans le MÊME vivier que « France », mais
+  // borné à 20 ans : ce sont bien les meilleurs joueurs U20 du pays.
   const u20 = estEquipeU20(nom);
   const paysSource = u20 ? nationDeLEquipeU20(nom) : nom;
 
-  // ⚠️ LES BASES DE DONNÉES NE LISTENT PAS LES ACADÉMIES. Beaucoup de pays
-  // n'ont qu'une poignée de joueurs de 20 ans ou moins dans les effectifs
-  // professionnels — l'Irlande n'en comptait que douze, pas de quoi aligner un
-  // XV. On élargit donc l'âge source par paliers (20, puis 21, 22, 23) jusqu'à
-  // avoir de quoi composer une feuille de match, et on RAMÈNE ces joueurs à
-  // vingt ans : leur note est recalculée à cet âge-là (`noteALAge`), donc c'est
-  // bien le niveau qu'ils avaient chez les U20, pas celui d'aujourd'hui.
+  // Le vivier parcourt les effectifs réellement utilisés par le jeu : bases
+  // historiques, nouvelles ligues (dont la Premier League russe), mercato et
+  // générations dorées. Ainsi un Russe performant à Kazan peut bien être appelé.
+  // Les académies étant peu renseignées, les U20 élargissent progressivement
+  // leur âge d'éligibilité afin de former une feuille complète.
   const construire = (ageMax: number): Coequipier[] => {
     const liste: Coequipier[] = [];
-    for (const [club, effectif] of Object.entries(EFFECTIFS_REELS)) {
+    const dejaPris = new Set<string>();
+    for (const club of CLUBS_SELECTION) {
+      const effectif = effectifDuClub(club, saison);
       for (const joueur of effectif) {
         if (nomNation(joueur.nation) !== paysSource) continue;
-        const age = joueur.age + saison - 1;
-        if (age > ageMax) continue;
-        // Chez les U20, personne n'a plus de vingt ans sur la feuille.
-        const ageRetenu = u20 ? Math.min(20, age) : age;
+        if (joueur.age > ageMax) continue;
+        // Un joueur peut être retrouvé après un transfert : on ne le convoque
+        // qu'une fois, et on conserve la version la mieux notée.
+        const identite = joueur.nom.toLocaleLowerCase('fr');
+        if (dejaPris.has(identite)) continue;
+        dejaPris.add(identite);
         liste.push({
-          id: `${nom}-${club}-${joueur.nom}`,
+          id: `${nom}-${joueur.id}`,
           nom: joueur.nom,
-          // ⚠️ Les données réelles ne donnent que la FAMILLE de poste ; on tire
-          // un numéro concret de façon déterministe, comme `effectif.ts`.
-          poste: posteDepuisFamille(joueur.poste, Math.floor(graine('poste#' + club + joueur.nom)() * 1000)),
-          age: ageRetenu,
-          note: noteALAge(joueur.note, joueur.age, joueur.potentiel, ageRetenu, 0.5),
+          poste: joueur.poste,
+          age: u20 ? Math.min(20, joueur.age) : joueur.age,
+          note: joueur.note,
           potentiel: joueur.potentiel,
           nation: joueur.nation,
-          regen: false,
+          regen: joueur.regen,
         });
       }
     }

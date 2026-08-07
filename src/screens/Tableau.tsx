@@ -328,6 +328,7 @@ export function Tableau() {
   const saison = joueur?.saison ?? 1;
   const internationales = useMemo(() => competitionsDeLaSaison(saison), [saison]);
   const rangMondial = useMemo(() => classementMondial(saison), [saison]);
+  const [classementMondialOuvert, setClassementMondialOuvert] = useState(false);
   const maNation = nomNation(joueur?.nation ?? '');
   const maLigneMondiale = useMemo(
     () => rangMondial.find((ligne) => ligne.nation === maNation),
@@ -436,6 +437,12 @@ export function Tableau() {
   const matchsTournoiVisibles = tournoi?.matchs.filter(
     (match) => ORDRE_TOUR_FINAL[match.tour] <= toursFinalsTermines,
   ) ?? [];
+  const toursCoupeTermines = coupe
+    ? Math.max(0, passees(numero, 'coupe') - coupe.totalJournees)
+    : 0;
+  const matchsCoupeVisibles = coupe?.bracket.filter(
+    (match) => ORDRE_TOUR_FINAL[match.tour] <= toursCoupeTermines,
+  ) ?? [];
   const finaleTerminee = toursFinalsTermines >= 3;
   const derniere = etat?.journees.length ?? 0;
   const total = donnees?.total ?? 0;
@@ -542,7 +549,13 @@ export function Tableau() {
         })}
       </div>
 
-      <div className="carte bloc-competition">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0.4rem 0 0.8rem' }}>
+        <button className="btn fantome" type="button" onClick={() => setClassementMondialOuvert((ouvert) => !ouvert)}>
+          {classementMondialOuvert ? t('intl.masquerClassement') : t('intl.voirClassement')}
+        </button>
+      </div>
+
+      {classementMondialOuvert && <div className="carte bloc-competition">
         <div className="comp-tete">
           <b>🌍 {t('intl.classementMondial')}</b>
           <span className="comp-count">{t('intl.top12')}</span>
@@ -569,7 +582,7 @@ export function Tableau() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* ---------- COUPE D'EUROPE ---------- */}
       {coupe && (
@@ -583,13 +596,13 @@ export function Tableau() {
             {coupe.vainqueur && ` 🏆 Vainqueur : ${coupe.vainqueur}.`}
           </p>
 
-          {coupe.bracket.length > 0 && (
+          {matchsCoupeVisibles.length > 0 && (
             <div className="carte bloc-competition">
               <div className="comp-tete">
                 <b>🔥 Tableau final</b>
                 {coupe.vainqueur && <span className="comp-count">🏆 {coupe.vainqueur}</span>}
               </div>
-              <Arbre matchs={coupe.bracket} club={joueur.club} />
+              <Arbre matchs={matchsCoupeVisibles} club={joueur.club} />
             </div>
           )}
 
