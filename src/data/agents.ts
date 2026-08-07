@@ -66,3 +66,35 @@ export const SANS_AGENT: Agent = {
 export function agentDe(id?: string): Agent {
   return (id && AGENT_PAR_ID[id]) || SANS_AGENT;
 }
+
+// ---------------------------------------------------------------------------
+// UN AGENT, ÇA SE MÉRITE — ça ne se choisit pas dans une liste
+// ---------------------------------------------------------------------------
+// ⚠️ Demande explicite : « l'agent, on peut pas vraiment le choisir, ça dépend
+// de nos performances ». On cochait un nom parmi quatre, dès la première
+// semaine, gratuitement : le requin qui fait exploser les salaires était
+// accessible à un joueur de Régionale 3. Chaque agent a désormais SA BARRE.
+//
+// Le joueur peut quand même DÉMARCHER (décision de l'utilisateur : « la 1, mais
+// tu peux aussi démarcher ») — l'agent refuse simplement s'il n'est pas au
+// niveau, et ça coûte un peu de moral.
+export const SEUIL_AGENT: Record<string, number> = {
+  // Le cousin ne demande rien à personne : c'est le premier, et il est là dès
+  // qu'on met un pied dans un vestiaire.
+  cousin: 0,
+  maison: 52,
+  international: 68,
+  requin: 74,
+};
+
+/** Ce qu'un agent regarde : le niveau du joueur ET sa notoriété. */
+export function niveauPourAgent(cote: number, reputation: number): number {
+  return cote * 0.75 + reputation * 0.25;
+}
+
+/** Les agents qui accepteraient de te représenter, du plus prestigieux au moins. */
+export function agentsAccessibles(niveau: number): Agent[] {
+  return AGENTS
+    .filter((a) => niveau >= (SEUIL_AGENT[a.id] ?? 99))
+    .sort((a, b) => (SEUIL_AGENT[b.id] ?? 0) - (SEUIL_AGENT[a.id] ?? 0));
+}

@@ -1,0 +1,302 @@
+// LA NÉGOCIATION D'UN CONTRAT — le club écrit, tu réponds, il tranche.
+//
+// Demande explicite : « j'aimerais refaire tout le système de transfert, que ça
+// se passe par X : un club envoie un message et c'est à nous de négocier ».
+//
+// ⚠️ CE FICHIER NE REFAIT PAS LE MARCHÉ. `lib/offres.ts` décide DÉJÀ qui
+// s'intéresse à toi et à quel prix — `cote()`, `besoinAuPoste()`, l'interdiction
+// de sauter deux étages, le plafond qui dépend de l'âge, les salaires par âge.
+// Tout ça est calibré et protégé par `verifMarche.ts` et `verifDifficulte.ts`.
+// Ce qu'on ajoute ici, c'est la CONVERSATION : ce qui se passe entre le moment
+// où un club se manifeste et celui où on signe.
+//
+// ⚠️ CE SONT LES CHIFFRES QUI TRANCHENT, PAS L'IA (décision de l'utilisateur).
+// Groq n'écrit que l'habillage des messages — jamais le montant, jamais le
+// verdict. C'est le patron de tout le projet : « le MJ propose, le jeu dispose ».
+// Un modèle qui fixe les salaires offre un jour 3 M€ à un joueur de Fédérale 2,
+// et le mode SANS CLÉ n'aurait plus de marché du tout. Ici, tout marche hors
+// ligne, à l'identique.
+//
+// ⚠️ LE PLAFOND DU CLUB N'EST JAMAIS MONTRÉ. C'est ce qui rend la négociation
+// intéressante : on ne sait pas jusqu'où pousser. Il est calculé une fois, à la
+// naissance de l'approche, et il ne bouge plus — sinon il suffirait de rouvrir
+// la conversation pour retenter sa chance (« save-scumming »).
+
+import type { Joueur, OffreContrat } from '../types';
+import { agentDe } from '../data/agents';
+import { graine } from './championnat';
+import { pseudoStable } from './comptes';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1. UNE APPROCHE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Ce qui est sur la table à un instant donné. */
+export interface Termes {
+  salaire: number;
+  prime: number;
+  saisons: number;
+  /** Temps de jeu promis : ça se paie en confiance du staff à l'arrivée. */
+  garantie: boolean;
+}
+
+export type EtatApproche =
+  | 'ouverte'   // la négociation est en cours
+  | 'accord'    // on s'est mis d'accord — le transfert attend l'intersaison
+  | 'rompue'    // le club s'est braqué, ou on a refusé
+  | 'signee';   // le pré-accord a été appliqué (intersaison passée)
+
+export interface Approche {
+  id: string;
+  /**
+   * Le compte L'Ovale qui écrit.
+   * ⚠️ C'EST LE PSEUDO DE L'ANNUAIRE (`pseudoStable(club, '_officiel')`), pas un
+   * identifiant inventé ici. Bug attrapé en jeu : avec un `club:<nom>` maison,
+   * la messagerie ne retrouvait pas le compte dans l'annuaire et la
+   * conversation n'apparaissait tout simplement pas — le club écrivait dans le
+   * vide.
+   */
+  pseudo: string;
+  club: string;
+  division: string;
+  divisionNom: string;
+  pays: string;
+  noteClub: number;
+  etranger: boolean;
+  /** Vrai si c'est le club actuel qui propose de prolonger. */
+  prolongation: boolean;
+  /** L'offre COURANTE, celle qu'on peut accepter. */
+  offre: Termes;
+  /**
+   * ⚠️ CE QUE LE CLUB NE DÉPASSERA JAMAIS. Jamais affiché : c'est l'inconnue de
+   * la négociation. Calculé une fois, à la naissance de l'approche.
+   */
+  plafond: Termes;
+  /** Tours de discussion restants avant que le club se braque. */
+  patience: number;
+  etat: EtatApproche;
+  saison: number;
+  semaine: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. LES LEVIERS — ce qu'on peut demander
+// ═══════════════════════════════════════════════════════════════════════════
+// Quatre, et seulement quatre. Une liste plus longue donnerait un formulaire ;
+// ici on veut une conversation où chaque demande coûte quelque chose.
+
+export type Levier = 'salaire' | 'prime' | 'duree' | 'garantie';
+
+export interface DefinitionLevier {
+  id: Levier;
+  nom: string;
+  emoji: string;
+  /** Ce que le joueur dit, en clair — sert de repli quand il n'y a pas de clé. */
+  phrase: string;
+  /** Ce qu'on demande, appliqué aux termes courants. */
+  demander: (t: Termes) => Termes;
+  /** Ce que ça coûte en patience. Le temps de jeu agace plus qu'un chiffre. */
+  cout: number;
+}
+
+export const LEVIERS: DefinitionLevier[] = [
+  {
+    id: 'salaire', nom: 'Plus de salaire', emoji: '💰',
+    phrase: 'Le projet me parle, mais pas le salaire. Il faut faire un effort là-dessus.',
+    demander: (t) => ({ ...t, salaire: Math.round(t.salaire * 1.18) }),
+    cout: 1,
+  },
+  {
+    id: 'prime', nom: 'Une prime à la signature', emoji: '✍️',
+    phrase: 'Je peux m’aligner sur le salaire si vous mettez quelque chose à la signature.',
+    demander: (t) => ({ ...t, prime: Math.max(2000, Math.round(t.prime * 1.6 + t.salaire * 0.12)) }),
+    cout: 1,
+  },
+  {
+    id: 'duree', nom: 'Un contrat plus long', emoji: '📅',
+    phrase: 'Je ne viens pas pour un an. Engagez-vous sur la durée et on avance.',
+    demander: (t) => ({ ...t, saisons: Math.min(5, t.saisons + 1) }),
+    cout: 1,
+  },
+  {
+    id: 'garantie', nom: 'Du temps de jeu garanti', emoji: '🎽',
+    phrase: 'Ce que je veux savoir, c’est si je joue. Je ne viens pas cirer le banc.',
+    demander: (t) => ({ ...t, garantie: true }),
+    // ⚠️ Le plus cher : un club déteste s'engager sur une feuille de match, et
+    // c'est ce qui rend ce levier fort. Le demander deux fois braque presque à
+    // coup sûr.
+    cout: 2,
+  },
+];
+
+export const LEVIER_PAR_ID: Record<Levier, DefinitionLevier> =
+  Object.fromEntries(LEVIERS.map((l) => [l.id, l])) as Record<Levier, DefinitionLevier>;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. NAÎTRE — d'une offre du marché à une approche négociable
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * ⚠️ LE PREMIER MOT DU CLUB EST EN DESSOUS DE CE QU'IL PEUT METTRE, sinon il n'y
+ * a rien à négocier. `genererOffres` donne le montant JUSTE pour ce joueur et ce
+ * club : on ouvre en dessous et on garde la marge en réserve. Négocier
+ * parfaitement rend donc un peu plus que l'ancien panneau « Choix de carrière »,
+ * mal négocier rend moins — c'est l'intérêt.
+ */
+const OUVERTURE = 0.86;
+
+/** Ce que le club peut monter au-dessus de son offre juste, au maximum. */
+const MARGE_CLUB = 0.3;
+
+export function approcheDepuisOffre(
+  o: OffreContrat, j: Joueur, semaine: number, prolongation = false,
+): Approche {
+  // Déterministe : même club, même saison → même marge de manœuvre. Rouvrir la
+  // conversation ne redonne donc jamais une meilleure main.
+  const rng = graine(`nego#${o.club}#${j.saison}#${j.nom}`);
+  const agent = agentDe(j.agent);
+
+  // L'agent négocie POUR toi : c'est là qu'il gagne sa commission.
+  const marge = MARGE_CLUB * (0.7 + rng() * 0.6) * agent.salaire;
+  const base: Termes = {
+    salaire: Math.round(o.salaire * OUVERTURE),
+    prime: Math.round(o.prime * OUVERTURE),
+    saisons: o.saisons,
+    garantie: false,
+  };
+  return {
+    id: `app-${o.club}-${j.saison}-${semaine}`,
+    pseudo: pseudoStable(o.club, '_officiel'),
+    club: o.club,
+    division: o.division,
+    divisionNom: o.divisionNom,
+    pays: o.pays,
+    noteClub: o.noteClub,
+    etranger: o.etranger,
+    prolongation,
+    offre: base,
+    plafond: {
+      salaire: Math.round(o.salaire * (1 + marge)),
+      prime: Math.round(Math.max(o.prime, o.salaire * 0.1) * (1 + marge * 2)),
+      // Un club s'engage rarement au-delà de ce qu'il a proposé + 1 an, et
+      // jamais plus de 5 : au-delà, c'est le joueur qui devient un risque.
+      saisons: Math.min(5, o.saisons + (rng() < 0.55 ? 1 : 0)),
+      // ⚠️ Le temps de jeu garanti n'est PAS toujours accordable. Un club qui a
+      // déjà mieux que toi à ton poste ne le promettra jamais — c'est la seule
+      // chose qu'il ne peut pas acheter.
+      garantie: rng() < 0.5 + (agent.salaire - 1) * 1.2,
+    },
+    // Trois tours, un de plus avec un bon agent. Assez pour tenter deux
+    // demandes, pas assez pour tout obtenir.
+    patience: agent.salaire >= 1.1 ? 4 : 3,
+    etat: 'ouverte',
+    saison: j.saison,
+    semaine,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. LE VERDICT DU CLUB
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type Verdict = 'accepte' | 'contre' | 'rompt';
+
+export interface Reponse {
+  verdict: Verdict;
+  /** L'approche mise à jour — c'est elle qu'on range dans le store. */
+  approche: Approche;
+  /** Ce que le club répond, en clair (repli sans clé Groq). */
+  texte: string;
+}
+
+function sous(t: Termes, p: Termes): boolean {
+  return t.salaire <= p.salaire && t.prime <= p.prime
+    && t.saisons <= p.saisons && (!t.garantie || p.garantie);
+}
+
+/** À mi-chemin entre ce qu'on demande et ce qui est sur la table, sans dépasser. */
+function contreProposition(demande: Termes, courant: Termes, plafond: Termes): Termes {
+  return {
+    salaire: Math.min(plafond.salaire, Math.round((demande.salaire + courant.salaire) / 2)),
+    prime: Math.min(plafond.prime, Math.round((demande.prime + courant.prime) / 2)),
+    saisons: Math.min(plafond.saisons, demande.saisons),
+    garantie: demande.garantie && plafond.garantie,
+  };
+}
+
+const MONNAIE = (n: number) => `${n.toLocaleString('fr-FR')} €`;
+
+/** Le club répond à une demande. PURE : elle ne touche à rien. */
+export function repondreAuClub(a: Approche, levier: Levier): Reponse {
+  if (a.etat !== 'ouverte') {
+    return { verdict: 'rompt', approche: a, texte: 'Cette discussion est close.' };
+  }
+  const def = LEVIER_PAR_ID[levier];
+  const demande = def.demander(a.offre);
+  const patience = a.patience - def.cout;
+
+  // ⚠️ ON REGARDE LA DEMANDE AVANT LA PATIENCE. Une demande raisonnable passe
+  // même au dernier tour : c'est le club qui se braque quand on pousse trop
+  // loin, pas quand on discute.
+  if (sous(demande, a.plafond)) {
+    const approche = { ...a, offre: demande, patience: Math.max(0, patience) };
+    return {
+      verdict: 'accepte',
+      approche,
+      texte: levier === 'garantie'
+        ? `Entendu. Le coach s’engage : tu arrives pour jouer, pas pour attendre.`
+        : levier === 'duree'
+          ? `On peut aller jusqu’à ${demande.saisons} saison${demande.saisons > 1 ? 's' : ''}. Ça nous va.`
+          : levier === 'prime'
+            ? `On monte la prime à ${MONNAIE(demande.prime)}. C’est notre effort.`
+            : `${MONNAIE(demande.salaire)} par saison, on peut le faire.`,
+    };
+  }
+
+  // Hors du plafond, et plus de patience : le club claque la porte.
+  if (patience <= 0) {
+    return {
+      verdict: 'rompt',
+      approche: { ...a, etat: 'rompue', patience: 0 },
+      texte: `Là, on ne se comprend plus. On va regarder ailleurs — bonne continuation.`,
+    };
+  }
+
+  // Hors du plafond mais il reste du temps : on coupe la poire en deux.
+  const contre = contreProposition(demande, a.offre, a.plafond);
+  const bouge = contre.salaire > a.offre.salaire || contre.prime > a.offre.prime
+    || contre.saisons > a.offre.saisons || (contre.garantie && !a.offre.garantie);
+  return {
+    verdict: 'contre',
+    approche: { ...a, offre: bouge ? contre : a.offre, patience },
+    texte: bouge
+      ? `Pas à ce prix-là. Notre dernier mot : ${MONNAIE(contre.salaire)} par saison`
+        + `${contre.prime > 0 ? `, ${MONNAIE(contre.prime)} à la signature` : ''}`
+        + `, ${contre.saisons} saison${contre.saisons > 1 ? 's' : ''}`
+        + `${contre.garantie ? ', et tu joues' : ''}.`
+      : levier === 'garantie'
+        ? `Le temps de jeu, ça se prend à l’entraînement. On ne promet ça à personne.`
+        : `On ne bougera plus. L’offre reste celle qu’on t’a faite.`,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. CE QUE ÇA DONNE À L'ARRIVÉE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Le résumé lisible d'une offre — utilisé dans les DM et le journal. */
+export function resumerTermes(t: Termes): string {
+  return `${MONNAIE(t.salaire)} par saison · ${t.saisons} saison${t.saisons > 1 ? 's' : ''}`
+    + (t.prime > 0 ? ` · ${MONNAIE(t.prime)} à la signature` : '')
+    + (t.garantie ? ' · temps de jeu garanti' : '');
+}
+
+/**
+ * La confiance du staff à l'arrivée. Une garantie de temps de jeu, c'est un
+ * coach qui t'attend — et ça se lit sur la feuille de match dès la première
+ * journée (`chanceTitulaire` dans le store lit `confianceCoach`).
+ */
+export function confianceALArrivee(t: Termes, prolongation: boolean): number {
+  if (prolongation) return 0; // 0 = on ne touche pas à l'existant
+  return t.garantie ? 68 : 50;
+}

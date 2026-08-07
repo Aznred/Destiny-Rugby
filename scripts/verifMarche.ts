@@ -79,10 +79,13 @@ console.log('\n=== 4. FIN DE CONTRAT : ON NE RESTE PAS AU CLUB ===');
   });
   // On force un contrat arrivé à son terme.
   const j0 = useGame.getState().joueur!;
+  // ⚠️ LE PANNEAU « CHOIX DE CARRIÈRE » N'EXISTE PLUS : le marché se négocie en
+  // message privé sur L'Ovale (`lib/negociation.ts`). Ce qui est testé ici reste
+  // le même verrou — on ne joue pas une saison sans contrat — mais il se lit
+  // maintenant sur la FICHE (`contratBloque`), pas sur un panneau ouvert.
   useGame.setState({
     joueur: { ...j0, contrat: { ...j0.contrat!, saisons: 0 } },
-    offres: [],
-    offresOuvertes: false,
+    approches: [],
   });
   const saisonAvant = useGame.getState().joueur!.saison;
   useGame.getState().saisonSuivante();
@@ -90,12 +93,12 @@ console.log('\n=== 4. FIN DE CONTRAT : ON NE RESTE PAS AU CLUB ===');
   ligne('la saison ne démarre pas sans contrat',
     `saison ${saisonAvant} → ${apres.joueur?.saison ?? '—'}`,
     apres.joueur?.saison === saisonAvant);
-  ligne('le panneau « Choix de carrière » s’ouvre',
-    `${apres.offres.length} offre(s), ouvert : ${apres.offresOuvertes}`,
-    apres.offresOuvertes && apres.offres.length > 0);
+  const ouvertes = apres.approches.filter((a) => a.etat === 'ouverte');
+  ligne('des clubs écrivent sur L’Ovale',
+    `${ouvertes.length} approche(s)`, ouvertes.length > 0);
 
-  // On signe, la saison doit repartir.
-  useGame.getState().signerOffre(apres.offres[0].id);
+  // On accepte, puis l'intersaison applique le transfert et la saison repart.
+  useGame.getState().accepterApproche(ouvertes[0].id);
   useGame.getState().saisonSuivante();
   const fin = useGame.getState();
   ligne('après signature, la saison repart',

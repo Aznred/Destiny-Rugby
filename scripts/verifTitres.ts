@@ -28,6 +28,7 @@
 //
 // Lancer : npx vite-node scripts/verifTitres.ts
 
+import { jouerUneSaison } from './_saison';
 import { COMPETITIONS_U20, competitionsDeLaSaison, internationalEnDirect } from '../src/lib/international';
 import { coupeEnDirect, coupesDuClub } from '../src/lib/coupe';
 import { TROPHEE_PAR_COUPE, TROPHEE_PAR_INTERNATIONAL, TROPHEES } from '../src/data/trophees';
@@ -153,13 +154,7 @@ console.log('\n=== 5. EN JEU : AUCUN TITRE FANTÔME, AUCUN TITRE OUBLIÉ ===');
     for (let s = 0; s < 6; s++) {
       const saisonJouee = g().joueur?.saison ?? 0;
       const club = g().joueur!.club;
-      g().saisonSuivante();
-      if (g().offres.length) g().signerOffre(g().offres[0].id);
-      if ((g().joueur?.saison ?? 0) === saisonJouee) {
-        g().saisonSuivante();
-        if (g().offres.length) g().signerOffre(g().offres[0].id);
-      }
-      useGame.setState({ tropheesEnAttente: [], offresOuvertes: false });
+      jouerUneSaison(g, (p) => useGame.setState(p));
 
       const gagnesCetteSaison = (g().joueur?.palmares ?? [])
         .filter((t) => t.saison === saisonJouee)

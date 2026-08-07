@@ -1,6 +1,7 @@
 // Sévérité : sur 100 carrières de 12 saisons, combien deviennent « de folie » ?
 import { useGame, noteGlobale } from '../src/store/useGame';
 import { plafonnerDeltas, ressembleATriche } from '../src/lib/groq';
+import { jouerUneSaison } from './_saison';
 const g = () => useGame.getState();
 let titres = 0, gros = 0, monde = 0; const gens: number[] = [];
 for (let n = 0; n < 100; n++) {
@@ -12,16 +13,7 @@ for (let n = 0; n < 100; n++) {
     // jeu, le joueur signe dans le panneau puis relance ; le script doit faire
     // pareil, sinon il compte une saison qui n'a jamais été jouée et
     // l'étalonnage de difficulté s'effondre artificiellement.
-    const avant = g().joueur?.saison ?? 0;
-    g().saisonSuivante();
-    let o = g().offres;
-    if (o.length) g().signerOffre(o[0].id);
-    if ((g().joueur?.saison ?? 0) === avant) {
-      g().saisonSuivante();
-      o = g().offres;
-      if (o.length) g().signerOffre(o[0].id);
-    }
-    useGame.setState({ tropheesEnAttente: [], offresOuvertes: false });
+    jouerUneSaison(g, (p) => useGame.setState(p));
   }
   const j = g().joueur!;
   gens.push(noteGlobale(j));

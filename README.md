@@ -470,6 +470,9 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 
 | Ce qui n'allait pas | Ce qui a changé |
 |---|---|
+| **Les transferts se choisissaient dans un panneau, sans un mot** | **Refaits de bout en bout, sur 𝕏 L'Ovale.** Un club t'écrit en message privé, tu **négocies** (salaire · prime · durée · temps de jeu garanti) et il accepte, contre-propose ou **se braque**. Son plafond reste caché ; seule sa patience se voit. Le panneau « Choix de carrière » a **disparu**. |
+| Un transfert tombait n'importe quand | Un club ne démarche qu'à **un an de contrat maximum** (sauf si tu ne joues pas — là, tu es sur le départ), les approches arrivent **en cours d'année**, et le transfert ne s'applique **qu'à l'intersaison**. |
+| L'agent se cochait dans une liste, gratuitement | **Il se mérite** : chaque agent a sa barre (le requin exige 74 de niveau). Il te **démarche** quand tu franchis son palier, tu peux le démarcher aussi — et il te **lâche après deux saisons ratées**. |
 | **« Le classement des stats perd des stats »** | Le joueur incarné était compté **deux fois** — `saisonEnCours` (panneau, profil) et `statsReelles` (classements) — et les deux divergeaient dès qu'on sautait des semaines. Ses vrais chiffres gagnent **toujours**. Le rattrapage des journées passe de 6 à 12, et l'en-tête dit combien ont **vraiment** été rejouées. |
 | **« En match on a pas accès à tous les stats »** | Le moteur en compte **23**, la feuille en montrait **5**. Six vues — Général · Attaque · Défense · Conquête · Pied · Discipline. |
 | **« On est jugé que sur plaquage, mètres et essai »** | Le barème en regardait déjà **quinze**, mais rien ne le montrait. Le dépliant **« ⭐ Ma note — d'où elle vient »** liste chaque ligne avec ce qu'elle a rapporté ou coûté. |

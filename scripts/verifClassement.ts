@@ -18,6 +18,7 @@
 //
 // Lancer : npx vite-node scripts/verifClassement.ts
 
+import { jouerUneSaison } from './_saison';
 import { TROPHEES } from '../src/data/trophees';
 import { SUCCES, SUCCES_PAR_ID } from '../src/data/succes';
 import {
@@ -327,16 +328,7 @@ console.log('\n=== 9. LA TABLE SE REMPLIT VRAIMENT (retraite → envoi) ===');
       nom: 'Retraité Test', poste: 'demi_melee', nation: 'France',
       club: 'Stade Nantais', division: 'nationale2', age: 18,
     });
-    for (let s = 0; s < 3; s++) {
-      const avant = g().joueur?.saison ?? 0;
-      g().saisonSuivante();
-      if (g().offres.length) g().signerOffre(g().offres[0].id);
-      if ((g().joueur?.saison ?? 0) === avant) {
-        g().saisonSuivante();
-        if (g().offres.length) g().signerOffre(g().offres[0].id);
-      }
-      useGame.setState({ tropheesEnAttente: [], offresOuvertes: false });
-    }
+    for (let s = 0; s < 3; s++) jouerUneSaison(g, (p) => useGame.setState(p));
     const avantRetraite = g().joueur!;
     g().prendreRetraite('entraîneur');
     // L'envoi est volontairement « au fil de l'eau » (on n'attend pas la

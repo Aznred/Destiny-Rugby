@@ -169,22 +169,32 @@ console.log('\n=== 6. LES TRANSFERTS SE PRODUISENT VRAIMENT ===');
   ligne('le MJ peut demander l’ouverture du marché', String(jug.marche), jug.marche);
   store.appliquerJugement(jug, 'je demande à mon agent de me trouver un autre club');
 
+  // ⚠️ LE MARCHÉ A CHANGÉ DE FORME. Le MJ ne peut toujours PAS changer ton club
+  // dans son récit — il lève seulement `marche: true`. Ce que ça ouvre n'est
+  // plus un panneau mais des conversations avec des clubs, sur L'Ovale.
   const apres = useGame.getState();
-  ligne('le panneau « Choix de carrière » s’ouvre', String(apres.offresOuvertes), apres.offresOuvertes);
-  ligne('de vraies offres sont sur la table',
-    `${apres.offres.length} offre(s)`, apres.offres.length > 0);
+  const ouvertes = apres.approches.filter((a) => a.etat === 'ouverte');
+  ligne('des clubs écrivent sur L’Ovale', `${ouvertes.length} approche(s)`, ouvertes.length > 0);
 
-  if (apres.offres.length) {
-    const offre = apres.offres[0];
+  if (ouvertes.length) {
+    const app = ouvertes[0];
     const clubAvant = apres.joueur!.club;
-    store.signerOffre(offre.id);
+    store.accepterApproche(app.id);
+    const accord = useGame.getState().joueur!;
+    // ⚠️ RIEN NE BOUGE AVANT L'INTERSAISON : c'est la règle donnée par
+    // l'utilisateur (« le transfert s'effectue qu'à l'intersaison »).
+    ligne('l’accord ne déplace pas le joueur tout de suite',
+      `${accord.club} (accord avec ${app.club})`, accord.club === clubAvant);
+    ligne('… mais il pose un pré-accord',
+      accord.preAccord?.club ?? 'aucun', accord.preAccord?.club === app.club);
+    store.appliquerPreAccord();
     const fin = useGame.getState().joueur!;
-    ligne('signer change VRAIMENT de club',
-      `${clubAvant} → ${fin.club}`, fin.club === offre.club && fin.club !== clubAvant);
-    ligne('… et la division suit', `${fin.division}`, fin.division === offre.division);
+    ligne('l’intersaison change VRAIMENT de club',
+      `${clubAvant} → ${fin.club}`, fin.club === app.club && fin.club !== clubAvant);
+    ligne('… et la division suit', `${fin.division}`, fin.division === app.division);
     ligne('… et le contrat aussi',
       fin.contrat ? `${fin.contrat.salaire} €/saison, ${fin.contrat.saisons} saison(s)` : 'aucun',
-      !!fin.contrat && fin.contrat.club === offre.club && fin.contrat.salaire === offre.salaire);
+      !!fin.contrat && fin.contrat.club === app.club && fin.contrat.salaire === app.offre.salaire);
   }
 }
 

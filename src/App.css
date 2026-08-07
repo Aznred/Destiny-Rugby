@@ -3377,3 +3377,46 @@ img, svg, canvas { max-width: 100%; }
 .ml-bilan-groupe { overflow-x: auto; }
 .ml-bilan-groupe .ml-bilan-entete,
 .ml-bilan-groupe .ml-bilan-ligne { gap: 0.35rem; }
+
+/* ====== NÉGOCIATION D'UN CONTRAT, dans les messages de L'Ovale ====== */
+/* Le marché des transferts vit ici depuis que le panneau « Choix de carrière »
+   a été supprimé. Scopé sous .x-app comme tout L'Ovale : ce bloc emprunte les
+   couleurs du réseau (fond sombre, bleu), pas celles du thème stade. */
+.x-nego {
+  border-top: 1px solid var(--x-bordure, rgba(255, 255, 255, 0.12));
+  padding: 0.7rem 0.9rem;
+  display: grid;
+  gap: 0.55rem;
+  background: rgba(29, 155, 240, 0.07);
+}
+.x-nego-tete { display: flex; justify-content: space-between; align-items: center; font-size: 0.86rem; }
+.x-nego-patience { letter-spacing: 0.18em; font-size: 0.7rem; opacity: 0.75; }
+.x-nego-offre { margin: 0; font-size: 0.84rem; opacity: 0.9; }
+.x-nego-leviers { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.x-nego-leviers button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  padding: 0.34rem 0.7rem;
+  font-size: 0.76rem;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 34px;
+}
+.x-nego-leviers button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); }
+.x-nego-leviers button:disabled { opacity: 0.35; cursor: default; }
+.x-nego-fin { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.x-nego-oui, .x-nego-non {
+  border-radius: 999px; padding: 0.42rem 0.9rem; font-size: 0.8rem;
+  font-family: inherit; cursor: pointer; border: 1px solid transparent; min-height: 38px;
+}
+.x-nego-oui { background: #1d9bf0; color: #fff; font-weight: 700; }
+.x-nego-non { background: transparent; color: inherit; border-color: rgba(255, 255, 255, 0.22); }
+.x-nego-accord { display: block; font-size: 0.85rem; }
+.x-nego-accord span { display: block; margin-top: 0.2rem; font-size: 0.75rem; opacity: 0.7; }
+/* Sur téléphone, les leviers passent sur deux colonnes plutôt qu'en file. */
+@media (max-width: 560px) {
+  .x-nego-leviers { display: grid; grid-template-columns: 1fr 1fr; }
+  .x-nego-leviers button { min-height: 42px; }
+}

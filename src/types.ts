@@ -55,7 +55,29 @@ export interface Contrat {
   salaire: number; // € par saison
 }
 
-// Une proposition reçue au mercato (panneau « Choix de carrière »).
+/**
+ * Un accord de principe, signé mais pas encore effectif.
+ * ⚠️ Il porte tout ce qu'il faut pour appliquer le transfert SANS relire
+ * l'approche : celle-ci peut avoir été purgée, ou le monde avoir bougé entre la
+ * poignée de main et le mois de juillet.
+ */
+export interface PreAccord {
+  club: string;
+  division: string;
+  divisionNom: string;
+  salaire: number;
+  prime: number;
+  saisons: number;
+  garantie: boolean;
+  etranger: boolean;
+  prolongation: boolean;
+  /** La saison À LA FIN DE LAQUELLE il s'applique. */
+  saison: number;
+}
+
+// Une proposition du marché (`lib/offres.ts`). Elle ne s'affiche plus dans un
+// panneau : elle devient une APPROCHE négociée en message privé sur L'Ovale
+// (`lib/negociation.ts`).
 export interface OffreContrat {
   id: string;
   club: string;
@@ -98,6 +120,13 @@ export interface Joueur {
   potentiel?: number; // note générale visée au pic de carrière
   noteSaison?: number; // note moyenne (sur 10) de la saison écoulée
   contrat?: Contrat;
+  /**
+   * ⚠️ UN ACCORD TROUVÉ EN COURS DE SAISON NE S'APPLIQUE QU'À L'INTERSAISON
+   * (décision de l'utilisateur : « le transfert s'effectue qu'à l'intersaison »).
+   * On serre la main en février, on déménage en juillet — comme dans la vraie
+   * vie. `saisonSuivante` le consomme et le remet à `undefined`.
+   */
+  preAccord?: PreAccord;
   // --- Mode « journée par journée » (calendrier réel) ---
   semaine?: number; // semaine en cours dans le calendrier (1 = fin août)
   saisonEnCours?: BilanEnCours;
@@ -115,7 +144,13 @@ export interface Joueur {
   // --- Lot 6 : ce que le staff et le public pensent de toi ---
   confianceCoach?: number; // 0-100, 50 par défaut — pèse sur le temps de jeu
   popularite?: number; // 0-100, 50 par défaut — pèse sur la réputation et le marché
-  agent?: string; // id de l'agent choisi (data/agents.ts)
+  agent?: string; // id de l'agent (data/agents.ts) — il se mérite, voir `choisirAgent`
+  /**
+   * La saison écoulée était-elle ratée (< 5/10) ?
+   * ⚠️ Sert UNIQUEMENT à ce qu'un agent ne parte pas sur un accident : il faut
+   * DEUX saisons ratées d'affilée pour qu'il te lâche (`mouvementAgents`).
+   */
+  derniereSaisonRatee?: boolean;
   // Poids du joueur sur les résultats de son club, figé pour la saison
   // (voir `calculerApportClub` dans le store).
   apportClub?: number;

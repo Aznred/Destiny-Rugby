@@ -27,6 +27,9 @@ import { clubParNom } from '../data/clubs';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { TONS } from '../data/social';
+import { LEVIERS, resumerTermes } from '../lib/negociation';
+import { AGENT_PAR_ID, niveauPourAgent, SEUIL_AGENT } from '../data/agents';
+import { cote } from '../lib/offres';
 import { compact, estCertifie, LIMITE_CARACTERES, pseudoDe, tendances } from '../lib/social';
 import { annuaire, chercherComptes, chercherPosts, banniereDe, BANNIERES } from '../lib/comptes';
 import { humeur } from '../lib/vie';
@@ -776,6 +779,112 @@ function PanneauSucces() {
   );
 }
 
+// --- Négociation d'un contrat, DANS la conversation -------------------------
+// ⚠️ CE BLOC EST LE MARCHÉ DES TRANSFERTS. Il a remplacé le panneau « Choix de
+// carrière », qui présentait des cartes à prendre ou à laisser sans un mot
+// échangé. Ici, un club écrit, on répond, il tranche — et son PLAFOND reste
+// caché : c'est ce qui rend la discussion intéressante. On voit seulement sa
+// patience s'user.
+function Negociation({ pseudo }: { pseudo: string }) {
+  const approche = useGame((s) => s.approches.find((a) => a.pseudo === pseudo && a.etat === 'ouverte'));
+  const accord = useGame((s) => s.approches.find((a) => a.pseudo === pseudo && a.etat === 'accord'));
+  const repondre = useGame((s) => s.repondreApproche);
+  const accepter = useGame((s) => s.accepterApproche);
+  const refuser = useGame((s) => s.refuserApproche);
+  const [confirme, setConfirme] = useState(false);
+
+  if (accord) {
+    return (
+      <div className="x-nego x-nego-accord">
+        🤝 <b>Accord trouvé</b> — {resumerTermes(accord.offre)}.
+        <span>Le transfert s’officialise à l’intersaison. D’ici là, tu finis ta saison.</span>
+      </div>
+    );
+  }
+  if (!approche) return null;
+
+  return (
+    <div className="x-nego">
+      <div className="x-nego-tete">
+        <b>{approche.prolongation ? '📄 Prolongation' : '✍️ Proposition de contrat'}</b>
+        {/* La patience se voit : c'est le seul indice sur ce qu'il reste à jouer. */}
+        <span className="x-nego-patience" title="Le club se braquera si tu pousses trop loin">
+          {'●'.repeat(Math.max(0, approche.patience))}
+          {'○'.repeat(Math.max(0, 4 - approche.patience))}
+        </span>
+      </div>
+      <p className="x-nego-offre">{resumerTermes(approche.offre)}</p>
+      <div className="x-nego-leviers">
+        {LEVIERS.map((l) => (
+          <button
+            key={l.id}
+            type="button"
+            onClick={() => repondre(approche.id, l.id)}
+            title={`${l.phrase} (coûte ${l.cout} tour${l.cout > 1 ? 's' : ''} de patience)`}
+            disabled={l.id === 'garantie' && approche.offre.garantie}
+          >
+            {l.emoji} {l.nom}
+          </button>
+        ))}
+      </div>
+      <div className="x-nego-fin">
+        <button className="x-nego-oui" onClick={() => accepter(approche.id)}>
+          🤝 Accepter cette offre
+        </button>
+        {confirme ? (
+          <button className="x-nego-non" onClick={() => refuser(approche.id)}>
+            Confirmer le refus
+          </button>
+        ) : (
+          <button className="x-nego-non" onClick={() => setConfirme(true)}>Décliner</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Signer avec un agent, depuis sa conversation ---------------------------
+// ⚠️ Décision de l'utilisateur : « les agents te démarchent, ET tu peux aussi
+// démarcher ». Les deux sens passent par le même endroit — la conversation avec
+// l'agent. Il refuse simplement si on n'est pas à son niveau, et ça coûte du
+// moral : c'est ce qui remplace la liste où l'on cochait un nom gratuitement.
+function CabinetAgent({ pseudo }: { pseudo: string }) {
+  const joueur = useGame((s) => s.joueur);
+  const choisir = useGame((s) => s.choisirAgent);
+  if (!joueur || !pseudo.startsWith('agent:')) return null;
+  const agent = AGENT_PAR_ID[pseudo.slice('agent:'.length)];
+  if (!agent) return null;
+
+  const sien = joueur.agent === agent.id;
+  const niveau = niveauPourAgent(cote(joueur), joueur.reputation);
+  const seuil = SEUIL_AGENT[agent.id] ?? 99;
+
+  return (
+    <div className="x-nego">
+      <div className="x-nego-tete">
+        <b>{agent.emoji} {agent.nom}</b>
+        <span className="x-nego-patience">
+          niveau {Math.round(niveau)} / {Math.round(seuil)}
+        </span>
+      </div>
+      <p className="x-nego-offre">
+        {agent.desc} Commission : {Math.round(agent.commission * 100)} % du salaire.
+      </p>
+      <div className="x-nego-fin">
+        {sien ? (
+          <button className="x-nego-non" onClick={() => choisir('')}>
+            Rompre le mandat
+          </button>
+        ) : (
+          <button className="x-nego-oui" onClick={() => choisir(agent.id)}>
+            🤝 Lui confier mes intérêts
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // --- Messagerie ------------------------------------------------------------
 function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil: (p: string) => void }) {
   const joueur = useGame((s) => s.joueur)!;
@@ -790,9 +899,20 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
     const monde = annuaire(joueur);
     const pseudos = new Set([...suivis.map((c) => c.pseudo), ...Object.keys(conversations)]);
     if (ouvrirSur) pseudos.add(ouvrirSur);
-    return [...pseudos]
-      .map((p) => suivis.find((c) => c.pseudo === p) ?? monde.find((c) => c.pseudo === p))
-      .filter(Boolean) as CompteSuivi[];
+    return [...pseudos].map((p) => {
+      const connu = suivis.find((c) => c.pseudo === p) ?? monde.find((c) => c.pseudo === p);
+      if (connu) return connu;
+      // ⚠️ UNE CONVERSATION NE DISPARAÎT JAMAIS FAUTE DE FICHE. C'était le bug :
+      // un interlocuteur absent de l'annuaire était silencieusement `undefined`,
+      // puis retiré par `.filter(Boolean)` — le message existait, la
+      // conversation non. Un club qui te propose un contrat ou un agent qui te
+      // démarche écrivaient donc dans le vide. Même principe que `compteDepuis`
+      // pour les profils : on fabrique une fiche minimale plutôt que rien.
+      const nom = p.startsWith('agent:')
+        ? AGENT_PAR_ID[p.slice('agent:'.length)]?.nom ?? p
+        : p.replace(/_officiel$/, '').replace(/_/g, ' ');
+      return { pseudo: p, nom, avatar: '💼', type: 'media' } as CompteSuivi;
+    });
   }, [suivis, conversations, ouvrirSur, joueur]);
 
   const [actif, setActif] = useState<string | null>(ouvrirSur ?? tous[0]?.pseudo ?? null);
@@ -849,6 +969,16 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
           {chargement && <div className="x-bulle lui ecrit">écrit…</div>}
           <div ref={bas} />
         </div>
+
+        {/* ═══ LA NÉGOCIATION DE CONTRAT ═══════════════════════════════════
+            ⚠️ Demande explicite : « refaire tout le système de transfert, que
+            ça se passe par X ». Quand l'interlocuteur est un club qui t'a
+            approché, la conversation porte les LEVIERS. Ce sont eux qui
+            décident — l'IA n'écrit que l'habillage (`lib/negociation.ts`), donc
+            tout fonctionne à l'identique sans clé Groq. */}
+        {actif && <Negociation pseudo={actif} />}
+        {actif && <CabinetAgent pseudo={actif} />}
+
         <div className="x-envoi">
           <input
             value={texte}

@@ -146,7 +146,15 @@ export function evoluer(j: Joueur, s: SaisonJouee): Evolution {
   // c'est le plancher de formation qui la tient.
   if (j.age <= 31) {
     const marge = Math.max(0, potentiel - gen);
-    points += Math.min(3.0, marge / 8.6) * (j.age < 27 ? 1 : j.age <= 29 ? 0.7 : 0.45);
+    // ⚠️ RÉOUVERT APRÈS LE PASSAGE DU MARCHÉ SUR L'OVALE. La règle du « un an de
+    // contrat maximum » (décision de l'utilisateur) réduit fortement la
+    // MOBILITÉ : un joueur ne change plus de club qu'une fois tous les deux ou
+    // trois ans, là où il pouvait enchaîner les montées chaque intersaison.
+    // Mesuré, c'est la QUEUE qui en souffre — carrières ≥ 80 : 10/100 → 1-6/100,
+    // la médiane ne bougeant pas. Le talent brut est le levier qui n'agit que
+    // sur cette queue : on le rouvre de `marge/8,6` plafonné à 3,0 vers
+    // `marge/7,4` plafonné à 3,5.
+    points += Math.min(3.5, marge / 7.4) * (j.age < 27 ? 1 : j.age <= 29 ? 0.7 : 0.45);
   }
   if (j.age <= 21) points = Math.max(points, 1.2);
   else if (j.age <= 23) points = Math.max(points, 0.7);

@@ -3178,3 +3178,147 @@ Demande explicite : « la fiche d'envoi, il faut que ça s'envoie automatiquemen
 Vérifié : `VITE_CLASSEMENT_URL=… npx vite-node scripts/verifClassement.ts` →
 3 saisons jouées + retraite = **4 requêtes**, scores 554 → 654 → 714 → 714,
 la dernière étant bien celle de la retraite.
+
+
+## ✈️ LE MARCHÉ DES TRANSFERTS SE JOUE SUR 𝕏 L'OVALE
+
+Demande explicite : « j'aimerais refaire tout le système de transfert, que ça se
+passe par X : un club envoie un message et c'est à nous de négocier ; l'agent
+pareil, on peut pas vraiment le choisir, ça dépend de nos performances ».
+
+Quatre arbitrages ont été tranchés avant d'écrire une ligne :
+
+| Question | Décision |
+|---|---|
+| Qui décide du résultat d'une négociation | **Leviers chiffrés**, l'IA n'écrit que l'habillage |
+| Le panneau « Choix de carrière » | **Il disparaît complètement** |
+| L'agent | Il te **démarche** — et tu peux le démarcher aussi |
+| Les fenêtres | Approches **en cours d'année**, transfert **à l'intersaison**, et seulement à **1 an de contrat maximum** |
+
+### ⚠️ ON N'A PAS REFAIT LE MOTEUR DU MARCHÉ — ON A REFAIT LA SURFACE
+
+`lib/offres.ts` décide toujours QUI s'intéresse à toi et à quel prix :
+`cote()`, `besoinAuPoste()`, l'interdiction de sauter deux étages, le plafond qui
+dépend de l'âge, les salaires par âge. Tout est calibré et protégé par
+`verifMarche.ts` et `verifDifficulte.ts` — le toucher, c'est refaire l'étalonnage
+de difficulté. Ce qui est neuf, c'est **la conversation** : ce qui se passe entre
+le moment où un club se manifeste et celui où on signe.
+
+### `src/lib/negociation.ts` — le moteur, pur et déterministe
+
+- **Une approche** porte l'offre COURANTE, un **plafond caché**, et une
+  **patience**. Le plafond est calculé une fois, à la naissance de l'approche
+  (graine = club + saison + nom) : rouvrir la conversation ne redonne jamais une
+  meilleure main, et le save-scumming ne sert à rien.
+- ⚠️ **LE PREMIER MOT DU CLUB EST SOUS SON OFFRE JUSTE** (×0,86), sinon il n'y a
+  rien à négocier. Bien négocier rend donc un peu plus que l'ancien panneau, mal
+  négocier rend moins — c'est tout l'intérêt.
+- **Quatre leviers** : 💰 salaire (+18 %) · ✍️ prime · 📅 durée · 🎽 temps de jeu
+  garanti. Le dernier coûte **deux** tours de patience : un club déteste
+  s'engager sur une feuille de match, et tous ne peuvent pas le promettre.
+  Accordé, il vaut **68 de confiance du staff à l'arrivée** au lieu de 50 — ça se
+  lit dès la première composition.
+- **Trois verdicts** : le club accepte, contre-propose à mi-chemin, ou **se
+  braque** quand la patience est épuisée. Mesuré : s'acharner sur le salaire fait
+  rompre au 3ᵉ tour, jamais au 1ᵉʳ, et le plafond n'est **jamais** dépassé.
+- ⚠️ **PURE : `repondreAuClub` ne mute pas son entrée.** Le store compare des
+  références ; une négociation qui modifie l'approche en place ne redessinerait
+  rien à l'écran.
+
+### Ce qui se passe dans le store
+
+- **`susciterApproches`** fait écrire des clubs. La règle du « un an de contrat
+  maximum » vit ici.
+- ⚠️ **UNE EXCEPTION, ET ELLE N'EST PAS UN CONTOURNEMENT** : un joueur dont la
+  générale est **12 points sous la force de son effectif** est sur le départ,
+  quel que soit son contrat. Mesuré sans elle : un espoir de 32 recruté par un
+  club noté 58 y restait **douze saisons** — médiane de difficulté **58 → 32**, et
+  **plus aucune carrière sur 100 ne dépassait 40**. C'est la mobilité qui permet
+  à un jeune de trouver son niveau, d'y jouer, donc de progresser. Et c'est
+  réaliste : un club qui ne fait pas jouer un joueur le prête ou le laisse
+  partir. La règle du « un an max » vise les clubs qui DÉBAUCHENT un joueur qui
+  réussit.
+- **`accepterApproche`** pose un **pré-accord** (`Joueur.preAccord`) et ferme
+  toutes les autres discussions : on a donné sa parole.
+- ⚠️ **LE TRANSFERT S'APPLIQUE APRÈS LA RÉSOLUTION DE LA SAISON**, pas avant.
+  Bug attrapé par `verifTitres.ts` : posé en tête de `saisonSuivante`, il
+  changeait de club AVANT `resoudreTrophees` — le joueur remportait la Champions
+  Cup avec son NOUVEAU club, qui ne l'avait pas gagnée, et le titre de l'ancien
+  passait à la trappe. Mesuré : **5 titres oubliés sur 48 saisons**. On finit sa
+  saison là où on l'a jouée.
+- **Le contrat signé n'est pas entamé** par la saison qu'on vient de jouer : les
+  N saisons commencent à la suivante.
+
+### Le blocage de fin de contrat a changé de support
+
+Le panneau portait le verrou « on ne joue pas une saison sans contrat ». Il a
+disparu — le verrou est donc devenu un **état de la fiche** :
+
+```ts
+contratBloque(j) = (j.contrat?.saisons ?? 1) <= 0 && !j.preAccord
+```
+
+Lu par `semaineSuivante` (qui refuse d'avancer), `avancerJusqua` (qui s'arrête
+avec le motif « contrat ») et `saisonSuivante` (qui ne démarre pas). ⚠️
+`avancerJusqua` ne compte plus une semaine que `semaineSuivante` a refusée —
+l'écran annonçait « 1 semaine jouée » sans que rien ne bouge.
+
+### L'agent se mérite — et il peut te lâcher
+
+- **`SEUIL_AGENT`** : le cousin dès le premier jour, le cabinet à 52, l'agence
+  internationale à 68, le requin à **74**. On cochait un nom dans une liste dès
+  la première semaine : le requin qui fait exploser les salaires était accessible
+  à un joueur de Régionale 3.
+- **Il te démarche** quand ta cote franchit sa barre (message privé sur L'Ovale),
+  et **tu peux le démarcher** depuis sa conversation — il décline poliment si tu
+  n'es pas au niveau, et ça coûte 4 de moral.
+- **Il te lâche après DEUX saisons ratées** d'affilée (`derniereSaisonRatee`) —
+  pas une : un agent ne part pas sur un accident.
+
+### ⚠️ ET L'ÉTALONNAGE A DÛ ÊTRE REPRIS
+
+La règle du « un an maximum » réduit fortement la MOBILITÉ : on ne change plus de
+club qu'une fois tous les deux ou trois ans, là où on pouvait enchaîner les
+montées chaque intersaison. Mesuré, c'est la **queue** qui en souffre — carrières
+≥ 80 : 10/100 → **1 à 6**, la médiane ne bougeant pas. Le **talent brut**
+(`lib/progression.ts`) est le levier qui n'agit que sur cette queue : rouvert de
+`marge/8,6` plafonné à 3,0 vers `marge/7,4` plafonné à 3,5.
+
+Réétalonné sur trois tirages de 100 carrières :
+
+| | référence | après ce lot |
+|---|---|---|
+| médiane | 58-63 | **61 · 57 · 58** |
+| maximum | 85-91 | 90 · 89 · 85 |
+| carrières ≥ 80 | 10-15/100 | **16 · 10 · 5** |
+| carrières ≥ 85 | 3-4/100 | 8 · 4 · 2 |
+
+### 🩹 Deux bugs attrapés en jeu pendant le développement
+
+- ⚠️ **LE PSEUDO DU CLUB DOIT ÊTRE CELUI DE L'ANNUAIRE**
+  (`pseudoStable(club, '_officiel')`). Avec un `club:<nom>` inventé pour
+  l'occasion, la messagerie ne retrouvait pas le compte et **la conversation
+  n'apparaissait pas** : le club écrivait dans le vide.
+- ⚠️ **UNE CONVERSATION NE DISPARAÎT PLUS FAUTE DE FICHE.** Un interlocuteur
+  absent de l'annuaire était silencieusement `undefined`, puis retiré par
+  `.filter(Boolean)` — le message existait, la conversation non. Même principe
+  que `compteDepuis` pour les profils : on fabrique une fiche minimale.
+
+### Le motif « signer puis relancer » est factorisé
+
+`scripts/_saison.ts` — cinq scripts de mesure recopiaient la même boucle, et les
+cinq se sont cassés le jour où le marché a changé de forme. ⚠️ Ce n'est pas un
+détail de test : `saisonSuivante` s'ARRÊTE sans contrat, donc un script qui ne
+signe pas compte des saisons jamais jouées et l'étalonnage devient faux sans
+prévenir. Deux pièges mesurés et documentés dedans : accepter la PREMIÈRE
+approche fait descendre les carrières (médiane 49 → 34), exiger qu'elle fasse
+MONTER les bloque toutes (plus rien au-dessus de 40).
+
+### Les scripts
+
+```bash
+npx vite-node scripts/verifTransferts.ts   # moteur pur, règles de fenêtre, pré-accord, blocage
+npx vite-node scripts/verifMarche.ts       # le marché à tous les étages
+npx vite-node scripts/verifTitres.ts       # le transfert n'efface plus les titres de l'ancien club
+npx vite-node scripts/verifDifficulte.ts   # ⚠️ à relancer après TOUTE retouche du marché
+```

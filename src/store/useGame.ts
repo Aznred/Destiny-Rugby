@@ -8,7 +8,7 @@ import type {
   Joueur,
   LegendeSauvegardee,
   BilanEnCours,
-  OffreContrat,
+  PreAccord,
   TitreGagne,
   Blessure,
   Rythme,
@@ -76,6 +76,11 @@ import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../
 import { forceEffectif, forceMoyenneDivision, noteDuClub, setTransfertsSociaux, effectifDuClub } from '../lib/effectif';
 import { evoluer } from '../lib/progression';
 import { genererOffres, offreProlongation, cote } from '../lib/offres';
+import { agentsAccessibles, niveauPourAgent, SEUIL_AGENT } from '../data/agents';
+import {
+  approcheDepuisOffre, confianceALArrivee, repondreAuClub, resumerTermes,
+  LEVIER_PAR_ID, type Approche, type Levier, type Reponse,
+} from '../lib/negociation';
 import {
   TROPHEES,
   TROPHEE_PAR_DIVISION,
@@ -134,6 +139,21 @@ function attributsDeBase(poste: PosteId): Attributs {
 
 function borne(v: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, v));
+}
+
+/**
+ * LE JEU EST-IL BLOQUÉ FAUTE DE CONTRAT ?
+ *
+ * ⚠️ CE PRÉDICAT REMPLACE LE PANNEAU « CHOIX DE CARRIÈRE » (décision de
+ * l'utilisateur : « il disparaît complètement »). Le blocage ne peut plus être
+ * « un panneau est ouvert » — il n'y a plus de panneau. C'est désormais un ÉTAT
+ * DE LA FICHE, lisible de partout : contrat épuisé et aucun accord trouvé.
+ * La nav le montre, `semaineSuivante` et `avancerJusqua` s'y arrêtent, et
+ * `saisonSuivante` refuse de démarrer.
+ */
+export function contratBloque(j: Joueur | null | undefined): boolean {
+  if (!j) return false;
+  return (j.contrat?.saisons ?? 1) <= 0 && !j.preAccord;
 }
 
 export function noteGlobale(j: Pick<Joueur, 'attributs'>): number {
@@ -416,8 +436,12 @@ interface GameState {
   evenementsVus: string[];
   compteurs: { evenements: number; situations: number; gainsIA: number; gainsMatchs?: number };
   tropheesEnAttente: string[]; // file des trophées à afficher en 3D
-  offres: OffreContrat[]; // propositions de contrat en attente de réponse
-  offresOuvertes: boolean; // panneau « Choix de carrière » affiché
+  /**
+   * LES APPROCHES DE CLUBS, en cours ou closes (`lib/negociation.ts`).
+   * ⚠️ Elles remplacent `offres` / `offresOuvertes` : le panneau « Choix de
+   * carrière » a été supprimé, tout se négocie en message privé sur L'Ovale.
+   */
+  approches: Approche[];
   rythme: Rythme; // « semaine » = calendrier réel, « saison » = simulation rapide
   // ⚠️ L'AMBIANCE DU SITE (demande explicite). Elle ne touche QUE la rampe de
   // fond (les variables `--pelouse-*` d'index.css) : l'or, le cuir et la craie
@@ -481,15 +505,19 @@ interface GameState {
   /** Pas de clé, ou l'IA a flanché : on renonce à la scène de cette semaine. */
   abandonnerEvenement: () => void;
   // Lot 6 — agent et négociation de contrat
-  choisirAgent: (id: string) => void;
-  negocierOffre: (id: string) => ResultatNegociation | null;
+  /** Signe avec un agent. Renvoie false s'il a décliné (tu n'es pas à son niveau). */
+  choisirAgent: (id: string) => boolean;
+  /** Intersaison : un meilleur agent te démarche, ou le tien te lâche. */
+  mouvementAgents: () => void;
   prendreRetraite: (reconversion?: string) => void;
   fermerTrophee: () => void;
   reinitialiser: () => void;
-  // marché des transferts
-  ouvrirOffres: () => void;
-  fermerOffres: () => void;
-  signerOffre: (id: string) => void;
+  // marché des transferts — tout passe par les messages privés de L'Ovale
+  susciterApproches: (maximum?: number, demande?: boolean) => number;
+  repondreApproche: (id: string, levier: Levier) => Reponse | null;
+  accepterApproche: (id: string) => void;
+  refuserApproche: (id: string) => void;
+  appliquerPreAccord: () => void;
   demanderTransfert: () => void;
   // fin de carrière
   prendreMentorat: () => void;
@@ -562,8 +590,7 @@ export const useGame = create<GameState>()(
       evenementsVus: [],
       compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
       tropheesEnAttente: [],
-      offres: [],
-      offresOuvertes: false,
+      approches: [],
       rythme: 'semaine',
       theme: 'vert',
       langue: langueDuNavigateur(),
@@ -754,16 +781,23 @@ export const useGame = create<GameState>()(
           });
           return get().saisonSuivante();
         }
-        if (joueur.contrat.saisons <= 0) {
-          let dispo = get().offres;
-          if (!dispo.length) {
-            // Personne sur la table : on relance le marché, barre abaissée.
-            dispo = genererOffres(joueur, { saison: joueur.saison, maximum: 4, demande: true });
-          }
-          if (dispo.length) {
+        // ⚠️ LE PRÉ-ACCORD NE S'APPLIQUE PAS ICI — il s'applique APRÈS que la
+        // saison écoulée a été résolue (voir plus bas, juste avant le mercato).
+        //
+        // Bug attrapé par `verifTitres.ts` : posé en tête, le transfert changeait
+        // de club AVANT `resoudreTrophees`. Le joueur remportait donc la
+        // Champions Cup avec son NOUVEAU club — qui ne l'avait pas gagnée — et
+        // le titre de l'ancien passait à la trappe. Mesuré : 5 titres oubliés
+        // sur 48 saisons. On finit sa saison là où on l'a jouée.
+        //
+        // ⚠️ ET LE BLOCAGE LIT `contratBloque`, pas `contrat.saisons` : un
+        // joueur qui a trouvé un accord n'est plus bloqué, même à zéro saison
+        // restante — c'est justement ce qui lui permet de repartir.
+        if (contratBloque(joueur)) {
+          // Le marché est relancé : les clubs écrivent sur L'Ovale.
+          const nees = get().susciterApproches(4, true);
+          if (nees > 0 || get().approches.some((a) => a.etat === 'ouverte')) {
             set((s) => ({
-              offres: dispo,
-              offresOuvertes: true,
               journal: s.journal.some((e) => e.evenement === `libre-${joueur.saison}`)
                 ? s.journal
                 : [...s.journal, {
@@ -772,8 +806,8 @@ export const useGame = create<GameState>()(
                     role: 'mj' as const,
                     titre: '📄 Tu es libre de tout contrat',
                     texte: `Ton contrat à ${joueur.club} est arrivé à son terme. `
-                      + `Tant que tu n'as pas signé, tu n'as plus de club, plus de salaire et plus de match : `
-                      + `ouvre « Choix de carrière » et tranche.`,
+                      + `Tant que tu n'as pas signé, tu n'as plus de club, plus de salaire et plus de match. `
+                      + `Des clubs t'écrivent sur 𝕏 L'Ovale : ouvre tes messages et négocie.`,
                     evenement: `libre-${joueur.saison}`,
                   }],
             }));
@@ -1204,28 +1238,51 @@ export const useGame = create<GameState>()(
           });
         }
 
-        // ---- MERCATO : fin de contrat, ou clubs séduits par ta saison ----
+        // ---- MERCATO D'INTERSAISON : les clubs écrivent sur L'Ovale ----
+        // ⚠️ Plus de panneau « Choix de carrière » : `susciterApproches` ouvre
+        // des conversations. La règle du « un an de contrat maximum » vaut ici
+        // aussi — sauf en fin de contrat, où le marché s'ouvre en grand.
         const finDeContrat = (j.contrat?.saisons ?? 0) <= 0;
         const belleSaison = evolution.noteSaison >= 7;
-        let offres: OffreContrat[] = [];
-        if (finDeContrat || belleSaison || Math.random() < 0.25) {
-          offres = genererOffres(j, { saison: j.saison, maximum: finDeContrat ? 4 : 2 });
-          if (finDeContrat) {
-            const prolongation = offreProlongation(j, competitionDuClub(j.club), j.saison);
-            if (prolongation) offres = [prolongation, ...offres];
+        // ⚠️ ON POSE LE JOUEUR AVANT, sinon `susciterApproches` lirait la fiche
+        // de la saison écoulée (club, division et contrat d'avant l'intersaison).
+        set({ joueur: j });
+
+        // ═══ LE TRANSFERT S'EFFECTUE ICI, ET SEULEMENT ICI ═══════════════════
+        // Décision de l'utilisateur : « le transfert s'effectue qu'à
+        // l'intersaison ». La saison écoulée vient d'être résolue — titres
+        // compris — avec le club où elle a été jouée ; on peut déménager.
+        if (j.preAccord && j.preAccord.saison <= joueur.saison) {
+          get().appliquerPreAccord();
+          j = get().joueur!;
+        }
+        // La prolongation vient du club actuel, et elle passe par le même canal.
+        if (finDeContrat && !j.preAccord) {
+          const prolongation = offreProlongation(j, competitionDuClub(j.club), j.saison);
+          if (prolongation && !get().approches.some((a) => a.club === j.club && a.saison === j.saison)) {
+            const app = approcheDepuisOffre(prolongation, j, j.semaine ?? 1, true);
+            set((s) => ({
+              approches: [...s.approches, app],
+              conversations: {
+                ...s.conversations,
+                [app.pseudo]: [
+                  ...(s.conversations[app.pseudo] ?? []),
+                  {
+                    id: idUnique(), pseudo: app.pseudo, de: 'lui' as const, saison: j.saison,
+                    texte: `${j.nom}, ton contrat arrive à son terme et on aimerait te garder. `
+                      + `Notre proposition : ${resumerTermes(app.offre)}. Dis-nous.`,
+                  },
+                ],
+              },
+            }));
           }
         }
-        if (offres.length) {
-          entrees.push({
-            id: idUnique(),
-            saison: j.saison,
-            role: 'mj',
-            titre: finDeContrat ? '📝 Fin de contrat' : '✈️ Le marché s’agite',
-            texte: finDeContrat
-              ? `Ton contrat à ${j.club} arrive à son terme. ${offres.length} proposition${offres.length > 1 ? 's' : ''} sur la table : ouvre le panneau « Choix de carrière » pour trancher.`
-              : `Ta saison a fait du bruit : ${offres.length} club${offres.length > 1 ? 's te font' : ' te fait'} les yeux doux. À toi de voir.`,
-          });
+        if (finDeContrat || belleSaison || Math.random() < 0.25) {
+          get().susciterApproches(finDeContrat ? 3 : 2, finDeContrat);
         }
+        // ⚠️ APRÈS les approches : un agent qui te repère commente ta saison,
+        // il ne prédit pas le marché. Et il faut que `noteSaison` soit posée.
+        get().mouvementAgents();
 
         // ---- MONTÉES ET DESCENTES DE TOUTE LA PYRAMIDE ----
         // ⚠️ Avant, seules la division du joueur et ses deux voisines bougeaient :
@@ -1347,8 +1404,6 @@ export const useGame = create<GameState>()(
           coins: s.coins + gain,
           compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
           tropheesEnAttente: [...s.tropheesEnAttente, ...gagnes],
-          offres,
-          offresOuvertes: offres.length > 0,
           mouvementsClubs: majMouvements,
           journal: [...s.journal, ...entrees],
         }));
@@ -1487,6 +1542,10 @@ export const useGame = create<GameState>()(
         const depart = get().joueur?.semaine ?? 1;
         let semaines = 0;
         if (!get().joueur || cible <= depart) return { semaines, arret: 'arrive' };
+        // ⚠️ ON VÉRIFIE LE BLOCAGE AVANT D'ENTRER DANS LA BOUCLE. Sinon on
+        // comptait une semaine que `semaineSuivante` avait justement refusé de
+        // jouer, et l'écran annonçait « 1 semaine jouée » sans que rien ne bouge.
+        if (contratBloque(get().joueur)) return { semaines: 0, arret: 'contrat' };
 
         // ⚠️ PAS UNE SCÈNE PAR SEMAINE SAUTÉE. `semaineSuivante` lève
         // `attenteEvenement`, et l'écran Carrière fabrique alors une scène avec
@@ -1502,11 +1561,18 @@ export const useGame = create<GameState>()(
             get().semaineSuivante();
             const apres = get().joueur;
             if (!apres) { arret = 'fin'; break; }                     // retraite
+            // ⚠️ ON NE COMPTE QUE CE QUI A VRAIMENT ÉTÉ JOUÉ. `semaineSuivante`
+            // peut refuser (contrat épuisé) : compter quand même annonçait des
+            // semaines qui n'avaient pas eu lieu.
+            if (apres.saison === avant.saison && apres.semaine === avant.semaine) {
+              arret = contratBloque(apres) ? 'contrat' : 'question';
+              break;
+            }
             semaines++;
             if (apres.saison !== avant.saison) { arret = 'saison'; break; }
-            if (get().offresOuvertes) { arret = 'contrat'; break; }
-            // Garde-fou : si la semaine n'a pas bougé, on ne boucle pas à vide.
-            if (apres.semaine === avant.semaine) { arret = 'question'; break; }
+            // ⚠️ Le blocage de fin de contrat n'est plus un panneau ouvert :
+            // c'est l'état de la fiche. Voir `contratBloque`.
+            if (contratBloque(get().joueur)) { arret = 'contrat'; break; }
           }
         } finally {
           set({ avanceRapide: false });
@@ -1521,8 +1587,20 @@ export const useGame = create<GameState>()(
       semaineSuivante: () => {
         const { joueur } = get();
         if (!joueur) return;
+        // ⚠️ SANS CONTRAT, ON N'AVANCE PAS. Le panneau « Choix de carrière »
+        // portait ce blocage ; il a été supprimé, donc il vit ici (voir
+        // `contratBloque`). Sans ça, on jouerait la saison sans club.
+        if (contratBloque(joueur)) return;
         const numero = joueur.semaine ?? 1;
         const sem = semaine(numero);
+
+        // ═══ LES CLUBS DÉMARCHENT EN COURS D'ANNÉE ═════════════════════════
+        // ⚠️ Décision de l'utilisateur : « intersaison plus dans l'année, mais
+        // le transfert s'effectue qu'à l'intersaison, et entre en fin de contrat
+        // en mode 1 an max restant ». `susciterApproches` porte la règle du
+        // « un an maximum » ; ici on décide seulement de la FRÉQUENCE — assez
+        // rare pour que recevoir un message reste un événement.
+        if (!joueur.preAccord && Math.random() < 0.05) get().susciterApproches(1);
 
         // Dernière semaine : on referme la saison (bilan, trophées, mercato).
         if (sem.type === 'treve') {
@@ -1711,42 +1789,214 @@ export const useGame = create<GameState>()(
       },
 
       // ---- Marché des transferts ----
-      ouvrirOffres: () => set({ offresOuvertes: true }),
-      fermerOffres: () => set({ offresOuvertes: false }),
+      // ═══════════════════════════════════════════════════════════════════════
+      // LE MARCHÉ DES TRANSFERTS — tout se passe sur 𝕏 L'Ovale
+      // ═══════════════════════════════════════════════════════════════════════
+      // ⚠️ Demande explicite : « refaire tout le système de transfert, que ça se
+      // passe par X : un club envoie un message et c'est à nous de négocier ».
+      // Le panneau « Choix de carrière » a disparu — il présentait des cartes à
+      // prendre ou à laisser, sans un mot échangé.
+      //
+      // ⚠️ TROIS RÈGLES DONNÉES PAR L'UTILISATEUR, ET ELLES SONT ICI :
+      //   1. un club ne démarche QUE s'il reste au plus UN an de contrat ;
+      //   2. on peut être approché EN COURS DE SAISON…
+      //   3. …mais le transfert ne s'applique QU'À L'INTERSAISON (`preAccord`).
 
-      signerOffre: (id) => {
-        const { joueur, offres } = get();
-        const offre = offres.find((o) => o.id === id);
-        if (!joueur || !offre) return;
-        const reste = offre.club === joueur.club;
+      /**
+       * Fait écrire des clubs. Renvoie le nombre d'approches réellement nées.
+       * @param demande true = on s'est mis sur le marché (barre abaissée).
+       */
+      susciterApproches: (maximum = 2, demande = false) => {
+        const joueur = get().joueur;
+        if (!joueur) return 0;
+        // ⚠️ LA RÈGLE DU « UN AN MAX RESTANT ». Un club n'écrit pas à un joueur
+        // sous contrat pour trois ans : ça n'existe pas, et ça rendrait le
+        // marché permanent. Une demande explicite du joueur passe outre — c'est
+        // lui qui a fait savoir qu'il voulait partir.
+        const restant = joueur.contrat?.saisons ?? 0;
+
+        // ⚠️ ET UNE EXCEPTION QUI N'EST PAS UN CONTOURNEMENT : UN JOUEUR QUI NE
+        // JOUE PAS EST SUR LE DÉPART, quel que soit son contrat.
+        //
+        // Mesuré, sans elle : un espoir de 32 de générale recruté par un club
+        // noté 58 y restait DOUZE SAISONS sans pouvoir en bouger — la médiane de
+        // difficulté s'écroulait de 58 à 32 et plus AUCUNE carrière sur 100 ne
+        // dépassait 40. C'est la mobilité qui permet à un jeune de trouver son
+        // niveau, d'y jouer, et donc de progresser (`noterSaison` compare le
+        // joueur à son groupe).
+        //
+        // Et c'est réaliste : un club qui ne fait pas jouer un joueur le prête
+        // ou le laisse partir. La règle du « un an max » vise les clubs qui
+        // DÉBAUCHENT un joueur qui réussit — pas un joueur dont personne ne veut
+        // dans son propre vestiaire.
+        const enDessous = noteGlobale(joueur) < forceEffectif(joueur.club, joueur.saison) - 12;
+        if (!demande && !enDessous && restant > 1) return 0;
+
+        const dejaVues = new Set(
+          get().approches.filter((a) => a.saison === joueur.saison).map((a) => a.club),
+        );
+        // On réutilise LE moteur du marché : cote, besoin au poste, saut
+        // d'étage, salaires par âge. Rien n'est recalculé ici.
+        const offres = genererOffres(joueur, { saison: joueur.saison, maximum: maximum + 2, demande })
+          .filter((o) => !dejaVues.has(o.club))
+          .slice(0, maximum);
+        if (!offres.length) return 0;
+
+        const semaine = joueur.semaine ?? 1;
+        const nouvelles = offres.map((o) => approcheDepuisOffre(o, joueur, semaine));
+        set((s) => ({
+          approches: [...s.approches, ...nouvelles],
+          // Le premier mot du club arrive en message privé, comme n'importe qui.
+          conversations: nouvelles.reduce((acc, a) => ({
+            ...acc,
+            [a.pseudo]: [
+              ...(acc[a.pseudo] ?? []),
+              {
+                id: idUnique(),
+                pseudo: a.pseudo,
+                de: 'lui' as const,
+                texte: `Bonjour, ${joueur.nom}. Ici ${a.club} (${a.divisionNom}). `
+                  + `On suit ce que tu fais et on aimerait t'avoir la saison prochaine. `
+                  + `Ce qu'on met sur la table : ${resumerTermes(a.offre)}. On en discute ?`,
+                saison: joueur.saison,
+              },
+            ],
+          }), { ...s.conversations }),
+          notifsSocial: [
+            {
+              id: idUnique(),
+              emoji: '✉️',
+              titre: `${nouvelles.length} club${nouvelles.length > 1 ? 's te contactent' : ' te contacte'}`,
+              texte: nouvelles.map((a) => a.club).join(', '),
+              saison: joueur.saison,
+            },
+            ...s.notifsSocial,
+          ].slice(0, 40),
+          journal: [...s.journal, {
+            id: idUnique(),
+            saison: joueur.saison,
+            role: 'systeme' as const,
+            titre: `✉️ ${nouvelles.length} club${nouvelles.length > 1 ? 's t’écrivent' : ' t’écrit'}`,
+            texte: `${nouvelles.map((a) => `${a.club} (${a.divisionNom})`).join(' · ')}. `
+              + `Réponds dans tes messages privés sur 𝕏 L'Ovale — c'est là que ça se négocie.`,
+          }],
+        }));
+        return nouvelles.length;
+      },
+
+      /** Une demande faite au club. Les chiffres tranchent, pas l'IA. */
+      repondreApproche: (id, levier) => {
+        const { joueur, approches } = get();
+        const a = approches.find((x) => x.id === id);
+        if (!joueur || !a || a.etat !== 'ouverte') return null;
+        const def = LEVIER_PAR_ID[levier];
+        const r = repondreAuClub(a, levier);
+        set((s) => ({
+          approches: s.approches.map((x) => (x.id === id ? r.approche : x)),
+          conversations: {
+            ...s.conversations,
+            [a.pseudo]: [
+              ...(s.conversations[a.pseudo] ?? []),
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: def.phrase, saison: joueur.saison },
+              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: r.texte, saison: joueur.saison },
+            ],
+          },
+        }));
+        return r;
+      },
+
+      /**
+       * On serre la main. ⚠️ RIEN NE BOUGE TOUT DE SUITE : c'est un PRÉ-ACCORD,
+       * appliqué à l'intersaison par `saisonSuivante`.
+       */
+      accepterApproche: (id) => {
+        const { joueur, approches } = get();
+        const a = approches.find((x) => x.id === id);
+        if (!joueur || !a || a.etat !== 'ouverte') return;
+        const preAccord: PreAccord = {
+          club: a.club, division: a.division, divisionNom: a.divisionNom,
+          salaire: a.offre.salaire, prime: a.offre.prime, saisons: a.offre.saisons,
+          garantie: a.offre.garantie, etranger: a.etranger, prolongation: a.prolongation,
+          saison: joueur.saison,
+        };
+        set((s) => ({
+          joueur: { ...joueur, preAccord },
+          // Toutes les autres discussions se ferment : on a donné sa parole.
+          approches: s.approches.map((x) =>
+            x.id === id ? { ...x, etat: 'accord' as const }
+              : x.etat === 'ouverte' ? { ...x, etat: 'rompue' as const } : x),
+          conversations: {
+            ...s.conversations,
+            [a.pseudo]: [
+              ...(s.conversations[a.pseudo] ?? []),
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'C’est d’accord. On se voit cet été.', saison: joueur.saison },
+              {
+                id: idUnique(), pseudo: a.pseudo, de: 'lui', saison: joueur.saison,
+                texte: `Parfait. On officialise à l’intersaison : ${resumerTermes(a.offre)}. `
+                  + `D’ici là, finis ta saison — et pas un mot à la presse.`,
+              },
+            ],
+          },
+          journal: [...s.journal, {
+            id: idUnique(),
+            saison: joueur.saison,
+            role: 'systeme' as const,
+            titre: a.prolongation ? `🤝 Accord de prolongation à ${a.club}` : `🤝 Accord trouvé avec ${a.club}`,
+            texte: `${resumerTermes(a.offre)}. `
+              + `⚠️ Rien ne change avant l'intersaison : tu finis la saison à ${joueur.club}.`,
+          }],
+        }));
+        get().verifierSucces();
+      },
+
+      /** On décline. Le club n'insistera pas cette saison. */
+      refuserApproche: (id) => {
+        const { joueur, approches } = get();
+        const a = approches.find((x) => x.id === id);
+        if (!joueur || !a || a.etat !== 'ouverte') return;
+        set((s) => ({
+          approches: s.approches.map((x) => (x.id === id ? { ...x, etat: 'rompue' as const } : x)),
+          conversations: {
+            ...s.conversations,
+            [a.pseudo]: [
+              ...(s.conversations[a.pseudo] ?? []),
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'Merci, mais je ne suis pas intéressé.', saison: joueur.saison },
+              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: 'Dommage. Bonne fin de saison.', saison: joueur.saison },
+            ],
+          },
+        }));
+      },
+
+      /** Le pré-accord devient un vrai contrat. Appelé à l'intersaison. */
+      appliquerPreAccord: () => {
+        const joueur = get().joueur;
+        const p = joueur?.preAccord;
+        if (!joueur || !p) return;
+        const reste = p.club === joueur.club;
+        const confiance = confianceALArrivee(
+          { salaire: p.salaire, prime: p.prime, saisons: p.saisons, garantie: p.garantie },
+          p.prolongation,
+        );
         const arrive: Joueur = {
           ...joueur,
-          club: offre.club,
-          division: offre.division,
+          club: p.club,
+          division: p.division,
+          preAccord: undefined,
           capitaine: reste ? joueur.capitaine : false,
-          // Nouveau club = nouveau staff : la confiance se regagne de zéro.
-          confianceCoach: reste ? joueur.confianceCoach : 50,
-          argent: joueur.argent + offre.prime,
+          // Nouveau club = nouveau staff. Une garantie de temps de jeu, c'est un
+          // coach qui t'attend : ça se lit dès la première feuille de match.
+          confianceCoach: reste ? joueur.confianceCoach : confiance,
+          argent: joueur.argent + p.prime,
           moral: borne(joueur.moral + (reste ? 6 : 10)),
-          reputation: borne(joueur.reputation + (offre.etranger ? 6 : reste ? 2 : 4)),
-          contrat: {
-            club: offre.club,
-            division: offre.division,
-            saisons: offre.saisons,
-            salaire: offre.salaire,
-          },
+          reputation: borne(joueur.reputation + (p.etranger ? 6 : reste ? 2 : 4)),
+          contrat: { club: p.club, division: p.division, saisons: p.saisons, salaire: p.salaire },
         };
-        // ⚠️ CHANGER DE CLUB, C'EST CHANGER D'AUDIENCE. Signer en Top 14 fait
-        // grimper le compteur d'abonnés vers celui d'un joueur de ce niveau ;
-        // descendre d'un étage le fait refluer, plus lentement.
         const abonnesApres = rapprocherAbonnes(
           arrive.abonnes ?? 0,
           abonnesCible(arrive.nom, arrive.club, noteGlobale(arrive), arrive.reputation),
           0.45,
         );
         const gagnes = abonnesApres - (arrive.abonnes ?? 0);
-
-        // Nouveau club, nouveau groupe : ce que tu y pèses se recalcule.
         const j: Joueur = {
           ...arrive,
           abonnes: abonnesApres,
@@ -1754,27 +2004,25 @@ export const useGame = create<GameState>()(
         };
         set((s) => ({
           joueur: j,
-          offres: [],
-          offresOuvertes: false,
-          journal: [
-            ...s.journal,
-            {
-              id: idUnique(),
-              saison: j.saison,
-              role: 'systeme',
-              titre: reste ? `✍️ Prolongation à ${offre.club}` : `✍️ Signature à ${offre.club}`,
-              texte: (reste
-                ? `Tu prolonges de ${offre.saisons} saison${offre.saisons > 1 ? 's' : ''} à ${offre.club} (${offre.divisionNom}) pour ${offre.salaire.toLocaleString('fr-FR')} € par saison.`
-                : `${offre.club} (${offre.divisionNom}${offre.etranger ? `, ${offre.pays}` : ''}) t'engage pour ${offre.saisons} saison${offre.saisons > 1 ? 's' : ''} : ${offre.salaire.toLocaleString('fr-FR')} € par saison et ${offre.prime.toLocaleString('fr-FR')} € à la signature.${offre.etranger ? ' Direction l’étranger — nouvelle langue, nouveau rugby.' : ''}`)
-                // L'annonce se voit sur L'Ovale : un club plus exposé, c'est
-                // une audience qui bascule du jour au lendemain.
-                + (gagnes >= 50
-                  ? ` 𝕏 L'annonce tourne : **+${gagnes.toLocaleString('fr-FR')} abonnés** sur L'Ovale.`
-                  : gagnes <= -50
-                    ? ` 𝕏 Un étage plus bas, les projecteurs s'éloignent : ${gagnes.toLocaleString('fr-FR')} abonnés.`
-                    : ''),
-            },
-          ],
+          // Les discussions de l'an passé sont closes.
+          approches: s.approches.filter((a) => a.saison >= j.saison),
+          journal: [...s.journal, {
+            id: idUnique(),
+            saison: j.saison,
+            role: 'systeme',
+            titre: reste ? `✍️ Prolongation à ${p.club}` : `✍️ Signature à ${p.club}`,
+            texte: (reste
+              ? `Tu prolonges de ${p.saisons} saison${p.saisons > 1 ? 's' : ''} à ${p.club} (${p.divisionNom}) pour ${p.salaire.toLocaleString('fr-FR')} € par saison.`
+              : `${p.club} (${p.divisionNom}) t'engage pour ${p.saisons} saison${p.saisons > 1 ? 's' : ''} : `
+                + `${p.salaire.toLocaleString('fr-FR')} € par saison et ${p.prime.toLocaleString('fr-FR')} € à la signature.`
+                + (p.garantie ? ' Le coach s’est engagé sur ton temps de jeu.' : '')
+                + (p.etranger ? ' Direction l’étranger — nouvelle langue, nouveau rugby.' : ''))
+              + (gagnes >= 50
+                ? ` 𝕏 L'annonce tourne : **+${gagnes.toLocaleString('fr-FR')} abonnés** sur L'Ovale.`
+                : gagnes <= -50
+                  ? ` 𝕏 Un étage plus bas, les projecteurs s'éloignent : ${gagnes.toLocaleString('fr-FR')} abonnés.`
+                  : ''),
+          }],
         }));
         get().verifierSucces();
       },
@@ -1799,16 +2047,19 @@ export const useGame = create<GameState>()(
         }));
       },
 
+      /**
+       * SE METTRE SUR LE MARCHÉ. ⚠️ C'est le SEUL moyen de faire écrire des
+       * clubs quand il reste plus d'un an de contrat — la règle du « un an max »
+       * (`susciterApproches`) ne s'applique pas à une demande explicite. Et ça
+       * se paie : le vestiaire apprend qu'on veut partir.
+       */
       demanderTransfert: () => {
         const joueur = get().joueur;
         if (!joueur) return;
-        const offres = genererOffres(joueur, { saison: joueur.saison, maximum: 3, demande: true });
-        // Réclamer son départ en plein contrat coûte au vestiaire.
         const j = appliquerDeltas(joueur, { moral: -6, reputation: -2 });
+        set({ joueur: j });
+        const nees = get().susciterApproches(3, true);
         set((s) => ({
-          joueur: j,
-          offres,
-          offresOuvertes: true,
           journal: [
             ...s.journal,
             {
@@ -1816,8 +2067,8 @@ export const useGame = create<GameState>()(
               saison: j.saison,
               role: 'systeme',
               titre: '📣 Demande de transfert',
-              texte: offres.length
-                ? `Ton agent a fait passer le message. ${offres.length} club${offres.length > 1 ? 's' : ''} se ${offres.length > 1 ? 'positionnent' : 'positionne'} — le vestiaire, lui, apprécie moyennement.`
+              texte: nees
+                ? `Ton agent a fait passer le message. ${nees} club${nees > 1 ? 's se positionnent' : ' se positionne'} et t'écrit sur 𝕏 L'Ovale — le vestiaire, lui, apprécie moyennement.`
                 : "Ton agent a fait le tour du marché : personne ne se positionne à ton niveau pour l'instant. Le vestiaire, lui, a entendu parler de ta demande.",
             },
           ],
@@ -1991,80 +2242,124 @@ export const useGame = create<GameState>()(
       },
 
       // ---- AGENT (lot 6) : il prélève sa commission, mais ouvre les portes ----
+      /**
+       * SIGNER AVEC UN AGENT — ou s'en séparer.
+       *
+       * ⚠️ IL PEUT REFUSER (demande explicite : « on peut pas vraiment le
+       * choisir, ça dépend de nos performances »). On cochait un nom dans une
+       * liste dès la première semaine : le requin qui fait exploser les salaires
+       * était accessible à un joueur de Régionale 3. Chaque agent a maintenant
+       * sa barre (`SEUIL_AGENT`), et se faire jeter coûte du moral.
+       * Renvoie `true` si l'agent a dit oui.
+       */
       choisirAgent: (id) => {
         const joueur = get().joueur;
-        if (!joueur) return;
+        if (!joueur) return false;
         const agent = agentDe(id);
-        if (joueur.agent === agent.id) return;
-        set((s) => ({
-          joueur: { ...joueur, agent: agent.id || undefined },
-          journal: [
-            ...s.journal,
-            {
-              id: idUnique(),
-              saison: joueur.saison,
-              role: 'systeme',
-              titre: `${agent.emoji} ${agent.nom}`,
-              texte: agent.id
-                ? `${agent.desc} Commission : ${Math.round(agent.commission * 100)} % de ton salaire.`
-                : 'Tu te sépares de ton agent : désormais, tu négocies seul.',
-            },
-          ],
-        }));
-      },
+        if (joueur.agent === agent.id) return false;
 
-      // ---- NÉGOCIATION (lot 6) ----
-      // La mécanique est côté code (l'IA ne fait que raconter, cf. lib/ia.ts) :
-      // ta cote, ta réputation et ton agent décident. On ne négocie qu'une fois
-      // par offre, et un club peut se braquer et tout retirer.
-      negocierOffre: (id) => {
-        const { joueur, offres } = get();
-        const offre = offres.find((o) => o.id === id);
-        if (!joueur || !offre || offre.negociee) return null;
-        const agent = agentDe(joueur.agent);
-        const marge = cote(joueur) - offre.noteClub; // au-dessus du club = du poids
-        const chance = Math.max(0.1, Math.min(0.9, 0.42 + marge / 22 + (agent.salaire - 1) * 1.4));
-        const tirage = Math.random();
-        const rupture = 0.1 + Math.max(0, -marge) / 40; // se braquer coûte plus cher que céder
-
-        let issue: 'succes' | 'partiel' | 'echec';
-        let salaire = offre.salaire;
-        let prime = offre.prime;
-        if (tirage < chance) {
-          issue = 'succes';
-          salaire = Math.round((offre.salaire * (1.12 + (agent.salaire - 1))) / 100) * 100;
-          prime = Math.round((offre.prime * 1.25) / 100) * 100;
-        } else if (tirage < 1 - rupture) {
-          issue = 'partiel';
-          salaire = Math.round((offre.salaire * 1.04) / 100) * 100;
-        } else {
-          issue = 'echec';
+        // Se séparer de son agent est toujours possible — c'est le seul sens
+        // dans lequel le joueur décide seul.
+        if (!agent.id) {
+          set((s) => ({
+            joueur: { ...joueur, agent: undefined },
+            journal: [...s.journal, {
+              id: idUnique(), saison: joueur.saison, role: 'systeme' as const,
+              titre: `${agent.emoji} Sans agent`,
+              texte: 'Tu te sépares de ton agent : désormais, tu négocies seul, '
+                + 'et le marché s\'en ressent.',
+            }],
+          }));
+          return true;
         }
 
-        const texte =
-          (issue === 'succes'
-            ? `${agent.nom} pose ses arguments sur la table et ne lâche rien. ${offre.club} finit par monter à ${salaire.toLocaleString('fr-FR')} € par saison.`
-            : issue === 'partiel'
-              ? `Le club ne bouge presque pas : ${salaire.toLocaleString('fr-FR')} € par saison, à prendre ou à laisser. C'est déjà ça.`
-              : `Le directeur sportif se lève au bout de dix minutes : « On avait fait un effort. » L'offre de ${offre.club} est retirée.`);
+        const niveau = niveauPourAgent(cote(joueur), joueur.reputation);
+        const seuil = SEUIL_AGENT[agent.id] ?? 99;
+        if (niveau < seuil) {
+          // Poli, mais c'est non. Et ça pique.
+          set((s) => ({
+            joueur: appliquerDeltas(joueur, { moral: -4 }),
+            journal: [...s.journal, {
+              id: idUnique(), saison: joueur.saison, role: 'mj' as const,
+              titre: `${agent.emoji} ${agent.nom} décline`,
+              texte: `« Rappelle-moi quand tu auras franchi un palier. » `
+                + `Il te faut environ ${Math.round(seuil)} de niveau ; tu es à ${Math.round(niveau)}.`,
+              deltas: { moral: -4 },
+            }],
+          }));
+          return false;
+        }
 
         set((s) => ({
-          offres:
-            issue === 'echec'
-              ? s.offres.filter((o) => o.id !== id)
-              : s.offres.map((o) => (o.id === id ? { ...o, salaire, prime, negociee: true } : o)),
-          journal: [
-            ...s.journal,
-            {
-              id: idUnique(),
-              saison: joueur.saison,
-              role: 'mj',
-              titre: `💼 Négociation — ${offre.club}`,
-              texte,
-            },
-          ],
+          joueur: { ...joueur, agent: agent.id },
+          journal: [...s.journal, {
+            id: idUnique(), saison: joueur.saison, role: 'systeme' as const,
+            titre: `${agent.emoji} ${agent.nom} te représente`,
+            texte: `${agent.desc} Commission : ${Math.round(agent.commission * 100)} % de ton salaire.`,
+          }],
         }));
-        return { issue, salaire, club: offre.club, agent: agent.nom };
+        return true;
+      },
+
+      /**
+       * LES AGENTS DÉMARCHENT — et lâchent ceux qui coulent.
+       * Appelé à chaque intersaison. Un agent écrit quand on vient de franchir
+       * sa barre ; il s'en va après deux saisons ratées d'affilée.
+       */
+      mouvementAgents: () => {
+        const joueur = get().joueur;
+        if (!joueur) return;
+        const niveau = niveauPourAgent(cote(joueur), joueur.reputation);
+        const actuel = agentDe(joueur.agent);
+
+        // ---- Il te lâche ----
+        // ⚠️ Deux saisons ratées, pas une : un agent ne part pas sur un accident.
+        const rate = (joueur.noteSaison ?? 6) < 5;
+        if (actuel.id && rate && joueur.derniereSaisonRatee) {
+          set((s) => ({
+            joueur: { ...joueur, agent: undefined, derniereSaisonRatee: true },
+            journal: [...s.journal, {
+              id: idUnique(), saison: joueur.saison, role: 'mj' as const,
+              titre: `${actuel.emoji} ${actuel.nom} te lâche`,
+              texte: `« Deux saisons comme ça, je ne peux plus rien vendre. » `
+                + `Tu repars sans agent — et le marché va te le faire sentir.`,
+            }],
+          }));
+          return;
+        }
+        set({ joueur: { ...joueur, derniereSaisonRatee: rate } });
+
+        // ---- Un meilleur agent te repère ----
+        const mieux = agentsAccessibles(niveau)
+          .find((a) => (SEUIL_AGENT[a.id] ?? 99) > (SEUIL_AGENT[actuel.id] ?? -1));
+        if (!mieux || Math.random() > 0.6) return;
+        const pseudo = `agent:${mieux.id}`;
+        set((s) => ({
+          conversations: {
+            ...s.conversations,
+            [pseudo]: [
+              ...(s.conversations[pseudo] ?? []),
+              {
+                id: idUnique(), pseudo, de: 'lui' as const, saison: joueur.saison,
+                texte: `${joueur.nom} ? ${mieux.nom}. On suit ta saison de près. `
+                  + `Si tu cherches quelqu'un pour défendre tes intérêts, je prends `
+                  + `${Math.round(mieux.commission * 100)} % — et je t'ouvre des portes que tu n'as pas.`,
+              },
+            ],
+          },
+          notifsSocial: [{
+            id: idUnique(), emoji: mieux.emoji,
+            titre: `${mieux.nom} te contacte`,
+            texte: 'Un agent s’intéresse à toi.',
+            saison: joueur.saison,
+          }, ...s.notifsSocial].slice(0, 40),
+          journal: [...s.journal, {
+            id: idUnique(), saison: joueur.saison, role: 'mj' as const,
+            titre: `${mieux.emoji} ${mieux.nom} te contacte`,
+            texte: `Ton niveau attire un autre calibre d'agent. Il t'a écrit sur 𝕏 L'Ovale — `
+              + `à toi de voir si tu changes de crèmerie.`,
+          }],
+        }));
       },
 
       resoudreChoix: (index) => {
@@ -2208,8 +2503,7 @@ export const useGame = create<GameState>()(
           evenementHebdo: null,
           evenementsVus: [],
           tropheesEnAttente: [],
-          offres: [],
-          offresOuvertes: false,
+          approches: [],
           mouvementsClubs: {},
           compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
           posts: [],
@@ -3125,6 +3419,7 @@ export const useGame = create<GameState>()(
           statsReelles?: Record<string, Record<string, LigneReelle>>;
           journeesReelles?: Record<string, number>;
           notifsSocial?: NotifSocial[];
+          approches?: Approche[];
           succesDebloques?: SuccesDebloques;
           defis?: { cle: string; faits: string[] };
           comptesSuivis?: CompteSuivi[];
@@ -3179,6 +3474,12 @@ export const useGame = create<GameState>()(
         // Le récit hebdomadaire : absent des sauvegardes d'avant.
         s.evenementHebdo ??= null;
         s.evenementsVus ??= [];
+        // ⚠️ LE MARCHÉ A CHANGÉ DE FORME. Une sauvegarde d'avant porte `offres`
+        // et `offresOuvertes` ; ces champs n'existent plus. On repart d'une
+        // liste d'approches vide : les offres en cours sont perdues, mais la
+        // fin de saison en régénère aussitôt — c'est mieux que de convertir des
+        // cartes en négociations qui n'ont jamais eu lieu.
+        s.approches ??= [];
         return s;
       },
       // La pyramide (qui joue dans quelle division) vit dans un registre de
@@ -3212,8 +3513,7 @@ export const useGame = create<GameState>()(
         // chaque rechargement de page.
         compteurs: s.compteurs,
         tropheesEnAttente: s.tropheesEnAttente,
-        offres: s.offres,
-        offresOuvertes: s.offresOuvertes,
+        approches: s.approches,
         rythme: s.rythme,
         theme: s.theme,
         langue: s.langue,

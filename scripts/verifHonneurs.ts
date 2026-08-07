@@ -20,6 +20,7 @@
 //
 // Lancer : npx vite-node scripts/verifHonneurs.ts
 
+import { jouerUneSaison } from './_saison';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { PosteId, StatsDetaillees } from '../src/types';
@@ -341,17 +342,8 @@ console.log('\n=== 9. ET EN JEU ? 60 CARRIÈRES RÉELLEMENT JOUÉES ===');
     });
     for (let s = 0; s < 14; s++) {
       // Un contrat arrivé à terme bloque la saison tant qu'on n'a pas signé
-      // (voir `saisonSuivante`) : on signe puis on relance, comme en jeu.
-      const avant = g().joueur?.saison ?? 0;
-      g().saisonSuivante();
-      let o = g().offres;
-      if (o.length) g().signerOffre(o[0].id);
-      if ((g().joueur?.saison ?? 0) === avant) {
-        g().saisonSuivante();
-        o = g().offres;
-        if (o.length) g().signerOffre(o[0].id);
-      }
-      useGame.setState({ tropheesEnAttente: [], offresOuvertes: false });
+      // (voir `saisonSuivante`) : `jouerUneSaison` négocie à notre place.
+      jouerUneSaison(g, (p) => useGame.setState(p));
     }
     // ⚠️ ON LIT LA COTE DANS LE JOURNAL, c'est-à-dire EXACTEMENT ce que le
     // joueur voit à l'écran. Un test qui recalculerait la cote de son côté

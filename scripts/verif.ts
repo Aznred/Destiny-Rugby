@@ -1,5 +1,6 @@
 // Vérification hors navigateur des nouvelles mécaniques (données amateurs,
 // mercato, progression, offres). Lancer : npx vite-node scripts/verif.ts
+import { jouerUneSaison } from './_saison';
 import { COMPETITIONS, clubParNom } from '../src/data/clubs';
 import { effectifDuClub, forceEffectif } from '../src/lib/effectif';
 import { mercatoReel } from '../src/lib/mercato';
@@ -81,11 +82,12 @@ const g = () => useGame.getState();
 g().creerJoueur({ nom: 'Tino Test', poste: 'ailier_droit', nation: 'France', club: 'Champagnole', division: 'reg1', age: 18 });
 for (let s = 1; s <= 8; s++) {
   const avant = g().joueur!;
-  g().saisonSuivante();
+  // ⚠️ On accepte ce qui se présente, pour tester la montée en gamme. Le marché
+  // se négocie maintenant sur L'Ovale (`lib/negociation.ts`) : `jouerUneSaison`
+  // fait le trajet complet — saison, accord, intersaison.
+  const offres = g().approches.filter((a) => a.etat === 'ouverte');
+  jouerUneSaison(g, (p) => useGame.setState(p));
   const apres = g().joueur!;
-  const offres = g().offres;
-  // On signe la meilleure offre proposée, pour tester la montée en gamme.
-  if (offres.length) g().signerOffre(offres[0].id);
   const j2 = g().joueur!;
   const gen = Math.round(Object.values(j2.attributs).reduce((a, b) => a + b, 0) / 8);
   ligne(
@@ -118,5 +120,4 @@ for (let s = 1; s <= 4; s++) {
   const bilan = g().journal.filter((e) => e.titre?.startsWith('Bilan')).at(-1);
   ligne(`  S${s} · ${bilan?.texte?.slice(0, 90)}…`);
   ligne(`     titres : ${j3.titres.join(', ') || '—'}`);
-  g().fermerOffres();
 }

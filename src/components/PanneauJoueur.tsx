@@ -52,9 +52,10 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const vecu = joueur.saisonEnCours;
   const prendreRetraite = useGame((s) => s.prendreRetraite);
   const setEcran = useGame((s) => s.setEcran);
-  const ouvrirOffres = useGame((s) => s.ouvrirOffres);
+  const approchesOuvertes = useGame(
+    (s) => s.approches.filter((a) => a.etat === 'ouverte').length,
+  );
   const demanderTransfert = useGame((s) => s.demanderTransfert);
-  const offres = useGame((s) => s.offres);
   const poste = POSTE_PAR_ID[joueur.poste];
   const generale = noteGlobale(joueur);
   // ⚠️ La division EFFECTIVE, pas celle du fichier de données : sinon un club
@@ -337,12 +338,17 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         <button onClick={() => setEcran('effectif')} title="Voir les joueurs de ton club">
           👥<span>{t('pj.equipe')}</span>
         </button>
+        {/* ⚠️ LE MARCHÉ VIT SUR L'OVALE, PLUS DANS UN PANNEAU. Ce bouton ouvre
+            les messages privés quand des clubs discutent, et sert à se mettre
+            sur le marché quand personne n'écrit. */}
         <button
-          onClick={() => (offres.length ? ouvrirOffres() : setConfirmerTransfert(true))}
-          title="Offres de contrat et marché des transferts"
+          onClick={() => (approchesOuvertes > 0 ? setEcran('social') : setConfirmerTransfert(true))}
+          title={approchesOuvertes > 0
+            ? 'Des clubs t’écrivent : va négocier dans tes messages'
+            : 'Se mettre sur le marché des transferts'}
         >
           ✈️<span>{t('pj.marche')}</span>
-          {offres.length > 0 && <i className="badge-offres">{offres.length}</i>}
+          {approchesOuvertes > 0 && <i className="badge-offres">{approchesOuvertes}</i>}
         </button>
         <button onClick={() => setEcran('tableau')} title="Classement et résultats en direct">
           📊<span>{t('pj.resultats')}</span>

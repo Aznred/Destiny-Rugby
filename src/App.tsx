@@ -33,7 +33,6 @@ const Social = lazy(() => import('./screens/Social').then((m) => ({ default: m.S
 const TropheeGagne = lazy(() =>
   import('./components/TropheeGagne').then((m) => ({ default: m.TropheeGagne })),
 );
-import { Offres } from './components/Offres';
 
 // Le temps qu'un écran arrive : quelques dixièmes de seconde, jamais une page
 // blanche. Le fond du stade reste en place, seul le contenu attend.
@@ -118,7 +117,6 @@ export default function App() {
       </AnimatePresence>
 
       {/* Marché des transferts : le panneau « Choix de carrière » */}
-      {joueur && <Offres />}
 
       {/* Cérémonie : le trophée gagné s'affiche en 3D, un par un */}
       <AnimatePresence>
