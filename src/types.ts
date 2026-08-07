@@ -302,7 +302,7 @@ export interface ProfilSocial {
   banniere?: string;
 }
 
-// Un message privé échangé avec un compte (Groq répond à sa place).
+// Un message privé échangé avec un compte (l'IA locale répond à sa place).
 export interface MessageDM {
   id: string;
   pseudo: string; // interlocuteur
@@ -356,7 +356,7 @@ export interface EntreeJournal {
   evenement?: string;
 }
 
-// Réponse structurée attendue du Maître du Jeu (Groq)
+// Réponse structurée attendue du Maître du Jeu local
 export interface ReponseMJ {
   recit: string;
   evenement?: string;
@@ -368,8 +368,8 @@ export interface ReponseMJ {
 /**
  * L'ÉVÈNEMENT DE LA SEMAINE — le cœur du récit.
  *
- * Demande explicite : « au lieu d'avoir des boutons, chaque semaine Groq sort un
- * évènement ; le joueur répond en écrivant et Groq juge la réponse ». Ce n'est
+ * Demande explicite : « au lieu d'avoir des boutons, chaque semaine l'IA sort un
+ * évènement ; le joueur répond en écrivant et l'IA juge la réponse ». Ce n'est
  * donc PAS un scénario à choix : il n'y a pas d'options, seulement une situation
  * et un champ de saisie. Les choix multiples restent le mode hors ligne.
  */

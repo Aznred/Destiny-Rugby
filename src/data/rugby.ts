@@ -119,7 +119,7 @@ export const ATTRIBUTS_LABELS: Record<string, string> = {
 // ⚠️ POURQUOI DES FONCTIONS ET PAS UNE TABLE PAR LANGUE. `ATTRIBUTS_LABELS` et
 // `POSTES` sont lus depuis une trentaine d'endroits, dont des fonctions PURES
 // (prompts, journal) qui n'ont pas de hook React. On garde donc les constantes
-// françaises — elles restent la source, et `lib/groq.ts` s'en sert telles quelles
+// françaises — elles restent la source, et `lib/iaLocale.ts` s'en sert telles quelles
 // pour décrire le joueur au MJ — et on ajoute à côté trois accesseurs traduits,
 // à utiliser partout où le texte est AFFICHÉ.
 //

@@ -13,7 +13,7 @@
 // 2. **Le contenu écrit par l'IA n'est pas ici.** Le Maître du Jeu, les
 //    situations et L'Ovale sont générés à l'exécution : on ne les traduit pas,
 //    on demande au modèle d'écrire directement dans la bonne langue
-//    (`consigneDeLangue`, utilisée par lib/groq.ts et lib/groqSocial.ts).
+//    (`consigneDeLangue`, utilisée par lib/iaLocale.ts et lib/iaSociale.ts).
 //    C'est ce qui rend le jeu *réellement* multilingue plutôt que « traduit ».
 // 3. **Aucune dépendance.** Pas de i18next : 40 lignes suffisent, et la
 //    bibliothèque pèserait plus lourd que tous les textes réunis.
@@ -125,8 +125,8 @@ export function nombre(n: number): string {
 // ⚠️ C'est LA pièce qui rend le jeu multilingue pour de bon. Traduire les
 // boutons ne sert à rien si le Maître du Jeu, les situations, les tweets et les
 // messages privés — c'est-à-dire 90 % de ce qu'on lit — restent en français.
-// Cette consigne est ajoutée en tête de CHAQUE prompt (lib/groq.ts,
-// lib/ia.ts, lib/groqSocial.ts, lib/moteur/consignes.ts).
+// Cette consigne est ajoutée en tête de CHAQUE prompt (lib/iaLocale.ts,
+// lib/ia.ts, lib/iaSociale.ts, lib/moteur/consignes.ts).
 //
 // Elle est écrite en anglais : c'est la langue dans laquelle les modèles
 // suivent le mieux une instruction de langue, y compris pour écrire en japonais.

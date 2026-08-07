@@ -1,10 +1,9 @@
 // ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.
-// Source : photos_joueurs/ · Généré par scripts/copierPhotosJoueurs.cjs
+// Source canonique : public/photos/ · Généré par scripts/copierPhotosJoueurs.cjs
 //
 // Photos de profil des joueurs réels du Top 14 et de la Pro D2, utilisées comme
-// avatars sur L'Ovale. La clé est le nom NORMALISÉ (voir `normaliserNom` dans
-// src/lib/avatars.ts) : accents retirés, tirets et apostrophes remplacés par des
-// espaces, minuscules.
+// avatars sur L'Ovale. La clé est le nom normalisé : accents retirés, tirets et
+// apostrophes remplacés par des espaces, minuscules.
 
 export const PHOTO_JOUEUR: Record<string, string> = {
   "aaron grandidier nkanang": "/photos/aaron_grandidier_nkanang.webp",

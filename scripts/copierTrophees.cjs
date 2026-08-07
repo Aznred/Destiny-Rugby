@@ -25,7 +25,7 @@
 // --texture-compress webp --texture-size 1024` fait la même chose d'un trait.
 //
 // ⚠️ LE MAILLAGE N'EST ALLÉGÉ QUE S'IL EST HORS NORME. Les trophées déjà en
-// place tournent entre 86 000 et 104 000 sommets ; les nouveaux montent jusqu'à
+// place tournent entre 86 000 et 104 000 sommets ; certains bruts montent jusqu'à
 // 571 000 (Bundesliga) — cinq fois plus de détail que l'écran n'en montre, pour
 // un modèle affiché dans une modale. Au-dessus de `SOMMETS_MAX`, on décime donc
 // vers cette densité, avec meshoptimizer et une **borne d'erreur** (0,2 % de la
@@ -41,7 +41,7 @@
 // ⚠️ UN MODÈLE EST REFAIT SI SA SOURCE EST PLUS RÉCENTE QUE SA SORTIE. C'est ce
 // qui permet de CORRIGER un trophée déjà embarqué — le modèle allemand et celui
 // du meilleur joueur du monde ont été relivrés — sans avoir à tout recompresser
-// (les vingt modèles de `nouvellecoupe/` prennent une bonne dizaine de minutes).
+// (le lot des championnats prend une bonne dizaine de minutes).
 //
 // Relancer : node scripts/copierTrophees.cjs        (ne refait que ce qui a changé)
 //            node scripts/copierTrophees.cjs --force (tout refaire)
@@ -65,7 +65,7 @@ const ERREUR_MAX = 0.002;
 
 // Un lot = un dossier livré + sa table « fichier livré (sans extension) → id ».
 const LOTS = [{
-  dossier: 'nouvellecoupe',
+  dossier: 'sources/modeles/trophees/championnats',
   intitule: 'les 20 championnats et coupes du monde',
   correspondance: {
   // Championnats et coupes de clubs
@@ -97,7 +97,7 @@ const LOTS = [{
   // pas le bon trophée) : ils écrasent les fichiers en place, parce que leur
   // source est plus récente. Les sept autres ouvrent une famille entière —
   // les HONNEURS INDIVIDUELS, qui n'existaient pas en jeu (`lib/honneurs.ts`).
-  dossier: 'trophe correct et new trophee',
+  dossier: 'sources/modeles/trophees/honneurs',
   intitule: 'les honneurs individuels (+ 2 corrections)',
   correspondance: {
     // Corrections de modèles déjà embarqués
@@ -112,6 +112,18 @@ const LOTS = [{
     'championscup best player': 'meilleurChampionsCup',
     'meilleurjoueursixnations': 'meilleurSixNations',
     'manofthematchworldcup': 'hommeDuMatchMonde',
+  },
+}, {
+  dossier: 'sources/modeles/trophees/internationaux',
+  intitule: 'les compétitions internationales',
+  correspondance: {
+    'Americas Rugby Championship': 'americasChamp',
+    "Oceania Cup (Oceania Rugby Men's Championship)": 'oceaniaCup',
+    'Rugby Europe Trophy  Conference': 'recTrophyConference',
+    'The Rugby Championship (Ancien Tri-Nations)': 'rugbyChampionship',
+    'World Rugby Nations Cup': 'nationsCup',
+    'World Rugby Pacific Challenge': 'pacificChallenge',
+    'World Rugby U20 Championship': 'mondialU20',
   },
 }];
 

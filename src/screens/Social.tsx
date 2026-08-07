@@ -1007,7 +1007,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
             ça se passe par X ». Quand l'interlocuteur est un club qui t'a
             approché, la conversation porte les LEVIERS. Ce sont eux qui
             décident — l'IA n'écrit que l'habillage (`lib/negociation.ts`), donc
-            tout fonctionne à l'identique sans clé Groq. */}
+            tout fonctionne à l'identique quand l'IA locale est désactivée. */}
         {actif && <Negociation pseudo={actif} />}
         {actif && <CabinetAgent pseudo={actif} />}
 
@@ -1045,7 +1045,7 @@ export function Social() {
   const notifs = useGame((s) => s.notifsSocial ?? []);
   const suivis = useGame((s) => s.comptesSuivis ?? []);
   const suggestions = useGame((s) => s.suggestionsComptes ?? []);
-  const groqKey = useGame((s) => s.groqKey);
+  const iaLocaleActivee = useGame((s) => s.iaLocaleActivee);
   const chargement = useGame((s) => s.chargementSocial);
   const erreur = useGame((s) => s.erreurSocial);
   const marquerNotifsLues = useGame((s) => s.marquerNotifsLues);
@@ -1062,7 +1062,7 @@ export function Social() {
   const [profilVu, setProfilVu] = useState<string | null>(null);
   const [messageAvec, setMessageAvec] = useState<string | null>(null);
 
-  const avecIA = !!groqKey;
+  const avecIA = iaLocaleActivee;
 
   // LE FIL SUIT LE CALENDRIER, PAS L'HORLOGE.
   //
@@ -1077,7 +1077,7 @@ export function Social() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filSemaine]);
 
-  // Avec une clé, l'IA écrit par-dessus la fournée locale — une fois par
+  // Avec l'IA locale, le modèle écrit par-dessus la fournée locale — une fois par
   // semaine de jeu elle aussi, pas toutes les 90 secondes.
   useEffect(() => {
     if (!joueur || !avecIA || !filSemaine) return;

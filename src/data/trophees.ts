@@ -286,7 +286,7 @@ export const TROPHEES: Record<string, Trophee> = {
     forme: 'bouclier',
   },
 
-  // --- Les vingt championnats et coupes du dossier « nouvellecoupe » ---------
+  // --- Les championnats et coupes de sources/modeles/trophees/ ----------------
   // ⚠️ Jusqu'ici, les 18 championnats ajoutés par `data/nouvellesLigues.ts` ne
   // décernaient RIEN : on pouvait signer à Batumi, y être champion, et repartir
   // les mains vides. Chacun a désormais son trophée, avec son modèle 3D.
@@ -468,6 +468,62 @@ export const TROPHEES: Record<string, Trophee> = {
     desc: 'Le « Tournoi des 6 Nations B » : Géorgie, Portugal, Roumanie, Espagne… Le titre des nations qui frappent à la porte du Tournoi.',
     ovas: 10,
   },
+  americasChamp: {
+    id: 'americasChamp',
+    nom: 'Americas Rugby Championship',
+    modele: '/m3d/americasChamp.glb',
+    couleur: '#2f72c4',
+    desc: 'Champion des Amériques après avoir affronté les meilleures sélections du continent.',
+    ovas: 8,
+  },
+  oceaniaCup: {
+    id: 'oceaniaCup',
+    nom: 'Oceania Cup',
+    modele: '/m3d/oceaniaCup.glb',
+    couleur: '#22a6a1',
+    desc: 'Vainqueur du championnat des nations émergentes d’Océanie.',
+    ovas: 5,
+  },
+  recTrophyConference: {
+    id: 'recTrophyConference',
+    nom: 'Rugby Europe Trophy / Conference',
+    modele: '/m3d/recTrophyConference.glb',
+    couleur: '#587fc2',
+    desc: 'Vainqueur de ton niveau européen et promu vers l’échelon supérieur.',
+    ovas: 5,
+  },
+  rugbyChampionship: {
+    id: 'rugbyChampionship',
+    nom: 'The Rugby Championship',
+    modele: '/m3d/rugbyChampionship.glb',
+    couleur: '#e0ad35',
+    desc: 'Champion de l’hémisphère sud face aux Springboks, All Blacks, Wallabies et Pumas.',
+    ovas: 15,
+  },
+  nationsCup: {
+    id: 'nationsCup',
+    nom: 'World Rugby Nations Cup',
+    modele: '/m3d/nationsCup.glb',
+    couleur: '#4b8ac6',
+    desc: 'Vainqueur de la Nations Cup, tournoi international des nations en développement.',
+    ovas: 8,
+  },
+  pacificChallenge: {
+    id: 'pacificChallenge',
+    nom: 'World Rugby Pacific Challenge',
+    modele: '/m3d/pacificChallenge.glb',
+    couleur: '#26a68b',
+    desc: 'Vainqueur du Pacific Challenge au terme d’une campagne insulaire intense.',
+    ovas: 7,
+  },
+  mondialU20: {
+    id: 'mondialU20',
+    nom: 'Championnat du monde U20',
+    modele: '/m3d/mondialU20.glb',
+    couleur: '#71b9e6',
+    desc: 'Champion du monde des moins de 20 ans, premier grand titre d’une carrière en devenir.',
+    ovas: 10,
+  },
 };
 
 // Trophée national décerné selon la division du club. Les clés sont les ids de
@@ -545,7 +601,16 @@ export const TROPHEE_PAR_COUPE: Record<string, string> = {
  */
 export const TROPHEE_PAR_INTERNATIONAL: Record<string, string> = {
   sixNations: 'sixNations',
+  rugbyChampionship: 'rugbyChampionship',
+  mondialU20: 'mondialU20',
   recEurope: 'recEurope',
+  oceaniaCup: 'oceaniaCup',
+  recTrophy: 'recTrophyConference',
+  recConference: 'recTrophyConference',
+  americasChamp: 'americasChamp',
+  nationsCupM: 'nationsCup',
+  pacificChallenge: 'pacificChallenge',
+  trcMonde: 'rugbyChampionship',
   coupeDuMonde: 'monde',
 };
 

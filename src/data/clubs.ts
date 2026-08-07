@@ -438,7 +438,7 @@ const AMATEURS: Competition[] = [
   { id: 'reg3', nom: 'Régionale 3', pays: 'France', drapeaux: ['fr'], emoji: '🥉', niveau: 10, zone: 'France', clubs: regionale('reg3'), note: 'Tout en bas de la pyramide — c\'est ici que naissent les légendes.' },
 ];
 
-// ---------- LE RESTE DU MONDE (dossier « new league ») ----------
+// ---------- LE RESTE DU MONDE (sources/competitions/ligues/) ----------
 // 18 championnats et coupes de plus — Espagne, Italie, Géorgie, Irlande,
 // Écosse, Galles, Pologne, Roumanie, Russie, Argentine, Portugal, Pays-Bas,
 // Tchéquie, Finlande, Nouvelle-Zélande. Les clubs, leur hiérarchie et leurs

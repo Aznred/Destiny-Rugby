@@ -1,17 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
-import { MODELE_DEFAUT, consoGroq, reinitialiserConsoGroq } from '../lib/groq';
+import {
+  MODELE_DEFAUT,
+  MEMOIRE_MODELE_MO,
+  activiteIALocale,
+  chargerIALocale,
+  dechargerIALocale,
+  ecouterEtatIALocale,
+  etatIALocale,
+  iaLocaleCompatible,
+  modeleIALocaleEnCache,
+  reinitialiserActiviteIALocale,
+  supprimerIALocale,
+} from '../lib/iaLocale';
 import type { Theme } from '../types';
 import { LANGUES, nombre, t, tn } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
-
-const MODELES = [
-  { id: 'llama-3.3-70b-versatile', nom: 'Llama 3.3 70B', qualificatif: 'reg.recommande' },
-  { id: 'llama-3.1-8b-instant', nom: 'Llama 3.1 8B', qualificatif: 'reg.rapide' },
-  { id: 'openai/gpt-oss-120b', nom: 'GPT-OSS 120B', qualificatif: '' },
-];
 
 // Les trois ambiances. `apercu` est le dégradé montré sur la pastille — il
 // reprend exactement les deux extrémités de la rampe de fond du thème.
@@ -26,35 +32,72 @@ interface Props {
 }
 
 export function Reglages({ onFermer }: Props) {
-  const groqKey = useGame((s) => s.groqKey);
-  const modele = useGame((s) => s.modele);
+  const iaLocaleActivee = useGame((s) => s.iaLocaleActivee);
   const theme = useGame((s) => s.theme);
   const langue = useGame((s) => s.langue);
   const setLangue = useGame((s) => s.setLangue);
   const setTheme = useGame((s) => s.setTheme);
-  const setGroqKey = useGame((s) => s.setGroqKey);
-  const setModele = useGame((s) => s.setModele);
+  const setIALocaleActivee = useGame((s) => s.setIALocaleActivee);
   const tenorKey = useGame((s) => s.tenorKey);
   const setTenorKey = useGame((s) => s.setTenorKey);
 
-  const [cleLocale, setCleLocale] = useState(groqKey);
-  const [modeleLocal, setModeleLocal] = useState(modele || MODELE_DEFAUT);
   const [tenorLocal, setTenorLocal] = useState(tenorKey);
   const [langueLocale, setLangueLocale] = useState(langue);
   const [themeLocal, setThemeLocal] = useState(theme);
-  const [voir, setVoir] = useState(false);
+  const [modeleEnCache, setModeleEnCache] = useState(false);
+  const [operationIA, setOperationIA] = useState(false);
+  const [erreurIA, setErreurIA] = useState<string | null>(null);
+  const etatIA = useSyncExternalStore(ecouterEtatIALocale, etatIALocale, etatIALocale);
   const { overlayRef, dialogRef } = useModalDialog(onFermer);
-  // Le compteur vit dans un module : on le lit à l'ouverture du panneau, et on
-  // force un rendu quand on le remet à zéro.
   const [, rafraichir] = useState(0);
-  const conso = consoGroq();
-  const remettreAZero = () => { reinitialiserConsoGroq(); rafraichir((n) => n + 1); };
+  const activite = activiteIALocale();
+  const remettreAZero = () => { reinitialiserActiviteIALocale(); rafraichir((n) => n + 1); };
 
-  const valide = cleLocale.trim().startsWith('gsk_');
+  useEffect(() => {
+    let actif = true;
+    void modeleIALocaleEnCache()
+      .then((present) => { if (actif) setModeleEnCache(present); })
+      .catch(() => undefined);
+    return () => { actif = false; };
+  }, [etatIA.phase]);
+
+  const activerIA = async () => {
+    setErreurIA(null);
+    setOperationIA(true);
+    setIALocaleActivee(true);
+    try {
+      await chargerIALocale();
+      setModeleEnCache(true);
+    } catch (cause) {
+      setIALocaleActivee(false);
+      setErreurIA(cause instanceof Error ? cause.message : t('reg.iaErreur'));
+    } finally {
+      setOperationIA(false);
+    }
+  };
+
+  const desactiverIA = async () => {
+    setIALocaleActivee(false);
+    setOperationIA(true);
+    await dechargerIALocale();
+    setOperationIA(false);
+  };
+
+  const effacerIA = async () => {
+    setIALocaleActivee(false);
+    setOperationIA(true);
+    setErreurIA(null);
+    try {
+      await supprimerIALocale();
+      setModeleEnCache(false);
+    } catch (cause) {
+      setErreurIA(cause instanceof Error ? cause.message : t('reg.iaErreur'));
+    } finally {
+      setOperationIA(false);
+    }
+  };
 
   const enregistrer = () => {
-    setGroqKey(cleLocale.trim());
-    setModele(modeleLocal);
     setTenorKey(tenorLocal.trim());
     setLangue(langueLocale);
     setTheme(themeLocal);
@@ -77,77 +120,75 @@ export function Reglages({ onFermer }: Props) {
       >
         <div className="eyebrow">{t('reg.eyebrow')}</div>
         <h2 id="reglages-titre">{t('reg.titre')}</h2>
-        <p className="aide">
-          {t('reg.cleAide')} {' '}
-          <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">
-            console.groq.com/keys
-          </a>.
-        </p>
+        <p className="aide">{t('reg.iaAide')}</p>
 
-        <div className="champ">
-          <label htmlFor="cle">{t('reg.cleApi')}</label>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              id="cle"
-              type={voir ? 'text' : 'password'}
-              placeholder="gsk_..."
-              value={cleLocale}
-              onChange={(e) => setCleLocale(e.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button
-              className="btn fantome"
-              type="button"
-              onClick={() => setVoir((v) => !v)}
-              style={{ padding: '0 1rem' }}
-            >
-              {voir ? '🙈' : '👁️'}
-            </button>
+        <div className="champ ia-locale">
+          <label>{t('reg.iaLocale')}</label>
+          <div className="ia-locale-entete">
+            <div>
+              <strong>Llama 3.2 1B</strong>
+              <span>{MODELE_DEFAUT.includes('q4') ? ' · 4-bit' : ''} · {nombre(MEMOIRE_MODELE_MO)} Mo</span>
+            </div>
+            <span className={`badge-cle ${etatIA.phase === 'prete' && iaLocaleActivee ? 'ok' : 'ko'}`}>
+              {etatIA.phase === 'prete' && iaLocaleActivee
+                ? `✓ ${t('reg.iaPrete')}`
+                : etatIA.phase === 'chargement'
+                  ? t('reg.iaChargement')
+                  : iaLocaleCompatible()
+                    ? t('reg.iaInactive')
+                    : t('reg.iaIncompatible')}
+            </span>
           </div>
-          <div style={{ marginTop: '0.6rem' }}>
-            {cleLocale.trim() === '' ? (
-              <span className="badge-cle ko">{t('reg.sansCle')}</span>
-            ) : valide ? (
-              <span className="badge-cle ok">✓ {t('reg.formatValide')}</span>
+
+          {etatIA.phase === 'chargement' && (
+            <div className="ia-progression" aria-live="polite">
+              <div className="ia-progression-piste">
+                <span style={{ width: `${Math.round(etatIA.progression * 100)}%` }} />
+              </div>
+              <b>{Math.round(etatIA.progression * 100)} %</b>
+            </div>
+          )}
+
+          {(erreurIA || etatIA.erreur) && (
+            <p className="alerte">{erreurIA || etatIA.erreur}</p>
+          )}
+
+          <p className="aide">
+            {modeleEnCache ? t('reg.iaCache') : t('reg.iaTelechargement')}
+          </p>
+          <div className="ia-actions">
+            {iaLocaleActivee ? (
+              <button type="button" className="btn fantome" disabled={operationIA} onClick={() => void desactiverIA()}>
+                {t('reg.iaDesactiver')}
+              </button>
             ) : (
-              <span className="badge-cle ko">{t('reg.formatInvalide')}</span>
+              <button
+                type="button"
+                className="btn primaire"
+                disabled={operationIA || !iaLocaleCompatible()}
+                onClick={() => void activerIA()}
+              >
+                {modeleEnCache ? t('reg.iaActiver') : t('reg.iaTelecharger')}
+              </button>
+            )}
+            {modeleEnCache && (
+              <button type="button" className="btn fantome" disabled={operationIA} onClick={() => void effacerIA()}>
+                {t('reg.iaEffacer')}
+              </button>
             )}
           </div>
-        </div>
 
-        <div className="champ">
-          <label htmlFor="modele">{t('reg.modele')}</label>
-          <select
-            id="modele"
-            value={modeleLocal}
-            onChange={(e) => setModeleLocal(e.target.value)}
-          >
-            {MODELES.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nom}{m.qualificatif ? ` (${t(m.qualificatif)})` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* ⚠️ LA CONSOMMATION, SOUS LES YEUX. La clé du site est partagée par
-            tous les joueurs : on ne peut pas économiser ce qu'on ne mesure pas.
-            Compteur de SESSION (lib/groq.ts), remis à zéro au rechargement. */}
-        {conso.appels > 0 && (
-          <div className="champ">
-            <label>{t('reg.conso')}</label>
-            <div className="conso-groq">
-              <span><b>{nombre(conso.appels)}</b> {tn('reg.appels', conso.appels)}</span>
-              <span><b>{nombre(conso.entree)}</b> {t('reg.envoyes')}</span>
-              <span><b>{nombre(conso.sortie)}</b> {t('reg.recus')}</span>
+          {activite.appels > 0 && (
+            <div className="activite-ia">
+              <span><b>{nombre(activite.appels)}</b> {tn('reg.appels', activite.appels)}</span>
+              <span><b>{nombre(activite.entree)}</b> {t('reg.envoyes')}</span>
+              <span><b>{nombre(activite.sortie)}</b> {t('reg.recus')}</span>
               <button type="button" className="btn fantome mini" onClick={remettreAZero}>
                 {t('reg.remiseAZero')}
               </button>
             </div>
-            <p className="aide">{t('reg.consoAide')}</p>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* GIFs dans les publications de L'Ovale. Facultatif : sans cette clé,
             les posts s'illustrent quand même avec des photos libres. */}

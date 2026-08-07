@@ -1,7 +1,7 @@
 // LES 30 SITUATIONS DE VIE, EN SEPT LANGUES (data/situations.ts)
 //
 // C'est le plus gros morceau du contenu hors ligne : 30 situations, 85 choix,
-// et pour chaque choix un récit d'issue. Sans clé Groq, c'est TOUT ce que le
+// et pour chaque choix un récit d'issue. Sans IA locale, c'est TOUT ce que le
 // joueur lit entre deux matchs — le laisser en français rendait les six autres
 // langues cosmétiques.
 //

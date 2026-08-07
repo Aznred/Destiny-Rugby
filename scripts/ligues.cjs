@@ -1,5 +1,5 @@
-// Table des championnats couverts par la base réelle (base_rugby_finale.json
-// + tous_les_classements.json). C'est LA source de vérité pour :
+// Table des championnats couverts par la base réelle (`sources/data/`).
+// C'est LA source de vérité pour :
 //   • le nom du club dans le jeu (les fichiers de données utilisent des noms
 //     courts : « Toulouse », « Bath »…) ;
 //   • sa ville et son logo (public/logos/<slug>.png, slug dérivé du nom court) ;

@@ -1,5 +1,5 @@
 // ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.
-// Source : base_rugby_finale.json (9 388 lignes, saison 25-26) — voir
+// Source : sources/data/base_rugby_finale.json (9 388 lignes, saison 25-26) — voir
 // scripts/genMonde.cjs. Régénérer avec : node scripts/genMonde.cjs
 //
 // • NOTE_CLUB_REEL : note générale d'un club, déduite du classement de la

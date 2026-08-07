@@ -4,9 +4,9 @@
 
 Incarne un rugbyman de ses débuts jusqu'au sommet. Tu **écris tes actions** en
 langage naturel (entraînement, match, contrat, médias, vie perso…), et le
-**Maître du Jeu IA (Groq)** juge le résultat de façon réaliste : il raconte ce
+**Maître du Jeu IA local** juge le résultat de façon réaliste : il raconte ce
 qui se passe et fait **monter ou chuter tes statistiques** en conséquence. Rien
-n'est scripté — chaque partie est unique.
+n'est envoyé à un service d'IA distant.
 
 Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
 
@@ -21,9 +21,11 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   te tend à 23 h. **Tu réponds en écrivant ce que tu fais**, et il juge. Environ
   une scène sur cinq est réellement dangereuse : là, et seulement là, ça peut
   finir en suspension, en garde à vue, à l'hôpital — ou pire.
-  *Sans clé Groq, le jeu reste entier : la même scène arrive chaque semaine, avec
-  des réponses à choix multiples.*
-- **Maître du Jeu IA** via l'API **Groq** (gratuite). Il juge chaque décision
+  *Si l'IA locale est désactivée ou incompatible, le jeu reste entier : la même
+  scène arrive chaque semaine, avec des réponses à choix multiples.*
+- **Maître du Jeu IA local** via **WebLLM** et WebGPU. Aucune clé, aucun compte,
+  aucun quota : le modèle Llama 3.2 1B quantifié tourne dans un Worker sur
+  l'appareil du joueur et reste en cache après son premier téléchargement. Il juge chaque décision
   selon les attributs, la forme, le moral, la réputation et le contexte, puis
   renvoie un récit + des variations de stats structurées. Il est **sévère** :
   par défaut une action ne change presque rien, l'échec est fréquent, et on ne
@@ -103,7 +105,7 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   et **entièrement écrit par l'IA**. Les clubs, les joueurs, les journalistes et
   les supporters publient (avec leurs propres pseudos), les commentaires sous
   tes posts sont générés pour CE post, tu peux **suivre** qui tu veux et leur
-  **écrire en message privé** : Groq répond à leur place, dans leur rôle.
+  **écrire en message privé** : l'IA locale répond à leur place, dans leur rôle.
   Tu publies ce que tu veux (5 tons, du plus humble au clash) — et si tu
   dérapes, ton club te convoque et te met à l'amende.
   ⚠️ **Les annonces sont réelles** : quand un compte annonce un transfert, le
@@ -111,7 +113,7 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   transférer par un tweet : pour toi, ça reste une offre à accepter).
   Le même écran regroupe tes **notifications**, tes **succès** (**68**, dont 18
   secrets — ils rapportent des Ovas et traversent tes carrières) et les **3 défis
-  de la semaine**. Sans clé Groq, un repli hors ligne prend le relais.
+  de la semaine**. Sans IA locale, un repli pré-écrit prend le relais.
 - **Séance d'entraînement hebdomadaire** (💪) : chaque semaine, tu choisis un
   secteur à travailler. Ça coûte 4 de forme, ça ne réussit pas à tous les coups,
   et ça ne dépasse jamais ton potentiel — mais sur une carrière, ça change tout.
@@ -238,8 +240,10 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   Sylvie, Patrick — qui commentent depuis leur canapé.
 - **Les tweets vivent** : les vues, likes et reposts d'une publication continuent
   de monter les semaines suivantes, de moins en moins vite, et **chaque** post
-  reçoit ses commentaires (écrits par l'IA quand une clé est là).
-- **Tutoriel intégré** pour obtenir/mettre sa clé Groq (dans ⚙️).
+  reçoit ses commentaires (écrits sur mesure quand l'IA locale est active).
+- **IA locale dans les réglages** : téléchargement lancé automatiquement en
+  arrière-plan au premier démarrage compatible, progression,
+  activation/désactivation et suppression du modèle mis en cache.
 - **Ballon 3D** : modèle `.glb` (France Rugby) **compressé Draco (0,45 Mo)**,
   sinon ballon texturé codé (recolorable par les skins).
 - **Monnaie « Ovas » (🪙)** volontairement **rare** : ~1-5 par action/saison.
@@ -251,6 +255,9 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   immortalisée avec son parcours et son score.
 - **Classement mondial** (🏆) : ta carrière face à des légendes (score global :
   niveau, réputation, longévité, titres, essais).
+- **Classement World Rugby des sélections** (🌍) : **114 nations** démarrent
+  avec leur note réelle sur 100, puis échangent des points après chaque match
+  international joué dans la carrière.
 - **Profil / palmarès** : note globale, faits marquants, titres.
 - **Ballon 3D texturé** codé en Three.js (façon Gilbert France Rugby : coq,
   swooshes, coutures) — chargé à la demande.
@@ -260,7 +267,7 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
 ## 🌍 Le monde du jeu s'agrandit — 18 championnats de plus
 
 Aux 20 compétitions déjà présentes s'ajoutent **18 championnats et coupes** et
-**13 compétitions de sélections**, tirés du dossier `new league/` :
+**13 compétitions de sélections**, tirés de `sources/competitions/ligues/` :
 
 | | |
 |---|---|
@@ -279,6 +286,24 @@ Etcheverry, mais on y croise quand même un Argentin et un Australien.
 Régénérer : `node scripts/genNouvellesLigues.cjs` (la table des ligues et leur
 calibrage sont dans `scripts/nouvellesLigues.cjs`).
 
+### Le classement World Rugby vit avec les résultats
+
+`src/data/classementWorldRugby.ts` contient les **114 notes de départ**. Le jeu
+n'utilise plus un Elo fictif autour de 1 000 points : il applique l'échange de
+points World Rugby dans `src/lib/classementWorldRugby.ts`.
+
+- l'équipe qui reçoit est considérée comme ayant **3 points de plus** ;
+- une victoire attendue rapporte peu, un exploit rapporte davantage ;
+- un nul transfère des points de la mieux notée vers la moins bien notée ;
+- une marge supérieure à 15 points multiplie l'échange par **1,5** ;
+- les matchs de Coupe du monde comptent **double** et sont à terrain neutre ;
+- chaque point gagné est perdu par l'adversaire, et les notes restent entre
+  **0 et 100**.
+
+Le classement de l'écran Résultats est recalculé jusqu'à la semaine courante :
+il évolue donc dès la fenêtre internationale suivante. Vérification :
+`npx vite-node scripts/verifClassementWorldRugby.ts`.
+
 ## 🔍 Référencement et vitesse
 
 - **Balises complètes** : Open Graph, Twitter Card, canonique, JSON-LD
@@ -289,7 +314,7 @@ calibrage sont dans `scripts/nouvellesLigues.cjs`).
   (les 250 drapeaux ne sont plus recopiés dedans en base 64), et sept écrans
   plus le moteur de match ne sont téléchargés qu'au moment où l'on s'en sert.
 
-## 💸 Consommation de l'IA, mesurée
+## ⚙️ Activité de l'IA locale, mesurée
 
 L'Ovale a été ramené de **trois appels par semaine à un seul**, commentaires
 compris, et les comptes à suivre ne passent plus par l'IA du tout — ils viennent
@@ -297,8 +322,9 @@ de l'annuaire du jeu.
 
 Le **récit hebdomadaire** en ajoute deux : la scène, puis son jugement. Soit
 **trois appels par semaine de jeu**, ~130 par saison. C'est le prix de la boucle
-narrative, et il est assumé. Le compteur exact (appels, tokens envoyés, tokens
-reçus) s'affiche dans ⚙️ — et sans clé, le coût est nul.
+narrative. Les générations sont sérialisées pour ne jamais lancer plusieurs
+calculs en même temps. Le compteur exact (appels, tokens d'entrée et de sortie)
+s'affiche dans ⚙️ ; il n'est associé à aucun coût ni quota.
 
 ## 🌐 Sept langues, une ambiance au choix, et le téléphone d'abord
 
@@ -345,16 +371,16 @@ npx vite-node scripts/verifClassement.ts
 L'écran Classement affiche **en clair** la fiche qui partirait et le verdict que
 le serveur rendrait : rien n'est caché, parce que rien n'a besoin de l'être.
 
-## 🔑 Clé API Groq personnelle (pour le Maître du Jeu)
+## 🧠 IA locale sans clé ni quota
 
-Le jeu est jouable sans clé (création, navigation, évènements aléatoires), mais
-le **MJ IA** a besoin d'une clé Groq. Clique sur **⚙️**, colle ta clé
-(`gsk_...`), puis enregistre. Elle est stockée
-**uniquement dans ton navigateur** (localStorage). C'est l'option qui **passe à
-l'échelle** : chaque joueur utilise son propre quota gratuit.
-
-> Les deux options coexistent : si une clé de site est présente, une clé perso
-> saisie dans ⚙️ la remplace pour ce joueur.
+Sur un appareil compatible, le navigateur commence automatiquement à télécharger
+le modèle quantifié en arrière-plan (environ 900 Mo) après l'ouverture du jeu,
+puis le conserve dans son cache. **⚙️ Réglages** permet de suivre la progression,
+de désactiver l'IA ou de supprimer le modèle ; une désactivation est mémorisée.
+L'inférence se déroule entièrement sur la carte graphique de l'appareil via
+WebGPU ; les actions, messages et données de carrière ne sont envoyés à aucun
+service d'IA. Si WebGPU manque ou si le modèle ne tient pas en mémoire, le jeu
+repasse automatiquement sur ses situations et réponses pré-écrites.
 
 ## 🚀 Démarrage
 
@@ -377,7 +403,7 @@ npm run lint     # oxlint
 - **Zustand** (état + persistance localStorage)
 - **Framer Motion** (animations)
 - **Three.js** via **@react-three/fiber** + **@react-three/drei** (3D)
-- **Groq API** (compatible OpenAI) pour le Maître du Jeu
+- **WebLLM** + **WebGPU** pour le Maître du Jeu local
 
 ## 📁 Structure
 
@@ -392,7 +418,9 @@ src/
   data/clubs.ts         # assemblage des compétitions : réelles (générées) + amateurs FR
   data/mondeReel.ts     # GÉNÉRÉ : 143 clubs (nom, ville, logo), coupes, sélections + classements
   data/effectifsReels.ts # GÉNÉRÉ : 6 306 joueurs réels 25-26 + note générale des clubs
-  lib/groq.ts           # appel API Groq + prompt système + parsing JSON
+  lib/iaLocale.ts       # modèle WebLLM, Worker, prompt système, JSON et garde-fous
+  lib/iaSociale.ts      # publications, commentaires et messages privés générés localement
+  workers/iaLocale.worker.ts # inférence hors du fil d'interface
   lib/ia.ts             # la scène de la semaine + son jugement (sévère), situations, interviews
   lib/armoire.ts        # étagères mesurées sur le modèle 3D, titres au sol, boucliers adossés, cadrage
   lib/honneurs.ts       # les distinctions individuelles : note de saison + stats + palmarès de l'année
@@ -410,13 +438,14 @@ scripts/
   verifArmoire.ts       # armoire à trophées : étagères décodées du .glb, boucliers adossés, cadrage mobile
   verifHonneurs.ts      # honneurs individuels : barème, équité entre postes, 60 carrières jouées
   verifMarche.ts        # marché : variété des clubs, saut d'étage interdit, salaires par âge
-  traduire.ts           # remplit les langues manquantes du dictionnaire (Groq), sans rien écraser
   verifClassement.ts    # joue le tricheur : chaque attaque du classement doit être refusée
+  verifLogosSelections.ts # signatures des images et couverture du classement World Rugby
+sources/                # matières premières rangées : data, logos, compétitions, modèles 3D
 serveur/                # le classement en ligne (Deno, déployé à part — pas dans le bundle)
   classement.ts         # Edge Function : vérifie la fiche, RECALCULE le score, n'écrit que lui
   schema.sql            # table (pseudo, score, cree_le), RLS sans droit d'insertion
   README.md             # déploiement, et ce que la protection ne peut pas faire
-  copierLogos.cjs       # logos_equipes/**.png → public/logos/*.png (à plat, dédoublonnés)
+  copierLogos.cjs       # sources/logos/clubs/** → public/logos/ (à plat, dédoublonnés)
   store/useGame.ts      # store Zustand (joueur, journal, Ovas, panthéon, scénarios, offres…)
   lib/progression.ts    # note de saison + évolution des attributs et du potentiel
   lib/offres.ts         # génération des offres de contrat (France et étranger)
@@ -426,15 +455,16 @@ serveur/                # le classement en ligne (Deno, déployé à part — pa
   data/trophees.ts      # trophées + conditions d'attribution + modèles 3D
   index.css / App.css   # design system (thème stade) + styles composants
 public/ballon.glb       # ballon France Rugby, compressé Draco (453 Ko)
-public/m3d/*.glb        # poteaux, 47 trophées (dont 8 distinctions), skins de ballon (57 Mo)
-public/logos/*.png      # 715 logos de clubs et de sélections (5,5 Mo)
+public/m3d/*.glb        # poteaux, 54 trophées (dont 8 distinctions), skins de ballon (70 Mo)
+public/logos/*          # 957 logos de clubs et de sélections (4,2 Mo)
 ```
 
 ### Régénérer les données réelles
 
-Les données viennent de trois sources déposées à la racine :
-`base_rugby_finale.json` (9 388 lignes joueur/compétition),
-`tous_les_classements.json` (25 classements) et `logos_equipes/`.
+Les données brutes sont regroupées dans `sources/` :
+`sources/data/base_rugby_finale.json` (9 388 lignes joueur/compétition),
+`sources/data/tous_les_classements.json` (25 classements) et
+`sources/logos/clubs/`.
 
 ```bash
 node scripts/copierLogos.cjs   # logos → public/logos/
@@ -443,7 +473,7 @@ node scripts/genMonde.cjs      # → src/data/mondeReel.ts + src/data/effectifsR
 
 > Les modèles sont compressés avec
 > `npx @gltf-transform/cli optimize <src> <dst> --compress draco --texture-compress webp --texture-size 1024`
-> (typiquement 20 Mo → 1 Mo). Les originaux restent dans `textures 3d/`.
+> (typiquement 20 Mo → 1 Mo). Les originaux restent dans `sources/modeles/`.
 
 Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les conventions.
 
@@ -482,7 +512,7 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 | Réglages : impossible de faire défiler | La modale a une hauteur maximale et un ascenseur ; l'overlay ne la coupe plus par le haut. |
 | Boutique | **Boosts supprimés**, articles affichés avec le **vrai ballon 3D**. |
 | Classement | **Vierge au départ**, avec la marche à suivre pour le brancher en ligne. |
-| Logos de sélections faux | Remplacés par ceux de « bonne selection » (39 écussons). |
+| Logos de sélections faux | 39 écussons principaux + **77 écussons du nouveau catalogue** validés par signature ; 24 variantes conservées sans doublonner le jeu. |
 | Pas de drapeau ni de note sur les nouvelles ligues | 28 championnats sur 28 ont leur drapeau, 183 clubs ont leur note. |
 | Pas de compétitions U20 | **Tournoi des 6 Nations U20** et **Championnat du monde U20**, avec convocation des meilleurs joueurs U20 de chaque pays. |
 | Traductions inachevées | 160 clés, 100 % dans les 7 langues, branchées sur tous les écrans principaux. |
@@ -531,9 +561,8 @@ fondations vers le confort) est dans **[ROADMAP.md](ROADMAP.md)**.
   retraite** ; le bouton d'envoi reste là pour une carrière en cours. Le principe
   tient en une phrase — *le navigateur envoie les faits d'une carrière, le
   serveur RECALCULE le score et n'écrit que lui*.
-- **Proxy backend pour Groq** : petit serveur qui garde la clé côté serveur et
-  applique un quota par joueur — permet une mise en ligne publique sans exposer
-  la clé ni saturer le quota.
+- **Optimiser l'IA locale** : évaluer d'autres modèles multilingues quantifiés
+  quand ils seront stables dans WebLLM, sans augmenter la mémoire minimale.
 - Matchs simulés tour par tour avec adversaires générés.
 - Logo FFR officiel en PNG sur le ballon (aujourd'hui : coq tracé en code).
 

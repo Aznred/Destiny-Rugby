@@ -1,7 +1,7 @@
 // LA VIE EN DEHORS DU TERRAIN — la grosse base d'évènements à choix.
 //
-// Demande explicite : « pour les situations, si Groq, ça nous pose un contexte
-// avec un évènement auquel on peut répondre ; si pas Groq, un texte préfait
+// Demande explicite : « avec l'IA, ça nous pose un contexte avec un évènement
+// auquel on peut répondre ; sans IA locale, un texte préfait
 // avec des choix (fais une grosse db d'évènements). Pas de truc avec les matchs
 // par contre, comme c'est pas durant les matchs. »
 //

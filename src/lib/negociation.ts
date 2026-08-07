@@ -11,7 +11,7 @@
 // où un club se manifeste et celui où on signe.
 //
 // ⚠️ CE SONT LES CHIFFRES QUI TRANCHENT, PAS L'IA (décision de l'utilisateur).
-// Groq n'écrit que l'habillage des messages — jamais le montant, jamais le
+// L'IA locale n'écrit que l'habillage des messages — jamais le montant, jamais le
 // verdict. C'est le patron de tout le projet : « le MJ propose, le jeu dispose ».
 // Un modèle qui fixe les salaires offre un jour 3 M€ à un joueur de Fédérale 2,
 // et le mode SANS CLÉ n'aurait plus de marché du tout. Ici, tout marche hors
@@ -214,7 +214,7 @@ export interface Reponse {
   verdict: Verdict;
   /** L'approche mise à jour — c'est elle qu'on range dans le store. */
   approche: Approche;
-  /** Ce que le club répond, en clair (repli sans clé Groq). */
+  /** Ce que le club répond, en clair (repli sans IA locale). */
   texte: string;
 }
 

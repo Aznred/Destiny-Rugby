@@ -1,12 +1,12 @@
 // Générateur du MONDE AMATEUR — Destiny Rugby 🏉
 //
 // Lit les données fournies :
-//   liste club regionaux/clubs_regionaux.json            (185 clubs R1/R2/R3)
-//   transfert + joueur .../effectifs_nationale2.json     (675 joueurs)
-//   transfert + joueur .../effectifs_federales_complet.json  (6 898)
-//   transfert + joueur .../effectifs_regionales.json     (4 402)
-//   transfert + joueur .../transferts_amateurs_complet.json  (3 224 mouvements)
-//   logos_equipes/logos_amateurs/**                      (525 logos)
+//   sources/data/clubs-regionaux/clubs_regionaux.json            (185 clubs R1/R2/R3)
+//   sources/data/effectifs-amateurs/effectifs_nationale2.json     (675 joueurs)
+//   sources/data/effectifs-amateurs/effectifs_federales_complet.json  (6 898)
+//   sources/data/effectifs-amateurs/effectifs_regionales.json     (4 402)
+//   sources/data/effectifs-amateurs/transferts_amateurs_complet.json  (3 224 mouvements)
+//   sources/logos/clubs/logos_amateurs/**                         (525 logos)
 //
 // Écrit :
 //   src/data/amateurs.ts   clubs régionaux, logos amateurs, effectifs amateurs
@@ -23,7 +23,7 @@ const path = require('path');
 const RACINE = path.join(__dirname, '..');
 const lire = (p) => JSON.parse(fs.readFileSync(path.join(RACINE, p), 'utf8'));
 
-const DOSSIER_T = 'transfert + joueur nat2, fed et reg';
+const DOSSIER_T = 'sources/data/effectifs-amateurs';
 
 // --------------------------------------------------------------------------
 // Outils de normalisation / rapprochement de noms de clubs
@@ -150,7 +150,7 @@ const DIV_REG = {
   'Regionale 3': 'reg3',
 };
 
-const clubsRegionaux = lire('liste club regionaux/clubs_regionaux.json');
+const clubsRegionaux = lire('sources/data/clubs-regionaux/clubs_regionaux.json');
 const REGIONALES = { reg1: [], reg2: [], reg3: [] };
 for (const c of clubsRegionaux) {
   const id = DIV_REG[c.Division];
@@ -166,7 +166,7 @@ for (const c of clubsRegionaux) {
 // --------------------------------------------------------------------------
 // Parcours RÉCURSIF du pack amateur : les logos sont rangés par division, et
 // les compléments arrivent dans des sous-dossiers (« nationale_2/qui manque »).
-const RACINE_LOGOS = path.join(RACINE, 'logos_equipes/logos_amateurs');
+const RACINE_LOGOS = path.join(RACINE, 'sources', 'logos', 'clubs', 'logos_amateurs');
 
 // Le dossier donne la division : indispensable pour ne pas coller le logo de
 // « R C Orléans la Source » (Fédérale 3) au « RC Orléans » de Nationale 2.

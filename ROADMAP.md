@@ -11,9 +11,9 @@ retoucher deux fois le même code. L'ordre suit trois règles.
 2. **Regrouper ce qui touche au même fichier.** Traits de caractère, agents,
    mentorat et reconversion vivent tous dans `types.ts` + `store/useGame.ts` :
    un seul passage plutôt que quatre.
-3. **Ce qui dépend de Groq en dernier dans chaque lot.** Le jeu doit rester
-   entièrement jouable sans clé : on écrit d'abord la mécanique, puis on branche
-   l'IA par-dessus.
+3. **Ce qui dépend de l'IA en dernier dans chaque lot.** Le jeu doit rester
+   entièrement jouable sans WebGPU : on écrit d'abord la mécanique, puis on
+   branche le modèle local par-dessus.
 
 Légende : 🟢 rapide (une passe) · 🟡 moyen · 🔴 gros chantier (réécriture de la
 boucle de jeu).
@@ -34,7 +34,7 @@ boucle de jeu).
 - **Départ à l'étranger** : les 20 championnats sont proposés à la création
   (lot 9, partie « nouvelles ligues jouables »).
 
-> Prochaine étape : **lot 6** — la couche Groq (situations unifiées, moments
+> Prochaine étape : **lot 6** — la couche IA locale (situations unifiées, moments
 > décisifs, interviews, négociation de contrat). Lots 1 à 5 faits.
 
 ---
@@ -95,10 +95,10 @@ boucle de jeu).
 
 ## Lot 6 — L'IA au service de l'immersion 🟡
 
-> Tout reste jouable sans clé : chaque brique a son pendant pré-écrit.
+> Tout reste jouable sans IA locale : chaque brique a son pendant pré-écrit.
 
 19. **Boucle d'événements unifiée** : 1 situation par itération, générée par
-    Groq si la clé est là, tirée du pool sinon.
+    WebLLM si l'IA locale est active, tirée du pool sinon.
 20. **Moments décisifs** en match (choix à la 80ᵉ).
 21. **Interviews d'après-match** (confiance du coach et des fans).
 22. **Négociation de contrat via l'IA** + **choix d'agent** (commission,

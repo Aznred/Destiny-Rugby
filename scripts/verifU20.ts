@@ -3,7 +3,7 @@
 // Trois retours de jeu traités ici :
 //   1. « rajoute les compétitions U20, convocation des joueurs U20 donc les
 //      meilleurs joueurs U20 de chaque pays » ;
-//   2. « dans "bonne selection" tu as les bons logos des sélections, change-les » ;
+//   2. les écussons prioritaires de `sources/logos/selections/` ;
 //   3. « manque les drapeaux sur les nouvelles ligues à côté des pays ».
 //
 // Lancer : npx vite-node scripts/verifU20.ts
@@ -109,7 +109,7 @@ console.log('\n=== 5. LES ÉCUSSONS DES SÉLECTIONS SONT EN PLACE ===');
     `${equipesU20.length - manquants.length}/${equipesU20.length}${manquants.length ? ' — manquants : ' + manquants.join(', ') : ''}`,
     manquants.length === 0);
 
-  // Les écussons remplacés par le dossier « bonne selection » : on vérifie que
+  // Les écussons prioritaires : on vérifie que
   // ce sont bien de vraies images et pas les vignettes de 200 octets d'avant.
   const aVerifier = ['france', 'angleterre', 'irlande', 'ecosse', 'italie', 'afrique_du_sud', 'japon', 'usa'];
   const petits = aVerifier.filter((n) => {

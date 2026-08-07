@@ -9,7 +9,7 @@
 //      en coupe), affiché dès que la phase régulière est terminée.
 
 import { useMemo, useState } from 'react';
-import { t } from '../lib/i18n';
+import { locale, t } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame, bonusClubDuJoueur } from '../store/useGame';
 import {
@@ -25,6 +25,7 @@ import {
   fenetreInternationale, journeesInternationalesA, classementMondial,
 } from '../lib/international';
 import { LogoEquipe } from '../components/Blason';
+import { Drapeau } from '../components/Drapeau';
 import { nomNation, nomNationTraduit } from '../lib/nations';
 import { COUPES_EUROPE } from '../data/mondeReel';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
@@ -41,6 +42,13 @@ import type { Joueur } from '../types';
 // Week-ends déjà passés, par type de semaine.
 function passees(numero: number, type: string): number {
   return CALENDRIER.slice(0, Math.max(0, numero - 1)).filter((s) => s.type === type).length;
+}
+
+function noteWorldRugby(note: number): string {
+  return note.toLocaleString(locale(), {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 // Le pictogramme de chaque type de semaine, dans la frise du calendrier.
@@ -326,7 +334,7 @@ export function Tableau() {
   // maintenant pour de vrai (lib/international.ts).
   const saison = joueur?.saison ?? 1;
   const internationales = useMemo(() => competitionsDeLaSaison(saison), [saison]);
-  const rangMondial = useMemo(() => classementMondial(saison), [saison]);
+  const rangMondial = useMemo(() => classementMondial(saison, numero), [saison, numero]);
   const [classementMondialOuvert, setClassementMondialOuvert] = useState(false);
   const maNation = nomNation(joueur?.nation ?? '');
   const maLigneMondiale = useMemo(
@@ -561,22 +569,28 @@ export function Tableau() {
         </div>
         {maLigneMondiale && leaderMondial && (
           <p className="intro-comp">
-            <b>{t('intl.maSelection', { nation: maLigneMondiale.nation, rang: maLigneMondiale.rang, points: maLigneMondiale.points })}</b>
+            <b>{t('intl.maSelection', {
+              nation: nomNationTraduit(maLigneMondiale.nation),
+              rang: maLigneMondiale.rang,
+              points: noteWorldRugby(maLigneMondiale.points),
+            })}</b>
             {' '}{maLigneMondiale.rang === 1
               ? t('intl.enTete')
-              : t('intl.ecartLeader', { points: leaderMondial.points - maLigneMondiale.points })}
+              : t('intl.ecartLeader', {
+                points: noteWorldRugby(leaderMondial.points - maLigneMondiale.points),
+              })}
             {' '}{maLigneMondiale.rang <= 12
               ? t('intl.dansTop12')
               : t('intl.placesTop12', { places: maLigneMondiale.rang - 12 })}
           </p>
         )}
-        <div className="classement-tableau tableau-live">
+        <div className="classement-tableau tableau-live classement-mondial-selections">
           {rangMondial.map((l) => (
             <div key={l.nation} className="classement-ligne" data-moi={l.nation === maNation ? 'oui' : undefined}>
               <span className="cl-pos" data-tete={l.rang <= 12 ? 'oui' : undefined}>{l.rang}</span>
-              <LogoEquipe nom={l.nation} taille={22} />
+              <Drapeau nation={l.nation} taille={1.05} />
               <span className="cl-nom">{nomNationTraduit(l.nation)}{l.nation === maNation && ' 🫵'}</span>
-              <span className="cl-pts">{l.points}</span>
+              <span className="cl-pts">{noteWorldRugby(l.points)}</span>
               <span style={{ gridColumn: 'span 5' }}>{l.rang <= 12 ? t('intl.qualifie') : t('intl.barrages')}</span>
             </div>
           ))}

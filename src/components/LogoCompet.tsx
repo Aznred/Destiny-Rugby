@@ -11,8 +11,8 @@ import { LOGO_COMPETITION } from '../data/logosCompetitions';
 import { LOGO_COMPETITION_NOUVEAU } from '../data/nouvellesLigues';
 
 // ⚠️ DEUX TABLES, DEUX GÉNÉRATEURS. Les compétitions historiques viennent de
-// `logo league/` (scripts/copierLogosCompetitions.cjs), les 31 nouvelles ligues
-// et coupes de `new league/` (scripts/genNouvellesLigues.cjs). On les fusionne
+// `sources/logos/competitions/` (copierLogosCompetitions.cjs), les nouvelles
+// ligues et coupes de `sources/competitions/` (genNouvellesLigues.cjs). On fusionne
 // ici plutôt que de faire écrire un générateur dans le fichier de l'autre.
 const LOGOS: Record<string, string> = { ...LOGO_COMPETITION, ...LOGO_COMPETITION_NOUVEAU };
 

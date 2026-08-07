@@ -20,21 +20,19 @@ import { POSTE_PAR_ID } from '../data/rugby';
 import { nomNation } from './nations';
 import { semaine, CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
+import {
+  NOTE_NOUVEAU_MEMBRE,
+  NOTE_WORLD_RUGBY_INITIALE,
+} from '../data/classementWorldRugby';
 import { COMPETITIONS } from '../data/clubs';
+import { appliquerEchangeWorldRugby } from './classementWorldRugby';
 import type { Joueur, PosteId } from '../types';
 
 // La hiérarchie mondiale, en « note d'équipe » sur la même échelle que les
 // clubs. Elle sert à jouer les matchs : deux points d'écart ≈ une possession.
-export const FORCE_NATION: Record<string, number> = {
-  'Afrique du Sud': 92, 'Nouvelle-Zélande': 91, Irlande: 90, France: 90,
-  Angleterre: 87, Argentine: 86, Écosse: 85, Australie: 85,
-  'Pays de Galles': 81, Fidji: 81, Italie: 80, Japon: 78, Géorgie: 77,
-  Samoa: 76, Tonga: 75, Portugal: 73, Espagne: 71, Uruguay: 71,
-  'États-Unis': 70, Roumanie: 69, Canada: 69, Chili: 68, Namibie: 65,
-  'Hong Kong': 63, Zimbabwe: 63, Belgique: 62, Allemagne: 62, 'Pays-Bas': 61,
-  Suisse: 58, Brésil: 68, 'Corée du Sud': 60, Kenya: 62,
-  Russie: 72, Biélorussie: 64,
-};
+// Sa base est désormais le vrai classement World Rugby fourni, sur 100, plutôt
+// qu'une trentaine de valeurs approximatives maintenues à la main.
+export const FORCE_NATION = NOTE_WORLD_RUGBY_INITIALE;
 
 // ⚠️ « France U20 » n'est pas dans `FORCE_NATION` — et n'a pas à y être : sa
 // force se DÉDUIT de celle des séniors. Une équipe de moins de 20 ans joue une
@@ -71,7 +69,7 @@ export function forceNation(nation: string): number {
   if (estEquipeU20(nom)) {
     return Math.max(35, forceNation(nationDeLEquipeU20(nom)) - ECART_U20);
   }
-  return FORCE_NATION[nom] ?? forcesDesNouvellesNations()[nom] ?? 55;
+  return FORCE_NATION[nom] ?? forcesDesNouvellesNations()[nom] ?? NOTE_NOUVEAU_MEMBRE;
 }
 
 export interface LigneClassementMondial {
@@ -81,52 +79,104 @@ export interface LigneClassementMondial {
   force: number;
 }
 
-/**
- * Classement vivant inspiré de World Rugby. Il rejoue les résultats
- * internationaux des saisons passées : battre un adversaire mieux classé fait
- * gagner davantage de points, une défaite en retire. Il sert aussi aux
- * qualifications de la Coupe du monde.
- */
-export function classementMondial(saison: number): LigneClassementMondial[] {
-  // Le classement mondial est celui des sélections A uniquement. Les U20 et
-  // équipes réserves peuvent jouer leurs propres compétitions, mais ne doivent
-  // jamais voler une place dans le Top 12 senior ou les qualifications.
-  // Les sources mélangent « Ecosse » / « Écosse », « USA » / « États-Unis »,
-  // les U20 écrits « U20 » ou « -20 » et les équipes A/B/C. Le classement
-  // senior ne doit contenir qu'UNE équipe première par pays.
-  const estSelectionSenior = (nom: string) => {
-    const compact = nom.trim().replace(/\s+/g, ' ');
-    return !estEquipeU20(compact)
-      && !/(?:\s|-)20$/i.test(compact)
-      && !/\s+(?:A|B|C|XV)$/i.test(compact);
-  };
-  const nations = new Set<string>(
-    [...Object.keys(FORCE_NATION), ...Object.keys(forcesDesNouvellesNations())]
-      .filter(estSelectionSenior)
-      .map((nom) => nomNation(nom)),
-  );
-  const points = new Map<string, number>([...nations].map((n) => [n, 1000 + forceNation(n) * 10]));
-  const competitions = [...COMPETITIONS_INTERNATIONALES, ...competitionsNouvellesNations()]
-    .filter((c) => !COMPETITIONS_U20.has(c.id));
-  for (let annee = 1; annee < Math.max(1, saison); annee++) {
-    for (const comp of competitions) {
-      for (const journee of grille(comp, annee)) {
-        for (const [domicile, exterieur] of journee) {
-          const match = jouerTestMatch(domicile, exterieur, annee, `rang#${comp.id}#${annee}#${domicile}#${exterieur}`, null);
-          const pd = points.get(domicile) ?? 1000;
-          const pe = points.get(exterieur) ?? 1000;
-          const attendu = 1 / (1 + 10 ** ((pe - pd) / 260));
-          const resultat = match.scoreD === match.scoreE ? 0.5 : match.scoreD > match.scoreE ? 1 : 0;
-          const variation = Math.round(18 * (resultat - attendu));
-          points.set(domicile, pd + variation);
-          points.set(exterieur, pe - variation);
-        }
-      }
+// Le classement mondial est celui des sélections A uniquement. Les U20 et les
+// équipes A/B/C/XV jouent dans le jeu, mais leurs résultats ne doivent jamais
+// déplacer leur sélection première dans le classement.
+function estSelectionSenior(nom: string): boolean {
+  const compact = nom.trim().replace(/\s+/g, ' ');
+  return !estEquipeU20(compact)
+    && !/(?:\s|-)20$/i.test(compact)
+    && !/\s+(?:A|B|C|XV)$/i.test(compact);
+}
+
+const cacheClassementMondial = new Map<string, LigneClassementMondial[]>();
+
+function appliquerCompetitionAuClassement(
+  points: Map<string, number>,
+  competition: CompetitionInternationale,
+  saison: number,
+  nombreJournees: number,
+): void {
+  const journees = grille(competition, saison).slice(0, nombreJournees);
+  for (let indexJournee = 0; indexJournee < journees.length; indexJournee++) {
+    for (const [domicileBrut, exterieurBrut] of journees[indexJournee]) {
+      if (!estSelectionSenior(domicileBrut) || !estSelectionSenior(exterieurBrut)) continue;
+      const domicile = nomNation(domicileBrut);
+      const exterieur = nomNation(exterieurBrut);
+      if (!domicile || !exterieur || domicile === exterieur) continue;
+
+      if (!points.has(domicile)) points.set(domicile, NOTE_NOUVEAU_MEMBRE);
+      if (!points.has(exterieur)) points.set(exterieur, NOTE_NOUVEAU_MEMBRE);
+
+      const match = jouerTestMatch(
+        domicileBrut,
+        exterieurBrut,
+        saison,
+        `rang#${competition.id}#${saison}#${indexJournee}#${domicileBrut}#${exterieurBrut}`,
+        null,
+      );
+      const nouvelles = appliquerEchangeWorldRugby({
+        noteDomicile: points.get(domicile) ?? NOTE_NOUVEAU_MEMBRE,
+        noteExterieur: points.get(exterieur) ?? NOTE_NOUVEAU_MEMBRE,
+        scoreDomicile: match.scoreD,
+        scoreExterieur: match.scoreE,
+        terrainNeutre: competition.id === 'coupeDuMonde',
+        coupeDuMonde: competition.id === 'coupeDuMonde',
+      });
+      points.set(domicile, nouvelles.noteDomicile);
+      points.set(exterieur, nouvelles.noteExterieur);
     }
   }
-  return [...nations].map((nation) => ({ nation, points: Math.round(points.get(nation) ?? 1000), force: forceNation(nation), rang: 0 }))
+}
+
+/**
+ * Classement World Rugby vivant.
+ *
+ * Sans `numeroSemaine`, il représente le début de la saison demandée : toutes
+ * les saisons précédentes ont été rejouées. Avec la semaine, les journées déjà
+ * disputées de la saison courante sont ajoutées ; le tableau bouge donc après
+ * chaque fenêtre internationale, pas seulement au changement de saison.
+ */
+export function classementMondial(saison: number, numeroSemaine?: number): LigneClassementMondial[] {
+  const saisonCourante = Math.max(1, Math.floor(saison));
+  const semaineCourante = numeroSemaine === undefined
+    ? undefined
+    : Math.max(1, Math.min(CALENDRIER.length, Math.floor(numeroSemaine)));
+  const cleCache = `${saisonCourante}#${semaineCourante ?? 'debut'}`;
+  const memo = cacheClassementMondial.get(cleCache);
+  if (memo) return memo;
+
+  const points = new Map<string, number>(Object.entries(FORCE_NATION));
+
+  for (let annee = 1; annee < saisonCourante; annee++) {
+    for (const competition of competitionsDeLaSaison(annee)) {
+      if (COMPETITIONS_U20.has(competition.id)) continue;
+      appliquerCompetitionAuClassement(points, competition, annee, competition.journees);
+    }
+  }
+
+  if (semaineCourante !== undefined) {
+    for (const competition of competitionsDeLaSaison(saisonCourante)) {
+      if (COMPETITIONS_U20.has(competition.id)) continue;
+      const jouees = journeesInternationalesA(
+        competition.id,
+        semaineCourante,
+        saisonCourante,
+      );
+      appliquerCompetitionAuClassement(points, competition, saisonCourante, jouees);
+    }
+  }
+
+  const classement = [...points].map(([nation, note]) => ({
+    nation,
+    points: Math.round(note * 100) / 100,
+    force: forceNation(nation),
+    rang: 0,
+  }))
     .sort((a, b) => b.points - a.points || b.force - a.force || a.nation.localeCompare(b.nation, 'fr'))
-    .map((l, i) => ({ ...l, rang: i + 1 }));
+    .map((ligne, index) => ({ ...ligne, rang: index + 1 }));
+  cacheClassementMondial.set(cleCache, classement);
+  return classement;
 }
 
 /** Les douze premiers sont qualifiés d'office ; douze places se gagnent en barrages. */
@@ -214,7 +264,7 @@ export const COMPETITIONS_INTERNATIONALES: CompetitionInternationale[] = [
 export const COMPETITIONS_U20 = new Set(['sixNationsU20', 'mondialU20']);
 
 // ---------------------------------------------------------------------------
-// LES COMPÉTITIONS DE SÉLECTIONS DU DOSSIER « new league »
+// LES COMPÉTITIONS DE SÉLECTIONS DE `sources/competitions/ligues/`
 // ---------------------------------------------------------------------------
 // Treize compétitions de plus, avec leur vrai plateau et leur vraie hiérarchie :
 // Rugby Europe Championship / Trophy / Conference, Oceania Cup, Americas
@@ -236,9 +286,12 @@ function forcesDesNouvellesNations(): Record<string, number> {
     forcesNouvelles = {};
     for (const comp of COMPETITIONS_NATIONS_NOUVELLES) {
       for (const e of comp.equipes) {
+        const nom = nomNation(e.nom);
         // On n'écrase JAMAIS une force calibrée à la main : `FORCE_NATION` fait
-        // autorité pour les 32 nations qu'elle couvre.
-        if (forcesNouvelles[e.nom] === undefined) forcesNouvelles[e.nom] = e.force;
+        // autorité pour les 114 nations qu'elle couvre.
+        if (FORCE_NATION[nom] === undefined && forcesNouvelles[nom] === undefined) {
+          forcesNouvelles[nom] = e.force;
+        }
       }
     }
   }
@@ -276,7 +329,7 @@ export function competitionsDeLaSaison(saison: number): CompetitionInternational
   return COMPETITIONS_INTERNATIONALES
     .filter((c) => !(mondial && c.id === 'autumn'))
     .concat(mondial ? [coupeDuMondeDeLaSaison(saison)] : [])
-    // ⚠️ Les compétitions du dossier « new league » viennent APRÈS : c'est
+    // ⚠️ Les compétitions du lot source viennent APRÈS : c'est
     // `fenetreInternationale` qui choisit celle du week-end, et elle prend la
     // PREMIÈRE de la fenêtre. Les 6 Nations et le Rugby Championship gardent
     // donc la priorité — le reste est consultable dans l'écran Résultats.

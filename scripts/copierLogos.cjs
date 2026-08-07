@@ -1,4 +1,4 @@
-// Copie les logos fournis (logos_equipes/<compétition>/<club>.png) vers
+// Copie les logos fournis (sources/logos/clubs/<compétition>/<club>.png) vers
 // public/logos/<slug>.png, à plat et dédoublonnés : un même club apparaît dans
 // plusieurs compétitions (Bath en Premiership + Champions Cup…) mais le fichier
 // est toujours identique. Les accents sont retirés du nom de fichier pour ne
@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 const RACINE = path.join(__dirname, '..');
-const SRC = path.join(RACINE, 'logos_equipes');
+const SRC = path.join(RACINE, 'sources', 'logos', 'clubs');
 const DEST = path.join(RACINE, 'public', 'logos');
 
 function slug(nomFichier) {

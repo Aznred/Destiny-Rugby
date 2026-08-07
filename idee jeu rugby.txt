@@ -8,15 +8,15 @@
 
     Système de Traits de Caractère : Lors de la création, le joueur doit choisir des "Traits" qui influenceront sa carrière et bonus malus (ex : Sang chaud, Peur de se faire mal, Fêtard, Professionnel, etc.).
 
-2. Gameplay et Événements (Système Groq)
+2. Gameplay et Événements (IA locale)
 
     Blocage de la progression : Impossible de passer à la suite de la saison tant que les actions de la journée n'ont pas été effectuées (boutons désactivés).
 
     Boucle d'événements : Chaque itération comprend 1 situation à vivre.
 
-    Intégration de l'IA (Groq) :
-        Si Groq est inactif : Lancement automatique de situations et d'événements pré-écrits.
-        Si Groq est actif : Le jeu envoie les statistiques et les informations du joueur à l'IA pour générer une situation textuelle sur mesure. Le joueur doit écrire sa propre réponse.
+    Intégration de l'IA locale :
+        Si l'IA locale est inactive : Lancement automatique de situations et d'événements pré-écrits.
+        Si l'IA locale est active : Le modèle exécuté sur l'appareil reçoit les statistiques et les informations du joueur pour générer une situation textuelle sur mesure. Le joueur doit écrire sa propre réponse.
 
     Blessures dynamiques : Mise en place d'un système de blessures (mineures, fin de saison, ou fin de carrière) dont la probabilité et la gravité dépendent de la forme physique et du moral du joueur.
 
@@ -44,7 +44,7 @@
 
     Réseaux Sociaux (Twitter) :
         Possibilité de poster des messages.
-        L'IA Groq génère des réponses (fans, journalistes, haters) basées sur le contenu du message et les performances récentes du joueur sur le terrain.
+        L'IA locale génère des réponses (fans, journalistes, haters) basées sur le contenu du message et les performances récentes du joueur sur le terrain.
         Influence directement la réputation et le nombre d'abonnés (peut entrainer des sanctions pour le club et le joueur si dérapages racisme etc).
 
     Ajout de nouvelles ligues et de nouvelles data.
@@ -63,7 +63,7 @@
 
 7. Gestion Avancée des Contrats et Transferts (Nouvelle MAJ)
 
-    Négociations via l'IA : Utilisation de Groq pour négocier les contrats (salaire, prime à la signature, rôle dans l'équipe).
+    Négociations via l'IA locale : le modèle intégré aide à négocier les contrats (salaire, prime à la signature, rôle dans l'équipe).
     Gestion de l'Agent : Choix entre différents agents (commission variable, accès aux meilleures ligues ou risque de drames).
 
 8. Évolution, Vétérance et Retraite (Nouvelle MAJ)

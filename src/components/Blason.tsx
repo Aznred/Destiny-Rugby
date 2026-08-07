@@ -1,6 +1,7 @@
 import type { Club } from '../types';
 import { LOGO_PAR_EQUIPE } from '../data/mondeReel';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
+import { LOGO_SELECTION_SUPPLEMENTAIRE } from '../data/logosSelections';
 import { nomNation } from '../lib/nations';
 
 // ⚠️ DEUX SOURCES D'ÉCUSSONS DE SÉLECTION. Les compétitions historiques
@@ -97,7 +98,12 @@ export function Blason({ club, taille = 40 }: { club: Club; taille?: number }) {
 // toutes les équipes des compétitions de nations — on s'en sert par défaut, et
 // à défaut on retombe sur les initiales plutôt que sur du vide.
 export function LogoEquipe({ nom, logo, taille = 28 }: { nom: string; logo?: string; taille?: number }) {
-  const src = logo ?? LOGOS_EQUIPE[nom];
+  // Les livraisons complémentaires ont priorité sur les vignettes génériques
+  // présentes dans les anciennes données de compétition.
+  const src = LOGO_SELECTION_SUPPLEMENTAIRE[nom]
+    ?? LOGO_SELECTION_SUPPLEMENTAIRE[nomNation(nom)]
+    ?? logo
+    ?? LOGOS_EQUIPE[nom];
   if (!src) {
     const initiales = nom
       .replace(/[^A-Za-zÀ-ÿ ]/g, '')

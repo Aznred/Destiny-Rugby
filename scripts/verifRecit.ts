@@ -1,18 +1,18 @@
 // VÉRIFICATION — LE RÉCIT HEBDOMADAIRE
 //
 // Retour de jeu, mot pour mot : « au lieu d'avoir des boutons chaque semaine
-// Groq sort un évènement (attention les transferts marchent pas : soit tu
+// L'IA locale sort un évènement (attention les transferts marchent pas : soit tu
 // supprimes, soit tu fais que ça transfère vraiment ; et supprime les scénarios
 // de matchs car le match est déjà passé). Les évènements peuvent être très
 // variés, du sportif aux folies furieuses qui peuvent mener à la mort, à
-// l'arrestation, etc. Enfin, à ce scénario le joueur répond en écrivant et Groq
+// l'arrestation, etc. Enfin, à ce scénario le joueur répond en écrivant et l'IA
 // juge la réponse — il doit être très sévère et prendre en compte les stats.
 // Sinon, juste des scénarios et des réponses à choix multiples. »
 //
 // ⚠️ AUCUN APPEL RÉSEAU ICI. On teste les PARSEURS (`lib/ia.ts`) et le STORE,
 // c'est-à-dire tout ce qui protège le joueur : le plafond des deltas, le budget
 // de saison, le verrou des conséquences dures, et le fait qu'un transfert
-// annoncé se produise pour de vrai. Ce que Groq écrit, lui, est du texte.
+// annoncé se produise pour de vrai. Ce que le modèle écrit, lui, est du texte.
 //
 // Lancer : npx vite-node scripts/verifRecit.ts
 

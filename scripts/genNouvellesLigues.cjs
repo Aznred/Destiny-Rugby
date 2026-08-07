@@ -1,6 +1,6 @@
 // LE GÉNÉRATEUR DES NOUVELLES LIGUES
 //
-// Entrée  : `new league/` — flashscore_rugby_data.json (88 compétitions avec
+// Entrée  : `sources/competitions/ligues/` — flashscore_rugby_data.json (88 compétitions avec
 //           leurs classements) et un dossier de logos par compétition.
 // Sortie  : `src/data/nouvellesLigues.ts` + les logos dans `public/`.
 //
@@ -25,7 +25,7 @@ const { CLUBS, NATIONS } = require('./nouvellesLigues.cjs');
 const { NOMS, ETRANGERS } = require('./nomsPays.cjs');
 
 const RACINE = path.join(__dirname, '..');
-const SRC = path.join(RACINE, 'new league');
+const SRC = path.join(RACINE, 'sources', 'competitions', 'ligues');
 const DEST_LOGOS = path.join(RACINE, 'public', 'logos');
 const DEST_COMPET = path.join(RACINE, 'public', 'logos-competitions');
 const SORTIE = path.join(RACINE, 'src', 'data', 'nouvellesLigues.ts');
@@ -97,7 +97,7 @@ const logoParEquipe = new Map();
 const logosCompetition = {};
 
 function copierLogos(ligne) {
-  // `base` permet de ranger une compétition ailleurs que dans « new league/ ».
+  // `base` permet de ranger une compétition ailleurs que dans le lot principal.
   const racine = ligne.base ? path.join(RACINE, ligne.base) : SRC;
   const dossier = path.join(racine, ligne.dossier);
   if (!fs.existsSync(dossier)) {
@@ -336,7 +336,7 @@ const nationsIndex = [...new Set(Object.values(effectifs).flat().map((j) => j.na
 const iNation = new Map(nationsIndex.map((n, i) => [n, i]));
 
 let ts = `// ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.
-// Source : « new league/ » (flashscore_rugby_data.json + les dossiers de logos).
+// Source : sources/competitions/ligues/ (flashscore_rugby_data.json + logos).
 // Régénérer avec : node scripts/genNouvellesLigues.cjs
 // La table des ligues, leurs niveaux et leurs échelles : scripts/nouvellesLigues.cjs
 //

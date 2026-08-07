@@ -1,7 +1,7 @@
 // LE CONTENU HORS LIGNE, EN SEPT LANGUES
 //
 // ⚠️ CE QUE CE FICHIER TRADUIT, ET POURQUOI IL EXISTE.
-// Le jeu doit rester jouable SANS clé Groq — c'est une règle du projet. Dans ce
+// Le jeu doit rester jouable SANS IA locale — c'est une règle du projet. Dans ce
 // mode, tout ce qu'on lit vient de pools pré-écrits : les situations de vie
 // (`data/situations.ts`), les scénarios (`data/scenarios.ts`), les évènements
 // aléatoires (`data/evenements.ts`).

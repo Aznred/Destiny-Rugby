@@ -1,5 +1,5 @@
 // ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.
-// Source : base_rugby_finale.json + tous_les_classements.json + logos_equipes/
+// Source : sources/data/*.json + sources/logos/clubs/
 // Régénérer avec : node scripts/genMonde.cjs
 //
 // Contient les championnats couverts par la base réelle (France : Top 14,

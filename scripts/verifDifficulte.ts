@@ -1,6 +1,6 @@
 // Sévérité : sur 100 carrières de 12 saisons, combien deviennent « de folie » ?
 import { useGame, noteGlobale } from '../src/store/useGame';
-import { plafonnerDeltas, ressembleATriche } from '../src/lib/groq';
+import { plafonnerDeltas, ressembleATriche } from '../src/lib/iaLocale';
 import { jouerUneSaison } from './_saison';
 const g = () => useGame.getState();
 let titres = 0, gros = 0, monde = 0; const gens: number[] = [];

@@ -447,16 +447,16 @@
 }
 
 .modale .aide { color: var(--craie-dim); font-size: 0.9rem; line-height: 1.55; margin-bottom: 1.2rem; }
-/* Consommation Groq de la session : trois compteurs et un bouton de remise à zéro. */
-.conso-groq {
+/* Activité de l'IA locale pendant la session. */
+.activite-ia {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem;
   padding: 0.6rem 0.75rem; margin-bottom: 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
   font-size: 0.86rem; color: var(--craie-dim); font-variant-numeric: tabular-nums;
 }
-.conso-groq b { color: var(--or-clair); font-family: 'Archivo', sans-serif; }
-.conso-groq .btn.mini { margin-left: auto; padding: 0.28rem 0.6rem; font-size: 0.76rem; }
+.activite-ia b { color: var(--or-clair); font-family: 'Archivo', sans-serif; }
+.activite-ia .btn.mini { margin-left: auto; padding: 0.28rem 0.6rem; font-size: 0.76rem; }
 .modale .aide a { text-decoration: underline; }
 .rangee-fin { display: flex; justify-content: flex-end; gap: 0.7rem; margin-top: 1.4rem; }
 .badge-cle {
@@ -465,6 +465,35 @@
 }
 .badge-cle.ok { background: rgba(72,196,122,0.15); color: var(--succes); border: 1px solid rgba(72,196,122,0.4); }
 .badge-cle.ko { background: rgba(224,90,77,0.15); color: var(--danger); border: 1px solid rgba(224,90,77,0.4); }
+.ia-locale {
+  padding: 1rem; border: 1px solid rgba(220, 177, 87, 0.2); border-radius: 14px;
+  background: linear-gradient(145deg, rgba(220, 177, 87, 0.07), rgba(255, 255, 255, 0.025));
+}
+.ia-locale-entete {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+.ia-locale-entete > div { display: flex; flex-direction: column; gap: 0.15rem; }
+.ia-locale-entete strong { font-family: var(--police-forte); color: var(--or-clair); }
+.ia-locale-entete span:not(.badge-cle) { color: var(--craie-dim); font-size: 0.78rem; }
+.ia-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-bottom: 0.8rem; }
+.ia-actions .btn { flex: 1 1 150px; }
+.ia-progression { display: flex; align-items: center; gap: 0.7rem; margin: 0.65rem 0 0.8rem; }
+.ia-progression-piste {
+  height: 8px; flex: 1; overflow: hidden; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.ia-progression-piste span {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--or), var(--or-clair));
+  transition: width 180ms ease;
+}
+.ia-progression b { min-width: 3.2rem; text-align: right; color: var(--or-clair); font-variant-numeric: tabular-nums; }
+.ia-locale .alerte { margin: 0.65rem 0; }
+
+@media (max-width: 520px) {
+  .ia-locale-entete { align-items: flex-start; flex-direction: column; }
+}
 
 /* ====== PROFIL ====== */
 .profil { width: min(1000px, 92vw); margin: 2rem auto 4rem; }
@@ -751,6 +780,9 @@
 .tableau-live .classement-entete, .tableau-live .classement-ligne {
   grid-template-columns: 28px 26px minmax(0,1fr) 42px 32px 32px 32px 32px 52px 32px;
 }
+.classement-mondial-selections .classement-ligne {
+  grid-template-columns: 28px 26px minmax(0, 1fr) 64px minmax(140px, 1fr);
+}
 .classement-ligne[data-moi='oui'] {
   background: rgba(232,178,58,0.12); border-radius: 8px;
   box-shadow: inset 0 0 0 1px rgba(232,178,58,0.35);
@@ -888,7 +920,10 @@
 .cl-nom { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cl-pos { font-family: var(--police-forte); font-weight: 800; color: var(--brume); }
 .cl-pos[data-tete] { color: var(--or-400); }
-.cl-pts { font-family: var(--police-forte); font-weight: 800; color: var(--craie); }
+.cl-pts {
+  font-family: var(--police-forte); font-weight: 800; color: var(--craie);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
 .cl-plus { color: #6fd88f; }
 .cl-moins { color: #e0765f; }
 
@@ -3070,6 +3105,10 @@
   .classement-tableau .classement-entete span:nth-child(n + 6),
   .classement-tableau .classement-ligne span:nth-child(n + 6) { display: none; }
   .classement-ligne, .classement-entete { grid-template-columns: 1.6rem 22px minmax(0, 1fr) 2.2rem 1.8rem; }
+  .classement-mondial-selections .classement-ligne {
+    grid-template-columns: 1.6rem 22px minmax(0, 1fr) 3.4rem;
+  }
+  .classement-mondial-selections .classement-ligne > span:nth-child(5) { display: none; }
   /* Le tableau des poules de coupe et l'arbre défilent plutôt que de déborder. */
   .grille-poules { grid-template-columns: 1fr; }
   .arbre { overflow-x: auto; padding-bottom: 0.5rem; }

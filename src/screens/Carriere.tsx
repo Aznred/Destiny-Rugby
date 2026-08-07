@@ -1,16 +1,16 @@
 // L'ÉCRAN DE CARRIÈRE — le récit, semaine après semaine
 //
 // ⚠️ LA BOUCLE A CHANGÉ (demande explicite) : « au lieu d'avoir des boutons,
-// chaque semaine Groq sort un évènement ; le joueur répond en écrivant et Groq
+// chaque semaine l'IA locale sort un évènement ; le joueur répond en écrivant et elle
 // juge la réponse — il doit être très sévère et prendre en compte les stats ;
 // sinon, juste des scénarios et des réponses à choix multiples ».
 //
 // Trois états possibles, jamais deux à la fois :
-//   · `evenementHebdo`  → une scène attend une RÉPONSE ÉCRITE (mode avec clé) ;
-//   · `scenarioActif`   → une situation attend un CLIC (mode hors ligne) ;
+//   · `evenementHebdo`  → une scène attend une RÉPONSE ÉCRITE (IA locale) ;
+//   · `scenarioActif`   → une situation attend un CLIC (repli pré-écrit) ;
 //   · rien              → le joueur écrit l'action libre de son choix.
 //
-// ⚠️ C'est l'ÉCRAN qui fabrique la scène, pas le store : l'appel à Groq est
+// ⚠️ C'est l'ÉCRAN qui fabrique la scène, pas le store : l'appel local est
 // asynchrone et le store est synchrone. `semaineSuivante()` lève donc un
 // drapeau (`attenteEvenement`) que cet écran consomme.
 
@@ -19,7 +19,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useGame, BUDGET_IA_PAR_SAISON } from '../store/useGame';
 import { PanneauJoueur } from '../components/PanneauJoueur';
 import { ClassementLateral } from '../components/ClassementLateral';
-import { demanderAuMJ } from '../lib/groq';
+import { demanderAuMJ } from '../lib/iaLocale';
 import { genererEvenementHebdo, jugerReaction } from '../lib/ia';
 import { semaine, libelleDate } from '../data/calendrier';
 import { ATTRIBUTS_LABELS, nomPoste } from '../data/rugby';
@@ -35,7 +35,7 @@ const IDEE_CLES = ['car.idee1', 'car.idee2', 'car.idee3', 'car.idee4'];
 export function Carriere({ onReglages }: Props) {
   const joueur = useGame((s) => s.joueur);
   const journal = useGame((s) => s.journal);
-  const groqKey = useGame((s) => s.groqKey);
+  const iaLocaleActivee = useGame((s) => s.iaLocaleActivee);
   const modele = useGame((s) => s.modele);
   const appliquerReponse = useGame((s) => s.appliquerReponse);
   const lancerScenario = useGame((s) => s.lancerScenario);
@@ -49,14 +49,13 @@ export function Carriere({ onReglages }: Props) {
   const poserEvenementHebdo = useGame((s) => s.poserEvenementHebdo);
   const appliquerJugement = useGame((s) => s.appliquerJugement);
   const abandonnerEvenement = useGame((s) => s.abandonnerEvenement);
-  const cle = groqKey;
 
   const [texte, setTexte] = useState('');
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [choix, setChoix] = useState<string[]>([]);
   const finRef = useRef<HTMLDivElement>(null);
-  // ⚠️ Verrou de ré-entrée. Sans lui, le moindre re-rendu pendant l'appel à Groq
+  // ⚠️ Verrou de ré-entrée. Sans lui, le moindre re-rendu pendant la génération
   // relançait une génération : deux scènes pour la même semaine, et deux fois
   // le coût en tokens.
   const fabrique = useRef(false);
@@ -81,9 +80,9 @@ export function Carriere({ onReglages }: Props) {
     if (!joueur || !attenteEvenement || evenementHebdo || scenarioActif) return;
     if (fabrique.current) return;
 
-    // Sans clé, le jeu reste ENTIER : on pose une situation à choix multiples
+    // Sans IA locale, le jeu reste ENTIER : on pose une situation à choix multiples
     // du pool pré-écrit, contextuelle (âge, forme, moral, division, contrat).
-    if (!cle) {
+    if (!iaLocaleActivee) {
       abandonnerEvenement();
       lancerScenario(false);
       return;
@@ -97,7 +96,6 @@ export function Carriere({ onReglages }: Props) {
         const sem = semaine(joueur.semaine ?? 1);
         const derniere = [...journal].reverse().find((e) => e.role !== 'joueur');
         const evt = await genererEvenementHebdo({
-          cle,
           modele,
           joueur,
           semaine: `${libelleDate(sem)} — ${sem.libelle}`,
@@ -123,7 +121,7 @@ export function Carriere({ onReglages }: Props) {
     // `journal` et `evenementsVus` sont volontairement hors dépendances : ils
     // changent à chaque entrée écrite, et relanceraient la génération en boucle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joueur, attenteEvenement, evenementHebdo, scenarioActif, cle, modele]);
+  }, [joueur, attenteEvenement, evenementHebdo, scenarioActif, iaLocaleActivee, modele]);
 
   if (!joueur) return null;
 
@@ -131,8 +129,8 @@ export function Carriere({ onReglages }: Props) {
   const envoyer = async (action: string) => {
     const contenu = action.trim();
     if (!contenu || enCours) return;
-    if (!cle) {
-      setErreur(t('car.sansCle'));
+    if (!iaLocaleActivee) {
+      setErreur(t('car.iaInactive'));
       onReglages();
       return;
     }
@@ -146,7 +144,6 @@ export function Carriere({ onReglages }: Props) {
         // quarante-trois semaines de récit ne doivent pas déplacer l'étalonnage
         // de difficulté (voir CLAUDE.md).
         const jugement = await jugerReaction({
-          cle,
           modele,
           joueur,
           evenement: evenementHebdo,
@@ -156,7 +153,6 @@ export function Carriere({ onReglages }: Props) {
         appliquerJugement(jugement, contenu);
       } else {
         const reponse = await demanderAuMJ({
-          cle,
           modele,
           joueur,
           historique,

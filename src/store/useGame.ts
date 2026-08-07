@@ -28,7 +28,7 @@ import {
   publierPost, pseudoDe, feedAmbiance, suggestionsLocales,
   estCertifie, statsDepuisVues, LIMITE_CARACTERES, vieillirPost,
 } from '../lib/social';
-import { filGroq, reponsesGroq, messageGroq } from '../lib/groqSocial';
+import { filIA, reponsesIA, messageIA } from '../lib/iaSociale';
 import {
   abonnesCible, annuaire, bassinSocial, pseudoStable, rapprocherAbonnes,
 } from '../lib/comptes';
@@ -82,7 +82,7 @@ import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS, nomPoste } from '../data/r
 import {
   retourDeMatch, BUDGET_MATCHS_PAR_SAISON, type StatsMatchJoueur,
 } from '../lib/moteur/apresMatch';
-import { MODELE_DEFAUT, plafonnerDeltas, ressembleATriche } from '../lib/groq';
+import { MODELE_DEFAUT, plafonnerDeltas, ressembleATriche } from '../lib/iaLocale';
 import { EVENEMENTS, traduireEvenement } from '../data/evenements';
 import { situationPour, versScenario, type ConsequenceDure } from '../data/situations';
 import { appliquerConsequence, lireDerapage, consequenceDuDerapage } from '../lib/consequences';
@@ -432,18 +432,18 @@ interface GameState {
   pantheon: LegendeSauvegardee[];
   scenarioActif: Scenario | null;
   // ═══ LE RÉCIT DE LA SEMAINE ═════════════════════════════════════════════
-  // ⚠️ Demande explicite : « au lieu d'avoir des boutons chaque semaine, Groq
-  // sort un évènement ; le joueur répond en écrivant et Groq juge ». D'où deux
+  // ⚠️ Demande explicite : « au lieu d'avoir des boutons chaque semaine, l'IA
+  // sort un évènement ; le joueur répond en écrivant et l'IA juge ». D'où deux
   // champs et non un : `attenteEvenement` dit qu'il FAUT en poser un (c'est le
   // store qui le sait, à la fin de `semaineSuivante`), `evenementHebdo` est
   // celui qui attend une réponse (c'est l'écran qui l'a fabriqué, parce que
-  // l'appel à Groq est asynchrone et que le store, lui, est synchrone).
+  // la génération est asynchrone et que le store, lui, est synchrone).
   attenteEvenement: boolean;
   /**
    * Une avance rapide est en cours (`avancerJusqua`). Non persisté — c'est un
    * état de la seconde qui passe, pas de la sauvegarde.
    * ⚠️ Il sert à NE PAS demander une scène du MJ à chaque semaine sautée : sans
-   * lui, un saut de quinze semaines déclenchait quinze appels à Groq et empilait
+   * lui, un saut de quinze semaines déclenchait quinze générations et empilait
    * quinze questions sans réponse.
    */
   avanceRapide: boolean;
@@ -477,12 +477,12 @@ interface GameState {
   relationsSociales: Record<string, number>; // pseudo → relation (−100..100)
   succesDebloques: SuccesDebloques; // id → saison où il est tombé
   defis: { cle: string; faits: string[] }; // défis de la semaine en cours
-  groqKey: string;
+  iaLocaleActivee: boolean;
   modele: string;
   tenorKey: string; // clé Tenor (facultative) pour les GIFs dans les posts
   // navigation & réglages
   setEcran: (e: Ecran) => void;
-  setGroqKey: (k: string) => void;
+  setIALocaleActivee: (active: boolean) => void;
   setModele: (m: string) => void;
   setTenorKey: (k: string) => void;
   // carrière
@@ -512,7 +512,7 @@ interface GameState {
   poserSituation: (sc: Scenario, compter?: boolean) => void;
   resoudreChoix: (index: number) => void;
   // ═══ L'ÉVÈNEMENT DE LA SEMAINE ═══════════════════════════════════════════
-  /** L'écran a obtenu une scène de Groq : on la pose et on attend la réponse écrite. */
+  /** L'écran a obtenu une scène de l'IA locale : on la pose et on attend la réponse écrite. */
   poserEvenementHebdo: (evt: EvenementHebdo) => void;
   /** Le MJ a jugé la réponse écrite : on l'applique (deltas, marché, conséquence dure). */
   appliquerJugement: (jugement: JugementMJ, reponse: string) => void;
@@ -625,12 +625,14 @@ export const useGame = create<GameState>()(
       erreurSocial: null,
       succesDebloques: {},
       defis: { cle: '', faits: [] },
-      groqKey: '',
+      // Préchargée en arrière-plan au lancement ; l'utilisateur peut toujours
+      // la désactiver dans les réglages pour les appareils modestes.
+      iaLocaleActivee: true,
       tenorKey: '',
       modele: MODELE_DEFAUT,
 
       setEcran: (ecran) => set({ ecran }),
-      setGroqKey: (groqKey) => set({ groqKey }),
+      setIALocaleActivee: (iaLocaleActivee) => set({ iaLocaleActivee }),
       setModele: (modele) => set({ modele }),
       setTenorKey: (tenorKey) => set({ tenorKey }),
 
@@ -727,7 +729,7 @@ export const useGame = create<GameState>()(
         if (!joueur) return;
 
         // ⚖️ Le MJ propose, le jeu dispose : ses deltas passent par un plafond
-        // que rien ne peut contourner (voir lib/groq.ts). Le budget de
+        // que rien ne peut contourner (voir lib/iaLocale.ts). Le budget de
         // progression par saison empêche de « farmer » l'IA.
         const { deltas, attributsGagnes, recadre } = plafonnerDeltas(r.deltas ?? {}, {
           budgetAttributs: Math.max(0, BUDGET_IA_PAR_SAISON - compteurs.gainsIA),
@@ -1562,7 +1564,7 @@ export const useGame = create<GameState>()(
 
         // ⚠️ PAS UNE SCÈNE PAR SEMAINE SAUTÉE. `semaineSuivante` lève
         // `attenteEvenement`, et l'écran Carrière fabrique alors une scène avec
-        // Groq. Sur un saut de quinze semaines, ce serait quinze appels — et
+        // l'IA. Sur un saut de quinze semaines, ce serait quinze générations — et
         // quinze questions empilées à l'arrivée. On lève le drapeau une seule
         // fois, à destination.
         set({ avanceRapide: true });
@@ -1708,7 +1710,7 @@ export const useGame = create<GameState>()(
         // pouvait pas l'être moins : `resultatSemaine` a déjà tout tranché.
         //
         // À la place : on DEMANDE une scène pour la semaine qui commence.
-        // L'écran s'en charge (l'appel à Groq est asynchrone) et rappelle
+        // L'écran s'en charge (la génération est asynchrone) et rappelle
         // `poserEvenementHebdo`. Sans clé, il retombe sur les scénarios à choix
         // multiples du pool — le jeu reste entier hors ligne.
         //
@@ -1718,7 +1720,7 @@ export const useGame = create<GameState>()(
         // ⚠️ PENDANT UNE AVANCE RAPIDE, ON NE POSE RIEN. Ni scène du MJ, ni
         // interview : on traverse les semaines pour arriver à une date, et
         // `avancerJusqua` lèvera le drapeau une seule fois, à l'arrivée. Sans
-        // ça, chaque semaine sautée déclenchait un appel Groq — et une
+        // ça, chaque semaine sautée déclenchait une génération — et une
         // interview d'après-match tombée en route bloquait le saut net.
         const enAvance = get().avanceRapide;
         let suite: Scenario | null = null;
@@ -2143,7 +2145,7 @@ export const useGame = create<GameState>()(
       },
 
       // Boucle unifiée du lot 6 : le jeu pose UNE situation à choix. Elle vient
-      // du pool pré-écrit, d'un moment décisif, d'une interview ou de Groq —
+      // du pool pré-écrit, d'un moment décisif, d'une interview ou de l'IA locale —
       // à partir d'ici, c'est exactement la même chose.
       poserSituation: (sc, compter = true) => {
         const { joueur, scenarioActif } = get();
@@ -2169,8 +2171,8 @@ export const useGame = create<GameState>()(
       // ═══════════════════════════════════════════════════════════════════════
       // L'ÉVÈNEMENT DE LA SEMAINE
       // ═══════════════════════════════════════════════════════════════════════
-      // Demande explicite : « chaque semaine Groq sort un évènement, le joueur
-      // répond en écrivant, et Groq juge la réponse — très sévère, en tenant
+      // Demande explicite : « chaque semaine l'IA sort un évènement, le joueur
+      // répond en écrivant, et l'IA juge la réponse — très sévère, en tenant
       // compte des stats ».
 
       poserEvenementHebdo: (evt) => {
@@ -2551,15 +2553,13 @@ export const useGame = create<GameState>()(
         const r = publierPost(joueur, propre, ton, idUnique());
         if (media?.url) r.post.media = media;
 
-        // Avec une clé, ce sont de VRAIS commentaires, écrits par l'IA pour ce
-        // post précis. Sans clé, on garde les réponses du pool (le jeu doit
-        // rester jouable hors ligne).
-        const cle = get().groqKey;
-        if (cle) {
+        // Avec l'IA locale, ce sont des commentaires écrits pour ce post précis.
+        // Sinon, on garde les réponses du pool pré-écrit.
+        if (get().iaLocaleActivee) {
           try {
             set({ chargementSocial: true, erreurSocial: null });
-            const reponses = await reponsesGroq(
-              { joueur, cle, modele: get().modele, suivis: get().comptesSuivis },
+            const reponses = await reponsesIA(
+              { joueur, modele: get().modele, suivis: get().comptesSuivis },
               propre, ton, 8,
             );
             if (reponses.length) r.post.reponses = reponses;
@@ -2652,13 +2652,12 @@ export const useGame = create<GameState>()(
       },
 
       // ---- LE FIL DU MONDE, ÉCRIT PAR L'IA ----
-      // Clubs, joueurs, journalistes et supporters publient. Sans clé, on
+      // Clubs, joueurs, journalistes et supporters publient. Sans IA locale, on
       // retombe sur la timeline d'ambiance pré-écrite.
       rafraichirFil: async () => {
         const { joueur, comptesSuivis, modele } = get();
         if (!joueur) return;
-        const cle = get().groqKey;
-        if (!cle) {
+        if (!get().iaLocaleActivee) {
           const secours = feedAmbiance(joueur, 6);
           set((s) => ({ posts: fusionner(secours, s.posts) }));
           return;
@@ -2673,11 +2672,11 @@ export const useGame = create<GameState>()(
             .filter(Boolean) as string[];
           // ⚠️ UN SEUL APPEL PAR SEMAINE (économie de tokens, demande explicite).
           // Il y en avait TROIS : le fil, puis un appel de commentaires pour
-          // chacune des deux publications les plus lues. `filGroq` rend
+          // chacune des deux publications les plus lues. `filIA` rend
           // désormais les commentaires DANS la même réponse. Les publications
           // qu'il n'a pas commentées reçoivent les réactions locales, qui sont
           // gratuites et jamais vides.
-          const posts = await filGroq({ joueur, cle, modele, suivis: comptesSuivis }, sujets, 6);
+          const posts = await filIA({ joueur, modele, suivis: comptesSuivis }, sujets, 6);
           const bassinReac = bassinSocial(joueur, comptesSuivis);
           for (const p of posts) {
             if (!p.reponses?.length) p.reponses = reactionsPour(p, bassinReac, 2);
@@ -2686,7 +2685,14 @@ export const useGame = create<GameState>()(
           // Les annonces ne sont pas que du texte : on les applique au monde.
           for (const p of posts) get().appliquerAnnonce(p);
         } catch (e) {
-          set({ erreurSocial: (e as Error).message });
+          // Une coupure pendant le chargement du modèle ne doit jamais laisser
+          // le fil vide : on publie immédiatement la même ambiance locale que
+          // lorsque l'IA est désactivée, tout en conservant l'erreur visible.
+          const secours = feedAmbiance(joueur, 6);
+          set((s) => ({
+            erreurSocial: e instanceof Error ? e.message : String(e),
+            posts: fusionner(secours, s.posts),
+          }));
         } finally {
           set({ chargementSocial: false });
         }
@@ -2877,13 +2883,12 @@ export const useGame = create<GameState>()(
           pseudo: cible.pseudo, nom: cible.auteur, avatar: cible.avatar,
           type: (cible.type as CompteSuivi['type']) ?? 'fan', abonnes: 2000,
         };
-        const cleIA = get().groqKey;
         let reponse = '';
-        if (cleIA) {
+        if (get().iaLocaleActivee) {
           set({ chargementSocial: true, erreurSocial: null });
           try {
-            reponse = await messageGroq(
-              { joueur, cle: cleIA, modele: get().modele, suivis: get().comptesSuivis },
+            reponse = await messageIA(
+              { joueur, modele: get().modele, suivis: get().comptesSuivis },
               compte,
               [{ id: 'ctx', pseudo: cible.pseudo, de: 'lui', texte: cible.texte, saison: joueur.saison }],
               propre, apres,
@@ -2993,7 +2998,7 @@ export const useGame = create<GameState>()(
         set((s) => ({ comptesSuivis: s.comptesSuivis.filter((c) => c.pseudo !== pseudo) })),
 
       // ---- MESSAGES PRIVÉS ----
-      // Groq répond à la place du compte, en gardant son caractère.
+      // L'IA locale répond à la place du compte, en gardant son caractère.
       envoyerMessage: async (pseudo, texte) => {
         const { joueur, comptesSuivis, conversations, modele, relationsSociales } = get();
         // On peut écrire à n'importe quel compte du monde, pas seulement aux
@@ -3036,13 +3041,12 @@ export const useGame = create<GameState>()(
           return;
         }
 
-        const cle = get().groqKey;
         let reponse = '';
-        if (cle) {
+        if (get().iaLocaleActivee) {
           set({ chargementSocial: true, erreurSocial: null });
           try {
-            reponse = await messageGroq(
-              { joueur, cle, modele, suivis: comptesSuivis }, compte, fil, mien.texte, apres,
+            reponse = await messageIA(
+              { joueur, modele, suivis: comptesSuivis }, compte, fil, mien.texte, apres,
             );
           } catch (e) {
             set({ erreurSocial: (e as Error).message });
@@ -3466,7 +3470,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 5,
+      version: 7,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -3493,6 +3497,9 @@ export const useGame = create<GameState>()(
           relationsSociales?: Record<string, number>;
           evenementHebdo?: EvenementHebdo | null;
           evenementsVus?: string[];
+          iaLocaleActivee?: boolean;
+          modele?: string;
+          groqKey?: unknown;
           rythme?: unknown;
         };
         if (!s) return s;
@@ -3562,6 +3569,19 @@ export const useGame = create<GameState>()(
         // fin de saison en régénère aussitôt — c'est mieux que de convertir des
         // cartes en négociations qui n'ont jamais eu lieu.
         s.approches ??= [];
+        // Version 6 : l'ancien service distant a été remplacé par WebLLM sur
+        // l'appareil. Une ancienne clé ne doit plus rester dans la sauvegarde.
+        // À cette étape de migration, le premier téléchargement restait
+        // volontaire ; la version 7 ci-dessous active le préchargement demandé.
+        if (version < 6) {
+          s.iaLocaleActivee = false;
+          s.modele = MODELE_DEFAUT;
+          delete s.groqKey;
+        }
+        // Version 7 : le modèle se télécharge désormais automatiquement en
+        // arrière-plan au premier lancement. Une désactivation faite ensuite
+        // reste persistée normalement.
+        if (version < 7) s.iaLocaleActivee = true;
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
         // réactiver une branche obsolète après fusion par Zustand.
@@ -3595,7 +3615,7 @@ export const useGame = create<GameState>()(
         evenementHebdo: s.evenementHebdo,
         evenementsVus: s.evenementsVus,
         // `attenteEvenement`, lui, ne l'est PAS : c'est un ordre donné à l'écran,
-        // pas un état du monde. Le persister ferait rejouer un appel Groq à
+        // pas un état du monde. Le persister ferait rejouer une génération à
         // chaque rechargement de page.
         compteurs: s.compteurs,
         tropheesEnAttente: s.tropheesEnAttente,
@@ -3618,7 +3638,7 @@ export const useGame = create<GameState>()(
         relationsSociales: s.relationsSociales,
         succesDebloques: s.succesDebloques,
         defis: s.defis,
-        groqKey: s.groqKey,
+        iaLocaleActivee: s.iaLocaleActivee,
         tenorKey: s.tenorKey,
         modele: s.modele,
       }),

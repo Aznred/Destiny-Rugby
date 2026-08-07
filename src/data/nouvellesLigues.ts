@@ -1,5 +1,5 @@
 // ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.
-// Source : « new league/ » (flashscore_rugby_data.json + les dossiers de logos).
+// Source : sources/competitions/ligues/ (données + dossiers de logos).
 // Régénérer avec : node scripts/genNouvellesLigues.cjs
 // La table des ligues, leurs niveaux et leurs échelles : scripts/nouvellesLigues.cjs
 //

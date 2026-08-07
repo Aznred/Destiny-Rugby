@@ -1,11 +1,11 @@
 // Générateur du « monde réel » de Destiny Rugby.
 //
 // Entrées (fournies par l'utilisateur, à la racine du projet) :
-//   • base_rugby_finale.json   — 9 388 lignes joueur/compétition : club, poste,
+//   • sources/data/base_rugby_finale.json — 9 388 lignes joueur/compétition : club, poste,
 //     âge, nationalité, matchs, minutes, essais, points… (saison 25-26)
-//   • tous_les_classements.json — classements de la saison passée pour les
+//   • sources/data/tous_les_classements.json — classements de la saison passée pour les
 //     25 compétitions (clubs ET sélections nationales)
-//   • logos_equipes/**          — logos officiels, copiés dans public/logos/
+//   • sources/logos/clubs/**    — logos officiels, copiés dans public/logos/
 //     par scripts/copierLogos.cjs
 //
 // Sorties :
@@ -33,8 +33,8 @@ function noteVedette(nom) {
 }
 
 const RACINE = path.join(__dirname, '..');
-const JOUEURS = require(path.join(RACINE, 'base_rugby_finale.json'));
-const CLASSEMENTS_SRC = require(path.join(RACINE, 'tous_les_classements.json'));
+const JOUEURS = require(path.join(RACINE, 'sources', 'data', 'base_rugby_finale.json'));
+const CLASSEMENTS_SRC = require(path.join(RACINE, 'sources', 'data', 'tous_les_classements.json'));
 const DOSSIER_LOGOS = path.join(RACINE, 'public', 'logos');
 
 const avertissements = [];
@@ -418,7 +418,7 @@ const esc = (s) => (s === null || s === undefined ? 'undefined' : `'${String(s).
 
 function ecrireMonde() {
   let ts = `// ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.
-// Source : base_rugby_finale.json + tous_les_classements.json + logos_equipes/
+// Source : sources/data/*.json + sources/logos/clubs/
 // Régénérer avec : node scripts/genMonde.cjs
 //
 // Contient les championnats couverts par la base réelle (France : Top 14,
@@ -513,7 +513,7 @@ function ecrireEffectifs() {
   const iNation = new Map(nations.map((n, i) => [n, i]));
 
   let ts = `// ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.
-// Source : base_rugby_finale.json (9 388 lignes, saison 25-26) — voir
+// Source : sources/data/base_rugby_finale.json (9 388 lignes, saison 25-26) — voir
 // scripts/genMonde.cjs. Régénérer avec : node scripts/genMonde.cjs
 //
 // • NOTE_CLUB_REEL : note générale d'un club, déduite du classement de la

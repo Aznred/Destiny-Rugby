@@ -1,7 +1,7 @@
 // VÉRIFICATION — LES TROPHÉES
 //
 // Demande : « rajoute toutes les coupes à chacune des bonnes compétitions ».
-// Les 20 modèles de `nouvellecoupe/` ont été compressés et branchés ; ce script
+// Les lots de `sources/modeles/trophees/` ont été compressés et branchés ; ce script
 // vérifie qu'aucun maillon ne manque entre le fichier sur le disque, l'entrée de
 // `data/trophees.ts` et la compétition qui le décerne.
 //
@@ -20,9 +20,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  TROPHEES, TROPHEE_PAR_DIVISION, TROPHEE_PAR_COUPE, NATIONS_REC, NATIONS_6N,
+  TROPHEES, TROPHEE_PAR_DIVISION, TROPHEE_PAR_COUPE, TROPHEE_PAR_INTERNATIONAL,
+  NATIONS_REC, NATIONS_6N,
 } from '../src/data/trophees';
 import { COMPETITIONS } from '../src/data/clubs';
+import {
+  COMPETITIONS_INTERNATIONALES, COUPE_DU_MONDE, competitionsNouvellesNations,
+} from '../src/lib/international';
 
 // Le repère est le parc EXISTANT, pas un chiffre rond : les trophées d'origine
 // vont de 739 Ko (six-nations) à 2 191 Ko (mlr). Un modèle qui dépasse ce
@@ -94,6 +98,28 @@ console.log('\n=== 4. LES TITRES DE SÉLECTION ===');
   const double = NATIONS_REC.filter((n) => NATIONS_6N.includes(n));
   ligne('aucune nation dans les deux tournois',
     double.length ? double.join(', ') : 'aucune', double.length === 0);
+
+  // Les tournées et matchs amicaux n'ont logiquement aucun trophée. Toutes les
+  // autres compétitions doivent avoir leur propre modèle, sans réutilisation
+  // silencieuse d'une coupe qui ne leur appartient pas.
+  const sansTitre = new Set(['autumn', 'amicaux']);
+  const competitions = [
+    ...COMPETITIONS_INTERNATIONALES,
+    ...competitionsNouvellesNations(),
+    COUPE_DU_MONDE,
+  ];
+  const manquantes = competitions
+    .filter((c) => !sansTitre.has(c.id) && !TROPHEE_PAR_INTERNATIONAL[c.id]);
+  ligne('compétitions internationales récompensées',
+    `${competitions.length - sansTitre.size - manquantes.length}/${competitions.length - sansTitre.size}`
+    + (manquantes.length ? ` — manquantes : ${manquantes.map((c) => `${c.id} (${c.nom})`).join(', ')}` : ''),
+    manquantes.length === 0);
+
+  const inconnus = Object.entries(TROPHEE_PAR_INTERNATIONAL)
+    .filter(([, id]) => !TROPHEES[id]);
+  ligne('trophées internationaux cités qui existent',
+    inconnus.length ? inconnus.map(([c, t]) => `${c}→${t}`).join(', ') : 'tous',
+    inconnus.length === 0);
 }
 
 console.log('\n=== 5. AUCUN MODÈLE LIVRÉ OUBLIÉ ===');
@@ -105,14 +131,16 @@ console.log('\n=== 5. AUCUN MODÈLE LIVRÉ OUBLIÉ ===');
   const LOTS: [string, string[]][] = [
     // 20 modèles → 20 trophées (le 21ᵉ, Championship Cup, réutilise
     // volontairement le modèle de la Premiership Rugby Cup).
-    ['nouvellecoupe', ['bundesliga', 'currieCup', 'ecosseSuper', 'espagne', 'finlande', 'gallesSRC',
+    ['sources/modeles/trophees/championnats', ['bundesliga', 'currieCup', 'ecosseSuper', 'espagne', 'finlande', 'gallesSRC',
       'gallesPrem', 'gallesChall', 'georgie', 'irlandeAIL', 'argentine', 'paysBas', 'nzHeartland',
       'pologne', 'portugal', 'tcheque', 'roumanie', 'russie', 'italie', 'recEurope']],
     // Les honneurs individuels, plus les deux modèles relivrés en correction
     // (le trophée allemand et celui du meilleur joueur du monde).
-    ['trophe correct et new trophee', ['bundesliga', 'meilleur-joueur', 'meilleurTop14',
+    ['sources/modeles/trophees/honneurs', ['bundesliga', 'meilleur-joueur', 'meilleurTop14',
       'meilleurPremiership', 'meilleurUrc', 'meilleurNZ', 'meilleurChampionsCup',
       'meilleurSixNations', 'hommeDuMatchMonde']],
+    ['sources/modeles/trophees/internationaux', ['americasChamp', 'oceaniaCup',
+      'recTrophyConference', 'rugbyChampionship', 'nationsCup', 'pacificChallenge', 'mondialU20']],
   ];
   for (const [dossier, branches] of LOTS) {
     const livres = fs.existsSync(dossier)

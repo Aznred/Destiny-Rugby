@@ -6,11 +6,11 @@
 //
 // Deux niveaux, comme partout dans le jeu :
 //   1. une lecture LOCALE par mots-clés, immédiate et hors ligne ;
-//   2. si une clé Groq est là, l'IA affine l'interprétation — elle comprend
+//   2. si l'IA locale est activée, elle affine l'interprétation — elle comprend
 //      « reste dans l'axe et attends le ballon dans la poche », que les
 //      mots-clés rateraient.
 
-import { appelGroqJSON, MODELE_DEFAUT, type MessageGroq } from '../groq';
+import { appelIAJSON, type MessageIA } from '../iaLocale';
 import { consigneDeLangue } from '../i18n';
 import type { ConsigneJoueur } from './etat';
 
@@ -47,11 +47,11 @@ export function lireConsigneLocale(texte: string): ConsigneJoueur {
 }
 
 // --- LECTURE PAR L'IA -------------------------------------------------------
-export async function lireConsigneGroq(
-  texte: string, cle: string, modele = MODELE_DEFAUT,
+export async function lireConsigneIA(
+  texte: string,
   contexte = '',
 ): Promise<ConsigneJoueur> {
-  const messages: MessageGroq[] = [
+  const messages: MessageIA[] = [
     {
       role: 'system',
       content: `Tu traduis une consigne de rugby en paramètres de placement pour UN joueur.
@@ -67,7 +67,7 @@ Réponds UNIQUEMENT en JSON valide :
     },
     { role: 'user', content: `${contexte}\n\nConsigne du joueur : « ${texte} »` },
   ];
-  const brut = await appelGroqJSON(cle, modele, messages, { temperature: 0.2, maxTokens: 160 });
+  const brut = await appelIAJSON(messages, { temperature: 0.2, maxTokens: 120 });
   try {
     const d = JSON.parse(brut);
     const nombre = (v: unknown, min: number, max: number, defaut: number) =>

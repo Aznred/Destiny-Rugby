@@ -1,13 +1,14 @@
 // LA TABLE DES NOUVELLES COMPÉTITIONS
 //
 // C'est ICI — et nulle part ailleurs — qu'on ajoute, renomme ou re-calibre une
-// ligue venue de `new league/`. Le générateur (`genNouvellesLigues.cjs`) ne fait
+// ligue venue de `sources/competitions/ligues/`. Le générateur ne fait
 // que lire cette table.
 //
-// • `dossier`   : le dossier de logos, dans `new league/`.
-// • `base`      : le dossier RACINE qui contient `dossier` (défaut : `new league`).
+// • `dossier`   : le dossier de logos, dans le lot principal.
+// • `base`      : le dossier RACINE qui contient `dossier`
+//                 (défaut : `sources/competitions/ligues`).
 //                 Les compétitions livrées plus tard ont leur propre dossier —
-//                 `2 new leagues/` pour la Bundesliga et la Currie Cup.
+//                 `sources/competitions/ligues-complementaires/` pour la Bundesliga et la Currie Cup.
 // • `src`       : [pays, nom_ligue] tels qu'écrits dans flashscore_rugby_data.json.
 //                 `null` = pas de classement fourni (on répartit les notes à plat,
 //                 ou on suit l'ordre de `equipes` s'il est donné).
@@ -125,12 +126,12 @@ const CLUBS = [
     niveau: 4, echelle: [44, 56], nation: 'Russie', etrangers: 0.22,
   },
 
-  // --- Livrées à part, dans « 2 new leagues/ » --------------------------------
+  // --- Livrées à part, dans le lot complémentaire -----------------------------
   // Aucun classement n'accompagne ces deux-là (le JSON fourni est vide) : leur
   // hiérarchie est donc DÉCLARÉE ici, dans l'ordre de `equipes`.
   {
     id: 'bundesliga', nom: 'Rugby-Bundesliga', pays: 'Allemagne', emoji: '🇩🇪',
-    base: '2 new leagues', dossier: '1 Bundesliga', src: null,
+    base: 'sources/competitions/ligues-complementaires', dossier: '1 Bundesliga', src: null,
     niveau: 6, echelle: [34, 47], nation: 'Allemagne', etrangers: 0.34,
     // Le rugby allemand tient sur Heidelberg : quatre des dix clubs y sont, et
     // les deux premiers (RG Heidelberg et le HRK) se partagent les titres.
@@ -149,7 +150,7 @@ const CLUBS = [
   },
   {
     id: 'currieCup', nom: 'Currie Cup', pays: 'Afrique du Sud', emoji: '🇿🇦',
-    base: '2 new leagues', dossier: 'Currie Cup', src: null, prefixeLogo: 'currie',
+    base: 'sources/competitions/ligues-complementaires', dossier: 'Currie Cup', src: null, prefixeLogo: 'currie',
     niveau: 2, echelle: [57, 69], nation: 'Afrique du Sud', etrangers: 0.13,
     poolLocal: 'Afrique du Sud (mixte)',
     // ⚠️ CE NE SONT PAS LES FRANCHISES DE L'URC. La Currie Cup se joue avec les

@@ -1,5 +1,5 @@
 // Notes calibrées À LA MAIN pour les joueurs identifiés (internationaux, cadres).
-// La base `base_rugby_finale.json` fournit du temps de jeu et des essais, mais
+// La base `sources/data/base_rugby_finale.json` fournit du temps de jeu et des essais, mais
 // rien qui distingue un pilier international d'un pilier honnête qui joue
 // autant : ces notes corrigent le tir sur les joueurs qu'on connaît.
 // Format : 'Nom PRÉNOM': note (l'âge vient toujours de la base réelle).
@@ -166,7 +166,7 @@ const VEDETTES_FRANCE = {
 };
 
 // ---------------- MONDE (Premiership, URC, Super Rugby, League One…) ----------
-// Tous ces noms ont été vérifiés présents dans base_rugby_finale.json.
+// Tous ces noms ont été vérifiés présents dans sources/data/base_rugby_finale.json.
 const VEDETTES_MONDE = {
   // Super Rugby Pacific / All Blacks & Wallabies
   'Ardie SAVEA': 92, 'Will JORDAN': 90, 'Jordie BARRETT': 89,
@@ -215,7 +215,7 @@ const VEDETTES_MONDE = {
 };
 
 // La table ci-dessus vient de l'ancien export LNR, qui écrivait les prénoms en
-// entier (« Grégory ALLDRITT ») ; `base_rugby_finale.json` utilise le prénom
+// entier (« Grégory ALLDRITT ») ; la base réelle utilise le prénom
 // d'usage (« Greg ALLDRITT »). Cette table renomme les clés pour que les deux
 // se rejoignent. Le générateur signale toute vedette qui ne trouve personne.
 const ALIAS = {

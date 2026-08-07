@@ -1,7 +1,7 @@
 // LA COUCHE D'IMMERSION (lot 6)
 //
 // Une seule et même boucle : à chaque itération, le jeu propose UNE situation à
-// choix. Si une clé Groq est disponible, elle est écrite sur mesure à partir du
+// choix. Si l'IA locale est activée, elle est écrite sur mesure à partir du
 // contexte réel (club, division, forme, journal, résultat du match) ; sinon
 // elle est tirée d'un pool pré-écrit. Le format de sortie est identique dans les
 // deux cas — un `Scenario` — si bien que le reste du jeu (store, UI) ne sait
@@ -16,16 +16,16 @@ import { SCENARIOS } from '../data/scenarios';
 import type { ConsequenceDure } from '../data/situations';
 import { interviewPour, type Interview } from '../data/interviews';
 import {
-  appelGroqJSON, fichePersonnage, nettoyerDeltas, plafonnerDeltas, ressembleATriche, MODELE_DEFAUT,
-} from './groq';
+  appelIAJSON, fichePersonnage, nettoyerDeltas, plafonnerDeltas, ressembleATriche,
+} from './iaLocale';
 import { consigneDeLangue, t } from './i18n';
 import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
 
 // --------------------------------------------------------------------------
 // Pré-écrit → Scenario (le mode SANS CLÉ, qui doit rester complet)
 // --------------------------------------------------------------------------
-// ⚠️ LA TRADUCTION SE FAIT ICI, à la conversion. Avec une clé Groq, l'IA écrit
-// déjà dans la langue du joueur (`consigneDeLangue`) ; sans clé, c'est ce pool
+// ⚠️ LA TRADUCTION SE FAIT ICI, à la conversion. Avec l'IA locale, le modèle écrit
+// déjà dans la langue du joueur (`consigneDeLangue`) ; sinon, c'est ce pool
 // pré-écrit qu'on lit, et il faut donc aller chercher sa version traduite
 // (`data/textesMoments.ts`, `data/textesContenu.ts`). Plus tard serait trop
 // tard : le scénario part dans le journal, où le texte est figé.
@@ -75,7 +75,7 @@ export function scenarioDuPool(): Scenario {
 }
 
 // --------------------------------------------------------------------------
-// Groq → Scenario (le mode AVEC CLÉ : la même chose, écrite pour toi)
+// IA locale → Scenario (la même chose, écrite pour toi)
 // --------------------------------------------------------------------------
 
 const SYSTEME_SITUATION = `Tu es le MAÎTRE DU JEU de « Destiny Rugby », un jeu de carrière de rugby en français.
@@ -104,7 +104,6 @@ STATS AUTORISÉES dans "deltas" : vitesse, force, endurance, plaquage, passe, je
 vision, mental, forme, moral, reputation, argent. Aucune autre clé. "deltas": {} est valide.`;
 
 export interface ContexteSituation {
-  cle: string;
   modele?: string;
   joueur: Joueur;
   // Ce qui vient de se passer (dernier match, dernière entrée du journal…).
@@ -126,9 +125,7 @@ const CONSIGNE: Record<NonNullable<ContexteSituation['genre']>, string> = {
 export async function genererSituation(opts: ContexteSituation): Promise<Scenario> {
   const genre = opts.genre ?? 'situation';
   const j = opts.joueur;
-  const brut = await appelGroqJSON(
-    opts.cle,
-    opts.modele || MODELE_DEFAUT,
+  const brut = await appelIAJSON(
     [
       { role: 'system', content: SYSTEME_SITUATION + consigneDeLangue() },
       { role: 'system', content: `FICHE DU JOUEUR :\n${fichePersonnage(j)}\nPoste : ${POSTE_PAR_ID[j.poste].nom}` },
@@ -184,10 +181,10 @@ function parserSituation(brut: string, j: Joueur, genre: string): Scenario {
 // ===========================================================================
 // L'ÉVÈNEMENT DE LA SEMAINE, ET SON JUGEMENT
 // ===========================================================================
-// Demande explicite : « au lieu d'avoir des boutons chaque semaine, Groq sort un
+// Demande explicite : « au lieu d'avoir des boutons chaque semaine, l'IA sort un
 // évènement ; les évènements peuvent être très variés, du sportif aux folies
 // furieuses qui peuvent mener à la mort, à l'arrestation, etc. ; le joueur
-// répond en écrivant et Groq juge la réponse — il doit être très sévère et
+// répond en écrivant et l'IA juge la réponse — elle doit être très sévère et
 // prendre en compte les stats. Sinon, juste des scénarios et des réponses à
 // choix multiples. »
 //
@@ -224,7 +221,6 @@ RÉPONDS UNIQUEMENT EN JSON VALIDE, format exact :
 { "emoji": "un emoji", "titre": "titre court (max 5 mots)", "texte": "la scène, 2 phrases maximum", "risque": false }`;
 
 export interface ContexteEvenement {
-  cle: string;
   modele?: string;
   joueur: Joueur;
   /** Ce que raconte le calendrier cette semaine (journée, coupe, trêve…). */
@@ -237,9 +233,7 @@ export interface ContexteEvenement {
 
 export async function genererEvenementHebdo(opts: ContexteEvenement): Promise<EvenementHebdo> {
   const j = opts.joueur;
-  const brut = await appelGroqJSON(
-    opts.cle,
-    opts.modele || MODELE_DEFAUT,
+  const brut = await appelIAJSON(
     [
       { role: 'system', content: SYSTEME_EVENEMENT + consigneDeLangue() },
       { role: 'system', content: `FICHE DU JOUEUR :\n${fichePersonnage(j)}\nPoste : ${POSTE_PAR_ID[j.poste].nom}` },
@@ -263,7 +257,7 @@ export async function genererEvenementHebdo(opts: ContexteEvenement): Promise<Ev
 // ⚠️ EXPORTÉ POUR ÊTRE VÉRIFIABLE SANS RÉSEAU (`scripts/verifRecit.ts`). Tout
 // ce qui protège le joueur — le plafond des deltas, le verrou des conséquences
 // dures — vit dans les deux parseurs ci-dessous : les laisser privés, c'est
-// n'avoir aucun moyen de prouver qu'ils tiennent sans appeler Groq pour de vrai.
+// n'avoir aucun moyen de prouver qu'ils tiennent sans charger le modèle pour de vrai.
 export function parserEvenement(brut: string, j: Joueur): EvenementHebdo {
   const obj = objetJSON(brut);
   const texte = typeof obj.texte === 'string' ? obj.texte.trim() : '';
@@ -342,7 +336,6 @@ export interface JugementMJ {
 }
 
 export interface ContexteJugement {
-  cle: string;
   modele?: string;
   joueur: Joueur;
   evenement: EvenementHebdo;
@@ -363,9 +356,7 @@ export async function jugerReaction(opts: ContexteJugement): Promise<JugementMJ>
   const attributs = Object.entries(j.attributs)
     .map(([k, v]) => `${ATTRIBUTS_LABELS[k] ?? k} ${v}/100`)
     .join(', ');
-  const brut = await appelGroqJSON(
-    opts.cle,
-    opts.modele || MODELE_DEFAUT,
+  const brut = await appelIAJSON(
     [
       { role: 'system', content: SYSTEME_JUGEMENT + consigneDeLangue() },
       {
@@ -433,11 +424,11 @@ function objetJSON(brut: string): Record<string, unknown> {
 // --------------------------------------------------------------------------
 // NÉGOCIATION DE CONTRAT
 // La mécanique (ce que tu obtiens, et le risque de tout perdre) est côté code —
-// l'IA ne fait que raconter la scène. Sans clé, un texte pré-écrit fait le job.
+// l'IA ne fait que raconter la scène. Sans modèle local, un texte pré-écrit fait le job.
 // --------------------------------------------------------------------------
 
 export async function raconterNegociation(
-  opts: { cle: string; modele?: string; joueur: Joueur },
+  opts: { modele?: string; joueur: Joueur },
   club: string,
   agent: string,
   issue: 'succes' | 'partiel' | 'echec',
@@ -449,9 +440,7 @@ export async function raconterNegociation(
       : issue === 'partiel'
         ? `La négociation aboutit à un compromis : ${montant.toLocaleString('fr-FR')} € par saison, moins que demandé.`
         : `La négociation ÉCHOUE : le club se braque et retire sa proposition.`;
-  const brut = await appelGroqJSON(
-    opts.cle,
-    opts.modele || MODELE_DEFAUT,
+  const brut = await appelIAJSON(
     [
       {
         role: 'system',

@@ -29,27 +29,17 @@ git remote add origin https://github.com/TON-COMPTE/destiny-rugby.git && git pus
 
 Chaque `git push` redéploie automatiquement.
 
-## 3. La clé Groq
+## 3. L'IA locale
 
-⚠️ **Ne mets pas la clé dans le dépôt.** Dans Vercel :
-**Settings → Environment Variables**, ajoute :
+Aucune clé ni variable d'environnement n'est nécessaire. Sur un appareil
+compatible, WebLLM commence automatiquement à télécharger le modèle quantifié
+en arrière-plan après l'ouverture du jeu, puis le conserve dans le cache du
+navigateur. **⚙️ Réglages** permet de le désactiver ou de l'effacer. Les générations sont
+effectuées sur son appareil avec WebGPU, dans un Worker.
 
-- **Name** : `VITE_GROQ_KEY`
-- **Value** : ta clé Groq
-- **Environments** : Production, Preview, Development
-
-Puis redéploie (**Deployments → … → Redeploy**).
-
-⚠️ **À savoir** : une variable `VITE_*` est embarquée dans le JavaScript envoyé
-au navigateur. **N'importe quel visiteur peut la lire** et consommer ton quota.
-Trois options :
-
-- **laisser vide** : chaque joueur saisit sa propre clé dans ⚙️ (le jeu reste
-  entièrement jouable sans clé) ;
-- **mettre la tienne** en acceptant le risque, sur un site peu diffusé ;
-- **passer par un proxy** (une Vercel Function qui garde la clé côté serveur et
-  applique un quota) — c'est la seule solution propre pour un site public, et
-  elle reste à écrire.
+Le modèle ne fait donc pas partie du déploiement Vercel. Prévoir environ 900 Mo
+au premier téléchargement. Si le navigateur ou la carte graphique est
+incompatible, le jeu utilise automatiquement ses scènes et réponses pré-écrites.
 
 ## 4. Points d'attention pour ce projet
 
@@ -63,6 +53,6 @@ Trois options :
 - **Les sauvegardes sont locales** (localStorage) : elles restent sur le
   navigateur de chaque joueur, elles ne sont pas partagées et ne survivent pas à
   un changement d'appareil.
-- **Aucune donnée n'est envoyée nulle part**, sauf les appels à Groq (le MJ et
-  L'Ovale), à Wikimedia Commons (les images des posts) et à randomuser.me (les
-  avatars génériques).
+- **Les textes confiés à l'IA restent sur l'appareil.** Les seules ressources
+  externes sont les poids publics du modèle au premier chargement, Wikimedia
+  Commons pour certaines images et randomuser.me pour les avatars génériques.

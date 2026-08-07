@@ -371,7 +371,7 @@ function contexteDe(sem: Semaine): string[] {
 //
 // Un tweet sans commentaire, ce n'est pas un réseau social. Chaque publication
 // du monde reçoit désormais ses réponses — pas seulement les tiennes. Ici c'est
-// le repli hors ligne ; avec une clé, `reponsesGroq` écrit du sur-mesure et
+// le repli hors ligne ; avec l'IA locale, `reponsesIA` écrit du sur-mesure et
 // vient les remplacer.
 
 // ⚠️ LE POOL A ÉTÉ MULTIPLIÉ PAR CINQ (demande explicite : « rajoute une énorme

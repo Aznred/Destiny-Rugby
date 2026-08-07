@@ -63,7 +63,6 @@ export const TEXTES_AUTO: Record<string, Partial<Record<Langue, string>>> = {
   'ov.publicationsRecherche': { es: 'Publicaciones', it: 'Post', de: 'Beiträge', pt: 'Publicações', ja: '投稿' },
   'ov.reseauEcrit': { es: 'La red habla de ello', it: 'La rete ne parla', de: 'Das Netzwerk spricht darüber', pt: 'A rede está a falar disso', ja: 'ネットで話題' },
   'ov.semaineActuelle': { es: 'Esta semana', it: 'Questa settimana', de: 'Diese Woche', pt: 'Esta semana', ja: '今週' },
-  'ov.cleIA': { es: 'Se necesita una clave de IA para esta acción.', it: 'Per questa azione serve una chiave IA.', de: 'Für diese Aktion ist ein KI-Schlüssel erforderlich.', pt: 'É necessária uma chave de IA para esta ação.', ja: 'この操作にはAIキーが必要です。' },
   'ov.aucuneNotification': { es: 'No hay notificaciones.', it: 'Nessuna notifica.', de: 'Keine Benachrichtigungen.', pt: 'Sem notificações.', ja: '通知はありません。' },
   'ov.tendanceDivision': { es: 'Tu liga', it: 'Il tuo campionato', de: 'Deine Liga', pt: 'O teu campeonato', ja: '所属リーグ' },
   'ov.tendanceRugby': { es: 'Rugby', it: 'Rugby', de: 'Rugby', pt: 'Râguebi', ja: 'ラグビー' },

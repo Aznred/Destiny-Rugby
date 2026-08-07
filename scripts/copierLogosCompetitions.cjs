@@ -1,16 +1,16 @@
-// Copie les logos de compétitions fournis (dossier `logo league/`) vers
+// Copie les logos fournis (`sources/logos/competitions/`) vers
 // public/logos-competitions/<id>.<ext>, nommés par l'ID DE COMPÉTITION du jeu :
 // plus besoin de deviner à l'exécution, `src/data/logosCompetitions.ts` fait
 // simplement `/logos-competitions/top14.webp`.
 //
 // Relancer avec : node scripts/copierLogosCompetitions.cjs
-// Ajouter une compétition = déposer son image dans `logo league/` et ajouter
+// Ajouter une compétition = déposer son image dans `sources/logos/competitions/` et ajouter
 // une ligne dans CORRESPONDANCE ci-dessous.
 const fs = require('fs');
 const path = require('path');
 
 const RACINE = path.join(__dirname, '..');
-const SRC = path.join(RACINE, 'logo league');
+const SRC = path.join(RACINE, 'sources', 'logos', 'competitions');
 const DEST = path.join(RACINE, 'public', 'logos-competitions');
 
 // id de compétition (COMPETITIONS, COUPES_EUROPE, COMPETITIONS_NATIONS, ou id

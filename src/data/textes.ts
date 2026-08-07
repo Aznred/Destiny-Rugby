@@ -8,7 +8,7 @@
 //
 // ⚠️ CE QUI N'EST PAS ICI, ET POURQUOI. Le récit du Maître du Jeu, les
 // situations, les tweets, les messages privés et les commentaires de match sont
-// ÉCRITS À L'EXÉCUTION par Groq. On ne les traduit pas : on demande au modèle
+// ÉCRITS À L'EXÉCUTION par l'IA locale. On ne les traduit pas : on demande au modèle
 // d'écrire directement dans la langue du joueur (`consigneDeLangue`,
 // lib/i18n.ts). C'est plus juste — un tweet traduit sonne toujours faux — et
 // ça ne coûte pas un octet de plus dans le bundle.
@@ -27,7 +27,7 @@ import { TEXTES_MATCH } from './textesMatch';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
-// manquantes en interrogeant Groq et écrit `textesAuto.ts` ; le fusionner ici
+// générées historiquement dans `textesAuto.ts` ; le fusionner ici
 // avec la priorité la plus BASSE garantit deux choses : une traduction écrite à
 // la main gagne toujours, et relancer le script ne peut rien abîmer. Corriger
 // une tournure, c'est simplement l'écrire dans le fichier normal.
@@ -108,13 +108,13 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   'accueil.saisons': { fr: 'saisons à écrire', en: 'seasons to write', es: 'temporadas por escribir', it: 'stagioni da scrivere', de: 'Saisons zu schreiben', pt: 'épocas por escrever', ja: '書くべきシーズン' },
   'acc.f1.titre': { fr: 'Un MJ qui juge vraiment', en: 'A Game Master that really judges', es: 'Un Máster que juzga de verdad', it: 'Un Master che giudica davvero', de: 'Ein Spielleiter, der wirklich urteilt', pt: 'Um Mestre que julga a sério', ja: '本当に裁くゲームマスター' },
   'acc.f1.texte': {
-    fr: 'Le Maître du Jeu (IA Groq) évalue chacune de tes décisions selon tes stats, ta forme et le contexte. Rien n’est scripté.',
-    en: 'The Game Master (Groq AI) weighs every decision against your stats, your fitness and the context. Nothing is scripted.',
-    es: 'El Máster (IA Groq) evalúa cada decisión según tus estadísticas, tu forma y el contexto. Nada está guionizado.',
-    it: 'Il Master (IA Groq) valuta ogni tua decisione in base a statistiche, forma e contesto. Niente è scriptato.',
-    de: 'Der Spielleiter (Groq-KI) bewertet jede Entscheidung anhand deiner Werte, deiner Form und der Situation. Nichts ist vorgeschrieben.',
-    pt: 'O Mestre do Jogo (IA Groq) avalia cada decisão com base nas tuas estatísticas, forma e contexto. Nada é guionizado.',
-    ja: 'ゲームマスター（Groq AI）が、能力値・調子・状況を踏まえて一つひとつの判断を評価します。すべては即興です。',
+    fr: 'Le Maître du Jeu local évalue tes décisions selon tes stats, ta forme et le contexte, directement sur ton appareil.',
+    en: 'The local Game Master weighs your decisions against your stats, fitness and context, directly on your device.',
+    es: 'El Máster local evalúa tus decisiones según tus estadísticas, forma y contexto, directamente en tu dispositivo.',
+    it: 'Il Master locale valuta le tue decisioni in base a statistiche, forma e contesto, direttamente sul tuo dispositivo.',
+    de: 'Der lokale Spielleiter bewertet deine Entscheidungen anhand deiner Werte, Form und Situation direkt auf deinem Gerät.',
+    pt: 'O Mestre do Jogo local avalia as tuas decisões com base nos atributos, forma e contexto, diretamente no teu dispositivo.',
+    ja: 'ローカルゲームマスターが能力値、調子、状況をもとに、端末上で直接あなたの判断を評価します。',
   },
   'acc.f2.titre': { fr: 'Une progression vivante', en: 'A living progression', es: 'Una progresión viva', it: 'Una progressione viva', de: 'Eine lebendige Entwicklung', pt: 'Uma progressão viva', ja: '生きた成長' },
   'acc.f2.texte': {
@@ -190,9 +190,21 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   'cl.phaseFinale': { fr: 'Phase finale', en: 'Play-offs', es: 'Fase final', it: 'Fase finale', de: 'Play-offs', pt: 'Fase final', ja: 'プレーオフ' },
 
   // --- RÉGLAGES -----------------------------------------------------------
-  'reg.titre': { fr: 'Connexion à Groq', en: 'Connect to Groq', es: 'Conexión con Groq', it: 'Connessione a Groq', de: 'Verbindung zu Groq', pt: 'Ligação ao Groq', ja: 'Groqへの接続' },
+  'reg.titre': { fr: 'Intelligence artificielle locale', en: 'Local artificial intelligence', es: 'Inteligencia artificial local', it: 'Intelligenza artificiale locale', de: 'Lokale künstliche Intelligenz', pt: 'Inteligência artificial local', ja: 'ローカル人工知能' },
   'reg.eyebrow': { fr: 'MOTEUR DU MAÎTRE DU JEU', en: 'GAME MASTER ENGINE', es: 'MOTOR DEL MÁSTER', it: 'MOTORE DEL MASTER', de: 'SPIELLEITER-ENGINE', pt: 'MOTOR DO MESTRE DO JOGO', ja: 'ゲームマスター エンジン' },
-  'reg.modele': { fr: 'Modèle', en: 'Model', es: 'Modelo', it: 'Modello', de: 'Modell', pt: 'Modelo', ja: 'モデル' },
+  'reg.iaAide': { fr: 'Le Maître du Jeu peut fonctionner directement sur ton appareil : aucune clé, aucun compte et aucun quota.', en: 'The Game Master can run directly on your device: no key, account or quota.', es: 'El Máster puede funcionar directamente en tu dispositivo: sin clave, cuenta ni cuota.', it: 'Il Master può funzionare direttamente sul tuo dispositivo: nessuna chiave, account o quota.', de: 'Der Spielleiter kann direkt auf deinem Gerät laufen: ohne Schlüssel, Konto oder Kontingent.', pt: 'O Mestre do Jogo pode funcionar diretamente no teu dispositivo: sem chave, conta ou quota.', ja: 'ゲームマスターは端末上で直接動作します。キー、アカウント、利用制限はありません。' },
+  'reg.iaLocale': { fr: 'Maître du Jeu local', en: 'Local Game Master', es: 'Máster local', it: 'Master locale', de: 'Lokaler Spielleiter', pt: 'Mestre do Jogo local', ja: 'ローカルゲームマスター' },
+  'reg.iaPrete': { fr: 'Prête', en: 'Ready', es: 'Lista', it: 'Pronta', de: 'Bereit', pt: 'Pronta', ja: '準備完了' },
+  'reg.iaChargement': { fr: 'Chargement', en: 'Loading', es: 'Cargando', it: 'Caricamento', de: 'Wird geladen', pt: 'A carregar', ja: '読み込み中' },
+  'reg.iaInactive': { fr: 'Inactive', en: 'Inactive', es: 'Inactiva', it: 'Inattiva', de: 'Inaktiv', pt: 'Inativa', ja: '無効' },
+  'reg.iaIncompatible': { fr: 'Appareil incompatible', en: 'Device not supported', es: 'Dispositivo incompatible', it: 'Dispositivo non compatibile', de: 'Gerät nicht kompatibel', pt: 'Dispositivo incompatível', ja: '非対応端末' },
+  'reg.iaCache': { fr: 'Le modèle est déjà enregistré dans ce navigateur. Son activation ne consommera aucun quota.', en: 'The model is already stored in this browser. Enabling it will not use any quota.', es: 'El modelo ya está guardado en este navegador. Activarlo no consumirá ninguna cuota.', it: 'Il modello è già salvato in questo browser. Attivarlo non consumerà alcuna quota.', de: 'Das Modell ist bereits in diesem Browser gespeichert. Die Aktivierung verbraucht kein Kontingent.', pt: 'O modelo já está guardado neste navegador. Ativá-lo não consumirá qualquer quota.', ja: 'モデルはこのブラウザーに保存済みです。有効にしても利用制限はありません。' },
+  'reg.iaTelechargement': { fr: 'Le premier lancement télécharge le modèle puis le conserve dans le navigateur. Prévois environ 900 Mo et une connexion Wi-Fi.', en: 'The first launch downloads the model and keeps it in the browser. Allow about 900 MB and use Wi-Fi.', es: 'El primer inicio descarga el modelo y lo guarda en el navegador. Reserva unos 900 MB y usa Wi-Fi.', it: 'Il primo avvio scarica il modello e lo conserva nel browser. Servono circa 900 MB e una connessione Wi-Fi.', de: 'Beim ersten Start wird das Modell heruntergeladen und im Browser gespeichert. Plane etwa 900 MB ein und nutze WLAN.', pt: 'O primeiro arranque transfere o modelo e guarda-o no navegador. Reserva cerca de 900 MB e usa Wi-Fi.', ja: '初回起動時に約900MBのモデルをダウンロードし、ブラウザーに保存します。Wi-Fiの利用を推奨します。' },
+  'reg.iaDesactiver': { fr: 'Désactiver', en: 'Disable', es: 'Desactivar', it: 'Disattiva', de: 'Deaktivieren', pt: 'Desativar', ja: '無効にする' },
+  'reg.iaActiver': { fr: 'Activer', en: 'Enable', es: 'Activar', it: 'Attiva', de: 'Aktivieren', pt: 'Ativar', ja: '有効にする' },
+  'reg.iaTelecharger': { fr: 'Télécharger et activer', en: 'Download and enable', es: 'Descargar y activar', it: 'Scarica e attiva', de: 'Herunterladen und aktivieren', pt: 'Transferir e ativar', ja: 'ダウンロードして有効化' },
+  'reg.iaEffacer': { fr: 'Effacer le modèle', en: 'Delete model', es: 'Borrar el modelo', it: 'Elimina il modello', de: 'Modell löschen', pt: 'Apagar o modelo', ja: 'モデルを削除' },
+  'reg.iaErreur': { fr: 'Impossible de lancer l’IA locale.', en: 'The local AI could not be started.', es: 'No se pudo iniciar la IA local.', it: 'Impossibile avviare l’IA locale.', de: 'Die lokale KI konnte nicht gestartet werden.', pt: 'Não foi possível iniciar a IA local.', ja: 'ローカルAIを起動できませんでした。' },
   'reg.langue': { fr: 'Langue', en: 'Language', es: 'Idioma', it: 'Lingua', de: 'Sprache', pt: 'Idioma', ja: '言語' },
   'reg.langueAide': {
     fr: 'Les changements s’appliquent après avoir appuyé sur Enregistrer. Le Maître du Jeu, les situations et L’Ovale écriront eux aussi dans cette langue.',
@@ -219,7 +231,6 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   'reg.rythme': { fr: 'Rythme de jeu', en: 'Game pace', es: 'Ritmo de juego', it: 'Ritmo di gioco', de: 'Spieltempo', pt: 'Ritmo de jogo', ja: 'プレーのペース' },
   'reg.journeeParJournee': { fr: 'Journée par journée', en: 'Round by round', es: 'Jornada a jornada', it: 'Giornata per giornata', de: 'Spieltag für Spieltag', pt: 'Jornada a jornada', ja: '節ごと' },
   'reg.saisonParSaison': { fr: 'Saison par saison', en: 'Season by season', es: 'Temporada a temporada', it: 'Stagione per stagione', de: 'Saison für Saison', pt: 'Época a época', ja: 'シーズンごと' },
-  'reg.conso': { fr: 'Consommation Groq — cette session', en: 'Groq usage — this session', es: 'Consumo de Groq — esta sesión', it: 'Consumo Groq — questa sessione', de: 'Groq-Verbrauch — diese Sitzung', pt: 'Consumo Groq — esta sessão', ja: 'Groq使用量 — 今セッション' },
   'reg.appels': { fr: 'appel', en: 'call', es: 'llamada', it: 'chiamata', de: 'Aufruf', pt: 'chamada', ja: '回の呼び出し' },
   'reg.appels.pluriel': { fr: 'appels', en: 'calls', es: 'llamadas', it: 'chiamate', de: 'Aufrufe', pt: 'chamadas', ja: '回の呼び出し' },
   'reg.envoyes': { fr: 'tokens envoyés', en: 'tokens sent', es: 'tokens enviados', it: 'token inviati', de: 'Tokens gesendet', pt: 'tokens enviados', ja: '送信トークン' },
@@ -227,19 +238,12 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   'reg.remiseAZero': { fr: 'Remettre à zéro', en: 'Reset', es: 'Poner a cero', it: 'Azzera', de: 'Zurücksetzen', pt: 'Repor a zero', ja: 'リセット' },
   'reg.fermer': { fr: 'Fermer', en: 'Close', es: 'Cerrar', it: 'Chiudi', de: 'Schließen', pt: 'Fechar', ja: '閉じる' },
   'reg.enregistrer': { fr: 'Enregistrer', en: 'Save', es: 'Guardar', it: 'Salva', de: 'Speichern', pt: 'Guardar', ja: '保存' },
-  'reg.cleApi': { fr: 'Clé API Groq', en: 'Groq API key', es: 'Clave API de Groq', it: 'Chiave API Groq', de: 'Groq-API-Schlüssel', pt: 'Chave API Groq', ja: 'Groq APIキー' },
-  'reg.sansCle': { fr: 'Aucune clé', en: 'No key', es: 'Sin clave', it: 'Nessuna chiave', de: 'Kein Schlüssel', pt: 'Sem chave', ja: 'キーなし' },
-  'reg.formatValide': { fr: 'Format valide', en: 'Valid format', es: 'Formato válido', it: 'Formato valido', de: 'Gültiges Format', pt: 'Formato válido', ja: '有効な形式' },
-  'reg.formatInvalide': { fr: 'Format inattendu (attendu : gsk_…)', en: 'Unexpected format (expected: gsk_…)', es: 'Formato inesperado (se espera: gsk_…)', it: 'Formato inatteso (atteso: gsk_…)', de: 'Unerwartetes Format (erwartet: gsk_…)', pt: 'Formato inesperado (esperado: gsk_…)', ja: '形式が正しくありません（gsk_… が必要です）' },
-  'reg.cleFournie': { fr: 'Une clé est déjà fournie par le site : tu peux jouer directement.', en: 'The site already provides a key: you can play right away.', es: 'El sitio ya proporciona una clave: puedes jugar directamente.', it: 'Il sito fornisce già una chiave: puoi giocare subito.', de: 'Die Seite stellt bereits einen Schlüssel bereit: Du kannst sofort spielen.', pt: 'O site já fornece uma chave: podes jogar diretamente.', ja: 'サイト側のキーがすでに用意されています。すぐにプレイできます。' },
-  'reg.cleAide': { fr: 'La clé est enregistrée uniquement dans ton navigateur.', en: 'The key is stored only in your browser.', es: 'La clave se guarda solo en tu navegador.', it: 'La chiave è salvata solo nel tuo browser.', de: 'Der Schlüssel wird nur in deinem Browser gespeichert.', pt: 'A chave é guardada apenas no teu navegador.', ja: 'キーはこのブラウザ内にのみ保存されます。' },
   'reg.tenor': { fr: 'Clé Tenor (GIFs) — facultatif', en: 'Tenor key (GIFs) — optional', es: 'Clave Tenor (GIFs) — opcional', it: 'Chiave Tenor (GIF) — facoltativa', de: 'Tenor-Schlüssel (GIFs) — optional', pt: 'Chave Tenor (GIFs) — opcional', ja: 'Tenorキー（GIF）— 任意' },
   'reg.rythmeAide': { fr: 'Journée par journée : chaque match et chaque statistique sont joués. Pour avancer, choisis une date dans Résultats.', en: 'Round by round: every match and stat is played. To move forward, choose a date in Results.', es: 'Jornada a jornada: se juega cada partido y cada estadística. Para avanzar, elige una fecha en Resultados.', it: 'Giornata per giornata: ogni partita e statistica viene giocata. Per avanzare, scegli una data nei Risultati.', de: 'Spieltag für Spieltag: Jedes Spiel und jede Statistik wird gespielt. Wähle zum Vorspulen ein Datum in Ergebnisse.', pt: 'Jornada a jornada: todos os jogos e estatísticas são jogados. Para avançar, escolhe uma data em Resultados.', ja: '試合と成績はすべて節ごとに処理されます。先へ進むには「結果」で日付を選んでください。' },
-  'reg.consoAide': { fr: 'Une semaine de jeu utilise un seul appel pour le fil et les commentaires de L’Ovale. Les suggestions de comptes sont gratuites.', en: 'One game week uses one call for The Oval feed and comments. Account suggestions are free.', es: 'Una semana de juego usa una llamada para el muro y comentarios de El Oval. Las sugerencias de cuentas son gratuitas.', it: 'Una settimana di gioco usa una chiamata per feed e commenti di L’Ovale. I suggerimenti account sono gratuiti.', de: 'Eine Spielwoche nutzt einen Aufruf für Feed und Kommentare von The Oval. Kontovorschläge sind kostenlos.', pt: 'Uma semana de jogo usa uma chamada para o feed e comentários de O Oval. As sugestões de contas são gratuitas.', ja: '1週間のプレイでは、オーバルのフィードとコメントに1回の呼び出しを使います。アカウント提案は無料です。' },
   'reg.tenorAide': { fr: 'Sans clé, L’Ovale utilise des images libres. Une clé Tenor gratuite permet aussi les GIFs animés.', en: 'Without a key, The Oval uses free images. A free Tenor key also enables animated GIFs.', es: 'Sin clave, El Oval usa imágenes libres. Una clave Tenor gratuita también activa GIFs animados.', it: 'Senza chiave, L’Ovale usa immagini libere. Una chiave Tenor gratuita abilita anche le GIF animate.', de: 'Ohne Schlüssel nutzt The Oval freie Bilder. Ein kostenloser Tenor-Schlüssel aktiviert auch animierte GIFs.', pt: 'Sem chave, O Oval usa imagens livres. Uma chave Tenor gratuita também ativa GIFs animados.', ja: 'キーがない場合、オーバルはフリー画像を使用します。無料のTenorキーでアニメーションGIFも使えます。' },
-  'reg.tutoriel': { fr: 'Tutoriel : obtenir et enregistrer ma clé', en: 'Guide: get and save my key', es: 'Guía: obtener y guardar mi clave', it: 'Guida: ottenere e salvare la chiave', de: 'Anleitung: Schlüssel holen und speichern', pt: 'Guia: obter e guardar a minha chave', ja: 'ガイド：キーの取得と保存' },
-  'reg.tutorielAide': { fr: 'Sur console.groq.com, crée un compte gratuit, ouvre « API Keys », crée une clé qui commence par gsk_, copie-la puis colle-la ici avant d’enregistrer.', en: 'At console.groq.com, create a free account, open “API Keys”, make a key starting with gsk_, copy it and paste it here before saving.', es: 'En console.groq.com, crea una cuenta gratuita, abre « API Keys », crea una clave que empiece por gsk_, cópiala y pégala aquí antes de guardar.', it: 'Su console.groq.com crea un account gratuito, apri “API Keys”, crea una chiave che inizi con gsk_, copiala e incollala qui prima di salvare.', de: 'Erstelle auf console.groq.com ein kostenloses Konto, öffne „API Keys“, erstelle einen Schlüssel mit gsk_, kopiere ihn und füge ihn hier vor dem Speichern ein.', pt: 'Em console.groq.com, cria uma conta gratuita, abre “API Keys”, cria uma chave que comece por gsk_, copia-a e cola-a aqui antes de guardar.', ja: 'console.groq.comで無料アカウントを作成し、「API Keys」からgsk_で始まるキーを発行して、ここに貼り付けて保存してください。' },
-  'reg.sansCleAide': { fr: 'Pas de clé ? Tu peux jouer quand même : les situations à choix et les événements aléatoires restent disponibles sans IA.', en: 'No key? You can still play: choice-driven situations and random events remain available without AI.', es: '¿Sin clave? Aún puedes jugar: las situaciones con elecciones y eventos aleatorios siguen disponibles sin IA.', it: 'Nessuna chiave? Puoi comunque giocare: situazioni a scelta ed eventi casuali restano disponibili senza IA.', de: 'Kein Schlüssel? Du kannst trotzdem spielen: Wahlereignisse und Zufallsereignisse bleiben ohne KI verfügbar.', pt: 'Sem chave? Podes jogar na mesma: situações de escolha e eventos aleatórios continuam disponíveis sem IA.', ja: 'キーがなくてもプレイできます。選択イベントとランダムイベントはAIなしでも利用可能です。' },
+  'reg.tutoriel': { fr: 'Comment fonctionne l’IA locale ?', en: 'How does local AI work?', es: '¿Cómo funciona la IA local?', it: 'Come funziona l’IA locale?', de: 'Wie funktioniert die lokale KI?', pt: 'Como funciona a IA local?', ja: 'ローカルAIの仕組み' },
+  'reg.tutorielAide': { fr: 'Le modèle est téléchargé depuis sa source publique, puis ses calculs sont exécutés par la carte graphique de ton appareil. Les textes du jeu ne quittent pas ton navigateur.', en: 'The model is downloaded from its public source, then calculations run on your device’s graphics processor. Game text never leaves your browser.', es: 'El modelo se descarga desde su fuente pública y los cálculos se ejecutan en la tarjeta gráfica de tu dispositivo. Los textos del juego no salen del navegador.', it: 'Il modello viene scaricato dalla sua fonte pubblica, poi i calcoli vengono eseguiti dalla scheda grafica del dispositivo. I testi del gioco non lasciano il browser.', de: 'Das Modell wird von seiner öffentlichen Quelle geladen und auf dem Grafikprozessor deines Geräts ausgeführt. Spieltexte verlassen deinen Browser nicht.', pt: 'O modelo é transferido da sua fonte pública e os cálculos são executados pela placa gráfica do teu dispositivo. Os textos do jogo não saem do navegador.', ja: 'モデルは公開元からダウンロードされ、端末のGPUで処理されます。ゲーム内の文章がブラウザー外へ送信されることはありません。' },
+  'reg.sansCleAide': { fr: 'Appareil incompatible ou IA désactivée ? Le jeu reste complet grâce aux situations, commentaires et réponses pré-écrits.', en: 'Unsupported device or local AI disabled? The game remains complete thanks to pre-written events, comments and replies.', es: '¿Dispositivo incompatible o IA desactivada? El juego sigue completo gracias a los eventos, comentarios y respuestas preescritos.', it: 'Dispositivo incompatibile o IA disattivata? Il gioco resta completo grazie a eventi, commenti e risposte già scritti.', de: 'Gerät nicht kompatibel oder lokale KI deaktiviert? Dank vorbereiteter Ereignisse, Kommentare und Antworten bleibt das Spiel vollständig.', pt: 'Dispositivo incompatível ou IA desativada? O jogo continua completo graças a eventos, comentários e respostas pré-escritos.', ja: '非対応端末やAIを無効にした場合でも、用意済みのイベント、コメント、返信ですべて遊べます。' },
 
   // --- MATCH EN DIRECT ----------------------------------------------------
   'ml.pause': { fr: 'Pause', en: 'Pause', es: 'Pausa', it: 'Pausa', de: 'Pause', pt: 'Pausa', ja: '一時停止' },
@@ -353,7 +357,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   'ov.publicationsRecherche': { fr: 'Publications — « {recherche} »', en: 'Posts — “{recherche}”' },
   'ov.reseauEcrit': { fr: 'le réseau écrit…', en: 'the network is writing…' },
   'ov.semaineActuelle': { fr: 'semaine {n} · {libelle}', en: 'week {n} · {libelle}' },
-  'ov.cleIA': { fr: 'Ajoute une clé Groq dans ⚙️ pour un fil écrit par l’IA.', en: 'Add a Groq key in ⚙️ for an AI-written feed.' },
+  'ov.cleIA': { fr: 'Active l’IA locale dans ⚙️ pour un fil écrit sur mesure.', en: 'Enable local AI in ⚙️ for a custom-written feed.', es: 'Activa la IA local en ⚙️ para obtener un muro escrito a medida.', it: 'Attiva l’IA locale in ⚙️ per un feed scritto su misura.', de: 'Aktiviere die lokale KI unter ⚙️ für einen individuell geschriebenen Feed.', pt: 'Ativa a IA local em ⚙️ para um feed escrito à medida.', ja: '⚙️でローカルAIを有効にすると、専用のフィードが生成されます。' },
   'ov.aucuneNotification': { fr: 'Rien pour l’instant. Publie quelque chose, ça viendra vite.', en: 'Nothing yet. Post something and it will happen soon.' },
   'ov.tendanceDivision': { fr: '{division} · Tendance', en: '{division} · Trending' },
   'ov.tendanceRugby': { fr: 'Rugby · Tendance', en: 'Rugby · Trending' },
@@ -598,7 +602,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
 
   // --- ATTRIBUTS ------------------------------------------------------------
   // Lus par `labelAttribut()` (data/rugby.ts). `ATTRIBUTS_LABELS` reste la
-  // source française : c'est elle que `lib/groq.ts` envoie au Maître du Jeu.
+  // source française : c'est elle que `lib/iaLocale.ts` envoie au Maître du Jeu.
   'attr.vitesse': { fr: 'Vitesse', en: 'Pace', es: 'Velocidad', it: 'Velocità', de: 'Tempo', pt: 'Velocidade', ja: 'スピード' },
   'attr.force': { fr: 'Force', en: 'Strength', es: 'Fuerza', it: 'Forza', de: 'Kraft', pt: 'Força', ja: 'パワー' },
   'attr.endurance': { fr: 'Endurance', en: 'Stamina', es: 'Resistencia', it: 'Resistenza', de: 'Ausdauer', pt: 'Resistência', ja: 'スタミナ' },

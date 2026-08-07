@@ -7,7 +7,7 @@ chaque changement notable.
 ## Le projet en une phrase
 
 RPG de **carrière de rugby** solo : le joueur écrit ses actions en français, un
-**Maître du Jeu IA (Groq)** juge le résultat et fait évoluer les statistiques.
+**Maître du Jeu IA local (WebLLM)** juge le résultat et fait évoluer les statistiques.
 Inspiré des jeux type *Destin Eleven*, décliné pour l'ovalie.
 
 ## Préférences de travail (imposées par l'utilisateur)
@@ -19,14 +19,18 @@ Inspiré des jeux type *Destin Eleven*, décliné pour l'ovalie.
   desktop **ET** mobile), pas seulement compiler.
 - **Responsive obligatoire.**
 - Tenir **`CLAUDE.md`** et **`README.md`** à jour à chaque évolution.
-- **Clé API Groq** : elle est saisie par chaque joueur dans ⚙️ et reste dans son
-  `localStorage`. Ne jamais ajouter de `VITE_GROQ_KEY` : tout secret préfixé
-  `VITE_` est intégré au bundle public.
+- **IA locale uniquement** : aucune clé ni API d'inférence. `App.tsx` précharge
+  Llama 3.2 1B quantifié dans un Worker WebLLM en arrière-plan au premier
+  démarrage compatible. Ne jamais
+  réintroduire de clé distante ou de variable `VITE_*` pour l'IA.
+- **Téléchargement automatique mais désactivable** : environ 900 Mo au premier
+  lancement. Le choix de désactivation dans Réglages est persisté. Si WebGPU
+  manque ou échoue, chaque fonction retombe sur son contenu pré-écrit.
 
 ## Stack
 
 Vite 8 · React 19 · TypeScript · Zustand (+ persist) · Framer Motion ·
-Three.js (@react-three/fiber + @react-three/drei) · API Groq (compatible OpenAI).
+Three.js (@react-three/fiber + @react-three/drei) · WebLLM + WebGPU.
 
 ## Architecture
 
@@ -35,15 +39,16 @@ Three.js (@react-three/fiber + @react-three/drei) · API Groq (compatible OpenAI
 | `src/types.ts` | Types du domaine (`Joueur`, `Attributs`, `ReponseMJ`, `EntreeJournal`, `Ecran`…). |
 | `src/data/rugby.ts` | Données statiques : `POSTES` (**15 postes numérotés 1-15**, chacun avec sa `famille` — les données réelles ne donnent que la famille ; `posteDepuisFamille()` attribue un numéro déterministe, `migrerPoste()` répare les vieilles sauvegardes), `NATIONS_PAR_ZONE` (**202 nations**, dérivées de `data/nations.ts`) + `NATIONS` (à plat), `ATTRIBUTS_LABELS`. |
 | `src/data/evenements.ts` | Pool d'`EVENEMENTS` aléatoires (récit + deltas + Ovas), jouables **sans IA**. |
-| `src/data/scenarios.ts` | `SCENARIOS` à **choix** (situation + options + issues, `transfert?` en option) — cœur du mode **sans clé**. |
+| `src/data/scenarios.ts` | `SCENARIOS` à **choix** (situation + options + issues, `transfert?` en option) — cœur du repli **sans IA locale**. |
 | `src/data/clubs.ts` | **Assemblage** des compétitions : les 3 divisions pro françaises + les 13 championnats du monde viennent du fichier généré `mondeReel.ts` ; **Nationale 2 (26), Fédérale 1 (48), 2 (95), 3 (157)** restent saisies ici (blocs `NOM OFFICIEL\|Nom court` parsés) ; **Régionale 1 (63), 2 (60), 3 (62)** viennent du fichier généré `amateurs.ts`. Soit **655 clubs français sur 10 divisions**. `club()` accroche au passage le vrai logo amateur (`LOGO_AMATEUR`). `divisionDuClub()` (France), `competitionDuClub()` (monde compris), `clubParNom()`, `NOTE_PAR_NIVEAU` (niveaux **0-10**), couleurs auto par hash (⚠️ `>>>` non signé). |
 | `src/data/mondeReel.ts` | ⚠️ **GÉNÉRÉ**. `COMPETITIONS_REELLES` (16 championnats, **143 clubs** avec nom, ville, **logo officiel**, couleurs de repli), `COUPES_EUROPE` (Champions/Challenge/Prem. Rugby Cup : clubs engagés), `COMPETITIONS_NATIONS` (10 compétitions de sélections **avec leur classement**), `LOGO_PAR_EQUIPE`. Les classements de CLUBS ne sont pas exportés : ils ne servent qu'au calcul des notes, dans le générateur. |
+| `src/data/classementWorldRugby.ts` | Les **114 notes initiales** des sélections masculines, sur l'échelle World Rugby 0–100, avec les noms français canoniques du jeu. `NOTE_NOUVEAU_MEMBRE = 30`. |
 | `src/data/effectifsReels.ts` | ⚠️ **GÉNÉRÉ**. `NOTE_CLUB_REEL` (note générale des 143 clubs) + `EFFECTIFS_REELS` (**6 306 joueurs réels** 25-26 : nom, poste, nation, âge, note, **potentiel**). Encodage **compact** (`nom\|poste\|âge\|note\|potentiel\|nation`, index pour poste et nation) : en objets littéraux le fichier ferait 700 Ko dans le bundle, ici 230 Ko. |
-| `scripts/genMonde.cjs` | **Le** générateur. Lit `base_rugby_finale.json` + `tous_les_classements.json`, calcule les notes de club et de joueur, écrit les deux fichiers ci-dessus. Signale en console tout écart (équipe inconnue, logo manquant, vedette sans joueur). **Relancer** : `node scripts/genMonde.cjs`. |
+| `scripts/genMonde.cjs` | **Le** générateur. Lit `sources/data/base_rugby_finale.json` + `sources/data/tous_les_classements.json`, calcule les notes de club et de joueur, écrit les deux fichiers ci-dessus. Signale en console tout écart (équipe inconnue, logo manquant, vedette sans joueur). **Relancer** : `node scripts/genMonde.cjs`. |
 | `scripts/ligues.cjs` | Table des championnats : `srcLigue` (nom dans les JSON), `echelle` `[note du dernier, note du premier]`, et pour chaque club `[nom court des données, nom dans le jeu, ville, note imposée?]`. **C'est ici** qu'on ajoute/renomme un club ou une division. |
 | `scripts/vedettes.cjs` | Notes calibrées à la main (~450 internationaux). `ALIAS` réconcilie les anciennes orthographes LNR (« Grégory ALLDRITT ») avec celles de la base (« Greg ALLDRITT »). |
-| `scripts/copierLogos.cjs` | `logos_equipes/**/<club>.png` → `public/logos/<slug>.png`, **récursif** (les logos amateurs sont rangés sur deux niveaux), à plat et dédoublonné, accents retirés du nom de fichier. **715 logos**, 5,5 Mo. |
-| `scripts/genAmateurs.cjs` | ⚙️ Générateur du **monde amateur** : lit `liste club regionaux/`, `transfert + joueur nat2, fed et reg/` et le pack de logos, rapproche les noms des clubs du jeu (clé normalisée + repli par inclusion + `ALIAS_CLUB`), écrit `src/data/amateurs.ts` et `src/data/mercato.ts`. Signale les clubs sans effectif/logo et les équipes non rattachées. **Relancer** : `node scripts/genAmateurs.cjs`. |
+| `scripts/copierLogos.cjs` | `sources/logos/clubs/**/<club>.png` → `public/logos/<slug>.png`, **récursif** (les logos amateurs sont rangés sur deux niveaux), à plat et dédoublonné, accents retirés du nom de fichier. **689 fichiers de base** ; les générateurs des nouvelles ligues et les sélections portent le total public à 957. |
+| `scripts/genAmateurs.cjs` | ⚙️ Générateur du **monde amateur** : lit `sources/data/clubs-regionaux/`, `sources/data/effectifs-amateurs/` et le pack `sources/logos/clubs/`, rapproche les noms des clubs du jeu (clé normalisée + repli par inclusion + `ALIAS_CLUB`), écrit `src/data/amateurs.ts` et `src/data/mercato.ts`. Signale les clubs sans effectif/logo et les équipes non rattachées. **Relancer** : `node scripts/genAmateurs.cjs`. |
 | `src/data/amateurs.ts` | ⚠️ **GÉNÉRÉ**. `CLUBS_REGIONAUX` (185 clubs R1-R3), `LOGO_AMATEUR` (494 clubs), `EFFECTIFS_AMATEURS` (**384 clubs, 12 086 joueurs réels** — encodage compact `nom|indice de poste`). Les données ne donnent **ni âge ni note** : ils sont tirés côté jeu, seed = club + nom. |
 | `src/data/mercato.ts` | ⚠️ **GÉNÉRÉ**. `MERCATO_REEL` : le **mercato estival réel** de 83 clubs (Top 14 → Nationale 2), **3 224 mouvements** (arrivées / départs / prolongations), encodés `nom|poste|nation|âge|club lié`. Décodé par `src/lib/mercato.ts`. |
 | `src/lib/effectif.ts` | `effectifDuClub(club, saison)` = effectif de base **+ mercato**. Base : **effectif réel pro** vieilli, sinon **effectif réel amateur** (`effectifAmateur`, âge/note tirés), sinon des coéquipiers **déterministes** (seed = club+slot+génération), retraite 33-37 ans → **regens**, **nationalités pondérées** (`PART_FRANCAIS`). Aussi : `noteALAge()` (**progression vers le potentiel jusqu'à 27 ans, puis déclin**), `estEspoir`/`estDeclinant`, `forceEffectif(club, saison)` et `forceMoyenneDivision(division, saison)` (tous deux mémoïsés). ⚠️ L'ordre des tirages `rng()` est figé (prénom, nom, âge, retraite, talent, nation) — ne pas le changer sans adapter le « peek » de `effectifDuClub`/`cumulDebut`. |
@@ -56,19 +61,21 @@ Three.js (@react-three/fiber + @react-three/drei) · API Groq (compatible OpenAI
 | `src/components/FicheClub.tsx` | Modale « effectif du club », ouverte au **clic sur un club** dans Championnats. Affiche note du club, force d'effectif et tous les joueurs poste par poste, pour la **saison en cours** de la carrière. Échap ou clic hors modale ferment. ⚠️ `createPortal(document.body)` obligatoire (backdrop-filter des `.carte`). |
 | `src/components/Selecteur.tsx` | **Liste déroulante maison** (un `<select>` natif ne peut ni afficher de drapeau ni être stylé : son menu est rendu par l'OS). Gère vignettes, groupes, recherche (auto > 10 options), clavier (↑↓/Entrée/Échap), clic extérieur. Utilisée dans `Creation` (nation, division, club). ⚠️ Le défilement auto ne s'applique qu'au clavier (`parClavier`) — sinon la liste saute sous le curseur à l'ouverture. |
 | `src/data/boutique.ts` | `SKINS` de ballon (`glb?` = modèle 3D dédié), `BOOSTS`, `PACKS` d'Ovas (achat réel non branché). |
-| `src/data/trophees.ts` | `TROPHEES` (**47** : 39 titres d'équipe + **8 distinctions individuelles**) + `TROPHEE_PAR_DIVISION` (clé = id de compétition), `TROPHEE_PAR_COUPE`, `COUPE_EUROPE_PAR_DIVISION`, `MEILLEUR_JOUEUR_PAR_DIVISION`, `NATIONS_6N`. Chaque trophée pointe un `.glb` de `public/m3d/`. ⚠️ **`Trophee.individuel` est LE champ qui range un trophée** : il commande sa place dans l'armoire ET la façon dont on le gagne (`lib/honneurs.ts` au lieu du terrain). |
+| `src/data/trophees.ts` | `TROPHEES` (**54** : 46 titres d'équipe + **8 distinctions individuelles**) + `TROPHEE_PAR_DIVISION`, `TROPHEE_PAR_COUPE`, `TROPHEE_PAR_INTERNATIONAL`, `COUPE_EUROPE_PAR_DIVISION`, `MEILLEUR_JOUEUR_PAR_DIVISION`, `NATIONS_6N`. Chaque trophée pointe un `.glb` de `public/m3d/`. ⚠️ **`Trophee.individuel` est LE champ qui range un trophée** : il commande sa place dans l'armoire ET la façon dont on le gagne (`lib/honneurs.ts` au lieu du terrain). |
 | `api/classement.ts` | **La fonction serverless Vercel du classement mondial** (à la racine, à côté de `src/` : c'est la convention Vercel, et c'est ce qui lui permet d'importer le barème du jeu au lieu de le recopier). `GET` = top 100, `POST` = débit, `verifierFiche`, RECALCUL du score, écriture du seul score. Déploiement : `serveur/VERCEL.md`. |
 | `src/lib/classementEnLigne.ts` | Le côté navigateur : `envoyerAuClassement()`, `lireClassementMondial()`. ⚠️ Sans serveur, il renvoie une liste vide **sans lever d'erreur** — le classement local continue. |
-| `scripts/traduire.ts` | **La traduction automatique du dictionnaire.** Repère les (clé, langue) manquantes, les fait traduire par Groq avec le vocabulaire du rugby imposé, et écrit `src/data/textesAuto.ts` (GÉNÉRÉ, fusionné avec la priorité la plus BASSE : une traduction humaine gagne toujours). ⚠️ Une traduction qui perd une variable `{n}` est **rejetée**. |
+| `src/lib/classementWorldRugby.ts` | Formule pure du classement **des sélections** : domicile +3, écart borné à ±10, nul/victoire, marge >15 ×1,5, Coupe du monde ×2, échange à somme nulle et notes bornées 0–100. Ne pas confondre avec le classement en ligne des carrières. |
 | `src/lib/honneurs.ts` | **Les distinctions individuelles.** `noterSaisonIndividuelle()` cote la saison sur ~100 (note de saison ×7, statistiques comparées au poste, palmarès de l'année, rang du club, notoriété, au prorata des matchs joués) et `decernerHonneurs()` la compare aux barres. **Pure, déterministe, aucun tirage au sort** : le seul aléa est la barre, qui bouge de ±3,5 par saison (le rival de l'année). Appelée par `saisonSuivante` APRÈS `evoluer()` — c'est le seul moment où la note de saison ET le palmarès existent tous les deux. |
 | `src/lib/armoire.ts` | La disposition de l'armoire, **fonction pure** (testable sans GPU). `detecterEtageres()` lit les tablettes sur la géométrie du `.glb`, `disposerArmoire()` place tout d'un coup — **distinctions en vitrine, titres d'équipe au sol**, boucliers adossés au coin avant du meuble — et `cadrage()` calcule la caméra pour l'ordinateur comme pour le téléphone. |
-| `src/data/selections.ts` | Dérive de `COMPETITIONS_NATIONS` la liste dédoublonnée des **sélections** : `SELECTIONS_SENIOR` (une équipe par pays : les A/XV/Barbarians/Māori sont écartés par `RESERVES`) et `SELECTIONS_U20` (nom, logo, nation de base pour le drapeau, compétitions disputées). Alimente l'onglet 🏳️ Sélections. |
+| `src/data/selections.ts` | Dérive de `COMPETITIONS_NATIONS`, `COMPETITIONS_NATIONS_NOUVELLES` et du classement World Rugby la liste dédoublonnée des **sélections** : `SELECTIONS_SENIOR` (les **114 nations classées**, une équipe par pays ; A/B/C/XV/Barbarians/Māori écartés par `RESERVES`) et `SELECTIONS_U20` (nom, logo, nation de base pour le drapeau, compétitions disputées). Les équipes des nouvelles compétitions apparaissent donc aussi dans l'onglet 🏳️ Sélections. |
 | `src/components/TropheeGagne.tsx` | Cérémonie : modale + Canvas R3F, modèle recentré/normalisé **en rotation continue**, Sparkles, aura colorée. |
 | `src/components/Confirmation.tsx` | Modale de confirmation maison. ⚠️ **Ne jamais utiliser `window.confirm()`** (bloqué/inconstant) et **toujours passer par `createPortal(document.body)`** : le `backdrop-filter` des `.carte` crée un bloc conteneur qui piège les `position: fixed`. |
 | `src/data/legendes.ts` | `LEGENDES_FICTIVES` qui peuplent le classement (marquées `fictif`). |
-| `src/lib/groq.ts` | Appel `fetch` à Groq avec la clé personnelle, **prompt système** du MJ (sévère, anti-triche), parsing du JSON et nettoyage des deltas. ⚠️ **`plafonnerDeltas()` et `ressembleATriche()`** sont le vrai garde-fou : le prompt seul finit toujours par se laisser convaincre. |
+| `src/lib/iaLocale.ts` | Pilote le Worker WebLLM et le cache, sérialise les générations, contient le **prompt système** du MJ, le parsing JSON et les garde-fous. `App.tsx` déclenche son préchargement différé en arrière-plan. ⚠️ **`plafonnerDeltas()` et `ressembleATriche()`** restent la vraie autorité. |
+| `src/lib/iaSociale.ts` | Publications, commentaires et messages privés générés sur l'appareil. Chaque fonction possède un repli dans `lib/social.ts`/`lib/vie.ts`. |
+| `src/workers/iaLocale.worker.ts` | Worker dédié à l'inférence : le modèle ne doit jamais tourner sur le fil React. |
 | `src/store/useGame.ts` | Store Zustand persistant : `joueur`, `journal`, `coins` (Ovas), `inventaire`/`skinActif`, `pantheon`, réglages, navigation, négociations de contrat et logique de carrière. Exporte aussi `scoreCarriere`, `noteGlobale`, `classementComplet`. |
-| `src/components/` | `Nav` (+ badge Ovas), `Reglages` (+ tutoriel clé), `Jauge`, `PanneauJoueur` (badge **GÉN**, logo+club·division, 👥 Mon équipe, retraite), `Hero3D` (si `skin.glb` → `ModeleBallon`, sinon `BallonRugby`), `ModeleBallon` (`useGLTF(url, true)` = **Draco**). |
+| `src/components/` | `Nav` (+ badge Ovas), `Reglages` (activation, progression et suppression de l'IA locale), `Jauge`, `PanneauJoueur` (badge **GÉN**, logo+club·division, 👥 Mon équipe, retraite), `Hero3D` (si `skin.glb` → `ModeleBallon`, sinon `BallonRugby`), `ModeleBallon` (`useGLTF(url, true)` = **Draco**). |
 | `src/screens/` | `Accueil`, `Creation` (division+club réels), `Carriere` (MJ + 📖/🎲 **limités à `MAX_PAR_SAISON`=2**), `Profil`, `Boutique`, `Pantheon`, `Classement`, `Championnats` (3 onglets France/Monde/Sélections ; clic sur un club → `FicheClub` ; l'onglet Sélections liste les **équipes** — séniors puis U20 — et non les compétitions), `Effectif` (coéquipiers). |
 | `src/index.css` | Design system : variables CSS (couleurs, polices, rayons), reset, fond. |
 | `src/App.css` | Styles des composants et écrans + **media queries responsive** (900px / 560px). |
@@ -76,9 +83,9 @@ Three.js (@react-three/fiber + @react-three/drei) · API Groq (compatible OpenAI
 ### Boucle de jeu (cœur)
 
 1. Le joueur tape une action dans `Carriere.tsx` (ou clique une suggestion).
-2. `demanderAuMJ()` (`lib/groq.ts`) envoie : prompt système + fiche joueur +
-   historique (8 derniers messages) + action → Groq (`response_format:
-   json_object`).
+2. `demanderAuMJ()` (`lib/iaLocale.ts`) transmet au modèle local : prompt
+   système + fiche joueur + historique récent + action. WebLLM impose
+   `response_format: json_object`.
 3. La réponse JSON est nettoyée en `ReponseMJ` (`recit`, `evenement`, `deltas`,
    `choix`).
 4. `appliquerReponse()` (store) applique les deltas (attributs bornés 0-100,
@@ -110,11 +117,10 @@ npm run lint     # oxlint
 npm run preview  # aperçu du build
 ```
 
-Régénération des données réelles (sources à la racine : `base_rugby_finale.json`,
-`tous_les_classements.json`, `logos_equipes/`) :
+Régénération des données réelles (sources regroupées dans `sources/`) :
 
 ```bash
-node scripts/copierLogos.cjs   # logos_equipes/** → public/logos/ (récursif, 715 fichiers)
+node scripts/copierLogos.cjs   # sources/logos/clubs/** → public/logos/ (récursif, 689 fichiers de base)
 node scripts/genMonde.cjs      # → src/data/mondeReel.ts + src/data/effectifsReels.ts
 node scripts/genAmateurs.cjs   # → src/data/amateurs.ts + src/data/mercato.ts
 ```
@@ -307,16 +313,16 @@ npx vite-node scripts/verif.ts
   (coupes, arbres, robustesse du Hall et du Classement).
 
 
-## L'Ovale piloté par l'IA (dernier ajout)
+## L'Ovale piloté par l'IA locale
 
-Tout le réseau social est désormais **écrit par Groq** et **entièrement
-interactif**. Il n'y a plus une seule phrase toute prête proposée au joueur :
+Tout le réseau social peut être **écrit par le modèle local** et reste entièrement
+interactif. Il n'y a plus une seule phrase toute prête proposée au joueur :
 la zone de rédaction est vide, on écrit ce qu'on veut.
 
 | Fichier | Rôle |
 |---|---|
-| `src/lib/groqSocial.ts` | Les quatre appels IA : `filGroq()` (publications des clubs, joueurs, presse et supporters, avec leurs pseudos), `reponsesGroq()` (les commentaires sous TES posts), `comptesGroq()` (comptes à suivre), `messageGroq()` (l'IA répond **à la place** de ton interlocuteur en message privé). Le contexte envoyé contient ton club, ton championnat, tes coéquipiers réels et tes rivaux : l'IA ne peut pas inventer un club. |
-| `src/lib/social.ts` | Le repli **hors ligne** de chacun (règle du projet : le jeu reste jouable sans clé), dont `suggestionsLocales()` qui fabrique de vrais comptes à partir de l'effectif et des clubs de la division. |
+| `src/lib/iaSociale.ts` | `filIA()` (publications), `reponsesIA()` (commentaires) et `messageIA()` (messages privés). Le contexte contient le club, le championnat, les coéquipiers et les rivaux réels. |
+| `src/lib/social.ts` | Le repli **pré-écrit** de chacun (règle du projet : le jeu reste jouable sans WebGPU), dont `suggestionsLocales()` qui fabrique de vrais comptes à partir de l'effectif et des clubs de la division. |
 | `src/screens/Social.tsx` | Cinq onglets : **Accueil** (fil + rédaction + « ↻ Actualiser le fil »), **Explorer** (suivre / se désabonner), **Messages** (conversation avec chaque compte suivi), **Notifs**, **Succès**. |
 
 ### ⚠️ Une annonce a des conséquences réelles
@@ -349,8 +355,8 @@ Effectif et panneau joueur.
 
 | Fichier | Rôle |
 |---|---|
-| `logo league/` | Les images fournies (24 fichiers, à la racine du projet). |
-| `scripts/copierLogosCompetitions.cjs` | Copie `logo league/*` vers `public/logos-competitions/<id>.<ext>`, **nommés par l'id de compétition** (plus rien à deviner à l'exécution), puis génère la table. La constante `CORRESPONDANCE` en tête du script est le SEUL endroit à modifier pour ajouter ou changer un logo. Relancer : `node scripts/copierLogosCompetitions.cjs`. |
+| `sources/logos/competitions/` | Les 24 images de compétitions fournies. |
+| `scripts/copierLogosCompetitions.cjs` | Copie `sources/logos/competitions/*` vers `public/logos-competitions/<id>.<ext>`, **nommés par l'id de compétition** (plus rien à deviner à l'exécution), puis génère la table. La constante `CORRESPONDANCE` en tête du script est le SEUL endroit à modifier pour ajouter ou changer un logo. Relancer : `node scripts/copierLogosCompetitions.cjs`. |
 | `src/data/logosCompetitions.ts` | ⚠️ **GÉNÉRÉ**. `LOGO_COMPETITION` : id de compétition → chemin public. |
 | `src/components/LogoCompet.tsx` | `<LogoCompet id="top14" emoji="🏉" taille={26} />` — le logo sur une pastille claire (les images sont sur fond blanc : sans pastille, un logo sombre disparaîtrait sur le thème nocturne), avec **repli sur l'emoji** quand aucune image n'est fournie. |
 
@@ -358,7 +364,7 @@ Effectif et panneau joueur.
 Restent en emoji faute d'image : Autumn Nations Series, Nations Championship,
 Nations Cup, Rugby Europe Championship, The Rugby Championship U20, Test-matchs
 et « Autres clubs européens ». Pour les ajouter : déposer le fichier dans
-`logo league/`, ajouter sa ligne dans `CORRESPONDANCE`, relancer le script.
+`sources/logos/competitions/`, ajouter sa ligne dans `CORRESPONDANCE`, relancer le script.
 
 
 ## L'Ovale vivant : annuaire, recherche, profils, relations
@@ -371,7 +377,7 @@ et « Autres clubs européens ». Pour les ajouter : déposer le fichier dans
 
 **Le fil bouge tout seul** : `battementSocial()` (store) est appelé toutes les
 **8 secondes** tant que l'écran est ouvert — un compte publie, et une fois sur
-cinq quelqu'un t'envoie un message privé. Avec une clé Groq, `rafraichirFil()`
+cinq quelqu'un t'envoie un message privé. Avec l'IA locale, `rafraichirFil()`
 vient en renfort toutes les **90 s** pour du contenu écrit sur mesure. Il n'y a
 plus aucun bouton « actualiser ».
 
@@ -403,7 +409,7 @@ Vérification sans navigateur : `npx vite-node scripts/verifSocial2.ts`
   - par défaut **LoremFlickr** (banque libre, interrogeable par mots-clés, sans
     clé) : `imagePourRequete('rugby scrum stadium')` ;
   - **Tenor** pour de vrais GIFs animés, si le joueur colle une clé gratuite
-    dans ⚙️ (`tenorKey`, rangée comme la clé Groq). Sans elle, la recherche
+    dans ⚙️ (`tenorKey`, facultative). Sans elle, la recherche
     renvoie des photos : le jeu ne casse jamais ;
   - `reduirePourAvatar()` recadre et compresse une image choisie sur le disque
     en **160×160 JPEG** — sans ça, une photo de 4 Mo ferait sauter le quota
@@ -503,7 +509,7 @@ premier.
 - **Composition des divisions** (`scripts/ligues.cjs`) — l'utilisateur a arbitré
   la saison en cours : **Vannes monte en Top 14, Montauban descend en Pro D2 ;
   Nice et Narbonne montent en Pro D2, Mont-de-Marsan et Carcassonne descendent
-  en Nationale.** Les classements de `tous_les_classements.json` sont donc ceux
+  en Nationale.** Les classements de `sources/data/tous_les_classements.json` sont donc ceux
   de la saison **précédente** — c'est normal qu'un club n'y figure pas dans la
   division où il est déclaré. Les autres corrections apportées par la base
   restent : Niort et Tarbes sont passés de Fédérale 3 à Nationale, Vienne et
@@ -572,7 +578,7 @@ premier.
 - **Logos** : `public/logos/<slug>.png`, slug dérivé du **nom court des
   données** (minuscules, sans accent ni apostrophe, espaces → `_`, tirets
   conservés). Les 198 fichiers sont dédoublonnés : un même club apparaît dans
-  plusieurs dossiers de `logos_equipes/` mais l'image est identique.
+  plusieurs dossiers de `sources/logos/clubs/` mais l'image est identique.
 
 ## Mécaniques ajoutées (monde amateur & transferts)
 
@@ -630,14 +636,14 @@ pendant qu'on lisait : fil illisible, dates absurdes, mêmes phrases en boucle.
 Désormais **une semaine jouée = une fournée de 8 publications**, datée de cette
 semaine et **déterministe** (`filDeLaSemaine`, graine `saison#semaine`).
 `vivreSemaineSociale()` (store) la génère, `filSemaine` sert de verrou pour ne
-jamais la produire deux fois. Avec une clé Groq, `rafraichirFil()` vient
+jamais la produire deux fois. Avec l'IA locale, `rafraichirFil()` vient
 enrichir la même fournée — une fois par semaine, plus toutes les 90 s.
 
 | Fichier | Ce qui change |
 |---|---|
 | `src/lib/vie.ts` | Gabarits par type de compte **avec alternatives** : `{ce soir\|demain\|dimanche}` est tiré à la graine. Un gabarit à trois alternatives de trois choix, c'est 27 phrases — le pool tient sur un écran et ne se répète quasiment jamais (mesuré : 40 textes distincts sur 48). ⚠️ Les variables (`{club}`, `{adverse}`…) sont substituées **avant** les alternatives, sinon un `{adverse}` niché cassait la reconnaissance et le gabarit brut s'affichait tel quel. Un pool `CONTEXTE` par type de semaine colle le fil au calendrier (journée, Coupe d'Europe, Tournoi, phase finale, mercato). Les clubs et les championnats répondent **en institutionnel** même quand on les insulte (`INSTITUTIONNELLES`). |
 | `src/lib/social.ts` | **`statsDePost` / `statsDepuisVues` / `audienceDe`** : tous les compteurs passent par là, **en cascade** (audience → vues → likes → reposts). Avant, chaque source tirait ses chiffres dans son coin — un compte de supporter affichait 40 000 vues, et il arrivait qu'un post ait plus de reposts que de likes. Vérifié : 0 incohérence sur 40 publications. |
-| `src/store/useGame.ts` | `repondreAuPost(id, texte)` — **commenter** : ta réponse s'ajoute sous le post, l'auteur **riposte** (Groq s'il y a une clé, sinon `reponseLocale`), et le ton de ton commentaire **fait bouger la relation** exactement comme un message privé. `reposter(id)` — le repost apparaît **sur ton profil** et donne un peu de portée à l'auteur. |
+| `src/store/useGame.ts` | `repondreAuPost(id, texte)` — **commenter** : ta réponse s'ajoute sous le post, l'auteur **riposte** (IA locale si active, sinon `reponseLocale`), et le ton de ton commentaire **fait bouger la relation** exactement comme un message privé. `reposter(id)` — le repost apparaît **sur ton profil** et donne un peu de portée à l'auteur. |
 | `src/screens/Social.tsx` | Zone de réponse sous chaque post, bouton repost actif (vert), compteur « N réponses » repliable. |
 
 ### Profil : rien n'est appliqué avant « Enregistrer »
@@ -663,7 +669,7 @@ marchent pas bien ». Trois étages désormais :
    y bascule sur `onError` : plus jamais de carré gris cassé dans le fil.
 
 ⚠️ `imagePourRequete()` est devenue **asynchrone** (c'est une vraie recherche) et
-n'échoue jamais. `filGroq` résout les mots-clés de l'IA en parallèle après avoir
+n'échoue jamais. `filIA` résout les mots-clés de l'IA en parallèle après avoir
 construit les posts.
 
 ## Le calendrier de l'année, cliquable
@@ -768,12 +774,12 @@ désormais composé famille par famille (10 clubs, 3 compétitions, 30 joueurs,
   écartées. ⚠️ Les comptes **institutionnels sont exclus** du bassin de
   commentaires : un club ne répond pas « J'y serai dimanche ! 🎟️ » sous le post
   d'un rival.
-- Avec une clé Groq, `rafraichirFil()` fait écrire les commentaires des **deux
-  publications les plus lues** par l'IA (`reponsesGroq`) — deux appels par
+- Avec l'IA locale, `rafraichirFil()` reçoit les commentaires dans la même
+  réponse que les publications (`filIA`) — un seul calcul par
   semaine, pas un par tweet. Les réactions locales restent en dessous si l'appel
   échoue.
 - ⚠️ **Les images sont RARES** (demande explicite) : le prompt le dit, mais
-  surtout `filGroq` plafonne à **une image par salve**, et seulement pour un
+  surtout `filIA` plafonne à **une image par salve**, et seulement pour un
   club, un média, un championnat ou un journaliste. Un supporter qui râle ne
   joint pas de photo.
 
@@ -869,7 +875,7 @@ raconter minute par minute) a lui aussi disparu — ce fichier ne contient plus 
 | `moteur/phasesArretees.ts` | Mêlée 3-4-1, alignement perpendiculaire entre les 5 et les 15 m, ruck, coup d'envoi, tir au but, renvoi aux 22. Formations **figées à l'entrée dans la phase**. |
 | `moteur/commentaire.ts` | Les pools de phrases (variables + alternatives `{a\|b\|c}`), tirées à la graine. |
 | `moteur/moteur.ts` | La boucle, les phases, les décisions, le score. |
-| `moteur/consignes.ts` | Le coaching en direct (mots-clés, puis Groq si une clé est là). |
+| `moteur/consignes.ts` | Le coaching en direct (mots-clés, puis IA locale si elle est active). |
 | `moteur/saison.ts` | La simulation de fond, sans rendu. |
 | `components/MatchLive.tsx` | Le rendu : terrain SVG, 30 pions, fil de commentaire, feuille de match. |
 
@@ -1184,8 +1190,14 @@ Cinq chantiers demandés en bloc. Tout est vérifiable sans navigateur :
 recopié de la saison réelle : pendant une fenêtre internationale, on ne voyait
 ni affiche, ni résultat, ni évolution.
 
-- `FORCE_NATION` (32 nations) donne la hiérarchie ; `jouerTestMatch()` en tire
-  un score, avec `scorePossible` — **0 score impossible sur toutes les journées**.
+- `FORCE_NATION` reprend les **114 notes World Rugby fournies** ;
+  `jouerTestMatch()` en tire un score, avec `scorePossible` — **0 score
+  impossible sur toutes les journées**.
+- `classementMondial(saison, semaine?)` part de ces notes et applique après
+  chaque résultat la formule World Rugby : domicile +3, écart borné à ±10,
+  marge >15 ×1,5, Coupe du monde ×2 sur terrain neutre, échange à somme nulle.
+  Les U20 et équipes A/B/C/XV sont exclues. Une nation nouvellement admise
+  commence à 30. Vérification : `scripts/verifClassementWorldRugby.ts`.
 - Trois compétitions tournantes calées sur le calendrier : **6 Nations**
   (6 équipes, 5 journées, aller simple), **The Rugby Championship**, **tournée
   d'automne** (12 équipes, 3 journées). Une saison sur quatre, la **Coupe du
@@ -1263,7 +1275,7 @@ indexe la fourchette sur le **niveau de la compétition** :
   vestiaire » n'est jamais proposé à 35 ans, « le corps parle » jamais à 19 ans.
 - `situationsVues` (store, persisté) évite les répétitions : **20 tirages
   successifs → 20 situations distinctes**.
-- Avec une clé Groq, c'est le MJ qui écrit la situation ; sans clé, on pioche
+- Avec l'IA locale, c'est le MJ qui écrit la situation ; sinon, on pioche
   dans la base. Même bouton, même rendu.
 
 ### 5. Les conséquences dures (`src/lib/consequences.ts`)
@@ -1382,7 +1394,7 @@ Vérification : `npx vite-node scripts/verifSaison.ts`.
   (« 20 000 à 320 000 » pour un club, quel que soit son étage). Explorer
   annonçait un chiffre, le profil du même compte en annonçait un autre — quand
   il s'ouvrait. Les suggestions viennent maintenant **de l'annuaire**.
-- **`comptesGroq` a été supprimé** : l'IA inventait des comptes AVEC leur nombre
+- **La génération IA des comptes a été supprimée** : le modèle inventait des comptes AVEC leur nombre
   d'abonnés. L'annuaire en contient 374, gratuits, cohérents et déterministes.
 - **`abonnesCible(nom, club, note, réputation)`** (comptes.ts) : l'audience que
   MÉRITE le joueur incarné, indexée sur l'audience de son club (donc son étage)
@@ -1407,7 +1419,7 @@ Les appelants passaient `nom` sans `logo` et le composant rendait un carré vide
 `LOGO_PAR_EQUIPE` (plus les 86 sélections des nouvelles compétitions), et
 retombe sur une pastille d'initiales plutôt que sur du vide.
 
-## ⚠️ ÉCONOMIE DE TOKENS GROQ (demande explicite)
+## ⚠️ PERFORMANCE DE L'IA LOCALE
 
 | | avant | maintenant |
 |---|---|---|
@@ -1419,9 +1431,10 @@ retombe sur une pastille d'initiales plutôt que sur du vide.
 | historique du MJ | 8 messages entiers | 6, tronqués à 600 caractères |
 | fiche du joueur | 9 lignes | 4, palmarès borné aux 3 derniers titres |
 
-**La consommation est mesurée** : `consoGroq()` (lib/groq.ts) cumule l'`usage`
-exact renvoyé par l'API, et ⚙️ Réglages l'affiche (appels, tokens envoyés,
-tokens reçus, remise à zéro). On ne peut pas économiser ce qu'on ne mesure pas.
+**L'activité est mesurée** : `activiteIALocale()` (`lib/iaLocale.ts`) cumule
+les appels et tokens de la session. Il n'y a ni facture ni quota ; ces nombres
+servent à surveiller le temps de calcul. `fileAppels` sérialise toutes les
+générations, car WebLLM ne doit jamais en exécuter plusieurs en parallèle.
 
 ## SEO et premier chargement (destiny-rugby.fr)
 
@@ -1451,7 +1464,7 @@ tokens reçus, remise à zéro). On ne peut pas économiser ce qu'on ne mesure p
 
 ## Le reste du monde : 18 championnats et 13 compétitions de sélections
 
-Source : le dossier **`new league/`** (flashscore_rugby_data.json + un dossier
+Source : le dossier **`sources/competitions/ligues/`** (flashscore_rugby_data.json + un dossier
 de logos par compétition).
 
 | Fichier | Rôle |
@@ -1557,12 +1570,12 @@ arrive sur destiny-rugby.fr n'a pas à chercher le sélecteur.
 ### ⚠️ CE QUI REND LE JEU RÉELLEMENT MULTILINGUE
 
 Traduire les boutons ne sert à rien ici : **l'essentiel de ce qu'on lit est écrit
-à l'exécution** par Groq — le récit du Maître du Jeu, les situations, les tweets,
+à l'exécution** par le modèle local — le récit du Maître du Jeu, les situations, les tweets,
 les messages privés, le coaching en direct. On ne les traduit donc pas : on
 demande au modèle d'écrire DIRECTEMENT dans la langue du joueur.
 
-`consigneDeLangue()` est ajoutée en tête de **chaque** prompt (`lib/groq.ts`,
-`lib/ia.ts`, `lib/groqSocial.ts`, `lib/moteur/consignes.ts`). Elle est rédigée en
+`consigneDeLangue()` est ajoutée en tête de **chaque** prompt (`lib/iaLocale.ts`,
+`lib/ia.ts`, `lib/iaSociale.ts`, `lib/moteur/consignes.ts`). Elle est rédigée en
 anglais — c'est la langue dans laquelle les modèles suivent le mieux une
 instruction de langue, y compris pour produire du japonais — et elle protège
 explicitement les noms propres : clubs, compétitions et joueurs ne se traduisent
@@ -1590,7 +1603,7 @@ défaut.
 panneau de carrière, le classement latéral, le match en direct, L'Ovale, la
 boutique, le Hall, la création — soit l'ossature de l'interface.
 
-**Écrit dans la langue du joueur par l'IA** (avec une clé Groq) : tout le récit,
+**Écrit dans la langue du joueur par l'IA locale** (quand elle est active) : tout le récit,
 les situations, les interviews, les tweets, les messages privés, le coaching.
 
 **Encore en français** : le contenu HORS LIGNE pré-écrit (`data/situations.ts`,
@@ -1790,13 +1803,17 @@ Vérification : `npx vite-node scripts/verifU20.ts`.
 
 ### Écussons, drapeaux, notes de club et traductions
 
-- **Les écussons de sélections** viennent du dossier `bonne selection/`
+- **Les écussons de sélections** viennent de `sources/logos/selections/principaux/`
+  et de `sources/logos/selections/catalogue/`
   (`node scripts/copierLogosSelections.cjs`). Les anciens pesaient 150 à 1 200
   octets — de simples vignettes ; les nouveaux, 3 à 12 Ko, sont les vrais
   écussons. ⚠️ `LogoEquipe` perd son `loading="lazy"` : même leçon que pour les
   avatars de L'Ovale, sur des vignettes de 40 px dans un conteneur en
   `content-visibility: auto`, le chargement ne se déclenche jamais. Vérifié en
-  jeu : 41 écussons sur 41 affichés.
+  jeu : 39 écussons principaux et **77 entrées de catalogue** affichables. Les
+  24 variantes restantes sont conservées pour les féminines, le rugby à 7 ou
+  de futurs effectifs. Le générateur vérifie les signatures et refuse les pages
+  HTML maquillées en images.
 - **Les drapeaux des 18 nouvelles ligues** : elles arrivaient avec
   `drapeaux: []`. Le code vient de `data/nations.ts`, la même table que
   `<Drapeau>` — donc `gb-sct`, `gb-wls` et `gb-eng` pour les nations
@@ -1837,17 +1854,18 @@ npx vite-node scripts/verifPlacementPied.ts   # placement, en-buts, 50/22 et tou
 npx vite-node scripts/verifMarche.ts          # offres à tous les niveaux, fin de contrat
 npx vite-node scripts/verifU20.ts             # compétitions U20, écussons, drapeaux
 npx vite-node scripts/verifTraductions.ts     # clés, couverture, écrans branchés
-node scripts/copierLogosSelections.cjs        # « bonne selection/ » → public/logos/
+npx vite-node scripts/verifLogosSelections.ts # images valides + couverture World Rugby
+node scripts/copierLogosSelections.cjs        # sources/logos/selections/ → public/
 ```
 
 
 ## 📖 LE RÉCIT HEBDOMADAIRE — la boucle de jeu a changé
 
 ⚠️ **C'est la modification la plus structurante depuis le moteur de match.**
-Demande explicite : « au lieu d'avoir des boutons chaque semaine, Groq sort un
+Demande explicite : « au lieu d'avoir des boutons chaque semaine, l'IA sort un
 évènement ; les évènements peuvent être très variés, du sportif aux folies
 furieuses qui peuvent mener à la mort, à l'arrestation, etc. ; le joueur répond
-en **écrivant** et Groq juge la réponse — il doit être **très sévère** et prendre
+en **écrivant** et l'IA juge la réponse — elle doit être **très sévère** et prendre
 en compte les stats. Sinon, juste des scénarios et des réponses à choix
 multiples. »
 
@@ -1856,7 +1874,7 @@ multiples. »
 | Avant | Maintenant |
 |---|---|
 | un bouton « 📖 La vie hors du terrain », **2 fois par saison** | une scène **chaque semaine**, automatique |
-| des choix multiples, toujours | on **écrit** sa réponse (avec clé) · choix multiples (sans clé) |
+| des choix multiples, toujours | on **écrit** sa réponse (IA locale) · choix multiples (repli pré-écrit) |
 | un « moment décisif » de 80ᵉ minute posé **après** le coup de sifflet | supprimé |
 | un transfert **raconté** qui n'arrivait jamais | le **vrai marché** s'ouvre, et signer déplace vraiment le joueur |
 
@@ -1867,7 +1885,7 @@ attendue), `scenarioActif` (un clic est attendu), ou rien (action libre).
 |---|---|
 | `src/lib/ia.ts` | **`genererEvenementHebdo()`** pose la scène (2-4 phrases, aucune option, un champ `risque`) et **`jugerReaction()`** tranche. Les prompts imposent la variété (sportif, club, médias, argent, vie perso, nuit et dérives, pur hasard) et la sévérité (l'échec est l'issue normale, `deltas: {}` la réponse la plus fréquente). |
 | `src/store/useGame.ts` | `attenteEvenement` (un ordre donné à l'écran, **non persisté**), `evenementHebdo` et `evenementsVus` (persistés). `poserEvenementHebdo`, `appliquerJugement`, `abandonnerEvenement`. |
-| `src/screens/Carriere.tsx` | La boucle. ⚠️ C'est l'**écran** qui fabrique la scène : l'appel Groq est asynchrone, le store est synchrone. Un verrou de ré-entrée (`fabrique`) empêche deux générations pour la même semaine. |
+| `src/screens/Carriere.tsx` | La boucle. ⚠️ C'est l'**écran** qui fabrique la scène : l'inférence locale est asynchrone, le store est synchrone. Un verrou de ré-entrée (`fabrique`) empêche deux générations pour la même semaine. |
 | `src/components/PanneauJoueur.tsx` | **On n'avance plus en laissant une question en plan** : « Semaine suivante » et « Fin de saison » sont bloqués tant qu'on n'a pas répondu. |
 
 ### ⚠️ CE QUI PROTÈGE LE JOUEUR
@@ -1905,13 +1923,13 @@ compris. Le match se joue dans le moteur 2D (`lib/moteur/`), et nulle part
 ailleurs. L'**interview d'après-match**, elle, reste : elle arrive après le
 match, c'est sa raison d'être — mais seulement quand aucune scène n'attend.
 
-### 💸 CE QUE ÇA COÛTE, HONNÊTEMENT
+### ⚙️ CE QUE ÇA CALCULE, HONNÊTEMENT
 
-La section « ÉCONOMIE DE TOKENS GROQ » plus haut annonçait **1 appel par semaine
-de jeu** (le fil de L'Ovale). Ce n'est plus vrai : le récit en ajoute **2** — la
-scène (`maxTokens` 420) et son jugement (520). Soit **3 appels par semaine**,
-~130 par saison. C'est le prix demandé, il est assumé, et il reste mesuré :
-`consoGroq()` le compte et ⚙️ Réglages l'affiche. Sans clé, le coût est nul et le
+La section « PERFORMANCE DE L'IA LOCALE » plus haut annonce **1 génération par semaine
+de jeu** (le fil de L'Ovale). Le récit en ajoute **2** — la scène
+(`maxTokens` 240) et son jugement (300). Soit **3 appels par semaine**,
+~130 par saison. Il n'y a ni prix ni quota, mais le temps GPU reste mesuré :
+`activiteIALocale()` le compte et ⚙️ Réglages l'affiche. Sans IA locale, le
 jeu reste **entier** (choix multiples tirés de `data/scenarios.ts` et
 `data/situations.ts`, sans rationnement — `lancerScenario(false)`).
 
@@ -2472,37 +2490,18 @@ plus lisible quand on écrit une clé, et incompatible avec eux. Les brancher
 voudrait dire réécrire tout `data/textes*.ts`, ajouter une dépendance et un
 compte en ligne payant — pour six cents chaînes.
 
-**`scripts/traduire.ts`** fait le même travail en 200 lignes, sans compte et sans
-abonnement, avec la clé Groq que le jeu utilise déjà.
+La traduction automatique distante a été retirée avec l'ancien fournisseur d'IA. Chaque nouvelle clé
+doit désormais être écrite dans les sept langues, puis vérifiée sans réseau :
 
 ```bash
-npx vite-node scripts/traduire.ts --verifier      # liste les trous, ne traduit rien
-GROQ_KEY=gsk_... npx vite-node scripts/traduire.ts
+npx vite-node scripts/verifTraductions.ts
 ```
 
-- **Il n'écrit jamais dans les fichiers écrits à la main.** La sortie est
-  `src/data/textesAuto.ts`, GÉNÉRÉ, fusionné dans `TEXTES` avec la priorité la
-  **plus basse** : une traduction humaine gagne toujours, relancer le script ne
-  peut rien écraser, et supprimer le fichier annule tout.
-- **Le prompt porte le vocabulaire du rugby**, pas seulement « traduis ». Sans
-  ça, une machine rend « Essais » par « Attempts » — le mot juste en français
-  courant, le contre-sens absolu au rugby (« Tries »). Vingt termes sont imposés,
-  ainsi que les noms propres à ne jamais traduire (clubs, compétitions, Ovas,
-  Brennus).
-- ⚠️ **Une traduction qui perd une variable est REJETÉE.** Un modèle qui
-  « améliore » un texte en supprimant `{n}` casse le jeu en silence — le compteur
-  affiche « matchs joués » sans le nombre. La clé retombe alors sur le français,
-  ce qui est le comportement sain du socle.
-
-État vérifié en août 2026 : **1 067 clés × 7 langues, 0 trou**. Les 147 clés
-historiquement incomplètes sont complétées dans `textesAuto.ts`, et
-c'est normal — le script sert à partir de la prochaine clé ajoutée. On écrit la
-ligne avec le seul `fr:`, on relance, et les six autres arrivent.
-
-⚠️ **L'appel réseau n'a pas pu être testé** : aucune clé Groq n'est présente
-localement (`.env.local` absent). Ce qui est vérifié : la détection des trous
-(éprouvée sur une clé incomplète ajoutée puis retirée), la fusion à priorité
-basse, et la compilation.
+`src/data/textesAuto.ts` reste une couche historique à priorité basse ; une
+traduction humaine dans `textes.ts` ou les dictionnaires spécialisés gagne
+toujours. Les variables comme `{n}` doivent être reproduites à l'identique dans
+chaque langue, et les noms propres de clubs, compétitions et joueurs ne se
+traduisent jamais.
 
 
 ## 📊 LA FEUILLE DE MATCH COMPLÈTE — plus une seule statistique estimée
@@ -2708,7 +2707,7 @@ de son groupe DOIT payer, c'est ce qui rend une carrière lisible.
 `verifU20.ts` refusait les écussons nationaux : France 210 octets, Angleterre
 291, Japon 383 — de simples vignettes, là où les bons fichiers font 4 à 12 Ko.
 La cause : **`copierLogos.cjs` réécrase `copierLogosSelections.cjs`**.
-`logos_equipes/nations_championship/` contient `france.png` et `angleterre.png`,
+`sources/logos/clubs/nations_championship/` contient `france.png` et `angleterre.png`,
 et le balayage récursif du pack de clubs passe par-dessus les bons fichiers.
 L'ordre est désormais écrit en tête du script, et il n'est pas négociable :
 
@@ -2895,7 +2894,7 @@ statistique détaillée : le mode de jeu décidait de la carrière.
   le motif d'arrêt, et l'écran le dit.
 - ⚠️ **`avanceRapide` (non persisté) coupe la demande de scène hebdomadaire.**
   `semaineSuivante` lève `attenteEvenement`, que l'écran Carrière consomme en
-  appelant Groq : sans ce drapeau, un saut de quinze semaines faisait quinze
+  appelant l'IA : sans ce drapeau, un saut de quinze semaines faisait quinze
   appels et empilait quinze questions. Le drapeau est levé **une seule fois**, à
   l'arrivée.
 - **La frise du calendrier (📊 Résultats) est une destination.** Une semaine
@@ -2972,7 +2971,7 @@ Corrigé sur les deux surfaces : le bouton du panneau ET la barre fixe mobile.
 
 | | avant | maintenant |
 |---|---|---|
-| récit du MJ (`groq.ts`) | 2 à 5 phrases · 700 tokens | **2 phrases** · 420 |
+| récit du MJ (`iaLocale.ts`) | 2 à 5 phrases · 700 tokens | **2 phrases** · 360 |
 | scène hebdomadaire (`ia.ts`) | 2 à 4 phrases · 420 | **2 phrases, 45 mots** · 240 |
 | jugement de la réponse | 2 à 5 phrases · 520 | **2 phrases** · 300 |
 | situation à choix | 2 à 4 phrases · 850 | **2 phrases** · 620 |

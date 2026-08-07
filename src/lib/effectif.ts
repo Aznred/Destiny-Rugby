@@ -300,7 +300,7 @@ function effectifReel(nomClub: string, saison: number, niveau: number): Coequipi
 // ---------------------------------------------------------------------------
 // EFFECTIFS DES NOUVELLES LIGUES (Espagne, Italie, Géorgie, Galles, Pologne…)
 //
-// Les données de `new league/` donnent les CLUBS et leurs classements, jamais
+// Les données de `sources/competitions/ligues/` donnent les clubs et leurs classements, jamais
 // les joueurs : `scripts/genNouvellesLigues.cjs` en fabrique un effectif de 30
 // joueurs avec des noms du pays et une part d'étrangers. Ils vieillissent,
 // progressent vers leur potentiel et laissent la place à des regens exactement

@@ -50,6 +50,8 @@ export default function App() {
   const ecran = useGame((s) => s.ecran);
   const joueur = useGame((s) => s.joueur);
   const setEcran = useGame((s) => s.setEcran);
+  const iaLocaleActivee = useGame((s) => s.iaLocaleActivee);
+  const setIALocaleActivee = useGame((s) => s.setIALocaleActivee);
   const tropheesEnAttente = useGame((s) => s.tropheesEnAttente);
   const fermerTrophee = useGame((s) => s.fermerTrophee);
   // ⚠️ CHANGER DE LANGUE REDESSINE TOUT. `t()` lit une variable de module (elle
@@ -69,6 +71,35 @@ export default function App() {
       setTotalTrophees(0);
     }
   }, [tropheesEnAttente.length, totalTrophees]);
+
+  // Le modèle local se prépare seul après le premier rendu. Le délai laisse
+  // l'accueil s'afficher immédiatement ; téléchargement, compilation WebGPU et
+  // chargement restent dans le Worker. Une désactivation manuelle est
+  // persistée et empêche ce préchargement aux ouvertures suivantes.
+  useEffect(() => {
+    if (!iaLocaleActivee) return;
+    let annule = false;
+    const minuterie = window.setTimeout(() => {
+      void import('./lib/iaLocale').then(async ({ chargerIALocale, iaLocaleCompatible }) => {
+        if (annule) return;
+        if (!iaLocaleCompatible()) {
+          setIALocaleActivee(false);
+          return;
+        }
+        try {
+          await chargerIALocale();
+        } catch {
+          // Tous les appelants disposent déjà d'un contenu pré-écrit de
+          // secours. On évite simplement de retenter à chaque action.
+          if (!annule) setIALocaleActivee(false);
+        }
+      });
+    }, 1200);
+    return () => {
+      annule = true;
+      window.clearTimeout(minuterie);
+    };
+  }, [iaLocaleActivee, setIALocaleActivee]);
 
   // Garde-fou : pas d'écran carrière/profil sans joueur.
   useEffect(() => {
