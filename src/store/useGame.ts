@@ -40,7 +40,7 @@ import {
 // `simulerStatsJournee` le charge donc À LA DEMANDE (`import()`), et seule la
 // petite fonction `estTitulaire` — qui n'a aucune dépendance — reste statique.
 import { estTitulaire } from '../lib/moteur/titulaire';
-import { definirLangue, langueDuNavigateur, type Langue } from '../lib/i18n';
+import { definirLangue, langueDuNavigateur, t, type Langue } from '../lib/i18n';
 import type { LigneReelle } from '../lib/moteur/saison';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import { ficheDepuisJoueur, scoreDeLaFiche } from '../lib/classementMondial';
@@ -62,7 +62,7 @@ import {
 } from '../lib/vie';
 import { evaluerSucces, defisDeLaSemaine, cleSemaine } from '../lib/succes';
 import { DEFI_PAR_ID, SUCCES_PAR_ID, type EvenementDefi } from '../data/succes';
-import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS } from '../data/rugby';
+import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS, nomPoste } from '../data/rugby';
 import {
   retourDeMatch, BUDGET_MATCHS_PAR_SAISON, type StatsMatchJoueur,
 } from '../lib/moteur/apresMatch';
@@ -695,8 +695,10 @@ export const useGame = create<GameState>()(
               id: idUnique(),
               saison: 1,
               role: 'systeme',
-              titre: 'Début de carrière',
-              texte: `${joueur.nom}, ${POSTE_PAR_ID[joueur.poste].nom.toLowerCase()} de ${joueur.club}. Le premier chapitre de ta légende commence. Que veux-tu faire ?`,
+              titre: t('car.debutTitre'),
+              texte: t('car.debutTexte', {
+                joueur: joueur.nom, poste: nomPoste(joueur.poste).toLowerCase(), club: joueur.club,
+              }),
             },
           ],
         });

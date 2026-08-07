@@ -10,7 +10,7 @@ import { Blason } from './Blason';
 import { LogoCompet } from './LogoCompet';
 import { Drapeau, nomNation, nomNationTraduit } from './Drapeau';
 import { Confirmation } from './Confirmation';
-import { semaine, libelleDate, SEMAINES_PAR_SAISON, CALENDRIER } from '../data/calendrier';
+import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON, CALENDRIER } from '../data/calendrier';
 import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store/useGame';
 import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID, descriptionTrait, nomTrait } from '../data/traits';
@@ -164,7 +164,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           title={`${t('pj.generale')}${joueur.potentiel ? ` — ${t('pj.potentiel', { note: joueur.potentiel })}` : ''}`}
         >
           <b>{generale}</b>
-          <span>{t('pj.generale')}</span>
+          <span aria-hidden="true">OVR</span>
           {joueur.potentiel && joueur.potentiel > generale && (
             <em className="badge-potentiel">↗ {joueur.potentiel}</em>
           )}
@@ -301,7 +301,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               <span>{t('pj.semaine', { n: semaineActuelle.numero, total: SEMAINES_PAR_SAISON })}</span>
             </div>
             <div className="cal-libelle">
-              {EMOJI_SEMAINE[semaineActuelle.type]} {semaineActuelle.libelle}
+              {EMOJI_SEMAINE[semaineActuelle.type]} {libelleSemaine(semaineActuelle)}
               <i className="cal-lien">🗓️ {t('pj.calendrier')}</i>
             </div>
             <div className="cal-barre">
@@ -498,7 +498,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         <div className="barre-jouer">
           <span className="barre-jouer-info">
             <b>S{joueur.saison}</b> · {libelleDate(semaineActuelle)}
-            {matchAJouer && adversaire ? ` · ${adversaire}` : ` · ${semaineActuelle.libelle}`}
+            {matchAJouer && adversaire ? ` · ${adversaire}` : ` · ${libelleSemaine(semaineActuelle)}`}
           </span>
           {matchAJouer ? (
             <button

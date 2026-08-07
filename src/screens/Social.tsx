@@ -37,7 +37,7 @@ import { SUCCES, descriptionSucces, nomSucces, texteDefi } from '../data/succes'
 import { defisDeLaSemaine, cleSemaine, progression } from '../lib/succes';
 import { CLE_ENV } from '../lib/groq';
 import { chercherMedias, reduirePourAvatar, vignetteLocale, type Media as MediaTrouve } from '../lib/images';
-import { semaine } from '../data/calendrier';
+import { semaine, libelleSemaine } from '../data/calendrier';
 import { avatarInitiales } from '../lib/avatars';
 import type { CompteSuivi, Joueur, PostSocial } from '../types';
 
@@ -186,7 +186,7 @@ function compteDepuis(
     nom: vu?.auteur ?? `@${pseudo}`,
     avatar: vu?.avatar ?? '🏉',
     type: (vu?.type as CompteSuivi['type']) ?? 'fan',
-    bio: vu ? 'Compte croisé sur L’Ovale.' : 'Ce compte n’a encore rien publié.',
+    bio: vu ? t('ov.compteCroise') : t('ov.aucunePublicationCompte'),
     certifie: vu?.certifie,
     abonnes: Math.max(120, Math.round((vu?.vues ?? 2000) / 6)),
     banniere: banniereDe(pseudo),
@@ -296,7 +296,7 @@ function Post({
             <button
               className={`x-action reponses${commentaire != null ? ' actif' : ''}`}
               onClick={() => (reponse ? setDeploye((v) => !v) : setCommentaire((c) => (c == null ? '' : null)))}
-              title={reponse ? 'Réponses' : 'Répondre'}
+              title={reponse ? t('ov.reponses') : t('car.repondre')}
             >
               <Icone d={I_REPONSE} />
               <span>{reponses.length || ''}</span>
@@ -304,7 +304,7 @@ function Post({
             <button
               className={`x-action reposts${post.repostee ? ' actif' : ''}`}
               onClick={() => reposter(post.id)}
-              title={post.repostee ? 'Annuler le repost' : 'Reposter'}
+              title={post.repostee ? t('ov.annulerRepost') : t('ov.reposter')}
             >
               <Icone d={I_REPOST} />
               <span>{compact(post.reposts)}</span>
@@ -312,18 +312,18 @@ function Post({
             <button
               className={`x-action likes${post.aime ? ' actif' : ''}`}
               onClick={() => aimerPost(post.id)}
-              title="J’aime"
+              title={t('ov.jaime')}
             >
               <Icone d={I_COEUR} />
               <span>{compact(post.likes)}</span>
             </button>
-            <button className="x-action vues" title="Vues">
+            <button className="x-action vues" title={t('ov.vues')}>
               <Icone d={I_VUES} />
               <span>{compact(post.vues)}</span>
             </button>
             {reponses.length > 0 && !reponse && (
               <button className="x-voir-rep" onClick={() => setDeploye((v) => !v)}>
-                {deploye ? 'Masquer' : `${reponses.length} réponse${reponses.length > 1 ? 's' : ''}`}
+                {deploye ? t('ov.masquer') : t('ov.nombreReponses', { n: reponses.length })}
               </button>
             )}
           </div>
@@ -335,12 +335,12 @@ function Post({
                 autoFocus
                 value={commentaire}
                 maxLength={LIMITE_CARACTERES}
-                placeholder={`Répondre à @${post.pseudo}…`}
+                placeholder={t('ov.repondreA', { pseudo: post.pseudo })}
                 onChange={(e) => setCommentaire(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') void envoyer(); }}
               />
               <button className="x-poster" disabled={!commentaire.trim() || envoi} onClick={() => void envoyer()}>
-                {envoi ? '…' : 'Répondre'}
+                {envoi ? '…' : t('car.repondre')}
               </button>
             </div>
           )}
@@ -399,7 +399,7 @@ function Composer() {
           value={texte}
           maxLength={LIMITE_CARACTERES}
           onChange={(e) => setTexte(e.target.value)}
-          placeholder="Quoi de neuf ?"
+          placeholder={t('ov.quoiDeNeuf')}
           rows={2}
         />
 
@@ -418,7 +418,7 @@ function Composer() {
         {media?.url && (
           <div className="x-media-choisi">
             <img src={media.url} alt="" />
-            <button onClick={() => setMedia(undefined)} title="Retirer">✕</button>
+            <button onClick={() => setMedia(undefined)} title={t('ov.retirer')}>✕</button>
           </div>
         )}
 
@@ -427,17 +427,17 @@ function Composer() {
             <div className="x-galerie-recherche">
               <input
                 value={requete}
-                placeholder={tenorKey ? 'Chercher un GIF…' : 'Chercher une image (mots-clés)'}
+                placeholder={tenorKey ? t('ov.chercherGif') : t('ov.chercherImage')}
                 onChange={(e) => setRequete(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') void lancerRecherche(requete); }}
               />
               <button className="x-poster" onClick={() => void lancerRecherche(requete)} disabled={chargeMedia}>
-                {chargeMedia ? '…' : 'Chercher'}
+                {chargeMedia ? '…' : t('ov.chercher')}
               </button>
               <button className="x-fermer-galerie" onClick={() => setGalerie(null)}>✕</button>
             </div>
             <div className="x-galerie-grille">
-              {galerie.length === 0 && !chargeMedia && <p className="x-vide">Rien trouvé.</p>}
+              {galerie.length === 0 && !chargeMedia && <p className="x-vide">{t('ov.rienTrouve')}</p>}
               {galerie.map((m) => (
                 <button
                   key={m.url}
@@ -451,25 +451,25 @@ function Composer() {
         )}
 
         <div className="x-tons">
-          {TONS.map((t) => (
+          {TONS.map((tone) => (
             <button
-              key={t.id}
-              className={`x-ton${ton === t.id ? ' actif' : ''}`}
-              onClick={() => setTon(t.id)}
-              title={t.desc}
+              key={tone.id}
+              className={`x-ton${ton === tone.id ? ' actif' : ''}`}
+              onClick={() => setTon(tone.id)}
+              title={t(`ov.tonDesc.${tone.id}`)}
             >
-              {t.emoji} {t.nom}
+              {tone.emoji} {t(`ov.ton.${tone.id}`)}
             </button>
           ))}
         </div>
         <p className="x-ton-desc">
-          {tonChoisi.desc}
-          {tonChoisi.risque > 0.2 && <b className="x-risque"> ⚠️ Le club surveille ce genre de sortie.</b>}
+          {t(`ov.tonDesc.${tonChoisi.id}`)}
+          {tonChoisi.risque > 0.2 && <b className="x-risque"> ⚠️ {t('ov.risqueTon')}</b>}
         </p>
         <div className="x-composer-pied">
           <button
             className="x-media-btn"
-            title={tenorKey ? 'Ajouter un GIF ou une image' : 'Ajouter une image libre'}
+            title={tenorKey ? t('ov.ajouterMedia') : t('ov.ajouterImage')}
             onClick={() => { setGalerie([]); void lancerRecherche(requete || 'rugby'); }}
           >
             {tenorKey ? 'GIF' : '🖼️'}
@@ -480,7 +480,7 @@ function Composer() {
             disabled={!texte.trim() || chargement}
             onClick={() => { const t = texte; const m = media; setTexte(''); setMedia(undefined); void publier(t, ton, m); }}
           >
-            {chargement ? 'Publication…' : 'Poster'}
+            {chargement ? t('ov.publicationEnCours') : t('ov.poster')}
           </button>
         </div>
       </div>
@@ -508,8 +508,8 @@ function Profil({
   const siens = posts.filter((p) => p.pseudo === compte.pseudo);
 
   const ETAT: Record<string, string> = {
-    ami: '💚 Proche', cordial: '🙂 Cordial', neutre: '· Neutre',
-    froid: '🧊 Tendu', ennemi: '💢 Conflit ouvert',
+    ami: `💚 ${t('ov.relationAmi')}`, cordial: `🙂 ${t('ov.relationCordial')}`, neutre: `· ${t('ov.relationNeutre')}`,
+    froid: `🧊 ${t('ov.relationFroid')}`, ennemi: `💢 ${t('ov.relationEnnemi')}`,
   };
 
   return (
@@ -518,7 +518,7 @@ function Profil({
         <button className="x-retour" onClick={onFermer}>←</button>
         <div>
           <b>{compte.nom}</b>
-          <span>{siens.length} publication{siens.length > 1 ? 's' : ''}</span>
+          <span>{siens.length} {t(siens.length > 1 ? 'ov.publication.pluriel' : 'ov.publication')}</span>
         </div>
       </div>
       <div className="x-banniere" style={{ background: compte.banniere ?? banniereDe(compte.pseudo) }} />
@@ -527,12 +527,12 @@ function Profil({
           <Avatar avatar={compte.avatar} club={compte.club} taille={76} nom={compte.nom} />
         </div>
         <div className="x-profil-boutons">
-          <button className="x-suivre secondaire" onClick={() => onMessage(compte.pseudo)}>Message</button>
+          <button className="x-suivre secondaire" onClick={() => onMessage(compte.pseudo)}>{t('ov.message')}</button>
           <button
             className={abonne ? 'x-suivre abonne' : 'x-suivre'}
             onClick={() => (abonne ? nePlusSuivre(compte.pseudo) : suivre(compte))}
           >
-            {abonne ? 'Abonné' : 'Suivre'}
+            {abonne ? t('gen.abonne') : t('gen.suivre')}
           </button>
         </div>
         <h2>{compte.nom}{compte.certifie && <Certifie />}</h2>
@@ -547,7 +547,7 @@ function Profil({
         </div>
       </div>
       <div className="x-fil">
-        {siens.length === 0 && <p className="x-vide">Ce compte n’a encore rien publié ici.</p>}
+        {siens.length === 0 && <p className="x-vide">{t('ov.aucunePublicationCompte')}</p>}
         {siens.map((p) => <Post key={p.id} post={p} onProfil={onProfil} onRecherche={onRecherche} />)}
       </div>
     </div>
@@ -596,7 +596,7 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
             className="x-suivre secondaire"
             onClick={() => (edition ? setEdition(false) : ouvrirEdition())}
           >
-            {edition ? 'Fermer' : 'Modifier le profil'}
+            {edition ? t('ov.fermer') : t('ov.modifierProfil')}
           </button>
         </div>
         <h2>{enregistre.nomAffiche}{estCertifie(joueur) && <Certifie />}</h2>
@@ -606,7 +606,7 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
           <span><b>{compact(joueur.abonnes ?? 0)}</b> {t('gen.abonnes')}</span>
           <span><b>{suivis.length}</b> {t('ov.abonnements')}</span>
           <span><b>{miens.length}</b> {t('ov.publications')}</span>
-          <span><b>{reposts.length}</b> reposts</span>
+          <span><b>{reposts.length}</b> {t('ov.reposts')}</span>
         </div>
       </div>
 
@@ -615,7 +615,7 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
           {/* L'aperçu montre le brouillon — le profil du dessus, lui, ne bouge
               pas tant qu'on n'a pas cliqué « Enregistrer ». */}
           <div className="x-apercu" style={{ background: brouillon.banniere }}>
-            <span className="x-apercu-tag">Aperçu — non enregistré</span>
+            <span className="x-apercu-tag">{t('ov.apercuNonEnregistre')}</span>
             <div className="x-apercu-carte">
               <span className="x-avatar" style={{ width: 46, height: 46 }}>
                 {brouillon.avatar.startsWith('data:')
@@ -627,28 +627,28 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
               <div>
                 <b>{brouillon.nomAffiche || '—'}</b>
                 <i>@{brouillon.pseudo || '—'}</i>
-                <p>{brouillon.bio || 'Aucune bio.'}</p>
+                <p>{brouillon.bio || t('ov.aucuneBio')}</p>
               </div>
             </div>
           </div>
           <label>
-            Nom affiché
+            {t('ov.nomAffiche')}
             <input value={brouillon.nomAffiche} maxLength={40} onChange={(e) => maj({ nomAffiche: e.target.value })} />
           </label>
           <label>
-            Identifiant
+            {t('ov.identifiant')}
             <input value={brouillon.pseudo} maxLength={20} onChange={(e) => maj({ pseudo: e.target.value })} />
           </label>
           <label>
-            Bio
+            {t('ov.bio')}
             <textarea value={brouillon.bio} maxLength={160} rows={2} onChange={(e) => maj({ bio: e.target.value })} />
           </label>
           <div className="x-choix">
-            <span>Photo de profil</span>
+            <span>{t('ov.photoProfil')}</span>
             {/* Un fichier du disque : redimensionné en 160×160 avant d'être
                 rangé dans la sauvegarde (le localStorage plafonne à ~5 Mo). */}
             <label className="x-fichier">
-              📁 Importer une photo
+              📁 {t('ov.importerPhoto')}
               <input
                 type="file"
                 accept="image/*"
@@ -684,7 +684,7 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
             </div>
           </div>
           <div className="x-choix">
-            <span>Bannière</span>
+            <span>{t('ov.banniere')}</span>
             <div className="x-bannieres">
               {BANNIERES.map((b) => (
                 <button
@@ -698,7 +698,7 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
           </div>
           <div className="x-edition-pied">
             <button className="x-suivre secondaire" onClick={() => { setBrouillon(enregistre); setEdition(false); }}>
-              Annuler
+              {t('ov.annuler')}
             </button>
             <button
               className="x-poster"
@@ -711,18 +711,18 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
                 setEdition(false);
               }}
             >
-              {modifie ? 'Enregistrer' : 'Aucune modification'}
+              {modifie ? t('ov.enregistrer') : t('ov.aucuneModification')}
             </button>
           </div>
         </div>
       )}
 
       <div className="x-fil">
-        {miens.length === 0 && reposts.length === 0 && <p className="x-vide">Tu n’as encore rien publié.</p>}
+        {miens.length === 0 && reposts.length === 0 && <p className="x-vide">{t('ov.aucunePublicationMoi')}</p>}
         {miens.map((x) => <Post key={x.id} post={x} onProfil={onProfil} onRecherche={onRecherche} />)}
         {reposts.length > 0 && (
           <>
-            <div className="x-bloc-tete"><h3>🔁 Tes reposts</h3></div>
+            <div className="x-bloc-tete"><h3>🔁 {t('ov.tesReposts')}</h3></div>
             {reposts.map((x) => <Post key={x.id} post={x} onProfil={onProfil} onRecherche={onRecherche} />)}
           </>
         )}
@@ -1208,10 +1208,12 @@ export function Social() {
             <Composer />
             <div className="x-actualiser">
               <span className={`x-vivant${chargement ? ' occupe' : ''}`}>
-                ● {chargement ? 'le réseau écrit…' : `semaine ${joueur.semaine ?? 1} · ${semaine(joueur.semaine ?? 1).libelle}`}
+                ● {chargement
+                  ? t('ov.reseauEcrit')
+                  : t('ov.semaineActuelle', { n: joueur.semaine ?? 1, libelle: libelleSemaine(semaine(joueur.semaine ?? 1)) })}
               </span>
               <span>{t('ov.filSemaine')}</span>
-              {!avecIA && <span>Ajoute une clé Groq dans ⚙️ pour un fil écrit par l’IA.</span>}
+              {!avecIA && <span>{t('ov.cleIA')}</span>}
             </div>
             <div className="x-fil">
               {fil.map((p) => <Post key={p.id} post={p} onProfil={ouvrirProfil} onRecherche={chercher} />)}
@@ -1224,19 +1226,19 @@ export function Social() {
           <div className="x-explorer">
             {recherche.trim() ? (
               <>
-                <div className="x-bloc-tete"><h3>Comptes — « {recherche} »</h3></div>
+                <div className="x-bloc-tete"><h3>{t('ov.comptesRecherche', { recherche })}</h3></div>
                 {resultatsComptes.length === 0 && <p className="x-vide">{t('ov.aucunCompte')}</p>}
                 {resultatsComptes.map(carteCompte)}
-                <div className="x-bloc-tete"><h3>Publications — « {recherche} »</h3></div>
+                <div className="x-bloc-tete"><h3>{t('ov.publicationsRecherche', { recherche })}</h3></div>
                 {resultatsPosts.length === 0 && <p className="x-vide">{t('ov.aucunePublication')}</p>}
                 {resultatsPosts.map((p) => <Post key={p.id} post={p} onProfil={ouvrirProfil} onRecherche={chercher} />)}
               </>
             ) : (
               <>
                 <div className="x-bloc-tete">
-                  <h3>Comptes à suivre</h3>
+                  <h3>{t('ov.comptesASuivre')}</h3>
                   <button className="x-rafraichir" onClick={() => void chargerSuggestions()} disabled={chargement}>
-                    {chargement ? '…' : '↻ Autres comptes'}
+                    {chargement ? '…' : `↻ ${t('ov.autresComptes')}`}
                   </button>
                 </div>
                 {suggestions.map(carteCompte)}
@@ -1266,7 +1268,7 @@ export function Social() {
         {onglet === 'notifs' && (
           <div className="x-fil">
             {notifs.length === 0 && (
-              <p className="x-vide">Rien pour l’instant. Publie quelque chose, ça viendra vite.</p>
+              <p className="x-vide">{t('ov.aucuneNotification')}</p>
             )}
             {notifs.map((n) => (
               <div key={n.id} className="x-notif">
@@ -1296,7 +1298,7 @@ export function Social() {
             placeholder={t('ov.rechercheComplete')}
           />
           {recherche && (
-            <button type="button" className="x-vider" onClick={() => setRecherche('')} title="Effacer">✕</button>
+            <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}>✕</button>
           )}
         </form>
         <div className="x-bloc">

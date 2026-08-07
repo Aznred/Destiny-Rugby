@@ -10,6 +10,8 @@
 // bissextiles ni les décalages réels d'un exercice à l'autre — le but est de
 // donner un fil crédible, pas un almanach.
 
+import { locale, t } from '../lib/i18n';
+
 export type TypeSemaine =
   | 'championnat'
   | 'coupe'
@@ -31,13 +33,33 @@ export interface Semaine {
   tourFinal?: 'barrage' | 'demie' | 'finale' | 'acces';
 }
 
-const MOIS = [
-  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
-];
-
 export function libelleDate(s: Semaine): string {
-  return `${s.jour} ${MOIS[s.mois - 1]}`;
+  return new Intl.DateTimeFormat(locale(), {
+    day: 'numeric', month: 'long', timeZone: 'UTC',
+  }).format(new Date(Date.UTC(2026, s.mois - 1, s.jour)));
+}
+
+/** Libellé destiné à l’interface. La valeur brute reste dans le calendrier pour le moteur. */
+export function libelleSemaine(s: Semaine): string {
+  if (s.libelle === 'Reprise du championnat') return t('cal.reprise');
+  if (s.libelle === 'Journée de championnat') return t('cal.journeeChamp');
+  if (s.libelle === 'Journée des fêtes') return t('cal.journeeFetes');
+  if (s.type === 'coupe') {
+    const numero = /([1-4])(?:re|e) journée/.exec(s.libelle)?.[1];
+    if (numero) return t('cal.coupeJournee', { n: numero });
+  }
+  if (s.competitionInternationale === 'autumn') return t('cal.tourneeAutomne');
+  if (s.competitionInternationale === 'sixNations') {
+    return s.finale ? t('cal.sixNationsFinale') : t('cal.sixNations');
+  }
+  if (s.competitionInternationale === 'worldCup') return t('cal.coupeMonde');
+  if (s.competitionInternationale === 'qualifWorldCup') return t('cal.qualifMondial');
+  if (s.competitionInternationale === 'friendly') return t('cal.matchAmical');
+  if (s.type === 'phaseFinale') {
+    return t(`cal.${s.tourFinal ?? 'phaseFinale'}`);
+  }
+  if (s.type === 'treve') return t('cal.treve');
+  return s.libelle;
 }
 
 // Construction : on empile les blocs de la saison dans l'ordre réel.

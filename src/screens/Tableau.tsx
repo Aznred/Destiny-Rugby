@@ -25,14 +25,14 @@ import {
   fenetreInternationale, journeesInternationalesA, classementMondial,
 } from '../lib/international';
 import { LogoEquipe } from '../components/Blason';
-import { nomNation } from '../components/Drapeau';
+import { nomNation, nomNationTraduit } from '../components/Drapeau';
 import { COUPES_EUROPE } from '../data/mondeReel';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { Selecteur, type OptionSelecteur } from '../components/Selecteur';
 import { Confirmation } from '../components/Confirmation';
-import { semaine, libelleDate, CALENDRIER } from '../data/calendrier';
+import { semaine, libelleDate, libelleSemaine, CALENDRIER } from '../data/calendrier';
 import {
   classementJoueurs, CATEGORIES, afficherValeur, libelleCategorie, nomPoste, type Categorie,
 } from '../lib/statsJoueurs';
@@ -59,10 +59,10 @@ function Rencontre({ match, mien }: { match: MatchChampionnat; mien: boolean }) 
 }
 
 // --- L'ARBRE d'une phase à élimination directe -----------------------------
-const TITRE_TOUR: Record<string, string> = {
-  barrage: 'Barrages', quart: 'Quarts de finale', demie: 'Demi-finales',
-  finale: 'Finale', accession: 'Match d’accès',
-};
+function titreTour(tour: string): string {
+  const traduit = t(`tb.tour.${tour}`);
+  return traduit === `tb.tour.${tour}` ? tour : traduit;
+}
 const ORDRE_TOURS = ['barrage', 'quart', 'demie', 'finale', 'accession'];
 const ORDRE_TOUR_FINAL: Record<string, number> = {
   barrage: 1, quart: 1, demie: 2, finale: 3, accession: 4,
@@ -78,7 +78,7 @@ function Arbre({ matchs, club }: { matchs: MatchFinal[]; club: string }) {
     <div className="arbre">
       {tours.map((t) => (
         <div key={t.tour} className="arbre-tour">
-          <div className="arbre-titre">{TITRE_TOUR[t.tour]}</div>
+          <div className="arbre-titre">{titreTour(t.tour)}</div>
           <div className="arbre-matchs">
             {t.matchs.map((m) => (
               <div
@@ -153,8 +153,8 @@ function Frise({
             disabled={!aDesMatchs && !aVenir}
             onClick={() => (aVenir ? onAller!(s.numero) : onJournee(premiere))}
             title={aVenir
-              ? `Jouer jusqu’au ${libelleDate(s)} (${s.numero - semaineActuelle} semaine(s))`
-              : `${libelleDate(s)} — ${s.libelle}${aDesMatchs ? ` (J${premiere}${derniere > premiere ? `-${derniere}` : ''})` : ''}`}
+              ? t('tb.jouerJusqua', { date: libelleDate(s), n: s.numero - semaineActuelle })
+              : `${libelleDate(s)} — ${libelleSemaine(s)}${aDesMatchs ? ` (J${premiere}${derniere > premiere ? `-${derniere}` : ''})` : ''}`}
           >
             <span className="frise-emoji">{aVenir ? '▶' : EMOJI_SEMAINE[s.type] ?? '🏉'}</span>
             <b>{aDesMatchs ? `J${premiere}` : '—'}</b>
@@ -215,9 +215,8 @@ function ClassementsJoueurs({
         <b>🥇 {t('tb.statsJoueurs')}</b>
         <span className="comp-count">
           {reelles
-            ? `matchs joués · ${rejouees} journée${rejouees > 1 ? 's' : ''}`
-              + (rejouees < journees ? ` sur ${journees}` : '')
-            : `estimation · ${journees} journée${journees > 1 ? 's' : ''}`}
+            ? `${t('tb.statsReelles', { n: rejouees })}${rejouees < journees ? ` / ${journees}` : ''}`
+            : t('tb.statsEstimees', { n: journees })}
         </span>
       </div>
       <div className="cats-stats">
@@ -226,13 +225,13 @@ function ClassementsJoueurs({
             key={c.id}
             className={`chip-cat${cat === c.id ? ' actif' : ''}`}
             onClick={() => setCat(c.id)}
-            title={c.desc}
+            title={t(`stats.${c.id}.desc`) === `stats.${c.id}.desc` ? c.desc : t(`stats.${c.id}.desc`)}
           >
             {c.emoji} {libelleCategorie(c.id)}
           </button>
         ))}
       </div>
-      <p className="cat-desc">{info.desc}</p>
+      <p className="cat-desc">{t(`stats.${info.id}.desc`) === `stats.${info.id}.desc` ? info.desc : t(`stats.${info.id}.desc`)}</p>
       {lignes.length === 0 ? (
         <p className="x-vide" style={{ padding: '0.8rem 0' }}>
           {t('tb.statsVides')}
@@ -465,33 +464,33 @@ export function Tableau() {
       ? [{
           valeur: maDivision,
           label: COMPETITIONS.find((c) => c.id === maDivision)?.nom ?? maDivision,
-          sous: 'Ton championnat',
+          sous: t('tb.tonChampionnat'),
           vignette: <LogoCompet id={maDivision} emoji="⭐" taille={22} />,
-          groupe: 'Mes compétitions',
+          groupe: t('tb.mesCompetitions'),
         }]
       : []),
     ...mesCoupes.map((id) => {
       const c = COUPES_EUROPE.find((x) => x.id === id)!;
-      return { valeur: id, label: c.nom, sous: 'Ton club y est engagé', vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: 'Mes compétitions' };
+      return { valeur: id, label: c.nom, sous: t('tb.clubEngage'), vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: t('tb.mesCompetitions') };
     }),
     ...(maSelection
       ? [{
           valeur: maSelection,
           label: internationales.find((c) => c.id === maSelection)!.nom,
-          sous: `Ta sélection — ${maNation}`,
+          sous: t('tb.taSelection', { nation: maNation }),
           vignette: <LogoCompet id={maSelection} emoji="🏳️" taille={22} />,
-          groupe: 'Mes compétitions',
+          groupe: t('tb.mesCompetitions'),
         }]
       : []),
     ...COUPES_EUROPE.filter((c) => !mesCoupes.includes(c.id)).map((c) => ({
-      valeur: c.id, label: c.nom, sous: c.pays, vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: 'Coupes d’Europe',
+      valeur: c.id, label: c.nom, sous: nomNationTraduit(c.pays), vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: t('tb.coupesEurope'),
     })),
     ...internationales.filter((c) => c.id !== maSelection).map((c) => ({
-      valeur: c.id, label: c.nom, sous: `${c.equipes.length} sélections`,
-      vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: 'Sélections',
+      valeur: c.id, label: c.nom, sous: t('tb.nombreSelections', { n: c.equipes.length }),
+      vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: t('tb.selections'),
     })),
     ...COMPETITIONS.filter((c) => c.id !== maDivision).map((c) => ({
-      valeur: c.id, label: c.nom, sous: c.pays, vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: 'Championnats',
+      valeur: c.id, label: c.nom, sous: nomNationTraduit(c.pays), vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: t('tb.championnats'),
     })),
   ];
 
@@ -505,7 +504,7 @@ export function Tableau() {
       <button className="btn fantome" onClick={() => setEcran('carriere')} style={{ marginBottom: '1rem' }}>
         ← Retour à la carrière
       </button>
-      <div className="eyebrow">{semActuelle.libelle} · {t('gen.saison').toLowerCase()} {joueur.saison}</div>
+      <div className="eyebrow">{libelleSemaine(semActuelle)} · {t('gen.saison').toLowerCase()} {joueur.saison}</div>
       <h1>📊 {t('tb.titre')}</h1>
 
       <div className="barre-competitions">
@@ -514,7 +513,7 @@ export function Tableau() {
             options={options}
             valeur={choix}
             onChange={(v) => { setChoix(v); setJourneeVue(null); setPouleVue(null); }}
-            placeholder="Choisir une compétition"
+        placeholder={t('tb.choisirCompetition')}
           />
         </div>
         {maDivision && (
@@ -522,7 +521,7 @@ export function Tableau() {
             className={`chip-comp${choix === maDivision ? ' actif' : ''}`}
             onClick={() => { setChoix(maDivision); setJourneeVue(null); setPouleVue(null); }}
           >
-            <LogoCompet id={maDivision} emoji="⭐" taille={18} /> Mon championnat
+            <LogoCompet id={maDivision} emoji="⭐" taille={18} /> {t('tb.monChampionnat')}
           </button>
         )}
         {maSelection && (
@@ -531,7 +530,7 @@ export function Tableau() {
             onClick={() => { setChoix(maSelection); setJourneeVue(null); setPouleVue(null); }}
             title={`${maNation} dispute cette compétition`}
           >
-            <LogoCompet id={maSelection} emoji="🏳️" taille={18} /> Ma sélection
+            <LogoCompet id={maSelection} emoji="🏳️" taille={18} /> {t('tb.maSelection')}
           </button>
         )}
         {mesCoupes.map((id) => {
@@ -576,7 +575,7 @@ export function Tableau() {
             <div key={l.nation} className="classement-ligne" data-moi={l.nation === maNation ? 'oui' : undefined}>
               <span className="cl-pos" data-tete={l.rang <= 12 ? 'oui' : undefined}>{l.rang}</span>
               <LogoEquipe nom={l.nation} taille={22} />
-              <span className="cl-nom">{l.nation}{l.nation === maNation && ' 🫵'}</span>
+              <span className="cl-nom">{nomNationTraduit(l.nation)}{l.nation === maNation && ' 🫵'}</span>
               <span className="cl-pts">{l.points}</span>
               <span style={{ gridColumn: 'span 5' }}>{l.rang <= 12 ? t('intl.qualifie') : t('intl.barrages')}</span>
             </div>
@@ -588,18 +587,17 @@ export function Tableau() {
       {coupe && (
         <>
           <p className="intro-comp">
-            <LogoCompet id={coupe.id} emoji={coupe.emoji} taille={20} /> <b>{coupe.nom}</b> — {coupe.journeesJouees} journée
-            {coupe.journeesJouees > 1 ? 's' : ''} de poules sur {coupe.totalJournees}.{' '}
+            <LogoCompet id={coupe.id} emoji={coupe.emoji} taille={20} /> <b>{coupe.nom}</b> — {t('tb.journeesPoules', { n: coupe.journeesJouees, total: coupe.totalJournees })}{' '}
             {coupe.engage
-              ? 'Ton club est engagé dans cette coupe.'
-              : 'Ton club n’y participe pas cette saison.'}
-            {coupe.vainqueur && ` 🏆 Vainqueur : ${coupe.vainqueur}.`}
+              ? t('tb.clubEngage')
+              : t('tb.clubPasEngage')}
+            {coupe.vainqueur && ` 🏆 ${t('tb.vainqueur', { club: coupe.vainqueur })}`}
           </p>
 
           {matchsCoupeVisibles.length > 0 && (
             <div className="carte bloc-competition">
               <div className="comp-tete">
-                <b>🔥 Tableau final</b>
+                <b>🔥 {t('tb.tableauFinal')}</b>
                 {coupe.vainqueur && <span className="comp-count">🏆 {coupe.vainqueur}</span>}
               </div>
               <Arbre matchs={matchsCoupeVisibles} club={joueur.club} />
@@ -611,7 +609,7 @@ export function Tableau() {
               <div key={p.nom} className="carte bloc-competition">
                 <div className="comp-tete">
                   <b>{p.nom}</b>
-                  <span className="comp-count">{p.clubs.length} clubs</span>
+                  <span className="comp-count">{p.clubs.length} {t('gen.clubs')}</span>
                 </div>
                 <Tableau1 lignes={p.classement} club={joueur.club} tete={2} />
                 {p.journees.length > 0 && (
@@ -637,15 +635,15 @@ export function Tableau() {
           <p className="intro-comp">
             <LogoCompet id={inter.etat.id} emoji={inter.etat.emoji} taille={20} /> <b>{inter.etat.nom}</b> —{' '}
             {inter.etat.journeesJouees > 0
-              ? `${inter.etat.journeesJouees} journée${inter.etat.journeesJouees > 1 ? 's' : ''} sur ${inter.etat.totalJournees}.`
-              : 'la compétition n’a pas encore commencé.'}
-            {inter.etat.equipes.includes(maNation) && ` Ta sélection : ${maNation}.`}
+              ? t('tb.journeesSur', { n: inter.etat.journeesJouees, total: inter.etat.totalJournees })
+              : t('tb.competitionPasCommencee')}
+            {inter.etat.equipes.includes(maNation) && ` ${t('tb.maSelection')} : ${nomNationTraduit(maNation)}.`}
           </p>
 
           <div className="carte bloc-competition">
             <div className="comp-tete">
-              <b>{inter.etat.emoji} Classement</b>
-              <span className="comp-count">{inter.etat.equipes.length} sélections</span>
+              <b>{inter.etat.emoji} {t('tb.classement')}</b>
+              <span className="comp-count">{t('tb.nombreSelections', { n: inter.etat.equipes.length })}</span>
             </div>
             <div className="classement-tableau tableau-live">
               <div className="classement-entete">
@@ -658,7 +656,7 @@ export function Tableau() {
                 <div key={l.club} className="classement-ligne" data-moi={l.club === maNation ? 'oui' : undefined}>
                   <span className="cl-pos" data-tete={l.position === 1 ? 'oui' : undefined}>{l.position}</span>
                   <LogoEquipe nom={l.club} taille={22} />
-                  <span className="cl-nom">{l.club}{l.club === maNation && ' 🫵'}</span>
+                  <span className="cl-nom">{nomNationTraduit(l.club)}{l.club === maNation && ' 🫵'}</span>
                   <span className="cl-pts">{l.points}</span>
                   <span>{l.joues}</span><span>{l.gagnes}</span><span>{l.nuls}</span><span>{l.perdus}</span>
                   <span className={l.difference >= 0 ? 'cl-plus' : 'cl-moins'}>
@@ -672,7 +670,7 @@ export function Tableau() {
 
           <div className="carte bloc-competition">
             <div className="comp-tete">
-              <b>{inter.affiches.some((a) => a.jouee) ? 'Résultats' : 'Programme'} — journée {inter.vue}</b>
+              <b>{inter.affiches.some((a) => a.jouee) ? t('tb.resultats') : t('tb.programme')} — {t('tb.journee', { n: inter.vue })}</b>
               <div className="nav-journee">
                 <button className="btn fantome mini" disabled={inter.vue <= 1}
                   onClick={() => setJourneeVue(inter.vue - 1)}>←</button>
@@ -686,11 +684,11 @@ export function Tableau() {
                 <div key={a.domicile} className="resultat"
                   data-moi={a.domicile === maNation || a.exterieur === maNation ? 'oui' : undefined}>
                   <span className={`res-equipe${a.match && a.match.scoreD > a.match.scoreE ? ' gagnant' : ''}`}>
-                    {a.domicile}
+                    {nomNationTraduit(a.domicile)}
                   </span>
-                  <b className="res-score">{a.match ? `${a.match.scoreD} - ${a.match.scoreE}` : 'à venir'}</b>
+                  <b className="res-score">{a.match ? `${a.match.scoreD} - ${a.match.scoreE}` : t('tb.aVenir')}</b>
                   <span className={`res-equipe droite${a.match && a.match.scoreE > a.match.scoreD ? ' gagnant' : ''}`}>
-                    {a.exterieur}
+                    {nomNationTraduit(a.exterieur)}
                   </span>
                 </div>
               ))}
@@ -705,14 +703,14 @@ export function Tableau() {
           <p className="intro-comp">
             <LogoCompet id={competition?.id} emoji={competition?.emoji} taille={20} /> <b>{competition?.nom}</b> —{' '}
             {derniere > 0
-              ? `${derniere} journée${derniere > 1 ? 's' : ''} disputée${derniere > 1 ? 's' : ''} sur ${etat.totalJournees}.`
-              : 'la saison n’a pas encore commencé.'}
+              ? t('tb.saisonResume', { n: derniere, total: etat.totalJournees })
+              : t('tb.saisonPasCommencee')}
           </p>
 
           {poules.length > 1 && (
             <div className="barre-poules">
               <span className="poules-titre">
-                {poules.length} poules — {estAmateur(choix) ? 'champion désigné par le tournoi final' : 'phase finale par poule'}
+                {t('tb.nombrePoules', { n: poules.length })} — {estAmateur(choix) ? t('tb.championTournoi') : t('tb.phaseFinalePoule')}
               </span>
               {poules.map((p, i) => (
                 <button
@@ -721,7 +719,7 @@ export function Tableau() {
                   onClick={() => { setPouleVue(i); setJourneeVue(null); }}
                   title={p.slice(0, 4).join(' · ') + '…'}
                 >
-                  Poule {i + 1}
+                  {t('tb.poule', { n: i + 1 })}
                   {choix === maDivision && i === maPoule && ' 🫵'}
                 </button>
               ))}
@@ -730,8 +728,8 @@ export function Tableau() {
 
           <div className="carte bloc-competition">
             <div className="comp-tete">
-              <b>Classement{poules.length > 1 ? ` — poule ${poule + 1}` : ''}</b>
-              <span className="comp-count">{etat.poule.length} clubs</span>
+              <b>{poules.length > 1 ? t('tb.classementPoule', { n: poule + 1 }) : t('tb.classement')}</b>
+              <span className="comp-count">{etat.poule.length} {t('gen.clubs')}</span>
             </div>
             <Tableau1 lignes={etat.classement} club={joueur.club} />
           </div>
@@ -741,11 +739,11 @@ export function Tableau() {
             <div className="carte bloc-competition">
               <div className="comp-tete">
                 <b>🏆 {tournoi.nom}</b>
-                <span className="comp-count">{tournoi.qualifies.length} qualifiés</span>
+                <span className="comp-count">{t('tb.nombreQualifies', { n: tournoi.qualifies.length })}</span>
               </div>
               <p className="intro-comp" style={{ margin: '0 0 0.6rem' }}>
-                Les meilleurs de chaque poule s’affrontent en tableau sec, façon coupe de France.
-                {finaleTerminee && tournoi.champion && <> 🏆 Vainqueur : <b>{tournoi.champion}</b>.</>}
+                {t('tb.tournoiAide')}
+                {finaleTerminee && tournoi.champion && <> 🏆 {t('tb.vainqueur', { club: tournoi.champion })}</>}
               </p>
               <Arbre matchs={matchsTournoiVisibles} club={joueur.club} />
             </div>
@@ -754,8 +752,8 @@ export function Tableau() {
           {phase && matchsPhaseVisibles.length > 0 && (
             <div className="carte bloc-competition">
               <div className="comp-tete">
-                <b>🔥 Phase finale</b>
-                <span className="comp-count">{phase.qualifies.length} qualifiés</span>
+                <b>🔥 {t('cl.phaseFinale')}</b>
+                <span className="comp-count">{t('tb.nombreQualifies', { n: phase.qualifies.length })}</span>
               </div>
               <Arbre matchs={matchsPhaseVisibles} club={joueur.club} />
               {finaleTerminee && phase.champion && phase.finaliste && (
@@ -778,16 +776,15 @@ export function Tableau() {
           {/* ---------- LE CALENDRIER DE L'ANNÉE ---------- */}
           <div className="carte bloc-competition">
             <div className="comp-tete">
-              <b>🗓️ Calendrier de la saison</b>
-              <span className="comp-count">{total} journées</span>
+              <b>🗓️ {t('tb.calendrier')}</b>
+              <span className="comp-count">{t('tb.nombreJournees', { n: total })}</span>
             </div>
             <p className="intro-comp" style={{ margin: '0 0 0.6rem' }}>
-              Clique une semaine <b>passée</b> pour voir ses affiches.
+              {t('tb.calendrierAide')}
               {peutAvancer
-                ? <> Clique une semaine <b>à venir</b> (▶) et le jeu <b>joue jusque-là</b> :
-                  tous les matchs, tes statistiques, ta forme et tes sélections comprises.</>
-                : ' Les semaines à venir affichent le programme.'}
-              {estAmateur(choix) && ' Ici, pas de trêve : on joue aussi pendant la Coupe d’Europe et le Tournoi.'}
+                ? <> {t('tb.calendrierAvance')}</>
+                : ` ${t('tb.calendrierProgramme')}`}
+              {estAmateur(choix) && ` ${t('tb.calendrierAmateur')}`}
             </p>
             <Frise
               divisionId={choix}
@@ -803,7 +800,7 @@ export function Tableau() {
             <div className="carte bloc-competition">
               <div className="comp-tete">
                 <b>
-                  {vue <= derniere ? 'Résultats' : 'Programme'} — journée {vue} / {total}
+                  {vue <= derniere ? t('tb.resultats') : t('tb.programme')} — {t('tb.journee', { n: vue })} / {total}
                 </b>
                 <div className="nav-journees">
                   <button disabled={vue <= 1} onClick={() => setJourneeVue(vue - 1)}>←</button>

@@ -998,13 +998,18 @@
 
 /* ====== BADGE GÉNÉRALE ====== */
 .badge-generale {
-  flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  width: 52px; height: 52px; border-radius: 12px;
+  position: relative; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 56px; height: 58px; border-radius: 12px;
   background: linear-gradient(180deg, var(--or-400), var(--or-500));
   color: #17110a; box-shadow: 0 6px 16px -6px rgba(232, 178, 58, 0.6);
 }
-.badge-generale b { font-family: var(--police-titre); font-size: 1.35rem; line-height: 1; }
-.badge-generale span { font-size: 0.55rem; font-weight: 800; letter-spacing: 0.14em; }
+.badge-generale b { font-family: var(--police-titre); font-size: 1.6rem; line-height: 0.9; }
+.badge-generale span { margin-top: 0.22rem; font-size: 0.55rem; font-weight: 900; letter-spacing: 0.12em; line-height: 1; }
+.badge-generale em {
+  position: absolute; right: -0.45rem; bottom: -0.4rem; padding: 0.12rem 0.22rem;
+  border-radius: 0.38rem; background: #0b1d31; color: var(--or-200); font-size: 0.58rem;
+  font-style: normal; font-weight: 900; line-height: 1; box-shadow: 0 1px 4px rgba(0,0,0,.35);
+}
 
 .choix-rapides button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 

@@ -22,9 +22,10 @@ import { libelleDate, semaine } from '../data/calendrier';
 import { effetsTraits } from '../data/traits';
 import { nomDivision } from './promotion';
 import { POSTE_PAR_ID } from '../data/rugby';
-import { nomNation } from '../components/Drapeau';
+import { nomNation, nomNationTraduit } from '../components/Drapeau';
 import { avatarPourCompte } from './avatars';
 import { annuaire } from './comptes';
+import { t } from './i18n';
 
 export const LIMITE_CARACTERES = 280;
 
@@ -322,11 +323,11 @@ export function tendances(j: Joueur): Tendance[] {
   const sem = semaine(j.semaine ?? 1);
   const division = nomDivision(j.division ?? '');
   const brut: Tendance[] = [
-    { categorie: `${division} · Tendance`, sujet: `#${j.club.replace(/[^A-Za-zÀ-ÿ0-9]/g, '')}`, volume: `${compact(2000 + Math.floor(rng() * 60_000))} posts` },
-    { categorie: 'Rugby · Tendance', sujet: `#${sem.type === 'international' ? 'XVdeFrance' : sem.type === 'coupe' ? 'ChampionsCup' : 'JourneeDeChampionnat'}`, volume: `${compact(8000 + Math.floor(rng() * 200_000))} posts` },
-    { categorie: 'Mercato', sujet: '#Mercato', volume: `${compact(4000 + Math.floor(rng() * 40_000))} posts` },
-    { categorie: 'Tendance en France', sujet: '#ArbitrageVideo', volume: `${compact(1000 + Math.floor(rng() * 25_000))} posts` },
-    { categorie: 'Sport · Tendance', sujet: `#${nomNation(j.nation).replace(/[^A-Za-zÀ-ÿ]/g, '')}`, volume: `${compact(900 + Math.floor(rng() * 18_000))} posts` },
+    { categorie: t('ov.tendanceDivision', { division }), sujet: `#${j.club.replace(/[^A-Za-zÀ-ÿ0-9]/g, '')}`, volume: t('ov.nombrePosts', { n: compact(2000 + Math.floor(rng() * 60_000)) }) },
+    { categorie: t('ov.tendanceRugby'), sujet: `#${sem.type === 'international' ? 'XVdeFrance' : sem.type === 'coupe' ? 'ChampionsCup' : 'JourneeDeChampionnat'}`, volume: t('ov.nombrePosts', { n: compact(8000 + Math.floor(rng() * 200_000)) }) },
+    { categorie: t('ov.tendanceMercato'), sujet: '#Mercato', volume: t('ov.nombrePosts', { n: compact(4000 + Math.floor(rng() * 40_000)) }) },
+    { categorie: t('ov.tendanceFrance'), sujet: '#ArbitrageVideo', volume: t('ov.nombrePosts', { n: compact(1000 + Math.floor(rng() * 25_000)) }) },
+    { categorie: t('ov.tendanceSport'), sujet: `#${nomNationTraduit(j.nation).replace(/[^A-Za-zÀ-ÿ]/g, '')}`, volume: t('ov.nombrePosts', { n: compact(900 + Math.floor(rng() * 18_000)) }) },
   ];
   return brut;
 }

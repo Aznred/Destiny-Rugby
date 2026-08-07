@@ -182,3 +182,46 @@ export async function POST(req: Request): Promise<Response> {
 
   return reponse({ ok: true, score: verdict.score });
 }
+
+// Vercel appelle une fonction `api/*.ts` via son export par défaut (req, res).
+// Les exports GET/POST ci-dessus restent utiles pour les tests et les runtimes
+// web, mais sans ce pont Vercel chargeait le module sans jamais appeler GET :
+// le navigateur recevait alors une erreur 500 générique.
+type RequeteVercel = {
+  method?: string;
+  url?: string;
+  headers?: Record<string, string | string[] | undefined>;
+  body?: unknown;
+};
+type ReponseVercel = {
+  status: (code: number) => ReponseVercel;
+  setHeader: (nom: string, valeur: string) => void;
+  send: (corps: string) => void;
+};
+
+export default async function classementVercel(req: RequeteVercel, res: ReponseVercel): Promise<void> {
+  const methode = (req.method ?? 'GET').toUpperCase();
+  const headers = new Headers();
+  for (const [nom, valeur] of Object.entries(req.headers ?? {})) {
+    if (Array.isArray(valeur)) headers.set(nom, valeur.join(', '));
+    else if (valeur) headers.set(nom, valeur);
+  }
+
+  const corps = methode === 'GET' || methode === 'OPTIONS'
+    ? undefined
+    : typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
+  const demande = new Request(`https://destiny-rugby.local${req.url ?? '/api/classement'}`, {
+    method: methode,
+    headers,
+    body: corps,
+  });
+
+  let resultat: Response;
+  if (methode === 'GET') resultat = await GET();
+  else if (methode === 'POST') resultat = await POST(demande);
+  else if (methode === 'OPTIONS') resultat = await OPTIONS();
+  else resultat = reponse({ erreur: 'Méthode non autorisée' }, 405);
+
+  resultat.headers.forEach((valeur, nom) => res.setHeader(nom, valeur));
+  res.status(resultat.status).send(await resultat.text());
+}

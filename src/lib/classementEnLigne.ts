@@ -91,8 +91,8 @@ export async function lireClassementMondial(): Promise<EtatMondial> {
   if (!ACTIF) return { etat: 'hors-ligne' };
   try {
     const r = await appeler(URL_CLASSEMENT);
-    if (!r.ok) return { etat: 'panne', erreur: `Le serveur a répondu ${r.status}` };
-    const data = (await r.json()) as { classement?: LigneMondiale[] };
+    const data = (await r.json().catch(() => ({}))) as { classement?: LigneMondiale[]; erreur?: string };
+    if (!r.ok) return { etat: 'panne', erreur: data.erreur ?? `Le serveur a répondu ${r.status}` };
     return { etat: 'ok', lignes: Array.isArray(data.classement) ? data.classement : [] };
   } catch (e) {
     // Pas de serveur, hors ligne, ou fonction pas encore déployée : le jeu

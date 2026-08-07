@@ -22,19 +22,15 @@ import { ClassementLateral } from '../components/ClassementLateral';
 import { demanderAuMJ, CLE_ENV } from '../lib/groq';
 import { genererEvenementHebdo, jugerReaction } from '../lib/ia';
 import { semaine, libelleDate } from '../data/calendrier';
-import { ATTRIBUTS_LABELS } from '../data/rugby';
+import { ATTRIBUTS_LABELS, nomPoste } from '../data/rugby';
+import { t } from '../lib/i18n';
 import type { EntreeJournal } from '../types';
 
 interface Props {
   onReglages: () => void;
 }
 
-const IDEES = [
-  "Je m'entraîne dur au plaquage toute la semaine.",
-  "Je demande plus de temps de jeu à mon entraîneur.",
-  "Je soigne mon hygiène de vie et ma récupération.",
-  "Je tente une action décisive lors du prochain match.",
-];
+const IDEE_CLES = ['car.idee1', 'car.idee2', 'car.idee3', 'car.idee4'];
 
 export function Carriere({ onReglages }: Props) {
   const joueur = useGame((s) => s.joueur);
@@ -136,7 +132,7 @@ export function Carriere({ onReglages }: Props) {
     const contenu = action.trim();
     if (!contenu || enCours) return;
     if (!cle) {
-      setErreur('Ajoute d’abord ta clé Groq dans les réglages (⚙️) pour réveiller le Maître du Jeu.');
+      setErreur(t('car.sansCle'));
       onReglages();
       return;
     }
@@ -170,7 +166,7 @@ export function Carriere({ onReglages }: Props) {
         setChoix(reponse.choix ?? []);
       }
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : 'Erreur inconnue.');
+      setErreur(e instanceof Error ? e.message : t('car.erreurInconnue'));
       // On garde l'action dans la barre pour réessayer
       setTexte(contenu);
     } finally {
@@ -185,7 +181,7 @@ export function Carriere({ onReglages }: Props) {
     }
   };
 
-  const suggestions = choix.length ? choix : IDEES;
+  const suggestions = choix.length ? choix : IDEE_CLES.map((cle) => t(cle));
 
   return (
     // ⚠️ Trois colonnes qui tiennent DANS l'écran : la page elle-même ne
@@ -217,7 +213,7 @@ export function Carriere({ onReglages }: Props) {
 
         {scenarioActif ? (
           <div className="scenario-choix">
-            <div className="scenario-consigne">👉 Fais ton choix :</div>
+            <div className="scenario-consigne">{t('car.faisTonChoix')}</div>
             {scenarioActif.choix.map((c, i) => (
               <button key={i} className="choix-scenario" onClick={() => resoudreChoix(i)}>
                 {c.texte}
@@ -242,10 +238,10 @@ export function Carriere({ onReglages }: Props) {
             que le champ de saisie sert à RÉPONDRE, pas à agir librement. */}
         {evenementHebdo && !enCours && (
           <div className="scenario-consigne" style={{ padding: '0 1.2rem 0.4rem' }}>
-            ✍️ À toi : qu’est-ce que tu fais ?{' '}
+            {t('car.aToi')}{' '}
             {evenementHebdo.risque && (
               <span style={{ color: 'var(--or)' }}>
-                — attention, ça peut mal tourner.
+                {t('car.risque')}
               </span>
             )}
           </div>
@@ -255,10 +251,10 @@ export function Carriere({ onReglages }: Props) {
           <textarea
             placeholder={
               scenarioActif
-                ? 'Réponds au choix ci-dessus…'
+                ? t('car.placeholderChoix')
                 : evenementHebdo
-                  ? 'Raconte ce que tu fais… (le MJ juge sur tes stats, et il est sévère)'
-                  : 'Décris ton action… (ex. « Je négocie une prolongation de contrat »)'
+                  ? t('car.placeholderEvenement')
+                  : t('car.placeholder')
             }
             value={texte}
             onChange={(e) => setTexte(e.target.value)}
@@ -271,7 +267,7 @@ export function Carriere({ onReglages }: Props) {
             onClick={() => envoyer(texte)}
             disabled={enCours || !!scenarioActif || !texte.trim()}
           >
-            {enCours ? '…' : evenementHebdo ? 'Répondre' : 'Jouer'}
+            {enCours ? '…' : evenementHebdo ? t('car.repondre') : t('car.jouer')}
           </button>
         </div>
       </div>
@@ -283,6 +279,20 @@ export function Carriere({ onReglages }: Props) {
 }
 
 function Message({ entree }: { entree: EntreeJournal }) {
+  const joueur = useGame((s) => s.joueur);
+  const estDebut = entree.role === 'systeme'
+    && (entree.titre === 'Début de carrière' || entree.titre === 'Career begins');
+  const transfert = entree.role === 'systeme'
+    ? /^(.*?) quitte (.*?) pour (.*?)\. Le transfert est acté : tu le verras dans les effectifs\.$/.exec(entree.texte)
+    : null;
+  const titre = estDebut
+    ? t('car.debutTitre')
+    : transfert ? t('car.mercatoOfficiel') : entree.titre;
+  const texte = estDebut && joueur
+    ? t('car.debutTexte', { joueur: joueur.nom, poste: nomPoste(joueur.poste).toLowerCase(), club: joueur.club })
+    : transfert
+      ? t('car.transfertOfficiel', { joueur: transfert[1], de: transfert[2], vers: transfert[3] })
+      : entree.texte;
   return (
     <motion.div
       className={`msg ${entree.role}`}
@@ -291,13 +301,13 @@ function Message({ entree }: { entree: EntreeJournal }) {
       transition={{ duration: 0.3 }}
     >
       <div className="bulle">
-        {entree.titre && entree.role === 'mj' && (
+        {titre && entree.role === 'mj' && (
           <div className="titre-evt">◆ {entree.titre}</div>
         )}
-        {entree.titre && entree.role === 'systeme' && (
-          <div className="titre-evt" style={{ color: 'var(--brume)' }}>{entree.titre}</div>
+        {titre && entree.role === 'systeme' && (
+          <div className="titre-evt" style={{ color: 'var(--brume)' }}>{titre}</div>
         )}
-        {entree.texte}
+        {texte}
         {entree.deltas && Object.keys(entree.deltas).length > 0 && (
           <div className="deltas">
             {Object.entries(entree.deltas).map(([k, v]) => (

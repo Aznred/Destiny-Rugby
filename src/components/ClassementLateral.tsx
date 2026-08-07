@@ -28,7 +28,7 @@ import {
 import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { Blason, LogoEquipe } from './Blason';
 import { nomNation } from './Drapeau';
-import { semaine, CALENDRIER } from '../data/calendrier';
+import { semaine, CALENDRIER, libelleSemaine } from '../data/calendrier';
 import { t } from '../lib/i18n';
 import type { Joueur } from '../types';
 import type { LigneTableau } from '../lib/championnat';
@@ -218,11 +218,11 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
             <b>{vue.pied.scoreD}-{vue.pied.scoreE}</b>
             <span>{vue.pied.exterieur}</span>
           </div>
-          <div className="cl-lat-note">{sem.libelle}</div>
+          <div className="cl-lat-note">{libelleSemaine(sem)}</div>
         </div>
       ) : (
         <div className="cl-lat-pied">
-          <div className="cl-lat-note">{sem.libelle}</div>
+          <div className="cl-lat-note">{libelleSemaine(sem)}</div>
         </div>
       )}
     </aside>
