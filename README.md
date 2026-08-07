@@ -512,7 +512,7 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 | Réglages : impossible de faire défiler | La modale a une hauteur maximale et un ascenseur ; l'overlay ne la coupe plus par le haut. |
 | Boutique | **Boosts supprimés**, articles affichés avec le **vrai ballon 3D**. |
 | Classement | **Vierge au départ**, avec la marche à suivre pour le brancher en ligne. |
-| Logos de sélections faux | 39 écussons principaux + **77 écussons du nouveau catalogue** validés par signature ; 24 variantes conservées sans doublonner le jeu. |
+| Logos de sélections faux | Les **39 écussons principaux sont toujours prioritaires** ; 77 écussons du catalogue servent uniquement de repli. Les signatures sont contrôlées et 24 variantes restent disponibles. |
 | Pas de drapeau ni de note sur les nouvelles ligues | 28 championnats sur 28 ont leur drapeau, 183 clubs ont leur note. |
 | Pas de compétitions U20 | **Tournoi des 6 Nations U20** et **Championnat du monde U20**, avec convocation des meilleurs joueurs U20 de chaque pays. |
 | Traductions inachevées | 160 clés, 100 % dans les 7 langues, branchées sur tous les écrans principaux. |

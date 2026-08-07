@@ -1,7 +1,54 @@
 // ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.
-// Source : sources/logos/selections/catalogue/
+// Sources : sources/logos/selections/principaux/ puis catalogue/ en repli.
 
-export const LOGO_SELECTION_SUPPLEMENTAIRE: Readonly<Record<string, string>> = {
+export const LOGO_SELECTION_PRINCIPALE: Readonly<Record<string, string>> = {
+  "Afrique du Sud": "/logos/afrique_du_sud.png",
+  "Afrique du Sud A": "/logos/afrique_du_sud_a.png",
+  "All Blacks XV": "/logos/all_blacks_xv.png",
+  "Allemagne": "/logos/allemagne.png",
+  "Angleterre": "/logos/angleterre.png",
+  "Angleterre A": "/logos/angleterre_a.png",
+  "Argentine": "/logos/argentine.png",
+  "Australie": "/logos/australie.png",
+  "Barbarians": "/logos/barbarians.png",
+  "Belgique": "/logos/belgique.png",
+  "Brésil": "/logos/bresil.png",
+  "Canada": "/logos/canada.png",
+  "Chili": "/logos/chili.png",
+  "Ecosse": "/logos/ecosse.png",
+  "Écosse": "/logos/ecosse.png",
+  "Espagne": "/logos/espagne.png",
+  "États-Unis": "/logos/usa.png",
+  "Fidji": "/logos/fidji.png",
+  "France": "/logos/france.png",
+  "France A": "/logos/france_a.png",
+  "Galles": "/logos/galles.png",
+  "Géorgie": "/logos/georgie.png",
+  "Hong Kong": "/logos/hong_kong.png",
+  "Hong Kong Chine": "/logos/hong_kong.png",
+  "Irlande": "/logos/irlande.png",
+  "Irlande A": "/logos/irlande_a.png",
+  "Italie": "/logos/italie.png",
+  "Italie XV": "/logos/italie_xv.png",
+  "Japon": "/logos/japon.png",
+  "Japon XV": "/logos/japon_xv.png",
+  "Māori All Blacks": "/logos/maori_all_blacks.png",
+  "Namibie": "/logos/namibie.png",
+  "Nouvelle Zélande": "/logos/nouvelle-zelande.png",
+  "Nouvelle-Zélande": "/logos/nouvelle-zelande.png",
+  "Pays de Galles": "/logos/galles.png",
+  "Pays-Bas": "/logos/pays-bas.png",
+  "Portugal": "/logos/portugal.png",
+  "Roumanie": "/logos/roumanie.png",
+  "Samoa": "/logos/samoa.png",
+  "Suisse": "/logos/suisse.png",
+  "Tonga": "/logos/tonga.png",
+  "Uruguay": "/logos/uruguay.png",
+  "USA": "/logos/usa.png",
+  "Zimbabwe": "/logos/zimbabwe.png",
+};
+
+export const LOGO_SELECTION_CATALOGUE: Readonly<Record<string, string>> = {
   "Afrique du Sud": "/logos-selections/afrique_du_sud.svg",
   "Afrique du Sud -20": "/logos-selections/afrique_du_sud_u20.svg",
   "Afrique du Sud A": "/logos-selections/afrique_du_sud_a.svg",
@@ -96,3 +143,6 @@ export const LOGO_SELECTION_SUPPLEMENTAIRE: Readonly<Record<string, string>> = {
   "Wallis-et-Futuna": "/logos-selections/wallis_futuna.png",
   "Zimbabwe": "/logos-selections/zimbabwe.png",
 };
+
+// Alias conservé pour les éventuels imports plus anciens.
+export const LOGO_SELECTION_SUPPLEMENTAIRE = LOGO_SELECTION_CATALOGUE;

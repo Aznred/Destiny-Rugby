@@ -11,6 +11,7 @@ import {
   ecouterEtatIALocale,
   etatIALocale,
   iaLocaleCompatible,
+  messageErreurIALocale,
   modeleIALocaleEnCache,
   reinitialiserActiviteIALocale,
   supprimerIALocale,
@@ -70,7 +71,7 @@ export function Reglages({ onFermer }: Props) {
       setModeleEnCache(true);
     } catch (cause) {
       setIALocaleActivee(false);
-      setErreurIA(cause instanceof Error ? cause.message : t('reg.iaErreur'));
+      setErreurIA(messageErreurIALocale(cause));
     } finally {
       setOperationIA(false);
     }
@@ -91,7 +92,7 @@ export function Reglages({ onFermer }: Props) {
       await supprimerIALocale();
       setModeleEnCache(false);
     } catch (cause) {
-      setErreurIA(cause instanceof Error ? cause.message : t('reg.iaErreur'));
+      setErreurIA(messageErreurIALocale(cause));
     } finally {
       setOperationIA(false);
     }

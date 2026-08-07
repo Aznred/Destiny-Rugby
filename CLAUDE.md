@@ -1813,7 +1813,9 @@ Vérification : `npx vite-node scripts/verifU20.ts`.
   jeu : 39 écussons principaux et **77 entrées de catalogue** affichables. Les
   24 variantes restantes sont conservées pour les féminines, le rugby à 7 ou
   de futurs effectifs. Le générateur vérifie les signatures et refuse les pages
-  HTML maquillées en images.
+  HTML maquillées en images. ⚠️ `LOGO_SELECTION_PRINCIPALE` a toujours priorité
+  sur `LOGO_SELECTION_CATALOGUE` dans `LogoEquipe` ; le catalogue est un repli,
+  jamais un remplacement du lot principal.
 - **Les drapeaux des 18 nouvelles ligues** : elles arrivaient avec
   `drapeaux: []`. Le code vient de `data/nations.ts`, la même table que
   `<Drapeau>` — donc `gb-sct`, `gb-wls` et `gb-eng` pour les nations

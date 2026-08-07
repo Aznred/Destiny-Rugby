@@ -24,6 +24,50 @@ const CIBLE_PRINCIPALE = path.join(RACINE, 'public', 'logos');
 const CIBLE_COMPLEMENTS = path.join(RACINE, 'public', 'logos-selections');
 const SORTIE = path.join(RACINE, 'src', 'data', 'logosSelections.ts');
 
+// Priorité absolue : ces fichiers sont les logos de référence du jeu. Les
+// alias couvrent les noms canoniques du moteur et ceux des données historiques.
+const PRINCIPAUX = {
+  'afrique_du_sud.png': ['Afrique du Sud'],
+  'afrique_du_sud_a.png': ['Afrique du Sud A'],
+  'all_blacks_xv.png': ['All Blacks XV'],
+  'allemagne.png': ['Allemagne'],
+  'angleterre.png': ['Angleterre'],
+  'angleterre_a.png': ['Angleterre A'],
+  'argentine.png': ['Argentine'],
+  'australie.png': ['Australie'],
+  'barbarians.png': ['Barbarians'],
+  'belgique.png': ['Belgique'],
+  'brésil.png': ['Brésil'],
+  'canada.png': ['Canada'],
+  'chili.png': ['Chili'],
+  'espagne.png': ['Espagne'],
+  'fidji.png': ['Fidji'],
+  'france.png': ['France'],
+  'france_a.png': ['France A'],
+  'galles.png': ['Galles', 'Pays de Galles'],
+  'géorgie.png': ['Géorgie'],
+  'hong_kong.png': ['Hong Kong', 'Hong Kong Chine'],
+  'irlande.png': ['Irlande'],
+  'irlande_a.png': ['Irlande A'],
+  'italie.png': ['Italie'],
+  'italie_xv.png': ['Italie XV'],
+  'japon.png': ['Japon'],
+  'japon_xv.png': ['Japon XV'],
+  'māori_all_blacks.png': ['Māori All Blacks'],
+  'namibie.png': ['Namibie'],
+  'nouvelle-zélande.png': ['Nouvelle-Zélande', 'Nouvelle Zélande'],
+  'pays-bas.png': ['Pays-Bas'],
+  'portugal.png': ['Portugal'],
+  'roumanie.png': ['Roumanie'],
+  'samoa.png': ['Samoa'],
+  'suisse.png': ['Suisse'],
+  'tonga.png': ['Tonga'],
+  'uruguay.png': ['Uruguay'],
+  'usa.png': ['États-Unis', 'USA'],
+  'zimbabwe.png': ['Zimbabwe'],
+  'écosse.png': ['Écosse', 'Ecosse'],
+};
+
 const CATALOGUE = {
   '2013_British_and_Irish_Lions_logo.svg': {
     slug: 'lions_britanniques_irlandais',
@@ -139,8 +183,15 @@ fs.mkdirSync(CIBLE_COMPLEMENTS, { recursive: true });
 
 let remplaces = 0;
 let ajoutes = 0;
-for (const fichier of fs.readdirSync(SOURCE_PRINCIPALE)) {
-  if (!/\.(png|jpg|jpeg|webp|svg|gif)$/i.test(fichier)) continue;
+const principauxLivres = fs.readdirSync(SOURCE_PRINCIPALE)
+  .filter((f) => /\.(png|jpg|jpeg|webp|svg|gif)$/i.test(f));
+const principauxNonDeclares = principauxLivres.filter((f) => !PRINCIPAUX[f]);
+const principauxAbsents = Object.keys(PRINCIPAUX).filter((f) => !principauxLivres.includes(f));
+if (principauxNonDeclares.length || principauxAbsents.length) {
+  throw new Error(`Table des logos principaux désynchronisée : non déclarés [${principauxNonDeclares.join(', ')}], absents [${principauxAbsents.join(', ')}]`);
+}
+const tablePrincipale = {};
+for (const fichier of principauxLivres) {
   const source = path.join(SOURCE_PRINCIPALE, fichier);
   if (!estImage(source)) throw new Error(`Fausse image détectée : ${source}`);
   const ext = path.extname(fichier).toLowerCase();
@@ -149,6 +200,9 @@ for (const fichier of fs.readdirSync(SOURCE_PRINCIPALE)) {
   fs.copyFileSync(source, cible);
   if (existait) remplaces += 1;
   else ajoutes += 1;
+  for (const nation of PRINCIPAUX[fichier]) {
+    tablePrincipale[nation] = `/logos/${path.basename(cible)}`;
+  }
 }
 
 const livres = fs.readdirSync(SOURCE_CATALOGUE)
@@ -159,7 +213,7 @@ for (const fichier of livres) {
 }
 const nonUtilises = livres.filter((f) => !CATALOGUE[f]);
 
-const table = {};
+const tableCatalogue = {};
 const ciblesAttendues = new Set();
 for (const [fichier, entree] of Object.entries(CATALOGUE)) {
   const source = path.join(SOURCE_CATALOGUE, fichier);
@@ -168,22 +222,30 @@ for (const [fichier, entree] of Object.entries(CATALOGUE)) {
   const nomCible = `${entree.slug}${ext}`;
   ciblesAttendues.add(nomCible);
   fs.copyFileSync(source, path.join(CIBLE_COMPLEMENTS, nomCible));
-  for (const nation of entree.nations) table[nation] = `/logos-selections/${nomCible}`;
+  for (const nation of entree.nations) tableCatalogue[nation] = `/logos-selections/${nomCible}`;
 }
 for (const fichier of fs.readdirSync(CIBLE_COMPLEMENTS)) {
   if (!ciblesAttendues.has(fichier)) fs.unlinkSync(path.join(CIBLE_COMPLEMENTS, fichier));
 }
 
-const lignes = Object.entries(table)
+const lignesPrincipales = Object.entries(tablePrincipale)
+  .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+  .map(([nation, logo]) => `  ${JSON.stringify(nation)}: ${JSON.stringify(logo)},`);
+const lignesCatalogue = Object.entries(tableCatalogue)
   .sort(([a], [b]) => a.localeCompare(b, 'fr'))
   .map(([nation, logo]) => `  ${JSON.stringify(nation)}: ${JSON.stringify(logo)},`);
 
 fs.writeFileSync(SORTIE, `// ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.\n`
-  + `// Source : sources/logos/selections/catalogue/\n\n`
-  + `export const LOGO_SELECTION_SUPPLEMENTAIRE: Readonly<Record<string, string>> = {\n`
-  + `${lignes.join('\n')}\n};\n`, 'utf8');
+  + `// Sources : sources/logos/selections/principaux/ puis catalogue/ en repli.\n\n`
+  + `export const LOGO_SELECTION_PRINCIPALE: Readonly<Record<string, string>> = {\n`
+  + `${lignesPrincipales.join('\n')}\n};\n\n`
+  + `export const LOGO_SELECTION_CATALOGUE: Readonly<Record<string, string>> = {\n`
+  + `${lignesCatalogue.join('\n')}\n};\n\n`
+  + `// Alias conservé pour les éventuels imports plus anciens.\n`
+  + `export const LOGO_SELECTION_SUPPLEMENTAIRE = LOGO_SELECTION_CATALOGUE;\n`, 'utf8');
 
 console.log(`✅ ${remplaces} écusson(s) principal(aux) remplacé(s), ${ajoutes} ajouté(s)`);
 console.log(`✅ ${Object.keys(CATALOGUE).length} écusson(s) du catalogue copié(s)`);
-console.log(`✅ ${Object.keys(table).length} nom(s) indexé(s) dans src/data/logosSelections.ts`);
+console.log(`✅ ${Object.keys(tablePrincipale).length} nom(s) principal(aux), prioritaires`);
+console.log(`✅ ${Object.keys(tableCatalogue).length} nom(s) du catalogue, utilisés en repli`);
 if (nonUtilises.length) console.log(`ℹ️ ${nonUtilises.length} variante(s) conservée(s), non utilisée(s) par le jeu`);

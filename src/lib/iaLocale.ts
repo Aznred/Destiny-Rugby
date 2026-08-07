@@ -1,6 +1,6 @@
 import type { Joueur, ReponseMJ } from '../types';
 import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
-import { consigneDeLangue } from './i18n';
+import { consigneDeLangue, t } from './i18n';
 import type { WebWorkerMLCEngine } from '@mlc-ai/web-llm';
 
 // Le modèle tourne entièrement dans le navigateur via WebGPU. Il est chargé
@@ -26,6 +26,10 @@ let etat: EtatIALocale = {
   progression: 0,
 };
 const ecouteurs = new Set<() => void>();
+
+class ErreurIALocale extends Error {
+  override name = 'ErreurIALocale';
+}
 
 function publier(suivant: EtatIALocale): void {
   etat = suivant;
@@ -55,7 +59,7 @@ export async function chargerIALocale(): Promise<WebWorkerMLCEngine> {
   if (moteur) return moteur;
   if (chargement) return chargement;
   if (!iaLocaleCompatible()) {
-    const message = 'IA locale indisponible : ce navigateur ne prend pas en charge WebGPU.';
+    const message = t('ia.erreurWebGPU');
     publier({ phase: 'indisponible', progression: 0, erreur: message });
     throw new Error(message);
   }
@@ -80,12 +84,12 @@ export async function chargerIALocale(): Promise<WebWorkerMLCEngine> {
       worker?.terminate();
       worker = null;
       moteur = null;
-      const detail = cause instanceof Error ? cause.message : String(cause);
+      const detail = detailErreurIALocale(cause);
       const message = /gpu|shader|adapter|device/i.test(detail)
-        ? 'Le processeur graphique de cet appareil ne peut pas charger le modèle local.'
-        : `Impossible de charger l’IA locale : ${detail}`;
+        ? t('ia.erreurChargementGpu')
+        : t('ia.erreurChargementDetail', { detail: detail || t('ia.erreurInconnue') });
       publier({ phase: 'erreur', progression: 0, erreur: message });
-      throw new Error(message, { cause });
+      throw new ErreurIALocale(message, { cause });
     } finally {
       chargement = null;
     }
@@ -189,6 +193,34 @@ N'invente aucune autre clé. Si l'action ne change rien — c'est le cas le plus
 fréquent — renvoie "deltas": {}.
 Reste cohérent avec le poste, l'âge et le niveau du joueur. Écris en français.`;
 
+// Un schéma explicite évite le mode `json_object` sans schéma de WebLLM,
+// qui peut continuer à produire des espaces jusqu'à la limite de tokens avec
+// les petits modèles. La grammaire sait ici exactement quand la réponse est finie.
+const SCHEMA_REPONSE_MJ = JSON.stringify({
+  type: 'object',
+  properties: {
+    recit: { type: 'string' },
+    evenement: { type: 'string' },
+    deltas: {
+      type: 'object',
+      properties: Object.fromEntries([
+        'vitesse', 'force', 'endurance', 'plaquage', 'passe', 'jeuAuPied',
+        'vision', 'mental', 'forme', 'moral', 'reputation', 'argent',
+      ].map((cle) => [cle, { type: 'integer' }])),
+      additionalProperties: false,
+    },
+    consequences: { type: 'string' },
+    choix: {
+      type: 'array',
+      items: { type: 'string' },
+      minItems: 2,
+      maxItems: 4,
+    },
+  },
+  required: ['recit', 'evenement', 'deltas', 'consequences', 'choix'],
+  additionalProperties: false,
+});
+
 export interface OptionsAppel {
   modele?: string;
   joueur: Joueur;
@@ -199,6 +231,67 @@ export interface OptionsAppel {
 export interface MessageIA {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+// WebLLM n'accepte qu'un seul message `system`, obligatoirement en tête. Les
+// prompts du jeu sont volontairement découpés (règles, fiche du joueur,
+// contexte de la scène…), donc on les fusionne ici avant chaque appel. Sans
+// cette normalisation, le Worker rejette notamment toutes les actions libres de
+// la carrière avec `SystemMessageOrderError`.
+export function normaliserMessagesIA(messages: MessageIA[]): MessageIA[] {
+  const systeme = messages
+    .filter((message) => message.role === 'system')
+    .map((message) => message.content.trim())
+    .filter(Boolean)
+    .join('\n\n');
+  const conversation = messages.filter((message) => message.role !== 'system');
+  return systeme ? [{ role: 'system', content: systeme }, ...conversation] : conversation;
+}
+
+export function detailErreurIALocale(cause: unknown): string {
+  if (cause instanceof Error) return cause.message.trim();
+  if (typeof cause === 'string') return cause.trim();
+  if (cause && typeof cause === 'object') {
+    const objet = cause as Record<string, unknown>;
+    for (const cle of ['message', 'error', 'reason', 'detail', 'cause']) {
+      const valeur = objet[cle];
+      if (typeof valeur === 'string' && valeur.trim()) return valeur.trim();
+      if (valeur instanceof Error && valeur.message.trim()) return valeur.message.trim();
+    }
+    try {
+      const serialise = JSON.stringify(cause);
+      if (serialise && serialise !== '{}') return serialise;
+    } catch {
+      // Certains objets du navigateur sont circulaires : le message générique
+      // ci-dessous est alors plus utile que "[object Object]".
+    }
+  }
+  return '';
+}
+
+export function messageErreurIALocale(cause: unknown): string {
+  if (cause instanceof ErreurIALocale) return cause.message;
+  const detail = detailErreurIALocale(cause).replace(/^Error:\s*/i, '');
+  const debutErreurDetaillee = t('ia.erreurDetail', { detail: '' }).trimEnd();
+  if (debutErreurDetaillee && detail.startsWith(debutErreurDetaillee)) return detail;
+  if ([
+    t('ia.erreurMemoire'),
+    t('ia.erreurGpu'),
+    t('ia.erreurModeleIncomplet'),
+    t('ia.erreurGenerique'),
+  ].includes(detail)) return detail;
+  if (/out of memory|allocation|memory limit|buffer.*(?:large|size)/i.test(detail)) {
+    return t('ia.erreurMemoire');
+  }
+  if (/device lost|webgpu|gpu|shader|adapter/i.test(detail)) {
+    return t('ia.erreurGpu');
+  }
+  if (/fetch|network|cache|failed to load|404/i.test(detail)) {
+    return t('ia.erreurModeleIncomplet');
+  }
+  return detail
+    ? t('ia.erreurDetail', { detail })
+    : t('ia.erreurGenerique');
 }
 
 // ---------------------------------------------------------------------------
@@ -235,17 +328,21 @@ function executerEnFile<T>(travail: () => Promise<T>): Promise<T> {
 // Point d'entrée partagé par le MJ, les situations, L'Ovale et le coaching.
 export async function appelIAJSON(
   messages: MessageIA[],
-  options: { temperature?: number; maxTokens?: number } = {},
+  options: { temperature?: number; maxTokens?: number; schema?: string } = {},
 ): Promise<string> {
   return executerEnFile(async () => {
     const engine = await chargerIALocale();
     const reponse = await engine.chat.completions.create({
-      messages,
+      messages: normaliserMessagesIA(messages),
       temperature: Math.min(0.9, Math.max(0.1, options.temperature ?? 0.72)),
       top_p: 0.9,
       repetition_penalty: 1.06,
       max_tokens: Math.min(640, options.maxTokens ?? 360),
-      response_format: { type: 'json_object' },
+      ...(options.schema
+        ? { response_format: { type: 'json_object' as const, schema: options.schema } }
+        : {}),
+    }).catch((cause: unknown) => {
+      throw new ErreurIALocale(messageErreurIALocale(cause), { cause });
     });
     activite.appels += 1;
     activite.entree += reponse.usage?.prompt_tokens ?? 0;
@@ -277,7 +374,10 @@ export async function demanderAuMJ({
     ...historique.slice(-6).map((m) => ({ ...m, content: m.content.slice(0, 600) })),
     { role: 'user', content: action },
   ];
-  return parserReponse(await appelIAJSON(messages, { maxTokens: 360 }));
+  return parserReponse(await appelIAJSON(messages, {
+    maxTokens: 200,
+    schema: SCHEMA_REPONSE_MJ,
+  }));
 }
 
 function parserReponse(brut: string): ReponseMJ {

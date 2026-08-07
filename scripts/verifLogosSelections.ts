@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { CLASSEMENT_WORLD_RUGBY_INITIAL } from '../src/data/classementWorldRugby';
-import { LOGO_SELECTION_SUPPLEMENTAIRE } from '../src/data/logosSelections';
+import { LOGO_SELECTION_CATALOGUE, LOGO_SELECTION_PRINCIPALE } from '../src/data/logosSelections';
 import { LOGO_PAR_EQUIPE } from '../src/data/mondeReel';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../src/data/nouvellesLigues';
 import { SELECTIONS_SENIOR, SELECTIONS_U20 } from '../src/data/selections';
@@ -46,12 +46,25 @@ for (const competition of COMPETITIONS_NATIONS_NOUVELLES) {
     }
   }
 }
-for (const [equipe, logo] of Object.entries(LOGO_SELECTION_SUPPLEMENTAIRE)) {
+for (const [equipe, logo] of Object.entries(LOGO_SELECTION_CATALOGUE)) {
+  logoParNation.set(nomNation(equipe), logo);
+}
+// Dernier passage volontaire : le principal écrase toutes les autres sources.
+for (const [equipe, logo] of Object.entries(LOGO_SELECTION_PRINCIPALE)) {
   logoParNation.set(nomNation(equipe), logo);
 }
 
-const cheminsComplements = [...new Set(Object.values(LOGO_SELECTION_SUPPLEMENTAIRE))];
-const invalides = cheminsComplements.filter((url) => !signatureImage(path.join(racine, 'public', url)));
+const cheminsPrincipaux = [...new Set(Object.values(LOGO_SELECTION_PRINCIPALE))];
+const cheminsCatalogue = [...new Set(Object.values(LOGO_SELECTION_CATALOGUE))];
+const principauxInvalides = cheminsPrincipaux.filter((url) => !signatureImage(path.join(racine, 'public', url)));
+const catalogueInvalides = cheminsCatalogue.filter((url) => !signatureImage(path.join(racine, 'public', url)));
+const nomsCommuns = Object.keys(LOGO_SELECTION_PRINCIPALE)
+  .filter((nom) => LOGO_SELECTION_CATALOGUE[nom]);
+const prioritesInvalides = nomsCommuns.filter((nom) => {
+  const resolu = LOGO_SELECTION_PRINCIPALE[nom]
+    ?? LOGO_SELECTION_CATALOGUE[nom];
+  return resolu !== LOGO_SELECTION_PRINCIPALE[nom];
+});
 const classementSansLogo = CLASSEMENT_WORLD_RUGBY_INITIAL
   .filter(({ nation }) => !logoParNation.has(nomNation(nation)))
   .map(({ nation }) => nation);
@@ -63,18 +76,24 @@ const atlas = [...SELECTIONS_SENIOR, ...SELECTIONS_U20];
 const atlasInvalides = atlas
   .map((selection) => ({
     nom: selection.nom,
-    url: LOGO_SELECTION_SUPPLEMENTAIRE[selection.nom]
-      ?? LOGO_SELECTION_SUPPLEMENTAIRE[nomNation(selection.nom)]
+    url: LOGO_SELECTION_PRINCIPALE[selection.nom]
+      ?? LOGO_SELECTION_PRINCIPALE[nomNation(selection.nom)]
+      ?? LOGO_SELECTION_CATALOGUE[selection.nom]
+      ?? LOGO_SELECTION_CATALOGUE[nomNation(selection.nom)]
       ?? selection.logo
       ?? logoParNation.get(nomNation(selection.nom)),
   }))
   .filter((entree): entree is { nom: string; url: string } => Boolean(entree.url))
   .filter(({ url }) => !signatureImage(path.join(racine, 'public', url)));
 
-console.log(`✅ ${cheminsComplements.length} images complémentaires valides sur ${cheminsComplements.length}`);
+console.log(`✅ ${cheminsPrincipaux.length} logos principaux valides et prioritaires`);
+console.log(`✅ ${cheminsCatalogue.length} logos du catalogue valides en repli`);
+console.log(`✅ priorité contrôlée sur ${nomsCommuns.length} nom(s) présent(s) dans les deux lots`);
 console.log(`✅ ${CLASSEMENT_WORLD_RUGBY_INITIAL.length - classementSansLogo.length}/${CLASSEMENT_WORLD_RUGBY_INITIAL.length} nations classées ont un logo déclaré`);
 console.log(`✅ atlas : ${SELECTIONS_SENIOR.length} sélections sénior + ${SELECTIONS_U20.length} sélections U20`);
-if (invalides.length) console.log(`❌ Compléments invalides : ${invalides.join(', ')}`);
+if (principauxInvalides.length) console.log(`❌ Principaux invalides : ${principauxInvalides.join(', ')}`);
+if (catalogueInvalides.length) console.log(`❌ Catalogue invalide : ${catalogueInvalides.join(', ')}`);
+if (prioritesInvalides.length) console.log(`❌ Priorité incorrecte : ${prioritesInvalides.join(', ')}`);
 if (cheminsClassementInvalides.length) {
   console.log(`❌ Logos déclarés mais absents/invalides : ${cheminsClassementInvalides.map(({ nation, url }) => `${nation} (${url})`).join(', ')}`);
 }
@@ -83,4 +102,5 @@ if (atlasInvalides.length) {
 }
 if (classementSansLogo.length) console.log(`ℹ️ Nations classées sans logo : ${classementSansLogo.join(', ')}`);
 
-if (invalides.length || cheminsClassementInvalides.length || atlasInvalides.length) process.exitCode = 1;
+if (principauxInvalides.length || catalogueInvalides.length || prioritesInvalides.length
+  || cheminsClassementInvalides.length || atlasInvalides.length) process.exitCode = 1;

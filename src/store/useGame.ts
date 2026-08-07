@@ -218,9 +218,10 @@ export function calculerApportClub(j: Joueur): number {
 }
 
 let compteur = 0;
+const prefixeSession = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 function idUnique(): string {
   compteur += 1;
-  return `e${compteur}-${compteur * 7 + 13}`;
+  return `e-${prefixeSession}-${compteur}`;
 }
 
 export interface CreationInput {
@@ -3470,7 +3471,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 7,
+      version: 8,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -3582,6 +3583,17 @@ export const useGame = create<GameState>()(
         // arrière-plan au premier lancement. Une désactivation faite ensuite
         // reste persistée normalement.
         if (version < 7) s.iaLocaleActivee = true;
+        // Version 8 : l'ancien compteur d'identifiants repartait de zéro à
+        // chaque rechargement et recréait `e1-20`, `e2-27`… déjà présents
+        // dans le journal persisté. React pouvait alors masquer ou dupliquer
+        // des messages. On assainit une fois les anciennes sauvegardes ; les
+        // nouveaux identifiants portent désormais un préfixe propre à la session.
+        if (version < 8) {
+          s.journal = (s.journal ?? []).map((entree, index) => ({
+            ...entree,
+            id: `m8-${index}-${entree.saison}`,
+          }));
+        }
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
         // réactiver une branche obsolète après fusion par Zustand.

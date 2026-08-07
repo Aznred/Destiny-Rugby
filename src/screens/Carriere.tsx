@@ -19,7 +19,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useGame, BUDGET_IA_PAR_SAISON } from '../store/useGame';
 import { PanneauJoueur } from '../components/PanneauJoueur';
 import { ClassementLateral } from '../components/ClassementLateral';
-import { demanderAuMJ } from '../lib/iaLocale';
+import { demanderAuMJ, messageErreurIALocale } from '../lib/iaLocale';
 import { genererEvenementHebdo, jugerReaction } from '../lib/ia';
 import { semaine, libelleDate } from '../data/calendrier';
 import { ATTRIBUTS_LABELS, nomPoste } from '../data/rugby';
@@ -162,7 +162,7 @@ export function Carriere({ onReglages }: Props) {
         setChoix(reponse.choix ?? []);
       }
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : t('car.erreurInconnue'));
+      setErreur(messageErreurIALocale(e));
       // On garde l'action dans la barre pour réessayer
       setTexte(contenu);
     } finally {
