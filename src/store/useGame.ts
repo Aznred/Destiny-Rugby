@@ -1272,6 +1272,7 @@ export const useGame = create<GameState>()(
                     id: idUnique(), pseudo: app.pseudo, de: 'lui' as const, saison: j.saison,
                     texte: `${j.nom}, ton contrat arrive à son terme et on aimerait te garder. `
                       + `Notre proposition : ${resumerTermes(app.offre)}. Dis-nous.`,
+                    creeLe: Date.now(), lu: false,
                   },
                 ],
               },
@@ -1882,7 +1883,7 @@ export const useGame = create<GameState>()(
               emoji: '✉️',
               titre: `${nouvelles.length} club${nouvelles.length > 1 ? 's te contactent' : ' te contacte'}`,
               texte: nouvelles.map((a) => a.club).join(', '),
-              saison: joueur.saison,
+              saison: joueur.saison, creeLe: Date.now(), lue: false,
             },
             ...s.notifsSocial,
           ].slice(0, 40),
@@ -1911,8 +1912,8 @@ export const useGame = create<GameState>()(
             ...s.conversations,
             [a.pseudo]: [
               ...(s.conversations[a.pseudo] ?? []),
-              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: def.phrase, saison: joueur.saison },
-              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: r.texte, saison: joueur.saison },
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: def.phrase, saison: joueur.saison, creeLe: Date.now(), lu: true },
+              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: r.texte, saison: joueur.saison, creeLe: Date.now(), lu: false },
             ],
           },
         }));
@@ -1943,11 +1944,12 @@ export const useGame = create<GameState>()(
             ...s.conversations,
             [a.pseudo]: [
               ...(s.conversations[a.pseudo] ?? []),
-              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'C’est d’accord. On se voit cet été.', saison: joueur.saison },
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'C’est d’accord. On se voit cet été.', saison: joueur.saison, creeLe: Date.now(), lu: true },
               {
                 id: idUnique(), pseudo: a.pseudo, de: 'lui', saison: joueur.saison,
                 texte: `Parfait. On officialise à l’intersaison : ${resumerTermes(a.offre)}. `
                   + `D’ici là, finis ta saison — et pas un mot à la presse.`,
+                creeLe: Date.now(), lu: false,
               },
             ],
           },
@@ -1974,8 +1976,8 @@ export const useGame = create<GameState>()(
             ...s.conversations,
             [a.pseudo]: [
               ...(s.conversations[a.pseudo] ?? []),
-              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'Merci, mais je ne suis pas intéressé.', saison: joueur.saison },
-              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: 'Dommage. Bonne fin de saison.', saison: joueur.saison },
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'Merci, mais je ne suis pas intéressé.', saison: joueur.saison, creeLe: Date.now(), lu: true },
+              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: 'Dommage. Bonne fin de saison.', saison: joueur.saison, creeLe: Date.now(), lu: false },
             ],
           },
         }));
@@ -2358,6 +2360,7 @@ export const useGame = create<GameState>()(
                 texte: `${joueur.nom} ? ${mieux.nom}. On suit ta saison de près. `
                   + `Si tu cherches quelqu'un pour défendre tes intérêts, je prends `
                   + `${Math.round(mieux.commission * 100)} % — et je t'ouvre des portes que tu n'as pas.`,
+                creeLe: Date.now(), lu: false,
               },
             ],
           },
@@ -2365,7 +2368,7 @@ export const useGame = create<GameState>()(
             id: idUnique(), emoji: mieux.emoji,
             titre: `${mieux.nom} te contacte`,
             texte: 'Un agent s’intéresse à toi.',
-            saison: joueur.saison,
+            saison: joueur.saison, creeLe: Date.now(), lue: false,
           }, ...s.notifsSocial].slice(0, 40),
           journal: [...s.journal, {
             id: idUnique(), saison: joueur.saison, role: 'mj' as const,
@@ -2779,14 +2782,14 @@ export const useGame = create<GameState>()(
                   ...s.conversations,
                   [pseudo]: [
                     ...(s.conversations[pseudo] ?? []),
-                    { id: idUnique(), pseudo, de: 'lui' as const, texte, saison: joueur.saison },
+                    { id: idUnique(), pseudo, de: 'lui' as const, texte, saison: joueur.saison, creeLe: Date.now(), lu: false },
                   ],
                 },
                 notifsSocial: [
                   {
                     id: idUnique(), emoji: '💬',
                     titre: `${co.nom} t’a écrit`,
-                    texte, saison: joueur.saison, lue: false,
+                    texte, saison: joueur.saison, creeLe: Date.now(), lue: false,
                   },
                   ...s.notifsSocial,
                 ].slice(0, 40),
@@ -2810,7 +2813,7 @@ export const useGame = create<GameState>()(
                   ...s.conversations,
                   [compte.pseudo]: [
                     ...(s.conversations[compte.pseudo] ?? []),
-                    { id: idUnique(), pseudo: compte.pseudo, de: 'lui' as const, texte, saison: joueur.saison },
+                    { id: idUnique(), pseudo: compte.pseudo, de: 'lui' as const, texte, saison: joueur.saison, creeLe: Date.now(), lu: false },
                   ],
                 },
                 notifsSocial: [
@@ -2818,8 +2821,7 @@ export const useGame = create<GameState>()(
                     id: idUnique(),
                     emoji: '✉️',
                     titre: `@${compte.pseudo} t’a envoyé un message`,
-                    texte,
-                    saison: joueur.saison,
+                    texte, saison: joueur.saison, creeLe: Date.now(), lue: false,
                   },
                   ...s.notifsSocial,
                 ].slice(0, 40),

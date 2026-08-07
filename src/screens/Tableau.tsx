@@ -34,7 +34,7 @@ import { Selecteur, type OptionSelecteur } from '../components/Selecteur';
 import { Confirmation } from '../components/Confirmation';
 import { semaine, libelleDate, CALENDRIER } from '../data/calendrier';
 import {
-  classementJoueurs, CATEGORIES, afficherValeur, nomPoste, type Categorie,
+  classementJoueurs, CATEGORIES, afficherValeur, libelleCategorie, nomPoste, type Categorie,
 } from '../lib/statsJoueurs';
 import type { Joueur } from '../types';
 
@@ -64,6 +64,9 @@ const TITRE_TOUR: Record<string, string> = {
   finale: 'Finale', accession: 'Match d’accès',
 };
 const ORDRE_TOURS = ['barrage', 'quart', 'demie', 'finale', 'accession'];
+const ORDRE_TOUR_FINAL: Record<string, number> = {
+  barrage: 1, quart: 1, demie: 2, finale: 3, accession: 4,
+};
 
 function Arbre({ matchs, club }: { matchs: MatchFinal[]; club: string }) {
   const tours = ORDRE_TOURS
@@ -209,7 +212,7 @@ function ClassementsJoueurs({
   return (
     <div className="carte bloc-competition">
       <div className="comp-tete">
-        <b>🥇 Classements des joueurs</b>
+        <b>🥇 {t('tb.statsJoueurs')}</b>
         <span className="comp-count">
           {reelles
             ? `matchs joués · ${rejouees} journée${rejouees > 1 ? 's' : ''}`
@@ -225,14 +228,14 @@ function ClassementsJoueurs({
             onClick={() => setCat(c.id)}
             title={c.desc}
           >
-            {c.emoji} {c.nom}
+            {c.emoji} {libelleCategorie(c.id)}
           </button>
         ))}
       </div>
       <p className="cat-desc">{info.desc}</p>
       {lignes.length === 0 ? (
         <p className="x-vide" style={{ padding: '0.8rem 0' }}>
-          Pas encore de statistiques : la saison n’a pas commencé.
+          {t('tb.statsVides')}
         </p>
       ) : (
         <div className="stats-tableau">
@@ -263,14 +266,14 @@ function Tableau1({ lignes, club, tete = 6 }: { lignes: LigneTableau[]; club: st
       <div className="classement-entete">
         <span />
         <span />
-        <span className="cl-nom">Club</span>
-        <span title="Points">Pts</span>
-        <span title="Joués">J</span>
-        <span title="Gagnés">G</span>
-        <span title="Nuls">N</span>
-        <span title="Perdus">P</span>
-        <span title="Différence de points">Diff</span>
-        <span title="Points de bonus">B</span>
+        <span className="cl-nom">{t('tb.club')}</span>
+        <span title={t('tb.points')}>Pts</span>
+        <span title={t('tb.joues')}>J</span>
+        <span title={t('tb.gagnes')}>G</span>
+        <span title={t('tb.nuls')}>N</span>
+        <span title={t('tb.perdus')}>P</span>
+        <span title={t('tb.difference')}>Diff</span>
+        <span title={t('tb.bonus')}>B</span>
       </div>
       {lignes.map((l) => {
         const data = clubParNom(l.club);
@@ -326,6 +329,11 @@ export function Tableau() {
   const internationales = useMemo(() => competitionsDeLaSaison(saison), [saison]);
   const rangMondial = useMemo(() => classementMondial(saison), [saison]);
   const maNation = nomNation(joueur?.nation ?? '');
+  const maLigneMondiale = useMemo(
+    () => rangMondial.find((ligne) => ligne.nation === maNation),
+    [rangMondial, maNation],
+  );
+  const leaderMondial = rangMondial[0];
   const fenetre = useMemo(
     () => fenetreInternationale(numero, saison, maNation),
     [numero, saison, maNation],
@@ -415,6 +423,20 @@ export function Tableau() {
 
   const etat = donnees?.etat;
   const phase = donnees?.phase;
+  // Les tableaux sont préparés en interne pour savoir qui affrontera qui, mais
+  // seules les rencontres déjà passées sont rendues : aucun score, finaliste ou
+  // champion ne doit être connu avant le match correspondant.
+  const toursFinalsTermines = useMemo(
+    () => CALENDRIER.slice(0, Math.max(0, numero - 1)).filter((s) => s.type === 'phaseFinale').length,
+    [numero],
+  );
+  const matchsPhaseVisibles = phase?.matchs.filter(
+    (match) => ORDRE_TOUR_FINAL[match.tour] <= toursFinalsTermines,
+  ) ?? [];
+  const matchsTournoiVisibles = tournoi?.matchs.filter(
+    (match) => ORDRE_TOUR_FINAL[match.tour] <= toursFinalsTermines,
+  ) ?? [];
+  const finaleTerminee = toursFinalsTermines >= 3;
   const derniere = etat?.journees.length ?? 0;
   const total = donnees?.total ?? 0;
   // ⚠️ On peut consulter N'IMPORTE QUELLE journée de l'année, y compris celles
@@ -525,8 +547,19 @@ export function Tableau() {
           <b>🌍 {t('intl.classementMondial')}</b>
           <span className="comp-count">{t('intl.top12')}</span>
         </div>
+        {maLigneMondiale && leaderMondial && (
+          <p className="intro-comp">
+            <b>{t('intl.maSelection', { nation: maLigneMondiale.nation, rang: maLigneMondiale.rang, points: maLigneMondiale.points })}</b>
+            {' '}{maLigneMondiale.rang === 1
+              ? t('intl.enTete')
+              : t('intl.ecartLeader', { points: leaderMondial.points - maLigneMondiale.points })}
+            {' '}{maLigneMondiale.rang <= 12
+              ? t('intl.dansTop12')
+              : t('intl.placesTop12', { places: maLigneMondiale.rang - 12 })}
+          </p>
+        )}
         <div className="classement-tableau tableau-live">
-          {rangMondial.slice(0, 20).map((l) => (
+          {rangMondial.map((l) => (
             <div key={l.nation} className="classement-ligne" data-moi={l.nation === maNation ? 'oui' : undefined}>
               <span className="cl-pos" data-tete={l.rang <= 12 ? 'oui' : undefined}>{l.rang}</span>
               <LogoEquipe nom={l.nation} taille={22} />
@@ -603,10 +636,10 @@ export function Tableau() {
             </div>
             <div className="classement-tableau tableau-live">
               <div className="classement-entete">
-                <span /><span /><span className="cl-nom">Sélection</span>
-                <span title="Points">Pts</span><span title="Joués">J</span>
-                <span title="Gagnés">G</span><span title="Nuls">N</span><span title="Perdus">P</span>
-                <span title="Différence de points">Diff</span><span title="Bonus">B</span>
+                <span /><span /><span className="cl-nom">{t('tb.selection')}</span>
+                <span title={t('tb.points')}>Pts</span><span title={t('tb.joues')}>J</span>
+                <span title={t('tb.gagnes')}>G</span><span title={t('tb.nuls')}>N</span><span title={t('tb.perdus')}>P</span>
+                <span title={t('tb.difference')}>Diff</span><span title={t('tb.bonus')}>B</span>
               </div>
               {inter.etat.classement.map((l) => (
                 <div key={l.club} className="classement-ligne" data-moi={l.club === maNation ? 'oui' : undefined}>
@@ -691,7 +724,7 @@ export function Tableau() {
           </div>
 
           {/* ---------- TOURNOI DE FIN D'ANNÉE ---------- */}
-          {tournoi && tournoi.matchs.length > 0 && (
+          {tournoi && matchsTournoiVisibles.length > 0 && (
             <div className="carte bloc-competition">
               <div className="comp-tete">
                 <b>🏆 {tournoi.nom}</b>
@@ -699,23 +732,25 @@ export function Tableau() {
               </div>
               <p className="intro-comp" style={{ margin: '0 0 0.6rem' }}>
                 Les meilleurs de chaque poule s’affrontent en tableau sec, façon coupe de France.
-                {tournoi.champion && <> 🏆 Vainqueur : <b>{tournoi.champion}</b>.</>}
+                {finaleTerminee && tournoi.champion && <> 🏆 Vainqueur : <b>{tournoi.champion}</b>.</>}
               </p>
-              <Arbre matchs={tournoi.matchs} club={joueur.club} />
+              <Arbre matchs={matchsTournoiVisibles} club={joueur.club} />
             </div>
           )}
 
-          {phase && phase.matchs.length > 0 && (
+          {phase && matchsPhaseVisibles.length > 0 && (
             <div className="carte bloc-competition">
               <div className="comp-tete">
                 <b>🔥 Phase finale</b>
                 <span className="comp-count">{phase.qualifies.length} qualifiés</span>
               </div>
-              <Arbre matchs={phase.matchs} club={joueur.club} />
-              <p style={{ color: 'var(--craie-dim)', fontSize: '0.85rem', marginTop: '0.7rem' }}>
-                🏆 Champion : <b>{phase.champion}</b>. {phase.finaliste} est battu en finale — il
-                disputera le match d’accès à la division supérieure contre son avant-dernier.
-              </p>
+              <Arbre matchs={matchsPhaseVisibles} club={joueur.club} />
+              {finaleTerminee && phase.champion && phase.finaliste && (
+                <p style={{ color: 'var(--craie-dim)', fontSize: '0.85rem', marginTop: '0.7rem' }}>
+                  🏆 Champion : <b>{phase.champion}</b>. {phase.finaliste} est battu en finale — il
+                  disputera le match d’accès à la division supérieure contre son avant-dernier.
+                </p>
+              )}
             </div>
           )}
 

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { MODELE_DEFAUT, CLE_ENV, consoGroq, reinitialiserConsoGroq } from '../lib/groq';
 import type { Theme } from '../types';
-import { LANGUES, t } from '../lib/i18n';
+import { LANGUES, nombre, t, tn } from '../lib/i18n';
 
 const MODELES = [
   { id: 'llama-3.3-70b-versatile', nom: 'Llama 3.3 70B (recommandé)' },
@@ -13,10 +13,10 @@ const MODELES = [
 
 // Les trois ambiances. `apercu` est le dégradé montré sur la pastille — il
 // reprend exactement les deux extrémités de la rampe de fond du thème.
-const AMBIANCES: { id: Theme; nom: string; apercu: string }[] = [
-  { id: 'vert', nom: 'Pelouse', apercu: 'linear-gradient(135deg,#08160f,#237a44)' },
-  { id: 'bleu', nom: 'Nuit', apercu: 'linear-gradient(135deg,#060f1c,#1f5c9c)' },
-  { id: 'rouge', nom: 'Grenat', apercu: 'linear-gradient(135deg,#1a0709,#8f2733)' },
+const AMBIANCES: { id: Theme; cle: string; apercu: string }[] = [
+  { id: 'vert', cle: 'reg.pelouse', apercu: 'linear-gradient(135deg,#08160f,#237a44)' },
+  { id: 'bleu', cle: 'reg.nuit', apercu: 'linear-gradient(135deg,#060f1c,#1f5c9c)' },
+  { id: 'rouge', cle: 'reg.grenat', apercu: 'linear-gradient(135deg,#1a0709,#8f2733)' },
 ];
 
 interface Props {
@@ -59,19 +59,15 @@ export function Reglages({ onFermer }: Props) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.22 }}
       >
-        <div className="eyebrow">Moteur du Maître du Jeu</div>
-        <h2>Connexion à Groq</h2>
+        <div className="eyebrow">{t('reg.eyebrow')}</div>
+        <h2>{t('reg.titre')}</h2>
         {CLE_ENV ? (
           <p className="aide">
-            ✅ Une clé est <b>déjà fournie par le site</b> — tu n'as rien à faire,
-            joue directement&nbsp;! Tu peux éventuellement saisir ta propre clé
-            ci-dessous pour utiliser ton quota personnel.
+            ✅ {t('reg.cleFournie')}
           </p>
         ) : (
           <p className="aide">
-            Le Maître du Jeu tourne sur l'API <b>Groq</b> (gratuite). Colle ta clé
-            ci-dessous&nbsp;: elle est stockée <b>uniquement dans ton navigateur</b> et
-            n'est jamais envoyée ailleurs. Obtiens-en une sur{' '}
+            {t('reg.cleAide')} {' '}
             <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">
               console.groq.com/keys
             </a>.
@@ -79,7 +75,7 @@ export function Reglages({ onFermer }: Props) {
         )}
 
         <div className="champ">
-          <label htmlFor="cle">Clé API Groq</label>
+          <label htmlFor="cle">{t('reg.cleApi')}</label>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <input
               id="cle"
@@ -101,11 +97,11 @@ export function Reglages({ onFermer }: Props) {
           </div>
           <div style={{ marginTop: '0.6rem' }}>
             {cleLocale.trim() === '' ? (
-              <span className="badge-cle ko">Aucune clé</span>
+              <span className="badge-cle ko">{t('reg.sansCle')}</span>
             ) : valide ? (
-              <span className="badge-cle ok">✓ Format valide</span>
+              <span className="badge-cle ok">✓ {t('reg.formatValide')}</span>
             ) : (
-              <span className="badge-cle ko">Format inattendu (attendu : gsk_…)</span>
+              <span className="badge-cle ko">{t('reg.formatInvalide')}</span>
             )}
           </div>
         </div>
@@ -132,25 +128,21 @@ export function Reglages({ onFermer }: Props) {
           <div className="champ">
             <label>{t('reg.conso')}</label>
             <div className="conso-groq">
-              <span><b>{conso.appels}</b> appel{conso.appels > 1 ? 's' : ''}</span>
-              <span><b>{conso.entree.toLocaleString('fr-FR')}</b> tokens envoyés</span>
-              <span><b>{conso.sortie.toLocaleString('fr-FR')}</b> reçus</span>
+              <span><b>{nombre(conso.appels)}</b> {tn('reg.appels', conso.appels)}</span>
+              <span><b>{nombre(conso.entree)}</b> {t('reg.envoyes')}</span>
+              <span><b>{nombre(conso.sortie)}</b> {t('reg.recus')}</span>
               <button type="button" className="btn fantome mini" onClick={remettreAZero}>
-                Remettre à zéro
+                {t('reg.remiseAZero')}
               </button>
             </div>
-            <p className="aide">
-              Une semaine de jeu coûte <b>un seul appel</b> pour tout L’Ovale (fil et
-              commentaires réunis) : les comptes à suivre, eux, sortent de l’annuaire du
-              jeu et ne coûtent rien.
-            </p>
+            <p className="aide">{t('reg.consoAide')}</p>
           </div>
         )}
 
         {/* GIFs dans les publications de L'Ovale. Facultatif : sans cette clé,
             les posts s'illustrent quand même avec des photos libres. */}
         <div className="champ">
-          <label htmlFor="tenor">Clé Tenor (GIFs) — facultatif</label>
+          <label htmlFor="tenor">{t('reg.tenor')}</label>
           <input
             id="tenor"
             type="password"
@@ -158,10 +150,7 @@ export function Reglages({ onFermer }: Props) {
             placeholder="AIza… (laisse vide pour des photos libres)"
             onChange={(e) => setTenorKey(e.target.value.trim())}
           />
-          <p className="aide">
-            Sans clé, la recherche d’images de L’Ovale utilise une banque libre (LoremFlickr)
-            et il n’y a pas de GIF animé. Une clé Tenor gratuite s’obtient sur Google Cloud.
-          </p>
+          <p className="aide">{t('reg.tenorAide')}</p>
         </div>
 
         {/* ⚠️ LA LANGUE CHANGE TOUT, pas seulement les boutons. Le Maître du
@@ -201,10 +190,10 @@ export function Reglages({ onFermer }: Props) {
                 className={theme === a.id ? 'actif' : ''}
                 onClick={() => setTheme(a.id)}
                 aria-pressed={theme === a.id}
-                title={a.nom}
+                title={t(a.cle)}
               >
                 <span className="pastille-theme" style={{ background: a.apercu }} />
-                {a.nom}
+                {t(a.cle)}
               </button>
             ))}
           </div>
@@ -223,22 +212,13 @@ export function Reglages({ onFermer }: Props) {
         <div className="champ">
           <label>{t('reg.rythme')}</label>
           <p className="aide">
-            📅 <b>Journée par journée</b>, et c’est le seul rythme. Le vrai
-            calendrier, d’août à juin : chaque match se joue, avec sa note.
-            Pour sauter plusieurs semaines, ouvre <b>📊 Résultats</b> et clique la
-            date où tu veux arriver — tout ce qu’il y a entre les deux est joué.
+            📅 {t('reg.rythmeAide')}
           </p>
         </div>
 
         <details className="tuto">
-          <summary>📘 Tutoriel : obtenir et mettre ma clé (2 min, gratuit)</summary>
-          <ol className="tuto-etapes">
-            <li>Va sur <a href="https://console.groq.com" target="_blank" rel="noreferrer">console.groq.com</a> et crée un compte (Google/GitHub, gratuit).</li>
-            <li>Dans le menu de gauche, ouvre <b>« API Keys »</b>.</li>
-            <li>Clique <b>« Create API Key »</b>, donne-lui un nom (ex. « Destiny Rugby »).</li>
-            <li>Copie la clé affichée (elle commence par <code>gsk_</code>) — tu ne pourras plus la revoir ensuite.</li>
-            <li>Reviens ici, colle-la dans le champ ci-dessus et clique <b>Enregistrer</b>. C'est prêt&nbsp;!</li>
-          </ol>
+          <summary>📘 {t('reg.tutoriel')}</summary>
+          <p className="aide">{t('reg.tutorielAide')}</p>
         </details>
 
         <div className="note-sans-cle">
@@ -249,10 +229,10 @@ export function Reglages({ onFermer }: Props) {
 
         <div className="rangee-fin">
           <button className="btn fantome" onClick={onFermer}>
-            Annuler
+            {t('reg.fermer')}
           </button>
           <button className="btn primaire" onClick={enregistrer}>
-            Enregistrer
+            {t('reg.enregistrer')}
           </button>
         </div>
       </motion.div>

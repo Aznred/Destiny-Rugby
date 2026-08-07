@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
 import { Jauge } from './Jauge';
 import { useGame, noteGlobale, bonusClubDuJoueur } from '../store/useGame';
-import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
+import { POSTE_PAR_ID, labelAttribut } from '../data/rugby';
 import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
 import { Blason } from './Blason';
@@ -14,7 +14,7 @@ import { semaine, libelleDate, SEMAINES_PAR_SAISON, CALENDRIER } from '../data/c
 import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store/useGame';
 import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID } from '../data/traits';
-import { t, tn } from '../lib/i18n';
+import { nombre, t, tn } from '../lib/i18n';
 import { matchDeLaSemaine } from '../lib/matchLive';
 import { matchInternationalDuJoueur, equipeU20 } from '../lib/international';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
@@ -160,10 +160,10 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         </div>
         <div
           className="badge-generale"
-          title={`Note générale (moyenne des attributs)${joueur.potentiel ? ` — potentiel ${joueur.potentiel}` : ''}`}
+          title={`${t('pj.generale')}${joueur.potentiel ? ` — ${t('pj.potentiel', { note: joueur.potentiel })}` : ''}`}
         >
           <b>{generale}</b>
-          <span>GÉN</span>
+          <span>{t('pj.generale')}</span>
           {joueur.potentiel && joueur.potentiel > generale && (
             <em className="badge-potentiel">↗ {joueur.potentiel}</em>
           )}
@@ -172,7 +172,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
 
       {(joueur.traits?.length || joueur.capitaine) && (
         <div className="ressources" style={{ marginBottom: '0.2rem' }}>
-          {joueur.capitaine && <span className="pastille pastille-capitaine">©️ Capitaine</span>}
+          {joueur.capitaine && <span className="pastille pastille-capitaine">©️ {t('pj.capitaine')}</span>}
           {(joueur.traits ?? []).map((id) => {
             const trait = TRAIT_PAR_ID[id];
             return trait ? (
@@ -185,10 +185,10 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       <div className="ressources">
         <span className="pastille">{t('gen.saison')} <b>{joueur.saison}</b></span>
         <span className="pastille">{joueur.age} {t('gen.ans')}</span>
-        <span className="pastille">💰 <b>{joueur.argent.toLocaleString('fr-FR')} €</b></span>
+        <span className="pastille">💰 <b>{nombre(joueur.argent)} €</b></span>
       </div>
       <div className="ressources" style={{ marginTop: '-0.4rem' }}>
-        <span className="pastille" title="Ton club et sa division">
+        <span className="pastille" title={t('pj.clubDivision')}>
           {clubData ? <Blason club={clubData} taille={18} /> : '🏟️'} <b>{joueur.club}</b>
           {division && (
             <>
@@ -226,7 +226,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       <div className="pj-titre eyebrow">{t('pj.attributs')}</div>
       <div className="attrs-grille pj-attrs">
         {(Object.keys(joueur.attributs) as (keyof Joueur['attributs'])[]).map((k) => (
-          <Jauge key={k} label={ATTRIBUTS_LABELS[k]} valeur={joueur.attributs[k]} />
+          <Jauge key={k} label={labelAttribut(k)} valeur={joueur.attributs[k]} />
         ))}
       </div>
 
@@ -234,18 +234,18 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         <span className="pastille">🏉 <b>{joueur.matchsJoues}</b></span>
         <span className="pastille">🎯 <b>{joueur.essais}</b></span>
         {joueur.noteSaison != null && (
-          <span className="pastille" title="Note moyenne de la saison écoulée">
+          <span className="pastille" title={t('pj.noteSaison')}>
             ⭐ <b>{joueur.noteSaison.toFixed(1)}</b>/10
           </span>
         )}
         {contrat && (
-          <span className="pastille" title={`Contrat : ${contrat.salaire.toLocaleString('fr-FR')} € par saison`}>
+          <span className="pastille" title={t('pj.contratAide', { salaire: nombre(contrat.salaire) })}>
             📄 <b>{Math.round(contrat.salaire / 1000)} k€</b> ·{' '}
-            {contrat.saisons > 0 ? `${contrat.saisons} s.` : 'fin'}
+            {contrat.saisons > 0 ? `${contrat.saisons} s.` : t('pj.contrat')}
           </span>
         )}
         {amis.length > 0 && (
-          <span className="pastille" title={`Dans le vestiaire : ${amis.map((r) => r.nom).join(', ')}`}>
+          <span className="pastille" title={t('pj.vestiaire', { joueurs: amis.map((r) => r.nom).join(', ') })}>
             🤝 <b>{amis.length}</b>
           </span>
         )}
@@ -267,7 +267,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               <span>
                 {blesse ? t('pj.infirmerie')
                   : joueur.entrainementFocus
-                    ? `${ATTRIBUTS_LABELS[joueur.entrainementFocus]} · ${dejaEntraine ? t('pj.seanceFaite') : t('pj.chaqueSemaine')}`
+                    ? `${labelAttribut(joueur.entrainementFocus)} · ${dejaEntraine ? t('pj.seanceFaite') : t('pj.chaqueSemaine')}`
                     : t('pj.choisirSecteur')}
               </span>
             </div>
@@ -279,9 +279,9 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
                   className={joueur.entrainementFocus === k ? 'actif' : undefined}
                   disabled={blesse}
                   onClick={() => choisirFocus(k)}
-                  title={`Travailler ${ATTRIBUTS_LABELS[k].toLowerCase()} chaque semaine (−4 de forme par séance)`}
+                  title={t('pj.entrainementAide', { attribut: labelAttribut(k) })}
                 >
-                  {ATTRIBUTS_LABELS[k]}
+                  {labelAttribut(k)}
                 </button>
               ))}
             </div>
@@ -293,7 +293,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             type="button"
             className="calendrier-semaine cliquable"
             onClick={() => setEcran('tableau')}
-            title="Voir tout le calendrier de la saison et les affiches de l’année"
+            title={t('pj.calendrierAide')}
           >
             <div className="cal-date">
               <b>{libelleDate(semaineActuelle)}</b>
@@ -332,11 +332,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               title={aRepondre ? motifAttente : `Suivre ${affiche!.match.domicile} – ${affiche!.match.exterieur} en direct`}
             >
               ▶️ <b>{aRepondre
-                ? '✍️ Réponds d’abord'
+                ? `✍️ ${t('pj.reponds')}`
                 : inter ? t(inter.u20 ? 'pj.jouerU20' : 'pj.jouerSelection') : t('pj.jouerMatch')}</b>
               <span>
                 {inter ? `${inter.affiche.competition.emoji} ${inter.affiche.competition.nom}` : `J${affiche!.journee}`}
-                {' · '}{affiche!.match.domicile === monEquipe ? 'reçoit' : 'à'} {adversaire}
+                {' · '}{affiche!.match.domicile === monEquipe ? t('pj.recoit') : t('pj.chez')} {adversaire}
               </span>
             </button>
           ) : (
@@ -388,7 +388,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           📊<span>{t('pj.resultats')}</span>
         </button>
         <button onClick={() => setEcran('social')} title="L’Ovale — réseau social, succès et défis">
-          𝕏<span>L’Ovale</span>
+          𝕏<span>{t('pj.ovale')}</span>
         </button>
         {/* Après 30 ans : transmettre pour durer (lot « corps, âge et fin de carrière ») */}
         {joueur.age >= 30 && !joueur.mentorat && (
@@ -508,7 +508,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               title={aRepondre ? motifAttente : undefined}
             >
               {aRepondre
-                ? '✍️ À toi de répondre'
+                ? `✍️ ${t('pj.reponds')}`
                 : `▶️ ${inter ? t(inter.u20 ? 'pj.jouerU20Court' : 'pj.jouerSelectionCourt') : t('pj.jouerMatch')}`}
             </button>
           ) : (
@@ -519,7 +519,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               disabled={aRepondre}
               title={aRepondre ? motifAttente : undefined}
             >
-              {aRepondre ? '✍️ À toi de répondre' : semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
+              {aRepondre ? `✍️ ${t('pj.reponds')}` : semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
             </button>
           )}
         </div>,

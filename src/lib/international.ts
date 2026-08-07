@@ -89,7 +89,14 @@ export interface LigneClassementMondial {
  * qualifications de la Coupe du monde.
  */
 export function classementMondial(saison: number): LigneClassementMondial[] {
-  const nations = new Set<string>([...Object.keys(FORCE_NATION), ...Object.keys(forcesDesNouvellesNations())]);
+  // Le classement mondial est celui des sélections A uniquement. Les U20 et
+  // équipes réserves peuvent jouer leurs propres compétitions, mais ne doivent
+  // jamais voler une place dans le Top 12 senior ou les qualifications.
+  const estSelectionSenior = (nom: string) => !estEquipeU20(nom) && !/\s+[BC]$/.test(nom);
+  const nations = new Set<string>(
+    [...Object.keys(FORCE_NATION), ...Object.keys(forcesDesNouvellesNations())]
+      .filter(estSelectionSenior),
+  );
   const points = new Map<string, number>([...nations].map((n) => [n, 1000 + forceNation(n) * 10]));
   const competitions = [...COMPETITIONS_INTERNATIONALES, ...competitionsNouvellesNations()]
     .filter((c) => !COMPETITIONS_U20.has(c.id));

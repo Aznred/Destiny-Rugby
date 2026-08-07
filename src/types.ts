@@ -333,6 +333,8 @@ export interface NotifSocial {
   titre: string;
   texte: string;
   saison: number;
+  /** Horodatage local pour les alertes et messages récents. */
+  creeLe?: number;
   lue?: boolean;
 }
 

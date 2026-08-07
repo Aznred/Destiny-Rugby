@@ -20,7 +20,7 @@
 //     les comptes sont débridés : insulte-les, ils répondent.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { t } from '../lib/i18n';
+import { locale, t } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { clubParNom } from '../data/clubs';
@@ -40,6 +40,13 @@ import { chercherMedias, reduirePourAvatar, vignetteLocale, type Media as MediaT
 import { semaine } from '../data/calendrier';
 import { avatarInitiales } from '../lib/avatars';
 import type { CompteSuivi, Joueur, PostSocial } from '../types';
+
+function dateEtHeure(instant?: number): string | null {
+  if (!instant) return null;
+  return new Intl.DateTimeFormat(locale(), {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  }).format(new Date(instant));
+}
 
 // --- Icônes (tracés maison, dans l'esprit de l'interface d'origine) --------
 const Icone = ({ d, ...reste }: { d: string } & React.SVGProps<SVGSVGElement>) => (
@@ -532,7 +539,7 @@ function Profil({
         <span className="x-pseudo">@{compte.pseudo}</span>
         {compte.bio && <p className="x-bio">{compte.bio}</p>}
         <div className="x-profil-chiffres">
-          <span><b>{compact(compte.abonnes)}</b> abonnés</span>
+          <span><b>{compact(compte.abonnes)}</b> {t('gen.abonnes')}</span>
           {compte.club && <span>🏟️ {compte.club}</span>}
           <span className="x-relation" data-etat={humeur(relation)}>
             {ETAT[humeur(relation)]}
@@ -596,9 +603,9 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
         <span className="x-pseudo">@{enregistre.pseudo}</span>
         <p className="x-bio">{enregistre.bio || `${joueur.club} · saison ${joueur.saison}`}</p>
         <div className="x-profil-chiffres">
-          <span><b>{compact(joueur.abonnes ?? 0)}</b> abonnés</span>
-          <span><b>{suivis.length}</b> abonnements</span>
-          <span><b>{miens.length}</b> publications</span>
+          <span><b>{compact(joueur.abonnes ?? 0)}</b> {t('gen.abonnes')}</span>
+          <span><b>{suivis.length}</b> {t('ov.abonnements')}</span>
+          <span><b>{miens.length}</b> {t('ov.publications')}</span>
           <span><b>{reposts.length}</b> reposts</span>
         </div>
       </div>
@@ -938,7 +945,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
   useEffect(() => { if (actif) lireConversation(actif); }, [actif, lireConversation]);
 
   if (!tous.length) {
-    return <p className="x-vide">Abonne-toi à des comptes ou ouvre un profil pour lancer une conversation.</p>;
+    return <p className="x-vide">{t('ov.comptesASuivre')}</p>;
   }
   const compte = tous.find((c) => c.pseudo === actif);
 
@@ -946,7 +953,10 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
     <div className="x-messagerie">
       <div className="x-conversations">
         {tous.map((c) => {
-          const nonLu = (conversations[c.pseudo] ?? []).some((m) => m.de === 'lui' && !m.lu);
+          const filConversation = conversations[c.pseudo] ?? [];
+          const nonLu = filConversation.some((m) => m.de === 'lui' && !m.lu);
+          const dernierMessage = filConversation.at(-1);
+          const horodatage = dateEtHeure(dernierMessage?.creeLe);
           return (
           <button
             key={c.pseudo}
@@ -956,7 +966,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
             <Avatar avatar={c.avatar} club={c.club} taille={36} nom={c.nom} />
             <span>
               <b>{c.nom}</b>
-              <i>@{c.pseudo}</i>
+              <i>@{c.pseudo}{horodatage && ` · ${horodatage}`}</i>
             </span>
           </button>
           );
@@ -979,11 +989,14 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
           </div>
         )}
         <div className="x-bulles">
-          {fil.length === 0 && <p className="x-vide">Écris le premier message.</p>}
+          {fil.length === 0 && <p className="x-vide">{t('ov.premierMessage')}</p>}
           {fil.map((m) => (
-            <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}>{m.texte}</div>
+            <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}>
+              <span>{m.texte}</span>
+              {dateEtHeure(m.creeLe) && <time>{dateEtHeure(m.creeLe)}</time>}
+            </div>
           ))}
-          {chargement && <div className="x-bulle lui ecrit">écrit…</div>}
+          {chargement && <div className="x-bulle lui ecrit">{t('ov.ecrit')}</div>}
           <div ref={bas} />
         </div>
 
@@ -1005,7 +1018,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
                 const t = texte; setTexte(''); void envoyer(actif, t);
               }
             }}
-            placeholder="Écrire un message…"
+            placeholder={t('ov.ecrireMessage')}
             maxLength={400}
           />
           <button
@@ -1013,7 +1026,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
             disabled={!texte.trim() || !actif || chargement}
             onClick={() => { const t = texte; setTexte(''); if (actif) void envoyer(actif, t); }}
           >
-            Envoyer
+            {t('ov.envoyer')}
           </button>
         </div>
       </div>
@@ -1124,14 +1137,14 @@ export function Social() {
             <b>{c.nom}</b>
           </button>
           {c.certifie && <Certifie />}
-          <span className="x-pseudo">@{c.pseudo} · {compact(c.abonnes)} abonnés</span>
+          <span className="x-pseudo">@{c.pseudo} · {compact(c.abonnes)} {t('gen.abonnes')}</span>
           {c.bio && <p>{c.bio}</p>}
         </div>
         <button
           className={abonne ? 'x-suivre abonne' : 'x-suivre'}
           onClick={() => (abonne ? nePlusSuivre(c.pseudo) : suivre(c))}
         >
-          {abonne ? 'Abonné' : 'Suivre'}
+          {abonne ? t('gen.abonne') : t('gen.suivre')}
         </button>
       </div>
     );
@@ -1147,14 +1160,14 @@ export function Social() {
       <aside className="x-rail">
         <LogoOvale />
         <nav>
-          {lien('timeline', I_ACCUEIL, 'Accueil')}
-          {lien('explorer', I_LOUPE, 'Explorer')}
-          {lien('messages', I_MESSAGE, 'Messages')}
-          {lien('notifs', I_CLOCHE, 'Notifications', nonLues)}
-          {lien('profil', I_PROFIL, 'Profil')}
-          {lien('succes', I_TROPHEE, 'Succès')}
+          {lien('timeline', I_ACCUEIL, t('ov.accueil'))}
+          {lien('explorer', I_LOUPE, t('ov.explorer'))}
+          {lien('messages', I_MESSAGE, t('ov.messages'))}
+          {lien('notifs', I_CLOCHE, t('ov.notifications'), nonLues)}
+          {lien('profil', I_PROFIL, t('nav.profil'))}
+          {lien('succes', I_TROPHEE, t('ov.succes'))}
           <button onClick={() => setEcran('carriere')}>
-            <span style={{ fontSize: '1.35rem', lineHeight: 1 }}>🏉</span> <span>Ma carrière</span>
+            <span style={{ fontSize: '1.35rem', lineHeight: 1 }}>🏉</span> <span>{t('ov.maCarriere')}</span>
           </button>
         </nav>
         <button className="x-compte" onClick={() => setOnglet('profil')}>
@@ -1212,10 +1225,10 @@ export function Social() {
             {recherche.trim() ? (
               <>
                 <div className="x-bloc-tete"><h3>Comptes — « {recherche} »</h3></div>
-                {resultatsComptes.length === 0 && <p className="x-vide">Aucun compte trouvé.</p>}
+                {resultatsComptes.length === 0 && <p className="x-vide">{t('ov.aucunCompte')}</p>}
                 {resultatsComptes.map(carteCompte)}
                 <div className="x-bloc-tete"><h3>Publications — « {recherche} »</h3></div>
-                {resultatsPosts.length === 0 && <p className="x-vide">Aucune publication trouvée.</p>}
+                {resultatsPosts.length === 0 && <p className="x-vide">{t('ov.aucunePublication')}</p>}
                 {resultatsPosts.map((p) => <Post key={p.id} post={p} onProfil={ouvrirProfil} onRecherche={chercher} />)}
               </>
             ) : (
@@ -1229,7 +1242,7 @@ export function Social() {
                 {suggestions.map(carteCompte)}
                 {suivis.length > 0 && (
                   <>
-                    <div className="x-bloc-tete"><h3>Tes abonnements ({suivis.length})</h3></div>
+                    <div className="x-bloc-tete"><h3>{t('ov.abonnements')} ({suivis.length})</h3></div>
                     {suivis.map(carteCompte)}
                   </>
                 )}
@@ -1261,6 +1274,7 @@ export function Social() {
                 <div>
                   <b>{n.titre}</b>
                   <p>{n.texte}</p>
+                  {dateEtHeure(n.creeLe) && <time className="x-notif-date">{dateEtHeure(n.creeLe)}</time>}
                 </div>
               </div>
             ))}
@@ -1279,22 +1293,22 @@ export function Social() {
           <input
             value={recherche}
             onChange={(e) => { setRecherche(e.target.value); if (e.target.value) setOnglet('explorer'); }}
-            placeholder="Rechercher un compte, un club, un tweet"
+            placeholder={t('ov.rechercheComplete')}
           />
           {recherche && (
             <button type="button" className="x-vider" onClick={() => setRecherche('')} title="Effacer">✕</button>
           )}
         </form>
         <div className="x-bloc">
-          <h3>Ton audience</h3>
+          <h3>{t('ov.audience')}</h3>
           <div className="x-audience">
-            <div><b>{compact(joueur.abonnes ?? 0)}</b><span>abonnés</span></div>
-            <div><b>{suivis.length}</b><span>abonnements</span></div>
-            <div><b>{Math.round(joueur.popularite ?? 50)}</b><span>popularité</span></div>
+            <div><b>{compact(joueur.abonnes ?? 0)}</b><span>{t('gen.abonnes')}</span></div>
+            <div><b>{suivis.length}</b><span>{t('ov.abonnements')}</span></div>
+            <div><b>{Math.round(joueur.popularite ?? 50)}</b><span>{t('ov.popularite')}</span></div>
           </div>
         </div>
         <div className="x-bloc">
-          <h3>Tendances pour vous</h3>
+          <h3>{t('ov.tendances')}</h3>
           {tend.map((t) => (
             <button
               key={t.sujet}

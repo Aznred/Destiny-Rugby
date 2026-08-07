@@ -2033,7 +2033,9 @@
 }
 .x-bulle.moi { align-self: flex-end; background: var(--x-bleu); color: #fff; border-bottom-right-radius: 4px; }
 .x-bulle.lui { align-self: flex-start; background: var(--x-survol); border-bottom-left-radius: 4px; }
+.x-bulle time { display: block; margin-top: 0.24rem; font-size: 0.67rem; opacity: 0.72; }
 .x-bulle.ecrit { color: var(--x-gris); font-style: italic; }
+.x-notif-date { display: block; margin-top: 0.28rem; color: var(--x-gris); font-size: 0.72rem; }
 .x-envoi {
   display: flex;
   gap: 0.5rem;

@@ -20,6 +20,7 @@ import type { Joueur, PosteId, StatsDetaillees } from '../types';
 import { graine, journeesALaSemaine, nombreJournees, poulesDe } from './championnat';
 import { effectifDuClub, forceEffectif, type Coequipier } from './effectif';
 import { POSTE_PAR_ID } from '../data/rugby';
+import { nombre, t } from './i18n';
 import type { LigneReelle } from './moteur/saison';
 
 export interface LigneStats {
@@ -259,6 +260,14 @@ export const CATEGORIES: {
   { id: 'minutes', nom: 'Temps de jeu', emoji: '⏱️', desc: 'Les increvables.' },
 ];
 
+/** Le moteur garde les libellés français pour ses calculs, l'écran les traduit. */
+export function libelleCategorie(id: Categorie): string {
+  const traduit = t(`stats.${id}`);
+  return traduit === `stats.${id}`
+    ? CATEGORIES.find((categorie) => categorie.id === id)?.nom ?? id
+    : traduit;
+}
+
 /** Un avant, au sens de la conquête : les maillots 1 à 8. */
 export function estAvant(poste: PosteId): boolean {
   return PROFILS[poste]?.avant ?? false;
@@ -296,8 +305,8 @@ export function afficherValeur(l: LigneStats, cat: Categorie): string {
       const total = l.plaquages + l.plaquagesManques;
       return `${l.plaquages} · ${total ? Math.round((l.plaquages / total) * 100) : 0} %`;
     }
-    case 'minutes': return `${l.minutes.toLocaleString('fr-FR')} min`;
-    case 'metres': return `${l.metres.toLocaleString('fr-FR')} m`;
+    case 'minutes': return `${nombre(l.minutes)} min`;
+    case 'metres': return `${nombre(l.metres)} m`;
     // On montre les deux couleurs : « 3 🟨 » ou « 2 🟨 · 1 🟥 ».
     case 'cartons': return `${l.cartonsJaunes} 🟨${l.cartonsRouges ? ` · ${l.cartonsRouges} 🟥` : ''}`;
     default: return String(valeurDe(l, cat));
