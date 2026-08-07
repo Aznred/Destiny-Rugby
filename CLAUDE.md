@@ -19,10 +19,9 @@ Inspiré des jeux type *Destin Eleven*, décliné pour l'ovalie.
   desktop **ET** mobile), pas seulement compiler.
 - **Responsive obligatoire.**
 - Tenir **`CLAUDE.md`** et **`README.md`** à jour à chaque évolution.
-- **Clé API Groq** : deux voies. (A) fournie par le site via `VITE_GROQ_KEY`
-  dans `.env.local` (⚠️ visible côté client, consomme le quota du propriétaire) ;
-  (B) saisie par le joueur dans ⚙️ (localStorage). La clé effective =
-  `groqKey || CLE_ENV`. Ne **jamais** committer `.env.local` (déjà gitignoré).
+- **Clé API Groq** : elle est saisie par chaque joueur dans ⚙️ et reste dans son
+  `localStorage`. Ne jamais ajouter de `VITE_GROQ_KEY` : tout secret préfixé
+  `VITE_` est intégré au bundle public.
 
 ## Stack
 
@@ -67,8 +66,8 @@ Three.js (@react-three/fiber + @react-three/drei) · API Groq (compatible OpenAI
 | `src/components/TropheeGagne.tsx` | Cérémonie : modale + Canvas R3F, modèle recentré/normalisé **en rotation continue**, Sparkles, aura colorée. |
 | `src/components/Confirmation.tsx` | Modale de confirmation maison. ⚠️ **Ne jamais utiliser `window.confirm()`** (bloqué/inconstant) et **toujours passer par `createPortal(document.body)`** : le `backdrop-filter` des `.carte` crée un bloc conteneur qui piège les `position: fixed`. |
 | `src/data/legendes.ts` | `LEGENDES_FICTIVES` qui peuplent le classement (marquées `fictif`). |
-| `src/lib/groq.ts` | Appel `fetch` à Groq, **prompt système** du MJ (sévère, anti-triche), parsing du JSON, nettoyage des deltas, **`CLE_ENV`** (clé fournie par le site via `VITE_GROQ_KEY`). ⚠️ **`plafonnerDeltas()` et `ressembleATriche()`** sont le vrai garde-fou : le prompt seul finit toujours par se laisser convaincre. |
-| `src/store/useGame.ts` | Store Zustand persistant : `joueur`, `journal`, `coins` (Ovas), `inventaire`/`skinActif`, `pantheon`, réglages, navigation, **offres de contrat**, et logique (`creerJoueur`, `appliquerReponse`, `saisonSuivante`, `evenementAleatoire`, `prendreRetraite`, `ouvrirOffres`/`signerOffre`/`demanderTransfert`, `acheterSkin`/`choisirSkin`/`acheterBoost`). Exporte aussi `scoreCarriere`, `noteGlobale`, `classementComplet`. |
+| `src/lib/groq.ts` | Appel `fetch` à Groq avec la clé personnelle, **prompt système** du MJ (sévère, anti-triche), parsing du JSON et nettoyage des deltas. ⚠️ **`plafonnerDeltas()` et `ressembleATriche()`** sont le vrai garde-fou : le prompt seul finit toujours par se laisser convaincre. |
+| `src/store/useGame.ts` | Store Zustand persistant : `joueur`, `journal`, `coins` (Ovas), `inventaire`/`skinActif`, `pantheon`, réglages, navigation, négociations de contrat et logique de carrière. Exporte aussi `scoreCarriere`, `noteGlobale`, `classementComplet`. |
 | `src/components/` | `Nav` (+ badge Ovas), `Reglages` (+ tutoriel clé), `Jauge`, `PanneauJoueur` (badge **GÉN**, logo+club·division, 👥 Mon équipe, retraite), `Hero3D` (si `skin.glb` → `ModeleBallon`, sinon `BallonRugby`), `ModeleBallon` (`useGLTF(url, true)` = **Draco**). |
 | `src/screens/` | `Accueil`, `Creation` (division+club réels), `Carriere` (MJ + 📖/🎲 **limités à `MAX_PAR_SAISON`=2**), `Profil`, `Boutique`, `Pantheon`, `Classement`, `Championnats` (3 onglets France/Monde/Sélections ; clic sur un club → `FicheClub` ; l'onglet Sélections liste les **équipes** — séniors puis U20 — et non les compétitions), `Effectif` (coéquipiers). |
 | `src/index.css` | Design system : variables CSS (couleurs, polices, rayons), reset, fond. |
@@ -191,10 +190,10 @@ npx vite-node scripts/verif.ts
 - **Calendrier réel** (`src/data/calendrier.ts`) : 43 semaines d'août à juin —
   23 journées, 8 dates de coupe d'Europe, 8 fenêtres internationales (tournée
   d'automne, Tournoi), 3 semaines de phase finale, puis la trêve qui clôt la
-  saison. `semaineSuivante()` (store) joue UNE semaine ; le rythme se choisit
-  dans ⚙️ (`rythme: 'semaine' | 'saison'`). En mode semaine, le bilan de fin de
-  saison utilise les stats RÉELLEMENT accumulées (`Joueur.saisonEnCours`), pas
-  une simulation.
+  saison. `semaineSuivante()` (store) joue UNE semaine ; pour avancer plus vite,
+  on choisit une date dans le calendrier et `avancerJusqua()` joue réellement
+  chaque semaine intermédiaire. Le bilan de fin de saison utilise les stats
+  RÉELLEMENT accumulées (`Joueur.saisonEnCours`), pas une simulation.
 - **Sélection nationale** (`src/lib/selection.ts`) : palier de niveau par nation
   (France 84, Italie 75, Espagne 65, défaut 55) + zone de concurrence aléatoire.
   Les capes s'accumulent dans `Joueur.selections`.
@@ -434,25 +433,22 @@ premier.
 
 ## Points d'attention / dette
 
-- **Bundle** : découpé (`vite.config.ts`, `manualChunks`) — **137 Ko gzip au premier rendu**, puis `three` (261 Ko gzip, à la demande), `donnees-monde` (85 Ko) et `donnees-amateurs` (133 Ko) en parallèle. `Hero3D` est bien
-  lazy-loadé depuis `Accueil.tsx`, mais **Three.js finit quand même dans le
-  chunk principal** parce que `TropheeGagne` (R3F) est importé en dur dans
-  `App.tsx` — le lazy-loader serait le prochain gain facile. Les données réelles
-  pèsent ~275 Ko de source (~90 Ko gzip) : c'est le prix des 6 306 joueurs.
-- Pas encore de matchs joués un par un : la saison est résumée en un bilan
-  (classement + matchs + essais simulés). `titres` n'est alimenté que par
-  `resoudreTrophees()` — le MJ ne peut toujours pas le faire évoluer.
-- `saisonSuivante()` régénère la forme (+10), vieillit le joueur, simule ses
-  matchs et ses essais de la saison, puis résout le bilan sportif.
-  `prendreRetraite()` fige la carrière dans `pantheon`.
-- **Classement « multijoueur » = local** pour l'instant (`classementComplet` =
-  légendes fictives + panthéon + carrière en cours). Le vrai online demande un
-  **backend** (Supabase/Firebase). De même, exposer la clé Groq en public
-  demanderait un **proxy backend** avec quota par joueur.
-- **Offres de transfert** : générées dans `saisonSuivante()` (`genererOffre` —
-  seuils `SEUILS_OFFRE` par division cible, 6 cibles, proba 70 %). Le choix
-  « signer » porte `issue.transfert` → `resoudreChoix` change `joueur.club/division`.
-  Pas encore de **relégation** ni d'offres étrangères (Monde) — pistes futures.
+- **Bundle** : dictionnaire, moteur, données réelles et scènes 3D sont séparés.
+  Mesure Vite 8 : `index` 57 Ko gzip, `App` 14 Ko, `useGame` 115 Ko, textes
+  155 Ko ; le fournisseur Three.js (263 Ko gzip) reste partagé et paresseux.
+- Les matchs se jouent dans le moteur 2D à pas fixe et leurs vraies statistiques
+  alimentent la saison. Les calculs complets des autres rencontres passent par
+  une file sérialisée afin qu'une avance calendrier ne puisse pas écraser un
+  cumul concurrent.
+- `semaineSuivante()` joue une semaine ; `avancerJusqua()` répète cette même
+  boucle jusqu'à la date choisie et s'arrête aux décisions du joueur.
+- **Classement mondial** : la fonction Vercel recalcule chaque fiche et ne garde
+  que le meilleur score. Le panthéon local et la carrière en cours restent
+  visibles si le service est indisponible ; aucune légende fictive n'est
+  présentée comme un vrai joueur.
+- **Transferts** : les approches françaises et étrangères arrivent dans les
+  messages privés de L'Ovale. Salaire, prime, durée et temps de jeu se négocient
+  avant un pré-accord appliqué uniquement à l'intersaison.
 - **Économie d'Ovas VOLONTAIREMENT DURE** (demande utilisateur) : départ 0,
   action IA +1, saison +3, évènements/scénarios via `gainOvas()` (= base/8,
   min 1), retraite score/150. Le solde n'apparaît **que dans la Boutique**
@@ -2111,7 +2107,7 @@ DB juste le score » :
 ```
    navigateur                    Edge Function                     base
 ┌──────────────────┐      ┌───────────────────────────┐     ┌────────────┐
-│ FicheCarriere    │ POST │ 1. débit (1/h, 10/j)      │     │ pseudo     │
+│ FicheCarriere    │ POST │ 1. débit (6/h, 40/j)      │     │ pseudo     │
 │ saisons, matchs, │  →   │ 2. verifierFiche()        │  →  │ score      │
 │ essais, titres…  │      │ 3. score = scoreDeLaFiche │     │ cree_le    │
 └──────────────────┘      │ 4. jette la fiche         │     └────────────┘
@@ -2481,7 +2477,7 @@ abonnement, avec la clé Groq que le jeu utilise déjà.
 
 ```bash
 npx vite-node scripts/traduire.ts --verifier      # liste les trous, ne traduit rien
-VITE_GROQ_KEY=gsk_... npx vite-node scripts/traduire.ts
+GROQ_KEY=gsk_... npx vite-node scripts/traduire.ts
 ```
 
 - **Il n'écrit jamais dans les fichiers écrits à la main.** La sortie est

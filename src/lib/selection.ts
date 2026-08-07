@@ -6,7 +6,7 @@
 // ci-dessous, calqués sur la hiérarchie mondiale.
 
 import type { Joueur } from '../types';
-import { nomNation } from '../components/Drapeau';
+import { nomNation } from './nations';
 import { EFFECTIFS_REELS } from '../data/effectifsReels';
 import { POSTE_PAR_ID } from '../data/rugby';
 import { noteALAge } from './effectif';

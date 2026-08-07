@@ -20,7 +20,6 @@ const creer = (extra: Partial<Joueur> = {}) => {
     nom: 'Hugo Philibert', poste: 'troisieme_aile_d', nation: 'France', age: 22,
     club: 'Stade Toulousain', division: 'top14', traits: ['professionnel', 'leader'],
   } as never);
-  useGame.setState({ rythme: 'saison' });
   useGame.setState((s) => ({ joueur: { ...s.joueur!, ...extra } as Joueur }));
   return useGame.getState().joueur!;
 };

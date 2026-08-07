@@ -61,12 +61,17 @@ function sqlClient() {
  * Sans sel, l'empreinte d'une IP donnée se retrouve par force brute en quelques
  * secondes — le haché ne protégerait plus rien.
  */
-function empreinteAppareil(req: Request): string {
-  const brut = [
-    req.headers.get('x-forwarded-for') ?? '',
-    req.headers.get('user-agent') ?? '',
-    process.env.SEL_APPAREIL ?? 'sel-par-defaut',
-  ].join('|');
+function empreinteAppareil(req: Request, sel: string): string {
+  // Vercel renseigne l'adresse à sa frontière. Le user-agent est contrôlé par
+  // l'appelant : le mélanger à l'empreinte permettait de contourner le quota en
+  // changeant simplement cette chaîne.
+  const ip = (req.headers.get('x-vercel-forwarded-for')
+    ?? req.headers.get('x-forwarded-for')
+    ?? '')
+    .split(',')[0]
+    .trim();
+  if (!ip) throw new Error('Adresse réseau absente');
+  const brut = `${ip}|${sel}`;
   return createHash('sha256').update(brut).digest('hex').slice(0, 32);
 }
 
@@ -114,6 +119,10 @@ export async function POST(req: Request): Promise<Response> {
   if (!process.env.DATABASE_URL) {
     return reponse({ erreur: 'DATABASE_URL absente des variables d’environnement' }, 500);
   }
+  const sel = process.env.SEL_APPAREIL?.trim();
+  if (!sel) {
+    return reponse({ erreur: 'SEL_APPAREIL absente des variables d’environnement' }, 500);
+  }
 
   // ---- 1. LE DÉBIT, AVANT TOUT LE RESTE ------------------------------------
   let sql: ReturnType<typeof neon>;
@@ -122,7 +131,7 @@ export async function POST(req: Request): Promise<Response> {
   let jour = 0;
   try {
     sql = sqlClient();
-    appareil = empreinteAppareil(req);
+    appareil = empreinteAppareil(req, sel);
     const [c] = await sql`
       select
         count(*) filter (where envoye_le > now() - interval '1 hour') as heure,

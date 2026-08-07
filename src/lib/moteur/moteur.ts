@@ -213,7 +213,7 @@ export function creerMatch(
     const c = e.placement[p.id];
     if (c) { p.pos = { x: c.x, y: c.y }; p.cible = { x: c.x, y: c.y }; stopper(p); }
   }
-  dire(e, 'jalon', null, `Coup d’envoi ! ${clubA} reçoit ${clubB}.`);
+  dire(e, 'jalon', null, C.texteMatch('coupEnvoiMatch', { clubA, clubB }));
   return e;
 }
 
@@ -242,9 +242,7 @@ function tick(e: EtatMatch): void {
   const finPeriode = e.periode * DUREE_PERIODE;
   if (!e.sirene && e.t >= finPeriode) {
     e.sirene = true;
-    dire(e, 'jalon', null, e.periode === 1
-      ? '🔔 La sirène retentit. On joue jusqu’à la sortie du ballon.'
-      : '🔔 Sirène ! Le temps est écoulé : ballon mort et c’est terminé.');
+    dire(e, 'jalon', null, C.texteMatch(e.periode === 1 ? 'sirenePremiere' : 'sireneFinale'));
   }
   // Garde-fou : on ne joue pas trois minutes de plus.
   if (e.sirene && e.t > finPeriode + 150) return clorePeriode(e);
@@ -444,7 +442,7 @@ function phaseCoupEnvoi(e: EtatMatch): void {
   botteur.stats.coupsDePied += 1;
   e.placement = null;
   lancerVol(e, botteur, arrivee, 'renvoi', 3.0, 1, { x: MILIEU, y: AXE });
-  dire(e, 'pied', camp, `${botteur.nom} donne le coup d’envoi.`, 0, botteur.moi);
+  dire(e, 'pied', camp, C.texteMatch('coupEnvoiJoueur', { nom: botteur.nom }), 0, botteur.moi);
 }
 
 function phaseRenvoi22(e: EtatMatch): void {
@@ -462,7 +460,7 @@ function phaseRenvoi22(e: EtatMatch): void {
   botteur.stats.coupsDePied += 1;
   e.placement = null;
   lancerVol(e, botteur, arrivee, 'renvoi', 2.8, 1, { x: depart, y: AXE });
-  dire(e, 'pied', camp, `Renvoi aux 22 de ${botteur.nom}.`, 0, botteur.moi);
+  dire(e, 'pied', camp, C.texteMatch('renvoi22Joueur', { nom: botteur.nom }), 0, botteur.moi);
 }
 
 // ---------------------------------------------------------------------------
@@ -503,7 +501,7 @@ function phaseBallonEnLAir(e: EtatMatch): void {
   // récompensé. On lit donc le terrain, comme un arbitre.
   if (horsDuTerrain(arrivee)) {
     if (v.intention === 'penaltouche') {
-      dire(e, 'touche', camp, `Touche à suivre pour ${nomClub(e, camp)}.`);
+      dire(e, 'touche', camp, C.texteMatch('toucheASuivre', { club: nomClub(e, camp) }));
       return arret(e, 'touche', camp, arrivee);
     }
     // 1. LE 50/22 — le coup de pied part de SON CAMP (les 50 ou en deçà) et
@@ -532,7 +530,7 @@ function phaseBallonEnLAir(e: EtatMatch): void {
     const direct = !dansSes22(v.de, camp);
     const lieu = direct ? { x: v.de.x, y: arrivee.y } : arrivee;
     if (direct) {
-      dire(e, 'touche', adverse(camp), `${v.auteur.nom} trouve la touche directement : pas de gain de terrain, touche à l’endroit du coup de pied.`, 0, v.auteur.moi);
+      dire(e, 'touche', adverse(camp), C.texteMatch('toucheDirecte', { nom: v.auteur.nom }), 0, v.auteur.moi);
     }
     return arret(e, 'touche', adverse(camp), lieu);
   }
@@ -541,7 +539,7 @@ function phaseBallonEnLAir(e: EtatMatch): void {
   if (arrivee.x <= LIGNE_A || arrivee.x >= LIGNE_B) {
     const defenseur: Cote = arrivee.x <= LIGNE_A ? 'A' : 'B';
     if (v.intention === 'cinquanteVingtDeux' || v.intention === 'occupation') {
-      dire(e, 'pied', camp, `Ballon dans l’en-but, renvoi aux 22.`);
+      dire(e, 'pied', camp, C.texteMatch('ballonEnBut'));
     }
     return arret(e, 'renvoi22', defenseur, { x: defenseur === 'A' ? M22_A : M22_B, y: AXE });
   }
@@ -581,7 +579,7 @@ function phaseBallonEnLAir(e: EtatMatch): void {
   if (!gagnant) return clorePeriode(e);
 
   if (gagnant.cote === camp && contestable) {
-    dire(e, 'pied', camp, `${gagnant.nom} récupère le ballon dans les airs !`, 0, gagnant.moi);
+    dire(e, 'pied', camp, C.texteMatch('ballonAerien', { nom: gagnant.nom }), 0, gagnant.moi);
   }
   // Petit risque d'échapper un ballon haut.
   if (v.hauteur > 0.7 && e.rng() < 0.07) {
@@ -635,7 +633,7 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // ── Ligne d'essai, touche ────────────────────────────────────────────────
   if (franchieLigne(porteur.pos, porteur.cote)) return tenterEssai(e, porteur);
   if (horsDuTerrain(porteur.pos)) {
-    dire(e, 'touche', adverse(porteur.cote), `${porteur.nom} est poussé en touche.`, 0, porteur.moi);
+    dire(e, 'touche', adverse(porteur.cote), C.texteMatch('pousseTouche', { nom: porteur.nom }), 0, porteur.moi);
     return arret(e, 'touche', adverse(porteur.cote), porteur.pos);
   }
 
@@ -863,7 +861,7 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
     porteur.battu = 0.4; // il ne peut pas être re-plaqué dans la même seconde
     if (e.rng() < 0.22) {
       dire(e, 'plaquage', porteur.cote,
-        `${porteur.nom} se dégage du plaquage de ${defenseur.nom} !`, 0, porteur.moi || defenseur.moi);
+        C.texteMatch('cassePlaquage', { porteur: porteur.nom, defenseur: defenseur.nom }), 0, porteur.moi || defenseur.moi);
     }
     return;
   }
@@ -893,7 +891,7 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
       q !== porteur && (q.pos.x - porteur.pos.x) * s <= 0.8 && distance2(q.pos, porteur.pos) < 90);
     if (soutiens.length) {
       const recu = soutiens.sort((a, b) => distance2(porteur.pos, a.pos) - distance2(porteur.pos, b.pos))[0];
-      dire(e, 'jeu', porteur.cote, `Offload de ${porteur.nom} pour ${recu.nom} !`, 0, porteur.moi || recu.moi);
+      dire(e, 'jeu', porteur.cote, C.texteMatch('offload', { porteur: porteur.nom, receveur: recu.nom }), 0, porteur.moi || recu.moi);
       porteur.stats.passes += 1;
       // ⚠️ L'OFFLOAD EST COMPTÉ À PART, EN PLUS de la passe. C'est une passe
       // APRÈS contact, la marque des grands centres et des troisièmes lignes :
@@ -1170,7 +1168,7 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
     fautif.sanction = rouge ? 99_999 : 600; // dix minutes, ou le reste du match
     if (rouge) fautif.stats.cartonsRouges += 1; else fautif.stats.cartonsJaunes += 1;
     dire(e, 'carton', fautif.cote, rouge
-      ? `🟥 CARTON ROUGE pour ${fautif.nom} (${motif}) — ${nomClub(e, fautif.cote)} finit à quatorze.`
+      ? C.texteMatch('cartonRouge', { nom: fautif.nom, motif, club: nomClub(e, fautif.cote) })
       : C.phrase(e.rng, C.CARTON, {
         nom: fautif.nom, motif, club: nomClub(e, fautif.cote),
       }), 0, fautif.moi);
@@ -1233,13 +1231,15 @@ function phasePenalite(e: EtatMatch): void {
     buteur.stats.coupsDePied += 1;
     e.placement = null;
     lancerVol(e, buteur, arrivee, 'penaltouche', 2.4, 0.4, info.lieu);
-    dire(e, 'pied', cote, `${buteur.nom} trouve la touche à ${Math.round(metresAvantLaLigne(arrivee, cote))} mètres de la ligne.`, 0, buteur.moi);
+    dire(e, 'pied', cote, C.texteMatch('penaltouche', {
+      nom: buteur.nom, distance: Math.round(metresAvantLaLigne(arrivee, cote)),
+    }), 0, buteur.moi);
     return;
   }
   // Jeu rapide à la main.
   e.placement = null;
   e.gardeRuck = 0.7;
-  dire(e, 'jeu', cote, `Pénalité jouée vite par ${nomClub(e, cote)}.`);
+  dire(e, 'jeu', cote, C.texteMatch('penaliteRapide', { club: nomClub(e, cote) }));
   reprendreJeu(e, info.lieu);
 }
 
@@ -1293,7 +1293,7 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
     : 0;
   if (reste <= 0 || (avance > 0.10 && e.minute < 72)) {
     dire(e, 'jeu', adverse(cote),
-      `${marqueur.nom} est tenu dans l’en-but ! Renvoi aux 22 pour ${nomClub(e, adverse(cote))}.`,
+      C.texteMatch('tenuEnBut', { nom: marqueur.nom, club: nomClub(e, adverse(cote)) }),
       0, marqueur.moi);
     return arret(e, 'renvoi22', adverse(cote), {
       x: adverse(cote) === 'A' ? M22_A : M22_B, y: AXE,
@@ -1668,7 +1668,7 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
         if (e.sirene) return clorePeriode(e);
         return preparerCoupEnvoi(e, adverse(p.cote));
       }
-      dire(e, 'butRate', p.cote, `Drop manqué de ${p.nom}.`, 0, p.moi);
+      dire(e, 'butRate', p.cote, C.texteMatch('dropRate', { nom: p.nom }), 0, p.moi);
       return arret(e, 'renvoi22', adverse(p.cote), {
         x: adverse(p.cote) === 'A' ? M22_A : M22_B, y: AXE,
       });
@@ -1817,7 +1817,9 @@ function clorePeriode(e: EtatMatch): void {
     e.porteur = null;
     e.vol = null;
     e.placement = null;
-    dire(e, 'jalon', null, `Mi-temps : ${e.clubA} ${e.scoreA} – ${e.scoreB} ${e.clubB}`);
+    dire(e, 'jalon', null, C.texteMatch('miTempsScore', {
+      clubA: e.clubA, scoreA: e.scoreA, scoreB: e.scoreB, clubB: e.clubB,
+    }));
     return;
   }
   solderLesPoints(e);
@@ -1830,13 +1832,14 @@ function clorePeriode(e: EtatMatch): void {
   // consommées, et l'écran projetait alors les pions à deux cents mètres du
   // terrain à la sirène.
   e.reliquat = 0;
-  dire(e, 'jalon', null,
-    `Coup de sifflet final — ${e.clubA} ${e.scoreA} – ${e.scoreB} ${e.clubB}.`);
+  dire(e, 'jalon', null, C.texteMatch('coupSiffletFinal', {
+    clubA: e.clubA, scoreA: e.scoreA, scoreB: e.scoreB, clubB: e.clubB,
+  }));
 }
 
 function phaseMiTemps(e: EtatMatch): void {
   if (e.minuteur > 0) return;
-  dire(e, 'jalon', null, 'Deuxième mi-temps !');
+  dire(e, 'jalon', null, C.texteMatch('deuxiemeMiTemps'));
   // L'équipe qui n'a pas engagé en début de match engage la seconde période.
   preparerCoupEnvoi(e, adverse(e.possession));
 }
@@ -1859,7 +1862,9 @@ function solderLesPoints(e: EtatMatch): void {
         if (buteur) { buteur.stats.butsTentes += 1; buteur.stats.butsReussis += 1; }
         marquer(e, cote, 7);
         if (cote === 'A') e.essaisA += 1; else e.essaisB += 1;
-        dire(e, 'essai', cote, `Essai transformé de ${m?.nom ?? nomClub(e, cote)} dans les arrêts de jeu !`, 7, m?.moi);
+        dire(e, 'essai', cote, C.texteMatch('essaiTransformeFin', {
+          nom: m?.nom ?? nomClub(e, cote),
+        }), 7, m?.moi);
       } else if (plan.essaisSecs > 0) {
         plan.essaisSecs -= 1;
         const m = choisirMarqueur(e, cote);
@@ -1867,12 +1872,16 @@ function solderLesPoints(e: EtatMatch): void {
         if (buteur) buteur.stats.butsTentes += 1;
         marquer(e, cote, 5);
         if (cote === 'A') e.essaisA += 1; else e.essaisB += 1;
-        dire(e, 'essai', cote, `Essai de ${m?.nom ?? nomClub(e, cote)} au bout du temps additionnel !`, 5, m?.moi);
+        dire(e, 'essai', cote, C.texteMatch('essaiFin', {
+          nom: m?.nom ?? nomClub(e, cote),
+        }), 5, m?.moi);
       } else {
         plan.penalites -= 1;
         if (buteur) { buteur.stats.butsTentes += 1; buteur.stats.butsReussis += 1; }
         marquer(e, cote, 3);
-        dire(e, 'but', cote, `Pénalité de ${buteur?.nom ?? nomClub(e, cote)} à la dernière seconde.`, 3, buteur?.moi);
+        dire(e, 'but', cote, C.texteMatch('penaliteFin', {
+          nom: buteur?.nom ?? nomClub(e, cote),
+        }), 3, buteur?.moi);
       }
     }
   }
@@ -1893,7 +1902,7 @@ function choisirMarqueur(e: EtatMatch, cote: Cote): Pion | undefined {
 
 export function appliquerConsigne(e: EtatMatch, c: ConsigneJoueur | undefined): void {
   e.consigne = c;
-  if (c) dire(e, 'jeu', null, `📣 Consigne : « ${c.libelle} »`);
+  if (c) dire(e, 'jeu', null, C.texteMatch('consigne', { libelle: c.libelle }));
 }
 
 export interface LigneBilan {

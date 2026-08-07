@@ -23,6 +23,7 @@ import { TEXTES_AUTO } from './textesAuto';
 import { TEXTES_SUPPLEMENTAIRES } from './textesSupplementaires';
 import { TEXTES_TROPHEES } from './textesTrophees';
 import { TEXTES_SOCIAUX } from './textesSociaux';
+import { TEXTES_MATCH } from './textesMatch';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -58,6 +59,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_ECRANS,
   ...TEXTES_CONTENU,
   ...TEXTES_SUPPLEMENTAIRES,
+  ...TEXTES_MATCH,
   ...TEXTES_TROPHEES,
   ...TEXTES_SOCIAUX,
 
@@ -193,13 +195,13 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   'reg.modele': { fr: 'Modèle', en: 'Model', es: 'Modelo', it: 'Modello', de: 'Modell', pt: 'Modelo', ja: 'モデル' },
   'reg.langue': { fr: 'Langue', en: 'Language', es: 'Idioma', it: 'Lingua', de: 'Sprache', pt: 'Idioma', ja: '言語' },
   'reg.langueAide': {
-    fr: 'L’interface change tout de suite. Le Maître du Jeu, les situations et L’Ovale écriront eux aussi dans cette langue.',
-    en: 'The interface switches instantly. The Game Master, the life events and The Oval will write in this language too.',
-    es: 'La interfaz cambia al instante. El Máster, las situaciones y El Oval también escribirán en este idioma.',
-    it: 'L’interfaccia cambia subito. Anche il Master, le situazioni e L’Ovale scriveranno in questa lingua.',
-    de: 'Die Oberfläche wechselt sofort. Auch der Spielleiter, die Ereignisse und The Oval schreiben dann in dieser Sprache.',
-    pt: 'A interface muda de imediato. O Mestre do Jogo, as situações e O Oval também escreverão neste idioma.',
-    ja: 'インターフェースは即座に切り替わります。ゲームマスター、イベント、オーバルもこの言語で書きます。',
+    fr: 'Les changements s’appliquent après avoir appuyé sur Enregistrer. Le Maître du Jeu, les situations et L’Ovale écriront eux aussi dans cette langue.',
+    en: 'Changes take effect after you select Save. The Game Master, the life events and The Oval will write in this language too.',
+    es: 'Los cambios se aplican al pulsar Guardar. El Máster, las situaciones y El Oval también escribirán en este idioma.',
+    it: 'Le modifiche si applicano dopo aver premuto Salva. Anche il Master, le situazioni e L’Ovale scriveranno in questa lingua.',
+    de: 'Die Änderungen werden nach dem Speichern angewendet. Auch der Spielleiter, die Ereignisse und The Oval schreiben dann in dieser Sprache.',
+    pt: 'As alterações são aplicadas depois de guardares. O Mestre do Jogo, as situações e O Oval também escreverão neste idioma.',
+    ja: '「保存」を押すと変更が反映されます。ゲームマスター、イベント、オーバルもこの言語で書きます。',
   },
   'reg.ambiance': { fr: 'Ambiance', en: 'Colour theme', es: 'Ambiente', it: 'Atmosfera', de: 'Farbstimmung', pt: 'Ambiente', ja: 'カラーテーマ' },
   'reg.ambianceAide': {

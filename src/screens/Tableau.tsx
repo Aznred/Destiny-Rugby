@@ -25,7 +25,7 @@ import {
   fenetreInternationale, journeesInternationalesA, classementMondial,
 } from '../lib/international';
 import { LogoEquipe } from '../components/Blason';
-import { nomNation, nomNationTraduit } from '../components/Drapeau';
+import { nomNation, nomNationTraduit } from '../lib/nations';
 import { COUPES_EUROPE } from '../data/mondeReel';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { Blason } from '../components/Blason';

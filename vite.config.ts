@@ -5,6 +5,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
+    // Three.js est volontairement un bloc fournisseur paresseux (~972 Ko
+    // minifiés, 265 Ko gzip), partagé par toutes les scènes 3D. Le couper
+    // artificiellement multiplierait les requêtes sans réduire le transfert ;
+    // le seuil distingue ce cas connu d'une nouvelle régression applicative.
+    chunkSizeWarningLimit: 1000,
     // ⚠️ LES DRAPEAUX NE SONT PLUS INLINÉS. `flag-icons` fournit 250 drapeaux en
     // SVG ; sous la limite d'inlining par défaut (4 Ko), Vite les recopiait TOUS
     // en `data:` URI dans la feuille de style — 503 Ko de CSS (102 Ko gzip) à

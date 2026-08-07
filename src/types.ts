@@ -341,9 +341,6 @@ export interface NotifSocial {
 // Un succès débloqué : id → saison où il est tombé.
 export type SuccesDebloques = Record<string, number>;
 
-// Rythme de jeu choisi par le joueur.
-export type Rythme = 'semaine' | 'saison';
-
 // L'ambiance du site. Elle ne repeint que le FOND (la rampe `--pelouse-*` du
 // design system) : l'or, le cuir et la craie restent, quelle que soit la
 // couleur choisie. Voir `index.css` et `appliquerTheme` (store/useGame.ts).

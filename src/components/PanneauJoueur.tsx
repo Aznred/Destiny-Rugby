@@ -8,7 +8,8 @@ import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
 import { Blason } from './Blason';
 import { LogoCompet } from './LogoCompet';
-import { Drapeau, nomNation, nomNationTraduit } from './Drapeau';
+import { Drapeau } from './Drapeau';
+import { nomNation, nomNationTraduit } from '../lib/nations';
 import { Confirmation } from './Confirmation';
 import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON, CALENDRIER } from '../data/calendrier';
 import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store/useGame';
@@ -49,8 +50,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const evenementHebdo = useGame((s) => s.evenementHebdo);
   const aRepondre = !!scenarioActif || !!evenementHebdo;
   const motifAttente = evenementHebdo
-    ? 'Réponds d’abord à la situation en cours'
-    : 'Fais d’abord ton choix';
+    ? t('pj.attenteSituation')
+    : t('pj.attenteChoix');
   const semaineActuelle = semaine(joueur.semaine ?? 1);
   const vecu = joueur.saisonEnCours;
   const prendreRetraite = useGame((s) => s.prendreRetraite);
@@ -251,14 +252,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           </span>
         )}
       </div>
-      {/* ⚠️ IL N'Y A PLUS QU'UN SEUL RYTHME. Le mode « saison rapide » a été
-          retiré : il résumait l'année en un tirage et le joueur y perdait ses
-          statistiques, sa forme et ses sélections. `rythme` reste dans le store
-          le temps que les vieilles sauvegardes migrent — il vaut toujours
-          « semaine ». */}
-      <>
-        <>
-          {/* ⚠️ L'ENTRAÎNEMENT EST PERMANENT. On ne clique plus sur un secteur
+      {/* ⚠️ L'ENTRAÎNEMENT EST PERMANENT. On ne clique plus sur un secteur
               chaque semaine : on choisit ce qu'on travaille, la séance se fait
               toute seule à chaque semaine jouée, et on peut changer quand on
               veut. */}
@@ -309,10 +303,10 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             </div>
             {vecu && (
               <div className="cal-bilan">
-                🏉 {vecu.matchs} match{vecu.matchs > 1 ? 's' : ''} · 🎯 {vecu.essais} essai{vecu.essais > 1 ? 's' : ''}
+                🏉 {tn('pj.bilanMatch', vecu.matchs)} · 🎯 {tn('pj.bilanEssai', vecu.essais)}
                 {vecu.notes.length > 0 &&
                   ` · ⭐ ${(vecu.notes.reduce((a, b) => a + b, 0) / vecu.notes.length).toFixed(1)}/10`}
-                {vecu.capes > 0 && ` · 🏳️ ${vecu.capes} sélection${vecu.capes > 1 ? 's' : ''}`}
+                {vecu.capes > 0 && ` · 🏳️ ${tn('pj.bilanSelection', vecu.capes)}`}
               </div>
             )}
           </button>
@@ -365,9 +359,6 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               </button>
             </div>
           )}
-        </>
-      </>
-
       {/* Barre d'actions : tout est atteignable sans faire défiler le panneau. */}
       <div className="pj-actions">
         <button onClick={() => setEcran('effectif')} title={t('pj.voirJoueursAide')}>
@@ -402,7 +393,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         )}
         {joueur.mentorat && (
           <button disabled title={t('pj.mentoratAide')}>
-            🧑‍🏫<span>Mentor ✓</span>
+            🧑‍🏫<span>{t('pj.mentor')} ✓</span>
           </button>
         )}
         <button
@@ -417,7 +408,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       {finDeCarriere && (
         <div className="champ pj-reconversion">
           <label htmlFor="reconversion">
-            Après ta carrière {joueur.age >= AGE_RETRAITE_FORCEE && '— dernière saison !'}
+            {t('pj.apresCarriere')} {joueur.age >= AGE_RETRAITE_FORCEE && `— ${t('pj.derniereSaison')}`}
           </label>
           <select
             id="reconversion"
@@ -425,7 +416,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             onChange={(e) => setReconversion(e.target.value)}
           >
             {RECONVERSIONS.map((r) => (
-              <option key={r.id} value={r.id}>{r.emoji} {r.nom}</option>
+              <option key={r.id} value={r.id}>{r.emoji} {t(`pj.reconversion.${r.id}`)}</option>
             ))}
           </select>
         </div>
@@ -434,10 +425,10 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       <AnimatePresence>
         {confirmerRetraite && (
           <Confirmation
-            titre="🏛️ Prendre ta retraite ?"
-            message="Ta carrière sera immortalisée dans le Hall des Légendes et le classement, puis tu pourras en commencer une nouvelle. Cette décision est définitive."
-            libelleOui="Je raccroche les crampons"
-            libelleNon="Continuer à jouer"
+            titre={`🏛️ ${t('pj.confirmerRetraite.titre')}`}
+            message={t('pj.confirmerRetraite.message')}
+            libelleOui={t('pj.confirmerRetraite.oui')}
+            libelleNon={t('pj.confirmerRetraite.non')}
             onOui={() => {
               setConfirmerRetraite(false);
               prendreRetraite(finDeCarriere ? reconversion : undefined);
@@ -447,10 +438,10 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         )}
         {confirmerTransfert && (
           <Confirmation
-            titre="📣 Demander ton transfert ?"
-            message="Ton agent va faire le tour du marché pour trouver un club à ta hauteur. Le vestiaire n'aime pas ça : tu perdras un peu de moral et de réputation, et rien ne garantit qu'une offre arrive."
-            libelleOui="Oui, contacte les clubs"
-            libelleNon="Rester concentré"
+            titre={`📣 ${t('pj.confirmerTransfert.titre')}`}
+            message={t('pj.confirmerTransfert.message')}
+            libelleOui={t('pj.confirmerTransfert.oui')}
+            libelleNon={t('pj.confirmerTransfert.non')}
             onOui={() => {
               setConfirmerTransfert(false);
               demanderTransfert();
@@ -469,8 +460,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           joueur={joueur}
           selection={!!inter}
           titre={inter
-            ? `${inter.affiche.competition.nom} · ${libelleDate(semaineActuelle)} · journée ${inter.affiche.journee}`
-            : `${division?.nom ?? 'Championnat'} · ${libelleDate(semaineActuelle)} · journée ${affiche.journee}`}
+            ? `${inter.affiche.competition.nom} · ${libelleDate(semaineActuelle)} · ${t('tb.journee', { n: inter.affiche.journee })}`
+            : `${division?.nom ?? t('pj.championnat')} · ${libelleDate(semaineActuelle)} · ${t('tb.journee', { n: affiche.journee })}`}
           onTermine={() => setMatchTermine(true)}
           onFermer={() => {
             setMatchOuvert(false);

@@ -117,8 +117,6 @@ export default function App() {
         {reglagesOuverts && <Reglages onFermer={() => setReglagesOuverts(false)} />}
       </AnimatePresence>
 
-      {/* Marché des transferts : le panneau « Choix de carrière » */}
-
       {/* Cérémonie : le trophée gagné s'affiche en 3D, un par un */}
       <AnimatePresence>
         {tropheesEnAttente.length > 0 && (

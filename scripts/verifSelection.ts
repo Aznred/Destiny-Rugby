@@ -27,7 +27,7 @@ import {
   fenetreInternationale, matchInternationalDuJoueur, competitionsDeLaSaison, forceNation,
 } from '../src/lib/international';
 import { convocation, niveauExige, niveauInternational } from '../src/lib/selection';
-import { nomNation } from '../src/components/Drapeau';
+import { nomNation } from '../src/lib/nations';
 
 let echecs = 0;
 function ligne(libelle: string, valeur: string, ok: boolean): void {

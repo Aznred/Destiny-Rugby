@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { t, nombre } from '../lib/i18n';
 import { useGame, palmaresDepuisLibelles } from '../store/useGame';
 import { POSTE_PAR_ID, migrerPoste, nomPoste } from '../data/rugby';
-import { Drapeau, nomNationTraduit } from '../components/Drapeau';
+import { Drapeau } from '../components/Drapeau';
+import { nomNationTraduit } from '../lib/nations';
 import type { TitreGagne } from '../types';
 import { titreTraduit } from '../lib/tropheesI18n';
 

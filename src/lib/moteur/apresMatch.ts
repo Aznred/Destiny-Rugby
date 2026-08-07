@@ -87,7 +87,9 @@ function borner(v: number, min: number, max: number): number {
 // attend de SON POSTE, au prorata de son temps de jeu.
 /** Une ligne du barème : ce que tel aspect du match a rapporté ou coûté. */
 export interface PostNote {
+  cle: string;
   libelle: string;
+  variables?: Record<string, string | number>;
   points: number;
 }
 
@@ -108,31 +110,35 @@ export interface PostNote {
 export function detailNote(poste: PosteId, s: StatsMatchJoueur): PostNote[] {
   const att = ATTENDU[poste] ?? ATTENDU.premier_centre;
   const part = borner(s.minutes / 80, 0.1, 1);
-  const lignes: PostNote[] = [{ libelle: 'Base', points: 5.8 }];
-  const ajouter = (libelle: string, points: number) => {
-    if (Math.abs(points) >= 0.05) lignes.push({ libelle, points });
+  const lignes: PostNote[] = [{ cle: 'ml.note.base', libelle: 'Base', points: 5.8 }];
+  const ajouter = (cle: string, libelle: string, points: number, variables?: Record<string, string | number>) => {
+    if (Math.abs(points) >= 0.05) lignes.push({ cle, libelle, variables, points });
   };
 
   // Entrer en jeu et tenir sa place, ça compte déjà.
-  ajouter('Temps de jeu', part >= 0.75 ? 0.35 : part <= 0.3 ? -0.35 : 0);
+  ajouter('ml.note.temps', 'Temps de jeu', part >= 0.75 ? 0.35 : part <= 0.3 ? -0.35 : 0);
 
   // Défense
   const plqAttendus = att.plaquages * part;
-  ajouter(`Plaquages (${s.plaquages} pour ${plqAttendus.toFixed(1)} attendus)`,
-    borner((s.plaquages - plqAttendus) / Math.max(3, plqAttendus) * 1.3, -1.2, 1.6));
-  ajouter(`Plaquages manqués (${s.plaquagesManques})`, -s.plaquagesManques * 0.28);
+  ajouter('ml.note.plaquages', `Plaquages (${s.plaquages} pour ${plqAttendus.toFixed(1)} attendus)`,
+    borner((s.plaquages - plqAttendus) / Math.max(3, plqAttendus) * 1.3, -1.2, 1.6),
+    { n: s.plaquages, attendu: plqAttendus.toFixed(1) });
+  ajouter('ml.note.plaquagesManques', `Plaquages manqués (${s.plaquagesManques})`, -s.plaquagesManques * 0.28,
+    { n: s.plaquagesManques });
 
   // Avancée ballon en main
   const mAttendus = att.metres * part;
-  ajouter(`Mètres gagnés (${Math.round(s.metres)} pour ${Math.round(mAttendus)} attendus)`,
-    borner((s.metres - mAttendus) / Math.max(15, mAttendus) * 1.1, -1, 1.8));
+  ajouter('ml.note.metres', `Mètres gagnés (${Math.round(s.metres)} pour ${Math.round(mAttendus)} attendus)`,
+    borner((s.metres - mAttendus) / Math.max(15, mAttendus) * 1.1, -1, 1.8),
+    { n: Math.round(s.metres), attendu: Math.round(mAttendus) });
 
   // Ce qui fait gagner un match
-  ajouter(`Essais (${s.essais})`, s.essais * 1.25);
-  ajouter(`Ballons grattés (${s.grattages})`, s.grattages * 0.45);
+  ajouter('ml.note.essais', `Essais (${s.essais})`, s.essais * 1.25, { n: s.essais });
+  ajouter('ml.note.grattages', `Ballons grattés (${s.grattages})`, s.grattages * 0.45, { n: s.grattages });
   if (s.butsTentes > 0) {
-    ajouter(`Tirs au but (${s.butsReussis}/${s.butsTentes})`,
-      s.butsReussis * 0.32 - (s.butsTentes - s.butsReussis) * 0.4);
+    ajouter('ml.note.buts', `Tirs au but (${s.butsReussis}/${s.butsTentes})`,
+      s.butsReussis * 0.32 - (s.butsTentes - s.butsReussis) * 0.4,
+      { reussis: s.butsReussis, tentes: s.butsTentes });
   }
 
   // ═══ TOUT LE RESTE DU JEU ═══════════════════════════════════════════════
@@ -142,35 +148,39 @@ export function detailNote(poste: PosteId, s: StatsMatchJoueur): PostNote[] {
   // un essai obtenait exactement la même note qu'un pilier qui n'a rien fait.
   // Chaque ligne ci-dessous est bornée : le total ne peut pas s'envoler, et
   // l'étalonnage de difficulté ne bouge pas — vérifié.
-  ajouter(`Passes décisives (${s.passesDecisives ?? 0})`,
-    borner((s.passesDecisives ?? 0) * 0.8, 0, 1.6));
-  ajouter(`Offloads (${s.offloads ?? 0})`,
-    borner(((s.offloads ?? 0) - att.offloads * part) * 0.35, -0.3, 0.9));
-  ajouter(`Franchissements (${s.franchissements ?? 0})`,
-    borner((s.franchissements ?? 0) * 0.22, 0, 1));
+  ajouter('ml.note.passesDecisives', `Passes décisives (${s.passesDecisives ?? 0})`,
+    borner((s.passesDecisives ?? 0) * 0.8, 0, 1.6), { n: s.passesDecisives ?? 0 });
+  ajouter('ml.note.offloads', `Offloads (${s.offloads ?? 0})`,
+    borner(((s.offloads ?? 0) - att.offloads * part) * 0.35, -0.3, 0.9), { n: s.offloads ?? 0 });
+  ajouter('ml.note.franchissements', `Franchissements (${s.franchissements ?? 0})`,
+    borner((s.franchissements ?? 0) * 0.22, 0, 1), { n: s.franchissements ?? 0 });
   // Les ballons rendus se paient : un porteur qui perd trois ballons a coûté
   // trois possessions, quoi qu'il ait fait par ailleurs.
-  ajouter(`Ballons rendus (${s.turnovers ?? 0})`, -borner((s.turnovers ?? 0) * 0.3, 0, 1.5));
+  ajouter('ml.note.turnovers', `Ballons rendus (${s.turnovers ?? 0})`,
+    -borner((s.turnovers ?? 0) * 0.3, 0, 1.5), { n: s.turnovers ?? 0 });
 
   // La conquête. `att.melees` vaut 0 pour un trois-quarts : la ligne est donc
   // absente pour lui, sans avoir besoin d'un test de poste ici.
   if (att.melees > 0) {
-    ajouter(`Mêlée (${s.melees ?? 0})`,
-      borner(((s.melees ?? 0) - att.melees * part) / Math.max(4, att.melees * part) * 0.8, -0.7, 0.9));
-    ajouter(`Touches captées (${s.touchesGagnees ?? 0})`,
-      borner(((s.touchesGagnees ?? 0) - att.touches * part) * 0.22, -0.4, 0.9));
-    ajouter(`Pick and go (${s.pickAndGo ?? 0})`,
-      borner(((s.pickAndGo ?? 0) - att.pickAndGo * part) * 0.10, -0.4, 0.7));
+    ajouter('ml.note.melees', `Mêlée (${s.melees ?? 0})`,
+      borner(((s.melees ?? 0) - att.melees * part) / Math.max(4, att.melees * part) * 0.8, -0.7, 0.9),
+      { n: s.melees ?? 0 });
+    ajouter('ml.note.touches', `Touches captées (${s.touchesGagnees ?? 0})`,
+      borner(((s.touchesGagnees ?? 0) - att.touches * part) * 0.22, -0.4, 0.9),
+      { n: s.touchesGagnees ?? 0 });
+    ajouter('ml.note.pickAndGo', `Pick and go (${s.pickAndGo ?? 0})`,
+      borner(((s.pickAndGo ?? 0) - att.pickAndGo * part) * 0.10, -0.4, 0.7),
+      { n: s.pickAndGo ?? 0 });
   }
   // Le 50/22 est un coup de maître : il retourne une position, on le paie cher.
-  ajouter(`50/22 réussis (${s.cinquanteVingtDeux ?? 0})`,
-    borner((s.cinquanteVingtDeux ?? 0) * 0.7, 0, 1.4));
+  ajouter('ml.note.cinquanteVingtDeux', `50/22 réussis (${s.cinquanteVingtDeux ?? 0})`,
+    borner((s.cinquanteVingtDeux ?? 0) * 0.7, 0, 1.4), { n: s.cinquanteVingtDeux ?? 0 });
 
   // ⚠️ Le rouge n'est pas un jaune. `cartons` reste le total pour compatibilité
   // (les appelants historiques ne fournissent que lui) ; quand la couleur est
   // connue, un rouge coûte trois fois plus — il a mis son équipe à quatorze.
   const rouges = s.cartonsRouges ?? 0;
-  ajouter('Cartons', -((s.cartons - rouges) * 1.4 + rouges * 4));
+  ajouter('ml.note.cartons', 'Cartons', -((s.cartons - rouges) * 1.4 + rouges * 4));
 
   return lignes;
 }

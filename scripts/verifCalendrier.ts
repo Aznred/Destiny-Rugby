@@ -33,12 +33,21 @@ console.log('  ' + g().journal.slice(-6).map((e) => e.titre).filter(Boolean).joi
 console.log('\n--- 6 SAISONS ENCHAÎNÉES (rythme semaine) ---');
 for (let s = 0; s < 6; s++) {
   for (let i = 0; i < SEMAINES_PAR_SAISON; i++) g().semaineSuivante();
-  const o = g().offres;
-  if (o.length) g().signerOffre(o[0].id);
-  useGame.setState({ tropheesEnAttente: [], offresOuvertes: false });
-  const k = g().joueur!;
+  let k = g().joueur!;
+  // Ce test vérifie le calendrier, pas la négociation. Si le contrat arrive à
+  // zéro, on le prolonge explicitement afin que la saison suivante puisse se
+  // jouer sans ressusciter l'ancien panneau `offres/signerOffre`.
+  if ((k.contrat?.saisons ?? 0) <= 0 && k.contrat) {
+    k = { ...k, contrat: { ...k.contrat, saisons: 2 } };
+    useGame.setState({ joueur: k });
+  }
+  useGame.setState({ tropheesEnAttente: [] });
   console.log(`  S${k.saison - 1} → ${k.club} (${k.division}) · ${k.matchsJoues} matchs · ${k.essais} essais · ` +
     `note ${k.noteSaison}/10 · ${k.selections ?? 0} capes · titres ${k.titres.length}`);
 }
 console.log('  mouvements enregistrés :', Object.keys(g().mouvementsClubs).length, 'clubs ont changé de division');
 console.log('  exemples :', Object.entries(g().mouvementsClubs).slice(0, 4).map(([c, d]) => `${c}→${d}`).join(', '));
+
+// Les feuilles complètes sont calculées en file de fond dans le navigateur.
+// Le test attend la file afin de détecter les erreurs et de rendre la main.
+await g().simulerStatsJournee();

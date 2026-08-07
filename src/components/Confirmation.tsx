@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { t } from '../lib/i18n';
+import { useModalDialog } from '../lib/useModalDialog';
 
 // Modale de confirmation maison — window.confirm() est bloqué par certains
 // navigateurs, on ne l'utilise JAMAIS.
@@ -21,18 +22,24 @@ export function Confirmation({
   onOui,
   onNon,
 }: Props) {
+  const { overlayRef, dialogRef } = useModalDialog(onNon);
   // Portal vers <body> : sans ça, le backdrop-filter des cartes parentes
   // crée un bloc conteneur et la modale reste piégée dans le panneau.
   return createPortal(
-    <div className="overlay" onClick={onNon}>
+    <div ref={overlayRef} className="overlay" onClick={onNon}>
       <motion.div
+        ref={dialogRef}
         className="carte modale"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirmation-titre"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, y: 16, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.2 }}
       >
-        <h2>{titre}</h2>
+        <h2 id="confirmation-titre">{titre}</h2>
         <p className="aide" style={{ marginTop: '0.6rem' }}>{message}</p>
         <div className="rangee-fin">
           <button className="btn fantome" onClick={onNon}>{libelleNon ?? t('gen.annuler')}</button>

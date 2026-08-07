@@ -24,8 +24,8 @@ const IDS_TROPHEES = Object.keys(TROPHEES);
 
 // Débit : un envoi par heure et dix par jour pour un même appareil. Une carrière
 // de douze saisons demande des heures de jeu — personne d'honnête n'est gêné.
-const PAR_HEURE = 100;
-const PAR_JOUR = 100;
+const PAR_HEURE = 1;
+const PAR_JOUR = 10;
 
 const base = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -33,12 +33,10 @@ const base = createClient(
 );
 
 /** Haché de l'appareil : on ne stocke JAMAIS l'IP en clair. */
-async function empreinteAppareil(req: Request): Promise<string> {
-  const brut = [
-    req.headers.get('x-forwarded-for') ?? '',
-    req.headers.get('user-agent') ?? '',
-    Deno.env.get('SEL_APPAREIL') ?? 'sel-par-defaut',
-  ].join('|');
+async function empreinteAppareil(req: Request, sel: string): Promise<string> {
+  const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim();
+  if (!ip) throw new Error('Adresse réseau absente');
+  const brut = `${ip}|${sel}`;
   const octets = new TextEncoder().encode(brut);
   const condense = await crypto.subtle.digest('SHA-256', octets);
   return [...new Uint8Array(condense)].map((o) => o.toString(16).padStart(2, '0')).join('').slice(0, 32);
@@ -66,7 +64,9 @@ Deno.serve(async (req) => {
   // ---- 1. LE DÉBIT, AVANT TOUT LE RESTE ------------------------------------
   // Le contrôle le moins cher passe en premier : inutile de valider une fiche
   // envoyée par un script qui en balance mille à la seconde.
-  const appareil = await empreinteAppareil(req);
+  const sel = Deno.env.get('SEL_APPAREIL')?.trim();
+  if (!sel) return reponse({ erreur: 'SEL_APPAREIL absente' }, 500);
+  const appareil = await empreinteAppareil(req, sel);
   const depuis = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
 
   const { count: derniereHeure } = await base

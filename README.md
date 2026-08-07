@@ -77,15 +77,11 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   Régionale 3 comme au Stade Toulousain — ou **à l'étranger** : les 20
   championnats (Premiership, URC, Super Rugby, League One, MLR…) sont proposés
   à la création, groupés par pays.
-- **Marché des transferts** (✈️) : un vrai panneau **« Choix de carrière »**.
-  Ton contrat a une durée et un salaire ; en fin de contrat — ou après une
-  grosse saison — les clubs se positionnent. Chaque offre affiche l'écusson, la
-  division, la note du club, le salaire, la prime à la signature et la durée.
-  Les propositions dépendent de ta **cote** (générale + réputation + note de la
-  saison) et du niveau des clubs : personne ne recrute très en dessous de son
-  niveau, et un club ne fait pas rêver un joueur bien au-dessus du sien. Tu peux
-  aussi **demander ton transfert** en cours de contrat — le vestiaire n'aimera
-  pas (−6 de moral).
+- **Marché des transferts** (✈️) : les clubs te contactent par message privé sur
+  **L'Ovale**. Tu négocies salaire, prime, durée et temps de jeu ; un club peut
+  contre-proposer ou se braquer. Un accord signé n'est appliqué qu'à
+  **l'intersaison**. Tu peux aussi demander à ton agent de sonder le marché — le
+  vestiaire n'aimera pas (−6 de moral).
 - **Carrière à l'étranger** 🌍 : à partir d'une certaine notoriété, la
   Premiership, l'URC, le Super Rugby, la League One japonaise ou la MLR viennent
   te chercher — avec leur **titre national à gagner** et, pour la Premiership et
@@ -248,8 +244,9 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   sinon ballon texturé codé (recolorable par les skins).
 - **Monnaie « Ovas » (🪙)** volontairement **rare** : ~1-5 par action/saison.
   Le solde n'est visible **que dans la Boutique** — chaque skin se mérite.
-- **Boutique** : skins de ballon 3D (dont **France Rugby**) et boosts d'attributs
-  achetables en Ovas. Le skin choisi s'affiche partout.
+- **Boutique** : skins de ballon 3D (dont **France Rugby**) et packs d'Ovas de
+  démonstration. Aucun bonus de performance ne s'achète ; le skin choisi
+  s'affiche partout.
 - **Hall des Légendes** (🏛️) : chaque carrière menée à la retraite est
   immortalisée avec son parcours et son score.
 - **Classement mondial** (🏆) : ta carrière face à des légendes (score global :
@@ -348,27 +345,11 @@ npx vite-node scripts/verifClassement.ts
 L'écran Classement affiche **en clair** la fiche qui partirait et le verdict que
 le serveur rendrait : rien n'est caché, parce que rien n'a besoin de l'être.
 
-## 🔑 Clé API Groq (pour le Maître du Jeu)
+## 🔑 Clé API Groq personnelle (pour le Maître du Jeu)
 
 Le jeu est jouable sans clé (création, navigation, évènements aléatoires), mais
-le **MJ IA** a besoin d'une clé Groq. Deux options :
-
-### Option A — Clé fournie par le site (les joueurs n'ont rien à saisir)
-
-1. Copie `.env.example` en **`.env.local`**.
-2. Renseigne `VITE_GROQ_KEY=gsk_...` (ta clé depuis
-   [console.groq.com/keys](https://console.groq.com/keys)).
-3. Relance `npm run dev`. Le MJ marche pour tout le monde, sans manip.
-
-> ⚠️ **Sécurité** : une clé mise en `.env.local` est incluse dans le build
-> **côté client**, donc **visible par n'importe quel visiteur** et elle consomme
-> **ton** quota Groq. À réserver à une démo ou à un usage restreint. Pour une
-> mise en ligne publique, préfère l'option B (ou un backend proxy — voir plus
-> bas) afin de ne pas exposer ta clé.
-
-### Option B — Chaque joueur met sa propre clé
-
-Clique sur **⚙️**, colle ta clé (`gsk_...`), enregistre. Elle est stockée
+le **MJ IA** a besoin d'une clé Groq. Clique sur **⚙️**, colle ta clé
+(`gsk_...`), puis enregistre. Elle est stockée
 **uniquement dans ton navigateur** (localStorage). C'est l'option qui **passe à
 l'échelle** : chaque joueur utilise son propre quota gratuit.
 
@@ -406,12 +387,12 @@ src/
   data/rugby.ts         # postes, nations, clubs, libellés
   data/evenements.ts    # pool d'évènements aléatoires (sans IA)
   data/scenarios.ts     # scénarios à choix (jouables sans clé)
-  data/boutique.ts      # skins de ballon, boosts, packs d'Ovas
+  data/boutique.ts      # skins de ballon et packs d'Ovas de démonstration
   data/legendes.ts      # légendes fictives peuplant le classement
   data/clubs.ts         # assemblage des compétitions : réelles (générées) + amateurs FR
   data/mondeReel.ts     # GÉNÉRÉ : 143 clubs (nom, ville, logo), coupes, sélections + classements
   data/effectifsReels.ts # GÉNÉRÉ : 6 306 joueurs réels 25-26 + note générale des clubs
-  lib/groq.ts           # appel API Groq + prompt système + parsing JSON + clé env
+  lib/groq.ts           # appel API Groq + prompt système + parsing JSON
   lib/ia.ts             # la scène de la semaine + son jugement (sévère), situations, interviews
   lib/armoire.ts        # étagères mesurées sur le modèle 3D, titres au sol, boucliers adossés, cadrage
   lib/honneurs.ts       # les distinctions individuelles : note de saison + stats + palmarès de l'année
@@ -559,4 +540,3 @@ fondations vers le confort) est dans **[ROADMAP.md](ROADMAP.md)**.
 ---
 
 Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
-

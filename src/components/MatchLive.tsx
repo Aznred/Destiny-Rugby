@@ -38,14 +38,14 @@ import {
 import { graine, type MatchChampionnat } from '../lib/championnat';
 import { effectifDuClub } from '../lib/effectif';
 import { effectifNational } from '../lib/international';
-import { nomNation } from './Drapeau';
+import { nomNation } from '../lib/nations';
 import { clubParNom } from '../data/clubs';
 import { POSTE_PAR_ID } from '../data/rugby';
-import { CLE_ENV } from '../lib/groq';
 import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
 import type { Joueur } from '../types';
 import { t } from '../lib/i18n';
+import { useModalDialog } from '../lib/useModalDialog';
 
 // ---------------------------------------------------------------------------
 // LA FEUILLE DE MATCH — TOUT CE QUE LE MOTEUR COMPTE
@@ -63,64 +63,64 @@ import { t } from '../lib/i18n';
 interface ColonneFeuille {
   cle: string;
   entete: string;
-  titre: string;
+  titreCle: string;
   valeur: (s: import('../lib/moteur/entites').StatsMatch) => number;
 }
 
-const VUES_FEUILLE: { id: string; nom: string; emoji: string; colonnes: ColonneFeuille[] }[] = [
+const VUES_FEUILLE: { id: string; nomCle: string; emoji: string; colonnes: ColonneFeuille[] }[] = [
   {
-    id: 'general', nom: 'Général', emoji: '📋',
+    id: 'general', nomCle: 'ml.vue.general', emoji: '📋',
     colonnes: [
-      { cle: 'metres', entete: 'm', titre: 'Mètres gagnés ballon en main', valeur: (s) => s.metres },
-      { cle: 'plaquages', entete: 'plq', titre: 'Plaquages réussis', valeur: (s) => s.plaquages },
-      { cle: 'essais', entete: 'ess', titre: 'Essais', valeur: (s) => s.essais },
-      { cle: 'passes', entete: 'pas', titre: 'Passes', valeur: (s) => s.passes },
+      { cle: 'metres', entete: 'm', titreCle: 'ml.stat.metres', valeur: (s) => s.metres },
+      { cle: 'plaquages', entete: 'plq', titreCle: 'ml.stat.plaquages', valeur: (s) => s.plaquages },
+      { cle: 'essais', entete: 'ess', titreCle: 'ml.stat.essais', valeur: (s) => s.essais },
+      { cle: 'passes', entete: 'pas', titreCle: 'ml.stat.passes', valeur: (s) => s.passes },
     ],
   },
   {
-    id: 'attaque', nom: 'Attaque', emoji: '⚡',
+    id: 'attaque', nomCle: 'ml.vue.attaque', emoji: '⚡',
     colonnes: [
-      { cle: 'courses', entete: 'crs', titre: 'Ballons portés', valeur: (s) => s.courses },
-      { cle: 'franchissements', entete: 'frn', titre: 'Franchissements / défenseurs battus', valeur: (s) => s.franchissements },
-      { cle: 'offloads', entete: 'off', titre: 'Offloads (passe après contact)', valeur: (s) => s.offloads },
-      { cle: 'passesDecisives', entete: 'p.d', titre: 'Passes décisives', valeur: (s) => s.passesDecisives },
-      { cle: 'passesRatees', entete: 'en-av', titre: 'En-avant et passes ratées', valeur: (s) => s.passesRatees },
+      { cle: 'courses', entete: 'crs', titreCle: 'ml.stat.courses', valeur: (s) => s.courses },
+      { cle: 'franchissements', entete: 'frn', titreCle: 'ml.stat.franchissements', valeur: (s) => s.franchissements },
+      { cle: 'offloads', entete: 'off', titreCle: 'ml.stat.offloads', valeur: (s) => s.offloads },
+      { cle: 'passesDecisives', entete: 'p.d', titreCle: 'ml.stat.passesDecisives', valeur: (s) => s.passesDecisives },
+      { cle: 'passesRatees', entete: 'en-av', titreCle: 'ml.stat.passesRatees', valeur: (s) => s.passesRatees },
     ],
   },
   {
-    id: 'defense', nom: 'Défense', emoji: '🛡️',
+    id: 'defense', nomCle: 'ml.vue.defense', emoji: '🛡️',
     colonnes: [
-      { cle: 'plaquages', entete: 'plq', titre: 'Plaquages réussis', valeur: (s) => s.plaquages },
-      { cle: 'plaquagesManques', entete: 'mqs', titre: 'Plaquages manqués', valeur: (s) => s.plaquagesManques },
-      { cle: 'grattages', entete: 'grt', titre: 'Ballons grattés au sol', valeur: (s) => s.grattages },
-      { cle: 'rucksNettoyes', entete: 'rck', titre: 'Rucks nettoyés', valeur: (s) => s.rucksNettoyes },
+      { cle: 'plaquages', entete: 'plq', titreCle: 'ml.stat.plaquages', valeur: (s) => s.plaquages },
+      { cle: 'plaquagesManques', entete: 'mqs', titreCle: 'ml.stat.plaquagesManques', valeur: (s) => s.plaquagesManques },
+      { cle: 'grattages', entete: 'grt', titreCle: 'ml.stat.grattages', valeur: (s) => s.grattages },
+      { cle: 'rucksNettoyes', entete: 'rck', titreCle: 'ml.stat.rucksNettoyes', valeur: (s) => s.rucksNettoyes },
     ],
   },
   {
-    id: 'conquete', nom: 'Conquête', emoji: '🌀',
+    id: 'conquete', nomCle: 'ml.vue.conquete', emoji: '🌀',
     colonnes: [
-      { cle: 'melees', entete: 'mêl', titre: 'Mêlées gagnées par son pack', valeur: (s) => s.melees },
-      { cle: 'touchesGagnees', entete: 'tch', titre: 'Touches captées', valeur: (s) => s.touchesGagnees },
-      { cle: 'pickAndGo', entete: 'p&g', titre: 'Pick and go (ballons portés au ras)', valeur: (s) => s.pickAndGo },
+      { cle: 'melees', entete: 'mêl', titreCle: 'ml.stat.melees', valeur: (s) => s.melees },
+      { cle: 'touchesGagnees', entete: 'tch', titreCle: 'ml.stat.touchesGagnees', valeur: (s) => s.touchesGagnees },
+      { cle: 'pickAndGo', entete: 'p&g', titreCle: 'ml.stat.pickAndGo', valeur: (s) => s.pickAndGo },
     ],
   },
   {
-    id: 'pied', nom: 'Pied', emoji: '🦵',
+    id: 'pied', nomCle: 'ml.vue.pied', emoji: '🦵',
     colonnes: [
-      { cle: 'coupsDePied', entete: 'cdp', titre: 'Coups de pied', valeur: (s) => s.coupsDePied },
-      { cle: 'metresAuPied', entete: 'm/p', titre: 'Mètres au pied', valeur: (s) => s.metresAuPied },
-      { cle: 'cinquanteVingtDeux', entete: '50/22', titre: '50/22 réussis', valeur: (s) => s.cinquanteVingtDeux },
-      { cle: 'buts', entete: 'buts', titre: 'Tirs au but réussis', valeur: (s) => s.butsReussis },
-      { cle: 'butsTentes', entete: 'tent', titre: 'Tirs au but tentés', valeur: (s) => s.butsTentes },
+      { cle: 'coupsDePied', entete: 'cdp', titreCle: 'ml.stat.coupsDePied', valeur: (s) => s.coupsDePied },
+      { cle: 'metresAuPied', entete: 'm/p', titreCle: 'ml.stat.metresAuPied', valeur: (s) => s.metresAuPied },
+      { cle: 'cinquanteVingtDeux', entete: '50/22', titreCle: 'ml.stat.cinquanteVingtDeux', valeur: (s) => s.cinquanteVingtDeux },
+      { cle: 'buts', entete: 'buts', titreCle: 'ml.stat.buts', valeur: (s) => s.butsReussis },
+      { cle: 'butsTentes', entete: 'tent', titreCle: 'ml.stat.butsTentes', valeur: (s) => s.butsTentes },
     ],
   },
   {
-    id: 'discipline', nom: 'Discipline', emoji: '🟨',
+    id: 'discipline', nomCle: 'ml.vue.discipline', emoji: '🟨',
     colonnes: [
-      { cle: 'cartonsJaunes', entete: '🟨', titre: 'Cartons jaunes', valeur: (s) => s.cartonsJaunes },
-      { cle: 'cartonsRouges', entete: '🟥', titre: 'Cartons rouges', valeur: (s) => s.cartonsRouges },
-      { cle: 'plaquagesManques', entete: 'mqs', titre: 'Plaquages manqués', valeur: (s) => s.plaquagesManques },
-      { cle: 'distance', entete: 'km', titre: 'Distance parcourue (km)', valeur: (s) => s.distanceParcourue / 1000 },
+      { cle: 'cartonsJaunes', entete: '🟨', titreCle: 'ml.stat.cartonsJaunes', valeur: (s) => s.cartonsJaunes },
+      { cle: 'cartonsRouges', entete: '🟥', titreCle: 'ml.stat.cartonsRouges', valeur: (s) => s.cartonsRouges },
+      { cle: 'plaquagesManques', entete: 'mqs', titreCle: 'ml.stat.plaquagesManques', valeur: (s) => s.plaquagesManques },
+      { cle: 'distance', entete: 'km', titreCle: 'ml.stat.distance', valeur: (s) => s.distanceParcourue / 1000 },
     ],
   },
 ];
@@ -187,16 +187,16 @@ const EMOJI: Record<TypeCommentaire, string> = {
   carton: '🟨', remplacement: '🔄', jalon: '🔔', jeu: '•',
 };
 
-const LIBELLE_PHASE: Record<string, string> = {
-  coupEnvoi: 'coup d’envoi', renvoi22: 'renvoi aux 22', ruck: 'ruck',
-  melee: 'mêlée', touche: 'touche', maul: 'ballon porté',
-  ballonEnLAir: 'ballon en l’air', tirAuBut: 'tir au but',
-  transformation: 'transformation', penalite: 'pénalité',
-  apresEssai: 'après l’essai', miTemps: 'mi-temps',
+const CLE_PHASE: Record<string, string> = {
+  coupEnvoi: 'ml.phase.coupEnvoi', renvoi22: 'ml.phase.renvoi22', ruck: 'ml.phase.ruck',
+  melee: 'ml.phase.melee', touche: 'ml.phase.touche', maul: 'ml.phase.maul',
+  ballonEnLAir: 'ml.phase.ballonEnLAir', tirAuBut: 'ml.phase.tirAuBut',
+  transformation: 'ml.phase.transformation', penalite: 'ml.phase.penalite',
+  apresEssai: 'ml.phase.apresEssai', miTemps: 'ml.phase.miTemps',
 };
 
-const LIBELLE_SYSTEME: Record<string, string> = {
-  blitz: 'défense montante', glissee: 'défense glissée', repli: 'repli, couverture du pied',
+const CLE_SYSTEME: Record<string, string> = {
+  blitz: 'ml.systeme.blitz', glissee: 'ml.systeme.glissee', repli: 'ml.systeme.repli',
 };
 
 // ---------------------------------------------------------------------------
@@ -300,6 +300,7 @@ export function MatchLive({
   const groqKey = useGame((s) => s.groqKey);
   const modele = useGame((s) => s.modele);
   const enregistrerMatchVecu = useGame((s) => s.enregistrerMatchVecu);
+  const { overlayRef, dialogRef } = useModalDialog(onFermer);
 
   // Le moteur vit dans une ref : c'est un objet muté sept fois par seconde de
   // jeu, le passer par l'état de React ferait des centaines de rendus.
@@ -381,7 +382,7 @@ export function MatchLive({
     setConsigneTexte('');
     setEnvoiConsigne(true);
     appliquerConsigne(e, lireConsigneLocale(t));
-    const cleIA = groqKey || CLE_ENV;
+    const cleIA = groqKey;
     if (cleIA) {
       try {
         const fine = await lireConsigneGroq(t, cleIA, modele,
@@ -447,7 +448,7 @@ export function MatchLive({
         // « Top 14 · 22 novembre · journée 7 » → « 22 novembre · journée 7 » :
         // le nom de la compétition est déjà partout ailleurs dans le journal.
         libelle: titre.split('·').slice(1).map((m) => m.trim()).filter(Boolean).join(' · ')
-          || 'Feuille de match',
+          || t('ml.feuilleMatch'),
       },
     );
   }, [e.fini, e, monPion, enregistrerMatchVecu, onTermine, titre]);
@@ -505,9 +506,14 @@ export function MatchLive({
   const terrain = useMemo(() => <TerrainMemo />, []);
 
   return createPortal(
-    <div className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) onFermer(); }}>
+    <div ref={overlayRef} className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) onFermer(); }}>
       <motion.div
+        ref={dialogRef}
         className="match-live"
+        role="dialog"
+        aria-modal="true"
+        aria-label={titre}
+        tabIndex={-1}
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25 }}
@@ -534,7 +540,7 @@ export function MatchLive({
         <div className="ml-sous-titre">
           {titre}
           {e.phase !== 'jeuCourant' && e.phase !== 'fini' && (
-            <span className="ml-phase"> · {LIBELLE_PHASE[e.phase] ?? e.phase}</span>
+            <span className="ml-phase"> · {CLE_PHASE[e.phase] ? t(CLE_PHASE[e.phase]) : e.phase}</span>
           )}
         </div>
 
@@ -569,7 +575,7 @@ export function MatchLive({
               🏉 {e.possession === 'A' ? e.clubA : e.clubB}
             </span>
             {e.lancement && <span className="ml-tag">▶ {e.lancement.libelle}</span>}
-            <span className="ml-tag">🛡️ {LIBELLE_SYSTEME[e.systeme]}</span>
+            <span className="ml-tag">🛡️ {t(CLE_SYSTEME[e.systeme] ?? `ml.systeme.${e.systeme}`)}</span>
             {e.phasesDepuisArret > 0 && <span className="ml-tag">{t('ml.temps', { n: e.phasesDepuisArret })}</span>}
           </div>
         )}
@@ -650,13 +656,13 @@ export function MatchLive({
             {maNote && (
               <details className="ml-ma-note">
                 <summary>
-                  ⭐ Ma note — <b>{maNote.note}/10</b>
-                  <span> · d’où elle vient</span>
+                  ⭐ {t('ml.maNote')} — <b>{maNote.note}/10</b>
+                  <span> · {t('ml.noteExplication')}</span>
                 </summary>
                 <div className="ml-note-detail">
                   {maNote.detail.map((l) => (
-                    <div key={l.libelle} className="ml-note-ligne">
-                      <span>{l.libelle}</span>
+                    <div key={l.cle} className="ml-note-ligne">
+                      <span>{t(l.cle, l.variables)}</span>
                       <b data-signe={l.points > 0 ? 'plus' : l.points < 0 ? 'moins' : undefined}>
                         {l.points > 0 ? '+' : ''}{Math.round(l.points * 10) / 10}
                       </b>
@@ -674,7 +680,7 @@ export function MatchLive({
                   className={`chip-cat${vueFeuille === v.id ? ' actif' : ''}`}
                   onClick={() => setVueFeuille(v.id)}
                 >
-                  {v.emoji} {v.nom}
+                  {v.emoji} {t(v.nomCle)}
                 </button>
               ))}
             </div>
@@ -686,7 +692,7 @@ export function MatchLive({
                   style={{ gridTemplateColumns: grilleColonnes }}
                 >
                   <span /><span>{t('ml.joueur')}</span>
-                  {colonnes.map((c) => <span key={c.cle} title={c.titre}>{c.entete}</span>)}
+                  {colonnes.map((c) => <span key={c.cle} title={t(c.titreCle)}>{c.entete}</span>)}
                   <span>min</span>
                 </div>
                 {stats.parJoueur

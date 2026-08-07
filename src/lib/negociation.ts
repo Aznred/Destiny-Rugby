@@ -26,6 +26,7 @@ import type { Joueur, OffreContrat } from '../types';
 import { agentDe } from '../data/agents';
 import { graine } from './championnat';
 import { pseudoStable } from './comptes';
+import { nombre, t } from './i18n';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. UNE APPROCHE
@@ -132,6 +133,14 @@ export const LEVIERS: DefinitionLevier[] = [
 export const LEVIER_PAR_ID: Record<Levier, DefinitionLevier> =
   Object.fromEntries(LEVIERS.map((l) => [l.id, l])) as Record<Levier, DefinitionLevier>;
 
+export function nomLevier(id: Levier): string {
+  return t(`nego.levier.${id}.nom`);
+}
+
+export function phraseLevier(id: Levier): string {
+  return t(`nego.levier.${id}.phrase`);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. NAÎTRE — d'une offre du marché à une approche négociable
 // ═══════════════════════════════════════════════════════════════════════════
@@ -224,12 +233,12 @@ function contreProposition(demande: Termes, courant: Termes, plafond: Termes): T
   };
 }
 
-const MONNAIE = (n: number) => `${n.toLocaleString('fr-FR')} €`;
+const MONNAIE = (n: number) => `${nombre(n)} €`;
 
 /** Le club répond à une demande. PURE : elle ne touche à rien. */
 export function repondreAuClub(a: Approche, levier: Levier): Reponse {
   if (a.etat !== 'ouverte') {
-    return { verdict: 'rompt', approche: a, texte: 'Cette discussion est close.' };
+    return { verdict: 'rompt', approche: a, texte: t('nego.close') };
   }
   const def = LEVIER_PAR_ID[levier];
   const demande = def.demander(a.offre);
@@ -244,12 +253,12 @@ export function repondreAuClub(a: Approche, levier: Levier): Reponse {
       verdict: 'accepte',
       approche,
       texte: levier === 'garantie'
-        ? `Entendu. Le coach s’engage : tu arrives pour jouer, pas pour attendre.`
+        ? t('nego.accepte.garantie')
         : levier === 'duree'
-          ? `On peut aller jusqu’à ${demande.saisons} saison${demande.saisons > 1 ? 's' : ''}. Ça nous va.`
+          ? t(demande.saisons > 1 ? 'nego.accepte.duree.pluriel' : 'nego.accepte.duree', { n: demande.saisons })
           : levier === 'prime'
-            ? `On monte la prime à ${MONNAIE(demande.prime)}. C’est notre effort.`
-            : `${MONNAIE(demande.salaire)} par saison, on peut le faire.`,
+            ? t('nego.accepte.prime', { montant: MONNAIE(demande.prime) })
+            : t('nego.accepte.salaire', { montant: MONNAIE(demande.salaire) }),
     };
   }
 
@@ -258,7 +267,7 @@ export function repondreAuClub(a: Approche, levier: Levier): Reponse {
     return {
       verdict: 'rompt',
       approche: { ...a, etat: 'rompue', patience: 0 },
-      texte: `Là, on ne se comprend plus. On va regarder ailleurs — bonne continuation.`,
+      texte: t('nego.rompt'),
     };
   }
 
@@ -270,13 +279,10 @@ export function repondreAuClub(a: Approche, levier: Levier): Reponse {
     verdict: 'contre',
     approche: { ...a, offre: bouge ? contre : a.offre, patience },
     texte: bouge
-      ? `Pas à ce prix-là. Notre dernier mot : ${MONNAIE(contre.salaire)} par saison`
-        + `${contre.prime > 0 ? `, ${MONNAIE(contre.prime)} à la signature` : ''}`
-        + `, ${contre.saisons} saison${contre.saisons > 1 ? 's' : ''}`
-        + `${contre.garantie ? ', et tu joues' : ''}.`
+      ? t('nego.contre', { termes: resumerTermes(contre) })
       : levier === 'garantie'
-        ? `Le temps de jeu, ça se prend à l’entraînement. On ne promet ça à personne.`
-        : `On ne bougera plus. L’offre reste celle qu’on t’a faite.`,
+        ? t('nego.refusGarantie')
+        : t('nego.refus'),
   };
 }
 
@@ -285,10 +291,10 @@ export function repondreAuClub(a: Approche, levier: Levier): Reponse {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Le résumé lisible d'une offre — utilisé dans les DM et le journal. */
-export function resumerTermes(t: Termes): string {
-  return `${MONNAIE(t.salaire)} par saison · ${t.saisons} saison${t.saisons > 1 ? 's' : ''}`
-    + (t.prime > 0 ? ` · ${MONNAIE(t.prime)} à la signature` : '')
-    + (t.garantie ? ' · temps de jeu garanti' : '');
+export function resumerTermes(termes: Termes): string {
+  return `${MONNAIE(termes.salaire)} ${t('nego.parSaison')} · ${termes.saisons} ${termes.saisons > 1 ? t('nego.saisons') : t('nego.saison')}`
+    + (termes.prime > 0 ? ` · ${MONNAIE(termes.prime)} ${t('nego.signature')}` : '')
+    + (termes.garantie ? ` · ${t('nego.garantie')}` : '');
 }
 
 /**

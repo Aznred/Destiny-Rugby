@@ -4,11 +4,23 @@
 // variables sont substituées AVANT le tirage des alternatives : un `{nom}`
 // niché dans une alternative casserait la reconnaissance.
 
+import { langueCourante } from '../i18n';
+import {
+  COMMENTAIRES_DIRECTS, POOLS_COMMENTAIRES,
+  type CleCommentaireDirect, type IdPoolCommentaire,
+} from '../../data/commentairesMatch';
+
 export type Variables = Record<string, string | number>;
 
 export function phrase(rng: () => number, pool: string[], v: Variables = {}): string {
-  let t = pool[Math.floor(rng() * pool.length)] ?? pool[0] ?? '';
-  for (const cle of Object.keys(v)) t = t.split(`{${cle}}`).join(String(v[cle]));
+  const langue = langueCourante();
+  const id = ID_PAR_POOL.get(pool);
+  const localise = langue !== 'fr' && id ? POOLS_COMMENTAIRES[langue][id] : pool;
+  let t = localise[Math.floor(rng() * localise.length)] ?? localise[0] ?? '';
+  for (const cle of Object.keys(v)) {
+    const valeur = cle === 'motif' ? motifLocalise(String(v[cle]), langue) : v[cle];
+    t = t.split(`{${cle}}`).join(String(valeur));
+  }
   // Alternatives « {a|b|c} », tirées après substitution.
   return t.replace(/\{([^{}]*\|[^{}]*)\}/g, (_, groupe: string) => {
     const choix = groupe.split('|');
@@ -187,3 +199,36 @@ export const ECARTEMENT = [
   'Ça écarte vite, {nom} est servi à l’aile !',
   'Surnombre au large — le ballon file jusqu’à {nom} !',
 ];
+
+const ID_PAR_POOL = new Map<string[], IdPoolCommentaire>([
+  [ESSAI, 'essai'], [ESSAI_PRECISION, 'precision'],
+  [TRANSFORMATION, 'transformation'], [TRANSFORMATION_RATEE, 'transformationRatee'],
+  [PENALITE_BUT, 'penaliteBut'], [PENALITE_RATEE, 'penaliteRatee'],
+  [DROP, 'drop'], [PENALITE, 'penalite'], [MOTIFS_PENALITE, 'motif'],
+  [PLAQUAGE, 'plaquage'], [FRANCHISSEMENT, 'franchissement'],
+  [RUCK_GRATTAGE, 'grattage'], [EN_AVANT, 'enAvant'],
+  [PIED_DEGAGEMENT, 'degagement'], [PIED_OCCUPATION, 'occupation'],
+  [PIED_CHANDELLE, 'chandelle'], [PIED_5022, 'cinquanteVingtDeux'],
+  [PIED_5022_RATE, 'cinquanteVingtDeuxRate'], [PIED_RASANT, 'rasant'],
+  [PIED_TRANSVERSALE, 'transversale'], [TOUCHE_GAGNEE, 'toucheGagnee'],
+  [TOUCHE_PERDUE, 'touchePerdue'], [MELEE_GAGNEE, 'meleeGagnee'],
+  [MELEE_DOMINEE, 'meleeDominee'], [MAUL, 'maul'], [MAUL_ESSAI, 'maulEssai'],
+  [CARTON, 'carton'], [REMPLACEMENT, 'remplacement'],
+  [PICK_AND_GO, 'pickAndGo'], [PERCUSSION, 'percussion'], [ECARTEMENT, 'ecartement'],
+]);
+
+function motifLocalise(motif: string, langue: ReturnType<typeof langueCourante>): string {
+  if (langue === 'fr') return motif;
+  const index = MOTIFS_PENALITE.indexOf(motif);
+  return index >= 0 ? (POOLS_COMMENTAIRES[langue].motif[index] ?? motif) : motif;
+}
+
+export function texteMatch(cle: CleCommentaireDirect, vars: Variables = {}): string {
+  const langue = langueCourante();
+  let texte = COMMENTAIRES_DIRECTS[langue][cle];
+  for (const [nom, valeurBrute] of Object.entries(vars)) {
+    const valeur = nom === 'motif' ? motifLocalise(String(valeurBrute), langue) : valeurBrute;
+    texte = texte.split(`{${nom}}`).join(String(valeur));
+  }
+  return texte;
+}

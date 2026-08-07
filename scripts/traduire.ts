@@ -26,10 +26,10 @@
 //
 // Lancer :
 //   node --env-file=.env.local -e ""   # (pour vérifier que la clé est là)
-//   VITE_GROQ_KEY=gsk_... npx vite-node scripts/traduire.ts
+//   GROQ_KEY=gsk_... npx vite-node scripts/traduire.ts
 //   npx vite-node scripts/traduire.ts --verifier   # ne traduit rien, liste les trous
 //
-// La clé est lue dans `VITE_GROQ_KEY` (ou `GROQ_KEY`), comme le jeu.
+// Cette clé de maintenance n'est lue que par le script et n'entre pas dans le jeu.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +44,7 @@ const PAR_PAQUET = 25;
 const CIBLES = LANGUES.filter((l) => l.id !== 'fr');
 
 const verifierSeulement = process.argv.includes('--verifier');
-const cle = process.env.VITE_GROQ_KEY ?? process.env.GROQ_KEY ?? '';
+const cle = process.env.GROQ_KEY ?? '';
 
 // ---------------------------------------------------------------------------
 // 1. OÙ SONT LES TROUS
@@ -93,7 +93,7 @@ if (verifierSeulement) process.exit(trous.length ? 1 : 0);
 
 if (!cle) {
   console.log('\n⛔ Aucune clé Groq. Relance avec :');
-  console.log('   VITE_GROQ_KEY=gsk_... npx vite-node scripts/traduire.ts');
+  console.log('   GROQ_KEY=gsk_... npx vite-node scripts/traduire.ts');
   console.log('   (une clé gratuite s\'obtient sur console.groq.com — la même que celle du jeu)');
   process.exit(1);
 }

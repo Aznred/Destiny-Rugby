@@ -14,7 +14,7 @@ juste une **base de données** et une **fonction serveur** au projet existant.
    navigateur (le jeu)              Vercel                          Postgres
 ┌──────────────────────┐   POST   ┌────────────────────────┐      ┌────────────┐
 │ FicheCarriere        │   ───→   │ api/classement.ts      │      │ pseudo     │
-│ saisons, note,       │          │ 1. débit (1/h, 10/j)   │  →   │ score      │
+│ saisons, note,       │          │ 1. débit (6/h, 40/j)   │  →   │ score      │
 │ matchs, essais,      │          │ 2. verifierFiche()     │      │ cree_le    │
 │ titres…              │          │ 3. score = RECALCULÉ   │      │ maj_le     │
 │                      │   ←───   │ 4. la fiche est jetée  │      └────────────┘
@@ -89,7 +89,7 @@ courante en tête de sa section 5.
 
 ## Étape 3 — Ajouter le sel des appareils
 
-Le débit repose sur un **haché** de l'IP et du navigateur — jamais l'IP en
+Le débit repose sur un **haché** de l'IP — jamais l'IP en
 clair. Sans sel, ce haché se retrouve par force brute en quelques secondes
 (il n'y a que 4 milliards d'IPv4) : le haché ne protégerait plus rien.
 
@@ -187,9 +187,10 @@ Ce que la fonction apporte, et qui n'est possible que côté serveur :
    âge et saisons incohérents, 900 matchs en 12 saisons, un trophée qui n'existe
    pas, un même trophée gagné deux fois dans la même saison — puis
    `scoreDeLaFiche()` recalcule. Le score annoncé n'est qu'une **comparaison**.
-2. **Le débit.** 1 envoi par heure, 10 par jour et par appareil. Une carrière
-   crédible demande des heures de jeu : personne d'honnête n'est gêné, un script
-   l'est immédiatement.
+2. **Le débit.** 6 envois par heure et 40 par jour et par adresse réseau. Cette
+   marge accepte les envois automatiques de plusieurs fins de saison dans une
+   même session ; un client ne peut pas contourner le quota en modifiant son
+   navigateur.
 3. **L'unicité du pseudo** et la conservation du **meilleur** score, faites par
    la base (`on conflict … where excluded.score > classement.score`) — donc sans
    course entre deux envois simultanés.

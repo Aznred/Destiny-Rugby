@@ -7,11 +7,10 @@ import { consigneDeLangue } from './i18n';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 export const MODELE_DEFAUT = 'llama-3.3-70b-versatile';
 
-// Clé fournie par le site via une variable d'environnement (fichier .env.local :
-// VITE_GROQ_KEY=gsk_...). Si elle est présente, les joueurs n'ont RIEN à saisir.
-// ⚠️ Une clé embarquée côté client est visible par tous et consomme ton quota.
-export const CLE_ENV: string =
-  (import.meta.env.VITE_GROQ_KEY as string | undefined)?.trim() || '';
+// ⚠️ Aucune clé de propriétaire ne doit être lue depuis `import.meta.env` :
+// toute variable `VITE_*` est copiée dans le JavaScript public. L'appel direct
+// n'utilise donc que la clé personnelle saisie par le joueur et conservée sur
+// son appareil.
 
 // ⚠️ COMPACTÉE (économie de tokens). Une fiche sur neuf lignes, renvoyée à
 // CHAQUE action, pour une information qui tient en trois. Les titres sont

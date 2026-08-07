@@ -70,7 +70,6 @@ console.log('\n=== 3. PAS DE DOUBLE COMPTAGE ===');
     nom: 'Léo Fabre', poste: 'ailier_droit', nation: 'France', age: 21,
     club: 'Stade Toulousain', division: 'top14', traits: ['professionnel', 'leader'],
   } as never);
-  useGame.setState({ rythme: 'semaine' });
   const avant = useGame.getState().joueur!;
   console.log(`  départ : ${avant.saisonEnCours?.matchs ?? 0} match, générale ${Math.round(Object.values(avant.attributs).reduce((a, b) => a + b, 0) / 8)}`);
 

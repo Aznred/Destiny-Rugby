@@ -9,6 +9,8 @@
 // notoriété qui donne accès à l'étranger, `salaire` pèse sur la négociation, et
 // `drame` est le risque d'incident médiatique à l'intersaison.
 
+import { t } from '../lib/i18n';
+
 export interface Agent {
   id: string;
   emoji: string;
@@ -65,6 +67,14 @@ export const SANS_AGENT: Agent = {
 
 export function agentDe(id?: string): Agent {
   return (id && AGENT_PAR_ID[id]) || SANS_AGENT;
+}
+
+export function nomAgent(agent: Agent): string {
+  return t(`agent.${agent.id || 'sans'}.nom`);
+}
+
+export function descriptionAgent(agent: Agent): string {
+  return t(`agent.${agent.id || 'sans'}.desc`);
 }
 
 // ---------------------------------------------------------------------------

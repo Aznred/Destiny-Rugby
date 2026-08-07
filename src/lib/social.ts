@@ -17,12 +17,15 @@ import {
   AMBIANCE, COMPTES, MOTS_INTERDITS, REPONSES_NEGATIVES, REPONSES_POSITIVES,
   TON_PAR_ID, type Compte, type TypeCompte,
 } from '../data/social';
+import {
+  ambiancesSocialesTraduites, reponsesSocialesTraduites, sanctionSociale,
+} from '../data/socialLocalise';
 import { graine } from './championnat';
 import { libelleDate, semaine } from '../data/calendrier';
 import { effetsTraits } from '../data/traits';
 import { nomDivision } from './promotion';
 import { POSTE_PAR_ID } from '../data/rugby';
-import { nomNation, nomNationTraduit } from '../components/Drapeau';
+import { nomNation, nomNationTraduit } from './nations';
 import { avatarPourCompte } from './avatars';
 import { annuaire } from './comptes';
 import { t } from './i18n';
@@ -186,7 +189,8 @@ export function publierPost(
     const compte = dispo.splice(Math.floor(rng() * dispo.length), 1)[0];
     const hostile =
       compte.type === 'hater' ? rng() < 0.85 : compte.type === 'fan' ? rng() < hostiles * 0.7 : rng() < hostiles;
-    const pool = hostile ? REPONSES_NEGATIVES[compte.type] : REPONSES_POSITIVES[compte.type];
+    const pool = reponsesSocialesTraduites(hostile)
+      ?? (hostile ? REPONSES_NEGATIVES[compte.type] : REPONSES_POSITIVES[compte.type]);
     if (!pool?.length) continue;
     // Deux fois la même phrase sous le même post, ça se voit tout de suite.
     let texte = remplacer(piocher(pool, rng), j);
@@ -261,11 +265,12 @@ export function publierPost(
     // Le club convoque. L'amende suit le salaire : elle doit piquer à tous
     // les étages de la pyramide.
     const amende = Math.max(150, Math.round((j.contrat?.salaire ?? 12_000) * 0.06));
+    const traduit = sanctionSociale(j, amende, grossier);
     retombees.sanction = {
-      titre: '⚠️ Convoqué par le club',
-      texte: grossier
+      titre: traduit?.titre ?? '⚠️ Convoqué par le club',
+      texte: traduit?.texte ?? (grossier
         ? `Ton message a fait le tour du championnat avant midi. ${j.club} publie un communiqué, te met à l’amende de ${amende.toLocaleString('fr-FR')} € et te rappelle « ce que représente le maillot ».`
-        : `Le service com’ de ${j.club} n’a pas apprécié. Amende interne de ${amende.toLocaleString('fr-FR')} €, et une discussion très fraîche avec le staff.`,
+        : `Le service com’ de ${j.club} n’a pas apprécié. Amende interne de ${amende.toLocaleString('fr-FR')} €, et une discussion très fraîche avec le staff.`),
       amende,
     };
     retombees.deltas.argent = -amende;
@@ -284,13 +289,14 @@ export function publierPost(
 
 export function feedAmbiance(j: Joueur, combien = 8): PostSocial[] {
   const posts: PostSocial[] = [];
+  const ambiances = ambiancesSocialesTraduites() ?? AMBIANCE;
   const numero = j.semaine ?? 1;
   for (let k = 0; k < combien; k++) {
     // Une graine par semaine passée : on remonte le temps pour remplir la
     // timeline avec les semaines précédentes.
     const sem = Math.max(1, numero - k);
     const rng = graine(`ambiance#${j.saison}#${sem}#${k}#${j.club}`);
-    const modele = piocher(AMBIANCE, rng);
+    const modele = piocher(ambiances, rng);
     const compte = piocher(comptesDe(modele.type), rng) ?? COMPTES[0];
     posts.push({
       id: `amb-${j.saison}-${sem}-${k}`,

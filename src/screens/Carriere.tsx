@@ -19,7 +19,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useGame, BUDGET_IA_PAR_SAISON } from '../store/useGame';
 import { PanneauJoueur } from '../components/PanneauJoueur';
 import { ClassementLateral } from '../components/ClassementLateral';
-import { demanderAuMJ, CLE_ENV } from '../lib/groq';
+import { demanderAuMJ } from '../lib/groq';
 import { genererEvenementHebdo, jugerReaction } from '../lib/ia';
 import { semaine, libelleDate } from '../data/calendrier';
 import { ATTRIBUTS_LABELS, nomPoste } from '../data/rugby';
@@ -49,7 +49,7 @@ export function Carriere({ onReglages }: Props) {
   const poserEvenementHebdo = useGame((s) => s.poserEvenementHebdo);
   const appliquerJugement = useGame((s) => s.appliquerJugement);
   const abandonnerEvenement = useGame((s) => s.abandonnerEvenement);
-  const cle = groqKey || CLE_ENV;
+  const cle = groqKey;
 
   const [texte, setTexte] = useState('');
   const [enCours, setEnCours] = useState(false);

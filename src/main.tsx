@@ -7,16 +7,23 @@ import './index.css'
 // et les drapeaux de l'écran de création restaient sans style le temps que
 // l'écran des championnats soit chargé. À l'entrée, c'est déterministe.
 import 'flag-icons/css/flag-icons.min.css'
-// Le dictionnaire est chargé AVANT le premier rendu : `t()` doit pouvoir
-// répondre dès la première ligne d'interface.
 import { chargerTextes } from './lib/i18n'
-import { TEXTES } from './data/textes'
-import App from './App.tsx'
 
-chargerTextes(TEXTES)
+// L'application et le gros dictionnaire multilingue sont deux chunks séparés,
+// chargés en parallèle. `t()` est tout de même prêt avant le premier rendu,
+// sans gonfler le fichier d'entrée au-delà du seuil de Vite.
+async function demarrer() {
+  const [{ TEXTES }, { default: App }] = await Promise.all([
+    import('./data/textes'),
+    import('./App.tsx'),
+  ])
+  chargerTextes(TEXTES)
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}
+
+void demarrer()

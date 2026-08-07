@@ -27,7 +27,7 @@ import {
 } from '../lib/international';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { Blason, LogoEquipe } from './Blason';
-import { nomNation } from './Drapeau';
+import { nomNation } from '../lib/nations';
 import { semaine, CALENDRIER, libelleSemaine } from '../data/calendrier';
 import { t } from '../lib/i18n';
 import type { Joueur } from '../types';
@@ -55,7 +55,6 @@ interface Vue {
 
 export function ClassementLateral({ joueur }: { joueur: Joueur }) {
   const setEcran = useGame((s) => s.setEcran);
-  const rythme = useGame((s) => s.rythme);
   const division = joueur.division;
 
   const vue = useMemo<Vue | null>(() => {
@@ -63,14 +62,13 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
     const numero = joueur.semaine ?? 1;
     const sem = semaine(numero);
     const bonus = bonusClubDuJoueur(joueur);
-    const rapide = rythme === 'saison';
-    const saison = rapide ? Math.max(1, joueur.saison - 1) : joueur.saison;
+    const saison = joueur.saison;
     // En bas de la pyramide, on joue le championnat TOUS les week-ends : le
     // panneau ne bascule jamais sur une coupe d'Europe qu'on ne dispute pas.
     const amateur = estAmateur(division);
 
     // ---- FENÊTRE INTERNATIONALE : le classement de MA sélection ----
-    if (!rapide && !amateur && sem.type === 'international') {
+    if (!amateur && sem.type === 'international') {
       const nation = nomNation(joueur.nation);
       const fenetre = fenetreInternationale(numero, joueur.saison, nation);
       if (fenetre && fenetre.competition.equipes.includes(nation)) {
@@ -98,7 +96,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
     }
 
     // ---- SEMAINE DE COUPE D'EUROPE : la poule de MON club ----
-    if (!rapide && !amateur && sem.type === 'coupe') {
+    if (!amateur && sem.type === 'coupe') {
       const mienne = coupesDuClub(joueur.club)[0];
       if (mienne) {
         const etat = coupeEnDirect(mienne, joueur.saison, joueur.club, passees(numero, 'coupe'));
@@ -128,9 +126,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
 
     // ---- LE RESTE DU TEMPS : son championnat ----
     const total = nombreJournees(division, joueur.club);
-    const jouees = rapide && joueur.saison > 1
-      ? total
-      : journeesALaSemaine(division, numero, total);
+    const jouees = journeesALaSemaine(division, numero, total);
     const champ = championnatEnDirect(division, saison, joueur.club, jouees, bonus);
     const phase = jouees >= total ? phaseFinale(division, saison, joueur.club, bonus) : null;
     const derniere = champ.journees[champ.journees.length - 1] ?? [];
@@ -140,7 +136,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
       titre: competition?.nom ?? 'Championnat',
       logo: competition?.id,
       emoji: competition?.emoji,
-      sousTitre: rapide ? `S${saison}` : `J${Math.min(jouees, total)}/${total}`,
+      sousTitre: `J${Math.min(jouees, total)}/${total}`,
       classement: champ.classement,
       nations: false,
       moi: joueur.club,
@@ -152,7 +148,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
         scoreE: m.scoreE, exterieur: m.exterieur,
         })),
     };
-  }, [division, joueur, rythme]);
+  }, [division, joueur]);
 
   if (!division || !vue) return null;
   const sem = semaine(joueur.semaine ?? 1);

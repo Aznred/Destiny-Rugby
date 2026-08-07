@@ -17,7 +17,7 @@
 import { calendrier, classer, graine, scorePossible, type LigneTableau, type MatchChampionnat } from './championnat';
 import { effectifDuClub, type Coequipier } from './effectif';
 import { POSTE_PAR_ID } from '../data/rugby';
-import { nomNation } from '../components/Drapeau';
+import { nomNation } from './nations';
 import { semaine, CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
 import { COMPETITIONS } from '../data/clubs';

@@ -7,7 +7,8 @@ import { COMPETITIONS, CLUBS_FRANCE_PAR_DIVISION } from '../data/clubs';
 import { TRAITS, MAX_TRAITS, descriptionTrait, nomTrait } from '../data/traits';
 import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
-import { Drapeau, nomNationTraduit } from '../components/Drapeau';
+import { Drapeau } from '../components/Drapeau';
+import { nomNationTraduit } from '../lib/nations';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import type { PosteId } from '../types';
@@ -91,7 +92,7 @@ export function Creation() {
       transition={{ duration: 0.4 }}
     >
       <button className="btn fantome" onClick={() => setEcran('accueil')} style={{ marginBottom: '1rem' }}>
-        ← {t('gen.retour')}
+        {t('gen.retour')}
       </button>
       <div className="eyebrow">{t('cr.eyebrow')}</div>
       <h1>{t('cr.titre')}</h1>

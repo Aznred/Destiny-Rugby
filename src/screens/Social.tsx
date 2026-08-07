@@ -27,15 +27,14 @@ import { clubParNom } from '../data/clubs';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { TONS } from '../data/social';
-import { LEVIERS, resumerTermes } from '../lib/negociation';
-import { AGENT_PAR_ID, niveauPourAgent, SEUIL_AGENT } from '../data/agents';
+import { LEVIERS, nomLevier, phraseLevier, resumerTermes } from '../lib/negociation';
+import { AGENT_PAR_ID, descriptionAgent, niveauPourAgent, nomAgent, SEUIL_AGENT } from '../data/agents';
 import { cote } from '../lib/offres';
 import { compact, estCertifie, LIMITE_CARACTERES, pseudoDe, tendances } from '../lib/social';
 import { annuaire, chercherComptes, chercherPosts, banniereDe, BANNIERES } from '../lib/comptes';
 import { humeur } from '../lib/vie';
 import { SUCCES, descriptionSucces, nomSucces, texteDefi } from '../data/succes';
 import { defisDeLaSemaine, cleSemaine, progression } from '../lib/succes';
-import { CLE_ENV } from '../lib/groq';
 import { chercherMedias, reduirePourAvatar, vignetteLocale, type Media as MediaTrouve } from '../lib/images';
 import { semaine, libelleSemaine } from '../data/calendrier';
 import { avatarInitiales } from '../lib/avatars';
@@ -289,7 +288,7 @@ function Post({
           {post.action?.type === 'transfert' && post.action.joueur && (
             <div className="x-annonce">
               🔁 <b>{post.action.joueur}</b> — {post.action.de} → {post.action.vers}
-              <span>transfert appliqué au jeu</span>
+              <span>{t('ov.transfertApplique')}</span>
             </div>
           )}
           <div className="x-actions">
@@ -803,8 +802,8 @@ function Negociation({ pseudo }: { pseudo: string }) {
   if (accord) {
     return (
       <div className="x-nego x-nego-accord">
-        🤝 <b>Accord trouvé</b> — {resumerTermes(accord.offre)}.
-        <span>Le transfert s’officialise à l’intersaison. D’ici là, tu finis ta saison.</span>
+        🤝 <b>{t('ov.accordTrouve')}</b> — {resumerTermes(accord.offre)}.
+        <span>{t('ov.accordIntersaison')}</span>
       </div>
     );
   }
@@ -813,7 +812,7 @@ function Negociation({ pseudo }: { pseudo: string }) {
   return (
     <div className="x-nego">
       <div className="x-nego-tete">
-        <b>{approche.prolongation ? '📄 Prolongation' : '✍️ Proposition de contrat'}</b>
+        <b>{approche.prolongation ? `📄 ${t('ov.prolongation')}` : `✍️ ${t('ov.propositionContrat')}`}</b>
         {/* La patience se voit : c'est le seul indice sur ce qu'il reste à jouer. */}
         <span className="x-nego-patience" title={t('ov.patienceAide')}>
           {'●'.repeat(Math.max(0, approche.patience))}
@@ -827,23 +826,23 @@ function Negociation({ pseudo }: { pseudo: string }) {
             key={l.id}
             type="button"
             onClick={() => repondre(approche.id, l.id)}
-            title={tn('ov.coutPatience', l.cout, { phrase: l.phrase })}
+            title={tn('ov.coutPatience', l.cout, { phrase: phraseLevier(l.id) })}
             disabled={l.id === 'garantie' && approche.offre.garantie}
           >
-            {l.emoji} {l.nom}
+            {l.emoji} {nomLevier(l.id)}
           </button>
         ))}
       </div>
       <div className="x-nego-fin">
         <button className="x-nego-oui" onClick={() => accepter(approche.id)}>
-          🤝 Accepter cette offre
+          🤝 {t('ov.accepterOffre')}
         </button>
         {confirme ? (
           <button className="x-nego-non" onClick={() => refuser(approche.id)}>
-            Confirmer le refus
+            {t('ov.confirmerRefus')}
           </button>
         ) : (
-          <button className="x-nego-non" onClick={() => setConfirme(true)}>Décliner</button>
+          <button className="x-nego-non" onClick={() => setConfirme(true)}>{t('ov.decliner')}</button>
         )}
       </div>
     </div>
@@ -869,22 +868,22 @@ function CabinetAgent({ pseudo }: { pseudo: string }) {
   return (
     <div className="x-nego">
       <div className="x-nego-tete">
-        <b>{agent.emoji} {agent.nom}</b>
+        <b>{agent.emoji} {nomAgent(agent)}</b>
         <span className="x-nego-patience">
-          niveau {Math.round(niveau)} / {Math.round(seuil)}
+          {t('ov.niveauAgent', { niveau: Math.round(niveau), seuil: Math.round(seuil) })}
         </span>
       </div>
       <p className="x-nego-offre">
-        {agent.desc} Commission : {Math.round(agent.commission * 100)} % du salaire.
+        {descriptionAgent(agent)} {t('ov.commissionAgent', { n: Math.round(agent.commission * 100) })}
       </p>
       <div className="x-nego-fin">
         {sien ? (
           <button className="x-nego-non" onClick={() => choisir('')}>
-            Rompre le mandat
+            {t('ov.rompreMandat')}
           </button>
         ) : (
           <button className="x-nego-oui" onClick={() => choisir(agent.id)}>
-            🤝 Lui confier mes intérêts
+            🤝 {t('ov.confierInterets')}
           </button>
         )}
       </div>
@@ -926,7 +925,10 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
       // démarche écrivaient donc dans le vide. Même principe que `compteDepuis`
       // pour les profils : on fabrique une fiche minimale plutôt que rien.
       const nom = p.startsWith('agent:')
-        ? AGENT_PAR_ID[p.slice('agent:'.length)]?.nom ?? p
+        ? (() => {
+            const agent = AGENT_PAR_ID[p.slice('agent:'.length)];
+            return agent ? nomAgent(agent) : p;
+          })()
         : p.replace(/_officiel$/, '').replace(/_/g, ' ');
       return { pseudo: p, nom, avatar: '💼', type: 'media' } as CompteSuivi;
     }).sort((a, b) => {
@@ -1060,7 +1062,7 @@ export function Social() {
   const [profilVu, setProfilVu] = useState<string | null>(null);
   const [messageAvec, setMessageAvec] = useState<string | null>(null);
 
-  const avecIA = !!(groqKey || CLE_ENV);
+  const avecIA = !!groqKey;
 
   // LE FIL SUIT LE CALENDRIER, PAS L'HORLOGE.
   //

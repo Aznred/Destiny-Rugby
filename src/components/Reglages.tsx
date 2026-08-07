@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
-import { MODELE_DEFAUT, CLE_ENV, consoGroq, reinitialiserConsoGroq } from '../lib/groq';
+import { MODELE_DEFAUT, consoGroq, reinitialiserConsoGroq } from '../lib/groq';
 import type { Theme } from '../types';
 import { LANGUES, nombre, t, tn } from '../lib/i18n';
+import { useModalDialog } from '../lib/useModalDialog';
 
 const MODELES = [
   { id: 'llama-3.3-70b-versatile', nom: 'Llama 3.3 70B', qualificatif: 'reg.recommande' },
@@ -36,7 +38,12 @@ export function Reglages({ onFermer }: Props) {
   const setTenorKey = useGame((s) => s.setTenorKey);
 
   const [cleLocale, setCleLocale] = useState(groqKey);
+  const [modeleLocal, setModeleLocal] = useState(modele || MODELE_DEFAUT);
+  const [tenorLocal, setTenorLocal] = useState(tenorKey);
+  const [langueLocale, setLangueLocale] = useState(langue);
+  const [themeLocal, setThemeLocal] = useState(theme);
   const [voir, setVoir] = useState(false);
+  const { overlayRef, dialogRef } = useModalDialog(onFermer);
   // Le compteur vit dans un module : on le lit à l'ouverture du panneau, et on
   // force un rendu quand on le remet à zéro.
   const [, rafraichir] = useState(0);
@@ -47,32 +54,35 @@ export function Reglages({ onFermer }: Props) {
 
   const enregistrer = () => {
     setGroqKey(cleLocale.trim());
+    setModele(modeleLocal);
+    setTenorKey(tenorLocal.trim());
+    setLangue(langueLocale);
+    setTheme(themeLocal);
     onFermer();
   };
 
-  return (
-    <div className="overlay" onClick={onFermer}>
+  return createPortal(
+    <div ref={overlayRef} className="overlay" onClick={onFermer}>
       <motion.div
+        ref={dialogRef}
         className="carte modale"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reglages-titre"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, y: 20, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.22 }}
       >
         <div className="eyebrow">{t('reg.eyebrow')}</div>
-        <h2>{t('reg.titre')}</h2>
-        {CLE_ENV ? (
-          <p className="aide">
-            ✅ {t('reg.cleFournie')}
-          </p>
-        ) : (
-          <p className="aide">
-            {t('reg.cleAide')} {' '}
-            <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">
-              console.groq.com/keys
-            </a>.
-          </p>
-        )}
+        <h2 id="reglages-titre">{t('reg.titre')}</h2>
+        <p className="aide">
+          {t('reg.cleAide')} {' '}
+          <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">
+            console.groq.com/keys
+          </a>.
+        </p>
 
         <div className="champ">
           <label htmlFor="cle">{t('reg.cleApi')}</label>
@@ -110,8 +120,8 @@ export function Reglages({ onFermer }: Props) {
           <label htmlFor="modele">{t('reg.modele')}</label>
           <select
             id="modele"
-            value={modele || MODELE_DEFAUT}
-            onChange={(e) => setModele(e.target.value)}
+            value={modeleLocal}
+            onChange={(e) => setModeleLocal(e.target.value)}
           >
             {MODELES.map((m) => (
               <option key={m.id} value={m.id}>
@@ -146,9 +156,9 @@ export function Reglages({ onFermer }: Props) {
           <input
             id="tenor"
             type="password"
-            value={tenorKey}
+            value={tenorLocal}
             placeholder={t('reg.tenorPlaceholder')}
-            onChange={(e) => setTenorKey(e.target.value.trim())}
+            onChange={(e) => setTenorLocal(e.target.value)}
           />
           <p className="aide">{t('reg.tenorAide')}</p>
         </div>
@@ -164,9 +174,9 @@ export function Reglages({ onFermer }: Props) {
               <button
                 key={l.id}
                 type="button"
-                className={langue === l.id ? 'actif' : ''}
-                onClick={() => setLangue(l.id)}
-                aria-pressed={langue === l.id}
+                className={langueLocale === l.id ? 'actif' : ''}
+                onClick={() => setLangueLocale(l.id)}
+                aria-pressed={langueLocale === l.id}
                 lang={l.id}
               >
                 <span className={`fi fi-${l.drapeau}`} aria-hidden="true" />
@@ -187,9 +197,9 @@ export function Reglages({ onFermer }: Props) {
               <button
                 key={a.id}
                 type="button"
-                className={theme === a.id ? 'actif' : ''}
-                onClick={() => setTheme(a.id)}
-                aria-pressed={theme === a.id}
+                className={themeLocal === a.id ? 'actif' : ''}
+                onClick={() => setThemeLocal(a.id)}
+                aria-pressed={themeLocal === a.id}
                 title={t(a.cle)}
               >
                 <span className="pastille-theme" style={{ background: a.apercu }} />
@@ -234,6 +244,7 @@ export function Reglages({ onFermer }: Props) {
           </button>
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body,
   );
 }

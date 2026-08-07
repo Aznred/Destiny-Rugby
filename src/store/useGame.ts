@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
   Attributs,
   Ecran,
@@ -11,7 +11,6 @@ import type {
   PreAccord,
   TitreGagne,
   Blessure,
-  Rythme,
   Theme,
   StatsDetaillees,
   PosteId,
@@ -40,7 +39,7 @@ import {
 // `simulerStatsJournee` le charge donc À LA DEMANDE (`import()`), et seule la
 // petite fonction `estTitulaire` — qui n'a aucune dépendance — reste statique.
 import { estTitulaire } from '../lib/moteur/titulaire';
-import { definirLangue, langueDuNavigateur, t, type Langue } from '../lib/i18n';
+import { definirLangue, langueDuNavigateur, nombre, t, type Langue } from '../lib/i18n';
 import type { LigneReelle } from '../lib/moteur/saison';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import { ficheDepuisJoueur, scoreDeLaFiche } from '../lib/classementMondial';
@@ -50,6 +49,23 @@ import {
   internationalEnDirect, equipeU20,
 } from '../lib/international';
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
+
+// Les journées complètes utilisent le moteur lourd chargé à la demande. Une
+// file unique empêche plusieurs clics rapides (ou une avance calendrier) de
+// rejouer en parallèle la même journée et d'écraser leurs cumuls respectifs.
+let fileStatsReelles: Promise<void> = Promise.resolve();
+
+// Les scripts de vérification et le rendu serveur n'ont pas de localStorage.
+// Un stockage mémoire silencieux garde alors exactement la même API sans
+// inonder la sortie d'avertissements ni faire échouer l'import du store.
+const memoireHorsNavigateur = new Map<string, string>();
+const stockageJeu = createJSONStorage(() => (typeof localStorage !== 'undefined'
+  ? localStorage
+  : {
+      getItem: (nom: string) => memoireHorsNavigateur.get(nom) ?? null,
+      setItem: (nom: string, valeur: string) => { memoireHorsNavigateur.set(nom, valeur); },
+      removeItem: (nom: string) => { memoireHorsNavigateur.delete(nom); },
+    }));
 
 // Combien de week-ends de ce type se sont écoulés AVANT cette semaine.
 function passeesDuType(numeroSemaine: number, type: string): number {
@@ -66,7 +82,7 @@ import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS, nomPoste } from '../data/r
 import {
   retourDeMatch, BUDGET_MATCHS_PAR_SAISON, type StatsMatchJoueur,
 } from '../lib/moteur/apresMatch';
-import { MODELE_DEFAUT, plafonnerDeltas, ressembleATriche, CLE_ENV } from '../lib/groq';
+import { MODELE_DEFAUT, plafonnerDeltas, ressembleATriche } from '../lib/groq';
 import { EVENEMENTS, traduireEvenement } from '../data/evenements';
 import { situationPour, versScenario, type ConsequenceDure } from '../data/situations';
 import { appliquerConsequence, lireDerapage, consequenceDuDerapage } from '../lib/consequences';
@@ -76,9 +92,9 @@ import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../
 import { forceEffectif, forceMoyenneDivision, noteDuClub, setTransfertsSociaux, effectifDuClub } from '../lib/effectif';
 import { evoluer } from '../lib/progression';
 import { genererOffres, offreProlongation, cote } from '../lib/offres';
-import { agentsAccessibles, niveauPourAgent, SEUIL_AGENT } from '../data/agents';
+import { agentsAccessibles, descriptionAgent, niveauPourAgent, nomAgent, SEUIL_AGENT } from '../data/agents';
 import {
-  approcheDepuisOffre, confianceALArrivee, repondreAuClub, resumerTermes,
+  approcheDepuisOffre, confianceALArrivee, phraseLevier, repondreAuClub, resumerTermes,
   LEVIER_PAR_ID, type Approche, type Levier, type Reponse,
 } from '../lib/negociation';
 import {
@@ -90,7 +106,7 @@ import {
   estIndividuel,
 } from '../data/trophees';
 import { decernerHonneurs, noterSaisonIndividuelle, BARRES_HONNEURS } from '../lib/honneurs';
-import { nomNation } from '../components/Drapeau';
+import { nomNation } from '../lib/nations';
 import {
   semaine, libelleDate, SEMAINES_PAR_SAISON, estAnneeDeCoupeDuMonde, type Semaine,
 } from '../data/calendrier';
@@ -442,7 +458,6 @@ interface GameState {
    * carrière » a été supprimé, tout se négocie en message privé sur L'Ovale.
    */
   approches: Approche[];
-  rythme: Rythme; // « semaine » = calendrier réel, « saison » = simulation rapide
   // ⚠️ L'AMBIANCE DU SITE (demande explicite). Elle ne touche QUE la rampe de
   // fond (les variables `--pelouse-*` d'index.css) : l'or, le cuir et la craie
   // ne bougent pas, sinon on perdrait l'identité « stade nocturne » du jeu.
@@ -485,7 +500,6 @@ interface GameState {
     semaines: number;
     arret: 'arrive' | 'question' | 'saison' | 'contrat' | 'fin';
   };
-  setRythme: (r: Rythme) => void;
   setTheme: (t: Theme) => void;
   setLangue: (l: Langue) => void;
   entrainer: (attribut: keyof Attributs) => void;
@@ -592,7 +606,6 @@ export const useGame = create<GameState>()(
       compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
       tropheesEnAttente: [],
       approches: [],
-      rythme: 'semaine',
       theme: 'vert',
       langue: langueDuNavigateur(),
       mouvementsClubs: {},
@@ -831,23 +844,14 @@ export const useGame = create<GameState>()(
           get().prendreRetraite();
           return;
         }
-        // Matchs et essais DE LA SAISON écoulée : le temps de jeu dépend du
-        // niveau du joueur face à son groupe, les essais de son poste et de sa
-        // finition. Ces deux chiffres pèsent ensuite sur le résultat du club.
+        // La saison a réellement été jouée journée après journée. Une vieille
+        // sauvegarde privée de bilan ne doit surtout pas recevoir des matchs et
+        // essais inventés : l'absence de donnée vaut zéro, puis la nouvelle
+        // saison repart avec un bilan propre.
         const forceGroupe = forceEffectif(joueur.club, joueur.saison);
-        const perso = noteGlobale(joueur) * 0.7 + joueur.reputation * 0.3;
-
-        // En mode « journée par journée », la saison a VRAIMENT été jouée :
-        // on reprend les matchs, essais et notes accumulés semaine après
-        // semaine. En mode rapide, on les simule d'un bloc.
         const vecu = joueur.saisonEnCours;
-        const titularisation = Math.max(0.15, Math.min(1, 0.5 + (perso - forceGroupe) / 20));
-        const matchsSaison = vecu ? vecu.matchs : Math.round((6 + Math.random() * 16) * titularisation);
-        const essaisSaison = vecu
-          ? vecu.essais
-          : Math.round(
-              matchsSaison * ESSAIS_PAR_MATCH[joueur.poste] * (0.5 + noteGlobale(joueur) / 100) * (0.5 + Math.random()),
-            );
+        const matchsSaison = vecu?.matchs ?? 0;
+        const essaisSaison = vecu?.essais ?? 0;
         const noteMatchs = vecu?.notes.length
           ? vecu.notes.reduce((a, b) => a + b, 0) / vecu.notes.length
           : undefined;
@@ -1210,8 +1214,10 @@ export const useGame = create<GameState>()(
             id: idUnique(),
             saison: j.saison,
             role: 'systeme',
-            titre: `${agent.emoji} Commission d’agent`,
-            texte: `${agent.nom} prélève ${Math.round(agent.commission * 100)} % de ton salaire, soit ${commission.toLocaleString('fr-FR')} €. C'est le prix du carnet d'adresses.`,
+            titre: `${agent.emoji} ${t('agent.commission.titre')}`,
+            texte: t('agent.commission.texte', {
+              agent: nomAgent(agent), taux: Math.round(agent.commission * 100), commission: nombre(commission),
+            }),
             deltas: { argent: -commission },
           });
         }
@@ -1235,8 +1241,8 @@ export const useGame = create<GameState>()(
             id: idUnique(),
             saison: j.saison,
             role: 'mj',
-            titre: '📰 Ton agent fait parler de lui',
-            texte: `${agent.nom} a lâché dans la presse que tu « méritais mieux que ce club ». Tu n'étais pas au courant. Le vestiaire, lui, a lu l'article.`,
+            titre: `📰 ${t('agent.drame.titre')}`,
+            texte: t('agent.drame.texte', { agent: nomAgent(agent) }),
             deltas: degats,
           });
         }
@@ -1452,8 +1458,6 @@ export const useGame = create<GameState>()(
 
       fermerTrophee: () =>
         set((s) => ({ tropheesEnAttente: s.tropheesEnAttente.slice(1) })),
-
-      setRythme: (rythme) => set({ rythme }),
 
       // Le thème vit sur <html data-theme="…"> : le CSS fait tout le reste,
       // et le fond change sans qu'un seul composant soit re-rendu.
@@ -1914,7 +1918,7 @@ export const useGame = create<GameState>()(
             ...s.conversations,
             [a.pseudo]: [
               ...(s.conversations[a.pseudo] ?? []),
-              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: def.phrase, saison: joueur.saison, creeLe: Date.now(), lu: true },
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: phraseLevier(def.id), saison: joueur.saison, creeLe: Date.now(), lu: true },
               { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: r.texte, saison: joueur.saison, creeLe: Date.now(), lu: false },
             ],
           },
@@ -2299,9 +2303,8 @@ export const useGame = create<GameState>()(
             joueur: appliquerDeltas(joueur, { moral: -4 }),
             journal: [...s.journal, {
               id: idUnique(), saison: joueur.saison, role: 'mj' as const,
-              titre: `${agent.emoji} ${agent.nom} décline`,
-              texte: `« Rappelle-moi quand tu auras franchi un palier. » `
-                + `Il te faut environ ${Math.round(seuil)} de niveau ; tu es à ${Math.round(niveau)}.`,
+              titre: `${agent.emoji} ${t('agent.decline.titre', { agent: nomAgent(agent) })}`,
+              texte: t('agent.decline.texte', { seuil: Math.round(seuil), niveau: Math.round(niveau) }),
               deltas: { moral: -4 },
             }],
           }));
@@ -2312,8 +2315,8 @@ export const useGame = create<GameState>()(
           joueur: { ...joueur, agent: agent.id },
           journal: [...s.journal, {
             id: idUnique(), saison: joueur.saison, role: 'systeme' as const,
-            titre: `${agent.emoji} ${agent.nom} te représente`,
-            texte: `${agent.desc} Commission : ${Math.round(agent.commission * 100)} % de ton salaire.`,
+            titre: `${agent.emoji} ${t('agent.represente.titre', { agent: nomAgent(agent) })}`,
+            texte: `${descriptionAgent(agent)} ${t('ov.commissionAgent', { n: Math.round(agent.commission * 100) })}`,
           }],
         }));
         return true;
@@ -2338,9 +2341,8 @@ export const useGame = create<GameState>()(
             joueur: { ...joueur, agent: undefined, derniereSaisonRatee: true },
             journal: [...s.journal, {
               id: idUnique(), saison: joueur.saison, role: 'mj' as const,
-              titre: `${actuel.emoji} ${actuel.nom} te lâche`,
-              texte: `« Deux saisons comme ça, je ne peux plus rien vendre. » `
-                + `Tu repars sans agent — et le marché va te le faire sentir.`,
+              titre: `${actuel.emoji} ${t('agent.quitte.titre', { agent: nomAgent(actuel) })}`,
+              texte: t('agent.quitte.texte'),
             }],
           }));
           return;
@@ -2359,24 +2361,23 @@ export const useGame = create<GameState>()(
               ...(s.conversations[pseudo] ?? []),
               {
                 id: idUnique(), pseudo, de: 'lui' as const, saison: joueur.saison,
-                texte: `${joueur.nom} ? ${mieux.nom}. On suit ta saison de près. `
-                  + `Si tu cherches quelqu'un pour défendre tes intérêts, je prends `
-                  + `${Math.round(mieux.commission * 100)} % — et je t'ouvre des portes que tu n'as pas.`,
+                texte: t('agent.contact.texte', {
+                  joueur: joueur.nom, agent: nomAgent(mieux), taux: Math.round(mieux.commission * 100),
+                }),
                 creeLe: Date.now(), lu: false,
               },
             ],
           },
           notifsSocial: [{
             id: idUnique(), emoji: mieux.emoji,
-            titre: `${mieux.nom} te contacte`,
-            texte: 'Un agent s’intéresse à toi.',
+            titre: t('agent.contact.titre', { agent: nomAgent(mieux) }),
+            texte: t('agent.contact.notif'),
             saison: joueur.saison, creeLe: Date.now(), lue: false,
           }, ...s.notifsSocial].slice(0, 40),
           journal: [...s.journal, {
             id: idUnique(), saison: joueur.saison, role: 'mj' as const,
-            titre: `${mieux.emoji} ${mieux.nom} te contacte`,
-            texte: `Ton niveau attire un autre calibre d'agent. Il t'a écrit sur 𝕏 L'Ovale — `
-              + `à toi de voir si tu changes de crèmerie.`,
+            titre: `${mieux.emoji} ${t('agent.contact.titre', { agent: nomAgent(mieux) })}`,
+            texte: t('agent.contact.journal'),
           }],
         }));
       },
@@ -2553,7 +2554,7 @@ export const useGame = create<GameState>()(
         // Avec une clé, ce sont de VRAIS commentaires, écrits par l'IA pour ce
         // post précis. Sans clé, on garde les réponses du pool (le jeu doit
         // rester jouable hors ligne).
-        const cle = get().groqKey || CLE_ENV;
+        const cle = get().groqKey;
         if (cle) {
           try {
             set({ chargementSocial: true, erreurSocial: null });
@@ -2656,7 +2657,7 @@ export const useGame = create<GameState>()(
       rafraichirFil: async () => {
         const { joueur, comptesSuivis, modele } = get();
         if (!joueur) return;
-        const cle = get().groqKey || CLE_ENV;
+        const cle = get().groqKey;
         if (!cle) {
           const secours = feedAmbiance(joueur, 6);
           set((s) => ({ posts: fusionner(secours, s.posts) }));
@@ -2876,7 +2877,7 @@ export const useGame = create<GameState>()(
           pseudo: cible.pseudo, nom: cible.auteur, avatar: cible.avatar,
           type: (cible.type as CompteSuivi['type']) ?? 'fan', abonnes: 2000,
         };
-        const cleIA = get().groqKey || CLE_ENV;
+        const cleIA = get().groqKey;
         let reponse = '';
         if (cleIA) {
           set({ chargementSocial: true, erreurSocial: null });
@@ -3035,7 +3036,7 @@ export const useGame = create<GameState>()(
           return;
         }
 
-        const cle = get().groqKey || CLE_ENV;
+        const cle = get().groqKey;
         let reponse = '';
         if (cle) {
           set({ chargementSocial: true, erreurSocial: null });
@@ -3275,26 +3276,33 @@ export const useGame = create<GameState>()(
       // match qu'on regarde, mais sans aucun rendu. Comme la graine est celle du
       // championnat, le match suivi en direct et celui rejoué ici sont
       // rigoureusement identiques : rien n'est compté deux fois.
-      simulerStatsJournee: async () => {
+      simulerStatsJournee: () => {
         const joueur = get().joueur;
         const division = joueur?.division;
-        if (!joueur || !division) return;
-        const sem = semaine(joueur.semaine ?? 1);
+        if (!joueur || !division) return Promise.resolve();
+        fileStatsReelles = fileStatsReelles.catch(() => {}).then(async () => {
+          // Les saisons précédentes n'alimentent plus l'écran courant. Les
+          // ignorer évite qu'une avance très rapide laisse des simulations
+          // obsolètes tourner plusieurs minutes après l'arrivée.
+          const actuel = get().joueur;
+          if (!actuel || actuel.saison !== joueur.saison || actuel.club !== joueur.club) return;
+          await new Promise<void>((resoudre) => setTimeout(resoudre, 0));
+          const sem = semaine(joueur.semaine ?? 1);
         // ⚠️ LE MOTEUR EST CHARGÉ ICI, PAS AU DÉMARRAGE. C'est le seul endroit
         // du store qui en a besoin : le sortir du chunk principal enlève
         // 3 500 lignes du premier chargement, pour un import qui arrive bien
         // avant que la simulation ne soit visible.
-        const { cumuler, simulerJournee, simulerJourneeCoupe, simulerJourneeInternationale }
-          = await import('../lib/moteur/saison');
-        const avatar = {
-          club: joueur.club, nom: joueur.nom, poste: joueur.poste,
-          attributs: joueur.attributs,
-        };
+          const { cumuler, simulerJournee, simulerJourneeCoupe, simulerJourneeInternationale }
+            = await import('../lib/moteur/saison');
+          const avatar = {
+            club: joueur.club, nom: joueur.nom, poste: joueur.poste,
+            attributs: joueur.attributs,
+          };
 
         // ⚠️ UNE SEMAINE EUROPÉENNE OU INTERNATIONALE A AUSSI SES STATISTIQUES.
         // Elles n'existaient pas : le joueur était le seul de la compétition à
         // avoir des chiffres après un match de coupe ou de sélection.
-        if (sem.type === 'coupe' && !estAmateur(division)) {
+          if (sem.type === 'coupe' && !estAmateur(division)) {
           const coupes = coupesDuClub(joueur.club);
           if (!coupes.length) return;
           const journee = passeesDuType(joueur.semaine ?? 1, 'coupe') + 1;
@@ -3307,9 +3315,9 @@ export const useGame = create<GameState>()(
             statsReelles: { ...s.statsReelles, [cleC]: cumuler(s.statsReelles[cleC] ?? {}, lignesC) },
             journeesReelles: { ...s.journeesReelles, [cleC]: journee },
           }));
-          return;
-        }
-        if (sem.type === 'international' && !estAmateur(division)) {
+            return;
+          }
+          if (sem.type === 'international' && !estAmateur(division)) {
           // ⚠️ On rejoue la fenêtre où le joueur est RÉELLEMENT engagé : chez les
           // A s'il y est appelé, sinon chez les U20 s'il y a l'âge et le niveau.
           const nation = nomNation(joueur.nation);
@@ -3336,14 +3344,14 @@ export const useGame = create<GameState>()(
             statsReelles: { ...s.statsReelles, [cleI]: cumuler(s.statsReelles[cleI] ?? {}, lignesI) },
             journeesReelles: { ...s.journeesReelles, [cleI]: fen.journee },
           }));
-          return;
-        }
+            return;
+          }
 
-        const affiche = matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur));
-        if (!affiche) return; // pas de journée cette semaine
-        const cle = `${division}#${joueur.saison}`;
-        const dejaFaites = get().journeesReelles[cle] ?? 0;
-        if (dejaFaites >= affiche.journee) return; // journée déjà simulée
+          const affiche = matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur));
+          if (!affiche) return; // pas de journée cette semaine
+          const cle = `${division}#${joueur.saison}`;
+          const dejaFaites = get().journeesReelles[cle] ?? 0;
+          if (dejaFaites >= affiche.journee) return; // journée déjà simulée
 
         // ⚠️ ON RATTRAPE LES JOURNÉES MANQUANTES, ON NE SAUTE PLUS À LA
         // DERNIÈRE. Depuis qu'on peut avancer de plusieurs semaines d'un coup
@@ -3363,19 +3371,19 @@ export const useGame = create<GameState>()(
         // stats »). Depuis que l'avance par le calendrier est LE moyen d'aller
         // vite, sauter dix journées est courant : borner à 6 laissait des trous
         // systématiques. Douze journées couvrent un saut d'une demi-saison.
-        const MAX_RATTRAPAGE = 12;
-        const premiere = Math.max(dejaFaites + 1, affiche.journee - MAX_RATTRAPAGE + 1);
-        if (premiere > dejaFaites + 1) {
-          console.info(
-            `[stats] journées ${dejaFaites + 1} à ${premiere - 1} non rejouées `
-            + `(rattrapage borné à ${MAX_RATTRAPAGE} journées).`,
-          );
-        }
+          const MAX_RATTRAPAGE = 12;
+          const premiere = Math.max(dejaFaites + 1, affiche.journee - MAX_RATTRAPAGE + 1);
+          if (premiere > dejaFaites + 1) {
+            console.info(
+              `[stats] journées ${dejaFaites + 1} à ${premiere - 1} non rejouées `
+              + `(rattrapage borné à ${MAX_RATTRAPAGE} journées).`,
+            );
+          }
 
-        const poules = poulesDe(division);
-        const numeroPoule = poules.length > 1
-          ? Math.max(0, indexPoule(division, joueur.club)) : undefined;
-        for (let journee = premiere; journee <= affiche.journee; journee++) {
+          const poules = poulesDe(division);
+          const numeroPoule = poules.length > 1
+            ? Math.max(0, indexPoule(division, joueur.club)) : undefined;
+          for (let journee = premiere; journee <= affiche.journee; journee++) {
           // ⚠️ ON REND LA MAIN ENTRE DEUX JOURNÉES. Rejouer une journée, c'est
           // huit matchs par le moteur complet : ~0,9 s de JavaScript synchrone.
           // Douze d'affilée, et l'onglet se fige dix secondes sans rien
@@ -3398,14 +3406,16 @@ export const useGame = create<GameState>()(
               titulaire: estTitulaire(joueur, cleMatch),
             },
           );
-          set((s) => ({
+            set((s) => ({
             // ⚠️ On ne garde que la saison EN COURS : accumuler tout l'historique
             // ferait exploser le quota du localStorage. La coupe et la sélection
             // ont chacune leur clé, elles cohabitent avec le championnat.
             statsReelles: { ...s.statsReelles, [cle]: cumuler(s.statsReelles[cle] ?? {}, lignes) },
             journeesReelles: { ...s.journeesReelles, [cle]: journee },
-          }));
-        }
+            }));
+          }
+        });
+        return fileStatsReelles;
       },
 
       signalerDefi: (evenement) => {
@@ -3456,7 +3466,8 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 4,
+      version: 5,
+      storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
       // ⚠️ Version 3 : on RÉPARE aussi les données abîmées (poste inconnu,
@@ -3482,6 +3493,7 @@ export const useGame = create<GameState>()(
           relationsSociales?: Record<string, number>;
           evenementHebdo?: EvenementHebdo | null;
           evenementsVus?: string[];
+          rythme?: unknown;
         };
         if (!s) return s;
         if (version < 2 && s.joueur) {
@@ -3550,6 +3562,10 @@ export const useGame = create<GameState>()(
         // fin de saison en régénère aussitôt — c'est mieux que de convertir des
         // cartes en négociations qui n'ont jamais eu lieu.
         s.approches ??= [];
+        // Le mode de simulation saison par saison a été supprimé. On enlève
+        // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
+        // réactiver une branche obsolète après fusion par Zustand.
+        delete s.rythme;
         return s;
       },
       // La pyramide (qui joue dans quelle division) vit dans un registre de
@@ -3584,7 +3600,6 @@ export const useGame = create<GameState>()(
         compteurs: s.compteurs,
         tropheesEnAttente: s.tropheesEnAttente,
         approches: s.approches,
-        rythme: s.rythme,
         theme: s.theme,
         langue: s.langue,
         mouvementsClubs: s.mouvementsClubs,

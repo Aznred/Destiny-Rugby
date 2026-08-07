@@ -7,7 +7,7 @@ import { championnatEnDirect, nombreJournees } from '../src/lib/championnat';
 import { COUPES_EUROPE } from '../src/data/mondeReel';
 import { COMPETITIONS } from '../src/data/clubs';
 import { POSTE_PAR_ID, migrerPoste } from '../src/data/rugby';
-import { nomNation } from '../src/components/Drapeau';
+import { nomNation } from '../src/lib/nations';
 import { LEGENDES_FICTIVES } from '../src/data/legendes';
 
 const SAISON = 1;

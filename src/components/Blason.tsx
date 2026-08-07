@@ -1,7 +1,7 @@
 import type { Club } from '../types';
 import { LOGO_PAR_EQUIPE } from '../data/mondeReel';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
-import { nomNation } from './Drapeau';
+import { nomNation } from '../lib/nations';
 
 // ⚠️ DEUX SOURCES D'ÉCUSSONS DE SÉLECTION. Les compétitions historiques
 // viennent de `mondeReel.ts`, les treize nouvelles (Rugby Europe Conference,
