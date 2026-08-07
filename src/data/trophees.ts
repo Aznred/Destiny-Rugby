@@ -2,7 +2,6 @@
 // (public/m3d/*.glb, compressé Draco) affiché en animation quand on le remporte.
 
 import { COMPETITIONS_NATIONS_NOUVELLES } from './nouvellesLigues.js';
-import { langueCourante } from '../lib/i18n';
 
 export interface Trophee {
   id: string;
@@ -470,31 +469,6 @@ export const TROPHEES: Record<string, Trophee> = {
     ovas: 10,
   },
 };
-
-const TROPHEES_ANGLAIS: Record<string, string> = {
-  brennus: 'Brennus Shield', prod2: 'Pro D2 Trophy', nationale: 'Nationale Shield',
-  nationale2: 'Nationale 2 Shield', federale: 'Fédérale Shield', regionale: 'Regional Shield',
-  sixNations: 'Six Nations Championship', monde: 'World Cup',
-  meilleurJoueur: 'Player of the Year', meilleurTop14: 'Top 14 Player of the Season',
-  meilleurPremiership: 'Premiership Player of the Season', meilleurUrc: 'URC Player of the Season',
-  meilleurNZ: 'New Zealand Player of the Season', meilleurChampionsCup: 'Champions Cup Player of the Season',
-  meilleurSixNations: 'Six Nations Player of the Championship', hommeDuMatchMonde: 'World Cup final player of the match',
-  russie: 'Russian Premier League', argentine: 'Argentine Top 12',
-};
-
-/** Nom pour les cartes et le palmarès ; les données source restent immuables. */
-export function nomTrophee(trophee: Trophee | undefined): string {
-  if (!trophee) return '';
-  return langueCourante() === 'en' ? TROPHEES_ANGLAIS[trophee.id] ?? trophee.nom : trophee.nom;
-}
-
-/** Traduit aussi les anciens libellés sauvegardés (« … (S8) »). */
-export function titreTraduit(titre: string): string {
-  if (langueCourante() !== 'en') return titre;
-  const trouve = Object.values(TROPHEES).find((t) => titre === t.nom || titre.startsWith(`${t.nom} (`));
-  if (!trouve) return titre;
-  return `${nomTrophee(trouve)}${titre.slice(trouve.nom.length)}`;
-}
 
 // Trophée national décerné selon la division du club. Les clés sont les ids de
 // compétition (data/clubs.ts) : la carrière est française pour l'instant, mais

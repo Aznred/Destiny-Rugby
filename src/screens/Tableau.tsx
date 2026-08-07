@@ -528,7 +528,7 @@ export function Tableau() {
           <button
             className={`chip-comp${choix === maSelection ? ' actif' : ''}`}
             onClick={() => { setChoix(maSelection); setJourneeVue(null); setPouleVue(null); }}
-            title={`${maNation} dispute cette compétition`}
+            title={t('tb.nationDispute', { nation: maNation })}
           >
             <LogoCompet id={maSelection} emoji="🏳️" taille={18} /> {t('tb.maSelection')}
           </button>
@@ -540,7 +540,7 @@ export function Tableau() {
               key={id}
               className={`chip-comp${choix === id ? ' actif' : ''}`}
               onClick={() => { setChoix(id); setJourneeVue(null); setPouleVue(null); }}
-              title={`Ton club dispute la ${c.nom}`}
+              title={t('tb.clubDispute', { competition: c.nom })}
             >
               <LogoCompet id={c.id} emoji={c.emoji} taille={18} /> {c.nom}
             </button>

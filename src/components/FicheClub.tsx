@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { effectifDuClub, forceEffectif, noteDuClub, estEspoir, estDeclinant } from '../lib/effectif';
 import { aEffectifReel } from '../data/effectifsReels';
 import { generationDuClub, libelleGeneration } from '../lib/generations';
-import { POSTES } from '../data/rugby';
+import { POSTES, nomPoste } from '../data/rugby';
+import { t } from '../lib/i18n';
 import { Blason } from './Blason';
 import { Drapeau } from './Drapeau';
 import type { Club } from '../types';
@@ -56,12 +57,12 @@ export function FicheClub({
           <Blason club={club} taille={56} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="eyebrow">
-              {competition ?? 'Club'}{club.ville ? ` · ${club.ville}` : ''} · Saison {saison}
+              {competition ?? t('fc.club')}{club.ville ? ` · ${club.ville}` : ''} · {t('gen.saison')} {saison}
             </div>
             <h2>{club.nom}</h2>
             <p className="fiche-club-stats">
-              Note du club <b>{noteClub}</b> · effectif noté <b>{force}</b> ·{' '}
-              {effectif.length} joueurs{reel ? ' · effectif réel' : ' · effectif simulé'}
+              {t('eff.noteClub')} <b>{noteClub}</b> · {t('eff.effectifNote')} <b>{force}</b> ·{' '}
+              {effectif.length} {t('gen.joueurs')}{reel ? ` · ${t('fc.effectifReel')}` : ` · ${t('fc.effectifSimule')}`}
             </p>
             {/* ⚠️ LA GÉNÉRATION DU CLUB SE VOIT. Un effectif qui prend cinq
                 points sans explication, c'est du bruit ; annoncé, c'est une
@@ -72,13 +73,13 @@ export function FicheClub({
                 {generation}
                 <span>
                   {gen.doree
-                    ? `Une promotion entière a éclos en même temps : +${Math.round(gen.bonus)} sur tout l’effectif cette saison.`
-                    : `Le vivier s’est tari : ${Math.round(gen.bonus)} sur tout l’effectif cette saison.`}
+                    ? t('fc.generationDoree', { bonus: Math.round(gen.bonus) })
+                    : t('fc.generationCreuse', { bonus: Math.round(gen.bonus) })}
                 </span>
               </p>
             )}
           </div>
-          <button className="btn fantome petit fiche-club-fermer" onClick={onFermer} aria-label="Fermer">
+          <button className="btn fantome petit fiche-club-fermer" onClick={onFermer} aria-label={t('reg.fermer')}>
             ✕
           </button>
         </div>
@@ -87,7 +88,7 @@ export function FicheClub({
           {parPoste.map(({ poste, joueurs }) => (
             <div key={poste.id} className="bloc-poste">
               <div className="poste-titre">
-                <b>{poste.nom}</b>
+                <b>{nomPoste(poste.id)}</b>
                 <span>{poste.numero}</span>
               </div>
               {joueurs.map((j) => (
@@ -101,19 +102,19 @@ export function FicheClub({
                   <span className="j-drapeau"><Drapeau nation={j.nation} taille={0.95} /></span>
                   <span className="j-nom">
                     {j.nom}
-                    {j.regen && <span title="Jeune regen"> 🌱</span>}
+                    {j.regen && <span title={t('eff.regen')}> 🌱</span>}
                     {estEspoir(j) && (
-                      <span className="j-tendance monte" title={`Espoir — peut atteindre ${j.potentiel}`}>
+                      <span className="j-tendance monte" title={t('eff.espoir', { n: j.potentiel })}>
                         ↗ {j.potentiel}
                       </span>
                     )}
                     {!estEspoir(j) && estDeclinant(j) && (
-                      <span className="j-tendance descend" title="En fin de carrière : sa note baisse chaque saison">
+                      <span className="j-tendance descend" title={t('eff.declin')}>
                         ↘
                       </span>
                     )}
                   </span>
-                  <span className="j-age">{j.age} ans</span>
+                  <span className="j-age">{j.age} {t('gen.ans')}</span>
                 </div>
               ))}
             </div>

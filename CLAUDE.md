@@ -2498,7 +2498,8 @@ VITE_GROQ_KEY=gsk_... npx vite-node scripts/traduire.ts
   affiche « matchs joués » sans le nombre. La clé retombe alors sur le français,
   ce qui est le comportement sain du socle.
 
-État actuel : **599 clés × 7 langues, 0 trou**. `textesAuto.ts` est donc vide, et
+État vérifié en août 2026 : **1 067 clés × 7 langues, 0 trou**. Les 147 clés
+historiquement incomplètes sont complétées dans `textesAuto.ts`, et
 c'est normal — le script sert à partir de la prochaine clé ajoutée. On écrit la
 ligne avec le seul `fr:`, on relance, et les six autres arrivent.
 

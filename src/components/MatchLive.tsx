@@ -528,7 +528,7 @@ export function MatchLive({
             <b>{e.clubB}</b>
             {clubB ? <Blason club={clubB} taille={30} /> : <LogoEquipe nom={e.clubB} taille={30} />}
           </div>
-          <button className="ml-fermer" onClick={onFermer} title="Fermer (Échap)">✕</button>
+          <button className="ml-fermer" onClick={onFermer} title={t('ml.fermerAide')}>✕</button>
         </header>
 
         <div className="ml-sous-titre">
@@ -539,13 +539,13 @@ export function MatchLive({
         </div>
 
         {/* ---------- LA BARRE DE POSSESSION ---------- */}
-        <div className="ml-possession" title="Possession">
+        <div className="ml-possession" title={t('ml.possession')}>
           <span style={{ width: `${possession}%`, background: couleurA }} />
           <span style={{ width: `${100 - possession}%`, background: couleurB }} />
         </div>
 
         {/* ---------- LE TERRAIN, AUX PROPORTIONS RÉELLES ---------- */}
-        <svg className="ml-terrain" viewBox={`0 0 ${LONGUEUR} ${LARGEUR}`} aria-label="terrain">
+        <svg className="ml-terrain" viewBox={`0 0 ${LONGUEUR} ${LARGEUR}`} aria-label={t('ml.terrain')}>
           {terrain}
           {surLeTerrain.filter((p) => p.cote === 'B').map(pion)}
           {surLeTerrain.filter((p) => p.cote === 'A').map(pion)}
@@ -570,7 +570,7 @@ export function MatchLive({
             </span>
             {e.lancement && <span className="ml-tag">▶ {e.lancement.libelle}</span>}
             <span className="ml-tag">🛡️ {LIBELLE_SYSTEME[e.systeme]}</span>
-            {e.phasesDepuisArret > 0 && <span className="ml-tag">temps {e.phasesDepuisArret}</span>}
+            {e.phasesDepuisArret > 0 && <span className="ml-tag">{t('ml.temps', { n: e.phasesDepuisArret })}</span>}
           </div>
         )}
 
@@ -585,7 +585,7 @@ export function MatchLive({
                 key={v.label}
                 className={`ml-vitesse${vitesse === i ? ' actif' : ''}`}
                 onClick={() => setVitesse(i)}
-                title={i === VITESSES.length - 1 ? 'Aller à la fin' : `Vitesse ${v.label}`}
+                title={i === VITESSES.length - 1 ? t('ml.finAide') : t('ml.vitesseAide', { vitesse: v.label })}
               >
                 {v.label}
               </button>
@@ -595,7 +595,7 @@ export function MatchLive({
             <span style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} />
           </div>
           {monPion && (
-            <span className="ml-endurance" title="Endurance de ton joueur">
+            <span className="ml-endurance" title={t('ml.enduranceAide')}>
               🫁 {Math.round(monPion.endurance)}%
             </span>
           )}

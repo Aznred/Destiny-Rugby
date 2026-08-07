@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { t } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
-import { POSTES, NATIONS, NATIONS_PAR_ZONE, nomPoste } from '../data/rugby';
+import { POSTES, NATIONS, NATIONS_PAR_ZONE, descriptionPoste, nomPoste } from '../data/rugby';
 import { COMPETITIONS, CLUBS_FRANCE_PAR_DIVISION } from '../data/clubs';
 import { TRAITS, MAX_TRAITS, descriptionTrait, nomTrait } from '../data/traits';
 import { Selecteur } from '../components/Selecteur';
@@ -106,7 +106,7 @@ export function Creation() {
             <input
               id="nom"
               type="text"
-              placeholder="Ex. Antoine Dupont"
+              placeholder={t('cr.nomExemple')}
               value={nom}
               onChange={(e) => setNom(e.target.value)}
               maxLength={40}
@@ -169,7 +169,7 @@ export function Creation() {
                 <div className="num">{p.numero}</div>
                 <div className="nom">{nomPoste(p.id)}</div>
                 <div className="cat">{t(`poste.cat.${p.categorie}`)}</div>
-                <div className="desc">{p.description}</div>
+                <div className="desc">{descriptionPoste(p.id)}</div>
               </button>
             ))}
           </div>

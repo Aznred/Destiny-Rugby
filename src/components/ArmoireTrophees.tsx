@@ -36,6 +36,7 @@ import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import type { Group, Object3D } from 'three';
 import { TROPHEES, estIndividuel, type Trophee } from '../data/trophees';
+import { descriptionTrophee, nomTrophee } from '../lib/tropheesI18n';
 import type { TitreGagne } from '../types';
 import { t } from '../lib/i18n';
 import {
@@ -355,8 +356,8 @@ export function ArmoireTrophees({ palmares, nom, onFermer }: Props) {
         <div className="armoire-fiche" style={{ ['--aura' as string]: enAvant?.trophee.couleur ?? 'var(--or)' }}>
           {enAvant ? (
             <>
-              <b>{enAvant.trophee.nom}{enAvant.fois > 1 ? ` ×${enAvant.fois}` : ''}</b>
-              <span>{enAvant.trophee.desc}</span>
+              <b>{nomTrophee(enAvant.trophee)}{enAvant.fois > 1 ? ` ×${enAvant.fois}` : ''}</b>
+              <span>{descriptionTrophee(enAvant.trophee)}</span>
               <em>{t('arm.saisons')} {[...enAvant.saisons].sort((a, b) => a - b).join(' · ')}</em>
             </>
           ) : (
@@ -370,7 +371,7 @@ export function ArmoireTrophees({ palmares, nom, onFermer }: Props) {
               l'écran est listé ici, noir sur blanc. */}
           {restantes.length > 0 && (
             <span className="armoire-reste">
-              {t('arm.reste')} {restantes.map((p) => p.trophee.nom).join(', ')}
+              {t('arm.reste')} {restantes.map((p) => nomTrophee(p.trophee)).join(', ')}
             </span>
           )}
         </footer>

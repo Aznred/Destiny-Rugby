@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import './App.css';
 import { Analytics } from '@vercel/analytics/react'
 import { useGame } from './store/useGame';
+import { t } from './lib/i18n';
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
 import { Reglages } from './components/Reglages';
@@ -40,7 +41,7 @@ function EcranEnRoute() {
   return (
     <div className="ecran-en-route" role="status" aria-live="polite">
       <span className="ballon-attente" aria-hidden="true" />
-      <span>Chargement…</span>
+      <span>{t('app.chargement')}</span>
     </div>
   );
 }

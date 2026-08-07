@@ -127,7 +127,7 @@ export function Boutique() {
           <div key={p.id} className="carte article pack">
             <div className="pack-ovas">🪙 {p.ovas}</div>
             {p.bonus && <div className="pack-bonus">{p.bonus}</div>}
-            <button className="btn fantome petit" disabled title="Paiement non disponible dans la démo">
+            <button className="btn fantome petit" disabled title={t('bout.paiementDemo')}>
               {p.prix}
             </button>
           </div>

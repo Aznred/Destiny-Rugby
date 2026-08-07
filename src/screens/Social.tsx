@@ -20,7 +20,7 @@
 //     les comptes sont débridés : insulte-les, ils répondent.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { locale, t } from '../lib/i18n';
+import { locale, t, tn } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { clubParNom } from '../data/clubs';
@@ -80,7 +80,7 @@ function LogoOvale() {
 
 function Certifie() {
   return (
-    <svg className="x-verifie" viewBox="0 0 24 24" width="16" height="16" aria-label="certifié">
+    <svg className="x-verifie" viewBox="0 0 24 24" width="16" height="16" aria-label={t('ov.certifie')}>
       <path d="M12 1.6 14.4 4l3.3-.4.9 3.2 3 1.4-1.4 3 1.4 3-3 1.4-.9 3.2-3.3-.4L12 22.4 9.6 20l-3.3.4-.9-3.2-3-1.4 1.4-3-1.4-3 3-1.4.9-3.2 3.3.4L12 1.6Zm-1.2 13.9 5.5-5.5-1.5-1.5-4 4-1.8-1.8-1.5 1.5 3.3 3.3Z" />
     </svg>
   );
@@ -273,7 +273,7 @@ function Post({
   return (
     <>
       <article className={`x-post${reponse ? ' reponse' : ''}`}>
-        <button className="x-lien-profil" onClick={() => onProfil(post.pseudo)} title={`Profil de @${post.pseudo}`}>
+        <button className="x-lien-profil" onClick={() => onProfil(post.pseudo)} title={t('ov.profilDe', { pseudo: post.pseudo })}>
           <Avatar avatar={post.avatar} club={post.moi ? joueur?.club : undefined} nom={post.auteur} />
         </button>
         <div className="x-corps">
@@ -667,14 +667,14 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
             {erreurPhoto && <span className="x-risque">{erreurPhoto}</span>}
             <div className="x-emojis">
               {brouillon.avatar.startsWith('data:') && (
-                <button className="actif" title="Ta photo">
+                <button className="actif" title={t('ov.taPhoto')}>
                   <img src={brouillon.avatar} alt="" />
                 </button>
               )}
               <button
                 className={brouillon.avatar === 'club' ? 'actif' : ''}
                 onClick={() => maj({ avatar: 'club' })}
-                title="L’écusson de ton club"
+                title={t('ov.ecussonClub')}
               >
                 🛡️
               </button>
@@ -815,7 +815,7 @@ function Negociation({ pseudo }: { pseudo: string }) {
       <div className="x-nego-tete">
         <b>{approche.prolongation ? '📄 Prolongation' : '✍️ Proposition de contrat'}</b>
         {/* La patience se voit : c'est le seul indice sur ce qu'il reste à jouer. */}
-        <span className="x-nego-patience" title="Le club se braquera si tu pousses trop loin">
+        <span className="x-nego-patience" title={t('ov.patienceAide')}>
           {'●'.repeat(Math.max(0, approche.patience))}
           {'○'.repeat(Math.max(0, 4 - approche.patience))}
         </span>
@@ -827,7 +827,7 @@ function Negociation({ pseudo }: { pseudo: string }) {
             key={l.id}
             type="button"
             onClick={() => repondre(approche.id, l.id)}
-            title={`${l.phrase} (coûte ${l.cout} tour${l.cout > 1 ? 's' : ''} de patience)`}
+            title={tn('ov.coutPatience', l.cout, { phrase: l.phrase })}
             disabled={l.id === 'garantie' && approche.offre.garantie}
           >
             {l.emoji} {l.nom}

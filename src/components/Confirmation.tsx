@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
+import { t } from '../lib/i18n';
 
 // Modale de confirmation maison — window.confirm() est bloqué par certains
 // navigateurs, on ne l'utilise JAMAIS.
@@ -15,8 +16,8 @@ interface Props {
 export function Confirmation({
   titre,
   message,
-  libelleOui = 'Confirmer',
-  libelleNon = 'Annuler',
+  libelleOui,
+  libelleNon,
   onOui,
   onNon,
 }: Props) {
@@ -34,8 +35,8 @@ export function Confirmation({
         <h2>{titre}</h2>
         <p className="aide" style={{ marginTop: '0.6rem' }}>{message}</p>
         <div className="rangee-fin">
-          <button className="btn fantome" onClick={onNon}>{libelleNon}</button>
-          <button className="btn primaire" onClick={onOui}>{libelleOui}</button>
+          <button className="btn fantome" onClick={onNon}>{libelleNon ?? t('gen.annuler')}</button>
+          <button className="btn primaire" onClick={onOui}>{libelleOui ?? t('gen.confirmer')}</button>
         </div>
       </motion.div>
     </div>,

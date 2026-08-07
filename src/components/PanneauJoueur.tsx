@@ -330,7 +330,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               className="btn match-semaine"
               onClick={() => setMatchOuvert(true)}
               disabled={aRepondre}
-              title={aRepondre ? motifAttente : `Suivre ${affiche!.match.domicile} – ${affiche!.match.exterieur} en direct`}
+              title={aRepondre ? motifAttente : t('pj.suivreDirect', { domicile: affiche!.match.domicile, exterieur: affiche!.match.exterieur })}
             >
               ▶️ <b>{aRepondre
                 ? `✍️ ${t('pj.reponds')}`
@@ -346,7 +346,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
                 className="btn vert"
                 onClick={semaineSuivante}
                 disabled={aRepondre}
-                title={aRepondre ? motifAttente : 'Jouer la semaine suivante du calendrier'}
+                title={aRepondre ? motifAttente : t('pj.jouerSemaineAide')}
               >
                 {semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
               </button>
@@ -359,7 +359,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               <button
                 className="btn fantome"
                 onClick={() => setEcran('tableau')}
-                title="Choisir une date dans le calendrier et jouer jusque-là"
+                title={t('pj.choisirDateAide')}
               >
                 🗓️ {t('pj.calendrier')}
               </button>
@@ -370,7 +370,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
 
       {/* Barre d'actions : tout est atteignable sans faire défiler le panneau. */}
       <div className="pj-actions">
-        <button onClick={() => setEcran('effectif')} title="Voir les joueurs de ton club">
+        <button onClick={() => setEcran('effectif')} title={t('pj.voirJoueursAide')}>
           👥<span>{t('pj.equipe')}</span>
         </button>
         {/* ⚠️ LE MARCHÉ VIT SUR L'OVALE, PLUS DANS UN PANNEAU. Ce bouton ouvre
@@ -379,35 +379,35 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         <button
           onClick={() => (approchesOuvertes > 0 ? setEcran('social') : setConfirmerTransfert(true))}
           title={approchesOuvertes > 0
-            ? 'Des clubs t’écrivent : va négocier dans tes messages'
-            : 'Se mettre sur le marché des transferts'}
+            ? t('pj.messagesClubsAide')
+            : t('pj.marcheAide')}
         >
           ✈️<span>{t('pj.marche')}</span>
           {approchesOuvertes > 0 && <i className="badge-offres">{approchesOuvertes}</i>}
         </button>
-        <button onClick={() => setEcran('tableau')} title="Classement et résultats en direct">
+        <button onClick={() => setEcran('tableau')} title={t('pj.resultatsAide')}>
           📊<span>{t('pj.resultats')}</span>
         </button>
-        <button onClick={() => setEcran('social')} title="L’Ovale — réseau social, succès et défis">
+        <button onClick={() => setEcran('social')} title={t('pj.ovaleAide')}>
           𝕏<span>{t('pj.ovale')}</span>
         </button>
         {/* Après 30 ans : transmettre pour durer (lot « corps, âge et fin de carrière ») */}
         {joueur.age >= 30 && !joueur.mentorat && (
           <button
             onClick={prendreMentorat}
-            title="Prendre un jeune sous ton aile : ton déclin ralentit et le moral remonte"
+            title={t('pj.mentorAide')}
           >
             🧑‍🏫<span>{t('pj.mentor')}</span>
           </button>
         )}
         {joueur.mentorat && (
-          <button disabled title="Tu accompagnes un jeune du centre de formation">
+          <button disabled title={t('pj.mentoratAide')}>
             🧑‍🏫<span>Mentor ✓</span>
           </button>
         )}
         <button
           onClick={() => setConfirmerRetraite(true)}
-          title="Terminer la carrière et rejoindre le Hall des Légendes"
+          title={t('pj.retraiteAide')}
         >
           🏛️<span>{t('pj.retraite')}</span>
         </button>

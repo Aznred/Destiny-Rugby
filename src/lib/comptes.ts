@@ -12,7 +12,8 @@ import type { CompteSuivi, Joueur } from '../types';
 import { COMPETITIONS, competitionDuClub } from '../data/clubs';
 import { COUPES_EUROPE } from '../data/mondeReel';
 import { effectifDuClub } from './effectif';
-import { POSTE_PAR_ID } from '../data/rugby';
+import { nomPoste } from '../data/rugby';
+import { langueCourante, t } from './i18n';
 import { COMPTES } from '../data/social';
 import { graine } from './championnat';
 import { avatarPourCompte, comptesLambda } from './avatars';
@@ -165,47 +166,27 @@ export function pseudoStable(nom: string, suffixe = ''): string {
 // ça se voit immédiatement. Les bios sont désormais tirées d'un pool, à la
 // graine du nom — donc uniques, variées et stables.
 const BIOS_JOUEUR = [
-  '{poste} au {club}. {age} ans. Le rugby, rien d’autre.',
-  '{poste} · {club} · formé au club, et fier de l’être.',
-  '{age} ans, {poste}. On lâche rien. 🏉',
-  '{poste} du {club}. Famille, boulot, rugby — dans le désordre.',
-  '{club} · {poste}. Chaque dimanche, on remet ça.',
-  '{poste}. {club}. Le maillot avant tout.',
-  '{age} ans · {poste} au {club}. Toujours prêt.',
-  '{poste} · {club}. Un jour à la fois, un match à la fois.',
-  'Je joue {poste} au {club}. Le reste, c’est du bruit.',
-  '{club} 🏉 {poste} · troisième mi-temps comprise.',
+  'bio.joueur.0', 'bio.joueur.1', 'bio.joueur.2', 'bio.joueur.3', 'bio.joueur.4',
+  'bio.joueur.5', 'bio.joueur.6', 'bio.joueur.7', 'bio.joueur.8', 'bio.joueur.9',
 ];
 
 const BIOS_SUPPORTER = [
-  'Abonné depuis {annees} ans. Tribune {tribune}, place {place}.',
-  'Supporter du {club} de père en fils. On y croit toujours.',
-  'Je râle, je gueule, je reviens dimanche. {club} à vie.',
-  'Rugby, apéro, et {club}. Dans cet ordre.',
-  '{annees} ans d’abonnement, zéro regret. Allez le {club} !',
-  'Tribune {tribune}. Je crie plus fort que l’arbitre.',
-  'Le rugby c’était mieux avant, mais je regarde quand même tout.',
-  'Supporter, pas expert. Mais j’ai un avis sur tout.',
-  'Maillot du {club} au placard depuis {annees} ans. Il sent le souvenir.',
-  'Je viens pour le jeu. Je reste pour la buvette.',
+  'bio.supporter.0', 'bio.supporter.1', 'bio.supporter.2', 'bio.supporter.3', 'bio.supporter.4',
+  'bio.supporter.5', 'bio.supporter.6', 'bio.supporter.7', 'bio.supporter.8', 'bio.supporter.9',
 ];
 
 const BIOS_HATER = [
-  'Je dis ce que tout le monde pense. Ça dérange ? Tant mieux.',
-  'Analyste du dimanche. Sans filtre, sans pitié.',
-  'On me dit trop dur. Je réponds : trop lucide.',
-  'Je note les joueurs. Ils n’aiment pas mes notes.',
-  'Ancien joueur (niveau départemental). Donc j’ai le droit.',
-  'Le rugby français va mal et je vous explique pourquoi.',
+  'bio.hater.0', 'bio.hater.1', 'bio.hater.2',
+  'bio.hater.3', 'bio.hater.4', 'bio.hater.5',
 ];
 
 const TRIBUNES = ['Nord', 'Sud', 'Est', 'Ouest', 'Présidentielle', 'Populaire'];
 
 function bioDe(pool: string[], cle: string, vars: Record<string, string | number>): string {
   const rng = graine('bio#' + cle);
-  let t = pool[Math.floor(rng() * pool.length)];
-  for (const k of Object.keys(vars)) t = t.split(`{${k}}`).join(String(vars[k]));
-  return t;
+  let texte = t(pool[Math.floor(rng() * pool.length)], vars);
+  for (const k of Object.keys(vars)) texte = texte.split(`{${k}}`).join(String(vars[k]));
+  return texte;
 }
 
 function compteJoueur(nom: string, club: string, poste: string, note: number, age: number): CompteSuivi {
@@ -238,7 +219,7 @@ function compteClub(nom: string): CompteSuivi {
     avatar: `club:${nom}`,
     type: 'club',
     club: nom,
-    bio: `Compte officiel du ${nom}${ville ? ` · ${ville}` : ''}. ${comp?.nom ?? ''}`,
+    bio: `${t('bio.clubOfficiel', { club: nom })}${ville ? ` · ${ville}` : ''}. ${comp?.nom ?? ''}`,
     // Un club amateur n'a pas de coche bleue.
     certifie: niveau <= 3,
     abonnes: abonnesClub(nom),
@@ -272,7 +253,7 @@ function compteCompetition(id: string, nom: string, desc: string, niveau = 1): C
 const cache = new Map<string, CompteSuivi[]>();
 
 export function annuaire(j: Joueur): CompteSuivi[] {
-  const cle = `${j.club}#${j.saison}#${j.division}`;
+  const cle = `${j.club}#${j.saison}#${j.division}#${langueCourante()}`;
   const enCache = cache.get(cle);
   if (enCache) return enCache;
 
@@ -285,8 +266,8 @@ export function annuaire(j: Joueur): CompteSuivi[] {
   };
 
   // 1. Les championnats et les coupes.
-  for (const c of COMPETITIONS) ajouter(compteCompetition(c.id, c.nom, `Compte officiel · ${c.pays}`, c.niveau));
-  for (const c of COUPES_EUROPE) ajouter(compteCompetition(c.id, c.nom, c.desc, 1));
+  for (const c of COMPETITIONS) ajouter(compteCompetition(c.id, c.nom, `${t('bio.competitionOfficielle')} · ${c.pays}`, c.niveau));
+  for (const c of COUPES_EUROPE) ajouter(compteCompetition(c.id, c.nom, `${t('bio.competitionOfficielle')} · ${c.pays}`, 1));
 
   // 2. Les clubs du championnat du joueur, puis les autres clubs français.
   const sienne = COMPETITIONS.find((c) => c.id === j.division);
@@ -297,12 +278,12 @@ export function annuaire(j: Joueur): CompteSuivi[] {
 
   // 3. Les joueurs : ses coéquipiers d'abord, puis ceux des clubs rivaux.
   for (const co of effectifDuClub(j.club, j.saison)) {
-    ajouter(compteJoueur(co.nom, j.club, POSTE_PAR_ID[co.poste].nom, co.note, co.age));
+    ajouter(compteJoueur(co.nom, j.club, nomPoste(co.poste), co.note, co.age));
   }
   for (const club of (sienne?.clubs ?? []).slice(0, 14)) {
     if (club.nom === j.club) continue;
     for (const co of effectifDuClub(club.nom, j.saison).slice(0, 8)) {
-      ajouter(compteJoueur(co.nom, club.nom, POSTE_PAR_ID[co.poste].nom, co.note, co.age));
+      ajouter(compteJoueur(co.nom, club.nom, nomPoste(co.poste), co.note, co.age));
     }
   }
 
@@ -319,19 +300,16 @@ export function annuaire(j: Joueur): CompteSuivi[] {
     const rng = graine('ab#' + c.pseudo);
     const bio = c.type === 'journaliste'
       ? bioDe(
-        ['Journaliste rugby. Je raconte, je ne juge pas (souvent).',
-          'Suit le Top 14 depuis {annees} ans. Terrain, vestiaire, buvette.',
-          'Rugby. Reportages, portraits, coulisses.',
-          'Journaliste. Les chiffres ne mentent pas, les joueurs si.'],
+        ['bio.journaliste.0', 'bio.journaliste.1', 'bio.journaliste.2', 'bio.journaliste.3'],
         c.pseudo, { annees: 5 + Math.floor(rng() * 20) })
       : c.type === 'media'
-        ? 'Toute l’actualité du rugby, en direct.'
+        ? t('bio.media')
         : c.type === 'hater'
           ? bioDe(BIOS_HATER, c.pseudo, {})
           : bioDe(BIOS_SUPPORTER, c.pseudo, {
             club: j.club,
             annees: 2 + Math.floor(rng() * 30),
-            tribune: TRIBUNES[Math.floor(rng() * TRIBUNES.length)],
+            tribune: t(`bio.tribune.${TRIBUNES[Math.floor(rng() * TRIBUNES.length)]}`),
             place: 1 + Math.floor(rng() * 40),
           });
     ajouter({
@@ -358,7 +336,14 @@ export function annuaire(j: Joueur): CompteSuivi[] {
         avatar: l.avatar,
         type: l.hater ? 'hater' : 'fan',
         club,
-        bio: l.bio,
+        bio: l.hater
+          ? bioDe(BIOS_HATER, l.pseudo, {})
+          : bioDe(BIOS_SUPPORTER, l.pseudo, {
+            club,
+            annees: 2 + Math.floor(graine('bioannees#' + l.pseudo)() * 30),
+            tribune: t(`bio.tribune.${TRIBUNES[Math.floor(graine('biotribune#' + l.pseudo)() * TRIBUNES.length)]}`),
+            place: 1 + Math.floor(graine('bioplace#' + l.pseudo)() * 40),
+          }),
         abonnes: l.abonnes,
         banniere: banniereDe(l.pseudo),
       });

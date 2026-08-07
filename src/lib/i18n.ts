@@ -94,7 +94,8 @@ export function t(cle: string, vars?: Record<string, string | number>): string {
 
 /** Le pluriel, à la française : 0 et 1 au singulier, le reste au pluriel. */
 export function tn(cle: string, n: number, vars?: Record<string, string | number>): string {
-  return t(n > 1 ? `${cle}.pluriel` : cle, { ...vars, n });
+  const pluriel = new Intl.PluralRules(locale()).select(n) !== 'one';
+  return t(pluriel ? `${cle}.pluriel` : cle, { ...vars, n });
 }
 
 // ---------------------------------------------------------------------------

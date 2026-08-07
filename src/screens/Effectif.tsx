@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { useGame, noteGlobale } from '../store/useGame';
 import { effectifDuClub, noteDuClub, forceEffectif, estEspoir, estDeclinant } from '../lib/effectif';
 import { EFFECTIFS_REELS } from '../data/effectifsReels';
-import { POSTES } from '../data/rugby';
+import { POSTES, nomPoste } from '../data/rugby';
+import { t } from '../lib/i18n';
 import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
 import { Blason } from '../components/Blason';
@@ -57,27 +58,24 @@ export function Effectif() {
       transition={{ duration: 0.4 }}
     >
       <button className="btn fantome" onClick={() => setEcran('carriere')} style={{ marginBottom: '1rem' }}>
-        ← Retour à la carrière
+        {t('gen.retourCarriere')}
       </button>
 
       <div className="carte effectif-tete">
         {clubData && <Blason club={clubData} taille={56} />}
         <div style={{ flex: 1 }}>
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <LogoCompet id={division?.id} taille={18} /> {division?.nom ?? 'Division inconnue'} · Saison {joueur.saison}
+            <LogoCompet id={division?.id} taille={18} /> {division?.nom ?? t('eff.divisionInconnue')} · {t('gen.saison')} {joueur.saison}
           </div>
           <h1>{joueur.club}</h1>
           <p style={{ color: 'var(--craie-dim)', fontSize: '0.9rem' }}>
-            Note du club <b style={{ color: 'var(--or)' }}>{noteClub}</b> · effectif
-            noté <b style={{ color: 'var(--or)' }}>{Math.round(forceEffectif(joueur.club, joueur.saison))}</b> ·{' '}
-            {lignes.length} joueurs
-            {reel && ' · effectif réel 2025-26'}
+            {t('eff.noteClub')} <b style={{ color: 'var(--or)' }}>{noteClub}</b> · {t('eff.effectifNote')}{' '}
+            <b style={{ color: 'var(--or)' }}>{Math.round(forceEffectif(joueur.club, joueur.saison))}</b> ·{' '}
+            {lignes.length} {t('gen.joueurs')}
+            {reel && ` · ${t('eff.effectifReel')}`}
           </p>
           <p style={{ color: 'var(--craie-dim)', fontSize: '0.82rem' }}>
-            Les espoirs <span className="j-tendance monte">↗</span> progressent vers
-            leur potentiel jusqu'à 27 ans, les anciens <span className="j-tendance descend">↘</span>{' '}
-            déclinent, et les retraités laissent place à des « regens » 🌱.
-            C'est la note moyenne de l'effectif qui décide du classement du club.
+            {t('eff.legende')}
           </p>
         </div>
       </div>
@@ -85,7 +83,7 @@ export function Effectif() {
       {parPoste.map(({ poste, joueurs }) => (
         <div key={poste.id} className="carte bloc-poste">
           <div className="poste-titre">
-            <b>{poste.nom}</b>
+            <b>{nomPoste(poste.id)}</b>
             <span>{poste.numero}</span>
           </div>
           {joueurs.map((l) => (
@@ -99,21 +97,21 @@ export function Effectif() {
               </span>
               <span className="j-nom">
                 {l.nom}
-                {'moi' in l && l.moi && <em> — toi</em>}
-                {l.regen && <span title="Jeune regen"> 🌱</span>}
+                {'moi' in l && l.moi && <em> {t('eff.toi')}</em>}
+                {l.regen && <span title={t('eff.regen')}> 🌱</span>}
                 {/* Trajectoire : espoir en progression, ou cadre sur le déclin. */}
                 {!('moi' in l) && estEspoir(l) && (
-                  <span className="j-tendance monte" title={`Espoir — peut atteindre ${l.potentiel}`}>
+                  <span className="j-tendance monte" title={t('eff.espoir', { n: l.potentiel })}>
                     ↗ {l.potentiel}
                   </span>
                 )}
                 {!('moi' in l) && !estEspoir(l) && estDeclinant(l) && (
-                  <span className="j-tendance descend" title="En fin de carrière : sa note baisse chaque saison">
+                  <span className="j-tendance descend" title={t('eff.declin')}>
                     ↘
                   </span>
                 )}
               </span>
-              <span className="j-age">{l.age} ans</span>
+              <span className="j-age">{l.age} {t('gen.ans')}</span>
             </div>
           ))}
         </div>

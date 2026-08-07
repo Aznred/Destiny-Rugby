@@ -9,6 +9,7 @@
 // encore, on sait quoi corriger.
 
 import { Component, type ReactNode } from 'react';
+import { t } from '../lib/i18n';
 
 // ⚠️ App monte ce garde avec key={ecran} : changer d'écran le remonte à neuf,
 // il n'y a donc rien à réinitialiser à la main.
@@ -34,10 +35,9 @@ export class Garde extends Component<Props, State> {
       <section className="section" style={{ padding: '3rem 0' }}>
         <div className="carte" style={{ padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: '2.4rem' }}>🚧</div>
-          <h2 style={{ margin: '0.6rem 0' }}>Cet écran n’a pas pu s’afficher</h2>
+          <h2 style={{ margin: '0.6rem 0' }}>{t('garde.titre')}</h2>
           <p style={{ color: 'var(--craie-dim)', maxWidth: '52ch', margin: '0 auto 1rem' }}>
-            Une donnée de ta sauvegarde n’a pas été comprise par cette version du jeu.
-            Ta carrière n’est pas perdue : reviens en arrière et continue de jouer.
+            {t('garde.texte')}
           </p>
           <code style={{ display: 'block', color: 'var(--brume)', fontSize: '0.8rem', marginBottom: '1.2rem' }}>
             {this.state.erreur}
@@ -49,7 +49,7 @@ export class Garde extends Component<Props, State> {
               this.props.onRetour();
             }}
           >
-            ← Retour à l’accueil
+            {t('garde.retour')}
           </button>
         </div>
       </section>

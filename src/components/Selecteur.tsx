@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { t } from '../lib/i18n';
 
 // Liste déroulante maison : un <select> natif ne peut afficher ni drapeau ni
 // style personnalisé (le menu est rendu par l'OS). Celui-ci suit le thème du
@@ -28,7 +29,7 @@ export function Selecteur({
   options,
   valeur,
   onChange,
-  placeholder = 'Choisir…',
+  placeholder,
   recherche,
 }: Props) {
   const [ouvert, setOuvert] = useState(false);
@@ -173,7 +174,7 @@ export function Selecteur({
       >
         {selection?.vignette && <span className="sel-vignette">{selection.vignette}</span>}
         <span className="sel-textes">
-          <span className="sel-label">{selection?.label ?? placeholder}</span>
+          <span className="sel-label">{selection?.label ?? placeholder ?? t('sel.choisir')}</span>
           {selection?.sous && <span className="sel-sous">{selection.sous}</span>}
         </span>
         <span className="sel-chevron" aria-hidden>▾</span>
@@ -195,7 +196,7 @@ export function Selecteur({
                   ref={champRef}
                   type="text"
                   value={filtre}
-                  placeholder="Rechercher…"
+                  placeholder={t('sel.rechercher')}
                   onChange={(e) => {
                     setFiltre(e.target.value);
                     setSurvol(0);
@@ -206,7 +207,7 @@ export function Selecteur({
               </div>
             )}
             <div className="sel-liste" ref={listeRef}>
-              {rendu.length ? rendu : <div className="sel-vide">Aucun résultat</div>}
+              {rendu.length ? rendu : <div className="sel-vide">{t('sel.aucun')}</div>}
             </div>
           </motion.div>
         )}

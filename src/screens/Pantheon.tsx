@@ -5,7 +5,7 @@ import { useGame, palmaresDepuisLibelles } from '../store/useGame';
 import { POSTE_PAR_ID, migrerPoste, nomPoste } from '../data/rugby';
 import { Drapeau, nomNationTraduit } from '../components/Drapeau';
 import type { TitreGagne } from '../types';
-import { titreTraduit } from '../data/trophees';
+import { titreTraduit } from '../lib/tropheesI18n';
 
 // ⚠️ CHARGÉE À LA DEMANDE. L'armoire tire tout Three.js ET un modèle 3D par
 // trophée : la mettre en import direct la ferait entrer dans le chunk du Hall,

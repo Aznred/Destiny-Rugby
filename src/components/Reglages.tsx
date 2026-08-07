@@ -6,9 +6,9 @@ import type { Theme } from '../types';
 import { LANGUES, nombre, t, tn } from '../lib/i18n';
 
 const MODELES = [
-  { id: 'llama-3.3-70b-versatile', nom: 'Llama 3.3 70B (recommandé)' },
-  { id: 'llama-3.1-8b-instant', nom: 'Llama 3.1 8B (rapide)' },
-  { id: 'openai/gpt-oss-120b', nom: 'GPT-OSS 120B' },
+  { id: 'llama-3.3-70b-versatile', nom: 'Llama 3.3 70B', qualificatif: 'reg.recommande' },
+  { id: 'llama-3.1-8b-instant', nom: 'Llama 3.1 8B', qualificatif: 'reg.rapide' },
+  { id: 'openai/gpt-oss-120b', nom: 'GPT-OSS 120B', qualificatif: '' },
 ];
 
 // Les trois ambiances. `apercu` est le dégradé montré sur la pastille — il
@@ -115,7 +115,7 @@ export function Reglages({ onFermer }: Props) {
           >
             {MODELES.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.nom}
+                {m.nom}{m.qualificatif ? ` (${t(m.qualificatif)})` : ''}
               </option>
             ))}
           </select>
@@ -147,7 +147,7 @@ export function Reglages({ onFermer }: Props) {
             id="tenor"
             type="password"
             value={tenorKey}
-            placeholder="AIza… (laisse vide pour des photos libres)"
+            placeholder={t('reg.tenorPlaceholder')}
             onChange={(e) => setTenorKey(e.target.value.trim())}
           />
           <p className="aide">{t('reg.tenorAide')}</p>
@@ -222,9 +222,7 @@ export function Reglages({ onFermer }: Props) {
         </details>
 
         <div className="note-sans-cle">
-          🎮 <b>Pas de clé ?</b> Tu peux jouer quand même : utilise « 📖 Vivre une
-          situation » et « 🎲 Évènement aléatoire » dans ta carrière — des
-          situations à choix et des évènements arrivent <b>sans IA</b>.
+          🎮 {t('reg.sansCleAide')}
         </div>
 
         <div className="rangee-fin">

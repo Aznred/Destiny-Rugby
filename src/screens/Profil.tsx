@@ -7,7 +7,7 @@ import { Drapeau, nomNationTraduit } from '../components/Drapeau';
 import { Confirmation } from '../components/Confirmation';
 import type { Joueur } from '../types';
 import { nombre, t, tn } from '../lib/i18n';
-import { titreTraduit } from '../data/trophees';
+import { titreTraduit } from '../lib/tropheesI18n';
 
 function moyenne(j: Joueur): number {
   const vals = Object.values(j.attributs);

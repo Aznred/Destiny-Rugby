@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import type { Group } from 'three';
 import { TROPHEES } from '../data/trophees';
+import { t, tn } from '../lib/i18n';
+import { descriptionTrophee, nomTrophee } from '../lib/tropheesI18n';
 
 // Modèle du trophée : recentré, normalisé, en rotation continue sur lui-même.
 function ModeleTrophee({ url }: { url: string }) {
@@ -78,7 +80,7 @@ export function TropheeGagne({ tropheeId, index, total, onFermer }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
         >
-          🏆 Titre remporté{total > 1 ? ` · ${index} / ${total}` : ''}
+          🏆 {t('trophee.remporte')}{total > 1 ? ` · ${index} / ${total}` : ''}
         </motion.div>
 
         <motion.h2
@@ -87,7 +89,7 @@ export function TropheeGagne({ tropheeId, index, total, onFermer }: Props) {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.35, type: 'spring', stiffness: 200 }}
         >
-          {trophee.nom}
+          {nomTrophee(trophee)}
         </motion.h2>
 
         <div className="trophee-canvas">
@@ -129,7 +131,7 @@ export function TropheeGagne({ tropheeId, index, total, onFermer }: Props) {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
         >
-          {trophee.desc}
+          {descriptionTrophee(trophee)}
         </motion.p>
 
         <motion.button
@@ -139,9 +141,7 @@ export function TropheeGagne({ tropheeId, index, total, onFermer }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.75 }}
         >
-          {reste > 0
-            ? `Trophée suivant (${reste} restant${reste > 1 ? 's' : ''}) →`
-            : 'Soulever le trophée 🙌'}
+          {reste > 0 ? `${tn('trophee.suivant', reste)} →` : t('trophee.soulever')}
         </motion.button>
       </motion.div>
     </div>

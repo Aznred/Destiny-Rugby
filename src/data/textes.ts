@@ -20,6 +20,9 @@ import type { Traduction } from '../lib/i18n';
 import { TEXTES_ECRANS } from './textesEcrans';
 import { TEXTES_CONTENU } from './textesContenu';
 import { TEXTES_AUTO } from './textesAuto';
+import { TEXTES_SUPPLEMENTAIRES } from './textesSupplementaires';
+import { TEXTES_TROPHEES } from './textesTrophees';
+import { TEXTES_SOCIAUX } from './textesSociaux';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -54,6 +57,9 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   // Placés EN PREMIER : une clé redéfinie plus bas dans ce fichier gagne.
   ...TEXTES_ECRANS,
   ...TEXTES_CONTENU,
+  ...TEXTES_SUPPLEMENTAIRES,
+  ...TEXTES_TROPHEES,
+  ...TEXTES_SOCIAUX,
 
   // --- NAVIGATION ---------------------------------------------------------
   'nav.accueil': { fr: 'Accueil', en: 'Home', es: 'Inicio', it: 'Home', de: 'Start', pt: 'Início', ja: 'ホーム' },

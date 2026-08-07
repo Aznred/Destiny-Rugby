@@ -19,7 +19,7 @@
 import type { Joueur, PosteId, StatsDetaillees } from '../types';
 import { graine, journeesALaSemaine, nombreJournees, poulesDe } from './championnat';
 import { effectifDuClub, forceEffectif, type Coequipier } from './effectif';
-import { POSTE_PAR_ID } from '../data/rugby';
+import { nomPoste as nomPosteTraduit } from '../data/rugby';
 import { nombre, t } from './i18n';
 import type { LigneReelle } from './moteur/saison';
 
@@ -479,5 +479,5 @@ export function journeesDisputees(divisionId: string, semaine: number, ancre = '
 }
 
 export function nomPoste(p: PosteId): string {
-  return POSTE_PAR_ID[p]?.nom ?? '';
+  return nomPosteTraduit(p);
 }
