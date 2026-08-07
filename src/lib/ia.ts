@@ -204,6 +204,8 @@ CE QUE TU ÉCRIS :
 - 2 phrases MAXIMUM, 45 mots au total. Tu poses la scène et tu t'arrêtes : pas de décor, pas de
   météo, pas de rappel de ce qu'il a déjà vécu. Tu finis sur ce qui est en jeu, jamais sur un conseil.
 - Tu écris à la 2e personne (« tu »), au présent.
+- Termine obligatoirement par UNE question directe, adaptée à la scène, qui invite le joueur à agir
+  (par exemple « Que fais-tu ? », mais formulée en rapport avec ce qui vient d'arriver).
 
 LA VARIÉTÉ EST OBLIGATOIRE — pioche largement, ne reviens pas toujours au vestiaire :
   · sportif : concurrence au poste, causerie, vidéo, test physique, sélection, blessure qui traîne

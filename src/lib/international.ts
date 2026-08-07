@@ -34,6 +34,7 @@ export const FORCE_NATION: Record<string, number> = {
   'États-Unis': 70, Roumanie: 69, Canada: 69, Chili: 68, Namibie: 65,
   'Hong Kong': 63, Zimbabwe: 63, Belgique: 62, Allemagne: 62, 'Pays-Bas': 61,
   Suisse: 58, Brésil: 68, 'Corée du Sud': 60, Kenya: 62,
+  Russie: 72, Biélorussie: 64,
 };
 
 // ⚠️ « France U20 » n'est pas dans `FORCE_NATION` — et n'a pas à y être : sa
@@ -74,6 +75,60 @@ export function forceNation(nation: string): number {
   return FORCE_NATION[nom] ?? forcesDesNouvellesNations()[nom] ?? 55;
 }
 
+export interface LigneClassementMondial {
+  rang: number;
+  nation: string;
+  points: number;
+  force: number;
+}
+
+/**
+ * Classement vivant inspiré de World Rugby. Il rejoue les résultats
+ * internationaux des saisons passées : battre un adversaire mieux classé fait
+ * gagner davantage de points, une défaite en retire. Il sert aussi aux
+ * qualifications de la Coupe du monde.
+ */
+export function classementMondial(saison: number): LigneClassementMondial[] {
+  const nations = new Set<string>([...Object.keys(FORCE_NATION), ...Object.keys(forcesDesNouvellesNations())]);
+  const points = new Map<string, number>([...nations].map((n) => [n, 1000 + forceNation(n) * 10]));
+  const competitions = [...COMPETITIONS_INTERNATIONALES, ...competitionsNouvellesNations()]
+    .filter((c) => !COMPETITIONS_U20.has(c.id));
+  for (let annee = 1; annee < Math.max(1, saison); annee++) {
+    for (const comp of competitions) {
+      for (const journee of grille(comp, annee)) {
+        for (const [domicile, exterieur] of journee) {
+          const match = jouerTestMatch(domicile, exterieur, annee, `rang#${comp.id}#${annee}#${domicile}#${exterieur}`, null);
+          const pd = points.get(domicile) ?? 1000;
+          const pe = points.get(exterieur) ?? 1000;
+          const attendu = 1 / (1 + 10 ** ((pe - pd) / 260));
+          const resultat = match.scoreD === match.scoreE ? 0.5 : match.scoreD > match.scoreE ? 1 : 0;
+          const variation = Math.round(18 * (resultat - attendu));
+          points.set(domicile, pd + variation);
+          points.set(exterieur, pe - variation);
+        }
+      }
+    }
+  }
+  return [...nations].map((nation) => ({ nation, points: Math.round(points.get(nation) ?? 1000), force: forceNation(nation), rang: 0 }))
+    .sort((a, b) => b.points - a.points || b.force - a.force || a.nation.localeCompare(b.nation, 'fr'))
+    .map((l, i) => ({ ...l, rang: i + 1 }));
+}
+
+/** Les douze premiers sont qualifiés d'office ; douze places se gagnent en barrages. */
+export function qualifiesCoupeDuMonde(saison: number): string[] {
+  const rang = classementMondial(Math.max(1, saison - 1));
+  const directs = rang.slice(0, 12).map((l) => l.nation);
+  const barragistes = rang.slice(12, 36).map((l) => l.nation);
+  const qualifies: string[] = [];
+  for (let i = 0; i + 1 < barragistes.length && qualifies.length < 12; i += 2) {
+    const a = barragistes[i];
+    const b = barragistes[i + 1];
+    const match = jouerTestMatch(a, b, saison - 1, `qualif-mondial#${saison}#${a}#${b}`, null);
+    qualifies.push(match.scoreD >= match.scoreE ? a : b);
+  }
+  return [...directs, ...qualifies];
+}
+
 export interface CompetitionInternationale {
   id: string;
   nom: string;
@@ -82,7 +137,7 @@ export interface CompetitionInternationale {
   // Nombre de journées réellement disputées (aller simple, éventuellement tronqué).
   journees: number;
   // Type de semaine du calendrier où elle se joue.
-  fenetre: 'automne' | 'tournoi';
+  fenetre: 'automne' | 'tournoi' | 'ete';
 }
 
 export const COMPETITIONS_INTERNATIONALES: CompetitionInternationale[] = [
@@ -126,6 +181,17 @@ export const COMPETITIONS_INTERNATIONALES: CompetitionInternationale[] = [
       'Australie U20', 'Géorgie U20', 'Uruguay U20',
     ],
     journees: 3,
+  },
+  {
+    id: 'amicaux', nom: 'Matchs amicaux d’été', emoji: '☀️', fenetre: 'ete',
+    equipes: [
+      'France', 'Irlande', 'Angleterre', 'Écosse', 'Pays de Galles', 'Italie',
+      'Afrique du Sud', 'Nouvelle-Zélande', 'Argentine', 'Australie', 'Japon', 'Géorgie',
+      'Portugal', 'Espagne', 'Roumanie', 'Belgique', 'Allemagne', 'Pays-Bas',
+      'Russie', 'Biélorussie', 'Uruguay', 'Chili', 'Canada', 'États-Unis',
+      'Brésil', 'Kenya', 'Zimbabwe', 'Namibie', 'Samoa', 'Tonga', 'Fidji', 'Corée du Sud',
+    ],
+    journees: 1,
   },
 ];
 
@@ -182,19 +248,19 @@ export function competitionsNouvellesNations(): CompetitionInternationale[] {
 // La Coupe du monde remplace la tournée d'automne une saison sur quatre.
 export const COUPE_DU_MONDE: CompetitionInternationale = {
   id: 'coupeDuMonde', nom: 'Coupe du monde', emoji: '🌍', fenetre: 'automne',
-  equipes: [
-    'Afrique du Sud', 'Nouvelle-Zélande', 'Irlande', 'France', 'Angleterre',
-    'Argentine', 'Écosse', 'Australie', 'Pays de Galles', 'Fidji', 'Italie',
-    'Japon', 'Géorgie', 'Samoa', 'Tonga', 'Portugal',
-  ],
+  equipes: [],
   journees: 4,
 };
+
+export function coupeDuMondeDeLaSaison(saison: number): CompetitionInternationale {
+  return { ...COUPE_DU_MONDE, equipes: qualifiesCoupeDuMonde(saison) };
+}
 
 export function competitionsDeLaSaison(saison: number): CompetitionInternationale[] {
   const mondial = estAnneeDeCoupeDuMonde(saison);
   return COMPETITIONS_INTERNATIONALES
     .filter((c) => !(mondial && c.id === 'autumn'))
-    .concat(mondial ? [COUPE_DU_MONDE] : [])
+    .concat(mondial ? [coupeDuMondeDeLaSaison(saison)] : [])
     // ⚠️ Les compétitions du dossier « new league » viennent APRÈS : c'est
     // `fenetreInternationale` qui choisit celle du week-end, et elle prend la
     // PREMIÈRE de la fenêtre. Les 6 Nations et le Rugby Championship gardent
@@ -294,10 +360,13 @@ function fenetreDe(
 ): { competition: CompetitionInternationale; journee: number } | null {
   const sem = semaine(numeroSemaine);
   if (sem.type !== 'international') return null;
-  const fenetre: 'automne' | 'tournoi' = sem.competitionInternationale === 'autumn' ? 'automne' : 'tournoi';
+  const fenetre: 'automne' | 'tournoi' | 'ete' = sem.competitionInternationale === 'amicaux'
+    ? 'ete'
+    : sem.competitionInternationale === 'autumn' ? 'automne' : 'tournoi';
   // Combien de semaines de CETTE fenêtre sont déjà passées ?
   const memeFenetre = (s: typeof sem) => s.type === 'international'
-    && ((s.competitionInternationale === 'autumn') === (fenetre === 'automne'));
+    && (fenetre === 'ete' ? s.competitionInternationale === 'amicaux'
+      : (s.competitionInternationale === 'autumn') === (fenetre === 'automne'));
   const dejaFaites = CALENDRIER.slice(0, numeroSemaine - 1).filter(memeFenetre).length;
   const ouvertes = competitionsDeLaSaison(saison).filter((c) => c.fenetre === fenetre && retenir(c));
   // ⚠️ LA COMPÉTITION DE **TON** PAYS D'ABORD (correctif signalé en jeu :
@@ -337,7 +406,8 @@ export function journeesInternationalesA(id: string, numeroSemaine: number, sais
   const c = competitionInternationaleParId(id, saison);
   if (!c) return 0;
   const memeFenetre = (s: (typeof CALENDRIER)[number]) => s.type === 'international'
-    && ((s.competitionInternationale === 'autumn') === (c.fenetre === 'automne'));
+    && (c.fenetre === 'ete' ? s.competitionInternationale === 'amicaux'
+      : (s.competitionInternationale === 'autumn') === (c.fenetre === 'automne'));
   return Math.min(c.journees, CALENDRIER.slice(0, Math.max(0, numeroSemaine - 1)).filter(memeFenetre).length);
 }
 

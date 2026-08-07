@@ -14,6 +14,8 @@
 
 import { championnatEnDirect, graine, type LigneTableau } from './championnat';
 import { forceEffectif } from './effectif';
+import { semaine } from '../data/calendrier';
+import type { Joueur } from '../types';
 
 export type TourFinal = 'barrage' | 'quart' | 'demie' | 'finale' | 'accession';
 
@@ -151,6 +153,16 @@ export function phaseFinale(
     dernier: classement[taille - 1]?.club ?? null,
     avantDernier: taille >= 2 ? classement[taille - 2].club : null,
   };
+}
+
+/** L'affiche de phase finale du joueur, uniquement le week-end du tour concerné. */
+export function matchPhaseFinaleDuJoueur(joueur: Joueur, bonusJoueur = 0): MatchFinal | null {
+  const sem = semaine(joueur.semaine ?? 1);
+  if (sem.type !== 'phaseFinale' || !sem.tourFinal || !joueur.division) return null;
+  const phase = phaseFinale(joueur.division, joueur.saison, joueur.club, bonusJoueur);
+  const tour = sem.tourFinal === 'acces' ? 'accession' : sem.tourFinal;
+  return phase.matchs.find((m) => m.tour === tour
+    && (m.domicile === joueur.club || m.exterieur === joueur.club)) ?? null;
 }
 
 // LE MATCH D'ACCÈS : l'avant-dernier de la division du dessus reçoit le

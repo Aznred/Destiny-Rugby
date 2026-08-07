@@ -892,6 +892,8 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
   const conversations = useGame((s) => s.conversations ?? {});
   const relations = useGame((s) => s.relationsSociales ?? {});
   const envoyer = useGame((s) => s.envoyerMessage);
+  const lireConversation = useGame((s) => s.lireConversation);
+  const approches = useGame((s) => s.approches ?? []);
   const chargement = useGame((s) => s.chargementSocial);
 
   // Les interlocuteurs : comptes suivis + toute conversation déjà ouverte.
@@ -902,6 +904,14 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
     return [...pseudos].map((p) => {
       const connu = suivis.find((c) => c.pseudo === p) ?? monde.find((c) => c.pseudo === p);
       if (connu) return connu;
+      const approche = approches.find((a) => a.pseudo === p);
+      if (approche) {
+        return { pseudo: p, nom: approche.club, avatar: `club:${approche.club}`, type: 'club', club: approche.club } as CompteSuivi;
+      }
+      if (p.startsWith('club:')) {
+        const club = p.slice('club:'.length);
+        return { pseudo: p, nom: club, avatar: `club:${club}`, type: 'club', club } as CompteSuivi;
+      }
       // ⚠️ UNE CONVERSATION NE DISPARAÎT JAMAIS FAUTE DE FICHE. C'était le bug :
       // un interlocuteur absent de l'annuaire était silencieusement `undefined`,
       // puis retiré par `.filter(Boolean)` — le message existait, la
@@ -912,8 +922,11 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
         ? AGENT_PAR_ID[p.slice('agent:'.length)]?.nom ?? p
         : p.replace(/_officiel$/, '').replace(/_/g, ' ');
       return { pseudo: p, nom, avatar: '💼', type: 'media' } as CompteSuivi;
+    }).sort((a, b) => {
+      const date = (p: string) => conversations[p]?.at(-1)?.creeLe ?? 0;
+      return date(b.pseudo) - date(a.pseudo);
     });
-  }, [suivis, conversations, ouvrirSur, joueur]);
+  }, [suivis, conversations, ouvrirSur, joueur, approches]);
 
   const [actif, setActif] = useState<string | null>(ouvrirSur ?? tous[0]?.pseudo ?? null);
   const [texte, setTexte] = useState('');
@@ -922,6 +935,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
   useEffect(() => { if (ouvrirSur) setActif(ouvrirSur); }, [ouvrirSur]);
   const fil = actif ? conversations[actif] ?? [] : [];
   useEffect(() => { bas.current?.scrollIntoView({ block: 'end' }); }, [fil.length]);
+  useEffect(() => { if (actif) lireConversation(actif); }, [actif, lireConversation]);
 
   if (!tous.length) {
     return <p className="x-vide">Abonne-toi à des comptes ou ouvre un profil pour lancer une conversation.</p>;
@@ -931,10 +945,12 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
   return (
     <div className="x-messagerie">
       <div className="x-conversations">
-        {tous.map((c) => (
+        {tous.map((c) => {
+          const nonLu = (conversations[c.pseudo] ?? []).some((m) => m.de === 'lui' && !m.lu);
+          return (
           <button
             key={c.pseudo}
-            className={`x-conv${actif === c.pseudo ? ' actif' : ''}`}
+            className={`x-conv${actif === c.pseudo ? ' actif' : ''}${nonLu ? ' non-lu' : ''}`}
             onClick={() => setActif(c.pseudo)}
           >
             <Avatar avatar={c.avatar} club={c.club} taille={36} nom={c.nom} />
@@ -943,7 +959,8 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
               <i>@{c.pseudo}</i>
             </span>
           </button>
-        ))}
+          );
+        })}
       </div>
 
       <div className="x-fil-messages">

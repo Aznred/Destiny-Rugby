@@ -115,7 +115,8 @@ function construire(): Semaine[] {
   // Le match d'accès se joue une fois les finales connues : l'avant-dernier de
   // la division reçoit le finaliste malheureux de la division du dessous.
   ajouter(27, 6, 'phaseFinale', 'Match d’accès', { tourFinal: 'acces' });
-  ajouter(4, 7, 'treve', 'Intersaison — repos et mercato');
+  ajouter(4, 7, 'international', 'Matchs amicaux d’été', { competitionInternationale: 'amicaux' });
+  ajouter(11, 7, 'treve', 'Intersaison — repos et mercato');
 
   return semaines;
 }

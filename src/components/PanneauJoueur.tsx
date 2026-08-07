@@ -10,13 +10,15 @@ import { Blason } from './Blason';
 import { LogoCompet } from './LogoCompet';
 import { Drapeau, nomNation } from './Drapeau';
 import { Confirmation } from './Confirmation';
-import { semaine, libelleDate, SEMAINES_PAR_SAISON } from '../data/calendrier';
+import { semaine, libelleDate, SEMAINES_PAR_SAISON, CALENDRIER } from '../data/calendrier';
 import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store/useGame';
 import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID } from '../data/traits';
 import { t, tn } from '../lib/i18n';
 import { matchDeLaSemaine } from '../lib/matchLive';
 import { matchInternationalDuJoueur, equipeU20 } from '../lib/international';
+import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
+import { matchPhaseFinaleDuJoueur } from '../lib/phaseFinale';
 import { convocation, convocationU20 } from '../lib/selection';
 // ⚠️ LE MATCH EN DIRECT ARRIVE AU CLIC, pas au chargement de la page. Ce
 // composant tire derrière lui tout `lib/moteur/` (le terrain, la tactique, les
@@ -97,11 +99,43 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
     return null;
   }, [joueur, semaineActuelle.type]);
 
+  const coupe = useMemo(() => {
+    if (semaineActuelle.type !== 'coupe') return null;
+    const id = coupesDuClub(joueur.club)[0];
+    if (!id) return null;
+    const date = CALENDRIER.slice(0, joueur.semaine ?? 1).filter((s) => s.type === 'coupe').length;
+    const etat = coupeEnDirect(id, joueur.saison, joueur.club, date);
+    if (!etat) return null;
+    const poule = etat.poules.find((p) => p.clubs.includes(joueur.club));
+    const matchPoule = date <= etat.totalJournees
+      ? poule?.journees[date - 1]?.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club)
+      : undefined;
+    const matchFinal = etat.bracket.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club);
+    const match = matchPoule ?? (matchFinal
+      ? { ...matchFinal, essaisD: Math.floor(matchFinal.scoreD / 7), essaisE: Math.floor(matchFinal.scoreE / 7) }
+      : undefined);
+    return match ? { id, nom: etat.nom, journee: date, match } : null;
+  }, [joueur, semaineActuelle.type]);
+
+  const phase = useMemo(() => (
+    semaineActuelle.type === 'phaseFinale'
+      ? matchPhaseFinaleDuJoueur(joueur, bonusClubDuJoueur(joueur))
+      : null
+  ), [joueur, semaineActuelle.type]);
+
   const affiche = useMemo(
     () => (inter
       ? { journee: inter.affiche.journee, match: inter.affiche.match, cle: inter.affiche.cle }
-      : matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur))),
-    [joueur, inter],
+      : coupe
+        ? { journee: coupe.journee, match: coupe.match, cle: `${coupe.id}#${joueur.saison}#${joueur.semaine}` }
+        : phase
+          ? {
+              journee: 0,
+              match: { ...phase, essaisD: Math.floor(phase.scoreD / 7), essaisE: Math.floor(phase.scoreE / 7) },
+              cle: `phase#${joueur.division}#${joueur.saison}#${joueur.semaine}`,
+            }
+          : matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur))),
+    [joueur, inter, coupe, phase],
   );
   const monEquipe = inter ? (inter.u20 ? equipeU20(joueur.nation) : nomNation(joueur.nation)) : joueur.club;
   const adversaire = affiche

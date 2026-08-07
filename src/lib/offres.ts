@@ -120,6 +120,8 @@ export interface ContexteOffres {
   // Le joueur a demandé son transfert : les clubs de son niveau répondent
   // présents, mais on ne monte pas d'un étage aussi facilement.
   demande?: boolean;
+  /** Un club contacté directement passe en tête, sans ignorer les règles sportives. */
+  clubCible?: string;
 }
 
 export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
@@ -213,6 +215,18 @@ export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
     .sort((a, b) => b.score - a.score)
     .slice(0, 45);
 
+  // Une démarche directe ne doit pas se perdre dans le tirage : si ce club a
+  // réellement le niveau pour recruter le joueur, il étudie son dossier avant
+  // les autres. Les critères de division et de niveau restent appliqués plus haut.
+  if (ctx.clubCible) {
+    const cible = candidats.find((x) => x.club.nom === ctx.clubCible);
+    if (cible && !pretendants.some((x) => x.cand.club.nom === cible.club.nom)) {
+      pretendants.unshift({ cand: cible, score: Number.POSITIVE_INFINITY });
+    } else if (cible) {
+      pretendants.sort((a, b) => (b.cand.club.nom === ctx.clubCible ? 1 : 0) - (a.cand.club.nom === ctx.clubCible ? 1 : 0));
+    }
+  }
+
   // « Ambitieux » fait sonner le téléphone, « Fidèle au maillot » le fait taire.
   const maximum = Math.max(
     1,
@@ -227,7 +241,7 @@ export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
     // celui qui écarte le plus de monde.
     const besoin = besoinAuPoste(cand.club.nom, ctx.saison, j.poste, c);
     if (besoin <= 0) continue;
-    if (graine(`offre#${j.nom}#${cand.club.nom}#${ctx.saison}#${ctx.demande ? 'd' : 's'}`)()
+    if (cand.club.nom !== ctx.clubCible && graine(`offre#${j.nom}#${cand.club.nom}#${ctx.saison}#${ctx.demande ? 'd' : 's'}`)()
       > Math.min(0.95, score * besoin)) continue;
     pris.add(cand.club.nom);
     choisis.push(cand);

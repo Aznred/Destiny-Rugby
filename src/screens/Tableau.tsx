@@ -22,7 +22,7 @@ import { tournoiDeFinDAnnee } from '../lib/tournoi';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import {
   internationalEnDirect, affichesInternationales, competitionsDeLaSaison,
-  fenetreInternationale, journeesInternationalesA,
+  fenetreInternationale, journeesInternationalesA, classementMondial,
 } from '../lib/international';
 import { LogoEquipe } from '../components/Blason';
 import { nomNation } from '../components/Drapeau';
@@ -324,6 +324,7 @@ export function Tableau() {
   // maintenant pour de vrai (lib/international.ts).
   const saison = joueur?.saison ?? 1;
   const internationales = useMemo(() => competitionsDeLaSaison(saison), [saison]);
+  const rangMondial = useMemo(() => classementMondial(saison), [saison]);
   const maNation = nomNation(joueur?.nation ?? '');
   const fenetre = useMemo(
     () => fenetreInternationale(numero, saison, maNation),
@@ -517,6 +518,24 @@ export function Tableau() {
             </button>
           );
         })}
+      </div>
+
+      <div className="carte bloc-competition">
+        <div className="comp-tete">
+          <b>🌍 {t('intl.classementMondial')}</b>
+          <span className="comp-count">{t('intl.top12')}</span>
+        </div>
+        <div className="classement-tableau tableau-live">
+          {rangMondial.slice(0, 20).map((l) => (
+            <div key={l.nation} className="classement-ligne" data-moi={l.nation === maNation ? 'oui' : undefined}>
+              <span className="cl-pos" data-tete={l.rang <= 12 ? 'oui' : undefined}>{l.rang}</span>
+              <LogoEquipe nom={l.nation} taille={22} />
+              <span className="cl-nom">{l.nation}{l.nation === maNation && ' 🫵'}</span>
+              <span className="cl-pts">{l.points}</span>
+              <span style={{ gridColumn: 'span 5' }}>{l.rang <= 12 ? t('intl.qualifie') : t('intl.barrages')}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ---------- COUPE D'EUROPE ---------- */}

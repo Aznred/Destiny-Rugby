@@ -1998,6 +1998,8 @@
 }
 .x-conv:hover { background: var(--x-survol); }
 .x-conv.actif { background: var(--x-survol); box-shadow: inset 2px 0 0 var(--x-bleu); }
+.x-conv.non-lu { background: rgba(29, 155, 240, 0.11); }
+.x-conv.non-lu b, .x-conv.non-lu i { color: var(--x-bleu); font-weight: 750; }
 .x-conv span { display: flex; flex-direction: column; min-width: 0; }
 .x-conv b { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .x-conv i { color: var(--x-gris); font-size: 0.72rem; font-style: normal; }

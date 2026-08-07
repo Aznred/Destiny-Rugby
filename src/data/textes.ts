@@ -66,6 +66,10 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   'nav.boutique': { fr: 'Boutique', en: 'Shop', es: 'Tienda', it: 'Negozio', de: 'Shop', pt: 'Loja', ja: 'ショップ' },
   'nav.reglages': { fr: 'Réglages IA', en: 'AI settings', es: 'Ajustes de IA', it: 'Impostazioni IA', de: 'KI-Einstellungen', pt: 'Definições de IA', ja: 'AI設定' },
   'nav.ovale': { fr: 'L’Ovale — le réseau social', en: 'The Oval — the social network', es: 'El Oval — la red social', it: 'L’Ovale — il social network', de: 'The Oval — das soziale Netzwerk', pt: 'O Oval — a rede social', ja: 'オーバル — SNS' },
+  'intl.classementMondial': { fr: 'Classement mondial des sélections', en: 'World national team rankings', es: 'Clasificación mundial de selecciones', it: 'Classifica mondiale delle nazionali', de: 'Weltrangliste der Nationalteams', pt: 'Ranking mundial de seleções', ja: '代表チーム世界ランキング' },
+  'intl.top12': { fr: 'Top 12 qualifié d’office au Mondial', en: 'Top 12 automatically qualified for the World Cup', es: 'El top 12 clasifica directamente al Mundial', it: 'Le prime 12 qualificate di diritto al Mondiale', de: 'Die Top 12 sind direkt für die Weltmeisterschaft qualifiziert', pt: 'Top 12 qualificado automaticamente para o Mundial', ja: '上位12チームはワールドカップへ自動出場' },
+  'intl.qualifie': { fr: 'Qualifié d’office', en: 'Automatically qualified', es: 'Clasificado directamente', it: 'Qualificato di diritto', de: 'Direkt qualifiziert', pt: 'Qualificado automaticamente', ja: '自動出場' },
+  'intl.barrages': { fr: 'Barrages de qualification', en: 'Qualification playoffs', es: 'Repechaje de clasificación', it: 'Spareggi di qualificazione', de: 'Qualifikations-Play-offs', pt: 'Play-offs de qualificação', ja: '予選プレーオフ' },
 
   // --- ACCUEIL ------------------------------------------------------------
   'accueil.eyebrow': { fr: 'RPG DE CARRIÈRE · RUGBY', en: 'RUGBY CAREER RPG', es: 'RPG DE CARRERA · RUGBY', it: 'GDR DI CARRIERA · RUGBY', de: 'RUGBY-KARRIERE-RPG', pt: 'RPG DE CARREIRA · RÂGBI', ja: 'ラグビー キャリアRPG' },

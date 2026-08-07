@@ -138,6 +138,17 @@ export function simulerJourneeCoupe(
       ));
     }
   }
+  if (journee > etat.totalJournees) {
+    for (const m of etat.bracket) {
+      if (joues++ >= MAX_MATCHS_PAR_JOURNEE) break;
+      const concerne = avatar && (avatar.club === m.domicile || avatar.club === m.exterieur);
+      verser(sortie, jouerSansRendu(
+        m.domicile, m.exterieur, saison, m.scoreD, m.scoreE,
+        `${coupeId}#${saison}#finale#${m.tour}#${m.domicile}#${m.exterieur}`,
+        concerne ? avatar : undefined,
+      ));
+    }
+  }
   return sortie;
 }
 

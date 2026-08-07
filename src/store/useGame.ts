@@ -513,7 +513,7 @@ interface GameState {
   fermerTrophee: () => void;
   reinitialiser: () => void;
   // marché des transferts — tout passe par les messages privés de L'Ovale
-  susciterApproches: (maximum?: number, demande?: boolean) => number;
+  susciterApproches: (maximum?: number, demande?: boolean, clubCible?: string) => number;
   repondreApproche: (id: string, levier: Levier) => Reponse | null;
   accepterApproche: (id: string) => void;
   refuserApproche: (id: string) => void;
@@ -529,6 +529,7 @@ interface GameState {
   suivreCompte: (c: CompteSuivi) => void;
   nePlusSuivre: (pseudo: string) => void;
   envoyerMessage: (pseudo: string, texte: string) => Promise<void>;
+  lireConversation: (pseudo: string) => void;
   appliquerAnnonce: (post: PostSocial) => void;
   // Le fil suit le CALENDRIER : une fournée de publications par semaine jouée.
   vivreSemaineSociale: () => void;
@@ -1401,6 +1402,11 @@ export const useGame = create<GameState>()(
 
         set((s) => ({
           joueur: j,
+          // Les feuilles détaillées sont utiles pendant la saison, mais les
+          // conserver pour chaque championnat et chaque année finit par remplir
+          // le localStorage du navigateur et bloque alors tous les boutons.
+          statsReelles: {},
+          journeesReelles: {},
           coins: s.coins + gain,
           compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
           tropheesEnAttente: [...s.tropheesEnAttente, ...gagnes],
@@ -1578,7 +1584,9 @@ export const useGame = create<GameState>()(
           set({ avanceRapide: false });
         }
         // La scène de la semaine est demandée UNE fois, à l'arrivée.
-        if (get().joueur && !get().evenementHebdo && !get().scenarioActif) {
+        const arrivee = get().joueur;
+        if (arrivee && !get().evenementHebdo && !get().scenarioActif
+          && ((arrivee.semaine ?? 1) % 4 === 1)) {
           set({ attenteEvenement: true });
         }
         return { semaines, arret };
@@ -1718,7 +1726,9 @@ export const useGame = create<GameState>()(
           scenarioActif: suite ?? s.scenarioActif,
           // Une seule scène à la fois : si une interview vient de tomber, la
           // semaine n'en réclame pas une deuxième.
-          attenteEvenement: !enAvance && rienEnCours && !suite,
+          // Une scène environ toutes les quatre semaines : le récit reste vivant
+          // sans bloquer la carrière à chaque passage de calendrier.
+          attenteEvenement: !enAvance && rienEnCours && !suite && numero % 4 === 1,
           journal: [
             ...s.journal,
             // ⚠️ Si le match vient d'être JOUÉ en direct, on n'ajoute PAS le
@@ -1806,7 +1816,7 @@ export const useGame = create<GameState>()(
        * Fait écrire des clubs. Renvoie le nombre d'approches réellement nées.
        * @param demande true = on s'est mis sur le marché (barre abaissée).
        */
-      susciterApproches: (maximum = 2, demande = false) => {
+      susciterApproches: (maximum = 2, demande = false, clubCible?: string) => {
         const joueur = get().joueur;
         if (!joueur) return 0;
         // ⚠️ LA RÈGLE DU « UN AN MAX RESTANT ». Un club n'écrit pas à un joueur
@@ -1837,7 +1847,9 @@ export const useGame = create<GameState>()(
         );
         // On réutilise LE moteur du marché : cote, besoin au poste, saut
         // d'étage, salaires par âge. Rien n'est recalculé ici.
-        const offres = genererOffres(joueur, { saison: joueur.saison, maximum: maximum + 2, demande })
+        const offres = genererOffres(joueur, {
+          saison: joueur.saison, maximum: maximum + 2, demande, clubCible,
+        })
           .filter((o) => !dejaVues.has(o.club))
           .slice(0, maximum);
         if (!offres.length) return 0;
@@ -1859,6 +1871,8 @@ export const useGame = create<GameState>()(
                   + `On suit ce que tu fais et on aimerait t'avoir la saison prochaine. `
                   + `Ce qu'on met sur la table : ${resumerTermes(a.offre)}. On en discute ?`,
                 saison: joueur.saison,
+                creeLe: Date.now(),
+                lu: false,
               },
             ],
           }), { ...s.conversations }),
@@ -2985,6 +2999,7 @@ export const useGame = create<GameState>()(
 
         const mien: MessageDM = {
           id: idUnique(), pseudo, de: 'moi', texte: texte.trim().slice(0, 400), saison: joueur.saison,
+          creeLe: Date.now(), lu: true,
         };
         const fil = [...(conversations[pseudo] ?? []), mien];
         // CE QUE TU DIS COMPTE : le ton du message fait bouger la relation, et
@@ -2995,6 +3010,26 @@ export const useGame = create<GameState>()(
           conversations: { ...conversations, [pseudo]: fil },
           relationsSociales: { ...relationsSociales, [pseudo]: apres },
         });
+
+        // Écrire à un club devient une démarche concrète : s'il peut réellement
+        // recruter le joueur, il envoie aussitôt une offre négociable dans ce fil.
+        if (compte.type === 'club' && compte.club && compte.club !== joueur.club) {
+          if (get().susciterApproches(1, true, compte.club) > 0) return;
+          set((s) => ({
+            conversations: {
+              ...s.conversations,
+              [pseudo]: [
+                ...(s.conversations[pseudo] ?? []),
+                {
+                  id: idUnique(), pseudo, de: 'lui' as const, saison: joueur.saison,
+                  texte: "Merci pour ton message. Nous suivons ton dossier, mais nous ne pouvons pas te faire une offre concrète pour le moment.",
+                  creeLe: Date.now(), lu: false,
+                },
+              ],
+            },
+          }));
+          return;
+        }
 
         const cle = get().groqKey || CLE_ENV;
         let reponse = '';
@@ -3016,7 +3051,10 @@ export const useGame = create<GameState>()(
             ...s.conversations,
             [pseudo]: [
               ...(s.conversations[pseudo] ?? []),
-              { id: idUnique(), pseudo, de: 'lui' as const, texte: reponse, saison: joueur.saison },
+              {
+                id: idUnique(), pseudo, de: 'lui' as const, texte: reponse, saison: joueur.saison,
+                creeLe: Date.now(), lu: false,
+              },
             ],
           },
         }));
@@ -3038,6 +3076,17 @@ export const useGame = create<GameState>()(
 
       marquerNotifsLues: () =>
         set((s) => ({ notifsSocial: s.notifsSocial.map((n) => ({ ...n, lue: true })) })),
+
+      lireConversation: (pseudo) => set((s) => {
+        const fil = s.conversations[pseudo] ?? [];
+        if (!fil.some((m) => m.de === 'lui' && !m.lu)) return s;
+        return {
+          conversations: {
+            ...s.conversations,
+            [pseudo]: fil.map((m) => m.de === 'lui' ? { ...m, lu: true } : m),
+          },
+        };
+      }),
 
       // ---- SUCCÈS ----
       // Appelé après chaque action qui fait bouger la carrière. Un succès ne
@@ -3403,7 +3452,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 3,
+      version: 4,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
       // ⚠️ Version 3 : on RÉPARE aussi les données abîmées (poste inconnu,
@@ -3418,6 +3467,7 @@ export const useGame = create<GameState>()(
           matchRegarde?: string;
           statsReelles?: Record<string, Record<string, LigneReelle>>;
           journeesReelles?: Record<string, number>;
+          journal?: EntreeJournal[];
           notifsSocial?: NotifSocial[];
           approches?: Approche[];
           succesDebloques?: SuccesDebloques;
@@ -3464,6 +3514,22 @@ export const useGame = create<GameState>()(
         s.matchRegarde ??= '';
         s.statsReelles ??= {};
         s.journeesReelles ??= {};
+        // Migration anti « quota exceeded » : les anciennes sauvegardes
+        // empilaient les feuilles de matchs de toutes les saisons. On ne garde
+        // que la saison en cours, plus un historique de lecture raisonnable.
+        const saisonCourante = s.joueur?.saison;
+        if (saisonCourante) {
+          const suffixe = `#${saisonCourante}`;
+          s.statsReelles = Object.fromEntries(Object.entries(s.statsReelles)
+            .filter(([cle]) => cle.endsWith(suffixe)));
+          s.journeesReelles = Object.fromEntries(Object.entries(s.journeesReelles)
+            .filter(([cle]) => cle.endsWith(suffixe)));
+        }
+        s.journal = (s.journal ?? []).slice(-160);
+        s.posts = (s.posts ?? []).slice(-120);
+        s.notifsSocial = (s.notifsSocial ?? []).slice(0, 40);
+        s.conversations = Object.fromEntries(Object.entries(s.conversations ?? {})
+          .map(([pseudo, fil]) => [pseudo, fil.slice(-40)]));
         s.notifsSocial ??= [];
         s.comptesSuivis ??= [];
         s.conversations ??= {};
@@ -3498,7 +3564,7 @@ export const useGame = create<GameState>()(
       },
       partialize: (s) => ({
         joueur: s.joueur,
-        journal: s.journal,
+        journal: s.journal.slice(-160),
         coins: s.coins,
         inventaire: s.inventaire,
         skinActif: s.skinActif,
@@ -3518,14 +3584,17 @@ export const useGame = create<GameState>()(
         theme: s.theme,
         langue: s.langue,
         mouvementsClubs: s.mouvementsClubs,
-        posts: s.posts,
+        posts: s.posts.slice(-120),
         filSemaine: s.filSemaine,
         matchRegarde: s.matchRegarde,
-        statsReelles: s.statsReelles,
-        journeesReelles: s.journeesReelles,
-        notifsSocial: s.notifsSocial,
+        statsReelles: Object.fromEntries(Object.entries(s.statsReelles)
+          .filter(([cle]) => cle.endsWith(`#${s.joueur?.saison ?? 0}`))),
+        journeesReelles: Object.fromEntries(Object.entries(s.journeesReelles)
+          .filter(([cle]) => cle.endsWith(`#${s.joueur?.saison ?? 0}`))),
+        notifsSocial: s.notifsSocial.slice(0, 40),
         comptesSuivis: s.comptesSuivis,
-        conversations: s.conversations,
+        conversations: Object.fromEntries(Object.entries(s.conversations)
+          .map(([pseudo, fil]) => [pseudo, fil.slice(-40)])),
         transfertsSociaux: s.transfertsSociaux,
         relationsSociales: s.relationsSociales,
         succesDebloques: s.succesDebloques,

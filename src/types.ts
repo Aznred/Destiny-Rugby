@@ -309,6 +309,10 @@ export interface MessageDM {
   de: 'moi' | 'lui';
   texte: string;
   saison: number;
+  /** Date locale de création : sert à garder les conversations dans le bon ordre. */
+  creeLe?: number;
+  /** Un message reçu reste bleu tant que le joueur n'a pas ouvert la discussion. */
+  lu?: boolean;
 }
 
 // Un transfert ANNONCÉ sur L'Ovale — et réellement appliqué au monde du jeu.

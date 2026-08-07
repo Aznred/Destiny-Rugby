@@ -89,6 +89,7 @@ export function coupeEnDirect(
   });
   const total = Math.max(...grilles.map((g) => g.length));
   const jusqua = Math.max(0, Math.min(total, journeesJouees));
+  const toursJoues = Math.max(0, journeesJouees - total);
 
   const poules: PouleCoupe[] = groupes.map((clubs, p) => {
     const journees: MatchChampionnat[][] = [];
@@ -150,8 +151,10 @@ export function coupeEnDirect(
         `FINALE : ${d1.vainqueur} – ${d2.vainqueur}`,
         0, // terrain neutre
       );
-      bracket.push(d1, d2, finale);
-      vainqueur = finale.vainqueur;
+      const tousLesMatchs = [...bracket, d1, d2, finale];
+      const ordre: Record<MatchFinal['tour'], number> = { barrage: 1, quart: 1, demie: 2, finale: 3, accession: 4 };
+      bracket.splice(0, bracket.length, ...tousLesMatchs.filter((m) => ordre[m.tour] <= toursJoues));
+      vainqueur = toursJoues >= 3 ? finale.vainqueur : null;
     }
   }
 
