@@ -25,7 +25,8 @@ import {
   fenetreInternationale, journeesInternationalesA, classementMondial,
 } from '../lib/international';
 import { LogoEquipe } from '../components/Blason';
-import { Drapeau } from '../components/Drapeau';
+// ⚠️ Plus de `<Drapeau>` sur cet écran : le classement mondial des sélections
+// affiche désormais leur ÉCUSSON (`LogoEquipe`), pas le drapeau du pays.
 import { nomNation, nomNationTraduit } from '../lib/nations';
 import { COUPES_EUROPE } from '../data/mondeReel';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
@@ -588,7 +589,13 @@ export function Tableau() {
           {rangMondial.map((l) => (
             <div key={l.nation} className="classement-ligne" data-moi={l.nation === maNation ? 'oui' : undefined}>
               <span className="cl-pos" data-tete={l.rang <= 12 ? 'oui' : undefined}>{l.rang}</span>
-              <Drapeau nation={l.nation} taille={1.05} />
+              {/* ⚠️ L'ÉCUSSON DE LA SÉLECTION, PAS LE DRAPEAU (demande
+                  explicite). Un classement de rugby montre les emblèmes des
+                  fédérations — le trèfle irlandais, la rose anglaise, le coq —
+                  pas des drapeaux d'États. `LogoEquipe` va chercher l'image
+                  tout seul et retombe sur les initiales s'il n'en trouve
+                  aucune ; depuis le lot « nations », il n'en manque plus. */}
+              <LogoEquipe nom={l.nation} taille={22} />
               <span className="cl-nom">{nomNationTraduit(l.nation)}{l.nation === maNation && ' 🫵'}</span>
               <span className="cl-pts">{noteWorldRugby(l.points)}</span>
               <span style={{ gridColumn: 'span 5' }}>{l.rang <= 12 ? t('intl.qualifie') : t('intl.barrages')}</span>

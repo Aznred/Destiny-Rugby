@@ -9,7 +9,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { CLASSEMENT_WORLD_RUGBY_INITIAL } from '../src/data/classementWorldRugby';
-import { LOGO_SELECTION_CATALOGUE, LOGO_SELECTION_PRINCIPALE } from '../src/data/logosSelections';
+import {
+  LOGO_SELECTION_CATALOGUE, LOGO_SELECTION_NATIONS, LOGO_SELECTION_PRINCIPALE,
+} from '../src/data/logosSelections';
 import { LOGO_PAR_EQUIPE } from '../src/data/mondeReel';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../src/data/nouvellesLigues';
 import { SELECTIONS_SENIOR, SELECTIONS_U20 } from '../src/data/selections';
@@ -46,6 +48,12 @@ for (const competition of COMPETITIONS_NATIONS_NOUVELLES) {
     }
   }
 }
+// ⚠️ LE BOUCHE-TROU EN PREMIER, donc écrasé par tout le reste : c'est
+// exactement l'ordre de résolution de `LogoEquipe` (`components/Blason.tsx`).
+// Un test qui ne reproduit pas l'ordre du jeu ne mesure rien.
+for (const [equipe, logo] of Object.entries(LOGO_SELECTION_NATIONS)) {
+  logoParNation.set(nomNation(equipe), logo);
+}
 for (const [equipe, logo] of Object.entries(LOGO_SELECTION_CATALOGUE)) {
   logoParNation.set(nomNation(equipe), logo);
 }
@@ -81,13 +89,16 @@ const atlasInvalides = atlas
       ?? LOGO_SELECTION_CATALOGUE[selection.nom]
       ?? LOGO_SELECTION_CATALOGUE[nomNation(selection.nom)]
       ?? selection.logo
-      ?? logoParNation.get(nomNation(selection.nom)),
+      ?? logoParNation.get(nomNation(selection.nom))
+      ?? LOGO_SELECTION_NATIONS[selection.nom]
+      ?? LOGO_SELECTION_NATIONS[nomNation(selection.nom)],
   }))
   .filter((entree): entree is { nom: string; url: string } => Boolean(entree.url))
   .filter(({ url }) => !signatureImage(path.join(racine, 'public', url)));
 
 console.log(`✅ ${cheminsPrincipaux.length} logos principaux valides et prioritaires`);
 console.log(`✅ ${cheminsCatalogue.length} logos du catalogue valides en repli`);
+console.log(`✅ ${[...new Set(Object.values(LOGO_SELECTION_NATIONS))].length} logos du lot « nations » (bouche-trou, priorité la plus basse)`);
 console.log(`✅ priorité contrôlée sur ${nomsCommuns.length} nom(s) présent(s) dans les deux lots`);
 console.log(`✅ ${CLASSEMENT_WORLD_RUGBY_INITIAL.length - classementSansLogo.length}/${CLASSEMENT_WORLD_RUGBY_INITIAL.length} nations classées ont un logo déclaré`);
 console.log(`✅ atlas : ${SELECTIONS_SENIOR.length} sélections sénior + ${SELECTIONS_U20.length} sélections U20`);

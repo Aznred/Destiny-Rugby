@@ -1,11 +1,20 @@
 // LES ÉCUSSONS DES SÉLECTIONS NATIONALES
 //
-// Deux lots sources, désormais rangés sous `sources/logos/selections/` :
+// TROIS lots sources, rangés sous `sources/logos/selections/`, du plus
+// prioritaire au moins prioritaire :
 //   • `principaux/` : les 39 écussons historiques déjà référencés par les
 //     données générées ; ils écrasent les petites vignettes du pack clubs ;
 //   • `catalogue/` : la livraison complète, contrôlée par signature binaire.
 //     Elle contient aussi des équipes A/U20 et des variantes non utilisées ; la
-//     table explicite ci-dessous choisit la bonne image pour chaque nom du jeu.
+//     table explicite ci-dessous choisit la bonne image pour chaque nom du jeu ;
+//   • `nations/` : ⚠️ **LE BOUCHE-TROU**, et rien d'autre. 167 écussons livrés
+//     en vrac, un fichier par pays, nommés dans la langue du jeu. Il ne sert
+//     qu'aux nations que les deux autres lots ne couvrent pas — mesuré avant
+//     son arrivée : **41 des 114 nations classées n'avaient aucun logo**
+//     (Corée du Sud, Sénégal, Ouganda, Nigeria, Chine, Grèce…) et affichaient
+//     donc un simple drapeau. Il n'a AUCUNE table à tenir à la main : le nom du
+//     fichier EST le nom du pays, la correspondance se fait toute seule (plus
+//     `ALIAS_NATIONS` pour les quelques orthographes qui diffèrent).
 //
 // Les compléments sont isolés dans `public/logos-selections/` et une table
 // TypeScript est générée. Cela évite qu'un futur passage de `copierLogos.cjs`
@@ -20,6 +29,7 @@ const path = require('path');
 const RACINE = path.join(__dirname, '..');
 const SOURCE_PRINCIPALE = path.join(RACINE, 'sources', 'logos', 'selections', 'principaux');
 const SOURCE_CATALOGUE = path.join(RACINE, 'sources', 'logos', 'selections', 'catalogue');
+const SOURCE_NATIONS = path.join(RACINE, 'sources', 'logos', 'selections', 'nations');
 const CIBLE_PRINCIPALE = path.join(RACINE, 'public', 'logos');
 const CIBLE_COMPLEMENTS = path.join(RACINE, 'public', 'logos-selections');
 const SORTIE = path.join(RACINE, 'src', 'data', 'logosSelections.ts');
@@ -153,6 +163,26 @@ const CATALOGUE = {
   'Zimbabwe_rugby_team_logo.PNG': { slug: 'zimbabwe', nations: ['Zimbabwe'] },
 };
 
+// ⚠️ LES QUELQUES NOMS QUI NE TOMBENT PAS EN FACE. Le pack est nommé en
+// français, comme le jeu : la correspondance est automatique dans 95 % des cas.
+// Ne sont listées ici que les divergences réelles — clé = nom du fichier livré
+// (sans extension), valeur = les noms canoniques du jeu.
+const ALIAS_NATIONS = {
+  'Corée du Sud': ['Corée du Sud', 'Coree du Sud'],
+  'Côte d’Ivoire': ['Côte d’Ivoire', "Côte d'Ivoire"],
+  'États-Unis': ['États-Unis', 'USA', 'Etats-Unis'],
+  'Trinité-et-Tobago': ['Trinité-et-Tobago', 'Trinidad-et-Tobago'],
+  'Saint-Vincent-et-les-Grenadines': ['Saint-Vincent-et-les-Grenadines', 'Saint-Vincent et les Grenadines'],
+  'Émirats arabes unis': ['Émirats arabes unis', 'Emirats arabes unis'],
+  'Îles Caïmans': ['Îles Caïmans', 'Iles Caïmans', 'Îles Caimans'],
+  'Taïwan': ['Taïwan', 'Taiwan', 'Taipei chinois'],
+  'Bosnie-Herzégovine': ['Bosnie-Herzégovine', 'Bosnie Herzégovine'],
+  'République tchèque': ['République tchèque', 'République Tchèque', 'Tchéquie'],
+  'Pays-Bas': ['Pays-Bas', 'Pays Bas'],
+  'Nouvelle-Zélande': ['Nouvelle-Zélande', 'Nouvelle Zélande'],
+  'Papouasie-Nouvelle-Guinée': ['Papouasie-Nouvelle-Guinée', 'Papouasie Nouvelle-Guinée'],
+};
+
 function slug(nom) {
   return nom
     .normalize('NFD')
@@ -224,9 +254,55 @@ for (const [fichier, entree] of Object.entries(CATALOGUE)) {
   fs.copyFileSync(source, path.join(CIBLE_COMPLEMENTS, nomCible));
   for (const nation of entree.nations) tableCatalogue[nation] = `/logos-selections/${nomCible}`;
 }
+// ⚠️ LA PURGE A ÉTÉ DÉPLACÉE PLUS BAS, après le lot « nations » : elle efface
+// tout ce qui n'est pas dans `ciblesAttendues`, et les `nation_*.png` n'y
+// entrent qu'au bloc suivant. Purger ici les aurait supprimés à chaque passage
+// pour les recopier aussitôt — inutile, et surtout piégeux le jour où le lot
+// « nations » est absent.
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LE BOUCHE-TROU : un écusson pour les nations qu'aucun des deux lots ne couvre
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ AUCUNE TABLE À TENIR À LA MAIN. Le nom du fichier EST le nom du pays dans
+// la langue du jeu — c'est ce qui rend ce lot maintenable : ajouter un pays,
+// c'est déposer un PNG, rien d'autre. Et c'est bien un REPLI : la table générée
+// est consultée en DERNIER (`LOGO_SELECTION_NATIONS`), après les écussons
+// officiels des deux autres lots.
+const tableNations = {};
+let nationsCopiees = 0;
+if (fs.existsSync(SOURCE_NATIONS)) {
+  for (const fichier of fs.readdirSync(SOURCE_NATIONS).filter((f) => /\.(png|jpg|jpeg|webp|gif)$/i.test(f))) {
+    const source = path.join(SOURCE_NATIONS, fichier);
+    // Une « image » qui n'en est pas casserait l'affichage sans le moindre
+    // message : même contrôle par signature binaire que pour les autres lots.
+    if (!estImage(source)) {
+      console.warn(`   ⚠ ignoré (pas une image) : nations/${fichier}`);
+      continue;
+    }
+    const ext = path.extname(fichier).toLowerCase();
+    const pays = path.basename(fichier, ext);
+    const nomCible = `nation_${slug(pays)}${ext}`;
+    ciblesAttendues.add(nomCible);
+    fs.copyFileSync(source, path.join(CIBLE_COMPLEMENTS, nomCible));
+    nationsCopiees += 1;
+    for (const nom of ALIAS_NATIONS[pays] ?? [pays]) {
+      tableNations[nom] = `/logos-selections/${nomCible}`;
+    }
+  }
+} else {
+  console.warn(`ℹ️ lot « nations » absent (${SOURCE_NATIONS}) — les nations sans écusson garderont leur drapeau.`);
+}
+
+// La purge, maintenant que TOUS les lots ont annoncé leurs cibles : ce qui
+// traîne dans `public/logos-selections/` sans être déclaré est un reste d'une
+// version précédente du script.
 for (const fichier of fs.readdirSync(CIBLE_COMPLEMENTS)) {
   if (!ciblesAttendues.has(fichier)) fs.unlinkSync(path.join(CIBLE_COMPLEMENTS, fichier));
 }
+
+const lignesNations = Object.entries(tableNations)
+  .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+  .map(([nation, logo]) => `  ${JSON.stringify(nation)}: ${JSON.stringify(logo)},`);
 
 const lignesPrincipales = Object.entries(tablePrincipale)
   .sort(([a], [b]) => a.localeCompare(b, 'fr'))
@@ -236,16 +312,24 @@ const lignesCatalogue = Object.entries(tableCatalogue)
   .map(([nation, logo]) => `  ${JSON.stringify(nation)}: ${JSON.stringify(logo)},`);
 
 fs.writeFileSync(SORTIE, `// ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.\n`
-  + `// Sources : sources/logos/selections/principaux/ puis catalogue/ en repli.\n\n`
+  + `// Sources, dans l'ordre de priorité : sources/logos/selections/principaux/,\n`
+  + `// puis catalogue/, puis nations/ (le bouche-trou, un fichier par pays).\n\n`
   + `export const LOGO_SELECTION_PRINCIPALE: Readonly<Record<string, string>> = {\n`
   + `${lignesPrincipales.join('\n')}\n};\n\n`
   + `export const LOGO_SELECTION_CATALOGUE: Readonly<Record<string, string>> = {\n`
   + `${lignesCatalogue.join('\n')}\n};\n\n`
+  + `// ⚠️ CONSULTÉE EN DERNIER. Écussons génériques livrés en vrac : ils évitent\n`
+  + `// qu'une nation classée n'ait aucune image, jamais ils ne passent devant un\n`
+  + `// écusson officiel des deux tables ci-dessus.\n`
+  + `export const LOGO_SELECTION_NATIONS: Readonly<Record<string, string>> = {\n`
+  + `${lignesNations.join('\n')}\n};\n\n`
   + `// Alias conservé pour les éventuels imports plus anciens.\n`
   + `export const LOGO_SELECTION_SUPPLEMENTAIRE = LOGO_SELECTION_CATALOGUE;\n`, 'utf8');
 
 console.log(`✅ ${remplaces} écusson(s) principal(aux) remplacé(s), ${ajoutes} ajouté(s)`);
 console.log(`✅ ${Object.keys(CATALOGUE).length} écusson(s) du catalogue copié(s)`);
+console.log(`✅ ${nationsCopiees} écusson(s) du lot « nations » copié(s) (bouche-trou)`);
 console.log(`✅ ${Object.keys(tablePrincipale).length} nom(s) principal(aux), prioritaires`);
 console.log(`✅ ${Object.keys(tableCatalogue).length} nom(s) du catalogue, utilisés en repli`);
+console.log(`✅ ${Object.keys(tableNations).length} nom(s) du lot nations, en dernier recours`);
 if (nonUtilises.length) console.log(`ℹ️ ${nonUtilises.length} variante(s) conservée(s), non utilisée(s) par le jeu`);

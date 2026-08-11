@@ -195,6 +195,15 @@ console.log('\n=== 4 bis. LES CLUBS SONT AFFICHÉS, DONC BORNÉS ===');
   // ⚠️ Les clubs ne pèsent RIEN sur le score : il n'y a rien à gagner à les
   // truquer. Mais ils s'affichent sur l'écran de tous les joueurs du monde —
   // c'est donc une surface d'injection, pas de triche, et elle se borne pareil.
+  // ⚠️ RÉGRESSION DE PRODUCTION, GARDÉE SOUS TEST : le serveur refusait
+  // « note hors bornes (100, attendu 0..99) ». Huit attributs à 100 donnent une
+  // moyenne de 100, et le store borne bien les attributs à 100.
+  const centaine = verifierFiche(
+    fiche({ saisons: 12, ageDebut: 18, age: 29, note: 100, matchs: 210, essais: 44 }),
+    IDS_TROPHEES,
+  );
+  ligne('une générale de 100 est acceptée',
+    centaine.anomalies.join(' | ') || `score ${centaine.score}`, centaine.valide);
   attaque('aucun club', fiche({ clubs: [] }), /aucun club/);
   attaque('clubs n’est pas une liste',
     fiche({ clubs: 'Toulouse' as unknown as string[] }), /pas une liste/);

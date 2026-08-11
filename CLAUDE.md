@@ -2475,8 +2475,9 @@ une clé publique : il FAUT des politiques pour lui interdire d'écrire. Ici la
 chaîne de connexion vit dans les variables d'environnement de la fonction — le
 navigateur n'a aucun accès à la base. Moins de surface, moins à verrouiller.
 
-⚠️ **`SCORE_MAX` est en dur dans le schéma** (`check (score <= 82488)`). Il a
-changé avec les distinctions individuelles (64 488 → 82 488). À remettre à jour à
+⚠️ **`SCORE_MAX` est en dur dans le schéma** (`check (score <= 82500)`). Il a
+changé avec les distinctions individuelles (64 488 → 82 488), puis quand
+`noteMax` est passé de 99 à 100 (82 488 → **82 500**). À remettre à jour à
 chaque retouche de `LIMITES`, sinon la base refuse des scores légitimes — c'est
 écrit dans les deux fichiers SQL et dans le guide.
 

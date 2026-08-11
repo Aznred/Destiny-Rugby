@@ -157,7 +157,18 @@ export const LIMITES = {
   titresParSaison: 9,
   /** Un international ne dépasse pas une douzaine de capes par an. */
   capesParSaison: 12,
-  noteMax: 99,
+  /**
+   * ⚠️ 100, PAS 99, ET C'EST UN BUG CORRIGÉ. Le serveur refusait de vraies
+   * carrières — journal de production : « note hors bornes (100, attendu
+   * 0..99) ». La note est la MOYENNE des 8 attributs (`noteGlobale`), et les
+   * attributs sont bornés à **100** par `borne()` dans le store : huit
+   * attributs à 100 donnent donc une moyenne de 100, légitimement. La borne
+   * était copiée du plafond de `entrainer()` (`Math.min(99, …)`), qui ne
+   * concerne que l'entraînement — la progression de saison, elle, monte bien
+   * jusqu'à 100. Une borne qui refuse une carrière légitime est pire que pas
+   * de borne du tout.
+   */
+  noteMax: 100,
   reputationMax: 100,
   /**
    * Note atteignable après N saisons. On démarre entre 30 et 40 (`attributsDeBase`)
@@ -166,7 +177,7 @@ export const LIMITES = {
    * 12 saisons. La borne est volontairement GÉNÉREUSE (40 + 6 × saisons) : elle
    * doit refuser l'absurde, pas la carrière exceptionnelle.
    */
-  noteApres: (saisons: number) => Math.min(99, 40 + saisons * 6),
+  noteApres: (saisons: number) => Math.min(100, 40 + saisons * 6),
   pseudoMax: 24,
   /**
    * Longueur d'un nom de club affiché. Le plus long du jeu (« 4 Cantons

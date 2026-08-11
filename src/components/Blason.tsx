@@ -1,7 +1,9 @@
 import type { Club } from '../types';
 import { LOGO_PAR_EQUIPE } from '../data/mondeReel';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
-import { LOGO_SELECTION_CATALOGUE, LOGO_SELECTION_PRINCIPALE } from '../data/logosSelections';
+import {
+  LOGO_SELECTION_CATALOGUE, LOGO_SELECTION_NATIONS, LOGO_SELECTION_PRINCIPALE,
+} from '../data/logosSelections';
 import { nomNation } from '../lib/nations';
 
 // ⚠️ DEUX SOURCES D'ÉCUSSONS DE SÉLECTION. Les compétitions historiques
@@ -100,12 +102,20 @@ export function Blason({ club, taille = 40 }: { club: Club; taille?: number }) {
 export function LogoEquipe({ nom, logo, taille = 28 }: { nom: string; logo?: string; taille?: number }) {
   // Les 39 écussons principaux sont la référence absolue. Le catalogue ne
   // prend le relais que pour une sélection absente du lot principal.
+  //
+  // ⚠️ ET `LOGO_SELECTION_NATIONS` PASSE EN DERNIER, APRÈS le logo fourni par
+  // l'appelant. C'est le bouche-trou : avant lui, **41 des 114 nations
+  // classées** n'avaient aucune image et retombaient sur leurs initiales. Il ne
+  // doit jamais passer devant un écusson officiel — d'où sa place en fin de
+  // chaîne (voir `scripts/copierLogosSelections.cjs`, lot « nations »).
   const src = LOGO_SELECTION_PRINCIPALE[nom]
     ?? LOGO_SELECTION_PRINCIPALE[nomNation(nom)]
     ?? LOGO_SELECTION_CATALOGUE[nom]
     ?? LOGO_SELECTION_CATALOGUE[nomNation(nom)]
     ?? logo
-    ?? LOGOS_EQUIPE[nom];
+    ?? LOGOS_EQUIPE[nom]
+    ?? LOGO_SELECTION_NATIONS[nom]
+    ?? LOGO_SELECTION_NATIONS[nomNation(nom)];
   if (!src) {
     const initiales = nom
       .replace(/[^A-Za-zÀ-ÿ ]/g, '')

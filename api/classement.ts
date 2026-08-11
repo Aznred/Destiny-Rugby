@@ -114,14 +114,34 @@ export async function GET(): Promise<Response> {
     // l'écran Classement déplie quand on clique sur une ligne (stats, armoire à
     // trophées, clubs traversés). Les colonnes sont toutes nullables — une ligne
     // écrite avant la migration v2 s'affiche encore, avec son seul score.
-    const lignes = await sql`
-      select pseudo, score, maj_le,
-             nom, poste, nation, age, saisons, note, reputation,
-             matchs, essais, selections, titres, clubs
-      from classement
-      order by score desc, maj_le asc
-      limit ${TOP}
-    `;
+    let lignes;
+    try {
+      lignes = await sql`
+        select pseudo, score, maj_le,
+               nom, poste, nation, age, saisons, note, reputation,
+               matchs, essais, selections, titres, clubs
+        from classement
+        order by score desc, maj_le asc
+        limit ${TOP}
+      `;
+    } catch (e) {
+      // ⚠️ LE CODE 42703, C'EST « CETTE COLONNE N'EXISTE PAS » — donc une base
+      // encore en schéma v1, sur laquelle la migration n'a pas été jouée. Vu en
+      // production : « column "nom" does not exist », et le classement mondial
+      // renvoyait 500 pour TOUT LE MONDE. Un déploiement de code ne doit pas
+      // pouvoir casser la lecture parce qu'un ALTER TABLE traîne : on retombe
+      // sur les seules colonnes que la v1 garantit, le tableau s'affiche, et
+      // les fiches détaillées apparaîtront d'elles-mêmes une fois la migration
+      // passée (`serveur/schema-vercel.sql`, en tête).
+      if ((e as { code?: string }).code !== '42703') throw e;
+      console.warn('[classement] schéma v1 détecté : migration v2 non jouée, lecture réduite au score');
+      lignes = await sql`
+        select pseudo, score, maj_le
+        from classement
+        order by score desc, maj_le asc
+        limit ${TOP}
+      `;
+    }
     return reponse({ classement: lignes });
   } catch (e) {
     console.error('[classement] lecture', e);
@@ -219,7 +239,26 @@ export async function POST(req: Request): Promise<Response> {
         where excluded.score > classement.score
     `;
   } catch (e) {
-    console.error('[classement] écriture', e);
+    // ⚠️ MÊME REPLI QUE POUR LA LECTURE : sur une base encore en v1, on écrit
+    // au moins le score. Sans ça, plus AUCUNE carrière n'entrait au classement
+    // tant que l'ALTER TABLE n'était pas joué — et le joueur n'avait, pour
+    // toute explication, qu'un « Écriture impossible ».
+    if ((e as { code?: string }).code === '42703') {
+      console.warn('[classement] schéma v1 détecté : seul le score est écrit');
+      try {
+        await sql`
+          insert into classement (pseudo, score) values (${pseudo}, ${verdict.score})
+          on conflict (pseudo) do update
+            set score = greatest(classement.score, excluded.score), maj_le = now()
+            where excluded.score > classement.score
+        `;
+        return reponse({ ok: true, score: verdict.score });
+      } catch (e2) {
+        console.error('[classement] écriture (repli v1)', e2);
+      }
+    } else {
+      console.error('[classement] écriture', e);
+    }
     return reponse({ erreur: 'Écriture impossible' }, 500);
   }
 
