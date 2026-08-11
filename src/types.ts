@@ -115,6 +115,18 @@ export interface Joueur {
   // une trace exploitable — id du trophée, saison ET club. Absent des vieilles
   // sauvegardes : toujours lire avec `?? []`.
   palmares?: TitreGagne[];
+  /**
+   * TOUS LES CLUBS PORTÉS, dans l'ordre, sans doublon consécutif.
+   *
+   * ⚠️ `palmares[].club` ne suffisait pas : il ne connaît que les clubs où l'on
+   * a GAGNÉ quelque chose. Une carrière honnête passée par cinq clubs sans titre
+   * n'en laissait aucune trace, alors que c'est précisément ce qu'on veut lire
+   * sur la fiche d'un joueur du classement mondial (« les clubs qu'ils ont
+   * faits »). Alimenté à la création et à chaque signature effective
+   * (`appliquerPreAccord`). Optionnel : les vieilles sauvegardes n'en ont pas,
+   * la migration les initialise avec le club courant.
+   */
+  clubs?: string[];
   // --- Évolution dynamique (ajoutés en cours de route : optionnels pour les
   // sauvegardes antérieures, complétés à la volée par le store) ---
   potentiel?: number; // note générale visée au pic de carrière
@@ -494,6 +506,8 @@ export interface LegendeSauvegardee {
    * libellés.
    */
   tropheeIds?: string[];
+  /** Les clubs traversés, dans l'ordre (`Joueur.clubs`). */
+  clubs?: string[];
   score: number;
   fictif?: boolean; // légende pré-générée (pour peupler le classement)
   reconversion?: string; // ce qu'il est devenu après sa carrière

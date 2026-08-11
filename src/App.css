@@ -620,6 +620,9 @@
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
 }
 .article-detail { font-size: 0.78rem; color: var(--brume); line-height: 1.35; }
+/* « Gratuit en regardant une pub » : on le dit AVANT le clic, en doré, pour que
+   la carte ne ressemble jamais à un article qu'on aurait oublié de tarifer. */
+.etiquette-pub { color: var(--or-400); font-weight: 700; }
 .article.porte { border-color: var(--or-400); }
 /* L'article du vestiaire occupe le GRAND cadre d'aperçu, celui des ballons :
    un seul contexte WebGL pour seize articles (voir components/ModeleObjet.tsx). */
@@ -660,6 +663,11 @@
 .carte-pub { cursor: default; }
 .modale-pub { max-width: 460px; text-align: center; }
 .modale-pub .rangee-fin { justify-content: center; }
+/* Le bloc d'annonce dans la modale récompensée : hauteur BORNÉE, sinon une
+   annonce haute pousse le compte à rebours et le bouton « quitter » hors de
+   l'écran — et une pub qu'on ne peut plus fermer, c'est précisément ce que le
+   joueur a demandé d'éviter (`lib/pub.ts`, règle 2). */
+.pub-annonce { margin: 0.8rem 0; max-height: 46vh; overflow: hidden; }
 .pub-compte { display: flex; align-items: center; gap: 0.7rem; margin: 1rem 0 0.4rem; }
 .pub-compte-piste {
   flex: 1; height: 8px; border-radius: 99px; overflow: hidden;
@@ -747,12 +755,31 @@
 .c-note, .c-saisons { text-align: center; font-variant-numeric: tabular-nums; color: var(--craie-dim); }
 .c-score { text-align: right; font-family: var(--police-forte); font-weight: 800; color: var(--or-400); font-variant-numeric: tabular-nums; }
 
-/* Le tableau MONDIAL n'a que trois colonnes : la base ne garde que le pseudo et
-   le score (poste, nation et saisons sont jetés après vérification). */
+/* Le tableau MONDIAL garde trois colonnes — rang, joueur, score — mais la
+   colonne « joueur » porte désormais poste, drapeau et saisons sous le pseudo :
+   depuis la v2 du schéma, la base conserve la fiche et plus seulement le score
+   (voir `serveur/schema-vercel.sql`). */
 .tableau-classement.mondial .ligne-classement { grid-template-columns: 3rem 1fr 5.4rem; }
 .tableau-classement.mondial { margin-bottom: 1.4rem; }
 .fiche-classement { margin-top: 1.2rem; display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: start; }
-.fiche-classement-stats, .fiche-classement .bloc-titres { grid-column: 1 / -1; }
+.fiche-classement-stats,
+.fiche-classement .bloc-titres,
+.fiche-classement .fiche-bloc,
+.fiche-classement > .aide { grid-column: 1 / -1; }
+.fiche-bloc { display: flex; flex-direction: column; gap: 0.55rem; }
+/* ⚠️ « parcours- » ET PAS « fiche-club » : `.fiche-club` EXISTE DÉJÀ — c'est la
+   modale d'effectif d'un club (`components/FicheClub.tsx`), en `width: 720px`.
+   La collision étirait chaque pastille sur toute la largeur de l'écran. */
+.parcours-clubs { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.parcours-club {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.3rem 0.7rem 0.3rem 0.35rem; border-radius: 999px;
+  border: 1px solid var(--bordure); background: rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem; font-weight: 600; color: var(--craie);
+}
+/* Sans écusson (club amateur ou nom inconnu), la pastille ne doit pas garder le
+   creux réservé au logo. */
+.parcours-club:not(:has(img)):not(:has(svg)) { padding-left: 0.7rem; }
 
 /* ====== SCÉNARIOS À CHOIX ====== */
 .scenario-choix { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.4rem 1.2rem 0; }

@@ -5,11 +5,15 @@ import {
   SKINS, PACKS, EQUIPEMENTS, EQUIPEMENT_PAR_ID, CATEGORIES_EQUIPEMENT,
 } from '../data/boutique';
 import { t } from '../lib/i18n';
-import { CartePubRecompensee } from '../components/Pub';
+import { CartePubRecompensee, BoutonDeblocageParPub } from '../components/Pub';
 import { IconeArticle } from '../components/ModeleObjet';
 
+// ⚠️ `ApercuBallon`, PAS `Hero3D` : depuis que le hero affiche le rugbyman dès
+// qu'une carrière existe, ce cadre montrait le JOUEUR à la place du ballon
+// survolé — cinq articles, la même image. L'aperçu de la boutique ne monte donc
+// que le ballon.
 const Apercu3D = lazy(() =>
-  import('../components/Hero3D').then((m) => ({ default: m.Hero3D })),
+  import('../components/Hero3D').then((m) => ({ default: m.ApercuBallon })),
 );
 // ⚠️ Une vignette par article, chargée à la demande comme le grand aperçu : la
 // boutique est déjà un écran paresseux, on ne veut pas que ses cinq petits
@@ -110,6 +114,13 @@ export function Boutique() {
                     ? `✓ ${t('bo.porte')}`
                     : t('bo.equiper')}
                 </button>
+              ) : articleVu.parPub ? (
+                /* ⚠️ Cet article-là ne s'achète PAS : il se regarde. Voir
+                   `ArticleEquipement.parPub` et `debloquerParPub` (store). */
+                <BoutonDeblocageParPub
+                  id={articleVu.id}
+                  onDebloque={() => message(t('bo.debloque', { article: articleVu.nom }))}
+                />
               ) : (
                 <button
                   className="btn primaire"
@@ -207,6 +218,12 @@ export function Boutique() {
                   <IconeArticle url={e.glb} teinte={e.teinte} emoji={e.emoji} />
                   <div className="article-nom">{e.nom}</div>
                   <div className="article-detail">{e.detail}</div>
+                  {/* Un article « par pub » annonce la couleur AVANT le clic :
+                      pas de prix barré, pas de fausse promo — juste ce qu'il
+                      faut faire pour l'avoir. */}
+                  {!possede && e.parPub && (
+                    <div className="article-detail etiquette-pub">🎬 {t('pub.gratuitPub')}</div>
+                  )}
                   {possede ? (
                     <button
                       className={porte ? 'btn fantome petit' : 'btn primaire petit'}
@@ -214,6 +231,11 @@ export function Boutique() {
                     >
                       {porte ? `✓ ${t('bo.porte')}` : t('bo.equiper')}
                     </button>
+                  ) : e.parPub ? (
+                    <BoutonDeblocageParPub
+                      id={e.id}
+                      onDebloque={() => message(t('bo.debloque', { article: e.nom }))}
+                    />
                   ) : (
                     <button
                       className="btn primaire petit"

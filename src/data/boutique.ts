@@ -1,3 +1,25 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// L'ÉCHELLE DES PRIX — trois marches, et elles veulent dire quelque chose
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ Demande explicite : « rééquilibre toute la boutique sur les prix, il faut
+// que ce soit dur d'obtenir des cosmétiques ». Le repère qui rend ces nombres
+// lisibles : une **belle carrière de 12 à 15 saisons rapporte ≈ 500 Ovas**
+// (succès réétalonnés, défis plafonnés — voir `data/succes.ts` et
+// `PLAFOND_OVAS_DEFIS_PAR_SAISON` dans le store). Donc :
+//
+//   • ENTRÉE   60 –  90 : une carrière en paie cinq. C'est ce qu'on s'offre en
+//                         premier, sans réfléchir.
+//   • PALIER   120 – 220 : deux ou trois par carrière. On choisit.
+//   • PRESTIGE 340 – 450 : les pièces dorées. **Une seule par carrière**, et il
+//                         faut la mériter jusqu'au bout.
+//
+// Tout acheter demande environ **9 carrières** (~5 000 Ovas depuis le second
+// lot de cosmétiques). C'est voulu : le vestiaire est un objectif de long
+// terme, pas une case à cocher — et quatre pièces échappent complètement aux
+// Ovas, puisqu'elles s'obtiennent en regardant une pub (`parPub`).
+//
+// ⚠️ Le chiffre exact est MESURÉ, pas estimé :
+//   npx vite-node scripts/verifEconomie.ts
 export interface SkinBallon {
   id: string;
   nom: string;
@@ -26,15 +48,20 @@ export const SKINS: SkinBallon[] = [
     prix: 0,
   },
   {
+    // ⚠️ L'ID RESTE `tricolore`, LE BALLON A CHANGÉ. Le modèle livré s'appelle
+    // « ballon ubb à la place du ballon tricolore » : c'est une SUBSTITUTION
+    // demandée, pas un ajout. Garder l'identifiant évite de faire disparaître
+    // l'article de l'inventaire des joueurs qui l'avaient déjà acheté — ils
+    // ouvrent la boutique et trouvent le nouveau ballon à sa place.
     id: 'tricolore',
-    nom: 'Tricolore Away',
+    nom: 'Union Bordeaux-Bègles',
     corps: '#eef1f6',
     bande: '#0d2a6b',
     lisere: '#e2231a',
     couture: '#2a2a2a',
     lacet: '#ffffff',
-    france: true,
-    prix: 90,
+    glb: '/m3d/ballon-ubb.glb',
+    prix: 80,
   },
   {
     id: 'cuir',
@@ -45,7 +72,7 @@ export const SKINS: SkinBallon[] = [
     couture: '#3a1d0e',
     lacet: '#e8dcc5',
     glb: '/m3d/ballon-cuir.glb',
-    prix: 120,
+    prix: 140,
   },
   {
     id: 'ocean',
@@ -57,7 +84,7 @@ export const SKINS: SkinBallon[] = [
     lacet: '#e6e9ec',
     metal: 0.2,
     glb: '/m3d/ballon-vannes.glb',
-    prix: 180,
+    prix: 220,
   },
   {
     id: 'or',
@@ -69,7 +96,7 @@ export const SKINS: SkinBallon[] = [
     lacet: '#fff4d6',
     metal: 0.5,
     glb: '/m3d/ballon-or.glb',
-    prix: 350,
+    prix: 450,
   },
 ];
 
@@ -97,11 +124,14 @@ export const SKIN_PAR_ID: Record<string, SkinBallon> = Object.fromEntries(
 // dans le dossier depuis des mois sans être branchés nulle part : ils le sont.
 
 // ⚠️ UNE CATÉGORIE = UNE PIÈCE PORTÉE À LA FOIS (`equipementActif` du store).
-// Le casque et les chaussettes ont donc la LEUR : rangés avec les accessoires,
-// on ne pourrait pas porter les deux, alors que la demande est justement de
-// « customiser casque, ballon, chaussettes, maillot, chaussures ».
+// Le casque a donc la SIENNE : rangé avec les accessoires, on ne pourrait pas
+// le porter en même temps qu'autre chose.
+//
+// ⚠️ PLUS DE CATÉGORIE « CHAUSSETTES » (demande explicite : « supprime le
+// protège-dents, mitaines, tee et chaussettes de la boutique »). Les trois
+// paires vendues n'étaient d'ailleurs accrochées nulle part sur le rugbyman 3D.
 export type CategorieEquipement =
-  | 'crampons' | 'maillot' | 'casque' | 'chaussettes' | 'accessoire';
+  | 'crampons' | 'maillot' | 'casque' | 'accessoire';
 
 export interface ArticleEquipement {
   id: string;
@@ -118,6 +148,21 @@ export interface ArticleEquipement {
    */
   teinte?: string;
   prix: number; // en Ovas
+  /**
+   * L'ARTICLE NE S'ACHÈTE PAS : IL SE REGARDE.
+   *
+   * ⚠️ Demande explicite : « fais en sorte que 3-4 cosmétiques on puisse les
+   * obtenir en regardant une pub ». Un article marqué ainsi a `prix: 0` et
+   * n'apparaît JAMAIS contre des Ovas — il se débloque en regardant une pub
+   * récompensée, laquelle consomme un des passages quotidiens
+   * (`PUBS_PAR_JOUR`, `lib/pub.ts`). C'est donc une porte de plus, pas un
+   * raccourci : on ne peut pas en enchaîner dix dans la soirée.
+   *
+   * ⚠️ ET ÇA NE TOUCHE PAS À LA DIFFICULTÉ : ce sont des cosmétiques, comme
+   * tout le reste de cette boutique. Règle 5 de `lib/pub.ts` — rien ne se
+   * débloque UNIQUEMENT par la pub qui ait le moindre effet sur le jeu.
+   */
+  parPub?: boolean;
   /** Une ligne pour dire ce que c'est — et, pour la 3D, ce qu'il faut modéliser. */
   detail: string;
 }
@@ -125,28 +170,49 @@ export interface ArticleEquipement {
 export const EQUIPEMENTS: ArticleEquipement[] = [
   // --- Crampons (modèle livré : m3d/crampons.glb) -------------------------
   { id: 'crampons-cuir', nom: 'Crampons cuir', categorie: 'crampons', emoji: '👟', glb: '/m3d/crampons.glb', teinte: '#2f2318', prix: 60, detail: 'Le noir mat des vieux terrains gras.' },
-  { id: 'crampons-flash', nom: 'Crampons flash', categorie: 'crampons', emoji: '⚡', glb: '/m3d/crampons.glb', teinte: '#2ad17c', prix: 120, detail: 'On te voit arriver de la tribune d’en face.' },
-  { id: 'crampons-or', nom: 'Crampons dorés', categorie: 'crampons', emoji: '🥇', glb: '/m3d/crampons.glb', teinte: '#d8a94a', prix: 260, detail: 'À ne sortir qu’un soir de finale.' },
+  { id: 'crampons-flash', nom: 'Crampons flash', categorie: 'crampons', emoji: '⚡', glb: '/m3d/crampons.glb', teinte: '#2ad17c', prix: 130, detail: 'On te voit arriver de la tribune d’en face.' },
+  { id: 'crampons-or', nom: 'Crampons dorés', categorie: 'crampons', emoji: '🥇', glb: '/m3d/crampons.glb', teinte: '#d8a94a', prix: 340, detail: 'À ne sortir qu’un soir de finale.' },
+  // ⚠️ CEUX-CI NE SE TEINTENT PAS : chacun a son propre `.glb` peint (second lot
+  // de modèles, `scripts/copierTrophees.cjs`). Une `teinte` repeindrait le motif.
+  { id: 'crampons-dupont', nom: 'Crampons signature', categorie: 'crampons', emoji: '✒️', glb: '/m3d/crampons-dupont.glb', prix: 300, detail: 'La paire d’un demi de mêlée international, signée sur le talon.' },
+  { id: 'crampons-graffiti', nom: 'Crampons graffiti', categorie: 'crampons', emoji: '🎨', glb: '/m3d/crampons-graffiti.glb', prix: 0, parPub: true, detail: 'Peints à la bombe, un soir de tournoi à sept.' },
   // --- Maillots (modèle livré : m3d/maillot.glb) --------------------------
-  { id: 'maillot-bleu', nom: 'Maillot bleu nuit', categorie: 'maillot', emoji: '👕', glb: '/m3d/maillot.glb', teinte: '#15317e', prix: 90, detail: 'La coupe classique, col lacé.' },
-  { id: 'maillot-blanc', nom: 'Maillot extérieur', categorie: 'maillot', emoji: '🤍', glb: '/m3d/maillot.glb', teinte: '#eef1f6', prix: 110, detail: 'Blanc cassé, liseré discret.' },
-  { id: 'maillot-legende', nom: 'Maillot des légendes', categorie: 'maillot', emoji: '🐐', glb: '/m3d/maillot.glb', teinte: '#f4cd63', prix: 320, detail: 'Le numéro brodé fil d’or.' },
-  // --- Accessoires : LES MODÈLES RESTENT À FAIRE -------------------------
-  // Le nom du fichier attendu est déjà écrit : dépose-le et il s'affiche.
+  { id: 'maillot-bleu', nom: 'Maillot bleu nuit', categorie: 'maillot', emoji: '👕', glb: '/m3d/maillot.glb', teinte: '#15317e', prix: 80, detail: 'La coupe classique, col lacé.' },
+  { id: 'maillot-blanc', nom: 'Maillot extérieur', categorie: 'maillot', emoji: '🤍', glb: '/m3d/maillot.glb', teinte: '#eef1f6', prix: 130, detail: 'Blanc cassé, liseré discret.' },
+  { id: 'maillot-legende', nom: 'Maillot des légendes', categorie: 'maillot', emoji: '🐐', glb: '/m3d/maillot.glb', teinte: '#f4cd63', prix: 420, detail: 'Le numéro brodé fil d’or.' },
+  // --- Maillots de club et de sélection (second lot, un .glb par maillot) ---
+  { id: 'maillot-toulousain', nom: 'Stade Toulousain', categorie: 'maillot', emoji: '🔴', glb: '/m3d/maillot-toulousain.glb', prix: 260, detail: 'Rouge et noir, le maillot le plus titré de France.' },
+  { id: 'maillot-stade-francais', nom: 'Stade Français', categorie: 'maillot', emoji: '💗', glb: '/m3d/maillot-stade-francais.glb', prix: 240, detail: 'Le rose de Paris, celui qu’on reconnaît de la dernière tribune.' },
+  { id: 'maillot-lyon', nom: 'LOU Rugby', categorie: 'maillot', emoji: '🔵', glb: '/m3d/maillot-lyon.glb', prix: 200, detail: 'Rouge et bleu, sur les bords du Rhône.' },
+  { id: 'maillot-bayonnais', nom: 'Aviron Bayonnais', categorie: 'maillot', emoji: '⚓', glb: '/m3d/maillot-bayonnais.glb', prix: 200, detail: 'Ciel et blanc, et Jean Dauger derrière.' },
+  { id: 'maillot-vannes', nom: 'RC Vannes', categorie: 'maillot', emoji: '🦅', glb: '/m3d/maillot-vannes.glb', prix: 0, parPub: true, detail: 'Grenat et blanc, le promu qui a tout renversé.' },
+  { id: 'maillot-angleterre', nom: 'Angleterre', categorie: 'maillot', emoji: '🌹', glb: '/m3d/maillot-angleterre.glb', prix: 220, detail: 'Blanc, rose brodée sur le cœur.' },
+  { id: 'maillot-irlande', nom: 'Irlande', categorie: 'maillot', emoji: '🍀', glb: '/m3d/maillot-irlande.glb', prix: 220, detail: 'Le vert de Dublin, un soir de Tournoi.' },
+  { id: 'maillot-italie', nom: 'Italie', categorie: 'maillot', emoji: '🇮🇹', glb: '/m3d/maillot-italie.glb', prix: 0, parPub: true, detail: 'L’azzurro, et l’envie d’y croire jusqu’au bout.' },
   // --- Casque (se porte sur la tête du rugbyman 3D) -----------------------
-  { id: 'casque', nom: 'Casque de mêlée', categorie: 'casque', emoji: '🪖', glb: '/m3d/casque.glb', teinte: '#1f2b22', prix: 90, detail: 'Casque souple de première ligne, sangle sous le menton.' },
-  { id: 'casque-blanc', nom: 'Casque blanc', categorie: 'casque', emoji: '⚪', glb: '/m3d/casque.glb', teinte: '#eef1f6', prix: 110, detail: 'Celui qu’on repère au fond du ruck.' },
-  { id: 'casque-or', nom: 'Casque doré', categorie: 'casque', emoji: '👑', glb: '/m3d/casque.glb', teinte: '#d8a94a', prix: 280, detail: 'Discret comme un projecteur de stade.' },
-  // --- Chaussettes ---------------------------------------------------------
-  { id: 'chaussettes', nom: 'Chaussettes du club', categorie: 'chaussettes', emoji: '🧦', glb: '/m3d/chaussettes.glb', teinte: '#7a1020', prix: 45, detail: 'Rayures du club, repliées sous le genou.' },
-  { id: 'chaussettes-noires', nom: 'Chaussettes noires', categorie: 'chaussettes', emoji: '🖤', glb: '/m3d/chaussettes.glb', teinte: '#15181b', prix: 45, detail: 'Sobres, hautes, tenues par du strap.' },
-  { id: 'chaussettes-or', nom: 'Chaussettes dorées', categorie: 'chaussettes', emoji: '✨', glb: '/m3d/chaussettes.glb', teinte: '#d8a94a', prix: 190, detail: 'Pour les soirs où l’on joue le titre.' },
+  { id: 'casque', nom: 'Casque de mêlée', categorie: 'casque', emoji: '🪖', glb: '/m3d/casque.glb', teinte: '#1f2b22', prix: 85, detail: 'Casque souple de première ligne, sangle sous le menton.' },
+  { id: 'casque-blanc', nom: 'Casque blanc', categorie: 'casque', emoji: '⚪', glb: '/m3d/casque.glb', teinte: '#eef1f6', prix: 120, detail: 'Celui qu’on repère au fond du ruck.' },
+  { id: 'casque-or', nom: 'Casque doré', categorie: 'casque', emoji: '👑', glb: '/m3d/casque.glb', teinte: '#d8a94a', prix: 360, detail: 'Discret comme un projecteur de stade.' },
+  { id: 'casque-rouge', nom: 'Casque rouge', categorie: 'casque', emoji: '🟥', glb: '/m3d/casque-rouge.glb', prix: 130, detail: 'Le rouge franc des premières lignes qui ne reculent pas.' },
+  { id: 'casque-australie', nom: 'Casque Wallabies', categorie: 'casque', emoji: '🇦🇺', glb: '/m3d/casque-australie.glb', prix: 210, detail: 'Or et vert, ramené d’une tournée dans l’hémisphère sud.' },
+  { id: 'casque-tribal', nom: 'Casque tribal', categorie: 'casque', emoji: '🗿', glb: '/m3d/casque-tribal.glb', prix: 230, detail: 'Motifs gravés, comme un tatouage du Pacifique.' },
+  { id: 'casque-rose', nom: 'Casque rose fluo', categorie: 'casque', emoji: '🩷', glb: '/m3d/casque-rose.glb', prix: 0, parPub: true, detail: 'On te repère depuis le parking. C’est le but.' },
   // --- Accessoires ---------------------------------------------------------
-  { id: 'protege-dents', nom: 'Protège-dents tricolore', categorie: 'accessoire', emoji: '🦷', glb: '/m3d/protege-dents.glb', teinte: '#e2231a', prix: 40, detail: 'Thermoformé, bleu-blanc-rouge.' },
-  { id: 'mitaines', nom: 'Mitaines d’ailier', categorie: 'accessoire', emoji: '🧤', glb: '/m3d/mitaines.glb', teinte: '#101418', prix: 70, detail: 'Doigts coupés, grip caoutchouté.' },
-  { id: 'tee', nom: 'Tee de buteur', categorie: 'accessoire', emoji: '⛳', glb: '/m3d/tee.glb', teinte: '#f4cd63', prix: 55, detail: 'Le petit socle qu’on pose avant de viser les poteaux.' },
-  { id: 'sac', nom: 'Sac de match brodé', categorie: 'accessoire', emoji: '🎒', glb: '/m3d/sac.glb', teinte: '#2a3a30', prix: 80, detail: 'Ton nom cousu sur le rabat.' },
-  { id: 'bouclier', nom: 'Bouclier de plaquage', categorie: 'accessoire', emoji: '🛡️', glb: '/m3d/bouclier-plaquage.glb', teinte: '#1d5c9c', prix: 65, detail: 'Le pare-chocs mousse des séances du mardi.' },
+  // ⚠️ RETIRÉS À LA DEMANDE : protège-dents, mitaines, tee de buteur et les
+  // trois paires de chaussettes. Leurs `.glb` restent dans `public/m3d/` — il
+  // suffirait de remettre une ligne ici pour les revendre.
+  { id: 'sac', nom: 'Sac de match brodé', categorie: 'accessoire', emoji: '🎒', glb: '/m3d/sac.glb', teinte: '#2a3a30', prix: 90, detail: 'Ton nom cousu sur le rabat.' },
+  { id: 'bouclier', nom: 'Bouclier de plaquage', categorie: 'accessoire', emoji: '🛡️', glb: '/m3d/bouclier-plaquage.glb', teinte: '#1d5c9c', prix: 70, detail: 'Le pare-chocs mousse des séances du mardi.' },
+];
+
+/**
+ * Les articles retirés de la vente. Ils servent encore à NETTOYER les
+ * sauvegardes : un joueur qui portait des chaussettes dorées ne doit pas garder
+ * un emplacement occupé par un article qui n'existe plus (`useGame`, version 10).
+ */
+export const EQUIPEMENTS_RETIRES = [
+  'chaussettes', 'chaussettes-noires', 'chaussettes-or',
+  'protege-dents', 'mitaines', 'tee',
 ];
 
 export const EQUIPEMENT_PAR_ID: Record<string, ArticleEquipement> = Object.fromEntries(
@@ -156,7 +222,6 @@ export const EQUIPEMENT_PAR_ID: Record<string, ArticleEquipement> = Object.fromE
 export const CATEGORIES_EQUIPEMENT: { id: CategorieEquipement; cle: string; emoji: string }[] = [
   { id: 'maillot', cle: 'bo.catMaillot', emoji: '👕' },
   { id: 'crampons', cle: 'bo.catCrampons', emoji: '👟' },
-  { id: 'chaussettes', cle: 'bo.catChaussettes', emoji: '🧦' },
   { id: 'casque', cle: 'bo.catCasque', emoji: '🪖' },
   { id: 'accessoire', cle: 'bo.catAccessoire', emoji: '🎒' },
 ];

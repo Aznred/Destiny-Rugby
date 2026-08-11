@@ -13,15 +13,23 @@
 // part que d'`index.html`), il n'entre donc pas dans le bundle du navigateur.
 //
 // Ce qu'il fait, dans cet ordre :
-//   GET  → les 100 meilleurs scores (lecture publique)
+//   GET  → les 100 meilleures carrières (lecture publique)
 //   POST → 1. débit par appareil · 2. `verifierFiche` · 3. RECALCUL du score
-//          4. écriture du seul score · 5. la fiche est jetée
+//          4. écriture du score ET des faits affichables de la fiche
+//
+// ⚠️ LA BASE GARDE MAINTENANT LA FICHE, plus seulement le score. Demande
+// explicite : « dans le classement mondial, qu'on puisse voir les stats des
+// autres joueurs, leurs profils, armoires à trophées, clubs qu'ils ont faits ».
+// Ça n'affaiblit rien — le score reste RECALCULÉ, c'est là qu'est la sécurité —
+// mais ça demande une migration de schéma : voir `serveur/schema-vercel.sql`,
+// section « v2 ». Sans les nouvelles colonnes, le POST échoue proprement (500
+// « Écriture impossible ») et le GET ne renvoie que ce qu'il trouve.
 //
 // Déploiement : voir `serveur/VERCEL.md`.
 
 import { neon } from '@neondatabase/serverless';
 import { createHash } from 'node:crypto';
-import { verifierFiche } from '../src/lib/classementMondial.js';
+import { verifierFiche, type FicheCarriere } from '../src/lib/classementMondial.js';
 import { TROPHEES } from '../src/data/trophees.js';
 
 export const config = { runtime: 'nodejs' };
@@ -102,8 +110,14 @@ export async function GET(): Promise<Response> {
 
   try {
     const sql = sqlClient();
+    // ⚠️ ON LIT LA FICHE ENTIÈRE, pas seulement le score : c'est elle que
+    // l'écran Classement déplie quand on clique sur une ligne (stats, armoire à
+    // trophées, clubs traversés). Les colonnes sont toutes nullables — une ligne
+    // écrite avant la migration v2 s'affiche encore, avec son seul score.
     const lignes = await sql`
-      select pseudo, score, maj_le
+      select pseudo, score, maj_le,
+             nom, poste, nation, age, saisons, note, reputation,
+             matchs, essais, selections, titres, clubs
       from classement
       order by score desc, maj_le asc
       limit ${TOP}
@@ -176,13 +190,32 @@ export async function POST(req: Request): Promise<Response> {
     console.error('[classement] journal', e);
   }
 
-  // ---- 3. L'ÉCRITURE : le score, et RIEN d'autre ---------------------------
-  const pseudo = String((fiche as { pseudo: string }).pseudo).trim().slice(0, 24);
+  // ---- 3. L'ÉCRITURE : le score RECALCULÉ, et les faits affichables --------
+  // ⚠️ TOUT VIENT DE `fiche`, MAIS RIEN N'EST CRU SUR PAROLE : `verifierFiche`
+  // a déjà borné chaque champ (types, longueurs, cohérence interne) et refusé la
+  // fiche sinon. Le score écrit est celui du serveur, jamais `fiche.score`.
+  const f = fiche as FicheCarriere;
+  const pseudo = String(f.pseudo).trim().slice(0, 24);
   try {
     await sql`
-      insert into classement (pseudo, score) values (${pseudo}, ${verdict.score})
+      insert into classement (
+        pseudo, score, nom, poste, nation, age, saisons, note, reputation,
+        matchs, essais, selections, titres, clubs
+      ) values (
+        ${pseudo}, ${verdict.score}, ${f.nom}, ${f.poste}, ${f.nation}, ${f.age},
+        ${f.saisons}, ${f.note}, ${f.reputation}, ${f.matchs}, ${f.essais},
+        ${f.selections}, ${JSON.stringify(f.titres)}::jsonb, ${JSON.stringify(f.clubs)}::jsonb
+      )
       on conflict (pseudo) do update
-        set score = greatest(classement.score, excluded.score), maj_le = now()
+        set score = excluded.score, maj_le = now(),
+            nom = excluded.nom, poste = excluded.poste, nation = excluded.nation,
+            age = excluded.age, saisons = excluded.saisons, note = excluded.note,
+            reputation = excluded.reputation, matchs = excluded.matchs,
+            essais = excluded.essais, selections = excluded.selections,
+            titres = excluded.titres, clubs = excluded.clubs
+        -- ⚠️ On ne remplace la fiche QUE si le score progresse : sinon un envoi
+        -- de mi-carrière écraserait la ligne d'une carrière déjà terminée, et le
+        -- tableau afficherait un palmarès plus pauvre que le score gardé.
         where excluded.score > classement.score
     `;
   } catch (e) {

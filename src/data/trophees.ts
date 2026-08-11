@@ -47,7 +47,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/brennus.glb',
     couleur: '#e8b23a',
     desc: 'Champion de France — Top 14. Le Graal du rugby français.',
-    ovas: 12,
+    ovas: 6,
     forme: 'bouclier',
   },
   prod2: {
@@ -56,7 +56,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/prod2.glb',
     couleur: '#c0c8d0',
     desc: 'Champion de Pro D2 : la montée dans l’élite se joue ici.',
-    ovas: 8,
+    ovas: 4,
     // Mesuré : 1,67 × 1,90 × 0,60 — le socle le rend trop épais pour que
     // `estBouclier()` le reconnaisse, mais c'en est un, et il s'adosse.
     forme: 'bouclier',
@@ -67,7 +67,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/nationale.glb',
     couleur: '#b3653a',
     desc: 'Champion de Nationale. Le tremplin vers le monde pro.',
-    ovas: 6,
+    ovas: 3,
     forme: 'bouclier',
   },
   nationale2: {
@@ -76,7 +76,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/nationale.glb',
     couleur: '#a8703f',
     desc: 'Champion de Nationale 2. La dernière marche avant le monde pro.',
-    ovas: 5,
+    ovas: 3,
     forme: 'bouclier',
   },
   federale: {
@@ -85,7 +85,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/nationale.glb',
     couleur: '#9a6b45',
     desc: 'Champion de Fédérale : le vrai rugby de clocher, et un titre qui compte.',
-    ovas: 4,
+    ovas: 2,
     forme: 'bouclier',
   },
   regionale: {
@@ -94,7 +94,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/nationale.glb',
     couleur: '#8d7350',
     desc: 'Champion de Régionale. Le bouclier du dimanche après-midi — on s’en souvient toute une vie.',
-    ovas: 3,
+    ovas: 2,
     forme: 'bouclier',
   },
   champions: {
@@ -103,7 +103,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/champions.glb',
     couleur: '#3fa9f5',
     desc: 'Le sommet européen des clubs, réservé aux 8 premiers du Top 14. L’Europe est à toi.',
-    ovas: 14,
+    ovas: 7,
   },
   challenge: {
     id: 'challenge',
@@ -111,7 +111,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/challenge.glb',
     couleur: '#48c47a',
     desc: 'La deuxième coupe d’Europe, disputée par les 6 derniers du Top 14.',
-    ovas: 9,
+    ovas: 5,
   },
   sixNations: {
     id: 'sixNations',
@@ -119,7 +119,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/six-nations.glb',
     couleur: '#e8b23a',
     desc: 'Vainqueur du Tournoi avec ta sélection nationale.',
-    ovas: 15,
+    ovas: 8,
   },
   monde: {
     id: 'monde',
@@ -127,7 +127,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/monde.glb',
     couleur: '#f4cd63',
     desc: 'Champion du monde. Ton nom entre dans l’histoire.',
-    ovas: 30,
+    ovas: 15,
   },
   // --- LES HONNEURS INDIVIDUELS ----------------------------------------------
   // ⚠️ Jusqu'ici, UNE SEULE distinction personnelle existait (meilleur joueur du
@@ -149,7 +149,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/meilleur-joueur.glb',
     couleur: '#f4cd63',
     desc: 'Élu meilleur joueur du monde. Personne ne t’a surpassé cette saison.',
-    ovas: 20,
+    ovas: 10,
     individuel: true,
   },
   meilleurTop14: {
@@ -158,7 +158,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/meilleurTop14.glb',
     couleur: '#e8b23a',
     desc: 'Élu meilleur joueur de la saison de Top 14 par tes pairs et par la presse.',
-    ovas: 11,
+    ovas: 6,
     individuel: true,
   },
   meilleurPremiership: {
@@ -167,7 +167,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/meilleurPremiership.glb',
     couleur: '#8e6bd6',
     desc: 'Joueur de la saison en Angleterre. Toute la Premiership a regardé dans ta direction.',
-    ovas: 10,
+    ovas: 5,
     individuel: true,
   },
   meilleurUrc: {
@@ -176,7 +176,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/meilleurUrc.glb',
     couleur: '#3ad1c0',
     desc: 'Joueur de la saison de l’United Rugby Championship — quatre pays, une seule référence : toi.',
-    ovas: 10,
+    ovas: 5,
     individuel: true,
   },
   // ⚠️ UN SEUL TROPHÉE POUR LES DEUX COMPÉTITIONS NÉO-ZÉLANDAISES, ET C'EST
@@ -188,7 +188,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/meilleurNZ.glb',
     couleur: '#1f1f1f',
     desc: 'Joueur néo-zélandais de l’année. Au pays des All Blacks, cette ligne-là vaut toutes les autres.',
-    ovas: 10,
+    ovas: 5,
     individuel: true,
   },
   meilleurChampionsCup: {
@@ -197,7 +197,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/meilleurChampionsCup.glb',
     couleur: '#3fa9f5',
     desc: 'Homme fort de la campagne européenne. Six matchs pour marquer l’Europe, et tu les as tous marqués.',
-    ovas: 13,
+    ovas: 7,
     individuel: true,
   },
   meilleurSixNations: {
@@ -206,7 +206,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/meilleurSixNations.glb',
     couleur: '#d4a017',
     desc: 'Joueur du Tournoi des 6 Nations. Cinq week-ends de février, et un nom qui revient dans toutes les bouches.',
-    ovas: 14,
+    ovas: 7,
     individuel: true,
   },
   hommeDuMatchMonde: {
@@ -215,7 +215,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/hommeDuMatchMonde.glb',
     couleur: '#f4cd63',
     desc: 'Meilleur joueur de la finale de la Coupe du monde. Une soirée que le rugby entier a regardée, et c’est toi qu’il a vu.',
-    ovas: 18,
+    ovas: 9,
     individuel: true,
   },
 
@@ -226,7 +226,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/premiership.glb',
     couleur: '#8e6bd6',
     desc: 'Champion d’Angleterre. Twickenham s’est levé pour toi.',
-    ovas: 12,
+    ovas: 6,
   },
   championship: {
     id: 'championship',
@@ -234,7 +234,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/championship.glb',
     couleur: '#7f9ab5',
     desc: 'Champion de la deuxième division anglaise : la Premiership t’attend.',
-    ovas: 8,
+    ovas: 4,
   },
   premCup: {
     id: 'premCup',
@@ -242,7 +242,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/prem-cup.glb',
     couleur: '#d65b8e',
     desc: 'La coupe anglaise, terrain de jeu des jeunes pousses et des revanchards.',
-    ovas: 7,
+    ovas: 4,
   },
   urc: {
     id: 'urc',
@@ -250,7 +250,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/urc.glb',
     couleur: '#3ad1c0',
     desc: 'Champion de l’URC — quatre pays, une seule couronne.',
-    ovas: 12,
+    ovas: 6,
   },
   super: {
     id: 'super',
@@ -258,7 +258,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/super.glb',
     couleur: '#4d8ef7',
     desc: 'Le titre le plus rapide du monde, arraché dans l’hémisphère sud.',
-    ovas: 12,
+    ovas: 6,
   },
   npc: {
     id: 'npc',
@@ -266,7 +266,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/npc.glb',
     couleur: '#c8553d',
     desc: 'Le championnat des provinces néo-zélandaises, pépinière des All Blacks.',
-    ovas: 9,
+    ovas: 5,
   },
   japon: {
     id: 'japon',
@@ -274,7 +274,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/japon.glb',
     couleur: '#e05a6b',
     desc: 'Champion du Japon. Le rugby nippon a trouvé sa star.',
-    ovas: 10,
+    ovas: 5,
   },
   mlr: {
     id: 'mlr',
@@ -282,7 +282,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/mlr.glb',
     couleur: '#3f7fd6',
     desc: 'Le bouclier américain. Tu as conquis le Nouveau Monde.',
-    ovas: 9,
+    ovas: 5,
     forme: 'bouclier',
   },
 
@@ -298,7 +298,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/currieCup.glb',
     couleur: '#0a7a3b',
     desc: 'La plus vieille coupe du rugby sud-africain. Les unions se la disputent depuis 1892 — et cette année, elle est à toi.',
-    ovas: 9,
+    ovas: 5,
   },
   italie: {
     id: 'italie',
@@ -306,7 +306,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/italie.glb',
     couleur: '#0a2a6b',
     desc: 'Champion d’Italie. Le Scudetto se coud sur le maillot, et il ne se rend pas sans se battre.',
-    ovas: 6,
+    ovas: 3,
   },
   argentine: {
     id: 'argentine',
@@ -314,7 +314,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/argentine.glb',
     couleur: '#74acdf',
     desc: 'Champion d’Argentine, au pays des Pumas : le vivier le plus rude de l’hémisphère sud.',
-    ovas: 6,
+    ovas: 3,
   },
   ecosseSuper: {
     id: 'ecosseSuper',
@@ -322,7 +322,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/ecosseSuper.glb',
     couleur: '#2b4a8b',
     desc: 'Le titre écossais, arraché sous la pluie et devant deux mille personnes qui n’ont pas bougé.',
-    ovas: 6,
+    ovas: 3,
   },
   espagne: {
     id: 'espagne',
@@ -330,7 +330,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/espagne.glb',
     couleur: '#c8102e',
     desc: 'Champion d’Espagne. Les Leones montent, et tu montes avec eux.',
-    ovas: 6,
+    ovas: 3,
   },
   georgie: {
     id: 'georgie',
@@ -338,7 +338,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/georgie.glb',
     couleur: '#b02a2a',
     desc: 'Champion de Géorgie : un pays où la mêlée est une affaire d’honneur, et où tu viens de la gagner.',
-    ovas: 6,
+    ovas: 3,
   },
   irlandeAIL: {
     id: 'irlandeAIL',
@@ -346,7 +346,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/irlandeAIL.glb',
     couleur: '#0a7a3b',
     desc: 'Le championnat des clubs irlandais, celui où tout commence. Ton nom rejoint la plaque du club-house.',
-    ovas: 6,
+    ovas: 3,
   },
   gallesSRC: {
     id: 'gallesSRC',
@@ -354,7 +354,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/gallesSRC.glb',
     couleur: '#c1121f',
     desc: 'Le sommet du rugby de club gallois. Toute une vallée a chanté pour toi.',
-    ovas: 6,
+    ovas: 3,
   },
   gallesPrem: {
     id: 'gallesPrem',
@@ -362,7 +362,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/gallesPrem.glb',
     couleur: '#7a1020',
     desc: 'Champion du deuxième étage gallois : la marche qui mène à la Super Rygbi Cymru.',
-    ovas: 5,
+    ovas: 3,
   },
   gallesChall: {
     id: 'gallesChall',
@@ -370,7 +370,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/gallesChall.glb',
     couleur: '#3f8f5f',
     desc: 'La coupe du Pays de Galles : un tableau sec, des terrains impossibles, et une finale à Cardiff.',
-    ovas: 5,
+    ovas: 3,
   },
   nzHeartland: {
     id: 'nzHeartland',
@@ -378,7 +378,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/nzHeartland.glb',
     couleur: '#1f1f1f',
     desc: 'Le trophée du Heartland Championship, la Nouvelle-Zélande rurale. Colin Meads a donné son nom à la coupe ; toi, tu l’as levée.',
-    ovas: 5,
+    ovas: 3,
   },
   portugal: {
     id: 'portugal',
@@ -386,7 +386,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/portugal.glb',
     couleur: '#0a7a3b',
     desc: 'Champion du Portugal, la nation qui monte. Os Lobos t’ont dans un coin de la tête.',
-    ovas: 5,
+    ovas: 3,
   },
   roumanie: {
     id: 'roumanie',
@@ -394,7 +394,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/roumanie.glb',
     couleur: '#f2c200',
     desc: 'Champion de Roumanie, au pays des Chênes : un rugby de devants, et un titre qui se prend au corps.',
-    ovas: 5,
+    ovas: 3,
   },
   russie: {
     id: 'russie',
@@ -402,7 +402,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/russie.glb',
     couleur: '#5a2d82',
     desc: 'Champion de Russie. Des déplacements interminables, des hivers durs, et une coupe au bout.',
-    ovas: 5,
+    ovas: 3,
     // Même cas que le Pro D2 : un bouclier sur un socle épais (1,48 × 1,90 × 0,91).
     forme: 'bouclier',
   },
@@ -412,7 +412,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/paysBas.glb',
     couleur: '#d96a00',
     desc: 'Champion des Pays-Bas. Le rugby néerlandais est confidentiel — ceux qui le suivent connaissent ton nom.',
-    ovas: 4,
+    ovas: 2,
   },
   pologne: {
     id: 'pologne',
@@ -420,7 +420,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/pologne.glb',
     couleur: '#c8102e',
     desc: 'Champion de Pologne, dans un championnat que personne n’attendait — et qui t’a pris deux saisons.',
-    ovas: 4,
+    ovas: 2,
   },
   bundesliga: {
     id: 'bundesliga',
@@ -428,7 +428,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/bundesliga.glb',
     couleur: '#d9a441',
     desc: 'Champion d’Allemagne. Tout le rugby du pays tient dans un quartier de Heidelberg, et tu y as gagné.',
-    ovas: 4,
+    ovas: 2,
   },
   tcheque: {
     id: 'tcheque',
@@ -436,7 +436,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/tcheque.glb',
     couleur: '#1a4b8c',
     desc: 'Champion de Tchéquie. Un titre de l’ombre, gagné dans le froid, devant les fidèles.',
-    ovas: 3,
+    ovas: 2,
   },
   finlande: {
     id: 'finlande',
@@ -444,7 +444,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/finlande.glb',
     couleur: '#5b9bd5',
     desc: 'Champion de Finlande : la saison la plus courte du monde, et la seule où l’on déneige le terrain avant de jouer.',
-    ovas: 3,
+    ovas: 2,
   },
   // ⚠️ MODÈLE RÉUTILISÉ, ASSUMÉ. Aucun `.glb` n'a été livré pour la coupe de la
   // deuxième division anglaise ; elle emprunte celui de la Premiership Rugby
@@ -456,7 +456,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/prem-cup.glb',
     couleur: '#7f9ab5',
     desc: 'La coupe de la deuxième division anglaise : peu de monde en tribunes, beaucoup de jeunes affamés sur le terrain.',
-    ovas: 5,
+    ovas: 3,
   },
 
   // --- Sélections ------------------------------------------------------------
@@ -466,7 +466,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/recEurope.glb',
     couleur: '#1a5fb4',
     desc: 'Le « Tournoi des 6 Nations B » : Géorgie, Portugal, Roumanie, Espagne… Le titre des nations qui frappent à la porte du Tournoi.',
-    ovas: 10,
+    ovas: 5,
   },
   americasChamp: {
     id: 'americasChamp',
@@ -474,7 +474,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/americasChamp.glb',
     couleur: '#2f72c4',
     desc: 'Champion des Amériques après avoir affronté les meilleures sélections du continent.',
-    ovas: 8,
+    ovas: 4,
   },
   oceaniaCup: {
     id: 'oceaniaCup',
@@ -482,7 +482,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/oceaniaCup.glb',
     couleur: '#22a6a1',
     desc: 'Vainqueur du championnat des nations émergentes d’Océanie.',
-    ovas: 5,
+    ovas: 3,
   },
   recTrophyConference: {
     id: 'recTrophyConference',
@@ -490,7 +490,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/recTrophyConference.glb',
     couleur: '#587fc2',
     desc: 'Vainqueur de ton niveau européen et promu vers l’échelon supérieur.',
-    ovas: 5,
+    ovas: 3,
   },
   rugbyChampionship: {
     id: 'rugbyChampionship',
@@ -498,7 +498,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/rugbyChampionship.glb',
     couleur: '#e0ad35',
     desc: 'Champion de l’hémisphère sud face aux Springboks, All Blacks, Wallabies et Pumas.',
-    ovas: 15,
+    ovas: 8,
   },
   nationsCup: {
     id: 'nationsCup',
@@ -506,7 +506,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/nationsCup.glb',
     couleur: '#4b8ac6',
     desc: 'Vainqueur de la Nations Cup, tournoi international des nations en développement.',
-    ovas: 8,
+    ovas: 4,
   },
   pacificChallenge: {
     id: 'pacificChallenge',
@@ -514,7 +514,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/pacificChallenge.glb',
     couleur: '#26a68b',
     desc: 'Vainqueur du Pacific Challenge au terme d’une campagne insulaire intense.',
-    ovas: 7,
+    ovas: 4,
   },
   mondialU20: {
     id: 'mondialU20',
@@ -522,7 +522,7 @@ export const TROPHEES: Record<string, Trophee> = {
     modele: '/m3d/mondialU20.glb',
     couleur: '#71b9e6',
     desc: 'Champion du monde des moins de 20 ans, premier grand titre d’une carrière en devenir.',
-    ovas: 10,
+    ovas: 5,
   },
 };
 

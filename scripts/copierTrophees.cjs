@@ -148,6 +148,39 @@ const LOTS = [{
     'bag': 'sac',
     'bouclierde percu': 'bouclier-plaquage',
   },
+}, {
+  // ⚠️ LE SECOND LOT DE COSMÉTIQUES — livré à la racine, et il y reste.
+  // Le dossier s'appelle « new model boutique » parce que c'est ainsi qu'il a
+  // été déposé ; le script prend un chemin relatif à la racine, il n'y a donc
+  // rien à déplacer (1,3 Go de sources) pour que la chaîne fonctionne.
+  //
+  // ⚠️ CES MODÈLES-LÀ NE SE TEINTENT PAS. Les précédents partageaient un même
+  // `.glb` décliné par `teinte` (trois paires de crampons, un seul fichier) ;
+  // ceux-ci portent leur maillot peint — le Stade Toulousain, l'Irlande, le
+  // rose fluo. Les teinter reviendrait à repeindre par-dessus le motif, donc
+  // `data/boutique.ts` les déclare SANS `teinte`.
+  dossier: 'new model boutique',
+  intitule: 'le second lot de cosmétiques (maillots de club, casques, crampons)',
+  correspondance: {
+    // ⚠️ Le ballon UBB REMPLACE le « Tricolore Away » (demande explicite, cf. le
+    // nom du fichier livré) : c'est le même id de skin, donc les joueurs qui
+    // l'avaient acheté gardent leur article — il change simplement de modèle.
+    'ballon ubb à la place du ballon tricolore': 'ballon-ubb',
+    'casque australie': 'casque-australie',
+    'casque rose fluo': 'casque-rose',
+    'casque rouge': 'casque-rouge',
+    'casque tribal': 'casque-tribal',
+    'crampons dupont signature': 'crampons-dupont',
+    'crampons graffiti': 'crampons-graffiti',
+    'maillor stade toulousain': 'maillot-toulousain',
+    'maillot angleterre': 'maillot-angleterre',
+    'maillot aviron bayonnais': 'maillot-bayonnais',
+    'maillot irelande': 'maillot-irlande',
+    'maillot italie': 'maillot-italie',
+    'maillot lyon': 'maillot-lyon',
+    'maillot stade francais': 'maillot-stade-francais',
+    'maillot vannes': 'maillot-vannes',
+  },
 }];
 
 const force = process.argv.includes('--force');

@@ -79,7 +79,7 @@ Three.js (@react-three/fiber + @react-three/drei) · Groq (API distante).
 | `src/lib/iaSociale.ts` | Publications, commentaires et messages privés générés sur l'appareil. Chaque fonction possède un repli dans `lib/social.ts`/`lib/vie.ts`. |
 | `src/workers/iaLocale.worker.ts` | Worker dédié à l'inférence : le modèle ne doit jamais tourner sur le fil React. |
 | `src/store/useGame.ts` | Store Zustand persistant : `joueur`, `journal`, `coins` (Ovas), `inventaire`/`skinActif`, `pantheon`, réglages, navigation, négociations de contrat et logique de carrière. Exporte aussi `scoreCarriere`, `noteGlobale`, `classementComplet`. |
-| `src/components/` | `Nav` (+ badge Ovas), `Reglages` (activation, progression et suppression de l'IA locale), `Jauge`, `PanneauJoueur` (badge **GÉN**, logo+club·division, 👥 Mon équipe, retraite), `Hero3D` (si `skin.glb` → `ModeleBallon`, sinon `BallonRugby`), `ModeleBallon` (`useGLTF(url, true)` = **Draco**). |
+| `src/components/` | `Nav` (+ badge Ovas), `Reglages` (activation, progression et suppression de l'IA locale), `Jauge`, `PanneauJoueur` (badge **GÉN**, logo+club·division, 👥 Mon équipe, retraite), `Hero3D` (le rugbyman + son décor au sol ; **`ApercuBallon`**, exporté du même fichier, est l'aperçu de la boutique — il ne monte QUE le ballon), `ModeleBallon` (`useGLTF(url, true)` = **Draco**). |
 | `src/screens/` | `Accueil`, `Creation` (division+club réels), `Carriere` (MJ + 📖/🎲 **limités à `MAX_PAR_SAISON`=2**), `Profil`, `Boutique`, `Pantheon`, `Classement`, `Championnats` (3 onglets France/Monde/Sélections ; clic sur un club → `FicheClub` ; l'onglet Sélections liste les **équipes** — séniors puis U20 — et non les compétitions), `Effectif` (coéquipiers). |
 | `src/index.css` | Design system : variables CSS (couleurs, polices, rayons), reset, fond. |
 | `src/App.css` | Styles des composants et écrans + **media queries responsive** (900px / 560px). |
@@ -464,6 +464,8 @@ premier.
   min 1), retraite score/150. Le solde n'apparaît **que dans la Boutique**
   (pas de badge nav, pas de « +X 🪙 » dans le journal ni sur les boutons).
   Ne pas ré-augmenter les gains ni réafficher les coins in-game sans demande.
+  ⚠️ **RÉÉTALONNÉE — voir la section « L'économie d'Ovas, mesurée » plus bas.**
+  Elle promettait « dure » et versait 4 000 à 5 000 Ovas par carrière.
 - **Effectif** : pas persisté (déterministe / regénéré à la volée).
   - **143 clubs ont un effectif RÉEL** (6 306 joueurs, saison 25-26) : Top 14,
     Pro D2, Nationale, Premiership, RFU Championship, URC, Super Rugby, NPC,
@@ -548,8 +550,11 @@ premier.
   le skin principal utilise désormais le `.glb` fourni (compressé Draco).
 - Draco : `useGLTF(url, true)` charge le décodeur depuis un CDN Google — OK en
   ligne, prévoir un décodeur local si besoin d'hors-ligne complet.
-- **Fond du hero** : `ModeleStade` affiche désormais `public/m3d/poteaux.glb`
-  (le stade a été retiré à la demande de l'utilisateur). Fallback : poteaux codés.
+- **Fond du hero** : ⚠️ **PLUS DE POTEAUX** (demande explicite : « enlève les
+  poteaux derrière le joueur »). `ModeleStade` et son repli en géométrie ont été
+  SUPPRIMÉS ; `poteaux.glb` n'est plus téléchargé au chargement de l'accueil.
+  À la place, `Hero3D` pose un **décor au sol** (`bouclier-plaquage.glb`, via
+  `DecorSol`) à gauche du joueur, derrière son plan.
 - **Palmarès** : `resoudreTrophees()` (store) est appelé dans `saisonSuivante()`
   pour la saison **écoulée**. Il simule d'abord `rangDuClub()` (1 à 14 dans une
   poule, à partir de l'écart entre `force = note*0.7 + reputation*0.3` et
@@ -3576,3 +3581,118 @@ réduire l'échantillon ou couper la simulation de fond
 (`simulerStatsJournee`) pendant la mesure. **Tant que ce n'est pas fait, aucun
 chiffre de `verifDifficulte.ts` ni de `verifHonneurs.ts` ne doit servir à
 retoucher l'étalonnage** : on corrigerait le jeu pour compenser un test faux.
+
+
+## L'économie d'Ovas, mesurée (réétalonnage complet)
+
+⚠️ **Demande explicite** : « rééquilibre toute la boutique sur les prix, il faut
+que ce soit dur d'obtenir des cosmétiques ; si on fait une bonne carrière avec
+les achievements on fait facile 4 000-5 000 Ovas, réduis pour que ce soit plus
+autour des 500. »
+
+Le diagnostic tient en une multiplication que personne n'avait faite : ce
+n'était **aucune des valeurs affichées** qui était trop généreuse, c'était le
+NOMBRE d'occasions.
+
+| Robinet | Avant | Maintenant | Ce qui a changé |
+|---|---|---|---|
+| Défis de la semaine | ~3 000 | **120** | 3 défis × 43 semaines × 12 saisons, sans plafond → `PLAFOND_OVAS_DEFIS_PAR_SAISON = 10` |
+| Actions au Maître du Jeu | ~500 | **48** | +1 Ova par scène, et la scène tombe CHAQUE semaine → `PLAFOND_OVAS_ACTIONS_PAR_SAISON = 4` |
+| Succès | ~630 | **253** | les 68 valeurs de `data/succes.ts` divisées par 2,5 (cagnotte 1 060 → 421) |
+| Trophées | ~90 | **45** | les 54 valeurs de `data/trophees.ts` divisées par 2 |
+| Saisons, situations, retraite | ~85 | 83 | inchangé |
+| **Total par belle carrière (12 saisons)** | **4 000-5 000** | **≈ 550** | |
+
+- **Le plafond des défis est AFFICHÉ, pas subi** : l'onglet Succès de L'Ovale
+  montre « 🪙 x / 10 Ovas versées par les défis cette saison », et un défi qui
+  ne rapporte plus rien affiche « — » au lieu de « +2 🪙 ». Un défi reste
+  toujours validé et notifié : c'est un objectif de semaine, pas une prime.
+  Les deux compteurs vivent dans `compteurs` (store), remis à zéro à chaque
+  intersaison — donc rien à migrer.
+- **La pub a suivi** : `OVAS_PAR_PUB` 8 → **4**, `PUBS_PAR_JOUR` 3 → **2**.
+  À 24 Ovas par jour, le robinet publicitaire versait une carrière entière en
+  trois semaines sans jouer une minute.
+- **L'échelle des prix** (`data/boutique.ts`) a trois marches qui veulent dire
+  quelque chose face à ces ~550 Ovas : **entrée 60-90** (une carrière en paie
+  cinq), **palier 120-260** (deux ou trois par carrière), **prestige 300-450**
+  (une seule, et il faut la mériter). Tout acheter demande **~9 carrières**
+  (~5 000 Ovas depuis le second lot de cosmétiques).
+- **La mesure est un script** : `npx vite-node scripts/verifEconomie.ts`. Il
+  additionne les robinets, affiche leur part, et **échoue** si le total sort de
+  380-640 Ovas. À relancer après toute retouche d'un `ovas:` ou d'un prix.
+
+## La boutique : ce qui a changé
+
+- **L'aperçu des ballons remontre un ballon.** Le grand cadre appelait `Hero3D`,
+  qui affiche le rugbyman dès qu'une carrière existe : on inspectait cinq
+  ballons et on voyait toujours le même joueur. Il passe par **`ApercuBallon`**
+  (exporté de `components/Hero3D.tsx`), qui ne monte que le ballon — et le fait
+  tourner, comme les vignettes (c'est là qu'on inspecte un article).
+- **Articles retirés** (demande explicite) : protège-dents, mitaines, tee de
+  buteur et les **trois paires de chaussettes** — la catégorie `chaussettes`
+  n'existe plus. Leurs `.glb` restent dans `public/m3d/`. `EQUIPEMENTS_RETIRES`
+  sert à **nettoyer les sauvegardes** (store, version **10**) : un joueur qui
+  portait des chaussettes dorées ne garde pas un emplacement occupé par un
+  fantôme.
+- **Second lot de modèles** (`new model boutique/`, 15 fichiers, 1,3 Go bruts) :
+  ballon UBB (il **remplace** le Tricolore Away et garde son id `tricolore`,
+  pour ne pas retirer l'article aux joueurs qui l'avaient acheté), 4 casques,
+  2 paires de crampons, 8 maillots de club et de sélection. Compressés par le
+  même pipeline que les trophées — `node scripts/copierTrophees.cjs`, dernier
+  lot de `LOTS`. ⚠️ **Ils ne se teintent pas** : chacun porte sa texture peinte,
+  une `teinte` repeindrait le motif. Ils sont donc déclarés sans.
+- **4 cosmétiques s'obtiennent en regardant une pub** (demande explicite) :
+  `casque-rose`, `crampons-graffiti`, `maillot-vannes`, `maillot-italie`. Ils
+  portent `parPub: true`, `prix: 0`, et `acheterEquipement()` les REFUSE — sans
+  ça, `coins < 0` étant toujours faux, un clic les aurait donnés gratuitement.
+  `debloquerParPub()` (store) consomme un des passages quotidiens, comme la pub
+  qui rapporte des Ovas : on ne débloque pas les quatre dans la même minute.
+- **`public/ads.txt`** déclare Google comme seul vendeur autorisé
+  (`google.com, pub-6166322317354663, DIRECT, f08c47fec0942fa0`). ⚠️ Il doit
+  être servi **à la racine du domaine** (`/ads.txt`) — c'est pour ça qu'il vit
+  dans `public/`, que Vite copie tel quel — et **par le domaine qui affiche les
+  annonces** : sur un sous-domaine de préproduction, Google lit l'ads.txt du
+  domaine racine. Sans lui, AdSense ne diffuse rien.
+- **AdSense est branché** : l'identifiant `ca-pub-6166322317354663` est **en dur**
+  dans `lib/pub.ts` (un `ca-pub-…` est public par construction — Google l'exige
+  dans le `<script>` et dans `ads.txt`), la variable `VITE_PUB_CLIENT` ne sert
+  plus qu'à pointer un autre compte. ⚠️ **Il manque encore `VITE_PUB_SLOT`** :
+  un « slot » se crée bloc par bloc dans la console AdSense, personne ne peut le
+  deviner. Tant qu'il est absent, aucune bannière n'est rendue et la pub
+  récompensée joue son **encart maison** (compte à rebours du jeu) : la mécanique
+  est jouable, mais elle ne rapporte rien. Avec le slot, une vraie annonce
+  s'affiche dans la modale pendant le décompte.
+
+## Le classement mondial montre enfin les autres joueurs
+
+⚠️ **Demande explicite** : « dans le classement mondial, qu'on puisse voir les
+stats des autres joueurs, leurs profils, armoires à trophées, clubs qu'ils ont
+faits ». Elle **renverse** une décision antérieure — « dans la DB je veux
+retenir juste le score » — dont `serveur/schema-vercel.sql` notait déjà la
+conséquence : « on ne pourra pas, plus tard, afficher 12 saisons, 44 essais à
+côté d'un score ». C'est exactement ce qu'il fallait faire.
+
+- **La base garde la fiche** (schéma **v2**) : `nom, poste, nation, age, saisons,
+  note, reputation, matchs, essais, selections, titres (jsonb), clubs (jsonb)`.
+  Toutes NULLABLES — une ligne écrite par la v1 reste lisible et affiche
+  franchement « seul son score est connu ». Le SQL de migration d'une base déjà
+  en ligne est en tête de `serveur/schema-vercel.sql`.
+- **La sécurité ne bouge pas d'un pouce** : ce qui protège le classement, c'est
+  que le serveur RECALCULE le score (`scoreDeLaFiche`). Stocker davantage
+  n'ouvre aucune brèche — chaque champ passe par `verifierFiche` avant d'être
+  écrit.
+- **`Joueur.clubs`** (nouveau) : tous les maillots portés, dans l'ordre.
+  `palmares[].club` ne connaissait que les clubs où l'on a GAGNÉ. Alimenté à la
+  création et dans `appliquerPreAccord` — le seul endroit où le club change.
+  Une prolongation ne rallonge pas la liste.
+- **`VERSION_BAREME` passe à 2** (le champ `clubs` entre dans la chaîne
+  canonique, donc dans le sceau). Jeu et API étant déployés ensemble, le
+  basculement est atomique.
+- **`FicheAffichable`** (écran `Classement`) ramène les deux tableaux — le Hall
+  local et le mondial — à une seule structure : il n'y a qu'un panneau de fiche
+  à écrire, à styler et à traduire. Chaque ligne des DEUX tableaux s'ouvre.
+- ⚠️ **La classe CSS s'appelle `.parcours-club`, pas `.fiche-club`** :
+  `.fiche-club` existe déjà (la modale d'effectif, `width: 720px`), et la
+  collision étirait chaque pastille sur toute la largeur de l'écran.
+- Vérification : `npx vite-node scripts/verifClassement.ts` (section « 4 bis »
+  pour les bornes des clubs).

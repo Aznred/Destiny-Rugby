@@ -6,8 +6,8 @@
 //
 // Le personnage est le modèle livré `public/m3d/rugbyman.glb` (compressé par
 // `node scripts/copierTrophees.cjs`). Les cosmétiques sont des modèles à part,
-// **accrochés dessus** : le casque sur la tête, les chaussettes sur les
-// mollets, les mitaines aux mains, le ballon au creux du bras.
+// **accrochés dessus** : le casque sur la tête, le maillot sur le buste, les
+// crampons aux pieds, le ballon au creux du bras.
 //
 // ⚠️ LES POINTS D'ACCROCHE SONT CALCULÉS SUR LA BOÎTE ENGLOBANTE, pas codés en
 // dur. Le modèle peut être relivré avec une autre échelle, une autre
@@ -45,17 +45,17 @@ function couleursDe(tenue: TenueRugbyman) {
     const id = equipe[categorie];
     return id ? EQUIPEMENT_PAR_ID[id] : undefined;
   };
-  // ⚠️ CASQUE ET CHAUSSETTES ONT LEUR PROPRE CATÉGORIE, et ce n'est pas un
-  // détail de rangement : `equipementActif` ne garde qu'UN article par
-  // catégorie. Rangés tous les deux dans « accessoire », on ne pourrait pas
-  // porter le casque ET les chaussettes — exactement ce que la demande exige
-  // (« on peut customiser casque, ballon, chaussettes, maillot, chaussures »).
+  // ⚠️ LE CASQUE A SA PROPRE CATÉGORIE, et ce n'est pas un détail de rangement :
+  // `equipementActif` ne garde qu'UN article par catégorie. Rangé dans
+  // « accessoire », on ne pourrait plus rien porter d'autre en même temps.
+  //
+  // ⚠️ PLUS DE CHAUSSETTES NI DE MITAINES : les deux ont été retirées de la
+  // boutique (demande explicite), et elles n'étaient de toute façon accrochées
+  // nulle part sur le personnage — `couleursDe` les calculait pour rien.
   return {
     maillot: article('maillot'),
     crampons: article('crampons'),
-    chaussettes: article('chaussettes'),
     casque: article('casque'),
-    mains: equipe.accessoire === 'mitaines' ? EQUIPEMENT_PAR_ID.mitaines : undefined,
     clubPrincipale: club?.c1 ?? '#15317e',
     clubSecondaire: club?.c2 ?? '#f4f4ef',
   };

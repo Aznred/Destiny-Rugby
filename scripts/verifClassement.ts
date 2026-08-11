@@ -72,6 +72,10 @@ function fiche(modif: Partial<FicheCarriere> = {}): FicheCarriere {
     essais: 44,
     selections: 21,
     titres: ['brennus', 'champions', 'sixNations'],
+    // ⚠️ Depuis la v2 du barème, une fiche sans clubs est REFUSÉE : c'est ce
+    // qu'affiche l'écran Classement (« clubs traversés »), et un champ affiché
+    // doit être un champ borné.
+    clubs: ['Stade Toulousain', 'RC Vannes'],
     ...modif,
   };
   return { ...base, score: modif.score ?? scoreDeLaFiche(base) };
@@ -183,6 +187,26 @@ console.log('\n=== 4. LES TROPHÉES INVENTÉS SONT REFUSÉS ===');
   const v = verifierFiche(tous, IDS_TROPHEES);
   ligne('les 40 premiers trophées du jeu sont reconnus',
     v.anomalies.join(' | ') || `score ${v.score}`, v.valide);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n=== 4 bis. LES CLUBS SONT AFFICHÉS, DONC BORNÉS ===');
+{
+  // ⚠️ Les clubs ne pèsent RIEN sur le score : il n'y a rien à gagner à les
+  // truquer. Mais ils s'affichent sur l'écran de tous les joueurs du monde —
+  // c'est donc une surface d'injection, pas de triche, et elle se borne pareil.
+  attaque('aucun club', fiche({ clubs: [] }), /aucun club/);
+  attaque('clubs n’est pas une liste',
+    fiche({ clubs: 'Toulouse' as unknown as string[] }), /pas une liste/);
+  attaque('club vide', fiche({ clubs: ['  '] }), /vide/);
+  attaque('nom de club à rallonge',
+    fiche({ clubs: ['C'.repeat(LIMITES.clubMax + 1)] }), /trop long/);
+  attaque('plus de clubs que de saisons',
+    fiche({ saisons: 2, ageDebut: 18, age: 19, note: 50, matchs: 40, essais: 8, selections: 4, clubs: ['A', 'B', 'C', 'D'] }),
+    /clubs en 2 saison/);
+  const legitime = verifierFiche(fiche({ clubs: ['Stade Toulousain'] }), IDS_TROPHEES);
+  ligne('un club unique sur toute la carrière reste valide',
+    legitime.anomalies.join(' | ') || `score ${legitime.score}`, legitime.valide);
 }
 
 console.log('\n=== 5. LE PLAFOND ABSOLU ===');

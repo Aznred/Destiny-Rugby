@@ -156,8 +156,10 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   saison (temps de jeu, essais, forme, moral) ne fait qu'infléchir le résultat —
   et tes matchs et essais sont désormais **simulés chaque saison** selon ton
   niveau face à ton groupe et ton poste.
-- **Hero 3D immersif** : poteaux de rugby en toile de fond + ballon France Rugby
-  flottant (modèles `.glb` compressés Draco).
+- **Hero 3D immersif** : **ton** rugbyman, en entier et de la tête aux crampons,
+  habillé de ce que tu lui as acheté au vestiaire, avec un sac de plaquage posé
+  à ses pieds. Tant qu'aucune carrière n'est commencée, c'est le ballon France
+  Rugby qui pose (modèles `.glb` compressés Draco).
 - **Cérémonies de trophées** 🏆 : chaque titre remporté déclenche une **modale
   avec le vrai trophée en 3D qui tourne sur lui-même**, particules et aura
   colorée. Titres gagnables chaque saison, selon ton niveau et ta division :
@@ -465,7 +467,8 @@ serveur/                # le classement en ligne (Deno, déployé à part — pa
   data/trophees.ts      # trophées + conditions d'attribution + modèles 3D
   index.css / App.css   # design system (thème stade) + styles composants
 public/ballon.glb       # ballon France Rugby, compressé Draco (453 Ko)
-public/m3d/*.glb        # poteaux, 54 trophées (dont 8 distinctions), skins de ballon (70 Mo)
+public/m3d/*.glb        # 54 trophées (dont 8 distinctions), le rugbyman, ses cosmétiques et les skins de ballon
+new model boutique/     # les modèles bruts du 2ᵉ lot de cosmétiques (1,3 Go, hors dépôt) — voir scripts/copierTrophees.cjs
 public/logos/*          # 957 logos de clubs et de sélections (4,2 Mo)
 ```
 

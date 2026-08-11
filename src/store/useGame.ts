@@ -89,7 +89,9 @@ import {
 import { EVENEMENTS, traduireEvenement } from '../data/evenements';
 import { situationPour, versScenario, type ConsequenceDure } from '../data/situations';
 import { appliquerConsequence, lireDerapage, consequenceDuDerapage } from '../lib/consequences';
-import { SKIN_PAR_ID, EQUIPEMENT_PAR_ID, type CategorieEquipement } from '../data/boutique';
+import {
+  SKIN_PAR_ID, EQUIPEMENT_PAR_ID, EQUIPEMENTS_RETIRES, type CategorieEquipement,
+} from '../data/boutique';
 import { ETAT_PUBS_VIDE, OVAS_PAR_PUB, etatDuJour, pubDisponible, type EtatPubs } from '../lib/pub';
 import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
@@ -370,6 +372,39 @@ function gainOvas(base: number): number {
   return Math.max(1, Math.floor(base / 8));
 }
 
+/**
+ * CE QUE LES DÉFIS DE LA SEMAINE PEUVENT RAPPORTER EN UNE SAISON.
+ *
+ * ⚠️ C'EST LE GARDE-FOU DE TOUTE L'ÉCONOMIE, et il vient d'une mesure : trois
+ * défis par semaine sur les 43 semaines du calendrier, à 1-2 Ovas pièce, ça
+ * faisait ~250 Ovas la saison — donc ~3 000 sur une carrière, quand tout le
+ * reste du jeu (succès, trophées, saisons, retraite) en donne moins de 500 à
+ * lui tout seul. Les défis payaient à eux seuls six fois le jeu.
+ *
+ * Demande explicite de l'utilisateur : « il faut que ce soit dur d'obtenir des
+ * cosmétiques ; si on fait une bonne carrière avec les achievements on fait
+ * facile 4 000-5 000 Ovas, réduis pour que ce soit plus autour des 500 ».
+ *
+ * Le défi continue d'être VALIDÉ et notifié une fois le plafond atteint — c'est
+ * un objectif de semaine, pas seulement une prime — mais il ne verse plus rien,
+ * et l'onglet Succès de L'Ovale affiche le compteur pour que ce ne soit jamais
+ * une surprise.
+ */
+export const PLAFOND_OVAS_DEFIS_PAR_SAISON = 10;
+
+/**
+ * MÊME GARDE-FOU POUR LES ACTIONS ÉCRITES AU MAÎTRE DU JEU.
+ *
+ * ⚠️ La deuxième fuite, et elle était invisible pour la même raison : une
+ * action rapporte 1 Ova, ce qui semblait dérisoire — sauf que la scène tombe
+ * CHAQUE semaine depuis le calendrier réel, soit 43 occasions par saison, donc
+ * ~500 Ovas sur une carrière rien qu'en répondant. Autant que tout le reste.
+ *
+ * Rien ne l'annonce à l'écran (règle du projet : « pas de +X 🪙 dans le journal
+ * ni sur les boutons »), donc le plafond ne trahit aucun affichage.
+ */
+export const PLAFOND_OVAS_ACTIONS_PAR_SAISON = 4;
+
 // Comparaison de noms tolérante (accents, casse, ponctuation).
 function normaliserNom(nom: string): string {
   return nom.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]/g, '');
@@ -463,7 +498,13 @@ interface GameState {
   evenementHebdo: EvenementHebdo | null;
   /** Titres déjà posés cette saison : envoyés à l'IA pour qu'elle se répète moins. */
   evenementsVus: string[];
-  compteurs: { evenements: number; situations: number; gainsIA: number; gainsMatchs?: number };
+  compteurs: {
+    evenements: number; situations: number; gainsIA: number; gainsMatchs?: number;
+    /** Ovas déjà versées par les défis cette saison (`PLAFOND_OVAS_DEFIS_PAR_SAISON`). */
+    ovasDefis?: number;
+    /** Idem pour les actions au MJ (`PLAFOND_OVAS_ACTIONS_PAR_SAISON`). */
+    ovasActions?: number;
+  };
   tropheesEnAttente: string[]; // file des trophées à afficher en 3D
   /**
    * LES APPROCHES DE CLUBS, en cours ou closes (`lib/negociation.ts`).
@@ -604,6 +645,8 @@ interface GameState {
   acheterSkin: (id: string) => boolean;
   choisirSkin: (id: string) => void;
   acheterEquipement: (id: string) => boolean;
+  /** Débloque un cosmétique « par pub » une fois la pub regardée. */
+  debloquerParPub: (id: string) => boolean;
   basculerEquipement: (id: string) => void;
   setPubConsentement: (choix: 'oui' | 'non') => void;
   /** Crédite la récompense d'une pub REGARDÉE JUSQU'AU BOUT. */
@@ -631,7 +674,7 @@ export const useGame = create<GameState>()(
       avanceRapide: false,
       evenementHebdo: null,
       evenementsVus: [],
-      compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
+      compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0 },
       tropheesEnAttente: [],
       approches: [],
       theme: 'vert',
@@ -708,6 +751,9 @@ export const useGame = create<GameState>()(
           // copains du club, deux ou trois supporters curieux.
           pseudo: pseudoDe(input.nom.trim() || 'Anonyme'),
           abonnes: 120 + Math.floor(Math.random() * 300),
+          // Le premier maillot de la carrière : la liste des clubs commence ici
+          // et s'allonge à chaque signature (`appliquerPreAccord`).
+          clubs: [input.club],
         };
         // Nouvelle carrière = pyramide remise à son état d'origine, et plus
         // aucun transfert annoncé sur L'Ovale ne traîne.
@@ -725,7 +771,7 @@ export const useGame = create<GameState>()(
           evenementHebdo: null,
           evenementsVus: [],
           mouvementsClubs: {},
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0 },
           // Nouvelle carrière : timeline et défis repartent de zéro. Les SUCCÈS,
           // eux, sont un palmarès de joueur — ils traversent les carrières (et
           // ne peuvent donc pas être refarmés pour des Ovas).
@@ -796,10 +842,17 @@ export const useGame = create<GameState>()(
           });
         }
 
+        // Plafonné à la saison (voir `PLAFOND_OVAS_ACTIONS_PAR_SAISON`).
+        const primeAction = Math.min(1, Math.max(0,
+          PLAFOND_OVAS_ACTIONS_PAR_SAISON - (get().compteurs.ovasActions ?? 0)));
         set((s) => ({
           joueur: j,
-          coins: s.coins + 1,
-          compteurs: { ...s.compteurs, gainsIA: s.compteurs.gainsIA + attributsGagnes },
+          coins: s.coins + primeAction,
+          compteurs: {
+            ...s.compteurs,
+            gainsIA: s.compteurs.gainsIA + attributsGagnes,
+            ovasActions: (s.compteurs.ovasActions ?? 0) + primeAction,
+          },
           journal: [...s.journal, ...entrees],
         }));
       },
@@ -1452,7 +1505,7 @@ export const useGame = create<GameState>()(
           statsReelles: {},
           journeesReelles: {},
           coins: s.coins + gain,
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0 },
           tropheesEnAttente: [...s.tropheesEnAttente, ...gagnes],
           mouvementsClubs: majMouvements,
           journal: [...s.journal, ...entrees],
@@ -2051,6 +2104,11 @@ export const useGame = create<GameState>()(
           moral: borne(joueur.moral + (reste ? 6 : 10)),
           reputation: borne(joueur.reputation + (p.etranger ? 6 : reste ? 2 : 4)),
           contrat: { club: p.club, division: p.division, saisons: p.saisons, salaire: p.salaire },
+          // ⚠️ C'EST LE SEUL ENDROIT OÙ LE JOUEUR CHANGE DE CLUB. On y tient la
+          // liste des maillots portés — une prolongation ne la rallonge pas.
+          clubs: reste
+            ? (joueur.clubs ?? [joueur.club])
+            : [...(joueur.clubs ?? [joueur.club]), p.club],
         };
         const abonnesApres = rapprocherAbonnes(
           arrive.abonnes ?? 0,
@@ -2282,12 +2340,21 @@ export const useGame = create<GameState>()(
         }
         if (entreeDure) entrees.push(entreeDure);
 
+        // ⚠️ C'EST LA SCÈNE HEBDOMADAIRE — 43 par saison. Sans le plafond
+        // ci-dessous, répondre à sa semaine rapportait à lui seul ~500 Ovas par
+        // carrière, autant que tout le reste du jeu réuni.
+        const primeHebdo = Math.min(1, Math.max(0,
+          PLAFOND_OVAS_ACTIONS_PAR_SAISON - (get().compteurs.ovasActions ?? 0)));
         set((s) => ({
           joueur: j,
           evenementHebdo: null,
           attenteEvenement: false,
-          coins: s.coins + 1,
-          compteurs: { ...s.compteurs, gainsIA: s.compteurs.gainsIA + jugement.attributsGagnes },
+          coins: s.coins + primeHebdo,
+          compteurs: {
+            ...s.compteurs,
+            gainsIA: s.compteurs.gainsIA + jugement.attributsGagnes,
+            ovasActions: (s.compteurs.ovasActions ?? 0) + primeHebdo,
+          },
           journal: [...s.journal, ...entrees],
         }));
 
@@ -2499,6 +2566,7 @@ export const useGame = create<GameState>()(
           titres: joueur.titres,
           // Les ids servent au classement mondial : voir `LegendeSauvegardee`.
           tropheeIds: (joueur.palmares ?? []).map((t) => t.trophee),
+          clubs: joueur.clubs ?? [joueur.club],
           score: scoreCarriere(joueur),
           reconversion,
         };
@@ -2564,7 +2632,7 @@ export const useGame = create<GameState>()(
           tropheesEnAttente: [],
           approches: [],
           mouvementsClubs: {},
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0 },
           posts: [],
           filSemaine: '',
           notifsSocial: [],
@@ -3514,9 +3582,16 @@ export const useGame = create<GameState>()(
           return;
         }
         const defi = DEFI_PAR_ID[evenement];
+        // ⚠️ LE PLAFOND DE SAISON. Le défi est validé et notifié quoi qu'il
+        // arrive — c'est un objectif de semaine — mais il ne verse plus rien une
+        // fois `PLAFOND_OVAS_DEFIS_PAR_SAISON` atteint. Sans ça, les défis
+        // rapportaient à eux seuls six fois le reste du jeu (voir la constante).
+        const dejaVerse = get().compteurs.ovasDefis ?? 0;
+        const verse = Math.max(0, Math.min(defi?.ovas ?? 1, PLAFOND_OVAS_DEFIS_PAR_SAISON - dejaVerse));
         set((s) => ({
           defis: { cle, faits: [...courant.faits, evenement] },
-          coins: s.coins + (defi?.ovas ?? 1),
+          coins: s.coins + verse,
+          compteurs: { ...s.compteurs, ovasDefis: (s.compteurs.ovasDefis ?? 0) + verse },
           notifsSocial: [
             {
               id: idUnique(),
@@ -3556,12 +3631,40 @@ export const useGame = create<GameState>()(
         const { coins, equipements } = get();
         const article = EQUIPEMENT_PAR_ID[id];
         if (!article || equipements.includes(id) || coins < article.prix) return false;
+        // ⚠️ UN ARTICLE « PAR PUB » NE S'ACHÈTE PAS, MÊME À 0 OVA. Sans cette
+        // ligne, `coins < 0` étant toujours faux, n'importe quel clic sur une
+        // carte l'aurait débloqué gratuitement — la porte de la pub servait
+        // alors de décoration.
+        if (article.parPub) return false;
         set((s) => ({
           coins: s.coins - article.prix,
           equipements: [...s.equipements, id],
           // On l'enfile tout de suite : personne n'achète des crampons pour les
           // laisser dans le sac.
           equipementActif: { ...s.equipementActif, [article.categorie]: id },
+        }));
+        return true;
+      },
+
+      /**
+       * Débloque un cosmétique « par pub », APRÈS que la pub a été regardée.
+       *
+       * ⚠️ ELLE CONSOMME UN PASSAGE QUOTIDIEN, exactement comme la pub qui
+       * rapporte des Ovas (`encaisserPub`) : deux par jour, quinze minutes
+       * d'écart. Sans ça, on débloquerait les quatre articles d'affilée en une
+       * minute et la contrainte n'existerait plus. C'est aussi ce qui garantit
+       * qu'on ne peut pas boucler la boutique en une soirée de visionnage.
+       */
+      debloquerParPub: (id) => {
+        const { equipements, pubs } = get();
+        const article = EQUIPEMENT_PAR_ID[id];
+        if (!article?.parPub || equipements.includes(id)) return false;
+        const etat = etatDuJour(pubs);
+        if (!pubDisponible(etat).possible) return false;
+        set((s) => ({
+          equipements: [...s.equipements, id],
+          equipementActif: { ...s.equipementActif, [article.categorie]: id },
+          pubs: { ...etat, vues: etat.vues + 1, derniere: Date.now() },
         }));
         return true;
       },
@@ -3608,7 +3711,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 9,
+      version: 10,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -3652,6 +3755,11 @@ export const useGame = create<GameState>()(
         if (s.joueur) {
           s.joueur = {
             ...s.joueur,
+            // ⚠️ VERSION 10 — LA LISTE DES CLUBS TRAVERSÉS N'EXISTAIT PAS. On ne
+            // peut pas la reconstituer (le jeu ne gardait aucune trace des
+            // transferts passés) : on repart du club actuel, et elle s'allonge
+            // à la prochaine signature.
+            clubs: s.joueur.clubs?.length ? s.joueur.clubs : [s.joueur.club],
             poste: migrerPoste(s.joueur.poste as string),
             nation: s.joueur.nation ?? 'France',
             titres: s.joueur.titres ?? [],
@@ -3742,6 +3850,17 @@ export const useGame = create<GameState>()(
         // liste d'articles ni tenue portée.
         s.equipements ??= [];
         s.equipementActif ??= {};
+        // ⚠️ VERSION 10 — LE VESTIAIRE A MAIGRI. Protège-dents, mitaines, tee de
+        // buteur et les trois paires de chaussettes ont été retirés de la vente
+        // (demande explicite). Une sauvegarde peut donc porter un article qui
+        // n'existe plus : on le retire de l'inventaire ET de l'emplacement
+        // équipé, sinon la boutique afficherait un emplacement occupé par un
+        // fantôme qu'aucune carte ne permet plus de libérer.
+        s.equipements = s.equipements.filter((id) => !EQUIPEMENTS_RETIRES.includes(id));
+        s.equipementActif = Object.fromEntries(
+          Object.entries(s.equipementActif)
+            .filter(([, id]) => id && !EQUIPEMENTS_RETIRES.includes(id)),
+        ) as Partial<Record<CategorieEquipement, string>>;
         s.pubConsentement ??= 'inconnu';
         s.pubs ??= ETAT_PUBS_VIDE;
         // Le mode de simulation saison par saison a été supprimé. On enlève
@@ -4492,6 +4611,8 @@ export function classementComplet(
       matchsJoues: joueur.matchsJoues,
       essais: joueur.essais,
       titres: joueur.titres,
+      tropheeIds: (joueur.palmares ?? []).map((t) => t.trophee),
+      clubs: joueur.clubs ?? [joueur.club],
       score: scoreCarriere(joueur),
       enCours: true,
       joueur: true,

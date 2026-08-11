@@ -17,18 +17,29 @@
 // La seule protection RÉELLE est donc : **le serveur ne fait jamais confiance
 // au score envoyé — il le RECALCULE.**
 //
-// D'où l'architecture, qui répond aussi à « dans la DB je veux juste le score » :
+// D'où l'architecture :
 //
 //        navigateur                      serveur (Edge Function)            DB
 //   ┌──────────────────┐          ┌────────────────────────────┐    ┌────────────┐
 //   │ FicheCarriere    │  POST →  │ 1. verifierFiche(fiche)    │    │ pseudo     │
 //   │ (les faits bruts │          │ 2. score = scoreDeLaFiche()│ →  │ score      │
-//   │  de la carrière) │          │ 3. jette la fiche          │    │ cree_le    │
+//   │  de la carrière) │          │ 3. écrit score + faits     │    │ + la fiche │
 //   └──────────────────┘          └────────────────────────────┘    └────────────┘
 //
-// La REQUÊTE porte les faits (saisons, note, matchs, essais, titres…), ce qui
-// permet au serveur de recalculer. La BASE, elle, ne garde que le score : la
-// fiche est jetée aussitôt vérifiée. Les deux contraintes sont satisfaites.
+// La REQUÊTE porte les faits (saisons, note, matchs, essais, titres, clubs…),
+// ce qui permet au serveur de RECALCULER le score. C'est ce recalcul, et lui
+// seul, qui protège le classement.
+//
+// ⚠️ LA BASE NE GARDAIT QUE LE SCORE — CE N'EST PLUS LE CAS, et c'est un
+// revirement assumé. La demande d'origine était « dans la DB je veux retenir
+// juste le score », et `serveur/schema-vercel.sql` en notait déjà la
+// conséquence : « on ne pourra pas, plus tard, afficher 12 saisons, 44 essais à
+// côté d'un score ». C'est précisément ce qui est demandé aujourd'hui : « dans
+// le classement mondial, qu'on puisse voir les stats des autres joueurs, leurs
+// profils, armoires à trophées, clubs qu'ils ont faits ». On conserve donc
+// désormais les faits AFFICHABLES de la fiche — les mêmes que ceux qui servent
+// au recalcul, rien de plus : aucune donnée personnelle, aucun journal, aucune
+// adresse. Le pseudo reste choisi par le joueur.
 //
 // ⚠️ CE FICHIER EST FAIT POUR TOURNER DES DEUX CÔTÉS. Aucune dépendance, aucun
 // import du store, aucun accès au DOM : on le copie tel quel dans la fonction
@@ -43,8 +54,15 @@
 // relations : moins il y a de champs, moins il y a de surface à falsifier et
 // moins il y a de données personnelles qui circulent.
 
-/** Version du barème. Toute fiche d'une autre version est refusée. */
-export const VERSION_BAREME = 1;
+/**
+ * Version du barème. Toute fiche d'une autre version est refusée.
+ *
+ * ⚠️ PASSÉE À 2 QUAND LA FICHE A GAGNÉ SES CLUBS. Le champ `clubs` entre dans
+ * la chaîne canonique, donc dans le sceau : une fiche v1 n'a pas de quoi être
+ * affichée sur l'écran Classement, et son sceau ne correspondrait plus. Comme
+ * le jeu et l'API sont déployés ensemble, le basculement est atomique.
+ */
+export const VERSION_BAREME = 2;
 
 export interface FicheCarriere {
   /** Version du barème avec lequel la fiche a été produite. */
@@ -67,6 +85,16 @@ export interface FicheCarriere {
   selections: number;
   /** Ids de trophées (`data/trophees.ts`), un par titre remporté. */
   titres: string[];
+  /**
+   * Les clubs portés, dans l'ordre (`Joueur.clubs`).
+   *
+   * ⚠️ AJOUTÉ POUR L'ÉCRAN, PAS POUR LE SCORE. Demande explicite : « dans le
+   * classement mondial, qu'on puisse voir les stats des autres joueurs, leurs
+   * profils, armoires à trophées, clubs qu'ils ont faits ». Il n'entre donc PAS
+   * dans `scoreDeLaFiche()` — le barème ne bouge pas, un classement ne se
+   * réordonne pas parce qu'on affiche un écusson de plus.
+   */
+  clubs: string[];
   /** Le score annoncé par le client. Le serveur le RECALCULE et compare. */
   score: number;
 }
@@ -140,6 +168,12 @@ export const LIMITES = {
    */
   noteApres: (saisons: number) => Math.min(99, 40 + saisons * 6),
   pseudoMax: 24,
+  /**
+   * Longueur d'un nom de club affiché. Le plus long du jeu (« 4 Cantons
+   * Bastides Haut Agenais Périgord ») fait 38 caractères : 48 laisse de la
+   * marge sans ouvrir la porte à un roman injecté dans le tableau mondial.
+   */
+  clubMax: 48,
 } as const;
 
 export const SAISONS_MAX = LIMITES.ageMax - LIMITES.ageDebutMin + 1;
@@ -215,6 +249,15 @@ export function verifierFiche(f: unknown, trophees?: Iterable<string>): Verdict 
   const titres = Array.isArray(c.titres) ? c.titres : [];
   if (titres.some((t) => typeof t !== 'string')) rejet('un titre n\'est pas un identifiant');
 
+  // ⚠️ LES CLUBS SONT AFFICHÉS TELS QUELS SUR L'ÉCRAN DE TOUS LES JOUEURS. Ils
+  // ne pèsent rien sur le score, donc il n'y a rien à « tricher » — mais tout à
+  // injecter. On borne le nombre, la longueur et le type avant d'écrire quoi
+  // que ce soit en base.
+  if (!Array.isArray(c.clubs)) rejet('clubs n\'est pas une liste');
+  const clubs = Array.isArray(c.clubs) ? c.clubs : [];
+  if (clubs.some((v) => typeof v !== 'string' || !v.trim())) rejet('un club est vide ou n\'est pas un texte');
+  if (clubs.some((v) => typeof v === 'string' && v.length > LIMITES.clubMax)) rejet('un nom de club est trop long');
+
   // Une anomalie de type rend la suite ininterprétable : on s'arrête là.
   if (anomalies.length) return { valide: false, score: 0, anomalies };
 
@@ -251,6 +294,13 @@ export function verifierFiche(f: unknown, trophees?: Iterable<string>): Verdict 
   if (selections > saisons * LIMITES.capesParSaison) {
     rejet(`${selections} sélections en ${saisons} saison(s) : maximum ${saisons * LIMITES.capesParSaison}`);
   }
+  // On ne change pas de club plus d'une fois par saison : le transfert ne
+  // s'applique qu'à l'intersaison (`appliquerPreAccord`). Le premier club, lui,
+  // est celui de la création — d'où le `+ 1`.
+  if (clubs.length > saisons + 1) {
+    rejet(`${clubs.length} clubs en ${saisons} saison(s) : maximum ${saisons + 1}`);
+  }
+  if (clubs.length === 0) rejet('aucun club : une carrière se joue quelque part');
   if (note > LIMITES.noteApres(saisons)) {
     rejet(`note ${note} après ${saisons} saison(s) : maximum ${LIMITES.noteApres(saisons)}`);
   }
@@ -309,6 +359,10 @@ export function canonique(f: FicheCarriere): string {
     // ⚠️ Les titres sont TRIÉS : deux carrières identiques dont les titres
     // arrivent dans un ordre différent doivent produire le même sceau.
     [...f.titres].sort().join(','),
+    // Les clubs, EUX, gardent leur ordre : c'est un parcours, pas un ensemble.
+    // `?? []` : le sceau ne doit jamais LEVER sur une fiche malformée — c'est
+    // `verifierFiche` qui refuse, proprement et avec un motif.
+    (f.clubs ?? []).join(','),
     f.score,
   ].join('|');
 }
@@ -385,6 +439,7 @@ export function ficheDepuisJoueur(j: Joueur, pseudo?: string): FicheCarriere {
     selections: j.selections ?? 0,
     // On envoie les IDS de trophées, pas les libellés : c'est vérifiable.
     titres: (j.palmares ?? []).map((t) => t.trophee),
+    clubs: j.clubs?.length ? j.clubs : [j.club],
   };
   return { ...base, score: scoreDeLaFiche(base) };
 }
@@ -434,6 +489,10 @@ export function ficheDepuisLegende(
     essais: l.essais,
     selections: 0,
     titres,
+    // ⚠️ Une légende d'avant ce champ n'a pas de liste de clubs : on retombe sur
+    // ceux où elle a gagné un titre. Mieux vaut une liste partielle qu'une fiche
+    // refusée pour « aucun club ».
+    clubs: l.clubs?.length ? l.clubs : ['—'],
   };
   return { ...base, score: scoreDeLaFiche(base) };
 }

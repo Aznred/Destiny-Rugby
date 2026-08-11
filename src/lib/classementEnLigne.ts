@@ -43,11 +43,38 @@ const ACTIF = import.meta.env.PROD || !!URL_CONFIGUREE;
  */
 export const CLASSEMENT_EN_LIGNE = ACTIF;
 
-/** Une ligne du classement mondial, telle que la base la rend. */
+/**
+ * Une ligne du classement mondial, telle que la base la rend.
+ *
+ * ⚠️ TOUT EST OPTIONNEL SAUF LE PSEUDO ET LE SCORE, et ce n'est pas de la
+ * prudence de principe : une ligne écrite avant la migration v2 du schéma
+ * (`serveur/schema-vercel.sql`) n'a que ces deux colonnes remplies. L'écran doit
+ * afficher la ligne quand même — un classement qui masque les anciens joueurs
+ * parce qu'il leur manque un champ, c'est un classement qui a l'air cassé.
+ */
 export interface LigneMondiale {
   pseudo: string;
   score: number;
   maj_le?: string;
+  nom?: string | null;
+  poste?: string | null;
+  nation?: string | null;
+  age?: number | null;
+  saisons?: number | null;
+  note?: number | null;
+  reputation?: number | null;
+  matchs?: number | null;
+  essais?: number | null;
+  selections?: number | null;
+  /** Ids de trophées (`data/trophees.ts`). */
+  titres?: string[] | null;
+  /** Clubs traversés, dans l'ordre. */
+  clubs?: string[] | null;
+}
+
+/** La ligne porte-t-elle de quoi ouvrir une fiche ? */
+export function ficheDisponible(l: LigneMondiale): boolean {
+  return typeof l.saisons === 'number' && typeof l.note === 'number';
 }
 
 export interface ResultatEnvoi {

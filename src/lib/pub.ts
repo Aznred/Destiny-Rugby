@@ -38,9 +38,33 @@
 
 import { t } from './i18n';
 
+/**
+ * L'IDENTIFIANT ADSENSE DU SITE.
+ *
+ * ⚠️ IL EST EN DUR, ET C'EST ASSUMÉ — exactement comme la clé Groq : un
+ * identifiant `ca-pub-…` est de toute façon PUBLIC (Google l'exige dans le
+ * `<script>` de chaque page qui affiche ses annonces, et il figure dans le
+ * fichier `ads.txt` de tout site monétisé). Le mettre ici plutôt que dans un
+ * `.env` évite qu'un déploiement oublie la variable et parte sans monétisation,
+ * sans rien exposer de plus. La variable d'environnement reste prioritaire pour
+ * pointer un autre compte (préproduction, test).
+ *
+ * Fourni par l'utilisateur avec le script officiel de sa console AdSense.
+ */
+const CLIENT_PAR_DEFAUT = 'ca-pub-6166322317354663';
+
 /** Identifiant de la régie (AdSense : `ca-pub-…`). Vide = aucune bannière. */
-export const CLIENT_PUB: string = (import.meta.env?.VITE_PUB_CLIENT as string | undefined)?.trim() ?? '';
-/** Emplacement AdSense pour la bannière de bas de page. */
+export const CLIENT_PUB: string =
+  (import.meta.env?.VITE_PUB_CLIENT as string | undefined)?.trim() || CLIENT_PAR_DEFAUT;
+/**
+ * Emplacement AdSense pour la bannière de bas de page.
+ *
+ * ⚠️ PAS DE VALEUR PAR DÉFAUT, ET C'EST VOULU. Un « slot » se crée bloc par bloc
+ * dans la console AdSense : personne ne peut le deviner, et un `data-ad-slot`
+ * inventé fait rendre un cadre vide. Tant qu'il est absent, `<Pub>` ne rend
+ * RIEN — la bannière n'existe pas. La pub RÉCOMPENSÉE de la boutique, elle, n'a
+ * pas besoin de slot : elle ne dépend que de `CLIENT_PUB`.
+ */
 export const SLOT_PUB: string = (import.meta.env?.VITE_PUB_SLOT as string | undefined)?.trim() ?? '';
 
 /** Les écrans qui ont le droit d'afficher une bannière. La liste est courte. */
@@ -54,11 +78,15 @@ export const ECRANS_AVEC_PUB = ['boutique', 'pantheon', 'classement', 'championn
  * ⚠️ RÉGLAGE VOLONTAIREMENT MODESTE. L'économie d'Ovas est dure par choix
  * (départ à 0, une action rapporte 1, une saison 3) : une pub à 50 Ovas
  * viderait la boutique en une soirée et rendrait le reste du jeu inutile.
- * À 8 Ovas et trois pubs par jour, une semaine de visionnage paie une paire de
- * crampons — c'est un coup de pouce, pas un raccourci.
+ *
+ * ⚠️ RABAISSÉ AVEC LE RESTE DE L'ÉCONOMIE (8 × 3/jour → 4 × 2/jour). Une belle
+ * carrière rapporte désormais ~500 Ovas ; à 24 Ovas par jour, la pub versait
+ * une carrière entière en trois semaines de robinet, sans jouer une minute.
+ * À 8 Ovas par jour, il faut une semaine et demie pour une paire de crampons —
+ * c'est un coup de pouce, pas un raccourci.
  */
-export const OVAS_PAR_PUB = 8;
-export const PUBS_PAR_JOUR = 3;
+export const OVAS_PAR_PUB = 4;
+export const PUBS_PAR_JOUR = 2;
 /** Entre deux pubs : on ne veut pas d'un joueur qui enchaîne dix vidéos. */
 export const ATTENTE_ENTRE_PUBS_MS = 15 * 60_000;
 /** Durée de l'encart « maison », quand aucune régie n'est configurée. */

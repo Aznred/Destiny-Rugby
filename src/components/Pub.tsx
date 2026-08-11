@@ -57,7 +57,19 @@ declare global {
  * cadre gris « emplacement publicitaire », pas de trou dans la mise en page :
  * l'écran doit être identique à ce qu'il était avant qu'on parle de pub.
  */
-export function Pub() {
+/**
+ * UN BLOC D'ANNONCE ADSENSE, et le seul endroit du jeu qui en fabrique un.
+ *
+ * ⚠️ IL NE REND RIEN SANS `SLOT_PUB`. Un « slot » se crée bloc par bloc dans la
+ * console AdSense : on ne peut pas le deviner, et un identifiant inventé fait
+ * rendre un cadre vide au milieu de l'écran. Tant qu'il manque, ce composant
+ * renvoie `null` — la bannière n'existe simplement pas, et la pub récompensée
+ * retombe sur son encart maison.
+ *
+ * Renvoie `null` aussi sans consentement ou si le script ne s'est pas chargé
+ * (bloqueur de pub, réseau) : un bloqueur ne doit JAMAIS casser un écran.
+ */
+function BlocAnnonce({ format = 'horizontal' }: { format?: string }) {
   const consentement = useGame((s) => s.pubConsentement);
   const [prete, setPrete] = useState(false);
   const bloc = useRef<HTMLModElement>(null);
@@ -82,19 +94,32 @@ export function Pub() {
   if (!prete || !CLIENT_PUB || !SLOT_PUB) return null;
 
   return (
+    <ins
+      ref={bloc}
+      className="adsbygoogle"
+      style={{ display: 'block' }}
+      data-ad-client={CLIENT_PUB}
+      data-ad-slot={SLOT_PUB}
+      data-ad-format={format}
+      data-full-width-responsive="true"
+    />
+  );
+}
+
+/**
+ * ⚠️ ELLE NE REND RIEN DU TOUT quand il n'y a pas de régie, pas de
+ * consentement, ou que le script ne s'est pas chargé (bloqueur de pub). Pas de
+ * cadre gris « emplacement publicitaire », pas de trou dans la mise en page :
+ * l'écran doit être identique à ce qu'il était avant qu'on parle de pub.
+ */
+export function Pub() {
+  if (!CLIENT_PUB || !SLOT_PUB) return null;
+  return (
     <aside className="emplacement-pub" aria-label={t('pub.emplacement')}>
       <span className="emplacement-pub-etiquette">{t('pub.etiquette')}</span>
       {/* `position: static` et hauteur bornée : voir `.emplacement-pub` dans
           App.css. Le bloc vit dans le flux, il ne recouvre jamais le jeu. */}
-      <ins
-        ref={bloc}
-        className="adsbygoogle"
-        style={{ display: 'block' }}
-        data-ad-client={CLIENT_PUB}
-        data-ad-slot={SLOT_PUB}
-        data-ad-format="horizontal"
-        data-full-width-responsive="true"
-      />
+      <BlocAnnonce />
     </aside>
   );
 }
@@ -171,18 +196,92 @@ export function CartePubRecompensee() {
 }
 
 /**
- * ⚠️ SANS RÉGIE, C'EST UN ENCART « MAISON ». Une vraie vidéo récompensée passe
- * par le SDK d'une régie (Ad Manager, AdSense H5 games…) : sans compte, il n'y
- * a rien à afficher. Plutôt que de désactiver la mécanique en attendant, on la
- * joue avec un encart du jeu et son compte à rebours — c'est jouable, c'est
- * testable, et le jour où le SDK arrive il prend simplement la place du
- * contenu de cette modale.
+ * LE BOUTON D'UN COSMÉTIQUE QUI S'OBTIENT EN REGARDANT UNE PUB.
+ *
+ * ⚠️ Demande explicite : « fais en sorte que 3-4 cosmétiques on puisse les
+ * obtenir en regardant une pub ». Il rejoue exactement la mécanique de la carte
+ * récompensée — même modale, même compte à rebours, même quota quotidien — mais
+ * la récompense est l'article, pas des Ovas. Fermer avant la fin ne débloque
+ * rien et ne consomme pas le passage (`debloquerParPub` n'est appelée qu'au
+ * bout du compte à rebours).
+ *
+ * ⚠️ ET ÇA RESTE DU COSMÉTIQUE. Règle 5 de `lib/pub.ts` : rien qui touche à la
+ * difficulté ne se débloque par la pub — ici, un maillot et un casque.
+ */
+export function BoutonDeblocageParPub({ id, onDebloque }: { id: string; onDebloque?: () => void }) {
+  const pubs = useGame((s) => s.pubs);
+  const debloquer = useGame((s) => s.debloquerParPub);
+  const consentement = useGame((s) => s.pubConsentement);
+  const setConsentement = useGame((s) => s.setPubConsentement);
+  const [ouverte, setOuverte] = useState(false);
+  // La disponibilité dépend de l'heure : on rafraîchit tant que le bouton vit.
+  const [, battement] = useState(0);
+  useEffect(() => {
+    const minuterie = setInterval(() => battement((n) => n + 1), 30_000);
+    return () => clearInterval(minuterie);
+  }, []);
+
+  const dispo = pubDisponible(pubs);
+
+  if (consentement === 'non') {
+    return (
+      <button type="button" className="btn fantome petit" onClick={() => setConsentement('oui')}>
+        {t('pub.reactiver')}
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn primaire petit"
+        disabled={!dispo.possible}
+        title={dispo.attente > 0 ? attenteLisible(dispo.attente) : undefined}
+        onClick={(e) => { e.stopPropagation(); setOuverte(true); }}
+      >
+        {dispo.possible
+          ? `🎬 ${t('pub.debloquer')}`
+          : dispo.restantes === 0
+            ? t('pub.demain')
+            : attenteLisible(dispo.attente)}
+      </button>
+      {ouverte && (
+        <PubRecompensee
+          onFermer={() => setOuverte(false)}
+          /* La récompense n'est pas des Ovas ici, c'est l'article : le texte de
+             l'encart maison doit dire la vérité. */
+          texteMaison={t('pub.maisonTexteArticle')}
+          onTerminee={() => { if (debloquer(id)) onDebloque?.(); setOuverte(false); }}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * ⚠️ CE QUI EST AFFICHÉ PENDANT L'ATTENTE DÉPEND DE CE QUI EST CONFIGURÉ.
+ * L'identifiant AdSense du site est en dur (`CLIENT_PUB`, voir `lib/pub.ts`),
+ * mais un bloc d'annonce a besoin EN PLUS d'un « slot » créé à la main dans la
+ * console AdSense. Donc :
+ *   • `VITE_PUB_SLOT` renseigné → une VRAIE annonce s'affiche ici pendant le
+ *     compte à rebours, et le joueur encaisse ses Ovas au bout ;
+ *   • sinon → l'encart MAISON, un compte à rebours du jeu. La mécanique reste
+ *     jouable et testable, mais elle ne rapporte évidemment rien à personne.
+ *
+ * ⚠️ ADSENSE NE FAIT PAS DE VIDÉO RÉCOMPENSÉE SUR UN SITE ORDINAIRE — c'est
+ * AdMob / Ad Manager (« H5 games ») qui expose ce SDK. Ce qu'on fait ici est
+ * donc une annonce display regardée pendant N secondes, pas un format
+ * « rewarded » officiel. Le jour où un compte Ad Manager existe, c'est SON SDK
+ * qui prend la place du contenu de cette modale, et rien d'autre ne bouge.
  *
  * ⚠️ ON PEUT FERMER À TOUT MOMENT. Une pub récompensée dont on ne peut pas
  * sortir, c'est exactement ce que le joueur a demandé d'éviter — fermer avant
  * la fin annule simplement la récompense.
  */
-function PubRecompensee({ onFermer, onTerminee }: { onFermer: () => void; onTerminee: () => void }) {
+function PubRecompensee({
+  onFermer, onTerminee, texteMaison = t('pub.maisonTexte'),
+}: { onFermer: () => void; onTerminee: () => void; texteMaison?: string }) {
   const [reste, setReste] = useState(DUREE_PUB_MAISON_S);
 
   useEffect(() => {
@@ -206,8 +305,14 @@ function PubRecompensee({ onFermer, onTerminee }: { onFermer: () => void; onTerm
         transition={{ duration: 0.2 }}
       >
         <div className="eyebrow">{t('pub.etiquette')}</div>
-        <h2>{t('pub.maisonTitre')}</h2>
-        <p className="aide">{t('pub.maisonTexte')}</p>
+        {SLOT_PUB ? (
+          <div className="pub-annonce"><BlocAnnonce format="rectangle" /></div>
+        ) : (
+          <>
+            <h2>{t('pub.maisonTitre')}</h2>
+            <p className="aide">{texteMaison}</p>
+          </>
+        )}
         <div className="pub-compte" aria-live="polite">
           <div className="pub-compte-piste">
             <span style={{ width: `${((DUREE_PUB_MAISON_S - reste) / DUREE_PUB_MAISON_S) * 100}%` }} />

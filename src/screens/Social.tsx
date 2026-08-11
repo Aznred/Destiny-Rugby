@@ -22,7 +22,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { t, tn } from '../lib/i18n';
 import { motion } from 'framer-motion';
-import { useGame } from '../store/useGame';
+import { useGame, PLAFOND_OVAS_DEFIS_PAR_SAISON } from '../store/useGame';
 import { clubParNom } from '../data/clubs';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
@@ -739,25 +739,35 @@ function PanneauSucces() {
   const joueur = useGame((s) => s.joueur);
   const debloques = useGame((s) => s.succesDebloques ?? {});
   const defisFaits = useGame((s) => s.defis ?? { cle: '', faits: [] });
+  const ovasDefis = useGame((s) => s.compteurs.ovasDefis ?? 0);
   if (!joueur) return null;
 
   const { faits, total } = progression(debloques);
   const sem = joueur.semaine ?? 1;
   const actifs = defisDeLaSemaine(joueur.saison, sem);
   const coches = defisFaits.cle === cleSemaine(joueur.saison, sem) ? defisFaits.faits : [];
+  // ⚠️ LE PLAFOND DE SAISON EST AFFICHÉ, PAS SUBI. Les défis ne versent plus
+  // que `PLAFOND_OVAS_DEFIS_PAR_SAISON` Ovas par saison (voir `useGame`) : sans
+  // ce compteur, un défi annoncé « +2 🪙 » n'aurait rien rapporté sans un mot
+  // d'explication. L'objectif, lui, reste à cocher.
+  const restant = Math.max(0, PLAFOND_OVAS_DEFIS_PAR_SAISON - ovasDefis);
 
   return (
     <div className="x-succes">
       <div className="x-defis">
         <h3>🎯 {t('ov.defisHebdo')}</h3>
         <p className="x-note">{t('ov.defisAide')}</p>
+        <p className="x-note">
+          🪙 {ovasDefis} / {PLAFOND_OVAS_DEFIS_PAR_SAISON} {t('ov.defisPlafond')}
+        </p>
         {actifs.map((d) => {
           const fait = coches.includes(d.id);
+          const paye = Math.min(d.ovas, restant);
           return (
             <div key={d.id} className={`x-defi${fait ? ' fait' : ''}`}>
               <span className="x-defi-emoji">{d.emoji}</span>
               <span className="x-defi-texte">{texteDefi(d.id, d.texte)}</span>
-              <span className="x-defi-gain">{fait ? '✅' : `+${d.ovas} 🪙`}</span>
+              <span className="x-defi-gain">{fait ? '✅' : paye > 0 ? `+${paye} 🪙` : '—'}</span>
             </div>
           );
         })}

@@ -9,9 +9,153 @@ import { titreTraduit } from '../lib/tropheesI18n';
 import { ficheDepuisJoueur, verifierFiche } from '../lib/classementMondial';
 import { nombre, t } from '../lib/i18n';
 import type { LegendeSauvegardee } from '../types';
+import { clubParNom } from '../data/clubs';
+import { Blason } from '../components/Blason';
 import {
-  lireClassementMondial, type EtatMondial,
+  lireClassementMondial, ficheDisponible,
+  type EtatMondial, type LigneMondiale,
 } from '../lib/classementEnLigne';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LA FICHE D'UNE CARRIÈRE — la même, qu'elle vienne d'ici ou du monde entier
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ Demande explicite : « dans le classement mondial, qu'on puisse voir les
+// stats des autres joueurs, leurs profils, armoires à trophées, clubs qu'ils ont
+// faits ». Le tableau mondial n'affichait qu'un pseudo et un score — et pour
+// cause : la base ne stockait rien d'autre (voir `serveur/schema-vercel.sql`,
+// section v2, et le revirement assumé qui y est documenté).
+//
+// Les deux tableaux de l'écran — le local (Hall) et le mondial — ne parlent pas
+// la même structure. On les ramène donc à CE format commun, et il n'y a qu'un
+// seul panneau de fiche à écrire, à styler et à traduire.
+interface FicheAffichable {
+  cle: string;
+  nom: string;
+  poste?: string;
+  nation?: string;
+  age?: number;
+  saisons?: number;
+  note?: number;
+  reputation?: number;
+  matchs?: number;
+  essais?: number;
+  selections?: number;
+  score: number;
+  /** Libellés de titres (Hall) OU ids de trophées (mondial) : on gère les deux. */
+  titres: string[];
+  clubs: string[];
+  /** Fiche d'avant la v2 du schéma : on n'a que le score, et on le dit. */
+  partielle?: boolean;
+}
+
+function depuisLegende(l: LegendeSauvegardee): FicheAffichable {
+  return {
+    cle: l.id,
+    nom: l.nom,
+    poste: l.poste,
+    nation: l.nation,
+    age: l.age,
+    saisons: l.saisons,
+    note: l.note,
+    reputation: l.reputation,
+    matchs: l.matchsJoues,
+    essais: l.essais,
+    score: l.score,
+    titres: l.titres,
+    clubs: l.clubs ?? [],
+  };
+}
+
+function depuisLigneMondiale(l: LigneMondiale): FicheAffichable {
+  const complete = ficheDisponible(l);
+  return {
+    cle: l.pseudo,
+    nom: l.nom?.trim() || l.pseudo,
+    poste: l.poste ?? undefined,
+    nation: l.nation ?? undefined,
+    age: l.age ?? undefined,
+    saisons: l.saisons ?? undefined,
+    note: l.note ?? undefined,
+    reputation: l.reputation ?? undefined,
+    matchs: l.matchs ?? undefined,
+    essais: l.essais ?? undefined,
+    selections: l.selections ?? undefined,
+    score: l.score,
+    titres: l.titres ?? [],
+    clubs: l.clubs ?? [],
+    partielle: !complete,
+  };
+}
+
+/**
+ * Le nom lisible d'un titre. Le Hall garde des LIBELLÉS (« Bouclier de Brennus
+ * (S4) »), le classement mondial des IDS (`brennus`) : on essaie l'id d'abord,
+ * et on retombe sur la traduction du libellé.
+ */
+function nomDuTitre(titre: string): string {
+  return TROPHEES[titre]?.nom ?? titreTraduit(titre);
+}
+
+function PanneauFiche({ fiche, onFermer }: { fiche: FicheAffichable; onFermer: () => void }) {
+  return (
+    <section className="carte fiche-classement" aria-label={t('clst.details')}>
+      <div>
+        <div className="eyebrow">{t('clst.details')}</div>
+        <h2 style={{ margin: '0.2rem 0' }}>{fiche.nom}</h2>
+        {fiche.poste && fiche.nation && (
+          <p className="aide" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            {nomPoste(migrerPoste(fiche.poste))} · <Drapeau nation={fiche.nation} taille={0.8} /> {nomNationTraduit(fiche.nation)}
+            {fiche.age != null && ` · ${fiche.age} ${t('gen.ans')}`}
+          </p>
+        )}
+      </div>
+      <button type="button" className="btn fantome" onClick={onFermer}>{t('clst.fermer')}</button>
+
+      {fiche.partielle && <p className="aide">🕰️ {t('clst.ficheAncienne')}</p>}
+
+      <div className="ressources fiche-classement-stats">
+        {fiche.note != null && <span className="pastille">{t('clst.note')} <b>{fiche.note}</b></span>}
+        {fiche.saisons != null && <span className="pastille">{t('clst.saisons')} <b>{fiche.saisons}</b></span>}
+        {fiche.matchs != null && <span className="pastille">🏉 <b>{fiche.matchs}</b> {t('prof.matchs')}</span>}
+        {fiche.essais != null && <span className="pastille">🎯 <b>{fiche.essais}</b> {t('ml.essais')}</span>}
+        {fiche.selections != null && fiche.selections > 0
+          && <span className="pastille">🎽 <b>{fiche.selections}</b> {t('clst.capes')}</span>}
+        {fiche.reputation != null && <span className="pastille">⭐ <b>{fiche.reputation}</b> {t('pj.reputation')}</span>}
+        <span className="pastille">{t('clst.score')} <b>{nombre(fiche.score)}</b></span>
+      </div>
+
+      {fiche.clubs.length > 0 && (
+        <div className="fiche-bloc">
+          <div className="eyebrow">{t('clst.clubs')}</div>
+          <div className="parcours-clubs">
+            {fiche.clubs.map((nom, i) => {
+              const c = clubParNom(nom);
+              return (
+                <span className="parcours-club" key={`${nom}-${i}`}>
+                  {c ? <Blason club={c} taille={22} /> : null}
+                  {nom}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="fiche-bloc">
+        <div className="eyebrow">🏆 {t('clst.armoire')}</div>
+        {fiche.titres.length > 0 ? (
+          <div className="bloc-titres">
+            {fiche.titres.map((titre, i) => (
+              <span className="medaille" key={`${titre}-${i}`}>🏆 {nomDuTitre(titre)}</span>
+            ))}
+          </div>
+        ) : (
+          <p className="aide" style={{ margin: 0 }}>{t('clst.aucunTitre')}</p>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export function Classement() {
   const pantheon = useGame((s) => s.pantheon);
@@ -27,7 +171,10 @@ export function Classement() {
   // classement fonctionne pas, la table se remplit pas ») : il n'y avait
   // littéralement pas de table à remplir. Voir `serveur/VERCEL.md`.
   const [mondial, setMondial] = useState<EtatMondial | null>(null);
-  const [ficheOuverte, setFicheOuverte] = useState<LegendeSauvegardee | null>(null);
+  // ⚠️ UNE SEULE FICHE OUVERTE, quel que soit le tableau qui l'a ouverte : les
+  // deux panneaux s'excluent, et on ne peut pas laisser deux cartes de détail
+  // empilées sous le classement.
+  const [ficheOuverte, setFicheOuverte] = useState<FicheAffichable | null>(null);
 
   useEffect(() => {
     let vivant = true;
@@ -98,17 +245,40 @@ export function Classement() {
               <span className="c-joueur">{t('clst.joueur')}</span>
               <span className="c-score">{t('clst.score')}</span>
             </div>
+            {/* ⚠️ CHAQUE LIGNE S'OUVRE. C'est la demande : voir les stats, le
+                profil, l'armoire à trophées et les clubs des AUTRES joueurs.
+                Même les lignes d'avant la v2 du schéma sont cliquables — leur
+                fiche dit alors franchement qu'on n'a que le score. */}
             {mondial.lignes.slice(0, 100).map((l, i) => (
-              <div
+              <button
+                type="button"
                 key={l.pseudo}
-                className={`ligne-classement ${l.pseudo === monPseudo ? 'moi' : ''}`}
+                className={`ligne-classement ouvrable ${l.pseudo === monPseudo ? 'moi' : ''}`}
+                onClick={() => setFicheOuverte(depuisLigneMondiale(l))}
+                title={t('clst.voirDetails')}
               >
                 <span className="c-rang">
                   {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                 </span>
-                <span className="c-joueur"><b>{l.pseudo}</b></span>
+                <span className="c-joueur">
+                  {l.poste && (
+                    <span className="c-emoji">
+                      {POSTE_PAR_ID[migrerPoste(l.poste)].categorie === 'Avant' ? '🛡️' : '⚡'}
+                    </span>
+                  )}
+                  <span>
+                    <b>{l.pseudo}</b>
+                    {ficheDisponible(l) && (
+                      <small style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        {l.poste ? `${nomPoste(migrerPoste(l.poste))} · ` : ''}
+                        {l.nation ? <><Drapeau nation={l.nation} taille={0.72} /> {nomNationTraduit(l.nation)} · </> : null}
+                        {l.saisons} {t('clst.saisons').toLowerCase()}
+                      </small>
+                    )}
+                  </span>
+                </span>
                 <span className="c-score">{nombre(l.score)}</span>
-              </div>
+              </button>
             ))}
           </>
         )}
@@ -158,7 +328,7 @@ export function Classement() {
             type="button"
             key={l.id}
             className={`ligne-classement ouvrable ${l.joueur ? 'moi' : ''} ${l.enCours ? 'en-cours' : ''}`}
-            onClick={() => setFicheOuverte(l)}
+            onClick={() => setFicheOuverte(depuisLegende(l))}
             title={t('clst.voirDetails')}
           >
             <span className="c-rang">
@@ -184,29 +354,7 @@ export function Classement() {
       )}
 
       {ficheOuverte && (
-        <section className="carte fiche-classement" aria-label={t('clst.details')}>
-          <div>
-            <div className="eyebrow">{t('clst.details')}</div>
-            <h2 style={{ margin: '0.2rem 0' }}>{ficheOuverte.nom}</h2>
-            <p className="aide" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              {nomPoste(migrerPoste(ficheOuverte.poste))} · <Drapeau nation={ficheOuverte.nation} taille={0.8} /> {nomNationTraduit(ficheOuverte.nation)} · {ficheOuverte.age} {t('gen.ans')}
-            </p>
-          </div>
-          <button type="button" className="btn fantome" onClick={() => setFicheOuverte(null)}>{t('clst.fermer')}</button>
-          <div className="ressources fiche-classement-stats">
-            <span className="pastille">{t('clst.note')} <b>{ficheOuverte.note}</b></span>
-            <span className="pastille">{t('clst.saisons')} <b>{ficheOuverte.saisons}</b></span>
-            <span className="pastille">🏉 <b>{ficheOuverte.matchsJoues}</b> {t('prof.matchs')}</span>
-            <span className="pastille">🎯 <b>{ficheOuverte.essais}</b> {t('ml.essais')}</span>
-            <span className="pastille">⭐ <b>{ficheOuverte.reputation}</b> {t('pj.reputation')}</span>
-            <span className="pastille">{t('clst.score')} <b>{nombre(ficheOuverte.score)}</b></span>
-          </div>
-          {ficheOuverte.titres.length > 0 && (
-            <div className="bloc-titres">
-              {ficheOuverte.titres.map((titre, i) => <span className="medaille" key={`${titre}-${i}`}>🏆 {titreTraduit(titre)}</span>)}
-            </div>
-          )}
-        </section>
+        <PanneauFiche fiche={ficheOuverte} onFermer={() => setFicheOuverte(null)} />
       )}
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.8rem', marginTop: '2rem' }}>
