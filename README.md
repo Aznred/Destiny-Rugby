@@ -1,12 +1,12 @@
-﻿# Destiny Rugby 🏉
+# Destiny Rugby 🏉
 
 **Le RPG de carrière de rugby où une IA joue le Maître du Jeu.**
 
 Incarne un rugbyman de ses débuts jusqu'au sommet. Tu **écris tes actions** en
 langage naturel (entraînement, match, contrat, médias, vie perso…), et le
-**Maître du Jeu IA local** juge le résultat de façon réaliste : il raconte ce
-qui se passe et fait **monter ou chuter tes statistiques** en conséquence. Rien
-n'est envoyé à un service d'IA distant.
+**Maître du Jeu** juge le résultat de façon réaliste : il raconte ce qui se
+passe et fait **monter ou chuter tes statistiques** en conséquence. Tu n'as ni
+clé à saisir ni modèle à télécharger : le jeu apporte la sienne.
 
 Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
 
@@ -21,11 +21,13 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   te tend à 23 h. **Tu réponds en écrivant ce que tu fais**, et il juge. Environ
   une scène sur cinq est réellement dangereuse : là, et seulement là, ça peut
   finir en suspension, en garde à vue, à l'hôpital — ou pire.
-  *Si l'IA locale est désactivée ou incompatible, le jeu reste entier : la même
+  *Si l'IA est désactivée ou son quota épuisé, le jeu reste entier : la même
   scène arrive chaque semaine, avec des réponses à choix multiples.*
-- **Maître du Jeu IA local** via **WebLLM** et WebGPU. Aucune clé, aucun compte,
-  aucun quota : le modèle Llama 3.2 1B quantifié tourne dans un Worker sur
-  l'appareil du joueur et reste en cache après son premier téléchargement. Il juge chaque décision
+- **Maître du Jeu servi par Groq**, avec la clé du site : rien à installer,
+  rien à télécharger, rien à saisir, et une réponse en une fraction de seconde.
+  **Quand le quota est atteint, le jeu ne le dit pas** — il bascule sur ses
+  situations pré-écrites et repasse sur l'IA tout seul dès qu'elle revient. Il
+  juge chaque décision
   selon les attributs, la forme, le moral, la réputation et le contexte, puis
   renvoie un récit + des variations de stats structurées. Il est **sévère** :
   par défaut une action ne change presque rien, l'échec est fréquent, et on ne
@@ -241,7 +243,7 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
 - **Les tweets vivent** : les vues, likes et reposts d'une publication continuent
   de monter les semaines suivantes, de moins en moins vite, et **chaque** post
   reçoit ses commentaires (écrits sur mesure quand l'IA locale est active).
-- **IA locale dans les réglages** : téléchargement lancé automatiquement en
+- **IA dans les réglages** : téléchargement lancé automatiquement en
   arrière-plan au premier démarrage compatible, progression,
   activation/désactivation et suppression du modèle mis en cache.
 - **Ballon 3D** : modèle `.glb` (France Rugby) **compressé Draco (0,45 Mo)**,
@@ -371,16 +373,23 @@ npx vite-node scripts/verifClassement.ts
 L'écran Classement affiche **en clair** la fiche qui partirait et le verdict que
 le serveur rendrait : rien n'est caché, parce que rien n'a besoin de l'être.
 
-## 🧠 IA locale sans clé ni quota
+## 🧠 Le Maître du Jeu tourne sur Groq — et le quota ne se voit pas
 
-Sur un appareil compatible, le navigateur commence automatiquement à télécharger
-le modèle quantifié en arrière-plan (environ 900 Mo) après l'ouverture du jeu,
-puis le conserve dans son cache. **⚙️ Réglages** permet de suivre la progression,
-de désactiver l'IA ou de supprimer le modèle ; une désactivation est mémorisée.
-L'inférence se déroule entièrement sur la carte graphique de l'appareil via
-WebGPU ; les actions, messages et données de carrière ne sont envoyés à aucun
-service d'IA. Si WebGPU manque ou si le modèle ne tient pas en mémoire, le jeu
-repasse automatiquement sur ses situations et réponses pré-écrites.
+Le jeu embarque **sa propre clé** : aucun joueur n'a rien à saisir, rien à
+télécharger, et la réponse arrive en quelques centaines de millisecondes.
+
+⚠️ **Un quota atteint n'est pas une panne, et ça ne s'affiche nulle part.**
+Quand Groq refuse (429), le jeu lit l'heure de reprise annoncée, bascule en
+silence sur ses situations et réponses pré-écrites, et **repart sur l'IA tout
+seul** à la seconde où elle se libère. Deux modèles sont essayés dans l'ordre :
+les limites étant comptées par modèle chez Groq, le second répond presque
+toujours quand le premier est à sec. Le seul endroit qui montre cet état, c'est
+**⚙️ Réglages** — modèle utilisé, quota, reprise estimée — et on peut y coller
+**sa propre clé** pour avoir son quota à soi.
+
+Configuration : `VITE_GROQ_KEY` dans `.env.local` (voir `.env.example`).
+⚠️ Cette clé est **publique** — c'est le prix à payer pour que personne n'ait
+rien à saisir, et c'est un choix assumé.
 
 ## 🚀 Démarrage
 
@@ -403,7 +412,7 @@ npm run lint     # oxlint
 - **Zustand** (état + persistance localStorage)
 - **Framer Motion** (animations)
 - **Three.js** via **@react-three/fiber** + **@react-three/drei** (3D)
-- **WebLLM** + **WebGPU** pour le Maître du Jeu local
+- **Groq** (API OpenAI-compatible) pour le Maître du Jeu — voir `src/lib/groq.ts`
 
 ## 📁 Structure
 
@@ -413,14 +422,15 @@ src/
   data/rugby.ts         # postes, nations, clubs, libellés
   data/evenements.ts    # pool d'évènements aléatoires (sans IA)
   data/scenarios.ts     # scénarios à choix (jouables sans clé)
-  data/boutique.ts      # skins de ballon et packs d'Ovas de démonstration
+  data/boutique.ts      # ballons, VESTIAIRE (crampons/maillots/accessoires) et packs d'Ovas
   data/legendes.ts      # légendes fictives peuplant le classement
   data/clubs.ts         # assemblage des compétitions : réelles (générées) + amateurs FR
   data/mondeReel.ts     # GÉNÉRÉ : 143 clubs (nom, ville, logo), coupes, sélections + classements
   data/effectifsReels.ts # GÉNÉRÉ : 6 306 joueurs réels 25-26 + note générale des clubs
-  lib/iaLocale.ts       # modèle WebLLM, Worker, prompt système, JSON et garde-fous
-  lib/iaSociale.ts      # publications, commentaires et messages privés générés localement
-  workers/iaLocale.worker.ts # inférence hors du fil d'interface
+  lib/groq.ts           # transport Groq : clé, quota, bascule silencieuse, retour auto
+  lib/mj.ts             # prompt système du Maître du Jeu, parsing JSON et GARDE-FOUS
+  lib/iaSociale.ts      # publications, commentaires et messages privés écrits par l'IA
+  lib/pub.ts            # publicité : où elle a le droit d'être, et la pub récompensée
   lib/ia.ts             # la scène de la semaine + son jugement (sévère), situations, interviews
   lib/armoire.ts        # étagères mesurées sur le modèle 3D, titres au sol, boucliers adossés, cadrage
   lib/honneurs.ts       # les distinctions individuelles : note de saison + stats + palmarès de l'année
@@ -561,8 +571,9 @@ fondations vers le confort) est dans **[ROADMAP.md](ROADMAP.md)**.
   retraite** ; le bouton d'envoi reste là pour une carrière en cours. Le principe
   tient en une phrase — *le navigateur envoie les faits d'une carrière, le
   serveur RECALCULE le score et n'écrit que lui*.
-- **Optimiser l'IA locale** : évaluer d'autres modèles multilingues quantifiés
-  quand ils seront stables dans WebLLM, sans augmenter la mémoire minimale.
+- **Monétisation** : brancher la régie publicitaire et le paiement des packs
+  d'Ovas — les pistes, les ordres de grandeur et les pièges sont dans
+  [MONETISATION.md](MONETISATION.md).
 - Matchs simulés tour par tour avec adversaires générés.
 - Logo FFR officiel en PNG sur le ballon (aujourd'hui : coq tracé en code).
 

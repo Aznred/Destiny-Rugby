@@ -16,8 +16,9 @@ import { SCENARIOS } from '../data/scenarios';
 import type { ConsequenceDure } from '../data/situations';
 import { interviewPour, type Interview } from '../data/interviews';
 import {
-  appelIAJSON, fichePersonnage, nettoyerDeltas, plafonnerDeltas, ressembleATriche,
-} from './iaLocale';
+  fichePersonnage, nettoyerDeltas, plafonnerDeltas, ressembleATriche,
+} from './mj';
+import { appelIAJSON } from './groq';
 import { consigneDeLangue, t } from './i18n';
 import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
 
@@ -407,6 +408,86 @@ export function parserJugement(brut: string, opts: ContexteJugement): JugementMJ
     attributsGagnes,
     marche: obj.marche === true,
     consequence,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// LE JUGEMENT SANS IA — parce qu'une réponse écrite mérite toujours une issue
+// ---------------------------------------------------------------------------
+// ⚠️ CE N'EST PAS UN MESSAGE D'ERREUR DÉGUISÉ. Quand le quota Groq est épuisé
+// au moment précis où le joueur répond à une scène, on ne peut ni afficher
+// « réessaie » (demande explicite : ça ne doit pas s'afficher) ni laisser la
+// scène en plan — elle bloque le passage à la semaine suivante. Le barème
+// ci-dessous tranche donc côté code, exactement comme le fait le pool de
+// situations : petit, sévère, et sans conséquence dure (celles-là restent
+// réservées à un vrai jugement du MJ).
+
+const ISSUES_LOCALES: Record<'echec' | 'mitige' | 'reussite', string[]> = {
+  echec: [
+    'Tu tentes le coup, et ça se retourne contre toi : le staff n’a pas apprécié.',
+    'Le message ne passe pas. Tu ravales ta réponse et la semaine se termine mal.',
+    'Mauvais moment, mauvaise idée : tu en sors avec la tête basse.',
+  ],
+  mitige: [
+    'Ça passe, sans plus. Personne n’en reparlera dans huit jours.',
+    'Tu t’en sors correctement, mais tu n’as convaincu personne.',
+    'Le vestiaire hausse les épaules : ni faute, ni exploit.',
+  ],
+  reussite: [
+    'Bien joué : le staff note, et ça se voit dans le groupe.',
+    'Tu tiens ta ligne et ça paie — on te regarde autrement cette semaine.',
+    'Le coup passe. Tu gagnes un peu de crédit dans le vestiaire.',
+  ],
+};
+
+/** Empreinte stable : la même réponse donne toujours la même issue. */
+function empreinte(texte: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < texte.length; i += 1) {
+    h ^= texte.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
+}
+
+export function jugementLocal(
+  joueur: Joueur,
+  evenement: EvenementHebdo,
+  reponse: string,
+  budgetAttributs: number,
+): JugementMJ {
+  const suspect = ressembleATriche(reponse);
+  const tirage = empreinte(`${evenement.id}#${reponse}`);
+  // La forme et le moral pèsent, comme dans le vrai jugement ; une réponse
+  // bâclée (moins de 15 caractères) ne rapporte jamais rien.
+  const soin = Math.min(1, reponse.trim().length / 90);
+  const assise = (joueur.forme + joueur.moral) / 200;
+  const score = tirage * 0.55 + assise * 0.3 + soin * 0.15 - (suspect ? 0.5 : 0);
+  const reussite: JugementMJ['reussite'] = score > 0.66 ? 'reussite' : score > 0.38 ? 'mitige' : 'echec';
+  const pool = ISSUES_LOCALES[reussite];
+
+  const bruts = reussite === 'reussite'
+    ? { moral: 4, reputation: 2 }
+    : reussite === 'echec'
+      ? { moral: -5, forme: -2 }
+      : { moral: 1 };
+  const { deltas, attributsGagnes, recadre } = plafonnerDeltas(bruts, {
+    budgetAttributs,
+    age: joueur.age,
+    salaire: joueur.contrat?.salaire ?? 0,
+    suspect,
+  });
+
+  return {
+    recit: pool[Math.floor(tirage * pool.length) % pool.length],
+    titre: evenement.titre,
+    reussite,
+    deltas: deltas as Partial<Record<StatVariable, number>>,
+    recadre,
+    attributsGagnes,
+    // ⚠️ NI MARCHÉ NI CONSÉQUENCE DURE hors jugement du MJ : ce sont des
+    // décisions lourdes, elles ne se prennent pas sur un tirage de secours.
+    marche: false,
   };
 }
 

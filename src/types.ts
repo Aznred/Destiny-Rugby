@@ -309,6 +309,12 @@ export interface MessageDM {
   de: 'moi' | 'lui';
   texte: string;
   saison: number;
+  /**
+   * ⚠️ LA SEMAINE DU JEU — c'est ELLE qu'on affiche. L'horodatage réel ne sert
+   * plus qu'au tri : un message reçu pendant la 12ᵉ journée doit être daté de
+   * novembre, pas du jour où l'on joue.
+   */
+  semaine?: number;
   /** Date locale de création : sert à garder les conversations dans le bon ordre. */
   creeLe?: number;
   /** Un message reçu reste bleu tant que le joueur n'a pas ouvert la discussion. */
@@ -333,7 +339,9 @@ export interface NotifSocial {
   titre: string;
   texte: string;
   saison: number;
-  /** Horodatage local pour les alertes et messages récents. */
+  /** La semaine de jeu, pour dater la notification sur le calendrier du jeu. */
+  semaine?: number;
+  /** Horodatage local : sert au TRI, jamais à l'affichage. */
   creeLe?: number;
   lue?: boolean;
 }

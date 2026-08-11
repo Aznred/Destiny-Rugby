@@ -14,13 +14,14 @@
 // asynchrone et le store est synchrone. `semaineSuivante()` lève donc un
 // drapeau (`attenteEvenement`) que cet écran consomme.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useGame, BUDGET_IA_PAR_SAISON } from '../store/useGame';
 import { PanneauJoueur } from '../components/PanneauJoueur';
 import { ClassementLateral } from '../components/ClassementLateral';
-import { demanderAuMJ, messageErreurIALocale } from '../lib/iaLocale';
-import { genererEvenementHebdo, jugerReaction } from '../lib/ia';
+import { demanderAuMJ, messageErreurIA } from '../lib/mj';
+import { ecouterEtatIA, etatIA } from '../lib/groq';
+import { genererEvenementHebdo, jugementLocal, jugerReaction } from '../lib/ia';
 import { semaine, libelleDate } from '../data/calendrier';
 import { ATTRIBUTS_LABELS, nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
@@ -35,8 +36,14 @@ const IDEE_CLES = ['car.idee1', 'car.idee2', 'car.idee3', 'car.idee4'];
 export function Carriere({ onReglages }: Props) {
   const joueur = useGame((s) => s.joueur);
   const journal = useGame((s) => s.journal);
-  const iaLocaleActivee = useGame((s) => s.iaLocaleActivee);
+  const iaActivee = useGame((s) => s.iaActivee);
   const modele = useGame((s) => s.modele);
+  // ⚠️ ON S'ABONNE À L'ÉTAT DE L'IA, on ne le lit pas une fois. Quand le quota
+  // se libère, cet écran doit repasser tout seul au récit écrit sur mesure —
+  // sans rechargement, sans clic, et sans jamais avoir dit au joueur que
+  // quelque chose n'allait pas.
+  const etat = useSyncExternalStore(ecouterEtatIA, etatIA, etatIA);
+  const avecIA = iaActivee && etat.disponible;
   const appliquerReponse = useGame((s) => s.appliquerReponse);
   const lancerScenario = useGame((s) => s.lancerScenario);
   const resoudreChoix = useGame((s) => s.resoudreChoix);
@@ -80,9 +87,11 @@ export function Carriere({ onReglages }: Props) {
     if (!joueur || !attenteEvenement || evenementHebdo || scenarioActif) return;
     if (fabrique.current) return;
 
-    // Sans IA locale, le jeu reste ENTIER : on pose une situation à choix multiples
-    // du pool pré-écrit, contextuelle (âge, forme, moral, division, contrat).
-    if (!iaLocaleActivee) {
+    // Sans IA — désactivée, quota épuisé, ou réseau coupé — le jeu reste
+    // ENTIER : on pose une situation à choix multiples du pool pré-écrit,
+    // contextuelle (âge, forme, moral, division, contrat). Rien ne le dit au
+    // joueur : c'est une autre façon de jouer la semaine, pas une panne.
+    if (!avecIA) {
       abandonnerEvenement();
       lancerScenario(false);
       return;
@@ -121,7 +130,7 @@ export function Carriere({ onReglages }: Props) {
     // `journal` et `evenementsVus` sont volontairement hors dépendances : ils
     // changent à chaque entrée écrite, et relanceraient la génération en boucle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joueur, attenteEvenement, evenementHebdo, scenarioActif, iaLocaleActivee, modele]);
+  }, [joueur, attenteEvenement, evenementHebdo, scenarioActif, avecIA, modele]);
 
   if (!joueur) return null;
 
@@ -129,27 +138,31 @@ export function Carriere({ onReglages }: Props) {
   const envoyer = async (action: string) => {
     const contenu = action.trim();
     if (!contenu || enCours) return;
-    if (!iaLocaleActivee) {
-      setErreur(t('car.iaInactive'));
-      onReglages();
+    // Une scène en cours se juge TOUJOURS, même sans IA : le joueur a écrit,
+    // il doit obtenir une issue. Sans elle, c'est le barème local qui tranche.
+    if (!avecIA && !evenementHebdo) {
+      if (!iaActivee) onReglages();
       return;
     }
     setErreur(null);
     setTexte('');
     setChoix([]);
     setEnCours(true);
+    const budget = Math.max(0, BUDGET_IA_PAR_SAISON - compteurs.gainsIA);
     try {
       if (evenementHebdo) {
         // ⚠️ LE JUGEMENT PASSE PAR LE BUDGET DE SAISON, comme une action libre :
         // quarante-trois semaines de récit ne doivent pas déplacer l'étalonnage
         // de difficulté (voir CLAUDE.md).
-        const jugement = await jugerReaction({
-          modele,
-          joueur,
-          evenement: evenementHebdo,
-          reponse: contenu,
-          budgetAttributs: Math.max(0, BUDGET_IA_PAR_SAISON - compteurs.gainsIA),
-        });
+        const jugement = avecIA
+          ? await jugerReaction({
+            modele,
+            joueur,
+            evenement: evenementHebdo,
+            reponse: contenu,
+            budgetAttributs: budget,
+          })
+          : jugementLocal(joueur, evenementHebdo, contenu, budget);
         appliquerJugement(jugement, contenu);
       } else {
         const reponse = await demanderAuMJ({
@@ -162,9 +175,20 @@ export function Carriere({ onReglages }: Props) {
         setChoix(reponse.choix ?? []);
       }
     } catch (e) {
-      setErreur(messageErreurIALocale(e));
-      // On garde l'action dans la barre pour réessayer
-      setTexte(contenu);
+      // ⚠️ QUOTA, CLÉ OU RÉSEAU : ON N'AFFICHE RIEN (demande explicite).
+      // `messageErreurIA` renvoie `null` dans ces cas-là — le jeu bascule en
+      // silence sur le contenu pré-écrit, et repassera sur Groq tout seul.
+      const message = messageErreurIA(e);
+      if (message) {
+        setErreur(message);
+        setTexte(contenu); // on garde l'action dans la barre pour réessayer
+      } else if (evenementHebdo) {
+        appliquerJugement(jugementLocal(joueur, evenementHebdo, contenu, budget), contenu);
+      } else {
+        // Une action libre sans MJ n'a pas d'issue possible : on rend la main
+        // au pool de situations, qui, lui, ne dépend de personne.
+        lancerScenario(false);
+      }
     } finally {
       setEnCours(false);
     }
@@ -217,7 +241,7 @@ export function Carriere({ onReglages }: Props) {
             ))}
           </div>
         ) : (
-          !enCours && !evenementHebdo && (
+          !enCours && !evenementHebdo && avecIA && (
             <div className="choix-rapides" style={{ padding: '0 1.2rem' }}>
               {/* ⚠️ PLUS DE BOUTON « La vie hors du terrain ». Le récit ne se
                   déclenche plus à la demande : il TOMBE, chaque semaine, comme
@@ -243,6 +267,10 @@ export function Carriere({ onReglages }: Props) {
           </div>
         )}
 
+        {/* ⚠️ L'ACTION LIBRE A BESOIN DU MJ. Sans lui (IA coupée dans les
+            réglages, ou quota épuisé), la semaine se joue aux situations à
+            choix : on neutralise la barre au lieu de laisser le joueur écrire
+            dans le vide. Aucun message d'alerte — juste une invite différente. */}
         <div className="saisie">
           <textarea
             placeholder={
@@ -250,18 +278,22 @@ export function Carriere({ onReglages }: Props) {
                 ? t('car.placeholderChoix')
                 : evenementHebdo
                   ? t('car.placeholderEvenement')
-                  : t('car.placeholder')
+                  : avecIA
+                    ? t('car.placeholder')
+                    : t('car.placeholderSansMJ')
             }
             value={texte}
             onChange={(e) => setTexte(e.target.value)}
             onKeyDown={gererClavier}
             rows={1}
-            disabled={enCours || !!scenarioActif}
+            disabled={enCours || !!scenarioActif || (!avecIA && !evenementHebdo)}
           />
           <button
             className="btn primaire"
             onClick={() => envoyer(texte)}
-            disabled={enCours || !!scenarioActif || !texte.trim()}
+            disabled={
+              enCours || !!scenarioActif || !texte.trim() || (!avecIA && !evenementHebdo)
+            }
           >
             {enCours ? '…' : evenementHebdo ? t('car.repondre') : t('car.jouer')}
           </button>

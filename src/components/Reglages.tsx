@@ -1,21 +1,14 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import {
-  MODELE_DEFAUT,
-  MEMOIRE_MODELE_MO,
-  activiteIALocale,
-  chargerIALocale,
-  dechargerIALocale,
-  ecouterEtatIALocale,
-  etatIALocale,
-  iaLocaleCompatible,
-  messageErreurIALocale,
-  modeleIALocaleEnCache,
-  reinitialiserActiviteIALocale,
-  supprimerIALocale,
-} from '../lib/iaLocale';
+  MODELES_GROQ,
+  activiteIA,
+  ecouterEtatIA,
+  etatIA,
+  reinitialiserActiviteIA,
+} from '../lib/groq';
 import type { Theme } from '../types';
 import { LANGUES, nombre, t, tn } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
@@ -32,74 +25,43 @@ interface Props {
   onFermer: () => void;
 }
 
+/** « dans 4 min », « dans 35 s » — la reprise du quota, en clair. */
+function delaiLisible(reprise: number | undefined): string {
+  const restant = Math.max(0, (reprise ?? 0) - Date.now());
+  const minutes = Math.ceil(restant / 60_000);
+  return minutes > 1
+    ? t('reg.iaRepriseMinutes', { n: String(minutes) })
+    : t('reg.iaRepriseBientot');
+}
+
 export function Reglages({ onFermer }: Props) {
-  const iaLocaleActivee = useGame((s) => s.iaLocaleActivee);
+  const iaActivee = useGame((s) => s.iaActivee);
   const theme = useGame((s) => s.theme);
   const langue = useGame((s) => s.langue);
   const setLangue = useGame((s) => s.setLangue);
   const setTheme = useGame((s) => s.setTheme);
-  const setIALocaleActivee = useGame((s) => s.setIALocaleActivee);
+  const setIAActivee = useGame((s) => s.setIAActivee);
   const tenorKey = useGame((s) => s.tenorKey);
   const setTenorKey = useGame((s) => s.setTenorKey);
+  const groqKey = useGame((s) => s.groqKey);
+  const setGroqKey = useGame((s) => s.setGroqKey);
 
   const [tenorLocal, setTenorLocal] = useState(tenorKey);
+  const [groqLocal, setGroqLocal] = useState(groqKey);
   const [langueLocale, setLangueLocale] = useState(langue);
   const [themeLocal, setThemeLocal] = useState(theme);
-  const [modeleEnCache, setModeleEnCache] = useState(false);
-  const [operationIA, setOperationIA] = useState(false);
-  const [erreurIA, setErreurIA] = useState<string | null>(null);
-  const etatIA = useSyncExternalStore(ecouterEtatIALocale, etatIALocale, etatIALocale);
+  // ⚠️ ABONNEMENT, PAS LECTURE. L'état de l'IA change tout seul quand le quota
+  // se libère : sans abonnement, le badge resterait figé sur « quota épuisé »
+  // alors que le jeu est déjà reparti sur Groq.
+  const etat = useSyncExternalStore(ecouterEtatIA, etatIA, etatIA);
   const { overlayRef, dialogRef } = useModalDialog(onFermer);
   const [, rafraichir] = useState(0);
-  const activite = activiteIALocale();
-  const remettreAZero = () => { reinitialiserActiviteIALocale(); rafraichir((n) => n + 1); };
-
-  useEffect(() => {
-    let actif = true;
-    void modeleIALocaleEnCache()
-      .then((present) => { if (actif) setModeleEnCache(present); })
-      .catch(() => undefined);
-    return () => { actif = false; };
-  }, [etatIA.phase]);
-
-  const activerIA = async () => {
-    setErreurIA(null);
-    setOperationIA(true);
-    setIALocaleActivee(true);
-    try {
-      await chargerIALocale();
-      setModeleEnCache(true);
-    } catch (cause) {
-      setIALocaleActivee(false);
-      setErreurIA(messageErreurIALocale(cause));
-    } finally {
-      setOperationIA(false);
-    }
-  };
-
-  const desactiverIA = async () => {
-    setIALocaleActivee(false);
-    setOperationIA(true);
-    await dechargerIALocale();
-    setOperationIA(false);
-  };
-
-  const effacerIA = async () => {
-    setIALocaleActivee(false);
-    setOperationIA(true);
-    setErreurIA(null);
-    try {
-      await supprimerIALocale();
-      setModeleEnCache(false);
-    } catch (cause) {
-      setErreurIA(messageErreurIALocale(cause));
-    } finally {
-      setOperationIA(false);
-    }
-  };
+  const activite = activiteIA();
+  const remettreAZero = () => { reinitialiserActiviteIA(); rafraichir((n) => n + 1); };
 
   const enregistrer = () => {
     setTenorKey(tenorLocal.trim());
+    setGroqKey(groqLocal.trim());
     setLangue(langueLocale);
     setTheme(themeLocal);
     onFermer();
@@ -123,58 +85,46 @@ export function Reglages({ onFermer }: Props) {
         <h2 id="reglages-titre">{t('reg.titre')}</h2>
         <p className="aide">{t('reg.iaAide')}</p>
 
+        {/* ⚠️ LE QUOTA N'EST PAS UNE PANNE. C'est le SEUL endroit du jeu où
+            l'état de l'IA s'affiche : ailleurs, quand elle n'est pas
+            disponible, le jeu bascule sur son contenu pré-écrit sans un mot
+            (demande explicite) et repart tout seul dès que le quota revient. */}
         <div className="champ ia-locale">
-          <label>{t('reg.iaLocale')}</label>
+          <label>{t('reg.iaMJ')}</label>
           <div className="ia-locale-entete">
             <div>
-              <strong>Llama 3.2 1B</strong>
-              <span>{MODELE_DEFAUT.includes('q4') ? ' · 4-bit' : ''} · {nombre(MEMOIRE_MODELE_MO)} Mo</span>
+              <strong>Groq</strong>
+              <span> · {etat.modele ?? MODELES_GROQ[0]}</span>
             </div>
-            <span className={`badge-cle ${etatIA.phase === 'prete' && iaLocaleActivee ? 'ok' : 'ko'}`}>
-              {etatIA.phase === 'prete' && iaLocaleActivee
-                ? `✓ ${t('reg.iaPrete')}`
-                : etatIA.phase === 'chargement'
-                  ? t('reg.iaChargement')
-                  : iaLocaleCompatible()
-                    ? t('reg.iaInactive')
-                    : t('reg.iaIncompatible')}
+            <span className={`badge-cle ${iaActivee && etat.disponible ? 'ok' : 'ko'}`}>
+              {!iaActivee
+                ? t('reg.iaInactive')
+                : etat.disponible
+                  ? `✓ ${t('reg.iaPrete')}`
+                  : etat.quotaEpuise
+                    ? t('reg.iaQuota')
+                    : t('reg.iaSansCle')}
             </span>
           </div>
 
-          {etatIA.phase === 'chargement' && (
-            <div className="ia-progression" aria-live="polite">
-              <div className="ia-progression-piste">
-                <span style={{ width: `${Math.round(etatIA.progression * 100)}%` }} />
-              </div>
-              <b>{Math.round(etatIA.progression * 100)} %</b>
-            </div>
-          )}
-
-          {(erreurIA || etatIA.erreur) && (
-            <p className="alerte">{erreurIA || etatIA.erreur}</p>
-          )}
-
           <p className="aide">
-            {modeleEnCache ? t('reg.iaCache') : t('reg.iaTelechargement')}
+            {!iaActivee
+              ? t('reg.iaDesactiveeAide')
+              : etat.quotaEpuise
+                ? `${t('reg.iaQuotaAide')} ${delaiLisible(etat.reprise)}`
+                : etat.disponible
+                  ? t('reg.iaPreteAide')
+                  : t('reg.iaSansCleAide')}
           </p>
+
           <div className="ia-actions">
-            {iaLocaleActivee ? (
-              <button type="button" className="btn fantome" disabled={operationIA} onClick={() => void desactiverIA()}>
+            {iaActivee ? (
+              <button type="button" className="btn fantome" onClick={() => setIAActivee(false)}>
                 {t('reg.iaDesactiver')}
               </button>
             ) : (
-              <button
-                type="button"
-                className="btn primaire"
-                disabled={operationIA || !iaLocaleCompatible()}
-                onClick={() => void activerIA()}
-              >
-                {modeleEnCache ? t('reg.iaActiver') : t('reg.iaTelecharger')}
-              </button>
-            )}
-            {modeleEnCache && (
-              <button type="button" className="btn fantome" disabled={operationIA} onClick={() => void effacerIA()}>
-                {t('reg.iaEffacer')}
+              <button type="button" className="btn primaire" onClick={() => setIAActivee(true)}>
+                {t('reg.iaActiver')}
               </button>
             )}
           </div>
@@ -189,6 +139,20 @@ export function Reglages({ onFermer }: Props) {
               </button>
             </div>
           )}
+        </div>
+
+        {/* La clé du site suffit à tout le monde. Celle-ci n'est là que pour
+            qui veut son propre quota — elle prend alors la priorité. */}
+        <div className="champ">
+          <label htmlFor="groq">{t('reg.groq')}</label>
+          <input
+            id="groq"
+            type="password"
+            value={groqLocal}
+            placeholder={t('reg.groqPlaceholder')}
+            onChange={(e) => setGroqLocal(e.target.value)}
+          />
+          <p className="aide">{t('reg.groqAide')}</p>
         </div>
 
         {/* GIFs dans les publications de L'Ovale. Facultatif : sans cette clé,

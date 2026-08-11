@@ -1,8 +1,12 @@
 import { Suspense, lazy, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
-import { SKINS, PACKS } from '../data/boutique';
+import {
+  SKINS, PACKS, EQUIPEMENTS, EQUIPEMENT_PAR_ID, CATEGORIES_EQUIPEMENT,
+} from '../data/boutique';
 import { t } from '../lib/i18n';
+import { CartePubRecompensee } from '../components/Pub';
+import { IconeArticle } from '../components/ModeleObjet';
 
 const Apercu3D = lazy(() =>
   import('../components/Hero3D').then((m) => ({ default: m.Hero3D })),
@@ -13,6 +17,11 @@ const Apercu3D = lazy(() =>
 const Vignette = lazy(() =>
   import('../components/VignetteBallon').then((m) => ({ default: m.VignetteBallon })),
 );
+// Même principe pour le vestiaire : un modèle générique, chargé à la demande,
+// qui retombe sur une pastille quand le `.glb` n'a pas encore été modélisé.
+const Objet3D = lazy(() =>
+  import('../components/ModeleObjet').then((m) => ({ default: m.ApercuObjet })),
+);
 
 export function Boutique() {
   const coins = useGame((s) => s.coins);
@@ -20,7 +29,17 @@ export function Boutique() {
   const skinActif = useGame((s) => s.skinActif);
   const acheterSkin = useGame((s) => s.acheterSkin);
   const choisirSkin = useGame((s) => s.choisirSkin);
+  const equipements = useGame((s) => s.equipements);
+  const equipementActif = useGame((s) => s.equipementActif);
+  const acheterEquipement = useGame((s) => s.acheterEquipement);
+  const basculerEquipement = useGame((s) => s.basculerEquipement);
   const [apercu, setApercu] = useState(skinActif);
+  // ⚠️ LE GRAND APERÇU EST PARTAGÉ : il montre soit un ballon, soit un article
+  // du vestiaire — jamais les deux, parce qu'il n'y a qu'un contexte WebGL à
+  // dépenser (voir le commentaire du cadre d'aperçu, plus bas).
+  const [apercuType, setApercuType] = useState<'ballon' | 'equipement'>('ballon');
+  const [apercuEquip, setApercuEquip] = useState(EQUIPEMENTS[0].id);
+  const articleVu = EQUIPEMENT_PAR_ID[apercuEquip] ?? EQUIPEMENTS[0];
   const [flash, setFlash] = useState<string | null>(null);
 
   const message = (m: string) => {
@@ -45,28 +64,66 @@ export function Boutique() {
 
       {flash && <div className="flash-boutique">{flash}</div>}
 
-      {/* Aperçu 3D du skin sélectionné */}
+      {/* ═══ UN SEUL GRAND APERÇU, POUR LES BALLONS **ET** LE VESTIAIRE ══════
+          ⚠️ CE N'EST PAS UN CHOIX DE MISE EN PAGE, C'EST UNE CONTRAINTE DU
+          NAVIGATEUR. Chaque `<Canvas>` ouvre un contexte WebGL et le navigateur
+          n'en accorde qu'une poignée : la boutique en consomme déjà six (les
+          cinq vignettes de ballons + cet aperçu). Mesuré en jeu, le septième
+          est perdu à la seconde où il s'ouvre — « THREE.WebGLRenderer: Context
+          Lost », cadre vide. Le vestiaire ne monte donc AUCUN canvas de son
+          côté : ses articles sont des pastilles, et pointer l'un d'eux change
+          ce qu'affiche ce cadre-ci. */}
       <div className="carte apercu-skin">
         <div className="apercu-canvas">
           <Suspense fallback={<div className="hero-canvas-skel" />}>
-            <Apercu3D skinId={apercu} />
+            {apercuType === 'ballon'
+              ? <Apercu3D skinId={apercu} />
+              : <Objet3D url={articleVu.glb} teinte={articleVu.teinte} emoji={articleVu.emoji} />}
           </Suspense>
         </div>
         <div className="apercu-info">
           <div className="eyebrow">{t('bo.apercu')}</div>
-          <h2>{SKINS.find((s) => s.id === apercu)?.nom}</h2>
-          <p style={{ color: 'var(--craie-dim)' }}>
-            {t('bo.apercuAide')}
-          </p>
-          {inventaire.includes(apercu) ? (
-            skinActif === apercu ? (
-              <span className="badge-cle ok">✓ {t('bo.equipe')}</span>
-            ) : (
-              <button className="btn primaire" onClick={() => { choisirSkin(apercu); message(t('bo.equipeMsg')); }}>
-                {t('bo.equiper')}
-              </button>
-            )
-          ) : null}
+          {apercuType === 'ballon' ? (
+            <>
+              <h2>{SKINS.find((s) => s.id === apercu)?.nom}</h2>
+              <p style={{ color: 'var(--craie-dim)' }}>{t('bo.apercuAide')}</p>
+              {inventaire.includes(apercu) ? (
+                skinActif === apercu ? (
+                  <span className="badge-cle ok">✓ {t('bo.equipe')}</span>
+                ) : (
+                  <button className="btn primaire" onClick={() => { choisirSkin(apercu); message(t('bo.equipeMsg')); }}>
+                    {t('bo.equiper')}
+                  </button>
+                )
+              ) : null}
+            </>
+          ) : (
+            <>
+              <h2>{articleVu.nom}</h2>
+              <p style={{ color: 'var(--craie-dim)' }}>{articleVu.detail}</p>
+              {equipements.includes(articleVu.id) ? (
+                <button
+                  className={equipementActif[articleVu.categorie] === articleVu.id ? 'btn fantome' : 'btn primaire'}
+                  onClick={() => basculerEquipement(articleVu.id)}
+                >
+                  {equipementActif[articleVu.categorie] === articleVu.id
+                    ? `✓ ${t('bo.porte')}`
+                    : t('bo.equiper')}
+                </button>
+              ) : (
+                <button
+                  className="btn primaire"
+                  disabled={coins < articleVu.prix}
+                  onClick={() => {
+                    if (acheterEquipement(articleVu.id)) message(t('bo.debloque', { article: articleVu.nom }));
+                    else message(t('bo.pasAssez'));
+                  }}
+                >
+                  🪙 {articleVu.prix}
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -78,9 +135,9 @@ export function Boutique() {
           return (
             <div
               key={s.id}
-              className={`carte article ${apercu === s.id ? 'vu' : ''}`}
-              onMouseEnter={() => setApercu(s.id)}
-              onClick={() => setApercu(s.id)}
+              className={`carte article ${apercuType === 'ballon' && apercu === s.id ? 'vu' : ''}`}
+              onMouseEnter={() => { setApercu(s.id); setApercuType('ballon'); }}
+              onClick={() => { setApercu(s.id); setApercuType('ballon'); }}
             >
               {/* Le VRAI ballon, en 3D, qui tourne — plus une pastille de couleur. */}
               <Suspense fallback={
@@ -101,7 +158,7 @@ export function Boutique() {
                   disabled={coins < s.prix}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (acheterSkin(s.id)) message(`${s.nom} débloqué et équipé !`);
+                    if (acheterSkin(s.id)) message(t('bo.debloque', { article: s.nom }));
                     else message(t('bo.pasAssez'));
                   }}
                 >
@@ -117,6 +174,74 @@ export function Boutique() {
           les attributs contredisait frontalement la difficulté du jeu, calibrée
           au dixième de point dans `lib/progression.ts` : on ne monte pas sa
           générale à la caisse. La boutique ne vend plus que du cosmétique. */}
+
+      {/* ═══ LE VESTIAIRE ═══════════════════════════════════════════════════
+          Crampons, maillots et accessoires. Purement cosmétique, comme les
+          ballons : ce qu'on porte se voit dans le panneau de carrière, jamais
+          dans les statistiques. Chaque article pointe déjà son `.glb` — ceux
+          qui restent à modéliser affichent leur pastille en attendant, et
+          passeront en 3D le jour où le fichier arrive dans `public/m3d/`. */}
+      <div className="eyebrow section-titre">{t('bo.vestiaire')}</div>
+      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
+        {t('bo.vestiaireAide')}
+      </p>
+      {CATEGORIES_EQUIPEMENT.map((cat) => (
+        <div key={cat.id} className="bloc-vestiaire">
+          <div className="vestiaire-titre">{cat.emoji} {t(cat.cle)}</div>
+          <div className="grille-boutique">
+            {EQUIPEMENTS.filter((e) => e.categorie === cat.id).map((e) => {
+              const possede = equipements.includes(e.id);
+              const porte = equipementActif[e.categorie] === e.id;
+              return (
+                <div
+                  key={e.id}
+                  className={`carte article ${apercuType === 'equipement' && apercuEquip === e.id ? 'vu' : ''}${porte ? ' porte' : ''}`}
+                  /* Survoler une carte ne monte AUCUN canvas : ça change juste
+                     ce qu'affiche le grand aperçu, en haut de l'écran. */
+                  onMouseEnter={() => { setApercuEquip(e.id); setApercuType('equipement'); }}
+                  onFocus={() => { setApercuEquip(e.id); setApercuType('equipement'); }}
+                  onClick={() => { setApercuEquip(e.id); setApercuType('equipement'); }}
+                >
+                  {/* Le VRAI modèle 3D en icône — rendu une fois hors écran,
+                      puis servi en image (voir `lib/vignettes3d.ts`). */}
+                  <IconeArticle url={e.glb} teinte={e.teinte} emoji={e.emoji} />
+                  <div className="article-nom">{e.nom}</div>
+                  <div className="article-detail">{e.detail}</div>
+                  {possede ? (
+                    <button
+                      className={porte ? 'btn fantome petit' : 'btn primaire petit'}
+                      onClick={() => basculerEquipement(e.id)}
+                    >
+                      {porte ? `✓ ${t('bo.porte')}` : t('bo.equiper')}
+                    </button>
+                  ) : (
+                    <button
+                      className="btn primaire petit"
+                      disabled={coins < e.prix}
+                      onClick={() => {
+                        if (acheterEquipement(e.id)) message(t('bo.debloque', { article: e.nom }));
+                        else message(t('bo.pasAssez'));
+                      }}
+                    >
+                      🪙 {e.prix}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* ═══ GAGNER DES OVAS SANS PAYER ══════════════════════════════════════
+          ⚠️ FACULTATIF, ET ÇA DOIT LE RESTER. Aucun article n'est réservé à
+          ceux qui regardent des pubs : c'est un raccourci vers la même
+          boutique, plafonné, et qui ne rapporte que des Ovas — donc rien qui
+          touche à la difficulté (voir `lib/pub.ts`). */}
+      <div className="eyebrow section-titre">{t('bo.gagnerOvas')}</div>
+      <div className="grille-boutique">
+        <CartePubRecompensee />
+      </div>
 
       <div className="eyebrow section-titre">{t('bo.recharges')}</div>
       <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>

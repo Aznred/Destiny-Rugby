@@ -7,6 +7,8 @@ import { t } from './lib/i18n';
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
 import { Reglages } from './components/Reglages';
+import { BandeauConsentementPub, Pub } from './components/Pub';
+import { ECRANS_AVEC_PUB } from './lib/pub';
 import { Accueil } from './screens/Accueil';
 import { Creation } from './screens/Creation';
 import { Carriere } from './screens/Carriere';
@@ -50,8 +52,6 @@ export default function App() {
   const ecran = useGame((s) => s.ecran);
   const joueur = useGame((s) => s.joueur);
   const setEcran = useGame((s) => s.setEcran);
-  const iaLocaleActivee = useGame((s) => s.iaLocaleActivee);
-  const setIALocaleActivee = useGame((s) => s.setIALocaleActivee);
   const tropheesEnAttente = useGame((s) => s.tropheesEnAttente);
   const fermerTrophee = useGame((s) => s.fermerTrophee);
   // ⚠️ CHANGER DE LANGUE REDESSINE TOUT. `t()` lit une variable de module (elle
@@ -72,34 +72,12 @@ export default function App() {
     }
   }, [tropheesEnAttente.length, totalTrophees]);
 
-  // Le modèle local se prépare seul après le premier rendu. Le délai laisse
-  // l'accueil s'afficher immédiatement ; téléchargement, compilation WebGPU et
-  // chargement restent dans le Worker. Une désactivation manuelle est
-  // persistée et empêche ce préchargement aux ouvertures suivantes.
-  useEffect(() => {
-    if (!iaLocaleActivee) return;
-    let annule = false;
-    const minuterie = window.setTimeout(() => {
-      void import('./lib/iaLocale').then(async ({ chargerIALocale, iaLocaleCompatible }) => {
-        if (annule) return;
-        if (!iaLocaleCompatible()) {
-          setIALocaleActivee(false);
-          return;
-        }
-        try {
-          await chargerIALocale();
-        } catch {
-          // Tous les appelants disposent déjà d'un contenu pré-écrit de
-          // secours. On évite simplement de retenter à chaque action.
-          if (!annule) setIALocaleActivee(false);
-        }
-      });
-    }, 1200);
-    return () => {
-      annule = true;
-      window.clearTimeout(minuterie);
-    };
-  }, [iaLocaleActivee, setIALocaleActivee]);
+  // ⚠️ PLUS RIEN À PRÉCHARGER. Il y avait ici un préchargement différé du
+  // modèle WebLLM : 900 Mo téléchargés en arrière-plan au premier lancement,
+  // une compilation WebGPU, et un repli silencieux quand l'appareil ne suivait
+  // pas. Le Maître du Jeu passe désormais par Groq (`lib/groq.ts`) : il n'y a
+  // ni téléchargement, ni GPU à interroger, ni état à préparer — le premier
+  // appel part quand le joueur agit.
 
   // Garde-fou : pas d'écran carrière/profil sans joueur.
   useEffect(() => {
@@ -142,6 +120,20 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
         </Garde>
+
+        {/* ⚠️ LA PUB N'EXISTE QUE SUR LES ÉCRANS OÙ L'ON FLÂNE — Boutique, Hall,
+            Classement, Clubs (`ECRANS_AVEC_PUB`). Jamais sur la Carrière, jamais
+            pendant un match, jamais sur 𝕏 L'Ovale : c'est là qu'on JOUE, et une
+            bannière au milieu d'une décision de carrière, c'est une pub qui
+            nuit au jeu. Elle est posée APRÈS le contenu, dans le flux, jamais
+            en surimpression, et elle ne rend rien du tout sans régie
+            configurée ni consentement (voir `lib/pub.ts`). */}
+        {(ECRANS_AVEC_PUB as readonly string[]).includes(ecran) && (
+          <>
+            <BandeauConsentementPub />
+            <Pub />
+          </>
+        )}
       </main>
 
       <AnimatePresence>

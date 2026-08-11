@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Modèles 3D livrés bruts (~90 Mo pièce) : la version compressée vit dans
+# public/m3d/, produite par `node scripts/copierTrophees.cjs`.
+sources/modeles/cosmetiques/

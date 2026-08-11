@@ -1,119 +1,18 @@
+// LE MAÎTRE DU JEU — prompts, parsing, et LES GARDE-FOUS
+//
+// ⚠️ CE FICHIER EST L'AUTORITÉ. Le modèle propose, `plafonnerDeltas()` et
+// `ressembleATriche()` disposent : un récit ne peut pas donner +10 en vitesse
+// ni un million d'euros, quoi qu'écrive le joueur et quoi que réponde l'IA.
+// C'est vrai avec Groq comme ça l'était avec le modèle local — le transport a
+// changé (`lib/groq.ts`), les limites du jeu n'ont pas bougé d'un point.
+//
+// (Anciennement `lib/iaLocale.ts`, du temps où le modèle tournait dans le
+// navigateur via WebLLM.)
+
 import type { Joueur, ReponseMJ } from '../types';
 import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
 import { consigneDeLangue, t } from './i18n';
-import type { WebWorkerMLCEngine } from '@mlc-ai/web-llm';
-
-// Le modèle tourne entièrement dans le navigateur via WebGPU. Il est chargé
-// dans un Worker pour que le téléchargement et la génération ne figent jamais
-// l'interface. WebLLM garde ensuite les poids dans le cache du navigateur :
-// aucune clé, aucun quota et aucun texte envoyé à un serveur d'inférence.
-export const MODELE_DEFAUT = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
-export const MEMOIRE_MODELE_MO = 879;
-
-export type PhaseIALocale = 'indisponible' | 'repos' | 'chargement' | 'prete' | 'erreur';
-
-export interface EtatIALocale {
-  phase: PhaseIALocale;
-  progression: number;
-  erreur?: string;
-}
-
-let moteur: WebWorkerMLCEngine | null = null;
-let chargement: Promise<WebWorkerMLCEngine> | null = null;
-let worker: Worker | null = null;
-let etat: EtatIALocale = {
-  phase: typeof navigator !== 'undefined' && 'gpu' in navigator ? 'repos' : 'indisponible',
-  progression: 0,
-};
-const ecouteurs = new Set<() => void>();
-
-class ErreurIALocale extends Error {
-  override name = 'ErreurIALocale';
-}
-
-function publier(suivant: EtatIALocale): void {
-  etat = suivant;
-  ecouteurs.forEach((ecouter) => ecouter());
-}
-
-export function etatIALocale(): EtatIALocale {
-  return etat;
-}
-
-export function ecouterEtatIALocale(ecouter: () => void): () => void {
-  ecouteurs.add(ecouter);
-  return () => ecouteurs.delete(ecouter);
-}
-
-export function iaLocaleCompatible(): boolean {
-  return typeof navigator !== 'undefined' && 'gpu' in navigator && typeof Worker !== 'undefined';
-}
-
-export async function modeleIALocaleEnCache(): Promise<boolean> {
-  if (typeof window === 'undefined') return false;
-  const { hasModelInCache } = await import('@mlc-ai/web-llm');
-  return hasModelInCache(MODELE_DEFAUT);
-}
-
-export async function chargerIALocale(): Promise<WebWorkerMLCEngine> {
-  if (moteur) return moteur;
-  if (chargement) return chargement;
-  if (!iaLocaleCompatible()) {
-    const message = t('ia.erreurWebGPU');
-    publier({ phase: 'indisponible', progression: 0, erreur: message });
-    throw new Error(message);
-  }
-
-  publier({ phase: 'chargement', progression: 0 });
-  chargement = (async () => {
-    try {
-      const { CreateWebWorkerMLCEngine } = await import('@mlc-ai/web-llm');
-      worker = new Worker(new URL('../workers/iaLocale.worker.ts', import.meta.url), { type: 'module' });
-      moteur = await CreateWebWorkerMLCEngine(worker, MODELE_DEFAUT, {
-        logLevel: 'WARN',
-        initProgressCallback: ({ progress }) => {
-          publier({
-            phase: 'chargement',
-            progression: Math.max(0, Math.min(1, progress)),
-          });
-        },
-      });
-      publier({ phase: 'prete', progression: 1 });
-      return moteur;
-    } catch (cause) {
-      worker?.terminate();
-      worker = null;
-      moteur = null;
-      const detail = detailErreurIALocale(cause);
-      const message = /gpu|shader|adapter|device/i.test(detail)
-        ? t('ia.erreurChargementGpu')
-        : t('ia.erreurChargementDetail', { detail: detail || t('ia.erreurInconnue') });
-      publier({ phase: 'erreur', progression: 0, erreur: message });
-      throw new ErreurIALocale(message, { cause });
-    } finally {
-      chargement = null;
-    }
-  })();
-  return chargement;
-}
-
-export async function dechargerIALocale(): Promise<void> {
-  if (moteur) await moteur.unload().catch(() => undefined);
-  moteur = null;
-  chargement = null;
-  worker?.terminate();
-  worker = null;
-  publier({
-    phase: iaLocaleCompatible() ? 'repos' : 'indisponible',
-    progression: 0,
-  });
-}
-
-export async function supprimerIALocale(): Promise<void> {
-  await dechargerIALocale();
-  const { deleteModelAllInfoInCache } = await import('@mlc-ai/web-llm');
-  await deleteModelAllInfoInCache(MODELE_DEFAUT);
-}
+import { appelIAJSON, erreurSilencieuse } from './groq';
 
 // ⚠️ COMPACTÉE (économie de tokens). Une fiche sur neuf lignes, renvoyée à
 // CHAQUE action, pour une information qui tient en trois. Les titres sont
@@ -193,34 +92,6 @@ N'invente aucune autre clé. Si l'action ne change rien — c'est le cas le plus
 fréquent — renvoie "deltas": {}.
 Reste cohérent avec le poste, l'âge et le niveau du joueur. Écris en français.`;
 
-// Un schéma explicite évite le mode `json_object` sans schéma de WebLLM,
-// qui peut continuer à produire des espaces jusqu'à la limite de tokens avec
-// les petits modèles. La grammaire sait ici exactement quand la réponse est finie.
-const SCHEMA_REPONSE_MJ = JSON.stringify({
-  type: 'object',
-  properties: {
-    recit: { type: 'string' },
-    evenement: { type: 'string' },
-    deltas: {
-      type: 'object',
-      properties: Object.fromEntries([
-        'vitesse', 'force', 'endurance', 'plaquage', 'passe', 'jeuAuPied',
-        'vision', 'mental', 'forme', 'moral', 'reputation', 'argent',
-      ].map((cle) => [cle, { type: 'integer' }])),
-      additionalProperties: false,
-    },
-    consequences: { type: 'string' },
-    choix: {
-      type: 'array',
-      items: { type: 'string' },
-      minItems: 2,
-      maxItems: 4,
-    },
-  },
-  required: ['recit', 'evenement', 'deltas', 'consequences', 'choix'],
-  additionalProperties: false,
-});
-
 export interface OptionsAppel {
   modele?: string;
   joueur: Joueur;
@@ -228,156 +99,42 @@ export interface OptionsAppel {
   action: string;
 }
 
-export interface MessageIA {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
-
-// WebLLM n'accepte qu'un seul message `system`, obligatoirement en tête. Les
-// prompts du jeu sont volontairement découpés (règles, fiche du joueur,
-// contexte de la scène…), donc on les fusionne ici avant chaque appel. Sans
-// cette normalisation, le Worker rejette notamment toutes les actions libres de
-// la carrière avec `SystemMessageOrderError`.
-export function normaliserMessagesIA(messages: MessageIA[]): MessageIA[] {
-  const systeme = messages
-    .filter((message) => message.role === 'system')
-    .map((message) => message.content.trim())
-    .filter(Boolean)
-    .join('\n\n');
-  const conversation = messages.filter((message) => message.role !== 'system');
-  return systeme ? [{ role: 'system', content: systeme }, ...conversation] : conversation;
-}
-
-export function detailErreurIALocale(cause: unknown): string {
-  if (cause instanceof Error) return cause.message.trim();
-  if (typeof cause === 'string') return cause.trim();
-  if (cause && typeof cause === 'object') {
-    const objet = cause as Record<string, unknown>;
-    for (const cle of ['message', 'error', 'reason', 'detail', 'cause']) {
-      const valeur = objet[cle];
-      if (typeof valeur === 'string' && valeur.trim()) return valeur.trim();
-      if (valeur instanceof Error && valeur.message.trim()) return valeur.message.trim();
-    }
-    try {
-      const serialise = JSON.stringify(cause);
-      if (serialise && serialise !== '{}') return serialise;
-    } catch {
-      // Certains objets du navigateur sont circulaires : le message générique
-      // ci-dessous est alors plus utile que "[object Object]".
-    }
-  }
-  return '';
-}
-
-export function messageErreurIALocale(cause: unknown): string {
-  if (cause instanceof ErreurIALocale) return cause.message;
-  const detail = detailErreurIALocale(cause).replace(/^Error:\s*/i, '');
-  const debutErreurDetaillee = t('ia.erreurDetail', { detail: '' }).trimEnd();
-  if (debutErreurDetaillee && detail.startsWith(debutErreurDetaillee)) return detail;
-  if ([
-    t('ia.erreurMemoire'),
-    t('ia.erreurGpu'),
-    t('ia.erreurModeleIncomplet'),
-    t('ia.erreurGenerique'),
-  ].includes(detail)) return detail;
-  if (/out of memory|allocation|memory limit|buffer.*(?:large|size)/i.test(detail)) {
-    return t('ia.erreurMemoire');
-  }
-  if (/device lost|webgpu|gpu|shader|adapter/i.test(detail)) {
-    return t('ia.erreurGpu');
-  }
-  if (/fetch|network|cache|failed to load|404/i.test(detail)) {
-    return t('ia.erreurModeleIncomplet');
-  }
-  return detail
-    ? t('ia.erreurDetail', { detail })
-    : t('ia.erreurGenerique');
-}
-
-// ---------------------------------------------------------------------------
-// L'ACTIVITÉ LOCALE, MESURÉE
-// ---------------------------------------------------------------------------
-export interface ActiviteIALocale {
-  appels: number;
-  entree: number;  // tokens de prompt
-  sortie: number;  // tokens générés
-}
-
-const activite: ActiviteIALocale = { appels: 0, entree: 0, sortie: 0 };
-
-export function activiteIALocale(): ActiviteIALocale {
-  return { ...activite };
-}
-
-export function reinitialiserActiviteIALocale(): void {
-  activite.appels = 0;
-  activite.entree = 0;
-  activite.sortie = 0;
-}
-
-// WebLLM ne doit recevoir qu'une génération à la fois. Le réseau social peut
-// demander plusieurs réponses ensemble : cette file les sérialise proprement.
-let fileAppels: Promise<void> = Promise.resolve();
-
-function executerEnFile<T>(travail: () => Promise<T>): Promise<T> {
-  const resultat = fileAppels.then(travail, travail);
-  fileAppels = resultat.then(() => undefined, () => undefined);
-  return resultat;
-}
-
-// Point d'entrée partagé par le MJ, les situations, L'Ovale et le coaching.
-export async function appelIAJSON(
-  messages: MessageIA[],
-  options: { temperature?: number; maxTokens?: number; schema?: string } = {},
-): Promise<string> {
-  return executerEnFile(async () => {
-    const engine = await chargerIALocale();
-    const reponse = await engine.chat.completions.create({
-      messages: normaliserMessagesIA(messages),
-      temperature: Math.min(0.9, Math.max(0.1, options.temperature ?? 0.72)),
-      top_p: 0.9,
-      repetition_penalty: 1.06,
-      max_tokens: Math.min(640, options.maxTokens ?? 360),
-      ...(options.schema
-        ? { response_format: { type: 'json_object' as const, schema: options.schema } }
-        : {}),
-    }).catch((cause: unknown) => {
-      throw new ErreurIALocale(messageErreurIALocale(cause), { cause });
-    });
-    activite.appels += 1;
-    activite.entree += reponse.usage?.prompt_tokens ?? 0;
-    activite.sortie += reponse.usage?.completion_tokens ?? 0;
-    const contenu = reponse.choices[0]?.message?.content;
-    return typeof contenu === 'string' && contenu.trim() ? contenu : '{}';
-  });
-}
-
 export { fichePersonnage };
+
+/**
+ * Le message à afficher pour une erreur d'IA — ou `null` quand il ne faut RIEN
+ * afficher (quota, clé, réseau : le jeu a déjà basculé sur son contenu
+ * pré-écrit, en parler ne ferait qu'inquiéter le joueur pour rien).
+ */
+export function messageErreurIA(cause: unknown): string | null {
+  if (erreurSilencieuse(cause)) return null;
+  const detail = (cause instanceof Error ? cause.message : String(cause ?? ''))
+    .replace(/^Error:\s*/i, '')
+    .trim();
+  return detail ? t('ia.erreurDetail', { detail }) : t('ia.erreurGenerique');
+}
 
 export async function demanderAuMJ({
   joueur,
   historique,
   action,
 }: OptionsAppel): Promise<ReponseMJ> {
-  const messages: MessageIA[] = [
+  const messages = [
     // ⚠️ LA LANGUE EN TÊTE DE PROMPT. Traduire les boutons ne sert à rien si
     // le récit du MJ — c'est-à-dire l'essentiel de ce qu'on lit — reste en
     // français. Vide quand on joue en français : pas un token gaspillé.
-    { role: 'system', content: SYSTEME + consigneDeLangue() },
+    { role: 'system' as const, content: SYSTEME + consigneDeLangue() },
     {
-      role: 'system',
+      role: 'system' as const,
       content: `FICHE ACTUELLE DU JOUEUR :\n${fichePersonnage(joueur)}`,
     },
     // ⚠️ SIX MESSAGES D'HISTORIQUE, TRONQUÉS (économie de tokens). Huit récits
     // complets du MJ, c'était plus de 1 200 tokens d'entrée à chaque action —
     // pour un contexte dont seules les dernières lignes servent vraiment.
     ...historique.slice(-6).map((m) => ({ ...m, content: m.content.slice(0, 600) })),
-    { role: 'user', content: action },
+    { role: 'user' as const, content: action },
   ];
-  return parserReponse(await appelIAJSON(messages, {
-    maxTokens: 200,
-    schema: SCHEMA_REPONSE_MJ,
-  }));
+  return parserReponse(await appelIAJSON(messages, { maxTokens: 320 }));
 }
 
 function parserReponse(brut: string): ReponseMJ {

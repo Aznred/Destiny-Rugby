@@ -125,6 +125,29 @@ const LOTS = [{
     'World Rugby Pacific Challenge': 'pacificChallenge',
     'World Rugby U20 Championship': 'mondialU20',
   },
+}, {
+  // ⚠️ CE LOT N'EST PAS FAIT DE TROPHÉES — le nom du script est historique.
+  // Ce sont **le rugbyman et ses cosmétiques** : le personnage qu'on voit sur
+  // l'accueil et dans le profil, et ce qu'on lui achète au vestiaire
+  // (`data/boutique.ts`). Même pipeline, mêmes raisons : livrés à ~90 Mo pièce
+  // (700 Mo au total), ils sont impubliables tels quels.
+  //
+  // ⚠️ `rugbyplayer` EST À PART : c'est le seul modèle que le jeu affiche EN
+  // GRAND et en permanence sur l'écran d'accueil. Il passe par le même
+  // traitement, mais c'est LUI qu'il faut regarder si la compression abîme
+  // quelque chose.
+  dossier: 'sources/modeles/cosmetiques',
+  intitule: 'le rugbyman et ses cosmétiques',
+  correspondance: {
+    'rugbyplayer': 'rugbyman',
+    'casque': 'casque',
+    'chausettes': 'chaussettes',
+    'mitaines': 'mitaines',
+    'protege dent': 'protege-dents',
+    'tee': 'tee',
+    'bag': 'sac',
+    'bouclierde percu': 'bouclier-plaquage',
+  },
 }];
 
 const force = process.argv.includes('--force');

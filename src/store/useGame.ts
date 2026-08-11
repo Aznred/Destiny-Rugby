@@ -82,11 +82,15 @@ import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS, nomPoste } from '../data/r
 import {
   retourDeMatch, BUDGET_MATCHS_PAR_SAISON, type StatsMatchJoueur,
 } from '../lib/moteur/apresMatch';
-import { MODELE_DEFAUT, plafonnerDeltas, ressembleATriche } from '../lib/iaLocale';
+import { plafonnerDeltas, ressembleATriche } from '../lib/mj';
+import {
+  MODELE_DEFAUT, definirCleGroqJoueur, erreurSilencieuse, iaDisponible,
+} from '../lib/groq';
 import { EVENEMENTS, traduireEvenement } from '../data/evenements';
 import { situationPour, versScenario, type ConsequenceDure } from '../data/situations';
 import { appliquerConsequence, lireDerapage, consequenceDuDerapage } from '../lib/consequences';
-import { SKIN_PAR_ID } from '../data/boutique';
+import { SKIN_PAR_ID, EQUIPEMENT_PAR_ID, type CategorieEquipement } from '../data/boutique';
+import { ETAT_PUBS_VIDE, OVAS_PAR_PUB, etatDuJour, pubDisponible, type EtatPubs } from '../lib/pub';
 import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
 import { forceEffectif, forceMoyenneDivision, noteDuClub, setTransfertsSociaux, effectifDuClub } from '../lib/effectif';
@@ -430,6 +434,14 @@ interface GameState {
   coins: number;
   inventaire: string[];
   skinActif: string;
+  /** Articles du vestiaire possédés (cosmétique pur). */
+  equipements: string[];
+  /** Ce qu'il porte, une pièce par catégorie. */
+  equipementActif: Partial<Record<CategorieEquipement, string>>;
+  /** Consentement publicitaire — rien ne se charge tant que c'est 'inconnu'. */
+  pubConsentement: 'inconnu' | 'oui' | 'non';
+  /** Compteur des pubs récompensées (quota journalier et délai d'attente). */
+  pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
   scenarioActif: Scenario | null;
   // ═══ LE RÉCIT DE LA SEMAINE ═════════════════════════════════════════════
@@ -478,14 +490,18 @@ interface GameState {
   relationsSociales: Record<string, number>; // pseudo → relation (−100..100)
   succesDebloques: SuccesDebloques; // id → saison où il est tombé
   defis: { cle: string; faits: string[] }; // défis de la semaine en cours
-  iaLocaleActivee: boolean;
+  /** L'IA est-elle autorisée par le joueur ? (⚙️ Réglages) */
+  iaActivee: boolean;
   modele: string;
   tenorKey: string; // clé Tenor (facultative) pour les GIFs dans les posts
+  /** Clé Groq personnelle (facultative) : elle prend le pas sur celle du site. */
+  groqKey: string;
   // navigation & réglages
   setEcran: (e: Ecran) => void;
-  setIALocaleActivee: (active: boolean) => void;
+  setIAActivee: (active: boolean) => void;
   setModele: (m: string) => void;
   setTenorKey: (k: string) => void;
+  setGroqKey: (k: string) => void;
   // carrière
   creerJoueur: (input: CreationInput) => void;
   ajouterEntree: (e: Omit<EntreeJournal, 'id' | 'saison'>) => void;
@@ -557,6 +573,8 @@ interface GameState {
   marquerNotifsLues: () => void;
   verifierSucces: () => void;
   signalerDefi: (evenement: EvenementDefi) => void;
+  /** Une blessure de gravité `carriere` arrête vraiment la carrière. */
+  raccrocherSurBlessure: () => void;
   // Les VRAIES statistiques du match regardé en direct, versées dans la saison.
   // `contexte` porte le résultat de la rencontre : c'est lui qui permet à la
   // feuille de match d'être la SEULE entrée du journal pour ce week-end.
@@ -585,6 +603,11 @@ interface GameState {
   // boutique
   acheterSkin: (id: string) => boolean;
   choisirSkin: (id: string) => void;
+  acheterEquipement: (id: string) => boolean;
+  basculerEquipement: (id: string) => void;
+  setPubConsentement: (choix: 'oui' | 'non') => void;
+  /** Crédite la récompense d'une pub REGARDÉE JUSQU'AU BOUT. */
+  encaisserPub: () => number;
   // ⚠️ `acheterBoost` a été supprimé : la boutique ne vend plus de bonus
   // d'attributs (demande explicite). Voir `src/data/boutique.ts`.
 }
@@ -598,6 +621,10 @@ export const useGame = create<GameState>()(
       coins: 0,
       inventaire: ['classique'],
       skinActif: 'classique',
+      equipements: [],
+      equipementActif: {},
+      pubConsentement: 'inconnu',
+      pubs: ETAT_PUBS_VIDE,
       pantheon: [],
       scenarioActif: null,
       attenteEvenement: false,
@@ -626,16 +653,21 @@ export const useGame = create<GameState>()(
       erreurSocial: null,
       succesDebloques: {},
       defis: { cle: '', faits: [] },
-      // Préchargée en arrière-plan au lancement ; l'utilisateur peut toujours
-      // la désactiver dans les réglages pour les appareils modestes.
-      iaLocaleActivee: true,
+      // ⚠️ ACTIVE PAR DÉFAUT, ET ÇA NE COÛTE RIEN AU JOUEUR : la clé du site est
+      // embarquée, il n'y a plus rien à télécharger ni à saisir. Le réglage ne
+      // sert qu'à ceux qui préfèrent le jeu entièrement pré-écrit.
+      iaActivee: true,
       tenorKey: '',
+      groqKey: '',
       modele: MODELE_DEFAUT,
 
       setEcran: (ecran) => set({ ecran }),
-      setIALocaleActivee: (iaLocaleActivee) => set({ iaLocaleActivee }),
+      setIAActivee: (iaActivee) => set({ iaActivee }),
       setModele: (modele) => set({ modele }),
       setTenorKey: (tenorKey) => set({ tenorKey }),
+      // La clé personnelle vit aussi dans un module (comme la langue et le
+      // thème) : `lib/groq.ts` ne peut pas importer le store sans cycle.
+      setGroqKey: (groqKey) => { definirCleGroqJoueur(groqKey); set({ groqKey }); },
 
       creerJoueur: (input) => {
         const attributs = attributsDeBase(input.poste);
@@ -1283,7 +1315,7 @@ export const useGame = create<GameState>()(
                     id: idUnique(), pseudo: app.pseudo, de: 'lui' as const, saison: j.saison,
                     texte: `${j.nom}, ton contrat arrive à son terme et on aimerait te garder. `
                       + `Notre proposition : ${resumerTermes(app.offre)}. Dis-nous.`,
-                    creeLe: Date.now(), lu: false,
+                    semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false,
                   },
                 ],
               },
@@ -1806,6 +1838,10 @@ export const useGame = create<GameState>()(
         // Une semaine jouée = une nouvelle fournée de publications, datée.
         get().vivreSemaineSociale();
         get().verifierSucces();
+        // ⚠️ EN DERNIER, PARCE QUE C'EST DÉFINITIF. Une blessure de gravité
+        // `carriere` tirée par le match arrête vraiment la carrière (voir
+        // `raccrocherSurBlessure`) — la semaine se termine normalement avant.
+        if (j.blessure?.gravite === 'carriere') get().raccrocherSurBlessure();
       },
 
       // ---- Marché des transferts ----
@@ -1881,7 +1917,7 @@ export const useGame = create<GameState>()(
                   + `On suit ce que tu fais et on aimerait t'avoir la saison prochaine. `
                   + `Ce qu'on met sur la table : ${resumerTermes(a.offre)}. On en discute ?`,
                 saison: joueur.saison,
-                creeLe: Date.now(),
+                semaine: joueur.semaine ?? 1, creeLe: Date.now(),
                 lu: false,
               },
             ],
@@ -1892,7 +1928,7 @@ export const useGame = create<GameState>()(
               emoji: '✉️',
               titre: `${nouvelles.length} club${nouvelles.length > 1 ? 's te contactent' : ' te contacte'}`,
               texte: nouvelles.map((a) => a.club).join(', '),
-              saison: joueur.saison, creeLe: Date.now(), lue: false,
+              saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lue: false,
             },
             ...s.notifsSocial,
           ].slice(0, 40),
@@ -1921,8 +1957,8 @@ export const useGame = create<GameState>()(
             ...s.conversations,
             [a.pseudo]: [
               ...(s.conversations[a.pseudo] ?? []),
-              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: phraseLevier(def.id), saison: joueur.saison, creeLe: Date.now(), lu: true },
-              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: r.texte, saison: joueur.saison, creeLe: Date.now(), lu: false },
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: phraseLevier(def.id), saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: true },
+              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: r.texte, saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false },
             ],
           },
         }));
@@ -1953,12 +1989,12 @@ export const useGame = create<GameState>()(
             ...s.conversations,
             [a.pseudo]: [
               ...(s.conversations[a.pseudo] ?? []),
-              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'C’est d’accord. On se voit cet été.', saison: joueur.saison, creeLe: Date.now(), lu: true },
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'C’est d’accord. On se voit cet été.', saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: true },
               {
                 id: idUnique(), pseudo: a.pseudo, de: 'lui', saison: joueur.saison,
                 texte: `Parfait. On officialise à l’intersaison : ${resumerTermes(a.offre)}. `
                   + `D’ici là, finis ta saison — et pas un mot à la presse.`,
-                creeLe: Date.now(), lu: false,
+                semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false,
               },
             ],
           },
@@ -1985,8 +2021,8 @@ export const useGame = create<GameState>()(
             ...s.conversations,
             [a.pseudo]: [
               ...(s.conversations[a.pseudo] ?? []),
-              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'Merci, mais je ne suis pas intéressé.', saison: joueur.saison, creeLe: Date.now(), lu: true },
-              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: 'Dommage. Bonne fin de saison.', saison: joueur.saison, creeLe: Date.now(), lu: false },
+              { id: idUnique(), pseudo: a.pseudo, de: 'moi', texte: 'Merci, mais je ne suis pas intéressé.', saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: true },
+              { id: idUnique(), pseudo: a.pseudo, de: 'lui', texte: 'Dommage. Bonne fin de saison.', saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false },
             ],
           },
         }));
@@ -2367,7 +2403,7 @@ export const useGame = create<GameState>()(
                 texte: t('agent.contact.texte', {
                   joueur: joueur.nom, agent: nomAgent(mieux), taux: Math.round(mieux.commission * 100),
                 }),
-                creeLe: Date.now(), lu: false,
+                semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false,
               },
             ],
           },
@@ -2375,7 +2411,7 @@ export const useGame = create<GameState>()(
             id: idUnique(), emoji: mieux.emoji,
             titre: t('agent.contact.titre', { agent: nomAgent(mieux) }),
             texte: t('agent.contact.notif'),
-            saison: joueur.saison, creeLe: Date.now(), lue: false,
+            saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lue: false,
           }, ...s.notifsSocial].slice(0, 40),
           journal: [...s.journal, {
             id: idUnique(), saison: joueur.saison, role: 'mj' as const,
@@ -2556,7 +2592,7 @@ export const useGame = create<GameState>()(
 
         // Avec l'IA locale, ce sont des commentaires écrits pour ce post précis.
         // Sinon, on garde les réponses du pool pré-écrit.
-        if (get().iaLocaleActivee) {
+        if (get().iaActivee && iaDisponible()) {
           try {
             set({ chargementSocial: true, erreurSocial: null });
             const reponses = await reponsesIA(
@@ -2565,7 +2601,10 @@ export const useGame = create<GameState>()(
             );
             if (reponses.length) r.post.reponses = reponses;
           } catch (e) {
-            set({ erreurSocial: (e as Error).message });
+            // ⚠️ QUOTA / CLÉ / RÉSEAU : ON N'AFFICHE RIEN (demande explicite).
+            // Le fil a déjà son contenu pré-écrit ; une bannière rouge ne
+            // ferait qu'inquiéter le joueur pour une bascule invisible.
+            set({ erreurSocial: erreurSilencieuse(e) ? null : (e as Error).message });
           } finally {
             set({ chargementSocial: false });
           }
@@ -2618,6 +2657,7 @@ export const useGame = create<GameState>()(
                 ? ` ${r.desabonnes.toLocaleString('fr-FR')} comptes se sont désabonnés.`
                 : ''),
             saison: j.saison,
+            semaine: j.semaine ?? 1,
           },
           ...(r.post.reponses ?? []).slice(0, 3).map((rep) => ({
             id: idUnique(),
@@ -2625,6 +2665,7 @@ export const useGame = create<GameState>()(
             titre: `@${rep.pseudo} a répondu`,
             texte: rep.texte,
             saison: j.saison,
+            semaine: j.semaine ?? 1,
           })),
         ];
 
@@ -2658,7 +2699,7 @@ export const useGame = create<GameState>()(
       rafraichirFil: async () => {
         const { joueur, comptesSuivis, modele } = get();
         if (!joueur) return;
-        if (!get().iaLocaleActivee) {
+        if (!get().iaActivee || !iaDisponible()) {
           const secours = feedAmbiance(joueur, 6);
           set((s) => ({ posts: fusionner(secours, s.posts) }));
           return;
@@ -2691,7 +2732,7 @@ export const useGame = create<GameState>()(
           // lorsque l'IA est désactivée, tout en conservant l'erreur visible.
           const secours = feedAmbiance(joueur, 6);
           set((s) => ({
-            erreurSocial: e instanceof Error ? e.message : String(e),
+            erreurSocial: erreurSilencieuse(e) ? null : (e instanceof Error ? e.message : String(e)),
             posts: fusionner(secours, s.posts),
           }));
         } finally {
@@ -2792,14 +2833,14 @@ export const useGame = create<GameState>()(
                   ...s.conversations,
                   [pseudo]: [
                     ...(s.conversations[pseudo] ?? []),
-                    { id: idUnique(), pseudo, de: 'lui' as const, texte, saison: joueur.saison, creeLe: Date.now(), lu: false },
+                    { id: idUnique(), pseudo, de: 'lui' as const, texte, saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false },
                   ],
                 },
                 notifsSocial: [
                   {
                     id: idUnique(), emoji: '💬',
                     titre: `${co.nom} t’a écrit`,
-                    texte, saison: joueur.saison, creeLe: Date.now(), lue: false,
+                    texte, saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lue: false,
                   },
                   ...s.notifsSocial,
                 ].slice(0, 40),
@@ -2823,7 +2864,7 @@ export const useGame = create<GameState>()(
                   ...s.conversations,
                   [compte.pseudo]: [
                     ...(s.conversations[compte.pseudo] ?? []),
-                    { id: idUnique(), pseudo: compte.pseudo, de: 'lui' as const, texte, saison: joueur.saison, creeLe: Date.now(), lu: false },
+                    { id: idUnique(), pseudo: compte.pseudo, de: 'lui' as const, texte, saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false },
                   ],
                 },
                 notifsSocial: [
@@ -2831,7 +2872,7 @@ export const useGame = create<GameState>()(
                     id: idUnique(),
                     emoji: '✉️',
                     titre: `@${compte.pseudo} t’a envoyé un message`,
-                    texte, saison: joueur.saison, creeLe: Date.now(), lue: false,
+                    texte, saison: joueur.saison, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lue: false,
                   },
                   ...s.notifsSocial,
                 ].slice(0, 40),
@@ -2885,7 +2926,7 @@ export const useGame = create<GameState>()(
           type: (cible.type as CompteSuivi['type']) ?? 'fan', abonnes: 2000,
         };
         let reponse = '';
-        if (get().iaLocaleActivee) {
+        if (get().iaActivee && iaDisponible()) {
           set({ chargementSocial: true, erreurSocial: null });
           try {
             reponse = await messageIA(
@@ -2895,7 +2936,10 @@ export const useGame = create<GameState>()(
               propre, apres,
             );
           } catch (e) {
-            set({ erreurSocial: (e as Error).message });
+            // ⚠️ QUOTA / CLÉ / RÉSEAU : ON N'AFFICHE RIEN (demande explicite).
+            // Le fil a déjà son contenu pré-écrit ; une bannière rouge ne
+            // ferait qu'inquiéter le joueur pour une bascule invisible.
+            set({ erreurSocial: erreurSilencieuse(e) ? null : (e as Error).message });
           } finally {
             set({ chargementSocial: false });
           }
@@ -2925,7 +2969,7 @@ export const useGame = create<GameState>()(
             {
               id: idUnique(), emoji: '💬',
               titre: `@${cible.pseudo} a répondu à ton commentaire`,
-              texte: reponse, saison: joueur.saison,
+              texte: reponse, saison: joueur.saison, semaine: joueur.semaine ?? 1,
             },
             ...s.notifsSocial,
           ].slice(0, 40),
@@ -3010,7 +3054,7 @@ export const useGame = create<GameState>()(
 
         const mien: MessageDM = {
           id: idUnique(), pseudo, de: 'moi', texte: texte.trim().slice(0, 400), saison: joueur.saison,
-          creeLe: Date.now(), lu: true,
+          semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: true,
         };
         const fil = [...(conversations[pseudo] ?? []), mien];
         // CE QUE TU DIS COMPTE : le ton du message fait bouger la relation, et
@@ -3034,7 +3078,7 @@ export const useGame = create<GameState>()(
                 {
                   id: idUnique(), pseudo, de: 'lui' as const, saison: joueur.saison,
                   texte: "Merci pour ton message. Nous suivons ton dossier, mais nous ne pouvons pas te faire une offre concrète pour le moment.",
-                  creeLe: Date.now(), lu: false,
+                  semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false,
                 },
               ],
             },
@@ -3043,14 +3087,17 @@ export const useGame = create<GameState>()(
         }
 
         let reponse = '';
-        if (get().iaLocaleActivee) {
+        if (get().iaActivee && iaDisponible()) {
           set({ chargementSocial: true, erreurSocial: null });
           try {
             reponse = await messageIA(
               { joueur, modele, suivis: comptesSuivis }, compte, fil, mien.texte, apres,
             );
           } catch (e) {
-            set({ erreurSocial: (e as Error).message });
+            // ⚠️ QUOTA / CLÉ / RÉSEAU : ON N'AFFICHE RIEN (demande explicite).
+            // Le fil a déjà son contenu pré-écrit ; une bannière rouge ne
+            // ferait qu'inquiéter le joueur pour une bascule invisible.
+            set({ erreurSocial: erreurSilencieuse(e) ? null : (e as Error).message });
           } finally {
             set({ chargementSocial: false });
           }
@@ -3063,7 +3110,7 @@ export const useGame = create<GameState>()(
               ...(s.conversations[pseudo] ?? []),
               {
                 id: idUnique(), pseudo, de: 'lui' as const, texte: reponse, saison: joueur.saison,
-                creeLe: Date.now(), lu: false,
+                semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false,
               },
             ],
           },
@@ -3126,6 +3173,7 @@ export const useGame = create<GameState>()(
               titre: `Succès débloqué — ${n.nom}`,
               texte: n.desc,
               saison: joueur.saison,
+              semaine: joueur.semaine ?? 1,
             })),
             ...s.notifsSocial,
           ].slice(0, 40),
@@ -3274,6 +3322,36 @@ export const useGame = create<GameState>()(
         if (retour.note >= 8) get().signalerDefi('note8');
         if (contexte && contexte.scorePour > contexte.scoreContre) get().signalerDefi('victoire');
         get().signalerDefi('match');
+        // ⚠️ UNE BLESSURE DE FIN DE CARRIÈRE DOIT VRAIMENT L'ARRÊTER.
+        if (blessure?.gravite === 'carriere') get().raccrocherSurBlessure();
+      },
+
+      // ═══ LE CORPS A DIT NON ═════════════════════════════════════════════
+      // ⚠️ BUG CORRIGÉ. `tirerBlessure()` peut sortir une blessure de gravité
+      // `carriere` (2 % des blessures) — « les médecins sont unanimes : tu ne
+      // rejoueras plus ». Le message tombait au journal… et le jeu continuait :
+      // 99 semaines d'infirmerie, aucun match, aucun entraînement (`entrainer`
+      // refuse quand on est blessé), la générale qui s'effondre saison après
+      // saison, et rien pour en sortir. Le joueur restait donc coincé DEUX ANS
+      // devant un bouton « semaine suivante » qui ne racontait que des soins.
+      //
+      // La voie du Maître du Jeu, elle, était correcte depuis le début
+      // (`appliquerConsequence` → `finale: true` → retraite) : c'est le tirage
+      // du terrain qui n'avait jamais été branché. Il l'est ici.
+      raccrocherSurBlessure: () => {
+        const joueur = get().joueur;
+        if (!joueur || joueur.blessure?.gravite !== 'carriere') return;
+        set((s) => ({
+          journal: [...s.journal, {
+            id: idUnique(),
+            saison: joueur.saison,
+            role: 'mj' as const,
+            titre: '🛑 Carrière terminée',
+            texte: `${joueur.blessure?.nom}. Les examens sont sans appel : tu ne rejoueras plus. `
+              + `À ${joueur.age} ans, il faut raccrocher — et choisir ce que tu fais de la suite.`,
+          }],
+        }));
+        get().prendreRetraite();
       },
 
       // ---- SIMULATION DE FOND DE LA JOURNÉE ----
@@ -3446,6 +3524,7 @@ export const useGame = create<GameState>()(
               titre: 'Défi de la semaine relevé',
               texte: defi?.texte ?? '',
               saison: joueur.saison,
+              semaine: joueur.semaine ?? 1,
             },
             ...s.notifsSocial,
           ].slice(0, 40),
@@ -3468,10 +3547,68 @@ export const useGame = create<GameState>()(
         if (get().inventaire.includes(id)) set({ skinActif: id });
       },
 
+      // ---- LE VESTIAIRE ----
+      // ⚠️ PUREMENT COSMÉTIQUE. Un article d'équipement ne touche à AUCUN
+      // attribut, ni à la forme, ni au moral, ni au potentiel : c'est la règle
+      // qui a fait supprimer les boosts, et l'étalonnage de difficulté
+      // (`scripts/verifDifficulte.ts`) n'a donc pas à être relancé.
+      acheterEquipement: (id) => {
+        const { coins, equipements } = get();
+        const article = EQUIPEMENT_PAR_ID[id];
+        if (!article || equipements.includes(id) || coins < article.prix) return false;
+        set((s) => ({
+          coins: s.coins - article.prix,
+          equipements: [...s.equipements, id],
+          // On l'enfile tout de suite : personne n'achète des crampons pour les
+          // laisser dans le sac.
+          equipementActif: { ...s.equipementActif, [article.categorie]: id },
+        }));
+        return true;
+      },
+
+      // ---- PUBLICITÉ ----
+      // ⚠️ RIEN NE SE CHARGE AVANT CE CHOIX. Tant que le consentement vaut
+      // « inconnu », aucun script de régie n'est injecté et aucun emplacement
+      // n'est rendu (voir `lib/pub.ts`). Un refus est définitif et respecté :
+      // le jeu ne redemande pas à chaque écran.
+      setPubConsentement: (choix) => set({ pubConsentement: choix }),
+
+      /**
+       * ⚠️ ELLE RAPPORTE DES OVAS, ET RIEN D'AUTRE. Pas un point d'attribut,
+       * pas un point de forme : les Ovas n'achètent que du cosmétique, donc
+       * regarder des pubs ne peut pas déplacer l'étalonnage de difficulté
+       * (`scripts/verifDifficulte.ts`). C'est la condition pour que la
+       * monétisation ne « nuise pas au jeu ».
+       *
+       * ⚠️ ET ELLE VÉRIFIE LE QUOTA CÔTÉ STORE, pas seulement dans le bouton :
+       * l'appel est le seul point de crédit, il doit tenir tout seul.
+       */
+      encaisserPub: () => {
+        const etat = etatDuJour(get().pubs);
+        if (!pubDisponible(etat).possible) return 0;
+        set((s) => ({
+          coins: s.coins + OVAS_PAR_PUB,
+          pubs: { ...etat, vues: etat.vues + 1, derniere: Date.now() },
+        }));
+        return OVAS_PAR_PUB;
+      },
+
+      /** Équipe l'article, ou le retire s'il est déjà porté. */
+      basculerEquipement: (id) => {
+        const article = EQUIPEMENT_PAR_ID[id];
+        if (!article || !get().equipements.includes(id)) return;
+        set((s) => ({
+          equipementActif: {
+            ...s.equipementActif,
+            [article.categorie]: s.equipementActif[article.categorie] === id ? undefined : id,
+          },
+        }));
+      },
+
     }),
     {
       name: 'destin-ovalie',
-      version: 8,
+      version: 9,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -3499,8 +3636,13 @@ export const useGame = create<GameState>()(
           evenementHebdo?: EvenementHebdo | null;
           evenementsVus?: string[];
           iaLocaleActivee?: boolean;
+          iaActivee?: boolean;
+          equipements?: string[];
+          equipementActif?: Partial<Record<CategorieEquipement, string>>;
+          pubConsentement?: 'inconnu' | 'oui' | 'non';
+          pubs?: EtatPubs;
           modele?: string;
-          groqKey?: unknown;
+          groqKey?: string;
           rythme?: unknown;
         };
         if (!s) return s;
@@ -3570,19 +3712,9 @@ export const useGame = create<GameState>()(
         // fin de saison en régénère aussitôt — c'est mieux que de convertir des
         // cartes en négociations qui n'ont jamais eu lieu.
         s.approches ??= [];
-        // Version 6 : l'ancien service distant a été remplacé par WebLLM sur
-        // l'appareil. Une ancienne clé ne doit plus rester dans la sauvegarde.
-        // À cette étape de migration, le premier téléchargement restait
-        // volontaire ; la version 7 ci-dessous active le préchargement demandé.
-        if (version < 6) {
-          s.iaLocaleActivee = false;
-          s.modele = MODELE_DEFAUT;
-          delete s.groqKey;
-        }
-        // Version 7 : le modèle se télécharge désormais automatiquement en
-        // arrière-plan au premier lancement. Une désactivation faite ensuite
-        // reste persistée normalement.
-        if (version < 7) s.iaLocaleActivee = true;
+        // Versions 6 et 7 : l'IA a vécu un temps dans le navigateur (WebLLM),
+        // avec un modèle de 900 Mo téléchargé en arrière-plan. La version 9
+        // ci-dessous referme cette parenthèse — on ne migre donc plus rien ici.
         // Version 8 : l'ancien compteur d'identifiants repartait de zéro à
         // chaque rechargement et recréait `e1-20`, `e2-27`… déjà présents
         // dans le journal persisté. React pouvait alors masquer ou dupliquer
@@ -3594,6 +3726,24 @@ export const useGame = create<GameState>()(
             id: `m8-${index}-${entree.saison}`,
           }));
         }
+        // ⚠️ VERSION 9 — RETOUR À UNE IA DISTANTE (Groq). Le modèle embarqué
+        // est parti avec sa dépendance : `modele` désignait un fichier WebLLM
+        // (« Llama-3.2-1B-Instruct-q4f16_1-MLC ») qui n'existe plus, et le
+        // laisser en place enverrait un nom de modèle inconnu à l'API. Le
+        // réglage « IA activée », lui, est conservé tel que le joueur l'a laissé.
+        if (version < 9) {
+          s.iaActivee = s.iaLocaleActivee ?? true;
+          s.modele = MODELE_DEFAUT;
+        }
+        s.iaActivee ??= true;
+        s.groqKey ??= '';
+        delete s.iaLocaleActivee;
+        // Le vestiaire est arrivé après coup : une sauvegarde d'avant n'a ni
+        // liste d'articles ni tenue portée.
+        s.equipements ??= [];
+        s.equipementActif ??= {};
+        s.pubConsentement ??= 'inconnu';
+        s.pubs ??= ETAT_PUBS_VIDE;
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
         // réactiver une branche obsolète après fusion par Zustand.
@@ -3613,6 +3763,9 @@ export const useGame = create<GameState>()(
         appliquerTheme(etat?.theme ?? 'vert');
         // Idem pour la langue : elle vit dans un module, pas dans React.
         definirLangue(etat?.langue ?? langueDuNavigateur());
+        // Et la clé Groq personnelle, pour la même raison (`lib/groq.ts` ne
+        // peut pas lire le store sans créer un cycle d'imports).
+        definirCleGroqJoueur(etat?.groqKey ?? '');
       },
       partialize: (s) => ({
         joueur: s.joueur,
@@ -3620,6 +3773,10 @@ export const useGame = create<GameState>()(
         coins: s.coins,
         inventaire: s.inventaire,
         skinActif: s.skinActif,
+        equipements: s.equipements,
+        equipementActif: s.equipementActif,
+        pubConsentement: s.pubConsentement,
+        pubs: s.pubs,
         pantheon: s.pantheon,
         scenarioActif: s.scenarioActif,
         // La scène de la semaine est persistée : fermer l'onglet en plein
@@ -3650,8 +3807,9 @@ export const useGame = create<GameState>()(
         relationsSociales: s.relationsSociales,
         succesDebloques: s.succesDebloques,
         defis: s.defis,
-        iaLocaleActivee: s.iaLocaleActivee,
+        iaActivee: s.iaActivee,
         tenorKey: s.tenorKey,
+        groqKey: s.groqKey,
         modele: s.modele,
       }),
     },

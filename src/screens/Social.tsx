@@ -19,8 +19,8 @@
 //   • ce que tu écris en message privé change ta RELATION avec le compte — et
 //     les comptes sont débridés : insulte-les, ils répondent.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { locale, t, tn } from '../lib/i18n';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { t, tn } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { clubParNom } from '../data/clubs';
@@ -36,15 +36,19 @@ import { humeur } from '../lib/vie';
 import { SUCCES, descriptionSucces, nomSucces, texteDefi } from '../data/succes';
 import { defisDeLaSemaine, cleSemaine, progression } from '../lib/succes';
 import { chercherMedias, reduirePourAvatar, vignetteLocale, type Media as MediaTrouve } from '../lib/images';
-import { semaine, libelleSemaine } from '../data/calendrier';
+import { semaine, libelleSemaine, horodatageJeu } from '../data/calendrier';
 import { avatarInitiales } from '../lib/avatars';
+import { ecouterEtatIA, etatIA } from '../lib/groq';
 import type { CompteSuivi, Joueur, PostSocial } from '../types';
 
-function dateEtHeure(instant?: number): string | null {
-  if (!instant) return null;
-  return new Intl.DateTimeFormat(locale(), {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-  }).format(new Date(instant));
+// ⚠️ L'HEURE DU JEU, PAS CELLE DE L'ORDINATEUR (retour de jeu : « dans les
+// messages, fais que la date et l'heure soient celles du calendrier in-game »).
+// On affichait `creeLe`, l'horodatage réel : un message reçu pendant la
+// 12ᵉ journée — novembre dans le jeu — s'affichait au jour où l'on jouait.
+// `creeLe` reste écrit, mais il ne sert plus qu'à RANGER les conversations.
+function dateEtHeure(element?: { id?: string; semaine?: number; saison?: number }): string | null {
+  if (!element?.semaine) return null;
+  return horodatageJeu(element.semaine, `${element.saison ?? 1}#${element.id ?? ''}`);
 }
 
 // --- Icônes (tracés maison, dans l'esprit de l'interface d'origine) --------
@@ -958,7 +962,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
           const filConversation = conversations[c.pseudo] ?? [];
           const nonLu = filConversation.some((m) => m.de === 'lui' && !m.lu);
           const dernierMessage = filConversation.at(-1);
-          const horodatage = dateEtHeure(dernierMessage?.creeLe);
+          const horodatage = dateEtHeure(dernierMessage);
           return (
           <button
             key={c.pseudo}
@@ -995,7 +999,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
           {fil.map((m) => (
             <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}>
               <span>{m.texte}</span>
-              {dateEtHeure(m.creeLe) && <time>{dateEtHeure(m.creeLe)}</time>}
+              {dateEtHeure(m) && <time>{dateEtHeure(m)}</time>}
             </div>
           ))}
           {chargement && <div className="x-bulle lui ecrit">{t('ov.ecrit')}</div>}
@@ -1045,7 +1049,7 @@ export function Social() {
   const notifs = useGame((s) => s.notifsSocial ?? []);
   const suivis = useGame((s) => s.comptesSuivis ?? []);
   const suggestions = useGame((s) => s.suggestionsComptes ?? []);
-  const iaLocaleActivee = useGame((s) => s.iaLocaleActivee);
+  const iaActivee = useGame((s) => s.iaActivee);
   const chargement = useGame((s) => s.chargementSocial);
   const erreur = useGame((s) => s.erreurSocial);
   const marquerNotifsLues = useGame((s) => s.marquerNotifsLues);
@@ -1062,7 +1066,10 @@ export function Social() {
   const [profilVu, setProfilVu] = useState<string | null>(null);
   const [messageAvec, setMessageAvec] = useState<string | null>(null);
 
-  const avecIA = iaLocaleActivee;
+  // ⚠️ Abonnement, pas lecture ponctuelle : quand le quota Groq se libère, le
+  // fil doit repasser tout seul aux publications écrites sur mesure.
+  const etat = useSyncExternalStore(ecouterEtatIA, etatIA, etatIA);
+  const avecIA = iaActivee && etat.disponible;
 
   // LE FIL SUIT LE CALENDRIER, PAS L'HORLOGE.
   //
@@ -1278,7 +1285,7 @@ export function Social() {
                 <div>
                   <b>{n.titre}</b>
                   <p>{n.texte}</p>
-                  {dateEtHeure(n.creeLe) && <time className="x-notif-date">{dateEtHeure(n.creeLe)}</time>}
+                  {dateEtHeure(n) && <time className="x-notif-date">{dateEtHeure(n)}</time>}
                 </div>
               </div>
             ))}

@@ -39,6 +39,46 @@ export function libelleDate(s: Semaine): string {
   }).format(new Date(Date.UTC(2026, s.mois - 1, s.jour)));
 }
 
+// ---------------------------------------------------------------------------
+// L'HEURE DU JEU, PAS CELLE DE L'ORDINATEUR
+// ---------------------------------------------------------------------------
+// ⚠️ Retour de jeu : « sur X, dans les messages, fais que la date et l'heure
+// soient celles du calendrier in-game et pas la date actuelle ». C'était le
+// cas des publications (elles portent `date: libelleDate(sem)`), mais PAS des
+// messages privés ni des notifications, qui affichaient `Date.now()` : on
+// pouvait lire « 10 août 17:04 » sous un message reçu en pleine 12ᵉ journée,
+// c'est-à-dire un mois de novembre du jeu.
+//
+// L'horodatage réel (`creeLe`) est conservé : il ne sert plus qu'à RANGER les
+// conversations dans l'ordre. Ce qu'on AFFICHE vient d'ici.
+
+/** « 12 oct. » — la date de cette semaine de jeu, en court. */
+export function libelleDateCourte(s: Semaine): string {
+  return new Intl.DateTimeFormat(locale(), {
+    day: 'numeric', month: 'short', timeZone: 'UTC',
+  }).format(new Date(Date.UTC(2026, s.mois - 1, s.jour)));
+}
+
+/**
+ * « 12 oct. · 18:42 ». L'heure est TIRÉE D'UNE GRAINE (l'identifiant du
+ * message) plutôt que de l'horloge : le même message garde donc la même heure
+ * à chaque ouverture de l'écran, et deux messages de la même semaine ne
+ * s'affichent pas tous à la même minute.
+ */
+export function horodatageJeu(numeroSemaine: number, graine: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < graine.length; i += 1) {
+    h ^= graine.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const tirage = (h >>> 0) / 4294967295;
+  // On vit entre 8 h et 23 h : personne n'envoie un message de club à 4 h du matin.
+  const heure = 8 + Math.floor(tirage * 16);
+  const minute = Math.floor((tirage * 997) % 60);
+  const jour = libelleDateCourte(semaine(numeroSemaine));
+  return `${jour} · ${String(heure).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
 /** Libellé destiné à l’interface. La valeur brute reste dans le calendrier pour le moteur. */
 export function libelleSemaine(s: Semaine): string {
   if (s.libelle === 'Reprise du championnat') return t('cal.reprise');

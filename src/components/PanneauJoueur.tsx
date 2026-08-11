@@ -22,6 +22,7 @@ import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import { matchPhaseFinaleDuJoueur } from '../lib/phaseFinale';
 import { convocation, convocationU20 } from '../lib/selection';
 import { nomBlessure } from '../lib/blessures';
+import { EQUIPEMENT_PAR_ID } from '../data/boutique';
 // ⚠️ LE MATCH EN DIRECT ARRIVE AU CLIC, pas au chargement de la page. Ce
 // composant tire derrière lui tout `lib/moteur/` (le terrain, la tactique, les
 // phases arrêtées, les pools de commentaire) : il pesait dans le chunk
@@ -76,6 +77,14 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const choisirFocus = useGame((st) => st.choisirFocus);
   const dejaEntraine = joueur.entrainementSemaine === (joueur.semaine ?? 1);
   const blesse = !!joueur.blessure && joueur.blessure.semaines > 0;
+  // La tenue portée (boutique → vestiaire). Cosmétique pur.
+  const equipementActif = useGame((s) => s.equipementActif);
+  const tenue = useMemo(
+    () => Object.values(equipementActif)
+      .map((id) => (id ? EQUIPEMENT_PAR_ID[id] : undefined))
+      .filter((e): e is NonNullable<typeof e> => !!e),
+    [equipementActif],
+  );
   // LE MATCH DE LA SEMAINE : s'il y en a un, c'est LUI qu'on joue, et c'est lui
   // qui fait passer à la semaine suivante une fois la sirène tombée.
   const [matchOuvert, setMatchOuvert] = useState(false);
@@ -172,7 +181,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         </div>
       </div>
 
-      {(joueur.traits?.length || joueur.capitaine) && (
+      {(joueur.traits?.length || joueur.capitaine || tenue.length > 0) && (
         <div className="ressources" style={{ marginBottom: '0.2rem' }}>
           {joueur.capitaine && <span className="pastille pastille-capitaine">©️ {t('pj.capitaine')}</span>}
           {(joueur.traits ?? []).map((id) => {
@@ -181,6 +190,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               <span key={id} className="pastille" title={descriptionTrait(id)}>{trait.emoji} {nomTrait(id)}</span>
             ) : null;
           })}
+          {/* La tenue achetée au vestiaire. Purement décoratif — c'est tout
+              l'intérêt : elle se VOIT, et elle ne change rien au terrain. */}
+          {tenue.map((e) => (
+            <span key={e.id} className="pastille pastille-tenue" title={e.detail}>{e.emoji} {e.nom}</span>
+          ))}
         </div>
       )}
 

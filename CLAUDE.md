@@ -1,4 +1,4 @@
-﻿# CLAUDE.md — Destiny Rugby 🏉
+# CLAUDE.md — Destiny Rugby 🏉
 
 Guide d'architecture et de conventions pour travailler sur ce projet.
 **Lis-le avant toute évolution**, et **tiens-le à jour** avec le `README.md` à
@@ -7,7 +7,7 @@ chaque changement notable.
 ## Le projet en une phrase
 
 RPG de **carrière de rugby** solo : le joueur écrit ses actions en français, un
-**Maître du Jeu IA local (WebLLM)** juge le résultat et fait évoluer les statistiques.
+**Maître du Jeu servi par Groq** juge le résultat et fait évoluer les statistiques.
 Inspiré des jeux type *Destin Eleven*, décliné pour l'ovalie.
 
 ## Préférences de travail (imposées par l'utilisateur)
@@ -19,18 +19,22 @@ Inspiré des jeux type *Destin Eleven*, décliné pour l'ovalie.
   desktop **ET** mobile), pas seulement compiler.
 - **Responsive obligatoire.**
 - Tenir **`CLAUDE.md`** et **`README.md`** à jour à chaque évolution.
-- **IA locale uniquement** : aucune clé ni API d'inférence. `App.tsx` précharge
-  Llama 3.2 1B quantifié dans un Worker WebLLM en arrière-plan au premier
-  démarrage compatible. Ne jamais
-  réintroduire de clé distante ou de variable `VITE_*` pour l'IA.
-- **Téléchargement automatique mais désactivable** : environ 900 Mo au premier
-  lancement. Le choix de désactivation dans Réglages est persisté. Si WebGPU
-  manque ou échoue, chaque fonction retombe sur son contenu pré-écrit.
+- ⚠️ **L'IA PASSE PAR GROQ** (`VITE_GROQ_KEY`), plus par un modèle local.
+  Demande explicite : « reviens à une clé Groq au lieu d'un LLM local, c'est
+  plus rapide pour répondre ». WebLLM, son Worker, ses 900 Mo de téléchargement
+  et sa dépendance `@mlc-ai/web-llm` ont été **supprimés**. La clé du site est
+  visible côté client : c'est assumé, personne n'a rien à saisir.
+- ⚠️ **UN QUOTA ÉPUISÉ NE S'AFFICHE JAMAIS** (demande explicite). Le jeu bascule
+  en silence sur son contenu pré-écrit et repart sur l'IA tout seul dès qu'elle
+  se libère. Ne jamais afficher « quota exceeded », « réessaie » ou une bannière
+  d'erreur pour ce cas — voir `lib/groq.ts` et `messageErreurIA`.
+- **Le jeu reste ENTIER sans IA** : situations et scénarios pré-écrits, et un
+  barème local (`jugementLocal`) pour trancher une réponse écrite.
 
 ## Stack
 
 Vite 8 · React 19 · TypeScript · Zustand (+ persist) · Framer Motion ·
-Three.js (@react-three/fiber + @react-three/drei) · WebLLM + WebGPU.
+Three.js (@react-three/fiber + @react-three/drei) · Groq (API distante).
 
 ## Architecture
 
@@ -3320,3 +3324,255 @@ npx vite-node scripts/verifMarche.ts       # le marché à tous les étages
 npx vite-node scripts/verifTitres.ts       # le transfert n'efface plus les titres de l'ancien club
 npx vite-node scripts/verifDifficulte.ts   # ⚠️ à relancer après TOUTE retouche du marché
 ```
+
+
+## 🔌 L'IA REPASSE SUR GROQ — et le quota devient invisible
+
+Demande, mot pour mot : « reviens à une clé Groq au lieu d'un LLM local, c'est
+plus rapide pour répondre ; ensuite fais que dès qu'il y a quota exceeded ça ne
+s'affiche pas et switch sur le système sans IA, et que dès que le quota est de
+retour il revienne ».
+
+### Ce qui a disparu
+
+| | avant | maintenant |
+|---|---|---|
+| moteur | WebLLM (Llama 3.2 1B, WebGPU, Worker) | **Groq**, API distante |
+| premier lancement | **~900 Mo** téléchargés en arrière-plan | rien |
+| dépendance | `@mlc-ai/web-llm` | aucune (un `fetch`) |
+| appareils exclus | tous ceux sans WebGPU | aucun |
+| latence d'une scène | plusieurs secondes sur machine modeste | quelques centaines de ms |
+| fichiers | `lib/iaLocale.ts`, `workers/iaLocale.worker.ts` | `lib/groq.ts` + `lib/mj.ts` |
+
+`src/lib/iaLocale.ts` a été **coupé en deux** : le TRANSPORT (clé, quota, appel,
+compteurs) dans `lib/groq.ts`, les PROMPTS et surtout les **garde-fous**
+(`plafonnerDeltas`, `ressembleATriche`) dans `lib/mj.ts`. Ces derniers n'ont pas
+bougé d'une ligne : le moteur a changé, l'étalonnage de difficulté non.
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/groq.ts` | La clé (site + joueur), les **modèles en cascade**, l'appel, le quota, l'état observable, les compteurs de tokens. |
+| `src/lib/mj.ts` | Le prompt système du MJ, le parsing, `plafonnerDeltas()`, `ressembleATriche()`, `messageErreurIA()`. |
+
+### ⚠️ CE QUE LE JOUEUR NE DOIT JAMAIS VOIR
+
+**Un quota atteint n'est pas une panne.** Trois mécanismes s'enchaînent :
+
+1. **Deux modèles, dans l'ordre** (`MODELES_GROQ` : `llama-3.3-70b-versatile`
+   puis `llama-3.1-8b-instant`). Chez Groq les limites sont comptées **par
+   modèle** : quand le gros est épuisé, le petit ne l'est presque jamais. On
+   dégringole donc d'un cran avant de couper quoi que ce soit.
+2. **Le blocage est daté.** `delaiDeReprise()` lit l'en-tête `retry-after`, à
+   défaut `x-ratelimit-reset-*`, à défaut le « try again in 7m32.6s » du corps
+   d'erreur. ⚠️ `dureeEnMs()` lit **`ms` avant `m`** — sans ça, `850ms` devenait
+   850 minutes et l'IA restait coupée quatorze heures.
+3. **`iaDisponible()` est réévaluée à chaque appel**, jamais mise en cache.
+   C'est ce qui fait que « ça revient tout seul » : à la seconde où le blocage
+   expire, l'appel suivant repart sur Groq. Un réveil programmé
+   (`programmerReveil`) prévient en plus les écrans abonnés.
+
+Et côté affichage : **`messageErreurIA()` renvoie `null`** pour un quota, une
+clé refusée ou une panne réseau. `erreurSocial` est mis à `null` dans les mêmes
+cas. Il n'existe aucun chemin qui écrive « quota » à l'écran, sauf ⚙️ Réglages —
+le seul endroit où l'état a le droit d'être visible, avec la reprise estimée.
+
+### ⚠️ UNE RÉPONSE ÉCRITE OBTIENT TOUJOURS UNE ISSUE
+
+C'est le piège de la bascule silencieuse, et il bloquait la partie : si le quota
+tombe **pendant** que le joueur répond à une scène hebdomadaire, on ne peut ni
+afficher une erreur (interdit), ni laisser la scène en plan — `evenementHebdo`
+verrouille « semaine suivante ». `jugementLocal()` (`lib/ia.ts`) tranche alors
+côté code : issue déterministe (graine = scène + réponse), pondérée par la forme,
+le moral et le soin apporté à la réponse, petits deltas, `ressembleATriche`
+appliqué. ⚠️ **Ni conséquence dure, ni départ sur le marché** : mourir ou finir
+en garde à vue ne se décide pas parce que le réseau a lâché.
+
+L'action LIBRE, elle, n'a pas d'issue possible sans MJ : la barre de saisie est
+alors neutralisée avec une invite différente (`car.placeholderSansMJ`), et la
+semaine se joue aux situations à choix. Pas de message d'erreur, pas de bouton
+mort.
+
+### La clé
+
+- `VITE_GROQ_KEY` = **la clé du site**, injectée à la compilation, donc lisible
+  par n'importe quel joueur. C'est un choix assumé (décision de l'utilisateur) :
+  personne n'a rien à saisir.
+- Un joueur peut coller **la sienne** dans ⚙️ Réglages (`groqKey`, persistée) :
+  elle prend la priorité et lui rend l'IA même quand le site est à sec.
+  ⚠️ Elle vit dans un module (`definirCleGroqJoueur`), comme la langue et le
+  thème — `lib/groq.ts` ne peut pas importer le store sans créer un cycle.
+- `VITE_GROQ_MODELE` surcharge la cascade de modèles sans toucher au code.
+
+⚠️ **Sauvegarde `version: 9`** : `iaLocaleActivee` devient `iaActivee`, et
+`modele` est réinitialisé — il pointait un fichier WebLLM
+(« Llama-3.2-1B-Instruct-q4f16_1-MLC ») qui serait parti tel quel dans une
+requête Groq.
+
+Vérification sans réseau : `npx vite-node scripts/verifIA.ts`.
+
+## 🗓️ L'HEURE DU JEU DANS LES MESSAGES DE L'OVALE
+
+Retour de jeu : « sur X, dans les messages, fais que la date et l'heure soient
+celles du calendrier in-game et pas la date actuelle ».
+
+Les **publications** étaient déjà datées du calendrier (`date: libelleDate(sem)`).
+Les **messages privés** et les **notifications**, non : ils affichaient
+`creeLe`, c'est-à-dire `Date.now()`. On lisait donc « 10 août 17:04 » sous un
+message reçu en pleine 12ᵉ journée — un mois de novembre dans le jeu.
+
+- `MessageDM` et `NotifSocial` portent désormais **`semaine`** (la semaine de
+  jeu). `creeLe` reste écrit, mais il ne sert plus qu'à **RANGER** les
+  conversations dans l'ordre.
+- **`horodatageJeu(semaine, graine)`** (`data/calendrier.ts`) rend « 12 oct. ·
+  18:42 ». ⚠️ L'heure est **tirée d'une graine** (l'identifiant du message), pas
+  de l'horloge : le même message garde la même heure à chaque ouverture, et deux
+  messages de la même semaine ne s'affichent pas tous à la même minute.
+- Une vieille sauvegarde n'a pas de `semaine` : l'horodatage est alors
+  simplement omis, plutôt que d'inventer une date.
+
+## 🚑 UNE BLESSURE DE FIN DE CARRIÈRE ARRÊTE ENFIN LA CARRIÈRE
+
+Bug de gameplay, et le pire du lot : `tirerBlessure()` peut sortir une blessure
+de gravité **`carriere`** (2 % des blessures, 99 semaines). Le journal annonçait
+« les médecins sont unanimes : tu ne rejoueras plus, ta carrière s'arrête ici »…
+et le jeu continuait. Le joueur se retrouvait avec **99 semaines d'infirmerie** :
+aucun match (`matchAJouer` exclut les blessés), aucun entraînement (`entrainer`
+refuse), la générale qui s'effondre saison après saison, et rien pour en sortir
+avant deux ans de jeu.
+
+La voie du Maître du Jeu était correcte depuis le début (`appliquerConsequence`
+→ `finale: true` → retraite) ; c'est le tirage **du terrain** qui n'avait jamais
+été branché. `raccrocherSurBlessure()` (store) l'est désormais, appelé par
+`semaineSuivante` et par `enregistrerMatchVecu`, en toute fin de traitement :
+la semaine se termine normalement, puis la carrière s'arrête et le joueur entre
+au Hall.
+
+## 👕 LE VESTIAIRE — 16 articles cosmétiques, et deux modèles enfin branchés
+
+Demande : « rajoute des items dans la boutique que je modéliserai en 3D ».
+
+`data/boutique.ts` gagne `EQUIPEMENTS` : **3 crampons, 3 maillots,
+10 accessoires**, rangés par `CategorieEquipement`. Le store porte
+`equipements` (possédés) et `equipementActif` (une pièce par catégorie), et la
+tenue portée s'affiche en pastilles dans le panneau de carrière, à côté des
+traits.
+
+- ⚠️ **COSMÉTIQUE, ET RIEN D'AUTRE.** Aucun article ne touche à un attribut, à
+  la forme, au moral ni au potentiel — c'est la règle qui a fait supprimer les
+  boosts, et elle vaut ici. `scripts/verifDifficulte.ts` n'a pas à être relancé.
+- ⚠️ **CHAQUE ARTICLE DÉCLARE DÉJÀ SON `.glb`, MÊME CEUX QUI N'EXISTENT PAS.**
+  `ModeleObjet` teste la présence du fichier (HEAD) et retombe sur la pastille
+  emoji. Déposer le modèle compressé dans `public/m3d/` suffit donc à le faire
+  apparaître en 3D, **sans une ligne de code**. Fichiers attendus :
+  `casque.glb`, `protege-dents.glb`, `bandeau.glb`, `mitaines.glb`,
+  `chaussettes.glb`, `tee.glb`, `sac.glb`, `strapping.glb`,
+  `bouclier-plaquage.glb`, `cuvette.glb`.
+- `m3d/crampons.glb` et `m3d/maillot.glb` traînaient dans le dossier depuis des
+  mois **sans être branchés nulle part** : ils le sont enfin, et une `teinte`
+  par article donne trois coloris à partir d'un seul fichier.
+
+### ⚠️ DEUX PIÈGES 3D, MESURÉS EN JEU
+
+1. **LE NAVIGATEUR N'ACCORDE QU'UNE POIGNÉE DE CONTEXTES WebGL.** La boutique en
+   consommait déjà six (cinq vignettes de ballon + le grand aperçu). Une
+   vignette animée par article d'équipement, c'était vingt-deux : le navigateur
+   ferme alors les plus anciens — « THREE.WebGLRenderer: Context Lost » en
+   boucle — et **tout devient noir, ballons compris**. Monter le modèle
+   seulement au survol ne suffit pas non plus : chaque entrée/sortie de souris
+   crée et détruit un contexte, et le navigateur ne les rend pas assez vite.
+   Solution retenue : les articles sont des **pastilles**, et pointer l'un
+   d'eux change ce qu'affiche **le grand aperçu déjà existant**. Six contextes,
+   quel que soit le nombre d'articles.
+2. **`mesh.material` NE DOIT PAS DEVENIR UN TABLEAU.** Le code de teinte
+   faisait `material.map(...)`, qui rend toujours un tableau — or three.js ne
+   dessine un maillage à plusieurs matériaux qu'en suivant `geometry.groups`.
+   Les modèles n'en ont aucun → **aucun appel de rendu, aucun message
+   d'erreur**, un cadre vide alors que le modèle était chargé, cadré et éclairé.
+   Et au passage : ces modèles arrivent en `metalness: 1, roughness: 1`. Un
+   métal pur n'a pas de diffus, il ne rend que ce qu'il réfléchit — et sans
+   carte d'environnement, il n'a rien à réfléchir : **noir sur noir**. On borne
+   donc le métal à 0,25 et la rugosité à 0,45 minimum.
+
+## 📺 LA PUBLICITÉ — d'abord une liste d'interdits
+
+Demande : « mets la possibilité d'avoir des pubs sur le site ou qu'on puisse
+visionner une pub pour avoir un bonus ou un cosmétique ; fais que les pubs ne
+soient pas chiantes et ne nuisent pas au jeu ».
+
+`src/lib/pub.ts` s'ouvre sur **sept règles**, et elles ne sont pas des
+préférences — ce sont les conditions pour que la pub reste supportable :
+
+1. **Aucune pub pendant le jeu** : ni sur l'écran de Carrière, ni pendant un
+   match, ni sur 𝕏 L'Ovale (une pub sur un faux réseau social, on ne sait plus
+   ce qui est du jeu). `ECRANS_AVEC_PUB` = Boutique, Hall, Classement, Clubs.
+2. **Jamais d'interstitiel**, jamais de pop-up, jamais de vidéo lancée seule.
+3. **Jamais de `position: fixed`** : le bloc vit dans le flux, en bas de page,
+   hauteur bornée à 132 px.
+4. Une seule par écran.
+5. La pub récompensée est **toujours facultative** — rien ne se débloque
+   uniquement par elle.
+6. ⚠️ **Elle ne touche pas à la difficulté** : elle rapporte des **Ovas**, et
+   les Ovas n'achètent que du cosmétique.
+7. **Rien ne se charge sans consentement** (RGPD) : tant que le choix vaut
+   « inconnu », aucun script de régie n'est injecté.
+
+**Réglage de la récompense** : `OVAS_PAR_PUB = 8`, `PUBS_PAR_JOUR = 3`,
+15 minutes entre deux. ⚠️ L'économie d'Ovas est dure par choix (départ à 0, une
+action rapporte 1, une saison 3) : une pub à 50 Ovas viderait la boutique en une
+soirée. Ne pas remonter sans y réfléchir.
+
+**Côté régie, rien n'est câblé** : sans `VITE_PUB_CLIENT`, aucune bannière n'est
+rendue et le jeu est strictement identique à avant. La pub récompensée, elle,
+est **jouable dès maintenant** grâce à un encart maison avec compte à rebours —
+le jour où un SDK arrive, il prend la place du contenu de la modale, et le
+contrat ne change pas : `onTerminee()` seulement si la pub a été vue en entier.
+
+Les pistes de revenus, les ordres de grandeur et ce qu'il ne faut pas faire :
+**[`MONETISATION.md`](MONETISATION.md)**.
+
+### Les scripts
+
+```bash
+npx vite-node scripts/verifIA.ts           # quota lu, bascule silencieuse, retour auto, garde-fous
+npx vite-node scripts/verifTraductions.ts  # les nouvelles clés dans les 7 langues
+npx vite-node scripts/verifDifficulte.ts   # ⚠️ inchangé : rien de vendu ne touche au terrain
+```
+
+## ⚠️ LES SCRIPTS DE MESURE NE MESURENT PLUS RIEN — À RÉPARER
+
+Constaté en lançant la suite : **`verifHonneurs.ts` échoue, et `verifDifficulte.ts`
+annonce des chiffres qui n'ont plus aucun rapport avec la documentation.**
+
+| | référence documentée | ce que les scripts rendent aujourd'hui |
+|---|---|---|
+| générale médiane (100 carrières) | 58-63 | **40** |
+| maximum | 85-91 | **56** |
+| carrières ≥ 80 | 10-15/100 | **0/100** |
+| carrières décrochant une distinction | 5/60 | **0/60** |
+
+⚠️ **CE N'EST PAS UNE RÉGRESSION DU JEU — c'est la MESURE qui est cassée**, et
+c'est vérifié : le même écart existe sur le commit `2606aa9`, avant toute
+modification de ce lot.
+
+**La cause.** `scripts/_saison.ts` enchaîne des `saisonSuivante()`. Or depuis la
+suppression du mode « saison par saison » (voir plus haut), `saisonSuivante` ne
+simule **plus aucun match** : c'est `semaineSuivante` qui remplit
+`Joueur.saisonEnCours`. Une saison jouée par ces scripts se termine donc avec
+**0 match, 0 essai, aucune note** — `noterSaison` la juge en conséquence, la
+progression stagne et le potentiel se rabote d'un point par an. Mesuré sur une
+carrière sondée : générale 35 → 44 en neuf saisons, puis déclin, avec un
+potentiel de 96 jamais approché.
+
+En jeu, rien de tout ça : la carrière se joue semaine par semaine (ou par
+`avancerJusqua`, qui rejoue vraiment chaque semaine), `saisonEnCours` est
+rempli, et la progression est normale — sondé à +12 de générale en trois
+saisons.
+
+**Ce qu'il faut faire** : réécrire `jouerUneSaison` pour boucler sur
+`semaineSuivante()` (en résolvant les scènes et les approches) plutôt que
+d'appeler `saisonSuivante()` directement. ⚠️ Le coût est réel — 100 carrières
+× 14 saisons × 45 semaines, matchs simulés compris — il faudra sans doute
+réduire l'échantillon ou couper la simulation de fond
+(`simulerStatsJournee`) pendant la mesure. **Tant que ce n'est pas fait, aucun
+chiffre de `verifDifficulte.ts` ni de `verifHonneurs.ts` ne doit servir à
+retoucher l'étalonnage** : on corrigerait le jeu pour compenser un test faux.

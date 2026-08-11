@@ -286,6 +286,9 @@ export const TEXTES_ECRANS: Record<string, Traduction> = {
     pt: 'Descreve a tua ação… (ex.: «Negoceio uma renovação de contrato»)',
     ja: '行動を書いてください…（例：「契約延長を交渉する」）',
   },
+  // L'action libre a besoin du Maître du Jeu. Sans lui, la semaine se joue aux
+  // situations à choix : on le dit dans l'invite, sans jamais parler de panne.
+  'car.placeholderSansMJ': { fr: 'Cette semaine, ta vie de joueur se joue aux choix ci-dessus.', en: 'This week, your career plays out through the choices above.', es: 'Esta semana, tu carrera se juega con las opciones de arriba.', it: 'Questa settimana la tua carriera si gioca con le scelte qui sopra.', de: 'Diese Woche entscheidet sich deine Karriere über die Optionen oben.', pt: 'Esta semana, a tua carreira joga-se nas escolhas acima.', ja: '今週は上の選択肢でキャリアが進みます。' },
   'car.jouer': { fr: 'Jouer', en: 'Play', es: 'Jugar', it: 'Gioca', de: 'Spielen', pt: 'Jogar', ja: '実行' },
   'car.repondre': { fr: 'Répondre', en: 'Reply', es: 'Responder', it: 'Rispondi', de: 'Antworten', pt: 'Responder', ja: '回答' },
   'car.aToi': { fr: '✍️ À toi : qu’est-ce que tu fais ?', en: '✍️ Your turn: what do you do?', es: '✍️ Tu turno: ¿qué haces?', it: '✍️ Tocca a te: cosa fai?', de: '✍️ Du bist dran: Was tust du?', pt: '✍️ A tua vez: o que fazes?', ja: '✍️ あなたの番です：何をしますか？' },

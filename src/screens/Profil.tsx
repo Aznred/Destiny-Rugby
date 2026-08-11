@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { Jauge } from '../components/Jauge';
@@ -9,6 +9,11 @@ import { Confirmation } from '../components/Confirmation';
 import type { Joueur } from '../types';
 import { nombre, t, tn } from '../lib/i18n';
 import { titreTraduit } from '../lib/tropheesI18n';
+
+// La 3D tire Three.js derrière elle : on ne la charge qu'à l'ouverture du profil.
+const Portrait = lazy(() =>
+  import('../components/PortraitJoueur').then((m) => ({ default: m.PortraitJoueur })),
+);
 
 function moyenne(j: Joueur): number {
   const vals = Object.values(j.attributs);
@@ -37,7 +42,11 @@ export function Profil() {
       transition={{ duration: 0.4 }}
     >
       <div className="carte profil-tete">
-        <div className="grand-avatar">{poste.categorie === 'Avant' ? '🛡️' : '⚡'}</div>
+        {/* ⚠️ TON joueur, en 3D, avec la tenue que tu lui as achetée — plus un
+            emoji générique. Il retombe sur l'emoji sur machine modeste. */}
+        <Suspense fallback={<div className="grand-avatar">{poste.categorie === 'Avant' ? '🛡️' : '⚡'}</div>}>
+          <Portrait repli={poste.categorie === 'Avant' ? '🛡️' : '⚡'} />
+        </Suspense>
         <div style={{ flex: 1 }}>
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             {nomPoste(joueur.poste)} · {poste.numero} · <Drapeau nation={joueur.nation} taille={0.8} /> {nomNationTraduit(joueur.nation)}

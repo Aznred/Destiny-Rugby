@@ -6,7 +6,12 @@ import type { Group } from 'three';
 
 // Charge le ballon modélisé en 3D (public/ballon.glb), le recentre et le
 // normalise à une taille cible, puis le fait tourner.
-export function ModeleBallon({ url = '/ballon.glb' }: { url?: string }) {
+// ⚠️ `tourne` EST UN VRAI RÉGLAGE, PAS UNE OPTION DE CONFORT. Demande
+// explicite : « il faut qu'aucun asset ne tourne dans le menu ou le profil ».
+// Un ballon qui pivote dans les mains d'un joueur immobile, ce n'est pas une
+// animation, c'est un bug visuel. La boutique, elle, garde la rotation : c'est
+// là qu'on inspecte un article sous toutes ses faces.
+export function ModeleBallon({ url = '/ballon.glb', tourne = true }: { url?: string; tourne?: boolean }) {
   // 2e argument : active le décodeur Draco (le .glb est compressé, 40 Mo → 0,45 Mo)
   const { scene } = useGLTF(url, true);
   const spin = useRef<Group>(null);
@@ -27,6 +32,7 @@ export function ModeleBallon({ url = '/ballon.glb' }: { url?: string }) {
   }, [scene]);
 
   useFrame((state, delta) => {
+    if (!tourne) return;
     if (spin.current) spin.current.rotation.y += delta * 0.5;
     if (bob.current) bob.current.position.y = Math.sin(state.clock.elapsedTime * 0.9) * 0.12;
   });

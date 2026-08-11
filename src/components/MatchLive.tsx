@@ -31,6 +31,7 @@ import type { Commentaire, TypeCommentaire } from '../lib/moteur/etat';
 import { LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, AXE } from '../lib/moteur/terrain';
 import { estTitulaire } from '../lib/moteur/saison';
 import { CONSIGNE_NEUTRE, lireConsigneIA, lireConsigneLocale } from '../lib/moteur/consignes';
+import { iaDisponible } from '../lib/groq';
 import type { Pion } from '../lib/moteur/entites';
 import {
   detailNote, noterMatch, type StatsMatchJoueur,
@@ -297,7 +298,7 @@ export function MatchLive({
   onTermine?: () => void;
   joueur?: Joueur | null;
 }) {
-  const iaLocaleActivee = useGame((s) => s.iaLocaleActivee);
+  const iaActivee = useGame((s) => s.iaActivee);
   const enregistrerMatchVecu = useGame((s) => s.enregistrerMatchVecu);
   const { overlayRef, dialogRef } = useModalDialog(onFermer);
 
@@ -381,7 +382,7 @@ export function MatchLive({
     setConsigneTexte('');
     setEnvoiConsigne(true);
     appliquerConsigne(e, lireConsigneLocale(t));
-    if (iaLocaleActivee) {
+    if (iaActivee && iaDisponible()) {
       try {
         const fine = await lireConsigneIA(t,
           `${e.clubA} ${e.scoreA} – ${e.scoreB} ${e.clubB}, ${e.minute}e minute.`);

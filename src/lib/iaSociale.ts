@@ -15,7 +15,7 @@
 // (pour lui, ça passe par une offre de contrat, qui reste refusable).
 
 import type { CompteSuivi, Joueur, MessageDM, PostSocial } from '../types';
-import { appelIAJSON, type MessageIA } from './iaLocale';
+import { appelIAJSON, type MessageIA } from './groq';
 import { POSTE_PAR_ID } from '../data/rugby';
 import { nomNation } from './nations';
 import { competitionDuClub } from '../data/clubs';

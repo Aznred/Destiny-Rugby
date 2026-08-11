@@ -8,7 +8,9 @@ import { makeBallonTexture } from './ballonTexture';
 // sphère étirée sur son axe polaire (Y local) ; on couche le ballon à
 // l'horizontale (groupe externe) puis on le fait tourner autour de son grand axe
 // (groupe interne) pour voir le profil ovale et défiler le panneau au coq.
-export function BallonRugby({ skinId = 'classique' }: { skinId?: string }) {
+// 	ourne : voir ModeleBallon — aucun asset ne tourne dans le menu ni dans
+// le profil, seule la boutique anime ses articles.
+export function BallonRugby({ skinId = 'classique', tourne = true }: { skinId?: string; tourne?: boolean }) {
   const skin = SKIN_PAR_ID[skinId] ?? SKIN_PAR_ID.classique;
   const spin = useRef<Group>(null);
   const externe = useRef<Group>(null);
@@ -18,6 +20,7 @@ export function BallonRugby({ skinId = 'classique' }: { skinId?: string }) {
   useEffect(() => () => texture.dispose(), [texture]);
 
   useFrame((state, delta) => {
+    if (!tourne) return;
     if (spin.current) spin.current.rotation.y += delta * 0.6;
     if (externe.current) {
       externe.current.position.y = Math.sin(state.clock.elapsedTime * 0.9) * 0.12;
