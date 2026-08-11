@@ -115,32 +115,85 @@ const PART_LARGEUR_UTILE = 0.94;
 // La pièce maîtresse (le premier du palmarès) est encore un cran au-dessus.
 const PART_BUSTE = 0.4;
 const PART_VEDETTE = 1.12;
-// ⚠️ LE SOL EST BORNÉ. Une version intermédiaire sortait TOUTES les pièces : sur
-// un palmarès complet, douze s'alignaient au sol, la scène faisait dix-huit
-// unités de large et la caméra reculait si loin que le meuble devenait un
-// timbre-poste. Au-delà de huit, un titre d'équipe reste en vitrine — ce qui
-// remplit le meuble plutôt que de le laisser vide, et ne perd donc rien.
-const MAX_SOL = 8;
-// Espace entre le flanc du meuble et la première pièce : quasi nul, pour qu'un
-// bouclier incliné semble VRAIMENT s'appuyer sur le coin de l'armoire.
-const MARGE_FLANC = 0.05;
-// Quatre rangs par côté, chacun un peu plus écarté et un peu plus en avant.
-// ⚠️ ON S'ÉTALE EN PROFONDEUR, PAS EN LARGEUR, et c'est un calcul : un mètre de
-// profondeur coûte un mètre de recul à la caméra, un mètre de largeur en coûte
-// 1,4 sur ordinateur et 2,5 sur téléphone (le canvas y est presque carré). Une
-// file qui s'écarte franchement sur les côtés sort du champ bien avant une file
-// qui s'avance vers le spectateur.
-const DECALAGE_RANG = 0.34;
-// L'avancée d'un rang au suivant n'est PAS constante : elle suit l'emprise
-// réelle des pièces déjà posées (voir `disposerArmoire`). Ceci n'est que l'air
-// qu'on laisse entre deux pièces qui se suivent.
-const ESPACE_AVANT = 0.16;
-// ⚠️ Un bouclier posé au sol ne tient pas debout tout seul : il bascule en
-// arrière jusqu'à toucher le meuble. 0,15 rad (8,6°) se lisait comme « droit » ;
-// à 0,3 rad (17°), l'appui est évident.
-const INCLINAISON_BOUCLIER = 0.3;
-// Les pièces du sol s'ouvrent légèrement vers le spectateur.
-const OUVERTURE = 0.2;
+// ⚠️ LE SOL PREND TOUS LES TITRES, ET C'EST UN BUG CORRIGÉ.
+// `MAX_SOL` valait 8 : au-delà, un titre d'équipe « restait en vitrine ». Ça
+// semblait un repli inoffensif, c'en était un vrai — signalé en jeu : « au bout
+// d'un certain nombre de trophées différents gagnés, des trophées collectifs se
+// mettent dans l'armoire à trophées individuels ». La vitrine est aux
+// distinctions, POINT : un joueur qui gagne beaucoup ne doit pas voir la règle
+// se déliter au moment précis où son palmarès devient intéressant. Le plafond
+// est donc celui de la scène entière (`MAX_PIECES`), plus une borne du sol.
+// Ce qui était devenu possible entre-temps : les titres ne s'alignent plus en
+// deux files qui s'éloignent, ils s'éparpillent DEVANT le meuble (voir plus
+// bas) — vingt pièces y tiennent sans que la caméra ait à reculer.
+const MAX_SOL = MAX_PIECES;
+
+// --- L'ÉPARPILLEMENT ---------------------------------------------------------
+// ⚠️ Demande explicite : « j'aimerais que les trophées collectifs soient rangés
+// dans le désordre, en mode éparpillés un peu partout devant l'armoire ».
+//
+// ⚠️ LE DÉSORDRE EST CALCULÉ, PAS TIRÉ AU SORT. `Math.random()` rendrait cette
+// fonction impure : le palmarès sauterait d'une place à l'autre à chaque image,
+// et `scripts/verifArmoire.ts` ne pourrait plus rien vérifier. On part donc
+// d'une grille — qui garantit qu'aucune pièce n'en chevauche une autre — et on
+// secoue chaque case d'un décalage DÉTERMINISTE tiré de l'indice du trophée.
+// À l'œil c'est du désordre ; au test, c'est reproductible au millimètre.
+// ⚠️ LA ZONE EST SERRÉE, ET C'EST LA CAMÉRA QUI L'IMPOSE. Chaque unité de
+// largeur coûte un recul de caméra — 1,4 sur ordinateur, 2,5 sur téléphone où
+// le canvas est presque carré — et chaque unité de profondeur en coûte une.
+// Un premier réglage à 2,3 × 0,95 étalait la scène sur 8,5 unités : le meuble
+// ne faisait plus que 31 % de la hauteur du cadre sur téléphone, contre les
+// 40 % que `verifArmoire` exige pour qu'il reste lisible. On éparpille donc
+// LARGE MAIS PAS LOIN.
+const ZONE_LARGEUR = 1.75;   // × la largeur du meuble
+const ZONE_PROFONDEUR = 0.5; // × la hauteur du meuble
+// Ce qu'on laisse entre la face avant du meuble et la première rangée, en part
+// de la hauteur du meuble. Sans ça, une pièce posée contre le meuble semble
+// sortir du bois — et la moitié de son épaisseur passe DANS le meuble.
+const RECUL_MEUBLE = 0.06;
+// Secousse maximale d'une pièce dans sa case, en part de la case. Au-delà de
+// 0,5 deux voisines peuvent se toucher.
+const SECOUSSE = 0.34;
+// De combien une pièce peut pivoter sur elle-même. Un palmarès posé au sol par
+// quelqu'un de pressé n'est pas aligné au rapporteur.
+// ⚠️ ET IL Y A UN MINIMUM. Sans plancher, le tirage déterministe finit par
+// donner à deux ou trois pièces un angle de 0,01 rad : elles se lisent alors
+// comme parfaitement alignées au milieu de voisines de travers, et c'est ce
+// détail-là qui trahit une grille. On garde donc le SIGNE du tirage et on
+// n'utilise sa valeur que pour choisir entre le minimum et le maximum.
+const PIVOT_MIN = 0.14;
+const PIVOT_MAX = 0.55;
+// ⚠️ LES BOUCLIERS NE SONT PLUS PENCHÉS (demande explicite : « le bouclier russe
+// et le Brennus sont penchés alors qu'il ne faut pas »). L'inclinaison de 0,3 rad
+// venait d'une demande antérieure — « mets les boucliers plus contre l'armoire,
+// un peu penchés » — qui n'a plus de sens depuis qu'ils ne s'adossent plus à
+// rien : éparpillés devant le meuble, un bouclier incliné ne s'appuie sur RIEN
+// et retombe dans le défaut qu'on cherchait justement à corriger, celui de la
+// pièce qui tient en l'air par magie. Ils se dressent donc droits.
+const INCLINAISON_BOUCLIER = 0;
+
+/**
+ * Un « hasard » reproductible entre −1 et 1, dérivé d'un entier.
+ *
+ * ⚠️ CE N'EST PAS DU HASARD, ET IL NE FAUT PAS QUE ÇA EN SOIT. Deux appels avec
+ * la même graine donnent la même valeur, toujours : c'est ce qui permet à
+ * `disposerArmoire` de rester une fonction pure, testable sans GPU, et au
+ * palmarès de ne pas se réorganiser sous les yeux du joueur à chaque rendu.
+ * (Mélange entier façon FNV, puis normalisation.)
+ */
+function secousse(graine: number): number {
+  let h = (graine + 0x9e3779b9) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  return (h / 0xffffffff) * 2 - 1;
+}
+
+/** Un pivot reproductible, jamais nul : entre ±PIVOT_MIN et ±PIVOT_MAX. */
+function pivot(graine: number): number {
+  const s = secousse(graine);
+  return Math.sign(s || 1) * (PIVOT_MIN + Math.abs(s) * (PIVOT_MAX - PIVOT_MIN));
+}
 
 // --- LA CAMÉRA ---------------------------------------------------------------
 /** Ce qu'on laisse d'air autour de la scène une fois tout cadré. */
@@ -317,30 +370,32 @@ export function disposerArmoire(
   // ⚠️ La répartition se fait AVANT le placement : c'est ce qui permet de
   // centrer une rangée incomplète, et ce qui empêche les casiers troués.
   //
-  // LA RÈGLE, EN UNE LIGNE : une distinction personnelle va en vitrine, un titre
-  // d'équipe va au sol. Les boucliers passent devant les coupes dans la file du
-  // sol — ce sont eux qu'on adosse au meuble, donc eux qui prennent les
-  // emplacements collés aux flancs. `sort` est stable en JavaScript : à
-  // l'intérieur de chaque famille, l'ordre de prestige est conservé.
-  const collectives = modeles
-    .map((_, i) => i)
-    .filter((i) => !modeles[i].individuel)
-    .sort((a, b) => Number(modeles[b].bouclier) - Number(modeles[a].bouclier));
+  // LA RÈGLE, EN UNE LIGNE, ET ELLE NE SOUFFRE PLUS D'EXCEPTION : une
+  // distinction personnelle va en vitrine, un titre d'équipe va au sol.
+  // L'ordre de prestige est conservé (`slice` ne trie pas) : le premier du
+  // palmarès prend la place de vedette, au premier plan.
+  const collectives = modeles.map((_, i) => i).filter((i) => !modeles[i].individuel);
   const sol: number[] = collectives.slice(0, MAX_SOL);
   const auSol = new Set(sol);
 
-  // La vitrine reçoit les distinctions, PUIS le débordement du sol (les titres
-  // au-delà de `MAX_SOL`). Un palmarès sans aucune distinction laisse donc le
-  // meuble vide s'il tient au sol : c'est exactement ce qui a été demandé — les
-  // titres se voient de loin, la vitrine se remplit à mesure qu'on est élu.
+  // La vitrine ne reçoit QUE des distinctions. ⚠️ Elle ne recueille plus le
+  // débordement du sol : c'était le bug signalé (« des trophées collectifs se
+  // mettent dans l'armoire à trophées individuels »). Un palmarès sans aucune
+  // distinction laisse donc le meuble vide — c'est exactement ce qui a été
+  // demandé : les titres se voient de loin, la vitrine se remplit à mesure
+  // qu'on est élu.
+  //
+  // ⚠️ LE DÉBORDEMENT VA VERS LE BAS, JAMAIS VERS LE HAUT. Une pièce qui ne
+  // trouve pas sa place descend au sol ; rien ne remonte en vitrine. C'est la
+  // formulation qui rend le bug impossible plutôt qu'improbable — et elle
+  // garantit au passage que CHAQUE modèle reçoit une place (le composant lit
+  // `places[i].echelle` sans filet).
   const rangees: number[][] = etageres.map(() => []);
   let etage = 0;
   modeles.forEach((_, i) => {
     if (auSol.has(i)) return;
+    if (!modeles[i].individuel) { sol.push(i); return; }
     while (etage < etageres.length && rangees[etage].length >= COLONNES) etage++;
-    // Vitrine pleine : la pièce rejoint le sol malgré le plafond. Ne peut pas
-    // arriver avec MAX_PIECES (16) et six tablettes de quatre — c'est une
-    // ceinture, pas une bretelle.
     if (etage >= etageres.length) { sol.push(i); return; }
     rangees[etage].push(i);
   });
@@ -372,54 +427,72 @@ export function disposerArmoire(
     });
   });
 
-  // --- 3. Le sol ------------------------------------------------------------
-  // Une file par flanc, qui part du coin avant du meuble et s'avance vers le
-  // spectateur. Le rang 0 est collé au meuble : c'est là que s'adossent les
-  // boucliers, qui ouvrent la file.
+  // --- 3. LE SOL : éparpillé devant le meuble -------------------------------
+  // ⚠️ ON N'ALIGNE PLUS EN DEUX FILES LE LONG DES FLANCS (demande explicite :
+  // « en désordre, en mode éparpillés un peu partout devant l'armoire »). Les
+  // files donnaient deux haies bien rangées qui s'éloignaient du meuble — d'un
+  // ordre de vitrine de magasin, pas d'un palmarès posé par quelqu'un.
   //
-  // ⚠️ L'AVANCÉE SUIT L'EMPRISE RÉELLE, ELLE N'EST PAS FORFAITAIRE. Un pas fixe
-  // marchait tant que toutes les pièces se ressemblaient ; un bouclier incliné
-  // occupe en profondeur sa propre épaisseur PLUS le débord de son arête haute
-  // (`sin(θ) × hauteur`, soit près d'un demi-mètre), et il chevauchait alors la
-  // pièce suivante. On empile donc les emprises, côté par côté : aucun
-  // recouvrement possible, quelles que soient les formes du palmarès.
+  // La méthode : une GRILLE dans la zone devant le meuble — elle seule garantit
+  // qu'aucune pièce n'en chevauche une autre, quel que soit le palmarès — puis
+  // chaque pièce est SECOUÉE dans sa case, en x, en z et en rotation. Le
+  // décalage vient de `secousse(indice)`, donc il est le même à chaque rendu.
+  //
+  // ⚠️ ET LES RANGÉES SONT REMPLIES DU FOND VERS L'AVANT, la pièce maîtresse
+  // (le premier du palmarès) au premier plan et au centre : c'est elle qu'on
+  // doit voir en premier, pas celle qui a hérité de la meilleure case.
   const buste = dims.hauteur * PART_BUSTE;
-  const files: number[][] = [[], []];
-  sol.forEach((i, k) => files[k % 2].push(i));
+  if (sol.length > 0) {
+    const zoneL = dims.largeur * ZONE_LARGEUR;
+    const zoneP = dims.hauteur * ZONE_PROFONDEUR;
+    // Une grille aussi carrée que la zone : sinon les pièces s'entassent dans
+    // un sens et le vide s'installe dans l'autre.
+    const colonnes = Math.max(1, Math.round(Math.sqrt(sol.length * (zoneL / zoneP))));
+    const lignes = Math.ceil(sol.length / colonnes);
+    const caseL = zoneL / colonnes;
+    const caseP = zoneP / lignes;
 
-  files.forEach((file, c) => {
-    const cote = c === 0 ? 1 : -1;
-    // Le plan de la face avant du meuble : c'est LUI que l'arête haute d'un
-    // bouclier doit toucher, et c'est de lui que part la file.
-    let curseur = dims.profondeur / 2;
-    file.forEach((i, rang) => {
+    sol.forEach((i, k) => {
       const m = modeles[i];
-      const hauteur = buste * (i === sol[0] ? PART_VEDETTE : 1);
+      // Rang 0 = le plus proche du spectateur. On y met la vedette.
+      const ligne = Math.floor(k / colonnes);
+      const colonne = k % colonnes;
+      // Une ligne incomplète est CENTRÉE, pas tassée à gauche.
+      const surLaLigne = Math.min(colonnes, sol.length - ligne * colonnes);
+      const largeurLigne = surLaLigne * caseL;
+
+      const hauteur = buste * (k === 0 ? PART_VEDETTE : 1);
       const echelle = hauteur / (m.taille.y || 1);
-      const largeur = m.taille.x * echelle;
       const epaisseur = m.taille.z * echelle;
       const angle = m.bouclier ? INCLINAISON_BOUCLIER : 0;
 
-      // Ce que la pièce occupe en profondeur, de part et d'autre de sa base.
-      const versLArriere = Math.sin(angle) * hauteur + (epaisseur * Math.cos(angle)) / 2;
-      const versLAvant = (epaisseur * Math.cos(angle)) / 2;
+      const x = -largeurLigne / 2 + caseL * (colonne + 0.5)
+        + secousse(i * 2 + 1) * caseL * SECOUSSE;
+      // ⚠️ `epaisseur / 2` EST OBLIGATOIRE : la position est le CENTRE de la
+      // pièce, pas son arête arrière. Sans lui, la rangée du fond s'enfonçait
+      // de sa demi-épaisseur dans le meuble — ce que `verifArmoire` attrape
+      // sous « pièces encastrées dans le meuble ».
+      const z = dims.profondeur / 2 + dims.hauteur * RECUL_MEUBLE + epaisseur / 2
+        + caseP * (lignes - 1 - ligne)
+        + secousse(i * 2 + 2) * caseP * SECOUSSE;
 
       places[i] = {
         position: [
-          cote * (dims.largeur / 2 + MARGE_FLANC + rang * DECALAGE_RANG + largeur / 2),
+          x,
           // Une pièce inclinée pivote sur sa base : sans ce rattrapage, son
-          // arête arrière passe sous le sol.
+          // arête arrière passe sous le sol. (Nul tant que l'angle l'est.)
           (Math.sin(angle) * epaisseur) / 2,
-          curseur + versLArriere,
+          z,
         ],
-        // Négatif = le haut part vers le fond, donc vers le meuble.
-        rotation: [-angle, -cote * OUVERTURE, 0],
+        // ⚠️ LA ROTATION Y EST LE CŒUR DE L'EFFET. Sans elle, des pièces
+        // décalées mais toutes face au spectateur se lisent encore comme une
+        // grille. Avec, on voit un palmarès posé, pas un présentoir.
+        rotation: [-angle, pivot(i * 2 + 3), 0],
         echelle,
         dehors: true,
       };
-      curseur += versLArriere + versLAvant + ESPACE_AVANT;
     });
-  });
+  }
 
   return places;
 }

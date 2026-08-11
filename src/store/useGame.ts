@@ -475,6 +475,15 @@ interface GameState {
   equipementActif: Partial<Record<CategorieEquipement, string>>;
   /** Consentement publicitaire — rien ne se charge tant que c'est 'inconnu'. */
   pubConsentement: 'inconnu' | 'oui' | 'non';
+  /**
+   * LE TUTORIEL A-T-IL DÉJÀ ÉTÉ VU ?
+   *
+   * ⚠️ Demande explicite : « fais un tuto pour les nouveaux joueurs pour
+   * baisser le bounce rate ». Il ne s'ouvre donc QU'UNE FOIS, et seulement pour
+   * quelqu'un qui n'a pas encore de carrière : un tutoriel qui revient à chaque
+   * visite est exactement ce qui fait fuir. Persisté avec le reste.
+   */
+  tutoVu: boolean;
   /** Compteur des pubs récompensées (quota journalier et délai d'attente). */
   pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
@@ -649,6 +658,7 @@ interface GameState {
   debloquerParPub: (id: string) => boolean;
   basculerEquipement: (id: string) => void;
   setPubConsentement: (choix: 'oui' | 'non') => void;
+  setTutoVu: (vu: boolean) => void;
   /** Crédite la récompense d'une pub REGARDÉE JUSQU'AU BOUT. */
   encaisserPub: () => number;
   // ⚠️ `acheterBoost` a été supprimé : la boutique ne vend plus de bonus
@@ -667,6 +677,7 @@ export const useGame = create<GameState>()(
       equipements: [],
       equipementActif: {},
       pubConsentement: 'inconnu',
+      tutoVu: false,
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
       scenarioActif: null,
@@ -3454,7 +3465,7 @@ export const useGame = create<GameState>()(
         // Elles n'existaient pas : le joueur était le seul de la compétition à
         // avoir des chiffres après un match de coupe ou de sélection.
           if (sem.type === 'coupe' && !estAmateur(division)) {
-          const coupes = coupesDuClub(joueur.club);
+          const coupes = coupesDuClub(joueur.club, joueur.saison);
           if (!coupes.length) return;
           const journee = passeesDuType(joueur.semaine ?? 1, 'coupe') + 1;
           const cleC = `${coupes[0]}#${joueur.saison}`;
@@ -3675,6 +3686,7 @@ export const useGame = create<GameState>()(
       // n'est rendu (voir `lib/pub.ts`). Un refus est définitif et respecté :
       // le jeu ne redemande pas à chaque écran.
       setPubConsentement: (choix) => set({ pubConsentement: choix }),
+      setTutoVu: (vu) => set({ tutoVu: vu }),
 
       /**
        * ⚠️ ELLE RAPPORTE DES OVAS, ET RIEN D'AUTRE. Pas un point d'attribut,
@@ -3711,7 +3723,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 10,
+      version: 11,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -3742,6 +3754,7 @@ export const useGame = create<GameState>()(
           iaActivee?: boolean;
           equipements?: string[];
           equipementActif?: Partial<Record<CategorieEquipement, string>>;
+          tutoVu?: boolean;
           pubConsentement?: 'inconnu' | 'oui' | 'non';
           pubs?: EtatPubs;
           modele?: string;
@@ -3861,7 +3874,20 @@ export const useGame = create<GameState>()(
           Object.entries(s.equipementActif)
             .filter(([, id]) => id && !EQUIPEMENTS_RETIRES.includes(id)),
         ) as Partial<Record<CategorieEquipement, string>>;
+        // ⚠️ VERSION 11 — LE SAC ET LE BOUCLIER ONT QUITTÉ « ACCESSOIRE ».
+        // Ils ont chacun leur catégorie pour pouvoir être posés TOUS LES DEUX
+        // au sol (`data/boutique.ts`). Une sauvegarde d'avant range l'un des
+        // deux sous `accessoire` : sans cette reprise, l'objet resterait
+        // « acheté mais jamais affiché », et la boutique montrerait un
+        // emplacement vide alors que le joueur a payé.
+        {
+          const actif = s.equipementActif as Record<string, string | undefined>;
+          const ancien = actif.accessoire;
+          if (ancien === 'sac' || ancien === 'bouclier') actif[ancien] = ancien;
+          delete actif.accessoire;
+        }
         s.pubConsentement ??= 'inconnu';
+        s.tutoVu ??= false;
         s.pubs ??= ETAT_PUBS_VIDE;
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
@@ -3895,6 +3921,7 @@ export const useGame = create<GameState>()(
         equipements: s.equipements,
         equipementActif: s.equipementActif,
         pubConsentement: s.pubConsentement,
+        tutoVu: s.tutoVu,
         pubs: s.pubs,
         pantheon: s.pantheon,
         scenarioActif: s.scenarioActif,
@@ -4072,13 +4099,13 @@ function resoudreTrophees(
   // liste des engagés de `COUPES_EUROPE`), pas celles que son classement lui
   // « donnerait ». C'est déjà ce que montrent l'écran Résultats et le classement
   // latéral : le trophée doit sortir de la même source qu'eux.
-  for (const coupeId of coupesDuClub(j.club)) {
+  for (const coupeId of coupesDuClub(j.club, saisonEcoulee)) {
     const tropheeCoupe = TROPHEE_PAR_COUPE[coupeId];
     if (!tropheeCoupe) continue;
     const etat = coupeEnDirect(coupeId, saisonEcoulee, j.club, WEEKENDS_COUPE);
     if (etat?.vainqueur === j.club) trophees.push(tropheeCoupe);
   }
-  const enChampionsCup = coupesDuClub(j.club).includes('championsCup');
+  const enChampionsCup = coupesDuClub(j.club, saisonEcoulee).includes('championsCup');
 
   // ---- SÉLECTION NATIONALE : le VRAI vainqueur, là aussi ----
   //
@@ -4394,7 +4421,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       // la même source que l'écran Résultats, le classement latéral et le
       // palmarès de fin de saison — trois vérités différentes sur « mon club
       // joue-t-il l'Europe ? », c'est le bug du titre fantôme en puissance.
-      if (coupesDuClub(j.club).length === 0) {
+      if (coupesDuClub(j.club, j.saison).length === 0) {
         return {
           emoji: '🛌', titre: semaineJouee.libelle,
           texte: 'Week-end sans match : ton club ne dispute pas la coupe d’Europe. Semaine d’entraînement et de récupération.',

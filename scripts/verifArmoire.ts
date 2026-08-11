@@ -339,9 +339,14 @@ console.log('\n=== 5. LES TITRES AU SOL, À HAUTEUR DE BUSTE, ADOSSÉS AU MEUBLE
   if (iBrennus >= 0) {
     const p = places[iBrennus];
     const h = affiches[iBrennus].taille.y * p.echelle;
-    const aCote = Math.abs(p.position[0]) > dims.largeur / 2;
-    ligne('le Bouclier de Brennus est à côté du meuble',
-      `x = ${p.position[0].toFixed(2)} (flanc à ${(dims.largeur / 2).toFixed(2)})`, p.dehors && aCote);
+    // ⚠️ « À CÔTÉ » EST DEVENU « DEVANT ». Les titres ne s'alignent plus le long
+    // des flancs mais s'éparpillent devant le meuble (demande explicite) : le
+    // critère n'est donc plus le x mais le z — la pièce est-elle en avant de la
+    // face avant ?
+    const devant = p.position[2] > dims.profondeur / 2;
+    ligne('le Bouclier de Brennus est posé devant le meuble',
+      `z = ${p.position[2].toFixed(2)} (face avant à ${(dims.profondeur / 2).toFixed(2)})`,
+      p.dehors && devant);
     ligne('… et il fait la taille d’un buste',
       `${h.toFixed(2)} pour un meuble de ${dims.hauteur} (${((h / dims.hauteur) * 100).toFixed(0)} %)`,
       h / dims.hauteur >= 0.3 && h / dims.hauteur <= 0.5);
@@ -361,57 +366,39 @@ console.log('\n=== 5. LES TITRES AU SOL, À HAUTEUR DE BUSTE, ADOSSÉS AU MEUBLE
     `${Math.min(...hauteursSol).toFixed(2)} contre ${hautVitrine.toFixed(2)} en rayon`,
     Math.min(...hauteursSol) > hautVitrine * 2);
 
-  // ⚠️ LE REPROCHE EXACT : « là ils tiennent droit comme par magie ». Un
-  // bouclier incliné ne suffit pas — il faut qu'il TOUCHE quelque chose. On
-  // calcule donc où tombe son arête haute, et on exige qu'elle atteigne le plan
-  // de la face avant du meuble (rang 0) ou la pièce précédente de sa file.
+  // ⚠️ LA DEMANDE S'EST INVERSÉE, ET LE TEST AVEC ELLE. Il exigeait que les
+  // boucliers PENCHENT (« mets-les plus contre l'armoire, un peu penchés ») ;
+  // l'utilisateur demande maintenant l'inverse : « le bouclier russe et le
+  // Brennus sont penchés alors qu'il ne faut pas ». Ils ne s'adossent plus à
+  // rien depuis qu'ils sont éparpillés devant le meuble — un bouclier incliné
+  // n'y tiendrait que par magie, précisément le défaut d'origine.
   const bouclierSol = affiches
     .map((m, i) => ({ m, i, p: places[i] }))
     .filter(({ i, p }) => p.dehors && mods[i].bouclier);
-  const boucliers = mods.filter((m) => m.bouclier).length;
-  const inclines = bouclierSol.filter(({ p }) => p.rotation[0] <= -0.25).length;
-  ligne('les boucliers penchent franchement (≥ 14°)',
-    `${inclines}/${bouclierSol.length} au sol · ${boucliers} boucliers au total`,
-    inclines === bouclierSol.length && bouclierSol.length > 0);
+  const penches = bouclierSol.filter(({ p }) => Math.abs(p.rotation[0]) > 1e-6);
+  ligne('les boucliers se dressent DROITS',
+    penches.length ? penches.map((b) => b.m.tr.id).join(', ') : `${bouclierSol.length}/${bouclierSol.length} d’aplomb`,
+    penches.length === 0);
 
-  // ⚠️ ET SURTOUT : SUR QUOI S'APPUIE-T-IL ? Le point le plus en arrière d'une
-  // pièce basculée de θ est son arête HAUTE et ARRIÈRE :
-  //     z − sin(θ) × hauteur − cos(θ) × épaisseur / 2
-  // (le sommet part vers le fond, moins la demi-épaisseur). Ce point doit
-  // tomber soit sur la face avant du meuble, soit sur la pièce posée derrière.
-  const emprise = affiches
-    .map((m, i) => ({ m, p: places[i], bouclier: mods[i].bouclier }))
-    .filter(({ p }) => p.dehors)
-    .map(({ m, p, bouclier }) => {
-      const angle = -p.rotation[0];
-      const h = m.taille.y * p.echelle;
-      const e = m.taille.z * p.echelle;
-      return {
-        id: m.tr.id, bouclier, cote: Math.sign(p.position[0]),
-        arriere: p.position[2] - Math.sin(angle) * h - (Math.cos(angle) * e) / 2,
-        avant: p.position[2] + (Math.cos(angle) * e) / 2,
-      };
-    });
+  // ⚠️ ET LE DÉSORDRE EST-IL RÉEL ? Un éparpillement qui retomberait sur une
+  // grille parfaite ne serait qu'un alignement déguisé. On exige donc que les
+  // pièces du sol ne partagent ni la même profondeur, ni la même orientation.
+  const auSolPlaces = affiches.map((_, i) => places[i]).filter((p) => p.dehors);
+  const zDistincts = new Set(auSolPlaces.map((p) => p.position[2].toFixed(3))).size;
+  ligne('les titres ne sont pas alignés en profondeur',
+    `${zDistincts} profondeur(s) distincte(s) pour ${auSolPlaces.length} pièce(s)`,
+    zDistincts === auSolPlaces.length);
+  const pivots = auSolPlaces.filter((p) => Math.abs(p.rotation[1]) > 0.02).length;
+  ligne('… et chacun a sa propre orientation',
+    `${pivots}/${auSolPlaces.length} pivoté(s)`,
+    pivots === auSolPlaces.length);
 
-  const sansAppui = emprise.filter((b) => {
-    if (!b.bouclier) return false;
-    // Le meuble lui-même ?
-    if (Math.abs(b.arriere - dims.profondeur / 2) < 1e-6) return false;
-    // Sinon, une pièce de sa file, juste derrière.
-    return !emprise.some((autre) => autre !== b && autre.cote === b.cote
-      && b.arriere - autre.avant >= -1e-6 && b.arriere - autre.avant < 0.2);
-  });
-  ligne('aucun bouclier ne s’appuie sur le vide',
-    sansAppui.length ? sansAppui.map((b) => b.id).join(', ') : `${emprise.filter((b) => b.bouclier).length}/${emprise.filter((b) => b.bouclier).length} adossés`,
-    sansAppui.length === 0);
-
-  // Et le premier de chaque file touche le meuble AU CONTACT, pas « à peu près ».
-  const premiers = [1, -1].map((c) => emprise.filter((b) => b.cote === c)[0]).filter(Boolean);
-  const colles = premiers.filter((b) => Math.abs(b.arriere - dims.profondeur / 2) < 1e-6);
-  ligne('la tête de chaque file touche le meuble',
-    premiers.map((b) => `${b.id} à ${b.arriere.toFixed(3)}`).join(' · ')
-    + ` (face avant à ${(dims.profondeur / 2).toFixed(3)})`,
-    colles.length === premiers.length && premiers.length === 2);
+  // Le désordre reste REPRODUCTIBLE : deux appels identiques, deux dispositions
+  // identiques. Sans ça, le palmarès sauterait à chaque image.
+  const bis = disposerArmoire(mods, dims, etageres);
+  const identique = places.every((p, i) => p.position.every((v, k) => v === bis[i].position[k])
+    && p.rotation.every((v, k) => v === bis[i].rotation[k]));
+  ligne('… mais le désordre est déterministe', identique ? 'deux appels, même disposition' : 'ÇA BOUGE', identique);
 }
 
 console.log('\n=== 6. AUCUN CHEVAUCHEMENT ===');
@@ -455,7 +442,16 @@ console.log('\n=== 6. AUCUN CHEVAUCHEMENT ===');
   ligne('sol : emprises qui se recouvrent', chocsSol.length ? chocsSol.join(', ') : 'aucune', chocsSol.length === 0);
 
   // Et aucune pièce du sol ne rentre dans le meuble.
-  const dansLeMeuble = auSol.filter((a) => Math.min(Math.abs(a.x0), Math.abs(a.x1)) < dims.largeur / 2 - 1e-6);
+  // ⚠️ LE TEST EST DEVENU BIDIMENSIONNEL, et il le fallait. Il n'examinait que
+  // le x — « la pièce dépasse-t-elle le flanc ? » — ce qui allait tant que les
+  // titres s'alignaient LE LONG des flancs. Depuis qu'ils s'éparpillent DEVANT
+  // le meuble, ils sont normalement dans sa largeur : ce qui compte, c'est
+  // qu'ils soient en avant de sa face. Une pièce n'est encastrée que si elle
+  // chevauche l'emprise du meuble en x ET en z.
+  const dansLeMeuble = auSol.filter((a) => (
+    a.x0 < dims.largeur / 2 - 1e-6 && a.x1 > -dims.largeur / 2 + 1e-6
+    && a.z0 < dims.profondeur / 2 - 1e-6 && a.z1 > -dims.profondeur / 2 + 1e-6
+  ));
   ligne('sol : pièces encastrées dans le meuble', dansLeMeuble.length ? dansLeMeuble.map((a) => a.id).join(', ') : 'aucune', dansLeMeuble.length === 0);
 }
 
@@ -515,14 +511,18 @@ console.log('\n=== 7. TOUT TIENT DANS LE CHAMP ===');
 
 console.log('\n=== 8. LES CAS LIMITES ===');
 {
-  // Que des boucliers : huit s'adossent au meuble, les autres restent en
-  // vitrine — c'est la borne qui empêche la scène de s'étaler sur vingt unités.
+  // ⚠️ SEIZE BOUCLIERS : TOUS AU SOL, PAS UN EN VITRINE. C'est LE bug signalé
+  // (« au bout d'un certain nombre de trophées différents gagnés, des trophées
+  // collectifs se mettent dans l'armoire à trophées individuels ») : l'ancienne
+  // borne `MAX_SOL = 8` renvoyait le surplus en vitrine. La vitrine est aux
+  // distinctions, sans exception — et la scène reste bornée parce que les
+  // titres s'éparpillent devant le meuble au lieu de s'éloigner en file.
   const bouclier: Modele = { taille: { x: 1.4, y: 1.9, z: 0.17 }, individuel: false, bouclier: true };
   const tous = disposerArmoire(Array.from({ length: MAX_PIECES }, () => bouclier), dims, etageres);
   const loin = tous.reduce((a, p) => Math.max(a, Math.abs(p.position[0])), 0);
-  ligne('seize boucliers : le sol reste borné',
+  ligne('seize titres : AUCUN ne monte en vitrine',
     `${tous.filter((p) => p.dehors).length} au sol, ${tous.filter((p) => !p.dehors).length} en vitrine, le plus loin à x = ${loin.toFixed(2)}`,
-    tous.filter((p) => p.dehors).length === 8 && loin < dims.largeur * 1.6);
+    tous.every((p) => p.dehors) && loin < dims.largeur * 1.6);
 
   // Rien du tout : la fonction ne doit pas exploser.
   ligne('palmarès vide', `${disposerArmoire([], dims, etageres).length} place(s)`, disposerArmoire([], dims, etageres).length === 0);

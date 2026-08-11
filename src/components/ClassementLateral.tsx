@@ -97,7 +97,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
 
     // ---- SEMAINE DE COUPE D'EUROPE : la poule de MON club ----
     if (!amateur && sem.type === 'coupe') {
-      const mienne = coupesDuClub(joueur.club)[0];
+      const mienne = coupesDuClub(joueur.club, joueur.saison)[0];
       if (mienne) {
         const etat = coupeEnDirect(mienne, joueur.saison, joueur.club, passees(numero, 'coupe'));
         const poule = etat?.poules.find((p) => p.clubs.includes(joueur.club));

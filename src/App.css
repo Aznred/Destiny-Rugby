@@ -661,6 +661,36 @@
   color: var(--brume); opacity: 0.75;
 }
 .carte-pub { cursor: default; }
+/* ====== TUTORIEL D'ACCUEIL ====== */
+.modale-tuto {
+  position: relative; max-width: 480px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+}
+.modale-tuto h2 { margin: 0.1rem 0 0; font-size: 1.35rem; line-height: 1.15; }
+.tuto-emoji { font-size: 2.6rem; line-height: 1; margin-top: 0.4rem; }
+.tuto-texte { color: var(--craie-dim); line-height: 1.55; max-width: 40ch; margin: 0.2rem 0 0.4rem; }
+.tuto-fermer {
+  position: absolute; top: 0.55rem; right: 0.7rem;
+  background: none; border: 0; color: var(--brume); font-size: 1rem;
+  line-height: 1; padding: 0.3rem; cursor: pointer;
+}
+.tuto-fermer:hover { color: var(--craie); }
+/* ⚠️ LES POINTS SONT LÀ POUR DIRE « C'EST COURT ». Sans eux, on ne sait pas si
+   on s'engage dans cinq écrans ou dans vingt — et dans le doute, on ferme. */
+.tuto-points { display: flex; gap: 0.35rem; margin: 0.2rem 0 0.6rem; }
+.tuto-points span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18); transition: background 0.2s ease, transform 0.2s ease;
+}
+.tuto-points span.fait { background: var(--or-500); }
+.tuto-points span.actif { background: var(--or-400); transform: scale(1.35); }
+.tuto-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+@media (max-width: 560px) {
+  .modale-tuto { max-width: 94vw; }
+  .tuto-actions { width: 100%; }
+  .tuto-actions .btn { flex: 1 1 auto; }
+}
+
 .modale-pub { max-width: 460px; text-align: center; }
 .modale-pub .rangee-fin { justify-content: center; }
 /* Le bloc d'annonce dans la modale récompensée : hauteur BORNÉE, sinon une

@@ -130,8 +130,14 @@ export const SKIN_PAR_ID: Record<string, SkinBallon> = Object.fromEntries(
 // ⚠️ PLUS DE CATÉGORIE « CHAUSSETTES » (demande explicite : « supprime le
 // protège-dents, mitaines, tee et chaussettes de la boutique »). Les trois
 // paires vendues n'étaient d'ailleurs accrochées nulle part sur le rugbyman 3D.
+// ⚠️ LE SAC ET LE BOUCLIER ONT CHACUN LEUR CATÉGORIE, et c'est la correction
+// d'un vrai reproche : « on ne peut pas mettre le sac de sport au lieu du
+// bouclier, ou les deux ». Rangés tous les deux dans « accessoire », le store
+// n'en gardait qu'UN actif — choisir le sac retirait le bouclier. Or ce ne sont
+// pas des pièces portées qui se disputent une place sur le corps : ce sont deux
+// objets POSÉS AU SOL à côté du joueur, et rien n'empêche d'en poser deux.
 export type CategorieEquipement =
-  | 'crampons' | 'maillot' | 'casque' | 'accessoire';
+  | 'crampons' | 'maillot' | 'casque' | 'bouclier' | 'sac';
 
 export interface ArticleEquipement {
   id: string;
@@ -176,12 +182,17 @@ export const EQUIPEMENTS: ArticleEquipement[] = [
   // de modèles, `scripts/copierTrophees.cjs`). Une `teinte` repeindrait le motif.
   { id: 'crampons-dupont', nom: 'Crampons signature', categorie: 'crampons', emoji: '✒️', glb: '/m3d/crampons-dupont.glb', prix: 300, detail: 'La paire d’un demi de mêlée international, signée sur le talon.' },
   { id: 'crampons-graffiti', nom: 'Crampons graffiti', categorie: 'crampons', emoji: '🎨', glb: '/m3d/crampons-graffiti.glb', prix: 0, parPub: true, detail: 'Peints à la bombe, un soir de tournoi à sept.' },
+  { id: 'crampons-bleus', nom: 'Crampons bleu électrique', categorie: 'crampons', emoji: '🔵', glb: '/m3d/crampons-bleus.glb', prix: 110, detail: 'Le bleu qu’on voit courir depuis la buvette.' },
+  { id: 'crampons-roses', nom: 'Crampons roses', categorie: 'crampons', emoji: '🩷', glb: '/m3d/crampons-roses.glb', prix: 120, detail: 'Assortis au casque, ou pas du tout. C’est toi qui vois.' },
   // --- Maillots (modèle livré : m3d/maillot.glb) --------------------------
   { id: 'maillot-bleu', nom: 'Maillot bleu nuit', categorie: 'maillot', emoji: '👕', glb: '/m3d/maillot.glb', teinte: '#15317e', prix: 80, detail: 'La coupe classique, col lacé.' },
   { id: 'maillot-blanc', nom: 'Maillot extérieur', categorie: 'maillot', emoji: '🤍', glb: '/m3d/maillot.glb', teinte: '#eef1f6', prix: 130, detail: 'Blanc cassé, liseré discret.' },
   { id: 'maillot-legende', nom: 'Maillot des légendes', categorie: 'maillot', emoji: '🐐', glb: '/m3d/maillot.glb', teinte: '#f4cd63', prix: 420, detail: 'Le numéro brodé fil d’or.' },
   // --- Maillots de club et de sélection (second lot, un .glb par maillot) ---
   { id: 'maillot-toulousain', nom: 'Stade Toulousain', categorie: 'maillot', emoji: '🔴', glb: '/m3d/maillot-toulousain.glb', prix: 260, detail: 'Rouge et noir, le maillot le plus titré de France.' },
+  { id: 'maillot-rochelais', nom: 'Stade Rochelais', categorie: 'maillot', emoji: '🟡', glb: '/m3d/maillot-rochelais.glb', prix: 250, detail: 'Jaune et noir, et Marcel-Deflandre qui gronde.' },
+  { id: 'maillot-ubb', nom: 'Union Bordeaux-Bègles', categorie: 'maillot', emoji: '⚜️', glb: '/m3d/maillot-ubb.glb', prix: 240, detail: 'Bordeaux et blanc, le maillot de Chaban.' },
+  { id: 'maillot-pau', nom: 'Section Paloise', categorie: 'maillot', emoji: '🟢', glb: '/m3d/maillot-pau.glb', prix: 190, detail: 'Vert et blanc, au pied des Pyrénées.' },
   { id: 'maillot-stade-francais', nom: 'Stade Français', categorie: 'maillot', emoji: '💗', glb: '/m3d/maillot-stade-francais.glb', prix: 240, detail: 'Le rose de Paris, celui qu’on reconnaît de la dernière tribune.' },
   { id: 'maillot-lyon', nom: 'LOU Rugby', categorie: 'maillot', emoji: '🔵', glb: '/m3d/maillot-lyon.glb', prix: 200, detail: 'Rouge et bleu, sur les bords du Rhône.' },
   { id: 'maillot-bayonnais', nom: 'Aviron Bayonnais', categorie: 'maillot', emoji: '⚓', glb: '/m3d/maillot-bayonnais.glb', prix: 200, detail: 'Ciel et blanc, et Jean Dauger derrière.' },
@@ -197,12 +208,17 @@ export const EQUIPEMENTS: ArticleEquipement[] = [
   { id: 'casque-australie', nom: 'Casque Wallabies', categorie: 'casque', emoji: '🇦🇺', glb: '/m3d/casque-australie.glb', prix: 210, detail: 'Or et vert, ramené d’une tournée dans l’hémisphère sud.' },
   { id: 'casque-tribal', nom: 'Casque tribal', categorie: 'casque', emoji: '🗿', glb: '/m3d/casque-tribal.glb', prix: 230, detail: 'Motifs gravés, comme un tatouage du Pacifique.' },
   { id: 'casque-rose', nom: 'Casque rose fluo', categorie: 'casque', emoji: '🩷', glb: '/m3d/casque-rose.glb', prix: 0, parPub: true, detail: 'On te repère depuis le parking. C’est le but.' },
-  // --- Accessoires ---------------------------------------------------------
+  // --- Le décor du terrain -------------------------------------------------
   // ⚠️ RETIRÉS À LA DEMANDE : protège-dents, mitaines, tee de buteur et les
   // trois paires de chaussettes. Leurs `.glb` restent dans `public/m3d/` — il
   // suffirait de remettre une ligne ici pour les revendre.
-  { id: 'sac', nom: 'Sac de match brodé', categorie: 'accessoire', emoji: '🎒', glb: '/m3d/sac.glb', teinte: '#2a3a30', prix: 90, detail: 'Ton nom cousu sur le rabat.' },
-  { id: 'bouclier', nom: 'Bouclier de plaquage', categorie: 'accessoire', emoji: '🛡️', glb: '/m3d/bouclier-plaquage.glb', teinte: '#1d5c9c', prix: 70, detail: 'Le pare-chocs mousse des séances du mardi.' },
+  //
+  // ⚠️ CES DEUX-LÀ NE SE PORTENT PAS, ILS SE POSENT. Ils apparaissent AU SOL à
+  // côté du rugbyman de l'accueil (`Hero3D`), et seulement si on les possède ET
+  // qu'on les a équipés. D'où deux catégories distinctes : on peut afficher le
+  // sac, le bouclier, les deux, ou rien.
+  { id: 'sac', nom: 'Sac de match brodé', categorie: 'sac', emoji: '🎒', glb: '/m3d/sac.glb', teinte: '#2a3a30', prix: 90, detail: 'Posé à tes pieds sur l’accueil. Ton nom cousu sur le rabat.' },
+  { id: 'bouclier', nom: 'Bouclier de plaquage', categorie: 'bouclier', emoji: '🛡️', glb: '/m3d/bouclier-plaquage.glb', teinte: '#1d5c9c', prix: 70, detail: 'Posé à tes pieds sur l’accueil. Le pare-chocs mousse des séances du mardi.' },
 ];
 
 /**
@@ -223,7 +239,8 @@ export const CATEGORIES_EQUIPEMENT: { id: CategorieEquipement; cle: string; emoj
   { id: 'maillot', cle: 'bo.catMaillot', emoji: '👕' },
   { id: 'crampons', cle: 'bo.catCrampons', emoji: '👟' },
   { id: 'casque', cle: 'bo.catCasque', emoji: '🪖' },
-  { id: 'accessoire', cle: 'bo.catAccessoire', emoji: '🎒' },
+  { id: 'bouclier', cle: 'bo.catDecor', emoji: '🛡️' },
+  { id: 'sac', cle: 'bo.catSac', emoji: '🎒' },
 ];
 
 // ⚠️ LES BOOSTS ONT ÉTÉ SUPPRIMÉS (demande explicite).

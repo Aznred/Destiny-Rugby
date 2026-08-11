@@ -112,7 +112,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
 
   const coupe = useMemo(() => {
     if (semaineActuelle.type !== 'coupe') return null;
-    const id = coupesDuClub(joueur.club)[0];
+    const id = coupesDuClub(joueur.club, joueur.saison)[0];
     if (!id) return null;
     const date = CALENDRIER.slice(0, joueur.semaine ?? 1).filter((s) => s.type === 'coupe').length;
     const etat = coupeEnDirect(id, joueur.saison, joueur.club, date);

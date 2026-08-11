@@ -41,6 +41,30 @@
   --ambiance: rgba(52, 163, 90, 0.18);
   --fond-bas: #050d09;
 
+  /* ═══ LES ALIAS — et pourquoi ils ne sont pas décoratifs ═══════════════════
+     ⚠️ UNE `var()` QUI POINTE DANS LE VIDE NE FAIT PAS RIEN : ELLE CASSE LA
+     DÉCLARATION. En CSS, `color: var(--inexistante)` devient `unset` — donc
+     `color` HÉRITE du parent. C'est ainsi que le potentiel du joueur (« ↗ 77 »)
+     s'affichait en NOIR sur fond bleu nuit, illisible : sa règle demandait
+     `var(--or-200)`, qui n'a jamais existé, et la couleur retombait sur le
+     #17110a du badge doré qui l'entoure. Rien dans la console, rien à l'œil nu
+     dans le fichier — juste un texte invisible en jeu.
+     Un balayage a trouvé SIX noms utilisés mais jamais déclarés, sur 38 règles :
+     `--or-clair` (32 usages !), `--or`, `--or-200`, `--or-600`,
+     `--pelouse-clair`, `--rayon-s`, `--police-corps`. On les déclare ici comme
+     alias des jetons réels plutôt que de réécrire 38 règles — et surtout, on
+     les déclare une bonne fois : c'est le genre de panne qui ne se voit qu'en
+     regardant l'écran, jamais en relisant le code.
+     (`--aura` et `--x-bordure` sont, eux, posés à la volée par un composant ou
+     défendus par une valeur de repli : ils vont bien.) */
+  --or: var(--or-400);
+  --or-clair: var(--or-400);
+  --or-200: #ffe9ab;
+  --or-600: #b8862a;
+  --pelouse-clair: var(--pelouse-400);
+  --rayon-s: var(--rayon-sm);
+  --police-corps: var(--police);
+
   color-scheme: dark;
 }
 

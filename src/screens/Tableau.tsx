@@ -327,7 +327,7 @@ export function Tableau() {
   const numero = joueur?.semaine ?? 1;
   const semActuelle = semaine(numero);
   const maDivision = joueur?.division ?? '';
-  const mesCoupes = useMemo(() => (joueur ? coupesDuClub(joueur.club) : []), [joueur]);
+  const mesCoupes = useMemo(() => (joueur ? coupesDuClub(joueur.club, joueur.saison) : []), [joueur]);
 
   // ⚠️ LES SÉLECTIONS SONT DES COMPÉTITIONS COMME LES AUTRES. Pendant une
   // fenêtre internationale, on n'y voyait ni affiche ni classement : le Tournoi

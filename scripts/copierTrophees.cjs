@@ -180,6 +180,14 @@ const LOTS = [{
     'maillot lyon': 'maillot-lyon',
     'maillot stade francais': 'maillot-stade-francais',
     'maillot vannes': 'maillot-vannes',
+    // Troisième livraison : 3 maillots et 2 paires de crampons de plus.
+    // (Le fichier de La Rochelle est livré « mallot » — on ne renomme pas la
+    // source, la table est là pour ça.)
+    'la rochelle mallot': 'maillot-rochelais',
+    'ubb maillot': 'maillot-ubb',
+    'pau maillot': 'maillot-pau',
+    'crampons bleu': 'crampons-bleus',
+    'crampons rose': 'crampons-roses',
   },
 }];
 

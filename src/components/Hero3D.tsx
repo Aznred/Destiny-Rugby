@@ -7,7 +7,7 @@ import { ModeleBallon } from './ModeleBallon';
 import { Rugbyman3D } from './Rugbyman3D';
 import { useTenue } from '../lib/tenue';
 import { modelePresent } from '../lib/modeles';
-import { SKIN_PAR_ID } from '../data/boutique';
+import { EQUIPEMENT_PAR_ID, SKIN_PAR_ID } from '../data/boutique';
 
 /** Le niveau du sol de la scène du hero — les pieds du rugbyman s'y posent. */
 const SOL = -3.6;
@@ -26,10 +26,36 @@ const SOL = -3.6;
 // page d'accueil ne télécharge plus ce modèle au chargement. À la place, un
 // **décor au sol** — le sac de plaquage des séances du mardi — pose la scène
 // sans jamais repasser devant le joueur.
+/**
+ * OÙ SE POSE CHAQUE OBJET DE DÉCOR, et de quelle taille.
+ *
+ * ⚠️ Un emplacement PAR CATÉGORIE, pas une file : les deux doivent pouvoir
+ * cohabiter sans se chevaucher, et le bouclier reste à gauche même quand il est
+ * seul — sinon poser le sac ferait sauter le bouclier d'un bout à l'autre de
+ * l'écran, ce qui se lit comme un bug.
+ */
+const DECORS: Record<string, { hauteur: number; position: [number, number, number]; rotationY: number }> = {
+  bouclier: { hauteur: 3.2, position: [-2.4, 0, -1.2], rotationY: 0.5 },
+  sac: { hauteur: 1.5, position: [2.5, 0, -1.5], rotationY: -0.6 },
+};
+
 export function Hero3D({ skinId = 'classique' }: { skinId?: string }) {
   const skin = SKIN_PAR_ID[skinId] ?? SKIN_PAR_ID.classique;
   const tenue = useTenue();
   const avecJoueur = Boolean(tenue.nom);
+
+  // ⚠️ ON LIT `equipement`, DONC L'INVENTAIRE : le store n'y met que des
+  // articles réellement achetés (`acheterEquipement` / `debloquerParPub`).
+  // Rien d'équipé = rien au sol.
+  const decors = useMemo(() => {
+    const porte = tenue.equipement ?? {};
+    return Object.entries(DECORS)
+      .map(([categorie, place]) => {
+        const article = EQUIPEMENT_PAR_ID[porte[categorie as keyof typeof porte] ?? ''];
+        return article ? { id: article.id, glb: article.glb, ...place } : null;
+      })
+      .filter((d): d is NonNullable<typeof d> => d !== null);
+  }, [tenue.equipement]);
 
   return (
     // ⚠️ LE JOUEUR TIENT EN ENTIER DANS LE CADRE, PIEDS COMPRIS — c'est une
@@ -56,11 +82,23 @@ export function Hero3D({ skinId = 'classique' }: { skinId?: string }) {
             <group position={[0, 0.35, 0.6]}>
               <Rugbyman3D tenue={tenue} />
             </group>
-            {/* ⚠️ DÉCOR, PAS COSMÉTIQUE : ce sac-là n'est pas celui qu'on achète
-                au vestiaire, il est posé au sol pour tout le monde. Il est calé
-                DERRIÈRE le plan du joueur (z négatif) et sur sa gauche pour ne
-                jamais lui passer devant. */}
-            <DecorSol url="/m3d/bouclier-plaquage.glb" hauteur={3.2} position={[-2.4, 0, -1.2]} rotationY={0.5} />
+            {/* ⚠️ LE DÉCOR EST CE QU'ON POSSÈDE, PLUS UN CADEAU DE LA MAISON.
+                Le bouclier était codé en dur : il s'affichait pour tout le
+                monde, y compris pour qui ne l'avait jamais acheté — et il n'y
+                avait aucun moyen de mettre le sac à la place, ni les deux.
+                Chacun a maintenant sa catégorie (`data/boutique.ts`), donc son
+                propre interrupteur : sac, bouclier, les deux, ou rien.
+                Ils sont calés DERRIÈRE le plan du joueur (z négatif) et de part
+                et d'autre, pour ne jamais lui passer devant. */}
+            {decors.map((d) => (
+              <DecorSol
+                key={d.id}
+                url={d.glb}
+                hauteur={d.hauteur}
+                position={d.position}
+                rotationY={d.rotationY}
+              />
+            ))}
           </>
         ) : (
           // ⚠️ PAS DE `<Float>` NON PLUS (« aucun asset ne tourne dans le
