@@ -87,6 +87,43 @@ export const ECRANS_AVEC_PUB = ['boutique', 'pantheon', 'classement', 'championn
  */
 export const OVAS_PAR_PUB = 4;
 export const PUBS_PAR_JOUR = 2;
+
+/**
+ * LE LIEN DIRECT MONETAG — c'est LUI qui s'ouvre quand on clique « Regarder ».
+ *
+ * ⚠️ CE N'EST PAS UN SDK DE VIDÉO RÉCOMPENSÉE, ET IL FAUT LE SAVOIR. Un « direct
+ * link » Monetag est une simple URL qui ouvre une page d'annonces dans un
+ * nouvel onglet. Il n'y a **aucun rappel** du réseau pour confirmer que le
+ * joueur a réellement regardé quoi que ce soit : la récompense est versée au
+ * bout du compte à rebours du jeu, qu'il ait lu l'annonce ou refermé l'onglet
+ * aussitôt. C'est une limite du format, pas un oubli — un vrai « rewarded »
+ * demande AdMob / Ad Manager et son SDK, qui prendrait alors la place de tout
+ * ce mécanisme.
+ *
+ * ⚠️ ET IL S'OUVRE SUR UN CLIC, JAMAIS AUTREMENT. `window.open()` appelé hors
+ * d'un geste de l'utilisateur est bloqué par tous les navigateurs — et une
+ * pop-up qui s'ouvre toute seule est exactement ce que la règle 2 ci-dessus
+ * interdit. Si le bloqueur la refuse quand même, la modale propose le lien à
+ * cliquer à la main plutôt que de laisser le joueur devant un compte à rebours
+ * sans rien.
+ *
+ * Fourni par l'utilisateur depuis son tableau de bord Monetag.
+ */
+export const LIEN_PUB_RECOMPENSEE = 'https://omg10.com/4/11553440';
+
+/**
+ * Ouvre l'annonce dans un nouvel onglet. Renvoie `false` si le navigateur l'a
+ * bloquée — l'appelant affiche alors le lien en clair.
+ *
+ * ⚠️ `noopener,noreferrer` n'est pas décoratif : sans `noopener`, la page
+ * ouverte garde une référence `window.opener` vers le jeu et peut le faire
+ * naviguer ailleurs (tabnabbing). On parle ici d'une page de régie tierce.
+ */
+export function ouvrirAnnonce(): boolean {
+  if (typeof window === 'undefined') return false;
+  const onglet = window.open(LIEN_PUB_RECOMPENSEE, '_blank', 'noopener,noreferrer');
+  return Boolean(onglet);
+}
 /** Entre deux pubs : on ne veut pas d'un joueur qui enchaîne dix vidéos. */
 export const ATTENTE_ENTRE_PUBS_MS = 15 * 60_000;
 /** Durée de l'encart « maison », quand aucune régie n'est configurée. */

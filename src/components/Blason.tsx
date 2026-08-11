@@ -4,7 +4,8 @@ import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
 import {
   LOGO_SELECTION_CATALOGUE, LOGO_SELECTION_NATIONS, LOGO_SELECTION_PRINCIPALE,
 } from '../data/logosSelections';
-import { nomNation } from '../lib/nations';
+import { aDrapeau, nomNation } from '../lib/nations';
+import { Drapeau } from './Drapeau';
 
 // ⚠️ DEUX SOURCES D'ÉCUSSONS DE SÉLECTION. Les compétitions historiques
 // viennent de `mondeReel.ts`, les treize nouvelles (Rugby Europe Conference,
@@ -117,6 +118,34 @@ export function LogoEquipe({ nom, logo, taille = 28 }: { nom: string; logo?: str
     ?? LOGO_SELECTION_NATIONS[nom]
     ?? LOGO_SELECTION_NATIONS[nomNation(nom)];
   if (!src) {
+    // ⚠️ LE DRAPEAU AVANT LES INITIALES (demande explicite : « si tu n'as pas
+    // le pays comme logo, mets le drapeau au lieu d'une lettre »). Il reste
+    // quatre nations classées sans écusson — Bermudes, Burkina Faso, Lesotho,
+    // Népal — parce qu'aucun des trois lots ne les livre. « BE » ou « BF » dans
+    // un classement ne dit rien à personne ; leur drapeau, si.
+    //
+    // ⚠️ MAIS EN BULLE, COMME LES ÉCUSSONS (demande explicite : « en bulle
+    // comme les pays, là c'est pas bon »). Un drapeau nu est un RECTANGLE :
+    // posé au milieu d'une grille de pastilles rondes, il crève l'alignement —
+    // c'était flagrant sur Bermudes et Burkina Faso, seuls carrés d'une liste
+    // de 119 ronds. On le recadre donc dans le même disque que `.blason-logo`,
+    // même fond, même ombre : la ligne reste régulière, et seul le contenu du
+    // médaillon change.
+    const nation = nomNation(nom);
+    if (aDrapeau(nation)) {
+      return (
+        <span
+          className="blason-logo blason-drapeau"
+          style={{ width: taille, height: taille }}
+          title={nom}
+        >
+          {/* `Drapeau` se dimensionne en `rem` (c'est une police d'icônes). On
+              le prend PLUS GRAND que la bulle et on rogne : un drapeau contenu
+              en entier laisserait deux croissants vides en haut et en bas. */}
+          <Drapeau nation={nation} taille={taille / 11} />
+        </span>
+      );
+    }
     const initiales = nom
       .replace(/[^A-Za-zÀ-ÿ ]/g, '')
       .split(' ')

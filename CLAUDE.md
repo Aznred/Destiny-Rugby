@@ -3697,3 +3697,96 @@ côté d'un score ». C'est exactement ce qu'il fallait faire.
   collision étirait chaque pastille sur toute la largeur de l'écran.
 - Vérification : `npx vite-node scripts/verifClassement.ts` (section « 4 bis »
   pour les bornes des clubs).
+
+
+## Correctifs du classement mondial (production)
+
+Trois pannes remontées par les journaux Vercel, trois causes distinctes.
+
+- **`column "nom" does not exist` (42703)** — le code v2 était déployé, la
+  **migration SQL ne l'était pas** : le `GET` renvoyait 500 pour tout le monde,
+  et le `POST` n'écrivait plus rien. Un déploiement de code ne doit pas pouvoir
+  casser le classement parce qu'un `ALTER TABLE` traîne : `api/classement.ts`
+  **retombe désormais sur les colonnes de la v1** (lecture ET écriture) quand
+  Postgres répond 42703, en le journalisant. Le tableau s'affiche, les fiches
+  détaillées apparaissent d'elles-mêmes une fois la migration passée.
+- **`note hors bornes (100, attendu 0..99)`** — le serveur refusait de VRAIES
+  carrières. `LIMITES.noteMax` valait 99, copié du plafond de `entrainer()`
+  (`Math.min(99, …)`), alors que la note est la MOYENNE des 8 attributs et que
+  le store les borne à **100** (`borne()`). Huit attributs à 100 = une générale
+  de 100, légitimement. ⚠️ Corriger `noteMax` déplace `SCORE_MAX` :
+  **82 488 → 82 500**, à répercuter dans les DEUX fichiers SQL (le `check` de la
+  colonne `score`) sous peine de voir la base refuser ce que le jeu produit.
+- **`version de barème inconnue (1)`** — un onglet resté ouvert sur l'ancien
+  bundle. Se résorbe au rechargement, rien à corriger.
+
+## Les écussons de sélection : le lot « nations »
+
+⚠️ Demande explicite : « récupère les logos des nations manquants et applique-les
+sur les sélections dont il manque l'image ; dans le classement mondial des
+sélections, mets le logo des sélections, pas le drapeau ».
+
+- **Troisième lot source** : `sources/logos/selections/nations/`, 167 écussons,
+  **un fichier par pays, nommé dans la langue du jeu**. C'est ce qui le rend
+  maintenable : il n'a AUCUNE table à tenir à la main (contrairement à
+  `CATALOGUE`), la correspondance se fait sur le nom du fichier. Seules les
+  orthographes divergentes passent par `ALIAS_NATIONS`.
+- **Il est consulté EN DERNIER** (`LOGO_SELECTION_NATIONS`, après le logo fourni
+  par l'appelant) : c'est un bouche-trou, il ne doit jamais passer devant un
+  écusson officiel des deux autres lots.
+- **Mesure** : `npx vite-node scripts/verifLogosSelections.ts` — les nations
+  classées avec écusson passent de **73/114 à 110/114**. Les 4 restantes
+  (Bermudes, Burkina Faso, Lesotho, Népal) ne sont dans aucun lot livré.
+- **Le repli n'est plus des initiales, c'est le DRAPEAU** (demande explicite) —
+  « BF » dans un classement ne dit rien à personne. ⚠️ **Et il est rond**
+  (`.blason-drapeau`) : un drapeau nu est un rectangle, et au milieu d'une
+  grille de 119 pastilles rondes il crevait l'alignement. Il est recadré dans le
+  même disque que `.blason-logo`.
+- **Le classement mondial des sélections** (`screens/Tableau.tsx`) affiche
+  `<LogoEquipe>` et non plus `<Drapeau>` : un classement de rugby montre les
+  emblèmes des fédérations — le trèfle, la rose, le coq — pas des drapeaux
+  d'États. Mesuré à l'écran : **110 écussons, 4 drapeaux, 0 initiales.**
+
+## Publicité : les deux fichiers à la racine
+
+| Fichier | Ce que c'est | Ce qu'il fait vraiment |
+|---|---|---|
+| `public/ads.txt` | Texte inerte | Déclare Google seul vendeur autorisé. Sans lui, AdSense ne diffuse rien. |
+| `public/sw.js` | **Service worker** | ⚠️ Fourni par une régie (Monetag, zone 11553232) sous l'intitulé « Verification ». **Ce n'est PAS un fichier de validation** : servi à `/sw.js` il a la portée RACINE du site, et son `importScripts` exécute du code distant modifiable à tout moment sans redéploiement. C'est le mécanisme des notifications push publicitaires. |
+
+### Les boutons de récompense passent par Monetag
+
+`LIEN_PUB_RECOMPENSEE` (`lib/pub.ts`) = `https://omg10.com/4/11553440`. Cliquer
+« 🎬 Regarder » (Ovas) ou « 🎬 Débloquer » (cosmétique `parPub`) ouvre ce lien
+dans un **nouvel onglet**, puis le compte à rebours du jeu se déroule dans la
+modale ; au bout, la récompense tombe.
+
+- ⚠️ **`ouvrirAnnonce()` est appelée DANS le gestionnaire de clic.** Un
+  `window.open` différé est bloqué par tous les navigateurs — et une pop-up qui
+  s'ouvre toute seule est exactement ce que la règle 2 de `lib/pub.ts` interdit.
+  Si le bloqueur la refuse malgré tout, la modale affiche le lien à cliquer à la
+  main plutôt qu'un décompte qui tourne devant rien.
+- ⚠️ **`noopener,noreferrer` n'est pas décoratif** : sans `noopener`, la page de
+  la régie garde une référence `window.opener` sur le jeu et peut le faire
+  naviguer ailleurs (tabnabbing).
+- ⚠️ **CE N'EST PAS UN VRAI FORMAT « REWARDED ».** Un direct link Monetag
+  n'émet **aucun rappel** confirmant que le joueur a regardé quoi que ce soit :
+  la récompense est versée au bout du compte à rebours, qu'il ait lu l'annonce
+  ou refermé l'onglet aussitôt. C'est une limite du format — un vrai rewarded
+  demande AdMob / Ad Manager et son SDK, qui remplacerait alors tout ce
+  mécanisme. Le garde-fou reste le quota : `PUBS_PAR_JOUR = 2`, 15 min d'écart.
+- Ordre d'affichage dans la modale : **1.** Monetag (l'annonce est dans l'autre
+  onglet, rien à montrer ici) · **2.** AdSense si `VITE_PUB_SLOT` est
+  renseigné · **3.** l'encart maison.
+
+⚠️ **Le jeu n'enregistre AUCUN service worker** : rien dans `src/` n'appelle
+`navigator.serviceWorker.register()`. Déposer `sw.js` ne l'active pas — c'est le
+tag de la régie, s'il est un jour posé dans la page, qui l'enregistrera. Tant
+qu'il ne l'est pas, le site se comporte exactement comme avant, ce qui permet de
+valider le domaine sans rien changer au jeu.
+
+⚠️ **Et ça entre en tension frontale avec les règles de `lib/pub.ts`** (« rien
+ne se charge sans consentement », « jamais d'interstitiel ni de pop-up ») : une
+notification push est exactement ce que ces règles écartent, et elle échappe au
+bandeau de consentement du jeu puisque c'est la régie qui la déclenche. À
+trancher avant d'ajouter le tag Monetag dans la page.

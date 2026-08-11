@@ -15,7 +15,7 @@ import { useGame } from '../store/useGame';
 import { t } from '../lib/i18n';
 import {
   CLIENT_PUB, SLOT_PUB, DUREE_PUB_MAISON_S, OVAS_PAR_PUB, PUBS_PAR_JOUR,
-  attenteLisible, chargerRegie, pubDisponible,
+  LIEN_PUB_RECOMPENSEE, attenteLisible, chargerRegie, ouvrirAnnonce, pubDisponible,
 } from '../lib/pub';
 
 // ---------------------------------------------------------------------------
@@ -139,6 +139,7 @@ export function CartePubRecompensee() {
   const consentement = useGame((s) => s.pubConsentement);
   const setConsentement = useGame((s) => s.setPubConsentement);
   const [ouverte, setOuverte] = useState(false);
+  const [bloquee, setBloquee] = useState(false);
   const [gain, setGain] = useState<number | null>(null);
   // La disponibilité dépend de l'heure : on redemande à chaque ouverture et
   // toutes les 30 s tant que la carte est visible.
@@ -173,7 +174,10 @@ export function CartePubRecompensee() {
             className="btn primaire petit"
             disabled={!dispo.possible}
             title={dispo.attente > 0 ? attenteLisible(dispo.attente) : undefined}
-            onClick={() => { setGain(null); setOuverte(true); }}
+            /* ⚠️ `ouvrirAnnonce()` DOIT être appelée DANS le gestionnaire de
+               clic : un `window.open` différé est bloqué par tous les
+               navigateurs. */
+            onClick={() => { setGain(null); setBloquee(!ouvrirAnnonce()); setOuverte(true); }}
           >
             {dispo.possible
               ? `🎬 ${t('pub.regarder')}`
@@ -187,6 +191,7 @@ export function CartePubRecompensee() {
 
       {ouverte && (
         <PubRecompensee
+          bloquee={bloquee}
           onFermer={() => setOuverte(false)}
           onTerminee={() => { setGain(encaisser()); setOuverte(false); }}
         />
@@ -214,6 +219,7 @@ export function BoutonDeblocageParPub({ id, onDebloque }: { id: string; onDebloq
   const consentement = useGame((s) => s.pubConsentement);
   const setConsentement = useGame((s) => s.setPubConsentement);
   const [ouverte, setOuverte] = useState(false);
+  const [bloquee, setBloquee] = useState(false);
   // La disponibilité dépend de l'heure : on rafraîchit tant que le bouton vit.
   const [, battement] = useState(0);
   useEffect(() => {
@@ -238,7 +244,7 @@ export function BoutonDeblocageParPub({ id, onDebloque }: { id: string; onDebloq
         className="btn primaire petit"
         disabled={!dispo.possible}
         title={dispo.attente > 0 ? attenteLisible(dispo.attente) : undefined}
-        onClick={(e) => { e.stopPropagation(); setOuverte(true); }}
+        onClick={(e) => { e.stopPropagation(); setBloquee(!ouvrirAnnonce()); setOuverte(true); }}
       >
         {dispo.possible
           ? `🎬 ${t('pub.debloquer')}`
@@ -248,6 +254,7 @@ export function BoutonDeblocageParPub({ id, onDebloque }: { id: string; onDebloq
       </button>
       {ouverte && (
         <PubRecompensee
+          bloquee={bloquee}
           onFermer={() => setOuverte(false)}
           /* La récompense n'est pas des Ovas ici, c'est l'article : le texte de
              l'encart maison doit dire la vérité. */
@@ -280,8 +287,13 @@ export function BoutonDeblocageParPub({ id, onDebloque }: { id: string; onDebloq
  * la fin annule simplement la récompense.
  */
 function PubRecompensee({
-  onFermer, onTerminee, texteMaison = t('pub.maisonTexte'),
-}: { onFermer: () => void; onTerminee: () => void; texteMaison?: string }) {
+  onFermer, onTerminee, bloquee = false, texteMaison = t('pub.maisonTexte'),
+}: {
+  onFermer: () => void; onTerminee: () => void;
+  /** Le navigateur a refusé d'ouvrir l'onglet de l'annonce. */
+  bloquee?: boolean;
+  texteMaison?: string;
+}) {
   const [reste, setReste] = useState(DUREE_PUB_MAISON_S);
 
   useEffect(() => {
@@ -305,7 +317,29 @@ function PubRecompensee({
         transition={{ duration: 0.2 }}
       >
         <div className="eyebrow">{t('pub.etiquette')}</div>
-        {SLOT_PUB ? (
+        {/* ⚠️ TROIS CAS, DANS CET ORDRE DE PRIORITÉ.
+            1. Monetag : l'annonce vient de s'ouvrir dans un AUTRE onglet, il
+               n'y a rien à afficher ici — sauf si le navigateur l'a bloquée,
+               auquel cas on donne le lien plutôt qu'un décompte qui tourne pour
+               rien devant un joueur qui ne voit aucune annonce.
+            2. AdSense, si un slot est configuré : l'annonce s'affiche DANS la
+               modale.
+            3. Sinon l'encart maison. */}
+        {LIEN_PUB_RECOMPENSEE ? (
+          <>
+            <h2>{t('pub.maisonTitre')}</h2>
+            {bloquee ? (
+              <p className="aide">
+                {t('pub.ongletBloque')}{' '}
+                <a href={LIEN_PUB_RECOMPENSEE} target="_blank" rel="noopener noreferrer">
+                  {t('pub.ouvrirAnnonce')}
+                </a>
+              </p>
+            ) : (
+              <p className="aide">{t('pub.ongletOuvert')}</p>
+            )}
+          </>
+        ) : SLOT_PUB ? (
           <div className="pub-annonce"><BlocAnnonce format="rectangle" /></div>
         ) : (
           <>

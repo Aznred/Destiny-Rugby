@@ -859,6 +859,16 @@
   background: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.14), rgba(0,0,0,0.35));
   box-shadow: 0 2px 6px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.06);
 }
+/* Le repli DRAPEAU d'une sélection sans écusson (`LogoEquipe`, Blason.tsx).
+   ⚠️ Il doit être un DISQUE, comme les écussons qui l'entourent : un drapeau
+   rectangulaire au milieu d'une grille de pastilles rondes saute aux yeux.
+   `overflow: hidden` fait le recadrage, `padding: 0` retire le liseré que
+   `.blason-logo` réserve aux logos sur fond blanc. */
+.blason-drapeau {
+  display: inline-flex; align-items: center; justify-content: center;
+  overflow: hidden; padding: 0;
+}
+.blason-drapeau .fi { border-radius: 0; }
 .blason-vide { flex: none; display: inline-block; border-radius: 50%; background: rgba(255,255,255,0.06); }
 .club-carte { min-width: 0; }
 .club-carte .club-nom, .club-carte .club-ville { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
