@@ -26,8 +26,9 @@ import { CALENDRIER } from '../src/data/calendrier';
 import {
   fenetreInternationale, matchInternationalDuJoueur, competitionsDeLaSaison, forceNation,
 } from '../src/lib/international';
-import { convocation, niveauExige, niveauInternational } from '../src/lib/selection';
+import { convocation, convocationU20, niveauExige, niveauInternational } from '../src/lib/selection';
 import { nomNation } from '../src/lib/nations';
+import { partEnSelection } from '../src/store/useGame';
 
 let echecs = 0;
 function ligne(libelle: string, valeur: string, ok: boolean): void {
@@ -127,6 +128,61 @@ console.log('\n=== 5. LA HIÉRARCHIE TIENT : plus la nation est forte, plus c’
   const n = niveauInternational(joueur('France', 80));
   ligne('le niveau international est sur l’échelle des notes', `${Math.round(n)} pour 80 de générale`, n >= 75 && n <= 90);
   ligne('nomNation reste stable', nomNation('France'), nomNation('France') === 'France');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n=== 6. EN SÉLECTION, ON NE JOUE PAS SON CHAMPIONNAT ===');
+// ⚠️ RETOUR DE JEU, ET C'ÉTAIT UN VRAI BUG : « quand on est en sélection, on ne
+// joue pas les matchs de championnat durant la compétition ». La règle « les
+// divisions amateurs jouent AUSSI les week-ends internationaux » (elles n'ont ni
+// coupe d'Europe ni internationaux) était appliquée AVANT de regarder si le
+// joueur était convoqué. Un espoir de Fédérale appelé chez les U20 voyait donc
+// sa sélection escamotée et jouait son match de club — pendant que le panneau
+// de carrière, lui, affichait bien l'affiche internationale.
+{
+  const semainesTournoi = CALENDRIER
+    .map((s, i) => ({ s, numero: i + 1 }))
+    .filter(({ s }) => s.competitionInternationale === 'sixNations');
+  console.log(`     Le Tournoi occupe ${semainesTournoi.length} week-ends du calendrier`
+    + ` (semaines ${semainesTournoi.map((x) => x.numero).join(', ')})`);
+  ligne('les week-ends du Tournoi sont bien de type international',
+    semainesTournoi.every(({ s }) => s.type === 'international') ? 'tous' : 'NON',
+    semainesTournoi.every(({ s }) => s.type === 'international'));
+
+  const unTournoi = semainesTournoi[0]?.s;
+  if (unTournoi) {
+    // Un international français : il part, quelle que soit sa division.
+    const star = joueur('France', 92);
+    ligne('un international part avec sa sélection',
+      `${nomNation(star.nation)} — ${partEnSelection(star, unTournoi) ? 'part' : 'reste'}`,
+      partEnSelection(star, unTournoi));
+
+    // ⚠️ LE CAS QUI PLANTAIT : un amateur convoqué. Sa division joue le week-end
+    // du Tournoi (règle des amateurs), et il est pourtant appelé.
+    const amateurAppele: Joueur = { ...joueur('Belgique', 88), division: 'fed1', club: 'Aurore de Vitré' };
+    ligne('un AMATEUR convoqué part aussi (le bug d’origine)',
+      `fed1, Belgique — ${partEnSelection(amateurAppele, unTournoi) ? 'part' : 'JOUE SON CHAMPIONNAT'}`,
+      partEnSelection(amateurAppele, unTournoi));
+
+    // Un espoir trop faible pour les A mais pris chez les U20.
+    const espoir: Joueur = { ...joueur('France', 72, 19), division: 'fed2' };
+    const chezLesU20 = convocationU20(espoir).selectionne;
+    ligne('un espoir pris chez les U20 part aussi',
+      `19 ans, fed2 — U20 ${chezLesU20 ? 'oui' : 'non'}, ${partEnSelection(espoir, unTournoi) ? 'part' : 'reste'}`,
+      partEnSelection(espoir, unTournoi) === chezLesU20);
+
+    // Et celui que personne n'appelle joue bien son championnat.
+    const quelconque: Joueur = { ...joueur('France', 42), division: 'fed3' };
+    ligne('un non-convoqué joue son championnat',
+      `${partEnSelection(quelconque, unTournoi) ? 'PART' : 'reste au club'}`,
+      !partEnSelection(quelconque, unTournoi));
+
+    // Hors fenêtre internationale, personne ne part — même le meilleur du monde.
+    const journee = CALENDRIER.find((s) => s.type === 'championnat')!;
+    ligne('une journée de championnat n’enlève personne',
+      `${partEnSelection(star, journee) ? 'PART' : 'reste au club'}`,
+      !partEnSelection(star, journee));
+  }
 }
 
 console.log(echecs === 0 ? '\n✅ Sélections atteignables.' : `\n❌ ${echecs} contrôle(s) en échec.`);

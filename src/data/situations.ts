@@ -34,6 +34,15 @@ export interface IssueSituation {
   ovas: number;
   coach?: number;
   fans?: number;
+  /**
+   * ⚠️ CE CHOIX OUVRE VRAIMENT LE MARCHÉ, comme pour les scénarios
+   * (`IssueChoix.marche`, data/scenarios.ts). Il manquait ici : une situation
+   * du genre « appelle ton agent pour partir en janvier » ne pouvait que le
+   * RACONTER, jamais le déclencher — exactement le défaut corrigé côté
+   * scénarios (« les transferts marchent pas »). `versScenario` recopie l'issue
+   * telle quelle, le store fait le reste.
+   */
+  marche?: boolean;
   /** Conséquence lourde, appliquée par le store. */
   dur?: { type: ConsequenceDure; semaines?: number; motif: string };
 }
@@ -445,6 +454,255 @@ export const SITUATIONS: Situation[] = [
           dur: { type: 'accident', semaines: 30, motif: 'accident de la route' },
         },
       },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DEUXIÈME LOT — LE CLUB, L'ARGENT, LA CHUTE ET L'APRÈS
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ⚠️ Demande explicite : « rajoute plein de scénarios pour la carrière quand
+  // on n'a pas l'IA — viré du club, augmentation, banni du rugby, prison,
+  // entrepreneuriat, études… mais reste sur une généralité rugby ».
+  //
+  // ⚠️ LA RÈGLE QUI TIENT CE LOT : UN CHOIX DUR DOIT COÛTER QUELQUE CHOSE.
+  // Un scénario « banni du rugby » qui se solde par −5 de moral n'est pas un
+  // scénario, c'est une anecdote. Ceux d'ici branchent de vraies conséquences
+  // (`ConsequenceDure`) : contrat rompu, suspension longue, prison. En
+  // contrepartie, aucun n'est un piège aveugle — le texte annonce toujours ce
+  // qu'on risque, et il existe toujours une porte de sortie honnête.
+
+  // ───────────────────────── LE CLUB ─────────────────────────
+  {
+    id: 'convoque-direction', emoji: '🚪', categorie: 'club', poids: 0.5,
+    quand: (j) => (j.confianceCoach ?? 50) < 40 && j.saison >= 2,
+    titre: 'Convoqué par la direction',
+    situation: 'Le président et le manager te reçoivent un mardi matin. Le ton est poli, la phrase est claire : ils envisagent de rompre ton contrat à l’amiable.',
+    choix: [
+      { texte: 'Refuser net et se battre pour ta place.', issue: { recit: 'Tu refuses de partir. Le club te laisse au groupe, mais l’ambiance est glaciale pendant des semaines.', deltas: { moral: -10, mental: 2 }, ovas: 3, coach: -4 } },
+      { texte: 'Négocier une indemnité de départ.', issue: { recit: 'Tu pars la tête haute, un chèque en poche. Reste à retrouver un club.', deltas: { argent: 18000, moral: -8 }, ovas: 5, dur: { type: 'exclusionClub', motif: 'rupture conventionnelle' } } },
+      { texte: 'Demander trois mois pour faire tes preuves.', issue: { recit: 'Ils acceptent. Tu as douze semaines pour tout renverser, et tout le monde le sait.', deltas: { moral: -3, mental: 3 }, ovas: 4, coach: 2 } },
+    ],
+  },
+  {
+    id: 'augmentation', emoji: '💶', categorie: 'argent', poids: 0.8,
+    quand: (j) => j.saison >= 2 && (j.noteSaison ?? 5) >= 6.5,
+    titre: 'Tu vaux plus que ça',
+    situation: 'Tu enchaînes les titularisations et ton salaire n’a pas bougé depuis ta signature. Ton agent veut aller taper à la porte du président.',
+    choix: [
+      { texte: 'Réclamer une revalorisation, franchement.', issue: { recit: 'Le président grogne, puis lâche. Salaire revu à la hausse — et une attente en face, désormais.', deltas: { argent: 14000, reputation: 3, moral: 6 }, ovas: 6, coach: -1 } },
+      { texte: 'Attendre la fin de saison sans rien dire.', issue: { recit: 'Tu laisses parler le terrain. Le club le remarque, et ta cote grimpe toute seule.', deltas: { reputation: 4, mental: 1 }, ovas: 4, coach: 5 } },
+      { texte: 'Faire fuiter que d’autres clubs t’appellent.', issue: { recit: 'La rumeur sort dans la presse locale. Le club augmente… et ne te le pardonne pas tout de suite.', deltas: { argent: 20000, reputation: 2, moral: -4 }, ovas: 5, coach: -7, fans: -3 } },
+    ],
+  },
+  {
+    id: 'mise-au-placard', emoji: '🪑', categorie: 'club', poids: 0.5,
+    quand: (j) => (j.confianceCoach ?? 50) < 35,
+    titre: 'Mis à l’écart du groupe',
+    situation: 'Tu t’entraînes avec les blessés et les indésirables. Personne ne t’a rien dit — c’est la feuille de match du samedi qui te l’a appris.',
+    choix: [
+      { texte: 'Bosser deux fois plus, en silence.', issue: { recit: 'Tu es le premier arrivé, le dernier parti. Au bout d’un mois, le staff n’a plus d’excuse.', deltas: { forme: 6, mental: 3, moral: -4 }, ovas: 5, coach: 8 } },
+      { texte: 'Demander des explications devant tout le monde.', issue: { recit: 'La discussion tourne mal dans le couloir. Le vestiaire te donne raison sur le fond, tort sur la forme.', deltas: { moral: -6, reputation: 2 }, ovas: 3, coach: -6 } },
+      { texte: 'Appeler ton agent pour partir en janvier.', issue: { recit: 'Le message est passé. Ton nom circule ailleurs, et le club le sait.', deltas: { moral: 3 }, ovas: 4, coach: -3, marche: true } },
+    ],
+  },
+  {
+    id: 'club-en-faillite', emoji: '🏦', categorie: 'club', poids: 0.25,
+    quand: (j) => amateur(j) || j.division === 'nationale',
+    titre: 'Le club ne paie plus',
+    situation: 'Deuxième mois sans salaire. Le trésorier ne répond plus, la DNACG a ouvert un dossier, et le bruit court d’une rétrogradation administrative.',
+    choix: [
+      { texte: 'Rester et jouer quand même.', issue: { recit: 'Vous finissez la saison à onze contre le monde entier. Le club est rétrogradé, mais le vestiaire est devenu une famille.', deltas: { moral: -6, mental: 4, argent: -3000 }, ovas: 6, coach: 6, dur: { type: 'relegationFinanciere', motif: 'dépôt de bilan du club' } } },
+      { texte: 'Saisir la commission juridique.', issue: { recit: 'Tu récupères tes arriérés et ta liberté. Le club te le fait payer en réputation.', deltas: { argent: 9000, reputation: -4 }, ovas: 5, dur: { type: 'exclusionClub', motif: 'contrat résilié pour impayés' } } },
+      { texte: 'Chercher un club immédiatement.', issue: { recit: 'Tu actives tous tes contacts avant que le marché ne se referme.', deltas: { moral: -2 }, ovas: 4, marche: true } },
+    ],
+  },
+  {
+    id: 'pret-division-inferieure', emoji: '📉', categorie: 'carriere', poids: 0.6,
+    quand: (j) => j.age <= 24 && pro(j),
+    titre: 'Un prêt à l’étage du dessous',
+    situation: 'Tu ne joues pas. Le club te propose un prêt de six mois dans une division inférieure, avec la garantie d’être titulaire.',
+    choix: [
+      { texte: 'Accepter : jouer, c’est tout ce qui compte.', issue: { recit: 'Vingt matchs pleins en six mois. Tu reviens avec des jambes et une confiance que le banc ne t’aurait jamais données.', deltas: { forme: 10, mental: 3, reputation: 2 }, ovas: 6, coach: 4 } },
+      { texte: 'Refuser et te battre pour ta place ici.', issue: { recit: 'Tu restes. Six mois de banc et d’entraînement, sans une minute de jeu.', deltas: { moral: -10, forme: -4, mental: 2 }, ovas: 2, coach: -2 } },
+    ],
+  },
+
+  // ───────────────────────── LA CHUTE ─────────────────────────
+  {
+    id: 'pari-du-copain', emoji: '🎰', categorie: 'nuit', poids: 0.3,
+    quand: (j) => j.age >= 20,
+    titre: 'Un pote te propose de parier',
+    situation: 'Un ami d’enfance te propose de miser gros sur un match de ton championnat. « Tu connais les équipes mieux que personne. » Parier sur sa propre compétition est interdit, et tu le sais.',
+    choix: [
+      { texte: 'Refuser et couper court.', issue: { recit: 'Tu raccroches. Il insiste deux fois, puis lâche l’affaire.', deltas: { mental: 2 }, ovas: 3 } },
+      { texte: 'Parier discrètement, une seule fois.', issue: { recit: 'La fédération croise les comptes six mois plus tard. Suspension, audition, une saison à regarder les autres jouer.', deltas: { moral: -22, reputation: -18, argent: 4000 }, ovas: 0, coach: -12, fans: -14, dur: { type: 'suspension', semaines: 40, motif: 'paris sur sa propre compétition' } } },
+      { texte: 'Lui donner un tuyau sur la compo.', issue: { recit: 'Une info d’initié, un SMS retrouvé. Le club rompt ton contrat le jour même.', deltas: { moral: -25, reputation: -22 }, ovas: 0, coach: -15, fans: -12, dur: { type: 'exclusionClub', motif: 'transmission d’informations à un parieur' } } },
+    ],
+  },
+  {
+    id: 'controle-antidopage', emoji: '🧪', categorie: 'corps', poids: 0.3,
+    quand: (j) => pro(j),
+    titre: 'Contrôle inopiné',
+    situation: 'Deux préleveurs t’attendent à la sortie du vestiaire. Tu prends un complément acheté en ligne depuis trois semaines — sans avoir vérifié la composition.',
+    choix: [
+      { texte: 'Tout déclarer, y compris le complément.', issue: { recit: 'Le produit contenait une substance apparentée. Ta transparence te vaut la clémence : trois mois, pas deux ans.', deltas: { moral: -14, reputation: -6 }, ovas: 1, coach: -4, dur: { type: 'suspension', semaines: 12, motif: 'complément alimentaire contaminé' } } },
+      { texte: 'Ne rien dire et croiser les doigts.', issue: { recit: 'Positif. Sans déclaration préalable, la commission ne retient aucune circonstance atténuante. Deux ans.', deltas: { moral: -30, reputation: -25 }, ovas: 0, coach: -15, fans: -18, dur: { type: 'suspension', semaines: 96, motif: 'contrôle positif, aucune déclaration' } } },
+      { texte: 'Refuser le contrôle.', issue: { recit: 'Un refus vaut un positif. Le règlement ne fait pas de nuance, et ton club non plus.', deltas: { moral: -28, reputation: -22 }, ovas: 0, coach: -14, dur: { type: 'exclusionClub', motif: 'refus de se soumettre à un contrôle' } } },
+    ],
+  },
+  {
+    id: 'sortie-de-boite', emoji: '🚔', categorie: 'nuit', poids: 0.3,
+    quand: (j) => j.age <= 30,
+    titre: 'Ça part en vrille à la sortie de boîte',
+    situation: 'Quatre heures du matin. Un type reconnaît ton maillot, insulte ton club, pousse ton frère. Deux téléphones filment déjà.',
+    choix: [
+      { texte: 'Partir sans répondre.', issue: { recit: 'Tu tires ton frère par le bras et vous rentrez. La vidéo fait trois vues.', deltas: { mental: 2, moral: -2 }, ovas: 3, coach: 2 } },
+      { texte: 'T’interposer, sans frapper.', issue: { recit: 'Tu prends un coup, tu n’en rends aucun. La vidéo tourne — et te donne le beau rôle.', deltas: { forme: -6, reputation: 4 }, ovas: 4, fans: 6 } },
+      { texte: 'Lui mettre une droite.', issue: { recit: 'Un coup, une mâchoire cassée, une plainte. Comparution immédiate, et la prison ferme au bout.', deltas: { moral: -28, reputation: -20, argent: -15000 }, ovas: 0, coach: -12, fans: -15, dur: { type: 'prison', semaines: 26, motif: 'violences volontaires' } } },
+    ],
+  },
+  {
+    id: 'permis-retire', emoji: '🚗', categorie: 'perso', poids: 0.4,
+    quand: (j) => j.age >= 19,
+    titre: 'Contrôle routier au retour du match',
+    situation: 'Troisième mi-temps, deux bières, deux heures de route. Les gendarmes sont au rond-point à la sortie du village.',
+    choix: [
+      { texte: 'Avoir laissé les clés à un coéquipier.', issue: { recit: 'Tu dors à l’arrière. Le contrôle dure quatre minutes.', deltas: { mental: 1 }, ovas: 3 } },
+      { texte: 'Souffler et espérer.', issue: { recit: '0,6 g. Permis suspendu six mois, amende, et un club qui apprend la nouvelle par le journal.', deltas: { argent: -4500, reputation: -8, moral: -10 }, ovas: 0, coach: -8, fans: -5 } },
+      { texte: 'Faire demi-tour avant le contrôle.', issue: { recit: 'La patrouille te suit. Refus d’obtempérer : ce n’est plus une amende, c’est un tribunal.', deltas: { moral: -20, reputation: -14, argent: -9000 }, ovas: 0, coach: -10, dur: { type: 'prison', semaines: 10, motif: 'refus d’obtempérer' } } },
+    ],
+  },
+
+  // ───────────────────────── L'ARGENT QU'ON FAIT TOURNER ─────────────────────
+  {
+    id: 'ouvrir-restaurant', emoji: '🍽️', categorie: 'argent', poids: 0.5,
+    quand: (j) => j.argent >= 60000 && j.age >= 24,
+    titre: 'Le restaurant du coin est à vendre',
+    situation: 'Une brasserie à deux rues du stade cherche un repreneur. Ton beau-frère est cuisinier. Tout le monde te dit que c’est une évidence — c’est bien ce qui t’inquiète.',
+    choix: [
+      { texte: 'Investir et t’impliquer à fond.', issue: { recit: 'Les six premiers mois sont un enfer : tu fermes à minuit et tu t’entraînes à sept heures. La salle est pleine, tes jambes sont vides.', deltas: { argent: -45000, forme: -10, moral: 6 }, ovas: 6, coach: -5 } },
+      { texte: 'Mettre de l’argent, laisser gérer.', issue: { recit: 'Tu signes un chèque et tu passes le dimanche. Ça tourne doucement, sans te coûter une minute de sommeil.', deltas: { argent: -30000, moral: 4 }, ovas: 5 } },
+      { texte: 'Laisser passer.', issue: { recit: 'Tu refuses poliment. Deux ans plus tard, l’affaire a coulé — et tu dors très bien.', deltas: { mental: 2 }, ovas: 3 } },
+    ],
+  },
+  {
+    id: 'placement-douteux', emoji: '📈', categorie: 'argent', poids: 0.5,
+    quand: (j) => j.argent >= 40000,
+    titre: 'Le conseiller du vestiaire',
+    situation: 'Un « conseiller en patrimoine » vient au club une fois par mois. Trois coéquipiers ont déjà signé. Le rendement annoncé est de 14 % par an, garanti.',
+    choix: [
+      { texte: 'Signer comme les autres.', issue: { recit: 'Le fonds s’effondre au printemps. Le conseiller ne répond plus, et vous êtes onze au commissariat.', deltas: { argent: -35000, moral: -14 }, ovas: 1 } },
+      { texte: 'Demander l’avis d’un expert indépendant.', issue: { recit: 'Deux questions suffisent à faire tomber le montage. Tu préviens le vestiaire — trois gars te doivent une fière chandelle.', deltas: { moral: 6, reputation: 3 }, ovas: 5, coach: 3 } },
+      { texte: 'Mettre une petite somme, pour voir.', issue: { recit: 'Tu perds ce que tu avais mis, pas plus. La leçon coûte le prix d’une montre.', deltas: { argent: -6000, mental: 2 }, ovas: 3 } },
+    ],
+  },
+  {
+    id: 'marque-vetements', emoji: '👕', categorie: 'argent', poids: 0.45,
+    quand: (j) => (j.abonnes ?? 0) >= 5000,
+    titre: 'Ta propre marque',
+    situation: 'Un ami graphiste te propose de lancer une marque de vêtements de rugby à ton nom. Cent pièces pour commencer, et ton visage sur chaque photo.',
+    choix: [
+      { texte: 'Se lancer, à fond.', issue: { recit: 'Rupture de stock en dix jours. Tu passes tes lundis à faire des cartons, et tu adores ça.', deltas: { argent: 12000, moral: 8, reputation: 5 }, ovas: 7, fans: 8 } },
+      { texte: 'Prêter ton nom, sans t’en occuper.', issue: { recit: 'La collection sort, la qualité est médiocre, et c’est ton nom qui est dessus.', deltas: { argent: 6000, reputation: -5 }, ovas: 3, fans: -4 } },
+      { texte: 'Attendre d’avoir un vrai palmarès.', issue: { recit: 'Tu remets à plus tard. Le projet t’attendra — ou pas.', deltas: { mental: 1 }, ovas: 2 } },
+    ],
+  },
+  {
+    id: 'sponsor-garagiste', emoji: '🤝', categorie: 'argent', poids: 0.6,
+    titre: 'Le garagiste veut te sponsoriser',
+    situation: 'Le patron du garage à la sortie de la ville te propose 500 € par mois et une voiture, contre ta photo sur ses devantures et deux inaugurations par an.',
+    choix: [
+      { texte: 'Accepter, c’est du concret.', issue: { recit: 'Ta tête est sur tous les abribus du département. Le club trouve ça très bien, tes coéquipiers te chambrent trois mois.', deltas: { argent: 6000, moral: 3 }, ovas: 5, fans: 5 } },
+      { texte: 'Négocier aussi un contrat pour ton club.', issue: { recit: 'Tu obtiens un maillot floqué pour les jeunes du club. Le président t’embrasserait.', deltas: { argent: 4000, reputation: 5 }, ovas: 6, coach: 5, fans: 6 } },
+      { texte: 'Refuser : tu veux rester libre.', issue: { recit: 'Tu déclines. Personne ne t’en veut, et personne ne t’aide non plus.', deltas: {}, ovas: 2 } },
+    ],
+  },
+
+  // ───────────────────────── LES ÉTUDES ET L'APRÈS ─────────────────────
+  {
+    id: 'reprendre-etudes', emoji: '🎓', categorie: 'perso', poids: 0.6,
+    quand: (j) => j.age >= 21,
+    titre: 'Reprendre les études',
+    situation: 'Le syndicat des joueurs propose une licence à distance, financée. Douze heures de travail par semaine, en plus des entraînements.',
+    choix: [
+      { texte: 'S’inscrire et tenir le rythme.', issue: { recit: 'Les six premiers mois sont durs, puis ça devient une habitude. Tu as un plan B, et ça change ta façon de jouer.', deltas: { mental: 5, forme: -4, moral: 6 }, ovas: 6 } },
+      { texte: 'S’inscrire, puis abandonner.', issue: { recit: 'Tu tiens deux mois. Le dossier reste dans un tiroir, et le doute avec.', deltas: { moral: -5 }, ovas: 2 } },
+      { texte: 'Refuser : le rugby d’abord.', issue: { recit: 'Tu mets tout dans le terrain. C’est un choix — il a un prix, et tu le connais.', deltas: { forme: 5, mental: -1 }, ovas: 3, coach: 3 } },
+    ],
+  },
+  {
+    id: 'diplome-entraineur', emoji: '📋', categorie: 'carriere', poids: 0.5,
+    quand: (j) => j.age >= 28,
+    titre: 'Le brevet d’entraîneur',
+    situation: 'La fédération ouvre une session de formation d’entraîneur. Trois week-ends par an, et une place à prendre à la fin de ta carrière.',
+    choix: [
+      { texte: 'S’inscrire pendant que tu joues encore.', issue: { recit: 'Tu passes tes week-ends de trêve en salle de classe. Le staff te regarde autrement — et te confie les jeunes le mercredi.', deltas: { mental: 4, moral: 5 }, ovas: 6, coach: 7 } },
+      { texte: 'Attendre la fin de carrière.', issue: { recit: 'Tu remets à plus tard. Les places, elles, ne t’attendront pas.', deltas: {}, ovas: 2 } },
+    ],
+  },
+  {
+    id: 'stage-kine', emoji: '🩺', categorie: 'perso', poids: 0.4,
+    quand: (j) => j.age >= 23 && (j.blessure?.semaines ?? 0) > 0,
+    titre: 'Trois semaines à la salle de soins',
+    situation: 'Blessé, tu passes tes journées au cabinet du kiné du club. Il te propose de l’assister pendant ta convalescence, pour comprendre ce qui t’arrive.',
+    choix: [
+      { texte: 'Accepter et apprendre.', issue: { recit: 'Tu ressors en sachant lire ton propre corps. Tu ne te blesseras plus jamais de la même façon.', deltas: { mental: 4, endurance: 2, moral: 5 }, ovas: 6 } },
+      { texte: 'Rester chez toi à ruminer.', issue: { recit: 'Trois semaines de canapé et de replays. La rééducation prend du retard.', deltas: { moral: -8, forme: -5 }, ovas: 1 } },
+    ],
+  },
+
+  // ───────────────────────── LE RUGBY, TOUT SIMPLEMENT ─────────────────
+  {
+    id: 'convocation-espoirs', emoji: '🎽', categorie: 'carriere', poids: 0.5,
+    quand: (j) => j.age <= 22 && gen(j) >= 55,
+    titre: 'Une convocation en équipe de jeunes',
+    situation: 'Le sélectionneur national des moins de 20 ans t’appelle pour un stage. Ton club, lui, joue un match capital le même week-end.',
+    choix: [
+      { texte: 'Partir en stage.', issue: { recit: 'Trois jours au centre national, entouré des meilleurs de ta génération. Ton club perd — et te le fait sentir.', deltas: { reputation: 10, mental: 3, moral: 6 }, ovas: 7, coach: -5 } },
+      { texte: 'Rester avec ton club.', issue: { recit: 'Tu joues, le club gagne, le vestiaire n’oubliera pas. Le sélectionneur, lui, appellera quelqu’un d’autre.', deltas: { moral: 4, reputation: -2 }, ovas: 4, coach: 9 } },
+    ],
+  },
+  {
+    id: 'essai-refuse-video', emoji: '📺', categorie: 'medias', poids: 0.6,
+    titre: 'L’arbitrage vidéo t’enlève un essai',
+    situation: 'Tu aplatis à la 78ᵉ, le stade explose. Quatre minutes de vidéo plus tard : en-avant à trois phases de là. Essai refusé, défaite.',
+    choix: [
+      { texte: 'Serrer la main de l’arbitre.', issue: { recit: 'Tu vas le voir avant tout le monde. L’image tourne, et elle te grandit.', deltas: { mental: 3, reputation: 4 }, ovas: 5, fans: 7, coach: 4 } },
+      { texte: 'Exploser au micro d’après-match.', issue: { recit: 'Tu dis tout haut ce que le stade pense. La commission de discipline aussi a une télévision.', deltas: { moral: 4, reputation: -6, argent: -2500 }, ovas: 3, fans: 5, coach: -6 } },
+      { texte: 'Ne rien dire et rentrer.', issue: { recit: 'Tu passes devant les micros sans t’arrêter. Personne n’en parle le lendemain.', deltas: { moral: -4 }, ovas: 3 } },
+    ],
+  },
+  {
+    id: 'retour-de-blessure', emoji: '🩹', categorie: 'corps', poids: 0.7,
+    quand: (j) => j.forme <= 60,
+    titre: 'Le genou n’est pas prêt',
+    situation: 'Le kiné dit trois semaines. Le coach dit qu’il a besoin de toi samedi. Le genou, lui, ne dit rien — mais tu le sens à chaque appui.',
+    choix: [
+      { texte: 'Écouter le kiné.', issue: { recit: 'Trois semaines de plus, et un genou qui tient. Le coach râle, ton corps te remercie.', deltas: { forme: 12, mental: 2 }, ovas: 5, coach: -3 } },
+      { texte: 'Jouer infiltré.', issue: { recit: 'Tu joues, tu tiens soixante minutes. Et tu paies le mois suivant, au double.', deltas: { forme: -18, moral: 4, reputation: 3 }, ovas: 3, coach: 7 } },
+      { texte: 'Jouer, mais le dire au staff.', issue: { recit: 'Tu entres en fin de match, vingt minutes, sans forcer. Personne ne perd.', deltas: { forme: -4, mental: 2 }, ovas: 5, coach: 4 } },
+    ],
+  },
+  {
+    id: 'jeune-qui-pousse', emoji: '🌱', categorie: 'vestiaire', poids: 0.6,
+    quand: (j) => j.age >= 28,
+    titre: 'Le gamin qui joue à ton poste',
+    situation: 'Il a dix ans de moins que toi, il court plus vite, et le staff ne parle plus que de lui. Il vient te demander des conseils.',
+    choix: [
+      { texte: 'Tout lui apprendre.', issue: { recit: 'Tu lui donnes tout ce que tu sais. Il te pique ta place en février — et te remercie publiquement en mai.', deltas: { moral: 5, mental: 3, reputation: 5 }, ovas: 6, coach: 8, fans: 6 } },
+      { texte: 'Le laisser se débrouiller.', issue: { recit: 'Tu gardes tes secrets. Il progresse quand même, et le vestiaire remarque ton silence.', deltas: { moral: -3 }, ovas: 2, coach: -4 } },
+      { texte: 'Lui montrer qu’il n’est pas prêt.', issue: { recit: 'Tu le passes à la moulinette à l’entraînement. Il apprend dans la douleur — et il apprend vite.', deltas: { mental: 2, forme: -3 }, ovas: 4, coach: 2 } },
+    ],
+  },
+  {
+    id: 'derniere-saison', emoji: '🕯️', categorie: 'carriere', poids: 0.5,
+    quand: (j) => j.age >= 33,
+    titre: 'Une dernière saison ?',
+    situation: 'Le corps encaisse moins bien, la récupération prend trois jours. Le club te propose une année de plus — avec un rôle de doublure et un salaire réduit.',
+    choix: [
+      { texte: 'Signer, pour le vestiaire.', issue: { recit: 'Tu joues moins, tu portes plus. La saison est belle, autrement.', deltas: { argent: -4000, moral: 8, mental: 3 }, ovas: 6, coach: 8 } },
+      { texte: 'Refuser et chercher un dernier vrai contrat.', issue: { recit: 'Tu veux jouer, pas accompagner. Le marché te dira si tu as raison.', deltas: { mental: 2, moral: -2 }, ovas: 4, marche: true } },
+      { texte: 'Arrêter à la fin de la saison.', issue: { recit: 'Tu poses la date toi-même. C’est rare, et ça vaut tous les contrats.', deltas: { moral: 6, mental: 4 }, ovas: 6 } },
     ],
   },
 ];

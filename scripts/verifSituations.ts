@@ -1,5 +1,6 @@
 // La base d'évènements : contextuelle, variée, et les conséquences dures.
 import { SITUATIONS, situationPour, versScenario } from '../src/data/situations';
+import { TEXTES_SITUATIONS } from '../src/data/textesSituations';
 import { appliquerConsequence, lireDerapage, consequenceDuDerapage } from '../src/lib/consequences';
 import type { Joueur } from '../src/types';
 
@@ -20,6 +21,61 @@ console.log('  par catégorie :', Object.entries(parCat).map(([k, v]) => `${k} $
 const dures = SITUATIONS.flatMap((s) => s.choix).filter((c) => c.issue.dur);
 console.log(`  issues à conséquence dure : ${dures.length}`);
 for (const d of dures) console.log(`     ${d.issue.dur!.type.padEnd(20)} ← « ${d.texte} »`);
+
+// ⚠️ DEUX SITUATIONS NE PEUVENT PAS PARTAGER UN ID, et ça s'est produit : en
+// ajoutant le deuxième lot, trois ids existaient déjà (`paris-sportifs`,
+// `bagarre-boite`, `sponsor-local`). Rien ne plantait — c'est bien le problème.
+// La deuxième situation devenait injoignable (`SITUATIONS.find` rend la
+// première), `dejaVues` en écartait deux d'un coup, et surtout les DEUX
+// partageaient les mêmes clés de traduction : le texte de l'une s'affichait
+// sous le titre de l'autre. On l'attrape ici, une bonne fois.
+{
+  const vus = new Set<string>();
+  const doublons = SITUATIONS.map((s) => s.id).filter((id) => {
+    if (vus.has(id)) return true;
+    vus.add(id);
+    return false;
+  });
+  const ok = doublons.length === 0;
+  console.log(`  ${ok ? '✅' : '❌'} aucun identifiant en double${ok ? '' : ` : ${[...new Set(doublons)].join(', ')}`}`);
+  if (!ok) process.exitCode = 1;
+}
+
+// Et chaque situation doit avoir au moins deux choix : un « scénario » à une
+// seule issue n'est pas un choix, c'est une notification.
+{
+  const maigres = SITUATIONS.filter((s) => s.choix.length < 2).map((s) => s.id);
+  console.log(`  ${maigres.length ? '❌' : '✅'} au moins deux choix par situation`
+    + `${maigres.length ? ` : ${maigres.join(', ')}` : ''}`);
+  if (maigres.length) process.exitCode = 1;
+}
+
+// ⚠️ ET TOUT EST TRADUIT — SINON ON NE LE VOIT JAMAIS. `traduit()` retombe en
+// silence sur le français quand une clé manque : c'est un excellent filet, et
+// une excellente façon de livrer six langues à moitié faites sans que personne
+// ne s'en aperçoive. Ce contrôle-ci reconstitue les clés attendues à partir du
+// NOMBRE DE CHOIX de chaque situation et exige qu'elles existent toutes, dans
+// les sept langues.
+{
+  const langues = ['fr', 'en', 'es', 'it', 'de', 'pt', 'ja'] as const;
+  const manquantes: string[] = [];
+  const incompletes: string[] = [];
+  for (const s of SITUATIONS) {
+    const cles = ['titre', 'txt', ...s.choix.flatMap((_, i) => [`c${i}`, `r${i}`])];
+    for (const suffixe of cles) {
+      const cle = `sit.${s.id}.${suffixe}`;
+      const entree = TEXTES_SITUATIONS[cle];
+      if (!entree) manquantes.push(cle);
+      else if (langues.some((l) => !entree[l]?.trim())) incompletes.push(cle);
+    }
+  }
+  const attendues = SITUATIONS.reduce((n, s) => n + 2 + s.choix.length * 2, 0);
+  const ok = manquantes.length === 0 && incompletes.length === 0;
+  console.log(`  ${ok ? '✅' : '❌'} ${attendues} clés de traduction, 7 langues`
+    + (manquantes.length ? ` — ${manquantes.length} absente(s) : ${manquantes.slice(0, 4).join(', ')}…` : '')
+    + (incompletes.length ? ` — ${incompletes.length} incomplète(s) : ${incompletes.slice(0, 4).join(', ')}…` : ''));
+  if (!ok) process.exitCode = 1;
+}
 
 console.log('\n=== 2. C’EST CONTEXTUEL ===');
 const profils: [string, Partial<Joueur>][] = [

@@ -4363,6 +4363,23 @@ function jouerMatch(j: Joueur, intensite: number): ResultatSemaine {
   };
 }
 
+/**
+ * LE JOUEUR PART-IL AVEC SA SÉLECTION CETTE SEMAINE ?
+ *
+ * ⚠️ FONCTION À PART, ET EXPORTÉE, POUR QU'ELLE SOIT TESTABLE. C'est elle qui
+ * tranche entre « je joue le Tournoi » et « je joue mon championnat », et le bug
+ * qu'elle corrige était invisible autrement : `jouerSemaine` n'est pas exportée,
+ * la seule façon de vérifier le comportement était de dérouler une carrière
+ * entière. Ici, `scripts/verifSelection.ts` la teste en trois lignes.
+ *
+ * Séniors ET U20 : une convocation chez les moins de 20 ans mobilise autant
+ * qu'une cape A — on ne joue pas avec son club le week-end du Tournoi U20.
+ */
+export function partEnSelection(j: Joueur, sem: Semaine): boolean {
+  return sem.type === 'international'
+    && (convocation(j).selectionne || convocationU20(j).selectionne);
+}
+
 function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
   // À l'infirmerie : on récupère, une semaine à la fois.
   if (j.blessure && j.blessure.semaines > 0) {
@@ -4383,8 +4400,18 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
   // week-ends de Coupe d'Europe et de Tournoi des 6 Nations. Ces divisions-là
   // n'ont ni coupe européenne ni internationaux : leur championnat continue.
   const divisionDuJoueur = j.division ?? 'fed3';
+  // ⚠️ ...SAUF QUAND ON EST EN SÉLECTION, ET C'ÉTAIT UN BUG.
+  // La règle « les amateurs jouent aussi les week-ends internationaux » était
+  // appliquée AVANT de regarder si le joueur était convoqué : un espoir de
+  // Fédérale appelé chez les U20 de son pays voyait sa sélection purement et
+  // simplement escamotée, et jouait son match de championnat à la place. Le
+  // panneau de carrière, lui, affichait bien l'affiche internationale — deux
+  // vérités pour la même semaine.
+  // Quand on part avec sa sélection, on ne joue pas le championnat : le club
+  // joue sans nous, comme dans la vraie vie.
+  const enSelection = partEnSelection(j, sem);
   const semaineJouee: Semaine =
-    estAmateur(divisionDuJoueur) && (sem.type === 'coupe' || sem.type === 'international')
+    estAmateur(divisionDuJoueur) && (sem.type === 'coupe' || (sem.type === 'international' && !enSelection))
       ? { ...sem, type: 'championnat', libelle: 'Journée de championnat' }
       : sem;
 
