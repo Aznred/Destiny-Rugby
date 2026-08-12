@@ -10,14 +10,18 @@
 // ⚠️ Comme pour le MJ, ce que renvoie le modèle passe TOUJOURS par
 // `plafonnerDeltas()` : une situation générée ne peut pas offrir +10 en vitesse.
 
-import type { EvenementHebdo, Joueur, StatVariable } from '../types';
+import type {
+  ConsequenceDure, DecisionClub, EvenementHebdo, Joueur, StatVariable,
+} from '../types';
 import type { Scenario, ChoixScenario } from '../data/scenarios';
 import { SCENARIOS } from '../data/scenarios';
-import type { ConsequenceDure } from '../data/situations';
 import { interviewPour, type Interview } from '../data/interviews';
 import {
-  fichePersonnage, nettoyerDeltas, plafonnerDeltas, ressembleATriche,
+  fichePersonnage, lireConsequence, lireDecisionClub, nettoyerDeltas,
+  niveauDuJoueur, plafonnerDeltas, ressembleATriche,
+  PERSONNALITE_MJ, POUVOIRS_CARRIERE, STATS_AUTORISEES,
 } from './mj';
+import { consequenceAutorisee, niveauDeFaute } from './consequences';
 import { appelIAJSON } from './groq';
 import { consigneDeLangue, t } from './i18n';
 import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
@@ -282,6 +286,8 @@ Il vient d'écrire ce qu'il fait. Tu juges, et tu es TRÈS SÉVÈRE.
 un pavé à chaque fois, et le joueur arrête de lire. Pas de décor, pas de ressenti, pas de
 morale finale — ce qui se passe, et ce que ça change.
 
+${PERSONNALITE_MJ}
+
 TU JUGES SUR LES STATISTIQUES, PAS SUR L'INTENTION :
 - Chaque attribut est noté sur 100. 30 = amateur du dimanche, 50 = bon niveau régional,
   65 = professionnel confirmé, 80 = international, 90+ = meilleur du monde.
@@ -299,15 +305,7 @@ SÉVÉRITÉ (non négociable) :
   et son issue réaliste, souvent un échec — et tu peux sanctionner le ridicule.
 - Une réponse hors sujet, vide ou absurde ne rapporte rien et coûte du moral.
 
-CE QUE TU PEUX DÉCLENCHER :
-- "marche": true — le joueur se met VRAIMENT sur le marché des transferts. Utilise-le quand
-  sa réponse consiste à vouloir partir, à demander un bon de sortie ou à écouter un autre club.
-  ⚠️ TU NE FAIS JAMAIS CHANGER DE CLUB DANS TON RÉCIT : ce n'est pas toi qui signes. Tu racontes
-  au plus que l'agent se met au travail.
-- "consequence" — UNIQUEMENT si la scène était dangereuse ET si la réponse du joueur va au bout
-  de la bêtise. Valeurs : "prison", "accident", "suspension", "exclusionClub", "deces",
-  "finDeCarriere". Sinon, omets complètement le champ. Ce n'est pas une punition au hasard :
-  c'est la suite logique de ce qu'il vient d'écrire.
+${POUVOIRS_CARRIERE}
 
 RÉPONDS UNIQUEMENT EN JSON VALIDE, format exact :
 {
@@ -315,10 +313,16 @@ RÉPONDS UNIQUEMENT EN JSON VALIDE, format exact :
   "titre": "titre court (max 5 mots)",
   "reussite": "echec" | "mitige" | "reussite",
   "deltas": { "moral": -4 },
-  "marche": false
+  "marche": false,
+  "consequence": "exclusionClub",
+  "semaines": 0,
+  "motif": "tu as traité le président de voleur devant les caméras",
+  "club": { "type": "prime", "montant": 1200, "motif": "homme du match." }
 }
-STATS AUTORISÉES dans "deltas" : vitesse, force, endurance, plaquage, passe, jeuAuPied,
-vision, mental (±1, ±2 pour un exploit), forme, moral, reputation (-15 à +10), argent (€, crédible).
+Les quatre derniers champs sont FACULTATIFS : omets-les complètement quand ils ne
+s'appliquent pas — c'est le cas le plus fréquent.
+
+${STATS_AUTORISEES}
 Aucune autre clé.`;
 
 export interface JugementMJ {
@@ -332,8 +336,17 @@ export interface JugementMJ {
   attributsGagnes: number;
   /** La réponse met vraiment le joueur sur le marché. */
   marche: boolean;
-  /** Conséquence dure, seulement si l'évènement était risqué. */
+  /**
+   * Conséquence dure — filtrée par `consequenceAutorisee()` : soit la scène
+   * était dangereuse, soit la réponse du joueur EST la faute.
+   */
   consequence?: ConsequenceDure;
+  /** Durée d'indisponibilité retenue pour cette conséquence. */
+  semaines?: number;
+  /** Le motif écrit par le MJ, repris dans le journal. */
+  motif?: string;
+  /** Augmentation, prime ou amende décidée par le club. */
+  club?: DecisionClub;
 }
 
 export interface ContexteJugement {
@@ -344,10 +357,6 @@ export interface ContexteJugement {
   /** Ce qu'il reste de budget d'attributs pour la saison. */
   budgetAttributs: number;
 }
-
-const CONSEQUENCES_VALIDES = new Set<ConsequenceDure>([
-  'prison', 'accident', 'suspension', 'exclusionClub', 'deces', 'finDeCarriere',
-]);
 
 export async function jugerReaction(opts: ContexteJugement): Promise<JugementMJ> {
   const j = opts.joueur;
@@ -364,14 +373,23 @@ export async function jugerReaction(opts: ContexteJugement): Promise<JugementMJ>
         role: 'system',
         content:
           `${fichePersonnage(j)}\nPoste : ${POSTE_PAR_ID[j.poste].nom}\nATTRIBUTS : ${attributs}.`
+          // ⚠️ LE NIVEAU, RÉPÉTÉ AU MOMENT DE TRANCHER. C'est la ligne à
+          // laquelle le MJ compare l'ambition du joueur avant de le clasher.
+          + `\nNIVEAU RÉEL : ${niveauDuJoueur(j)}.`
           + (opts.evenement.risque
-            ? '\nCETTE SCÈNE EST DANGEREUSE : une conséquence dure est autorisée si le joueur va au bout.'
-            : '\nCETTE SCÈNE N’EST PAS DANGEREUSE : le champ "consequence" est INTERDIT.'),
+            ? '\nCETTE SCÈNE EST DANGEREUSE : toutes les conséquences dures sont ouvertes '
+              + 'si le joueur va au bout — jusqu’à la prison ou la mort.'
+            : '\nCETTE SCÈNE N’EST PAS DANGEREUSE : seules les conséquences que le joueur '
+              + 'DÉCLENCHE LUI-MÊME par ce qu’il écrit sont recevables (blessure ; et, s’il '
+              + 's’en prend à son club, à son image ou aux règles : suspension, exclusionClub, '
+              + 'banRugby). Ni "deces" ni "accident" ici.'),
       },
       { role: 'system', content: `LA SCÈNE : ${opts.evenement.texte}` },
       { role: 'user', content: opts.reponse },
     ],
-    { temperature: 0.9, maxTokens: 300 },
+    // 300 tokens suffisaient pour un récit et des deltas ; il faut de la place
+    // pour "consequence", "motif" et "club" sans tronquer le JSON.
+    { temperature: 0.9, maxTokens: 420 },
   );
   return parserJugement(brut, opts);
 }
@@ -388,15 +406,32 @@ export function parserJugement(brut: string, opts: ContexteJugement): JugementMJ
     budgetAttributs: opts.budgetAttributs,
     age: opts.joueur.age,
     salaire: opts.joueur.contrat?.salaire ?? 0,
+    abonnes: opts.joueur.abonnes ?? 0,
     suspect: ressembleATriche(opts.reponse),
   });
 
-  // La conséquence dure n'est retenue que si la scène le permettait : c'est le
-  // verrou qui empêche le MJ de tuer un joueur sur une réponse anodine.
-  const brute = typeof obj.consequence === 'string' ? (obj.consequence as ConsequenceDure) : undefined;
-  const consequence = opts.evenement.risque && brute && CONSEQUENCES_VALIDES.has(brute)
+  // ═══ LE VERROU DES CONSÉQUENCES DURES ════════════════════════════════════
+  // Il avait UNE clé (« la scène était-elle dangereuse ? ») ; il en a deux
+  // depuis la demande « toute action qui porte atteinte au club ou à son image,
+  // c'est l'exclusion ». La seconde, c'est la RÉPONSE DU JOUEUR : quand elle
+  // est elle-même la faute (insulter le président, truquer un match, se doper),
+  // la sanction disciplinaire passe même si la semaine avait l'air tranquille.
+  // Ce qui reste impossible : mourir ou finir en garde à vue après « je vais
+  // m'entraîner ». Voir `lib/consequences.ts`.
+  const faute = niveauDeFaute(opts.reponse);
+  const brute = lireConsequence(obj.consequence);
+  const consequence = brute && consequenceAutorisee(brute, opts.evenement.risque, faute)
     ? brute
     : undefined;
+
+  // ⚠️ UNE BLESSURE SUR UNE SCÈNE ANODINE RESTE UNE BLESSURE DE SEMAINE. Sans
+  // ce plafond, « le kiné te propose un massage » pouvait coûter la saison.
+  const semainesBrutes = typeof obj.semaines === 'number' && Number.isFinite(obj.semaines)
+    ? Math.max(1, Math.min(99, Math.round(obj.semaines)))
+    : undefined;
+  const semaines = consequence === 'blessure' && !opts.evenement.risque
+    ? Math.min(semainesBrutes ?? 3, 10)
+    : semainesBrutes;
 
   const reussite = obj.reussite === 'reussite' || obj.reussite === 'echec' ? obj.reussite : 'mitige';
   return {
@@ -408,6 +443,11 @@ export function parserJugement(brut: string, opts: ContexteJugement): JugementMJ
     attributsGagnes,
     marche: obj.marche === true,
     consequence,
+    semaines,
+    motif: typeof obj.motif === 'string' && obj.motif.trim()
+      ? obj.motif.trim().slice(0, 140)
+      : undefined,
+    club: lireDecisionClub(obj.club),
   };
 }
 

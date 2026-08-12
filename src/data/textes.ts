@@ -688,6 +688,12 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   'attr.moral': { fr: 'Moral', en: 'Morale', es: 'Moral', it: 'Morale', de: 'Moral', pt: 'Moral', ja: '士気' },
   'attr.reputation': { fr: 'Réputation', en: 'Reputation', es: 'Reputación', it: 'Reputazione', de: 'Ruf', pt: 'Reputação', ja: '評判' },
   'attr.argent': { fr: 'Argent', en: 'Money', es: 'Dinero', it: 'Denaro', de: 'Geld', pt: 'Dinheiro', ja: '資金' },
+  // ⚠️ TROIS JAUGES QUI NE SONT PAS DES ATTRIBUTS. Elles vivent sous le même
+  // préfixe `attr.` parce que c'est ce que lit `labelAttribut()` quand le
+  // journal affiche un delta — et le MJ peut désormais les faire bouger.
+  'attr.popularite': { fr: 'Popularité', en: 'Popularity', es: 'Popularidad', it: 'Popolarità', de: 'Beliebtheit', pt: 'Popularidade', ja: '人気' },
+  'attr.abonnes': { fr: 'Abonnés', en: 'Followers', es: 'Seguidores', it: 'Follower', de: 'Follower', pt: 'Seguidores', ja: 'フォロワー' },
+  'attr.confianceCoach': { fr: 'Confiance du staff', en: 'Staff trust', es: 'Confianza del cuerpo técnico', it: 'Fiducia dello staff', de: 'Vertrauen des Trainerstabs', pt: 'Confiança da equipa técnica', ja: 'スタッフの信頼' },
 
   // --- LES 15 POSTES --------------------------------------------------------
   // Lus par `nomPoste()`. Les noms suivent l'usage de CHAQUE pays : un pilier

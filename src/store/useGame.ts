@@ -23,6 +23,7 @@ import type {
   MessageDM,
   TransfertAnnonce,
   ProfilSocial,
+  DecisionClub,
 } from '../types';
 import {
   publierPost, pseudoDe, feedAmbiance, suggestionsLocales,
@@ -88,7 +89,10 @@ import {
 } from '../lib/groq';
 import { EVENEMENTS, traduireEvenement } from '../data/evenements';
 import { situationPour, versScenario, type ConsequenceDure } from '../data/situations';
-import { appliquerConsequence, lireDerapage, consequenceDuDerapage } from '../lib/consequences';
+import {
+  appliquerActionClub, appliquerConsequence, consequenceAutorisee, lireDerapage,
+  consequenceDuDerapage, niveauDeFaute,
+} from '../lib/consequences';
 import {
   SKIN_PAR_ID, EQUIPEMENT_PAR_ID, EQUIPEMENTS_RETIRES, type CategorieEquipement,
 } from '../data/boutique';
@@ -513,6 +517,15 @@ interface GameState {
     ovasDefis?: number;
     /** Idem pour les actions au MJ (`PLAFOND_OVAS_ACTIONS_PAR_SAISON`). */
     ovasActions?: number;
+    /**
+     * Augmentations de salaire accordées par le MJ cette saison.
+     * ⚠️ UNE SEULE (`AUGMENTATIONS_PAR_SAISON`). Le MJ juge 43 semaines par
+     * saison : sans ce compteur, un joueur bavard doublait son salaire avant
+     * Noël, et toute l'économie (cote, offres, plafond d'argent) partait avec.
+     */
+    augmentations?: number;
+    /** Primes déjà versées par le MJ cette saison, en € (`PART_PRIMES_PAR_SAISON`). */
+    primesIA?: number;
   };
   tropheesEnAttente: string[]; // file des trophées à afficher en 3D
   /**
@@ -600,6 +613,8 @@ interface GameState {
   refuserApproche: (id: string) => void;
   appliquerPreAccord: () => void;
   demanderTransfert: () => void;
+  /** Après un licenciement : ouvre le marché tout de suite, ou clôt la carrière. */
+  retrouverUnClub: () => void;
   // fin de carrière
   prendreMentorat: () => void;
   // lot 7 — réseau social, succès et défis
@@ -685,7 +700,7 @@ export const useGame = create<GameState>()(
       avanceRapide: false,
       evenementHebdo: null,
       evenementsVus: [],
-      compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0 },
+      compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
       tropheesEnAttente: [],
       approches: [],
       theme: 'vert',
@@ -782,7 +797,7 @@ export const useGame = create<GameState>()(
           evenementHebdo: null,
           evenementsVus: [],
           mouvementsClubs: {},
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           // Nouvelle carrière : timeline et défis repartent de zéro. Les SUCCÈS,
           // eux, sont un palmarès de joueur — ils traversent les carrières (et
           // ne peuvent donc pas être refarmés pour des Ovas).
@@ -825,9 +840,36 @@ export const useGame = create<GameState>()(
           budgetAttributs: Math.max(0, BUDGET_IA_PAR_SAISON - compteurs.gainsIA),
           age: joueur.age,
           salaire: joueur.contrat?.salaire ?? 0,
+          abonnes: joueur.abonnes ?? 0,
           suspect: ressembleATriche(actionJoueur),
         });
-        const j = appliquerDeltas(joueur, deltas);
+
+        // ⚠️ UNE ACTION LIBRE ENGAGE AUTANT QU'UNE RÉPONSE À LA SCÈNE DE LA
+        // SEMAINE. Écrire « je vais dire au président ce que je pense de lui
+        // devant les caméras », c'est la même faute, qu'on l'écrive dans la
+        // barre d'action ou en réponse à une scène — et ça doit coûter la même
+        // chose. Il n'y a pas d'évènement `risque` ici : le seul juge de paix
+        // est donc ce que le joueur a écrit (`niveauDeFaute`), ce qui garantit
+        // au passage qu'on ne meurt jamais après « je m'entraîne au plaquage ».
+        const faute = niveauDeFaute(actionJoueur);
+        const consequence = r.consequence
+          && consequenceAutorisee(r.consequence, false, faute)
+          ? r.consequence
+          : undefined;
+        const suites = appliquerSuitesMJ(
+          appliquerDeltas(joueur, deltas),
+          {
+            consequence,
+            // Une blessure hors scène dangereuse reste une affaire de semaines.
+            semaines: consequence === 'blessure'
+              ? Math.min(r.semaines ?? 3, 10)
+              : r.semaines,
+            motif: r.motif ?? r.evenement ?? actionJoueur.slice(0, 120),
+            club: r.club,
+          },
+          compteurs,
+        );
+        const j = suites.joueur;
 
         const entrees: EntreeJournal[] = [
           { id: idUnique(), saison: j.saison, role: 'joueur', texte: actionJoueur },
@@ -852,6 +894,7 @@ export const useGame = create<GameState>()(
               'On ne progresse pas en le demandant : entraîne-toi, joue, et laisse les saisons faire.',
           });
         }
+        entrees.push(...suites.entrees);
 
         // Plafonné à la saison (voir `PLAFOND_OVAS_ACTIONS_PAR_SAISON`).
         const primeAction = Math.min(1, Math.max(0,
@@ -863,9 +906,16 @@ export const useGame = create<GameState>()(
             ...s.compteurs,
             gainsIA: s.compteurs.gainsIA + attributsGagnes,
             ovasActions: (s.compteurs.ovasActions ?? 0) + primeAction,
+            augmentations: (s.compteurs.augmentations ?? 0) + (suites.augmentation ? 1 : 0),
+            primesIA: (s.compteurs.primesIA ?? 0) + suites.primeVersee,
           },
           journal: [...s.journal, ...entrees],
         }));
+
+        if (r.marche && !suites.finale && !suites.sansClub) get().demanderTransfert();
+        if (suites.sansClub) get().retrouverUnClub();
+        get().verifierSucces();
+        if (suites.finale) get().prendreRetraite();
       },
 
       saisonSuivante: () => {
@@ -1516,7 +1566,7 @@ export const useGame = create<GameState>()(
           statsReelles: {},
           journeesReelles: {},
           coins: s.coins + gain,
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           tropheesEnAttente: [...s.tropheesEnAttente, ...gagnes],
           mouvementsClubs: majMouvements,
           journal: [...s.journal, ...entrees],
@@ -2037,6 +2087,9 @@ export const useGame = create<GameState>()(
         const { joueur, approches } = get();
         const a = approches.find((x) => x.id === id);
         if (!joueur || !a || a.etat !== 'ouverte') return;
+        // Sans contrat valide, on ne serre pas la main pour l'été prochain : on
+        // signe maintenant (voir le commentaire en bas de cette fonction).
+        const libre = contratBloque(joueur);
         const preAccord: PreAccord = {
           club: a.club, division: a.division, divisionNom: a.divisionNom,
           salaire: a.offre.salaire, prime: a.offre.prime, saisons: a.offre.saisons,
@@ -2068,9 +2121,22 @@ export const useGame = create<GameState>()(
             role: 'systeme' as const,
             titre: a.prolongation ? `🤝 Accord de prolongation à ${a.club}` : `🤝 Accord trouvé avec ${a.club}`,
             texte: `${resumerTermes(a.offre)}. `
-              + `⚠️ Rien ne change avant l'intersaison : tu finis la saison à ${joueur.club}.`,
+              + (libre
+                ? 'Tu étais sans club : la signature prend effet immédiatement.'
+                : `⚠️ Rien ne change avant l'intersaison : tu finis la saison à ${joueur.club}.`),
           }],
         }));
+        // ═══ UN JOUEUR LIBRE SIGNE ET JOUE — TOUT DE SUITE ═══════════════════
+        // ⚠️ LA RÈGLE « LE TRANSFERT NE SE FAIT QU'À L'INTERSAISON » VISE UN
+        // JOUEUR SOUS CONTRAT. Appliquée à un joueur libre, elle produisait
+        // l'inverse de ce qu'elle protège : contrat épuisé (ou rompu par une
+        // exclusion) → `contratBloque()` gèle le calendrier → le joueur signe
+        // → mais le pré-accord n'était consommé qu'à la fin de la saison
+        // SUIVANTE, celle qu'il ne pouvait pas jouer. Il restait donc affiché
+        // au club qu'il venait de quitter, sans contrat, sans match, jusqu'à
+        // la fin des temps. Un joueur sans club signe et joue le samedi : c'est
+        // ce que fait cette ligne, et c'est ce que la vraie vie fait aussi.
+        if (libre) get().appliquerPreAccord();
         get().verifierSucces();
       },
 
@@ -2307,28 +2373,27 @@ export const useGame = create<GameState>()(
       abandonnerEvenement: () => set({ attenteEvenement: false }),
 
       appliquerJugement: (jugement, reponse) => {
-        const { joueur, evenementHebdo } = get();
+        const { joueur, evenementHebdo, compteurs } = get();
         if (!joueur || !evenementHebdo) return;
 
-        let j = appliquerDeltas(joueur, jugement.deltas);
-
         // ⚠️ LA CONSÉQUENCE DURE N'EST JAMAIS UNE SURPRISE. `lib/ia.ts` ne l'a
-        // laissée passer que si la scène était marquée `risque` ET si la réponse
-        // du joueur allait au bout. C'est la traduction de la demande : « des
-        // folies furieuses qui peuvent mener à la mort, l'arrestation, etc. ».
-        let entreeDure: EntreeJournal | null = null;
-        let finale = false;
-        if (jugement.consequence) {
-          const effet = appliquerConsequence(
-            j, jugement.consequence, evenementHebdo.titre, 10,
-          );
-          j = effet.joueur;
-          finale = effet.finale;
-          entreeDure = {
-            id: idUnique(), saison: j.saison, role: 'systeme',
-            titre: `${effet.emoji} ${effet.titre}`, texte: effet.texte,
-          };
-        }
+        // laissée passer que si la scène était marquée `risque`, OU si la
+        // réponse du joueur EST elle-même la faute (insulter son club, truquer
+        // un match, prendre le volant ivre). C'est la traduction de la demande :
+        // « des folies furieuses qui peuvent mener à la mort, l'arrestation »,
+        // et « toute action qui porte atteinte au club, c'est l'exclusion ».
+        const suites = appliquerSuitesMJ(
+          appliquerDeltas(joueur, jugement.deltas),
+          {
+            consequence: jugement.consequence,
+            semaines: jugement.semaines,
+            // Sans motif écrit par le MJ, le titre de la scène fait l'affaire.
+            motif: jugement.motif ?? evenementHebdo.titre,
+            club: jugement.club,
+          },
+          compteurs,
+        );
+        const j = suites.joueur;
 
         const entrees: EntreeJournal[] = [
           { id: idUnique(), saison: j.saison, role: 'joueur', texte: reponse },
@@ -2349,7 +2414,7 @@ export const useGame = create<GameState>()(
               + 'On ne progresse pas en le demandant : entraîne-toi, joue, et laisse les saisons faire.',
           });
         }
-        if (entreeDure) entrees.push(entreeDure);
+        entrees.push(...suites.entrees);
 
         // ⚠️ C'EST LA SCÈNE HEBDOMADAIRE — 43 par saison. Sans le plafond
         // ci-dessous, répondre à sa semaine rapportait à lui seul ~500 Ovas par
@@ -2365,6 +2430,8 @@ export const useGame = create<GameState>()(
             ...s.compteurs,
             gainsIA: s.compteurs.gainsIA + jugement.attributsGagnes,
             ovasActions: (s.compteurs.ovasActions ?? 0) + primeHebdo,
+            augmentations: (s.compteurs.augmentations ?? 0) + (suites.augmentation ? 1 : 0),
+            primesIA: (s.compteurs.primesIA ?? 0) + suites.primeVersee,
           },
           journal: [...s.journal, ...entrees],
         }));
@@ -2373,11 +2440,54 @@ export const useGame = create<GameState>()(
         // club dans son récit (le prompt le lui interdit) : quand la réponse du
         // joueur revient à vouloir partir, on ouvre le VRAI marché — celui qui
         // change le club, la division, le salaire et la durée quand on signe.
-        if (jugement.marche && !finale) get().demanderTransfert();
+        if (jugement.marche && !suites.finale && !suites.sansClub) get().demanderTransfert();
+        // Licencié : le marché s'ouvre TOUT DE SUITE, sinon la carrière se fige.
+        if (suites.sansClub) get().retrouverUnClub();
 
         get().signalerDefi('situation');
         get().verifierSucces();
-        if (finale) get().prendreRetraite();
+        if (suites.finale) get().prendreRetraite();
+      },
+
+      /**
+       * LE JOUEUR VIENT D'ÊTRE LICENCIÉ — ET IL FAUT QU'IL PUISSE REBONDIR.
+       *
+       * ⚠️ SANS CETTE FONCTION, UNE EXCLUSION FIGEAIT LA PARTIE. Un contrat à
+       * zéro saison rend `contratBloque()` vrai : `semaineSuivante` refuse
+       * d'avancer, `saisonSuivante` refuse de démarrer, et la seule porte de
+       * sortie — le mercato — ne s'ouvre qu'à l'intersaison. Le joueur restait
+       * planté sur sa semaine, pour toujours.
+       *
+       * On ouvre donc le marché dans la seconde. Et si vraiment personne n'en
+       * veut, on ne laisse pas le joueur en suspens : le rugby s'arrête là,
+       * exactement comme quand un contrat se termine sans repreneur.
+       */
+      retrouverUnClub: () => {
+        const joueur = get().joueur;
+        if (!joueur) return;
+        const ouvertes = get().approches.filter((a) => a.etat === 'ouverte').length;
+        const nees = get().susciterApproches(4, true);
+        if (nees > 0 || ouvertes > 0) {
+          set((s) => ({
+            journal: [...s.journal, {
+              id: idUnique(), saison: joueur.saison, role: 'systeme' as const,
+              titre: '📞 Il va falloir retrouver un club',
+              texte: 'Sans contrat, tu ne joues plus une minute : le calendrier s’arrête pour toi. '
+                + 'Ouvre tes messages privés sur 𝕏 L’Ovale, négocie, et signe — '
+                + 'cette fois, la signature prend effet immédiatement.',
+            }],
+          }));
+          return;
+        }
+        set((s) => ({
+          journal: [...s.journal, {
+            id: idUnique(), saison: joueur.saison, role: 'mj' as const,
+            titre: '🚪 Plus aucun club',
+            texte: `Le téléphone ne sonne pas. Après ce que tu as fait, plus personne `
+              + `ne veut de ton nom sur une feuille de match : la carrière s'arrête ici.`,
+          }],
+        }));
+        get().prendreRetraite();
       },
 
       // ---- AGENT (lot 6) : il prélève sa commission, mais ouvre les portes ----
@@ -2553,6 +2663,8 @@ export const useGame = create<GameState>()(
         // pratique aucun scénario ne le remplissait, si bien que « Offre d'un
         // club plus huppé » racontait un départ qui n'arrivait jamais.
         if (choix.issue.marche && !finale) get().demanderTransfert();
+        // Une issue qui licencie doit rouvrir le marché, comme pour le MJ.
+        if (dur?.type === 'exclusionClub' && !finale) get().retrouverUnClub();
 
         get().signalerDefi('situation');
         get().verifierSucces();
@@ -2643,7 +2755,7 @@ export const useGame = create<GameState>()(
           tropheesEnAttente: [],
           approches: [],
           mouvementsClubs: {},
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           posts: [],
           filSemaine: '',
           notifsSocial: [],
@@ -2769,6 +2881,12 @@ export const useGame = create<GameState>()(
         }));
         get().signalerDefi('post');
         get().verifierSucces();
+        // Salir son club en public, c'est le licenciement — et donc un marché
+        // à rouvrir dans la seconde (`retrouverUnClub`).
+        if (derapage && !carriereFinie
+          && consequenceDuDerapage(derapage).type === 'exclusionClub') {
+          get().retrouverUnClub();
+        }
         if (carriereFinie) get().prendreRetraite();
       },
 
@@ -4622,6 +4740,107 @@ function afficheDuJour(
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LES SUITES D'UNE DÉCISION DU MJ
+// ═══════════════════════════════════════════════════════════════════════════
+// Demande explicite : « que Groq puisse gérer les actions de notre carrière :
+// virer du club, mort du joueur, blessure, suspension, prison, augmentation,
+// prime de match, popularité ».
+//
+// ⚠️ UN SEUL ENDROIT POUR LES DEUX CHEMINS. Le joueur peut écrire librement
+// (`appliquerReponse`) ou répondre à la scène de la semaine
+// (`appliquerJugement`) : sans cette fonction, les mêmes règles auraient été
+// recopiées deux fois, et auraient divergé au premier correctif.
+//
+// ⚠️ ET C'EST ICI QUE LES PLAFONDS DE SAISON S'APPLIQUENT. Le MJ pourrait
+// accorder une augmentation par semaine : quarante-trois par saison, et
+// l'économie du jeu n'existe plus. Une augmentation par saison, et un cumul de
+// primes borné au salaire — le reste est raconté, pas versé.
+interface SuitesMJ {
+  consequence?: ConsequenceDure;
+  semaines?: number;
+  motif?: string;
+  club?: DecisionClub;
+}
+
+interface ResultatSuites {
+  joueur: Joueur;
+  entrees: EntreeJournal[];
+  /** La carrière s'arrête ici (décès, radiation, fin de carrière). */
+  finale: boolean;
+  /** Le joueur vient de perdre son club : le marché doit s'ouvrir tout de suite. */
+  sansClub: boolean;
+  /** Une augmentation a été consommée cette saison. */
+  augmentation: boolean;
+  /** Primes versées par cette décision, à ajouter au cumul de la saison. */
+  primeVersee: number;
+}
+
+/** Une augmentation par saison, pas deux. */
+const AUGMENTATIONS_PAR_SAISON = 1;
+/** Cumul de primes que le MJ peut verser sur une saison, en part de salaire. */
+const PART_PRIMES_PAR_SAISON = 0.6;
+const PRIMES_MINIMUM_PAR_SAISON = 2000;
+
+function appliquerSuitesMJ(
+  depart: Joueur,
+  suites: SuitesMJ,
+  compteurs: { augmentations?: number; primesIA?: number },
+): ResultatSuites {
+  let joueur = depart;
+  const entrees: EntreeJournal[] = [];
+  let finale = false;
+  let sansClub = false;
+  let augmentation = false;
+  let primeVersee = 0;
+
+  // ---- 1. La conséquence dure (déjà filtrée par `consequenceAutorisee`) ----
+  if (suites.consequence) {
+    const motif = suites.motif?.trim() || 'ce que tu viens de faire';
+    const effet = appliquerConsequence(
+      joueur, suites.consequence, motif, suites.semaines ?? 10,
+    );
+    joueur = effet.joueur;
+    finale = effet.finale;
+    sansClub = suites.consequence === 'exclusionClub';
+    entrees.push({
+      id: idUnique(), saison: joueur.saison, role: 'systeme',
+      titre: `${effet.emoji} ${effet.titre}`, texte: effet.texte,
+    });
+  }
+
+  // ---- 2. Ce que le club décide côté portefeuille ----
+  // ⚠️ Jamais après une radiation ou un décès : on ne primait tout de même pas
+  // un joueur que la fédération vient de rayer à vie.
+  if (suites.club && !finale) {
+    const type = suites.club.type;
+    const salaire = joueur.contrat?.salaire ?? 0;
+    const plafondPrimes = Math.max(
+      PRIMES_MINIMUM_PAR_SAISON, Math.round(salaire * PART_PRIMES_PAR_SAISON),
+    );
+    const dejaVersees = compteurs.primesIA ?? 0;
+    const trop = type === 'augmentation'
+      ? (compteurs.augmentations ?? 0) >= AUGMENTATIONS_PAR_SAISON
+      : type === 'prime' && dejaVersees >= plafondPrimes;
+    if (!trop) {
+      const effet = appliquerActionClub(
+        joueur, type, suites.club.montant ?? 0, suites.club.motif?.trim() || '',
+      );
+      if (effet) {
+        joueur = effet.joueur;
+        if (type === 'augmentation') augmentation = true;
+        if (type === 'prime') primeVersee = effet.montant;
+        entrees.push({
+          id: idUnique(), saison: joueur.saison, role: 'systeme',
+          titre: `${effet.emoji} ${effet.titre}`, texte: effet.texte,
+        });
+      }
+    }
+  }
+
+  return { joueur, entrees, finale, sansClub, augmentation, primeVersee };
+}
+
 function appliquerDeltas(joueur: Joueur, deltas: Partial<Record<StatVariable, number>>): Joueur {
   const j: Joueur = { ...joueur, attributs: { ...joueur.attributs } };
   for (const [cle, val] of Object.entries(deltas) as [StatVariable, number][]) {
@@ -4632,6 +4851,13 @@ function appliquerDeltas(joueur: Joueur, deltas: Partial<Record<StatVariable, nu
       j[cle] = borne(j[cle] + val);
     } else if (cle === 'argent') {
       j.argent = Math.max(0, j.argent + val);
+    } else if (cle === 'popularite' || cle === 'confianceCoach') {
+      // Deux jauges 0-100 arrivées après coup : elles valent 50 par défaut sur
+      // les vieilles sauvegardes, jamais `undefined`.
+      j[cle] = borne((j[cle] ?? 50) + val);
+    } else if (cle === 'abonnes') {
+      // Un compteur, pas une jauge : pas de borne haute, mais jamais négatif.
+      j.abonnes = Math.max(0, (j.abonnes ?? 0) + val);
     }
   }
   return j;

@@ -111,6 +111,12 @@ export const ATTRIBUTS_LABELS: Record<string, string> = {
   moral: 'Moral',
   reputation: 'Réputation',
   argent: 'Argent',
+  // Trois clés qui ne sont PAS des attributs, mais que le MJ fait bouger
+  // (`StatVariable`) : elles ont besoin d'un libellé pour s'afficher dans le
+  // journal comme les autres.
+  popularite: 'Popularité',
+  abonnes: 'Abonnés',
+  confianceCoach: 'Confiance du staff',
 };
 
 // ---------------------------------------------------------------------------

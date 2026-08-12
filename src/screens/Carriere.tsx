@@ -23,7 +23,7 @@ import { demanderAuMJ, messageErreurIA } from '../lib/mj';
 import { ecouterEtatIA, etatIA } from '../lib/groq';
 import { genererEvenementHebdo, jugementLocal, jugerReaction } from '../lib/ia';
 import { semaine, libelleDate } from '../data/calendrier';
-import { ATTRIBUTS_LABELS, nomPoste } from '../data/rugby';
+import { labelAttribut, nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
 import type { EntreeJournal } from '../types';
 
@@ -340,8 +340,15 @@ function Message({ entree }: { entree: EntreeJournal }) {
           <div className="deltas">
             {Object.entries(entree.deltas).map(([k, v]) => (
               <span key={k} className={`delta ${v > 0 ? 'plus' : 'moins'}`}>
-                {v > 0 ? '▲' : '▼'} {ATTRIBUTS_LABELS[k] ?? k} {v > 0 ? '+' : ''}
-                {k === 'argent' ? `${v.toLocaleString('fr-FR')} €` : v}
+                {/* ⚠️ `labelAttribut` et pas `ATTRIBUTS_LABELS` : la table brute
+                    est la source FRANÇAISE (elle sert aux prompts du MJ), pas
+                    ce qu'on affiche. Un joueur japonais lisait « Plaquage ». */}
+                {v > 0 ? '▲' : '▼'} {labelAttribut(k)} {v > 0 ? '+' : ''}
+                {/* Les abonnés se comptent par milliers : sans séparateur,
+                    « +12400 » ne se lit pas. */}
+                {k === 'argent'
+                  ? `${v.toLocaleString('fr-FR')} €`
+                  : k === 'abonnes' ? v.toLocaleString('fr-FR') : v}
               </span>
             ))}
           </div>

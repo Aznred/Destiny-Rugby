@@ -13,20 +13,18 @@
 // moral, la division, la notoriété, le contrat… On ne propose pas « premier
 // contrat pro » à un joueur de 33 ans, ni « la retraite approche » à un espoir.
 
-import type { Joueur, StatVariable } from '../types';
+import type { ConsequenceDure, Joueur, StatVariable } from '../types';
 import type { Scenario } from './scenarios';
 import { t } from '../lib/i18n';
 
 // Ce que peut déclencher un choix, en plus des stats. C'est LE point d'entrée
 // des évènements durs (voir `lib/consequences.ts`).
-export type ConsequenceDure =
-  | 'prison'          // condamnation : plusieurs mois hors des terrains
-  | 'accident'        // accident grave : longue indisponibilité
-  | 'deces'           // fin brutale — la carrière s'arrête là
-  | 'finDeCarriere'   // le corps a dit stop
-  | 'exclusionClub'   // le club rompt le contrat : te voilà sans club
-  | 'relegationFinanciere' // le club est rétrogradé administrativement
-  | 'suspension';     // suspension sportive de quelques semaines
+// ⚠️ LE TYPE A DÉMÉNAGÉ DANS `types.ts` (le MJ peut désormais le déclencher
+// lui-même, et `ReponseMJ` en a besoin). Il est ré-exporté ici : tout le code
+// qui l'importe depuis `data/situations` continue de marcher, et c'est
+// l'endroit où on le lit naturellement — juste au-dessus des situations qui
+// s'en servent.
+export type { ConsequenceDure };
 
 export interface IssueSituation {
   recit: string;

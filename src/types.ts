@@ -40,12 +40,21 @@ export interface Attributs {
 export type AttributId = keyof Attributs;
 
 // Clés numériques du joueur que l'IA peut faire varier
+//
+// ⚠️ LES TROIS DERNIÈRES SONT ARRIVÉES APRÈS COUP (demande explicite : « la
+// popularité, donc le nombre d'abonnés sur X »). Elles ne sont PAS des
+// attributs : `popularite` et `confianceCoach` sont bornées 0-100 comme la
+// forme, `abonnes` est un compteur absolu qui peut valoir des dizaines de
+// milliers. Chacune a son propre plafond dans `plafonnerDeltas` (lib/mj.ts).
 export type StatVariable =
   | AttributId
   | 'forme'
   | 'moral'
   | 'reputation'
-  | 'argent';
+  | 'argent'
+  | 'popularite'
+  | 'abonnes'
+  | 'confianceCoach';
 
 // Contrat en cours du joueur : durée restante et salaire annuel.
 export interface Contrat {
@@ -376,6 +385,37 @@ export interface EntreeJournal {
   evenement?: string;
 }
 
+// ---------------------------------------------------------------------------
+// CE QUE LE MJ PEUT DÉCLENCHER DANS LA VRAIE VIE DU JOUEUR
+// ---------------------------------------------------------------------------
+// ⚠️ DÉFINIS ICI, PAS DANS `data/situations.ts` (qui les ré-exporte pour ne
+// casser aucun import) : `ReponseMJ` en a besoin, et `types.ts` ne doit
+// dépendre d'aucun fichier de données.
+
+/** Les issues lourdes — voir `lib/consequences.ts`. */
+export type ConsequenceDure =
+  | 'prison'          // condamnation : plusieurs mois hors des terrains
+  | 'accident'        // accident grave : longue indisponibilité
+  | 'deces'           // fin brutale — la carrière s'arrête là
+  | 'finDeCarriere'   // le corps a dit stop
+  | 'exclusionClub'   // le club rompt le contrat : te voilà sans club
+  | 'banRugby'        // radiation : plus aucun club, plus aucune fédération
+  | 'blessure'        // le corps lâche : indisponibilité, sans faute morale
+  | 'relegationFinanciere' // le club est rétrogradé administrativement
+  | 'suspension';     // suspension sportive de quelques semaines
+
+/** Ce que le club décide côté portefeuille — voir `appliquerActionClub`. */
+export type ActionClub = 'augmentation' | 'prime' | 'amende';
+
+/** La décision « contrat » d'un jugement du MJ, avant plafonnement. */
+export interface DecisionClub {
+  type: ActionClub;
+  /** Montant proposé par le MJ, en € (borné par le code). */
+  montant?: number;
+  /** Une demi-phrase qui explique pourquoi. */
+  motif?: string;
+}
+
 // Réponse structurée attendue du Maître du Jeu local
 export interface ReponseMJ {
   recit: string;
@@ -383,6 +423,17 @@ export interface ReponseMJ {
   deltas?: Partial<Record<StatVariable, number>>;
   consequences?: string;
   choix?: string[];
+  // --- Les leviers de carrière (demande explicite) -------------------------
+  /** Suspension, exclusion, prison, radiation… Toujours filtrée par le code. */
+  consequence?: ConsequenceDure;
+  /** Durée de l'indisponibilité, quand la conséquence en demande une. */
+  semaines?: number;
+  /** Le motif écrit par le MJ, repris tel quel dans le journal. */
+  motif?: string;
+  /** Augmentation, prime de match, amende interne. */
+  club?: DecisionClub;
+  /** La réponse met vraiment le joueur sur le marché des transferts. */
+  marche?: boolean;
 }
 
 /**
