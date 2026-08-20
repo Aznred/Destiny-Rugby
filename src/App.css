@@ -923,6 +923,49 @@
 .trait-check { margin-left: auto; color: var(--or-400); font-weight: 800; }
 .trait-desc { margin-top: 0.35rem; font-size: 0.78rem; line-height: 1.45; color: var(--craie-dim); }
 
+/* Un archétype qu’on n’a pas encore acheté : visible, lisible, mais fermé.
+   ⚠️ IL NE PREND PAS L’OPACITÉ 0,4 DES AUTRES BOUTONS DÉSACTIVÉS. Une carte à
+   40 % rend son prix illisible — or c’est précisément l’information qu’on veut
+   faire passer : ce trait existe, il coûte tant. Le liseré pointillé dit
+   « fermé » sans effacer le texte. */
+.trait-carte.verrouille:disabled {
+  opacity: 0.72; border-style: dashed; border-color: rgba(232, 178, 58, 0.3);
+  background: rgba(4, 13, 9, 0.32);
+}
+.trait-prix {
+  margin-top: 0.5rem; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.01em;
+  color: var(--or-400);
+}
+.trait-note {
+  margin-top: 0.55rem; font-size: 0.78rem; line-height: 1.45; color: var(--brume);
+}
+
+/* Boutique — la section « Les caractères ».
+   Elle ne réutilise pas `.grille-boutique` : un article de boutique est une
+   vignette carrée avec son modèle 3D, un archétype est un PARAGRAPHE (deux
+   phrases qui disent ce qu’il donne et ce qu’il coûte). La grille est donc plus
+   large et la carte s’étire en hauteur, avec son bouton collé en bas pour que
+   les prix restent alignés d’une carte à l’autre. */
+.grille-caracteres {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.7rem; margin-bottom: 1.1rem;
+}
+.carte.caractere {
+  display: flex; flex-direction: column; gap: 0.4rem; padding: 0.85rem 0.9rem;
+  text-align: left;
+}
+.carte.caractere .btn, .caractere-acquis { margin-top: auto; align-self: flex-start; }
+.carte.caractere.possede { border-color: rgba(232, 178, 58, 0.4); }
+.caractere-tete {
+  display: flex; align-items: center; gap: 0.45rem;
+  font-family: var(--police-forte); font-size: 0.98rem;
+}
+.caractere-emoji { font-size: 1.25rem; }
+.caractere-desc { font-size: 0.79rem; line-height: 1.5; color: var(--craie-dim); }
+.caractere-acquis {
+  padding-top: 0.2rem; font-size: 0.8rem; font-weight: 700; color: var(--or-400);
+}
+
 /* Séance d'entraînement hebdomadaire */
 .entrainement {
   margin-top: 1rem; padding: 0.7rem 0.8rem; border-radius: 12px;
@@ -4356,4 +4399,34 @@ img, svg, canvas { max-width: 100%; }
   /* ⚠️ 44 px de cible, la règle du projet. */
   .fc-fermer { width: 40px; height: 40px; }
   .fc-armoire { min-height: 44px; }
+}
+
+/* --- 📘 LES PAGES DE CONTENU, DEPUIS L'ACCUEIL --------------------------- */
+/* ⚠️ Ce sont de VRAIS liens (`<a href>`) vers du HTML statique servi depuis
+   `public/`, pas des boutons qui changent d'écran. C'est ce qui donne au site
+   des pages indexables — leur absence est précisément ce qui a fait bloquer le
+   compte AdSense. Voir `scripts/genPages.cjs`. */
+.section.lecture { display: flex; flex-direction: column; gap: 0.4rem; }
+.lecture-chapo { color: var(--craie-dim); max-width: 60ch; margin: 0 0 1rem; }
+.lecture-liens {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.8rem;
+}
+.lecture-lien {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem 1.1rem;
+  text-decoration: none;
+  color: var(--craie);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.lecture-lien:hover { border-color: var(--or-clair); transform: translateY(-2px); }
+.lecture-lien .ico { font-size: 1.5rem; }
+.lecture-lien b { font-family: 'Archivo', system-ui, sans-serif; font-size: 1rem; }
+.lecture-desc { font-size: 0.84rem; color: var(--craie-dim); line-height: 1.45; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lecture-lien:hover { transform: none; }
 }

@@ -133,7 +133,7 @@ import {
   estAmateur, weekEndsJoues, totalWeekEnds, poulesDe, indexPoule,
 } from '../lib/championnat';
 import { risqueDeBlessure, tirerBlessure, messageBlessure, deltasBlessure } from '../lib/blessures';
-import { effetsTraits, MAX_TRAITS } from '../data/traits';
+import { effetsTraits, MAX_TRAITS, TRAIT_PAR_ID } from '../data/traits';
 import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiaire';
 import { interviewAleatoire, scenarioDuPool, type JugementMJ } from '../lib/ia';
 import { agentDe } from '../data/agents';
@@ -318,7 +318,15 @@ export function recuperationHebdo(j: Joueur): number {
   // soigne une blessure. On vise plus bas, sinon on revenait de six semaines
   // d'arrêt plus frais qu'en sortant d'un week-end de repos.
   const cible = conditionDeBase(j) - (j.blessure && j.blessure.semaines > 0 ? 18 : 0);
-  return Math.max(0, Math.round((cible - j.forme) * 0.45 + 4));
+  // ⚠️ LE TRAIT DE CARACTÈRE ENTRE ENFIN ICI, et c'était un bug muet.
+  // `formeParSemaine` était calculé par `effetsTraits()` et **lu nulle part** :
+  // « Professionnel » promettait de mieux récupérer et ne récupérait rien de
+  // plus, « Fêtard » promettait de le payer physiquement et ne payait rien.
+  // Deux traits sur douze annonçaient un effet inexistant — c'est exactement le
+  // genre de promesse qui rend un choix de création sans conséquence.
+  return Math.max(0, Math.round(
+    (cible - j.forme) * 0.45 + 4 + effetsTraits(j.traits).formeParSemaine,
+  ));
 }
 
 // ---------------------------------------------------------------------------
@@ -526,6 +534,20 @@ interface GameState {
    * appartient ; le reste suit le jeu.
    */
   touchesMatch: Liaisons;
+  /**
+   * Les archétypes de caractère débloqués en Ovas (`data/traits.ts`).
+   *
+   * ⚠️ ON ACHÈTE DU CHOIX, PAS DE LA PUISSANCE. `MAX_TRAITS` reste à deux :
+   * un joueur qui a tout débloqué en porte autant qu'un joueur qui n'a rien
+   * acheté. Ce que les Ovas ouvrent, ce sont des façons de jouer en plus —
+   * et chaque archétype coûte quelque chose autant qu'il apporte
+   * (`scripts/verifTraits.ts` échoue si ce n'est plus vrai).
+   *
+   * ⚠️ Persisté HORS de la fiche du joueur : un trait débloqué appartient au
+   * compte, pas à la carrière. On ne rachète pas ses archétypes à chaque fois
+   * qu'on raccroche.
+   */
+  traitsDebloques: string[];
   /** Compteur des pubs récompensées (quota journalier et délai d'attente). */
   pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
@@ -715,6 +737,8 @@ interface GameState {
   acheterSkin: (id: string) => boolean;
   choisirSkin: (id: string) => void;
   acheterEquipement: (id: string) => boolean;
+  /** Débloque un archétype de caractère contre des Ovas. */
+  debloquerTrait: (id: string) => boolean;
   /** Débloque un cosmétique « par pub » une fois la pub regardée. */
   debloquerParPub: (id: string) => boolean;
   basculerEquipement: (id: string) => void;
@@ -746,6 +770,7 @@ export const useGame = create<GameState>()(
       tutoVu: false,
       tutoMatchVu: false,
       touchesMatch: {},
+      traitsDebloques: [],
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
       scenarioActif: null,
@@ -1841,7 +1866,15 @@ export const useGame = create<GameState>()(
         // `enregistrerMatchVecu`) ou non : c'est le seul moyen d'avoir un
         // barème de forme unique. Voir `recuperationHebdo`.
         const recuperation = recuperationHebdo(joueur);
-        let j = appliquerDeltas(joueur, { forme: recuperation });
+        // ⚠️ `moralParSemaine` SOUFFRAIT DU MÊME BUG QUE `formeParSemaine` : il
+        // était cumulé par `effetsTraits()` et jamais lu. Quatre traits sur
+        // douze — Fêtard, Leader naturel, Ambitieux, Fidèle au maillot —
+        // annonçaient un effet sur le moral qui n'existait pas. Il s'applique
+        // désormais chaque semaine, comme la récupération physique.
+        let j = appliquerDeltas(joueur, {
+          forme: recuperation,
+          moral: effetsTraits(joueur.traits).moralParSemaine,
+        });
         j = appliquerDeltas(j, matchDejaVecu ? {} : resultat.deltas);
 
         // Suivi de l'infirmerie : on décompte, ou on encaisse une nouvelle blessure.
@@ -3885,6 +3918,20 @@ export const useGame = create<GameState>()(
       // attribut, ni à la forme, ni au moral, ni au potentiel : c'est la règle
       // qui a fait supprimer les boosts, et l'étalonnage de difficulté
       // (`scripts/verifDifficulte.ts`) n'a donc pas à être relancé.
+      // ⚠️ MÊME GARDE-FOU QUE POUR LES COSMÉTIQUES : on vérifie que le trait
+      // EXISTE, qu'il est bien payant, qu'on ne l'a pas déjà, et que le solde
+      // suffit. Sans le test « il est bien payant », un appel forgé
+      // débloquerait un trait de base et le ferait disparaître de la liste
+      // gratuite au profit de la liste achetée.
+      debloquerTrait: (id) => {
+        const { coins, traitsDebloques } = get();
+        const trait = TRAIT_PAR_ID[id];
+        if (!trait || trait.prix == null || traitsDebloques.includes(id)) return false;
+        if (coins < trait.prix) return false;
+        set({ coins: coins - trait.prix, traitsDebloques: [...traitsDebloques, id] });
+        return true;
+      },
+
       acheterEquipement: (id) => {
         const { coins, equipements } = get();
         const article = EQUIPEMENT_PAR_ID[id];
@@ -4024,6 +4071,7 @@ export const useGame = create<GameState>()(
           tutoVu?: boolean;
           tutoMatchVu?: boolean;
           touchesMatch?: Liaisons;
+          traitsDebloques?: string[];
           pubConsentement?: 'inconnu' | 'oui' | 'non';
           pubs?: EtatPubs;
           modele?: string;
@@ -4165,6 +4213,7 @@ export const useGame = create<GameState>()(
         s.tutoVu ??= false;
         s.tutoMatchVu ??= false;
         s.touchesMatch ??= {};
+        s.traitsDebloques ??= [];
         s.pubs ??= ETAT_PUBS_VIDE;
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
@@ -4201,6 +4250,7 @@ export const useGame = create<GameState>()(
         tutoVu: s.tutoVu,
         tutoMatchVu: s.tutoMatchVu,
         touchesMatch: s.touchesMatch,
+        traitsDebloques: s.traitsDebloques,
         pubs: s.pubs,
         pantheon: s.pantheon,
         scenarioActif: s.scenarioActif,

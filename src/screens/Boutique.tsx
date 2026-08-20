@@ -4,6 +4,9 @@ import { useGame } from '../store/useGame';
 import {
   SKINS, PACKS, EQUIPEMENTS, EQUIPEMENT_PAR_ID, CATEGORIES_EQUIPEMENT,
 } from '../data/boutique';
+import {
+  TRAITS_A_DEBLOQUER, descriptionTrait, nomTrait,
+} from '../data/traits';
 import { t } from '../lib/i18n';
 import { CartePubRecompensee, BoutonDeblocageParPub } from '../components/Pub';
 import { IconeArticle } from '../components/ModeleObjet';
@@ -36,6 +39,8 @@ export function Boutique() {
   const equipements = useGame((s) => s.equipements);
   const equipementActif = useGame((s) => s.equipementActif);
   const acheterEquipement = useGame((s) => s.acheterEquipement);
+  const traitsDebloques = useGame((s) => s.traitsDebloques);
+  const debloquerTrait = useGame((s) => s.debloquerTrait);
   const basculerEquipement = useGame((s) => s.basculerEquipement);
   const [apercu, setApercu] = useState(skinActif);
   // ⚠️ LE GRAND APERÇU EST PARTAGÉ : il montre soit un ballon, soit un article
@@ -255,6 +260,47 @@ export function Boutique() {
         </div>
       ))}
 
+      {/* ═══ LES CARACTÈRES ═══════════════════════════════════════════════
+          ⚠️ LA SEULE CHOSE NON COSMÉTIQUE DE LA BOUTIQUE, ET C’EST ASSUMÉ —
+          parce que ça ne vend PAS de la puissance. `MAX_TRAITS` reste à deux :
+          un joueur qui a tout débloqué en porte autant qu’un joueur qui n’a
+          rien acheté, et chaque archétype coûte quelque chose autant qu’il
+          rapporte. `scripts/verifTraits.ts` échoue si un payant pèse plus lourd
+          que le meilleur des gratuits, paires comprises. Ce qu’on achète, c’est
+          une façon de jouer de plus. */}
+      <div className="eyebrow section-titre">{t('bo.caracteres')}</div>
+      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
+        {t('bo.caracteresAide')}
+      </p>
+      <div className="grille-caracteres">
+        {TRAITS_A_DEBLOQUER.map((tr) => {
+          const possede = traitsDebloques.includes(tr.id);
+          const prix = tr.prix ?? 0;
+          return (
+            <div key={tr.id} className={`carte caractere${possede ? ' possede' : ''}`}>
+              <div className="caractere-tete">
+                <span className="caractere-emoji">{tr.emoji}</span>
+                <b>{nomTrait(tr.id)}</b>
+              </div>
+              <div className="caractere-desc">{descriptionTrait(tr.id)}</div>
+              {possede ? (
+                <div className="caractere-acquis">{t('bo.traitDebloque')}</div>
+              ) : (
+                <button
+                  className="btn primaire petit"
+                  disabled={coins < prix}
+                  onClick={() => {
+                    if (debloquerTrait(tr.id)) message(t('bo.traitAchete', { trait: nomTrait(tr.id) }));
+                    else message(t('bo.pasAssez'));
+                  }}
+                >
+                  🪙 {prix}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
       {/* ═══ GAGNER DES OVAS SANS PAYER ══════════════════════════════════════
           ⚠️ FACULTATIF, ET ÇA DOIT LE RESTER. Aucun article n'est réservé à
           ceux qui regardent des pubs : c'est un raccourci vers la même

@@ -225,7 +225,8 @@ npx vite-node scripts/verif.ts
   pour la création ET pour `<Drapeau>`, qui en dérive sa table de codes.
 - **Générale de départ 30-40** (`attributsDeBase`) : 26-36 par attribut, +6/+10
   sur les attributs clés du poste, plafond 60.
-- **Traits de caractère** (`src/data/traits.ts`, 12 traits, 2 au choix) : chaque
+- **Traits de caractère** (`src/data/traits.ts`, **24 traits** — 12 gratuits
+  et 12 à débloquer en Ovas —, **2 au choix**) : chaque
   trait est LU quelque part — `effetsTraits()` cumule multiplicateurs et bonus,
   branchés dans `progression` (vitesse de progression), `blessures` (risque et
   gravité), la note de match, les cartons, et `offres` (nombre de propositions).
@@ -4558,4 +4559,196 @@ chevauchent plus tiennent moins de place qu'un empilement qui débordait.
 ```bash
 npx vite-node scripts/verifArmoire.ts   # emprises PIVOTÉES, cadrage, cas limites
 npx vite-node scripts/verifEcrans.ts    # robustesse du Hall et du Classement
+```
+
+---
+
+## 📄 DES PAGES DE CONTENU — la réponse au blocage AdSense
+
+AdSense a bloqué le compte : « Annonces Google diffusées sur des pages ou écrans
+sans contenu d'éditeur ». Le diagnostic tenait en trois points, tous exacts.
+
+### ⚠️ CE N'ÉTAIT PAS UN PROBLÈME DE RÉGLAGE, MAIS DE NATURE
+
+1. **LE JEU N'A QU'UNE SEULE URL.** `setEcran` change un champ du store,
+   l'adresse ne bouge jamais. Pour un moteur de recherche comme pour un
+   examinateur, tout le site EST la page d'accueil.
+2. **CETTE PAGE EST VIDE AU CHARGEMENT.** Tout est rendu par React ; un robot
+   qui n'exécute pas le JS ne trouvait que le `<noscript>`, soit quatre phrases
+   — la définition même du « contenu à faible valeur informative ».
+3. **LES QUATRE ÉCRANS QUI PORTAIENT LES ANNONCES** (Boutique, Hall, Classement,
+   Clubs) sont une boutique, deux tableaux de scores et un annuaire d'écussons.
+   Le règlement nomme ce cas : « écrans qui servent aux alertes, à la NAVIGATION
+   ou à d'autres fins comportementales ». Une annonce à côté d'un classement
+   vide (« personne n'y figure encore ») est le cas d'école.
+
+### ⚠️ UN ROUTEUR N'AURAIT RIEN RÉGLÉ
+
+C'était le premier réflexe, et il était faux. Un routeur côté navigateur crée
+des adresses, mais le serveur continue de renvoyer la même coquille vide : le
+robot qui ne rend pas le JavaScript voit exactement ce qu'il voyait avant.
+
+**Les pages sont donc du HTML COMPLET, généré à la construction**, avec leur
+texte dans la source. Ni React, ni JavaScript, ni CSS externe nécessaires pour
+les lire.
+
+| Fichier | Rôle |
+|---|---|
+| `scripts/contenuPages.cjs` | **Le texte, et rien d'autre.** Séparé du rendu pour qu'on puisse corriger une phrase sans toucher au HTML. |
+| `scripts/genPages.cjs` | Le rendu : HTML, métadonnées, JSON-LD, sommaire automatique, et **régénération du sitemap**. |
+| `public/contenu.css` | Feuille autonome. ⚠️ Elle ne partage RIEN avec `src/App.css`, qui n'existe qu'une fois compilé par Vite. |
+| `public/<slug>/index.html` | ⚠️ **GÉNÉRÉ.** Quatre pages : `/guide/`, `/pyramide/`, `/moteur/`, `/journal/`. |
+
+```bash
+node scripts/genPages.cjs                    # sans annonces
+PUB_SLOT=1234567890 node scripts/genPages.cjs   # avec
+```
+
+⚠️ **SANS `PUB_SLOT`, AUCUN CODE PUBLICITAIRE N'EST GÉNÉRÉ** — pas même le script
+AdSense. Un slot se crée bloc par bloc dans la console : tant qu'il n'existe pas,
+une balise vide ne ferait qu'ajouter du bruit à une page qui n'a rien à afficher.
+
+⚠️ **LE CONTENU DOIT RESTER VRAI.** Du remplissage tombe sous exactement la même
+règle que le vide. Chaque chiffre cité (655 clubs, 44 semaines, 0,15 s de pas de
+simulation, 248 plaquages par match…) sort du code ou d'un script `verif*.ts` —
+s'il change dans le jeu, il faut le changer là aussi.
+
+### Ce qui a bougé dans le jeu
+
+- **`<Pub />` et `<BandeauConsentementPub />` ont disparu de `App.tsx`.** Le jeu
+  ne porte plus une seule annonce, et c'est très bien : une bannière au milieu
+  d'une décision de carrière est une pub qui nuit au jeu.
+- **`sw.js` a été supprimé.** C'était un service worker Monetag qui chargeait du
+  code distant depuis `3nbf4.com` à la racine du domaine — une porte ouverte aux
+  notifications publicitaires, en contradiction frontale avec les règles écrites
+  dans `lib/pub.ts` (« jamais de pop-up », « rien sans consentement ») et un
+  risque supplémentaire pour l'examen AdSense.
+- **L'accueil renvoie vers les quatre pages** par de VRAIS `<a href>`. Un
+  `onClick` ne crée aucun lien pour un moteur de recherche.
+- **Le `<noscript>` porte les mêmes liens** : c'est le seul chemin d'un robot
+  sans JavaScript vers le contenu.
+
+⚠️ **`/guide/` NE MARCHE PAS EN `npm run dev`** — le repli SPA de Vite intercepte
+l'adresse. Il faut `/guide/index.html` en développement. **En production c'est
+correct** : vérifié sur `npm run build` + `vite preview`, `dist/guide/index.html`
+est bien servi à `/guide/`.
+
+---
+
+## 💳 VENDRE DES OVAS — voir `serveur/PAIEMENTS.md`
+
+Guide complet Stripe : compte, produits, `api/paiement.ts`, webhook signé, table
+idempotente, coûts réels et obligations (TVA, CGV, rétractation, mineurs).
+
+⚠️ **DEUX POINTS À NE PAS CONTOURNER**, écrits en tête du guide :
+
+1. **Le navigateur ne crédite jamais les Ovas.** Le crédit vient d'un webhook
+   Stripe signé. Même raisonnement que le classement mondial : le serveur ne
+   croit pas le client.
+2. **Le jeu n'a aucun compte utilisateur** — la sauvegarde vit dans le
+   `localStorage`. Sans identité, un achat ne peut être rattaché à personne :
+   cache vidé, Ovas payés perdus, remboursement. **Il faut une identité avant de
+   vendre** (lien magique par e-mail, ~1 jour).
+
+---
+
+## 🧬 LES TRAITS DE CARACTÈRE — deux effets sur onze étaient morts
+
+Question posée : « les caractères, ils ont un impact ou quoi ? » Vérification
+faite effet par effet, en comptant les lectures hors de `data/traits.ts` :
+
+| Effet | Lu par |
+|---|---|
+| `progression` | `lib/progression.ts` |
+| `risqueBlessure`, `graviteBlessure` | `useGame` (tirage de blessure de match) |
+| `noteMatch`, `noteGrosMatch` | `useGame` (note de match) |
+| `cartons` | `useGame` et `lib/social.ts` (dérapage public) |
+| `offres` | `lib/offres.ts` |
+| `leadership`, `vestiaire` | `lib/vestiaire.ts` |
+| ~~`formeParSemaine`~~ | **PERSONNE** |
+| ~~`moralParSemaine`~~ | **PERSONNE** |
+
+⚠️ **Ils étaient cumulés par `effetsTraits()` et lus nulle part.** Six traits sur
+douze annonçaient donc un effet inexistant : « Professionnel » promettait de
+mieux récupérer sans rien récupérer, « Fêtard » promettait de le payer
+physiquement sans rien payer, « Leader naturel », « Ambitieux », « Fidèle au
+maillot » et « Bourreau de travail » de même sur le moral ou la forme.
+
+Corrigé : `recuperationHebdo()` ajoute `formeParSemaine`, et la semaine applique
+`moralParSemaine` au même endroit que la récupération physique.
+
+⚠️ **L'effet sur l'étalonnage n'a pas pu être mesuré** : `verifDifficulte.ts` est
+cassé depuis la suppression du mode « saison rapide » (voir plus haut, « LES
+SCRIPTS DE MESURE NE MESURENT PLUS RIEN »). L'amplitude est bornée — ±2 de forme
+par semaine pour deux traits sur douze — mais la forme pèse sur la note de match,
+donc sur la progression. **À revérifier dès que le script de mesure est réparé.**
+
+### Douze archétypes à débloquer — et pourquoi ce n’est pas du pay-to-win
+
+Demande explicite : « corrige les caractères et traits, fais qu’il y ait plein
+de nouveaux caractères qu’on peut acheter en Ovas ». `data/traits.ts` passe de
+**12 à 24 traits**, dont douze portent un champ `prix`.
+
+⚠️ **LA BOUTIQUE VEND DU CHOIX, PAS DE LA PUISSANCE**, et ce n’est pas une
+formule : c’est mesurable, et c’est mesuré. Trois verrous, tous dans
+`scripts/verifTraits.ts`, qui **échoue** si l’un saute :
+
+1. **`MAX_TRAITS` reste à DEUX.** Quelqu’un qui a tout débloqué n’en porte pas
+   un de plus que quelqu’un qui n’a rien acheté. Ce qu’on achète, ce sont des
+   façons de jouer supplémentaires — pas des bonus cumulables.
+2. **Aucun payant ne pèse plus lourd que le meilleur gratuit** (`poidsTrait`,
+   la somme signée des effets ramenés à une échelle commune). Mesuré :
+   max payant **8,4** contre **9,6** pour le meilleur gratuit.
+3. **Et la meilleure PAIRE non plus.** C’est le test qui compte vraiment : deux
+   traits raisonnables séparément peuvent se cumuler en une combinaison qui ne
+   l’est pas. Mesuré : meilleure paire gratuite 17,3 · meilleure paire possible
+   18,0, avec une tolérance de 15 % (19,9).
+
+⚠️ **CHAQUE ARCHÉTYPE EST UN PARI, PAS UNE AMÉLIORATION.** Ils poussent un
+curseur beaucoup plus loin que les douze de base — **dans les deux sens**. Le
+« Roc » (risque de blessure ÷ 2) ne progresse quasiment plus ; le « Précoce »
+apprend 35 % plus vite et récupère mal ; la « Tête brûlée » est injouable en
+finale et prend **2,8 fois** plus de cartons ; le « Cadre du vestiaire » tient le
+groupe mais n’intéresse plus le marché.
+
+⚠️ **LE PRIX SUIT L’ÉCONOMIE MESURÉE, PAS L’ENVIE.** Une belle carrière rapporte
+**549 Ovas** (`verifEconomie.ts`) : à **90-190 Ovas** pièce, on en débloque trois
+ou quatre par carrière, et il en reste toujours à découvrir. Total des douze :
+**1 700 Ovas**. `verifEconomie.ts` les compte désormais dans le catalogue — les
+oublier revenait à annoncer « tout acheter : 10,7 carrières » en ignorant un
+tiers de la dépense possible ; c’est **13,8 carrières**.
+
+| Où | Ce qui a changé |
+|---|---|
+| `data/traits.ts` | `Trait.prix?`, 12 archétypes, `TRAITS_DE_BASE`, `TRAITS_A_DEBLOQUER`, `traitDisponible()`, `poidsTrait()` |
+| `store/useGame.ts` | `traitsDebloques: string[]` (persisté) et `debloquerTrait(id)` |
+| `screens/Boutique.tsx` | la section **« Les caractères »**, entre le vestiaire et les Ovas |
+| `screens/Creation.tsx` | les archétypes fermés restent **visibles, grisés, avec leur prix** |
+| `data/textesSupplementaires.ts` | 24 clés `trait.<id>.nom/.desc` + `trait.leader.desc` réécrite, dans les 7 langues |
+| `scripts/verifTraits.ts` | le banc d’essai (5 sections) |
+
+⚠️ **`traitsDebloques` VIT HORS DE LA FICHE DU JOUEUR.** Un archétype débloqué
+appartient au COMPTE, pas à la carrière : on ne rachète pas ses caractères à
+chaque fois qu’on raccroche. Migration idempotente (`s.traitsDebloques ??= []`),
+pas de bump de version.
+
+⚠️ **UN ARCHÉTYPE FERMÉ RESTE AFFICHÉ À LA CRÉATION**, grisé, liseré pointillé,
+avec son prix en clair. Le masquer reviendrait à cacher la moitié du système à
+qui n’a rien acheté : on ne peut pas vouloir un trait dont on ignore
+l’existence. Et il **ne prend pas l’opacité 0,4** des autres boutons désactivés
+(0,72) — à 40 %, le prix devient illisible, c’est-à-dire exactement
+l’information qu’on voulait faire passer.
+
+⚠️ **Bug attrapé en écrivant l’écran** : le paramètre de la boucle des traits
+s’appelait `t` dans `Creation.tsx` — il **masquait la fonction de traduction**,
+et l’étiquette de prix n’aurait pas pu être traduite. Renommé `tr`.
+
+⚠️ **`leader` n’avait AUCUNE contrepartie** — repéré par le nouveau banc d’essai,
+qui refuse un trait sans coût. Il gagne `progression: 0.94` : on passe son temps
+sur les autres. Son texte français change donc, et avec lui ses sept traductions.
+
+```bash
+npx vite-node scripts/verifTraits.ts       # effets vivants, coût/gain, poids des paires, verrou d’achat
+npx vite-node scripts/verifEconomie.ts     # les 1 700 Ovas d’archétypes entrent dans le catalogue
+npx vite-node scripts/verifTraductions.ts  # les 30 clés ajoutées, dans les 7 langues
 ```

@@ -13,6 +13,21 @@ const Hero3D = lazy(() =>
   import('../components/Hero3D').then((m) => ({ default: m.Hero3D })),
 );
 
+/**
+ * Les pages de contenu du site, en HTML statique.
+ * ⚠️ La liste est recopiée ici À LA MAIN, et c'est assumé : `scripts/genPages.cjs`
+ * tourne à la construction (Node, CommonJS) et le jeu à l'exécution (navigateur,
+ * ESM). Les faire partager un module obligerait à embarquer tout le texte des
+ * quatre pages dans le bundle — plusieurs dizaines de kilo-octets pour afficher
+ * quatre liens.
+ */
+const PAGES_CONTENU = [
+  { slug: 'guide', ico: '📘', titre: 'accueil.lien.guide', desc: 'accueil.lien.guideDesc' },
+  { slug: 'pyramide', ico: '🏟️', titre: 'accueil.lien.pyramide', desc: 'accueil.lien.pyramideDesc' },
+  { slug: 'moteur', ico: '⚙️', titre: 'accueil.lien.moteur', desc: 'accueil.lien.moteurDesc' },
+  { slug: 'journal', ico: '📝', titre: 'accueil.lien.journal', desc: 'accueil.lien.journalDesc' },
+];
+
 const apparait = {
   hidden: { opacity: 0, y: 24 },
   show: (i: number) => ({
@@ -99,6 +114,27 @@ export function Accueil() {
             <p>{t(f.texte)}</p>
           </motion.div>
         ))}
+      </section>
+
+      {/* ⚠️ DE VRAIS LIENS, PAS DES BOUTONS. Ces quatre pages sont du HTML
+          statique servi depuis `public/` (voir `scripts/genPages.cjs`) : elles
+          existent à leur propre adresse, elles se lisent sans JavaScript, et
+          elles portent le contenu éditorial du site. Un `<a href>` est donc
+          indispensable — un `onClick` ne crée aucun lien pour un moteur de
+          recherche, et c'est précisément l'absence de pages indexables qui a
+          fait bloquer le compte AdSense. */}
+      <section className="section lecture">
+        <h2>{t('accueil.lecture')}</h2>
+        <p className="lecture-chapo">{t('accueil.lectureChapo')}</p>
+        <div className="lecture-liens">
+          {PAGES_CONTENU.map((p) => (
+            <a className="carte lecture-lien" key={p.slug} href={`/${p.slug}/`}>
+              <span className="ico">{p.ico}</span>
+              <b>{t(p.titre)}</b>
+              <span className="lecture-desc">{t(p.desc)}</span>
+            </a>
+          ))}
+        </div>
       </section>
     </>
   );

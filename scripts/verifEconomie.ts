@@ -15,6 +15,7 @@
 import { SUCCES, DEFIS } from '../src/data/succes';
 import { TROPHEES } from '../src/data/trophees';
 import { SKINS, EQUIPEMENTS } from '../src/data/boutique';
+import { TRAITS_A_DEBLOQUER } from '../src/data/traits';
 import { PLAFOND_OVAS_DEFIS_PAR_SAISON, PLAFOND_OVAS_ACTIONS_PAR_SAISON } from '../src/store/useGame';
 import { OVAS_PAR_PUB, PUBS_PAR_JOUR } from '../src/lib/pub';
 
@@ -58,9 +59,16 @@ console.log(`\n  Cagnotte totale des succès : ${poolSucces} Ovas (tous, sur tou
 console.log(`  Valeur moyenne d'un trophée : ${valeurMoyenneTrophee.toFixed(1)} Ovas`);
 console.log(`  Pub récompensée : ${OVAS_PAR_PUB} × ${PUBS_PAR_JOUR}/jour = ${OVAS_PAR_PUB * PUBS_PAR_JOUR} Ovas/jour`);
 
-const catalogue = SKINS.reduce((a, s) => a + s.prix, 0) + EQUIPEMENTS.reduce((a, e) => a + e.prix, 0);
+// ⚠️ LES ARCHÉTYPES DE CARACTÈRE COMPTENT DANS LE CATALOGUE. Ils s’achètent
+// en Ovas comme le reste ; les oublier ici, c’est annoncer « tout acheter :
+// N carrières » en ignorant un tiers de la dépense possible.
+const traits = TRAITS_A_DEBLOQUER.reduce((a, tr) => a + (tr.prix ?? 0), 0);
+const catalogue = SKINS.reduce((a, s) => a + s.prix, 0)
+  + EQUIPEMENTS.reduce((a, e) => a + e.prix, 0)
+  + traits;
 console.log(`\n🛒 LA BOUTIQUE\n`);
 console.log(`  Tout acheter : ${catalogue} Ovas, soit ${(catalogue / total).toFixed(1)} carrières`);
+console.log(`  dont ${TRAITS_A_DEBLOQUER.length} archétypes de caractère : ${traits} Ovas`);
 const plusCher = [...SKINS.map((s) => ({ nom: s.nom, prix: s.prix })), ...EQUIPEMENTS]
   .sort((a, b) => b.prix - a.prix)[0];
 console.log(`  Pièce la plus chère : ${plusCher.nom} à ${plusCher.prix} Ovas`

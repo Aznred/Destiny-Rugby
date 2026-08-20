@@ -572,4 +572,149 @@ console.log('\n=== 8. LES CAS LIMITES ===');
   ligne('une rangée incomplète est centrée', `centre de gravité à ${centre.toFixed(3)}`, Math.abs(centre) < 1e-6);
 }
 
+// ---------------------------------------------------------------------------
+// 9. LE PALMARÈS COMPLET — les 54 trophées du jeu d'un coup
+// ---------------------------------------------------------------------------
+// Demande : « teste avec une armoire à trophées qui contient TOUS les trophées
+// du jeu pour voir s'il y a des bugs ».
+//
+// ⚠️ CE N'EST PAS UN CAS THÉORIQUE. Personne ne gagnera les 54, mais le chemin
+// est réel : `MAX_PIECES` coupe la liste À L'AFFICHAGE, pas en amont. Tout ce
+// qui se passe AVANT la coupe — le regroupement par trophée, l'ordre, le
+// comptage du pied de modale — voit bien les 54, et c'est là que se cachent
+// les défauts qu'un palmarès de six pièces ne révèle jamais.
+console.log('\n=== 9. LE PALMARÈS COMPLET (54 trophées) ===');
+{
+  // Le palmarès entier, dans l'ordre où `data/trophees.ts` les déclare — c'est
+  // celui que produit une carrière, `resoudreTrophees` poussant les titres au
+  // fil des saisons.
+  const tous = modeles(mesures);
+  ligne('tous les modèles sont mesurables',
+    `${mesures.length}/${Object.keys(TROPHEES).length}`,
+    mesures.length === Object.keys(TROPHEES).length);
+
+  // --- 9a. La coupe d'affichage -------------------------------------------
+  // La modale n'en monte que `MAX_PIECES` : chaque trophée est un .glb de
+  // ~1,4 Mo, et cinquante-quatre d'un coup mettraient une machine à genoux.
+  const montres = mesures.slice(0, MAX_PIECES);
+  const distinctionsMontrees = montres.filter((m) => estIndividuel(m.tr)).length;
+  console.log(`     ${montres.length} pièces montées, ${mesures.length - montres.length} annoncées en pied de modale`);
+  console.log(`     dont ${distinctionsMontrees} distinction(s) individuelle(s)`);
+
+  // ⚠️ LE PIÈGE : `Object.values(TROPHEES)` SORT LES COLLECTIFS EN PREMIER.
+  // Une coupe naïve aux seize premiers ne garde alors QUE des titres d'équipe,
+  // et le meuble reste vide alors que le joueur a huit distinctions. C'est
+  // exactement le défaut que la modale doit éviter — d'où ce contrôle.
+  ligne('la vitrine n’est pas vide sur un palmarès complet',
+    `${distinctionsMontrees} distinction(s) dans les ${MAX_PIECES} montées`,
+    distinctionsMontrees > 0);
+
+  // --- 9b. La géométrie tient-elle avec le maximum de pièces ? ------------
+  const placesTous = disposerArmoire(tous, dims, etageres);
+  const cassees = placesTous.filter((pl) => pl.position.some((v) => !Number.isFinite(v))
+    || !Number.isFinite(pl.echelle) || pl.echelle <= 0);
+  ligne('54 pièces : positions et échelles calculables',
+    `${placesTous.length - cassees.length}/${placesTous.length}`, cassees.length === 0);
+
+  const enVitrine = placesTous.filter((pl) => !pl.dehors).length;
+  const capacite = etageres.length * COLONNES;
+  const distinctions = tous.filter((m) => m.individuel).length;
+  console.log(`     ${enVitrine} en vitrine (capacité ${capacite}) · ${placesTous.length - enVitrine} au sol`);
+  // La règle qui ne souffre pas d'exception : un titre d'équipe ne monte JAMAIS
+  // en vitrine, même quand il n'y a plus de place au sol.
+  const collectifsEnVitrine = placesTous.filter((pl, i) => !pl.dehors && !tous[i].individuel).length;
+  ligne('aucun titre d’équipe ne monte en vitrine', `${collectifsEnVitrine}`, collectifsEnVitrine === 0);
+  ligne('les distinctions tiennent en vitrine',
+    `${enVitrine} pour ${distinctions} distinction(s)`,
+    enVitrine === Math.min(distinctions, capacite));
+
+  // --- 9c. Aucun chevauchement, EMPRISE PIVOTÉE ---------------------------
+  const empriseSol = (m, pl) => {
+    const a = pl.rotation[1];
+    const c = Math.abs(Math.cos(a));
+    const sn = Math.abs(Math.sin(a));
+    return {
+      lx: (m.taille.x * c + m.taille.z * sn) * pl.echelle,
+      lz: (m.taille.x * sn + m.taille.z * c) * pl.echelle,
+    };
+  };
+  const boitesSol = placesTous
+    .map((pl, i) => ({ pl, m: tous[i], id: mesures[i].tr.id }))
+    .filter((o) => o.pl.dehors)
+    .map((o) => {
+      const e = empriseSol(o.m, o.pl);
+      return {
+        id: o.id,
+        x0: o.pl.position[0] - e.lx / 2, x1: o.pl.position[0] + e.lx / 2,
+        z0: o.pl.position[2] - e.lz / 2, z1: o.pl.position[2] + e.lz / 2,
+      };
+    });
+  const chocs = [];
+  for (let a = 0; a < boitesSol.length; a++) {
+    for (let b = a + 1; b < boitesSol.length; b++) {
+      const u = boitesSol[a]; const v = boitesSol[b];
+      if (u.x0 < v.x1 - 1e-6 && v.x0 < u.x1 - 1e-6 && u.z0 < v.z1 - 1e-6 && v.z0 < u.z1 - 1e-6) {
+        chocs.push(`${u.id} ↔ ${v.id}`);
+      }
+    }
+  }
+  ligne('54 pièces : aucune emprise au sol ne se recouvre',
+    chocs.length ? `${chocs.length} — ${chocs.slice(0, 3).join(', ')}…` : 'aucune', chocs.length === 0);
+
+  // Et la vitrine, tablette par tablette.
+  const chocsVitrine = [];
+  etageres.forEach((et) => {
+    const rangee = placesTous
+      .map((pl, i) => ({ pl, m: tous[i], id: mesures[i].tr.id }))
+      .filter((o) => !o.pl.dehors && Math.abs(o.pl.position[1] - et.y) < 1e-6)
+      .sort((a, b) => a.pl.position[0] - b.pl.position[0]);
+    for (let k = 1; k < rangee.length; k++) {
+      const g = rangee[k - 1]; const d = rangee[k];
+      const bordG = g.pl.position[0] + (g.m.taille.x * g.pl.echelle) / 2;
+      const bordD = d.pl.position[0] - (d.m.taille.x * d.pl.echelle) / 2;
+      if (bordD < bordG - 1e-6) chocsVitrine.push(`${g.id} ↔ ${d.id}`);
+    }
+  });
+  ligne('54 pièces : la vitrine ne se chevauche pas',
+    chocsVitrine.length ? chocsVitrine.join(', ') : 'aucun', chocsVitrine.length === 0);
+
+  // --- 9d. Rien n’entre dans le meuble ni ne passe sous le sol ------------
+  const encastrees = boitesSol.filter((a) => (
+    a.x0 < dims.largeur / 2 - 1e-6 && a.x1 > -dims.largeur / 2 + 1e-6
+    && a.z0 < dims.profondeur / 2 - 1e-6 && a.z1 > -dims.profondeur / 2 + 1e-6
+  ));
+  ligne('54 pièces : aucune encastrée dans le meuble',
+    encastrees.length ? encastrees.map((a) => a.id).join(', ') : 'aucune', encastrees.length === 0);
+  const sousLeSol = placesTous.filter((pl) => pl.position[1] < -1e-6).length;
+  ligne('54 pièces : aucune sous le sol', `${sousLeSol}`, sousLeSol === 0);
+
+  // --- 9e. Le cadrage tient-il encore ? -----------------------------------
+  // ⚠️ C'EST LE VRAI RISQUE D'UN PALMARÈS COMPLET. Chaque pièce au sol pousse
+  // la scène en profondeur, et la caméra recule d'autant : au-delà d'un
+  // certain point le meuble devient un timbre-poste et la vitrine illisible.
+  const boitesTous: Boite[] = tous.map((m, i) => ({
+    x: placesTous[i].position[0],
+    z: placesTous[i].position[2],
+    y: placesTous[i].position[1],
+    demiLargeur: (m.taille.x * placesTous[i].echelle) / 2,
+    hauteur: m.taille.y * placesTous[i].echelle,
+  }));
+  for (const [nom, largeur, hauteur] of ECRANS) {
+    const cam = cadrage(boitesTous, dims, FOV, largeur / hauteur);
+    const dehors = boitesTous.filter((b) => {
+      const d = Math.max(0.001, cam.distance - b.z);
+      const demiChampL = Math.tan((FOV * Math.PI) / 360) * (largeur / hauteur) * d;
+      const demiChampH = Math.tan((FOV * Math.PI) / 360) * d;
+      return Math.abs(b.x) + b.demiLargeur > demiChampL
+        || Math.abs(b.y + b.hauteur / 2 - cam.cible) + b.hauteur / 2 > demiChampH;
+    });
+    // La part de la hauteur d'écran qu'occupe le meuble : sous 25 %, la vitrine
+    // n'est plus lisible du tout.
+    const champ = 2 * Math.tan((FOV * Math.PI) / 360) * cam.distance;
+    const part = (dims.hauteur / champ) * 100;
+    ligne(`54 pièces : cadrage ${nom}`,
+      `caméra à ${cam.distance.toFixed(2)} · ${dehors.length} hors champ · meuble ${part.toFixed(0)} %`,
+      dehors.length === 0 && part >= 25);
+  }
+}
 console.log(echecs === 0 ? '\n✅ Armoire conforme.' : `\n❌ ${echecs} contrôle(s) en échec.`);

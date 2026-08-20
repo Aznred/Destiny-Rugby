@@ -1,0 +1,226 @@
+/* LES PAGES DE CONTENU — feuille de style autonome.
+   ⚠️ ELLE NE PARTAGE RIEN AVEC LE JEU, et c'est voulu : `src/App.css` fait
+   4 200 lignes et n'existe qu'une fois compilé par Vite. Ces pages doivent être
+   lisibles sans React, sans bundle et sans JavaScript — donc avec leur propre
+   CSS, servi tel quel depuis `public/`. Les couleurs reprennent celles du jeu
+   (stade nocturne, cuir, craie, dorures) pour que la transition ne surprenne
+   pas, mais rien n'est importé. */
+
+:root {
+  --fond: #071410;
+  --fond-2: #0b1c14;
+  --carte: rgba(255, 255, 255, 0.03);
+  --bord: rgba(255, 255, 255, 0.11);
+  --bord-or: rgba(232, 178, 58, 0.4);
+  --craie: #eef2ec;
+  --brume: #9bb0a3;
+  --or: #e8b23a;
+  --vert: #34a35a;
+  --police: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(90% 60% at 50% 0%, #123420 0%, transparent 60%),
+    linear-gradient(180deg, var(--fond), var(--fond-2));
+  background-attachment: fixed;
+  color: var(--craie);
+  font-family: var(--police);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* --- L'en-tête ------------------------------------------------------------ */
+.entete {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem 1.1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.4rem;
+  border-bottom: 1px solid var(--bord);
+  background: rgba(4, 12, 8, 0.7);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  backdrop-filter: blur(8px);
+}
+.marque {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--craie);
+  text-decoration: none;
+  margin-right: 0.4rem;
+}
+.entete nav { display: flex; gap: 0.2rem; flex-wrap: wrap; flex: 1; }
+.entete nav a {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  color: var(--brume);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.entete nav a:hover { color: var(--craie); background: rgba(255, 255, 255, 0.05); }
+.entete nav a[aria-current='page'] { color: var(--or); background: rgba(232, 178, 58, 0.12); }
+.jouer {
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f4cd63, var(--or));
+  color: #16240f;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+/* --- Le corps ------------------------------------------------------------- */
+main { max-width: 46rem; margin: 0 auto; padding: 2rem 1.4rem 3rem; }
+
+.fil { font-size: 0.8rem; color: var(--brume); margin: 0 0 0.8rem; }
+.fil a { color: var(--brume); }
+
+h1 {
+  font-size: clamp(1.7rem, 5vw, 2.5rem);
+  line-height: 1.15;
+  margin: 0 0 0.8rem;
+  letter-spacing: -0.01em;
+}
+.chapo {
+  font-size: 1.1rem;
+  color: var(--brume);
+  margin: 0 0 2rem;
+  padding-bottom: 1.6rem;
+  border-bottom: 1px solid var(--bord);
+}
+.chapo strong { color: var(--craie); }
+
+h2 {
+  font-size: clamp(1.3rem, 3.5vw, 1.65rem);
+  margin: 2.6rem 0 0.9rem;
+  padding-top: 0.4rem;
+  line-height: 1.25;
+  /* Le point d'ancrage tient compte de l'en-tête collante. */
+  scroll-margin-top: 5rem;
+}
+h3 { font-size: 1.1rem; margin: 1.8rem 0 0.6rem; color: var(--or); }
+p { margin: 0 0 1.1rem; }
+strong { color: #fff; font-weight: 650; }
+a { color: var(--or); }
+code {
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--bord);
+  font-size: 0.88em;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+ul { margin: 0 0 1.2rem; padding-left: 1.1rem; }
+li { margin-bottom: 0.55rem; }
+li::marker { color: var(--or); }
+
+/* --- Le sommaire ---------------------------------------------------------- */
+.sommaire {
+  margin: 0 0 2.2rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--bord);
+  border-left: 3px solid var(--or);
+  border-radius: 0 12px 12px 0;
+  background: var(--carte);
+}
+.sommaire-titre {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--or);
+}
+.sommaire ol { margin: 0; padding-left: 1.2rem; }
+.sommaire li { margin-bottom: 0.3rem; }
+.sommaire a { color: var(--craie); text-decoration: none; }
+.sommaire a:hover { text-decoration: underline; }
+
+/* --- Tableaux ------------------------------------------------------------- */
+/* ⚠️ Un tableau large défile DANS son conteneur, jamais en emportant la page :
+   c'est la règle du projet, et elle vaut ici aussi. */
+.tableau-large { overflow-x: auto; margin: 0 0 1.4rem; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { padding: 0.55rem 0.8rem; text-align: left; border-bottom: 1px solid var(--bord); }
+th {
+  color: var(--or);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
+
+/* --- Encadrés ------------------------------------------------------------- */
+.encadre {
+  margin: 0 0 1.4rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--bord-or);
+  border-radius: 12px;
+  background: rgba(232, 178, 58, 0.07);
+}
+.encadre p { margin: 0; font-size: 0.95rem; }
+
+/* --- Publicité ------------------------------------------------------------ */
+/* ⚠️ ELLE EST ANNONCÉE, ET ELLE EST DANS LE FLUX. Pas de position fixe, pas
+   d'interstitiel, une seule par page, et jamais avant le premier paragraphe. */
+.pub { margin: 2rem 0; text-align: center; }
+.pub-mention {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brume);
+}
+
+/* --- Suite de lecture ----------------------------------------------------- */
+.suite { margin-top: 3rem; padding-top: 1.6rem; border-top: 1px solid var(--bord); }
+.suite-titre {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--or);
+  margin: 0 0 0.8rem;
+}
+.suite ul { list-style: none; padding: 0; display: grid; gap: 0.6rem; }
+.suite li { margin: 0; }
+.suite a {
+  display: block;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  background: var(--carte);
+  text-decoration: none;
+  color: var(--craie);
+}
+.suite a:hover { border-color: var(--bord-or); }
+.suite a strong { display: block; color: var(--craie); margin-bottom: 0.15rem; }
+.suite a span { display: block; font-size: 0.86rem; color: var(--brume); }
+
+/* --- Pied ----------------------------------------------------------------- */
+.pied {
+  padding: 2rem 1.4rem 3rem;
+  border-top: 1px solid var(--bord);
+  text-align: center;
+  color: var(--brume);
+  font-size: 0.86rem;
+}
+.pied p { margin: 0 0 0.4rem; }
+.pied-note { font-size: 0.76rem; opacity: 0.75; }
+
+@media (max-width: 700px) {
+  body { font-size: 16px; }
+  main { padding: 1.4rem 1rem 2.4rem; }
+  .entete { padding: 0.7rem 1rem; }
+  /* Le bandeau de navigation défile plutôt que de passer sur trois rangées. */
+  .entete nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .entete nav::-webkit-scrollbar { display: none; }
+  .entete nav a { white-space: nowrap; }
+}

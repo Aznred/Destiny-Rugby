@@ -39,7 +39,13 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
 - **Création de joueur** : nom, âge, **202 nations** (groupées par continent,
   avec leur vrai drapeau), championnat et club de départ (France ou étranger),
   les **15 postes** numérotés 1 à 15, et **2 traits de caractère** à choisir
-  parmi 12 — ils te suivront toute ta carrière. Tu démarres avec une générale
+  parmi **24** — ils te suivront toute ta carrière. Douze sont là d'entrée ;
+  les **douze archétypes** restants se débloquent en Ovas dans la boutique et
+  restent acquis pour toutes tes carrières suivantes. ⚠️ **On y achète du
+  choix, pas de la puissance** : on en porte toujours deux, et chacun coûte
+  autant qu'il rapporte (le « Roc » ne se blesse presque jamais et ne progresse
+  quasiment plus ; la « Tête brûlée » gagne les finales et collectionne les
+  cartons). Tu démarres avec une générale
   de **30 à 40** : tout est à construire. Les listes
   déroulantes sont des composants maison (drapeaux, blasons, recherche
   instantanée, navigation clavier) au thème du jeu.

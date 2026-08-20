@@ -4,7 +4,9 @@ import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { POSTES, NATIONS, NATIONS_PAR_ZONE, descriptionPoste, nomPoste } from '../data/rugby';
 import { COMPETITIONS, CLUBS_FRANCE_PAR_DIVISION } from '../data/clubs';
-import { TRAITS, MAX_TRAITS, descriptionTrait, nomTrait } from '../data/traits';
+import {
+  TRAITS, MAX_TRAITS, descriptionTrait, nomTrait, traitDisponible,
+} from '../data/traits';
 import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
 import { Drapeau } from '../components/Drapeau';
@@ -16,6 +18,7 @@ import type { PosteId } from '../types';
 export function Creation() {
   const creerJoueur = useGame((s) => s.creerJoueur);
   const setEcran = useGame((s) => s.setEcran);
+  const traitsDebloques = useGame((s) => s.traitsDebloques);
 
   const [nom, setNom] = useState('');
   const [poste, setPoste] = useState<PosteId>('demi_ouverture');
@@ -185,31 +188,42 @@ export function Creation() {
             </span>
           </label>
           <div className="traits-grille">
-            {TRAITS.map((t) => {
-              const choisi = traits.includes(t.id);
-              const plein = traits.length >= MAX_TRAITS && !choisi;
+            {TRAITS.map((tr) => {
+              const choisi = traits.includes(tr.id);
+              // ⚠️ UN ARCHÉTYPE PAYANT RESTE VISIBLE, GRISÉ, AVEC SON PRIX. Le
+              // masquer reviendrait à cacher la moitié du système de caractères
+              // à qui n'a rien acheté : on ne peut pas vouloir un trait dont on
+              // ignore l'existence.
+              const ouvert = traitDisponible(tr.id, traitsDebloques);
+              const plein = (traits.length >= MAX_TRAITS && !choisi) || !ouvert;
               return (
                 <button
-                  key={t.id}
+                  key={tr.id}
                   type="button"
-                  className={`trait-carte${choisi ? ' actif' : ''}`}
+                  className={`trait-carte${choisi ? ' actif' : ''}${ouvert ? '' : ' verrouille'}`}
                   disabled={plein}
                   onClick={() =>
                     setTraits((liste) =>
-                      liste.includes(t.id) ? liste.filter((x) => x !== t.id) : [...liste, t.id],
+                      liste.includes(tr.id) ? liste.filter((x) => x !== tr.id) : [...liste, tr.id],
                     )
                   }
                 >
                   <div className="trait-tete">
-                    <span className="trait-emoji">{t.emoji}</span>
-                    <b>{nomTrait(t.id)}</b>
+                    <span className="trait-emoji">{tr.emoji}</span>
+                    <b>{nomTrait(tr.id)}</b>
                     {choisi && <span className="trait-check">✓</span>}
                   </div>
-                  <div className="trait-desc">{descriptionTrait(t.id)}</div>
+                  <div className="trait-desc">{descriptionTrait(tr.id)}</div>
+                  {!ouvert && (
+                    <div className="trait-prix">
+                      🔒 {t('cr.traitVerrouille', { prix: tr.prix ?? 0 })}
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
+          <div className="trait-note">{t('cr.traitsBoutique')}</div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>

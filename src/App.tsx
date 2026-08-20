@@ -7,8 +7,6 @@ import { t } from './lib/i18n';
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
 import { Reglages } from './components/Reglages';
-import { BandeauConsentementPub, Pub } from './components/Pub';
-import { ECRANS_AVEC_PUB } from './lib/pub';
 import { Accueil } from './screens/Accueil';
 import { Creation } from './screens/Creation';
 import { Carriere } from './screens/Carriere';
@@ -122,18 +120,24 @@ export default function App() {
         </Garde>
 
         {/* ⚠️ LA PUB N'EXISTE QUE SUR LES ÉCRANS OÙ L'ON FLÂNE — Boutique, Hall,
-            Classement, Clubs (`ECRANS_AVEC_PUB`). Jamais sur la Carrière, jamais
-            pendant un match, jamais sur 𝕏 L'Ovale : c'est là qu'on JOUE, et une
-            bannière au milieu d'une décision de carrière, c'est une pub qui
-            nuit au jeu. Elle est posée APRÈS le contenu, dans le flux, jamais
-            en surimpression, et elle ne rend rien du tout sans régie
-            configurée ni consentement (voir `lib/pub.ts`). */}
-        {(ECRANS_AVEC_PUB as readonly string[]).includes(ecran) && (
-          <>
-            <BandeauConsentementPub />
-            <Pub />
-          </>
-        )}
+            Classement, Clubs. C'était une erreur, et elle a coûté le compte
+            AdSense : « Annonces Google diffusées sur des pages ou écrans sans
+            contenu d'éditeur ».
+
+            ⚠️ LE DIAGNOSTIC, POUR QUE PERSONNE NE LES REMETTE. Le règlement
+            interdit les annonces sur les écrans « qui servent aux alertes, à la
+            NAVIGATION ou à d'autres fins comportementales ». Or ces quatre-là
+            sont exactement ça : une boutique, deux tableaux de scores et un
+            annuaire d'écussons. S'y ajoutait un défaut plus profond — le jeu
+            n'a qu'UNE URL (l'écran vit dans le store, pas dans l'adresse) et
+            son HTML est vide avant hydratation : pour un examinateur, tout le
+            site tenait dans quatre phrases de `<noscript>`.
+
+            La publicité vit désormais sur de VRAIES pages de contenu, en HTML
+            statique, à de vraies adresses : /guide/, /pyramide/, /moteur/ et
+            /journal/ (voir `scripts/genPages.cjs`). Le jeu, lui, n'en porte
+            plus une seule — et c'est très bien ainsi : une bannière au milieu
+            d'une décision de carrière est une pub qui nuit au jeu. */}
       </main>
 
       <AnimatePresence>

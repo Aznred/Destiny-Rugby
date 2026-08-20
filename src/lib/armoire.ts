@@ -156,6 +156,13 @@ const ZONE_LARGEUR = 1.75;   // × la largeur du meuble
 // C'est LUI qui garantit qu'elles ne se touchent pas, et c'est lui qui borne
 // la secousse.
 const ECART_SOL = 0.1;
+// ⚠️ LA PROFONDEUR DE LA SCÈNE EST BUDGÉTÉE, en part de la hauteur du meuble.
+// Chaque unité de profondeur coûte une unité de recul à la caméra : sans
+// plafond, un palmarès complet repoussait l'objectif à 32 unités et le meuble
+// n'occupait plus que 15 % de la hauteur d'écran (mesuré, verifArmoire §9).
+// Au-delà de ce budget, les pièces rétrécissent — on ne retire jamais un
+// trophée gagné.
+const PROFONDEUR_MAX = 0.85;
 // Ce qu'on laisse entre la face avant du meuble et la première rangée, en part
 // de la hauteur du meuble. Sans ça, une pièce posée contre le meuble semble
 // sortir du bois — et la moitié de son épaisseur passe DANS le meuble.
@@ -469,60 +476,93 @@ export function disposerArmoire(
     const zoneL = dims.largeur * ZONE_LARGEUR;
     const ecart = dims.largeur * ECART_SOL;
 
-    // 3a. Chaque pièce à sa stature, avec son EMPRISE AU SOL RÉELLE.
-    const poses = sol.map((i, k) => {
-      const m = modeles[i];
-      const angle = m.bouclier ? INCLINAISON_BOUCLIER : 0;
-      const pv = pivot(i * 2 + 3);
-      const c = Math.abs(Math.cos(pv));
-      const sn = Math.abs(Math.sin(pv));
-      // L'emprise au sol d'une boîte pivotée autour de Y, à l'échelle 1.
-      const uniteX = m.taille.x * c + m.taille.z * sn;
-      const uniteZ = m.taille.x * sn + m.taille.z * c;
-      // La pièce maîtresse (le premier du palmarès) est un cran au-dessus.
-      let echelle = (buste * (k === 0 ? PART_VEDETTE : 1)) / (m.taille.y || 1);
-      // ⚠️ ET AUCUNE PIÈCE N'EST PLUS LARGE QUE LA ZONE. Sans cette borne, un
-      // bouclier démesuré ferait une rangée à lui seul et emporterait le
-      // cadrage avec lui.
-      echelle = Math.min(echelle, zoneL / (uniteX || 1));
-      return {
-        i,
-        angle,
-        pv,
-        echelle,
-        ex: uniteX * echelle,
-        ez: uniteZ * echelle,
-        epaisseur: m.taille.z * echelle,
-      };
-    });
+    /**
+     * Range les titres en rangées, à une stature donnée, et rend la
+     * profondeur totale occupée.
+     *
+     * ⚠️ SÉPARÉE DU PLACEMENT parce qu'on l'appelle PLUSIEURS FOIS : c'est le
+     * seul moyen de savoir ce que coûte une stature avant de s'y engager.
+     */
+    const composer = (stature: number) => {
+      const poses = sol.map((idx, k) => {
+        const m = modeles[idx];
+        const angle = m.bouclier ? INCLINAISON_BOUCLIER : 0;
+        const pv = pivot(idx * 2 + 3);
+        const c = Math.abs(Math.cos(pv));
+        const sn = Math.abs(Math.sin(pv));
+        // L'emprise au sol d'une boîte pivotée autour de Y, à l'échelle 1.
+        const uniteX = m.taille.x * c + m.taille.z * sn;
+        const uniteZ = m.taille.x * sn + m.taille.z * c;
+        // La pièce maîtresse (le premier du palmarès) est un cran au-dessus.
+        let echelle = (buste * stature * (k === 0 ? PART_VEDETTE : 1)) / (m.taille.y || 1);
+        // ⚠️ ET AUCUNE PIÈCE N'EST PLUS LARGE QUE LA ZONE. Sans cette borne, un
+        // bouclier démesuré ferait une rangée à lui seul et emporterait le
+        // cadrage avec lui.
+        echelle = Math.min(echelle, zoneL / (uniteX || 1));
+        return {
+          i: idx,
+          angle,
+          pv,
+          echelle,
+          ex: uniteX * echelle,
+          ez: uniteZ * echelle,
+          epaisseur: m.taille.z * echelle,
+        };
+      });
 
-    // 3b. On remplit des RANGÉES, à la largeur réelle des pièces.
-    type Pose = (typeof poses)[number];
-    const rangs: Pose[][] = [];
-    let courant: Pose[] = [];
-    let large = 0;
-    for (const pose of poses) {
-      const avec = courant.length === 0 ? pose.ex : large + ecart + pose.ex;
-      if (courant.length > 0 && avec > zoneL) {
-        rangs.push(courant);
-        courant = [pose];
-        large = pose.ex;
-      } else {
-        courant.push(pose);
-        large = avec;
+      // On remplit des RANGÉES, à la largeur réelle des pièces.
+      type Pose = (typeof poses)[number];
+      const rangs: Pose[][] = [];
+      let courant: Pose[] = [];
+      let large = 0;
+      for (const pose of poses) {
+        const avec = courant.length === 0 ? pose.ex : large + ecart + pose.ex;
+        if (courant.length > 0 && avec > zoneL) {
+          rangs.push(courant);
+          courant = [pose];
+          large = pose.ex;
+        } else {
+          courant.push(pose);
+          large = avec;
+        }
       }
-    }
-    if (courant.length > 0) rangs.push(courant);
+      if (courant.length > 0) rangs.push(courant);
 
-    // 3c. Du fond vers l'avant. ⚠️ LE RANG 0 PORTE LA VEDETTE, donc il va
-    // DEVANT : c'est elle qu'on doit voir en premier, pas celle qui a hérité de
-    // la meilleure case.
+      const profondeurs = rangs.map((r) => Math.max(...r.map((pose) => pose.ez)));
+      const totale = profondeurs.reduce((a, b) => a + b, 0) + ecart * (rangs.length - 1);
+      return { rangs, profondeurs, totale };
+    };
+
+    // ⚠️ LA STATURE SE RÉDUIT JUSQU'À CE QUE LA SCÈNE TIENNE, et c'est le second
+    // correctif de l'armoire.
+    //
+    // Le test « palmarès complet » (verifArmoire, section 9) a montré le
+    // défaut : avec beaucoup de titres, chaque pièce gardait sa hauteur de
+    // buste, les rangées s'empilaient vers l'avant, et la caméra reculait
+    // d'autant — **le meuble tombait à 15 % de la hauteur de l'écran**. Aucun
+    // chevauchement, tout était juste géométriquement, et la vitrine était
+    // devenue illisible. Un palmarès complet doit impressionner, pas disparaître.
+    //
+    // ⚠️ ON RÉDUIT LA TAILLE, PAS LE NOMBRE. Écarter des trophées déjà gagnés
+    // serait pire : le joueur ne verrait pas ce qu'il a remporté. Une foule de
+    // pièces un peu plus petites devant le meuble se lit très bien — et c'est
+    // même ce qui donne sa valeur à un grand palmarès.
+    let stature = 1;
+    let plan = composer(stature);
+    const profondeurMax = dims.hauteur * PROFONDEUR_MAX;
+    for (let essai = 0; essai < 12 && plan.totale > profondeurMax; essai++) {
+      stature *= 0.9;
+      plan = composer(stature);
+    }
+
+    // Du fond vers l'avant. ⚠️ LE RANG 0 PORTE LA VEDETTE, donc il va DEVANT :
+    // c'est elle qu'on doit voir en premier, pas celle qui a hérité de la
+    // meilleure place.
     const zBase = dims.profondeur / 2 + dims.hauteur * RECUL_MEUBLE;
-    const profondeurs = rangs.map((r) => Math.max(...r.map((pose) => pose.ez)));
     let z = zBase;
-    for (let r = rangs.length - 1; r >= 0; r--) {
-      const rang = rangs[r];
-      const centreZ = z + profondeurs[r] / 2;
+    for (let r = plan.rangs.length - 1; r >= 0; r--) {
+      const rang = plan.rangs[r];
+      const centreZ = z + plan.profondeurs[r] / 2;
       const largeurRang = rang.reduce((a, pose) => a + pose.ex, 0) + ecart * (rang.length - 1);
       // Une rangée incomplète est CENTRÉE, pas tassée à gauche.
       let x = -largeurRang / 2;
@@ -547,15 +587,14 @@ export function disposerArmoire(
           // ⚠️ LA ROTATION Y EST LE CŒUR DE L'EFFET. Sans elle, des pièces
           // décalées mais toutes face au spectateur se lisent encore comme une
           // grille. Avec, on voit un palmarès posé, pas un présentoir. Elle est
-          // désormais décidée AVANT l'échelle, puisque c'est elle qui fixe
-          // l'emprise au sol.
+          // décidée AVANT l'échelle, puisque c'est elle qui fixe l'emprise.
           rotation: [-pose.angle, pose.pv, 0],
           echelle: pose.echelle,
           dehors: true,
         };
         x += pose.ex + ecart;
       }
-      z += profondeurs[r] + ecart;
+      z += plan.profondeurs[r] + ecart;
     }
   }
   return places;
