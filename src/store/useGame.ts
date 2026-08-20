@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { LIAISONS_DEFAUT, type Assignation, type Commande, type Liaisons } from '../lib/moteur/manette';
 import type {
   Attributs,
   Ecran,
@@ -514,6 +515,17 @@ interface GameState {
    * revient est exactement ce qui fait fermer l'onglet.
    */
   tutoMatchVu: boolean;
+  /**
+   * Les touches du match réassignées par le joueur.
+   *
+   * ⚠️ ON NE STOCKE QUE LES DIFFÉRENCES avec `LIAISONS_DEFAUT`, pas la table
+   * entière. Persister les vingt liaisons figerait la disposition d'origine
+   * dans chaque sauvegarde : le jour où l'on corrige un défaut par défaut
+   * (c'est arrivé — les touches d'action étaient injouables), personne ne le
+   * recevrait jamais. Ici, seul ce que le joueur a explicitement changé lui
+   * appartient ; le reste suit le jeu.
+   */
+  touchesMatch: Liaisons;
   /** Compteur des pubs récompensées (quota journalier et délai d'attente). */
   pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
@@ -709,6 +721,10 @@ interface GameState {
   setPubConsentement: (choix: 'oui' | 'non') => void;
   setTutoVu: (vu: boolean) => void;
   setTutoMatchVu: (vu: boolean) => void;
+  /** Réassigne une commande. `null` remet celle-ci à sa valeur par défaut. */
+  setToucheMatch: (commande: Commande, a: Assignation | null) => void;
+  /** Remet TOUTES les touches du match à leur valeur par défaut. */
+  reinitialiserTouchesMatch: () => void;
   /** Crédite la récompense d'une pub REGARDÉE JUSQU'AU BOUT. */
   encaisserPub: () => number;
   // ⚠️ `acheterBoost` a été supprimé : la boutique ne vend plus de bonus
@@ -729,6 +745,7 @@ export const useGame = create<GameState>()(
       pubConsentement: 'inconnu',
       tutoVu: false,
       tutoMatchVu: false,
+      touchesMatch: {},
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
       scenarioActif: null,
@@ -3919,6 +3936,25 @@ export const useGame = create<GameState>()(
       setTutoVu: (vu) => set({ tutoVu: vu }),
       setTutoMatchVu: (vu) => set({ tutoMatchVu: vu }),
 
+      // ⚠️ UNE TOUCHE NE PEUT PAS SERVIR DEUX FOIS. Sans cette libération, un
+      // joueur qui met « clic gauche » sur le coup de pied gardait aussi le
+      // plaquage dessus : un seul clic déclenchait les deux, et l'un des deux
+      // gagnait au hasard de l'ordre de la table. On retire donc le code
+      // partout ailleurs avant de le poser — y compris s'il occupait une
+      // liaison par défaut, qui est alors explicitement vidée.
+      setToucheMatch: (commande, a) => set((s) => {
+        const suivant: Liaisons = { ...s.touchesMatch };
+        if (!a) { delete suivant[commande]; return { touchesMatch: suivant }; }
+        for (const [autre, def] of Object.entries(LIAISONS_DEFAUT) as [Commande, Assignation][]) {
+          if (autre === commande) continue;
+          const actuelle = suivant[autre] ?? def;
+          if (actuelle.code === a.code) suivant[autre] = { code: '', libelle: '—' };
+        }
+        suivant[commande] = a;
+        return { touchesMatch: suivant };
+      }),
+      reinitialiserTouchesMatch: () => set({ touchesMatch: {} }),
+
       /**
        * ⚠️ ELLE RAPPORTE DES OVAS, ET RIEN D'AUTRE. Pas un point d'attribut,
        * pas un point de forme : les Ovas n'achètent que du cosmétique, donc
@@ -3987,6 +4023,7 @@ export const useGame = create<GameState>()(
           equipementActif?: Partial<Record<CategorieEquipement, string>>;
           tutoVu?: boolean;
           tutoMatchVu?: boolean;
+          touchesMatch?: Liaisons;
           pubConsentement?: 'inconnu' | 'oui' | 'non';
           pubs?: EtatPubs;
           modele?: string;
@@ -4127,6 +4164,7 @@ export const useGame = create<GameState>()(
         s.pubConsentement ??= 'inconnu';
         s.tutoVu ??= false;
         s.tutoMatchVu ??= false;
+        s.touchesMatch ??= {};
         s.pubs ??= ETAT_PUBS_VIDE;
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
@@ -4162,6 +4200,7 @@ export const useGame = create<GameState>()(
         pubConsentement: s.pubConsentement,
         tutoVu: s.tutoVu,
         tutoMatchVu: s.tutoMatchVu,
+        touchesMatch: s.touchesMatch,
         pubs: s.pubs,
         pantheon: s.pantheon,
         scenarioActif: s.scenarioActif,

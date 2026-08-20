@@ -15,7 +15,7 @@
 
 import { creerMatch, avancer, ordonner, type EtatMatch } from '../src/lib/moteur/moteur';
 import {
-  actionsDisponibles, demanderAction, piloterDirection,
+  actionsDisponibles, demanderAction, piloterDirection, receveurCote,
 } from '../src/lib/moteur/controle';
 import type { ActionJoueur, NiveauMatch, OrdreBagarre } from '../src/lib/moteur/etat';
 import { jouerRencontre } from '../src/lib/championnat';
@@ -129,6 +129,30 @@ console.log('\n=== 2. CHAQUE GESTE CHANGE QUELQUE CHOSE ===');
   const enduranceAuto = moyenne({}, (e) => monPion(e).endurance);
   const enduranceSprint = moyenne({ controle: true, action: 'sprint' }, (e) => monPion(e).endurance);
   ligne('le sprint coûte VRAIMENT de l’endurance', `${enduranceAuto.toFixed(0)} → ${enduranceSprint.toFixed(0)}`, enduranceSprint < enduranceAuto);
+
+  // ⚠️ LE CROCHET ET LE RAFFUT N'ÉTAIENT MESURÉS NULLE PART, et c'est
+  // exactement là que le retour de jeu a porté : « raffut, crochet qui marchent
+  // vraiment ». Leur effet existait (`resoudrePlaquage` ajoute de l'évitement
+  // et de la puissance à la résistance du porteur) mais personne ne le
+  // surveillait — on pouvait donc le raboter sans que rien ne le signale.
+  //
+  // Ce qui se mesure ici, c'est le FRANCHISSEMENT : un crochet réussi, c'est un
+  // plaqueur qui plaque dans le vide. On compare au même joueur qui ne
+  // crocheterait pas — un test absolu ne voudrait rien dire, le nombre de
+  // ballons portés variant d'un match à l'autre.
+  const franchAuto = moyenne({ controle: true }, (e) => monPion(e).stats.franchissements);
+  const franchCrochet = moyenne({ controle: true, action: 'crochet' }, (e) => monPion(e).stats.franchissements);
+  const franchRaffut = moyenne({ controle: true, action: 'raffut' }, (e) => monPion(e).stats.franchissements);
+  ligne('le crochet fait vraiment franchir',
+    `${franchAuto.toFixed(1)} → ${franchCrochet.toFixed(1)}`, franchCrochet > franchAuto);
+  ligne('le raffut aussi',
+    `${franchAuto.toFixed(1)} → ${franchRaffut.toFixed(1)}`, franchRaffut > franchAuto);
+  // ⚠️ ET ILS NE DOIVENT PAS RENDRE IMPLAQUABLE. Un ailier qui franchit vingt
+  // fois par match, ce n'est plus du rugby — le taux de plaquage réussi du
+  // rugby professionnel est de ~88 %, et le moteur est calé dessus.
+  ligne('…sans rendre imprenable (< 12 par match)',
+    `${Math.max(franchCrochet, franchRaffut).toFixed(1)}`,
+    Math.max(franchCrochet, franchRaffut) < 12);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,6 +348,151 @@ console.log('\n=== 7. 🕹️ LE PILOTAGE DIRECT ===');
     chambre && (e3.recharges.provoquer ?? 0) > 0 && !(e3.recharges.passe ?? 0));
 }
 
+// ---------------------------------------------------------------------------
+// 8. 🗯️ LE MATCH S'ÉCHAUFFE TOUT SEUL — frictions, gestes illégaux, bulles
+// ---------------------------------------------------------------------------
+// ⚠️ CE BLOC MESURE UN RENVERSEMENT DE RÈGLE. La première version posait : « on
+// ne déclenche jamais une bagarre au hasard, elle est toujours la suite d'un
+// geste du joueur ». Conséquence en jeu : rien n'arrivait JAMAIS si l'on ne
+// cliquait pas sur « chambrer », et l'équipe d'en face était un décor poli.
+// Retour de jeu : « refais les bagarres pour que l'équipe d'en face puisse la
+// lancer, et que ça vienne plutôt d'actions illégales — plaquage haut,
+// chambrage — qui s'activent toutes seules ».
+//
+// Ce qu'on vérifie, et qui n'est PAS négociable :
+//   • le match s'échauffe sans que le joueur ne clique sur rien ;
+//   • une altercation peut naître du camp d'en face ;
+//   • les gestes illégaux existent, mais restent RARES — un plaquage haut
+//     toutes les dix minutes ferait un match de boxe ;
+//   • et le score de la ligue ne bouge toujours pas d'un point.
+console.log('\n=== 8. 🗯️ LE MATCH S’ÉCHAUFFE TOUT SEUL ===');
+{
+  /** Un match joué SANS que le joueur ne demande quoi que ce soit. */
+  function passif(cle: string, niveau: NiveauMatch) {
+    const m = jouerRencontre(A, B, 1, cle, null);
+    const e = creerMatch(A, B, effA, effB, m.scoreD, m.scoreE, cle, AVATAR,
+      { niveau, controle: true });
+    let bulles = 0;
+    // ⚠️ ON COMPTE LES OBJETS, PAS LES ÉTATS. Une bulle vit ~2,8 s simulées,
+    // soit sept passages de boucle : la compter à chaque tour donnait
+    // « 162 répliques par match » pour une vingtaine de phrases réellement
+    // prononcées. L'identité de l'objet est le seul repère juste.
+    const vues = new Set<object>();
+    let tensionMax = 0;
+    let garde = 0;
+    while (!e.fini && garde++ < 30_000) {
+      avancer(e, 0.4);
+      for (const b of e.bulles) vues.add(b);
+      if (e.bulles.length) bulles = Math.max(bulles, e.bulles.length);
+      tensionMax = Math.max(tensionMax, e.tension);
+      // On ne donne QUE l'ordre de reculer : le joueur ne provoque rien.
+      if (e.bagarre && !e.bagarre.ordre) ordonner(e, 'reculer');
+    }
+    return { e, bullesSimultanees: bulles, repliques: vues.size, tensionMax, score: [m.scoreD, m.scoreE] as const };
+  }
+
+  let repliques = 0;
+  let tension = 0;
+  let bagarresSubies = 0;
+  let ecarts = 0;
+  let pireSimultane = 0;
+  for (let i = 0; i < N; i++) {
+    const r = passif('friction#' + i, i % 2 ? 'amateur' : 'pro');
+    repliques += r.repliques;
+    tension = Math.max(tension, r.tensionMax);
+    bagarresSubies += r.e.discipline.bagarres;
+    pireSimultane = Math.max(pireSimultane, r.bullesSimultanees);
+    if (r.e.scoreA !== r.score[0] || r.e.scoreB !== r.score[1]) ecarts++;
+  }
+
+  console.log(`  ${'répliques entendues par match'.padEnd(46)} ${(repliques / N).toFixed(1)}`);
+  console.log(`  ${'altercations subies par match'.padEnd(46)} ${(bagarresSubies / N).toFixed(2)}`);
+
+  // ⚠️ LE JOUEUR N'A RIEN DEMANDÉ dans ces douze matchs : tout ce qui suit
+  // vient du moteur seul.
+  ligne('le match se parle sans qu’on clique', `${(repliques / N).toFixed(1)} répliques/match`, repliques > 0);
+  ligne('la température monte toute seule', `pic ${Math.round(tension)}/100`, tension > 15);
+  ligne('l’équipe d’en face peut allumer la mèche', `${bagarresSubies} sur ${N} matchs`, bagarresSubies > 0);
+  // Une BD, ce n'est pas un match : au-delà de quatre bulles l'écran devient
+  // illisible (BULLES_MAX dans bagarre.ts).
+  ligne('jamais plus de 4 bulles à l’écran', `${pireSimultane}`, pireSimultane <= 4);
+  // ⚠️ LA RÈGLE QUI NE PLIE PAS.
+  ligne('le score reste celui de la ligue', `${ecarts} écart(s) sur ${N}`, ecarts === 0);
+}
+
+// ---------------------------------------------------------------------------
+// 9. ⚖️ LES GESTES ILLÉGAUX RESTENT RARES
+// ---------------------------------------------------------------------------
+console.log('\n=== 9. ⚖️ PLAQUAGE HAUT ET PLAQUAGE EN RETARD ===');
+{
+  function compter(niveau: NiveauMatch, cle: string): number {
+    const m = jouerRencontre(A, B, 1, cle, null);
+    const e = creerMatch(A, B, effA, effB, m.scoreD, m.scoreE, cle, AVATAR,
+      { niveau, controle: false });
+    let garde = 0;
+    while (!e.fini && garde++ < 30_000) avancer(e, 2);
+    // ⚠️ ON COMPTE LE COMPTEUR, PAS LE TEXTE. « plaquage haut » figure DÉJÀ
+    // dans MOTIFS_PENALITE (commentaire.ts) comme l'un des sept motifs tirés au
+    // hasard pour habiller n'importe quelle pénalité : compter les phrases
+    // mélangeait ces habillages avec la vraie mécanique et donnait 5,75 gestes
+    // par match là où le moteur n'en produit que deux.
+    return e.compteurs.irregularites;
+  }
+  let amateur = 0;
+  let pro = 0;
+  for (let i = 0; i < N; i++) {
+    amateur += compter('amateur', 'irr#a#' + i);
+    pro += compter('pro', 'irr#p#' + i);
+  }
+  console.log(`  ${'gestes illégaux sifflés par match'.padEnd(46)} amateur ${(amateur / N).toFixed(2)} · pro ${(pro / N).toFixed(2)}`);
+  // ⚠️ LES BORNES SONT CELLES DU RUGBY, PAS D'UN GOÛT. Le carton pour plaquage
+  // haut est la sanction la plus fréquente du jeu moderne, mais on parle d'un
+  // ou deux par match — pas d'un toutes les dix minutes.
+  ligne('ça existe vraiment', `${(pro / N).toFixed(2)}/match en pro`, pro > 0);
+  ligne('et ça reste rare (≤ 4/match)', `${(amateur / N).toFixed(2)}/match en amateur`, amateur / N <= 4);
+  ligne('plus fréquent en amateur', `${(amateur / N).toFixed(2)} vs ${(pro / N).toFixed(2)}`, amateur >= pro);
+}
+
+// ---------------------------------------------------------------------------
+// 10. ⬅️➡️ LA PASSE A UN CÔTÉ
+// ---------------------------------------------------------------------------
+// ⚠️ Retour de jeu : « en mode A ou E pour faire la passe droite ou gauche ».
+// Le test qui compte n'est pas « la passe part » mais « elle part DU BON
+// CÔTÉ » — et le côté est celui de l'ÉCRAN, donc retourné pour le camp B
+// (voir `receveurCote`). Un signe de travers, et le ballon part à l'opposé un
+// match sur deux.
+console.log('\n=== 10. ⬅️➡️ LA PASSE À GAUCHE VA À GAUCHE ===');
+{
+  let testes = 0;
+  let justes = 0;
+  for (let i = 0; i < N; i++) {
+    const cle = 'passe#' + i;
+    const m = jouerRencontre(A, B, 1, cle, null);
+    const e = creerMatch(A, B, effA, effB, m.scoreD, m.scoreE, cle, AVATAR,
+      { niveau: 'pro', controle: true });
+    let garde = 0;
+    while (!e.fini && garde++ < 30_000) {
+      avancer(e, 0.3);
+      const moi = e.pions.find((q) => q.moi)!;
+      if (e.porteur !== moi || !moi.surLeTerrain) continue;
+      for (const cote of [-1, 1] as const) {
+        const r = receveurCote(e, moi, cote);
+        if (!r) continue;
+        testes++;
+        // Le camp A attaque vers les X croissants : sa gauche d'écran est les
+        // Y décroissants. Pour le camp B, tout est retourné.
+        const s = moi.cote === 'A' ? 1 : -1;
+        const versY = cote * s;
+        const bonCote = (r.pos.y - moi.pos.y) * versY > 0;
+        const pasEnAvant = (r.pos.x - moi.pos.x) * s <= 0.6;
+        if (bonCote && pasEnAvant) justes++;
+      }
+    }
+  }
+  console.log(`  ${'receveurs proposés'.padEnd(46)} ${testes}`);
+  ligne('on trouve bien des receveurs des deux côtés', `${testes} cas`, testes > 20);
+  ligne('toujours du bon côté ET jamais en avant', `${justes}/${testes}`, testes > 0 && justes === testes);
+}
 console.log(`\nbagarres/match — amateur ${bagarresAmateur.toFixed(2)} · pro ${bagarresPro.toFixed(2)}`);
 console.log(echecs === 0
   ? '\n✅ TOUT EST BON — actions contextuelles, gestes qui pèsent, discipline asymétrique amateur/pro.'

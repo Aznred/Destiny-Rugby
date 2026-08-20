@@ -227,16 +227,24 @@ export async function POST(req: Request): Promise<Response> {
         ${f.selections}, ${JSON.stringify(f.titres)}::jsonb, ${JSON.stringify(f.clubs)}::jsonb
       )
       on conflict (pseudo) do update
-        set score = excluded.score, maj_le = now(),
+        set score = greatest(classement.score, excluded.score), maj_le = now(),
             nom = excluded.nom, poste = excluded.poste, nation = excluded.nation,
             age = excluded.age, saisons = excluded.saisons, note = excluded.note,
             reputation = excluded.reputation, matchs = excluded.matchs,
             essais = excluded.essais, selections = excluded.selections,
             titres = excluded.titres, clubs = excluded.clubs
-        -- ⚠️ On ne remplace la fiche QUE si le score progresse : sinon un envoi
-        -- de mi-carrière écraserait la ligne d'une carrière déjà terminée, et le
-        -- tableau afficherait un palmarès plus pauvre que le score gardé.
-        where excluded.score > classement.score
+        -- ⚠️ On ne remplace la fiche QUE si le score ne RECULE pas : sinon un
+        -- envoi de mi-carrière écraserait la ligne d'une carrière déjà terminée,
+        -- et le tableau afficherait un palmarès plus pauvre que le score gardé.
+        --
+        -- ⚠️ MAIS C'EST BIEN « ≥ », PAS « > », ET C'EST LA MIGRATION QUI L'EXIGE.
+        -- Avec un « > » strict, une ligne écrite avant la v2 du schéma (score
+        -- seul, fiche vide) ne se remplissait JAMAIS : son propriétaire renvoie
+        -- sa carrière terminée, donc le MÊME score, donc la condition est fausse,
+        -- donc l'armoire à trophées reste vide à l'écran — définitivement. À
+        -- score égal la carrière est la même : la fiche est bonne à prendre.
+        -- `greatest` garantit qu'aucun score ne peut baisser au passage.
+        where excluded.score >= classement.score
     `;
   } catch (e) {
     // ⚠️ MÊME REPLI QUE POUR LA LECTURE : sur une base encore en v1, on écrit

@@ -36,9 +36,12 @@ import {
   type Phase, type PlanDeScore, type TypeCommentaire,
 } from './etat';
 import {
-  chauffer, donnerOrdre, refroidir, resoudreBagarre, sanctionApresMatch,
+  apresGesteIllegal, chauffer, donnerOrdre, frictions, irregularite, refroidir,
+  resoudreBagarre, sanctionApresMatch, vieillirBulles,
 } from './bagarre';
-import { consommerIntention, intentionEst, receveurPour } from './controle';
+import {
+  consommerIntention, intentionEst, receveurCote, receveurPour,
+} from './controle';
 import {
   choisirCoteOuvert, choisirSysteme, placerEquipes, plusProche, surLeTerrain,
   surnombreAuLarge, vitesseMontee, numero as maillot,
@@ -222,7 +225,7 @@ export function creerMatch(
     scoreA: 0, scoreB: 0,
     planA: planVide(scoreCibleA, rng), planB: planVide(scoreCibleB, rng),
     essaisA: 0, essaisB: 0,
-    compteurs: { rucks: 0, melees: 0, touches: 0, percees: 0, tempsA: 0, tempsB: 0 },
+    compteurs: { rucks: 0, melees: 0, touches: 0, percees: 0, irregularites: 0, tempsA: 0, tempsB: 0 },
     placement: null, cibleRenvoi: null, tir: null, penalite: null,
     remplacementsA: 0, remplacementsB: 0, prochaineDecision: 1, compteur: 0,
     commentaires: [], fini: false, rng,
@@ -234,6 +237,8 @@ export function creerMatch(
     sprint: false,
     tension: 0,
     bagarre: null,
+    bulles: [],
+    prochaineFriction: 12,
     discipline: disciplineVide(),
   };
 
@@ -313,6 +318,13 @@ function tick(e: EtatMatch): void {
     if (reste <= 0) delete e.recharges[cle]; else e.recharges[cle] = reste;
   }
   refroidir(e, dt);
+  // ⚠️ LE MATCH S'ÉCHAUFFE TOUT SEUL. Deux adversaires proches se cherchent, se
+  // parlent, et la température monte sans qu'on ait rien cliqué — c'est ce qui
+  // permet à l'équipe d'en face d'être à l'origine d'une altercation
+  // (`bagarre.ts` → `frictions`). Les bulles vieillissent au rythme du MATCH,
+  // pas à celui de l'écran : en accéléré elles passent vite, comme le reste.
+  vieillirBulles(e, dt);
+  frictions(e, dt);
 
   // ── Placement toutes les 3 images de simulation (0,45 s) : invisible à
   // l'écran, et trois fois moins cher pour la simulation de fond.
@@ -836,8 +848,18 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // 3 m et 1,35 m de pression il ne s'écoule que 0,13 s (c'est déjà la leçon
   // du « fixer et donner » juste en dessous).
   if (porteur.moi && e.controle && e.intention) {
-    if (e.intention.type === 'passe') {
-      const receveur = receveurPour(e, porteur);
+    // ⚠️ TROIS PASSES, PAS UNE. `passe` est l'action contextuelle du gros bouton
+    // (elle donne au plus évident) ; `passeGauche` et `passeDroite` désignent un
+    // CÔTÉ. Retour de jeu : « en mode A ou E pour faire la passe droite ou
+    // gauche ». Avec un seul bouton, le moteur choisissait le receveur : on
+    // subissait sa lecture au lieu de jouer la sienne, et l'aile fermée ne
+    // recevait jamais rien.
+    const cote = e.intention.type === 'passeGauche' ? -1
+      : e.intention.type === 'passeDroite' ? 1 : 0;
+    if (e.intention.type === 'passe' || cote !== 0) {
+      const receveur = cote === 0
+        ? receveurPour(e, porteur)
+        : (receveurCote(e, porteur, cote) ?? receveurPour(e, porteur));
       if (receveur) {
         consommerIntention(e);
         return passerLeBallon(e, porteur, receveur, pression);
@@ -1029,6 +1051,21 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
 // ---------------------------------------------------------------------------
 
 function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
+  // ⚠️ LE GESTE ILLÉGAL SE JOUE AVANT LE DUEL, ET IL LE REMPLACE. Un plaquage
+  // haut n'est pas un plaquage raté : l'arbitre siffle, le ballon change de
+  // camp, et la température monte d'un cran. Ça vaut pour les TRENTE pions —
+  // c'est ce qui permet à l'équipe d'en face d'allumer la mèche
+  // (`bagarre.ts` → `irregularite` et `apresGesteIllegal`).
+  const irreg = irregularite(e, defenseur);
+  if (irreg) {
+    e.compteurs.irregularites += 1;
+    defenseur.stats.plaquagesManques += 1;
+    porteur.battu = 0.6;
+    siffler(e, porteur.cote, { x: porteur.pos.x, y: porteur.pos.y }, irreg.motif, defenseur);
+    apresGesteIllegal(e, defenseur, porteur, irreg);
+    return;
+  }
+
   const fatigueD = 0.72 + defenseur.endurance / 360;
   // ⚠️ LE GESTE DU JOUEUR PÈSE VRAIMENT SUR LE DUEL — sinon la barre d'actions
   // ne serait qu'un habillage. Il ne le décide pas pour autant : il déplace le
@@ -1037,8 +1074,14 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
   const monPlaquage = defenseur.moi && intentionEst(e, 'plaquage');
   const force = defenseur.plaquage * fatigueD * (monPlaquage ? 1.16 : 1);
   const resistance = porteur.evitement * 0.55 + porteur.puissance * 0.45
-    + (monGeste === 'crochet' ? porteur.evitement * 0.30 : 0)
-    + (monGeste === 'raffut' ? porteur.puissance * 0.26 : 0)
+    // ⚠️ RENFORCÉS APRÈS RETOUR DE JEU (« raffut, crochet qui marche vraiment »).
+    // À 0,30 et 0,26, un crochet faisait passer la chance de franchir de 10 % à
+    // 15 % : l'effet existait — le banc d'essai le mesurait — mais il était
+    // INVISIBLE manette en main, parce qu'on ne joue pas cent crochets d'affilée.
+    // Un geste qu'on ne sent pas est un geste qui n'existe pas. À 0,45 et 0,40,
+    // on franchit une fois sur quatre : c'est un pari qu'on voit gagner.
+    + (monGeste === 'crochet' ? porteur.evitement * 0.45 : 0)
+    + (monGeste === 'raffut' ? porteur.puissance * 0.40 : 0)
     + (monGeste === 'sprint' ? 6 : 0);
   // ⚠️ Le taux de réussite au plaquage du rugby professionnel est de ~88 %.
   // Le rythme de l'équipe qui court après son plan de marque l'infléchit :

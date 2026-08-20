@@ -65,7 +65,13 @@ export type NiveauMatch = 'pro' | 'amateur';
 /** Ce que le joueur peut demander à son pion pendant le match. */
 export type ActionJoueur =
   // ── Ballon en main ───────────────────────────────────────────────────────
-  | 'sprint' | 'crochet' | 'raffut' | 'passe' | 'pied'
+  // ⚠️ LA PASSE EST DIRECTIONNELLE. Retour de jeu : « en mode A ou E pour faire
+  // la passe droite ou gauche ». Un seul bouton « passer » laissait le moteur
+  // choisir le receveur : on subissait sa lecture au lieu de jouer la sienne,
+  // et l'aile fermée ne recevait jamais rien. `passe` reste (c'est l'action
+  // contextuelle du gros bouton, qui donne au plus évident) ; les deux autres
+  // désignent un CÔTÉ, et c'est le joueur qui décide d'ouvrir ou de fermer.
+  | 'sprint' | 'crochet' | 'raffut' | 'passe' | 'passeGauche' | 'passeDroite' | 'pied'
   // ── Son équipe attaque, il n'a pas le ballon ─────────────────────────────
   | 'appel' | 'soutien'
   // ── Son équipe défend ───────────────────────────────────────────────────
@@ -97,6 +103,27 @@ export interface IntentionJoueur {
  * l'arbitre.
  */
 
+
+/**
+ * 💬 UNE BULLE AU-DESSUS D'UN PION.
+ *
+ * ⚠️ Demande explicite : « en mode chambrage, petites bulles avec les joueurs
+ * qui disent quelque chose ». Le fil de commentaire raconte le match à la
+ * troisième personne ; une bulle, elle, se passe SUR LE TERRAIN, à l'endroit
+ * exact où ça se joue — c'est ce qui fait qu'on voit une friction naître au
+ * lieu d'en lire le compte rendu deux lignes plus bas.
+ *
+ * ⚠️ Elles vivent dans l'ÉTAT, pas dans l'écran : le moteur les fait vieillir
+ * avec le reste, donc elles suivent la vitesse du match (une bulle ne reste pas
+ * trois minutes à l'écran en accéléré) et deux matchs simulés en parallèle ne
+ * se les partagent pas.
+ */
+export interface Bulle {
+  pion: Pion;
+  texte: string;
+  /** Secondes simulées restantes avant de disparaître. */
+  restant: number;
+}
 
 /** L'ordre donné pendant la bagarre. */
 export type OrdreBagarre = 'tous' | 'proteger' | 'calmer' | 'reculer';
@@ -263,6 +290,8 @@ export interface EtatMatch {
   // Compteurs de match (affichés et mesurés par le banc d'essai).
   compteurs: {
     rucks: number; melees: number; touches: number; percees: number;
+    /** Plaquages hauts et plaquages en retard sifflés (voir bagarre.ts). */
+    irregularites: number;
     tempsA: number; tempsB: number; // secondes de possession, pour l'affichage
   };
 
@@ -326,6 +355,16 @@ export interface EtatMatch {
   tension: number;
   /** La bagarre en cours : tant qu'elle est là, le jeu attend un ordre. */
   bagarre: Bagarre | null;
+  /** Les bulles de dialogue visibles en ce moment sur le terrain. */
+  bulles: Bulle[];
+  /**
+   * Secondes simulées avant la prochaine friction automatique.
+   *
+   * ⚠️ DANS L'ÉTAT, PAS EN VARIABLE DE MODULE. Deux matchs simulés en parallèle
+   * — le direct et une rencontre jouée en fond — se partageraient le compteur,
+   * et le déterminisme du moteur tomberait.
+   */
+  prochaineFriction: number;
   /** L'ardoise disciplinaire du joueur incarné. */
   discipline: DisciplineMatch;
 }

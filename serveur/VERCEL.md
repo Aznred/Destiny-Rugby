@@ -12,18 +12,32 @@ juste une **base de données** et une **fonction serveur** au projet existant.
 
 ```
    navigateur (le jeu)              Vercel                          Postgres
-┌──────────────────────┐   POST   ┌────────────────────────┐      ┌────────────┐
-│ FicheCarriere        │   ───→   │ api/classement.ts      │      │ pseudo     │
-│ saisons, note,       │          │ 1. débit (6/h, 40/j)   │  →   │ score      │
-│ matchs, essais,      │          │ 2. verifierFiche()     │      │ cree_le    │
-│ titres…              │          │ 3. score = RECALCULÉ   │      │ maj_le     │
-│                      │   ←───   │ 4. la fiche est jetée  │      └────────────┘
-└──────────────────────┘   GET    └────────────────────────┘
+┌──────────────────────┐   POST   ┌────────────────────────┐      ┌──────────────┐
+│ FicheCarriere        │   ───→   │ api/classement.ts      │      │ pseudo       │
+│ saisons, note,       │          │ 1. débit (6/h, 40/j)   │  →   │ score        │
+│ matchs, essais,      │          │ 2. verifierFiche()     │      │ la fiche :   │
+│ titres, clubs…       │          │ 3. score = RECALCULÉ   │      │ saisons, note│
+│                      │   ←───   │ 4. écriture du score   │      │ titres, clubs│
+│  ← fiches des autres │          │    ET de la fiche      │      │ maj_le       │
+└──────────────────────┘   GET    └────────────────────────┘      └──────────────┘
 ```
 
-**La base ne contient que le score.** C'était la contrainte de départ : la fiche
-voyage dans la requête pour que le serveur puisse recalculer, puis elle
-disparaît. Elle ne touche jamais la base.
+**La base garde le score ET la fiche affichable** (schéma v2). La v1 ne
+stockait que `pseudo` + `score` : c’était la contrainte de départ, et elle
+interdisait d’afficher le profil des autres joueurs. Depuis, la base conserve
+les faits **affichables** — saisons, matchs, essais, sélections, note,
+réputation, armoire à trophées et clubs traversés — ceux-là mêmes qui servent
+au recalcul du score.
+
+⚠️ **La sécurité ne change pas d’un pouce** : ce qui protège le classement,
+c’est que le serveur **RECALCULE** le score au lieu de croire celui qu’on lui
+envoie. Stocker davantage n’ouvre aucune brèche — chaque champ est borné par
+`verifierFiche()` avant d’arriver en base.
+
+> 📌 **Base déjà en ligne en v1 ?** Il y a un seul `ALTER TABLE` à jouer, une
+> fois : voir **[`MIGRATION-FICHES.md`](MIGRATION-FICHES.md)**. Tant qu’il ne
+> l’est pas, le serveur le détecte et retombe proprement sur « score seul » —
+> rien ne casse, mais les fiches restent vides.
 
 ---
 
@@ -33,6 +47,7 @@ disparaît. Elle ne touche jamais la base.
 |---|---|
 | `api/classement.ts` | **La fonction serveur.** À la racine du projet, à côté de `src/` — c'est la convention Vercel. `GET` rend le top 100, `POST` reçoit une carrière. |
 | `serveur/schema-vercel.sql` | Les deux tables, à coller une fois dans la console SQL. |
+| `serveur/MIGRATION-FICHES.md` | **Passer une base v1 en v2** pour afficher armoires, clubs et stats des autres joueurs. |
 | `src/lib/classementMondial.ts` | **Le barème, partagé.** La fonction l'importe, elle ne le recopie pas. |
 | `src/lib/classementEnLigne.ts` | Le côté navigateur : `envoyerAuClassement()` et `lireClassementMondial()`. |
 | `serveur/classement.ts` + `serveur/schema.sql` | L'ancienne version **Supabase**. Gardée pour référence — si tu déploies sur Vercel, tu n'en as pas besoin. |

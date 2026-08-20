@@ -22,7 +22,7 @@
 //    jeu ; c'est `moteur.ts` qui l'applique. Sans cette séparation, `bagarre.ts`
 //    devrait importer `moteur.ts`, qui l'importe déjà — un cycle.
 
-import { CARTON, phrase, texteMatch } from './commentaire';
+import { CARTON, CHAMBRAGE, phrase, texteMatch } from './commentaire';
 import type { Pion } from './entites';
 import { stopper } from './entites';
 import {
@@ -85,6 +85,210 @@ function chanceDeRiposte(niveau: NiveauMatch, tension: number, dejaVues: number)
 // ⚠️ AU-DELÀ, L'ARBITRE AURAIT VIDÉ LE TERRAIN. Trois altercations dans un même
 // match, c'est déjà le maximum de ce qu'on voit en Fédérale un jour de derby.
 const BAGARRES_MAX = 3;
+
+// ---------------------------------------------------------------------------
+// 💬 LES BULLES — ce que les joueurs se disent, sur le terrain
+// ---------------------------------------------------------------------------
+// ⚠️ Demande explicite : « en mode chambrage, petites bulles avec les joueurs
+// qui disent quelque chose ». Le fil raconte le match à la troisième personne ;
+// une bulle se passe À L'ENDROIT où ça se joue. C'est la différence entre lire
+// « le ton monte » et VOIR deux pions se parler avant que ça parte.
+
+/** Combien de bulles peuvent coexister. Au-delà, l'écran devient une BD. */
+const BULLES_MAX = 4;
+
+export function ajouterBulle(e: EtatMatch, pion: Pion, texte: string, duree = 2.8): void {
+  // Un joueur ne parle pas par-dessus lui-même : sa bulle précédente est
+  // remplacée, pas empilée.
+  const dejaLa = e.bulles.findIndex((b) => b.pion === pion);
+  if (dejaLa >= 0) e.bulles.splice(dejaLa, 1);
+  e.bulles.push({ pion, texte, restant: duree });
+  if (e.bulles.length > BULLES_MAX) e.bulles.shift();
+}
+
+/** Les bulles vieillissent au RYTHME DU MATCH, pas à celui de l'écran. */
+export function vieillirBulles(e: EtatMatch, dt: number): void {
+  if (!e.bulles.length) return;
+  for (const b of e.bulles) b.restant -= dt;
+  e.bulles = e.bulles.filter((b) => b.restant > 0 && b.pion.surLeTerrain && b.pion.sanction <= 0);
+}
+
+// ---------------------------------------------------------------------------
+// 🗯️ LES FRICTIONS AUTOMATIQUES — le match s'échauffe tout seul
+// ---------------------------------------------------------------------------
+// ⚠️ CE BLOC RENVERSE LA RÈGLE N° 1 D'ORIGINE, ET C'EST DEMANDÉ.
+//
+// La première version posait : « on ne déclenche jamais une bagarre au hasard,
+// elle est toujours la suite d'un geste du joueur ». Conséquence en jeu : rien
+// n'arrivait JAMAIS si l'on ne cliquait pas sur « chambrer », et l'équipe d'en
+// face était un décor poli. Retour de jeu : « refais les bagarres pour que
+// l'équipe d'en face puisse la lancer, et que ça vienne plutôt d'actions
+// illégales — plaquage haut, chambrage — qui s'activent toutes seules ».
+//
+// ⚠️ MAIS LE PRINCIPE DE FOND TIENT TOUJOURS : on ne PUNIT jamais le joueur sans
+// cause. Une friction adverse ne coûte rien tant qu'il n'y répond pas — c'est
+// l'adversaire qui prend la pénalité et le carton. Le joueur reste maître de
+// ce qui lui arrive : il peut reculer, séparer, ou entrer dedans.
+
+/** Secondes simulées entre deux tentatives de friction. */
+const PERIODE_FRICTION = 9;
+
+/**
+ * Deux adversaires proches se cherchent. Appelée à chaque tick par le moteur.
+ *
+ * ⚠️ LA FRÉQUENCE SUIT LA TEMPÉRATURE ET LE NIVEAU. À froid en professionnel,
+ * on s'ignore ; à 80 de tension en Fédérale, ça se parle à chaque regroupement.
+ * Sans ce couplage, on obtenait soit un match muet, soit un plateau de théâtre.
+ */
+export function frictions(e: EtatMatch, dt: number): void {
+  if (e.fini || e.bagarre) return;
+  e.prochaineFriction -= dt;
+  if (e.prochaineFriction > 0) return;
+  e.prochaineFriction = PERIODE_FRICTION;
+
+  // La chance qu'un mot parte, sur cette fenêtre.
+  const chaleur = e.tension / 100;
+  const chance = (e.niveau === 'amateur' ? 0.30 : 0.16) * (0.35 + chaleur);
+  if (e.rng() >= chance) return;
+
+  // On cherche deux adversaires côte à côte. Le joueur incarné est privilégié
+  // — c'est son match, il doit le vivre, pas le regarder de loin.
+  const moi = monPion(e);
+  const auteur = moi && e.rng() < 0.55
+    ? adversaireProche(e, moi, 12)
+    : pionAuHasard(e);
+  if (!auteur) return;
+  const cible = adversaireProche(e, auteur, 10);
+  if (!cible) return;
+
+  chambrer(e, auteur, cible);
+}
+
+/** Un joueur au hasard, parmi ceux qui sont en jeu. */
+function pionAuHasard(e: EtatMatch): Pion | undefined {
+  const dispo = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0);
+  return dispo[Math.floor(e.rng() * dispo.length)];
+}
+
+/**
+ * Un joueur en chambre un autre : deux bulles, de la tension, et parfois la
+ * suite.
+ *
+ * ⚠️ LA RÉPONSE EST PONDÉRÉE PAR LA DISCIPLINE, comme la riposte à une
+ * provocation du joueur. Un capitaine international encaisse, un soupe-au-lait
+ * répond — et c'est lui qui, plus tard, craquera.
+ */
+export function chambrer(e: EtatMatch, auteur: Pion, cible: Pion): void {
+  ajouterBulle(e, auteur, phrase(e.rng, CHAMBRAGE));
+  chauffer(e, e.niveau === 'amateur' ? 9 : 5);
+
+  // La cible répond une fois sur deux, plus souvent si elle est soupe-au-lait.
+  const repond = e.rng() < 0.35 + (100 - cible.discipline) / 220;
+  if (repond) {
+    ajouterBulle(e, cible, phrase(e.rng, CHAMBRAGE), 2.4);
+    chauffer(e, 4);
+  }
+
+  // ⚠️ ÇA NE PART EN BAGARRE QUE SI LE JOUEUR INCARNÉ EST DEDANS. Le moteur
+  // sait résoudre une altercation entre deux PNJ, mais l'écran, lui, ne sait
+  // poser la question qu'à une personne : mettre le jeu en pause pour une
+  // bagarre qu'on ne peut pas arbitrer serait une interruption sans choix.
+  // Les frictions entre PNJ chauffent donc le match, et c'est tout — ce sont
+  // elles qui rendent la suivante possible.
+  const moi = monPion(e);
+  if (!moi || (auteur !== moi && cible !== moi)) return;
+  if (e.discipline.bagarres >= BAGARRES_MAX) return;
+
+  const adversaire = auteur === moi ? cible : auteur;
+  // Le joueur s'est fait chercher : c'est l'adversaire qui monte, donc c'est
+  // lui l'origine — et la commission en tiendra compte.
+  const chance = chanceDeRiposte(e.niveau, e.tension, e.discipline.bagarres)
+    * (1.35 - adversaire.discipline / 150);
+  if (e.rng() < chance) declencherBagarre(e, 'adversaire', false, adversaire);
+}
+
+// ---------------------------------------------------------------------------
+// ⚖️ LES GESTES ILLÉGAUX — plaquage haut, plaquage en retard
+// ---------------------------------------------------------------------------
+
+/** Ce qu'un plaquage irrégulier vaut à l'arbitre. */
+export interface Irregularite {
+  /** Le motif tel que l'arbitre l'annonce (traduit par `motifLocalise`). */
+  motif: string;
+  /** Le geste a-t-il visé la tête ? Le carton n'est pas le même. */
+  haut: boolean;
+}
+
+/**
+ * Ce plaquage est-il irrégulier ? Appelée par le moteur à CHAQUE contact.
+ *
+ * ⚠️ CE N'EST PAS UNE ACTION DU JOUEUR, ET C'EST TOUT L'INTÉRÊT. Retour de
+ * jeu : « ça serait plus par rapport à des actions illégales type plaquage
+ * haut, chambrage, mais qui s'activent toutes seules ». Un bouton « plaquer
+ * haut » ferait de la faute un choix tactique — au rugby, c'est un geste qui
+ * ÉCHAPPE, sous la fatigue et sous la tension. La probabilité suit donc les
+ * deux : un plaqueur cuit dans un match électrique monte trop haut.
+ *
+ * ⚠️ ET ELLE VAUT POUR LES TRENTE PIONS, pas seulement pour le joueur. C'est ce
+ * qui permet à l'équipe d'en face d'être à l'origine de l'altercation.
+ */
+export function irregularite(e: EtatMatch, plaqueur: Pion): Irregularite | null {
+  // Un plaqueur discipliné et frais ne monte pas haut. Un joueur à bout de
+  // souffle dans un match tendu, si.
+  const fatigue = 1 - plaqueur.endurance / 100;
+  const base = e.niveau === 'amateur' ? 0.016 : 0.009;
+  const p = base * (0.5 + fatigue) * (0.6 + e.tension / 70) * (1.4 - plaqueur.discipline / 150);
+  if (e.rng() >= p) return null;
+  // Deux tiers de plaquages hauts, un tiers de plaquages en retard : c'est la
+  // répartition des cartons du rugby moderne, où la tête est la priorité.
+  const haut = e.rng() < 0.66;
+  return {
+    motif: haut ? 'plaquage haut' : 'plaquage en retard',
+    haut,
+  };
+}
+
+/**
+ * La suite d'un geste illégal : la tension monte, et l'équipe lésée peut venir
+ * demander des comptes.
+ *
+ * ⚠️ APPELÉE APRÈS que le moteur ait sifflé la pénalité — c'est lui qui gère
+ * l'arbitrage, ce fichier ne s'occupe que de ce que ça déclenche entre les
+ * hommes. Sans cette séparation, `bagarre.ts` devrait importer `moteur.ts`,
+ * qui l'importe déjà : un cycle.
+ */
+export function apresGesteIllegal(
+  e: EtatMatch, fautif: Pion, victime: Pion, irreg: Irregularite,
+): void {
+  // Un plaquage sur la tête soulève le stade ; un plaquage en retard agace.
+  chauffer(e, irreg.haut ? 26 : 16);
+  ajouterBulle(e, victime, phrase(e.rng, CHAMBRAGE), 2.6);
+
+  const moi = monPion(e);
+  if (!moi || e.bagarre || e.discipline.bagarres >= BAGARRES_MAX) return;
+
+  // ⚠️ TROIS CAS, ET UN SEUL DÉCLENCHE. Le joueur est la VICTIME (ses coéquipiers
+  // et lui vont chercher le fautif), le joueur est le FAUTIF (l'équipe d'en face
+  // vient le chercher), ou ça ne le concerne pas (la tension monte, point).
+  const jeSuisVictime = victime === moi;
+  const jeSuisFautif = fautif === moi;
+  if (!jeSuisVictime && !jeSuisFautif) return;
+
+  const adversaire = jeSuisVictime ? fautif : victime;
+  // Un geste sur la tête se relève beaucoup plus facilement qu'un simple retard,
+  // et un joueur qui vient d'en prendre un ne se laisse pas faire.
+  const chance = chanceDeRiposte(e.niveau, e.tension, e.discipline.bagarres)
+    * (irreg.haut ? 2.4 : 1.2)
+    * (1.35 - adversaire.discipline / 150);
+  if (e.rng() >= chance) return;
+
+  // ⚠️ L'ORIGINE EST « adversaire » DANS LES DEUX SENS, et ce n'est pas une
+  // erreur : elle dit qui a ALLUMÉ la mèche, pas qui est de quel côté. Victime,
+  // le joueur n'a rien demandé ; fautif, c'est son geste — mais un geste subi,
+  // pas un coup de poing volontaire. La commission distingue déjà les deux par
+  // `coupPorte`, qui reste faux ici.
+  declencherBagarre(e, 'adversaire', false, adversaire);
+}
 
 // ---------------------------------------------------------------------------
 // LES TROIS GESTES DU JOUEUR

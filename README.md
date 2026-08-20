@@ -514,6 +514,7 @@ serveur/                # le classement en ligne (Deno, déployé à part — pa
   classement.ts         # Edge Function : vérifie la fiche, RECALCULE le score, n'écrit que lui
   schema.sql            # table (pseudo, score, cree_le), RLS sans droit d'insertion
   README.md             # déploiement, et ce que la protection ne peut pas faire
+  MIGRATION-FICHES.md   # passer la base en v2 : armoires, clubs et stats dans le classement
   copierLogos.cjs       # sources/logos/clubs/** → public/logos/ (à plat, dédoublonnés)
   store/useGame.ts      # store Zustand (joueur, journal, Ovas, panthéon, scénarios, offres…)
   lib/progression.ts    # note de saison + évolution des attributs et du potentiel

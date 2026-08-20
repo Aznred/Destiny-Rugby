@@ -8,7 +8,8 @@ export type IdPoolCommentaire =
   | 'cinquanteVingtDeuxRate' | 'rasant' | 'transversale'
   | 'toucheGagnee' | 'touchePerdue' | 'meleeGagnee' | 'meleeDominee'
   | 'maul' | 'maulEssai' | 'carton' | 'remplacement'
-  | 'pickAndGo' | 'percussion' | 'ecartement';
+  | 'pickAndGo' | 'percussion' | 'ecartement'
+  | 'chambrage';
 
 export type CleCommentaireDirect =
   | 'coupEnvoiMatch' | 'sirenePremiere' | 'sireneFinale' | 'coupEnvoiJoueur'
@@ -62,6 +63,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     pickAndGo: ['Pick and go by {nom}, another metre gained.'],
     percussion: ['{nom} carries hard through the middle.'],
     ecartement: ['The ball goes wide… {nom} receives it!'],
+    chambrage: ['Still standing, are you?', 'We’re waiting.', 'Is that it?', 'Stay with us, it’s a long one.', 'Have a look at the scoreboard.', 'Planning on running today?', 'Another hour of this.', 'Easy now, grandad.', 'Are you done?', 'Back to the changing room.'],
   },
   es: {
     essai: ['¡ENSAYO! ¡{nom} posa el balón {precision}!'],
@@ -95,6 +97,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     pickAndGo: ['Pick and go de {nom}, gana otro metro.'],
     percussion: ['{nom} carga con fuerza por el centro.'],
     ecartement: ['El balón llega al exterior… ¡recibe {nom}!'],
+    chambrage: ['¿Todavía en pie?', 'Te estamos esperando.', '¿Eso es todo?', 'Aguanta, queda mucho.', 'Mira el marcador.', '¿Piensas correr hoy?', 'Una hora más así.', 'Tranquilo, abuelo.', '¿Has terminado?', 'Vuelve al vestuario.'],
   },
   it: {
     essai: ['META! {nom} schiaccia {precision}!'],
@@ -128,6 +131,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     pickAndGo: ['Pick and go di {nom}, un altro metro.'],
     percussion: ['{nom} carica con forza al centro.'],
     ecartement: ['Il pallone va al largo… lo riceve {nom}!'],
+    chambrage: ['Stai ancora in piedi?', 'Ti stiamo aspettando.', 'Tutto qui?', 'Resta con noi, è lunga.', 'Guarda il tabellone.', 'Hai intenzione di correre oggi?', 'Un’altra ora così.', 'Piano, nonno.', 'Hai finito?', 'Torna negli spogliatoi.'],
   },
   de: {
     essai: ['VERSUCH! {nom} legt den Ball {precision} ab!'],
@@ -161,6 +165,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     pickAndGo: ['Pick and Go von {nom}, noch ein Meter.'],
     percussion: ['{nom} trägt hart durch die Mitte.'],
     ecartement: ['Der Ball geht nach außen… {nom} bekommt ihn!'],
+    chambrage: ['Stehst du noch?', 'Wir warten.', 'Das war’s?', 'Bleib dran, es dauert.', 'Schau auf die Anzeigetafel.', 'Willst du heute noch laufen?', 'Noch eine Stunde davon.', 'Ruhig, Opa.', 'Bist du fertig?', 'Ab in die Kabine.'],
   },
   pt: {
     essai: ['ENSAIO! {nom} apoia a bola {precision}!'],
@@ -194,6 +199,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     pickAndGo: ['Pick and go de {nom}, mais um metro.'],
     percussion: ['{nom} carrega com força pelo centro.'],
     ecartement: ['A bola vai para fora… {nom} recebe!'],
+    chambrage: ['Ainda de pé?', 'Estamos à tua espera.', 'É só isso?', 'Aguenta, ainda é longo.', 'Olha para o marcador.', 'Pensas correr hoje?', 'Mais uma hora assim.', 'Calma, avô.', 'Já acabaste?', 'Volta ao balneário.'],
   },
   ja: {
     essai: ['トライ！{nom}が{precision}グラウンディング！'],
@@ -227,6 +233,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     pickAndGo: ['{nom}のピック・アンド・ゴー。さらに1メートル。'],
     percussion: ['{nom}が中央を力強くキャリー。'],
     ecartement: ['ボールが外へ…{nom}が受ける！'],
+    chambrage: ['まだ立ってるのか？', '待ってるぞ。', 'それだけか？', '長いぞ、ついてこい。', 'スコアボードを見ろ。', '今日は走る気あるのか？', 'あと一時間これが続く。', '落ち着けよ、じいさん。', '終わったか？', 'ロッカーに戻れ。'],
   },
 };
 

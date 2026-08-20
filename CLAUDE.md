@@ -4201,3 +4201,61 @@ npx vite-node scripts/verifControle.ts     # inchangé : actions, discipline, sc
 npx vite-node scripts/verifMoteur.ts       # inchangé : l'étalonnage du moteur
 npx vite-node scripts/verifTraductions.ts  # les 30 clés ajoutées, dans les 7 langues
 ```
+
+---
+
+## 🏆 LES FICHES DU CLASSEMENT MONDIAL — la base était le seul chaînon manquant
+
+Demande : « fait moi un tuto pour modifier les db actuelles afin d'afficher les
+armoires à trophées des joueurs dans le classement, leurs stats, clubs joués et
+saisons ».
+
+### ⚠️ PREMIER CONSTAT : IL N'Y AVAIT RIEN À PROGRAMMER
+
+Toute la chaîne existait déjà et était déployée — `FicheCarriere` porte
+`titres`, `clubs`, `saisons`, `matchs`, `essais`, `selections`, `note`,
+`reputation` ; `api/classement.ts` les écrit et les relit ; `PanneauFiche`
+(écran Classement) affiche l'armoire, le parcours en clubs avec écussons et les
+pastilles de stats. **Seule la base en ligne était restée en v1** (`pseudo` +
+`score`). Le serveur détecte le cas (code Postgres `42703`), retombe sur « score
+seul » et continue de répondre : rien n'a l'air cassé, et rien ne s'affiche.
+
+→ **`serveur/MIGRATION-FICHES.md`** (nouveau) : diagnostic, l'`ALTER TABLE`,
+vérification, état de la voie Supabase, et la liste des **6 endroits à toucher**
+pour ajouter un champ plus tard.
+
+### ⚠️ ET UN PIÈGE RÉEL, TROUVÉ EN ÉCRIVANT LE TUTO
+
+L'`ON CONFLICT` de `api/classement.ts` était gardé par
+`where excluded.score > classement.score` — le score devait **progresser**.
+Conséquence sur une base migrée : une ligne v1 (score seul, fiche vide)
+appartenant à un joueur **déjà à son meilleur score** renvoyait exactement le
+même score, la condition était fausse, et **sa fiche ne se remplissait jamais**.
+Un joueur à la retraite n'aurait jamais eu d'armoire — c'est-à-dire précisément
+ce que la demande veut afficher.
+
+Passé à **`>=`** : à score égal la carrière est la même, donc la fiche est bonne
+à prendre. `score = greatest(classement.score, excluded.score)` garantit qu'aucun
+score ne peut reculer au passage.
+
+### Deux documents qui mentaient
+
+- `serveur/VERCEL.md` affichait encore « **La base ne contient que le score** »
+  et un schéma avec « 4. la fiche est jetée ». Faux depuis la v2 du schéma.
+- `serveur/schema.sql` (Supabase) est **resté en v1**, et ne le disait pas. Il
+  est maintenant annoté : la voie Vercel a migré, celle-ci non, et c'est
+  volontaire — maintenir deux serveurs pour un seul site déployé, c'est se
+  garantir deux comportements différents un jour.
+
+### Ce qui ne change pas
+
+La sécurité ne tient pas à ce qu'on stocke, mais au fait que le serveur
+**RECALCULE** le score (`scoreDeLaFiche`) au lieu de croire celui qu'on lui
+envoie, et que `verifierFiche()` borne chaque champ avant l'écriture. On stocke
+exactement ce qui servait déjà au recalcul, plus la liste des clubs — qui,
+elle, n'entre PAS dans le barème : un classement ne se réordonne pas parce qu'on
+affiche un écusson de plus.
+
+```bash
+npx vite-node scripts/verifClassement.ts   # joue le tricheur : chaque attaque doit être refusée
+```

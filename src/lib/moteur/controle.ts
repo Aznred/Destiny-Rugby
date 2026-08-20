@@ -63,9 +63,21 @@ export interface DefinitionAction {
 export const ACTIONS: DefinitionAction[] = [
   // ── Ballon en main ───────────────────────────────────────────────────────
   { id: 'sprint', emoji: '🏃', cle: 'ml.act.sprint', aide: 'ml.act.sprint.aide', famille: 'ballon', duree: 3.2, recharge: 6, cout: 3 },
-  { id: 'crochet', emoji: '↩️', cle: 'ml.act.crochet', aide: 'ml.act.crochet.aide', famille: 'ballon', duree: 2.6, recharge: 5, cout: 3 },
-  { id: 'raffut', emoji: '💪', cle: 'ml.act.raffut', aide: 'ml.act.raffut.aide', famille: 'ballon', duree: 2.6, recharge: 5, cout: 3 },
+  // ⚠️ FENÊTRE ALLONGÉE DE 2,6 À 3,4 s. Un crochet ne « marche » que s'il est
+  // encore armé À L'INSTANT DU CONTACT : armé trop tôt, il expirait avant le
+  // plaqueur et le joueur voyait son geste ne rien faire — d'où « raffut,
+  // crochet qui marche vraiment ». Huit dixièmes de plus, c'est la différence
+  // entre anticiper le contact et devoir le deviner à la frame près.
+  { id: 'crochet', emoji: '↩️', cle: 'ml.act.crochet', aide: 'ml.act.crochet.aide', famille: 'ballon', duree: 3.4, recharge: 5, cout: 3 },
+  { id: 'raffut', emoji: '💪', cle: 'ml.act.raffut', aide: 'ml.act.raffut.aide', famille: 'ballon', duree: 3.4, recharge: 5, cout: 3 },
   { id: 'passe', emoji: '🤝', cle: 'ml.act.passe', aide: 'ml.act.passe.aide', famille: 'ballon', duree: 1.4, recharge: 2, cout: 0 },
+  // ⚠️ LA PASSE A UN CÔTÉ. Retour de jeu : « en mode A ou E pour faire la passe
+  // droite ou gauche ». Avec un seul bouton, c'est le moteur qui choisissait le
+  // receveur — on subissait sa lecture au lieu de jouer la sienne, et l'aile
+  // fermée ne recevait jamais rien. Ces deux-là ne remplacent pas `passe`
+  // (l'action contextuelle du gros bouton), elles la précisent.
+  { id: 'passeGauche', emoji: '⬅️', cle: 'ml.act.passeGauche', aide: 'ml.act.passeGauche.aide', famille: 'ballon', duree: 1.4, recharge: 2, cout: 0 },
+  { id: 'passeDroite', emoji: '➡️', cle: 'ml.act.passeDroite', aide: 'ml.act.passeDroite.aide', famille: 'ballon', duree: 1.4, recharge: 2, cout: 0 },
   { id: 'pied', emoji: '🦶', cle: 'ml.act.pied', aide: 'ml.act.pied.aide', famille: 'ballon', duree: 1.4, recharge: 3, cout: 1 },
   // ── Son équipe attaque, il n'a pas le ballon ─────────────────────────────
   { id: 'appel', emoji: '🙋', cle: 'ml.act.appel', aide: 'ml.act.appel.aide', famille: 'attaque', duree: 11, recharge: 14, cout: 0 },
@@ -119,6 +131,8 @@ export function actionsDisponibles(e: EtatMatch): DefinitionAction[] {
         if (!jeVaisAuBallon) return false;
         // On ne « passe » que s'il y a quelqu'un à qui donner.
         if (a.id === 'passe') return !!receveurPour(e, p);
+        if (a.id === 'passeGauche') return !!receveurCote(e, p, -1);
+        if (a.id === 'passeDroite') return !!receveurCote(e, p, 1);
         return true;
       case 'attaque':
         return vivant && monEquipeAttaque && !jeVaisAuBallon;
@@ -145,6 +159,31 @@ export function receveurPour(e: EtatMatch, p: Pion): Pion | undefined {
   const s = p.cote === 'A' ? 1 : -1;
   return surLeTerrain(e, p.cote)
     .filter((q) => q !== p && q.sanction <= 0 && (q.pos.x - p.pos.x) * s <= 0.6)
+    .sort((a, b) => distance2(a.pos, p.pos) - distance2(b.pos, p.pos))[0];
+}
+
+/**
+ * Le partenaire vers LA GAUCHE ou LA DROITE DE L'ÉCRAN, en respectant la règle
+ * du rugby : la passe ne part jamais vers l'avant.
+ *
+ * ⚠️ `cote` EST DONNÉ EN REPÈRE D'ÉCRAN (−1 = vers la gauche de l'image,
+ * +1 = vers la droite), et il est retourné pour le camp B. Sans ça, « passe à
+ * gauche » enverrait le ballon à droite un match sur deux — puisque le camp B
+ * attaque dans l'autre sens et que la caméra le retourne (`moteur/camera.ts`).
+ * Le joueur, lui, voit toujours son écran : c'est cette gauche-là qui compte.
+ */
+export function receveurCote(e: EtatMatch, p: Pion, cote: -1 | 1 | number): Pion | undefined {
+  const s = p.cote === 'A' ? 1 : -1;
+  // Le camp A attaque vers les X croissants ; sa gauche d'écran est donc les Y
+  // décroissants. Pour le camp B, tout est retourné.
+  const versY = cote * s;
+  return surLeTerrain(e, p.cote)
+    .filter((q) => q !== p && q.sanction <= 0
+      // Jamais en avant : la règle, avant tout le reste.
+      && (q.pos.x - p.pos.x) * s <= 0.6
+      // Et bien du bon côté, avec une marge d'un mètre pour ne pas exiger
+      // l'alignement parfait.
+      && (q.pos.y - p.pos.y) * versY > 1)
     .sort((a, b) => distance2(a.pos, p.pos) - distance2(b.pos, p.pos))[0];
 }
 

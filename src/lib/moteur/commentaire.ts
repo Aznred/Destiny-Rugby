@@ -188,6 +188,25 @@ export const CARTON = [
   'L’arbitre sort le jaune : {nom} quitte le terrain dix minutes.',
 ];
 
+// 💬 CE QUE LES JOUEURS SE DISENT — le contenu des bulles (moteur/bagarre.ts).
+//
+// ⚠️ COURT, ET SANS INSULTE. Trois contraintes qui ne sont pas de la pudeur :
+// une bulle tient dans 120 px au-dessus d'un pion de 20 px, elle est lue en
+// une seconde et demie, et le jeu est ouvert aux mineurs. Le chambrage de
+// rugby marche très bien au premier degré — c'est du mépris tranquille, pas
+// de la grossièreté.
+export const CHAMBRAGE = [
+  'Tu tiens debout, toi ?',
+  'On t’attend, allez.',
+  'C’est tout ?',
+  'Reste avec nous, ça va être long.',
+  'Regarde le tableau.',
+  'Tu comptes courir aujourd’hui ?',
+  'Encore une heure comme ça.',
+  'Doucement, le vieux.',
+  'T’as fini ?',
+  'Retourne au vestiaire.',
+];
 export const REMPLACEMENT = [
   '{entrant} remplace {sortant}.',
   'Changement pour {club} : {entrant} entre à la place de {sortant}.',
@@ -210,6 +229,7 @@ export const ECARTEMENT = [
 ];
 
 const ID_PAR_POOL = new Map<string[], IdPoolCommentaire>([
+  [CHAMBRAGE, 'chambrage'],
   [ESSAI, 'essai'], [ESSAI_PRECISION, 'precision'],
   [TRANSFORMATION, 'transformation'], [TRANSFORMATION_RATEE, 'transformationRatee'],
   [PENALITE_BUT, 'penaliteBut'], [PENALITE_RATEE, 'penaliteRatee'],

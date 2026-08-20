@@ -48,18 +48,29 @@ export type Cadrage = 'large' | 'suivi' | 'proche';
 /**
  * Mètres de LONGUEUR DE TERRAIN visibles à l'écran, par cadrage.
  *
- * ⚠️ MESURÉ AU DOIGT, PAS CHOISI AU HASARD. Un pion a 0,86 m de rayon. Sur un
- * téléphone de 375 px de large :
- *   • `large`  (122 m) → disque de 5 px  — illisible, mais c'est le mode
- *                        « je regarde le match », on suit le ballon pas les pions ;
- *   • `suivi`  (78 m)  → disque de 11 px — on lit les lignes et les espaces ;
- *   • `proche` (46 m)  → disque de 19 px — on distingue chaque joueur, on vise.
- * En dessous de 40 m on perd la lecture du hors-jeu et du soutien : le joueur
- * ne voit plus arriver la défense, et le jeu devient injuste plutôt que dur.
+ * ⚠️ MESURÉ AU DOIGT, PAS CHOISI AU HASARD. Les pions sont dessinés à leur
+ * taille réelle (0,86 m de rayon) ; sur un téléphone de 375 px tenu droit, cela
+ * donne :
+ *   • `large`  (122 m) → disque de 8,5 px — on lit la FORME du jeu, les lignes
+ *                        et les intervalles, pas les individus. C'est le mode
+ *                        « je regarde le match » ;
+ *   • `suivi`  (68 m)  → disque de 15 px  — on distingue les maillots et on voit
+ *                        arriver la défense ;
+ *   • `proche` (46 m)  → disque de 22 px  — on vise, on décide, on joue.
+ *
+ * En dessous de 40 m on perdrait la lecture du hors-jeu et du soutien : le
+ * joueur ne verrait plus arriver la défense, et le jeu deviendrait injuste
+ * plutôt que dur.
+ *
+ * ⚠️ `suivi` EST PASSÉ DE 78 À 68 m APRÈS MESURE. À 78, le pion tombait à 13 px
+ * sur un téléphone : lisible de justesse, mais c'est le cadrage dans lequel on
+ * passe les trois quarts du temps de pilotage — celui où l'on se replace et où
+ * l'on lit le jeu qui vient. Huit mètres de moins ne coûtent aucun contexte
+ * (on voit toujours toute la largeur du terrain) et rendent les maillots nets.
  */
 export const COUVERTURE: Record<Cadrage, number> = {
   large: LONGUEUR,
-  suivi: 78,
+  suivi: 68,
   proche: 46,
 };
 

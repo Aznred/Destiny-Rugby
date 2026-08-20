@@ -4049,3 +4049,138 @@ img, svg, canvas { max-width: 100%; }
   .ml-tempo.actif span { display: block; }
   .ml-mode { font-size: 0.68rem; padding: 0.3rem 0.45rem; }
 }
+
+/* --- 💬 LES BULLES ET LE SOUFFLE ---------------------------------------- */
+/* ⚠️ Le texte des bulles est dessiné DANS le SVG, en mètres de terrain : il
+   suit donc le pion et le cadrage sans un pixel de calcul côté React. Le
+   liseré sombre (`paint-order: stroke`) est ce qui le garde lisible sur une
+   pelouse claire comme sur un maillot foncé. */
+.ml-bulle-texte {
+  fill: #fff8e6;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.78);
+  stroke-width: 0.5;
+  stroke-linejoin: round;
+}
+
+/* ⚠️ UNE BARRE, PLUS UN POURCENTAGE. Le sprint se paie en endurance, et c'est
+   la ressource qui décide de la fin de match — mais « 🫁 62 % » perdu au milieu
+   de trois pastilles ne se lit pas en pleine course. Une jauge se lit du coin
+   de l'œil. */
+.ml-souffle {
+  position: absolute;
+  top: 4.4rem;
+  left: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem 0.2rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(4, 12, 8, 0.62);
+  backdrop-filter: blur(3px);
+  font-size: 0.7rem;
+  color: var(--craie);
+}
+.ml-souffle > b { font-size: 0.8rem; }
+.ml-souffle > span {
+  display: block;
+  width: 84px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.ml-souffle > span > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #6fbf73, #b6d96a);
+  transition: width 0.25s linear;
+}
+/* Sous 30 %, on ne sprinte plus très longtemps : la jauge le dit avant la
+   jambe. */
+.ml-souffle[data-bas='oui'] > span > span { background: linear-gradient(90deg, #ff8a4d, #ff4d4d); }
+.ml-souffle[data-sprint='oui'] { border: 1px solid rgba(255, 212, 94, 0.6); }
+.ml-souffle em {
+  font-style: normal;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--or-clair);
+}
+
+/* --- ⌨️ LES TOUCHES RÉGLABLES (⚙️ Réglages) ------------------------------ */
+.reglage-touches {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  background: rgba(0, 0, 0, 0.22);
+}
+.reglage-touches > summary {
+  cursor: pointer;
+  font-family: 'Archivo', system-ui, sans-serif;
+  color: var(--craie);
+}
+.reglage-touches > .aide { margin: 0.5rem 0 0.7rem; }
+.touches-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.3rem 0.8rem;
+  margin-bottom: 0.7rem;
+}
+.touche-ligne {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.22rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.touche-nom {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  color: var(--craie-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Une touche réassignée se voit : sinon on ne sait plus ce qu'on a changé. */
+.touche-ligne[data-modifiee='oui'] .touche-nom { color: var(--or-clair); }
+.touche-cible {
+  flex: 0 0 auto;
+  min-width: 92px;
+  min-height: 34px;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--craie);
+  font-family: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.touche-cible:hover { border-color: var(--or-clair); }
+.touche-cible.capte, .touche-cible.capture {
+  border-color: var(--or-clair);
+  background: rgba(212, 175, 55, 0.2);
+  color: var(--or-clair);
+}
+.touche-cible kbd {
+  display: inline-block;
+  min-width: 1.1em;
+  padding: 0 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--craie);
+  font-family: inherit;
+  font-size: 0.72rem;
+}
+.touche-vide { color: var(--craie-dim); }
+
+@media (max-width: 560px) {
+  .touches-liste { grid-template-columns: 1fr; }
+  /* ⚠️ 44 px de cible sur téléphone, comme partout ailleurs dans le projet. */
+  .touche-cible { min-height: 44px; min-width: 104px; }
+}

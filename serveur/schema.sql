@@ -8,6 +8,20 @@
 -- Conséquence assumée : on ne pourra pas, plus tard, afficher « 12 saisons,
 -- 44 essais » à côté d'un score, ni recalculer un classement si le barème
 -- change. C'est le prix d'une base minimale — et c'est ce qui a été demandé.
+--
+-- ═══ ⚠️ CE FICHIER EST RESTÉ EN v1, ET C’EST VOLONTAIRE ════════════════════
+-- La conséquence annoncée ci-dessus s’est produite : il a fallu afficher le
+-- profil des autres joueurs (armoire à trophées, clubs, stats). La voie
+-- **Vercel** a donc été migrée en v2 — `serveur/schema-vercel.sql` et
+-- `api/classement.ts` stockent maintenant la fiche affichable, et
+-- `serveur/MIGRATION-FICHES.md` explique la manœuvre.
+--
+-- Cette voie-ci (Supabase + Deno) N’A PAS SUIVI. Le site est déployé sur
+-- Vercel ; maintenir deux serveurs pour un seul site, c'est se garantir deux
+-- comportements différents un jour. Ce fichier reste donc une référence
+-- historique. Pour le remettre à niveau : ALTER TABLE identique, puis
+-- `poser_score()` et `serveur/classement.ts` à reprendre — la liste est en
+-- fin de `MIGRATION-FICHES.md`.
 
 create table if not exists classement (
   -- Le pseudo EST la clé : une seule ligne par joueur, donc pas de spam.

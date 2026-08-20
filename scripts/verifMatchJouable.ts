@@ -90,25 +90,33 @@ console.log('=== 1. LA CAMÉRA NE MONTRE JAMAIS DE VIDE ===');
 }
 
 // ═══ 2. UN JOUEUR EST VISIBLE AU DOIGT ══════════════════════════════════════
-console.log('\n=== 2. UN PION FAIT UNE TAILLE DE DOIGT ===');
+console.log('\n=== 2. UN PION FAIT UNE TAILLE DE DOIGT — ET PAS PLUS ===');
 {
-  // Le rendu dessine les pions avec un rayon de `max(0,86 ; portée × 0,016)`
-  // mètres (voir `MatchLive`). Sur un téléphone de 375 px, on veut au moins
-  // 10 px de diamètre : en dessous, on ne distingue plus un maillot d'un autre.
+  // Le rendu dessine les pions à leur TAILLE RÉELLE (0,86 m de rayon), avec un
+  // plancher de 3,6 px de rayon pour qu'ils ne disparaissent jamais (voir
+  // `MatchLive`). On vérifie les deux bouts de la règle :
+  //
+  //  • en vue rapprochée, au moins 14 px de diamètre — en dessous, on ne vise
+  //    plus rien au pouce et on ne distingue plus un maillot d'un autre ;
+  //  • ⚠️ EN VUE LARGE, PAS PLUS DE 14 px. Retour de jeu : « je trouve les pions
+  //    beaucoup trop gros sur le terrain quand on met en regarder ». La
+  //    première version les grossissait avec le dézoom et trente pions de 19 px
+  //    se chevauchaient sur un terrain entier : on ne lisait plus ni les lignes,
+  //    ni les intervalles — exactement ce qu'on vient regarder.
   const largeurEcran = 375;
   for (const cadrage of ['large', 'suivi', 'proche'] as Cadrage[]) {
-    const angle: Angle = -90; // téléphone debout : la portée court en hauteur
+    const angle: Angle = -90; // téléphone debout : la longueur court en hauteur
     const cam = new Camera();
     const cible = { x: LONGUEUR / 2, y: LARGEUR / 2 };
     cam.couper(cible, cadrage);
     const vue = cam.suivre(cible, cadrage, 375 / 600, angle, 0.016);
-    const rayonM = Math.max(0.86, vue.cadre.w * 0.016);
     // Combien de pixels vaut un mètre en travers de l'écran.
     const pxParMetre = largeurEcran / vue.W;
+    const rayonM = Math.max(0.86, 3.6 / pxParMetre);
     const diametre = rayonM * 2 * pxParMetre;
     ligne(`cadrage « ${cadrage} » (${COUVERTURE[cadrage]} m)`,
       `${diametre.toFixed(1)} px de diamètre`,
-      cadrage === 'large' ? diametre > 5 : diametre >= 10);
+      cadrage === 'large' ? diametre >= 7 && diametre <= 14 : diametre >= 14);
   }
 }
 
