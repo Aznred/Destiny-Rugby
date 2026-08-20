@@ -106,7 +106,7 @@ export function Profil() {
                 label={t('prof.reussitePied')}
                 valeur={joueur.stats.butsTentes
                   ? `${Math.round((joueur.stats.butsReussis / joueur.stats.butsTentes) * 100)} %`
-                  : '—'}
+                  : '-'}
                 aide={joueur.stats.butsTentes ? `${joueur.stats.butsReussis}/${joueur.stats.butsTentes}` : undefined}
               />
               <Stat

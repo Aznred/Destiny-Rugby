@@ -278,7 +278,7 @@ export function verifierFiche(f: unknown, trophees?: Iterable<string>): Verdict 
 
   // Une saison de jeu = un an de vie. Le calendrier ne connaît pas d'exception.
   if (age !== ageDebut + saisons - 1) {
-    rejet(`âge incohérent : ${ageDebut} + ${saisons} saisons − 1 = ${ageDebut + saisons - 1}, annoncé ${age}`);
+    rejet(`âge incohérent : ${ageDebut} + ${saisons} saisons - 1 = ${ageDebut + saisons - 1}, annoncé ${age}`);
   }
   if (matchs > saisons * LIMITES.matchsParSaison) {
     rejet(`${matchs} matchs en ${saisons} saison(s) : maximum ${saisons * LIMITES.matchsParSaison}`);
@@ -410,7 +410,7 @@ export const RECOMMANDATIONS_SERVEUR_LISTE = [
   'Refuser toute fiche dont verifierFiche() renvoie des anomalies.',
   'Limiter : 1 envoi/heure et 10/jour par appareil, 30/heure par IP.',
   'Contrainte unique sur le pseudo, et ne garder que le meilleur score.',
-  'Écrire depuis une Edge Function avec la clé de service — jamais depuis le navigateur.',
+  'Écrire depuis une Edge Function avec la clé de service, jamais depuis le navigateur.',
   'Journaliser les refus : c\'est là qu\'on voit arriver les scripts.',
 ] as const;
 
@@ -503,7 +503,7 @@ export function ficheDepuisLegende(
     // ⚠️ Une légende d'avant ce champ n'a pas de liste de clubs : on retombe sur
     // ceux où elle a gagné un titre. Mieux vaut une liste partielle qu'une fiche
     // refusée pour « aucun club ».
-    clubs: l.clubs?.length ? l.clubs : ['—'],
+    clubs: l.clubs?.length ? l.clubs : ['-'],
   };
   return { ...base, score: scoreDeLaFiche(base) };
 }

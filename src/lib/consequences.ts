@@ -35,13 +35,13 @@ export function appliquerConsequence(
       return {
         joueur: {
           ...j,
-          blessure: { nom: `Suspension — ${motif}`, gravite: 'saison', semaines },
+          blessure: { nom: `Suspension : ${motif}`, gravite: 'saison', semaines },
           moral: borne(j.moral - 20),
           reputation: borne(j.reputation - 15),
           confianceCoach: borne((j.confianceCoach ?? 50) - 25),
         },
         emoji: '⛔',
-        titre: `Suspension — ${semaines} semaines`,
+        titre: `Suspension : ${semaines} semaines`,
         texte: `La commission de discipline te suspend ${semaines} semaines pour ${motif}. `
           + 'Tu ne peux plus jouer, tu continues de t’entraîner à part, et tout le monde en parle.',
         finale: false,
@@ -52,7 +52,7 @@ export function appliquerConsequence(
       return {
         joueur: {
           ...j,
-          blessure: { nom: `Détention — ${motif}`, gravite: 'saison', semaines },
+          blessure: { nom: `Détention : ${motif}`, gravite: 'saison', semaines },
           moral: borne(j.moral - 35),
           reputation: borne(j.reputation - 30),
           popularite: borne((j.popularite ?? 50) - 30),
@@ -72,7 +72,7 @@ export function appliquerConsequence(
       return {
         joueur: {
           ...j,
-          blessure: { nom: `Accident — ${motif}`, gravite: 'saison', semaines },
+          blessure: { nom: `Accident : ${motif}`, gravite: 'saison', semaines },
           moral: borne(j.moral - 30),
           forme: borne(j.forme - 45),
           attributs: {
@@ -87,7 +87,7 @@ export function appliquerConsequence(
         titre: 'Accident grave',
         texte: `${motif.charAt(0).toUpperCase() + motif.slice(1)}. `
           + `${semaines} semaines d’arrêt, opérations, rééducation. `
-          + 'Tu rejoueras — mais pas tout à fait le même joueur.',
+          + 'Tu rejoueras, mais pas tout à fait le même joueur.',
         finale: false,
       };
 
@@ -139,7 +139,7 @@ export function appliquerConsequence(
           moral: borne(j.moral + degats.moral),
         },
         emoji: '🩼',
-        titre: `Blessure — ${semainesBlessure} semaine${semainesBlessure > 1 ? 's' : ''}`,
+        titre: `Blessure : ${semainesBlessure} semaine${semainesBlessure > 1 ? 's' : ''}`,
         texte: `${motif}. Le staff médical annonce ${semainesBlessure} semaine`
           + `${semainesBlessure > 1 ? 's' : ''} d’indisponibilité : `
           + (gravite === 'legere'
@@ -174,7 +174,7 @@ export function appliquerConsequence(
         },
         emoji: '📄',
         titre: 'Licencié par le club',
-        texte: `Le club rompt ton contrat : ${motif}. Tu es libre — sans salaire, `
+        texte: `Le club rompt ton contrat : ${motif}. Tu es libre, sans salaire, `
           + 'sans club, et avec une ligne de plus sur ton dossier. '
           + 'Tant que tu n’as pas resigné ailleurs, tu ne joues plus une minute.',
         finale: false,
@@ -194,7 +194,7 @@ export function appliquerConsequence(
             ? { ...j.contrat, saisons: 0, salaire: 0 }
             : { club: j.club, division: j.division ?? '', saisons: 0, salaire: 0 },
           capitaine: false,
-          blessure: { nom: `Radiation — ${motif}`, gravite: 'carriere', semaines: 99 },
+          blessure: { nom: `Radiation : ${motif}`, gravite: 'carriere', semaines: 99 },
           moral: borne(j.moral - 45),
           reputation: borne(j.reputation - 40),
           popularite: borne((j.popularite ?? 50) - 35),
@@ -370,25 +370,25 @@ export function consequenceDuDerapage(d: Exclude<DerapageGrave, null>): {
       return {
         type: 'exclusionClub', semaines: 0,
         motif: 'propos discriminatoires publiés sur les réseaux',
-        titre: 'Propos discriminatoires — le club rompt',
+        titre: 'Propos discriminatoires, le club rompt',
       };
     case 'menace':
       return {
         type: 'suspension', semaines: 12,
         motif: 'menaces publiques',
-        titre: 'Menaces publiques — suspension',
+        titre: 'Menaces publiques, suspension',
       };
     case 'drogue':
       return {
         type: 'suspension', semaines: 18,
         motif: 'apologie de produits interdits',
-        titre: 'Publication sur les stupéfiants — contrôle et suspension',
+        titre: 'Publication sur les stupéfiants, contrôle et suspension',
       };
     case 'atteinteClub':
       return {
         type: 'exclusionClub', semaines: 0,
         motif: 'publication portant atteinte au club et à son image',
-        titre: 'Tu as sali ton club en public — le club rompt',
+        titre: 'Tu as sali ton club en public, le club rompt',
       };
   }
 }

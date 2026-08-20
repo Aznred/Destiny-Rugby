@@ -29,7 +29,7 @@ const MODELES: Modele[] = [
   },
   {
     gravite: 'carriere', poids: 2, semaines: [99, 99],
-    noms: ['Commotions à répétition — le médecin est formel', 'Rachis cervical : l’arrêt est impératif', 'Genou détruit, l’articulation ne suivra plus'],
+    noms: ['Commotions à répétition, le médecin est formel', 'Rachis cervical : l’arrêt est impératif', 'Genou détruit, l’articulation ne suivra plus'],
   },
 ];
 
@@ -48,7 +48,7 @@ const BLESSURES_ANGLAISES: Record<string, string> = {
   'Fracture du péroné': 'Fibula fracture',
   'Rupture du tendon d’Achille': 'Achilles tendon rupture',
   'Hernie discale opérée': 'Surgery for a slipped disc',
-  'Commotions à répétition — le médecin est formel': 'Repeated concussions — the doctor is unequivocal',
+  'Commotions à répétition, le médecin est formel': 'Repeated concussions, the doctor is unequivocal',
   'Rachis cervical : l’arrêt est impératif': 'Cervical spine injury: retirement is mandatory',
   'Genou détruit, l’articulation ne suivra plus': 'Destroyed knee: the joint will not hold up',
 };
@@ -90,7 +90,7 @@ export function messageBlessure(b: Blessure): string {
   if (langueCourante() === 'en') {
     switch (b.gravite) {
       case 'legere': return `${nom}. Nothing serious: ${b.semaines} week${b.semaines > 1 ? 's' : ''} of treatment, then you are back.`;
-      case 'moyenne': return `${nom}. The staff expect ${b.semaines} weeks out — it will be a long season.`;
+      case 'moyenne': return `${nom}. The staff expect ${b.semaines} weeks out, it will be a long season.`;
       case 'saison': return `${nom}. Your season is over: surgery, rehabilitation and a serious mental test ahead.`;
       default: return `${nom}. The doctors agree: you will not play again. Your career ends here.`;
     }
@@ -99,7 +99,7 @@ export function messageBlessure(b: Blessure): string {
     case 'legere':
       return `${nom}. Rien de grave : ${b.semaines} semaine${b.semaines > 1 ? 's' : ''} de soins et tu reprends.`;
     case 'moyenne':
-      return `${nom}. Le staff annonce ${b.semaines} semaines d’indisponibilité — la saison va être longue.`;
+      return `${nom}. Le staff annonce ${b.semaines} semaines d’indisponibilité, la saison va être longue.`;
     case 'saison':
       return `${nom}. C’est terminé pour la saison : opération, rééducation, et un mental à toute épreuve.`;
     default:

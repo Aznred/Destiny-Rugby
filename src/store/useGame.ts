@@ -1173,7 +1173,7 @@ export const useGame = create<GameState>()(
             id: idUnique(),
             saison: joueur.saison,
             role: 'systeme',
-            titre: `🚑 Toujours indisponible — ${blessure.nom}`,
+            titre: `🚑 Toujours indisponible : ${blessure.nom}`,
             texte: `Tu reprends la saison à l'infirmerie : encore ${blessure.semaines} semaine${blessure.semaines > 1 ? 's' : ''} avant de retoucher un ballon.`,
           });
         }
@@ -1182,7 +1182,7 @@ export const useGame = create<GameState>()(
             id: idUnique(),
             saison: joueur.saison,
             role: 'systeme',
-            titre: `💪 Une saison de travail — +${gainEntrainement} ${ATTRIBUTS_LABELS[focus]}`,
+            titre: `💪 Une saison de travail, +${gainEntrainement} ${ATTRIBUTS_LABELS[focus]}`,
             texte: `${seances} séances ciblées sur ton ${ATTRIBUTS_LABELS[focus].toLowerCase()} au fil de la saison. Le staff a vu la différence.`,
             deltas: { [focus]: gainEntrainement },
           });
@@ -1241,7 +1241,7 @@ export const useGame = create<GameState>()(
           id: idUnique(),
           saison: joueur.saison,
           role: 'systeme',
-          titre: `📈 Évolution — note de saison ${evolution.noteSaison.toFixed(1)}/10`,
+          titre: `📈 Évolution, note de saison ${evolution.noteSaison.toFixed(1)}/10`,
           texte:
             `${evolution.resume} ` +
             (bougees.length
@@ -1288,7 +1288,7 @@ export const useGame = create<GameState>()(
             id: idUnique(),
             saison: joueur.saison,
             role: 'systeme',
-            titre: `🗳️ Vote du meilleur joueur — ta saison cotée ${Math.round(cote)}/100`,
+            titre: `🗳️ Vote du meilleur joueur, ta saison cotée ${Math.round(cote)}/100`,
             texte: honneurs.length
               ? `Note de saison, statistiques, palmarès : tu passes devant tout le monde. `
                 + `${honneurs.length > 1 ? `${honneurs.length} distinctions` : 'Une distinction'} pour toi.`
@@ -1307,7 +1307,7 @@ export const useGame = create<GameState>()(
             `${joueur.club} termine ${bilan.rang}${bilan.rang === 1 ? 'er' : 'e'} de ${bilan.divisionNom} ` +
             `(effectif noté ${Math.round(bilan.forceEffectif)}). ` +
             `Ta saison : ${matchsSaison} match${matchsSaison > 1 ? 's' : ''}, ` +
-            `${essaisSaison} essai${essaisSaison > 1 ? 's' : ''} — ` +
+            `${essaisSaison} essai${essaisSaison > 1 ? 's' : ''} - ` +
             (vecu ? `${vecu.stats.points} pts, ${vecu.stats.plaquages} plaquages${vecu.stats.butsTentes ? `, ${vecu.stats.butsReussis}/${vecu.stats.butsTentes} au pied` : ''}${vecu.stats.grattages ? `, ${vecu.stats.grattages} grattages` : ''}. ` : '') +
             (bilan.apport >= 0.6
               ? 'tu as tiré ton équipe vers le haut.'
@@ -1390,7 +1390,7 @@ export const useGame = create<GameState>()(
             (j.age >= AGE_RETRAITE_FORCEE
               ? 'Le corps ne suit plus : c’est ta dernière ligne droite, il est temps de raccrocher.'
               : j.age >= AGE_RETRAITE_LIBRE
-                ? 'À ton âge, chaque saison est un sursis — tu peux raccrocher quand tu le sens.'
+                ? 'À ton âge, chaque saison est un sursis, tu peux raccrocher quand tu le sens.'
                 : 'Quels sont tes objectifs ?'),
         });
 
@@ -1423,7 +1423,7 @@ export const useGame = create<GameState>()(
             saison: j.saison,
             role: 'mj',
             titre: '©️ Le brassard est pour toi',
-            texte: `Le staff a tranché : tu seras le capitaine de ${j.club} la saison prochaine. Le groupe t'écoute — à toi de le tirer vers le haut.`,
+            texte: `Le staff a tranché : tu seras le capitaine de ${j.club} la saison prochaine. Le groupe t'écoute, à toi de le tirer vers le haut.`,
             deltas: { moral: 12, reputation: 4 },
           });
         }
@@ -1680,7 +1680,7 @@ export const useGame = create<GameState>()(
               id: idUnique(),
               saison: j.saison,
               role: 'mj' as const,
-              titre: `🏛️ ${AGE_RETRAITE_FORCEE} ans — le rideau tombe`,
+              titre: `🏛️ ${AGE_RETRAITE_FORCEE} ans, le rideau tombe`,
               texte: `Tu as ${j.age} ans. Aucune fédération ne délivre plus de licence de joueur `
                 + `professionnel à cet âge : ta carrière s'arrête ici, et elle s'arrête debout.`,
             }],
@@ -1718,7 +1718,7 @@ export const useGame = create<GameState>()(
           joueur: { ...joueur, entrainementFocus: attribut },
           journal: [...st.journal, {
             id: idUnique(), saison: joueur.saison, role: 'systeme' as const,
-            titre: `🎯 Secteur de travail — ${ATTRIBUTS_LABELS[attribut]}`,
+            titre: `🎯 Secteur de travail : ${ATTRIBUTS_LABELS[attribut]}`,
             texte: `Tu préviens le préparateur physique : chaque semaine, tu travailleras ton `
               + `${ATTRIBUTS_LABELS[attribut].toLowerCase()}. Tu peux en changer quand tu veux.`,
           }],
@@ -1752,7 +1752,7 @@ export const useGame = create<GameState>()(
               saison: j.saison,
               role: 'systeme',
               titre: gagne
-                ? `💪 Séance réussie — +${gagne} ${ATTRIBUTS_LABELS[attribut]}`
+                ? `💪 Séance réussie, +${gagne} ${ATTRIBUTS_LABELS[attribut]}`
                 : '💪 Séance d’entraînement',
               texte: gagne
                 ? `Tu as passé la semaine à travailler ton ${ATTRIBUTS_LABELS[attribut].toLowerCase()}. Le staff a vu la différence.`
@@ -1987,7 +1987,7 @@ export const useGame = create<GameState>()(
               id: idUnique(),
               saison: j.saison,
               role: 'systeme' as const,
-              titre: `${resultat.emoji} ${libelleDate(sem)} — ${resultat.titre}`,
+              titre: `${resultat.emoji} ${libelleDate(sem)} - ${resultat.titre}`,
               texte: resultat.texte,
               // ⚠️ La récupération EST dans les deltas affichés. Un gain qu'on
               // ne voit pas n'existe pas pour le joueur : c'est ce qui donnait
@@ -2144,7 +2144,7 @@ export const useGame = create<GameState>()(
             role: 'systeme' as const,
             titre: `✉️ ${nouvelles.length} club${nouvelles.length > 1 ? 's t’écrivent' : ' t’écrit'}`,
             texte: `${nouvelles.map((a) => `${a.club} (${a.divisionNom})`).join(' · ')}. `
-              + `Réponds dans tes messages privés sur 𝕏 L'Ovale — c'est là que ça se négocie.`,
+              + `Réponds dans tes messages privés sur 𝕏 L'Ovale, c'est là que ça se négocie.`,
           }],
         }));
         return nouvelles.length;
@@ -2202,7 +2202,7 @@ export const useGame = create<GameState>()(
               {
                 id: idUnique(), pseudo: a.pseudo, de: 'lui', saison: joueur.saison,
                 texte: `Parfait. On officialise à l’intersaison : ${resumerTermes(a.offre)}. `
-                  + `D’ici là, finis ta saison — et pas un mot à la presse.`,
+                  + `D’ici là, finis ta saison, et pas un mot à la presse.`,
                 semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false,
               },
             ],
@@ -2304,7 +2304,7 @@ export const useGame = create<GameState>()(
               : `${p.club} (${p.divisionNom}) t'engage pour ${p.saisons} saison${p.saisons > 1 ? 's' : ''} : `
                 + `${p.salaire.toLocaleString('fr-FR')} € par saison et ${p.prime.toLocaleString('fr-FR')} € à la signature.`
                 + (p.garantie ? ' Le coach s’est engagé sur ton temps de jeu.' : '')
-                + (p.etranger ? ' Direction l’étranger — nouvelle langue, nouveau rugby.' : ''))
+                + (p.etranger ? ' Direction l’étranger, nouvelle langue, nouveau rugby.' : ''))
               + (gagnes >= 50
                 ? ` 𝕏 L'annonce tourne : **+${gagnes.toLocaleString('fr-FR')} abonnés** sur L'Ovale.`
                 : gagnes <= -50
@@ -2356,7 +2356,7 @@ export const useGame = create<GameState>()(
               role: 'systeme',
               titre: '📣 Demande de transfert',
               texte: nees
-                ? `Ton agent a fait passer le message. ${nees} club${nees > 1 ? 's se positionnent' : ' se positionne'} et t'écrit sur 𝕏 L'Ovale — le vestiaire, lui, apprécie moyennement.`
+                ? `Ton agent a fait passer le message. ${nees} club${nees > 1 ? 's se positionnent' : ' se positionne'} et t'écrit sur 𝕏 L'Ovale, le vestiaire, lui, apprécie moyennement.`
                 : "Ton agent a fait le tour du marché : personne ne se positionne à ton niveau pour l'instant. Le vestiaire, lui, a entendu parler de ta demande.",
             },
           ],
@@ -2565,7 +2565,7 @@ export const useGame = create<GameState>()(
               id: idUnique(), saison: joueur.saison, role: 'systeme' as const,
               titre: '📞 Il va falloir retrouver un club',
               texte: 'Sans contrat, tu ne joues plus une minute : le calendrier s’arrête pour toi. '
-                + 'Ouvre tes messages privés sur 𝕏 L’Ovale, négocie, et signe — '
+                + 'Ouvre tes messages privés sur 𝕏 L’Ovale, négocie, et signe : '
                 + 'cette fois, la signature prend effet immédiatement.',
             }],
           }));
@@ -3060,7 +3060,7 @@ export const useGame = create<GameState>()(
               id: idUnique(),
               saison: joueur.saison,
               role: 'systeme' as const,
-              titre: '🔁 Mercato — c’est officiel',
+              titre: '🔁 Mercato, c’est officiel',
               texte: `${a.joueur} quitte ${a.de} pour ${a.vers}. Le transfert est acté : tu le verras dans les effectifs.`,
             },
           ],
@@ -3459,7 +3459,7 @@ export const useGame = create<GameState>()(
             ...nouveaux.map((n) => ({
               id: idUnique(),
               emoji: n.emoji,
-              titre: `Succès débloqué — ${n.nom}`,
+              titre: `Succès débloqué : ${n.nom}`,
               texte: n.desc,
               saison: joueur.saison,
               semaine: joueur.semaine ?? 1,
@@ -3472,7 +3472,7 @@ export const useGame = create<GameState>()(
               id: idUnique(),
               saison: joueur.saison,
               role: 'systeme' as const,
-              titre: `${n.emoji} Succès — ${n.nom}`,
+              titre: `${n.emoji} Succès : ${n.nom}`,
               texte: n.desc,
             })),
           ],
@@ -3570,7 +3570,7 @@ export const useGame = create<GameState>()(
         if (blessure) j = appliquerDeltas({ ...j, blessure }, deltasBlessure(blessure));
 
         const gagne = retour.attribut
-          ? ` **+1 ${ATTRIBUTS_LABELS[retour.attribut]}** — le staff a vu ce qu'il voulait voir.`
+          ? ` **+1 ${ATTRIBUTS_LABELS[retour.attribut]}**, le staff a vu ce qu'il voulait voir.`
           : '';
         // ⚠️ UNE SEULE ENTRÉE POUR LE WEEK-END. Le résultat de la rencontre est
         // porté par la feuille de match : `semaineSuivante` n'ajoute plus son
@@ -3596,8 +3596,8 @@ export const useGame = create<GameState>()(
             saison: j.saison,
             role: 'systeme' as const,
             titre: c
-              ? `📋 ${c.libelle} — ${resultat} ${c.domicile ? 'contre' : 'à'} ${c.adversaire} · ${retour.note}/10`
-              : `📋 Feuille de match — ${retour.note}/10`,
+              ? `📋 ${c.libelle} - ${resultat} ${c.domicile ? 'contre' : 'à'} ${c.adversaire} · ${retour.note}/10`
+              : `📋 Feuille de match : ${retour.note}/10`,
             texte: `${retour.texte} ${s.minutes}′ jouées · ${s.plaquages} plaquage${s.plaquages > 1 ? 's' : ''} · `
               + `${Math.round(s.metres)} m portés · ${s.essais} essai${s.essais > 1 ? 's' : ''}.${gagne}`
               + (blessure ? ` 🚑 ${messageBlessure(blessure)}` : ''),
@@ -3637,7 +3637,7 @@ export const useGame = create<GameState>()(
             role: 'mj' as const,
             titre: '🛑 Carrière terminée',
             texte: `${joueur.blessure?.nom}. Les examens sont sans appel : tu ne rejoueras plus. `
-              + `À ${joueur.age} ans, il faut raccrocher — et choisir ce que tu fais de la suite.`,
+              + `À ${joueur.age} ans, il faut raccrocher, et choisir ce que tu fais de la suite.`,
           }],
         }));
         get().prendreRetraite();
@@ -3672,7 +3672,7 @@ export const useGame = create<GameState>()(
           j = appliquerDeltas({ ...j, blessure: b }, deltasBlessure(b));
           entrees.push({
             titre: `🚑 ${blessure.nom}`,
-            texte: `Ramassée dans la bagarre. ${blessure.semaines} semaine${blessure.semaines > 1 ? 's' : ''} d’indisponibilité — `
+            texte: `Ramassée dans la bagarre. ${blessure.semaines} semaine${blessure.semaines > 1 ? 's' : ''} d’indisponibilité : `
               + 'et une facture que personne n’avait prévue au budget.',
           });
         }
@@ -4001,7 +4001,7 @@ export const useGame = create<GameState>()(
         for (const [autre, def] of Object.entries(LIAISONS_DEFAUT) as [Commande, Assignation][]) {
           if (autre === commande) continue;
           const actuelle = suivant[autre] ?? def;
-          if (actuelle.code === a.code) suivant[autre] = { code: '', libelle: '—' };
+          if (actuelle.code === a.code) suivant[autre] = { code: '', libelle: '-' };
         }
         suivant[commande] = a;
         return { touchesMatch: suivant };
@@ -4686,7 +4686,7 @@ function jouerMatch(j: Joueur, intensite: number): ResultatSemaine {
 
   return {
     emoji: essais > 0 ? '🎯' : '🏉',
-    titre: `Match — note ${note}/10`,
+    titre: `Match, note ${note}/10`,
     texte: `${recit}${finition}${jugement}${details}${bobo}`,
     deltas,
     aJoue: true,
@@ -4721,7 +4721,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
     const reste = j.blessure.semaines - 1;
     return {
       emoji: '🚑',
-      titre: `Infirmerie — ${j.blessure.nom}`,
+      titre: `Infirmerie : ${j.blessure.nom}`,
       texte: reste > 0
         ? `Soins, kiné, salle. Encore ${reste} semaine${reste > 1 ? 's' : ''} avant de retoucher un ballon.`
         : 'Dernière séance de rééducation : tu es apte pour la semaine prochaine. Le retour va piquer.',
@@ -4757,7 +4757,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       // Ces week-ends-là, il n'y a tout simplement pas de match.
       if (!affiche) {
         return {
-          emoji: '🏋️', titre: `${semaineJouee.libelle} — pas de match`,
+          emoji: '🏋️', titre: `${semaineJouee.libelle}, pas de match`,
           texte: 'Aucun adversaire au programme ce week-end : semaine complète à l’entraînement, et le corps respire.',
           // ⚠️ Le gros de la remontée vient maintenant de `recuperationHebdo`
           // (convergence vers la condition de base). Ce qui reste ici n'est que
@@ -4771,7 +4771,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       const r = jouerMatch(j, 1);
       return {
         ...r,
-        titre: `J${affiche.journee} — ${affiche.resume}`,
+        titre: `J${affiche.journee} - ${affiche.resume}`,
         texte: `${affiche.recit} ${r.texte}`,
         victoire: affiche.victoire,
       };
@@ -4792,7 +4792,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
         };
       }
       const r = jouerMatch(j, 1.6);
-      return { ...r, titre: `${semaineJouee.libelle}${r.aJoue ? ` — note ${r.note}/10` : ''}` };
+      return { ...r, titre: `${semaineJouee.libelle}${r.aJoue ? `, note ${r.note}/10` : ''}` };
     }
 
     case 'international': {
@@ -4808,7 +4808,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
           return {
             ...rj,
             emoji: '🌱',
-            titre: `${semaineJouee.libelle} — sélection U20`,
+            titre: `${semaineJouee.libelle}, sélection U20`,
             texte: `Tu es appelé chez les moins de 20 ans de ${nomNation(j.nation)} ! ${rj.texte}`,
             deltas: {
               ...rj.deltas,
@@ -4821,7 +4821,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
           };
         }
         return {
-          emoji: '📺', titre: `${semaineJouee.libelle} — pas convoqué`,
+          emoji: '📺', titre: `${semaineJouee.libelle}, pas convoqué`,
           texte: `Le groupe est annoncé sans toi (il faut ${Math.round(conv.exige)} de niveau international, tu es à ${Math.round(conv.niveau)}).`
             + (j.age <= 20
               ? ` Chez les U20 non plus (${Math.round(jeune.exige)} exigé).`
@@ -4835,7 +4835,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       return {
         ...r,
         emoji: '🏳️',
-        titre: `${semaineJouee.libelle} — sélection nationale`,
+        titre: `${semaineJouee.libelle}, sélection nationale`,
         texte: `Tu es appelé en sélection ! ${r.texte}`,
         deltas: { ...r.deltas, reputation: (r.deltas.reputation ?? 0) + (r.aJoue ? 5 : 2), moral: (r.deltas.moral ?? 0) + 6 },
         cape: r.aJoue,
@@ -4895,14 +4895,14 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       const r = jouerMatch(j, tour === 'finale' ? 2 : 1.8);
       const enjeu =
         tour === 'acces'
-          ? gagne ? ' Ta place est assurée — quel soulagement.' : ' C’est la relégation. Un vestiaire en larmes.'
+          ? gagne ? ' Ta place est assurée, quel soulagement.' : ' C’est la relégation. Un vestiaire en larmes.'
           : tour === 'finale'
             ? gagne ? ' VOUS ÊTES CHAMPIONS !' : ' Si près du Brennus, si loin.'
             : gagne ? ' Vous passez au tour suivant !' : ' L’aventure s’arrête là.';
       return {
         ...r,
         emoji: gagne ? '🔥' : '💔',
-        titre: `${semaineJouee.libelle} — ${gagne ? 'Victoire' : 'Défaite'} ${nous}-${eux} contre ${adversaire}`,
+        titre: `${semaineJouee.libelle} - ${gagne ? 'Victoire' : 'Défaite'} ${nous}-${eux} contre ${adversaire}`,
         texte: `${chezNous ? 'À domicile' : 'En déplacement'} contre ${adversaire} : ${nous}-${eux}.${enjeu} ${r.texte}`,
         deltas: {
           ...r.deltas,

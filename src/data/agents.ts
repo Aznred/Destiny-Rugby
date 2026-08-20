@@ -42,7 +42,7 @@ export const AGENTS: Agent[] = [
     id: 'requin',
     emoji: '🦈',
     nom: 'Marco « le requin » Vidal',
-    desc: 'Il négocie comme il conduit : vite et sans clignotant. Les salaires explosent, les portes s’ouvrent — et les tabloïds adorent ses clients.',
+    desc: 'Il négocie comme il conduit : vite et sans clignotant. Les salaires explosent, les portes s’ouvrent, et les tabloïds adorent ses clients.',
     commission: 0.12, offres: 1.6, ouverture: 14, salaire: 1.22, drame: 0.22,
   },
   {

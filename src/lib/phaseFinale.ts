@@ -108,8 +108,8 @@ export function phaseFinale(
   let demiFinalistes: string[];
   if (n >= 6) {
     // Barrages : 3 reçoit 6, 4 reçoit 5. Les deux premiers attendent.
-    const b1 = duel(q[2], q[5], saison, cle('barrage1', q[2], q[5]), 'barrage', `Barrage : ${q[2]} – ${q[5]}`);
-    const b2 = duel(q[3], q[4], saison, cle('barrage2', q[3], q[4]), 'barrage', `Barrage : ${q[3]} – ${q[4]}`);
+    const b1 = duel(q[2], q[5], saison, cle('barrage1', q[2], q[5]), 'barrage', `Barrage : ${q[2]} - ${q[5]}`);
+    const b2 = duel(q[3], q[4], saison, cle('barrage2', q[3], q[4]), 'barrage', `Barrage : ${q[3]} - ${q[4]}`);
     matchs.push(b1, b2);
     // Le 1er reçoit le moins bien classé des deux qualifiés.
     const [faible, fort] = [b1.vainqueur, b2.vainqueur].sort((a, b) => rang(b) - rang(a));
@@ -125,12 +125,12 @@ export function phaseFinale(
     const d1 = duel(
       demiFinalistes[0], demiFinalistes[1], saison,
       cle('demie1', demiFinalistes[0], demiFinalistes[1]), 'demie',
-      `Demi-finale : ${demiFinalistes[0]} – ${demiFinalistes[1]}`,
+      `Demi-finale : ${demiFinalistes[0]} - ${demiFinalistes[1]}`,
     );
     const d2 = duel(
       demiFinalistes[2], demiFinalistes[3], saison,
       cle('demie2', demiFinalistes[2], demiFinalistes[3]), 'demie',
-      `Demi-finale : ${demiFinalistes[2]} – ${demiFinalistes[3]}`,
+      `Demi-finale : ${demiFinalistes[2]} - ${demiFinalistes[3]}`,
     );
     matchs.push(d1, d2);
     finalistes = [d1.vainqueur, d2.vainqueur];
@@ -140,7 +140,7 @@ export function phaseFinale(
 
   // LA FINALE — terrain neutre : personne ne reçoit.
   const [fa, fb] = finalistes.sort((a, b) => rang(a) - rang(b));
-  const finale = duel(fa, fb, saison, cle('finale', fa, fb), 'finale', `FINALE : ${fa} – ${fb}`, 0);
+  const finale = duel(fa, fb, saison, cle('finale', fa, fb), 'finale', `FINALE : ${fa} - ${fb}`, 0);
   matchs.push(finale);
 
   return {
@@ -180,7 +180,7 @@ export function matchAcces(
     tenant, pretendant, saison,
     `acces#${haut.divisionId}#${bas.divisionId}#${saison}#${tenant}#${pretendant}`,
     'accession',
-    `Match d’accès : ${tenant} – ${pretendant}`,
+    `Match d’accès : ${tenant} - ${pretendant}`,
     // Recevoir chez soi avec sa place en jeu : un vrai avantage.
     5,
   );

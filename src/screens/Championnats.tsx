@@ -204,7 +204,7 @@ function BlocCompetition({
             type="button"
             className="club-carte"
             onClick={() => onClub(club)}
-            title={`${t('ch.voirEffectif')} — ${club.nom}`}
+            title={`${t('ch.voirEffectif')} - ${club.nom}`}
           >
             <Blason club={club} taille={40} />
             <div style={{ minWidth: 0 }}>

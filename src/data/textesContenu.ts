@@ -58,7 +58,7 @@ export const TEXTES_CONTENU: Record<string, Traduction> = {
     en: 'A step, a change of pace, and you ground it in the corner! The stadium erupts.',
     es: '¡Quiebro, apoyo y anotas en el rincón! El estadio estalla.',
     it: 'Finta, appoggio, e schiacci in bandierina! Lo stadio esplode.',
-    de: 'Ein Haken, ein Antritt — und du legst in der Ecke ab! Das Stadion tobt.',
+    de: 'Ein Haken, ein Antritt, und du legst in der Ecke ab! Das Stadion tobt.',
     pt: 'Um corte, um apoio, e apoias no canto! O estádio explode.',
     ja: 'ステップ、加速、そしてコーナーでグラウンディング！ スタジアムが沸く。',
   },
@@ -120,7 +120,7 @@ export const TEXTES_CONTENU: Record<string, Traduction> = {
     it: 'Ultimo minuto, davanti ai pali… e la metti dentro. Freddezza assoluta.',
     de: 'Letzte Minute, vor den Stangen … und du verwandelst. Eiskalt.',
     pt: 'Último minuto, em frente aos postes… e marcas. Sangue-frio total.',
-    ja: 'ラストプレー、ポール正面——決めた。完璧な冷静さ。',
+    ja: 'ラストプレー、ポール正面、決めた。完璧な冷静さ。',
   },
   'evt.carton.titre': { fr: 'Carton rouge', en: 'Red card', es: 'Tarjeta roja', it: 'Cartellino rosso', de: 'Rote Karte', pt: 'Cartão vermelho', ja: 'レッドカード' },
   'evt.carton.txt': {
@@ -166,7 +166,7 @@ export const TEXTES_CONTENU: Record<string, Traduction> = {
     pt: 'O clube oferece-te o primeiro contrato profissional, mas o salário é modesto. O teu agente acha que dá para negociar.',
     ja: 'クラブが初のプロ契約を提示。ただし年俸は控えめだ。エージェントは交渉の余地があると見ている。',
   },
-  'scn.contrat.c0': { fr: 'Signer tout de suite, la sécurité avant tout.', en: 'Sign right away — security first.', es: 'Firmar ya, la seguridad primero.', it: 'Firmare subito, prima la sicurezza.', de: 'Sofort unterschreiben — Sicherheit zuerst.', pt: 'Assinar já, segurança primeiro.', ja: 'すぐ署名する。まずは安定を。' },
+  'scn.contrat.c0': { fr: 'Signer tout de suite, la sécurité avant tout.', en: 'Sign right away, security first.', es: 'Firmar ya, la seguridad primero.', it: 'Firmare subito, prima la sicurezza.', de: 'Sofort unterschreiben, Sicherheit zuerst.', pt: 'Assinar já, segurança primeiro.', ja: 'すぐ署名する。まずは安定を。' },
   'scn.contrat.r0': {
     fr: 'Tu signes sans discuter. Le staff apprécie ta loyauté et ta sérénité.',
     en: 'You sign without haggling. The staff notes your loyalty and your calm.',
@@ -184,7 +184,7 @@ export const TEXTES_CONTENU: Record<string, Traduction> = {
     it: 'Braccio di ferro teso… ma la spunti. Lo spogliatoio ti guarda diversamente.',
     de: 'Ein zähes Ringen … aber du setzt dich durch. Die Kabine sieht dich anders.',
     pt: 'Braço de ferro tenso… mas ganhas a queda. O balneário olha-te de outra forma.',
-    ja: '緊張した綱引き——だが押し切った。ロッカールームの見る目が変わる。',
+    ja: '緊張した綱引き、だが押し切った。ロッカールームの見る目が変わる。',
   },
   'scn.contrat.c2': { fr: 'Tester le marché ailleurs.', en: 'Test the market elsewhere.', es: 'Tantear el mercado en otro sitio.', it: 'Sondare il mercato altrove.', de: 'Den Markt anderswo testen.', pt: 'Testar o mercado noutro lado.', ja: '他所で市場価値を試す。' },
   'scn.contrat.r2': {
@@ -376,10 +376,10 @@ export const TEXTES_CONTENU: Record<string, Traduction> = {
     pt: 'Lideras o grupo com autoridade. Nasceu um líder.',
     ja: '威厳をもってチームを率いた。リーダーが生まれた。',
   },
-  'scn.capitanat.c1': { fr: 'Refuser, tu ne te sens pas prêt.', en: 'Decline — you don’t feel ready.', es: 'Rechazar, no te sientes preparado.', it: 'Rifiutare, non ti senti pronto.', de: 'Ablehnen — du fühlst dich nicht bereit.', pt: 'Recusar, não te sentes pronto.', ja: '断る。まだその時ではない。' },
+  'scn.capitanat.c1': { fr: 'Refuser, tu ne te sens pas prêt.', en: 'Decline, you don’t feel ready.', es: 'Rechazar, no te sientes preparado.', it: 'Rifiutare, non ti senti pronto.', de: 'Ablehnen, du fühlst dich nicht bereit.', pt: 'Recusar, não te sentes pronto.', ja: '断る。まだその時ではない。' },
   'scn.capitanat.r1': {
     fr: 'Honnête, mais l’occasion passe à un autre.',
-    en: 'Honest — but the chance goes to someone else.',
+    en: 'Honest, but the chance goes to someone else.',
     es: 'Honesto, pero la oportunidad pasa a otro.',
     it: 'Onesto, ma l’occasione passa a un altro.',
     de: 'Ehrlich, doch die Chance geht an einen anderen.',

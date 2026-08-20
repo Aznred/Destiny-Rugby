@@ -161,7 +161,7 @@ export const REPONSES_POSITIVES: Record<TypeCompte, string[]> = {
   media: [
     '🚨 {joueur} ({club}) : le message qui fait réagir tout le championnat.',
     'La publication de {joueur} dépasse déjà les 200 000 vues.',
-    '💬 {joueur} sort du silence — notre analyse à lire ici.',
+    '💬 {joueur} sort du silence, notre analyse à lire ici.',
     '📈 Le compte de {joueur} explose depuis ce message.',
     '🎙️ {joueur} sera notre invité cette semaine. Rendez-vous jeudi.',
     'Rarement vu un joueur de {division} faire autant parler en une phrase.',
@@ -252,7 +252,7 @@ export interface Ambiance {
 }
 
 export const AMBIANCE: Ambiance[] = [
-  { type: 'media', texte: '📊 {division} — Classement mis à jour après cette journée. {club} continue de faire parler la poule.' },
+  { type: 'media', texte: '📊 {division} : Classement mis à jour après cette journée. {club} continue de faire parler la poule.' },
   { type: 'media', texte: '🏉 Programme du week-end en {division} : encore une affiche à ne pas manquer du côté de {club}.' },
   { type: 'journaliste', texte: 'On me souffle que plusieurs clubs suivent la situation de {joueur} de très près. À confirmer.' },
   { type: 'journaliste', texte: 'Belle ambiance à l’entraînement de {club} ce matin. Groupe au complet, ou presque.' },
@@ -261,7 +261,7 @@ export const AMBIANCE: Ambiance[] = [
   { type: 'fan', texte: 'Le stade était plein hier. Ça, c’est du rugby.' },
   { type: 'hater', texte: 'Sérieusement, quelqu’un peut m’expliquer ce que {joueur} fait sur une feuille de match ?' },
   { type: 'hater', texte: '{club} en {division}, c’est le niveau réel du club. Rien d’injuste.' },
-  { type: 'media', texte: '🔁 MERCATO — Ça bouge beaucoup en coulisses. Plusieurs dossiers devraient tomber d’ici la fin de semaine.' },
+  { type: 'media', texte: '🔁 MERCATO : Ça bouge beaucoup en coulisses. Plusieurs dossiers devraient tomber d’ici la fin de semaine.' },
   { type: 'journaliste', texte: 'La sélection de {nation} affine sa liste. Quelques surprises attendues.' },
   { type: 'fan', texte: 'Franchement le maillot de cette saison est magnifique. C’est déjà ça. 😅' },
   { type: 'media', texte: '🎥 Le résumé de la journée est en ligne. Un essai de 90 mètres qui va tourner en boucle.' },

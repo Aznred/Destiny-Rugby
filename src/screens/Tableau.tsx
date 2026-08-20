@@ -163,10 +163,10 @@ function Frise({
             onClick={() => (aVenir ? onAller!(s.numero) : onJournee(premiere))}
             title={aVenir
               ? t('tb.jouerJusqua', { date: libelleDate(s), n: s.numero - semaineActuelle })
-              : `${libelleDate(s)} — ${libelleSemaine(s)}${aDesMatchs ? ` (J${premiere}${derniere > premiere ? `-${derniere}` : ''})` : ''}`}
+              : `${libelleDate(s)} - ${libelleSemaine(s)}${aDesMatchs ? ` (J${premiere}${derniere > premiere ? `-${derniere}` : ''})` : ''}`}
           >
             <span className="frise-emoji">{aVenir ? '▶' : EMOJI_SEMAINE[s.type] ?? '🏉'}</span>
-            <b>{aDesMatchs ? `J${premiere}` : '—'}</b>
+            <b>{aDesMatchs ? `J${premiere}` : '-'}</b>
             <i>{libelleDate(s)}</i>
           </button>
         );
@@ -181,7 +181,7 @@ function Affiche({ a, club }: { a: AfficheCalendrier; club: string }) {
   return (
     <div className="resultat a-venir" data-moi={mien ? 'oui' : undefined}>
       <span className="res-equipe">{a.domicile}</span>
-      <b className="res-score">–</b>
+      <b className="res-score">-</b>
       <span className="res-equipe droite">{a.exterieur}</span>
     </div>
   );
@@ -608,7 +608,7 @@ export function Tableau() {
       {coupe && (
         <>
           <p className="intro-comp">
-            <LogoCompet id={coupe.id} emoji={coupe.emoji} taille={20} /> <b>{coupe.nom}</b> — {t('tb.journeesPoules', { n: coupe.journeesJouees, total: coupe.totalJournees })}{' '}
+            <LogoCompet id={coupe.id} emoji={coupe.emoji} taille={20} /> <b>{coupe.nom}</b> : {t('tb.journeesPoules', { n: coupe.journeesJouees, total: coupe.totalJournees })}{' '}
             {coupe.engage
               ? t('tb.clubEngage')
               : t('tb.clubPasEngage')}
@@ -654,7 +654,7 @@ export function Tableau() {
       {inter && (
         <>
           <p className="intro-comp">
-            <LogoCompet id={inter.etat.id} emoji={inter.etat.emoji} taille={20} /> <b>{inter.etat.nom}</b> —{' '}
+            <LogoCompet id={inter.etat.id} emoji={inter.etat.emoji} taille={20} /> <b>{inter.etat.nom}</b> :{' '}
             {inter.etat.journeesJouees > 0
               ? t('tb.journeesSur', { n: inter.etat.journeesJouees, total: inter.etat.totalJournees })
               : t('tb.competitionPasCommencee')}
@@ -691,7 +691,7 @@ export function Tableau() {
 
           <div className="carte bloc-competition">
             <div className="comp-tete">
-              <b>{inter.affiches.some((a) => a.jouee) ? t('tb.resultats') : t('tb.programme')} — {t('tb.journee', { n: inter.vue })}</b>
+              <b>{inter.affiches.some((a) => a.jouee) ? t('tb.resultats') : t('tb.programme')} : {t('tb.journee', { n: inter.vue })}</b>
               <div className="nav-journee">
                 <button className="btn fantome mini" disabled={inter.vue <= 1}
                   onClick={() => setJourneeVue(inter.vue - 1)}>←</button>
@@ -722,7 +722,7 @@ export function Tableau() {
       {etat && (
         <>
           <p className="intro-comp">
-            <LogoCompet id={competition?.id} emoji={competition?.emoji} taille={20} /> <b>{competition?.nom}</b> —{' '}
+            <LogoCompet id={competition?.id} emoji={competition?.emoji} taille={20} /> <b>{competition?.nom}</b> :{' '}
             {derniere > 0
               ? t('tb.saisonResume', { n: derniere, total: etat.totalJournees })
               : t('tb.saisonPasCommencee')}
@@ -731,7 +731,7 @@ export function Tableau() {
           {poules.length > 1 && (
             <div className="barre-poules">
               <span className="poules-titre">
-                {t('tb.nombrePoules', { n: poules.length })} — {estAmateur(choix) ? t('tb.championTournoi') : t('tb.phaseFinalePoule')}
+                {t('tb.nombrePoules', { n: poules.length })} · {estAmateur(choix) ? t('tb.championTournoi') : t('tb.phaseFinalePoule')}
               </span>
               {poules.map((p, i) => (
                 <button
@@ -779,7 +779,7 @@ export function Tableau() {
               <Arbre matchs={matchsPhaseVisibles} club={joueur.club} />
               {finaleTerminee && phase.champion && phase.finaliste && (
                 <p style={{ color: 'var(--craie-dim)', fontSize: '0.85rem', marginTop: '0.7rem' }}>
-                  🏆 Champion : <b>{phase.champion}</b>. {phase.finaliste} est battu en finale — il
+                  🏆 Champion : <b>{phase.champion}</b>. {phase.finaliste} est battu en finale, il
                   disputera le match d’accès à la division supérieure contre son avant-dernier.
                 </p>
               )}
@@ -821,7 +821,7 @@ export function Tableau() {
             <div className="carte bloc-competition">
               <div className="comp-tete">
                 <b>
-                  {vue <= derniere ? t('tb.resultats') : t('tb.programme')} — {t('tb.journee', { n: vue })} / {total}
+                  {vue <= derniere ? t('tb.resultats') : t('tb.programme')} : {t('tb.journee', { n: vue })} / {total}
                 </b>
                 <div className="nav-journees">
                   <button disabled={vue <= 1} onClick={() => setJourneeVue(vue - 1)}>←</button>
@@ -848,7 +848,7 @@ export function Tableau() {
           message={
             `${destination - numero} semaine(s) vont être jouées, une par une : matchs, `
             + `statistiques, forme, blessures et sélections comprises. Tu ne verras pas ces `
-            + `matchs en direct — ils sont simulés par le même moteur. Le jeu s’arrêtera avant `
+            + `matchs en direct, ils sont simulés par le même moteur. Le jeu s’arrêtera avant `
             + `si une scène du Maître du Jeu t’attend, s’il faut signer un contrat, ou si la `
             + `saison se termine.`
           }

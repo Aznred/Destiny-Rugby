@@ -590,7 +590,7 @@ export function MatchLive({
     if (iaActivee && iaDisponible()) {
       try {
         const fine = await lireConsigneIA(texte,
-          `${e.clubA} ${e.scoreA} – ${e.scoreB} ${e.clubB}, ${e.minute}e minute.`);
+          `${e.clubA} ${e.scoreA} - ${e.scoreB} ${e.clubB}, ${e.minute}e minute.`);
         appliquerConsigne(e, fine);
       } catch {
         // On garde la lecture locale : le coaching marche toujours hors ligne.
@@ -1210,8 +1210,8 @@ export function MatchLive({
                     <kbd>{liaisons.bas.libelle}</kbd><kbd>{liaisons.droite.libelle}</kbd>
                     {' · '}<kbd>◀▲▼▶</kbd> · 🕹️ {t('ml.commandes.deplacer')}
                   </span>
-                  <span><kbd>{liaisons.sprint.libelle}</kbd> · <kbd>RT</kbd> — {t('ml.commandes.sprint')}</span>
-                  <span><kbd>{liaisons.principale.libelle}</kbd> · <kbd>A / ✕</kbd> — {t('ml.commandes.principale')}</span>
+                  <span><kbd>{liaisons.sprint.libelle}</kbd> · <kbd>RT</kbd> : {t('ml.commandes.sprint')}</span>
+                  <span><kbd>{liaisons.principale.libelle}</kbd> · <kbd>A / ✕</kbd> : {t('ml.commandes.principale')}</span>
                   {manetteVue.current && <span>🎮 {t('ml.manetteDetectee')}</span>}
                   {/* ⚠️ LA NOTICE SE CONSTRUIT DEPUIS LA TABLE RÉGLABLE, pas
                       depuis celle de la manette : sinon une action jouable au
@@ -1227,8 +1227,8 @@ export function MatchLive({
                     const bouton = BOUTON_PAR_ACTION.get(def.id);
                     return (
                       <span key={cle}>
-                        <kbd>{a?.code ? (a.libelle || libelleDeCode(a.code)) : '—'}</kbd>
-                        {bouton && <> · <kbd>{bouton}</kbd></>} — {def.emoji} {t(def.cle)}
+                        <kbd>{a?.code ? (a.libelle || libelleDeCode(a.code)) : '-'}</kbd>
+                        {bouton && <> · <kbd>{bouton}</kbd></>} : {def.emoji} {t(def.cle)}
                       </span>
                     );
                   })}

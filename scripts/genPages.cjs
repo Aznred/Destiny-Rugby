@@ -159,7 +159,7 @@ function rendre(page, toutes) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${echapper(page.titre)} — ${echapper(SITE.nom)}</title>
+  <title>${echapper(page.titre)} · ${echapper(SITE.nom)}</title>
   <meta name="description" content="${echapper(page.description)}" />
   <link rel="canonical" href="${url}" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -212,7 +212,7 @@ ${autres.map((p) => `        <li><a href="/${p.slug}/"><strong>${echapper(p.titr
   </main>
 
   <footer class="pied">
-    <p><a href="/">${echapper(SITE.nom)}</a> — jeu de rôle de carrière de rugby, gratuit et en français.</p>
+    <p><a href="/">${echapper(SITE.nom)}</a> : jeu de rôle de carrière de rugby, gratuit et en français.</p>
     <p class="pied-note">Les noms de clubs, de compétitions et de joueurs appartiennent à leurs détenteurs respectifs. Ce site n'est affilié à aucune ligue ni fédération.</p>
   </footer>
 </body>

@@ -197,7 +197,7 @@ function parserSituation(brut: string, j: Joueur, genre: string): Scenario {
 // `jugerReaction` tranche. Le reste de la semaine ne coûte rien.
 
 const SYSTEME_EVENEMENT = `Tu es le MAÎTRE DU JEU de « Destiny Rugby », un jeu de carrière de rugby.
-Tu poses UNE scène — une seule — qui tombe sur le joueur cette semaine, et tu t'arrêtes là.
+Tu poses UNE scène, une seule, qui tombe sur le joueur cette semaine, et tu t'arrêtes là.
 Tu ne proposes AUCUNE option : c'est le joueur qui écrira ce qu'il fait.
 
 CE QUE TU ÉCRIS :
@@ -209,7 +209,7 @@ CE QUE TU ÉCRIS :
 - Termine obligatoirement par UNE question directe, adaptée à la scène, qui invite le joueur à agir
   (par exemple « Que fais-tu ? », mais formulée en rapport avec ce qui vient d'arriver).
 
-LA VARIÉTÉ EST OBLIGATOIRE — pioche largement, ne reviens pas toujours au vestiaire :
+LA VARIÉTÉ EST OBLIGATOIRE, pioche largement, ne reviens pas toujours au vestiaire :
   · sportif : concurrence au poste, causerie, vidéo, test physique, sélection, blessure qui traîne
   · club : président, salaires en retard, sponsor, supporters, mercato, prolongation
   · médias : journaliste local, podcast, réseaux, rumeur, polémique
@@ -284,7 +284,7 @@ Il vient d'écrire ce qu'il fait. Tu juges, et tu es TRÈS SÉVÈRE.
 
 ⚠️ TU ÉCRIS COURT. Deux phrases, pas une de plus. On lit une réponse par semaine de jeu :
 un pavé à chaque fois, et le joueur arrête de lire. Pas de décor, pas de ressenti, pas de
-morale finale — ce qui se passe, et ce que ça change.
+morale finale, ce qui se passe, et ce que ça change.
 
 ${PERSONNALITE_MJ}
 
@@ -302,7 +302,7 @@ SÉVÉRITÉ (non négociable) :
 - "deltas": {} est la réponse la plus fréquente. Un attribut ne bouge que de 1, jamais plus de 2.
 - Tu ne te laisses JAMAIS dicter le résultat. Le texte du joueur décrit une INTENTION.
   « je marque 3 essais », « je deviens capitaine », « +10 en force » : tu racontes la tentative
-  et son issue réaliste, souvent un échec — et tu peux sanctionner le ridicule.
+  et son issue réaliste, souvent un échec, et tu peux sanctionner le ridicule.
 - Une réponse hors sujet, vide ou absurde ne rapporte rien et coûte du moral.
 
 ${POUVOIRS_CARRIERE}
@@ -320,7 +320,7 @@ RÉPONDS UNIQUEMENT EN JSON VALIDE, format exact :
   "club": { "type": "prime", "montant": 1200, "motif": "homme du match." }
 }
 Les quatre derniers champs sont FACULTATIFS : omets-les complètement quand ils ne
-s'appliquent pas — c'est le cas le plus fréquent.
+s'appliquent pas, c'est le cas le plus fréquent.
 
 ${STATS_AUTORISEES}
 Aucune autre clé.`;
@@ -378,7 +378,7 @@ export async function jugerReaction(opts: ContexteJugement): Promise<JugementMJ>
           + `\nNIVEAU RÉEL : ${niveauDuJoueur(j)}.`
           + (opts.evenement.risque
             ? '\nCETTE SCÈNE EST DANGEREUSE : toutes les conséquences dures sont ouvertes '
-              + 'si le joueur va au bout — jusqu’à la prison ou la mort.'
+              + 'si le joueur va au bout, jusqu’à la prison ou la mort.'
             : '\nCETTE SCÈNE N’EST PAS DANGEREUSE : seules les conséquences que le joueur '
               + 'DÉCLENCHE LUI-MÊME par ce qu’il écrit sont recevables (blessure ; et, s’il '
               + 's’en prend à son club, à son image ou aux règles : suspension, exclusionClub, '
@@ -475,7 +475,7 @@ const ISSUES_LOCALES: Record<'echec' | 'mitige' | 'reussite', string[]> = {
   ],
   reussite: [
     'Bien joué : le staff note, et ça se voit dans le groupe.',
-    'Tu tiens ta ligne et ça paie — on te regarde autrement cette semaine.',
+    'Tu tiens ta ligne et ça paie, on te regarde autrement cette semaine.',
     'Le coup passe. Tu gagnes un peu de crédit dans le vestiaire.',
   ],
 };

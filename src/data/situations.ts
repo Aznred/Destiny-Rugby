@@ -80,7 +80,7 @@ export const SITUATIONS: Situation[] = [
     choix: [
       { texte: 'Y aller à fond, faux et assumé.', issue: { recit: 'Tu massacres la chanson, le vestiaire pleure de rire. Tu fais partie du groupe.', deltas: { moral: 8, reputation: 2 }, ovas: 3, coach: 3, fans: 2 } },
       { texte: 'Refuser poliment.', issue: { recit: 'Personne n’insiste, mais tu sens un froid pendant deux semaines.', deltas: { moral: -5 }, ovas: 1, coach: -2 } },
-      { texte: 'Retourner le truc contre les anciens.', issue: { recit: 'Tu improvises un couplet sur le capitaine. Risqué — mais le vestiaire adore.', deltas: { moral: 10, reputation: 4, mental: 1 }, ovas: 5, coach: 1, fans: 4 } },
+      { texte: 'Retourner le truc contre les anciens.', issue: { recit: 'Tu improvises un couplet sur le capitaine. Risqué, mais le vestiaire adore.', deltas: { moral: 10, reputation: 4, mental: 1 }, ovas: 5, coach: 1, fans: 4 } },
     ],
   },
   {
@@ -100,8 +100,8 @@ export const SITUATIONS: Situation[] = [
     situation: 'Un espoir de 19 ans monte s’entraîner avec le groupe. Il est perdu, il n’ose parler à personne, et il joue à ton poste.',
     choix: [
       { texte: 'Le prendre sous ton aile.', issue: { recit: 'Tu lui expliques tout : les codes, les vidéos, les kinés. Le staff apprécie beaucoup.', deltas: { moral: 6, reputation: 3 }, ovas: 5, coach: 6, fans: 3 } },
-      { texte: 'Le laisser se débrouiller — c’est un concurrent.', issue: { recit: 'Il galère. Personne ne t’en veut ouvertement, mais on t’a vu faire.', deltas: { moral: -2 }, ovas: 1, coach: -3 } },
-      { texte: 'Le pousser à bout à l’entraînement.', issue: { recit: 'Tu le passes à la moulinette. Il en ressort plus dur — et il te doit quelque chose.', deltas: { plaquage: 1, reputation: 2 }, ovas: 4, coach: 2 } },
+      { texte: 'Le laisser se débrouiller, c’est un concurrent.', issue: { recit: 'Il galère. Personne ne t’en veut ouvertement, mais on t’a vu faire.', deltas: { moral: -2 }, ovas: 1, coach: -3 } },
+      { texte: 'Le pousser à bout à l’entraînement.', issue: { recit: 'Tu le passes à la moulinette. Il en ressort plus dur, et il te doit quelque chose.', deltas: { plaquage: 1, reputation: 2 }, ovas: 4, coach: 2 } },
     ],
   },
   {
@@ -186,7 +186,7 @@ export const SITUATIONS: Situation[] = [
     titre: 'Une équipe de télé veut te suivre',
     situation: 'Une production veut te filmer pendant six mois : entraînements, famille, vestiaire. Gros chèque, zéro intimité.',
     choix: [
-      { texte: 'Accepter tout.', issue: { recit: 'Le documentaire cartonne. Tu deviens un visage connu — et tu ne rentres plus chez toi sans caméra.', deltas: { argent: 30_000, reputation: 12, moral: -6, forme: -4 }, ovas: 10, fans: 20, coach: -3 } },
+      { texte: 'Accepter tout.', issue: { recit: 'Le documentaire cartonne. Tu deviens un visage connu, et tu ne rentres plus chez toi sans caméra.', deltas: { argent: 30_000, reputation: 12, moral: -6, forme: -4 }, ovas: 10, fans: 20, coach: -3 } },
       { texte: 'Accepter, mais sans la famille.', issue: { recit: 'Compromis accepté. Moins d’argent, mais ta maison reste ta maison.', deltas: { argent: 14_000, reputation: 6 }, ovas: 8, fans: 10 } },
       { texte: 'Refuser.', issue: { recit: 'Tu passes ton tour. La production trouve quelqu’un d’autre.', deltas: { moral: 2 }, ovas: 3, coach: 2 } },
     ],
@@ -236,7 +236,7 @@ export const SITUATIONS: Situation[] = [
     id: 'reprise-etudes', emoji: '🎓', categorie: 'perso', poids: 0.6,
     quand: (j) => j.age >= 24,
     titre: 'Préparer l’après',
-    situation: 'Le syndicat des joueurs propose une formation à distance — kiné, commerce, entraîneur. Ça prend deux soirs par semaine.',
+    situation: 'Le syndicat des joueurs propose une formation à distance, kiné, commerce, entraîneur. Ça prend deux soirs par semaine.',
     choix: [
       { texte: 'S’inscrire.', issue: { recit: 'Deux soirs en moins pour récupérer, mais un avenir qui se dessine.', deltas: { forme: -5, mental: 3, moral: 6 }, ovas: 7 } },
       { texte: 'Plus tard.', issue: { recit: 'Tu remets à la saison prochaine. Comme l’an dernier.', deltas: { moral: -2 }, ovas: 1 } },
@@ -281,7 +281,7 @@ export const SITUATIONS: Situation[] = [
       {
         texte: 'Ne rien dire.',
         issue: {
-          recit: 'Tu enchaînes. Trois semaines plus tard, un second choc — et cette fois, les médecins sont formels : c’est terminé.',
+          recit: 'Tu enchaînes. Trois semaines plus tard, un second choc, et cette fois, les médecins sont formels : c’est terminé.',
           deltas: { moral: -35, forme: -40 }, ovas: 0,
           dur: { type: 'finDeCarriere', motif: 'commotions cérébrales à répétition' },
         },
@@ -343,7 +343,7 @@ export const SITUATIONS: Situation[] = [
     titre: 'Les salaires ont du retard',
     situation: 'Deuxième mois sans virement. Le président parle de « décalage de trésorerie ». Le vestiaire gronde.',
     choix: [
-      { texte: 'Faire grève avec le groupe.', issue: { recit: 'Entraînement boycotté, presse locale en alerte. Le président paie sous quinze jours — et la DNACG ouvre un dossier.', deltas: { moral: -6, argent: 4000 }, ovas: 4, coach: -4 } },
+      { texte: 'Faire grève avec le groupe.', issue: { recit: 'Entraînement boycotté, presse locale en alerte. Le président paie sous quinze jours, et la DNACG ouvre un dossier.', deltas: { moral: -6, argent: 4000 }, ovas: 4, coach: -4 } },
       { texte: 'Aller voir le président seul à seul.', issue: { recit: 'Il te reçoit, t’explique tout, te règle en priorité. Le vestiaire l’apprend et grince des dents.', deltas: { argent: 6000, moral: -3, reputation: -3 }, ovas: 5 } },
       {
         texte: 'Prévenir la fédération.',
@@ -447,7 +447,7 @@ export const SITUATIONS: Situation[] = [
       {
         texte: 'Braquer sec.',
         issue: {
-          recit: 'Aquaplaning, fossé, tonneau. Les pompiers te sortent conscient — mais l’épaule et le bassin sont en morceaux.',
+          recit: 'Aquaplaning, fossé, tonneau. Les pompiers te sortent conscient, mais l’épaule et le bassin sont en morceaux.',
           deltas: { moral: -25, forme: -50 }, ovas: 0,
           dur: { type: 'accident', semaines: 30, motif: 'accident de la route' },
         },
@@ -487,7 +487,7 @@ export const SITUATIONS: Situation[] = [
     titre: 'Tu vaux plus que ça',
     situation: 'Tu enchaînes les titularisations et ton salaire n’a pas bougé depuis ta signature. Ton agent veut aller taper à la porte du président.',
     choix: [
-      { texte: 'Réclamer une revalorisation, franchement.', issue: { recit: 'Le président grogne, puis lâche. Salaire revu à la hausse — et une attente en face, désormais.', deltas: { argent: 14000, reputation: 3, moral: 6 }, ovas: 6, coach: -1 } },
+      { texte: 'Réclamer une revalorisation, franchement.', issue: { recit: 'Le président grogne, puis lâche. Salaire revu à la hausse, et une attente en face, désormais.', deltas: { argent: 14000, reputation: 3, moral: 6 }, ovas: 6, coach: -1 } },
       { texte: 'Attendre la fin de saison sans rien dire.', issue: { recit: 'Tu laisses parler le terrain. Le club le remarque, et ta cote grimpe toute seule.', deltas: { reputation: 4, mental: 1 }, ovas: 4, coach: 5 } },
       { texte: 'Faire fuiter que d’autres clubs t’appellent.', issue: { recit: 'La rumeur sort dans la presse locale. Le club augmente… et ne te le pardonne pas tout de suite.', deltas: { argent: 20000, reputation: 2, moral: -4 }, ovas: 5, coach: -7, fans: -3 } },
     ],
@@ -496,7 +496,7 @@ export const SITUATIONS: Situation[] = [
     id: 'mise-au-placard', emoji: '🪑', categorie: 'club', poids: 0.5,
     quand: (j) => (j.confianceCoach ?? 50) < 35,
     titre: 'Mis à l’écart du groupe',
-    situation: 'Tu t’entraînes avec les blessés et les indésirables. Personne ne t’a rien dit — c’est la feuille de match du samedi qui te l’a appris.',
+    situation: 'Tu t’entraînes avec les blessés et les indésirables. Personne ne t’a rien dit, c’est la feuille de match du samedi qui te l’a appris.',
     choix: [
       { texte: 'Bosser deux fois plus, en silence.', issue: { recit: 'Tu es le premier arrivé, le dernier parti. Au bout d’un mois, le staff n’a plus d’excuse.', deltas: { forme: 6, mental: 3, moral: -4 }, ovas: 5, coach: 8 } },
       { texte: 'Demander des explications devant tout le monde.', issue: { recit: 'La discussion tourne mal dans le couloir. Le vestiaire te donne raison sur le fond, tort sur la forme.', deltas: { moral: -6, reputation: 2 }, ovas: 3, coach: -6 } },
@@ -541,7 +541,7 @@ export const SITUATIONS: Situation[] = [
     id: 'controle-antidopage', emoji: '🧪', categorie: 'corps', poids: 0.3,
     quand: (j) => pro(j),
     titre: 'Contrôle inopiné',
-    situation: 'Deux préleveurs t’attendent à la sortie du vestiaire. Tu prends un complément acheté en ligne depuis trois semaines — sans avoir vérifié la composition.',
+    situation: 'Deux préleveurs t’attendent à la sortie du vestiaire. Tu prends un complément acheté en ligne depuis trois semaines, sans avoir vérifié la composition.',
     choix: [
       { texte: 'Tout déclarer, y compris le complément.', issue: { recit: 'Le produit contenait une substance apparentée. Ta transparence te vaut la clémence : trois mois, pas deux ans.', deltas: { moral: -14, reputation: -6 }, ovas: 1, coach: -4, dur: { type: 'suspension', semaines: 12, motif: 'complément alimentaire contaminé' } } },
       { texte: 'Ne rien dire et croiser les doigts.', issue: { recit: 'Positif. Sans déclaration préalable, la commission ne retient aucune circonstance atténuante. Deux ans.', deltas: { moral: -30, reputation: -25 }, ovas: 0, coach: -15, fans: -18, dur: { type: 'suspension', semaines: 96, motif: 'contrôle positif, aucune déclaration' } } },
@@ -555,7 +555,7 @@ export const SITUATIONS: Situation[] = [
     situation: 'Quatre heures du matin. Un type reconnaît ton maillot, insulte ton club, pousse ton frère. Deux téléphones filment déjà.',
     choix: [
       { texte: 'Partir sans répondre.', issue: { recit: 'Tu tires ton frère par le bras et vous rentrez. La vidéo fait trois vues.', deltas: { mental: 2, moral: -2 }, ovas: 3, coach: 2 } },
-      { texte: 'T’interposer, sans frapper.', issue: { recit: 'Tu prends un coup, tu n’en rends aucun. La vidéo tourne — et te donne le beau rôle.', deltas: { forme: -6, reputation: 4 }, ovas: 4, fans: 6 } },
+      { texte: 'T’interposer, sans frapper.', issue: { recit: 'Tu prends un coup, tu n’en rends aucun. La vidéo tourne, et te donne le beau rôle.', deltas: { forme: -6, reputation: 4 }, ovas: 4, fans: 6 } },
       { texte: 'Lui mettre une droite.', issue: { recit: 'Un coup, une mâchoire cassée, une plainte. Comparution immédiate, et la prison ferme au bout.', deltas: { moral: -28, reputation: -20, argent: -15000 }, ovas: 0, coach: -12, fans: -15, dur: { type: 'prison', semaines: 26, motif: 'violences volontaires' } } },
     ],
   },
@@ -576,11 +576,11 @@ export const SITUATIONS: Situation[] = [
     id: 'ouvrir-restaurant', emoji: '🍽️', categorie: 'argent', poids: 0.5,
     quand: (j) => j.argent >= 60000 && j.age >= 24,
     titre: 'Le restaurant du coin est à vendre',
-    situation: 'Une brasserie à deux rues du stade cherche un repreneur. Ton beau-frère est cuisinier. Tout le monde te dit que c’est une évidence — c’est bien ce qui t’inquiète.',
+    situation: 'Une brasserie à deux rues du stade cherche un repreneur. Ton beau-frère est cuisinier. Tout le monde te dit que c’est une évidence, c’est bien ce qui t’inquiète.',
     choix: [
       { texte: 'Investir et t’impliquer à fond.', issue: { recit: 'Les six premiers mois sont un enfer : tu fermes à minuit et tu t’entraînes à sept heures. La salle est pleine, tes jambes sont vides.', deltas: { argent: -45000, forme: -10, moral: 6 }, ovas: 6, coach: -5 } },
       { texte: 'Mettre de l’argent, laisser gérer.', issue: { recit: 'Tu signes un chèque et tu passes le dimanche. Ça tourne doucement, sans te coûter une minute de sommeil.', deltas: { argent: -30000, moral: 4 }, ovas: 5 } },
-      { texte: 'Laisser passer.', issue: { recit: 'Tu refuses poliment. Deux ans plus tard, l’affaire a coulé — et tu dors très bien.', deltas: { mental: 2 }, ovas: 3 } },
+      { texte: 'Laisser passer.', issue: { recit: 'Tu refuses poliment. Deux ans plus tard, l’affaire a coulé, et tu dors très bien.', deltas: { mental: 2 }, ovas: 3 } },
     ],
   },
   {
@@ -590,7 +590,7 @@ export const SITUATIONS: Situation[] = [
     situation: 'Un « conseiller en patrimoine » vient au club une fois par mois. Trois coéquipiers ont déjà signé. Le rendement annoncé est de 14 % par an, garanti.',
     choix: [
       { texte: 'Signer comme les autres.', issue: { recit: 'Le fonds s’effondre au printemps. Le conseiller ne répond plus, et vous êtes onze au commissariat.', deltas: { argent: -35000, moral: -14 }, ovas: 1 } },
-      { texte: 'Demander l’avis d’un expert indépendant.', issue: { recit: 'Deux questions suffisent à faire tomber le montage. Tu préviens le vestiaire — trois gars te doivent une fière chandelle.', deltas: { moral: 6, reputation: 3 }, ovas: 5, coach: 3 } },
+      { texte: 'Demander l’avis d’un expert indépendant.', issue: { recit: 'Deux questions suffisent à faire tomber le montage. Tu préviens le vestiaire, trois gars te doivent une fière chandelle.', deltas: { moral: 6, reputation: 3 }, ovas: 5, coach: 3 } },
       { texte: 'Mettre une petite somme, pour voir.', issue: { recit: 'Tu perds ce que tu avais mis, pas plus. La leçon coûte le prix d’une montre.', deltas: { argent: -6000, mental: 2 }, ovas: 3 } },
     ],
   },
@@ -602,7 +602,7 @@ export const SITUATIONS: Situation[] = [
     choix: [
       { texte: 'Se lancer, à fond.', issue: { recit: 'Rupture de stock en dix jours. Tu passes tes lundis à faire des cartons, et tu adores ça.', deltas: { argent: 12000, moral: 8, reputation: 5 }, ovas: 7, fans: 8 } },
       { texte: 'Prêter ton nom, sans t’en occuper.', issue: { recit: 'La collection sort, la qualité est médiocre, et c’est ton nom qui est dessus.', deltas: { argent: 6000, reputation: -5 }, ovas: 3, fans: -4 } },
-      { texte: 'Attendre d’avoir un vrai palmarès.', issue: { recit: 'Tu remets à plus tard. Le projet t’attendra — ou pas.', deltas: { mental: 1 }, ovas: 2 } },
+      { texte: 'Attendre d’avoir un vrai palmarès.', issue: { recit: 'Tu remets à plus tard. Le projet t’attendra, ou pas.', deltas: { mental: 1 }, ovas: 2 } },
     ],
   },
   {
@@ -625,7 +625,7 @@ export const SITUATIONS: Situation[] = [
     choix: [
       { texte: 'S’inscrire et tenir le rythme.', issue: { recit: 'Les six premiers mois sont durs, puis ça devient une habitude. Tu as un plan B, et ça change ta façon de jouer.', deltas: { mental: 5, forme: -4, moral: 6 }, ovas: 6 } },
       { texte: 'S’inscrire, puis abandonner.', issue: { recit: 'Tu tiens deux mois. Le dossier reste dans un tiroir, et le doute avec.', deltas: { moral: -5 }, ovas: 2 } },
-      { texte: 'Refuser : le rugby d’abord.', issue: { recit: 'Tu mets tout dans le terrain. C’est un choix — il a un prix, et tu le connais.', deltas: { forme: 5, mental: -1 }, ovas: 3, coach: 3 } },
+      { texte: 'Refuser : le rugby d’abord.', issue: { recit: 'Tu mets tout dans le terrain. C’est un choix, il a un prix, et tu le connais.', deltas: { forme: 5, mental: -1 }, ovas: 3, coach: 3 } },
     ],
   },
   {
@@ -634,7 +634,7 @@ export const SITUATIONS: Situation[] = [
     titre: 'Le brevet d’entraîneur',
     situation: 'La fédération ouvre une session de formation d’entraîneur. Trois week-ends par an, et une place à prendre à la fin de ta carrière.',
     choix: [
-      { texte: 'S’inscrire pendant que tu joues encore.', issue: { recit: 'Tu passes tes week-ends de trêve en salle de classe. Le staff te regarde autrement — et te confie les jeunes le mercredi.', deltas: { mental: 4, moral: 5 }, ovas: 6, coach: 7 } },
+      { texte: 'S’inscrire pendant que tu joues encore.', issue: { recit: 'Tu passes tes week-ends de trêve en salle de classe. Le staff te regarde autrement, et te confie les jeunes le mercredi.', deltas: { mental: 4, moral: 5 }, ovas: 6, coach: 7 } },
       { texte: 'Attendre la fin de carrière.', issue: { recit: 'Tu remets à plus tard. Les places, elles, ne t’attendront pas.', deltas: {}, ovas: 2 } },
     ],
   },
@@ -656,7 +656,7 @@ export const SITUATIONS: Situation[] = [
     titre: 'Une convocation en équipe de jeunes',
     situation: 'Le sélectionneur national des moins de 20 ans t’appelle pour un stage. Ton club, lui, joue un match capital le même week-end.',
     choix: [
-      { texte: 'Partir en stage.', issue: { recit: 'Trois jours au centre national, entouré des meilleurs de ta génération. Ton club perd — et te le fait sentir.', deltas: { reputation: 10, mental: 3, moral: 6 }, ovas: 7, coach: -5 } },
+      { texte: 'Partir en stage.', issue: { recit: 'Trois jours au centre national, entouré des meilleurs de ta génération. Ton club perd, et te le fait sentir.', deltas: { reputation: 10, mental: 3, moral: 6 }, ovas: 7, coach: -5 } },
       { texte: 'Rester avec ton club.', issue: { recit: 'Tu joues, le club gagne, le vestiaire n’oubliera pas. Le sélectionneur, lui, appellera quelqu’un d’autre.', deltas: { moral: 4, reputation: -2 }, ovas: 4, coach: 9 } },
     ],
   },
@@ -674,7 +674,7 @@ export const SITUATIONS: Situation[] = [
     id: 'retour-de-blessure', emoji: '🩹', categorie: 'corps', poids: 0.7,
     quand: (j) => j.forme <= 60,
     titre: 'Le genou n’est pas prêt',
-    situation: 'Le kiné dit trois semaines. Le coach dit qu’il a besoin de toi samedi. Le genou, lui, ne dit rien — mais tu le sens à chaque appui.',
+    situation: 'Le kiné dit trois semaines. Le coach dit qu’il a besoin de toi samedi. Le genou, lui, ne dit rien, mais tu le sens à chaque appui.',
     choix: [
       { texte: 'Écouter le kiné.', issue: { recit: 'Trois semaines de plus, et un genou qui tient. Le coach râle, ton corps te remercie.', deltas: { forme: 12, mental: 2 }, ovas: 5, coach: -3 } },
       { texte: 'Jouer infiltré.', issue: { recit: 'Tu joues, tu tiens soixante minutes. Et tu paies le mois suivant, au double.', deltas: { forme: -18, moral: 4, reputation: 3 }, ovas: 3, coach: 7 } },
@@ -687,16 +687,16 @@ export const SITUATIONS: Situation[] = [
     titre: 'Le gamin qui joue à ton poste',
     situation: 'Il a dix ans de moins que toi, il court plus vite, et le staff ne parle plus que de lui. Il vient te demander des conseils.',
     choix: [
-      { texte: 'Tout lui apprendre.', issue: { recit: 'Tu lui donnes tout ce que tu sais. Il te pique ta place en février — et te remercie publiquement en mai.', deltas: { moral: 5, mental: 3, reputation: 5 }, ovas: 6, coach: 8, fans: 6 } },
+      { texte: 'Tout lui apprendre.', issue: { recit: 'Tu lui donnes tout ce que tu sais. Il te pique ta place en février, et te remercie publiquement en mai.', deltas: { moral: 5, mental: 3, reputation: 5 }, ovas: 6, coach: 8, fans: 6 } },
       { texte: 'Le laisser se débrouiller.', issue: { recit: 'Tu gardes tes secrets. Il progresse quand même, et le vestiaire remarque ton silence.', deltas: { moral: -3 }, ovas: 2, coach: -4 } },
-      { texte: 'Lui montrer qu’il n’est pas prêt.', issue: { recit: 'Tu le passes à la moulinette à l’entraînement. Il apprend dans la douleur — et il apprend vite.', deltas: { mental: 2, forme: -3 }, ovas: 4, coach: 2 } },
+      { texte: 'Lui montrer qu’il n’est pas prêt.', issue: { recit: 'Tu le passes à la moulinette à l’entraînement. Il apprend dans la douleur, et il apprend vite.', deltas: { mental: 2, forme: -3 }, ovas: 4, coach: 2 } },
     ],
   },
   {
     id: 'derniere-saison', emoji: '🕯️', categorie: 'carriere', poids: 0.5,
     quand: (j) => j.age >= 33,
     titre: 'Une dernière saison ?',
-    situation: 'Le corps encaisse moins bien, la récupération prend trois jours. Le club te propose une année de plus — avec un rôle de doublure et un salaire réduit.',
+    situation: 'Le corps encaisse moins bien, la récupération prend trois jours. Le club te propose une année de plus, avec un rôle de doublure et un salaire réduit.',
     choix: [
       { texte: 'Signer, pour le vestiaire.', issue: { recit: 'Tu joues moins, tu portes plus. La saison est belle, autrement.', deltas: { argent: -4000, moral: 8, mental: 3 }, ovas: 6, coach: 8 } },
       { texte: 'Refuser et chercher un dernier vrai contrat.', issue: { recit: 'Tu veux jouer, pas accompagner. Le marché te dira si tu as raison.', deltas: { mental: 2, moral: -2 }, ovas: 4, marche: true } },

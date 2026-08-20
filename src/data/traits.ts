@@ -46,7 +46,7 @@ export interface Trait {
 export const TRAITS: Trait[] = [
   {
     id: 'professionnel', nom: 'Professionnel', emoji: '🧊',
-    desc: 'Hygiène irréprochable, premier au réveil musculaire. Tu progresses plus vite et tu récupères mieux — mais tu n’as pas le grain de folie.',
+    desc: 'Hygiène irréprochable, premier au réveil musculaire. Tu progresses plus vite et tu récupères mieux, mais tu n’as pas le grain de folie.',
     progression: 1.2, formeParSemaine: 2, noteGrosMatch: -0.2,
   },
   {
@@ -81,7 +81,7 @@ export const TRAITS: Trait[] = [
     // ET coûte quelque chose — sinon ce serait un bonus déguisé ». Repéré par
     // `scripts/verifTraits.ts`, qui refuse désormais un trait sans coût.
     // Le prix choisi colle à la fiction : on passe son temps sur les autres.
-    desc: 'On t’écoute avant même que tu parles. Le brassard te tend les bras — mais tu passes plus de temps à porter le groupe qu’à travailler pour toi.',
+    desc: 'On t’écoute avant même que tu parles. Le brassard te tend les bras, mais tu passes plus de temps à porter le groupe qu’à travailler pour toi.',
     leadership: 5, vestiaire: 2, moralParSemaine: 1, progression: 0.94,
   },
   {
@@ -91,12 +91,12 @@ export const TRAITS: Trait[] = [
   },
   {
     id: 'ambitieux', nom: 'Ambitieux', emoji: '📈',
-    desc: 'Ton agent a ton numéro en favori. Les clubs te suivent — le tien s’en méfie un peu.',
+    desc: 'Ton agent a ton numéro en favori. Les clubs te suivent, le tien s’en méfie un peu.',
     offres: 1.6, vestiaire: -1, moralParSemaine: -1,
   },
   {
     id: 'fidele', nom: 'Fidèle au maillot', emoji: '💚',
-    desc: 'Un club, une histoire. Tu es chez toi, et ça se voit sur le terrain — le marché s’intéresse moins à toi.',
+    desc: 'Un club, une histoire. Tu es chez toi, et ça se voit sur le terrain, le marché s’intéresse moins à toi.',
     noteMatch: 0.25, moralParSemaine: 1, offres: 0.6,
   },
   {
@@ -128,7 +128,7 @@ export const TRAITS: Trait[] = [
   },
   {
     id: 'cerveau', nom: 'Cerveau du jeu', emoji: '🧠', prix: 170,
-    desc: 'Tu lis une attaque trois temps à l’avance. Encore faut-il aller au contact pour en profiter — et ton corps le paie.',
+    desc: 'Tu lis une attaque trois temps à l’avance. Encore faut-il aller au contact pour en profiter, et ton corps le paie.',
     noteMatch: 0.45, risqueBlessure: 1.3, formeParSemaine: -1,
   },
   {
@@ -143,7 +143,7 @@ export const TRAITS: Trait[] = [
   },
   {
     id: 'tete_brulee', nom: 'Tête brûlée', emoji: '💣', prix: 160,
-    desc: 'Les soirs de finale, tu es injouable. Les autres soirs, tu joues avec le feu — et l’arbitre a un carnet.',
+    desc: 'Les soirs de finale, tu es injouable. Les autres soirs, tu joues avec le feu, et l’arbitre a un carnet.',
     noteGrosMatch: 1.1, cartons: 2.8, moralParSemaine: -1,
   },
   {
@@ -168,7 +168,7 @@ export const TRAITS: Trait[] = [
   },
   {
     id: 'muraille', nom: 'Muraille', emoji: '🧱', prix: 160,
-    desc: 'Rien ne passe. Ta défense fait mal — parfois d’un demi-mètre trop haut, et l’arbitre le voit.',
+    desc: 'Rien ne passe. Ta défense fait mal, parfois d’un demi-mètre trop haut, et l’arbitre le voit.',
     noteMatch: 0.4, cartons: 1.7,
   },
   {
@@ -178,7 +178,7 @@ export const TRAITS: Trait[] = [
   },
   {
     id: 'increvable', nom: 'Increvable', emoji: '🫁', prix: 130,
-    desc: 'Tu enchaînes les matchs sans jamais tirer la langue. Tu t’entraînes moins dur, aussi — tu n’en as jamais eu besoin.',
+    desc: 'Tu enchaînes les matchs sans jamais tirer la langue. Tu t’entraînes moins dur, aussi, tu n’en as jamais eu besoin.',
     formeParSemaine: 4, progression: 0.88,
   },
 ];

@@ -400,7 +400,7 @@ export function Classement() {
           </p>
           <p className="aide">
             Aucune carrière n'a encore été menée à son terme sur cet appareil.
-            Joue, raccroche les crampons — et ton nom s'inscrira ici le premier.
+            Joue, raccroche les crampons, et ton nom s'inscrira ici le premier.
           </p>
         </div>
       ) : (

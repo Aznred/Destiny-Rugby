@@ -58,7 +58,7 @@ export function Pantheon() {
           onClick={() => setVitrine({ nom: joueur.nom, palmares: monPalmares })}
         >
           {t('arm.ouvrir')}
-          <em>{t('arm.maCarriere')} — {t('arm.total', { n: monPalmares.length, distincts: new Set(monPalmares.map((p) => p.trophee)).size })}</em>
+          <em>{t('arm.maCarriere')} : {t('arm.total', { n: monPalmares.length, distincts: new Set(monPalmares.map((p) => p.trophee)).size })}</em>
         </button>
       )}
 

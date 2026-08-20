@@ -69,7 +69,7 @@ export const DROP = [
 ];
 
 export const PENALITE = [
-  'Pénalité pour {club} — {motif}.',
+  'Pénalité pour {club} : {motif}.',
   'Coup de sifflet : {motif}. Pénalité pour {club}.',
   'M. l’arbitre siffle {motif}, pénalité {club}.',
 ];
@@ -97,7 +97,7 @@ export const PLAQUAGE = [
 
 export const FRANCHISSEMENT = [
   '{nom} est dans l’intervalle, il est lancé !',
-  'Cadrage-débordement de {nom} — la ligne est franchie !',
+  'Cadrage-débordement de {nom}, la ligne est franchie !',
   '{nom} casse le premier rideau, il y a de l’espace !',
   'Quelle accélération de {nom}, il est passé !',
 ];
@@ -110,7 +110,7 @@ export const RUCK_GRATTAGE = [
 
 export const EN_AVANT = [
   'En-avant de {nom}, mêlée pour {club}.',
-  'Le ballon échappe à {nom} — en-avant.',
+  'Le ballon échappe à {nom}, en-avant.',
   'Ballon perdu par {nom}, l’arbitre siffle l’en-avant.',
 ];
 
@@ -127,7 +127,7 @@ export const PIED_OCCUPATION = [
 ];
 
 export const PIED_CHANDELLE = [
-  'Chandelle de {nom} — les avants montent dessus !',
+  'Chandelle de {nom}, les avants montent dessus !',
   '{nom} envoie un ballon haut, la course est lancée.',
   'Box kick de {nom}, contestable.',
 ];
@@ -180,11 +180,11 @@ export const MAUL = [
 
 export const MAUL_ESSAI = [
   'ESSAI au terme du ballon porté ! {nom} pose le ballon.',
-  'Le maul enfonce tout — ESSAI de {nom} !',
+  'Le maul enfonce tout : ESSAI de {nom} !',
 ];
 
 export const CARTON = [
-  'CARTON JAUNE pour {nom} — {motif}. {club} à quatorze pour dix minutes.',
+  'CARTON JAUNE pour {nom} : {motif}. {club} à quatorze pour dix minutes.',
   'L’arbitre sort le jaune : {nom} quitte le terrain dix minutes.',
 ];
 
@@ -225,7 +225,7 @@ export const PERCUSSION = [
 export const ECARTEMENT = [
   'Le ballon voyage… {nom} le reçoit au large !',
   'Ça écarte vite, {nom} est servi à l’aile !',
-  'Surnombre au large — le ballon file jusqu’à {nom} !',
+  'Surnombre au large, le ballon file jusqu’à {nom} !',
 ];
 
 const ID_PAR_POOL = new Map<string[], IdPoolCommentaire>([

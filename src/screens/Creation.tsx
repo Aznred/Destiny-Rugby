@@ -228,7 +228,7 @@ export function Creation() {
           <label>
             {t('cr.traits')}{' '}
             <span style={{ fontWeight: 400, color: 'var(--brume)', fontSize: '0.85rem' }}>
-              — {t('cr.traitsAide', { max: MAX_TRAITS, choisis: traits.length })}
+              : {t('cr.traitsAide', { max: MAX_TRAITS, choisis: traits.length })}
             </span>
           </label>
           <div className="traits-grille">

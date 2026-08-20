@@ -142,7 +142,7 @@ export const SCENARIOS: Scenario[] = [
         texte: 'Partir pour le grand club.',
         // `marche` : le club ne change pas ici, il change quand tu SIGNES.
         issue: {
-          recit: 'Tu dis oui à ton agent. Il décroche son téléphone, et les propositions arrivent — à toi de choisir.',
+          recit: 'Tu dis oui à ton agent. Il décroche son téléphone, et les propositions arrivent, à toi de choisir.',
           deltas: { reputation: 4, moral: 2 }, ovas: 25, marche: true,
         },
       },

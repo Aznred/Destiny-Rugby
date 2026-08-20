@@ -4900,7 +4900,7 @@ const BRUT: Record<string, string[]> = {
     'James ARSCOTT|4|24|51|55|28',
     'Titi NOFOAGATOTOA|3|22|49|54|4',
     'Nathaniel POLE|1|21|48|55|28',
-    'Sam HAINSWORTH–FA\'AOFO|3|22|48|54|28',
+    'Sam HAINSWORTH-FA\'AOFO|3|22|48|54|28',
     'Harvey CORDUKES|2|20|47|56|4',
     'Rico SIMPSON|5|21|47|55|28',
   ],

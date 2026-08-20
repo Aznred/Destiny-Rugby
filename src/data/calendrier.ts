@@ -139,13 +139,13 @@ function construire(): Semaine[] {
   ajouter(29, 11, 'championnat', 'Journée de championnat');
   // --- Décembre : coupes d'Europe ---
   ajouter(6, 12, 'championnat', 'Journée de championnat');
-  ajouter(13, 12, 'coupe', 'Coupe d’Europe — 1re journée');
-  ajouter(20, 12, 'coupe', 'Coupe d’Europe — 2e journée');
+  ajouter(13, 12, 'coupe', 'Coupe d’Europe : 1re journée');
+  ajouter(20, 12, 'coupe', 'Coupe d’Europe : 2e journée');
   ajouter(27, 12, 'championnat', 'Journée des fêtes');
   // --- Janvier ---
   ajouter(3, 1, 'championnat', 'Journée de championnat');
-  ajouter(10, 1, 'coupe', 'Coupe d’Europe — 3e journée');
-  ajouter(17, 1, 'coupe', 'Coupe d’Europe — 4e journée');
+  ajouter(10, 1, 'coupe', 'Coupe d’Europe : 3e journée');
+  ajouter(17, 1, 'coupe', 'Coupe d’Europe : 4e journée');
   ajouter(24, 1, 'championnat', 'Journée de championnat');
   ajouter(31, 1, 'championnat', 'Journée de championnat');
   // --- Février / mars : Tournoi des 6 Nations ---
@@ -155,18 +155,18 @@ function construire(): Semaine[] {
   ajouter(28, 2, 'international', 'Tournoi des 6 Nations', { competitionInternationale: 'sixNations' });
   ajouter(7, 3, 'championnat', 'Journée de championnat');
   ajouter(14, 3, 'international', 'Tournoi des 6 Nations', { competitionInternationale: 'sixNations' });
-  ajouter(21, 3, 'international', 'Tournoi des 6 Nations — Super Samedi', {
+  ajouter(21, 3, 'international', 'Tournoi des 6 Nations : Super Samedi', {
     competitionInternationale: 'sixNations', finale: true,
   });
   ajouter(28, 3, 'championnat', 'Journée de championnat');
   // --- Avril : sprint final + phases finales européennes ---
   ajouter(4, 4, 'championnat', 'Journée de championnat');
-  ajouter(11, 4, 'coupe', 'Coupe d’Europe — huitièmes');
+  ajouter(11, 4, 'coupe', 'Coupe d’Europe, huitièmes');
   ajouter(18, 4, 'championnat', 'Journée de championnat');
-  ajouter(25, 4, 'coupe', 'Coupe d’Europe — quarts');
+  ajouter(25, 4, 'coupe', 'Coupe d’Europe, quarts');
   // --- Mai ---
   ajouter(2, 5, 'championnat', 'Journée de championnat');
-  ajouter(9, 5, 'coupe', 'Coupe d’Europe — demi-finales');
+  ajouter(9, 5, 'coupe', 'Coupe d’Europe, demi-finales');
   ajouter(16, 5, 'championnat', 'Journée de championnat');
   ajouter(23, 5, 'coupe', 'Finale de la Coupe d’Europe', { finale: true });
   ajouter(30, 5, 'championnat', 'Dernière journée');
@@ -178,7 +178,7 @@ function construire(): Semaine[] {
   // la division reçoit le finaliste malheureux de la division du dessous.
   ajouter(27, 6, 'phaseFinale', 'Match d’accès', { tourFinal: 'acces' });
   ajouter(4, 7, 'international', 'Matchs amicaux d’été', { competitionInternationale: 'amicaux' });
-  ajouter(11, 7, 'treve', 'Intersaison — repos et mercato');
+  ajouter(11, 7, 'treve', 'Intersaison, repos et mercato');
 
   return semaines;
 }

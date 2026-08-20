@@ -158,7 +158,7 @@ export function calendrier(clubs: string[], cle?: string): [string, string][][] 
       [liste[i], liste[k]] = [liste[k], liste[i]];
     }
   }
-  if (liste.length % 2) liste.push('—'); // exempt
+  if (liste.length % 2) liste.push('-'); // exempt
   const n = liste.length;
   const aller: [string, string][][] = [];
   for (let tour = 0; tour < n - 1; tour++) {
@@ -166,7 +166,7 @@ export function calendrier(clubs: string[], cle?: string): [string, string][][] 
     for (let i = 0; i < n / 2; i++) {
       const a = liste[i];
       const b = liste[n - 1 - i];
-      if (a !== '—' && b !== '—') journee.push(tour % 2 ? [b, a] : [a, b]);
+      if (a !== '-' && b !== '-') journee.push(tour % 2 ? [b, a] : [a, b]);
     }
     aller.push(journee);
     // rotation : le premier reste, les autres tournent

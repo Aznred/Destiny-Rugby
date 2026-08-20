@@ -80,7 +80,7 @@ function decor(j: Joueur, suivis: CompteSuivi[]): string {
 // resserrées sans rien perdre de ce qui compte : le ton débridé voulu par le
 // projet, et la seule limite non négociable.
 const REGLES = `Tu écris « L'Ovale », un réseau social de rugby calqué sur X, en FRANÇAIS.
-Ton : celui des vrais comptes rugby — phrases courtes, emojis mesurés, fautes de frappe chez les supporters.
+Ton : celui des vrais comptes rugby, phrases courtes, emojis mesurés, fautes de frappe chez les supporters.
 DÉBRIDÉ : un supporter en colère insulte franchement, un hater est méchant et personnel, un joueur
 chambré répond du tac au tac. Si le joueur humain agresse quelqu'un, ON LUI RÉPOND sèchement.
 Punchlines, rumeurs et règlements de comptes publics sont permis.
@@ -133,7 +133,7 @@ Format EXACT :
 - "image" : mots-clés en anglais, UNE publication sur cinq au maximum, et jamais sous un supporter
   qui râle. Sans image, omets le champ.
 - "action" : au maximum UNE par salve. "transfert" déplace VRAIMENT un joueur NON-HUMAIN entre deux
-  clubs du contexte — reste crédible. N'annonce JAMAIS de transfert de ${j.nom}.` },
+  clubs du contexte, reste crédible. N'annonce JAMAIS de transfert de ${j.nom}.` },
     { role: 'user', content: `${decor(j, ctx.suivis)}
 
 Actualité : ${sujets.slice(0, 4).join(' · ') || 'vie ordinaire du club'}.

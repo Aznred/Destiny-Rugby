@@ -435,7 +435,7 @@ const AMATEURS: Competition[] = [
   { id: 'fed3', nom: 'Fédérale 3', pays: 'France', drapeaux: ['fr'], emoji: '🏉', niveau: 7, zone: 'France', clubs: FEDERALE3 },
   { id: 'reg1', nom: 'Régionale 1', pays: 'France', drapeaux: ['fr'], emoji: '🥉', niveau: 8, zone: 'France', clubs: regionale('reg1'), note: 'Le premier échelon régional : le vrai rugby du dimanche.' },
   { id: 'reg2', nom: 'Régionale 2', pays: 'France', drapeaux: ['fr'], emoji: '🥉', niveau: 9, zone: 'France', clubs: regionale('reg2') },
-  { id: 'reg3', nom: 'Régionale 3', pays: 'France', drapeaux: ['fr'], emoji: '🥉', niveau: 10, zone: 'France', clubs: regionale('reg3'), note: 'Tout en bas de la pyramide — c\'est ici que naissent les légendes.' },
+  { id: 'reg3', nom: 'Régionale 3', pays: 'France', drapeaux: ['fr'], emoji: '🥉', niveau: 10, zone: 'France', clubs: regionale('reg3'), note: 'Tout en bas de la pyramide, c\'est ici que naissent les légendes.' },
 ];
 
 // ---------- LE RESTE DU MONDE (sources/competitions/ligues/) ----------

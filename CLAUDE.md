@@ -4914,3 +4914,128 @@ PUB_SLOT=1234567890 node scripts/genPages.cjs   # les pages AVEC le code AdSense
 npx vite-node scripts/verifTraductions.ts       # 1 605 clés, 100 % dans les 7 langues
 npx vite-node scripts/verifEcrans.ts            # robustesse du Hall et du Classement
 ```
+
+---
+
+## ✂️ PLUS UN SEUL TIRET CADRATIN DANS LE JEU
+
+Demande : « enlève tous les tirets bizarres du jeu ». Les « — » ont été
+remplacés partout où le JOUEUR les lit : **763 dans les chaînes**, 19 dans le
+texte JSX, 41 dans les pages de contenu et la coquille HTML. Vérifié à
+l’écran : `document.body.innerText` n’en contient plus aucun.
+
+⚠️ **LES COMMENTAIRES DU CODE N’ONT PAS ÉTÉ TOUCHÉS**, et c’est délibéré : sur
+les 1 707 tirets de `src/`, la grande majorité vit dans la documentation du
+projet, que personne ne lit en jeu. Un `sed` global aurait réécrit tout le
+raisonnement de ce fichier pour rien.
+
+**`scripts/tirets.cjs`** fait le travail, et il reste dans le dépôt pour la
+prochaine fois :
+
+```bash
+node scripts/tirets.cjs            # inventaire, rien n’est écrit
+node scripts/tirets.cjs --ecrire   # applique
+```
+
+Il embarque un petit lexeur (code · commentaire · chaîne · gabarit) parce
+qu’il n’y a pas d’autre façon de ne réécrire que le texte. Quatre règles, et
+chacune vient d’un cas trouvé à la relecture du diff :
+
+| Cas | Devient | Pourquoi |
+|---|---|---|
+| segment qui n’est QU’un tiret | `-` | `${a} – ${b}` est un score, pas une phrase. Avec une virgule, 34-11 devenait « 34, 11 ». |
+| en début de ligne | rien | tiret décoratif de liste |
+| devant une valeur | ` : ` | « À débloquer en boutique : 140 Ovas » |
+| en fin de segment | ` : ` | il annonce l’interpolation qui suit : « Séance réussie : +5 de plaquage » |
+| partout ailleurs | `, ` | il relie deux propositions |
+
+⚠️ **DEUX LANGUES NE SE PONCTUENT PAS COMME LE FRANÇAIS**, et l’ignorer donnait
+des résultats faux :
+
+- en **allemand**, tous les noms communs portent une majuscule. La règle
+  « majuscule à droite → deux-points » y tirait au hasard : « lass die KI über
+  deine Karriere urteilen — Spiel für Spiel » devenait « … urteilen : Spiel für
+  Spiel » au lieu d’une virgule ;
+- en **japonais**, le tiret long s’écrit DOUBLE et SANS espaces (« 裁く——試合 »).
+  Aucune règle à espaces ne l’attrapait et le repli en faisait « -- ». La
+  ponctuation correcte est la virgule idéographique, « 、 ».
+
+La langue se lit sur le code qui précède la chaîne (`de: '…'`, `ja: '…'`).
+⚠️ Le segmenteur pousse le guillemet OUVRANT dans ce segment : sans l’accepter,
+la détection ne matchait jamais et les sept langues passaient pour du français.
+
+Un garde-fou compare chaque fichier réécrit à l’original **débarrassé des
+tirets, de la ponctuation ajoutée et des espaces** : si un seul autre caractère
+bouge, le fichier est laissé tel quel. C’est ce qui a signalé les trois
+premières versions ratées du lexeur.
+
+---
+
+## 🎬 LE TRAILER VERTICAL — tourné EN JOUANT
+
+Demande : « fais un trailer du jeu, joue vraiment au jeu, fais une démo pour
+TikTok et Insta ». Le fichier : **`trailer/destiny-rugby-trailer.mp4`**,
+1080 × 1920, 31 s, 3,3 Mo, H.264 yuv420p, sans son.
+
+⚠️ **AUCUNE IMAGE N’EST MISE EN SCÈNE.** Un Chrome local est piloté
+(`puppeteer-core`, aucun navigateur téléchargé) sur le serveur de dev : on crée
+une carrière, on joue le match, et on photographie ce qui se passe. Le match du
+trailer est un vrai match du moteur : Pierrefeucain 29-26 Loudun, quatre essais
+partout, 211 rucks, note 10/10.
+
+Trois obstacles, et chacun a changé le tournage :
+
+1. **Partir en Top 14 mettait le joueur sur le BANC.** Un débutant noté 34 n’y
+   est pas titulaire : beau terrain, aucune manette. On part donc de la
+   Régionale 3, qui est de toute façon le vrai point de départ du jeu.
+2. **`estTitulaire` est DÉTERMINISTE** (graine = club + nom + journée) : selon le
+   nom, on commence ou pas. Le script fait donc une passe de **repérage sans
+   photo** qui essaie des noms jusqu’à en trouver un qui débute, puis rejoue la
+   carrière avec ce nom-là. Même graine, même moteur, même match.
+3. **Une bagarre met le match en pause** et attend un ordre : le chrono restait
+   bloqué à la 1ʳᵉ minute. C’est aussi l’une des plus belles séquences du jeu,
+   donc on la photographie AVANT d’y répondre. Même chose pour le tiroir, qui
+   met en pause sans se relancer tout seul quand on le referme.
+
+Les cinq cartons-titres sont **rendus dans le navigateur**, avec Anton et la
+palette du jeu : un `drawtext` d’ffmpeg aurait juré avec le reste.
+
+⚠️ **PAS DE MUSIQUE.** Une piste sous licence n’a rien à faire dans un dépôt, et
+TikTok comme Instagram veulent de toute façon qu’on choisisse le son dans leur
+bibliothèque : c’est aussi ce qui pousse la vidéo. Le montage est cadencé pour
+ça — coupes franches, 31 s, l’accroche dans les deux premières secondes.
+
+Les scripts de tournage vivent dans le dossier de travail de la session, pas
+dans le dépôt : ils dépendent de `puppeteer-core`, d’un Chrome local et du
+serveur de dev, et n’ont pas leur place dans les dépendances du jeu.
+
+### La deuxième version : humour noir, Top 14, joueur boosté
+
+**`trailer/destiny-rugby-trailer-noir.mp4`** (1080 × 1920, 32 s). Stade
+Toulousain, coup de poing à la 1ʳᵉ minute, 12 semaines de suspension, puis le
+clash sur 𝕏 L’Ovale et ses réponses.
+
+⚠️ **UNE SEULE CHOSE EST TRUQUÉE, ET ELLE EST DEMANDÉE** : le joueur est BOOSTÉ.
+Ses attributs sont écrits à 93 dans la sauvegarde avant le coup d’envoi, pour
+qu’il soit titulaire en Top 14. Le reste tourne normalement : le match finit
+15-29, note 10/10, trois essais, 454 mètres, et la commission tombe pour de vrai.
+
+⚠️ **CHAMBRER NE SERT À RIEN EN TOP 14**, et c’est le moteur qui le dit :
+`chanceDeRiposte` vaut 1,2 % chez les pros contre 22 % en amateur. Quarante
+chambrages, zéro bagarre. Pour la séquence, il faut FRAPPER (touche N) : quinze
+échauffourées, un carton, et 12 semaines de suspension à l’arrivée. La mécanique
+documentée se vérifie donc à la caméra.
+
+⚠️ **ON NE MONTRE AUCUN JOUEUR RÉEL SUR 𝕏 L’OVALE.** L’annuaire donne un compte
+aux joueurs réels de la division (Mauvaka, Aldegheri, Willis…) avec des posts
+générés. En jeu c’est le décor ; dans un clip public, une capture se lit comme
+une **fausse citation attribuée à quelqu’un de réel**. Les plans du fil sont donc
+recadrés sur les comptes FICTIFS (supporters, haters, médias inventés) et sur le
+post du joueur incarné. Les noms réels ne restent que là où ils sont factuels :
+la feuille de match.
+
+⚠️ **LA LIGNE DE L’HUMOUR EST CELLE DU PROJET**, pas une règle ajoutée : la
+section L’Ovale autorise « l’insulte, le mépris, la punchline et le règlement de
+comptes public » et interdit « rien de discriminatoire, pas de menace de violence
+réelle, rien de sexuel ». Les cartons tapent sur le joueur incarné et sur le
+sport, jamais sur une personne réelle ni sur un groupe.

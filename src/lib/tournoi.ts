@@ -113,7 +113,7 @@ export function tournoiDeFinDAnnee(
         a, b, saison,
         `tournoi#${divisionId}#${saison}#${taille}#${a}#${b}`,
         finale ? 'finale' : taille === 4 ? 'demie' : taille === 8 ? 'quart' : 'barrage',
-        `${finale ? 'FINALE' : libelleTour} : ${a} – ${b}`,
+        `${finale ? 'FINALE' : libelleTour} : ${a} - ${b}`,
         finale ? 0 : 3,
       );
       matchs.push(m);

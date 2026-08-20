@@ -133,10 +133,10 @@ export function nombre(n: number): string {
 export function consigneDeLangue(l: Langue = courante): string {
   const langue = LANGUES.find((x) => x.id === l) ?? LANGUES[0];
   if (l === 'fr') return '';
-  return `\n\nIMPORTANT — LANGUAGE: write EVERY piece of text you output in `
+  return `\n\nIMPORTANT : LANGUAGE: write EVERY piece of text you output in `
     + `${langue.enAnglais} (${langue.nom}), and nothing else. This includes the `
     + `narrative, the event titles, the choices, the tweets and the replies. `
-    + `Keep club names, competition names and player names EXACTLY as given — `
+    + `Keep club names, competition names and player names EXACTLY as given : `
     + `they are proper nouns and must never be translated. The JSON keys stay in `
     + `English/French as specified in the format above.`;
 }

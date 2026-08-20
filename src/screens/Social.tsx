@@ -291,7 +291,7 @@ function Post({
           {post.media?.url && <Media media={post.media} legende={post.texte} />}
           {post.action?.type === 'transfert' && post.action.joueur && (
             <div className="x-annonce">
-              🔁 <b>{post.action.joueur}</b> — {post.action.de} → {post.action.vers}
+              🔁 <b>{post.action.joueur}</b> : {post.action.de} → {post.action.vers}
               <span>{t('ov.transfertApplique')}</span>
             </div>
           )}
@@ -628,8 +628,8 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
                     : <span style={{ fontSize: 26 }}>{brouillon.avatar}</span>}
               </span>
               <div>
-                <b>{brouillon.nomAffiche || '—'}</b>
-                <i>@{brouillon.pseudo || '—'}</i>
+                <b>{brouillon.nomAffiche || '-'}</b>
+                <i>@{brouillon.pseudo || '-'}</i>
                 <p>{brouillon.bio || t('ov.aucuneBio')}</p>
               </div>
             </div>
@@ -767,7 +767,7 @@ function PanneauSucces() {
             <div key={d.id} className={`x-defi${fait ? ' fait' : ''}`}>
               <span className="x-defi-emoji">{d.emoji}</span>
               <span className="x-defi-texte">{texteDefi(d.id, d.texte)}</span>
-              <span className="x-defi-gain">{fait ? '✅' : paye > 0 ? `+${paye} 🪙` : '—'}</span>
+              <span className="x-defi-gain">{fait ? '✅' : paye > 0 ? `+${paye} 🪙` : '-'}</span>
             </div>
           );
         })}
@@ -816,7 +816,7 @@ function Negociation({ pseudo }: { pseudo: string }) {
   if (accord) {
     return (
       <div className="x-nego x-nego-accord">
-        🤝 <b>{t('ov.accordTrouve')}</b> — {resumerTermes(accord.offre)}.
+        🤝 <b>{t('ov.accordTrouve')}</b> : {resumerTermes(accord.offre)}.
         <span>{t('ov.accordIntersaison')}</span>
       </div>
     );

@@ -105,7 +105,7 @@ export function ReglageTouches() {
                   ? t('reg.touchesEcoute')
                   : a.code
                     ? <kbd>{a.libelle || libelleDeCode(a.code)}</kbd>
-                    : <span className="touche-vide">—</span>}
+                    : <span className="touche-vide">-</span>}
               </button>
             </div>
           );

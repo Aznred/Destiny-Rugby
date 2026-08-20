@@ -180,7 +180,7 @@ export const COMPETITIONS_REELLES: Competition[] = [
     ],
   },
   {
-    id: 'japon1', nom: 'Japan Rugby League One — D1', pays: 'Japon',
+    id: 'japon1', nom: 'Japan Rugby League One : D1', pays: 'Japon',
     drapeaux: ['jp'], emoji: '🌏',
     niveau: 0, zone: 'Monde',
     clubs: [
@@ -199,7 +199,7 @@ export const COMPETITIONS_REELLES: Competition[] = [
     ],
   },
   {
-    id: 'japon2', nom: 'Japan Rugby League One — D2', pays: 'Japon',
+    id: 'japon2', nom: 'Japan Rugby League One : D2', pays: 'Japon',
     drapeaux: ['jp'], emoji: '🌏',
     niveau: 0, zone: 'Monde',
     clubs: [
@@ -214,7 +214,7 @@ export const COMPETITIONS_REELLES: Competition[] = [
     ],
   },
   {
-    id: 'japon3', nom: 'Japan Rugby League One — D3', pays: 'Japon',
+    id: 'japon3', nom: 'Japan Rugby League One : D3', pays: 'Japon',
     drapeaux: ['jp'], emoji: '🌏',
     niveau: 0, zone: 'Monde',
     clubs: [

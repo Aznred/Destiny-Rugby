@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Comment un match de rugby est simulé, joueur par joueur — Destiny Rugby</title>
+  <title>Comment un match de rugby est simulé, joueur par joueur · Destiny Rugby</title>
   <meta name="description" content="Trente joueurs, sept pas de simulation par seconde, en mètres réels : le fonctionnement du moteur de match de Destiny Rugby et son étalonnage chiffré." />
   <link rel="canonical" href="https://destiny-rugby.fr/moteur/" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
@@ -65,10 +65,10 @@
         </ol>
       </nav>
       <h2 id="metres">Tout est en mètres</h2>
-      <p>Le moteur raisonne dans les dimensions réelles : 100 mètres de jeu, deux en-buts de 11 mètres, 70 mètres de large. C'est ce qui permet d'écrire les règles telles qu'elles sont — « le 50/22 vise les 22 adverses », « la ligne de hors-jeu est au dernier pied » — au lieu de les approximer en pixels. L'affichage convertit en pixels ; jamais l'inverse.</p>
+      <p>Le moteur raisonne dans les dimensions réelles : 100 mètres de jeu, deux en-buts de 11 mètres, 70 mètres de large. C'est ce qui permet d'écrire les règles telles qu'elles sont : « le 50/22 vise les 22 adverses », « la ligne de hors-jeu est au dernier pied », au lieu de les approximer en pixels. L'affichage convertit en pixels ; jamais l'inverse.</p>
       <p>Chaque joueur a une position, un <strong>vecteur vitesse</strong> et une accélération bornée. Il ne se téléporte pas vers sa cible : un ailier lancé décrit une courbe, un pilier met deux secondes à se mettre en route. La simulation avance par pas fixes de 0,15 seconde, soit près de sept fois par seconde de jeu.</p>
       <h2 id="lancement">Le lancement de jeu fait circuler le ballon</h2>
-      <p>À chaque libération de ballon, une combinaison est choisie, et elle contient la <strong>chaîne de passes</strong> : 9 → 10 → 12 → 13 → ailier. C'est elle qui fait voyager le ballon, et son absence était le défaut majeur de la première version du moteur — chaque porteur cherchait son voisin le plus proche, et la balle tournait sur trois mètres.</p>
+      <p>À chaque libération de ballon, une combinaison est choisie, et elle contient la <strong>chaîne de passes</strong> : 9 → 10 → 12 → 13 → ailier. C'est elle qui fait voyager le ballon, et son absence était le défaut majeur de la première version du moteur, chaque porteur cherchait son voisin le plus proche, et la balle tournait sur trois mètres.</p>
       <div class="tableau-large">
       <table>
         <thead><tr><th>Combinaison</th><th>Chaîne</th><th>Part des phases</th></tr></thead>
@@ -83,12 +83,12 @@
       </div>
       <p>Le percuteur tourne : parmi les quatre avants les plus proches et hors du ruck, c'est celui qui a le moins porté qui part. Prendre « l'avant le plus proche » revenait à toujours désigner les mêmes, et les piliers finissaient le match à zéro mètre.</p>
       <h2 id="defense">La défense monte en deux rideaux</h2>
-      <p>Douze joueurs à plat, espacés d'environ 4,5 mètres, appariés à leurs cibles <strong>par ordre de largeur</strong> — sans ça ils se croisent et le rideau se noue. Derrière, l'arrière couvre le fond entre 11 et 30 mètres selon la menace, l'ailier du côté fermé fait le pendule, et le demi de mêlée tient la sentinelle.</p>
+      <p>Douze joueurs à plat, espacés d'environ 4,5 mètres, appariés à leurs cibles <strong>par ordre de largeur</strong>, sans ça ils se croisent et le rideau se noue. Derrière, l'arrière couvre le fond entre 11 et 30 mètres selon la menace, l'ailier du côté fermé fait le pendule, et le demi de mêlée tient la sentinelle.</p>
       <p>Deux chasseurs, trois au maximum, montent sur le porteur. Tout le reste tient sa place. Le second rideau ne bouge que si la ligne est <strong>vraiment</strong> franchie, mesurée sur les positions réelles : sans cette règle, les quinze joueurs couraient après le ballon. Résultat mesuré : 1,4 défenseur à moins de six mètres du porteur, contre quinze avant correction.</p>
       <p>Trois systèmes s'alternent selon la situation : <strong>montante</strong> (blitz, 4,4 m/s, parapluie vers l'extérieur), <strong>glissée</strong> (tout le rideau décalé de 3,4 mètres vers la touche, on pousse dehors), <strong>repli</strong> (on couvre le jeu au pied).</p>
       <h2 id="score">Le score reste celui de la ligue</h2>
-      <p>C'est la contrainte qui structure tout le reste. Le score final vient du même calcul que pour les autres rencontres de la journée — c'est lui qui alimente le classement, les montées et les coupes. On ne peut pas laisser le moteur inventer un 248-207.</p>
-      <p>Il est donc décomposé à l'avance en événements plausibles — essais transformés, essais secs, pénalités — puis le moteur joue librement en suivant un échéancier. Le réglage est <strong>asymétrique</strong> : une équipe en retard sur son plan trouve un peu d'espace, une équipe en avance se heurte à un mur. À partir de la soixantième minute, l'écart pèse deux fois plus lourd.</p>
+      <p>C'est la contrainte qui structure tout le reste. Le score final vient du même calcul que pour les autres rencontres de la journée, c'est lui qui alimente le classement, les montées et les coupes. On ne peut pas laisser le moteur inventer un 248-207.</p>
+      <p>Il est donc décomposé à l'avance en événements plausibles, essais transformés, essais secs, pénalités, puis le moteur joue librement en suivant un échéancier. Le réglage est <strong>asymétrique</strong> : une équipe en retard sur son plan trouve un peu d'espace, une équipe en avance se heurte à un mur. À partir de la soixantième minute, l'écart pèse deux fois plus lourd.</p>
       <aside class="encadre"><p>Vérifié sur trente matchs : zéro écart entre le score du moteur et celui de la ligue. Le joueur change comment on marque, jamais combien.</p></aside>
       <h2 id="etalonnage">L'étalonnage, en chiffres</h2>
       <p>Chaque valeur est mesurée automatiquement et comparée à la fourchette du rugby professionnel.</p>
@@ -111,9 +111,9 @@
       </div>
       <p>Le ballon circule : <strong>44 joueurs sur 46 le touchent</strong>, aucun maillot à zéro. Le demi de mêlée en porte 31 %, l'ouvreur 21 %, les avants 20 % à eux huit, le trio arrière 11 %.</p>
       <h2 id="controle">Prendre la main sur son joueur</h2>
-      <p>On peut piloter son propre pion. Pas au joystick sur les trente — seulement le sien, avec des <strong>intentions de rugbyman</strong> que le moteur joue avec ses propres règles : plaquer, gratter, crocheter, raffuter, réclamer le ballon, passer à gauche ou à droite, taper.</p>
-      <p>Deux principes rendent ça jouable. D'abord, une intention est <strong>armée, pas instantanée</strong> : « je plaque » ne veut rien dire quand le porteur est à quinze mètres, alors l'ordre reste valable quelques secondes puis expire. Ensuite, chaque geste <strong>coûte</strong> — de l'endurance à la demande, et un geste raté coûte plus qu'il ne rapporte : un plaquage lancé et manqué laisse un trou de trois secondes.</p>
-      <p>Chaque action porte aussi un temps de recharge. Sans lui, mesuré au banc d'essai : un joueur qui réclame le ballon dès que possible finissait à <strong>soixante ballons portés</strong> — un troisième ligne en porte douze.</p>
+      <p>On peut piloter son propre pion. Pas au joystick sur les trente, seulement le sien, avec des <strong>intentions de rugbyman</strong> que le moteur joue avec ses propres règles : plaquer, gratter, crocheter, raffuter, réclamer le ballon, passer à gauche ou à droite, taper.</p>
+      <p>Deux principes rendent ça jouable. D'abord, une intention est <strong>armée, pas instantanée</strong> : « je plaque » ne veut rien dire quand le porteur est à quinze mètres, alors l'ordre reste valable quelques secondes puis expire. Ensuite, chaque geste <strong>coûte</strong>, de l'endurance à la demande, et un geste raté coûte plus qu'il ne rapporte : un plaquage lancé et manqué laisse un trou de trois secondes.</p>
+      <p>Chaque action porte aussi un temps de recharge. Sans lui, mesuré au banc d'essai : un joueur qui réclame le ballon dès que possible finissait à <strong>soixante ballons portés</strong>, un troisième ligne en porte douze.</p>
       <h2 id="temps">Le temps du match n'est pas linéaire</h2>
       <p>Un match contient environ 35 minutes de ballon vivant sur 80. L'horloge défile donc beaucoup plus vite pendant les arrêts : une mêlée se met en place en cinq secondes à l'écran et avale cinquante secondes au chronomètre.</p>
       <p>Quand on pilote, le jeu file à neuf fois la vitesse réelle tant qu'il ne se passe rien pour toi, et <strong>retombe en temps réel</strong> dès qu'un ballon arrive sur toi ou qu'un porteur te fonce dessus. Mesuré : 24 % du match joué au ralenti, et un match complet en <strong>onze minutes de manette</strong>.</p>
@@ -130,7 +130,7 @@
   </main>
 
   <footer class="pied">
-    <p><a href="/">Destiny Rugby</a> — jeu de rôle de carrière de rugby, gratuit et en français.</p>
+    <p><a href="/">Destiny Rugby</a> : jeu de rôle de carrière de rugby, gratuit et en français.</p>
     <p class="pied-note">Les noms de clubs, de compétitions et de joueurs appartiennent à leurs détenteurs respectifs. Ce site n'est affilié à aucune ligue ni fédération.</p>
   </footer>
 </body>

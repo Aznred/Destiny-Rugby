@@ -171,7 +171,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         </div>
         <div
           className="badge-generale"
-          title={`${t('pj.generale')}${joueur.potentiel ? ` — ${t('pj.potentiel', { note: joueur.potentiel })}` : ''}`}
+          title={`${t('pj.generale')}${joueur.potentiel ? ` - ${t('pj.potentiel', { note: joueur.potentiel })}` : ''}`}
         >
           <b>{generale}</b>
           <span aria-hidden="true">OVR</span>
@@ -422,7 +422,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       {finDeCarriere && (
         <div className="champ pj-reconversion">
           <label htmlFor="reconversion">
-            {t('pj.apresCarriere')} {joueur.age >= AGE_RETRAITE_FORCEE && `— ${t('pj.derniereSaison')}`}
+            {t('pj.apresCarriere')} {joueur.age >= AGE_RETRAITE_FORCEE && `- ${t('pj.derniereSaison')}`}
           </label>
           <select
             id="reconversion"

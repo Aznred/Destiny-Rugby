@@ -93,7 +93,7 @@ export const NATIONS = NATIONS_PAR_ZONE.flatMap((g) => g.nations);
 
 export const CLUBS_DEPART = [
   'Espoirs du club',
-  'Fédérale 2 — village natal',
+  'Fédérale 2, village natal',
   'Académie régionale',
   'Centre de formation pro',
 ];

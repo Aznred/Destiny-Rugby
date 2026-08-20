@@ -433,7 +433,7 @@ export function coupeEnDirect(
         const finale = tour.length === 2;
         const m = duel(
           d, e, saison, cle(nomsTours[etape], d, e), nomsTours[etape],
-          `${libelles[etape]} : ${d} – ${e}`,
+          `${libelles[etape]} : ${d} - ${e}`,
           // Terrain neutre pour la finale, avantage au mieux classé sinon.
           finale ? 0 : undefined,
         );

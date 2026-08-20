@@ -107,9 +107,9 @@ export function Carriere({ onReglages }: Props) {
         const evt = await genererEvenementHebdo({
           modele,
           joueur,
-          semaine: `${libelleDate(sem)} — ${sem.libelle}`,
+          semaine: `${libelleDate(sem)} - ${sem.libelle}`,
           contexte: derniere
-            ? `${derniere.titre ?? ''} — ${derniere.texte}`.slice(0, 240)
+            ? `${derniere.titre ?? ''} - ${derniere.texte}`.slice(0, 240)
             : undefined,
           dejaVus: evenementsVus,
         });

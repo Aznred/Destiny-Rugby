@@ -108,7 +108,7 @@ export function FeuilleMatch({
   return (
     <div className="ml-fil ml-feuille">
       <div className="ml-resume">
-        <span>🏉 {stats.essaisA} – {stats.essaisB} {t('ml.essais')}</span>
+        <span>🏉 {stats.essaisA} - {stats.essaisB} {t('ml.essais')}</span>
         <span>🔒 {e.compteurs.rucks} {t('ml.rucks')}</span>
         <span>🙌 {e.compteurs.touches} {t('ml.touches')}</span>
         <span>🌀 {e.compteurs.melees} {t('ml.melees')}</span>
@@ -132,7 +132,7 @@ export function FeuilleMatch({
             })}</p>
           )}
           {stats.discipline.blessure && (
-            <p>🚑 {stats.discipline.blessure.nom} — {t('ml.sanction.semaines', {
+            <p>🚑 {stats.discipline.blessure.nom} : {t('ml.sanction.semaines', {
               n: stats.discipline.blessure.semaines,
             })}</p>
           )}
@@ -149,7 +149,7 @@ export function FeuilleMatch({
       {maNote && (
         <details className="ml-ma-note" open>
           <summary>
-            ⭐ {t('ml.maNote')} — <b>{maNote.note}/10</b>
+            ⭐ {t('ml.maNote')} : <b>{maNote.note}/10</b>
             <span> · {t('ml.noteExplication')}</span>
           </summary>
           <div className="ml-note-detail">
@@ -201,7 +201,7 @@ export function FeuilleMatch({
                 <span className="ml-bilan-nom">{j.nom}</span>
                 {colonnes.map((c) => {
                   const v = c.valeur(j.stats);
-                  return <span key={c.cle}>{v ? Math.round(v * 10) / 10 : '–'}</span>;
+                  return <span key={c.cle}>{v ? Math.round(v * 10) / 10 : '-'}</span>;
                 })}
                 <span>{j.minutes}′</span>
               </div>
