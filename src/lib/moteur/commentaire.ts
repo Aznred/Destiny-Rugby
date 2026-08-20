@@ -74,9 +74,18 @@ export const PENALITE = [
   'M. l’arbitre siffle {motif}, pénalité {club}.',
 ];
 
+// ⚠️ CETTE LISTE EST UNE TABLE DE TRADUCTION, PAS UN POOL DE TIRAGE. Les motifs
+// sont choisis par le moteur (`siffler`) puis retrouvés ICI PAR LEUR INDEX dans
+// la langue du joueur (`motifLocalise`). Ajouter un motif oblige donc à
+// l'ajouter AU MÊME RANG dans les sept tableaux `motif` de
+// `data/commentairesMatch.ts` — sinon une pénalité s'annonce avec le libellé
+// d'une autre.
 export const MOTIFS_PENALITE = [
   'hors-jeu', 'plaquage haut', 'ballon tenu au sol', 'plaqueur qui ne se relève pas',
   'entrée par le côté au ruck', 'faute technique en mêlée', 'obstruction',
+  // Les motifs de discipline (moteur/bagarre.ts) : ils passent par la même
+  // table, ce qui leur donne les sept langues sans mécanique de plus.
+  'coup de poing', 'bagarre générale', 'antijeu', 'coup de poing relevé sur les images',
 ];
 
 export const PLAQUAGE = [
@@ -221,6 +230,17 @@ function motifLocalise(motif: string, langue: ReturnType<typeof langueCourante>)
   if (langue === 'fr') return motif;
   const index = MOTIFS_PENALITE.indexOf(motif);
   return index >= 0 ? (POOLS_COMMENTAIRES[langue].motif[index] ?? motif) : motif;
+}
+
+/**
+ * Le motif d'une sanction dans la langue du joueur.
+ *
+ * Le moteur travaille en français (c'est sa langue source, comme tout le
+ * projet) ; l'écran de fin de match, lui, doit annoncer « punch » à un joueur
+ * anglais. Même table que les pénalités : une seule liste à tenir.
+ */
+export function motifTraduit(motif: string): string {
+  return motifLocalise(motif, langueCourante());
 }
 
 export function texteMatch(cle: CleCommentaireDirect, vars: Variables = {}): string {

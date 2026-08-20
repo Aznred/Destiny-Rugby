@@ -306,9 +306,13 @@ export function niveauDeFaute(texte: string): NiveauFaute | null {
   const t = texte.toLowerCase();
   if (ACTES_CRIMINELS.some((m) => t.includes(m))) return 'criminel';
   if (ACTES_GRAVES.some((m) => t.includes(m))) return 'grave';
-  if (lireDerapage(texte)) return 'grave';
-  const cible = CIBLES_CLUB.some((m) => t.includes(m));
-  if (cible && ACTES_HOSTILES.some((m) => t.includes(m))) return 'image';
+  // ⚠️ `lireDerapage` répond aussi « atteinteClub », et il ne faut SURTOUT pas
+  // la traiter comme une insulte raciste : traiter le président de voleur est
+  // une faute d'image (licenciement possible), pas une faute qui ouvre la
+  // radiation à vie. Sans cette distinction, les deux niveaux se confondaient.
+  const derapage = lireDerapage(texte);
+  if (derapage === 'atteinteClub') return 'image';
+  if (derapage) return 'grave';
   return null;
 }
 

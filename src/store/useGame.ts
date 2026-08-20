@@ -85,7 +85,7 @@ import {
 } from '../lib/moteur/apresMatch';
 import { plafonnerDeltas, ressembleATriche } from '../lib/mj';
 import {
-  MODELE_DEFAUT, definirCleGroqJoueur, erreurSilencieuse, iaDisponible,
+  MODELE_DEFAUT, MODELES_GROQ, definirCleGroqJoueur, erreurSilencieuse, iaDisponible,
 } from '../lib/groq';
 import { EVENEMENTS, traduireEvenement } from '../data/evenements';
 import { situationPour, versScenario, type ConsequenceDure } from '../data/situations';
@@ -466,6 +466,20 @@ export function palmaresDepuisLibelles(titres: string[]): TitreGagne[] {
   return sortie;
 }
 
+/**
+ * L'ardoise disciplinaire d'un match, telle que le moteur la rend
+ * (`BilanMatch.discipline`). On la recopie ici plutôt que d'importer le type du
+ * moteur : le store est chargé dès l'accueil, le moteur ne l'est qu'à
+ * l'ouverture d'un match — et c'est ce qui garde ses 3 500 lignes hors du
+ * chunk principal (voir la note sur `moteur/titulaire.ts`).
+ */
+export interface SanctionDeMatch {
+  citation: { semaines: number; motif: string } | null;
+  blessure: { nom: string; semaines: number } | null;
+  jaunes: number;
+  rouges: number;
+}
+
 interface GameState {
   ecran: Ecran;
   joueur: Joueur | null;
@@ -488,6 +502,18 @@ interface GameState {
    * visite est exactement ce qui fait fuir. Persisté avec le reste.
    */
   tutoVu: boolean;
+  /**
+   * La notice de la manette de match a déjà été vue.
+   *
+   * ⚠️ ELLE EST SÉPARÉE DE `tutoVu`, et ce n'est pas de la coquetterie : le
+   * tutoriel d'accueil explique le JEU (« tu es un joueur, pas un manager »),
+   * celui-ci explique les COMMANDES du direct — joystick à gauche, gros bouton
+   * à droite, ralenti sur tes moments. Quelqu'un qui a passé l'accueil il y a
+   * trois saisons découvre quand même la manette à son premier match piloté.
+   * Il s'affiche UNE FOIS et se referme au premier geste : un tutoriel qui
+   * revient est exactement ce qui fait fermer l'onglet.
+   */
+  tutoMatchVu: boolean;
   /** Compteur des pubs récompensées (quota journalier et délai d'attente). */
   pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
@@ -640,6 +666,14 @@ interface GameState {
   signalerDefi: (evenement: EvenementDefi) => void;
   /** Une blessure de gravité `carriere` arrête vraiment la carrière. */
   raccrocherSurBlessure: () => void;
+  /**
+   * ⚖️ CE QUE LA COMMISSION RETIENT DU MATCH. Appelée par `MatchLive` à la
+   * sirène, juste après `enregistrerMatchVecu` : carton rouge, coup de poing
+   * relevé sur les images, blessure prise dans une bagarre. C'est le seul
+   * chemin par lequel la discipline du terrain devient une conséquence de
+   * carrière (voir `lib/moteur/bagarre.ts`).
+   */
+  appliquerSanctionMatch: (sanction: SanctionDeMatch) => void;
   // Les VRAIES statistiques du match regardé en direct, versées dans la saison.
   // `contexte` porte le résultat de la rencontre : c'est lui qui permet à la
   // feuille de match d'être la SEULE entrée du journal pour ce week-end.
@@ -674,6 +708,7 @@ interface GameState {
   basculerEquipement: (id: string) => void;
   setPubConsentement: (choix: 'oui' | 'non') => void;
   setTutoVu: (vu: boolean) => void;
+  setTutoMatchVu: (vu: boolean) => void;
   /** Crédite la récompense d'une pub REGARDÉE JUSQU'AU BOUT. */
   encaisserPub: () => number;
   // ⚠️ `acheterBoost` a été supprimé : la boutique ne vend plus de bonus
@@ -693,6 +728,7 @@ export const useGame = create<GameState>()(
       equipementActif: {},
       pubConsentement: 'inconnu',
       tutoVu: false,
+      tutoMatchVu: false,
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
       scenarioActif: null,
@@ -3551,6 +3587,82 @@ export const useGame = create<GameState>()(
         get().prendreRetraite();
       },
 
+      // ═══ LA COMMISSION DE DISCIPLINE ════════════════════════════════════
+      // ⚠️ LE CARTON COÛTAIT DIX MINUTES ET RIEN D'AUTRE. Le moteur distribuait
+      // des rouges depuis longtemps ; ils finissaient dans une colonne de
+      // statistiques, et le joueur rejouait le week-end suivant comme si de
+      // rien n'était. Ce chemin-là est le pendant de `appliquerConsequence` du
+      // côté du terrain : ce qu'on fait sur le pré se paie dans la carrière.
+      //
+      // ⚠️ ON NE CUMULE PAS DEUX INDISPONIBILITÉS. `Joueur.blessure` est un
+      // champ unique — il porte aussi bien un ligament croisé qu'une suspension
+      // (voir `lib/consequences.ts`). Une main cassée à la 30ᵉ ET quinze
+      // semaines de suspension, ce n'est pas vingt et une semaines d'absence :
+      // c'est la plus longue des deux, l'autre se soignant pendant.
+      appliquerSanctionMatch: (sanction) => {
+        const joueur = get().joueur;
+        if (!joueur) return;
+        const { citation, blessure, rouges } = sanction;
+        if (!citation && !blessure && rouges === 0) return;
+
+        let j = joueur;
+        const entrees: { titre: string; texte: string }[] = [];
+
+        // 1. La blessure de bagarre, d'abord : la suspension pourra l'écraser.
+        if (blessure) {
+          const gravite: Blessure['gravite'] = blessure.semaines <= 3 ? 'legere'
+            : blessure.semaines <= 10 ? 'moyenne' : 'saison';
+          const b: Blessure = { nom: blessure.nom, gravite, semaines: blessure.semaines };
+          j = appliquerDeltas({ ...j, blessure: b }, deltasBlessure(b));
+          entrees.push({
+            titre: `🚑 ${blessure.nom}`,
+            texte: `Ramassée dans la bagarre. ${blessure.semaines} semaine${blessure.semaines > 1 ? 's' : ''} d’indisponibilité — `
+              + 'et une facture que personne n’avait prévue au budget.',
+          });
+        }
+
+        // 2. Un rouge sans citation coûte quand même la confiance du staff : on
+        //    ne finit pas un match à quatorze impunément.
+        if (rouges > 0 && !citation) {
+          j = {
+            ...j,
+            confianceCoach: Math.max(0, Math.min(100, (j.confianceCoach ?? 50) - 10)),
+            moral: Math.max(0, Math.min(100, j.moral - 6)),
+          };
+          entrees.push({
+            titre: '🟥 Carton rouge',
+            texte: 'Tu as laissé les tiens à quatorze. La commission n’a pas donné suite, '
+              + 'mais le staff, lui, a très bien retenu.',
+          });
+        }
+
+        // 3. La suspension. `appliquerConsequence` fait tout le reste — moral,
+        //    réputation, confiance du staff — exactement comme pour une issue
+        //    du Maître du Jeu.
+        if (citation) {
+          const restant = j.blessure && j.blessure.gravite !== 'carriere' ? j.blessure.semaines : 0;
+          const effet = appliquerConsequence(j, 'suspension', citation.motif, citation.semaines);
+          j = effet.joueur;
+          // La blessure éventuelle se soigne PENDANT la suspension : on garde
+          // la plus longue des deux indisponibilités, pas leur somme.
+          if (restant > citation.semaines && j.blessure) {
+            j = { ...j, blessure: { ...j.blessure, semaines: restant } };
+          }
+          entrees.push({ titre: `${effet.emoji} ${effet.titre}`, texte: effet.texte });
+        }
+
+        set((s) => ({
+          joueur: j,
+          journal: [...s.journal, ...entrees.map((entree) => ({
+            id: idUnique(),
+            saison: j.saison,
+            role: 'systeme' as const,
+            titre: entree.titre,
+            texte: entree.texte,
+          }))],
+        }));
+      },
+
       // ---- SIMULATION DE FOND DE LA JOURNÉE ----
       // Toutes les affiches de la poule sont rejouées par le MÊME moteur que le
       // match qu'on regarde, mais sans aucun rendu. Comme la graine est celle du
@@ -3805,6 +3917,7 @@ export const useGame = create<GameState>()(
       // le jeu ne redemande pas à chaque écran.
       setPubConsentement: (choix) => set({ pubConsentement: choix }),
       setTutoVu: (vu) => set({ tutoVu: vu }),
+      setTutoMatchVu: (vu) => set({ tutoMatchVu: vu }),
 
       /**
        * ⚠️ ELLE RAPPORTE DES OVAS, ET RIEN D'AUTRE. Pas un point d'attribut,
@@ -3873,6 +3986,7 @@ export const useGame = create<GameState>()(
           equipements?: string[];
           equipementActif?: Partial<Record<CategorieEquipement, string>>;
           tutoVu?: boolean;
+          tutoMatchVu?: boolean;
           pubConsentement?: 'inconnu' | 'oui' | 'non';
           pubs?: EtatPubs;
           modele?: string;
@@ -3976,6 +4090,12 @@ export const useGame = create<GameState>()(
         }
         s.iaActivee ??= true;
         s.groqKey ??= '';
+        // ⚠️ LES MODÈLES LLAMA ONT DISPARU DU CATALOGUE GROQ. Une sauvegarde
+        // faite avant la bascule garde leur nom : on repose le modèle par
+        // défaut dès que celui qui est enregistré ne fait plus partie de la
+        // cascade, plutôt que d'afficher dans ⚙️ Réglages le nom d'un modèle
+        // que plus personne ne sert.
+        if (!s.modele || !MODELES_GROQ.includes(s.modele)) s.modele = MODELE_DEFAUT;
         delete s.iaLocaleActivee;
         // Le vestiaire est arrivé après coup : une sauvegarde d'avant n'a ni
         // liste d'articles ni tenue portée.
@@ -4006,6 +4126,7 @@ export const useGame = create<GameState>()(
         }
         s.pubConsentement ??= 'inconnu';
         s.tutoVu ??= false;
+        s.tutoMatchVu ??= false;
         s.pubs ??= ETAT_PUBS_VIDE;
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
@@ -4040,6 +4161,7 @@ export const useGame = create<GameState>()(
         equipementActif: s.equipementActif,
         pubConsentement: s.pubConsentement,
         tutoVu: s.tutoVu,
+        tutoMatchVu: s.tutoMatchVu,
         pubs: s.pubs,
         pantheon: s.pantheon,
         scenarioActif: s.scenarioActif,

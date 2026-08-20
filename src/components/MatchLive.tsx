@@ -1,22 +1,49 @@
-// LE MATCH EN DIRECT — le moteur (lib/moteur/) rendu à l'écran.
+// LE MATCH EN DIRECT — le moteur (lib/moteur/) rendu à l'écran, et JOUABLE.
 //
-// L'écran ne raconte pas un score : il AFFICHE trente pions qui jouent
-// vraiment. Les pods se forment, la ligne défensive monte, le second rideau
-// couvre le fond, le ballon voyage jusqu'à l'aile.
+// ═══ CE QUI A ÉTÉ REFAIT, ET POURQUOI ════════════════════════════════════════
 //
-// ⚠️ TROIS CHOIX QUI FONT LA FLUIDITÉ
-// 1. AUCUNE TRANSITION CSS sur les pions. L'ancien rendu posait une transition
-//    de 0,55 s sur `transform` : chaque position affichée avait une demi-seconde
-//    de retard sur la simulation, et le mouvement « caoutchoutait ». Le moteur
-//    tourne à 60 images par seconde, il n'a besoin d'aucune aide.
-// 2. INTERPOLATION EXACTE. La simulation avance par pas fixes de 0,15 s, le
-//    rendu à 60 Hz : sans rien, les pions avanceraient par saccades de 7 Hz. On
-//    affiche donc `position + vitesse × reliquat` — le reliquat étant le temps
-//    déjà écoulé mais pas encore simulé. C'est exact, ça ne coûte rien, et ça
-//    ne retarde rien.
-// 3. LE TERRAIN EST DESSINÉ UNE FOIS (`useMemo`) et le fil de commentaire n'est
-//    reconstruit que lorsqu'une ligne s'ajoute. Seuls les 30 pions et le ballon
-//    sont recalculés à chaque image.
+// Retour de jeu, mot pour mot : « le système de jeu durant les matchs est
+// injouable et pas fun, et il faut que ça marche sur téléphone ». Le moteur
+// n'était pas en cause — il simule trente pions sept fois par seconde et son
+// étalonnage tient. C'était TOUT CE QUI SE TROUVE ENTRE LE MOTEUR ET LE POUCE.
+// Quatre défauts, et chacun suffisait à lui seul :
+//
+// 1. **AUCUNE CAMÉRA.** L'écran affichait les 122 × 70 m d'un seul tenant. Sur
+//    un téléphone de 375 px, un joueur fait 3 pixels : on ne trouve pas son
+//    propre pion, on ne voit pas qui arrive, on ne sait pas à qui on passe.
+//    → `lib/moteur/camera.ts` : une caméra qui suit, cadre à 46 m quand c'est à
+//      toi, et PIVOTE D'UN QUART DE TOUR en portrait pour qu'on attaque vers le
+//      haut de l'écran. On attaque toujours dans le même sens, camp A ou B.
+//
+// 2. **LE JEU TOURNAIT À CINQ FOIS LA VITESSE RÉELLE PENDANT QU'ON PILOTAIT.**
+//    L'ancienne vitesse « ×1 » valait `facteur: 5`. Un plaquage à contrer
+//    durait deux dixièmes de seconde à l'écran. Ce n'était pas exigeant,
+//    c'était impossible.
+//    → `lib/moteur/moments.ts` : le match file à ×9 tant qu'il ne se passe rien
+//      pour toi, et retombe en TEMPS RÉEL dès qu'un ballon arrive sur toi ou
+//      qu'un porteur te fonce dessus. Un match complet tient en cinq ou six
+//      minutes de manette, et on ne rate aucune de ses propres actions.
+//
+// 3. **LES COMMANDES ÉTAIENT SOUS LE TERRAIN.** Une barre de vignettes de 58 px
+//    qui DÉFILAIT HORIZONTALEMENT, deux cents pixels sous l'action : il fallait
+//    quitter le jeu des yeux, chercher le bon bouton, et le faire défiler.
+//    → Le HUD est POSÉ SUR LE TERRAIN : joystick flottant sous le pouce gauche,
+//      un gros bouton d'action contextuel sous le pouce droit, trois boutons
+//      secondaires en arc. Rien à chercher, rien à faire défiler.
+//
+// 4. **LE RESTE MANGEAIT L'ÉCRAN.** Notice des commandes, champ de consigne,
+//    fil de commentaire, six boutons de vitesse : sur 375 px, le terrain finissait
+//    en bandeau de 200 px sous une pile de panneaux.
+//    → Tout ce qui n'est pas le jeu part dans un tiroir (📜 fil, 📣 consigne,
+//      🕹️ commandes). Sur grand écran, le fil revient en colonne de droite.
+//
+// ⚠️ TROIS CHOIX TECHNIQUES QUI FONT LA FLUIDITÉ, ET QUI N'ONT PAS BOUGÉ
+// 1. AUCUNE TRANSITION CSS sur les pions : le moteur tourne à 60 images par
+//    seconde, une transition ne ferait qu'ajouter du retard.
+// 2. INTERPOLATION EXACTE : la simulation avance par pas fixes de 0,15 s, le
+//    rendu à 60 Hz. On affiche `position + vitesse × reliquat`.
+// 3. LE TERRAIN EST DESSINÉ UNE FOIS (`PelouseMemo`) ; seuls les trente pions,
+//    le ballon et le HUD sont recalculés à chaque image.
 //
 // ⚠️ `createPortal(document.body)` obligatoire : le `backdrop-filter` des
 // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
@@ -25,106 +52,41 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import {
-  appliquerConsigne, avancer, bilan, creerMatch, DT, type EtatMatch,
+  activerControle, appliquerConsigne, avancer, bilan, creerMatch, DT, ordonner,
+  type EtatMatch,
 } from '../lib/moteur/moteur';
-import type { Commentaire, TypeCommentaire } from '../lib/moteur/etat';
-import { LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, AXE } from '../lib/moteur/terrain';
+import {
+  ACTION_PAR_ID, actionPrincipale, actionsDisponibles, demanderAction, piloterDirection,
+  receveurPour, type DefinitionAction,
+} from '../lib/moteur/controle';
+import {
+  BOUTON_PAR_ACTION, LecteurEntrees, TOUCHES, TOUCHE_PAR_ACTION,
+} from '../lib/moteur/manette';
+import { ORDRES } from '../lib/moteur/bagarre';
+import type { Commentaire, NiveauMatch, TypeCommentaire } from '../lib/moteur/etat';
+import { competitionEffective } from '../lib/divisions';
+import { LARGEUR, LONGUEUR, borner, type Vec } from '../lib/moteur/terrain';
+import { Camera, COUVERTURE, angleDeVue, type Cadrage, type Vue } from '../lib/moteur/camera';
+import {
+  facteurTempo, momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
+} from '../lib/moteur/moments';
 import { estTitulaire } from '../lib/moteur/saison';
 import { CONSIGNE_NEUTRE, lireConsigneIA, lireConsigneLocale } from '../lib/moteur/consignes';
 import { iaDisponible } from '../lib/groq';
 import type { Pion } from '../lib/moteur/entites';
-import {
-  detailNote, noterMatch, type StatsMatchJoueur,
-} from '../lib/moteur/apresMatch';
+import { detailNote, noterMatch, type StatsMatchJoueur } from '../lib/moteur/apresMatch';
 import { graine, type MatchChampionnat } from '../lib/championnat';
 import { effectifDuClub } from '../lib/effectif';
 import { effectifNational } from '../lib/international';
 import { nomNation } from '../lib/nations';
 import { clubParNom } from '../data/clubs';
-import { POSTE_PAR_ID } from '../data/rugby';
 import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
+import { PelouseMemo } from './match/Pelouse';
+import { FeuilleMatch } from './match/FeuilleMatch';
 import type { Joueur } from '../types';
 import { t } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
-
-// ---------------------------------------------------------------------------
-// LA FEUILLE DE MATCH — TOUT CE QUE LE MOTEUR COMPTE
-// ---------------------------------------------------------------------------
-// ⚠️ Retour de jeu : « en match on a pas accès à tous les stats ». Le moteur
-// tient VINGT-TROIS compteurs par joueur (`StatsMatch`, moteur/entites.ts) et la
-// feuille n'en montrait que cinq — mètres, plaquages, essais, passes, minutes.
-// Autant dire que le match d'un avant était invisible : ni mêlée, ni touche, ni
-// pick and go, ni grattage.
-//
-// ⚠️ ET ON NE FAIT PAS UN TABLEAU DE VINGT-TROIS COLONNES. Sur un téléphone de
-// 375 px, c'est illisible, et sur ordinateur ça ne se lit pas mieux. On range
-// par FAMILLE — comme les classements de l'écran Résultats — et on bascule d'un
-// clic. Chaque colonne dit à quoi elle correspond au survol.
-interface ColonneFeuille {
-  cle: string;
-  entete: string;
-  titreCle: string;
-  valeur: (s: import('../lib/moteur/entites').StatsMatch) => number;
-}
-
-const VUES_FEUILLE: { id: string; nomCle: string; emoji: string; colonnes: ColonneFeuille[] }[] = [
-  {
-    id: 'general', nomCle: 'ml.vue.general', emoji: '📋',
-    colonnes: [
-      { cle: 'metres', entete: 'm', titreCle: 'ml.stat.metres', valeur: (s) => s.metres },
-      { cle: 'plaquages', entete: 'plq', titreCle: 'ml.stat.plaquages', valeur: (s) => s.plaquages },
-      { cle: 'essais', entete: 'ess', titreCle: 'ml.stat.essais', valeur: (s) => s.essais },
-      { cle: 'passes', entete: 'pas', titreCle: 'ml.stat.passes', valeur: (s) => s.passes },
-    ],
-  },
-  {
-    id: 'attaque', nomCle: 'ml.vue.attaque', emoji: '⚡',
-    colonnes: [
-      { cle: 'courses', entete: 'crs', titreCle: 'ml.stat.courses', valeur: (s) => s.courses },
-      { cle: 'franchissements', entete: 'frn', titreCle: 'ml.stat.franchissements', valeur: (s) => s.franchissements },
-      { cle: 'offloads', entete: 'off', titreCle: 'ml.stat.offloads', valeur: (s) => s.offloads },
-      { cle: 'passesDecisives', entete: 'p.d', titreCle: 'ml.stat.passesDecisives', valeur: (s) => s.passesDecisives },
-      { cle: 'passesRatees', entete: 'en-av', titreCle: 'ml.stat.passesRatees', valeur: (s) => s.passesRatees },
-    ],
-  },
-  {
-    id: 'defense', nomCle: 'ml.vue.defense', emoji: '🛡️',
-    colonnes: [
-      { cle: 'plaquages', entete: 'plq', titreCle: 'ml.stat.plaquages', valeur: (s) => s.plaquages },
-      { cle: 'plaquagesManques', entete: 'mqs', titreCle: 'ml.stat.plaquagesManques', valeur: (s) => s.plaquagesManques },
-      { cle: 'grattages', entete: 'grt', titreCle: 'ml.stat.grattages', valeur: (s) => s.grattages },
-      { cle: 'rucksNettoyes', entete: 'rck', titreCle: 'ml.stat.rucksNettoyes', valeur: (s) => s.rucksNettoyes },
-    ],
-  },
-  {
-    id: 'conquete', nomCle: 'ml.vue.conquete', emoji: '🌀',
-    colonnes: [
-      { cle: 'melees', entete: 'mêl', titreCle: 'ml.stat.melees', valeur: (s) => s.melees },
-      { cle: 'touchesGagnees', entete: 'tch', titreCle: 'ml.stat.touchesGagnees', valeur: (s) => s.touchesGagnees },
-      { cle: 'pickAndGo', entete: 'p&g', titreCle: 'ml.stat.pickAndGo', valeur: (s) => s.pickAndGo },
-    ],
-  },
-  {
-    id: 'pied', nomCle: 'ml.vue.pied', emoji: '🦵',
-    colonnes: [
-      { cle: 'coupsDePied', entete: 'cdp', titreCle: 'ml.stat.coupsDePied', valeur: (s) => s.coupsDePied },
-      { cle: 'metresAuPied', entete: 'm/p', titreCle: 'ml.stat.metresAuPied', valeur: (s) => s.metresAuPied },
-      { cle: 'cinquanteVingtDeux', entete: '50/22', titreCle: 'ml.stat.cinquanteVingtDeux', valeur: (s) => s.cinquanteVingtDeux },
-      { cle: 'buts', entete: 'buts', titreCle: 'ml.stat.buts', valeur: (s) => s.butsReussis },
-      { cle: 'butsTentes', entete: 'tent', titreCle: 'ml.stat.butsTentes', valeur: (s) => s.butsTentes },
-    ],
-  },
-  {
-    id: 'discipline', nomCle: 'ml.vue.discipline', emoji: '🟨',
-    colonnes: [
-      { cle: 'cartonsJaunes', entete: '🟨', titreCle: 'ml.stat.cartonsJaunes', valeur: (s) => s.cartonsJaunes },
-      { cle: 'cartonsRouges', entete: '🟥', titreCle: 'ml.stat.cartonsRouges', valeur: (s) => s.cartonsRouges },
-      { cle: 'plaquagesManques', entete: 'mqs', titreCle: 'ml.stat.plaquagesManques', valeur: (s) => s.plaquagesManques },
-      { cle: 'distance', entete: 'km', titreCle: 'ml.stat.distance', valeur: (s) => s.distanceParcourue / 1000 },
-    ],
-  },
-];
 
 /**
  * La feuille du joueur incarné, au format attendu par le barème.
@@ -160,21 +122,6 @@ function statsPourLaNote(p: Pion): StatsMatchJoueur {
   };
 }
 
-// ⚠️ L'ÉCHELLE DE TEMPS EST DOUBLE, et c'est ce qui rend le direct regardable.
-//
-// L'ACTION se joue à ×5 : on suit les courses sans que ça saute. Mais un match
-// ne contient que ~35 minutes de ballon vivant — le reste, ce sont des mêlées
-// qui se forment et des transformations. Le moteur fait donc défiler l'horloge
-// beaucoup plus vite pendant les arrêts de jeu (une mêlée : 5 secondes à
-// l'écran, 50 secondes au chrono). Résultat : ~7 minutes réelles pour 80
-// minutes de rugby, dont presque tout en ballon vivant.
-const VITESSES = [
-  { label: '×1', facteur: 5 },
-  { label: '×2', facteur: 10 },
-  { label: '×4', facteur: 20 },
-  { label: '⏭️', facteur: 600 },
-];
-
 function couleursDe(nom: string): [string, string] {
   const club = clubParNom(nom);
   if (club) return [club.c1, club.c2];
@@ -200,62 +147,10 @@ const CLE_SYSTEME: Record<string, string> = {
   blitz: 'ml.systeme.blitz', glissee: 'ml.systeme.glissee', repli: 'ml.systeme.repli',
 };
 
-// ---------------------------------------------------------------------------
-// LE TERRAIN — dessiné une seule fois
-// ---------------------------------------------------------------------------
-function Terrain() {
-  return (
-    <>
-      <defs>
-        <linearGradient id="ml-pelouse" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#1c5a37" />
-          <stop offset="0.5" stopColor="#164a2c" />
-          <stop offset="1" stopColor="#0f3a22" />
-        </linearGradient>
-        <radialGradient id="ml-lumiere" cx="0.5" cy="0.42" r="0.72">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0.10" />
-          <stop offset="1" stopColor="#000000" stopOpacity="0.18" />
-        </radialGradient>
-      </defs>
-      <rect width={LONGUEUR} height={LARGEUR} fill="url(#ml-pelouse)" />
-      {/* Bandes de tonte, dans le sens de la longueur */}
-      {Array.from({ length: 10 }, (_, i) => (
-        <rect key={i} x="0" y={(i * LARGEUR) / 10} width={LONGUEUR} height={LARGEUR / 10}
-          fill={i % 2 ? 'rgba(255,255,255,.035)' : 'transparent'} />
-      ))}
-      {/* En-buts */}
-      <rect x="0" y="0" width={LIGNE_A} height={LARGEUR} fill="rgba(0,0,0,.28)" />
-      <rect x={LIGNE_B} y="0" width={LIGNE_A} height={LARGEUR} fill="rgba(0,0,0,.28)" />
-      {/* Lignes pleines : essai, 22, médiane */}
-      {[LIGNE_A, M22_A, MILIEU, M22_B, LIGNE_B].map((x) => (
-        <line key={x} x1={x} y1="0" x2={x} y2={LARGEUR}
-          stroke="rgba(255,255,255,.58)" strokeWidth={x === MILIEU ? 0.5 : 0.4} />
-      ))}
-      {/* Les 10 mètres, en pointillés */}
-      {[MILIEU - 10, MILIEU + 10].map((x) => (
-        <line key={x} x1={x} y1="0" x2={x} y2={LARGEUR} stroke="rgba(255,255,255,.32)"
-          strokeWidth="0.3" strokeDasharray="1.6 2.4" />
-      ))}
-      {/* Pointillés des 5 m et 15 m */}
-      {[5, 15, LARGEUR - 15, LARGEUR - 5].map((y) => (
-        <line key={y} x1={LIGNE_A} y1={y} x2={LIGNE_B} y2={y} stroke="rgba(255,255,255,.15)"
-          strokeWidth="0.22" strokeDasharray="1 4" />
-      ))}
-      <rect x="0.2" y="0.2" width={LONGUEUR - 0.4} height={LARGEUR - 0.4}
-        fill="none" stroke="rgba(255,255,255,.42)" strokeWidth="0.35" />
-      {/* Poteaux en H, sur la ligne d'en-but */}
-      {[LIGNE_A, LIGNE_B].map((x) => (
-        <g key={x} stroke="#f6f2e6" strokeWidth="0.55" fill="none">
-          <line x1={x} y1={AXE - 2.8} x2={x} y2={AXE - 9.5} />
-          <line x1={x} y1={AXE + 2.8} x2={x} y2={AXE + 9.5} />
-          <line x1={x} y1={AXE - 2.8} x2={x} y2={AXE + 2.8} strokeWidth="0.75" />
-        </g>
-      ))}
-      <rect width={LONGUEUR} height={LARGEUR} fill="url(#ml-lumiere)" pointerEvents="none" />
-    </>
-  );
-}
-const TerrainMemo = memo(Terrain);
+/** Déflexion maximale du joystick, en PIXELS d'écran. */
+const RAYON_STICK = 46;
+/** Au-delà de cette fraction de déflexion, on sprinte. */
+const SEUIL_SPRINT = 0.86;
 
 // ---------------------------------------------------------------------------
 // LE FIL DE COMMENTAIRE — reconstruit seulement quand une ligne s'ajoute
@@ -281,6 +176,44 @@ const Fil = memo(function Fil({ lignes }: { lignes: Commentaire[]; n: number }) 
   );
 });
 
+/**
+ * Professionnel ou amateur ?
+ *
+ * ⚠️ LA COUPURE EST À LA NATIONALE 2 (niveau 4), et elle n'est pas cosmétique :
+ * c'est elle qui dit si une provocation part en bagarre une fois sur trois ou
+ * une fois sur vingt-cinq, et si un coup de poing coûte trois dimanches ou une
+ * demi-saison. Au-dessus — Top 14, Pro D2, Nationale et tous les championnats
+ * étrangers (niveau 0) — on est en professionnel.
+ */
+function niveauDuMatch(joueur: Joueur | null | undefined, selection?: boolean): NiveauMatch {
+  if (!joueur || selection) return 'pro';
+  const niveau = competitionEffective(joueur.club, joueur.division)?.niveau ?? 0;
+  return niveau >= 4 ? 'amateur' : 'pro';
+}
+
+/** Écran large : le fil peut vivre en colonne plutôt que dans le tiroir. */
+function useLarge(): boolean {
+  const [large, setLarge] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 980px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 980px)');
+    const ecouter = () => setLarge(mq.matches);
+    mq.addEventListener('change', ecouter);
+    return () => mq.removeEventListener('change', ecouter);
+  }, []);
+  return large;
+}
+
+/** Une vibration courte, si le téléphone en a une. Silencieuse partout ailleurs. */
+function vibrer(ms: number): void {
+  try {
+    navigator.vibrate?.(ms);
+  } catch {
+    // Certains navigateurs exposent l'API et la refusent : ce n'est pas une erreur.
+  }
+}
+
 // ---------------------------------------------------------------------------
 export function MatchLive({
   match, saison, cle, titre, onFermer, onTermine, joueur, selection,
@@ -299,8 +232,12 @@ export function MatchLive({
   joueur?: Joueur | null;
 }) {
   const iaActivee = useGame((s) => s.iaActivee);
+  const tutoMatchVu = useGame((s) => s.tutoMatchVu);
+  const setTutoMatchVu = useGame((s) => s.setTutoMatchVu);
   const enregistrerMatchVecu = useGame((s) => s.enregistrerMatchVecu);
+  const appliquerSanctionMatch = useGame((s) => s.appliquerSanctionMatch);
   const { overlayRef, dialogRef } = useModalDialog(onFermer);
+  const large = useLarge();
 
   // Le moteur vit dans une ref : c'est un objet muté sept fois par seconde de
   // jeu, le passer par l'état de React ferait des centaines de rendus.
@@ -325,17 +262,79 @@ export function MatchLive({
             titulaire: selection ? true : estTitulaire(joueur, cle),
           }
         : undefined,
+      // ⚠️ LE NIVEAU DÉCIDE DE TOUTE LA DISCIPLINE : cartons plus fréquents et
+      // bagarres faciles en amateur, arbitrage feutré mais commission
+      // impitoyable chez les professionnels (voir `moteur/bagarre.ts`).
+      { niveau: niveauDuMatch(joueur, selection), controle: true },
     );
   }
   const e = moteur.current;
+  const monPion = e.pions.find((p) => p.moi);
 
   const [, redessiner] = useState(0);
   const [enPause, setEnPause] = useState(false);
-  const [vitesse, setVitesse] = useState(0);
+  // ⚠️ « JOUER » OU « REGARDER » EST LE PREMIER CHOIX DE L'ÉCRAN, et il
+  // commande tout le reste : la caméra, le tempo, et la présence du HUD. On
+  // démarre en JOUER dès qu'on a un pion — c'est le match du joueur, pas une
+  // rediffusion.
+  const [mode, setMode] = useState<'jouer' | 'regarder'>(monPion ? 'jouer' : 'regarder');
+  const [tempo, setTempo] = useState<Tempo>(monPion ? 'moments' : 'suivre');
+  const [tiroir, setTiroir] = useState<null | 'fil' | 'consigne' | 'commandes'>(null);
+  const [disciplineOuverte, setDisciplineOuverte] = useState(false);
   const [consigneTexte, setConsigneTexte] = useState('');
   const [envoiConsigne, setEnvoiConsigne] = useState(false);
+
   const filRef = useRef<HTMLDivElement>(null);
   const dernierTemps = useRef<number>(0);
+  // Les commandes vivent dans une ref : elles sont lues soixante fois par
+  // seconde et ne doivent JAMAIS provoquer de rendu par elles-mêmes.
+  const lecteur = useRef(new LecteurEntrees());
+  const manetteVue = useRef(false);
+  const sceneRef = useRef<HTMLDivElement>(null);
+  /** Les dimensions du terrain à l'écran, tenues par un ResizeObserver. */
+  const boite = useRef({ largeur: 1, hauteur: 1 });
+  const camera = useRef(new Camera());
+  const vueRef = useRef<Vue | null>(null);
+  /** Le joystick : origine et déflexion courante, en PIXELS d'écran. */
+  const pouce = useRef<{ id: number; ox: number; oy: number; dx: number; dy: number } | null>(null);
+  /**
+   * Le moment en cours, avec sa tenue (voir `moments.ts`).
+   *
+   * ⚠️ DEUX CHAMPS, ET PAS UN SEUL. `actuel` est le moment VRAI de cette image :
+   * c'est lui qu'affiche la bannière, sinon on lit encore « le ballon est à
+   * toi » deux secondes après l'avoir donné. `tenue` fait durer le RALENTI
+   * au-delà du moment, pour qu'on voie le résultat de son geste au lieu que la
+   * vitesse reparte dans la même seconde.
+   */
+  const momentRef = useRef<{ actuel: Moment | null; tenue: number }>({ actuel: null, tenue: 0 });
+
+  // Les valeurs lues pendant le rendu : posées par la boucle, lues juste après.
+  const vue = vueRef.current;
+  const moment = momentRef.current.actuel;
+
+  const enJeu = mode === 'jouer' && !!monPion;
+  // ⚠️ « J'AI UN PION » ET « JE PEUX JOUER » NE SONT PAS LA MÊME CHOSE : sur le
+  // banc ou sous carton, le pion existe toujours (il porte ses statistiques et
+  // ses minutes) mais il n'est pas sur le pré.
+  const jePeuxJouer = !!monPion && monPion.surLeTerrain && monPion.sanction <= 0;
+
+  // --- LA TAILLE DU TERRAIN À L'ÉCRAN ---------------------------------------
+  // ⚠️ Par ResizeObserver, PAS par `getBoundingClientRect()` à chaque image :
+  // lire la géométrie soixante fois par seconde force un recalcul de mise en
+  // page à chaque fois, et c'est exactement ce qui fait tomber un téléphone de
+  // 60 à 40 images par seconde.
+  useEffect(() => {
+    const noeud = sceneRef.current;
+    if (!noeud) return;
+    const mesurer = () => {
+      const r = noeud.getBoundingClientRect();
+      boite.current = { largeur: Math.max(1, r.width), hauteur: Math.max(1, r.height) };
+    };
+    mesurer();
+    const ro = new ResizeObserver(mesurer);
+    ro.observe(noeud);
+    return () => ro.disconnect();
+  }, []);
 
   // --- LA BOUCLE DE RENDU ---------------------------------------------------
   useEffect(() => {
@@ -346,45 +345,216 @@ export function MatchLive({
       brut = requestAnimationFrame(image);
       const precedent = dernierTemps.current || ms;
       dernierTemps.current = ms;
+      const dtReel = Math.min(0.2, (ms - precedent) / 1000);
+
+      const moi = e.pions.find((p) => p.moi);
+      const { largeur, hauteur } = boite.current;
+      const ratio = largeur / hauteur;
+      const angle = angleDeVue(moi?.cote ?? 'A', hauteur > largeur);
+
+      // ── 🎮 LES COMMANDES SONT LUES À CHAQUE IMAGE ─────────────────────────
+      // ⚠️ AVANT le test de pause, et c'est voulu : la manette doit pouvoir
+      // répondre au panneau de bagarre, qui s'affiche justement en pause.
+      const entrees = lecteur.current.lire();
+      if (entrees.manette && !manetteVue.current) {
+        manetteVue.current = true;
+        redessiner((n) => n + 1);
+      }
+      if (e.bagarre) {
+        // Losange de la manette : A/✕, B/○, X/□, Y/△ = les quatre ordres.
+        if (entrees.ordre !== null && !e.bagarre.ordre) {
+          ordonner(e, ORDRES[entrees.ordre].id);
+          setEnPause(false);
+        }
+      } else if (e.controle && !enPause) {
+        // ⚠️ LA DIRECTION EST LUE EN REPÈRE D'ÉCRAN, PUIS TRADUITE EN REPÈRE DE
+        // TERRAIN. Sans ça, « pousse vers le haut » enverrait le pion vers la
+        // touche gauche dès que la caméra pivote en portrait, ou vers son
+        // propre en-but quand on joue pour le camp B. C'est la même matrice
+        // que celle qui dessine : l'image et la commande ne peuvent pas se
+        // désaccorder.
+        const v = vueRef.current;
+        const d = v ? v.directionMonde(entrees.dx, entrees.dy) : { dx: entrees.dx, dy: entrees.dy };
+        piloterDirection(e, d.dx, d.dy, entrees.sprint);
+        for (const action of entrees.appuis) demanderAction(e, action);
+        if (entrees.principale) {
+          const choisie = actionPrincipale(e);
+          if (choisie) demanderAction(e, choisie);
+        }
+      }
+
+      // ── ⏱️ EST-CE MON MOMENT ? ────────────────────────────────────────────
+      const m = enJeu ? momentDuJoueur(e, moi) : null;
+      const suivi = momentRef.current;
+      // Nouveau moment : une vibration courte pour dire « c'est à toi »,
+      // parce qu'un ralenti qu'on n'a pas vu venir ne sert à rien.
+      if (m && (!suivi.actuel || suivi.actuel.type !== m.type)) vibrer(18);
+      suivi.actuel = m;
+      if (m) suivi.tenue = TENUE;
+      else if (suivi.tenue > 0) suivi.tenue = Math.max(0, suivi.tenue - dtReel);
+      const enMoment = suivi.tenue > 0;
+
+      // ── 🎥 LA CAMÉRA ──────────────────────────────────────────────────────
+      const ballon = positionBallon(e);
+      let cadrage: Cadrage = 'large';
+      let cible: Vec = ballon;
+      if (enJeu && moi && moi.surLeTerrain && moi.sanction <= 0) {
+        cadrage = enMoment ? 'proche' : 'suivi';
+        // Entre le ballon et son joueur, plus près de soi quand c'est à soi de
+        // jouer : on doit voir ce qu'on fait, et voir venir ce qui arrive.
+        const poids = enMoment ? 0.5 : 0.38;
+        cible = {
+          x: ballon.x + (moi.pos.x - ballon.x) * poids,
+          y: ballon.y + (moi.pos.y - ballon.y) * poids,
+        };
+        // ⚠️ ET SON PION RESTE DANS LE CADRE, quoi qu'il arrive. Sans cette
+        // borne, un dégagement de soixante mètres emmène la caméra sur le
+        // ballon et le joueur se retrouve à piloter un pion invisible.
+        const marge = Math.max(8, COUVERTURE[cadrage] / 2 - 7);
+        cible = {
+          x: borner(cible.x, moi.pos.x - marge, moi.pos.x + marge),
+          y: borner(cible.y, moi.pos.y - marge, moi.pos.y + marge),
+        };
+      }
+      vueRef.current = camera.current.suivre(cible, cadrage, ratio, angle, dtReel);
+
       // Match terminé : on arrête la boucle, plus rien ne bouge.
       if (e.fini) { redessiner((n) => n + 1); actif = false; cancelAnimationFrame(brut); return; }
-      if (enPause) { return; }
-      // Le delta réel est plafonné : revenir sur l'onglet ne doit pas faire
-      // avancer le match de trois minutes d'un coup.
-      const dtReel = Math.min(0.2, (ms - precedent) / 1000);
-      avancer(e, dtReel * VITESSES[vitesse].facteur);
+
+      // ⚠️ ON LÂCHE LE PION EN PAUSE. Sans ça, la dernière direction reste
+      // posée : on met la pause, on va lire le fil, et le joueur repart en
+      // courant vers la touche dès la reprise sans qu'on ait rien touché.
+      if (enPause) { piloterDirection(e, 0, 0, false); redessiner((n) => n + 1); return; }
+
+      avancer(e, dtReel * facteurTempo(tempo, enMoment));
       redessiner((n) => n + 1);
     };
     brut = requestAnimationFrame(image);
     return () => { actif = false; cancelAnimationFrame(brut); };
-  }, [enPause, vitesse, e]);
+  }, [enPause, tempo, enJeu, e]);
+
+  // Le mode commande le contrôle du moteur : une seule vérité, pas deux.
+  useEffect(() => { activerControle(e, mode === 'jouer'); }, [mode, e]);
 
   useEffect(() => {
     filRef.current?.scrollTo({ top: filRef.current.scrollHeight });
   }, [e.commentaires.length]);
 
   useEffect(() => {
+    const lu = lecteur.current;
     const clavier = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') onFermer();
-      if (ev.key === ' ' && (ev.target as HTMLElement)?.tagName !== 'INPUT') {
+      const saisie = (ev.target as HTMLElement)?.tagName === 'INPUT';
+      if (ev.key === 'Escape') { onFermer(); return; }
+      if (saisie) return;
+      // ⚠️ LA BARRE D'ESPACE NE MET PLUS EN PAUSE : ELLE JOUE. C'est la touche
+      // d'action de tous les jeux de sport, et la laisser sur la pause serait
+      // le plus sûr moyen de faire une passe en croyant s'arrêter.
+      if (lu.auClavier(ev)) {
         ev.preventDefault();
-        setEnPause((p) => !p);
+        redessiner((n) => n + 1);
+        return;
+      }
+      // Les chiffres 1-9 doublent la barre d'actions affichée. ⚠️ Lus sur
+      // `ev.code` (`Digit1`) : en AZERTY la rangée des chiffres rend « & é " »
+      // sans Maj.
+      if (ev.code.startsWith('Digit')) {
+        const rang = Number(ev.code.slice(5)) - 1;
+        const action = actionsDisponibles(e)[rang];
+        if (action) {
+          ev.preventDefault();
+          demanderAction(e, action.id);
+          redessiner((n) => n + 1);
+        }
       }
     };
+    const relacher = (ev: KeyboardEvent) => lu.relacher(ev);
+    // ⚠️ On oublie TOUT quand la fenêtre perd le focus : une touche enfoncée
+    // au moment où l'on change d'onglet ne reçoit jamais son `keyup`, et le
+    // joueur retrouve un pion qui court tout seul vers la touche.
+    const perdreFocus = () => lu.toutRelacher();
     window.addEventListener('keydown', clavier);
-    return () => window.removeEventListener('keydown', clavier);
-  }, [onFermer]);
+    window.addEventListener('keyup', relacher);
+    window.addEventListener('blur', perdreFocus);
+    return () => {
+      window.removeEventListener('keydown', clavier);
+      window.removeEventListener('keyup', relacher);
+      window.removeEventListener('blur', perdreFocus);
+      lu.toutRelacher();
+    };
+  }, [onFermer, e]);
+
+  // ⚠️ UNE BAGARRE MET LA PAUSE, ET C'EST INDISPENSABLE. Le moteur attend un
+  // ordre pour la résoudre : laisser le match défiler pendant qu'on lit quatre
+  // boutons reviendrait à choisir au hasard. La reprise est faite par le bouton
+  // d'ordre lui-même — sinon le jeu resterait figé sur une phase que seul un
+  // tick peut refermer.
+  const bagarre = e.bagarre;
+  useEffect(() => {
+    if (bagarre) setEnPause(true);
+  }, [bagarre]);
+
+  // --- LE JOYSTICK TACTILE --------------------------------------------------
+  // ⚠️ IL FLOTTE SOUS LE POUCE, dans la moitié gauche du terrain. Le premier
+  // contact devient le centre, la direction est le vecteur jusqu'au doigt.
+  // C'est le schéma de tous les jeux d'action sur téléphone, et il ne coûte pas
+  // un pixel d'interface — alors qu'une croix directionnelle fixe mangerait le
+  // terrain, qui fait déjà toute la largeur.
+  //
+  // ⚠️ LA MOITIÉ DROITE EST RÉSERVÉE AUX BOUTONS. Laisser le joystick partir de
+  // n'importe où mettait les deux pouces en concurrence : on visait le gros
+  // bouton d'action, on ratait de dix pixels, et le pion partait en courant.
+  //
+  // ⚠️ LE SPRINT EST DANS LE STICK, pas sur un bouton : pousser à fond (86 % de
+  // la déflexion) sprinte. Un bouton de sprint de plus, c'est un troisième
+  // doigt qu'on n'a pas.
+  //
+  // ⚠️ `touch-action: none` sur la scène (App.css) est indispensable : sans lui,
+  // glisser le doigt fait défiler la page et le joystick ne reçoit qu'un seul
+  // événement.
+  const enPixels = (ev: React.PointerEvent): { x: number; y: number } | null => {
+    const r = sceneRef.current?.getBoundingClientRect();
+    if (!r || !r.width) return null;
+    return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+  };
+  const poserPouce = (ev: React.PointerEvent) => {
+    if (!e.controle || e.fini || e.bagarre || !jePeuxJouer) return;
+    const p = enPixels(ev);
+    if (!p) return;
+    if (p.x > boite.current.largeur * 0.55) return; // la droite, c'est les boutons
+    sceneRef.current?.setPointerCapture(ev.pointerId);
+    pouce.current = { id: ev.pointerId, ox: p.x, oy: p.y, dx: 0, dy: 0 };
+    lecteur.current.tactile = { dx: 0, dy: 0, sprint: false };
+    if (!tutoMatchVu) setTutoMatchVu(true);
+  };
+  const bougerPouce = (ev: React.PointerEvent) => {
+    const j = pouce.current;
+    if (!j || j.id !== ev.pointerId) return;
+    const p = enPixels(ev);
+    if (!p) return;
+    j.dx = p.x - j.ox;
+    j.dy = p.y - j.oy;
+    const norme = Math.hypot(j.dx, j.dy);
+    const ratio = Math.min(1, norme / RAYON_STICK);
+    lecteur.current.tactile = norme < 1
+      ? { dx: 0, dy: 0, sprint: false }
+      : { dx: (j.dx / norme) * ratio, dy: (j.dy / norme) * ratio, sprint: ratio > SEUIL_SPRINT };
+  };
+  const leverPouce = (ev: React.PointerEvent) => {
+    if (pouce.current && pouce.current.id !== ev.pointerId) return;
+    pouce.current = null;
+    lecteur.current.tactile = null;
+  };
 
   // --- LE COACHING EN DIRECT ------------------------------------------------
   const envoyerConsigne = async () => {
-    const t = consigneTexte.trim();
-    if (!t) return;
+    const texte = consigneTexte.trim();
+    if (!texte) return;
     setConsigneTexte('');
     setEnvoiConsigne(true);
-    appliquerConsigne(e, lireConsigneLocale(t));
+    appliquerConsigne(e, lireConsigneLocale(texte));
     if (iaActivee && iaDisponible()) {
       try {
-        const fine = await lireConsigneIA(t,
+        const fine = await lireConsigneIA(texte,
           `${e.clubA} ${e.scoreA} – ${e.scoreB} ${e.clubB}, ${e.minute}e minute.`);
         appliquerConsigne(e, fine);
       } catch {
@@ -394,23 +564,36 @@ export function MatchLive({
     setEnvoiConsigne(false);
   };
 
+  const jouerAction = (id: DefinitionAction['id']) => {
+    demanderAction(e, id);
+    vibrer(12);
+    if (!tutoMatchVu) setTutoMatchVu(true);
+    redessiner((n) => n + 1);
+  };
+
   const [couleurA] = couleursDe(e.clubA);
   const [couleurB] = couleursDe(e.clubB);
   const clubA = clubParNom(e.clubA);
   const clubB = clubParNom(e.clubB);
-  const monPion = e.pions.find((p) => p.moi);
-  // Quelle famille de statistiques la feuille de match affiche (voir VUES_FEUILLE).
-  const [vueFeuille, setVueFeuille] = useState<string>('general');
-  const colonnes = (VUES_FEUILLE.find((v) => v.id === vueFeuille) ?? VUES_FEUILLE[0]).colonnes;
-  // La grille suit le nombre de colonnes : numéro, nom, les stats, les minutes.
-  // ⚠️ `minmax(74px, 1fr)` SUR LE NOM, PAS `1fr`. Mesuré en jeu : avec cinq
-  // colonnes de statistiques (vue « Pied »), les largeurs fixes consommaient
-  // exactement la place disponible et la colonne du nom tombait à **0 px** —
-  // une feuille de match sans noms. Le plancher la force à déborder, et le bloc
-  // défile alors horizontalement DANS son conteneur (`.ml-bilan-groupe`) :
-  // c'est la règle du projet pour les tableaux larges, la page ne part jamais
-  // de côté.
-  const grilleColonnes = `26px minmax(74px, 1fr) ${colonnes.map(() => '38px').join(' ')} 38px`;
+
+  // --- CE QUI EST JOUABLE MAINTENANT ---------------------------------------
+  // ⚠️ ON NE MONTRE PAS TREIZE BOUTONS. Un gros bouton contextuel (« ce qu'il
+  // faut faire »), trois secondaires pour qui veut choisir, et la discipline
+  // derrière son propre bouton — parce qu'un « frapper » touché par erreur à la
+  // place d'un « passer », c'est une saison de suspension.
+  const actions = enJeu && jePeuxJouer && !e.fini ? actionsDisponibles(e) : [];
+  const idPrincipale = actions.length ? actionPrincipale(e) : null;
+  const defPrincipale = idPrincipale ? ACTION_PAR_ID.get(idPrincipale) : undefined;
+  const secondaires = actions
+    .filter((a) => a.id !== idPrincipale && a.famille !== 'discipline')
+    .slice(0, 3);
+  const disciplinaires = actions.filter((a) => a.famille === 'discipline');
+  // À qui part la passe : on l'écrit sur le bouton ET on le montre sur le
+  // terrain. Une passe dont on ne sait pas où elle va n'est pas une décision.
+  const receveur = idPrincipale === 'passe' && monPion ? receveurPour(e, monPion) : undefined;
+  const cibleDefense = enJeu && jePeuxJouer && monPion && e.possession !== monPion.cote
+    ? e.porteur : null;
+
   // La feuille de match n'est calculée qu'une fois, à la sirène.
   const bilanRef = useRef<ReturnType<typeof bilan> | null>(null);
   if (e.fini && !bilanRef.current) bilanRef.current = bilan(e);
@@ -426,7 +609,7 @@ export function MatchLive({
 
   // ⚠️ À LA SIRÈNE, LES VRAIES STATS DE TON JOUEUR PARTENT DANS LA SAISON.
   // Elles alimentent le classement des joueurs (écran Résultats) : ce ne sont
-  // plus des chiffres estimés, ce sont ceux du match qu'on vient de regarder.
+  // plus des chiffres estimés, ce sont ceux du match qu'on vient de jouer.
   const dejaEnregistre = useRef(false);
   useEffect(() => {
     if (!e.fini || dejaEnregistre.current) return;
@@ -434,8 +617,7 @@ export function MatchLive({
     onTermine?.();
     if (!monPion) return;
     // ⚠️ Le RÉSULTAT part avec les statistiques : c'est ce qui permet à la
-    // feuille de match d'être la seule entrée du journal pour ce week-end
-    // (`semaineSuivante` n'ajoute plus son récit simulé par-dessus).
+    // feuille de match d'être la seule entrée du journal pour ce week-end.
     const chezMoi = monPion.cote === 'A';
     enregistrerMatchVecu(
       statsPourLaNote(monPion),
@@ -450,7 +632,17 @@ export function MatchLive({
           || t('ml.feuilleMatch'),
       },
     );
-  }, [e.fini, e, monPion, enregistrerMatchVecu, onTermine, titre]);
+    // ⚠️ ET LA DISCIPLINE PART AVEC, JUSTE APRÈS. C'est le seul chemin par
+    // lequel un carton rouge ou un coup de poing devient une suspension.
+    // L'ordre compte — `enregistrerMatchVecu` peut poser une blessure de match,
+    // et la suspension doit passer par-dessus.
+    appliquerSanctionMatch({
+      citation: e.discipline.citation,
+      blessure: e.discipline.blessure,
+      jaunes: e.discipline.jaunes,
+      rouges: e.discipline.rouges,
+    });
+  }, [e.fini, e, monPion, enregistrerMatchVecu, appliquerSanctionMatch, onTermine, titre]);
 
   // --- LE RENDU DES PIONS ---------------------------------------------------
   // ⚠️ Interpolation exacte : le moteur avance par pas de 0,15 s, l'écran à
@@ -460,271 +652,551 @@ export function MatchLive({
   const r = Math.min(DT, Math.max(0, e.reliquat));
   const surLeTerrain = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0);
 
+  // ⚠️ LE RAYON D'UN PION SUIT LE CADRAGE, il n'est pas « réaliste ». À taille
+  // réelle (0,86 m), un joueur fait 5 px en vue large : invisible. On vise donc
+  // une taille CONSTANTE À L'ÉCRAN — environ 12 px de diamètre quel que soit le
+  // zoom — et on ne descend jamais sous la taille réelle en vue rapprochée,
+  // sinon les distances de plaquage deviennent mensongères.
+  const spanVue = vue ? Math.max(vue.cadre.w, 1) : LONGUEUR;
+  const rayon = Math.max(0.86, spanVue * 0.016);
+  const tailleTexte = rayon * 1.16;
+
   const pion = (p: Pion) => {
     const x = p.pos.x + p.vitesse.x * r;
     const y = p.pos.y + p.vitesse.y * r;
     const porte = e.porteur === p;
     return (
       <g key={p.id} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})`}>
-        {p.moi && <circle r="1.75" className="ml-aura" />}
-        <ellipse cx="0.12" cy="0.3" rx="0.85" ry="0.6" fill="rgba(0,0,0,.35)" />
+        {p.moi && <circle r={rayon * 2.1} className="ml-aura" />}
+        <ellipse cx={rayon * 0.14} cy={rayon * 0.35} rx={rayon} ry={rayon * 0.7} fill="rgba(0,0,0,.35)" />
         <circle
-          r="0.86"
+          r={rayon}
           fill={p.cote === 'A' ? couleurA : couleurB}
           stroke={p.moi ? '#ffd45e' : porte ? '#fff6d8' : p.cote === 'A' ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)'}
-          strokeWidth={p.moi || porte ? 0.3 : 0.16}
+          strokeWidth={p.moi || porte ? rayon * 0.34 : rayon * 0.18}
         />
-        <text y="0.33" textAnchor="middle" fontSize="1" fill="#fff" fontWeight="700"
-          style={{ paintOrder: 'stroke', stroke: 'rgba(0,0,0,.45)', strokeWidth: 0.22 }}>
+        {/* ⚠️ Les numéros reçoivent la rotation INVERSE de la caméra : sans ça
+            ils se lisent de travers dès que le terrain pivote en portrait. */}
+        <text
+          transform={vue?.redresser}
+          y={tailleTexte * 0.36} textAnchor="middle" fontSize={tailleTexte} fill="#fff" fontWeight="700"
+          style={{ paintOrder: 'stroke', stroke: 'rgba(0,0,0,.45)', strokeWidth: tailleTexte * 0.22 }}
+        >
           {p.numero}
         </text>
+        {/* Le chevron : c'est LUI qui répond à « où est mon joueur ». */}
+        {p.moi && (
+          <g transform={vue?.redresser}>
+            <path
+              className="ml-chevron"
+              d={`M ${-rayon * 0.9} ${-rayon * 2.7} L ${rayon * 0.9} ${-rayon * 2.7} L 0 ${-rayon * 1.5} Z`}
+            />
+          </g>
+        )}
       </g>
     );
   };
 
   // Le ballon : porté, en vol, ou au sol. En vol on l'agrandit et on garde son
   // ombre au sol — c'est ce qui donne la sensation de hauteur.
-  const vol = e.vol;
-  const ballon = e.porteur
-    ? { x: e.porteur.pos.x + e.porteur.vitesse.x * r, y: e.porteur.pos.y + e.porteur.vitesse.y * r, h: 0 }
-    : vol
-      ? (() => {
-          const k = Math.min(1, (vol.ecoule + r) / vol.duree);
-          return {
-            x: vol.de.x + (vol.vers.x - vol.de.x) * k,
-            y: vol.de.y + (vol.vers.y - vol.de.y) * k,
-            h: vol.hauteur * Math.sin(Math.PI * k),
-          };
-        })()
-      : { x: e.ballon.x, y: e.ballon.y, h: 0 };
-
+  const ballon = positionBallonInterpolee(e, r);
   const possession = e.compteurs.tempsA + e.compteurs.tempsB > 0
     ? Math.round((e.compteurs.tempsA / (e.compteurs.tempsA + e.compteurs.tempsB)) * 100)
     : 50;
+  const derniere = e.commentaires[e.commentaires.length - 1];
 
-  const terrain = useMemo(() => <TerrainMemo />, []);
+  // La flèche de bord quand le ballon sort du cadre : sans elle, on perd le
+  // ballon de vue dès qu'un dégagement part à l'opposé.
+  const flecheBallon = (() => {
+    if (!vue || !enJeu) return null;
+    const p = vue.versEcran(ballon);
+    const dedans = p.x > 1 && p.x < vue.W - 1 && p.y > 1 && p.y < vue.H - 1;
+    if (dedans) return null;
+    const bx = borner(p.x, 2.5, vue.W - 2.5);
+    const by = borner(p.y, 2.5, vue.H - 2.5);
+    const angle = (Math.atan2(p.y - by, p.x - bx) * 180) / Math.PI;
+    return { bx, by, angle };
+  })();
+
+  const pelouse = useMemo(() => <PelouseMemo />, []);
+  const montrerTuto = enJeu && jePeuxJouer && !tutoMatchVu && !e.fini;
 
   return createPortal(
     <div ref={overlayRef} className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) onFermer(); }}>
       <motion.div
         ref={dialogRef}
         className="match-live"
+        data-mode={mode}
         role="dialog"
         aria-modal="true"
         aria-label={titre}
         tabIndex={-1}
-        initial={{ opacity: 0, scale: 0.96 }}
+        initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.25 }}
+        transition={{ duration: 0.2 }}
       >
+        {/* ═══ L'EN-TÊTE — score, minute, et rien d'autre ═══════════════════ */}
         <header className="ml-tete">
           <div className="ml-equipe">
-            {clubA ? <Blason club={clubA} taille={30} /> : <LogoEquipe nom={e.clubA} taille={30} />}
+            {clubA ? <Blason club={clubA} taille={26} /> : <LogoEquipe nom={e.clubA} taille={26} />}
             <b>{e.clubA}</b>
           </div>
           <div className="ml-score">
             <span>{e.scoreA}</span>
-            <i>
-              {e.minute}′{e.sirene && <em className="ml-sirene"> +</em>}
-            </i>
+            <i>{e.minute}′{e.sirene && <em className="ml-sirene"> +</em>}</i>
             <span>{e.scoreB}</span>
           </div>
           <div className="ml-equipe droite">
             <b>{e.clubB}</b>
-            {clubB ? <Blason club={clubB} taille={30} /> : <LogoEquipe nom={e.clubB} taille={30} />}
+            {clubB ? <Blason club={clubB} taille={26} /> : <LogoEquipe nom={e.clubB} taille={26} />}
           </div>
           <button className="ml-fermer" onClick={onFermer} title={t('ml.fermerAide')}>✕</button>
         </header>
-
-        <div className="ml-sous-titre">
-          {titre}
-          {e.phase !== 'jeuCourant' && e.phase !== 'fini' && (
-            <span className="ml-phase"> · {CLE_PHASE[e.phase] ? t(CLE_PHASE[e.phase]) : e.phase}</span>
-          )}
+        <div className="ml-progression" title={titre}>
+          <span style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} />
         </div>
 
-        {/* ---------- LA BARRE DE POSSESSION ---------- */}
-        <div className="ml-possession" title={t('ml.possession')}>
-          <span style={{ width: `${possession}%`, background: couleurA }} />
-          <span style={{ width: `${100 - possession}%`, background: couleurB }} />
-        </div>
-
-        {/* ---------- LE TERRAIN, AUX PROPORTIONS RÉELLES ---------- */}
-        <svg className="ml-terrain" viewBox={`0 0 ${LONGUEUR} ${LARGEUR}`} aria-label={t('ml.terrain')}>
-          {terrain}
-          {surLeTerrain.filter((p) => p.cote === 'B').map(pion)}
-          {surLeTerrain.filter((p) => p.cote === 'A').map(pion)}
-          {ballon.h > 0.02 && (
-            <ellipse cx={ballon.x} cy={ballon.y} rx="0.7" ry="0.45" fill="rgba(0,0,0,.3)" />
-          )}
-          <ellipse
-            className="ml-ballon"
-            cx={ballon.x}
-            cy={ballon.y - ballon.h * 2.2}
-            rx={0.85 + ballon.h * 0.35}
-            ry={0.58 + ballon.h * 0.25}
-            fill="#f4e3c0" stroke="#3a2410" strokeWidth="0.26"
-          />
-        </svg>
-
-        {/* ---------- LA LECTURE DU JEU ---------- */}
-        {!e.fini && (
-          <div className="ml-lecture">
-            <span className="ml-tag" style={{ borderColor: e.possession === 'A' ? couleurA : couleurB }}>
-              🏉 {e.possession === 'A' ? e.clubA : e.clubB}
-            </span>
-            {e.lancement && <span className="ml-tag">▶ {e.lancement.libelle}</span>}
-            <span className="ml-tag">🛡️ {t(CLE_SYSTEME[e.systeme] ?? `ml.systeme.${e.systeme}`)}</span>
-            {e.phasesDepuisArret > 0 && <span className="ml-tag">{t('ml.temps', { n: e.phasesDepuisArret })}</span>}
-          </div>
-        )}
-
-        {/* ---------- COMMANDES ---------- */}
-        <div className="ml-commandes">
-          <button className="btn fantome" onClick={() => setEnPause((p) => !p)} disabled={e.fini}>
-            {enPause ? `▶️ ${t('ml.reprendre')}` : `⏸️ ${t('ml.pause')}`}
-          </button>
-          <div className="ml-vitesses">
-            {VITESSES.map((v, i) => (
-              <button
-                key={v.label}
-                className={`ml-vitesse${vitesse === i ? ' actif' : ''}`}
-                onClick={() => setVitesse(i)}
-                title={i === VITESSES.length - 1 ? t('ml.finAide') : t('ml.vitesseAide', { vitesse: v.label })}
+        <div className="ml-corps">
+          <div className="ml-colonne">
+            {e.fini && stats ? (
+              <FeuilleMatch e={e} stats={stats} maNote={maNote} />
+            ) : (
+              /* ═══ LA SCÈNE — terrain plein cadre, HUD posé dessus ═══════ */
+              <div
+                className="ml-scene"
+                ref={sceneRef}
+                onPointerDown={poserPouce}
+                onPointerMove={bougerPouce}
+                onPointerUp={leverPouce}
+                onPointerCancel={leverPouce}
               >
-                {v.label}
+                <svg
+                  className="ml-terrain"
+                  viewBox={vue?.viewBox ?? `0 0 ${LONGUEUR} ${LARGEUR}`}
+                  preserveAspectRatio="xMidYMid slice"
+                  aria-label={t('ml.terrain')}
+                >
+                  <g transform={vue?.transform}>
+                    {pelouse}
+                    {/* La cible de la passe : un cercle qui dit « c'est lui ». */}
+                    {receveur && (
+                      <g className="ml-cible-passe">
+                        <line x1={monPion!.pos.x} y1={monPion!.pos.y} x2={receveur.pos.x} y2={receveur.pos.y} />
+                        <circle cx={receveur.pos.x} cy={receveur.pos.y} r={rayon * 2} />
+                      </g>
+                    )}
+                    {cibleDefense && (
+                      <circle className="ml-cible-plaquage" cx={cibleDefense.pos.x} cy={cibleDefense.pos.y}
+                        r={rayon * 2.2} />
+                    )}
+                    {surLeTerrain.filter((p) => p.cote === 'B').map(pion)}
+                    {surLeTerrain.filter((p) => p.cote === 'A').map(pion)}
+                    {ballon.h > 0.02 && (
+                      <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * 0.8} ry={rayon * 0.5} fill="rgba(0,0,0,.3)" />
+                    )}
+                    <ellipse
+                      className="ml-ballon"
+                      cx={ballon.x}
+                      cy={ballon.y - ballon.h * 2.2}
+                      rx={rayon * 0.95 + ballon.h * 0.35}
+                      ry={rayon * 0.66 + ballon.h * 0.25}
+                      fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayon * 0.3}
+                    />
+                  </g>
+                  {/* La flèche de bord vit hors du groupe pivoté : elle est
+                      posée en coordonnées d'écran, comme le HUD. */}
+                  {flecheBallon && (
+                    <g className="ml-fleche-ballon"
+                      transform={`translate(${flecheBallon.bx} ${flecheBallon.by}) rotate(${flecheBallon.angle})`}>
+                      <path d="M 0 -1.6 L 3 0 L 0 1.6 Z" />
+                    </g>
+                  )}
+                </svg>
+
+                {/* ---------- LE HUD ---------- */}
+                <div className="ml-hud">
+                  <div className="ml-hud-haut">
+                    <span className="ml-tag" style={{ borderColor: e.possession === 'A' ? couleurA : couleurB }}>
+                      🏉 {e.possession === 'A' ? e.clubA : e.clubB} · {possession}%
+                    </span>
+                    {e.phase !== 'jeuCourant' && (
+                      <span className="ml-tag">{CLE_PHASE[e.phase] ? t(CLE_PHASE[e.phase]) : e.phase}</span>
+                    )}
+                    {!enJeu && <span className="ml-tag">🛡️ {t(CLE_SYSTEME[e.systeme] ?? `ml.systeme.${e.systeme}`)}</span>}
+                    {monPion && (
+                      <span className="ml-tag ml-endurance" title={t('ml.enduranceAide')}>
+                        🫁 {Math.round(monPion.endurance)}%
+                      </span>
+                    )}
+                  </div>
+
+                  {/* La bannière du moment : elle dit POURQUOI ça vient de
+                      ralentir. Un ralenti sans explication passe pour une
+                      saccade. */}
+                  {moment && (
+                    <div className="ml-banniere" key={moment.type}>
+                      <b>{moment.emoji} {t(moment.cle)}</b>
+                    </div>
+                  )}
+
+                  {/* Le fil réduit à sa dernière ligne : on garde le
+                      commentaire sans lui donner un tiers de l'écran. */}
+                  {derniere && (
+                    <button type="button" className="ml-ticker" onClick={() => setTiroir('fil')}>
+                      <span className="ml-minute">{derniere.minute}′</span>
+                      <span className="ml-emoji">{EMOJI[derniere.type] ?? '•'}</span>
+                      <span className="ml-texte">{derniere.texte}</span>
+                    </button>
+                  )}
+
+                  {/* ---------- LE JOYSTICK ---------- */}
+                  {enJeu && jePeuxJouer && (
+                    <div
+                      className={`ml-stick${pouce.current ? ' actif' : ''}`}
+                      style={pouce.current
+                        ? { left: pouce.current.ox, top: pouce.current.oy }
+                        : undefined}
+                    >
+                      <span className="ml-stick-base" />
+                      <span
+                        className="ml-stick-tete"
+                        style={pouce.current ? teteStick(pouce.current) : undefined}
+                      />
+                    </div>
+                  )}
+
+                  {/* ---------- LES ACTIONS ---------- */}
+                  {enJeu && (
+                    <div className="ml-cluster">
+                      {!jePeuxJouer && (
+                        <span className="ml-attente">
+                          {monPion && monPion.sanction > 0 ? `🟨 ${t('ml.sanctionne')}` : `🪑 ${t('ml.surLeBanc')}`}
+                        </span>
+                      )}
+                      {jePeuxJouer && (
+                        <>
+                          {disciplineOuverte && disciplinaires.length > 0 && (
+                            <div className="ml-discipline">
+                              {disciplinaires.map((a) => (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  className="ml-act fam-discipline"
+                                  title={t(a.aide)}
+                                  onPointerDown={(ev) => { ev.stopPropagation(); jouerAction(a.id); }}
+                                >
+                                  <b>{a.emoji}</b><span>{t(a.cle)}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <div className="ml-secondaires">
+                            {secondaires.map((a) => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                className={`ml-act fam-${a.famille}${e.intention?.type === a.id ? ' actif' : ''}`}
+                                title={t(a.aide)}
+                                onPointerDown={(ev) => { ev.stopPropagation(); jouerAction(a.id); }}
+                              >
+                                <b>{a.emoji}</b>
+                                <span>{t(a.cle)}</span>
+                                <i>{TOUCHE_PAR_ACTION.get(a.id)}</i>
+                              </button>
+                            ))}
+                          </div>
+                          <div className="ml-principal-rangee">
+                            {disciplinaires.length > 0 && (
+                              <button
+                                type="button"
+                                className={`ml-chauffe${disciplineOuverte ? ' actif' : ''}`}
+                                title={t('ml.discipline.aide')}
+                                aria-label={t('ml.discipline.titre')}
+                                onPointerDown={(ev) => { ev.stopPropagation(); setDisciplineOuverte((v) => !v); }}
+                              >
+                                💢
+                                <span className="ml-tension" title={t('ml.tensionAide')}>
+                                  <span style={{ width: `${Math.round(e.tension)}%` }} />
+                                </span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="ml-principal"
+                              disabled={!defPrincipale}
+                              title={defPrincipale ? t(defPrincipale.aide) : undefined}
+                              onPointerDown={(ev) => {
+                                ev.stopPropagation();
+                                if (idPrincipale) jouerAction(idPrincipale);
+                              }}
+                            >
+                              {defPrincipale ? (
+                                <>
+                                  <b>{defPrincipale.emoji}</b>
+                                  <span>
+                                    {t(defPrincipale.cle)}
+                                    {receveur && <em> #{receveur.numero}</em>}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <b>⏳</b>
+                                  <span>{Object.keys(e.recharges).length ? t('ml.recharge') : t('ml.actionsAttente')}</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ---------- LA PREMIÈRE FOIS ---------- */}
+                  {montrerTuto && (
+                    <div className="ml-tuto" onPointerDown={() => setTutoMatchVu(true)}>
+                      <div className="ml-tuto-carte">
+                        <b>🎮 {t('ml.tuto.titre')}</b>
+                        <p>👈 {t('ml.tuto.stick')}</p>
+                        <p>👉 {t('ml.tuto.bouton')}</p>
+                        <p>🎯 {t('ml.tuto.moments')}</p>
+                        <button type="button" className="btn vert"
+                          onPointerDown={(ev) => { ev.stopPropagation(); setTutoMatchVu(true); }}>
+                          {t('ml.tuto.compris')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ---------- ÇA A DÉGÉNÉRÉ : L'ORDRE QUE TU DONNES ----------
+                      Le moteur reste EN ATTENTE tant qu'aucun ordre n'est
+                      donné : chaque bouton dit ce qu'il coûte, parce qu'une
+                      sanction qu'on n'a pas vue venir n'apprend rien. */}
+                  {e.bagarre && (
+                    <div className="ml-bagarre" role="alertdialog" aria-label={t('ml.bagarre.titre')}>
+                      <b>💢 {t('ml.bagarre.titre')}</b>
+                      <p>{t('ml.bagarre.texte', { nom: e.bagarre.adversaire.nom })}</p>
+                      <div className="ml-ordres">
+                        {ORDRES.map((o) => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            className="ml-ordre"
+                            onPointerDown={(ev) => { ev.stopPropagation(); ordonner(e, o.id); setEnPause(false); }}
+                          >
+                            <b>{o.emoji} {t(o.cle)}</b>
+                            <span>{t(o.aide)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {enPause && !e.bagarre && (
+                    <button type="button" className="ml-voile-pause" onPointerDown={() => setEnPause(false)}>
+                      <b>▶️ {t('ml.reprendre')}</b>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ═══ LA BARRE DU BAS — mode, tempo, tiroir ═══════════════════ */}
+            <div className="ml-barre">
+              {monPion && !e.fini && (
+                <button
+                  type="button"
+                  className={`ml-mode${enJeu ? ' actif' : ''}`}
+                  title={t('ml.controleAide')}
+                  onClick={() => {
+                    const suivant = mode === 'jouer' ? 'regarder' : 'jouer';
+                    setMode(suivant);
+                    setTempo(suivant === 'jouer' ? 'moments' : 'suivre');
+                  }}
+                >
+                  {enJeu ? `🎮 ${t('ml.mode.jouer')}` : `👁️ ${t('ml.mode.regarder')}`}
+                </button>
+              )}
+              {!e.fini && (
+                <div className="ml-tempos">
+                  {TEMPOS.filter((v) => v.id !== 'moments' || !!monPion).map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      className={`ml-tempo${tempo === v.id ? ' actif' : ''}`}
+                      title={t(v.aide)}
+                      aria-label={t(v.cle)}
+                      onClick={() => setTempo(v.id)}
+                    >
+                      <b>{v.emoji}</b><span>{t(v.cle)}</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className={`ml-tempo${enPause ? ' actif' : ''}`}
+                    aria-label={enPause ? t('ml.reprendre') : t('ml.pause')}
+                    title={enPause ? t('ml.reprendre') : t('ml.pause')}
+                    onClick={() => setEnPause((p) => !p)}
+                  >
+                    <b>{enPause ? '▶️' : '⏸️'}</b><span>{enPause ? t('ml.reprendre') : t('ml.pause')}</span>
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                className="ml-tiroir-bouton"
+                aria-label={t('ml.plus')}
+                onClick={() => setTiroir((v) => (v ? null : (large ? 'commandes' : 'fil')))}
+              >
+                ⋯
               </button>
-            ))}
+              {e.fini && <button className="btn vert" onClick={onFermer}>{t('ml.terminer')}</button>}
+            </div>
           </div>
-          <div className="ml-progression">
-            <span style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} />
-          </div>
-          {monPion && (
-            <span className="ml-endurance" title={t('ml.enduranceAide')}>
-              🫁 {Math.round(monPion.endurance)}%
-            </span>
+
+          {/* ═══ LA COLONNE DE DROITE — seulement sur grand écran ═════════ */}
+          {large && !e.fini && (
+            <aside className="ml-cote">
+              <div className="ml-fil" ref={filRef}>
+                <Fil lignes={e.commentaires} n={e.commentaires.length} />
+              </div>
+              {monPion && <Coaching {...{ consigneTexte, setConsigneTexte, envoiConsigne, envoyerConsigne, e }} />}
+            </aside>
           )}
-          {e.fini && <button className="btn vert" onClick={onFermer}>{t('ml.terminer')}</button>}
         </div>
 
-        {/* ---------- COACHING EN DIRECT ---------- */}
-        {monPion && !e.fini && (
-          <div className="ml-coaching">
-            <input
-              value={consigneTexte}
-              placeholder={t('ml.consigne')}
-              onChange={(ev) => setConsigneTexte(ev.target.value)}
-              onKeyDown={(ev) => { if (ev.key === 'Enter') void envoyerConsigne(); }}
-              maxLength={120}
-            />
-            <button className="x-poster" disabled={!consigneTexte.trim() || envoiConsigne}
-              onClick={() => void envoyerConsigne()}>
-              {envoiConsigne ? '…' : `📣 ${t('ml.transmettre')}`}
-            </button>
-            {e.consigne && e.consigne !== CONSIGNE_NEUTRE && (
-              <span className="ml-consigne">{e.consigne.libelle}</span>
-            )}
-          </div>
-        )}
-
-        {/* ---------- COMMENTAIRE / FEUILLE DE MATCH ---------- */}
-        {e.fini && stats ? (
-          <div className="ml-fil">
-            <div className="ml-resume">
-              <span>🏉 {stats.essaisA} – {stats.essaisB} {t('ml.essais')}</span>
-              <span>🔒 {e.compteurs.rucks} {t('ml.rucks')}</span>
-              <span>🙌 {e.compteurs.touches} {t('ml.touches')}</span>
-              <span>🌀 {e.compteurs.melees} {t('ml.melees')}</span>
-              <span>⚡ {e.compteurs.percees} {t('ml.percees')}</span>
+        {/* ═══ LE TIROIR — tout ce qui n'est pas le jeu ════════════════════ */}
+        {tiroir && (
+          <div className="ml-tiroir" role="dialog" aria-label={t('ml.plus')}>
+            <div className="ml-tiroir-onglets">
+              {([
+                ['fil', '📜', 'ml.onglet.fil'],
+                ['consigne', '📣', 'ml.onglet.consigne'],
+                ['commandes', '🕹️', 'ml.commandes.titre'],
+              ] as const)
+                .filter(([id]) => (id !== 'consigne' || !!monPion) && (id !== 'fil' || !large))
+                .map(([id, emoji, cleOnglet]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`chip-cat${tiroir === id ? ' actif' : ''}`}
+                    onClick={() => setTiroir(id)}
+                  >
+                    {emoji} {t(cleOnglet)}
+                  </button>
+                ))}
+              <button type="button" className="ml-tiroir-fermer" onClick={() => setTiroir(null)}>✕</button>
             </div>
-            {/* ⚠️ TOUTES LES STATISTIQUES SONT ACCESSIBLES (retour de jeu : « en
-                match on a pas accès à tous les stats »). Le moteur en compte
-                VINGT-TROIS et la feuille n'en montrait que cinq — un pilier qui
-                dominait la mêlée et gagnait ses touches lisait une ligne à
-                « 12 m, 9 plaquages » et rien d'autre. Plutôt qu'un tableau de
-                vingt-trois colonnes illisible sur téléphone, on range par
-                FAMILLE et on bascule d'un clic. */}
-            {/* ═══ MA NOTE, ET D'OÙ ELLE VIENT ═══════════════════════════
-                ⚠️ Retour de jeu : « notre joueur est jugé que sur plaquage,
-                mètres parcourus et essai, ce qui est dommage ». Le barème en
-                regarde quinze depuis longtemps — mais rien ne le montrait, et
-                le résumé ne citait que ces trois-là. Ici, chaque ligne du
-                barème est affichée avec ce qu'elle a rapporté ou coûté ; c'est
-                `detailNote` qui les produit, la fonction que `noterMatch`
-                additionne, donc ce qu'on lit EST la note. */}
-            {maNote && (
-              <details className="ml-ma-note">
-                <summary>
-                  ⭐ {t('ml.maNote')} — <b>{maNote.note}/10</b>
-                  <span> · {t('ml.noteExplication')}</span>
-                </summary>
-                <div className="ml-note-detail">
-                  {maNote.detail.map((l) => (
-                    <div key={l.cle} className="ml-note-ligne">
-                      <span>{t(l.cle, l.variables)}</span>
-                      <b data-signe={l.points > 0 ? 'plus' : l.points < 0 ? 'moins' : undefined}>
-                        {l.points > 0 ? '+' : ''}{Math.round(l.points * 10) / 10}
-                      </b>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            )}
 
-            <div className="cats-stats ml-vues">
-              {VUES_FEUILLE.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  className={`chip-cat${vueFeuille === v.id ? ' actif' : ''}`}
-                  onClick={() => setVueFeuille(v.id)}
-                >
-                  {v.emoji} {t(v.nomCle)}
-                </button>
-              ))}
-            </div>
-            {[e.clubA, e.clubB].map((club) => (
-              <div key={club} className="ml-bilan-groupe">
-                <div className="ml-bilan-tete">📋 {club}</div>
-                <div
-                  className="ml-bilan-entete"
-                  style={{ gridTemplateColumns: grilleColonnes }}
-                >
-                  <span /><span>{t('ml.joueur')}</span>
-                  {colonnes.map((c) => <span key={c.cle} title={t(c.titreCle)}>{c.entete}</span>)}
-                  <span>min</span>
-                </div>
-                {stats.parJoueur
-                  .filter((j) => j.club === club)
-                  .sort((a, b) => a.numero - b.numero)
-                  .map((j) => (
-                    <div
-                      key={`${j.club}-${j.numero}-${j.nom}`}
-                      className="ml-bilan-ligne"
-                      style={{ gridTemplateColumns: grilleColonnes }}
-                      data-moi={j.moi ? 'oui' : undefined}
-                      /* Les maillots 16 à 23 sont le banc : on les distingue. */
-                      data-banc={j.numero > 15 ? 'oui' : undefined}
-                    >
-                      <span className="ml-bilan-num" title={POSTE_PAR_ID[j.poste]?.nom}>{j.numero}</span>
-                      <span className="ml-bilan-nom">{j.nom}</span>
-                      {colonnes.map((c) => {
-                        const v = c.valeur(j.stats);
-                        return <span key={c.cle}>{v ? Math.round(v * 10) / 10 : '–'}</span>;
-                      })}
-                      <span>{j.minutes}′</span>
-                    </div>
-                  ))}
+            {tiroir === 'fil' && (
+              <div className="ml-fil" ref={large ? undefined : filRef}>
+                <Fil lignes={e.commentaires} n={e.commentaires.length} />
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="ml-fil" ref={filRef}>
-            <Fil lignes={e.commentaires} n={e.commentaires.length} />
+            )}
+            {tiroir === 'consigne' && monPion && (
+              <div className="ml-tiroir-corps">
+                <p className="ml-tiroir-note">{t('ml.consigneAide')}</p>
+                <Coaching {...{ consigneTexte, setConsigneTexte, envoiConsigne, envoyerConsigne, e }} />
+              </div>
+            )}
+            {tiroir === 'commandes' && (
+              <div className="ml-tiroir-corps">
+                <div className="ml-commandes-liste">
+                  <span>👆 {t('ml.commandes.tactile')}</span>
+                  <span>👆 {t('ml.commandes.sprintTactile')}</span>
+                  <span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>◀▲▼▶</kbd> · 🕹️ {t('ml.commandes.deplacer')}</span>
+                  <span><kbd>Maj</kbd> · <kbd>RT</kbd> — {t('ml.commandes.sprint')}</span>
+                  <span><kbd>Espace</kbd> · <kbd>A / ✕</kbd> — {t('ml.commandes.principale')}</span>
+                  {manetteVue.current && <span>🎮 {t('ml.manetteDetectee')}</span>}
+                  {/* ⚠️ LA NOTICE SE CONSTRUIT DEPUIS LA TABLE DES TOUCHES, pas
+                      depuis celle de la manette : sinon une action jouable au
+                      clavier mais non mappée sur un bouton n'apparaîtrait nulle
+                      part — c'est ce qui est arrivé à « Plaquer », l'action la
+                      plus utile du jeu, absente de l'écran d'aide. */}
+                  {TOUCHES.map(({ action, touche }) => {
+                    const def = ACTION_PAR_ID.get(action);
+                    if (!def) return null;
+                    const bouton = BOUTON_PAR_ACTION.get(action);
+                    return (
+                      <span key={action}>
+                        <kbd>{touche}</kbd>{bouton && <> · <kbd>{bouton}</kbd></>} — {def.emoji} {t(def.cle)}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </motion.div>
     </div>,
     document.body,
   );
+}
+
+/** Le champ de consigne au coach, partagé par la colonne et le tiroir. */
+function Coaching({
+  consigneTexte, setConsigneTexte, envoiConsigne, envoyerConsigne, e,
+}: {
+  consigneTexte: string;
+  setConsigneTexte: (v: string) => void;
+  envoiConsigne: boolean;
+  envoyerConsigne: () => Promise<void>;
+  e: EtatMatch;
+}) {
+  return (
+    <div className="ml-coaching">
+      <input
+        value={consigneTexte}
+        placeholder={t('ml.consigne')}
+        onChange={(ev) => setConsigneTexte(ev.target.value)}
+        onKeyDown={(ev) => { if (ev.key === 'Enter') void envoyerConsigne(); }}
+        maxLength={120}
+      />
+      <button className="x-poster" disabled={!consigneTexte.trim() || envoiConsigne}
+        onClick={() => void envoyerConsigne()}>
+        {envoiConsigne ? '…' : `📣 ${t('ml.transmettre')}`}
+      </button>
+      {e.consigne && e.consigne !== CONSIGNE_NEUTRE && (
+        <span className="ml-consigne">{e.consigne.libelle}</span>
+      )}
+    </div>
+  );
+}
+
+/** Position brute du ballon (sans interpolation) : ce que vise la caméra. */
+function positionBallon(e: EtatMatch): Vec {
+  if (e.porteur) return e.porteur.pos;
+  if (e.vol) {
+    const k = Math.min(1, e.vol.ecoule / e.vol.duree);
+    return {
+      x: e.vol.de.x + (e.vol.vers.x - e.vol.de.x) * k,
+      y: e.vol.de.y + (e.vol.vers.y - e.vol.de.y) * k,
+    };
+  }
+  return e.ballon;
+}
+
+/** Position affichée du ballon, interpolée entre deux pas de simulation. */
+function positionBallonInterpolee(e: EtatMatch, r: number): { x: number; y: number; h: number } {
+  if (e.porteur) {
+    return { x: e.porteur.pos.x + e.porteur.vitesse.x * r, y: e.porteur.pos.y + e.porteur.vitesse.y * r, h: 0 };
+  }
+  if (e.vol) {
+    const k = Math.min(1, (e.vol.ecoule + r) / e.vol.duree);
+    return {
+      x: e.vol.de.x + (e.vol.vers.x - e.vol.de.x) * k,
+      y: e.vol.de.y + (e.vol.vers.y - e.vol.de.y) * k,
+      h: e.vol.hauteur * Math.sin(Math.PI * k),
+    };
+  }
+  return { x: e.ballon.x, y: e.ballon.y, h: 0 };
+}
+
+/** La tête du joystick, bornée au rayon de déflexion. */
+function teteStick(j: { dx: number; dy: number }): React.CSSProperties {
+  const norme = Math.hypot(j.dx, j.dy) || 1;
+  const k = Math.min(1, norme / RAYON_STICK);
+  return {
+    transform: `translate(${(j.dx / norme) * k * RAYON_STICK}px, ${(j.dy / norme) * k * RAYON_STICK}px)`,
+  };
 }

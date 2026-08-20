@@ -233,6 +233,23 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   ruck, les trois-quarts étalés, et en face une vraie **ligne défensive**. Le
   résultat est le vrai : regarder le match ou passer la semaine donne exactement
   le même score.
+- **🎮 Tu joues ton joueur, pas seulement ton club.** Pendant le match, une barre
+  d'actions suit la phase : ballon en main, tu **sprintes**, tu **crochètes**, tu
+  **raffutes**, tu **passes** ou tu **tapes** ; sans ballon, tu **réclames** la
+  balle ou tu **suis le porteur** ; en défense, tu **plaques**, tu **montes** ou
+  tu **grattes** au sol. Raccourcis 1 à 9 au clavier, boutons au pouce sur
+  téléphone. Chaque geste coûte de l'endurance et se paie quand il rate : un
+  plaquage lancé et manqué laisse un trou, un grattage mal placé donne une
+  pénalité. Tu changes **comment** on marque, jamais **combien** : le score reste
+  celui du championnat.
+- **🥊 Et tu peux chercher la bagarre.** Chambre un adversaire et la température
+  du match monte ; quelqu'un finit par craquer, et là **le jeu s'arrête et te
+  demande un ordre** : on y va tous, protège-le, on se calme, ou je recule.
+  ⚠️ **Ça ne se passe pas du tout pareil selon l'étage.** En Fédérale ça part au
+  quart de tour et l'arbitre distribue les cartons — mais la commission fait dans
+  la semaine et le pardon. En Top 14, personne ne relève une provocation ; celui
+  qui craque prend un rouge, une convocation, la vidéo, et **peut y laisser sa
+  saison** (jusqu'à 34 semaines). Sans compter la main cassée sur un casque.
 - **Classements individuels dans toutes les ligues** : meilleurs marqueurs,
   meilleurs pointeurs, **% de réussite des buteurs**, plaquages (nombre et
   taux), grattages, turnovers, passes décisives, cartons, temps de jeu. Tous les
@@ -383,15 +400,48 @@ télécharger, et la réponse arrive en quelques centaines de millisecondes.
 ⚠️ **Un quota atteint n'est pas une panne, et ça ne s'affiche nulle part.**
 Quand Groq refuse (429), le jeu lit l'heure de reprise annoncée, bascule en
 silence sur ses situations et réponses pré-écrites, et **repart sur l'IA tout
-seul** à la seconde où elle se libère. Deux modèles sont essayés dans l'ordre :
-les limites étant comptées par modèle chez Groq, le second répond presque
-toujours quand le premier est à sec. Le seul endroit qui montre cet état, c'est
+seul** à la seconde où elle se libère. Trois modèles sont essayés dans l'ordre —
+`openai/gpt-oss-20b`, puis `openai/gpt-oss-120b`, puis `qwen/qwen3.6-27b` : les
+limites étant comptées par modèle chez Groq, le suivant répond presque toujours
+quand le premier est à sec. ⚠️ **On part du moins cher**, et non du plus gros :
+la clé du site est partagée par tous les joueurs, et le petit modèle suffit
+largement au JSON court et cadré qu'on lui demande. Le seul endroit qui montre cet état, c'est
 **⚙️ Réglages** — modèle utilisé, quota, reprise estimée — et on peut y coller
 **sa propre clé** pour avoir son quota à soi.
 
 Configuration : `VITE_GROQ_KEY` dans `.env.local` (voir `.env.example`).
 ⚠️ Cette clé est **publique** — c'est le prix à payer pour que personne n'ait
 rien à saisir, et c'est un choix assumé.
+
+## 🎮 Le match se joue enfin — caméra, moments, et un pouce sur chaque bord
+
+Retour de jeu : « le système de jeu durant les matchs est injouable et pas fun,
+et il faut que ça marche sur téléphone ». Le moteur n'était pas en cause — il
+simule trente joueurs sept fois par seconde et son étalonnage n'a pas bougé.
+C'est tout ce qui se trouvait **entre le moteur et le pouce** qui a été refait.
+
+| Ce qui n'allait pas | Ce que ça donnait | Ce qui le remplace |
+| --- | --- | --- |
+| Aucune caméra : les 122 × 70 m d'un seul tenant | Un joueur fait **3 px** sur un téléphone. On ne trouve pas son propre pion. | Une caméra qui suit et cadre **46 m** quand c'est à toi : le joueur fait 20 px. |
+| La vitesse « ×1 » valait **cinq fois le temps réel** | Un plaquage à contrer durait deux dixièmes de seconde. On cliquait toujours après coup. | Le tempo **🎯 Moments** : ×9 quand il ne se passe rien pour toi, **temps réel** dès qu'une action te concerne. |
+| Les boutons vivaient 200 px sous le terrain, dans une barre qui défilait | Il fallait quitter le jeu des yeux, chercher, et faire défiler. | Un **gros bouton contextuel** sous le pouce droit, trois secondaires, un joystick flottant sous le pouce gauche. |
+| Notice, consigne, fil et six boutons de vitesse empilés sous le terrain | Le terrain tombait à un bandeau de 200 px. | Tout part dans un **tiroir** (📜 fil · 📣 consigne · 🕹️ commandes). Sur grand écran, le fil revient en colonne. |
+
+**Le terrain pivote d'un quart de tour sur un téléphone tenu droit**, et l'on
+attaque toujours vers le haut de l'écran — camp A ou camp B, match après match.
+L'image et la commande partagent la même matrice : un pivot ne peut pas les
+désaccorder, et `verifMatchJouable.ts` le vérifie dans les quatre orientations.
+
+Mesuré (`npx vite-node scripts/verifMatchJouable.ts`) :
+
+- **11,4 minutes** de manette pour un match complet en tempo « Moments » ;
+- **24 %** du match joué en temps réel — le reste défile ;
+- **168 moments** par match, d'une durée moyenne de **4,2 s** ;
+- la caméra ne montre **jamais** de vide autour du terrain, sur les trois formes d'écran testées.
+
+> ⚠️ Le score, lui, reste celui de la ligue : le joueur change **comment** on
+> marque, jamais **combien**. `verifControle.ts` et `verifMoteur.ts` sont
+> inchangés et passent toujours.
 
 ## 🚀 Démarrage
 
@@ -429,7 +479,12 @@ src/
   data/clubs.ts         # assemblage des compétitions : réelles (générées) + amateurs FR
   data/mondeReel.ts     # GÉNÉRÉ : 143 clubs (nom, ville, logo), coupes, sélections + classements
   data/effectifsReels.ts # GÉNÉRÉ : 6 306 joueurs réels 25-26 + note générale des clubs
-  lib/groq.ts           # transport Groq : clé, quota, bascule silencieuse, retour auto
+  lib/groq.ts           # transport Groq : clé, cascade de modèles, quota, bascule silencieuse
+  lib/moteur/controle.ts # les 13 actions du joueur en match : contexte, coût, recharge
+  lib/moteur/camera.ts  # la caméra du direct : cadrage en mètres, quart de tour en portrait
+  lib/moteur/moments.ts # « c'est à toi » : le match ralentit en temps réel sur tes actions
+  components/match/     # la scène du direct : pelouse, feuille de match
+  lib/moteur/bagarre.ts # tension, provocations, bagarres, cartons et commission de discipline
   lib/mj.ts             # prompt système du Maître du Jeu, parsing JSON et GARDE-FOUS
   lib/iaSociale.ts      # publications, commentaires et messages privés écrits par l'IA
   lib/pub.ts            # publicité : où elle a le droit d'être, et la pub récompensée
@@ -449,6 +504,8 @@ scripts/
   verifSelection.ts     # sélections atteignables, petites nations comprises
   verifArmoire.ts       # armoire à trophées : étagères décodées du .glb, boucliers adossés, cadrage mobile
   verifHonneurs.ts      # honneurs individuels : barème, équité entre postes, 60 carrières jouées
+  verifControle.ts      # contrôle du joueur : actions contextuelles, discipline amateur/pro, bagarres
+  verifMatchJouable.ts  # caméra, sens du stick, rythme des moments, durée réelle d'un match
   verifMarche.ts        # marché : variété des clubs, saut d'étage interdit, salaires par âge
   verifClassement.ts    # joue le tricheur : chaque attaque du classement doit être refusée
   verifLogosSelections.ts # signatures des images et couverture du classement World Rugby

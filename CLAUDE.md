@@ -3364,10 +3364,12 @@ bougé d'une ligne : le moteur a changé, l'étalonnage de difficulté non.
 
 **Un quota atteint n'est pas une panne.** Trois mécanismes s'enchaînent :
 
-1. **Deux modèles, dans l'ordre** (`MODELES_GROQ` : `llama-3.3-70b-versatile`
-   puis `llama-3.1-8b-instant`). Chez Groq les limites sont comptées **par
-   modèle** : quand le gros est épuisé, le petit ne l'est presque jamais. On
-   dégringole donc d'un cran avant de couper quoi que ce soit.
+1. **Trois modèles, dans l'ordre** (`MODELES_GROQ`). Chez Groq les limites sont
+   comptées **par modèle** : quand le premier est épuisé, le suivant ne l'est
+   presque jamais. On dégringole donc d'un cran avant de couper quoi que ce
+   soit. ⚠️ **La cascade a changé de composition ET de doctrine** — voir
+   « L'IA REPART SUR GPT-OSS » plus bas : les modèles Llama ont disparu du
+   catalogue Groq, et on part désormais du **moins cher**.
 2. **Le blocage est daté.** `delaiDeReprise()` lit l'en-tête `retry-after`, à
    défaut `x-ratelimit-reset-*`, à défaut le « try again in 7m32.6s » du corps
    d'erreur. ⚠️ `dureeEnMs()` lit **`ms` avant `m`** — sans ça, `850ms` devenait
@@ -3790,3 +3792,412 @@ ne se charge sans consentement », « jamais d'interstitiel ni de pop-up ») : u
 notification push est exactement ce que ces règles écartent, et elle échappe au
 bandeau de consentement du jeu puisque c'est la régie qui la déclenche. À
 trancher avant d'ajouter le tag Monetag dans la page.
+
+
+## 🔌 L'IA REPART SUR GPT-OSS — les modèles Llama ont disparu de Groq
+
+Retour de jeu : « sur Groq le modèle Llama n'est plus dispo, seuls GPT et Qwen
+le sont je crois — donc switch sur le plus économe ».
+
+### ⚠️ CE N'ÉTAIT PAS UNE PANNE VISIBLE, ET C'EST LE PIRE CAS
+
+`llama-3.3-70b-versatile` et `llama-3.1-8b-instant` ne figurent plus au
+catalogue de production de Groq. Le premier appel répondait donc **404
+`model_decommissioned`** — et comme la cascade sortait sur son `break` « panne
+réseau », le second modèle (mort lui aussi) n'était même pas tenté. Résultat :
+**toute l'IA du jeu était muette, en silence**, puisque par construction un
+problème d'IA ne s'affiche jamais au joueur (règle du projet). Le jeu tournait
+sur son contenu pré-écrit, et rien ne pouvait le signaler.
+
+### La cascade, et pourquoi elle part du plus petit
+
+| Ordre | Modèle | $ / M jetons (entrée / sortie) | Rôle |
+|---|---|---|---|
+| 1 | `openai/gpt-oss-20b` | **0,075 / 0,30** | le moins cher, production |
+| 2 | `openai/gpt-oss-120b` | 0,15 / 0,60 | repli quand le quota du 20b est épuisé |
+| 3 | `qwen/qwen3.6-27b` | ~0,29 / ~0,59 | dernier recours, catalogue *preview* |
+
+⚠️ **C'EST UN CHANGEMENT DE DOCTRINE, PAS UN SIMPLE RENOMMAGE.** L'ancienne
+cascade descendait du gros modèle vers le petit (« le meilleur d'abord »). On
+fait l'inverse : la clé du site est partagée par TOUS les joueurs, et ce qu'on
+demande au modèle est du JSON court et cadré dont `lib/mj.ts` reste de toute
+façon l'autorité (`plafonnerDeltas`, `ressembleATriche`). Les limites Groq étant
+comptées **par modèle**, la cascade reste par ailleurs la mécanique anti-quota.
+
+### Les trois garde-fous ajoutés avec
+
+1. **`ErreurModeleIA` + `modeleDisparu()`** — un 400/404 dont le corps parle de
+   modèle (`model_not_found`, `model_decommissioned`…) met ce modèle au repos
+   **douze heures** et **passe au suivant** au lieu de couper la cascade. C'est
+   exactement le cas qui vient d'arriver : il ne peut plus tuer l'IA.
+   `erreurSilencieuse()` la classe comme invisible, comme un quota.
+2. **`reasoning_effort: 'low'`, et seulement pour gpt-oss.** Groq refuse (400)
+   un paramètre inconnu : l'envoyer « au cas où » couperait le modèle qu'il est
+   censé économiser. Il divise par deux les jetons de sortie facturés.
+3. **Le budget de jetons a une marge (+260) et le `reasoning` sert de
+   repêchage.** Chez un modèle qui raisonne, les jetons de réflexion sont
+   décomptés de `max_tokens` : au plafond d'origine, le JSON se faisait couper
+   net. Et si `content` revient vide, on rend le `reasoning` quand il contient
+   une accolade — `lib/mj.ts` sait extraire un objet noyé dans du texte.
+
+⚠️ **La sauvegarde répare le modèle mémorisé** : `s.modele` pointait un nom de
+modèle Llama, et ⚙️ Réglages l'affichait encore. La migration le remplace dès
+qu'il ne fait plus partie de `MODELES_GROQ` — pas de bump de version, c'est une
+réparation idempotente.
+
+`VITE_GROQ_MODELE` surcharge toujours la cascade sans toucher au code.
+Vérification : `npx vite-node scripts/verifIA.ts`.
+
+
+## 🎮 LE JOUEUR PREND LA MAIN — actions, provocations, bagarres
+
+Demande explicite : « en match, j'aimerais qu'on puisse avoir l'option de
+contrôler notre joueur comme dans un jeu — plaquage, sprint, passe, grattages,
+etc. ; et qu'il puisse y avoir des bagarres si on insulte des joueurs, avec
+l'option de pouvoir donner des ordres, avec répercussions : cartons plus souvent
+en amateur et presque jamais en pro, qui suivent de grosses sanctions,
+suspensions pour la saison, blessures, etc. »
+
+| Fichier | Rôle |
+|---|---|
+| `moteur/controle.ts` | Les **13 actions**, leur disponibilité selon la phase, le coût en endurance, la recharge. Ne connaît pas `moteur.ts` — c'est l'inverse. |
+| `moteur/bagarre.ts` | La **tension**, la provocation, le coup de poing, la bagarre, les cartons, les blessures, et la **commission d'après-match**. |
+| `moteur/etat.ts` | `NiveauMatch`, `ActionJoueur`, `IntentionJoueur`, `Bagarre`, `DisciplineMatch`, et `ajouterCommentaire()` — mis en commun pour éviter le cycle `moteur ↔ bagarre`. |
+| `moteur/moteur.ts` | Consomme l'intention là où elle se joue : contact, ruck, choix de combinaison, phase `bagarre`. |
+| `components/MatchLive.tsx` | La barre d'actions contextuelle, la jauge de tension, le panneau d'ordres, la sanction d'après-match. |
+| `store/useGame.ts` | `appliquerSanctionMatch()` — le seul chemin par lequel la discipline du terrain devient une conséquence de carrière. |
+
+### ⚠️ CE QUI A ÉTÉ TRANCHÉ AVANT D'ÉCRIRE UNE LIGNE
+
+1. **ON NE PILOTE PAS AU JOYSTICK.** Le moteur déplace trente pions à inertie
+   sept fois par seconde ; poser deux flèches dessus donnerait un pion qui
+   glisse à côté du rugby des vingt-neuf autres. Le joueur donne des
+   **intentions de rugbyman**, le moteur les joue avec ses règles.
+2. **UNE INTENTION EST ARMÉE, PAS INSTANTANÉE** — « je plaque » ne veut rien
+   dire quand le porteur est à quinze mètres. Elle reste valable quelques
+   secondes puis expire.
+3. **UN SEUL ORDRE À LA FOIS** (`e.intention`) : on ne sprinte pas en grattant.
+4. **ÇA COÛTE, ET ÇA RISQUE.** Endurance à la demande ; un plaquage lancé et
+   manqué laisse un trou de trois secondes, un crochet raté rend le ballon une
+   fois sur huit, un grattage mal placé donne une pénalité une fois sur cinq.
+
+### Les treize actions, par famille
+
+| Famille | Actions | Quand |
+|---|---|---|
+| **Ballon en main** | 🏃 Sprint · ↩️ Crochet · 💪 Raffut · 🤝 Passer · 🦶 Taper | on est le porteur |
+| **Attaque sans ballon** | 🙋 Réclamer · 🤸 Soutien | ballon vivant, son équipe l'a |
+| **Défense** | 💥 Plaquer · ⬆️ Monter · 🪝 Gratter | ballon vivant, l'adversaire l'a |
+| **Discipline** | 🗯️ Chambrer · 🥊 Frapper · ✋ Calmer | un adversaire à moins de 26 m |
+
+⚠️ **LA BARRE NE MONTRE QUE CE QUI EST JOUABLE** — trois à cinq boutons, pas
+treize dont onze grisés : sur un téléphone de 375 px, une barre grise est
+illisible et oblige à chercher ce qui est actif. Et **quand rien n'est jouable,
+on dit POURQUOI** (sur le banc, sous carton, en recharge, phase morte) — vu en
+jeu : le joueur démarrait remplaçant, la manette s'affichait, aucun bouton
+n'apparaissait jamais et rien ne l'expliquait.
+
+Raccourcis clavier **1 à 9**, lus sur `ev.code` (`Digit1`) et non `ev.key` : sur
+un clavier AZERTY, la rangée des chiffres rend « & é " ' ( » sans Maj.
+
+### ⚠️ LE TEMPS DE RECHARGE — ce que le banc d'essai a révélé
+
+`scripts/verifControle.ts` joue un **pilote qui martèle le bouton** : c'est ce
+que fera un vrai joueur. Sans recharge, la première version donnait :
+
+| | sans recharge | avec |
+|---|---|---|
+| ballons portés (« Réclamer » en boucle) | **60** (un 3ᵉ ligne en porte 12) | 25 |
+| ballons grattés | **14** | 8,6 |
+| bagarres par match | **16** | 3 en amateur, 0,4 en pro |
+| endurance à la sirène (sprint en boucle) | 14 | 17 |
+
+Ce n'était pas un défaut de réglage mais de conception : un geste de rugby
+demande de se replacer, de souffler, et de se faire oublier de l'arbitre.
+Chaque action porte donc une `recharge` (2 s pour une passe, 15 s pour un
+grattage, **45 s pour chambrer ou frapper**), toujours ≥ sa durée d'armement.
+Deux garde-fous s'y ajoutent : réclamer le ballon exige d'être **à 25 m** et ne
+marche qu'**une fois sur deux** (le 9 n'écoute pas toujours), et la riposte
+adverse s'**amortit après chaque altercation** (`/(1 + 2n)`) — au rugby, la
+première échauffourée change tout. Au-delà de **trois** altercations, plus rien
+ne part : l'arbitre aurait vidé le terrain.
+
+### ⚠️ AMATEUR / PRO : l'asymétrie demandée, mesurée
+
+La coupure est à la **Nationale 2 (niveau 4)** : au-dessus — Top 14, Pro D2,
+Nationale, championnats étrangers (niveau 0) et sélections — on est en
+professionnel. `creerMatch(..., { niveau })`, **`pro` par défaut** : c'est ce
+défaut qui garantit que la simulation de fond et les scripts de mesure gardent
+l'étalonnage documenté.
+
+| Mesuré (`verifControle.ts`, pilote qui chambre tout le match) | amateur | pro |
+|---|---|---|
+| bagarres par match | 3,0 | **0,4** |
+| cartons par match (toutes causes) | 2,75 | 1,50 |
+| suspension après un coup de poing | 5,3 semaines | **20,6 semaines** |
+
+C'est la demande, littéralement : ça part au quart de tour en Fédérale et
+l'arbitre distribue, mais la commission fait dans la semaine ; en Top 14
+personne ne relève une provocation — et celui qui craque joue sa saison. Deux
+réglages portent tout : `chanceDeRiposte()` (22 % contre 1,2 % à froid) et
+`sanctionApresMatch()` (3-8 semaines contre 12-34).
+
+### La bagarre : le jeu attend un ordre
+
+La phase `bagarre` **ne fait rien** tant que `e.bagarre.ordre` est nul : l'écran
+met la pause et pose la question. Quatre ordres, chacun annonçant son prix —
+🥊 *On y va tous* (générale, cartons des deux côtés) · 🛡️ *Protéger* (risque
+moyen) · ✋ *On se calme* (l'arbitre le voit, la sanction s'allège) · 🚶
+*Reculer* (aucune sanction). Un **garde-fou d'attente** tranche tout seul au
+bout de 90 s simulées : sans lui, un appel à `avancer()` hors interface
+(simulation de fond, script de mesure) tournerait sans fin.
+
+Le verdict tient en une note de **culpabilité** — origine de la bagarre, coup
+porté, ordre donné — puis en une table de cartons qui dépend du niveau. Rien
+n'est tiré au sort avant cette note : c'est ce qui rend la sanction lisible et
+jamais arbitraire. En amateur, une générale envoie en plus un **troisième
+larron** au vestiaire une fois sur deux — c'est le rugby du dimanche.
+
+### Ce que le match laisse à la carrière
+
+`bilan(e).discipline` porte l'ardoise du joueur ; `MatchLive` la passe à
+**`appliquerSanctionMatch()`** juste après `enregistrerMatchVecu` :
+
+- **carton rouge** → citation (pro 3-8 semaines, amateur 2-4) ;
+- **coup de poing** → pro 12-34 semaines (la saison peut y passer), amateur 3-8 ;
+- **coup non vu par l'arbitre** → la vidéo rattrape : cité 62 % du temps en pro,
+  22 % en amateur. C'est ce qui empêche « frapper quand l'arbitre regarde
+  ailleurs » d'être une stratégie ;
+- **blessure de bagarre** (arcade, nez, main cassée, plancher orbitaire) ;
+- un rouge sans citation coûte quand même 10 de confiance du staff.
+
+⚠️ **ON NE CUMULE PAS DEUX INDISPONIBILITÉS.** `Joueur.blessure` est un champ
+unique — il porte aussi bien un ligament croisé qu'une suspension. Main cassée
++ quinze semaines de suspension, ce n'est pas vingt et une semaines d'absence :
+c'est la plus longue des deux, l'autre se soignant pendant.
+
+### Ce qui n'a PAS bougé
+
+- **Le score reste celui de la ligue** : vérifié, 0 écart sur 12 matchs pilotés.
+  Le joueur change COMMENT on marque, jamais COMBIEN.
+- **Le déterminisme du moteur** : deux pilotages identiques donnent le même
+  match. Le contrôle vit dans l'état (`e.intention`, `e.recharge`, `e.tension`),
+  jamais dans une variable de module.
+- **L'étalonnage du moteur** : `verifMoteur.ts` inchangé (le niveau vaut `pro`
+  par défaut, le contrôle est éteint hors interface).
+
+```bash
+npx vite-node scripts/verifControle.ts    # actions contextuelles, gestes qui pèsent, discipline amateur/pro
+npx vite-node scripts/verifMoteur.ts      # l'étalonnage du moteur ne doit pas bouger
+npx vite-node scripts/verifIA.ts          # la cascade de modèles Groq
+npx vite-node scripts/verifTraductions.ts # les clés ajoutées, dans les 7 langues
+```
+
+---
+
+## 🎮 LE MATCH SE JOUE ENFIN — caméra, moments, HUD sous le pouce
+
+Retour de jeu, mot pour mot : **« refait le système de jeu durant les matchs car
+actuellement c'est injouable et pas fun, de plus il faut que ça marche sur
+téléphone »**.
+
+### ⚠️ CE QUI N'ÉTAIT PAS EN CAUSE : LE MOTEUR
+
+Première chose vérifiée, et il faut le dire d'emblée pour que personne n'aille
+le « réparer » : `lib/moteur/` va bien. Trente pions, sept ticks par seconde,
+étalonnage tenu (`verifMoteur.ts` inchangé, `verifControle.ts` inchangé). Le
+problème était **entièrement entre le moteur et le pouce**. Quatre défauts, et
+chacun suffisait à lui seul à rendre le match injouable.
+
+#### 1. Il n'y avait AUCUNE CAMÉRA
+
+L'écran affichait les 122 × 70 mètres du terrain d'un seul tenant, en gardant
+les proportions réelles. Sur un téléphone de 375 px, un joueur mesure alors
+**3 pixels**. On ne distingue pas son propre pion, on ne voit pas qui vient
+plaquer, on ne sait pas à qui l'on passe. **Aucun réglage de bouton ne rattrape
+ça** — c'est pour cela qu'il fallait commencer par là.
+
+→ **`src/lib/moteur/camera.ts`** (nouveau). Trois décisions y sont écrites en
+tête de fichier, et elles expliquent tout le reste :
+
+- **Le cadrage se mesure en MÈTRES DE TERRAIN, pas en zoom.** « proche » ne veut
+  pas dire « ×2,7 », ça veut dire « 46 mètres de longueur à l'écran ». C'est la
+  seule définition qui donne la même lisibilité sur 375 px et sur 1 440 : le
+  pion fait toujours la même fraction de l'écran, donc toujours la même taille
+  au doigt. Les trois cadrages : `large` (122 m, spectateur), `suivi` (78 m),
+  `proche` (46 m).
+- **En portrait, le terrain PIVOTE D'UN QUART DE TOUR.** Un terrain fait 1,74
+  fois plus long que large ; un téléphone tenu droit fait 2,2 fois plus haut que
+  large. Poser l'un dans l'autre sans pivoter, c'est jeter les trois quarts de
+  l'écran. On joue donc vers le haut. Le pivot est une **rotation propre** (0°,
+  180°, ±90° — jamais un miroir) : seuls les numéros de maillot reçoivent la
+  rotation inverse pour rester lisibles.
+- **On attaque TOUJOURS dans le même sens.** Le moteur fait attaquer A vers les
+  X croissants et B vers les décroissants ; l'écran tourne le monde de 180°
+  quand on joue pour B. Le joueur pousse toujours son stick vers l'en-but
+  adverse, match après match, sans jamais se demander de quel côté il joue.
+  C'est ce qui rend le pilotage réflexe plutôt que réfléchi.
+
+⚠️ **LA MÊME MATRICE DESSINE ET LIT LE JOYSTICK.** `Vue` expose `transform`,
+`redresser`, `versEcran`, `versMonde` et `directionMonde` : le rendu utilise les
+premiers, la commande le dernier. Deux implémentations, et le premier signe de
+travers envoie le joueur dans son propre en-but sans que rien ne le montre à la
+relecture. `verifMatchJouable.ts` teste les quatre orientations.
+
+⚠️ **LA CAMÉRA COUPE AU LIEU DE VOYAGER** au-delà de 34 m de saut (dégagement,
+mêlée à l'autre bout, reprise après essai). Une caméra qui traverse le terrain
+en glissant fait perdre deux secondes de jeu à chaque coup de pied — et on rate
+justement l'action qu'on suivait. Le rattrapage est exponentiel exact
+(`1 − e^(−dt/τ)`, τ = 0,28 s) : un `lerp(a, b, 0.1)` par image aurait suivi deux
+fois plus vite à 120 Hz qu'à 60.
+
+#### 2. ⚠️ LE JEU TOURNAIT À CINQ FOIS LA VITESSE RÉELLE PENDANT QU'ON PILOTAIT
+
+C'est le défaut le plus grave, et il était **invisible dans le code** : la
+vitesse affichée « ×1 » valait `facteur: 5`. Une seconde de poignet pour cinq
+secondes de rugby. Un plaquage à contrer durait **deux dixièmes de seconde** à
+l'écran. Ce n'était pas exigeant, c'était impossible — on cliquait après coup,
+toujours. **Le libellé mentait, et c'est ce mensonge qui faisait croire que le
+pilotage était cassé alors qu'il était seulement cinq fois trop rapide.**
+
+Mais on ne peut pas jouer 80 minutes en temps réel non plus : un match contient
+~35 minutes de ballon vivant, et passer trente-cinq minutes à trottiner pour
+vivre quatre minutes de rugby, c'est le second visage du « pas fun ».
+
+→ **`src/lib/moteur/moments.ts`** (nouveau). **Le match défile, et il s'arrête
+sur toi.** Le jeu file à ×9 tant qu'il ne se passe rien pour ton joueur, et
+retombe en **TEMPS RÉEL** dès qu'un ballon arrive sur toi, qu'un porteur te fonce
+dessus ou qu'un regroupement se forme à ta portée. C'est le mode « carrière
+joueur » des jeux de sport : on ne vit que ses propres moments, mais on les vit
+vraiment, à la bonne vitesse, avec le temps de décider.
+
+Les quatre tempos disent désormais ce qu'ils **font**, pas un facteur qui mentait :
+
+| Tempo | Sur ton moment | Le reste du temps |
+| --- | --- | --- |
+| 🎯 Moments (défaut en pilotage) | ×1 — temps réel | ×9 |
+| 👁️ Suivre (défaut en spectateur) | ×5 | ×5 |
+| ⏩ Accéléré | ×18 | ×18 |
+| ⏭️ Fin | ×600 | ×600 |
+
+⚠️ **LE RALENTI TIENT 1,2 s APRÈS LA FIN DU MOMENT** (`TENUE`). Une passe reçue
+et donnée en une seconde ferait clignoter la vitesse trois fois par phase, et le
+joueur n'aurait jamais le temps de voir le résultat de son geste.
+
+⚠️ **MAIS LA BANNIÈRE, ELLE, SUIT LE MOMENT VRAI.** Deux champs dans la ref, pas
+un : `actuel` pour ce qu'on affiche, `tenue` pour le ralenti. Vu en jeu avec un
+seul champ : on lisait encore « le ballon est à toi » deux secondes après l'avoir
+donné.
+
+##### ⚠️ ET LE RÉGLAGE A DÛ ÊTRE REPRIS DEUX FOIS — MESURÉ
+
+Le premier jet déclenchait un moment dès que le porteur adverse était à 21 m.
+`verifMatchJouable.ts` a relevé **47 % du match joué au ralenti**, soit **20
+minutes** de manette pour un match. Un ralenti permanent n'est pas du ralenti,
+c'est un jeu lent — et l'accélération entre les moments ne servait plus à rien.
+Trois corrections, dans l'ordre où elles ont été mesurées :
+
+1. Les portées ont été resserrées (défense 21 → **14 m**, ruck 13 → **9 m**,
+   ballon libre 16 → **12 m**) et « je suis le prochain de la combinaison » ne
+   regarde plus que **le prochain**, pas les deux suivants. → 37 %.
+2. **Le porteur doit VENIR VERS TOI** (produit scalaire de sa vitesse avec le
+   vecteur qui va vers toi). Sans ça, le jeu ralentissait pendant que le ballon
+   s'éloignait à l'autre bout de la ligne.
+3. ⚠️ **ET IL FAUT ÊTRE LE MIEUX PLACÉ DE SON CAMP** (`leMieuxPlace`). C'est la
+   condition qui dit « c'est pour toi » : « à quatorze mètres du ballon » décrit
+   la moitié d'une ligne défensive, alors qu'un plaquage, un grattage ou un
+   ballon qui traîne, c'est **le plus proche** qui y va. → **24 %**, et 11,4
+   minutes de manette.
+
+#### 3. Les commandes vivaient SOUS le terrain, dans une barre qui défilait
+
+Jusqu'à cinq vignettes de 58 px dans un conteneur à **défilement horizontal**,
+deux cents pixels sous l'action. Il fallait quitter le jeu des yeux, chercher le
+bon bouton, et le faire défiler.
+
+→ **Le HUD est POSÉ SUR LE TERRAIN.**
+
+- **Joystick flottant sous le pouce gauche.** Le premier contact devient le
+  centre, la direction est le vecteur jusqu'au doigt. ⚠️ **Il ne part que de la
+  moitié gauche** : laisser le joystick naître n'importe où mettait les deux
+  pouces en concurrence — on visait le gros bouton, on ratait de dix pixels, et
+  le pion partait en courant. Au repos il reste visible en bas à gauche (un
+  joystick invisible est un joystick qu'on ne trouve pas), et il disparaît sur
+  un écran à souris (`@media (hover: hover) and (pointer: fine)`).
+- ⚠️ **LE SPRINT EST DANS LE STICK**, pas sur un bouton : pousser à 86 % de la
+  déflexion sprinte. Sur téléphone on n'a que deux pouces ; un troisième bouton
+  demanderait un doigt qu'on n'a pas, et ne serait jamais pressé.
+- **Un disque de 88 px sous le pouce droit** : l'action évidente de la situation
+  (`actionPrincipale`), écrite en clair — et quand c'est une passe, **avec le
+  numéro du receveur**. Trois boutons secondaires en arc pour qui veut choisir.
+- ⚠️ **LA DISCIPLINE EST DERRIÈRE SON PROPRE BOUTON 💢.** Un « frapper » touché
+  à la place d'un « passer », c'est une demi-saison de suspension. La jauge de
+  tension est dessus : un risque qu'on ne voit pas n'est pas un choix.
+- **Sur le terrain** : chevron + aura sur son pion (« où est mon joueur »),
+  cercle pointillé sur le receveur de la passe, réticule rouge sur le porteur à
+  plaquer, flèche de bord quand le ballon sort du cadre. Une décision qu'on ne
+  voit pas n'est pas une décision.
+
+#### 4. Le reste mangeait l'écran
+
+Notice dépliante, champ de consigne, fil de commentaire et six boutons de
+vitesse : sur 375 px, le terrain finissait en bandeau de 200 px sous une pile de
+panneaux.
+
+→ Tout ce qui **ne sert pas à jouer** part dans un tiroir (📜 fil · 📣 consigne ·
+🕹️ commandes), ouvert par `⋯` ou en touchant le bandeau de commentaire. Le fil
+est réduit à sa **dernière ligne** en haut du terrain. Sur écran large
+(≥ 980 px), il revient en colonne de droite — parce que là, il y a la place.
+
+### La structure de l'écran
+
+```
+MatchLive.tsx              l'orchestrateur : moteur, boucle, caméra, HUD, tiroir
+components/match/Pelouse.tsx      le terrain, dessiné UNE fois en mètres (memo)
+components/match/FeuilleMatch.tsx la feuille des 23 compteurs, à la sirène
+lib/moteur/camera.ts       cadrage, pivot, et les deux conversions écran ↔ terrain
+lib/moteur/moments.ts      « c'est à toi » + les quatre tempos
+```
+
+⚠️ **`Pelouse` NE SAIT RIEN DU CADRAGE.** Elle pose un terrain de 122 × 70 à
+l'origine, et c'est la caméra qui le place. C'est ce qui permet de la `memo`-ïser
+une fois pour toutes alors que la vue bouge à chaque image.
+
+⚠️ **LA TAILLE DE LA SCÈNE EST LUE PAR `ResizeObserver`, pas par
+`getBoundingClientRect()` à chaque image.** Lire la géométrie soixante fois par
+seconde force un recalcul de mise en page à chaque fois — c'est exactement ce qui
+fait tomber un téléphone de 60 à 40 images par seconde.
+
+⚠️ **`.match-live` A UNE HAUTEUR DÉTERMINÉE (`height`), PAS SEULEMENT UN
+PLAFOND.** La scène est en `flex: 1` : sans hauteur fixée sur le conteneur, elle
+se réduit à la hauteur de son contenu — c'est-à-dire zéro — et le terrain
+disparaît. Vu en développement : le SVG passait en flux normal, prenait sa taille
+du rapport du `viewBox`, faisait grandir la scène, ce qui changeait le rapport,
+qui rallongeait le SVG… jusqu'à **5 500 px de haut**.
+
+### Ce qui n'a PAS bougé
+
+- **Le score reste celui de la ligue** — `verifControle.ts` : 0 écart sur 12
+  matchs pilotés. Le joueur change COMMENT on marque, jamais COMBIEN.
+- **Le déterminisme du moteur** : la caméra et les moments sont des **lectures
+  pures** de l'état. Changer la vitesse d'affichage ne change pas le match,
+  seulement le nombre de secondes réelles qu'il met à se jouer.
+- **Les treize actions, la tension, les bagarres et la commission de
+  discipline** : intactes (`moteur/controle.ts`, `moteur/bagarre.ts`).
+- **La feuille de match et le barème de la note** : le même code, déplacé dans
+  son propre fichier.
+
+### Ce que le store gagne
+
+`tutoMatchVu` — la notice de la manette s'affiche **une fois** et se referme au
+premier geste. ⚠️ Elle est séparée de `tutoVu` : celui-ci explique le JEU (« tu
+es un joueur, pas un manager »), celle-là explique les COMMANDES. Quelqu'un qui a
+passé l'accueil il y a trois saisons découvre quand même la manette à son premier
+match piloté.
+
+```bash
+npx vite-node scripts/verifMatchJouable.ts # caméra, sens du stick, rythme des moments, durée réelle
+npx vite-node scripts/verifControle.ts     # inchangé : actions, discipline, score de la ligue
+npx vite-node scripts/verifMoteur.ts       # inchangé : l'étalonnage du moteur
+npx vite-node scripts/verifTraductions.ts  # les 30 clés ajoutées, dans les 7 langues
+```

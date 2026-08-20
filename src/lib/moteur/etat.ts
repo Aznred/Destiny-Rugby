@@ -21,6 +21,7 @@ export type Phase =
   | 'transformation'
   | 'apresEssai'
   | 'miTemps'
+  | 'bagarre'        // ça a dégénéré : le jeu attend l'ordre du joueur
   | 'fini';
 
 // Les phases pendant lesquelles le chronomètre défile vite : le ballon est mort,
@@ -47,6 +48,96 @@ export interface Commentaire {
 }
 
 export type SystemeDefensif = 'blitz' | 'glissee' | 'repli';
+
+// ---------------------------------------------------------------------------
+// LE JOUEUR PREND LA MAIN — actions, tension, bagarre, discipline
+// ---------------------------------------------------------------------------
+
+/**
+ * ⚠️ LE NIVEAU N'EST PAS DÉCORATIF : C'EST LUI QUI RÈGLE LA DISCIPLINE.
+ * En amateur ça part vite et l'arbitre sort la carte facilement, mais la
+ * commission fait dans la semaine et dans le pardon. En professionnel, une
+ * bagarre est rarissime — personne ne veut jouer sa saison sur un coup de sang
+ * — et quand elle éclate, elle coûte des mois. Voir `moteur/bagarre.ts`.
+ */
+export type NiveauMatch = 'pro' | 'amateur';
+
+/** Ce que le joueur peut demander à son pion pendant le match. */
+export type ActionJoueur =
+  // ── Ballon en main ───────────────────────────────────────────────────────
+  | 'sprint' | 'crochet' | 'raffut' | 'passe' | 'pied'
+  // ── Son équipe attaque, il n'a pas le ballon ─────────────────────────────
+  | 'appel' | 'soutien'
+  // ── Son équipe défend ───────────────────────────────────────────────────
+  | 'plaquage' | 'monter' | 'grattage'
+  // ── Discipline : à tout moment, y compris ballon mort ────────────────────
+  | 'provoquer' | 'frapper' | 'calmer';
+
+/**
+ * L'ordre en cours, et sa durée de validité.
+ *
+ * ⚠️ UNE ACTION N'EST PAS INSTANTANÉE, ET C'EST VOULU. « Je plaque » ne veut
+ * rien dire à l'instant t : le porteur est à quinze mètres. L'intention reste
+ * donc armée quelques secondes, le temps que la situation se présente — puis
+ * elle expire, exactement comme un joueur qui a lu la mauvaise action.
+ */
+export interface IntentionJoueur {
+  type: ActionJoueur;
+  restant: number; // secondes simulées avant expiration
+}
+
+/**
+ * ⚠️ LE TEMPS DE RECHARGE EXISTE PARCE QUE LE JOUEUR VA MARTELER LE BOUTON.
+ * Mesuré au banc d'essai (`scripts/verifControle.ts`) sans lui : un pilote qui
+ * réclame le ballon dès que possible finissait à **60 ballons portés** (un
+ * troisième ligne en porte douze), un gratteur à **14 turnovers**, et une
+ * provocation toutes les six secondes déclenchait **seize bagarres par match**.
+ * Ce n'était pas un défaut de réglage mais un défaut de conception : un geste
+ * de rugby demande de se replacer, de souffler, et de se faire oublier de
+ * l'arbitre.
+ */
+
+
+/** L'ordre donné pendant la bagarre. */
+export type OrdreBagarre = 'tous' | 'proteger' | 'calmer' | 'reculer';
+
+export interface Bagarre {
+  /** Qui a commencé : le joueur, ou l'adversaire qu'il avait chauffé. */
+  origine: 'moi' | 'adversaire';
+  adversaire: Pion;
+  /** Le joueur a-t-il déjà porté un coup avant l'ordre ? */
+  coupPorte: boolean;
+  attente: number;          // secondes simulées passées à attendre l'ordre
+  ordre: OrdreBagarre | null;
+  /** Le déroulé, ligne à ligne, pour l'écran. */
+  resume: string[];
+}
+
+/**
+ * Ce que le match laisse au joueur côté discipline. Lu APRÈS le coup de
+ * sifflet final (`bilan`) : c'est ce qui devient une suspension, une amende ou
+ * une blessure dans la carrière.
+ */
+export interface DisciplineMatch {
+  provocations: number;
+  bagarres: number;
+  coupsPortes: number;
+  jaunes: number;
+  rouges: number;
+  /** Le mot de l'arbitre sur la feuille de match — motif de la citation. */
+  motif: string;
+  /** Ce que la commission retiendra (rempli à la sirène). */
+  citation: { semaines: number; motif: string } | null;
+  /** Une blessure prise dans la bagarre : main cassée, arcade, nez. */
+  blessure: { nom: string; semaines: number } | null;
+}
+
+export function disciplineVide(): DisciplineMatch {
+  return {
+    provocations: 0, bagarres: 0, coupsPortes: 0, jaunes: 0, rouges: 0,
+    motif: '', citation: null, blessure: null,
+  };
+}
 
 // Le paramétrage de placement d'UN joueur, dicté par le coaching en direct.
 export interface ConsigneJoueur {
@@ -191,4 +282,67 @@ export interface EtatMatch {
   consigne?: ConsigneJoueur;
   fini: boolean;
   rng: () => number;
+
+  // ── LE JOUEUR AUX COMMANDES ──────────────────────────────────────────────
+  /** Le niveau du match : il commande toute la discipline. */
+  niveau: NiveauMatch;
+  /** Le joueur pilote son pion lui-même (bascule à tout moment). */
+  controle: boolean;
+  /** L'ordre en cours, consommé par le moteur dès que l'occasion se présente. */
+  intention: IntentionJoueur | null;
+  /**
+   * Secondes simulées restantes avant de pouvoir REJOUER chaque geste.
+   *
+   * ⚠️ UNE RECHARGE PAR ACTION, ET SURTOUT PAS UNE SEULE POUR TOUTES. La
+   * première version n'en avait qu'une : chambrer un adversaire (45 s de
+   * recharge) rendait alors la PASSE indisponible pendant trois quarts de
+   * minute. Sur un jeu où l'on pilote son joueur en direct, c'est
+   * insupportable — et ça n'a aucun sens : souffler après un grattage
+   * n'empêche pas de donner un ballon.
+   */
+  recharges: Partial<Record<ActionJoueur, number>>;
+  /**
+   * ⚠️ LE PILOTAGE DIRECT : où le joueur pousse son pion, MAINTENANT.
+   *
+   * Vecteur unitaire posé à chaque image par la manette, le clavier ou le
+   * joystick tactile (`moteur/manette.ts`), et remis à `null` dès qu'on lâche.
+   * Il court-circuite tout le placement automatique — le pion va où on le dit,
+   * y compris ballon en main.
+   *
+   * ⚠️ ON NE TÉLÉPORTE RIEN : la direction devient une CIBLE à dix mètres
+   * devant, et c'est le déplacement à inertie du moteur (`deplacer`) qui
+   * l'emmène. Un ailier lancé décrit toujours sa courbe, un pilier met toujours
+   * deux secondes à se mettre en route. C'est ce qui empêche le pion piloté de
+   * glisser à côté du rugby des vingt-neuf autres.
+   */
+  direction: Vec | null;
+  /** Le sprint est MAINTENU (gâchette droite, Maj) — pas une action ponctuelle. */
+  sprint: boolean;
+  /**
+   * La température du match, 0 à 100. Elle monte quand on chambre, quand un
+   * plaquage part haut, quand l'écart se creuse — et elle redescend toute
+   * seule. C'est elle qui décide si un adversaire relève la provocation.
+   */
+  tension: number;
+  /** La bagarre en cours : tant qu'elle est là, le jeu attend un ordre. */
+  bagarre: Bagarre | null;
+  /** L'ardoise disciplinaire du joueur incarné. */
+  discipline: DisciplineMatch;
+}
+
+/**
+ * Pousser une ligne dans le fil de commentaire.
+ *
+ * ⚠️ ELLE VIT ICI, PAS DANS `moteur.ts`, pour une raison d'imports :
+ * `bagarre.ts` doit pouvoir commenter, et `moteur.ts` importe `bagarre.ts`.
+ * Passer par l'état — que tout le monde importe déjà — évite le cycle.
+ */
+export function ajouterCommentaire(
+  e: EtatMatch, type: TypeCommentaire, cote: Cote | null, texte: string,
+  points = 0, moi = false,
+): void {
+  e.commentaires.push({
+    minute: Math.min(80, Math.floor(e.t / 60)), texte, type, cote, points,
+    scoreA: e.scoreA, scoreB: e.scoreB, moi,
+  });
 }

@@ -30,9 +30,15 @@ import {
   type AttributsPion, type Pion, type StatsMatch,
 } from './entites';
 import {
-  PHASES_ARRETEES, type ConsigneJoueur, type EtatMatch,
-  type IntentionPied, type Lancement, type Phase, type PlanDeScore, type TypeCommentaire,
+  PHASES_ARRETEES, ajouterCommentaire, disciplineVide,
+  type ConsigneJoueur, type DisciplineMatch, type EtatMatch,
+  type IntentionPied, type Lancement, type NiveauMatch, type OrdreBagarre,
+  type Phase, type PlanDeScore, type TypeCommentaire,
 } from './etat';
+import {
+  chauffer, donnerOrdre, refroidir, resoudreBagarre, sanctionApresMatch,
+} from './bagarre';
+import { consommerIntention, intentionEst, receveurPour } from './controle';
 import {
   choisirCoteOuvert, choisirSysteme, placerEquipes, plusProche, surLeTerrain,
   surnombreAuLarge, vitesseMontee, numero as maillot,
@@ -77,6 +83,11 @@ const ARRETS: Record<string, { visuel: number; horloge: number }> = {
   apresEssai: { visuel: 9, horloge: 58 }, // célébration + transformation
   penalite: { visuel: 2.5, horloge: 12 },
   miTemps: { visuel: 3, horloge: 0 },
+  // ⚠️ L'horloge s'arrête pendant une bagarre : l'arbitre coupe le chrono le
+  // temps de séparer et de sortir les cartes. C'est aussi ce qui empêche
+  // qu'une pause d'écran, pendant qu'on choisit son ordre, coûte du temps de
+  // jeu au joueur.
+  bagarre: { visuel: 6, horloge: 0 },
 };
 
 function facteurHorloge(phase: Phase): number {
@@ -90,6 +101,19 @@ function facteurHorloge(phase: Phase): number {
 
 export interface Avatar {
   club: string; nom: string; poste: PosteId; attributs: AttributsPion; titulaire?: boolean;
+}
+
+export interface OptionsMatch {
+  /**
+   * ⚠️ LE NIVEAU COMMANDE TOUTE LA DISCIPLINE (cartons, bagarres, sanctions
+   * d'après-match). Il vaut `pro` PAR DÉFAUT, et ce défaut n'est pas neutre :
+   * il garantit que les matchs rejoués en fond et les scripts de mesure
+   * gardent exactement l'étalonnage documenté. Seul l'appelant qui sait qu'il
+   * est en division amateur passe `amateur`.
+   */
+  niveau?: NiveauMatch;
+  /** Le joueur pilote son pion dès le coup d'envoi. */
+  controle?: boolean;
 }
 
 function planVide(total: number, rng: () => number): PlanDeScore {
@@ -153,7 +177,7 @@ export function creerMatch(
   clubA: string, clubB: string,
   effectifA: Coequipier[], effectifB: Coequipier[],
   scoreCibleA: number, scoreCibleB: number,
-  cle: string, avatar?: Avatar,
+  cle: string, avatar?: Avatar, options: OptionsMatch = {},
 ): EtatMatch {
   const rng = graine('moteur2#' + cle);
   const pions: Pion[] = [];
@@ -202,6 +226,15 @@ export function creerMatch(
     placement: null, cibleRenvoi: null, tir: null, penalite: null,
     remplacementsA: 0, remplacementsB: 0, prochaineDecision: 1, compteur: 0,
     commentaires: [], fini: false, rng,
+    niveau: options.niveau ?? 'pro',
+    controle: options.controle ?? false,
+    intention: null,
+    recharges: {},
+    direction: null,
+    sprint: false,
+    tension: 0,
+    bagarre: null,
+    discipline: disciplineVide(),
   };
 
   e.cibleRenvoi = {
@@ -267,6 +300,20 @@ function tick(e: EtatMatch): void {
   }
   if (e.minute >= 48) gererRemplacements(e);
 
+  // ── L'ordre du joueur vit sa vie, la tension redescend ───────────────────
+  // ⚠️ UNE INTENTION EXPIRE. Sans ça, un « je plaque » cliqué à la 12ᵉ minute
+  // resterait armé jusqu'à la sirène et le pion passerait le match à charger
+  // le porteur, quelle que soit la phase.
+  if (e.intention) {
+    e.intention.restant -= dt;
+    if (e.intention.restant <= 0) e.intention = null;
+  }
+  for (const cle of Object.keys(e.recharges) as (keyof typeof e.recharges)[]) {
+    const reste = (e.recharges[cle] ?? 0) - dt;
+    if (reste <= 0) delete e.recharges[cle]; else e.recharges[cle] = reste;
+  }
+  refroidir(e, dt);
+
   // ── Placement toutes les 3 images de simulation (0,45 s) : invisible à
   // l'écran, et trois fois moins cher pour la simulation de fond.
   if (e.compteur++ % 3 === 0) {
@@ -278,6 +325,11 @@ function tick(e: EtatMatch): void {
       }
     }
   }
+  // ⚠️ APRÈS LE PLACEMENT, ET À CHAQUE TICK. La tactique repose les cibles de
+  // tout le monde toutes les trois images ; si le pilotage passait avant, la
+  // consigne du joueur serait écrasée deux images sur trois et son pion
+  // « hésiterait » au lieu de foncer.
+  if (e.controle) piloterMonJoueur(e);
 
   // ── Le rythme de marque, relu par la tactique ────────────────────────────
   e.aide = retard(e, e.possession);
@@ -334,22 +386,124 @@ function tick(e: EtatMatch): void {
     // temps au chronomètre.
     case 'apresEssai': return phaseApresEssai(e);
     case 'miTemps': return phaseMiTemps(e);
+    case 'bagarre': return phaseBagarre(e);
     default: return;
   }
+}
+
+// ---------------------------------------------------------------------------
+// LE PILOTAGE DU PION DU JOUEUR
+// ---------------------------------------------------------------------------
+// Ce que l'ordre change dans le DÉPLACEMENT. Les effets sur les duels (contact,
+// grattage, combinaison) sont appliqués là où ils se jouent : `resoudrePlaquage`,
+// `phaseRuck`, `reprendreJeu`.
+//
+// ⚠️ `effort` EST UN MULTIPLICATEUR SUR LA VITESSE MAXIMALE, et il reste
+// volontairement petit. À 1,3 on obtenait un pion qui double tout le monde en
+// ligne droite — un joueur d'arcade au milieu d'un match de rugby. À 1,12, le
+// sprint se voit, se paie en endurance, et ne casse pas la simulation.
+function piloterMonJoueur(e: EtatMatch): void {
+  const p = e.pions.find((q) => q.moi);
+  if (!p || !p.surLeTerrain || p.sanction > 0) return;
+  const s = sens(p.cote);
+  const porteur = e.porteur;
+
+  // ── 🕹️ LE PILOTAGE DIRECT PASSE AVANT TOUT LE RESTE ────────────────────
+  // Tant que le joueur pousse son stick (ou une touche, ou son doigt), c'est
+  // LUI qui décide où va le pion : ni la tactique, ni l'ordre armé, ni la
+  // ligne de course automatique n'ont leur mot à dire. La cible est posée à
+  // dix mètres devant — assez loin pour que `deplacer()` donne plein gaz,
+  // assez près pour que la course reste franche.
+  if (e.direction) {
+    p.cible = {
+      x: borner(p.pos.x + e.direction.x * 10, LIGNE_A - 1, LIGNE_B + 1),
+      y: borner(p.pos.y + e.direction.y * 10, 0.5, LARGEUR - 0.5),
+    };
+    p.effort = e.sprint ? 1.12 : 1;
+    // ⚠️ LE SPRINT SE PAIE, SINON ON LE TIENT 80 MINUTES. La dépense s'ajoute
+    // à celle que `deplacer()` calcule déjà sur l'intensité de la course :
+    // c'est ce qui fait qu'un joueur qui sprinte tout le match finit à plat.
+    if (e.sprint) p.endurance = Math.max(0, p.endurance - DT * 1.4);
+    return;
+  }
+  if (!e.intention) return;
+
+  switch (e.intention.type) {
+    case 'sprint':
+      p.effort = 1.12;
+      break;
+    case 'plaquage':
+    case 'monter': {
+      // On charge le porteur ; à défaut, on monte sur le ballon.
+      const cible = porteur && porteur.cote !== p.cote ? porteur.pos : e.ballon;
+      p.cible = { x: cible.x, y: cible.y };
+      p.effort = e.intention.type === 'plaquage' ? 1.12 : 1.06;
+      break;
+    }
+    case 'soutien':
+      if (porteur && porteur.cote === p.cote && porteur !== p) {
+        // Deux mètres derrière son épaule : la position du soutien, celle qui
+        // permet de recevoir l'offload et de nettoyer le ruck.
+        p.cible = { x: porteur.pos.x - s * 2.2, y: borner(porteur.pos.y + 1.4 * e.ouvert, 2.5, LARGEUR - 2.5) };
+        p.effort = 1.08;
+      }
+      break;
+    case 'grattage':
+      // Au ruck, on se jette sur le ballon ; avant, on suit le contact.
+      if (e.phase === 'ruck' || (porteur && porteur.cote !== p.cote)) {
+        const cible = e.phase === 'ruck' ? e.ballon : porteur!.pos;
+        p.cible = { x: cible.x, y: cible.y };
+        p.effort = 1.1;
+      }
+      break;
+    case 'appel':
+      // Se rendre disponible : remonter dans la ligne, à hauteur de passe.
+      if (e.possession === p.cote && porteur && porteur !== p) {
+        p.cible = {
+          x: porteur.pos.x - s * 3.5,
+          y: borner(porteur.pos.y + 7 * e.ouvert, 2.5, LARGEUR - 2.5),
+        };
+        p.effort = 1.05;
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LA BAGARRE — le jeu attend un ordre
+// ---------------------------------------------------------------------------
+// ⚠️ CETTE PHASE NE FAIT RIEN TANT QUE L'ORDRE N'EST PAS DONNÉ, et c'est
+// exactement ce qu'on veut : l'écran met la pause et pose la question. Le
+// garde-fou d'attente n'est là que pour les appels hors interface (simulation
+// de fond, scripts de mesure) — sans lui, `avancer()` tournerait sans fin.
+function phaseBagarre(e: EtatMatch): void {
+  const b = e.bagarre;
+  if (!b) { e.phase = 'jeuCourant'; return; }
+  if (!b.ordre) {
+    b.attente += DT;
+    if (b.attente > 90) donnerOrdre(e, 'reculer');
+    return;
+  }
+  const suite = resoudreBagarre(e);
+  e.bagarre = null;
+  e.intention = null;
+  arret(e, 'penalite', suite.pour, suite.lieu);
+  e.penalite = { pour: suite.pour, lieu: { x: suite.lieu.x, y: suite.lieu.y }, motif: suite.motif };
 }
 
 // ---------------------------------------------------------------------------
 // COMMENTAIRE
 // ---------------------------------------------------------------------------
 
+// ⚠️ L'ÉCRITURE VIT DANS `etat.ts` : `bagarre.ts` doit pouvoir commenter, et
+// `moteur.ts` l'importe déjà — passer par l'état évite le cycle d'imports.
 function dire(
   e: EtatMatch, type: TypeCommentaire, cote: Cote | null, texte: string,
   points = 0, moi = false,
 ): void {
-  e.commentaires.push({
-    minute: Math.min(80, Math.floor(e.t / 60)), texte, type, cote, points,
-    scoreA: e.scoreA, scoreB: e.scoreB, moi,
-  });
+  ajouterCommentaire(e, type, cote, texte, points, moi);
 }
 
 // ⚠️ INSTALLER UNE FORMATION. Les joueurs COURENT s'y placer — c'est ce qui
@@ -614,7 +768,19 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const s = sens(porteur.cote);
 
   // ── La course du porteur ─────────────────────────────────────────────────
-  porteur.cible = ligneDeCourse(e, porteur);
+  // ⚠️ SI C'EST MOI QUI PORTE ET QUE JE POUSSE, JE COURS OÙ JE VEUX. Sans ce
+  // test, `ligneDeCourse` (la course automatique : fixer son vis-à-vis, ou
+  // attaquer l'intervalle extérieur) reprenait la main à chaque tick et le
+  // pion piloté partait en diagonale de son propre chef — la sensation qu'on
+  // ne contrôle rien.
+  const pilote = porteur.moi && e.controle && e.direction;
+  porteur.cible = pilote
+    ? {
+        x: borner(porteur.pos.x + e.direction!.x * 10, LIGNE_A - 1, LIGNE_B + 1),
+        y: borner(porteur.pos.y + e.direction!.y * 10, 0.5, LARGEUR - 0.5),
+      }
+    : ligneDeCourse(e, porteur);
+  if (pilote) porteur.effort = e.sprint ? 1.12 : 1;
   const avant = porteur.pos.x;
   deplacer(porteur, dt);
   // ⚠️ LES MÈTRES SE COMPTENT AU-DELÀ DE LA LIGNE D'AVANTAGE, comme dans les
@@ -664,20 +830,47 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
       C.phrase(e.rng, C.FRANCHISSEMENT, { nom: porteur.nom }), 0, porteur.moi);
   }
 
+  // ⚠️ LE JOUEUR DÉCIDE AVANT LA MACHINE. Passer et taper sont des ordres
+  // IMMÉDIATS : les évaluer ici, avant la logique de combinaison et avant le
+  // plaquage, c'est la seule façon qu'un clic serve à quelque chose — entre
+  // 3 m et 1,35 m de pression il ne s'écoule que 0,13 s (c'est déjà la leçon
+  // du « fixer et donner » juste en dessous).
+  if (porteur.moi && e.controle && e.intention) {
+    if (e.intention.type === 'passe') {
+      const receveur = receveurPour(e, porteur);
+      if (receveur) {
+        consommerIntention(e);
+        return passerLeBallon(e, porteur, receveur, pression);
+      }
+    }
+    if (e.intention.type === 'pied') {
+      consommerIntention(e);
+      return taperAuPied(e, porteur, intentionDePied(e, porteur));
+    }
+  }
+
   // ⚠️ « FIXER ET DONNER » — ÉVALUÉ À CHAQUE TICK, avant le plaquage.
   // C'était LE bug du ballon qui n'allait jamais à l'aile : la décision n'était
   // reprise que toutes les 0,22 s, et entre 3 m et 1,35 m il ne s'écoule que
   // 0,13 s — le porteur était plaqué avant d'avoir eu le droit de passer.
+  // ⚠️ QUAND C'EST LE JOUEUR QUI PORTE, PERSONNE NE PASSE À SA PLACE. C'est le
+  // cœur de « on contrôle vraiment son joueur » : la combinaison reprenait la
+  // main dès qu'un défenseur arrivait à trois mètres, et le ballon partait
+  // sans qu'on ait rien demandé. À lui d'appuyer sur « passer » — et s'il
+  // garde le ballon une seconde de trop, il se fait plaquer. C'est le jeu.
   const lancement = e.lancement;
   const suivant = lancement && lancement.index + 1 < lancement.chaine.length
     ? lancement.chaine[lancement.index + 1] : null;
-  if (suivant && suivant.surLeTerrain && pression <= (porteur.avant ? 3.4 : 3.7)) {
+  const jePilote = porteur.moi && e.controle;
+  if (!jePilote && suivant && suivant.surLeTerrain && pression <= (porteur.avant ? 3.4 : 3.7)) {
     return passerLeBallon(e, porteur, suivant, pression);
   }
 
   if (plaqueur && porteur.battu <= 0) return resoudrePlaquage(e, porteur, plaqueur);
 
   // ── Les décisions plus lourdes (coup de pied, drop) ──────────────────────
+  // Là encore : on ne tape pas au pied à la place du joueur qui pilote.
+  if (jePilote) return;
   e.prochaineDecision -= dt;
   if (e.prochaineDecision > 0) return;
   e.prochaineDecision = 0.25;
@@ -837,8 +1030,16 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
 
 function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
   const fatigueD = 0.72 + defenseur.endurance / 360;
-  const force = defenseur.plaquage * fatigueD;
-  const resistance = porteur.evitement * 0.55 + porteur.puissance * 0.45;
+  // ⚠️ LE GESTE DU JOUEUR PÈSE VRAIMENT SUR LE DUEL — sinon la barre d'actions
+  // ne serait qu'un habillage. Il ne le décide pas pour autant : il déplace le
+  // curseur d'un contact qui reste arbitré par les attributs des deux hommes.
+  const monGeste = porteur.moi && e.controle && e.intention ? e.intention.type : null;
+  const monPlaquage = defenseur.moi && intentionEst(e, 'plaquage');
+  const force = defenseur.plaquage * fatigueD * (monPlaquage ? 1.16 : 1);
+  const resistance = porteur.evitement * 0.55 + porteur.puissance * 0.45
+    + (monGeste === 'crochet' ? porteur.evitement * 0.30 : 0)
+    + (monGeste === 'raffut' ? porteur.puissance * 0.26 : 0)
+    + (monGeste === 'sprint' ? 6 : 0);
   // ⚠️ Le taux de réussite au plaquage du rugby professionnel est de ~88 %.
   // Le rythme de l'équipe qui court après son plan de marque l'infléchit :
   // c'est le seul endroit où le score « aide » l'attaque, et c'est ce réglage
@@ -857,9 +1058,23 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
   if (e.rng() >= proba) {
     defenseur.stats.plaquagesManques += 1;
     porteur.stats.franchissements += 1;
-    defenseur.battu = 2.0;
+    // ⚠️ UN PLAQUAGE LANCÉ ET MANQUÉ COÛTE PLUS CHER. On part en cathédrale :
+    // si le porteur crochète, on met trois secondes à revenir dans le match,
+    // pas deux. C'est le risque qui rend l'action intéressante à jouer.
+    defenseur.battu = monPlaquage ? 3.0 : 2.0;
     porteur.battu = 0.4; // il ne peut pas être re-plaqué dans la même seconde
-    if (e.rng() < 0.22) {
+    if (monGeste === 'crochet' || monGeste === 'raffut') {
+      consommerIntention(e);
+      dire(e, 'franchissement', porteur.cote, C.texteMatch(
+        monGeste === 'crochet' ? 'crochetReussi' : 'raffutReussi',
+        { nom: porteur.nom, cible: defenseur.nom },
+      ), 0, true);
+    } else if (monPlaquage) {
+      consommerIntention(e);
+      dire(e, 'plaquage', porteur.cote, C.texteMatch('plaquageRateJoueur', {
+        nom: defenseur.nom, cible: porteur.nom,
+      }), 0, true);
+    } else if (e.rng() < 0.22) {
       dire(e, 'plaquage', porteur.cote,
         C.texteMatch('cassePlaquage', { porteur: porteur.nom, defenseur: defenseur.nom }), 0, porteur.moi || defenseur.moi);
     }
@@ -867,6 +1082,13 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
   }
 
   defenseur.stats.plaquages += 1;
+  if (monPlaquage) {
+    consommerIntention(e);
+    dire(e, 'plaquage', defenseur.cote,
+      C.texteMatch('plaquageLance', { nom: defenseur.nom, cible: porteur.nom }), 0, true);
+    // Un plaquage appuyé, ça se répond : la température monte d'un cran.
+    chauffer(e, 4);
+  }
   // Plaquage à deux : le second défenseur qui arrive est crédité, comme dans
   // les statistiques officielles du rugby.
   for (const d2 of surLeTerrain(e, defenseur.cote)) {
@@ -879,13 +1101,34 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
       0, defenseur.moi || porteur.moi);
   }
 
-  // Faute de plaquage (haut, sans les bras…).
-  if (e.rng() < 0.020 * (1.6 - defenseur.discipline / 130)) {
+  // Faute de plaquage (haut, sans les bras…). ⚠️ Se jeter sur le porteur, c'est
+  // DEUX FOIS PLUS de risque de monter dans les épaules : c'est la contrepartie
+  // du bonus au plaquage, et ce qui rend le bouton « je plaque » un choix.
+  if (e.rng() < 0.020 * (1.6 - defenseur.discipline / 130) * (monPlaquage ? 2.2 : 1)) {
+    if (monPlaquage) chauffer(e, 8);
     return siffler(e, porteur.cote, porteur.pos, 'plaquage haut', defenseur);
   }
 
+  // ⚠️ UN CROCHET RATÉ, C'EST UN BALLON EN DANGER. Chercher l'exploit et se
+  // faire cueillir, c'est se retrouver au sol dans une position impossible :
+  // une fois sur huit, le ballon est rendu. Sans ce risque, on crocheterait à
+  // chaque contact.
+  if (monGeste === 'crochet') {
+    consommerIntention(e);
+    dire(e, 'plaquage', defenseur.cote,
+      C.texteMatch('crochetRate', { nom: porteur.nom, cible: defenseur.nom }), 0, true);
+    if (e.rng() < 0.13) {
+      porteur.stats.passesRatees += 1;
+      dire(e, 'jeu', porteur.cote, C.phrase(e.rng, C.EN_AVANT, {
+        nom: porteur.nom, club: nomClub(e, adverse(porteur.cote)),
+      }), 0, true);
+      return arret(e, 'melee', adverse(porteur.cote), porteur.pos);
+    }
+  }
+
   // Offload : le geste des grandes équipes, rare mais spectaculaire.
-  if (e.rng() < 0.055 + porteur.vision / 1600) {
+  // Le raffut, lui, est fait pour ça : on garde un bras libre.
+  if (e.rng() < 0.055 + porteur.vision / 1600 + (monGeste === 'raffut' ? 0.22 : 0)) {
     const s = sens(porteur.cote);
     const soutiens = surLeTerrain(e, porteur.cote).filter((q) =>
       q !== porteur && (q.pos.x - porteur.pos.x) * s <= 0.8 && distance2(q.pos, porteur.pos) < 90);
@@ -959,8 +1202,27 @@ function phaseRuck(e: EtatMatch): void {
   const proches = e.pions
     .filter((p) => p.surLeTerrain && p.sanction <= 0 && p.avant && p.cote === defense)
     .sort((a, b) => distance2(a.pos, e.ballon) - distance2(b.pos, e.ballon));
-  const gratteur = proches.find((p) => p.numero === 7 || p.numero === 6 || p.numero === 2) ?? proches[0];
-  const chanceGrattage = (e.ballonLent ? 0.10 : 0.045) + (gratteur ? gratteur.plaquage / 2200 : 0);
+  let gratteur = proches.find((p) => p.numero === 7 || p.numero === 6 || p.numero === 2) ?? proches[0];
+  let chanceGrattage = (e.ballonLent ? 0.10 : 0.045) + (gratteur ? gratteur.plaquage / 2200 : 0);
+
+  // ⚠️ LE GRATTAGE DU JOUEUR — et son revers. S'il a demandé à gratter ET
+  // qu'il est vraiment sur le ballon (huit mètres, pas trente), c'est LUI qui
+  // conteste, avec une vraie chance de voler le ballon. Mais un gratteur mal
+  // placé ne lâche pas le porteur assez vite : une fois sur cinq, c'est
+  // pénalité contre son camp — et à ce moment-là le carton devient possible,
+  // comme pour n'importe quelle faute (`siffler`).
+  const moi = e.pions.find((p) => p.moi);
+  const jeGratte = intentionEst(e, 'grattage') && !!moi && moi.cote === defense
+    && moi.surLeTerrain && moi.sanction <= 0 && distance2(moi.pos, e.ballon) < 64;
+  if (jeGratte && moi) {
+    consommerIntention(e);
+    gratteur = moi;
+    chanceGrattage += 0.10;
+    dire(e, 'ruck', defense, C.texteMatch('grattagePlonge', { nom: moi.nom }), 0, true);
+    if (e.rng() < 0.19) {
+      return siffler(e, attaque, e.ballon, 'plaqueur qui ne se relève pas', moi);
+    }
+  }
   if (gratteur && e.rng() < chanceGrattage) {
     gratteur.stats.grattages += 1;
     dire(e, 'ruck', defense, C.phrase(e.rng, C.RUCK_GRATTAGE, { nom: gratteur.nom }), 0, gratteur.moi);
@@ -1154,8 +1416,14 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
   })();
 
   // Carton jaune : rare (≈ 1,3 par match), plus probable près de sa ligne.
+  // ⚠️ ET PLUS FRÉQUENT EN AMATEUR (demande explicite : « cartons plus souvent
+  // en amateur »). Un arbitre seul, sans vidéo ni juges de touche, coupe court :
+  // il sort la carte plutôt que de gérer. En professionnel, on siffle, on parle
+  // au capitaine, et la sanction lourde arrive après le match (voir
+  // `bagarre.ts` → `sanctionApresMatch`).
   const pres = metresAvantLaLigne(lieu, pour) < 22;
-  if (coupable && e.rng() < (pres ? 0.16 : 0.05)) {
+  const severite = e.niveau === 'amateur' ? 1.7 : 1;
+  if (coupable && e.rng() < (pres ? 0.16 : 0.05) * severite) {
     const fautif = coupable;
     // ⚠️ LE CARTON ROUGE EXISTE ENFIN. Le moteur n'en donnait aucun : la
     // discipline se résumait à un compteur de jaunes, et un joueur ne risquait
@@ -1167,6 +1435,15 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
     fautif.surLeTerrain = false;
     fautif.sanction = rouge ? 99_999 : 600; // dix minutes, ou le reste du match
     if (rouge) fautif.stats.cartonsRouges += 1; else fautif.stats.cartonsJaunes += 1;
+    // ⚠️ LE CARTON DU JOUEUR INCARNÉ SUIT JUSQU'À LA CARRIÈRE. Il était jusqu'ici
+    // une simple ligne de statistique : un rouge coûtait dix minutes de jeu et
+    // rien d'autre. C'est lui qui déclenche maintenant la commission de
+    // discipline après le match (`sanctionApresMatch`).
+    if (fautif.moi) {
+      if (rouge) e.discipline.rouges += 1; else e.discipline.jaunes += 1;
+      e.discipline.motif = motif;
+    }
+    if (rouge) chauffer(e, 12);
     dire(e, 'carton', fautif.cote, rouge
       ? C.texteMatch('cartonRouge', { nom: fautif.nom, motif, club: nomClub(e, fautif.cote) })
       : C.phrase(e.rng, C.CARTON, {
@@ -1413,10 +1690,41 @@ function reprendreJeu(e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?
   const premier = porteurImpose ?? lancement.chaine[0] ?? liste[0];
   lancement.chaine = raccourcir(dedoublonner([premier, ...lancement.chaine]), 5);
   lancement.index = 0;
+  reclamerLeBallon(e, lancement, cote);
   e.lancement = lancement;
 
   e.ballon = { x: lieu.x, y: lieu.y };
   donnerBallon(e, premier, 0.3);
+}
+
+/**
+ * 🙋 « DONNE-LA-MOI. » Quand le joueur a réclamé le ballon, on l'INSÈRE dans la
+ * chaîne de passes de la combinaison qui démarre.
+ *
+ * ⚠️ ON L'INSÈRE, ON NE LE MET PAS EN TÊTE. Le mettre premier ferait servir la
+ * mêlée par un ailier ; le mettre dernier ne changerait rien s'il n'y a que
+ * deux maillons. Il prend donc la place juste après le lanceur — c'est-à-dire
+ * exactement ce qu'un joueur obtient en appelant fort : le ballon au deuxième
+ * temps, pas la relance.
+ *
+ * ⚠️ ET ÇA NE MARCHE PAS À TOUS LES COUPS. Un demi de mêlée n'écoute pas
+ * l'ailier qui hurle à trente mètres : il faut être à portée de la combinaison.
+ */
+function reclamerLeBallon(e: EtatMatch, lancement: Lancement, cote: Cote): void {
+  if (!intentionEst(e, 'appel')) return;
+  const p = e.pions.find((q) => q.moi);
+  if (!p || !p.surLeTerrain || p.sanction > 0 || p.cote !== cote) return;
+  if (lancement.chaine.includes(p)) return;
+  // ⚠️ ON DOIT ÊTRE À PORTÉE, ET LE 9 N'ÉCOUTE PAS TOUJOURS. Mesuré sans ces
+  // deux garde-fous : un joueur qui réclamait dès qu'il le pouvait finissait à
+  // SOIXANTE ballons portés — un troisième ligne en porte douze. Vingt-cinq
+  // mètres, une fois sur deux : on obtient une vraie influence sur le jeu, pas
+  // une confiscation du ballon.
+  if (distance2(p.pos, e.ballon) > 25 * 25) return;
+  consommerIntention(e);
+  if (e.rng() < 0.45) return;
+  lancement.chaine.splice(Math.min(1, lancement.chaine.length), 0, p);
+  dire(e, 'jeu', cote, C.texteMatch('appelBallon', { nom: p.nom }), 0, true);
 }
 
 // ⚠️ On raccourcit une chaîne trop longue en supprimant un maillon AU MILIEU —
@@ -1644,6 +1952,26 @@ function arriereGardeMontee(e: EtatMatch, defenseur: Cote): boolean {
 // LE JEU AU PIED
 // ---------------------------------------------------------------------------
 
+/**
+ * Le coup de pied que le joueur veut taper, déduit de l'endroit où il est.
+ *
+ * ⚠️ ON NE LUI DEMANDE PAS DE CHOISIR ENTRE SEPT COUPS DE PIED. Un menu de
+ * sept boutons sur un téléphone, en plein match, personne ne le lit : le
+ * rugbyman qui tape depuis ses 22 dégage, celui qui est à vingt mètres de la
+ * ligne tente le rasant. On lit donc le terrain à sa place, comme le fait déjà
+ * `choisirLancement` pour l'équipe.
+ */
+function intentionDePied(e: EtatMatch, p: Pion): IntentionPied {
+  const restant = metresAvantLaLigne(p.pos, p.cote);
+  if (dansSes22(p.pos, p.cote)) return 'degagement';
+  if (restant < 28) return p.pied > 60 && e.rng() < 0.35 ? 'transversale' : 'rasant';
+  if (dansSonCamp(p.pos, p.cote)) {
+    return p.pied > 62 && arriereGardeMontee(e, adverse(p.cote))
+      ? 'cinquanteVingtDeux' : 'occupation';
+  }
+  return p.numero === 9 ? 'chandelle' : 'occupation';
+}
+
 function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
   const s = sens(p.cote);
   p.stats.coupsDePied += 1;
@@ -1823,10 +2151,16 @@ function clorePeriode(e: EtatMatch): void {
     return;
   }
   solderLesPoints(e);
+  // ⚠️ LA COMMISSION SE RÉUNIT APRÈS LE COUP DE SIFFLET, pas pendant. C'est ici
+  // qu'un carton rouge ou un coup de poing devient une suspension de carrière —
+  // `MatchLive` la lit dans le bilan et la fait appliquer par le store.
+  sanctionApresMatch(e);
   e.phase = 'fini';
   e.fini = true;
   e.porteur = null;
   e.vol = null;
+  e.bagarre = null;
+  e.intention = null;
   // ⚠️ On vide le reliquat. Il sert à interpoler l'affichage entre deux pas de
   // simulation ; en ⏭️ (facteur 600) il pouvait rester deux minutes de jeu non
   // consommées, et l'écran projetait alors les pions à deux cents mètres du
@@ -1905,6 +2239,23 @@ export function appliquerConsigne(e: EtatMatch, c: ConsigneJoueur | undefined): 
   if (c) dire(e, 'jeu', null, C.texteMatch('consigne', { libelle: c.libelle }));
 }
 
+/**
+ * Le joueur prend (ou rend) la main sur son pion.
+ *
+ * ⚠️ RENDRE LA MAIN ANNULE L'ORDRE EN COURS. Sans ça, une intention armée
+ * juste avant de décocher continuerait de piloter le pion pendant huit
+ * secondes, sans qu'aucun bouton ne soit plus affiché pour l'expliquer.
+ */
+export function activerControle(e: EtatMatch, actif: boolean): void {
+  e.controle = actif;
+  if (!actif) e.intention = null;
+}
+
+/** L'ordre donné pendant une bagarre (l'écran le pose, le tick le résout). */
+export function ordonner(e: EtatMatch, ordre: OrdreBagarre): void {
+  donnerOrdre(e, ordre);
+}
+
 export interface LigneBilan {
   nom: string; club: string; numero: number; poste: PosteId;
   stats: StatsMatch; minutes: number; moi: boolean;
@@ -1913,11 +2264,14 @@ export interface LigneBilan {
 export interface BilanMatch {
   scoreA: number; scoreB: number; essaisA: number; essaisB: number;
   parJoueur: LigneBilan[];
+  /** L'ardoise disciplinaire du joueur incarné, citation comprise. */
+  discipline: DisciplineMatch;
 }
 
 export function bilan(e: EtatMatch): BilanMatch {
   return {
     scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB,
+    discipline: e.discipline,
     parJoueur: e.pions
       .filter((p) => p.minutes > 0.3)
       .map((p) => ({

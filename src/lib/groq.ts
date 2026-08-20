@@ -25,13 +25,36 @@ const URL_GROQ = 'https://api.groq.com/openai/v1/chat/completions';
 /** La clé du site, injectée à la compilation (`.env.local` → `VITE_GROQ_KEY`). */
 const CLE_SITE: string = (import.meta.env?.VITE_GROQ_KEY as string | undefined)?.trim() ?? '';
 
-// ⚠️ DEUX MODÈLES, DANS CET ORDRE, ET C'EST UNE MÉCANIQUE ANTI-QUOTA.
-// Chez Groq les limites sont comptées PAR MODÈLE : quand le gros modèle est
-// épuisé, le petit ne l'est presque jamais. On dégringole donc d'un cran avant
-// de couper l'IA — le joueur ne voit rien passer, sinon des phrases un peu plus
-// simples. Le tout est surchargeable sans recompiler la logique :
-// `VITE_GROQ_MODELE="a,b,c"`.
-const MODELES_PAR_DEFAUT = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+// ⚠️ LES MODÈLES LLAMA ONT ÉTÉ RETIRÉS DE GROQ. `llama-3.3-70b-versatile` et
+// `llama-3.1-8b-instant` ne figurent plus dans son catalogue de production : le
+// premier appel répondait donc 404 `model_decommissioned`, et comme une erreur
+// non-quota coupait la cascade (voir `appelIAJSON`), TOUTE l'IA du jeu était
+// muette — silencieusement, puisqu'un problème d'IA ne s'affiche jamais.
+//
+// ⚠️ ON PART DU MOINS CHER, ET C'EST UN CHANGEMENT DE DOCTRINE. L'ancienne
+// cascade descendait du gros modèle vers le petit ; on fait l'inverse, parce
+// que la clé du site est partagée par tous les joueurs et que le petit modèle
+// suffit très largement à ce qu'on lui demande (du JSON court et cadré, dont
+// `lib/mj.ts` reste de toute façon l'autorité). Tarifs Groq au moment de la
+// bascule, par million de jetons entrée/sortie :
+//
+//   openai/gpt-oss-20b    0,075 $ / 0,30 $   ← le moins cher, production
+//   openai/gpt-oss-120b   0,15 $  / 0,60 $   ← repli quand le 20b est à sec
+//   qwen/qwen3.6-27b      ~0,29 $ / ~0,59 $  ← dernier recours, catalogue « preview »
+//
+// Les limites Groq étant comptées PAR MODÈLE, cette cascade reste d'abord une
+// mécanique anti-quota : quand le premier est épuisé, le suivant ne l'est
+// presque jamais. Surchargeable sans recompiler : `VITE_GROQ_MODELE="a,b,c"`.
+//
+// ⚠️ Le dernier est un modèle « preview » chez Groq : il peut disparaître du
+// jour au lendemain. C'est exactement le cas que gère `modeleDisparu()` — il
+// est mis au repos pour la session et la cascade continue, au lieu de couper
+// l'IA comme l'a fait le retrait de Llama.
+const MODELES_PAR_DEFAUT = [
+  'openai/gpt-oss-20b',
+  'openai/gpt-oss-120b',
+  'qwen/qwen3.6-27b',
+];
 
 const MODELES_CONFIGURES = ((import.meta.env?.VITE_GROQ_MODELE as string | undefined) ?? '')
   .split(',')
@@ -173,12 +196,27 @@ export class ErreurCleIA extends Error {
 }
 
 /**
+ * Levée quand Groq ne connaît plus le modèle demandé (retiré du catalogue).
+ *
+ * ⚠️ ELLE EXISTE À CAUSE DU RETRAIT DE LLAMA. Sans elle, un modèle disparu se
+ * présentait comme une panne quelconque, la cascade s'arrêtait au premier et
+ * l'IA du jeu était morte en silence. Avec elle, le modèle est mis au repos et
+ * on passe au suivant — le joueur ne voit rien, comme pour un quota.
+ */
+export class ErreurModeleIA extends Error {
+  override name = 'ErreurModeleIA';
+}
+
+/**
  * Une erreur d'IA doit-elle rester invisible ? Quota, clé, réseau : oui, dans
  * tous ces cas le jeu a déjà un contenu de secours et le joueur n'a rien à
  * faire. Seule une vraie anomalie mérite un message.
  */
 export function erreurSilencieuse(cause: unknown): boolean {
   if (cause instanceof ErreurQuotaIA || cause instanceof ErreurCleIA) return true;
+  // Un modèle retiré du catalogue est une panne de NOTRE côté, pas de celui du
+  // joueur : il a déjà son contenu pré-écrit, on ne lui parle de rien.
+  if (cause instanceof ErreurModeleIA) return true;
   const message = cause instanceof Error ? cause.message : String(cause ?? '');
   return /quota|rate.?limit|429|401|403|failed to fetch|networkerror|load failed|abort/i.test(message);
 }
@@ -316,7 +354,12 @@ export async function appelIAJSON(
     messages: normaliserMessagesIA(messages),
     temperature: Math.min(1.2, Math.max(0.1, options.temperature ?? 0.72)),
     top_p: 0.9,
-    max_tokens: Math.min(1200, options.maxTokens ?? 360),
+    // ⚠️ LES MODÈLES QUI RAISONNENT CONSOMMENT CE BUDGET AVANT D'ÉCRIRE. Chez
+    // gpt-oss, les jetons de réflexion sont décomptés de `max_tokens` comme les
+    // autres : au plafond d'origine (360), le JSON attendu se faisait couper
+    // net. On garde donc une marge — `reasoning_effort: 'low'` plus bas limite
+    // de toute façon la réflexion à quelques dizaines de jetons.
+    max_tokens: Math.min(2000, (options.maxTokens ?? 360) + 260),
     ...(options.json === false ? {} : { response_format: { type: 'json_object' as const } }),
   };
 
@@ -331,11 +374,30 @@ export async function appelIAJSON(
       derniere = cause;
       if (cause instanceof ErreurCleIA) break;      // inutile d'essayer les autres
       if (cause instanceof ErreurQuotaIA) continue; // le modèle suivant, peut-être
+      // ⚠️ UN MODÈLE RETIRÉ DU CATALOGUE NE DOIT PAS COUPER L'IA. C'est
+      // exactement ce qui vient d'arriver avec Llama : Groq répondait 404, la
+      // boucle sortait sur son `break` « panne réseau », et le jeu tournait
+      // sans MJ sans que personne ne puisse s'en apercevoir. On passe au
+      // suivant — `appelUnique` a déjà mis le disparu au repos.
+      if (cause instanceof ErreurModeleIA) continue;
       break; // panne réseau ou réponse illisible : on ne martèle pas l'API
     }
   }
   activite.replis += 1;
   throw derniere;
+}
+
+/**
+ * L'effort de réflexion, quand le modèle en accepte un.
+ *
+ * ⚠️ ON NE L'ENVOIE QU'AUX MODÈLES QUI LE DOCUMENTENT : Groq refuse (400) un
+ * paramètre inconnu, et un réglage envoyé « au cas où » couperait le modèle
+ * qu'il est censé économiser. `low` est le réglage le moins cher de gpt-oss —
+ * juste ce qu'il faut pour un JSON de quinze lignes, et deux fois moins de
+ * jetons de sortie facturés.
+ */
+function effortDeReflexion(modele: string): Record<string, string> {
+  return modele.startsWith('openai/gpt-oss') ? { reasoning_effort: 'low' } : {};
 }
 
 async function appelUnique(
@@ -354,7 +416,7 @@ async function appelUnique(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${cle}`,
       },
-      body: JSON.stringify({ ...corps, model: modele }),
+      body: JSON.stringify({ ...corps, ...effortDeReflexion(modele), model: modele }),
       signal: arret.signal,
     });
   } catch (cause) {
@@ -384,16 +446,38 @@ async function appelUnique(
       bloquer(modele, 3 * 60_000);
       throw new ErreurQuotaIA(t('ia.quota'));
     }
+    // ⚠️ MODÈLE INCONNU OU RETIRÉ (404 `model_not_found`, 400
+    // `model_decommissioned`) : c'est ce qui a tué Llama. On le met au repos
+    // pour la session — le rappeler ne servirait à rien, il ne reviendra pas —
+    // et l'appelant passe au modèle suivant.
+    if (modeleDisparu(reponse.status, texte)) {
+      bloquer(modele, 12 * 60 * 60_000);
+      throw new ErreurModeleIA(`Groq : modèle ${modele} indisponible`);
+    }
     throw new Error(`Groq ${reponse.status} : ${texte.slice(0, 200)}`);
   }
 
   const donnees = await reponse.json() as {
-    choices?: { message?: { content?: string } }[];
+    choices?: { message?: { content?: string; reasoning?: string } }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   activite.appels += 1;
   activite.entree += donnees.usage?.prompt_tokens ?? 0;
   activite.sortie += donnees.usage?.completion_tokens ?? 0;
-  const contenu = donnees.choices?.[0]?.message?.content;
-  return typeof contenu === 'string' && contenu.trim() ? contenu : '{}';
+  const message = donnees.choices?.[0]?.message;
+  const contenu = message?.content;
+  if (typeof contenu === 'string' && contenu.trim()) return contenu;
+  // ⚠️ REPÊCHAGE DES MODÈLES QUI RAISONNENT. Quand la réflexion consomme tout
+  // le budget de jetons, gpt-oss rend un `content` vide et laisse le début du
+  // travail dans `reasoning`. Le JSON y est parfois complet : `lib/mj.ts` sait
+  // extraire un objet noyé dans du texte, autant lui donner sa chance plutôt
+  // que de retomber sur le contenu pré-écrit.
+  const reflexion = message?.reasoning;
+  return typeof reflexion === 'string' && reflexion.includes('{') ? reflexion : '{}';
+}
+
+/** Groq ne connaît pas (ou plus) ce modèle : inutile de le rappeler. */
+function modeleDisparu(statut: number, corps: string): boolean {
+  if (statut !== 400 && statut !== 404) return false;
+  return /model_not_found|model_decommissioned|does not exist|has been decommissioned|no longer supported/i.test(corps);
 }

@@ -2741,58 +2741,14 @@
   cursor: pointer;
 }
 .ml-fermer:hover { color: var(--craie); border-color: var(--or-clair); }
-.ml-sous-titre {
-  text-align: center;
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--craie-dim);
-  padding-bottom: 0.6rem;
-}
 
-.ml-terrain {
-  /* Le terrain garde ses proportions réelles (122 m × 70 m). ⚠️ On borne la
-     LARGEUR plutôt que la hauteur : avec un simple max-height, le SVG restait
-     large et le terrain se retrouvait letterboxé au milieu de deux bandes
-     vertes vides. */
-  display: block;
-  width: 100%;
-  max-width: calc(40vh * 122 / 70);
-  aspect-ratio: 122 / 70;
-  height: auto;
-  margin: 0 auto;
-  /* ⚠️ `.match-live` est une colonne flex : sans ça, le terrain se faisait
-     écraser en hauteur par ses voisins et repassait à 4:1. */
-  flex: 0 0 auto;
-  background: #0f3a22;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
 /* ⚠️ AUCUNE TRANSITION CSS SUR LES PIONS. Le moteur les déplace 60 fois par
    seconde avec interpolation exacte ; une transition de 0,55 s ajoutait une
    demi-seconde de retard sur la simulation et faisait « caoutchouter » tout le
    terrain. C'est ce qui donnait l'impression que ça n'était pas fluide. */
 .ml-ballon { filter: drop-shadow(0 0.4px 0.6px rgba(0, 0, 0, 0.55)); }
 
-/* Barre de possession, sous le score */
-.ml-possession {
-  display: flex;
-  height: 4px;
-  margin: 0 1rem 0.5rem;
-  border-radius: 3px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-}
-.ml-possession span { transition: width 0.6s ease; }
 
-/* La lecture du jeu : combinaison en cours et système défensif */
-.ml-lecture {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  padding: 0.5rem 1rem 0;
-  justify-content: center;
-}
 .ml-tag {
   font-size: 0.7rem;
   letter-spacing: 0.02em;
@@ -2814,26 +2770,6 @@
   margin-bottom: 0.4rem;
 }
 
-.ml-commandes {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 1rem;
-  flex-wrap: wrap;
-}
-.ml-vitesses { display: flex; gap: 0.25rem; }
-.ml-vitesse {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--craie-dim);
-  border-radius: 8px;
-  padding: 0.25rem 0.55rem;
-  font-family: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-.ml-vitesse:hover { border-color: var(--or-clair); }
-.ml-vitesse.actif { background: rgba(212, 175, 55, 0.18); border-color: var(--or-clair); color: var(--or-clair); }
 .ml-progression {
   flex: 1;
   min-width: 90px;
@@ -2902,13 +2838,6 @@
   font-weight: 400;
 }
 
-@media (max-width: 700px) {
-  .ml-tete { grid-template-columns: 1fr auto auto; row-gap: 0.3rem; }
-  .ml-equipe.droite { grid-column: 1 / -1; justify-content: flex-start; }
-  .ml-score { font-size: 1.6rem; }
-  .ml-terrain { max-width: 100%; }
-  .ml-action { grid-template-columns: 30px 18px 1fr auto; font-size: 0.8rem; }
-}
 
 
 /* --- CLASSEMENTS INDIVIDUELS -------------------------------------------- */
@@ -3045,6 +2974,151 @@
   border-radius: 999px;
   padding: 0.18rem 0.6rem;
 }
+
+.ml-act {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  min-width: 60px;
+  padding: 0.28rem 0.5rem 0.22rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: var(--craie-dim);
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1.1;
+}
+.ml-act b { font-size: 1rem; }
+.ml-act span { font-size: 0.66rem; white-space: nowrap; }
+/* Le rappel du raccourci clavier, discret : on ne le montre pas sur mobile,
+   où il n'y a pas de clavier. */
+.ml-act i {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-style: normal;
+  font-size: 0.56rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+.ml-act:hover { border-color: var(--or-clair); color: var(--craie); }
+.ml-act.actif {
+  border-color: var(--or-clair);
+  background: rgba(212, 175, 55, 0.2);
+  color: var(--or-clair);
+}
+/* Chaque famille a sa couleur : ballon en main, sans ballon, défense, et le
+   rouge de la discipline — celui-là doit se voir avant d'être cliqué. */
+.ml-act.fam-attaque { border-color: rgba(90, 170, 255, 0.35); }
+.ml-act.fam-defense { border-color: rgba(120, 220, 160, 0.32); }
+.ml-act.fam-discipline { border-color: rgba(255, 107, 107, 0.45); }
+.ml-act.fam-discipline b { filter: saturate(1.2); }
+
+/* Ce qui remplace les boutons quand il n'y a rien à jouer : on dit toujours
+   pourquoi (banc, carton, recharge, phase morte). */
+.ml-attente {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.72rem;
+  color: var(--craie-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ml-tension {
+  flex: 0 0 54px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+.ml-tension span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #6fbf73, #ffb020 55%, #ff4d4d);
+  transition: width 0.4s linear;
+}
+
+
+.ml-commandes-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.15rem 0.7rem;
+  padding: 0.35rem 0 0.1rem;
+}
+.ml-commandes-liste kbd {
+  display: inline-block;
+  min-width: 1.1em;
+  padding: 0 0.28rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--craie);
+  font-family: inherit;
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+/* --- LA BAGARRE : le jeu attend un ordre -------------------------------- */
+.ml-bagarre {
+  margin: 0.5rem 1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(255, 107, 107, 0.5);
+  background: linear-gradient(180deg, rgba(120, 20, 20, 0.42), rgba(60, 10, 10, 0.32));
+  border-radius: 12px;
+}
+.ml-bagarre > b {
+  font-family: 'Archivo', system-ui, sans-serif;
+  color: #ffb4b4;
+  font-size: 0.95rem;
+}
+.ml-bagarre p {
+  margin: 0.2rem 0 0.55rem;
+  font-size: 0.82rem;
+  color: var(--craie);
+}
+.ml-ordres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.4rem;
+}
+.ml-ordre {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  color: var(--craie);
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 44px;
+}
+.ml-ordre:hover { border-color: var(--or-clair); background: rgba(212, 175, 55, 0.12); }
+.ml-ordre b { font-size: 0.84rem; }
+.ml-ordre span { font-size: 0.68rem; color: var(--craie-dim); line-height: 1.25; }
+
+/* --- LA SANCTION D'APRÈS-MATCH ------------------------------------------ */
+.ml-sanction {
+  margin-bottom: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(255, 107, 107, 0.42);
+  background: rgba(120, 20, 20, 0.22);
+  border-radius: 10px;
+}
+.ml-sanction b {
+  font-family: 'Archivo', system-ui, sans-serif;
+  color: #ffb4b4;
+  font-size: 0.86rem;
+}
+.ml-sanction p { margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--craie); }
 
 .ml-bilan-tete {
   font-family: 'Archivo', system-ui, sans-serif;
@@ -3226,45 +3300,6 @@
   .pj-actions { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* --- 4. LE MATCH EN DIRECT, PLEIN ÉCRAN SUR TÉLÉPHONE --- */
-/* La modale gardait ses marges et son coin arrondi : sur 375 px de large, le
-   terrain tombait à 300 px et les pions devenaient illisibles. */
-@media (max-width: 700px) {
-  .overlay-match { padding: 0; align-items: stretch; }
-  .match-live {
-    width: 100%;
-    max-width: none;
-    max-height: none;
-    height: 100dvh;
-    border-radius: 0;
-    padding: calc(0.6rem + env(safe-area-inset-top, 0px)) 0.6rem
-             calc(0.6rem + env(safe-area-inset-bottom, 0px));
-  }
-  .ml-terrain { max-width: none; }
-  /* ⚠️ L'en-tête tenait sur quatre colonnes : à 375 px, le nom du club
-     visiteur passait à la ligne et le bouton de fermeture se retrouvait
-     seul sur une troisième rangée. On garde UNE rangée — écusson, score,
-     écusson — et la croix va se poser en absolu dans le coin. */
-  .ml-tete {
-    /* En flex plutôt qu'en grille : la croix sort du flux (absolue) et une
-       grille de trois colonnes lui gardait quand même sa place, ce qui
-       renvoyait l'équipe visiteuse à la ligne. */
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.4rem;
-    padding: 0.6rem 2.6rem 0.3rem 0.6rem;
-  }
-  .ml-tete .ml-equipe { flex: 1 1 0; }
-  .ml-tete .ml-score { flex: 0 0 auto; }
-  .ml-equipe b { font-size: 0.76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ml-fermer { position: absolute; top: calc(0.5rem + env(safe-area-inset-top, 0px)); right: 0.6rem; width: 34px; height: 34px; }
-  .ml-sous-titre { font-size: 0.7rem; }
-  .ml-commandes { flex-wrap: wrap; gap: 0.5rem; }
-  .ml-vitesse { min-width: 42px; min-height: 38px; }
-  .ml-coaching { flex-wrap: wrap; }
-  .ml-coaching input { min-height: 44px; }
-}
 
 /* --- 5. LES CLASSEMENTS : ON GARDE L'ESSENTIEL --- */
 @media (max-width: 560px) {
@@ -3536,4 +3571,481 @@ img, svg, canvas { max-width: 100%; }
 @media (max-width: 560px) {
   .x-nego-leviers { display: grid; grid-template-columns: 1fr 1fr; }
   .x-nego-leviers button { min-height: 42px; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE MATCH EN DIRECT — TERRAIN PLEIN CADRE, COMMANDES SOUS LE POUCE
+   ═══════════════════════════════════════════════════════════════════════════
+   Retour de jeu : « le système de jeu durant les matchs est injouable et pas
+   fun, et il faut que ça marche sur téléphone ». La mise en page était le
+   premier coupable — un bandeau de terrain de 200 px sous une pile de panneaux
+   (barre de vitesses, vignettes d'action défilantes, notice dépliante, champ de
+   consigne, fil de commentaire), et des boutons à deux cents pixels de l'action.
+
+   LA RÈGLE DE CETTE REFONTE : LE TERRAIN PREND TOUTE LA PLACE QUI RESTE, ET
+   TOUT CE QUI SERT À JOUER EST POSÉ DESSUS. Ce qui ne sert pas à jouer part
+   dans le tiroir (fil, consigne, notice). Sur grand écran seulement, le fil
+   revient en colonne — parce que là, il y a la place.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ⚠️ HAUTEUR DÉTERMINÉE, PAS SEULEMENT UN PLAFOND. La scène est en « flex: 1 » :
+   sans hauteur fixée sur le conteneur, elle se réduit à la hauteur de son
+   contenu — c'est-à-dire zéro — et le terrain disparaît purement et simplement. */
+.match-live {
+  width: min(1180px, 100%);
+  height: min(94dvh, 900px);
+  max-height: 94dvh;
+}
+
+.ml-corps { flex: 1; min-height: 0; display: flex; }
+.ml-colonne { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.ml-cote {
+  flex: 0 0 320px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* La progression du match, sous le score : trois pixels, pas une ligne. */
+.ml-progression { flex: 0 0 auto; height: 3px; min-width: 0; border-radius: 0; margin: 0; }
+
+/* --- LA SCÈNE ------------------------------------------------------------ */
+/* ⚠️ « touch-action: none » est indispensable : sans lui, glisser le doigt fait
+   défiler la page, le navigateur s'approprie le geste après quelques pixels,
+   le « pointermove » s'arrête et le pion se fige en pleine course. */
+.ml-scene {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #0b2b1a;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Le terrain occupe la scène entière. La caméra (moteur/camera.ts) décide de ce
+   qu'on en voit ; « slice » garantit qu'on ne borde jamais de vide. */
+.ml-terrain { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* Le repère du joueur : le chevron répond à « où est mon pion ». */
+.ml-chevron { fill: #ffd45e; stroke: rgba(0, 0, 0, 0.55); stroke-width: 0.12; }
+/* À qui part la passe, et sur qui on monte : une décision qu'on ne voit pas
+   n'est pas une décision. */
+.ml-cible-passe line { stroke: rgba(255, 255, 255, 0.5); stroke-width: 0.3; stroke-dasharray: 1.2 1.2; }
+.ml-cible-passe circle { fill: none; stroke: rgba(255, 255, 255, 0.85); stroke-width: 0.32; stroke-dasharray: 1.4 1; }
+.ml-cible-plaquage { fill: none; stroke: rgba(255, 90, 90, 0.85); stroke-width: 0.34; stroke-dasharray: 1.6 1.2; }
+.ml-fleche-ballon path { fill: rgba(255, 240, 200, 0.92); }
+
+/* --- LE HUD, POSÉ SUR LE TERRAIN ----------------------------------------- */
+/* ⚠️ « pointer-events: none » sur la couche, « auto » sur ce qui se touche :
+   sinon le HUD couvre tout le terrain et le joystick ne reçoit plus rien. */
+.ml-hud { position: absolute; inset: 0; pointer-events: none; }
+.ml-hud button, .ml-hud .ml-bagarre, .ml-hud .ml-tuto { pointer-events: auto; }
+
+.ml-hud-haut {
+  position: absolute;
+  top: 0.45rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.ml-hud .ml-tag {
+  background: rgba(4, 12, 8, 0.62);
+  backdrop-filter: blur(3px);
+  color: var(--craie);
+  font-size: 0.66rem;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* La bannière du ralenti : elle dit POURQUOI le jeu vient de ralentir. Sans
+   elle, un changement de vitesse passe pour une saccade. */
+.ml-banniere {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.32rem 1rem;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.94);
+  color: #10190f;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: ml-banniere-in 0.26s ease-out;
+}
+@keyframes ml-banniere-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.9); }
+}
+@media (prefers-reduced-motion: reduce) { .ml-banniere { animation: none; } }
+
+/* Le fil réduit à sa dernière ligne. Il ouvre le tiroir d'une pression. */
+.ml-ticker {
+  position: absolute;
+  top: 2.3rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.22rem 0.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(4, 12, 8, 0.62);
+  backdrop-filter: blur(3px);
+  color: var(--craie-dim);
+  font-family: inherit;
+  font-size: 0.74rem;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.ml-ticker .ml-texte { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* --- LE JOYSTICK --------------------------------------------------------- */
+/* ⚠️ IL FLOTTE SOUS LE POUCE, dans la moitié GAUCHE du terrain, et la moitié
+   droite est réservée aux boutons. Laisser le joystick partir de n'importe où
+   mettait les deux pouces en concurrence : on visait le gros bouton, on ratait
+   de dix pixels, et le pion partait en courant. Au repos il reste visible en
+   bas à gauche — un joystick invisible est un joystick qu'on ne trouve pas. */
+.ml-stick { position: absolute; left: 78px; bottom: 78px; width: 0; height: 0; opacity: 0.45; }
+.ml-stick.actif { bottom: auto; opacity: 1; }
+.ml-stick-base, .ml-stick-tete { position: absolute; border-radius: 50%; display: block; }
+.ml-stick-base {
+  left: -52px;
+  top: -52px;
+  width: 104px;
+  height: 104px;
+  border: 2px solid rgba(255, 212, 94, 0.4);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
+}
+.ml-stick-tete {
+  left: -26px;
+  top: -26px;
+  width: 52px;
+  height: 52px;
+  background: rgba(255, 212, 94, 0.42);
+  border: 2px solid rgba(255, 212, 94, 0.92);
+}
+
+/* --- LES ACTIONS, SOUS LE POUCE DROIT ------------------------------------ */
+/* ⚠️ UN GROS BOUTON, TROIS PETITS, ET LA DISCIPLINE À PART. L'ancienne barre
+   posait jusqu'à cinq vignettes de 58 px dans un conteneur qui DÉFILAIT
+   HORIZONTALEMENT, deux cents pixels sous l'action : il fallait quitter le jeu
+   des yeux, chercher, et faire défiler. Ici le geste évident est un disque de
+   88 px, là où le pouce se trouve déjà. */
+.ml-cluster {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+.ml-secondaires, .ml-discipline { display: flex; gap: 0.35rem; }
+.ml-principal-rangee { display: flex; align-items: center; gap: 0.5rem; }
+.ml-cluster .ml-act {
+  min-width: 58px;
+  min-height: 54px;
+  background: rgba(6, 18, 12, 0.78);
+  backdrop-filter: blur(4px);
+}
+.ml-cluster .ml-act i { display: none; }
+.ml-cluster .ml-attente {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(6, 18, 12, 0.78);
+  font-size: 0.74rem;
+}
+
+.ml-principal {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  padding: 0 0.3rem;
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  background: radial-gradient(circle at 32% 26%, rgba(64, 176, 110, 0.96), rgba(22, 88, 52, 0.96));
+  color: #fff;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+.ml-principal b { font-size: 1.75rem; line-height: 1; }
+.ml-principal span {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.15;
+}
+.ml-principal em { font-style: normal; opacity: 0.85; }
+.ml-principal:active { transform: scale(0.94); }
+.ml-principal:disabled {
+  background: rgba(4, 12, 8, 0.8);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--craie-dim);
+  cursor: default;
+}
+
+/* La discipline derrière SON bouton : un « frapper » touché à la place d'un
+   « passer », c'est une demi-saison de suspension. */
+.ml-chauffe {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: rgba(6, 18, 12, 0.78);
+  border: 1px solid rgba(255, 107, 107, 0.5);
+  color: #fff;
+  font-size: 1.1rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.ml-chauffe.actif { border-color: var(--or-clair); background: rgba(212, 175, 55, 0.2); }
+.ml-chauffe .ml-tension { flex: 0 0 auto; width: 26px; height: 3px; }
+
+/* La pause et la toute première fois : deux voiles, deux messages. */
+.ml-voile-pause {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 8, 5, 0.55);
+  color: var(--craie);
+  font-family: inherit;
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+.ml-tuto {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(2, 8, 5, 0.78);
+  pointer-events: auto;
+}
+.ml-tuto-carte {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 360px;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 14px;
+  background: #0e1a13;
+}
+.ml-tuto-carte b { font-family: 'Archivo', system-ui, sans-serif; color: var(--or-clair); }
+.ml-tuto-carte p { margin: 0; font-size: 0.84rem; color: var(--craie); line-height: 1.35; }
+
+/* La bagarre attend un ordre : elle se pose AU MILIEU du terrain, pas sous lui. */
+.ml-hud .ml-bagarre {
+  position: absolute;
+  left: 0.6rem;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  background: linear-gradient(180deg, rgba(120, 20, 20, 0.96), rgba(40, 8, 8, 0.96));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* --- LA BARRE DU BAS : mode, tempo, tiroir ------------------------------- */
+.ml-barre {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ml-mode {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--craie-dim);
+  font-family: inherit;
+  font-size: 0.76rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ml-mode.actif { background: rgba(35, 122, 68, 0.3); border-color: rgba(35, 122, 68, 0.75); color: var(--craie); }
+.ml-tempos { display: flex; gap: 0.25rem; flex: 1; min-width: 0; }
+.ml-tempo {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0.2rem 0.1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: var(--craie-dim);
+  font-family: inherit;
+  cursor: pointer;
+}
+.ml-tempo b { font-size: 0.95rem; line-height: 1; }
+.ml-tempo span {
+  font-size: 0.58rem;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ml-tempo.actif { background: rgba(212, 175, 55, 0.18); border-color: var(--or-clair); color: var(--or-clair); }
+.ml-tiroir-bouton {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--craie-dim);
+  font-size: 1.1rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.ml-tiroir-bouton:hover, .ml-mode:hover, .ml-tempo:hover { border-color: var(--or-clair); }
+
+/* --- LE TIROIR : tout ce qui n'est pas le jeu ---------------------------- */
+.ml-tiroir {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  max-height: 72%;
+  background: #0b1610;
+  border-top: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -18px 44px rgba(0, 0, 0, 0.6);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.ml-tiroir-onglets {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ml-tiroir-fermer {
+  margin-left: auto;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--craie-dim);
+  font-family: inherit;
+  cursor: pointer;
+}
+.ml-tiroir-corps { overflow-y: auto; padding: 0.6rem 0.8rem 1rem; }
+.ml-tiroir-note { margin: 0 0 0.6rem; font-size: 0.78rem; color: var(--craie-dim); line-height: 1.4; }
+.ml-tiroir .ml-fil { min-height: 0; }
+
+/* --- LA FEUILLE DE MATCH, À LA SIRÈNE ------------------------------------ */
+.ml-feuille { padding-top: 0.8rem; }
+
+/* --- TÉLÉPHONE ----------------------------------------------------------- */
+/* ⚠️ PLEIN ÉCRAN, SANS MARGE NI COIN ARRONDI. Chaque pixel rendu au terrain est
+   un pixel de lisibilité : c'est la caméra qui rapproche, mais elle ne peut pas
+   inventer de la surface. */
+@media (max-width: 700px) {
+  .overlay-match { padding: 0; place-items: stretch; }
+  .match-live {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  /* ⚠️ L'en-tête tient sur UNE rangée — écusson, score, écusson — et la croix
+     se pose en absolu par-dessus : sur 375 px, une quatrième colonne renvoyait
+     le club visiteur à la ligne. */
+  .ml-tete { grid-template-columns: 1fr auto 1fr; padding: 0.45rem 2.5rem 0.3rem 0.55rem; gap: 0.35rem; }
+  .ml-equipe b { font-size: 0.72rem; }
+  .ml-score { font-size: 1.45rem; gap: 0.5rem; }
+  .ml-fermer {
+    position: absolute;
+    top: calc(0.35rem + env(safe-area-inset-top, 0px));
+    right: 0.5rem;
+    width: 34px;
+    height: 34px;
+    z-index: 9;
+  }
+  .ml-barre { padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom, 0px)); gap: 0.3rem; }
+  .ml-mode { padding: 0.3rem 0.55rem; font-size: 0.7rem; }
+  .ml-action { grid-template-columns: 30px 18px 1fr auto; font-size: 0.8rem; }
+  .ml-ordres { grid-template-columns: 1fr 1fr; }
+  .ml-coaching input { min-height: 44px; }
+}
+
+/* Téléphone étroit : le gros bouton et le stick se resserrent plutôt que de
+   se chevaucher. */
+@media (max-width: 380px) {
+  .ml-principal { width: 78px; height: 78px; }
+  .ml-principal b { font-size: 1.5rem; }
+  .ml-cluster .ml-act { min-width: 52px; min-height: 50px; padding: 0.25rem 0.35rem; }
+  .ml-stick { left: 66px; bottom: 70px; }
+  .ml-stick-base { left: -44px; top: -44px; width: 88px; height: 88px; }
+}
+
+/* Téléphone à l'horizontale : l'écran est bas, on rend tout à la scène. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .ml-tete { padding-top: 0.25rem; padding-bottom: 0.15rem; }
+  .ml-score { font-size: 1.2rem; }
+  .ml-barre { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+  .ml-tempo { min-height: 38px; }
+  .ml-tempo span { display: none; }
+  .ml-mode { min-height: 38px; }
+  .ml-stick { bottom: 62px; }
+  .ml-principal { width: 72px; height: 72px; }
+}
+
+
+/* ⚠️ PAS DE JOYSTICK AU REPOS SUR UN ÉCRAN À SOURIS. Le grand cercle posé en
+   bas à gauche est un repère pour le pouce ; devant un clavier il ne sert à
+   rien et masque un coin du terrain. Il reste évidemment affiché DÈS QU'IL EST
+   SAISI, y compris à la souris. */
+@media (hover: hover) and (pointer: fine) {
+  .ml-stick:not(.actif) { display: none; }
+}
+
+/* ⚠️ SUR TÉLÉPHONE, SEUL LE TEMPO ACTIF PORTE SON NOM. Cinq libellés sur
+   375 px de large donnaient « Mome… », « Accél… » : des mots coupés qui
+   n'apprennent rien. Le bouton choisi s'élargit et s'écrit en toutes lettres,
+   les autres se réduisent à leur emoji — la barre reste lisible et chaque
+   bouton garde ses 44 px de cible. */
+@media (max-width: 430px) {
+  .ml-tempo span { display: none; }
+  .ml-tempo.actif { flex: 2.4 1 0; }
+  .ml-tempo.actif span { display: block; }
+  .ml-mode { font-size: 0.68rem; padding: 0.3rem 0.45rem; }
 }
