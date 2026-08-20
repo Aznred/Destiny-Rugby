@@ -4752,3 +4752,165 @@ npx vite-node scripts/verifTraits.ts       # effets vivants, coût/gain, poids d
 npx vite-node scripts/verifEconomie.ts     # les 1 700 Ovas d’archétypes entrent dans le catalogue
 npx vite-node scripts/verifTraductions.ts  # les 30 clés ajoutées, dans les 7 langues
 ```
+
+---
+
+## 🩹 Trois retours de jeu : l’âge, l’accueil, la fiche du classement
+
+### ⚠️ L’ÂGE ÉTAIT IMPOSSIBLE À CHANGER SUR TÉLÉPHONE
+
+Retour : « sur téléphone on peut pas changer l’âge lors de la création du joueur,
+16, 18 ou 30 ». **Le champ était cassé partout, mais il n’était INUTILISABLE que
+sur téléphone**, et c’est ce qui explique que le bug ait survécu si longtemps.
+
+La cause tient sur une ligne — le bornage était joué **à chaque frappe** :
+
+```tsx
+onChange={(e) => setAge(Math.max(16, Math.min(30, Number(e.target.value) || 18)))}
+```
+
+Taper « 25 » donne d’abord « 2 » → borné à **16** ; la seconde touche compose
+alors « 165 » → borné à **30**. Vider le champ donne `Number('') === 0`, donc
+`|| 18`. On ne pouvait atteindre que 16, 18 ou 30 — exactement les trois valeurs
+signalées. Sur ordinateur les flèches du `type="number"` masquaient le problème ;
+**un téléphone n’en affiche aucune**, il ne restait que le clavier, c’est-à-dire
+rien.
+
+Deux corrections, et il fallait les deux :
+
+1. **On garde la SAISIE, pas le nombre.** `ageSaisi: string` ; l’âge est dérivé
+   (`bornerAge(Number(ageSaisi) || AGE_DEFAUT)`) et le bornage ne s’applique qu’à
+   la **sortie du champ**. Mesuré en jeu : « 25 » → 25 · « 99 » → 30 à la sortie ·
+   champ vidé puis quitté → 18, jamais `NaN`.
+2. **Deux touches − / + de 48 px** encadrent le champ (`.pas-a-pas`), au-dessus du
+   minimum de 44 px que le projet s’impose. Le `−` se désactive à 16, le `+` à 30.
+   ⚠️ Ce n’est pas de la décoration : sans flèches natives, un champ numérique de
+   téléphone n’a **aucun** moyen de réglage en dehors du clavier.
+
+Le champ passe en `type="text"` + `inputMode="numeric"` : on veut le pavé
+numérique du téléphone, pas les flèches (absentes) ni la molette (dangereuse) du
+`type="number"`. Une ligne d’aide annonce les bornes plutôt que de les faire
+découvrir en butant dessus.
+
+Vérifié de bout en bout : âge réglé à 24 → `joueur.age === 24` dans la
+sauvegarde.
+
+### « Comprendre le jeu » remplace les trois arguments de l’accueil
+
+Demande : « comprendre le jeu, ça serait bien de l’avoir à la place du MJ qui
+juge etc ». La section `features` (« Un MJ qui juge vraiment », « Une progression
+vivante », « Ta légende sur 15 ans ») **a été retirée** ; la section
+**« Comprendre le jeu »** — les quatre pages de contenu en HTML statique — prend
+sa place, juste sous le hero.
+
+⚠️ **C’est aussi le bon geste pour l’examen AdSense**, et c’est ce qui a fait
+trancher sans hésiter : c’est la seule section de l’accueil qui **mène à du
+contenu** (4 pages, ~3 355 mots, lisibles sans JavaScript). Trois promesses
+marketing au-dessus d’elles, c’était repousser le contenu éditorial sous la ligne
+de flottaison — exactement le reproche qui a valu le blocage.
+
+Les clés `acc.f1…f3` **restent dans le dictionnaire** : elles ne coûtent rien et
+serviront si l’on veut réintroduire un argumentaire ailleurs.
+
+### La fiche du classement : juste la porte de l’armoire
+
+Demande : « dans le classement, juste avoir le bouton ouvrir l’armoire à trophées
+au lieu de mettre tous les titres ». La liste de médailles (`.bloc-titres`)
+disparaît de `PanneauFiche`.
+
+⚠️ **MAIS LE NOMBRE DE TITRES N’EST PAS PERDU** : il passe en **tuile**
+(`clst.titres`), dans la rangée de chiffres. Sans ça, retirer la liste effaçait
+l’information « combien » — le bouton ne dit que « il y en a ». Une carrière à dix
+titres empilait dix étiquettes grises qui répétaient, en moins bien, ce que le
+meuble en 3D montre d’un seul regard, et qui faisaient défiler tout le classement
+— on perdait la ligne qu’on venait d’ouvrir.
+
+`nomDuTitre()` et l’import `titreTraduit` ont été supprimés avec elle : ils ne
+servaient plus qu’à ça. `.bloc-titres` et `.medaille` restent dans le CSS — le
+Profil et le Panthéon les utilisent toujours.
+
+### Un champ « Nom » vide donne un nom de son pays, plus « Anonyme »
+
+Demande : « si le joueur ne met pas de nom, mets un nom aléatoire en fonction de
+la nationalité ». `creerJoueur` retombait sur la chaîne `'Anonyme'`.
+
+**`src/lib/nomsJoueurs.ts`** — `nomAleatoirePourNation(nation)`.
+
+⚠️ **ON N’A ÉCRIT AUCUN POOL DE PRÉNOMS PAR PAYS**, et c’est le point de la
+conception. Le jeu embarque déjà **11 916 joueurs étiquetés par nationalité** —
+6 306 réels (`data/effectifsReels.ts`) et 5 610 générés pour les 18 championnats
+ajoutés (`data/nouvellesLigues.ts`). Une table à côté, ce serait recopier à la
+main ce qui est là, et se garantir qu’un jour les deux ne diront plus la même
+chose. On recombine : le prénom de l’un, le nom de l’autre.
+
+| Nation | Ce que ça donne |
+|---|---|
+| France | Pablo Jalibert · Cyril Vergé · Elyjah Flament |
+| Géorgie | Davit Lagvilava · Sergo Goginava · Vakh Karkadze |
+| Japon | Shunsuke Taniguchi · Mamoru Kitade · Shu Moriwaki |
+| Portugal | Afonso Madeira · Diogo Aguilar · Francisco Moreira |
+| Roumanie | Bogdan Ursache · Yanis Mitu · Răzvan Mureșan |
+
+⚠️ **52 NATIONS SUR 202 ONT UN VIVIER**, et la création en propose 202. Le repli
+est explicite, et il est assumé approximatif : la nation, puis **sa zone**
+(`NATIONS_PAR_ZONE`), puis tout le monde. Un Népalais reçoit un nom d’Asie —
+imparfait, mais un nom du bon continent se lit mieux qu’un « Léo Dupont » à
+Katmandou.
+
+⚠️ **LES DEUX BASES N’ÉCRIVENT PAS LES NOMS DE LA MÊME FAÇON**, et l’ignorer a
+coûté un bug silencieux. Les joueurs RÉELS portent leur nom de famille en
+capitales (« Cedate GOMES SA »), les joueurs GÉNÉRÉS sont en casse normale
+(« Duarte Pinto »). La première version ne lisait que la casse : elle jetait
+**les 5 610 joueurs générés** sans rien signaler. Mesuré avant correction — le
+Portugal, dont presque tout le vivier est généré, tombait à **7 prénoms pour
+325 joueurs**, et le tirage resservait « Raffaele » trois fois de suite. On lit
+donc la casse quand il y a des capitales (seule façon fiable de placer
+« DU PREEZ », « LE BOURGEOIS », « GOMES SA »), et **le dernier mot** sinon.
+
+⚠️ **ARRÊT ANTICIPÉ À 40 PRÉNOMS** (`CIBLE`). Construire l’index complet des
+11 916 joueurs pour tirer UN nom retiendrait des dizaines de milliers de chaînes
+jusqu’à la fin de la session, pour un clic. On balaie les effectifs réels
+d’abord — ils sont déjà décodés en objets, alors que `effectifNouveau` décode et
+met en cache — puis on s’arrête dès qu’il y a de quoi ne pas se répéter.
+
+⚠️ **UN PRÉNOM TOUT EN CAPITALES N’EST PAS UN BUG** : « JT », « AJ », « CJ » sont
+de vrais prénoms de rugbymen sud-africains. Le banc d’essai ne contrôle donc la
+casse que sur le DERNIER mot — il échouait sinon sur « JT Everitt », qui est
+correct.
+
+Le tirage se fait dans le store (`creerJoueur`), le seul endroit où un joueur est
+créé. Il est volontairement **aléatoire, pas déterministe** : deux carrières
+créées de suite dans le même pays ne doivent pas porter le même nom. Et l’écran
+le DIT (`cr.nomVide`) — sinon un nom tiré à la validation passe pour un bug.
+
+```bash
+npx vite-node scripts/verifNoms.ts   # style par pays, 202 nations, particules, aléa
+```
+
+### 📄 État de la candidature AdSense
+
+⚠️ **LE PROBLÈME DE CONTENU EST RÉGLÉ, MAIS IL RESTE UNE ÉTAPE AVANT DE DEMANDER
+L’EXAMEN** : **aucun code AdSense n’est actuellement servi**. Ni `index.html`, ni
+les quatre pages générées ne portent le script — `scripts/genPages.cjs` ne l’émet
+que si la variable `PUB_SLOT` est renseignée, et `<Pub />` a été retiré du jeu.
+Un examen lancé sur un site sans code AdSense se solde par « code introuvable ».
+
+L’ordre à respecter :
+
+1. créer un **bloc d’annonces** dans la console AdSense → il rend un identifiant
+   de slot (10 chiffres) ;
+2. `PUB_SLOT=<le slot> node scripts/genPages.cjs` puis `npm run build` ;
+3. **déployer**, et vérifier en production que `/guide/`, `/pyramide/`,
+   `/moteur/`, `/journal/`, `/ads.txt` et `/sitemap.xml` répondent bien ;
+4. seulement alors, demander l’examen.
+
+Ce qui est prêt : 4 pages de contenu (11 Ko chacune, ~3 355 mots), `ads.txt` à la
+racine avec le bon `pub-…`, un `sitemap.xml` à 5 entrées, des `<a href>` réels
+depuis l’accueil **et** depuis le `<noscript>`, et plus aucun service worker de
+régie.
+
+```bash
+PUB_SLOT=1234567890 node scripts/genPages.cjs   # les pages AVEC le code AdSense
+npx vite-node scripts/verifTraductions.ts       # 1 605 clés, 100 % dans les 7 langues
+npx vite-node scripts/verifEcrans.ts            # robustesse du Hall et du Classement
+```

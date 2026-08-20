@@ -101,6 +101,7 @@ import { ETAT_PUBS_VIDE, OVAS_PAR_PUB, etatDuJour, pubDisponible, type EtatPubs 
 import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
 import { forceEffectif, forceMoyenneDivision, noteDuClub, setTransfertsSociaux, effectifDuClub } from '../lib/effectif';
+import { nomAleatoirePourNation } from '../lib/nomsJoueurs';
 import { evoluer } from '../lib/progression';
 import { genererOffres, offreProlongation, cote } from '../lib/offres';
 import { agentsAccessibles, descriptionAgent, niveauPourAgent, nomAgent, SEUIL_AGENT } from '../data/agents';
@@ -821,7 +822,12 @@ export const useGame = create<GameState>()(
         const gen = noteGlobale({ attributs });
         const salaireDepart = Math.max(0, Math.round(noteDuClub(input.club) * 60));
         const joueur: Joueur = {
-          nom: input.nom.trim() || 'Anonyme',
+          // ⚠️ PLUS DE « Anonyme ». Un champ laissé vide donne désormais un nom
+          // tiré dans le vivier de SA nationalité (lib/nomsJoueurs.ts) : on
+          // recombine le prénom et le nom de deux des 11 916 joueurs étiquetés
+          // que le jeu embarque déjà. C'est ici et nulle part ailleurs, parce
+          // que c'est le seul endroit où un joueur est créé.
+          nom: input.nom.trim() || nomAleatoirePourNation(input.nation),
           poste: input.poste,
           traits: (input.traits ?? []).slice(0, MAX_TRAITS),
           nation: input.nation,

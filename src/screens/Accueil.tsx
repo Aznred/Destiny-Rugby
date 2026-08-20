@@ -37,15 +37,17 @@ const apparait = {
   }),
 };
 
-// ⚠️ Les trois arguments de la page d'accueil sont des CLÉS de traduction, pas
-// du texte : ils sont résolus au rendu par `t()`, donc ils changent de langue
-// avec le reste. La page d'accueil était le premier écran vu par un joueur
-// étranger, et elle restait entièrement en français.
-const FEATURES = [
-  { ico: '🧠', titre: 'acc.f1.titre', texte: 'acc.f1.texte' },
-  { ico: '📈', titre: 'acc.f2.titre', texte: 'acc.f2.texte' },
-  { ico: '🏆', titre: 'acc.f3.titre', texte: 'acc.f3.texte' },
-];
+// ⚠️ LES TROIS ARGUMENTS MARKETING (« Un MJ qui juge vraiment », « Une
+// progression vivante », « Ta légende sur 15 ans ») ONT ÉTÉ RETIRÉS, à la
+// demande : « comprendre le jeu, ça serait bien de l'avoir à la place du MJ qui
+// juge ». C'est le bon échange sous les deux angles. Pour le joueur, trois
+// promesses valent moins qu'une porte d'entrée qui explique vraiment. Et pour
+// l'examen AdSense, la section « Comprendre le jeu » est la seule de l'accueil
+// qui MÈNE À DU CONTENU — quatre pages en HTML complet, lisibles sans
+// JavaScript. La remonter, c'est mettre le contenu éditorial au-dessus de la
+// ligne de flottaison plutôt que sous une pile d'arguments.
+// Les clés `acc.f1…f3` restent dans le dictionnaire : elles ne coûtent rien et
+// serviront si l'on veut réintroduire un argumentaire ailleurs.
 
 export function Accueil() {
   const setEcran = useGame((s) => s.setEcran);
@@ -98,24 +100,6 @@ export function Accueil() {
         </div>
       </section>
 
-      <section className="section features">
-        {FEATURES.map((f, i) => (
-          <motion.div
-            key={f.titre}
-            className="carte feature"
-            custom={i}
-            variants={apparait}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: '-60px' }}
-          >
-            <div className="ico">{f.ico}</div>
-            <h3>{t(f.titre)}</h3>
-            <p>{t(f.texte)}</p>
-          </motion.div>
-        ))}
-      </section>
-
       {/* ⚠️ DE VRAIS LIENS, PAS DES BOUTONS. Ces quatre pages sont du HTML
           statique servi depuis `public/` (voir `scripts/genPages.cjs`) : elles
           existent à leur propre adresse, elles se lisent sans JavaScript, et
@@ -127,12 +111,21 @@ export function Accueil() {
         <h2>{t('accueil.lecture')}</h2>
         <p className="lecture-chapo">{t('accueil.lectureChapo')}</p>
         <div className="lecture-liens">
-          {PAGES_CONTENU.map((p) => (
-            <a className="carte lecture-lien" key={p.slug} href={`/${p.slug}/`}>
+          {PAGES_CONTENU.map((p, i) => (
+            <motion.a
+              className="carte lecture-lien"
+              key={p.slug}
+              href={`/${p.slug}/`}
+              custom={i}
+              variants={apparait}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: '-60px' }}
+            >
               <span className="ico">{p.ico}</span>
               <b>{t(p.titre)}</b>
               <span className="lecture-desc">{t(p.desc)}</span>
-            </a>
+            </motion.a>
           ))}
         </div>
       </section>

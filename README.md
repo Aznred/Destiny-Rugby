@@ -36,7 +36,7 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   ni le joueur ni l'IA ne peuvent contourner. Il ne peut pas non plus te faire
   changer de club dans son récit : quand tu dis que tu veux partir, c'est le
   **vrai marché** qui s'ouvre, et rien ne bouge tant que tu n'as pas signé.
-- **Création de joueur** : nom, âge, **202 nations** (groupées par continent,
+- **Création de joueur** : nom (**laissé vide, il est tiré dans le style de ta nationalité** — « Sergo Shvangiradze » en Géorgie, « Afonso Madeira » au Portugal), **âge de 16 à 30 ans** (réglable au clavier ou au pouce, − / +), **202 nations** (groupées par continent,
   avec leur vrai drapeau), championnat et club de départ (France ou étranger),
   les **15 postes** numérotés 1 à 15, et **2 traits de caractère** à choisir
   parmi **24** — ils te suivront toute ta carrière. Douze sont là d'entrée ;

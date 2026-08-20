@@ -15,6 +15,13 @@ import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import type { PosteId } from '../types';
 
+// ⚠️ L’ÂGE DE DÉPART EST BORNÉ, MAIS PAS PENDANT LA FRAPPE. Voir le champ
+// plus bas : c’est exactement ce qui le rendait impossible à changer.
+const AGE_MIN = 16;
+const AGE_MAX = 30;
+const AGE_DEFAUT = 18;
+const bornerAge = (n: number) => Math.max(AGE_MIN, Math.min(AGE_MAX, n));
+
 export function Creation() {
   const creerJoueur = useGame((s) => s.creerJoueur);
   const setEcran = useGame((s) => s.setEcran);
@@ -36,7 +43,13 @@ export function Creation() {
   const [divisionId, setDivisionId] = useState(championnats[0].id);
   const division = championnats.find((d) => d.id === divisionId)!;
   const [club, setClub] = useState(division.clubs[0].nom);
-  const [age, setAge] = useState(18);
+  // ⚠️ ON GARDE LA SAISIE BRUTE, PAS LE NOMBRE. Le champ clampait à chaque
+  // frappe : taper « 25 » donnait « 2 » → borné à 16, puis « 165 » → borné à
+  // 30. Sur téléphone, où il n’y a pas de flèches de réglage, l’âge était donc
+  // tout simplement IMPOSSIBLE à changer — c’est le bug signalé. On ne borne
+  // plus qu’à la sortie du champ (et aux boutons − / +).
+  const [ageSaisi, setAgeSaisi] = useState(String(AGE_DEFAUT));
+  const age = bornerAge(Number(ageSaisi) || AGE_DEFAUT);
   const [traits, setTraits] = useState<string[]>([]);
 
   const changerDivision = (id: string) => {
@@ -115,17 +128,48 @@ export function Creation() {
               onChange={(e) => setNom(e.target.value)}
               maxLength={40}
             />
+            {/* Un champ vide ne bloque plus rien, et on le DIT : sinon le nom
+                tiré au sort à la validation passe pour un bug. */}
+            <span className="champ-aide">{t('cr.nomVide')}</span>
           </div>
           <div className="champ">
             <label htmlFor="age">{t('cr.age')}</label>
-            <input
-              id="age"
-              type="number"
-              min={16}
-              max={30}
-              value={age}
-              onChange={(e) => setAge(Math.max(16, Math.min(30, Number(e.target.value) || 18)))}
-            />
+            {/* ⚠️ DEUX BOUTONS AUTOUR DU CHAMP, ET CE N’EST PAS DÉCORATIF. Un
+                `type="number"` seul n’affiche AUCUNE flèche de réglage sur
+                téléphone : il ne restait que le clavier, et le clavier était
+                cassé par le bornage à chaque frappe. Les deux touches font
+                48 px — au-dessus du minimum de 44 px du projet. */}
+            <div className="pas-a-pas">
+              <button
+                type="button"
+                onClick={() => setAgeSaisi(String(bornerAge(age - 1)))}
+                disabled={age <= AGE_MIN}
+                aria-label={t('cr.ageMoins')}
+              >
+                −
+              </button>
+              <input
+                id="age"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={ageSaisi}
+                aria-describedby="age-bornes"
+                onChange={(e) => setAgeSaisi(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                onBlur={() => setAgeSaisi(String(age))}
+              />
+              <button
+                type="button"
+                onClick={() => setAgeSaisi(String(bornerAge(age + 1)))}
+                disabled={age >= AGE_MAX}
+                aria-label={t('cr.agePlus')}
+              >
+                +
+              </button>
+            </div>
+            <span className="champ-aide" id="age-bornes">
+              {t('cr.ageBornes', { min: AGE_MIN, max: AGE_MAX })}
+            </span>
           </div>
         </div>
 

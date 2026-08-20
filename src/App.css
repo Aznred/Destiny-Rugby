@@ -185,6 +185,28 @@
   border-color: var(--or-500);
   box-shadow: 0 0 0 3px rgba(232, 178, 58, 0.18);
 }
+/* Réglage d’un nombre : − valeur + .
+   ⚠️ SUR TÉLÉPHONE, UN `input[type=number]` N’A PAS DE FLÈCHES. Le champ d’âge
+   n’était donc réglable qu’au clavier — et le clavier était cassé par un
+   bornage joué à chaque frappe. Les deux touches font 48 px de côté, au-dessus
+   du minimum de 44 px que le projet s’impose. */
+.pas-a-pas { display: flex; align-items: stretch; gap: 0.4rem; }
+.pas-a-pas input {
+  flex: 1; min-width: 0; text-align: center;
+  font-family: var(--police-forte); font-size: 1.1rem; letter-spacing: 0.02em;
+}
+.pas-a-pas > button {
+  flex: 0 0 48px; width: 48px; min-height: 48px;
+  display: grid; place-items: center;
+  background: rgba(4, 13, 9, 0.6); border: 1px solid var(--bordure);
+  border-radius: var(--rayon-sm); color: var(--craie);
+  font-size: 1.4rem; line-height: 1; font-family: var(--police-forte);
+  cursor: pointer; transition: border-color 0.16s, background 0.16s, color 0.16s;
+}
+.pas-a-pas > button:hover:not(:disabled) { border-color: var(--or-500); color: var(--or-400); }
+.pas-a-pas > button:disabled { opacity: 0.35; cursor: not-allowed; }
+.champ-aide { display: block; margin-top: 0.4rem; font-size: 0.78rem; color: var(--brume); }
+
 .postes-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7rem; }
 .poste-carte {
   text-align: left;

@@ -5,7 +5,6 @@ import { POSTE_PAR_ID, migrerPoste, nomPoste } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
 import { nomNationTraduit } from '../lib/nations';
 import { TROPHEES } from '../data/trophees';
-import { titreTraduit } from '../lib/tropheesI18n';
 import { ficheDepuisJoueur, verifierFiche } from '../lib/classementMondial';
 import { nombre, t } from '../lib/i18n';
 import type { LegendeSauvegardee, TitreGagne } from '../types';
@@ -116,15 +115,6 @@ function depuisLigneMondiale(l: LigneMondiale): FicheAffichable {
 }
 
 /**
- * Le nom lisible d'un titre. Le Hall garde des LIBELLÉS (« Bouclier de Brennus
- * (S4) »), le classement mondial des IDS (`brennus`) : on essaie l'id d'abord,
- * et on retombe sur la traduction du libellé.
- */
-function nomDuTitre(titre: string): string {
-  return TROPHEES[titre]?.nom ?? titreTraduit(titre);
-}
-
-/**
  * Une tuile de statistique : le CHIFFRE d'abord, son nom en dessous.
  *
  * ⚠️ ELLE REMPLACE LES PASTILLES, et ce n'est pas cosmétique. Les pastilles
@@ -183,6 +173,7 @@ function PanneauFiche({
         {fiche.selections != null && fiche.selections > 0
           && <Tuile valeur={fiche.selections} libelle={t('clst.capes')} />}
         {fiche.reputation != null && <Tuile valeur={fiche.reputation} libelle={t('pj.reputation')} />}
+        {fiche.titres.length > 0 && <Tuile valeur={fiche.titres.length} libelle={t('clst.titres')} />}
       </div>
 
       {/* ═══ LE PARCOURS ET LE PALMARÈS, CÔTE À CÔTE ════════════════════
@@ -209,23 +200,17 @@ function PanneauFiche({
 
         <div className="fc-bloc">
           <div className="fc-titre">🏆 {t('clst.armoire')}</div>
-          {fiche.titres.length > 0 ? (
-            <>
-              <div className="bloc-titres">
-                {fiche.titres.map((titre, i) => (
-                  <span className="medaille" key={`${titre}-${i}`}>🏆 {nomDuTitre(titre)}</span>
-                ))}
-              </div>
-              {/* ⚠️ ON OUVRE L'ARMOIRE DE CE JOUEUR-LÀ, pas la sienne. C'est la
-                  demande : voir le palmarès des AUTRES en 3D, pas seulement une
-                  liste de médailles. Le bouton n'apparaît que s'il y a de quoi
-                  remplir le meuble. */}
-              {fiche.palmares.length > 0 && (
-                <button type="button" className="fc-armoire" onClick={onArmoire}>
-                  🗄️ {t('clst.ouvrirArmoire')}
-                </button>
-              )}
-            </>
+          {/* ⚠️ PLUS DE LISTE DE MÉDAILLES, JUSTE LA PORTE DE L'ARMOIRE (demande
+              explicite). Une carrière à dix titres empilait dix étiquettes
+              grises qui répétaient, en moins bien, ce que le meuble en 3D montre
+              d'un seul regard — et qui faisaient défiler tout le classement, si
+              bien qu'on perdait la ligne qu'on venait d'ouvrir. Le NOMBRE de
+              titres, lui, n'est pas perdu : il est passé en tuile, au-dessus.
+              ⚠️ Et c'est l'armoire de CE joueur-là, pas la sienne. */}
+          {fiche.palmares.length > 0 ? (
+            <button type="button" className="fc-armoire" onClick={onArmoire}>
+              🗄️ {t('clst.ouvrirArmoire')}
+            </button>
           ) : (
             <p className="fc-note">{t('clst.aucunTitre')}</p>
           )}
