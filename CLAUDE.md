@@ -5039,3 +5039,66 @@ section L’Ovale autorise « l’insulte, le mépris, la punchline et le règle
 comptes public » et interdit « rien de discriminatoire, pas de menace de violence
 réelle, rien de sexuel ». Les cartons tapent sur le joueur incarné et sur le
 sport, jamais sur une personne réelle ni sur un groupe.
+
+---
+
+## 🔢 LE CLASSEMENT INDIVIDUEL PRENAIT UNE JOURNÉE D’AVANCE
+
+Deux retours de jeu, et c’étaient deux symptômes du même défaut : « on a plus
+de matchs que le maximum possible » et « on voit les stats de la journée avant
+de l’avoir jouée ».
+
+### ⚠️ 1. UN NUMÉRO DE SEMAINE LU AU MAUVAIS MOMENT
+
+`semaineSuivante` fait passer la fiche à `numero + 1` **avant** d’appeler
+`simulerStatsJournee`, qui lisait `joueur.semaine` et demandait à
+`matchDeLaSemaine` l’affiche de cette semaine-là. On rejouait donc
+systématiquement la journée **N+1**, celle qui n’avait pas encore eu lieu : le
+classement individuel avait une journée d’avance sur le championnat, en
+permanence, et un titulaire affichait sept matchs quand six journées seulement
+avaient été disputées.
+
+La semaine est devenue un **paramètre** : `simulerStatsJournee(semaineJouee?)`.
+Le repli sur la fiche ne sert plus qu’aux appels hors boucle de jeu. Les trois
+autres lectures de la fonction (journée de coupe, fenêtre A, fenêtre U20)
+avaient le même décalage et sont corrigées avec.
+
+### ⚠️ 2. DES HOMONYMES DANS LE MÊME CLUB, ET UNE CLÉ DE CUMUL QUI LES FUSIONNE
+
+Le banc d’essai a immédiatement attrapé un **second** bug, indépendant. Les
+statistiques de fond sont cumulées sous `club|nom` : deux joueurs du même club
+portant le même nom fusionnent en UNE ligne qui additionne leurs deux feuilles
+de match. Mesuré en Régionale 3 : un « Leo BOGALHO » apparaissait **quatre**
+fois dans le même effectif, donc 4 matchs et 320 minutes par journée.
+
+C’est un défaut des DONNÉES, pas de la génération : les effectifs amateurs
+viennent de listes de licenciés qui **mélangent les sections d’un club**, où la
+même personne figure plusieurs fois (et où de vrais frères figurent aussi).
+
+`distinguerLesHomonymes()` (`lib/effectif.ts`) suffixe les doublons en chiffres
+romains : « Leo BOGALHO II ».
+
+⚠️ **ON RENOMME, ON NE SUPPRIME PAS**, et le renommage arrive **après** le
+tirage. Retirer les doublons changerait la taille du groupe, donc
+`forceEffectif`, donc les classements et tout l’étalonnage ; et l’âge comme la
+note sont semés sur le nom D’ORIGINE (`effectifAmateur`), qui ne bouge pas. Le
+seul effet est l’étiquette, à l’écran et dans la clé de cumul. Vérifié :
+`verifStats`, `verifMoteur`, `verifPyramide` et `verifGenerations` inchangés.
+
+### Mesuré, avant / après
+
+| | avant | après |
+|---|---|---|
+| journée rejouée à la semaine 9 | J6 pour 5 disputées | **J5 pour 5** |
+| joueurs au-dessus du nombre de journées | 3 sur 261 (jusqu’à 20 matchs pour 5 journées) | **0 sur 277** |
+| minutes maximales | 1 204′ pour 400′ possibles | **400′ pour 400′** |
+| doublons dans une journée | 9 | **0** |
+
+Relevé en jeu à la semaine 5 : le tableau affiche « 2 journée(s) disputée(s) »,
+la colonne J du classement affiche 2, et l’en-tête des statistiques « matchs
+joués · 2 journée(s) ». Les trois disent la même chose.
+
+```bash
+npx vite-node scripts/verifStatsJournees.ts   # la simulation ne devance plus le championnat
+npx vite-node scripts/verifStats.ts           # les 18 classements, le poste attendu en tête
+```

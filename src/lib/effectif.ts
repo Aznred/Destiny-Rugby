@@ -426,6 +426,45 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
 
 // Effectif complet du club pour une saison donnée, MERCATO COMPRIS : c'est
 // cette fonction que le jeu utilise partout.
+/**
+ * Deux joueurs d'un même club ne peuvent pas porter le même nom.
+ *
+ * ⚠️ CE N'EST PAS DE LA COSMÉTIQUE, C'EST LA CLÉ D'IDENTITÉ DU JEU. Les
+ * statistiques de fond sont cumulées sous `club|nom` (`statsReelles`) : deux
+ * homonymes dans le même club fusionnent en UNE ligne, qui additionne leurs
+ * deux feuilles de match. Signalé en jeu — « on a plus de matchs que le
+ * maximum possible » : mesuré en Régionale 3, un « Leo BOGALHO » apparaissait
+ * QUATRE fois dans le même club, donc 4 matchs et 320 minutes par journée.
+ *
+ * ⚠️ ET C'EST UN DÉFAUT DES DONNÉES, PAS UN BOGUE DE GÉNÉRATION. Les effectifs
+ * amateurs viennent de listes de licenciés qui MÉLANGENT LES SECTIONS d'un
+ * club : la même personne y figure plusieurs fois, et de vrais frères y
+ * figurent aussi.
+ *
+ * ⚠️ ON RENOMME, ON NE SUPPRIME PAS. Retirer les doublons changerait la taille
+ * du groupe, donc `forceEffectif`, donc les classements et tout
+ * l'étalonnage. Et on renomme APRÈS le tirage : l'âge et la note sont semés
+ * sur le nom D'ORIGINE (`effectifAmateur`), qui ne bouge pas. Le seul effet
+ * est l'étiquette, à l'écran et dans la clé de cumul.
+ */
+function distinguerLesHomonymes(liste: Coequipier[]): Coequipier[] {
+  const vus = new Map<string, number>();
+  let doublons = 0;
+  const sortie = liste.map((j) => {
+    const n = (vus.get(j.nom) ?? 0) + 1;
+    vus.set(j.nom, n);
+    if (n === 1) return j;
+    doublons++;
+    return { ...j, nom: `${j.nom} ${romain(n)}` };
+  });
+  return doublons ? sortie : liste;
+}
+
+/** « II », « III »… : plus discret qu'un « (2) » sur une feuille de match. */
+function romain(n: number): string {
+  return ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'][n] ?? `#${n}`;
+}
+
 export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
   // ⚠️ Les transferts annoncés sur L'Ovale s'appliquent APRÈS le mercato, et
   // dès la saison 1 (le mercato, lui, ne démarre qu'en saison 2).
@@ -441,14 +480,14 @@ export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
   // montre bien des joueurs meilleurs. L'appliquer sur `forceEffectif` seul
   // aurait donné un club qui joue comme 82 avec un effectif affiché à 75.
   const { bonus } = generationDuClub(nomClub, saison, noteDuClub(nomClub));
-  if (Math.abs(bonus) < 0.05) return liste;
-  return liste.map((j) => ({
+  if (Math.abs(bonus) < 0.05) return distinguerLesHomonymes(liste);
+  return distinguerLesHomonymes(liste.map((j) => ({
     ...j,
     note: Math.max(20, Math.min(99, Math.round(j.note + bonus))),
     // Le potentiel suit : une génération dorée, ce sont des joueurs qui
     // dépassent ce qu'on attendait d'eux, pas seulement une bonne saison.
     potentiel: Math.max(20, Math.min(99, Math.round(j.potentiel + bonus * 0.6))),
-  }));
+  })));
 }
 
 // Un groupe doit pouvoir aligner un XV et son banc. Les données réelles vont de

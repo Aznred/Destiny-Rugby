@@ -733,7 +733,15 @@ interface GameState {
   // Clé : « division#saison » → « club|nom » → cumul.
   statsReelles: Record<string, Record<string, LigneReelle>>;
   journeesReelles: Record<string, number>;
-  simulerStatsJournee: () => Promise<void>;
+  /**
+   * Rejoue en fond la journée de la semaine QUI VIENT D’ÊTRE JOUÉE.
+   *
+   * ⚠️ LE NUMÉRO DE SEMAINE EST UN PARAMÈTRE, ET IL DOIT LE RESTER. Cette
+   * fonction est appelée depuis `semaineSuivante`, APRÈS que la fiche du
+   * joueur soit passée à `numero + 1` : lire `joueur.semaine` revenait donc à
+   * rejouer la journée SUIVANTE, celle qui n’a pas encore eu lieu.
+   */
+  simulerStatsJournee: (semaineJouee?: number) => Promise<void>;
   // boutique
   acheterSkin: (id: string) => boolean;
   choisirSkin: (id: string) => void;
@@ -2030,7 +2038,7 @@ export const useGame = create<GameState>()(
         // ---- LA JOURNÉE EST REJOUÉE EN FOND ----
         // C'est ici que les statistiques individuelles de toute la poule sont
         // produites, juste après le match du joueur.
-        get().simulerStatsJournee();
+        get().simulerStatsJournee(numero);
 
         // ---- LA SÉANCE DE LA SEMAINE SE FAIT TOUTE SEULE ----
         // ⚠️ On ne clique plus sur un secteur chaque semaine : on choisit une
@@ -3724,18 +3732,33 @@ export const useGame = create<GameState>()(
       // match qu'on regarde, mais sans aucun rendu. Comme la graine est celle du
       // championnat, le match suivi en direct et celui rejoué ici sont
       // rigoureusement identiques : rien n'est compté deux fois.
-      simulerStatsJournee: () => {
-        const joueur = get().joueur;
-        const division = joueur?.division;
-        if (!joueur || !division) return Promise.resolve();
+      simulerStatsJournee: (semaineJouee) => {
+        const fiche = get().joueur;
+        const division = fiche?.division;
+        if (!fiche || !division) return Promise.resolve();
+        // ⚠️ ON TRAVAILLE SUR LA SEMAINE JOUÉE, PAS SUR CELLE DE LA FICHE.
+        //
+        // Deux bugs signalés en jeu n'en faisaient qu'un : « on a plus de matchs
+        // que le maximum possible » et « on voit les stats de la journée avant
+        // de l'avoir jouée ». `semaineSuivante` incrémente `joueur.semaine`
+        // AVANT d'appeler cette fonction, et `matchDeLaSemaine` rend l'affiche
+        // de la semaine qu'on lui donne : on rejouait donc systématiquement la
+        // journée N+1. Le classement individuel avait une journée d'avance sur
+        // le championnat, d'où des joueurs à sept matchs quand six journées
+        // seulement avaient été disputées.
+        //
+        // Le repli sur `joueur.semaine` ne sert qu'aux appels hors boucle de
+        // jeu (scripts, rattrapage manuel), où la fiche n'a pas été avancée.
+        const numeroJoue = semaineJouee ?? fiche.semaine ?? 1;
+        const joueur = { ...fiche, semaine: numeroJoue };
         fileStatsReelles = fileStatsReelles.catch(() => {}).then(async () => {
           // Les saisons précédentes n'alimentent plus l'écran courant. Les
           // ignorer évite qu'une avance très rapide laisse des simulations
           // obsolètes tourner plusieurs minutes après l'arrivée.
           const actuel = get().joueur;
-          if (!actuel || actuel.saison !== joueur.saison || actuel.club !== joueur.club) return;
+          if (!actuel || actuel.saison !== fiche.saison || actuel.club !== fiche.club) return;
           await new Promise<void>((resoudre) => setTimeout(resoudre, 0));
-          const sem = semaine(joueur.semaine ?? 1);
+          const sem = semaine(numeroJoue);
         // ⚠️ LE MOTEUR EST CHARGÉ ICI, PAS AU DÉMARRAGE. C'est le seul endroit
         // du store qui en a besoin : le sortir du chunk principal enlève
         // 3 500 lignes du premier chargement, pour un import qui arrive bien
@@ -3753,7 +3776,7 @@ export const useGame = create<GameState>()(
           if (sem.type === 'coupe' && !estAmateur(division)) {
           const coupes = coupesDuClub(joueur.club, joueur.saison);
           if (!coupes.length) return;
-          const journee = passeesDuType(joueur.semaine ?? 1, 'coupe') + 1;
+          const journee = passeesDuType(numeroJoue, 'coupe') + 1;
           const cleC = `${coupes[0]}#${joueur.saison}`;
           if ((get().journeesReelles[cleC] ?? 0) >= journee) return;
           const lignesC = simulerJourneeCoupe(coupes[0], joueur.saison, journee, joueur.club, {
@@ -3770,10 +3793,10 @@ export const useGame = create<GameState>()(
           // A s'il y est appelé, sinon chez les U20 s'il y a l'âge et le niveau.
           const nation = nomNation(joueur.nation);
           const equipeJeune = equipeU20(joueur.nation);
-          const fenA = fenetreInternationale(joueur.semaine ?? 1, joueur.saison, nation);
+          const fenA = fenetreInternationale(numeroJoue, joueur.saison, nation);
           const chezLesA = !!fenA && fenA.competition.equipes.includes(nation)
             && convocation(joueur).selectionne;
-          const fenJ = chezLesA ? null : fenetreU20(joueur.semaine ?? 1, joueur.saison, equipeJeune);
+          const fenJ = chezLesA ? null : fenetreU20(numeroJoue, joueur.saison, equipeJeune);
           const chezLesJeunes = !chezLesA && !!fenJ
             && fenJ.competition.equipes.includes(equipeJeune)
             && convocationU20(joueur).selectionne;
