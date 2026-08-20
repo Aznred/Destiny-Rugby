@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { useGame, classementComplet } from '../store/useGame';
+import { Fragment, Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useGame, classementComplet, palmaresDepuisLibelles } from '../store/useGame';
 import { POSTE_PAR_ID, migrerPoste, nomPoste } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
 import { nomNationTraduit } from '../lib/nations';
@@ -8,13 +8,20 @@ import { TROPHEES } from '../data/trophees';
 import { titreTraduit } from '../lib/tropheesI18n';
 import { ficheDepuisJoueur, verifierFiche } from '../lib/classementMondial';
 import { nombre, t } from '../lib/i18n';
-import type { LegendeSauvegardee } from '../types';
+import type { LegendeSauvegardee, TitreGagne } from '../types';
 import { clubParNom } from '../data/clubs';
 import { Blason } from '../components/Blason';
 import {
   lireClassementMondial, ficheDisponible,
   type EtatMondial, type LigneMondiale,
 } from '../lib/classementEnLigne';
+
+// ⚠️ L'ARMOIRE EST CHARGÉE À LA DEMANDE. Elle embarque three.js, ses modèles et
+// son décodeur Draco : la mettre dans le chunk du classement ferait payer
+// plusieurs centaines de kilo-octets à quelqu'un qui vient juste voir un
+// tableau de scores.
+const ArmoireTrophees = lazy(() =>
+  import('../components/ArmoireTrophees').then((m) => ({ default: m.ArmoireTrophees })));
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LA FICHE D'UNE CARRIÈRE — la même, qu'elle vienne d'ici ou du monde entier
@@ -43,13 +50,30 @@ interface FicheAffichable {
   score: number;
   /** Libellés de titres (Hall) OU ids de trophées (mondial) : on gère les deux. */
   titres: string[];
+  /**
+   * Le palmarès au format de l'armoire 3D.
+   *
+   * ⚠️ IL EST DISTINCT DE `titres`, et il le faut : l'armoire a besoin d'IDS de
+   * trophées (pour retrouver le `.glb` et la traduction), tandis que `titres`
+   * peut contenir des LIBELLÉS quand la fiche vient du Hall. Les reconstruire
+   * dans le composant d'affichage aurait dispersé la conversion à deux endroits.
+   */
+  palmares: TitreGagne[];
   clubs: string[];
   /** Fiche d'avant la v2 du schéma : on n'a que le score, et on le dit. */
   partielle?: boolean;
 }
 
 function depuisLegende(l: LegendeSauvegardee): FicheAffichable {
+  // ⚠️ `tropheeIds` D'ABORD, les libellés en repli. Une sauvegarde d'avant ce
+  // champ n'a que « Bouclier de Brennus (S4) » : `palmaresDepuisLibelles` sait
+  // en retrouver l'id, et c'est le seul chemin qui rende son armoire à une
+  // vieille légende.
+  const palmares: TitreGagne[] = l.tropheeIds?.length
+    ? l.tropheeIds.map((id) => ({ trophee: id, nom: id, saison: 0, club: '' }))
+    : palmaresDepuisLibelles(l.titres ?? []);
   return {
+    palmares,
     cle: l.id,
     nom: l.nom,
     poste: l.poste,
@@ -69,6 +93,10 @@ function depuisLegende(l: LegendeSauvegardee): FicheAffichable {
 function depuisLigneMondiale(l: LigneMondiale): FicheAffichable {
   const complete = ficheDisponible(l);
   return {
+    // La base ne stocke que les IDS (voir `serveur/MIGRATION-FICHES.md`) : pas
+    // de saison, pas de club. L'armoire s'en accommode — elle n'affiche une
+    // année que si elle en connaît une.
+    palmares: (l.titres ?? []).map((id) => ({ trophee: id, nom: id, saison: 0, club: '' })),
     cle: l.pseudo,
     nom: l.nom?.trim() || l.pseudo,
     poste: l.poste ?? undefined,
@@ -96,62 +124,112 @@ function nomDuTitre(titre: string): string {
   return TROPHEES[titre]?.nom ?? titreTraduit(titre);
 }
 
-function PanneauFiche({ fiche, onFermer }: { fiche: FicheAffichable; onFermer: () => void }) {
+/**
+ * Une tuile de statistique : le CHIFFRE d'abord, son nom en dessous.
+ *
+ * ⚠️ ELLE REMPLACE LES PASTILLES, et ce n'est pas cosmétique. Les pastilles
+ * (`Note 34`, `Saisons 1`, `🏉 0 matchs`…) mettaient le libellé et la valeur sur
+ * la même ligne, à la même taille : on lisait sept étiquettes grises avant de
+ * trouver un chiffre. Une carrière se juge d'un coup d'œil sur ses nombres.
+ */
+function Tuile({ valeur, libelle, fort }: { valeur: string | number; libelle: string; fort?: boolean }) {
   return (
-    <section className="carte fiche-classement" aria-label={t('clst.details')}>
-      <div>
-        <div className="eyebrow">{t('clst.details')}</div>
-        <h2 style={{ margin: '0.2rem 0' }}>{fiche.nom}</h2>
-        {fiche.poste && fiche.nation && (
-          <p className="aide" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            {nomPoste(migrerPoste(fiche.poste))} · <Drapeau nation={fiche.nation} taille={0.8} /> {nomNationTraduit(fiche.nation)}
-            {fiche.age != null && ` · ${fiche.age} ${t('gen.ans')}`}
-          </p>
-        )}
-      </div>
-      <button type="button" className="btn fantome" onClick={onFermer}>{t('clst.fermer')}</button>
+    <div className="fc-tuile" data-fort={fort ? 'oui' : undefined}>
+      <b>{valeur}</b>
+      <span>{libelle}</span>
+    </div>
+  );
+}
 
-      {fiche.partielle && <p className="aide">🕰️ {t('clst.ficheAncienne')}</p>}
-
-      <div className="ressources fiche-classement-stats">
-        {fiche.note != null && <span className="pastille">{t('clst.note')} <b>{fiche.note}</b></span>}
-        {fiche.saisons != null && <span className="pastille">{t('clst.saisons')} <b>{fiche.saisons}</b></span>}
-        {fiche.matchs != null && <span className="pastille">🏉 <b>{fiche.matchs}</b> {t('prof.matchs')}</span>}
-        {fiche.essais != null && <span className="pastille">🎯 <b>{fiche.essais}</b> {t('ml.essais')}</span>}
-        {fiche.selections != null && fiche.selections > 0
-          && <span className="pastille">🎽 <b>{fiche.selections}</b> {t('clst.capes')}</span>}
-        {fiche.reputation != null && <span className="pastille">⭐ <b>{fiche.reputation}</b> {t('pj.reputation')}</span>}
-        <span className="pastille">{t('clst.score')} <b>{nombre(fiche.score)}</b></span>
-      </div>
-
-      {fiche.clubs.length > 0 && (
-        <div className="fiche-bloc">
-          <div className="eyebrow">{t('clst.clubs')}</div>
-          <div className="parcours-clubs">
-            {fiche.clubs.map((nom, i) => {
-              const c = clubParNom(nom);
-              return (
-                <span className="parcours-club" key={`${nom}-${i}`}>
-                  {c ? <Blason club={c} taille={22} /> : null}
-                  {nom}
-                </span>
-              );
-            })}
-          </div>
+function PanneauFiche({
+  fiche, onFermer, onArmoire,
+}: {
+  fiche: FicheAffichable;
+  onFermer: () => void;
+  onArmoire: () => void;
+}) {
+  return (
+    <section className="fiche-classement" aria-label={t('clst.details')}>
+      {/* ═══ L'EN-TÊTE ══════════════════════════════════════════════════ */}
+      <header className="fc-tete">
+        <div className="fc-identite">
+          <h3>{fiche.nom}</h3>
+          {fiche.poste && fiche.nation && (
+            <p>
+              {nomPoste(migrerPoste(fiche.poste))}
+              <i>·</i>
+              <Drapeau nation={fiche.nation} taille={0.8} /> {nomNationTraduit(fiche.nation)}
+              {fiche.age != null && <><i>·</i>{fiche.age} {t('gen.ans')}</>}
+            </p>
+          )}
         </div>
-      )}
+        {/* ⚠️ UNE CROIX, PAS UN BOUTON « Fermer ». Le panneau est un tiroir
+            posé sous une ligne de tableau : un bouton pleine largeur en tête
+            lui donnait l'air d'une modale, et volait la place du nom. */}
+        <button type="button" className="fc-fermer" onClick={onFermer} aria-label={t('clst.fermer')}>
+          ✕
+        </button>
+      </header>
 
-      <div className="fiche-bloc">
-        <div className="eyebrow">🏆 {t('clst.armoire')}</div>
-        {fiche.titres.length > 0 ? (
-          <div className="bloc-titres">
-            {fiche.titres.map((titre, i) => (
-              <span className="medaille" key={`${titre}-${i}`}>🏆 {nomDuTitre(titre)}</span>
-            ))}
+      {fiche.partielle && <p className="fc-note">🕰️ {t('clst.ficheAncienne')}</p>}
+
+      {/* ═══ LES CHIFFRES ═══════════════════════════════════════════════ */}
+      <div className="fc-tuiles">
+        <Tuile valeur={nombre(fiche.score)} libelle={t('clst.score')} fort />
+        {fiche.note != null && <Tuile valeur={fiche.note} libelle={t('clst.note')} />}
+        {fiche.saisons != null && <Tuile valeur={fiche.saisons} libelle={t('clst.saisons')} />}
+        {fiche.matchs != null && <Tuile valeur={fiche.matchs} libelle={t('prof.matchs')} />}
+        {fiche.essais != null && <Tuile valeur={fiche.essais} libelle={t('ml.essais')} />}
+        {fiche.selections != null && fiche.selections > 0
+          && <Tuile valeur={fiche.selections} libelle={t('clst.capes')} />}
+        {fiche.reputation != null && <Tuile valeur={fiche.reputation} libelle={t('pj.reputation')} />}
+      </div>
+
+      {/* ═══ LE PARCOURS ET LE PALMARÈS, CÔTE À CÔTE ════════════════════
+          ⚠️ Deux colonnes sur grand écran, empilées sous 700 px. En une seule
+          colonne, la fiche d'un joueur à dix titres faisait défiler tout le
+          classement — on perdait la ligne qu'on venait d'ouvrir. */}
+      <div className="fc-colonnes">
+        {fiche.clubs.length > 0 && (
+          <div className="fc-bloc">
+            <div className="fc-titre">🏟️ {t('clst.clubs')}</div>
+            <div className="parcours-clubs">
+              {fiche.clubs.map((nom, i) => {
+                const c = clubParNom(nom);
+                return (
+                  <span className="parcours-club" key={`${nom}-${i}`}>
+                    {c ? <Blason club={c} taille={22} /> : null}
+                    {nom}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-        ) : (
-          <p className="aide" style={{ margin: 0 }}>{t('clst.aucunTitre')}</p>
         )}
+
+        <div className="fc-bloc">
+          <div className="fc-titre">🏆 {t('clst.armoire')}</div>
+          {fiche.titres.length > 0 ? (
+            <>
+              <div className="bloc-titres">
+                {fiche.titres.map((titre, i) => (
+                  <span className="medaille" key={`${titre}-${i}`}>🏆 {nomDuTitre(titre)}</span>
+                ))}
+              </div>
+              {/* ⚠️ ON OUVRE L'ARMOIRE DE CE JOUEUR-LÀ, pas la sienne. C'est la
+                  demande : voir le palmarès des AUTRES en 3D, pas seulement une
+                  liste de médailles. Le bouton n'apparaît que s'il y a de quoi
+                  remplir le meuble. */}
+              {fiche.palmares.length > 0 && (
+                <button type="button" className="fc-armoire" onClick={onArmoire}>
+                  🗄️ {t('clst.ouvrirArmoire')}
+                </button>
+              )}
+            </>
+          ) : (
+            <p className="fc-note">{t('clst.aucunTitre')}</p>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -174,7 +252,16 @@ export function Classement() {
   // ⚠️ UNE SEULE FICHE OUVERTE, quel que soit le tableau qui l'a ouverte : les
   // deux panneaux s'excluent, et on ne peut pas laisser deux cartes de détail
   // empilées sous le classement.
-  const [ficheOuverte, setFicheOuverte] = useState<FicheAffichable | null>(null);
+  // ⚠️ ON MÉMORISE LA CLÉ DE LA LIGNE, PAS LA FICHE. La fiche s'affiche
+  // désormais SOUS le joueur qu'on vient de toucher (demande explicite) : il
+  // faut donc savoir QUELLE ligne la porte, et la reconstruire à côté d'elle.
+  // Garder l'objet aurait obligé à le comparer pour retrouver sa place.
+  const [ligneOuverte, setLigneOuverte] = useState<string | null>(null);
+  /** Le palmarès dont on regarde l'armoire en 3D, ou `null`. */
+  const [vitrine, setVitrine] = useState<{ nom: string; palmares: TitreGagne[] } | null>(null);
+
+  // Ouvrir une ligne, ou refermer celle qui l'était déjà.
+  const basculer = (cle: string) => setLigneOuverte((v) => (v === cle ? null : cle));
 
   useEffect(() => {
     let vivant = true;
@@ -250,11 +337,12 @@ export function Classement() {
                 Même les lignes d'avant la v2 du schéma sont cliquables — leur
                 fiche dit alors franchement qu'on n'a que le score. */}
             {mondial.lignes.slice(0, 100).map((l, i) => (
+              <Fragment key={l.pseudo}>
               <button
                 type="button"
-                key={l.pseudo}
-                className={`ligne-classement ouvrable ${l.pseudo === monPseudo ? 'moi' : ''}`}
-                onClick={() => setFicheOuverte(depuisLigneMondiale(l))}
+                className={`ligne-classement ouvrable ${l.pseudo === monPseudo ? 'moi' : ''}${ligneOuverte === `m:${l.pseudo}` ? ' deplie' : ''}`}
+                onClick={() => basculer(`m:${l.pseudo}`)}
+                aria-expanded={ligneOuverte === `m:${l.pseudo}`}
                 title={t('clst.voirDetails')}
               >
                 <span className="c-rang">
@@ -279,6 +367,22 @@ export function Classement() {
                 </span>
                 <span className="c-score">{nombre(l.score)}</span>
               </button>
+              {/* ⚠️ LA FICHE S'OUVRE SOUS LE JOUEUR QU'ON VIENT DE TOUCHER
+                  (demande explicite). Elle s'affichait auparavant tout en bas
+                  de la page, après les DEUX tableaux : sur un classement de
+                  cent lignes, on touchait un nom et il ne se passait rien à
+                  l'écran — il fallait deviner qu'il fallait faire défiler. */}
+              {ligneOuverte === `m:${l.pseudo}` && (
+                <PanneauFiche
+                  fiche={depuisLigneMondiale(l)}
+                  onFermer={() => setLigneOuverte(null)}
+                  onArmoire={() => {
+                    const f = depuisLigneMondiale(l);
+                    setVitrine({ nom: f.nom, palmares: f.palmares });
+                  }}
+                />
+              )}
+              </Fragment>
             ))}
           </>
         )}
@@ -324,11 +428,12 @@ export function Classement() {
           <span className="c-score">{t('clst.score')}</span>
         </div>
         {liste.map((l, i) => (
+          <Fragment key={l.id}>
           <button
             type="button"
-            key={l.id}
-            className={`ligne-classement ouvrable ${l.joueur ? 'moi' : ''} ${l.enCours ? 'en-cours' : ''}`}
-            onClick={() => setFicheOuverte(depuisLegende(l))}
+            className={`ligne-classement ouvrable ${l.joueur ? 'moi' : ''} ${l.enCours ? 'en-cours' : ''}${ligneOuverte === `h:${l.id}` ? ' deplie' : ''}`}
+            onClick={() => basculer(`h:${l.id}`)}
+            aria-expanded={ligneOuverte === `h:${l.id}`}
             title={t('clst.voirDetails')}
           >
             <span className="c-rang">
@@ -349,13 +454,36 @@ export function Classement() {
             <span className="c-saisons">{l.saisons}</span>
             <span className="c-score">{nombre(l.score ?? 0)}</span>
           </button>
+          {ligneOuverte === `h:${l.id}` && (
+            <PanneauFiche
+              fiche={depuisLegende(l)}
+              onFermer={() => setLigneOuverte(null)}
+              onArmoire={() => {
+                const f = depuisLegende(l);
+                setVitrine({ nom: f.nom, palmares: f.palmares });
+              }}
+            />
+          )}
+          </Fragment>
         ))}
       </div>
       )}
 
-      {ficheOuverte && (
-        <PanneauFiche fiche={ficheOuverte} onFermer={() => setFicheOuverte(null)} />
-      )}
+      {/* ⚠️ L'ARMOIRE EST UNE MODALE, PAS UN BLOC DE PAGE : elle monte un canvas
+          three.js plein écran et se ferme au clic hors du meuble, comme depuis
+          le Hall. C'est le MÊME composant — le palmarès d'un inconnu se regarde
+          exactement comme le sien. */}
+      <AnimatePresence>
+        {vitrine && (
+          <Suspense fallback={null}>
+            <ArmoireTrophees
+              nom={vitrine.nom}
+              palmares={vitrine.palmares}
+              onFermer={() => setVitrine(null)}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.8rem', marginTop: '2rem' }}>
         {joueur ? (

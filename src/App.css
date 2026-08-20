@@ -791,12 +791,12 @@
    (voir `serveur/schema-vercel.sql`). */
 .tableau-classement.mondial .ligne-classement { grid-template-columns: 3rem 1fr 5.4rem; }
 .tableau-classement.mondial { margin-bottom: 1.4rem; }
-.fiche-classement { margin-top: 1.2rem; display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: start; }
-.fiche-classement-stats,
-.fiche-classement .bloc-titres,
-.fiche-classement .fiche-bloc,
-.fiche-classement > .aide { grid-column: 1 / -1; }
-.fiche-bloc { display: flex; flex-direction: column; gap: 0.55rem; }
+/* ⚠️ L'ANCIENNE MISE EN PAGE DE LA FICHE A ÉTÉ RETIRÉE. Elle posait une
+   grille de deux colonnes (contenu | bouton Fermer) et n'existait que pour un
+   panneau rendu en bas de page. Depuis que la fiche s'ouvre SOUS le joueur,
+   elle est un tiroir : voir la section « LA FICHE D'UNE CARRIÈRE » en fin de
+   fichier. Les classes .fiche-classement-stats et .fiche-bloc n'existent plus
+   dans le balisage. */
 /* ⚠️ « parcours- » ET PAS « fiche-club » : `.fiche-club` EXISTE DÉJÀ — c'est la
    modale d'effectif d'un club (`components/FicheClub.tsx`), en `width: 720px`.
    La collision étirait chaque pastille sur toute la largeur de l'écran. */
@@ -4183,4 +4183,177 @@ img, svg, canvas { max-width: 100%; }
   .touches-liste { grid-template-columns: 1fr; }
   /* ⚠️ 44 px de cible sur téléphone, comme partout ailleurs dans le projet. */
   .touche-cible { min-height: 44px; min-width: 104px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   🗂️ LA FICHE D'UNE CARRIÈRE — le tiroir qui s'ouvre sous le joueur
+   ═══════════════════════════════════════════════════════════════════════════
+   Demande : « les fiches joueurs dans le classement, ça serait bien qu'elles
+   s'affichent sous le joueur quand on clique » — puis, la première version
+   livrée : « c'est cropé, change l'interface pour que ce soit plus joli ».
+
+   ⚠️ LE « CROP » N'EN ÉTAIT PAS UN : LA FICHE N'AVAIT AUCUN PADDING.
+   Elle portait la classe `.carte`, dont le rembourrage est neutralisé pour
+   `.tableau-classement` (`padding: 0.6rem` sur le conteneur, rien à
+   l'intérieur). Résultat mesuré : `padding: 0px` — le titre collait au bord
+   gauche et la dernière ligne au bord inférieur, ce qui se lit exactement comme
+   une image coupée. Elle ne se déguise donc plus en carte : c'est un TIROIR,
+   avec son propre rembourrage et son propre fond.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.fiche-classement {
+  margin: -0.2rem 0 0.7rem;
+  padding: 1.1rem 1.2rem 1.25rem;
+  border-radius: 0 0 14px 14px;
+  /* Le liseré doré en tête la rattache visuellement à la ligne qui l'a ouverte
+     — sans lui, elle flotte entre deux joueurs et on ne sait plus à qui elle
+     appartient. */
+  border-top: 2px solid var(--or-400);
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(232, 178, 58, 0.09), transparent 60%),
+    linear-gradient(180deg, rgba(10, 26, 17, 0.96), rgba(7, 18, 12, 0.96));
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  animation: fiche-ouvre 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes fiche-ouvre {
+  from { opacity: 0; transform: translateY(-8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fiche-classement { animation: none; }
+}
+
+/* La ligne dépliée reste visiblement « celle qu'on a ouverte ». */
+.ligne-classement.deplie {
+  background: rgba(232, 178, 58, 0.14);
+  border-radius: 10px 10px 0 0;
+}
+
+/* --- L'en-tête ----------------------------------------------------------- */
+.fc-tete {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.fc-identite { flex: 1; min-width: 0; }
+.fc-identite h3 {
+  margin: 0;
+  font-family: var(--police-forte);
+  font-size: 1.35rem;
+  line-height: 1.15;
+  color: var(--craie);
+}
+.fc-identite p {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.3rem 0 0;
+  font-size: 0.84rem;
+  color: var(--brume);
+}
+/* Les points de séparation : plus discrets que le texte qu'ils séparent. */
+.fc-identite p i { font-style: normal; opacity: 0.45; }
+
+.fc-fermer {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--brume);
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.fc-fermer:hover { color: var(--craie); border-color: var(--or-400); }
+
+.fc-note { margin: 0; font-size: 0.8rem; color: var(--brume); }
+
+/* --- Les chiffres, en tuiles --------------------------------------------- */
+/* ⚠️ LE NOMBRE D'ABORD, SON NOM EN DESSOUS. Les pastilles mettaient les deux
+   sur la même ligne à la même taille : on lisait sept étiquettes grises avant
+   de trouver un chiffre. Une carrière se juge d'un coup d'œil sur ses nombres. */
+.fc-tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+}
+.fc-tuile {
+  padding: 0.6rem 0.7rem;
+  border-radius: 11px;
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.28);
+  text-align: center;
+}
+.fc-tuile b {
+  display: block;
+  font-family: var(--police-forte);
+  font-size: 1.3rem;
+  line-height: 1.1;
+  color: var(--craie);
+  font-variant-numeric: tabular-nums;
+}
+.fc-tuile span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brume);
+}
+/* Le score est la valeur qui classe : c'est la seule qui a le droit à l'or. */
+.fc-tuile[data-fort='oui'] {
+  border-color: var(--bordure-forte);
+  background: rgba(232, 178, 58, 0.1);
+}
+.fc-tuile[data-fort='oui'] b { color: var(--or-400); }
+
+/* --- Parcours et palmarès, côte à côte ----------------------------------- */
+.fc-colonnes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem 1.4rem;
+  align-items: start;
+}
+.fc-bloc { display: flex; flex-direction: column; gap: 0.55rem; min-width: 0; }
+.fc-titre {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--or-400);
+  font-family: var(--police-forte);
+}
+
+.fc-armoire {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid var(--bordure-forte);
+  background: linear-gradient(180deg, rgba(232, 178, 58, 0.18), rgba(232, 178, 58, 0.08));
+  color: var(--or-400);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.fc-armoire:hover { background: rgba(232, 178, 58, 0.26); color: var(--craie); }
+
+/* --- Téléphone ------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .fiche-classement { padding: 0.9rem 0.8rem 1rem; }
+  .fc-identite h3 { font-size: 1.15rem; }
+  /* Trois tuiles de front sur 375 px : en dessous elles deviennent illisibles,
+     au-dessus la grille se réduit à une colonne et la fiche s'allonge. */
+  .fc-tuiles { grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 0.4rem; }
+  .fc-tuile { padding: 0.5rem 0.35rem; }
+  .fc-tuile b { font-size: 1.1rem; }
+  /* ⚠️ 44 px de cible, la règle du projet. */
+  .fc-fermer { width: 40px; height: 40px; }
+  .fc-armoire { min-height: 44px; }
 }

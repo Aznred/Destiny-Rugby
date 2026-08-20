@@ -358,7 +358,17 @@ export function ArmoireTrophees({ palmares, nom, onFermer }: Props) {
             <>
               <b>{nomTrophee(enAvant.trophee)}{enAvant.fois > 1 ? ` ×${enAvant.fois}` : ''}</b>
               <span>{descriptionTrophee(enAvant.trophee)}</span>
-              <em>{t('arm.saisons')} {[...enAvant.saisons].sort((a, b) => a - b).join(' · ')}</em>
+              {/* ⚠️ ON N'ÉCRIT PAS « Saisons 0 ». Une armoire ouverte depuis le
+                  classement mondial n'a que des IDS de trophées : la base ne
+                  stocke pas l'année (voir `serveur/MIGRATION-FICHES.md`). La
+                  ligne disparaît alors, plutôt que d'annoncer une saison zéro
+                  qui n'existe pas. */}
+              {enAvant.saisons.some((n) => n > 0) && (
+                <em>
+                  {t('arm.saisons')}{' '}
+                  {enAvant.saisons.filter((n) => n > 0).sort((a, b) => a - b).join(' · ')}
+                </em>
+              )}
             </>
           ) : (
             <span className="armoire-aide">{pieces.length > 0 ? t('arm.aide') : ''}</span>

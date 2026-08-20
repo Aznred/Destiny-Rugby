@@ -34,7 +34,8 @@ import { createRequire } from 'node:module';
 import { TROPHEES, estIndividuel } from '../src/data/trophees';
 import {
   cadrage, disposerArmoire, detecterEtageres, estBouclier, COLONNES, MAX_PIECES,
-  type Boite, type DimensionsArmoire, type Geometrie, type Modele, type TailleModele,
+  type Boite, type DimensionsArmoire, type Geometrie, type Modele, type Place,
+  type TailleModele,
 } from '../src/lib/armoire';
 
 // Doivent rester alignés sur `components/ArmoireTrophees.tsx`.
@@ -420,16 +421,36 @@ console.log('\n=== 6. AUCUN CHEVAUCHEMENT ===');
   ligne('vitrine : voisins qui se touchent', collisions.length ? collisions.join(', ') : 'aucun', collisions.length === 0);
 
   // Au sol : vrai test d'emprise au sol, en x ET en z (les rangs s'avancent).
+  //
+  // ⚠️ L'EMPRISE EST CELLE DE LA PIÈCE PIVOTÉE, et c'est la correction qui a
+  // rendu ce test capable de voir le bug signalé en jeu (« certains trophées se
+  // superposent »). Il mesurait `taille.x × taille.z`, c'est-à-dire la boîte
+  // NON tournée — alors que `disposerArmoire` fait pivoter chaque titre autour
+  // de Y. Une pièce à 30° occupe `l·cos θ + p·sin θ` : jusqu'à moitié plus
+  // large. Le test restait donc au vert devant un écran qui montrait le
+  // contraire — le pire cas possible pour un banc d'essai.
+  const empriseAuSol = (m: { taille: TailleModele }, p: Place) => {
+    const a = p.rotation[1];
+    const c = Math.abs(Math.cos(a));
+    const s2 = Math.abs(Math.sin(a));
+    return {
+      lx: (m.taille.x * c + m.taille.z * s2) * p.echelle,
+      lz: (m.taille.x * s2 + m.taille.z * c) * p.echelle,
+    };
+  };
   const auSol = affiches
     .map((m, i) => ({ m, p: places[i] }))
     .filter(({ p }) => p.dehors)
-    .map(({ m, p }) => ({
-      id: m.tr.id,
-      x0: p.position[0] - (m.taille.x * p.echelle) / 2,
-      x1: p.position[0] + (m.taille.x * p.echelle) / 2,
-      z0: p.position[2] - (m.taille.z * p.echelle) / 2,
-      z1: p.position[2] + (m.taille.z * p.echelle) / 2,
-    }));
+    .map(({ m, p }) => {
+      const e = empriseAuSol(m, p);
+      return {
+        id: m.tr.id,
+        x0: p.position[0] - e.lx / 2,
+        x1: p.position[0] + e.lx / 2,
+        z0: p.position[2] - e.lz / 2,
+        z1: p.position[2] + e.lz / 2,
+      };
+    });
   const chocsSol: string[] = [];
   for (let a = 0; a < auSol.length; a++) {
     for (let b = a + 1; b < auSol.length; b++) {

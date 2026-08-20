@@ -4259,3 +4259,303 @@ affiche un écusson de plus.
 ```bash
 npx vite-node scripts/verifClassement.ts   # joue le tricheur : chaque attaque doit être refusée
 ```
+
+---
+
+## 🎮 LES COMMANDES REFAITES, ET LE MATCH QUI S'ÉCHAUFFE TOUT SEUL
+
+Retour de jeu, en un bloc : « quand on regarde les joueurs on n'a pas les
+numéros, on les a seulement quand on joue » · « sur PC ou manette les touches
+pour plaquer etc. ne sont pas bonnes, il faudrait A ou E pour la passe droite ou
+gauche, clic droit ou gauche pour plaquer / tirer au pied, Maj pour sprinter avec
+une barre d'endurance, raffut et crochet qui marchent vraiment, et qu'on puisse
+modifier ces touches dans les paramètres » · « refais les bagarres pour que
+l'équipe d'en face puisse la lancer, et que ça vienne plutôt d'actions illégales
+type plaquage haut, chambrage, mais qui s'activent toutes seules ; en mode
+chambrage, petites bulles avec les joueurs qui disent quelque chose ».
+
+### ⚠️ 1. LES NUMÉROS AVAIENT ÉTÉ MASQUÉS — c'était une erreur du lot précédent
+
+En réduisant la taille des pions, le numéro avait été masqué sous 7 px « parce
+qu'il salissait le pion ». Conséquence immédiate en vue large : un match qu'on
+regarde devient un nuage de points — on ne suit personne, on ne reconnaît pas son
+club, on ne sait pas qui vient de marquer.
+
+Le texte a donc son **propre plancher en pixels** (`7,6 / pxParMetre`),
+indépendant du disque : il déborde très légèrement en vue large, et le liseré
+noir (`paintOrder: stroke`, épaissi à 0,26) le garde lisible sur n'importe quel
+maillot. **Trente numéros affichés en permanence, à tous les cadrages.**
+
+Le contour des pions a un plancher lui aussi (**1,5 px**) : sans numéro, à 0,8 px,
+le liseré clair (camp A) ou sombre (camp B) était le seul moyen de séparer deux
+équipes aux couleurs voisines — et il ne se voyait plus.
+
+### ⚠️ 2. LES TOUCHES — `moteur/manette.ts` réécrit autour d'une table réglable
+
+| | avant | maintenant |
+|---|---|---|
+| passe | **un** bouton, le moteur choisit le receveur | **A** et **E** — passe gauche / passe droite |
+| plaquer | `J` | **clic gauche** |
+| taper au pied | `I` | **clic droit** |
+| sprint | `Maj` (aucun retour visuel) | `Maj` + **barre de souffle** |
+| réassignable | non | **oui**, ⚙️ Réglages, 20 commandes |
+
+- **`Commande`** (haut/bas/gauche/droite + sprint + principale + les 15 actions)
+  et **`LIAISONS_DEFAUT`** remplacent l'ancienne table `TOUCHES` figée.
+  `Assignation = { code, libelle }` : le **code physique** sert à jouer, le
+  **libellé** à afficher. ⚠️ Les deux sont stockés ensemble parce que `KeyQ`
+  s'écrit « A » en AZERTY et « Q » en QWERTY, et **seul le navigateur du joueur
+  sait laquelle** — on lit donc `ev.key` à la capture.
+- ⚠️ **« A ET E » MARCHE DANS LES DEUX MONDES**, et ce n'est pas un hasard : les
+  deux touches qui encadrent « avancer » portent les codes `KeyQ` et `KeyE`,
+  soit **A / E** en AZERTY et **Q / E** en QWERTY. Dans les deux cas, les
+  voisines immédiates du pouce gauche.
+- ⚠️ **LES FLÈCHES NE SONT PAS RÉGLABLES ET MARCHENT TOUJOURS.** C'est le filet
+  de sécurité : quelqu'un qui réassigne ses quatre directions sur des touches
+  introuvables doit pouvoir bouger sans aller rouvrir les réglages avec un pion
+  planté au milieu du pré.
+- ⚠️ **UNE TOUCHE NE SERT QU'UNE FOIS.** Le store libère l'ancienne liaison avant
+  de poser la nouvelle (`setToucheMatch`) — sans ça, un même clic déclenchait
+  deux actions et l'une des deux gagnait au hasard de l'ordre de la table.
+  Vérifié en jeu : assigner `R` au crochet vide la ligne du raffut (« — »).
+- ⚠️ **LA SOURIS NE FAIT JAMAIS RIEN DU TOUT.** On ne plaque pas quand on porte
+  le ballon, et un clic sans effet passe pour un bug : si le geste assigné n'est
+  pas jouable, `MatchLive` joue l'**action contextuelle** à la place.
+- ⚠️ **UN BOUTON DE SOURIS ASSIGNÉ NE POSE PAS LE JOYSTICK** (`pointerType ===
+  'mouse'`). Sans ce partage, un clic droit pour taper démarrait aussi une
+  course : le pion partait vers le curseur pendant que le ballon s'envolait. Le
+  doigt garde le joystick, la souris garde ses boutons. Et `onContextMenu` est
+  neutralisé, sinon le menu du navigateur s'ouvre par-dessus le match.
+- **`components/ReglageTouches.tsx`** : 20 lignes, capture au clavier **ou à la
+  souris**, Échap annule, Suppr remet par défaut, et un bouton « tout remettre ».
+  ⚠️ **Seules les DIFFÉRENCES sont persistées** (`touchesMatch: Liaisons`) :
+  figer les vingt liaisons dans chaque sauvegarde interdirait à jamais de
+  corriger un défaut par défaut — ce qui est précisément ce qu'on vient de faire.
+- ⚠️ **Une réassignation prend effet MATCH OUVERT**, et le lecteur oublie ce qui
+  était enfoncé : une direction restée en mémoire sur l'ancienne touche ferait
+  courir le pion tout seul, sans plus aucun moyen de l'arrêter.
+
+### 3. La passe a un côté — `receveurCote(e, p, cote)`
+
+⚠️ **LE CÔTÉ EST CELUI DE L'ÉCRAN, DONC RETOURNÉ POUR LE CAMP B.** Le camp A
+attaque vers les X croissants : sa gauche d'écran est les Y décroissants ; pour
+le camp B, la caméra tourne le monde de 180° (`moteur/camera.ts`) et tout
+s'inverse. Un signe de travers, et « passe à gauche » envoie le ballon à droite
+un match sur deux. Mesuré : **1 093 receveurs proposés, 1 093 du bon côté et
+jamais en avant.**
+
+`passe` (l'action contextuelle du gros bouton) n'a pas disparu : elle donne au
+plus évident. Les deux nouvelles la **précisent**.
+
+### 4. Le crochet et le raffut « marchent vraiment » — mesuré
+
+Leur effet EXISTAIT (`resoudrePlaquage` ajoutait `evitement × 0,30` et
+`puissance × 0,26` à la résistance du porteur) mais il était **invisible manette
+en main** : un crochet faisait passer la chance de franchir de 10 % à 15 %, ce
+qui ne se sent pas quand on n'en joue pas cent d'affilée. Et surtout, **personne
+ne le surveillait** — aucun banc d'essai ne le mesurait, on pouvait donc le
+raboter sans que rien ne le signale.
+
+- Coefficients portés à **0,45** et **0,40**.
+- ⚠️ **Fenêtre d'armement allongée de 2,6 à 3,4 s.** C'était l'autre moitié du
+  problème : un crochet ne compte que s'il est encore armé **à l'instant du
+  contact**. Armé trop tôt, il expirait avant le plaqueur — le joueur voyait son
+  geste ne rien faire.
+- Mesuré (`verifControle`, section 2) : franchissements **1,1 → 1,8** avec le
+  crochet (+64 %), **1,1 → 1,4** avec le raffut. Borné à 12 par match : un ailier
+  imprenable, ce n'est plus du rugby.
+
+### 5. Le souffle est une barre, plus un pourcentage
+
+`🫁 62 %` perdu au milieu de trois pastilles ne se lit pas en pleine course.
+`.ml-souffle` est une jauge sous le bandeau du fil : verte, **rouge sous 30 %**,
+et bordée d'or avec la mention `SPRINT` tant que la gâchette est tenue. Le sprint
+se paie toujours autant (`piloterMonJoueur`), on le voit simplement venir.
+
+### ⚠️ 6. LES BAGARRES : la règle n°1 d'origine a été RENVERSÉE, à la demande
+
+La première version posait : « on ne déclenche **jamais** une bagarre au hasard,
+elle est toujours la suite d'un geste du joueur ». Conséquence en jeu : **rien
+n'arrivait jamais** si l'on ne cliquait pas sur « chambrer », et l'équipe d'en
+face était un décor poli.
+
+⚠️ **MAIS LE PRINCIPE DE FOND TIENT TOUJOURS** : on ne PUNIT jamais le joueur
+sans cause. Une friction adverse ne lui coûte rien tant qu'il n'y répond pas —
+c'est l'adversaire qui prend la pénalité et le carton. Il reste maître de ce qui
+lui arrive : reculer, séparer, ou entrer dedans.
+
+| Nouveauté | Ce que c'est |
+|---|---|
+| `frictions(e, dt)` | Toutes les 9 s simulées, deux adversaires proches **se cherchent**. Fréquence indexée sur la température ET le niveau. |
+| `chambrer(e, auteur, cible)` | Deux bulles, de la tension, et parfois la suite. La cible répond selon sa **discipline**. |
+| `irregularite(e, plaqueur)` | Un plaquage peut être **haut** (2/3) ou **en retard** (1/3). Probabilité indexée sur la FATIGUE, la tension et la discipline. |
+| `apresGesteIllegal(...)` | La victime râle (bulle), la température bondit, et l'équipe lésée peut venir demander des comptes. |
+| `e.bulles` / `vieillirBulles` | Les bulles vivent dans l'ÉTAT et vieillissent au rythme du MATCH — en accéléré elles passent vite, comme le reste. |
+| `e.compteurs.irregularites` | Le compteur de match, pour que ça se mesure. |
+
+- ⚠️ **UN GESTE ILLÉGAL N'EST PAS UNE ACTION DU JOUEUR**, et c'est la demande
+  (« qui s'activent toutes seules »). Un bouton « plaquer haut » ferait de la
+  faute un choix tactique ; au rugby, c'est un geste qui **échappe**, sous la
+  fatigue et sous la tension. La probabilité suit donc les deux.
+- ⚠️ **ÇA VAUT POUR LES TRENTE PIONS**, pas seulement pour le joueur : c'est ce
+  qui permet à l'équipe d'en face d'allumer la mèche.
+- ⚠️ **UNE FRICTION ENTRE DEUX PNJ NE DÉCLENCHE PAS DE BAGARRE.** Le moteur
+  saurait la résoudre, mais l'écran ne sait poser la question qu'à une personne :
+  mettre le jeu en pause pour une altercation qu'on ne peut pas arbitrer serait
+  une interruption sans choix. Les frictions entre PNJ **chauffent** le match, et
+  c'est tout — ce sont elles qui rendent la suivante possible.
+- ⚠️ **`CHAMBRAGE` EST COURT ET SANS INSULTE**, et ce n'est pas de la pudeur :
+  une bulle tient dans 120 px au-dessus d'un pion de 20 px, elle est lue en une
+  seconde et demie, et le jeu est ouvert aux mineurs. Le chambrage de rugby
+  marche très bien au premier degré. Dix répliques, **dans les sept langues**.
+
+Mesuré (`verifControle`, sections 8 et 9), **le joueur ne cliquant sur rien** :
+
+| | |
+|---|---|
+| répliques entendues par match | **24,2** |
+| pic de température | 56 / 100 |
+| altercations **subies** | 0,58 / match — **7 matchs sur 12** en ont vu une |
+| bulles simultanées à l'écran | 2 (plafond 4) |
+| gestes illégaux sifflés | **1,25 / match en amateur · 0,58 en pro** |
+| écart au score de la ligue | **0 sur 12** |
+
+⚠️ **LE PREMIER COMPTAGE ÉTAIT FAUX, DEUX FOIS**, et c'est instructif :
+« plaquage haut » figure **déjà** dans `MOTIFS_PENALITE` comme l'un des sept
+habillages tirés au sort pour n'importe quelle pénalité — compter les phrases
+donnait 5,75 gestes par match au lieu de 1,25. Et compter les bulles à chaque
+passage de boucle (elles vivent 2,8 s, soit sept tours) donnait « 162 répliques
+par match » pour une vingtaine de phrases réellement prononcées. **On compte le
+compteur du moteur et l'identité des objets, jamais le texte affiché.**
+
+L'étalonnage du moteur, lui, n'a pas bougé : `verifMoteur` → 19,6 pénalités
+(cible 14-26), 1,2 carton jaune (cible 0,8-3).
+
+### Ce que le store gagne
+
+`touchesMatch: Liaisons` — les différences avec la table par défaut, persistées.
+`setToucheMatch(commande, assignation | null)` et `reinitialiserTouchesMatch()`.
+
+```bash
+npx vite-node scripts/verifControle.ts     # + sections 8, 9, 10 : frictions, gestes illégaux, passe directionnelle
+npx vite-node scripts/verifMoteur.ts       # l'étalonnage ne bouge pas
+npx vite-node scripts/verifMatchJouable.ts # caméra, sens du stick, rythme des moments
+npx vite-node scripts/verifTraductions.ts  # les clés ajoutées, dans les 7 langues
+```
+
+---
+
+## 🗂️ LA FICHE S'OUVRE SOUS LE JOUEUR, ET L'ARMOIRE NE SE SUPERPOSE PLUS
+
+Deux retours en un : « les fiches joueurs dans le classement, ça serait bien
+qu'elles s'affichent sous le joueur quand on clique, et qu'on puisse ouvrir
+l'armoire à trophées du joueur » · « bug sur l'armoire, certains trophées se
+superposent, ce qui n'est pas bon ».
+
+### 1. La fiche est devenue un tiroir, pas un bas de page
+
+`PanneauFiche` était rendu **après les deux tableaux**, tout en bas de l'écran.
+Sur un classement de cent lignes, on touchait un nom et il ne se passait
+visiblement rien : il fallait deviner qu'il fallait faire défiler.
+
+⚠️ **ET LA PREMIÈRE VERSION LIVRÉE ÉTAIT « CROPÉE »** — retour de jeu, capture à
+l'appui. Ce n'était pas un débordement : la fiche portait la classe `.carte`,
+dont le rembourrage est neutralisé à l'intérieur de `.tableau-classement`
+(`padding: 0.6rem` sur le conteneur, rien dedans). Mesuré à l'écran :
+**`padding: 0px`**. Le titre collait au bord gauche et la dernière ligne au bord
+inférieur — ce qui se lit exactement comme une image coupée. Elle ne se déguise
+donc plus en carte : c'est un TIROIR, avec son propre rembourrage, son propre
+fond et son liseré doré en tête.
+
+⚠️ **LES PASTILLES SONT DEVENUES DES TUILES.** `Note 34`, `Saisons 1`,
+`🏉 0 matchs`… mettaient le libellé et la valeur sur la même ligne, à la même
+taille : on lisait sept étiquettes grises avant de trouver un chiffre. Une
+carrière se juge d'un coup d'œil sur ses nombres, donc le NOMBRE d'abord et son
+nom dessous — et le score, seule valeur qui classe, a seul droit à l'or.
+Le parcours en clubs et le palmarès passent côte à côte sur grand écran :
+en une colonne, la fiche d'un joueur à dix titres faisait défiler tout le
+classement et on perdait la ligne qu'on venait d'ouvrir.
+
+Mesuré après correction : padding réel de 17,6 × 19,2 px, six tuiles sur une
+rangée à 1280 px, **trois sur 375 px**, croix de fermeture à 40 px, et aucun
+débordement horizontal.
+
+
+- L'état ne retient plus la fiche mais **la clé de la ligne** (`ligneOuverte`),
+  préfixée par son tableau (`m:` mondial, `h:` Hall) — les deux tableaux
+  partagent l'état, donc les clés ne doivent pas pouvoir se confondre.
+- Chaque ligne est enveloppée dans un `<Fragment>` avec sa fiche : le tableau
+  est une pile de blocs, pas un vrai `<table>`, donc l'insertion est directe.
+- Retoucher la même ligne **referme** (`basculer`), et `aria-expanded` suit.
+- La ligne dépliée garde un fond doré, et la bordure haute de la fiche la
+  rattache à elle : sans ce repère, une fiche longue fait perdre de vue à qui
+  elle appartient.
+
+### 2. On ouvre l'armoire 3D de N'IMPORTE QUEL joueur
+
+Le bouton **« 🗄️ Ouvrir son armoire en 3D »** monte le **même** composant que
+depuis le Hall (`ArmoireTrophees`) — le palmarès d'un inconnu se regarde
+exactement comme le sien.
+
+- ⚠️ **`FicheAffichable` porte désormais `palmares: TitreGagne[]`, en plus de
+  `titres`.** Ce n'est pas une redondance : l'armoire a besoin d'**IDS** de
+  trophées (pour retrouver le `.glb` et la traduction), alors que `titres` peut
+  contenir des **LIBELLÉS** quand la fiche vient du Hall. Convertir dans le
+  composant d'affichage aurait dispersé la conversion à deux endroits.
+- Côté Hall : `tropheeIds` d'abord, `palmaresDepuisLibelles` en repli — c'est le
+  seul chemin qui rende son armoire à une légende d'avant ce champ.
+- Côté mondial : la base ne stocke que les ids, **sans saison ni club**.
+  L'armoire n'écrit donc plus « Saisons 0 » : la ligne disparaît quand l'année
+  est inconnue.
+- ⚠️ **Chargée en `lazy()`** : elle embarque three.js, ses modèles et le
+  décodeur Draco. La mettre dans le chunk du classement ferait payer plusieurs
+  centaines de kilo-octets à quelqu'un venu voir un tableau de scores.
+
+### ⚠️ 3. LE BUG DE SUPERPOSITION — et pourquoi le banc d'essai ne le voyait pas
+
+`verifArmoire.ts` affichait **« sol : emprises qui se recouvrent — aucune »**
+pendant que l'écran montrait le contraire. C'est le pire cas possible pour un
+banc d'essai, et il avait **trois** causes qui se cumulaient :
+
+1. **L'ÉCHELLE NE REGARDAIT QUE LA HAUTEUR** (`buste / taille.y`). Un bouclier
+   est large et plat : mis à hauteur de buste, il fait presque deux fois la
+   largeur d'une case. La grille espaçait les **centres**, pas les pièces.
+2. **LA SECOUSSE ÉTAIT UNE PART DE LA CASE**, pas du jeu réellement disponible :
+   deux voisines déjà serrées se rapprochaient encore de 68 % d'une case.
+3. **LA ROTATION SUR Y N'ÉTAIT COMPTÉE NULLE PART.** Une pièce pivotée de 30°
+   occupe au sol `l·cos θ + p·sin θ` — jusqu'à moitié plus large. Le test
+   mesurait `taille.x × taille.z`, c'est-à-dire la boîte **non tournée**.
+
+Mesuré avec des boucliers de proportions réalistes (1,9 × 2,4 × 0,6) : **3
+chevauchements sans compter la rotation, 6 en la comptant.**
+
+**La grille a été remplacée par une mise en rangées qui part des pièces**, comme
+la vitrine range ses tablettes : chacune reçoit sa stature, on calcule son
+emprise au sol **une fois pivotée**, puis on remplit des rangées tant que la
+largeur de zone tient. L'écart entre deux pièces est posé **en mètres**
+(`ECART_SOL`), et la secousse est bornée par lui — à 0,34, deux voisines
+secouées l'une vers l'autre gardent toujours un tiers de l'écart.
+
+⚠️ **`ZONE_PROFONDEUR` A DISPARU**, et c'est la moitié du correctif. Elle
+imposait une profondeur **fixe** découpée en autant de rangs qu'il fallait : les
+cases rétrécissaient à mesure que le palmarès grandissait, pendant que les
+pièces gardaient leur stature. La profondeur de la scène se déduit désormais des
+pièces elles-mêmes.
+
+Et **le test compte maintenant l'emprise pivotée** : sans cette correction-là, on
+aurait corrigé à l'aveugle.
+
+| | avant | après |
+|---|---|---|
+| chevauchements (boucliers réalistes) | **6** | **0** |
+| largeur de la scène | 6,83 | **6,08** |
+| le meuble occupe (téléphone 299 × 294) | 44 % | **51 %** |
+| le meuble occupe (ordinateur 714 × 344) | 64 % | **67 %** |
+
+Resserrer la scène était un effet de bord attendu : des pièces qui ne se
+chevauchent plus tiennent moins de place qu'un empilement qui débordait.
+
+```bash
+npx vite-node scripts/verifArmoire.ts   # emprises PIVOTÉES, cadrage, cas limites
+npx vite-node scripts/verifEcrans.ts    # robustesse du Hall et du Classement
+```

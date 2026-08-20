@@ -146,7 +146,16 @@ const MAX_SOL = MAX_PIECES;
 // 40 % que `verifArmoire` exige pour qu'il reste lisible. On éparpille donc
 // LARGE MAIS PAS LOIN.
 const ZONE_LARGEUR = 1.75;   // × la largeur du meuble
-const ZONE_PROFONDEUR = 0.5; // × la hauteur du meuble
+// ⚠️ `ZONE_PROFONDEUR` A DISPARU, et c'est la moitié du correctif. Elle
+// imposait une profondeur FIXE à la zone, découpée en autant de rangs qu'il
+// fallait : les cases rétrécissaient à mesure que le palmarès grandissait, et
+// les pièces, elles, gardaient leur stature. La profondeur de la scène se
+// déduit maintenant des pièces elles-mêmes, rangée par rangée.
+//
+// L'écart minimal entre deux pièces au sol, en part de la largeur du meuble.
+// C'est LUI qui garantit qu'elles ne se touchent pas, et c'est lui qui borne
+// la secousse.
+const ECART_SOL = 0.1;
 // Ce qu'on laisse entre la face avant du meuble et la première rangée, en part
 // de la hauteur du meuble. Sans ça, une pièce posée contre le meuble semble
 // sortir du bois — et la moitié de son épaisseur passe DANS le meuble.
@@ -428,72 +437,127 @@ export function disposerArmoire(
   });
 
   // --- 3. LE SOL : éparpillé devant le meuble -------------------------------
-  // ⚠️ ON N'ALIGNE PLUS EN DEUX FILES LE LONG DES FLANCS (demande explicite :
-  // « en désordre, en mode éparpillés un peu partout devant l'armoire »). Les
-  // files donnaient deux haies bien rangées qui s'éloignaient du meuble — d'un
-  // ordre de vitrine de magasin, pas d'un palmarès posé par quelqu'un.
+  // ⚠️ Demande explicite : « j'aimerais que les trophées collectifs soient
+  // rangés dans le désordre, en mode éparpillés un peu partout devant
+  // l'armoire ». Les anciennes files le long des flancs donnaient deux haies
+  // bien rangées, d'un ordre de vitrine de magasin.
   //
-  // La méthode : une GRILLE dans la zone devant le meuble — elle seule garantit
-  // qu'aucune pièce n'en chevauche une autre, quel que soit le palmarès — puis
-  // chaque pièce est SECOUÉE dans sa case, en x, en z et en rotation. Le
-  // décalage vient de `secousse(indice)`, donc il est le même à chaque rendu.
+  // ⚠️ ET LA GRILLE QUI LES A REMPLACÉES SUPERPOSAIT LES PIÈCES — bug signalé
+  // en jeu : « certains trophées se superposent ». Elle prétendait pourtant
+  // « garantir qu'aucune pièce n'en chevauche une autre ». Trois raisons, qui
+  // se cumulaient, et aucune n'était visible à la relecture :
   //
-  // ⚠️ ET LES RANGÉES SONT REMPLIES DU FOND VERS L'AVANT, la pièce maîtresse
-  // (le premier du palmarès) au premier plan et au centre : c'est elle qu'on
-  // doit voir en premier, pas celle qui a hérité de la meilleure case.
+  //  1. **L'ÉCHELLE NE REGARDAIT QUE LA HAUTEUR** (`buste / taille.y`). Un
+  //     bouclier est large et plat : mis à hauteur de buste, il fait presque
+  //     deux fois la largeur d'une case. La grille espaçait les CENTRES, pas
+  //     les pièces.
+  //  2. **LA SECOUSSE ÉTAIT UNE PART DE LA CASE**, pas du jeu réellement
+  //     disponible : deux voisines déjà serrées se rapprochaient encore de
+  //     68 % d'une case.
+  //  3. **LA ROTATION SUR Y N'ÉTAIT COMPTÉE NULLE PART.** Une pièce pivotée de
+  //     30° occupe au sol `l·cos θ + p·sin θ` — sensiblement plus que sa
+  //     largeur. Le banc d'essai l'ignorait aussi, d'où un test au vert devant
+  //     un écran qui montrait le contraire.
+  //
+  // LA MÉTHODE, MAINTENANT : on part des PIÈCES, plus d'une grille. Chacune
+  // reçoit sa stature, on calcule son emprise au sol UNE FOIS PIVOTÉE, puis on
+  // remplit des rangées tant que la largeur de zone tient — exactement comme la
+  // vitrine range ses tablettes. Deux pièces ne peuvent alors plus se toucher :
+  // l'écart entre elles est posé en mètres, et la secousse est bornée par lui.
   const buste = dims.hauteur * PART_BUSTE;
   if (sol.length > 0) {
     const zoneL = dims.largeur * ZONE_LARGEUR;
-    const zoneP = dims.hauteur * ZONE_PROFONDEUR;
-    // Une grille aussi carrée que la zone : sinon les pièces s'entassent dans
-    // un sens et le vide s'installe dans l'autre.
-    const colonnes = Math.max(1, Math.round(Math.sqrt(sol.length * (zoneL / zoneP))));
-    const lignes = Math.ceil(sol.length / colonnes);
-    const caseL = zoneL / colonnes;
-    const caseP = zoneP / lignes;
+    const ecart = dims.largeur * ECART_SOL;
 
-    sol.forEach((i, k) => {
+    // 3a. Chaque pièce à sa stature, avec son EMPRISE AU SOL RÉELLE.
+    const poses = sol.map((i, k) => {
       const m = modeles[i];
-      // Rang 0 = le plus proche du spectateur. On y met la vedette.
-      const ligne = Math.floor(k / colonnes);
-      const colonne = k % colonnes;
-      // Une ligne incomplète est CENTRÉE, pas tassée à gauche.
-      const surLaLigne = Math.min(colonnes, sol.length - ligne * colonnes);
-      const largeurLigne = surLaLigne * caseL;
-
-      const hauteur = buste * (k === 0 ? PART_VEDETTE : 1);
-      const echelle = hauteur / (m.taille.y || 1);
-      const epaisseur = m.taille.z * echelle;
       const angle = m.bouclier ? INCLINAISON_BOUCLIER : 0;
-
-      const x = -largeurLigne / 2 + caseL * (colonne + 0.5)
-        + secousse(i * 2 + 1) * caseL * SECOUSSE;
-      // ⚠️ `epaisseur / 2` EST OBLIGATOIRE : la position est le CENTRE de la
-      // pièce, pas son arête arrière. Sans lui, la rangée du fond s'enfonçait
-      // de sa demi-épaisseur dans le meuble — ce que `verifArmoire` attrape
-      // sous « pièces encastrées dans le meuble ».
-      const z = dims.profondeur / 2 + dims.hauteur * RECUL_MEUBLE + epaisseur / 2
-        + caseP * (lignes - 1 - ligne)
-        + secousse(i * 2 + 2) * caseP * SECOUSSE;
-
-      places[i] = {
-        position: [
-          x,
-          // Une pièce inclinée pivote sur sa base : sans ce rattrapage, son
-          // arête arrière passe sous le sol. (Nul tant que l'angle l'est.)
-          (Math.sin(angle) * epaisseur) / 2,
-          z,
-        ],
-        // ⚠️ LA ROTATION Y EST LE CŒUR DE L'EFFET. Sans elle, des pièces
-        // décalées mais toutes face au spectateur se lisent encore comme une
-        // grille. Avec, on voit un palmarès posé, pas un présentoir.
-        rotation: [-angle, pivot(i * 2 + 3), 0],
+      const pv = pivot(i * 2 + 3);
+      const c = Math.abs(Math.cos(pv));
+      const sn = Math.abs(Math.sin(pv));
+      // L'emprise au sol d'une boîte pivotée autour de Y, à l'échelle 1.
+      const uniteX = m.taille.x * c + m.taille.z * sn;
+      const uniteZ = m.taille.x * sn + m.taille.z * c;
+      // La pièce maîtresse (le premier du palmarès) est un cran au-dessus.
+      let echelle = (buste * (k === 0 ? PART_VEDETTE : 1)) / (m.taille.y || 1);
+      // ⚠️ ET AUCUNE PIÈCE N'EST PLUS LARGE QUE LA ZONE. Sans cette borne, un
+      // bouclier démesuré ferait une rangée à lui seul et emporterait le
+      // cadrage avec lui.
+      echelle = Math.min(echelle, zoneL / (uniteX || 1));
+      return {
+        i,
+        angle,
+        pv,
         echelle,
-        dehors: true,
+        ex: uniteX * echelle,
+        ez: uniteZ * echelle,
+        epaisseur: m.taille.z * echelle,
       };
     });
-  }
 
+    // 3b. On remplit des RANGÉES, à la largeur réelle des pièces.
+    type Pose = (typeof poses)[number];
+    const rangs: Pose[][] = [];
+    let courant: Pose[] = [];
+    let large = 0;
+    for (const pose of poses) {
+      const avec = courant.length === 0 ? pose.ex : large + ecart + pose.ex;
+      if (courant.length > 0 && avec > zoneL) {
+        rangs.push(courant);
+        courant = [pose];
+        large = pose.ex;
+      } else {
+        courant.push(pose);
+        large = avec;
+      }
+    }
+    if (courant.length > 0) rangs.push(courant);
+
+    // 3c. Du fond vers l'avant. ⚠️ LE RANG 0 PORTE LA VEDETTE, donc il va
+    // DEVANT : c'est elle qu'on doit voir en premier, pas celle qui a hérité de
+    // la meilleure case.
+    const zBase = dims.profondeur / 2 + dims.hauteur * RECUL_MEUBLE;
+    const profondeurs = rangs.map((r) => Math.max(...r.map((pose) => pose.ez)));
+    let z = zBase;
+    for (let r = rangs.length - 1; r >= 0; r--) {
+      const rang = rangs[r];
+      const centreZ = z + profondeurs[r] / 2;
+      const largeurRang = rang.reduce((a, pose) => a + pose.ex, 0) + ecart * (rang.length - 1);
+      // Une rangée incomplète est CENTRÉE, pas tassée à gauche.
+      let x = -largeurRang / 2;
+      for (const pose of rang) {
+        // ⚠️ LA SECOUSSE EST UNE PART DE L'ÉCART, PAS DE LA CASE. Deux voisines
+        // séparées de `ecart` et secouées l'une vers l'autre se rapprochent au
+        // pire de `2 × SECOUSSE × ecart` : à 0,34, il reste toujours un tiers
+        // de l'écart entre elles. C'est ce qui rend le chevauchement impossible
+        // plutôt qu'improbable.
+        const dx = secousse(pose.i * 2 + 1) * ecart * SECOUSSE;
+        const dz = secousse(pose.i * 2 + 2) * ecart * SECOUSSE;
+        places[pose.i] = {
+          position: [
+            x + pose.ex / 2 + dx,
+            // Une pièce inclinée pivote sur sa base : sans ce rattrapage, son
+            // arête arrière passe sous le sol. (Nul tant que l'angle l'est.)
+            (Math.sin(pose.angle) * pose.epaisseur) / 2,
+            // ⚠️ Et jamais en deçà de la face avant du meuble, secousse
+            // comprise : `verifArmoire` appelle ça « encastrée dans le meuble ».
+            Math.max(centreZ + dz, zBase + pose.ez / 2),
+          ],
+          // ⚠️ LA ROTATION Y EST LE CŒUR DE L'EFFET. Sans elle, des pièces
+          // décalées mais toutes face au spectateur se lisent encore comme une
+          // grille. Avec, on voit un palmarès posé, pas un présentoir. Elle est
+          // désormais décidée AVANT l'échelle, puisque c'est elle qui fixe
+          // l'emprise au sol.
+          rotation: [-pose.angle, pose.pv, 0],
+          echelle: pose.echelle,
+          dehors: true,
+        };
+        x += pose.ex + ecart;
+      }
+      z += profondeurs[r] + ecart;
+    }
+  }
   return places;
 }
 

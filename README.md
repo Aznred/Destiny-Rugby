@@ -443,6 +443,45 @@ Mesuré (`npx vite-node scripts/verifMatchJouable.ts`) :
 > marque, jamais **combien**. `verifControle.ts` et `verifMoteur.ts` sont
 > inchangés et passent toujours.
 
+### Les commandes, et le match qui s'échauffe tout seul
+
+Deuxième passe sur le même écran, après essai manette en main.
+
+| | Avant | Maintenant |
+| --- | --- | --- |
+| Passer | **un** bouton, le moteur choisissait le receveur | **A** et **E** — passe à gauche, passe à droite |
+| Plaquer | `J` | **clic gauche** |
+| Taper au pied | `I` | **clic droit** |
+| Sprinter | `Maj`, sans aucun retour visuel | `Maj` + une **barre de souffle** qui vire au rouge |
+| Changer une touche | impossible | **⚙️ Réglages** — 20 commandes, clavier ou souris |
+| Numéros de maillot | masqués en vue large | **toujours affichés**, à tous les cadrages |
+
+**A et E marchent sur les deux claviers** : ce sont les codes `KeyQ` et `KeyE`,
+soit A / E en AZERTY et Q / E en QWERTY — dans les deux cas, les voisines
+immédiates de la touche « avancer ». Une touche ne peut servir qu'à une seule
+action : en réassigner une libère l'ancienne.
+
+**Le crochet et le raffut se sentent enfin.** Leur effet existait, mais il était
+invisible : un crochet faisait passer la chance de franchir de 10 % à 15 %, et sa
+fenêtre d'armement expirait souvent avant le contact. Mesuré aujourd'hui —
+franchissements **1,1 → 1,8** avec le crochet, **1,1 → 1,4** avec le raffut.
+
+**Les bagarres ne viennent plus d'un bouton.** Deux adversaires proches se
+cherchent tout seuls (petites **bulles de dialogue** sur le terrain), la
+température monte, et un **plaquage haut** ou **en retard** peut échapper à
+n'importe lequel des trente joueurs — d'autant plus qu'il est fatigué et que le
+match est chaud. C'est l'équipe d'en face qui peut venir te chercher, et pas
+seulement l'inverse.
+
+> ⚠️ **Mais on ne te punit toujours jamais sans cause** : une friction adverse ne
+> te coûte rien tant que tu n'y réponds pas — c'est l'autre qui prend la pénalité
+> et le carton. Tu restes libre de reculer, de séparer, ou d'y aller.
+
+Mesuré sur douze matchs **sans que le joueur ne clique sur rien** : 24 répliques
+entendues par match, 0,58 altercation subie (7 matchs sur 12 en voient une),
+**1,25 geste illégal sifflé en amateur contre 0,58 en pro** — et toujours
+**0 écart** au score de la ligue.
+
 ## 🚀 Démarrage
 
 ```bash
