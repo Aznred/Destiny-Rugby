@@ -45,7 +45,7 @@ import { definirLangue, langueDuNavigateur, nombre, t, type Langue } from '../li
 import type { LigneReelle } from '../lib/moteur/saison';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import { ficheDepuisJoueur, scoreDeLaFiche } from '../lib/classementMondial';
-import { envoyerAuClassement } from '../lib/classementEnLigne';
+import { cleAleatoire, envoyerAuClassement } from '../lib/classementEnLigne';
 import {
   COMPETITIONS_U20, competitionsDeLaSaison, fenetreInternationale, fenetreU20,
   internationalEnDirect, equipeU20,
@@ -492,6 +492,16 @@ export interface SanctionDeMatch {
 
 interface GameState {
   ecran: Ecran;
+  /**
+   * Les écrans déjà ouverts au moins une fois, pour le guide de carrière.
+   *
+   * ⚠️ C'est la seule façon de cocher « tu as vu l'écran Résultats » sans
+   * scripter le tutoriel : le guide LIT ce que le joueur a fait, il ne lui
+   * impose pas un parcours (voir `data/guide.ts`).
+   */
+  ecransVus: string[];
+  /** Le guide de carrière a été refermé pour de bon. */
+  guideFerme: boolean;
   joueur: Joueur | null;
   journal: EntreeJournal[];
   coins: number;
@@ -549,6 +559,32 @@ interface GameState {
    * qu'on raccroche.
    */
   traitsDebloques: string[];
+  /**
+   * L'IDENTITÉ DE CETTE INSTALLATION AU CLASSEMENT MONDIAL.
+   *
+   * ⚠️ CORRECTION D'UN BUG SIGNALÉ EN JEU : « si on a le même pseudo qu'un
+   * joueur dans le classement, notre classement apparaît pas ». La table était
+   * clé par le PSEUDO, et l'écriture gardée par « le score ne recule pas » : le
+   * second joueur à porter un pseudo n'écrivait donc rien du tout, en silence.
+   * C'est cette clé-ci qui identifie désormais la ligne (voir
+   * `FicheCarriere.cle` et `serveur/schema-vercel.sql`).
+   *
+   * ⚠️ Persistée HORS de la fiche du joueur, comme `traitsDebloques` : elle
+   * appartient à l'installation, pas à la carrière. Deux carrières successives
+   * partagent donc une ligne, et c'est voulu — le classement garde le meilleur
+   * score d'un joueur, il ne liste pas toutes ses tentatives.
+   */
+  cleClassement: string;
+  /**
+   * L'identifiant de MA ligne dans le tableau mondial, tel que le serveur l'a
+   * renvoyé au dernier envoi réussi. Nul tant qu'aucun envoi n'a abouti.
+   *
+   * ⚠️ IL FAUT BIEN CELUI-LÀ, ET PAS LE PSEUDO : c'est tout l'objet du
+   * correctif. Deux lignes peuvent porter le même pseudo, et surligner
+   * « la mienne » d'après le nom affiché reviendrait à désigner celle d'un
+   * inconnu une fois sur deux.
+   */
+  rangMondialId: number | null;
   /** Compteur des pubs récompensées (quota journalier et délai d'attente). */
   pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
@@ -754,6 +790,8 @@ interface GameState {
   setPubConsentement: (choix: 'oui' | 'non') => void;
   setTutoVu: (vu: boolean) => void;
   setTutoMatchVu: (vu: boolean) => void;
+  /** Referme le guide de carrière définitivement. */
+  fermerGuide: () => void;
   /** Réassigne une commande. `null` remet celle-ci à sa valeur par défaut. */
   setToucheMatch: (commande: Commande, a: Assignation | null) => void;
   /** Remet TOUTES les touches du match à leur valeur par défaut. */
@@ -762,6 +800,20 @@ interface GameState {
   encaisserPub: () => number;
   // ⚠️ `acheterBoost` a été supprimé : la boutique ne vend plus de bonus
   // d'attributs (demande explicite). Voir `src/data/boutique.ts`.
+}
+
+/**
+ * Retient l'identifiant de MA ligne au classement mondial, s'il est revenu.
+ *
+ * ⚠️ ON NE TOUCHE À RIEN QUAND LE SERVEUR N'EN DONNE PAS. Une base restée à un
+ * schéma antérieur, un serveur en panne ou une absence de réseau ne doivent pas
+ * effacer l'identifiant déjà connu : le joueur perdrait le surlignage de sa
+ * propre ligne pour une raison qui n'a rien à voir avec lui.
+ */
+function retenirMaLigne(poser: (p: Partial<GameState>) => void) {
+  return (r: { id?: number }) => {
+    if (typeof r?.id === 'number' && Number.isFinite(r.id)) poser({ rangMondialId: r.id });
+  };
 }
 
 export const useGame = create<GameState>()(
@@ -780,6 +832,9 @@ export const useGame = create<GameState>()(
       tutoMatchVu: false,
       touchesMatch: {},
       traitsDebloques: [],
+      // Tirée au premier lancement, puis persistée : elle ne change plus.
+      cleClassement: cleAleatoire(),
+      rangMondialId: null,
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
       scenarioActif: null,
@@ -787,6 +842,8 @@ export const useGame = create<GameState>()(
       avanceRapide: false,
       evenementHebdo: null,
       evenementsVus: [],
+      ecransVus: [],
+      guideFerme: false,
       compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
       tropheesEnAttente: [],
       approches: [],
@@ -817,7 +874,11 @@ export const useGame = create<GameState>()(
       groqKey: '',
       modele: MODELE_DEFAUT,
 
-      setEcran: (ecran) => set({ ecran }),
+      setEcran: (ecran) => set((s) => ({
+        ecran,
+        ecransVus: s.ecransVus.includes(ecran) ? s.ecransVus : [...s.ecransVus, ecran],
+      })),
+      fermerGuide: () => set({ guideFerme: true }),
       setIAActivee: (iaActivee) => set({ iaActivee }),
       setModele: (modele) => set({ modele }),
       setTenorKey: (tenorKey) => set({ tenorKey }),
@@ -884,6 +945,10 @@ export const useGame = create<GameState>()(
         set({
           joueur,
           ecran: 'carriere',
+          // ⚠️ Le guide lit `ecransVus` : un écran atteint sans passer par
+          // `setEcran` doit s'y inscrire quand même, sinon son étape reste
+          // décochée alors qu'on est justement dessus.
+          ecransVus: ['carriere'],
           scenarioActif: null,
           attenteEvenement: false,
           evenementHebdo: null,
@@ -1676,7 +1741,9 @@ export const useGame = create<GameState>()(
         // serveur, hors ligne, fiche refusée ou quota atteint, la saison se
         // referme exactement pareil. Le serveur ne garde que le MEILLEUR score :
         // renvoyer chaque année ne peut donc rien dégrader.
-        void envoyerAuClassement(ficheDepuisJoueur(j)).catch(() => {});
+        void envoyerAuClassement(ficheDepuisJoueur(j, undefined, get().cleClassement))
+          .then(retenirMaLigne(set))
+          .catch(() => {});
 
         // ---- LA LIMITE D'ÂGE, VRAIMENT APPLIQUÉE ----
         // ⚠️ `AGE_RETRAITE_FORCEE` n'était qu'un texte : on pouvait jouer
@@ -2806,7 +2873,9 @@ export const useGame = create<GameState>()(
         // une erreur qu'on ignore — la retraite reste instantanée, et le
         // classement local n'a besoin de personne. Le bouton manuel de l'écran
         // Classement reste là pour renvoyer une carrière en cours ou réessayer.
-        void envoyerAuClassement(ficheDepuisJoueur(joueur)).catch(() => {});
+        void envoyerAuClassement(ficheDepuisJoueur(joueur, undefined, get().cleClassement))
+          .then(retenirMaLigne(set))
+          .catch(() => {});
         setMouvementsClubs({});
         // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
         // du joueur précédent sont périmés (voir lib/promotion.ts).
@@ -2836,6 +2905,7 @@ export const useGame = create<GameState>()(
           offres: [],
           offresOuvertes: false,
           ecran: 'pantheon',
+          ecransVus: [...s.ecransVus, 'pantheon'].filter((e, i, l) => l.indexOf(e) === i),
         }));
       },
 
@@ -4101,6 +4171,10 @@ export const useGame = create<GameState>()(
           tutoMatchVu?: boolean;
           touchesMatch?: Liaisons;
           traitsDebloques?: string[];
+          cleClassement?: string;
+          rangMondialId?: number | null;
+          ecransVus?: string[];
+          guideFerme?: boolean;
           pubConsentement?: 'inconnu' | 'oui' | 'non';
           pubs?: EtatPubs;
           modele?: string;
@@ -4243,6 +4317,14 @@ export const useGame = create<GameState>()(
         s.tutoMatchVu ??= false;
         s.touchesMatch ??= {};
         s.traitsDebloques ??= [];
+        // ⚠️ Une sauvegarde d'avant ce champ n'a pas de clé : on lui en tire une
+        // ici. Sa ligne historique au classement (clé par pseudo) reste en base
+        // et le serveur la laisse tranquille ; la prochaine fin de saison en
+        // ouvre une nouvelle, à elle. Voir `serveur/schema-vercel.sql`.
+        s.cleClassement ||= cleAleatoire();
+        s.rangMondialId ??= null;
+        s.ecransVus ??= [];
+        s.guideFerme ??= false;
         s.pubs ??= ETAT_PUBS_VIDE;
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
@@ -4280,6 +4362,8 @@ export const useGame = create<GameState>()(
         tutoMatchVu: s.tutoMatchVu,
         touchesMatch: s.touchesMatch,
         traitsDebloques: s.traitsDebloques,
+        cleClassement: s.cleClassement,
+        rangMondialId: s.rangMondialId,
         pubs: s.pubs,
         pantheon: s.pantheon,
         scenarioActif: s.scenarioActif,
@@ -4299,6 +4383,8 @@ export const useGame = create<GameState>()(
         posts: s.posts.slice(-120),
         filSemaine: s.filSemaine,
         matchRegarde: s.matchRegarde,
+        ecransVus: s.ecransVus,
+        guideFerme: s.guideFerme,
         statsReelles: Object.fromEntries(Object.entries(s.statsReelles)
           .filter(([cle]) => cle.endsWith(`#${s.joueur?.saison ?? 0}`))),
         journeesReelles: Object.fromEntries(Object.entries(s.journeesReelles)

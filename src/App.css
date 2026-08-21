@@ -4452,3 +4452,94 @@ img, svg, canvas { max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .lecture-lien:hover { transform: none; }
 }
+
+/* ═══ LE GUIDE DE CARRIÈRE ═══════════════════════════════════════════════
+   Une pastille en bas à droite, un panneau qui s’ouvre par-dessus.
+
+   ⚠️ ELLE EST AU-DESSUS DE LA BARRE D’ACTION MOBILE (`.barre-jouer`), jamais
+   dessous : cette barre est FIXE en bas sous 900 px et porte le bouton qui
+   fait avancer le jeu. Un guide qui recouvre « Jouer le match » serait le
+   comble. D’où le `bottom` qui change avec la media query, et le respect de
+   la barre de gestes (`env(safe-area-inset-bottom)`). */
+.guide-pastille {
+  position: fixed; right: 1rem; z-index: 60;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; gap: 0.55rem;
+  max-width: min(360px, calc(100vw - 2rem));
+  padding: 0.6rem 0.9rem; min-height: 46px;
+  border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(232, 178, 58, 0.45);
+  background: linear-gradient(180deg, rgba(12, 34, 22, 0.96), rgba(6, 20, 13, 0.96));
+  color: var(--craie); font: inherit; font-size: 0.84rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  transition: transform 0.16s ease, border-color 0.16s;
+}
+.guide-pastille:hover { transform: translateY(-2px); border-color: var(--or-500); }
+.guide-jauge { font-family: var(--police-forte); color: var(--or-400); white-space: nowrap; }
+.guide-etape {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--craie-dim);
+}
+
+.guide-fond {
+  position: fixed; inset: 0; z-index: 70;
+  display: grid; align-items: safe center; justify-items: center;
+  padding: 1rem; overflow-y: auto;
+  background: rgba(2, 8, 5, 0.7);
+}
+.guide-panneau {
+  width: min(560px, 100%); max-height: 100dvh; overflow-y: auto;
+  padding: 1.2rem 1.3rem 1rem;
+  border-radius: var(--rayon); border: 1px solid rgba(232, 178, 58, 0.35);
+  background: linear-gradient(180deg, rgba(10, 30, 20, 0.99), rgba(5, 16, 11, 0.99));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+}
+.guide-tete { display: flex; align-items: flex-start; gap: 0.8rem; margin-bottom: 0.9rem; }
+.guide-tete h2 { font-family: var(--police-titre); font-size: 1.5rem; text-transform: uppercase; }
+.guide-fermer {
+  margin-left: auto; width: 40px; height: 40px; flex: 0 0 40px;
+  display: grid; place-items: center; border-radius: 50%; cursor: pointer;
+  background: rgba(4, 13, 9, 0.6); border: 1px solid var(--bordure); color: var(--craie);
+  font-size: 1rem;
+}
+.guide-progression { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.1rem; }
+.guide-barre { flex: 1; height: 7px; border-radius: 4px; background: rgba(4, 13, 9, 0.7); overflow: hidden; }
+.guide-barre span { display: block; height: 100%; background: var(--or-500); transition: width 0.4s ease; }
+.guide-progression b { font-family: var(--police-forte); color: var(--or-400); font-size: 0.9rem; }
+
+.guide-chapitre { margin-bottom: 1.1rem; }
+.guide-chapitre-titre {
+  font-family: var(--police-forte); font-size: 0.78rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--or-400); margin-bottom: 0.5rem;
+}
+.guide-etape-ligne {
+  display: flex; gap: 0.7rem; padding: 0.6rem 0.7rem; border-radius: 10px;
+  border: 1px solid transparent;
+}
+.guide-etape-ligne p {
+  margin-top: 0.2rem; font-size: 0.8rem; line-height: 1.5; color: var(--craie-dim);
+}
+.guide-etape-ligne .btn { margin-top: 0.5rem; }
+/* ⚠️ UNE ÉTAPE FAITE S’EFFACE, ELLE NE DISPARAÎT PAS : voir la liste des
+   choses déjà comprises fait autant pour la confiance que la suivante. */
+.guide-etape-ligne.faite { opacity: 0.5; }
+.guide-etape-ligne.faite .guide-coche { color: var(--or-400); }
+.guide-etape-ligne.active {
+  border-color: rgba(232, 178, 58, 0.4);
+  background: linear-gradient(180deg, rgba(232, 178, 58, 0.1), rgba(232, 178, 58, 0.02));
+}
+.guide-coche { flex: 0 0 1.4rem; font-size: 1rem; line-height: 1.4; text-align: center; }
+
+.guide-pied {
+  display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+  padding-top: 0.8rem; border-top: 1px solid var(--bordure);
+}
+.guide-note { font-size: 0.76rem; color: var(--brume); flex: 1; min-width: 180px; }
+
+@media (max-width: 900px) {
+  /* La barre d’action fixe occupe le bas de l’écran : on passe au-dessus. */
+  .guide-pastille { bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 560px) {
+  /* Trop étroit pour lire l’étape : la pastille redevient une icône. */
+  .guide-etape { display: none; }
+}

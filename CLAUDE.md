@@ -5102,3 +5102,190 @@ joués · 2 journée(s) ». Les trois disent la même chose.
 npx vite-node scripts/verifStatsJournees.ts   # la simulation ne devance plus le championnat
 npx vite-node scripts/verifStats.ts           # les 18 classements, le poste attendu en tête
 ```
+
+---
+
+## 🎓 LE GUIDE DE CARRIÈRE — « on comprend pas comment ça marche au début »
+
+Retour de joueurs, et il visait juste : « au début c'était pas trop
+compréhensible, comment marchent les transferts etc. ». Le tutoriel d'accueil
+(`components/Tutoriel.tsx`) répond à « qu'est-ce que je vais faire ? » AVANT de
+créer un joueur. Il ne répond pas à « et maintenant, je clique où ? ».
+
+| Fichier | Rôle |
+|---|---|
+| `src/data/guide.ts` | Les **12 étapes**, en 3 chapitres. Chacune est un PRÉDICAT sur l'état de la partie. |
+| `src/components/Guide.tsx` | Une pastille en bas à droite, un panneau qui s'ouvre par-dessus. |
+| `src/store/useGame.ts` | `ecransVus` (les écrans déjà ouverts) et `guideFerme`, persistés. |
+
+### ⚠️ IL NE SCRIPTE RIEN, ET C'EST LE CHOIX STRUCTURANT
+
+Aucun clic forcé, aucun écran bloqué, aucun ordre imposé. Une étape se coche
+quand la chose est faite, que le joueur soit passé par le guide ou non. Un
+tutoriel qui prend la main casse exactement ce qu'il prétend apprendre : se
+débrouiller. Corollaire : le guide survit à n'importe quel ordre de jeu, et il
+n'a pas d'état à lui en dehors de « fermé ou pas ».
+
+### ⚠️ LE CHAPITRE DES TRANSFERTS NE PEUT PAS SE TERMINER EN UNE SAISON
+
+Et c'est le jeu qui le veut : `susciterApproches` ne fait démarcher qu'un joueur
+à **un an de contrat maximum**, or on démarre à deux ou trois ans. Le premier
+transfert arrive donc vers la **saison 3**.
+
+**C'est précisément ce qui rendait la mécanique incompréhensible** : personne ne
+la voyait assez tôt pour la deviner. Le guide l'EXPLIQUE donc dès la première
+semaine, les textes ne se déverrouillent pas, et il coche ses étapes le jour
+venu. Les trois choses qu'un joueur ne pouvait pas deviner y sont écrites noir
+sur blanc :
+
+1. **un club n'écrit qu'à un an de la fin du contrat** ;
+2. **il écrit en message privé sur 𝕏 L'Ovale**, et le badge bleu de l'onglet est
+   la seule alerte : aucun panneau ne s'ouvre ;
+3. **le transfert s'applique à l'intersaison**, pas à la signature.
+
+### Les détails qui ont demandé une correction
+
+⚠️ **`setEcran` N'EST PAS LE SEUL CHEMIN VERS UN ÉCRAN.** `creerJoueur` et la
+retraite posent `ecran:` directement dans un `set()`. Résultat en jeu : l'étape
+« lis ta fiche » restait décochée alors qu'on était justement sur l'écran de
+carrière. Les deux alimentent maintenant `ecransVus` elles aussi.
+
+⚠️ **LA PASTILLE PASSE AU-DESSUS DE LA BARRE D'ACTION MOBILE** (`.barre-jouer`,
+fixe sous 900 px). Un guide qui recouvre « Jouer le match » serait le comble.
+Mesuré à 375 px : pastille à 83 px du bas, 46 px de haut, aucun chevauchement.
+
+⚠️ **L'ÉTAPE EN COURS EST ÉCRITE SUR LA PASTILLE**, pas cachée derrière un clic :
+sinon il faut déjà savoir qu'on a besoin d'aide pour aller la chercher. Elle
+redevient une icône seule sous 560 px.
+
+⚠️ **UNE ÉTAPE FAITE S'EFFACE (opacité 0,5), ELLE NE DISPARAÎT PAS.** Voir la
+liste de ce qu'on a déjà compris fait autant pour la confiance que la suivante.
+
+### Le banc d'essai
+
+⚠️ **`chargerTextes(TEXTES)` EST APPELÉ PAR `main.tsx`, PAS PAR `i18n.ts`.** Hors
+du navigateur, `t()` rend la clé elle-même : le contrôle des textes serait passé
+au vert sur du vide. Le banc charge donc le dictionnaire explicitement.
+
+Ce qu'il vérifie, et qu'aucun autre ne pouvait : **chaque étape est réellement
+atteignable**. On fabrique l'état qui la valide et on vérifie qu'elle bascule.
+Une étape qu'aucun état ne coche bloquerait le guide pour toute la carrière.
+
+```bash
+npx vite-node scripts/verifGuide.ts        # 12 étapes atteignables, ordre, textes ×7 langues
+npx vite-node scripts/verifTraductions.ts  # 33 clés ajoutées, 100 % dans les 7 langues
+```
+
+---
+
+## 👥 DEUX JOUEURS, UN SEUL PSEUDO — le classement en perdait un
+
+Retour de jeu : « si on a le même pseudo qu'un joueur dans le classement, notre
+classement apparaît pas ». C'était exact, et la cause tenait en une ligne de
+schéma.
+
+### ⚠️ LE PSEUDO ÉTAIT LA CLÉ PRIMAIRE
+
+`create table classement (pseudo text primary key, …)`. Deux joueurs qui
+choisissent le même nom se partageaient donc **une seule ligne**, et l'écriture
+est gardée par « le score ne recule pas » :
+
+```sql
+on conflict (pseudo) do update … where excluded.score >= classement.score
+```
+
+Celui des deux qui avait le score le plus bas **n'écrivait rien du tout**. Pas
+d'erreur, pas de message : le serveur répondait `ok`, le jeu affichait « publiée
+au classement », et la carrière n'y entrait jamais. Le pire genre de bug — celui
+qui se présente comme un succès.
+
+⚠️ **ET CE N'EST PAS UN CAS RARE** : le pseudo par défaut est le **nom du
+joueur** (`ficheDepuisJoueur` → `j.pseudo ?? j.nom`). Deux « Antoine Dupont »
+suffisent, et le jeu propose littéralement ce nom en exemple sous le champ.
+
+### La correction : la ligne appartient à une INSTALLATION, pas à un nom
+
+| | avant | maintenant |
+|---|---|---|
+| clé de la ligne | `pseudo` | **`cle`** — tirée au hasard une fois, rangée dans la sauvegarde |
+| identifiant public | *aucun* | **`id`**, renvoyé par le `GET` |
+| pseudo | clé primaire | un simple **libellé**, partageable |
+| « ma » ligne à l'écran | `l.pseudo === monPseudo` | `l.id === rangMondialId` |
+
+| Fichier | Ce qui change |
+|---|---|
+| `src/lib/classementMondial.ts` | `FicheCarriere.cle?` (facultative, bornée par `verifierFiche`, `LIMITES.cleMax = 40`) et `ficheDepuisJoueur(j, pseudo?, cle?)`. |
+| `src/lib/classementEnLigne.ts` | `cleAleatoire()`, `LigneMondiale.id`, `ResultatEnvoi.id`. |
+| `src/store/useGame.ts` | `cleClassement` (persistée, hors de la fiche du joueur) et `rangMondialId` (l'identifiant de MA ligne, retenu au dernier envoi réussi). |
+| `api/classement.ts` | `on conflict (cle)`, `returning id`, et une **cascade de schémas** en lecture comme en écriture (v3 → v2 → v1). |
+| `serveur/schema-vercel.sql` | Le SQL de la v3 et sa migration. |
+| `serveur/MIGRATION-FICHES.md` | **Étape 2 bis**, avec ce que la migration ne répare pas. |
+
+### ⚠️ POURQUOI DEUX COLONNES, ET PAS UNE
+
+`cle` est le **droit d'écrire** sur la ligne : elle ne sort jamais du serveur.
+`id` est **public**. Renvoyer la clé aurait suffi pour surligner « moi » et pour
+donner une clé React unique — et aurait permis à n'importe qui de récrire la
+fiche du premier du classement (pas son score, `greatest` s'y oppose, mais son
+nom, ses clubs et son palmarès). Deux colonnes, deux rôles.
+
+### ⚠️ CE QUE ÇA NE RÉPARE PAS, ET QU'IL FAUT DIRE
+
+La clé vit dans la sauvegarde, parce que **le jeu n'a aucun compte utilisateur**
+(voir `serveur/PAIEMENTS.md`, même constat). Trois conséquences assumées :
+
+1. **deux appareils font deux lignes** ;
+2. **une sauvegarde effacée repart sur une ligne neuve**, l'ancienne restant
+   figée sur son dernier score ;
+3. les lignes écrites **avant** la migration gardent leur identité héritée
+   (`v1:<pseudo>`) et **ne sont pas supprimées** : leur propriétaire en ouvrira
+   une nouvelle à son prochain envoi. Effacer une ligne parce qu'une autre porte
+   le même pseudo, ce serait refaire le raisonnement qui a créé le bug.
+
+### ⚠️ LA CLÉ EST FACULTATIVE, ET LE SERVEUR SAIT VIVRE SANS
+
+- Une fiche **sans clé** (un onglet resté ouvert sur l'ancien bundle) retombe sur
+  `v1:<pseudo>` : l'ancien comportement, bug compris, plutôt qu'un refus. Pas de
+  bump de `VERSION_BAREME` — un bump aurait coupé le classement à ces joueurs
+  jusqu'au rechargement, pour rien.
+- Une **base non migrée** est détectée (code Postgres `42703`) : la lecture et
+  l'écriture redescendent v3 → v2 → v1, en le journalisant. Rien ne casse, mais
+  rien n'est corrigé non plus tant que l'`ALTER TABLE` n'est pas joué.
+- La clé **n'entre pas dans la chaîne canonique** du sceau : ce n'est pas un fait
+  de carrière, c'est une adresse. La même carrière envoyée depuis deux appareils
+  doit produire la même empreinte.
+
+### ⚠️ ET UN ACCENT GRAVE CASSAIT TOUT LE FICHIER `api/classement.ts`
+
+Trouvé en passant, et c'est le plus grave du lot. Un commentaire SQL contenait
+`` `greatest` `` **à l'intérieur d'un gabarit JavaScript** : l'accent grave ferme
+le gabarit. Le fichier ne se **parsait plus** — donc `SyntaxError` à l'import,
+donc **500 sur toutes les routes**, GET compris. C'était l'« erreur d'analyse
+préexistante d'`api/classement.ts` » que `npm run lint` signalait et qu'on avait
+classée comme un détail de linter : c'en était une, mais elle mettait le
+classement mondial entier par terre. Les noms de fonctions SQL s'écrivent
+désormais entre guillemets français dans ces commentaires-là, et `npm run lint`
+est propre.
+
+### Vérifié
+
+`npx vite-node scripts/verifClassement.ts` gagne une **section 6 bis** (deux
+carrières sous un même pseudo, les bornes de la clé, la compatibilité d'une fiche
+sans clé, l'indépendance du sceau) et deux contrôles en section 9 (chaque envoi
+porte la clé, et le jeu retient l'identifiant renvoyé).
+
+En navigateur, contre un faux serveur qui sert deux carrières sous le pseudo
+« Aznred » : **les deux lignes s'affichent**, chacune ouvre SA fiche, aucun
+avertissement de clé React, et c'est bien la ligne dont l'`id` correspond qui est
+surlignée — pas l'homonyme mieux classé. À 375 px : aucun débordement
+horizontal, lignes à 84 px, fiche à 324 px.
+
+⚠️ **CE QUI N'EST PAS TESTÉ AUTOMATIQUEMENT** : le SQL lui-même. Il n'y a pas de
+Postgres dans la chaîne de vérification — l'`ON CONFLICT`, le `returning id` et
+la cascade 42703 sont relus, pas exécutés. La vérification en production, c'est
+l'étape 3 de `serveur/MIGRATION-FICHES.md`.
+
+```bash
+npx vite-node scripts/verifClassement.ts   # + section 6 bis : les homonymes
+npx vite-node scripts/verifEcrans.ts       # robustesse du Hall et du Classement
+```

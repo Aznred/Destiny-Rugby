@@ -15,6 +15,28 @@
 import type { FicheCarriere } from './classementMondial';
 
 /**
+ * Une identité de ligne pour cette installation, tirée au hasard une fois.
+ *
+ * ⚠️ ELLE REMPLACE LE PSEUDO COMME CLÉ DE LIGNE. Deux joueurs qui choisissent
+ * le même pseudo se partageaient une seule ligne : l'écriture étant gardée par
+ * « le score ne recule pas », le second n'entrait jamais au classement. Voir
+ * `FicheCarriere.cle`.
+ *
+ * ⚠️ `crypto.randomUUID()` n'existe qu'en contexte sécurisé (https ou
+ * localhost) et pas dans tous les moteurs où tournent les scripts de mesure :
+ * le repli n'est pas décoratif. Il n'a rien de cryptographique et n'a pas à
+ * l'être — une collision entre deux installations n'ouvre aucune porte, elle
+ * recrée simplement le bug qu'on corrige, avec une chance sur quelques
+ * milliards.
+ */
+export function cleAleatoire(): string {
+  const c = (globalThis as { crypto?: Crypto }).crypto;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  const bout = () => Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
+  return `${bout()}-${bout()}-${bout()}-${bout()}`;
+}
+
+/**
  * Où joindre la fonction. Vide = pas de serveur configuré.
  * ⚠️ En déployant le jeu et l'API sur le MÊME projet Vercel, `/api/classement`
  * suffit : même origine, donc pas de CORS et rien à configurer. La variable
@@ -53,6 +75,18 @@ export const CLASSEMENT_EN_LIGNE = ACTIF;
  * parce qu'il leur manque un champ, c'est un classement qui a l'air cassé.
  */
 export interface LigneMondiale {
+  /**
+   * L'identifiant PUBLIC de la ligne, attribué par la base.
+   *
+   * ⚠️ CE N'EST PAS `FicheCarriere.cle`, et il ne faut surtout pas confondre :
+   * la clé est le droit d'ÉCRIRE sur cette ligne, elle ne sort jamais du
+   * serveur. Cet identifiant-là ne sert qu'à deux choses, toutes deux
+   * indispensables depuis que deux joueurs peuvent porter le même pseudo :
+   * distinguer deux lignes dans le rendu React, et reconnaître la sienne.
+   *
+   * Absent d'une base qui n'a pas encore joué la migration v3.
+   */
+  id?: number | null;
   pseudo: string;
   score: number;
   maj_le?: string;
@@ -81,6 +115,12 @@ export interface ResultatEnvoi {
   ok: boolean;
   /** Le score RECALCULÉ par le serveur. Peut différer de celui du client. */
   score?: number;
+  /**
+   * L'identifiant public de la ligne écrite. Le jeu le retient pour savoir
+   * laquelle, dans le tableau mondial, est la sienne — le pseudo ne suffit plus
+   * à le dire, puisque deux joueurs peuvent le partager.
+   */
+  id?: number;
   /** Message lisible en cas de refus. */
   erreur?: string;
   /** Le détail du refus, tel que `verifierFiche` l'a produit. */
@@ -165,7 +205,7 @@ export async function envoyerAuClassement(fiche: FicheCarriere): Promise<Resulta
         anomalies: data.anomalies,
       };
     }
-    return { ok: true, score: data.score };
+    return { ok: true, score: data.score, id: data.id };
   } catch (e) {
     const abandonne = e instanceof DOMException && e.name === 'AbortError';
     return {

@@ -95,6 +95,31 @@ export interface FicheCarriere {
    * réordonne pas parce qu'on affiche un écusson de plus.
    */
   clubs: string[];
+  /**
+   * L'IDENTITÉ DE LA LIGNE au classement mondial. Facultative.
+   *
+   * ⚠️ C'EST LA CORRECTION DU BUG « SI QUELQU'UN A LE MÊME PSEUDO QUE MOI, JE
+   * N'APPARAIS PAS ». La table était clé par le pseudo : deux joueurs qui
+   * choisissent le même nom partageaient UNE ligne, et l'écriture est gardée
+   * par « le score ne recule pas ». Le second n'écrivait donc rien du tout,
+   * silencieusement, et sa carrière n'entrait jamais au classement.
+   *
+   * ⚠️ ELLE N'IDENTIFIE PAS UNE PERSONNE, mais une INSTALLATION du jeu : elle
+   * est tirée au hasard une fois et rangée dans la sauvegarde. Le jeu n'a aucun
+   * compte utilisateur (voir `serveur/PAIEMENTS.md`), donc il n'y a rien de
+   * plus stable à quoi se raccrocher. Conséquences assumées : deux appareils
+   * font deux lignes, et une sauvegarde effacée repart sur une nouvelle ligne.
+   *
+   * ⚠️ ELLE NE PÈSE RIEN SUR LE SCORE et n'entre pas dans la chaîne canonique :
+   * ce n'est pas un fait de carrière, c'est une adresse. Deux envois de la même
+   * carrière depuis deux appareils doivent produire le même sceau.
+   *
+   * ⚠️ ET ELLE EST FACULTATIVE, exprès : un onglet resté ouvert sur l'ancien
+   * bundle envoie une fiche sans elle. La refuser aurait coupé le classement à
+   * ces joueurs jusqu'au rechargement, pour rien — le serveur retombe alors sur
+   * l'ancienne identité (le pseudo).
+   */
+  cle?: string;
   /** Le score annoncé par le client. Le serveur le RECALCULE et compare. */
   score: number;
 }
@@ -185,6 +210,11 @@ export const LIMITES = {
    * marge sans ouvrir la porte à un roman injecté dans le tableau mondial.
    */
   clubMax: 48,
+  /**
+   * Longueur de l'identifiant de ligne (`FicheCarriere.cle`). Un UUID en fait
+   * 36 : 40 laisse la marge d'un préfixe sans ouvrir la colonne à un roman.
+   */
+  cleMax: 40,
 } as const;
 
 export const SAISONS_MAX = LIMITES.ageMax - LIMITES.ageDebutMin + 1;
@@ -243,6 +273,16 @@ export function verifierFiche(f: unknown, trophees?: Iterable<string>): Verdict 
   const pseudo = typeof c.pseudo === 'string' ? c.pseudo.trim() : '';
   if (!pseudo) rejet('pseudo vide');
   else if (pseudo.length > LIMITES.pseudoMax) rejet('pseudo trop long');
+  // ⚠️ LA CLÉ EST FACULTATIVE MAIS BORNÉE. Elle sert d'identifiant de ligne en
+  // base : elle est donc écrite telle quelle, et tout ce qui est écrit tel quel
+  // se borne AVANT. Alphabet volontairement étroit — un UUID et son préfixe
+  // n'ont besoin de rien d'autre.
+  if (c.cle !== undefined) {
+    if (typeof c.cle !== 'string') rejet('clé de ligne : ce n’est pas un texte');
+    else if (!c.cle.trim()) rejet('clé de ligne vide');
+    else if (c.cle.length > LIMITES.cleMax) rejet('clé de ligne trop longue');
+    else if (!/^[A-Za-z0-9:_-]+$/.test(c.cle)) rejet('clé de ligne mal formée');
+  }
   if (typeof c.nom !== 'string' || !c.nom.trim()) rejet('nom vide');
   if (typeof c.poste !== 'string' || !c.poste) rejet('poste absent');
   if (typeof c.nation !== 'string' || !c.nation) rejet('nation absente');
@@ -429,7 +469,7 @@ function moyenne(valeurs: number[]): number {
 }
 
 /** La fiche d'une carrière EN COURS. */
-export function ficheDepuisJoueur(j: Joueur, pseudo?: string): FicheCarriere {
+export function ficheDepuisJoueur(j: Joueur, pseudo?: string, cle?: string): FicheCarriere {
   const saisons = Math.max(1, j.saison);
   const base = {
     v: VERSION_BAREME,
@@ -451,6 +491,10 @@ export function ficheDepuisJoueur(j: Joueur, pseudo?: string): FicheCarriere {
     // On envoie les IDS de trophées, pas les libellés : c'est vérifiable.
     titres: (j.palmares ?? []).map((t) => t.trophee),
     clubs: j.clubs?.length ? j.clubs : [j.club],
+    // ⚠️ Omise plutôt que vide quand elle est inconnue : `verifierFiche` refuse
+    // une clé présente et creuse, et l'écran Classement construit une fiche sans
+    // clé pour afficher un verdict.
+    ...(cle ? { cle } : {}),
   };
   return { ...base, score: scoreDeLaFiche(base) };
 }

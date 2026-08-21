@@ -89,6 +89,20 @@ function depuisLegende(l: LegendeSauvegardee): FicheAffichable {
   };
 }
 
+/**
+ * L'identité d'une ligne mondiale à l'écran.
+ *
+ * ⚠️ CE N'EST PLUS LE PSEUDO, et c'est la moitié visible du correctif « si on a
+ * le même pseudo qu'un joueur, notre classement apparaît pas ». Deux joueurs
+ * peuvent maintenant figurer sous le même nom : deux lignes avec la même clé
+ * React, c'est un rendu qui mélange les deux et une fiche qui s'ouvre sous la
+ * mauvaise. L'identifiant vient de la base ; le repli sur le pseudo ne sert
+ * qu'aux lignes d'une base restée à un schéma antérieur.
+ */
+function cleLigne(l: LigneMondiale, rang: number): string {
+  return l.id != null ? `#${l.id}` : `p${rang}:${l.pseudo}`;
+}
+
 function depuisLigneMondiale(l: LigneMondiale): FicheAffichable {
   const complete = ficheDisponible(l);
   return {
@@ -96,7 +110,7 @@ function depuisLigneMondiale(l: LigneMondiale): FicheAffichable {
     // de saison, pas de club. L'armoire s'en accommode — elle n'affiche une
     // année que si elle en connaît une.
     palmares: (l.titres ?? []).map((id) => ({ trophee: id, nom: id, saison: 0, club: '' })),
-    cle: l.pseudo,
+    cle: l.id != null ? `#${l.id}` : l.pseudo,
     nom: l.nom?.trim() || l.pseudo,
     poste: l.poste ?? undefined,
     nation: l.nation ?? undefined,
@@ -224,6 +238,7 @@ export function Classement() {
   const pantheon = useGame((s) => s.pantheon);
   const joueur = useGame((s) => s.joueur);
   const setEcran = useGame((s) => s.setEcran);
+  const monRangId = useGame((s) => s.rangMondialId);
 
   const liste = classementComplet(pantheon, joueur);
 
@@ -263,6 +278,27 @@ export function Classement() {
   }, [joueur]);
 
   const monPseudo = envoi?.fiche.pseudo ?? '';
+
+  /**
+   * Laquelle de ces lignes est la mienne ?
+   *
+   * ⚠️ PAR L'IDENTIFIANT RENVOYÉ AU DERNIER ENVOI, pas par le pseudo. C'est tout
+   * l'objet du correctif : deux joueurs peuvent porter le même nom, et surligner
+   * « moi » d'après le nom désignerait la ligne d'un inconnu une fois sur deux.
+   *
+   * ⚠️ LE REPLI SUR LE PSEUDO EXISTE, MAIS SOUS CONDITION : il ne s'applique que
+   * si ce pseudo n'apparaît QU'UNE fois dans le tableau. Une carrière qui n'a
+   * pas encore été envoyée (ou envoyée avant ce correctif) n'a pas
+   * d'identifiant, et ne rien surligner du tout serait une régression pour
+   * l'immense majorité des joueurs, dont le pseudo est unique. En cas de
+   * doublon, on préfère ne rien surligner à surligner faux.
+   */
+  const estMoi = (l: LigneMondiale, lignes: LigneMondiale[]): boolean => {
+    if (monRangId != null && l.id != null) return l.id === monRangId;
+    if (monRangId != null) return false;
+    if (!monPseudo || l.pseudo !== monPseudo) return false;
+    return lignes.filter((a) => a.pseudo === monPseudo).length === 1;
+  };
 
   return (
     <motion.section
@@ -321,13 +357,15 @@ export function Classement() {
                 profil, l'armoire à trophées et les clubs des AUTRES joueurs.
                 Même les lignes d'avant la v2 du schéma sont cliquables — leur
                 fiche dit alors franchement qu'on n'a que le score. */}
-            {mondial.lignes.slice(0, 100).map((l, i) => (
-              <Fragment key={l.pseudo}>
+            {mondial.lignes.slice(0, 100).map((l, i) => {
+              const cle = cleLigne(l, i);
+              return (
+              <Fragment key={cle}>
               <button
                 type="button"
-                className={`ligne-classement ouvrable ${l.pseudo === monPseudo ? 'moi' : ''}${ligneOuverte === `m:${l.pseudo}` ? ' deplie' : ''}`}
-                onClick={() => basculer(`m:${l.pseudo}`)}
-                aria-expanded={ligneOuverte === `m:${l.pseudo}`}
+                className={`ligne-classement ouvrable ${estMoi(l, mondial.lignes) ? 'moi' : ''}${ligneOuverte === `m:${cle}` ? ' deplie' : ''}`}
+                onClick={() => basculer(`m:${cle}`)}
+                aria-expanded={ligneOuverte === `m:${cle}`}
                 title={t('clst.voirDetails')}
               >
                 <span className="c-rang">
@@ -357,7 +395,7 @@ export function Classement() {
                   de la page, après les DEUX tableaux : sur un classement de
                   cent lignes, on touchait un nom et il ne se passait rien à
                   l'écran — il fallait deviner qu'il fallait faire défiler. */}
-              {ligneOuverte === `m:${l.pseudo}` && (
+              {ligneOuverte === `m:${cle}` && (
                 <PanneauFiche
                   fiche={depuisLigneMondiale(l)}
                   onFermer={() => setLigneOuverte(null)}
@@ -368,7 +406,8 @@ export function Classement() {
                 />
               )}
               </Fragment>
-            ))}
+              );
+            })}
           </>
         )}
 

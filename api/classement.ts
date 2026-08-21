@@ -114,34 +114,54 @@ export async function GET(): Promise<Response> {
     // l'écran Classement déplie quand on clique sur une ligne (stats, armoire à
     // trophées, clubs traversés). Les colonnes sont toutes nullables — une ligne
     // écrite avant la migration v2 s'affiche encore, avec son seul score.
-    let lignes;
-    try {
-      lignes = await sql`
+    // ⚠️ LE CODE 42703, C'EST « CETTE COLONNE N'EXISTE PAS » : une base restée à
+    // un schéma plus ancien que le code. Vu en production : « column "nom" does
+    // not exist », et le classement mondial renvoyait 500 pour TOUT LE MONDE. Un
+    // déploiement de code ne doit pas pouvoir casser la lecture parce qu'un
+    // ALTER TABLE traîne. On descend donc les schémas un par un, du plus complet
+    // au plus pauvre : le tableau s'affiche dans tous les cas, et les colonnes
+    // manquantes réapparaissent d'elles-mêmes une fois la migration jouée
+    // (`serveur/schema-vercel.sql`, en tête).
+    const lectures = [
+      // v3 : la ligne porte un identifiant public — c'est lui qui permet
+      // d'afficher deux lignes sous le même pseudo sans les confondre.
+      ['v3', () => sql`
+        select id, pseudo, score, maj_le,
+               nom, poste, nation, age, saisons, note, reputation,
+               matchs, essais, selections, titres, clubs
+        from classement
+        order by score desc, maj_le asc
+        limit ${TOP}
+      `],
+      // v2 : la fiche affichable, sans identifiant de ligne.
+      ['v2', () => sql`
         select pseudo, score, maj_le,
                nom, poste, nation, age, saisons, note, reputation,
                matchs, essais, selections, titres, clubs
         from classement
         order by score desc, maj_le asc
         limit ${TOP}
-      `;
-    } catch (e) {
-      // ⚠️ LE CODE 42703, C'EST « CETTE COLONNE N'EXISTE PAS » — donc une base
-      // encore en schéma v1, sur laquelle la migration n'a pas été jouée. Vu en
-      // production : « column "nom" does not exist », et le classement mondial
-      // renvoyait 500 pour TOUT LE MONDE. Un déploiement de code ne doit pas
-      // pouvoir casser la lecture parce qu'un ALTER TABLE traîne : on retombe
-      // sur les seules colonnes que la v1 garantit, le tableau s'affiche, et
-      // les fiches détaillées apparaîtront d'elles-mêmes une fois la migration
-      // passée (`serveur/schema-vercel.sql`, en tête).
-      if ((e as { code?: string }).code !== '42703') throw e;
-      console.warn('[classement] schéma v1 détecté : migration v2 non jouée, lecture réduite au score');
-      lignes = await sql`
+      `],
+      // v1 : le score seul.
+      ['v1', () => sql`
         select pseudo, score, maj_le
         from classement
         order by score desc, maj_le asc
         limit ${TOP}
-      `;
+      `],
+    ] as const;
+
+    let lignes: Record<string, unknown>[] | null = null;
+    for (const [nom, lire] of lectures) {
+      try {
+        lignes = (await lire()) as Record<string, unknown>[];
+        break;
+      } catch (e) {
+        if ((e as { code?: string }).code !== '42703') throw e;
+        console.warn(`[classement] schéma antérieur à ${nom} : lecture repliée d'un cran`);
+      }
     }
+    if (!lignes) throw new Error('aucun schéma de classement reconnu');
     return reponse({ classement: lignes });
   } catch (e) {
     console.error('[classement] lecture', e);
@@ -216,6 +236,81 @@ export async function POST(req: Request): Promise<Response> {
   // fiche sinon. Le score écrit est celui du serveur, jamais `fiche.score`.
   const f = fiche as FicheCarriere;
   const pseudo = String(f.pseudo).trim().slice(0, 24);
+
+  // ⚠️ LA LIGNE N'EST PLUS IDENTIFIÉE PAR LE PSEUDO, ET C'ÉTAIT UN VRAI BUG.
+  // Signalé en jeu : « si on a le même pseudo qu'un joueur dans le classement,
+  // notre classement apparaît pas ». Le pseudo était la clé primaire : deux
+  // joueurs qui choisissent le même nom se partageaient UNE ligne, et l'ON
+  // CONFLICT n'écrit que si le score ne recule pas. Celui des deux qui avait le
+  // score le plus bas n'écrivait donc RIEN — sans erreur et sans message, le
+  // serveur répondant `ok` : sa carrière n'entrait jamais au classement.
+  //
+  // ⚠️ ET LE REPLI SUR LE PSEUDO EST DÉLIBÉRÉ. Une fiche sans clé vient d'un
+  // onglet resté ouvert sur l'ancien bundle : elle retrouve exactement l'ancien
+  // comportement — sa ligne historique, avec son bug — plutôt que de se voir
+  // refusée. Le préfixe garantit qu'une clé tirée au hasard ne tombera jamais
+  // sur une identité héritée.
+  const cle = typeof f.cle === 'string' && f.cle.trim()
+    ? f.cle.trim().slice(0, 40)
+    : `v1:${pseudo}`;
+
+  try {
+    const ecrit = await sql`
+      insert into classement (
+        cle, pseudo, score, nom, poste, nation, age, saisons, note, reputation,
+        matchs, essais, selections, titres, clubs
+      ) values (
+        ${cle}, ${pseudo}, ${verdict.score}, ${f.nom}, ${f.poste}, ${f.nation}, ${f.age},
+        ${f.saisons}, ${f.note}, ${f.reputation}, ${f.matchs}, ${f.essais},
+        ${f.selections}, ${JSON.stringify(f.titres)}::jsonb, ${JSON.stringify(f.clubs)}::jsonb
+      )
+      on conflict (cle) do update
+        set score = greatest(classement.score, excluded.score), maj_le = now(),
+            pseudo = excluded.pseudo,
+            nom = excluded.nom, poste = excluded.poste, nation = excluded.nation,
+            age = excluded.age, saisons = excluded.saisons, note = excluded.note,
+            reputation = excluded.reputation, matchs = excluded.matchs,
+            essais = excluded.essais, selections = excluded.selections,
+            titres = excluded.titres, clubs = excluded.clubs
+        -- ⚠️ On ne remplace la fiche QUE si le score ne RECULE pas : sinon un
+        -- envoi de mi-carrière écraserait la ligne d'une carrière déjà terminée,
+        -- et le tableau afficherait un palmarès plus pauvre que le score gardé.
+        -- « greatest » interdit par ailleurs à tout score de baisser au passage.
+        --
+        -- ⚠️ ET C'EST BIEN « ≥ », PAS « > » : à score égal la carrière est la
+        -- même, donc la fiche est bonne à prendre. Avec un « > » strict, une
+        -- ligne écrite avant la v2 du schéma (score seul, fiche vide) ne se
+        -- remplissait JAMAIS — son propriétaire renvoie sa carrière terminée,
+        -- donc le MÊME score, donc la condition est fausse, donc son armoire à
+        -- trophées reste vide à l'écran, définitivement.
+        where excluded.score >= classement.score
+      returning id
+    `;
+    // ⚠️ UN « ON CONFLICT … WHERE » NE RENVOIE RIEN QUAND IL N'ÉCRIT PAS. Le
+    // score n'a pas progressé, mais la ligne existe : on va chercher son
+    // identifiant, sinon le joueur perdrait le surlignage de SA ligne pour la
+    // seule raison qu'il n'a pas battu son record.
+    let id = Number((ecrit as { id?: unknown }[])[0]?.id ?? NaN);
+    if (!Number.isFinite(id)) {
+      const [dejaLa] = await sql`select id from classement where cle = ${cle}`;
+      id = Number((dejaLa as { id?: unknown })?.id ?? NaN);
+    }
+    return reponse(Number.isFinite(id)
+      ? { ok: true, score: verdict.score, id }
+      : { ok: true, score: verdict.score });
+  } catch (e) {
+    if ((e as { code?: string }).code !== '42703') {
+      console.error('[classement] écriture', e);
+      return reponse({ erreur: 'Écriture impossible' }, 500);
+    }
+    console.warn('[classement] schéma antérieur à v3 : écriture repliée sur le pseudo');
+  }
+
+  // ═══ REPLI v2 : la fiche complète, mais la ligne est encore clé par pseudo ══
+  // ⚠️ Le bug des homonymes revient tant que la migration v3 n'est pas jouée :
+  // sans la colonne `cle`, il n'y a rien d'autre à quoi accrocher une ligne.
+  // C'est écrit dans les journaux ci-dessus, et le remède est dans
+  // `serveur/schema-vercel.sql`.
   try {
     await sql`
       insert into classement (
@@ -243,7 +338,7 @@ export async function POST(req: Request): Promise<Response> {
         -- sa carrière terminée, donc le MÊME score, donc la condition est fausse,
         -- donc l'armoire à trophées reste vide à l'écran — définitivement. À
         -- score égal la carrière est la même : la fiche est bonne à prendre.
-        -- `greatest` garantit qu'aucun score ne peut baisser au passage.
+        -- « greatest » garantit qu'aucun score ne peut baisser au passage.
         where excluded.score >= classement.score
     `;
   } catch (e) {

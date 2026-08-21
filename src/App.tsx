@@ -6,6 +6,7 @@ import { useGame } from './store/useGame';
 import { t } from './lib/i18n';
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
+import { Guide } from './components/Guide';
 import { Reglages } from './components/Reglages';
 import { Accueil } from './screens/Accueil';
 import { Creation } from './screens/Creation';
@@ -90,6 +91,9 @@ export default function App() {
   return (
     <div key={langue} className="racine">
       <Nav onReglages={() => setReglagesOuverts(true)} />
+      {/* Le guide de carrière : une pastille discrète, sur tous les écrans de
+          jeu. Il ne monte rien tant qu'il n'y a pas de carrière. */}
+      <Guide />
 
       <main>
         {/* Un écran qui plante ne doit JAMAIS emporter la navigation avec lui. */}

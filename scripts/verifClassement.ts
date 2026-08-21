@@ -27,7 +27,7 @@ import {
   SCORE_MAX, SAISONS_MAX, LIMITES, VERSION_BAREME, type FicheCarriere,
 } from '../src/lib/classementMondial';
 import { scoreCarriere } from '../src/store/useGame';
-import { CLASSEMENT_EN_LIGNE } from '../src/lib/classementEnLigne';
+import { CLASSEMENT_EN_LIGNE, cleAleatoire } from '../src/lib/classementEnLigne';
 import type { Joueur } from '../src/types';
 
 let echecs = 0;
@@ -275,6 +275,57 @@ console.log('\n=== 6. LE BARÈME EST UNIQUE (jeu = serveur) ===');
     f.titres.join(', '), f.titres.every((t) => IDS_TROPHEES.includes(t)));
 }
 
+console.log('\n=== 6 bis. DEUX JOUEURS, UN SEUL PSEUDO ===');
+{
+  // ⚠️ LE BUG QUE CETTE SECTION GARDE FERMÉ. Signalé en jeu : « si on a le même
+  // pseudo qu'un joueur dans le classement, notre classement apparaît pas ». La
+  // table était clé par le PSEUDO et l'écriture gardée par « le score ne recule
+  // pas » : le second à porter un pseudo n'écrivait rien du tout, en silence.
+  // C'est `FicheCarriere.cle` qui identifie la ligne désormais.
+  const commun = 'Aznred';
+  const a = fiche({ pseudo: commun, cle: cleAleatoire() });
+  // Une carrière DIFFÉRENTE, et volontairement moins bonne : c'est exactement
+  // celle qui n'entrait jamais en base sous l'ancienne clé.
+  const b = fiche({
+    pseudo: commun, cle: cleAleatoire(),
+    saisons: 4, ageDebut: 18, age: 21, note: 52, matchs: 60, essais: 9, titres: [],
+  });
+  const va = verifierFiche(a, IDS_TROPHEES);
+  const vb = verifierFiche(b, IDS_TROPHEES);
+
+  ligne('deux installations ne tirent pas la même clé',
+    `${String(a.cle).slice(0, 8)}… ≠ ${String(b.cle).slice(0, 8)}…`, a.cle !== b.cle);
+  ligne('les deux fiches sont acceptées malgré le pseudo commun',
+    va.anomalies.concat(vb.anomalies).join(' | ') || `${va.score} et ${vb.score}`,
+    va.valide && vb.valide);
+  ligne('… et la moins bonne des deux reste la moins bonne',
+    `${vb.score} < ${va.score}`, vb.score < va.score);
+
+  // ⚠️ LA CLÉ RESTE FACULTATIVE : un onglet ouvert sur l'ancien bundle envoie
+  // une fiche sans elle, et la refuser lui couperait le classement pour rien.
+  ligne('une fiche SANS clé passe toujours', 'compatibilité ascendante',
+    verifierFiche(fiche(), IDS_TROPHEES).valide);
+
+  // Elle est écrite telle quelle en base : elle se borne AVANT.
+  const refus: [string, unknown][] = [
+    ['clé vide', ''],
+    ['clé trop longue', 'x'.repeat(LIMITES.cleMax + 1)],
+    ['clé mal formée', 'ma clé; drop table'],
+    ['clé qui n’est pas un texte', 42],
+  ];
+  for (const [nom, cle] of refus) {
+    const v = verifierFiche({ ...fiche(), cle }, IDS_TROPHEES);
+    ligne(nom, v.anomalies.join(' | ') || 'ACCEPTÉE', !v.valide);
+  }
+
+  // ⚠️ LA CLÉ N'EST PAS UN FAIT DE CARRIÈRE : elle ne doit pas entrer dans le
+  // sceau, sinon la même carrière envoyée depuis deux appareils produirait deux
+  // empreintes différentes.
+  const sel = 'sel-de-test';
+  ligne('la clé n’entre pas dans le sceau', 'même carrière, deux appareils',
+    sceller({ ...fiche(), cle: 'appareil-a' }, sel) === sceller({ ...fiche(), cle: 'appareil-b' }, sel));
+}
+
 console.log('\n=== 7. LE SCEAU DÉTECTE UNE SAUVEGARDE RETOUCHÉE ===');
 {
   const sel = 'sel-de-test';
@@ -345,10 +396,12 @@ console.log('\n=== 9. LA TABLE SE REMPLIT VRAIMENT (retraite → envoi) ===');
   // `fetch` est remplacé le temps du test : zéro requête réseau, et on lit
   // exactement ce que le jeu aurait envoyé.
   const vraiFetch = globalThis.fetch;
+  /** Ce que le vrai serveur renvoie : l'identifiant public de la ligne écrite. */
+  const ID_DE_LIGNE = 77;
   const envois: { url: string; corps: FicheCarriere }[] = [];
   globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
     envois.push({ url: String(url), corps: JSON.parse(String(init?.body ?? '{}')) });
-    return new Response(JSON.stringify({ ok: true, score: 0 }), {
+    return new Response(JSON.stringify({ ok: true, score: 0, id: ID_DE_LIGNE }), {
       status: 200, headers: { 'content-type': 'application/json' },
     });
   }) as typeof fetch;
@@ -395,6 +448,23 @@ console.log('\n=== 9. LA TABLE SE REMPLIT VRAIMENT (retraite → envoi) ===');
       const dernier = envois[envois.length - 1];
       ligne('… et la dernière est bien celle de la retraite', dernier?.url ?? '—',
         dernier?.corps?.score === fichePartante.score);
+      // ⚠️ CHAQUE ENVOI PORTE LA CLÉ DE LIGNE, sinon le serveur retombe sur le
+      // pseudo et le bug des homonymes revient sans que rien ne le signale.
+      const cles = new Set(envois.map((e) => e.corps.cle));
+      ligne('chaque envoi porte la clé de la ligne',
+        [...cles].map((c) => String(c).slice(0, 8) + '…').join(', ') || 'AUCUNE',
+        envois.every((e) => typeof e.corps.cle === 'string' && e.corps.cle.length > 0));
+      // Et c'est la MÊME d'un envoi à l'autre : elle appartient à
+      // l'installation, pas à la saison qu'on vient de finir.
+      ligne('… et c’est la même à chaque fois', `${cles.size} clé(s) pour ${envois.length} envois`,
+        cles.size === 1);
+
+      // ⚠️ ET LE JEU LE RETIENT. Sans ça, l'écran ne saurait pas quelle ligne
+      // surligner — et il ne peut plus le déduire du pseudo, puisque deux
+      // joueurs peuvent le partager. C'est la moitié visible du correctif.
+      ligne('le jeu retient l’identifiant de SA ligne',
+        String(useGame.getState().rangMondialId), useGame.getState().rangMondialId === ID_DE_LIGNE);
+
       // Les scores ne peuvent que monter : une carrière ne perd pas de matchs.
       const croissants = envois.every((e, i) => i === 0 || e.corps.score >= envois[i - 1].corps.score);
       ligne('les scores envoyés ne reculent jamais',

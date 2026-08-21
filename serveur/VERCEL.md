@@ -13,8 +13,8 @@ juste une **base de données** et une **fonction serveur** au projet existant.
 ```
    navigateur (le jeu)              Vercel                          Postgres
 ┌──────────────────────┐   POST   ┌────────────────────────┐      ┌──────────────┐
-│ FicheCarriere        │   ───→   │ api/classement.ts      │      │ pseudo       │
-│ saisons, note,       │          │ 1. débit (6/h, 40/j)   │  →   │ score        │
+│ FicheCarriere        │   ───→   │ api/classement.ts      │      │ id, cle      │
+│ cle, saisons, note,  │          │ 1. débit (6/h, 40/j)   │  →   │ pseudo, score│
 │ matchs, essais,      │          │ 2. verifierFiche()     │      │ la fiche :   │
 │ titres, clubs…       │          │ 3. score = RECALCULÉ   │      │ saisons, note│
 │                      │   ←───   │ 4. écriture du score   │      │ titres, clubs│
@@ -83,7 +83,10 @@ exécute.
 
 Tu dois obtenir deux tables :
 
-- **`classement`** — `pseudo` (clé primaire), `score`, `cree_le`, `maj_le` ;
+- **`classement`** — `id` (clé primaire, PUBLIQUE, renvoyée par le `GET`),
+  `cle` (unique, l'identité de l'installation qui envoie, **jamais
+  renvoyée**), `pseudo` (un simple libellé : deux joueurs peuvent le partager),
+  `score`, `cree_le`, `maj_le`, plus la fiche affichable ;
 - **`envois`** — le haché d'appareil et l'horodatage, pour le débit.
 
 Vérifie que ça a pris :
@@ -206,9 +209,14 @@ Ce que la fonction apporte, et qui n'est possible que côté serveur :
    marge accepte les envois automatiques de plusieurs fins de saison dans une
    même session ; un client ne peut pas contourner le quota en modifiant son
    navigateur.
-3. **L'unicité du pseudo** et la conservation du **meilleur** score, faites par
-   la base (`on conflict … where excluded.score > classement.score`) — donc sans
-   course entre deux envois simultanés.
+3. **Une ligne par installation** et la conservation du **meilleur** score,
+   faites par la base (`on conflict (cle) … where excluded.score >=
+   classement.score`) — donc sans course entre deux envois simultanés.
+   ⚠️ **Ce n'est plus le PSEUDO qui porte l'unicité**, et c'était un bug :
+   « si on a le même pseudo qu'un joueur dans le classement, notre classement
+   apparaît pas ». Deux homonymes se partageaient une ligne, et celui qui avait
+   le score le plus bas n'écrivait rien du tout — en silence. Voir
+   `serveur/MIGRATION-FICHES.md`, étape 2 bis.
 4. **La journalisation des refus.** Vercel → Logs : c'est là qu'on voit arriver
    les scripts, et nulle part ailleurs.
 

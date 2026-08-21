@@ -49,6 +49,10 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   de **30 à 40** : tout est à construire. Les listes
   déroulantes sont des composants maison (drapeaux, blasons, recherche
   instantanée, navigation clavier) au thème du jeu.
+- **Guide de carrière** (🎓) : une pastille discrète accompagne les premières
+  semaines, de la fiche au premier match jusqu’au premier transfert. Elle ne
+  force rien : les étapes se cochent toutes seules quand tu fais les choses, et
+  le chapitre sur les transferts est lisible dès le premier jour.
 - **Progression vivante** : 8 attributs (vitesse, force, endurance, plaquage,
   passe, jeu au pied, vision, mental) + forme, moral, réputation, argent.
   Chaque saison reçoit une **note sur 10** (temps de jeu, essais rapportés à ton
@@ -371,8 +375,14 @@ Le tableau part **vierge** et ne contient que ce qui a vraiment été joué. Tou
 est prêt pour le brancher en ligne — il ne manque que l'URL du serveur
 (`serveur/`).
 
-Le principe tient en une phrase : **le navigateur envoie les faits, le serveur
-recalcule le score, et la base ne garde que lui.**
+Le principe tient en une phrase : **le navigateur envoie les faits, et le
+serveur recalcule le score au lieu de croire celui qu'on lui donne.** La base
+garde ensuite les faits AFFICHABLES — saisons, matchs, essais, palmarès, clubs —
+parce que le classement montre la fiche des autres joueurs.
+
+Une ligne appartient à une **installation**, pas à un pseudo : deux joueurs
+peuvent porter le même nom sans se marcher dessus (`serveur/MIGRATION-FICHES.md`,
+étape 2 bis).
 
 ⚠️ **Disons-le franchement** : un jeu qui tourne entièrement dans le navigateur
 ne peut rien garantir tout seul. Le joueur possède la machine qui calcule — il
@@ -612,6 +622,8 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 | **Grand Chelem avec la France, pas de trophée des 6 Nations** | Le Tournoi était **joué pour de vrai** (classement à l'écran toute la saison) mais le titre était **tiré au sort** sur la note du joueur. On lit maintenant le **1ᵉʳ du classement**. Idem Rugby Europe Championship et Coupe du monde. |
 | **Champions Cup gagnée, pas de trophée** | Même bug : le titre venait du rang en championnat (`tire((9 − rang) / 48)`), pas de la finale. C'est le **vainqueur de la finale** (`coupeEnDirect`) qui l'emporte, dans la coupe que le club **dispute vraiment**. |
 | **Pas meilleur joueur de l'année malgré Brennus + 3 distinctions** | Mesuré : la saison cotait 82,7 (barre 94). Les deux correctifs ci-dessus la montent à 91,2 — toujours pas assez. Le titre mondial **lit désormais les distinctions déjà décernées** (+3 chacune) : 100,2. Il en faut **trois** pour franchir la barre. |
+| **« Même pseudo qu'un autre joueur → mon classement n'apparaît pas »** | Le `pseudo` était la **clé primaire** de la table : deux homonymes se partageaient une ligne, et l'écriture n'a lieu que si le score ne recule pas. Celui qui avait le score le plus bas **n'écrivait rien**, en silence, le serveur répondant « ok ». La ligne est désormais clé par une **identité d'installation**, et l'écran reconnaît la sienne à son identifiant, plus à son nom. |
+| **`api/classement.ts` ne se parsait pas** | Un accent grave dans un commentaire SQL fermait le gabarit JavaScript qui le portait : `SyntaxError` à l'import, donc **500 sur toutes les routes**. C'était l'« erreur de linter préexistante » qu'on traînait. |
 | **Le classement mondial ne se remplissait pas** | Le serveur, la base et le barème étaient bons : **rien n'envoyait jamais**. La **retraite envoie la carrière**, et le tableau mondial s'affiche **toujours**, avec son état (chargement · pas de serveur · panne · encore vide). |
 | Top 14 à 16 clubs, Pro D2 à 14 | La fin de saison était calculée **deux fois** avec des résultats différents, et les deux champions montaient. Source unique (`phaseFinaleDe`) + garde-fou d'équilibre. Vérifié sur 12 saisons. |
 | Club promu encore affiché dans son ancienne division | Le panneau lisait la pyramide figée des données ; il lit maintenant la division **effective**. |
