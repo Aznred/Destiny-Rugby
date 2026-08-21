@@ -48,7 +48,7 @@
 // ⚠️ `createPortal(document.body)` obligatoire : le `backdrop-filter` des
 // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import {
@@ -64,13 +64,16 @@ import {
   liaisonsEffectives,
 } from '../lib/moteur/manette';
 import { ORDRES } from '../lib/moteur/bagarre';
-import type { Commentaire, NiveauMatch, TypeCommentaire } from '../lib/moteur/etat';
+import { ajouterCommentaire, type ActionJoueur, type Commentaire, type NiveauMatch, type TypeCommentaire } from '../lib/moteur/etat';
 import { competitionEffective } from '../lib/divisions';
 import { LARGEUR, LONGUEUR, borner, type Vec } from '../lib/moteur/terrain';
 import { Camera, COUVERTURE, angleDeVue, type Cadrage, type Vue } from '../lib/moteur/camera';
 import {
   facteurTempo, momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
 } from '../lib/moteur/moments';
+import {
+  DELAI_DECISION, REJEU, decisionPour, type Decision,
+} from '../lib/moteur/decisions';
 import { estTitulaire } from '../lib/moteur/saison';
 import { CONSIGNE_NEUTRE, lireConsigneIA, lireConsigneLocale } from '../lib/moteur/consignes';
 import { iaDisponible } from '../lib/groq';
@@ -280,7 +283,24 @@ export function MatchLive({
   // démarre en JOUER dès qu'on a un pion — c'est le match du joueur, pas une
   // rediffusion.
   const [mode, setMode] = useState<'jouer' | 'regarder'>(monPion ? 'jouer' : 'regarder');
-  const [tempo, setTempo] = useState<Tempo>(monPion ? 'moments' : 'suivre');
+  // ⚠️ ON DÉMARRE EN « DÉCISIONS » DÈS QU'ON PILOTE, et c'est la demande :
+  // « plus en mode on a un moment, 10 secondes pour choisir une action ». Le
+  // mode manette (« Moments ») reste à un bouton d'ici, pour qui le préfère.
+  const [tempo, setTempo] = useState<Tempo>(monPion ? 'decisions' : 'suivre');
+  /**
+   * La carte de décision ouverte, s'il y en a une. Le match est FIGÉ tant
+   * qu'elle est là : c'est tout l'intérêt.
+   */
+  const [decision, setDecision] = useState<Decision | null>(null);
+  /** Le compte à rebours, en secondes RÉELLES. Une ref : il change 60 fois/s. */
+  const chrono = useRef(DELAI_DECISION);
+  /** `e.sim` au moment de la dernière carte : c'est lui qui espace les cartes. */
+  const derniereDecision = useRef(0);
+  // ⚠️ LA BOUCLE LIT UNE REF, PAS L'ÉTAT. Elle ne se réabonne pas à chaque
+  // ouverture de carte : sans ça, ouvrir une carte relance `useEffect`, ce qui
+  // remet `dernierTemps` à zéro et fait sauter le match d'un cran.
+  const decisionRef = useRef<Decision | null>(null);
+  decisionRef.current = decision;
   const [tiroir, setTiroir] = useState<null | 'fil' | 'consigne' | 'commandes'>(null);
   const [disciplineOuverte, setDisciplineOuverte] = useState(false);
   const [consigneTexte, setConsigneTexte] = useState('');
@@ -340,6 +360,26 @@ export function MatchLive({
     return () => ro.disconnect();
   }, []);
 
+  /**
+   * Refermer la carte, avec ou sans geste.
+   *
+   * ⚠️ ON REJOUE AU RALENTI APRÈS LE CHOIX. Sans ça, on choisit « je plaque »,
+   * le jeu repart à seize fois la vitesse réelle et trois images plus tard on
+   * est au regroupement suivant sans avoir rien vu. Un choix dont on ne voit
+   * pas le résultat n'apprend rien et ne procure rien : on force donc quelques
+   * secondes de ralenti, exactement comme sur un moment.
+   */
+  const fermerDecision = useCallback((joue: boolean) => {
+    decisionRef.current = null;
+    setDecision(null);
+    momentRef.current.tenue = joue ? REJEU : TENUE;
+  }, []);
+
+  const jouerDecision = useCallback((action: ActionJoueur) => {
+    demanderAction(e, action);
+    fermerDecision(true);
+  }, [e, fermerDecision]);
+
   // --- LA BOUCLE DE RENDU ---------------------------------------------------
   useEffect(() => {
     let brut = 0;
@@ -370,7 +410,7 @@ export function MatchLive({
           ordonner(e, ORDRES[entrees.ordre].id);
           setEnPause(false);
         }
-      } else if (e.controle && !enPause) {
+      } else if (e.controle && !enPause && !decisionRef.current) {
         // ⚠️ LA DIRECTION EST LUE EN REPÈRE D'ÉCRAN, PUIS TRADUITE EN REPÈRE DE
         // TERRAIN. Sans ça, « pousse vers le haut » enverrait le pion vers la
         // touche gauche dès que la caméra pivote en portrait, ou vers son
@@ -435,6 +475,37 @@ export function MatchLive({
       // Match terminé : on arrête la boucle, plus rien ne bouge.
       if (e.fini) { redessiner((n) => n + 1); actif = false; cancelAnimationFrame(brut); return; }
 
+      // ── ⏸️ LA CARTE DE DÉCISION ──────────────────────────────────────────
+      // ⚠️ LE MATCH EST FIGÉ TANT QU'ELLE EST OUVERTE, et le compte à rebours
+      // tourne en temps RÉEL. C'est la demande : « un moment, dix secondes pour
+      // choisir une action, et ça la simule ». Rien n'avance : ni le chrono du
+      // match, ni les pions, ni le moteur. On ne perd donc pas une action à
+      // rester devant sa carte.
+      if (decisionRef.current) {
+        piloterDirection(e, 0, 0, false);
+        chrono.current -= dtReel;
+        if (chrono.current <= 0) {
+          // ⚠️ NE PAS CHOISIR EST UN CHOIX, et il se dit. Le moteur reprend son
+          // rugby automatique, comme pour les vingt-neuf autres : ce n'est pas
+          // une punition, c'est ce qui arrive quand on reste spectateur.
+          if (moi) ajouterCommentaire(e, 'jeu', moi.cote, t('ml.dec.hesite', { nom: moi.nom }), 0, true);
+          fermerDecision(false);
+        }
+        redessiner((n) => n + 1);
+        return;
+      }
+      if (tempo === 'decisions' && enJeu && !enPause) {
+        const carte = decisionPour(e, moi, e.sim - derniereDecision.current);
+        if (carte) {
+          derniereDecision.current = e.sim;
+          chrono.current = DELAI_DECISION;
+          decisionRef.current = carte;
+          setDecision(carte);
+          redessiner((n) => n + 1);
+          return;
+        }
+      }
+
       // ⚠️ ON LÂCHE LE PION EN PAUSE. Sans ça, la dernière direction reste
       // posée : on met la pause, on va lire le fil, et le joueur repart en
       // courant vers la touche dès la reprise sans qu'on ait rien touché.
@@ -445,7 +516,25 @@ export function MatchLive({
     };
     brut = requestAnimationFrame(image);
     return () => { actif = false; cancelAnimationFrame(brut); };
-  }, [enPause, tempo, enJeu, e]);
+  }, [enPause, tempo, enJeu, e, fermerDecision]);
+
+  // ⚠️ LES CHIFFRES CHOISISSENT SUR LA CARTE, et rien d'autre. Pendant qu'elle
+  // est ouverte la manette est coupée (voir la boucle) : sans ce raccourci, il
+  // n'y aurait plus que la souris, et une carte à dix secondes se joue au
+  // clavier. On lit `ev.code` et pas `ev.key` : en AZERTY la rangée des chiffres
+  // rend « & é " ' ( » sans Maj.
+  useEffect(() => {
+    if (!decision) return;
+    const auClavier = (ev: KeyboardEvent) => {
+      const n = Number((/^Digit([1-9])$/.exec(ev.code) ?? [])[1]);
+      const choix = decision.options[n - 1];
+      if (!choix) return;
+      ev.preventDefault();
+      jouerDecision(choix.action);
+    };
+    window.addEventListener('keydown', auClavier);
+    return () => window.removeEventListener('keydown', auClavier);
+  }, [decision, jouerDecision]);
 
   // Le mode commande le contrôle du moteur : une seule vérité, pas deux.
   useEffect(() => { activerControle(e, mode === 'jouer'); }, [mode, e]);
@@ -1093,7 +1182,59 @@ export function MatchLive({
                     </div>
                   )}
 
-                  {enPause && !e.bagarre && (
+                  {/* ---------- 📣 CE QUE L'ARBITRE VIENT DE SIFFLER ----------
+                      ⚠️ ELLE EXISTE PARCE QU'UNE SANCTION INVISIBLE N'EN EST
+                      PAS UNE. Retour de jeu : « on peut faire des en-avants
+                      sans répercussion ». La mêlée était bien accordée à
+                      l'adversaire — c'est mesuré — mais ça passait dans une
+                      ligne du fil, réduite à une seule au-dessus du terrain, et
+                      défilant à seize fois la vitesse réelle. */}
+                  {e.sifflet && !decision && !e.bagarre && (
+                    <div className={`ml-sifflet${e.sifflet.maFaute ? ' faute' : ''}`} role="status">
+                      <b>{t(e.sifflet.cle)}</b>
+                      <span>
+                        {t('ml.sifflet.pour', { club: e.sifflet.club })}
+                        {e.sifflet.maFaute ? ` · ${t('ml.sifflet.maFaute')}` : ''}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* ---------- ⏸️ DIX SECONDES POUR CHOISIR ----------
+                      Le match est FIGÉ tant que cette carte est là : le chrono
+                      du match ne tourne pas, les pions ne bougent pas. On lit,
+                      on choisit, et le moteur joue la suite au ralenti. */}
+                  {decision && !e.bagarre && (
+                    <div className="ml-decision" role="alertdialog" aria-label={t('ml.dec.titre')}>
+                      <div className="ml-dec-chrono">
+                        <span style={{ width: `${Math.max(0, chrono.current / DELAI_DECISION) * 100}%` }} />
+                      </div>
+                      <b className="ml-dec-situation">{decision.emoji} {t(decision.cle)}</b>
+                      <div className="ml-dec-options">
+                        {decision.options.map((o, i) => (
+                          <button
+                            key={o.action}
+                            type="button"
+                            className="ml-dec-option"
+                            onPointerDown={(ev) => { ev.stopPropagation(); jouerDecision(o.action); }}
+                          >
+                            <span className="ml-dec-touche">{i + 1}</span>
+                            <b>{o.emoji} {t(o.cle)}</b>
+                            <span className="ml-dec-aide">{t(o.aide)}</span>
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className="ml-dec-option laisser"
+                          onPointerDown={(ev) => { ev.stopPropagation(); fermerDecision(false); }}
+                        >
+                          <b>⏭️ {t('ml.dec.laisser')}</b>
+                          <span className="ml-dec-aide">{t('ml.dec.laisserAide')}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {enPause && !decision && !e.bagarre && (
                     <button type="button" className="ml-voile-pause" onPointerDown={() => setEnPause(false)}>
                       <b>▶️ {t('ml.reprendre')}</b>
                     </button>

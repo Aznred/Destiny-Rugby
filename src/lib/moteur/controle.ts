@@ -119,6 +119,18 @@ export function actionsDisponibles(e: EtatMatch): DefinitionAction[] {
   if (!p) return [];
 
   const jeVaisAuBallon = e.porteur === p;
+  // ⚠️ ON PEUT S'ARMER AVANT QUE LE BALLON N'ARRIVE, et c'est une correction de
+  // fond. Un crochet ne « marche » que s'il est encore armé à l'instant du
+  // contact : tant qu'il fallait AVOIR le ballon pour le demander, il ne
+  // restait qu'une fraction de seconde entre la réception et le plaqueur, et le
+  // geste ne servait jamais. Un rugbyman, lui, sait ce qu'il va faire avant que
+  // la passe ne parte. Les gestes de course s'arment donc dès que le ballon
+  // vient sur soi ; la passe et le coup de pied, non — on ne donne pas un
+  // ballon qu'on n'a pas.
+  const suivantDeLaChaine = e.lancement
+    && e.possession === p.cote
+    && e.lancement.chaine[e.lancement.index + 1] === p;
+  const ballonArrive = jeVaisAuBallon || e.vol?.receveur === p || !!suivantDeLaChaine;
   const monEquipeAttaque = e.possession === p.cote;
   const vivant = ballonVivant(e);
   const adversairePres = !!surLeTerrain(e, adverse(p.cote))
@@ -128,6 +140,10 @@ export function actionsDisponibles(e: EtatMatch): DefinitionAction[] {
     if ((e.recharges[a.id] ?? 0) > 0) return false;
     switch (a.famille) {
       case 'ballon':
+        // Courir, crocheter, raffuter : dès que le ballon vient sur soi.
+        if (a.id === 'sprint' || a.id === 'crochet' || a.id === 'raffut') {
+          return ballonArrive;
+        }
         if (!jeVaisAuBallon) return false;
         // On ne « passe » que s'il y a quelqu'un à qui donner.
         if (a.id === 'passe') return !!receveurPour(e, p);

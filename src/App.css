@@ -3170,6 +3170,128 @@
 .ml-ordre b { font-size: 0.84rem; }
 .ml-ordre span { font-size: 0.68rem; color: var(--craie-dim); line-height: 1.25; }
 
+/* --- ⏸️ LA CARTE DE DÉCISION -------------------------------------------
+   Dix secondes pour choisir, le match figé derrière.
+
+   ⚠️ ELLE NE COUVRE PAS LE TERRAIN, et c'est la règle qui commande sa taille :
+   on choisit EN REGARDANT le jeu — qui arrive, où sont les soutiens, à quelle
+   distance est la ligne. Une modale plein écran ferait choisir à l'aveugle.
+   D'où le fond posé en bas, la hauteur bornée, et rien au-dessus du milieu. */
+.ml-decision {
+  position: absolute;
+  left: 0.6rem;
+  right: 0.6rem;
+  bottom: 0.5rem;
+  padding: 0.55rem 0.7rem 0.6rem;
+  border-radius: 14px;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  background: linear-gradient(180deg, rgba(8, 26, 18, 0.93), rgba(4, 14, 10, 0.96));
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+  max-height: 52%;
+  overflow-y: auto;
+}
+/* Le compte à rebours : une barre, pas un nombre. On la lit sans la lire. */
+.ml-dec-chrono {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  margin-bottom: 0.45rem;
+}
+.ml-dec-chrono span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--or-500), #ffd97a);
+  /* ⚠️ AUCUNE TRANSITION : la largeur est posée à chaque image par la boucle.
+     Une transition CSS par-dessus ferait traîner la barre derrière le chrono
+     réel, et le joueur perdrait une demi-seconde qu'il croit avoir. */
+}
+.ml-dec-situation {
+  display: block;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: var(--or-400);
+  margin-bottom: 0.45rem;
+}
+.ml-dec-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.4rem;
+}
+.ml-dec-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-align: left;
+  padding: 0.5rem 0.6rem 0.5rem 1.9rem;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  color: var(--craie);
+  font-family: inherit;
+  cursor: pointer;
+  /* ⚠️ 52 px : au-dessus du minimum de 44 px que le projet s'impose, parce
+     qu'on vise ce bouton en dix secondes, sous pression, sur un téléphone. */
+  min-height: 52px;
+}
+.ml-dec-option:hover { border-color: var(--or-clair); background: rgba(212, 175, 55, 0.14); }
+.ml-dec-option.laisser { opacity: 0.72; padding-left: 0.6rem; }
+.ml-dec-option b { font-size: 0.85rem; }
+.ml-dec-aide { font-size: 0.68rem; color: var(--craie-dim); line-height: 1.25; }
+/* Le numéro du raccourci clavier. Il disparaît là où il n'y a pas de clavier. */
+.ml-dec-touche {
+  position: absolute;
+  left: 0.45rem;
+  top: 0.5rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: rgba(212, 175, 55, 0.2);
+  color: var(--or-400);
+  font-size: 0.62rem;
+  font-family: 'Archivo', system-ui, sans-serif;
+}
+@media (hover: none) and (pointer: coarse) {
+  .ml-dec-touche { display: none; }
+  .ml-dec-option { padding-left: 0.6rem; }
+}
+
+/* --- 📣 LE COUP DE SIFFLET, EN GRAND ------------------------------------
+   ⚠️ ELLE EST EN HAUT ET AU CENTRE, hors du chemin du pouce et hors du fil de
+   commentaire : c'est une décision d'arbitre, pas une phrase de plus. */
+.ml-sifflet {
+  position: absolute;
+  top: 11%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 82%;
+  padding: 0.4rem 1rem 0.5rem;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(6, 18, 12, 0.9);
+  animation: sifflet 0.24s ease-out;
+}
+.ml-sifflet b {
+  display: block;
+  font-family: 'Anton', system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  font-size: clamp(1rem, 4.2vw, 1.5rem);
+  color: var(--craie);
+}
+.ml-sifflet span { font-size: 0.72rem; color: var(--craie-dim); }
+/* Ma faute : c'est rouge, et ça se voit de l'autre bout de la pièce. */
+.ml-sifflet.faute { border-color: rgba(255, 107, 107, 0.7); background: rgba(70, 12, 12, 0.9); }
+.ml-sifflet.faute b { color: #ffb4b4; }
+@keyframes sifflet {
+  from { transform: translateX(-50%) scale(0.86); opacity: 0; }
+  to { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .ml-sifflet { animation: none; } }
+
 /* --- LA SANCTION D'APRÈS-MATCH ------------------------------------------ */
 .ml-sanction {
   margin-bottom: 0.5rem;
@@ -3708,7 +3830,8 @@ img, svg, canvas { max-width: 100%; }
 /* ⚠️ « pointer-events: none » sur la couche, « auto » sur ce qui se touche :
    sinon le HUD couvre tout le terrain et le joystick ne reçoit plus rien. */
 .ml-hud { position: absolute; inset: 0; pointer-events: none; }
-.ml-hud button, .ml-hud .ml-bagarre, .ml-hud .ml-tuto { pointer-events: auto; }
+.ml-hud button, .ml-hud .ml-bagarre, .ml-hud .ml-tuto,
+.ml-hud .ml-decision { pointer-events: auto; }
 
 .ml-hud-haut {
   position: absolute;

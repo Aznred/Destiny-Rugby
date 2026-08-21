@@ -17,6 +17,16 @@
 //     ballons. On mesure donc la proportion de temps ralenti sur un vrai match
 //     simulé, et le nombre de moments par match.
 //
+//  3. LES DÉCISIONS (`moteur/decisions.ts`) — le mode demandé ensuite : « on a
+//     un moment, dix secondes pour choisir une action, et ça la simule ». Ce
+//     qui se mesure ici, c'est le NOMBRE de cartes (une par phase, c'est un
+//     menu ; trois par match, c'est un film) et le fait que chaque option
+//     proposée soit réellement jouable à cet instant-là.
+//
+//  4. LES EN-AVANTS — « on peut faire des en-avants sans répercussion ». On
+//     compte ceux d'un match entier, et on vérifie qu'un ballon lâché coûte
+//     TOUJOURS la possession.
+//
 //   npx vite-node scripts/verifMatchJouable.ts
 
 import { avancer, creerMatch, type EtatMatch } from '../src/lib/moteur/moteur';
@@ -24,6 +34,10 @@ import {
   Camera, COUVERTURE, angleDeVue, construireVue, type Angle, type Cadrage,
 } from '../src/lib/moteur/camera';
 import { facteurTempo, momentDuJoueur, TEMPOS, TENUE } from '../src/lib/moteur/moments';
+import {
+  DELAI_DECISION, REJEU, REPOS_DECISION, decisionPour,
+} from '../src/lib/moteur/decisions';
+import { actionsDisponibles } from '../src/lib/moteur/controle';
 import { LARGEUR, LONGUEUR, type Vec } from '../src/lib/moteur/terrain';
 import { effectifDuClub } from '../src/lib/effectif';
 
@@ -302,7 +316,112 @@ console.log('\n=== 6. UN MATCH TIENT DANS UNE SESSION ===');
   ligne('le match va bien au bout', `${pas} pas · ${e.scoreA}-${e.scoreB}`, e.fini);
 }
 
+console.log('\n=== 7. ⏸️ LES CARTES DE DÉCISION TOMBENT SUR LES CARREFOURS ===');
+{
+  const N = 4;
+  let cartes = 0;
+  let optionsTotal = 0;
+  let optionsHorsJeu = 0;
+  let mini = 9;
+  let maxi = 0;
+  const parType: Record<string, number> = {};
+  let simTotal = 0;
+
+  for (let m = 0; m < N; m++) {
+    const e = nouveauMatch(`decision#${m}`);
+    const moi = e.pions.find((q) => q.moi)!;
+    let derniere = 0;
+    let pas = 0;
+    while (!e.fini && pas < 40000) {
+      avancer(e, 0.15);
+      pas++;
+      const carte = decisionPour(e, moi, e.sim - derniere);
+      if (!carte) continue;
+      derniere = e.sim;
+      cartes++;
+      parType[carte.moment] = (parType[carte.moment] ?? 0) + 1;
+      optionsTotal += carte.options.length;
+      mini = Math.min(mini, carte.options.length);
+      maxi = Math.max(maxi, carte.options.length);
+      // ⚠️ LE CONTRÔLE QUI COMPTE : une carte ne doit JAMAIS proposer un geste
+      // que le moteur refusera. Un bouton qui ne fait rien, sur une carte à dix
+      // secondes, se lit comme un jeu cassé — et on ne le verrait pas à la
+      // relecture, puisque les deux listes viennent du même fichier.
+      const jouables = new Set(actionsDisponibles(e).map((a) => a.id));
+      for (const o of carte.options) if (!jouables.has(o.action)) optionsHorsJeu++;
+    }
+    simTotal += e.sim;
+  }
+
+  const moyCartes = cartes / N;
+  console.log(`  ${'cartes par match'.padEnd(46)} ${moyCartes.toFixed(1)}`);
+  console.log(`  ${'réparties par situation'.padEnd(46)} ${
+    Object.entries(parType).map(([k, v]) => `${k} ${Math.round(v / N)}`).join(' · ')}`);
+
+  // ⚠️ LES BORNES SONT DES BORNES DE PLAISIR. Sous dix cartes on regarde un
+  // match sans y toucher ; au-dessus de trente-cinq on remplit un formulaire.
+  ligne('assez de carrefours pour jouer (≥ 10)', `${moyCartes.toFixed(1)}/match`, moyCartes >= 10);
+  ligne('pas un menu à chaque phase (≤ 35)', `${moyCartes.toFixed(1)}/match`, moyCartes <= 35);
+  ligne('2 à 4 options par carte', `${mini} à ${maxi}, moyenne ${(optionsTotal / Math.max(1, cartes)).toFixed(1)}`,
+    cartes > 0 && mini >= 2 && maxi <= 4);
+  ligne('aucune option injouable', `${optionsHorsJeu} sur ${optionsTotal}`, optionsHorsJeu === 0);
+  ligne('le repos entre deux cartes est respecté', `${REPOS_DECISION} s simulées`,
+    moyCartes <= simTotal / N / REPOS_DECISION + 0.001);
+
+  // ⚠️ LA VRAIE QUESTION : COMBIEN DE TEMPS ÇA PREND. Le match défile hors
+  // décision, se fige pendant qu'on choisit (on compte six secondes de
+  // réflexion sur les dix offertes), puis rejoue au ralenti.
+  const rapide = (simTotal / N) / facteurTempo('decisions', false);
+  const reflexion = moyCartes * 6;
+  const rejeu = moyCartes * REJEU;
+  const minutes = (rapide + reflexion + rejeu) / 60;
+  console.log(`  ${'dont'.padEnd(46)} ${(rapide / 60).toFixed(1)} min de jeu · ${
+    (reflexion / 60).toFixed(1)} min de choix · ${(rejeu / 60).toFixed(1)} min de rejeu`);
+  ligne('un match en décisions tient en 3 à 12 min', `${minutes.toFixed(1)} min`,
+    minutes >= 3 && minutes <= 12);
+  ligne('dix secondes pour choisir', `${DELAI_DECISION} s`, DELAI_DECISION === 10);
+}
+
+console.log('\n=== 8. ⚠️ UN EN-AVANT COÛTE TOUJOURS LA POSSESSION ===');
+{
+  const N = 6;
+  let total = 0;
+  let sansConsequence = 0;
+  let sansSifflet = 0;
+
+  for (let m = 0; m < N; m++) {
+    const e = nouveauMatch(`enavant#${m}`);
+    let pas = 0;
+    let vus = 0;
+    while (!e.fini && pas < 40000) {
+      const avantCoup = e.compteurs.enAvants;
+      avancer(e, 0.15);
+      pas++;
+      if (e.compteurs.enAvants > avantCoup) {
+        vus = e.compteurs.enAvants;
+        // ⚠️ ON COMPARE AU CAMP DU FAUTIF, PAS AU CAMP QUI AVAIT LE BALLON.
+        // Un défenseur qui lâche un ballon au sol rend la mêlée à l'équipe qui
+        // attaquait déjà : la possession ne CHANGE pas, et pourtant la règle
+        // est bien appliquée. C'est le fautif qui doit perdre le ballon.
+        const fautif = e.pions.find((q) => q.nom === e.sifflet?.fautif);
+        if (fautif && e.possession === fautif.cote) sansConsequence++;
+        if (!e.sifflet) sansSifflet++;
+      }
+    }
+    total += vus;
+  }
+
+  const moy = total / N;
+  console.log(`  ${'en-avants et passes en avant par match'.padEnd(46)} ${moy.toFixed(1)}`);
+  // Le rugby professionnel compte 12 à 18 fautes de main par match, les deux
+  // équipes réunies. En dessous, le ballon ne se perd jamais et le jeu n'a plus
+  // d'accident ; au-dessus, on ne construit plus rien.
+  ligne('autant qu\'en vrai (10 à 20 par match)', `${moy.toFixed(1)}`, moy >= 10 && moy <= 20);
+  ligne('le fautif perd le ballon À CHAQUE FOIS', `${sansConsequence} sans conséquence`, sansConsequence === 0);
+  ligne('et l\'arbitre l\'annonce à l\'écran', `${sansSifflet} sans bannière`, sansSifflet === 0);
+}
+
 console.log(echecs === 0
-  ? '\n✅ TOUT EST BON — la caméra cadre juste, le stick pousse dans le bon sens, le ralenti tombe sur les bons moments.'
+  ? '\n✅ TOUT EST BON — la caméra cadre juste, le stick pousse dans le bon sens, les carrefours tombent au bon moment, et un ballon lâché coûte toujours la possession.'
   : `\n❌ ${echecs} contrôle(s) en échec.`);
 process.exit(echecs === 0 ? 0 : 1);

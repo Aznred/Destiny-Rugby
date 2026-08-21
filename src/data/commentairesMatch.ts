@@ -3,7 +3,7 @@ import type { Langue } from '../lib/i18n';
 export type IdPoolCommentaire =
   | 'essai' | 'precision' | 'transformation' | 'transformationRatee'
   | 'penaliteBut' | 'penaliteRatee' | 'drop' | 'penalite' | 'motif'
-  | 'plaquage' | 'franchissement' | 'grattage' | 'enAvant'
+  | 'plaquage' | 'franchissement' | 'grattage' | 'enAvant' | 'passeAvant'
   | 'degagement' | 'occupation' | 'chandelle' | 'cinquanteVingtDeux'
   | 'cinquanteVingtDeuxRate' | 'rasant' | 'transversale'
   | 'toucheGagnee' | 'touchePerdue' | 'meleeGagnee' | 'meleeDominee'
@@ -45,6 +45,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     franchissement: ['{nom} breaks the defensive line!'],
     grattage: ['Turnover by {nom}! Ball won on the ground.'],
     enAvant: ['Knock-on by {nom}, scrum to {club}.'],
+    passeAvant: ['Forward pass by {nom}, scrum to {club}.'],
     degagement: ['{nom} clears to touch and gains fifty metres.'],
     occupation: ['{nom} kicks for territory.'],
     chandelle: ['High ball from {nom}, the chase is on!'],
@@ -79,6 +80,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     franchissement: ['¡{nom} rompe la línea defensiva!'],
     grattage: ['¡Recuperación de {nom}! Balón ganado en el suelo.'],
     enAvant: ['Avant de {nom}, melé para {club}.'],
+    passeAvant: ['Pase adelantado de {nom}, melé para {club}.'],
     degagement: ['{nom} despeja a touche y gana cincuenta metros.'],
     occupation: ['{nom} juega al pie para ocupar campo.'],
     chandelle: ['¡Patada alta de {nom}, comienza la persecución!'],
@@ -113,6 +115,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     franchissement: ['{nom} rompe la linea difensiva!'],
     grattage: ['Pallone recuperato da {nom} a terra!'],
     enAvant: ['In avanti di {nom}, mischia per {club}.'],
+    passeAvant: ['Passaggio in avanti di {nom}, mischia per {club}.'],
     degagement: ['{nom} libera in touche e guadagna cinquanta metri.'],
     occupation: ['{nom} calcia per guadagnare territorio.'],
     chandelle: ['Campanile di {nom}: parte la caccia!'],
@@ -147,6 +150,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     franchissement: ['{nom} durchbricht die Verteidigungslinie!'],
     grattage: ['Turnover durch {nom}! Ball am Boden gewonnen.'],
     enAvant: ['Vorwurf von {nom}, Gedränge für {club}.'],
+    passeAvant: ['Vorwärtspass von {nom}, Gedränge für {club}.'],
     degagement: ['{nom} klärt ins Aus und gewinnt fünfzig Meter.'],
     occupation: ['{nom} kickt auf Raumgewinn.'],
     chandelle: ['Hoher Ball von {nom}, die Jagd beginnt!'],
@@ -181,6 +185,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     franchissement: ['{nom} quebra a linha defensiva!'],
     grattage: ['Recuperação de {nom}! Bola ganha no chão.'],
     enAvant: ['Avanço de {nom}, formação ordenada para {club}.'],
+    passeAvant: ['Passe para a frente de {nom}, formação ordenada para {club}.'],
     degagement: ['{nom} alivia para fora e ganha cinquenta metros.'],
     occupation: ['{nom} chuta para ganhar território.'],
     chandelle: ['Bola alta de {nom}, começa a perseguição!'],
@@ -215,6 +220,7 @@ export const POOLS_COMMENTAIRES: Record<Exclude<Langue, 'fr'>, Pools> = {
     franchissement: ['{nom}がディフェンスラインを突破！'],
     grattage: ['{nom}がジャッカル成功！ボールを奪う。'],
     enAvant: ['{nom}がノックオン。{club}のスクラム。'],
+    passeAvant: ['{nom}のパスが前に。{club}のスクラム。'],
     degagement: ['{nom}がタッチへ蹴り出し、50メートル前進。'],
     occupation: ['{nom}がエリアを取るキック。'],
     chandelle: ['{nom}のハイパント。チェイスが始まる！'],

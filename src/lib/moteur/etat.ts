@@ -63,6 +63,32 @@ export type SystemeDefensif = 'blitz' | 'glissee' | 'repli';
 export type NiveauMatch = 'pro' | 'amateur';
 
 /** Ce que le joueur peut demander à son pion pendant le match. */
+/**
+ * ⚠️ LE COUP DE SIFFLET, POUR QU'IL SE VOIE.
+ *
+ * Retour de jeu : « on peut faire des en-avants sans répercussion ». La
+ * répercussion EXISTAIT — mêlée pour l'adversaire, possession perdue, c'est
+ * mesuré — mais elle était invisible : elle passait dans une ligne du fil de
+ * commentaire, réduit à sa dernière ligne au-dessus du terrain, et défilant à
+ * neuf fois la vitesse réelle. Une sanction qu'on ne voit pas est une sanction
+ * qui n'existe pas pour le joueur.
+ *
+ * L'arbitre pose donc sa décision ICI, et l'écran l'affiche en grand : ce qui
+ * s'est passé, et surtout QUI RÉCUPÈRE LE BALLON.
+ */
+export interface CoupDeSifflet {
+  /** Clé i18n de la décision : en-avant, passe en avant, pénalité, carton. */
+  cle: string;
+  /** Le club qui récupère le ballon. */
+  club: string;
+  /** Le fautif, s'il est nommé. */
+  fautif: string;
+  /** ⚠️ Est-ce MOI qui viens de la faire ? L'écran ne le dit pas pareil. */
+  maFaute: boolean;
+  /** Ce qu'il reste à l'afficher, en secondes SIMULÉES. */
+  restant: number;
+}
+
 export type ActionJoueur =
   // ── Ballon en main ───────────────────────────────────────────────────────
   // ⚠️ LA PASSE EST DIRECTIONNELLE. Retour de jeu : « en mode A ou E pour faire
@@ -288,10 +314,26 @@ export interface EtatMatch {
   essaisB: number;
 
   // Compteurs de match (affichés et mesurés par le banc d'essai).
+  /**
+   * La dernière décision de l'arbitre, tant qu'elle est fraîche. Voir
+   * `CoupDeSifflet` : c'est ce qui rend une sanction visible.
+   */
+  sifflet: CoupDeSifflet | null;
+
   compteurs: {
     rucks: number; melees: number; touches: number; percees: number;
     /** Plaquages hauts et plaquages en retard sifflés (voir bagarre.ts). */
     irregularites: number;
+    /**
+     * Les en-avants du match, toutes causes confondues.
+     *
+     * ⚠️ IL A ÉTÉ AJOUTÉ PARCE QU'ON NE POUVAIT PAS LES COMPTER, et donc pas
+     * les régler. Retour de jeu : « on peut faire des en-avants sans
+     * répercussion ». Le moteur en produisait bien quelques-uns, mais personne
+     * n'en mesurait le nombre, et surtout UNE PASSE REÇUE NE POUVAIT PAS ÊTRE
+     * LÂCHÉE : la faute de main la plus banale du rugby n'existait pas.
+     */
+    enAvants: number;
     tempsA: number; tempsB: number; // secondes de possession, pour l'affichage
   };
 

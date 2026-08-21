@@ -114,6 +114,12 @@ export const EN_AVANT = [
   'Ballon perdu par {nom}, l’arbitre siffle l’en-avant.',
 ];
 
+export const PASSE_AVANT = [
+  'Passe en avant de {nom}, mêlée pour {club}.',
+  'Le ballon part devant sur la passe de {nom}, l’arbitre siffle.',
+  '{nom} a lâché sa passe en avant, mêlée {club}.',
+];
+
 export const PIED_DEGAGEMENT = [
   '{nom} dégage en touche et rend cinquante mètres.',
   'Chandelle de dégagement de {nom}, l’équipe respire.',
@@ -235,7 +241,7 @@ const ID_PAR_POOL = new Map<string[], IdPoolCommentaire>([
   [PENALITE_BUT, 'penaliteBut'], [PENALITE_RATEE, 'penaliteRatee'],
   [DROP, 'drop'], [PENALITE, 'penalite'], [MOTIFS_PENALITE, 'motif'],
   [PLAQUAGE, 'plaquage'], [FRANCHISSEMENT, 'franchissement'],
-  [RUCK_GRATTAGE, 'grattage'], [EN_AVANT, 'enAvant'],
+  [RUCK_GRATTAGE, 'grattage'], [EN_AVANT, 'enAvant'], [PASSE_AVANT, 'passeAvant'],
   [PIED_DEGAGEMENT, 'degagement'], [PIED_OCCUPATION, 'occupation'],
   [PIED_CHANDELLE, 'chandelle'], [PIED_5022, 'cinquanteVingtDeux'],
   [PIED_5022_RATE, 'cinquanteVingtDeuxRate'], [PIED_RASANT, 'rasant'],

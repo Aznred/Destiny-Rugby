@@ -438,19 +438,26 @@ console.log('\n=== 9. ⚖️ PLAQUAGE HAUT ET PLAQUAGE EN RETARD ===');
     // par match là où le moteur n'en produit que deux.
     return e.compteurs.irregularites;
   }
+  // ⚠️ CETTE SECTION-LÀ A BESOIN DE PLUS DE MATCHS QUE LES AUTRES, et ce n'est
+  // pas un caprice : un geste illégal tombe moins d'une fois par match. Sur
+  // douze matchs on comparait huit évènements à neuf, et le contrôle « plus
+  // fréquent en amateur » passait ou tombait au tirage, sans que le réglage
+  // ait bougé d'un pouce (base 0,016 contre 0,009 : le rapport est de 1,8).
+  // Un test qui répond au hasard est pire qu'une absence de test.
+  const N_DISCIPLINE = 40;
   let amateur = 0;
   let pro = 0;
-  for (let i = 0; i < N; i++) {
+  for (let i = 0; i < N_DISCIPLINE; i++) {
     amateur += compter('amateur', 'irr#a#' + i);
     pro += compter('pro', 'irr#p#' + i);
   }
-  console.log(`  ${'gestes illégaux sifflés par match'.padEnd(46)} amateur ${(amateur / N).toFixed(2)} · pro ${(pro / N).toFixed(2)}`);
+  console.log(`  ${'gestes illégaux sifflés par match'.padEnd(46)} amateur ${(amateur / N_DISCIPLINE).toFixed(2)} · pro ${(pro / N_DISCIPLINE).toFixed(2)}`);
   // ⚠️ LES BORNES SONT CELLES DU RUGBY, PAS D'UN GOÛT. Le carton pour plaquage
   // haut est la sanction la plus fréquente du jeu moderne, mais on parle d'un
   // ou deux par match — pas d'un toutes les dix minutes.
-  ligne('ça existe vraiment', `${(pro / N).toFixed(2)}/match en pro`, pro > 0);
-  ligne('et ça reste rare (≤ 4/match)', `${(amateur / N).toFixed(2)}/match en amateur`, amateur / N <= 4);
-  ligne('plus fréquent en amateur', `${(amateur / N).toFixed(2)} vs ${(pro / N).toFixed(2)}`, amateur >= pro);
+  ligne('ça existe vraiment', `${(pro / N_DISCIPLINE).toFixed(2)}/match en pro`, pro > 0);
+  ligne('et ça reste rare (≤ 4/match)', `${(amateur / N_DISCIPLINE).toFixed(2)}/match en amateur`, amateur / N_DISCIPLINE <= 4);
+  ligne('plus fréquent en amateur', `${(amateur / N_DISCIPLINE).toFixed(2)} vs ${(pro / N_DISCIPLINE).toFixed(2)}`, amateur > pro);
 }
 
 // ---------------------------------------------------------------------------

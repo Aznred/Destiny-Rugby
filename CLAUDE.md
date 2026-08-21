@@ -4076,9 +4076,10 @@ Les quatre tempos disent désormais ce qu'ils **font**, pas un facteur qui menta
 
 | Tempo | Sur ton moment | Le reste du temps |
 | --- | --- | --- |
-| 🎯 Moments (défaut en pilotage) | ×1 — temps réel | ×9 |
-| 👁️ Suivre (défaut en spectateur) | ×5 | ×5 |
-| ⏩ Accéléré | ×18 | ×18 |
+| ⏸️ Décisions (défaut en pilotage) | jeu FIGÉ, dix secondes pour choisir | ×16 |
+| 🎯 Moments | ×1 — temps réel | ×13 |
+| 👁️ Suivre (défaut en spectateur) | ×7 | ×7 |
+| ⏩ Accéléré | ×26 | ×26 |
 | ⏭️ Fin | ×600 | ×600 |
 
 ⚠️ **LE RALENTI TIENT 1,2 s APRÈS LA FIN DU MOMENT** (`TENUE`). Une passe reçue
@@ -5288,4 +5289,197 @@ l'étape 3 de `serveur/MIGRATION-FICHES.md`.
 ```bash
 npx vite-node scripts/verifClassement.ts   # + section 6 bis : les homonymes
 npx vite-node scripts/verifEcrans.ts       # robustesse du Hall et du Classement
+```
+
+---
+
+## ⏸️ LE MODE « DÉCISIONS » — dix secondes pour choisir, le jeu joue la suite
+
+Retour de jeu, mot pour mot : « améliore le gameplay, rends-le plus fun et plus
+jouable, plus en mode on a un moment, 10 secondes pour choisir une action et ça
+la simule », « le temps passe trop lentement, trop d'action en ce temps », et
+« fixe les en-avants, on peut faire des en-avants sans répercussion ».
+
+Trois reproches, trois causes distinctes. Aucune n'était dans le moteur.
+
+### ⚠️ 1. LE MODE MANETTE DEMANDAIT DE RÉAGIR CENT DIX-NEUF FOIS PAR MATCH
+
+`moments.ts` fait très bien ce pour quoi il a été écrit : ralentir dès qu'une
+action concerne le joueur. Mesuré, ça tombe **114 fois par match**. C'est un jeu
+de sport à la manette, et c'est réussi comme tel — mais ce jeu-ci est une
+CARRIÈRE, et entre deux gestes il ne se passe rien pour soi tout en obligeant à
+rester devant.
+
+**`src/lib/moteur/decisions.ts`** répond exactement à la demande : le match file
+tout seul, se **fige** sur un carrefour, ouvre une carte de deux à quatre
+options avec un compte à rebours de **dix secondes réelles**, puis rejoue la
+suite au ralenti pour qu'on VOIE ce que le choix a donné.
+
+| | mode « Moments » | mode « Décisions » |
+|---|---|---|
+| sollicitations par match | 114 | **19** |
+| ce qu'on fait | lire et réagir en temps réel | lire et choisir, jeu figé |
+| durée d'un match | 11,6 min | **5,8 min** (2,9 de jeu · 1,9 de choix · 1,0 de rejeu) |
+| par défaut | non | **oui, dès qu'on pilote** |
+
+Les deux coexistent : un bouton les sépare, et « Moments » ne perd rien.
+
+⚠️ **AUCUNE OPTION N'EST INVENTÉE.** Une carte ne propose que ce que
+`controle.ts` déclare jouable à cet instant, et elle le joue par
+`demanderAction` — le même chemin que la barre, le clavier et la manette. Une
+seule surface d'appel, donc rien à re-régler quand une action change. Le banc
+d'essai le vérifie option par option : **0 injouable sur 278**.
+
+⚠️ **NE PAS CHOISIR EST UN CHOIX.** À zéro, la carte se ferme sans rien armer,
+une ligne le dit (« … hésite une seconde de trop »), et le moteur joue son rugby
+automatique — comme pour les vingt-neuf autres. Ce n'est pas une punition, c'est
+ce qui arrive quand on reste spectateur, et c'est ce qui donne du prix au fait
+de décider.
+
+⚠️ **LE REPOS DE 95 SECONDES SIMULÉES EST LE RÉGLAGE CENTRAL.** Une carte à
+chaque moment, ce serait 114 menus : vingt minutes de formulaire et plus une
+seconde de rugby. Espacées, elles tombent sur **19 carrefours**, l'ordre de
+grandeur des ballons qu'un joueur touche vraiment. Sous 10 par match on regarde
+sans jouer, au-dessus de 35 on remplit un formulaire : le banc échoue aux deux
+bouts.
+
+⚠️ **LE REJEU DE 3,2 SECONDES N'EST PAS DU CONFORT.** Sans lui on choisit « je
+plaque », le jeu repart à seize fois la vitesse réelle, et trois images plus
+tard on est au regroupement suivant sans avoir rien vu. Un choix dont on ne voit
+pas le résultat n'apprend rien et ne procure rien.
+
+⚠️ **ET LE FICHIER NE MUTE RIEN**, comme `moments.ts`. Il lit l'état et propose ;
+c'est l'écran qui arme le geste. Le déterminisme du moteur est intact, et le
+compteur de repos vit dans l'écran — pas en variable de module, sinon deux
+matchs joués en parallèle le partageraient.
+
+### ⚠️ 2. ON PEUT S'ARMER AVANT DE RECEVOIR LE BALLON
+
+Correction de fond attrapée en écrivant les cartes : `actionsDisponibles`
+exigeait d'AVOIR le ballon pour proposer crochet, raffut ou sprint. Or un
+crochet ne compte que s'il est encore armé **à l'instant du contact**, et entre
+la réception et le plaqueur il ne reste qu'une fraction de seconde. Le geste
+était donc quasi injouable — et sur une carte de réception, il n'y avait
+carrément rien à proposer.
+
+Les gestes de COURSE s'arment maintenant dès que le ballon vient sur soi (passe
+en vol, ou joueur suivant de la combinaison). La passe et le coup de pied, non :
+on ne donne pas un ballon qu'on n'a pas.
+
+### ⚠️ 3. « LE TEMPS PASSE TROP LENTEMENT, TROP D'ACTION EN CE TEMPS »
+
+Le reproche est exact et il est arithmétique : hors moment, le jeu tournait à
+neuf fois la vitesse réelle, si bien qu'une mêlée qui avale cinquante secondes
+d'horloge demandait encore cinq secondes de patience, et une possession de trois
+minutes en coûtait vingt. On regardait le chrono ramper pendant que le jeu, lui,
+débordait d'action.
+
+| tempo | avant (moment / hors) | maintenant |
+|---|---|---|
+| ⏸️ Décisions | *n'existait pas* | **2 / 16** |
+| 🎯 Moments | 1 / 9 | 1 / **13** |
+| 👁️ Suivre | 5 / 5 | **7 / 7** |
+| ⏩ Accéléré | 18 / 18 | **26 / 26** |
+| ⏭️ Fin | 600 / 600 | inchangé |
+
+⚠️ **ON N'A PAS TOUCHÉ À LA DENSITÉ DU JEU**, et il ne faut pas : 149 rucks,
+242 plaquages et 5,4 essais par match, c'est le rugby réel, et
+`scripts/verifMoteur.ts` le protège. Ce qui manquait, c'est de la vitesse
+d'ÉCOULEMENT, pas moins de rugby. Les durées visuelles des phases arrêtées
+(`ARRETS`) n'ont pas bougé non plus : ce sont elles qui laissent aux trente pions
+le temps d'atteindre leur place en mêlée et en touche (mesuré : 96 % et 90 %).
+
+### ⚠️ 4. LES EN-AVANTS — LA RÉPERCUSSION EXISTAIT, ELLE ÉTAIT INVISIBLE
+
+Vérification faite avant de toucher quoi que ce soit : le moteur produisait déjà
+**12 en-avants par match**, chacun donnant une mêlée à l'adversaire, donc une
+perte de possession. Le reproche restait juste, pour trois raisons :
+
+1. **ON NE LES VOYAIT PAS.** La sanction passait dans une ligne du fil de
+   commentaire, réduit à sa DERNIÈRE ligne au-dessus du terrain, et défilant à
+   neuf fois la vitesse réelle. Une sanction qu'on ne voit pas n'existe pas pour
+   le joueur. `EtatMatch.sifflet` porte désormais la décision de l'arbitre, et
+   l'écran l'affiche **en grand, au centre** : ce qui s'est passé, qui récupère
+   le ballon, et en rouge si c'est toi le fautif.
+2. **UNE PASSE REÇUE NE POUVAIT PAS ÊTRE LÂCHÉE.** `donnerBallon` donnait le
+   ballon, point final. Or la faute de main la plus fréquente du rugby n'est pas
+   la passe ratée, c'est la RÉCEPTION ratée : passe trop dure, dans le dos, ou
+   prise avec un défenseur dans le nez. `receptionRatee()` la rend possible, et
+   le risque DIT quelque chose du jeu — il monte avec la pression sur le
+   receveur et la longueur de la passe, il descend avec ses mains et sa
+   fraîcheur. **Un offload est trois fois plus risqué** : c'est le point
+   d'équilibre du geste, qui offrait sinon un temps de jeu gratuit sans revers.
+3. **LA PASSE EN AVANT N'EXISTAIT PAS DU TOUT.** `passerLeBallon` ramenait le
+   point d'arrivée derrière le passeur dès que le receveur avait dérivé devant :
+   la règle était « respectée », mais à l'écran le ballon partait vers un
+   partenaire placé plus haut et l'arbitre ne disait rien. C'est littéralement
+   « faire un en-avant sans répercussion ». Elle est désormais sifflée — rarement,
+   et seulement au-delà d'un mètre quarante de dérive, sinon plus aucune envolée
+   de trois-quarts ne passerait.
+
+Un seul chemin les traite tous (`enAvant()`) : commentaire, statistique du
+fautif, compteur du match, bannière, et mêlée pour l'adversaire. Trois copies
+traînaient dans le fichier, avec pour seul point commun que **personne ne les
+comptait** — et un évènement qu'on ne mesure pas est un évènement qu'on ne règle
+pas.
+
+| | avant | après |
+|---|---|---|
+| en-avants + passes en avant par match | 12,1 (non mesurés) | **13,2** (rugby pro : 12 à 18) |
+| dont réceptions manquées | **0** | ~3 |
+| dont passes en avant | **0** | ~1 |
+| le fautif perd le ballon | oui | oui, **0 exception sur 6 matchs** |
+| l'arbitre l'annonce à l'écran | non | **0 sans bannière** |
+
+⚠️ **LE FAUTIF PERD LE BALLON, LA POSSESSION NE « CHANGE » PAS TOUJOURS**, et le
+banc d'essai s'est trompé là-dessus avant d'être corrigé : un défenseur qui
+lâche un ballon au sol rend la mêlée à l'équipe qui attaquait DÉJÀ. Le contrôle
+compare donc au camp du fautif, jamais au camp qui avait le ballon.
+
+⚠️ **L'ÉTALONNAGE DU MOTEUR N'A PAS BOUGÉ** : `verifMoteur.ts` reste dans toutes
+ses cibles (42,6 points, 5,6 essais, 229 plaquages, 158 rucks, 15,4 mêlées,
+20,6 pénalités) et le score reste **exactement celui de la ligue** — 0 écart sur
+14 matchs. Un en-avant de plus, c'est une mêlée de plus, pas un point de plus.
+
+### 🩹 Un banc d'essai qui répondait au hasard
+
+`verifControle.ts` comparait les gestes illégaux amateur / pro sur **douze
+matchs**, c'est-à-dire huit évènements contre neuf. Le contrôle « plus fréquent
+en amateur » passait ou tombait au tirage sans que le réglage ait bougé d'un
+pouce (base 0,016 contre 0,009 : le rapport est de 1,8). Porté à **quarante
+matchs** : 0,72 contre 0,57, stable. Un test qui répond au hasard est pire qu'une
+absence de test.
+
+### L'écran
+
+| Élément | Où |
+|---|---|
+| `.ml-decision` | la carte, posée **en bas** du terrain (52 % de hauteur maximum) |
+| `.ml-dec-chrono` | le compte à rebours, une barre et pas un nombre — on la lit sans la lire |
+| `.ml-dec-option` | 52 px de haut minimum, deux colonnes, raccourcis 1 à 4 au clavier |
+| `.ml-sifflet` | la décision de l'arbitre, centrée à 11 % du haut, rouge si c'est ta faute |
+
+⚠️ **LA CARTE NE COUVRE PAS LE TERRAIN**, et c'est ce qui commande sa taille : on
+choisit EN REGARDANT le jeu — qui arrive, où sont les soutiens, à quelle distance
+est la ligne. Une modale plein écran ferait choisir à l'aveugle. Mesuré :
+**26 % de la hauteur sur ordinateur, 46 % sur téléphone**, toujours en bas.
+
+⚠️ **LE HUD EST EN `display: block`**, donc `align-self` et `margin: auto` n'y
+font rien. Mesuré en jeu avant correction : la bannière de sifflet s'étalait sur
+**723 px** au lieu de tenir en son milieu. Les deux blocs sont posés en absolu,
+comme `.ml-banniere` et `.ml-bagarre`.
+
+⚠️ **PENDANT UNE CARTE, LA MANETTE EST COUPÉE.** Sinon la touche « 1 » armerait
+à la fois l'option 1 de la carte et la première action de la barre. Les chiffres
+choisissent sur la carte, et rien d'autre — lus sur `ev.code`, parce qu'en AZERTY
+la rangée des chiffres rend « & é " ' ( » sans Maj.
+
+### Les scripts
+
+```bash
+npx vite-node scripts/verifMatchJouable.ts  # + sections 7 et 8 : les cartes, les en-avants
+npx vite-node scripts/verifMoteur.ts        # l'étalonnage du moteur ne bouge pas
+npx vite-node scripts/verifControle.ts      # actions, discipline (40 matchs sur la discipline)
+npx vite-node scripts/verifStats.ts         # les 18 classements individuels
+npx vite-node scripts/verifTraductions.ts   # les 16 clés ajoutées, dans les 7 langues
 ```

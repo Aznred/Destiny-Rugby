@@ -178,7 +178,7 @@ function lireMoment(e: EtatMatch, p: Pion): TypeMoment | null {
  * lui qui faisait croire que le pilotage était cassé alors qu'il était
  * seulement cinq fois trop rapide. Chaque tempo dit maintenant ce qu'il FAIT.
  */
-export type Tempo = 'moments' | 'suivre' | 'accelere' | 'fin';
+export type Tempo = 'decisions' | 'moments' | 'suivre' | 'accelere' | 'fin';
 
 export interface DefinitionTempo {
   id: Tempo;
@@ -192,15 +192,27 @@ export interface DefinitionTempo {
 }
 
 export const TEMPOS: DefinitionTempo[] = [
+  // ⚠️ LE TEMPO PAR DÉFAUT, ET LE PLUS DEMANDÉ : « on a un moment, 10 secondes
+  // pour choisir une action, et ça la simule ». Le match file à seize fois la
+  // vitesse réelle, se FIGE sur une carte de décision (voir `decisions.ts`),
+  // puis rejoue la suite au ralenti pour qu'on voie ce que le choix a donné.
+  //
+  // ⚠️ ET C'EST LUI QUI RÉPOND À « LE TEMPS PASSE TROP LENTEMENT ». À neuf fois
+  // la vitesse réelle, une mêlée qui avale cinquante secondes d'horloge en
+  // demandait encore cinq de patience, et une possession de trois minutes en
+  // coûtait vingt : on regardait le chrono ramper pendant que le jeu, lui,
+  // débordait d'action. Seize, c'est le double d'écoulement pour la même
+  // densité de rugby.
+  { id: 'decisions', emoji: '⏸️', cle: 'ml.tempo.decisions', aide: 'ml.tempo.decisions.aide', moment: 2, hors: 16 },
   // ⚠️ LE TEMPO PAR DÉFAUT DÈS QU'ON PILOTE. Temps réel sur tes moments —
   // c'est-à-dire exactement quand tu as une décision à prendre — et neuf fois
   // la vitesse réelle le reste du temps, ce qui ramène un match complet à cinq
   // ou six minutes de manette sans jamais rien te faire manquer.
-  { id: 'moments', emoji: '🎯', cle: 'ml.tempo.moments', aide: 'ml.tempo.moments.aide', moment: 1, hors: 9 },
+  { id: 'moments', emoji: '🎯', cle: 'ml.tempo.moments', aide: 'ml.tempo.moments.aide', moment: 1, hors: 13 },
   // Le match qu'on regarde : assez vif pour tenir en sept minutes, assez lent
   // pour lire les courses. C'est l'ancien « ×1 ».
-  { id: 'suivre', emoji: '👁️', cle: 'ml.tempo.suivre', aide: 'ml.tempo.suivre.aide', moment: 5, hors: 5 },
-  { id: 'accelere', emoji: '⏩', cle: 'ml.tempo.accelere', aide: 'ml.tempo.accelere.aide', moment: 18, hors: 18 },
+  { id: 'suivre', emoji: '👁️', cle: 'ml.tempo.suivre', aide: 'ml.tempo.suivre.aide', moment: 7, hors: 7 },
+  { id: 'accelere', emoji: '⏩', cle: 'ml.tempo.accelere', aide: 'ml.tempo.accelere.aide', moment: 26, hors: 26 },
   { id: 'fin', emoji: '⏭️', cle: 'ml.tempo.fin', aide: 'ml.tempo.fin.aide', moment: 600, hors: 600 },
 ];
 

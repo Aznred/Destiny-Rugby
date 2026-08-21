@@ -225,7 +225,8 @@ export function creerMatch(
     scoreA: 0, scoreB: 0,
     planA: planVide(scoreCibleA, rng), planB: planVide(scoreCibleB, rng),
     essaisA: 0, essaisB: 0,
-    compteurs: { rucks: 0, melees: 0, touches: 0, percees: 0, irregularites: 0, tempsA: 0, tempsB: 0 },
+    sifflet: null,
+    compteurs: { rucks: 0, melees: 0, touches: 0, percees: 0, irregularites: 0, enAvants: 0, tempsA: 0, tempsB: 0 },
     placement: null, cibleRenvoi: null, tir: null, penalite: null,
     remplacementsA: 0, remplacementsB: 0, prochaineDecision: 1, compteur: 0,
     commentaires: [], fini: false, rng,
@@ -272,6 +273,10 @@ export function avancer(e: EtatMatch, secondesSimulees: number): void {
 function tick(e: EtatMatch): void {
   const dt = DT;
   e.sim += dt;
+  if (e.sifflet) {
+    e.sifflet.restant -= dt;
+    if (e.sifflet.restant <= 0) e.sifflet = null;
+  }
   const dtHorloge = dt * facteurHorloge(e.phase);
   e.t += dtHorloge;
   e.minute = Math.min(80, Math.floor(e.t / 60));
@@ -749,11 +754,8 @@ function phaseBallonEnLAir(e: EtatMatch): void {
   }
   // Petit risque d'échapper un ballon haut.
   if (v.hauteur > 0.7 && e.rng() < 0.07) {
-    dire(e, 'jeu', gagnant.cote, C.phrase(e.rng, C.EN_AVANT, {
-      nom: gagnant.nom, club: nomClub(e, adverse(gagnant.cote)),
-    }), 0, gagnant.moi);
-    gagnant.stats.passesRatees += 1;
-    return arret(e, 'melee', adverse(gagnant.cote), gagnant.pos);
+    e.ballon = { x: gagnant.pos.x, y: gagnant.pos.y };
+    return enAvant(e, gagnant);
   }
   e.possession = gagnant.cote;
   reprendreJeu(e, gagnant.pos, gagnant);
@@ -769,8 +771,14 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
     if (e.vol.ecoule < e.vol.duree) return;
     const receveur = e.vol.receveur;
     const offload = e.vol.intention === 'offload';
+    const longueur = distance(e.vol.de, e.vol.vers);
     e.vol = null;
     if (!receveur || !receveur.surLeTerrain || receveur.sanction > 0) return formerRuck(e, e.ballon);
+    // ⚠️ ET IL FAUT ENCORE L'ATTRAPER. Voir `receptionRatee`.
+    if (receptionRatee(e, receveur, longueur, offload)) {
+      e.ballon = { x: receveur.pos.x, y: receveur.pos.y };
+      return enAvant(e, receveur);
+    }
     donnerBallon(e, receveur, offload ? 0.5 : 0.35);
     return;
   }
@@ -935,6 +943,106 @@ function ligneDeCourse(e: EtatMatch, p: Pion): Vec {
   return { x: p.pos.x + s * 15, y: borner(marqueur.pos.y + ouvert * 5.5, 2.5, LARGEUR - 2.5) };
 }
 
+/**
+ * ⚠️ ON POSE LA DÉCISION DE L'ARBITRE POUR QU'ELLE SE VOIE.
+ *
+ * `DUREE_SIFFLET` est en secondes SIMULÉES, pas réelles, et c'est voulu : à
+ * l'accélération, la bannière disparaît vite parce que le jeu file ; sur un
+ * moment joué en temps réel, elle reste le temps de la lire. Elle suit le
+ * rythme du match, comme tout le reste.
+ */
+const DUREE_SIFFLET = 4.5;
+
+function poserSifflet(e: EtatMatch, cle: string, pour: Cote, fautif?: Pion): void {
+  e.sifflet = {
+    cle,
+    club: nomClub(e, pour),
+    fautif: fautif?.nom ?? '',
+    maFaute: !!fautif?.moi,
+    restant: DUREE_SIFFLET,
+  };
+}
+
+/**
+ * ⚠️ L'EN-AVANT — UN SEUL CHEMIN, POUR QU'IL AIT TOUJOURS UNE CONSÉQUENCE.
+ *
+ * Retour de jeu : « on peut faire des en-avants sans répercussion ». Le fait
+ * était exact, et il avait deux causes bien distinctes :
+ *
+ * 1. ⚠️ UNE PASSE REÇUE NE POUVAIT PAS ÊTRE LÂCHÉE. `donnerBallon` donnait le
+ *    ballon, point. Or au rugby la faute de main la plus fréquente n'est pas la
+ *    passe ratée, c'est la RÉCEPTION ratée : une passe trop dure, dans le dos,
+ *    ou prise avec un défenseur dans le nez. Le geste le plus banal du sport
+ *    n'existait tout simplement pas dans le moteur.
+ * 2. LE PEU QUI EXISTAIT ÉTAIT RECOPIÉ EN TROIS ENDROITS, avec trois
+ *    formulations et un seul point commun : personne ne les comptait. Un
+ *    évènement qu'on ne mesure pas est un évènement qu'on ne règle pas.
+ *
+ * Tout passe donc par ici : le commentaire, la statistique du fautif, le
+ * compteur du match, et surtout LA MÊLÉE POUR L'ADVERSAIRE, c'est-à-dire la
+ * perte de la possession. C'est ça, la répercussion.
+ */
+function enAvant(e: EtatMatch, p: Pion): void {
+  p.stats.passesRatees += 1;
+  e.compteurs.enAvants += 1;
+  dire(e, 'jeu', p.cote, C.phrase(e.rng, C.EN_AVANT, {
+    nom: p.nom, club: nomClub(e, adverse(p.cote)),
+  }), 0, p.moi);
+  poserSifflet(e, 'ml.sifflet.enAvant', adverse(p.cote), p);
+  arret(e, 'melee', adverse(p.cote), p.pos);
+}
+
+/**
+ * ⚠️ LA PASSE EN AVANT EXISTE ENFIN, ELLE N'EST PLUS RABOTÉE EN SILENCE.
+ *
+ * `passerLeBallon` ramenait le point d'arrivée derrière le passeur dès que le
+ * receveur avait dérivé devant lui : la règle était « respectée », mais à
+ * l'écran le ballon partait vers un partenaire placé plus haut et l'arbitre ne
+ * disait rien. C'est exactement ce que décrit le retour de jeu, et c'est la
+ * seule faute du rugby que le moteur était incapable de commettre.
+ *
+ * ⚠️ ELLE RESTE RARE, ET C'EST UNE DÉCISION : on ne siffle qu'une fraction des
+ * passes litigieuses (les autres sont corrigées par le passeur, qui retient son
+ * geste). Une passe en avant sifflée à chaque dérive de trente centimètres
+ * rendrait toute envolée de trois-quarts impossible.
+ */
+function passeEnAvant(e: EtatMatch, p: Pion): void {
+  p.stats.passes -= 1;
+  p.stats.passesRatees += 1;
+  e.compteurs.enAvants += 1;
+  dire(e, 'jeu', p.cote, C.phrase(e.rng, C.PASSE_AVANT, {
+    nom: p.nom, club: nomClub(e, adverse(p.cote)),
+  }), 0, p.moi);
+  poserSifflet(e, 'ml.sifflet.passeAvant', adverse(p.cote), p);
+  arret(e, 'melee', adverse(p.cote), p.pos);
+}
+
+/**
+ * ⚠️ LA RÉCEPTION PEUT ÊTRE MANQUÉE, et c'est ce qui manquait.
+ *
+ * Le risque n'est pas un dé plat : il dit quelque chose du jeu, sinon il n'est
+ * qu'une punition au hasard. Il monte avec la PRESSION sur le receveur (une
+ * passe prise avec un plaqueur sur les épaules), avec la LONGUEUR de la passe,
+ * et il descend avec la qualité de mains du receveur (`passe`) et sa fraîcheur.
+ *
+ * ⚠️ L'OFFLOAD EST BIEN PLUS RISQUÉ, et c'est le point d'équilibre du geste :
+ * une passe après contact offre un temps de jeu gratuit, elle doit pouvoir le
+ * coûter. Sans ça, raffut puis offload était une machine à franchir sans aucun
+ * revers possible.
+ */
+function receptionRatee(e: EtatMatch, receveur: Pion, longueur: number, offload: boolean): boolean {
+  let plusProche = 99;
+  for (const d of surLeTerrain(e, adverse(receveur.cote))) {
+    if (d.sanction > 0 || d.battu > 0) continue;
+    plusProche = Math.min(plusProche, distance(d.pos, receveur.pos));
+  }
+  const mains = 0.55 + receveur.passe / 200 + receveur.endurance / 900;
+  const risque = (offload ? 0.020 : 0.0045)
+    + Math.max(0, 4 - plusProche) * 0.006
+    + Math.max(0, longueur - 9) / 600;
+  return e.rng() < Math.max(0, risque / mains);
+}
+
 function donnerBallon(e: EtatMatch, p: Pion, delai: number): void {
   e.porteur = p;
   e.possession = p.cote;
@@ -983,20 +1091,23 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
   // receveur, mais si celui-ci a pris de l'avance on ramène le point d'arrivée
   // derrière le passeur.
   const cible: Vec = { x: receveur.pos.x, y: receveur.pos.y };
-  if ((cible.x - p.pos.x) * s > 0.4) cible.x = p.pos.x - s * 0.4;
-
   const d = distance(p.pos, cible);
   p.stats.passes += 1;
 
+  // ⚠️ LE RECEVEUR A DÉRIVÉ DEVANT : soit le passeur retient son geste, soit il
+  // la lâche quand même et l'arbitre siffle. Voir `passeEnAvant`.
+  const avance = (cible.x - p.pos.x) * s;
+  if (avance > 0.4) {
+    const risque = Math.min(0.22, Math.max(0, avance - 1.4) * 0.038) * (1.3 - p.vision / 200);
+    if (e.rng() < risque) return passeEnAvant(e, p);
+    cible.x = p.pos.x - s * 0.4;
+  }
+
   // En-avant : rare, mais plus fréquent sous pression et chez un avant.
-  const risque = 0.016 + Math.max(0, 3 - pression) * 0.009 + d / 1400;
+  const risque = 0.010 + Math.max(0, 3 - pression) * 0.007 + d / 1800;
   if (e.rng() < risque * (1.35 - p.passe / 220)) {
     p.stats.passes -= 1;
-    p.stats.passesRatees += 1;
-    dire(e, 'jeu', p.cote, C.phrase(e.rng, C.EN_AVANT, {
-      nom: p.nom, club: nomClub(e, adverse(p.cote)),
-    }), 0, p.moi);
-    return arret(e, 'melee', adverse(p.cote), p.pos);
+    return enAvant(e, p);
   }
 
   // La passe est partie et elle est bonne : si un essai tombe avant le
@@ -1160,13 +1271,7 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
     consommerIntention(e);
     dire(e, 'plaquage', defenseur.cote,
       C.texteMatch('crochetRate', { nom: porteur.nom, cible: defenseur.nom }), 0, true);
-    if (e.rng() < 0.13) {
-      porteur.stats.passesRatees += 1;
-      dire(e, 'jeu', porteur.cote, C.phrase(e.rng, C.EN_AVANT, {
-        nom: porteur.nom, club: nomClub(e, adverse(porteur.cote)),
-      }), 0, true);
-      return arret(e, 'melee', adverse(porteur.cote), porteur.pos);
-    }
+    if (e.rng() < 0.13) return enAvant(e, porteur);
   }
 
   // Offload : le geste des grandes équipes, rare mais spectaculaire.
@@ -1444,6 +1549,7 @@ function phaseTouche(e: EtatMatch): void {
 
 function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pion): void {
   dire(e, 'penalite', pour, C.phrase(e.rng, C.PENALITE, { club: nomClub(e, pour), motif }));
+  poserSifflet(e, 'ml.sifflet.penalite', pour, fautif);
 
   // ⚠️ UNE PÉNALITÉ A TOUJOURS UN FAUTIF. Trois appels sur quatre n'en
   // désignaient aucun — dont celui du ruck, de loin le plus fréquent : le
