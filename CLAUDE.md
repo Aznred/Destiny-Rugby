@@ -5575,6 +5575,27 @@ barre du bas passe par `moteur/consignes.ts` (mots-clés d'abord, IA ensuite si
 elle est disponible). Elle ne remplace pas le choix, elle s'ajoute — on peut
 donner une consigne ET prendre une option.
 
+### 🩹 Deux classes qui portaient le même nom
+
+⚠️ **LES RANGÉES DU FIL ET LES MARQUAGES DU TERRAIN S'APPELAIENT TOUS LES DEUX
+`.fd-ligne`.** Un marquage est en `position: absolute ; top: 0 ; bottom: 0 ;
+width: 1px` : chaque rangée du fil héritait donc de la règle, et TOUTES se
+retrouvaient empilées au même endroit, sur quatorze pixels de large, un mot par
+ligne. Signalé en jeu, capture à l'appui. Mesuré avant correction :
+`position: absolute`, 14 × 878 px, huit rangées à la même origine. Après :
+`static`, 656 × 31 px, 36 px d'écart entre deux rangées.
+
+La rangée s'appelle désormais **`.fd-evt`**, le marquage **`.fd-marque`**, et la
+rangée est stylée **par sa classe** et non plus par `.fd-fil > div` : un
+sélecteur de descendance ne dit pas ce qu'il vise, il attrape tout ce qu'on
+posera un jour dans le fil, et il n'aide pas à voir la collision quand elle
+arrive.
+
+⚠️ **LE CONTRÔLE QUI L'AURAIT ATTRAPÉ** tient en quelques lignes de script, et il
+vaut pour n'importe quel écran : extraire les classes `fd-*` du composant, les
+confronter à celles d'`App.css`, et exiger que les deux ensembles coïncident.
+Vérifié : **30 classes dans le TSX, aucune sans règle, aucune règle orpheline.**
+
 ### 🩹 Le bug qu'il ne fallait pas faire : la modale sans portal
 
 ⚠️ **LA MODALE DE MATCH S'AFFICHAIT DANS LE PANNEAU DE CARRIÈRE.** Signalé en

@@ -330,14 +330,19 @@ export function MatchDirect({
         <div className="fd-chrono"><span style={{ width: `${(minute / 80) * 100}%` }} /></div>
 
         {/* ═══ OÙ EST LE BALLON ═══════════════════════════════════════════
+            ⚠️ LES MARQUAGES S'APPELLENT `fd-marque`, PAS `fd-ligne`. Les deux
+            ont porté le même nom, et comme un marquage est en
+            `position: absolute; top: 0; bottom: 0; width: 1px`, CHAQUE rangée
+            du fil héritait de la règle : toutes empilées au même endroit, sur
+            un pixel de large, illisibles. Vu en jeu, capture à l'appui.
             ⚠️ TOUTE LA PART « VISUELLE » DONT UN FIL A BESOIN. Un texte seul
             ne dit jamais si on défend sur sa ligne ou si on pilonne à cinq
             mètres, et c'est pourtant ce qui fait monter la tension. */}
         <div className="fd-terrain" aria-hidden="true">
           <span className="fd-enbut gauche" />
-          <span className="fd-ligne" style={{ left: '22%' }} />
-          <span className="fd-ligne milieu" style={{ left: '50%' }} />
-          <span className="fd-ligne" style={{ left: '78%' }} />
+          <span className="fd-marque" style={{ left: '22%' }} />
+          <span className="fd-marque milieu" style={{ left: '50%' }} />
+          <span className="fd-marque" style={{ left: '78%' }} />
           <span className="fd-enbut droite" />
           <span className="fd-ballon" style={{ left: `${avancee * 100}%` }}>🏉</span>
         </div>
@@ -345,7 +350,7 @@ export function MatchDirect({
         {/* ═══ LE FIL ═════════════════════════════════════════════════════ */}
         <div className="fd-fil" ref={filRef} aria-live="polite">
           {lignes.map((l) => (
-            <div key={l.cle} className={`fd-ligne${l.moi ? ' moi' : ''}${l.fort ? ' fort' : ''}`}>
+            <div key={l.cle} className={`fd-evt${l.moi ? ' moi' : ''}${l.fort ? ' fort' : ''}`}>
               <span className="fd-min">{l.minute}′</span>
               <span className="fd-emoji">{l.emoji}</span>
               <span className="fd-texte">
