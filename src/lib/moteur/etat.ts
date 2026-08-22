@@ -373,23 +373,6 @@ export interface EtatMatch {
    */
   recharges: Partial<Record<ActionJoueur, number>>;
   /**
-   * ⚠️ LE PILOTAGE DIRECT : où le joueur pousse son pion, MAINTENANT.
-   *
-   * Vecteur unitaire posé à chaque image par la manette, le clavier ou le
-   * joystick tactile (`moteur/manette.ts`), et remis à `null` dès qu'on lâche.
-   * Il court-circuite tout le placement automatique — le pion va où on le dit,
-   * y compris ballon en main.
-   *
-   * ⚠️ ON NE TÉLÉPORTE RIEN : la direction devient une CIBLE à dix mètres
-   * devant, et c'est le déplacement à inertie du moteur (`deplacer`) qui
-   * l'emmène. Un ailier lancé décrit toujours sa courbe, un pilier met toujours
-   * deux secondes à se mettre en route. C'est ce qui empêche le pion piloté de
-   * glisser à côté du rugby des vingt-neuf autres.
-   */
-  direction: Vec | null;
-  /** Le sprint est MAINTENU (gâchette droite, Maj) — pas une action ponctuelle. */
-  sprint: boolean;
-  /**
    * La température du match, 0 à 100. Elle monte quand on chambre, quand un
    * plaquage part haut, quand l'écart se creuse — et elle redescend toute
    * seule. C'est elle qui décide si un adversaire relève la provocation.

@@ -9,14 +9,16 @@
 //  4. les cartons sont plus fréquents en amateur ;
 //  5. le score reste CELUI DE LA LIGUE, contrôle ou pas — c'est la règle qui ne
 //     doit jamais casser, sinon le classement ment ;
-//  6. rien ne se bloque : une bagarre sans interface se dénoue toute seule.
+//  6. rien ne se bloque : une bagarre sans interface se dénoue toute seule ;
+//  7. ⚠️ ET LE PLUS IMPORTANT DEPUIS QU'ON NE PILOTE PLUS : un joueur qui NE
+//     CHOISIT JAMAIS RIEN doit vivre un match de rugby normal. Le pion du
+//     joueur est joué par le moteur comme les vingt-neuf autres ; sa seule
+//     prise sur le match, c'est la carte de décision.
 //
 //   npx vite-node scripts/verifControle.ts
 
 import { creerMatch, avancer, ordonner, type EtatMatch } from '../src/lib/moteur/moteur';
-import {
-  actionsDisponibles, demanderAction, piloterDirection, receveurCote,
-} from '../src/lib/moteur/controle';
+import { actionsDisponibles, demanderAction, receveurCote } from '../src/lib/moteur/controle';
 import type { ActionJoueur, NiveauMatch, OrdreBagarre } from '../src/lib/moteur/etat';
 import { jouerRencontre } from '../src/lib/championnat';
 import { effectifDuClub } from '../src/lib/effectif';
@@ -287,47 +289,57 @@ console.log('\n=== 6. RIEN NE CASSE : SCORE, BLOCAGE, DÉTERMINISME ===');
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n=== 7. 🕹️ LE PILOTAGE DIRECT ===');
+console.log('\n=== 7. 🤖 SANS UN SEUL CHOIX, ÇA RESTE DU RUGBY ===');
 {
-  // ⚠️ LE TEST QUI COMPTE : quand je pousse à gauche, mon pion va à gauche.
-  // Tout le reste du fichier vérifie des probabilités ; celui-ci vérifie qu'on
-  // JOUE. Sans lui, on pourrait casser le pilotage sans qu'aucun chiffre ne
-  // bouge, puisque le moteur continuerait de placer le pion tout seul.
-  const cap = (dx: number, dy: number) => {
-    const e = creerMatch(A, B, effA, effB, 20, 15, 'pilote#1', AVATAR, { controle: true });
-    let garde = 0;
-    while (!e.fini && garde++ < 200) {
-      avancer(e, 0.15);
-      if (monPion(e).surLeTerrain) break;
-    }
-    const p = monPion(e);
-    const depart = { x: p.pos.x, y: p.pos.y };
-    for (let i = 0; i < 60; i++) {
-      piloterDirection(e, dx, dy, false);
-      avancer(e, 0.15);
-    }
-    return { dx: p.pos.x - depart.x, dy: p.pos.y - depart.y, endurance: p.endurance };
-  };
-  const versLeHaut = cap(0, -1);
-  const versLaDroite = cap(1, 0);
-  ligne('pousser vers le haut monte le pion', `Δy = ${versLeHaut.dy.toFixed(1)} m`, versLeHaut.dy < -6);
-  ligne('pousser à droite le déplace à droite', `Δx = ${versLaDroite.dx.toFixed(1)} m`, versLaDroite.dx > 6);
+  // ⚠️ LA SECTION QUI REMPLACE « LE PILOTAGE DIRECT », ET LA PLUS IMPORTANTE DU
+  // FICHIER DEPUIS QUE LES COMMANDES ONT DISPARU.
+  //
+  // Elle mesurait : « je pousse à gauche, mon pion va à gauche » et « le sprint
+  // maintenu va plus loin mais coûte plus cher ». Il n'y a plus ni stick ni
+  // sprint maintenu (`piloterDirection`, `EtatMatch.direction` et
+  // `EtatMatch.sprint` sont supprimés) — la demande était « on ne fait que les
+  // choix, on ne bouge pas le joueur ».
+  //
+  // ⚠️ CE QU'IL FAUT MESURER À LA PLACE, C'EST LE PIÈGE DE CE CHANGEMENT. Tant
+  // qu'il y avait des boutons, `moteur.ts` SE TAISAIT quand le pion du joueur
+  // portait le ballon : pas de passe automatique, pas de coup de pied, puisque
+  // le joueur allait décider. Ce cas particulier a été retiré avec les boutons.
+  // S'il revenait — et il reviendra, c'est deux lignes — le pion garderait le
+  // ballon jusqu'au plaquage à CHAQUE possession sans qu'aucun autre chiffre du
+  // banc ne bouge : le score vient de la ligue, les bagarres sont ailleurs.
+  // C'est exactement le genre de régression qu'on ne voit qu'en jouant.
+  // ⚠️ LA MESURE EST UNE ÉGALITÉ, ET C'EST CE QUI LA REND IMPLACABLE. Depuis
+  // le retrait du pilotage, TOUT ce que `e.controle` change encore est gardé
+  // derrière un `e.intention` (voir les trois occurrences dans `moteur.ts`).
+  // Donc un match « contrôlé » où l'on ne choisit JAMAIS rien doit être
+  // rigoureusement le même match que le même match regardé.
+  //
+  // Le jour où quelqu'un remet un cas particulier pour le pion du joueur — et
+  // c'est deux lignes, ça a existé pendant des mois sous le nom `jePilote` —
+  // cette égalité casse immédiatement, alors qu'aucun autre chiffre du banc ne
+  // bougerait : le score vient de la ligue, les bagarres se mesurent ailleurs.
+  let identiques = 0;
+  let passesTotal = 0;
+  let coursesTotal = 0;
+  for (let i = 0; i < N; i++) {
+    const passif = jouer(`passif#${i}`, { controle: true });
+    const spectateur = jouer(`passif#${i}`, {});
+    if (passif.scoreA === spectateur.scoreA
+      && passif.scoreB === spectateur.scoreB
+      && passif.commentaires.length === spectateur.commentaires.length
+      && passif.compteurs.rucks === spectateur.compteurs.rucks) identiques++;
+    passesTotal += monPion(passif).stats.passes;
+    coursesTotal += monPion(passif).stats.courses;
+  }
+  ligne('ne rien choisir = le match qu\u2019on aurait regardé', `${identiques}/${N}`, identiques === N);
 
-  // Le sprint : plus loin, mais plus cher.
-  const e1 = creerMatch(A, B, effA, effB, 20, 15, 'pilote#2', AVATAR, { controle: true });
-  const e2 = creerMatch(A, B, effA, effB, 20, 15, 'pilote#2', AVATAR, { controle: true });
-  const courir = (e: EtatMatch, sprint: boolean) => {
-    let garde = 0;
-    while (!e.fini && garde++ < 200) { avancer(e, 0.15); if (monPion(e).surLeTerrain) break; }
-    const p = monPion(e);
-    const depart = p.pos.x;
-    for (let i = 0; i < 80; i++) { piloterDirection(e, 1, 0, sprint); avancer(e, 0.15); }
-    return { metres: Math.abs(p.pos.x - depart), endurance: p.endurance };
-  };
-  const tranquille = courir(e1, false);
-  const lance = courir(e2, true);
-  ligne('le sprint va plus loin', `${tranquille.metres.toFixed(1)} → ${lance.metres.toFixed(1)} m`, lance.metres > tranquille.metres);
-  ligne('et il coûte plus d’endurance', `${tranquille.endurance.toFixed(0)} → ${lance.endurance.toFixed(0)}`, lance.endurance < tranquille.endurance);
+  // ⚠️ ET IL DOIT VRAIMENT DONNER LE BALLON. C'est le symptôme direct du piège :
+  // avec le cas particulier, le pion gardait le ballon jusqu'au plaquage à
+  // chaque possession, et son total de passes tombait à zéro sur toute une
+  // saison. Un troisième ligne aile en donne quelques-unes par match.
+  ligne('un joueur qui ne choisit rien passe quand même',
+    `${(passesTotal / N).toFixed(1)} passe(s) pour ${(coursesTotal / N).toFixed(1)} ballon(s) portés`,
+    passesTotal / N >= 0.5);
 
   // ⚠️ UNE RECHARGE PAR ACTION. Chambrer (45 s) ne doit pas rendre la PASSE
   // indisponible : c'était le défaut de la première version, et sur un jeu qui

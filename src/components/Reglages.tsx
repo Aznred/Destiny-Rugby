@@ -1,5 +1,4 @@
 import { useState, useSyncExternalStore } from 'react';
-import { ReglageTouches } from './ReglageTouches';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
@@ -233,11 +232,14 @@ export function Reglages({ onFermer }: Props) {
           </p>
         </div>
 
-        {/* ⚠️ LES TOUCHES DU MATCH. Elles vivent ici et pas dans l'écran de
-            match : on ne réassigne pas un plaquage pendant qu'un ailier arrive
-            dessus. La notice, elle, reste dans le tiroir du direct — c'est là
-            qu'on la cherche. */}
-        <ReglageTouches />
+        {/* ⚠️ LE RÉGLAGE DES TOUCHES DU MATCH A ÉTÉ RETIRÉ, ET IL NE DOIT PAS
+            REVENIR TANT QU'ON NE PILOTE PAS. Il y avait ici une table de six
+            commandes réassignables (quatre directions, sprint, action du
+            moment) plus les gestes. Le match ne se pilote plus : « on ne fait
+            que les choix, on ne bouge pas le joueur ». Les cartes de décision
+            se jouent aux chiffres 1-4, qui sont écrits dessus et qu'on ne
+            réassigne pas. Un panneau de réglage pour des touches qui n'existent
+            plus, c'est pire qu'une fonction manquante : c'est un mensonge. */}
 
         <details className="tuto">
           <summary>📘 {t('reg.tutoriel')}</summary>

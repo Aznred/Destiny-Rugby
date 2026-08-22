@@ -116,6 +116,25 @@ const PREFERENCES: Record<TypeMoment, ActionJoueur[]> = {
   ruck: ['grattage', 'plaquage', 'monter'],
 };
 
+/**
+ * Les gestes qui font monter la température, dans l'ordre où on les propose.
+ *
+ * ⚠️ ILS ONT PERDU LEUR BOUTON, PAS LEUR PLACE DANS LE JEU. Chambrer, frapper
+ * et calmer vivaient derrière le 💢 du HUD, avec sa jauge de tension ; le HUD
+ * est parti avec le pilotage (« on ne fait que les choix »). Sans ce repli, le
+ * joueur ne pourrait plus JAMAIS déclencher une bagarre — il ne pourrait que
+ * les subir, et toute la ligne « Ovale » du jeu deviendrait décorative.
+ *
+ * ⚠️ ET SEULEMENT QUAND LE MATCH EST CHAUD. Proposer « frapper » à la 3e minute
+ * d'un match tranquille, c'est le proposer QUATRE-VINGTS fois : la moitié des
+ * carrières finiraient sur une commission de discipline. Au-dessus de `TENDU`,
+ * c'est un vrai carrefour ; en dessous, ça n'aurait aucun sens dramatique.
+ */
+const DISCIPLINE: ActionJoueur[] = ['provoquer', 'frapper', 'calmer'];
+
+/** La température à partir de laquelle la carte ose proposer un geste chaud. */
+export const TENDU = 55;
+
 /** Au-delà, la carte devient une liste : on ne choisit plus, on cherche. */
 const MAX_OPTIONS = 4;
 /** En deçà, il n'y a pas de décision à prendre : on ne coupe pas le match. */
@@ -138,11 +157,17 @@ export function decisionPour(e: EtatMatch, p: Pion | undefined, depuis: number):
 
   const dispo = new Set(actionsDisponibles(e).map((a) => a.id));
   const options: OptionDecision[] = [];
-  for (const id of PREFERENCES[moment.type]) {
-    if (!dispo.has(id) || options.length >= MAX_OPTIONS) continue;
+  const ajouter = (id: ActionJoueur) => {
+    if (!dispo.has(id) || options.length >= MAX_OPTIONS) return;
     const def = ACTION_PAR_ID.get(id);
     if (def) options.push({ action: id, emoji: def.emoji, cle: def.cle, aide: def.aide });
-  }
+  };
+  for (const id of PREFERENCES[moment.type]) ajouter(id);
+  // ⚠️ LA DISCIPLINE PASSE EN DERNIER, ET SEULEMENT S'IL RESTE DE LA PLACE.
+  // C'est exactement le rôle qu'on lui donne : « la quatrième option est
+  // toujours celle qui sort du cadre ». Elle ne prend jamais la place d'un
+  // geste de rugby — elle occupe le slot qu'aucun geste de rugby ne réclame.
+  if (e.tension >= TENDU) for (const id of DISCIPLINE) ajouter(id);
   if (options.length < MIN_OPTIONS) return null;
 
   return { moment: moment.type, ...SITUATIONS[moment.type], options };

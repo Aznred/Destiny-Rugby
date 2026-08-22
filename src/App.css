@@ -3100,74 +3100,11 @@
   padding: 0.18rem 0.6rem;
 }
 
-.ml-act {
-  position: relative;
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.05rem;
-  min-width: 60px;
-  padding: 0.28rem 0.5rem 0.22rem;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 10px;
-  color: var(--craie-dim);
-  font-family: inherit;
-  cursor: pointer;
-  line-height: 1.1;
-}
-.ml-act b { font-size: 1rem; }
-.ml-act span { font-size: 0.66rem; white-space: nowrap; }
-/* Le rappel du raccourci clavier, discret : on ne le montre pas sur mobile,
-   où il n'y a pas de clavier. */
-.ml-act i {
-  position: absolute;
-  top: 2px;
-  right: 4px;
-  font-style: normal;
-  font-size: 0.56rem;
-  color: rgba(255, 255, 255, 0.35);
-}
-.ml-act:hover { border-color: var(--or-clair); color: var(--craie); }
-.ml-act.actif {
-  border-color: var(--or-clair);
-  background: rgba(212, 175, 55, 0.2);
-  color: var(--or-clair);
-}
-/* Chaque famille a sa couleur : ballon en main, sans ballon, défense, et le
-   rouge de la discipline — celui-là doit se voir avant d'être cliqué. */
-.ml-act.fam-attaque { border-color: rgba(90, 170, 255, 0.35); }
-.ml-act.fam-defense { border-color: rgba(120, 220, 160, 0.32); }
-.ml-act.fam-discipline { border-color: rgba(255, 107, 107, 0.45); }
-.ml-act.fam-discipline b { filter: saturate(1.2); }
-
-/* Ce qui remplace les boutons quand il n'y a rien à jouer : on dit toujours
-   pourquoi (banc, carton, recharge, phase morte). */
-.ml-attente {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 0.72rem;
-  color: var(--craie-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ml-tension {
-  flex: 0 0 54px;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.09);
-  overflow: hidden;
-}
-.ml-tension span {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #6fbf73, #ffb020 55%, #ff4d4d);
-  transition: width 0.4s linear;
-}
-
+/* ⚠️ IL Y AVAIT ICI TOUTE LA BARRE D'ACTIONS — .ml-act et ses quatre
+   familles de couleur, .ml-attente, .ml-tension. Elle est partie avec le
+   pilotage : « on ne fait que les choix, on ne bouge pas le joueur ». Seule
+   .ml-attente survit (dire qu'on est sur le banc reste indispensable), et elle
+   est définie plus bas, avec le peu qui reste du cluster. */
 
 .ml-commandes-liste {
   display: grid;
@@ -3881,8 +3818,6 @@ img, svg, canvas { max-width: 100%; }
 .ml-chevron { fill: #ffd45e; stroke: rgba(0, 0, 0, 0.55); stroke-width: 0.12; }
 /* À qui part la passe, et sur qui on monte : une décision qu'on ne voit pas
    n'est pas une décision. */
-.ml-cible-passe line { stroke: rgba(255, 255, 255, 0.5); stroke-width: 0.3; stroke-dasharray: 1.2 1.2; }
-.ml-cible-passe circle { fill: none; stroke: rgba(255, 255, 255, 0.85); stroke-width: 0.32; stroke-dasharray: 1.4 1; }
 .ml-cible-plaquage { fill: none; stroke: rgba(255, 90, 90, 0.85); stroke-width: 0.34; stroke-dasharray: 1.6 1.2; }
 .ml-fleche-ballon path { fill: rgba(255, 240, 200, 0.92); }
 
@@ -3958,38 +3893,17 @@ img, svg, canvas { max-width: 100%; }
 }
 .ml-ticker .ml-texte { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* --- LE JOYSTICK --------------------------------------------------------- */
-/* ⚠️ IL FLOTTE SOUS LE POUCE, dans la moitié GAUCHE du terrain, et la moitié
-   droite est réservée aux boutons. Laisser le joystick partir de n'importe où
-   mettait les deux pouces en concurrence : on visait le gros bouton, on ratait
-   de dix pixels, et le pion partait en courant. Au repos il reste visible en
-   bas à gauche — un joystick invisible est un joystick qu'on ne trouve pas. */
-.ml-stick { position: absolute; left: 78px; bottom: 78px; width: 0; height: 0; opacity: 0.45; }
-.ml-stick.actif { bottom: auto; opacity: 1; }
-.ml-stick-base, .ml-stick-tete { position: absolute; border-radius: 50%; display: block; }
-.ml-stick-base {
-  left: -52px;
-  top: -52px;
-  width: 104px;
-  height: 104px;
-  border: 2px solid rgba(255, 212, 94, 0.4);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
-}
-.ml-stick-tete {
-  left: -26px;
-  top: -26px;
-  width: 52px;
-  height: 52px;
-  background: rgba(255, 212, 94, 0.42);
-  border: 2px solid rgba(255, 212, 94, 0.92);
-}
+/* --- 🪑 CE QUI RESTE DU HUD DE PILOTAGE ---------------------------------- */
+/* ⚠️ PRESQUE RIEN, ET C'EST VOULU. Il y avait ici le joystick flottant
+   (.ml-stick, sa base et sa tête), le disque d'action de 88 px (.ml-principal),
+   les trois secondaires (.ml-secondaires), le bouton de discipline (.ml-chauffe)
+   et sa jauge. Tout est parti d'un coup : « dans les matchs on ne fait que les
+   choix, pas bouger le joueur ». Le terrain n'a donc plus rien sur ses deux
+   pouces, et la carte de décision a toute la place quand elle s'ouvre.
 
-/* --- LES ACTIONS, SOUS LE POUCE DROIT ------------------------------------ */
-/* ⚠️ UN GROS BOUTON, TROIS PETITS, ET LA DISCIPLINE À PART. L'ancienne barre
-   posait jusqu'à cinq vignettes de 58 px dans un conteneur qui DÉFILAIT
-   HORIZONTALEMENT, deux cents pixels sous l'action : il fallait quitter le jeu
-   des yeux, chercher, et faire défiler. Ici le geste évident est un disque de
-   88 px, là où le pouce se trouve déjà. */
+   Ce qui reste tient en une pastille : DIRE QU'ON N'EST PAS SUR LE PRÉ. Sans
+   elle, un début de match sur le banc — donc sans une seule carte — passe pour
+   un match cassé. */
 .ml-cluster {
   position: absolute;
   right: 0.7rem;
@@ -3999,78 +3913,19 @@ img, svg, canvas { max-width: 100%; }
   align-items: flex-end;
   gap: 0.4rem;
 }
-.ml-secondaires, .ml-discipline { display: flex; gap: 0.35rem; }
-.ml-principal-rangee { display: flex; align-items: center; gap: 0.5rem; }
-.ml-cluster .ml-act {
-  min-width: 58px;
-  min-height: 54px;
-  background: rgba(6, 18, 12, 0.78);
-  backdrop-filter: blur(4px);
-}
-.ml-cluster .ml-act i { display: none; }
-.ml-cluster .ml-attente {
+.ml-attente {
   flex: 0 0 auto;
+  max-width: 62vw;
   padding: 0.3rem 0.8rem;
   border-radius: 999px;
   background: rgba(6, 18, 12, 0.78);
-  font-size: 0.74rem;
-}
-
-.ml-principal {
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.05rem;
-  padding: 0 0.3rem;
-  border: 2px solid rgba(255, 255, 255, 0.38);
-  background: radial-gradient(circle at 32% 26%, rgba(64, 176, 110, 0.96), rgba(22, 88, 52, 0.96));
-  color: #fff;
-  font-family: inherit;
-  cursor: pointer;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
-}
-.ml-principal b { font-size: 1.75rem; line-height: 1; }
-.ml-principal span {
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  text-align: center;
-  line-height: 1.15;
-}
-.ml-principal em { font-style: normal; opacity: 0.85; }
-.ml-principal:active { transform: scale(0.94); }
-.ml-principal:disabled {
-  background: rgba(4, 12, 8, 0.8);
-  border-color: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(4px);
   color: var(--craie-dim);
-  cursor: default;
+  font-size: 0.74rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-
-/* La discipline derrière SON bouton : un « frapper » touché à la place d'un
-   « passer », c'est une demi-saison de suspension. */
-.ml-chauffe {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  background: rgba(6, 18, 12, 0.78);
-  border: 1px solid rgba(255, 107, 107, 0.5);
-  color: #fff;
-  font-size: 1.1rem;
-  font-family: inherit;
-  cursor: pointer;
-}
-.ml-chauffe.actif { border-color: var(--or-clair); background: rgba(212, 175, 55, 0.2); }
-.ml-chauffe .ml-tension { flex: 0 0 auto; width: 26px; height: 3px; }
 
 /* La pause et la toute première fois : deux voiles, deux messages. */
 .ml-voile-pause {
@@ -4258,11 +4113,6 @@ img, svg, canvas { max-width: 100%; }
 /* Téléphone étroit : le gros bouton et le stick se resserrent plutôt que de
    se chevaucher. */
 @media (max-width: 380px) {
-  .ml-principal { width: 78px; height: 78px; }
-  .ml-principal b { font-size: 1.5rem; }
-  .ml-cluster .ml-act { min-width: 52px; min-height: 50px; padding: 0.25rem 0.35rem; }
-  .ml-stick { left: 66px; bottom: 70px; }
-  .ml-stick-base { left: -44px; top: -44px; width: 88px; height: 88px; }
 }
 
 /* Téléphone à l'horizontale : l'écran est bas, on rend tout à la scène. */
@@ -4273,8 +4123,6 @@ img, svg, canvas { max-width: 100%; }
   .ml-tempo { min-height: 38px; }
   .ml-tempo span { display: none; }
   .ml-mode { min-height: 38px; }
-  .ml-stick { bottom: 62px; }
-  .ml-principal { width: 72px; height: 72px; }
 }
 
 
@@ -4283,7 +4131,6 @@ img, svg, canvas { max-width: 100%; }
    rien et masque un coin du terrain. Il reste évidemment affiché DÈS QU'IL EST
    SAISI, y compris à la souris. */
 @media (hover: hover) and (pointer: fine) {
-  .ml-stick:not(.actif) { display: none; }
 }
 
 /* ⚠️ SUR TÉLÉPHONE, SEUL LE TEMPO ACTIF PORTE SON NOM. Cinq libellés sur
@@ -4316,6 +4163,36 @@ img, svg, canvas { max-width: 100%; }
    la ressource qui décide de la fin de match — mais « 🫁 62 % » perdu au milieu
    de trois pastilles ne se lit pas en pleine course. Une jauge se lit du coin
    de l'œil. */
+/* --- 🎬 CE QUE MON JOUEUR EST EN TRAIN DE FAIRE -------------------------- */
+/* ⚠️ ELLE EST DANS LE SVG, DONC EN MÈTRES DE TERRAIN : la taille vient de
+   l'attribut `fontSize` (calculé au pixel près comme les numéros de maillot),
+   pas d'ici. Ce que le CSS fait, c'est la rendre LISIBLE sur une pelouse verte,
+   sur trente pions, à n'importe quel niveau de zoom — un liseré sombre posé
+   sous le remplissage (`paint-order: stroke`) et rien d'autre.
+   C'est la réponse à « qu'on voie vraiment notre joueur effectuer le choix » :
+   elle apparaît sur SA tête au moment où il exécute, et s'éteint avec le
+   ralenti (3,2 s). */
+.ml-geste {
+  fill: var(--or-clair, #ffd45e);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.72);
+  stroke-width: 0.5;
+  stroke-linejoin: round;
+  pointer-events: none;
+  animation: geste-apparait 0.18s ease-out;
+}
+@keyframes geste-apparait {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* Un joueur qui a coupé les animations n'a pas besoin d'un fondu pour lire un
+   libellé : il le lit tout de suite. */
+@media (prefers-reduced-motion: reduce) {
+  .ml-geste { animation: none; }
+}
+
 .ml-souffle {
   position: absolute;
   top: 4.4rem;
@@ -4348,7 +4225,6 @@ img, svg, canvas { max-width: 100%; }
 /* Sous 30 %, on ne sprinte plus très longtemps : la jauge le dit avant la
    jambe. */
 .ml-souffle[data-bas='oui'] > span > span { background: linear-gradient(90deg, #ff8a4d, #ff4d4d); }
-.ml-souffle[data-sprint='oui'] { border: 1px solid rgba(255, 212, 94, 0.6); }
 .ml-souffle em {
   font-style: normal;
   font-size: 0.58rem;

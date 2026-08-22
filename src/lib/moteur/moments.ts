@@ -178,7 +178,7 @@ function lireMoment(e: EtatMatch, p: Pion): TypeMoment | null {
  * lui qui faisait croire que le pilotage était cassé alors qu'il était
  * seulement cinq fois trop rapide. Chaque tempo dit maintenant ce qu'il FAIT.
  */
-export type Tempo = 'decisions' | 'moments' | 'suivre' | 'accelere' | 'fin';
+export type Tempo = 'decisions' | 'suivre' | 'accelere' | 'fin';
 
 export interface DefinitionTempo {
   id: Tempo;
@@ -204,11 +204,12 @@ export const TEMPOS: DefinitionTempo[] = [
   // débordait d'action. Seize, c'est le double d'écoulement pour la même
   // densité de rugby.
   { id: 'decisions', emoji: '⏸️', cle: 'ml.tempo.decisions', aide: 'ml.tempo.decisions.aide', moment: 2, hors: 16 },
-  // ⚠️ LE TEMPO PAR DÉFAUT DÈS QU'ON PILOTE. Temps réel sur tes moments —
-  // c'est-à-dire exactement quand tu as une décision à prendre — et neuf fois
-  // la vitesse réelle le reste du temps, ce qui ramène un match complet à cinq
-  // ou six minutes de manette sans jamais rien te faire manquer.
-  { id: 'moments', emoji: '🎯', cle: 'ml.tempo.moments', aide: 'ml.tempo.moments.aide', moment: 1, hors: 13 },
+  // ⚠️ IL Y AVAIT ICI UN TEMPO « 🎯 MOMENTS » : temps réel dès qu'un ballon
+  // arrivait sur soi, pour avoir le temps de RÉAGIR à la manette. Il est parti
+  // avec elle (« on ne fait que les choix, on ne bouge pas le joueur ») — sans
+  // commandes, il n'offrait plus qu'un ralenti pendant lequel on ne pouvait
+  // rien faire, à côté d'un « ⏸️ Décisions » qui, lui, fige VRAIMENT le jeu et
+  // pose la question. Deux modes pour la même intention, dont un impuissant.
   // Le match qu'on regarde : assez vif pour tenir en sept minutes, assez lent
   // pour lire les courses. C'est l'ancien « ×1 ».
   { id: 'suivre', emoji: '👁️', cle: 'ml.tempo.suivre', aide: 'ml.tempo.suivre.aide', moment: 7, hors: 7 },

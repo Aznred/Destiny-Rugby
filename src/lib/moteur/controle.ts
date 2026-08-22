@@ -237,23 +237,6 @@ export function annulerAction(e: EtatMatch): void {
 // ---------------------------------------------------------------------------
 
 /**
- * 🕹️ POUSSER SON PION. Appelée à CHAQUE IMAGE par l'écran, avec ce que rendent
- * le stick, les touches ou le doigt.
- *
- * ⚠️ ON NE POSE PAS UNE POSITION, ON POSE UNE DIRECTION. Le moteur garde la
- * main sur la façon dont le pion s'y rend : accélération bornée, vitesse
- * maximale du poste, endurance qui se vide. Un pion piloté reste donc un
- * rugbyman — pas un curseur qui glisse sur le terrain.
- */
-export function piloterDirection(e: EtatMatch, dx: number, dy: number, sprint: boolean): void {
-  if (!e.controle) { e.direction = null; e.sprint = false; return; }
-  const norme = Math.hypot(dx, dy);
-  // En deçà, c'est de la dérive de stick ou un doigt qui tremble.
-  e.direction = norme < 0.2 ? null : { x: dx / norme, y: dy / norme };
-  e.sprint = sprint;
-}
-
-/**
  * ⚠️ « FAIS CE QU'IL FAUT FAIRE » — la barre d'espace, le bouton A.
  *
  * On ne demande pas à un joueur de se rappeler que J plaque et P passe pendant

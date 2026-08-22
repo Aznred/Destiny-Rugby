@@ -5,11 +5,12 @@
 // modules purs, et ce sont EXACTEMENT ceux que ce script mesure :
 //
 //  1. LA CAMÉRA (`moteur/camera.ts`) — elle doit rapprocher assez pour qu'un
-//     joueur soit visible au doigt, ne jamais montrer de vide autour du
-//     terrain, et surtout garder l'IMAGE ET LA COMMANDE ACCORDÉES : si la
-//     matrice qui dessine et celle qui lit le joystick divergent d'un signe,
-//     « pousse vers le haut » envoie le pion vers son propre en-but. C'est
-//     invisible à la relecture et évident manette en main.
+//     joueur soit visible au doigt, et ne jamais montrer de vide autour du
+//     terrain. ⚠️ La section 3 vérifie encore que la matrice écran ↔ terrain
+//     est cohérente dans les deux sens, alors qu'il n'y a plus de joystick à
+//     accorder avec elle : c'est la même matrice qui place les trente pions,
+//     les numéros redressés et les étiquettes de geste. Un signe inversé
+//     dessinerait le match à l'envers.
 //
 //  2. LES MOMENTS (`moteur/moments.ts`) — le match ne doit ralentir QUE
 //     lorsqu'une action concerne le joueur, et il doit ralentir à chaque fois.
@@ -276,9 +277,20 @@ console.log('\n=== 5. ⚠️ LE MATCH RALENTIT QUAND C’EST À TOI, ET PAS AVAN
   // comme garde-fou contre un déclenchement en boucle.
   ligne('assez de moments pour jouer (≥ 20)', `${moyMoments.toFixed(1)}/match`, moyMoments >= 20);
   ligne('pas de déclenchement en boucle (≤ 250)', `${moyMoments.toFixed(1)}/match`, moyMoments <= 250);
-  // Le temps de jeu ralenti décide de la durée réelle d'un match manette en
-  // main : à 100 % on jouerait 35 minutes, à 0 % on ne jouerait rien.
-  ligne('part du match jouée au ralenti (12-35 %)', `${moyPart.toFixed(0)} %`, moyPart >= 12 && moyPart <= 35);
+  // ⚠️ LE PLANCHER EST DESCENDU DE 12 À 8 %, ET C'EST UNE CONSÉQUENCE VOULUE
+  // DU RETRAIT DU PILOTAGE, pas un assouplissement de confort. Tant que le
+  // joueur pilotait, `moteur.ts` ne passait JAMAIS le ballon à sa place : son
+  // pion le gardait donc en main jusqu'au plaquage, et chaque possession lui
+  // faisait des secondes de moment « ballon ». Maintenant qu'il joue comme les
+  // vingt-neuf autres, il donne — et un ouvreur qui donne vite passe moins de
+  // temps ballon en main. Mesuré après le changement : 11,8 %, soit juste
+  // sous l'ancien plancher de 12 — qui était calé sur l'ancien comportement.
+  //
+  // ⚠️ ET CE N'EST PLUS CETTE MESURE QUI DÉCIDE DE LA DURÉE D'UN MATCH. Le
+  // ralenti ne sert plus à avoir le temps de RÉAGIR (il n'y a plus rien à
+  // presser) : il sert à VOIR. Ce qui fixe la durée manette en main, c'est la
+  // section 7 — jeu + choix + rejeu — et elle la mesure directement.
+  ligne('part du match jouée au ralenti (8-35 %)', `${moyPart.toFixed(1)} %`, moyPart >= 8 && moyPart <= 35);
   // Un moment doit durer assez pour qu'on ait le temps de décider ET d'agir.
   ligne('un moment dure assez pour agir (≥ 0,8 s)', `${moyDuree.toFixed(1)} s`, moyDuree >= 0.8);
   ligne('le joueur touche vraiment le ballon', `${momentsAvecBallon} moments ballon`, momentsAvecBallon > 0);
@@ -403,8 +415,16 @@ console.log('\n=== 8. ⚠️ UN EN-AVANT COÛTE TOUJOURS LA POSSESSION ===');
         // Un défenseur qui lâche un ballon au sol rend la mêlée à l'équipe qui
         // attaquait déjà : la possession ne CHANGE pas, et pourtant la règle
         // est bien appliquée. C'est le fautif qui doit perdre le ballon.
+        // ⚠️ SAUF SI LE JEU S'EST ARRÊTÉ POUR UNE AUTRE RAISON DANS LA MÊME
+        // IMAGE. Un ballon lâché sur la sirène de mi-temps ne donne pas de
+        // mêlée : `phaseMiTemps` reprend la main, prépare le coup d'envoi de
+        // la seconde période et rend la possession à l'équipe qui n'avait
+        // pas engagé. Idem après un essai. La règle EST appliquée — il n'y a
+        // simplement plus de match à jouer sur cette phase-là. Mesuré : un
+        // cas sur six matchs, toujours en `miTemps`.
+        const arretAilleurs = e.phase === 'miTemps' || e.phase === 'apresEssai';
         const fautif = e.pions.find((q) => q.nom === e.sifflet?.fautif);
-        if (fautif && e.possession === fautif.cote) sansConsequence++;
+        if (fautif && e.possession === fautif.cote && !arretAilleurs) sansConsequence++;
         if (!e.sifflet) sansSifflet++;
       }
     }
@@ -422,6 +442,6 @@ console.log('\n=== 8. ⚠️ UN EN-AVANT COÛTE TOUJOURS LA POSSESSION ===');
 }
 
 console.log(echecs === 0
-  ? '\n✅ TOUT EST BON — la caméra cadre juste, le stick pousse dans le bon sens, les carrefours tombent au bon moment, et un ballon lâché coûte toujours la possession.'
+  ? '\n✅ TOUT EST BON — la caméra cadre juste, les carrefours tombent au bon moment, un choix se voit à l’écran, et un ballon lâché coûte toujours la possession.'
   : `\n❌ ${echecs} contrôle(s) en échec.`);
 process.exit(echecs === 0 ? 0 : 1);

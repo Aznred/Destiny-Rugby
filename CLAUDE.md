@@ -3998,6 +3998,13 @@ npx vite-node scripts/verifTraductions.ts # les clés ajoutées, dans les 7 lang
 
 ## 🎮 LE MATCH SE JOUE ENFIN — caméra, moments, HUD sous le pouce
 
+> ⚠️ **CE QUI SUIT DÉCRIT UN HUD QUI N'EXISTE PLUS.** Le joystick flottant,
+> le gros bouton contextuel et les boutons secondaires ont été retirés :
+> « dans les matchs on ne fait que les choix, pas bouger le joueur ». **La
+> caméra et les moments, eux, sont toujours là et toujours vrais.** Ce qui a
+> remplacé la manette est décrit dans « 🎯 ON NE BOUGE PLUS SON JOUEUR », en
+> bas de ce fichier.
+
 Retour de jeu, mot pour mot : **« refait le système de jeu durant les matchs car
 actuellement c'est injouable et pas fun, de plus il faut que ça marche sur
 téléphone »**.
@@ -5516,7 +5523,9 @@ dépend plus.
 - **`statsPourLaNote`** a définitivement déménagé de `MatchLive.tsx` vers
   `moteur/apresMatch.ts`. Une fonction de barème n'avait de toute façon rien à
   faire dans un composant de rendu, et elle y est mieux même sans second écran.
-- **Le réglage des touches** est revenu dans ⚙️ Réglages : il redevient vrai.
+- **Le réglage des touches** est revenu dans ⚙️ Réglages… puis en est reparti
+  pour de bon deux jours plus tard, avec la manette entière. Voir la section
+  suivante.
 
 ### ⚠️ LA LEÇON, ET ELLE VAUT POUR LA PROCHAINE FOIS
 
@@ -5531,3 +5540,152 @@ texte, même bien réglé, se paie en présence.
 l'écran est parfois exactement ce qui fait le jeu**. La bonne question n'était
 pas « comment enlever le terrain », mais « comment garder le terrain en rendant
 la décision plus simple » — ce que les cartes font déjà.
+
+## 🎯 ON NE BOUGE PLUS SON JOUEUR — on ne fait que choisir, et on le regarde
+
+Demande, mot pour mot : **« je veux que tu modifies juste pour que dans les
+matchs on puisse faire que les choix, pas bouger le joueur, et qu'on voie
+vraiment notre joueur effectuer le choix »**.
+
+Deux phrases, deux moitiés, et la seconde est la plus exigeante : enlever la
+manette est un travail de suppression, montrer le geste est un travail de mise
+en scène.
+
+### ⚠️ LA LIGNE DE MOTEUR SANS LAQUELLE RIEN NE MARCHE
+
+C'est la seule chose vraiment délicate de tout le changement, et elle ne se voit
+pas en lisant l'écran. Tant qu'il y avait des boutons, `moteur.ts` **se taisait**
+dès que le pion du joueur portait le ballon :
+
+```ts
+const jePilote = porteur.moi && e.controle;
+if (!jePilote && suivant && …) return passerLeBallon(…);  // pas de passe auto
+if (plaqueur && porteur.battu <= 0) return resoudrePlaquage(…);
+if (jePilote) return;                                     // pas de coup de pied
+```
+
+C'était juste : personne ne devait passer à la place du joueur qui allait
+appuyer sur « passer ». **Retirer les boutons sans retirer ce cas particulier
+aurait donné un pion qui garde le ballon jusqu'au plaquage à CHAQUE possession
+— quatre-vingts fois par match, et jamais une passe.** Le cas particulier a donc
+disparu avec les boutons ; le pion du joueur joue exactement comme les
+vingt-neuf autres.
+
+⚠️ **ET L'ORDRE DES BLOCS SUFFIT À GARANTIR QUE LE CHOIX PASSE DEVANT.**
+L'intention armée par la carte est lue une trentaine de lignes PLUS HAUT, avant
+la combinaison et avant le plaquage. Il n'y a donc rien à arbitrer : un choix
+gagne toujours, ne pas choisir laisse le rugby automatique faire.
+
+### Ce qui a été supprimé, en entier
+
+| Fichier | Sort |
+|---|---|
+| `src/lib/moteur/manette.ts` | **supprimé** — `LecteurEntrees`, les liaisons, la manette, la souris, le tactile |
+| `src/components/ReglageTouches.tsx` | **supprimé** — plus une seule touche à assigner |
+| `EtatMatch.direction`, `EtatMatch.sprint` | **supprimés** de `etat.ts` et de `creerMatch` |
+| `piloterDirection()` | **supprimée** de `controle.ts` |
+| la branche « stick » de `piloterMonJoueur` | **supprimée** — la fonction ne lit plus que `e.intention` |
+| la branche `pilote` de la course du porteur | **supprimée** — `ligneDeCourse` vaut pour les trente |
+| le tempo `'moments'` | **supprimé** de `TEMPOS` et du type `Tempo` |
+| `touchesMatch`, `setToucheMatch`, `reinitialiserTouchesMatch` | **retirés** du store |
+| `.ml-stick`, `.ml-principal`, `.ml-secondaires`, `.ml-chauffe`, `.ml-act`, `.ml-tension` | **retirés** de `App.css` |
+| 28 clés i18n (`cmd.*`, `reg.touches*`, `ml.commandes.deplacer`…) | **retirées** des sept langues |
+
+⚠️ **`touchesMatch` RESTE DANS LES SAUVEGARDES EXISTANTES, ET C'EST VOULU.**
+`partialize` ne le réécrit plus et plus rien ne le lit : il s'éteint tout seul au
+prochain enregistrement. Le purger aurait demandé une migration versionnée pour
+supprimer une clé que personne ne regarde.
+
+### ⚠️ LE TEMPO « 🎯 MOMENTS » DEVAIT PARTIR AVEC, ET C'EST MOINS ÉVIDENT
+
+Il existait pour donner le **temps de réagir** : temps réel dès qu'un ballon
+arrivait sur soi. Sans commandes, il n'offrait plus qu'un ralenti pendant lequel
+on ne peut rien faire, juste à côté d'un « ⏸️ Décisions » qui, lui, **fige**
+vraiment le jeu et pose la question. Deux modes pour la même intention, dont un
+impuissant : c'est le genre de reste qui fait passer un jeu pour bâclé.
+
+### 🎬 « QU'ON VOIE VRAIMENT NOTRE JOUEUR EFFECTUER LE CHOIX »
+
+Trois choses, ensemble. Aucune ne suffit seule, et aucune n'est décorative.
+
+1. **LE RALENTI** (`REJEU` = 3,2 s réelles). Il existait déjà : le jeu repart à
+   deux fois la vitesse réelle au lieu de seize.
+2. **LA CAMÉRA SE COLLE AU PION** — c'est nouveau. Le reste du temps elle cadre
+   un compromis entre le ballon et son joueur (pondération 0,5), et c'est la
+   bonne lecture : on doit voir venir ce qui arrive. Mais trois secondes après
+   « je plaque », **le sujet du plan n'est pas le ballon** : à 0,5, un plaquage
+   à douze mètres du ballon se jouait au bord du cadre. Pendant le rejeu la
+   pondération passe à **1** et le cadrage à `'proche'`.
+3. **L'ÉTIQUETTE DU GESTE**, en or, au-dessus de sa tête (`.ml-geste`). On lit
+   « 💥 Plaquer » **sur le pion** pendant qu'il charge.
+
+⚠️ **L'ÉTIQUETTE LIT `rejeu`, PAS `e.intention`**, et la différence n'est pas un
+détail : une intention est **consommée** dès que le moteur la joue, souvent au
+premier tick. Un « 💥 Plaquer » qui s'éteint un dixième de seconde après le clic
+ne se lit pas. `rejeu` tient les 3,2 s du plan, en secondes **réelles** — une
+durée de plan ne doit pas s'allonger parce que le jeu ralentit, ce serait le
+serpent qui se mord la queue.
+
+### ⚠️ DEUX DÉFAUTS TROUVÉS EN JOUANT, PAS EN RELISANT
+
+Les deux touchaient exactement la moitié « qu'on voie son joueur », et aucun
+banc d'essai ne pouvait les attraper.
+
+- **MON PION ÉTAIT DESSINÉ SOUS CEUX D'EN FACE.** Les deux camps se dessinaient
+  l'un après l'autre (`cote === 'B'` puis `cote === 'A'`) : le camp B finissait
+  systématiquement dessous. Mesuré à l'écran — mon numéro 10 caché sous le 8
+  adverse **au moment du ruck**, c'est-à-dire précisément quand il se passe
+  quelque chose pour lui. Mon pion est désormais dessiné **en dernier, toujours**.
+- **L'ÉTIQUETTE SORTAIT DU CADRE EN BORD DE TOUCHE.** La caméra borne son cadre
+  au terrain (elle ne montre jamais de vide) : un joueur collé à la ligne se
+  retrouve au bord de l'écran, et tout ce qui est posé « au-dessus » de lui
+  passe hors du `viewBox`. Mesuré : l'étiquette à 691 px dans une scène qui
+  s'arrête à 680. Elle **bascule sous le pion** quand celui-ci est dans le haut
+  du cadre — décidé sur la position **à l'écran** (`vue.versEcran`), donc après
+  le pivot du portrait.
+
+### La discipline n'a pas de bouton, elle a une carte
+
+Chambrer, frapper et calmer vivaient derrière le 💢 du HUD. Sans repli, le
+joueur ne pourrait plus **jamais** déclencher une bagarre — seulement les subir,
+et toute la ligne « Ovale » du jeu deviendrait décorative. Ils sont donc proposés
+sur les cartes de décision, **en dernière position et seulement au-dessus de
+`TENDU` = 55 de température**. C'est exactement le rôle que la carte leur
+donne : « la quatrième option est toujours celle qui sort du cadre ». Proposer
+« frapper » à la 3e minute d'un match tranquille, ce serait le proposer
+quatre-vingts fois, et la moitié des carrières finirait en commission.
+
+### Ce que le banc d'essai mesure maintenant
+
+`scripts/verifControle.ts`, section 7 — elle mesurait « je pousse à gauche, mon
+pion va à gauche ». Elle mesure désormais **une égalité**, et c'est ce qui la
+rend implacable :
+
+> **un match « contrôlé » où l'on ne choisit JAMAIS rien est rigoureusement le
+> même match que le même match regardé** — score, nombre de commentaires,
+> nombre de rucks. 12/12.
+
+Tout ce que `e.controle` change encore est gardé derrière un `e.intention` (trois
+occurrences dans `moteur.ts`, allez les compter). Le jour où quelqu'un remet un
+cas particulier pour le pion du joueur — **et c'est deux lignes, ça a vécu des
+mois sous le nom `jePilote`** — cette égalité casse immédiatement, alors
+qu'aucun autre chiffre du banc ne bougerait : le score vient de la ligue, les
+bagarres se mesurent ailleurs. Une seconde ligne vérifie qu'il **donne** le
+ballon : 1,8 passe pour 5,8 ballons portés par match.
+
+### Deux seuils de banc ont bougé, et il faut savoir pourquoi
+
+| Contrôle | Avant | Après | Raison |
+|---|---|---|---|
+| `verifMatchJouable` § 5 · part du match au ralenti | 12-35 % | **8-35 %** | Le pion **donne** le ballon maintenant : il le garde moins en main, donc moins de secondes de moment « ballon ». Mesuré 11,8 %. Et ce n'est plus cette mesure qui décide de la durée d'un match — c'est la § 7, qui la mesure directement (5,7 min : 2,9 de jeu, 1,8 de choix, 1,0 de rejeu). |
+| `verifMatchJouable` § 8 · en-avant sans conséquence | 0 toléré | 0 **hors `miTemps` / `apresEssai`** | Un ballon lâché **sur la sirène** ne donne pas de mêlée : `phaseMiTemps` reprend la main et prépare le coup d'envoi de la seconde période. La règle EST appliquée, il n'y a simplement plus de match à jouer sur cette phase. Un cas sur six matchs. |
+
+### Vérifié en jouant, desktop et téléphone
+
+Match complet joué **uniquement aux cartes**, jusqu'à la sirène : 19-10, note
+**7,2/10**, 6 plaquages, 32 m gagnés, 1 ballon gratté, 2/2 aux tirs au but. La
+semaine avance à la fermeture. Sur téléphone (375 × 812) la carte s'ouvre en
+grille 2 × 2 + « laisser faire », le terrain pivote, et il ne reste **aucun**
+bouton posé sur la pelouse. Étiquette mesurée : 21 échantillons, **0 hors
+cadre**, 100-116 px de large.
+

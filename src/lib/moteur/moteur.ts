@@ -234,8 +234,6 @@ export function creerMatch(
     controle: options.controle ?? false,
     intention: null,
     recharges: {},
-    direction: null,
-    sprint: false,
     tension: 0,
     bagarre: null,
     bulles: [],
@@ -409,11 +407,21 @@ function tick(e: EtatMatch): void {
 }
 
 // ---------------------------------------------------------------------------
-// LE PILOTAGE DU PION DU JOUEUR
+// CE QUE LE CHOIX DU JOUEUR CHANGE DANS SA COURSE
 // ---------------------------------------------------------------------------
-// Ce que l'ordre change dans le DÉPLACEMENT. Les effets sur les duels (contact,
-// grattage, combinaison) sont appliqués là où ils se jouent : `resoudrePlaquage`,
-// `phaseRuck`, `reprendreJeu`.
+// ⚠️ ON NE DÉPLACE PLUS SON PION À LA MAIN — ON ARME UNE INTENTION, ET C'EST
+// ELLE QUI LE FAIT COURIR. Demande, mot pour mot : « dans les matchs on ne fait
+// que les choix, on ne bouge pas le joueur ». Il y avait ici une première
+// branche qui posait la cible à dix mètres dans l'axe du stick et court-
+// circuitait tout le reste ; elle n'a plus d'entrée pour l'alimenter.
+//
+// Ce qui reste est l'essentiel, et c'est ce qui rend un choix VISIBLE : « je
+// plaque » envoie vraiment le pion charger le porteur, « je gratte » le jette
+// sur le ballon au sol, « j'appelle » le remonte à hauteur de passe. Sans ces
+// cibles, une carte de décision ne changerait qu'un tirage de dés.
+//
+// Les effets sur les DUELS (contact, grattage, combinaison) sont appliqués là
+// où ils se jouent : `resoudrePlaquage`, `phaseRuck`, `reprendreJeu`.
 //
 // ⚠️ `effort` EST UN MULTIPLICATEUR SUR LA VITESSE MAXIMALE, et il reste
 // volontairement petit. À 1,3 on obtenait un pion qui double tout le monde en
@@ -425,29 +433,15 @@ function piloterMonJoueur(e: EtatMatch): void {
   const s = sens(p.cote);
   const porteur = e.porteur;
 
-  // ── 🕹️ LE PILOTAGE DIRECT PASSE AVANT TOUT LE RESTE ────────────────────
-  // Tant que le joueur pousse son stick (ou une touche, ou son doigt), c'est
-  // LUI qui décide où va le pion : ni la tactique, ni l'ordre armé, ni la
-  // ligne de course automatique n'ont leur mot à dire. La cible est posée à
-  // dix mètres devant — assez loin pour que `deplacer()` donne plein gaz,
-  // assez près pour que la course reste franche.
-  if (e.direction) {
-    p.cible = {
-      x: borner(p.pos.x + e.direction.x * 10, LIGNE_A - 1, LIGNE_B + 1),
-      y: borner(p.pos.y + e.direction.y * 10, 0.5, LARGEUR - 0.5),
-    };
-    p.effort = e.sprint ? 1.12 : 1;
-    // ⚠️ LE SPRINT SE PAIE, SINON ON LE TIENT 80 MINUTES. La dépense s'ajoute
-    // à celle que `deplacer()` calcule déjà sur l'intensité de la course :
-    // c'est ce qui fait qu'un joueur qui sprinte tout le match finit à plat.
-    if (e.sprint) p.endurance = Math.max(0, p.endurance - DT * 1.4);
-    return;
-  }
   if (!e.intention) return;
 
   switch (e.intention.type) {
     case 'sprint':
       p.effort = 1.12;
+      // ⚠️ LE SPRINT SE PAIE, SINON ON LE CHOISIT À CHAQUE CARTE. La dépense
+      // s'ajoute à celle que `deplacer()` calcule déjà sur l'intensité de la
+      // course : trois relances à fond dans la même mi-temps se sentent.
+      p.endurance = Math.max(0, p.endurance - DT * 1.4);
       break;
     case 'plaquage':
     case 'monter': {
@@ -788,19 +782,12 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const s = sens(porteur.cote);
 
   // ── La course du porteur ─────────────────────────────────────────────────
-  // ⚠️ SI C'EST MOI QUI PORTE ET QUE JE POUSSE, JE COURS OÙ JE VEUX. Sans ce
-  // test, `ligneDeCourse` (la course automatique : fixer son vis-à-vis, ou
-  // attaquer l'intervalle extérieur) reprenait la main à chaque tick et le
-  // pion piloté partait en diagonale de son propre chef — la sensation qu'on
-  // ne contrôle rien.
-  const pilote = porteur.moi && e.controle && e.direction;
-  porteur.cible = pilote
-    ? {
-        x: borner(porteur.pos.x + e.direction!.x * 10, LIGNE_A - 1, LIGNE_B + 1),
-        y: borner(porteur.pos.y + e.direction!.y * 10, 0.5, LARGEUR - 0.5),
-      }
-    : ligneDeCourse(e, porteur);
-  if (pilote) porteur.effort = e.sprint ? 1.12 : 1;
+  // ⚠️ TOUT LE MONDE COURT PAREIL, Y COMPRIS SON PROPRE PION. Il y avait ici
+  // une branche « piloté » qui posait la cible à dix mètres dans l'axe du
+  // stick ; le stick n'existe plus (« que les choix, pas bouger le joueur »).
+  // La ligne de course automatique — fixer son vis-à-vis tant qu'il reste un
+  // partenaire, attaquer l'intervalle sinon — vaut donc pour les trente.
+  porteur.cible = ligneDeCourse(e, porteur);
   const avant = porteur.pos.x;
   deplacer(porteur, dt);
   // ⚠️ LES MÈTRES SE COMPTENT AU-DELÀ DE LA LIGNE D'AVANTAGE, comme dans les
@@ -883,24 +870,28 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // C'était LE bug du ballon qui n'allait jamais à l'aile : la décision n'était
   // reprise que toutes les 0,22 s, et entre 3 m et 1,35 m il ne s'écoule que
   // 0,13 s — le porteur était plaqué avant d'avoir eu le droit de passer.
-  // ⚠️ QUAND C'EST LE JOUEUR QUI PORTE, PERSONNE NE PASSE À SA PLACE. C'est le
-  // cœur de « on contrôle vraiment son joueur » : la combinaison reprenait la
-  // main dès qu'un défenseur arrivait à trois mètres, et le ballon partait
-  // sans qu'on ait rien demandé. À lui d'appuyer sur « passer » — et s'il
-  // garde le ballon une seconde de trop, il se fait plaquer. C'est le jeu.
+  // ⚠️ ET LE JOUEUR N'EST PLUS UN CAS PARTICULIER — C'EST LE CŒUR DE LA
+  // DEMANDE : « dans les matchs on ne fait que les choix, on ne bouge pas le
+  // joueur ». Tant qu'il y avait une manette, le moteur se TAISAIT dès que le
+  // pion du joueur portait le ballon : ni passe automatique, ni coup de pied,
+  // parce qu'un bouton allait décider. Les boutons ont disparu ; sans ce
+  // retrait, le pion garderait le ballon jusqu'au plaquage à CHAQUE possession
+  // — quatre-vingts fois par match, et jamais une passe.
+  //
+  // Ce qui reste au joueur, c'est la CARTE DE DÉCISION. L'intention qu'elle
+  // arme est lue une trentaine de lignes plus haut, DONC AVANT ce bloc : un
+  // choix passe toujours devant le rugby automatique. Ne pas choisir laisse
+  // simplement le pion jouer comme les vingt-neuf autres.
   const lancement = e.lancement;
   const suivant = lancement && lancement.index + 1 < lancement.chaine.length
     ? lancement.chaine[lancement.index + 1] : null;
-  const jePilote = porteur.moi && e.controle;
-  if (!jePilote && suivant && suivant.surLeTerrain && pression <= (porteur.avant ? 3.4 : 3.7)) {
+  if (suivant && suivant.surLeTerrain && pression <= (porteur.avant ? 3.4 : 3.7)) {
     return passerLeBallon(e, porteur, suivant, pression);
   }
 
   if (plaqueur && porteur.battu <= 0) return resoudrePlaquage(e, porteur, plaqueur);
 
   // ── Les décisions plus lourdes (coup de pied, drop) ──────────────────────
-  // Là encore : on ne tape pas au pied à la place du joueur qui pilote.
-  if (jePilote) return;
   e.prochaineDecision -= dt;
   if (e.prochaineDecision > 0) return;
   e.prochaineDecision = 0.25;
