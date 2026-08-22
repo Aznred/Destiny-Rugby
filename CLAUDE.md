@@ -5575,7 +5575,33 @@ barre du bas passe par `moteur/consignes.ts` (mots-clés d'abord, IA ensuite si
 elle est disponible). Elle ne remplace pas le choix, elle s'ajoute — on peut
 donner une consigne ET prendre une option.
 
-### 🩹 Deux bugs de mise en page attrapés en jeu
+### 🩹 Le bug qu'il ne fallait pas faire : la modale sans portal
+
+⚠️ **LA MODALE DE MATCH S'AFFICHAIT DANS LE PANNEAU DE CARRIÈRE.** Signalé en
+jeu, capture à l'appui : le match écrasé sur 290 px de large, par-dessus la fiche
+du joueur, tout le texte superposé. La cause est écrite **trois fois** dans ce
+fichier et je ne l'ai pas relue : le `backdrop-filter` des `.carte` crée un bloc
+conteneur, donc un `position: fixed` à l'intérieur se cale sur la carte et non
+sur la fenêtre. **`createPortal(document.body)` est obligatoire**, exactement
+comme pour `Confirmation`, `FicheClub`, la barre d'action mobile et l'ancien
+`MatchLive` — qui, lui, le faisait.
+
+⚠️ **ET `useModalDialog` EN DÉPENDAIT AUSSI**, ce qui doublait les dégâts : il
+rend `inert` tous les enfants de `<body>` SAUF l'overlay. L'overlay n'étant pas
+un enfant direct de `<body>`, il n'en épargnait aucun — la page ET la modale
+étaient neutralisées. Vérifié après correction : sur les cinq enfants de
+`<body>`, quatre sont `inert` et seul `.overlay-match` ne l'est pas.
+
+⚠️ **CE QUE J'AVAIS MESURÉ NE POUVAIT PAS L'ATTRAPER**, et c'est la vraie leçon.
+J'avais relevé la TAILLE de la modale (680 × 880, centrée) sans jamais vérifier
+qu'elle COUVRAIT l'écran ; sur la fenêtre étroite de l'essai, la mise en page
+tenait en une colonne et la boîte tombait juste malgré le piège. Le contrôle qui
+compte pour toute modale de ce projet est donc en deux points :
+**`.overlay-match` est-il un enfant direct de `<body>`, et sa boîte vaut-elle
+exactement la fenêtre ?** Mesuré après correction : 1600 × 900 à l'origine sur
+ordinateur, 375 × 812 sur téléphone, panneau de carrière intact dessous.
+
+### 🩹 Deux autres bugs de mise en page attrapés en jeu
 
 ⚠️ **LA MODALE FAISAIT 226 px DE LARGE DANS UNE FENÊTRE DE 966.** `.overlay-match`
 est une grille en `place-items: center` : sa colonne se dimensionne sur le

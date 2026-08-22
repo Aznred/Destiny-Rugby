@@ -23,6 +23,18 @@
 // discipline et les blessures suivent le même chemin qu'avant. On a remplacé la
 // surface, pas la simulation — et tout ce qui était mesuré le reste.
 //
+// ⚠️ `createPortal(document.body)` EST OBLIGATOIRE, ET CE N'EST PAS UN DÉTAIL.
+// Le `backdrop-filter` des `.carte` crée un bloc conteneur : un `position: fixed`
+// à l'intérieur ne se cale plus sur la fenêtre mais sur la carte. Sans portal,
+// la modale de match se retrouvait DANS le panneau de carrière, écrasée sur
+// 290 px, par-dessus la fiche du joueur — vu en jeu, capture à l'appui. C'est
+// la même leçon que `Confirmation`, `FicheClub` et la barre d'action mobile, et
+// elle est déjà écrite trois fois dans CLAUDE.md : il fallait la relire.
+//
+// ⚠️ ET `useModalDialog` EN DÉPEND AUSSI : il rend `inert` tous les enfants de
+// `<body>` SAUF l'overlay. Si l'overlay n'est pas un enfant direct de `<body>`,
+// il n'en épargne aucun — la modale se neutralise elle-même.
+
 // ⚠️ ET ON N'AVANCE PLUS À L'IMAGE, MAIS À L'ÉVÈNEMENT (voir `moteur/fil.ts`).
 // Une horloge remplace `requestAnimationFrame` : plus d'interpolation, plus de
 // `ResizeObserver`, plus de matrice de caméra. C'est ce qui rend l'écran
@@ -30,6 +42,7 @@
 // navigateur ne déclenche plus une seule image.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   appliquerConsigne, bilan, creerMatch, ordonner, type EtatMatch,
@@ -288,7 +301,7 @@ export function MatchDirect({
   } : null;
   const surLeBanc = !!monPion && !monPion.surLeTerrain;
 
-  return (
+  return createPortal(
     <div className="overlay-match" ref={overlayRef}>
       <motion.div
         className="fd"
@@ -460,6 +473,7 @@ export function MatchDirect({
           )}
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body,
   );
 }
