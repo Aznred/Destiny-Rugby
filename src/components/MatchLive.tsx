@@ -78,7 +78,7 @@ import { estTitulaire } from '../lib/moteur/saison';
 import { CONSIGNE_NEUTRE, lireConsigneIA, lireConsigneLocale } from '../lib/moteur/consignes';
 import { iaDisponible } from '../lib/groq';
 import type { Pion } from '../lib/moteur/entites';
-import { detailNote, noterMatch, type StatsMatchJoueur } from '../lib/moteur/apresMatch';
+import { detailNote, noterMatch, statsPourLaNote } from '../lib/moteur/apresMatch';
 import { graine, type MatchChampionnat } from '../lib/championnat';
 import { effectifDuClub } from '../lib/effectif';
 import { effectifNational } from '../lib/international';
@@ -91,40 +91,6 @@ import { FeuilleMatch } from './match/FeuilleMatch';
 import type { Joueur } from '../types';
 import { t } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
-
-/**
- * La feuille du joueur incarné, au format attendu par le barème.
- *
- * ⚠️ UNE SEULE EXTRACTION, DEUX USAGES : ce qui part dans la saison
- * (`enregistrerMatchVecu`) et ce qui s'affiche en détail de note. Deux copies,
- * et le détail montré finirait par ne plus correspondre à la note calculée.
- */
-function statsPourLaNote(p: Pion): StatsMatchJoueur {
-  return {
-    essais: p.stats.essais,
-    plaquages: p.stats.plaquages,
-    plaquagesManques: p.stats.plaquagesManques,
-    passes: p.stats.passes,
-    metres: Math.round(p.stats.metres),
-    grattages: p.stats.grattages,
-    butsTentes: p.stats.butsTentes,
-    butsReussis: p.stats.butsReussis,
-    cartons: p.stats.cartonsJaunes + p.stats.cartonsRouges,
-    minutes: Math.min(80, Math.round(p.minutes)),
-    // ⚠️ TOUTE LA FEUILLE REMONTE, pas seulement ce qui se voit. C'est ce qui
-    // permet à la note de juger un avant sur son vrai travail (mêlée, touche,
-    // ballons portés au ras) et pas sur ses essais.
-    passesDecisives: p.stats.passesDecisives,
-    offloads: p.stats.offloads,
-    franchissements: p.stats.franchissements,
-    turnovers: p.stats.passesRatees,
-    melees: p.stats.melees,
-    touchesGagnees: p.stats.touchesGagnees,
-    pickAndGo: p.stats.pickAndGo,
-    cinquanteVingtDeux: p.stats.cinquanteVingtDeux,
-    cartonsRouges: p.stats.cartonsRouges,
-  };
-}
 
 function couleursDe(nom: string): [string, string] {
   const club = clubParNom(nom);

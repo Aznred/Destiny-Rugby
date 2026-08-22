@@ -47,7 +47,23 @@ const IDS_TROPHEES = Object.keys(TROPHEES);
 // script, puisque la vraie barrière n'est pas le débit mais le RECALCUL.
 const PAR_HEURE = 6;
 const PAR_JOUR = 40;
-const TOP = 100;
+
+/**
+ * ⚠️ LE CLASSEMENT NE S'ARRÊTE PLUS AU CENTIÈME.
+ *
+ * Demande explicite : « qu'on puisse avoir accès à tout le monde ». Le `GET`
+ * rendait les cent meilleurs et rien d'autre : au-delà, une carrière existait en
+ * base sans exister à l'écran, et son auteur n'avait aucun moyen de savoir où il
+ * se situait. Un classement mondial qui cache 90 % du monde est un tableau
+ * d'honneur, pas un classement.
+ *
+ * ⚠️ ET ON PAGINE PLUTÔT QUE DE TOUT ENVOYER. Une base à dix mille carrières,
+ * fiches et palmarès compris, ferait plusieurs mégaoctets par ouverture d'écran
+ * — sur un téléphone en 4G, c'est l'écran qui ne s'affiche jamais.
+ */
+const PAR_PAGE = 50;
+/** Garde-fou : au-delà, c'est un script qui balaie la table, pas un joueur. */
+const PAGE_MAX = 400;
 
 /**
  * ⚠️ CONNEXION PARESSEUSE, ET C'EST IMPORTANT. `neon('')` LÈVE à l'appel (« No
@@ -103,10 +119,23 @@ export async function OPTIONS(): Promise<Response> {
   return new Response(null, { headers: ENTETES });
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(req?: Request): Promise<Response> {
   if (!process.env.DATABASE_URL) {
     return reponse({ erreur: 'DATABASE_URL absente des variables d’environnement' }, 500);
   }
+
+  // ⚠️ `id` EST L'IDENTIFIANT PUBLIC DE LA LIGNE, JAMAIS LA CLÉ D'ÉCRITURE.
+  // Il voyage dans l'adresse, donc dans les journaux du serveur : y faire
+  // passer `cle` reviendrait à publier le droit d'écrire sur une ligne. Voir
+  // `serveur/MIGRATION-FICHES.md`, étape 2 bis.
+  let page = 1;
+  let monId = NaN;
+  if (req) {
+    const params = new URL(req.url).searchParams;
+    page = Math.min(PAGE_MAX, Math.max(1, Math.floor(Number(params.get('page')) || 1)));
+    monId = Math.floor(Number(params.get('id')));
+  }
+  const decalage = (page - 1) * PAR_PAGE;
 
   try {
     const sql = sqlClient();
@@ -131,7 +160,7 @@ export async function GET(): Promise<Response> {
                matchs, essais, selections, titres, clubs
         from classement
         order by score desc, maj_le asc
-        limit ${TOP}
+        limit ${PAR_PAGE} offset ${decalage}
       `],
       // v2 : la fiche affichable, sans identifiant de ligne.
       ['v2', () => sql`
@@ -140,21 +169,23 @@ export async function GET(): Promise<Response> {
                matchs, essais, selections, titres, clubs
         from classement
         order by score desc, maj_le asc
-        limit ${TOP}
+        limit ${PAR_PAGE} offset ${decalage}
       `],
       // v1 : le score seul.
       ['v1', () => sql`
         select pseudo, score, maj_le
         from classement
         order by score desc, maj_le asc
-        limit ${TOP}
+        limit ${PAR_PAGE} offset ${decalage}
       `],
     ] as const;
 
     let lignes: Record<string, unknown>[] | null = null;
+    let schema = 'v1';
     for (const [nom, lire] of lectures) {
       try {
         lignes = (await lire()) as Record<string, unknown>[];
+        schema = nom;
         break;
       } catch (e) {
         if ((e as { code?: string }).code !== '42703') throw e;
@@ -162,7 +193,43 @@ export async function GET(): Promise<Response> {
       }
     }
     if (!lignes) throw new Error('aucun schéma de classement reconnu');
-    return reponse({ classement: lignes });
+
+    // Combien de carrières en tout : c'est ce qui permet à l'écran d'annoncer
+    // « page 3 sur 12 » plutôt qu'un « suivant » qui mène parfois au vide.
+    let total = lignes.length + decalage;
+    try {
+      const [c] = await sql`select count(*)::int as total from classement`;
+      total = Number((c as { total?: unknown })?.total ?? total);
+    } catch (e) {
+      console.warn('[classement] total indisponible', e);
+    }
+
+    // ⚠️ MA LIGNE ET MON RANG, MÊME SI JE SUIS 4 000ᵉ. Demande explicite :
+    // « qu'on puisse voir notre classement en bas ». Sans ça, il faudrait
+    // feuilleter jusqu'à se trouver — et on ne se cherche pas soi-même dans
+    // quarante pages. Le rang est calculé par la base, sur le MÊME tri que la
+    // page : deux tris différents donneraient deux rangs différents pour la
+    // même ligne, et le joueur aurait raison de ne pas y croire.
+    let moi: Record<string, unknown> | null = null;
+    if (schema === 'v3' && Number.isFinite(monId) && monId > 0) {
+      try {
+        const [ligne] = await sql`
+          select * from (
+            select id, pseudo, score, maj_le,
+                   nom, poste, nation, age, saisons, note, reputation,
+                   matchs, essais, selections, titres, clubs,
+                   rank() over (order by score desc, maj_le asc) as rang
+            from classement
+          ) tout
+          where id = ${monId}
+        `;
+        moi = (ligne as Record<string, unknown>) ?? null;
+      } catch (e) {
+        console.warn('[classement] rang personnel indisponible', e);
+      }
+    }
+
+    return reponse({ classement: lignes, total, page, parPage: PAR_PAGE, moi });
   } catch (e) {
     console.error('[classement] lecture', e);
     return reponse({ erreur: 'Lecture impossible' }, 500);
@@ -403,7 +470,7 @@ export default async function classementVercel(req: RequeteVercel, res: ReponseV
     });
 
     let resultat: Response;
-    if (methode === 'GET') resultat = await GET();
+    if (methode === 'GET') resultat = await GET(demande);
     else if (methode === 'POST') resultat = await POST(demande);
     else if (methode === 'OPTIONS') resultat = await OPTIONS();
     else resultat = reponse({ erreur: 'Méthode non autorisée' }, 405);

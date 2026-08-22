@@ -104,6 +104,16 @@ export interface LigneMondiale {
   titres?: string[] | null;
   /** Clubs traversés, dans l'ordre. */
   clubs?: string[] | null;
+  /**
+   * Le rang mondial de CETTE ligne, calculé par la base.
+   *
+   * ⚠️ Renseigné UNIQUEMENT sur `moi` : pour les lignes d'une page, le rang se
+   * déduit du numéro de page et de la position, et le faire calculer par la
+   * base pour cinquante lignes serait une fenêtre de tri par ligne pour rien.
+   * Pour la sienne, en revanche, il n'y a pas d'autre moyen : on peut être
+   * 4 000ᵉ et n'apparaître sur aucune page consultée.
+   */
+  rang?: number | null;
 }
 
 /** La ligne porte-t-elle de quoi ouvrir une fiche ? */
@@ -149,18 +159,63 @@ async function appeler(url: string, init?: RequestInit): Promise<Response> {
  * du tout. Un tableau absent se lit « le classement est cassé ».
  */
 export type EtatMondial =
-  | { etat: 'hors-ligne' }                       // aucun serveur sur cette installation
-  | { etat: 'panne'; erreur: string }            // serveur injoignable ou en erreur
-  | { etat: 'ok'; lignes: LigneMondiale[] };     // lu (la liste peut être vide)
+  | { etat: 'hors-ligne' }              // aucun serveur sur cette installation
+  | { etat: 'panne'; erreur: string }   // serveur injoignable ou en erreur
+  | {
+      etat: 'ok';
+      /** La page demandée (la liste peut être vide). */
+      lignes: LigneMondiale[];
+      /** Le nombre TOTAL de carrières classées, toutes pages confondues. */
+      total: number;
+      page: number;
+      parPage: number;
+      /**
+       * Ma ligne et son rang mondial, où qu'elle soit dans le classement.
+       *
+       * ⚠️ C'EST LA RÉPONSE À « QU'ON PUISSE VOIR NOTRE CLASSEMENT EN BAS ».
+       * Elle ne dépend pas de la page affichée : on est 4 000ᵉ et on le voit
+       * quand même, sans feuilleter quarante pages à sa propre recherche.
+       */
+      moi?: LigneMondiale | null;
+    };
 
-/** Les meilleurs scores, avec l'état de la lecture. Ne lève jamais. */
-export async function lireClassementMondial(): Promise<EtatMondial> {
+/**
+ * Une page du classement, avec l'état de la lecture. Ne lève jamais.
+ *
+ * @param page 1 pour la tête du classement.
+ * @param monId l'identifiant public de MA ligne, pour que le serveur renvoie
+ *   aussi mon rang. Facultatif : sans lui, `moi` est simplement absent.
+ */
+export async function lireClassementMondial(page = 1, monId?: number | null): Promise<EtatMondial> {
   if (!ACTIF) return { etat: 'hors-ligne' };
   try {
-    const r = await appeler(URL_CLASSEMENT);
-    const data = (await r.json().catch(() => ({}))) as { classement?: LigneMondiale[]; erreur?: string };
+    // ⚠️ ON COMPOSE LA CHAÎNE, ON NE PASSE PAS PAR new URL(). URL_CLASSEMENT
+    // peut être RELATIVE (/api/classement, le cas normal) ou ABSOLUE (une
+    // préproduction, ou le faux serveur des essais). Reconstruire une URL puis
+    // n'en garder que le chemin envoyait la requête sur la mauvaise origine :
+    // mesuré en essai, le classement revenait vide alors que le serveur avait
+    // les données.
+    const params = new URLSearchParams();
+    if (page > 1) params.set('page', String(page));
+    if (monId != null && Number.isFinite(monId)) params.set('id', String(monId));
+    const q = params.toString();
+    const r = await appeler(q ? URL_CLASSEMENT + '?' + q : URL_CLASSEMENT);
+    const data = (await r.json().catch(() => ({}))) as {
+      classement?: LigneMondiale[]; total?: number; page?: number; parPage?: number;
+      moi?: LigneMondiale | null; erreur?: string;
+    };
     if (!r.ok) return { etat: 'panne', erreur: data.erreur ?? `Le serveur a répondu ${r.status}` };
-    return { etat: 'ok', lignes: Array.isArray(data.classement) ? data.classement : [] };
+    const lignes = Array.isArray(data.classement) ? data.classement : [];
+    return {
+      etat: 'ok',
+      lignes,
+      // ⚠️ UN SERVEUR D'AVANT LA PAGINATION NE RENVOIE NI TOTAL NI PAGE, et il
+      // ne doit pas casser l'écran pour autant : on retombe sur ce qu'on a.
+      total: typeof data.total === 'number' ? data.total : lignes.length,
+      page: typeof data.page === 'number' ? data.page : page,
+      parPage: typeof data.parPage === 'number' && data.parPage > 0 ? data.parPage : Math.max(1, lignes.length),
+      moi: data.moi ?? null,
+    };
   } catch (e) {
     // Pas de serveur, hors ligne, ou fonction pas encore déployée : le jeu
     // continue avec son classement local. On ne lève pas — on le DIT.

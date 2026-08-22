@@ -5483,3 +5483,148 @@ npx vite-node scripts/verifControle.ts      # actions, discipline (40 matchs sur
 npx vite-node scripts/verifStats.ts         # les 18 classements individuels
 npx vite-node scripts/verifTraductions.ts   # les 16 clés ajoutées, dans les 7 langues
 ```
+
+---
+
+## 📺 LA MÉCANIQUE DE MATCH, REFAITE DE ZÉRO — LE FIL
+
+Demande, mot pour mot : « refais la mécanique de match totalement, que ce soit
+super facile et fun à prendre en main sur n'importe quel appareil et super
+ludique ». Et, dans le message juste avant, le format voulu, décrit précisément :
+un fil généré **par blocs de deux à quatre actions**, chaque ligne en
+`[minute'] [emoji] [phrase courte]`, **centré sur son joueur**, qui **s'arrête**
+sur un moment décisif et attend la décision — un choix parmi ceux proposés, ou
+une consigne libre.
+
+### ⚠️ CE QUI DISPARAÎT DE L'ÉCRAN, ET CE QUI NE BOUGE PAS
+
+| | avant (`MatchLive`) | maintenant (`MatchDirect`) |
+|---|---|---|
+| ce qu'on regarde | un terrain SVG, 30 pions, une caméra | **un fil de texte** |
+| ce qu'on fait | joystick + 13 boutons + 20 touches | **on lit, et on choisit** |
+| la boucle | `requestAnimationFrame`, 60 images/s | **une horloge**, un bloc à la fois |
+| ce qu'il faut apprendre | le pilotage | rien |
+| durée d'un match | 5,8 min | **3,6 min** (1,9 de lecture · 1,7 de choix) |
+
+⚠️ **LE MOTEUR N'A PAS ÉTÉ TOUCHÉ D'UNE LIGNE, ET C'EST LA DÉCISION
+STRUCTURANTE.** `lib/moteur/` produit déjà tout ce qu'il faut : la minute, les
+phases, les plaquages, les cartons, la feuille du joueur, sa note, et surtout **le
+score EXACT de la ligue**. Le problème n'a jamais été la simulation, il a toujours
+été sa SURFACE. On remplace donc la surface — et tout ce qui était mesuré le reste
+par construction : `verifMoteur`, `verifControle`, `verifStats`, `verifApresMatch`
+passent sans une modification.
+
+### Les deux fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/moteur/fil.ts` | **Pur.** L'emoji de chaque type d'action, l'habillage d'une ligne, la génération par blocs (`jouerUnBloc`), et la position du ballon en un seul nombre. |
+| `src/components/MatchDirect.tsx` | L'écran : bandeau, barre de terrain, fil, ma ligne de stats, carte de décision, feuille de match à la sirène. |
+
+### ⚠️ ON N'AVANCE PLUS À L'IMAGE, MAIS À L'ÉVÈNEMENT
+
+C'est ce qui rend l'écran identique partout, et c'est le vrai changement
+d'architecture. L'ancien écran demandait soixante images par seconde, une
+interpolation entre deux pas de simulation, un `ResizeObserver` et une matrice de
+caméra. Ici, `jouerUnBloc` fait tourner le moteur jusqu'à ce qu'il ait **quelque
+chose à raconter**, puis un `setTimeout` de 1,15 s laisse le temps de le lire.
+
+⚠️ **ET ÇA MARCHE DANS UN ONGLET EN ARRIÈRE-PLAN**, ce qui n'était pas le cas
+avant : un navigateur ne déclenche plus une seule image sur une page qu'il ne
+compose pas. Constaté pendant les essais du lot précédent — le match restait
+figé à la 0ᵉ minute et il a fallu remplacer `requestAnimationFrame` par un
+minuteur pour pouvoir seulement le tester. Un écran qu'on ne peut pas tester sans
+bidouille est un écran trop fragile.
+
+### La taille des blocs varie, et elle ne tire pas au sort
+
+Un bloc systématiquement long de deux lignes donne un télétype régulier comme un
+métronome : on décroche. La cible cycle donc sur **2, 3, 4** à partir du nombre de
+lignes déjà écrites. ⚠️ **C'est une LECTURE de l'état, jamais un appel à
+`e.rng()`** — le générateur du moteur est la graine du match lui-même, y puiser
+pour l'affichage changerait le résultat et casserait le déterminisme. Mesuré :
+104 blocs par match, 2,9 lignes en moyenne, aucun pavé.
+
+### Ce que l'écran montre, et pourquoi
+
+- **Le bandeau** : les deux écussons, le score en gros, la minute, et une barre
+  de progression des 80 minutes.
+- ⚠️ **UNE BARRE DE TERRAIN AVEC UN BALLON QUI GLISSE.** C'est toute la part
+  « visuelle » dont un fil a besoin : un texte seul ne dit jamais si on défend sur
+  sa ligne ou si on pilonne à cinq mètres, et c'est pourtant ce qui fait monter la
+  tension. `avanceeDuBallon()` rend un nombre de 0 à 1, **retourné pour le camp
+  B** : les deux équipes voient leur en-but adverse à droite. Sans ce
+  retournement, la barre dirait « on pilonne » quand on défend, un match sur deux.
+- **Le fil**, avec **ma ligne surlignée en or**. Le match raconte trente joueurs :
+  sans ce liseré, on cherche son nom dans le mur de texte au lieu de vivre son
+  match. Mesuré : 25 lignes sur 280 me concernent.
+- **Le score en pastille, seulement quand il change.** Le répéter à chaque ligne
+  ferait un fil de chiffres où l'essai ne se remarque plus.
+- **Ma ligne de stats** en bas : minutes, plaquages, essais, mètres. Ou
+  « sur le banc », qui est une information à part entière.
+
+### La décision, et la consigne libre
+
+La carte réutilise **`moteur/decisions.ts`** tel quel — même repos de 95 secondes
+simulées, mêmes options tirées de `controle.ts`, même `demanderAction`. Le match
+est **figé** tant qu'elle est là : ni chrono, ni pions, ni horloge. On peut donc
+relire le fil au-dessus avant de choisir, ce qui est exactement le point du mode.
+
+⚠️ **LA CONSIGNE LIBRE EST DEMANDÉE, ET ELLE EXISTAIT DÉJÀ** : le champ de la
+barre du bas passe par `moteur/consignes.ts` (mots-clés d'abord, IA ensuite si
+elle est disponible). Elle ne remplace pas le choix, elle s'ajoute — on peut
+donner une consigne ET prendre une option.
+
+### 🩹 Deux bugs de mise en page attrapés en jeu
+
+⚠️ **LA MODALE FAISAIT 226 px DE LARGE DANS UNE FENÊTRE DE 966.** `.overlay-match`
+est une grille en `place-items: center` : sa colonne se dimensionne sur le
+CONTENU, donc un `width: 100 %` s'y résout circulairement et retombe sur la
+largeur du texte. Les boutons de décision se retrouvaient écrasés en colonne sur
+un écran d'ordinateur. La largeur se mesure désormais sur la FENÊTRE
+(`min(680px, calc(100vw - 2rem))`).
+
+⚠️ **`.fd-fil > div` s'appliquait aussi aux trois points d'attente** (grille à
+trois colonnes sur trois pastilles de 5 px) : le sélecteur du bloc d'attente a été
+renforcé.
+
+⚠️ **`navigator.vibrate` EST REFUSÉ AVANT LE PREMIER GESTE**, et Chrome l'écrit en
+ERREUR dans la console. Une erreur rouge pour un comportement parfaitement normal
+finit par masquer les vraies : on demande d'abord `userActivation.hasBeenActive`.
+
+### Ce qui devient inutilisé
+
+`components/MatchLive.tsx` n'est plus monté nulle part, et avec lui
+`moteur/camera.ts`, `moteur/manette.ts` et `components/ReglageTouches.tsx`.
+⚠️ **Les fichiers restent sur le disque, mais le réglage des touches a été RETIRÉ
+de l'écran ⚙️ Réglages** : proposer de réassigner « plaquer » à une touche qui ne
+fait plus rien serait un réglage qui ment. `verifMatchJouable.ts` continue de
+mesurer la caméra et les moments — il teste des modules purs, pas l'écran.
+
+**À trancher** : supprimer ces quatre fichiers pour de bon, ou garder l'ancien
+écran comme une option. Rien ne presse, et rien ne casse en attendant.
+
+### Mesuré
+
+```
+blocs par match                    104   (2,9 lignes en moyenne, aucun pavé)
+lignes au total                    300
+lignes qui me concernent            25   (sur 280)
+cartes de décision                  17   par match
+durée totale                       3,6 min  (1,9 de lecture · 1,7 de choix)
+score du fil == score de la ligue  0 écart sur 6 matchs
+```
+
+En navigateur, desktop (966 px) et téléphone (375 px) : modale 680 × 880 puis
+375 × 812 plein écran, barre de terrain 353 px, carte de décision à 38 % de la
+hauteur avec des boutons de 56 à 67 px, champ de consigne à 44 px, **aucun
+débordement horizontal**, et le match va au bout — 29-26 à la 80ᵉ, feuille de
+match, note 6,7/10 détaillée, puis la semaine avance et le match compte dans la
+saison.
+
+```bash
+npx vite-node scripts/verifFil.ts          # emojis, blocs, mon fil, durée, ballon, score de la ligue
+npx vite-node scripts/verifMoteur.ts       # inchangé : l'étalonnage du moteur
+npx vite-node scripts/verifApresMatch.ts   # inchangé : la note et le budget d'attributs
+npx vite-node scripts/verifTraductions.ts  # les 5 clés ajoutées, dans les 7 langues
+```

@@ -12,7 +12,6 @@ import {
 import type { Theme } from '../types';
 import { LANGUES, nombre, t, tn } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
-import { ReglageTouches } from './ReglageTouches';
 
 // Les trois ambiances. `apercu` est le dégradé montré sur la pastille — il
 // reprend exactement les deux extrémités de la rampe de fond du thème.
@@ -233,11 +232,12 @@ export function Reglages({ onFermer }: Props) {
           </p>
         </div>
 
-        {/* ⚠️ LES TOUCHES DU MATCH. Elles vivent ici et pas dans l'écran de
-            match : on ne réassigne pas un plaquage pendant qu'un ailier arrive
-            dessus. La notice, elle, reste dans le tiroir du direct — c'est là
-            qu'on la cherche. */}
-        <ReglageTouches />
+        {/* ⚠️ LE RÉGLAGE DES TOUCHES A ÉTÉ RETIRÉ DE CET ÉCRAN, et ce n'est
+            pas un oubli : le match ne se pilote plus au joystick ni au
+            clavier. Il se lit et il se choisit (voir components/MatchDirect),
+            et proposer de réassigner « plaquer » à une touche qui ne fait plus
+            rien serait un réglage qui ment. Le composant reste sur le disque
+            le temps qu'on décide du sort de l'ancien écran de match. */}
 
         <details className="tuto">
           <summary>📘 {t('reg.tutoriel')}</summary>

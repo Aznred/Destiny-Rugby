@@ -44,7 +44,7 @@ import { estTitulaire } from '../lib/moteur/titulaire';
 import { definirLangue, langueDuNavigateur, nombre, t, type Langue } from '../lib/i18n';
 import type { LigneReelle } from '../lib/moteur/saison';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
-import { ficheDepuisJoueur, scoreDeLaFiche } from '../lib/classementMondial';
+import { LIMITES, ficheDepuisJoueur, scoreDeLaFiche } from '../lib/classementMondial';
 import { cleAleatoire, envoyerAuClassement } from '../lib/classementEnLigne';
 import {
   COMPETITIONS_U20, competitionsDeLaSaison, fenetreInternationale, fenetreU20,
@@ -576,6 +576,26 @@ interface GameState {
    */
   cleClassement: string;
   /**
+   * LE PSEUDO SOUS LEQUEL ON FIGURE AU CLASSEMENT MONDIAL.
+   *
+   * Demande explicite : « faire un système de pseudo ». Jusqu'ici la fiche
+   * partait sous `j.pseudo ?? j.nom`, c'est-à-dire sous l'IDENTIFIANT @ DE
+   * L'OVALE s'il existait, sinon sous le nom du personnage. Deux surprises pour
+   * le joueur : il figurait sous un nom qu'il n'avait pas choisi pour ça, et il
+   * changeait de nom au classement en changeant de carrière.
+   *
+   * ⚠️ IL APPARTIENT À L'INSTALLATION, PAS À LA CARRIÈRE — comme
+   * `cleClassement` et `traitsDebloques`. On garde donc son nom de classement
+   * quand on raccroche et qu'on repart pour une nouvelle carrière : c'est la
+   * même personne qui joue, et c'est la même ligne du classement.
+   *
+   * ⚠️ VIDE = LE NOM DU PERSONNAGE. Pas de valeur par défaut inventée : tant
+   * qu'on n'a rien choisi, on figure sous le nom qu'on s'est donné à la
+   * création, exactement comme avant. Aucune sauvegarde ne change de nom au
+   * chargement.
+   */
+  pseudoClassement: string;
+  /**
    * L'identifiant de MA ligne dans le tableau mondial, tel que le serveur l'a
    * renvoyé au dernier envoi réussi. Nul tant qu'aucun envoi n'a abouti.
    *
@@ -784,6 +804,8 @@ interface GameState {
   acheterEquipement: (id: string) => boolean;
   /** Débloque un archétype de caractère contre des Ovas. */
   debloquerTrait: (id: string) => boolean;
+  /** Choisir son nom au classement mondial. Vide = le nom du personnage. */
+  setPseudoClassement: (p: string) => void;
   /** Débloque un cosmétique « par pub » une fois la pub regardée. */
   debloquerParPub: (id: string) => boolean;
   basculerEquipement: (id: string) => void;
@@ -834,6 +856,7 @@ export const useGame = create<GameState>()(
       traitsDebloques: [],
       // Tirée au premier lancement, puis persistée : elle ne change plus.
       cleClassement: cleAleatoire(),
+      pseudoClassement: '',
       rangMondialId: null,
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
@@ -1741,7 +1764,7 @@ export const useGame = create<GameState>()(
         // serveur, hors ligne, fiche refusée ou quota atteint, la saison se
         // referme exactement pareil. Le serveur ne garde que le MEILLEUR score :
         // renvoyer chaque année ne peut donc rien dégrader.
-        void envoyerAuClassement(ficheDepuisJoueur(j, undefined, get().cleClassement))
+        void envoyerAuClassement(ficheDepuisJoueur(j, get().pseudoClassement || undefined, get().cleClassement))
           .then(retenirMaLigne(set))
           .catch(() => {});
 
@@ -2873,7 +2896,7 @@ export const useGame = create<GameState>()(
         // une erreur qu'on ignore — la retraite reste instantanée, et le
         // classement local n'a besoin de personne. Le bouton manuel de l'écran
         // Classement reste là pour renvoyer une carrière en cours ou réessayer.
-        void envoyerAuClassement(ficheDepuisJoueur(joueur, undefined, get().cleClassement))
+        void envoyerAuClassement(ficheDepuisJoueur(joueur, get().pseudoClassement || undefined, get().cleClassement))
           .then(retenirMaLigne(set))
           .catch(() => {});
         setMouvementsClubs({});
@@ -2907,6 +2930,14 @@ export const useGame = create<GameState>()(
           ecran: 'pantheon',
           ecransVus: [...s.ecransVus, 'pantheon'].filter((e, i, l) => l.indexOf(e) === i),
         }));
+      },
+
+      setPseudoClassement: (p) => {
+        // ⚠️ ON BORNE ICI, PAS SEULEMENT À L'ÉCRAN. `verifierFiche` refuse un
+        // pseudo de plus de 24 caractères : laisser passer une saisie plus
+        // longue, c'est un envoi refusé par le serveur et une carrière qui
+        // n'entre jamais au classement, sans que rien ne l'explique.
+        set({ pseudoClassement: p.trim().slice(0, LIMITES.pseudoMax) });
       },
 
       reinitialiser: () => {
@@ -4172,6 +4203,7 @@ export const useGame = create<GameState>()(
           touchesMatch?: Liaisons;
           traitsDebloques?: string[];
           cleClassement?: string;
+          pseudoClassement?: string;
           rangMondialId?: number | null;
           ecransVus?: string[];
           guideFerme?: boolean;
@@ -4322,6 +4354,7 @@ export const useGame = create<GameState>()(
         // et le serveur la laisse tranquille ; la prochaine fin de saison en
         // ouvre une nouvelle, à elle. Voir `serveur/schema-vercel.sql`.
         s.cleClassement ||= cleAleatoire();
+        s.pseudoClassement ??= '';
         s.rangMondialId ??= null;
         s.ecransVus ??= [];
         s.guideFerme ??= false;
@@ -4363,6 +4396,7 @@ export const useGame = create<GameState>()(
         touchesMatch: s.touchesMatch,
         traitsDebloques: s.traitsDebloques,
         cleClassement: s.cleClassement,
+        pseudoClassement: s.pseudoClassement,
         rangMondialId: s.rangMondialId,
         pubs: s.pubs,
         pantheon: s.pantheon,

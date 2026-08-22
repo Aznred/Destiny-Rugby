@@ -14,6 +14,7 @@
 //     (`BUDGET_MATCHS_PAR_SAISON`) que rien ne contourne — sinon il suffirait
 //     de regarder tous ses matchs pour exploser le plafond de carrière.
 
+import type { Pion } from './entites';
 import type { AttributId, Joueur, PosteId, StatVariable } from '../../types';
 import { POSTE_PAR_ID } from '../../data/rugby';
 
@@ -187,6 +188,45 @@ export function detailNote(poste: PosteId, s: StatsMatchJoueur): PostNote[] {
 
 // LA NOTE DU MATCH, sur 10. Elle compare ce qu'a fait le joueur à ce qu'on
 // attend de SON POSTE, au prorata de son temps de jeu.
+/**
+ * La feuille d'un joueur, au format attendu par le barème de note.
+ *
+ * ⚠️ UNE SEULE EXTRACTION, TROIS USAGES : ce qui part dans la saison
+ * (`enregistrerMatchVecu`), ce qui s'affiche en détail de note, et les deux
+ * écrans de match. Deux copies, et le détail montré finirait par ne plus
+ * correspondre à la note calculée.
+ *
+ * ⚠️ ELLE A DÉMÉNAGÉ ICI DEPUIS `MatchLive.tsx` le jour où un second écran de
+ * match est arrivé (`MatchDirect`, le fil live). Une fonction de barème n'avait
+ * de toute façon rien à faire dans un composant de rendu.
+ */
+export function statsPourLaNote(p: Pion): StatsMatchJoueur {
+  return {
+    essais: p.stats.essais,
+    plaquages: p.stats.plaquages,
+    plaquagesManques: p.stats.plaquagesManques,
+    passes: p.stats.passes,
+    metres: Math.round(p.stats.metres),
+    grattages: p.stats.grattages,
+    butsTentes: p.stats.butsTentes,
+    butsReussis: p.stats.butsReussis,
+    cartons: p.stats.cartonsJaunes + p.stats.cartonsRouges,
+    minutes: Math.min(80, Math.round(p.minutes)),
+    // ⚠️ TOUTE LA FEUILLE REMONTE, pas seulement ce qui se voit. C'est ce qui
+    // permet à la note de juger un avant sur son vrai travail (mêlée, touche,
+    // ballons portés au ras) et pas sur ses essais.
+    passesDecisives: p.stats.passesDecisives,
+    offloads: p.stats.offloads,
+    franchissements: p.stats.franchissements,
+    turnovers: p.stats.passesRatees,
+    melees: p.stats.melees,
+    touchesGagnees: p.stats.touchesGagnees,
+    pickAndGo: p.stats.pickAndGo,
+    cinquanteVingtDeux: p.stats.cinquanteVingtDeux,
+    cartonsRouges: p.stats.cartonsRouges,
+  };
+}
+
 export function noterMatch(poste: PosteId, s: StatsMatchJoueur): number {
   const total = detailNote(poste, s).reduce((a, l) => a + l.points, 0);
   return Math.round(borner(total, 1, 10) * 10) / 10;

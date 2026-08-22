@@ -5,7 +5,7 @@ import { POSTE_PAR_ID, migrerPoste, nomPoste } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
 import { nomNationTraduit } from '../lib/nations';
 import { TROPHEES } from '../data/trophees';
-import { ficheDepuisJoueur, verifierFiche } from '../lib/classementMondial';
+import { LIMITES, ficheDepuisJoueur, verifierFiche } from '../lib/classementMondial';
 import { nombre, t } from '../lib/i18n';
 import type { LegendeSauvegardee, TitreGagne } from '../types';
 import { clubParNom } from '../data/clubs';
@@ -239,6 +239,8 @@ export function Classement() {
   const joueur = useGame((s) => s.joueur);
   const setEcran = useGame((s) => s.setEcran);
   const monRangId = useGame((s) => s.rangMondialId);
+  const pseudoClassement = useGame((s) => s.pseudoClassement);
+  const setPseudoClassement = useGame((s) => s.setPseudoClassement);
 
   const liste = classementComplet(pantheon, joueur);
 
@@ -259,25 +261,47 @@ export function Classement() {
   const [ligneOuverte, setLigneOuverte] = useState<string | null>(null);
   /** Le palmarès dont on regarde l'armoire en 3D, ou `null`. */
   const [vitrine, setVitrine] = useState<{ nom: string; palmares: TitreGagne[] } | null>(null);
+  /**
+   * La page du classement mondial affichée.
+   *
+   * ⚠️ ON PAGINE PARCE QUE LE CLASSEMENT NE S'ARRÊTE PLUS AU CENTIÈME (demande
+   * explicite : « qu'on puisse avoir accès à tout le monde »). Une carrière
+   * au-delà du top 100 existait en base sans exister à l'écran.
+   */
+  const [page, setPage] = useState(1);
+  /** Le pseudo en cours de saisie, ou `null` quand on ne l'édite pas. */
+  const [pseudoEnCours, setPseudoEnCours] = useState<string | null>(null);
 
   // Ouvrir une ligne, ou refermer celle qui l'était déjà.
   const basculer = (cle: string) => setLigneOuverte((v) => (v === cle ? null : cle));
 
   useEffect(() => {
     let vivant = true;
-    lireClassementMondial().then((r) => { if (vivant) setMondial(r); });
+    // ⚠️ ON ENVOIE SON IDENTIFIANT DE LIGNE, PAS SA CLÉ. Le serveur s'en sert
+    // pour renvoyer MON rang mondial, calculé sur le même tri que la page.
+    lireClassementMondial(page, monRangId).then((r) => { if (vivant) setMondial(r); });
     return () => { vivant = false; };
-  }, []);
+  }, [page, monRangId]);
 
   // Le verdict que le serveur rendrait sur la carrière en cours : il sert à
   // afficher l'état de l'envoi automatique, et à dire pourquoi si ça coince.
   const envoi = useMemo(() => {
     if (!joueur) return null;
-    const fiche = ficheDepuisJoueur(joueur);
+    // ⚠️ LE MÊME PSEUDO QUE CELUI QUI PART VRAIMENT (voir `useGame` →
+    // `pseudoClassement`). Afficher un verdict calculé sur un autre nom que
+    // celui envoyé, c'est promettre une ligne qui n'arrivera pas.
+    const fiche = ficheDepuisJoueur(joueur, pseudoClassement || undefined);
     return { fiche, verdict: verifierFiche(fiche, Object.keys(TROPHEES)) };
-  }, [joueur]);
+  }, [joueur, pseudoClassement]);
 
   const monPseudo = envoi?.fiche.pseudo ?? '';
+  /** La ligne du joueur, où qu'elle soit dans le classement. */
+  const maLigne = mondial?.etat === 'ok' ? mondial.moi : null;
+  const pages = mondial?.etat === 'ok'
+    ? Math.max(1, Math.ceil(mondial.total / Math.max(1, mondial.parPage))) : 1;
+  /** La page où se trouve ma ligne, pour pouvoir y sauter d'un clic. */
+  const maPage = maLigne?.rang && mondial?.etat === 'ok'
+    ? Math.ceil(maLigne.rang / Math.max(1, mondial.parPage)) : null;
 
   /**
    * Laquelle de ces lignes est la mienne ?
@@ -350,15 +374,23 @@ export function Classement() {
           <>
             <div className="ligne-classement entete">
               <span className="c-rang">#</span>
-              <span className="c-joueur">{t('clst.joueur')}</span>
+              <span className="c-joueur">
+                {t('clst.joueur')}
+                {' · '}
+                <small>{t('clst.carrieres', { n: nombre(mondial.total) })}</small>
+              </span>
               <span className="c-score">{t('clst.score')}</span>
             </div>
             {/* ⚠️ CHAQUE LIGNE S'OUVRE. C'est la demande : voir les stats, le
                 profil, l'armoire à trophées et les clubs des AUTRES joueurs.
                 Même les lignes d'avant la v2 du schéma sont cliquables — leur
                 fiche dit alors franchement qu'on n'a que le score. */}
-            {mondial.lignes.slice(0, 100).map((l, i) => {
+            {mondial.lignes.map((l, i) => {
               const cle = cleLigne(l, i);
+              // ⚠️ LE RANG NE PEUT PLUS ÊTRE L'INDEX DE LA LIGNE. Depuis qu'on
+              // pagine, le premier de la page 3 est 101ᵉ, pas 1ᵉʳ — et il ne
+              // porte évidemment pas la médaille d'or.
+              const rang = (mondial.page - 1) * mondial.parPage + i + 1;
               return (
               <Fragment key={cle}>
               <button
@@ -369,7 +401,7 @@ export function Classement() {
                 title={t('clst.voirDetails')}
               >
                 <span className="c-rang">
-                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                  {rang === 1 ? '🥇' : rang === 2 ? '🥈' : rang === 3 ? '🥉' : rang}
                 </span>
                 <span className="c-joueur">
                   {l.poste && (
@@ -408,7 +440,104 @@ export function Classement() {
               </Fragment>
               );
             })}
+
+            {/* ---------- LES PAGES : LE CLASSEMENT NE S'ARRÊTE PLUS AU 100ᵉ ----------
+                Demande explicite : « qu'on puisse avoir accès à tout le
+                monde ». Au-delà du centième, une carrière existait en base sans
+                exister à l'écran, et son auteur n'avait aucun moyen de savoir
+                où il se situait. */}
+            {pages > 1 && (
+              <div className="pages-classement">
+                <button
+                  type="button"
+                  className="btn fantome petit"
+                  disabled={mondial.page <= 1}
+                  onClick={() => setPage((v) => Math.max(1, v - 1))}
+                >
+                  ‹ {t('clst.precedent')}
+                </button>
+                <span className="pages-position">
+                  {t('clst.pageSur', { page: mondial.page, pages })}
+                </span>
+                <button
+                  type="button"
+                  className="btn fantome petit"
+                  disabled={mondial.page >= pages}
+                  onClick={() => setPage((v) => Math.min(pages, v + 1))}
+                >
+                  {t('clst.suivant')} ›
+                </button>
+                {maPage != null && maPage !== mondial.page && (
+                  <button
+                    type="button"
+                    className="btn fantome petit"
+                    title={t('clst.maPlaceAide')}
+                    onClick={() => setPage(maPage)}
+                  >
+                    🎯 {t('clst.maPlace')}
+                  </button>
+                )}
+              </div>
+            )}
           </>
+        )}
+
+        {/* ---------- MA LIGNE, TOUJOURS SOUS LES YEUX ----------
+            Demande explicite : « qu'on puisse voir notre classement en bas ».
+            ⚠️ ELLE NE DÉPEND PAS DE LA PAGE AFFICHÉE : le rang vient du serveur,
+            calculé sur le MÊME tri que le tableau. On est 4 000ᵉ et on le voit,
+            sans se chercher soi-même dans quarante pages. */}
+        {mondial?.etat === 'ok' && maLigne && (
+          <div className="ma-ligne-mondiale">
+            <div className="eyebrow">{t('clst.monRang')}</div>
+            <button
+              type="button"
+              className="ligne-classement moi"
+              disabled={maPage == null || maPage === mondial.page}
+              title={t('clst.maPlaceAide')}
+              onClick={() => { if (maPage != null) setPage(maPage); }}
+            >
+              <span className="c-rang">{maLigne.rang ?? '-'}</span>
+              <span className="c-joueur">
+                <span>
+                  <b>{maLigne.pseudo}</b>
+                  <small>
+                    {maLigne.nom && maLigne.nom !== maLigne.pseudo ? `${maLigne.nom} · ` : ''}
+                    {maLigne.saisons ? `${maLigne.saisons} ${t('clst.saisons').toLowerCase()}` : ''}
+                  </small>
+                </span>
+              </span>
+              <span className="c-score">{nombre(maLigne.score)}</span>
+            </button>
+          </div>
+        )}
+
+        {/* ---------- SOUS QUEL NOM JE FIGURE, ET COMMENT EN CHANGER ---------- */}
+        {envoi && pseudoEnCours !== null && (
+          <div className="edition-pseudo">
+            <label htmlFor="pseudo-classement">{t('clst.tonPseudo')}</label>
+            <div className="edition-pseudo-ligne">
+              <input
+                id="pseudo-classement"
+                type="text"
+                value={pseudoEnCours}
+                maxLength={LIMITES.pseudoMax}
+                placeholder={joueur?.nom ?? ''}
+                onChange={(ev) => setPseudoEnCours(ev.target.value)}
+              />
+              <button
+                type="button"
+                className="btn vert petit"
+                onClick={() => { setPseudoClassement(pseudoEnCours); setPseudoEnCours(null); }}
+              >
+                {t('ov.enregistrer')}
+              </button>
+              <button type="button" className="btn fantome petit" onClick={() => setPseudoEnCours(null)}>
+                {t('ov.annuler')}
+              </button>
+            </div>
+            <p className="aide">{t('clst.pseudoAide')}</p>
+          </div>
         )}
 
         {/* ⚠️ PLUS DE BOUTON : L'ENVOI EST AUTOMATIQUE. Ne reste que l'état, en
@@ -419,6 +548,19 @@ export function Classement() {
             {envoi.verdict.valide
               ? t('clst.publie', { pseudo: monPseudo, score: nombre(envoi.verdict.score) })
               : t('clst.rejete', { erreurs: envoi.verdict.anomalies.join(' · ') })}
+            {!maLigne && envoi.verdict.valide && ` ${t('clst.pasEncoreClasse')}`}
+            {pseudoEnCours === null && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="btn fantome petit"
+                  onClick={() => setPseudoEnCours(pseudoClassement)}
+                >
+                  ✏️ {t('clst.changerPseudo')}
+                </button>
+              </>
+            )}
           </p>
         )}
       </div>
