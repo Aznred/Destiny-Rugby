@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
+import { ReglageTouches } from './ReglageTouches';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
@@ -232,12 +233,11 @@ export function Reglages({ onFermer }: Props) {
           </p>
         </div>
 
-        {/* ⚠️ LE RÉGLAGE DES TOUCHES A ÉTÉ RETIRÉ DE CET ÉCRAN, et ce n'est
-            pas un oubli : le match ne se pilote plus au joystick ni au
-            clavier. Il se lit et il se choisit (voir components/MatchDirect),
-            et proposer de réassigner « plaquer » à une touche qui ne fait plus
-            rien serait un réglage qui ment. Le composant reste sur le disque
-            le temps qu'on décide du sort de l'ancien écran de match. */}
+        {/* ⚠️ LES TOUCHES DU MATCH. Elles vivent ici et pas dans l'écran de
+            match : on ne réassigne pas un plaquage pendant qu'un ailier arrive
+            dessus. La notice, elle, reste dans le tiroir du direct — c'est là
+            qu'on la cherche. */}
+        <ReglageTouches />
 
         <details className="tuto">
           <summary>📘 {t('reg.tutoriel')}</summary>

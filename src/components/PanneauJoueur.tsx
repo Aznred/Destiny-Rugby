@@ -28,15 +28,13 @@ import { EQUIPEMENT_PAR_ID } from '../data/boutique';
 // phases arrêtées, les pools de commentaire) : il pesait dans le chunk
 // principal alors qu'on ne l'ouvre qu'un week-end sur deux, et jamais avant
 // d'avoir créé un joueur.
-// ⚠️ LE MATCH SE JOUE DANS LE FIL, PLUS SUR LE TERRAIN 2D.
-// Demande explicite : « refais la mécanique de match totalement, que ce soit
-// super facile et fun à prendre en main sur n'importe quel appareil ». Le
-// terrain, la caméra et le joystick demandaient d'apprendre à jouer avant de
-// pouvoir jouer ; le fil demande de lire et de choisir. Voir MatchDirect.tsx.
-//
-// ⚠️ LE MOTEUR EST LE MÊME (lib/moteur/) : score de la ligue, statistiques,
-// discipline et note passent exactement par les mêmes fonctions.
-const MatchDirect = lazy(() => import('./MatchDirect').then((m) => ({ default: m.MatchDirect })));
+// ⚠️ LE MATCH SE JOUE SUR LE TERRAIN, PAS DANS UN FIL DE TEXTE.
+// Le fil (`MatchDirect`) a été essayé, et refusé : « reprends le même système
+// de jeu et de simulation d'avant, car maintenant c'est moche, mais en gardant
+// le système de moment comme maintenant ». Le terrain en deux dimensions, la
+// caméra et la manette reviennent donc ; les CARTES DE DÉCISION, elles, restent
+// — elles vivent dans `moteur/decisions.ts` et `MatchLive` les affiche déjà.
+const MatchLive = lazy(() => import('./MatchLive').then((m) => ({ default: m.MatchLive })));
 import type { Joueur } from '../types';
 
 const EMOJI_POSTE: Record<string, string> = {
@@ -475,7 +473,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
 
       {matchOuvert && affiche && (
         <Suspense fallback={null}>
-        <MatchDirect
+        <MatchLive
           match={affiche.match}
           saison={joueur.saison}
           cle={affiche.cle}

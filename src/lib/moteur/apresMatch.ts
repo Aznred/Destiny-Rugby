@@ -197,8 +197,9 @@ export function detailNote(poste: PosteId, s: StatsMatchJoueur): PostNote[] {
  * correspondre à la note calculée.
  *
  * ⚠️ ELLE A DÉMÉNAGÉ ICI DEPUIS `MatchLive.tsx` le jour où un second écran de
- * match est arrivé (`MatchDirect`, le fil live). Une fonction de barème n'avait
- * de toute façon rien à faire dans un composant de rendu.
+ * match a existé un temps. Ce second écran a disparu, mais la fonction reste
+ * ici : une fonction de barème n'avait de toute façon rien à faire dans un
+ * composant de rendu.
  */
 export function statsPourLaNote(p: Pion): StatsMatchJoueur {
   return {
