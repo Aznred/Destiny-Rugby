@@ -5500,7 +5500,7 @@ une consigne libre.
 
 | | avant (`MatchLive`) | maintenant (`MatchDirect`) |
 |---|---|---|
-| ce qu'on regarde | un terrain SVG, 30 pions, une caméra | **un fil de texte** |
+| ce qu'on regarde | un terrain SVG plein écran + une caméra | **un fil de texte, et un terrain en vignette** |
 | ce qu'on fait | joystick + 13 boutons + 20 touches | **on lit, et on choisit** |
 | la boucle | `requestAnimationFrame`, 60 images/s | **une horloge**, un bloc à la fois |
 | ce qu'il faut apprendre | le pilotage | rien |
@@ -5549,12 +5549,16 @@ pour l'affichage changerait le résultat et casserait le déterminisme. Mesuré 
 
 - **Le bandeau** : les deux écussons, le score en gros, la minute, et une barre
   de progression des 80 minutes.
-- ⚠️ **UNE BARRE DE TERRAIN AVEC UN BALLON QUI GLISSE.** C'est toute la part
-  « visuelle » dont un fil a besoin : un texte seul ne dit jamais si on défend sur
-  sa ligne ou si on pilonne à cinq mètres, et c'est pourtant ce qui fait monter la
-  tension. `avanceeDuBallon()` rend un nombre de 0 à 1, **retourné pour le camp
-  B** : les deux équipes voient leur en-but adverse à droite. Sans ce
-  retournement, la barre dirait « on pilonne » quand on défend, un match sur deux.
+- ⚠️ **UN VRAI TERRAIN, VU DU DESSUS.** Retour de jeu : « on voit pas le
+  terrain ». La première version se contentait d'une barre de progression avec
+  un ballon qui glissait : elle disait où était le ballon, elle ne disait pas où
+  étaient les joueurs, ni à quoi ressemblait la situation. La pelouse est
+  revenue — les trente pions, le ballon, les 22, la médiane, les poteaux — mais
+  **sans rien de ce qui pesait** : pas de caméra, pas de pivot en portrait, pas
+  d'interpolation, pas de `requestAnimationFrame`. Elle est redessinée **une
+  fois par bloc**, environ une fois par seconde, et le déplacement est lissé par
+  une simple transition CSS sur `cx`/`cy`. Mesurée : 521 × 300 sur ordinateur,
+  353 × 203 sur téléphone (25 % de la hauteur), rapport 1,74 exact, 30 pions.
 - **Le fil**, avec **ma ligne surlignée en or**. Le match raconte trente joueurs :
   sans ce liseré, on cherche son nom dans le mur de texte au lieu de vivre son
   match. Mesuré : 25 lignes sur 280 me concernent.
@@ -5574,6 +5578,15 @@ relire le fil au-dessus avant de choisir, ce qui est exactement le point du mode
 barre du bas passe par `moteur/consignes.ts` (mots-clés d'abord, IA ensuite si
 elle est disponible). Elle ne remplace pas le choix, elle s'ajoute — on peut
 donner une consigne ET prendre une option.
+
+### ⚠️ UN BUG D'AFFICHAGE SIGNALÉ N'EST PAS TOUJOURS UN BUG PRÉSENT
+
+Le fil écrasé a été signalé **deux fois**, la seconde après correction : la
+capture montrait encore les rangées empilées alors qu'un chargement neuf donnait
+`position: static`, 656 × 31 px, 36 px d'écart. C'était un **bundle pas
+rechargé**. Le réflexe utile, avant de repartir chercher une cause : mesurer sur
+une page fraîche, et si c'est propre, demander un rechargement franc plutôt que
+de corriger un défaut qui n'existe plus.
 
 ### 🩹 Deux classes qui portaient le même nom
 

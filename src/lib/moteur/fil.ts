@@ -28,7 +28,6 @@
 
 import { avancer } from './moteur';
 import type { Commentaire, EtatMatch, TypeCommentaire } from './etat';
-import { LIGNE_A, LIGNE_B } from './terrain';
 
 /**
  * L'emoji de chaque type d'action.
@@ -176,27 +175,4 @@ export function jouerUnBloc(
 
   if (e.fini) return { raison: 'fini', produites: e.commentaires.length - depart };
   return { raison: 'bloc', produites: e.commentaires.length - depart };
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// LA POSITION DU BALLON, EN UN SEUL NOMBRE
-// ───────────────────────────────────────────────────────────────────────────
-
-/**
- * Où en est le ballon sur le terrain, de 0 (ma ligne d'essai) à 1 (la sienne).
- *
- * ⚠️ C'EST TOUTE LA PARTIE « VISUELLE » DONT UN FIL A BESOIN. Un texte seul ne
- * dit jamais si on défend sur sa ligne ou si on pilonne à cinq mètres — et
- * c'est pourtant ce qui fait monter la tension. Une barre et un ballon qui
- * glisse suffisent, là où une scène en deux dimensions demandait une caméra,
- * une interpolation et soixante images par seconde.
- *
- * @param monCote le camp du joueur incarné ; à défaut, on regarde du côté A.
- */
-export function avanceeDuBallon(e: EtatMatch, monCote: 'A' | 'B' = 'A'): number {
-  const brut = (e.ballon.x - LIGNE_A) / (LIGNE_B - LIGNE_A);
-  const borne = Math.max(0, Math.min(1, brut));
-  // Le camp B attaque vers les X décroissants : on retourne pour que « vers la
-  // droite » veuille toujours dire « vers l'en-but adverse ».
-  return monCote === 'A' ? borne : 1 - borne;
 }

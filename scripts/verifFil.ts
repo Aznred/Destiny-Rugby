@@ -23,9 +23,10 @@ import { jouerRencontre } from '../src/lib/championnat';
 import { effectifDuClub } from '../src/lib/effectif';
 import { decisionPour } from '../src/lib/moteur/decisions';
 import {
-  BLOC_MAX, BLOC_MIN, EMOJI_ACTION, avanceeDuBallon, filComplet, habiller, jouerUnBloc,
+  BLOC_MAX, BLOC_MIN, EMOJI_ACTION, filComplet, habiller, jouerUnBloc,
 } from '../src/lib/moteur/fil';
 import type { TypeCommentaire } from '../src/lib/moteur/etat';
+import { LARGEUR, LONGUEUR } from '../src/lib/moteur/terrain';
 
 let echecs = 0;
 function ligne(nom: string, valeur: string | number, ok: boolean): void {
@@ -160,27 +161,47 @@ console.log('\n=== 4. UN MATCH TIENT DANS UNE PAUSE CAFÉ ===');
   ligne('assez de décisions pour jouer (≥ 8)', cMoy.toFixed(0), cMoy >= 8);
 }
 
-// ═══ 5. LA POSITION DU BALLON ═══════════════════════════════════════════════
-console.log('\n=== 5. LA BARRE DE TERRAIN DIT OÙ ON EN EST ===');
+// ═══ 5. LA PELOUSE EST LISIBLE ══════════════════════════════════════════════
+console.log('\n=== 5. LE TERRAIN VU DU DESSUS ===');
 {
-  const { e } = nouveauMatch('ballon#1');
-  let hors = 0;
-  let min = 1;
-  let max = 0;
+  // ⚠️ CE QUE LA PELOUSE DEMANDE AU MOTEUR : que tout le monde reste DANS le
+  // rectangle. Elle dessine les positions telles quelles, en mètres, sans
+  // caméra ni recadrage — un pion à x = −9 (ça s'est déjà vu, voir CLAUDE.md)
+  // sortirait tout simplement du cadre, sans que rien ne le signale.
+  const { e } = nouveauMatch('pelouse#1');
+  let horsCadre = 0;
+  let ballonHors = 0;
+  let mesures = 0;
+  let surLeTerrain = 0;
+  let pire = 0;
+
   for (let i = 0; i < 400 && !e.fini; i++) {
     avancer(e, 1.5);
-    const a = avanceeDuBallon(e, 'A');
-    if (a < 0 || a > 1) hors++;
-    min = Math.min(min, a);
-    max = Math.max(max, a);
-    // ⚠️ LES DEUX CAMPS VOIENT LEUR EN-BUT ADVERSE À DROITE : sans ce
-    // retournement, la barre dirait « on pilonne » quand on défend, un match
-    // sur deux.
-    if (Math.abs(avanceeDuBallon(e, 'B') - (1 - a)) > 1e-9) hors++;
+    mesures++;
+    const dessus = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0);
+    surLeTerrain = Math.max(surLeTerrain, dessus.length);
+    for (const p of dessus) {
+      const debord = Math.max(0, -p.pos.x, p.pos.x - LONGUEUR, -p.pos.y, p.pos.y - LARGEUR);
+      if (debord > 0) horsCadre++;
+      pire = Math.max(pire, debord);
+    }
+    if (e.ballon.x < 0 || e.ballon.x > LONGUEUR || e.ballon.y < 0 || e.ballon.y > LARGEUR) ballonHors++;
   }
-  ligne('toujours entre 0 et 1', `${hors} sortie(s)`, hors === 0);
-  ligne('le ballon parcourt le terrain', `${(min * 100).toFixed(0)} % → ${(max * 100).toFixed(0)} %`,
-    min < 0.3 && max > 0.7);
+
+  console.log(`  ${'relevés'.padEnd(46)} ${mesures}`);
+  // ⚠️ QUELQUES DÉBORDEMENTS SONT DU VRAI RUGBY, PAS UN BUG : un chasseur lancé
+  // sur un porteur qui plonge dans l'en-but sort du rectangle, et un ballon
+  // poussé en touche aussi — le moteur l'autorise explicitement (voir
+  // CLAUDE.md, « les positions sont bornées sur les deux axes, sauf pour un
+  // chasseur »). Ce qu'on refuse, c'est le pion projeté LOIN du cadre : le
+  // symptôme du bug historique du ballon à x = −9.
+  console.log(`  ${'débordements'.padEnd(46)} ${horsCadre} relevés, au pire ${pire.toFixed(1)} m`);
+  ligne('personne n\u2019est projeté hors du terrain', `${pire.toFixed(1)} m au pire`, pire <= 3);
+  ligne('le ballon reste sur le terrain', `${ballonHors} sortie(s)`, ballonHors === 0);
+  // Trente pions dessinés : c'est ce qui fait qu'on RECONNAÎT une situation de
+  // rugby plutôt qu'un point qui bouge.
+  ligne('les deux équipes sont dessinables', `${surLeTerrain} pions au maximum`,
+    surLeTerrain >= 28 && surLeTerrain <= 30);
 }
 
 // ═══ 6. LE SCORE RESTE CELUI DE LA LIGUE ════════════════════════════════════

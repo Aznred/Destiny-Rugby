@@ -52,7 +52,8 @@ import { demanderAction } from '../lib/moteur/controle';
 import {
   DELAI_DECISION, decisionPour, type Decision,
 } from '../lib/moteur/decisions';
-import { avanceeDuBallon, filComplet, jouerUnBloc, type LigneFil } from '../lib/moteur/fil';
+import { filComplet, jouerUnBloc, type LigneFil } from '../lib/moteur/fil';
+import { LARGEUR, LONGUEUR } from '../lib/moteur/terrain';
 import { detailNote, noterMatch, statsPourLaNote } from '../lib/moteur/apresMatch';
 import { CONSIGNE_NEUTRE, lireConsigneIA, lireConsigneLocale } from '../lib/moteur/consignes';
 import { estTitulaire } from '../lib/moteur/saison';
@@ -68,6 +69,7 @@ import type { Joueur } from '../types';
 import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
 import { FeuilleMatch } from './match/FeuilleMatch';
+import { PelouseMemo } from './match/Pelouse';
 import { t } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
 
@@ -81,6 +83,18 @@ import { useModalDialog } from '../lib/useModalDialog';
  */
 const RYTHME = { normal: 1150, rapide: 260 } as const;
 type Vitesse = keyof typeof RYTHME;
+
+/**
+ * Les deux couleurs d'un club, pour que les trente pions se distinguent.
+ * Repli sur une teinte tirée du nom quand la base n'en fournit pas.
+ */
+function couleursDe(nom: string): [string, string] {
+  const club = clubParNom(nom);
+  if (club) return [club.c1, club.c2];
+  let h = 0;
+  for (let i = 0; i < nom.length; i++) h = (h * 31 + nom.charCodeAt(i)) >>> 0;
+  return [`hsl(${h % 360} 62% 42%)`, '#ffffff'];
+}
 
 /** Le niveau décide de toute la discipline (voir `moteur/bagarre.ts`). */
 function niveauDuMatch(joueur: Joueur | null | undefined, selection?: boolean): NiveauMatch {
@@ -146,6 +160,8 @@ export function MatchDirect({
   const e = moteur.current;
   const clubA = clubParNom(e.clubA);
   const clubB = clubParNom(e.clubB);
+  const couleursA = couleursDe(e.clubA);
+  const couleursB = couleursDe(e.clubB);
   const monPion = e.pions.find((p) => p.moi);
 
   const [lignes, setLignes] = useState<LigneFil[]>([]);
@@ -289,8 +305,6 @@ export function MatchDirect({
   }, [consigne, e, iaActivee]);
 
   // ── LE RENDU ──────────────────────────────────────────────────────────────
-  const monCote = monPion?.cote ?? 'A';
-  const avancee = avanceeDuBallon(e, monCote);
   const minute = Math.min(80, Math.floor(e.t / 60));
   const mesStats = monPion ? {
     minutes: Math.min(80, Math.round(monPion.minutes)),
@@ -329,22 +343,46 @@ export function MatchDirect({
 
         <div className="fd-chrono"><span style={{ width: `${(minute / 80) * 100}%` }} /></div>
 
-        {/* ═══ OÙ EST LE BALLON ═══════════════════════════════════════════
-            ⚠️ LES MARQUAGES S'APPELLENT `fd-marque`, PAS `fd-ligne`. Les deux
-            ont porté le même nom, et comme un marquage est en
-            `position: absolute; top: 0; bottom: 0; width: 1px`, CHAQUE rangée
-            du fil héritait de la règle : toutes empilées au même endroit, sur
-            un pixel de large, illisibles. Vu en jeu, capture à l'appui.
-            ⚠️ TOUTE LA PART « VISUELLE » DONT UN FIL A BESOIN. Un texte seul
-            ne dit jamais si on défend sur sa ligne ou si on pilonne à cinq
-            mètres, et c'est pourtant ce qui fait monter la tension. */}
-        <div className="fd-terrain" aria-hidden="true">
-          <span className="fd-enbut gauche" />
-          <span className="fd-marque" style={{ left: '22%' }} />
-          <span className="fd-marque milieu" style={{ left: '50%' }} />
-          <span className="fd-marque" style={{ left: '78%' }} />
-          <span className="fd-enbut droite" />
-          <span className="fd-ballon" style={{ left: `${avancee * 100}%` }}>🏉</span>
+        {/* ═══ LE TERRAIN, EN VRAI ════════════════════════════════════════
+            Retour de jeu : « on voit pas le terrain ». Une barre de progression
+            disait où était le ballon ; elle ne disait pas où étaient les
+            joueurs, ni à quoi ressemblait la situation. On remet donc une
+            VRAIE pelouse, vue du dessus, avec les trente pions et le ballon.
+
+            ⚠️ ET ELLE NE COÛTE PRESQUE RIEN, contrairement à l'ancien terrain
+            plein écran : pas de caméra, pas de pivot, pas d'interpolation, pas
+            de `requestAnimationFrame`. Elle est redessinée UNE FOIS PAR BLOC —
+            environ une fois par seconde — et le déplacement est lissé par une
+            transition CSS sur `cx` et `cy`. C'est tout.
+
+            ⚠️ `PelouseMemo` dessine en MÈTRES DE TERRAIN (122 × 70) : les
+            positions du moteur s'y posent telles quelles, sans conversion. */}
+        <div className="fd-pelouse">
+          <svg
+            viewBox={`0 0 ${LONGUEUR} ${LARGEUR}`}
+            preserveAspectRatio="xMidYMid meet"
+            role="img"
+            aria-label={t('fd.terrain')}
+          >
+            <PelouseMemo />
+            {e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0).map((p) => {
+              const [fond, trait] = p.cote === 'A' ? couleursA : couleursB;
+              return (
+                <circle
+                  key={`${p.cote}${p.numero}`}
+                  className={p.moi ? 'fd-pion moi' : 'fd-pion'}
+                  cx={p.pos.x}
+                  cy={p.pos.y}
+                  r={p.moi ? 1.6 : 1.15}
+                  fill={fond}
+                  stroke={p.moi ? '#ffd97a' : trait}
+                  strokeWidth={p.moi ? 0.55 : 0.28}
+                />
+              );
+            })}
+            <circle className="fd-ballon" cx={e.ballon.x} cy={e.ballon.y} r="1"
+              fill="#ffd97a" stroke="#2c1f04" strokeWidth="0.4" />
+          </svg>
         </div>
 
         {/* ═══ LE FIL ═════════════════════════════════════════════════════ */}

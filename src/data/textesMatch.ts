@@ -103,6 +103,7 @@ export const TEXTES_MATCH: Record<string, Traduction> = {
   // ce mensonge qui faisait croire que le pilotage était cassé alors qu'il
   // était seulement cinq fois trop rapide. Chaque tempo dit ce qu'il FAIT.
   'ml.fermer': { fr: "Fermer", en: "Close", es: "Cerrar", it: "Chiudi", de: "Schließen", pt: "Fechar", ja: "閉じる" },
+  'fd.terrain': { fr: "Le terrain vu du dessus : les joueurs et le ballon, en direct.", en: "The pitch from above: players and ball, live.", es: "El campo visto desde arriba: jugadores y balón, en directo.", it: "Il campo visto dall alto: giocatori e pallone, in diretta.", de: "Das Spielfeld von oben: Spieler und Ball, live.", pt: "O campo visto de cima: jogadores e bola, em direto.", ja: "ピッチを上から。選手とボールをリアルタイムで。" },
   'fd.surLeBanc': { fr: "Sur le banc", en: "On the bench", es: "En el banquillo", it: "In panchina", de: "Auf der Bank", pt: "No banco", ja: "ベンチ" },
   'fd.consigne': { fr: "Une consigne ? (ex. « on défend haut »)", en: "An instruction? (e.g. \"press up in defence\")", es: "¿Una consigna? (p. ej. «defendemos arriba»)", it: "Un’indicazione? (es. «difesa alta»)", de: "Eine Ansage? (z. B. „hoch verteidigen“)", pt: "Uma indicação? (ex. «defender alto»)", ja: "指示は？（例「ディフェンスを前に」）" },
   'fd.enCours': { fr: "Le match se joue…", en: "The match is under way…", es: "El partido está en marcha…", it: "La partita è in corso…", de: "Das Spiel läuft…", pt: "O jogo está a decorrer…", ja: "試合進行中…" },

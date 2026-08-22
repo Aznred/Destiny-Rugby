@@ -2877,34 +2877,50 @@
   transition: width 0.5s linear;
 }
 
-/* --- Où est le ballon ----------------------------------------------------
-   ⚠️ C'EST TOUTE LA PART VISUELLE DONT UN FIL A BESOIN. Un texte seul ne dit
-   jamais si on défend sur sa ligne ou si on pilonne à cinq mètres — et c'est
-   pourtant ce qui fait monter la tension. Une barre et un ballon qui glisse
-   suffisent, là où une scène en deux dimensions demandait une caméra, une
-   interpolation et soixante images par seconde. */
-.fd-terrain {
-  position: relative;
-  height: 26px;
-  margin: 0.5rem 0.7rem 0.2rem;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: repeating-linear-gradient(90deg,
-    rgba(28, 74, 44, 0.85) 0 8%, rgba(24, 64, 38, 0.85) 8% 16%);
-  overflow: hidden;
+/* --- LE TERRAIN, VU DU DESSUS ----------------------------------------------
+   Retour de jeu : « on voit pas le terrain ». Une barre de progression disait
+   où était le ballon ; elle ne disait pas où étaient les joueurs.
+
+   ⚠️ ELLE NE COÛTE PRESQUE RIEN, contrairement à l'ancien terrain plein écran :
+   pas de caméra, pas de pivot, pas d'interpolation, pas de boucle d'images. Le
+   SVG est redessiné UNE FOIS PAR BLOC, environ une fois par seconde.
+
+   ⚠️ ET C'EST LE SVG QUI PORTE SES DIMENSIONS, PAS LE CONTENEUR. Avec
+   « width: auto ; height: auto ; max-width: 100% ; max-height: … », le rapport
+   122/70 du viewBox donne la taille exacte : aucune bande noire sur les côtés,
+   aucune déformation. Mettre la contrainte sur le conteneur aurait donné l'un
+   ou l'autre. */
+.fd-pelouse {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  margin: 0.5rem 0.7rem 0.1rem;
 }
-.fd-enbut { position: absolute; top: 0; bottom: 0; width: 9%; background: rgba(232, 178, 58, 0.16); }
-.fd-enbut.gauche { left: 0; }
-.fd-enbut.droite { right: 0; }
-.fd-marque { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, 0.22); }
-.fd-marque.milieu { background: rgba(255, 255, 255, 0.4); }
-.fd-ballon {
-  position: absolute; top: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 0.85rem;
-  /* Le ballon glisse, il ne saute pas : c'est le seul mouvement de l'écran. */
-  transition: left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+.fd-pelouse svg {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  /* ⚠️ LE TERRAIN NE DOIT JAMAIS MANGER LE FIL. Un plafond en pixels seul ne
+     suffit pas : sur une fenêtre courte, 300 px, c'est la moitié de la modale.
+     Le plafond est donc aussi relatif à la hauteur de l'écran. */
+  max-height: min(300px, 30vh);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* ⚠️ LE DÉPLACEMENT EST LISSÉ PAR UNE TRANSITION, PAS PAR UNE BOUCLE. Les pions
+   sautent d'une position à l'autre une fois par bloc ; sans transition, l'œil
+   ne suit rien. Chrome, Firefox et Safari animent `cx`/`cy` en CSS depuis
+   longtemps — et là où ce n'est pas le cas, le pion saute, ce qui reste lisible. */
+.fd-pion, .fd-ballon {
+  transition: cx 0.9s linear, cy 0.9s linear;
+}
+/* Mon joueur porte une aura : c'est LUI qu'on cherche des yeux. */
+.fd-pion.moi { filter: drop-shadow(0 0 1.4px #ffd97a); }
+@media (prefers-reduced-motion: reduce) {
+  .fd-pion, .fd-ballon { transition: none; }
 }
 
 /* --- Le fil ---------------------------------------------------------------
@@ -2965,7 +2981,7 @@
 @keyframes fd-entree { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) {
   .fd-evt { animation: none; }
-  .fd-ballon, .fd-chrono span { transition: none; }
+  .fd-chrono span { transition: none; }
 }
 
 /* Les trois points : le match continue, il ne s'est pas figé.
