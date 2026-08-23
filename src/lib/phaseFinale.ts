@@ -12,7 +12,7 @@
 // Tout est déterministe (graine = division + saison + tour + équipes) : rouvrir
 // l'écran ne rejoue pas les matchs, et rien n'a besoin d'être sauvegardé.
 
-import { championnatEnDirect, graine, type LigneTableau } from './championnat';
+import { championnatEnDirect, graine, scorePossible, type LigneTableau } from './championnat';
 import { forceEffectif } from './effectif';
 import { semaine } from '../data/calendrier';
 import type { Joueur } from '../types';
@@ -67,10 +67,19 @@ export function duel(
   // Un match de phase finale se joue plus fermé qu'une journée de championnat :
   // moins de points, plus de tension, et l'écart pèse un peu moins (« tout peut
   // arriver sur un match »).
-  let scoreD = Math.max(0, Math.round(18 + ecart * 0.85 + (rng() * 18 - 9)));
-  let scoreE = Math.max(0, Math.round(18 - ecart * 0.85 + (rng() * 18 - 9)));
+  // ⚠️ ON MARQUE AU RUGBY PAR 3, 5 OU 7 : 1, 2 ET 4 SONT IMPOSSIBLES. La règle
+  // existait depuis longtemps (`scorePossible`, championnat.ts) et
+  // `jouerRencontre` l'applique — mais `duel`, qui décide de TOUS les matchs à
+  // élimination directe (coupes d'Europe, phases finales de championnat,
+  // tournoi amateur de fin d'année), ne l'appelait pas. On lisait donc des
+  // « 20-4 » en quart de finale de Champions Cup, relevé en jeu.
+  let scoreD = scorePossible(18 + ecart * 0.85 + (rng() * 18 - 9));
+  let scoreE = scorePossible(18 - ecart * 0.85 + (rng() * 18 - 9));
   if (scoreD === scoreE) {
-    // Prolongation puis drop : quelqu'un doit sortir vainqueur.
+    // ⚠️ DÉPARTAGER APRÈS L'ARRONDI, PAS AVANT : rabattre 4 sur 3 peut CRÉER
+    // une égalité (4-3 devient 3-3). Trancher en amont laisserait donc des
+    // matchs nuls dans un tableau à élimination directe, où quelqu’un doit
+    // sortir. Prolongation puis drop : trois points, et c’est réglé.
     if (rng() < 0.55) scoreD += 3;
     else scoreE += 3;
   }

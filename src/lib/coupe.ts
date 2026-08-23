@@ -68,10 +68,58 @@ export interface EtatCoupe {
   totalJournees: number;
   journeesJouees: number;
   bracket: MatchFinal[]; // huitièmes → quarts → demies → finale
+  /**
+   * ⚠️ LE RANG (`ORDRE_TOUR`) DU TOUR QUI SE JOUE CETTE SEMAINE-LÀ — pas le
+   * plus profond du tableau.
+   *
+   * Sans lui, on ne peut pas distinguer « la finale se joue aujourd’hui » de
+   * « la finale a été jouée la semaine dernière et le tableau est fini ». Les
+   * deux donnent le même `bracket`. Mesuré : sur la Prem Rugby Cup, dont le
+   * tableau s’épuise avant la dernière date de coupe, le finaliste rejouait sa
+   * finale une semaine de plus.
+   *
+   * Vaut 0 tant qu’on est en poules, et dépasse le rang de la finale quand la
+   * compétition est terminée : dans les deux cas, il n’y a pas de match.
+   */
+  ordreTourCourant: number;
   vainqueur: string | null;
   engage: boolean; // le club du joueur dispute cette coupe
   /** Les clubs reversés depuis la Champions Cup (Challenge Cup uniquement). */
   reverses: string[];
+}
+
+/**
+ * L'ordre des tours d'un tableau final. Exporté parce que trois écrans en ont
+ * besoin pour savoir ce qui est joué et ce qui reste à jouer.
+ */
+export const ORDRE_TOUR: Record<MatchFinal['tour'], number> = {
+  barrage: 1, quart: 2, demie: 3, finale: 4, accession: 5,
+};
+
+/**
+ * ⚠️ LE MATCH QUE CE CLUB DISPUTE **AU TOUR EN COURS** — pas le premier qu’il
+ * ait joué dans le tableau.
+ *
+ * C’est la correction d’un bug de jeu signalé tel quel : « les phases finales
+ * sont buguées, je joue toujours contre la même équipe jusqu’à la finale avec
+ * le même score ». La cause tient en un mot : `EtatCoupe.bracket` contient
+ * **tous les tours déjà joués**, pas seulement le dernier. Un appelant qui
+ * faisait `bracket.find(m => m.domicile === club …)` retombait donc chaque
+ * semaine sur le PREMIER match du club — son quart de finale — et le lui
+ * refaisait jouer, adversaire et score compris, jusqu’au bout de la coupe.
+ *
+ * ⚠️ ET SI LE CLUB N’EST PAS DANS LE DERNIER TOUR, C’EST QU’IL EST ÉLIMINÉ :
+ * on rend `undefined`. Chercher son match « le plus profond » aurait rendu
+ * indéfiniment sa défaite d’élimination — le même bug, un tour plus loin.
+ */
+export function matchDuTourCourant(etat: EtatCoupe, club: string): MatchFinal | undefined {
+  return etat.bracket.find((m) => ORDRE_TOUR[m.tour] === etat.ordreTourCourant
+    && (m.domicile === club || m.exterieur === club));
+}
+
+/** Les matchs du tour en cours, tous clubs confondus. */
+export function matchsDuTourCourant(etat: EtatCoupe): MatchFinal[] {
+  return etat.bracket.filter((m) => ORDRE_TOUR[m.tour] === etat.ordreTourCourant);
 }
 
 /** Les trois championnats qui alimentent les coupes d'Europe. */
@@ -412,6 +460,7 @@ export function coupeEnDirect(
 
   const bracket: MatchFinal[] = [];
   let vainqueur: string | null = null;
+  let ordreTourCourant = 0;
 
   if (jusqua >= total && seize.length >= 4) {
     const cle = (tour: string, a: string, b: string) => `coupe#${coupeId}#${saison}#${tour}#${a}#${b}`;
@@ -444,11 +493,17 @@ export function coupeEnDirect(
       etape += 1;
     }
 
-    const ordre: Record<MatchFinal['tour'], number> = { barrage: 1, quart: 2, demie: 3, finale: 4, accession: 5 };
+    const ordre = ORDRE_TOUR;
     // Les tours d'un tableau de 8 démarrent au quart : on décale pour que le
     // premier tour joué soit bien débloqué à la première date de phase finale.
     const decalage = seize.length > 8 ? 0 : 1;
     bracket.push(...tous.filter((m) => ordre[m.tour] - decalage <= toursJoues));
+    // ⚠️ LE TOUR DE LA SEMAINE, ET IL PEUT NE PAS EXISTER. Une fois la finale
+    // disputée, `toursJoues` continue de grandir s’il reste des dates de coupe
+    // au calendrier (c’est le cas de la Prem Rugby Cup) : le rang dépasse alors
+    // celui de la finale, aucun match ne correspond, et c’est exactement ce
+    // qu’on veut dire — la compétition est finie.
+    ordreTourCourant = toursJoues + decalage;
     const derniere = tous[tous.length - 1];
     if (derniere && ordre[derniere.tour] - decalage <= toursJoues) vainqueur = derniere.vainqueur;
   }
@@ -460,6 +515,7 @@ export function coupeEnDirect(
     poules,
     totalJournees: total,
     journeesJouees: jusqua,
+    ordreTourCourant,
     bracket,
     vainqueur,
     engage: (engagesEuropeens(saison)[coupeId] ?? []).some((e) => e.club === clubJoueur),

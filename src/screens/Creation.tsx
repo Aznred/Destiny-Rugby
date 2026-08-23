@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { LIMITES } from '../lib/classementMondial';
 import { t } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
@@ -18,7 +19,12 @@ import type { PosteId } from '../types';
 // ⚠️ L’ÂGE DE DÉPART EST BORNÉ, MAIS PAS PENDANT LA FRAPPE. Voir le champ
 // plus bas : c’est exactement ce qui le rendait impossible à changer.
 const AGE_MIN = 16;
-const AGE_MAX = 30;
+/**
+ * ⚠️ LU DEPUIS LE CRIBLE DU CLASSEMENT, PAS RECOPIÉ. Les deux valeurs ont vécu
+ * séparément — 30 ici, 24 là-bas — et toute carrière commencée après 24 ans
+ * était refusée au classement mondial, à vie, sans que rien ne le signale.
+ */
+const AGE_MAX = LIMITES.ageDebutMax;
 const AGE_DEFAUT = 18;
 const bornerAge = (n: number) => Math.max(AGE_MIN, Math.min(AGE_MAX, n));
 

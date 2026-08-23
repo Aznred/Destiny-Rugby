@@ -8,7 +8,7 @@
 
 import { affichesDeLaJournee } from '../championnat';
 import { effectifDuClub } from '../effectif';
-import { coupeEnDirect } from '../coupe';
+import { coupeEnDirect, matchsDuTourCourant } from '../coupe';
 import { affichesInternationales, effectifNational } from '../international';
 import { avancer, bilan, creerMatch } from './moteur';
 import type { AttributsPion } from './entites';
@@ -139,7 +139,12 @@ export function simulerJourneeCoupe(
     }
   }
   if (journee > etat.totalJournees) {
-    for (const m of etat.bracket) {
+    // ⚠️ SEULEMENT LE TOUR EN COURS. `etat.bracket` cumule tous les tours déjà
+    // joués : le parcourir en entier à chaque semaine de coupe rejouait les
+    // quarts en même temps que les demies, puis en même temps que la finale —
+    // et `verser` ACCUMULE, donc les statistiques de ces matchs étaient comptées
+    // deux puis trois fois dans le classement individuel.
+    for (const m of matchsDuTourCourant(etat)) {
       if (joues++ >= MAX_MATCHS_PAR_JOURNEE) break;
       const concerne = avatar && (avatar.club === m.domicile || avatar.club === m.exterieur);
       verser(sortie, jouerSansRendu(

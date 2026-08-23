@@ -106,6 +106,48 @@ console.log('=== 1. UNE CARRIÈRE HONNÊTE PASSE ===');
   ligne('une première saison passe aussi', vd.anomalies.join(' | ') || `score ${vd.score}`, vd.valide);
 }
 
+console.log('\n=== 1 bis. ⚠️ TOUT CE QUE L’ÉCRAN DE CRÉATION AUTORISE DOIT PASSER ===');
+{
+  // ⚠️ LA SECTION QUI MANQUAIT, ET QUI A COÛTÉ CHER. Le crible refusait de
+  // démarrer après 24 ans alors que `Creation` laisse choisir jusqu'à 30 : un
+  // joueur qui créait un vétéran voyait TOUTES ses fiches rejetées, à vie,
+  // sans que rien ne le lui dise — le motif ne s'affiche nulle part dans le
+  // jeu. Retour de joueur : « la plupart de mes carrières légitimes ne sont
+  // pas retenues ». Mesuré sur les quinze âges de départ que l’écran propose :
+  // vingt et un refus sur vingt et un portaient ce seul motif.
+  //
+  // ⚠️ ON NE TESTE PAS UNE BORNE, ON TESTE UNE COUVERTURE : le crible doit
+  // accepter tout ce que le jeu permet de créer. Le sens de la comparaison
+  // compte — plus permissif est correct, plus strict est un bug.
+  const AGE_MIN_ECRAN = 16;  // `screens/Creation.tsx`
+  const AGE_MAX_ECRAN = LIMITES.ageDebutMax; // lu depuis ici, justement
+  ligne('le crible couvre le minimum de l’écran (16 ans)',
+    `${LIMITES.ageDebutMin} ≤ ${AGE_MIN_ECRAN}`, LIMITES.ageDebutMin <= AGE_MIN_ECRAN);
+
+  let refuses = 0;
+  let pire = '';
+  for (let age = AGE_MIN_ECRAN; age <= AGE_MAX_ECRAN; age++) {
+    // Une première saison, puis une carrière longue : les deux extrêmes de ce
+    // qu’un joueur de cet âge peut produire.
+    for (const saisons of [1, 5, Math.max(1, Math.min(12, 44 - age))]) {
+      const f = fiche({
+        ageDebut: age, age: age + saisons - 1, saisons,
+        note: Math.min(100, 34 + saisons * 4), reputation: 10 + saisons * 3,
+        matchs: saisons * 18, essais: saisons * 3, selections: 0,
+        titres: palmaresCredible(saisons, saisons), clubs: ['Stade Toulousain'],
+      });
+      const v = verifierFiche(f, IDS_TROPHEES);
+      if (!v.valide) { refuses++; if (!pire) pire = `${age} ans / ${saisons} saison(s) : ${v.anomalies[0]}`; }
+    }
+  }
+  ligne('tous les âges de départ jouables sont acceptés',
+    refuses ? pire : `${AGE_MIN_ECRAN} à ${AGE_MAX_ECRAN} ans, 0 refus`, refuses === 0);
+
+  // Et la borne reste une borne : au-delà de ce que l’écran permet, on refuse.
+  attaque('départ à 4 ans', fiche({ ageDebut: 4, age: 15, saisons: 12 }), /ageDebut hors bornes/);
+  attaque('départ à 40 ans', fiche({ ageDebut: 40, age: 43, saisons: 4 }), /ageDebut hors bornes/);
+}
+
 console.log('\n=== 2. LES ATTAQUES DIRECTES SONT REFUSÉES ===');
 {
   attaque('score gonflé à la main', { ...fiche(), score: 999_999 }, /score annoncé/);

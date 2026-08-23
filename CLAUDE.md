@@ -6038,3 +6038,192 @@ npx vite-node scripts/verifControle.ts     # ne rien choisir = le match qu’on 
 npx vite-node scripts/verifMatchJouable.ts # caméra, carrefours, en-avants
 npx vite-node scripts/verifTraductions.ts  # les 34 clés ajoutées, dans les 7 langues
 ```
+
+## 🏆 LE CLASSEMENT REFUSAIT UN TIERS DES CARRIÈRES — une borne, et un envoi qui manquait
+
+Retour de jeu : « réduis la sévérité pour être pris dans le classement, la
+plupart de mes carrières légitimes ne sont pas retenues ; et aussi, si c'est la
+première saison pas finie, c'est pas pris en compte ».
+
+⚠️ **ON N’A RIEN « ASSOUPLI ».** La demande disait « réduis la sévérité », et
+c'aurait été le pire réflexe : desserrer des bornes au jugé, c'est ouvrir la
+porte aux tricheurs pour corriger un bug qu'on n'a pas cherché. On a mesuré
+d'abord — en jouant de vraies carrières, semaine par semaine, et en soumettant
+leur fiche à `verifierFiche` après chaque saison. Le verdict est sans appel :
+
+```text
+46 fiches soumises · 25 valides
+Motifs de refus :  21 × ageDebut hors bornes
+
+Marges des autres bornes (positif = dépassement) :
+  matchs/saison le plus haut : 6,5   (borne 50)
+  clubs − saisons            : 0     (borne +1)
+  capes/saison               : 0,0   (borne 12)
+  note au-dessus de noteApres: 0
+```
+
+**Un seul motif, et aucune autre borne même approchée.**
+
+### ⚠️ LA CAUSE : DEUX FENÊTRES D’ÂGE QUI NE SE PARLAIENT PAS
+
+| | |
+|---|---|
+| `screens/Creation.tsx` | on démarre de **16 à 30 ans** |
+| `LIMITES.ageDebutMax` | le crible en refusait plus de **24** |
+
+Toute carrière commencée à 25 ans ou plus était donc rejetée — et pas une fois :
+**à vie**. `ficheDepuisJoueur` DÉDUIT `ageDebut` de l’âge et du nombre de
+saisons (`j.age − saisons + 1`), une valeur qui ne bouge jamais. Le joueur ne
+voyait rien non plus : le motif n'est affiché nulle part dans le jeu, l'envoi
+est silencieux par construction.
+
+⚠️ **`Creation` LIT DÉSORMAIS `LIMITES.ageDebutMax`.** C'est le seul moyen que
+les deux ne puissent plus diverger. Le minimum, lui, reste volontairement **un
+an plus bas** que celui de l'écran (15 contre 16) : le crible doit toujours
+être au moins aussi permissif que le jeu, jamais l'inverse.
+
+⚠️ **`SCORE_MAX` NE BOUGE PAS** (82 500) : il dépend de `SAISONS_MAX`, calculé
+sur `ageDebutMin` — inchangé. **Aucune migration SQL** (le `check` de la
+colonne `score` reste bon).
+
+### ⚠️ ET LE BANC D’ESSAI NE POUVAIT PAS L’ATTRAPER
+
+`verifClassement.ts` testait des fiches ÉCRITES À LA MAIN, toutes démarrées à
+18 ans. Il vérifiait très bien qu'un tricheur est refusé, jamais qu'un joueur
+honnête est accepté. La section **1 bis** rejoue donc les quinze âges de départ
+que l'écran propose, sur trois durées de carrière chacun :
+
+```text
+✅ le crible couvre le minimum de l’écran (16 ans)      15 ≤ 16
+✅ tous les âges de départ jouables sont acceptés       16 à 30 ans, 0 refus
+✅ départ à 4 ans                    ageDebut hors bornes (4, attendu 15..30)
+✅ départ à 40 ans                   ageDebut hors bornes (40, attendu 15..30)
+```
+
+⚠️ **ON NE TESTE PAS UNE BORNE, ON TESTE UNE COUVERTURE.** Le sens de la
+comparaison est tout : plus permissif que l'écran est correct, plus strict est
+un bug.
+
+### 🗓️ LA CARRIÈRE EN COURS ENTRE AU CLASSEMENT
+
+Second point du retour, et il était exact : l'envoi n'avait lieu qu'à la **fin
+d'une saison** et à la **retraite**. Quelqu'un qui joue ses premières journées —
+le moment où l'on a le plus envie de se voir quelque part — n'existait nulle
+part.
+
+`publierAuClassement(force?)` (store) est désormais appelée **à chaque semaine
+jouée**, avec deux freins :
+
+| Frein | Pourquoi |
+|---|---|
+| le score doit avoir **progressé** depuis le dernier envoi ACCEPTÉ | sinon on renverrait la même fiche chaque semaine |
+| **dix minutes** minimum entre deux envois | le serveur en accepte six par heure ; se faire jeter par son propre débit serait le comble |
+
+La fin de saison et la retraite passent outre (`force`) : ce sont les deux
+moments où la carrière DOIT être posée.
+
+⚠️ **`dernierScoreEnvoye` N'EST ÉCRIT QUE SUR UN ENVOI ACCEPTÉ.** Le noter
+avant la réponse enfermerait un joueur hors ligne : son premier envoi
+échouerait, le frein se refermerait, et sa carrière n'entrerait jamais.
+
+Vérifié contre un faux serveur, avec un joueur créé **à 27 ans** — un âge qui
+était refusé jusqu’ici :
+
+```text
+créé : Vétéran, 27 ans, US Oyonnax
+saison 1, semaine 13 · envois reçus : 1 · score 512 · ✅ accepté
+40 semaines de plus (dans les 10 min) : 1 envoi (la fin de saison, forcée)
+```
+
+
+## 🏉 LA CHAMPIONS CUP REJOUAIT LE MÊME MATCH JUSQU’À LA FINALE
+
+Retour de jeu : « bug avec la Champions Cup, les phases finales sont buguées, je
+joue toujours contre la même équipe jusqu’à la finale avec le même score ».
+
+### ⚠️ `EtatCoupe.bracket` CONTIENT TOUS LES TOURS, PAS LE DERNIER
+
+C'est écrit dans son type (« huitièmes → quarts → demies → finale ») et
+personne ne l'avait lu comme ça côté écran. `PanneauJoueur` faisait :
+
+```ts
+const matchFinal = etat.bracket.find((m) => m.domicile === club || m.exterieur === club);
+```
+
+Un `find` rend le **premier** — c’est-à-dire le match du **premier tour** que
+le club a disputé. Toutes les semaines de coupe suivantes le lui refaisaient
+jouer. Mesuré avant correction :
+
+```text
+date 5 · bracket=[barrage]                    Toulouse 35-9 Ulster
+date 6 · bracket=[barrage+quart]              Toulouse 35-9 Ulster   ← identique
+date 7 · bracket=[barrage+quart+demie]        Toulouse 35-9 Ulster   ← identique
+date 8 · bracket=[…+finale]                   Toulouse 35-9 Ulster   ← identique
+```
+
+Après :
+
+```text
+date 5  barrage  Toulouse 35-9  Ulster
+date 6  quart    Toulouse 29-17 Leinster
+date 7  demie    Toulouse 18-13 Bordeaux Bègles
+date 8  FINALE   Toulouse 23-10 La Rochelle
+```
+
+### ⚠️ « LE TOUR LE PLUS PROFOND » NE SUFFISAIT PAS — deux cas limites
+
+Première correction tentée : prendre le match du tour le plus avancé du
+tableau. Le banc d’essai a immédiatement montré que ça déplaçait le bug :
+
+- **un club ÉLIMINÉ** rejouait indéfiniment sa défaite d'élimination ;
+- **la Prem Rugby Cup**, dont le tableau s'épuise avant la dernière date de
+  coupe du calendrier, faisait rejouer sa **finale** une semaine de plus
+  (2 cas sur 6 saisons).
+
+`EtatCoupe` porte donc **`ordreTourCourant`** : le rang du tour qui se joue
+CETTE semaine-là. Il vaut 0 en phase de poules, et **dépasse le rang de la
+finale quand la compétition est terminée** — dans les deux cas, aucun match ne
+correspond, et c'est exactement ce qu'on veut dire.
+
+| Fonction | Rôle |
+|---|---|
+| `ORDRE_TOUR` | exporté : trois écrans en avaient besoin, chacun avait sa copie |
+| `matchDuTourCourant(etat, club)` | le match de CE club au tour de la semaine, ou rien |
+| `matchsDuTourCourant(etat)` | tous les matchs du tour de la semaine |
+
+### 🩹 Et deux bugs trouvés en le mesurant
+
+- ⚠️ **LES STATISTIQUES DES TOURS PRÉCÉDENTS ÉTAIENT COMPTÉES PLUSIEURS FOIS.**
+  `moteur/saison.ts` parcourait `etat.bracket` en entier à chaque semaine de
+  coupe pour rejouer les matchs sans rendu — donc les quarts en même temps que
+  les demies, puis en même temps que la finale. Et `verser` **accumule** : les
+  chiffres de ces matchs entraient deux puis trois fois dans le classement
+  individuel. Il ne rejoue plus que `matchsDuTourCourant`.
+- ⚠️ **`duel()` N'APPLIQUAIT PAS `scorePossible`.** La règle « on marque par 3,
+  5 ou 7 : 1, 2 et 4 sont impossibles » existe depuis longtemps et
+  `jouerRencontre` la respecte — mais `duel`, qui décide de **tous** les matchs
+  à élimination directe du jeu (coupes d’Europe, phases finales de championnat,
+  tournoi amateur de fin d'année), ne l'appelait pas. Relevé à l'écran en
+  mesurant le premier bug : **« La Rochelle 20-4 Munster »** en barrage de
+  Champions Cup.
+
+  ⚠️ **ET ON DÉPARTAGE APRÈS L’ARRONDI, PAS AVANT** : rabattre 4 sur 3 peut
+  CRÉER une égalité (4-3 devient 3-3). Trancher en amont laisserait des matchs
+  nuls dans un tableau à élimination directe, où quelqu’un doit sortir.
+
+### Mesuré (`verifCoupesEurope.ts`, section 6)
+
+| | |
+|---|---|
+| matchs à élimination directe examinés | **402** sur 6 saisons |
+| scores impossibles (1, 2, 4) | **0** |
+| matchs nuls dans un tableau | **0** |
+| semaines où un club rejoue le même match | **0** |
+| clubs éliminés à qui on propose encore un match | **0** |
+
+```bash
+npx vite-node scripts/verifCoupesEurope.ts  # section 6 : le tour avance, les scores sont du rugby
+npx vite-node scripts/verifClassement.ts    # section 1 bis : tous les âges de départ passent
+npx vite-node scripts/verifStatsJournees.ts # la simulation de fond ne double plus les tours
+npx vite-node scripts/verifTitres.ts        # aucun titre fantôme, aucun titre oublié
+```

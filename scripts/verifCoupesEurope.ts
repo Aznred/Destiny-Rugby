@@ -13,6 +13,7 @@
 
 import {
   coupeEnDirect, engagesEuropeens, coupesDuClub, JOURNEES_POULE,
+  matchDuTourCourant,
 } from '../src/lib/coupe';
 
 let echecs = 0;
@@ -189,5 +190,81 @@ console.log('\n=== 5. UN CLUB SAIT CE QU’IL JOUE ===');
     coupesDuClub('Aurore de Vitré', 3).length === 0);
 }
 
+console.log('\n=== 6. ⚠️ LA PHASE FINALE AVANCE, ET SES SCORES SONT DU RUGBY ===');
+{
+  // ⚠️ DEUX BUGS DE JEU SIGNALÉS ENSEMBLE, ET CETTE SECTION EXISTE POUR EUX.
+  //
+  // « Les phases finales sont buguées, je joue toujours contre la même équipe
+  // jusqu’à la finale avec le même score. » `EtatCoupe.bracket` contient TOUS
+  // les tours déjà joués, pas seulement le dernier : l’écran cherchait le match
+  // du club avec un `find`, retombait donc éternellement sur son premier tour,
+  // et le lui refaisait jouer chaque semaine de coupe.
+  //
+  // Et en le mesurant, un second est apparu : `duel` ne passait pas par
+  // `scorePossible`. Tous les matchs à élimination directe du jeu pouvaient
+  // donc afficher des scores impossibles au rugby — relevé en jeu : « 20-4 ».
+  const impossible = (n: number) => n === 1 || n === 2 || n === 4;
+  const CLUBS = ['Stade Toulousain', 'Leinster', 'Stade Rochelais', 'Bath Rugby'];
+  let matchs = 0;
+  let scoresFaux = 0;
+  let nuls = 0;
+  let repetitions = 0;
+  let toursVus = 0;
+  let exemple = '';
+
+  for (let saison = 1; saison <= 6; saison++) {
+    for (const club of CLUBS) {
+      for (const id of coupesDuClub(club, saison)) {
+        const fin = coupeEnDirect(id, saison, club, 8);
+        if (!fin) continue;
+        for (const m of fin.bracket) {
+          matchs++;
+          if (impossible(m.scoreD) || impossible(m.scoreE)) {
+            scoresFaux++;
+            if (!exemple) exemple = `${m.tour} ${m.domicile} ${m.scoreD}-${m.scoreE} ${m.exterieur}`;
+          }
+          // Un tableau à élimination directe ne peut pas rendre un nul.
+          if (m.scoreD === m.scoreE) nuls++;
+        }
+
+        // ⚠️ SEMAINE APRÈS SEMAINE, comme le fait le panneau de carrière.
+        const vus = new Set<string>();
+        for (let date = 1; date <= 8; date++) {
+          const e = coupeEnDirect(id, saison, club, date);
+          if (!e || date <= e.totalJournees) continue;
+          const m = matchDuTourCourant(e, club);
+          if (!m) continue;
+          toursVus++;
+          const cle = `${m.domicile}#${m.exterieur}#${m.scoreD}#${m.scoreE}`;
+          if (vus.has(cle)) repetitions++;
+          vus.add(cle);
+        }
+      }
+    }
+  }
+
+  console.log(`  ${String(matchs).padStart(4)} matchs à élimination directe · ${toursVus} tours joués par un club`);
+  ligne('aucun score impossible au rugby (1, 2, 4)',
+    scoresFaux ? exemple : `0 sur ${matchs}`, scoresFaux === 0);
+  ligne('aucun match nul dans un tableau', `${nuls}`, nuls === 0);
+  ligne('un club ne rejoue jamais le même match', `${repetitions} répétition(s)`, repetitions === 0);
+
+  // ⚠️ ET UN ÉLIMINÉ N’A PLUS DE MATCH. Prendre « son match le plus profond »
+  // aurait rendu indéfiniment sa défaite d’élimination — le même bug, un tour
+  // plus loin.
+  let elimineAvecMatch = 0;
+  for (let saison = 1; saison <= 6; saison++) {
+    for (const club of CLUBS) {
+      const id = coupesDuClub(club, saison)[0];
+      if (!id) continue;
+      const e = coupeEnDirect(id, saison, club, 8);
+      if (!e || !e.bracket.length) continue;
+      const finale = e.bracket.find((m) => m.tour === `finale`);
+      const enFinale = !!finale && (finale.domicile === club || finale.exterieur === club);
+      if (!enFinale && matchDuTourCourant(e, club)) elimineAvecMatch++;
+    }
+  }
+  ligne('un club éliminé n’a plus de match à jouer', `${elimineAvecMatch}`, elimineAvecMatch === 0);
+}
 console.log(echecs ? `\n❌ ${echecs} contrôle(s) en échec.\n` : '\n✅ Coupes d’Europe conformes au format 2023-24.\n');
 if (echecs) process.exit(1);

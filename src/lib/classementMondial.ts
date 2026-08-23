@@ -158,9 +158,27 @@ export function scoreDeLaFiche(f: Pick<
 // autant jouer.
 
 export const LIMITES = {
-  /** `Creation` n'autorise pas de démarrer avant 15 ans. */
+  /**
+   * ⚠️ LA FENÊTRE D'ÂGE DU CRIBLE DOIT COUVRIR CELLE DE L'ÉCRAN DE CRÉATION.
+   *
+   * Elle ne la couvrait pas, et c'était LE bug du classement : `Creation`
+   * autorise de démarrer **jusqu'à 30 ans**, le crible en refusait plus de 24.
+   * Toute carrière commencée à 25 ans ou plus était donc rejetée — pas une
+   * fois, mais À VIE, puisque `ageDebut` est déduit de l'âge et du nombre de
+   * saisons (`ficheDepuisJoueur`) et ne change jamais. Retour de jeu : « la
+   * plupart de mes carrières légitimes ne sont pas retenues ». Mesuré sur les
+   * quinze âges de départ que l'écran propose : **21 refus sur 21 portaient ce
+   * seul motif**, et aucune autre borne n'était même approchée.
+   *
+   * ⚠️ `Creation` LIT `ageDebutMax` D'ICI. C'est le seul moyen que les deux ne
+   * puissent plus diverger. Le minimum, lui, reste volontairement UN AN PLUS
+   * BAS que celui de l'écran (16) : le crible doit toujours être au moins aussi
+   * permissif que le jeu, jamais l'inverse — une borne qui refuse une carrière
+   * légitime est pire qu'une borne large. Et `verifClassement.ts` rejoue
+   * désormais tous les âges de départ pour que ça ne reparte pas en silence.
+   */
   ageDebutMin: 15,
-  ageDebutMax: 24,
+  ageDebutMax: 30,
   /** `AGE_RETRAITE_FORCEE` : la carrière s'arrête d'office à 44 ans. */
   ageMax: 44,
   /** Le calendrier fait 44 semaines ; on tolère phases finales et sélections. */

@@ -18,7 +18,7 @@ import { TRAIT_PAR_ID, descriptionTrait, nomTrait } from '../data/traits';
 import { nombre, t, tn } from '../lib/i18n';
 import { matchDeLaSemaine } from '../lib/matchLive';
 import { matchInternationalDuJoueur, equipeU20 } from '../lib/international';
-import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
+import { coupeEnDirect, coupesDuClub, matchDuTourCourant } from '../lib/coupe';
 import { matchPhaseFinaleDuJoueur } from '../lib/phaseFinale';
 import { convocation, convocationU20 } from '../lib/selection';
 import { nomBlessure } from '../lib/blessures';
@@ -127,7 +127,13 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
     const matchPoule = date <= etat.totalJournees
       ? poule?.journees[date - 1]?.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club)
       : undefined;
-    const matchFinal = etat.bracket.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club);
+    // ⚠️ LE TOUR EN COURS, PAS LE PREMIER DU TABLEAU. `etat.bracket` contient
+    // TOUS les tours déjà joués : un `find` y retombait chaque semaine sur le
+    // quart de finale du club, et le lui refaisait jouer contre le même
+    // adversaire, avec le même score, jusqu’à la fin de la coupe. Bug signalé
+    // en jeu, mot pour mot : « je joue toujours contre la même équipe jusqu’à
+    // la finale avec le même score ».
+    const matchFinal = matchDuTourCourant(etat, joueur.club);
     const match = matchPoule ?? (matchFinal
       ? { ...matchFinal, essaisD: Math.floor(matchFinal.scoreD / 7), essaisE: Math.floor(matchFinal.scoreE / 7) }
       : undefined);

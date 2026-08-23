@@ -596,6 +596,19 @@ interface GameState {
    * inconnu une fois sur deux.
    */
   rangMondialId: number | null;
+  /**
+   * Le meilleur score DÉJÀ ACCEPTÉ par le serveur, ou 0.
+   *
+   * ⚠️ IL SERT DE FREIN, PAS DE MÉMOIRE. La carrière est publiée en cours de
+   * route (plus seulement à la fin d’une saison), et il faut bien un garde-fou
+   * pour ne pas réveiller le serveur à chaque semaine jouée. On ne renvoie que
+   * si le score a PROGRESSÉ — c’est-à-dire si la carrière a réellement changé.
+   *
+   * ⚠️ ÉCRIT UNIQUEMENT SUR UN ENVOI ACCEPTÉ. Le noter avant la réponse
+   * enfermerait un joueur hors ligne : son premier envoi échouerait, le frein
+   * se refermerait, et sa carrière n’entrerait jamais.
+   */
+  dernierScoreEnvoye: number;
   /** Compteur des pubs récompensées (quota journalier et délai d'attente). */
   pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
@@ -797,6 +810,12 @@ interface GameState {
   debloquerTrait: (id: string) => boolean;
   /** Choisir son nom au classement mondial. Vide = le nom du personnage. */
   setPseudoClassement: (p: string) => void;
+  /**
+   * Publie la carrière EN COURS au classement mondial.
+   *
+   * @param force ignore les freins (fin de saison, retraite).
+   */
+  publierAuClassement: (force?: boolean) => void;
   /** Débloque un cosmétique « par pub » une fois la pub regardée. */
   debloquerParPub: (id: string) => boolean;
   basculerEquipement: (id: string) => void;
@@ -819,6 +838,21 @@ interface GameState {
  * effacer l'identifiant déjà connu : le joueur perdrait le surlignage de sa
  * propre ligne pour une raison qui n'a rien à voir avec lui.
  */
+/**
+ * ⚠️ DIX MINUTES ENTRE DEUX ENVOIS AUTOMATIQUES, et ce n’est pas un chiffre en
+ * l'air : le serveur accepte **six envois par heure** par appareil
+ * (`api/classement.ts`). Publier en cours de saison sans ce plancher, c’est se
+ * faire jeter par son propre débit — et le joueur honnête récolterait des 429
+ * pendant que sa carrière n’entre pas.
+ */
+const DELAI_ENVOI = 10 * 60 * 1000;
+
+/**
+ * Dernier envoi tenté, en horloge murale. Volontairement HORS de la sauvegarde :
+ * une nouvelle session a le droit de publier tout de suite.
+ */
+let dernierEnvoiLe = 0;
+
 function retenirMaLigne(poser: (p: Partial<GameState>) => void) {
   return (r: { id?: number }) => {
     if (typeof r?.id === 'number' && Number.isFinite(r.id)) poser({ rangMondialId: r.id });
@@ -844,6 +878,7 @@ export const useGame = create<GameState>()(
       cleClassement: cleAleatoire(),
       pseudoClassement: '',
       rangMondialId: null,
+      dernierScoreEnvoye: 0,
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
       scenarioActif: null,
@@ -1750,9 +1785,7 @@ export const useGame = create<GameState>()(
         // serveur, hors ligne, fiche refusée ou quota atteint, la saison se
         // referme exactement pareil. Le serveur ne garde que le MEILLEUR score :
         // renvoyer chaque année ne peut donc rien dégrader.
-        void envoyerAuClassement(ficheDepuisJoueur(j, get().pseudoClassement || undefined, get().cleClassement))
-          .then(retenirMaLigne(set))
-          .catch(() => {});
+        get().publierAuClassement(true);
 
         // ---- LA LIMITE D'ÂGE, VRAIMENT APPLIQUÉE ----
         // ⚠️ `AGE_RETRAITE_FORCEE` n'était qu'un texte : on pouvait jouer
@@ -2128,6 +2161,11 @@ export const useGame = create<GameState>()(
         // Une semaine jouée = une nouvelle fournée de publications, datée.
         get().vivreSemaineSociale();
         get().verifierSucces();
+        // ⚠️ ET LA CARRIÈRE EN COURS ENTRE AU CLASSEMENT, sans attendre la fin
+        // de la saison. Les deux freins de `publierAuClassement` font que ça ne
+        // part réellement que si le score a bougé, et au plus une fois par dix
+        // minutes : une avance de douze semaines ne produit donc qu’un envoi.
+        get().publierAuClassement();
         // ⚠️ EN DERNIER, PARCE QUE C'EST DÉFINITIF. Une blessure de gravité
         // `carriere` tirée par le match arrête vraiment la carrière (voir
         // `raccrocherSurBlessure`) — la semaine se termine normalement avant.
@@ -2882,9 +2920,7 @@ export const useGame = create<GameState>()(
         // une erreur qu'on ignore — la retraite reste instantanée, et le
         // classement local n'a besoin de personne. Le bouton manuel de l'écran
         // Classement reste là pour renvoyer une carrière en cours ou réessayer.
-        void envoyerAuClassement(ficheDepuisJoueur(joueur, get().pseudoClassement || undefined, get().cleClassement))
-          .then(retenirMaLigne(set))
-          .catch(() => {});
+        get().publierAuClassement(true);
         setMouvementsClubs({});
         // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
         // du joueur précédent sont périmés (voir lib/promotion.ts).
@@ -2924,6 +2960,42 @@ export const useGame = create<GameState>()(
         // longue, c'est un envoi refusé par le serveur et une carrière qui
         // n'entre jamais au classement, sans que rien ne l'explique.
         set({ pseudoClassement: p.trim().slice(0, LIMITES.pseudoMax) });
+      },
+
+      // ═══ LA CARRIÈRE EN COURS ENTRE AU CLASSEMENT ═══════════════════════
+      // ⚠️ RETOUR DE JEU : « si c'est la première saison pas finie, c'est pas
+      // pris en compte ». C’était exact, et c’était une conséquence du réglage
+      // précédent : l’envoi n’avait lieu qu’à la FIN D’UNE SAISON et à la
+      // retraite. Quelqu’un qui joue ses premières journées — le moment où l’on
+      // a le plus envie de se voir quelque part — n’existait nulle part.
+      //
+      // ⚠️ DEUX FREINS, ET LES DEUX SONT NÉCESSAIRES :
+      //   · le score doit avoir PROGRESSÉ depuis le dernier envoi accepté —
+      //     sinon on renverrait la même fiche à chaque semaine ;
+      //   · dix minutes minimum entre deux envois — le serveur en accepte six
+      //     par heure, et se faire jeter par son propre débit serait le comble.
+      // La fin de saison et la retraite passent outre (`force`) : ce sont les
+      // deux moments où la carrière DOIT être posée, quoi qu’il arrive.
+      publierAuClassement: (force = false) => {
+        const j = get().joueur;
+        if (!j) return;
+        const fiche = ficheDepuisJoueur(
+          j, get().pseudoClassement || undefined, get().cleClassement,
+        );
+        if (!force) {
+          if (fiche.score <= get().dernierScoreEnvoye) return;
+          if (Date.now() - dernierEnvoiLe < DELAI_ENVOI) return;
+        }
+        dernierEnvoiLe = Date.now();
+        // Fait exprès : on n’attend pas la réponse et on n’échoue jamais. Sans
+        // serveur, hors ligne, fiche refusée ou quota atteint, le jeu continue
+        // exactement pareil. Le serveur ne garde que le MEILLEUR score.
+        void envoyerAuClassement(fiche)
+          .then((r) => {
+            retenirMaLigne(set)(r);
+            if (r.ok) set({ dernierScoreEnvoye: fiche.score });
+          })
+          .catch(() => {});
       },
 
       reinitialiser: () => {
@@ -4177,6 +4249,7 @@ export const useGame = create<GameState>()(
           cleClassement?: string;
           pseudoClassement?: string;
           rangMondialId?: number | null;
+          dernierScoreEnvoye?: number;
           ecransVus?: string[];
           guideFerme?: boolean;
           pubConsentement?: 'inconnu' | 'oui' | 'non';
@@ -4324,6 +4397,9 @@ export const useGame = create<GameState>()(
         // ici. Sa ligne historique au classement (clé par pseudo) reste en base
         // et le serveur la laisse tranquille ; la prochaine fin de saison en
         // ouvre une nouvelle, à elle. Voir `serveur/schema-vercel.sql`.
+        // Réparation idempotente : une sauvegarde d'avant l'envoi en cours de
+        // saison n'a pas ce frein, et `undefined` le rendrait inopérant.
+        s.dernierScoreEnvoye ??= 0;
         s.cleClassement ||= cleAleatoire();
         s.pseudoClassement ??= '';
         s.rangMondialId ??= null;
@@ -4368,6 +4444,7 @@ export const useGame = create<GameState>()(
         cleClassement: s.cleClassement,
         pseudoClassement: s.pseudoClassement,
         rangMondialId: s.rangMondialId,
+        dernierScoreEnvoye: s.dernierScoreEnvoye,
         pubs: s.pubs,
         pantheon: s.pantheon,
         scenarioActif: s.scenarioActif,
