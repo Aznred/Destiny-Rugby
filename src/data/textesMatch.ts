@@ -113,6 +113,59 @@ export const TEXTES_MATCH: Record<string, Traduction> = {
   'ml.dec.titre': { fr: "À toi de jouer", en: "Your call", es: "Te toca", it: "Tocca a te", de: "Du bist dran", pt: "É contigo", ja: "君の判断" },
   'ml.dec.laisser': { fr: "Laisser faire", en: "Let it play", es: "Dejar correr", it: "Lascia correre", de: "Laufen lassen", pt: "Deixar correr", ja: "任せる" },
   'ml.dec.laisserAide': { fr: "Tu ne tentes rien de particulier : le jeu suit son cours.", en: "You try nothing in particular: play carries on.", es: "No intentas nada en particular: el juego sigue.", it: "Non tenti nulla di particolare: il gioco prosegue.", de: "Du versuchst nichts Besonderes: das Spiel läuft weiter.", pt: "Não tentas nada de especial: o jogo segue.", ja: "特に何もしない。プレーはそのまま流れる。" },
+  // ═══ CE QUE CHAQUE OPTION MET EN JEU (moteur/moteur.ts → enjeuDe) ═══════
+  // ⚠️ « ET D’IMPACT DANS LE JEU », dit la demande. Un pourcentage seul ne dit
+  // pas s’il faut le prendre : 62 % de réussite, c’est excellent pour un
+  // plaquage, c’est du suicide pour un geste qui, raté, coûte une mêlée dans
+  // ses vingt-deux. Chaque option annonce donc les DEUX faces — ce qu’on gagne
+  // et ce qu’on paie — en une ligne chacune, lisibles en une seconde.
+  'ml.enj.plaquage.gain': { fr: "Tu le mets au sol", en: "You put him down", es: "Lo tumbas", it: "Lo metti a terra", de: "Du legst ihn", pt: "Deitas-lo ao chão", ja: "倒す" },
+  'ml.enj.plaquage.risque': { fr: "Il te passe dessus", en: "He goes right past you", es: "Se te escapa", it: "Ti passa addosso", de: "Er läuft an dir vorbei", pt: "Passa por cima de ti", ja: "抜かれる" },
+  'ml.enj.monter.gain': { fr: "Tu le plaques avant la ligne", en: "You stop him behind the gain line", es: "Lo paras antes de la línea", it: "Lo fermi prima della linea", de: "Du stoppst ihn vor der Linie", pt: "Paras-lo antes da linha", ja: "ゲインライン前で止める" },
+  'ml.enj.monter.risque': { fr: "Tu ouvres un boulevard", en: "You open a motorway", es: "Abres una autopista", it: "Apri un’autostrada", de: "Du reißt ein Loch auf", pt: "Abres uma autoestrada", ja: "大穴を開ける" },
+  'ml.enj.crochet.gain': { fr: "Tu perces, et tu peux enchaîner", en: "You break through, and can chain", es: "Rompes y puedes encadenar", it: "Sfondi e puoi concatenare", de: "Du brichst durch und kannst nachlegen", pt: "Rompes e podes encadear", ja: "突破して連続で仕掛けられる" },
+  'ml.enj.crochet.risque': { fr: "Plaqué, et le ballon peut sauter", en: "Tackled, and the ball may spill", es: "Placado, y el balón puede saltar", it: "Placcato, e la palla può schizzare", de: "Getackelt, der Ball kann springen", pt: "Placado, e a bola pode saltar", ja: "タックルされ、ボールがこぼれることも" },
+  'ml.enj.raffut.gain': { fr: "Tu traverses, offload probable", en: "You power through, offload likely", es: "Atraviesas, offload probable", it: "Sfondi, offload probabile", de: "Du brichst durch, Offload wahrscheinlich", pt: "Atravessas, offload provável", ja: "突き破る。オフロードの目も" },
+  'ml.enj.raffut.risque': { fr: "Stoppé net au contact", en: "Stopped dead in the contact", es: "Parado en seco", it: "Fermato di netto", de: "Im Kontakt gestoppt", pt: "Parado a seco", ja: "コンタクトで止められる" },
+  'ml.enj.sprint.gain': { fr: "Tu prends le large", en: "You get away", es: "Te vas", it: "Te ne vai", de: "Du ziehst davon", pt: "Escapas", ja: "突き放す" },
+  'ml.enj.sprint.risque': { fr: "Rattrapé, et le souffle en moins", en: "Caught, and out of breath", es: "Te alcanzan y pierdes fuelle", it: "Ripreso, e senza fiato", de: "Eingeholt und außer Atem", pt: "Apanhado e sem fôlego", ja: "追いつかれ、息も切れる" },
+  'ml.enj.grattage.gain': { fr: "Ballon volé, possession retournée", en: "Turnover won", es: "Balón robado", it: "Palla rubata", de: "Ball erobert", pt: "Bola roubada", ja: "ターンオーバー" },
+  'ml.enj.grattage.risque': { fr: "Pénalité contre toi, une fois sur quatre", en: "Penalty against you, one time in four", es: "Penal en tu contra, una de cada cuatro", it: "Punizione contro, una volta su quattro", de: "Strafstoß gegen dich, jedes vierte Mal", pt: "Penalidade contra ti, uma em quatro", ja: "四回に一回は自陣に反則" },
+  'ml.enj.passe.gain': { fr: "Le ballon vit, la ligne avance", en: "Ball stays alive, the line advances", es: "El balón vive, la línea avanza", it: "La palla vive, la linea avanza", de: "Der Ball lebt, die Linie rückt vor", pt: "A bola vive, a linha avança", ja: "ボールが生き、ラインが前へ" },
+  'ml.enj.passe.risque': { fr: "En-avant : mêlée pour eux", en: "Knock-on: scrum to them", es: "Balón adelantado: melé para ellos", it: "In avanti: mischia per loro", de: "Vorwurf: Gedränge für sie", pt: "Avanço: formação ordenada para eles", ja: "ノックオン。相手ボールのスクラム" },
+  'ml.enj.pied.gain': { fr: "Tu gagnes le terrain", en: "You win the territory", es: "Ganas terreno", it: "Guadagni terreno", de: "Du gewinnst Raum", pt: "Ganhas terreno", ja: "陣地を取る" },
+  'ml.enj.pied.risque': { fr: "Contré : ballon perdu sur place", en: "Charged down: ball lost on the spot", es: "Bloqueada: balón perdido ahí mismo", it: "Murato: palla persa sul posto", de: "Geblockt: Ball sofort weg", pt: "Tapado: bola perdida no sítio", ja: "チャージされその場でボールを失う" },
+  'ml.enj.appel.gain': { fr: "Le prochain ballon est pour toi", en: "The next ball is yours", es: "El próximo balón es tuyo", it: "Il prossimo pallone è tuo", de: "Der nächste Ball gehört dir", pt: "A próxima bola é tua", ja: "次のボールが自分に来る" },
+  'ml.enj.appel.risque': { fr: "Personne ne te voit", en: "Nobody sees you", es: "Nadie te ve", it: "Nessuno ti vede", de: "Niemand sieht dich", pt: "Ninguém te vê", ja: "誰にも見てもらえない" },
+  'ml.enj.soutien.gain': { fr: "Tu es là pour l’offload", en: "You are there for the offload", es: "Estás ahí para el offload", it: "Ci sei per l’offload", de: "Du bist für den Offload da", pt: "Estás lá para o offload", ja: "オフロードに間に合う" },
+  'ml.enj.soutien.risque': { fr: "Tu cours pour rien", en: "You run for nothing", es: "Corres para nada", it: "Corri per niente", de: "Du läufst umsonst", pt: "Corres para nada", ja: "走り損" },
+  'ml.enj.discipline.gain': { fr: "Le match s’enflamme à ton avantage", en: "The match ignites your way", es: "El partido se enciende a tu favor", it: "La partita si accende a tuo favore", de: "Das Spiel kippt zu deinen Gunsten", pt: "O jogo incendeia-se a teu favor", ja: "流れが自分に傾く" },
+  'ml.enj.discipline.risque': { fr: "Carton, citation, semaines de suspension", en: "Card, citing, weeks of ban", es: "Tarjeta, citación, semanas de sanción", it: "Cartellino, deferimento, settimane di squalifica", de: "Karte, Anzeige, Wochen Sperre", pt: "Cartão, citação, semanas de castigo", ja: "カード、事後聴聞、数週間の出場停止" },
+
+  // ═══ CE QU'UN CHOIX A RAPPORTÉ (le bandeau .ml-resultat) ════════════════
+  // ⚠️ AU SINGULIER, TOUJOURS, ET LE NOMBRE SE MET DERRIÈRE : « Plaquage ×2 ».
+  // C'est la seule forme qui traverse les sept langues sans demander deux
+  // clés par ligne — le français accorde, l'allemand décline, le japonais
+  // ignore le pluriel. Et sur un bandeau qui vit trois secondes, « Plaquage
+  // ×2 » se lit mieux que « 2 plaquages » : le nom saute aux yeux, le
+  // chiffre suit.
+  // ⚠️ CE SONT LES NOMS DE LA FEUILLE DE MATCH, pas des synonymes : « +1
+  // Plaquage » ici doit se retrouver à la ligne « Plaquages » à la sirène.
+  'ml.gain.essai': { fr: "Essai", en: "Try", es: "Ensayo", it: "Meta", de: "Versuch", pt: "Ensaio", ja: "トライ" },
+  'ml.gain.grattage': { fr: "Ballon gratté", en: "Turnover won", es: "Balón robado", it: "Palla rubata", de: "Ball erobert", pt: "Bola roubada", ja: "ジャッカル" },
+  'ml.gain.franchissement': { fr: "Défenseur battu", en: "Defender beaten", es: "Defensa superada", it: "Difensore battuto", de: "Gegner überwunden", pt: "Defesa batida", ja: "ディフェンス突破" },
+  'ml.gain.plaquage': { fr: "Plaquage", en: "Tackle", es: "Placaje", it: "Placcaggio", de: "Tackling", pt: "Placagem", ja: "タックル" },
+  'ml.gain.offload': { fr: "Offload", en: "Offload", es: "Offload", it: "Offload", de: "Offload", pt: "Offload", ja: "オフロード" },
+  'ml.gain.passe': { fr: "Passe", en: "Pass", es: "Pase", it: "Passaggio", de: "Pass", pt: "Passe", ja: "パス" },
+  'ml.gain.course': { fr: "Ballon porté", en: "Carry", es: "Balón llevado", it: "Palla portata", de: "Ballvortrag", pt: "Bola transportada", ja: "キャリー" },
+  'ml.gain.pied': { fr: "Coup de pied", en: "Kick", es: "Patada", it: "Calcio", de: "Kick", pt: "Pontapé", ja: "キック" },
+  'ml.gain.ruck': { fr: "Ruck nettoyé", en: "Ruck cleared", es: "Ruck limpiado", it: "Ruck ripulito", de: "Ruck geräumt", pt: "Ruck limpo", ja: "ラック処理" },
+  'ml.gain.plaquageManque': { fr: "Plaquage manqué", en: "Missed tackle", es: "Placaje fallado", it: "Placcaggio mancato", de: "Tackling verpasst", pt: "Placagem falhada", ja: "タックルミス" },
+  'ml.gain.enAvant': { fr: "En-avant", en: "Knock-on", es: "Balón adelantado", it: "In avanti", de: "Vorwurf", pt: "Avanço", ja: "ノックオン" },
+
+  'ml.dec.enchaine': { fr: "Tu as percé, enchaîne !", en: "You are through, go again!", es: "¡Has roto, encadena!", it: "Hai sfondato, incalza!", de: "Du bist durch, leg nach!", pt: "Rompeste, encadeia!", ja: "突破した、続けて仕掛けろ！" },
+  'ml.dec.gains': { fr: "Ce que ton geste vient de rapporter à ta feuille de match", en: "What your call just added to your match stats", es: "Lo que tu decisión acaba de sumar a tu estadística", it: "Ciò che la tua scelta ha appena aggiunto alla tua statistica", de: "Was deine Entscheidung gerade auf dein Spielerkonto gebracht hat", pt: "O que a tua escolha acaba de somar à tua ficha de jogo", ja: "その判断が自分の成績に加えたもの" },
+  'ml.dec.execute': { fr: "Ton joueur exécute…", en: "Your player is on it…", es: "Tu jugador lo ejecuta…", it: "Il tuo giocatore esegue…", de: "Dein Spieler führt aus …", pt: "O teu jogador executa…", ja: "選手が実行中…" },
   'ml.dec.hesite': { fr: "{nom} hésite une seconde de trop, l’action lui échappe.", en: "{nom} hesitates a second too long and the moment is gone.", es: "{nom} duda un segundo de más y la acción se le escapa.", it: "{nom} esita un secondo di troppo e l’azione gli sfugge.", de: "{nom} zögert eine Sekunde zu lang, die Aktion ist vorbei.", pt: "{nom} hesita um segundo a mais e a ação escapa-lhe.", ja: "{nom}の判断が一瞬遅れ、好機は消えた。" },
   'ml.sifflet.enAvant': { fr: "EN-AVANT", en: "KNOCK-ON", es: "BALÓN ADELANTADO", it: "IN AVANTI", de: "VORWURF", pt: "AVANÇO", ja: "ノックオン" },
   'ml.sifflet.passeAvant': { fr: "PASSE EN AVANT", en: "FORWARD PASS", es: "PASE ADELANTADO", it: "PASSAGGIO IN AVANTI", de: "VORWÄRTSPASS", pt: "PASSE PARA A FRENTE", ja: "スローフォワード" },

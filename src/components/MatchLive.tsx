@@ -87,9 +87,9 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import {
   activerControle, appliquerConsigne, avancer, bilan, creerMatch, DT, ordonner,
-  type EtatMatch,
+  resoudreChoix, type EtatMatch,
 } from '../lib/moteur/moteur';
-import { ACTION_PAR_ID, demanderAction } from '../lib/moteur/controle';
+import { ACTION_PAR_ID } from '../lib/moteur/controle';
 import { ORDRES } from '../lib/moteur/bagarre';
 import { ajouterCommentaire, type ActionJoueur, type Commentaire, type NiveauMatch, type TypeCommentaire } from '../lib/moteur/etat';
 import { competitionEffective } from '../lib/divisions';
@@ -99,12 +99,13 @@ import {
   facteurTempo, momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
 } from '../lib/moteur/moments';
 import {
-  DELAI_DECISION, REJEU, decisionPour, type Decision,
+  DELAI_COMBO, DELAI_DECISION, REJEU, REPOS_DECISION, decisionPour,
+  type Decision, type OptionDecision,
 } from '../lib/moteur/decisions';
 import { estTitulaire } from '../lib/moteur/saison';
 import { CONSIGNE_NEUTRE, lireConsigneIA, lireConsigneLocale } from '../lib/moteur/consignes';
 import { iaDisponible } from '../lib/groq';
-import type { Pion } from '../lib/moteur/entites';
+import type { Pion, StatsMatch } from '../lib/moteur/entites';
 import { detailNote, noterMatch, statsPourLaNote } from '../lib/moteur/apresMatch';
 import { graine, type MatchChampionnat } from '../lib/championnat';
 import { effectifDuClub } from '../lib/effectif';
@@ -195,6 +196,75 @@ function useLarge(): boolean {
     return () => mq.removeEventListener('change', ecouter);
   }, []);
   return large;
+}
+
+/**
+ * 🎬 LE PLAN QUI SUIT UN CHOIX.
+ *
+ * ⚠️ IL PORTE LE RÉSULTAT, PAS SEULEMENT LE GESTE, et c'est tout le sujet du
+ * retour de jeu « on clique mais pas l'impression que ça marche vraiment ».
+ * Le geste seul dit ce qu'on a demandé ; le `resultat` dit ce que le moteur en
+ * a fait — et c'est la phrase qu'il écrit de toute façon dans le fil, sortie du
+ * fil pour être posée en grand au milieu de l'écran.
+ */
+interface Rejeu {
+  /**
+   * Secondes RÉELLES restantes au BANDEAU.
+   *
+   * ⚠️ CE N'EST PAS LA MÊME HORLOGE QUE LE PLAN DE CAMÉRA, et les séparer est
+   * ce qui corrige « on clique mais pas l'impression que ça marche ». Un
+   * crochet n'est pas joué à l'instant du clic : il ARME une intention, que le
+   * moteur dépense au premier contact — qui peut venir quatre secondes plus
+   * tard, ou jamais si personne ne monte. Le bandeau s'éteignait au bout des
+   * 3,2 s du plan, c'est-à-dire souvent AVANT le geste qu'il annonçait. Il
+   * tient maintenant tant que l'intention est armée, puis le temps de lire ce
+   * qu'elle a donné.
+   */
+  restant: number;
+  /**
+   * Secondes RÉELLES restantes au PLAN DE CAMÉRA (gros plan + étiquette sur le
+   * pion). Court, lui : c'est une durée de plan de télévision.
+   */
+  plan: number;
+  /** Garde-fou : au-delà, on cesse d'attendre un geste qui ne viendra pas. */
+  patience: number;
+  /** Le geste choisi, tant que le plan tourne. */
+  action: ActionJoueur | null;
+  /** L'index du fil au moment du clic : tout ce qui suit est la conséquence. */
+  depuis: number;
+  /** La première ligne que le moteur a écrite sur MON joueur depuis. */
+  resultat: Commentaire | null;
+  /** La chance annoncée sur le bouton qu'on vient de toucher. */
+  chance: number;
+  /**
+   * ⚠️ LE VERDICT — ET IL RESTE `null` TANT QUE LE DÉ N'EST PAS TOMBÉ.
+   *
+   * C'est la moitié écran du champ `Issue.joue`, et l'oublier ici annulait tout
+   * le travail fait dans le moteur : sur une carte de RÉCEPTION (la majorité des
+   * cartes), le ballon n'est pas encore dans les mains, le geste reste ARMÉ, et
+   * `resoudreChoix` rend `reussi: false` faute de mieux. La bulle affichait donc
+   * un ❌ rouge sur un crochet qui n'avait pas encore eu lieu — mesuré en jeu,
+   * seize fois de suite. Un échec annoncé avant l'action, c'est pire que pas de
+   * retour du tout.
+   *
+   * Tant qu'il est `null`, la bulle dit « ▶️ armé ». Le verdict arrive soit du
+   * duel joué sur-le-champ, soit de la percée que le moteur signale au contact
+   * (`e.perceeJoueur`), soit de la phrase que le moteur écrit sur le joueur.
+   */
+  verdict: { reussi: boolean; texte: string } | null;
+  /**
+   * ⚠️ LA FEUILLE DE MON JOUEUR AU MOMENT DU CLIC, ET C'EST ELLE QUI SAUVE
+   * L'AFFAIRE. Le commentaire ne vient PAS toujours : le moteur n'écrit une
+   * ligne que sur les évènements qui font une histoire, et « réclamer », «
+   * soutenir » ou un crochet qui passe sans plaqueur n'en produisent aucune.
+   * On resterait alors sur « ton joueur exécute… » et le retour de jeu serait
+   * intact : « on clique mais pas l'impression que ça marche ».
+   *
+   * Les statistiques, elles, bougent presque toujours — et ce sont EXACTEMENT
+   * celles qui font la note de fin de match. « +1 plaquage » est une preuve,
+   * pas une animation.
+   */
+  avant: StatsMatch | null;
 }
 
 /** Une vibration courte, si le téléphone en a une. Silencieuse partout ailleurs. */
@@ -299,6 +369,33 @@ export function MatchLive({
   /** Les dimensions du terrain à l'écran, tenues par un ResizeObserver. */
   const boite = useRef({ largeur: 1, hauteur: 1 });
   const camera = useRef(new Camera());
+  /**
+   * ⚠️ LA TAILLE RÉELLE DE LA BULLE DU VERDICT, EN PIXELS.
+   *
+   * Elle est bornée au cadre pour ne jamais sortir de la scène — et cette borne
+   * ne peut pas se calculer avec des marges fixes. Mesuré en jeu : sur un
+   * téléphone de 375 px la bulle fait jusqu'à 315 px de large (~84 % de
+   * l'écran), soit 158 px de demi-largeur pour une marge codée à 96. Résultat :
+   * **13 relevés sur 13 hors cadre** — la moitié du verdict passait sous le
+   * bord, exactement sur l'appareil où il compte le plus.
+   *
+   * ⚠️ ET C'EST UN ~ResizeObserver~, PAS UNE LECTURE PAR IMAGE. La bulle change
+   * de taille quand son texte change (« armé » → la phrase du moteur) ; lire
+   * ~offsetWidth~ à chaque image forcerait un recalcul de mise en page soixante
+   * fois par seconde, ce qui est précisément ce qu'on évite pour la scène.
+   */
+  const tailleBulle = useRef({ l: 180, h: 62 });
+  const roBulle = useRef<ResizeObserver | null>(null);
+  const mesurerBulle = useCallback((n: HTMLDivElement | null) => {
+    roBulle.current?.disconnect();
+    roBulle.current = null;
+    if (!n) return;
+    const lire = () => { tailleBulle.current = { l: n.offsetWidth, h: n.offsetHeight }; };
+    lire();
+    const ro = new ResizeObserver(lire);
+    ro.observe(n);
+    roBulle.current = ro;
+  }, []);
   const vueRef = useRef<Vue | null>(null);
   /**
    * 🎬 LE RALENTI QUI SUIT UN CHOIX — c'est la moitié « et qu'on voie vraiment
@@ -312,7 +409,36 @@ export function MatchLive({
    * redessine déjà. Le passer par `useState` ferait soixante rendus par seconde
    * de plus pour la même image.
    */
-  const rejeu = useRef<{ restant: number; action: ActionJoueur | null }>({ restant: 0, action: null });
+  const rejeu = useRef<Rejeu>({
+    restant: 0, plan: 0, patience: 0, action: null, chance: 0, depuis: 0,
+    resultat: null, verdict: null, avant: null,
+  });
+  /**
+   * ⚠️ L'ENCHAÎNEMENT. Demande : « il peut y avoir des combos sur l'action — tu
+   * perces, tu peux tenter un autre truc sur le défenseur ».
+   *
+   * Quand `resoudreChoix` rend `combo: true` (le vis-à-vis est au sol, je suis
+   * debout, ballon en main), on rouvre une carte IMMÉDIATEMENT, sans attendre le
+   * repos de 95 secondes simulées qui espace les carrefours ordinaires.
+   *
+   * ⚠️ ET ON COMPTE LES MAILLONS. Sans plafond, un joueur en forme enchaînerait
+   * crochet sur crochet jusqu'à l'en-but et le match deviendrait un jeu de
+   * cartes. Trois gestes d'affilée, c'est déjà une action d'anthologie.
+   */
+  const combo = useRef({ attendu: false, chaine: 0 });
+  /**
+   * Le numéro de la carte en cours. Sert de `key` au compte à rebours : c'est
+   * lui qui relance l'animation CSS à chaque nouvelle carte, puisque React
+   * réutilise sinon le même nœud et que l'animation ne repart pas toute seule.
+   */
+  const noCarte = useRef(0);
+  /**
+   * ⚠️ LE TUTORIEL FIGE LE MATCH, LUI AUSSI. Il ne le faisait pas : un joueur
+   * qui découvrait le jeu lisait trois lignes pendant que le match défilait à
+   * seize fois la vitesse réelle derrière le voile. La boucle le lit dans une
+   * ref pour ne pas se réabonner (même raison que `decisionRef`).
+   */
+  const tutoRef = useRef(false);
   /**
    * Le moment en cours, avec sa tenue (voir `moments.ts`).
    *
@@ -375,11 +501,41 @@ export function MatchLive({
    * exemple. Dans ce cas on ne lance PAS de ralenti : trois secondes de gros
    * plan sur un pion qui ne fait rien, c'est pire que pas de ralenti du tout.
    */
-  const jouerDecision = useCallback((action: ActionJoueur) => {
-    const armee = demanderAction(e, action);
-    rejeu.current = { restant: armee ? REJEU : 0, action: armee ? action : null };
-    vibrer(14);
-    fermerDecision(armee);
+  const jouerDecision = useCallback((option: OptionDecision) => {
+    const moi = e.pions.find((q) => q.moi);
+    if (!moi) return;
+    const avant = { ...moi.stats };
+    const depuis = e.commentaires.length;
+    // ⚠️ ICI, LE GESTE EST JOUÉ — PAS ARMÉ. C'est toute la demande : « que ça
+    // s'applique vraiment, plaquage réussi ça plaque direct, plaquage raté le
+    // mec perce ». `resoudreChoix` tire UNE fois, avec la chance exacte écrite
+    // sur le bouton qu'on vient de toucher, et applique l'issue sur-le-champ.
+    const issue = resoudreChoix(e, moi, option.action);
+    rejeu.current = {
+      restant: REJEU,
+      plan: REJEU,
+      // ⚠️ Le geste est résolu : il n'y a plus rien à attendre. La patience ne
+      // sert qu'aux gestes restés armés faute de vis-à-vis (un crochet demandé
+      // avant d'avoir le ballon), que `resoudreChoix` signale en ne changeant
+      // rien d'autre que l'intention.
+      patience: 12,
+      action: option.action,
+      chance: option.chance,
+      depuis,
+      resultat: null,
+      // ⚠️ PAS DE VERDICT SI LE DÉ N'A PAS ÉTÉ LANCÉ. Voir `Issue.joue`.
+      verdict: issue.joue ? { reussi: issue.reussi, texte: issue.texte } : null,
+      avant,
+    };
+    // Deux vibrations pour une réussite, une seule sinon : on sait ce qui s'est
+    // passé avant même d'avoir lu.
+    vibrer(issue.reussi ? 26 : 12);
+    // ⚠️ L'ENCHAÎNEMENT N'EST PLUS DÉCIDÉ ICI : `e.perceeJoueur` est le seul
+    // signal, et la boucle le consomme (voir plus bas). Un duel tranché
+    // sur-le-champ lève déjà le drapeau ; un geste armé le lèvera au contact.
+    // Ce qu'on fait ici, c'est seulement CLORE la chaîne quand rien n'a percé.
+    if (!issue.combo) combo.current = { attendu: false, chaine: 0 };
+    fermerDecision(true);
   }, [e, fermerDecision]);
 
   // --- LA BOUCLE DE RENDU ---------------------------------------------------
@@ -398,14 +554,71 @@ export function MatchLive({
       const ratio = largeur / hauteur;
       const angle = angleDeVue(moi?.cote ?? 'A', hauteur > largeur);
 
-      // ── 🎬 LE PLAN SUR MON JOUEUR S'ÉPUISE ────────────────────────────────
+      // ── 🎬 LE PLAN SUR MON JOUEUR, ET CE QU'IL A DONNÉ ───────────────────
       // ⚠️ EN SECONDES RÉELLES, PAS SIMULÉES : c'est une durée de PLAN, elle ne
       // doit pas s'allonger parce que le jeu tourne au ralenti — ce serait le
       // serpent qui se mord la queue, puisque c'est justement lui qui ralentit.
-      if (rejeu.current.restant > 0) {
-        rejeu.current.restant = Math.max(0, rejeu.current.restant - dtReel);
-        if (rejeu.current.restant === 0) rejeu.current.action = null;
+      const rj = rejeu.current;
+      // ⚠️ ON RETIENT L'ÉTAT D'AVANT pour savoir s'il faut un rendu. Les états
+      // figés (carte, pause, tuto) sortent de la boucle SANS redessiner —
+      // c'est le correctif qui libère le fil principal sur téléphone. Mais si
+      // le plan sur mon joueur s'éteint pile pendant l'un d'eux, le bandeau
+      // resterait affiché jusqu'à la reprise.
+      const gesteAvant = rj.action;
+      if (rj.plan > 0) rj.plan = Math.max(0, rj.plan - dtReel);
+
+      // ── ⚡ L'ENCHAÎNEMENT ─────────────────────────────────────────────────
+      // ⚠️ LE MOTEUR SIGNALE LA PERCÉE, L'ÉCRAN LA CONSOMME. Le drapeau est posé
+      // au fond de `resoudrePlaquage`, ce qui couvre les DEUX chemins : le duel
+      // tranché sur-le-champ, et le geste resté armé qui trouve son contact deux
+      // secondes plus tard — le cas le plus fréquent, puisque la carte tombe
+      // souvent avant que le ballon arrive.
+      if (e.perceeJoueur) {
+        e.perceeJoueur = false;
+        // Le geste armé vient d'aboutir : on peut enfin trancher son verdict.
+        if (rj.action && !rj.verdict) {
+          rj.verdict = { reussi: true, texte: '' };
+          rj.plan = Math.max(rj.plan, REJEU);
+        }
+        if (combo.current.chaine < 2) {
+          combo.current = { attendu: true, chaine: combo.current.chaine + 1 };
+        }
       }
+      if (rj.restant > 0) {
+        rj.patience = Math.max(0, rj.patience - dtReel);
+        // ⚠️ TANT QUE L'INTENTION EST ARMÉE, LE BANDEAU RESTE. C'est là toute
+        // la différence : il annonce un geste qui n'a pas encore eu lieu, et
+        // il doit être encore là quand il a lieu. Le moteur consomme
+        // l'intention (`consommerIntention`) au moment exact où il la joue ;
+        // ce test suit donc le geste, pas un minuteur arbitraire.
+        const armeeEncore = !!e.intention && e.intention.type === rj.action;
+        if (armeeEncore && !rj.resultat && rj.patience > 0) rj.restant = Math.max(rj.restant, 0.5);
+        // ⚠️ ON GUETTE CE QUE LE MOTEUR ÉCRIT SUR MOI, et c'est ça, « le
+        // résultat de l'action ». On ne l'invente pas et on ne le devine pas :
+        // c'est la phrase que le fil aurait affichée de toute façon, sortie du
+        // fil pour être posée en grand. `moi` est déjà porté par le
+        // commentaire (`dire(…, p.moi)`), donc rien à recalculer.
+        // ⚠️ ON GUETTE ENCORE, MÊME AVEC UN VERDICT : un plaquage réussi peut
+        // être suivi d'un grattage, d'une pénalité, d'un essai. Le verdict dit
+        // l'issue du DUEL, le commentaire dit la suite de l'ACTION.
+        if (!rj.resultat) {
+          for (let i = rj.depuis; i < e.commentaires.length; i++) {
+            const c = e.commentaires[i];
+            if (!c.moi) continue;
+            if (rj.verdict && c.texte === rj.verdict.texte) continue;
+            rj.resultat = c;
+            // ⚠️ ET ON PROLONGE LE PLAN POUR QU'ON AIT LE TEMPS DE LIRE. Un
+            // essai qui s'affiche trois dixièmes de seconde avant que la
+            // caméra reparte, c'est exactement le « on ne voit pas ce que ça a
+            // fait » qu'on essaie de corriger.
+            rj.restant = Math.max(rj.restant, c.points > 0 ? 3.4 : 2.4);
+            break;
+          }
+        }
+        rj.restant = Math.max(0, rj.restant - dtReel);
+        if (rj.restant === 0) { rj.action = null; rj.resultat = null; rj.verdict = null; }
+      }
+      const planAChange = rj.action !== gesteAvant || (rj.restant > 0 && !!rj.resultat);
 
       // ── ⏱️ EST-CE MON MOMENT ? ────────────────────────────────────────────
       const m = enJeu ? momentDuJoueur(e, moi) : null;
@@ -432,7 +645,7 @@ export function MatchLive({
         // plaquage à douze mètres du ballon se jouait au bord du cadre, et la
         // demande « qu'on voie vraiment notre joueur effectuer le choix »
         // restait lettre morte.
-        const poids = rejeu.current.action ? 1 : enMoment ? 0.5 : 0.38;
+        const poids = rejeu.current.plan > 0 ? 1 : enMoment ? 0.5 : 0.38;
         cible = {
           x: ballon.x + (moi.pos.x - ballon.x) * poids,
           y: ballon.y + (moi.pos.y - ballon.y) * poids,
@@ -466,22 +679,49 @@ export function MatchLive({
           if (moi) ajouterCommentaire(e, 'jeu', moi.cote, t('ml.dec.hesite', { nom: moi.nom }), 0, true);
           fermerDecision(false);
         }
-        redessiner((n) => n + 1);
+        // ⚠️ ON NE REDESSINE PAS, ET C'EST UN CORRECTIF, PAS UNE OPTIMISATION.
+        // On appelait `redessiner` ici à CHAQUE IMAGE, pendant les dix secondes
+        // où le match est figé et où pas un pion ne bouge — soixante
+        // réconciliations React par seconde, trente pions à chaque fois, pour
+        // animer une barre de progression. Sur un téléphone, ça sature le fil
+        // principal et les taps ne passent plus : c'est la moitié invisible de
+        // « les boutons de choix ne fonctionnent pas ». La barre est désormais
+        // une animation CSS (voir `.ml-dec-chrono`), et l'ouverture comme la
+        // fermeture de la carte déclenchent déjà leur propre rendu.
+        if (planAChange) redessiner((n) => n + 1);
         return;
       }
-      if (tempo === 'decisions' && enJeu && !enPause) {
-        const carte = decisionPour(e, moi, e.sim - derniereDecision.current);
+      if (tempo === 'decisions' && enJeu && !enPause && !tutoRef.current) {
+        // ⚠️ UN ENCHAÎNEMENT NE PASSE PAS PAR LE REPOS. On vient de percer : la
+        // carte suivante doit tomber TOUT DE SUITE, sinon « tu peux tenter un
+        // autre truc sur le défenseur » n'arrive jamais — 95 secondes simulées
+        // séparent deux carrefours ordinaires. On lui donne aussi moins de
+        // temps : on est au cœur de l'action, pas devant un choix de plan.
+        const enchaine = combo.current.attendu;
+        const repos = enchaine ? REPOS_DECISION : e.sim - derniereDecision.current;
+        const carte = decisionPour(e, moi, repos);
         if (carte) {
+          combo.current.attendu = false;
           derniereDecision.current = e.sim;
-          chrono.current = DELAI_DECISION;
-          decisionRef.current = carte;
-          setDecision(carte);
-          redessiner((n) => n + 1);
+          chrono.current = enchaine ? DELAI_COMBO : DELAI_DECISION;
+          noCarte.current += 1;
+          decisionRef.current = { ...carte, enchaine };
+          setDecision({ ...carte, enchaine });
           return;
         }
+        // L'enchaînement n'a rien trouvé à proposer (tout est en recharge) :
+        // on le laisse tomber plutôt que de le tenir en attente.
+        if (enchaine) combo.current = { attendu: false, chaine: 0 };
       }
 
-      if (enPause) { redessiner((n) => n + 1); return; }
+      // ⚠️ MÊME RÈGLE POUR LA PAUSE ET LE TUTORIEL : rien ne bouge, donc on ne
+      // redessine pas. Et le tutoriel ARRÊTE le match, ce qu'il ne faisait pas
+      // — on lisait trois lignes pendant que le jeu défilait à seize fois la
+      // vitesse réelle derrière le voile.
+      if (enPause || tutoRef.current) {
+        if (planAChange) redessiner((n) => n + 1);
+        return;
+      }
 
       avancer(e, dtReel * facteurTempo(tempo, enMoment));
       redessiner((n) => n + 1);
@@ -502,7 +742,7 @@ export function MatchLive({
       const choix = decision.options[n - 1];
       if (!choix) return;
       ev.preventDefault();
-      jouerDecision(choix.action);
+      jouerDecision(choix);
     };
     window.addEventListener('keydown', auClavier);
     return () => window.removeEventListener('keydown', auClavier);
@@ -574,6 +814,10 @@ export function MatchLive({
   // alors que l'étiquette doit tenir les trois secondes du plan. Un « 💥 Plaquer »
   // qui disparaît un dixième de seconde après le clic ne se lit pas.
   const geste = rejeu.current.action ? ACTION_PAR_ID.get(rejeu.current.action) : undefined;
+  const resultat = rejeu.current.resultat;
+  // Ce que le geste a VRAIMENT ajouté à sa feuille depuis le clic.
+  const acquis = geste && monPion ? ecartsDeFeuille(rejeu.current.avant, monPion.stats) : [];
+  const verdict = rejeu.current.verdict;
   // Sur qui il va aller : le cercle sur le porteur adverse dit à qui s'adresse
   // un plaquage ou un grattage. C'est une aide de LECTURE, pas une commande.
   const cibleDefense = enJeu && jePeuxJouer && monPion && e.possession !== monPion.cote
@@ -667,14 +911,23 @@ export function MatchLive({
   // deux équipes aux couleurs voisines — et à 0,8 px il ne se voyait plus.
   const trait = Math.max(rayon * 0.18, 1.5 / pxParMetre);
 
+  // ⚠️ OÙ EST MON PION À L'ÉCRAN, EN PIXELS. C'est là que se pose la bulle du
+  // verdict. `versEcran` rend des unités de viewBox ; `pxParMetre` les convertit
+  // — et le rapport est exact, parce que la caméra construit son cadre avec le
+  // ratio du conteneur (le `slice` du SVG ne rogne donc rien).
+  const perso = (() => {
+    if (!vue || !monPion || !surLeTerrain.includes(monPion)) return null;
+    const q = vue.versEcran({
+      x: monPion.pos.x + monPion.vitesse.x * r,
+      y: monPion.pos.y + monPion.vitesse.y * r,
+    });
+    return { x: q.x * pxParMetre, y: q.y * pxParMetre };
+  })();
+
   const pion = (p: Pion) => {
     const x = p.pos.x + p.vitesse.x * r;
     const y = p.pos.y + p.vitesse.y * r;
     const porte = e.porteur === p;
-    // Où ce pion tombe-t-il À L'ÉCRAN ? Sert uniquement à décider de quel côté
-    // écrire l'étiquette de geste (voir plus bas).
-    const surEcran = p.moi && geste && vue ? vue.versEcran({ x, y }) : null;
-    const enHautDuCadre = !!surEcran && vue ? surEcran.y < vue.H * 0.24 : false;
     return (
       <g key={p.id} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})`}>
         {p.moi && <circle r={rayon * 2.1} className="ml-aura" />}
@@ -701,31 +954,12 @@ export function MatchLive({
               className="ml-chevron"
               d={`M ${-rayon * 0.9} ${-rayon * 2.7} L ${rayon * 0.9} ${-rayon * 2.7} L 0 ${-rayon * 1.5} Z`}
             />
-            {/* ---------- 🎬 CE QU'IL EST EN TRAIN DE FAIRE ----------
-                ⚠️ SUR LE PION, PAS DANS UN COIN DE L'ÉCRAN. C'est la réponse
-                à « qu'on voie vraiment notre joueur effectuer le choix » : un
-                bandeau de HUD dirait la même chose, mais il faudrait regarder
-                ailleurs qu'au seul endroit qui compte. Redressé comme les
-                numéros, sinon il se lit de travers en portrait. */}
-            {geste && (
-              <text
-                className="ml-geste"
-                /* ⚠️ ELLE PASSE SOUS LE PION QUAND IL EST EN HAUT DU CADRE, et
-                   ce n'est pas de la coquetterie : la caméra borne son cadre
-                   au terrain (elle ne montre jamais de vide), donc un joueur
-                   collé à la touche se retrouve au bord de l'écran et tout ce
-                   qui est posé « au-dessus » de lui sort du viewBox. Mesuré :
-                   l'étiquette tombait à 691 px dans une scène qui s'arrête à
-                   680 — invisible exactement quand le joueur est plaqué en
-                   bord de touche. On lit la position À L'ÉCRAN (donc après le
-                   pivot du portrait) et on bascule le décalage. */
-                y={enHautDuCadre ? rayon * 4.4 : -rayon * 3.6}
-                textAnchor="middle"
-                fontSize={tailleTexte * 1.05}
-              >
-                {geste.emoji} {t(geste.cle)}
-              </text>
-            )}
+            {/* ⚠️ L'ÉTIQUETTE DU GESTE ÉTAIT ICI, EN SVG. Elle est devenue une
+                BULLE HTML posée aux coordonnées écran du pion (.ml-perso, plus
+                bas) : le verdict d'un duel est une PHRASE — « Crochet de Baille !
+                Bertin plaque dans le vide. » — et une phrase, ça se met en forme
+                avec une pastille, un retour à la ligne et une largeur maximale.
+                Le SVG ne sait rien faire de tout ça sans qu'on le recode. */}
           </g>
         )}
       </g>
@@ -755,6 +989,10 @@ export function MatchLive({
 
   const pelouse = useMemo(() => <PelouseMemo />, []);
   const montrerTuto = enJeu && jePeuxJouer && !tutoMatchVu && !e.fini;
+  // ⚠️ LA BOUCLE LE LIT DANS UNE REF, comme la carte de décision : la poser en
+  // dépendance de `useEffect` relancerait la boucle et remettrait `dernierTemps`
+  // à zéro, ce qui fait sauter le match d'un cran à chaque bascule.
+  tutoRef.current = montrerTuto;
 
   return createPortal(
     <div ref={overlayRef} className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) onFermer(); }}>
@@ -948,14 +1186,14 @@ export function MatchLive({
 
                   {/* ---------- LA PREMIÈRE FOIS ---------- */}
                   {montrerTuto && (
-                    <div className="ml-tuto" onPointerDown={() => setTutoMatchVu(true)}>
+                    <div className="ml-tuto" onClick={() => setTutoMatchVu(true)}>
                       <div className="ml-tuto-carte">
                         <b>⏸️ {t('ml.tuto.titre')}</b>
                         <p>🏉 {t('ml.tuto.file')}</p>
                         <p>⏱️ {t('ml.tuto.carte')}</p>
                         <p>🎬 {t('ml.tuto.ralenti')}</p>
                         <button type="button" className="btn vert"
-                          onPointerDown={(ev) => { ev.stopPropagation(); setTutoMatchVu(true); }}>
+                          onClick={(ev) => { ev.stopPropagation(); setTutoMatchVu(true); }}>
                           {t('ml.tuto.compris')}
                         </button>
                       </div>
@@ -976,7 +1214,7 @@ export function MatchLive({
                             key={o.id}
                             type="button"
                             className="ml-ordre"
-                            onPointerDown={(ev) => { ev.stopPropagation(); ordonner(e, o.id); setEnPause(false); }}
+                            onClick={() => { ordonner(e, o.id); setEnPause(false); }}
                           >
                             <b>{o.emoji} {t(o.cle)}</b>
                             <span>{t(o.aide)}</span>
@@ -1003,33 +1241,127 @@ export function MatchLive({
                     </div>
                   )}
 
+                  {/* ---------- 🎬 CE QUE MON CHOIX A DONNÉ, SUR MON JOUEUR ----------
+                      ⚠️ DEMANDE EXPLICITE : « fais que ces phrases elles soient
+                      au-dessus de soi ». Elles vivaient au milieu de l'écran, à
+                      l'endroit où on ne regarde justement pas : on suit son pion.
+                      La bulle est posée aux coordonnées écran du pion, en pixels,
+                      et bornée au cadre — un joueur plaqué en bord de touche doit
+                      pouvoir lire son verdict comme les autres.
+
+                      ⚠️ TROIS LIGNES, ET CHACUNE RÉPOND À UNE QUESTION :
+                      1. « mon clic est passé ? »   → ▶️ le geste, dès le clic
+                      2. « ça a marché ? »          → ✅/❌ et le % qu'on avait
+                      3. « ça a donné quoi ? »      → la phrase du moteur, puis
+                                                      ce que ça a mis sur la feuille */}
+                  {geste && perso && !e.bagarre && (
+                    <div
+                      className="ml-perso"
+                      role="status"
+                      title={t('ml.dec.gains')}
+                      data-reussi={verdict ? (verdict.reussi ? 'oui' : 'non') : undefined}
+                      data-marque={resultat && resultat.points > 0 ? 'oui' : undefined}
+                      ref={mesurerBulle}
+                      style={{
+                        // La bulle est ancrée par son bas-centre (translate en
+                        // CSS) : la marge horizontale vaut donc sa DEMI-largeur,
+                        // et la marge haute sa hauteur PLUS le décalage de 18 px.
+                        left: `${borner(
+                          perso.x,
+                          tailleBulle.current.l / 2 + 4,
+                          Math.max(tailleBulle.current.l / 2 + 4, boite.current.largeur - tailleBulle.current.l / 2 - 4),
+                        )}px`,
+                        top: `${borner(
+                          perso.y,
+                          tailleBulle.current.h + 22,
+                          Math.max(tailleBulle.current.h + 22, boite.current.hauteur - 6),
+                        )}px`,
+                      }}
+                    >
+                      <b className="ml-perso-geste">
+                        {verdict ? (verdict.reussi ? '✅' : '❌') : '▶️'} {geste.emoji} {t(geste.cle)}
+                        <em>{Math.round(rejeu.current.chance * 100)} %</em>
+                      </b>
+                      {/* ⚠️ LA PHRASE DU MOTEUR PASSE DEVANT CELLE DU DUEL : elle
+                          raconte la SUITE (l'essai, la pénalité, le ruck), le
+                          verdict ne disait que l'issue du contact. Et tant que
+                          rien n'est tranché, on n'écrit pas de phrase du tout —
+                          « il joue son geste » ne renseigne personne. */}
+                      {(resultat || verdict?.texte) && (
+                        <span className="ml-perso-phrase">
+                          {resultat
+                            ? `${EMOJI[resultat.type] ?? '•'} ${resultat.texte}`
+                            : verdict?.texte}
+                        </span>
+                      )}
+                      <span className="ml-perso-gains">
+                        {resultat && resultat.points > 0 ? `+${resultat.points} · ` : ''}
+                        {acquis.length ? acquis.join(' · ') : t('ml.dec.execute')}
+                      </span>
+                    </div>
+                  )}
+
                   {/* ---------- ⏸️ DIX SECONDES POUR CHOISIR ----------
                       Le match est FIGÉ tant que cette carte est là : le chrono
                       du match ne tourne pas, les pions ne bougent pas. On lit,
                       on choisit, et le moteur joue la suite au ralenti. */}
                   {decision && !e.bagarre && (
-                    <div className="ml-decision" role="alertdialog" aria-label={t('ml.dec.titre')}>
+                    <div
+                      className="ml-decision"
+                      role="alertdialog"
+                      aria-label={t('ml.dec.titre')}
+                      data-enchaine={decision.enchaine ? 'oui' : undefined}
+                    >
+                      {/* ⚠️ LA BARRE EST ANIMÉE PAR LE CSS, PAS PAR LA BOUCLE.
+                          Elle était une largeur reposée à chaque image : dix
+                          secondes de rendus React à soixante par seconde,
+                          pendant que le jeu est FIGÉ. Le `key` est
+                          indispensable — sans lui React réutilise le même nœud
+                          d'une carte à l'autre et l'animation ne repart pas. */}
                       <div className="ml-dec-chrono">
-                        <span style={{ width: `${Math.max(0, chrono.current / DELAI_DECISION) * 100}%` }} />
+                        <span
+                          key={noCarte.current}
+                          style={{ animationDuration: `${DELAI_DECISION}s` }}
+                        />
                       </div>
-                      <b className="ml-dec-situation">{decision.emoji} {t(decision.cle)}</b>
+                      <b className="ml-dec-situation">
+                        {/* ⚠️ UN ENCHAÎNEMENT SE DIT, sinon on croit à un bug :
+                            deux cartes coup sur coup, sans le repos habituel,
+                            ça ressemble à une répétition. */}
+                        {decision.enchaine
+                          ? `⚡ ${t('ml.dec.enchaine')}`
+                          : `${decision.emoji} ${t(decision.cle)}`}
+                      </b>
                       <div className="ml-dec-options">
                         {decision.options.map((o, i) => (
                           <button
                             key={o.action}
                             type="button"
                             className="ml-dec-option"
-                            onPointerDown={(ev) => { ev.stopPropagation(); jouerDecision(o.action); }}
+                            data-sur={o.chance >= 0.72 ? 'oui' : undefined}
+                            data-pari={o.chance <= 0.42 ? 'oui' : undefined}
+                            onClick={() => jouerDecision(o)}
                           >
                             <span className="ml-dec-touche">{i + 1}</span>
-                            <b>{o.emoji} {t(o.cle)}</b>
-                            <span className="ml-dec-aide">{t(o.aide)}</span>
+                            <b>
+                              {o.emoji} {t(o.cle)}
+                              {/* ⚠️ LE POURCENTAGE EST CELUI QUI SERA TIRÉ, pas une
+                                  estimation d'ambiance : il vient de `enjeuDe`, que
+                                  `resoudreChoix` rappelle juste avant de lancer le
+                                  dé. Arrondi à l'entier — annoncer « 71,4 % » sur un
+                                  coup de dé unique serait une fausse précision. */}
+                              <em className="ml-dec-chance">{Math.round(o.chance * 100)} %</em>
+                            </b>
+                            {/* Les deux faces du pari, une ligne chacune. Un
+                                pourcentage seul ne dit pas s'il faut le prendre. */}
+                            <span className="ml-dec-gain">✅ {t(o.gain)}</span>
+                            <span className="ml-dec-risque">⚠️ {t(o.risque)}</span>
                           </button>
                         ))}
                         <button
                           type="button"
                           className="ml-dec-option laisser"
-                          onPointerDown={(ev) => { ev.stopPropagation(); fermerDecision(false); }}
+                          onClick={() => fermerDecision(false)}
                         >
                           <b>⏭️ {t('ml.dec.laisser')}</b>
                           <span className="ml-dec-aide">{t('ml.dec.laisserAide')}</span>
@@ -1039,7 +1371,7 @@ export function MatchLive({
                   )}
 
                   {enPause && !decision && !e.bagarre && (
-                    <button type="button" className="ml-voile-pause" onPointerDown={() => setEnPause(false)}>
+                    <button type="button" className="ml-voile-pause" onClick={() => setEnPause(false)}>
                       <b>▶️ {t('ml.reprendre')}</b>
                     </button>
                   )}
@@ -1200,6 +1532,57 @@ function Coaching({
       )}
     </div>
   );
+}
+
+/**
+ * Ce que le geste a ajouté à la feuille du joueur, en libellés courts.
+ *
+ * ⚠️ ON NE LISTE QUE CE QUI A BOUGÉ, et on s'arrête à trois : le bandeau doit
+ * se lire d'un coup d'œil pendant que le jeu tourne au ralenti, pas se
+ * dépouiller. L'ordre est celui du RÉCIT — ce qui vient d'arriver de plus
+ * marquant d'abord (essai, franchissement), les mètres en dernier.
+ *
+ * ⚠️ ET LES MÈTRES SONT ARRONDIS À L'ENTIER : « +3,7 m » donne l'impression
+ * d'une mesure de laboratoire, « +4 m » d'une action de rugby.
+ */
+/**
+ * ⚠️ « PLAQUAGE ×2 », PAS « 2 PLAQUAGES », et ce n'est pas de la coquetterie :
+ * la seconde forme demande un singulier ET un pluriel dans les sept langues —
+ * le français accorde, l'allemand décline, le japonais ignore le pluriel. Le
+ * nom au singulier suivi du compte traverse tout, et se lit mieux sur un
+ * bandeau de trois secondes : le nom saute aux yeux, le chiffre suit.
+ *
+ * ⚠️ ET L'EMOJI SEUL NE SUFFISAIT PAS. Première version : « ➡️ · 🏃 ». Mesuré
+ * à l'écran, et illisible — personne ne devine « une passe et un ballon
+ * porté ». Un HUD peut être compact, il ne peut pas être un rébus.
+ */
+const GAINS: [keyof StatsMatch, string, string][] = [
+  ['essais', '\u{1F3C9}', 'ml.gain.essai'],
+  ['grattages', '\u{1FA9D}', 'ml.gain.grattage'],
+  ['franchissements', '⚡', 'ml.gain.franchissement'],
+  ['plaquages', '\u{1F4A5}', 'ml.gain.plaquage'],
+  ['offloads', '\u{1F91D}', 'ml.gain.offload'],
+  ['passes', '➡️', 'ml.gain.passe'],
+  ['courses', '\u{1F3C3}', 'ml.gain.course'],
+  ['coupsDePied', '\u{1F9B6}', 'ml.gain.pied'],
+  ['rucksNettoyes', '\u{1F512}', 'ml.gain.ruck'],
+  ['plaquagesManques', '\u{1F573}️', 'ml.gain.plaquageManque'],
+  ['passesRatees', '❌', 'ml.gain.enAvant'],
+];
+
+function ecartsDeFeuille(avant: StatsMatch | null, apres: StatsMatch): string[] {
+  if (!avant) return [];
+  const sortie: string[] = [];
+  for (const [cle, emoji, cle2] of GAINS) {
+    const d = (apres[cle] as number) - (avant[cle] as number);
+    if (d > 0 && sortie.length < 3) {
+      const nom = `${emoji} ${t(cle2)}`;
+      sortie.push(d > 1 ? `${nom} ×${d}` : nom);
+    }
+  }
+  const m = Math.round(apres.metres - avant.metres);
+  if (m > 0 && sortie.length < 3) sortie.push(`📏 +${m} m`);
+  return sortie;
 }
 
 /** Position brute du ballon (sans interpolation) : ce que vise la caméra. */

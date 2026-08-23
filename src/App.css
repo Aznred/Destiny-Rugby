@@ -3184,8 +3184,16 @@
   border: 1px solid rgba(212, 175, 55, 0.55);
   background: linear-gradient(180deg, rgba(8, 26, 18, 0.93), rgba(4, 14, 10, 0.96));
   box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
-  max-height: 52%;
+  /* ⚠️ 62 %, ET ELLE DÉFILE VRAIMENT. À 52 % sur un téléphone, la quatrième
+     option et « laisser faire » tombaient sous le pli — et comme la scène
+     portait « touch-action: none », le doigt ne pouvait pas aller les
+     chercher. Les deux se corrigent ensemble : plus de hauteur, et le geste
+     vertical rendu à la carte. */
+  max-height: 62%;
   overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 /* Le compte à rebours : une barre, pas un nombre. On la lit sans la lire. */
 .ml-dec-chrono {
@@ -3195,14 +3203,40 @@
   overflow: hidden;
   margin-bottom: 0.45rem;
 }
+/* ⚠️ LE COMPTE À REBOURS EST UNE ANIMATION CSS, PAS UN RENDU PAR IMAGE.
+   Il a longtemps été une largeur posée par la boucle à chaque image — donc
+   SOIXANTE rendus React par seconde, trente pions reconciliés à chaque fois,
+   pendant les dix secondes où le jeu est FIGÉ et où plus rien ne bouge. Sur un
+   téléphone, ça sature le fil principal et les taps ne passent plus : c'est la
+   moitié invisible de « on peut pas cliquer dessus ». Le compositeur sait
+   animer une largeur tout seul, sans réveiller React une seule fois.
+   La durée vient de ~DELAI_DECISION~ (une seule vérité), posée en style. */
 .ml-dec-chrono span {
   display: block;
   height: 100%;
+  width: 100%;
   background: linear-gradient(90deg, var(--or-500), #ffd97a);
-  /* ⚠️ AUCUNE TRANSITION : la largeur est posée à chaque image par la boucle.
-     Une transition CSS par-dessus ferait traîner la barre derrière le chrono
-     réel, et le joueur perdrait une demi-seconde qu'il croit avoir. */
+  animation: ml-dec-chrono linear forwards;
+  transform-origin: left center;
 }
+@keyframes ml-dec-chrono {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+/* Sans animation, on donne le seul repère honnête : la barre reste pleine, et
+   le libellé du bouton « laisser faire » dit déjà que ne rien faire est un
+   choix. Mieux qu'une barre qui saute. */
+@media (prefers-reduced-motion: reduce) {
+  .ml-dec-chrono span { animation: none; }
+}
+/* ⚠️ UNE CARTE D'ENCHAÎNEMENT SE SIGNALE. Deux cartes coup sur coup sans le
+   repos habituel, ça ressemble à un bug tant qu'on ne dit pas que c'est voulu. */
+.ml-decision[data-enchaine='oui'] {
+  border-color: rgba(255, 212, 94, 0.95);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 212, 94, 0.35);
+}
+.ml-decision[data-enchaine='oui'] .ml-dec-situation { color: #ffd97a; }
+
 .ml-dec-situation {
   display: block;
   font-family: 'Archivo', system-ui, sans-serif;
@@ -3234,8 +3268,43 @@
 }
 .ml-dec-option:hover { border-color: var(--or-clair); background: rgba(212, 175, 55, 0.14); }
 .ml-dec-option.laisser { opacity: 0.72; padding-left: 0.6rem; }
-.ml-dec-option b { font-size: 0.85rem; }
+.ml-dec-option b {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
 .ml-dec-aide { font-size: 0.68rem; color: var(--craie-dim); line-height: 1.25; }
+
+/* ⚠️ LE POURCENTAGE DE RÉUSSITE, ET C'EST LE CHIFFRE QUI SERA TIRÉ.
+   Il est poussé à droite du libellé, en pastille : on lit « 💥 Plaquer » puis
+   « 71 % », dans cet ordre, parce qu'on choisit un geste avant de peser sa
+   chance. */
+.ml-dec-chance {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.05rem 0.32rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--craie);
+}
+/* Vert au-dessus de 72 %, rouge en dessous de 42 % : la couleur fait le tri
+   avant la lecture, et c'est ce qui rend la carte jouable en cinq secondes. */
+.ml-dec-option[data-sur='oui'] .ml-dec-chance { background: rgba(110, 220, 150, 0.22); color: #8ff0b4; }
+.ml-dec-option[data-pari='oui'] .ml-dec-chance { background: rgba(255, 120, 120, 0.22); color: #ff9a9a; }
+
+/* Les deux faces du pari. ⚠️ Un pourcentage seul ne dit pas s'il faut le
+   prendre : 62 %, c'est excellent pour un plaquage et suicidaire pour un geste
+   qui, raté, offre une mêlée dans ses vingt-deux. */
+.ml-dec-gain, .ml-dec-risque {
+  font-size: 0.66rem;
+  line-height: 1.2;
+}
+.ml-dec-gain { color: rgba(143, 240, 180, 0.9); }
+.ml-dec-risque { color: rgba(255, 154, 154, 0.85); }
 /* Le numéro du raccourci clavier. Il disparaît là où il n'y a pas de clavier. */
 .ml-dec-touche {
   position: absolute;
@@ -3796,16 +3865,26 @@ img, svg, canvas { max-width: 100%; }
 .ml-progression { flex: 0 0 auto; height: 3px; min-width: 0; border-radius: 0; margin: 0; }
 
 /* --- LA SCÈNE ------------------------------------------------------------ */
-/* ⚠️ « touch-action: none » est indispensable : sans lui, glisser le doigt fait
-   défiler la page, le navigateur s'approprie le geste après quelques pixels,
-   le « pointermove » s'arrête et le pion se fige en pleine course. */
+/* ⚠️ « touch-action: none » A ÉTÉ RETIRÉ, ET C'ÉTAIT UN VRAI BUG DE JEU.
+   Il avait été posé pour le joystick : sans lui, glisser le doigt faisait
+   défiler la page et le pion se figeait en pleine course. Le joystick n'existe
+   plus — mais la règle, elle, s'appliquait à TOUT ce qui vit dans la scène,
+   y compris à la carte de décision (~max-height: 62%; overflow-y: auto~) et au
+   tutoriel. Sur un téléphone, les options du bas et le bouton « C'est parti »
+   passaient sous le pli, et le doigt ne pouvait PAS faire défiler pour les
+   atteindre. Retour de jeu, mot pour mot : « bug sur téléphone, les boutons de
+   choix et de dire oui j'ai compris comment ça marche ne fonctionnent pas, on
+   peut pas cliquer dessus ». Ce n'était pas le clic : c'était le défilement.
+
+   ⚠️ NE PAS LE REMETTRE tant qu'on ne pilote pas au doigt. S'il faut un jour
+   rattraper un geste sur la pelouse, il se pose sur le SVG du terrain, pas sur
+   la scène qui porte aussi tout le HUD. */
 .ml-scene {
   position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
   background: #0b2b1a;
-  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -3938,6 +4017,9 @@ img, svg, canvas { max-width: 100%; }
   font-size: 1.15rem;
   cursor: pointer;
 }
+/* ⚠️ IL DÉFILE. Trois lignes et un bouton, ça tient partout — sauf sur un
+   téléphone tenu à l'horizontale, où la scène fait deux cents pixels de haut
+   et où « C'est parti » passait sous le bord sans aucun moyen de l'atteindre. */
 .ml-tuto {
   position: absolute;
   inset: 0;
@@ -3946,10 +4028,14 @@ img, svg, canvas { max-width: 100%; }
   padding: 1rem;
   background: rgba(2, 8, 5, 0.78);
   pointer-events: auto;
+  overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 .ml-tuto-carte {
   display: grid;
   gap: 0.5rem;
+  margin: auto;
   max-width: 360px;
   padding: 1rem 1.1rem;
   border: 1px solid rgba(212, 175, 55, 0.4);
@@ -4163,34 +4249,96 @@ img, svg, canvas { max-width: 100%; }
    la ressource qui décide de la fin de match — mais « 🫁 62 % » perdu au milieu
    de trois pastilles ne se lit pas en pleine course. Une jauge se lit du coin
    de l'œil. */
-/* --- 🎬 CE QUE MON JOUEUR EST EN TRAIN DE FAIRE -------------------------- */
-/* ⚠️ ELLE EST DANS LE SVG, DONC EN MÈTRES DE TERRAIN : la taille vient de
-   l'attribut `fontSize` (calculé au pixel près comme les numéros de maillot),
-   pas d'ici. Ce que le CSS fait, c'est la rendre LISIBLE sur une pelouse verte,
-   sur trente pions, à n'importe quel niveau de zoom — un liseré sombre posé
-   sous le remplissage (`paint-order: stroke`) et rien d'autre.
-   C'est la réponse à « qu'on voie vraiment notre joueur effectuer le choix » :
-   elle apparaît sur SA tête au moment où il exécute, et s'éteint avec le
-   ralenti (3,2 s). */
-.ml-geste {
-  fill: var(--or-clair, #ffd45e);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  paint-order: stroke;
-  stroke: rgba(0, 0, 0, 0.72);
-  stroke-width: 0.5;
-  stroke-linejoin: round;
+/* --- 🎬 LE VERDICT, POSÉ SUR MON JOUEUR ---------------------------------- */
+/* ⚠️ DEMANDE EXPLICITE : « fais que ces phrases elles soient au-dessus de soi ».
+   Il y avait ici DEUX choses, et les deux sont parties :
+   — .ml-resultat, un bandeau centré à 22 % de hauteur. Il disait la bonne chose
+     au mauvais endroit : quand on suit son pion, on ne regarde pas le milieu de
+     l'écran.
+   — .ml-geste, une étiquette SVG collée au pion. Bon endroit, mais elle ne
+     savait afficher qu'un libellé : un verdict de duel est une PHRASE, et une
+     phrase demande une largeur maximale, un retour à la ligne et une pastille.
+
+   La bulle est positionnée en PIXELS par le composant (coordonnées écran du
+   pion, bornées au cadre) et ancrée par son coin bas-centre, donc elle flotte
+   AU-DESSUS de la tête. */
+.ml-perso {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, calc(-100% - 18px));
+  display: grid;
+  gap: 0.1rem;
+  justify-items: center;
+  text-align: center;
+  width: max-content;
+  max-width: min(78vw, 22rem);
+  padding: 0.34rem 0.6rem;
+  border-radius: 11px;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  background: rgba(6, 18, 12, 0.92);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
   pointer-events: none;
-  animation: geste-apparait 0.18s ease-out;
+  animation: ml-perso-entre 0.15s ease-out;
 }
-@keyframes geste-apparait {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* La petite pointe qui désigne le pion : sans elle, la bulle flotte sans dire
+   de qui elle parle — et il y a trente pions à l'écran. */
+.ml-perso::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  transform: translateX(-50%) rotate(45deg);
+  background: rgba(6, 18, 12, 0.92);
+  border-right: 1px solid rgba(212, 175, 55, 0.55);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.55);
 }
-/* Un joueur qui a coupé les animations n'a pas besoin d'un fondu pour lire un
-   libellé : il le lit tout de suite. */
+.ml-perso-geste {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 0.82rem;
+  color: var(--or-clair);
+  line-height: 1.1;
+}
+/* Le pourcentage qu'on AVAIT : c'est lui qui transforme un échec en pari perdu
+   plutôt qu'en injustice. */
+.ml-perso-geste em {
+  font-style: normal;
+  font-size: 0.68rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--craie-dim);
+}
+.ml-perso-phrase { font-size: 0.76rem; color: var(--craie); line-height: 1.25; }
+.ml-perso-gains { font-size: 0.7rem; color: var(--craie-dim); line-height: 1.2; }
+
+/* Réussi : vert. Raté : rouge. On le sait avant d'avoir lu. */
+.ml-perso[data-reussi='oui'] { border-color: rgba(110, 220, 150, 0.85); }
+.ml-perso[data-reussi='oui']::after { border-color: rgba(110, 220, 150, 0.85); }
+.ml-perso[data-reussi='oui'] .ml-perso-geste { color: #8ff0b4; }
+.ml-perso[data-reussi='non'] { border-color: rgba(255, 120, 120, 0.8); }
+.ml-perso[data-reussi='non']::after { border-color: rgba(255, 120, 120, 0.8); }
+.ml-perso[data-reussi='non'] .ml-perso-geste { color: #ff9a9a; }
+.ml-perso[data-marque='oui'] { background: rgba(8, 40, 22, 0.95); }
+.ml-perso[data-marque='oui']::after { background: rgba(8, 40, 22, 0.95); }
+
+@keyframes ml-perso-entre {
+  from { opacity: 0; transform: translate(-50%, calc(-100% - 6px)); }
+  to { opacity: 1; transform: translate(-50%, calc(-100% - 18px)); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .ml-geste { animation: none; }
+  .ml-perso { animation: none; }
+}
+@media (max-width: 560px) {
+  .ml-perso { max-width: 84vw; padding: 0.3rem 0.5rem; }
+  .ml-perso-geste { font-size: 0.76rem; }
+  .ml-perso-phrase { font-size: 0.7rem; }
+  .ml-perso-gains { font-size: 0.65rem; }
 }
 
 .ml-souffle {

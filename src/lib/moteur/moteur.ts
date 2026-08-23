@@ -31,7 +31,7 @@ import {
 } from './entites';
 import {
   PHASES_ARRETEES, ajouterCommentaire, disciplineVide,
-  type ConsigneJoueur, type DisciplineMatch, type EtatMatch,
+  type ActionJoueur, type ConsigneJoueur, type DisciplineMatch, type EtatMatch,
   type IntentionPied, type Lancement, type NiveauMatch, type OrdreBagarre,
   type Phase, type PlanDeScore, type TypeCommentaire,
 } from './etat';
@@ -40,7 +40,7 @@ import {
   resoudreBagarre, sanctionApresMatch, vieillirBulles,
 } from './bagarre';
 import {
-  consommerIntention, intentionEst, receveurCote, receveurPour,
+  consommerIntention, demanderAction, intentionEst, receveurCote, receveurPour,
 } from './controle';
 import {
   choisirCoteOuvert, choisirSysteme, placerEquipes, plusProche, surLeTerrain,
@@ -234,6 +234,7 @@ export function creerMatch(
     controle: options.controle ?? false,
     intention: null,
     recharges: {},
+    perceeJoueur: false,
     tension: 0,
     bagarre: null,
     bulles: [],
@@ -1152,7 +1153,67 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
 // PLAQUAGE, RUCK, MAUL
 // ---------------------------------------------------------------------------
 
-function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
+/**
+ * ⚠️ LA CHANCE QU'UN PLAQUAGE ABOUTISSE — LA SEULE, ET ELLE A DEUX LECTEURS.
+ *
+ * Elle vivait au milieu de `resoudrePlaquage`, ce qui allait très bien tant que
+ * personne d'autre n'avait besoin de la connaître. Depuis que la carte de
+ * décision AFFICHE un pourcentage de réussite, un second lecteur existe — et
+ * une probabilité recopiée est une probabilité qui ment un jour. Le chiffre
+ * montré au joueur et le tirage qui décide de son sort sortent donc
+ * littéralement de la même ligne de code.
+ *
+ * @param geste   le geste ARMÉ PAR L'ATTAQUANT (crochet, raffut, sprint) — il
+ *   fait baisser la probabilité de plaquage, donc monter celle de percer.
+ * @param monPlaquage le défenseur est le joueur ET il a demandé à plaquer : il
+ *   se lance, +16 % de force, et il paiera plus cher s'il manque.
+ */
+export function probaPlaquage(
+  e: EtatMatch, porteur: Pion, defenseur: Pion,
+  geste: ActionJoueur | null, monPlaquage: boolean,
+): number {
+  const fatigueD = 0.72 + defenseur.endurance / 360;
+  // ⚠️ LE GESTE DU JOUEUR PÈSE VRAIMENT SUR LE DUEL — sinon la carte ne serait
+  // qu'un habillage. Il ne le décide pas pour autant : il déplace le curseur
+  // d'un contact qui reste arbitré par les attributs des deux hommes.
+  const force = defenseur.plaquage * fatigueD * (monPlaquage ? 1.16 : 1);
+  const resistance = porteur.evitement * 0.55 + porteur.puissance * 0.45
+    // ⚠️ RENFORCÉS APRÈS RETOUR DE JEU (« raffut, crochet qui marche vraiment »).
+    // À 0,30 et 0,26, un crochet faisait passer la chance de franchir de 10 % à
+    // 15 % : l'effet existait — le banc d'essai le mesurait — mais il était
+    // INVISIBLE manette en main, parce qu'on ne joue pas cent crochets d'affilée.
+    // Un geste qu'on ne sent pas est un geste qui n'existe pas. À 0,45 et 0,40,
+    // on franchit une fois sur quatre : c'est un pari qu'on voit gagner.
+    + (geste === 'crochet' ? porteur.evitement * 0.45 : 0)
+    + (geste === 'raffut' ? porteur.puissance * 0.40 : 0)
+    + (geste === 'sprint' ? 6 : 0);
+  // ⚠️ Le taux de réussite au plaquage du rugby professionnel est de ~88 %.
+  // Le rythme de l'équipe qui court après son plan de marque l'infléchit :
+  // c'est le seul endroit où le score « aide » l'attaque, et c'est ce réglage
+  // invisible qui évite d'avoir à refuser un essai à l'écran.
+  const r = retard(e, porteur.cote);
+  const pres = metresAvantLaLigne(porteur.pos, porteur.cote);
+  // ⚠️ Le réglage est ASYMÉTRIQUE. Une équipe en retard sur son plan trouve un
+  // peu d'espace ; une équipe en avance se heurte à un mur. Sans ce second
+  // versant, tout le score tombait dans le premier quart d'heure et la fin de
+  // match était stérile (mesuré : 16 points avant la 20ᵉ, 5 après la 60ᵉ).
+  const aide = r >= 0
+    ? r * 0.20 + (pres < 25 ? r * 0.22 : 0) + (pres < 8 ? r * 0.22 : 0)
+    : r * 0.45;
+  return borner(0.90 + (force - resistance) / 400 - aide, 0.36, 0.99);
+}
+
+/**
+ * @param abouti  issue IMPOSÉE du duel, quand le joueur vient de choisir son
+ *   geste sur une carte de décision : `resoudreChoix` a déjà tiré le dé (avec
+ *   la MÊME `probaPlaquage` que celle affichée sur la carte) et impose ici le
+ *   résultat. Sans ce paramètre, le contact serait tiré DEUX FOIS et le
+ *   pourcentage annoncé au joueur ne voudrait plus rien dire.
+ *   Laissé vide, le duel se joue tout seul : le cas des vingt-neuf autres.
+ */
+function resoudrePlaquage(
+  e: EtatMatch, porteur: Pion, defenseur: Pion, abouti?: boolean,
+): void {
   // ⚠️ LE GESTE ILLÉGAL SE JOUE AVANT LE DUEL, ET IL LE REMPLACE. Un plaquage
   // haut n'est pas un plaquage raté : l'arbitre siffle, le ballon change de
   // camp, et la température monte d'un cran. Ça vaut pour les TRENTE pions —
@@ -1168,39 +1229,11 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
     return;
   }
 
-  const fatigueD = 0.72 + defenseur.endurance / 360;
-  // ⚠️ LE GESTE DU JOUEUR PÈSE VRAIMENT SUR LE DUEL — sinon la barre d'actions
-  // ne serait qu'un habillage. Il ne le décide pas pour autant : il déplace le
-  // curseur d'un contact qui reste arbitré par les attributs des deux hommes.
   const monGeste = porteur.moi && e.controle && e.intention ? e.intention.type : null;
   const monPlaquage = defenseur.moi && intentionEst(e, 'plaquage');
-  const force = defenseur.plaquage * fatigueD * (monPlaquage ? 1.16 : 1);
-  const resistance = porteur.evitement * 0.55 + porteur.puissance * 0.45
-    // ⚠️ RENFORCÉS APRÈS RETOUR DE JEU (« raffut, crochet qui marche vraiment »).
-    // À 0,30 et 0,26, un crochet faisait passer la chance de franchir de 10 % à
-    // 15 % : l'effet existait — le banc d'essai le mesurait — mais il était
-    // INVISIBLE manette en main, parce qu'on ne joue pas cent crochets d'affilée.
-    // Un geste qu'on ne sent pas est un geste qui n'existe pas. À 0,45 et 0,40,
-    // on franchit une fois sur quatre : c'est un pari qu'on voit gagner.
-    + (monGeste === 'crochet' ? porteur.evitement * 0.45 : 0)
-    + (monGeste === 'raffut' ? porteur.puissance * 0.40 : 0)
-    + (monGeste === 'sprint' ? 6 : 0);
-  // ⚠️ Le taux de réussite au plaquage du rugby professionnel est de ~88 %.
-  // Le rythme de l'équipe qui court après son plan de marque l'infléchit :
-  // c'est le seul endroit où le score « aide » l'attaque, et c'est ce réglage
-  // invisible qui évite d'avoir à refuser un essai à l'écran.
-  const r = retard(e, porteur.cote);
-  const pres = metresAvantLaLigne(porteur.pos, porteur.cote);
-  // ⚠️ Le réglage est ASYMÉTRIQUE. Une équipe en retard sur son plan trouve un
-  // peu d'espace ; une équipe en avance se heurte à un mur. Sans ce second
-  // versant, tout le score tombait dans le premier quart d'heure et la fin de
-  // match était stérile (mesuré : 16 points avant la 20ᵉ, 5 après la 60ᵉ).
-  const aide = r >= 0
-    ? r * 0.20 + (pres < 25 ? r * 0.22 : 0) + (pres < 8 ? r * 0.22 : 0)
-    : r * 0.45;
-  const proba = borner(0.90 + (force - resistance) / 400 - aide, 0.36, 0.99);
+  const proba = probaPlaquage(e, porteur, defenseur, monGeste, monPlaquage);
 
-  if (e.rng() >= proba) {
+  if (abouti === undefined ? e.rng() >= proba : !abouti) {
     defenseur.stats.plaquagesManques += 1;
     porteur.stats.franchissements += 1;
     // ⚠️ UN PLAQUAGE LANCÉ ET MANQUÉ COÛTE PLUS CHER. On part en cathédrale :
@@ -1208,6 +1241,11 @@ function resoudrePlaquage(e: EtatMatch, porteur: Pion, defenseur: Pion): void {
     // pas deux. C'est le risque qui rend l'action intéressante à jouer.
     defenseur.battu = monPlaquage ? 3.0 : 2.0;
     porteur.battu = 0.4; // il ne peut pas être re-plaqué dans la même seconde
+    // ⚠️ C'EST ICI, ET NULLE PART AILLEURS, QU'UNE PERCÉE EXISTE. Que le geste
+    // ait été joué sur-le-champ ou qu'il soit resté armé jusqu'au contact, le
+    // moteur passe par cette ligne — donc l'enchaînement s'ouvre dans les deux
+    // cas, ce qu'un drapeau posé depuis l'écran n'aurait jamais su faire.
+    if (porteur.moi) e.perceeJoueur = true;
     if (monGeste === 'crochet' || monGeste === 'raffut') {
       consommerIntention(e);
       dire(e, 'franchissement', porteur.cote, C.texteMatch(
@@ -2428,4 +2466,388 @@ export function pionDuJoueur(e: EtatMatch): Pion | undefined {
 // Libellé de la combinaison en cours, pour l'affichage.
 export function libelleLancement(e: EtatMatch): string {
   return e.lancement?.libelle ?? '';
+}
+
+// ---------------------------------------------------------------------------
+// 🎲 LES DUELS DE LA CARTE DE DÉCISION — annoncés, puis joués SUR-LE-CHAMP
+// ---------------------------------------------------------------------------
+//
+// Retour de jeu, mot pour mot : « avec un système de pourcentage de réussite et
+// d'impact dans le jeu, et aussi que ça s'applique vraiment — en mode plaquage
+// réussi ça plaque direct, plaquage raté le mec perce, pareil pour les autres.
+// Et il peut y avoir des combos sur l'action : tu perces, tu peux tenter un
+// autre truc sur le défenseur. »
+//
+// ═══ CE QUI NE MARCHAIT PAS ════════════════════════════════════════════════
+//
+// Un choix n'était pas un geste, c'était une INTENTION : `demanderAction` posait
+// un drapeau, et le moteur le dépensait plus tard, au prochain contact — qui
+// pouvait venir quatre secondes après, ou jamais. On choisissait « crochet »
+// devant un défenseur, le porteur donnait le ballon avant le contact, et le
+// crochet expirait sans avoir existé.
+//
+// ═══ CE QUI SE PASSE MAINTENANT ════════════════════════════════════════════
+//
+// 1. `enjeuDe` calcule la chance de réussite AVANT le choix. Elle est écrite
+//    sur le bouton : « 💥 Plaquer · 71 % ».
+// 2. `resoudreChoix` tire UNE fois, avec cette chance exacte, et applique
+//    l'issue immédiatement — le plaquage a lieu, ou le porteur perce.
+// 3. Si le vis-à-vis est battu, `Issue.combo` est vrai et une nouvelle carte
+//    s'ouvre dans la foulée, sans attendre le repos habituel.
+//
+// ⚠️ UNE SEULE FORMULE, DEUX LECTEURS. `enjeuDe` et `resoudreChoix` appellent
+// tous les deux `probaPlaquage` — celle-là même que le moteur utilise pour les
+// vingt-neuf autres. Le pourcentage affiché EST le pourcentage joué ; il ne
+// peut pas dériver, parce que ce serait la même ligne qui dérive.
+//
+// ⚠️ ET LA PHRASE AFFICHÉE EST CELLE DU MOTEUR, PAS UNE COPIE. `resoudreChoix`
+// relit le commentaire que le moteur vient d'écrire sur le joueur
+// (`phraseDepuis`) plutôt que de composer sa propre prose. Sans ça, il y aurait
+// deux récits du même contact — celui du fil et celui de la carte — et ils
+// divergeraient au premier réglage. Les clés de repli ne servent que pour les
+// issues dont le moteur ne dit rien (un appel dans le vide, par exemple).
+//
+// ⚠️ ET LE SCORE RESTE CELUI DE LA LIGUE. Ces duels décident du COMMENT, jamais
+// du COMBIEN : `jouerRencontre` fixe le résultat et `solderLesPoints` le
+// respecte. Un joueur qui réussit tout ne gagne pas un match qu'il devait
+// perdre — il le vit autrement, et sa note de fin de match, elle, monte.
+
+export interface Enjeu {
+  action: ActionJoueur;
+  /** La probabilité EXACTE que `resoudreChoix` va tirer. 0 à 1. */
+  chance: number;
+  /** Clé i18n : ce que la réussite donne. */
+  gain: string;
+  /** Clé i18n : ce que l’échec coûte. */
+  risque: string;
+}
+
+export interface Issue {
+  /**
+   * ⚠️ LE DÉ A-T-IL VRAIMENT ÉTÉ LANCÉ ?
+   *
+   * Faux quand la situation ne permettait pas de trancher tout de suite — et
+   * c'est le cas le PLUS FRÉQUENT, pas un cas limite : sur une carte de
+   * réception (treize des dix-huit cartes d'un match), le ballon n'est pas
+   * encore dans les mains. Un crochet demandé là reste ARMÉ pour le contact qui
+   * vient, et le moteur le jouera à ce moment-là.
+   *
+   * ⚠️ SANS CE CHAMP, `reussi` MENTAIT. Il valait `true` sur ces sorties
+   * anticipées, et le banc d'essai l'a vu tout de suite : la tranche « 55-75 %
+   * annoncés » sortait à 78,6 %, celle des « 35-55 % » à 29 %. Le total, lui,
+   * tombait juste — un biais par geste, invisible en moyenne. C'est exactement
+   * le genre de mensonge que le joueur met sur le compte de la malchance.
+   */
+  joue: boolean;
+  reussi: boolean;
+  /** La phrase à afficher au-dessus du joueur — celle du moteur, si elle existe. */
+  texte: string;
+  /**
+   * ⚠️ LE COMBO. Vrai quand le vis-à-vis est battu ET que le joueur est encore
+   * debout, ballon en main : on lui rouvre une carte tout de suite, sans le
+   * repos de 95 secondes simulées qui espace les carrefours ordinaires. C'est
+   * la demande « tu perces, tu peux tenter un autre truc sur le défenseur ».
+   */
+  combo: boolean;
+}
+
+/** Le vis-à-vis du duel : qui je dois battre, ou qui je dois arrêter. */
+function visAVis(e: EtatMatch, p: Pion): Pion | null {
+  if (e.porteur === p) {
+    let meilleur: Pion | null = null;
+    let d2 = 400; // vingt mètres : au-delà, il n’y a pas de duel à jouer
+    for (const q of surLeTerrain(e, adverse(p.cote))) {
+      if (q.sanction > 0 || q.battu > 0) continue;
+      const d = distance2(q.pos, p.pos);
+      if (d < d2) { d2 = d; meilleur = q; }
+    }
+    return meilleur;
+  }
+  if (e.porteur && e.porteur.cote !== p.cote) return e.porteur;
+  return null;
+}
+
+/** Le partenaire à qui la passe partirait, du côté demandé. */
+function receveurChoisi(e: EtatMatch, p: Pion, action: ActionJoueur): Pion | undefined {
+  const cote = action === 'passeGauche' ? -1 : action === 'passeDroite' ? 1 : 0;
+  return cote === 0 ? receveurPour(e, p) : (receveurCote(e, p, cote) ?? receveurPour(e, p));
+}
+
+/** La distance au vis-à-vis, en mètres. 99 s’il n’y en a pas. */
+function pressionSur(e: EtatMatch, p: Pion): number {
+  const d = visAVis(e, p);
+  return d ? Math.sqrt(distance2(d.pos, p.pos)) : 99;
+}
+
+/**
+ * La chance qu'une passe parte proprement.
+ *
+ * ⚠️ ELLE DÉPEND DE LA PRESSION, et c'est ce qui fait de « passer » une vraie
+ * décision plutôt qu'un bouton sûr. Passer avec un défenseur dans le nez, c'est
+ * la passe au sol ; passer tôt, c'est presque toujours propre.
+ */
+function probaPasse(e: EtatMatch, p: Pion, receveur: Pion | undefined): number {
+  if (!receveur) return 0;
+  const longueur = Math.sqrt(distance2(receveur.pos, p.pos));
+  const mains = 0.62 + p.passe / 260 + p.endurance / 900;
+  const gene = Math.max(0, 5 - pressionSur(e, p)) * 0.035 + Math.max(0, longueur - 12) / 220;
+  return borner(mains - gene, 0.35, 0.985);
+}
+
+/** La chance de trouver son coup de pied plutôt que de se faire contrer. */
+function probaPied(e: EtatMatch, p: Pion): number {
+  // ⚠️ Sous six mètres, taper est un pari : le contre est la punition la plus
+  // humiliante du rugby, et il doit exister pour que « dégager » ne soit pas la
+  // réponse gratuite à toutes les situations difficiles.
+  return borner(0.58 + p.pied / 260 - Math.max(0, 6 - pressionSur(e, p)) * 0.055, 0.30, 0.97);
+}
+
+/** La chance de gratter le ballon au sol. */
+function probaGrattage(e: EtatMatch, p: Pion): number {
+  const loin = distance2(p.pos, e.ballon);
+  if (loin > 64) return 0;
+  const base = (e.ballonLent ? 0.34 : 0.22) + p.plaquage / 340;
+  return borner(base - Math.sqrt(loin) * 0.012, 0.08, 0.72);
+}
+
+/** La chance de se rendre disponible et de recevoir le prochain ballon. */
+function probaAppel(e: EtatMatch, p: Pion): number {
+  if (!e.lancement || e.possession !== p.cote) return 0;
+  return borner(0.42 + p.vision / 400 + p.vitesseMax / 90, 0.2, 0.9);
+}
+
+/**
+ * ⚠️ CE QUE CHAQUE OPTION MET EN JEU — le chiffre qui s'affiche sur le bouton.
+ *
+ * Pure : elle ne tire rien et ne mute rien. Appelée à chaque construction de
+ * carte (`decisions.ts`) ET par `resoudreChoix` juste avant le tirage, ce qui
+ * garantit que les deux parlent du même dé.
+ */
+export function enjeuDe(e: EtatMatch, p: Pion, action: ActionJoueur): Enjeu {
+  const g = (chance: number, gain: string, risque: string): Enjeu =>
+    ({ action, chance: borner(chance, 0, 1), gain, risque });
+  const adv = visAVis(e, p);
+
+  switch (action) {
+    case 'plaquage':
+      return adv && e.porteur === adv
+        ? g(probaPlaquage(e, adv, p, null, true), 'ml.enj.plaquage.gain', 'ml.enj.plaquage.risque')
+        : g(0.5, 'ml.enj.plaquage.gain', 'ml.enj.plaquage.risque');
+    case 'monter':
+      // ⚠️ MONTER, C’EST PLAQUER PLUS HAUT SUR LE TERRAIN : on gagne des mètres
+      // quand ça passe, on ouvre un boulevard quand ça rate. Douze pour cent de
+      // réussite en moins, et un échec bien plus cher — c’est ce qui en fait un
+      // choix, et pas un « plaquage bis ».
+      return adv && e.porteur === adv
+        ? g(probaPlaquage(e, adv, p, null, true) * 0.88, 'ml.enj.monter.gain', 'ml.enj.monter.risque')
+        : g(0.44, 'ml.enj.monter.gain', 'ml.enj.monter.risque');
+    case 'crochet':
+      return adv
+        ? g(1 - probaPlaquage(e, p, adv, 'crochet', false), 'ml.enj.crochet.gain', 'ml.enj.crochet.risque')
+        : g(0.6, 'ml.enj.crochet.gain', 'ml.enj.crochet.risque');
+    case 'raffut':
+      return adv
+        ? g(1 - probaPlaquage(e, p, adv, 'raffut', false), 'ml.enj.raffut.gain', 'ml.enj.raffut.risque')
+        : g(0.6, 'ml.enj.raffut.gain', 'ml.enj.raffut.risque');
+    case 'sprint':
+      return adv && e.porteur === p
+        ? g(1 - probaPlaquage(e, p, adv, 'sprint', false), 'ml.enj.sprint.gain', 'ml.enj.sprint.risque')
+        : g(borner(0.5 + p.endurance / 260, 0.3, 0.92), 'ml.enj.sprint.gain', 'ml.enj.sprint.risque');
+    case 'grattage':
+      return g(probaGrattage(e, p), 'ml.enj.grattage.gain', 'ml.enj.grattage.risque');
+    case 'passe':
+    case 'passeGauche':
+    case 'passeDroite':
+      return g(probaPasse(e, p, receveurChoisi(e, p, action)), 'ml.enj.passe.gain', 'ml.enj.passe.risque');
+    case 'pied':
+      return g(probaPied(e, p), 'ml.enj.pied.gain', 'ml.enj.pied.risque');
+    case 'appel':
+      return g(probaAppel(e, p), 'ml.enj.appel.gain', 'ml.enj.appel.risque');
+    case 'soutien':
+      return g(borner(0.55 + p.vision / 320, 0.3, 0.9), 'ml.enj.soutien.gain', 'ml.enj.soutien.risque');
+    default:
+      // La discipline (chambrer, frapper, calmer) ne se tire pas ici : elle
+      // reste une intention, et c’est `bagarre.ts` qui en décide. Le chiffre
+      // annoncé est la chance que ça reste sans conséquence pour soi.
+      return g(0.5, 'ml.enj.discipline.gain', 'ml.enj.discipline.risque');
+  }
+}
+
+/** Les gestes que `resoudreChoix` joue immédiatement. Les autres restent armés. */
+const DUELS: ActionJoueur[] = [
+  'plaquage', 'monter', 'crochet', 'raffut', 'sprint', 'grattage',
+  'passe', 'passeGauche', 'passeDroite', 'pied', 'appel', 'soutien',
+];
+
+export function estUnDuel(action: ActionJoueur): boolean {
+  return DUELS.includes(action);
+}
+
+/**
+ * Les seules clés de repli que `resoudreChoix` s’autorise.
+ *
+ * ⚠️ LE TYPE EST ÉTROIT EXPRÈS. Si on laissait `CleCommentaireDirect`, rien
+ * n’empêcherait d’aller chercher « coup d’envoi » ou « carton rouge » comme
+ * texte de repli d’un duel, et personne ne s’en apercevrait avant de le lire
+ * à l’écran en pleine partie.
+ */
+type CleDuel = 'choixArme' | 'choixTropTard' | 'duelContactKo' | 'duelGrattageKo'
+  | 'duelPasseOk' | 'duelPasseKo' | 'duelPiedContre' | 'duelAppelKo';
+
+/** La première phrase que le moteur vient d’écrire sur MON joueur, s’il en a écrit une. */
+function phraseDepuis(e: EtatMatch, depuis: number): string | null {
+  for (let i = depuis; i < e.commentaires.length; i++) {
+    if (e.commentaires[i].moi) return e.commentaires[i].texte;
+  }
+  return null;
+}
+
+/**
+ * ⚠️ LE CHOIX SE JOUE MAINTENANT. C'est le cœur de la demande.
+ *
+ * Un seul tirage, avec la chance exacte affichée sur le bouton, et les
+ * conséquences appliquées dans la foulée — pas à un tick futur, pas « quand le
+ * moteur en aura envie ».
+ */
+export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issue {
+  const nom = p.nom;
+  const depuis = e.commentaires.length;
+  const adv = visAVis(e, p);
+  const cible = adv ? adv.nom : nom;
+  /** Ce que le moteur a raconté, ou la phrase de repli. */
+  const dit = (repli: CleDuel): string =>
+    phraseDepuis(e, depuis) ?? C.texteMatch(repli, { nom, cible });
+  /**
+   * Le geste est parti, mais rien n’est encore tranché : il attend son contact.
+   * ⚠️ `joue: false` — c’est ce qui empêche l’écran d’annoncer une réussite qui
+   * n’a pas eu lieu, et le banc d’essai de compter ce tirage dans l’étalonnage.
+   */
+  const arme = (): Issue => ({
+    joue: false, reussi: false, texte: C.texteMatch('choixArme', { nom, cible }), combo: false,
+  });
+  /** Le dé est tombé. `combo` vient du moteur, pas d’une supposition d’ici. */
+  const tranche = (reussi: boolean, repli: CleDuel): Issue => ({
+    joue: true, reussi, texte: dit(repli), combo: e.perceeJoueur,
+  });
+  const tropTard = (): Issue => ({
+    joue: false, reussi: false, texte: C.texteMatch('choixTropTard', { nom, cible }), combo: false,
+  });
+
+  if (!estUnDuel(action)) {
+    demanderAction(e, action);
+    return arme();
+  }
+
+  const enjeu = enjeuDe(e, p, action);
+  const reussi = e.rng() < enjeu.chance;
+
+  switch (action) {
+    // ── EN DÉFENSE ───────────────────────────────────────────────────────
+    case 'plaquage':
+    case 'monter': {
+      const porteur = e.porteur;
+      if (!porteur || porteur.cote === p.cote) return tropTard();
+      // ⚠️ ON POSE L’INTENTION AVANT D’APPELER LE MOTEUR : c’est elle qui dit à
+      // `resoudrePlaquage` que ce plaquage est LANCÉ (bonus de force, mais
+      // risque de plaquage haut doublé). L’issue, elle, est imposée.
+      demanderAction(e, action);
+      if (reussi && action === 'monter') {
+        // Monter et réussir, c’est plaquer AVANT la ligne d’avantage : on le
+        // matérialise en ramenant le porteur d’un mètre et demi.
+        porteur.pos.x -= sens(porteur.cote) * 1.5;
+      }
+      resoudrePlaquage(e, porteur, p, reussi);
+      return tranche(reussi, reussi ? 'choixArme' : 'duelContactKo');
+    }
+    case 'grattage': {
+      demanderAction(e, action);
+      consommerIntention(e);
+      if (!reussi) {
+        // ⚠️ GRATTER MAL, C’EST UNE PÉNALITÉ CONTRE SON CAMP une fois sur quatre :
+        // c’est ce qui empêche de gratter à tous les regroupements.
+        if (e.rng() < 0.24) {
+          siffler(e, e.possession, { x: e.ballon.x, y: e.ballon.y }, 'plaqueur qui ne se relève pas', p);
+        }
+        return tranche(false, 'duelGrattageKo');
+      }
+      p.stats.grattages += 1;
+      e.possession = p.cote;
+      e.phasesDepuisArret = 0;
+      dire(e, 'ruck', p.cote, C.phrase(e.rng, C.RUCK_GRATTAGE, { nom }), 0, true);
+      return tranche(true, 'choixArme');
+    }
+
+    // ── BALLON EN MAIN, AU CONTACT ───────────────────────────────────────
+    case 'crochet':
+    case 'raffut':
+    case 'sprint': {
+      demanderAction(e, action);
+      // ⚠️ LE CAS LE PLUS FRÉQUENT, ET LE PLUS FACILE À MAL TRAITER : sur une
+      // carte de RÉCEPTION, le ballon n’est pas encore là. Il n’y a rien à
+      // trancher — le geste reste armé, et `resoudrePlaquage` le jouera au
+      // contact, avec la même formule. On le dit (`joue: false`) au lieu de
+      // faire semblant d’avoir gagné.
+      if (e.porteur !== p || !adv) return arme();
+      // ⚠️ MON SUCCÈS EST L’ÉCHEC DU PLAQUEUR. Le duel est le même objet vu des
+      // deux côtés : on impose donc `abouti = !reussi`.
+      resoudrePlaquage(e, p, adv, !reussi);
+      return tranche(reussi, reussi ? 'choixArme' : 'duelContactKo');
+    }
+
+    // ── BALLON EN MAIN, LIBÉRER ──────────────────────────────────────────
+    case 'passe':
+    case 'passeGauche':
+    case 'passeDroite': {
+      const receveur = receveurChoisi(e, p, action);
+      if (e.porteur !== p || !receveur) return tropTard();
+      consommerIntention(e);
+      if (!reussi) {
+        // ⚠️ UNE PASSE RATÉE COÛTE LE BALLON, TOUJOURS. C’est ce qui donne du
+        // poids au choix « je donne » contre « je garde ».
+        passeEnAvant(e, p);
+        return tranche(false, 'duelPasseKo');
+      }
+      passerLeBallon(e, p, receveur, pressionSur(e, p));
+      return {
+        joue: true,
+        reussi: true,
+        texte: phraseDepuis(e, depuis) ?? C.texteMatch('duelPasseOk', { nom, cible: receveur.nom }),
+        combo: false,
+      };
+    }
+    case 'pied': {
+      if (e.porteur !== p) return tropTard();
+      consommerIntention(e);
+      if (!reussi) {
+        // ⚠️ LE CONTRE. La punition la plus humiliante du rugby, et la raison
+        // pour laquelle « dégager » ne peut pas être la réponse gratuite à
+        // toutes les situations difficiles.
+        p.stats.coupsDePied += 1;
+        dire(e, 'pied', adverse(p.cote), C.texteMatch('duelPiedContre', { nom, cible }), 0, true);
+        arret(e, 'melee', adverse(p.cote), { x: p.pos.x, y: p.pos.y });
+        return tranche(false, 'duelPiedContre');
+      }
+      taperAuPied(e, p, intentionDePied(e, p));
+      return tranche(true, 'choixArme');
+    }
+
+    // ── SANS BALLON ──────────────────────────────────────────────────────
+    case 'appel':
+    case 'soutien': {
+      demanderAction(e, action);
+      const l = e.lancement;
+      if (!l || e.possession !== p.cote) return tropTard();
+      if (!reussi) return tranche(false, 'duelAppelKo');
+      // ⚠️ RÉUSSIR UN APPEL, C’EST ENTRER DANS LA COMBINAISON — pour de vrai.
+      // On s’insère juste après le porteur courant : le prochain ballon est pour
+      // nous. C’est la seule façon qu’un geste sans contact « se voie ».
+      if (!l.chaine.includes(p)) l.chaine.splice(l.index + 1, 0, p);
+      dire(e, 'jeu', p.cote, C.texteMatch('appelBallon', { nom }), 0, true);
+      return tranche(true, 'choixArme');
+    }
+
+    default:
+      demanderAction(e, action);
+      return arme();
+  }
 }

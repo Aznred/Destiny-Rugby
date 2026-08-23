@@ -373,6 +373,22 @@ export interface EtatMatch {
    */
   recharges: Partial<Record<ActionJoueur, number>>;
   /**
+   * ⚠️ LE JOUEUR VIENT DE BATTRE SON VIS-À-VIS — le drapeau qui ouvre un
+   * ENCHAÎNEMENT.
+   *
+   * Demande : « tu perces, tu peux tenter un autre truc sur le défenseur ». Il
+   * fallait un signal, et il ne pouvait pas venir de l'écran : une percée se
+   * décide dans `resoudrePlaquage`, au fond du moteur, et elle arrive par DEUX
+   * chemins — le duel joué sur-le-champ par `resoudreChoix`, et le geste resté
+   * ARMÉ qui trouve son contact deux secondes plus tard (le cas le plus
+   * fréquent, puisque la carte tombe souvent avant que le ballon arrive). Un
+   * seul drapeau couvre les deux.
+   *
+   * ⚠️ C'EST L'ÉCRAN QUI LE REMET À `false`, comme il consomme un évènement. Le
+   * moteur ne le baisse jamais tout seul : une percée non lue reste une percée.
+   */
+  perceeJoueur: boolean;
+  /**
    * La température du match, 0 à 100. Elle monte quand on chambre, quand un
    * plaquage part haut, quand l'écart se creuse — et elle redescend toute
    * seule. C'est elle qui décide si un adversaire relève la provocation.

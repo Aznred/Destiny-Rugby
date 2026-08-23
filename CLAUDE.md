@@ -5689,3 +5689,352 @@ grille 2 × 2 + « laisser faire », le terrain pivote, et il ne reste **aucun**
 bouton posé sur la pelouse. Étiquette mesurée : 21 échantillons, **0 hors
 cadre**, 100-116 px de large.
 
+## 👆 « ON CLIQUE MAIS PAS L'IMPRESSION QUE ÇA MARCHE » — et sur téléphone, ça ne marchait vraiment pas
+
+Retour de jeu, en un message, deux défauts :
+
+> « tu peux faire en sorte que les actions qu'on choisit en match marchent
+> vraiment, ou marque le résultat dans l'action, car on clique mais pas
+> l'impression que ça marche vraiment. Aussi bug sur téléphone : les boutons
+> de choix et de dire oui j'ai compris comment ça marche ne fonctionnent pas,
+> on peut pas cliquer dessus. »
+
+### ⚠️ LE BUG TACTILE N'ÉTAIT PAS UN BUG DE CLIC — C'ÉTAIT UN BUG DE DÉFILEMENT
+
+Et il était **à moi**, posé deux jours plus tôt en retirant le joystick.
+
+| | |
+|---|---|
+| la cause | `.ml-scene { touch-action: none }` |
+| pourquoi elle existait | Le joystick flottant. Sans elle, glisser le doigt faisait défiler la page, le navigateur s'appropriait le geste après quelques pixels et le pion se figeait en pleine course. |
+| pourquoi c'est devenu un bug | Le joystick a été supprimé, **pas la règle**. Et elle s'applique à TOUT ce qui vit dans la scène — donc à la carte de décision (`max-height: 52%; overflow-y: auto`) et au tutoriel. |
+| ce que ça donnait | Sur un téléphone, la 4ᵉ option et « laisser faire » passaient sous le pli, et **le doigt ne pouvait pas faire défiler pour les atteindre**. Le tutoriel, lui, est `inset: 0` dans une scène en `overflow: hidden` : sur un écran couché (scène de 221 px pour un contenu de 268), « C'est parti » était purement et simplement **coupé**. |
+
+⚠️ **LA LEÇON, ET ELLE EST GÉNÉRALE : une règle CSS posée pour une
+fonctionnalité doit partir avec elle.** `touch-action: none` était juste tant
+qu'on pilotait ; le jour où plus rien ne se pilote, elle ne protège plus rien
+et casse tout le reste. Un commentaire disait même « est indispensable » —
+il l'était, pour un joystick qui n'existait plus.
+
+⚠️ **ET ELLE NE DOIT PAS REVENIR** telle quelle. S'il faut un jour rattraper un
+geste sur la pelouse, elle se pose sur le `<svg>` du terrain, **pas** sur la
+scène qui porte aussi tout le HUD.
+
+### 🩹 Ce qui a été corrigé, et mesuré
+
+| | Avant | Après |
+|---|---|---|
+| `.ml-scene` | `touch-action: none` | *(retiré)* — `auto` |
+| `.ml-decision` | `max-height: 52%` | `62%`, `touch-action: pan-y`, `overscroll-behavior: contain` |
+| `.ml-tuto` | pas de défilement | `overflow-y: auto`, `touch-action: pan-y`, carte en `margin: auto` |
+| les cartes, le tuto, les ordres de bagarre, le voile de pause | `onPointerDown` | **`onClick`** |
+
+⚠️ **`onPointerDown` AVAIT UN SENS QUAND ON PILOTAIT** — gagner les quelques
+millisecondes du `click` comptait, manette en main. Il n'y a plus rien à
+piloter, et `onClick` est le geste que le navigateur valide vraiment sur un
+écran tactile : un doigt qui ripe de deux pixels ne doit pas perdre son choix.
+
+Mesuré sur un vrai 375 × 812, carte ouverte : deux colonnes de 161 px, options
+de 77 à 90 px de haut, **carte non défilante** (tout tient), et les **cinq**
+options répondent à `elementFromPoint`. Tutoriel sur une scène de 221 px pour
+268 px de contenu : il défile, et « C'est parti » se touche.
+
+### ⚠️ LA MOITIÉ INVISIBLE : SOIXANTE RENDUS PAR SECONDE POUR NE RIEN MONTRER
+
+La boucle appelait `redessiner` **à chaque image** dans trois états où **rien
+ne bouge** :
+
+- **carte de décision ouverte** — le match est figé, dix secondes durant, et on
+  reconciliait trente pions soixante fois par seconde **pour animer une barre
+  de progression** ;
+- **pause** — même chose, sans limite de durée ;
+- **tutoriel** — qui, en plus, ne figeait même pas le match : on lisait trois
+  lignes pendant que le jeu défilait à seize fois la vitesse réelle derrière
+  le voile.
+
+Sur un téléphone, ça sature le fil principal, et un fil saturé avale les taps.
+C'est la seconde cause de « on peut pas cliquer dessus », et celle qu'on ne
+voit jamais sur un ordinateur de développement.
+
+Corrigé : **aucun `redessiner` dans les états figés**. Le compte à rebours est
+devenu une **animation CSS** (`@keyframes ml-dec-chrono`, durée posée en style
+depuis `DELAI_DECISION` — une seule vérité), que le compositeur anime sans
+réveiller React une seule fois. Le `key={noCarte.current}` est indispensable :
+sans lui React réutilise le même nœud d'une carte à l'autre et l'animation ne
+repart pas. Et le tutoriel arrête désormais le match.
+
+⚠️ Un garde subsiste : si le plan sur mon joueur s'éteint **pendant** un état
+figé, le bandeau resterait affiché jusqu'à la reprise. `planAChange` force
+alors le seul rendu nécessaire.
+
+### 🎬 « MARQUE LE RÉSULTAT DANS L'ACTION »
+
+Le geste s'écrivait bien au-dessus du pion, mais **rien ne disait ce qu'il
+avait produit**. Le bandeau `.ml-resultat` répond en deux temps :
+
+1. **L'ACCUSÉ DE RÉCEPTION, à l'instant du clic** : « ▶️ ↩️ Crochet ». Il
+   s'affiche **avant** la moindre simulation — c'est lui qui répond à « est-ce
+   que mon clic a été pris ? », et à lui seul il règle la moitié du retour.
+2. **LE VERDICT DU MOTEUR**, dès qu'il tombe : « 💥 Gaëtan Baille se lance sur
+   Basile BENAZET ! ». On ne fabrique aucun texte — c'est la ligne que le fil
+   aurait affichée de toute façon, sortie du fil pour être posée en grand.
+
+⚠️ **DEUX HORLOGES, ET C'EST LE CŒUR DU CORRECTIF.** Un crochet **n'est pas
+joué au clic** : il ARME une intention que le moteur dépense au premier
+contact — qui peut venir quatre secondes plus tard, ou jamais si personne ne
+monte. Le bandeau s'éteignait au bout des 3,2 s du plan de caméra,
+c'est-à-dire **souvent avant le geste qu'il annonçait**. Désormais :
+
+| | Durée | À quoi ça sert |
+|---|---|---|
+| `rejeu.plan` | `REJEU` = 3,2 s | Gros plan caméra + étiquette sur le pion. Une durée de plan de télévision. |
+| `rejeu.restant` | tant que l'intention est armée, puis 2,4 s (3,4 s si ça a marqué) | Le bandeau. Il doit être encore là quand le geste a lieu. |
+| `rejeu.patience` | 12 s réelles | Garde-fou. Hors ralenti le jeu tourne à ×16 : au-delà, le bandeau finirait par annoncer autre chose que ce qu'on a demandé. |
+
+### ⚠️ ET QUAND LE MOTEUR N'ÉCRIT RIEN — LE CAS LE PLUS FRÉQUENT
+
+Il n'écrit une ligne que sur les évènements qui font une histoire. « Réclamer »,
+« soutenir », ou un crochet qui passe sans qu'aucun plaqueur ne monte n'en
+produisent **aucune**. On serait resté sur « Ton joueur exécute… », et le
+retour de jeu serait intact.
+
+La seconde ligne du bandeau montre donc **ce que le geste a ajouté à la feuille
+de match** : « ➡️ Passe · 🏃 Ballon porté », « 💥 Plaquage ×2 », « 📏 +7 m ».
+Ce sont exactement les compteurs qui font la note à la sirène — « +1 Plaquage »
+ici vaut « +0,4 » sur la note. **Une preuve, pas une animation.**
+
+⚠️ **AU SINGULIER, LE NOMBRE DERRIÈRE : « Plaquage ×2 ».** « 2 plaquages »
+demanderait une forme singulier ET une forme pluriel dans les sept langues —
+le français accorde, l'allemand décline, le japonais ignore le pluriel. Onze
+clés au lieu de vingt-deux, et ça se lit mieux sur un bandeau de trois
+secondes : le nom saute aux yeux, le chiffre suit.
+
+⚠️ **ET L'EMOJI SEUL NE SUFFISAIT PAS.** Première version : « ➡️ · 🏃 ».
+Mesuré à l'écran, et illisible — personne ne devine « une passe et un ballon
+porté ». Un HUD peut être compact, il ne peut pas être un rébus.
+
+### ⚠️ CE QUE LE BANDEAU NE PROMET PAS
+
+Il montre **la première ligne écrite sur mon joueur** après le clic, pas « la
+conséquence causale du geste ». Sur une séquence longue, ça peut être une
+transformation réussie plutôt que le crochet lui-même. C'est assumé : les deux
+sont vrais, le bandeau ne dit jamais « grâce à ton choix », et filtrer par
+causalité demanderait au moteur de tracer une origine par évènement — pour
+cacher, la plupart du temps, un résultat que le joueur veut voir.
+
+### Vérifié en jouant
+
+Journal capté sur un match, taps tactiles simulés à la position réelle des
+boutons :
+
+```text
+>>> TAP : ↩️ Crochet
+▶️ ↩️ Crochet | Ton joueur exécute…
+▶️ ↩️ Crochet | 🏃 Ballon porté
+▶️ ↩️ Crochet | ➡️ Passe · 🏃 Ballon porté
+>>> TAP : 💥 Plaquer
+▶️ 💥 Plaquer | 💥 Plaquage
+💥 Gaëtan Baille se lance sur Basile BENAZET ! | 💥 Plaquage ×2
+```
+
+⚠️ **UNE NOTE SUR LA VÉRIFICATION.** Les tours précédents avaient « validé » la
+carte de décision au clavier et par `dispatchEvent` — deux chemins qui
+**contournent le test de collision du navigateur**. Le bouton pouvait être
+couvert ou hors cadre sans que rien ne le montre. Le seul contrôle qui vaut,
+c'est `document.elementFromPoint()` au centre de chaque bouton : il répond ce
+que le doigt aurait touché. À faire systématiquement avant de dire qu'une
+surface tactile marche.
+
+## 🎲 UN CHOIX EST UN DUEL — pourcentage annoncé, geste joué sur-le-champ, enchaînement
+
+Retour de jeu, en un message :
+
+> « fais que ces phrases elles soient au-dessus de soi, et avec un système de
+> pourcentage de réussite et d'impact dans le jeu ; et aussi que ça s'applique
+> vraiment — en mode plaquage réussi ça plaque direct, plaquage raté le mec
+> perce, pareil pour les autres ; et il peut y avoir des combos sur l'action :
+> tu perces, tu peux tenter un autre truc sur le défenseur. »
+
+Quatre demandes, et la troisième est la seule qui touche au moteur.
+
+### ⚠️ UN CHOIX N'ÉTAIT PAS UN GESTE — C'ÉTAIT UNE INTENTION
+
+C'est la cause de tout le reste, et elle était invisible à la lecture de
+l'écran. `demanderAction` posait un DRAPEAU (`e.intention`) que le moteur
+dépensait plus tard, au prochain contact — qui pouvait venir quatre secondes
+après, ou jamais. On choisissait « crochet » devant un défenseur, le porteur
+donnait le ballon avant le contact, et le crochet expirait sans avoir existé.
+
+| | Avant | Maintenant |
+|---|---|---|
+| ce que fait un clic | arme une intention | **`resoudreChoix` tire le dé et applique l'issue** |
+| quand ça se joue | au prochain contact, ou jamais | **maintenant** |
+| ce qu'on sait avant | rien | **le pourcentage exact**, écrit sur le bouton |
+| ce qu'on sait après | une ligne dans un fil qui défile | **le verdict du moteur, au-dessus de son pion** |
+| après une percée | rien | **une carte d’enchaînement, sans le repos de 95 s** |
+
+### ⚠️ UNE SEULE FORMULE, DEUX LECTEURS
+
+`probaPlaquage()` a été **sortie de `resoudrePlaquage`** pour être appelée
+aussi par `enjeuDe`. Elle vivait au milieu du contact, ce qui allait très bien
+tant que personne d'autre n'avait besoin de la connaître — mais depuis que la
+carte AFFICHE un pourcentage, un second lecteur existe, et **une probabilité
+recopiée est une probabilité qui ment un jour**. Le chiffre montré au joueur
+et le tirage qui décide de son sort sortent littéralement de la même ligne.
+
+⚠️ **ET LE DUEL N'EST TIRÉ QU'UNE FOIS.** `resoudrePlaquage` accepte un
+paramètre `abouti` : quand `resoudreChoix` a déjà lancé le dé, il IMPOSE le
+résultat au lieu de le retirer. Sans ça, le contact serait arbitré deux fois
+et le pourcentage annoncé ne voudrait plus rien dire.
+
+### Ce que chaque option met en jeu
+
+`enjeuDe(e, p, action)` est **pure** — elle ne tire rien, ne mute rien — et
+rend trois choses : la chance, ce que la réussite donne, ce que l'échec coûte.
+Les deux dernières comptent autant que la première : **62 % de réussite, c’est
+excellent pour un plaquage et suicidaire pour un geste qui, raté, offre une
+mêlée dans ses vingt-deux.** Un pourcentage seul ne dit pas s’il faut le
+prendre.
+
+| Geste | Chance | Réussite | Échec |
+|---|---|---|---|
+| 💥 Plaquer | `probaPlaquage` | le porteur est au sol | **il perce**, et je reste au sol 3 s |
+| ⬆️ Monter | `probaPlaquage` × 0,88 | plaqué avant la ligne d'avantage | un boulevard s'ouvre |
+| ↩️ Crochet | `1 − probaPlaquage(crochet)` | **je perce → enchaînement** | plaqué, 13 % de ballon lâché |
+| 💪 Raffut | `1 − probaPlaquage(raffut)` | **je perce → enchaînement** | stoppé net |
+| 🏃 Sprint | `1 − probaPlaquage(sprint)` | je prends le large | rattrapé |
+| 🪝 Gratter | ballon lent + plaquage / distance | turnover | 24 % de pénalité contre soi |
+| ⬅️➡️ Passer | mains + pression + longueur | le ballon vit | **en-avant, mêlée pour eux** |
+| 🦶 Taper | pied − pression | terrain gagné | **contré**, ballon perdu sur place |
+| 🙋 Réclamer | vision + vitesse | **je m'insère dans la combinaison** | personne ne me voit |
+
+⚠️ **LA DISCIPLINE NE PASSE PAS PAR LE DUEL.** Chambrer ou frapper ne se
+résout pas en un tirage : ça met le feu, et `bagarre.ts` gère la suite. Pour
+eux, `resoudreChoix` arme l'intention comme avant.
+
+### ⚠️ LE PIÈGE QUE LE BANC D'ESSAI A ATTRAPÉ, ET QU'UN HUMAIN N'AURAIT PAS VU
+
+Premier jet : la calibration globale tombait juste (63,3 % annoncés, 63,1 %
+sortis) et **chaque tranche était fausse** :
+
+```text
+tranche 35-55 %   annoncé 46,3 %  ·  sorti 29,0 %
+tranche 55-75 %   annoncé 65,2 %  ·  sorti 78,6 %
+```
+
+Un biais **par geste**, invisible en moyenne. La cause : sur une carte de
+RÉCEPTION — **treize des dix-huit cartes d’un match** — le ballon n’est pas
+encore dans les mains. Il n’y a rien à trancher, le geste reste ARMÉ pour le
+contact qui vient… et `resoudreChoix` rendait quand même `reussi: true` sur
+cette sortie anticipée. Les crochets de réception « réussissaient » tous, les
+plaquages sans porteur « échouaient » tous.
+
+**`Issue.joue`** dit désormais si le dé a été lancé. Le banc n'étalonne que
+les duels tranchés, et l’écran n’affiche un verdict que dans ce cas.
+
+### ⚠️ ET L’ÉCRAN AVAIT LE MÊME BUG, MESURÉ EN JOUANT
+
+Le champ existait côté moteur, l'écran ne le lisait pas : la bulle affichait
+un **❌ rouge sur un crochet qui n’avait pas encore eu lieu** — relevé seize
+fois de suite dans le journal de jeu. Un échec annoncé avant l'action, c'est
+pire que pas de retour du tout. Tant que `Issue.joue` est faux, la bulle dit
+« ▶️ armé » et attend.
+
+### ⚡ L’ENCHAÎNEMENT : un drapeau posé au fond du moteur
+
+`EtatMatch.perceeJoueur` est levé **dans `resoudrePlaquage`**, à la ligne où
+le plaqueur manque son homme. C’est le seul endroit où une percée existe — et
+c’est ce qui fait que l’enchaînement marche par les **deux** chemins : le duel
+tranché sur-le-champ, et le geste resté armé qui trouve son contact deux
+secondes plus tard. Un drapeau posé depuis l'écran n'aurait jamais couvert le
+second, qui est pourtant le plus fréquent.
+
+L'écran le **consomme** (`e.perceeJoueur = false`), rouvre une carte sans
+attendre le repos de 95 secondes simulées, avec **5 secondes** de réflexion au
+lieu de 10 (`DELAI_COMBO`) — on est au cœur de l'action, pas devant un choix
+de plan — et la carte le DIT (« ⚡ Tu as percé — enchaîne ! », liseré doré).
+
+⚠️ **DEUX MAILLONS MAXIMUM.** Sans plafond, un joueur en forme enchaînerait
+crochet sur crochet jusqu'à l'en-but et le match deviendrait un jeu de cartes.
+Et la recharge des actions fait le reste du travail : un crochet qui vient
+d'être joué n'est pas reproposé.
+
+### 🎬 Le verdict est posé SUR le joueur
+
+Demande : « fais que ces phrases elles soient au-dessus de soi ». Deux choses
+ont disparu pour ça :
+
+- **`.ml-resultat`**, un bandeau centré à 22 % de hauteur. Il disait la bonne
+  chose au mauvais endroit : quand on suit son pion, on ne regarde pas le
+  milieu de l'écran.
+- **`.ml-geste`**, une étiquette SVG collée au pion. Bon endroit, mais elle ne
+  savait afficher qu’un libellé — or un verdict de duel est une PHRASE, et une
+  phrase demande une largeur maximale, un retour à la ligne et une pastille.
+
+**`.ml-perso`** est une bulle HTML posée aux coordonnées écran du pion, avec
+une pointe qui le désigne (il y a trente pions), et trois lignes qui répondent
+chacune à une question : *mon clic est passé ?* (▶️ dès le clic) · *ça a
+marché ?* (✅/❌ et le % qu’on avait) · *ça a donné quoi ?* (la phrase du
+moteur, puis ce que ça a mis sur la feuille de match).
+
+⚠️ **LE BORNAGE SE CALCULE SUR LA TAILLE MESURÉE DE LA BULLE, PAS SUR DES
+MARGES FIXES.** Première version : marges de 96 px, alors que la bulle monte à
+**315 px de large sur un écran de 375** (84 vw), soit 158 px de demi-largeur.
+Mesuré en jeu sur téléphone : **13 relevés sur 13 hors cadre** — la moitié du
+verdict passait sous le bord, exactement sur l'appareil où il compte le plus.
+Un `ResizeObserver` sur la bulle donne sa taille réelle (elle change quand son
+texte change) ; la lire par image forcerait un recalcul de mise en page
+soixante fois par seconde, ce qu’on évite déjà pour la scène.
+
+### Ce que le banc d’essai mesure
+
+`scripts/verifDuels.ts` — 48 matchs joués **par le vrai chemin** (`decisionPour`
+puis `resoudreChoix`), 799 gestes choisis dont **608 duels tranchés** :
+
+| Contrôle | Résultat |
+|---|---|
+| annoncé vs sorti, par tranche | 3 % → 0 % · 44 % → 40 % · 67 % → 69 % · 87 % → 88 % |
+| écart maximal | **1,0 σ** |
+| sur l'ensemble | annoncé 67,1 % · sorti **67,1 %** |
+| plaquage réussi → porteur stoppé | **57/57** |
+| plaquage raté → il franchit | **3/3**, et le plaqueur reste au sol 3/3 |
+| enchaînements | 18 sur 48 matchs (0,4/match), **jamais plus de 2 maillons** |
+| score de la ligue | **0 écart sur 48** |
+
+⚠️ **LA TOLÉRANCE SE CALCULE, ELLE NE SE DEVINE PAS.** Un seuil fixe est un
+piège sur des lots de tailles inégales : huit points, c'est laxiste sur trois
+cents tirages et intenable sur cinquante, où l'écart-type d'une proportion vaut
+déjà sept points à lui seul. Chaque tranche est comparée à **deux écarts-types
+de sa propre taille** — ce qui refuse un biais systématique et accepte le
+hasard. Le premier réglage, à 8 points fixes, a échoué sur du bruit pur.
+
+⚠️ **ET LE SCORE RESTE CELUI DE LA LIGUE.** Ces duels décident du COMMENT,
+jamais du COMBIEN. Un joueur qui réussit tout ne gagne pas un match qu’il
+devait perdre — il le vit autrement, et sa note de fin de match, elle, monte.
+
+### Vérifié en jouant, desktop et téléphone
+
+```text
+[🏉 Le ballon est à toi]  >>> ⬅️ Passe gauche 77 %
+   ✅ ⬅️ Passe gauche | 77 % | Baille donne proprement à Perenara. | ➡️ Passe
+
+>>> 💥 Plaquer 92 %
+   ✅ 💥 Plaquer | 92 % | Baille se lance sur Simon MALBRAND ! | 💥 Plaquage
+
+>>> ↩️ Crochet 60 %                        (carte de réception : geste ARMÉ)
+   ▶️ ↩️ Crochet | 60 % | Ton joueur exécute…
+   ▶️ ↩️ Crochet | 60 % | • Le ballon échappe à Baille, en-avant. | ❌ En-avant
+```
+
+Sur 375 × 812 : carte en deux colonnes de 161 px, options de 89 à 104 px,
+**non défilante**, les cinq répondent à `elementFromPoint`. Bulle du verdict :
+**24 relevés, 0 hors cadre**. Et « ↩️ Crochet 6 % » en rouge face à un bon
+défenseur — c'est exactement l'information « d'impact » demandée.
+
+```bash
+npx vite-node scripts/verifDuels.ts        # étalonnage des %, geste appliqué, enchaînements
+npx vite-node scripts/verifMoteur.ts       # l’étalonnage du moteur ne bouge pas
+npx vite-node scripts/verifControle.ts     # ne rien choisir = le match qu’on aurait regardé
+npx vite-node scripts/verifMatchJouable.ts # caméra, carrefours, en-avants
+npx vite-node scripts/verifTraductions.ts  # les 34 clés ajoutées, dans les 7 langues
+```

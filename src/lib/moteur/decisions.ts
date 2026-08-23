@@ -24,10 +24,17 @@
 // ⚠️ TROIS RÈGLES QUI TIENNENT TOUT LE RESTE :
 //
 // 1. **AUCUNE OPTION N'EST INVENTÉE.** Une carte ne propose que des actions que
-//    `controle.ts` déclare jouables à cet instant précis, et elle les joue par
-//    `demanderAction` — le même chemin que la barre et que le clavier. Il n'y a
-//    donc pas deux façons de jouer un plaquage, une seule surface d'appel, et
-//    rien à re-régler quand une action change.
+//    `controle.ts` déclare jouables à cet instant précis. Il n'y a donc pas deux
+//    façons de jouer un plaquage, une seule surface d'appel, et rien à re-régler
+//    quand une action change.
+//
+//    ⚠️ ET DEPUIS « QUE ÇA S'APPLIQUE VRAIMENT », ELLE LES FAIT JOUER PAR
+//    `resoudreChoix` (moteur/moteur.ts) ET NON PLUS PAR `demanderAction`. La
+//    différence est tout sauf cosmétique : `demanderAction` ARMAIT une intention
+//    que le moteur dépensait plus tard, au prochain contact — qui pouvait ne
+//    jamais venir. `resoudreChoix` tire le dé tout de suite, avec la chance
+//    affichée sur le bouton, et applique l'issue dans la foulée : le plaquage a
+//    lieu, ou le porteur perce.
 // 2. **NE PAS CHOISIR EST UN CHOIX.** À zéro, la carte se ferme sans rien armer
 //    et le jeu reprend : le moteur joue son rugby automatique, comme pour les
 //    vingt-neuf autres. Ce n'est pas une punition, c'est ce qui se passe quand
@@ -38,6 +45,7 @@
 //    intact, et deux joueurs qui font les mêmes choix vivent le même match.
 
 import { ACTION_PAR_ID, actionsDisponibles } from './controle';
+import { enjeuDe } from './moteur';
 import type { ActionJoueur, EtatMatch } from './etat';
 import type { Pion } from './entites';
 import { momentDuJoueur, type TypeMoment } from './moments';
@@ -49,6 +57,16 @@ import { momentDuJoueur, type TypeMoment } from './moments';
  * dans l'instant, et l'hésitation doit coûter.
  */
 export const DELAI_DECISION = 10;
+
+/**
+ * Le compte à rebours d'une carte D'ENCHAÎNEMENT, en secondes réelles.
+ *
+ * ⚠️ PLUS COURT QUE DIX, ET C'EST LE POINT. Un enchaînement se joue au cœur de
+ * l'action — on vient de percer, le défenseur est au sol, il y a un trou. Dix
+ * secondes de réflexion là-dedans casseraient exactement l'élan qu'on vient de
+ * créer. Cinq, c'est le temps de lire deux options et de trancher.
+ */
+export const DELAI_COMBO = 5;
 
 /**
  * Le repos entre deux cartes, en secondes SIMULÉES.
@@ -79,10 +97,33 @@ export interface OptionDecision {
   cle: string;
   /** Clé i18n de l'explication : ce que ça fait, ce que ça risque. */
   aide: string;
+  /**
+   * ⚠️ LA CHANCE DE RÉUSSITE, 0 À 1 — ET C'EST CELLE QUI SERA TIRÉE.
+   *
+   * Demande : « avec un système de pourcentage de réussite et d'impact dans le
+   * jeu ». Elle vient de `enjeuDe`, que `resoudreChoix` rappelle juste avant de
+   * lancer le dé : le chiffre écrit sur le bouton EST le chiffre joué. Il ne
+   * peut pas dériver, parce qu'il n'existe qu'à un seul endroit.
+   *
+   * ⚠️ ELLE EST CALCULÉE À L'OUVERTURE DE LA CARTE, et le jeu est FIGÉ tant
+   * qu'elle est ouverte : la situation ne peut donc pas changer entre
+   * l'affichage et le clic. C'est ce qui rend la promesse tenable.
+   */
+  chance: number;
+  /** Clé i18n : ce que la réussite donne. */
+  gain: string;
+  /** Clé i18n : ce que l'échec coûte. */
+  risque: string;
 }
 
 export interface Decision {
   moment: TypeMoment;
+  /**
+   * Cette carte est un ENCHAÎNEMENT : elle suit un geste réussi, sans repos.
+   * L'écran s'en sert pour le dire (« ⚡ Enchaîne ! ») et pour raccourcir le
+   * compte à rebours.
+   */
+  enchaine?: boolean;
   /** Clé i18n de la situation, en une phrase. */
   cle: string;
   emoji: string;
@@ -160,7 +201,12 @@ export function decisionPour(e: EtatMatch, p: Pion | undefined, depuis: number):
   const ajouter = (id: ActionJoueur) => {
     if (!dispo.has(id) || options.length >= MAX_OPTIONS) return;
     const def = ACTION_PAR_ID.get(id);
-    if (def) options.push({ action: id, emoji: def.emoji, cle: def.cle, aide: def.aide });
+    if (!def) return;
+    const enjeu = enjeuDe(e, p, id);
+    options.push({
+      action: id, emoji: def.emoji, cle: def.cle, aide: def.aide,
+      chance: enjeu.chance, gain: enjeu.gain, risque: enjeu.risque,
+    });
   };
   for (const id of PREFERENCES[moment.type]) ajouter(id);
   // ⚠️ LA DISCIPLINE PASSE EN DERNIER, ET SEULEMENT S'IL RESTE DE LA PLACE.
