@@ -38,15 +38,29 @@ const IDS_TROPHEES = Object.keys(TROPHEES);
 
 // Débit par appareil.
 //
-// ⚠️ DESSERRÉ AVEC L'ENVOI AUTOMATIQUE. Un envoi par heure était calibré pour un
-// bouton qu'on cliquait à la main. Depuis que la carrière part toute seule à
-// chaque fin de saison et à la retraite, une session de jeu normale en produit
-// plusieurs par heure : le joueur honnête se prenait des 429 et son meilleur
-// score n'arrivait jamais. Six par heure couvre une bonne session, quarante par
-// jour couvre la journée la plus intense — et ça reste sans intérêt pour un
-// script, puisque la vraie barrière n'est pas le débit mais le RECALCUL.
-const PAR_HEURE = 6;
-const PAR_JOUR = 40;
+// ⚠️ DESSERRÉ UNE PREMIÈRE FOIS AVEC L'ENVOI AUTOMATIQUE. Un envoi par heure
+// était calibré pour un bouton qu'on cliquait à la main. Depuis que la carrière
+// part toute seule à chaque fin de saison et à la retraite, une session de jeu
+// normale en produit plusieurs par heure : le joueur honnête se prenait des 429
+// et son meilleur score n'arrivait jamais.
+//
+// ⚠️ ET TRIPLÉ UNE SECONDE FOIS (6 → 18 par heure, 40 → 120 par jour), à la
+// demande : « augmente la limite de requêtes par heure, c'est pas assez ». Six
+// ne suffisait plus parce que l'envoi ne se déclenche plus seulement à la fin
+// d'une saison — `publierAuClassement` part aussi à CHAQUE SEMAINE JOUÉE dès que
+// le score progresse (voir le store, frein de dix minutes). Une soirée où l'on
+// avance par le calendrier franchit donc six envois en moins d'une heure.
+//
+// ⚠️ CE N'EST PAS UN AFFAIBLISSEMENT DE LA PROTECTION, et il faut le redire
+// parce que le réflexe serait de le croire : **le débit n'a jamais été ce qui
+// protège le classement**. Ce qui protège, c'est que le serveur RECALCULE le
+// score (`scoreDeLaFiche`) et que `verifierFiche` borne chaque champ par les
+// autres. Un script qui posterait cent fois par heure n'obtiendrait toujours
+// que des refus : il lui faudrait fabriquer une carrière entière qui tient
+// debout, et à ce moment-là autant la jouer. Le débit ne sert qu'à empêcher
+// qu'on martèle la base pour rien.
+const PAR_HEURE = 18;
+const PAR_JOUR = 120;
 
 /**
  * ⚠️ LE CLASSEMENT NE S'ARRÊTE PLUS AU CENTIÈME.

@@ -4942,3 +4942,22 @@ img, svg, canvas { max-width: 100%; }
   .histo-manager .classement-ligne > :nth-child(3),
   .histo-manager .classement-ligne > :nth-child(5) { display: none; }
 }
+
+/* ⚠️ DANS UNE CARTE DE POULE, LA COLONNE DU NOM TOMBAIT À ZÉRO.
+   `.classement-ligne` déclare `minmax(0, 1fr)` sur le nom — donc il a le droit
+   de disparaître complètement — et c'est exactement ce qui arrivait : les neuf
+   autres cellules (rang, écusson, Pts, J, G, N, P, Diff, B) sont à largeur
+   FIXE et consomment ~325 px avec leurs gouttières, or une carte de poule n'en
+   offre que ~320 quand trois tiennent sur une rangée. Mesuré en jeu : les
+   quatre poules de la Coupe du monde affichaient des classements SANS AUCUN NOM
+   D'ÉQUIPE, et l'en-tête « Club » avait disparu avec.
+   Le nom garde donc un plancher et le tableau défile DANS sa carte — c'est le
+   correctif déjà appliqué à la feuille de match, pour la même cause.
+   ⚠️ Et la dixième colonne (le bonus) est enfin DÉCLARÉE : elle tombait dans
+   une colonne implicite `auto`, ce qui rendait la somme des largeurs
+   imprévisible selon le contenu. */
+.grille-poules .classement-tableau { overflow-x: auto; }
+.grille-poules .classement-entete,
+.grille-poules .classement-ligne {
+  grid-template-columns: 1.6rem 22px minmax(88px, 1fr) 2.4rem 1.7rem 1.7rem 1.7rem 1.7rem 2.6rem 1.4rem;
+}

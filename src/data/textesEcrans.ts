@@ -76,6 +76,17 @@ export const TEXTES_ECRANS: Record<string, Traduction> = {
     pt: 'As promessas ↗ evoluem para o seu potencial até aos 27, os veteranos ↘ declinam, e os retirados dão lugar a «regens» 🌱. É a média do plantel que decide a classificação do clube.',
     ja: '有望株 ↗ は27歳まで潜在能力に向けて伸び、ベテラン ↘ は衰え、引退者は「リジェン」🌱 に道を譲ります。クラブの順位を決めるのはスカッドの平均評価です。',
   },
+  'eff.groupeNational': { fr: "Groupe national", en: "National squad", es: "Grupo nacional", it: "Gruppo nazionale", de: "Nationalkader", pt: "Grupo nacional", ja: "代表スカッド" },
+  'eff.groupeU20': { fr: "Groupe des moins de 20 ans", en: "Under-20 squad", es: "Grupo sub-20", it: "Gruppo Under 20", de: "U20-Kader", pt: "Grupo sub-20", ja: "U20スカッド" },
+  'eff.legendeSelection': {
+    fr: 'Le XV national se compose des MEILLEURS joueurs du pays, tous clubs confondus : deux par poste, trente au total. C’est exactement le groupe que le moteur aligne quand tu joues avec ta sélection.',
+    en: 'The national squad is drawn from the country’s BEST players, across every club: two per position, thirty in all. It is exactly the group the engine fields when you play for your country.',
+    es: 'El XV nacional se compone de los MEJORES jugadores del país, de todos los clubes: dos por puesto, treinta en total. Es exactamente el grupo que el motor alinea cuando juegas con tu selección.',
+    it: 'Il XV nazionale è formato dai MIGLIORI giocatori del paese, di tutti i club: due per ruolo, trenta in totale. È esattamente il gruppo che il motore schiera quando giochi con la tua nazionale.',
+    de: 'Der Nationalkader besteht aus den BESTEN Spielern des Landes, vereinsübergreifend: zwei pro Position, dreißig insgesamt. Genau diese Gruppe stellt die Engine auf, wenn du für dein Land spielst.',
+    pt: 'O XV nacional é composto pelos MELHORES jogadores do país, de todos os clubes: dois por posição, trinta ao todo. É exatamente o grupo que o motor alinha quando jogas pela tua seleção.',
+    ja: '代表チームは所属クラブを問わず国内最高の選手で構成されます。各ポジション2名、計30名。代表戦でエンジンが実際に起用するのはこのグループです。',
+  },
   'eff.regen': { fr: 'Jeune regen', en: 'Young regen', es: 'Joven regen', it: 'Giovane regen', de: 'Junger Regen', pt: 'Jovem regen', ja: '若手リジェン' },
   'eff.espoir': { fr: 'Espoir, peut atteindre {n}', en: 'Prospect, can reach {n}', es: 'Promesa, puede llegar a {n}', it: 'Giovane promessa, può arrivare a {n}', de: 'Talent, kann {n} erreichen', pt: 'Promessa, pode chegar a {n}', ja: '有望株、最大{n}まで成長' },
   'eff.declin': {

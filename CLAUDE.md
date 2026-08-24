@@ -7121,3 +7121,127 @@ npx vite-node scripts/verifClassement.ts  # le plafond suit les deux barèmes
 npx vite-node scripts/verifHonneurs.ts    # les deux distinctions fantômes sont sous test
 npx vite-node scripts/verifTitres.ts      # aucun titre fantôme, aucun titre oublié
 ```
+
+---
+
+## 🏳️ LE MAILLOT DU WEEK-END — et deux poules sans nom d'équipe
+
+Trois demandes et un bug, tous sur le même week-end de sélection : « je suis en
+Coupe du monde et c'est marqué tournée d'automne » · « quand on est avec sa
+sélection, mets le logo de la sélection au lieu du club » · « et qu'on puisse
+voir l'effectif de notre sélection aussi » · « autre bug » (capture : les quatre
+poules du Mondial, sans un seul nom d'équipe).
+
+### ⚠️ 1. UNE SEMAINE NE SAIT PAS EN QUELLE ANNÉE ON EST
+
+`libelleSemaine(s)` est une fonction du CALENDRIER, et le calendrier est le même
+toutes les saisons : ses trois dates de novembre portent le libellé figé
+« Tournée d'automne ». Or une saison sur quatre, la **Coupe du monde REMPLACE la
+tournée** — `competitionsDeLaSaison` retire `autumn` cette année-là. L'écran
+annonçait donc « Tournée d'automne » juste au-dessus d'un bouton
+« 🌍 Coupe du monde · reçoit Fidji ».
+
+`libelleSemaine(s, saison?)` prend désormais la saison. ⚠️ **Le paramètre est
+FACULTATIF, et c'est ce qui permet de ne pas casser les appelants qui n'ont pas
+de carrière sous la main** — la frise d'une compétition qu'on consulte, par
+exemple. Les huit appels qui ont une saison la passent (panneau de carrière,
+classement latéral, écran Résultats, L'Ovale, écran manager).
+
+Contre-épreuve faite en jeu, et elle compte autant que le correctif : **saison 5
+(pas d'année de Mondial) affiche toujours « 🍂 Tournée d'automne »**. Sans elle,
+on aurait juste inversé le bug.
+
+### ⚠️ 2. ON PORTAIT L'ÉCUSSON DE SON CLUB EN PLEINE COUPE DU MONDE
+
+Le panneau affichait le blason du club même pendant une fenêtre
+internationale — alors que le bouton juste en dessous propose « ▶️ Jouer avec ta
+sélection ». Deux maillots contradictoires sur le même écran, et c'est le club
+qui gagnait.
+
+- L'avatar devient le **`LogoEquipe` de la sélection** dès qu'il y a un match
+  international cette semaine-là.
+- Une **pastille de sélection** s'ajoute (« 🇿🇦 Afrique du Sud · Coupe du monde »).
+  ⚠️ **Elle s'AJOUTE, elle ne remplace pas celle du club** : on est sélectionné
+  pour une semaine, on appartient à un club toute l'année, et c'est lui qui paie
+  le salaire affiché deux lignes plus haut.
+
+⚠️ **ON LE LIT SUR `inter`, PAS SUR `maSelection`.** `inter` dit qu'il y a
+VRAIMENT un match international cette semaine ; `maSelection` dit seulement qu'on
+est international. Un joueur convoqué toute l'année ne doit pas porter son
+maillot national un dimanche de championnat.
+
+### 3. L'effectif de la sélection
+
+**`maSelection(joueur)`** (`lib/selection.ts`) devient la seule définition de
+« ma sélection ». Le panneau, l'écran Effectif et le match posaient chacun la
+question à leur façon — un jour l'un aurait affiché le maillot des A pendant que
+l'autre montrait le groupe U20.
+
+⚠️ **LE TIRAGE EST FIGÉ À 0,5**, pas laissé au hasard. `convocation` comporte une
+zone de concurrence aléatoire : appelée deux fois dans le même rendu, elle rend
+deux réponses différentes, et l'écusson clignoterait d'un rendu à l'autre. Ici on
+ne décide pas d'une feuille de match, on répond à « de quelle sélection suis-je ? ».
+
+L'écran Effectif gagne **deux onglets** — son club, sa sélection — et le bouton
+« 👥 Équipe » du panneau ouvre le bon : la sélection pendant une fenêtre
+internationale, le club le reste du temps. Relevé en jeu : « Afrique du Sud ·
+Groupe national · Saison 4 · effectif noté 86 · 31 joueurs », le joueur incarné
+dedans **une seule fois**.
+
+⚠️ **L'ONGLET N'APPARAÎT QUE SI ON EST RÉELLEMENT INTERNATIONAL.** Le proposer à
+un joueur de Fédérale 3 ouvrirait un groupe dont il ne fait pas partie, et le
+laisserait croire qu'il y a sa place.
+
+⚠️ **`effectifNational` CONTIENT DÉJÀ le joueur incarné** quand il est du niveau :
+c'est le même vivier. On ne l'ajoute donc à la liste que côté club, sinon il
+apparaîtrait deux fois dans son propre groupe national.
+
+⚠️ **ET LE SEUIL DE COULEUR SUIT LE GROUPE AFFICHÉ.** Comparer un XV national à la
+note d'un club de Fédérale peindrait les trente joueurs en or, et l'indication ne
+dirait plus rien. La référence est la force du groupe montré, calculée avec la
+**même formule** que `forceEffectif` (moyenne pondérée des 23 meilleurs, XV ×1 et
+banc ×0,5) : deux barèmes différents feraient croire qu'un XV national vaut moins
+qu'un club de Pro D2.
+
+### ⚠️ 4. LES POULES DU MONDIAL N'AVAIENT AUCUN NOM D'ÉQUIPE
+
+Capture à l'appui : quatre poules, six lignes chacune, rang et points — **et une
+colonne vide à la place du nom**. L'en-tête « Club » avait disparu avec.
+
+La cause est arithmétique. `.classement-ligne` déclare le nom en
+`minmax(0, 1fr)` : il a donc **le droit de tomber à zéro**. Les neuf autres
+cellules (rang, écusson, Pts, J, G, N, P, Diff, B) sont à largeur FIXE et
+consomment ~325 px avec leurs gouttières, or une carte de poule n'en offre que
+~320 quand trois tiennent sur une rangée. Le nom absorbait tout le déficit.
+
+⚠️ **ET LA DIXIÈME COLONNE N'ÉTAIT MÊME PAS DÉCLARÉE.** `Tableau1` rend dix
+cellules pour neuf colonnes définies : le bonus tombait dans une colonne
+implicite `auto`, ce qui rendait la somme des largeurs dépendante du contenu.
+
+Le nom garde donc un plancher (`minmax(88px, 1fr)`) dans le scope
+`.grille-poules`, la dixième colonne est déclarée, et le tableau défile DANS sa
+carte. **C'est exactement le correctif déjà appliqué à la feuille de match**,
+pour exactement la même cause — et il s'applique aussi aux poules de coupe
+d'Europe, qui partagent cette grille.
+
+⚠️ **LE CORRECTIF EST SCOPÉ À `.grille-poules`**, vérifié : le classement de
+championnat, qui n'y est pas, garde sa colonne de nom à 462 px et ne bouge pas
+d'un pixel.
+
+### Vérifié en jouant
+
+Sauvegarde réelle — un ailier sud-africain de Northampton, saison 4 (année de
+Mondial), semaine 11 :
+
+```text
+panneau     🏳️ Coupe du monde  (au lieu de « Tournée d’automne »)
+avatar      /logos/afrique_du_sud.png · titre « Afrique du Sud »
+pastilles   Afrique du Sud · Coupe du monde   ‖   Northampton Saints · Premiership
+👥 Équipe   → onglet « Afrique du Sud » actif · 31 joueurs · effectif noté 86
+poules      1 Afrique du Sud 🫵 5 1 1 0 0 +7 5 1   ← le nom est là, 88 px
+saison 5    🍂 Tournée d’automne                    ← la contre-épreuve
+```
+
+À 375 px : quatre poules en une colonne, noms lisibles, **aucun débordement
+horizontal**, et le tableau n'a même pas besoin de défiler (les colonnes
+secondaires sont déjà masquées sur téléphone).

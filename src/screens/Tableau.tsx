@@ -558,7 +558,7 @@ export function Tableau() {
       <button className="btn fantome" onClick={() => setEcran('carriere')} style={{ marginBottom: '1rem' }}>
         ← Retour à la carrière
       </button>
-      <div className="eyebrow">{libelleSemaine(semActuelle)} · {t('gen.saison').toLowerCase()} {joueur.saison}</div>
+      <div className="eyebrow">{libelleSemaine(semActuelle, joueur.saison)} · {t('gen.saison').toLowerCase()} {joueur.saison}</div>
       <h1>📊 {t('tb.titre')}</h1>
 
       <div className="barre-competitions">

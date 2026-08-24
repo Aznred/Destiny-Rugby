@@ -10,6 +10,9 @@ import { nomNation } from './nations';
 import { EFFECTIFS_REELS } from '../data/effectifsReels';
 import { POSTE_PAR_ID } from '../data/rugby';
 import { noteALAge } from './effectif';
+// ⚠️ `international.ts` n'importe PAS `selection.ts` : le sens unique est
+// vérifié, il n'y a pas de cycle. C'est lui qui sait écrire « Galles U20 ».
+import { equipeU20 } from './international';
 
 // Niveau (générale + réputation) exigé pour être appelé, par nation.
 const NIVEAU_EXIGE: Record<string, number> = {
@@ -157,4 +160,24 @@ export function convocation(j: Joueur, alea = Math.random(), saison = j.saison):
   // La forme et le moral pèsent : un cadre méforme reste à la maison.
   if (selectionne && (j.forme < 45 || j.moral < 35)) selectionne = alea > 0.6;
   return { selectionne, niveau, exige, marge };
+}
+
+/**
+ * L'équipe nationale du joueur : celle où il est RÉELLEMENT retenu.
+ *
+ * ⚠️ UNE SEULE DÉFINITION DE « MA SÉLECTION », et c'est tout l'objet de cette
+ * fonction. Le panneau de carrière, l'écran Effectif et le match en direct
+ * posaient chacun la question à leur façon — un jour l'un aurait affiché le
+ * maillot des A pendant que l'autre montrait le groupe U20.
+ *
+ * ⚠️ ET LE TIRAGE EST FIGÉ À 0,5 (`alea`), pas laissé au hasard. `convocation`
+ * comporte une zone de concurrence aléatoire : appelée deux fois de suite dans
+ * le même rendu, elle rendrait deux réponses différentes, et l'écusson de la
+ * sélection clignoterait d'un rendu à l'autre. Ici on ne décide pas d'une
+ * feuille de match, on répond à « de quelle sélection suis-je ? ».
+ */
+export function maSelection(j: Joueur): { equipe: string; u20: boolean } | null {
+  if (convocation(j, 0.5).selectionne) return { equipe: nomNation(j.nation), u20: false };
+  if (convocationU20(j, 0.5).selectionne) return { equipe: equipeU20(j.nation), u20: true };
+  return null;
 }

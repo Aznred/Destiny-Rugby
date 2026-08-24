@@ -91,7 +91,7 @@ export function Manager() {
       <div className="eyebrow">
         {libre ? '🔓 Mode libre, hors classement' : 'Carrière d’entraîneur'}
         {' · '}saison {manager.saison}
-        {!sansBanc && ` · ${libelleSemaine(sem)}`}
+        {!sansBanc && ` · ${libelleSemaine(sem, manager.saison)}`}
       </div>
       <h1>🧑‍🏫 {manager.nom}</h1>
 

@@ -732,6 +732,17 @@ interface GameState {
   signerBanc: (club: string) => void;
   /** Raccrocher : la carrière part au Hall et au classement. */
   quitterBanc: () => void;
+  /**
+   * Quel groupe l’écran Effectif doit ouvrir : son club, ou sa sélection.
+   *
+   * ⚠️ NON PERSISTÉ, comme `ouvrirSocialSur` : c’est un ordre donné à un
+   * écran au moment où on l’ouvre, pas un état de la partie. L’écran garde
+   * ses deux onglets — ceci ne fait que choisir celui qui s’affiche en
+   * arrivant.
+   */
+  ouvrirEffectifSur: 'club' | 'selection' | null;
+  viserEffectif: (quoi: 'club' | 'selection') => void;
+  consommerViseeEffectif: () => void;
   ouvrirSocialSur: 'messages' | null;
   ouvrirMessagesOvale: () => void;
   consommerOuvertureSociale: () => void;
@@ -893,13 +904,22 @@ interface GameState {
  * propre ligne pour une raison qui n'a rien à voir avec lui.
  */
 /**
- * ⚠️ DIX MINUTES ENTRE DEUX ENVOIS AUTOMATIQUES, et ce n’est pas un chiffre en
- * l'air : le serveur accepte **six envois par heure** par appareil
- * (`api/classement.ts`). Publier en cours de saison sans ce plancher, c’est se
+ * Le plancher entre deux envois automatiques.
+ *
+ * ⚠️ CE N’EST PAS UN CHIFFRE EN L’AIR : IL EST CALCULÉ SUR LE DÉBIT DU
+ * SERVEUR. `api/classement.ts` accepte `PAR_HEURE` envois par appareil ; on se
+ * laisse donc une heure divisée par ce nombre. Publier plus vite, c’est se
  * faire jeter par son propre débit — et le joueur honnête récolterait des 429
  * pendant que sa carrière n’entre pas.
+ *
+ * ⚠️ ET LES DEUX VALEURS DOIVENT BOUGER ENSEMBLE. Tripler le débit du serveur
+ * sans toucher à ce plancher n’aurait RIEN changé pour le joueur : c’est lui
+ * qui limitait la cadence, pas le serveur. Demande explicite : « augmente la
+ * limite de requêtes par heure, c’est pas assez ». 6/h et dix minutes sont
+ * donc devenus 18/h et trois minutes vingt.
  */
-const DELAI_ENVOI = 10 * 60 * 1000;
+const ENVOIS_PAR_HEURE = 18; // ⚠️ doit rester égal à PAR_HEURE (api/classement.ts)
+const DELAI_ENVOI = Math.round((60 / ENVOIS_PAR_HEURE) * 60 * 1000);
 
 /**
  * Dernier envoi tenté, en horloge murale. Volontairement HORS de la sauvegarde :
@@ -974,6 +994,9 @@ export const useGame = create<GameState>()(
 
       manager: null,
       reconversionManager: null,
+      ouvrirEffectifSur: null,
+      viserEffectif: (quoi) => set({ ouvrirEffectifSur: quoi }),
+      consommerViseeEffectif: () => set({ ouvrirEffectifSur: null }),
       ouvrirSocialSur: null,
       ouvrirMessagesOvale: () => set((s) => ({
         ecran: 'social',
@@ -3276,8 +3299,9 @@ export const useGame = create<GameState>()(
       // ⚠️ DEUX FREINS, ET LES DEUX SONT NÉCESSAIRES :
       //   · le score doit avoir PROGRESSÉ depuis le dernier envoi accepté —
       //     sinon on renverrait la même fiche à chaque semaine ;
-      //   · dix minutes minimum entre deux envois — le serveur en accepte six
-      //     par heure, et se faire jeter par son propre débit serait le comble.
+      //   · un plancher entre deux envois, calculé sur le débit du serveur
+      //     (`DELAI_ENVOI`) — se faire jeter par son propre débit serait le
+      //     comble.
       // La fin de saison et la retraite passent outre (`force`) : ce sont les
       // deux moments où la carrière DOIT être posée, quoi qu’il arrive.
       publierAuClassement: (force = false) => {

@@ -6,7 +6,7 @@ import { useGame, noteGlobale, bonusClubDuJoueur } from '../store/useGame';
 import { POSTE_PAR_ID, labelAttribut, nomPoste } from '../data/rugby';
 import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
-import { Blason } from './Blason';
+import { Blason, LogoEquipe } from './Blason';
 import { LogoCompet } from './LogoCompet';
 import { Drapeau } from './Drapeau';
 import { nomNation, nomNationTraduit } from '../lib/nations';
@@ -98,6 +98,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const matchRegarde = useGame((s) => s.matchRegarde);
   const approches = useGame((s) => s.approches);
   const ouvrirMessagesOvale = useGame((s) => s.ouvrirMessagesOvale);
+  const viserEffectif = useGame((s) => s.viserEffectif);
   // Les clubs qui attendent une réponse, prolongation comprise.
   const ouvertes = approches.filter((a) => a.etat === 'ouverte').length;
   // ⚠️ UNE SEMAINE INTERNATIONALE A AUSSI SON MATCH. On ne voyait ni affiche ni
@@ -119,6 +120,24 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
     }
     return null;
   }, [joueur, semaineActuelle.type]);
+
+  /**
+   * ⚠️ CE WEEK-END, ON NE JOUE PAS POUR SON CLUB.
+   *
+   * Demande explicite : « quand on est avec sa sélection, mets le logo de la
+   * sélection au lieu du club ». Le panneau affichait l’écusson du club même
+   * en pleine Coupe du monde, alors que le bouton juste en dessous propose
+   * « ▶️ Jouer avec ta sélection » : deux maillots contradictoires sur le
+   * même écran, et c’est le club qui gagnait.
+   *
+   * ⚠️ ON LE LIT SUR `inter`, PAS SUR `maSelection`. `inter` dit qu’il y a
+   * VRAIMENT un match international cette semaine-là ; `maSelection` dit
+   * seulement qu’on est international. Un joueur convoqué toute l’année ne
+   * doit pas porter son maillot national un dimanche de championnat.
+   */
+  const equipeDuWeekEnd = inter
+    ? (inter.u20 ? equipeU20(joueur.nation) : nomNation(joueur.nation))
+    : null;
 
   const coupe = useMemo(() => {
     if (semaineActuelle.type !== 'coupe') return null;
@@ -175,9 +194,12 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   return (
     <aside className="carte panneau-joueur">
       <div className="ph">
-        {/* L'écusson du club plutôt qu'une icône générique : on joue POUR un club. */}
-        <div className="avatar avatar-club" title={joueur.club}>
-          {clubData ? <Blason club={clubData} taille={44} /> : EMOJI_POSTE[poste.categorie]}
+        {/* L'écusson de l'équipe pour laquelle on joue CE week-end : le club
+            d’ordinaire, la sélection pendant une fenêtre internationale. */}
+        <div className="avatar avatar-club" title={equipeDuWeekEnd ?? joueur.club}>
+          {equipeDuWeekEnd
+            ? <LogoEquipe nom={equipeDuWeekEnd} taille={44} />
+            : clubData ? <Blason club={clubData} taille={44} /> : EMOJI_POSTE[poste.categorie]}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="nom">{joueur.nom}</div>
@@ -220,6 +242,15 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         <span className="pastille">💰 <b>{nombre(joueur.argent)} €</b></span>
       </div>
       <div className="ressources" style={{ marginTop: '-0.4rem' }}>
+        {/* ⚠️ Le club reste affiché À CÔTÉ de la sélection, jamais remplacé :
+            on est sélectionné POUR une semaine, on appartient à un club toute
+            l’année, et c’est lui qui paie le salaire affiché juste au-dessus. */}
+        {equipeDuWeekEnd && (
+          <span className="pastille pastille-selection" title={inter?.affiche.competition.nom}>
+            <LogoEquipe nom={equipeDuWeekEnd} taille={18} /> <b>{equipeDuWeekEnd}</b>
+            {inter && <>{' · '}{inter.affiche.competition.nom}</>}
+          </span>
+        )}
         <span className="pastille" title={t('pj.clubDivision')}>
           {clubData ? <Blason club={clubData} taille={18} /> : '🏟️'} <b>{joueur.club}</b>
           {division && (
@@ -346,7 +377,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               <span>{t('pj.semaine', { n: semaineActuelle.numero, total: SEMAINES_PAR_SAISON })}</span>
             </div>
             <div className="cal-libelle">
-              {EMOJI_SEMAINE[semaineActuelle.type]} {libelleSemaine(semaineActuelle)}
+              {EMOJI_SEMAINE[semaineActuelle.type]} {libelleSemaine(semaineActuelle, joueur.saison)}
               <i className="cal-lien">🗓️ {t('pj.calendrier')}</i>
             </div>
             <div className="cal-barre">
@@ -412,7 +443,15 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           )}
       {/* Barre d'actions : tout est atteignable sans faire défiler le panneau. */}
       <div className="pj-actions">
-        <button onClick={() => setEcran('effectif')} title={t('pj.voirJoueursAide')}>
+        {/* ⚠️ LE BOUTON EMMÈNE SUR LE BON GROUPE. Demande : « qu’on puisse
+            voir l’effectif de notre sélection aussi ». Pendant une fenêtre
+            internationale, « Mon équipe » ouvrait l’effectif du CLUB — celui
+            qu’on ne joue justement pas ce week-end-là. L’écran garde ses deux
+            onglets : on n’a rien perdu, on arrive juste au bon. */}
+        <button
+          onClick={() => { viserEffectif(equipeDuWeekEnd ? 'selection' : 'club'); setEcran('effectif'); }}
+          title={t('pj.voirJoueursAide')}
+        >
           👥<span>{t('pj.equipe')}</span>
         </button>
         {/* ⚠️ LE MARCHÉ VIT SUR L'OVALE, PLUS DANS UN PANNEAU. Ce bouton ouvre
@@ -540,7 +579,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         <div className="barre-jouer">
           <span className="barre-jouer-info">
             <b>S{joueur.saison}</b> · {libelleDate(semaineActuelle)}
-            {matchAJouer && adversaire ? ` · ${adversaire}` : ` · ${libelleSemaine(semaineActuelle)}`}
+            {matchAJouer && adversaire ? ` · ${adversaire}` : ` · ${libelleSemaine(semaineActuelle, joueur.saison)}`}
           </span>
           {matchAJouer ? (
             <button

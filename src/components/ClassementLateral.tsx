@@ -214,11 +214,11 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
             <b>{vue.pied.scoreD}-{vue.pied.scoreE}</b>
             <span>{vue.pied.exterieur}</span>
           </div>
-          <div className="cl-lat-note">{libelleSemaine(sem)}</div>
+          <div className="cl-lat-note">{libelleSemaine(sem, joueur.saison)}</div>
         </div>
       ) : (
         <div className="cl-lat-pied">
-          <div className="cl-lat-note">{libelleSemaine(sem)}</div>
+          <div className="cl-lat-note">{libelleSemaine(sem, joueur.saison)}</div>
         </div>
       )}
     </aside>

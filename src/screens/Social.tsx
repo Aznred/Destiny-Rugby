@@ -1247,7 +1247,7 @@ export function Social() {
               <span className={`x-vivant${chargement ? ' occupe' : ''}`}>
                 ● {chargement
                   ? t('ov.reseauEcrit')
-                  : t('ov.semaineActuelle', { n: joueur.semaine ?? 1, libelle: libelleSemaine(semaine(joueur.semaine ?? 1)) })}
+                  : t('ov.semaineActuelle', { n: joueur.semaine ?? 1, libelle: libelleSemaine(semaine(joueur.semaine ?? 1), joueur.saison) })}
               </span>
               <span>{t('ov.filSemaine')}</span>
               {!avecIA && <span>{t('ov.cleIA')}</span>}

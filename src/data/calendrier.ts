@@ -79,8 +79,22 @@ export function horodatageJeu(numeroSemaine: number, graine: string): string {
   return `${jour} · ${String(heure).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-/** Libellé destiné à l’interface. La valeur brute reste dans le calendrier pour le moteur. */
-export function libelleSemaine(s: Semaine): string {
+/**
+ * Libellé destiné à l’interface. La valeur brute reste dans le calendrier pour
+ * le moteur.
+ *
+ * ⚠️ LA SAISON EST UN PARAMÈTRE, ET ELLE COMPTE POUR UNE SEULE RAISON : une
+ * saison sur quatre, la **Coupe du monde REMPLACE la tournée d’automne**
+ * (`competitionsDeLaSaison` retire `autumn` cette année-là). Le calendrier, lui,
+ * ne connaît qu’un libellé figé par semaine : l’écran annonçait donc
+ * « Tournée d’automne » en pleine Coupe du monde — bug signalé en jeu, capture à
+ * l’appui. Une semaine ne peut pas savoir seule en quelle année on est.
+ *
+ * Sans `saison`, le comportement ne change pas : c’est ce qui permet de ne pas
+ * réécrire les huit appelants d’un coup, et les écrans qui n’ont pas de carrière
+ * sous la main (la frise d’une compétition consultée) restent justes.
+ */
+export function libelleSemaine(s: Semaine, saison?: number): string {
   if (s.libelle === 'Reprise du championnat') return t('cal.reprise');
   if (s.libelle === 'Journée de championnat') return t('cal.journeeChamp');
   if (s.libelle === 'Journée des fêtes') return t('cal.journeeFetes');
@@ -88,7 +102,10 @@ export function libelleSemaine(s: Semaine): string {
     const numero = /([1-4])(?:re|e) journée/.exec(s.libelle)?.[1];
     if (numero) return t('cal.coupeJournee', { n: numero });
   }
-  if (s.competitionInternationale === 'autumn') return t('cal.tourneeAutomne');
+  if (s.competitionInternationale === 'autumn') {
+    return saison != null && estAnneeDeCoupeDuMonde(saison)
+      ? t('cal.coupeMonde') : t('cal.tourneeAutomne');
+  }
   if (s.competitionInternationale === 'sixNations') {
     return s.finale ? t('cal.sixNationsFinale') : t('cal.sixNations');
   }
