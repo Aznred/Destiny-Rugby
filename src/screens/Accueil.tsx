@@ -52,6 +52,7 @@ const apparait = {
 export function Accueil() {
   const setEcran = useGame((s) => s.setEcran);
   const joueur = useGame((s) => s.joueur);
+  const manager = useGame((s) => s.manager);
   const skinActif = useGame((s) => s.skinActif);
 
   return (
@@ -80,10 +81,34 @@ export function Accueil() {
                   {t('accueil.voirProfil')}
                 </button>
               </>
+            ) : manager ? (
+              // ⚠️ UNE CARRIÈRE D’ENTRAÎNEUR OCCUPE LA MÊME PLACE QU’UNE
+              //    CARRIÈRE DE JOUEUR, et jamais les deux en même temps :
+              //    `creerManager` met `joueur` à null. Sans cette branche,
+              //    l’accueil proposait « commencer » à quelqu’un qui a déjà
+              //    un banc, et sa carrière devenait introuvable.
+              <>
+                <button className="btn primaire grand" onClick={() => setEcran('manager')}>
+                  🧑‍🏫 Reprendre mon banc
+                </button>
+                <button className="btn fantome grand" onClick={() => setEcran('tableau')}>
+                  {t('accueil.voirProfil')}
+                </button>
+              </>
             ) : (
-              <button className="btn primaire grand" onClick={() => setEcran('creation')}>
-                {t('accueil.commencer')}
-              </button>
+              <>
+                <button className="btn primaire grand" onClick={() => setEcran('creation')}>
+                  {t('accueil.commencer')}
+                </button>
+                {/* ⚠️ LE SECOND MODE DOIT SE VOIR DÈS L’ACCUEIL. Caché
+                    derrière un menu, personne ne saurait qu’il existe : le
+                    jeu s’appelle « carrière de rugby », pas « carrière de
+                    joueur ». Il reste en second : entraîner est le mode
+                    d’après, et on démarre en Régionale sans expérience. */}
+                <button className="btn fantome grand" onClick={() => setEcran('creationManager')}>
+                  🧑‍🏫 Devenir entraîneur
+                </button>
+              </>
             )}
           </motion.div>
           <motion.div custom={4} variants={apparait} initial="hidden" animate="show" className="stats-bandeau">

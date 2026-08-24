@@ -640,9 +640,30 @@ export const MEILLEUR_JOUEUR_PAR_DIVISION: Record<string, string> = {
  * pour le Tournoi, avoir disputé (et gagné) la finale du monde.
  */
 export const HONNEUR_CHAMPIONS_CUP = 'meilleurChampionsCup';
-export const HONNEUR_TOURNOI = 'meilleurSixNations';
 export const HONNEUR_FINALE_MONDE = 'hommeDuMatchMonde';
 export const HONNEUR_MONDIAL = 'meilleurJoueur';
+
+/**
+ * Quelle compétition de sélections élit un meilleur joueur, et lequel.
+ *
+ * ⚠️ CETTE TABLE REMPLACE UN `HONNEUR_TOURNOI` EN DUR, ET C'ÉTAIT UN BUG DE
+ * JEU : « j'ai gagné les Six Nations meilleur joueur en étant sud-africain ».
+ * `lib/honneurs.ts` testait « le joueur est sélectionné pour la compétition de
+ * SA fenêtre de février » — ce qui est vrai du Rugby Championship pour un
+ * Springbok et du Rugby Europe Championship pour un Portugais — puis décernait
+ * systématiquement le trophée du TOURNOI DES 6 NATIONS. Un booléen répondait à
+ * une question à dix réponses possibles.
+ *
+ * ⚠️ ET IL N'Y A QU'UNE SEULE ENTRÉE, comme `MEILLEUR_JOUEUR_PAR_DIVISION` n'en
+ * a que cinq sur trente-trois championnats. Ce n'est pas un oubli : une
+ * distinction n'existe dans le jeu que si elle a son modèle 3D dans
+ * `public/m3d/`, et la rareté est ce qui lui donne sa valeur. Un Sud-Africain
+ * ne peut donc pas être élu meilleur joueur d'un tournoi — pour lui en ouvrir
+ * un, il faut d'abord livrer le `.glb` du Rugby Championship.
+ */
+export const HONNEUR_PAR_INTERNATIONAL: Record<string, string> = {
+  sixNations: 'meilleurSixNations',
+};
 
 // Championnats qui donnent accès aux coupes d'Europe : les 8 premiers jouent
 // la Champions Cup, les autres la Challenge Cup (voir le store). Le Top 14, la

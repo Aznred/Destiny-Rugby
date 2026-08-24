@@ -30,8 +30,12 @@ import {
 } from '../src/lib/honneurs';
 import {
   TROPHEES, MEILLEUR_JOUEUR_PAR_DIVISION, estIndividuel,
-  HONNEUR_CHAMPIONS_CUP, HONNEUR_FINALE_MONDE, HONNEUR_MONDIAL, HONNEUR_TOURNOI,
+  HONNEUR_CHAMPIONS_CUP, HONNEUR_FINALE_MONDE, HONNEUR_MONDIAL, HONNEUR_PAR_INTERNATIONAL,
 } from '../src/data/trophees';
+import { COMPETITIONS } from '../src/data/clubs';
+
+/** Le trophée du Tournoi des 6 Nations : la seule distinction de sélection. */
+const HONNEUR_TOURNOI = HONNEUR_PAR_INTERNATIONAL.sixNations;
 import { PROFILS } from '../src/lib/statsJoueurs';
 import { LIMITES } from '../src/lib/classementMondial';
 
@@ -59,6 +63,9 @@ function statsPour(poste: PosteId, matchs: number, facteur: number): StatsDetail
   };
 }
 
+/** Le niveau reel d un championnat (0 = elite, 10 = Regionale 3). */
+const niveauDe = (id: string) => COMPETITIONS.find((c) => c.id === id)?.niveau ?? 10;
+
 function saison(over: Partial<SaisonJugee> = {}): SaisonJugee {
   const poste = over.poste ?? 'deuxieme_centre';
   const matchs = over.matchs ?? 22;
@@ -74,8 +81,8 @@ function saison(over: Partial<SaisonJugee> = {}): SaisonJugee {
     taillePoule: 14,
     titres: [],
     competition: 'top14',
+    niveau: 0,
     championsCup: false,
-    tournoi: false,
     saison: 5,
     ...over,
   };
@@ -178,7 +185,7 @@ console.log('\n=== 3. L’ÉCHELLE EST JUSTE ===');
     grande.length ? grande.map((h) => h.trophee).join(', ') : 'rien',
     grande.some((h) => h.trophee === 'meilleurTop14'));
 
-  const top = decernerHonneurs({ ...historique, championsCup: true, tournoi: true });
+  const top = decernerHonneurs({ ...historique, championsCup: true, tournoiId: 'sixNations' });
   ligne('une saison historique rapporte la couronne mondiale',
     top.map((h) => h.trophee).join(', ') || 'rien',
     top.some((h) => h.trophee === HONNEUR_MONDIAL));
@@ -241,10 +248,26 @@ console.log('\n=== 5. LES CONDITIONS D’ACCÈS TIENNENT ===');
     avecEurope.map((h) => h.trophee).join(', ') || 'rien',
     avecEurope.some((h) => h.trophee === HONNEUR_CHAMPIONS_CUP));
 
-  const sansSelection = decernerHonneurs({ ...enorme, tournoi: false });
+  const sansSelection = decernerHonneurs({ ...enorme, tournoiId: undefined });
   ligne('pas de meilleur joueur du Tournoi sans sélection',
     sansSelection.map((h) => h.trophee).join(', ') || 'rien',
     !sansSelection.some((h) => h.trophee === HONNEUR_TOURNOI));
+  const avecTournoi = decernerHonneurs({ ...enorme, tournoiId: 'sixNations' });
+  ligne('… et il tombe quand on l’a disputé',
+    avecTournoi.map((h) => h.trophee).join(', ') || 'rien',
+    avecTournoi.some((h) => h.trophee === HONNEUR_TOURNOI));
+
+  // ⚠️ BUG DE JEU, GARDÉ SOUS TEST : « j’ai gagné les Six Nations meilleur
+  // joueur en étant sud-africain ». Un Springbok dispute le Rugby
+  // Championship, pas le Tournoi — et le jeu lui décernait quand même le
+  // trophée du Tournoi, parce que la condition était un booléen « il joue la
+  // compétition de sa fenêtre de février ».
+  for (const id of ['rugbyChampionship', 'recEurope', 'americasChamp', 'oceaniaCup']) {
+    const autre = decernerHonneurs({ ...enorme, tournoiId: id });
+    ligne(`pas de trophée du Tournoi en jouant ${id}`,
+      autre.map((h) => h.trophee).join(', ') || 'rien',
+      !autre.some((h) => h.trophee === HONNEUR_TOURNOI));
+  }
 
   const sansFinale = decernerHonneurs({ ...enorme, titres: ['brennus'] });
   ligne('pas d’homme du match sans finale du monde gagnée',
@@ -267,7 +290,8 @@ console.log('\n=== 6. RIEN NE SE DÉCERNE LÀ OÙ PERSONNE N’ÉLIT ===');
   // championnat : ces divisions n'en décernent pas, et c'est voulu.
   const amateurs = ['fed1', 'fed2', 'fed3', 'reg1', 'reg2', 'reg3', 'nationale', 'nationale2', 'prod2'];
   const fautifs = amateurs.filter((c) => decernerHonneurs(avecStats({
-    competition: c, note: 9.8, rang: 1, titres: ['federale'], reputation: 95, facteur: 2.2, taillePoule: 12,
+    competition: c, niveau: niveauDe(c), note: 9.8, rang: 1, titres: ['federale'],
+    reputation: 95, facteur: 2.2, taillePoule: 12,
   })).length > 0);
   ligne('aucune distinction hors des cinq championnats concernés',
     fautifs.length ? fautifs.join(', ') : `${amateurs.length} championnats testés`,
@@ -275,11 +299,41 @@ console.log('\n=== 6. RIEN NE SE DÉCERNE LÀ OÙ PERSONNE N’ÉLIT ===');
 
   const attendus = ['top14', 'premiership', 'urc', 'super', 'npc'];
   const manquants = attendus.filter((c) => !decernerHonneurs(avecStats({
-    competition: c, note: 9.4, rang: 1, titres: ['brennus'], reputation: 92, facteur: 2, taillePoule: 12,
+    competition: c, niveau: niveauDe(c), note: 9.4, rang: 1, titres: ['brennus'],
+    reputation: 92, facteur: 2, taillePoule: 12,
   })).some((h) => h.trophee === MEILLEUR_JOUEUR_PAR_DIVISION[c]));
   ligne('les cinq championnats concernés décernent bien',
     manquants.length ? `sans titre : ${manquants.join(', ')}` : attendus.join(', '),
     manquants.length === 0);
+}
+
+console.log('\n=== 6 bis. LA COURONNE MONDIALE NE SORT PAS DU MONDE AMATEUR ===');
+{
+  // ⚠️ BUG DE JEU, GARDÉ SOUS TEST : « j’ai gagné le meilleur joueur de
+  //    l’année en étant en Nationale 2, j’avais 9,6 de note moyenne ». La note
+  //    de saison est RELATIVE au groupe : trop fort pour son étage, on frôle le
+  //    10 sans effort. La sélection nationale suffisait alors à ouvrir la
+  //    vitrine mondiale, et un amateur convoqué chez lui décrochait la couronne.
+  for (const c of ['nationale2', 'fed1', 'fed2', 'reg1', 'reg3']) {
+    const enAmateur = decernerHonneurs(avecStats({
+      competition: c, niveau: niveauDe(c), note: 9.8, rang: 1,
+      titres: ['federale'], reputation: 98, facteur: 2.4, taillePoule: 12,
+      tournoiId: 'sixNations', championsCup: true,
+    }));
+    ligne(`pas de couronne mondiale depuis ${c}`,
+      enAmateur.map((h) => h.trophee).join(', ') || 'rien',
+      !enAmateur.some((h) => h.trophee === 'meilleurJoueur'));
+  }
+
+  // Et la porte reste ouverte là où le monde regarde vraiment.
+  const enPro = decernerHonneurs(avecStats({
+    competition: 'top14', niveau: niveauDe('top14'), note: 9.5, rang: 1,
+    titres: ['brennus', 'champions'], reputation: 96, facteur: 2, taillePoule: 14,
+    tournoiId: 'sixNations', championsCup: true,
+  }));
+  ligne('… mais elle reste atteignable en Top 14',
+    enPro.map((h) => h.trophee).join(', ') || 'rien',
+    enPro.some((h) => h.trophee === 'meilleurJoueur'));
 }
 
 console.log('\n=== 7. TOUT EST DÉTERMINISTE ===');
@@ -305,7 +359,7 @@ console.log('\n=== 8. LE PLAFOND DU CLASSEMENT MONDIAL TIENT ===');
   const parfaite = avecStats({
     note: 9.8, rang: 1, reputation: 100, facteur: 2.4,
     titres: ['brennus', 'champions', 'sixNations', 'monde'],
-    championsCup: true, tournoi: true,
+    championsCup: true, tournoiId: 'sixNations',
   });
   const individuels = decernerHonneurs(parfaite).length;
   const total = parfaite.titres.length + individuels;

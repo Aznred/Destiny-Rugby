@@ -24,7 +24,7 @@ import { SUCCES, SUCCES_PAR_ID } from '../src/data/succes';
 import {
   ficheDepuisJoueur, ficheDepuisLegende, scoreDeLaFiche, verifierFiche,
   sceller, sceauValide, canonique,
-  SCORE_MAX, SAISONS_MAX, LIMITES, VERSION_BAREME, type FicheCarriere,
+  SCORE_MAX, SAISONS_MAX, SAISONS_MAX_MANAGER, LIMITES, VERSION_BAREME, type FicheCarriere,
 } from '../src/lib/classementMondial';
 import { scoreCarriere } from '../src/store/useGame';
 import { CLASSEMENT_EN_LIGNE, cleAleatoire } from '../src/lib/classementEnLigne';
@@ -263,8 +263,13 @@ console.log('\n=== 4 bis. LES CLUBS SONT AFFICHÉS, DONC BORNÉS ===');
 console.log('\n=== 5. LE PLAFOND ABSOLU ===');
 {
   console.log(`     SCORE_MAX = ${SCORE_MAX.toLocaleString('fr-FR')} · SAISONS_MAX = ${SAISONS_MAX}`);
+  // ⚠️ LA CARRIÈRE MAXIMALE EST UN « JOUEUR + ENTRAÎNEUR », depuis le mode
+  // manager. `SCORE_MAX` additionne les deux versants : une fiche de joueur pur,
+  // aussi parfaite soit-elle, ne peut plus l'atteindre — elle plafonne à
+  // 82 500. Comparer l'une à l'autre reviendrait à exiger qu'un demi-barème
+  // égale le barème entier.
   const parfaite = fiche({
-    ageDebut: LIMITES.ageDebutMin, age: LIMITES.ageMax, saisons: SAISONS_MAX,
+    ageDebut: LIMITES.ageDebutMin, age: LIMITES.ageManagerMax, saisons: SAISONS_MAX_MANAGER,
     note: LIMITES.noteMax, reputation: LIMITES.reputationMax,
     matchs: SAISONS_MAX * LIMITES.matchsParSaison,
     essais: SAISONS_MAX * LIMITES.matchsParSaison * LIMITES.essaisParMatch,
@@ -274,6 +279,15 @@ console.log('\n=== 5. LE PLAFOND ABSOLU ===');
     // pas, et `verifierFiche` le refuse depuis qu'on borne chaque trophée à une
     // fois par saison.
     titres: palmaresCredible(SAISONS_MAX * LIMITES.titresParSaison, SAISONS_MAX),
+    manager: {
+      saisons: SAISONS_MAX_MANAGER,
+      titres: palmaresCredible(
+        SAISONS_MAX_MANAGER * LIMITES.titresManagerParSaison, SAISONS_MAX_MANAGER,
+      ),
+      montees: SAISONS_MAX_MANAGER * LIMITES.monteesParSaison,
+      prestige: LIMITES.prestigeMax,
+      clubs: new Array(SAISONS_MAX_MANAGER + 1).fill('Stade Toulousain'),
+    },
   });
   const v = verifierFiche(parfaite, IDS_TROPHEES);
   ligne('la carrière théorique maximale est acceptée',

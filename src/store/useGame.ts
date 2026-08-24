@@ -24,6 +24,7 @@ import type {
   TransfertAnnonce,
   ProfilSocial,
   DecisionClub,
+  Manager, SaisonManager,
 } from '../types';
 import {
   publierPost, pseudoDe, feedAmbiance, suggestionsLocales,
@@ -126,10 +127,17 @@ import {
   resoudrePyramide, nomDivision, resoudreToutesDivisions, oublierResultats,
   equilibrerMouvements, setContexteJoueur,
 } from '../lib/promotion';
+// ⚠️ LE MODE MANAGER : ses règles d’accès vivent dans un module pur, sans
+// store ni DOM (`lib/manager.ts`). Le store ne fait qu’appliquer ce qu’elles
+// disent — c’est ce qui permet au banc d’essai de les mesurer sans navigateur.
+import {
+  MARGE_AMBITION, PRESTIGE_DEBUT, appliquerVerdict, noteMaximale, objectifDuBoard,
+  prestigeDepuisJoueur, salaireManager, verdictDeSaison, CONFIANCE_LICENCIEMENT,
+} from '../lib/manager';
 import { setMouvementsClubs } from '../lib/divisions';
 import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFinale';
 import {
-  championnatEnDirect, journeesApres, nombreJournees, graine,
+  championnatEnDirect, journeesApres, nombreJournees, graine, rangFinal,
   estAmateur, weekEndsJoues, totalWeekEnds, poulesDe, indexPoule,
 } from '../lib/championnat';
 import { risqueDeBlessure, tirerBlessure, messageBlessure, deltasBlessure } from '../lib/blessures';
@@ -353,7 +361,7 @@ function gainDUneSeance(
 // Les reconversions proposées quand on raccroche. La plus crédible dépend de
 // ce qu'a été la carrière (palmarès, réputation, mental).
 export const RECONVERSIONS = [
-  { id: 'entraineur', emoji: '📋', nom: 'Entraîneur', desc: 'Tu passes tes diplômes et reprends un groupe. Le terrain, autrement.' },
+  { id: 'entraineur', emoji: '📋', nom: 'Entraîneur', desc: 'Tu passes tes diplômes et prends un banc. ⚠️ C’est le SEUL choix qui ouvre une vraie seconde carrière : ton statut de joueur devient ton prestige de départ (lib/manager.ts).' },
   { id: 'consultant', emoji: '🎙️', nom: 'Consultant TV', desc: 'Costume, plateau et analyses du dimanche soir. Ta voix compte encore.' },
   { id: 'agent', emoji: '🤝', nom: 'Agent de joueurs', desc: 'Tu connais les coulisses par cœur : tu défends désormais les jeunes.' },
   { id: 'bar', emoji: '🍺', nom: 'Patron de bar', desc: 'Le troisième mi-temps à vie, au comptoir du club, à raconter les anciens.' },
@@ -692,6 +700,38 @@ interface GameState {
    * raison d’ouvrir ce jour-là. Le seul signal d’une carrière qui bascule
    * était une pastille.
    */
+  // ═══ LE MODE MANAGER ═══════════════════════════════════════════════════
+  /**
+   * La carrière d’entraîneur en cours.
+   *
+   * ⚠️ ELLE VIT À CÔTÉ DE `joueur`, PAS À SA PLACE. Une reconversion garde le
+   * passé de joueur dans `Manager.passeJoueur` — mais `joueur` lui-même passe
+   * à `null`, comme à n’importe quelle retraite : on ne joue plus. Les deux
+   * champs pleins en même temps signifieraient deux carrières simultanées, et
+   * tout l’écran de carrière aurait à choisir laquelle afficher.
+   */
+  manager: Manager | null;
+  /**
+   * La carrière de joueur qui vient de s’achever, en attente d’un banc.
+   *
+   * ⚠️ NON PERSISTÉE, comme `attenteEvenement` : c’est un ordre donné à
+   * l’écran de création, pas un état de la partie. La légende est DÉJÀ au
+   * Hall et DÉJÀ envoyée au classement — si le joueur ferme l’onglet ici, il
+   * ne perd rien, il repart d’une création d’entraîneur ordinaire.
+   */
+  reconversionManager: LegendeSauvegardee | null;
+  creerManager: (m: {
+    nom: string; nation: string; club: string; age?: number;
+    libre?: boolean; depuis?: LegendeSauvegardee;
+  }) => void;
+  /** La fin de saison : le board juge, le prestige bouge, on garde ou on part. */
+  saisonManager: () => void;
+  /** Une semaine de calendrier passe. */
+  semaineManager: () => void;
+  /** Prendre un banc (premier contrat, ou après un licenciement). */
+  signerBanc: (club: string) => void;
+  /** Raccrocher : la carrière part au Hall et au classement. */
+  quitterBanc: () => void;
   ouvrirSocialSur: 'messages' | null;
   ouvrirMessagesOvale: () => void;
   consommerOuvertureSociale: () => void;
@@ -932,6 +972,8 @@ export const useGame = create<GameState>()(
       groqKey: '',
       modele: MODELE_DEFAUT,
 
+      manager: null,
+      reconversionManager: null,
       ouvrirSocialSur: null,
       ouvrirMessagesOvale: () => set((s) => ({
         ecran: 'social',
@@ -956,13 +998,22 @@ export const useGame = create<GameState>()(
         const attributs = attributsDeBase(input.poste);
         const gen = noteGlobale({ attributs });
         const salaireDepart = Math.max(0, Math.round(noteDuClub(input.club) * 60));
+        // ⚠️ LE NOM SE TIRE AVANT TOUT LE RESTE, et ce n’était pas le cas :
+        // `pseudo` était calculé sur `input.nom`, donc sur le champ VIDE. Une
+        // carrière sans nom saisi s’appelait « Matis Page-Relo » à l’écran et
+        // « @anonyme_59 » partout ailleurs — sur 𝕏 L’Ovale, et surtout au
+        // classement mondial, où le joueur ne se reconnaissait pas dans la
+        // liste. Retour de jeu : « si on ne met pas de nom à la création, on
+        // n’apparaît pas dans le classement mondial ». Il y apparaissait :
+        // sous un identifiant technique que rien ne rattachait à lui.
+        const nomChoisi = input.nom.trim() || nomAleatoirePourNation(input.nation);
         const joueur: Joueur = {
           // ⚠️ PLUS DE « Anonyme ». Un champ laissé vide donne désormais un nom
           // tiré dans le vivier de SA nationalité (lib/nomsJoueurs.ts) : on
           // recombine le prénom et le nom de deux des 11 916 joueurs étiquetés
           // que le jeu embarque déjà. C'est ici et nulle part ailleurs, parce
           // que c'est le seul endroit où un joueur est créé.
-          nom: input.nom.trim() || nomAleatoirePourNation(input.nation),
+          nom: nomChoisi,
           poste: input.poste,
           traits: (input.traits ?? []).slice(0, MAX_TRAITS),
           nation: input.nation,
@@ -994,7 +1045,7 @@ export const useGame = create<GameState>()(
           },
           // L'Ovale : on démarre avec une poignée d'abonnés — la famille, les
           // copains du club, deux ou trois supporters curieux.
-          pseudo: pseudoDe(input.nom.trim() || 'Anonyme'),
+          pseudo: pseudoDe(nomChoisi),
           abonnes: 120 + Math.floor(Math.random() * 300),
           // Le premier maillot de la carrière : la liste des clubs commence ici
           // et s'allonge à chaque signature (`appliquerPreAccord`).
@@ -1417,7 +1468,8 @@ export const useGame = create<GameState>()(
           titres: bilan.trophees,
           competition: bilan.competition,
           championsCup: bilan.enChampionsCup,
-          tournoi: bilan.selectionne6N,
+          tournoiId: bilan.tournoiId,
+          niveau: bilan.niveau,
           saison: joueur.saison,
         };
         const honneurs = decernerHonneurs(saisonJugee);
@@ -1427,7 +1479,7 @@ export const useGame = create<GameState>()(
         // ne voit pas venir n'est pas un objectif, c'est une surprise — et on ne
         // travaille pas pour une surprise. La note s'affiche donc dès qu'une
         // distinction est en jeu, gagnée ou non.
-        if (MEILLEUR_JOUEUR_PAR_DIVISION[bilan.competition] || bilan.enChampionsCup || bilan.selectionne6N) {
+        if (MEILLEUR_JOUEUR_PAR_DIVISION[bilan.competition] || bilan.enChampionsCup || bilan.tournoiId) {
           const cote = noterSaisonIndividuelle(saisonJugee);
           entrees.push({
             id: idUnique(),
@@ -2968,6 +3020,11 @@ export const useGame = create<GameState>()(
           notifsSocial: [],
           defis: { cle: '', faits: [] },
           joueur: null,
+          // ⚠️ « SI À LA FIN DE NOTRE CARRIÈRE JOUEUR ON PEUT DEVENIR
+          // ENTRAÎNEUR » : la légende part au Hall ET reste sous la main de
+          // l’écran de création, qui en tire le prestige de départ
+          // (`prestigeDepuisJoueur`). Le Hall reste la sortie par défaut.
+          reconversionManager: reconversion === 'entraineur' ? legende : null,
           mouvementsClubs: {},
           journal: [],
           scenarioActif: null,
@@ -2977,8 +3034,223 @@ export const useGame = create<GameState>()(
           tropheesEnAttente: [],
           offres: [],
           offresOuvertes: false,
-          ecran: 'pantheon',
+          ecran: reconversion === 'entraineur' ? 'creationManager' : 'pantheon',
           ecransVus: [...s.ecransVus, 'pantheon'].filter((e, i, l) => l.indexOf(e) === i),
+        }));
+      },
+
+      // ═══ LE MODE MANAGER ═════════════════════════════════════════════════
+      // ⚠️ COUCHE 1 : QUI PEUT ENTRAÎNER QUOI, ET CE QUE ÇA DEVIENT.
+      // La semaine du manager (composer le XV, coacher le match) et le marché
+      // arrivent par-dessus. Ce qui est ici, c’est la charpente : la création,
+      // la saison jugée par un board, le prestige qui ouvre des clubs, et la
+      // sortie vers le classement.
+
+      creerManager: ({ nom, nation, club, age, libre, depuis }) => {
+        const fiche = clubParNom(club);
+        if (!fiche) return;
+        const comp = competitionDuClub(club);
+        const prestige = depuis ? prestigeDepuisJoueur(depuis) : PRESTIGE_DEBUT;
+        const force = forceEffectif(club, 1);
+        const objectif = objectifDuBoard(club, comp, 1);
+        const manager: Manager = {
+          nom: nom.trim() || (depuis?.nom ?? 'Entraîneur'),
+          nation,
+          age: age ?? (depuis ? depuis.age : 34),
+          club,
+          division: comp?.id ?? '',
+          divisionNom: comp?.nom ?? '',
+          saison: 1,
+          semaine: 1,
+          prestige,
+          // Un board recrute avec de l’espoir : on ne démarre pas sur la
+          // sellette, mais pas non plus intouchable.
+          confiance: 62,
+          objectif,
+          argent: 0,
+          contrat: { saisons: 3, salaire: salaireManager(force) },
+          clubs: [club],
+          titres: [],
+          palmares: [],
+          historique: [],
+          ...(depuis ? {
+            passeJoueur: {
+              nom: depuis.nom,
+              saisons: depuis.saisons,
+              note: Math.round(depuis.note),
+              reputation: Math.round(depuis.reputation),
+              matchs: depuis.matchsJoues,
+              essais: depuis.essais,
+              selections: 0,
+              titres: depuis.tropheeIds ?? [],
+              clubs: depuis.clubs ?? [],
+              ageDebut: depuis.age - depuis.saisons + 1,
+            },
+          } : {}),
+          ...(libre ? { libre: true } : {}),
+        };
+        set((s) => ({
+          manager,
+          joueur: null,
+          reconversionManager: null,
+          ecran: 'manager',
+          ecransVus: s.ecransVus.includes('manager') ? s.ecransVus : [...s.ecransVus, 'manager'],
+          journal: [{
+            id: idUnique(),
+            saison: 1,
+            role: 'mj' as const,
+            titre: '🧑‍🏫 Premier banc',
+            texte: `${manager.nom} prend ${club} (${manager.divisionNom}). `
+              + `Le board attend une place dans les ${objectif} premiers.`
+              + (libre
+                ? ` ⚠️ Carrière lancée en mode libre : elle n’entrera dans aucun classement.`
+                : ''),
+          }],
+        }));
+      },
+
+      signerBanc: (club) => {
+        const m = get().manager;
+        if (!m || !clubParNom(club)) return;
+        const comp = competitionDuClub(club);
+        const force = forceEffectif(club, m.saison);
+        // ⚠️ ON NE VÉRIFIE PAS SEULEMENT « le club existe » : un banc au-dessus
+        // de son prestige, c’est exactement le mode libre — et il se déclare à
+        // la création, pas en cours de route.
+        if (!m.libre && force > noteMaximale(m.prestige) + MARGE_AMBITION) return;
+        set({
+          manager: {
+            ...m,
+            club,
+            division: comp?.id ?? '',
+            divisionNom: comp?.nom ?? '',
+            objectif: objectifDuBoard(club, comp, m.saison),
+            confiance: 62,
+            contrat: { saisons: 3, salaire: salaireManager(force) },
+            clubs: m.clubs[m.clubs.length - 1] === club ? m.clubs : [...m.clubs, club],
+          },
+        });
+      },
+
+      semaineManager: () => {
+        const m = get().manager;
+        if (!m) return;
+        // Sans banc, le temps ne passe pas : on cherche un club.
+        if (!m.club) return;
+        if (m.semaine < SEMAINES_PAR_SAISON) {
+          set({ manager: { ...m, semaine: m.semaine + 1 } });
+          return;
+        }
+        get().saisonManager();
+      },
+
+      /**
+       * La fin de saison d’un entraîneur.
+       *
+       * ⚠️ LE RANG VIENT DU CHAMPIONNAT RÉELLEMENT JOUÉ (`rangFinal`), pas
+       * d’une estimation. C’est la même fonction que la carrière de joueur, et
+       * c’est la condition pour que le mode manager soit jugé sur le même
+       * monde : montées, générations dorées et effectifs vieillissants
+       * compris.
+       *
+       * ⚠️ ET LE BOARD JUGE SUR L’ÉCART À SON OBJECTIF, jamais sur le rang nu.
+       * Finir huitième avec le budget du dernier est un exploit ; finir
+       * troisième avec celui du premier est un échec. Sans cet écart, la seule
+       * stratégie serait de prendre le meilleur club accessible et d’y rester.
+       */
+      saisonManager: () => {
+        const m = get().manager;
+        if (!m || !m.club) return;
+        const rang = rangFinal(m.division, m.saison, m.club);
+        const py = resoudrePyramide(m.division, m.saison, m.club);
+        const monte = py.mouvements.some((x) => x.club === m.club && x.sens === 'montee');
+        const descendu = py.mouvements.some((x) => x.club === m.club && x.sens === 'descente');
+        const trophee = rang === 1 ? TROPHEE_PAR_DIVISION[m.division] : undefined;
+        const titres = trophee ? [trophee] : [];
+
+        const v = verdictDeSaison(rang, m.objectif, {
+          titres: titres.length, montee: monte, descente: descendu,
+        });
+        const { prestige, confiance } = appliquerVerdict(m, v);
+
+        const ligne: SaisonManager = {
+          saison: m.saison, club: m.club, division: m.division,
+          divisionNom: m.divisionNom, rang, objectif: m.objectif,
+          tenu: v.tenu, titres,
+          ...(monte ? { montee: true } : {}),
+          ...(descendu ? { descente: true } : {}),
+        };
+
+        // ⚠️ LE LICENCIEMENT EST LE SEUL VRAI RISQUE DU MODE, et il doit être
+        // lisible : la confiance se lit toute la saison, elle ne tombe pas par
+        // surprise à la sirène. Un contrat qui expire ne protège de rien.
+        const licencie = confiance < CONFIANCE_LICENCIEMENT;
+        const saisonsContrat = Math.max(0, (m.contrat?.saisons ?? 1) - 1);
+
+        const suivant: Manager = {
+          ...m,
+          saison: m.saison + 1,
+          semaine: 1,
+          age: m.age + 1,
+          prestige,
+          confiance: licencie ? 62 : confiance,
+          argent: m.argent + (m.contrat?.salaire ?? 0),
+          titres: trophee ? [...m.titres, `${nomDivision(m.division)} (S${m.saison})`] : m.titres,
+          palmares: trophee
+            ? [...m.palmares, {
+              trophee, nom: TROPHEES[trophee]?.nom ?? trophee,
+              saison: m.saison, club: m.club, division: m.division,
+            }]
+            : m.palmares,
+          historique: [...m.historique, { ...ligne, ...(licencie ? { licencie: true } : {}) }],
+          // Sans banc, le temps s’arrête : on cherche un club avant de repartir.
+          club: licencie ? '' : m.club,
+          division: licencie ? '' : m.division,
+          divisionNom: licencie ? '' : m.divisionNom,
+          contrat: licencie ? null : { saisons: saisonsContrat, salaire: m.contrat?.salaire ?? 0 },
+          objectif: licencie ? 0
+            : objectifDuBoard(m.club, competitionDuClub(m.club), m.saison + 1),
+        };
+
+        set((st) => ({
+          manager: suivant,
+          journal: [...st.journal, {
+            id: idUnique(),
+            saison: m.saison,
+            role: 'mj' as const,
+            titre: licencie
+              ? '📉 Le board te remercie'
+              : `📋 Bilan de la saison ${m.saison}`,
+            texte: `${m.club} finit ${rang}ᵉ (objectif : ${m.objectif}ᵉ).`
+              + (trophee ? ' 🏆 Champion !' : '')
+              + (monte ? ' ⬆️ Montée.' : '')
+              + (descendu ? ' ⬇️ Descente.' : '')
+              + ` Prestige ${prestige.toFixed(0)}/100.`
+              + (licencie
+                ? ' Tu es libre : cherche un nouveau banc.'
+                : ` Confiance du board : ${confiance}/100.`),
+          }],
+        }));
+      },
+
+      quitterBanc: () => {
+        const m = get().manager;
+        if (!m) return;
+        // ⚠️ LE MODE LIBRE N’ENVOIE RIEN, ET C’EST LE SEUL ENDROIT QUI DÉCIDE.
+        // Demande explicite : « mode triche […] donc pas dans le classement
+        // mondial ». Le verrou est ici, pas dans `ficheDepuisManager` : une
+        // fonction pure qui refuserait de produire une fiche selon un drapeau
+        // se contournerait en retirant le drapeau.
+        if (!m.libre) get().publierAuClassement(true);
+        setMouvementsClubs({});
+        oublierResultats();
+        setContexteJoueur('', 0);
+        set((s) => ({
+          manager: null,
+          mouvementsClubs: {},
+          journal: [],
+          ecran: 'pantheon',
+          ecransVus: s.ecransVus.includes('pantheon') ? s.ecransVus : [...s.ecransVus, 'pantheon'],
         }));
       },
 
@@ -4567,7 +4839,15 @@ export interface BilanSaison {
   competition: string;
   taillePoule: number;
   enChampionsCup: boolean; // le club dispute la Champions Cup
-  selectionne6N: boolean; // le joueur est retenu pour le Tournoi
+  /**
+   * L’id du tournoi de sélections RÉELLEMENT disputé, s’il y en a un.
+   * ⚠️ Un id, plus un booléen : un Sud-Africain joue le Rugby Championship,
+   * pas le Tournoi des 6 Nations, et le jeu lui décernait quand même le titre
+   * de meilleur joueur des 6 Nations (bug signalé en jeu).
+   */
+  tournoiId?: string;
+  /** Niveau de la compétition de club (0 = élite). Décide de la vitrine mondiale. */
+  niveau: number;
 }
 
 /**
@@ -4684,7 +4964,7 @@ function resoudreTrophees(
   const selectionne = capesSaison > 0 || convocation(j, 0.5, saisonEcoulee).selectionne;
 
   const sonTournoi = competitionDeSaNation(nation, saisonEcoulee, 'tournoi');
-  const selectionne6N = selectionne && !!sonTournoi;
+  const tournoiId = selectionne && sonTournoi ? sonTournoi.id : undefined;
   if (sonTournoi && selectionne) {
     const trophee = TROPHEE_PAR_INTERNATIONAL[sonTournoi.id];
     if (trophee && vainqueurInternational(sonTournoi.id, saisonEcoulee) === nation) {
@@ -4723,7 +5003,8 @@ function resoudreTrophees(
     competition: divisionId,
     taillePoule: taille,
     enChampionsCup,
-    selectionne6N,
+    ...(tournoiId ? { tournoiId } : {}),
+    niveau: division?.niveau ?? 10,
   };
 }
 

@@ -30,10 +30,16 @@ create table if not exists classement (
   -- théorique maximale du jeu. Une valeur au-dessus est mathématiquement
   -- impossible — la base elle-même la refuse, même si le code se trompait.
   -- ⚠️ Il a changé deux fois : 64 488 → 82 488 avec les distinctions
-  -- individuelles (4 → 9 titres par saison), puis 82 488 → 82 500 quand
+  -- individuelles (4 → 9 titres par saison), puis 82 488 → 117 000 quand
   -- `noteMax` est passé de 99 à 100. À remettre à jour à chaque retouche de
   -- `LIMITES`, sinon la base rejette des scores légitimes.
-  score    integer not null check (score >= 0 and score <= 82500),
+  -- ⚠️ TROISIÈME DÉPLACEMENT : le mode manager ajoute un second barème, et
+  --    une carrière « joueur + entraîneur » cumule les deux versants.
+  --    82 500 → 117 000. Sur une base déjà en ligne :
+  --      alter table classement drop constraint classement_score_check;
+  --      alter table classement add constraint classement_score_check
+  --        check (score >= 0 and score <= 117000);
+  score    integer not null check (score >= 0 and score <= 117000),
   cree_le  timestamptz not null default now(),
   maj_le   timestamptz not null default now()
 );

@@ -472,7 +472,10 @@ export type Ecran =
   | 'championnats'
   | 'effectif'
   | 'tableau'
-  | 'social';
+  | 'social'
+  // ── Le mode manager ─────────────────────────────────────────────────
+  | 'creationManager'
+  | 'manager';
 
 // ---------------------------------------------------------------------------
 // CLUBS & CHAMPIONNATS
@@ -531,6 +534,104 @@ export interface CompetitionNations {
   emoji: string;
   desc: string;
   classement: LigneClassement[];
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// LE MODE MANAGER
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Ce qu’une carrière a été. C’est ÇA qui la classe.
+ *
+ * Demande explicite : « faire plusieurs classements de catégories, et un
+ * classement total comprenant les carrières sans entraîneur, juste
+ * entraîneur, et avec entraîneur/joueur ».
+ *
+ * ⚠️ ELLE EST FACULTATIVE PARTOUT, et se lit `?? 'joueur'`. Toutes les fiches
+ * déjà envoyées au classement mondial en sont dépourvues : les refuser, ou
+ * les reclasser ailleurs, viderait le tableau existant.
+ *
+ * ⚠️ ET ELLE EST DÉFINIE DANS `lib/classementMondial.ts`, PAS ICI. Ce
+ * fichier-là doit rester copiable tel quel dans une Edge Function : il ne peut
+ * pas importer le domaine du jeu. On le réexporte donc, pour que le reste du
+ * code continue de lire ses types au même endroit.
+ */
+export type { CategorieCarriere } from './lib/classementMondial';
+
+/** Une saison d’entraîneur, telle que le board l’a jugée. */
+export interface SaisonManager {
+  saison: number;
+  club: string;
+  division: string;
+  divisionNom: string;
+  /** Le rang obtenu dans la poule. */
+  rang: number;
+  /** Le rang que le board avait demandé. */
+  objectif: number;
+  tenu: boolean;
+  /** Ids de trophées (`data/trophees.ts`). */
+  titres: string[];
+  montee?: boolean;
+  descente?: boolean;
+  /** Le club a-t-il remercié son entraîneur à la fin de cette saison ? */
+  licencie?: boolean;
+}
+
+export interface Manager {
+  nom: string;
+  nation: string;
+  age: number;
+  /** Vide entre deux clubs : un entraîneur au chômage reste un entraîneur. */
+  club: string;
+  division: string;
+  divisionNom: string;
+  saison: number;
+  semaine: number;
+  /**
+   * 0 à 100. La seule jauge qui ouvre des portes (`lib/manager.ts`).
+   *
+   * ⚠️ UNE SEULE, PAS TROIS. « Expérience », « réputation » et « palmarès »
+   * auraient dit la même chose trois fois, avec trois équilibrages à tenir.
+   */
+  prestige: number;
+  /** 0 à 100. Celle du board, et elle se perd vite. */
+  confiance: number;
+  /** Le rang demandé cette saison. */
+  objectif: number;
+  argent: number;
+  contrat: { saisons: number; salaire: number } | null;
+  /** Tous les clubs entraînés, dans l’ordre, sans doublon consécutif. */
+  clubs: string[];
+  titres: string[];
+  palmares: TitreGagne[];
+  historique: SaisonManager[];
+  /**
+   * Le passé de joueur, quand la carrière vient d’une reconversion.
+   *
+   * ⚠️ C’EST LUI QUI FAIT LA CATÉGORIE « joueur + entraîneur », et c’est lui
+   * qui a ouvert de meilleurs clubs au premier jour (`prestigeDepuisJoueur`).
+   */
+  passeJoueur?: {
+    nom: string;
+    saisons: number;
+    note: number;
+    reputation: number;
+    matchs: number;
+    essais: number;
+    selections: number;
+    titres: string[];
+    clubs: string[];
+    ageDebut: number;
+  };
+  /**
+   * ⚠️ LE MODE LIBRE, ET CE QU’IL COÛTE. Demande : « sinon mettre un mode
+   * triche où on peut partir avec n’importe quel club, mais donc pas dans le
+   * classement mondial ». Le drapeau est posé À LA CRÉATION et ne s’enlève
+   * jamais : une carrière lancée au Stade Toulousain avec zéro prestige ne
+   * redevient pas légitime parce qu’on a gagné ensuite.
+   */
+  libre?: boolean;
+  pseudo?: string;
 }
 
 // Une carrière figée dans le Hall des Légendes.

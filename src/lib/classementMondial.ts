@@ -62,6 +62,16 @@
  * affichée sur l'écran Classement, et son sceau ne correspondrait plus. Comme
  * le jeu et l'API sont déployés ensemble, le basculement est atomique.
  */
+/**
+ * Ce qu’une carrière a été.
+ *
+ * ⚠️ DÉCLARÉ ICI, PAS IMPORTÉ DE types.ts, et c’est la règle du fichier : il
+ * doit rester copiable tel quel dans une Edge Function. Un seul import de
+ * VALEUR depuis le jeu, et le serveur traîne tout le domaine derrière lui.
+ * types.ts réexporte donc ce type-là, il ne le définit pas.
+ */
+export type CategorieCarriere = 'joueur' | 'entraineur' | 'joueurEntraineur';
+
 export const VERSION_BAREME = 2;
 
 export interface FicheCarriere {
@@ -120,8 +130,35 @@ export interface FicheCarriere {
    * l'ancienne identité (le pseudo).
    */
   cle?: string;
+  /**
+   * Ce qu’a été cette carrière — et donc dans quel tableau elle entre.
+   *
+   * ⚠️ FACULTATIVE, ET ELLE LE RESTERA. Toutes les fiches déjà en base en
+   * sont dépourvues : elles se lisent `?? 'joueur'`. Exiger le champ aurait
+   * vidé le classement existant du jour au lendemain.
+   */
+  categorie?: CategorieCarriere;
+  /**
+   * Le versant entraîneur, quand il existe.
+   *
+   * ⚠️ UN OBJET À PART, PAS DES CHAMPS À PLAT. Un entraîneur n’a ni essais ni
+   * plaquages, et un joueur n’a ni montées ni prestige : les mélanger dans la
+   * même liste de nombres obligerait à écrire « 0 » partout et à deviner, à
+   * la lecture, lesquels comptent. Ici, sa présence EST l’information.
+   */
+  manager?: FicheManager;
   /** Le score annoncé par le client. Le serveur le RECALCULE et compare. */
   score: number;
+}
+
+export interface FicheManager {
+  saisons: number;
+  /** Ids de trophées gagnés SUR LE BANC. */
+  titres: string[];
+  montees: number;
+  /** 0 à 100, la jauge de `lib/manager.ts`. */
+  prestige: number;
+  clubs: string[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -132,7 +169,7 @@ export interface FicheCarriere {
  * LE score. C'est la seule définition qui existe dans tout le projet :
  * `scoreCarriere()` (store) et le serveur passent tous les deux par ici.
  */
-export function scoreDeLaFiche(f: Pick<
+export function scoreJoueur(f: Pick<
   FicheCarriere, 'note' | 'reputation' | 'saisons' | 'titres' | 'essais' | 'matchs'
 >): number {
   return Math.round(
@@ -143,6 +180,63 @@ export function scoreDeLaFiche(f: Pick<
     + f.essais * 6
     + f.matchs * 2,
   );
+}
+
+/**
+ * Le versant entraîneur.
+ *
+ * ⚠️ IL NE PEUT PAS RÉUTILISER LE BARÈME DU JOUEUR, et c’est la raison d’être
+ * des catégories. Celui-ci compte des essais et des matchs : appliqué à un
+ * entraîneur, il rendrait zéro quel que soit son palmarès. Ici, ce sont les
+ * TITRES, les MONTÉES et le prestige atteint qui font la carrière — c’est-à-
+ * dire ce qu’un entraîneur laisse derrière lui.
+ *
+ * ⚠️ ET LES DEUX ÉCHELLES ONT ÉTÉ CALÉES L’UNE SUR L’AUTRE : une très belle
+ * carrière de joueur et une très belle carrière d’entraîneur tombent dans le
+ * même ordre de grandeur (~4 000), sinon le classement TOTAL n’aurait été
+ * qu’un classement de l’une des deux.
+ */
+export function scoreManager(m: FicheManager | undefined): number {
+  if (!m) return 0;
+  return Math.round(
+    m.saisons * 30
+    + m.titres.length * 150
+    + m.montees * 90
+    + m.prestige * 12
+    + m.clubs.length * 15,
+  );
+}
+
+/**
+ * LE score — les deux versants additionnés.
+ *
+ * ⚠️ UNE CARRIÈRE DE JOUEUR SEULE GARDE EXACTEMENT SON SCORE D’AVANT :
+ * `manager` est absent, `scoreManager` rend 0, et l'addition ne change rien.
+ * C’était la condition pour ne pas rebattre le classement existant.
+ */
+export function scoreDeLaFiche(f: Pick<
+  FicheCarriere, 'note' | 'reputation' | 'saisons' | 'titres' | 'essais' | 'matchs'
+> & { manager?: FicheManager }): number {
+  return scoreJoueur(f) + scoreManager(f.manager);
+}
+
+/**
+ * La catégorie d’une fiche, déduite de ce qu’elle contient.
+ *
+ * ⚠️ ON NE FAIT PAS CONFIANCE AU CHAMP `categorie` POUR CLASSER. Il est écrit
+ * par le client : annoncer « entraîneur » sur une fiche de joueur mettrait
+ * une carrière dans le mauvais tableau. La vérité, c’est la présence du
+ * versant manager et celle de matchs joués — deux faits que `verifierFiche`
+ * borne déjà.
+ */
+export function categorieDeLaFiche(f: Pick<FicheCarriere, 'matchs'> & {
+  manager?: FicheManager;
+}): CategorieCarriere {
+  const entraine = !!f.manager && f.manager.saisons > 0;
+  const joue = f.matchs > 0;
+  if (entraine && joue) return 'joueurEntraineur';
+  if (entraine) return 'entraineur';
+  return 'joueur';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -198,6 +292,34 @@ export const LIMITES = {
    * pire qu'une borne large.
    */
   titresParSaison: 9,
+  /**
+   * ⚠️ UN ENTRAÎNEUR NE RACCROCHE PAS À 44 ANS. `ageMax` borne la carrière de
+   * JOUEUR (`AGE_RETRAITE_FORCEE`) ; appliquée telle quelle à un banc, elle
+   * refuserait toute reconversion — un joueur qui arrête à 36 ans et entraîne
+   * quinze saisons finit à 51. Soixante-dix ans, c’est la limite de ce qu’on
+   * a vu dans le métier, et elle borne aussi le nombre de saisons annonçables.
+   */
+  ageManagerMax: 70,
+  /**
+   * ⚠️ ET `ageDebut` NE VEUT PAS DIRE LA MÊME CHOSE SUR UN BANC. Pour un
+   * joueur — et pour un ancien joueur devenu entraîneur — c'est l'âge de ses
+   * débuts SUR LE TERRAIN, donc 15 à 30. Pour quelqu'un qui n'a jamais joué,
+   * c'est l'âge de son premier banc, et personne ne prend un banc à 18 ans :
+   * `ficheDepuisManager` déduit ce champ de l'âge et du nombre de saisons, il
+   * vaut donc 30, 35, 40.
+   *
+   * Le banc d'essai a trouvé l'impasse tout de suite, et c'est EXACTEMENT le
+   * bug déjà payé une fois côté joueur (« ageDebut hors bornes », 21 refus sur
+   * 21) : sans ces deux bornes-là, **aucune carrière d'entraîneur pur n'entrait
+   * au classement**, jamais, et rien à l'écran ne l'aurait dit.
+   */
+  ageDebutManagerMin: 20,
+  ageDebutManagerMax: 60,
+  /** Championnat + coupe d’Europe + coupe nationale : trois, c’est déjà rare. */
+  titresManagerParSaison: 3,
+  /** On ne monte pas deux fois dans la même saison. */
+  monteesParSaison: 1,
+  prestigeMax: 100,
   /** Un international ne dépasse pas une douzaine de capes par an. */
   capesParSaison: 12,
   /**
@@ -237,14 +359,64 @@ export const LIMITES = {
 
 export const SAISONS_MAX = LIMITES.ageMax - LIMITES.ageDebutMin + 1;
 
-/** Le score le plus élevé qu'une carrière PUISSE atteindre en respectant les règles. */
+/**
+ * ⚠️ ET LE PLAFOND N’EST PAS LE MÊME SUR UN BANC. Une carrière qui commence à
+ * 15 ans et se termine à 70 fait 56 saisons — un joueur n’en fera jamais que
+ * 30. Utiliser `SAISONS_MAX` pour tout le monde refuserait toute reconversion
+ * un peu longue, en silence.
+ */
+export const SAISONS_MAX_MANAGER = LIMITES.ageManagerMax - LIMITES.ageDebutMin + 1;
+
+/** Le plafond de saisons applicable à une catégorie donnée. */
+export function saisonsMax(categorie: CategorieCarriere): number {
+  return categorie === 'joueur' ? SAISONS_MAX : SAISONS_MAX_MANAGER;
+}
+
+/** L’âge maximal applicable à une catégorie donnée. */
+export function ageMaxDe(categorie: CategorieCarriere): number {
+  return categorie === 'joueur' ? LIMITES.ageMax : LIMITES.ageManagerMax;
+}
+
+/**
+ * Les bornes de `ageDebut` applicables à une catégorie donnée.
+ *
+ * ⚠️ SEUL L'ENTRAÎNEUR PUR SORT DE LA FENÊTRE DU JOUEUR. Un « joueur +
+ * entraîneur » a commencé sa vie sur le terrain : ses bornes sont celles d'un
+ * joueur, et les élargir pour lui rouvrirait la porte qu'elles ferment.
+ */
+export function ageDebutBornes(categorie: CategorieCarriere): [number, number] {
+  return categorie === 'entraineur'
+    ? [LIMITES.ageDebutManagerMin, LIMITES.ageDebutManagerMax]
+    : [LIMITES.ageDebutMin, LIMITES.ageDebutMax];
+}
+
+/**
+ * Le score le plus élevé qu'une carrière PUISSE atteindre en respectant les
+ * règles.
+ *
+ * ⚠️ IL A CHANGÉ AVEC LE MODE MANAGER, DONC LE `check` SQL AUSSI. La colonne
+ * `score` porte une contrainte en dur (`serveur/schema-vercel.sql` et
+ * `serveur/schema.sql`) : la laisser derrière ferait refuser par la base des
+ * scores que le jeu produit — c’est déjà arrivé deux fois.
+ *
+ * ⚠️ ET C’EST BIEN UNE CARRIÈRE « joueur + entraîneur » qui le fixe : elle
+ * cumule les deux versants. Un joueur seul ne peut pas l’atteindre, et c’est
+ * normal — le plafond borne le pire cas, pas le cas courant.
+ */
 export const SCORE_MAX = scoreDeLaFiche({
   note: LIMITES.noteMax,
   reputation: LIMITES.reputationMax,
-  saisons: SAISONS_MAX,
+  saisons: SAISONS_MAX_MANAGER,
   titres: new Array(SAISONS_MAX * LIMITES.titresParSaison).fill('brennus'),
   essais: SAISONS_MAX * LIMITES.matchsParSaison * LIMITES.essaisParMatch,
   matchs: SAISONS_MAX * LIMITES.matchsParSaison,
+  manager: {
+    saisons: SAISONS_MAX_MANAGER,
+    titres: new Array(SAISONS_MAX_MANAGER * LIMITES.titresManagerParSaison).fill('brennus'),
+    montees: SAISONS_MAX_MANAGER * LIMITES.monteesParSaison,
+    prestige: LIMITES.prestigeMax,
+    clubs: new Array(SAISONS_MAX_MANAGER + 1).fill('club'),
+  },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -305,9 +477,27 @@ export function verifierFiche(f: unknown, trophees?: Iterable<string>): Verdict 
   if (typeof c.poste !== 'string' || !c.poste) rejet('poste absent');
   if (typeof c.nation !== 'string' || !c.nation) rejet('nation absente');
 
-  const saisons = entier(c.saisons, 'saisons', 1, SAISONS_MAX);
-  const ageDebut = entier(c.ageDebut, 'ageDebut', LIMITES.ageDebutMin, LIMITES.ageDebutMax);
-  const age = entier(c.age, 'age', LIMITES.ageDebutMin, LIMITES.ageMax);
+  // ⚠️ LA CATÉGORIE SE DÉDUIT, ELLE NE SE CROIT PAS. Le champ `categorie` est
+  // écrit par le client : s’y fier pour choisir les bornes laisserait annoncer
+  // « entraîneur » sur une fiche de joueur pour gagner vingt-six saisons de
+  // marge. C’est la PRÉSENCE d’un versant manager qui tranche, et elle est
+  // bornée juste en dessous.
+  const versant = c.manager;
+  if (versant !== undefined && (typeof versant !== 'object' || versant === null)) {
+    rejet('versant entraîneur illisible');
+  }
+  const m = (typeof versant === 'object' && versant !== null ? versant : undefined) as
+    Partial<FicheManager> | undefined;
+  const categorie: CategorieCarriere = m ? (Number(c.matchs) > 0
+    ? 'joueurEntraineur' : 'entraineur') : 'joueur';
+  if (c.categorie !== undefined && c.categorie !== categorie) {
+    rejet(`catégorie annoncée « ${String(c.categorie)} », déduite « ${categorie} »`);
+  }
+
+  const saisons = entier(c.saisons, 'saisons', 1, saisonsMax(categorie));
+  const [debutMin, debutMax] = ageDebutBornes(categorie);
+  const ageDebut = entier(c.ageDebut, 'ageDebut', debutMin, debutMax);
+  const age = entier(c.age, 'age', debutMin, ageMaxDe(categorie));
   const note = entier(c.note, 'note', 0, LIMITES.noteMax);
   const reputation = entier(c.reputation, 'reputation', 0, LIMITES.reputationMax);
   const matchs = entier(c.matchs, 'matchs', 0, SAISONS_MAX * LIMITES.matchsParSaison);
@@ -326,6 +516,25 @@ export function verifierFiche(f: unknown, trophees?: Iterable<string>): Verdict 
   const clubs = Array.isArray(c.clubs) ? c.clubs : [];
   if (clubs.some((v) => typeof v !== 'string' || !v.trim())) rejet('un club est vide ou n\'est pas un texte');
   if (clubs.some((v) => typeof v === 'string' && v.length > LIMITES.clubMax)) rejet('un nom de club est trop long');
+
+  // --- LE VERSANT ENTRAÎNEUR -----------------------------------------------
+  let saisonsM = 0;
+  let titresM: string[] = [];
+  let monteesM = 0;
+  let prestigeM = 0;
+  let clubsM: string[] = [];
+  if (m) {
+    saisonsM = entier(m.saisons, 'saisons entraîneur', 1, SAISONS_MAX_MANAGER);
+    monteesM = entier(m.montees, 'montées', 0, SAISONS_MAX_MANAGER);
+    prestigeM = entier(m.prestige, 'prestige', 0, LIMITES.prestigeMax);
+    if (!Array.isArray(m.titres)) rejet('titres entraîneur : ce n’est pas une liste');
+    titresM = Array.isArray(m.titres) ? m.titres : [];
+    if (titresM.some((t) => typeof t !== 'string')) rejet('un titre entraîneur n’est pas un identifiant');
+    if (!Array.isArray(m.clubs)) rejet('clubs entraîneur : ce n’est pas une liste');
+    clubsM = Array.isArray(m.clubs) ? m.clubs : [];
+    if (clubsM.some((v) => typeof v !== 'string' || !v.trim())) rejet('un club entraîné est vide');
+    if (clubsM.some((v) => typeof v === 'string' && v.length > LIMITES.clubMax)) rejet('un nom de club entraîné est trop long');
+  }
 
   // Une anomalie de type rend la suite ininterprétable : on s'arrête là.
   if (anomalies.length) return { valide: false, score: 0, anomalies };
@@ -380,16 +589,51 @@ export function verifierFiche(f: unknown, trophees?: Iterable<string>): Verdict 
   // Un titre se gagne avec une équipe : il faut avoir joué.
   if (matchs === 0 && titres.length > 0) rejet('des titres sans le moindre match');
 
+  // --- La cohérence du versant entraîneur -----------------------------------
+  if (m) {
+    // ⚠️ LE TOTAL BORNE LES DEUX VERSANTS. Une carrière de trente saisons dont
+    // vingt sur le banc en a joué dix, pas trente : sans ce test, on annonçait
+    // « 30 saisons de joueur ET 30 saisons d’entraîneur » dans la même vie.
+    if (saisonsM > saisons) {
+      rejet(`${saisonsM} saisons d’entraîneur pour ${saisons} saison(s) de carrière`);
+    }
+    if (titresM.length > saisonsM * LIMITES.titresManagerParSaison) {
+      rejet(`${titresM.length} titres d’entraîneur en ${saisonsM} saison(s) :`
+        + ` maximum ${saisonsM * LIMITES.titresManagerParSaison}`);
+    }
+    const parTropheeM = new Map<string, number>();
+    for (const t of titresM) parTropheeM.set(t, (parTropheeM.get(t) ?? 0) + 1);
+    const repetesM = [...parTropheeM].filter(([, n]) => n > saisonsM);
+    if (repetesM.length) {
+      rejet(`trophée(s) d’entraîneur gagné(s) plus d’une fois par saison : `
+        + repetesM.map(([id, n]) => `${id} ×${n}`).join(', '));
+    }
+    if (monteesM > saisonsM * LIMITES.monteesParSaison) {
+      rejet(`${monteesM} montées en ${saisonsM} saison(s)`);
+    }
+    // On ne change pas de banc plus d’une fois par saison.
+    if (clubsM.length > saisonsM + 1) {
+      rejet(`${clubsM.length} clubs entraînés en ${saisonsM} saison(s)`);
+    }
+    if (clubsM.length === 0) rejet('aucun club entraîné : un entraîneur entraîne quelque part');
+  }
+
   // --- Les titres doivent EXISTER ------------------------------------------
   // Sans ça, on annonce quarante titres inventés et le compteur × 120 s'envole.
   if (trophees) {
     const connus = new Set(trophees);
-    const inconnus = [...new Set(titres.filter((t) => !connus.has(t)))];
+    const inconnus = [...new Set([...titres, ...titresM].filter((t) => !connus.has(t)))];
     if (inconnus.length) rejet(`trophée(s) inconnu(s) : ${inconnus.join(', ')}`);
   }
 
   // --- Enfin : le score annoncé doit être CELUI QU'ON RECALCULE -------------
-  const score = scoreDeLaFiche({ note, reputation, saisons, titres, essais, matchs });
+  const score = scoreDeLaFiche({
+    note, reputation, saisons, titres, essais, matchs,
+    manager: m ? {
+      saisons: saisonsM, titres: titresM, montees: monteesM,
+      prestige: prestigeM, clubs: clubsM,
+    } : undefined,
+  });
   if (typeof c.score !== 'number' || Math.round(c.score) !== score) {
     rejet(`score annoncé ${String(c.score)}, score recalculé ${score}`);
   }
@@ -432,6 +676,18 @@ export function canonique(f: FicheCarriere): string {
     // `?? []` : le sceau ne doit jamais LEVER sur une fiche malformée — c'est
     // `verifierFiche` qui refuse, proprement et avec un motif.
     (f.clubs ?? []).join(','),
+    // ⚠️ LE VERSANT ENTRAÎNEUR N’ALLONGE LA CHAÎNE QUE S’IL EXISTE. Ajouter
+    // deux champs vides pour tout le monde aurait changé le sceau de TOUTES
+    // les sauvegardes de joueur déjà scellées, et le jeu les aurait lues
+    // comme retouchées à la main. Une fiche de joueur produit exactement la
+    // même chaîne qu’avant.
+    ...(f.manager ? [
+      f.manager.saisons,
+      [...f.manager.titres].sort().join(','),
+      f.manager.montees,
+      f.manager.prestige,
+      f.manager.clubs.join(','),
+    ] : []),
     f.score,
   ].join('|');
 }
@@ -480,7 +736,7 @@ export const RECOMMANDATIONS_SERVEUR_LISTE = [
 // côté serveur. Si tu le copies dans une Edge Function, tu peux supprimer cette
 // section — le serveur reçoit une fiche déjà faite, il n'a qu'à la vérifier.
 
-import type { Joueur, LegendeSauvegardee } from '../types';
+import type { Joueur, LegendeSauvegardee, Manager } from '../types';
 
 function moyenne(valeurs: number[]): number {
   return Math.round(valeurs.reduce((a, b) => a + b, 0) / (valeurs.length || 1));
@@ -491,7 +747,14 @@ export function ficheDepuisJoueur(j: Joueur, pseudo?: string, cle?: string): Fic
   const saisons = Math.max(1, j.saison);
   const base = {
     v: VERSION_BAREME,
-    pseudo: (pseudo ?? j.pseudo ?? j.nom).slice(0, LIMITES.pseudoMax),
+    // ⚠️ LE NOM DU PERSONNAGE, PAS SON IDENTIFIANT 𝕏. La chaîne passait par
+    // `j.pseudo` avant `j.nom` — or `j.pseudo` est le handle de L'Ovale
+    // (`colin_gomez_12`, et `anonyme_59` quand le champ nom était laissé vide).
+    // Le classement mondial affichait donc tout le monde sous un identifiant
+    // technique, et personne ne s'y reconnaissait. Retour de jeu : « si on ne
+    // met pas de nom à la création, on n'apparaît pas dans le classement ».
+    // Seul un pseudo CHOISI exprès (`pseudoClassement`) passe devant le nom.
+    pseudo: (pseudo || j.nom || j.pseudo || 'Sans nom').slice(0, LIMITES.pseudoMax),
     nom: j.nom,
     poste: j.poste,
     nation: j.nation,
@@ -568,4 +831,63 @@ export function ficheDepuisLegende(
     clubs: l.clubs?.length ? l.clubs : ['-'],
   };
   return { ...base, score: scoreDeLaFiche(base) };
+}
+
+/**
+ * La fiche d’une carrière d’ENTRAÎNEUR — en cours ou terminée.
+ *
+ * ⚠️ ELLE PORTE LES DEUX VERSANTS, et c’est ce qui rend les catégories
+ * possibles. Un entraîneur qui a d’abord été joueur garde son passé de joueur
+ * dans les champs du haut (`matchs`, `essais`, `note`…) : `categorieDeLaFiche`
+ * y lit « joueur + entraîneur », et son score additionne les deux barèmes.
+ * Un entraîneur qui n’a jamais joué laisse ces champs à zéro, et tombe dans la
+ * catégorie « entraîneur ».
+ *
+ * ⚠️ ET UNE CARRIÈRE EN MODE LIBRE NE PRODUIT PAS DE FICHE DU TOUT. Ce n’est
+ * pas à cette fonction de le savoir — c’est au store de ne pas l’appeler
+ * (`publierAuClassement`). Une fonction pure qui rendrait `null` selon un
+ * drapeau se contournerait en retirant le drapeau ; le vrai verrou est de ne
+ * jamais envoyer.
+ */
+export function ficheDepuisManager(
+  m: Manager, pseudo?: string, cle?: string,
+): FicheCarriere {
+  const passe = m.passeJoueur;
+  const saisonsManager = Math.max(1, m.saison);
+  // Une saison de jeu = un an de vie : le total est la somme des deux vies.
+  const saisons = (passe?.saisons ?? 0) + saisonsManager;
+  const base = {
+    v: VERSION_BAREME,
+    pseudo: (pseudo ?? m.pseudo ?? m.nom).slice(0, LIMITES.pseudoMax),
+    nom: m.nom,
+    // ⚠️ `poste` NE PEUT PAS ÊTRE VIDE — `verifierFiche` le refuse, et il a
+    // raison : c’est un champ affiché tel quel sur la fiche de tout le monde.
+    // Un entraîneur n’a pas de poste, il a une fonction.
+    poste: 'entraineur',
+    nation: m.nation,
+    ageDebut: m.age - saisons + 1,
+    age: m.age,
+    saisons,
+    note: passe?.note ?? 0,
+    reputation: passe?.reputation ?? 0,
+    matchs: passe?.matchs ?? 0,
+    essais: passe?.essais ?? 0,
+    selections: passe?.selections ?? 0,
+    titres: passe?.titres ?? [],
+    // Les clubs affichés sont ceux de toute la vie : joués puis entraînés.
+    clubs: [...(passe?.clubs ?? []), ...m.clubs].filter((v, i, l) => v && l.indexOf(v) === i),
+    manager: {
+      saisons: saisonsManager,
+      titres: m.palmares.map((t) => t.trophee),
+      montees: m.historique.filter((h) => h.montee).length,
+      prestige: Math.round(m.prestige),
+      clubs: m.clubs,
+    },
+    ...(cle ? { cle } : {}),
+  };
+  return {
+    ...base,
+    categorie: categorieDeLaFiche(base),
+    score: scoreDeLaFiche(base),
+  };
 }

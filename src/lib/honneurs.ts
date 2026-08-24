@@ -42,7 +42,7 @@ import type { PosteId, StatsDetaillees } from '../types';
 import { graine } from './championnat';
 import { PROFILS } from './statsJoueurs';
 import {
-  HONNEUR_CHAMPIONS_CUP, HONNEUR_FINALE_MONDE, HONNEUR_MONDIAL, HONNEUR_TOURNOI,
+  HONNEUR_CHAMPIONS_CUP, HONNEUR_FINALE_MONDE, HONNEUR_MONDIAL, HONNEUR_PAR_INTERNATIONAL,
   MEILLEUR_JOUEUR_PAR_DIVISION, TROPHEES,
 } from '../data/trophees';
 
@@ -71,8 +71,27 @@ export interface SaisonJugee {
   competition: string;
   /** Le club dispute la Champions Cup cette saison. */
   championsCup: boolean;
-  /** Le joueur est retenu en sélection pour le Tournoi. */
-  tournoi: boolean;
+  /**
+   * L’id de la compétition de sélections que le joueur a DISPUTÉE cette
+   * saison (`sixNations`, `rugbyChampionship`, `recEurope`…), ou rien.
+   *
+   * ⚠️ UN IDENTIFIANT, PLUS UN BOOLÉEN, et c’est la correction d’un bug de
+   * jeu : « j’ai gagné les Six Nations meilleur joueur en étant sud-africain ».
+   * `tournoi: boolean` disait « il a joué la compétition de sa fenêtre de
+   * février » et on en déduisait le Tournoi des 6 Nations — alors qu’un
+   * Springbok y joue le Rugby Championship et un Portugais le Rugby Europe
+   * Championship. Un booléen ne peut pas porter cette information.
+   */
+  tournoiId?: string;
+  /**
+   * Le niveau de la compétition de club (0 = élite, 10 = Régionale 3).
+   *
+   * ⚠️ INDISPENSABLE À LA COURONNE MONDIALE, second bug du même retour :
+   * « j’ai gagné le meilleur joueur de l’année en étant en Nationale 2, 
+   * j’avais 9,6 de moyenne ». La note de saison est RELATIVE au groupe
+   * (`noterSaison`) : trop fort pour son étage, on frôle le 10 sans effort.
+   */
+  niveau: number;
   saison: number;
 }
 
@@ -82,6 +101,15 @@ export interface SaisonJugee {
 // Les quatre poids ci-dessous sont l'échelle entière. La note de saison pèse à
 // elle seule les deux tiers : c'est voulu, c'est la mesure la plus complète
 // dont on dispose, et les trois autres ne font que la nuancer.
+
+/**
+ * Le niveau de compétition le plus bas encore considéré comme professionnel.
+ * ⚠️ C’EST LA MÊME COUPURE QUE LE MOTEUR DE MATCH (`NiveauMatch`) : Top 14,
+ * Pro D2, Nationale et championnats étrangers d’un côté, Nationale 2 et tout
+ * le monde amateur de l’autre. Deux coupures différentes finiraient par se
+ * contredire.
+ */
+const NIVEAU_PRO_MAX = 3;
 
 const POIDS_NOTE = 7; // note /10 → 21 à 68,6
 const MAX_STATS = 16;
@@ -290,8 +318,10 @@ export function decernerHonneurs(s: SaisonJugee): Honneur[] {
   // 2. La coupe d'Europe — il faut y avoir joué.
   tenter(HONNEUR_CHAMPIONS_CUP, BARRES.championsCup, 'championsCup', s.championsCup);
 
-  // 3. Le Tournoi — il faut avoir été sélectionné.
-  tenter(HONNEUR_TOURNOI, BARRES.tournoi, 'tournoi', s.tournoi);
+  // 3. Le tournoi de sélections — celui qu’on a VRAIMENT disputé, et
+  //    seulement s’il élit un meilleur joueur (une compétition sur dix).
+  const honneurTournoi = s.tournoiId ? HONNEUR_PAR_INTERNATIONAL[s.tournoiId] : undefined;
+  tenter(honneurTournoi, BARRES.tournoi, 'tournoi', !!honneurTournoi);
 
   // 4. La finale de la Coupe du monde : on ne peut être homme du match d'une
   //    finale qu'on n'a pas jouée. Dans le jeu, on la joue quand on la gagne.
@@ -313,7 +343,17 @@ export function decernerHonneurs(s: SaisonJugee): Honneur[] {
   // du barème où une distinction en regarde une autre, et c'est volontaire —
   // c'est ce qui distingue « le meilleur joueur du monde » d'un cinquième vote
   // indépendant.
-  const vitrineMondiale = !!MEILLEUR_JOUEUR_PAR_DIVISION[s.competition] || s.championsCup || s.tournoi;
+  // ⚠️ ET LA VITRINE EXIGE DEUX CHOSES, PAS UNE. Le premier réglage se
+  // contentait de « il joue quelque part où le monde regarde », et une
+  // sélection nationale suffisait à l’ouvrir : un joueur de NATIONALE 2
+  // convoqué chez lui décrochait la couronne mondiale avec 9,6 de note de
+  // saison — une note qui ne dit que « il est trop fort pour sa poule ». On
+  // demande donc AUSSI de jouer dans un club professionnel : la coupure est
+  // celle du moteur de match (niveau ≤ 3, soit au-dessus de la Nationale 2).
+  const enPro = s.niveau <= NIVEAU_PRO_MAX;
+  const vitrine = !!MEILLEUR_JOUEUR_PAR_DIVISION[s.competition] || s.championsCup
+    || !!s.tournoiId;
+  const vitrineMondiale = vitrine && enPro;
   tenter(
     HONNEUR_MONDIAL, BARRES.mondial, 'mondial', s.titres.length > 0 && vitrineMondiale,
     obtenus.length * BONUS_PAR_DISTINCTION,

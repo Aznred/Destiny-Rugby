@@ -34,7 +34,13 @@ import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { Selecteur, type OptionSelecteur } from '../components/Selecteur';
 import { Confirmation } from '../components/Confirmation';
-import { semaine, libelleDate, libelleSemaine, CALENDRIER } from '../data/calendrier';
+import {
+  semaine, libelleDate, libelleSemaine, CALENDRIER, estAnneeDeCoupeDuMonde,
+} from '../data/calendrier';
+// ⚠️ La Coupe du monde est un TOURNOI à part (poules puis tableau), pas un
+// championnat : c'est `lib/mondial.ts` qui la tire, et son tirage est
+// déterministe — donc affichable avant même qu'elle ne se joue.
+import { mondialEnDirect } from '../lib/mondial';
 import {
   classementJoueurs, CATEGORIES, afficherValeur, libelleCategorie, nomPoste, type Categorie,
 } from '../lib/statsJoueurs';
@@ -353,7 +359,29 @@ export function Tableau() {
     for (const l of classementMondial(saison)) m.set(l.nation, l.rang);
     return m;
   }, [saison]);
-  const [classementMondialOuvert, setClassementMondialOuvert] = useState(false);
+  /**
+   * ⚠️ REPLIÉ PAR DÉFAUT, ET C’EST UN RETOUR EN ARRIÈRE ASSUMÉ.
+   *
+   * Le lot précédent l’avait ouvert d’office pour répondre à « le classement
+   * mondial doit bouger ». C’était la mauvaise lecture : ce qui manquait,
+   * c’était de VOIR qu’il bougeait, pas d’avoir vingt lignes de points en
+   * tête d’écran à chaque visite. Demande explicite : « faut que le
+   * classement points des nations soit caché, en mode un bouton pour le voir
+   * comme avant ». La ligne « ta sélection est Nᵉ » reste, elle : c’est un
+   * fait sur la carrière en cours, pas un annuaire.
+   */
+  const [vueMondiale, setVueMondiale] = useState<'ferme' | 'top' | 'tout'>('ferme');
+  const classementMondialOuvert = vueMondiale === 'tout';
+
+  // La Coupe du monde : sa saison, ses poules. Déterministe, donc lisible
+  // des années à l’avance — c’est tout l’intérêt (voir plus bas).
+  const [poulesMondialOuvertes, setPoulesMondialOuvertes] = useState(false);
+  const saisonMondial = useMemo(() => {
+    let sa = saison;
+    while (!estAnneeDeCoupeDuMonde(sa)) sa++;
+    return sa;
+  }, [saison]);
+  const mondialAVenir = useMemo(() => mondialEnDirect(saisonMondial, 0), [saisonMondial]);
   const maNation = nomNation(joueur?.nation ?? '');
   const maLigneMondiale = useMemo(
     () => rangMondial.find((ligne) => ligne.nation === maNation),
@@ -604,6 +632,7 @@ export function Tableau() {
               : t('intl.placesTop12', { places: maLigneMondiale.rang - 12 })}
           </p>
         )}
+        {vueMondiale !== 'ferme' && (
         <div className="classement-tableau tableau-live classement-mondial-selections">
           {rangMondial
             // Le haut du tableau, et MA nation même si elle est 60ᵉ : sans
@@ -631,9 +660,88 @@ export function Tableau() {
               );
             })}
         </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn fantome mini"
+            type="button"
+            onClick={() => setVueMondiale((v) => (v === 'ferme' ? 'top' : 'ferme'))}
+          >
+            {vueMondiale === 'ferme' ? t('intl.voirClassement') : t('intl.masquerClassement')}
+          </button>
+          {vueMondiale !== 'ferme' && (
+            <button
+              className="btn fantome mini"
+              type="button"
+              onClick={() => setVueMondiale((v) => (v === 'tout' ? 'top' : 'tout'))}
+            >
+              {vueMondiale === 'tout' ? t('intl.top12') : t('intl.nations', { n: rangMondial.length })}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ═══ LA COUPE DU MONDE, QU’ELLE SE JOUE OU NON ══════════════════
+          ⚠️ RETOUR DE JEU : « aucune trace de la Coupe du monde, on ne sait
+          pas quand elle va être ni les équipes qu’il y a ». Elle EXISTAIT et
+          se jouait bien (lot précédent) — mais uniquement à l’intérieur du
+          sélecteur de compétition, une saison sur quatre, pendant trois
+          semaines de novembre. Il fallait donc déjà savoir qu’elle avait lieu
+          pour aller la chercher : de l’extérieur, elle n’existait pas.
+
+          ⚠️ ET LE TIRAGE EST LISIBLE DES ANNÉES À L’AVANCE, parce qu’il est
+          DÉTERMINISTE (graine `mondial#saison`, lib/mondial.ts). Montrer les
+          quatre poules d’une édition qui n’a pas commencé n’est donc pas une
+          promesse en l’air : ce sont exactement les poules qui seront jouées.
+          C’est ce qui donne un horizon à une carrière de sélection. */}
+      <div className="carte bloc-competition">
+        <div className="comp-tete">
+          <b>🌍 {t('mond.titre')}</b>
+          <span className="comp-count">
+            {saisonMondial === joueur.saison
+              ? t('mond.cetteSaison')
+              : t('mond.dansNSaisons', { n: saisonMondial - joueur.saison, saison: saisonMondial })}
+          </span>
+        </div>
+        <p className="intro-comp">
+          {t('mond.format', { nations: mondialAVenir.poules.reduce((n, p) => n + p.equipes.length, 0) })}
+          {mondialAVenir.poules.some((p) => p.equipes.includes(maNation))
+            ? ` ${t('mond.tuYEs', { nation: nomNationTraduit(maNation) })}`
+            : ` ${t('mond.tuNyEsPas', { nation: nomNationTraduit(maNation) })}`}
+        </p>
+        {poulesMondialOuvertes && (
+          <div className="grille-poules">
+            {mondialAVenir.poules.map((p) => (
+              <div key={p.nom} className="carte bloc-competition">
+                <div className="comp-tete">
+                  <b>{p.nom}</b>
+                  <span className="comp-count">{t('intl.deuxQualifies')}</span>
+                </div>
+                <div className="classement-tableau tableau-live">
+                  {p.equipes.map((nation) => (
+                    <div
+                      key={nation}
+                      className="classement-ligne"
+                      data-moi={nation === maNation ? 'oui' : undefined}
+                    >
+                      <LogoEquipe nom={nation} taille={22} />
+                      <span className="cl-nom" style={{ gridColumn: 'span 3' }}>
+                        {nomNationTraduit(nation)}{nation === maNation && ' 🫵'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
-          <button className="btn fantome mini" type="button" onClick={() => setClassementMondialOuvert((o) => !o)}>
-            {classementMondialOuvert ? t('intl.masquerClassement') : t('intl.voirClassement')}
+          <button
+            className="btn fantome mini"
+            type="button"
+            onClick={() => setPoulesMondialOuvertes((o) => !o)}
+          >
+            {poulesMondialOuvertes ? t('mond.masquerPoules') : t('mond.voirPoules')}
           </button>
         </div>
       </div>

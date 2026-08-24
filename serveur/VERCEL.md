@@ -96,7 +96,7 @@ select table_name from information_schema.tables
 where table_schema = 'public' order by 1;
 ```
 
-⚠️ **Le plafond de la colonne `score` est en dur dans le schéma** (`82500`). Il
+⚠️ **Le plafond de la colonne `score` est en dur dans le schéma** (`117000`). Il
 vient de `SCORE_MAX` (`src/lib/classementMondial.ts`) : c'est la carrière
 théorique maximale du jeu. Si tu retouches un jour `LIMITES`, **remets cette
 valeur à jour**, sinon la base refusera des scores que le jeu produit

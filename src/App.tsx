@@ -30,6 +30,11 @@ const Championnats = lazy(() => import('./screens/Championnats').then((m) => ({ 
 const Effectif = lazy(() => import('./screens/Effectif').then((m) => ({ default: m.Effectif })));
 const Tableau = lazy(() => import('./screens/Tableau').then((m) => ({ default: m.Tableau })));
 const Social = lazy(() => import('./screens/Social').then((m) => ({ default: m.Social })));
+// ⚠️ LE MODE MANAGER EST CHARGÉ À LA DEMANDE, comme les autres écrans
+// secondaires : la création balaie les 855 clubs du jeu, et personne ne doit
+// payer ce code tant qu’il n’a pas choisi d’entraîner.
+const CreationManager = lazy(() => import('./screens/CreationManager').then((m) => ({ default: m.CreationManager })));
+const Manager = lazy(() => import('./screens/Manager').then((m) => ({ default: m.Manager })));
 // La cérémonie 3D tire tout Three.js derrière elle : on ne la charge qu'au
 // moment où un trophée est remporté (sinon elle alourdit le chunk principal).
 const TropheeGagne = lazy(() =>
@@ -50,6 +55,7 @@ function EcranEnRoute() {
 export default function App() {
   const ecran = useGame((s) => s.ecran);
   const joueur = useGame((s) => s.joueur);
+  const manager = useGame((s) => s.manager);
   const setEcran = useGame((s) => s.setEcran);
   const tropheesEnAttente = useGame((s) => s.tropheesEnAttente);
   const fermerTrophee = useGame((s) => s.fermerTrophee);
@@ -81,12 +87,15 @@ export default function App() {
   // Garde-fou : pas d'écran carrière/profil sans joueur.
   useEffect(() => {
     if (
-      (ecran === 'carriere' || ecran === 'profil' || ecran === 'effectif'
-        || ecran === 'tableau' || ecran === 'social') && !joueur
+      ((ecran === 'carriere' || ecran === 'profil' || ecran === 'social') && !joueur)
+      // ⚠️ `tableau` et `effectif` servent AUSSI au mode manager : les renvoyer
+      //    à l’accueil dès que `joueur` est nul enfermait l’entraîneur dehors.
+      || ((ecran === 'tableau' || ecran === 'effectif') && !joueur && !manager)
+      || (ecran === 'manager' && !manager)
     ) {
       setEcran('accueil');
     }
-  }, [ecran, joueur, setEcran]);
+  }, [ecran, joueur, manager, setEcran]);
 
   return (
     <div key={langue} className="racine">
@@ -118,6 +127,8 @@ export default function App() {
               {ecran === 'effectif' && <Effectif />}
               {ecran === 'tableau' && <Tableau />}
               {ecran === 'social' && <Social />}
+              {ecran === 'creationManager' && <CreationManager />}
+              {ecran === 'manager' && <Manager />}
             </Suspense>
           </motion.div>
         </AnimatePresence>

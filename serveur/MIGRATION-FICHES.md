@@ -278,7 +278,7 @@ atteint, les Ovas dépensés…), voici la liste complète — dans l'ordre, cha
    ⚠️ **Ne le mets PAS dans `scoreDeLaFiche()`** sauf si tu veux vraiment
    changer le barème : un classement ne doit pas se réordonner parce qu'on
    affiche une information de plus. Si tu y touches quand même, `SCORE_MAX`
-   change, et il faut mettre à jour la contrainte SQL `check (score <= 82500)`
+   change, et il faut mettre à jour la contrainte SQL `check (score <= 117000)`
    dans les deux schémas.
 2. **`ficheDepuisJoueur()`** (même fichier) — le remplir depuis le `Joueur`.
 3. **`serveur/schema-vercel.sql`** — la colonne dans le `create table` **et**
