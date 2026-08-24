@@ -1321,16 +1321,7 @@ export function probaPlaquage(
   // qu'un habillage. Il ne le décide pas pour autant : il déplace le curseur
   // d'un contact qui reste arbitré par les attributs des deux hommes.
   const force = defenseur.plaquage * fatigueD * (monPlaquage ? 1.16 : 1);
-  const resistance = porteur.evitement * 0.55 + porteur.puissance * 0.45
-    // ⚠️ RENFORCÉS APRÈS RETOUR DE JEU (« raffut, crochet qui marche vraiment »).
-    // À 0,30 et 0,26, un crochet faisait passer la chance de franchir de 10 % à
-    // 15 % : l'effet existait — le banc d'essai le mesurait — mais il était
-    // INVISIBLE manette en main, parce qu'on ne joue pas cent crochets d'affilée.
-    // Un geste qu'on ne sent pas est un geste qui n'existe pas. À 0,45 et 0,40,
-    // on franchit une fois sur quatre : c'est un pari qu'on voit gagner.
-    + (geste === 'crochet' ? porteur.evitement * 0.45 : 0)
-    + (geste === 'raffut' ? porteur.puissance * 0.40 : 0)
-    + (geste === 'sprint' ? 6 : 0);
+  const resistance = porteur.evitement * 0.55 + porteur.puissance * 0.45;
   // ⚠️ Le taux de réussite au plaquage du rugby professionnel est de ~88 %.
   // Le rythme de l'équipe qui court après son plan de marque l'infléchit :
   // c'est le seul endroit où le score « aide » l'attaque, et c'est ce réglage
@@ -1350,7 +1341,74 @@ export function probaPlaquage(
   // l’élan entre dans la formule que `enjeuDe` affiche ET que `resoudreChoix`
   // tire. Un plaquage à 88 % passe à 94 % quand l’équipe est portée.
   const elan = bonusElan(e, defenseur.cote);
-  return borner(0.90 + (force - resistance) / 400 - aide + elan, 0.36, 0.99);
+
+  // ═══ LE GESTE CHOISI : UN BONUS DIRECT, PAS UN TERME DE RÉSISTANCE ══════
+  //
+  // ⚠️ RETOUR DE JEU : « les sprints, crochets, raffuts, j’ai l’impression que
+  // ça marche jamais, le joueur se fait coffrer et ne passe jamais ». C’était
+  // JUSTE, et mesurable — voici ce que la carte annonçait, sur de vrais
+  // joueurs de Top 14 :
+  //
+  //     porteur            rien   crochet   raffut   sprint
+  //     demi d’ouverture   12,2 %   21,0 %   21,3 %   13,7 %
+  //     pilier gauche      11,6 %   19,3 %   21,3 %   13,1 %
+  //
+  // Un crochet qui échoue quatre fois sur cinq, ce n’est pas un pari, c’est
+  // une loterie ; et le SPRINT ne valait qu’un point et demi — un bouton qui
+  // ne fait rien. Pire, un PILIER crochetait presque aussi bien qu’un ouvreur.
+  //
+  // ⚠️ LA CAUSE ÉTAIT LE DIVISEUR, PAS LES COEFFICIENTS. Le geste passait par
+  // `(force − resistance) / 400` : quarante points d’attribut n’y valent que
+  // dix points de probabilité. On avait déjà remonté les coefficients une fois
+  // (0,30 → 0,45) en croyant régler le problème — ça n’a rendu que six points.
+  // Tant que le geste traverse ce diviseur, il ne peut pas se sentir.
+  //
+  // Le geste retranche donc DIRECTEMENT de la chance de plaquage, et il est
+  // indexé sur l’attribut qui le porte : un ailier rapide sprinte, un pilier
+  // raffute, et aucun des deux ne fait le métier de l’autre.
+  return borner(
+    0.90 + (force - resistance) / 400 - aide + elan - bonusDuGeste(porteur, geste),
+    0.36, 0.99,
+  );
+}
+
+/**
+ * Ce que le geste choisi retire à la chance de plaquage.
+ *
+ * ⚠️ LES BORNES SONT LE VRAI RÉGLAGE, et elles sont posées sur une cible
+ * lisible : un joueur MOYEN (attribut 60) doit franchir environ une fois sur
+ * cinq, un TRÈS BON (85) un peu plus d’une fois sur trois. En dessous, le
+ * geste ne se sent pas ; au-dessus, l’ailier devient imprenable et ce n’est
+ * plus du rugby — `verifControle.ts` refuse plus de douze franchissements par
+ * match.
+ *
+ * ⚠️ ET ÇA NE TOUCHE PAS L’ÉTALONNAGE DU MOTEUR. `geste` n’est jamais
+ * renseigné hors pilotage (`monGeste` exige `porteur.moi && e.controle && une
+ * intention armée`) : les vingt-neuf autres joueurs, la simulation de fond et
+ * `verifMoteur.ts` passent tous par `geste === null`, donc par zéro.
+ */
+function bonusDuGeste(porteur: Pion, geste: ActionJoueur | null): number {
+  // Une droite entre « ça n’aide presque pas » et « ça change le duel ».
+  //
+  // ⚠️ CHAQUE GESTE A SON PROPRE PLANCHER, ET CE N’EST PAS UN DÉTAIL. Les deux
+  //    attributs ne vivent pas sur la même plage : dans un pack de Top 14,
+  //    `puissance` court de 85 à 97 là où `evitement` va de 68 à 78. Avec un
+  //    plancher commun, le raffut butait sur le plafond pour TOUT LE MONDE
+  //    (38 % de franchissement contre 33 % au crochet, mesuré) : il devenait la
+  //    réponse à tout, et le choix de la carte ne voulait plus rien dire.
+  const surAttribut = (a: number, plancher: number) => borner((a - plancher) * 0.006, 0, 0.26);
+  switch (geste) {
+    case 'crochet': return surAttribut(porteur.evitement, 43);
+    case 'raffut': return surAttribut(porteur.puissance, 58);
+    // ⚠️ LE SPRINT SE JOUE SUR LA VITESSE RÉELLE DU PION, pas sur un forfait.
+    //    Il valait `+6` de résistance pour tout le monde, soit un point et
+    //    demi de probabilité : autant dire rien, et rien qui distingue un
+    //    ailier d’un pilier. `vitesseMax` va de ~7,5 (première ligne) à ~9,8
+    //    (ailier) : le geste ne rend donc quelque chose qu’à ceux qui ont de
+    //    quoi prendre l’extérieur.
+    case 'sprint': return borner((porteur.vitesseMax - 7.6) * 0.11, 0, 0.20);
+    default: return 0;
+  }
 }
 
 /**

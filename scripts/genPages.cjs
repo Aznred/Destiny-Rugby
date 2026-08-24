@@ -51,6 +51,10 @@ const { PAGES, SITE } = require('./contenuPages.cjs');
 // AdSense : sans lui, on ne génère AUCUN code publicitaire. Pas de balise
 // fantôme sur une page qui n'a rien à afficher.
 const CLIENT_ADSENSE = 'ca-pub-6166322317354663';
+
+// Le conteneur Google Tag Manager. Public par construction, comme le `ca-pub-…`
+// d’AdSense : Google exige qu’il figure en clair dans la page.
+const GTM = 'GTM-KF48DSQ9';
 const SLOT = (process.env.PUB_SLOT || '').trim();
 
 const SORTIE = 'public';
@@ -122,6 +126,40 @@ function encartPub() {
   ].join('\n');
 }
 
+/**
+ * Google Tag Manager, la moitié <head>.
+ *
+ * ⚠️ CES PAGES SONT GÉNÉRÉES : on pose la balise ICI, jamais dans
+ * `public/<slug>/index.html`. Le HTML est réécrit à chaque exécution de ce
+ * script, et une balise collée à la main dans le résultat disparaîtrait à la
+ * première régénération, sans un mot.
+ *
+ * ⚠️ ET CONTRAIREMENT À ADSENSE, ELLE N’EST PAS CONDITIONNÉE À `SLOT`. GTM
+ * n’affiche rien : c’est un conteneur de mesure, il a du sens sur une page
+ * sans la moindre annonce — c’est même là qu’on veut savoir si quelqu’un lit.
+ */
+function gtmTete() {
+  return [
+  '  <!-- Google Tag Manager -->',
+  '  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({"gtm.start":',
+  '  new Date().getTime(),event:"gtm.js"});var f=d.getElementsByTagName(s)[0],',
+  '  j=d.createElement(s),dl=l!="dataLayer"?"&l="+l:"";j.async=true;j.src=',
+  '  "https://www.googletagmanager.com/gtm.js?id="+i+dl;f.parentNode.insertBefore(j,f);',
+  `  })(window,document,"script","dataLayer","${GTM}");</script>`,
+    '',
+  ].join('\n');
+}
+
+/** Google Tag Manager, le repli sans JavaScript, juste après <body>. */
+function gtmCorps() {
+  return [
+    '  <!-- Google Tag Manager (noscript) -->',
+    `  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${GTM}"`,
+    '    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>',
+    '',
+  ].join('\n');
+}
+
 function scriptAdsense() {
   if (!SLOT) return '';
   return `  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${CLIENT_ADSENSE}" crossorigin="anonymous"></script>\n`;
@@ -159,6 +197,7 @@ function rendre(page, toutes) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+${gtmTete()}
   <title>${echapper(page.titre)} · ${echapper(SITE.nom)}</title>
   <meta name="description" content="${echapper(page.description)}" />
   <link rel="canonical" href="${url}" />
@@ -186,6 +225,7 @@ ${JSON.stringify({
   </script>
 ${scriptAdsense()}</head>
 <body>
+${gtmCorps()}
   <header class="entete">
     <a class="marque" href="/">🏉 ${echapper(SITE.nom)}</a>
     <nav aria-label="Pages du guide">

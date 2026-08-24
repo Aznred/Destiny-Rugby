@@ -4,6 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- ═══ GOOGLE TAG MANAGER ═══════════════════════════════════════════
+         ⚠️ LE PLUS HAUT POSSIBLE DANS LE <head>, C'EST LA CONSIGNE DE GOOGLE,
+         et elle a une raison : le conteneur doit exister avant que la page ne
+         commence à pousser des évènements dans `dataLayer`. Placé en bas, il
+         perd tout ce qui s'est produit avant son chargement.
+
+         ⚠️ IL EST `async` ET SANS DÉPENDANCE : s'il est bloqué (bloqueur de
+         publicité, réseau coupé, pays où googletagmanager.com ne répond pas),
+         la page se charge exactement pareil. C'est la règle du projet — le jeu
+         reste ENTIER quand un service tiers tombe.
+
+         ⚠️ ET IL NE MESURE RIEN TOUT SEUL. GTM est un CONTENEUR : ce qu'il
+         charge se décide dans son interface, pas ici. C'est sa force (on ajoute
+         une balise sans redéployer) et son risque — voir la note de
+         `src/lib/pub.ts` : « rien ne se charge sans consentement ». Le
+         consentement des balises qu'il déclenche se règle DANS GTM (mode
+         Consentement de Google), pas dans ce fichier. -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-KF48DSQ9');</script>
+
+
     <!-- ===== IDENTITÉ ===== -->
     <!-- ⚠️ Pas d'emoji dans le <title> : Google le retire de ses résultats et
          il consomme des caractères sur les 60 qui s'affichent vraiment. -->
@@ -80,6 +104,9 @@
     </script>
   </head>
   <body>
+    <!-- Google Tag Manager, repli sans JavaScript. -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KF48DSQ9"
+      height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div id="root"></div>
     <!-- ⚠️ DU CONTENU POUR LES ROBOTS. L'application est rendue entièrement par
          React : sans ce bloc, la page servie à un crawler qui n'exécute pas le

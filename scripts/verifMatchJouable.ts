@@ -463,9 +463,14 @@ console.log('\n=== 8. ⚠️ UN EN-AVANT COÛTE TOUJOURS LA POSSESSION ===');
         // mêlée : `phaseMiTemps` reprend la main, prépare le coup d'envoi de
         // la seconde période et rend la possession à l'équipe qui n'avait
         // pas engagé. Idem après un essai. La règle EST appliquée — il n'y a
-        // simplement plus de match à jouer sur cette phase-là. Mesuré : un
-        // cas sur six matchs, toujours en `miTemps`.
-        const arretAilleurs = e.phase === 'miTemps' || e.phase === 'apresEssai';
+        // simplement plus de match à jouer sur cette phase-là.
+        // ⚠️ ET `fini` COMPTE AUSSI, ce qui manquait. Mesuré à la sonde : le
+        //    cas résiduel tombait en `phase=fini` — un ballon lâché sur la
+        //    sirène de FIN de match, pas de mi-temps. Le raisonnement est le
+        //    même mot pour mot, seule la sirène change ; l’exception était
+        //    juste incomplète, et le contrôle échouait sur un cas conforme.
+        const arretAilleurs = e.phase === 'miTemps' || e.phase === 'apresEssai'
+          || e.phase === 'fini';
         const fautif = e.pions.find((q) => q.nom === e.sifflet?.fautif);
         if (fautif && e.possession === fautif.cote && !arretAilleurs) sansConsequence++;
         if (!e.sifflet) sansSifflet++;
