@@ -313,7 +313,7 @@ npx vite-node scripts/verifTraductions.ts  # les 7 langues
 - **La vie privée.** Rien de nominatif n'entre en base : le `pseudo` est choisi
   par le joueur, le `nom` est celui d'un personnage de fiction, et l'identifiant
   d'appareil reste un **haché salé** dans une table `envois` purgée à deux jours.
-- **Le débit.** 6 envois par heure et 40 par jour et par appareil, inchangé.
+- **Le débit.** 18 envois par heure et 120 par jour et par appareil.
 - **Le jeu hors ligne.** Sans `DATABASE_URL`, sans serveur, ou serveur en panne :
   l'écran affiche son état et le classement local continue de fonctionner. Le
   classement mondial est un bonus, jamais une dépendance.

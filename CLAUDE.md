@@ -2137,7 +2137,7 @@ DB juste le score » :
 ```
    navigateur                    Edge Function                     base
 ┌──────────────────┐      ┌───────────────────────────┐     ┌────────────┐
-│ FicheCarriere    │ POST │ 1. débit (6/h, 40/j)      │     │ pseudo     │
+│ FicheCarriere    │ POST │ 1. débit (18/h, 120/j)    │     │ pseudo     │
 │ saisons, matchs, │  →   │ 2. verifierFiche()        │  →  │ score      │
 │ essais, titres…  │      │ 3. score = scoreDeLaFiche │     │ cree_le    │
 └──────────────────┘      │ 4. jette la fiche         │     └────────────┘
@@ -3180,7 +3180,8 @@ Demande explicite : « la fiche d'envoi, il faut que ça s'envoie automatiquemen
 - ⚠️ **LE DÉBIT SERVEUR A ÉTÉ DESSERRÉ EN CONSÉQUENCE** : 1 envoi/heure était
   calibré pour un bouton cliqué à la main. Avec l'envoi automatique, une session
   normale en produit plusieurs par heure — le joueur honnête se prenait des 429
-  et son meilleur score n'arrivait jamais. **6/heure et 40/jour** ; ça reste sans
+  et son meilleur score n'arrivait jamais. **18/heure et 120/jour** (triplé une
+seconde fois : l'envoi part aussi à chaque semaine jouée) ; ça reste sans
   intérêt pour un script, puisque la vraie barrière n'est pas le débit mais le
   RECALCUL.
 
@@ -6129,7 +6130,7 @@ jouée**, avec deux freins :
 | Frein | Pourquoi |
 |---|---|
 | le score doit avoir **progressé** depuis le dernier envoi ACCEPTÉ | sinon on renverrait la même fiche chaque semaine |
-| **dix minutes** minimum entre deux envois | le serveur en accepte six par heure ; se faire jeter par son propre débit serait le comble |
+| un plancher entre deux envois (**3 min 20 s**, soit 60 ÷ `PAR_HEURE`) | le serveur en accepte dix-huit par heure ; se faire jeter par son propre débit serait le comble |
 
 La fin de saison et la retraite passent outre (`force`) : ce sont les deux
 moments où la carrière DOIT être posée.

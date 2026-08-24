@@ -14,7 +14,7 @@ juste une **base de données** et une **fonction serveur** au projet existant.
    navigateur (le jeu)              Vercel                          Postgres
 ┌──────────────────────┐   POST   ┌────────────────────────┐      ┌──────────────┐
 │ FicheCarriere        │   ───→   │ api/classement.ts      │      │ id, cle      │
-│ cle, saisons, note,  │          │ 1. débit (6/h, 40/j)   │  →   │ pseudo, score│
+│ cle, saisons, note,  │          │ 1. débit (18/h, 120/j) │  →   │ pseudo, score│
 │ matchs, essais,      │          │ 2. verifierFiche()     │      │ la fiche :   │
 │ titres, clubs…       │          │ 3. score = RECALCULÉ   │      │ saisons, note│
 │                      │   ←───   │ 4. écriture du score   │      │ titres, clubs│
@@ -205,7 +205,7 @@ Ce que la fonction apporte, et qui n'est possible que côté serveur :
    âge et saisons incohérents, 900 matchs en 12 saisons, un trophée qui n'existe
    pas, un même trophée gagné deux fois dans la même saison — puis
    `scoreDeLaFiche()` recalcule. Le score annoncé n'est qu'une **comparaison**.
-2. **Le débit.** 6 envois par heure et 40 par jour et par adresse réseau. Cette
+2. **Le débit.** 18 envois par heure et 120 par jour et par adresse réseau. Cette
    marge accepte les envois automatiques de plusieurs fins de saison dans une
    même session ; un client ne peut pas contourner le quota en modifiant son
    navigateur.
