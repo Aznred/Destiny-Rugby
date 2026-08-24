@@ -102,6 +102,7 @@ import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
 import { forceEffectif, forceMoyenneDivision, noteDuClub, setTransfertsSociaux, effectifDuClub } from '../lib/effectif';
 import { nomAleatoirePourNation } from '../lib/nomsJoueurs';
+import { chantierVisible } from '../lib/modeDev';
 import { evoluer } from '../lib/progression';
 import { genererOffres, offreProlongation, cote } from '../lib/offres';
 import { agentsAccessibles, descriptionAgent, niveauPourAgent, nomAgent, SEUIL_AGENT } from '../data/agents';
@@ -3047,7 +3048,15 @@ export const useGame = create<GameState>()(
           // ENTRAÎNEUR » : la légende part au Hall ET reste sous la main de
           // l’écran de création, qui en tire le prestige de départ
           // (`prestigeDepuisJoueur`). Le Hall reste la sortie par défaut.
-          reconversionManager: reconversion === 'entraineur' ? legende : null,
+          // ⚠️ ET LA PORTE NE S’OUVRE QUE POUR LE DÉVELOPPEUR TANT QUE LE
+          //    MODE EST EN CHANTIER (demande explicite). Sans ce garde, un
+          //    joueur qui choisit « Entraîneur » à la retraite atterrirait sur
+          //    un écran qu’on ne veut pas encore montrer. Le choix reste dans
+          //    la liste : c’était déjà une reconversion NARRATIVE avant ce
+          //    chantier, et la retirer changerait un texte que le joueur
+          //    connaît. Il retombe simplement au Hall, comme les quatre autres.
+          reconversionManager: reconversion === 'entraineur' && chantierVisible('manager')
+            ? legende : null,
           mouvementsClubs: {},
           journal: [],
           scenarioActif: null,
@@ -3057,7 +3066,8 @@ export const useGame = create<GameState>()(
           tropheesEnAttente: [],
           offres: [],
           offresOuvertes: false,
-          ecran: reconversion === 'entraineur' ? 'creationManager' : 'pantheon',
+          ecran: reconversion === 'entraineur' && chantierVisible('manager')
+            ? 'creationManager' : 'pantheon',
           ecransVus: [...s.ecransVus, 'pantheon'].filter((e, i, l) => l.indexOf(e) === i),
         }));
       },

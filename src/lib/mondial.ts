@@ -1,47 +1,48 @@
-// 🌍 LA COUPE DU MONDE — poules, tableau final, un vainqueur.
+// 🌍 LA COUPE DU MONDE — format 2027 : 24 nations, 6 poules de 4, huitièmes.
 //
-// Retour de jeu, mot pour mot : « gros bug, il n'y a jamais de Coupe du monde
-// jouée ».
+// ═══ LE FORMAT, TEL QU'IL A ÉTÉ DONNÉ ═══════════════════════════════════════
 //
-// ═══ CE QUI EXISTAIT, ET POURQUOI ÇA NE RESSEMBLAIT À RIEN ═══════════════════
+// Demande explicite, et elle décrit le vrai format de l'édition 2027 :
 //
-// La Coupe du monde était déclarée comme une compétition ORDINAIRE
-// (`COUPE_DU_MONDE` dans `international.ts`) : 24 équipes, 4 journées, un
-// classement au barème rugby, et le « vainqueur » = le premier de ce
-// classement. Trois conséquences, toutes visibles en jeu :
+//   • **24 équipes en 6 poules de 4.** Chaque équipe joue UNE FOIS contre
+//     chacun de ses trois adversaires : un vrai toutes rondes, plus la poule
+//     tronquée de l'ancien format.
+//   • **Les deux premiers de chaque poule (12) + les quatre meilleurs
+//     troisièmes** = 16 qualifiés.
+//   • **Huitièmes de finale**, puis quarts, demies, **match pour la 3ᵉ place**
+//     et finale.
+//   • **Bonus offensif à QUATRE ESSAIS**, pas à trois essais d'écart.
+//   • Égalité en phase finale : **prolongation**, puis **tirs au but (drops)**.
 //
-// 1. **ELLE NE SE TERMINAIT JAMAIS.** Elle déclarait 4 journées et le
-//    calendrier ne réserve que **3 dates** à la fenêtre d'automne : la
-//    quatrième n'était jamais jouée, et le classement restait celui d'un
-//    tournoi interrompu.
-// 2. **IL N'Y AVAIT NI POULE NI PHASE FINALE.** Vingt-quatre nations tirées au
-//    hasard dans un mini-championnat : ni tableau, ni demi-finale, ni finale.
-//    On ne pouvait ni suivre un parcours, ni perdre en quart, ni gagner un
-//    titre — on regardait une colonne de points.
-// 3. **LE TITRE ALLAIT AU PREMIER D'UNE LIGUE TRONQUÉE**, c'est-à-dire à
-//    l'équipe qui avait eu les trois adversaires les plus tendres.
+// ⚠️ CE FICHIER REMPLACE LE FORMAT PRÉCÉDENT (4 poules de 6, deux matchs
+// chacune, tableau à 8). Il n'en reste rien : ni le tirage, ni la grille, ni le
+// nombre de qualifiés. Ne pas chercher à faire cohabiter les deux.
 //
-// ═══ LE FORMAT RETENU, ET LA COMPRESSION ASSUMÉE ═════════════════════════════
+// ═══ LA COMPRESSION DU CALENDRIER, ET ELLE EST ASSUMÉE ══════════════════════
 //
 // Le calendrier réserve **trois dates** à la fenêtre d'automne, et la Coupe du
 // monde les remplace (`estAnneeDeCoupeDuMonde`). Une vraie Coupe du monde en
-// prend six ou sept. On compresse donc, et on le dit :
+// prend sept. Il faut donc caser trois tours de poule ET cinq tours de tableau
+// dans trois week-ends :
 //
-//   • **S10 et S11 — les poules.** 24 nations, **4 poules de 6**, et chaque
-//     nation ne joue que **DEUX matchs**, contre deux adversaires différents.
-//     ⚠️ C'est exactement le format des coupes d'Europe depuis 2023-24 (voir
-//     l'entête de `coupe.ts` : « 4 matchs dans une poule de 6 ») — le jeu sait
-//     déjà le lire, l'afficher et le classer.
-//   • **S12 — le tableau final.** Les **deux premiers de chaque poule** (8)
-//     disputent quarts, demies et finale.
+//   | date | ce qui se joue |
+//   |------|----------------|
+//   | S10  | 1ᵉʳ tour de poule |
+//   | S11  | **2ᵉ ET 3ᵉ tours de poule** |
+//   | S12  | tout le tableau : huitièmes → quarts → demies → 3ᵉ place → finale |
 //
-// ⚠️ **LES TROIS TOURS DU TABLEAU TOMBENT LE MÊME WEEK-END, et c'est le seul
-// compromis du fichier.** Le joueur ne dispute qu'UN match par semaine de
-// calendrier : il joue donc le quart de finale de sa nation, et voit le reste
-// du tableau se dérouler. L'alternative — étaler le tableau sur trois dates —
-// demanderait de supprimer la tournée d'automne ET deux journées de
-// championnat une saison sur quatre, ce qui déplacerait le nombre de journées
-// de la saison et tout l'étalonnage qui en dépend.
+// ⚠️ POURQUOI COMPRIMER LES POULES PLUTÔT QUE LE TABLEAU. Le joueur ne dispute
+// qu'UN match par date de calendrier. En étalant les poules sur les trois
+// dates, il jouerait ses trois matchs de poule et **ne jouerait jamais un match
+// à élimination directe de Coupe du monde** — on lui retirerait le seul moment
+// qui compte. En comprimant les poules, il joue deux matchs de poule en direct,
+// son troisième se résout en fond, et il dispute VRAIMENT son huitième.
+//
+// ⚠️ L'ALTERNATIVE A ÉTÉ ÉCARTÉE, chiffres à l'appui : étaler le tournoi
+// demanderait de supprimer la tournée d'automne ET quatre journées de
+// championnat une saison sur quatre — donc de changer le nombre de journées de
+// la saison, et tout l'étalonnage qui en dépend (`verifDifficulte.ts`,
+// `verifPyramide.ts`, la note de saison, les statistiques individuelles).
 //
 // ⚠️ **DÉTERMINISTE, RIEN À SAUVEGARDER**, comme les coupes d'Europe : la
 // graine est `mondial#saison`. Rouvrir l'écran ne rejoue rien.
@@ -53,8 +54,28 @@ import {
 import type { MatchFinal } from './phaseFinale';
 import { forceNation, jouerTestMatch, qualifiesCoupeDuMonde } from './international';
 
-/** Le nombre de journées de poule, et donc de dates de calendrier. */
-export const JOURNEES_POULES = 2;
+/**
+ * Les tours de poule RÉELLEMENT joués : un toutes rondes de quatre en fait
+ * trois. À ne pas confondre avec `DATES_POULES`.
+ */
+export const JOURNEES_POULES = 3;
+
+/**
+ * Les DATES DE CALENDRIER que les poules occupent.
+ *
+ * ⚠️ DEUX DATES POUR TROIS TOURS, et c'est tout le compromis du fichier (voir
+ * l'entête) : la deuxième date en porte deux. C'est ce qui libère la troisième
+ * pour le tableau final, et donc ce qui permet au joueur de disputer un
+ * huitième de finale de Coupe du monde.
+ */
+export const DATES_POULES = 2;
+
+/** Nombre de poules, et de nations par poule. */
+export const NB_POULES = 6;
+export const PAR_POULE = 4;
+
+/** Les quatre meilleurs troisièmes complètent les seize. */
+export const MEILLEURS_TROISIEMES = 4;
 
 export interface PouleMondial {
   nom: string;
@@ -66,21 +87,49 @@ export interface PouleMondial {
 export interface EtatMondial {
   saison: number;
   poules: PouleMondial[];
-  /** Les 8 qualifiés pour le tableau, dans l'ordre du tirage. */
+  /** Les 16 qualifiés pour le tableau, dans l'ordre des têtes de série. */
   qualifies: string[];
+  /** Les quatre meilleurs troisièmes retenus, pour l'afficher à l'écran. */
+  meilleursTroisiemes: string[];
   bracket: MatchFinal[];
   vainqueur: string | null;
+  /** Le finaliste battu, et le vainqueur de la petite finale. */
+  finaliste: string | null;
+  troisieme: string | null;
+  /** Tours de poule joués (0 à 3), pas dates de calendrier. */
   journeesPoulesJouees: number;
   /** Le tableau final a-t-il été disputé ? */
   tableauJoue: boolean;
 }
 
 /**
+ * Combien de tours de poule sont joués après `dates` dates de calendrier.
+ *
+ * ⚠️ UNE SEULE DÉFINITION DE LA COMPRESSION. Elle est lue par `mondialEnDirect`,
+ * par `afficheMondialDe` et par `matchsInternationaux` (international.ts) :
+ * trois exemplaires de cette petite règle, et un jour l'écran annoncerait un
+ * match que le classement ne connaît pas.
+ */
+export function toursDePouleApres(dates: number): number {
+  if (dates <= 0) return 0;
+  if (dates === 1) return 1;
+  return JOURNEES_POULES; // la 2ᵉ date porte les tours 2 et 3
+}
+
+/**
+ * Un tour à élimination directe : prolongation, puis tirs au but.
+ *
  * ⚠️ UN TOUR À ÉLIMINATION DIRECTE NE PEUT PAS FINIR SUR UN NUL, et
  * `jouerTestMatch` ne le sait pas — il rend un score de test-match, nul
  * compris. On départage APRÈS l'arrondi de `scorePossible`, comme `duel()` :
  * rabattre 4 sur 3 peut CRÉER une égalité (4-3 devient 3-3), et trancher en
  * amont laisserait des matchs nuls dans un tableau où quelqu'un doit sortir.
+ *
+ * ⚠️ ET LE DÉPARTAGE SE FAIT EN DEUX TEMPS, comme le règlement : d'abord une
+ * PROLONGATION où l'on peut marquer (donc un score qui bouge, +3 ou +5), et si
+ * l'égalité persiste une séance de DROPS — qui, elle, ne change pas le score
+ * affiché. C'est la seule façon d'avoir un vainqueur sans inventer des points
+ * qui n'ont pas été marqués sur le terrain.
  */
 function duelNation(
   a: string, b: string, cle: string,
@@ -92,14 +141,40 @@ function duelNation(
   const ecart = forceNation(a) - forceNation(b);
   let scoreD = scorePossible(23 + ecart * 1.2 + (rng() * 18 - 9));
   let scoreE = scorePossible(23 - ecart * 1.2 + (rng() * 18 - 9));
+  let mention = '';
+
   if (scoreD === scoreE) {
-    // Prolongation : l'écart de niveau tranche, le hasard finit le travail.
-    if (ecart > 0 || (ecart === 0 && rng() < 0.5)) scoreD += 3;
-    else scoreE += 3;
+    // Prolongation : vingt minutes, et l'écart de niveau pèse plus qu'à
+    // quatre-vingts — les organismes lâchent, la meilleure équipe sort.
+    const prolongation = rng();
+    const pourA = ecart > 0 ? prolongation < 0.66 : ecart < 0 ? prolongation < 0.34 : prolongation < 0.5;
+    // Un essai en prolongation existe : on ne se contente pas d'un drop.
+    const gain = rng() < 0.3 ? 7 : 3;
+    if (pourA) scoreD += gain; else scoreE += gain;
+    mention = ' (a.p.)';
+
+    // Une prolongation peut se terminer sur une égalité elle aussi — l'autre
+    // équipe a répondu. Là, et seulement là, on passe aux drops.
+    if (rng() < 0.18) {
+      if (pourA) scoreE += gain; else scoreD += gain;
+      // Les drops ne s'ajoutent PAS au score : ils désignent un vainqueur.
+      const auxDrops = ecart >= 0 ? rng() < 0.6 : rng() < 0.4;
+      return {
+        tour,
+        libelle: libelle + ' (tirs au but)',
+        domicile: a,
+        exterieur: b,
+        scoreD,
+        scoreE,
+        vainqueur: auxDrops ? a : b,
+        perdant: auxDrops ? b : a,
+      };
+    }
   }
+
   return {
     tour,
-    libelle,
+    libelle: libelle + mention,
     domicile: a,
     exterieur: b,
     scoreD,
@@ -121,21 +196,21 @@ function melanger<T>(liste: T[], cle: string): T[] {
 }
 
 /**
- * Le tirage des poules : quatre chapeaux, un serpentin.
+ * Le tirage : quatre chapeaux de six, un par ligne de poule.
  *
  * ⚠️ LES CHAPEAUX EXISTENT POUR QUE LE TIRAGE AIT UN SENS. Sans eux, une poule
  * pouvait réunir la Nouvelle-Zélande, l'Afrique du Sud et l'Irlande pendant
- * qu'une autre alignait le Paraguay, l'Allemagne et la Roumanie — et le
- * classement mondial des qualifiés, lui, existe déjà. On répartit donc les
- * 24 nations en quatre chapeaux de six selon leur rang, et chaque poule prend
- * une nation par chapeau… deux fois (poules de 6).
+ * qu'une autre alignait le Paraguay, l'Allemagne et la Roumanie. On répartit
+ * donc les 24 nations en **quatre chapeaux de six** selon leur rang mondial, et
+ * chaque poule reçoit exactement une nation de chaque chapeau — c'est le tirage
+ * réel d'une Coupe du monde, et avec des poules de quatre il tombe juste sans
+ * le moindre reste.
  */
 function tirerLesPoules(qualifies: string[], saison: number): string[][] {
-  const poules: string[][] = [[], [], [], []];
-  // Six chapeaux de quatre : chaque poule reçoit une nation de chaque chapeau.
-  for (let chapeau = 0; chapeau < 6; chapeau++) {
+  const poules: string[][] = Array.from({ length: NB_POULES }, () => []);
+  for (let chapeau = 0; chapeau < PAR_POULE; chapeau++) {
     const lot = melanger(
-      qualifies.slice(chapeau * 4, chapeau * 4 + 4),
+      qualifies.slice(chapeau * NB_POULES, chapeau * NB_POULES + NB_POULES),
       `mondial#${saison}#chapeau${chapeau}`,
     );
     lot.forEach((nation, i) => poules[i].push(nation));
@@ -144,40 +219,71 @@ function tirerLesPoules(qualifies: string[], saison: number): string[][] {
 }
 
 /**
- * ⚠️ DEUX MATCHS DANS UNE POULE DE SIX, et c'est le format, pas un raccourci.
+ * Les trois tours d'une poule de quatre : un vrai toutes rondes.
  *
- * Chaque nation affronte deux adversaires DIFFÉRENTS, et jamais deux fois le
- * même : c’est la rotation classique du carrousel, la première équipe fixe et
- * les cinq autres qui tournent d’un cran.
- *
- * ⚠️ LA PREMIÈRE VERSION FAISAIT REJOUER UNE AFFICHE SUR TROIS, et elle avait
- * l’air juste : 1-6, 2-5, 3-4 puis 4-1, 5-2, 6-3. On croit avoir tout décalé,
- * mais **2-5 et 5-2 sont le même match** — le banc d’essai a relevé douze
- * doublons sur trois éditions. Une poule où deux nations se rencontrent deux
- * fois pendant qu’elles en ignorent trois autres n’est pas une poule.
+ * ⚠️ LES SIX AFFICHES SONT LÀ, ET CHACUNE UNE SEULE FOIS. C'est ce que
+ * l'ancien format ne savait pas faire : sa poule de six ne jouait que deux
+ * matchs, et sa première version rejouait une affiche sur trois (2-5 et 5-2
+ * sont le même match). Avec quatre équipes, il n'y a plus de compromis à
+ * faire : ab · cd, puis ac · db, puis ad · bc — les six paires, une fois.
  */
 function affichesDePoule(poule: string[]): [string, string][][] {
-  const [a, b, c, d, e, f] = poule;
+  const [a, b, c, d] = poule;
   return [
-    [[a, f], [b, e], [c, d]],
-    [[a, b], [c, f], [d, e]],
+    [[a, b], [c, d]],
+    [[a, c], [d, b]],
+    [[a, d], [b, c]],
   ];
+}
+
+/**
+ * ⚠️ LE BARÈME DE LA COUPE DU MONDE N'EST PAS CELUI DU TOP 14.
+ *
+ * Le bonus offensif d'un championnat de clubs se gagne à **trois essais
+ * d'écart** ; celui d'une Coupe du monde se gagne à **quatre essais marqués**,
+ * quel que soit le résultat. `classer` applique la règle des clubs (c'est la
+ * bonne, pour eux) : on recalcule donc ici les seuls points, sur les mêmes
+ * matchs, avec la règle du tournoi.
+ */
+function classerMondial(equipes: string[], journees: MatchChampionnat[][]): LigneTableau[] {
+  const base = new Map(classer(equipes, journees).map((l) => [l.club, { ...l, points: 0, bonus: 0 }]));
+  for (const journee of journees) {
+    for (const m of journee) {
+      const a = base.get(m.domicile);
+      const b = base.get(m.exterieur);
+      if (!a || !b) continue;
+      if (m.scoreD > m.scoreE) a.points += 4;
+      else if (m.scoreD < m.scoreE) b.points += 4;
+      else { a.points += 2; b.points += 2; }
+      // Bonus offensif : quatre essais ou plus, victoire ou défaite.
+      if (m.essaisD >= 4) { a.points++; a.bonus++; }
+      if (m.essaisE >= 4) { b.points++; b.bonus++; }
+      // Bonus défensif : battu de sept points ou moins. Cumulable.
+      if (m.scoreD < m.scoreE && m.scoreE - m.scoreD <= 7) { a.points++; a.bonus++; }
+      if (m.scoreE < m.scoreD && m.scoreD - m.scoreE <= 7) { b.points++; b.bonus++; }
+    }
+  }
+  return [...base.values()]
+    .sort((x, y) => y.points - x.points || y.difference - x.difference || y.pour - x.pour)
+    .map((l, i) => ({ ...l, position: i + 1 }));
 }
 
 /**
  * L'état de la Coupe du monde à un instant de la saison.
  *
- * @param journeesJouees 0, 1 ou 2 pour les poules ; 3 et plus = tableau final.
+ * @param datesJouees Nombre de DATES DE CALENDRIER de la fenêtre déjà jouées
+ *   (0 à 3), pas de tours de poule. La conversion est dans
+ *   `toursDePouleApres` — une seule définition, trois lecteurs.
  */
-export function mondialEnDirect(saison: number, journeesJouees: number): EtatMondial {
+export function mondialEnDirect(saison: number, datesJouees: number): EtatMondial {
   const qualifies = qualifiesCoupeDuMonde(saison);
   const tirage = tirerLesPoules(qualifies, saison);
-  const jouees = Math.max(0, Math.min(JOURNEES_POULES, journeesJouees));
+  const tours = toursDePouleApres(datesJouees);
 
   const poules: PouleMondial[] = tirage.map((equipes, i) => {
     const grille = affichesDePoule(equipes);
     const journees: MatchChampionnat[][] = [];
-    for (let j = 0; j < jouees; j++) {
+    for (let j = 0; j < tours && j < grille.length; j++) {
       journees.push(grille[j].map(([x, y]) =>
         jouerTestMatch(x, y, saison, `mondial#${saison}#poule${i}#${j}#${x}#${y}`, null)));
     }
@@ -185,64 +291,122 @@ export function mondialEnDirect(saison: number, journeesJouees: number): EtatMon
       nom: `Poule ${String.fromCharCode(65 + i)}`,
       equipes,
       journees,
-      classement: classer(equipes, journees),
+      classement: classerMondial(equipes, journees),
     };
   });
 
-  const tableauJoue = journeesJouees > JOURNEES_POULES && jouees === JOURNEES_POULES;
+  const poulesFinies = tours >= JOURNEES_POULES;
+  const tableauJoue = datesJouees > DATES_POULES && poulesFinies;
+
+  // ═══ LES SEIZE QUALIFIÉS ═══════════════════════════════════════════════
+  const premiers = poules.map((p) => p.classement[0]).filter(Boolean);
+  const seconds = poules.map((p) => p.classement[1]).filter(Boolean);
+  // ⚠️ LES QUATRE MEILLEURS TROISIÈMES SE COMPARENT ENTRE POULES, et c'est le
+  //    seul endroit du jeu où des lignes de tableaux DIFFÉRENTS sont mises en
+  //    concurrence. Le critère est celui du règlement, dans l'ordre : points,
+  //    puis différence, puis points marqués.
+  const troisiemesClasses = poules
+    .map((p) => p.classement[2])
+    .filter(Boolean)
+    .sort((x, y) => y.points - x.points || y.difference - x.difference || y.pour - x.pour);
+  const troisiemesRetenus = poulesFinies
+    ? troisiemesClasses.slice(0, MEILLEURS_TROISIEMES)
+    : [];
+
+  // Têtes de série : les six vainqueurs de poule, puis les six deuxièmes, puis
+  // les quatre troisièmes repêchés. Chaque bloc trié sur son propre mérite.
+  const parMerite = (l: LigneTableau[]) =>
+    [...l].sort((x, y) => y.points - x.points || y.difference - x.difference || y.pour - x.pour);
+  const seize = poulesFinies
+    ? [...parMerite(premiers), ...parMerite(seconds), ...troisiemesRetenus].map((l) => l.club)
+    : [];
+
   const bracket: MatchFinal[] = [];
   let vainqueur: string | null = null;
-  // ⚠️ LES DEUX PREMIERS DE CHAQUE POULE, CROISÉS. Un premier de poule ne
-  // rencontre pas un autre premier en quart : c'est la règle de tout tableau,
-  // et sans le croisement les quatre favoris se seraient éliminés d'entrée.
-  const premiers = poules.map((p) => p.classement[0]?.club).filter(Boolean) as string[];
-  const seconds = poules.map((p) => p.classement[1]?.club).filter(Boolean) as string[];
-  const huit = [premiers[0], seconds[1], premiers[2], seconds[3],
-    premiers[1], seconds[0], premiers[3], seconds[2]].filter(Boolean) as string[];
+  let finaliste: string | null = null;
+  let troisieme: string | null = null;
 
-  if (tableauJoue && huit.length === 8) {
-    const TOURS: MatchFinal['tour'][] = ['quart', 'demie', 'finale'];
-    const LIBELLES = ['Quart de finale', 'Demi-finale', 'FINALE'];
-    let tour = huit;
+  if (tableauJoue && seize.length === 16) {
+    // ⚠️ TABLEAU CLASSIQUE 1-16, 2-15, 3-14… La tête de série 1 ne peut
+    //    rencontrer la 2 qu'en finale : sans ce croisement, les favoris
+    //    s'élimineraient d'entrée et le tableau ne voudrait rien dire.
+    const TOURS: MatchFinal['tour'][] = ['huitieme', 'quart', 'demie', 'finale'];
+    const LIBELLES = ['Huitième de finale', 'Quart de finale', 'Demi-finale', 'FINALE'];
+    let tour = seize;
+    const perdantsDemies: string[] = [];
+
     for (let etape = 0; etape < TOURS.length && tour.length > 1; etape++) {
       const suivants: string[] = [];
-      for (let i = 0; i < tour.length; i += 2) {
+      const moitie = Math.floor(tour.length / 2);
+      for (let i = 0; i < moitie; i++) {
+        const d = tour[i];
+        const e = tour[tour.length - 1 - i];
         const m = duelNation(
-          tour[i], tour[i + 1],
-          `mondial#${saison}#${TOURS[etape]}#${tour[i]}#${tour[i + 1]}`,
-          TOURS[etape], `${LIBELLES[etape]} : ${tour[i]} - ${tour[i + 1]}`,
+          d, e,
+          `mondial#${saison}#${TOURS[etape]}#${d}#${e}`,
+          TOURS[etape], `${LIBELLES[etape]} : ${d} - ${e}`,
         );
         bracket.push(m);
         suivants.push(m.vainqueur);
+        if (TOURS[etape] === 'demie') perdantsDemies.push(m.perdant);
+        if (TOURS[etape] === 'finale') finaliste = m.perdant;
       }
       tour = suivants;
     }
     vainqueur = tour[0] ?? null;
+
+    // ⚠️ LA PETITE FINALE SE JOUE APRÈS LA FINALE DANS LE CODE, mais elle se
+    //    place AVANT dans le tableau affiché (`ORDRE_TOURS`, Tableau.tsx) :
+    //    il faut connaître les deux perdants de demies, et on ne les a qu'une
+    //    fois les demies jouées.
+    if (perdantsDemies.length === 2) {
+      const p = duelNation(
+        perdantsDemies[0], perdantsDemies[1],
+        `mondial#${saison}#petiteFinale#${perdantsDemies[0]}#${perdantsDemies[1]}`,
+        'petiteFinale',
+        `Match pour la 3ᵉ place : ${perdantsDemies[0]} - ${perdantsDemies[1]}`,
+      );
+      bracket.push(p);
+      troisieme = p.vainqueur;
+    }
   }
 
   return {
-    saison, poules, qualifies: huit, bracket, vainqueur,
-    journeesPoulesJouees: jouees, tableauJoue,
+    saison,
+    poules,
+    qualifies: seize,
+    meilleursTroisiemes: troisiemesRetenus.map((l) => l.club),
+    bracket,
+    vainqueur,
+    finaliste,
+    troisieme,
+    journeesPoulesJouees: tours,
+    tableauJoue,
   };
 }
 
 /**
- * L'affiche de CETTE nation à la journée demandée, s'il y en a une.
+ * L'affiche de CETTE nation à la date de calendrier demandée, s'il y en a une.
  *
- * ⚠️ AU TABLEAU FINAL, ON REND LE PREMIER MATCH DE SA NATION. Les trois tours
- * tombent le même week-end (voir l'entête) : le joueur dispute le quart de
- * finale, et les tours suivants sont résolus. Rendre le dernier match aurait
- * fait jouer une finale à une équipe qui n'a pas passé son quart.
+ * ⚠️ LA DATE 2 PORTE DEUX TOURS DE POULE, et on rend celui du tour 2 : le
+ * troisième se résout en fond. C'est la compression décrite en tête de fichier,
+ * et c'est ce qui laisse la date 3 au tableau final.
+ *
+ * ⚠️ AU TABLEAU FINAL, ON REND LE PREMIER MATCH DE SA NATION — son huitième.
+ * Les cinq tours tombent le même week-end : rendre le dernier aurait fait jouer
+ * une finale à une équipe qui n'a pas passé son huitième.
  */
 export function afficheMondialDe(
-  etat: EtatMondial, nation: string, journee: number,
+  etat: EtatMondial, nation: string, dateJournee: number,
 ): { match: MatchChampionnat; libelle: string } | null {
-  if (journee <= JOURNEES_POULES) {
+  if (dateJournee <= DATES_POULES) {
+    // date 1 → tour 1 · date 2 → tour 2
+    const tour = dateJournee - 1;
     for (const poule of etat.poules) {
-      const m = poule.journees[journee - 1]?.find(
+      const m = poule.journees[tour]?.find(
         (x) => x.domicile === nation || x.exterieur === nation,
       );
-      if (m) return { match: m, libelle: `${poule.nom}, journée ${journee}` };
+      if (m) return { match: m, libelle: `${poule.nom}, journée ${dateJournee}` };
     }
     return null;
   }
@@ -259,17 +423,37 @@ export function afficheMondialDe(
   };
 }
 
+/**
+ * Les matchs regroupés PAR DATE DE CALENDRIER, pas par tour de poule.
+ *
+ * ⚠️ C'EST CE QUI PERMET AUX ÉCRANS DE GARDER « journée = date ». La date 2
+ * porte deux tours : elle rend donc douze affiches, et c'est exact — deux
+ * rondes se sont jouées ce week-end-là. Sans ce regroupement, l'écran Résultats
+ * afficherait le tour 3 à la place du tableau final.
+ */
+export function journeesParDate(etat: EtatMondial): MatchChampionnat[][] {
+  const dates: MatchChampionnat[][] = [];
+  const tour = (j: number) => etat.poules.flatMap((p) => p.journees[j] ?? []);
+  if (etat.journeesPoulesJouees >= 1) dates.push(tour(0));
+  if (etat.journeesPoulesJouees >= 2) dates.push([...tour(1), ...tour(2)]);
+  if (etat.tableauJoue) dates.push(matchsDuBracket(etat));
+  return dates;
+}
+
+/** Le tableau final, en matchs de championnat (pour le classement mondial). */
+export function matchsDuBracket(etat: EtatMondial): MatchChampionnat[] {
+  return etat.bracket.map((f) => ({
+    domicile: f.domicile, exterieur: f.exterieur,
+    scoreD: f.scoreD, scoreE: f.scoreE,
+    essaisD: Math.max(0, Math.round((f.scoreD - 6) / 7)),
+    essaisE: Math.max(0, Math.round((f.scoreE - 6) / 7)),
+  }));
+}
+
 /** Tous les matchs disputés, pour le classement mondial et les statistiques. */
 export function matchsDuMondial(etat: EtatMondial): MatchChampionnat[] {
   const tous: MatchChampionnat[] = [];
   for (const p of etat.poules) for (const j of p.journees) tous.push(...j);
-  for (const f of etat.bracket) {
-    tous.push({
-      domicile: f.domicile, exterieur: f.exterieur,
-      scoreD: f.scoreD, scoreE: f.scoreE,
-      essaisD: Math.max(0, Math.round((f.scoreD - 6) / 7)),
-      essaisE: Math.max(0, Math.round((f.scoreE - 6) / 7)),
-    });
-  }
+  tous.push(...matchsDuBracket(etat));
   return tous;
 }

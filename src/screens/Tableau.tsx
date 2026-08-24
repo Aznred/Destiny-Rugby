@@ -78,9 +78,11 @@ function titreTour(tour: string): string {
   const traduit = t(`tb.tour.${tour}`);
   return traduit === `tb.tour.${tour}` ? tour : traduit;
 }
-const ORDRE_TOURS = ['barrage', 'quart', 'demie', 'finale', 'accession'];
+// L'ordre des COLONNES de l'arbre, de gauche à droite. La petite finale se
+// place juste avant la finale : c'est là qu'elle se joue dans un tournoi.
+const ORDRE_TOURS = ['barrage', 'huitieme', 'quart', 'demie', 'petiteFinale', 'finale', 'accession'];
 const ORDRE_TOUR_FINAL: Record<string, number> = {
-  barrage: 1, quart: 1, demie: 2, finale: 3, accession: 4,
+  barrage: 1, huitieme: 1, quart: 1, demie: 2, petiteFinale: 3, finale: 3, accession: 4,
 };
 
 function Arbre({ matchs, club }: { matchs: MatchFinal[]; club: string }) {

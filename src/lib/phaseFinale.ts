@@ -17,7 +17,15 @@ import { forceEffectif } from './effectif';
 import { semaine } from '../data/calendrier';
 import type { Joueur } from '../types';
 
-export type TourFinal = 'barrage' | 'quart' | 'demie' | 'finale' | 'accession';
+/**
+ * ⚠️ `huitieme` ET `petiteFinale` NE SERVENT QU'À LA COUPE DU MONDE
+ * (format 2027 : 24 nations, seize qualifiés, match pour la 3ᵉ place). Les
+ * coupes d'Europe appellent leur premier tour `barrage`, et il ne faut pas
+ * les confondre : voir `ORDRE_TOUR` dans `coupe.ts`, dont les valeurs sont
+ * PORTEUSES pour les coupes.
+ */
+export type TourFinal =
+  | 'barrage' | 'huitieme' | 'quart' | 'demie' | 'petiteFinale' | 'finale' | 'accession';
 
 export interface MatchFinal {
   tour: TourFinal;

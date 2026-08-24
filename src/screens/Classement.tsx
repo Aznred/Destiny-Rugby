@@ -36,7 +36,10 @@ const ArmoireTrophees = lazy(() =>
 // seul panneau de fiche à écrire, à styler et à traduire.
 interface FicheAffichable {
   cle: string;
+  /** Ce qu’on affiche en gros : le pseudo du classement. */
   nom: string;
+  /** Le nom porté sur le terrain, s’il diffère du pseudo. */
+  nomPersonnage?: string;
   poste?: string;
   nation?: string;
   age?: number;
@@ -132,7 +135,18 @@ function depuisLigneMondiale(l: LigneMondiale): FicheAffichable {
     // année que si elle en connaît une.
     palmares: (l.titres ?? []).map((id) => ({ trophee: id, nom: id, saison: 0, club: '' })),
     cle: l.id != null ? `#${l.id}` : l.pseudo,
-    nom: l.nom?.trim() || l.pseudo,
+    // ⚠️ LE PSEUDO PASSE DEVANT LE NOM DU PERSONNAGE, et c'est un bug de jeu :
+    // « si je me renomme dans le classement, mon nom n'est pas changé quand
+    // j'affiche le profil ». La ligne affichait bien « Van der merve », la
+    // fiche dépliée juste en dessous affichait toujours « Tiaan Leyds ». Deux
+    // noms pour la même carrière, à trois centimètres l'un de l'autre.
+    //
+    // ⚠️ Le nom du personnage n'est pas perdu pour autant : il s'affiche en
+    // sous-titre quand il diffère (`nomPersonnage`). C'est une information —
+    // le pseudo est ce qu'on choisit de montrer au monde, le nom est celui
+    // qu'on a porté sur le terrain.
+    nom: l.pseudo || l.nom?.trim() || '—',
+    nomPersonnage: l.nom?.trim() && l.nom.trim() !== l.pseudo ? l.nom.trim() : undefined,
     poste: l.poste ?? undefined,
     nation: l.nation ?? undefined,
     age: l.age ?? undefined,
@@ -179,6 +193,11 @@ function PanneauFiche({
       <header className="fc-tete">
         <div className="fc-identite">
           <h3>{fiche.nom}</h3>
+          {/* Le nom du personnage quand il n’est pas le pseudo : une
+              information, pas un doublon. */}
+          {fiche.nomPersonnage && (
+            <p className="fc-alias">{fiche.nomPersonnage}</p>
+          )}
           {fiche.poste && fiche.nation && (
             <p>
               {nomPoste(migrerPoste(fiche.poste))}

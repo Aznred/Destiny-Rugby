@@ -4961,3 +4961,6 @@ img, svg, canvas { max-width: 100%; }
 .grille-poules .classement-ligne {
   grid-template-columns: 1.6rem 22px minmax(88px, 1fr) 2.4rem 1.7rem 1.7rem 1.7rem 1.7rem 2.6rem 1.4rem;
 }
+
+/* Le nom du personnage sous le pseudo, dans la fiche du classement. */
+.fc-alias { margin: 0.1rem 0 0; font-size: 0.82rem; color: var(--brume); font-style: italic; }

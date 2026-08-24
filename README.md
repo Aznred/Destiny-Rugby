@@ -607,6 +607,12 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 
 | Ce qui n'allait pas | Ce qui a changé |
 |---|---|
+| **La Coupe du monde n'était pas au bon format** | Passée au format **2027** : 24 nations, **6 poules de 4** en toutes rondes, les 2 premiers plus les **4 meilleurs troisièmes**, puis **huitièmes** → quarts → demies → **match pour la 3ᵉ place** → finale. Bonus offensif à 4 essais, prolongation puis tirs au but. Les 3 premiers de chaque poule de l'édition précédente sont qualifiés d'office. |
+| **Le joueur ne disputait pas le même Mondial que celui affiché** | Trouvé en vérifiant le nouveau format : son match venait d'un carrousel générique, pas du tirage des poules. Deux tournois en parallèle, avec deux scores. Il lit maintenant le même état que l'écran. |
+| **« Afrique du Sud 51-0 Fidji »** | L’écart de niveau était LINÉAIRE : 57 points de force donnaient 131 points de marge théorique. Il sature désormais. Matchs à 50 points d’écart : **18 % → 6 %**. |
+| **« Y'a pas de hors-jeu sur les coups de pied »** | Il n'existait pas. Tout partenaire devant le botteur est maintenant hors-jeu : il ne peut pas gagner le ballon, il est remis en jeu quand le botteur le dépasse, et s'il est sur le ballon c'est pénalité. |
+| Limite d’envoi au classement trop basse | **Triplée** : 18 par heure et 120 par jour. Et le plancher côté jeu suit — le tripler côté serveur seul n’aurait rien changé, c’était le jeu qui bridait. |
+| **Se renommer au classement ne changeait pas la fiche** | La ligne affichait le nouveau nom, la fiche dépliée l’ancien. Le pseudo passe devant ; le nom du personnage reste en sous-titre. |
 | **« Je suis en Coupe du monde et c'est marqué tournée d'automne »** | Le libellé vient du CALENDRIER, qui est le même toutes les saisons — or une saison sur quatre, le Mondial **remplace** la tournée. `libelleSemaine` prend maintenant la saison. Contre-épreuve faite : une saison sans Mondial dit toujours « Tournée d'automne ». |
 | On portait l’écusson de son CLUB en pleine Coupe du monde | L’avatar du panneau devient **l’écusson de la sélection** dès qu’il y a un match international, et une pastille dit laquelle. Le club reste affiché à côté : c’est lui qui paie le salaire. |
 | Impossible de voir son groupe national | L’écran Effectif a **deux onglets** — son club, sa sélection — et « 👥 Équipe » ouvre le bon selon la semaine. Le XV national est exactement celui que le moteur aligne : 31 joueurs, les meilleurs du pays tous clubs confondus. |
@@ -707,6 +713,12 @@ vérification — est dans [`CLAUDE.md`](CLAUDE.md), sections
 
 
 ## 🧑‍🏫 Le mode manager (couche 1)
+
+> ⚠️ **CACHÉ POUR L’INSTANT.** Le mode est entier et jouable, mais ses portes
+> d’entrée sont fermées tant que la couche 2 (composer le XV, coacher le match)
+> n’est pas là : on ne veut pas qu’un joueur tombe sur un mode inachevé et le
+> prenne pour un bug. Pour l’ouvrir : `?dev=1` dans l’adresse (voir
+> `src/lib/modeDev.ts`).
 
 On peut désormais mener une **carrière d’entraîneur**, à côté de la carrière de
 joueur. Elle se lance depuis l’accueil (« 🧑‍🏫 Devenir entraîneur ») ou à la

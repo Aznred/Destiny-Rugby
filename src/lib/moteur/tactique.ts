@@ -433,6 +433,26 @@ export function placerEquipes(e: EtatMatch): void {
     // placer derrière sa propre ligne d'essai. Seul un chasseur lancé sur le
     // porteur y va — parce que le porteur y va.
     if (p.role !== 'chasseur') p.cible.x = bornerX(p.cible.x);
+    // ⚠️ UN JOUEUR HORS-JEU LÈVE LE PIED, IL NE SE FIGE PAS — et la nuance a
+    //    été MESURÉE. Première version : cible = sa propre position, effort
+    //    0,25. Avec une cinquantaine de coups de pied par match et le paquet
+    //    d’avants systématiquement devant son ouvreur, c’étaient huit joueurs
+    //    plantés à chaque dégagement — l’étalonnage du moteur a bougé aussitôt
+    //    (grattages 6,8 → 9,3 par match, hors cible, et le raffut a cessé de
+    //    faire franchir). Il ralentit donc simplement : il ne chasse plus, il
+    //    n’arrête pas de jouer au rugby.
+    // ⚠️ ET SEULEMENT PENDANT LE VOL DU BALLON. Le drapeau ne s’éteint qu’à la
+    //    reprise du jeu ; l’appliquer après la réception ferait trottiner un
+    //    paquet d’avants pendant tout le temps de jeu suivant, alors que le
+    //    hors-jeu ne concerne que la chasse. Mesuré sans cette borne :
+    //    grattages 6,8 → 9,3 par match (hors cible) et le raffut cessait de
+    //    faire franchir.
+    if (p.horsJeu && e.phase === 'ballonEnLAir') {
+      p.cible.x = p.pos.x;
+      p.cible.y = p.pos.y;
+      p.effort = 0.2;
+      continue;
+    }
     if (arret || p.role === 'chasseur') { p.effort = 1; continue; }
     const d2 = distance2(p.pos, e.ballon);
     p.effort = d2 < 400 ? 1 : d2 < 1600 ? 0.76 : 0.5;

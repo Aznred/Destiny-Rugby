@@ -6,6 +6,7 @@ import { t } from '../lib/i18n';
 // il existe pour retenir quelqu'un qui hésite à rester, une seconde d'attente
 // le viderait de son sens. Il ne monte ni canvas ni modèle 3D — c'est du texte.
 import { Tutoriel } from '../components/Tutoriel';
+import { chantierVisible } from '../lib/modeDev';
 
 // La 3D (Three.js) est lourde : on la charge à la demande pour un premier
 // affichage immédiat du texte, puis la scène apparaît en fondu.
@@ -105,9 +106,15 @@ export function Accueil() {
                     jeu s’appelle « carrière de rugby », pas « carrière de
                     joueur ». Il reste en second : entraîner est le mode
                     d’après, et on démarre en Régionale sans expérience. */}
+                {/* ⚠️ CACHÉ TANT QUE LA COUCHE 2 N'EST PAS LÀ (demande explicite :
+                    « cache le mode entraîneur, il doit être accessible que par moi
+                    le dev »). Le mode est ENTIER par ailleurs — c'est sa porte
+                    d'entrée qu'on retire, pas lui. Voir `lib/modeDev.ts`. */}
+                {chantierVisible('manager') && (
                 <button className="btn fantome grand" onClick={() => setEcran('creationManager')}>
                   🧑‍🏫 Devenir entraîneur
                 </button>
+                )}
               </>
             )}
           </motion.div>

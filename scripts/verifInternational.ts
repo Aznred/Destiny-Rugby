@@ -103,13 +103,19 @@ console.log('\n=== 7. ⚠️ LA COUPE DU MONDE SE JOUE VRAIMENT ===');
   let scoresImpossibles = 0;
   let poulesIncompletes = 0;
   let matchsEnDouble = 0;
+  let seizeIncomplets = 0;
+  let sansPetiteFinale = 0;
+  let troisiemesHorsPoule = 0;
 
   for (const saison of SAISONS) {
     const m = mondialEnDirect(saison, 3);
-    // Quatre poules de six, deux matchs chacune : personne ne joue deux fois
-    // le même adversaire, et personne n’est oublié.
+    // ⚠️ FORMAT 2027 : six poules de QUATRE, en toutes rondes. Chaque nation
+    //    joue exactement TROIS matchs, contre ses trois adversaires, une fois
+    //    chacun. L’ancien format (4 poules de 6, deux matchs) ne pouvait pas
+    //    dire « toutes rondes » — et sa première version rejouait une affiche
+    //    sur trois.
     for (const p of m.poules) {
-      if (p.equipes.length !== 6) poulesIncompletes++;
+      if (p.equipes.length !== 4) poulesIncompletes++;
       const compte = new Map<string, number>();
       const paires = new Set<string>();
       for (const j of p.journees) for (const x of j) {
@@ -119,11 +125,20 @@ console.log('\n=== 7. ⚠️ LA COUPE DU MONDE SE JOUE VRAIMENT ===');
         if (paires.has(paire)) matchsEnDouble++;
         paires.add(paire);
       }
-      for (const e of p.equipes) if (compte.get(e) !== 2) poulesIncompletes++;
+      for (const e of p.equipes) if (compte.get(e) !== 3) poulesIncompletes++;
     }
-    // Le tableau : 4 quarts + 2 demies + 1 finale, aucun nul, aucun score
-    // impossible au rugby.
-    if (m.bracket.length !== 7) sansFinale++;
+    // Les seize : deux par poule + les quatre meilleurs troisièmes.
+    if (m.qualifies.length !== 16) seizeIncomplets++;
+    // ⚠️ UN REPÊCHÉ DOIT VRAIMENT ÊTRE TROISIÈME DE SA POULE. Le tri des
+    //    troisièmes compare des lignes de tableaux DIFFÉRENTS : une erreur
+    //    d’index y repêcherait un quatrième sans que rien ne le montre.
+    for (const n of m.meilleursTroisiemes) {
+      const p = m.poules.find((x) => x.equipes.includes(n));
+      if (!p || p.classement[2]?.club !== n) troisiemesHorsPoule++;
+    }
+    // Le tableau : 8 huitièmes + 4 quarts + 2 demies + finale + petite finale.
+    if (m.bracket.length !== 16) sansFinale++;
+    if (!m.bracket.some((f) => f.tour === 'petiteFinale')) sansPetiteFinale++;
     for (const f of m.bracket) {
       if (f.scoreD === f.scoreE) nulsEnTableau++;
       for (const sc of [f.scoreD, f.scoreE]) if (sc === 1 || sc === 2 || sc === 4) scoresImpossibles++;
@@ -134,13 +149,22 @@ console.log('\n=== 7. ⚠️ LA COUPE DU MONDE SE JOUE VRAIMENT ===');
   const m4 = mondialEnDirect(4, 3);
   console.log(`  ${"poules".padEnd(46)} ${m4.poules.map((p) => p.equipes.length).join(" · ")}`);
   console.log(`  ${"tableau".padEnd(46)} ${m4.bracket.map((f) => f.tour).join(" · ")}`);
-  console.log(`  ${"finale".padEnd(46)} ${m4.bracket.at(-1)?.libelle ?? "aucune"}`);
+  console.log(`  ${"finale".padEnd(46)} ${m4.bracket.find((f) => f.tour === "finale")?.libelle ?? "aucune"}`);
+  console.log(`  ${"3e place".padEnd(46)} ${m4.troisieme ?? "aucun"}`);
 
-  dit(`chaque poule fait six nations, deux matchs`,
-    poulesIncompletes ? `${poulesIncompletes} anomalie(s)` : `4 poules de 6`, poulesIncompletes === 0);
+  dit(`six poules de quatre, en toutes rondes`,
+    poulesIncompletes ? `${poulesIncompletes} anomalie(s)` : `6 poules de 4, 3 matchs chacun`,
+    poulesIncompletes === 0);
+  dit(`seize qualifiés : 12 + les 4 meilleurs troisièmes`,
+    seizeIncomplets ? `${seizeIncomplets} édition(s) incomplète(s)` : `16 à chaque fois`,
+    seizeIncomplets === 0);
+  dit(`et un repêché est bien 3ᵉ de sa poule`,
+    `${troisiemesHorsPoule} anomalie(s)`, troisiemesHorsPoule === 0);
+  dit(`le match pour la 3ᵉ place se joue`,
+    `${SAISONS.length - sansPetiteFinale}/${SAISONS.length}`, sansPetiteFinale === 0);
   dit(`et jamais deux fois le même adversaire`,
     `${matchsEnDouble} doublon(s)`, matchsEnDouble === 0);
-  dit(`le tableau va jusqu’à la finale`,
+  dit(`le tableau va des huitièmes à la finale (16 matchs)`,
     `${SAISONS.length - sansFinale}/${SAISONS.length} mondiaux complets`, sansFinale === 0);
   dit(`aucun nul à élimination directe`, `${nulsEnTableau}`, nulsEnTableau === 0);
   dit(`aucun score impossible au rugby`, `${scoresImpossibles}`, scoresImpossibles === 0);

@@ -386,6 +386,11 @@ function tick(e: EtatMatch): void {
 
   // ── Le ballon en vol ─────────────────────────────────────────────────────
   if (e.vol) {
+    // ⚠️ REMISE EN JEU : le botteur court, et ceux qu’il dépasse redeviennent
+    //    jouables. Sans ce rattrapage, un chasseur marqué au coup de pied le
+    //    resterait toute la séquence — même après avoir été doublé par son
+    //    propre botteur, ce qui est exactement le cas où il redevient loyal.
+    if (e.vol.type === 'pied') remettreEnJeu(e, e.vol.auteur);
     e.vol.ecoule += dt;
     const k = Math.min(1, e.vol.ecoule / e.vol.duree);
     e.ballon = {
@@ -654,6 +659,31 @@ function lancerVol(
   duree: number, hauteur: number, depuis?: Vec,
 ): void {
   const de = depuis ?? { x: auteur.pos.x, y: auteur.pos.y };
+
+  // ═══ LE HORS-JEU SUR COUP DE PIED ══════════════════════════════════════
+  //
+  // ⚠️ IL N'EXISTAIT PAS. Retour de jeu : « durant le jeu y'a pas de hors-jeu
+  // sur les coups de pied, fixe-le ». Un ailier placé trente mètres devant son
+  // ouvreur récupérait le ballon sans que rien ne soit sifflé — c'est la faute
+  // la plus élémentaire du rugby, et la plus visible.
+  //
+  // La règle : au moment du coup de pied, TOUT partenaire situé devant le
+  // botteur est hors-jeu. Il ne peut ni chasser ni jouer le ballon jusqu'à ce
+  // qu'on le remette en jeu — en pratique, jusqu'à ce que le botteur (ou un
+  // partenaire parti de derrière lui) le dépasse.
+  //
+  // ⚠️ ON MARQUE ICI PARCE QUE C'EST LE SEUL ENTONNOIR DES COUPS DE PIED.
+  // Dégagement, occupation, chandelle, 50/22, rasant, transversale, drop,
+  // renvoi : les huit intentions passent par `lancerVol`. Poser la règle dans
+  // `deciderAvecLeBallon` aurait demandé huit copies, et il n'en aurait manqué
+  // qu'une pour que le hors-jeu redevienne facultatif.
+  const sHJ = sens(auteur.cote);
+  for (const q of surLeTerrain(e, auteur.cote)) {
+    q.horsJeu = q !== auteur && (q.pos.x - de.x) * sHJ > 0.5;
+  }
+  // Les adversaires ne sont jamais hors-jeu sur NOTRE coup de pied.
+  for (const q of surLeTerrain(e, adverse(auteur.cote))) q.horsJeu = false;
+
   e.vol = {
     de, vers: arrivee, duree, ecoule: 0, hauteur,
     type: 'pied', intention, auteur, receveur: null,
@@ -663,6 +693,27 @@ function lancerVol(
   e.phase = 'ballonEnLAir';
   e.minuteur = duree + 0.5;
   e.derniereTouche = auteur;
+}
+
+/**
+ * Remet en jeu les partenaires que le botteur a dépassés.
+ *
+ * ⚠️ C'EST LE BOTTEUR QUI REMET EN JEU, pas le temps qui passe. Un chasseur
+ * hors-jeu qui attend ne redevient pas loyal parce qu'il a patienté : il le
+ * redevient parce que quelqu’un venu de derrière lui est passé devant. Poser
+ * un simple compte à rebours aurait donné un hors-jeu qui s'efface tout seul,
+ * c'est-à-dire une règle qu'on n'applique pas.
+ */
+function remettreEnJeu(e: EtatMatch, botteur: Pion): void {
+  const s = sens(botteur.cote);
+  for (const q of surLeTerrain(e, botteur.cote)) {
+    if (q.horsJeu && (botteur.pos.x - q.pos.x) * s >= 0) q.horsJeu = false;
+  }
+}
+
+/** Tout le monde est en jeu : à toute reprise, le hors-jeu du pied s’efface. */
+function libererHorsJeu(e: EtatMatch): void {
+  for (const p of e.pions) p.horsJeu = false;
 }
 
 function phaseBallonEnLAir(e: EtatMatch): void {
@@ -738,8 +789,30 @@ function phaseBallonEnLAir(e: EtatMatch): void {
     }
     return best;
   };
-  const chasseur = meilleur(mien);
+  // ⚠️ UN JOUEUR HORS-JEU NE PEUT PAS JOUER LE BALLON, et c’est là que la
+  //    règle se voit. On choisit donc le meilleur chasseur PARMI LES LOYAUX ;
+  //    celui qui était devant son botteur n'est plus candidat, quelle que soit
+  //    son avance.
+  const chasseur = meilleur(mien.filter((p) => !p.horsJeu));
   const receveur = meilleur(adv);
+
+  // ⚠️ ET S’IL EST SUR LE BALLON, C’EST PÉNALITÉ. Ne pas le laisser gagner la
+  //    course suffirait à respecter la règle, mais pas à la RENDRE VISIBLE : un
+  //    ailier planté à deux mètres du point de chute doit être sifflé, sinon le
+  //    joueur ne comprend pas pourquoi son chasseur s'arrête. Le rayon est
+  //    serré (4 m) exprès : au-delà, il n’a gêné personne, et gonfler le compte
+  //    de pénalités déplacerait l’étalonnage du moteur (cible 14 à 26).
+  //    On siffle quand un hors-jeu est PLUS PRÈS DU BALLON que le chasseur
+  //    loyal : c’est le cas où il allait manifestement le jouer. Un rayon fixe
+  //    de quatre mètres ne sifflait JAMAIS rien (mesuré : 0,00 par match sur
+  //    14 matchs) — la règle existait dans le code et pas à l’écran.
+  const distLoyal = chasseur ? distance2(chasseur.pos, arrivee) : Infinity;
+  const intrus = mien.find((p) => p.horsJeu
+    && distance2(p.pos, arrivee) < Math.min(distLoyal, 100));
+  if (intrus) {
+    libererHorsJeu(e);
+    return siffler(e, adverse(camp), { x: arrivee.x, y: arrivee.y }, 'hors-jeu', intrus);
+  }
 
   // Un coup de pied de récupération (chandelle, rasant, transversale) donne une
   // vraie chance au chasseur ; un dégagement, non.
@@ -1524,6 +1597,10 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec): void {
   e.porteur = null;
   e.vol = null;
   e.lancement = null;
+  // ⚠️ ET LE HORS-JEU DU PIED S’EFFACE. Une phase arrêtée remet tout le monde
+  //    en jeu : garder le drapeau ferait chasser un joueur au ralenti trois
+  //    phases après le coup de pied qui l’avait mis hors-jeu.
+  libererHorsJeu(e);
   // Le jeu s'arrête : ce qui a été passé avant n'amènera plus d'essai.
   e.dernierPasseur = null;
   e.phasesDepuisArret = 0;
@@ -1905,6 +1982,8 @@ function reprendreJeu(e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?
   // terminé. Celle qui est menée continue de jouer.
   if (e.sirene && ecart(e, e.possession) >= 0) return clorePeriode(e);
 
+  // Le ballon est joué : le hors-jeu du coup de pied précédent est éteint.
+  libererHorsJeu(e);
   const cote = e.possession;
   const liste = surLeTerrain(e, cote);
   if (!liste.length) return clorePeriode(e);

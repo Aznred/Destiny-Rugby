@@ -7246,3 +7246,243 @@ saison 5    🍂 Tournée d’automne                    ← la contre-épreuve
 À 375 px : quatre poules en une colonne, noms lisibles, **aucun débordement
 horizontal**, et le tableau n'a même pas besoin de défiler (les colonnes
 secondaires sont déjà masquées sur téléphone).
+
+---
+
+## 🌍 LA COUPE DU MONDE PASSE AU FORMAT 2027 — 24 nations, 6 poules de 4, huitièmes
+
+Le format a été donné en détail, et c'est celui de la vraie édition 2027 :
+24 équipes en **six poules de quatre** jouées en toutes rondes, les deux
+premiers de chaque poule plus les **quatre meilleurs troisièmes**, puis
+**huitièmes** → quarts → demies → **match pour la 3ᵉ place** → finale. Bonus
+offensif à **quatre essais marqués**, bonus défensif à sept points. Égalité en
+phase finale : prolongation, puis **tirs au but**.
+
+⚠️ **`lib/mondial.ts` A ÉTÉ RÉÉCRIT, PAS AMENDÉ.** L'ancien format (4 poules de
+6, deux matchs chacune, tableau à 8) n'a plus rien en commun avec celui-ci : ni
+le tirage, ni la grille, ni le nombre de qualifiés, ni le barème. Ne pas
+chercher à faire cohabiter les deux.
+
+### Le tirage, et pourquoi il tombe juste
+
+Quatre chapeaux de six selon le rang mondial, un par ligne de poule. Avec des
+poules de quatre, chaque poule reçoit **exactement une nation de chaque
+chapeau** — c'est le tirage réel d'une Coupe du monde, et il n'y a plus le
+moindre reste à répartir.
+
+⚠️ **ET LA QUALIFICATION EST HÉRITÉE.** Les trois premiers de chaque poule de
+l'édition précédente sont qualifiés d'office : six poules, donc **dix-huit
+places héritées**, les six dernières allant au classement mondial (le jeu n'a
+pas de tournois continentaux, et en inventer six demanderait six calendriers).
+Deux garde-fous, et il faut les deux : un **plancher** (avant la deuxième
+édition il n'y a pas de Mondial antérieur à lire) et un **mémo par saison**,
+sans lequel la saison 40 rejouerait neuf éditions dont chacune rejouerait les
+huit précédentes.
+
+### La compression du calendrier, et pourquoi elle porte sur les POULES
+
+Le calendrier réserve **trois dates** à la fenêtre d'automne. Il faut y caser
+trois tours de poule et cinq tours de tableau :
+
+| date | ce qui se joue |
+|---|---|
+| S10 | 1ᵉʳ tour de poule |
+| S11 | **2ᵉ et 3ᵉ tours de poule** |
+| S12 | tout le tableau : huitièmes → quarts → demies → 3ᵉ place → finale |
+
+⚠️ **ON COMPRIME LES POULES, PAS LE TABLEAU, ET C'EST UN CHOIX DE JEU.** Le
+joueur ne dispute qu'un match par date. En étalant les poules sur les trois
+dates il jouerait ses trois matchs de poule et **ne disputerait jamais un match
+à élimination directe de Coupe du monde** — on lui retirerait le seul moment qui
+compte. En comprimant, il joue deux matchs de poule en direct, son troisième se
+résout en fond, et il dispute vraiment son huitième.
+
+⚠️ **`toursDePouleApres()` EST LA SEULE DÉFINITION DE CETTE COMPRESSION**, et
+`journeesParDate()` la seule façon de regrouper les matchs par date. Trois
+lecteurs en ont besoin (l'état, l'affiche du joueur, l'écran Résultats) : trois
+copies, et un jour l'écran annoncerait un match que le classement ne connaît pas.
+
+### ⚠️ ET LE JOUEUR NE DISPUTAIT PAS LE MÊME TOURNOI QUE CELUI AFFICHÉ
+
+Bug trouvé en vérifiant le nouveau format, **antérieur à ce lot**, et c'est le
+plus grave des deux. `matchInternationalDuJoueur` passait par `grille()` — un
+carrousel générique sur les 24 nations — au lieu de lire `lib/mondial.ts`. Le
+match du joueur n'était donc ni son match de poule, ni son huitième : c'était
+une affiche inventée, avec sa propre graine, donc son propre score. **L'écran
+Résultats montrait un tournoi, le joueur en jouait un autre.**
+
+C'est exactement la forme du bug déjà payé sur le classement mondial (`rang#…`
+contre `…`). La Coupe du monde a désormais son chemin dédié, qui rend le match
+tel quel : même graine, même score, même adversaire. Vérifié en jeu :
+
+```text
+semaine 10 → Coupe du monde J1 — Afrique du Sud 47-5 Fidji     (poule A, tour 1)
+semaine 11 → Coupe du monde J2 — Afrique du Sud 51-0 Tonga     (poule A, tour 2)
+semaine 12 → Coupe du monde J3 — Afrique du Sud 43-0 Portugal  (huitième)
+```
+
+### ⚠️ ET LES SCORES ÉTAIENT INVRAISEMBLABLES — l'écart de niveau ne saturait pas
+
+Mesuré sur quatre éditions : **18 % des matchs à cinquante points d'écart ou
+plus**, un maximum de 69, et des « Afrique du Sud 51-0 Fidji ». La cause est
+arithmétique : `jouerTestMatch` appliquait `ecart × 1,15` **des deux côtés**,
+soit 2,3 points de score par point de force. Correct pour un Tournoi (5 à 15
+d'écart → 12 à 35 points, la réalité) ; absurde dès qu'on met le monde entier
+dans la même poule — l'Afrique du Sud (94) contre le Zimbabwe (40), c'est 57
+d'écart, donc **131 points** de marge théorique.
+
+L'écart passe par un `tanh` plafonné à 22 : les petits écarts sont intacts (10
+reste 9,5), les grands sont comprimés (57 devient 22).
+
+| | avant | après |
+|---|---|---|
+| écart moyen | 31,4 | **27,3** |
+| écart maximal | 69 | **59** |
+| matchs à 50 points ou plus | 18 % | **6 %** |
+
+⚠️ **C'EST UN CHANGEMENT AU-DELÀ DE CE QUI ÉTAIT DEMANDÉ**, et il touche TOUS les
+résultats internationaux — donc le classement mondial, les titres, les
+sélections. Il est fait parce que la refonte du format le rendait visible en
+permanence, et les cinq bancs concernés ont été rejoués (`verifInternational`,
+`verifClassementWorldRugby`, `verifTitres`, `verifSelection`, `verifU20`).
+
+### Ce que le tableau a gagné
+
+`TourFinal` accueille `huitieme` et `petiteFinale`. ⚠️ **Ils sont AJOUTÉS À LA
+FIN de `ORDRE_TOUR`, jamais insérés** : ces valeurs sont porteuses pour les
+coupes d'Europe (`ordreTourCourant` les compare directement au nombre de dates
+de coupe jouées), et renuméroter `barrage`/`quart`/`demie`/`finale` décalerait
+tout leur tableau d'un tour. L'ordre d'AFFICHAGE, lui, vit dans `ORDRE_TOURS`
+(Tableau.tsx), où la petite finale se place juste avant la finale.
+
+### Mesuré (`verifInternational.ts`, section 7)
+
+| | |
+|---|---|
+| poules | **6 × 4**, toutes rondes, 3 matchs par nation |
+| affiches rejouées deux fois | **0** |
+| qualifiés | **16** à chaque édition (12 + 4 meilleurs troisièmes) |
+| un repêché est bien 3ᵉ de sa poule | **0 anomalie** |
+| tableau | 8 huitièmes + 4 quarts + 2 demies + finale + petite finale = **16 matchs** |
+| matchs nuls à élimination directe · scores impossibles | **0 · 0** |
+| un champion par édition | **3/3** |
+
+Vérifié à l'écran (1280 px et 375 px) : six poules, colonnes
+« Huitièmes · Quarts · Demi-finales · Match pour la 3ᵉ place · Finale »
+(8 · 4 · 2 · 1 · 1), un champion affiché, et **aucun débordement horizontal**.
+
+---
+
+## 🚩 LE HORS-JEU SUR COUP DE PIED
+
+Retour de jeu : « durant le jeu y'a pas de hors-jeu sur les coups de pied,
+fixe-le ». C'était exact : un ailier placé trente mètres devant son ouvreur
+récupérait le ballon sans que rien ne soit sifflé.
+
+La règle est posée **dans `lancerVol`**, et c'est le point important : les huit
+intentions de coup de pied (dégagement, occupation, chandelle, 50/22, rasant,
+transversale, drop, renvoi) passent toutes par cet entonnoir. La poser dans
+`deciderAvecLeBallon` aurait demandé huit copies, et il n'en aurait manqué
+qu'une pour que le hors-jeu redevienne facultatif.
+
+- **Au coup de pied**, tout partenaire situé devant le botteur est marqué
+  (`Pion.horsJeu`).
+- **Il ne peut pas gagner le ballon** : il est écarté des candidats à la
+  réception.
+- **Il est remis en jeu par le BOTTEUR**, pas par le temps qui passe : un
+  chasseur parti trop tôt ne redevient pas loyal parce qu'il a patienté, mais
+  parce que quelqu'un venu de derrière l'a dépassé. Un simple compte à rebours
+  aurait donné une règle qui s'efface toute seule.
+- **S'il est plus près du ballon que le chasseur loyal, c'est pénalité.**
+- Toute reprise de jeu (`arret`, `reprendreJeu`) éteint le drapeau.
+
+### ⚠️ ET LA PREMIÈRE VERSION A DÉPLACÉ L'ÉTALONNAGE DU MOTEUR
+
+Elle figeait le joueur hors-jeu (cible = sa propre position, effort 0,25) et le
+laissait figé tant que le drapeau tenait. Avec une cinquantaine de coups de pied
+par match et le paquet d'avants systématiquement devant son ouvreur, c'étaient
+huit joueurs plantés à chaque dégagement — **pendant tout le temps de jeu
+suivant**. Mesuré aussitôt : grattages 6,8 → **9,3** par match (hors cible), et
+le raffut a cessé de faire franchir.
+
+L'arrêt est donc borné à `phase === 'ballonEnLAir'` : il ne chasse plus, il
+n'arrête pas de jouer au rugby. Étalonnage revérifié — 42,6 points, 5,6 essais,
+48,9 coups de pied, **20,7 pénalités** (cible 14 à 26), 155 rucks, 16,5 mêlées.
+
+### 🩹 Un banc d'essai qui répondait au hasard
+
+`verifControle.ts` comparait les franchissements avec et sans crochet sur
+**douze matchs**, pour une statistique qui vaut ~1 par match : l'écart-type de la
+moyenne dépassait l'effet mesuré. Relevé tel quel sur le MÊME code : « 0,9 →
+0,7 » une fois, « 0,8 → 1,6 » la suivante. Porté à **quarante matchs** : 0,9 →
+1,2 pour les deux gestes, stable. C'est la même leçon que les gestes illégaux
+(section 9), et un test qui répond au hasard est pire qu'une absence de test —
+il fait chercher une régression qui n'existe pas.
+
+---
+
+## 🔒 LE MODE ENTRAÎNEUR EST CACHÉ (chantier en cours)
+
+Demande : « cache le mode entraîneur pour l'instant, il doit être accessible que
+par moi le dev pour voir les bugs ».
+
+**`src/lib/modeDev.ts`** — `chantierVisible('manager')`. Trois façons d'ouvrir :
+en développement (`npm run dev`, toujours ouvert), `?dev=1` dans l'adresse (le
+passage qu'on utilise une fois), et le `localStorage` qu'il pose (le passage qui
+survit aux rechargements). `?dev=0` referme.
+
+⚠️ **CE N'EST PAS UNE SÉCURITÉ, et il ne faut pas le présenter comme telle.**
+Tout ce qui est livré au navigateur est lisible : la clé se trouve en vingt
+secondes dans le bundle, comme la clé Groq du site. C'est un **interrupteur de
+chantier** — il évite qu'un joueur tombe sur un mode inachevé, se demande
+pourquoi il ne peut pas composer son XV, et le prenne pour un bug.
+
+⚠️ **ET IL NE SUPPRIME RIEN.** Le mode est entier : store, écrans, banc d'essai,
+classement à catégories, persistance. Seules ses deux PORTES sont fermées — le
+bouton de l'accueil, et la reconversion « Entraîneur » à la retraite (qui
+retombe au Hall, comme les quatre autres reconversions). Le jour où la couche 2
+est prête, on retire `manager` de `CHANTIERS` et tout réapparaît sans rien
+réécrire.
+
+Vérifié dans le bundle de production : `import.meta.env.DEV` est compilé away,
+le drapeau `ovalie-dev` est bien la seule porte.
+
+---
+
+## 🩹 Deux correctifs de plus
+
+### La limite d'envoi au classement, triplée
+
+Demande : « augmente la limite de requêtes par heure, c'est pas assez ».
+**6/heure et 40/jour → 18/heure et 120/jour.**
+
+⚠️ **ET LES DEUX CÔTÉS DOIVENT BOUGER ENSEMBLE.** Tripler le débit du serveur
+seul n'aurait **rien** changé pour le joueur : c'est le jeu qui limitait la
+cadence, avec son plancher de dix minutes entre deux envois automatiques —
+calibré précisément sur les six envois par heure du serveur. Le plancher est
+désormais **calculé** (`60 / ENVOIS_PAR_HEURE`, soit 3 min 20 s), pas écrit en
+dur : les deux ne peuvent plus diverger sans qu'on le voie.
+
+⚠️ **CE N'EST PAS UN AFFAIBLISSEMENT DE LA PROTECTION.** Le débit n'a jamais été
+ce qui protège le classement — c'est le RECALCUL du score côté serveur. Un
+script qui posterait cent fois par heure n'obtiendrait que des refus.
+
+### Le renommage au classement n'atteignait pas la fiche
+
+Retour de jeu : « si je me renomme dans le classement, mon nom n'est pas changé
+quand j'affiche le profil ». La ligne affichait bien « Van der merve », la fiche
+dépliée juste en dessous affichait toujours « Tiaan Leyds » — deux noms pour la
+même carrière, à trois centimètres l'un de l'autre.
+
+Le pseudo passe devant le nom du personnage dans la fiche. ⚠️ **Le nom du
+personnage n'est pas perdu** : il s'affiche en sous-titre quand il diffère. Le
+pseudo est ce qu'on choisit de montrer au monde, le nom est celui qu'on a porté
+sur le terrain — les deux sont une information.
+
+```bash
+npx vite-node scripts/verifInternational.ts       # section 7 au format 2027
+npx vite-node scripts/verifClassementWorldRugby.ts # l’écart saturé n’a rien cassé
+npx vite-node scripts/verifMoteur.ts               # l’étalonnage tient malgré le hors-jeu
+npx vite-node scripts/verifControle.ts             # franchissements mesurés sur 40 matchs
+npx vite-node scripts/verifTitres.ts               # le titre mondial suit la finale
+```

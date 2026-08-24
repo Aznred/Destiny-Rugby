@@ -92,8 +92,17 @@ export interface EtatCoupe {
  * L'ordre des tours d'un tableau final. Exporté parce que trois écrans en ont
  * besoin pour savoir ce qui est joué et ce qui reste à jouer.
  */
+// ⚠️ CES VALEURS SONT PORTEUSES, PAS DÉCORATIVES : `ordreTourCourant` les
+//    compare directement au NOMBRE DE DATES DE COUPE JOUÉES (`toursJoues`).
+//    Renuméroter `barrage`, `quart`, `demie` ou `finale`, c'est décaler tout
+//    le tableau des coupes d'Europe d'un tour.
+// ⚠️ `huitieme` et `petiteFinale` sont donc AJOUTÉS À LA FIN, jamais insérés :
+//    ils n'existent qu'en Coupe du monde, qui a son propre tableau
+//    (`lib/mondial.ts`) et ne lit pas cette table. Leur rang ici ne sert à
+//    rien — l'ordre d'AFFICHAGE vit dans `ORDRE_TOURS` (Tableau.tsx).
 export const ORDRE_TOUR: Record<MatchFinal['tour'], number> = {
   barrage: 1, quart: 2, demie: 3, finale: 4, accession: 5,
+  huitieme: 6, petiteFinale: 7,
 };
 
 /**

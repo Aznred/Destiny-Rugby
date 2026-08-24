@@ -24,7 +24,7 @@ import { semaine, CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier'
 // s’exécute à l’évaluation des deux modules — que des déclarations. C’est la
 // même précaution que pour `forceNation`, mémoïsée à la demande.
 import {
-  JOURNEES_POULES, matchsDuMondial, mondialEnDirect, type PouleMondial,
+  DATES_POULES, afficheMondialDe, journeesParDate, mondialEnDirect, type PouleMondial,
 } from './mondial';
 import type { MatchFinal } from './phaseFinale';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
@@ -121,13 +121,12 @@ export function matchsInternationaux(
   apport: { nation: string; bonus: number } | null,
 ): MatchChampionnat[][] {
   if (c.id === 'coupeDuMonde') {
-    const m = mondialEnDirect(saison, jusqua);
-    const tout: MatchChampionnat[][] = [];
-    for (let j = 0; j < Math.min(JOURNEES_POULES, jusqua); j++) {
-      tout.push(m.poules.flatMap((p) => p.journees[j] ?? []));
-    }
-    if (m.tableauJoue) tout.push(matchsDuMondial(m).slice(-m.bracket.length));
-    return tout;
+    // ⚠️ ON REGROUPE PAR DATE DE CALENDRIER, PAS PAR TOUR DE POULE. La 2ᵉ date
+    //    en porte deux (format 2027 : trois tours dans deux week-ends), et
+    //    tous les écrans indexent par « journée = date ». Sans ce
+    //    regroupement, la date 3 afficherait le 3ᵉ tour de poule à la place du
+    //    tableau final. La règle vit dans `lib/mondial.ts`, une seule fois.
+    return journeesParDate(mondialEnDirect(saison, jusqua));
   }
   const grilleC = grille(c, saison);
   const journees: MatchChampionnat[][] = [];
@@ -222,19 +221,67 @@ export function classementMondial(saison: number, numeroSemaine?: number): Ligne
   return classement;
 }
 
-/** Les douze premiers sont qualifiés d'office ; douze places se gagnent en barrages. */
+/**
+ * Les 24 nations de la Coupe du monde.
+ *
+ * ⚠️ LES TROIS PREMIERS DE CHAQUE POULE DE L'ÉDITION PRÉCÉDENTE SONT
+ * QUALIFIÉS D'OFFICE, et c'est la vraie règle : « les équipes ayant terminé
+ * dans les trois premiers de leur poule lors de l'édition précédente sont
+ * automatiquement qualifiées ». Six poules de quatre, donc **dix-huit places
+ * héritées** ; les six dernières se gagnent au classement mondial, qui tient
+ * lieu de tournois continentaux — le jeu n'a pas de qualifications
+ * régionales, et en inventer six demanderait six calendriers.
+ *
+ * ⚠️ ET ÇA RECULE D'ÉDITION EN ÉDITION. `mondialEnDirect(saison - 4)` rappelle
+ * cette fonction pour la saison précédente, qui rappelle l'avant-précédente…
+ * D'où DEUX garde-fous, et il faut les deux :
+ *   • **un plancher** : avant la deuxième édition (saison 8), il n'y a pas de
+ *     Coupe du monde antérieure à lire — on part du seul classement mondial ;
+ *   • **un mémo par saison**, sinon la profondeur se paierait en
+ *     re-simulations : à la saison 40, c'est neuf éditions à rejouer, et
+ *     chacune rejouerait les huit précédentes.
+ */
+const cacheQualifies = new Map<number, string[]>();
+
 export function qualifiesCoupeDuMonde(saison: number): string[] {
+  const memo = cacheQualifies.get(saison);
+  if (memo) return memo;
+
   const rang = classementMondial(Math.max(1, saison - 1));
-  const directs = rang.slice(0, 12).map((l) => l.nation);
-  const barragistes = rang.slice(12, 36).map((l) => l.nation);
-  const qualifies: string[] = [];
-  for (let i = 0; i + 1 < barragistes.length && qualifies.length < 12; i += 2) {
-    const a = barragistes[i];
-    const b = barragistes[i + 1];
-    const match = jouerTestMatch(a, b, saison - 1, `qualif-mondial#${saison}#${a}#${b}`, null);
-    qualifies.push(match.scoreD >= match.scoreE ? a : b);
+  const parRang = rang.map((l) => l.nation);
+
+  // Les héritiers : les trois premiers de chaque poule d'il y a quatre ans.
+  const herites: string[] = [];
+  const precedente = saison - 4;
+  if (precedente >= 8) {
+    // ⚠️ On demande l'édition TERMINÉE (toutes ses dates jouées) : sur une
+    //    édition en cours, les classements de poule ne veulent rien dire.
+    for (const poule of mondialEnDirect(precedente, DATES_POULES + 1).poules) {
+      for (const ligne of poule.classement.slice(0, 3)) herites.push(ligne.club);
+    }
   }
-  return [...directs, ...qualifies];
+
+  const retenus: string[] = [];
+  const vu = new Set<string>();
+  const ajouter = (nation: string) => {
+    if (!nation || vu.has(nation) || retenus.length >= 24) return;
+    vu.add(nation);
+    retenus.push(nation);
+  };
+  for (const n of herites) ajouter(n);
+  // Les places restantes vont au classement mondial. C'est aussi ce qui
+  // rattrape une édition précédente incomplète : on remplit jusqu'à 24.
+  for (const n of parRang) ajouter(n);
+
+  // ⚠️ ON REND LES 24 TRIÉS PAR RANG MONDIAL, et ce n'est pas cosmétique : le
+  //    tirage des poules découpe cette liste en quatre chapeaux de six
+  //    (`tirerLesPoules`). Rendue dans l'ordre d'héritage, elle mettrait les
+  //    trois premiers d'une même poule dans le même chapeau.
+  const position = new Map(parRang.map((n, i) => [n, i]));
+  retenus.sort((a, b) => (position.get(a) ?? 999) - (position.get(b) ?? 999));
+
+  cacheQualifies.set(saison, retenus);
+  return retenus;
 }
 
 export interface CompetitionInternationale {
@@ -400,8 +447,24 @@ export function jouerTestMatch(
   if (apport && nomNation(apport.nation) === domicile) ecart += apport.bonus;
   if (apport && nomNation(apport.nation) === exterieur) ecart -= apport.bonus;
 
-  const scoreD = scorePossible(22 + ecart * 1.15 + (rng() * 20 - 10));
-  const scoreE = scorePossible(22 - ecart * 1.15 + (rng() * 20 - 10));
+  // ⚠️ L’ÉCART DE NIVEAU SATURE, IL N’EST PAS LINÉAIRE — et c’est un défaut
+  //    qui ne se voyait que sur les extrêmes. Le terme valait `ecart × 1,15`
+  //    des DEUX côtés, soit 2,3 point de score par point de force : correct
+  //    pour un Tournoi (des écarts de 5 à 15 donnent 12 à 35 points, la
+  //    réalité), absurde dès qu’on met le monde entier dans la même poule.
+  //    L’Afrique du Sud (94) contre le Zimbabwe (40), c’est 57 d’écart, donc
+  //    **131 points** de marge théorique. Mesuré sur quatre Coupes du monde :
+  //    18 % des matchs à cinquante points d’écart ou plus, et des
+  //    « Afrique du Sud 51-0 Fidji » que personne ne peut croire.
+  //
+  //    `tanh` laisse les petits écarts intacts (10 reste 9,5) et comprime les
+  //    grands (57 devient 22) : une nation très supérieure gagne largement,
+  //    elle ne gagne plus de cent points. Le PLAFOND est le seul réglage.
+  const PLAFOND_ECART = 22;
+  const ecartUtile = PLAFOND_ECART * Math.tanh(ecart / PLAFOND_ECART);
+
+  const scoreD = scorePossible(22 + ecartUtile * 1.15 + (rng() * 20 - 10));
+  const scoreE = scorePossible(22 - ecartUtile * 1.15 + (rng() * 20 - 10));
   return {
     domicile, exterieur, scoreD, scoreE,
     essaisD: Math.max(0, Math.round((scoreD - 6) / 7)),
@@ -628,6 +691,29 @@ export function matchInternationalDuJoueur(
     : fenetreInternationale(j.semaine ?? 1, j.saison, nation);
   if (!fen) return null;
   if (!fen.competition.equipes.includes(nation)) return null;
+
+  // ═══ LA COUPE DU MONDE NE PASSE PAS PAR `grille` ═══════════════════════
+  //
+  // ⚠️ ET C’ÉTAIT UNE SECONDE VÉRITÉ, exactement le bug déjà payé sur le
+  //    classement mondial (« rang#… » contre « … »). `grille` déroule un
+  //    carrousel sur les 24 nations : le match que le JOUEUR disputait n’était
+  //    donc ni son match de poule, ni son huitième — c’était une affiche
+  //    inventée, avec sa propre graine, donc son propre score. L’écran
+  //    Résultats montrait un tournoi, le joueur en jouait un autre.
+  //
+  //    On lit donc le MÊME état que l’écran (`lib/mondial.ts`), et on rend le
+  //    match tel quel : même graine, même score, même adversaire.
+  if (fen.competition.id === 'coupeDuMonde') {
+    const etat = mondialEnDirect(j.saison, fen.journee);
+    const trouve = afficheMondialDe(etat, nation, fen.journee);
+    if (!trouve) return null;
+    return {
+      competition: fen.competition,
+      journee: fen.journee,
+      match: trouve.match,
+      cle: `mondial#${j.saison}#${fen.journee}#${nation}`,
+    };
+  }
 
   const affiches = grille(fen.competition, j.saison)[fen.journee - 1] ?? [];
   const mien = affiches.find(([d, e]) => d === nation || e === nation);

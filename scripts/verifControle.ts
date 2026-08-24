@@ -142,9 +142,22 @@ console.log('\n=== 2. CHAQUE GESTE CHANGE QUELQUE CHOSE ===');
   // plaqueur qui plaque dans le vide. On compare au même joueur qui ne
   // crocheterait pas — un test absolu ne voudrait rien dire, le nombre de
   // ballons portés variant d'un match à l'autre.
-  const franchAuto = moyenne({ controle: true }, (e) => monPion(e).stats.franchissements);
-  const franchCrochet = moyenne({ controle: true, action: 'crochet' }, (e) => monPion(e).stats.franchissements);
-  const franchRaffut = moyenne({ controle: true, action: 'raffut' }, (e) => monPion(e).stats.franchissements);
+  // ⚠️ QUARANTE MATCHS ICI, PAS DOUZE, ET C’EST LA MÊME LEÇON QUE LES GESTES
+  //    ILLÉGAUX (section 9). Un franchissement, c’est ~1 par match : sur douze
+  //    matchs, l’écart-type de la moyenne vaut plus que l’effet qu’on mesure,
+  //    et le contrôle passe ou tombe au tirage sans que le réglage ait bougé
+  //    d’un pouce. Relevé tel quel : 0,9 → 0,7 une fois, 0,8 → 1,6 la suivante,
+  //    sur le MÊME code. Un test qui répond au hasard est pire qu’une absence
+  //    de test — il fait chercher une régression qui n’existe pas.
+  const MATCHS_FRANCH = 40;
+  const moyenneLongue = (o: Options, f: (e: EtatMatch) => number) => {
+    let total = 0;
+    for (let i = 0; i < MATCHS_FRANCH; i++) total += f(jouer(`franch#${i}`, o));
+    return total / MATCHS_FRANCH;
+  };
+  const franchAuto = moyenneLongue({ controle: true }, (e) => monPion(e).stats.franchissements);
+  const franchCrochet = moyenneLongue({ controle: true, action: 'crochet' }, (e) => monPion(e).stats.franchissements);
+  const franchRaffut = moyenneLongue({ controle: true, action: 'raffut' }, (e) => monPion(e).stats.franchissements);
   ligne('le crochet fait vraiment franchir',
     `${franchAuto.toFixed(1)} → ${franchCrochet.toFixed(1)}`, franchCrochet > franchAuto);
   ligne('le raffut aussi',

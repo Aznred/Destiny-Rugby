@@ -89,6 +89,16 @@ export interface Pion {
 
   endurance: number;    // 100 → 0
   battu: number;        // secondes pendant lesquelles il est hors du coup
+  /**
+   * ⚠️ HORS-JEU SUR COUP DE PIED : il était DEVANT le botteur au moment du
+   * coup de pied. Tant que ce drapeau est levé, il ne peut ni chasser, ni
+   * jouer le ballon — et s’il le joue quand même, c’est pénalité.
+   *
+   * Il vit sur le PION, pas dans une variable de module : deux matchs simulés
+   * en parallèle se partageraient la variable, et le déterminisme du moteur
+   * tomberait avec (voir l’entête de `moteur.ts`).
+   */
+  horsJeu: boolean;
   surLeTerrain: boolean;
   sanction: number;     // secondes de carton restantes (0 = pas sanctionné)
   minutes: number;
@@ -186,6 +196,7 @@ export function creerPion(
     acceleration: (ACCEL_POSTE[poste] ?? 4) * (0.9 + vitesseNote / 800),
     endurance: 100,
     battu: 0,
+    horsJeu: false,
     surLeTerrain: index < 15,
     sanction: 0,
     minutes: 0,
