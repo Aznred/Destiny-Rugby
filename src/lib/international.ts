@@ -19,6 +19,14 @@ import { effectifDuClub, type Coequipier } from './effectif';
 import { POSTE_PAR_ID } from '../data/rugby';
 import { nomNation } from './nations';
 import { semaine, CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier';
+// ⚠️ CYCLE ASSUMÉ : `mondial.ts` importe `jouerTestMatch` et
+// `qualifiesCoupeDuMonde` d’ici. Il est sans danger parce que RIEN ne
+// s’exécute à l’évaluation des deux modules — que des déclarations. C’est la
+// même précaution que pour `forceNation`, mémoïsée à la demande.
+import {
+  JOURNEES_POULES, matchsDuMondial, mondialEnDirect, type PouleMondial,
+} from './mondial';
+import type { MatchFinal } from './phaseFinale';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
 import {
   NOTE_NOUVEAU_MEMBRE,
@@ -91,30 +99,65 @@ function estSelectionSenior(nom: string): boolean {
 
 const cacheClassementMondial = new Map<string, LigneClassementMondial[]>();
 
+/**
+ * ⚠️ LES MATCHS RÉELLEMENT DISPUTÉS — LA SEULE SOURCE, pour l’écran comme
+ * pour le classement mondial.
+ *
+ * Deux raisons de la centraliser, et chacune corrigeait un défaut :
+ *
+ * 1. **LE CLASSEMENT MONDIAL SE CALCULAIT SUR D’AUTRES RÉSULTATS QUE CEUX
+ *    AFFICHÉS.** `appliquerCompetitionAuClassement` rejouait chaque match
+ *    avec la graine `rang#…` alors que l’écran utilisait `…` tout court :
+ *    deux graines, donc deux scores. La France pouvait gagner 30-10 à
+ *    l’écran et perdre dans le calcul du rang. Le joueur voyait un
+ *    classement bouger sans rapport avec ce qu’il venait de jouer.
+ * 2. **LA COUPE DU MONDE N’EST PAS UN CHAMPIONNAT.** Ses affiches viennent
+ *    de `lib/mondial.ts` (poules puis tableau), pas d’un carrousel — et le
+ *    tableau ne peut pas être rejoué par `jouerTestMatch`, qui rendrait des
+ *    matchs nuls dans une phase à élimination directe.
+ */
+export function matchsInternationaux(
+  c: CompetitionInternationale, saison: number, jusqua: number,
+  apport: { nation: string; bonus: number } | null,
+): MatchChampionnat[][] {
+  if (c.id === 'coupeDuMonde') {
+    const m = mondialEnDirect(saison, jusqua);
+    const tout: MatchChampionnat[][] = [];
+    for (let j = 0; j < Math.min(JOURNEES_POULES, jusqua); j++) {
+      tout.push(m.poules.flatMap((p) => p.journees[j] ?? []));
+    }
+    if (m.tableauJoue) tout.push(matchsDuMondial(m).slice(-m.bracket.length));
+    return tout;
+  }
+  const grilleC = grille(c, saison);
+  const journees: MatchChampionnat[][] = [];
+  for (let j = 0; j < Math.min(grilleC.length, jusqua); j++) {
+    journees.push(grilleC[j].map(([d, e]) =>
+      jouerTestMatch(d, e, saison, `${c.id}#${saison}#${j}#${d}#${e}`, apport)));
+  }
+  return journees;
+}
+
 function appliquerCompetitionAuClassement(
   points: Map<string, number>,
   competition: CompetitionInternationale,
   saison: number,
   nombreJournees: number,
 ): void {
-  const journees = grille(competition, saison).slice(0, nombreJournees);
-  for (let indexJournee = 0; indexJournee < journees.length; indexJournee++) {
-    for (const [domicileBrut, exterieurBrut] of journees[indexJournee]) {
-      if (!estSelectionSenior(domicileBrut) || !estSelectionSenior(exterieurBrut)) continue;
-      const domicile = nomNation(domicileBrut);
-      const exterieur = nomNation(exterieurBrut);
+  // ⚠️ `apport: null`, ET LES MÊMES GRAINES QUE L’ÉCRAN. Le classement doit
+  // découler des résultats que le joueur a sous les yeux, pas d’une seconde
+  // simulation menée en parallèle.
+  const journees = matchsInternationaux(competition, saison, nombreJournees, null);
+  for (const journee of journees) {
+    for (const match of journee) {
+      if (!estSelectionSenior(match.domicile) || !estSelectionSenior(match.exterieur)) continue;
+      const domicile = nomNation(match.domicile);
+      const exterieur = nomNation(match.exterieur);
       if (!domicile || !exterieur || domicile === exterieur) continue;
 
       if (!points.has(domicile)) points.set(domicile, NOTE_NOUVEAU_MEMBRE);
       if (!points.has(exterieur)) points.set(exterieur, NOTE_NOUVEAU_MEMBRE);
 
-      const match = jouerTestMatch(
-        domicileBrut,
-        exterieurBrut,
-        saison,
-        `rang#${competition.id}#${saison}#${indexJournee}#${domicileBrut}#${exterieurBrut}`,
-        null,
-      );
       const nouvelles = appliquerEchangeWorldRugby({
         noteDomicile: points.get(domicile) ?? NOTE_NOUVEAU_MEMBRE,
         noteExterieur: points.get(exterieur) ?? NOTE_NOUVEAU_MEMBRE,
@@ -317,7 +360,11 @@ export function competitionsNouvellesNations(): CompetitionInternationale[] {
 export const COUPE_DU_MONDE: CompetitionInternationale = {
   id: 'coupeDuMonde', nom: 'Coupe du monde', emoji: '🌍', fenetre: 'automne',
   equipes: [],
-  journees: 4,
+  // ⚠️ TROIS, PAS QUATRE — c’est le nombre de dates que le calendrier réserve
+  // à la fenêtre d’automne. Elle en déclarait quatre : la dernière n’était
+  // JAMAIS jouée, et le tournoi restait éternellement interrompu. Deux
+  // journées de poule, puis le tableau final (`lib/mondial.ts`).
+  journees: 3,
 };
 
 export function coupeDuMondeDeLaSaison(saison: number): CompetitionInternationale {
@@ -367,7 +414,70 @@ export function jouerTestMatch(
 // ⚠️ Le tirage change chaque saison (`competition#saison`) : sans clé, la J1 du
 // Tournoi opposait éternellement les deux mêmes nations, et chaque équipe
 // recevait toujours les mêmes adversaires à la même date.
+/**
+ * ⚠️ UNE TOURNÉE D’ÉTÉ N’EST PAS UN TIRAGE AU CHAPEAU.
+ *
+ * Retour de jeu : « c’est toujours les mêmes matchs pour la tournée d’été ».
+ * Le tirage CHANGEAIT bien d’une saison à l’autre (mesuré : 6 grilles
+ * distinctes sur 6 saisons) — le problème était qu’il ne voulait rien dire.
+ * `calendrier()` déroulait un carrousel sur trente-deux nations de tous
+ * niveaux mélangées, et rendait des affiches comme **« Biélorussie 0-81
+ * France »**, « Russie 0-61 France » ou « France 68-0 Zimbabwe ». Trois
+ * saisons de suite avec ce genre de programme, et on ne distingue plus une
+ * tournée d’une autre : elles se ressemblent toutes parce qu’aucune ne
+ * ressemble à quelque chose.
+ *
+ * En juillet, le Nord VA CHEZ le Sud. On apparie donc chaque nation du Nord
+ * à un hôte, tiré à la graine de la saison ; les nations restantes se
+ * rencontrent entre elles. Le résultat se lit : « Nouvelle-Zélande - France »,
+ * « Japon - Écosse », « Uruguay - Italie ».
+ */
+const TOURNEURS_ETE = [
+  'France', 'Irlande', 'Angleterre', 'Écosse', 'Pays de Galles', 'Italie',
+];
+const HOTES_ETE = [
+  'Nouvelle-Zélande', 'Afrique du Sud', 'Australie', 'Argentine', 'Japon',
+  'Fidji', 'Samoa', 'Tonga', 'Géorgie', 'Uruguay', 'Chili', 'États-Unis',
+  'Canada', 'Portugal', 'Espagne', 'Roumanie',
+];
+
+function grilleTourneeEte(c: CompetitionInternationale, saison: number): [string, string][][] {
+  const rng = graine(`ete#${saison}`);
+  const dispo = HOTES_ETE.filter((h) => c.equipes.includes(h));
+  // Fisher-Yates seedé : l’ordre des hôtes change chaque été, la logique non.
+  for (let i = dispo.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [dispo[i], dispo[j]] = [dispo[j], dispo[i]];
+  }
+  const pris = new Set<string>();
+  const affiches: [string, string][] = [];
+  for (const visiteur of TOURNEURS_ETE) {
+    if (!c.equipes.includes(visiteur)) continue;
+    const hote = dispo.find((h) => !pris.has(h));
+    if (!hote) break;
+    pris.add(hote);
+    pris.add(visiteur);
+    // L’hôte reçoit : c’est le sens même d’une tournée.
+    affiches.push([hote, visiteur]);
+  }
+  // ⚠️ LE RESTE DU MONDE JOUE À SON NIVEAU, et ce n’est pas une politesse.
+  // Apparier les nations restantes AU HASARD produisait des « Namibie 3-64
+  // Géorgie » — mesuré, une affiche sur vingt finissait à plus de soixante
+  // points d’écart. On les trie donc par force et on apparie les voisines :
+  // une fédération ne programme pas un test qu’elle sait perdu de cinquante
+  // points, elle cherche un adversaire à sa portée.
+  const reste = c.equipes.filter((n) => !pris.has(n))
+    .sort((x, y) => forceNation(y) - forceNation(x));
+  for (let i = 0; i + 1 < reste.length; i += 2) {
+    // Le receveur alterne : sur une saison, tout le monde voyage.
+    const chezLui = rng() < 0.5;
+    affiches.push(chezLui ? [reste[i], reste[i + 1]] : [reste[i + 1], reste[i]]);
+  }
+  return [affiches];
+}
+
 function grille(c: CompetitionInternationale, saison: number): [string, string][][] {
+  if (c.id === 'amicaux') return grilleTourneeEte(c, saison);
   const complet = calendrier(c.equipes, `${c.id}#${saison}`);
   return complet.slice(0, c.journees);
 }
@@ -381,6 +491,11 @@ export interface EtatInternational {
   classement: LigneTableau[];
   totalJournees: number;
   journeesJouees: number;
+  /** Coupe du monde seulement : les quatre poules, puis le tableau final. */
+  poules?: PouleMondial[];
+  bracket?: MatchFinal[];
+  /** Le vainqueur de la FINALE. `null` pour un championnat. */
+  vainqueur?: string | null;
 }
 
 export function internationalEnDirect(
@@ -389,17 +504,21 @@ export function internationalEnDirect(
 ): EtatInternational | null {
   const c = competitionInternationaleParId(id, saison);
   if (!c) return null;
-  const g = grille(c, saison);
-  const jusqua = Math.max(0, Math.min(g.length, journeesJouees));
-  const journees: MatchChampionnat[][] = [];
-  for (let j = 0; j < jusqua; j++) {
-    journees.push(g[j].map(([d, e]) =>
-      jouerTestMatch(d, e, saison, `${id}#${saison}#${j}#${d}#${e}`, apport)));
-  }
+  const total = c.journees;
+  const jusqua = Math.max(0, Math.min(total, journeesJouees));
+  const journees = matchsInternationaux(c, saison, jusqua, apport);
+  // ⚠️ LA COUPE DU MONDE PORTE SON TABLEAU, et son vainqueur n’est PAS le
+  // premier d’un classement : c’est celui qui gagne la finale. Le champ
+  // reste facultatif — toutes les autres compétitions sont des championnats,
+  // et leur vainqueur se lit bien en tête du tableau.
+  const mondial = c.id === 'coupeDuMonde' ? mondialEnDirect(saison, jusqua) : null;
   return {
     id: c.id, nom: c.nom, emoji: c.emoji, equipes: c.equipes,
     journees, classement: classer(c.equipes, journees),
-    totalJournees: g.length, journeesJouees: jusqua,
+    totalJournees: total, journeesJouees: jusqua,
+    poules: mondial?.poules,
+    bracket: mondial?.bracket,
+    vainqueur: mondial?.vainqueur ?? null,
   };
 }
 
@@ -410,6 +529,15 @@ export function affichesInternationales(
 ): { domicile: string; exterieur: string; jouee: boolean; match: MatchChampionnat | null }[] {
   const c = competitionInternationaleParId(id, saison);
   if (!c) return [];
+  // ⚠️ LE TABLEAU FINAL D’UNE COUPE DU MONDE N’EXISTE PAS AVANT LES POULES :
+  // on rend les matchs joués, et rien à l’avance. Annoncer une affiche de
+  // quart avant de connaître les qualifiés reviendrait à l’inventer.
+  if (c.id === 'coupeDuMonde') {
+    const joues = matchsInternationaux(c, saison, journeesJouees, apport)[journee - 1] ?? [];
+    return joues.map((m) => ({
+      domicile: m.domicile, exterieur: m.exterieur, jouee: true, match: m,
+    }));
+  }
   const affiches = grille(c, saison)[journee - 1];
   if (!affiches) return [];
   const jouee = journee <= journeesJouees;

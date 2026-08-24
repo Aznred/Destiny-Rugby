@@ -1112,6 +1112,24 @@ export function Social() {
     [posts, recherche],
   );
 
+  /**
+   * ⚠️ SUR QUEL ONGLET S’OUVRIR — et le hook vit AVANT le premier retour
+   * anticipé. Posé après `if (!joueur) return null`, il n’est pas appelé au
+   * même rang à chaque rendu : React l’interdit, et `oxlint` l’a signalé
+   * immédiatement (`rules-of-hooks`).
+   *
+   * ⚠️ ET ON CONSOMME L’ORDRE, comme l’écran consomme la percée du moteur :
+   * sans ça, revenir sur 𝕏 trois écrans plus tard rouvrirait les messages à
+   * chaque fois.
+   */
+  const ouvrirSocialSur = useGame((s) => s.ouvrirSocialSur);
+  const consommerOuvertureSociale = useGame((s) => s.consommerOuvertureSociale);
+  useEffect(() => {
+    if (!ouvrirSocialSur) return;
+    setOnglet(ouvrirSocialSur);
+    consommerOuvertureSociale();
+  }, [ouvrirSocialSur, consommerOuvertureSociale]);
+
   if (!joueur) return null;
   const nonLues = notifs.filter((n) => !n.lue).length;
   const fil = [...posts].sort((a, b) => b.saison - a.saison || b.semaine - a.semaine);

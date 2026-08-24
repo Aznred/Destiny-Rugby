@@ -2103,7 +2103,15 @@
 
 @media (max-width: 700px) {
   .arbre { grid-auto-flow: row; grid-auto-columns: auto; }
-  .grille-poules { grid-template-columns: 1fr; }
+  /* ⚠️ minmax(0, 1fr) ET PAS 1fr, et ça faisait déborder toute la page.
+     `1fr` vaut `minmax(auto, 1fr)` : le minimum est le MIN-CONTENT de la
+     poule, c est-a-dire les dix colonnes de son classement. Mesuré sur un
+     écran de 375 px : la colonne se calculait à 467 px, le bloc suivait, et
+     le document entier partait à 483 px de large. Le zéro autorise la colonne
+     à se serrer, et c est le tableau qui défile dans sa propre boîte
+     (`.classement-tableau { overflow-x: auto }`). */
+  .grille-poules { grid-template-columns: minmax(0, 1fr); }
+  .grille-poules > * { min-width: 0; }
 }
 
 
@@ -2916,6 +2924,30 @@
    gauche à droite se lirait comme une réserve d’énergie — et il faudrait une
    légende pour comprendre que 50 % veut dire « personne n’a la main ».
    Le trait central est le zéro, et la barre pousse du côté de qui domine. */
+/* ═══ L'ALERTE DE FIN DE CONTRAT ═══════════════════════════════════════════
+   ⚠️ C’EST UN BOUTON PLEINE LARGEUR, PAS UNE PASTILLE. Une fin de contrat
+   est le moment le plus décisif d’une carrière : elle ne peut pas se lire
+   au milieu des sept pastilles de statistiques, et elle doit MENER quelque
+   part — les propositions arrivent en message privé, sur un écran qu’on
+   n’ouvre pas de lui-même. */
+.alerte-contrat {
+  display: grid;
+  gap: 0.12rem;
+  width: 100%;
+  margin: 0.5rem 0 0.2rem;
+  padding: 0.55rem 0.8rem;
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.16), rgba(212, 175, 55, 0.06));
+  color: var(--craie);
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.alerte-contrat:hover { border-color: var(--or-clair); transform: translateY(-1px); }
+.alerte-contrat b { font-family: 'Archivo', system-ui, sans-serif; font-size: 0.92rem; color: var(--or-clair); }
+.alerte-contrat span { font-size: 0.8rem; opacity: 0.86; }
+.alerte-contrat em { font-size: 0.78rem; font-style: normal; color: var(--or-clair); opacity: 0.9; }
 .ml-elan {
   position: relative;
   flex: 0 0 3px;
@@ -3626,7 +3658,15 @@
   }
   .classement-mondial-selections .classement-ligne > span:nth-child(5) { display: none; }
   /* Le tableau des poules de coupe et l'arbre défilent plutôt que de déborder. */
-  .grille-poules { grid-template-columns: 1fr; }
+  /* ⚠️ minmax(0, 1fr) ET PAS 1fr, et ça faisait déborder toute la page.
+     `1fr` vaut `minmax(auto, 1fr)` : le minimum est le MIN-CONTENT de la
+     poule, c est-a-dire les dix colonnes de son classement. Mesuré sur un
+     écran de 375 px : la colonne se calculait à 467 px, le bloc suivait, et
+     le document entier partait à 483 px de large. Le zéro autorise la colonne
+     à se serrer, et c est le tableau qui défile dans sa propre boîte
+     (`.classement-tableau { overflow-x: auto }`). */
+  .grille-poules { grid-template-columns: minmax(0, 1fr); }
+  .grille-poules > * { min-width: 0; }
   .arbre { overflow-x: auto; padding-bottom: 0.5rem; }
 }
 

@@ -336,6 +336,23 @@ export function Tableau() {
   const saison = joueur?.saison ?? 1;
   const internationales = useMemo(() => competitionsDeLaSaison(saison), [saison]);
   const rangMondial = useMemo(() => classementMondial(saison, numero), [saison, numero]);
+  /**
+   * ⚠️ LE CLASSEMENT DOIT SE VOIR BOUGER, PAS SEULEMENT BOUGER.
+   *
+   * Retour de jeu : « c’est le classement mondial qui doit bouger, pas un
+   * classement de toutes les nations ». Il BOUGEAIT déjà — mesuré, la France
+   * passe 4ᵉ → 3ᵉ → 5ᵉ → 2ᵉ sur six saisons — mais rien ne le montrait : on
+   * lisait cent quatorze lignes figées, sans repère, derrière un bouton
+   * replié. Un classement dont on ne voit pas le mouvement est une liste.
+   *
+   * On compare donc au rang du DÉBUT de saison (`classementMondial(saison)`,
+   * sans semaine) : la flèche dit ce qui s’est passé cette année-là.
+   */
+  const rangDebut = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of classementMondial(saison)) m.set(l.nation, l.rang);
+    return m;
+  }, [saison]);
   const [classementMondialOuvert, setClassementMondialOuvert] = useState(false);
   const maNation = nomNation(joueur?.nation ?? '');
   const maLigneMondiale = useMemo(
@@ -557,16 +574,18 @@ export function Tableau() {
         })}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0.4rem 0 0.8rem' }}>
-        <button className="btn fantome" type="button" onClick={() => setClassementMondialOuvert((ouvert) => !ouvert)}>
-          {classementMondialOuvert ? t('intl.masquerClassement') : t('intl.voirClassement')}
-        </button>
-      </div>
-
-      {classementMondialOuvert && <div className="carte bloc-competition">
+      {/* ═══ LE CLASSEMENT WORLD RUGBY ═══════════════════════════════════
+          ⚠️ VINGT LIGNES, PAS CENT QUATORZE. Le classement complet existe
+          toujours (le bouton le déplie), mais ce qu’on vient lire c’est le
+          haut du tableau et SA nation — pas l’annuaire des fédérations. */}
+      <div className="carte bloc-competition">
         <div className="comp-tete">
           <b>🌍 {t('intl.classementMondial')}</b>
-          <span className="comp-count">{t('intl.top12')}</span>
+          <span className="comp-count">
+            {classementMondialOuvert
+              ? t('intl.nations', { n: rangMondial.length })
+              : t('intl.top12')}
+          </span>
         </div>
         {maLigneMondiale && leaderMondial && (
           <p className="intro-comp">
@@ -586,23 +605,38 @@ export function Tableau() {
           </p>
         )}
         <div className="classement-tableau tableau-live classement-mondial-selections">
-          {rangMondial.map((l) => (
-            <div key={l.nation} className="classement-ligne" data-moi={l.nation === maNation ? 'oui' : undefined}>
-              <span className="cl-pos" data-tete={l.rang <= 12 ? 'oui' : undefined}>{l.rang}</span>
-              {/* ⚠️ L'ÉCUSSON DE LA SÉLECTION, PAS LE DRAPEAU (demande
-                  explicite). Un classement de rugby montre les emblèmes des
-                  fédérations — le trèfle irlandais, la rose anglaise, le coq —
-                  pas des drapeaux d'États. `LogoEquipe` va chercher l'image
-                  tout seul et retombe sur les initiales s'il n'en trouve
-                  aucune ; depuis le lot « nations », il n'en manque plus. */}
-              <LogoEquipe nom={l.nation} taille={22} />
-              <span className="cl-nom">{nomNationTraduit(l.nation)}{l.nation === maNation && ' 🫵'}</span>
-              <span className="cl-pts">{noteWorldRugby(l.points)}</span>
-              <span style={{ gridColumn: 'span 5' }}>{l.rang <= 12 ? t('intl.qualifie') : t('intl.barrages')}</span>
-            </div>
-          ))}
+          {rangMondial
+            // Le haut du tableau, et MA nation même si elle est 60ᵉ : sans
+            // elle, le classement ne parle pas de la carrière en cours.
+            .filter((l, i) => classementMondialOuvert || i < 20 || l.nation === maNation)
+            .map((l) => {
+              const avant = rangDebut.get(l.nation);
+              const bouge = avant === undefined ? 0 : avant - l.rang;
+              return (
+                <div key={l.nation} className="classement-ligne" data-moi={l.nation === maNation ? 'oui' : undefined}>
+                  <span className="cl-pos" data-tete={l.rang <= 12 ? 'oui' : undefined}>{l.rang}</span>
+                  <LogoEquipe nom={l.nation} taille={22} />
+                  <span className="cl-nom">{nomNationTraduit(l.nation)}{l.nation === maNation && ' 🫵'}</span>
+                  <span className="cl-pts">{noteWorldRugby(l.points)}</span>
+                  {/* La flèche est LE point de la demande : elle dit que ce
+                      tableau vit. Zéro se lit « = », pas un blanc. */}
+                  <span
+                    className={bouge > 0 ? 'cl-plus' : bouge < 0 ? 'cl-moins' : undefined}
+                    title={t('intl.depuisDebut')}
+                  >
+                    {bouge > 0 ? `▲ ${bouge}` : bouge < 0 ? `▼ ${-bouge}` : '='}
+                  </span>
+                  <span style={{ gridColumn: 'span 4' }}>{l.rang <= 12 ? t('intl.qualifie') : t('intl.barrages')}</span>
+                </div>
+              );
+            })}
         </div>
-      </div>}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
+          <button className="btn fantome mini" type="button" onClick={() => setClassementMondialOuvert((o) => !o)}>
+            {classementMondialOuvert ? t('intl.masquerClassement') : t('intl.voirClassement')}
+          </button>
+        </div>
+      </div>
 
       {/* ---------- COUPE D'EUROPE ---------- */}
       {coupe && (
@@ -661,7 +695,39 @@ export function Tableau() {
             {inter.etat.equipes.includes(maNation) && ` ${t('tb.maSelection')} : ${nomNationTraduit(maNation)}.`}
           </p>
 
-          <div className="carte bloc-competition">
+          {/* ═══ LA COUPE DU MONDE : POULES ET TABLEAU ═══════════════════
+              ⚠️ ELLE N’EST PAS UN CHAMPIONNAT, et l’afficher comme tel était
+              la moitié du bug « il n’y a jamais de Coupe du monde jouée » :
+              on lisait une colonne de points de vingt-quatre nations, sans
+              poule, sans quart, sans finale et sans vainqueur. */}
+          {inter.etat.poules && (
+            <>
+              {inter.etat.bracket && inter.etat.bracket.length > 0 && (
+                <div className="carte bloc-competition">
+                  <div className="comp-tete">
+                    <b>🔥 {t('tb.tableauFinal')}</b>
+                    {inter.etat.vainqueur && (
+                      <span className="comp-count">🏆 {nomNationTraduit(inter.etat.vainqueur)}</span>
+                    )}
+                  </div>
+                  <Arbre matchs={inter.etat.bracket} club={maNation} />
+                </div>
+              )}
+              <div className="grille-poules">
+                {inter.etat.poules.map((p) => (
+                  <div key={p.nom} className="carte bloc-competition">
+                    <div className="comp-tete">
+                      <b>{p.nom}</b>
+                      <span className="comp-count">{t('intl.deuxQualifies')}</span>
+                    </div>
+                    <Tableau1 lignes={p.classement} club={maNation} tete={2} />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {!inter.etat.poules && <div className="carte bloc-competition">
             <div className="comp-tete">
               <b>{inter.etat.emoji} {t('tb.classement')}</b>
               <span className="comp-count">{t('tb.nombreSelections', { n: inter.etat.equipes.length })}</span>
@@ -687,7 +753,7 @@ export function Tableau() {
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
 
           <div className="carte bloc-competition">
             <div className="comp-tete">

@@ -2,8 +2,9 @@
 import {
   internationalEnDirect, affichesInternationales, fenetreInternationale,
   matchInternationalDuJoueur, effectifNational, competitionsDeLaSaison,
-  journeesInternationalesA,
+  journeesInternationalesA, classementMondial,
 } from '../src/lib/international';
+import { mondialEnDirect } from '../src/lib/mondial';
 import { CALENDRIER } from '../src/data/calendrier';
 import { simulerJourneeInternationale, simulerJourneeCoupe } from '../src/lib/moteur/saison';
 import type { Joueur } from '../src/types';
@@ -76,3 +77,209 @@ console.log('\n=== 6. STATISTIQUES DE FOND : COUPES ET SÉLECTIONS ===');
   console.log(`  Champions Cup J1 : ${coupe.length} lignes · ${clubsC.length} clubs · ${ms2} ms`);
   console.log(`     ${clubsC.slice(0, 6).join(' · ')}…`);
 }
+
+// Le compteur des trois sections ajoutées, indépendant de celui du haut.
+let rates = 0;
+console.log('\n=== 7. ⚠️ LA COUPE DU MONDE SE JOUE VRAIMENT ===');
+{
+  // Retour de jeu : « gros bug, il n’y a jamais de Coupe du monde jouée ».
+  //
+  // ⚠️ ELLE EXISTAIT POURTANT DANS LE CODE, et `fenetreInternationale` la
+  // rendait bien une saison sur quatre. Ce qui n’existait pas, c’est le
+  // TOURNOI : 24 nations dans un mini-championnat de 4 journées dont la
+  // quatrième n’était jamais jouée (le calendrier n’en réserve que trois), un
+  // classement au barème rugby, et un « vainqueur » qui était le premier de
+  // cette ligue interrompue. Ni poule, ni quart, ni finale.
+  let echecs7 = 0;
+  const dit = (nom: string, valeur: string, ok: boolean) => {
+    if (!ok) echecs7++;
+    console.log(`  ${ok ? "✅" : "❌"} ${nom.padEnd(46)} ${valeur}`);
+  };
+
+  const SAISONS = [4, 8, 12];
+  let vainqueurs: string[] = [];
+  let sansFinale = 0;
+  let nulsEnTableau = 0;
+  let scoresImpossibles = 0;
+  let poulesIncompletes = 0;
+  let matchsEnDouble = 0;
+
+  for (const saison of SAISONS) {
+    const m = mondialEnDirect(saison, 3);
+    // Quatre poules de six, deux matchs chacune : personne ne joue deux fois
+    // le même adversaire, et personne n’est oublié.
+    for (const p of m.poules) {
+      if (p.equipes.length !== 6) poulesIncompletes++;
+      const compte = new Map<string, number>();
+      const paires = new Set<string>();
+      for (const j of p.journees) for (const x of j) {
+        compte.set(x.domicile, (compte.get(x.domicile) ?? 0) + 1);
+        compte.set(x.exterieur, (compte.get(x.exterieur) ?? 0) + 1);
+        const paire = [x.domicile, x.exterieur].sort().join("|");
+        if (paires.has(paire)) matchsEnDouble++;
+        paires.add(paire);
+      }
+      for (const e of p.equipes) if (compte.get(e) !== 2) poulesIncompletes++;
+    }
+    // Le tableau : 4 quarts + 2 demies + 1 finale, aucun nul, aucun score
+    // impossible au rugby.
+    if (m.bracket.length !== 7) sansFinale++;
+    for (const f of m.bracket) {
+      if (f.scoreD === f.scoreE) nulsEnTableau++;
+      for (const sc of [f.scoreD, f.scoreE]) if (sc === 1 || sc === 2 || sc === 4) scoresImpossibles++;
+    }
+    if (m.vainqueur) vainqueurs.push(m.vainqueur);
+  }
+
+  const m4 = mondialEnDirect(4, 3);
+  console.log(`  ${"poules".padEnd(46)} ${m4.poules.map((p) => p.equipes.length).join(" · ")}`);
+  console.log(`  ${"tableau".padEnd(46)} ${m4.bracket.map((f) => f.tour).join(" · ")}`);
+  console.log(`  ${"finale".padEnd(46)} ${m4.bracket.at(-1)?.libelle ?? "aucune"}`);
+
+  dit(`chaque poule fait six nations, deux matchs`,
+    poulesIncompletes ? `${poulesIncompletes} anomalie(s)` : `4 poules de 6`, poulesIncompletes === 0);
+  dit(`et jamais deux fois le même adversaire`,
+    `${matchsEnDouble} doublon(s)`, matchsEnDouble === 0);
+  dit(`le tableau va jusqu’à la finale`,
+    `${SAISONS.length - sansFinale}/${SAISONS.length} mondiaux complets`, sansFinale === 0);
+  dit(`aucun nul à élimination directe`, `${nulsEnTableau}`, nulsEnTableau === 0);
+  dit(`aucun score impossible au rugby`, `${scoresImpossibles}`, scoresImpossibles === 0);
+  dit(`un champion du monde à chaque édition`,
+    vainqueurs.join(" · ") || `aucun`, vainqueurs.length === SAISONS.length);
+
+  // ⚠️ ET LE TITRE VA AU VAINQUEUR DE LA FINALE, pas au premier d’un tableau.
+  // C’est le chemin exact que suit `resoudreTrophees` (store).
+  const etat = internationalEnDirect('coupeDuMonde', 4, 3, null);
+  dit(`le vainqueur du jeu est celui de la finale`,
+    `${etat?.vainqueur ?? "aucun"}`, !!etat?.vainqueur && etat.vainqueur === m4.vainqueur);
+  // Et une saison ordinaire n’en a pas : c’est la tournée d’automne.
+  const auto = internationalEnDirect('autumn', 5, 3, null);
+  dit(`une saison ordinaire n’a pas de Mondial`,
+    `${auto?.vainqueur ?? "null"}`, !auto?.vainqueur);
+
+  rates += echecs7;
+}
+
+console.log('\n=== 8. ⚠️ LA TOURNÉE D’ÉTÉ VA CHEZ LE SUD ===');
+{
+  // Retour de jeu : « c’est toujours les mêmes matchs pour la tournée d’été ».
+  //
+  // ⚠️ LE TIRAGE CHANGEAIT BIEN — mesuré, six grilles distinctes sur six
+  // saisons. Le défaut était ailleurs : `calendrier()` déroulait un carrousel
+  // sur TRENTE-DEUX nations de tous niveaux mélangées, et rendait « Biélorussie
+  // 0-81 France », « Russie 0-61 France », « France 68-0 Zimbabwe ». Trois étés
+  // de suite avec ce programme et on ne distingue plus une tournée d’une autre :
+  // elles se ressemblent parce qu’aucune ne ressemble à quelque chose.
+  let echecs8 = 0;
+  const dit = (nom: string, valeur: string, ok: boolean) => {
+    if (!ok) echecs8++;
+    console.log(`  ${ok ? "✅" : "❌"} ${nom.padEnd(46)} ${valeur}`);
+  };
+
+  const NORD = ['France', 'Irlande', 'Angleterre', 'Écosse', 'Pays de Galles', 'Italie'];
+  const grilles = new Set<string>();
+  let nordRecoit = 0;
+  let nordContreNord = 0;
+  let ecrasements = 0;
+  let total = 0;
+  const adversaires: string[] = [];
+
+  for (let saison = 1; saison <= 8; saison++) {
+    const etat = internationalEnDirect('amicaux', saison, 1, null);
+    const affiches = etat?.journees[0] ?? [];
+    grilles.add(JSON.stringify(affiches.map((m) => [m.domicile, m.exterieur])));
+    for (const m of affiches) {
+      total++;
+      const dNord = NORD.includes(m.domicile);
+      const eNord = NORD.includes(m.exterieur);
+      // Une tournée, c’est le Nord qui SE DÉPLACE : il ne reçoit pas.
+      if (dNord && !eNord) nordRecoit++;
+      if (dNord && eNord) nordContreNord++;
+      if (Math.abs(m.scoreD - m.scoreE) >= 60) ecrasements++;
+    }
+    const fr = affiches.find((m) => m.domicile === 'France' || m.exterieur === 'France');
+    if (fr) adversaires.push(fr.domicile === 'France' ? fr.exterieur : fr.domicile);
+  }
+
+  console.log(`  ${"la France en tournée".padEnd(46)} ${adversaires.join(" · ")}`);
+  dit(`le Nord se déplace, il ne reçoit pas`,
+    `${nordRecoit} affiche(s) à l’envers`, nordRecoit === 0);
+  dit(`et il ne s’affronte pas lui-même en juillet`,
+    `${nordContreNord}`, nordContreNord === 0);
+  // ⚠️ SOIXANTE POINTS D’ÉCART, C’EST LE SEUIL DE L’ABSURDE. Un test-match
+  // peut être sévère ; « 81-0 » n’est pas un résultat, c’est un tirage raté.
+  dit(`plus de déroute à soixante points`,
+    `${ecrasements} sur ${total} matchs`, ecrasements <= total * 0.04);
+  dit(`et le programme change chaque été`,
+    `${grilles.size} grille(s) sur 8 saisons`, grilles.size >= 7);
+
+  rates += echecs8;
+}
+
+console.log('\n=== 9. ⚠️ LE CLASSEMENT MONDIAL BOUGE, ET SUR LES BONS RÉSULTATS ===');
+{
+  // Retour de jeu : « c’est le classement mondial qui doit bouger, pas un
+  // classement de toutes les nations ».
+  let echecs9 = 0;
+  const dit = (nom: string, valeur: string, ok: boolean) => {
+    if (!ok) echecs9++;
+    console.log(`  ${ok ? "✅" : "❌"} ${nom.padEnd(46)} ${valeur}`);
+  };
+
+  const rangs = [1, 2, 3, 4, 5, 6, 7, 8].map((s) =>
+    classementMondial(s).find((l) => l.nation === 'France')?.rang ?? 0);
+  const bouges = new Set(rangs).size;
+  console.log(`  ${"la France, rangs S1→S8".padEnd(46)} ${rangs.join(" → ")}`);
+  dit(`le rang d’une nation change avec les saisons`, `${bouges} rang(s) distincts`, bouges >= 3);
+
+  // ⚠️ LE CONTRÔLE QUI COMPTE : le classement doit découler des résultats
+  // AFFICHÉS. `appliquerCompetitionAuClassement` rejouait chaque match avec la
+  // graine `rang#…` alors que l’écran utilisait `…` tout court : deux graines,
+  // donc deux scores. La France pouvait gagner 30-10 à l’écran et perdre dans
+  // le calcul du rang, sans que rien ne le montre.
+  const tournoi = internationalEnDirect('sixNations', 2, 5, null);
+  const affiches = tournoi?.journees.flat() ?? [];
+  // ⚠️ ON ENCADRE LE TOURNOI, ET RIEN D’AUTRE. Première version : semaine 1
+  // contre semaine 40 — c’est-à-dire la tournée d’automne ET le Tournoi. Une
+  // nation qui gagnait cinq matchs en février après en avoir perdu trois en
+  // novembre descendait, et le contrôle criait au bug (1/4). Le test était
+  // faux, pas le classement : on borne à la fenêtre qu’on mesure.
+  const avant = classementMondial(2, 22);
+  const apres = classementMondial(2, 30);
+  const rangDe = (l: typeof avant, n: string) => l.find((x) => x.nation === n)?.points ?? 0;
+  // Une nation qui a tout gagné au Tournoi doit avoir MONTÉ.
+  const bilans = new Map<string, number>();
+  for (const m of affiches) {
+    bilans.set(m.domicile, (bilans.get(m.domicile) ?? 0) + (m.scoreD > m.scoreE ? 1 : -1));
+    bilans.set(m.exterieur, (bilans.get(m.exterieur) ?? 0) + (m.scoreE > m.scoreD ? 1 : -1));
+  }
+  // ⚠️ ON NE TESTE QUE LES BILANS SANS AMBIGUÏTÉ, et c’est la formule World
+  // Rugby qui l’impose : l’échange est PONDÉRÉ PAR L’ÉCART DE NOTE. Battre
+  // beaucoup plus faible que soi ne rapporte presque rien, perdre contre plus
+  // fort ne coûte presque rien — une nation à quatre victoires et une défaite
+  // peut donc terminer à l’équilibre, et c’est exact. Un Grand Chelem et un
+  // bilan vierge, eux, ne se discutent pas.
+  let coherents = 0;
+  let observes = 0;
+  const joues = new Map<string, number>();
+  for (const m of affiches) {
+    joues.set(m.domicile, (joues.get(m.domicile) ?? 0) + 1);
+    joues.set(m.exterieur, (joues.get(m.exterieur) ?? 0) + 1);
+  }
+  for (const [nation, bilan] of bilans) {
+    const n = joues.get(nation) ?? 0;
+    if (n < 3 || Math.abs(bilan) !== n) continue; // ni sans faute, ni bredouille
+    observes++;
+    const delta = rangDe(apres, nation) - rangDe(avant, nation);
+    if (Math.sign(delta) === Math.sign(bilan)) coherents++;
+  }
+  dit(`un sans-faute monte, une bredouille descend`,
+    `${coherents}/${observes} nations`, observes > 0 && coherents === observes);
+
+  rates += echecs9;
+}
+
+console.log(rates
+  ? `\n❌ ${rates} contrôle(s) international(aux) en échec.`
+  : '\n✅ Coupe du monde jouée, tournée d’été crédible, classement mondial vivant.');
+if (rates) process.exitCode = 1;

@@ -3861,6 +3861,7 @@ suspensions pour la saison, blessures, etc. »
 
 | Fichier | Rôle |
 |---|---|
+| `lib/mondial.ts` | **La Coupe du monde** : 4 poules de 6 (2 journées), les 2 premiers croisés en quarts, puis demies et finale. Le vainqueur est celui de la FINALE. Déterministe (graine `mondial#saison`). |
 | `moteur/elan.ts` | **La dynamique** — un nombre signé de −1 à +1, poussé par les turnovers, les percées et les essais, qui retombe de moitié en 40 s. Il entre dans `probaPlaquage` et `probaGrattage`, donc dans le pourcentage écrit sur chaque carte. Sans dépendance : `controle.ts` et `decisions.ts` le lisent sans connaître `moteur.ts`. |
 | `moteur/controle.ts` | Les **25 actions**, leur disponibilité selon la phase, le coût en endurance, la recharge. Ne connaît pas `moteur.ts` — c'est l'inverse. |
 | `moteur/bagarre.ts` | La **tension**, la provocation, le coup de poing, la bagarre, les cartons, les blessures, et la **commission d'après-match**. |
@@ -6601,4 +6602,210 @@ npx vite-node scripts/verifMoteur.ts       # l’étalonnage du moteur ne bouge 
 npx vite-node scripts/verifMatchJouable.ts # le rythme des cartes et la durée d’un match
 npx vite-node scripts/verifControle.ts     # ne rien choisir = le match qu’on aurait regardé
 npx vite-node scripts/verifTraductions.ts  # les 45 clés ajoutées, dans les 7 langues
+```
+
+## 🌍 LA COUPE DU MONDE N'EXISTAIT PAS, ET LE CLASSEMENT MONDIAL SE CALCULAIT AILLEURS
+
+Quatre retours de jeu en un message : « gros bug, il n'y a jamais de Coupe du
+monde jouée ; ensuite c'est toujours les mêmes matchs pour la tournée d'été ; et
+c'est le classement mondial qui doit bouger, pas un classement de toutes les
+nations ; enfin, lorsque notre joueur est en fin de contrat, ouvre 𝕏 sur les
+messages avec les propositions des autres clubs ou la prolongation ».
+
+Quatre causes distinctes, et aucune n'était celle qu'on aurait devinée.
+
+### 1. ⚠️ LA COUPE DU MONDE SE DÉCLENCHAIT BIEN — ELLE N'ÉTAIT PAS UN TOURNOI
+
+Premier réflexe vérifié avant de toucher quoi que ce soit :
+`fenetreInternationale` **rendait bien** `coupeDuMonde` aux saisons 4, 8 et 12,
+sur les trois dates de la fenêtre d'automne. Le déclenchement n'a jamais été en
+cause. Ce qui n'existait pas, c'est le tournoi.
+
+`COUPE_DU_MONDE` était déclarée comme une compétition **ordinaire** : 24 nations,
+4 journées, un classement au barème rugby. Trois conséquences, toutes visibles :
+
+| | |
+|---|---|
+| **elle ne se terminait jamais** | 4 journées déclarées, **3 dates** au calendrier : la dernière n'était jamais jouée |
+| **ni poule, ni quart, ni finale** | vingt-quatre nations tirées au carrousel dans un mini-championnat |
+| **le titre allait au premier d'une ligue tronquée** | c'est-à-dire à qui avait eu les trois adversaires les plus tendres |
+
+**`src/lib/mondial.ts`** en fait un vrai tournoi, sur les trois dates
+disponibles :
+
+- **S10 et S11 — les poules.** 4 poules de 6, chaque nation joue **deux** matchs
+  contre deux adversaires différents. ⚠️ C'est exactement le format des coupes
+  d'Europe depuis 2023-24 (« 4 matchs dans une poule de 6 », entête de
+  `coupe.ts`) : le jeu sait déjà le lire, le classer et l'afficher.
+- **S12 — le tableau final.** Les **deux premiers de chaque poule** (8),
+  **croisés** (un premier ne rencontre pas un premier en quart), disputent
+  quarts, demies et **finale**.
+- **Le vainqueur est celui de la FINALE**, plus le premier d'un tableau :
+  `EtatInternational.vainqueur` porte l'information et `resoudreTrophees` la lit.
+
+⚠️ **LES TROIS TOURS DU TABLEAU TOMBENT LE MÊME WEEK-END, ET C'EST LE SEUL
+COMPROMIS.** Le joueur ne dispute qu'un match par date de calendrier : il joue le
+quart de finale de sa nation et voit le reste du tableau se dérouler.
+L'alternative — étaler le tableau — demanderait de supprimer la tournée d'automne
+**et** deux journées de championnat une saison sur quatre, donc de changer le
+nombre de journées de la saison et tout l'étalonnage qui en dépend.
+
+⚠️ **ET LE PREMIER TIRAGE DE POULE FAISAIT REJOUER UNE AFFICHE SUR TROIS.** Il
+avait l'air juste : 1-6, 2-5, 3-4, puis 4-1, 5-2, 6-3. On croit avoir tout
+décalé, mais **2-5 et 5-2 sont le même match** — le banc d'essai a relevé douze
+doublons sur trois éditions. Une poule où deux nations se rencontrent deux fois
+pendant qu'elles en ignorent trois autres n'est pas une poule. C'est la rotation
+du carrousel qu'il fallait : la première fixe, les cinq autres qui tournent.
+
+### 2. ⚠️ LA TOURNÉE D'ÉTÉ CHANGEAIT BIEN — ELLE NE VOULAIT RIEN DIRE
+
+Mesuré avant de corriger : **six grilles distinctes sur six saisons**. Le tirage
+n'était pas figé. Le problème était ailleurs, et il saute aux yeux dès qu'on lit
+les affiches produites :
+
+```text
+S1  Biélorussie 0-81 France      S4  Russie 0-61 France
+S3  États-Unis 0-43 France       S6  France 68-0 Zimbabwe
+```
+
+`calendrier()` déroulait un carrousel sur **trente-deux nations de tous niveaux
+mélangées**. Trois étés de suite avec ce programme et on ne distingue plus une
+tournée d'une autre : elles se ressemblent parce qu'**aucune ne ressemble à
+quelque chose**.
+
+En juillet, le Nord va chez le Sud. `grilleTourneeEte` apparie donc chaque nation
+du Nord à un hôte tiré à la graine de la saison, **l'hôte recevant** — c'est le
+sens même d'une tournée. Et les nations restantes sont **triées par force puis
+appariées deux à deux** : une fédération ne programme pas un test qu'elle sait
+perdu de cinquante points.
+
+| | avant | après |
+|---|---|---|
+| la France en tournée | Biélorussie, Zimbabwe, Russie | **Argentine, Japon, Afrique du Sud, Chili** |
+| affiches à l'envers (le Nord reçoit) | — | **0** |
+| déroutes à 60 points et plus | 6 sur 128 | **0** |
+| grilles distinctes sur 8 saisons | 8 | 8 |
+
+### 3. ⚠️ LE CLASSEMENT MONDIAL SE CALCULAIT SUR D'AUTRES RÉSULTATS QUE CEUX AFFICHÉS
+
+C'est le défaut le plus grave du lot, et il ne se voyait nulle part.
+
+`appliquerCompetitionAuClassement` rejouait chaque match avec la graine
+`` `rang#${id}#${saison}#…` `` alors que l'écran utilisait `` `${id}#${saison}#…` ``
+tout court. **Deux graines, donc deux scores.** La France pouvait gagner 30-10 à
+l'écran et perdre dans le calcul du rang — un classement qui bouge sans rapport
+avec ce qu'on vient de jouer se lit exactement comme « le classement ne bouge
+pas ».
+
+**`matchsInternationaux(c, saison, jusqua, apport)`** est désormais la source
+unique : l'écran, les affiches et le classement mondial lisent la même chose. Et
+elle sait que la Coupe du monde n'est pas un championnat — ses matchs viennent de
+`mondial.ts`, et son tableau ne peut pas être rejoué par `jouerTestMatch`, qui
+rendrait des matchs nuls en phase à élimination directe.
+
+**Le classement BOUGEAIT déjà**, d'ailleurs — mesuré, la France passe
+4ᵉ → 3ᵉ → 5ᵉ → 2ᵉ sur huit saisons. Ce qui manquait, c'est qu'on le VOIE :
+
+| | avant | après |
+|---|---|---|
+| visibilité | derrière un bouton replié | **affiché** |
+| lignes | **114 nations**, l'annuaire des fédérations | **top 20 + ma nation**, le reste au clic |
+| mouvement | aucun repère | **▲ / ▼** contre le rang du début de saison |
+
+⚠️ **MA NATION RESTE AFFICHÉE MÊME 60ᵉ.** Sans elle, le classement ne parle pas
+de la carrière en cours — et c'est précisément ce qui en faisait « un classement
+de toutes les nations » plutôt que le sien.
+
+### 4. LA FIN DE CONTRAT MÈNE ENFIN QUELQUE PART
+
+Le mécanisme existait **entièrement** : `susciterApproches` fait écrire les clubs
+depuis longtemps. Il était simplement invisible — les propositions arrivent en
+**message privé sur un réseau social** qu'on n'a aucune raison d'ouvrir ce
+jour-là, et le seul signal était une **pastille bleue** sur un onglet. Le journal
+disait « ouvre tes messages » et laissait le joueur sur un écran où le bouton
+refusait d'avancer sans dire où cliquer.
+
+- **`ouvrirSocialSur`** (store, **non persisté** — c'est un ordre donné à
+  l'écran, comme `attenteEvenement`) et `ouvrirMessagesOvale()`.
+- **Quand le contrat expire et bloque la semaine, on EMMÈNE le joueur** sur 𝕏 →
+  Messages. On ne lui dit plus d'y aller.
+- **Une alerte pleine largeur** dans le panneau de carrière dès la dernière année
+  de contrat : « ✍️ Dernière année de contrat — 3 clubs t'écrivent sur 𝕏
+  L'Ovale → Ouvrir mes messages ». ⚠️ Un bouton, pas une pastille : une fin de
+  contrat est le moment le plus décisif d'une carrière, elle ne se lit pas au
+  milieu de sept compteurs de statistiques.
+
+⚠️ **LE HOOK VIT AVANT LE PREMIER RETOUR ANTICIPÉ.** Posé après
+`if (!joueur) return null`, il n'est pas appelé au même rang à chaque rendu :
+React l'interdit, et `oxlint` l'a signalé immédiatement (`rules-of-hooks`).
+
+### Mesuré (`scripts/verifInternational.ts`, sections 7 à 9)
+
+| Contrôle | Résultat |
+|---|---|
+| poules | **4 × 6 nations**, deux matchs chacune |
+| adversaires joués deux fois | **0** (12 avant correction) |
+| tableau | quart ×4 · demie ×2 · **finale** |
+| nuls à élimination directe · scores impossibles | **0 · 0** |
+| un champion du monde par édition | **3/3** — Nouvelle-Zélande, Nouvelle-Zélande, Afrique du Sud |
+| le vainqueur du jeu est celui de la finale | ✅ |
+| tournée d'été : affiches à l'envers | **0** |
+| … déroutes à 60 points | **0 sur 128** |
+| … grilles distinctes | **8 sur 8 saisons** |
+| le rang d'une nation change avec les saisons | **oui** (France 4 → 3 → 5 → 4 → 5) |
+| un sans-faute monte, une bredouille descend | **2/2** |
+
+⚠️ **UN CONTRÔLE DU BANC ÉTAIT FAUX, ET IL FAUT SAVOIR POURQUOI.** La première
+version comparait le classement de la semaine 1 à celui de la semaine 40 en
+attribuant l'écart au Tournoi — alors que la **tournée d'automne** tombe entre
+les deux. Une nation qui gagnait cinq matchs en février après en avoir perdu
+trois en novembre descendait, et le contrôle criait au bug (1/4). Et sa seconde
+version était encore trop stricte : l'échange World Rugby est **pondéré par
+l'écart de note**, donc battre beaucoup plus faible que soi ne rapporte presque
+rien — une nation à quatre victoires et une défaite peut terminer à l'équilibre,
+et c'est exact. On ne teste donc que les bilans qui ne se discutent pas : le
+Grand Chelem et la bredouille.
+
+### 🩹 Et un débordement horizontal, préexistant, trouvé en affichant les poules
+
+Le Mondial affiche quatre poules, donc `.grille-poules` — et sur 375 px la page
+partait à **483 px de large**. La règle mobile existait pourtant :
+`.grille-poules { grid-template-columns: 1fr }`.
+
+⚠️ **`1fr` VAUT `minmax(auto, 1fr)`**, et cet `auto` est le MIN-CONTENT de la
+poule, c’est-à-dire les dix colonnes de son classement. La colonne se calculait
+donc à **467 px** dans un conteneur de 345, le bloc suivait, et tout le document
+avec. `minmax(0, 1fr)` autorise la colonne à se serrer ; le tableau défile alors
+dans sa propre boîte, ce que `.classement-tableau` sait déjà faire.
+
+⚠️ **CE N’EST PAS UN DÉFAUT DE CE LOT** : les poules des coupes d’Europe
+utilisent la même grille et débordaient déjà. Elles sont corrigées avec.
+
+### Vérifié en jouant
+
+```text
+Coupe du monde, saison 4
+  Quarts   Afrique du Sud 28-9 Angleterre · Irlande 29-16 Australie
+           Japon 31-13 Géorgie · Nouvelle-Zélande 34-10 Italie
+  Demies   Afrique du Sud 29-23 Irlande · Japon 5-33 Nouvelle-Zélande
+  FINALE   Afrique du Sud 19-23 Nouvelle-Zélande      🏆 Nouvelle-Zélande
+
+Classement mondial (le même écran, juste après)
+  1 · Nouvelle-Zélande · 97,03 · ▲ 1
+  2 · Afrique du Sud   · 96,13 · ▼ 1
+  5 · France 🫵        · 88,84 · ▼ 2
+```
+
+Le champion du monde monte d’un rang dans la foulée : le classement suit bien
+les résultats qu’on vient de voir. La tournée d’été affiche « Espagne - France »,
+« Afrique du Sud - Irlande », « Tonga - Angleterre », « Argentine - Écosse ».
+Et l’alerte de fin de contrat ouvre 𝕏 **directement sur l’onglet Messages**,
+vérifié à `elementFromPoint` : joignable sur ordinateur comme sur 375 × 812,
+où la page ne déborde plus (`scrollWidth` 483 → **375**).
+
+```bash
+npx vite-node scripts/verifInternational.ts # 7 à 9 : Mondial, tournée d’été, classement mondial
+npx vite-node scripts/verifTitres.ts        # le titre mondial va bien au vainqueur de la finale
+npx vite-node scripts/verifSelection.ts     # les petites nations restent atteignables
+npx vite-node scripts/verifClassementWorldRugby.ts # la formule World Rugby elle-même
 ```

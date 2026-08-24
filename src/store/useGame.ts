@@ -681,6 +681,20 @@ interface GameState {
   /** Clé Groq personnelle (facultative) : elle prend le pas sur celle du site. */
   groqKey: string;
   // navigation & réglages
+  /**
+   * ⚠️ SUR QUEL ONGLET OUVRIR 𝕏 L’OVALE — un ordre donné à l’écran, pas un
+   * état de la partie (donc NON persisté, comme `attenteEvenement`).
+   *
+   * Retour de jeu : « lorsque notre joueur est en fin de contrat, ouvre 𝕏
+   * sur les messages avec les propositions des autres clubs ou la
+   * prolongation ». Les clubs écrivaient déjà — en message privé, derrière
+   * un badge bleu sur un onglet, sur un réseau social qu’on n’a aucune
+   * raison d’ouvrir ce jour-là. Le seul signal d’une carrière qui bascule
+   * était une pastille.
+   */
+  ouvrirSocialSur: 'messages' | null;
+  ouvrirMessagesOvale: () => void;
+  consommerOuvertureSociale: () => void;
   setEcran: (e: Ecran) => void;
   setIAActivee: (active: boolean) => void;
   setModele: (m: string) => void;
@@ -917,6 +931,14 @@ export const useGame = create<GameState>()(
       tenorKey: '',
       groqKey: '',
       modele: MODELE_DEFAUT,
+
+      ouvrirSocialSur: null,
+      ouvrirMessagesOvale: () => set((s) => ({
+        ecran: 'social',
+        ouvrirSocialSur: 'messages',
+        ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
+      })),
+      consommerOuvertureSociale: () => set({ ouvrirSocialSur: null }),
 
       setEcran: (ecran) => set((s) => ({
         ecran,
@@ -1177,6 +1199,12 @@ export const useGame = create<GameState>()(
                     evenement: `libre-${joueur.saison}`,
                   }],
             }));
+            // ⚠️ ON L’EMMÈNE, ON NE LUI DIT PAS D’Y ALLER. Le journal
+            // annonçait « ouvre tes messages » et laissait le joueur sur un
+            // écran où plus rien ne répondait : le bouton refusait d’avancer
+            // sans expliquer où cliquer. La demande est explicite — « ouvre
+            // 𝕏 sur les messages ».
+            get().ouvrirMessagesOvale();
             return; // la saison ne démarre pas tant qu'on n'a pas signé
           }
           // ⚠️ AUCUN CLUB N'EN VEUT. On ne laisse pas le joueur en suspens : le
@@ -4563,7 +4591,11 @@ function vainqueurInternational(id: string, saison: number): string | null {
   const comp = competitionsDeLaSaison(saison).find((c) => c.id === id);
   if (!comp) return null;
   const etat = internationalEnDirect(id, saison, comp.journees, null);
-  return etat?.classement[0]?.club ?? null;
+  // ⚠️ UNE COUPE DU MONDE SE GAGNE EN FINALE, PAS EN TÊTE D’UN CLASSEMENT.
+  // `EtatInternational.vainqueur` n’est rempli que par elle ; pour un
+  // championnat de sélections (Tournoi, Rugby Championship), le premier du
+  // tableau reste la bonne réponse.
+  return etat?.vainqueur ?? etat?.classement[0]?.club ?? null;
 }
 
 /** La compétition de sélections que SA nation dispute sur une fenêtre donnée. */

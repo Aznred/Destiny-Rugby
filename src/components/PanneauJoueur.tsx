@@ -96,6 +96,10 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const [matchOuvert, setMatchOuvert] = useState(false);
   const [matchTermine, setMatchTermine] = useState(false);
   const matchRegarde = useGame((s) => s.matchRegarde);
+  const approches = useGame((s) => s.approches);
+  const ouvrirMessagesOvale = useGame((s) => s.ouvrirMessagesOvale);
+  // Les clubs qui attendent une réponse, prolongation comprise.
+  const ouvertes = approches.filter((a) => a.etat === 'ouverte').length;
   // ⚠️ UNE SEMAINE INTERNATIONALE A AUSSI SON MATCH. On ne voyait ni affiche ni
   // compétition pendant le Tournoi ou la tournée d'automne : la sélection se
   // joue maintenant comme un match de club (lib/international.ts).
@@ -278,6 +282,27 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           </span>
         )}
       </div>
+
+      {/* ═══ LA FIN DE CONTRAT SE VOIT, ET ELLE MÈNE QUELQUE PART ══════════
+          Retour de jeu : « lorsque notre joueur est en fin de contrat, ouvre 𝕏
+          sur les messages avec les propositions des autres clubs ou la
+          prolongation ».
+          ⚠️ LE MÉCANISME EXISTAIT ENTIÈREMENT, IL ÉTAIT INVISIBLE. Les clubs
+          écrivent depuis longtemps (`susciterApproches`), en message privé sur
+          un réseau social qu’on n’a aucune raison d’ouvrir ce jour-là, et le
+          seul signal était une pastille bleue sur un onglet. Une négociation
+          de contrat ne se cache pas derrière un badge. */}
+      {contrat && (contrat.saisons <= 1 || ouvertes > 0) && !joueur.preAccord && (
+        <button type="button" className="alerte-contrat" onClick={ouvrirMessagesOvale}>
+          <b>✍️ {contrat.saisons <= 0 ? t('pj.contratFini') : t('pj.contratDerniereAnnee')}</b>
+          <span>
+            {ouvertes > 0
+              ? t('pj.propositions', { n: ouvertes })
+              : t('pj.aucuneProposition')}
+          </span>
+          <em>{t('pj.ouvrirMessages')} →</em>
+        </button>
+      )}
       {/* ⚠️ L'ENTRAÎNEMENT EST PERMANENT. On ne clique plus sur un secteur
               chaque semaine : on choisit ce qu'on travaille, la séance se fait
               toute seule à chaque semaine jouée, et on peut changer quand on
