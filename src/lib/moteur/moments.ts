@@ -39,7 +39,12 @@ export type TypeMoment =
   | 'reception'   // il arrive sur toi (passe, chandelle, ou tu es le suivant)
   | 'libre'       // il traîne au sol et tu es le plus proche
   | 'defense'     // le porteur adverse arrive dans ta zone
-  | 'ruck';       // un regroupement se forme à ta portée
+  | 'ruck'        // un regroupement se forme à ta portée
+  // ⚠️ LE MOMENT QUI RÉCOMPENSE UN DUEL GAGNÉ. Retour de jeu : « nos actions
+  // n'ont aucun impact ». Une percée rendait la main au rugby automatique ;
+  // maintenant elle ouvre une échappée, et l'échappée a sa propre question :
+  // plonger, chiper par-dessus le dernier défenseur, ou servir le soutien.
+  | 'espace';      // tu es passé, la ligne est devant toi
 
 export interface Moment {
   type: TypeMoment;
@@ -54,6 +59,7 @@ const BANNIERES: Record<TypeMoment, { cle: string; emoji: string }> = {
   libre: { cle: 'ml.moment.libre', emoji: '⚡' },
   defense: { cle: 'ml.moment.defense', emoji: '🛡️' },
   ruck: { cle: 'ml.moment.ruck', emoji: '🔒' },
+  espace: { cle: 'ml.moment.espace', emoji: '💨' },
 };
 
 // ⚠️ LES DISTANCES SONT DES SECONDES DÉGUISÉES. Un trois-quarts court à 8 m/s :
@@ -113,6 +119,11 @@ export function momentDuJoueur(e: EtatMatch, p: Pion | undefined): Moment | null
 }
 
 function lireMoment(e: EtatMatch, p: Pion): TypeMoment | null {
+  // ⚠️ AVANT « LE BALLON EST À TOI », et c’est tout l’enjeu : pendant une
+  // échappée on EST le porteur. Posé après, ce test n’était jamais atteint —
+  // mesuré, zéro carte de l’espace sur vingt matchs. Le moment le plus
+  // spécifique se lit toujours en premier.
+  if (e.echappee?.pion === p && e.porteur === p) return 'espace';
   if (e.porteur === p) return 'ballon';
 
   // Le ballon est en l'air ET il t'est destiné : c'est déjà ton moment, il
@@ -137,6 +148,21 @@ function lireMoment(e: EtatMatch, p: Pion): TypeMoment | null {
     if (plusProche === p) return 'libre';
   }
 
+  // ⚠️ LE 9 À LA SORTIE DE SON PROPRE RUCK — un moment qui N’EXISTAIT PAS.
+  // Tout ce qui suit était gardé derrière « je défends » : le demi de mêlée
+  // qui protège son propre regroupement, ballon à ses pieds, n’avait donc
+  // aucun moment, aucune carte, aucun geste. C’est pourtant LA situation la
+  // plus caractéristique de son poste — et la demande le disait mot pour mot :
+  // « une 9 de faire une chenille, chandelle pour dégager ».
+  //
+  // ⚠️ RÉSERVÉ AU NUMÉRO 9, et pas au « mieux placé » : au ruck, le mieux
+  // placé de son camp est presque toujours un avant qui pousse. Le ballon à la
+  // sortie appartient au demi de mêlée, personne d’autre ne se met là.
+  if ((e.phase === 'ruck' || e.phase === 'maul') && e.possession === p.cote
+    && p.numero === 9 && distance2(p.pos, e.ballon) < PORTEE_RUCK * PORTEE_RUCK) {
+    return 'ruck';
+  }
+
   const defend = e.possession !== p.cote;
   if (!defend) return null;
 
@@ -147,6 +173,17 @@ function lireMoment(e: EtatMatch, p: Pion): TypeMoment | null {
     && leMieuxPlace(e, p, e.ballon)) {
     return 'ruck';
   }
+
+  // ⚠️ UNE PASSE EN L’AIR POUR EUX, À TA PORTÉE — le moment de l’interception,
+  // et il N’EXISTAIT PAS. Mesuré sur vingt matchs joués carte par carte :
+  // **zéro interception proposée**. La raison est mécanique — pendant un vol
+  // il n’y a pas de porteur, donc pas de moment `defense`, donc pas de carte.
+  // Le geste était dans le type, dans la liste, dans le moteur, et
+  // inatteignable. Exactement le sort des deux effets de traits restés sans
+  // lecteur pendant des mois.
+  if (e.vol?.receveur && e.vol.receveur.cote !== p.cote
+    && distance2(p.pos, e.vol.receveur.pos) < PORTEE_DEFENSE * PORTEE_DEFENSE
+    && leMieuxPlace(e, p, e.vol.receveur.pos)) return 'defense';
 
   // En défense, le porteur entre dans ta zone, IL VIENT VERS TOI, et c'est toi
   // le mieux placé pour l'arrêter.

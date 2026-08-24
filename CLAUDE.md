@@ -3861,7 +3861,7 @@ suspensions pour la saison, blessures, etc. »
 
 | Fichier | Rôle |
 |---|---|
-| `moteur/controle.ts` | Les **13 actions**, leur disponibilité selon la phase, le coût en endurance, la recharge. Ne connaît pas `moteur.ts` — c'est l'inverse. |
+| `moteur/controle.ts` | Les **20 actions**, leur disponibilité selon la phase, le coût en endurance, la recharge. Ne connaît pas `moteur.ts` — c'est l'inverse. |
 | `moteur/bagarre.ts` | La **tension**, la provocation, le coup de poing, la bagarre, les cartons, les blessures, et la **commission d'après-match**. |
 | `moteur/etat.ts` | `NiveauMatch`, `ActionJoueur`, `IntentionJoueur`, `Bagarre`, `DisciplineMatch`, et `ajouterCommentaire()` — mis en commun pour éviter le cycle `moteur ↔ bagarre`. |
 | `moteur/moteur.ts` | Consomme l'intention là où elle se joue : contact, ruck, choix de combinaison, phase `bagarre`. |
@@ -3882,17 +3882,22 @@ suspensions pour la saison, blessures, etc. »
    manqué laisse un trou de trois secondes, un crochet raté rend le ballon une
    fois sur huit, un grattage mal placé donne une pénalité une fois sur cinq.
 
-### Les treize actions, par famille
+### Les vingt actions, par famille
 
 | Famille | Actions | Quand |
 |---|---|---|
 | **Ballon en main** | 🏃 Sprint · ↩️ Crochet · 💪 Raffut · 🤝 Passer · 🦶 Taper | on est le porteur |
+| **Ballon en main** | ⬅️ ➡️ Passe gauche / droite | on est le porteur, un partenaire de ce côté |
+| **Gestes de poste** | 🎯 50/22 · ☂️ Chandelle | trois-quarts avec du pied |
+| **Gestes de poste** | 🐛 Chenille | le numéro 9, au ruck de son camp |
+| **Gestes de poste** | 🐂 Foncer | un avant, le ballon arrive |
+| **Gestes de poste** | 🤲 Offload | le ballon arrive, un défenseur au contact |
 | **Attaque sans ballon** | 🙋 Réclamer · 🤸 Soutien | ballon vivant, son équipe l'a |
 | **Défense** | 💥 Plaquer · ⬆️ Monter · 🪝 Gratter | ballon vivant, l'adversaire l'a |
 | **Discipline** | 🗯️ Chambrer · 🥊 Frapper · ✋ Calmer | un adversaire à moins de 26 m |
 
 ⚠️ **LA BARRE NE MONTRE QUE CE QUI EST JOUABLE** — trois à cinq boutons, pas
-treize dont onze grisés : sur un téléphone de 375 px, une barre grise est
+vingt dont dix-sept grisés : sur un téléphone de 375 px, une barre grise est
 illisible et oblige à chercher ce qui est actif. Et **quand rien n'est jouable,
 on dit POURQUOI** (sur le banc, sous carton, en recharge, phase morte) — vu en
 jeu : le joueur démarrait remplaçant, la manette s'affichait, aucun bouton
@@ -4191,7 +4196,7 @@ qui rallongeait le SVG… jusqu'à **5 500 px de haut**.
 - **Le déterminisme du moteur** : la caméra et les moments sont des **lectures
   pures** de l'état. Changer la vitesse d'affichage ne change pas le match,
   seulement le nombre de secondes réelles qu'il met à se jouer.
-- **Les treize actions, la tension, les bagarres et la commission de
+- **Les vingt actions, la tension, les bagarres et la commission de
   discipline** : intactes (`moteur/controle.ts`, `moteur/bagarre.ts`).
 - **La feuille de match et le barème de la note** : le même code, déplacé dans
   son propre fichier.
@@ -6226,4 +6231,160 @@ npx vite-node scripts/verifCoupesEurope.ts  # section 6 : le tour avance, les sc
 npx vite-node scripts/verifClassement.ts    # section 1 bis : tous les âges de départ passent
 npx vite-node scripts/verifStatsJournees.ts # la simulation de fond ne double plus les tours
 npx vite-node scripts/verifTitres.ts        # aucun titre fantôme, aucun titre oublié
+```
+
+## 🏉 UNE CARTE À CHAQUE BALLON, ET CINQ GESTES QUI VIENNENT DU POSTE
+
+Demande, mot pour mot : « dès que notre joueur va ou touche le ballon, on a le
+choix de l'action ; et rajoute-en de nouvelles en fonction du poste — un arrière
+faire un 50/22, une 9 faire une chenille, chandelle pour dégager, foncer en
+avant, faire un offload au dernier moment ; et il faut que les actions soient
+vraiment effectuées, qu'on le voie visuellement, que ça ait un vrai impact ».
+
+Trois demandes en une, et la troisième est la seule qui compte : un geste ajouté
+au type, affiché sur la carte, et qui ne changerait rien à l'état du match,
+personne ne le verrait jamais.
+
+### 1. Le rythme : le repos n'est plus le même selon qu'on a le ballon
+
+`decisions.ts` refusait d'ouvrir une carte moins de `REPOS_DECISION` (95 s de
+jeu) après la précédente. C'est la bonne règle pour un **carrefour** — plaquer
+ou monter, gratter ou pousser — et c'est absurde pour un ballon reçu : un
+ouvreur en touche soixante par match, et on lui en donnait quatre.
+
+| | avant | après |
+|---|---|---|
+| repos, ballon en main | 95 s | **`REPOS_BALLON` = 6 s** |
+| repos, carrefour (défense, ruck) | 95 s | 95 s, inchangé |
+| compte à rebours | `DELAI_DECISION` = 10 s | **6 s ballon** · 10 s carrefour · 5 s enchaînement |
+
+⚠️ **SIX SECONDES, PARCE QU'IL Y EN A SOIXANTE.** Dix secondes de menu sur une
+passe de routine, soixante fois, ce sont **six minutes de formulaire** : mesuré,
+ça faisait passer le match de 5,7 à 12,4 minutes. Six secondes, c'est le temps
+de LIRE quatre options, pas de calculer.
+
+⚠️ **ET LES TROIS DÉLAIS N'ONT QU'UNE DÉFINITION**, `delaiDeCarte(d)`, parce que
+deux lecteurs en ont besoin — l'écran qui arme le compte à rebours, et le banc
+d'essai qui calcule la durée d'un match. Recopiée, la règle diverge, et le banc
+se met à mesurer un jeu qui n'existe pas.
+
+⚠️ **`Decision.balleEnMain` N'EST PAS `moment === 'reception'`.** Ce moment-là
+couvre aussi « je suis le prochain de la combinaison », qui se présente à chaque
+phase et ne se concrétise presque jamais : s'y fier donnait **61 cartes de
+réception pour 3 ballons réellement joués**.
+
+⚠️ **LE RALENTI SUIT LE GESTE, PAS LA CARTE.** 3,2 s de gros plan après *chaque*
+passe, soixante fois, ce sont trois minutes de ralenti sur des gestes qui n'en
+demandent pas. Seuls les gestes de `CONTACTS` (plaquage, crochet, raffut,
+percussion, offload, grattage, chenille, monter) gardent `REJEU` ; le reste se
+lit en `REJEU_COURT` = 1,5 s.
+
+### 2. Le poste : le filtre est une donnée, pas un `if`
+
+`DefinitionAction.pour?: (p: Pion) => boolean` s'ajoute au filtre de situation
+déjà porté par le `switch` de `actionsDisponibles`. Les deux sont indépendants :
+l'un dit **qui**, l'autre **quand**.
+
+| geste | qui | quand | recharge |
+|---|---|---|---|
+| **50/22** | `BOTTEUR` : trois-quarts, `pied ≥ 50` | ballon à moi, dans mon camp | 40 s |
+| **Chandelle** | `BOTTEUR` | ballon à moi | 14 s |
+| **Chenille** | le **numéro 9**, et lui seul | ruck de mon camp | 26 s |
+| **Foncer** | un avant | le ballon arrive | 8 s |
+| **Offload** | tout le monde | le ballon arrive, un défenseur au contact | 12 s |
+
+⚠️ **LA CHENILLE EST RÉSERVÉE AU NUMÉRO 9, PAS AU « MIEUX PLACÉ ».** Au ruck, le
+mieux placé de son camp est presque toujours un avant qui pousse. Le ballon à la
+sortie appartient au demi de mêlée ; personne d'autre ne se met là.
+
+⚠️ **ET LE MOMENT DU 9 N'EXISTAIT PAS.** Tout ce qui suit dans `moments.ts` était
+gardé derrière « je défends » : le demi de mêlée qui protège son propre
+regroupement, ballon à ses pieds, n'avait **aucun moment, aucune carte, aucun
+geste** — la situation la plus caractéristique de son poste. Un nouveau moment
+`'ruck'` s'ouvre désormais aussi en attaque, et la liste des préférences de ruck
+a dû s'élargir avec lui : avec la seule chenille, une carte de ruck offensive
+n'aurait eu **qu'une** option, et `MIN_OPTIONS` l'aurait refusée en silence.
+
+⚠️ **L'ORDRE DES PRÉFÉRENCES A ÉTÉ MESURÉ, PAS DEVINÉ.** Placés en tête, les
+gestes de poste **évinçaient complètement la passe** — un ouvreur ne se voyait
+plus proposer d'écarter. Les passes reviennent en premier, les gestes de poste
+juste derrière.
+
+### 3. L'exécution : `resoudreChoix` tranche sur-le-champ
+
+Chaque geste rejoint les `DUELS` — donc un pourcentage annoncé, un dé tiré tout
+de suite, une phrase, un effet.
+
+| geste | réussi | raté |
+|---|---|---|
+| 50/22 | touche dans leurs 22, ballon à nous | le ballon reste en jeu, contre-attaque |
+| Chandelle | terrain gagné, ballon à disputer | contré → mêlée pour eux |
+| Chenille | `ballonLent`, possession assurée, dégagement tranquille | 45 % pénalité, sinon ballon perdu |
+| Foncer | `pos.x` avance de `2,6 + puissance/45`, ballon conservé, ballon rapide | en-avant |
+| Offload | le ballon part, le défenseur reste battu 0,6 s | en-avant, mêlée pour eux |
+
+⚠️ **L'OFFLOAD A ÉTÉ ÉCRIT DEUX FOIS, ET LA PREMIÈRE NE FAISAIT RIEN.** Version
+initiale : résoudre le plaquage, *puis* tenter la passe. Mais `resoudrePlaquage`
+finit sur `formerRuck`, qui met `e.porteur` à `null` — la condition « je porte
+encore » n'était donc **jamais** vraie. Le geste déclenchait un plaquage
+ordinaire et rien d'autre. Vu dans le journal de jeu, et c'est la seule façon de
+le voir : « ✅ Offload — *Maxime Retière joue son geste* », le texte de repli,
+parce que le moteur n'avait rien eu à raconter. Le ballon part maintenant
+**avant** que le plaquage ne se referme — ce qui est d'ailleurs la définition du
+geste. « Au dernier moment » reste vrai : le défenseur est au contact (c'est la
+condition d'entrée) et il reste sonné une demi-seconde.
+
+### Mesuré
+
+`scripts/verifDuels.ts` (section 3 bis) et `scripts/verifMatchJouable.ts`
+(section 7, réécrite) :
+
+| Contrôle | Résultat |
+|---|---|
+| annoncé vs sorti, écart maximal par tranche | **0,7 σ** (727 duels tranchés) |
+| sur l'ensemble | annoncé 66,3 % · sorti **65,9 %** |
+| cartes par ballon touché | **61 cartes pour 60,8 ballons** — jamais deux pour un |
+| durée d'un match en décisions | **8,3 min** |
+| arrière | 50/22 ×7 · chandelle ×8 · offload ×5 |
+| demi de mêlée | chenille ×24 · chandelle ×68 · 50/22 ×45 |
+| pilier | percussion ×26 |
+| gestes proposés hors poste | **0** |
+| gestes tranchés sans effet sur l'état | **0** |
+
+⚠️ **« VRAIMENT EFFECTUÉ » NE SE PROUVE PAS AVEC UN BOOLÉEN DE RETOUR.** Le banc
+photographie l'état du match — phase, possession, porteur, intention de vol,
+position du ballon, nombre de commentaires, coups de pied, passes, mètres,
+offloads — joue le geste, rephotographie, et exige que **quelque chose ait
+bougé**. Un geste qui ne change rien est un bouton mort, et on ne le verrait pas
+à la relecture.
+
+⚠️ **ET LA BORNE DE CARTES EST RELATIVE, PLUS ABSOLUE.** La section 7 vérifiait
+« pas plus de trente-cinq carrefours par match » ; c'était juste tant qu'une
+carte était rare. Un plafond en valeur absolue ne veut plus rien dire quand un
+ouvreur touche soixante ballons et un pilier dix : on compare désormais aux
+ballons **réellement** touchés, comptés sur le front montant (le moteur tourne à
+sept pas par seconde — sans ça on compterait sept fois la même possession).
+
+### Vérifié en jouant, desktop et téléphone
+
+```text
+>>> [Passe gauche | Passe droite | Crochet | Offload]  → 🤲 Offload
+   ✅ 🤲 Offload | 48 % | Offload de Maxime Retière pour Enzo Sallefranque !
+                        | 🤝 Offload · ➡️ Passe
+>>> [...]                                              → 🤲 Offload
+   ❌ 🤲 Offload | 48 % | En-avant de Maxime Retière, mêlée pour Loudun.
+                        | ❌ En-avant
+```
+
+Sur 375 × 812 : **20 relevés `elementFromPoint`, 0 bouton injoignable, 0 hors
+écran**, la cinquième option (« Laisser faire ») comprise. Bulle du verdict de
+300 à 315 px de large sur une scène de 363 : bornée à 5 → 338 px, **jamais
+coupée**.
+
+```bash
+npx vite-node scripts/verifDuels.ts        # 3 bis : chaque poste reçoit ET joue ses gestes
+npx vite-node scripts/verifMatchJouable.ts # 7 : une carte par ballon touché, et la durée
+npx vite-node scripts/verifControle.ts     # ne rien choisir = le match qu'on aurait regardé
+npx vite-node scripts/verifMoteur.ts       # l'étalonnage du moteur ne bouge pas
+npx vite-node scripts/verifTraductions.ts  # les 20 clés ajoutées, dans les 7 langues
 ```

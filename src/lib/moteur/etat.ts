@@ -98,6 +98,38 @@ export type ActionJoueur =
   // contextuelle du gros bouton, qui donne au plus évident) ; les deux autres
   // désignent un CÔTÉ, et c'est le joueur qui décide d'ouvrir ou de fermer.
   | 'sprint' | 'crochet' | 'raffut' | 'passe' | 'passeGauche' | 'passeDroite' | 'pied'
+  // ⚠️ LES GESTES DE POSTE. Retour de jeu : « rajoute de nouvelles actions en
+  // fonction du poste — un arrière l'occasion de faire un 50/22, une 9 de faire
+  // une chenille, une chandelle pour dégager, foncer en avant, et faire un
+  // offload au dernier moment ».
+  //
+  // ⚠️ TROIS D'ENTRE ELLES N'AJOUTENT RIEN AU MOTEUR — elles LUI RENDENT LA
+  // MAIN. `taperAuPied` sait déjà jouer une chandelle, un 50/22, un rasant et
+  // une transversale ; c'était `intentionDePied` qui choisissait à la place du
+  // joueur. Ces actions-là ne font que retirer ce choix à la machine.
+  //   · cinquanteVingtDeux — le pari de l'arrière : touche dans leurs 22
+  //   · chandelle         — le box kick du 9, ses avants montent dessus
+  //   · chenille          — le 9 protège la sortie de ruck, puis dégage
+  //   · percussion        — l'avant rentre dedans : des mètres, sûrs
+  //   · offload           — donner APRÈS le contact, au dernier moment
+  | 'cinquanteVingtDeux' | 'chandelle' | 'chenille' | 'percussion' | 'offload'
+  // ⚠️ LES GESTES QUI MÈNENT QUELQUE PART. Retour de jeu : « nos actions
+  // n’ont aucun impact dans le jeu ; fais qu’un raffut, un sprint ou un
+  // prendre-l’espace mène à un essai si réussi, qu’un turnover relance la
+  // dynamique de l’équipe, qu’une passe puisse arriver à une passe
+  // décisive ».
+  //
+  // ⚠️ CE QUI MANQUAIT N’ÉTAIT PAS LE GESTE, C’ÉTAIT LA SUITE. Battre son
+  // vis-à-vis rendait la main au rugby automatique : deux foulées plus loin,
+  // le pion refaisait une passe de routine. Ces cinq-là ouvrent une
+  // ÉCHAPPÉE (`EtatMatch.echappee`) ou la concluent — c’est le chemin qui
+  // va du duel gagné à la ligne d’essai.
+  //   · percee        — lire l’intervalle et l’attaquer : on est dans le dos
+  //   · chipEtSuivre  — par-dessus le rideau, et on court après
+  //   · plongeon      — à portée de la ligne, on plonge dans l’en-but
+  //   · interception  — lire la passe adverse : le turnover le plus payant
+  //   · contreRuck    — pousser le paquet par-dessus le ballon au sol
+  | 'percee' | 'chipEtSuivre' | 'plongeon' | 'interception' | 'contreRuck'
   // ── Son équipe attaque, il n'a pas le ballon ─────────────────────────────
   | 'appel' | 'soutien'
   // ── Son équipe défend ───────────────────────────────────────────────────
@@ -388,6 +420,59 @@ export interface EtatMatch {
    * moteur ne le baisse jamais tout seul : une percée non lue reste une percée.
    */
   perceeJoueur: boolean;
+  /**
+   * ⚠️ L’ÉCHAPPÉE — le pion est DANS L’ESPACE, et il court à la ligne.
+   *
+   * Retour de jeu : « nos actions n’ont aucun impact ; fais qu’un raffut, un
+   * sprint ou un prendre-l’espace mène à un essai si réussi ». Le moteur
+   * savait déjà marquer un essai quand un porteur franchit la ligne
+   * (`franchieLigne` → `tenterEssai`) ; ce qui n’existait pas, c’est le
+   * CHEMIN pour y arriver. Battre son défenseur rendait la main à
+   * `ligneDeCourse` et à « fixer et donner », qui redonnaient le ballon deux
+   * foulées plus loin. Le duel gagné ne menait donc jamais nulle part.
+   *
+   * Tant qu’elle dure, le porteur vise la ligne, on ne le fait plus passer
+   * automatiquement, et il n’envisage plus le coup de pied. Elle s’éteint
+   * toute seule — un contre-attaquant finit toujours par être rejoint.
+   */
+  echappee: { pion: Pion; restant: number } | null;
+  /**
+   * ⚠️ LA DYNAMIQUE, DE −1 (le camp B est dessus) À +1 (le camp A l’est).
+   *
+   * Demande : « un turnover relance la dynamique de l’équipe ». Un seul
+   * nombre SIGNÉ, et pas deux jauges : l’élan est un rapport de force, ce
+   * que l’un prend l’autre le perd. Deux compteurs indépendants auraient
+   * permis aux deux équipes d’être portées en même temps, ce qui ne veut
+   * rien dire.
+   *
+   * ⚠️ ET IL SE LIT SUR LES POURCENTAGES DES CARTES. Il entre dans
+   * `probaPlaquage` et `probaGrattage` — les deux duels qui décident le
+   * contact et les ballons volés — donc `enjeuDe` l’affiche et
+   * `resoudreChoix` le tire. Une jauge qui ne changerait que la couleur
+   * d’une barre ne serait qu’un décor.
+   */
+  elan: number;
+  /**
+   * Le dernier ballon volé par le joueur incarné, et quand.
+   *
+   * ⚠️ IL SERT À DIRE MERCI. Un grattage qui amène un essai quarante
+   * secondes plus tard, personne ne fait le lien : le fil a défilé, la carte
+   * est refermée depuis longtemps. C’est ce chaînon qui permet à l’écran de
+   * revenir dessus — « ton ballon volé a amené l’essai ».
+   */
+  dernierTurnover: { pion: Pion; t: number } | null;
+  /**
+   * ⚠️ CE QU’UN GESTE PASSÉ VIENT DE RAPPORTER. L’écran les affiche, puis
+   * vide la file.
+   *
+   * Demande : « une passe peut arriver à une passe décisive ». La statistique
+   * existait déjà (`stats.passesDecisives`, créditée dans `tenterEssai`) —
+   * mais elle n’apparaissait qu’à la feuille de match, une heure plus tard.
+   * Le geste et sa récompense étaient séparés par tout un match : c’est
+   * exactement ce qui donne le sentiment que « nos actions n’ont aucun
+   * impact ». Une retombée se dit À L’INSTANT où elle tombe.
+   */
+  echos: { cle: string; nom: string; cible: string }[];
   /**
    * La température du match, 0 à 100. Elle monte quand on chambre, quand un
    * plaquage part haut, quand l'écart se creuse — et elle redescend toute

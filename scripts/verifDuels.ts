@@ -24,7 +24,7 @@
 //   npx vite-node scripts/verifDuels.ts
 
 import {
-  avancer, creerMatch, estUnDuel, resoudreChoix, type EtatMatch,
+  avancer, creerMatch, enjeuDe, estUnDuel, resoudreChoix, type EtatMatch,
 } from '../src/lib/moteur/moteur';
 import { decisionPour, REPOS_DECISION } from '../src/lib/moteur/decisions';
 import { jouerRencontre } from '../src/lib/championnat';
@@ -236,6 +236,280 @@ console.log('\n=== 3. LES ENCHAÎNEMENTS EXISTENT, ET NE S’EMBALLENT PAS ===')
 }
 
 // ---------------------------------------------------------------------------
+console.log('\n=== 3 bis. ⚠️ CHAQUE POSTE A SES GESTES, ET ILS S’APPLIQUENT ===');
+{
+  // Demande, mot pour mot : « rajoute de nouvelles actions en fonction du poste
+  // — un arrière l’occasion de faire un 50/22, une 9 de faire une chenille,
+  // chandelle pour dégager, foncer en avant, et faire un offload au dernier
+  // moment ; et il faut que les actions soient vraiment effectuées ».
+  //
+  // ⚠️ DEUX CHOSES À PROUVER, ET LA SECONDE EST LA VRAIE. Qu’un geste soit
+  // PROPOSÉ au bon poste se lit dans `DefinitionAction.pour` ; qu’il soit
+  // EXÉCUTÉ ne se lit nulle part. Un geste ajouté au type, offert sur la carte,
+  // et qui ne changerait rien à l’état du match, personne ne le verrait — c’est
+  // exactement ce qui est arrivé à deux effets de traits, restés sans lecteur
+  // pendant des mois.
+  const PROFILS = [
+    { poste: 'arriere' as const, attendus: ['cinquanteVingtDeux', 'chandelle'] },
+    { poste: 'demi_melee' as const, attendus: ['chenille', 'chandelle'] },
+    { poste: 'pilier_gauche' as const, attendus: ['percussion'] },
+  ];
+  const SPECIAUX = ['cinquanteVingtDeux', 'chandelle', 'chenille', 'percussion', 'offload'];
+
+  let manquants = 0;
+  let horsPoste = 0;
+  let sansEffet = 0;
+  let detailManquant = '';
+  let detailHorsPoste = '';
+  let detailSansEffet = '';
+
+  for (const { poste, attendus } of PROFILS) {
+    const avatar = {
+      club: A, nom: 'Sonde Poste', poste, titulaire: true,
+      attributs: { vitesse: 78, passe: 76, plaquage: 74, jeuAuPied: 78, vision: 76, force: 76, mental: 72, endurance: 80 },
+    };
+    const joues = new Map<string, number>();
+    const proposes = new Set<string>();
+
+    for (let m = 0; m < 3; m++) {
+      const r = jouerRencontre(A, B, 1, `poste#${poste}#${m}`, null);
+      const e = creerMatch(A, B, effA, effB, r.scoreD, r.scoreE, `poste#${poste}#${m}`, avatar, {
+        niveau: 'pro', controle: true,
+      });
+      const moi = monPion(e);
+      const avant = moi.avant;
+      let depuis = 0;
+      let pas = 0;
+      while (!e.fini && pas++ < 40_000) {
+        const carte = decisionPour(e, moi, e.sim - depuis);
+        if (!carte) { avancer(e, 0.3); continue; }
+        depuis = e.sim;
+        for (const o of carte.options) {
+          if (!SPECIAUX.includes(o.action)) continue;
+          proposes.add(o.action);
+          // ⚠️ UN AVANT NE TAPE PAS DE CHANDELLE, un trois-quarts ne fait pas de
+          // percussion : le filtre de poste doit tenir dans les deux sens.
+          if (avant && (o.action === 'chandelle' || o.action === 'cinquanteVingtDeux')) {
+            horsPoste++; detailHorsPoste = `${poste} (avant) s’est vu proposer ${o.action}`;
+          }
+          if (!avant && o.action === 'percussion') {
+            horsPoste++; detailHorsPoste = `${poste} (ligne arrière) s’est vu proposer percussion`;
+          }
+          if (o.action === 'chenille' && moi.numero !== 9) {
+            horsPoste++; detailHorsPoste = `${poste} (n°${moi.numero}) s’est vu proposer la chenille`;
+          }
+        }
+
+        // On joue le geste de poste dès qu’il est là : c’est ce qu’on mesure.
+        const spe = carte.options.find((o) => SPECIAUX.includes(o.action));
+        const choisi = spe ?? carte.options[0];
+
+        // ⚠️ L’EMPREINTE AVANT / APRÈS. « Vraiment effectué » ne se prouve pas en
+        // lisant un booléen de retour : on photographie l’état du match, on joue,
+        // et on exige que QUELQUE CHOSE ait bougé — le ballon, la possession, la
+        // phase, une statistique, une ligne de commentaire.
+        const photo = `${e.phase}|${e.possession}|${e.porteur?.nom ?? 0}|${e.vol?.intention ?? 0}`
+          + `|${Math.round(e.ballon.x)}|${e.commentaires.length}|${moi.stats.coupsDePied}`
+          + `|${moi.stats.passes}|${moi.stats.metres.toFixed(1)}|${moi.stats.offloads}`;
+        const issue = resoudreChoix(e, moi, choisi.action);
+        const apres = `${e.phase}|${e.possession}|${e.porteur?.nom ?? 0}|${e.vol?.intention ?? 0}`
+          + `|${Math.round(e.ballon.x)}|${e.commentaires.length}|${moi.stats.coupsDePied}`
+          + `|${moi.stats.passes}|${moi.stats.metres.toFixed(1)}|${moi.stats.offloads}`;
+
+        if (SPECIAUX.includes(choisi.action)) {
+          joues.set(choisi.action, (joues.get(choisi.action) ?? 0) + 1);
+          if (issue.joue && photo === apres) {
+            sansEffet++;
+            detailSansEffet = `${choisi.action} tranché sans rien changer à l’état`;
+          }
+        }
+      }
+    }
+
+    const vus = attendus.filter((a) => proposes.has(a));
+    const faits = attendus.filter((a) => (joues.get(a) ?? 0) > 0);
+    console.log(`  ${poste.padEnd(16)} proposés : ${[...proposes].join(", ") || "aucun"}`);
+    console.log(`  ${"".padEnd(16)} joués    : ${[...joues].map(([k, v]) => `${k} ×${v}`).join(", ") || "aucun"}`);
+    if (vus.length < attendus.length) {
+      manquants++;
+      detailManquant = `${poste} : ${attendus.filter((a) => !proposes.has(a)).join(", ")} jamais proposé(s)`;
+    } else if (faits.length < attendus.length) {
+      manquants++;
+      detailManquant = `${poste} : ${attendus.filter((a) => !faits.includes(a)).join(", ")} proposé(s) mais jamais joué(s)`;
+    }
+  }
+
+  ligne('chaque poste reçoit ET joue ses gestes',
+    manquants ? detailManquant : 'arrière, 9 et pilier servis', manquants === 0);
+  ligne('et jamais ceux d’un autre poste',
+    horsPoste ? detailHorsPoste : '0 geste hors poste', horsPoste === 0);
+  ligne('un geste tranché change toujours quelque chose',
+    sansEffet ? detailSansEffet : '0 geste sans effet', sansEffet === 0);
+}
+console.log('\n=== 3 ter. ⚠️ UN GESTE RÉUSSI MÈNE QUELQUE PART ===');
+{
+  // Retour de jeu, mot pour mot : « c’est pas assez fun, nos actions n’ont
+  // aucun impact dans le jeu ; fais que par exemple un raffut, un sprint ou un
+  // prendre-l’espace mène à un essai si réussi, qu’un turnover relance la
+  // dynamique de l’équipe, qu’une passe peut arriver à une passe décisive ».
+  //
+  // ⚠️ TROIS CHAÎNES À PROUVER, ET AUCUNE NE SE LIT DANS LE CODE. Qu’un geste
+  // existe se vérifie à la relecture ; qu’il MÈNE quelque part ne se vérifie
+  // qu’en jouant. Le piège est connu de ce projet : l’offload a vécu un tour
+  // entier en déclenchant un plaquage ordinaire, parce que rien ne mesurait sa
+  // conséquence — seulement son existence.
+  const N_MATCHS = 5;
+  const POSTES = ['arriere', 'demi_ouverture', 'demi_melee', 'pilier_gauche'] as const;
+  const NOUVEAUX: ActionJoueur[] = ['percee', 'chipEtSuivre', 'plongeon', 'interception', 'contreRuck'];
+
+  let echappees = 0;
+  let essaisJoueur = 0;
+  let cartesEspace = 0;
+  let passesDecisives = 0;
+  let retombees = 0;
+  let turnovers = 0;
+  let turnoversQuiPoussent = 0;
+  let elanMax = 0;
+  let ecartAnnonce = 0;
+  let sansEffet = 0;
+  let detailSansEffet = '';
+  const proposes = new Set<string>();
+  const joues = new Set<string>();
+
+  for (const poste of POSTES) {
+    for (let m = 0; m < N_MATCHS; m++) {
+      const cle = `impact#${poste}#${m}`;
+      const r = jouerRencontre(A, B, 1, cle, null);
+      const e = creerMatch(A, B, effA, effB, r.scoreD, r.scoreE, cle,
+        { ...AVATAR, poste }, { niveau: `pro`, controle: true });
+      const moi = monPion(e);
+      let depuis = 0;
+      let pas = 0;
+      let dansLEspace = false;
+      while (!e.fini && pas++ < 40_000) {
+        const carte = decisionPour(e, moi, e.sim - depuis);
+        if (!carte) { avancer(e, 0.3); continue; }
+        depuis = e.sim;
+        if (carte.moment === 'espace') cartesEspace++;
+        for (const o of carte.options) proposes.add(o.action);
+
+        // On joue en priorité ce qui doit mener quelque part : c’est ce qu’on
+        // mesure. Les autres cartes se jouent au premier choix.
+        const choisi = carte.options.find((o) => NOUVEAUX.includes(o.action)) ?? carte.options[0];
+
+        // ⚠️ `battu` FAIT PARTIE DE L’EMPREINTE, et ce n’est pas une complaisance :
+        // une interception ratée ne change ni la phase, ni la possession, ni le
+        // ballon — son unique conséquence est que le défenseur est SORTI DU JEU
+        // pendant près de trois secondes, et c’est la plus chère du lot.
+        // ⚠️ L’EMPREINTE AVANT / APRÈS, comme en 3 bis : un geste qui ne change
+        // rien à l’état est un bouton mort, et ça ne se voit pas à la relecture.
+        const photo = `${e.phase}|${e.possession}|${e.porteur?.nom ?? 0}|${e.vol?.intention ?? 0}`
+          + `|${Math.round(e.ballon.x)}|${e.commentaires.length}|${e.elan.toFixed(3)}`
+          + `|${moi.stats.metres.toFixed(1)}|${moi.stats.essais}|${moi.stats.grattages}`
+          + `|${moi.battu.toFixed(2)}`;
+        const essaisAvant = moi.stats.essais;
+        const pdAvant = moi.stats.passesDecisives;
+        const elanAvant = e.elan;
+        const enj = enjeuDe(e, moi, choisi.action);
+        const issue = resoudreChoix(e, moi, choisi.action);
+        const apres = `${e.phase}|${e.possession}|${e.porteur?.nom ?? 0}|${e.vol?.intention ?? 0}`
+          + `|${Math.round(e.ballon.x)}|${e.commentaires.length}|${e.elan.toFixed(3)}`
+          + `|${moi.stats.metres.toFixed(1)}|${moi.stats.essais}|${moi.stats.grattages}`
+          + `|${moi.battu.toFixed(2)}`;
+
+        if (NOUVEAUX.includes(choisi.action)) {
+          joues.add(choisi.action);
+          if (issue.joue && photo === apres) {
+            sansEffet++;
+            detailSansEffet = `${choisi.action} tranché sans rien changer à l’état`;
+          }
+        }
+        // Un ballon volé DOIT pousser la dynamique du bon côté.
+        if (issue.joue && issue.reussi
+          && (choisi.action === 'interception' || choisi.action === 'contreRuck'
+            || choisi.action === 'grattage')) {
+          turnovers++;
+          const gagne = moi.cote === `A` ? e.elan - elanAvant : elanAvant - e.elan;
+          if (gagne > 0.05) turnoversQuiPoussent++;
+        }
+        elanMax = Math.max(elanMax, Math.abs(e.elan));
+        ecartAnnonce = Math.max(ecartAnnonce, Math.abs(enj.chance - enjeuDe(e, moi, choisi.action).chance));
+
+        if (moi.stats.essais > essaisAvant) essaisJoueur++;
+        if (moi.stats.passesDecisives > pdAvant) passesDecisives++;
+        if (e.echos.length) { retombees += e.echos.length; e.echos.length = 0; }
+        const ech = e.echappee?.pion === moi;
+        if (ech && !dansLEspace) echappees++;
+        dansLEspace = ech;
+      }
+      essaisJoueur = Math.max(essaisJoueur, moi.stats.essais);
+    }
+  }
+
+  const matchs = POSTES.length * N_MATCHS;
+  console.log(`  ${"échappées ouvertes".padEnd(46)} ${(echappees / matchs).toFixed(1)}/match`);
+  console.log(`  ${"cartes « tu es dans l’espace »".padEnd(46)} ${(cartesEspace / matchs).toFixed(1)}/match`);
+  console.log(`  ${"élan maximal atteint".padEnd(46)} ${elanMax.toFixed(2)}`);
+
+  // ⚠️ « MÈNE À UN ESSAI » NE VEUT PAS DIRE « DONNE UN ESSAI ». Le score reste
+  // celui de la ligue : `tenterEssai` refuse un essai qui dépasserait le plan
+  // de marque. Ce qu’on exige, c’est que le CHEMIN existe et soit emprunté.
+  ligne(`une percée ouvre vraiment une échappée`,
+    `${(echappees / matchs).toFixed(1)}/match`, echappees > 0);
+  ligne(`… et l’échappée pose sa propre question`,
+    `${cartesEspace} carte(s) « dans l’espace »`, cartesEspace > 0);
+  ligne(`… et elle finit parfois dans l’en-but`,
+    `${essaisJoueur} essai(s) du joueur`, essaisJoueur > 0);
+
+  ligne(`un ballon volé relance la dynamique`,
+    `${turnoversQuiPoussent}/${turnovers} turnovers`,
+    turnovers > 0 && turnoversQuiPoussent === turnovers);
+  // ⚠️ ET LA JAUGE DOIT VRAIMENT BOUGER. Un élan qui plafonnerait à 0,05 ne
+  // déplacerait aucun pourcentage : la promesse serait tenue sur le papier et
+  // invisible en jeu — exactement le défaut qu’on corrige.
+  ligne(`… et la jauge sort du bruit`, `pic ${elanMax.toFixed(2)}`, elanMax > 0.3);
+
+  ligne(`une passe qui amène l’essai est dite tout de suite`,
+    `${retombees} retombée(s) poussée(s)`, retombees > 0);
+
+  const manquants = NOUVEAUX.filter((a) => !proposes.has(a));
+  ligne(`les cinq gestes sont proposés en jeu`,
+    manquants.length ? `jamais vus : ${manquants.join(", ")}` : `5/5`, manquants.length === 0);
+  const jamaisJoues = NOUVEAUX.filter((a) => !joues.has(a));
+  ligne(`… et tous les cinq se jouent`,
+    jamaisJoues.length ? `jamais joués : ${jamaisJoues.join(", ")}` : `5/5`, jamaisJoues.length === 0);
+  ligne(`… et aucun ne laisse l’état inchangé`,
+    sansEffet ? detailSansEffet : `0 geste sans effet`, sansEffet === 0);
+}
+
+  // ⚠️ ET L’ÉLAN SE LIT SUR LE BOUTON — sinon la jauge n’est qu’une décoration.
+  // C’est le cœur de la demande (« un turnover relance la dynamique de
+  // l’équipe ») et la seule façon de le prouver : on gèle une situation de
+  // plaquage et on relit `enjeuDe` avec l’élan tourné d’un côté puis de
+  // l’autre. Le chiffre annoncé DOIT bouger — c’est celui-là même que
+  // `resoudreChoix` tirera.
+  {
+    const cle = 'elan#lecture';
+    const r = jouerRencontre(A, B, 1, cle, null);
+    const e = creerMatch(A, B, effA, effB, r.scoreD, r.scoreE, cle, AVATAR,
+      { niveau: `pro`, controle: true });
+    const moi = monPion(e);
+    let ecart = 0;
+    let pas = 0;
+    while (!e.fini && pas++ < 40_000 && ecart === 0) {
+      avancer(e, 0.3);
+      if (!e.porteur || e.porteur.cote === moi.cote) continue;
+      const signe = moi.cote === `A` ? 1 : -1;
+      e.elan = signe;
+      const porte = enjeuDe(e, moi, 'plaquage').chance;
+      e.elan = -signe;
+      const subi = enjeuDe(e, moi, 'plaquage').chance;
+      e.elan = 0;
+      ecart = porte - subi;
+    }
+    ligne(`la dynamique déplace le pourcentage annoncé`,
+      `${Math.round(ecart * 1000) / 10} pts entre porté et dominé`, ecart >= 0.08);
+  }
 console.log('\n=== 4. LE GARDE-FOU : LE SCORE RESTE CELUI DE LA LIGUE ===');
 {
   let ecarts = 0;

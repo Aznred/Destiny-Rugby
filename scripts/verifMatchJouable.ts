@@ -36,7 +36,7 @@ import {
 } from '../src/lib/moteur/camera';
 import { facteurTempo, momentDuJoueur, TEMPOS, TENUE } from '../src/lib/moteur/moments';
 import {
-  DELAI_DECISION, REJEU, REPOS_DECISION, decisionPour,
+  DELAI_BALLON, DELAI_DECISION, REJEU, decisionPour, delaiDeCarte,
 } from '../src/lib/moteur/decisions';
 import { actionsDisponibles } from '../src/lib/moteur/controle';
 import { LARGEUR, LONGUEUR, type Vec } from '../src/lib/moteur/terrain';
@@ -328,15 +328,27 @@ console.log('\n=== 6. UN MATCH TIENT DANS UNE SESSION ===');
   ligne('le match va bien au bout', `${pas} pas · ${e.scoreA}-${e.scoreB}`, e.fini);
 }
 
-console.log('\n=== 7. ⏸️ LES CARTES DE DÉCISION TOMBENT SUR LES CARREFOURS ===');
+console.log('\n=== 7. ⏸️ UNE CARTE À CHAQUE BALLON TOUCHÉ, ET PAS UNE DE PLUS ===');
 {
+  // ⚠️ LA PROMESSE A CHANGÉ, DONC LA MESURE AUSSI. Cette section vérifiait
+  // « pas plus de trente-cinq carrefours par match » — c’était la bonne règle
+  // tant qu’une carte était un évènement rare. Demande explicite depuis :
+  // « dès que notre joueur va ou touche le ballon, on a le choix de l’action ».
+  //
+  // La nouvelle promesse se mesure autrement, et plus sévèrement : **une carte
+  // par ballon touché, jamais deux**. Un plafond en valeur absolue ne dirait
+  // rien — un ouvreur touche soixante ballons par match, un pilier dix.
   const N = 4;
   let cartes = 0;
+  let cartesBallon = 0;
+  let touches = 0;
   let optionsTotal = 0;
   let optionsHorsJeu = 0;
   let mini = 9;
   let maxi = 0;
+  let secondesDeChoix = 0;
   const parType: Record<string, number> = {};
+  const parGeste: Record<string, number> = {};
   let simTotal = 0;
 
   for (let m = 0; m < N; m++) {
@@ -344,21 +356,33 @@ console.log('\n=== 7. ⏸️ LES CARTES DE DÉCISION TOMBENT SUR LES CARREFOURS 
     const moi = e.pions.find((q) => q.moi)!;
     let derniere = 0;
     let pas = 0;
+    let avaitLeBallon = false;
     while (!e.fini && pas < 40000) {
       avancer(e, 0.15);
       pas++;
+
+      // ⚠️ UN BALLON TOUCHÉ, C’EST UNE TRANSITION, pas un état : sans ce
+      // front montant on compterait sept fois la même possession (le moteur
+      // tourne à sept pas par seconde).
+      const auBallon = e.porteur === moi || e.vol?.receveur === moi;
+      if (auBallon && !avaitLeBallon) touches++;
+      avaitLeBallon = auBallon;
+
       const carte = decisionPour(e, moi, e.sim - derniere);
       if (!carte) continue;
       derniere = e.sim;
       cartes++;
+      if (carte.balleEnMain) cartesBallon++;
+      secondesDeChoix += delaiDeCarte(carte);
       parType[carte.moment] = (parType[carte.moment] ?? 0) + 1;
       optionsTotal += carte.options.length;
       mini = Math.min(mini, carte.options.length);
       maxi = Math.max(maxi, carte.options.length);
+      for (const o of carte.options) parGeste[o.action] = (parGeste[o.action] ?? 0) + 1;
       // ⚠️ LE CONTRÔLE QUI COMPTE : une carte ne doit JAMAIS proposer un geste
-      // que le moteur refusera. Un bouton qui ne fait rien, sur une carte à dix
-      // secondes, se lit comme un jeu cassé — et on ne le verrait pas à la
-      // relecture, puisque les deux listes viennent du même fichier.
+      // que le moteur refusera. Un bouton qui ne fait rien se lit comme un jeu
+      // cassé — et on ne le verrait pas à la relecture, puisque les deux listes
+      // viennent du même fichier.
       const jouables = new Set(actionsDisponibles(e).map((a) => a.id));
       for (const o of carte.options) if (!jouables.has(o.action)) optionsHorsJeu++;
     }
@@ -367,31 +391,50 @@ console.log('\n=== 7. ⏸️ LES CARTES DE DÉCISION TOMBENT SUR LES CARREFOURS 
 
   const moyCartes = cartes / N;
   console.log(`  ${'cartes par match'.padEnd(46)} ${moyCartes.toFixed(1)}`);
+  console.log(`  ${'ballons touchés par match'.padEnd(46)} ${(touches / N).toFixed(1)}`);
   console.log(`  ${'réparties par situation'.padEnd(46)} ${
     Object.entries(parType).map(([k, v]) => `${k} ${Math.round(v / N)}`).join(' · ')}`);
 
-  // ⚠️ LES BORNES SONT DES BORNES DE PLAISIR. Sous dix cartes on regarde un
-  // match sans y toucher ; au-dessus de trente-cinq on remplit un formulaire.
   ligne('assez de carrefours pour jouer (≥ 10)', `${moyCartes.toFixed(1)}/match`, moyCartes >= 10);
-  ligne('pas un menu à chaque phase (≤ 35)', `${moyCartes.toFixed(1)}/match`, moyCartes <= 35);
+  // ⚠️ LA BORNE EST RELATIVE AUX BALLONS TOUCHÉS, plus à un plafond inventé.
+  // C’est la promesse, mot pour mot : une carte quand le ballon vient, et une
+  // seule. La marge de 10 % couvre les cartes de DÉFENSE et de RUCK, qui ont
+  // gardé leur repos de 95 secondes et ne suivent pas le ballon.
+  ligne('jamais plus d’une carte par ballon touché',
+    `${cartesBallon} cartes pour ${touches} ballons`, cartesBallon <= touches);
+  ligne('et on ne coupe pas le jeu ailleurs sans raison',
+    `${cartes - cartesBallon} carte(s) hors ballon`, cartes - cartesBallon <= touches * 0.2 + 4 * N);
+
   ligne('2 à 4 options par carte', `${mini} à ${maxi}, moyenne ${(optionsTotal / Math.max(1, cartes)).toFixed(1)}`,
     cartes > 0 && mini >= 2 && maxi <= 4);
   ligne('aucune option injouable', `${optionsHorsJeu} sur ${optionsTotal}`, optionsHorsJeu === 0);
-  ligne('le repos entre deux cartes est respecté', `${REPOS_DECISION} s simulées`,
-    moyCartes <= simTotal / N / REPOS_DECISION + 0.001);
+
+  // ⚠️ LES GESTES DE POSTE DOIVENT ÊTRE PROPOSÉS POUR DE VRAI. Ajoutés au type
+  // et jamais offerts, ils n’existeraient que dans le code — c’est arrivé aux
+  // effets de traits, qui ont vécu des mois sans lecteur.
+  const DE_POSTE = ['cinquanteVingtDeux', 'chandelle', 'chenille', 'percussion', 'offload'];
+  const offerts = DE_POSTE.filter((a) => (parGeste[a] ?? 0) > 0);
+  console.log(`  ${'gestes de poste proposés'.padEnd(46)} ${
+    DE_POSTE.map((a) => `${a} ${Math.round((parGeste[a] ?? 0) / N)}`).join(' · ')}`);
+  // Un ouvreur ne verra jamais la chenille (elle est au 9) ni la percussion
+  // (elle est aux avants) : on exige donc CEUX DE SON POSTE, pas les cinq.
+  ligne('les gestes du poste sont vraiment proposés',
+    `${offerts.length}/5 vus par un ouvreur`, offerts.length >= 2);
 
   // ⚠️ LA VRAIE QUESTION : COMBIEN DE TEMPS ÇA PREND. Le match défile hors
-  // décision, se fige pendant qu'on choisit (on compte six secondes de
-  // réflexion sur les dix offertes), puis rejoue au ralenti.
+  // décision, se fige pendant qu’on choisit, puis rejoue au ralenti. On compte
+  // 60 % du temps offert — personne n’attend la fin du compte à rebours — et le
+  // délai vient de `delaiDeCarte`, donc du jeu, pas d’une constante recopiée.
   const rapide = (simTotal / N) / facteurTempo('decisions', false);
-  const reflexion = moyCartes * 6;
-  const rejeu = moyCartes * REJEU;
+  const reflexion = (secondesDeChoix / N) * 0.6;
+  const rejeu = moyCartes * REJEU * 0.5;
   const minutes = (rapide + reflexion + rejeu) / 60;
   console.log(`  ${'dont'.padEnd(46)} ${(rapide / 60).toFixed(1)} min de jeu · ${
     (reflexion / 60).toFixed(1)} min de choix · ${(rejeu / 60).toFixed(1)} min de rejeu`);
   ligne('un match en décisions tient en 3 à 12 min', `${minutes.toFixed(1)} min`,
     minutes >= 3 && minutes <= 12);
-  ligne('dix secondes pour choisir', `${DELAI_DECISION} s`, DELAI_DECISION === 10);
+  ligne('six secondes pour un ballon, dix pour un carrefour',
+    `${DELAI_BALLON} s / ${DELAI_DECISION} s`, DELAI_BALLON === 6 && DELAI_DECISION === 10);
 }
 
 console.log('\n=== 8. ⚠️ UN EN-AVANT COÛTE TOUJOURS LA POSSESSION ===');

@@ -40,8 +40,10 @@ import {
   resoudreBagarre, sanctionApresMatch, vieillirBulles,
 } from './bagarre';
 import {
-  consommerIntention, demanderAction, intentionEst, receveurCote, receveurPour,
+  consommerIntention, demanderAction, intentionEst, intervalle, metresDeLaLigne,
+  pressionDevant, receveurCote, receveurPour,
 } from './controle';
+import { POUSSEES, bonusElan, fondreElan, pousserElan } from './elan';
 import {
   choisirCoteOuvert, choisirSysteme, placerEquipes, plusProche, surLeTerrain,
   surnombreAuLarge, vitesseMontee, numero as maillot,
@@ -235,6 +237,10 @@ export function creerMatch(
     intention: null,
     recharges: {},
     perceeJoueur: false,
+    echappee: null,
+    elan: 0,
+    dernierTurnover: null,
+    echos: [],
     tension: 0,
     bagarre: null,
     bulles: [],
@@ -275,6 +281,16 @@ function tick(e: EtatMatch): void {
   if (e.sifflet) {
     e.sifflet.restant -= dt;
     if (e.sifflet.restant <= 0) e.sifflet = null;
+  }
+  // ⚠️ LA DYNAMIQUE S’ÉTEINT TOUTE SEULE. Un ballon volé à la 12ᵉ minute ne
+  // porte pas l’équipe jusqu’à la sirène : sans cette fonte, l’élan devient
+  // une seconde note d’équipe, et le match se décide au premier turnover.
+  fondreElan(e, dt);
+  // ⚠️ ET UNE ÉCHAPPÉE FINIT TOUJOURS PAR ÊTRE REJOINTE. Elle s’arrête aussi
+  // dès que le ballon quitte les mains du fuyard — passé, tapé, ou perdu.
+  if (e.echappee) {
+    e.echappee.restant -= dt;
+    if (e.echappee.restant <= 0 || e.porteur !== e.echappee.pion) e.echappee = null;
   }
   const dtHorloge = dt * facteurHorloge(e.phase);
   e.t += dtHorloge;
@@ -788,7 +804,15 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // stick ; le stick n'existe plus (« que les choix, pas bouger le joueur »).
   // La ligne de course automatique — fixer son vis-à-vis tant qu'il reste un
   // partenaire, attaquer l'intervalle sinon — vaut donc pour les trente.
-  porteur.cible = ligneDeCourse(e, porteur);
+  // ⚠️ EN ÉCHAPPÉE, ON NE FIXE PLUS PERSONNE : ON COURT À LA LIGNE. C’est la
+  // moitié du correctif « qu’un raffut ou un sprint réussi mène à un essai » —
+  // `ligneDeCourse` cherche un intervalle et attend un soutien, ce qui est la
+  // bonne lecture face à un rideau en place et la mauvaise quand il est déjà
+  // dans le dos.
+  const enEchappee = e.echappee?.pion === porteur;
+  porteur.cible = enEchappee
+    ? { x: porteur.cote === 'A' ? LIGNE_B + 2 : LIGNE_A - 2, y: borner(porteur.pos.y, 3, LARGEUR - 3) }
+    : ligneDeCourse(e, porteur);
   const avant = porteur.pos.x;
   deplacer(porteur, dt);
   // ⚠️ LES MÈTRES SE COMPTENT AU-DELÀ DE LA LIGNE D'AVANTAGE, comme dans les
@@ -886,7 +910,13 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const lancement = e.lancement;
   const suivant = lancement && lancement.index + 1 < lancement.chaine.length
     ? lancement.chaine[lancement.index + 1] : null;
-  if (suivant && suivant.surLeTerrain && pression <= (porteur.avant ? 3.4 : 3.7)) {
+  // ⚠️ ET ON NE DONNE PAS LE BALLON QUAND ON EST DANS L’ESPACE. « Fixer et
+  // donner » est la bonne règle face à un défenseur ; à quarante mètres de la
+  // ligne avec le rideau battu, c’est ce qui annulait la percée qu’on venait
+  // de réussir. Le joueur peut toujours servir son soutien : la carte de
+  // l’espace le lui propose, et un choix passe toujours devant l’automatisme.
+  if (!enEchappee && suivant && suivant.surLeTerrain
+    && pression <= (porteur.avant ? 3.4 : 3.7)) {
     return passerLeBallon(e, porteur, suivant, pression);
   }
 
@@ -896,7 +926,8 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   e.prochaineDecision -= dt;
   if (e.prochaineDecision > 0) return;
   e.prochaineDecision = 0.25;
-  deciderAvecLeBallon(e, porteur, pression);
+  // On ne tape pas en touche quand on a la ligne devant soi.
+  if (!enEchappee) deciderAvecLeBallon(e, porteur, pression);
 }
 
 // LA LIGNE DE COURSE : on ne fonce pas tout droit. Tant qu'il reste un
@@ -981,6 +1012,8 @@ function enAvant(e: EtatMatch, p: Pion): void {
     nom: p.nom, club: nomClub(e, adverse(p.cote)),
   }), 0, p.moi);
   poserSifflet(e, 'ml.sifflet.enAvant', adverse(p.cote), p);
+  // Perdre le ballon de ses propres mains, ça casse un élan.
+  pousserElan(e, p.cote, POUSSEES.enAvant);
   arret(e, 'melee', adverse(p.cote), p.pos);
 }
 
@@ -1154,6 +1187,44 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
 // ---------------------------------------------------------------------------
 
 /**
+ * ⚠️ DONNER APRÈS LE CONTACT — extrait de `resoudrePlaquage` parce que DEUX
+ * chemins en ont désormais besoin : le tirage automatique du moteur, et
+ * l'action `offload` que le joueur choisit sur sa carte de décision. Deux
+ * copies de ce transfert de ballon, et un jour l’une compte la statistique et
+ * pas l’autre.
+ *
+ * ⚠️ LE SOUTIEN DOIT ÊTRE DERRIÈRE, ou à hauteur : une passe après contact
+ * reste une passe, elle ne peut pas partir vers l’avant.
+ *
+ * @returns faux s’il n’y avait personne pour recevoir — le contact suit alors
+ *   son cours normal.
+ */
+function offloader(e: EtatMatch, porteur: Pion): boolean {
+  const s = sens(porteur.cote);
+  const soutiens = surLeTerrain(e, porteur.cote).filter((q) =>
+    q !== porteur && (q.pos.x - porteur.pos.x) * s <= 0.8 && distance2(q.pos, porteur.pos) < 90);
+  if (!soutiens.length) return false;
+  const recu = soutiens.sort((a, b) => distance2(porteur.pos, a.pos) - distance2(porteur.pos, b.pos))[0];
+  dire(e, 'jeu', porteur.cote, C.texteMatch('offload', { porteur: porteur.nom, receveur: recu.nom }), 0, porteur.moi || recu.moi);
+  porteur.stats.passes += 1;
+  // ⚠️ L'OFFLOAD EST COMPTÉ À PART, EN PLUS de la passe. C'est une passe
+  // APRÈS contact, la marque des grands centres et des troisièmes lignes :
+  // la noyer dans le total des passes, c'est perdre exactement ce qui
+  // distingue un joueur qui fait vivre le ballon d'un joueur qui le donne.
+  porteur.stats.offloads += 1;
+  // Un offload amène l'essai aussi souvent qu'une passe classique.
+  e.dernierPasseur = porteur;
+  if (e.lancement) { e.lancement.chaine = []; e.lancement.index = 0; }
+  e.porteur = null;
+  e.vol = {
+    de: { x: porteur.pos.x, y: porteur.pos.y }, vers: { x: recu.pos.x, y: recu.pos.y },
+    duree: 0.28, ecoule: 0, hauteur: 0, type: 'passe', intention: 'offload',
+    auteur: porteur, receveur: recu,
+  };
+  return true;
+}
+
+/**
  * ⚠️ LA CHANCE QU'UN PLAQUAGE ABOUTISSE — LA SEULE, ET ELLE A DEUX LECTEURS.
  *
  * Elle vivait au milieu de `resoudrePlaquage`, ce qui allait très bien tant que
@@ -1200,7 +1271,13 @@ export function probaPlaquage(
   const aide = r >= 0
     ? r * 0.20 + (pres < 25 ? r * 0.22 : 0) + (pres < 8 ? r * 0.22 : 0)
     : r * 0.45;
-  return borner(0.90 + (force - resistance) / 400 - aide, 0.36, 0.99);
+  // ⚠️ LA DYNAMIQUE PÈSE SUR LE CONTACT, ET ELLE SE VOIT SUR LA CARTE.
+  // Retour de jeu : « un turnover relance la dynamique de l’équipe ». Une
+  // jauge qui ne changerait que la couleur d’une barre serait un décor ; ici,
+  // l’élan entre dans la formule que `enjeuDe` affiche ET que `resoudreChoix`
+  // tire. Un plaquage à 88 % passe à 94 % quand l’équipe est portée.
+  const elan = bonusElan(e, defenseur.cote);
+  return borner(0.90 + (force - resistance) / 400 - aide + elan, 0.36, 0.99);
 }
 
 /**
@@ -1246,6 +1323,13 @@ function resoudrePlaquage(
     // moteur passe par cette ligne — donc l'enchaînement s'ouvre dans les deux
     // cas, ce qu'un drapeau posé depuis l'écran n'aurait jamais su faire.
     if (porteur.moi) e.perceeJoueur = true;
+    // ⚠️ ET C’EST ICI QUE LE DUEL GAGNÉ MÈNE ENFIN QUELQUE PART. Jusque-là,
+    // battre son homme rendait la main à `ligneDeCourse` et à « fixer et
+    // donner » : deux foulées plus loin, le pion refaisait une passe de
+    // routine. Retour de jeu, mot pour mot : « nos actions n’ont aucun impact
+    // dans le jeu ». Une percée dans un rideau OUVERT lance une échappée.
+    if (porteur.moi && intervalle(e, porteur) >= 7) lancerEchappee(e, porteur);
+    else pousserElan(e, porteur.cote, POUSSEES.percee * 0.5);
     if (monGeste === 'crochet' || monGeste === 'raffut') {
       consommerIntention(e);
       dire(e, 'franchissement', porteur.cote, C.texteMatch(
@@ -1305,31 +1389,8 @@ function resoudrePlaquage(
 
   // Offload : le geste des grandes équipes, rare mais spectaculaire.
   // Le raffut, lui, est fait pour ça : on garde un bras libre.
-  if (e.rng() < 0.055 + porteur.vision / 1600 + (monGeste === 'raffut' ? 0.22 : 0)) {
-    const s = sens(porteur.cote);
-    const soutiens = surLeTerrain(e, porteur.cote).filter((q) =>
-      q !== porteur && (q.pos.x - porteur.pos.x) * s <= 0.8 && distance2(q.pos, porteur.pos) < 90);
-    if (soutiens.length) {
-      const recu = soutiens.sort((a, b) => distance2(porteur.pos, a.pos) - distance2(porteur.pos, b.pos))[0];
-      dire(e, 'jeu', porteur.cote, C.texteMatch('offload', { porteur: porteur.nom, receveur: recu.nom }), 0, porteur.moi || recu.moi);
-      porteur.stats.passes += 1;
-      // ⚠️ L'OFFLOAD EST COMPTÉ À PART, EN PLUS de la passe. C'est une passe
-      // APRÈS contact, la marque des grands centres et des troisièmes lignes :
-      // la noyer dans le total des passes, c'est perdre exactement ce qui
-      // distingue un joueur qui fait vivre le ballon d'un joueur qui le donne.
-      porteur.stats.offloads += 1;
-      // Un offload amène l'essai aussi souvent qu'une passe classique.
-      e.dernierPasseur = porteur;
-      if (e.lancement) { e.lancement.chaine = []; e.lancement.index = 0; }
-      e.porteur = null;
-      e.vol = {
-        de: { x: porteur.pos.x, y: porteur.pos.y }, vers: { x: recu.pos.x, y: recu.pos.y },
-        duree: 0.28, ecoule: 0, hauteur: 0, type: 'passe', intention: 'offload',
-        auteur: porteur, receveur: recu,
-      };
-      return;
-    }
-  }
+  if (e.rng() < 0.055 + porteur.vision / 1600 + (monGeste === 'raffut' ? 0.22 : 0)
+    && offloader(e, porteur)) return;
 
   formerRuck(e, { x: porteur.pos.x, y: porteur.pos.y });
 }
@@ -1579,6 +1640,10 @@ function phaseTouche(e: EtatMatch): void {
 function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pion): void {
   dire(e, 'penalite', pour, C.phrase(e.rng, C.PENALITE, { club: nomClub(e, pour), motif }));
   poserSifflet(e, 'ml.sifflet.penalite', pour, fautif);
+  // ⚠️ `pour` EST LE CAMP QUI OBTIENT LA PÉNALITÉ : c’est l’AUTRE qui perd sa
+  // dynamique. Le sens du signe est le genre de détail qu’on inverse une fois
+  // sur deux, et la jauge se mettrait alors à récompenser l’indiscipline.
+  pousserElan(e, adverse(pour), POUSSEES.penalite);
 
   // ⚠️ UNE PÉNALITÉ A TOUJOURS UN FAUTIF. Trois appels sur quatre n'en
   // désignaient aucun — dont celui du ruck, de loin le plus fréquent : le
@@ -1761,8 +1826,24 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   // n'a pas fait de passe décisive ; sans ce test, il en aurait une.
   if (e.dernierPasseur && e.dernierPasseur !== marqueur && e.dernierPasseur.cote === cote) {
     e.dernierPasseur.stats.passesDecisives += 1;
+    // ⚠️ ON LE DIT TOUT DE SUITE. La statistique existait déjà, mais elle
+    // n’apparaissait qu’à la feuille de match, une heure plus tard : le geste
+    // et sa récompense étaient séparés par tout un match. C’est exactement ce
+    // qui donne le sentiment que « nos actions n’ont aucun impact ».
+    if (e.dernierPasseur.moi) {
+      e.echos.push({ cle: 'ml.echo.passeDecisive', nom: e.dernierPasseur.nom, cible: marqueur.nom });
+    }
   }
   e.dernierPasseur = null;
+  // ⚠️ LE BALLON VOLÉ QUI AMÈNE L’ESSAI QUARANTE SECONDES PLUS TARD : personne
+  // ne fait le lien, le fil a défilé et la carte est refermée depuis
+  // longtemps. C’est ce chaînon qui permet de revenir dessus.
+  const vol = e.dernierTurnover;
+  if (vol && vol.pion.moi && vol.pion.cote === cote && e.t - vol.t < 40) {
+    e.echos.push({ cle: 'ml.echo.turnoverEssai', nom: vol.pion.nom, cible: marqueur.nom });
+    e.dernierTurnover = null;
+  }
+  pousserElan(e, cote, POUSSEES.essai);
   marquer(e, cote, 5);
   if (cote === 'A') e.essaisA += 1; else e.essaisB += 1;
 
@@ -2606,7 +2687,8 @@ function probaPied(e: EtatMatch, p: Pion): number {
 function probaGrattage(e: EtatMatch, p: Pion): number {
   const loin = distance2(p.pos, e.ballon);
   if (loin > 64) return 0;
-  const base = (e.ballonLent ? 0.34 : 0.22) + p.plaquage / 340;
+  // Un ballon volé en appelle un autre : la défense monte, le porteur doute.
+  const base = (e.ballonLent ? 0.34 : 0.22) + p.plaquage / 340 + bonusElan(e, p.cote);
   return borner(base - Math.sqrt(loin) * 0.012, 0.08, 0.72);
 }
 
@@ -2623,6 +2705,48 @@ function probaAppel(e: EtatMatch, p: Pion): number {
  * carte (`decisions.ts`) ET par `resoudreChoix` juste avant le tirage, ce qui
  * garantit que les deux parlent du même dé.
  */
+/**
+ * Combien de temps un fuyard reste dans l’espace, en secondes simulées.
+ *
+ * ⚠️ SEPT SECONDES, C’EST CINQUANTE MÈTRES DE COURSE. Au-delà, on ne fuit
+ * plus, on marche vers l’en-but : la couverture adverse a toujours le temps
+ * de revenir, et un jeu où une percée vaut un essai à tous les coups n’a plus
+ * de duel à jouer. Elle s’éteint aussi dès que le ballon quitte les mains.
+ */
+const DUREE_ECHAPPEE = 7;
+
+/**
+ * ⚠️ LE PION EST DANS L’ESPACE — le chaînon qui manquait entre le duel gagné
+ * et la ligne d’essai.
+ *
+ * Retour de jeu : « nos actions n’ont aucun impact dans le jeu ; fais qu’un
+ * raffut, un sprint ou un prendre-l’espace mène à un essai si réussi ». Le
+ * moteur savait déjà marquer quand un porteur franchit la ligne
+ * (`franchieLigne` → `tenterEssai`) : ce qui n’existait pas, c’est le CHEMIN.
+ */
+function lancerEchappee(e: EtatMatch, p: Pion): void {
+  e.echappee = { pion: p, restant: DUREE_ECHAPPEE };
+  // ⚠️ ET ON ROUVRE UNE CARTE TOUT DE SUITE. Être dans l’espace sans qu’on
+  // vous demande rien, c’est regarder le moteur finir l’action à votre place :
+  // le drapeau d’enchaînement est ce qui transforme la percée en question.
+  if (p.moi) e.perceeJoueur = true;
+  pousserElan(e, p.cote, POUSSEES.percee);
+  dire(e, 'franchissement', p.cote, C.texteMatch('echappee', { nom: p.nom }), 0, p.moi);
+}
+
+/**
+ * Un ballon volé : la dynamique bascule, et on retient qui l’a volé.
+ *
+ * ⚠️ ON RETIENT LE VOLEUR POUR POUVOIR DIRE MERCI. Un grattage qui amène
+ * l’essai quarante secondes plus tard, personne ne fait le lien — le fil a
+ * défilé, la carte est refermée depuis longtemps. `tenterEssai` relit ce
+ * chaînon et pousse une retombée dans `e.echos`.
+ */
+function turnoverJoueur(e: EtatMatch, p: Pion): void {
+  pousserElan(e, p.cote, POUSSEES.turnover);
+  if (p.moi) e.dernierTurnover = { pion: p, t: e.t };
+}
+
 export function enjeuDe(e: EtatMatch, p: Pion, action: ActionJoueur): Enjeu {
   const g = (chance: number, gain: string, risque: string): Enjeu =>
     ({ action, chance: borner(chance, 0, 1), gain, risque });
@@ -2655,6 +2779,76 @@ export function enjeuDe(e: EtatMatch, p: Pion, action: ActionJoueur): Enjeu {
         : g(borner(0.5 + p.endurance / 260, 0.3, 0.92), 'ml.enj.sprint.gain', 'ml.enj.sprint.risque');
     case 'grattage':
       return g(probaGrattage(e, p), 'ml.enj.grattage.gain', 'ml.enj.grattage.risque');
+
+    // ── LES GESTES DE POSTE ──────────────────────────────────────────────
+    case 'cinquanteVingtDeux':
+      // ⚠️ DEUX DÉS, DONC UN PRODUIT — et c’est la vraie chance de réussir un
+      // 50/22 : ne pas se faire contrer, PUIS trouver la touche dans leurs 22.
+      // Le second facteur est copié de `taperAuPied`, qui le tirera lui-même :
+      // on annonce exactement ce que le moteur va jouer, pas une estimation.
+      return g(probaPied(e, p) * (0.3 + p.pied / 320), 'ml.enj.5022.gain', 'ml.enj.5022.risque');
+    case 'chandelle':
+      return g(probaPied(e, p), 'ml.enj.chandelle.gain', 'ml.enj.chandelle.risque');
+    case 'chenille':
+      // Le 9 protège la sortie derrière son paquet : ses mains et un ballon
+      // déjà lent (donc un regroupement stabilisé) font tout.
+      return g(borner(0.52 + p.passe / 300 + (e.ballonLent ? 0.12 : 0), 0.3, 0.93), 'ml.enj.chenille.gain', 'ml.enj.chenille.risque');
+    case 'percussion':
+      // ⚠️ LE GESTE SÛR DU LOT, et c’est ce qui en fait un choix : on ne perce
+      // pas, on avance et on garde. Un crochet à 60 % qui coûte le ballon une
+      // fois sur trois ne se compare pas à une percussion à 85 %.
+      return g(borner(0.68 + p.puissance / 320 - pressionSur(e, p) * 0.004, 0.45, 0.95), 'ml.enj.percussion.gain', 'ml.enj.percussion.risque');
+    case 'offload':
+      // Donner APRÈS le contact, au dernier moment : le geste le plus dur du
+      // rugby, et le plus cher quand il rate.
+      return g(borner(0.28 + p.passe / 300 + p.vision / 420, 0.18, 0.72), 'ml.enj.offload.gain', 'ml.enj.offload.risque');
+    // ── LES GESTES QUI MÈNENT À LA LIGNE ─────────────────────────────────
+    case 'percee': {
+      // ⚠️ LA CHANCE EST CELLE DU TROU, PAS CELLE DU JOUEUR. Un ailier
+      // international ne perce pas un rideau fermé, et un pilier passe dans
+      // un boulevard : `intervalle` mesure le plus grand écart entre deux
+      // défenseurs devant soi, ce que lit un joueur qui relève la tête.
+      //
+      // ⚠️ ET L’ÉCART EST PLAFONNÉ À QUATORZE MÈTRES. Sans ça, un rideau vide
+      // rend `LARGEUR` (70) et le geste s’affiche à 100 % : on annoncerait une
+      // certitude là où il reste une couverture à battre.
+      // ⚠️ ON COMPTE CE QUI DÉPASSE L’ÉCARTEMENT NORMAL DU RIDEAU (~6 m), pas
+      // l’écart brut. Première version : `trou * 0,028` sur l’écart total —
+      // mesuré, la percée sortait à **62 % de réussite**, c’est-à-dire plus
+      // souvent qu’un plaquage n’est manqué. Un geste d’exception qui passe
+      // deux fois sur trois n’est plus un pari, c’est la tactique de base.
+      const trou = Math.min(intervalle(e, p), 16);
+      return g(0.06 + Math.max(0, trou - 6) * 0.045 + p.vision / 600
+        + p.vitesseMax / 150 - pressionSur(e, p) * 0.008, 'ml.enj.percee.gain', 'ml.enj.percee.risque');
+    }
+    case 'chipEtSuivre':
+      // Deux dés en un : poser le ballon derrière le rideau, PUIS le
+      // reprendre. C’est le geste le plus improbable du rugby, et le plus beau
+      // quand il passe.
+      return g(borner(0.16 + p.pied / 400 + p.vitesseMax / 120 + p.vision / 500, 0.14, 0.52),
+        'ml.enj.chip.gain', 'ml.enj.chip.risque');
+    case 'plongeon':
+      // ⚠️ TOUT EST DANS LA DISTANCE. À un mètre c’est une formalité, à douze
+      // c’est un fantasme — et c’est ce qui fait qu’on ne plonge pas n’importe
+      // quand. La pression proche compte : un défenseur au contact tient le
+      // porteur debout, et un ballon tenu en-but ne vaut rien.
+      return g(0.88 - metresDeLaLigne(p) * 0.055
+        - Math.max(0, 8 - pressionDevant(e, p)) * 0.028, 'ml.enj.plongeon.gain', 'ml.enj.plongeon.risque');
+    case 'interception': {
+      // ⚠️ RARISSIME, ET ÇA DOIT SE VOIR SUR LE BOUTON. Lire une passe, c’est
+      // partir avant qu’elle ne parte : réussi, on court seul vers l’en-but ;
+      // raté, on a ouvert un boulevard là où on était censé défendre.
+      const v = e.vol;
+      const ecart = v?.receveur ? Math.sqrt(distance2(p.pos, v.receveur.pos)) : 99;
+      return g(0.10 + p.vision / 420 + Math.max(0, 8 - ecart) * 0.022,
+        'ml.enj.interception.gain', 'ml.enj.interception.risque');
+    }
+    case 'contreRuck':
+      // Le pendant collectif du grattage : on ne pique pas le ballon, on
+      // passe le paquet par-dessus. Plus sûr qu’un grattage, plus lent aussi.
+      return g(borner(0.30 + p.puissance / 300 + (e.ballonLent ? 0.10 : 0)
+        - (e.gardeRuck > 0 ? 0.12 : 0), 0.14, 0.66), 'ml.enj.contreRuck.gain', 'ml.enj.contreRuck.risque');
+
     case 'passe':
     case 'passeGauche':
     case 'passeDroite':
@@ -2677,6 +2871,8 @@ export function enjeuDe(e: EtatMatch, p: Pion, action: ActionJoueur): Enjeu {
 const DUELS: ActionJoueur[] = [
   'plaquage', 'monter', 'crochet', 'raffut', 'sprint', 'grattage',
   'passe', 'passeGauche', 'passeDroite', 'pied', 'appel', 'soutien',
+  'cinquanteVingtDeux', 'chandelle', 'chenille', 'percussion', 'offload',
+  'percee', 'chipEtSuivre', 'plongeon', 'interception', 'contreRuck',
 ];
 
 export function estUnDuel(action: ActionJoueur): boolean {
@@ -2692,7 +2888,10 @@ export function estUnDuel(action: ActionJoueur): boolean {
  * à l’écran en pleine partie.
  */
 type CleDuel = 'choixArme' | 'choixTropTard' | 'duelContactKo' | 'duelGrattageKo'
-  | 'duelPasseOk' | 'duelPasseKo' | 'duelPiedContre' | 'duelAppelKo';
+  | 'duelPasseOk' | 'duelPasseKo' | 'duelPiedContre' | 'duelAppelKo'
+  | 'duel5022Rate' | 'duelChenilleOk' | 'duelChenilleKo' | 'duelPercussionOk' | 'duelOffloadKo'
+  | 'duelPerceeKo' | 'duelChipOk' | 'duelChipKo' | 'duelPlongeonKo'
+  | 'duelInterceptionOk' | 'duelInterceptionKo' | 'duelContreRuckOk' | 'duelContreRuckKo';
 
 /** La première phrase que le moteur vient d’écrire sur MON joueur, s’il en a écrit une. */
 function phraseDepuis(e: EtatMatch, depuis: number): string | null {
@@ -2773,6 +2972,7 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issu
       p.stats.grattages += 1;
       e.possession = p.cote;
       e.phasesDepuisArret = 0;
+      turnoverJoueur(e, p);
       dire(e, 'ruck', p.cote, C.phrase(e.rng, C.RUCK_GRATTAGE, { nom }), 0, true);
       return tranche(true, 'choixArme');
     }
@@ -2828,6 +3028,232 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issu
         return tranche(false, 'duelPiedContre');
       }
       taperAuPied(e, p, intentionDePied(e, p));
+      return tranche(true, 'choixArme');
+    }
+
+    // ── LES GESTES DE POSTE ──────────────────────────────────────────────
+    case 'cinquanteVingtDeux':
+    case 'chandelle': {
+      if (e.porteur !== p) return tropTard();
+      consommerIntention(e);
+      // ⚠️ LE CONTRE EST TIRÉ ICI, LE RESTE PAR LE MOTEUR. `probaPied` dit si
+      // le ballon quitte le pied ; `taperAuPied` dit où il tombe. On ne
+      // refait pas son travail — on lui retire seulement le CHOIX du coup de
+      // pied, qui appartenait à `intentionDePied`.
+      if (e.rng() >= probaPied(e, p)) {
+        p.stats.coupsDePied += 1;
+        dire(e, 'pied', adverse(p.cote), C.texteMatch('duelPiedContre', { nom, cible }), 0, true);
+        arret(e, 'melee', adverse(p.cote), { x: p.pos.x, y: p.pos.y });
+        return tranche(false, 'duelPiedContre');
+      }
+      taperAuPied(e, p, action === 'chandelle' ? 'chandelle' : 'cinquanteVingtDeux');
+      // ⚠️ LA RÉUSSITE SE LIT SUR LE BALLON, PAS SUR UN SECOND DÉ. Quand le
+      // 50/22 ne trouve pas la touche, `taperAuPied` bascule lui-même le vol en
+      // « occupation » : c’est LUI le verdict, et le relire évite d’avoir deux
+      // avis sur le même coup de pied.
+      const trouve = action === 'chandelle' || e.vol?.intention === 'cinquanteVingtDeux';
+      return tranche(trouve, trouve ? 'choixArme' : 'duel5022Rate');
+    }
+    case 'chenille': {
+      demanderAction(e, action);
+      consommerIntention(e);
+      if (e.phase !== 'ruck' || e.possession !== p.cote) return tropTard();
+      if (!reussi) {
+        // ⚠️ UNE CHENILLE QUI S’ÉCROULE, C’EST UNE PÉNALITÉ. Le 9 traîne, le
+        // paquet se disloque, l’arbitre siffle le ballon tenu. Sans ce revers,
+        // ce serait une sortie de ruck gratuite à tous les regroupements.
+        if (e.rng() < 0.45) {
+          siffler(e, adverse(p.cote), { x: e.ballon.x, y: e.ballon.y }, 'ballon tenu au sol', p);
+          return tranche(false, 'duelChenilleKo');
+        }
+        e.possession = adverse(p.cote);
+        return tranche(false, 'duelChenilleKo');
+      }
+      // ⚠️ LE BALLON EST ASSURÉ, PUIS DÉGAGÉ. C’est ça, une chenille : on ralentit
+      // volontairement la sortie pour que le paquet fasse écran, et le 9 tape
+      // par-dessus sans être chargé. Le ballon lent, ici, est un CHOIX.
+      e.ballonLent = true;
+      e.possession = p.cote;
+      e.gardeRuck = 0.9;
+      dire(e, 'ruck', p.cote, C.texteMatch('duelChenilleOk', { nom }), 0, true);
+      taperAuPied(e, p, 'chandelle');
+      return tranche(true, 'choixArme');
+    }
+    case 'percussion': {
+      demanderAction(e, action);
+      if (e.porteur !== p) return arme();
+      // ⚠️ ON AVANCE AVANT DE RÉSOUDRE, ET ÇA SE VOIT. Une percussion, c’est
+      // d’abord des mètres : le pion est poussé de deux à quatre mètres dans
+      // l’axe, puis le contact se joue. Sans ce déplacement, « foncer » et
+      // « crocheter » donneraient exactement la même image à l’écran.
+      const avance = reussi ? 2.6 + p.puissance / 45 : 1.4;
+      p.pos.x = borner(p.pos.x + sens(p.cote) * avance, LIGNE_A + 0.5, LIGNE_B - 0.5);
+      p.stats.metres += avance;
+      if (!adv) return tranche(reussi, 'choixArme');
+      if (!reussi) {
+        // Le ballon saute dans le contact : la sanction du geste en force.
+        enAvant(e, p);
+        return tranche(false, 'duelContactKo');
+      }
+      // Plaqué, mais le ballon est propre et ressort vite pour les siens.
+      resoudrePlaquage(e, p, adv, true);
+      e.ballonLent = false;
+      e.possession = p.cote;
+      return tranche(true, 'duelPercussionOk');
+    }
+    case 'offload': {
+      demanderAction(e, action);
+      if (e.porteur !== p || !adv) return arme();
+      // ⚠️ L'OFFLOAD PART AVANT QUE LE PLAQUAGE NE SE REFERME, et c'est la
+      // seule façon qu’il existe. Première version : on résolvait le plaquage
+      // PUIS on tentait la passe — mais `resoudrePlaquage` finit sur
+      // `formerRuck`, qui met `e.porteur` à `null`. La condition
+      // « je porte encore » n’était donc JAMAIS vraie, et le geste ne faisait
+      // rien d’autre que déclencher un plaquage ordinaire. Vu dans le journal
+      // de jeu : « ✅ Offload — Maxime Retière joue son geste », le texte de
+      // repli, parce que le moteur n’avait rien eu à raconter.
+      //
+      // ⚠️ « AU DERNIER MOMENT » RESTE VRAI : le défenseur est bien au contact
+      // (c’est la condition d’entrée), et il reste sonné une demi-seconde —
+      // il a plaqué, mais le ballon lui est passé entre les doigts.
+      if (reussi && offloader(e, p)) {
+        adv.battu = Math.max(adv.battu, 0.6);
+        return tranche(true, 'choixArme');
+      }
+      // Le bras part, le ballon aussi : en-avant, et la mêlée pour eux.
+      enAvant(e, p);
+      return tranche(false, 'duelOffloadKo');
+    }
+
+    // ── LES GESTES QUI MÈNENT À LA LIGNE ─────────────────────────────────
+    case 'percee': {
+      demanderAction(e, action);
+      if (e.porteur !== p) return arme();
+      if (!reussi) {
+        // L’intervalle s’est refermé : plaqué dans le trou, ballon lent, et la
+        // défense a le temps de se remettre en place. On a joué, on a perdu.
+        // ⚠️ ET ON LE RACONTE MÊME SANS PLAQUEUR. Attrapé par l’empreinte du
+        // banc d’essai : quand l’intervalle visé était au bord du rideau, il n’y
+        // avait personne pour plaquer — la percée ratée ne changeait alors
+        // strictement RIEN, ni l’état, ni le fil. Un bouton muet.
+        if (adv) resoudrePlaquage(e, p, adv, true);
+        else dire(e, 'jeu', p.cote, C.texteMatch('duelPerceeKo', { nom: p.nom }), 0, true);
+        e.ballonLent = true;
+        return tranche(false, 'duelPerceeKo');
+      }
+      // ⚠️ LE RIDEAU EST DANS LE DOS, ET ON L’ÉCRIT SUR LES PIONS. Sans mettre
+      // les défenseurs proches à terre (`battu`), le plus près replaquerait à
+      // la frame suivante et la percée n’aurait duré qu’un dixième de seconde.
+      for (const q of surLeTerrain(e, adverse(p.cote))) {
+        if (q.sanction > 0) continue;
+        if (distance2(q.pos, p.pos) < 100) q.battu = Math.max(q.battu, 1.8);
+      }
+      p.stats.franchissements += 1;
+      lancerEchappee(e, p);
+      return tranche(true, 'choixArme');
+    }
+    case 'chipEtSuivre': {
+      if (e.porteur !== p) return tropTard();
+      consommerIntention(e);
+      p.stats.coupsDePied += 1;
+      if (!reussi) {
+        // Trop long, trop court, ou cueilli par l’arrière : on a rendu le cuir.
+        // ⚠️ ON PASSE PAR `taperAuPied` PLUTÔT QUE DE POSER UN ARRÊT : un chip
+        // raté ne sort pas du jeu, il offre une contre-attaque — c’est bien
+        // pire, et c’est ce qui doit faire hésiter.
+        taperAuPied(e, p, 'rasant');
+        return tranche(false, 'duelChipKo');
+      }
+      // ⚠️ ON REPREND DERRIÈRE LE RIDEAU, ET ÇA SE VOIT : le pion avance
+      // vraiment de la longueur du coup de pied, ballon en main.
+      const bond = 12 + p.pied / 12;
+      p.pos.x = borner(p.pos.x + sens(p.cote) * bond, LIGNE_A + 0.5, LIGNE_B - 0.5);
+      p.stats.metres += bond;
+      p.stats.metresAuPied += bond;
+      e.ballon = { x: p.pos.x, y: p.pos.y };
+      for (const q of surLeTerrain(e, adverse(p.cote))) {
+        if (q.sanction <= 0 && (q.pos.x - p.pos.x) * sens(p.cote) < 0) {
+          q.battu = Math.max(q.battu, 2);
+        }
+      }
+      dire(e, 'pied', p.cote, C.texteMatch('duelChipOk', { nom: p.nom }), 0, true);
+      lancerEchappee(e, p);
+      return tranche(true, 'choixArme');
+    }
+    case 'plongeon': {
+      if (e.porteur !== p) return tropTard();
+      consommerIntention(e);
+      if (!reussi) {
+        // Tenu à un mètre, ou le ballon qui glisse des mains dans le plongeon.
+        if (e.rng() < 0.5) {
+          enAvant(e, p);
+          return tranche(false, 'duelPlongeonKo');
+        }
+        p.pos.x = borner(p.pos.x + sens(p.cote) * 1.2, LIGNE_A + 0.5, LIGNE_B - 0.5);
+        if (adv) resoudrePlaquage(e, p, adv, true);
+        return tranche(false, 'duelPlongeonKo');
+      }
+      // ⚠️ ON APLATIT, ET C’EST `tenterEssai` QUI TRANCHE. Le score reste celui
+      // de la ligue : si le plan de marque est épuisé ou très en avance, le
+      // ballon est « tenu en-but » et c’est un renvoi aux 22. Le geste a
+      // parfaitement réussi ; c’est le match qui n’en voulait pas.
+      p.pos.x = p.cote === 'A' ? LIGNE_B + 0.6 : LIGNE_A - 0.6;
+      e.ballon = { x: p.pos.x, y: p.pos.y };
+      tenterEssai(e, p);
+      return tranche(true, 'choixArme');
+    }
+    case 'interception': {
+      demanderAction(e, action);
+      consommerIntention(e);
+      const v = e.vol;
+      if (!v || !v.receveur || v.receveur.cote === p.cote) return tropTard();
+      if (!reussi) {
+        // ⚠️ LE PRIX DE L’INTERCEPTION RATÉE : on est sorti de sa ligne, et le
+        // trou qu’on laisse est immense. Sans ce revers, le geste serait
+        // gratuit et se jouerait à chaque passe adverse.
+        p.battu = Math.max(p.battu, 2.8);
+        return tranche(false, 'duelInterceptionKo');
+      }
+      // Le ballon est cueilli en pleine course, et il n’y a plus personne.
+      e.vol = null;
+      e.lancement = null;
+      e.phasesDepuisArret = 0;
+      e.ligneAvantage = p.pos.x;
+      donnerBallon(e, p, 0.4);
+      p.stats.grattages += 1;
+      turnoverJoueur(e, p);
+      dire(e, 'franchissement', p.cote, C.texteMatch('duelInterceptionOk', { nom: p.nom }), 0, true);
+      lancerEchappee(e, p);
+      return tranche(true, 'choixArme');
+    }
+    case 'contreRuck': {
+      demanderAction(e, action);
+      consommerIntention(e);
+      if (e.phase !== 'ruck' && e.phase !== 'maul') return tropTard();
+      if (!reussi) {
+        // ⚠️ UNE CONTRE-POUSSÉE RATÉE COÛTE, MÊME SANS COUP DE SIFFLET. Première
+        // version : une pénalité une fois sur quatre, et RIEN les trois autres
+        // fois — un bouton mort dans 72 % des cas, attrapé par l’empreinte
+        // avant/après du banc d’essai. On s’est jeté dans le regroupement : on
+        // en sort en retard, et le ballon ressort vite pour eux.
+        p.battu = Math.max(p.battu, 1.4);
+        e.ballonLent = false;
+        if (e.rng() < 0.28) {
+          siffler(e, e.possession, { x: e.ballon.x, y: e.ballon.y }, 'hors-jeu au ruck', p);
+        }
+        return tranche(false, 'duelContreRuckKo');
+      }
+      // ⚠️ LE PAQUET PASSE, ET LE BALLON EST À NOUS TOUT DE SUITE. `ballonLent`
+      // à faux, c’est la différence entre un turnover et un turnover EXPLOITÉ :
+      // sans ça, la défense adverse a le temps de se replacer et le ballon volé
+      // ne vaut qu’une sortie de ruck ordinaire.
+      p.stats.grattages += 1;
+      e.possession = p.cote;
+      e.ballonLent = false;
+      e.gardeRuck = 0;
+      e.phasesDepuisArret = 0;
+      turnoverJoueur(e, p);
+      dire(e, 'ruck', p.cote, C.texteMatch('duelContreRuckOk', { nom: p.nom }), 0, true);
       return tranche(true, 'choixArme');
     }
 

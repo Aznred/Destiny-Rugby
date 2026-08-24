@@ -69,6 +69,21 @@ export const DELAI_DECISION = 10;
 export const DELAI_COMBO = 5;
 
 /**
+ * Le compte à rebours d’une carte de BALLON, en secondes réelles.
+ *
+ * ⚠️ SIX, ET PAS DIX, PARCE QU’IL Y EN A SOIXANTE PAR MATCH. Depuis qu’une
+ * carte s’ouvre à chaque ballon touché, ce n’est plus un carrefour toutes les
+ * deux minutes : c’est le rythme du jeu. Dix secondes de menu sur une passe de
+ * routine, soixante fois, c’est six minutes de formulaire — mesuré, et ça
+ * faisait passer le match de 5,7 à 12,4 minutes.
+ *
+ * ⚠️ ET SIX SECONDES, C’EST DÉJÀ LONG POUR UN BALLON EN MAIN. Un ouvreur qui
+ * reçoit décide en un temps ; ce qu’on lui laisse ici, c’est le temps de LIRE
+ * quatre options, pas de calculer.
+ */
+export const DELAI_BALLON = 6;
+
+/**
  * Le repos entre deux cartes, en secondes SIMULÉES.
  *
  * ⚠️ C'EST LUI QUI FAIT LA DIFFÉRENCE ENTRE UN CARREFOUR ET UNE CORVÉE.
@@ -78,6 +93,38 @@ export const DELAI_COMBO = 5;
  * joueur touche vraiment dans un match.
  */
 export const REPOS_DECISION = 95;
+
+/**
+ * Le repos avant une carte de BALLON, en secondes simulées.
+ *
+ * ⚠️ SIX, ET PAS QUATRE-VINGT-QUINZE. Demande explicite : « dès que notre
+ * joueur va ou touche le ballon, on a le choix de l’action ». Un ballon touché
+ * est LE moment où l’on veut décider — l’espacement de 95 secondes, qui évite
+ * qu’un plaquage ou un regroupement ne devienne un menu, n’a aucune raison de
+ * s’appliquer là.
+ *
+ * ⚠️ MAIS PAS ZÉRO NON PLUS, et voici pourquoi : une réception et la
+ * possession qui suit sont DEUX moments (`reception` puis `ballon`) séparés
+ * d’une seconde ou deux. À zéro, un seul ballon touché ouvrirait deux cartes
+ * coup sur coup — la seconde annulant la première, qu’on venait à peine de
+ * jouer. Six secondes simulées, c’est le temps d’un ballon.
+ */
+export const REPOS_BALLON = 6;
+
+/**
+ * Le repos avant une carte « tu es dans l’espace », en secondes simulées.
+ *
+ * ⚠️ TROIS, ET PAS SIX, PARCE QUE L’ÉCHAPPÉE N’EN DURE QUE SEPT. Mesuré : la
+ * carte de l’espace **ne s’ouvrait jamais** — zéro sur vingt matchs. La cause
+ * est arithmétique : une percée se joue depuis une carte de ballon, donc le
+ * repos de six secondes vient d’être remis à zéro, et l’échappée est finie
+ * avant qu’il ne s’écoule. Le moment existait, le geste existait, et la
+ * question ne se posait jamais.
+ *
+ * ⚠️ ET ÇA RESTE UN REPOS, PAS ZÉRO : sans lui, une échappée de sept secondes
+ * rouvrirait une carte à chaque image tant qu’on choisit « sprint ».
+ */
+export const REPOS_ESPACE = 3;
 
 /**
  * Le rejeu : les secondes RÉELLES pendant lesquelles le match repart au ralenti
@@ -119,6 +166,15 @@ export interface OptionDecision {
 export interface Decision {
   moment: TypeMoment;
   /**
+   * Le ballon est DANS les mains ou EN VOL vers elles.
+   *
+   * ⚠️ CE N’EST PAS `moment === 'reception'`. Ce moment-là couvre aussi « je
+   * suis le prochain de la combinaison », qui arrive à chaque phase et ne se
+   * concrétise presque jamais : ouvrir une carte dessus donnait 61 cartes de
+   * réception pour 3 ballons réellement joués.
+   */
+  balleEnMain: boolean;
+  /**
    * Cette carte est un ENCHAÎNEMENT : elle suit un geste réussi, sans repos.
    * L'écran s'en sert pour le dire (« ⚡ Enchaîne ! ») et pour raccourcir le
    * compte à rebours.
@@ -138,6 +194,7 @@ const SITUATIONS: Record<TypeMoment, { cle: string; emoji: string }> = {
   libre: { cle: 'ml.dec.libre', emoji: '⚡' },
   defense: { cle: 'ml.dec.defense', emoji: '🛡️' },
   ruck: { cle: 'ml.dec.ruck', emoji: '🔒' },
+  espace: { cle: 'ml.dec.espace', emoji: '💨' },
 };
 
 /**
@@ -149,12 +206,38 @@ const SITUATIONS: Record<TypeMoment, { cle: string; emoji: string }> = {
  * carte se lit en une seconde et que la première paire doit poser le vrai
  * dilemme. La quatrième option est toujours celle qui sort du cadre.
  */
+// ⚠️ LES GESTES DE POSTE SONT EN TÊTE DE LEUR SITUATION, et c’est voulu : ils
+// ne sortent que pour celui qui peut les jouer (`DefinitionAction.pour`), donc
+// ils ne prennent jamais la place d’une option à quelqu’un d’autre. Un arrière
+// doit voir son 50/22 en premier quand il est dans son camp — c’est le geste
+// qui définit son poste, pas une variante de la passe.
 const PREFERENCES: Record<TypeMoment, ActionJoueur[]> = {
-  ballon: ['passeGauche', 'passeDroite', 'crochet', 'raffut', 'pied', 'sprint', 'passe'],
-  reception: ['crochet', 'raffut', 'sprint', 'appel', 'soutien'],
+  // ⚠️ LA PASSE D’ABORD, TOUJOURS. Première version : les gestes de poste en
+  // tête « parce qu’ils définissent le poste ». Mesuré, ils occupaient les
+  // quatre emplacements et **la passe n’était plus jamais proposée** — le
+  // geste le plus fondamental du rugby, chassé par des coups spéciaux. Les
+  // deux passes ouvrent donc toutes les cartes ; les gestes de poste prennent
+  // le troisième et le quatrième, et comme ils sont filtrés par `pour`, un
+  // avant y voit sa percussion là où un arrière y voit son 50/22.
+  ballon: [
+    'passeGauche', 'passeDroite',
+    'percee', 'percussion', 'cinquanteVingtDeux', 'chandelle',
+    'plongeon', 'chipEtSuivre',
+    'crochet', 'offload', 'raffut', 'pied', 'sprint', 'passe',
+  ],
+  reception: ['percee', 'percussion', 'offload', 'crochet', 'raffut', 'sprint', 'appel', 'soutien'],
   libre: ['sprint', 'appel', 'soutien', 'plaquage'],
-  defense: ['plaquage', 'monter', 'grattage'],
-  ruck: ['grattage', 'plaquage', 'monter'],
+  defense: ['interception', 'plaquage', 'monter', 'grattage'],
+  // ⚠️ LE RUCK SE JOUE DES DEUX CÔTÉS, et la liste doit le porter : en défense
+  // on gratte et on plaque, en attaque le 9 protège sa sortie. Avec la seule
+  // chenille, une carte de ruck offensive n’aurait eu QU’UNE option — et
+  // `MIN_OPTIONS` l’aurait refusée sans rien dire, ce qui revenait à réécrire
+  // le moment pour rien.
+  ruck: ['chenille', 'contreRuck', 'grattage', 'plaquage', 'monter', 'appel', 'soutien'],
+  // ⚠️ DANS L’ESPACE, ON NE PROPOSE PLUS DE PERCER : c’est fait. La question
+  // devient « comment je conclus ? » — plonger si la ligne est là, chiper
+  // par-dessus le dernier défenseur, ou servir le soutien qui suit.
+  espace: ['plongeon', 'chipEtSuivre', 'passeGauche', 'passeDroite', 'offload', 'sprint'],
 };
 
 /**
@@ -191,10 +274,35 @@ const MIN_OPTIONS = 2;
  */
 export function decisionPour(e: EtatMatch, p: Pion | undefined, depuis: number): Decision | null {
   if (!e.controle || e.fini || e.bagarre || !p) return null;
-  if (depuis < REPOS_DECISION) return null;
 
+  // ⚠️ LE MOMENT SE LIT AVANT LE REPOS, et l’ordre compte : c’est la NATURE du
+  // moment qui décide du repos à appliquer. Un ballon dans les mains ouvre une
+  // carte à tous les coups ; un plaquage ou un regroupement, non — sinon le
+  // match redevient le menu permanent qu’on avait mesuré à 114 sollicitations.
   const moment = momentDuJoueur(e, p);
   if (!moment) return null;
+  // ⚠️ « VA AU BALLON » VEUT DIRE QUE LE BALLON VIENT VRAIMENT, pas qu’il
+  // pourrait venir. Le moment `reception` couvre DEUX situations très
+  // différentes : le ballon est en l’air pour moi (`e.vol.receveur`), ou je suis
+  // simplement le prochain maillon de la combinaison — ce qui arrive à chaque
+  // phase et ne se concrétise presque jamais. Mesuré en ouvrant une carte sur
+  // les deux : **61 cartes de réception pour 3 ballons réellement joués**, et
+  // un match qui passait de 5,7 à 12,8 minutes. On ne coupe donc le jeu que
+  // quand le ballon est DANS les mains ou EN VOL vers elles.
+  //
+  // ⚠️ LE MOMENT, LUI, NE CHANGE PAS : être le prochain de la chaîne déclenche
+  // toujours le ralenti (`moments.ts`) et permet toujours d’armer un crochet.
+  // C’est la CARTE qu’on réserve au vrai ballon, pas le ralenti.
+  // ⚠️ ET LE 9 À SON PROPRE RUCK COMPTE COMME UN BALLON EN MAIN. Il l'a à ses
+  // pieds, il va le ramasser : c'est « va au ballon » au sens le plus littéral.
+  // Sans cette ligne, sa carte tombait sous le repos de 95 secondes des
+  // carrefours — un repos que les cartes de ballon remettent à zéro en
+  // permanence, si bien que la chenille sortait UNE fois tous les trois matchs.
+  const balleEnMain = moment.type === 'ballon' || moment.type === 'espace'
+    || (moment.type === 'ruck' && e.possession === p.cote);
+  const repos = moment.type === 'espace' ? REPOS_ESPACE
+    : balleEnMain ? REPOS_BALLON : REPOS_DECISION;
+  if (depuis < repos) return null;
 
   const dispo = new Set(actionsDisponibles(e).map((a) => a.id));
   const options: OptionDecision[] = [];
@@ -216,5 +324,18 @@ export function decisionPour(e: EtatMatch, p: Pion | undefined, depuis: number):
   if (e.tension >= TENDU) for (const id of DISCIPLINE) ajouter(id);
   if (options.length < MIN_OPTIONS) return null;
 
-  return { moment: moment.type, ...SITUATIONS[moment.type], options };
+  return { moment: moment.type, balleEnMain, ...SITUATIONS[moment.type], options };
+}
+
+/**
+ * ⚠️ COMBIEN DE TEMPS ON A POUR CHOISIR — UNE SEULE DÉFINITION.
+ *
+ * Trois délais coexistent (carrefour, ballon, enchaînement) et deux lecteurs
+ * en ont besoin : l’écran, qui arme le compte à rebours, et le banc d’essai,
+ * qui calcule la durée d’un match. Recopiée, la règle diverge — et le banc se
+ * met à mesurer un jeu qui n’existe pas.
+ */
+export function delaiDeCarte(d: Decision): number {
+  if (d.enchaine) return DELAI_COMBO;
+  return d.balleEnMain ? DELAI_BALLON : DELAI_DECISION;
 }

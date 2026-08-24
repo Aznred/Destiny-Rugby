@@ -99,9 +99,10 @@ import {
   facteurTempo, momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
 } from '../lib/moteur/moments';
 import {
-  DELAI_COMBO, DELAI_DECISION, REJEU, REPOS_DECISION, decisionPour,
+  DELAI_DECISION, REJEU, REPOS_DECISION, decisionPour, delaiDeCarte,
   type Decision, type OptionDecision,
 } from '../lib/moteur/decisions';
+import { elanDe } from '../lib/moteur/elan';
 import { estTitulaire } from '../lib/moteur/saison';
 import { CONSIGNE_NEUTRE, lireConsigneIA, lireConsigneLocale } from '../lib/moteur/consignes';
 import { iaDisponible } from '../lib/groq';
@@ -267,6 +268,20 @@ interface Rejeu {
   avant: StatsMatch | null;
 }
 
+/**
+ * Les gestes qui méritent un GROS PLAN — ceux qui se jouent au contact.
+ *
+ * ⚠️ TOUT LE RESTE SE LIT EN UNE SECONDE : une passe qui part, un coup de pied
+ * qui s’envole. Leur donner les mêmes 3,2 secondes de ralenti coûtait trois
+ * minutes par match depuis qu’une carte s’ouvre à chaque ballon.
+ */
+const CONTACTS = new Set<ActionJoueur>([
+  'plaquage', 'monter', 'crochet', 'raffut', 'percussion', 'offload', 'grattage', 'chenille',
+]);
+
+/** La durée du plan quand il n’y a rien de spectaculaire à regarder. */
+const REJEU_COURT = 1.5;
+
 /** Une vibration courte, si le téléphone en a une. Silencieuse partout ailleurs. */
 function vibrer(ms: number): void {
   try {
@@ -363,6 +378,20 @@ export function MatchLive({
   const [consigneTexte, setConsigneTexte] = useState('');
   const [envoiConsigne, setEnvoiConsigne] = useState(false);
 
+  /**
+   * ⚠️ CE QU’UN GESTE PASSÉ VIENT DE RAPPORTER, et qu’on afficherait sinon
+   * une heure plus tard sur la feuille de match.
+   *
+   * Retour de jeu : « nos actions n’ont aucun impact dans le jeu […] une
+   * passe peut arriver à une passe décisive ». La statistique existait, mais
+   * quarante secondes séparent la passe de l’essai qu’elle amène : le fil a
+   * défilé, la carte est refermée, et personne ne fait le lien. Le moteur
+   * pousse la retombée dans `e.echos`, l’écran la vide et l’affiche.
+   *
+   * ⚠️ EN SECONDES RÉELLES, comme le plan de caméra : c’est une durée de
+   * lecture, elle ne doit pas s’allonger parce que le jeu passe au ralenti.
+   */
+  const echoCourant = useRef<{ texte: string; restant: number } | null>(null);
   const filRef = useRef<HTMLDivElement>(null);
   const dernierTemps = useRef<number>(0);
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -511,9 +540,14 @@ export function MatchLive({
     // mec perce ». `resoudreChoix` tire UNE fois, avec la chance exacte écrite
     // sur le bouton qu'on vient de toucher, et applique l'issue sur-le-champ.
     const issue = resoudreChoix(e, moi, option.action);
+    // ⚠️ LE PLAN DURE CE QU’IL Y A À VOIR. Trois secondes de gros plan après
+    // CHAQUE passe, soixante fois par match, c’est trois minutes de ralenti sur
+    // des gestes qui n’en demandent pas. Un contact, si : on veut voir le
+    // plaquage, le crochet, la percussion. Le reste se lit en une seconde.
+    const duree = CONTACTS.has(option.action) ? REJEU : REJEU_COURT;
     rejeu.current = {
-      restant: REJEU,
-      plan: REJEU,
+      restant: duree,
+      plan: duree,
       // ⚠️ Le geste est résolu : il n'y a plus rien à attendre. La patience ne
       // sert qu'aux gestes restés armés faute de vis-à-vis (un crochet demandé
       // avant d'avoir le ballon), que `resoudreChoix` signale en ne changeant
@@ -564,6 +598,20 @@ export function MatchLive({
       // c'est le correctif qui libère le fil principal sur téléphone. Mais si
       // le plan sur mon joueur s'éteint pile pendant l'un d'eux, le bandeau
       // resterait affiché jusqu'à la reprise.
+      // ── 🎁 LES RETOMBÉES : ce qu’un geste passé vient de rapporter ──────
+      // ⚠️ UNE SEULE À LA FOIS, ET DANS L’ORDRE. Deux essais coup sur coup
+      // sont impossibles, mais une passe décisive et un ballon volé peuvent
+      // tomber sur le même essai : les empiler les rendrait illisibles.
+      const ec = echoCourant.current;
+      if (ec) {
+        ec.restant -= dtReel;
+        if (ec.restant <= 0) echoCourant.current = null;
+      }
+      if (!echoCourant.current && e.echos.length) {
+        const r = e.echos.shift()!;
+        echoCourant.current = { texte: t(r.cle, { nom: r.nom, cible: r.cible }), restant: 4.5 };
+      }
+
       const gesteAvant = rj.action;
       if (rj.plan > 0) rj.plan = Math.max(0, rj.plan - dtReel);
 
@@ -703,10 +751,11 @@ export function MatchLive({
         if (carte) {
           combo.current.attendu = false;
           derniereDecision.current = e.sim;
-          chrono.current = enchaine ? DELAI_COMBO : DELAI_DECISION;
+          const ouverte = { ...carte, enchaine };
+          chrono.current = delaiDeCarte(ouverte);
           noCarte.current += 1;
-          decisionRef.current = { ...carte, enchaine };
-          setDecision({ ...carte, enchaine });
+          decisionRef.current = ouverte;
+          setDecision(ouverte);
           return;
         }
         // L'enchaînement n'a rien trouvé à proposer (tout est en recharge) :
@@ -813,6 +862,9 @@ export function MatchLive({
   // intention est consommée dès que le moteur la joue (souvent au premier tick),
   // alors que l'étiquette doit tenir les trois secondes du plan. Un « 💥 Plaquer »
   // qui disparaît un dixième de seconde après le clic ne se lit pas.
+  // De MON point de vue : +1 mon équipe est portée, −1 elle subit.
+  const elanMoi = monPion ? elanDe(e, monPion.cote) : e.elan;
+  const echo = echoCourant.current;
   const geste = rejeu.current.action ? ACTION_PAR_ID.get(rejeu.current.action) : undefined;
   const resultat = rejeu.current.resultat;
   // Ce que le geste a VRAIMENT ajouté à sa feuille depuis le clic.
@@ -1029,6 +1081,27 @@ export function MatchLive({
           <span style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} />
         </div>
 
+        {/* ═══ LA DYNAMIQUE ════════════════════════════════════════════════
+            Retour de jeu : « un turnover relance la dynamique de l’équipe ».
+            ⚠️ CE N’EST PAS UN DÉCOR : `e.elan` entre dans `probaPlaquage` et
+            `probaGrattage`, donc dans le pourcentage écrit sur chaque carte.
+            Après un ballon volé, « Plaquer 88 % » devient « Plaquer 94 % » —
+            on voit la jauge bouger ET le chiffre avec.
+            ⚠️ ELLE PART DU MILIEU, dans les deux sens : un élan est un rapport
+            de force, pas une réserve qui se remplit. Une barre qui pousse à
+            droite quand c’est nous, à gauche quand c’est eux, se lit sans
+            légende. */}
+        <div className="ml-elan" title={t(`ml.elan`)} aria-hidden>
+          <span
+            className="ml-elan-jauge"
+            data-pour={elanMoi > 0.02 ? `nous` : elanMoi < -0.02 ? `eux` : undefined}
+            style={{
+              left: `${50 + Math.min(0, elanMoi) * 50}%`,
+              width: `${Math.abs(elanMoi) * 50}%`,
+            }}
+          />
+        </div>
+
         <div className="ml-corps">
           <div className="ml-colonne">
             {e.fini && stats ? (
@@ -1154,6 +1227,18 @@ export function MatchLive({
                   {moment && (
                     <div className="ml-banniere" key={moment.type}>
                       <b>{moment.emoji} {t(moment.cle)}</b>
+                    </div>
+                  )}
+
+                  {/* ---------- CE QUE TON GESTE A FINI PAR RAPPORTER ------
+                      ⚠️ IL VIT AU-DESSUS DE LA BULLE DU VERDICT, PAS DEDANS.
+                      La bulle raconte le geste qu’on vient de choisir ; celui-ci
+                      raconte un geste d’il y a quarante secondes. Les mêler
+                      ferait croire que la passe décisive vient du plaquage
+                      qu’on est en train de jouer. */}
+                  {echo && (
+                    <div className="ml-retombee" role="status">
+                      <b>🎁 {echo.texte}</b>
                     </div>
                   )}
 
@@ -1321,7 +1406,7 @@ export function MatchLive({
                       <div className="ml-dec-chrono">
                         <span
                           key={noCarte.current}
-                          style={{ animationDuration: `${DELAI_DECISION}s` }}
+                          style={{ animationDuration: `${delaiDeCarte(decision)}s` }}
                         />
                       </div>
                       <b className="ml-dec-situation">

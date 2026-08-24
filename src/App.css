@@ -2910,6 +2910,68 @@
   transition: width 0.5s linear;
 }
 
+/* ═══ LA DYNAMIQUE ═════════════════════════════════════════════════════════
+   ⚠️ ELLE PART DU MILIEU, DANS LES DEUX SENS. Un élan est un rapport de
+   force : ce que l’un prend, l’autre le perd. Une jauge qui se remplirait de
+   gauche à droite se lirait comme une réserve d’énergie — et il faudrait une
+   légende pour comprendre que 50 % veut dire « personne n’a la main ».
+   Le trait central est le zéro, et la barre pousse du côté de qui domine. */
+.ml-elan {
+  position: relative;
+  flex: 0 0 3px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+/* Le zéro, pour que l’œil ait un repère quand la barre est courte. */
+.ml-elan::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.28);
+}
+.ml-elan-jauge {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  transition: left 0.45s ease-out, width 0.45s ease-out;
+}
+.ml-elan-jauge[data-pour='nous'] { background: var(--or-clair); }
+.ml-elan-jauge[data-pour='eux'] { background: #d2553f; }
+
+/* ═══ CE QU’UN GESTE PASSÉ VIENT DE RAPPORTER ══════════════════════════════
+   ⚠️ PLUS BAS QUE LA BANNIÈRE DU MOMENT (26 %), parce que les deux peuvent
+   s’afficher en même temps : on vient de percer (bannière « tu es dans
+   l’espace ») pendant que la passe d’il y a trente secondes devient décisive.
+   Superposées, on n’en lirait aucune des deux. */
+.ml-retombee {
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  max-width: 84%;
+  transform: translateX(-50%);
+  padding: 0.3rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  background: rgba(8, 22, 14, 0.94);
+  color: var(--or-clair);
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 0.82rem;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: ml-retombee-in 0.3s ease-out;
+  pointer-events: none;
+}
+@keyframes ml-retombee-in {
+  from { opacity: 0; transform: translate(-50%, 8px) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
 .ml-fil {
   flex: 1;
   min-height: 120px;
