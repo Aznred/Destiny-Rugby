@@ -3861,7 +3861,8 @@ suspensions pour la saison, blessures, etc. »
 
 | Fichier | Rôle |
 |---|---|
-| `moteur/controle.ts` | Les **20 actions**, leur disponibilité selon la phase, le coût en endurance, la recharge. Ne connaît pas `moteur.ts` — c'est l'inverse. |
+| `moteur/elan.ts` | **La dynamique** — un nombre signé de −1 à +1, poussé par les turnovers, les percées et les essais, qui retombe de moitié en 40 s. Il entre dans `probaPlaquage` et `probaGrattage`, donc dans le pourcentage écrit sur chaque carte. Sans dépendance : `controle.ts` et `decisions.ts` le lisent sans connaître `moteur.ts`. |
+| `moteur/controle.ts` | Les **25 actions**, leur disponibilité selon la phase, le coût en endurance, la recharge. Ne connaît pas `moteur.ts` — c'est l'inverse. |
 | `moteur/bagarre.ts` | La **tension**, la provocation, le coup de poing, la bagarre, les cartons, les blessures, et la **commission d'après-match**. |
 | `moteur/etat.ts` | `NiveauMatch`, `ActionJoueur`, `IntentionJoueur`, `Bagarre`, `DisciplineMatch`, et `ajouterCommentaire()` — mis en commun pour éviter le cycle `moteur ↔ bagarre`. |
 | `moteur/moteur.ts` | Consomme l'intention là où elle se joue : contact, ruck, choix de combinaison, phase `bagarre`. |
@@ -3882,7 +3883,7 @@ suspensions pour la saison, blessures, etc. »
    manqué laisse un trou de trois secondes, un crochet raté rend le ballon une
    fois sur huit, un grattage mal placé donne une pénalité une fois sur cinq.
 
-### Les vingt actions, par famille
+### Les vingt-cinq actions, par famille
 
 | Famille | Actions | Quand |
 |---|---|---|
@@ -3892,12 +3893,17 @@ suspensions pour la saison, blessures, etc. »
 | **Gestes de poste** | 🐛 Chenille | le numéro 9, au ruck de son camp |
 | **Gestes de poste** | 🐂 Foncer | un avant, le ballon arrive |
 | **Gestes de poste** | 🤲 Offload | le ballon arrive, un défenseur au contact |
+| **Mener à la ligne** | 🕳️ Prendre l’espace | le ballon arrive, un trou ≥ 7 m près de soi |
+| **Mener à la ligne** | 🪁 Par-dessus | ballon en main, un défenseur à moins de 13 m, hors de ses 22 |
+| **Mener à la ligne** | 🤿 Plonger | ballon en main, à 12 m de la ligne d’essai |
+| **Mener à la ligne** | 🦅 Intercepter | une passe en l’air POUR EUX, à 12 m |
+| **Mener à la ligne** | 🐘 Contre-poussée | un avant, au ruck qu’on défend |
 | **Attaque sans ballon** | 🙋 Réclamer · 🤸 Soutien | ballon vivant, son équipe l'a |
 | **Défense** | 💥 Plaquer · ⬆️ Monter · 🪝 Gratter | ballon vivant, l'adversaire l'a |
 | **Discipline** | 🗯️ Chambrer · 🥊 Frapper · ✋ Calmer | un adversaire à moins de 26 m |
 
 ⚠️ **LA BARRE NE MONTRE QUE CE QUI EST JOUABLE** — trois à cinq boutons, pas
-vingt dont dix-sept grisés : sur un téléphone de 375 px, une barre grise est
+vingt-cinq dont vingt-deux grisés : sur un téléphone de 375 px, une barre grise est
 illisible et oblige à chercher ce qui est actif. Et **quand rien n'est jouable,
 on dit POURQUOI** (sur le banc, sous carton, en recharge, phase morte) — vu en
 jeu : le joueur démarrait remplaçant, la manette s'affichait, aucun bouton
@@ -4196,7 +4202,7 @@ qui rallongeait le SVG… jusqu'à **5 500 px de haut**.
 - **Le déterminisme du moteur** : la caméra et les moments sont des **lectures
   pures** de l'état. Changer la vitesse d'affichage ne change pas le match,
   seulement le nombre de secondes réelles qu'il met à se jouer.
-- **Les vingt actions, la tension, les bagarres et la commission de
+- **Les vingt-cinq actions, la tension, les bagarres et la commission de
   discipline** : intactes (`moteur/controle.ts`, `moteur/bagarre.ts`).
 - **La feuille de match et le barème de la note** : le même code, déplacé dans
   son propre fichier.
@@ -6387,4 +6393,212 @@ npx vite-node scripts/verifMatchJouable.ts # 7 : une carte par ballon touché, e
 npx vite-node scripts/verifControle.ts     # ne rien choisir = le match qu'on aurait regardé
 npx vite-node scripts/verifMoteur.ts       # l'étalonnage du moteur ne bouge pas
 npx vite-node scripts/verifTraductions.ts  # les 20 clés ajoutées, dans les 7 langues
+```
+
+## 🌊 « NOS ACTIONS N'ONT AUCUN IMPACT » — l'élan, l'échappée, et cinq gestes qui mènent à la ligne
+
+Retour de jeu, mot pour mot : « rajoute encore de nouvelles possibilités, et
+c'est pas assez fun en mode nos actions n'ont aucun impact dans le jeu ; fais
+que par exemple un raffut, un sprint ou un prendre-l'espace mène à un essai si
+réussi, ou un turnover relance la dynamique de l'équipe, une passe peut arriver
+à une passe décisive, etc. »
+
+### ⚠️ LE DIAGNOSTIC : LE GESTE MARCHAIT, LA SUITE N'EXISTAIT PAS
+
+Le tour précédent avait rendu les gestes réels — un dé tiré sur-le-champ, une
+conséquence appliquée, une phrase. Et le reproche restait juste, parce qu'il ne
+portait pas sur le geste mais sur **ce qui vient après**.
+
+Battre son vis-à-vis rendait la main au rugby automatique : `ligneDeCourse`
+cherchait le prochain intervalle, « fixer et donner » évaluait la passe à chaque
+tick, et deux foulées plus loin le pion refaisait une passe de routine. Le duel
+gagné ne menait donc **nulle part** — littéralement : il n'existait aucun chemin,
+dans le moteur, entre « j'ai battu mon homme » et la ligne d'essai.
+
+Trois chaînes manquaient. Elles sont écrites, et elles se mesurent.
+
+### 1. L'ÉCHAPPÉE — le chemin qui va du duel gagné à l'en-but
+
+`EtatMatch.echappee: { pion, restant }`. Tant qu'elle dure (**7 s simulées**,
+soit une cinquantaine de mètres de course) :
+
+| | hors échappée | en échappée |
+|---|---|---|
+| ligne de course | `ligneDeCourse` : fixer, chercher l'intervalle | **droit sur la ligne d'essai** |
+| « fixer et donner » | passe automatique sous 3,7 m de pression | **suspendue** |
+| `deciderAvecLeBallon` | peut taper en touche | **suspendu** |
+| carte de décision | ballon / réception / défense / ruck | **`espace`**, avec ses propres options |
+
+Elle s'ouvre par quatre chemins, et **`lancerEchappee` est le seul endroit qui
+les couvre tous** : la percée choisie sur une carte, la percée subie par le
+plaqueur (au fond de `resoudrePlaquage`, donc y compris pour un geste resté
+armé), le chip repris, l'interception. Elle s'éteint toute seule, et dès que le
+ballon quitte les mains — passé, tapé, ou perdu.
+
+⚠️ **« MÈNE À UN ESSAI » NE VEUT PAS DIRE « DONNE UN ESSAI ».** Le score reste
+celui de la ligue, et c'est la règle d'architecture la plus importante du
+moteur : `tenterEssai` refuse un essai qui dépasserait le plan de marque, et le
+ballon est alors tenu en-but. Ce qui a changé, c'est que **le chemin existe et
+qu'il est emprunté**.
+
+### 2. LA DYNAMIQUE — `src/lib/moteur/elan.ts`
+
+Un seul nombre **signé**, de −1 (le camp B est dessus) à +1. Pas deux jauges :
+l'élan est un rapport de force, ce que l'un prend l'autre le perd — deux
+compteurs indépendants auraient laissé les deux équipes être portées en même
+temps, ce qui ne veut rien dire sur un terrain de rugby.
+
+| Évènement | Poussée |
+|---|---|
+| **ballon volé** (grattage, interception, contre-poussée) | **+0,50** |
+| la ligne d'avantage franchie | +0,26 |
+| essai | +0,42 |
+| en-avant | −0,24 |
+| pénalité concédée | −0,14 |
+
+Demi-vie **40 secondes** simulées : une possession, deux au plus. Un ballon volé
+à la 12ᵉ minute ne porte pas l'équipe jusqu'à la sirène.
+
+⚠️ **ET CE N'EST PAS UNE DÉCORATION.** `bonusElan` entre dans `probaPlaquage` et
+`probaGrattage` — les deux duels qui décident le contact et les turnovers. Donc
+`enjeuDe` l'**affiche** et `resoudreChoix` le **tire** : c'est la même ligne.
+Après un ballon volé, « 💥 Plaquer 88 % » devient « 💥 Plaquer 94 % ». Mesuré :
+**10,8 points d'écart** sur le pourcentage annoncé entre une équipe portée et une
+équipe dominée. Une jauge qui ne déplacerait aucun chiffre ne serait qu'une barre
+de couleur.
+
+⚠️ **POURQUOI UN FICHIER À PART, ET PAS TROIS LIGNES DANS `moteur.ts`.** Trois
+lecteurs en ont besoin et ils ne peuvent pas s'importer entre eux : `moteur.ts`
+pousse, `controle.ts` et `decisions.ts` lisent — et ces deux-là ne connaissent
+pas `moteur.ts`, c'est l'inverse (entête de `controle.ts`). Un module sans
+dépendance, comme `terrain.ts`, est le seul endroit où la règle peut vivre une
+seule fois.
+
+### 3. LES RETOMBÉES — « une passe peut arriver à une passe décisive »
+
+`EtatMatch.echos`, une file que l'écran vide et affiche (`.ml-retombee`).
+
+La statistique existait depuis longtemps (`stats.passesDecisives`, créditée dans
+`tenterEssai`). Le problème n'était pas de la compter, c'était que **quarante
+secondes séparent la passe de l'essai qu'elle amène** : le fil a défilé, la carte
+est refermée, et personne ne fait le lien. Elle n'apparaissait qu'à la feuille de
+match, une heure plus tard. C'est exactement ce qui donne le sentiment qu'un
+geste ne sert à rien.
+
+Deux retombées pour l'instant, et un chaînon pour la seconde
+(`EtatMatch.dernierTurnover`) :
+
+- **« Passe décisive : ton ballon a fini dans l'en-but par X ! »**
+- **« Ton ballon volé a amené l'essai de X ! »** (dans les 40 s)
+
+### Les cinq nouveaux gestes — 20 actions → 25
+
+| geste | qui | quand | recharge | réussi | raté |
+|---|---|---|---|---|---|
+| 🕳️ **Prendre l'espace** | tous | le ballon arrive, **un trou ≥ 7 m près de soi** | 52 s | rideau battu, **échappée** | plaqué, ballon lent |
+| 🪁 **Par-dessus** | trois-quarts, `pied ≥ 42` | ballon en main, un défenseur à moins de 13 m, hors de ses 22 | 46 s | on avance de `12 + pied/12` m, **échappée** | le ballon leur revient, contre-attaque |
+| 🤿 **Plonger** | tous | ballon en main, **à 12 m de la ligne** | 10 s | `tenterEssai` | tenu, ou en-avant |
+| 🦅 **Intercepter** | tous | une passe en l'air **pour eux**, à 12 m | 50 s | turnover + **échappée** | 2,8 s hors du jeu, trou béant |
+| 🐘 **Contre-poussée** | un avant | ruck qu'on défend, à 8 m | 24 s | turnover, ballon rapide | on sort en retard, 28 % de pénalité |
+
+⚠️ **RECHARGES TRÈS LONGUES, ET C'EST LEUR CONTREPARTIE.** Ce sont des paris, pas
+des tactiques. Sans ça le banc d'essai relèverait dix percées par match là où le
+rugby professionnel en compte deux à quatre pour QUINZE joueurs.
+
+### ⚠️ Quatre défauts que seule la mesure pouvait attraper
+
+Aucun ne se voit à la relecture. Tous ont été trouvés par le banc d'essai ou
+dans le journal de jeu.
+
+1. **`intervalle` mesurait le plus grand trou DU TERRAIN.** Un pilier au ras du
+   ruck se voyait proposer « prendre l'espace » parce qu'il restait vingt mètres
+   de libre à l'autre bout — bords de touche compris. Mesuré : **13,7 percées
+   proposées par match et 56 % de réussite**. Elle mesure désormais le segment
+   dans lequel on court **et ses deux voisins** : on se déporte d'une foulée, pas
+   de vingt mètres. Et la chance se compte sur ce qui DÉPASSE l'écartement normal
+   du rideau (~6 m), pas sur l'écart brut.
+2. **LA CARTE DE L'ESPACE NE S'OUVRAIT JAMAIS** — zéro sur vingt matchs, alors
+   que le test était écrit. Deux causes cumulées : il était posé **après**
+   `if (e.porteur === p) return 'ballon'` dans `lireMoment`, or pendant une
+   échappée on EST le porteur ; et le repos de 6 s des cartes de ballon venait
+   d'être remis à zéro par la carte qui avait lancé la percée, alors que
+   l'échappée n'en dure que 7. D'où `REPOS_ESPACE = 3`. **C'est la même erreur
+   que le 9 à son propre ruck, au tour d'avant : un moment plus spécifique se lit
+   toujours avant le moment général.**
+3. **L'INTERCEPTION ÉTAIT INATTEIGNABLE.** Zéro proposée sur vingt matchs, pour
+   une raison purement mécanique : pendant un vol il n'y a pas de porteur, donc
+   pas de moment `defense`, donc pas de carte. Le geste était dans le type, dans
+   la liste des préférences, dans le moteur — et personne ne pouvait le jouer.
+4. **DEUX GESTES NE FAISAIENT RIEN DANS CERTAINS CAS.** Une contre-poussée ratée
+   sans coup de sifflet (72 % du temps) ne changeait **rien** ; une percée ratée
+   au bord du rideau, sans plaqueur à proximité, non plus. Deux boutons muets,
+   attrapés par l'empreinte avant/après.
+
+Et un cinquième, vu dans le journal de jeu : **la phrase contredisait le
+verdict**. Un chip raté affichait « ❌ » au-dessus de « *Coup de pied rasant de
+Maxime Retière derrière la défense !* » — parce que `phraseDepuis` rend le
+PREMIER commentaire écrit sur mon joueur, et que `taperAuPied` parlait avant
+nous. L'échec se raconte donc maintenant **avant** de taper.
+
+### Mesuré
+
+`scripts/verifDuels.ts`, section **3 ter** (20 matchs joués carte par carte, le
+joueur choisissant systématiquement le geste qui doit mener quelque part) :
+
+| Contrôle | Résultat |
+|---|---|
+| échappées ouvertes | **5,1/match** |
+| cartes « tu es dans l'espace » | 2,5/match |
+| essais du joueur | **5** |
+| ballons volés qui poussent la dynamique | **19/19** |
+| pic d'élan atteint | 0,65 |
+| retombées annoncées au joueur | **6** |
+| les cinq gestes proposés en jeu | **5/5** |
+| … et tous joués | **5/5** |
+| … et aucun sans effet sur l'état | **0** |
+| la dynamique déplace le pourcentage annoncé | **10,8 pts** |
+
+Et rien n'a bougé ailleurs : étalonnage des duels **1,6 σ** au pire (65,2 %
+annoncés · 65,8 % sortis sur 722 duels tranchés), **0 écart sur 48 matchs** avec
+le score de la ligue, `verifMoteur` dans toutes ses cibles (42,6 points,
+5,6 essais, 223,9 plaquages, 18,3 percées), et le rythme des cartes inchangé —
+62,5 cartes pour 61,3 ballons touchés, **8,4 min** par match.
+
+⚠️ **`battu` FAIT PARTIE DE L'EMPREINTE DU BANC, et ce n'est pas une
+complaisance** : une interception ratée ne change ni la phase, ni la possession,
+ni le ballon — son unique conséquence est que le défenseur est **sorti du jeu**
+près de trois secondes, et c'est la plus chère du lot.
+
+### Vérifié en jouant
+
+```text
+>>> [Passe gauche | Passe droite | 🕳️ Prendre l’espace | Chandelle]  → 🕳️ 37 %
+   ✅ 🕳️ Prendre l’espace | 37 % | Maxime Retière est dans l’espace,
+                                   plus personne devant ! | ⚡ Défenseur battu
+>>> ⚡ Tu as percé, enchaîne !  [🪁 Par-dessus | Passe gauche | Passe droite | 🤲 Offload]
+```
+
+La carte d'enchaînement porte bien les options de l'**espace** (plonger, chiper,
+servir le soutien) et non celles d'un ballon ordinaire. La jauge de dynamique se
+lit en tête d'écran, part du milieu dans les deux sens, et **retombe visiblement**
+(relevé : 20 % → 9 % pour eux, puis 2 % pour nous).
+
+Sur 375 × 812, rechargé à cette taille : **162 relevés `elementFromPoint`,
+0 bouton injoignable, 0 élément hors écran** — les cinq options, la bulle du
+verdict et la jauge comprises.
+
+⚠️ **UNE NOTE SUR LA MESURE MOBILE, parce qu'elle a coûté un faux positif.**
+Redimensionner la fenêtre du navigateur d'aperçu **ne déclenche pas** l'évènement
+`change` de `matchMedia` : `useLarge` restait à `true`, la colonne de droite
+occupait 313 px des 375, et la carte de décision tombait à 33 px de large. Rien à
+corriger dans le jeu — sur un téléphone, la page se charge à la bonne taille et
+une rotation notifie bien. **Il faut recharger la page après un
+redimensionnement émulé avant de mesurer quoi que ce soit.**
+
+```bash
+npx vite-node scripts/verifDuels.ts        # 3 ter : le geste mène quelque part, l’élan se lit sur le bouton
+npx vite-node scripts/verifMoteur.ts       # l’étalonnage du moteur ne bouge pas
+npx vite-node scripts/verifMatchJouable.ts # le rythme des cartes et la durée d’un match
+npx vite-node scripts/verifControle.ts     # ne rien choisir = le match qu’on aurait regardé
+npx vite-node scripts/verifTraductions.ts  # les 45 clés ajoutées, dans les 7 langues
 ```

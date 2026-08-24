@@ -3161,6 +3161,14 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issu
         // ⚠️ ON PASSE PAR `taperAuPied` PLUTÔT QUE DE POSER UN ARRÊT : un chip
         // raté ne sort pas du jeu, il offre une contre-attaque — c’est bien
         // pire, et c’est ce qui doit faire hésiter.
+        //
+        // ⚠️ ON RACONTE L’ÉCHEC AVANT DE TAPER, et ce n’est pas cosmétique.
+        // `phraseDepuis` rend le PREMIER commentaire écrit sur mon joueur :
+        // laisser `taperAuPied` parler en premier affichait « Coup de pied
+        // rasant de Maxime Retière derrière la défense ! » sous une croix rouge.
+        // Vu tel quel dans le journal de jeu — le verdict disait raté, la phrase
+        // disait réussi, et c’est la phrase qu’on croit.
+        dire(e, 'pied', p.cote, C.texteMatch('duelChipKo', { nom: p.nom }), 0, true);
         taperAuPied(e, p, 'rasant');
         return tranche(false, 'duelChipKo');
       }
