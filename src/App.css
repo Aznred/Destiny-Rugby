@@ -4852,3 +4852,93 @@ img, svg, canvas { max-width: 100%; }
   /* Trop étroit pour lire l’étape : la pastille redevient une icône. */
   .guide-etape { display: none; }
 }
+
+/* ═══ LES ONGLETS DE CATÉGORIE DU CLASSEMENT MONDIAL ══════════════════════
+   Quatre puces au-dessus du tableau : Total, Joueurs, Entraîneurs, Joueur +
+   entraîneur. Elles réutilisent `.chip-comp` (écran Résultats) — un second
+   style de puce pour la même fonction, c'est deux styles à tenir à jour.
+   ⚠️ `flex-wrap` et pas de défilement horizontal : sur 375 px les quatre
+   passent sur deux rangées plutôt que d'emporter la page de côté. */
+.onglets-classement {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.2rem 0 0.9rem;
+}
+.onglets-classement .chip-comp { font-size: 0.86rem; }
+
+/* ═══ LE MODE MANAGER ═════════════════════════════════════════════════════ */
+/* Les deux modes de création, côte à côte : carrière (classée) ou libre. */
+.modes-manager {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.7rem;
+}
+.mode-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+  padding: 0.9rem 1rem;
+  border-radius: var(--r-md, 12px);
+  border: 1px solid var(--pelouse-400);
+  background: var(--pelouse-700);
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.mode-manager:hover { border-color: var(--or-500); }
+.mode-manager.actif {
+  border-color: var(--or-500);
+  background: var(--pelouse-600);
+  box-shadow: inset 0 0 0 1px var(--or-500);
+}
+.mode-titre { font-family: 'Archivo', sans-serif; font-weight: 700; }
+.mode-desc { font-size: 0.84rem; opacity: 0.85; line-height: 1.4; }
+
+/* La carte du club : écusson, compétition, et les chiffres qui comptent. */
+.contrat-manager, .club-manager { margin-top: 1rem; padding: 1.1rem; }
+.cm-tete { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.8rem; }
+.cm-compet { display: flex; align-items: center; gap: 0.4rem; font-size: 0.86rem; opacity: 0.85; }
+/* ⚠️ `minmax(0, 1fr)` ET PAS `1fr` : `1fr` vaut `minmax(auto, 1fr)`, et cet
+   `auto` est le min-content de la tuile — un salaire à sept chiffres forçait
+   alors la colonne plus large que son conteneur, et toute la page partait de
+   côté. C'est exactement le bug des poules de Coupe du monde. */
+.cm-chiffres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.cm-chiffres > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.55rem 0.4rem;
+  border-radius: var(--r-sm, 8px);
+  background: var(--pelouse-700);
+}
+.cm-chiffres span {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+.cm-chiffres em { font-style: normal; font-size: 0.72rem; opacity: 0.7; line-height: 1.25; }
+.cm-note { margin: 0.7rem 0 0; font-size: 0.85rem; color: var(--or-400, #d9b45a); }
+
+.humeur-board { margin: 0.6rem 0 0; font-size: 0.9rem; }
+.humeur-board.rouge { color: #e06a5a; }
+.humeur-board.orange { color: #dba24a; }
+.humeur-board.vert { color: var(--pelouse-100, #9fd1a0); }
+.humeur-board.or { color: var(--or-400, #d9b45a); }
+
+.histo-manager .classement-ligne { grid-template-columns: 3.2rem minmax(0, 1.4fr) minmax(0, 1fr) 5.5rem minmax(0, 1.6fr); }
+
+@media (max-width: 560px) {
+  .cm-chiffres { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .histo-manager .classement-ligne { grid-template-columns: 3rem minmax(0, 1fr) 5rem; }
+  .histo-manager .classement-ligne > :nth-child(3),
+  .histo-manager .classement-ligne > :nth-child(5) { display: none; }
+}

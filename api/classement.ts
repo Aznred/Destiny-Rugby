@@ -130,10 +130,12 @@ export async function GET(req?: Request): Promise<Response> {
   // `serveur/MIGRATION-FICHES.md`, étape 2 bis.
   let page = 1;
   let monId = NaN;
+  let categorie = 'total';
   if (req) {
     const params = new URL(req.url).searchParams;
     page = Math.min(PAGE_MAX, Math.max(1, Math.floor(Number(params.get('page')) || 1)));
     monId = Math.floor(Number(params.get('id')));
+    categorie = params.get('categorie') ?? 'total';
   }
   const decalage = (page - 1) * PAR_PAGE;
 
@@ -151,6 +153,25 @@ export async function GET(req?: Request): Promise<Response> {
     // au plus pauvre : le tableau s'affiche dans tous les cas, et les colonnes
     // manquantes réapparaissent d'elles-mêmes une fois la migration jouée
     // (`serveur/schema-vercel.sql`, en tête).
+    // ═══ LES CLASSEMENTS DE CATÉGORIE ═══════════════════════════════════
+    // Demande explicite : « faire plusieurs classements de catégories et un
+    // classement total comprenant les carrières sans entraîneur, juste
+    // entraîneur, et joueur + entraîneur ».
+    //
+    // ⚠️ LE FILTRE EST FAIT PAR LA BASE, ET IL LE FAUT. Le classement est
+    // PAGINÉ (50 lignes) : filtrer côté navigateur ne filtrerait que la page
+    // affichée, et l’onglet « Entraîneurs » montrerait deux lignes sur cent
+    // en laissant croire qu’il n’y a que deux entraîneurs au monde.
+    //
+    // ⚠️ ET IL N’Y A AUCUNE COLONNE `categorie` À AJOUTER : la catégorie se
+    // DÉDUIT de deux colonnes qui existent depuis la v2 du schéma. Une fiche
+    // d’entraîneur porte `poste = 'entraineur'` (`ficheDepuisManager`), et
+    // `matchs > 0` distingue celui qui a d’abord joué. Zéro migration SQL,
+    // donc zéro risque de casser une base déjà en ligne — la leçon de
+    // « column "nom" does not exist », qui avait rendu 500 à tout le monde.
+    const filtre = ['joueur', 'entraineur', 'joueurEntraineur'].includes(categorie)
+      ? categorie : 'total';
+
     const lectures = [
       // v3 : la ligne porte un identifiant public — c'est lui qui permet
       // d'afficher deux lignes sous le même pseudo sans les confondre.
@@ -159,6 +180,10 @@ export async function GET(req?: Request): Promise<Response> {
                nom, poste, nation, age, saisons, note, reputation,
                matchs, essais, selections, titres, clubs
         from classement
+        where ${filtre} = 'total'
+           or (${filtre} = 'joueur' and coalesce(poste, '') <> 'entraineur')
+           or (${filtre} = 'entraineur' and poste = 'entraineur' and coalesce(matchs, 0) = 0)
+           or (${filtre} = 'joueurEntraineur' and poste = 'entraineur' and coalesce(matchs, 0) > 0)
         order by score desc, maj_le asc
         limit ${PAR_PAGE} offset ${decalage}
       `],
@@ -168,6 +193,10 @@ export async function GET(req?: Request): Promise<Response> {
                nom, poste, nation, age, saisons, note, reputation,
                matchs, essais, selections, titres, clubs
         from classement
+        where ${filtre} = 'total'
+           or (${filtre} = 'joueur' and coalesce(poste, '') <> 'entraineur')
+           or (${filtre} = 'entraineur' and poste = 'entraineur' and coalesce(matchs, 0) = 0)
+           or (${filtre} = 'joueurEntraineur' and poste = 'entraineur' and coalesce(matchs, 0) > 0)
         order by score desc, maj_le asc
         limit ${PAR_PAGE} offset ${decalage}
       `],
@@ -196,9 +225,20 @@ export async function GET(req?: Request): Promise<Response> {
 
     // Combien de carrières en tout : c'est ce qui permet à l'écran d'annoncer
     // « page 3 sur 12 » plutôt qu'un « suivant » qui mène parfois au vide.
+    // ⚠️ LE TOTAL COMPTE EXACTEMENT CE QUE LA PAGE MONTRE. Un total non
+    //    filtré à côté d’une page filtrée annoncerait « page 1 sur 12 » pour
+    //    une catégorie qui tient sur une page.
     let total = lignes.length + decalage;
     try {
-      const [c] = await sql`select count(*)::int as total from classement`;
+      const [c] = schema === 'v1'
+        ? await sql`select count(*)::int as total from classement`
+        : await sql`
+          select count(*)::int as total from classement
+          where ${filtre} = 'total'
+             or (${filtre} = 'joueur' and coalesce(poste, '') <> 'entraineur')
+             or (${filtre} = 'entraineur' and poste = 'entraineur' and coalesce(matchs, 0) = 0)
+             or (${filtre} = 'joueurEntraineur' and poste = 'entraineur' and coalesce(matchs, 0) > 0)
+        `;
       total = Number((c as { total?: unknown })?.total ?? total);
     } catch (e) {
       console.warn('[classement] total indisponible', e);
@@ -229,7 +269,15 @@ export async function GET(req?: Request): Promise<Response> {
       }
     }
 
-    return reponse({ classement: lignes, total, page, parPage: PAR_PAGE, moi });
+    // ⚠️ UNE BASE RESTÉE EN v1 N’A PAS DE COLONNE `poste` : la cascade est
+    //    retombée sur la requête NON filtrée. On le DIT plutôt que de servir
+    //    le classement total en le présentant comme celui des entraîneurs —
+    //    c'est exactement le genre de silence qui se lit comme un bug.
+    return reponse({
+      classement: lignes, total, page, parPage: PAR_PAGE, moi,
+      categorie: filtre,
+      ...(filtre !== 'total' && schema === 'v1' ? { filtreIgnore: true } : {}),
+    });
   } catch (e) {
     console.error('[classement] lecture', e);
     return reponse({ erreur: 'Lecture impossible' }, 500);

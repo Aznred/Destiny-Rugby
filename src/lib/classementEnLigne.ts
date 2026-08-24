@@ -12,7 +12,7 @@
 //
 // Déploiement de l'autre bout : `serveur/VERCEL.md`.
 
-import type { FicheCarriere } from './classementMondial';
+import type { CategorieCarriere, FicheCarriere } from './classementMondial';
 
 /**
  * Une identité de ligne pour cette installation, tirée au hasard une fois.
@@ -169,6 +169,17 @@ export type EtatMondial =
       total: number;
       page: number;
       parPage: number;
+      /** La catégorie réellement servie par le serveur. */
+      categorie: 'total' | CategorieCarriere;
+      /**
+       * ⚠️ LE SERVEUR N’A PAS PU FILTRER, et il le dit.
+       *
+       * Une base restée au schéma v1 n’a pas de colonne `poste` : la cascade
+       * de lecture retombe sur la requête non filtrée. Servir le classement
+       * TOTAL en le présentant comme celui des entraîneurs serait le pire des
+       * silences — l’écran affiche donc un mot à la place.
+       */
+      filtreIgnore?: boolean;
       /**
        * Ma ligne et son rang mondial, où qu'elle soit dans le classement.
        *
@@ -186,7 +197,11 @@ export type EtatMondial =
  * @param monId l'identifiant public de MA ligne, pour que le serveur renvoie
  *   aussi mon rang. Facultatif : sans lui, `moi` est simplement absent.
  */
-export async function lireClassementMondial(page = 1, monId?: number | null): Promise<EtatMondial> {
+export async function lireClassementMondial(
+  page = 1,
+  monId?: number | null,
+  categorie: 'total' | CategorieCarriere = 'total',
+): Promise<EtatMondial> {
   if (!ACTIF) return { etat: 'hors-ligne' };
   try {
     // ⚠️ ON COMPOSE LA CHAÎNE, ON NE PASSE PAS PAR new URL(). URL_CLASSEMENT
@@ -198,11 +213,13 @@ export async function lireClassementMondial(page = 1, monId?: number | null): Pr
     const params = new URLSearchParams();
     if (page > 1) params.set('page', String(page));
     if (monId != null && Number.isFinite(monId)) params.set('id', String(monId));
+    if (categorie !== 'total') params.set('categorie', categorie);
     const q = params.toString();
     const r = await appeler(q ? URL_CLASSEMENT + '?' + q : URL_CLASSEMENT);
     const data = (await r.json().catch(() => ({}))) as {
       classement?: LigneMondiale[]; total?: number; page?: number; parPage?: number;
       moi?: LigneMondiale | null; erreur?: string;
+      categorie?: 'total' | CategorieCarriere; filtreIgnore?: boolean;
     };
     if (!r.ok) return { etat: 'panne', erreur: data.erreur ?? `Le serveur a répondu ${r.status}` };
     const lignes = Array.isArray(data.classement) ? data.classement : [];
@@ -215,6 +232,8 @@ export async function lireClassementMondial(page = 1, monId?: number | null): Pr
       page: typeof data.page === 'number' ? data.page : page,
       parPage: typeof data.parPage === 'number' && data.parPage > 0 ? data.parPage : Math.max(1, lignes.length),
       moi: data.moi ?? null,
+      categorie: data.categorie ?? categorie,
+      ...(data.filtreIgnore ? { filtreIgnore: true } : {}),
     };
   } catch (e) {
     // Pas de serveur, hors ligne, ou fonction pas encore déployée : le jeu

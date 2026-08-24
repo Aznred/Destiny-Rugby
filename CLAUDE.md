@@ -6809,3 +6809,315 @@ npx vite-node scripts/verifTitres.ts        # le titre mondial va bien au vainqu
 npx vite-node scripts/verifSelection.ts     # les petites nations restent atteignables
 npx vite-node scripts/verifClassementWorldRugby.ts # la formule World Rugby elle-même
 ```
+
+---
+
+## 🩹 CINQ RETOURS DE JEU — deux distinctions fantômes, un nom perdu, un Mondial invisible
+
+### ⚠️ 1 et 2. « MEILLEUR JOUEUR DES 6 NATIONS EN ÉTANT SUD-AFRICAIN » — et « meilleur joueur de l'année en Nationale 2 »
+
+Deux symptômes, **une seule cause** : `SaisonJugee.tournoi` était un **booléen**
+là où il fallait un identifiant.
+
+```ts
+const selectionne6N = selectionne && !!sonTournoi;   // « il joue LA compétition de sa fenêtre de février »
+tenter(HONNEUR_TOURNOI, BARRES.tournoi, 'tournoi', s.tournoi);   // → toujours `meilleurSixNations`
+```
+
+Or la fenêtre de février n'est pas le Tournoi pour tout le monde : un Springbok
+y dispute **The Rugby Championship**, un Portugais le **Rugby Europe
+Championship**. Le drapeau disait « il a joué un tournoi de sélections », et on
+en déduisait le Tournoi des 6 Nations. Un booléen ne peut pas porter une
+information à dix réponses possibles.
+
+- **`HONNEUR_PAR_INTERNATIONAL`** (`data/trophees.ts`) remplace la constante
+  `HONNEUR_TOURNOI` en dur. ⚠️ **Elle n'a qu'UNE entrée**, comme
+  `MEILLEUR_JOUEUR_PAR_DIVISION` n'en a que cinq sur trente-trois championnats :
+  une distinction n'existe dans le jeu que si elle a son `.glb` dans
+  `public/m3d/`, et la rareté est ce qui lui donne sa valeur. Pour ouvrir le
+  Rugby Championship, il faut d'abord livrer son modèle.
+- `SaisonJugee.tournoi: boolean` devient **`tournoiId?: string`**, et
+  `BilanSaison.selectionne6N` devient **`tournoiId`**.
+
+**Et le second symptôme tombait par le même trou.** La couronne mondiale exige
+de jouer « là où le monde regarde » — un championnat qui élit, la Champions Cup,
+**ou une sélection**. Ce troisième chemin s'ouvrait donc pour un joueur de
+Nationale 2 convoqué chez lui. Or `noterSaison` est **relative au groupe** : trop
+fort pour son étage, on frôle le 10 sans effort (« j'avais 9,6 de moyenne »).
+
+La vitrine mondiale demande maintenant **deux choses**, pas une : jouer là où le
+monde regarde **ET** dans un club professionnel. `SaisonJugee.niveau` porte le
+niveau de la compétition, et la coupure est celle du moteur de match
+(`NIVEAU_PRO_MAX = 3` : au-dessus de la Nationale 2). Deux coupures différentes
+pour la même question finiraient par se contredire.
+
+### ⚠️ 3. « SI ON NE MET PAS DE NOM, ON N'APPARAÎT PAS DANS LE CLASSEMENT »
+
+Il y apparaissait — **sous un identifiant technique que rien ne rattachait au
+joueur**. Deux bugs sur la même ligne de `creerJoueur` :
+
+```ts
+nom: input.nom.trim() || nomAleatoirePourNation(input.nation),   // ✅ le nom est bien tiré
+pseudo: pseudoDe(input.nom.trim() || 'Anonyme'),                 // ❌ calculé sur le champ VIDE
+```
+
+Le personnage s'appelait « Matis Page-Relo » à l'écran et **« @anonyme_59 »**
+partout ailleurs. Le nom est désormais tiré **avant** tout le reste
+(`nomChoisi`), et le pseudo 𝕏 en dérive.
+
+⚠️ **ET LE CLASSEMENT MONDIAL AFFICHAIT LE HANDLE 𝕏, PAS LE NOM.** La chaîne de
+`ficheDepuisJoueur` était `pseudo ?? j.pseudo ?? j.nom` — or `j.pseudo` est
+l'identifiant de L'Ovale (`colin_gomez_12`). **Tout le monde** figurait au
+classement sous un handle, pas seulement les carrières sans nom ; c'est juste
+qu'« anonyme_59 » rend le défaut visible. Elle devient `pseudo || j.nom` : seul
+un pseudo CHOISI exprès passe devant le nom du personnage.
+
+### ⚠️ 4. « AUCUNE TRACE DE LA COUPE DU MONDE »
+
+Elle se jouait bien (lot précédent) — mais **uniquement à l'intérieur du
+sélecteur de compétition, une saison sur quatre, pendant trois semaines de
+novembre**. Il fallait donc déjà savoir qu'elle avait lieu pour aller la
+chercher : de l'extérieur, elle n'existait pas.
+
+Une **carte permanente** s'ouvre en tête de l'écran 📊 Résultats, qu'elle se joue
+ou non : la saison où elle tombe (« Saison 4, dans 3 saisons »), les dates, le
+format, si **ta** sélection y est qualifiée, et les **quatre poules dépliables**.
+
+⚠️ **ET LES POULES SONT LISIBLES DES ANNÉES À L'AVANCE**, parce que le tirage est
+**déterministe** (graine `mondial#saison`). Ce n'est donc pas une promesse en
+l'air : ce sont exactement les poules qui seront jouées. C'est ce qui donne un
+horizon à une carrière de sélection. Relevé en jeu à la saison 1 pour l'édition
+de la saison 4 : Poule A Afrique du Sud · Écosse · Géorgie · Espagne · Pays-Bas ·
+Suisse — Poule B Angleterre · **France** · Japon · Uruguay · Namibie · Suède…
+
+### 5. Le classement des nations repart REPLIÉ
+
+Demande : « faut que le classement points des nations soit caché, en mode un
+bouton pour le voir comme avant ». **C'est un retour en arrière assumé** : le lot
+précédent l'avait ouvert d'office pour répondre à « le classement mondial doit
+bouger ». C'était la mauvaise lecture — ce qui manquait, c'était de **voir** qu'il
+bougeait, pas d'avoir vingt lignes de points en tête d'écran à chaque visite.
+
+Trois états au lieu de deux : **fermé** (par défaut) → **top 20 + ma nation** →
+**les 114**. La ligne « ta sélection est 4ᵉ mondiale, à 6,53 points du leader »
+reste toujours affichée : c'est un fait sur la carrière en cours, pas un
+annuaire.
+
+### Ce qui a été vérifié
+
+`verifHonneurs.ts` gagne les deux régressions sous test : quatre tournois qui ne
+donnent AUCUN trophée du Tournoi (`rugbyChampionship`, `recEurope`,
+`americasChamp`, `oceaniaCup`), et cinq étages amateurs qui ne donnent AUCUNE
+couronne mondiale même avec 9,8/10 et une sélection — tout en la laissant
+atteignable en Top 14.
+
+⚠️ **DEUX ÉCHECS DE `verifHonneurs.ts` SONT ANTÉRIEURS À CE LOT**, vérifié en
+remisant les fichiers (`git stash`) : « le palmarès de l'année déplace la cote »
+(58,6 → 61,4 → 64,5 pour un seuil de +4 par titre) et la section 9 (0 distinction
+sur 60 carrières), cette dernière étant le symptôme connu de
+« LES SCRIPTS DE MESURE NE MESURENT PLUS RIEN » plus haut. Ils ne sont pas
+corrigés ici.
+
+---
+
+## 🧑‍🏫 LE MODE MANAGER — couche 1 : qui entraîne quoi, et ce que ça devient
+
+Demande : « prépare le mode manager du jeu, où on peut manager n'importe quel
+club **avec de l'expérience** ; si on crée notre carrière manager on peut
+commencer que dans des petits clubs puis évoluer dans de plus gros ; et si à la
+fin de notre carrière joueur on peut devenir entraîneur, avec notre statut on
+peut avoir de meilleurs clubs ; sinon mettre un mode cheat où on peut partir avec
+n'importe quel club mais donc pas dans le classement mondial ».
+
+Deux arbitrages tranchés avant d'écrire une ligne :
+
+| Question | Réponse de l'utilisateur |
+|---|---|
+| Ce qu'on fait en tant que manager | **« Les deux, en couches »** : la gestion (objectifs, effectif, marché) ET le match coaché, livrés sur plusieurs tours |
+| Le classement | **Plusieurs classements de catégories, plus un total** comprenant les trois familles |
+
+**Ce tour livre la couche 1, et seulement elle** : la charpente d'accès. Composer
+le XV, coacher le match et le marché des transferts viennent par-dessus. Les
+poser d'abord évite le piège classique — écrire la semaine du manager, puis
+découvrir qu'on ne sait pas dire si un débutant a le droit de prendre le Stade
+Toulousain.
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/manager.ts` | **Les règles, pures.** Prestige, `noteMaximale`, `clubsAccessibles`, `objectifDuBoard`, `verdictDeSaison`, `salaireManager`, `prestigeDepuisJoueur`. Aucune dépendance au store, aucun DOM : testable sans navigateur. |
+| `src/screens/CreationManager.tsx` | Le mode (carrière ou libre), le nom, la nation, l'âge, le banc, et le contrat qu'on signe. |
+| `src/screens/Manager.tsx` | La carrière : classement, objectif, prestige, confiance du board, semaine suivante, parcours, journal. |
+| `src/store/useGame.ts` | `manager`, `creerManager`, `signerBanc`, `semaineManager`, `saisonManager`, `quitterBanc`, `reconversionManager`. |
+| `scripts/verifManager.ts` | Le banc d'essai, 6 sections. |
+
+### ⚠️ UNE SEULE JAUGE : LE PRESTIGE
+
+On aurait pu séparer « expérience », « réputation » et « palmarès » : trois
+nombres qui disent la même chose, qu'il faut équilibrer les uns contre les
+autres, et dont deux finissent par ne servir à rien. Le prestige (0-100) les
+résume, et il n'ouvre qu'une chose — **des clubs** :
+
+```
+noteMaximale(prestige) = 30 + prestige × 0,58        (+ MARGE_AMBITION = 2)
+```
+
+| prestige | clubs ouverts | étage le plus haut | meilleur club |
+|---|---|---|---|
+| 6 (départ) | **37** | Régionale 2 | Marseillais (35,5) |
+| 20 | 252 | Fédérale 3 | Pouyastruc (43,6) |
+| 40 | 631 | Fédérale 1 | Burgos (55,2) |
+| 60 | 790 | Nationale | Highlanders (66,6) |
+| 80 | 833 | Pro D2 | Leicester Tigers (78,4) |
+| 100 | **855** (tout) | Premiership | Stade Toulousain (89,9) |
+
+⚠️ **ON LIT LA FORCE RÉELLE DE L'EFFECTIF, PAS LA NOTE DE LA DIVISION.**
+`NOTE_PAR_NIVEAU` dit ce que vaut un étage ; elle ne dit pas qu'un club de
+Fédérale 1 en pleine génération dorée (`lib/generations.ts`) vaut mieux qu'un
+promu de Nationale. Sans ça, « progresser vers de plus gros clubs » ne serait
+qu'un changement de libellé.
+
+⚠️ **LA CARRIÈRE DE MANAGER EST MONDIALE, contrairement à celle de joueur.** Le
+balayage couvre les 855 clubs des 33 compétitions : à 60 de prestige, le meilleur
+banc à portée est celui des **Highlanders**. C'est une conséquence de
+`clubsAccessibles`, et elle est voulue — un entraîneur va où on l'appelle.
+
+### ⚠️ DEUX DÉFAUTS DE CONCEPTION ATTRAPÉS PAR LE BANC D'ESSAI, DÈS SA PREMIÈRE EXÉCUTION
+
+1. **LE PRESTIGE SATURAIT À 100 EN QUINZE SAISONS.** Premier réglage (place 1,6 ·
+   titre 9 · montée 7 · saison 1,2) : tout le monde entraînable, le Stade
+   Toulousain vers la dixième saison, et plus rien à jouer ensuite. Un mode dont
+   la seule jauge sature à mi-carrière n'a plus de courbe. Chaque poussée a été
+   divisée par ~1,8 — la même carrière finit maintenant à **64,3**, c'est-à-dire
+   au niveau de la Nationale ou du bas de la Pro D2.
+2. **UN ENTRAÎNEUR RUINÉ NE POUVAIT PLUS JAMAIS ENTRAÎNER.** Trois licenciements,
+   prestige à 0, `noteMaximale(0)` vaut 30, et **plus aucun club du jeu ne passe
+   sous ce plafond** : `clubsAccessibles` rendait une liste VIDE. Plus de banc,
+   donc plus de saison, donc plus aucun moyen de remonter — la carrière était
+   morte sans être terminée, et rien ne le disait. `PLANCHER_ACCES = 12` rend les
+   douze clubs les plus faibles du monde : c'est-à-dire exactement là où le
+   métier recommence.
+
+### ⚠️ ET DEUX AUTRES ATTRAPÉS À L'ÉCRAN, QUE LE BANC NE POUVAIT PAS VOIR
+
+3. **LE BOARD DEMANDAIT LA 40ᵉ PLACE D'UNE POULE DE DOUZE.** `objectifDuBoard`
+   classait la DIVISION (Régionale 3 : 62 clubs) alors qu'on y joue dans une
+   **poule** (`pouleDe`, 12 clubs) — la même que lisent `championnatEnDirect` et
+   `rangFinal`. L'objectif était donc tenu d'avance et impossible à manquer.
+   Mesuré après correction : **10ᵉ**, et une première saison finit 7ᵉ.
+4. **UNE CARRIÈRE D'ENTRAÎNEUR DISPARAISSAIT AU RECHARGEMENT.** `manager`
+   n'était pas dans `partialize` : un F5, et le banc, le prestige, le palmarès et
+   tout l'historique repartaient à zéro sans un mot. `reconversionManager`, lui,
+   n'est **pas** persisté — c'est un ordre donné à l'écran de création, pas un
+   état de la partie (même règle que `attenteEvenement`).
+
+### Le board juge sur l'ÉCART à son objectif, jamais sur le rang nu
+
+`objectifDuBoard` = le rang que l'effectif mérite dans sa poule, **plus une place
+de mou**. Finir huitième avec le budget du dernier est un exploit ; finir
+troisième avec celui du premier est un échec. Sans cet écart, la seule stratégie
+serait de prendre le meilleur club accessible et de ne plus bouger.
+
+`verdictDeSaison` en tire le prestige ET la confiance du board — la seconde
+réagissant **plus fort et plus vite** : un board se lasse en une saison, une
+réputation se construit en dix. Sous `CONFIANCE_LICENCIEMENT = 18`, on est
+remercié. Mesuré sur 15 saisons simulées :
+
+| carrière | prestige final | force du club | licenciements |
+|---|---|---|---|
+| réussie (3 places devant l'objectif) | **64,3** | 35,5 → **69,1** (niveau 0) | 0 |
+| moyenne (objectif tenu tout juste) | 16,5 | — | 0 |
+| ratée (3 places derrière) | **0,0** | — | **5** |
+
+### « Avec notre statut » : la reconversion
+
+`RECONVERSIONS[0]` (« 📋 Entraîneur ») existait déjà à la retraite et ne menait
+nulle part. `prendreRetraite('entraineur')` garde désormais la légende sous la
+main (`reconversionManager`) et emmène à l'écran de création, qui en tire le
+prestige de départ.
+
+⚠️ **UN GRAND JOUEUR N'EST PAS UN GRAND ENTRAÎNEUR**, et le réglage le dit :
+`PRESTIGE_ANCIEN_JOUEUR_MAX = 48`. Mesuré — carrière modeste **12** (Régionale 1),
+solide **30** (Fédérale 2), légendaire **48** (Nationale 2). De quoi être accueilli
+en Nationale, **jamais en Top 14**. Sans ce plafond, finir une belle carrière de
+joueur donnerait le Stade Toulousain le lendemain, et le mode n'aurait plus de
+courbe.
+
+⚠️ **LA LÉGENDE PART QUAND MÊME AU HALL ET AU CLASSEMENT.** La reconversion n'est
+pas une porte de sortie de la carrière de joueur : c'est une suite. Les deux
+existent, et `joueur` passe à `null` comme à n'importe quelle retraite — les deux
+champs pleins en même temps signifieraient deux carrières simultanées.
+
+### ⚠️ LE MODE LIBRE N'ENTRE DANS AUCUN CLASSEMENT, ET LE VERROU EST DANS LE STORE
+
+Demande : « un mode cheat où on peut partir avec n'importe quel club mais donc
+pas dans le classement mondial ». `quitterBanc` n'appelle `publierAuClassement`
+que si `!m.libre` — vérifié au banc : **0 envoi**.
+
+⚠️ **LE VERROU N'EST PAS DANS `ficheDepuisManager`**, et c'est délibéré : une
+fonction pure qui refuserait de produire une fiche selon un drapeau se
+contournerait en retirant le drapeau. Le vrai verrou est de ne jamais envoyer.
+
+⚠️ **ET LE CHOIX SE FAIT À LA CRÉATION, UNE FOIS.** `signerBanc` refuse un club
+au-dessus de `noteMaximale + MARGE_AMBITION` : passer en mode libre en cours de
+route reviendrait à jouer classé jusqu'au moment où l'on décide de ne plus l'être.
+
+### Le classement à catégories
+
+Quatre onglets sur l'écran 🏆 : **Total** · Joueurs · Entraîneurs · Joueur +
+entraîneur.
+
+⚠️ **« TOTAL » COMPARE VRAIMENT LES TROIS FAMILLES.** `scoreJoueur` et
+`scoreManager` ont été calibrés l'un sur l'autre exprès — une grande carrière
+vaut ~3 990 d'un côté, ~3 444 de l'autre. Sans cette calibration, le classement
+total ne serait qu'un des deux, déguisé. Un « joueur + entraîneur » additionne
+les deux versants (mesuré : 4 977 contre 2 343 pour un entraîneur pur).
+
+⚠️ **LE FILTRE EST FAIT PAR LA BASE, ET IL LE FAUT.** Le classement est paginé
+(50 lignes) : filtrer côté navigateur ne filtrerait que la page affichée, et
+l'onglet « Entraîneurs » montrerait deux lignes sur cent en laissant croire qu'il
+n'y a que deux entraîneurs au monde.
+
+⚠️ **ET IL N'Y A AUCUNE COLONNE `categorie` À AJOUTER.** La catégorie se DÉDUIT de
+deux colonnes qui existent depuis la v2 du schéma : `poste = 'entraineur'`
+(`ficheDepuisManager`) et `matchs > 0` pour celui qui a d'abord joué. **Zéro
+migration SQL**, donc zéro risque de rejouer « column "nom" does not exist », qui
+avait rendu 500 à tout le monde en production. Une base restée en v1 n'a pas de
+colonne `poste` : le serveur retombe alors sur la lecture non filtrée **et le
+dit** (`filtreIgnore`), plutôt que de servir le classement total en le présentant
+comme celui des entraîneurs.
+
+⚠️ **CÔTÉ SERVEUR, LA CATÉGORIE RESTE DÉDUITE DE LA FICHE, PAS CRUE.**
+`verifierFiche` la tire de la PRÉSENCE du versant `manager` et refuse une fiche
+qui annonce autre chose. La déduction sur `poste` n'est qu'un affichage : un
+client qui mentirait changerait sa colonne à l'écran, pas son score ni son rang.
+
+### Ce que le crible du classement a dû apprendre
+
+⚠️ **`ageDebut` NE VEUT PAS DIRE LA MÊME CHOSE SUR UN BANC.** Pour un joueur — et
+pour un ancien joueur devenu entraîneur — c'est l'âge de ses débuts SUR LE
+TERRAIN, donc 15 à 30. Pour quelqu'un qui n'a jamais joué, c'est l'âge de son
+premier banc : `ficheDepuisManager` le déduit de l'âge et du nombre de saisons,
+il vaut donc 35, 40, 45. **Sans `ageDebutManagerMin/Max` (20-60), aucune carrière
+d'entraîneur pur n'entrait au classement, jamais, et rien à l'écran ne l'aurait
+dit** — exactement le bug déjà payé une fois côté joueur (21 refus sur 21).
+
+`SCORE_MAX` passe de **82 500 à 116 995** (le mode manager ajoute un second
+barème, et une carrière « joueur + entraîneur » cumule les deux versants).
+⚠️ **À répercuter dans les DEUX fichiers SQL** — c'est la quatrième fois qu'il
+bouge, et les deux premières ont fait refuser par la base des scores que le jeu
+produisait.
+
+### Ce qui reste à faire
+
+- **Couche 2** : la semaine du manager — composer le XV et le banc, l'entraînement
+  du groupe, et coacher le match dans le moteur 2D existant.
+- **Couche 3** : le marché des transferts, le budget, les contrats des joueurs.
+- Les deux écrans du mode manager sont **en français uniquement**, comme `Profil`,
+  `Effectif` et `Carrière` : le socle i18n est en place, il reste à brancher `t()`.
+
+```bash
+npx vite-node scripts/verifManager.ts     # accès gradué, 15 saisons, reconversion, mode libre, la boucle par le store
+npx vite-node scripts/verifClassement.ts  # le plafond suit les deux barèmes
+npx vite-node scripts/verifHonneurs.ts    # les deux distinctions fantômes sont sous test
+npx vite-node scripts/verifTitres.ts      # aucun titre fantôme, aucun titre oublié
+```

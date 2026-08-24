@@ -103,6 +103,27 @@ function cleLigne(l: LigneMondiale, rang: number): string {
   return l.id != null ? `#${l.id}` : `p${rang}:${l.pseudo}`;
 }
 
+/**
+ * Ce qu’a été cette carrière, déduit des colonnes existantes.
+ *
+ * ⚠️ ON NE STOCKE PAS DE COLONNE `categorie`, ET C’EST DÉLIBÉRÉ. Une fiche
+ * d’entraîneur porte `poste = 'entraineur'` (`ficheDepuisManager`), et
+ * `matchs > 0` distingue celui qui a d’abord joué. Les deux colonnes existent
+ * depuis la v2 du schéma : la catégorie s’en déduit sans une seule migration
+ * SQL — donc sans risquer de rejouer « column "nom" does not exist », qui
+ * avait rendu 500 à tout le monde en production.
+ *
+ * ⚠️ C’EST UNE DÉDUCTION D’AFFICHAGE, PAS UN VERROU. Le crible du serveur,
+ * lui, déduit la catégorie de la PRÉSENCE du versant entraîneur dans la fiche
+ * envoyée (`verifierFiche`), et c’est cette déduction-là qui décide du score.
+ * Un client qui mentirait sur `poste` changerait sa colonne à l’écran, pas son
+ * score ni son rang.
+ */
+function categorieDeLaLigne(l: LigneMondiale): 'joueur' | 'entraineur' | 'joueurEntraineur' {
+  if (l.poste !== 'entraineur') return 'joueur';
+  return (l.matchs ?? 0) > 0 ? 'joueurEntraineur' : 'entraineur';
+}
+
 function depuisLigneMondiale(l: LigneMondiale): FicheAffichable {
   const complete = ficheDisponible(l);
   return {
@@ -269,6 +290,15 @@ export function Classement() {
    * au-delà du top 100 existait en base sans exister à l'écran.
    */
   const [page, setPage] = useState(1);
+  /**
+   * L’onglet de catégorie affiché.
+   *
+   * ⚠️ LE FILTRE EST FAIT PAR LE SERVEUR, pas ici. Le classement est paginé :
+   * filtrer les cinquante lignes de la page donnerait « 2 entraîneurs dans le
+   * monde » parce que les autres sont page 3. C’est pour ça que la catégorie
+   * part dans la requête et que changer d’onglet revient page 1.
+   */
+  const [categorie, setCategorie] = useState<'total' | 'joueur' | 'entraineur' | 'joueurEntraineur'>('total');
   /** Le pseudo en cours de saisie, ou `null` quand on ne l'édite pas. */
   const [pseudoEnCours, setPseudoEnCours] = useState<string | null>(null);
 
@@ -279,9 +309,9 @@ export function Classement() {
     let vivant = true;
     // ⚠️ ON ENVOIE SON IDENTIFIANT DE LIGNE, PAS SA CLÉ. Le serveur s'en sert
     // pour renvoyer MON rang mondial, calculé sur le même tri que la page.
-    lireClassementMondial(page, monRangId).then((r) => { if (vivant) setMondial(r); });
+    lireClassementMondial(page, monRangId, categorie).then((r) => { if (vivant) setMondial(r); });
     return () => { vivant = false; };
-  }, [page, monRangId]);
+  }, [page, monRangId, categorie]);
 
   // Le verdict que le serveur rendrait sur la carrière en cours : il sert à
   // afficher l'état de l'envoi automatique, et à dire pourquoi si ça coince.
@@ -356,6 +386,41 @@ export function Classement() {
         <h2 style={{ marginTop: 0 }}>🌍 {t('clst.mondialTitre')}</h2>
         <p className="aide">{t('clst.mondialIntro')}</p>
 
+        {/* ═══ LES QUATRE CLASSEMENTS ══════════════════════════════════
+            Demande explicite : « faire plusieurs classements de catégories
+            et faire un classement total comprenant les carrières sans
+            entraîneur, juste entraîneur, et avec entraîneur/joueur ».
+
+            ⚠️ « TOTAL » RESTE L’ONGLET PAR DÉFAUT, et il compare vraiment
+            les trois familles : `scoreJoueur` et `scoreManager` ont été
+            calibrés l’un sur l’autre exprès (une grande carrière vaut ~3 990
+            d’un côté, ~3 444 de l’autre). Sans cette calibration, le
+            classement total ne serait qu’un des deux, déguisé. */}
+        <div className="onglets-classement">
+          {([
+            ['total', '🌍', 'Total'],
+            ['joueur', '🏉', 'Joueurs'],
+            ['entraineur', '🧑‍🏫', 'Entraîneurs'],
+            ['joueurEntraineur', '⭐', 'Joueur + entraîneur'],
+          ] as const).map(([id, emoji, libelle]) => (
+            <button
+              key={id}
+              type="button"
+              className={`chip-comp${categorie === id ? ' actif' : ''}`}
+              onClick={() => { setCategorie(id); setPage(1); setLigneOuverte(null); }}
+            >
+              {emoji} {libelle}
+            </button>
+          ))}
+        </div>
+        {mondial?.etat === 'ok' && mondial.filtreIgnore && (
+          <p className="aide">
+            ⚠️ Le serveur n’a pas pu filtrer par catégorie (base restée au
+            schéma v1) : c’est le classement complet qui s’affiche.
+            Voir <code>serveur/MIGRATION-FICHES.md</code>.
+          </p>
+        )}
+
         {mondial === null && <p className="aide">⏳ {t('clst.chargement')}</p>}
 
         {mondial?.etat === 'hors-ligne' && (
@@ -404,16 +469,24 @@ export function Classement() {
                   {rang === 1 ? '🥇' : rang === 2 ? '🥈' : rang === 3 ? '🥉' : rang}
                 </span>
                 <span className="c-joueur">
-                  {l.poste && (
+                  {/* ⚠️ `migrerPoste('entraineur')` REND « arrière » : la
+                      table des quinze maillots ne connaît pas le banc, et sa
+                      valeur de repli est le poste 15. Un entraîneur
+                      s’affichait donc « ⚡ Arrière ». */}
+                  {l.poste === 'entraineur' ? (
+                    <span className="c-emoji">🧑‍🏫</span>
+                  ) : l.poste ? (
                     <span className="c-emoji">
                       {POSTE_PAR_ID[migrerPoste(l.poste)].categorie === 'Avant' ? '🛡️' : '⚡'}
                     </span>
-                  )}
+                  ) : null}
                   <span>
                     <b>{l.pseudo}</b>
                     {ficheDisponible(l) && (
                       <small style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        {l.poste ? `${nomPoste(migrerPoste(l.poste))} · ` : ''}
+                        {l.poste === 'entraineur'
+                          ? `${categorieDeLaLigne(l) === 'joueurEntraineur' ? 'Joueur puis entraîneur' : 'Entraîneur'} · `
+                          : l.poste ? `${nomPoste(migrerPoste(l.poste))} · ` : ''}
                         {l.nation ? <><Drapeau nation={l.nation} taille={0.72} /> {nomNationTraduit(l.nation)} · </> : null}
                         {l.saisons} {t('clst.saisons').toLowerCase()}
                       </small>

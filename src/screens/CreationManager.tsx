@@ -60,7 +60,7 @@ export function CreationManager() {
       valeur: n,
       label: nomNationTraduit(n),
       groupe: g.zone,
-      vignette: <Drapeau nation={n} taille={20} />,
+      vignette: <Drapeau nation={n} taille={1.05} />,
     }))),
     [],
   );

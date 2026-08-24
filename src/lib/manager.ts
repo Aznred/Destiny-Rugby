@@ -22,6 +22,9 @@
 
 import { COMPETITIONS, NOTE_PAR_NIVEAU, clubParNom, competitionDuClub } from '../data/clubs';
 import { forceEffectif } from './effectif';
+// La POULE réellement jouée, celle que lisent `championnatEnDirect` et
+// `rangFinal` : une grande division amateur est découpée en poules de douze.
+import { pouleDe } from './championnat';
 import type { Club, Competition, LegendeSauvegardee, Manager } from '../types';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -211,13 +214,22 @@ export function objectifDuBoard(
 ): number {
   const comp = competition ?? competitionDuClub(nomClub);
   if (!comp) return 8;
-  const forces = comp.clubs
-    .map((c) => ({ nom: c.nom, force: forceEffectif(c.nom, saison) }))
+  // ⚠️ ON CLASSE LA POULE, PAS LA DIVISION, et c'est un bug attrapé à l'écran :
+  // le board d'un club de Régionale 3 demandait la « 40ᵉ place » d'une division
+  // de 62 clubs, alors qu'on y joue dans une POULE DE DOUZE. L'objectif était
+  // donc tenu d'avance et impossible à manquer, quelle que soit la saison.
+  // `pouleDe` est exactement ce que lisent `championnatEnDirect` et `rangFinal`
+  // (`lib/championnat.ts`) : un objectif qui ne se compare pas au classement
+  // réellement joué ne veut rien dire.
+  const poule = pouleDe(comp.id, nomClub);
+  const adversaires = poule.length ? poule : comp.clubs.map((c) => c.nom);
+  const forces = adversaires
+    .map((nom) => ({ nom, force: forceEffectif(nom, saison) }))
     .sort((a, b) => b.force - a.force);
   const rang = forces.findIndex((c) => c.nom === nomClub) + 1;
-  if (rang <= 0) return Math.max(1, Math.round(comp.clubs.length / 2));
+  if (rang <= 0) return Math.max(1, Math.round(adversaires.length / 2));
   // Une place de mou, et jamais au-delà du dernier.
-  return Math.max(1, Math.min(comp.clubs.length, rang + 1));
+  return Math.max(1, Math.min(adversaires.length, rang + 1));
 }
 
 /** Le club le plus fort qu'un prestige donné met à portée. Sert à l'écran. */

@@ -607,6 +607,11 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 
 | Ce qui n'allait pas | Ce qui a changé |
 |---|---|
+| **« Meilleur joueur des 6 Nations en étant sud-africain »** | La condition était un **booléen** (« il joue la compétition de sa fenêtre de février ») et on en déduisait toujours le Tournoi. Or un Springbok y dispute le Rugby Championship. C'est désormais **l'id du tournoi réellement disputé** qui décide, et une seule compétition élit un meilleur joueur — celle qui a son modèle 3D. |
+| **« Meilleur joueur de l'année en étant en Nationale 2 »** | Même trou : « être sélectionné » suffisait à ouvrir la couronne mondiale. Or la note de saison est **relative au groupe** — trop fort pour son étage, on frôle le 10 sans effort. Il faut maintenant jouer là où le monde regarde **ET** dans un club professionnel. |
+| **« Sans nom à la création, on n'apparaît pas au classement »** | On y apparaissait, sous **« @anonyme_59 »** : le pseudo 𝕏 était calculé sur le champ VIDE, avant que le nom ne soit tiré. Et le classement mondial affichait ce handle plutôt que le nom du personnage — pour **tout le monde**, pas seulement les carrières sans nom. |
+| **« Aucune trace de la Coupe du monde »** | Elle se jouait bien, mais uniquement dans le sélecteur de compétition, une saison sur quatre, trois semaines en novembre. Une **carte permanente** dit maintenant quand elle tombe, si ta sélection est qualifiée, et déplie ses **quatre poules** — lisibles des années à l'avance, le tirage étant déterministe. |
+| Le classement des nations s'ouvrait d'office | Retour en arrière demandé : il repart **replié derrière un bouton**. Trois états — fermé, top 20 + ma nation, les 114. La ligne « ta sélection est 4ᵉ mondiale » reste, elle : c'est un fait sur la carrière, pas un annuaire. |
 | **Les transferts se choisissaient dans un panneau, sans un mot** | **Refaits de bout en bout, sur 𝕏 L'Ovale.** Un club t'écrit en message privé, tu **négocies** (salaire · prime · durée · temps de jeu garanti) et il accepte, contre-propose ou **se braque**. Son plafond reste caché ; seule sa patience se voit. Le panneau « Choix de carrière » a **disparu**. |
 | Un transfert tombait n'importe quand | Un club ne démarche qu'à **un an de contrat maximum** (sauf si tu ne joues pas — là, tu es sur le départ), les approches arrivent **en cours d'année**, et le transfert ne s'applique **qu'à l'intersaison**. |
 | L'agent se cochait dans une liste, gratuitement | **Il se mérite** : chaque agent a sa barre (le requin exige 74 de niveau). Il te **démarche** quand tu franchis son palier, tu peux le démarcher aussi — et il te **lâche après deux saisons ratées**. |
@@ -696,6 +701,66 @@ vérification — est dans [`CLAUDE.md`](CLAUDE.md), sections
 « Retours de jeu — la passe de correction », « LE RÉCIT HEBDOMADAIRE » et
 « L'ARMOIRE À TROPHÉES ».
 
+
+## 🧑‍🏫 Le mode manager (couche 1)
+
+On peut désormais mener une **carrière d’entraîneur**, à côté de la carrière de
+joueur. Elle se lance depuis l’accueil (« 🧑‍🏫 Devenir entraîneur ») ou à la
+retraite, en choisissant la reconversion « Entraîneur ».
+
+### On commence en Régionale, et on se fait un nom
+
+Une seule jauge ouvre les portes : le **prestige** (0-100). Il ne sert qu’à une
+chose — décider quels clubs acceptent de te confier leur banc.
+
+| Prestige | Clubs à portée | Étage le plus haut |
+|---|---|---|
+| 6 (départ) | 37 | Régionale 2 |
+| 40 | 631 | Fédérale 1 |
+| 60 | 790 | Nationale |
+| 100 | 855 (tout) | Premiership |
+
+À chaque fin de saison, le board juge — **sur l’écart à son objectif, jamais sur
+le rang nu**. Finir huitième avec le budget du dernier est un exploit ; finir
+troisième avec celui du premier est un échec. Le prestige et la confiance du
+board bougent en conséquence, et sous 18 de confiance on est remercié.
+
+Mesuré sur quinze saisons : une carrière réussie part d’un effectif noté 35 et
+finit à **69**, sans jamais être licenciée ; une carrière ratée retombe à 0 de
+prestige et se fait remercier **cinq fois**.
+
+⚠️ **La carrière d’entraîneur est MONDIALE**, contrairement à celle de joueur :
+les 855 clubs des 33 compétitions sont dans la balance. Un entraîneur va où on
+l’appelle.
+
+### Trois façons de commencer
+
+| | Prestige de départ | Au classement mondial ? |
+|---|---|---|
+| **Carrière** | 6 — la Régionale, rien de plus | ✅ catégorie « entraîneur » |
+| **Reconversion** (fin de carrière joueur) | 12 à **48** selon ce qu’a été la carrière | ✅ catégorie « joueur + entraîneur » |
+| **Mode libre** | n’importe quel club, tout de suite | ❌ **jamais**, c’est le marché |
+
+⚠️ **Un grand joueur n’est pas un grand entraîneur.** Le meilleur palmarès du
+jeu plafonne à 48 de prestige : de quoi être accueilli en Nationale, jamais en
+Top 14. Sans ce plafond, finir une belle carrière donnerait le Stade Toulousain
+le lendemain, et il n’y aurait plus rien à jouer.
+
+### Le classement mondial a maintenant quatre onglets
+
+**Total** · Joueurs · Entraîneurs · Joueur + entraîneur. Le total compare
+vraiment les trois familles : les deux barèmes ont été calibrés l’un sur
+l’autre (une grande carrière vaut ~3 990 d’un côté, ~3 444 de l’autre).
+
+### Ce qui arrive ensuite
+
+Ce tour pose la **charpente d’accès**, et seulement elle. Composer le XV et le
+banc, l’entraînement du groupe et le match coaché dans le moteur 2D viennent en
+couche 2 ; le marché des transferts en couche 3.
+
+```bash
+npx vite-node scripts/verifManager.ts   # accès gradué, 15 saisons, reconversion, mode libre
+```
 
 ## 🗺️ Idées d'évolution
 

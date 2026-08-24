@@ -3054,7 +3054,11 @@ export const useGame = create<GameState>()(
         const force = forceEffectif(club, 1);
         const objectif = objectifDuBoard(club, comp, 1);
         const manager: Manager = {
-          nom: nom.trim() || (depuis?.nom ?? 'Entraîneur'),
+          // ⚠️ MÊME RÈGLE QUE POUR UN JOUEUR, et pour la même raison : l’écran
+          // de création PROMET « laissé vide, un nom de ta nation est tiré ».
+          // Retomber sur la chaîne « Entraîneur » aurait été un troisième
+          // « Anonyme » — une promesse d’interface non tenue par le store.
+          nom: nom.trim() || depuis?.nom || nomAleatoirePourNation(nation),
           nation,
           age: age ?? (depuis ? depuis.age : 34),
           club,
@@ -4731,6 +4735,13 @@ export const useGame = create<GameState>()(
       },
       partialize: (s) => ({
         joueur: s.joueur,
+        // ⚠️ SANS CETTE LIGNE, UNE CARRIÈRE D’ENTRAÎNEUR DISPARAÎT AU
+        //    RECHARGEMENT. Attrapé en jouant : un rechargement de page, et le
+        //    banc, le prestige, le palmarès et tout l’historique repartaient à
+        //    zéro sans un mot. `reconversionManager`, lui, ne se persiste PAS :
+        //    c’est un ordre donné à l’écran de création, pas un état de la
+        //    partie (même règle que `attenteEvenement`).
+        manager: s.manager,
         journal: s.journal.slice(-160),
         coins: s.coins,
         inventaire: s.inventaire,

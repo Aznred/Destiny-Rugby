@@ -31,7 +31,9 @@ import {
   SCORE_MAX, categorieDeLaFiche, ficheDepuisManager, scoreDeLaFiche, verifierFiche,
 } from '../src/lib/classementMondial';
 import { competitionDuClub } from '../src/data/clubs';
+import { useGame } from '../src/store/useGame';
 import { forceEffectif } from '../src/lib/effectif';
+import { SEMAINES_PAR_SAISON } from '../src/data/calendrier';
 import type { LegendeSauvegardee, Manager } from '../src/types';
 
 let echecs = 0;
@@ -334,6 +336,85 @@ console.log('\n=== 5. LE CLASSEMENT À CATÉGORIES ===');
     const v = verdict(fiche);
     ligne(nom, v.ok ? 'ACCEPTÉE' : v.motif, !v.ok);
   }
+}
+
+console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
+{
+  // ⚠️ CE QUE LES CINQ SECTIONS PRÉCÉDENTES NE PEUVENT PAS PROUVER : que les
+  // règles pures sont RÉELLEMENT BRANCHÉES. `lib/manager.ts` peut être
+  // parfait et le store ne jamais l’appeler — c’est exactement ce qui est
+  // arrivé à `formeParSemaine`, cumulé par `effetsTraits()` et lu par
+  // personne pendant des mois. On joue donc la boucle par le store.
+  const s0 = useGame.getState();
+
+  // 6a. Une création à froid.
+  s0.creerManager({ nom: '', nation: 'France', club: 'Marseillais', age: 34 });
+  const m1 = useGame.getState().manager;
+  ligne('creerManager pose bien une carrière', m1 ? `${m1.nom} · ${m1.club}` : 'aucune', !!m1);
+  ligne('un nom vide est TIRÉ, pas remplacé par « Entraîneur »',
+    m1?.nom ?? '—', !!m1 && m1.nom !== 'Entraîneur' && m1.nom.includes(' '));
+  ligne('le joueur laisse la place', String(useGame.getState().joueur), useGame.getState().joueur === null);
+  ligne('l’objectif tient dans la poule réellement jouée',
+    `${m1?.objectif}ᵉ`, !!m1 && m1.objectif >= 1 && m1.objectif <= 12);
+
+  // 6b. Une saison entière, semaine par semaine.
+  for (let i = 0; i < SEMAINES_PAR_SAISON + 1; i++) useGame.getState().semaineManager();
+  const m2 = useGame.getState().manager!;
+  info('après une saison', `saison ${m2.saison} · prestige ${m2.prestige} · confiance ${m2.confiance}`);
+  ligne('la saison se clôt toute seule', `saison ${m2.saison}`, m2.saison === 2);
+  ligne('elle laisse une ligne d’historique', `${m2.historique.length}`, m2.historique.length === 1);
+  ligne('le rang vient du championnat, pas d’une estimation',
+    `${m2.historique[0].rang}ᵉ dans une poule de 12`,
+    m2.historique[0].rang >= 1 && m2.historique[0].rang <= 12);
+  ligne('le salaire est versé', `${m2.argent} €`, m2.argent > 0);
+
+  // 6c. La reconversion : la vraie demande, « avec notre statut ».
+  useGame.setState({ manager: null, joueur: null });
+  useGame.getState().creerJoueur({
+    nom: 'Grand Joueur', poste: 'demi_ouverture', nation: 'France',
+    club: 'Stade Toulousain', division: 'top14', age: 22, traits: [],
+  } as never);
+  useGame.setState((st) => ({
+    joueur: st.joueur && {
+      ...st.joueur, saison: 15, age: 36, reputation: 90,
+      titres: ['Bouclier de Brennus (S9)'],
+      palmares: [{ trophee: 'top14', nom: 'Bouclier de Brennus', saison: 9, club: 'Stade Toulousain' }],
+    },
+  }));
+  useGame.getState().prendreRetraite('entraineur');
+  const apres = useGame.getState();
+  ligne('la retraite « entraîneur » garde la légende sous la main',
+    apres.reconversionManager?.nom ?? 'aucune', !!apres.reconversionManager);
+  ligne('… et emmène à l’écran de création', apres.ecran, apres.ecran === 'creationManager');
+  ligne('… tout en laissant la carrière au Hall', `${apres.pantheon.length} légende(s)`, apres.pantheon.length > 0);
+
+  const depuis = apres.reconversionManager!;
+  const prestigeRecon = prestigeDepuisJoueur(depuis);
+  apres.creerManager({
+    nom: '', nation: 'France', club: meilleurClubAccessible(prestigeRecon, 1)!.club.nom,
+    depuis,
+  });
+  const m3 = useGame.getState().manager!;
+  ligne('la reconversion démarre AU-DESSUS d’un inconnu',
+    `${m3.prestige} vs ${PRESTIGE_DEBUT}`, m3.prestige > PRESTIGE_DEBUT);
+  ligne('elle garde le passé de joueur', m3.passeJoueur?.nom ?? 'perdu', !!m3.passeJoueur);
+  ligne('la légende consommée ne traîne pas',
+    String(useGame.getState().reconversionManager), useGame.getState().reconversionManager === null);
+
+  // 6d. Le mode libre ne publie rien. C’est LE verrou de la demande.
+  useGame.setState({ manager: null });
+  s0.creerManager({
+    nom: 'Tricheur', nation: 'France', club: 'Stade Toulousain', libre: true,
+  });
+  const libre = useGame.getState().manager!;
+  ligne('le mode libre ouvre le plus gros club du jeu', libre.club, libre.club === 'Stade Toulousain');
+  let publie = 0;
+  const vraiePublication = useGame.getState().publierAuClassement;
+  useGame.setState({ publierAuClassement: (() => { publie++; }) as never });
+  useGame.getState().quitterBanc();
+  useGame.setState({ publierAuClassement: vraiePublication });
+  ligne('⚠️ et il n’envoie RIEN au classement mondial',
+    `${publie} envoi(s)`, publie === 0);
 }
 
 console.log(`\n${echecs === 0 ? '✅ TOUT PASSE' : `❌ ${echecs} ÉCHEC(S)`}`);
