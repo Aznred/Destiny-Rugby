@@ -36,14 +36,23 @@ export const LANGUE_DEFAUT: Langue = 'fr';
 // production, le pays associé à l'adresse IP passe d'abord par `/api/langue` :
 // un navigateur configuré en anglais n'impose donc plus l'anglais à quelqu'un
 // qui arrive depuis un pays francophone.
-export function langueDuNavigateur(): Langue {
-  if (typeof navigator === 'undefined') return LANGUE_DEFAUT;
+/**
+ * ⚠️ LE REPLI SE PASSE EN PARAMÈTRE, IL N'EST PAS LU ICI. Sur notre site il
+ * vaut le français ; sur un portail de jeux il DOIT valoir l'anglais (« if not
+ * available/set fallback to English »). On serait tenté d'importer `lib/cible`
+ * pour trancher — c'est justement ce qu'il ne faut pas faire : ce module est
+ * aussi importé par `api/langue.ts`, une fonction serverless où
+ * `import.meta.env` n'existe pas et ferait échouer l'import entier. Le module
+ * reste donc lisible des DEUX côtés, et c'est l'appelant qui sait où il est.
+ */
+export function langueDuNavigateur(repli: Langue = LANGUE_DEFAUT): Langue {
+  if (typeof navigator === 'undefined') return repli;
   for (const brut of navigator.languages ?? [navigator.language]) {
     const court = String(brut).slice(0, 2).toLowerCase();
     const connue = LANGUES.find((l) => l.id === court);
     if (connue) return connue.id;
   }
-  return LANGUE_DEFAUT;
+  return repli;
 }
 
 /** Pays dont la langue du jeu ne prête pas à ambiguïté. */

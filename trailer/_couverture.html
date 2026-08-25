@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@600;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ⚠️ CETTE PAGE N'EST PAS LE JEU. C'est un gabarit d'AFFICHE, rendu dans le
+     navigateur pour être photographié aux trois formats du portail. On reprend
+     la palette et les polices du jeu — sinon la couverture ne ressemblerait pas
+     à ce qu'on clique — mais la mise en page est celle d'une jaquette : un
+     titre qui se lit en vignette, un personnage, rien d'autre.
+
+     Une capture d'écran de l'interface ne fait PAS une couverture : mesuré, le
+     format carré tombait au milieu de la page, titre coupé, barres de
+     navigation en travers. Un portail affiche cette image en 200 px de large
+     dans une grille : il faut que le titre y soit encore lisible. */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #f5f7f2;
+    background:
+      radial-gradient(120% 90% at 50% -10%, rgba(52,163,90,.30), transparent 62%),
+      radial-gradient(90% 70% at 92% 108%, rgba(232,178,58,.13), transparent 58%),
+      linear-gradient(180deg, #08160f, #050d09 92%);
+    position: relative;
+  }
+  /* Le grain du jeu : c'est lui qui empêche l'aplat sombre de faire « dégradé
+     CSS » et qui casse les bandes de compression. */
+  body::after {
+    content: ''; position: absolute; inset: 0; opacity: .05; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+  }
+  /* Les lignes de terrain, très discrètes. */
+  body::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background-image: repeating-linear-gradient(90deg, transparent 0 119px, rgba(245,247,242,.02) 119px 120px);
+  }
+
+  .scene { position: absolute; inset: 0; display: grid; }
+  .joueur {
+    position: absolute; bottom: 0; object-fit: contain; object-position: bottom center;
+    /* ⚠️ `screen` fond le rectangle sombre de la capture dans le fond de
+       l'affiche : le personnage a été photographié sur le vert du jeu, pas sur
+       de la transparence, et un simple collage laisserait un bloc visible. */
+    mix-blend-mode: screen;
+    filter: contrast(1.05) saturate(1.08);
+    /* ⚠️ ET `screen` NE SUFFIT PAS SEUL — vu à l'écran : le vert de la capture
+       reste plus clair que le fond de l'affiche, si bien qu'un RECTANGLE net
+       apparaissait autour du joueur, du milieu de l'image jusqu'au bord droit.
+       Le masque efface les bords de la source en douceur : il ne reste que le
+       personnage, au centre, là où le masque est opaque. Les pourcentages sont
+       larges (le joueur n'occupe que le tiers central de sa capture). */
+    -webkit-mask-image:
+      radial-gradient(72% 62% at 50% 46%, #000 58%, transparent 100%);
+    mask-image:
+      radial-gradient(72% 62% at 50% 46%, #000 58%, transparent 100%);
+  }
+  .texte { position: relative; z-index: 3; display: flex; flex-direction: column; }
+  .eyebrow {
+    font-family: 'Archivo', sans-serif; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .24em; color: #f4cd63;
+  }
+  h1 {
+    font-family: 'Anton', sans-serif; text-transform: uppercase; line-height: .92;
+    letter-spacing: -.005em; text-wrap: balance;
+  }
+  h1 .or {
+    color: #f4cd63;
+    text-shadow: 0 0 44px rgba(232,178,58,.34);
+  }
+  .accroche { color: #c7d1c6; }
+
+  /* ── PAYSAGE 1920x1080 ─────────────────────────────────────────────── */
+  body.paysage .texte { justify-content: center; padding-left: 96px; max-width: 60%; gap: 22px; }
+  body.paysage .eyebrow { font-size: 26px; }
+  body.paysage h1 { font-size: 132px; }
+  body.paysage .accroche { font-size: 30px; line-height: 1.42; max-width: 22ch; }
+  body.paysage .joueur { right: 60px; height: 96%; }
+
+  /* ── PORTRAIT 800x1200 ─────────────────────────────────────────────── */
+  body.portrait .texte { justify-content: flex-start; padding: 74px 56px 0; gap: 16px; }
+  body.portrait .eyebrow { font-size: 20px; }
+  body.portrait h1 { font-size: 92px; }
+  body.portrait .accroche { font-size: 23px; line-height: 1.4; max-width: 20ch; }
+  body.portrait .joueur { left: 50%; transform: translateX(-50%); height: 72%; bottom: -3%; }
+
+  /* ── CARRÉ 800x800 ─────────────────────────────────────────────────── */
+  body.carre .texte { justify-content: flex-start; padding: 56px 48px 0; gap: 12px; }
+  body.carre .eyebrow { font-size: 18px; }
+  body.carre h1 { font-size: 78px; }
+  body.carre .accroche { display: none; } /* à 200 px de large, elle ne se lit plus */
+  body.carre .joueur { left: 50%; transform: translateX(-50%); height: 76%; bottom: -5%; }
+</style>
+</head>
+<body>
+  <div class="scene">
+    <img class="joueur" src="joueur.png" alt="">
+    <div class="texte">
+      <div class="eyebrow">Rugby career RPG</div>
+      <h1>Become a <span class="or">legend</span> of rugby</h1>
+      <p class="accroche">One player. Fifteen seasons. Every choice is yours.</p>
+    </div>
+  </div>
+  <script>
+    document.body.className = new URLSearchParams(location.search).get('f') || 'paysage';
+  </script>
+</body>
+</html>

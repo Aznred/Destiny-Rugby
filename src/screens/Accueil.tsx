@@ -1,3 +1,4 @@
+import { LIENS_SORTANTS_AUTORISES } from '../lib/cible';
 import { lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
@@ -141,6 +142,12 @@ export function Accueil() {
           indispensable — un `onClick` ne crée aucun lien pour un moteur de
           recherche, et c'est précisément l'absence de pages indexables qui a
           fait bloquer le compte AdSense. */}
+      {/* ⚠️ RIEN DE TOUT ÇA SUR LE PORTAIL. « The game should not include
+          cross-promotions for external or internal games/platforms » : dans une
+          iframe, un clic ici REMPLACERAIT le jeu par un article, et l'équipe de
+          QA refuse. Ces pages gardent tout leur sens sur destiny-rugby.fr, où
+          elles portent le référencement — les deux cibles cohabitent. */}
+      {LIENS_SORTANTS_AUTORISES && (
       <section className="section lecture">
         <h2>{t('accueil.lecture')}</h2>
         <p className="lecture-chapo">{t('accueil.lectureChapo')}</p>
@@ -163,6 +170,7 @@ export function Accueil() {
           ))}
         </div>
       </section>
+      )}
     </>
   );
 }

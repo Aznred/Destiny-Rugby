@@ -50,6 +50,7 @@ import {
 // petite fonction `estTitulaire` — qui n'a aucune dépendance — reste statique.
 import { estTitulaire } from '../lib/moteur/titulaire';
 import { definirLangue, langueDuNavigateur, nombre, t, type Langue } from '../lib/i18n';
+import { LANGUE_DE_REPLI } from '../lib/cible';
 import type { LigneReelle } from '../lib/moteur/saison';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import { LIMITES, ficheDepuisJoueur, scoreDeLaFiche } from '../lib/classementMondial';
@@ -432,7 +433,6 @@ export function appliquerTheme(theme: Theme): void {
 export const AGE_RETRAITE_LIBRE = 33;
 export const AGE_RETRAITE_FORCEE = 44;
 
-// ---------------------------------------------------------------------------
 export function motifFinDepuisConsequence(type?: ConsequenceDure): MotifFinCarriere {
   if (type === 'deces') return 'deces';
   if (type === 'banRugby') return 'radiation';
@@ -449,6 +449,7 @@ function motifFinParDefaut(joueur: Joueur): MotifFinCarriere {
   return 'retraiteChoisie';
 }
 
+// ---------------------------------------------------------------------------
 // LA RÉCUPÉRATION HEBDOMADAIRE
 // ---------------------------------------------------------------------------
 // ⚠️ ELLE N'EXISTAIT PAS, ET C'ÉTAIT LE BUG signalé en jeu : « impossible de
@@ -785,9 +786,9 @@ interface GameState {
   /** Compteur des pubs récompensées (quota journalier et délai d'attente). */
   pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
-  scenarioActif: Scenario | null;
   /** Épilogue à lire avant l'entrée effective dans le Hall des légendes. */
   finCarriere: FinCarriere | null;
+  scenarioActif: Scenario | null;
   // ═══ LE RÉCIT DE LA SEMAINE ═════════════════════════════════════════════
   // ⚠️ Demande explicite : « au lieu d'avoir des boutons chaque semaine, l'IA
   // sort un évènement ; le joueur répond en écrivant et l'IA juge ». D'où deux
@@ -1149,8 +1150,8 @@ export const useGame = create<GameState>()(
       dernierScoreEnvoye: 0,
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
-      scenarioActif: null,
       finCarriere: null,
+      scenarioActif: null,
       attenteEvenement: false,
       avanceRapide: false,
       evenementHebdo: null,
@@ -1162,7 +1163,7 @@ export const useGame = create<GameState>()(
       approches: [],
       dossiersRecrutement: {},
       theme: 'vert',
-      langue: langueDuNavigateur(),
+      langue: langueDuNavigateur(LANGUE_DE_REPLI),
       langueManuelle: false,
       mouvementsClubs: {},
       posts: [],
@@ -1309,8 +1310,8 @@ export const useGame = create<GameState>()(
         setTransfertsSociaux([]);
         set({
           joueur,
-          ecran: 'carriere',
           finCarriere: null,
+          ecran: 'carriere',
           // ⚠️ Le guide lit `ecransVus` : un écran atteint sans passer par
           // `setEcran` doit s'y inscrire quand même, sinon son étape reste
           // décochée alors qu'on est justement dessus.
@@ -3353,9 +3354,9 @@ export const useGame = create<GameState>()(
           score: scoreCarriere(joueur),
           reconversion,
         };
-        // ═══ LE CLASSEMENT MONDIAL SE REMPLIT ICI ════════════════════════════
         const versManager = reconversion === 'entraineur' && chantierVisible('manager');
         const raison = motif ?? motifFinParDefaut(joueur);
+        // ═══ LE CLASSEMENT MONDIAL SE REMPLIT ICI ════════════════════════════
         // ⚠️ BUG SIGNALÉ EN JEU : « le classement fonctionne pas, la table se
         // remplit pas ». La fonction serveur, la base et le barème étaient bons
         // — mais RIEN N'ENVOYAIT JAMAIS. L'envoi était entièrement manuel, et
@@ -3997,8 +3998,8 @@ export const useGame = create<GameState>()(
         setContexteJoueur('', 0);
         set({
           joueur: null,
-          journal: [],
           finCarriere: null,
+          journal: [],
           scenarioActif: null,
           attenteEvenement: false,
           evenementHebdo: null,
@@ -5546,7 +5547,7 @@ export const useGame = create<GameState>()(
         // conservée. Reste un cas non couvert, assumé : celui qui a choisi
         // exprès la langue de son navigateur verra la détection repasser une
         // fois — son prochain clic dans ⚙️ tiendra pour de bon.
-        if (s.langueManuelle && s.langue === langueDuNavigateur()) {
+        if (s.langueManuelle && s.langue === langueDuNavigateur(LANGUE_DE_REPLI)) {
           s.langueManuelle = false;
         }
         // VERSION 12 — le manager gagne son bureau hebdomadaire et ses
@@ -5604,16 +5605,16 @@ export const useGame = create<GameState>()(
         // réhydratation, sinon le site repart en vert à chaque rechargement.
         appliquerTheme(etat?.theme ?? 'vert');
         // Idem pour la langue : elle vit dans un module, pas dans React.
-        definirLangue(etat?.langue ?? langueDuNavigateur());
+        definirLangue(etat?.langue ?? langueDuNavigateur(LANGUE_DE_REPLI));
         // Les sauvegardes qui contiennent déjà un message resté sans
         // réponse sont réparées au rechargement, dans la langue de la partie.
         if (etat?.joueur) {
           etat.reparerSilencesClubs();
         }
-        // Et la clé Groq personnelle, pour la même raison (`lib/groq.ts` ne
         // Fermer l'onglet sur l'épilogue ne permet pas de le contourner : au
         // retour, on reprend l'explication avant d'ouvrir le Hall.
         if (etat?.finCarriere) etat.setEcran('finCarriere');
+        // Et la clé Groq personnelle, pour la même raison (`lib/groq.ts` ne
         // peut pas lire le store sans créer un cycle d'imports).
         definirCleGroqJoueur(etat?.groqKey ?? '');
       },
@@ -5642,8 +5643,8 @@ export const useGame = create<GameState>()(
         dernierScoreEnvoye: s.dernierScoreEnvoye,
         pubs: s.pubs,
         pantheon: s.pantheon,
-        scenarioActif: s.scenarioActif,
         finCarriere: s.finCarriere,
+        scenarioActif: s.scenarioActif,
         // La scène de la semaine est persistée : fermer l'onglet en plein
         // milieu ne doit pas escamoter la question qui attend une réponse.
         evenementHebdo: s.evenementHebdo,

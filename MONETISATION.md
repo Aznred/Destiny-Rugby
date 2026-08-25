@@ -30,7 +30,7 @@ classement, donc plus de raison de revenir.
 | Source | État | Où |
 |---|---|---|
 | **Bannière publicitaire** | code prêt, **identifiant de régie à fournir** | `lib/pub.ts`, `components/Pub.tsx` |
-| **Pub récompensée** (8 Ovas, 3/jour) | **jouable**, avec un encart maison en attendant une régie | Boutique → « Gagner des Ovas » |
+| **Pub récompensée** (4 Ovas, 2/jour) | **jouable**, avec un encart maison en attendant une régie | Boutique → « Gagner des Ovas » |
 | **Consentement RGPD** | fait (rien ne se charge avant un « oui ») | `BandeauConsentementPub` |
 | **Packs d'Ovas** (0,99 € / 4,99 € / 9,99 €) | **vitrine seulement**, paiement non branché | `data/boutique.ts` → `PACKS` |
 | **Boutique cosmétique** | 5 ballons + 16 articles de vestiaire | Boutique |
@@ -57,7 +57,7 @@ bandeau de consentement se montre tout seul au premier passage.
 AdSense ne propose pas de vidéo récompensée pour un site web classique — il
 faut **Google Ad Manager** (« rewarded ads », gratuit, mais demande un compte
 et un peu de configuration) ou une régie de jeux web (Adinplay, Playwire,
-CrazyGames si le jeu y est publié).
+CrazyGames si le jeu y est publié — voir la section 1 bis).
 
 Côté code, un seul endroit à changer : le composant `PubRecompensee`
 (`components/Pub.tsx`). Il affiche aujourd'hui un encart maison avec un compte
@@ -65,6 +65,64 @@ Côté code, un seul endroit à changer : le composant `PubRecompensee`
 `onTerminee()` uniquement si la pub a été **regardée jusqu'au bout**.
 
 ---
+
+
+## 1 bis. CrazyGames — l'option la plus sérieuse, et ce qu'elle demande
+
+Question posée : « t'en penses quoi de se mettre sur CrazyGames pour les pubs ? »
+**Réponse courte : c'est la meilleure des trois pistes envisagées jusqu'ici, et
+pour une raison qui n'est pas la publicité.**
+
+### Pourquoi c'est mieux qu'AdSense ou qu'une régie de liens
+
+| | AdSense | Monetag (retiré) | CrazyGames |
+|---|---|---|---|
+| vraie vidéo récompensée | non (il faut Ad Manager) | **non** — aucun rappel, la récompense tombait à l'aveugle | **oui**, avec rappel de fin |
+| apporte des joueurs | non | non | **oui, c'est son métier** |
+| état du compte | **bloqué** (« pages sans contenu d'éditeur ») | — | à demander |
+| consentement RGPD | à notre charge | contourné par la régie | pris en charge par le portail |
+
+⚠️ **LE VRAI SUJET N'EST PAS LE REVENU, C'EST L'AUDIENCE.** Une régie sur un site
+que personne ne visite ne rapporte rien : le taux de rebond dont on parle depuis
+trois lots est d'abord un problème de *trafic*, et un RPG de rugby en français
+n'a quasiment aucune découverte organique. Un portail apporte des joueurs — c'est
+ce qu'on ne sait pas faire tout seul.
+
+⚠️ **ET ÇA RÉPARE LE DÉFAUT QU'ON VIENT DE SUPPRIMER.** Le SDK d'un portail rend
+un rappel de fin de vidéo : la récompense en Ovas devient enfin *méritée*, au
+lieu d'être versée au bout d'un compte à rebours maison. C'est exactement le
+contrat que `PubRecompensee` attend déjà — `onTerminee()` seulement si la pub a
+été regardée jusqu'au bout. **Un seul composant à changer.**
+
+### Les trois choses à régler AVANT de postuler
+
+1. ⚠️ **LA CLÉ GROQ DU SITE NE TIENDRA PAS.** Elle est partagée par tous les
+   joueurs (choix assumé, voir CLAUDE.md) et déjà juste. Avec le trafic d'un
+   portail, le quota s'évapore en continu : le Maître du Jeu, les situations et
+   L'Ovale basculeraient sur le contenu pré-écrit **pour tout le monde, en
+   permanence**. Le jeu reste entier — c'est une règle du projet — mais
+   l'argument « l'IA juge ta carrière » ne serait plus vrai. À trancher : quota
+   payant, ou assumer que l'IA devient un bonus pour qui colle sa propre clé.
+2. **Le poids au premier chargement.** Les portails jugent là-dessus. Aujourd'hui :
+   le fournisseur Three.js pèse 263 Ko gzip, les textes 155 Ko, le store 115 Ko,
+   plus 957 logos et les `.glb`. Il faudra une passe de chargement paresseux
+   avant de présenter le jeu.
+3. **Le classement mondial est sur notre domaine.** Servi dans le cadre du
+   portail, `api/classement.ts` devra accepter l'origine du portail (CORS) —
+   sinon le classement ne remonte plus.
+
+### Ce qui ne suit pas
+
+Les quatre pages de contenu (`/guide/`, `/pyramide/`, `/moteur/`, `/journal/`)
+avaient été écrites pour débloquer AdSense : elles n'ont aucun sens dans un
+portail, qui n'affiche que le jeu. Elles restent utiles pour le référencement du
+site propre — les deux peuvent coexister, le portail n'exige pas l'exclusivité
+pour son programme de base.
+
+⚠️ **Vérifier les conditions à jour** (part reversée, exclusivité, formats
+disponibles, exigences techniques) **sur leur documentation développeur** avant
+de s'engager : elles changent, et ce fichier ne doit pas faire autorité sur des
+chiffres qu'il ne peut pas garantir.
 
 ## 2. Ce que ça peut rapporter, honnêtement
 

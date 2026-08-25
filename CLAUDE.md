@@ -3796,50 +3796,50 @@ sélections, mets le logo des sélections, pas le drapeau ».
   emblèmes des fédérations — le trèfle, la rose, le coq — pas des drapeaux
   d'États. Mesuré à l'écran : **110 écussons, 4 drapeaux, 0 initiales.**
 
-## Publicité : les deux fichiers à la racine
+## Publicité : ce qui reste à la racine
 
 | Fichier | Ce que c'est | Ce qu'il fait vraiment |
 |---|---|---|
 | `public/ads.txt` | Texte inerte | Déclare Google seul vendeur autorisé. Sans lui, AdSense ne diffuse rien. |
-| `public/sw.js` | **Service worker** | ⚠️ Fourni par une régie (Monetag, zone 11553232) sous l'intitulé « Verification ». **Ce n'est PAS un fichier de validation** : servi à `/sw.js` il a la portée RACINE du site, et son `importScripts` exécute du code distant modifiable à tout moment sans redéploiement. C'est le mécanisme des notifications push publicitaires. |
 
-### Les boutons de récompense passent par Monetag
+### ⚠️ MONETAG A ÉTÉ ENTIÈREMENT RETIRÉ
 
-`LIEN_PUB_RECOMPENSEE` (`lib/pub.ts`) = `https://omg10.com/4/11553440`. Cliquer
-« 🎬 Regarder » (Ovas) ou « 🎬 Débloquer » (cosmétique `parPub`) ouvre ce lien
-dans un **nouvel onglet**, puis le compte à rebours du jeu se déroule dans la
-modale ; au bout, la récompense tombe.
+Demande explicite : « retire tous les trucs Monetag ». Il en restait trois
+morceaux, retirés en deux temps :
 
-- ⚠️ **`ouvrirAnnonce()` est appelée DANS le gestionnaire de clic.** Un
-  `window.open` différé est bloqué par tous les navigateurs — et une pop-up qui
-  s'ouvre toute seule est exactement ce que la règle 2 de `lib/pub.ts` interdit.
-  Si le bloqueur la refuse malgré tout, la modale affiche le lien à cliquer à la
-  main plutôt qu'un décompte qui tourne devant rien.
-- ⚠️ **`noopener,noreferrer` n'est pas décoratif** : sans `noopener`, la page de
-  la régie garde une référence `window.opener` sur le jeu et peut le faire
-  naviguer ailleurs (tabnabbing).
-- ⚠️ **CE N'EST PAS UN VRAI FORMAT « REWARDED ».** Un direct link Monetag
-  n'émet **aucun rappel** confirmant que le joueur a regardé quoi que ce soit :
-  la récompense est versée au bout du compte à rebours, qu'il ait lu l'annonce
-  ou refermé l'onglet aussitôt. C'est une limite du format — un vrai rewarded
-  demande AdMob / Ad Manager et son SDK, qui remplacerait alors tout ce
-  mécanisme. Le garde-fou reste le quota : `PUBS_PAR_JOUR = 2`, 15 min d'écart.
-- Ordre d'affichage dans la modale : **1.** Monetag (l'annonce est dans l'autre
-  onglet, rien à montrer ici) · **2.** AdSense si `VITE_PUB_SLOT` est
-  renseigné · **3.** l'encart maison.
+| Morceau | Sort |
+|---|---|
+| `public/sw.js` — service worker de la régie, servi à la RACINE du domaine | supprimé (lot « pages de contenu ») |
+| `LIEN_PUB_RECOMPENSEE` = `https://omg10.com/4/11553440` | **supprimé** |
+| `ouvrirAnnonce()` — le `window.open` qui allait avec | **supprimé** |
+
+⚠️ **ET CE N'ÉTAIT PAS UNE QUESTION DE GOÛT.** Un « direct link » n'émet **aucun
+rappel** confirmant que le joueur a regardé quoi que ce soit : la récompense
+tombait au bout du compte à rebours du jeu, qu'il ait lu l'annonce ou refermé
+l'onglet aussitôt. Ce n'était donc pas une vidéo récompensée — c'était un onglet
+publicitaire payé au clic, déguisé en récompense, avec une modale qui décomptait
+devant un joueur pendant que la publicité vivait ailleurs.
+
+Le service worker posait un problème plus grave encore : servi à `/sw.js`, il
+avait la portée RACINE du site, et son `importScripts` exécutait du code distant
+**modifiable à tout moment sans redéploiement**. C'est le mécanisme des
+notifications push publicitaires — exactement ce que les règles 1 et 2 de
+`lib/pub.ts` écartent (« rien ne se charge sans consentement », « jamais
+d'interstitiel ni de pop-up »), et il y échappait puisque c'est la régie qui les
+déclenche.
+
+**Il reste deux chemins, et ils sont propres** : AdSense quand `VITE_PUB_SLOT`
+est renseigné (l'annonce s'affiche DANS la modale, là où le joueur regarde),
+l'encart maison sinon. Le garde-fou ne change pas : `PUBS_PAR_JOUR = 2`,
+15 minutes d'écart, `OVAS_PAR_PUB = 4`.
 
 ⚠️ **Le jeu n'enregistre AUCUN service worker** : rien dans `src/` n'appelle
-`navigator.serviceWorker.register()`. Déposer `sw.js` ne l'active pas — c'est le
-tag de la régie, s'il est un jour posé dans la page, qui l'enregistrera. Tant
-qu'il ne l'est pas, le site se comporte exactement comme avant, ce qui permet de
-valider le domaine sans rien changer au jeu.
+`navigator.serviceWorker.register()`, et plus aucun fichier de régie ne traîne
+dans `public/`.
 
-⚠️ **Et ça entre en tension frontale avec les règles de `lib/pub.ts`** (« rien
-ne se charge sans consentement », « jamais d'interstitiel ni de pop-up ») : une
-notification push est exactement ce que ces règles écartent, et elle échappe au
-bandeau de consentement du jeu puisque c'est la régie qui la déclenche. À
-trancher avant d'ajouter le tag Monetag dans la page.
-
+Trois clés de dictionnaire sont parties avec (`pub.ouvrirAnnonce`,
+`pub.ongletBloque`, `pub.ongletOuvert`) : elles ne décrivaient que l'onglet
+Monetag.
 
 ## 🔌 L'IA REPART SUR GPT-OSS — les modèles Llama ont disparu de Groq
 
