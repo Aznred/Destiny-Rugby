@@ -62,6 +62,16 @@ export interface Contrat {
   division: string;
   saisons: number; // saisons restantes (0 = fin de contrat)
   salaire: number; // € par saison
+  /**
+   * ⚠️ LE RUGBY AMATEUR NE PAIE PAS DE SALAIRE, IL PAIE LA FEUILLE DE MATCH.
+   * Retour de jeu : « certains clubs ne proposent pas de salaires, que des
+   * primes ». Sous la Nationale 2 — et dans les petits championnats étrangers —
+   * beaucoup de clubs engagent un joueur pour un défraiement par match et rien
+   * d'autre : `salaire` vaut alors 0 et c'est CE champ qui remplit le
+   * portefeuille, au prorata des matchs joués (voir `saisonSuivante`).
+   * Optionnel : les sauvegardes antérieures ne l'ont pas.
+   */
+  primeMatch?: number; // € par feuille de match
 }
 
 /**
@@ -76,6 +86,8 @@ export interface PreAccord {
   divisionNom: string;
   salaire: number;
   prime: number;
+  /** Défraiement par match, quand le club ne verse pas de salaire. */
+  primeMatch?: number;
   saisons: number;
   garantie: boolean;
   etranger: boolean;
@@ -100,6 +112,8 @@ export interface OffreContrat {
   etranger: boolean;
   argumentaire: string;
   negociee?: boolean; // on ne renégocie pas deux fois la même offre
+  /** Défraiement par match — les clubs amateurs ne proposent que ça (`salaire: 0`). */
+  primeMatch?: number;
 }
 
 export interface Joueur {

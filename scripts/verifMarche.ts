@@ -256,4 +256,127 @@ console.log('\n=== 7. LES GROS SALAIRES SE MÉRITENT ===');
     debordent.length === 0);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LES QUATRE REPROCHES SUIVANTS : « toujours les mêmes championnats », « que de
+// la Régionale au début », « les mêmes clubs quand on est trop fort », et
+// « certains clubs ne devraient proposer que des primes ».
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Douze intersaisons du même joueur, avec la mémoire des clubs déjà venus. */
+function douzeSaisons(base: Joueur, maximum = 4) {
+  const clubs = new Map<string, number>();
+  const divisions = new Map<string, number>();
+  const pays = new Map<string, number>();
+  let total = 0;
+  let sansSalaire = 0;
+  const historique: { saison: number; club: string }[] = [];
+  for (let s = 1; s <= 12; s++) {
+    const recents = historique.filter((h) => h.saison >= s - 2).map((h) => h.club);
+    for (const o of genererOffres({ ...base, saison: s }, { saison: s, maximum, clubsRecents: recents })) {
+      total++;
+      if (!o.salaire) sansSalaire++;
+      historique.push({ saison: s, club: o.club });
+      clubs.set(o.club, (clubs.get(o.club) ?? 0) + 1);
+      divisions.set(o.divisionNom, (divisions.get(o.divisionNom) ?? 0) + 1);
+      pays.set(o.pays, (pays.get(o.pays) ?? 0) + 1);
+    }
+  }
+  return { clubs, divisions, pays, total, sansSalaire };
+}
+
+console.log('\n=== 8. LE MARCHÉ NE SERT PLUS TOUJOURS LE MÊME CHAMPIONNAT ===');
+{
+  // ⚠️ LE TIRAGE SE FAIT CHAMPIONNAT D'ABORD, CLUB ENSUITE, et c'est ce contrôle
+  // qui le protège. Club par club, la division la plus PEUPLÉE gagnait
+  // mécaniquement : la Fédérale 3 aligne 157 clubs, la Didi 10 géorgienne en
+  // aligne 10 — à mérite égal, la Fédérale 3 sortait seize fois plus souvent.
+  const profils: [string, Joueur][] = [
+    ['débutant en Régionale 3', joueurDe(30, 8, COMPETITIONS.find((c) => c.id === 'reg3')!.clubs[0].nom, 'reg3')],
+    ['Fédérale 2 solide', joueurDe(50, 35, COMPETITIONS.find((c) => c.id === 'fed2')!.clubs[0].nom, 'fed2')],
+    ['star mondiale', joueurDe(95, 96)],
+  ];
+  for (const [libelle, j] of profils) {
+    const r = douzeSaisons(j);
+    console.log(`     ${libelle} : ${r.total} offres · ${r.clubs.size} clubs · ${r.divisions.size} championnats · ${r.pays.size} pays`);
+    ligne(`${libelle} : les championnats se renouvellent`,
+      `${r.divisions.size} championnats différents`, r.divisions.size >= 3);
+    const plusAssidu = Math.max(0, ...r.divisions.values());
+    ligne(`${libelle} : aucun championnat ne rafle tout`,
+      `le plus servi : ${plusAssidu} offres sur ${r.total}`, plusAssidu <= r.total * 0.75);
+  }
+}
+
+console.log('\n=== 9. À L’ÉTRANGER, LE MARCHÉ SUIT OÙ L’ON VIT ===');
+{
+  // ⚠️ Retour de jeu : « les mêmes championnats même si on est à l'étranger ».
+  // Mesuré avant correction : un joueur de Didi 10 (Géorgie) recevait 27 offres
+  // FRANÇAISES sur 48, dont 24 de Fédérale 1 — la Géorgie n'en envoyait que 3.
+  const geo = COMPETITIONS.find((c) => c.id === 'georgie')!;
+  const expat = joueurDe(55, 45, geo.clubs[0].nom, 'georgie');
+  const r = douzeSaisons(expat);
+  const enFrance = r.pays.get('France') ?? 0;
+  console.log(`     ${r.total} offres · ${r.pays.size} pays · ${[...r.pays.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([p, n]) => `${p}×${n}`).join(' · ')}`);
+  ligne('la France ne monopolise plus le marché d’un expatrié',
+    `${enFrance} offres françaises sur ${r.total}`, enFrance <= r.total * 0.45);
+  ligne('son championnat d’accueil se manifeste',
+    `${r.pays.get('Géorgie') ?? 0} offre(s) de Géorgie`, (r.pays.get('Géorgie') ?? 0) > 0);
+  ligne('et le monde reste ouvert',
+    `${r.pays.size} pays différents`, r.pays.size >= 6);
+}
+
+console.log('\n=== 10. ON N’A PLUS QUE DE LA RÉGIONALE AU DÉBUT ===');
+{
+  // Retour de jeu : « on n'a que de la Régionale au début, ça serait bien
+  // d'avoir un peu plus d'exotique ». Un joueur du bas de la pyramide a sept
+  // championnats français à portée contre deux ou trois étrangers : les poids
+  // seuls ne suffisaient pas, d'où le « coup de cœur » de l'agent.
+  const reg3 = COMPETITIONS.find((c) => c.id === 'reg3')!;
+  const debutant = joueurDe(32, 12, reg3.clubs[0].nom, 'reg3');
+  const r = douzeSaisons({ ...debutant, age: 20 });
+  const etranger = r.total - (r.pays.get('France') ?? 0);
+  console.log(`     ${[...r.divisions.entries()].sort((a, b) => b[1] - a[1]).map(([d, n]) => `${d}×${n}`).join(' · ')}`);
+  ligne('un débutant voit passer autre chose que la Régionale',
+    `${r.divisions.size} championnats`, r.divisions.size >= 3);
+  ligne('… dont au moins une porte vers l’étranger',
+    `${etranger} offre(s) hors de France`, etranger > 0);
+  ligne('… sans que les mêmes clubs reviennent sans arrêt',
+    `${r.clubs.size} clubs distincts pour ${r.total} offres`, r.clubs.size >= r.total * 0.5);
+}
+
+console.log('\n=== 11. TOUS LES CLUBS NE PAIENT PAS DE SALAIRE ===');
+{
+  // Retour de jeu : « certains clubs ne proposent pas de salaires, que des
+  // primes ». C'est la réalité sous la Nationale 2 : on est défrayé à la
+  // feuille de match, pas employé.
+  const etages: [string, string, number][] = [
+    ['Régionale 3', 'reg3', 30], ['Fédérale 2', 'fed2', 50],
+    ['Nationale', 'nationale', 60], ['Top 14', 'top14', 84],
+  ];
+  for (const [libelle, id, niveau] of etages) {
+    const comp = COMPETITIONS.find((c) => c.id === id)!;
+    const j = joueurDe(niveau, niveau - 15, comp.clubs[0].nom, id);
+    const r = douzeSaisons(j, 5);
+    const part = r.total ? r.sansSalaire / r.total : 0;
+    console.log(`     ${libelle.padEnd(12)} ${r.sansSalaire}/${r.total} offres sans salaire (${Math.round(part * 100)} %)`);
+    // Le professionnalisme est la règle en haut, l'exception en bas.
+    const attendu = niveau >= 60 ? part <= 0.2 : part >= 0.25;
+    ligne(`${libelle} : la part de contrats amateurs est crédible`,
+      `${Math.round(part * 100)} % sans salaire`, r.total > 0 && attendu);
+  }
+
+  // Et une offre sans salaire DOIT porter un défraiement : sinon elle ne
+  // rapporte rien du tout, et c'est un contrat vide.
+  const reg2 = COMPETITIONS.find((c) => c.id === 'reg2')!;
+  const petit = joueurDe(33, 15, reg2.clubs[0].nom, 'reg2');
+  const vides: string[] = [];
+  for (let s = 1; s <= 12; s++) {
+    for (const o of genererOffres({ ...petit, saison: s }, { saison: s, maximum: 5 })) {
+      if (!o.salaire && !(o.primeMatch ?? 0)) vides.push(o.club);
+    }
+  }
+  ligne('aucune offre sans salaire ET sans prime de match',
+    vides.length ? vides.join(', ') : 'aucun contrat vide', vides.length === 0);
+}
+
 console.log(echecs === 0 ? '\n✅ Le marché fonctionne à tous les étages.' : `\n❌ ${echecs} contrôle(s) en échec.`);

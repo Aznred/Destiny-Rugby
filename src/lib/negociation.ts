@@ -36,9 +36,22 @@ import { nombre, t } from './i18n';
 export interface Termes {
   salaire: number;
   prime: number;
+  /**
+   * ⚠️ LE DÉFRAIEMENT PAR MATCH — ce que propose un club qui ne paie pas de
+   * salaire. Retour de jeu : « certains clubs ne proposent pas de salaires, que
+   * des primes ». En dessous de la Nationale 2, et dans les petits championnats
+   * étrangers, `salaire` vaut 0 et c'est CE chiffre qui se négocie.
+   * Optionnel : les approches d'une sauvegarde antérieure ne l'ont pas.
+   */
+  primeMatch?: number;
   saisons: number;
   /** Temps de jeu promis : ça se paie en confiance du staff à l'arrivée. */
   garantie: boolean;
+}
+
+/** Un club qui ne verse pas de salaire : tout se joue sur la feuille de match. */
+export function estAmateur(t: Termes): boolean {
+  return t.salaire <= 0 && (t.primeMatch ?? 0) > 0;
 }
 
 export type EtatApproche =
@@ -104,13 +117,26 @@ export const LEVIERS: DefinitionLevier[] = [
   {
     id: 'salaire', nom: 'Plus de salaire', emoji: '💰',
     phrase: 'Le projet me parle, mais pas le salaire. Il faut faire un effort là-dessus.',
-    demander: (t) => ({ ...t, salaire: Math.round(t.salaire * 1.18) }),
+    // ⚠️ CHEZ UN CLUB AMATEUR, IL N'Y A PAS DE SALAIRE À AUGMENTER : ×1,18 sur
+    // zéro fait zéro, et le levier le plus utilisé du jeu devenait un bouton
+    // mort. On négocie alors ce qui est réellement sur la table — le
+    // défraiement par feuille de match.
+    demander: (t) => (estAmateur(t)
+      ? { ...t, primeMatch: Math.round((t.primeMatch ?? 0) * 1.18) }
+      : { ...t, salaire: Math.round(t.salaire * 1.18) }),
     cout: 1,
   },
   {
     id: 'prime', nom: 'Une prime à la signature', emoji: '✍️',
     phrase: 'Je peux m’aligner sur le salaire si vous mettez quelque chose à la signature.',
-    demander: (t) => ({ ...t, prime: Math.max(2000, Math.round(t.prime * 1.6 + t.salaire * 0.12)) }),
+    // Un club du dimanche n'a pas 2 000 € de trésorerie pour une signature : le
+    // plancher suit ce que la saison rapporterait vraiment.
+    demander: (t) => ({
+      ...t,
+      prime: estAmateur(t)
+        ? Math.max(120, Math.round(t.prime * 1.6 + (t.primeMatch ?? 0) * 2.4))
+        : Math.max(2000, Math.round(t.prime * 1.6 + t.salaire * 0.12)),
+    }),
     cout: 1,
   },
   {
@@ -170,6 +196,7 @@ export function approcheDepuisOffre(
   const base: Termes = {
     salaire: Math.round(o.salaire * OUVERTURE),
     prime: Math.round(o.prime * OUVERTURE),
+    primeMatch: Math.round((o.primeMatch ?? 0) * OUVERTURE),
     saisons: o.saisons,
     garantie: false,
   };
@@ -186,7 +213,10 @@ export function approcheDepuisOffre(
     offre: base,
     plafond: {
       salaire: Math.round(o.salaire * (1 + marge)),
-      prime: Math.round(Math.max(o.prime, o.salaire * 0.1) * (1 + marge * 2)),
+      prime: Math.round(
+        Math.max(o.prime, o.salaire * 0.1, (o.primeMatch ?? 0) * 2.5) * (1 + marge * 2),
+      ),
+      primeMatch: Math.round((o.primeMatch ?? 0) * (1 + marge)),
       // Un club s'engage rarement au-delà de ce qu'il a proposé + 1 an, et
       // jamais plus de 5 : au-delà, c'est le joueur qui devient un risque.
       saisons: Math.min(5, o.saisons + (rng() < 0.55 ? 1 : 0)),
@@ -220,6 +250,7 @@ export interface Reponse {
 
 function sous(t: Termes, p: Termes): boolean {
   return t.salaire <= p.salaire && t.prime <= p.prime
+    && (t.primeMatch ?? 0) <= (p.primeMatch ?? 0)
     && t.saisons <= p.saisons && (!t.garantie || p.garantie);
 }
 
@@ -228,6 +259,10 @@ function contreProposition(demande: Termes, courant: Termes, plafond: Termes): T
   return {
     salaire: Math.min(plafond.salaire, Math.round((demande.salaire + courant.salaire) / 2)),
     prime: Math.min(plafond.prime, Math.round((demande.prime + courant.prime) / 2)),
+    primeMatch: Math.min(
+      plafond.primeMatch ?? 0,
+      Math.round(((demande.primeMatch ?? 0) + (courant.primeMatch ?? 0)) / 2),
+    ),
     saisons: Math.min(plafond.saisons, demande.saisons),
     garantie: demande.garantie && plafond.garantie,
   };
@@ -258,7 +293,9 @@ export function repondreAuClub(a: Approche, levier: Levier): Reponse {
           ? t(demande.saisons > 1 ? 'nego.accepte.duree.pluriel' : 'nego.accepte.duree', { n: demande.saisons })
           : levier === 'prime'
             ? t('nego.accepte.prime', { montant: MONNAIE(demande.prime) })
-            : t('nego.accepte.salaire', { montant: MONNAIE(demande.salaire) }),
+            : estAmateur(demande)
+              ? t('nego.accepte.primeMatch', { montant: MONNAIE(demande.primeMatch ?? 0) })
+              : t('nego.accepte.salaire', { montant: MONNAIE(demande.salaire) }),
     };
   }
 
@@ -274,6 +311,7 @@ export function repondreAuClub(a: Approche, levier: Levier): Reponse {
   // Hors du plafond mais il reste du temps : on coupe la poire en deux.
   const contre = contreProposition(demande, a.offre, a.plafond);
   const bouge = contre.salaire > a.offre.salaire || contre.prime > a.offre.prime
+    || (contre.primeMatch ?? 0) > (a.offre.primeMatch ?? 0)
     || contre.saisons > a.offre.saisons || (contre.garantie && !a.offre.garantie);
   return {
     verdict: 'contre',
@@ -290,9 +328,19 @@ export function repondreAuClub(a: Approche, levier: Levier): Reponse {
 // 5. CE QUE ÇA DONNE À L'ARRIVÉE
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** Le résumé lisible d'une offre — utilisé dans les DM et le journal. */
+/**
+ * Le résumé lisible d'une offre — utilisé dans les DM et le journal.
+ *
+ * ⚠️ UN CLUB AMATEUR N'ANNONCE PAS « 0 € PAR SAISON ». C'est exact, et ça se lit
+ * comme un bug. Ce qu'il met sur la table, c'est un défraiement par feuille de
+ * match : on le dit tel quel, avec ce que ça vaut sur une saison pleine.
+ */
 export function resumerTermes(termes: Termes): string {
-  return `${MONNAIE(termes.salaire)} ${t('nego.parSaison')} · ${termes.saisons} ${termes.saisons > 1 ? t('nego.saisons') : t('nego.saison')}`
+  const duree = `${termes.saisons} ${termes.saisons > 1 ? t('nego.saisons') : t('nego.saison')}`;
+  const tete = estAmateur(termes)
+    ? `${t('nego.sansSalaire')} · ${MONNAIE(termes.primeMatch ?? 0)} ${t('nego.parMatch')} · ${duree}`
+    : `${MONNAIE(termes.salaire)} ${t('nego.parSaison')} · ${duree}`;
+  return tete
     + (termes.prime > 0 ? ` · ${MONNAIE(termes.prime)} ${t('nego.signature')}` : '')
     + (termes.garantie ? ` · ${t('nego.garantie')}` : '');
 }

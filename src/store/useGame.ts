@@ -295,6 +295,20 @@ function assurerConversationsApproches(
  * sans réponse : le profil et son pseudo existaient encore, mais la branche
  * « club » n'était jamais atteinte.
  */
+/**
+ * Ce qu'un contrat rapporte, dit en français.
+ *
+ * ⚠️ TOUS LES CLUBS NE VERSENT PAS DE SALAIRE (retour de jeu : « certains clubs
+ * ne proposent pas de salaires, que des primes »). En dessous de la Nationale 2,
+ * et dans les petits championnats étrangers, un club défraie la feuille de match
+ * et rien d'autre : écrire « 0 € par saison » serait exact et se lirait comme un
+ * bug.
+ */
+function remuneration(c: { salaire: number; primeMatch?: number }): string {
+  if (c.salaire > 0) return `${c.salaire.toLocaleString('fr-FR')} € par saison`;
+  return `pas de salaire, ${(c.primeMatch ?? 0).toLocaleString('fr-FR')} € la feuille de match`;
+}
+
 function clubDepuisCompte(compte: CompteSuivi): string | null {
   const avatar = compte.avatar.startsWith('club:') ? compte.avatar.slice(5) : '';
   for (const nom of [compte.club, compte.nom, avatar]) {
@@ -1835,12 +1849,30 @@ export const useGame = create<GameState>()(
           salaire: Math.round(noteDuClub(j.club) * 60),
         };
         const agent = agentDe(j.agent);
-        const commission = Math.round(contrat.salaire * agent.commission);
+        // ⚠️ EN AMATEUR, ON N'EST PAS PAYÉ POUR L'ANNÉE : ON EST DÉFRAYÉ POUR LES
+        // MATCHS JOUÉS. Un club sans salaire (`salaire: 0`) verse `primeMatch`
+        // par feuille de match — une saison pleine rapporte à peu près ce que
+        // valait l'ancien salaire annuel, une saison sur le banc ne rapporte
+        // rien. C'est le seul endroit où ce champ se transforme en euros.
+        const primesDeMatch = Math.round((contrat.primeMatch ?? 0) * matchsSaison);
+        const gains = contrat.salaire + primesDeMatch;
+        const commission = Math.round(gains * agent.commission);
         j = {
           ...j,
-          argent: j.argent + contrat.salaire - commission,
+          argent: j.argent + gains - commission,
           contrat: { ...contrat, saisons: Math.max(0, contrat.saisons - 1) },
         };
+        if (primesDeMatch > 0) {
+          entrees.push({
+            id: idUnique(),
+            saison: j.saison,
+            role: 'systeme',
+            titre: '🧾 Défraiements de la saison',
+            texte: `${j.club} ne verse pas de salaire : ${matchsSaison} feuille${matchsSaison > 1 ? 's' : ''} de match `
+              + `à ${(contrat.primeMatch ?? 0).toLocaleString('fr-FR')} €, soit ${primesDeMatch.toLocaleString('fr-FR')} € sur l'année.`,
+            deltas: { argent: primesDeMatch },
+          });
+        }
         if (commission > 0) {
           entrees.push({
             id: idUnique(),
@@ -2658,7 +2690,8 @@ export const useGame = create<GameState>()(
         const libre = contratBloque(joueur);
         const preAccord: PreAccord = {
           club: a.club, division: a.division, divisionNom: a.divisionNom,
-          salaire: a.offre.salaire, prime: a.offre.prime, saisons: a.offre.saisons,
+          salaire: a.offre.salaire, prime: a.offre.prime, primeMatch: a.offre.primeMatch,
+          saisons: a.offre.saisons,
           garantie: a.offre.garantie, etranger: a.etranger, prolongation: a.prolongation,
           saison: joueur.saison,
         };
@@ -2731,7 +2764,7 @@ export const useGame = create<GameState>()(
         if (!joueur || !p) return;
         const reste = p.club === joueur.club;
         const confiance = confianceALArrivee(
-          { salaire: p.salaire, prime: p.prime, saisons: p.saisons, garantie: p.garantie },
+          { salaire: p.salaire, prime: p.prime, primeMatch: p.primeMatch, saisons: p.saisons, garantie: p.garantie },
           p.prolongation,
         );
         const arrive: Joueur = {
@@ -2746,7 +2779,10 @@ export const useGame = create<GameState>()(
           argent: joueur.argent + p.prime,
           moral: borne(joueur.moral + (reste ? 6 : 10)),
           reputation: borne(joueur.reputation + (p.etranger ? 6 : reste ? 2 : 4)),
-          contrat: { club: p.club, division: p.division, saisons: p.saisons, salaire: p.salaire },
+          contrat: {
+            club: p.club, division: p.division, saisons: p.saisons, salaire: p.salaire,
+            ...(p.primeMatch ? { primeMatch: p.primeMatch } : {}),
+          },
           // ⚠️ C'EST LE SEUL ENDROIT OÙ LE JOUEUR CHANGE DE CLUB. On y tient la
           // liste des maillots portés — une prolongation ne la rallonge pas.
           clubs: reste
@@ -2773,10 +2809,12 @@ export const useGame = create<GameState>()(
             saison: j.saison,
             role: 'systeme',
             titre: reste ? `✍️ Prolongation à ${p.club}` : `✍️ Signature à ${p.club}`,
+            // ⚠️ UN CLUB AMATEUR N'ANNONCE PAS « 0 € par saison » : il défraie la
+            // feuille de match, et c'est ce qu'il faut écrire.
             texte: (reste
-              ? `Tu prolonges de ${p.saisons} saison${p.saisons > 1 ? 's' : ''} à ${p.club} (${p.divisionNom}) pour ${p.salaire.toLocaleString('fr-FR')} € par saison.`
+              ? `Tu prolonges de ${p.saisons} saison${p.saisons > 1 ? 's' : ''} à ${p.club} (${p.divisionNom}) pour ${remuneration(p)}.`
               : `${p.club} (${p.divisionNom}) t'engage pour ${p.saisons} saison${p.saisons > 1 ? 's' : ''} : `
-                + `${p.salaire.toLocaleString('fr-FR')} € par saison et ${p.prime.toLocaleString('fr-FR')} € à la signature.`
+                + `${remuneration(p)}${p.prime > 0 ? ` et ${p.prime.toLocaleString('fr-FR')} € à la signature` : ''}.`
                 + (p.garantie ? ' Le coach s’est engagé sur ton temps de jeu.' : '')
                 + (p.etranger ? ' Direction l’étranger, nouvelle langue, nouveau rugby.' : ''))
               + (gagnes >= 50

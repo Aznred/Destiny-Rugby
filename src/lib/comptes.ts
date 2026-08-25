@@ -269,15 +269,21 @@ export function annuaire(j: Joueur): CompteSuivi[] {
   for (const c of COMPETITIONS) ajouter(compteCompetition(c.id, c.nom, `${t('bio.competitionOfficielle')} · ${c.pays}`, c.niveau));
   for (const c of COUPES_EUROPE) ajouter(compteCompetition(c.id, c.nom, `${t('bio.competitionOfficielle')} · ${c.pays}`, 1));
 
-  // 2. Les clubs du championnat du joueur, puis tous les clubs étrangers et
-  // les clubs professionnels français. Les petites ligues étrangères étaient
-  // auparavant absentes à cause du filtre `niveau <= 3` : impossible de trouver
-  // Helsinki, Prague ou Heidelberg sur L'Ovale, donc impossible de leur écrire.
+  // 2. TOUS les clubs du monde ont un compte. Le sien d'abord, puis le reste.
+  //
+  // ⚠️ LES DIVISIONS AMATEURS FRANÇAISES MANQUAIENT, ET C'ÉTAIT LA MOITIÉ DE
+  // « quand on veut demander à des clubs de les rejoindre, aucune réponse ».
+  // Le filtre gardait les clubs étrangers et les clubs français de `niveau <= 3`
+  // (Top 14, Pro D2, Nationale) : un joueur de Régionale 2 ne pouvait donc
+  // trouver AUCUN club de Nationale 2, de Fédérale ou de Régionale 1 sur
+  // L'Ovale — c'est-à-dire précisément les seuls clubs qu'il pouvait rejoindre.
+  // Il ne lui restait qu'à écrire au Stade Toulousain, qui refuse, et à en
+  // conclure que le système ne marche pas. Mesuré : 382 clubs joignables sur
+  // 855, et six divisions françaises entières absentes.
   const sienne = COMPETITIONS.find((c) => c.id === j.division);
   for (const club of sienne?.clubs ?? []) ajouter(compteClub(club.nom));
-  for (const comp of COMPETITIONS.filter(
-    (c) => c.id !== j.division && (c.zone === 'Monde' || c.niveau <= 3),
-  )) {
+  for (const comp of COMPETITIONS) {
+    if (comp.id === j.division) continue;
     for (const club of comp.clubs) ajouter(compteClub(club.nom));
   }
 

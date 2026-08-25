@@ -98,6 +98,23 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   vestiaire n'aimera pas (−6 de moral). Le marché se souvient désormais des deux
   dernières saisons et privilégie de nouveaux interlocuteurs ; une star reçoit
   aussi des projets de clubs moyens qui veulent en faire leur tête d'affiche.
+- **Un marché qui change de visage chaque été** : le tirage désigne d'abord un
+  CHAMPIONNAT, puis un club dedans. Sans ça, la division la plus peuplée gagnait
+  toujours (la Fédérale 3 aligne 157 clubs, la Didi 10 géorgienne en aligne 10),
+  et l'on recevait douze saisons de suite les mêmes offres du même étage. Le
+  marché suit aussi **où l'on vit** : expatrié en Géorgie, on est démarché par la
+  Géorgie et ses voisins avant la France. Une fois de temps en temps, l'agent
+  fait circuler le dossier **hors des frontières** : c'est ainsi qu'un joueur de
+  Régionale part jouer en Finlande ou en Tchéquie.
+- **Tous les clubs ne paient pas de salaire** : sous la Nationale 2, et dans les
+  petits championnats étrangers, beaucoup de clubs ne proposent **aucun salaire**
+  mais un **défraiement par feuille de match**. Une saison pleine rapporte à peu
+  près ce que valait l'ancien salaire annuel ; une saison sur le banc ne rapporte
+  rien. C'est ce chiffre-là qui se négocie avec eux.
+- **Tous les clubs du monde sont joignables sur L'Ovale** : les 833 clubs des
+  33 compétitions y ont un compte, divisions amateurs françaises comprises. On
+  peut donc écrire à un club de sa Régionale, et il répond : une offre, ou un
+  refus motivé.
 - **Carrière à l'étranger** 🌍 : l'accès dépend du niveau de la ligue. Un joueur
   amateur peut rejoindre un petit championnat étranger de sa force, tandis que
   la Premiership, l'URC, le Super Rugby, la League One japonaise ou la MLR

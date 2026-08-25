@@ -301,10 +301,23 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             ⭐ <b>{joueur.noteSaison.toFixed(1)}</b>/10
           </span>
         )}
+        {/* ⚠️ « 0 k€ » N'EST PAS UN CONTRAT LISIBLE. Un club amateur ne verse pas
+            de salaire, il défraie la feuille de match : la pastille montre alors
+            ce chiffre-là, qui est le seul qui existe. */}
         {contrat && (
-          <span className="pastille" title={t('pj.contratAide', { salaire: nombre(contrat.salaire) })}>
-            📄 <b>{Math.round(contrat.salaire / 1000)} k€</b> ·{' '}
-            {contrat.saisons > 0 ? `${contrat.saisons} s.` : t('pj.contrat')}
+          <span
+            className="pastille"
+            title={contrat.salaire > 0
+              ? t('pj.contratAide', { salaire: nombre(contrat.salaire) })
+              : t('pj.contratAideAmateur', { prime: nombre(contrat.primeMatch ?? 0) })}
+          >
+            📄{' '}
+            <b>
+              {contrat.salaire > 0
+                ? `${Math.round(contrat.salaire / 1000)} k€`
+                : `${nombre(contrat.primeMatch ?? 0)} €/match`}
+            </b>{' '}
+            · {contrat.saisons > 0 ? `${contrat.saisons} s.` : t('pj.contrat')}
           </span>
         )}
         {amis.length > 0 && (

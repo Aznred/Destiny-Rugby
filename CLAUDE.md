@@ -58,7 +58,7 @@ Three.js (@react-three/fiber + @react-three/drei) · Groq (API distante).
 | `src/lib/effectif.ts` | `effectifDuClub(club, saison)` = effectif de base **+ mercato**. Base : **effectif réel pro** vieilli, sinon **effectif réel amateur** (`effectifAmateur`, âge/note tirés), sinon des coéquipiers **déterministes** (seed = club+slot+génération), retraite 33-37 ans → **regens**, **nationalités pondérées** (`PART_FRANCAIS`). Aussi : `noteALAge()` (**progression vers le potentiel jusqu'à 27 ans, puis déclin**), `estEspoir`/`estDeclinant`, `forceEffectif(club, saison)` et `forceMoyenneDivision(division, saison)` (tous deux mémoïsés). ⚠️ L'ordre des tirages `rng()` est figé (prénom, nom, âge, retraite, talent, nation) — ne pas le changer sans adapter le « peek » de `effectifDuClub`/`cumulDebut`. |
 | `src/lib/mercato.ts` | Décode `MERCATO_REEL` (`mercatoReel(club)`). |
 | `src/lib/progression.ts` | **Évolution dynamique** : `noterSaison()` note la saison sur 10 (temps de jeu, essais vs `ESSAIS_ATTENDUS` du poste, niveau face au groupe, forme/moral, rang du club), `evoluer()` en déduit les points d'attributs (× facteur d'âge, **bonus formation avant 23 ans**, déclin après 31), les répartit par la **méthode du plus fort reste** (pondérée par les attributs clés du poste) et fait bouger le **potentiel**. |
-| `src/lib/offres.ts` | **Marché** : `cote(j)`, `genererOffres()` (fenêtre basse progressive `cote−18/23/28`, plafond selon l'âge, mémoire `clubsRecents`, **seuil étranger gradué selon la force de la ligue**), `offreProlongation()`, salaires par niveau (`SALAIRE_PAR_NIVEAU`). |
+| `src/lib/offres.ts` | **Marché** : `cote(j)`, `genererOffres()` — tirage **championnat d'abord, club ensuite** (sinon la division la plus peuplée rafle tout), **affinité géographique** (`VOISINS`, le pays où l'on joue puis sa nation), **coup de cœur de l'agent** vers l'étranger, quota d'un championnat par vague, fenêtre basse progressive `cote−18/23/28`, plafond selon l'âge (+6 pour les ligues étrangères semi-amatrices), mémoire `clubsRecents`, **seuil étranger gradué**. Aussi : `sansSalaire()` / `primeDeMatch()` — **tous les clubs ne paient pas de salaire**, un club amateur défraie la feuille de match. `offreProlongation()`, `SALAIRE_PAR_NIVEAU`. |
 | `src/components/Offres.tsx` | Panneau **« Choix de carrière »** (portal) : contrat en cours, cartes d'offres (logo, division, note du club, salaire, prime, durée), signature. |
 | `src/components/Drapeau.tsx` | Vrais drapeaux **SVG** (lib `flag-icons`, locale) — les emojis drapeaux ne s'affichent pas sous Windows. `CODES` vient de `data/nations.ts` (202 nations) + quelques entités des données réelles. `ALIAS` absorbe les orthographes des données (« Afrique du sud », « Pays-de-Galles »…). `nomNation()` retire l'emoji de tête (compat anciennes sauvegardes « 🇫🇷 France »). |
 | `src/components/Blason.tsx` | Écusson d'un club : **vrai logo** (`club.logo`, un `<img>` sur pastille sombre) si la base en fournit un, sinon blason SVG généré (initiales + couleurs). `LogoEquipe` fait la même chose pour une équipe dont on n'a que le nom (sélections). |
@@ -7752,3 +7752,178 @@ Vérifications dédiées : `scripts/verifManagerMatch.ts` (23 joueurs uniques,
 rôles, consignes, plan de score, changement manuel et score injecté) et
 `scripts/verifSituations.ts` (151 ids uniques, au moins deux choix, impact réel,
 catégories, contexte et non-répétition).
+
+---
+
+## ✈️ LE MARCHÉ REBÂTI — variété des championnats, exotisme, et clubs sans salaire
+
+Quatre reproches en un message : « c'est toujours les mêmes clubs qui proposent
+des transferts, et les mêmes championnats même si on est à l'étranger » · « on
+n'a que de la Régionale au début, ça serait bien d'avoir un peu plus d'exotique »
+· « certains clubs ne proposent pas de salaires, que des primes » · « quand on
+veut demander à des clubs de les rejoindre, aucune réponse ».
+
+⚠️ **TROIS DE CES QUATRE REPROCHES SONT LE MÊME BUG, ET IL EST ARITHMÉTIQUE.**
+
+### 1. Le tirage se faisait CLUB PAR CLUB, donc la division la plus peuplée gagnait
+
+C'est la cause, et elle n'a rien à voir avec le hasard ni avec la calibration.
+`genererOffres` ramassait tous les clubs éligibles dans un seul sac, les triait
+par score, puis n'en gardait que les 70 premiers. Or la France aligne **655 clubs
+sur dix divisions**, la Géorgie en aligne 10 : à mérite égal, la France sortait
+soixante-cinq fois plus souvent. Mesuré avant correction, sur douze intersaisons
+du même joueur :
+
+| Profil | Offres | Clubs distincts | Championnats | Pays |
+|---|---|---|---|---|
+| débutant en Régionale 3 | 48 | **18** | **2** | 1 |
+| Fédérale 2 | 48 | 34 | 5 | 5 |
+| **expatrié en Géorgie** | 48 | 32 | 13 | **27 offres françaises sur 48** |
+| star mondiale | 48 | 21 | 5 | 5 |
+
+Le débutant ne voyait que de la Régionale 2 et 3 ; l'expatrié géorgien recevait
+24 offres de Fédérale 1 contre 3 de Géorgie ; la star tournait entre Leinster,
+les Hurricanes et Montpellier. **Le tirage désigne désormais un CHAMPIONNAT, puis
+un club dedans** : la Didi 10 pèse alors ce qu'elle vaut, pas ce qu'elle compte
+de clubs.
+
+| Après | Offres | Clubs distincts | Championnats | Pays |
+|---|---|---|---|---|
+| débutant en Régionale 3 (20 ans) | 48 | **38** | **6** | 3 |
+| Fédérale 2 | 48 | 43 | **14** | 10 |
+| expatrié en Géorgie | 48 | 44 | **19** | **11 offres françaises sur 48** |
+| star mondiale | 48 | **35** | 5 | 5 |
+
+⚠️ **ET UNE VAGUE N'EST PLUS QUATRE FOIS LE MÊME CHAMPIONNAT** : le poids d'une
+ligue est divisé par 3,6 dès qu'elle a servi une offre de la vague. Sans ce
+freinage, la ligue la mieux notée raflait les quatre places.
+
+### 2. L'affinité géographique — le marché suit OÙ L'ON VIT
+
+⚠️ **UN CHAMPIONNAT N'EST PAS À LA MÊME DISTANCE POUR TOUT LE MONDE.** Rester
+dans le pays où l'on joue est le mouvement le plus courant (×2,1), rentrer chez
+soi vient juste après (×1,7), un pays voisin suit (×1,15) — `VOISINS` porte la
+carte. Le bout du monde reste possible, avec un poids **tiré à la graine de la
+saison** : les destinations lointaines qui « bougent » changent d'une intersaison
+à l'autre, et c'est ce qui empêche les mêmes championnats de revenir sans qu'on
+ait à interdire quoi que ce soit.
+
+### 3. Le « coup de cœur de l'agent » — d'où vient l'exotisme
+
+Les poids seuls ne suffisaient pas, et c'est mesurable : un joueur du bas de la
+pyramide française a **sept championnats français** à portée contre deux ou trois
+étrangers, si bien que l'étranger sortait **1 fois sur 48**. Une fois de temps en
+temps (32 % des vagues, 45 % si l'on s'est mis sur le marché), la **première**
+offre de la vague est donc réservée à l'étranger : c'est le dossier qu'un agent
+fait circuler hors des frontières. Le niveau, lui, reste filtré comme partout
+ailleurs — c'est un dépaysement, pas un passe-droit.
+
+⚠️ **ET LE PLAFOND EST RELEVÉ DE 6 POINTS POUR LES LIGUES ÉTRANGÈRES DE NIVEAU
+≥ 5.** À l'étranger on arrive comme IMPORT : l'Ereklasse, la Bundesliga ou
+l'Extraliga recrutent volontiers un peu au-dessus de leur moyenne, c'est même
+tout l'intérêt qu'elles y trouvent. Sans ce cran, le plafond calé sur la cote
+fermait l'intégralité des petits championnats étrangers aux joueurs amateurs.
+
+### 4. ⚠️ EN AMATEUR, ON NE REFUSE PAS UN JOUEUR QUI SE PRÉSENTE
+
+`besoinAuPoste` est écrit pour le rugby professionnel, où une place se prend à
+quelqu'un : « deux joueurs devant toi, et bien devant → le club passe son tour ».
+Appliqué à la Régionale, il jetait presque tout le monde — mesuré sur un
+débutant, il ne restait qu'une poignée de clubs assez faibles pour « avoir besoin
+de lui », et **le même nom revenait dix fois en douze saisons**. Un club du
+dimanche, lui, cherche des licenciés pour aligner un XV et un banc. Le filtre a
+donc un **plancher** qui dépend de l'étage : 0,75 en Régionale, 0,5 en Fédérale
+2-3, 0,3 en Fédérale 1, **0 dès la Nationale 2** — le monde professionnel ne
+bouge pas d'un pouce.
+
+### 5. Tous les clubs ne paient pas de salaire
+
+⚠️ Retour de jeu : « certains clubs ne proposent pas de salaires, que des
+primes ». C'était exact, et le jeu versait pourtant un salaire annuel à tout le
+monde jusqu'à la Régionale 3 — 500 € par an, mais un salaire, donc un contrat de
+la même forme à tous les étages.
+
+- **`sansSalaire(club, niveau, etranger)`** : la part de clubs amateurs suit
+  l'étage (15 % en Fédérale 1, 45 % en Fédérale 2, 70 % en Fédérale 3, 85-92 % en
+  Régionale) et **monte d'un cran à l'étranger, dès le niveau 4** — le Heartland
+  Championship ou l'Ereklasse sont des championnats du samedi après-midi. La
+  graine est le nom du club : un club amateur ne devient pas professionnel parce
+  qu'on rouvre le marché la saison suivante.
+- **`primeDeMatch()`** = ce que le poste vaudrait en salaire annuel ÷ 22. Une
+  saison pleine rapporte donc à peu près l'ancien salaire ; une saison sur le banc
+  ne rapporte **rien**. C'est la même somme, mais elle se mérite.
+- **`Contrat.primeMatch`, `OffreContrat.primeMatch`, `PreAccord.primeMatch` et
+  `Termes.primeMatch`** sont tous **optionnels** : une sauvegarde antérieure ne
+  les a pas et ne doit ni planter ni afficher `NaN`. Aucune migration de version.
+- ⚠️ **LE LEVIER 💰 SALAIRE NE POUVAIT PLUS RIEN FAIRE** : ×1,18 sur zéro fait
+  zéro, et le levier le plus utilisé du jeu devenait un bouton mort. Chez un club
+  amateur, il négocie le **défraiement**. Vérifié en jeu : 22 € → 26 € la feuille
+  de match, avec la bonne réponse du club.
+- ⚠️ **ET ON N'ÉCRIT JAMAIS « 0 € PAR SAISON »** — c'est exact, et ça se lit comme
+  un bug. `resumerTermes`, le journal de signature et la pastille de contrat
+  disent « Pas de salaire · 26 € la feuille de match ».
+- **Le versement vit dans `saisonSuivante`**, au même endroit que le salaire :
+  `primeMatch × matchsSaison`, avec son entrée de journal. Mesuré : 10 feuilles de
+  match à 26 € → **+260 €** sur l'année, et la commission de l'agent porte
+  désormais sur le total encaissé.
+
+Part de contrats amateurs mesurée (`verifMarche.ts`, section 11) : **Régionale 3
+88 % · Fédérale 2 63 % · Nationale 13 % · Top 14 0 %.**
+
+### 6. ⚠️ « AUCUNE RÉPONSE QUAND ON ÉCRIT À UN CLUB » — ils étaient introuvables
+
+Le mécanisme de candidature spontanée fonctionnait depuis longtemps
+(`susciterApproches(1, true, clubCible)`, puis un refus motivé et une mise en
+liste de suivi). Ce qui manquait, c'est que **l'annuaire de L'Ovale ne contenait
+pas les clubs auxquels on pouvait postuler**. Le filtre gardait les clubs
+étrangers et les clubs français de `niveau <= 3` : un joueur de Régionale 2 ne
+trouvait donc **aucun** club de Nationale 2, de Fédérale ou de Régionale 1.
+Mesuré : **382 clubs joignables sur 855, et six divisions françaises entières
+absentes**. Il ne lui restait qu'à écrire au Stade Toulousain, qui refuse — et à
+en conclure que le système ne marche pas.
+
+`annuaire()` expose désormais **tous les clubs du monde**. Mesuré : **833 clubs
+joignables, aucune compétition sans un seul club**, annuaire construit en 27 ms
+(il est mémoïsé par club + saison + division + langue). Vérifié en jeu : quatorze
+candidatures à des clubs de son niveau, **quatorze réponses**, dont les offres
+attendues.
+
+### Ce qui n'a PAS bougé, et qu'il ne faut pas toucher
+
+⚠️ **AUCUN CRITÈRE SPORTIF N'A ÉTÉ DESSERRÉ.** `cote()` et sa pondération 75/25,
+le plafond selon l'âge, l'interdiction de sauter deux étages, la fenêtre basse
+progressive et `SALAIRE_PAR_NIVEAU` sont **intacts** : ce lot change QUELS clubs
+sortent parmi ceux qui avaient déjà le droit de se manifester, pas lesquels y ont
+droit. Les deux seules exceptions sont documentées ci-dessus — le plancher de
+besoin en amateur et le plafond +6 des petites ligues étrangères — et ne
+concernent que le bas de la pyramide.
+
+⚠️ **ET L'ÉTALONNAGE DE DIFFICULTÉ N'A PAS PU ÊTRE REMESURÉ** : `verifDifficulte.ts`
+et `verifHonneurs.ts` sont cassés depuis la suppression du mode « saison par
+saison » (voir « LES SCRIPTS DE MESURE NE MESURENT PLUS RIEN », plus haut) — ils
+comptent des saisons **sans un seul match joué**. S'en servir pour retoucher le
+marché reviendrait à corriger le jeu pour compenser un test faux. À revérifier
+dès que ces scripts sont réparés.
+
+### Le banc d'essai
+
+`scripts/verifMarche.ts` gagne quatre sections, une par reproche :
+
+| Section | Ce qu'elle refuse |
+|---|---|
+| **8. le marché ne sert plus toujours le même championnat** | moins de 3 championnats sur douze saisons, ou un championnat qui rafle plus de 75 % des offres |
+| **9. à l'étranger, le marché suit où l'on vit** | plus de 45 % d'offres françaises pour un expatrié, un championnat d'accueil muet, moins de 6 pays |
+| **10. on n'a plus que de la Régionale au début** | moins de 3 championnats, aucune porte vers l'étranger, moins d'un club distinct pour deux offres |
+| **11. tous les clubs ne paient pas de salaire** | 0 % d'amateurs sous la Fédérale, plus de 20 % au-dessus de la Nationale, ou une offre sans salaire **et** sans prime de match |
+
+Vérifié en jeu, ordinateur et téléphone (375 × 812) : la carte de négociation
+affiche « Pas de salaire · 22 € la feuille de match · 4 saisons », **aucun
+débordement horizontal**, boutons à 44 px, et la pastille de contrat lit
+« 📄 26 €/match · 4 s. ».
+
+```bash
+npx vite-node scripts/verifMarche.ts       # variété, géographie, exotisme, contrats amateurs
+npx vite-node scripts/verifTransferts.ts   # la négociation et ses règles de fenêtre
+npx vite-node scripts/verifSocial2.ts      # l'annuaire, la recherche, les profils
+npx vite-node scripts/verifTraductions.ts  # les 5 clés ajoutées, dans les 7 langues
+```
