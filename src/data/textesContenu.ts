@@ -27,6 +27,7 @@
 import type { Traduction } from '../lib/i18n';
 
 import { TEXTES_SITUATIONS } from './textesSituations';
+import { TEXTES_SITUATIONS_ETENDUES } from './situationsEtendues';
 
 export const TEXTES_CONTENU: Record<string, Traduction> = {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -439,4 +440,5 @@ export const TEXTES_CONTENU: Record<string, Traduction> = {
   // (retour de jeu : « supprime les scénarios de matchs, le match est déjà
   // passé »). Le match se joue dans le moteur 2D, et nulle part ailleurs.
   ...TEXTES_SITUATIONS,
+  ...TEXTES_SITUATIONS_ETENDUES,
 };

@@ -17,6 +17,7 @@ import type { ConsequenceDure, Joueur, StatVariable } from '../types';
 import type { Scenario } from './scenarios';
 import { t } from '../lib/i18n';
 import { SITUATIONS_SUPPLEMENTAIRES } from './situationsSupplementaires';
+import { SITUATIONS_ETENDUES } from './situationsEtendues';
 
 // Ce que peut déclencher un choix, en plus des stats. C'est LE point d'entrée
 // des évènements durs (voir `lib/consequences.ts`).
@@ -707,13 +708,15 @@ const SITUATIONS_BASE: Situation[] = [
 ];
 
 /**
- * 151 scènes au total : les 51 situations historiques, plus 100 situations
- * originales rangées dans un fichier dédié. Les garder séparées évite qu'une
- * extension éditoriale rende illisible le moteur de sélection ci-dessous.
+ * 651 scènes au total : les 51 situations historiques, 100 situations
+ * supplémentaires écrites individuellement et 500 situations multilingues
+ * composées depuis un catalogue éditorial dédié. Les garder séparées évite
+ * qu'une extension rende illisible le moteur de sélection ci-dessous.
  */
 export const SITUATIONS: Situation[] = [
   ...SITUATIONS_BASE,
   ...SITUATIONS_SUPPLEMENTAIRES,
+  ...SITUATIONS_ETENDUES,
 ];
 
 export const SITUATION_PAR_ID: Record<string, Situation> = Object.fromEntries(
