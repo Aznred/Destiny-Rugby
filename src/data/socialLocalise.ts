@@ -1,5 +1,6 @@
 import type { Ambiance } from './social';
 import { langueCourante, locale, type Langue } from '../lib/i18n';
+import type { SanctionSociale as SanctionEmbrouille } from '../lib/disciplineSociale';
 
 type Reactions = { positifDebut: string[]; positifFin: string[]; negatifDebut: string[]; negatifFin: string[] };
 
@@ -7,38 +8,38 @@ const REACTIONS: Record<Exclude<Langue, 'fr'>, Reactions> = {
   en: {
     positifDebut: ['Great message.', 'Fully agreed.', 'That is the right attitude.', 'Keep going, {joueur}.'],
     positifFin: ['The supporters are with you. 💚', '{club} can be proud.', 'Now show it on the pitch. 🏉'],
-    negatifDebut: ['Talk is cheap.', 'This is not convincing.', 'Focus on your rugby.', 'The season tells another story.'],
-    negatifFin: ['Prove it on the pitch.', '{club} deserve better.', 'We will remember this post. 📌'],
+    negatifDebut: ['Talk is cheap.', 'Sit down, clown.', 'Shut up and look at your stats.', 'Your rugby is as empty as this post.'],
+    negatifFin: ['Prove it on the pitch, loser.', '{club} deserve better than this rubbish.', 'We saved the screenshot, idiot. 📌'],
   },
   es: {
     positifDebut: ['Gran mensaje.', 'Totalmente de acuerdo.', 'Esa es la actitud.', 'Sigue así, {joueur}.'],
     positifFin: ['La afición está contigo. 💚', '{club} puede estar orgulloso.', 'Ahora demuéstralo en el campo. 🏉'],
-    negatifDebut: ['Hablar es fácil.', 'Esto no convence.', 'Concéntrate en tu rugby.', 'La temporada cuenta otra historia.'],
-    negatifFin: ['Demuéstralo en el campo.', '{club} merece más.', 'Guardaremos esta publicación. 📌'],
+    negatifDebut: ['Hablar es fácil.', 'Siéntate, payaso.', 'Cállate y mira tus números.', 'Tu rugby está tan vacío como este mensaje.'],
+    negatifFin: ['Demuéstralo en el campo, inútil.', '{club} merece más que esta basura.', 'Captura guardada, idiota. 📌'],
   },
   it: {
     positifDebut: ['Gran bel messaggio.', 'Pienamente d’accordo.', 'Questo è l’atteggiamento giusto.', 'Continua così, {joueur}.'],
     positifFin: ['I tifosi sono con te. 💚', '{club} può essere orgoglioso.', 'Ora dimostralo in campo. 🏉'],
-    negatifDebut: ['Parlare è facile.', 'Non convince.', 'Pensa al rugby.', 'La stagione racconta altro.'],
-    negatifFin: ['Dimostralo in campo.', '{club} merita di più.', 'Conserveremo questo post. 📌'],
+    negatifDebut: ['Parlare è facile.', 'Siediti, pagliaccio.', 'Stai zitto e guarda le tue statistiche.', 'Il tuo rugby è vuoto come questo post.'],
+    negatifFin: ['Dimostralo in campo, scarso.', '{club} merita più di questa spazzatura.', 'Screenshot salvato, idiota. 📌'],
   },
   de: {
     positifDebut: ['Starke Botschaft.', 'Volle Zustimmung.', 'Das ist die richtige Einstellung.', 'Weiter so, {joueur}.'],
     positifFin: ['Die Fans stehen hinter dir. 💚', '{club} kann stolz sein.', 'Jetzt auf dem Platz zeigen. 🏉'],
-    negatifDebut: ['Reden ist leicht.', 'Das überzeugt nicht.', 'Konzentriere dich aufs Rugby.', 'Die Saison erzählt etwas anderes.'],
-    negatifFin: ['Beweise es auf dem Platz.', '{club} verdient mehr.', 'Diesen Beitrag merken wir uns. 📌'],
+    negatifDebut: ['Reden ist leicht.', 'Setz dich, Clown.', 'Halt die Klappe und sieh dir deine Zahlen an.', 'Dein Rugby ist so leer wie dieser Beitrag.'],
+    negatifFin: ['Beweise es auf dem Platz, Versager.', '{club} verdient mehr als diesen Müll.', 'Screenshot gespeichert, Idiot. 📌'],
   },
   pt: {
     positifDebut: ['Grande mensagem.', 'Concordo plenamente.', 'Essa é a atitude certa.', 'Continua assim, {joueur}.'],
     positifFin: ['Os adeptos estão contigo. 💚', '{club} pode ter orgulho.', 'Agora mostra-o em campo. 🏉'],
-    negatifDebut: ['Falar é fácil.', 'Isto não convence.', 'Concentra-te no râguebi.', 'A época conta outra história.'],
-    negatifFin: ['Prova-o em campo.', '{club} merece mais.', 'Vamos guardar esta publicação. 📌'],
+    negatifDebut: ['Falar é fácil.', 'Senta-te, palhaço.', 'Cala a boca e olha para os teus números.', 'O teu râguebi é tão vazio como esta publicação.'],
+    negatifFin: ['Prova-o em campo, inútil.', '{club} merece mais do que este lixo.', 'Captura guardada, idiota. 📌'],
   },
   ja: {
     positifDebut: ['素晴らしいメッセージ。', '完全に同意。', 'その姿勢が大切だ。', '{joueur}、その調子。'],
     positifFin: ['サポーターは味方だ。💚', '{club}も誇りに思うはず。', '次はピッチで見せてくれ。🏉'],
-    negatifDebut: ['言うだけなら簡単だ。', '説得力がない。', 'ラグビーに集中してくれ。', '今季の内容とは違う。'],
-    negatifFin: ['ピッチで証明してくれ。', '{club}にはもっと必要だ。', 'この投稿は覚えておく。📌'],
+    negatifDebut: ['言うだけなら簡単だ。', '座ってろ、ピエロ。', '黙って自分の数字を見ろ。', 'お前のラグビーはこの投稿と同じくらい空っぽだ。'],
+    negatifFin: ['ピッチで証明しろ、下手くそ。', '{club}はこんなクソ投稿より上だ。', 'スクショ保存したぞ、馬鹿。📌'],
   },
 };
 
@@ -135,4 +136,84 @@ export function sanctionSociale(
   };
   const d = donnees[langue];
   return { titre: d.titre, texte: grossier ? d.grossier : d.simple };
+}
+
+/** Texte complet des sanctions graduées, dans les sept langues du jeu. */
+export function sanctionEmbrouilleSociale(
+  joueur: { club: string }, sanction: SanctionEmbrouille,
+): { titre: string; texte: string } {
+  const langue = langueCourante();
+  const montant = sanction.amende.toLocaleString(locale(langue));
+  const semaines = sanction.semaines;
+  const fuite = sanction.fuite;
+
+  const fr = {
+    avertissement: ['⚠️ Recadrage du club', `${fuite ? 'Une capture de la discussion privée a fuité.' : 'Le clash public est arrivé au staff.'} ${joueur.club} te donne un avertissement officiel : la prochaine sortie coûtera ta place.`],
+    amende: ['💸 Amende interne', `${fuite ? 'La capture privée tourne sur L’Ovale.' : 'L’embrouille publique a fait le tour du club.'} ${joueur.club} te sanctionne de ${montant} € et ta relation avec le staff se dégrade.`],
+    banc: ['🪑 Mis sur le banc', `${joueur.club} te sanctionne après ${fuite ? 'la fuite de tes messages' : 'ton clash public'} : ${montant} € d’amende et ${semaines} semaine${semaines > 1 ? 's' : ''} comme remplaçant imposé.`],
+    suspension: ['⛔ Suspendu par le club', `${joueur.club} juge l’altercation intenable : ${montant} € d’amende et ${semaines} semaine${semaines > 1 ? 's' : ''} de suspension. Tu ne peux plus être aligné.`],
+    exclusion: ['📄 Contrat rompu', `${joueur.club} met fin à ton contrat après cette nouvelle embrouille. Tu es exclu du club et replacé immédiatement sur le marché.`],
+  } as const;
+
+  const traductions: Record<Exclude<Langue, 'fr'>, Record<SanctionEmbrouille['niveau'], readonly [string, string]>> = {
+    en: {
+      avertissement: ['⚠️ Formal club warning', `${fuite ? 'A screenshot of the private chat leaked.' : 'The public row reached the coaches.'} ${joueur.club} issue a formal warning: the next outburst could cost your place.`],
+      amende: ['💸 Internal fine', `${fuite ? 'The private screenshot is spreading on L’Ovale.' : 'The public row went around the club.'} ${joueur.club} fine you €${montant} and the coaches lose trust in you.`],
+      banc: ['🪑 Dropped to the bench', `${joueur.club} punish ${fuite ? 'the leaked messages' : 'your public row'}: a €${montant} fine and ${semaines} week${semaines > 1 ? 's' : ''} as a forced substitute.`],
+      suspension: ['⛔ Suspended by the club', `${joueur.club} rule the row unacceptable: a €${montant} fine and a ${semaines}-week suspension. You cannot be selected.`],
+      exclusion: ['📄 Contract terminated', `${joueur.club} terminate your contract after another row. You are expelled from the club and immediately placed on the market.`],
+    },
+    es: {
+      avertissement: ['⚠️ Advertencia del club', `${fuite ? 'Se filtró una captura de la conversación privada.' : 'La pelea pública llegó al cuerpo técnico.'} ${joueur.club} te da un aviso oficial: la próxima salida puede costarte el puesto.`],
+      amende: ['💸 Multa interna', `${fuite ? 'La captura privada circula por L’Ovale.' : 'La pelea pública recorrió el club.'} ${joueur.club} te multa con ${montant} € y el cuerpo técnico pierde confianza en ti.`],
+      banc: ['🪑 Al banquillo', `${joueur.club} te sanciona por ${fuite ? 'los mensajes filtrados' : 'la pelea pública'}: ${montant} € y ${semaines} semana${semaines > 1 ? 's' : ''} como suplente obligado.`],
+      suspension: ['⛔ Suspendido por el club', `${joueur.club} considera intolerable la pelea: ${montant} € y ${semaines} semana${semaines > 1 ? 's' : ''} de suspensión. No puedes jugar.`],
+      exclusion: ['📄 Contrato rescindido', `${joueur.club} rescinde tu contrato tras otra pelea. Quedas expulsado del club y vuelves inmediatamente al mercado.`],
+    },
+    it: {
+      avertissement: ['⚠️ Richiamo ufficiale', `${fuite ? 'È trapelato uno screenshot della chat privata.' : 'La lite pubblica è arrivata allo staff.'} ${joueur.club} ti richiama ufficialmente: la prossima uscita può costarti il posto.`],
+      amende: ['💸 Multa interna', `${fuite ? 'Lo screenshot privato gira su L’Ovale.' : 'La lite pubblica ha fatto il giro del club.'} ${joueur.club} ti multa di ${montant} € e lo staff perde fiducia.`],
+      banc: ['🪑 Mandato in panchina', `${joueur.club} ti punisce per ${fuite ? 'i messaggi trapelati' : 'la lite pubblica'}: ${montant} € e ${semaines} settiman${semaines > 1 ? 'e' : 'a'} da riserva obbligata.`],
+      suspension: ['⛔ Sospeso dal club', `${joueur.club} giudica intollerabile la lite: ${montant} € e ${semaines} settiman${semaines > 1 ? 'e' : 'a'} di sospensione. Non puoi giocare.`],
+      exclusion: ['📄 Contratto risolto', `${joueur.club} risolve il contratto dopo l’ennesima lite. Sei escluso dal club e torni subito sul mercato.`],
+    },
+    de: {
+      avertissement: ['⚠️ Offizielle Verwarnung', `${fuite ? 'Ein Screenshot des privaten Chats wurde geleakt.' : 'Der öffentliche Streit erreichte den Trainerstab.'} ${joueur.club} verwarnt dich offiziell: Der nächste Ausbruch kann deinen Platz kosten.`],
+      amende: ['💸 Vereinsstrafe', `${fuite ? 'Der private Screenshot kursiert auf L’Ovale.' : 'Der öffentliche Streit machte im Verein die Runde.'} ${joueur.club} verhängt ${montant} € Strafe und der Stab verliert Vertrauen.`],
+      banc: ['🪑 Auf die Bank gesetzt', `${joueur.club} bestraft ${fuite ? 'die geleakten Nachrichten' : 'deinen öffentlichen Streit'}: ${montant} € und ${semaines} Woche${semaines > 1 ? 'n' : ''} als erzwungener Ersatzspieler.`],
+      suspension: ['⛔ Vom Verein suspendiert', `${joueur.club} hält den Streit für untragbar: ${montant} € und ${semaines} Woche${semaines > 1 ? 'n' : ''} Sperre. Du darfst nicht eingesetzt werden.`],
+      exclusion: ['📄 Vertrag aufgelöst', `${joueur.club} löst deinen Vertrag nach dem erneuten Streit auf. Du wirst ausgeschlossen und sofort auf den Markt gesetzt.`],
+    },
+    pt: {
+      avertissement: ['⚠️ Advertência do clube', `${fuite ? 'Foi divulgada uma captura da conversa privada.' : 'A discussão pública chegou à equipa técnica.'} ${joueur.club} dá-te um aviso oficial: a próxima saída pode custar o teu lugar.`],
+      amende: ['💸 Multa interna', `${fuite ? 'A captura privada circula no L’Ovale.' : 'A discussão pública percorreu o clube.'} ${joueur.club} multa-te em ${montant} € e a equipa técnica perde confiança.`],
+      banc: ['🪑 Mandado para o banco', `${joueur.club} pune ${fuite ? 'as mensagens divulgadas' : 'a discussão pública'}: ${montant} € e ${semaines} semana${semaines > 1 ? 's' : ''} como suplente obrigatório.`],
+      suspension: ['⛔ Suspenso pelo clube', `${joueur.club} considera a discussão intolerável: ${montant} € e ${semaines} semana${semaines > 1 ? 's' : ''} de suspensão. Não podes jogar.`],
+      exclusion: ['📄 Contrato rescindido', `${joueur.club} rescinde o contrato após nova discussão. És expulso do clube e colocado imediatamente no mercado.`],
+    },
+    ja: {
+      avertissement: ['⚠️ クラブからの正式警告', `${fuite ? '非公開チャットのスクリーンショットが流出した。' : '公開口論がスタッフに届いた。'}${joueur.club}は正式警告を出した。次の問題行動ではポジションを失う。`],
+      amende: ['💸 クラブ内罰金', `${fuite ? '非公開のスクリーンショットがL’Ovaleで拡散中。' : '公開口論がクラブ中に広まった。'}${joueur.club}は${montant}ユーロの罰金を科し、スタッフの信頼も低下した。`],
+      banc: ['🪑 ベンチ降格', `${joueur.club}は${fuite ? '流出メッセージ' : '公開口論'}を処分。${montant}ユーロの罰金と${semaines}週間の強制ベンチスタート。`],
+      suspension: ['⛔ クラブから出場停止', `${joueur.club}は口論を看過できないと判断。${montant}ユーロの罰金と${semaines}週間の出場停止で、試合には出られない。`],
+      exclusion: ['📄 契約解除', `${joueur.club}は度重なる口論を理由に契約を解除。クラブを追放され、直ちに移籍市場へ戻る。`],
+    },
+  };
+
+  const ligne = langue === 'fr' ? fr[sanction.niveau] : traductions[langue][sanction.niveau];
+  return { titre: ligne[0], texte: ligne[1] };
+}
+
+export function miseAuBancSociale(semaines: number): { titre: string; texte: string } {
+  const langue = langueCourante();
+  const lignes: Record<Langue, [string, string]> = {
+    fr: ['Sanction interne', `Remplaçant imposé pendant ${semaines} semaine${semaines > 1 ? 's' : ''}`],
+    en: ['Internal sanction', `Forced substitute for ${semaines} week${semaines > 1 ? 's' : ''}`],
+    es: ['Sanción interna', `Suplente obligado durante ${semaines} semana${semaines > 1 ? 's' : ''}`],
+    it: ['Sanzione interna', `Riserva obbligata per ${semaines} settiman${semaines > 1 ? 'e' : 'a'}`],
+    de: ['Interne Sanktion', `Für ${semaines} Woche${semaines > 1 ? 'n' : ''} als Ersatzspieler gesetzt`],
+    pt: ['Sanção interna', `Suplente obrigatório durante ${semaines} semana${semaines > 1 ? 's' : ''}`],
+    ja: ['クラブ内処分', `${semaines}週間、強制的にベンチスタート`],
+  };
+  return { titre: lignes[langue][0], texte: lignes[langue][1] };
 }

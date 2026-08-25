@@ -221,6 +221,10 @@ export const REPONSES_NEGATIVES: Record<TypeCompte, string[]> = {
     'Je vais garder ce message pour la fin de saison. 📌',
     'Tu devrais mettre ton compte en privé, sincèrement.',
     'Encore un qui se croit arrivé. Classique.',
+    'Ferme-la deux minutes, ton rugby parle déjà contre toi.',
+    'Bouffon, même ton meilleur match n’a pas fait autant de bruit que ce post.',
+    'Tu chauffes le banc mais tu refroidis jamais ton téléphone. Fascinant.',
+    'T’es nul et bruyant : le doublé parfait.',
   ],
   media: [
     '⚠️ La publication de {joueur} fait polémique. La commission pourrait se saisir du dossier.',
@@ -240,6 +244,9 @@ export const REPONSES_NEGATIVES: Record<TypeCompte, string[]> = {
     'Appelle-moi. Tout de suite.',
     'On est une équipe. Là, tu joues perso.',
     'J’ai rien vu, j’ai rien lu. Pour ton bien. 🙈',
+    'Tu veux jouer au dur ? Commence par gagner ta place, clown.',
+    'Parle encore de moi et je publie tes stats, bouffon.',
+    'T’es vraiment en train d’insulter les autres avec ta saison ? Ferme-la.',
   ],
 };
 

@@ -17,6 +17,7 @@ import type { Joueur } from '../../types';
 
 // La confiance du staff et le niveau décident, de façon déterministe.
 export function estTitulaire(j: Joueur, cle: string): boolean {
+  if ((j.miseAuBanc?.semaines ?? 0) > 0) return false;
   const valeurs = Object.values(j.attributs ?? {});
   const general = valeurs.length ? valeurs.reduce((a, b) => a + b, 0) / valeurs.length : 45;
   const chance = 0.18 + (j.confianceCoach ?? 50) / 190 + (general - 45) / 120;

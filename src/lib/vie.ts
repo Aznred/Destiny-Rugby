@@ -35,7 +35,7 @@ export function humeur(relation: number): 'ami' | 'cordial' | 'neutre' | 'froid'
 }
 
 // Ce que le joueur vient d'écrire : agressif, chaleureux, ou entre les deux.
-const AGRESSIF = /\b(nul|nuls|merde|conn?ard|conn?asse|encul|batard|bâtard|ferme|ta gueule|tg|salope|abruti|débile|debile|clown|clochard|bouffon|dégage|degage|pourri|tocard|guignol|honte|ridicule)\w*/i;
+const AGRESSIF = /(?:\b(nul|nuls|merde|conn?ard|conn?asse|encul|batard|bâtard|ferme|ta gueule|tg|salope|abruti|débile|debile|clown|clochard|bouffon|dégage|degage|pourri|tocard|guignol|honte|ridicule|idiot|moron|trash|useless|asshole|fuck|shit|payaso|basura|inútil|pagliaccio|scarso|stronzo|nutzlos|arschloch|palhaço|otário)\w*|馬鹿|バカ|アホ|黙れ|クソ|雑魚)/i;
 const CHALEUREUX = /\b(merci|bravo|respect|felicitation|félicitation|content|hâte|hate|fier|force|courage|super|génial|genial|top|frère|frere|bisous|✊|💪|🤝|❤️|👏)/i;
 
 export function tonDuMessage(texte: string): 'agressif' | 'chaleureux' | 'neutre' {
@@ -47,28 +47,29 @@ export function tonDuMessage(texte: string): 'agressif' | 'chaleureux' | 'neutre
 // Comment un message fait bouger la relation.
 export function effetSurRelation(texte: string, relation: number): number {
   const ton = tonDuMessage(texte);
-  if (ton === 'agressif') return Math.max(-100, relation - 25);
+  if (ton === 'agressif') return Math.max(-100, relation - 32);
   if (ton === 'chaleureux') return Math.min(100, relation + 8);
   return Math.min(100, relation + 2); // parler, c'est déjà tisser un lien
 }
 
 // --- RÉPONSES HORS LIGNE, SELON L'HUMEUR ----------------------------------
 const RIPOSTES = [
-  'Répète-moi ça en face samedi, on verra si t’as la même voix. 😐',
+  'Ferme-la un peu : ton palmarès tient dans une bio X.',
   'Tu me parles comme ça alors que t’as fait quoi cette saison, exactement ?',
-  'Ok. Noté. On se retrouve sur le terrain, tranquille.',
-  'Franchement ? Va t’entraîner au lieu d’écrire des messages.',
-  'Mec, t’es en train de te griller tout seul, et devant tout le monde.',
-  'T’as vraiment pris le temps d’écrire ça. C’est fascinant.',
-  'Je garde le message. On en reparlera au moment où il faudra.',
-  'Continue. Sincèrement, continue. Ça m’aide.',
-  'Le pire, c’est que tu penses que ça m’atteint.',
-  'Y’a des gens qui bossent, et y’a toi.',
-  'Capture d’écran faite. Bonne soirée quand même.',
-  'Dimanche, 15h. Viens, on en discute.',
-  'Tu veux qu’on compare nos palmarès ou t’as compris tout seul ?',
-  'Je réponds une fois, et une seule : t’es hors sujet.',
-  'Le respect, ça se demande pas, ça se mérite. Toi t’as raté les deux.',
+  'Va t’entraîner, bouffon. Tes posts ont plus de rythme que ton rugby.',
+  'Tu te grilles tout seul et tu crois encore avoir gagné la discussion. Quel clown.',
+  'T’as vraiment écrit ça avec ton bilan ? La honte.',
+  'Continue, champion. Chaque message explique un peu mieux pourquoi tu chauffes le banc.',
+  'Tu ne m’atteins pas, tu rappelles juste à tout le monde que t’es nul.',
+  'Y’a des joueurs qui bossent, et y’a toi qui fais du bruit.',
+  'Capture faite. Ton club va adorer, abruti.',
+  'Compare nos palmarès avant d’ouvrir ta bouche, ça t’évitera le ridicule.',
+  'T’es hors sujet, hors niveau et bientôt hors du groupe.',
+  'Tu parles comme une star avec les stats d’un remplaçant.',
+  'Même ta meilleure punchline est plus faible que ton dernier match.',
+  'Le terrain te donne tort chaque week-end, ça devrait suffire.',
+  'Garde cette énergie pour gagner une place, clown.',
+  'Tu veux du respect ? Commence par arrêter de jouer comme un fantôme.',
 ];
 const FROIDES = [
   'Je préfère qu’on en reste là.',

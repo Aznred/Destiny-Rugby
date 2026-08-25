@@ -178,6 +178,9 @@ export interface Joueur {
   entrainementFocus?: AttributId;
   // --- Lot 6 : ce que le staff et le public pensent de toi ---
   confianceCoach?: number; // 0-100, 50 par défaut — pèse sur le temps de jeu
+  // Une mise au banc disciplinaire force réellement le statut de remplaçant.
+  // Champ optionnel pour que toutes les anciennes sauvegardes restent valides.
+  miseAuBanc?: { semaines: number; motif: string };
   popularite?: number; // 0-100, 50 par défaut — pèse sur la réputation et le marché
   agent?: string; // id de l'agent (data/agents.ts) — il se mérite, voir `choisirAgent`
   /**

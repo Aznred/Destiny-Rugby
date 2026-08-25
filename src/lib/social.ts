@@ -18,8 +18,11 @@ import {
   TON_PAR_ID, type Compte, type TypeCompte,
 } from '../data/social';
 import {
-  ambiancesSocialesTraduites, reponsesSocialesTraduites, sanctionSociale,
+  ambiancesSocialesTraduites, reponsesSocialesTraduites, sanctionEmbrouilleSociale,
 } from '../data/socialLocalise';
+import {
+  evaluerEmbrouilleSociale, type SanctionSociale,
+} from './disciplineSociale';
 import { graine } from './championnat';
 import { libelleDate, semaine } from '../data/calendrier';
 import { effetsTraits } from '../data/traits';
@@ -142,7 +145,7 @@ export interface Retombees {
   deltas: { reputation: number; moral: number; argent: number };
   coach: number;
   fans: number;
-  sanction?: { titre: string; texte: string; amende: number };
+  sanction?: SanctionSociale & { titre: string; texte: string };
 }
 
 export function publierPost(
@@ -262,21 +265,13 @@ export function publierPost(
   };
 
   if (derape) {
-    // Le club convoque. L'amende suit le salaire : elle doit piquer à tous
-    // les étages de la pyramide.
-    const amende = Math.max(150, Math.round((j.contrat?.salaire ?? 12_000) * 0.06));
-    const traduit = sanctionSociale(j, amende, grossier);
-    retombees.sanction = {
-      titre: traduit?.titre ?? '⚠️ Convoqué par le club',
-      texte: traduit?.texte ?? (grossier
-        ? `Ton message a fait le tour du championnat avant midi. ${j.club} publie un communiqué, te met à l’amende de ${amende.toLocaleString('fr-FR')} € et te rappelle « ce que représente le maillot ».`
-        : `Le service com’ de ${j.club} n’a pas apprécié. Amende interne de ${amende.toLocaleString('fr-FR')} €, et une discussion très fraîche avec le staff.`),
-      amende,
-    };
-    retombees.deltas.argent = -amende;
-    retombees.deltas.moral -= 6;
-    retombees.coach -= 12;
-    retombees.deltas.reputation -= 2;
+    const sanction = evaluerEmbrouilleSociale(j, texte, {
+      canal: 'publication', cle: idPost, tonClash: ton.id === 'clash',
+    });
+    if (sanction) {
+      const traduit = sanctionEmbrouilleSociale(j, sanction);
+      retombees.sanction = { ...sanction, ...traduit };
+    }
   }
 
   return retombees;

@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "verify:situations": "vite-node scripts/verifierSituations.ts"
+    "verify:situations": "vite-node scripts/verifierSituations.ts",
+    "verify:social": "vite-node scripts/verifierDisciplineSociale.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

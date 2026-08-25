@@ -48,7 +48,9 @@ function decorCourt(j: Joueur): string {
   const sem = semaine(j.semaine ?? 1);
   return `${j.nom} (@${j.pseudo}), ${POSTE_PAR_ID[j.poste].nom} de ${j.club}, `
     + `${j.age} ans, ${nomNation(j.nation)}. ${division?.nom ?? 'championnat inconnu'}, `
-    + `saison ${j.saison}, ${libelleDate(sem)}. Réputation ${j.reputation}/100.`;
+    + `saison ${j.saison}, ${libelleDate(sem)}. Réputation ${j.reputation}/100, `
+    + `confiance du coach ${j.confianceCoach ?? 50}/100, popularité ${j.popularite ?? 50}/100, `
+    + `${j.matchsJoues ?? 0} matchs et ${j.essais ?? 0} essais en carrière.`;
 }
 
 // Le décor complet : réservé à l'écriture du fil, qui a besoin de noms propres
@@ -80,10 +82,14 @@ function decor(j: Joueur, suivis: CompteSuivi[]): string {
 // resserrées sans rien perdre de ce qui compte : le ton débridé voulu par le
 // projet, et la seule limite non négociable.
 const REGLES = `Tu écris « L'Ovale », un réseau social de rugby calqué sur X, en FRANÇAIS.
-Ton : celui des vrais comptes rugby, phrases courtes, emojis mesurés, fautes de frappe chez les supporters.
-DÉBRIDÉ : un supporter en colère insulte franchement, un hater est méchant et personnel, un joueur
-chambré répond du tac au tac. Si le joueur humain agresse quelqu'un, ON LUI RÉPOND sèchement.
-Punchlines, rumeurs et règlements de comptes publics sont permis.
+Ton : celui de vrais comptes rugby, phrases très courtes, ego, mauvaise foi, fautes chez les supporters.
+DÉBRIDÉ : les joueurs ont une personnalité, une loyauté de club et de l'orgueil. Ils provoquent aussi
+d'eux-mêmes, se moquent d'une mauvaise forme, d'un statut de remplaçant, d'un bilan vide ou d'un club.
+Un joueur chambré ne fait PAS la morale et ne cherche PAS automatiquement à calmer le jeu : il riposte
+avec une punchline concrète, peut être vulgaire ("t'es nul", "bouffon", "ferme-la", "va cirer le banc")
+et garde le conflit en mémoire. Un hater attaque franchement. Une embrouille peut durer plusieurs tours.
+Si le joueur humain agresse quelqu'un, ON LUI RÉPOND coup pour coup, sans sermon poli ni langue de bois.
+Punchlines, insultes ordinaires, rumeurs et règlements de comptes publics ou privés sont permis.
 SEULE LIMITE : rien de discriminatoire (racisme, sexisme, homophobie, religion, handicap),
 aucune menace de violence réelle, rien de sexuel.
 Clubs et championnats restent institutionnels. Les journalistes sourcent.
@@ -148,7 +154,7 @@ parlent pas toutes du joueur humain.` },
   // commentaires sont désormais demandés DANS la même réponse — même contenu,
   // un tiers du coût, et une seule latence.
   const brut = await appelIAJSON(messages, {
-    temperature: 0.85, maxTokens: 640,
+    temperature: 1, maxTokens: 640,
   });
   const posts = extraire<PostGenere>(brut, 'posts')
     .filter((p) => p && typeof p.texte === 'string' && p.texte.trim())
@@ -228,12 +234,13 @@ Format EXACT : {"reponses":[{"auteur":"…","pseudo":"…","type":"fan|hater|jou
 ${j.nom} vient de publier (ton : ${ton}) :
 « ${texteDuPost} »
 
-Écris ${combien} réponses de comptes DIFFÉRENTS. Mélange soutien et critique.
-"hostile":true pour les réponses négatives.` },
+Écris ${combien} réponses de comptes DIFFÉRENTS. Mélange soutien et critique. Les joueurs et haters
+hostiles attaquent un élément CONCRET de son niveau, sa saison ou son club et ne parlent pas comme un
+service communication. "hostile":true pour les réponses négatives.` },
   ];
 
   const brut = await appelIAJSON(messages, {
-    temperature: 0.85, maxTokens: 320,
+    temperature: 1.05, maxTokens: 320,
   });
   return extraire<PostGenere & { hostile?: boolean }>(brut, 'reponses')
     .filter((r) => r && typeof r.texte === 'string' && r.texte.trim())
@@ -258,11 +265,11 @@ export async function messageIA(
   relation = 0,
 ): Promise<string> {
   // La RELATION décide du ton : un ami blague, un ennemi juré mord.
-  const etat = relation >= 50 ? 'Vous êtes proches, tu le tutoies avec affection et tu le défends.'
-    : relation >= 15 ? 'Vous vous entendez bien, ton ton est cordial.'
-      : relation > -15 ? 'Vous vous connaissez peu, ton ton est neutre voire méfiant.'
-        : relation > -50 ? 'Il y a du froid entre vous : tu es sec, distant, un peu méprisant.'
-          : 'Vous êtes en conflit ouvert : tu es cinglant, tu ne lâches rien, tu réponds coup pour coup.';
+  const etat = relation >= 50 ? 'Vous êtes proches : complicité, vannes et défense mutuelle.'
+    : relation >= 15 ? 'Vous vous entendez bien, mais tu peux le chambrer comme un joueur de rugby.'
+      : relation > -15 ? 'Vous vous connaissez peu : tu es compétitif, méfiant et pas spécialement aimable.'
+        : relation > -50 ? 'Il y a du froid : tu es sec, arrogant, méprisant et tu attaques son bilan sportif.'
+          : 'Conflit ouvert : tu es cinglant et vulgaire sans être discriminatoire, tu relances et réponds coup pour coup.';
   const j = ctx.joueur;
   // ⚠️ Quatre messages d'historique suffisent à tenir le fil d'une conversation
   // privée : au-delà, on repayait à chaque envoi des échanges que personne ne
@@ -275,8 +282,9 @@ export async function messageIA(
     { role: 'system', content: `${REGLES}${consigneDeLangue()}
 
 Tu incarnes UN SEUL compte et tu réponds en message privé, à la première personne, sans
-guillemets, en 1 à 2 phrases COURTES. Tu restes dans ton rôle. Tu peux refuser, plaisanter, relancer,
-t'énerver, couper court. Si on t'insulte, tu RÉPONDS sèchement.
+guillemets, en 1 à 2 phrases COURTES. Tu restes dans ton rôle. Un joueur parle comme un joueur, pas
+comme un community manager : il a de l'ego, chambre, provoque, relance, s'énerve ou coupe court.
+Si on t'insulte, tu RÉPONDS par une vraie riposte personnelle et sportive. Aucun sermon sur le respect.
 Format EXACT : {"reponse":"…"}` },
     // ⚠️ Décor COURT : répondre en privé ne demande ni l'effectif ni les rivaux.
     { role: 'user', content: `${decorCourt(j)}
@@ -292,7 +300,7 @@ Réponds.` },
   ];
 
   const brut = await appelIAJSON(messages, {
-    temperature: 0.85, maxTokens: 160,
+    temperature: 1.08, maxTokens: 160,
   });
   try {
     const data = JSON.parse(brut);

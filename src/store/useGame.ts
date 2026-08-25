@@ -32,6 +32,10 @@ import {
   publierPost, pseudoDe, feedAmbiance, suggestionsLocales,
   estCertifie, statsDepuisVues, LIMITE_CARACTERES, vieillirPost,
 } from '../lib/social';
+import {
+  appliquerSanctionSociale, evaluerEmbrouilleSociale,
+} from '../lib/disciplineSociale';
+import { sanctionEmbrouilleSociale } from '../data/socialLocalise';
 import { filIA, reponsesIA, messageIA } from '../lib/iaSociale';
 import {
   abonnesCible, annuaire, bassinSocial, pseudoStable, rapprocherAbonnes,
@@ -1522,6 +1526,10 @@ export const useGame = create<GameState>()(
           ? { ...joueur.blessure, semaines: blessureRestante }
           : null;
         const guerie = !!joueur.blessure && !blessure;
+        const bancRestant = Math.max(0, (joueur.miseAuBanc?.semaines ?? 0) - semainesSautees);
+        const miseAuBanc = joueur.miseAuBanc && bancRestant > 0
+          ? { ...joueur.miseAuBanc, semaines: bancRestant }
+          : undefined;
 
         // 2. La préparation d'été. Un vétéran remonte moins haut qu'un espoir,
         // et un joueur encore à l'infirmerie ne fait pas de préparation.
@@ -1557,6 +1565,7 @@ export const useGame = create<GameState>()(
           essais: joueur.essais + essaisSaison,
           forme,
           blessure,
+          miseAuBanc,
           semaine: 1,
           entrainementSemaine: undefined,
           saisonEnCours: undefined,
@@ -2332,6 +2341,12 @@ export const useGame = create<GameState>()(
           j = { ...j, blessure: reste > 0 ? { ...j.blessure, semaines: reste } : null };
         } else if (resultat.blessure && !matchDejaVecu) {
           j = appliquerDeltas({ ...j, blessure: resultat.blessure }, deltasBlessure(resultat.blessure));
+        }
+        // La mise au banc a pesé sur la feuille qui vient d'être jouée, puis sa
+        // durée baisse. Elle disparaît proprement au terme de la sanction.
+        if ((j.miseAuBanc?.semaines ?? 0) > 0) {
+          const reste = j.miseAuBanc!.semaines - 1;
+          j = { ...j, miseAuBanc: reste > 0 ? { ...j.miseAuBanc!, semaines: reste } : undefined };
         }
         const vecu: BilanEnCours = joueur.saisonEnCours ?? {
           matchs: 0, titularisations: 0, essais: 0, notes: [], capes: 0, stats: STATS_VIDES,
@@ -3993,6 +4008,7 @@ export const useGame = create<GameState>()(
         const derapage = lireDerapage(propre);
         let entreeDure: EntreeJournal | null = null;
         let carriereFinie = false;
+        let exclusionSociale = false;
         if (derapage) {
           const c = consequenceDuDerapage(derapage);
           const effet = appliquerConsequence(j, c.type, c.motif, c.semaines);
@@ -4008,6 +4024,10 @@ export const useGame = create<GameState>()(
             texte: `${effet.texte} La publication est capturée, relayée, et ne disparaîtra jamais. `
               + `La moitié de tes abonnés se désabonnent dans la journée.`,
           };
+        } else if (r.sanction) {
+          const effet = appliquerSanctionSociale(j, r.sanction);
+          j = effet.joueur;
+          exclusionSociale = effet.exclusion;
         }
 
         const notifs: NotifSocial[] = [
@@ -4032,6 +4052,13 @@ export const useGame = create<GameState>()(
             saison: j.saison,
             semaine: j.semaine ?? 1,
           })),
+          ...(!derapage && r.sanction
+            ? [{
+                id: idUnique(), emoji: r.sanction.niveau === 'banc' ? '🪑' : '⚠️',
+                titre: r.sanction.titre, texte: r.sanction.texte,
+                saison: j.saison, semaine: j.semaine ?? 1,
+              }]
+            : []),
         ];
 
         set((s) => ({
@@ -4040,14 +4067,14 @@ export const useGame = create<GameState>()(
           notifsSocial: [...notifs, ...s.notifsSocial].slice(0, 40),
           journal: [
             ...s.journal,
-            ...(r.sanction
+            ...(!derapage && r.sanction
               ? [{
                   id: idUnique(),
                   saison: j.saison,
                   role: 'systeme' as const,
                   titre: r.sanction.titre,
                   texte: r.sanction.texte,
-                  deltas: { argent: -r.sanction.amende, moral: -6 },
+                  deltas: { argent: -r.sanction.amende },
                 }]
               : []),
             ...(entreeDure ? [entreeDure] : []),
@@ -4061,6 +4088,7 @@ export const useGame = create<GameState>()(
           && consequenceDuDerapage(derapage).type === 'exclusionClub') {
           get().retrouverUnClub();
         }
+        if (exclusionSociale) get().retrouverUnClub();
         if (carriereFinie) get().prendreRetraite();
       },
 
@@ -4254,9 +4282,9 @@ export const useGame = create<GameState>()(
       },
 
       // ---- RÉPONDRE SOUS UN POST ----
-      // Commenter n'est pas publier : ça ne touche ni l'audience ni le club.
-      // En revanche l'auteur du post RÉPOND — l'IA si une clé est là, sinon
-      // les ripostes locales, avec le ton dicté par la relation.
+      // Une réponse est publique : l'auteur riposte ET le club peut la voir.
+      // Une récidive peut donc coûter une amende, le banc, une suspension ou
+      // le contrat — exactement comme une publication autonome.
       repondreAuPost: async (id, texte) => {
         const { joueur, posts } = get();
         const propre = texte.trim().slice(0, LIMITE_CARACTERES);
@@ -4296,6 +4324,10 @@ export const useGame = create<GameState>()(
           pseudo: cible.pseudo, nom: cible.auteur, avatar: cible.avatar,
           type: (cible.type as CompteSuivi['type']) ?? 'fan', abonnes: 2000,
         };
+        const sanction = evaluerEmbrouilleSociale(joueur, propre, {
+          canal: 'commentaire', cibleType: compte.type, relation: apres,
+          cle: `${id}#${cible.pseudo}`,
+        });
         let reponse = '';
         if (get().iaActivee && iaDisponible()) {
           set({ chargementSocial: true, erreurSocial: null });
@@ -4332,7 +4364,13 @@ export const useGame = create<GameState>()(
           date: libelleDate(sem),
           ...statsDepuisVues(cible.vues * (0.05 + rng2() * 0.2), rng2),
         };
+        const joueurCourant = get().joueur;
+        const effetSanction = sanction && joueurCourant
+          ? appliquerSanctionSociale(joueurCourant, sanction)
+          : null;
+        const libelleSanction = sanction ? sanctionEmbrouilleSociale(joueur, sanction) : null;
         set((s) => ({
+          joueur: effetSanction?.joueur ?? s.joueur,
           posts: s.posts.map((p) =>
             p.id === id ? { ...p, reponses: [...(p.reponses ?? []), sienne] } : p,
           ),
@@ -4342,9 +4380,24 @@ export const useGame = create<GameState>()(
               titre: `@${cible.pseudo} a répondu à ton commentaire`,
               texte: reponse, saison: joueur.saison, semaine: joueur.semaine ?? 1,
             },
+            ...(libelleSanction
+              ? [{
+                  id: idUnique(), emoji: sanction?.niveau === 'banc' ? '🪑' : '⚠️',
+                  titre: libelleSanction.titre, texte: libelleSanction.texte,
+                  saison: joueur.saison, semaine: joueur.semaine ?? 1,
+                }]
+              : []),
             ...s.notifsSocial,
           ].slice(0, 40),
+          journal: libelleSanction
+            ? [...s.journal, {
+                id: idUnique(), saison: joueur.saison, role: 'systeme' as const,
+                titre: libelleSanction.titre, texte: libelleSanction.texte,
+                deltas: sanction?.amende ? { argent: -sanction.amende } : undefined,
+              }]
+            : s.journal,
         }));
+        if (effetSanction?.exclusion) get().retrouverUnClub();
         get().signalerDefi('post');
       },
 
@@ -4513,7 +4566,22 @@ export const useGame = create<GameState>()(
           }
         }
         if (!reponse) reponse = reponseLocale(compte, apres, mien.texte);
+        // Un privé peut être capturé. Les comptes institutionnels répondent par
+        // leur propre procédure ; pour les joueurs, supporters et haters, une
+        // fuite devient une vraie affaire disciplinaire.
+        const sanction = compte.type === 'club' || compte.type === 'competition'
+          ? null
+          : evaluerEmbrouilleSociale(joueur, mien.texte, {
+              canal: 'messagePrive', cibleType: compte.type, relation: apres,
+              cle: `${mien.id}#${pseudo}`,
+            });
+        const joueurCourant = get().joueur;
+        const effetSanction = sanction && joueurCourant
+          ? appliquerSanctionSociale(joueurCourant, sanction)
+          : null;
+        const libelleSanction = sanction ? sanctionEmbrouilleSociale(joueur, sanction) : null;
         set((s) => ({
+          joueur: effetSanction?.joueur ?? s.joueur,
           conversations: {
             ...s.conversations,
             [pseudo]: [
@@ -4524,7 +4592,22 @@ export const useGame = create<GameState>()(
               },
             ],
           },
+          notifsSocial: libelleSanction
+            ? [{
+                id: idUnique(), emoji: sanction?.niveau === 'banc' ? '🪑' : '⚠️',
+                titre: libelleSanction.titre, texte: libelleSanction.texte,
+                saison: joueur.saison, semaine: joueur.semaine ?? 1,
+              }, ...s.notifsSocial].slice(0, 40)
+            : s.notifsSocial,
+          journal: libelleSanction
+            ? [...s.journal, {
+                id: idUnique(), saison: joueur.saison, role: 'systeme' as const,
+                titre: libelleSanction.titre, texte: libelleSanction.texte,
+                deltas: sanction?.amende ? { argent: -sanction.amende } : undefined,
+              }]
+            : s.journal,
         }));
+        if (effetSanction?.exclusion) get().retrouverUnClub();
       },
 
       aimerPost: (id) =>
@@ -5862,8 +5945,9 @@ function jouerMatch(j: Joueur, intensite: number): ResultatSemaine {
   const confiance = ((j.confianceCoach ?? 50) - 50) / 200;
   const chanceTitulaire = Math.max(0.05, Math.min(0.95, 0.5 + ecart / 16 + confiance));
   const tirage = Math.random();
-  const titulaire = tirage < chanceTitulaire;
-  const remplacant = !titulaire && tirage < chanceTitulaire + 0.3;
+  const forceBanc = (j.miseAuBanc?.semaines ?? 0) > 0;
+  const titulaire = !forceBanc && tirage < chanceTitulaire;
+  const remplacant = forceBanc || (!titulaire && tirage < chanceTitulaire + 0.3);
 
   if (!titulaire && !remplacant) {
     return {
@@ -5918,7 +6002,9 @@ function jouerMatch(j: Joueur, intensite: number): ResultatSemaine {
 
   const recit = titulaire
     ? `Titulaire, tu joues ${minutes} minutes.`
-    : `Tu entres en jeu et disputes ${minutes} minutes.`;
+    : forceBanc
+      ? `Sanctionné par le club, tu débutes sur le banc puis disputes ${minutes} minutes.`
+      : `Tu entres en jeu et disputes ${minutes} minutes.`;
   const finition = essais > 0 ? ` Tu marques ${essais === 1 ? 'un essai' : `${essais} essais`} !` : '';
   const bobo = blessure ? ` 🚑 ${messageBlessure(blessure)}` : '';
   const details = ` (${stats.plaquages} plaquages${stats.butsTentes ? `, ${stats.butsReussis}/${stats.butsTentes} au pied` : ''}${stats.grattages ? `, ${stats.grattages} grattage` : ''}${stats.cartonsJaunes ? ', carton jaune 🟨' : ''})`;

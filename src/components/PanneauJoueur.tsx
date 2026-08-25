@@ -23,6 +23,7 @@ import { coupeEnDirect, coupesDuClub, matchDuTourCourant } from '../lib/coupe';
 import { matchPhaseFinaleDuJoueur } from '../lib/phaseFinale';
 import { convocation, convocationU20 } from '../lib/selection';
 import { nomBlessure } from '../lib/blessures';
+import { miseAuBancSociale } from '../data/socialLocalise';
 import { EQUIPEMENT_PAR_ID } from '../data/boutique';
 // ⚠️ LE MATCH EN DIRECT ARRIVE AU CLIC, pas au chargement de la page. Ce
 // composant tire derrière lui tout `lib/moteur/` (le terrain, la tactique, les
@@ -274,6 +275,16 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           </span>
         </div>
       )}
+
+      {(joueur.miseAuBanc?.semaines ?? 0) > 0 && (() => {
+        const sanction = miseAuBancSociale(joueur.miseAuBanc!.semaines);
+        return (
+          <div className="bandeau-blessure" data-gravite="banc">
+            🪑 <b>{sanction.titre}</b>
+            <span>{sanction.texte}</span>
+          </div>
+        );
+      })()}
 
       {/* Jauges sur deux colonnes : demande explicite — tout doit tenir dans
           l'écran, sans défilement du panneau. */}
