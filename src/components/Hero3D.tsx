@@ -101,12 +101,29 @@ export function Hero3D({ skinId = 'classique' }: { skinId?: string }) {
             ))}
           </>
         ) : (
-          // ⚠️ PAS DE `<Float>` NON PLUS (« aucun asset ne tourne dans le
-          // menu ») : le ballon d'accueil se contente d'une belle pose.
+          // ⚠️ LE BALLON D'ACCUEIL TOURNE À NOUVEAU (demande explicite : « remets
+          // l'animation du ballon qui tourne, mais pas du joueur »). Il ne
+          // tournait plus depuis la règle « aucun asset ne tourne dans le menu
+          // ou le profil » — règle qui visait le RUGBYMAN, dont la rotation
+          // lente donnait l'impression d'un mannequin sur un plateau tournant.
+          //
+          // ⚠️ ET LA RÈGLE TIENT TOUJOURS POUR LE RESTE : le personnage reste
+          // immobile (`Rugbyman3D`, aucune rotation), et le ballon qu'il TIENT
+          // au creux du bras reste figé lui aussi — celui-là est posé pile sur
+          // le ballon cuit dans le maillage du modèle pour le recouvrir, le
+          // faire tourner découvrirait celui du dessous. Ici, le ballon est
+          // seul en scène : rien à découvrir, et une belle pose statique n'a
+          // jamais vendu un jeu.
+          //
+          // ⚠️ `tourne` fait DEUX choses, et c'est voulu : la rotation sur le
+          // grand axe (~0,5 rad/s) ET un flottement vertical de ±0,12 — les
+          // deux vivent dans le même `useFrame` de `ModeleBallon` et de
+          // `BallonRugby`. Pas besoin d'un `<Float>` de drei par-dessus, il
+          // ferait doublon.
           <group rotation={[0.1, -0.3, 0]}>
             {skin.glb
-              ? <ModeleBallon url={skin.glb} tourne={false} />
-              : <BallonRugby skinId={skinId} tourne={false} />}
+              ? <ModeleBallon url={skin.glb} />
+              : <BallonRugby skinId={skinId} />}
           </group>
         )}
 
