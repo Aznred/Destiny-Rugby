@@ -65,6 +65,7 @@ Three.js (@react-three/fiber + @react-three/drei) · Groq (API distante).
 | `src/components/Offres.tsx` | Panneau **« Choix de carrière »** (portal) : contrat en cours, cartes d'offres (logo, division, note du club, salaire, prime, durée), signature. |
 | `src/components/Drapeau.tsx` | Vrais drapeaux **SVG** (lib `flag-icons`, locale) — les emojis drapeaux ne s'affichent pas sous Windows. `CODES` vient de `data/nations.ts` (202 nations) + quelques entités des données réelles. `ALIAS` absorbe les orthographes des données (« Afrique du sud », « Pays-de-Galles »…). `nomNation()` retire l'emoji de tête (compat anciennes sauvegardes « 🇫🇷 France »). |
 | `src/components/Blason.tsx` | Écusson d'un club : **vrai logo** (`club.logo`, un `<img>` sur pastille sombre) si la base en fournit un, sinon blason SVG généré (initiales + couleurs). `LogoEquipe` fait la même chose pour une équipe dont on n'a que le nom (sélections). |
+| `src/components/Icone.tsx` | **Les icônes du jeu**, douze tracés sur une grille de 24, en `currentColor`, sans dépendance. ⚠️ Elles remplacent les emoji dans la barre d'action du panneau, la navigation basse et les réglages : un emoji est dessiné par Apple, Google ou Microsoft — pas par nous —, il est en couleur (jamais la nôtre) et il ne s'aligne pas sur une ligne de texte. Voir « ÇA FAIT TROP IA » en bas de ce fichier. |
 | `src/components/FicheClub.tsx` | Modale « effectif du club », ouverte au **clic sur un club** dans Championnats. Affiche note du club, force d'effectif et tous les joueurs poste par poste, pour la **saison en cours** de la carrière. Échap ou clic hors modale ferment. ⚠️ `createPortal(document.body)` obligatoire (backdrop-filter des `.carte`). |
 | `src/components/Selecteur.tsx` | **Liste déroulante maison** (un `<select>` natif ne peut ni afficher de drapeau ni être stylé : son menu est rendu par l'OS). Gère vignettes, groupes, recherche (auto > 10 options), clavier (↑↓/Entrée/Échap), clic extérieur. Utilisée dans `Creation` (nation, division, club). ⚠️ Le défilement auto ne s'applique qu'au clavier (`parClavier`) — sinon la liste saute sous le curseur à l'ouverture. |
 | `src/data/boutique.ts` | `SKINS` de ballon (`glb?` = modèle 3D dédié), `BOOSTS`, `PACKS` d'Ovas (achat réel non branché). |
@@ -8158,3 +8159,150 @@ serverless Vercel, Vite ne la sert pas. `langueDepuisAdresseIP()` reçoit un 404
 renvoie `null` en silence, et la langue du navigateur reste en place — c'est le
 comportement prévu. La détection ne se constate donc qu'en production ; le banc
 d'essai, lui, appelle le handler directement.
+
+---
+
+## 🎨 « ÇA FAIT TROP IA » — les six réflexes qui trahissent une interface générée
+
+Retour de jeu : « rends l'UI beaucoup plus belle, ça fait trop IA, rends-la plus
+propre, pro et jolie ».
+
+⚠️ **LE REPROCHE EST IDENTIFIABLE, PAS SUBJECTIF.** Ce qui faisait « généré », ce
+n'était pas la palette — stade nocturne, cuir, dorures : elle est bonne et elle
+est à nous. C'étaient **six réflexes** qu'on retrouve dans presque toute
+interface sortie d'un modèle, et qui étaient tous présents :
+
+| # | Le réflexe | Où il était |
+|---|---|---|
+| 1 | une **lueur colorée** sous les boutons | `box-shadow: 0 10px 24px -8px rgba(or,.55)` |
+| 2 | un **soulèvement au survol** sur TOUS les boutons | `.btn:hover { transform: translateY(-2px) }` |
+| 3 | la **gélule complète** (999 px) sur tout ce qui se clique | `.btn`, partout |
+| 4 | le **verre dépoli** | `backdrop-filter: blur(6px)` sur `.carte` |
+| 5 | **une seule ombre**, énorme et floue, sur tout | `--ombre: 0 18px 50px -12px` |
+| 6 | des **emoji en guise d'icônes** | 👥 ✈️ 📊 🏉 👤 ⚙️ |
+
+Aucun n'est faux isolément. Ensemble, ils produisent une page sans matière, sans
+hiérarchie et sans contact avec elle-même : tout flotte à la même hauteur, tout
+brille pareil, tout est arrondi pareil.
+
+### 1. De la matière, pas du verre
+
+Le verre dépoli est le raccourci le plus reconnaissable de l'interface générée :
+il coûte cher au défilement, il rend le texte moins net, et il donne à toutes les
+cartes la même consistance de gelée. À la place : un fond **opaque**, une lumière
+qui tombe du haut sur 96 px, et surtout une **arête claire d'un pixel** sur le
+bord supérieur (`inset 0 1px 0 rgba(255,255,255,.07)`).
+
+⚠️ **C'EST CE PIXEL QUI FAIT PRESQUE TOUT LE TRAVAIL.** Une surface sans arête
+haute éclairée ressemble à un rectangle coloré ; avec elle, elle ressemble à un
+matériau posé sous une lampe. C'est la différence entre un aplat et un objet.
+
+### 2. Une échelle d'élévation, pas une ombre unique
+
+Une ombre réelle a **deux composantes** — un contact serré et sombre juste sous
+l'objet, une diffusion large et faible. `--ombre-1/2/3` remplacent l'ombre unique
+et floue ; `--ombre` reste comme alias du niveau 2, donc les 40 règles qui
+l'utilisaient n'ont pas eu à changer.
+
+### 3. Des boutons qui ressemblent à des touches
+
+⚠️ **LA LUEUR DORÉE DISPARAÎT.** Une ombre portée **colorée** n'existe pas dans
+le monde physique : un objet jaune ne projette pas de halo jaune, il projette une
+ombre grise. C'est joli deux secondes et ça date une interface instantanément.
+
+Ce qui la remplace tient en trois traits, et c'est ainsi qu'on dessine une touche
+depuis toujours : un liseré clair **en haut** (la lumière sur l'arête), un bord
+sombre **en bas** (l'épaisseur), une ombre de contact courte. Au survol le bouton
+**s'éclaire** (`filter: brightness(1.06)`) au lieu de monter de deux pixels ; à
+l'appui il s'enfonce (ombre interne).
+
+Et les rayons deviennent une **échelle** (`--rayon` 14, `--rayon-controle` 11,
+`--rayon-sm` 10, `--rayon-pilule` 999) : le grand cadre est plus doux que le
+bouton qu'il contient, ce qui se lit immédiatement comme du travail de métier.
+La gélule reste là où c'en est vraiment une — pastilles de navigation, badges.
+
+### 4. Le grain
+
+⚠️ **UN FOND FAIT DE TROIS DÉGRADÉS CSS EST PARFAITEMENT LISSE**, et aucun écran,
+aucune impression, aucune photographie ne l'est. C'est ce lissé absolu que l'œil
+lit comme « fait par une machine », sans savoir le nommer. Un bruit à 3,5 %
+(`feTurbulence` en `data:` URI, ~200 octets, aucune requête) casse les bandes de
+dégradé des aplats sombres et donne de la matière. Coupé sous 700 px : un calque
+fixe qui se recompose à chaque image coûte cher sur un téléphone et n'apporte
+rien à cette taille.
+
+### 5. `src/components/Icone.tsx` — douze tracés, zéro dépendance
+
+Les emoji sont le signal le plus fort du lot, pour trois raisons qui n'ont rien
+de subjectif :
+
+1. **ils ne sont pas à nous** : 👥 ✈️ 📊 sont dessinés par Apple, Google et
+   Microsoft, chacun à sa façon — l'interface change d'aspect selon la machine ;
+2. **ils sont en couleur, et pas dans la nôtre** : un avion bleu ciel au milieu
+   d'une palette or et vert nocturne ne se fond jamais, il se pose dessus ;
+3. **ils ne s'alignent pas** : hauteur, ligne de base et marges varient d'un
+   système à l'autre, d'où les décalages d'un pixel qu'on rattrape sans fin.
+
+Douze tracés sur une grille de 24, en `currentColor` : ils prennent la couleur du
+texte, s'éclairent avec lui au survol, et changent de taille sans flouter.
+⚠️ **On n'ajoute pas une bibliothèque pour ça** — elle pèserait 50 à 300 Ko pour
+qu'on en utilise huit, et imposerait un style qui n'est pas celui du jeu.
+
+⚠️ **DES CURSEURS, PAS UN ENGRENAGE, POUR LES RÉGLAGES.** Un engrenage demande au
+moins huit dents pour être reconnu ; à 18 px, huit rayons autour d'un cercle se
+lisent comme un **soleil** — c'est exactement ce que donnait la première version,
+vu à l'écran. Trois faders restent lisibles à 16 px.
+
+Remplacés : la barre d'action du panneau (5 icônes), la barre de navigation basse
+du téléphone (5), le bouton de réglages (3 emplacements). **13 emoji en moins**
+aux endroits les plus vus.
+
+### 6. Le récit se lit enfin
+
+⚠️ **LE JOURNAL ÉTAIT EN ITALIQUE, DANS UN CADRE EN POINTILLÉS** — les deux
+conventions du texte *provisoire*. L'italique sur un paragraphe entier ralentit
+la lecture d'environ 15 %, et le pointillé est ce qu'on dessine quand on n'a pas
+décidé du cadre. Or c'est le texte le plus lu du jeu. Il devient du texte normal
+adossé à un **filet doré à gauche** : la convention typographique de la citation,
+qui dit « ceci est une voix » sans crier.
+
+### 7. Le fil s'ancre en bas
+
+En début de carrière, le journal contient deux entrées et la colonne du milieu
+était un **rectangle vide de six cents pixels** avec le champ de saisie seul en
+bas. C'est la première chose que l'œil rencontrait, et ça se lit comme un écran
+inachevé. Un fil de conversation s'ancre en bas — convention de toutes les
+messageries, et elle a une raison : le message le plus récent doit être au plus
+près de l'endroit où l'on écrit. Le vide passe alors au-dessus, où il se lit
+comme une marge.
+
+⚠️ `justify-content: flex-end` sur un conteneur qui défile **coupe le début du
+contenu** dans Firefox et Safari (le débordement part vers le haut, hors de
+portée du défilement). La parade est `margin-top: auto` sur le premier enfant.
+
+### 🩹 Et une régression du lot précédent, vue à l'écran
+
+La barre d'actions collée en bas du panneau avait un **dégradé transparent →
+opaque À L'INTÉRIEUR d'elle-même**. Vu en jeu : le tiers haut laissait passer les
+boutons d'entraînement qui défilaient dessous — ça ne se lisait pas comme un
+fondu, ça se lisait comme un bug d'empilement. Le fondu est devenu un `::before`
+posé **juste au-dessus** de la barre ; la barre elle-même est franche, avec son
+filet. Elle n'aurait pas été trouvée sans regarder l'écran : toutes les mesures
+du DOM étaient bonnes.
+
+### Ce qui n'a pas bougé
+
+**Aucune géométrie** : pas une largeur, pas une grille, pas une taille de police
+de corps. Le lot ne touche qu'aux matières — arêtes, ombres, rayons, états — plus
+trois composants pour les icônes. **Rien du jeu n'est concerné** : ni store, ni
+barème, ni calendrier, ni données.
+
+`tsc`, `oxlint` et le build passent ; `verifEcrans`, `verifTraductions`,
+`verifGuide` et `verifMarche` sont au vert. Vérifié à l'écran en 1180 × 760 et
+375 × 812, sur l'accueil, la carrière, l'atlas et la boutique.
+
+⚠️ **UNE TRACE D'ERREUR RESTE DANS LE TAMPON DE LA CONSOLE** (`Icone is not
+defined`) : elle date des quelques secondes où le JSX utilisait `<Icone>` avant
+que la ligne d'import ne soit ajoutée, et le lecteur de console ne vide pas son
+historique. Le composant rend bien ses cinq icônes, aucun garde-fou d'erreur ne
+se déclenche, et la compilation est propre.

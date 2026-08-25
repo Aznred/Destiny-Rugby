@@ -418,6 +418,18 @@ s'affiche dans ⚙️ ; il n'est associé à aucun coût ni quota.
   à la main » — et éteignait la détection automatique **définitivement**, dès la
   première visite dans ⚙️. Les sauvegardes marquées à tort sont décoincées au
   chargement, sans écraser les vrais choix.
+- **Une interface qui ne fait plus « générée ».** Six réflexes trahissaient
+  l'interface sortie d'un modèle, et ils y étaient tous : une lueur dorée sous
+  les boutons, un soulèvement au survol sur chacun d'eux, la gélule complète
+  partout, le verre dépoli sur toutes les cartes, une ombre unique et floue sur
+  tout, et des emoji en guise d'icônes. À la place : des surfaces opaques avec
+  une arête claire d'un pixel (ce qui sépare un aplat d'un objet), une échelle
+  d'élévation à trois niveaux, des boutons dessinés comme des touches — liseré
+  clair en haut, bord sombre en bas, ils s'éclairent au lieu de sauter —, une
+  échelle de rayons, un grain de 3,5 % qui casse le lissé des dégradés, et
+  **douze icônes dessinées** (`src/components/Icone.tsx`) sans une dépendance de
+  plus. Le récit de carrière quitte l'italique et le cadre en pointillés pour un
+  filet doré, et le fil s'ancre en bas comme une messagerie.
 - **Trois ambiances** — Pelouse, Nuit, Grenat. La couleur du stade change, les
   dorures et le cuir restent.
 - **Jouable au pouce** : cinq destinations stables vivent dans une barre basse,

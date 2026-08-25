@@ -7,6 +7,7 @@ import { POSTE_PAR_ID, labelAttribut, nomPoste } from '../data/rugby';
 import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
 import { Blason, LogoEquipe } from './Blason';
+import { Icone } from './Icone';
 import { LogoCompet } from './LogoCompet';
 import { Drapeau } from './Drapeau';
 import { nomNation, nomNationTraduit } from '../lib/nations';
@@ -465,7 +466,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           onClick={() => { viserEffectif(equipeDuWeekEnd ? 'selection' : 'club'); setEcran('effectif'); }}
           title={t('pj.voirJoueursAide')}
         >
-          👥<span>{t('pj.equipe')}</span>
+          <Icone nom="equipe" /><span>{t('pj.equipe')}</span>
         </button>
         {/* ⚠️ LE MARCHÉ VIT SUR L'OVALE, PLUS DANS UN PANNEAU. Ce bouton ouvre
             les messages privés quand des clubs discutent, et sert à se mettre
@@ -476,14 +477,14 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             ? t('pj.messagesClubsAide')
             : t('pj.marcheAide')}
         >
-          ✈️<span>{t('pj.marche')}</span>
+          <Icone nom="marche" /><span>{t('pj.marche')}</span>
           {approchesOuvertes > 0 && <i className="badge-offres">{approchesOuvertes}</i>}
         </button>
         <button onClick={() => setEcran('tableau')} title={t('pj.resultatsAide')}>
-          📊<span>{t('pj.resultats')}</span>
+          <Icone nom="resultats" /><span>{t('pj.resultats')}</span>
         </button>
         <button onClick={() => setEcran('social')} title={t('pj.ovaleAide')}>
-          𝕏<span>{t('pj.ovale')}</span>
+          <Icone nom="ovale" /><span>{t('pj.ovale')}</span>
         </button>
         {/* Après 30 ans : transmettre pour durer (lot « corps, âge et fin de carrière ») */}
         {joueur.age >= 30 && !joueur.mentorat && (
@@ -491,19 +492,19 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             onClick={prendreMentorat}
             title={t('pj.mentorAide')}
           >
-            🧑‍🏫<span>{t('pj.mentor')}</span>
+            <Icone nom="mentor" /><span>{t('pj.mentor')}</span>
           </button>
         )}
         {joueur.mentorat && (
           <button disabled title={t('pj.mentoratAide')}>
-            🧑‍🏫<span>{t('pj.mentor')} ✓</span>
+            <Icone nom="mentor" /><span>{t('pj.mentor')} ✓</span>
           </button>
         )}
         <button
           onClick={() => setConfirmerRetraite(true)}
           title={t('pj.retraiteAide')}
         >
-          🏛️<span>{t('pj.retraite')}</span>
+          <Icone nom="retraite" /><span>{t('pj.retraite')}</span>
         </button>
       </div>
 

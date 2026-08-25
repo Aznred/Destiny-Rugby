@@ -29,9 +29,31 @@
   --bordure: rgba(232, 178, 58, 0.18);
   --bordure-forte: rgba(232, 178, 58, 0.4);
 
-  --ombre: 0 18px 50px -12px rgba(0, 0, 0, 0.7);
-  --rayon: 16px;
+  /* ═══ L'ÉLÉVATION — trois hauteurs, pas une seule ombre géante ════════════
+     ⚠️ Il n'y avait qu'un `--ombre` : `0 18px 50px -12px rgba(0,0,0,.7)`, posé
+     à l'identique sur les cartes, les modales et les vignettes. Une ombre
+     unique et très floue, c'est la signature d'une interface générée : rien ne
+     paraît posé sur rien, tout flotte à la même hauteur.
+     Une ombre réelle a DEUX composantes — un contact serré et sombre juste sous
+     l'objet, et une diffusion large et faible. C'est ce qui donne la matière. */
+  --ombre-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ombre-2: 0 2px 4px rgba(0, 0, 0, 0.34), 0 12px 28px -14px rgba(0, 0, 0, 0.68);
+  --ombre-3: 0 4px 10px rgba(0, 0, 0, 0.36), 0 28px 56px -22px rgba(0, 0, 0, 0.8);
+  --ombre: var(--ombre-2);
+
+  /* ⚠️ LE LISERÉ CLAIR DU HAUT, ET IL FAIT PLUS QUE TOUT LE RESTE. Une surface
+     sans arête haute éclairée ressemble à un rectangle coloré ; avec elle, elle
+     ressemble à un matériau posé sous une lumière. C'est un pixel. */
+  --arete: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+
+  /* ═══ LES RAYONS — une échelle, pas une valeur ════════════════════════════
+     Tout était à 16 px ou en gélule complète (999 px). Une échelle qui
+     distingue le CONTENANT du CONTRÔLE se lit tout de suite comme du travail
+     de métier : le grand cadre est plus doux que le bouton qu'il contient. */
+  --rayon: 14px;
   --rayon-sm: 10px;
+  --rayon-controle: 11px;
+  --rayon-pilule: 999px;
 
   --police-titre: 'Anton', 'Archivo', sans-serif;
   --police-forte: 'Archivo', system-ui, sans-serif;
@@ -146,6 +168,30 @@ body::before {
   background-image:
     repeating-linear-gradient(90deg, transparent 0 119px, rgba(245, 247, 242, 0.02) 119px 120px);
   z-index: 0;
+}
+
+/* ⚠️ LE GRAIN — ce qui distingue une surface peinte d'un dégradé CSS.
+   Un fond fait de deux `radial-gradient` et d'un `linear-gradient` est
+   PARFAITEMENT lisse : aucun écran, aucune impression, aucune photographie ne
+   l'est. C'est ce lissé absolu que l'œil lit comme « fait par une machine »,
+   sans savoir le nommer. Un bruit de 3 % suffit à casser les bandes de dégradé
+   (le fameux « banding » des aplats sombres) et à donner de la matière.
+   Le motif est un SVG en `data:` — aucune requête, ~200 octets, et il se répète
+   sur 160 px pour que la trame ne se voie jamais. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+/* Un grain fixe qui se recompose à chaque image coûte cher sur un téléphone, et
+   il n'apporte rien à cette taille d'écran. */
+@media (max-width: 700px) {
+  body::after { display: none; }
 }
 
 h1, h2, h3 {

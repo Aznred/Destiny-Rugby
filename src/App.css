@@ -2324,14 +2324,30 @@
   /* ⚠️ Le rembourrage BAS du panneau passe sur la barre elle-même : laissé sur
      le conteneur, il crée une bande sous la barre collée dans laquelle le
      contenu défilant réapparaît. */
+  /* ⚠️ LE FOND DE LA BARRE EST OPAQUE, ET LE DÉGRADÉ EST AU-DESSUS D'ELLE.
+     Première version : un dégradé transparent → opaque À L'INTÉRIEUR de la
+     barre. Vu à l'écran, le tiers haut laissait passer les boutons
+     d'entraînement qui défilaient dessous — ça ne se lisait pas comme un fondu,
+     ça se lisait comme un bug d'empilement. Le fondu est donc un `::before`
+     posé JUSTE AU-DESSUS de la barre : le contenu s'y efface avant de
+     l'atteindre, et la barre elle-même reste franche, avec son filet. */
   .panneau-joueur { padding-bottom: 0; }
   .panneau-joueur .pj-actions {
     position: sticky;
     bottom: 0;
     z-index: 2;
     margin-inline: -0.4rem;
-    padding: 0.55rem 0.4rem 0.9rem;
-    background: linear-gradient(180deg, rgba(12, 36, 24, 0) 0%, var(--pelouse-800) 30%);
+    padding: 0.6rem 0.4rem 0.9rem;
+    background: var(--surface-solid);
+    border-top: 1px solid var(--bordure);
+  }
+  .panneau-joueur .pj-actions::before {
+    content: '';
+    position: absolute;
+    inset: auto 0 100% 0;
+    height: 1.4rem;
+    pointer-events: none;
+    background: linear-gradient(180deg, transparent, var(--surface-solid));
   }
 }
 
@@ -5744,4 +5760,196 @@ img, svg, canvas { max-width: 100%; }
   .aller-contenu { transition: none; }
   .hero-canvas-skel { animation: none; }
   .msg, .carte, .btn { scroll-behavior: auto; }
+}
+
+/* ===========================================================================
+   ⚠️ LA FINITION — « ça fait trop IA, rends-la plus propre, pro et jolie »
+   ===========================================================================
+   Retour de jeu, mot pour mot. Le reproche est juste, et il est identifiable :
+   ce qui fait « généré », ce ne sont pas les couleurs — la palette stade
+   nocturne / cuir / dorures est bonne — ce sont SIX RÉFLEXES qu'on retrouve
+   dans toutes les interfaces sorties d'un modèle, et qui étaient tous ici :
+
+   1. une LUEUR COLORÉE sous les boutons (`0 10px 24px -8px rgba(or,.55)`) ;
+   2. un SOULÈVEMENT au survol sur absolument tous les boutons
+      (`.btn:hover { transform: translateY(-2px) }`) ;
+   3. la GÉLULE COMPLÈTE (999 px) sur tout ce qui se clique ;
+   4. le VERRE DÉPOLI partout (`backdrop-filter` + surface à 55 % d'opacité) ;
+   5. UNE SEULE OMBRE, énorme et floue, sur chaque élément sans distinction ;
+   6. `transition: all`.
+
+   Aucun de ces six réflexes n'est faux isolément. Ensemble, ils produisent une
+   page qui n'a ni matière, ni hiérarchie, ni contact avec elle-même : tout
+   flotte à la même hauteur, tout brille pareil, tout est arrondi pareil.
+
+   ⚠️ CE BLOC NE CHANGE AUCUNE GÉOMÉTRIE — pas une largeur, pas une grille, pas
+   une taille de police. Il ne touche qu'aux matières : arêtes, ombres, rayons,
+   états. Rien du jeu n'est concerné.
+   =========================================================================== */
+
+/* ---- 1. LES CARTES DEVIENNENT DE LA MATIÈRE ------------------------------
+   Le verre dépoli (`backdrop-filter: blur()` sur une surface translucide) est
+   le raccourci le plus reconnaissable de toute l'interface générée. Il coûte
+   cher au défilement, il rend le texte moins net, et surtout il donne à toutes
+   les cartes la même consistance de gelée.
+   À la place : un fond OPAQUE, une lumière qui tombe du haut, et une arête
+   claire d'un pixel sur le bord supérieur. C'est tout — et c'est ce qui fait la
+   différence entre un rectangle coloré et une plaque posée sous une lampe. */
+.carte {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 96px),
+    var(--surface-solid);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre-2), var(--arete);
+  backdrop-filter: none;
+}
+
+/* ---- 2. LES BOUTONS ------------------------------------------------------
+   ⚠️ LA LUEUR DORÉE DISPARAÎT. Une ombre portée COLORÉE n'existe pas dans le
+   monde physique : un objet jaune ne projette pas de halo jaune, il projette
+   une ombre grise. C'est joli deux secondes et ça date une interface
+   instantanément.
+   Ce qui la remplace tient en trois traits, et c'est ainsi qu'on dessine une
+   touche depuis toujours : un liseré clair EN HAUT (la lumière qui frappe
+   l'arête), un bord sombre EN BAS (l'épaisseur), une ombre de contact courte. */
+.btn {
+  border-radius: var(--rayon-controle);
+  transition: background-color 0.16s ease, border-color 0.16s ease,
+    box-shadow 0.16s ease, filter 0.16s ease;
+}
+/* ⚠️ PLUS DE SOULÈVEMENT AU SURVOL. Un bouton qui recule de deux pixels sous le
+   curseur, sur TOUS les boutons d'un site, c'est le tic le plus reconnaissable
+   du lot. Un bouton réel ne monte pas quand on le regarde : il s'éclaire. */
+.btn:hover { transform: none; }
+.btn:active { transform: none; }
+.btn:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.08); }
+
+.btn.primaire {
+  border: 1px solid #a9791f;
+  background: linear-gradient(180deg, #f8d67f 0%, var(--or-400) 38%, var(--or-500) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(120, 80, 10, 0.35),
+    var(--ombre-1);
+}
+.btn.primaire:hover:not(:disabled) { filter: brightness(1.06); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(120, 80, 10, 0.35), var(--ombre-2); }
+.btn.primaire:active:not(:disabled) { filter: brightness(0.96); box-shadow: inset 0 2px 4px rgba(90, 60, 8, 0.4); }
+
+.btn.vert {
+  border: 1px solid rgba(10, 40, 22, 0.9);
+  background: linear-gradient(180deg, var(--pelouse-400) 0%, var(--pelouse-500) 45%, var(--pelouse-600) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    var(--ombre-1);
+}
+.btn.vert:hover:not(:disabled) { filter: brightness(1.08); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), var(--ombre-2); }
+.btn.vert:active:not(:disabled) { filter: brightness(0.95); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35); }
+
+/* Le bouton fantôme redevient un vrai contour, pas un fantôme de gélule. */
+.btn.fantome {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--bordure);
+  box-shadow: var(--arete);
+}
+.btn.fantome:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--bordure-forte);
+}
+
+/* ---- 3. LA NAVIGATION ----------------------------------------------------
+   `transition: all` anime aussi la géométrie : au survol, le navigateur
+   interpole des propriétés qui n'ont aucune raison de bouger. On nomme ce
+   qu'on anime. La pastille active garde sa gélule — c'en est une, c'est son
+   rôle — mais elle perd son dégradé plat au profit d'une vraie arête. */
+.nav .liens button { transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease; }
+.nav .liens button.actif {
+  background: linear-gradient(180deg, #f8d67f, var(--or-500));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), var(--ombre-1);
+}
+
+/* ---- 4. LE RÉCIT SE LIT ENFIN --------------------------------------------
+   ⚠️ LE JOURNAL ÉTAIT EN ITALIQUE, DANS UN CADRE EN POINTILLÉS. Ce sont les
+   deux conventions du texte « provisoire » : l'italique sur un paragraphe
+   entier ralentit la lecture d'environ 15 %, et le pointillé est ce qu'on
+   dessine quand on n'a pas décidé du cadre. Or c'est le texte le plus lu du
+   jeu — le récit d'une carrière.
+   Il devient du texte normal, adossé à un FILET DORÉ à gauche : la convention
+   typographique de la citation, qui dit « ceci est une voix » sans crier. */
+.msg.systeme .bulle {
+  border: 0;
+  border-left: 2px solid var(--bordure-forte);
+  border-radius: 0 var(--rayon-sm) var(--rayon-sm) 0;
+  background: rgba(255, 255, 255, 0.028);
+  font-style: normal;
+  color: var(--craie-dim);
+}
+.msg.mj .bulle,
+.msg.joueur .bulle { box-shadow: var(--arete); }
+
+/* ---- 5. LES CHAMPS DE SAISIE --------------------------------------------
+   Un champ doit paraître CREUX — c'est ce qui dit qu'on peut écrire dedans.
+   L'ombre interne en haut fait exactement ça, à l'inverse de l'arête des
+   boutons, qui eux paraissent en relief. */
+input[type='text'],
+input[type='password'],
+input[type='number'],
+input[type='search'],
+textarea,
+select {
+  border-radius: var(--rayon-sm);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--bordure-forte);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35), 0 0 0 3px rgba(232, 178, 58, 0.12);
+}
+
+/* ---- 6. LA BARRE DE DÉFILEMENT ------------------------------------------
+   Verte vif sur fond sombre, elle attirait l'œil plus que le contenu. Une
+   barre de défilement se remarque quand on la cherche, pas avant. */
+* { scrollbar-color: rgba(255, 255, 255, 0.16) transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); background-clip: content-box; }
+
+/* Les icônes de la barre d'action : le trait suit la couleur du bouton, donc
+   il s'éclaire au survol comme le libellé. */
+.pj-actions button svg { opacity: .92; }
+.pj-actions button:hover:not(:disabled) svg { opacity: 1; }
+.nav-reglages svg, .nav .liens button svg { display: block; }
+
+/* ---- 7. LE FIL DE CARRIÈRE S'ANCRE EN BAS -------------------------------
+   ⚠️ En début de carrière, le journal contient deux entrées et la colonne du
+   milieu est un GRAND RECTANGLE VIDE de six cents pixels, avec le champ de
+   saisie tout seul en bas. C'est la première chose que l'œil rencontre en
+   arrivant, et ça se lit comme un écran inachevé.
+   Un fil de conversation s'ancre en bas — c'est la convention de toutes les
+   messageries, et elle a une raison : le message le PLUS RÉCENT doit être au
+   plus près de l'endroit où l'on écrit. Le vide passe alors au-dessus, où il
+   se lit comme une marge, pas comme un trou. Le défilement continue de
+   fonctionner : quand le contenu dépasse, il déborde par le haut. */
+.carriere .journal { justify-content: flex-end; }
+/* ⚠️ `flex-end` sur un conteneur qui défile COUPE le début du contenu dans
+   Firefox et Safari (le débordement part vers le haut, hors de portée du
+   défilement). La parade standard est une marge automatique sur le premier
+   enfant : le contenu est poussé vers le bas sans que la boîte perde sa
+   direction de débordement. */
+.carriere .journal > :first-child { margin-top: auto; }
+
+/* Le titre d'une entrée : plus court, plus haut, en capitales espacées. Une
+   ligne de titre qui ressemble au corps du texte n'est pas un titre. */
+.carriere .msg .titre-evt {
+  font-size: .74rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: .45rem;
 }

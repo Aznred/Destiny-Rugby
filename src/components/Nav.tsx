@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useGame } from '../store/useGame';
+import { Icone, type NomIcone } from './Icone';
 import { t } from '../lib/i18n';
 import { chantierVisible } from '../lib/modeDev';
 import { clubParNom } from '../data/clubs';
@@ -58,7 +59,7 @@ function MenuMobile({ ecran, joueurPresent, onFermer, onNaviguer, onReglages }: 
           {entree('pantheon', '⭐', t('nav.hall'))}
           {entree('boutique', '🛍️', t('nav.boutique'))}
           <button type="button" onClick={() => { onFermer(); onReglages(); }}>
-            <span aria-hidden="true">⚙️</span>
+            <Icone nom="reglages" />
             <b>{t('nav.reglages')}</b>
           </button>
         </div>
@@ -96,7 +97,7 @@ export function Nav({ onReglages }: NavProps) {
     </button>
   );
 
-  const lienMobile = (cible: Ecran, label: string, icone: string, badge?: number) => (
+  const lienMobile = (cible: Ecran, label: string, icone: NomIcone, badge?: number) => (
     <button
       type="button"
       className={ecran === cible ? 'actif' : ''}
@@ -104,7 +105,7 @@ export function Nav({ onReglages }: NavProps) {
       aria-current={ecran === cible ? 'page' : undefined}
       aria-label={label}
     >
-      <span className="nav-mobile-icone" aria-hidden="true">{icone}</span>
+      <span className="nav-mobile-icone"><Icone nom={icone} taille={22} /></span>
       <span className="nav-mobile-label">{label}</span>
       {!!badge && <i className="nav-badge">{badge > 9 ? '9+' : badge}</i>}
     </button>
@@ -166,7 +167,7 @@ export function Nav({ onReglages }: NavProps) {
           {lien('classement', t('nav.classement'))}
           {lien('pantheon', t('nav.hall'))}
           {lien('boutique', t('nav.boutique'))}
-          <button type="button" onClick={onReglages} title={t('nav.reglages')} aria-label={t('nav.reglages')}>⚙️</button>
+          <button type="button" onClick={onReglages} title={t('nav.reglages')} aria-label={t('nav.reglages')}><Icone nom="reglages" taille={18} /></button>
         </nav>
 
         <button
@@ -175,21 +176,21 @@ export function Nav({ onReglages }: NavProps) {
           onClick={onReglages}
           aria-label={t('nav.reglages')}
         >
-          ⚙️
+          <Icone nom="reglages" />
         </button>
       </header>
 
       <nav className="nav-mobile" aria-label={t('nav.navigation')}>
-        {lienMobile('accueil', t('nav.accueil'), '⌂')}
-        {lienMobile(joueur ? 'carriere' : managerActif ? 'manager' : 'creation', joueur ? t('nav.carriere') : managerActif ? t('mgr.bureau') : t('nav.creer'), '🏉')}
+        {lienMobile('accueil', t('nav.accueil'), 'accueil')}
+        {lienMobile(joueur ? 'carriere' : managerActif ? 'manager' : 'creation', joueur ? t('nav.carriere') : managerActif ? t('mgr.bureau') : t('nav.creer'), 'ballon')}
         {carriereActive
-          ? lienMobile('social', 'L’Ovale', '𝕏', nonLues)
-          : lienMobile('championnats', t('nav.clubs'), '🏟️')}
+          ? lienMobile('social', 'L’Ovale', 'ovale', nonLues)
+          : lienMobile('championnats', t('nav.clubs'), 'clubs')}
         {joueur
-          ? lienMobile('profil', t('nav.profil'), '👤')
+          ? lienMobile('profil', t('nav.profil'), 'profil')
           : managerActif
-            ? lienMobile('tableau', t('mgr.resultatsMonde'), '📊')
-            : lienMobile('classement', t('nav.classement'), '🏆')}
+            ? lienMobile('tableau', t('mgr.resultatsMonde'), 'resultats')
+            : lienMobile('classement', t('nav.classement'), 'resultats')}
         <button
           type="button"
           className={menuActif ? 'actif' : ''}
@@ -198,7 +199,7 @@ export function Nav({ onReglages }: NavProps) {
           aria-haspopup="dialog"
           aria-label={t('nav.plus')}
         >
-          <span className="nav-mobile-icone" aria-hidden="true">•••</span>
+          <span className="nav-mobile-icone"><Icone nom="plus" /></span>
           <span className="nav-mobile-label">{t('nav.plus')}</span>
         </button>
       </nav>
