@@ -86,7 +86,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import {
-  activerControle, appliquerConsigne, avancer, bilan, creerMatch, DT, ordonner,
+  activerControle, appliquerConsigne, appliquerTactiqueEquipe, avancer, bilan, creerMatch,
+  demanderRemplacement, DT, ordonner,
   resoudreChoix, type EtatMatch,
 } from '../lib/moteur/moteur';
 import { ACTION_PAR_ID } from '../lib/moteur/controle';
@@ -108,7 +109,7 @@ import { CONSIGNE_NEUTRE, lireConsigneIA, lireConsigneLocale } from '../lib/mote
 import { iaDisponible } from '../lib/groq';
 import type { Pion, StatsMatch } from '../lib/moteur/entites';
 import { detailNote, noterMatch, statsPourLaNote } from '../lib/moteur/apresMatch';
-import { graine, type MatchChampionnat } from '../lib/championnat';
+import { graine, scorePossible, type MatchChampionnat } from '../lib/championnat';
 import { effectifDuClub } from '../lib/effectif';
 import { effectifNational } from '../lib/international';
 import { nomNation } from '../lib/nations';
@@ -117,7 +118,11 @@ import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
 import { PelouseMemo } from './match/Pelouse';
 import { FeuilleMatch } from './match/FeuilleMatch';
-import type { Joueur } from '../types';
+import type { CompositionManager, Joueur, TactiqueManager } from '../types';
+import {
+  compositionManagerParDefaut, feuilleDepuisComposition, noteCompositionManager,
+  reconcilerCompositionManager,
+} from '../lib/compositionManager';
 import { t } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
 
@@ -293,7 +298,7 @@ function vibrer(ms: number): void {
 
 // ---------------------------------------------------------------------------
 export function MatchLive({
-  match, saison, cle, titre, onFermer, onTermine, joueur, selection,
+  match, saison, cle, titre, onFermer, onTermine, joueur, selection, manager,
 }: {
   match: MatchChampionnat;
   saison: number;
@@ -305,8 +310,16 @@ export function MatchLive({
   onFermer: () => void;
   /** Appelé UNE FOIS à la sirène : c'est ce qui autorise le passage à la
    *  semaine suivante quand on referme la fenêtre. */
-  onTermine?: () => void;
+  onTermine?: (resultat: {
+    scoreA: number; scoreB: number; essaisA: number; essaisB: number;
+  }) => void;
   joueur?: Joueur | null;
+  manager?: {
+    club: string;
+    composition: CompositionManager;
+    tactique: TactiqueManager;
+    onTactique: (tactique: TactiqueManager) => void;
+  };
 }) {
   const iaActivee = useGame((s) => s.iaActivee);
   const tutoMatchVu = useGame((s) => s.tutoMatchVu);
@@ -324,10 +337,28 @@ export function MatchLive({
       (selection ? effectifNational(equipe, saison) : effectifDuClub(equipe, saison));
     // En sélection, « son club » est sa NATION.
     const monEquipe = joueur ? (selection ? nomNation(joueur.nation) : joueur.club) : '';
+    const effectifA = effectif(match.domicile);
+    const effectifB = effectif(match.exterieur);
+    const coteManager = manager?.club === match.domicile ? 'A'
+      : manager?.club === match.exterieur ? 'B' : null;
+    const effectifManager = coteManager === 'A' ? effectifA : coteManager === 'B' ? effectifB : null;
+    const compoManager = manager && effectifManager
+      ? reconcilerCompositionManager(effectifManager, manager.composition) : null;
+    const feuilleManager = compoManager && effectifManager
+      ? feuilleDepuisComposition(effectifManager, compoManager) : undefined;
+    // Une composition moins forte que le meilleur XV disponible dégrade le
+    // potentiel de marque. Choisir les cadres au bon poste n'est donc pas un
+    // écran cosmétique ; le score de référence transmis au moteur bouge.
+    const deltaCompo = compoManager && effectifManager
+      ? Math.round((noteCompositionManager(effectifManager, compoManager)
+        - noteCompositionManager(effectifManager, compositionManagerParDefaut(effectifManager))) * 1.25)
+      : 0;
+    const scoreA = scorePossible(match.scoreD + (coteManager === 'A' ? deltaCompo : 0));
+    const scoreB = scorePossible(match.scoreE + (coteManager === 'B' ? deltaCompo : 0));
     moteur.current = creerMatch(
       match.domicile, match.exterieur,
-      effectif(match.domicile), effectif(match.exterieur),
-      match.scoreD, match.scoreE, cle,
+      effectifA, effectifB,
+      scoreA, scoreB, cle,
       joueur && (monEquipe === match.domicile || monEquipe === match.exterieur)
         ? {
             club: monEquipe, nom: joueur.nom, poste: joueur.poste,
@@ -342,7 +373,17 @@ export function MatchLive({
       // ⚠️ LE NIVEAU DÉCIDE DE TOUTE LA DISCIPLINE : cartons plus fréquents et
       // bagarres faciles en amateur, arbitrage feutré mais commission
       // impitoyable chez les professionnels (voir `moteur/bagarre.ts`).
-      { niveau: niveauDuMatch(joueur, selection), controle: true },
+      {
+        niveau: niveauDuMatch(joueur, selection), controle: true,
+        ...(coteManager === 'A' && feuilleManager && compoManager && manager ? {
+          compositionA: feuilleManager, tactiqueA: manager.tactique,
+          capitaineAId: compoManager.capitaineId, buteurAId: compoManager.buteurId,
+        } : {}),
+        ...(coteManager === 'B' && feuilleManager && compoManager && manager ? {
+          compositionB: feuilleManager, tactiqueB: manager.tactique,
+          capitaineBId: compoManager.capitaineId, buteurBId: compoManager.buteurId,
+        } : {}),
+      },
     );
   }
   const e = moteur.current;
@@ -374,9 +415,17 @@ export function MatchLive({
   // remet `dernierTemps` à zéro et fait sauter le match d'un cran.
   const decisionRef = useRef<Decision | null>(null);
   decisionRef.current = decision;
-  const [tiroir, setTiroir] = useState<null | 'fil' | 'consigne' | 'commandes'>(null);
+  const [tiroir, setTiroir] = useState<null | 'fil' | 'consigne' | 'tactique' | 'commandes'>(null);
   const [consigneTexte, setConsigneTexte] = useState('');
   const [envoiConsigne, setEnvoiConsigne] = useState(false);
+  const coteManager = manager?.club === e.clubA ? 'A' : manager?.club === e.clubB ? 'B' : null;
+  const changerTactiqueManager = useCallback((partiel: Partial<TactiqueManager>) => {
+    if (!manager || !coteManager || e.fini) return;
+    const suivante = { ...manager.tactique, ...partiel };
+    appliquerTactiqueEquipe(e, coteManager, suivante);
+    manager.onTactique(suivante);
+    redessiner((n) => n + 1);
+  }, [manager, coteManager, e]);
 
   /**
    * ⚠️ CE QU’UN GESTE PASSÉ VIENT DE RAPPORTER, et qu’on afficherait sinon
@@ -895,7 +944,7 @@ export function MatchLive({
   useEffect(() => {
     if (!e.fini || dejaEnregistre.current) return;
     dejaEnregistre.current = true;
-    onTermine?.();
+    onTermine?.({ scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB });
     if (!monPion) return;
     // ⚠️ Le RÉSULTAT part avec les statistiques : c'est ce qui permet à la
     // feuille de match d'être la seule entrée du journal pour ce week-end.
@@ -1509,7 +1558,7 @@ export function MatchLive({
                 type="button"
                 className="ml-tiroir-bouton"
                 aria-label={t('ml.plus')}
-                onClick={() => setTiroir((v) => (v ? null : (large ? 'commandes' : 'fil')))}
+                onClick={() => setTiroir((v) => (v ? null : (manager ? 'tactique' : large ? 'commandes' : 'fil')))}
               >
                 ⋯
               </button>
@@ -1523,7 +1572,9 @@ export function MatchLive({
               <div className="ml-fil" ref={filRef}>
                 <Fil lignes={e.commentaires} n={e.commentaires.length} />
               </div>
-              {monPion && <Coaching {...{ consigneTexte, setConsigneTexte, envoiConsigne, envoyerConsigne, e }} />}
+              {manager && coteManager
+                ? <CoachingManager tactique={manager.tactique} onChange={changerTactiqueManager} e={e} cote={coteManager} />
+                : monPion && <Coaching {...{ consigneTexte, setConsigneTexte, envoiConsigne, envoyerConsigne, e }} />}
             </aside>
           )}
         </div>
@@ -1535,9 +1586,12 @@ export function MatchLive({
               {([
                 ['fil', '📜', 'ml.onglet.fil'],
                 ['consigne', '📣', 'ml.onglet.consigne'],
+                ['tactique', '🧠', 'mgr.tactique'],
                 ['commandes', '❓', 'ml.commandes.titre'],
               ] as const)
-                .filter(([id]) => (id !== 'consigne' || !!monPion) && (id !== 'fil' || !large))
+                .filter(([id]) => (id !== 'consigne' || !!monPion)
+                  && (id !== 'tactique' || !!manager)
+                  && (id !== 'fil' || !large))
                 .map(([id, emoji, cleOnglet]) => (
                   <button
                     key={id}
@@ -1560,6 +1614,11 @@ export function MatchLive({
               <div className="ml-tiroir-corps">
                 <p className="ml-tiroir-note">{t('ml.consigneAide')}</p>
                 <Coaching {...{ consigneTexte, setConsigneTexte, envoiConsigne, envoyerConsigne, e }} />
+              </div>
+            )}
+            {tiroir === 'tactique' && manager && coteManager && (
+              <div className="ml-tiroir-corps">
+                <CoachingManager tactique={manager.tactique} onChange={changerTactiqueManager} e={e} cote={coteManager} />
               </div>
             )}
             {tiroir === 'commandes' && (
@@ -1586,6 +1645,79 @@ export function MatchLive({
       </motion.div>
     </div>,
     document.body,
+  );
+}
+
+const OPTIONS_TACTIQUES = {
+  attaque: [
+    ['equilibre', '⚖️ Équilibré'], ['avants', '🧱 Jeu d’avants'],
+    ['large', '↔️ Jouer au large'], ['occupation', '🦶 Occupation'],
+  ],
+  defense: [
+    ['blitz', '⚡ Blitz'], ['glissee', '↔️ Glissée'], ['repli', '🛡️ Repli'],
+  ],
+  rythme: [
+    ['gestion', '🧊 Gérer'], ['normal', '▶️ Normal'], ['intense', '🔥 Intense'],
+  ],
+  penalites: [
+    ['mixte', '🧠 Selon le terrain'], ['points', '🎯 Prendre les points'], ['touche', '🚩 Chercher la touche'],
+  ],
+  remplacements: [
+    ['precoces', '⏱️ Précoces'], ['standard', '🔄 Standards'], ['tardifs', '⌛ Tardifs'],
+  ],
+} as const;
+
+function CoachingManager({
+  tactique, onChange, e, cote,
+}: {
+  tactique: TactiqueManager;
+  onChange: (partiel: Partial<TactiqueManager>) => void;
+  e: EtatMatch;
+  cote: 'A' | 'B';
+}) {
+  const terrain = e.pions.filter((p) => p.cote === cote && p.surLeTerrain && p.numero <= 15);
+  const banc = e.pions.filter((p) => p.cote === cote && !p.surLeTerrain && p.minutes === 0);
+  const [sortant, setSortant] = useState('');
+  const [entrant, setEntrant] = useState('');
+  const sortantActif = terrain.some((p) => p.sourceId === sortant) ? sortant : terrain[0]?.sourceId ?? '';
+  const entrantActif = banc.some((p) => p.sourceId === entrant) ? entrant : banc[0]?.sourceId ?? '';
+  const demande = e.remplacementsDemandes[cote];
+  return (
+    <div className="ml-coaching-manager">
+      <div className="ml-coaching-manager-tete">
+        <b>🧠 Banc tactique</b>
+        <span>Les changements s’appliquent à la prochaine action.</span>
+      </div>
+      {(Object.keys(OPTIONS_TACTIQUES) as (keyof typeof OPTIONS_TACTIQUES)[]).map((cle) => (
+        <fieldset key={cle}>
+          <legend>{cle === 'attaque' ? 'Avec le ballon' : cle === 'defense' ? 'Sans le ballon'
+            : cle === 'rythme' ? 'Rythme' : cle === 'penalites' ? 'Pénalités' : 'Banc'}</legend>
+          <div>
+            {OPTIONS_TACTIQUES[cle].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={tactique[cle] === id ? 'actif' : ''}
+                aria-pressed={tactique[cle] === id}
+                onClick={() => onChange({ [cle]: id } as Partial<TactiqueManager>)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      ))}
+      <fieldset className="ml-changement-manuel">
+        <legend>Changement manuel</legend>
+        {banc.length ? (
+          <div>
+            <label><span>Sortir</span><select value={sortantActif} onChange={(ev) => setSortant(ev.target.value)}>{terrain.map((p) => <option key={p.sourceId} value={p.sourceId}>n° {p.numero} · {p.nom} · {Math.round(p.endurance)} %</option>)}</select></label>
+            <label><span>Faire entrer</span><select value={entrantActif} onChange={(ev) => setEntrant(ev.target.value)}>{banc.map((p) => <option key={p.sourceId} value={p.sourceId}>n° {p.numero} · {p.nom}</option>)}</select></label>
+            <button type="button" disabled={!sortantActif || !entrantActif || !!demande} onClick={() => demanderRemplacement(e, cote, entrantActif, sortantActif)}>{demande ? '⏳ Prévu au prochain arrêt' : '🔄 Programmer le changement'}</button>
+          </div>
+        ) : <span className="ml-banc-vide">Les huit remplaçants sont entrés.</span>}
+      </fieldset>
+    </div>
   );
 }
 

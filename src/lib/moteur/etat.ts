@@ -6,6 +6,7 @@
 
 import type { Pion } from './entites';
 import type { Cote, Vec } from './terrain';
+import type { TactiqueManager } from '../../types';
 
 export type Phase =
   | 'coupEnvoi'      // engagement et renvois après un score
@@ -342,6 +343,14 @@ export interface EtatMatch {
   scoreB: number;
   planA: PlanDeScore;
   planB: PlanDeScore;
+  /** Cibles de ligue avant les ajustements du banc. */
+  cibleBaseA: number;
+  cibleBaseB: number;
+  /** Impact déjà appliqué au plan, pour qu'un changement ne puisse pas s'empiler. */
+  ajustementTactiqueA: number;
+  ajustementTactiqueB: number;
+  /** Seul le côté coaché en direct en possède une ; l'autre garde son IA. */
+  tactiques: Partial<Record<Cote, TactiqueManager>>;
   essaisA: number;
   essaisB: number;
 
@@ -377,6 +386,7 @@ export interface EtatMatch {
 
   remplacementsA: number;
   remplacementsB: number;
+  remplacementsDemandes: Partial<Record<Cote, { entrantId: string; sortantId: string }>>;
   prochaineDecision: number;
   compteur: number;      // ⚠️ dans l'état, pas en variable de module : deux
                          // matchs simulés en parallèle ne doivent pas se

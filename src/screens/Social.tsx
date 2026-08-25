@@ -916,12 +916,23 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
   const envoyer = useGame((s) => s.envoyerMessage);
   const lireConversation = useGame((s) => s.lireConversation);
   const approches = useGame((s) => s.approches ?? []);
+  const dossiersRecrutement = useGame((s) => s.dossiersRecrutement ?? {});
   const chargement = useGame((s) => s.chargementSocial);
 
   // Les interlocuteurs : comptes suivis + toute conversation déjà ouverte.
   const tous = useMemo(() => {
     const monde = annuaire(joueur);
-    const pseudos = new Set([...suivis.map((c) => c.pseudo), ...Object.keys(conversations)]);
+    const pseudos = new Set([
+      ...suivis.map((c) => c.pseudo),
+      ...Object.keys(conversations),
+      ...Object.keys(dossiersRecrutement),
+      // Une négociation reste visible même si une ancienne sauvegarde a perdu
+      // son premier message. Le store réparera le fil à l'ouverture ; cette
+      // ligne empêche déjà l'interlocuteur de disparaître de la liste.
+      ...approches
+        .filter((a) => a.etat === 'ouverte' || a.etat === 'accord')
+        .map((a) => a.pseudo),
+    ]);
     if (ouvrirSur) pseudos.add(ouvrirSur);
     return [...pseudos].map((p) => {
       const connu = suivis.find((c) => c.pseudo === p) ?? monde.find((c) => c.pseudo === p);
@@ -929,6 +940,10 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
       const approche = approches.find((a) => a.pseudo === p);
       if (approche) {
         return { pseudo: p, nom: approche.club, avatar: `club:${approche.club}`, type: 'club', club: approche.club } as CompteSuivi;
+      }
+      const dossier = dossiersRecrutement[p];
+      if (dossier) {
+        return { pseudo: p, nom: dossier.club, avatar: `club:${dossier.club}`, type: 'club', club: dossier.club } as CompteSuivi;
       }
       if (p.startsWith('club:')) {
         const club = p.slice('club:'.length);
@@ -951,7 +966,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
       const date = (p: string) => conversations[p]?.at(-1)?.creeLe ?? 0;
       return date(b.pseudo) - date(a.pseudo);
     });
-  }, [suivis, conversations, ouvrirSur, joueur, approches]);
+  }, [suivis, conversations, ouvrirSur, joueur, approches, dossiersRecrutement]);
 
   const [actif, setActif] = useState<string | null>(ouvrirSur ?? tous[0]?.pseudo ?? null);
   const [texte, setTexte] = useState('');
@@ -966,6 +981,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
     return <p className="x-vide">{t('ov.comptesASuivre')}</p>;
   }
   const compte = tous.find((c) => c.pseudo === actif);
+  const dossierActif = actif ? dossiersRecrutement[actif] : undefined;
 
   return (
     <div className="x-messagerie">
@@ -1004,6 +1020,12 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
             <span className="x-relation" data-etat={humeur(relations[compte.pseudo] ?? 0)}>
               {humeur(relations[compte.pseudo] ?? 0)}
             </span>
+          </div>
+        )}
+        {dossierActif && (
+          <div className="x-suivi-recrutement" role="status">
+            <b>👀 {t('recrut.suivi.titre', { club: dossierActif.club })}</b>
+            <span>{t('recrut.suivi.examen')}</span>
           </div>
         )}
         <div className="x-bulles">
@@ -1271,11 +1293,19 @@ function SocialJoueur() {
    */
   const ouvrirSocialSur = useGame((s) => s.ouvrirSocialSur);
   const consommerOuvertureSociale = useGame((s) => s.consommerOuvertureSociale);
+  const conversationCible = useGame((s) => s.conversationSocialeCible);
+  const consommerConversationCible = useGame((s) => s.consommerConversationSocialeCible);
   useEffect(() => {
     if (!ouvrirSocialSur) return;
     setOnglet(ouvrirSocialSur);
     consommerOuvertureSociale();
   }, [ouvrirSocialSur, consommerOuvertureSociale]);
+  useEffect(() => {
+    if (!conversationCible) return;
+    setMessageAvec(conversationCible);
+    setOnglet('messages');
+    consommerConversationCible();
+  }, [conversationCible, consommerConversationCible]);
 
   if (!joueur) return null;
   const nonLues = notifs.filter((n) => !n.lue).length;

@@ -21,10 +21,12 @@ import type {
   SuccesDebloques,
   CompteSuivi,
   MessageDM,
+  DossierRecrutementClub,
   TransfertAnnonce,
   ProfilSocial,
   DecisionClub,
-  Manager, SaisonManager, CibleRecrutementManager,
+  Manager, SaisonManager, CibleRecrutementManager, CompositionManager,
+  TactiqueManager, ResultatMatchManager,
 } from '../types';
 import {
   publierPost, pseudoDe, feedAmbiance, suggestionsLocales,
@@ -73,7 +75,7 @@ const stockageJeu = createJSONStorage(() => (typeof localStorage !== 'undefined'
 function passeesDuType(numeroSemaine: number, type: string): number {
   return SEMAINES.slice(0, Math.max(0, numeroSemaine - 1)).filter((s) => s.type === type).length;
 }
-import { matchDeLaSemaine } from '../lib/matchLive';
+import { matchDeLaSemaine, matchDuClubSemaine } from '../lib/matchLive';
 import {
   filDeLaSemaine, messageSpontane, invitationCoequipier, effetSurRelation, reponseLocale,
   tonDuMessage, reactionsPour,
@@ -145,7 +147,11 @@ import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFina
 import {
   championnatEnDirect, journeesApres, nombreJournees, graine, rangFinal,
   estAmateur, weekEndsJoues, totalWeekEnds, poulesDe, indexPoule,
+  enregistrerResultatJoue, setResultatsJoues, effacerResultatsJoues,
 } from '../lib/championnat';
+import {
+  compositionManagerParDefaut, reconcilerCompositionManager, TACTIQUE_MANAGER_DEFAUT,
+} from '../lib/compositionManager';
 import { risqueDeBlessure, tirerBlessure, messageBlessure, deltasBlessure } from '../lib/blessures';
 import { effetsTraits, MAX_TRAITS, TRAIT_PAR_ID } from '../data/traits';
 import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiaire';
@@ -247,6 +253,123 @@ const prefixeSession = `${Date.now().toString(36)}-${Math.random().toString(36).
 function idUnique(): string {
   compteur += 1;
   return `e-${prefixeSession}-${compteur}`;
+}
+
+/** Le premier message qui rend une approche visible et compréhensible dans L'Ovale. */
+function messageInitialApproche(a: Approche, joueur: Joueur | null | undefined): MessageDM {
+  const texte = a.prolongation
+    ? `${joueur?.nom ?? 'Bonjour'}, ton contrat arrive à son terme et on aimerait te garder. `
+      + `Notre proposition : ${resumerTermes(a.offre)}. Dis-nous.`
+    : `Bonjour${joueur?.nom ? `, ${joueur.nom}` : ''}. Ici ${a.club} (${a.divisionNom}). `
+      + `On suit ce que tu fais et on aimerait t'avoir la saison prochaine. `
+      + `Ce qu'on met sur la table : ${resumerTermes(a.offre)}. On en discute ?`;
+  return {
+    id: idUnique(), pseudo: a.pseudo, de: 'lui', texte,
+    saison: a.saison, semaine: a.semaine, creeLe: Date.now(), lu: false,
+  };
+}
+
+/**
+ * Une offre ouverte ne doit jamais exister sans son fil de messages. Cette
+ * réparation idempotente couvre notamment les anciennes sauvegardes et les
+ * écritures interrompues par un quota de stockage.
+ */
+function assurerConversationsApproches(
+  joueur: Joueur | null | undefined,
+  approches: readonly Approche[],
+  conversations: Record<string, MessageDM[]>,
+): Record<string, MessageDM[]> {
+  let resultat = conversations;
+  for (const approche of approches) {
+    if (approche.etat !== 'ouverte' && approche.etat !== 'accord') continue;
+    if ((resultat[approche.pseudo] ?? []).length > 0) continue;
+    if (resultat === conversations) resultat = { ...conversations };
+    resultat[approche.pseudo] = [messageInitialApproche(approche, joueur)];
+  }
+  return resultat;
+}
+
+/**
+ * Retrouve un club même depuis un ancien compte suivi dont le champ `type`
+ * est faux ou incomplet. C'est précisément le cas qui laissait certains fils
+ * sans réponse : le profil et son pseudo existaient encore, mais la branche
+ * « club » n'était jamais atteinte.
+ */
+function clubDepuisCompte(compte: CompteSuivi): string | null {
+  const avatar = compte.avatar.startsWith('club:') ? compte.avatar.slice(5) : '';
+  for (const nom of [compte.club, compte.nom, avatar]) {
+    if (nom && competitionDuClub(nom)) return nom;
+  }
+  return null;
+}
+
+function motifRefusClub(joueur: Joueur, club: string): string {
+  const cible = competitionDuClub(club);
+  const actuelle = competitionDuClub(joueur.club);
+  const ecart = noteDuClub(club) - cote(joueur);
+  if (cible && actuelle && actuelle.niveau - cible.niveau > (joueur.age <= 21 ? 3 : 2)) {
+    return t('recrut.refus.palier');
+  }
+  if (ecart > 1) {
+    return t('recrut.refus.niveau');
+  }
+  return t('recrut.refus.poste');
+}
+
+/**
+ * Rattrape au chargement les anciens fils terminés par un message du joueur.
+ * La correction ne demande donc pas de renvoyer « vous recrutez ? » : le
+ * club apporte le refus qui manquait et le dossier devient vraiment suivi.
+ */
+function reparerSilencesClubs(
+  joueur: Joueur,
+  comptesSuivis: readonly CompteSuivi[],
+  conversations: Record<string, MessageDM[]>,
+  dossiers: Record<string, DossierRecrutementClub>,
+  approches: readonly Approche[],
+): {
+  conversations: Record<string, MessageDM[]>;
+  dossiers: Record<string, DossierRecrutementClub>;
+} {
+  let fils = conversations;
+  let suivis = dossiers;
+  const monde = annuaire(joueur);
+  const valeur = cote(joueur);
+
+  for (const [pseudo, fil] of Object.entries(conversations)) {
+    if (fil.at(-1)?.de !== 'moi') continue;
+    const compte = comptesSuivis.find((c) => c.pseudo === pseudo)
+      ?? monde.find((c) => c.pseudo === pseudo);
+    const club = compte ? clubDepuisCompte(compte) : null;
+    if (!club || club === joueur.club) continue;
+
+    const existante = approches.find((a) =>
+      a.club === club && (a.etat === 'ouverte' || a.etat === 'accord'));
+    const texte = existante
+      ? (existante.etat === 'accord'
+          ? t('recrut.accord.maintenu', { club })
+          : t('recrut.offre.ouverte'))
+      : t('recrut.refus.message', { motif: motifRefusClub(joueur, club) });
+
+    fils = {
+      ...fils,
+      [pseudo]: [...fil, {
+        id: idUnique(), pseudo, de: 'lui', texte, saison: joueur.saison,
+        semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false,
+      }],
+    };
+    if (!existante) {
+      suivis = {
+        ...suivis,
+        [pseudo]: suivis[pseudo] ?? {
+          pseudo, club, saisonContact: joueur.saison,
+          semaineContact: joueur.semaine ?? 1, coteAuContact: valeur,
+          derniereCoteEtudiee: valeur, derniereSaisonEtudiee: joueur.saison,
+        },
+      };
+    }
+  }
+  return { conversations: fils, dossiers: suivis };
 }
 
 export interface CreationInput {
@@ -669,6 +792,8 @@ interface GameState {
    * carrière » a été supprimé, tout se négocie en message privé sur L'Ovale.
    */
   approches: Approche[];
+  /** Clubs qui ont refusé aujourd'hui mais gardent le joueur sur leur liste. */
+  dossiersRecrutement: Record<string, DossierRecrutementClub>;
   // ⚠️ L'AMBIANCE DU SITE (demande explicite). Elle ne touche QUE la rampe de
   // fond (les variables `--pelouse-*` d'index.css) : l'or, le cuir et la craie
   // ne bougent pas, sinon on perdrait l'identité « stade nocturne » du jeu.
@@ -738,6 +863,10 @@ interface GameState {
   semaineManager: () => void;
   /** Trancher la scène de la semaine avant de pouvoir continuer. */
   repondreDecisionManager: (decisionId: string, choixId: string) => void;
+  /** Modifier la feuille de match et le plan collectif depuis le banc. */
+  definirCompositionManager: (composition: CompositionManager) => void;
+  definirTactiqueManager: (tactique: TactiqueManager) => void;
+  enregistrerResultatManager: (resultat: ResultatMatchManager) => void;
   /** Ouvrir puis mener une négociation avec un joueur dans L'Ovale. */
   contacterJoueurManager: (cible: CibleRecrutementManager) => void;
   negocierJoueurManager: (id: string, levier: LevierRecrutementManager) => void;
@@ -762,6 +891,8 @@ interface GameState {
   ouvrirSocialSur: 'messages' | null;
   conversationSocialeCible: string | null;
   ouvrirMessagesOvale: () => void;
+  /** Rattrape les anciens messages adressés à un club et restés sans réponse. */
+  reparerSilencesClubs: () => void;
   ouvrirDiscussionOvale: (pseudo: string) => void;
   consommerOuvertureSociale: () => void;
   consommerConversationSocialeCible: () => void;
@@ -814,6 +945,8 @@ interface GameState {
   reinitialiser: () => void;
   // marché des transferts — tout passe par les messages privés de L'Ovale
   susciterApproches: (maximum?: number, demande?: boolean, clubCible?: string) => number;
+  /** Réétudie les candidatures conservées après une progression ou une intersaison. */
+  examinerDossiersRecrutement: () => number;
   repondreApproche: (id: string, levier: Levier) => Reponse | null;
   accepterApproche: (id: string) => void;
   refuserApproche: (id: string) => void;
@@ -985,6 +1118,7 @@ export const useGame = create<GameState>()(
       compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
       tropheesEnAttente: [],
       approches: [],
+      dossiersRecrutement: {},
       theme: 'vert',
       langue: langueDuNavigateur(),
       langueManuelle: false,
@@ -1020,12 +1154,26 @@ export const useGame = create<GameState>()(
       consommerViseeEffectif: () => set({ ouvrirEffectifSur: null }),
       ouvrirSocialSur: null,
       conversationSocialeCible: null,
-      ouvrirMessagesOvale: () => set((s) => ({
-        ecran: 'social',
-        ouvrirSocialSur: 'messages',
-        conversationSocialeCible: null,
-        ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
-      })),
+      ouvrirMessagesOvale: () => set((s) => {
+        const cible = s.approches.find((a) => a.etat === 'ouverte')?.pseudo ?? null;
+        return {
+          ecran: 'social',
+          ouvrirSocialSur: 'messages',
+          conversationSocialeCible: cible,
+          conversations: assurerConversationsApproches(s.joueur, s.approches, s.conversations),
+          ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
+        };
+      }),
+      reparerSilencesClubs: () => {
+        const s = get();
+        if (!s.joueur) return;
+        const repare = reparerSilencesClubs(
+          s.joueur, s.comptesSuivis, s.conversations, s.dossiersRecrutement, s.approches,
+        );
+        if (repare.conversations !== s.conversations || repare.dossiers !== s.dossiersRecrutement) {
+          set({ conversations: repare.conversations, dossiersRecrutement: repare.dossiers });
+        }
+      },
       ouvrirDiscussionOvale: (pseudo) => set((s) => ({
         ecran: 'social',
         ouvrirSocialSur: 'messages',
@@ -1134,6 +1282,7 @@ export const useGame = create<GameState>()(
           comptesSuivis: [],
           suggestionsComptes: [],
           conversations: {},
+          dossiersRecrutement: {},
           transfertsSociaux: [],
           relationsSociales: {},
           defis: { cle: '', faits: [] },
@@ -1748,6 +1897,9 @@ export const useGame = create<GameState>()(
           get().appliquerPreAccord();
           j = get().joueur!;
         }
+        // Les clubs qui avaient conservé la candidature refont leur choix à
+        // chaque intersaison, avant que le marché général ne se mette à sonner.
+        get().examinerDossiersRecrutement();
         // La prolongation vient du club actuel, et elle passe par le même canal.
         if (finDeContrat && !j.preAccord) {
           const prolongation = offreProlongation(j, competitionDuClub(j.club), j.saison);
@@ -2299,6 +2451,10 @@ export const useGame = create<GameState>()(
           get().entrainer(j.entrainementFocus);
         }
 
+        // Une candidature refusée n'est pas oubliée : une vraie progression
+        // de cote suffit à faire réexaminer le dossier par le club concerné.
+        get().examinerDossiersRecrutement();
+
         // ---- L'OVALE SUIT LE CALENDRIER ----
         // Une semaine jouée = une nouvelle fournée de publications, datée.
         get().vivreSemaineSociale();
@@ -2361,12 +2517,21 @@ export const useGame = create<GameState>()(
         const dejaVues = new Set(
           get().approches.filter((a) => a.saison === joueur.saison).map((a) => a.club),
         );
+        // Deux années de mémoire suffisent à renouveler les appels sans rendre
+        // impossible le retour d'un club réellement insistant plus tard.
+        const clubsRecents = get().approches
+          .filter((a) => !a.prolongation && a.saison >= joueur.saison - 2)
+          .map((a) => a.club);
         // On réutilise LE moteur du marché : cote, besoin au poste, saut
         // d'étage, salaires par âge. Rien n'est recalculé ici.
         const offres = genererOffres(joueur, {
-          saison: joueur.saison, maximum: maximum + 2, demande, clubCible,
+          saison: joueur.saison, maximum: maximum + 3, demande, clubCible, clubsRecents,
         })
-          .filter((o) => !dejaVues.has(o.club))
+          // Une candidature directe ne doit JAMAIS être remplacée par
+          // l'offre d'un autre club. C'était la cause du silence observé :
+          // le moteur trouvait un autre prétendant, renvoyait « 1 offre »,
+          // puis le fil du club contacté restait sans réponse.
+          .filter((o) => (!clubCible || o.club === clubCible) && !dejaVues.has(o.club))
           .slice(0, maximum);
         if (!offres.length) return 0;
 
@@ -2374,6 +2539,10 @@ export const useGame = create<GameState>()(
         const nouvelles = offres.map((o) => approcheDepuisOffre(o, joueur, semaine));
         set((s) => ({
           approches: [...s.approches, ...nouvelles],
+          dossiersRecrutement: Object.fromEntries(
+            Object.entries(s.dossiersRecrutement)
+              .filter(([, dossier]) => !nouvelles.some((a) => a.club === dossier.club)),
+          ),
           // Le premier mot du club arrive en message privé, comme n'importe qui.
           conversations: nouvelles.reduce((acc, a) => ({
             ...acc,
@@ -2412,6 +2581,47 @@ export const useGame = create<GameState>()(
           }],
         }));
         return nouvelles.length;
+      },
+
+      examinerDossiersRecrutement: () => {
+        const joueur = get().joueur;
+        if (!joueur || joueur.preAccord) return 0;
+        const actuelle = cote(joueur);
+        let offresCreees = 0;
+
+        // Une progression de cote d'un point correspond déjà à plusieurs
+        // gains d'attributs : c'est assez significatif pour rouvrir un dossier,
+        // sans faire relancer le même club après chaque petite séance.
+        for (const [pseudo, dossier] of Object.entries(get().dossiersRecrutement)) {
+          const approcheExistante = get().approches.some((a) =>
+            a.club === dossier.club && (a.etat === 'ouverte' || a.etat === 'accord'));
+          if (joueur.club === dossier.club || approcheExistante) {
+            set((s) => {
+              const { [pseudo]: _retire, ...restants } = s.dossiersRecrutement;
+              return { dossiersRecrutement: restants };
+            });
+            continue;
+          }
+
+          const nouvelleSaison = joueur.saison > dossier.derniereSaisonEtudiee;
+          const progression = actuelle >= dossier.derniereCoteEtudiee + 1;
+          if (!nouvelleSaison && !progression) continue;
+
+          // On date l'examen avant de lancer le marché : si le club refuse
+          // encore, la semaine suivante ne doit pas recommencer en boucle.
+          set((s) => ({
+            dossiersRecrutement: {
+              ...s.dossiersRecrutement,
+              [pseudo]: {
+                ...dossier,
+                derniereCoteEtudiee: actuelle,
+                derniereSaisonEtudiee: joueur.saison,
+              },
+            },
+          }));
+          offresCreees += get().susciterApproches(1, true, dossier.club);
+        }
+        return offresCreees;
       },
 
       /** Une demande faite au club. Les chiffres tranchent, pas l'IA. */
@@ -3147,6 +3357,9 @@ export const useGame = create<GameState>()(
           budgetSalarial: budgets.salarial,
           contrat: { saisons: 3, salaire: salaireManager(force) },
           decision: null,
+          composition: compositionManagerParDefaut(effectifDuClub(club, 1)),
+          tactique: { ...TACTIQUE_MANAGER_DEFAUT },
+          resultats: {},
           negociations: [],
           recrues: [],
           clubs: [club],
@@ -3209,6 +3422,8 @@ export const useGame = create<GameState>()(
           budgetSalarial: budgets.salarial,
           contrat: { saisons: 3, salaire: salaireManager(force) },
           decision: null,
+          composition: compositionManagerParDefaut(effectifDuClub(club, m.saison)),
+          tactique: { ...TACTIQUE_MANAGER_DEFAUT },
           negociations: m.negociations.map((n) => (
             n.etat === 'ouverte' || n.etat === 'accord' ? { ...n, etat: 'rompue' as const } : n
           )),
@@ -3228,6 +3443,11 @@ export const useGame = create<GameState>()(
         // Comme la carrière joueur, on ne saute jamais une scène restée sans
         // réponse. Ici les choix sont déterministes et fonctionnent hors ligne.
         if (m.decision) return;
+        // Le championnat du manager est désormais joué, pas seulement simulé.
+        // Tant que l'affiche de cette semaine n'a pas atteint la sirène, le
+        // calendrier ne peut pas l'effacer en passant au lundi suivant.
+        const affiche = matchDuClubSemaine(m);
+        if (affiche && !m.resultats[affiche.cle]) return;
         if (m.semaine < SEMAINES_PAR_SAISON) {
           const suivant: Manager = { ...m, semaine: m.semaine + 1, decision: null };
           suivant.decision = decisionManagerPour(suivant);
@@ -3258,6 +3478,49 @@ export const useGame = create<GameState>()(
             role: 'joueur' as const,
             titre: `${decision.emoji} ${choix.label}`,
             texte: choix.consequence,
+          }],
+        }));
+      },
+
+      definirCompositionManager: (composition) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const effectif = effectifDuClub(m.club, m.saison);
+        set({ manager: { ...m, composition: reconcilerCompositionManager(effectif, composition) } });
+      },
+
+      definirTactiqueManager: (tactique) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        set({ manager: { ...m, tactique: { ...tactique } } });
+      },
+
+      enregistrerResultatManager: (resultat) => {
+        const m = get().manager;
+        if (!m?.club || resultat.club !== m.club || m.resultats[resultat.cle]) return;
+        const domicile = resultat.domicile ? resultat.club : resultat.adversaire;
+        const exterieur = resultat.domicile ? resultat.adversaire : resultat.club;
+        const scoreD = resultat.domicile ? resultat.scorePour : resultat.scoreContre;
+        const scoreE = resultat.domicile ? resultat.scoreContre : resultat.scorePour;
+        const essaisD = resultat.domicile ? resultat.essaisPour : resultat.essaisContre;
+        const essaisE = resultat.domicile ? resultat.essaisContre : resultat.essaisPour;
+        enregistrerResultatJoue(resultat.cle, { domicile, exterieur, scoreD, scoreE, essaisD, essaisE });
+        oublierResultats();
+        const victoire = resultat.scorePour > resultat.scoreContre;
+        const nul = resultat.scorePour === resultat.scoreContre;
+        set((s) => ({
+          manager: {
+            ...m,
+            resultats: { ...m.resultats, [resultat.cle]: resultat },
+            confiance: borne(m.confiance + (victoire ? 2 : nul ? 0 : -2)),
+            prestige: borne(m.prestige + (victoire ? 0.35 : nul ? 0.05 : -0.12)),
+          },
+          journal: [...s.journal, {
+            id: idUnique(), saison: m.saison, role: 'systeme' as const,
+            titre: victoire ? '🏉 Victoire du manager' : nul ? '🤝 Match nul' : '📋 Défaite du manager',
+            texte: `${m.club} ${resultat.scorePour}-${resultat.scoreContre} ${resultat.adversaire} · `
+              + `${resultat.essaisPour} essai${resultat.essaisPour > 1 ? 's' : ''} marqué${resultat.essaisPour > 1 ? 's' : ''}. `
+              + `Le résultat est enregistré dans le championnat.`,
           }],
         }));
       },
@@ -3513,6 +3776,9 @@ export const useGame = create<GameState>()(
           objectif: licencie ? 0
             : objectifDuBoard(m.club, competitionDuClub(m.club), m.saison + 1),
           decision: null,
+          composition: licencie
+            ? m.composition
+            : reconcilerCompositionManager(effectifDuClub(m.club, m.saison + 1), m.composition),
           negociations: m.negociations.map((n) => (
             n.etat === 'ouverte' || n.etat === 'accord' ? { ...n, etat: 'rompue' as const } : n
           )),
@@ -3551,6 +3817,7 @@ export const useGame = create<GameState>()(
         // se contournerait en retirant le drapeau.
         if (!m.libre) get().publierAuClassement(true);
         setMouvementsClubs({});
+        effacerResultatsJoues();
         oublierResultats();
         setContexteJoueur('', 0);
         set((s) => ({
@@ -3622,6 +3889,7 @@ export const useGame = create<GameState>()(
           evenementsVus: [],
           tropheesEnAttente: [],
           approches: [],
+          dossiersRecrutement: {},
           mouvementsClubs: {},
           compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           posts: [],
@@ -4131,18 +4399,57 @@ export const useGame = create<GameState>()(
           relationsSociales: { ...relationsSociales, [pseudo]: apres },
         });
 
-        // Écrire à un club devient une démarche concrète : s'il peut réellement
-        // recruter le joueur, il envoie aussitôt une offre négociable dans ce fil.
-        if (compte.type === 'club' && compte.club && compte.club !== joueur.club) {
-          if (get().susciterApproches(1, true, compte.club) > 0) return;
+        // Écrire à un club devient une démarche concrète. On reconnaît le
+        // club par son identité réelle, pas uniquement par `type` : certaines
+        // anciennes sauvegardes gardent un profil parfaitement visible avec
+        // une catégorie obsolète, ce qui expliquait les fils sans réponse.
+        const clubContacte = clubDepuisCompte(compte);
+        if (clubContacte && clubContacte !== joueur.club) {
+          const existante = get().approches.find((a) =>
+            a.club === clubContacte && (a.etat === 'ouverte' || a.etat === 'accord'));
+          if (existante) {
+            const reponse = existante.etat === 'accord'
+              ? t('recrut.accord.maintenu', { club: clubContacte })
+              : t('recrut.offre.ouverte');
+            set((s) => ({
+              conversations: {
+                ...s.conversations,
+                [pseudo]: [
+                  ...(s.conversations[pseudo] ?? []),
+                  {
+                    id: idUnique(), pseudo, de: 'lui' as const, saison: joueur.saison,
+                    texte: reponse, semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false,
+                  },
+                ],
+              },
+            }));
+            return;
+          }
+
+          if (get().susciterApproches(1, true, clubContacte) > 0) return;
+
+          const valeur = cote(joueur);
+          const motif = motifRefusClub(joueur, clubContacte);
           set((s) => ({
+            dossiersRecrutement: {
+              ...s.dossiersRecrutement,
+              [pseudo]: {
+                pseudo,
+                club: clubContacte,
+                saisonContact: s.dossiersRecrutement[pseudo]?.saisonContact ?? joueur.saison,
+                semaineContact: s.dossiersRecrutement[pseudo]?.semaineContact ?? (joueur.semaine ?? 1),
+                coteAuContact: s.dossiersRecrutement[pseudo]?.coteAuContact ?? valeur,
+                derniereCoteEtudiee: valeur,
+                derniereSaisonEtudiee: joueur.saison,
+              },
+            },
             conversations: {
               ...s.conversations,
               [pseudo]: [
                 ...(s.conversations[pseudo] ?? []),
                 {
                   id: idUnique(), pseudo, de: 'lui' as const, saison: joueur.saison,
-                  texte: "Merci pour ton message. Nous suivons ton dossier, mais nous ne pouvons pas te faire une offre concrète pour le moment.",
+                  texte: t('recrut.refus.message', { motif }),
                   semaine: joueur.semaine ?? 1, creeLe: Date.now(), lu: false,
                 },
               ],
@@ -4821,7 +5128,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 13,
+      version: 16,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -4840,6 +5147,7 @@ export const useGame = create<GameState>()(
           journal?: EntreeJournal[];
           notifsSocial?: NotifSocial[];
           approches?: Approche[];
+          dossiersRecrutement?: Record<string, DossierRecrutementClub>;
           succesDebloques?: SuccesDebloques;
           defis?: { cle: string; faits: string[] };
           comptesSuivis?: CompteSuivi[];
@@ -4941,6 +5249,16 @@ export const useGame = create<GameState>()(
         // fin de saison en régénère aussitôt — c'est mieux que de convertir des
         // cartes en négociations qui n'ont jamais eu lieu.
         s.approches ??= [];
+        // VERSION 16 — un refus de club devient un vrai suivi de recrutement,
+        // conservé entre les sessions puis réétudié avec la progression.
+        s.dossiersRecrutement ??= {};
+        // VERSION 15 — une approche persistée sans son fil créait une vignette
+        // « offre » sur la carrière, mais aucun interlocuteur dans L'Ovale.
+        // On reconstruit uniquement le message d'ouverture manquant ; les fils
+        // existants et toutes les décisions du joueur restent intacts.
+        if (version < 15) {
+          s.conversations = assurerConversationsApproches(s.joueur, s.approches, s.conversations);
+        }
         // Versions 6 et 7 : l'IA a vécu un temps dans le navigateur (WebLLM),
         // avec un modèle de 900 Mo téléchargé en arrière-plan. La version 9
         // ci-dessous referme cette parenthèse — on ne migre donc plus rien ici.
@@ -5038,6 +5356,11 @@ export const useGame = create<GameState>()(
             negociations: s.manager.negociations ?? [],
             recrues: s.manager.recrues ?? [],
             decision: s.manager.decision ?? null,
+            composition: s.manager.composition ?? (s.manager.club
+              ? compositionManagerParDefaut(effectifDuClub(s.manager.club, s.manager.saison))
+              : { titulaires: [], remplacants: [], capitaineId: '', buteurId: '' }),
+            tactique: { ...TACTIQUE_MANAGER_DEFAUT, ...(s.manager.tactique ?? {}) },
+            resultats: s.manager.resultats ?? {},
           };
           if (version < 12 && s.manager.club && !s.manager.decision) {
             s.manager.decision = decisionManagerPour(s.manager);
@@ -5057,11 +5380,27 @@ export const useGame = create<GameState>()(
         // composition des divisions : elles doivent être purgées en même temps.
         oublierResultats();
         setTransfertsSociaux(etat?.transfertsSociaux ?? []);
+        setResultatsJoues(Object.values(etat?.manager?.resultats ?? {}).map((r) => ({
+          cle: r.cle,
+          match: {
+            domicile: r.domicile ? r.club : r.adversaire,
+            exterieur: r.domicile ? r.adversaire : r.club,
+            scoreD: r.domicile ? r.scorePour : r.scoreContre,
+            scoreE: r.domicile ? r.scoreContre : r.scorePour,
+            essaisD: r.domicile ? r.essaisPour : r.essaisContre,
+            essaisE: r.domicile ? r.essaisContre : r.essaisPour,
+          },
+        })));
         // ⚠️ Le thème vit sur <html>, pas dans React : il faut le reposer à la
         // réhydratation, sinon le site repart en vert à chaque rechargement.
         appliquerTheme(etat?.theme ?? 'vert');
         // Idem pour la langue : elle vit dans un module, pas dans React.
         definirLangue(etat?.langue ?? langueDuNavigateur());
+        // Les sauvegardes qui contiennent déjà un message resté sans
+        // réponse sont réparées au rechargement, dans la langue de la partie.
+        if (etat?.joueur) {
+          etat.reparerSilencesClubs();
+        }
         // Et la clé Groq personnelle, pour la même raison (`lib/groq.ts` ne
         // peut pas lire le store sans créer un cycle d'imports).
         definirCleGroqJoueur(etat?.groqKey ?? '');
@@ -5102,6 +5441,7 @@ export const useGame = create<GameState>()(
         compteurs: s.compteurs,
         tropheesEnAttente: s.tropheesEnAttente,
         approches: s.approches,
+        dossiersRecrutement: s.dossiersRecrutement,
         theme: s.theme,
         langue: s.langue,
         langueManuelle: s.langueManuelle,

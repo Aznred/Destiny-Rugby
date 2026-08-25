@@ -342,6 +342,22 @@ export interface MessageDM {
   lu?: boolean;
 }
 
+/**
+ * Un club qui a refusé une candidature sans fermer définitivement la porte.
+ *
+ * Le dossier est persistant : le marché le réétudie après une progression
+ * significative du joueur et, quoi qu'il arrive, à la saison suivante.
+ */
+export interface DossierRecrutementClub {
+  pseudo: string;
+  club: string;
+  saisonContact: number;
+  semaineContact: number;
+  coteAuContact: number;
+  derniereCoteEtudiee: number;
+  derniereSaisonEtudiee: number;
+}
+
 // Un transfert ANNONCÉ sur L'Ovale — et réellement appliqué au monde du jeu.
 export interface TransfertAnnonce {
   nom: string; // joueur concerné
@@ -644,6 +660,44 @@ export interface DecisionManager {
   choix: ChoixDecisionManager[];
 }
 
+export type PlanAttaqueManager = 'equilibre' | 'avants' | 'large' | 'occupation';
+export type PlanDefenseManager = 'blitz' | 'glissee' | 'repli';
+export type RythmeManager = 'gestion' | 'normal' | 'intense';
+export type ChoixPenaliteManager = 'mixte' | 'points' | 'touche';
+export type TimingRemplacementsManager = 'precoces' | 'standard' | 'tardifs';
+
+/** Le plan collectif transmis au moteur de match, avant et pendant la partie. */
+export interface TactiqueManager {
+  attaque: PlanAttaqueManager;
+  defense: PlanDefenseManager;
+  rythme: RythmeManager;
+  penalites: ChoixPenaliteManager;
+  remplacements: TimingRemplacementsManager;
+}
+
+/** Une feuille de match complète : XV, banc de huit, capitaine et buteur. */
+export interface CompositionManager {
+  titulaires: string[];
+  remplacants: string[];
+  capitaineId: string;
+  buteurId: string;
+}
+
+/** Le score réellement produit par le moteur et réinjecté au championnat. */
+export interface ResultatMatchManager {
+  cle: string;
+  club: string;
+  saison: number;
+  semaine: number;
+  journee: number;
+  domicile: boolean;
+  adversaire: string;
+  scorePour: number;
+  scoreContre: number;
+  essaisPour: number;
+  essaisContre: number;
+}
+
 export interface Manager {
   nom: string;
   nation: string;
@@ -671,6 +725,10 @@ export interface Manager {
   budgetSalarial: number;
   contrat: { saisons: number; salaire: number } | null;
   decision: DecisionManager | null;
+  composition: CompositionManager;
+  tactique: TactiqueManager;
+  /** Indexé par la clé déterministe du calendrier. Un match ne se joue qu'une fois. */
+  resultats: Record<string, ResultatMatchManager>;
   negociations: NegociationManager[];
   recrues: RecrueManager[];
   /** Tous les clubs entraînés, dans l’ordre, sans doublon consécutif. */

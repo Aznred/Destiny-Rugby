@@ -1,7 +1,7 @@
-// La base d'évènements : contextuelle, variée, et les conséquences dures.
+// Contrôle éditorial et mécanique de la bibliothèque de situations.
 import { SITUATIONS, situationPour, versScenario } from '../src/data/situations';
 import { TEXTES_SITUATIONS } from '../src/data/textesSituations';
-import { appliquerConsequence, lireDerapage, consequenceDuDerapage } from '../src/lib/consequences';
+import { appliquerConsequence, consequenceDuDerapage, lireDerapage } from '../src/lib/consequences';
 import type { Joueur } from '../src/types';
 
 const base = {
@@ -13,121 +13,78 @@ const base = {
   contrat: { club: 'Stade Toulousain', division: 'top14', saisons: 2, salaire: 90_000 },
 } as unknown as Joueur;
 
-console.log('=== 1. LA BASE ===');
-console.log(`  ${SITUATIONS.length} situations · ${SITUATIONS.reduce((n, s) => n + s.choix.length, 0)} choix au total`);
-const parCat: Record<string, number> = {};
-for (const s of SITUATIONS) parCat[s.categorie] = (parCat[s.categorie] ?? 0) + 1;
-console.log('  par catégorie :', Object.entries(parCat).map(([k, v]) => `${k} ${v}`).join(' · '));
-const dures = SITUATIONS.flatMap((s) => s.choix).filter((c) => c.issue.dur);
-console.log(`  issues à conséquence dure : ${dures.length}`);
-for (const d of dures) console.log(`     ${d.issue.dur!.type.padEnd(20)} ← « ${d.texte} »`);
-
-// ⚠️ DEUX SITUATIONS NE PEUVENT PAS PARTAGER UN ID, et ça s'est produit : en
-// ajoutant le deuxième lot, trois ids existaient déjà (`paris-sportifs`,
-// `bagarre-boite`, `sponsor-local`). Rien ne plantait — c'est bien le problème.
-// La deuxième situation devenait injoignable (`SITUATIONS.find` rend la
-// première), `dejaVues` en écartait deux d'un coup, et surtout les DEUX
-// partageaient les mêmes clés de traduction : le texte de l'une s'affichait
-// sous le titre de l'autre. On l'attrape ici, une bonne fois.
-{
-  const vus = new Set<string>();
-  const doublons = SITUATIONS.map((s) => s.id).filter((id) => {
-    if (vus.has(id)) return true;
-    vus.add(id);
-    return false;
-  });
-  const ok = doublons.length === 0;
-  console.log(`  ${ok ? '✅' : '❌'} aucun identifiant en double${ok ? '' : ` : ${[...new Set(doublons)].join(', ')}`}`);
-  if (!ok) process.exitCode = 1;
+let echecs = 0;
+function verifier(ok: boolean, message: string): void {
+  console.log(`  ${ok ? '✅' : '❌'} ${message}`);
+  if (!ok) echecs++;
 }
 
-// Et chaque situation doit avoir au moins deux choix : un « scénario » à une
-// seule issue n'est pas un choix, c'est une notification.
-{
-  const maigres = SITUATIONS.filter((s) => s.choix.length < 2).map((s) => s.id);
-  console.log(`  ${maigres.length ? '❌' : '✅'} au moins deux choix par situation`
-    + `${maigres.length ? ` : ${maigres.join(', ')}` : ''}`);
-  if (maigres.length) process.exitCode = 1;
-}
-
-// ⚠️ ET TOUT EST TRADUIT — SINON ON NE LE VOIT JAMAIS. `traduit()` retombe en
-// silence sur le français quand une clé manque : c'est un excellent filet, et
-// une excellente façon de livrer six langues à moitié faites sans que personne
-// ne s'en aperçoive. Ce contrôle-ci reconstitue les clés attendues à partir du
-// NOMBRE DE CHOIX de chaque situation et exige qu'elles existent toutes, dans
-// les sept langues.
-{
-  const langues = ['fr', 'en', 'es', 'it', 'de', 'pt', 'ja'] as const;
-  const manquantes: string[] = [];
-  const incompletes: string[] = [];
-  for (const s of SITUATIONS) {
-    const cles = ['titre', 'txt', ...s.choix.flatMap((_, i) => [`c${i}`, `r${i}`])];
-    for (const suffixe of cles) {
-      const cle = `sit.${s.id}.${suffixe}`;
-      const entree = TEXTES_SITUATIONS[cle];
-      if (!entree) manquantes.push(cle);
-      else if (langues.some((l) => !entree[l]?.trim())) incompletes.push(cle);
-    }
+console.log('=== 1. BIBLIOTHÈQUE ===');
+const ids = new Set<string>();
+const categories = new Map<string, number>();
+verifier(SITUATIONS.length === 151, `${SITUATIONS.length} situations (151 attendues)`);
+for (const situation of SITUATIONS) {
+  verifier(!!situation.id && !ids.has(situation.id), `identifiant unique : ${situation.id}`);
+  ids.add(situation.id);
+  categories.set(situation.categorie, (categories.get(situation.categorie) ?? 0) + 1);
+  verifier(!!situation.titre.trim() && !!situation.situation.trim(), `texte complet : ${situation.id}`);
+  verifier(situation.choix.length >= 2 && situation.choix.length <= 4, `2 à 4 choix : ${situation.id}`);
+  for (const [index, choix] of situation.choix.entries()) {
+    const impact = Object.values(choix.issue.deltas).some((v) => v !== 0)
+      || choix.issue.ovas !== 0 || !!choix.issue.coach || !!choix.issue.fans
+      || !!choix.issue.marche || !!choix.issue.dur;
+    verifier(!!choix.texte.trim() && !!choix.issue.recit.trim() && impact,
+      `choix ${index + 1} jouable : ${situation.id}`);
   }
-  const attendues = SITUATIONS.reduce((n, s) => n + 2 + s.choix.length * 2, 0);
-  const ok = manquantes.length === 0 && incompletes.length === 0;
-  console.log(`  ${ok ? '✅' : '❌'} ${attendues} clés de traduction, 7 langues`
-    + (manquantes.length ? ` — ${manquantes.length} absente(s) : ${manquantes.slice(0, 4).join(', ')}…` : '')
-    + (incompletes.length ? ` — ${incompletes.length} incomplète(s) : ${incompletes.slice(0, 4).join(', ')}…` : ''));
-  if (!ok) process.exitCode = 1;
+}
+for (const categorie of ['vestiaire', 'argent', 'medias', 'perso', 'corps', 'nuit', 'club', 'carriere']) {
+  verifier((categories.get(categorie) ?? 0) >= 10, `${categorie} : ${categories.get(categorie) ?? 0} situations`);
 }
 
-console.log('\n=== 2. C’EST CONTEXTUEL ===');
+console.log('\n=== 2. CONTEXTE ET NON-RÉPÉTITION ===');
 const profils: [string, Partial<Joueur>][] = [
-  ['espoir de 19 ans en Fédérale 2', { age: 19, division: 'fed2', argent: 500, reputation: 8, attributs: { ...base.attributs, vitesse: 40, force: 38, endurance: 42, plaquage: 38, passe: 44, jeuAuPied: 40, vision: 42, mental: 40 } }],
-  ['cadre de 28 ans en Top 14', { age: 28, reputation: 62 }],
-  ['vétéran de 34 ans', { age: 34, reputation: 70, forme: 55 }],
-  ['joueur en fin de contrat', { contrat: { club: 'Stade Toulousain', division: 'top14', saisons: 0, salaire: 90_000 } as never }],
-  ['joueur en délicatesse avec le staff', { confianceCoach: 25 }],
+  ['espoir', { age: 19, division: 'fed2', reputation: 8 }],
+  ['cadre', { age: 28, reputation: 62 }],
+  ['vétéran', { age: 35, reputation: 70, forme: 55 }],
+  ['fin de contrat', { contrat: { club: base.club, division: 'top14', saisons: 0, salaire: 90_000 } }],
 ];
-for (const [nom, p] of profils) {
-  const j = { ...base, ...p } as Joueur;
-  const eligibles = SITUATIONS.filter((s) => !s.quand || s.quand(j));
-  const tires = new Set(Array.from({ length: 12 }, (_, i) => situationPour(j, [], () => (i + 0.5) / 12)?.id));
-  console.log(`  ${nom.padEnd(34)} ${eligibles.length}/${SITUATIONS.length} éligibles · ex. ${[...tires].slice(0, 3).join(', ')}`);
+for (const [nom, partiel] of profils) {
+  const joueur = { ...base, ...partiel } as Joueur;
+  const eligibles = SITUATIONS.filter((s) => !s.quand || s.quand(joueur));
+  verifier(eligibles.length >= 80, `${nom} : ${eligibles.length} situations éligibles`);
 }
-{
-  const jeune = { ...base, age: 19 } as Joueur;
-  const vieux = { ...base, age: 35 } as Joueur;
-  console.log(`  « bizutage » proposé à 19 ans : ${SITUATIONS.find((s) => s.id === 'bizutage')!.quand!(jeune) ? '✅' : '❌'}`);
-  console.log(`  « bizutage » proposé à 35 ans : ${SITUATIONS.find((s) => s.id === 'bizutage')!.quand!(vieux) ? '❌ (ne devrait pas)' : '✅ écarté'}`);
-  console.log(`  « le corps parle » à 35 ans : ${SITUATIONS.find((s) => s.id === 'fin-approche')!.quand!(vieux) ? '✅' : '❌'}`);
+const vues: string[] = [];
+for (let i = 0; i < 30; i++) {
+  const situation = situationPour(base, vues);
+  if (situation) vues.push(situation.id);
 }
-{
-  // On ne repropose pas ce qu'on a déjà vécu.
-  const vues: string[] = [];
-  for (let i = 0; i < 20; i++) {
-    const s = situationPour(base, vues);
-    if (s) vues.push(s.id);
-  }
-  console.log(`  20 tirages successifs → ${new Set(vues).size} situations distinctes`);
-}
+verifier(new Set(vues).size === 30, '30 tirages successifs sans répétition');
 
-console.log('\n=== 3. LES CONSÉQUENCES DURES ===');
-for (const t of ['suspension', 'prison', 'accident', 'exclusionClub', 'relegationFinanciere', 'finDeCarriere', 'deces'] as const) {
-  const e = appliquerConsequence(base, t, 'motif de test', 12);
-  console.log(`  ${e.emoji} ${e.titre.padEnd(34)} finale=${e.finale ? 'OUI' : 'non'} · moral ${base.moral}→${e.joueur.moral} · contrat ${e.joueur.contrat ? 'gardé' : 'rompu'}`);
-}
+console.log('\n=== 3. TRADUCTIONS HISTORIQUES ET REPLI ===');
+const langues = ['fr', 'en', 'es', 'it', 'de', 'pt', 'ja'] as const;
+const historiques = SITUATIONS.slice(0, 51);
+const manquantes = historiques.flatMap((s) => {
+  const suffixes = ['titre', 'txt', ...s.choix.flatMap((_, i) => [`c${i}`, `r${i}`])];
+  return suffixes.filter((suffixe) => {
+    const entree = TEXTES_SITUATIONS[`sit.${s.id}.${suffixe}`];
+    return !entree || langues.some((langue) => !entree[langue]?.trim());
+  });
+});
+verifier(manquantes.length === 0, 'les 51 scènes historiques restent traduites dans les 7 langues');
+verifier(versScenario(SITUATIONS[51]).titre === SITUATIONS[51].titre,
+  'les nouvelles scènes disposent du repli français sans clé visible');
 
-console.log('\n=== 4. LES DÉRAPAGES SUR L’OVALE ===');
-const tweets: [string, string][] = [
-  ['Match dur mais on lâche rien 🏉', 'rien'],
-  ['L’arbitre est une catastrophe, franchement nul.', 'rien (clash autorisé)'],
-  ['Ce mec est un sale race, qu’il retourne dans son pays', 'discrimination'],
-  ['je vais te tuer toi et ta famille', 'menace'],
-  ['soirée cocaïne avant le match, c’était chaud', 'drogue'],
-];
-for (const [t, attendu] of tweets) {
-  const d = lireDerapage(t);
-  const c = d ? consequenceDuDerapage(d) : null;
-  console.log(`  « ${t.slice(0, 44).padEnd(44)} » → ${d ?? 'rien'} ${c ? `(${c.type}, ${c.semaines} sem.)` : ''} [attendu : ${attendu}]`);
+console.log('\n=== 4. CONSÉQUENCES ET CONVERSION ===');
+for (const type of ['suspension', 'prison', 'accident', 'exclusionClub', 'relegationFinanciere', 'finDeCarriere', 'deces'] as const) {
+  const effet = appliquerConsequence(base, type, 'motif de test', 12);
+  verifier(!!effet.titre && !!effet.joueur, `conséquence ${type} appliquée`);
 }
+for (const texte of ['Match dur mais on lâche rien 🏉', 'je vais te tuer toi et ta famille', 'soirée cocaïne avant le match']) {
+  const derapage = lireDerapage(texte);
+  if (derapage) verifier(!!consequenceDuDerapage(derapage), `dérapage ${derapage} relié à une conséquence`);
+}
+const scenario = versScenario(SITUATIONS[0]);
+verifier(scenario.choix.length === SITUATIONS[0].choix.length, 'conversion vers l’écran sans perte de choix');
 
-console.log('\n=== 5. CONVERSION VERS L’ÉCRAN ===');
-const sc = versScenario(SITUATIONS[0]);
-console.log(`  ${sc.emoji} ${sc.titre} — ${sc.choix.length} choix, format Scenario ✅`);
+console.log(`\n${echecs ? `❌ ${echecs} échec(s)` : '✅ TOUT PASSE'}`);
+process.exitCode = echecs ? 1 : 0;

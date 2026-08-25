@@ -58,7 +58,7 @@ Three.js (@react-three/fiber + @react-three/drei) · Groq (API distante).
 | `src/lib/effectif.ts` | `effectifDuClub(club, saison)` = effectif de base **+ mercato**. Base : **effectif réel pro** vieilli, sinon **effectif réel amateur** (`effectifAmateur`, âge/note tirés), sinon des coéquipiers **déterministes** (seed = club+slot+génération), retraite 33-37 ans → **regens**, **nationalités pondérées** (`PART_FRANCAIS`). Aussi : `noteALAge()` (**progression vers le potentiel jusqu'à 27 ans, puis déclin**), `estEspoir`/`estDeclinant`, `forceEffectif(club, saison)` et `forceMoyenneDivision(division, saison)` (tous deux mémoïsés). ⚠️ L'ordre des tirages `rng()` est figé (prénom, nom, âge, retraite, talent, nation) — ne pas le changer sans adapter le « peek » de `effectifDuClub`/`cumulDebut`. |
 | `src/lib/mercato.ts` | Décode `MERCATO_REEL` (`mercatoReel(club)`). |
 | `src/lib/progression.ts` | **Évolution dynamique** : `noterSaison()` note la saison sur 10 (temps de jeu, essais vs `ESSAIS_ATTENDUS` du poste, niveau face au groupe, forme/moral, rang du club), `evoluer()` en déduit les points d'attributs (× facteur d'âge, **bonus formation avant 23 ans**, déclin après 31), les répartit par la **méthode du plus fort reste** (pondérée par les attributs clés du poste) et fait bouger le **potentiel**. |
-| `src/lib/offres.ts` | **Marché** : `cote(j)`, `genererOffres()` (clubs dont la note est dans la fenêtre `cote−16 … cote+5`, **étranger à partir de 55 de notoriété**), `offreProlongation()`, salaires par niveau (`SALAIRE_PAR_NIVEAU`). |
+| `src/lib/offres.ts` | **Marché** : `cote(j)`, `genererOffres()` (fenêtre basse progressive `cote−18/23/28`, plafond selon l'âge, mémoire `clubsRecents`, **seuil étranger gradué selon la force de la ligue**), `offreProlongation()`, salaires par niveau (`SALAIRE_PAR_NIVEAU`). |
 | `src/components/Offres.tsx` | Panneau **« Choix de carrière »** (portal) : contrat en cours, cartes d'offres (logo, division, note du club, salaire, prime, durée), signature. |
 | `src/components/Drapeau.tsx` | Vrais drapeaux **SVG** (lib `flag-icons`, locale) — les emojis drapeaux ne s'affichent pas sous Windows. `CODES` vient de `data/nations.ts` (202 nations) + quelques entités des données réelles. `ALIAS` absorbe les orthographes des données (« Afrique du sud », « Pays-de-Galles »…). `nomNation()` retire l'emoji de tête (compat anciennes sauvegardes « 🇫🇷 France »). |
 | `src/components/Blason.tsx` | Écusson d'un club : **vrai logo** (`club.logo`, un `<img>` sur pastille sombre) si la base en fournit un, sinon blason SVG généré (initiales + couleurs). `LogoEquipe` fait la même chose pour une équipe dont on n'a que le nom (sélections). |
@@ -615,8 +615,10 @@ premier.
   génère des offres si le contrat expire, si la saison est ≥ 7/10, ou 25 % du
   temps. Le club actuel propose toujours une prolongation en fin de contrat.
   `demanderTransfert()` force une salve d'offres contre −6 de moral et −2 de
-  réputation. **L'étranger** s'ouvre à partir de 55 de notoriété
-  (réputation + note de saison × 3).
+  réputation. **L'étranger** utilise un seuil gradué : les petites ligues sont
+  accessibles à un amateur de leur niveau, les ligues majeures exigent toujours
+  une forte notoriété. Une demande de transfert ou un message direct aide le
+  dossier, sans contourner le plafond sportif ni la règle des étages.
 - **CARRIÈRE HORS DE FRANCE** : `resoudreTrophees()` travaille désormais sur
   `COMPETITIONS` (et plus `DIVISIONS_FRANCE`), avec une **taille de poule réelle**
   (Premiership 10, Top 14 14, URC 16 ; 12 par défaut pour les divisions amateurs,
@@ -1276,16 +1278,18 @@ indexe la fourchette sur le **niveau de la compétition** :
   veut. Le bouton actif est surligné.
 - **« 🎲 Évènement aléatoire » a disparu** : il faisait double emploi. Il ne
   reste que **« 📖 La vie hors du terrain »**.
-- **`src/data/situations.ts`** — la grosse base : **30 situations, 85 choix**,
+- **`src/data/situations.ts` + `situationsSupplementaires.ts`** — la grosse base :
+  **151 situations** (51 historiques + 100 nouvelles), avec au moins deux choix
+  réellement impactants chacune,
   réparties en 8 catégories (vestiaire, argent, médias, perso, corps, nuit,
   club, carrière). ⚠️ **Aucune ne parle du match en cours** : le match se joue
   dans le moteur.
 - **Chaque situation est CONTEXTUELLE** (`quand`) : âge, forme, moral, division,
   argent, contrat, confiance du staff. Mesuré : un espoir de 19 ans en Fédérale 2
-  voit 15 situations sur 30, un vétéran de 34 ans en voit 25 ; « le rituel du
+  voit plus de 100 situations, un vétéran de 34 ans plus de 130 ; « le rituel du
   vestiaire » n'est jamais proposé à 35 ans, « le corps parle » jamais à 19 ans.
-- `situationsVues` (store, persisté) évite les répétitions : **20 tirages
-  successifs → 20 situations distinctes**.
+- `situationsVues` (store, persisté) évite les répétitions : **30 tirages
+  successifs → 30 situations distinctes**.
 - Avec l'IA locale, c'est le MJ qui écrit la situation ; sinon, on pioche
   dans la base. Même bouton, même rendu.
 
@@ -2636,7 +2640,7 @@ désormais la conquête, à zéro pour un trois-quarts : la ligne est donc
 naturellement neutre pour lui, sans test de poste.
 
 
-## 🔁 LE MARCHÉ DES TRANSFERTS — deux reproches, quatre causes
+## 🔁 LE MARCHÉ DES TRANSFERTS — variété, projets et accès mondial
 
 Demande : « c'est trop facile d'avoir de gros clubs et de gros salaires » et
 « j'ai l'impression que c'est toujours les mêmes clubs qui proposent ».
@@ -2645,9 +2649,9 @@ Demande : « c'est trop facile d'avoir de gros clubs et de gros salaires » et
 
 Le tirage ne pondérait que **la proximité de niveau**. Comme la note d'un club ne
 bouge presque pas d'une saison à l'autre, les mêmes cinq ou six noms revenaient à
-chaque intersaison, pendant douze saisons. Deux ajouts :
+chaque intersaison, pendant douze saisons. Quatre mécanismes corrigent ça :
 
-1. **L'humeur de la saison.** `graine('marche#club#saison')` donne à chaque club
+1. **L'humeur de la saison.** `graine('marche#joueur#club#saison')` donne à chaque club
    un intérêt propre, stable pour l'année et différent la suivante. Un club
    scoute quelques joueurs par an, et pas les mêmes. Déterministe : rouvrir le
    panneau ne change rien (pas de save-scumming).
@@ -2655,29 +2659,65 @@ chaque intersaison, pendant douze saisons. Deux ajouts :
    joueurs nettement meilleurs à ton poste ne recrute pas un troisième. C'est LA
    question qu'aucune version ne posait, et elle écarte des clubs **différents
    pour chaque poste et chaque saison**.
+3. **Une mémoire sur deux saisons.** Les clubs déjà venus passent derrière les
+   nouveaux prétendants, mais peuvent revenir plus tard. Une relance mesurée avec
+   quatre clubs récents produit quatre nouveaux interlocuteurs quand le vivier le
+   permet.
+4. **Des projets pour les stars.** Le plancher bas passe progressivement de
+   `cote−18` à `cote−28` : un club moyen peut tenter d'attirer une tête d'affiche,
+   sans jamais faire tomber une star jusque dans les divisions régionales.
 
-Mesuré sur douze intersaisons du même joueur : **22 à 24 clubs différents pour
+Mesuré sur douze intersaisons du même joueur : **23 clubs différents pour
 48 offres**, le plus assidu revenant 4 fois. Et un ouvreur et un pilier de même
 niveau ne reçoivent pas la même liste.
 
+### « Les petits championnats étrangers sont inaccessibles »
+
+Le blocage était double : le seuil de notoriété était fixé à 55 pour toutes les
+ligues du monde, et l'annuaire de L'Ovale n'ajoutait que les compétitions de
+niveau 0 à 3. Les clubs de Finlande, des Pays-Bas, de Pologne, d'Allemagne ou de
+République tchèque étaient donc introuvables, puis refusaient mécaniquement le
+dossier même lorsqu'ils correspondaient au niveau du joueur.
+
+- `seuilEtranger(niveau)` demande peu de notoriété aux ligues semi-amatrices et
+  beaucoup aux ligues majeures ; un agent sollicité ou un message direct donne
+  un bonus d'ouverture, mais ne change jamais le niveau sportif du joueur ;
+- `annuaire()` expose tous les clubs étrangers. Un joueur de Régionale 3 peut
+  ainsi trouver Jyväskylä, lui écrire et recevoir une offre de SM-sarja ;
+- `verifMarche.ts` protège le compte L'Ovale, la démarche directe, l'apparition
+  spontanée d'un pays étranger et la mémoire anti-répétition.
+
+### Offre fantôme : une approche sans conversation
+
+La vignette Marché comptait `approches[etat=ouverte]`, tandis que l'écran Messages
+ne listait que les clés de `conversations`. Une ancienne sauvegarde pouvait donc
+afficher « 1 » puis ouvrir un L'Ovale vide. Trois protections se recouvrent :
+
+- le bouton appelle `ouvrirMessagesOvale()` et vise le pseudo de la première
+  approche ouverte, au lieu d'ouvrir simplement l'accueil du réseau ;
+- `Messages` inclut toujours les pseudos des approches ouvertes ou acceptées ;
+- `assurerConversationsApproches()` recrée seulement le message initial absent.
+  La migration de sauvegarde passe en **version 15**, et la réparation est aussi
+  rejouée à chaque ouverture pour couvrir un état déjà chargé.
+
 ### « Trop facile d'avoir de gros clubs et de gros salaires »
 
-3. **Le plafond dépend de l'ÂGE.** Il était fixe (« cote + 5 ») : un joueur de
+1. **Le plafond dépend de l'ÂGE.** Il était fixe (« cote + 5 ») : un joueur de
    32 ans recevait des offres de clubs 5 points au-dessus de lui, exactement
    comme un espoir de 19 ans. Or un club ne paie au-dessus du niveau constaté que
    pour du POTENTIEL. La marge passe de **7 points avant 21 ans à 0,5 après 29**.
-4. **On ne saute plus deux étages.** Un joueur de Fédérale 1 ne signe pas en
+2. **On ne saute plus deux étages.** Un joueur de Fédérale 1 ne signe pas en
    Top 14 : il passe par la Nationale et la Pro D2. Les très jeunes font
    exception (trois étages avant 22 ans) — un club professionnel va vraiment
    chercher un espoir de 20 ans plus bas.
-5. **La notoriété ne fait plus le niveau.** La cote est plafonnée à
+3. **La notoriété ne fait plus le niveau.** La cote est plafonnée à
    `générale + RENOM_MAX` (7). Un joueur moyen (générale 60) très connu
    (réputation 95) affichait 68,75 : de quoi intéresser le bas du Top 14 sans y
    avoir jamais joué.
-6. **Le salaire tient compte de l'âge** : ×0,55 à 20 ans, plein tarif de 25 à 31,
+4. **Le salaire tient compte de l'âge** : ×0,55 à 20 ans, plein tarif de 25 à 31,
    ×0,72 après 34. Et le multiplicateur d'écart passe de 2,2 à 1,8 — c'est un
-   salaire, pas une prime de transfert. Mesuré à cote égale : **230 000 € à
-   19 ans, 420 000 € à 27 ans, 305 000 € à 36 ans**.
+   salaire, pas une prime de transfert. Mesuré à cote égale : **260 000 € à
+   19 ans, 470 000 € à 27 ans, 340 000 € à 36 ans** dans le banc actuel.
 
 ⚠️ **LA PONDÉRATION 75/25 DE LA COTE EST CONSERVÉE, APRÈS MESURE.** Une version
 intermédiaire faisait de la générale la base et de la réputation un simple
@@ -7441,9 +7481,10 @@ pourquoi il ne peut pas composer son XV, et le prenne pour un bug.
 ⚠️ **ET IL NE SUPPRIME RIEN.** Le mode est entier : store, écrans, banc d'essai,
 classement à catégories, persistance. Seules ses deux PORTES sont fermées — le
 bouton de l'accueil, et la reconversion « Entraîneur » à la retraite (qui
-retombe au Hall, comme les quatre autres reconversions). Le jour où la couche 2
-est prête, on retire `manager` de `CHANTIERS` et tout réapparaît sans rien
-réécrire.
+  retombe au Hall, comme les quatre autres reconversions). La couche composition
+  et coaching est maintenant présente ; le verrou reste en place jusqu'à la fin
+  de la stabilisation. Pour ouvrir ensuite, on retire `manager` de `CHANTIERS`
+  et tout réapparaît sans rien réécrire.
 
 Vérifié dans le bundle de production : `import.meta.env.DEV` est compilé away,
 le drapeau `ovalie-dev` est bien la seule porte.
@@ -7674,3 +7715,40 @@ dans les sept langues (`textesManager.ts`).
 Vérifications : `tsc -b`, `oxlint`, build Vite, `verifManager.ts` (contact,
 accord, signature et présence réelle dans l'effectif) et
 `verifTraductions.ts` (1 928 clés, 100 % dans les sept langues).
+
+### Couche 2 : composition et coaching du match
+
+`lib/compositionManager.ts` est la vérité de la feuille : 15 postes, huit
+profils de banc, composition par défaut, réparation des joueurs partis et
+conversion des identifiants persistés vers une feuille 1–23. `Manager` persiste
+la composition, le capitaine, le buteur, le plan collectif et les résultats
+réellement coachés. La sauvegarde passe en version 14.
+
+`screens/Manager.tsx` ajoute deux vues :
+
+1. **Composition** — chaque poste utilise un select natif accessible, un choix
+   déjà présent est échangé plutôt que dupliqué ; capitaine et buteur sont
+   indépendants ;
+2. **Match** — l'affiche réelle de la semaine ouvre `MatchLive` depuis le banc.
+   La semaine est verrouillée jusqu'à la sirène.
+
+Le moteur reçoit `TactiqueManager` et l'utilise à cinq endroits distincts :
+
+- `choisirLancement` modifie la fréquence avants/large/occupation ;
+- `choisirSysteme` et `vitesseMontee` imposent blitz, glissée ou repli ;
+- l'effort du pion applique gestion/intensité, donc vitesse **et fatigue** ;
+- `phasePenalite` suit l'ordre points/touche et utilise le buteur désigné ;
+- `gererRemplacements` suit le timing du banc et exécute un changement manuel
+  programmé au premier arrêt de jeu.
+
+Changer de rythme réévalue seulement le potentiel de marque encore disponible :
+le delta est pondéré par le temps restant et remplace l'ancien impact, ce qui
+empêche d'empiler des bonus en cliquant. À la sirène,
+`enregistrerResultatJoue()` remplace le score déterministe de la ligue ; le
+calendrier, `championnatEnDirect` et le verdict du board lisent donc tous le
+résultat joué.
+
+Vérifications dédiées : `scripts/verifManagerMatch.ts` (23 joueurs uniques,
+rôles, consignes, plan de score, changement manuel et score injecté) et
+`scripts/verifSituations.ts` (151 ids uniques, au moins deux choix, impact réel,
+catégories, contexte et non-répétition).

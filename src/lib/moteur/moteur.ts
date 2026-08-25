@@ -21,9 +21,9 @@
 // DT exacts. Le match suivi en direct (appels de 16 ms) et le même match rejoué
 // en fond (appels de 8 s) donnent donc rigoureusement le même résultat.
 
-import { graine } from '../championnat';
+import { graine, scorePossible } from '../championnat';
 import type { Coequipier } from '../effectif';
-import type { PosteId } from '../../types';
+import type { PosteId, TactiqueManager } from '../../types';
 import { POSTE_PAR_ID } from '../../data/rugby';
 import {
   ORDRE_MAILLOTS, creerPion, deplacer, stopper,
@@ -119,6 +119,15 @@ export interface OptionsMatch {
   niveau?: NiveauMatch;
   /** Le joueur pilote son pion dès le coup d'envoi. */
   controle?: boolean;
+  /** Feuilles 1 → 23 déjà composées par un manager. */
+  compositionA?: Coequipier[];
+  compositionB?: Coequipier[];
+  tactiqueA?: TactiqueManager;
+  tactiqueB?: TactiqueManager;
+  capitaineAId?: string;
+  capitaineBId?: string;
+  buteurAId?: string;
+  buteurBId?: string;
 }
 
 function planVide(total: number, rng: () => number): PlanDeScore {
@@ -188,7 +197,8 @@ export function creerMatch(
   const pions: Pion[] = [];
 
   const monter = (eff: Coequipier[], cote: Cote, club: string) => {
-    const liste = composer(eff);
+    const imposee = cote === 'A' ? options.compositionA : options.compositionB;
+    const liste = imposee?.length ? imposee.slice(0, 23) : composer(eff);
     if (avatar && avatar.club === club) {
       // Le joueur prend le maillot de son poste s'il est titulaire ; sinon la
       // place du banc qui correspond à son poste (ou à sa famille), pour qu'il
@@ -207,11 +217,24 @@ export function creerMatch(
     }
     liste.forEach((c, i) => {
       const moi = !!avatar && avatar.club === club && c.nom === avatar.nom;
-      pions.push(creerPion(c, i, cote, moi, moi ? avatar!.attributs : undefined));
+      const pion = creerPion(c, i, cote, moi, moi ? avatar!.attributs : undefined);
+      const capitaineId = cote === 'A' ? options.capitaineAId : options.capitaineBId;
+      const buteurId = cote === 'A' ? options.buteurAId : options.buteurBId;
+      pion.capitaine = !!capitaineId && pion.sourceId === capitaineId;
+      pion.buteur = !!buteurId && pion.sourceId === buteurId;
+      if (pion.capitaine) pion.discipline += 4;
+      pions.push(pion);
     });
   };
   monter(effectifA, 'A', clubA);
   monter(effectifB, 'B', clubB);
+
+  // Un capitaine ne se contente pas de porter le brassard : sa présence
+  // stabilise aussi la discipline collective de son équipe.
+  for (const cote of ['A', 'B'] as Cote[]) {
+    if (!pions.some((p) => p.cote === cote && p.capitaine)) continue;
+    for (const pion of pions) if (pion.cote === cote) pion.discipline += 1;
+  }
 
   const possession: Cote = rng() < 0.5 ? 'A' : 'B';
   const e: EtatMatch = {
@@ -226,11 +249,14 @@ export function creerMatch(
     systeme: 'blitz', ligneDef: MILIEU, horsJeu: MILIEU, gardeRuck: 0,
     scoreA: 0, scoreB: 0,
     planA: planVide(scoreCibleA, rng), planB: planVide(scoreCibleB, rng),
+    cibleBaseA: scoreCibleA, cibleBaseB: scoreCibleB,
+    ajustementTactiqueA: 0, ajustementTactiqueB: 0,
+    tactiques: {},
     essaisA: 0, essaisB: 0,
     sifflet: null,
     compteurs: { rucks: 0, melees: 0, touches: 0, percees: 0, irregularites: 0, enAvants: 0, tempsA: 0, tempsB: 0 },
     placement: null, cibleRenvoi: null, tir: null, penalite: null,
-    remplacementsA: 0, remplacementsB: 0, prochaineDecision: 1, compteur: 0,
+    remplacementsA: 0, remplacementsB: 0, remplacementsDemandes: {}, prochaineDecision: 1, compteur: 0,
     commentaires: [], fini: false, rng,
     niveau: options.niveau ?? 'pro',
     controle: options.controle ?? false,
@@ -258,6 +284,10 @@ export function creerMatch(
     if (c) { p.pos = { x: c.x, y: c.y }; p.cible = { x: c.x, y: c.y }; stopper(p); }
   }
   dire(e, 'jalon', null, C.texteMatch('coupEnvoiMatch', { clubA, clubB }));
+  // Le plan d'avant-match compte déjà. Il est appliqué une fois, puis tout
+  // changement en direct ne modifiera que la différence restante.
+  if (options.tactiqueA) appliquerTactiqueEquipe(e, 'A', options.tactiqueA, false);
+  if (options.tactiqueB) appliquerTactiqueEquipe(e, 'B', options.tactiqueB, false);
   return e;
 }
 
@@ -323,7 +353,7 @@ function tick(e: EtatMatch): void {
       if (PHASES_ARRETEES.has(e.phase)) p.endurance = Math.min(100, p.endurance + dtHorloge * 0.055);
     }
   }
-  if (e.minute >= 48) gererRemplacements(e);
+  if (e.minute >= 48 || Object.keys(e.remplacementsDemandes).length > 0) gererRemplacements(e);
 
   // ── L'ordre du joueur vit sa vie, la tension redescend ───────────────────
   // ⚠️ UNE INTENTION EXPIRE. Sans ça, un « je plaque » cliqué à la 12ᵉ minute
@@ -623,7 +653,7 @@ function phaseCoupEnvoi(e: EtatMatch): void {
   if (e.minuteur > 0) return;
   const camp = e.possession;
   const liste = surLeTerrain(e, camp);
-  const botteur = maillot(liste, 10) ?? liste[0];
+  const botteur = liste.find((p) => p.buteur) ?? maillot(liste, 10) ?? liste[0];
   if (!botteur) return clorePeriode(e);
   const arrivee = e.cibleRenvoi ?? { x: MILIEU + sens(camp) * 30, y: AXE };
   botteur.stats.coupsDePied += 1;
@@ -637,7 +667,7 @@ function phaseRenvoi22(e: EtatMatch): void {
   const camp = e.possession;
   const s = sens(camp);
   const liste = surLeTerrain(e, camp);
-  const botteur = [...liste].sort((a, b) => b.pied - a.pied)[0] ?? liste[0];
+  const botteur = liste.find((p) => p.buteur) ?? [...liste].sort((a, b) => b.pied - a.pied)[0] ?? liste[0];
   if (!botteur) return clorePeriode(e);
   const depart = camp === 'A' ? M22_A : M22_B;
   const arrivee = {
@@ -1847,7 +1877,8 @@ function phasePenalite(e: EtatMatch): void {
   const plan = planDe(e, cote);
   const liste = surLeTerrain(e, cote);
   if (!liste.length) return clorePeriode(e);
-  const buteur = [...liste].sort((a, b) => b.pied - a.pied)[0];
+  const buteurDesigne = liste.find((p) => p.buteur);
+  const buteur = buteurDesigne ?? [...liste].sort((a, b) => b.pied - a.pied)[0];
 
   const dist = metresAvantLaLigne(info.lieu, cote) + 11;
   const ecartAxe = Math.abs(info.lieu.y - AXE);
@@ -1864,8 +1895,13 @@ function phasePenalite(e: EtatMatch): void {
   // ⚠️ Moins de coups de pied de sortie = plus de temps de jeu, donc plus de
   // pénalités à portée : à 11 % de tentatives « hors plan », le pourcentage de
   // réussite au pied du match tombait sous les 68 %. 7 % le remet à ~72 %.
-  const veutTirer = aPortee && !besoinEssai
-    && (plan.penalites > 0 ? e.rng() < 0.93 : e.rng() < 0.07);
+  const ordrePenalite = e.tactiques[cote]?.penalites ?? 'mixte';
+  const chanceTir = ordrePenalite === 'points'
+    ? (plan.penalites > 0 ? 0.995 : 0.16)
+    : ordrePenalite === 'touche'
+      ? (plan.penalites > 0 ? 0.28 : 0.015)
+      : (plan.penalites > 0 ? 0.93 : 0.07);
+  const veutTirer = aPortee && !besoinEssai && e.rng() < chanceTir;
 
   if (veutTirer) {
     e.tir = { buteur, distance: dist, angle: ecartAxe, valeur: 3, suite: 'coupEnvoi' };
@@ -1876,7 +1912,8 @@ function phasePenalite(e: EtatMatch): void {
   }
 
   const s = sens(cote);
-  if (metresAvantLaLigne(info.lieu, cote) > 8 && e.rng() < 0.72) {
+  const chanceTouche = ordrePenalite === 'touche' ? 0.97 : ordrePenalite === 'points' ? 0.42 : 0.72;
+  if (metresAvantLaLigne(info.lieu, cote) > 8 && e.rng() < chanceTouche) {
     // Pénaltouche : on gagne le terrain ET on garde le ballon.
     const gain = borner(28 + buteur.pied / 3, 20, 48);
     const arrivee = {
@@ -1991,7 +2028,7 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
 
   // ── La transformation : le PLAN décide, la position décide qui du 7 ou du 5
   const liste = surLeTerrain(e, cote);
-  const buteur = [...liste].sort((a, b) => b.pied - a.pied)[0] ?? marqueur;
+  const buteur = liste.find((p) => p.buteur) ?? [...liste].sort((a, b) => b.pied - a.pied)[0] ?? marqueur;
   const ecartAxe = Math.abs(marqueur.pos.y - AXE);
   const chance = probaTir(22 + ecartAxe * 0.55, ecartAxe, buteur.pied);
 
@@ -2170,6 +2207,7 @@ function choisirLancement(
   const restantes = 80 - e.minute;
   const diff = ecart(e, cote);
   const pousse = retard(e, cote); // >0 : il faut marquer
+  const tactique = e.tactiques[cote];
   const r = e.rng();
 
   // Trois longueurs de chaîne : au ras (1 passe), au premier centre (2-3), et
@@ -2188,7 +2226,9 @@ function choisirLancement(
   // 58 % laisse le jeu d'occupation lisible tout en autorisant les relances.
   if (chezSoi && pousse < 0.32 && !(diff < 0 && restantes < 8)) {
     const botteur = (dix && dix.pied > 55 ? dix : neuf) ?? liste[0];
-    if (r < 0.60) {
+    const chanceDegagement = tactique?.attaque === 'occupation' ? 0.88
+      : tactique?.attaque === 'large' ? 0.42 : tactique?.attaque === 'avants' ? 0.5 : 0.60;
+    if (r < chanceDegagement) {
       return {
         type: 'pied', chaine: [neuf, botteur].filter(Boolean) as Pion[], index: 0,
         intention: botteur === neuf ? 'chandelle' : 'degagement', botteur,
@@ -2209,7 +2249,9 @@ function choisirLancement(
       };
     }
     // Occupation depuis son camp : une phase sur huit, plus une sur cinq.
-    if (phases >= 2 && r < 0.13 - pousse * 0.08) {
+    const occupation = tactique?.attaque === 'occupation' ? 0.29
+      : tactique?.attaque === 'large' ? 0.07 : 0.13;
+    if (phases >= 2 && r < occupation - pousse * 0.08) {
       return {
         type: 'pied', chaine: [neuf, botteur].filter(Boolean) as Pion[], index: 0,
         intention: e.ballonLent ? 'chandelle' : 'occupation', botteur,
@@ -2220,10 +2262,14 @@ function choisirLancement(
 
   // ── 3. DANS LES 22 ADVERSES : on pilonne, ou on écarte s'il y a de la place
   if (distLigne < 22) {
-    if (surnombre >= 1 && r < 0.55) {
+    const chanceLarge = tactique?.attaque === 'large' ? 0.82
+      : tactique?.attaque === 'avants' ? 0.28 : 0.55;
+    if (surnombre >= 1 && r < chanceLarge) {
       return { type: 'large', chaine: chaineLarge, index: 0, libelle: 'écarter au large' };
     }
-    if (distLigne < 8 && r < 0.55) {
+    const chanceRas = tactique?.attaque === 'avants' ? 0.78
+      : tactique?.attaque === 'large' ? 0.34 : 0.55;
+    if (distLigne < 8 && r < chanceRas) {
       return {
         type: 'pickAndGo', chaine: [neuf, percuteur].filter(Boolean) as Pion[], index: 0,
         libelle: 'pick and go',
@@ -2257,7 +2303,10 @@ function choisirLancement(
   // aspirer la défense dans l'axe, PUIS on écarte dans l'espace libéré. C'est
   // l'alternance qui compte — écarter à chaque temps de jeu ne prend jamais
   // personne à défaut.
-  const envie = r + pousse * 0.3;
+  const biaisAttaque = tactique?.attaque === 'large' ? 0.18
+    : tactique?.attaque === 'avants' ? -0.18
+      : tactique?.attaque === 'occupation' ? -0.05 : 0;
+  const envie = r + pousse * 0.3 + biaisAttaque;
 
   // Premier temps après une phase arrêtée : c'est là que les combinaisons se
   // jouent, la défense n'est pas encore réorganisée.
@@ -2471,6 +2520,22 @@ const MINUTE_ENTREE: Record<number, number> = {
   16: 52, 17: 50, 18: 50, 19: 58, 20: 56, 21: 63, 22: 66, 23: 62,
 };
 
+function faireRemplacement(e: EtatMatch, cote: Cote, entrant: Pion, sortant: Pion): boolean {
+  if (entrant.cote !== cote || sortant.cote !== cote || entrant.surLeTerrain || !sortant.surLeTerrain) return false;
+  sortant.surLeTerrain = false;
+  entrant.surLeTerrain = true;
+  entrant.poste = sortant.poste;
+  entrant.avant = sortant.avant;
+  entrant.pos = { x: sortant.pos.x, y: sortant.pos.y };
+  entrant.cible = { x: sortant.pos.x, y: sortant.pos.y };
+  stopper(entrant);
+  if (cote === 'A') e.remplacementsA += 1; else e.remplacementsB += 1;
+  dire(e, 'remplacement', cote, C.phrase(e.rng, C.REMPLACEMENT, {
+    entrant: entrant.nom, sortant: sortant.nom, club: nomClub(e, cote),
+  }), 0, entrant.moi || sortant.moi);
+  return true;
+}
+
 function gererRemplacements(e: EtatMatch): void {
   if (!PHASES_ARRETEES.has(e.phase)) return; // on ne change qu'à l'arrêt de jeu
   const famille = (x: Pion) => POSTE_PAR_ID[x.poste]?.famille;
@@ -2481,6 +2546,16 @@ function gererRemplacements(e: EtatMatch): void {
     const sur = surLeTerrain(e, cote);
     const banc = e.pions.filter((p) => p.cote === cote && !p.surLeTerrain && p.sanction <= 0 && p.minutes === 0);
     if (!banc.length) continue;
+
+    // Le manager peut préparer un changement à n'importe quel moment. Il est
+    // exécuté ici, au premier arrêt de jeu, comme depuis un vrai banc.
+    const demande = e.remplacementsDemandes[cote];
+    if (demande) {
+      const entrant = banc.find((p) => p.sourceId === demande.entrantId);
+      const sortant = sur.find((p) => p.sourceId === demande.sortantId && p.numero <= 15);
+      delete e.remplacementsDemandes[cote];
+      if (entrant && sortant && faireRemplacement(e, cote, entrant, sortant)) continue;
+    }
 
     // ⚠️ ON APPARIE LE POSTE. Le remplaçant prend la place d'un titulaire de son
     // poste (à défaut de sa famille, à défaut de sa catégorie), jamais « le
@@ -2500,7 +2575,11 @@ function gererRemplacements(e: EtatMatch): void {
     // Qui a le droit d'entrer maintenant ? L'heure prévue pour son maillot —
     // avancée de dix minutes si celui qu'il doit relayer est déjà cuit.
     const pret = banc
-      .map((p) => ({ p, cible: chercherSortant(p), heure: MINUTE_ENTREE[p.numero] ?? 60 }))
+        .map((p) => {
+          const timing = e.tactiques[cote]?.remplacements ?? 'standard';
+          const decalage = timing === 'precoces' ? -8 : timing === 'tardifs' ? 8 : 0;
+          return { p, cible: chercherSortant(p), heure: (MINUTE_ENTREE[p.numero] ?? 60) + decalage };
+        })
       .filter((x) => {
         if (!x.cible) return false;
         const cuit = x.cible.endurance < (x.cible.avant ? 42 : 34);
@@ -2513,21 +2592,8 @@ function gererRemplacements(e: EtatMatch): void {
     const sortant = pret[0].cible;
     if (!sortant || !entrant) continue;
 
-    sortant.surLeTerrain = false;
-    entrant.surLeTerrain = true;
-    // ⚠️ LE REMPLAÇANT GARDE SON NUMÉRO (16 à 23). Il héritait de celui du
-    // sortant : sur la feuille de match, huit joueurs entraient avec un maillot
-    // de 1 à 15 et le banc n'apparaissait nulle part. Au rugby, le 18 qui
-    // remplace le 3 reste le 18 — il prend juste sa PLACE sur le terrain.
-    entrant.poste = sortant.poste;
-    entrant.avant = sortant.avant;
-    entrant.pos = { x: sortant.pos.x, y: sortant.pos.y };
-    entrant.cible = { x: sortant.pos.x, y: sortant.pos.y };
-    stopper(entrant);
-    if (cote === 'A') e.remplacementsA += 1; else e.remplacementsB += 1;
-    dire(e, 'remplacement', cote, C.phrase(e.rng, C.REMPLACEMENT, {
-      entrant: entrant.nom, sortant: sortant.nom, club: nomClub(e, cote),
-    }), 0, entrant.moi || sortant.moi);
+    // Le remplaçant garde son numéro 16 à 23 et prend le poste du sortant.
+    faireRemplacement(e, cote, entrant, sortant);
   }
 }
 
@@ -2582,7 +2648,7 @@ function solderLesPoints(e: EtatMatch): void {
   for (const cote of ['A', 'B'] as Cote[]) {
     const plan = planDe(e, cote);
     const liste = surLeTerrain(e, cote);
-    const buteur = [...liste].sort((a, b) => b.pied - a.pied)[0];
+    const buteur = liste.find((p) => p.buteur) ?? [...liste].sort((a, b) => b.pied - a.pied)[0];
     let garde = 0;
     while ((plan.essaisTransformes > 0 || plan.essaisSecs > 0 || plan.penalites > 0) && garde++ < 12) {
       if (plan.essaisTransformes > 0) {
@@ -2633,6 +2699,70 @@ function choisirMarqueur(e: EtatMatch, cote: Cote): Pion | undefined {
 export function appliquerConsigne(e: EtatMatch, c: ConsigneJoueur | undefined): void {
   e.consigne = c;
   if (c) dire(e, 'jeu', null, C.texteMatch('consigne', { libelle: c.libelle }));
+}
+
+function impactTactique(e: EtatMatch, cote: Cote): number {
+  const t = e.tactiques[cote];
+  if (!t) return 0;
+  const adverseT = e.tactiques[adverse(cote)];
+  let impact = t.rythme === 'intense' ? 3 : t.rythme === 'gestion' ? -2 : 0;
+  impact += t.attaque === 'large' ? 1 : t.attaque === 'occupation' ? -1 : 0;
+  if (adverseT) {
+    if (t.attaque === 'large' && adverseT.defense === 'blitz') impact += 2;
+    if (t.attaque === 'large' && adverseT.defense === 'glissee') impact -= 1;
+    if (t.attaque === 'avants' && adverseT.defense === 'repli') impact += 1;
+    if (t.attaque === 'occupation' && adverseT.defense === 'repli') impact -= 1;
+  }
+  return impact;
+}
+
+function recomposerPlan(e: EtatMatch, cote: Cote, total: number): void {
+  const plan = planDe(e, cote);
+  const cible = Math.max(plan.marques, scorePossible(total));
+  const d = decomposer(Math.max(0, cible - plan.marques), e.rng);
+  plan.essaisTransformes = d.essaisTransformes;
+  plan.essaisSecs = d.essaisSecs;
+  plan.penalites = d.penalites;
+  plan.total = plan.marques + d.essaisTransformes * 7 + d.essaisSecs * 5 + d.penalites * 3;
+}
+
+/**
+ * Une consigne manager ne change pas qu'un libellé : elle modifie les
+ * combinaisons, le système défensif, la fatigue, les pénalités, l'heure du
+ * banc et, tant qu'il reste du temps, le potentiel de marque du match.
+ */
+export function appliquerTactiqueEquipe(
+  e: EtatMatch, cote: Cote, tactique: TactiqueManager, annoncer = true,
+): void {
+  const ancienA = impactTactique(e, 'A');
+  const ancienB = impactTactique(e, 'B');
+  e.tactiques[cote] = { ...tactique };
+  const nouveauA = impactTactique(e, 'A');
+  const nouveauB = impactTactique(e, 'B');
+  const restant = Math.max(0, 1 - e.t / (2 * DUREE_PERIODE));
+  const deltaA = Math.round((nouveauA - ancienA) * restant);
+  const deltaB = Math.round((nouveauB - ancienB) * restant);
+  if (deltaA) recomposerPlan(e, 'A', e.planA.total + deltaA);
+  if (deltaB) recomposerPlan(e, 'B', e.planB.total + deltaB);
+  e.ajustementTactiqueA = nouveauA;
+  e.ajustementTactiqueB = nouveauB;
+  if (annoncer) {
+    const club = nomClub(e, cote);
+    dire(e, 'jeu', cote, `${club} change son plan : ${tactique.attaque}, défense ${tactique.defense}, rythme ${tactique.rythme}.`);
+  }
+}
+
+/** Programme un changement au prochain arrêt de jeu. */
+export function demanderRemplacement(
+  e: EtatMatch, cote: Cote, entrantId: string, sortantId: string,
+): boolean {
+  if (e.fini) return false;
+  const entrant = e.pions.find((p) => p.cote === cote && p.sourceId === entrantId && !p.surLeTerrain && p.minutes === 0);
+  const sortant = e.pions.find((p) => p.cote === cote && p.sourceId === sortantId && p.surLeTerrain && p.numero <= 15);
+  if (!entrant || !sortant) return false;
+  e.remplacementsDemandes[cote] = { entrantId, sortantId };
+  dire(e, 'jeu', cote, `${entrant.nom} se prépare, ${sortant.nom} sortira au prochain arrêt.`);
+  return true;
 }
 
 /**

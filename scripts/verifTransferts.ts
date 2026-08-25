@@ -25,7 +25,13 @@ import {
 } from '../src/lib/negociation';
 import { agentsAccessibles, niveauPourAgent, SEUIL_AGENT } from '../src/data/agents';
 import { cote } from '../src/lib/offres';
+import { COMPETITIONS } from '../src/data/clubs';
+import { pseudoStable } from '../src/lib/comptes';
+import { chargerTextes } from '../src/lib/i18n';
+import { TEXTES } from '../src/data/textes';
 import type { Joueur, OffreContrat } from '../src/types';
+
+chargerTextes(TEXTES);
 
 let echecs = 0;
 function ligne(libelle: string, valeur: string, ok: boolean): void {
@@ -167,6 +173,19 @@ console.log('\n=== 4. EN JEU : APPROCHES, PRÉ-ACCORD, BLOCAGE ===');
     `${(g().conversations[app.pseudo] ?? []).length} message(s)`,
     (g().conversations[app.pseudo] ?? []).length > 0);
 
+  // Reproduction du bug : la vignette lit l'approche, mais une vieille
+  // sauvegarde a perdu le fil correspondant. Ouvrir le marché doit reconstruire
+  // le premier message ET viser directement la bonne conversation.
+  useGame.setState({ conversations: {} });
+  g().ouvrirMessagesOvale();
+  ligne('une offre fantôme reconstruit son message',
+    `${(g().conversations[app.pseudo] ?? []).length} message(s)`,
+    (g().conversations[app.pseudo] ?? []).length === 1);
+  ligne('la vignette ouvre la bonne conversation',
+    `onglet ${g().ouvrirSocialSur ?? '—'} · @${g().conversationSocialeCible ?? '—'}`,
+    g().ecran === 'social' && g().ouvrirSocialSur === 'messages'
+      && g().conversationSocialeCible === app.pseudo);
+
   // --- Négocier depuis le store ---
   const avant = app.offre.salaire;
   const r = g().repondreApproche(app.id, 'salaire');
@@ -220,6 +239,53 @@ console.log('\n=== 4. EN JEU : APPROCHES, PRÉ-ACCORD, BLOCAGE ===');
   const r2 = g().avancerJusqua(30);
   ligne('… et l’avance par le calendrier aussi',
     `${r2.semaines} semaine(s), arrêt « ${r2.arret} »`, r2.semaines === 0);
+
+  // --- Un club contacté répond toujours et conserve le dossier ---
+  g().reinitialiser();
+  const regionale3 = COMPETITIONS.find((c) => c.id === 'reg3')!;
+  g().creerJoueur({
+    nom: 'Candidature', poste: 'demi_ouverture', nation: 'France',
+    club: regionale3.clubs[0].nom, division: regionale3.id, age: 26,
+  });
+  const debutant = g().joueur!;
+  useGame.setState({
+    joueur: {
+      ...debutant,
+      attributs: Object.fromEntries(Object.keys(debutant.attributs).map((k) => [k, 25])) as typeof debutant.attributs,
+      reputation: 20,
+      contrat: { ...debutant.contrat!, saisons: 3 },
+    },
+  });
+  const clubSuivi = 'Kalev Tallinn';
+  const pseudoClub = pseudoStable(clubSuivi, '_officiel');
+  await g().envoyerMessage(pseudoClub, 'Vous recrutez ?');
+  const filRefus = g().conversations[pseudoClub] ?? [];
+  const reponseClub = filRefus.at(-1);
+  ligne('un club trop ambitieux répond quand même',
+    reponseClub?.texte.slice(0, 36) ?? 'AUCUNE RÉPONSE',
+    reponseClub?.de === 'lui' && reponseClub.texte.includes('refuser'));
+  ligne('aucun autre club ne répond à sa place',
+    `${g().approches.length} approche(s)`, g().approches.length === 0);
+  ligne('le refus place le joueur sur la liste de suivi',
+    g().dossiersRecrutement[pseudoClub]?.club ?? 'AUCUN DOSSIER',
+    g().dossiersRecrutement[pseudoClub]?.club === clubSuivi);
+
+  // Le joueur progresse franchement : le même club doit réexaminer son
+  // dossier et, s'il est désormais au niveau, revenir avec un vrai projet.
+  useGame.setState({
+    joueur: {
+      ...g().joueur!,
+      attributs: Object.fromEntries(Object.keys(g().joueur!.attributs).map((k) => [k, 45])) as typeof debutant.attributs,
+      reputation: 45,
+    },
+  });
+  const revenues = g().examinerDossiersRecrutement();
+  ligne('la progression fait revenir le club suivi',
+    `${revenues} offre(s) · ${g().approches.at(-1)?.club ?? '—'}`,
+    revenues === 1 && g().approches.at(-1)?.club === clubSuivi);
+  ligne('une offre remplace le dossier de suivi',
+    `${Object.keys(g().dossiersRecrutement).length} dossier(s)`,
+    !g().dossiersRecrutement[pseudoClub]);
 }
 
 console.log(

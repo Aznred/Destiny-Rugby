@@ -16,6 +16,7 @@
 import type { ConsequenceDure, Joueur, StatVariable } from '../types';
 import type { Scenario } from './scenarios';
 import { t } from '../lib/i18n';
+import { SITUATIONS_SUPPLEMENTAIRES } from './situationsSupplementaires';
 
 // Ce que peut déclencher un choix, en plus des stats. C'est LE point d'entrée
 // des évènements durs (voir `lib/consequences.ts`).
@@ -70,7 +71,7 @@ const gen = (j: Joueur): number => {
 const pro = (j: Joueur): boolean => ['top14', 'prod2', 'nationale'].includes(j.division ?? '');
 const amateur = (j: Joueur): boolean => !pro(j);
 
-export const SITUATIONS: Situation[] = [
+const SITUATIONS_BASE: Situation[] = [
   // ═══════════════════════ VESTIAIRE ═══════════════════════
   {
     id: 'bizutage', emoji: '🎽', categorie: 'vestiaire', poids: 1,
@@ -703,6 +704,16 @@ export const SITUATIONS: Situation[] = [
       { texte: 'Arrêter à la fin de la saison.', issue: { recit: 'Tu poses la date toi-même. C’est rare, et ça vaut tous les contrats.', deltas: { moral: 6, mental: 4 }, ovas: 6 } },
     ],
   },
+];
+
+/**
+ * 151 scènes au total : les 51 situations historiques, plus 100 situations
+ * originales rangées dans un fichier dédié. Les garder séparées évite qu'une
+ * extension éditoriale rende illisible le moteur de sélection ci-dessous.
+ */
+export const SITUATIONS: Situation[] = [
+  ...SITUATIONS_BASE,
+  ...SITUATIONS_SUPPLEMENTAIRES,
 ];
 
 export const SITUATION_PAR_ID: Record<string, Situation> = Object.fromEntries(

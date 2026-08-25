@@ -20,31 +20,40 @@ export interface AfficheSemaine {
   cle: string;
 }
 
-// Le match du club du joueur pour la semaine en cours, s'il y en a un.
-export function matchDeLaSemaine(j: Joueur, bonus = 0): AfficheSemaine | null {
-  const division = j.division;
-  if (!division) return null;
-  const total = nombreJournees(division, j.club);
-  const sem = j.semaine ?? 1;
-  const fin = journeesALaSemaine(division, sem + 1, total); // journées jouées APRÈS cette semaine
-  const debut = journeesALaSemaine(division, sem, total) + 1;
-  if (fin < debut) return null; // pas de journée ce week-end
+export interface CarriereDeClub {
+  division: string;
+  club: string;
+  saison: number;
+  semaine: number;
+}
 
-  // ⚠️ MÊME CLÉ DE TIRAGE QUE `championnatEnDirect` : c'est ce qui garantit que
-  // l'affiche annoncée dans le panneau est celle du tableau des résultats.
-  const grille = calendrier(pouleDe(division, j.club), `${division}#${j.saison}`);
+export function matchDuClubSemaine(c: CarriereDeClub, bonus = 0): AfficheSemaine | null {
+  const division = c.division;
+  if (!division || !c.club) return null;
+  const total = nombreJournees(division, c.club);
+  const fin = journeesALaSemaine(division, c.semaine + 1, total);
+  const debut = journeesALaSemaine(division, c.semaine, total) + 1;
+  if (fin < debut) return null;
+  const grille = calendrier(pouleDe(division, c.club), `${division}#${c.saison}`);
   for (let journee = debut; journee <= fin; journee++) {
-    const affiche = (grille[journee - 1] ?? []).find(([d, e]) => d === j.club || e === j.club);
+    const affiche = (grille[journee - 1] ?? []).find(([d, e]) => d === c.club || e === c.club);
     if (!affiche) continue;
     const [d, e] = affiche;
-    const cle = `${division}#${j.saison}#${journee - 1}#${d}#${e}`;
+    const cle = `${division}#${c.saison}#${journee - 1}#${d}#${e}`;
     return {
       journee,
-      match: jouerRencontre(d, e, j.saison, cle, { club: j.club, bonus }),
+      match: jouerRencontre(d, e, c.saison, cle, { club: c.club, bonus }),
       cle,
     };
   }
   return null;
+}
+
+// Le match du club du joueur pour la semaine en cours, s'il y en a un.
+export function matchDeLaSemaine(j: Joueur, bonus = 0): AfficheSemaine | null {
+  return matchDuClubSemaine({
+    division: j.division ?? '', club: j.club, saison: j.saison, semaine: j.semaine ?? 1,
+  }, bonus);
 }
 
 // Le numéro de maillot d'un joueur dans la compo (1 à 15).

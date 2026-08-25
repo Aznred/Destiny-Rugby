@@ -456,6 +456,8 @@ export function placerEquipes(e: EtatMatch): void {
     if (arret || p.role === 'chasseur') { p.effort = 1; continue; }
     const d2 = distance2(p.pos, e.ballon);
     p.effort = d2 < 400 ? 1 : d2 < 1600 ? 0.76 : 0.5;
+    const rythme = e.tactiques[p.cote]?.rythme;
+    p.effort *= rythme === 'intense' ? 1.08 : rythme === 'gestion' ? 0.92 : 1;
   }
   if (e.porteur) e.porteur.effort = 1;
   separer(e, arret);
@@ -524,6 +526,8 @@ function appliquerConsignePerso(e: EtatMatch): void {
 // ---------------------------------------------------------------------------
 
 export function choisirSysteme(e: EtatMatch, defenseur: Cote): SystemeDefensif {
+  const impose = e.tactiques[defenseur]?.defense;
+  if (impose) return impose;
   const b = e.ballon;
   const attaquant = adverse(defenseur);
   // L'attaque sort de ses 22 : elle va taper. On se replie pour couvrir.
@@ -549,7 +553,9 @@ export function vitesseMontee(e: EtatMatch, defenseur: Cote): number {
   let endurance = 0;
   for (const p of liste) endurance += p.endurance;
   endurance /= liste.length;
-  return base * (0.72 + endurance / 360) * borner(1 - e.aide * 0.3, 0.7, 1.2);
+  const rythme = e.tactiques[defenseur]?.rythme;
+  const multiplicateur = rythme === 'intense' ? 1.08 : rythme === 'gestion' ? 0.92 : 1;
+  return base * multiplicateur * (0.72 + endurance / 360) * borner(1 - e.aide * 0.3, 0.7, 1.2);
 }
 
 // ---------------------------------------------------------------------------

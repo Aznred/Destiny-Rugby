@@ -122,6 +122,18 @@ export interface ContexteOffres {
   demande?: boolean;
   /** Un club contacté directement passe en tête, sans ignorer les règles sportives. */
   clubCible?: string;
+  /** Clubs déjà venus récemment : ils restent possibles, mais passent après les nouveaux. */
+  clubsRecents?: readonly string[];
+}
+
+/**
+ * La distance ne représente pas le même obstacle selon le championnat.
+ * Une star doit être connue pour traverser le monde vers une ligue majeure ;
+ * une formation semi-amatrice étrangère peut en revanche étudier le dossier
+ * d'un joueur de Fédérale ou de Régionale transmis par son agent.
+ */
+function seuilEtranger(niveau: number): number {
+  return 22 + Math.max(0, 8 - niveau) * 5;
 }
 
 export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
@@ -168,9 +180,14 @@ export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
   const possibles: Candidat[] = [];
   for (const comp of COMPETITIONS) {
     const etranger = comp.zone === 'Monde';
-    // L'expatriation demande un vrai nom : sinon personne ne va chercher un
-    // joueur à l'autre bout du monde.
-    if (etranger && notoriete < 55) continue;
+    const cibleDansCetteCompetition = !!ctx.clubCible
+      && comp.clubs.some((club) => club.nom === ctx.clubCible);
+    // L'ancien seuil unique (55) fermait absolument TOUT l'étranger aux petits
+    // joueurs, y compris les ligues de leur niveau. Le seuil suit désormais la
+    // puissance du championnat ; une demande ou un message direct aide le
+    // dossier à franchir la distance sans supprimer les règles sportives.
+    const ouvertureDossier = (ctx.demande ? 5 : 0) + (cibleDansCetteCompetition ? 18 : 0);
+    if (etranger && notoriete + ouvertureDossier < seuilEtranger(comp.niveau)) continue;
     // Un club ne fait pas rêver un joueur bien au-dessus de son niveau.
     if ((NOTE_PAR_NIVEAU[comp.niveau] ?? 50) > plafond + 12) continue;
     // Le niveau 0 est le plus haut : monter, c'est faire BAISSER le numéro.
@@ -187,9 +204,12 @@ export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
 
   let meilleure = -Infinity;
   for (const p of possibles) if (p.note > meilleure) meilleure = p.note;
-  // Le plancher normal, SAUF s'il vidait le marché : dans ce cas on descend
-  // jusqu'à huit points sous le meilleur club encore accessible.
-  const plancher = Math.min(c - 16, meilleure - 8);
+  // Une star intéresse aussi des projets moins huppés qui veulent en faire leur
+  // tête d'affiche. L'ancien écart fixe de 16 points supprimait ces clubs et
+  // finissait par afficher toujours la même poignée de géants. On élargit donc
+  // progressivement la fenêtre, sans jamais descendre une star en Régionale.
+  const profondeur = c >= 88 ? 28 : c >= 76 ? 23 : 18;
+  const plancher = Math.min(c - profondeur, meilleure - 10);
   const candidats = possibles.filter((p) => p.note >= plancher);
   if (!candidats.length) return [];
   // L'amplitude sert au tirage pondéré : sans elle, un joueur à 105 de cote
@@ -203,17 +223,27 @@ export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
   // quelques joueurs par an, et pas les mêmes d'une année sur l'autre : cette
   // graine — stable pour une saison, différente à la suivante — rebat les cartes
   // sans rien laisser au hasard pur (rouvrir le panneau ne change rien).
-  const interet = (nom: string) => 0.35 + graine(`marche#${nom}#${ctx.saison}`)() * 1.3;
+  const interet = (nom: string) => 0.25 + graine(`marche#${j.nom}#${nom}#${ctx.saison}`)() * 1.5;
+  const clubsRecents = new Set(ctx.clubsRecents ?? []);
 
   // On classe d'abord sur ce qui est GRATUIT à calculer (niveau + humeur), puis
   // on n'interroge l'effectif — coûteux — que pour une courte liste.
   const pretendants = candidats
     .map((cand) => {
       const proximite = 1 - Math.min(1, Math.abs(cand.note - c) / amplitude);
-      return { cand, score: (0.25 + proximite * 0.75) * interet(cand.club.nom) };
+      // Un club déjà vu reste crédible, mais le marché cherche d'abord de
+      // nouveaux interlocuteurs. C'est ce qui casse les listes répétées d'une
+      // saison sur l'autre sans interdire à un prétendant de revenir plus tard.
+      const nouveaute = clubsRecents.has(cand.club.nom) ? 0.12 : 1;
+      // Pour un joueur d'élite, un club moyen peut présenter un vrai projet de
+      // tête d'affiche : ce bonus empêche les seules superpuissances d'occuper
+      // systématiquement les premières places du tirage.
+      const ecartProjet = c - cand.note;
+      const projet = c >= 78 && ecartProjet >= 8 && ecartProjet <= profondeur ? 1.35 : 1;
+      return { cand, score: (0.22 + proximite * 0.78) * interet(cand.club.nom) * nouveaute * projet };
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, 45);
+    .slice(0, 70);
 
   // Une démarche directe ne doit pas se perdre dans le tirage : si ce club a
   // réellement le niveau pour recruter le joueur, il étudie son dossier avant

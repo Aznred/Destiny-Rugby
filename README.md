@@ -95,11 +95,14 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   **L'Ovale**. Tu négocies salaire, prime, durée et temps de jeu ; un club peut
   contre-proposer ou se braquer. Un accord signé n'est appliqué qu'à
   **l'intersaison**. Tu peux aussi demander à ton agent de sonder le marché — le
-  vestiaire n'aimera pas (−6 de moral).
-- **Carrière à l'étranger** 🌍 : à partir d'une certaine notoriété, la
-  Premiership, l'URC, le Super Rugby, la League One japonaise ou la MLR viennent
-  te chercher — avec leur **titre national à gagner** et, pour la Premiership et
-  l'URC, la coupe d'Europe.
+  vestiaire n'aimera pas (−6 de moral). Le marché se souvient désormais des deux
+  dernières saisons et privilégie de nouveaux interlocuteurs ; une star reçoit
+  aussi des projets de clubs moyens qui veulent en faire leur tête d'affiche.
+- **Carrière à l'étranger** 🌍 : l'accès dépend du niveau de la ligue. Un joueur
+  amateur peut rejoindre un petit championnat étranger de sa force, tandis que
+  la Premiership, l'URC, le Super Rugby, la League One japonaise ou la MLR
+  demandent une vraie notoriété. Tous leurs clubs sont trouvables et joignables
+  dans l'annuaire de **L'Ovale**.
 - **Le monde bouge sans toi** : chaque intersaison, les clubs recrutent et
   laissent filer des joueurs. La saison 2 applique le **vrai mercato estival**
   (3 224 mouvements réels, Top 14 → Nationale 2) ; ensuite, chaque division
@@ -737,8 +740,10 @@ Voir [`CLAUDE.md`](CLAUDE.md) pour les détails d'architecture et les convention
 | Un pilier ne pouvait pas faire un grand match | La note de match ne regardait que plaquages, mètres, essais et tirs au but. Elle juge maintenant **la conquête et le jeu au ras** — le vrai travail d'un avant. |
 | Les cartons n'existaient quasiment pas | 0,25 par match au lieu des 1,3 annoncés, et **aucun rouge**, jamais : trois pénalités sur quatre ne désignaient pas de fautif. Corrigé — **1,4 jaune et 0,08 rouge par match**. |
 | Le classement des passeurs décisifs était un classement de demis de mêlée | Il affichait le TOTAL des passes (86 par match). Le moteur compte désormais **la vraie passe qui amène l'essai**. |
-| « C'est toujours les mêmes clubs qui proposent » | Chaque club a son **humeur de la saison** et un **besoin à ton poste**. Mesuré : **22 à 24 clubs différents** pour 48 offres sur douze saisons, contre cinq ou six avant. |
-| « Trop facile d'avoir de gros clubs et de gros salaires » | Le plafond dépend de l'**âge** (7 points de marge à 20 ans, 0,5 après 29), on ne **saute plus deux étages**, la notoriété est plafonnée à +7, et le salaire suit l'âge (230 k€ à 19 ans, 420 k€ à 27, 305 k€ à 36). |
+| « C'est toujours les mêmes clubs qui proposent » | Chaque club a son **humeur de la saison**, un **besoin à ton poste** et le marché mémorise les deux saisons précédentes. Mesuré : **23 clubs différents** pour 48 offres sur douze saisons, sans répétition lors d'une relance quand d'autres projets sont disponibles. |
+| « Les petits championnats étrangers sont inaccessibles » | Tous leurs clubs ont désormais un compte dans l'annuaire de **L'Ovale**. Le seuil d'expatriation suit la force de la ligue : un joueur régional peut recevoir ou solliciter une offre étrangère de son niveau sans ouvrir artificiellement les championnats majeurs. |
+| Vignette d'offre visible, mais aucun message dans L'Ovale | La vignette ouvre maintenant directement l'onglet Messages et la bonne conversation. Une sauvegarde qui contient une approche sans son fil est réparée automatiquement : le message initial du club est reconstruit sans modifier l'offre. |
+| « Trop facile d'avoir de gros clubs et de gros salaires » | Le plafond dépend de l'**âge** (7 points de marge à 20 ans, 0,5 après 29), on ne **saute plus deux étages**, la notoriété est plafonnée à +7, et le salaire suit l'âge (260 k€ à 19 ans, 470 k€ à 27, 340 k€ à 36 dans le banc actuel). |
 | Écussons de sélections redevenus des vignettes | `copierLogos.cjs` réécrasait `copierLogosSelections.cjs`. L'ordre des deux scripts est maintenant écrit noir sur blanc. |
 
 Le détail de chaque correction — la cause, la mesure avant/après et le script de
@@ -750,8 +755,9 @@ vérification — est dans [`CLAUDE.md`](CLAUDE.md), sections
 ## 🧑‍🏫 Le mode manager — bureau, récit et recrutement
 
 > ⚠️ **CACHÉ POUR L’INSTANT.** Le mode est entier et jouable, mais ses portes
-> d’entrée sont fermées tant que la couche 2 (composer le XV, coacher le match)
-> n’est pas là : on ne veut pas qu’un joueur tombe sur un mode inachevé et le
+> d’entrée restent fermées pendant la phase de stabilisation : composition et
+> coaching sont maintenant jouables, mais on ne veut pas qu’un joueur tombe sur
+> un chantier avant sa passe complète de test et le
 > prenne pour un bug. Pour l’ouvrir : `?dev=1` dans l’adresse (voir
 > `src/lib/modeDev.ts`).
 
@@ -812,9 +818,25 @@ prestige, la confiance et les finances ; tant qu'il n'est pas tranché, on ne
 saute pas à la semaine suivante. Le journal, le calendrier réel et le classement
 de la poule restent les mêmes briques que dans la carrière joueur.
 
-Le bureau se partage en trois espaces : **Bureau**, **Marché mondial** et
-**Négociations**. Sur mobile, ils deviennent trois onglets tactiles et le récit
+Le bureau se partage en cinq espaces : **Bureau**, **Composition**, **Match**,
+**Marché mondial** et **Négociations**. Sur mobile, ils deviennent des onglets tactiles et le récit
 reste la première chose affichée.
+
+### Composer le XV et coacher réellement le match
+
+- La feuille contient **15 titulaires et 8 remplaçants**, poste par poste. Les
+  joueurs peuvent être échangés sans doublon ; le capitaine et le buteur sont
+  désignés séparément et transmis au moteur.
+- Le plan initial règle le jeu avec ballon (équilibré, avants, large,
+  occupation), la défense (blitz, glissée, repli), le rythme, les pénalités et
+  l'heure du banc. Tous ces ordres restent modifiables pendant les 80 minutes.
+- Le banc permet aussi de programmer un **changement manuel** : il est effectué
+  au prochain arrêt de jeu. Le rythme influe sur la vitesse et la fatigue, la
+  défense sur la montée, l'attaque sur les combinaisons, le choix de pénalité
+  sur les tirs/touches et le timing sur les remplacements automatiques.
+- Le score produit à la sirène remplace le score théorique dans le calendrier,
+  le classement et le verdict de fin de saison. Une semaine avec match ne peut
+  plus être passée tant que la rencontre n'est pas terminée.
 
 ### Le marché mondial passe par 𝕏 L'Ovale
 
@@ -832,11 +854,10 @@ reste la première chose affichée.
   championnats, coupes, sélections et la Coupe du monde sont lisibles depuis le
   bureau. L'écran **Effectif** l'est aussi et montre immédiatement les recrues.
 
-La prochaine couche reste le coaching de match : composition du XV, banc,
-entraînement collectif et décisions dans le moteur 2D.
-
 ```bash
-npx vite-node scripts/verifManager.ts   # accès, récit, 15 saisons, L'Ovale, signature et effectif réel
+npx vite-node scripts/verifManager.ts        # carrière, calendrier, marché et saison
+npx vite-node scripts/verifManagerMatch.ts   # composition, consignes, banc et résultat réel
+npx vite-node scripts/verifSituations.ts     # 151 situations, impacts et non-répétition
 ```
 
 ## 🗺️ Idées d'évolution

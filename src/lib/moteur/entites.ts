@@ -74,12 +74,16 @@ export type Role =
 
 export interface Pion {
   id: string;
+  /** Identifiant stable dans l'effectif, utilisé par la composition manager. */
+  sourceId: string;
   nom: string;
   numero: number;       // 1 à 23
   poste: PosteId;       // le poste DU MAILLOT (pas celui de la fiche joueur)
   cote: Cote;
   avant: boolean;
   moi: boolean;
+  capitaine: boolean;
+  buteur: boolean;
 
   pos: Vec;
   vitesse: Vec;         // vecteur vitesse courant (m/s)
@@ -183,12 +187,15 @@ export function creerPion(
 
   return {
     id: `${cote}${index}`,
+    sourceId: c.id,
     nom: c.nom,
     numero: index + 1,
     poste,
     cote,
     avant,
     moi,
+    capitaine: false,
+    buteur: false,
     pos: { x: 0, y: AXE },
     vitesse: { x: 0, y: 0 },
     cible: { x: 0, y: AXE },

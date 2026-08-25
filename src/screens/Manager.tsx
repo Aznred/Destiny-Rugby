@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { t, nombre } from '../lib/i18n';
@@ -9,7 +9,7 @@ import { Confirmation } from '../components/Confirmation';
 import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
 import { COMPETITIONS, clubParNom, competitionDuClub } from '../data/clubs';
-import { forceEffectif } from '../lib/effectif';
+import { effectifDuClub, forceEffectif } from '../lib/effectif';
 import { championnatEnDirect } from '../lib/championnat';
 import { semaine, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
 import { TROPHEES } from '../data/trophees';
@@ -20,8 +20,16 @@ import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
   noteMaximale, salaireManager,
 } from '../lib/manager';
+import { matchDuClubSemaine } from '../lib/matchLive';
+import {
+  joueurCompatibleManager, noteCompositionManager, POSTES_BANC_MANAGER,
+  POSTES_XV_MANAGER, reconcilerCompositionManager,
+} from '../lib/compositionManager';
+import type { CompositionManager, TactiqueManager } from '../types';
 
-type VueManager = 'bureau' | 'marche' | 'negociations';
+const MatchLive = lazy(() => import('../components/MatchLive').then((m) => ({ default: m.MatchLive })));
+
+type VueManager = 'bureau' | 'equipe' | 'match' | 'marche' | 'negociations';
 
 function humeurDuBoard(confiance: number): { texte: string; ton: string } {
   if (confiance < CONFIANCE_LICENCIEMENT + 12) return { texte: t('mgr.board.sellette'), ton: 'rouge' };
@@ -40,6 +48,9 @@ export function Manager() {
   const ouvrirDiscussion = useGame((s) => s.ouvrirDiscussionOvale);
   const signerBanc = useGame((s) => s.signerBanc);
   const quitterBanc = useGame((s) => s.quitterBanc);
+  const definirComposition = useGame((s) => s.definirCompositionManager);
+  const definirTactique = useGame((s) => s.definirTactiqueManager);
+  const enregistrerResultat = useGame((s) => s.enregistrerResultatManager);
   const journal = useGame((s) => s.journal);
 
   const [vue, setVue] = useState<VueManager>('bureau');
@@ -49,6 +60,7 @@ export function Manager() {
   const [clubMarche, setClubMarche] = useState('');
   const [recherche, setRecherche] = useState('');
   const [poste, setPoste] = useState('');
+  const [matchOuvert, setMatchOuvert] = useState(false);
 
   const saison = manager?.saison ?? 1;
   const prestige = manager?.prestige ?? 0;
@@ -69,6 +81,18 @@ export function Manager() {
       .filter((c) => !recherche.trim()
         || `${c.nom} ${c.club} ${c.nation}`.toLowerCase().includes(recherche.trim().toLowerCase()));
   }, [manager?.club, manager?.saison, divisionMarche, clubMarche, poste, recherche]);
+  const effectif = useMemo(
+    () => manager?.club ? effectifDuClub(manager.club, manager.saison) : [],
+    [manager],
+  );
+  const compositionMemo = useMemo(
+    () => reconcilerCompositionManager(effectif, manager?.composition),
+    [effectif, manager?.composition],
+  );
+  const afficheMemo = useMemo(
+    () => manager ? matchDuClubSemaine(manager) : null,
+    [manager],
+  );
 
   if (!manager) return null;
 
@@ -80,6 +104,30 @@ export function Manager() {
   const maLigne = classement?.classement.find((l) => l.club === manager.club);
   const sem = semaine(manager.semaine);
   const actives = manager.negociations.filter((n) => n.etat === 'ouverte' || n.etat === 'accord');
+  const composition = compositionMemo;
+  const afficheManager = afficheMemo;
+  const resultatManager = afficheManager ? manager.resultats[afficheManager.cle] : undefined;
+
+  const changerJoueur = (zone: 'titulaires' | 'remplacants', index: number, joueurId: string) => {
+    const suivante: CompositionManager = {
+      ...composition,
+      titulaires: [...composition.titulaires],
+      remplacants: [...composition.remplacants],
+    };
+    const ancien = suivante[zone][index];
+    for (const autreZone of ['titulaires', 'remplacants'] as const) {
+      const autreIndex = suivante[autreZone].indexOf(joueurId);
+      if (autreIndex >= 0) suivante[autreZone][autreIndex] = ancien;
+    }
+    suivante[zone][index] = joueurId;
+    if (suivante.capitaineId === ancien && zone === 'titulaires') suivante.capitaineId = joueurId;
+    if (suivante.buteurId === ancien) suivante.buteurId = joueurId;
+    definirComposition(suivante);
+  };
+
+  const majTactique = <K extends keyof TactiqueManager>(cle: K, valeur: TactiqueManager[K]) => {
+    definirTactique({ ...manager.tactique, [cle]: valeur });
+  };
 
   const optionsBancs: OptionSelecteur[] = bancsLibres.map((c) => ({
     valeur: c.club.nom,
@@ -144,6 +192,10 @@ export function Manager() {
         <>
           <nav className="manager-onglets" aria-label={t('mgr.navigation')}>
             <button className={vue === 'bureau' ? 'actif' : ''} onClick={() => setVue('bureau')}>🏟️ {t('mgr.bureau')}</button>
+            <button className={vue === 'equipe' ? 'actif' : ''} onClick={() => setVue('equipe')}>👥 Composition</button>
+            <button className={vue === 'match' ? 'actif' : ''} onClick={() => setVue('match')}>
+              🎮 Match {afficheManager && !resultatManager && <i>1</i>}
+            </button>
             <button className={vue === 'marche' ? 'actif' : ''} onClick={() => setVue('marche')}>🌍 {t('mgr.marche')}</button>
             <button className={vue === 'negociations' ? 'actif' : ''} onClick={() => setVue('negociations')}>
               💬 {t('mgr.negociations')} {actives.length > 0 && <i>{actives.length}</i>}
@@ -194,9 +246,17 @@ export function Manager() {
                   </article>
                 ) : (
                   <article className="carte manager-semaine-prete">
-                    <span>✓</span><h2>{t('mgr.semainePreparee')}</h2><p>{t('mgr.semainePrepareeTexte')}</p>
-                    <button className="btn primaire grand" onClick={semaineManager}>
-                      {manager.semaine >= SEMAINES_PAR_SAISON ? `🏁 ${t('mgr.cloreSaison')}` : `▶ ${t('mgr.semaineSuivante')} (${manager.semaine}/${SEMAINES_PAR_SAISON})`}
+                    <span>{afficheManager && !resultatManager ? '🏉' : '✓'}</span>
+                    <h2>{afficheManager && !resultatManager ? 'Le match attend tes consignes' : t('mgr.semainePreparee')}</h2>
+                    <p>{afficheManager && !resultatManager
+                      ? `${afficheManager.match.domicile} reçoit ${afficheManager.match.exterieur}. Prépare ton XV puis prends place sur le banc.`
+                      : t('mgr.semainePrepareeTexte')}</p>
+                    <button className="btn primaire grand" onClick={() => {
+                      if (afficheManager && !resultatManager) setVue('match'); else semaineManager();
+                    }}>
+                      {afficheManager && !resultatManager
+                        ? '🧠 Coacher le match'
+                        : manager.semaine >= SEMAINES_PAR_SAISON ? `🏁 ${t('mgr.cloreSaison')}` : `▶ ${t('mgr.semaineSuivante')} (${manager.semaine}/${SEMAINES_PAR_SAISON})`}
                     </button>
                   </article>
                 )}
@@ -217,6 +277,102 @@ export function Manager() {
                 </div>
                 <p className="manager-prochain">{t('mgr.calendrierComplet')}</p>
               </aside>
+            </div>
+          )}
+
+          {vue === 'equipe' && (
+            <div className="manager-equipe">
+              <section className="carte manager-composition-tete">
+                <div>
+                  <div className="eyebrow">Feuille de match · 23 joueurs</div>
+                  <h2>👥 Ton XV, ton banc, tes rôles</h2>
+                  <p>Chaque choix est transmis au moteur. Un joueur hors de son poste perd la cohérence collective ; le buteur et le capitaine influencent réellement les pénalités et la discipline.</p>
+                </div>
+                <div className="manager-note-compo"><b>{noteCompositionManager(effectif, composition).toFixed(1)}</b><span>note du XV</span></div>
+              </section>
+
+              <div className="manager-composition-grille">
+                <section className="carte manager-xv">
+                  <div className="comp-tete"><b>🏉 XV de départ</b><span className="comp-count">15</span></div>
+                  <div className="manager-liste-compo">
+                    {POSTES_XV_MANAGER.map((posteSlot, index) => {
+                      const joueur = effectif.find((j) => j.id === composition.titulaires[index]);
+                      return (
+                        <label key={`${posteSlot}-${index}`} className="manager-slot">
+                          <span className="manager-numero">{index + 1}</span>
+                          <span><b>{nomPoste(posteSlot)}</b><small>{joueur && joueur.poste !== posteSlot ? `Adapté depuis ${nomPoste(joueur.poste)}` : 'Poste naturel'}</small></span>
+                          <select value={joueur?.id ?? ''} onChange={(e) => changerJoueur('titulaires', index, e.target.value)}>
+                            {effectif
+                              .filter((j) => joueurCompatibleManager(j, posteSlot))
+                              .sort((a, b) => (b.poste === posteSlot ? 100 : 0) + b.note - ((a.poste === posteSlot ? 100 : 0) + a.note))
+                              .map((j) => <option key={j.id} value={j.id}>{j.nom} · {j.note} · {nomPoste(j.poste)}</option>)}
+                          </select>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <section className="carte manager-banc-compo">
+                  <div className="comp-tete"><b>🪑 Banc</b><span className="comp-count">8</span></div>
+                  <div className="manager-liste-compo">
+                    {POSTES_BANC_MANAGER.map((posteSlot, index) => {
+                      const joueur = effectif.find((j) => j.id === composition.remplacants[index]);
+                      return (
+                        <label key={`${posteSlot}-${index}`} className="manager-slot">
+                          <span className="manager-numero">{index + 16}</span>
+                          <span><b>{nomPoste(posteSlot)}</b><small>{joueur ? `${joueur.note} · ${joueur.age} ans` : '—'}</small></span>
+                          <select value={joueur?.id ?? ''} onChange={(e) => changerJoueur('remplacants', index, e.target.value)}>
+                            {effectif
+                              .filter((j) => joueurCompatibleManager(j, posteSlot))
+                              .sort((a, b) => b.note - a.note)
+                              .map((j) => <option key={j.id} value={j.id}>{j.nom} · {j.note} · {nomPoste(j.poste)}</option>)}
+                          </select>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="manager-roles">
+                    <label><span>©️ Capitaine</span><select value={composition.capitaineId} onChange={(e) => definirComposition({ ...composition, capitaineId: e.target.value })}>{composition.titulaires.map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom}</option>; })}</select></label>
+                    <label><span>🎯 Buteur</span><select value={composition.buteurId} onChange={(e) => definirComposition({ ...composition, buteurId: e.target.value })}>{[...composition.titulaires, ...composition.remplacants].map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom} · {nomPoste(j.poste)}</option>; })}</select></label>
+                  </div>
+                </section>
+              </div>
+
+              <section className="carte manager-plan-avant-match">
+                <div className="comp-tete"><b>🧠 Plan de jeu initial</b><span>modifiable pendant le match</span></div>
+                <div className="manager-tactiques-selects">
+                  <label><span>Attaque</span><select value={manager.tactique.attaque} onChange={(e) => majTactique('attaque', e.target.value as TactiqueManager['attaque'])}><option value="equilibre">Équilibré</option><option value="avants">Jeu d’avants</option><option value="large">Jouer au large</option><option value="occupation">Occupation au pied</option></select></label>
+                  <label><span>Défense</span><select value={manager.tactique.defense} onChange={(e) => majTactique('defense', e.target.value as TactiqueManager['defense'])}><option value="blitz">Blitz</option><option value="glissee">Glissée</option><option value="repli">Repli</option></select></label>
+                  <label><span>Rythme</span><select value={manager.tactique.rythme} onChange={(e) => majTactique('rythme', e.target.value as TactiqueManager['rythme'])}><option value="gestion">Gérer</option><option value="normal">Normal</option><option value="intense">Intense</option></select></label>
+                  <label><span>Pénalités</span><select value={manager.tactique.penalites} onChange={(e) => majTactique('penalites', e.target.value as TactiqueManager['penalites'])}><option value="mixte">Selon le terrain</option><option value="points">Prendre les points</option><option value="touche">Chercher la touche</option></select></label>
+                  <label><span>Remplacements</span><select value={manager.tactique.remplacements} onChange={(e) => majTactique('remplacements', e.target.value as TactiqueManager['remplacements'])}><option value="precoces">Précoces</option><option value="standard">Standards</option><option value="tardifs">Tardifs</option></select></label>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {vue === 'match' && (
+            <div className="manager-match-centre">
+              {!afficheManager ? (
+                <section className="carte manager-match-vide"><span>📆</span><h2>Pas de match cette semaine</h2><p>Le calendrier laisse une fenêtre de récupération. Tu peux préparer la suite puis avancer.</p><button className="btn primaire" disabled={!!manager.decision} onClick={semaineManager}>▶ Semaine suivante</button></section>
+              ) : (
+                <section className="carte manager-affiche-match">
+                  <div className="eyebrow">Journée {afficheManager.journee} · {manager.divisionNom}</div>
+                  <div className="manager-duel">
+                    <span>{clubParNom(afficheManager.match.domicile) && <Blason club={clubParNom(afficheManager.match.domicile)!} taille={54} />}<b>{afficheManager.match.domicile}</b></span>
+                    <strong>{resultatManager ? `${afficheManager.match.scoreD} – ${afficheManager.match.scoreE}` : 'VS'}</strong>
+                    <span>{clubParNom(afficheManager.match.exterieur) && <Blason club={clubParNom(afficheManager.match.exterieur)!} taille={54} />}<b>{afficheManager.match.exterieur}</b></span>
+                  </div>
+                  {resultatManager ? (
+                    <div className="manager-match-joue"><b>✓ Résultat enregistré au championnat</b><p>{resultatManager.essaisPour} essai{resultatManager.essaisPour > 1 ? 's' : ''} marqué{resultatManager.essaisPour > 1 ? 's' : ''} · confiance du board mise à jour.</p><button className="btn primaire" onClick={semaineManager}>{manager.semaine >= SEMAINES_PAR_SAISON ? '🏁 Clore la saison' : '▶ Semaine suivante'}</button></div>
+                  ) : manager.decision ? (
+                    <div className="manager-match-bloque"><b>📋 Une décision de bureau attend encore.</b><p>Tranche-la avant le coup d’envoi : elle fait partie de la préparation de la semaine.</p><button className="btn fantome" onClick={() => setVue('bureau')}>Retour au bureau</button></div>
+                  ) : (
+                    <div className="manager-lancer-match"><p>Le XV, le banc, le capitaine, le buteur et le plan de jeu seront figés au coup d’envoi. Les consignes collectives resteront modifiables en direct.</p><div><button className="btn fantome" onClick={() => setVue('equipe')}>👥 Vérifier la composition</button><button className="btn primaire grand" onClick={() => setMatchOuvert(true)}>🎮 Prendre place sur le banc</button></div></div>
+                  )}
+                </section>
+              )}
             </div>
           )}
 
@@ -283,6 +439,36 @@ export function Manager() {
 
       <button className="btn fantome manager-raccrocher" onClick={() => setRaccrocher(true)}>🚪 {t('mgr.raccrocher')}</button>
       {raccrocher && <Confirmation titre={t('mgr.raccrocherTitre')} message={libre ? t('mgr.raccrocherLibre') : t('mgr.raccrocherClasse')} libelleOui={t('mgr.raccrocher')} onOui={() => { setRaccrocher(false); quitterBanc(); }} onNon={() => setRaccrocher(false)} />}
+      {matchOuvert && afficheManager && (
+        <Suspense fallback={null}>
+          <MatchLive
+            match={afficheManager.match}
+            saison={manager.saison}
+            cle={afficheManager.cle}
+            titre={`${manager.divisionNom} · journée ${afficheManager.journee}`}
+            manager={{
+              club: manager.club,
+              composition,
+              tactique: manager.tactique,
+              onTactique: definirTactique,
+            }}
+            onTermine={({ scoreA, scoreB, essaisA, essaisB }) => {
+              const domicile = afficheManager.match.domicile === manager.club;
+              enregistrerResultat({
+                cle: afficheManager.cle, club: manager.club,
+                saison: manager.saison, semaine: manager.semaine,
+                journee: afficheManager.journee, domicile,
+                adversaire: domicile ? afficheManager.match.exterieur : afficheManager.match.domicile,
+                scorePour: domicile ? scoreA : scoreB,
+                scoreContre: domicile ? scoreB : scoreA,
+                essaisPour: domicile ? essaisA : essaisB,
+                essaisContre: domicile ? essaisB : essaisA,
+              });
+            }}
+            onFermer={() => setMatchOuvert(false)}
+          />
+        </Suspense>
+      )}
     </motion.section>
   );
 }

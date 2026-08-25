@@ -458,7 +458,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             les messages privés quand des clubs discutent, et sert à se mettre
             sur le marché quand personne n'écrit. */}
         <button
-          onClick={() => (approchesOuvertes > 0 ? setEcran('social') : setConfirmerTransfert(true))}
+          onClick={() => (approchesOuvertes > 0 ? ouvrirMessagesOvale() : setConfirmerTransfert(true))}
           title={approchesOuvertes > 0
             ? t('pj.messagesClubsAide')
             : t('pj.marcheAide')}

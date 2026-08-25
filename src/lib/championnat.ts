@@ -22,6 +22,24 @@ export interface MatchChampionnat {
   essaisE: number;
 }
 
+// Les matchs effectivement coachés remplacent leur résultat théorique dans
+// tous les écrans : calendrier, classement et verdict du board. Le registre
+// est réalimenté par la sauvegarde au chargement.
+const RESULTATS_JOUES = new Map<string, MatchChampionnat>();
+
+export function enregistrerResultatJoue(cle: string, match: MatchChampionnat): void {
+  RESULTATS_JOUES.set(cle, { ...match });
+}
+
+export function setResultatsJoues(liste: { cle: string; match: MatchChampionnat }[]): void {
+  RESULTATS_JOUES.clear();
+  for (const { cle, match } of liste) RESULTATS_JOUES.set(cle, { ...match });
+}
+
+export function effacerResultatsJoues(): void {
+  RESULTATS_JOUES.clear();
+}
+
 export interface LigneTableau {
   position: number;
   club: string;
@@ -195,6 +213,8 @@ export function jouerRencontre(
   domicile: string, exterieur: string, saison: number, cle: string,
   apportJoueur: { club: string; bonus: number } | null,
 ): MatchChampionnat {
+  const reel = RESULTATS_JOUES.get(cle);
+  if (reel && reel.domicile === domicile && reel.exterieur === exterieur) return { ...reel };
   const rng = graine(cle);
   const fD = forceEffectif(domicile, saison) + 2.5; // avantage du terrain
   const fE = forceEffectif(exterieur, saison);

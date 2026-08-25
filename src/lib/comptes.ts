@@ -269,10 +269,15 @@ export function annuaire(j: Joueur): CompteSuivi[] {
   for (const c of COMPETITIONS) ajouter(compteCompetition(c.id, c.nom, `${t('bio.competitionOfficielle')} · ${c.pays}`, c.niveau));
   for (const c of COUPES_EUROPE) ajouter(compteCompetition(c.id, c.nom, `${t('bio.competitionOfficielle')} · ${c.pays}`, 1));
 
-  // 2. Les clubs du championnat du joueur, puis les autres clubs français.
+  // 2. Les clubs du championnat du joueur, puis tous les clubs étrangers et
+  // les clubs professionnels français. Les petites ligues étrangères étaient
+  // auparavant absentes à cause du filtre `niveau <= 3` : impossible de trouver
+  // Helsinki, Prague ou Heidelberg sur L'Ovale, donc impossible de leur écrire.
   const sienne = COMPETITIONS.find((c) => c.id === j.division);
   for (const club of sienne?.clubs ?? []) ajouter(compteClub(club.nom));
-  for (const comp of COMPETITIONS.filter((c) => c.id !== j.division && c.niveau <= 3)) {
+  for (const comp of COMPETITIONS.filter(
+    (c) => c.id !== j.division && (c.zone === 'Monde' || c.niveau <= 3),
+  )) {
     for (const club of comp.clubs) ajouter(compteClub(club.nom));
   }
 

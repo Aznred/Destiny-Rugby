@@ -37,6 +37,8 @@ import { effectifDuClub } from '../src/lib/effectif';
 import { ciblesDuMarche } from '../src/lib/recrutementManager';
 import { SEMAINES_PAR_SAISON } from '../src/data/calendrier';
 import type { LegendeSauvegardee, Manager } from '../src/types';
+import { compositionManagerParDefaut, TACTIQUE_MANAGER_DEFAUT } from '../src/lib/compositionManager';
+import { matchDuClubSemaine } from '../src/lib/matchLive';
 
 let echecs = 0;
 function ligne(nom: string, valeur: string | number, ok: boolean): void {
@@ -277,7 +279,10 @@ console.log('\n=== 5. LE CLASSEMENT À CATÉGORIES ===');
       prestige: 84, confiance: 70, objectif: 2, argent: 0,
       budgetTransferts: 20_000_000, budgetSalarial: 4_000_000,
       contrat: { saisons: 2, salaire: 400_000 },
-      decision: null, negociations: [], recrues: [],
+      decision: null,
+      composition: compositionManagerParDefaut(effectifDuClub('Stade Toulousain', 18)),
+      tactique: { ...TACTIQUE_MANAGER_DEFAUT }, resultats: {},
+      negociations: [], recrues: [],
       clubs: ['SU Agen', 'RC Vannes', 'Stade Toulousain'],
       titres: [],
       palmares: [
@@ -362,6 +367,9 @@ console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
     `${m1?.objectif}ᵉ`, !!m1 && m1.objectif >= 1 && m1.objectif <= 12);
   ligne('une décision narrative attend dès la première semaine',
     m1?.decision?.titre ?? 'aucune', !!m1?.decision && m1.decision.choix.length === 3);
+  ligne('une feuille de 23 joueurs est prête dès la création',
+    `${(m1?.composition.titulaires.length ?? 0) + (m1?.composition.remplacants.length ?? 0)} joueurs`,
+    m1?.composition.titulaires.length === 15 && m1.composition.remplacants.length === 8);
 
   // 6b. Le marché mondial mène bien à une signature et modifie l'effectif.
   const cible = ciblesDuMarche(m1!.division, m1!.saison, m1!.club)[0];
@@ -385,10 +393,32 @@ console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
 
   // 6c. Une saison entière, semaine par semaine : chaque décision est tranchée
   // avant de continuer, exactement comme le joueur doit répondre à son récit.
+  let verrouMatchTeste = false;
   for (let i = 0; i < SEMAINES_PAR_SAISON + 1; i++) {
     const courant = useGame.getState().manager;
     if (courant?.decision) {
       useGame.getState().repondreDecisionManager(courant.decision.id, courant.decision.choix[0].id);
+    }
+    const prepare = useGame.getState().manager!;
+    const affiche = matchDuClubSemaine(prepare);
+    if (affiche && !prepare.resultats[affiche.cle]) {
+      const semaineAvant = prepare.semaine;
+      useGame.getState().semaineManager();
+      if (!verrouMatchTeste) {
+        ligne('un match non joué bloque réellement la semaine',
+          `semaine ${semaineAvant}`, useGame.getState().manager?.semaine === semaineAvant);
+        verrouMatchTeste = true;
+      }
+      const domicile = affiche.match.domicile === prepare.club;
+      useGame.getState().enregistrerResultatManager({
+        cle: affiche.cle, club: prepare.club, saison: prepare.saison,
+        semaine: prepare.semaine, journee: affiche.journee, domicile,
+        adversaire: domicile ? affiche.match.exterieur : affiche.match.domicile,
+        scorePour: domicile ? affiche.match.scoreD : affiche.match.scoreE,
+        scoreContre: domicile ? affiche.match.scoreE : affiche.match.scoreD,
+        essaisPour: domicile ? affiche.match.essaisD : affiche.match.essaisE,
+        essaisContre: domicile ? affiche.match.essaisE : affiche.match.essaisD,
+      });
     }
     useGame.getState().semaineManager();
   }

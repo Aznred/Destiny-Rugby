@@ -12,6 +12,8 @@
 
 import type { Joueur } from '../src/types';
 import { genererOffres, cote, RENOM_MAX } from '../src/lib/offres';
+import { COMPETITIONS } from '../src/data/clubs';
+import { annuaire } from '../src/lib/comptes';
 
 function joueurDe(niveau: number, reputation: number, club = 'Stade Toulousain', division = 'top14'): Joueur {
   return {
@@ -68,6 +70,40 @@ console.log('\n=== 3. UNE STAR NE SIGNE PAS EN RÉGIONALE ===');
   const bas = offres.filter((o) => o.noteClub < 60);
   ligne('aucune offre d’un club noté sous 60',
     `${offres.length} offres, ${bas.length} sous 60`, bas.length === 0 && offres.length > 0);
+
+  const projetsMoyens = new Set<string>();
+  for (let saison = 1; saison <= 8; saison++) {
+    for (const o of genererOffres({ ...j, saison }, { saison, maximum: 6 })) {
+      if (o.noteClub >= 60 && cote(j) - o.noteClub >= 16) projetsMoyens.add(o.club);
+    }
+  }
+  ligne('des clubs moyens tentent aussi leur chance avec une star',
+    `${projetsMoyens.size} projets différents`, projetsMoyens.size >= 3);
+}
+
+console.log('\n=== 3 BIS. LES PETITES LIGUES ÉTRANGÈRES SONT ACCESSIBLES ===');
+{
+  const clubRegional = COMPETITIONS.find((c) => c.id === 'reg3')?.clubs[0]?.nom ?? 'Club régional';
+  const petit = joueurDe(35, 20, clubRegional, 'reg3');
+  const clubEtranger = 'Jyväskylä';
+  const compteExiste = annuaire(petit).some((c) => c.type === 'club' && c.club === clubEtranger);
+  ligne('le club étranger possède un compte L’Ovale', clubEtranger, compteExiste);
+
+  const directe = genererOffres(petit, {
+    saison: 6, maximum: 1, demande: true, clubCible: clubEtranger,
+  });
+  ligne('un petit joueur peut envoyer son dossier à l’étranger',
+    directe.map((o) => `${o.club} (${o.divisionNom})`).join(', ') || 'aucune réponse',
+    directe.some((o) => o.club === clubEtranger));
+
+  const pays = new Set<string>();
+  for (let saison = 1; saison <= 8; saison++) {
+    for (const o of genererOffres({ ...petit, saison }, { saison, maximum: 5, demande: true })) {
+      if (o.etranger) pays.add(o.pays);
+    }
+  }
+  ligne('le marché spontané ne se limite plus aux Régionales françaises',
+    pays.size ? [...pays].join(', ') : 'aucun pays étranger', pays.size > 0);
 }
 
 console.log('\n=== 4. FIN DE CONTRAT : ON NE RESTE PAS AU CLUB ===');
@@ -140,6 +176,15 @@ console.log('\n=== 5. CE NE SONT PLUS LES MÊMES CLUBS ===');
   ligne('aucun club ne monopolise le marché',
     `le plus assidu : ${revenants[0]?.[1] ?? 0} offres sur ${total}`,
     (revenants[0]?.[1] ?? 0) <= Math.max(3, total * 0.25));
+
+  const premiereVague = genererOffres(j, { saison: 5, maximum: 4 });
+  const relance = genererOffres(j, {
+    saison: 5, maximum: 4, clubsRecents: premiereVague.map((o) => o.club),
+  });
+  const repetitions = relance.filter((o) => premiereVague.some((p) => p.club === o.club));
+  ligne('la mémoire récente renouvelle les interlocuteurs',
+    `${repetitions.length} répétition(s) sur ${relance.length} nouvelles approches`,
+    relance.length > 0 && repetitions.length === 0);
 
   // Et deux postes différents doivent recevoir des offres de clubs différents :
   // c'est la signature du « besoin au poste ».
