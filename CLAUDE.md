@@ -17,7 +17,10 @@ Inspiré des jeux type *Destin Eleven*, décliné pour l'ovalie.
   (stade nocturne / cuir / pelouse / dorures). **Jamais** un rendu générique.
 - **Tester dans le navigateur** après chaque changement (aperçu `localhost:5173`,
   desktop **ET** mobile), pas seulement compiler.
-- **Responsive obligatoire.**
+- **Responsive obligatoire.** ⚠️ Et ça vaut **dans les deux sens** : le fichier
+  n'a longtemps eu que des media queries `max-width`, si bien qu'un écran de
+  1 920 px héritait de la densité écrite pour un téléphone. Voir « L'ORDINATEUR
+  N'AVAIT AUCUN PALIER » en bas de ce fichier.
 - Tenir **`CLAUDE.md`** et **`README.md`** à jour à chaque évolution.
 - ⚠️ **L'IA PASSE PAR GROQ** (`VITE_GROQ_KEY`), plus par un modèle local.
   Demande explicite : « reviens à une clé Groq au lieu d'un LLM local, c'est
@@ -7927,3 +7930,231 @@ npx vite-node scripts/verifTransferts.ts   # la négociation et ses règles de f
 npx vite-node scripts/verifSocial2.ts      # l'annuaire, la recherche, les profils
 npx vite-node scripts/verifTraductions.ts  # les 5 clés ajoutées, dans les 7 langues
 ```
+
+---
+
+## 🖥️ L'ORDINATEUR N'AVAIT AUCUN PALIER — il héritait de la mise en page du téléphone
+
+Retour de jeu : « rends le desktop plus lisible ; je sais pas pourquoi mais j'ai
+52 % de rebond mobile et 68 % sur PC ; rends l'UI PC plus belle, plus agréable,
+plus simple d'utilisation **sans modifier le jeu** ».
+
+⚠️ **LE CHIFFRE LE PLUS ÉLEVÉ ÉTAIT CELUI DE L'ORDINATEUR, ET C'EST LOGIQUE.**
+Le lot « ACCESSIBILITÉ MOBILE » (plus haut) a traité le téléphone ; personne
+n'avait jamais traité l'écran large. Les **45 media queries** du fichier étaient
+TOUTES en `max-width` : la mise en page de base ÉTAIT la version compressée,
+celle écrite pour tenir sur 375 px sans défilement (voir « CARRIÈRE COMPACTE »),
+et un écran de 1 920 px héritait exactement de la même densité.
+
+### Ce que ça donnait, mesuré sur l'écran de carrière
+
+| | avant | après |
+|---|---|---|
+| styles de texte **sous 12 px portant un mot** | **8** | **0** |
+| le plus petit | **8,8 px** (« OVR »), puis 9,3 · 9,9 · 10,6 · 10,9 · 11,2 | 10,2 px, et c'est « OVR » |
+| « ATTRIBUTS » · « Vitesse » · « Équipe » | 9,9 · 10,6 · 9,9 px | 12,2 · 12,8 · 12,2 px |
+| colonnes latérales | 310 et 292 px, à **toute** largeur d'écran | 334/306 px, puis 358/328 au-delà de 1500 |
+| caractères par ligne dans le journal | **87** en 1440 · **106** en 1920 | **69** · **67** |
+| paragraphe le plus large (boutique, 1920) | **148 caractères par ligne** | **74** |
+| barre d'actions du panneau | coupée (833 px de contenu pour 812 de haut) | **collée en bas, toujours atteignable** |
+| section suivante de l'accueil, en 1440 × 900 | commence à y = 900, soit **pile au pli** | 80 px dépassent au-dessus du pli |
+
+Les deux défauts se répondaient : les panneaux étaient ILLISIBLES parce que
+serrés, pendant que la colonne du milieu était FATIGANTE parce qu'elle s'étalait.
+La typographie de référence place le confort de lecture entre 45 et 75
+caractères par ligne — à 106, l'œil perd la ligne en revenant à la marge.
+
+### ⚠️ LA LARGEUR COMMANDE LA TYPOGRAPHIE, LA HAUTEUR COMMANDE L'AÉRATION
+
+C'est la décision qui structure tout le bloc, et elle vient d'un échec mesuré.
+Première version : tout grossissait ensemble. Le contenu du panneau de gauche
+est passé de 833 à **1 056 px** pour 812 px de hauteur — il fallait DÉFILER pour
+atteindre « semaine suivante », c'est-à-dire le bouton qui fait avancer le jeu.
+On aurait échangé un défaut de lisibilité contre un défaut d'usage.
+
+Les deux axes sont donc séparés :
+
+- **`@media (min-width: 1120px)`** → la TAILLE DU TEXTE et la largeur des
+  colonnes. S'applique dès qu'on est sur un écran d'ordinateur.
+- **`@media (min-width: 1120px) and (min-height: 940px)`** → l'ESPACEMENT
+  (rembourrages, marges, épaisseur des jauges, taille de l'avatar). 940 px est
+  la hauteur à partir de laquelle le panneau tient entier une fois aéré ; en
+  dessous, un portable 1440 × 720 garde la densité serrée **avec le texte
+  lisible**. Ce qui lui manque, c'est la hauteur, pas la largeur.
+
+### Les quatre corrections
+
+1. **Plancher de lisibilité à 0,76 rem (12,2 px)** pour tout libellé qu'on doit
+   LIRE. ⚠️ Ce n'est pas un goût : sous 12 px, une minuscule accentuée (é, à, ç)
+   perd son accent à l'antialiasing sur un écran non HiDPI, et tout le jeu est
+   en français. Seules les vignettes de deux ou trois caractères descendent en
+   dessous (« OVR », un compteur) : on les reconnaît, on ne les lit pas.
+   ⚠️ **Deux règles ont dû être écrites à la spécificité supérieure** et l'oubli
+   ne se voyait pas : `.badge-generale em` (0,1,1) battait `.badge-potentiel`
+   (0,1,0) — mesuré, le badge restait à 9,28 px malgré la règle —, et
+   `.cal-lien` est déclarée **plus bas** dans le fichier, donc elle repassait
+   devant à la cascade.
+2. **Longueur de ligne bornée en `ch`, jamais en pixels.** Une borne en pixels
+   redevient fausse dès que le lecteur grossit la police de son navigateur — or
+   c'est exactement ce que fait quelqu'un qui trouve un site illisible. ⚠️ Et
+   `1ch` est la largeur du **zéro**, pas d'une lettre moyenne : avec Inter,
+   `60ch` tient environ 70 caractères courants. Chiffre mesuré, pas déduit.
+3. **La barre d'actions du panneau devient collante** (`position: sticky`).
+   C'est le vrai gain d'usage : mesuré AVANT toute modification, le panneau
+   tenait 833 px de contenu dans 812 px, la barre 👥 Équipe · ✈️ Marché ·
+   📊 Résultats · 𝕏 L'Ovale · 🏛️ Retraite était donc **déjà coupée**, et il
+   fallait faire défiler une fiche de joueur entière pour atteindre le marché
+   des transferts. ⚠️ Le rembourrage bas du panneau passe **sur la barre** :
+   laissé sur le conteneur, il crée une bande sous la barre collée dans laquelle
+   le contenu défilant réapparaît.
+4. **Le « faux fond » de l'accueil.** Le hero mesurait 828 px et la section
+   suivante commençait à y = 900 : un visiteur voyait une page qui se termine
+   proprement, sans le moindre indice qu'elle continue. C'est l'un des schémas
+   qui font le plus rebondir sur ordinateur. Le hero est raccourci juste assez
+   pour que la suite dépasse de 80 px. Rien n'est retiré, rien n'est ajouté : on
+   montre qu'il y a une suite.
+
+### Et une affordance qui manquait
+
+⚠️ **LE CLASSEMENT LATÉRAL EST CLIQUABLE EN ENTIER** — il ouvre l'écran
+Résultats — **et rien ne le disait**. Le curseur en main était bien là, mais
+hérité de la carte : au survol, aucun changement, donc aucune raison de tenter le
+clic. Sur un écran tactile la question ne se pose pas ; à la souris, c'est la
+moitié de l'information. Les secteurs d'entraînement avaient le même défaut.
+
+### ⚠️ CE QUI N'A PAS ÉTÉ TOUCHÉ
+
+**Un seul fichier a changé : `src/App.css`, en ajout pur (223 lignes, 0
+suppression).** Aucun composant, aucun texte, aucune règle de jeu, aucun store.
+La demande disait « sans modifier le jeu », et c'est vérifiable d'un coup d'œil
+au diff.
+
+⚠️ **ET LE MOBILE NE BOUGE PAS D'UN PIXEL** : tout le lot vit sous
+`min-width: 900px` ou `1120px`. Vérifié en 375 × 812 et 768 × 1024 — le
+rembourrage du panneau, la barre d'action fixe et l'absence de débordement
+horizontal sont identiques à avant.
+
+### Vérifié en jeu
+
+Aux quatre tailles, sur Accueil · Carrière · Profil · Clubs · Classement ·
+Hall · Boutique : **0 débordement horizontal**, et la barre d'actions reste
+atteignable sans défiler jusqu'en 1366 × 660.
+
+| | 1366 × 660 | 1440 × 900 | 1920 × 1080 | 375 × 812 |
+|---|---|---|---|---|
+| colonnes de la carrière | 334 / 650 / 306 | 334 / 722 / 306 | 358 / 839 / 328 | une colonne |
+| caractères par ligne | 69 | 69 | 67 | — |
+| barre d'actions atteignable | ✅ (collée) | ✅ | ✅ | barre fixe mobile |
+| aération | serrée (écran bas) | serrée | aérée | inchangée |
+
+⚠️ **Une limite de la vérification, à dire clairement** : le panneau d'aperçu ne
+compositait pas les images pendant la session, donc `requestAnimationFrame` ne
+s'exécutait jamais. Tous les chiffres ci-dessus viennent de mesures du DOM (qui,
+elles, sont exactes — la mise en page est calculée sans rendu), mais **le rendu
+3D du hero n'a pas pu être contrôlé visuellement**. Rien ne le concerne dans ce
+lot.
+
+---
+
+## ⚙️ LES RÉGLAGES S'APPLIQUENT AU CLIC — et c'est ce qui réparait la langue par IP
+
+Retour de jeu : « fais que les changements de paramètres s'effectuent sans
+enregistrer, en mode l'anglais s'active direct ; et qu'en fonction d'où on est,
+un utilisateur avec une IP anglaise ait la bonne langue de son pays ».
+
+⚠️ **LES DEUX DEMANDES N'EN FONT QU'UNE : le bouton « Enregistrer » ÉTAIT la
+cause de la panne de détection.**
+
+### Le bug, et il était invisible
+
+Le panneau ⚙️ travaillait sur un brouillon (`langueLocale`, `themeLocal`) et
+publiait **tout** d'un coup :
+
+```ts
+const enregistrer = () => {
+  setTenorKey(tenorLocal.trim());
+  setGroqKey(groqLocal.trim());
+  setLangue(langueLocale);   // ← appelé MÊME si personne n'a touché à la langue
+  setTheme(themeLocal);
+  onFermer();
+};
+```
+
+Or `setLangue` fait `set({ langue, langueManuelle: true })`, et `langueManuelle`
+est **persisté**. Il suffisait donc d'ouvrir ⚙️ **une seule fois** — pour coller
+une clé Groq, changer d'ambiance, ou simplement regarder et cliquer sur le bouton
+principal — pour que `langueManuelle` passe à `true` **définitivement**.
+
+`appliquerLangueAutomatique` commence par `if (get().langueManuelle) return;` :
+la détection par le pays de l'IP était donc éteinte pour ces joueurs, à jamais.
+Quelqu'un qui arrivait d'Angleterre gardait le français, et **rien ne
+l'expliquait**. La table pays → langue, elle, était juste depuis le début —
+`verifLangueIP.ts` la validait déjà sur seize cas.
+
+### Ce qui change dans le panneau
+
+| | avant | après |
+|---|---|---|
+| langue | brouillon, appliquée au clic sur « Enregistrer » | **appliquée au clic sur le drapeau** |
+| ambiance | brouillon (alors que le commentaire annonçait « immédiat ») | **appliquée au clic** |
+| clés Groq / Tenor | brouillon | validées **à la sortie du champ** et à la fermeture |
+| pied du panneau | « Fermer » + « Enregistrer » | **« Fermer »**, seul |
+
+⚠️ **LES DEUX CLÉS GARDENT UN ÉTAT LOCAL, ET C'EST NÉCESSAIRE.** Ce sont des
+champs de saisie : publier à chaque frappe ferait passer « g », « gs », « gsk »…
+pour des clés d'API, et `definirCleGroqJoueur` les prendrait au sérieux. Elles
+sont donc validées sur `onBlur`, plus une fois à la fermeture — **Échap et le
+clic à l'extérieur compris**, puisque `useModalDialog` reçoit maintenant le
+`fermer` qui valide.
+
+⚠️ **ET LE BOUTON « ENREGISTRER » A DISPARU, PAS ÉTÉ DÉSACTIVÉ.** Un bouton qui
+ne fait plus rien est pire qu'un bouton manquant : il laisse croire qu'on peut
+encore annuler. La clé `reg.enregistrer` reste dans le dictionnaire (elle ne
+coûte rien et resservira si un formulaire en a besoin un jour).
+
+### ⚠️ LA MIGRATION QUI DÉCOINCE LES SAUVEGARDES DÉJÀ MARQUÉES (version 17)
+
+Corriger le panneau ne suffisait pas : tous les joueurs existants traînent un
+`langueManuelle: true` parasite. Mais **on ne peut pas distinguer après coup un
+vrai choix d'un marquage parasite** — le drapeau ne dit pas d'où il vient.
+
+Le marquage parasite a une signature : il réécrivait la langue **déjà en place**,
+c'est-à-dire celle du navigateur. On ne rouvre donc la détection que dans ce cas :
+
+```ts
+if (s.langueManuelle && s.langue === langueDuNavigateur()) s.langueManuelle = false;
+```
+
+Une langue **différente** de celle du navigateur ne peut venir que d'un clic
+délibéré : elle est conservée telle quelle.
+
+⚠️ **UN CAS N'EST PAS COUVERT, ET IL EST ASSUMÉ** : quelqu'un qui a choisi
+exprès la langue de son propre navigateur verra la détection repasser **une
+fois**. Son prochain clic dans ⚙️ tiendra pour de bon, puisque `setLangue` n'est
+plus appelé que sur un vrai clic. C'est le prix à payer pour rendre la détection
+à tous les autres, et il n'y a pas de moyen honnête de faire mieux avec
+l'information disponible.
+
+### Vérifié
+
+`scripts/verifLangueIP.ts` gagne cinq contrôles, et ils couvrent enfin le CÔTÉ
+JEU — c'est précisément là que vivait le bug, et rien ne le testait :
+
+```
+✅ une IP anglaise met le jeu en anglais → en
+✅ choisir une langue la marque comme manuelle → true
+✅ … et la détection ne la touche plus → ja
+✅ un marquage parasite rouvre la détection → false
+✅ un choix délibéré reste protégé → true
+```
+
+En jeu (1440 × 900 et 375 × 812) : un clic sur « English » repeint la navigation,
+le titre du panneau et son bouton de fermeture **sans rien valider**, `html lang`
+suit, le panneau reste ouvert pour revenir en arrière, et Échap conserve tout.
+Le thème pose `data-theme` et la balise `theme-color` dans la foulée.
+
+⚠️ **`/api/langue` NE RÉPOND PAS EN DÉVELOPPEMENT** : c'est une fonction
+serverless Vercel, Vite ne la sert pas. `langueDepuisAdresseIP()` reçoit un 404,
+renvoie `null` en silence, et la langue du navigateur reste en place — c'est le
+comportement prévu. La détection ne se constate donc qu'en production ; le banc
+d'essai, lui, appelle le handler directement.

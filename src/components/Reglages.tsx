@@ -46,29 +46,40 @@ export function Reglages({ onFermer }: Props) {
   const groqKey = useGame((s) => s.groqKey);
   const setGroqKey = useGame((s) => s.setGroqKey);
 
+  // ⚠️ IL N'Y A PLUS DE BROUILLON POUR LA LANGUE NI POUR L'AMBIANCE (demande
+  // explicite : « fais que les changements de paramètres s'effectuent sans
+  // enregistrer »). Un panneau de préférences n'est pas un formulaire : on
+  // clique sur « English » pour voir le jeu en anglais, pas pour armer une
+  // intention qu'il faudra confirmer plus bas. Les deux boutons lisent donc
+  // directement le store et écrivent dedans.
+  //
+  // Seules les DEUX CLÉS gardent un état local, et c'est nécessaire : ce sont
+  // des champs de saisie, et publier à chaque frappe ferait passer « g », « gs »,
+  // « gsk »… pour des clés d'API. Elles sont validées à la sortie du champ et,
+  // par sécurité, à la fermeture du panneau — Échap et le clic à l'extérieur
+  // compris.
   const [tenorLocal, setTenorLocal] = useState(tenorKey);
   const [groqLocal, setGroqLocal] = useState(groqKey);
-  const [langueLocale, setLangueLocale] = useState(langue);
-  const [themeLocal, setThemeLocal] = useState(theme);
   // ⚠️ ABONNEMENT, PAS LECTURE. L'état de l'IA change tout seul quand le quota
   // se libère : sans abonnement, le badge resterait figé sur « quota épuisé »
   // alors que le jeu est déjà reparti sur Groq.
   const etat = useSyncExternalStore(ecouterEtatIA, etatIA, etatIA);
-  const { overlayRef, dialogRef } = useModalDialog(onFermer);
+
+  const validerLesCles = () => {
+    const groq = groqLocal.trim();
+    const tenor = tenorLocal.trim();
+    if (groq !== groqKey) setGroqKey(groq);
+    if (tenor !== tenorKey) setTenorKey(tenor);
+  };
+  const fermer = () => { validerLesCles(); onFermer(); };
+
+  const { overlayRef, dialogRef } = useModalDialog(fermer);
   const [, rafraichir] = useState(0);
   const activite = activiteIA();
   const remettreAZero = () => { reinitialiserActiviteIA(); rafraichir((n) => n + 1); };
 
-  const enregistrer = () => {
-    setTenorKey(tenorLocal.trim());
-    setGroqKey(groqLocal.trim());
-    setLangue(langueLocale);
-    setTheme(themeLocal);
-    onFermer();
-  };
-
   return createPortal(
-    <div ref={overlayRef} className="overlay" onClick={onFermer}>
+    <div ref={overlayRef} className="overlay" onClick={fermer}>
       <motion.div
         ref={dialogRef}
         className="carte modale"
@@ -151,6 +162,7 @@ export function Reglages({ onFermer }: Props) {
             value={groqLocal}
             placeholder={t('reg.groqPlaceholder')}
             onChange={(e) => setGroqLocal(e.target.value)}
+            onBlur={validerLesCles}
           />
           <p className="aide">{t('reg.groqAide')}</p>
         </div>
@@ -165,6 +177,7 @@ export function Reglages({ onFermer }: Props) {
             value={tenorLocal}
             placeholder={t('reg.tenorPlaceholder')}
             onChange={(e) => setTenorLocal(e.target.value)}
+            onBlur={validerLesCles}
           />
           <p className="aide">{t('reg.tenorAide')}</p>
         </div>
@@ -180,9 +193,9 @@ export function Reglages({ onFermer }: Props) {
               <button
                 key={l.id}
                 type="button"
-                className={langueLocale === l.id ? 'actif' : ''}
-                onClick={() => setLangueLocale(l.id)}
-                aria-pressed={langueLocale === l.id}
+                className={langue === l.id ? 'actif' : ''}
+                onClick={() => setLangue(l.id)}
+                aria-pressed={langue === l.id}
                 lang={l.id}
               >
                 <span className={`fi fi-${l.drapeau}`} aria-hidden="true" />
@@ -203,9 +216,9 @@ export function Reglages({ onFermer }: Props) {
               <button
                 key={a.id}
                 type="button"
-                className={themeLocal === a.id ? 'actif' : ''}
-                onClick={() => setThemeLocal(a.id)}
-                aria-pressed={themeLocal === a.id}
+                className={theme === a.id ? 'actif' : ''}
+                onClick={() => setTheme(a.id)}
+                aria-pressed={theme === a.id}
                 title={t(a.cle)}
               >
                 <span className="pastille-theme" style={{ background: a.apercu }} />
@@ -250,12 +263,14 @@ export function Reglages({ onFermer }: Props) {
           🎮 {t('reg.sansCleAide')}
         </div>
 
+        {/* ⚠️ IL N'Y A PLUS DE BOUTON « ENREGISTRER », et ce n'est pas un oubli.
+            Il ne servait plus rien : la langue, l'ambiance, l'IA et les clés
+            s'appliquent au moment où on y touche. Le garder aurait été pire que
+            l'enlever — un bouton qui ne fait rien laisse croire qu'on peut
+            encore annuler. */}
         <div className="rangee-fin">
-          <button className="btn fantome" onClick={onFermer}>
+          <button className="btn primaire" onClick={fermer}>
             {t('reg.fermer')}
-          </button>
-          <button className="btn primaire" onClick={enregistrer}>
-            {t('reg.enregistrer')}
           </button>
         </div>
       </motion.div>

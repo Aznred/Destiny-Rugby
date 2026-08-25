@@ -2183,6 +2183,229 @@
 }
 
 
+
+/* ===========================================================================
+   ⚠️ LE PALIER « ÉCRAN LARGE » — il n'en existait AUCUN, et c'est tout le bug
+   ===========================================================================
+   Retour de jeu : « rends le desktop plus lisible ; 52 % de rebond sur mobile,
+   68 % sur PC ». Le chiffre le plus élevé était bien celui de l'ordinateur, et
+   la cause est structurelle : les 45 media queries du fichier étaient TOUTES en
+   `max-width`. Autrement dit, la mise en page de base ÉTAIT la version
+   compressée — celle écrite pour tenir sur un téléphone sans défilement (voir
+   « CARRIÈRE COMPACTE » juste au-dessus) — et un écran de 1 920 px héritait
+   exactement de la même densité qu'un écran de 375.
+
+   Mesuré avant correction sur l'écran de carrière, en 1440 × 900 :
+
+   | | mesuré |
+   |---|---|
+   | libellés de texte sous 13 px | **18 styles distincts** |
+   | le plus petit | **8,8 px** (« OVR »), puis 9,3 · 9,9 · 10,6 · 10,9 · 11,2 |
+   | colonnes latérales | 310 px et 292 px, quelle que soit la largeur d'écran |
+   | caractères par ligne dans le journal | **87** en 1440, **106** en 1920 |
+
+   Les deux défauts se répondent : les panneaux sont ILLISIBLES parce qu'ils
+   sont serrés, pendant que la colonne du milieu est FATIGANTE parce qu'elle
+   s'étale. La typographie de référence place le confort de lecture entre 45 et
+   75 caractères par ligne ; à 106, l'œil perd la ligne en revenant à la marge.
+
+   ⚠️ ET LA TAILLE DU TEXTE EST SÉPARÉE DE L'ESPACEMENT, c'est la clé de tout
+   le bloc. Première version : tout grossissait ensemble, et le contenu du
+   panneau de gauche passait de 833 à 1 056 px pour 812 px de hauteur — il
+   fallait DÉFILER pour atteindre « semaine suivante », c'est-à-dire le bouton
+   qui fait avancer le jeu. On aurait échangé un défaut de lisibilité contre un
+   défaut d'usage. La largeur commande donc la TYPOGRAPHIE, la hauteur commande
+   l'AÉRATION : un 1440 × 900 lit confortablement sans rien perdre de vue, un
+   1920 × 1200 respire en plus.
+
+   Ce bloc ne touche QUE l'apparence : aucune règle de jeu, aucun composant,
+   aucun texte.
+   =========================================================================== */
+
+/* ---- A. LA LARGEUR COMMANDE LA TYPOGRAPHIE ------------------------------- */
+@media (min-width: 1120px) {
+  /* Les colonnes latérales étaient figées à 310 et 292 px : la colonne du
+     milieu absorbait seule chaque pixel gagné, ce qui aggravait la longueur de
+     ligne au lieu de rendre les panneaux lisibles. */
+  .carriere { grid-template-columns: 334px minmax(0, 1fr) 306px; gap: 1.1rem; }
+
+  /* ⚠️ PLANCHER DE LISIBILITÉ : plus rien sous 0,76 rem (12,2 px) pour un
+     libellé qu'on doit LIRE. Ce n'est pas un goût : sous 12 px, une minuscule
+     accentuée (é, à, ç) perd son accent à l'antialiasing sur un écran non
+     HiDPI, et tout le jeu est en français. Seules les vignettes de 2 ou
+     3 caractères (OVR, un compteur) descendent en dessous : on les reconnaît,
+     on ne les lit pas. */
+  .panneau-joueur .nom { font-size: 1.15rem; }
+  .panneau-joueur .sous { font-size: 0.82rem; }
+  .panneau-joueur .pastille { font-size: 0.78rem; padding: 0.26rem 0.55rem; }
+
+  /* ⚠️ Il faut ici la spécificité de `.badge-generale em` et `span` (0,1,1) :
+     une règle en `.badge-potentiel` seule (0,1,0) perdait sans que rien ne le
+     montre — mesuré, elle restait à 9,28 px. Et le badge s'agrandit avec son
+     libellé, sinon « OVR » déborderait de la vignette dorée. */
+  .panneau-joueur .badge-generale { width: 62px; height: 64px; }
+  .panneau-joueur .badge-generale b { font-size: 1.8rem; }
+  .panneau-joueur .badge-generale span { font-size: 0.64rem; letter-spacing: 0.1em; }
+  .panneau-joueur .badge-generale em { font-size: 0.7rem; padding: 0.14rem 0.28rem; }
+
+  .pj-titre { font-size: 0.76rem; }
+  .pj-jauges .jauge .tete { font-size: 0.82rem; }
+  .pj-attrs .jauge .tete { font-size: 0.8rem; }
+
+  .panneau-joueur .entr-tete { font-size: 0.88rem; }
+  .panneau-joueur .entr-tete span { font-size: 0.79rem; }
+  .panneau-joueur .entr-boutons button { font-size: 0.78rem; }
+
+  .panneau-joueur .cal-date b { font-size: 0.96rem; }
+  .panneau-joueur .cal-date span { font-size: 0.78rem; }
+  .panneau-joueur .cal-libelle { font-size: 0.86rem; }
+  .panneau-joueur .cal-bilan { font-size: 0.79rem; }
+  /* `.cal-lien` est déclarée PLUS BAS dans le fichier : sans le préfixe, elle
+     repasse devant à la cascade. */
+  .panneau-joueur .cal-lien { font-size: 0.78rem; }
+  .panneau-joueur .btn.match-semaine span { font-size: 0.79rem; }
+  .panneau-joueur .badge-offres { font-size: 0.78rem; }
+
+  .pj-avancer .btn { font-size: 0.94rem; }
+  .pj-avancer .btn.fantome { font-size: 0.82rem; }
+  .pj-actions button { font-size: 1.05rem; }
+  .pj-actions button span { font-size: 0.76rem; }
+  .pj-reconversion label { font-size: 0.8rem; }
+  .pj-reconversion select { font-size: 0.86rem; }
+
+  /* Le classement latéral : même traitement, mêmes raisons. */
+  .cl-lat-nom, .cl-lat-pts { font-size: 0.86rem; }
+  .cl-lat-pos, .cl-lat-j, .cl-lat-note { font-size: 0.78rem; }
+
+  /* ---- LA LONGUEUR DE LIGNE ----------------------------------------------
+     ⚠️ ON BORNE EN `ch`, PAS EN PIXELS. Une largeur en pixels redevient fausse
+     dès que le lecteur grossit la police de son navigateur — or c'est
+     exactement ce que fait quelqu'un qui trouve un site illisible. `ch` suit la
+     taille du texte, la ligne garde donc le même nombre de caractères.
+     ⚠️ Et `1ch` est la largeur du ZÉRO, pas d'une lettre moyenne : avec Inter,
+     `60ch` tient environ 70 caractères courants. Mesuré, pas déduit. */
+  .carriere .msg { max-width: min(92%, 58ch); }
+  .carriere .msg.systeme { max-width: min(100%, 60ch); }
+  .msg .bulle { font-size: 1rem; line-height: 1.62; }
+
+  /* ⚠️ LE JOURNAL EST FAIT DE MESSAGES « SYSTÈME », ET ILS ÉTAIENT CENTRÉS.
+     C'est juste pour une note d'une ligne (« Tu es libre de tout contrat »),
+     et mauvais pour un bilan de saison de six : un paragraphe centré n'a pas
+     de marge gauche stable, donc l'œil cherche le début de chaque ligne. La
+     bulle reste centrée dans la colonne — elle épouse son contenu, une note
+     courte ne se voit donc pas déplacée — mais son TEXTE s'aligne à gauche. */
+  .carriere .msg.systeme .bulle { text-align: left; }
+
+  /* ---- LES CIBLES SE VOIENT ----------------------------------------------
+     ⚠️ LE CLASSEMENT LATÉRAL EST CLIQUABLE EN ENTIER — il ouvre l'écran
+     Résultats — et RIEN ne le disait. Le curseur en main était bien là, mais
+     hérité de la carte : au survol d'une ligne, aucun changement, donc aucune
+     raison de tenter le clic. Sur un écran tactile, la question ne se pose
+     pas ; à la souris, c'est la moitié de l'information. */
+  .panneau-joueur .entr-boutons button:hover:not(:disabled) {
+    border-color: var(--bordure-forte);
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .classement-lateral { transition: border-color 0.16s ease, box-shadow 0.16s ease; }
+  .classement-lateral:hover {
+    border-color: var(--or-clair);
+    box-shadow: var(--ombre), 0 0 0 1px rgba(232, 178, 58, 0.25);
+  }
+  .pj-actions button:hover:not(:disabled) { transform: translateY(-1px); }
+
+  /* ⚠️ LA BARRE D'ACTIONS RESTE COLLÉE EN BAS DU PANNEAU, et c'est le vrai gain
+     d'usage de ce lot. Mesuré AVANT toute modification : le panneau tenait
+     833 px de contenu dans 812 px de haut — la barre 👥 Équipe · ✈️ Marché ·
+     📊 Résultats · 𝕏 L'Ovale · 🏛️ Retraite était donc DÉJÀ coupée, et il
+     fallait défiler une fiche de joueur entière pour atteindre le marché des
+     transferts. Rendue collante, elle ne dépend plus de la taille du contenu
+     au-dessus : quel que soit l'écran, les six destinations sont à un clic.
+     Le fond opaque est indispensable — sans lui, les jauges défilent au travers. */
+  /* ⚠️ Le rembourrage BAS du panneau passe sur la barre elle-même : laissé sur
+     le conteneur, il crée une bande sous la barre collée dans laquelle le
+     contenu défilant réapparaît. */
+  .panneau-joueur { padding-bottom: 0; }
+  .panneau-joueur .pj-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-inline: -0.4rem;
+    padding: 0.55rem 0.4rem 0.9rem;
+    background: linear-gradient(180deg, rgba(12, 36, 24, 0) 0%, var(--pelouse-800) 30%);
+  }
+}
+
+/* ---- B. LA HAUTEUR COMMANDE L'AÉRATION -----------------------------------
+   ⚠️ 940 px de haut, et pas moins : c'est la hauteur à partir de laquelle le
+   panneau de gauche tient ENTIER une fois aéré. En dessous, la densité
+   compacte est la bonne réponse — ce qui manque alors, c'est la hauteur, pas
+   la largeur, et un panneau qui défile cache le bouton qui fait avancer le
+   jeu. Un portable 1440 × 720 garde donc la version serrée, avec le texte
+   lisible du bloc A. */
+@media (min-width: 1120px) and (min-height: 940px) {
+  .panneau-joueur { padding: 1.05rem 1.1rem; }
+  .panneau-joueur .ph { gap: 0.75rem; padding-bottom: 0.75rem; margin-bottom: 0.75rem; }
+  .panneau-joueur .avatar { width: 52px; height: 52px; font-size: 1.5rem; }
+  .panneau-joueur .ressources { gap: 0.42rem; margin: 0 0 0.6rem; }
+  .pj-titre { margin: 0.6rem 0 0.4rem; }
+  .pj-jauges { gap: 0.15rem 0.9rem; }
+  .pj-jauges .jauge { margin-bottom: 0.5rem; }
+  .pj-jauges .jauge .piste { height: 8px; }
+  .pj-attrs { gap: 0.22rem 0.9rem; }
+  .pj-attrs .jauge { margin-bottom: 0.36rem; }
+  .pj-attrs .jauge .piste { height: 7px; }
+  .pj-stats { margin: 0.65rem 0 0.7rem; }
+  .panneau-joueur .entrainement { padding: 0.7rem 0.75rem; }
+  .panneau-joueur .entr-boutons { gap: 0.32rem; margin-top: 0.5rem; }
+  .panneau-joueur .entr-boutons button { padding: 0.42rem 0.2rem; }
+  .panneau-joueur .calendrier-semaine { padding: 0.7rem 0.75rem; margin-top: 0.65rem; }
+  .pj-avancer { gap: 0.5rem; margin-top: 0.65rem; }
+  .pj-avancer .btn { padding: 0.64rem 0.8rem; }
+  .pj-actions { gap: 0.38rem; margin-top: 0.65rem; }
+  .pj-actions button { gap: 0.16rem; padding: 0.5rem 0.25rem; }
+  .carriere .journal { padding: 1.15rem 1.3rem; gap: 0.9rem; }
+  .carriere .saisie { padding: 0.9rem 1.1rem; }
+  .msg .bulle { padding: 0.95rem 1.15rem; }
+  .cl-lat-ligne { padding-block: 0.32rem; }
+}
+
+/* ---- C bis. LE « FAUX FOND » DE L'ACCUEIL ---------------------------------
+   ⚠️ Mesuré en 1440 × 900 : le hero fait 828 px, et la section suivante
+   commence à y = 900 — EXACTEMENT le pli. Un visiteur voit donc une page qui
+   se termine proprement, sans le moindre indice qu'elle continue : c'est le
+   « faux fond », l'un des schémas qui font le plus rebondir sur ordinateur.
+   On raccourcit le hero juste assez pour que le titre de la section suivante
+   dépasse d'une soixantaine de pixels. Rien n'est retiré, rien n'est ajouté :
+   on montre qu'il y a une suite. */
+@media (min-width: 900px) {
+  .hero { min-height: min(92vh, calc(100dvh - 152px)); }
+}
+
+/* ---- C. LES PARAGRAPHES D'EXPLICATION NE S'ÉTALENT PLUS -------------------
+   ⚠️ Ils n'ont AUCUNE largeur propre : ils prennent celle de leur carte, qui
+   prend celle de l'écran. Mesuré en 1920 : la boutique servait un paragraphe de
+   1 100 px à 13,6 px, soit **148 caractères par ligne** — le double du confort
+   de lecture. Le classement en affichait 103. Ces textes existent pour être
+   lus : on les borne, comme le fil de carrière, et en `ch` pour la même raison
+   (une borne en pixels casse dès que le lecteur grossit sa police). */
+@media (min-width: 900px) {
+  .boutique > p,
+  .classement .aide,
+  .tableau-classement .aide,
+  .pantheon > p,
+  .atlas > p {
+    max-width: 64ch;
+  }
+}
+
+/* Au-delà de 1500 px de large, un cran de plus pour les panneaux — pas pour le
+   texte du milieu, que la borne en `ch` tient déjà. */
+@media (min-width: 1500px) {
+  .carriere { grid-template-columns: 358px minmax(0, 1fr) 328px; }
+  .pj-attrs .jauge .tete, .pj-jauges .jauge .tete { font-size: 0.84rem; }
+  .msg .bulle { font-size: 1.03rem; }
+}
+
 /* ===========================================================================
    RÉSULTATS EN DIRECT — sélecteur de compétition, poules de coupe et ARBRE
    des phases finales.

@@ -5166,7 +5166,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 16,
+      version: 17,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -5211,6 +5211,7 @@ export const useGame = create<GameState>()(
           pubs?: EtatPubs;
           modele?: string;
           groqKey?: string;
+          langue?: Langue;
           langueManuelle?: boolean;
           rythme?: unknown;
           manager?: Manager | null;
@@ -5378,6 +5379,28 @@ export const useGame = create<GameState>()(
         // touché : elles basculent sur la nouvelle détection. Tout choix fait
         // ensuite dans ⚙️ est marqué et ne sera plus jamais écrasé.
         s.langueManuelle ??= false;
+        // ⚠️ VERSION 17 — ON DÉCOINCE LES SAUVEGARDES QUE ⚙️ AVAIT MARQUÉES À TORT.
+        //
+        // L'ancien panneau de réglages travaillait sur un brouillon et publiait
+        // TOUT au clic sur « Enregistrer », y compris `setLangue(langueLocale)`
+        // — même quand la personne n'avait pas touché à la langue. Or `setLangue`
+        // lève `langueManuelle`. Il suffisait donc d'ouvrir ⚙️ une seule fois
+        // pour coller sa clé Groq ou changer d'ambiance, et la détection par le
+        // pays de l'IP était éteinte DÉFINITIVEMENT : quelqu'un arrivant
+        // d'Angleterre gardait le français, et rien ne l'expliquait.
+        //
+        // ⚠️ ON NE REMET PAS TOUT LE MONDE À ZÉRO, et c'est le point délicat :
+        // on ne peut pas distinguer après coup un vrai choix d'un marquage
+        // parasite. Mais le marquage parasite réécrivait la langue DÉJÀ en
+        // place, c'est-à-dire celle du navigateur. On ne rouvre donc la
+        // détection que dans ce cas précis ; une langue différente de celle du
+        // navigateur ne peut venir que d'un clic délibéré, et elle est
+        // conservée. Reste un cas non couvert, assumé : celui qui a choisi
+        // exprès la langue de son navigateur verra la détection repasser une
+        // fois — son prochain clic dans ⚙️ tiendra pour de bon.
+        if (s.langueManuelle && s.langue === langueDuNavigateur()) {
+          s.langueManuelle = false;
+        }
         // VERSION 12 — le manager gagne son bureau hebdomadaire et ses
         // enveloppes de recrutement. Une ancienne carrière reprend avec les
         // moyens normaux de son club et une première décision à trancher.

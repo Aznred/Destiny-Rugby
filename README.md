@@ -411,6 +411,13 @@ s'affiche dans ⚙️ ; il n'est associé à aucun coût ni quota.
   de repli hors ligne. Un choix fait dans les réglages reste toujours prioritaire.
   Et ce n'est pas qu'un habillage : le Maître du Jeu, les situations, les tweets
   et les messages privés sont ÉCRITS dans ta langue, pas traduits après coup.
+- **Les réglages s'appliquent au clic, il n'y a plus rien à enregistrer.** Un clic
+  sur « English » repeint le jeu tout de suite ; l'ambiance aussi. ⚠️ Et c'est ce
+  qui a réparé la détection par IP : l'ancien bouton « Enregistrer » republiait la
+  langue même quand personne n'y avait touché, ce qui la marquait comme « choisie
+  à la main » — et éteignait la détection automatique **définitivement**, dès la
+  première visite dans ⚙️. Les sauvegardes marquées à tort sont décoincées au
+  chargement, sans écraser les vrais choix.
 - **Trois ambiances** — Pelouse, Nuit, Grenat. La couleur du stade change, les
   dorures et le cuir restent.
 - **Jouable au pouce** : cinq destinations stables vivent dans une barre basse,
@@ -423,6 +430,17 @@ s'affiche dans ⚙️ ; il n'est associé à aucun coût ni quota.
 - **L'accueil retient mieux** : le titre, l'explication et « Commencer » passent
   avant la scène 3D sur téléphone. Les encoches iPhone, la réduction des
   animations, le focus clavier et les lecteurs d'écran sont pris en compte.
+- **Et l'ordinateur a enfin son propre palier.** Toutes les adaptations d'écran
+  du projet étaient des `max-width` : la mise en page de base était celle du
+  téléphone, si bien qu'un moniteur de 1 920 px héritait de la même densité. Sur
+  l'écran de carrière, huit styles de texte portant un mot tombaient **sous
+  12 px** (« ATTRIBUTS » à 9,9 · « Vitesse » à 10,6 · « OVR » à 8,8) pendant que
+  le fil du journal s'étirait à **106 caractères par ligne**. Désormais : plus
+  aucun mot sous 12 px, **67 à 69 caractères par ligne**, des colonnes latérales
+  qui grandissent avec l'écran, et la barre 👥 Équipe · ✈️ Marché · 📊 Résultats ·
+  𝕏 L'Ovale **collée en bas du panneau** au lieu d'être coupée. La largeur
+  commande la taille du texte, la hauteur commande l'aération : un portable bas
+  garde sa densité serrée, avec le texte lisible.
 
 ## 🏆 Le classement mondial, et pourquoi on ne peut pas le truquer
 
