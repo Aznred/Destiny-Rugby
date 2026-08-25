@@ -12,6 +12,130 @@
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--bordure);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BUREAU DU MANAGER — récit, marché mondial et négociations
+   ═══════════════════════════════════════════════════════════════════════ */
+.carriere-manager { max-width: 1500px; margin: 0 auto; padding: 1.2rem; }
+.manager-entete { display:flex; justify-content:space-between; gap:1rem; align-items:center; margin-bottom:1rem; }
+.manager-entete h1 { margin:.15rem 0 0; }
+.manager-identite-club { display:flex; gap:.7rem; align-items:center; padding:.55rem .8rem; border:1px solid var(--bordure); border-radius:14px; background:rgba(4,18,12,.72); }
+.manager-identite-club span { display:flex; flex-direction:column; }
+.manager-identite-club small { color:var(--craie-dim); }
+.manager-onglets { display:flex; gap:.4rem; padding:.35rem; margin-bottom:1rem; overflow-x:auto; border:1px solid var(--bordure); border-radius:14px; background:rgba(4,18,12,.72); }
+.manager-onglets button { min-height:44px; padding:.65rem 1rem; border:0; border-radius:10px; color:var(--craie-dim); background:transparent; white-space:nowrap; }
+.manager-onglets button.actif { color:var(--craie); background:rgba(224,176,72,.16); box-shadow:inset 0 0 0 1px rgba(224,176,72,.38); }
+.manager-onglets i { display:inline-grid; place-items:center; min-width:21px; min-height:21px; margin-left:.35rem; border-radius:99px; color:#06150e; background:var(--or); font-style:normal; font-size:.75rem; }
+.manager-bureau { display:grid; grid-template-columns:minmax(245px, .78fr) minmax(390px, 1.45fr) minmax(250px, .82fr); gap:1rem; align-items:start; }
+.manager-club-panel,.manager-decision,.manager-semaine-prete,.manager-journal,.manager-classement,.manager-marche-tete,.manager-filtres,.manager-cible,.manager-dossier,.manager-vide,.manager-sans-banc { padding:1.1rem; }
+.manager-club-panel { position:sticky; top:84px; display:grid; gap:.85rem; }
+.cm-chiffres.compacts { grid-template-columns:repeat(2,1fr); margin:.1rem 0; }
+.manager-budgets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; }
+.manager-budgets span { display:flex; flex-direction:column; gap:.15rem; padding:.65rem; border:1px solid rgba(224,176,72,.2); border-radius:10px; background:rgba(224,176,72,.06); }
+.manager-budgets small { color:var(--craie-dim); }
+.manager-budgets b { color:var(--or); font-size:.92rem; }
+.actions.verticales { display:grid; }
+.actions.verticales .btn { width:100%; justify-content:flex-start; }
+.manager-recit { display:grid; gap:1rem; }
+.manager-decision { position:relative; overflow:hidden; min-height:350px; padding:1.5rem; background:linear-gradient(145deg,rgba(13,49,31,.95),rgba(6,24,16,.98)); }
+.manager-decision::after { content:''; position:absolute; inset:auto -80px -120px auto; width:260px; height:260px; border:55px solid rgba(224,176,72,.035); border-radius:50%; pointer-events:none; }
+.manager-decision-emoji { font-size:2.5rem; margin-bottom:.65rem; }
+.manager-decision h2 { margin:.35rem 0 .65rem; font-size:clamp(1.45rem,3vw,2rem); }
+.manager-decision > p { max-width:64ch; color:var(--craie-dim); line-height:1.65; }
+.manager-choix { display:grid; gap:.65rem; margin-top:1.2rem; }
+.manager-choix button { display:flex; flex-direction:column; align-items:flex-start; gap:.18rem; min-height:62px; padding:.8rem .9rem; text-align:left; border:1px solid rgba(255,255,255,.11); border-radius:11px; color:var(--craie); background:rgba(255,255,255,.035); }
+.manager-choix button:hover,.manager-choix button:focus-visible { border-color:var(--or); background:rgba(224,176,72,.1); transform:translateY(-1px); }
+.manager-choix span { color:var(--craie-dim); font-size:.82rem; }
+.manager-semaine-prete { display:grid; justify-items:center; text-align:center; padding:2.4rem 1.2rem; }
+.manager-semaine-prete > span { display:grid; place-items:center; width:54px; height:54px; border-radius:50%; color:#07150e; background:var(--or); font-size:1.5rem; font-weight:900; }
+.manager-semaine-prete p { color:var(--craie-dim); }
+.manager-journal .journal { max-height:420px; overflow:auto; }
+.manager-classement { position:sticky; top:84px; }
+.manager-classement .comp-tete button { border:0; color:var(--or); background:transparent; }
+.manager-top-classement { display:grid; gap:.25rem; margin-top:.7rem; }
+.manager-top-classement > div { display:grid; grid-template-columns:24px 1fr auto; gap:.45rem; align-items:center; padding:.55rem .45rem; border-radius:8px; font-size:.82rem; }
+.manager-top-classement > div.moi { color:var(--or); background:rgba(224,176,72,.12); }
+.manager-top-classement > div > span { color:var(--craie-dim); text-align:center; }
+.manager-top-classement > div > b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.manager-top-classement > div > strong { color:var(--craie-dim); }
+.manager-prochain { margin:.9rem 0 0; padding-top:.75rem; border-top:1px solid var(--bordure); color:var(--craie-dim); font-size:.8rem; }
+.manager-marche,.manager-negociations { display:grid; gap:1rem; }
+.manager-marche-tete { display:flex; justify-content:space-between; gap:1rem; align-items:center; }
+.manager-marche-tete h2 { margin:.25rem 0; }
+.manager-marche-tete p { margin:.2rem 0 0; color:var(--craie-dim); }
+.manager-budgets.resume { min-width:min(360px,100%); }
+.manager-filtres { display:grid; grid-template-columns:1.3fr 1.2fr .9fr 1fr; gap:.65rem; }
+.manager-filtres > input { width:100%; min-height:46px; border:1px solid var(--bordure); border-radius:10px; padding:0 .8rem; color:var(--craie); background:rgba(0,0,0,.24); }
+.manager-resultats-marche { margin:0; color:var(--craie-dim); font-size:.85rem; }
+.manager-cibles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; }
+.manager-cible { display:grid; grid-template-columns:56px 1fr auto; gap:.85rem; align-items:center; }
+.manager-cible-note { display:grid; place-items:center; align-content:center; width:54px; height:54px; border-radius:12px; color:#07150e; background:linear-gradient(145deg,#f0c96a,#b78628); font-size:1.25rem; font-weight:900; }
+.manager-cible-note small { font-size:.55rem; text-transform:uppercase; }
+.manager-cible-corps { min-width:0; }
+.manager-cible-identite { display:flex; gap:.45rem; align-items:center; }
+.manager-cible-identite span { display:flex; flex-direction:column; min-width:0; }
+.manager-cible-identite b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.manager-cible-identite small,.manager-cible-corps > p { color:var(--craie-dim); font-size:.78rem; }
+.manager-cible-corps > p { display:flex; gap:.35rem; align-items:center; margin:.4rem 0; }
+.manager-cible-chiffres { display:flex; flex-wrap:wrap; gap:.35rem .75rem; font-size:.72rem; color:var(--craie-dim); }
+.manager-cible-chiffres b { color:var(--craie); }
+.manager-dossiers { display:grid; gap:.7rem; }
+.manager-dossier { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:1rem; }
+.manager-dossier > div { display:flex; flex-direction:column; }
+.manager-dossier span { color:var(--craie-dim); font-size:.82rem; }
+.manager-dossier > strong { color:var(--or); }
+.manager-dossier[data-etat="rompue"] { opacity:.62; }
+.manager-dossier[data-etat="signee"] { border-color:rgba(64,190,121,.45); }
+.manager-vide { grid-column:1/-1; text-align:center; color:var(--craie-dim); }
+.manager-historique,.manager-raccrocher { margin-top:1rem; }
+.manager-sans-banc { max-width:780px; margin:0 auto; }
+.x-manager .x-centre { max-width:1100px; }
+.x-manager .x-messagerie { min-height:calc(100vh - 110px); }
+.manager-x-tete { justify-content:space-between; }
+.manager-x-termes { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.45rem; margin:.75rem 0; }
+.manager-x-termes span { display:flex; flex-direction:column; padding:.55rem; border:1px solid #263340; border-radius:9px; background:#111820; }
+.manager-x-termes small { color:#8b98a5; }
+.manager-x-signature { display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; }
+.manager-x-signature p { flex:1 1 100%; margin:.2rem 0; font-size:.84rem; }
+.manager-x-signature .budget-ok { color:#39d98a; }
+.manager-x-signature .budget-non { color:#ff7b72; }
+.manager-x-vide { display:grid; justify-items:center; gap:.6rem; padding:4rem 1rem; }
+.x-nego-manager[data-etat="signee"] { border-top-color:#00ba7c; }
+
+@media (max-width: 1120px) {
+  .manager-bureau { grid-template-columns:minmax(235px,.7fr) minmax(390px,1.3fr); }
+  .manager-classement { position:static; grid-column:1/-1; }
+  .manager-filtres { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 760px) {
+  .carriere-manager { padding:.75rem .65rem calc(6.4rem + env(safe-area-inset-bottom)); }
+  .manager-entete { align-items:flex-start; }
+  .manager-identite-club { padding:.35rem; }
+  .manager-identite-club span { display:none; }
+  .manager-onglets { position:sticky; top:58px; z-index:12; margin-inline:-.25rem; scrollbar-width:none; }
+  .manager-onglets button { flex:1; min-width:max-content; }
+  .manager-bureau { display:flex; flex-direction:column; }
+  .manager-club-panel,.manager-classement { position:static; width:100%; }
+  .manager-club-panel { order:2; }
+  .manager-recit { order:1; width:100%; }
+  .manager-classement { order:3; }
+  .manager-decision { min-height:0; padding:1.05rem; }
+  .manager-choix button { min-height:72px; }
+  .manager-marche-tete { align-items:stretch; flex-direction:column; }
+  .manager-filtres { grid-template-columns:1fr; position:relative; }
+  .manager-cibles { grid-template-columns:1fr; }
+  .manager-cible { grid-template-columns:50px 1fr; }
+  .manager-cible > .btn { grid-column:1/-1; min-height:48px; width:100%; }
+  .manager-dossier { grid-template-columns:1fr auto; }
+  .manager-dossier .btn { grid-column:1/-1; min-height:46px; }
+  .manager-budgets.resume { min-width:0; }
+  .histo-manager .classement-ligne { min-width:650px; }
+  .x-manager .x-messagerie { display:block; }
+  .x-manager .x-conversations { display:flex; max-width:none; overflow-x:auto; border-right:0; border-bottom:1px solid #2f3336; }
+  .x-manager .x-conv { min-width:210px; }
+  .manager-x-termes { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
 .nav .marque {
   display: flex;
   align-items: center;

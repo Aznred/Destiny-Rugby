@@ -6,6 +6,7 @@ import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
 import { Drapeau } from '../components/Drapeau';
 import { nomNationTraduit } from '../lib/nations';
+import { nombre, t } from '../lib/i18n';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { LIMITES } from '../lib/classementMondial';
@@ -69,8 +70,10 @@ export function CreationManager() {
     () => accessibles.slice(0, CLUBS_AFFICHES).map((c) => ({
       valeur: c.club.nom,
       label: c.club.nom,
-      sous: `${c.competition.nom} · force ${c.force.toFixed(1)}`
-        + (c.ambitieux ? ' · ambitieux' : ''),
+      sous: t('mgr.creation.clubSous', {
+        competition: c.competition.nom, force: c.force.toFixed(1),
+        ambition: c.ambitieux ? ` · ${t('mgr.creation.ambitieux')}` : '',
+      }),
       vignette: <Blason club={c.club} taille={22} />,
     })),
     [accessibles],
@@ -95,20 +98,18 @@ export function CreationManager() {
       transition={{ duration: 0.3 }}
     >
       <button className="btn fantome" onClick={() => setEcran('accueil')} style={{ marginBottom: '1rem' }}>
-        ← Retour
+        ← {t('mgr.creation.retour')}
       </button>
 
-      <div className="eyebrow">Carrière d’entraîneur</div>
-      <h1>{depuis ? 'Raccrocher les crampons, prendre le banc' : 'Prendre un premier banc'}</h1>
+      <div className="eyebrow">{t('mgr.carriere')}</div>
+      <h1>{depuis ? t('mgr.creation.reconversionTitre') : t('mgr.creation.premierBanc')}</h1>
 
       {depuis && (
         <div className="carte reconversion" style={{ padding: '1.1rem', marginBottom: '1rem' }}>
-          <strong>{depuis.nom}</strong> raccroche après {depuis.saisons} saison(s),
-          {' '}{depuis.titres.length} titre(s), une générale de {Math.round(depuis.note)}.
-          <br />
-          Son statut lui ouvre un prestige de départ de <strong>{prestige}/100</strong>{' '}
-          au lieu de {PRESTIGE_DEBUT} — mais un grand joueur n’est pas un grand
-          entraîneur : c’est sur le banc que tout se rejoue.
+          {t('mgr.creation.reconversionTexte', {
+            nom: depuis.nom, saisons: depuis.saisons, titres: depuis.titres.length,
+            note: Math.round(depuis.note), prestige, debut: PRESTIGE_DEBUT,
+          })}
         </div>
       )}
 
@@ -119,48 +120,42 @@ export function CreationManager() {
             l'on décide de ne plus l'être : c'est pour ça que `signerBanc` refuse
             un club hors de portée. */}
         <div className="champ">
-          <label>Mode de carrière</label>
+          <label>{t('mgr.creation.mode')}</label>
           <div className="modes-manager">
             <button
               type="button"
               className={`mode-manager ${!libre ? 'actif' : ''}`}
               onClick={() => setLibre(false)}
             >
-              <span className="mode-titre">🎖️ Carrière</span>
-              <span className="mode-desc">
-                On commence en bas et on se fait un nom. Chaque saison tenue
-                ouvre de plus gros clubs. <strong>Compte au classement mondial.</strong>
-              </span>
+              <span className="mode-titre">🎖️ {t('mgr.creation.modeCarriere')}</span>
+              <span className="mode-desc">{t('mgr.creation.modeCarriereTexte')}</span>
             </button>
             <button
               type="button"
               className={`mode-manager ${libre ? 'actif' : ''}`}
               onClick={() => setLibre(true)}
             >
-              <span className="mode-titre">🔓 Mode libre</span>
-              <span className="mode-desc">
-                N’importe quel club du monde, tout de suite, Stade Toulousain
-                compris. <strong>N’entre dans aucun classement</strong>, jamais.
-              </span>
+              <span className="mode-titre">🔓 {t('mgr.creation.modeLibre')}</span>
+              <span className="mode-desc">{t('mgr.creation.modeLibreTexte')}</span>
             </button>
           </div>
         </div>
 
         <div className="grille-2">
           <div className="champ">
-            <label htmlFor="mnom">Nom</label>
+            <label htmlFor="mnom">{t('mgr.creation.nom')}</label>
             <input
               id="mnom"
               type="text"
               value={nom}
               maxLength={LIMITES.pseudoMax}
-              placeholder="Ton nom d’entraîneur"
+              placeholder={t('mgr.creation.nomPlaceholder')}
               onChange={(e) => setNom(e.target.value)}
             />
-            <span className="champ-aide">Laissé vide, un nom de ta nation est tiré.</span>
+            <span className="champ-aide">{t('mgr.creation.nomAide')}</span>
           </div>
           <div className="champ">
-            <label htmlFor="mage">Âge</label>
+            <label htmlFor="mage">{t('mgr.creation.age')}</label>
             {/* Même dispositif que la création de joueur : sur téléphone un
                 champ numérique n'affiche aucune flèche, et borner à chaque
                 frappe rend le champ impossible à remplir. */}
@@ -169,7 +164,7 @@ export function CreationManager() {
                 type="button"
                 onClick={() => setAgeSaisi(String(bornerAge(age - 1)))}
                 disabled={age <= AGE_MIN}
-                aria-label="Un an de moins"
+                aria-label={t('mgr.creation.moinsUn')}
               >
                 −
               </button>
@@ -187,19 +182,19 @@ export function CreationManager() {
                 type="button"
                 onClick={() => setAgeSaisi(String(bornerAge(age + 1)))}
                 disabled={age >= AGE_MAX}
-                aria-label="Un an de plus"
+                aria-label={t('mgr.creation.plusUn')}
               >
                 +
               </button>
             </div>
             <span className="champ-aide" id="mage-bornes">
-              De {AGE_MIN} à {AGE_MAX} ans.
+              {t('mgr.creation.ageBornes', { min: AGE_MIN, max: AGE_MAX })}
             </span>
           </div>
         </div>
 
         <div className="champ">
-          <label htmlFor="mnation">Nationalité</label>
+          <label htmlFor="mnation">{t('mgr.creation.nationalite')}</label>
           <Selecteur
             id="mnation"
             options={optionsNations}
@@ -210,7 +205,9 @@ export function CreationManager() {
 
         <div className="champ">
           <label htmlFor="mclub">
-            Club {libre ? '(tous les clubs du monde)' : `(${accessibles.length} à ta portée)`}
+            {t('mgr.creation.club')} {libre
+              ? t('mgr.creation.tousClubs')
+              : t('mgr.creation.clubsPortee', { n: accessibles.length })}
           </label>
           <Selecteur
             id="mclub"
@@ -221,13 +218,13 @@ export function CreationManager() {
           />
           <span className="champ-aide">
             {libre
-              ? 'Tout est ouvert — et rien ne sera classé.'
-              : `Prestige ${prestige}/100 : tu peux entraîner jusqu’à un effectif noté `
-                + `${(noteMaximale(prestige) + MARGE_AMBITION).toFixed(0)}, soit le niveau `
-                + `${etage?.nom ?? 'amateur'}. Les clubs « ambitieux » sont ceux que tu `
-                + 'n’étais pas censé décrocher.'}
+              ? t('mgr.creation.libreAide')
+              : t('mgr.creation.clubAide', {
+                prestige, note: (noteMaximale(prestige) + MARGE_AMBITION).toFixed(0),
+                niveau: etage?.nom ?? t('mgr.amateur'),
+              })}
             {optionsClubs.length < accessibles.length
-              && ` Seuls les ${CLUBS_AFFICHES} plus forts sont listés : utilise la recherche pour les autres.`}
+              && ` ${t('mgr.creation.limiteClubs', { n: CLUBS_AFFICHES })}`}
           </span>
         </div>
 
@@ -244,18 +241,17 @@ export function CreationManager() {
               </div>
             </div>
             <div className="cm-chiffres">
-              <div><span>{choisi.force.toFixed(1)}</span><em>force de l’effectif</em></div>
-              <div><span>{choisi.objectif}ᵉ</span><em>demandé par le board</em></div>
+              <div><span>{choisi.force.toFixed(1)}</span><em>{t('mgr.force')}</em></div>
+              <div><span>{choisi.objectif}ᵉ</span><em>{t('mgr.objectif')}</em></div>
               <div>
-                <span>{salaireManager(choisi.force).toLocaleString('fr-FR')} €</span>
-                <em>par saison</em>
+                <span>{nombre(salaireManager(choisi.force))} €</span>
+                <em>{t('mgr.creation.parSaison')}</em>
               </div>
-              <div><span>3 ans</span><em>de contrat</em></div>
+              <div><span>{t('mgr.creation.troisAns')}</span><em>{t('mgr.contrat')}</em></div>
             </div>
             {choisi.ambitieux && (
               <p className="cm-note">
-                ⚠️ Ce club est au-dessus de ton prestige. Le board t’a fait
-                confiance : il sera d’autant plus dur à convaincre.
+                ⚠️ {t('mgr.creation.clubAmbitieuxAide')}
               </p>
             )}
           </div>
@@ -263,7 +259,7 @@ export function CreationManager() {
 
         <div className="actions">
           <button className="btn primaire grand" onClick={valider} disabled={!choisi}>
-            {libre ? '🔓 Prendre ce banc (hors classement)' : '🎖️ Signer'}
+            {libre ? `🔓 ${t('mgr.creation.prendreLibre')}` : `🎖️ ${t('mgr.signer')}`}
           </button>
         </div>
       </div>

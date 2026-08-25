@@ -317,6 +317,7 @@ function Tableau1({ lignes, club, tete = 6 }: { lignes: LigneTableau[]; club: st
 
 export function Tableau() {
   const joueur = useGame((s) => s.joueur);
+  const manager = useGame((s) => s.manager);
   const setEcran = useGame((s) => s.setEcran);
   const [journeeVue, setJourneeVue] = useState<number | null>(null);
 
@@ -330,18 +331,19 @@ export function Tableau() {
   const [bilanAvance, setBilanAvance] = useState<string | null>(null);
   // Une question du MJ en plan bloque l'avance, exactement comme elle bloque
   // « semaine suivante » : on ne saute pas par-dessus une scène sans réponse.
+  const carriere = joueur ?? manager;
   const peutAvancer = !!joueur && !evenementHebdo && !scenarioActif;
 
-  const numero = joueur?.semaine ?? 1;
+  const numero = carriere?.semaine ?? 1;
   const semActuelle = semaine(numero);
-  const maDivision = joueur?.division ?? '';
-  const mesCoupes = useMemo(() => (joueur ? coupesDuClub(joueur.club, joueur.saison) : []), [joueur]);
+  const maDivision = carriere?.division ?? '';
+  const mesCoupes = useMemo(() => (carriere?.club ? coupesDuClub(carriere.club, carriere.saison) : []), [carriere]);
 
   // ⚠️ LES SÉLECTIONS SONT DES COMPÉTITIONS COMME LES AUTRES. Pendant une
   // fenêtre internationale, on n'y voyait ni affiche ni classement : le Tournoi
   // n'était qu'un tableau figé recopié de la vraie saison. Il se joue
   // maintenant pour de vrai (lib/international.ts).
-  const saison = joueur?.saison ?? 1;
+  const saison = carriere?.saison ?? 1;
   const internationales = useMemo(() => competitionsDeLaSaison(saison), [saison]);
   const rangMondial = useMemo(() => classementMondial(saison, numero), [saison, numero]);
   /**
@@ -384,7 +386,7 @@ export function Tableau() {
     return sa;
   }, [saison]);
   const mondialAVenir = useMemo(() => mondialEnDirect(saisonMondial, 0), [saisonMondial]);
-  const maNation = nomNation(joueur?.nation ?? '');
+  const maNation = nomNation(carriere?.nation ?? '');
   const maLigneMondiale = useMemo(
     () => rangMondial.find((ligne) => ligne.nation === maNation),
     [rangMondial, maNation],
@@ -420,62 +422,62 @@ export function Tableau() {
   );
   const [pouleVue, setPouleVue] = useState<number | null>(null);
   const maPoule = useMemo(
-    () => (joueur && choix === maDivision ? Math.max(0, indexPoule(choix, joueur.club)) : 0),
-    [joueur, choix, maDivision],
+    () => (carriere?.club && choix === maDivision ? Math.max(0, indexPoule(choix, carriere.club)) : 0),
+    [carriere, choix, maDivision],
   );
   const poule = pouleVue ?? maPoule;
 
   const donnees = useMemo(() => {
-    if (!joueur || estCoupe || estInternational || !choix) return null;
+    if (!carriere || estCoupe || estInternational || !choix) return null;
     // ⚠️ On ne s'ancre sur SON club que dans SA division ET dans SA poule :
     // sinon le Stade Toulousain apparaissait dans le classement de la Régionale 3.
     const sien = choix === maDivision && poule === maPoule;
-    const ancre = sien ? joueur.club : '';
-    const bonus = sien ? bonusClubDuJoueur(joueur) : 0;
+    const ancre = sien ? carriere.club : '';
+    const bonus = sien && joueur ? bonusClubDuJoueur(joueur) : 0;
     const numeroPoule = poules.length > 1 ? poule : undefined;
     const total = nombreJournees(choix, ancre, numeroPoule);
     // ⚠️ Chaque étage a son propre calendrier : de la Nationale 2 à la
     // Régionale 3, on joue aussi les week-ends de Coupe d'Europe et de Tournoi.
     const jouees = journeesALaSemaine(choix, numero, total);
     return {
-      etat: championnatEnDirect(choix, joueur.saison, ancre, jouees, bonus, numeroPoule),
-      phase: jouees >= total ? phaseFinale(choix, joueur.saison, ancre, bonus, numeroPoule) : null,
+      etat: championnatEnDirect(choix, carriere.saison, ancre, jouees, bonus, numeroPoule),
+      phase: jouees >= total ? phaseFinale(choix, carriere.saison, ancre, bonus, numeroPoule) : null,
       jouees, total, ancre, bonus, numeroPoule,
     };
-  }, [joueur, choix, estCoupe, estInternational, maDivision, numero, poule, maPoule, poules.length]);
+  }, [carriere, joueur, choix, estCoupe, estInternational, maDivision, numero, poule, maPoule, poules.length]);
 
   // ---------- LA COMPÉTITION DE SÉLECTIONS ----------
   const inter = useMemo(() => {
-    if (!joueur || !estInternational) return null;
-    const jouees = journeesInternationalesA(choix, numero, joueur.saison);
-    const etatInter = internationalEnDirect(choix, joueur.saison, jouees, null);
+    if (!carriere || !estInternational) return null;
+    const jouees = journeesInternationalesA(choix, numero, carriere.saison);
+    const etatInter = internationalEnDirect(choix, carriere.saison, jouees, null);
     if (!etatInter) return null;
     const vueInter = Math.max(1, Math.min(journeeVue ?? Math.max(1, jouees), etatInter.totalJournees));
     return {
       etat: etatInter,
       vue: vueInter,
-      affiches: affichesInternationales(choix, joueur.saison, vueInter, jouees, null),
+      affiches: affichesInternationales(choix, carriere.saison, vueInter, jouees, null),
     };
-  }, [joueur, choix, estInternational, numero, journeeVue]);
+  }, [carriere, choix, estInternational, numero, journeeVue]);
 
   // Le TOURNOI DE FIN D'ANNÉE : dans les divisions à poules multiples, c'est lui
   // qui désigne le champion — les meilleurs de chaque poule s'affrontent en
   // tableau sec, façon coupe de France.
   const tournoi = useMemo(() => {
-    if (!joueur || estCoupe || poules.length < 2 || !donnees) return null;
+    if (!carriere || estCoupe || poules.length < 2 || !donnees) return null;
     if (donnees.jouees < donnees.total) return null; // la phase de poules n'est pas finie
     return tournoiDeFinDAnnee(
-      choix, joueur.saison,
+      choix, carriere.saison,
       COMPETITIONS.find((c) => c.id === choix)?.nom ?? choix,
-      choix === maDivision ? joueur.club : '',
-      choix === maDivision ? bonusClubDuJoueur(joueur) : 0,
+      choix === maDivision ? carriere.club : '',
+      choix === maDivision && joueur ? bonusClubDuJoueur(joueur) : 0,
     );
-  }, [joueur, choix, estCoupe, poules.length, donnees, maDivision]);
+  }, [carriere, joueur, choix, estCoupe, poules.length, donnees, maDivision]);
 
   const coupe = useMemo(() => {
-    if (!joueur || !estCoupe) return null;
-    return coupeEnDirect(choix, joueur.saison, joueur.club, passees(numero, 'coupe'));
-  }, [joueur, choix, estCoupe, numero]);
+    if (!carriere || !estCoupe) return null;
+    return coupeEnDirect(choix, carriere.saison, carriere.club, passees(numero, 'coupe'));
+  }, [carriere, choix, estCoupe, numero]);
 
   const etat = donnees?.etat;
   const phase = donnees?.phase;
@@ -505,13 +507,13 @@ export function Tableau() {
   // qui ne sont pas encore jouées : les affiches existent, les scores non.
   const vue = Math.max(1, Math.min(journeeVue ?? Math.max(1, derniere), total || 1));
   const affiches: AfficheCalendrier[] = useMemo(() => {
-    if (!joueur || !donnees) return [];
+    if (!carriere || !donnees) return [];
     return affichesDeLaJournee(
-      choix, joueur.saison, donnees.ancre, vue, donnees.jouees, donnees.bonus, donnees.numeroPoule,
+      choix, carriere.saison, donnees.ancre, vue, donnees.jouees, donnees.bonus, donnees.numeroPoule,
     );
-  }, [joueur, choix, donnees, vue]);
+  }, [carriere, choix, donnees, vue]);
 
-  if (!joueur) return null;
+  if (!carriere) return null;
   const competition = COMPETITIONS.find((c) => c.id === choix);
 
   // Options : mes compétitions d'abord, puis les coupes, puis tout le monde.
@@ -557,10 +559,10 @@ export function Tableau() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
     >
-      <button className="btn fantome" onClick={() => setEcran('carriere')} style={{ marginBottom: '1rem' }}>
-        ← Retour à la carrière
+      <button className="btn fantome" onClick={() => setEcran(joueur ? 'carriere' : 'manager')} style={{ marginBottom: '1rem' }}>
+        ← {joueur ? t('gen.retourCarriere') : t('mgr.retourBureau')}
       </button>
-      <div className="eyebrow">{libelleSemaine(semActuelle, joueur.saison)} · {t('gen.saison').toLowerCase()} {joueur.saison}</div>
+      <div className="eyebrow">{libelleSemaine(semActuelle, carriere.saison)} · {t('gen.saison').toLowerCase()} {carriere.saison}</div>
       <h1>📊 {t('tb.titre')}</h1>
 
       <div className="barre-competitions">
@@ -700,9 +702,9 @@ export function Tableau() {
         <div className="comp-tete">
           <b>🌍 {t('mond.titre')}</b>
           <span className="comp-count">
-            {saisonMondial === joueur.saison
+            {saisonMondial === carriere.saison
               ? t('mond.cetteSaison')
-              : t('mond.dansNSaisons', { n: saisonMondial - joueur.saison, saison: saisonMondial })}
+              : t('mond.dansNSaisons', { n: saisonMondial - carriere.saison, saison: saisonMondial })}
           </span>
         </div>
         <p className="intro-comp">
@@ -765,7 +767,7 @@ export function Tableau() {
                 <b>🔥 {t('tb.tableauFinal')}</b>
                 {coupe.vainqueur && <span className="comp-count">🏆 {coupe.vainqueur}</span>}
               </div>
-              <Arbre matchs={matchsCoupeVisibles} club={joueur.club} />
+              <Arbre matchs={matchsCoupeVisibles} club={carriere.club} />
             </div>
           )}
 
@@ -776,14 +778,14 @@ export function Tableau() {
                   <b>{p.nom}</b>
                   <span className="comp-count">{p.clubs.length} {t('gen.clubs')}</span>
                 </div>
-                <Tableau1 lignes={p.classement} club={joueur.club} tete={2} />
+                <Tableau1 lignes={p.classement} club={carriere.club} tete={2} />
                 {p.journees.length > 0 && (
                   <div className="grille-resultats">
                     {p.journees[p.journees.length - 1].map((m) => (
                       <Rencontre
                         key={m.domicile}
                         match={m}
-                        mien={m.domicile === joueur.club || m.exterieur === joueur.club}
+                        mien={m.domicile === carriere.club || m.exterieur === carriere.club}
                       />
                     ))}
                   </div>
@@ -928,7 +930,7 @@ export function Tableau() {
               <b>{poules.length > 1 ? t('tb.classementPoule', { n: poule + 1 }) : t('tb.classement')}</b>
               <span className="comp-count">{etat.poule.length} {t('gen.clubs')}</span>
             </div>
-            <Tableau1 lignes={etat.classement} club={joueur.club} />
+            <Tableau1 lignes={etat.classement} club={carriere.club} />
           </div>
 
           {/* ---------- TOURNOI DE FIN D'ANNÉE ---------- */}
@@ -942,7 +944,7 @@ export function Tableau() {
                 {t('tb.tournoiAide')}
                 {finaleTerminee && tournoi.champion && <> 🏆 {t('tb.vainqueur', { club: tournoi.champion })}</>}
               </p>
-              <Arbre matchs={matchsTournoiVisibles} club={joueur.club} />
+              <Arbre matchs={matchsTournoiVisibles} club={carriere.club} />
             </div>
           )}
 
@@ -952,7 +954,7 @@ export function Tableau() {
                 <b>🔥 {t('cl.phaseFinale')}</b>
                 <span className="comp-count">{t('tb.nombreQualifies', { n: phase.qualifies.length })}</span>
               </div>
-              <Arbre matchs={matchsPhaseVisibles} club={joueur.club} />
+              <Arbre matchs={matchsPhaseVisibles} club={carriere.club} />
               {finaleTerminee && phase.champion && phase.finaliste && (
                 <p style={{ color: 'var(--craie-dim)', fontSize: '0.85rem', marginTop: '0.7rem' }}>
                   🏆 Champion : <b>{phase.champion}</b>. {phase.finaliste} est battu en finale, il
@@ -962,13 +964,15 @@ export function Tableau() {
             </div>
           )}
 
-          <ClassementsJoueurs
-            divisionId={choix}
-            saison={joueur.saison}
-            journees={donnees?.jouees ?? 0}
-            numeroPoule={poules.length > 1 ? poule : undefined}
-            joueur={joueur}
-          />
+          {joueur && (
+            <ClassementsJoueurs
+              divisionId={choix}
+              saison={joueur.saison}
+              journees={donnees?.jouees ?? 0}
+              numeroPoule={poules.length > 1 ? poule : undefined}
+              joueur={joueur}
+            />
+          )}
 
           {/* ---------- LE CALENDRIER DE L'ANNÉE ---------- */}
           <div className="carte bloc-competition">
@@ -1006,7 +1010,7 @@ export function Tableau() {
               </div>
               <div className="grille-resultats">
                 {affiches.map((a) => (
-                  <Affiche key={`${a.domicile}-${a.exterieur}`} a={a} club={joueur.club} />
+                  <Affiche key={`${a.domicile}-${a.exterieur}`} a={a} club={carriere.club} />
                 ))}
               </div>
             </div>

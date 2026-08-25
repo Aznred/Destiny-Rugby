@@ -3,8 +3,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import './App.css';
 import { Analytics } from '@vercel/analytics/react'
 import { useGame } from './store/useGame';
-import { t } from './lib/i18n';
+import { langueDepuisAdresseIP, t } from './lib/i18n';
 import { pageVue } from './lib/mesure';
+import { chantierVisible } from './lib/modeDev';
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
 import { Guide } from './components/Guide';
@@ -57,6 +58,12 @@ export default function App() {
   const ecran = useGame((s) => s.ecran);
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
+  const managerVisible = chantierVisible('manager');
+  // Une sauvegarde de chantier peut rester sur l'appareil du développeur.
+  // Tant que le chantier est fermé, elle ne doit compter comme une carrière
+  // active sur AUCUN écran public — mais on la conserve pour la prochaine
+  // session de développement.
+  const managerActif = managerVisible ? manager : null;
   const setEcran = useGame((s) => s.setEcran);
   const tropheesEnAttente = useGame((s) => s.tropheesEnAttente);
   const fermerTrophee = useGame((s) => s.fermerTrophee);
@@ -66,6 +73,7 @@ export default function App() {
   // s'en sert comme `key` sur l'arbre — un seul remontage, instantané, plutôt
   // qu'un contexte à traverser dans les cent fichiers de l'interface.
   const langue = useGame((s) => s.langue);
+  const appliquerLangueAutomatique = useGame((s) => s.appliquerLangueAutomatique);
   const [reglagesOuverts, setReglagesOuverts] = useState(false);
   // Nombre de trophées de la « salve » en cours, figé à l'ouverture de la file
   const [totalTrophees, setTotalTrophees] = useState(0);
@@ -77,6 +85,17 @@ export default function App() {
       setTotalTrophees(0);
     }
   }, [tropheesEnAttente.length, totalTrophees]);
+
+  // Le pays associé à l'IP arrive sans bloquer l'accueil. Une préférence
+  // choisie dans les réglages reste prioritaire (contrôle fait aussi dans le
+  // store, au cas où la réponse et le clic arriveraient au même instant).
+  useEffect(() => {
+    let actif = true;
+    void langueDepuisAdresseIP().then((detectee) => {
+      if (actif && detectee) appliquerLangueAutomatique(detectee);
+    });
+    return () => { actif = false; };
+  }, [appliquerLangueAutomatique]);
 
   // ⚠️ PLUS RIEN À PRÉCHARGER. Il y avait ici un préchargement différé du
   // modèle WebLLM : 900 Mo téléchargés en arrière-plan au premier lancement,
@@ -92,18 +111,23 @@ export default function App() {
   // sans passer par `setEcran` (création, retraite, ouverture des messages…).
   useEffect(() => { pageVue(ecran); }, [ecran]);
 
-  // Garde-fou : pas d'écran carrière/profil sans joueur.
+  // Garde-fou : pas d'écran carrière/profil sans joueur, et aucune porte
+  // indirecte vers le chantier manager. Masquer le bouton de l'accueil ne
+  // suffisait pas : une ancienne sauvegarde pouvait encore rouvrir le bureau
+  // depuis la navigation ou les écrans partagés.
   useEffect(() => {
     if (
-      ((ecran === 'carriere' || ecran === 'profil' || ecran === 'social') && !joueur)
+      ((ecran === 'carriere' || ecran === 'profil') && !joueur)
+      || (ecran === 'social' && !joueur && !managerActif)
       // ⚠️ `tableau` et `effectif` servent AUSSI au mode manager : les renvoyer
       //    à l’accueil dès que `joueur` est nul enfermait l’entraîneur dehors.
-      || ((ecran === 'tableau' || ecran === 'effectif') && !joueur && !manager)
-      || (ecran === 'manager' && !manager)
+      || ((ecran === 'tableau' || ecran === 'effectif') && !joueur && !managerActif)
+      || (ecran === 'creationManager' && !managerVisible)
+      || (ecran === 'manager' && !managerActif)
     ) {
       setEcran('accueil');
     }
-  }, [ecran, joueur, manager, setEcran]);
+  }, [ecran, joueur, managerActif, managerVisible, setEcran]);
 
   return (
     <div key={langue} className="racine" data-ecran={ecran}>
@@ -135,11 +159,11 @@ export default function App() {
               {ecran === 'pantheon' && <Pantheon />}
               {ecran === 'classement' && <Classement />}
               {ecran === 'championnats' && <Championnats />}
-              {ecran === 'effectif' && <Effectif />}
-              {ecran === 'tableau' && <Tableau />}
-              {ecran === 'social' && <Social />}
-              {ecran === 'creationManager' && <CreationManager />}
-              {ecran === 'manager' && <Manager />}
+              {ecran === 'effectif' && Boolean(joueur || managerActif) && <Effectif />}
+              {ecran === 'tableau' && Boolean(joueur || managerActif) && <Tableau />}
+              {ecran === 'social' && Boolean(joueur || managerActif) && <Social />}
+              {ecran === 'creationManager' && managerVisible && <CreationManager />}
+              {ecran === 'manager' && Boolean(managerActif) && <Manager />}
             </Suspense>
           </motion.div>
         </AnimatePresence>

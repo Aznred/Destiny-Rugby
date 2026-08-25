@@ -37,6 +37,7 @@ function forceDuGroupe(groupe: { note: number }[]): number {
 
 export function Effectif() {
   const joueur = useGame((s) => s.joueur);
+  const manager = useGame((s) => s.manager);
   const setEcran = useGame((s) => s.setEcran);
 
   const viser = useGame((s) => s.ouvrirEffectifSur);
@@ -61,21 +62,25 @@ export function Effectif() {
   }, [viser, selection, consommerVisee]);
 
   const coequipiers = useMemo(
-    () => (joueur ? effectifDuClub(joueur.club, joueur.saison) : []),
-    [joueur],
+    () => {
+      const carriere = joueur ?? manager;
+      return carriere?.club ? effectifDuClub(carriere.club, carriere.saison) : [];
+    },
+    [joueur, manager],
   );
   const internationaux = useMemo(
     () => (joueur && selection ? effectifNational(selection.equipe, joueur.saison) : []),
     [joueur, selection],
   );
 
-  if (!joueur) return null;
+  if (!joueur && !manager) return null;
+  const carriere = joueur ?? manager!;
   const enSelection = onglet === 'selection' && !!selection;
-  const division = competitionEffective(joueur.club, joueur.division);
-  const clubData = clubParNom(joueur.club);
-  const maNote = noteGlobale(joueur);
-  const reel = joueur.club in EFFECTIFS_REELS;
-  const noteClub = noteDuClub(joueur.club);
+  const division = competitionEffective(carriere.club, carriere.division);
+  const clubData = clubParNom(carriere.club);
+  const maNote = joueur ? noteGlobale(joueur) : 0;
+  const reel = carriere.club in EFFECTIFS_REELS;
+  const noteClub = noteDuClub(carriere.club);
   const reference = enSelection
     ? Math.round(forceDuGroupe(internationaux))
     : noteClub;
@@ -85,10 +90,10 @@ export function Effectif() {
   //    niveau : c’est le même vivier. On ne l’ajoute donc que côté club,
   //    sinon il apparaîtrait deux fois dans son groupe national.
   const groupe = enSelection ? internationaux : coequipiers;
-  const dejaDedans = enSelection && groupe.some((c) => c.nom === joueur.nom);
+  const dejaDedans = !!joueur && enSelection && groupe.some((c) => c.nom === joueur.nom);
   const lignes = [
     ...groupe,
-    {
+    ...(joueur ? [{
       id: 'moi',
       nom: joueur.nom,
       poste: joueur.poste,
@@ -98,7 +103,7 @@ export function Effectif() {
       nation: joueur.nation,
       regen: false,
       moi: true,
-    },
+    }] : []),
   ].filter((l) => !(dejaDedans && 'moi' in l && l.moi));
 
   const parPoste = POSTES.map((p) => ({
@@ -115,8 +120,8 @@ export function Effectif() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <button className="btn fantome" onClick={() => setEcran('carriere')} style={{ marginBottom: '1rem' }}>
-        {t('gen.retourCarriere')}
+      <button className="btn fantome" onClick={() => setEcran(joueur ? 'carriere' : 'manager')} style={{ marginBottom: '1rem' }}>
+        {joueur ? t('gen.retourCarriere') : t('mgr.retourBureau')}
       </button>
 
       {/* ⚠️ DEUX GROUPES, DEUX ONGLETS. Demande explicite : « qu’on puisse
@@ -124,14 +129,14 @@ export function Effectif() {
           si le joueur est RÉELLEMENT international : proposer « Ma sélection »
           à un joueur de Fédérale 3 ouvrirait un groupe dont il ne fait pas
           partie, et le laisserait croire qu’il y a sa place. */}
-      {selection && (
+      {joueur && selection && (
         <div className="onglets-classement">
           <button
             type="button"
             className={`chip-comp${onglet === 'club' ? ' actif' : ''}`}
             onClick={() => setOnglet('club')}
           >
-            {clubData && <Blason club={clubData} taille={18} />} {joueur.club}
+            {clubData && <Blason club={clubData} taille={18} />} {carriere.club}
           </button>
           <button
             type="button"
@@ -150,10 +155,10 @@ export function Effectif() {
         <div style={{ flex: 1 }}>
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             {enSelection
-              ? <>🏳️ {selection!.u20 ? t('eff.groupeU20') : t('eff.groupeNational')} · {t('gen.saison')} {joueur.saison}</>
-              : <><LogoCompet id={division?.id} taille={18} /> {division?.nom ?? t('eff.divisionInconnue')} · {t('gen.saison')} {joueur.saison}</>}
+              ? <>🏳️ {selection!.u20 ? t('eff.groupeU20') : t('eff.groupeNational')} · {t('gen.saison')} {carriere.saison}</>
+              : <><LogoCompet id={division?.id} taille={18} /> {division?.nom ?? t('eff.divisionInconnue')} · {t('gen.saison')} {carriere.saison}</>}
           </div>
-          <h1>{enSelection ? selection!.equipe : joueur.club}</h1>
+          <h1>{enSelection ? selection!.equipe : carriere.club}</h1>
           <p style={{ color: 'var(--craie-dim)', fontSize: '0.9rem' }}>
             {enSelection ? (
               <>
@@ -164,7 +169,7 @@ export function Effectif() {
             ) : (
               <>
                 {t('eff.noteClub')} <b style={{ color: 'var(--or)' }}>{noteClub}</b> · {t('eff.effectifNote')}{' '}
-                <b style={{ color: 'var(--or)' }}>{Math.round(forceEffectif(joueur.club, joueur.saison))}</b> ·{' '}
+                <b style={{ color: 'var(--or)' }}>{Math.round(forceEffectif(carriere.club, carriere.saison))}</b> ·{' '}
                 {lignes.length} {t('gen.joueurs')}
                 {reel && ` · ${t('eff.effectifReel')}`}
               </>

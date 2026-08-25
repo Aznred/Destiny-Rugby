@@ -577,6 +577,73 @@ export interface SaisonManager {
   licencie?: boolean;
 }
 
+export type RoleRecrueManager = 'cadre' | 'rotation' | 'espoir';
+
+/** Un joueur réellement présent dans un effectif du monde, repéré par le manager. */
+export interface CibleRecrutementManager {
+  id: string;
+  pseudo: string;
+  nom: string;
+  club: string;
+  division: string;
+  poste: PosteId;
+  age: number;
+  note: number;
+  potentiel: number;
+  nation: string;
+  indemnite: number;
+  salaireDemande: number;
+  primeDemandee: number;
+  dureeDemandee: number;
+  roleDemande: RoleRecrueManager;
+}
+
+export interface TermesRecrutementManager {
+  salaire: number;
+  prime: number;
+  duree: number;
+  role: RoleRecrueManager;
+}
+
+/** Une discussion de recrutement menée dans les messages de L'Ovale. */
+export interface NegociationManager {
+  id: string;
+  pseudo: string;
+  joueur: CibleRecrutementManager;
+  offre: TermesRecrutementManager;
+  /** Exigences cachées du joueur : l'interface ne montre que sa patience. */
+  exigences: TermesRecrutementManager;
+  patience: number;
+  etat: 'ouverte' | 'accord' | 'signee' | 'rompue';
+  saison: number;
+  semaine: number;
+}
+
+export interface RecrueManager {
+  joueur: CibleRecrutementManager;
+  termes: TermesRecrutementManager;
+  saison: number;
+}
+
+export interface ChoixDecisionManager {
+  id: string;
+  label: string;
+  consequence: string;
+  confiance?: number;
+  prestige?: number;
+  budgetTransferts?: number;
+  budgetSalarial?: number;
+}
+
+/** La scène hebdomadaire du manager : contexte, puis décision obligatoire. */
+export interface DecisionManager {
+  id: string;
+  emoji: string;
+  titre: string;
+  texte: string;
+  choix: ChoixDecisionManager[];
+}
+
 export interface Manager {
   nom: string;
   nation: string;
@@ -599,7 +666,13 @@ export interface Manager {
   /** Le rang demandé cette saison. */
   objectif: number;
   argent: number;
+  /** Enveloppes du club, distinctes du salaire personnel de l'entraîneur. */
+  budgetTransferts: number;
+  budgetSalarial: number;
   contrat: { saisons: number; salaire: number } | null;
+  decision: DecisionManager | null;
+  negociations: NegociationManager[];
+  recrues: RecrueManager[];
   /** Tous les clubs entraînés, dans l’ordre, sans doublon consécutif. */
   clubs: string[];
   titres: string[];

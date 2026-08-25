@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useGame } from '../store/useGame';
 import { t } from '../lib/i18n';
+import { chantierVisible } from '../lib/modeDev';
 import { clubParNom } from '../data/clubs';
 import { Blason } from './Blason';
 import { useModalDialog } from '../lib/useModalDialog';
@@ -71,10 +72,13 @@ export function Nav({ onReglages }: NavProps) {
   const ecran = useGame((s) => s.ecran);
   const setEcran = useGame((s) => s.setEcran);
   const joueur = useGame((s) => s.joueur);
+  const manager = useGame((s) => s.manager);
+  const managerActif = chantierVisible('manager') ? manager : null;
   const nonLues = useGame((s) => (s.notifsSocial ?? []).filter((n) => !n.lue).length);
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
 
-  const clubData = joueur ? clubParNom(joueur.club) : undefined;
+  const clubData = joueur ? clubParNom(joueur.club) : managerActif?.club ? clubParNom(managerActif.club) : undefined;
+  const carriereActive = !!joueur || !!managerActif;
   const naviguer = (cible: Ecran) => {
     setMenuMobileOuvert(false);
     setEcran(cible);
@@ -106,7 +110,7 @@ export function Nav({ onReglages }: NavProps) {
     </button>
   );
 
-  const ecransMenu: Ecran[] = joueur
+  const ecransMenu: Ecran[] = carriereActive
     ? ['championnats', 'classement', 'pantheon', 'boutique']
     : ['pantheon', 'boutique'];
   const menuActif = menuMobileOuvert || ecransMenu.includes(ecran);
@@ -138,9 +142,14 @@ export function Nav({ onReglages }: NavProps) {
                   </span>
                 ) : undefined,
               )
-            : lien('creation', t('nav.creer'))}
+            : managerActif
+              ? lien(
+                  'manager', t('mgr.bureau'),
+                  clubData ? <span className="nav-logo" title={managerActif.club}><Blason club={clubData} taille={20} /></span> : undefined,
+                )
+              : lien('creation', t('nav.creer'))}
           {joueur && lien('profil', t('nav.profil'))}
-          {joueur && (
+          {carriereActive && (
             <button
               type="button"
               className={ecran === 'social' ? 'actif' : ''}
@@ -172,13 +181,15 @@ export function Nav({ onReglages }: NavProps) {
 
       <nav className="nav-mobile" aria-label={t('nav.navigation')}>
         {lienMobile('accueil', t('nav.accueil'), '⌂')}
-        {lienMobile(joueur ? 'carriere' : 'creation', joueur ? t('nav.carriere') : t('nav.creer'), '🏉')}
-        {joueur
+        {lienMobile(joueur ? 'carriere' : managerActif ? 'manager' : 'creation', joueur ? t('nav.carriere') : managerActif ? t('mgr.bureau') : t('nav.creer'), '🏉')}
+        {carriereActive
           ? lienMobile('social', 'L’Ovale', '𝕏', nonLues)
           : lienMobile('championnats', t('nav.clubs'), '🏟️')}
         {joueur
           ? lienMobile('profil', t('nav.profil'), '👤')
-          : lienMobile('classement', t('nav.classement'), '🏆')}
+          : managerActif
+            ? lienMobile('tableau', t('mgr.resultatsMonde'), '📊')
+            : lienMobile('classement', t('nav.classement'), '🏆')}
         <button
           type="button"
           className={menuActif ? 'actif' : ''}

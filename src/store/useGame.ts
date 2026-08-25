@@ -24,7 +24,7 @@ import type {
   TransfertAnnonce,
   ProfilSocial,
   DecisionClub,
-  Manager, SaisonManager,
+  Manager, SaisonManager, CibleRecrutementManager,
 } from '../types';
 import {
   publierPost, pseudoDe, feedAmbiance, suggestionsLocales,
@@ -135,6 +135,11 @@ import {
   MARGE_AMBITION, PRESTIGE_DEBUT, appliquerVerdict, noteMaximale, objectifDuBoard,
   prestigeDepuisJoueur, salaireManager, verdictDeSaison, CONFIANCE_LICENCIEMENT,
 } from '../lib/manager';
+import { decisionManagerPour } from '../data/decisionsManager';
+import {
+  accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, negocierAvecJoueur,
+  ouvrirNegociationManager, type LevierRecrutementManager,
+} from '../lib/recrutementManager';
 import { setMouvementsClubs } from '../lib/divisions';
 import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFinale';
 import {
@@ -671,6 +676,8 @@ interface GameState {
   // La langue de TOUT : l'interface (data/textes.ts) et le contenu écrit par
   // l'IA (consigneDeLangue, ajoutée à chaque prompt).
   langue: Langue;
+  /** Une langue choisie dans les réglages prime toujours sur la détection IP. */
+  langueManuelle: boolean;
   mouvementsClubs: Record<string, string>; // club → division après montées/descentes
   // Lot 7 — réseau social « L'Ovale », succès et défis
   posts: PostSocial[]; // fil : publications du joueur ET du monde (récentes en tête)
@@ -729,6 +736,14 @@ interface GameState {
   saisonManager: () => void;
   /** Une semaine de calendrier passe. */
   semaineManager: () => void;
+  /** Trancher la scène de la semaine avant de pouvoir continuer. */
+  repondreDecisionManager: (decisionId: string, choixId: string) => void;
+  /** Ouvrir puis mener une négociation avec un joueur dans L'Ovale. */
+  contacterJoueurManager: (cible: CibleRecrutementManager) => void;
+  negocierJoueurManager: (id: string, levier: LevierRecrutementManager) => void;
+  accepterDemandesJoueurManager: (id: string) => void;
+  signerJoueurManager: (id: string) => void;
+  rompreNegociationManager: (id: string) => void;
   /** Prendre un banc (premier contrat, ou après un licenciement). */
   signerBanc: (club: string) => void;
   /** Raccrocher : la carrière part au Hall et au classement. */
@@ -745,8 +760,11 @@ interface GameState {
   viserEffectif: (quoi: 'club' | 'selection') => void;
   consommerViseeEffectif: () => void;
   ouvrirSocialSur: 'messages' | null;
+  conversationSocialeCible: string | null;
   ouvrirMessagesOvale: () => void;
+  ouvrirDiscussionOvale: (pseudo: string) => void;
   consommerOuvertureSociale: () => void;
+  consommerConversationSocialeCible: () => void;
   setEcran: (e: Ecran) => void;
   setIAActivee: (active: boolean) => void;
   setModele: (m: string) => void;
@@ -769,6 +787,7 @@ interface GameState {
   };
   setTheme: (t: Theme) => void;
   setLangue: (l: Langue) => void;
+  appliquerLangueAutomatique: (l: Langue) => void;
   entrainer: (attribut: keyof Attributs) => void;
   // Le secteur travaillé chaque semaine, modifiable à tout moment.
   choisirFocus: (attribut: keyof Attributs) => void;
@@ -968,6 +987,7 @@ export const useGame = create<GameState>()(
       approches: [],
       theme: 'vert',
       langue: langueDuNavigateur(),
+      langueManuelle: false,
       mouvementsClubs: {},
       posts: [],
       filSemaine: '',
@@ -999,12 +1019,21 @@ export const useGame = create<GameState>()(
       viserEffectif: (quoi) => set({ ouvrirEffectifSur: quoi }),
       consommerViseeEffectif: () => set({ ouvrirEffectifSur: null }),
       ouvrirSocialSur: null,
+      conversationSocialeCible: null,
       ouvrirMessagesOvale: () => set((s) => ({
         ecran: 'social',
         ouvrirSocialSur: 'messages',
+        conversationSocialeCible: null,
+        ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
+      })),
+      ouvrirDiscussionOvale: (pseudo) => set((s) => ({
+        ecran: 'social',
+        ouvrirSocialSur: 'messages',
+        conversationSocialeCible: pseudo,
         ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
       })),
       consommerOuvertureSociale: () => set({ ouvrirSocialSur: null }),
+      consommerConversationSocialeCible: () => set({ conversationSocialeCible: null }),
 
       setEcran: (ecran) => set((s) => ({
         ecran,
@@ -1919,6 +1948,15 @@ export const useGame = create<GameState>()(
       // appelée depuis des fonctions pures (libellés de postes, formatage de
       // dates) qui n'ont pas accès à un hook.
       setLangue: (langue) => {
+        definirLangue(langue);
+        set({ langue, langueManuelle: true });
+      },
+
+      // La réponse IP arrive après le premier rendu. Si la personne a choisi
+      // une langue pendant ce temps, son choix gagne — sans course ni flash
+      // tardif qui remettrait l'interface dans une autre langue.
+      appliquerLangueAutomatique: (langue) => {
+        if (get().langueManuelle) return;
         definirLangue(langue);
         set({ langue });
       },
@@ -3073,11 +3111,10 @@ export const useGame = create<GameState>()(
       },
 
       // ═══ LE MODE MANAGER ═════════════════════════════════════════════════
-      // ⚠️ COUCHE 1 : QUI PEUT ENTRAÎNER QUOI, ET CE QUE ÇA DEVIENT.
-      // La semaine du manager (composer le XV, coacher le match) et le marché
-      // arrivent par-dessus. Ce qui est ici, c’est la charpente : la création,
-      // la saison jugée par un board, le prestige qui ouvre des clubs, et la
-      // sortie vers le classement.
+      // LE MODE MANAGER : charpente de carrière, scène hebdomadaire et marché.
+      // Le XV coaché en direct viendra encore par-dessus ; les décisions, les
+      // budgets et les signatures via L'Ovale vivent déjà ici et partagent le
+      // même championnat et les mêmes effectifs que la carrière joueur.
 
       creerManager: ({ nom, nation, club, age, libre, depuis }) => {
         const fiche = clubParNom(club);
@@ -3086,6 +3123,7 @@ export const useGame = create<GameState>()(
         const prestige = depuis ? prestigeDepuisJoueur(depuis) : PRESTIGE_DEBUT;
         const force = forceEffectif(club, 1);
         const objectif = objectifDuBoard(club, comp, 1);
+        const budgets = budgetsDuClub(club, 1);
         const manager: Manager = {
           // ⚠️ MÊME RÈGLE QUE POUR UN JOUEUR, et pour la même raison : l’écran
           // de création PROMET « laissé vide, un nom de ta nation est tiré ».
@@ -3105,7 +3143,12 @@ export const useGame = create<GameState>()(
           confiance: 62,
           objectif,
           argent: 0,
+          budgetTransferts: budgets.transferts,
+          budgetSalarial: budgets.salarial,
           contrat: { saisons: 3, salaire: salaireManager(force) },
+          decision: null,
+          negociations: [],
+          recrues: [],
           clubs: [club],
           titres: [],
           palmares: [],
@@ -3126,6 +3169,7 @@ export const useGame = create<GameState>()(
           } : {}),
           ...(libre ? { libre: true } : {}),
         };
+        manager.decision = decisionManagerPour(manager);
         set((s) => ({
           manager,
           joueur: null,
@@ -3136,12 +3180,10 @@ export const useGame = create<GameState>()(
             id: idUnique(),
             saison: 1,
             role: 'mj' as const,
-            titre: '🧑‍🏫 Premier banc',
-            texte: `${manager.nom} prend ${club} (${manager.divisionNom}). `
-              + `Le board attend une place dans les ${objectif} premiers.`
-              + (libre
-                ? ` ⚠️ Carrière lancée en mode libre : elle n’entrera dans aucun classement.`
-                : ''),
+            titre: t('mgr.journal.premierBanc'),
+            texte: t('mgr.journal.premierBancTexte', {
+              manager: manager.nom, club, division: manager.divisionNom, objectif,
+            }) + (libre ? ` ${t('mgr.journal.horsClassement')}` : ''),
           }],
         }));
       },
@@ -3155,17 +3197,26 @@ export const useGame = create<GameState>()(
         // de son prestige, c’est exactement le mode libre — et il se déclare à
         // la création, pas en cours de route.
         if (!m.libre && force > noteMaximale(m.prestige) + MARGE_AMBITION) return;
+        const budgets = budgetsDuClub(club, m.saison);
+        const suivant: Manager = {
+          ...m,
+          club,
+          division: comp?.id ?? '',
+          divisionNom: comp?.nom ?? '',
+          objectif: objectifDuBoard(club, comp, m.saison),
+          confiance: 62,
+          budgetTransferts: budgets.transferts,
+          budgetSalarial: budgets.salarial,
+          contrat: { saisons: 3, salaire: salaireManager(force) },
+          decision: null,
+          negociations: m.negociations.map((n) => (
+            n.etat === 'ouverte' || n.etat === 'accord' ? { ...n, etat: 'rompue' as const } : n
+          )),
+          clubs: m.clubs[m.clubs.length - 1] === club ? m.clubs : [...m.clubs, club],
+        };
+        suivant.decision = decisionManagerPour(suivant);
         set({
-          manager: {
-            ...m,
-            club,
-            division: comp?.id ?? '',
-            divisionNom: comp?.nom ?? '',
-            objectif: objectifDuBoard(club, comp, m.saison),
-            confiance: 62,
-            contrat: { saisons: 3, salaire: salaireManager(force) },
-            clubs: m.clubs[m.clubs.length - 1] === club ? m.clubs : [...m.clubs, club],
-          },
+          manager: suivant,
         });
       },
 
@@ -3174,11 +3225,218 @@ export const useGame = create<GameState>()(
         if (!m) return;
         // Sans banc, le temps ne passe pas : on cherche un club.
         if (!m.club) return;
+        // Comme la carrière joueur, on ne saute jamais une scène restée sans
+        // réponse. Ici les choix sont déterministes et fonctionnent hors ligne.
+        if (m.decision) return;
         if (m.semaine < SEMAINES_PAR_SAISON) {
-          set({ manager: { ...m, semaine: m.semaine + 1 } });
+          const suivant: Manager = { ...m, semaine: m.semaine + 1, decision: null };
+          suivant.decision = decisionManagerPour(suivant);
+          set({ manager: suivant });
           return;
         }
         get().saisonManager();
+      },
+
+      repondreDecisionManager: (decisionId, choixId) => {
+        const m = get().manager;
+        const decision = m?.decision;
+        if (!m || !decision || decision.id !== decisionId) return;
+        const choix = decision.choix.find((c) => c.id === choixId);
+        if (!choix) return;
+        set((s) => ({
+          manager: {
+            ...m,
+            confiance: borne(m.confiance + (choix.confiance ?? 0)),
+            prestige: borne(m.prestige + (choix.prestige ?? 0)),
+            budgetTransferts: Math.max(0, m.budgetTransferts + (choix.budgetTransferts ?? 0)),
+            budgetSalarial: Math.max(0, m.budgetSalarial + (choix.budgetSalarial ?? 0)),
+            decision: null,
+          },
+          journal: [...s.journal, {
+            id: idUnique(),
+            saison: m.saison,
+            role: 'joueur' as const,
+            titre: `${decision.emoji} ${choix.label}`,
+            texte: choix.consequence,
+          }],
+        }));
+      },
+
+      contacterJoueurManager: (cible) => {
+        const m = get().manager;
+        if (!m?.club || cible.club === m.club) return;
+        const existante = m.negociations.find((n) => n.joueur.id === cible.id
+          && (n.etat === 'ouverte' || n.etat === 'accord'));
+        const nego = existante ?? ouvrirNegociationManager(cible, m.saison, m.semaine);
+        set((s) => ({
+          manager: existante ? m : { ...m, negociations: [...m.negociations, nego] },
+          conversations: existante ? s.conversations : {
+            ...s.conversations,
+            [nego.pseudo]: [
+              ...(s.conversations[nego.pseudo] ?? []),
+              {
+                id: idUnique(), pseudo: nego.pseudo, de: 'moi' as const,
+                texte: t('mgr.dm.contact', { club: m.club }), saison: m.saison,
+                semaine: m.semaine, creeLe: Date.now(), lu: true,
+              },
+              {
+                id: idUnique(), pseudo: nego.pseudo, de: 'lui' as const,
+                texte: t('mgr.dm.exigences', {
+                  salaire: nombre(nego.exigences.salaire),
+                  prime: nombre(nego.exigences.prime),
+                  duree: nego.exigences.duree,
+                }),
+                saison: m.saison, semaine: m.semaine, creeLe: Date.now() + 1, lu: false,
+              },
+            ],
+          },
+          ouvrirSocialSur: 'messages',
+          conversationSocialeCible: nego.pseudo,
+          ecran: 'social',
+          ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
+        }));
+      },
+
+      negocierJoueurManager: (id, levier) => {
+        const m = get().manager;
+        const actuelle = m?.negociations.find((n) => n.id === id);
+        if (!m || !actuelle || actuelle.etat !== 'ouverte') return;
+        const resultat = negocierAvecJoueur(actuelle, levier);
+        const reponse = resultat.accord
+          ? t('mgr.dm.accord')
+          : resultat.negociation.etat === 'rompue'
+            ? t('mgr.dm.rupturePatience')
+            : t('mgr.dm.contreProposition', { n: resultat.negociation.patience });
+        set((s) => ({
+          manager: {
+            ...m,
+            negociations: m.negociations.map((n) => n.id === id ? resultat.negociation : n),
+          },
+          conversations: {
+            ...s.conversations,
+            [actuelle.pseudo]: [
+              ...(s.conversations[actuelle.pseudo] ?? []),
+              {
+                id: idUnique(), pseudo: actuelle.pseudo, de: 'moi' as const,
+                texte: t(`mgr.dm.levier.${levier}`), saison: m.saison,
+                semaine: m.semaine, creeLe: Date.now(), lu: true,
+              },
+              {
+                id: idUnique(), pseudo: actuelle.pseudo, de: 'lui' as const,
+                texte: reponse, saison: m.saison, semaine: m.semaine,
+                creeLe: Date.now() + 1, lu: false,
+              },
+            ],
+          },
+        }));
+      },
+
+      accepterDemandesJoueurManager: (id) => {
+        const m = get().manager;
+        const actuelle = m?.negociations.find((n) => n.id === id);
+        if (!m || !actuelle || actuelle.etat !== 'ouverte') return;
+        const accord = accepterDemandesJoueur(actuelle);
+        set((s) => ({
+          manager: { ...m, negociations: m.negociations.map((n) => n.id === id ? accord : n) },
+          conversations: {
+            ...s.conversations,
+            [actuelle.pseudo]: [
+              ...(s.conversations[actuelle.pseudo] ?? []),
+              {
+                id: idUnique(), pseudo: actuelle.pseudo, de: 'moi' as const,
+                texte: t('mgr.dm.accepterDemandes'), saison: m.saison,
+                semaine: m.semaine, creeLe: Date.now(), lu: true,
+              },
+              {
+                id: idUnique(), pseudo: actuelle.pseudo, de: 'lui' as const,
+                texte: t('mgr.dm.accord'), saison: m.saison,
+                semaine: m.semaine, creeLe: Date.now() + 1, lu: false,
+              },
+            ],
+          },
+        }));
+      },
+
+      signerJoueurManager: (id) => {
+        const m = get().manager;
+        const actuelle = m?.negociations.find((n) => n.id === id);
+        if (!m?.club || !actuelle || actuelle.etat !== 'accord') return;
+        const cout = coutPremiereSaison(actuelle);
+        if (m.budgetTransferts < cout || m.budgetSalarial < actuelle.offre.salaire) return;
+        const transfert: TransfertAnnonce = {
+          nom: actuelle.joueur.nom,
+          de: actuelle.joueur.club,
+          vers: m.club,
+          saison: m.saison,
+          poste: POSTE_PAR_ID[actuelle.joueur.poste]?.famille,
+          age: actuelle.joueur.age,
+          note: actuelle.joueur.note,
+          nation: actuelle.joueur.nation,
+        };
+        set((s) => {
+          const transfertsSociaux = [...s.transfertsSociaux, transfert];
+          setTransfertsSociaux(transfertsSociaux);
+          const signee = { ...actuelle, etat: 'signee' as const };
+          return {
+            manager: {
+              ...m,
+              budgetTransferts: m.budgetTransferts - cout,
+              budgetSalarial: m.budgetSalarial - actuelle.offre.salaire,
+              negociations: m.negociations.map((n) => n.id === id ? signee : n),
+              recrues: [...m.recrues, {
+                joueur: actuelle.joueur, termes: actuelle.offre, saison: m.saison,
+              }],
+            },
+            transfertsSociaux,
+            conversations: {
+              ...s.conversations,
+              [actuelle.pseudo]: [
+                ...(s.conversations[actuelle.pseudo] ?? []),
+                {
+                  id: idUnique(), pseudo: actuelle.pseudo, de: 'moi' as const,
+                  texte: t('mgr.dm.signature', { club: m.club }), saison: m.saison,
+                  semaine: m.semaine, creeLe: Date.now(), lu: true,
+                },
+                {
+                  id: idUnique(), pseudo: actuelle.pseudo, de: 'lui' as const,
+                  texte: t('mgr.dm.signatureReponse'), saison: m.saison,
+                  semaine: m.semaine, creeLe: Date.now() + 1, lu: false,
+                },
+              ],
+            },
+            journal: [...s.journal, {
+              id: idUnique(), saison: m.saison, role: 'mj' as const,
+              titre: t('mgr.journal.recrueTitre', { joueur: actuelle.joueur.nom }),
+              texte: t('mgr.journal.recrueTexte', {
+                joueur: actuelle.joueur.nom, club: actuelle.joueur.club,
+                destination: m.club, montant: nombre(actuelle.joueur.indemnite),
+              }),
+            }],
+          };
+        });
+      },
+
+      rompreNegociationManager: (id) => {
+        const m = get().manager;
+        const actuelle = m?.negociations.find((n) => n.id === id);
+        if (!m || !actuelle || actuelle.etat === 'signee') return;
+        set((s) => ({
+          manager: {
+            ...m,
+            negociations: m.negociations.map((n) => n.id === id ? { ...n, etat: 'rompue' } : n),
+          },
+          conversations: {
+            ...s.conversations,
+            [actuelle.pseudo]: [
+              ...(s.conversations[actuelle.pseudo] ?? []),
+              {
+                id: idUnique(), pseudo: actuelle.pseudo, de: 'moi' as const,
+                texte: t('mgr.dm.finDiscussion'), saison: m.saison,
+                semaine: m.semaine, creeLe: Date.now(), lu: true,
+              },
+            ],
+          },
+        }));
       },
 
       /**
@@ -3223,6 +3481,7 @@ export const useGame = create<GameState>()(
         // surprise à la sirène. Un contrat qui expire ne protège de rien.
         const licencie = confiance < CONFIANCE_LICENCIEMENT;
         const saisonsContrat = Math.max(0, (m.contrat?.saisons ?? 1) - 1);
+        const budgets = budgetsDuClub(m.club, m.saison + 1);
 
         const suivant: Manager = {
           ...m,
@@ -3232,6 +3491,12 @@ export const useGame = create<GameState>()(
           prestige,
           confiance: licencie ? 62 : confiance,
           argent: m.argent + (m.contrat?.salaire ?? 0),
+          // Le board renouvelle une partie des enveloppes. Épargner aide, mais
+          // ne permet pas d'empiler dix saisons de budgets sans les dépenser.
+          budgetTransferts: licencie ? 0
+            : Math.round(budgets.transferts + m.budgetTransferts * 0.28),
+          budgetSalarial: licencie ? 0
+            : Math.round(budgets.salarial + m.budgetSalarial * 0.2),
           titres: trophee ? [...m.titres, `${nomDivision(m.division)} (S${m.saison})`] : m.titres,
           palmares: trophee
             ? [...m.palmares, {
@@ -3247,7 +3512,12 @@ export const useGame = create<GameState>()(
           contrat: licencie ? null : { saisons: saisonsContrat, salaire: m.contrat?.salaire ?? 0 },
           objectif: licencie ? 0
             : objectifDuBoard(m.club, competitionDuClub(m.club), m.saison + 1),
+          decision: null,
+          negociations: m.negociations.map((n) => (
+            n.etat === 'ouverte' || n.etat === 'accord' ? { ...n, etat: 'rompue' as const } : n
+          )),
         };
+        if (!licencie) suivant.decision = decisionManagerPour(suivant);
 
         set((st) => ({
           manager: suivant,
@@ -3256,16 +3526,17 @@ export const useGame = create<GameState>()(
             saison: m.saison,
             role: 'mj' as const,
             titre: licencie
-              ? '📉 Le board te remercie'
-              : `📋 Bilan de la saison ${m.saison}`,
-            texte: `${m.club} finit ${rang}ᵉ (objectif : ${m.objectif}ᵉ).`
-              + (trophee ? ' 🏆 Champion !' : '')
-              + (monte ? ' ⬆️ Montée.' : '')
-              + (descendu ? ' ⬇️ Descente.' : '')
-              + ` Prestige ${prestige.toFixed(0)}/100.`
+              ? t('mgr.journal.licencie')
+              : t('mgr.journal.bilanTitre', { saison: m.saison }),
+            texte: t('mgr.journal.bilanTexte', {
+              club: m.club, rang, objectif: m.objectif, prestige: prestige.toFixed(0),
+            })
+              + (trophee ? ` ${t('mgr.journal.champion')}` : '')
+              + (monte ? ` ${t('mgr.journal.montee')}` : '')
+              + (descendu ? ` ${t('mgr.journal.descente')}` : '')
               + (licencie
-                ? ' Tu es libre : cherche un nouveau banc.'
-                : ` Confiance du board : ${confiance}/100.`),
+                ? ` ${t('mgr.journal.nouveauBanc')}`
+                : ` ${t('mgr.journal.confiance', { confiance })}`),
           }],
         }));
       },
@@ -4550,7 +4821,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 11,
+      version: 13,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -4594,7 +4865,9 @@ export const useGame = create<GameState>()(
           pubs?: EtatPubs;
           modele?: string;
           groqKey?: string;
+          langueManuelle?: boolean;
           rythme?: unknown;
+          manager?: Manager | null;
         };
         if (!s) return s;
         if (version < 2 && s.joueur) {
@@ -4744,6 +5017,32 @@ export const useGame = create<GameState>()(
         s.ecransVus ??= [];
         s.guideFerme ??= false;
         s.pubs ??= ETAT_PUBS_VIDE;
+        // VERSION 13 — la langue automatique vient désormais du pays de l'IP.
+        // Les anciennes sauvegardes n'indiquaient pas si le réglage avait été
+        // touché : elles basculent sur la nouvelle détection. Tout choix fait
+        // ensuite dans ⚙️ est marqué et ne sera plus jamais écrasé.
+        s.langueManuelle ??= false;
+        // VERSION 12 — le manager gagne son bureau hebdomadaire et ses
+        // enveloppes de recrutement. Une ancienne carrière reprend avec les
+        // moyens normaux de son club et une première décision à trancher.
+        if (s.manager) {
+          const budgets = s.manager.club
+            ? budgetsDuClub(s.manager.club, s.manager.saison)
+            : { transferts: 0, salarial: 0 };
+          s.manager = {
+            ...s.manager,
+            budgetTransferts: Number.isFinite(s.manager.budgetTransferts)
+              ? s.manager.budgetTransferts : budgets.transferts,
+            budgetSalarial: Number.isFinite(s.manager.budgetSalarial)
+              ? s.manager.budgetSalarial : budgets.salarial,
+            negociations: s.manager.negociations ?? [],
+            recrues: s.manager.recrues ?? [],
+            decision: s.manager.decision ?? null,
+          };
+          if (version < 12 && s.manager.club && !s.manager.decision) {
+            s.manager.decision = decisionManagerPour(s.manager);
+          }
+        }
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
         // réactiver une branche obsolète après fusion par Zustand.
@@ -4805,6 +5104,7 @@ export const useGame = create<GameState>()(
         approches: s.approches,
         theme: s.theme,
         langue: s.langue,
+        langueManuelle: s.langueManuelle,
         mouvementsClubs: s.mouvementsClubs,
         posts: s.posts.slice(-120),
         filSemaine: s.filSemaine,

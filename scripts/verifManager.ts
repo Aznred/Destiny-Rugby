@@ -33,6 +33,8 @@ import {
 import { competitionDuClub } from '../src/data/clubs';
 import { useGame } from '../src/store/useGame';
 import { forceEffectif } from '../src/lib/effectif';
+import { effectifDuClub } from '../src/lib/effectif';
+import { ciblesDuMarche } from '../src/lib/recrutementManager';
 import { SEMAINES_PAR_SAISON } from '../src/data/calendrier';
 import type { LegendeSauvegardee, Manager } from '../src/types';
 
@@ -273,7 +275,9 @@ console.log('\n=== 5. LE CLASSEMENT À CATÉGORIES ===');
       nom: 'Coach', nation: 'France', age: 52, club: 'Stade Toulousain',
       division: 'top14', divisionNom: 'Top 14', saison: 18, semaine: 1,
       prestige: 84, confiance: 70, objectif: 2, argent: 0,
+      budgetTransferts: 20_000_000, budgetSalarial: 4_000_000,
       contrat: { saisons: 2, salaire: 400_000 },
+      decision: null, negociations: [], recrues: [],
       clubs: ['SU Agen', 'RC Vannes', 'Stade Toulousain'],
       titres: [],
       palmares: [
@@ -356,9 +360,38 @@ console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
   ligne('le joueur laisse la place', String(useGame.getState().joueur), useGame.getState().joueur === null);
   ligne('l’objectif tient dans la poule réellement jouée',
     `${m1?.objectif}ᵉ`, !!m1 && m1.objectif >= 1 && m1.objectif <= 12);
+  ligne('une décision narrative attend dès la première semaine',
+    m1?.decision?.titre ?? 'aucune', !!m1?.decision && m1.decision.choix.length === 3);
 
-  // 6b. Une saison entière, semaine par semaine.
-  for (let i = 0; i < SEMAINES_PAR_SAISON + 1; i++) useGame.getState().semaineManager();
+  // 6b. Le marché mondial mène bien à une signature et modifie l'effectif.
+  const cible = ciblesDuMarche(m1!.division, m1!.saison, m1!.club)[0];
+  const avant = effectifDuClub(m1!.club, m1!.saison).some((j) => j.nom === cible.nom);
+  useGame.getState().contacterJoueurManager(cible);
+  let enCours = useGame.getState().manager!.negociations.at(-1)!;
+  ligne('le contact ouvre une discussion dans L’Ovale',
+    `@${enCours.pseudo}`, !!useGame.getState().conversations[enCours.pseudo]?.length);
+  useGame.getState().accepterDemandesJoueurManager(enCours.id);
+  enCours = useGame.getState().manager!.negociations.at(-1)!;
+  useGame.setState((st) => ({ manager: st.manager && {
+    ...st.manager, budgetTransferts: 99_000_000, budgetSalarial: 99_000_000,
+  } }));
+  useGame.getState().signerJoueurManager(enCours.id);
+  const apresSignature = useGame.getState().manager!;
+  const dansEffectif = effectifDuClub(apresSignature.club, apresSignature.saison)
+    .some((j) => j.nom === cible.nom);
+  ligne('la signature est persistée dans la carrière',
+    `${apresSignature.recrues.length} recrue(s)`, apresSignature.recrues.length === 1);
+  ligne('le joueur rejoint réellement l’effectif', `${avant} → ${dansEffectif}`, !avant && dansEffectif);
+
+  // 6c. Une saison entière, semaine par semaine : chaque décision est tranchée
+  // avant de continuer, exactement comme le joueur doit répondre à son récit.
+  for (let i = 0; i < SEMAINES_PAR_SAISON + 1; i++) {
+    const courant = useGame.getState().manager;
+    if (courant?.decision) {
+      useGame.getState().repondreDecisionManager(courant.decision.id, courant.decision.choix[0].id);
+    }
+    useGame.getState().semaineManager();
+  }
   const m2 = useGame.getState().manager!;
   info('après une saison', `saison ${m2.saison} · prestige ${m2.prestige} · confiance ${m2.confiance}`);
   ligne('la saison se clôt toute seule', `saison ${m2.saison}`, m2.saison === 2);
@@ -368,7 +401,7 @@ console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
     m2.historique[0].rang >= 1 && m2.historique[0].rang <= 12);
   ligne('le salaire est versé', `${m2.argent} €`, m2.argent > 0);
 
-  // 6c. La reconversion : la vraie demande, « avec notre statut ».
+  // 6d. La reconversion : la vraie demande, « avec notre statut ».
   useGame.setState({ manager: null, joueur: null });
   useGame.getState().creerJoueur({
     nom: 'Grand Joueur', poste: 'demi_ouverture', nation: 'France',
@@ -401,7 +434,7 @@ console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
   ligne('la légende consommée ne traîne pas',
     String(useGame.getState().reconversionManager), useGame.getState().reconversionManager === null);
 
-  // 6d. Le mode libre ne publie rien. C’est LE verrou de la demande.
+  // 6e. Le mode libre ne publie rien. C’est LE verrou de la demande.
   useGame.setState({ manager: null });
   s0.creerManager({
     nom: 'Tricheur', nation: 'France', club: 'Stade Toulousain', libre: true,

@@ -20,7 +20,7 @@
 //     les comptes sont débridés : insulte-les, ils répondent.
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { t, tn } from '../lib/i18n';
+import { nombre, t, tn } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame, PLAFOND_OVAS_DEFIS_PAR_SAISON } from '../store/useGame';
 import { clubParNom } from '../data/clubs';
@@ -40,6 +40,8 @@ import { semaine, libelleSemaine, horodatageJeu } from '../data/calendrier';
 import { avatarInitiales } from '../lib/avatars';
 import { ecouterEtatIA, etatIA } from '../lib/groq';
 import type { CompteSuivi, Joueur, PostSocial } from '../types';
+import { nomPoste } from '../data/rugby';
+import { coutPremiereSaison } from '../lib/recrutementManager';
 
 // ⚠️ L'HEURE DU JEU, PAS CELLE DE L'ORDINATEUR (retour de jeu : « dans les
 // messages, fais que la date et l'heure soient celles du calendrier in-game »).
@@ -1050,10 +1052,155 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
   );
 }
 
+// --- Bureau de recrutement du manager, dans L'Ovale ------------------------
+function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
+  const manager = useGame((s) => s.manager)!;
+  const negocier = useGame((s) => s.negocierJoueurManager);
+  const accepterDemandes = useGame((s) => s.accepterDemandesJoueurManager);
+  const signer = useGame((s) => s.signerJoueurManager);
+  const rompre = useGame((s) => s.rompreNegociationManager);
+  const nego = [...manager.negociations].reverse().find((n) => n.pseudo === pseudo);
+  if (!nego) return null;
+
+  const cout = coutPremiereSaison(nego);
+  const budgetOk = manager.budgetTransferts >= cout && manager.budgetSalarial >= nego.offre.salaire;
+  const role = t(`mgr.role.${nego.offre.role}`);
+
+  return (
+    <div className="x-nego x-nego-manager" data-etat={nego.etat}>
+      <div className="x-nego-tete">
+        <b>✍️ {t('mgr.x.offreContrat')}</b>
+        {nego.etat === 'ouverte' && (
+          <span className="x-nego-patience" title={t('mgr.x.patience')}>
+            {'●'.repeat(nego.patience)}{'○'.repeat(Math.max(0, 4 - nego.patience))}
+          </span>
+        )}
+      </div>
+      <div className="manager-x-termes">
+        <span><small>{t('mgr.salaire')}</small><b>{nombre(nego.offre.salaire)} €</b></span>
+        <span><small>{t('mgr.x.prime')}</small><b>{nombre(nego.offre.prime)} €</b></span>
+        <span><small>{t('mgr.x.duree')}</small><b>{nego.offre.duree} {t('mgr.x.ans')}</b></span>
+        <span><small>{t('mgr.x.role')}</small><b>{role}</b></span>
+      </div>
+      <p className="x-nego-offre">
+        {t('mgr.x.indemniteClub', { club: nego.joueur.club, montant: nombre(nego.joueur.indemnite) })}
+      </p>
+
+      {nego.etat === 'ouverte' && (
+        <>
+          <div className="x-nego-leviers">
+            <button onClick={() => negocier(nego.id, 'salaire')}>💶 {t('mgr.x.augmenterSalaire')}</button>
+            <button onClick={() => negocier(nego.id, 'prime')}>🎁 {t('mgr.x.augmenterPrime')}</button>
+            <button onClick={() => negocier(nego.id, 'duree')}>📄 {t('mgr.x.allonger')}</button>
+            <button onClick={() => negocier(nego.id, 'role')}>⭐ {t('mgr.x.meilleurRole')}</button>
+          </div>
+          <div className="x-nego-fin">
+            <button className="x-nego-oui" onClick={() => accepterDemandes(nego.id)}>🤝 {t('mgr.x.accepterDemandes')}</button>
+            <button className="x-nego-non" onClick={() => rompre(nego.id)}>{t('mgr.x.arreter')}</button>
+          </div>
+        </>
+      )}
+      {nego.etat === 'accord' && (
+        <div className="manager-x-signature">
+          <p className={budgetOk ? 'budget-ok' : 'budget-non'}>
+            {budgetOk
+              ? t('mgr.x.budgetValide', { cout: nombre(cout) })
+              : t('mgr.x.budgetInsuffisant', { cout: nombre(cout) })}
+          </p>
+          <button className="x-nego-oui" disabled={!budgetOk} onClick={() => signer(nego.id)}>✍️ {t('mgr.x.signerJoueur')}</button>
+          <button className="x-nego-non" onClick={() => rompre(nego.id)}>{t('mgr.x.arreter')}</button>
+        </div>
+      )}
+      {nego.etat === 'signee' && <div className="x-nego-accord">✅ <b>{t('mgr.x.transfertFinalise')}</b></div>}
+      {nego.etat === 'rompue' && <div className="x-nego-accord">⛔ <b>{t('mgr.x.discussionClose')}</b></div>}
+    </div>
+  );
+}
+
+function SocialManager() {
+  const manager = useGame((s) => s.manager)!;
+  const conversations = useGame((s) => s.conversations ?? {});
+  const setEcran = useGame((s) => s.setEcran);
+  const lireConversation = useGame((s) => s.lireConversation);
+  const conversationCible = useGame((s) => s.conversationSocialeCible);
+  const consommerCible = useGame((s) => s.consommerConversationSocialeCible);
+  const consommerOuverture = useGame((s) => s.consommerOuvertureSociale);
+  const dossiers = useMemo(() => {
+    const parPseudo = new Map<string, typeof manager.negociations[number]>();
+    for (const n of manager.negociations) parPseudo.set(n.pseudo, n);
+    return [...parPseudo.values()].sort((a, b) => {
+      const date = (p: string) => conversations[p]?.at(-1)?.creeLe ?? 0;
+      return date(b.pseudo) - date(a.pseudo);
+    });
+  }, [manager.negociations, conversations]);
+  const [actif, setActif] = useState<string | null>(dossiers[0]?.pseudo ?? null);
+  const fil = actif ? conversations[actif] ?? [] : [];
+  const bas = useRef<HTMLDivElement>(null);
+  useEffect(() => { bas.current?.scrollIntoView({ block: 'end' }); }, [fil.length]);
+  useEffect(() => { if (!actif && dossiers[0]) setActif(dossiers[0].pseudo); }, [actif, dossiers]);
+  useEffect(() => { if (actif) lireConversation(actif); }, [actif, lireConversation]);
+  useEffect(() => { consommerOuverture(); }, [consommerOuverture]);
+  useEffect(() => {
+    if (!conversationCible) return;
+    setActif(conversationCible);
+    consommerCible();
+  }, [conversationCible, consommerCible]);
+  const dossier = dossiers.find((n) => n.pseudo === actif);
+
+  return (
+    <motion.section className="x-app x-manager" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <aside className="x-rail">
+        <LogoOvale />
+        <nav>
+          <button className="actif"><Icone d={I_MESSAGE} width={24} height={24} /><span>{t('ov.messages')}</span></button>
+          <button onClick={() => setEcran('manager')}><span style={{ fontSize: '1.35rem' }}>🏟️</span><span>{t('mgr.bureau')}</span></button>
+        </nav>
+        <button className="x-compte" onClick={() => setEcran('manager')}>
+          <Avatar avatar={`club:${manager.club}`} club={manager.club} taille={36} nom={manager.club} />
+          <div><b>{manager.nom}</b><span>{manager.club}</span></div>
+        </button>
+      </aside>
+      <div className="x-centre">
+        <header className="x-tetes manager-x-tete"><button className="actif">𝕏 {t('mgr.x.recrutement')}</button><button onClick={() => setEcran('manager')}>← {t('mgr.bureau')}</button></header>
+        {dossiers.length ? (
+          <div className="x-messagerie">
+            <div className="x-conversations">
+              {dossiers.map((n) => {
+                const nonLu = (conversations[n.pseudo] ?? []).some((m) => m.de === 'lui' && !m.lu);
+                return (
+                  <button key={n.id} className={`x-conv${actif === n.pseudo ? ' actif' : ''}${nonLu ? ' non-lu' : ''}`} onClick={() => setActif(n.pseudo)}>
+                    <Avatar avatar={`initiales:${n.joueur.nom}`} taille={36} nom={n.joueur.nom} />
+                    <span><b>{n.joueur.nom}</b><i>{nomPoste(n.joueur.poste)} · {t(`mgr.etat.${n.etat}`)}</i></span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="x-fil-messages">
+              {dossier && (
+                <div className="x-conv-tete">
+                  <Avatar avatar={`initiales:${dossier.joueur.nom}`} taille={36} nom={dossier.joueur.nom} />
+                  <div><b>{dossier.joueur.nom}</b><span className="x-pseudo">@{dossier.pseudo} · {dossier.joueur.club}</span></div>
+                </div>
+              )}
+              <div className="x-bulles">
+                {fil.map((m) => <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}><span>{m.texte}</span>{dateEtHeure(m) && <time>{dateEtHeure(m)}</time>}</div>)}
+                <div ref={bas} />
+              </div>
+              {actif && <NegociationRecrueManager pseudo={actif} />}
+            </div>
+          </div>
+        ) : (
+          <div className="x-vide manager-x-vide"><b>{t('mgr.aucuneDiscussion')}</b><p>{t('mgr.aucuneDiscussionTexte')}</p><button className="x-poster" onClick={() => setEcran('manager')}>{t('mgr.explorerMarche')}</button></div>
+        )}
+      </div>
+    </motion.section>
+  );
+}
+
 // --- Écran -----------------------------------------------------------------
 type Onglet = 'timeline' | 'explorer' | 'messages' | 'notifs' | 'succes' | 'profil' | 'compte';
 
-export function Social() {
+function SocialJoueur() {
   const joueur = useGame((s) => s.joueur);
   const posts = useGame((s) => s.posts ?? []);
   const notifs = useGame((s) => s.notifsSocial ?? []);
@@ -1363,4 +1510,14 @@ export function Social() {
       </aside>
     </motion.section>
   );
+}
+
+/** L'Ovale garde son interface joueur complète et ouvre un bureau de messages
+ * dédié quand la carrière active est celle d'un entraîneur. */
+export function Social() {
+  const joueur = useGame((s) => s.joueur);
+  const manager = useGame((s) => s.manager);
+  if (manager && !joueur) return <SocialManager />;
+  if (joueur) return <SocialJoueur />;
+  return null;
 }

@@ -10,9 +10,10 @@
 //
 // ═══ CE FICHIER NE FAIT QU'UNE CHOSE : IL DIT QUI PEUT ENTRAÎNER QUOI ════════
 //
-// C'est la couche 1 du chantier, et c'est délibérément la seule. Tout le reste
-// — composer le XV, coacher le match, le marché — viendra par-dessus, et
-// s'appuiera sur ces règles-là. Les poser d'abord évite le piège classique :
+// C'est la couche de fondation. Le récit et le marché vivent désormais dans
+// `decisionsManager.ts` et `recrutementManager.ts`; composer le XV et coacher
+// le match viendront encore par-dessus. Ils s'appuient tous sur ces règles.
+// Les poser d'abord évite le piège classique :
 // écrire la semaine du manager, puis découvrir qu'on ne sait pas dire si un
 // débutant a le droit d'entraîner le Stade Toulousain.
 //

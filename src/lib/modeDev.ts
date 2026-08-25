@@ -11,9 +11,10 @@
 // il ne peut pas composer son XV, et le prenne pour un bug.
 //
 // ⚠️ ET IL NE SUPPRIME RIEN. Le mode entraîneur est entièrement là : store,
-// écrans, banc d'essai, classement à catégories. Ce fichier ne fait que décider
-// si ses PORTES s'affichent. Le jour où la couche 2 est prête, on retire
-// `manager` de `CHANTIERS` et tout apparaît — sans rien réécrire.
+// écrans, banc d'essai, classement à catégories. Ce fichier décide si ses
+// PORTES s'affichent, et `App.tsx` bloque aussi les accès indirects provenant
+// d'une ancienne sauvegarde de chantier. Le jour où la couche 2 est prête, on
+// retire `manager` de `CHANTIERS` et tout apparaît — sans rien réécrire.
 
 /** Les fonctionnalités encore en chantier, cachées par défaut. */
 const CHANTIERS = ['manager'] as const;

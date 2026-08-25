@@ -385,9 +385,12 @@ s'affiche dans ⚙️ ; il n'est associé à aucun coût ni quota.
 ## 🌐 Sept langues, une ambiance au choix, et le téléphone d'abord
 
 - **Français, anglais, espagnol, italien, allemand, portugais, japonais.** La
-  langue du navigateur est détectée toute seule. Et ce n'est pas qu'un habillage :
-  le Maître du Jeu, les situations, les tweets et les messages privés sont ÉCRITS
-  dans ta langue, pas traduits après coup.
+  langue est choisie automatiquement d'après le **pays de l'adresse IP** par la
+  fonction Vercel `api/langue.ts` (sans stocker ni renvoyer l'IP). Le navigateur
+  ne sert qu'à départager les pays multilingues — Canada, Suisse, Belgique… — ou
+  de repli hors ligne. Un choix fait dans les réglages reste toujours prioritaire.
+  Et ce n'est pas qu'un habillage : le Maître du Jeu, les situations, les tweets
+  et les messages privés sont ÉCRITS dans ta langue, pas traduits après coup.
 - **Trois ambiances** — Pelouse, Nuit, Grenat. La couleur du stade change, les
   dorures et le cuir restent.
 - **Jouable au pouce** : cinq destinations stables vivent dans une barre basse,
@@ -744,7 +747,7 @@ vérification — est dans [`CLAUDE.md`](CLAUDE.md), sections
 « L'ARMOIRE À TROPHÉES ».
 
 
-## 🧑‍🏫 Le mode manager (couche 1)
+## 🧑‍🏫 Le mode manager — bureau, récit et recrutement
 
 > ⚠️ **CACHÉ POUR L’INSTANT.** Le mode est entier et jouable, mais ses portes
 > d’entrée sont fermées tant que la couche 2 (composer le XV, coacher le match)
@@ -800,14 +803,40 @@ le lendemain, et il n’y aurait plus rien à jouer.
 vraiment les trois familles : les deux barèmes ont été calibrés l’un sur
 l’autre (une grande carrière vaut ~3 990 d’un côté, ~3 444 de l’autre).
 
-### Ce qui arrive ensuite
+### Un vrai bureau, une décision par semaine
 
-Ce tour pose la **charpente d’accès**, et seulement elle. Composer le XV et le
-banc, l’entraînement du groupe et le match coaché dans le moteur 2D viennent en
-couche 2 ; le marché des transferts en couche 3.
+Le manager reprend la boucle de la carrière joueur sans la copier : chaque
+semaine ouvre une **scène de club à trois choix** (cadre mécontent, jeune à
+lancer, pression du board, brassard, entraînement, presse). Le choix agit sur le
+prestige, la confiance et les finances ; tant qu'il n'est pas tranché, on ne
+saute pas à la semaine suivante. Le journal, le calendrier réel et le classement
+de la poule restent les mêmes briques que dans la carrière joueur.
+
+Le bureau se partage en trois espaces : **Bureau**, **Marché mondial** et
+**Négociations**. Sur mobile, ils deviennent trois onglets tactiles et le récit
+reste la première chose affichée.
+
+### Le marché mondial passe par 𝕏 L'Ovale
+
+- Toutes les compétitions et tous leurs clubs sont consultables. Les candidats
+  sont les joueurs qui existent réellement dans `effectifDuClub`, avec âge,
+  poste, note, potentiel, nationalité, salaire et indemnité.
+- Contacter un joueur ouvre sa conversation privée sur **L'Ovale**. On négocie
+  salaire, prime, durée et rôle ; ses exigences restent cachées derrière sa
+  patience, ou on peut accepter immédiatement ses demandes.
+- Un accord ne suffit pas : le budget transferts et la marge salariale sont
+  contrôlés avant la signature. Une fois signé, le joueur quitte vraiment son
+  ancien club, rejoint l'effectif du manager et modifie la force utilisée par
+  les résultats et les classements.
+- L'écran **Résultats** est désormais commun aux deux carrières : tous les
+  championnats, coupes, sélections et la Coupe du monde sont lisibles depuis le
+  bureau. L'écran **Effectif** l'est aussi et montre immédiatement les recrues.
+
+La prochaine couche reste le coaching de match : composition du XV, banc,
+entraînement collectif et décisions dans le moteur 2D.
 
 ```bash
-npx vite-node scripts/verifManager.ts   # accès gradué, 15 saisons, reconversion, mode libre
+npx vite-node scripts/verifManager.ts   # accès, récit, 15 saisons, L'Ovale, signature et effectif réel
 ```
 
 ## 🗺️ Idées d'évolution

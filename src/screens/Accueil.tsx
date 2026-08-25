@@ -54,6 +54,8 @@ export function Accueil() {
   const setEcran = useGame((s) => s.setEcran);
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
+  const managerVisible = chantierVisible('manager');
+  const managerActif = managerVisible ? manager : null;
   const skinActif = useGame((s) => s.skinActif);
 
   return (
@@ -82,7 +84,7 @@ export function Accueil() {
                   {t('accueil.voirProfil')}
                 </button>
               </>
-            ) : manager ? (
+            ) : managerActif ? (
               // ⚠️ UNE CARRIÈRE D’ENTRAÎNEUR OCCUPE LA MÊME PLACE QU’UNE
               //    CARRIÈRE DE JOUEUR, et jamais les deux en même temps :
               //    `creerManager` met `joueur` à null. Sans cette branche,
@@ -110,7 +112,7 @@ export function Accueil() {
                     « cache le mode entraîneur, il doit être accessible que par moi
                     le dev »). Le mode est ENTIER par ailleurs — c'est sa porte
                     d'entrée qu'on retire, pas lui. Voir `lib/modeDev.ts`. */}
-                {chantierVisible('manager') && (
+                {managerVisible && (
                 <button className="btn fantome grand" onClick={() => setEcran('creationManager')}>
                   🧑‍🏫 Devenir entraîneur
                 </button>

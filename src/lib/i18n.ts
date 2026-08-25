@@ -32,8 +32,10 @@ export type Langue = (typeof LANGUES)[number]['id'];
 
 export const LANGUE_DEFAUT: Langue = 'fr';
 
-// La langue du navigateur, si on la parle. Un joueur italien qui arrive sur
-// destiny-rugby.fr ne devrait pas avoir à chercher le sélecteur.
+// La langue du navigateur reste le repli hors ligne et en développement. En
+// production, le pays associé à l'adresse IP passe d'abord par `/api/langue` :
+// un navigateur configuré en anglais n'impose donc plus l'anglais à quelqu'un
+// qui arrive depuis un pays francophone.
 export function langueDuNavigateur(): Langue {
   if (typeof navigator === 'undefined') return LANGUE_DEFAUT;
   for (const brut of navigator.languages ?? [navigator.language]) {
@@ -42,6 +44,90 @@ export function langueDuNavigateur(): Langue {
     if (connue) return connue.id;
   }
   return LANGUE_DEFAUT;
+}
+
+/** Pays dont la langue du jeu ne prête pas à ambiguïté. */
+const PAYS_PAR_LANGUE: Readonly<Record<Exclude<Langue, 'en'>, readonly string[]>> = {
+  fr: [
+    'FR', 'MC', 'SN', 'CI', 'ML', 'BF', 'NE', 'BJ', 'TG', 'GN', 'CD', 'CG',
+    'GA', 'TD', 'CF', 'DJ', 'MG', 'KM', 'HT', 'DZ', 'MA', 'TN', 'RE', 'GP',
+    'MQ', 'GF', 'PF', 'NC', 'PM', 'WF',
+  ],
+  es: [
+    'ES', 'MX', 'AR', 'BO', 'CL', 'CO', 'CR', 'CU', 'DO', 'EC', 'SV', 'GT',
+    'HN', 'NI', 'PA', 'PY', 'PE', 'PR', 'UY', 'VE', 'GQ', 'AD',
+  ],
+  it: ['IT', 'SM', 'VA'],
+  de: ['DE', 'AT', 'LI'],
+  pt: ['PT', 'BR', 'AO', 'MZ', 'CV', 'GW', 'ST', 'TL', 'MO'],
+  ja: ['JP'],
+};
+
+/**
+ * Les pays où l'IP seule ne peut pas deviner la langue de la personne.
+ * L'ordre donne le repli local ; `Accept-Language` départage quand il désigne
+ * une des langues du jeu réellement utilisée dans ce pays.
+ */
+const PAYS_MULTILINGUES: Readonly<Record<string, readonly Langue[]>> = {
+  BE: ['fr', 'de'],
+  CA: ['en', 'fr'],
+  CH: ['de', 'fr', 'it'],
+  CM: ['fr', 'en'],
+  BI: ['fr', 'en'],
+  LB: ['fr', 'en'],
+  LU: ['fr', 'de'],
+  MU: ['fr', 'en'],
+  RW: ['en', 'fr'],
+  SC: ['en', 'fr'],
+  VU: ['fr', 'en'],
+};
+
+function langueDesPreferences(preferences: readonly string[], permises?: readonly Langue[]): Langue | null {
+  for (const preference of preferences) {
+    const id = String(preference).trim().slice(0, 2).toLowerCase() as Langue;
+    if (LANGUES.some((langue) => langue.id === id) && (!permises || permises.includes(id))) return id;
+  }
+  return null;
+}
+
+/**
+ * Langue à servir pour un code pays ISO à deux lettres.
+ *
+ * - l'adresse IP décide du pays ;
+ * - la préférence du navigateur ne sert qu'aux pays multilingues ;
+ * - un pays dont la langue n'est pas encore traduite reçoit l'anglais ;
+ * - sans pays (développement/hors ligne), on conserve le repli navigateur.
+ */
+export function langueDuPays(pays: string | null | undefined, preferences: readonly string[] = []): Langue {
+  const code = String(pays ?? '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) return langueDesPreferences(preferences) ?? LANGUE_DEFAUT;
+
+  const multilingue = PAYS_MULTILINGUES[code];
+  if (multilingue) return langueDesPreferences(preferences, multilingue) ?? multilingue[0];
+
+  for (const [langue, paysDeLaLangue] of Object.entries(PAYS_PAR_LANGUE) as [Exclude<Langue, 'en'>, readonly string[]][]) {
+    if (paysDeLaLangue.includes(code)) return langue;
+  }
+  return 'en';
+}
+
+let detectionIP: Promise<Langue | null> | null = null;
+
+/**
+ * Demande au serveur la langue déduite du pays de l'IP. Une seule requête est
+ * faite par chargement, même sous React StrictMode. L'échec est silencieux :
+ * la langue du navigateur déjà affichée reste alors en place.
+ */
+export function langueDepuisAdresseIP(): Promise<Langue | null> {
+  detectionIP ??= fetch('/api/langue', { headers: { Accept: 'application/json' } })
+    .then(async (reponse) => {
+      if (!reponse.ok) return null;
+      const corps = await reponse.json() as { langue?: unknown };
+      const langue = String(corps.langue ?? '') as Langue;
+      return LANGUES.some((candidate) => candidate.id === langue) ? langue : null;
+    })
+    .catch(() => null);
+  return detectionIP;
 }
 
 // ⚠️ Le français est requis, les autres sont facultatives : on peut donc

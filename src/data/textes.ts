@@ -24,6 +24,7 @@ import { TEXTES_SUPPLEMENTAIRES } from './textesSupplementaires';
 import { TEXTES_TROPHEES } from './textesTrophees';
 import { TEXTES_SOCIAUX } from './textesSociaux';
 import { TEXTES_MATCH } from './textesMatch';
+import { TEXTES_MANAGER } from './textesManager';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -62,6 +63,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_MATCH,
   ...TEXTES_TROPHEES,
   ...TEXTES_SOCIAUX,
+  ...TEXTES_MANAGER,
 
   // --- NAVIGATION ---------------------------------------------------------
   'nav.accueil': { fr: 'Accueil', en: 'Home', es: 'Inicio', it: 'Home', de: 'Start', pt: 'Início', ja: 'ホーム' },

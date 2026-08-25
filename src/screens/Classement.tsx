@@ -7,6 +7,7 @@ import { nomNationTraduit } from '../lib/nations';
 import { TROPHEES } from '../data/trophees';
 import { LIMITES, ficheDepuisJoueur, verifierFiche } from '../lib/classementMondial';
 import { nombre, t } from '../lib/i18n';
+import { chantierVisible } from '../lib/modeDev';
 import type { LegendeSauvegardee, TitreGagne } from '../types';
 import { clubParNom } from '../data/clubs';
 import { Blason } from '../components/Blason';
@@ -275,6 +276,7 @@ function PanneauFiche({
 }
 
 export function Classement() {
+  const managerVisible = chantierVisible('manager');
   const pantheon = useGame((s) => s.pantheon);
   const joueur = useGame((s) => s.joueur);
   const setEcran = useGame((s) => s.setEcran);
@@ -317,7 +319,19 @@ export function Classement() {
    * monde » parce que les autres sont page 3. C’est pour ça que la catégorie
    * part dans la requête et que changer d’onglet revient page 1.
    */
-  const [categorie, setCategorie] = useState<'total' | 'joueur' | 'entraineur' | 'joueurEntraineur'>('total');
+  type Categorie = 'total' | 'joueur' | 'entraineur' | 'joueurEntraineur';
+  // Tant que le mode est en chantier, le classement public ne doit ni annoncer
+  // ses catégories ni faire remonter une fiche créée pendant les essais du
+  // développeur. Le classement « Joueurs » est alors l'unique vue publique.
+  const [categorie, setCategorie] = useState<Categorie>(managerVisible ? 'total' : 'joueur');
+  const categories: ReadonlyArray<readonly [Categorie, string, string]> = managerVisible
+    ? [
+        ['total', '🌍', 'Total'],
+        ['joueur', '🏉', 'Joueurs'],
+        ['entraineur', '🧑‍🏫', 'Entraîneurs'],
+        ['joueurEntraineur', '⭐', 'Joueur + entraîneur'],
+      ]
+    : [['joueur', '🏉', 'Joueurs']];
   /** Le pseudo en cours de saisie, ou `null` quand on ne l'édite pas. */
   const [pseudoEnCours, setPseudoEnCours] = useState<string | null>(null);
 
@@ -416,12 +430,7 @@ export function Classement() {
             d’un côté, ~3 444 de l’autre). Sans cette calibration, le
             classement total ne serait qu’un des deux, déguisé. */}
         <div className="onglets-classement">
-          {([
-            ['total', '🌍', 'Total'],
-            ['joueur', '🏉', 'Joueurs'],
-            ['entraineur', '🧑‍🏫', 'Entraîneurs'],
-            ['joueurEntraineur', '⭐', 'Joueur + entraîneur'],
-          ] as const).map(([id, emoji, libelle]) => (
+          {categories.map(([id, emoji, libelle]) => (
             <button
               key={id}
               type="button"

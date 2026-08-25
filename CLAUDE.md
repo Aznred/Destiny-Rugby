@@ -67,6 +67,7 @@ Three.js (@react-three/fiber + @react-three/drei) · Groq (API distante).
 | `src/data/boutique.ts` | `SKINS` de ballon (`glb?` = modèle 3D dédié), `BOOSTS`, `PACKS` d'Ovas (achat réel non branché). |
 | `src/data/trophees.ts` | `TROPHEES` (**54** : 46 titres d'équipe + **8 distinctions individuelles**) + `TROPHEE_PAR_DIVISION`, `TROPHEE_PAR_COUPE`, `TROPHEE_PAR_INTERNATIONAL`, `COUPE_EUROPE_PAR_DIVISION`, `MEILLEUR_JOUEUR_PAR_DIVISION`, `NATIONS_6N`. Chaque trophée pointe un `.glb` de `public/m3d/`. ⚠️ **`Trophee.individuel` est LE champ qui range un trophée** : il commande sa place dans l'armoire ET la façon dont on le gagne (`lib/honneurs.ts` au lieu du terrain). |
 | `api/classement.ts` | **La fonction serverless Vercel du classement mondial** (à la racine, à côté de `src/` : c'est la convention Vercel, et c'est ce qui lui permet d'importer le barème du jeu au lieu de le recopier). `GET` = top 100, `POST` = débit, `verifierFiche`, RECALCUL du score, écriture du seul score. Déploiement : `serveur/VERCEL.md`. |
+| `api/langue.ts` | **Détection de langue par pays de l'IP.** Lit uniquement l'en-tête Vercel `x-vercel-ip-country`, répond avec une des sept langues et ne conserve jamais l'IP. `src/lib/i18n.ts` porte la table pays → langue ; `Accept-Language` ne départage que les pays multilingues ou sert de repli sans géolocalisation. Une langue choisie dans ⚙️ pose `langueManuelle` et n'est plus écrasée. Vérification : `scripts/verifLangueIP.ts`. |
 | `src/lib/classementEnLigne.ts` | Le côté navigateur : `envoyerAuClassement()`, `lireClassementMondial()`. ⚠️ Sans serveur, il renvoie une liste vide **sans lever d'erreur** — le classement local continue. |
 | `src/lib/classementWorldRugby.ts` | Formule pure du classement **des sélections** : domicile +3, écart borné à ±10, nul/victoire, marge >15 ×1,5, Coupe du monde ×2, échange à somme nulle et notes bornées 0–100. Ne pas confondre avec le classement en ligne des carrières. |
 | `src/lib/honneurs.ts` | **Les distinctions individuelles.** `noterSaisonIndividuelle()` cote la saison sur ~100 (note de saison ×7, statistiques comparées au poste, palmarès de l'année, rang du club, notoriété, au prorata des matchs joués) et `decernerHonneurs()` la compare aux barres. **Pure, déterministe, aucun tirage au sort** : le seul aléa est la barre, qui bouge de ±3,5 par saison (le rival de l'année). Appelée par `saisonSuivante` APRÈS `evoluer()` — c'est le seul moment où la note de saison ET le palmarès existent tous les deux. |
@@ -6937,11 +6938,10 @@ Deux arbitrages tranchés avant d'écrire une ligne :
 | Ce qu'on fait en tant que manager | **« Les deux, en couches »** : la gestion (objectifs, effectif, marché) ET le match coaché, livrés sur plusieurs tours |
 | Le classement | **Plusieurs classements de catégories, plus un total** comprenant les trois familles |
 
-**Ce tour livre la couche 1, et seulement elle** : la charpente d'accès. Composer
-le XV, coacher le match et le marché des transferts viennent par-dessus. Les
-poser d'abord évite le piège classique — écrire la semaine du manager, puis
-découvrir qu'on ne sait pas dire si un débutant a le droit de prendre le Stade
-Toulousain.
+**Cette section documente la couche 1 d'origine** : la charpente d'accès. La
+suite (récit hebdomadaire, bureau et marché des transferts) est maintenant
+livrée et documentée dans la section « MODE MANAGER — bureau et recrutement »
+plus bas. Composer le XV et coacher le match restent la prochaine couche.
 
 | Fichier | Rôle |
 |---|---|
@@ -7110,11 +7110,12 @@ produisait.
 
 ### Ce qui reste à faire
 
-- **Couche 2** : la semaine du manager — composer le XV et le banc, l'entraînement
-  du groupe, et coacher le match dans le moteur 2D existant.
-- **Couche 3** : le marché des transferts, le budget, les contrats des joueurs.
-- Les deux écrans du mode manager sont **en français uniquement**, comme `Profil`,
-  `Effectif` et `Carrière` : le socle i18n est en place, il reste à brancher `t()`.
+- **Couche match** : composer le XV et le banc, l'entraînement du groupe et
+  coacher le match dans le moteur 2D existant.
+- ✅ La semaine narrative, le marché, les budgets, les contrats et les
+  signatures via L'Ovale sont livrés.
+- ✅ `CreationManager`, `Manager` et le bureau de recrutement de L'Ovale sont
+  branchés sur `t()` : les sept langues sont complètes.
 
 ```bash
 npx vite-node scripts/verifManager.ts     # accès gradué, 15 saisons, reconversion, mode libre, la boucle par le store
@@ -7604,3 +7605,72 @@ d'utilisation, sans changer le jeu, pour baisser le bounce rate ».
 
 Vérifications : TypeScript, oxlint, compilation de production et
 `verifTraductions.ts` (1 762 clés, 100 % dans les sept langues).
+
+---
+
+## 🧑‍🏫 MODE MANAGER — BUREAU, RÉCIT ET RECRUTEMENT
+
+Demande : continuer le mode manager en réutilisant les briques de la carrière
+joueur — texte de choix, calendrier, classements mondiaux — avec des interfaces
+propres au métier, surtout la négociation de joueurs depuis 𝕏 L'Ovale.
+
+### Une même simulation, deux points de vue
+
+`Tableau` et `Effectif` ne sont plus des écrans réservés à `joueur`. Ils prennent
+la carrière active (`joueur ?? manager`) : même calendrier, mêmes journées,
+mêmes poules, mêmes coupes, mêmes sélections et mêmes effectifs. Le bonus
+personnel du joueur reste à zéro pour le manager, ce qui évite de lui inventer
+un apport de terrain.
+
+Le bureau (`screens/Manager.tsx`) expose trois interfaces :
+
+1. **Bureau** — objectif, confiance, prestige, budgets, récit hebdomadaire,
+   journal et top du classement ;
+2. **Marché mondial** — compétition, club, poste et recherche textuelle ;
+3. **Négociations** — état de chaque dossier et raccourci vers sa conversation.
+
+Sous 760 px, le récit passe devant les indicateurs, les onglets restent visibles
+et chaque action garde une cible d'au moins 44 px.
+
+### Le récit hebdomadaire est une vraie barrière de calendrier
+
+`data/decisionsManager.ts` tire une scène stable depuis le nom, le club, la
+saison et la semaine. Trois choix couvrent stabilité, ambition et prudence
+financière. `semaineManager()` refuse d'avancer tant que `Manager.decision`
+n'est pas résolue ; `repondreDecisionManager()` applique les effets, écrit le
+journal puis libère la semaine. Le système ne dépend pas de Groq.
+
+### Le recrutement vient des effectifs, pas d'une liste parallèle
+
+`lib/recrutementManager.ts` transforme les joueurs de `effectifDuClub` en
+cibles avec une indemnité et des exigences déterministes. Les quatre leviers
+sont salaire, prime, durée et rôle. Le seuil d'acceptation est numérique et les
+exigences restent cachées ; seule la patience est rendue.
+
+Les deux enveloppes ont des sens distincts :
+
+- `budgetTransferts` paie indemnité + prime ;
+- `budgetSalarial` paie le salaire annuel.
+
+Elles sont calculées depuis la force et le niveau du club, partiellement
+renouvelées à l'intersaison et remises au niveau du nouveau club quand le
+manager change de banc.
+
+### La signature sur L'Ovale change réellement le monde
+
+`contacterJoueurManager()` crée la négociation, écrit les deux premiers DM et
+ouvre `social` sur le bon `@`. `SocialManager` réemploie l'interface de messages
+de L'Ovale avec le panneau de conditions. À la signature, le store ajoute un
+`TransfertAnnonce`, appelle `setTransfertsSociaux` et débite les budgets. Le
+registre d'effectif retire alors le joueur de son ancien club et l'ajoute au
+club du manager : `forceEffectif`, les résultats et l'écran Effectif lisent tous
+le mouvement sans deuxième vérité.
+
+La sauvegarde passe en version 12. Une ancienne carrière reçoit les budgets de
+son club, des tableaux de négociations/recrues vides et une décision en cours.
+Les écrans manager et tous leurs nouveaux textes portent 100 % des traductions
+dans les sept langues (`textesManager.ts`).
+
+Vérifications : `tsc -b`, `oxlint`, build Vite, `verifManager.ts` (contact,
+accord, signature et présence réelle dans l'effectif) et
+`verifTraductions.ts` (1 928 clés, 100 % dans les sept langues).
