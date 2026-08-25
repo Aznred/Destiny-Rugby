@@ -192,7 +192,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
     && matchRegarde !== `${joueur.saison}#${joueur.semaine ?? 1}`;
 
   return (
-    <aside className="carte panneau-joueur">
+    <aside id="carriere-joueur" className="carte panneau-joueur">
       <div className="ph">
         {/* L'écusson de l'équipe pour laquelle on joue CE week-end : le club
             d’ordinaire, la sélection pendant une fenêtre internationale. */}

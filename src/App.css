@@ -4964,3 +4964,369 @@ img, svg, canvas { max-width: 100%; }
 
 /* Le nom du personnage sous le pseudo, dans la fiche du classement. */
 .fc-alias { margin: 0.1rem 0 0; font-size: 0.82rem; color: var(--brume); font-style: italic; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITÉ MOBILE — une main, une action, aucun labyrinthe
+
+   Cette couche ne change aucune règle du jeu. Elle change seulement la façon
+   d'atteindre les écrans et l'ordre dans lequel le téléphone les présente :
+   CTA avant la 3D, cinq destinations stables sous le pouce, et trois vues
+   courtes dans la carrière à la place d'une page interminable.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.nav .marque {
+  padding: 0.35rem 0.25rem;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.nav-mobile,
+.nav-reglages-mobile,
+.carriere-mobile-vues { display: none; }
+
+/* Le lien apparaît au clavier seulement. Il permet de sauter les deux barres
+   de navigation et devient particulièrement utile avec un lecteur d'écran. */
+.aller-contenu {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 180;
+  padding: 0.7rem 1rem;
+  border-radius: var(--rayon-sm);
+  background: var(--or-400);
+  color: #17110a;
+  font-family: var(--police-forte);
+  font-weight: 800;
+  transform: translateY(-160%);
+  transition: transform 0.15s ease;
+}
+.aller-contenu:focus { transform: translateY(0); }
+
+/* Un focus unique et très visible, y compris sur les cartes qui se comportent
+   comme des boutons. La souris ne le déclenche pas grâce à `:focus-visible`. */
+:where(button, a, input, textarea, select, [role='button']):focus-visible {
+  outline: 3px solid var(--or-400);
+  outline-offset: 3px;
+}
+.classement-lateral:focus-visible { border-color: var(--or-400); }
+
+/* Le tiroir « Plus » est un vrai dialogue : fond isolé, focus retenu et grande
+   poignée de fermeture. */
+.nav-mobile-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: grid;
+  align-items: end;
+  padding: 1rem;
+  background: rgba(3, 9, 6, 0.78);
+}
+.nav-mobile-menu {
+  width: min(520px, 100%);
+  margin: 0 auto;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  border-radius: 22px;
+  background: var(--surface-solid);
+}
+.nav-mobile-menu-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+.nav-mobile-menu-tete h2 { font-family: var(--police-titre); text-transform: uppercase; }
+.nav-mobile-fermer {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--bordure);
+  background: var(--pelouse-700);
+  color: var(--craie);
+}
+.nav-mobile-menu-grille {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+.nav-mobile-menu-grille button {
+  min-width: 0;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 13px;
+  border: 1px solid var(--bordure);
+  background: var(--pelouse-800);
+  color: var(--craie-dim);
+  text-align: left;
+}
+.nav-mobile-menu-grille button > span { flex: 0 0 auto; font-size: 1.25rem; }
+.nav-mobile-menu-grille button b { min-width: 0; overflow-wrap: anywhere; }
+.nav-mobile-menu-grille button.actif {
+  color: var(--craie);
+  border-color: var(--or-500);
+  background: var(--pelouse-700);
+}
+
+@media (max-width: 900px) {
+  /* Les colonnes de carrière deviennent des vues exclusives. Le composant du
+     joueur reste monté : sa barre d'action en portail continue donc à marcher. */
+  .carriere {
+    width: min(760px, 96vw);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+    margin: 0.6rem auto 1rem;
+    padding-bottom: calc(146px + env(safe-area-inset-bottom, 0px));
+  }
+  .carriere-mobile-vues {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    position: sticky;
+    top: calc(58px + env(safe-area-inset-top, 0px));
+    z-index: 18;
+    padding: 0.35rem;
+    border: 1px solid var(--bordure);
+    border-radius: 14px;
+    background: rgba(8, 22, 15, 0.96);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+  }
+  .carriere-mobile-vues button {
+    min-width: 0;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.35rem;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--craie-dim);
+    font-size: 0.78rem;
+  }
+  .carriere-mobile-vues button[aria-pressed='true'] {
+    color: #17110a;
+    border-color: var(--or-500);
+    background: var(--or-400);
+  }
+  .carriere[data-mobile-vue='jeu'] > .panneau-joueur,
+  .carriere[data-mobile-vue='jeu'] > .classement-lateral,
+  .carriere[data-mobile-vue='joueur'] > .jeu,
+  .carriere[data-mobile-vue='joueur'] > .classement-lateral,
+  .carriere[data-mobile-vue='classement'] > .jeu,
+  .carriere[data-mobile-vue='classement'] > .panneau-joueur {
+    display: none !important;
+  }
+  .carriere > .jeu,
+  .carriere > .panneau-joueur,
+  .carriere > .classement-lateral { order: 0; min-width: 0; }
+  .carriere[data-mobile-vue='jeu'] > .jeu {
+    display: flex;
+    height: calc(100dvh - 294px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    min-height: 410px;
+  }
+  .carriere .journal { max-height: none; padding: 0.85rem; }
+  .carriere .panneau-joueur { overflow: visible; }
+  .carriere .classement-lateral { max-height: none; overflow: visible; }
+
+  /* L'action principale se place au-dessus de la nouvelle navigation basse. */
+  .barre-jouer {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    z-index: 70;
+    min-height: 62px;
+    padding: 0.45rem 0.7rem;
+  }
+  .barre-jouer .btn { min-height: 48px; }
+
+  .guide-pastille { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  .racine[data-ecran='carriere'] .guide-pastille {
+    bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 900px) {
+  :root { --nav-mobile-hauteur: 64px; }
+
+  body { padding-bottom: calc(var(--nav-mobile-hauteur) + env(safe-area-inset-bottom, 0px)); }
+  button, a { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+  /* En-tête calme : la marque ramène à l'accueil, les destinations vivent en
+     bas. Plus de ruban horizontal dont la moitié des entrées est cachée. */
+  .nav {
+    min-height: 58px;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding: calc(0.35rem + env(safe-area-inset-top, 0px)) 0.75rem 0.35rem;
+    z-index: 75;
+    background: rgba(8, 22, 15, 0.96);
+  }
+  .nav .nav-bureau { display: none; }
+  .nav .marque {
+    min-height: 44px;
+    min-width: 44px;
+    margin-right: auto;
+  }
+  .nav .marque span.mot { display: inline; font-size: 1.12rem; }
+  .nav-reglages-mobile {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--bordure);
+    background: var(--pelouse-800);
+    color: var(--craie);
+    font-size: 1.05rem;
+  }
+
+  .nav-mobile {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 80;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: stretch;
+    min-height: calc(var(--nav-mobile-hauteur) + env(safe-area-inset-bottom, 0px));
+    padding: 0.25rem max(0.25rem, env(safe-area-inset-left, 0px)) env(safe-area-inset-bottom, 0px) max(0.25rem, env(safe-area-inset-right, 0px));
+    border-top: 1px solid var(--bordure);
+    background: rgba(6, 18, 11, 0.98);
+    box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.36);
+  }
+  .nav-mobile button {
+    position: relative;
+    min-width: 0;
+    min-height: 58px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.16rem;
+    padding: 0.25rem 0.1rem;
+    border: 0;
+    border-radius: 11px;
+    background: transparent;
+    color: var(--brume);
+  }
+  .nav-mobile button.actif { color: var(--or-400); background: rgba(232, 178, 58, 0.1); }
+  .nav-mobile-icone { font-size: 1.25rem; line-height: 1; }
+  .nav-mobile-label {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.62rem;
+    line-height: 1.15;
+    font-weight: 700;
+  }
+  .nav-mobile .nav-badge { top: 2px; right: 16%; }
+
+  /* La promesse et le bouton arrivent avant la scène 3D : le visiteur comprend
+     quoi faire dès le premier écran, même avec un réseau ou un GPU modeste. */
+  .hero {
+    min-height: auto;
+    width: min(680px, 92vw);
+    gap: 0.8rem;
+    padding: 0.9rem 0 1.5rem;
+  }
+  .hero-texte { order: 0; }
+  .hero-canvas {
+    order: 2;
+    height: min(32vh, 280px);
+    margin-top: 0.4rem;
+  }
+  .hero h1 { font-size: clamp(2.5rem, 13vw, 4rem); margin: 0.45rem 0 0.8rem; }
+  .hero p.accroche { line-height: 1.5; }
+  .hero .cta-groupe {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+    margin-top: 1.1rem;
+  }
+  .hero .cta-groupe .btn { width: 100%; min-height: 52px; }
+  .hero .stats-bandeau {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin-top: 1.2rem;
+  }
+  .hero .stats-bandeau .stat {
+    min-width: 0;
+    padding: 0.55rem 0.3rem;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    text-align: center;
+  }
+  .hero .stats-bandeau .stat b { font-size: 1.55rem; }
+  .hero .stats-bandeau .stat span { font-size: 0.62rem; letter-spacing: 0.06em; }
+
+  /* Les surfaces principales récupèrent quelques pixels utiles et les boutons
+     structurants restent toujours assez grands pour un pouce. */
+  .section,
+  .creation,
+  .profil,
+  .boutique,
+  .pantheon,
+  .classement,
+  .championnats { width: min(760px, 94vw); }
+  .btn { min-height: 48px; }
+  .nav-journees button,
+  .x-retour,
+  .x-emojis button,
+  .x-media-choisi button,
+  .ml-tiroir-fermer,
+  .fc-fermer,
+  .guide-fermer,
+  .tuto-fermer {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .x-bannieres button { height: 44px; }
+  .x-nego-leviers button,
+  .x-nego-oui,
+  .x-nego-non { min-height: 44px; }
+  .choix-scenario { min-height: 48px; line-height: 1.4; }
+  .scenario-choix { padding-inline: 0.75rem; }
+  .saisie { gap: 0.45rem; padding: 0.65rem 0.7rem; }
+  .saisie textarea { max-height: 96px; }
+  .choix-rapides {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-inline: 0.75rem !important;
+    scroll-snap-type: x proximity;
+  }
+  .choix-rapides button { flex: 0 0 min(78vw, 300px); text-align: left; scroll-snap-align: start; }
+
+  /* Les grandes modales deviennent des feuilles tirées depuis le bas : leur
+     fermeture et leurs actions restent dans la zone naturelle du pouce. */
+  .overlay { align-items: end; padding: 0; }
+  .overlay > .modale {
+    width: 100%;
+    max-height: calc(92dvh - env(safe-area-inset-top, 0px));
+    padding: 1.2rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    border-radius: 22px 22px 0 0;
+    background: var(--surface-solid);
+  }
+  .rangee-fin { gap: 0.5rem; }
+  .rangee-fin .btn { flex: 1 1 0; }
+  .lecture-liens { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 390px) {
+  .nav .marque span.mot { font-size: 1rem; }
+  .barre-jouer-info { display: none; }
+  .barre-jouer .btn { width: 100%; }
+  .carriere-mobile-vues button { flex-direction: column; gap: 0.1rem; font-size: 0.68rem; }
+  .nav-mobile-menu-grille { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aller-contenu { transition: none; }
+  .hero-canvas-skel { animation: none; }
+  .msg, .carte, .btn { scroll-behavior: auto; }
+}

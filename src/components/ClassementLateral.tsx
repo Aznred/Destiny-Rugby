@@ -155,9 +155,19 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
 
   return (
     <aside
+      id="carriere-classement"
       className="carte classement-lateral"
       onClick={() => setEcran('tableau')}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setEcran('tableau');
+        }
+      }}
       title={t('cl.voirTout')}
+      role="button"
+      tabIndex={0}
+      aria-label={t('cl.voirTout')}
     >
       <div className="cl-lat-tete">
         <div>

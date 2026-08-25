@@ -7575,3 +7575,32 @@ Vérifié en jeu : `dataLayer` contient bien
 `{"event":"virtual_pageview","page_path":"/jeu/accueil"}` au chargement, puis
 `/jeu/classement` au clic sur l'onglet, et `google_tag_manager` expose la clé
 `GTM-KF48DSQ9` — sur `index.html` comme sur `/guide/`.
+
+## 📱 ACCESSIBILITÉ MOBILE — LE JEU AVANT LES MENUS
+
+Demande : « rendre beaucoup plus accessible la version mobile, plus simple
+d'utilisation, sans changer le jeu, pour baisser le bounce rate ».
+
+- **Navigation mobile dédiée** (`components/Nav.tsx`) : sous 900 px, la longue
+  file d'onglets horizontale disparaît. Une barre basse fixe expose Accueil,
+  Carrière/Créer, L'Ovale, Profil et Plus. « Plus » ouvre un vrai dialogue
+  accessible (focus enfermé, Échap, fond inert) pour Clubs, Classement, Hall,
+  Boutique et Réglages. Sur ordinateur, la navigation historique ne change pas.
+- **Carrière en trois vues** (`screens/Carriere.tsx`) : Récit est la vue
+  initiale, Profil et Classement restent à un toucher. Les trois composants
+  restent montés : aucune donnée ni mécanique ne bouge et la barre d'action en
+  portail continue à fonctionner. Le bouton principal vit au-dessus de la barre
+  basse, jamais dessous.
+- **Accueil orienté conversion** : sur téléphone, le texte et le CTA passent
+  AVANT `Hero3D`. La scène reste présente, mais ne retarde plus la compréhension
+  ni le premier geste. Les boutons du groupe CTA prennent toute la largeur.
+- **Socle d'accessibilité** : lien « aller au contenu », `aria-current`, journal
+  `role=log`, erreurs annoncées, champ du MJ nommé, classement latéral activable
+  au clavier, focus `:focus-visible`, cibles tactiles d'au moins 44 px et
+  `viewport-fit=cover` pour que les `safe-area-inset-*` fonctionnent sur iPhone.
+- **Aucun changement de jeu** : ni store, ni barème, ni calendrier, ni IA, ni
+  données. La passe ne touche qu'à l'ordre visuel, la navigation et les
+  attributs d'accessibilité.
+
+Vérifications : TypeScript, oxlint, compilation de production et
+`verifTraductions.ts` (1 762 clés, 100 % dans les sept langues).

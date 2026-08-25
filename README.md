@@ -390,9 +390,16 @@ s'affiche dans ⚙️ ; il n'est associé à aucun coût ni quota.
   dans ta langue, pas traduits après coup.
 - **Trois ambiances** — Pelouse, Nuit, Grenat. La couleur du stade change, les
   dorures et le cuir restent.
-- **Jouable au pouce** : l'action principale reste en bas de l'écran en
-  permanence, la navigation défile d'un doigt, le match passe en plein écran et
-  rien ne déborde. Vérifié à 375 × 812.
+- **Jouable au pouce** : cinq destinations stables vivent dans une barre basse,
+  le reste tient dans un menu « Plus », et toutes les cibles principales font
+  au moins 44 px. Plus besoin de faire défiler la navigation pour deviner ce
+  qu'elle cache.
+- **La carrière va droit au jeu** : le récit s'ouvre en premier ; Profil et
+  Classement sont deux vues à un toucher au lieu de former une longue page. Le
+  bouton qui joue le match ou passe la semaine reste au-dessus de la navigation.
+- **L'accueil retient mieux** : le titre, l'explication et « Commencer » passent
+  avant la scène 3D sur téléphone. Les encoches iPhone, la réduction des
+  animations, le focus clavier et les lecteurs d'écran sont pris en compte.
 
 ## 🏆 Le classement mondial, et pourquoi on ne peut pas le truquer
 

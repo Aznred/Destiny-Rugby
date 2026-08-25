@@ -61,6 +61,10 @@ export function Carriere({ onReglages }: Props) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [choix, setChoix] = useState<string[]>([]);
+  // Sur téléphone, les trois colonnes deviennent trois vues simples. Le récit
+  // est la porte d'entrée : la fiche et le classement restent à un toucher,
+  // sans imposer plusieurs écrans de défilement avant de pouvoir jouer.
+  const [vueMobile, setVueMobile] = useState<'jeu' | 'joueur' | 'classement'>('jeu');
   const finRef = useRef<HTMLDivElement>(null);
   // ⚠️ Verrou de ré-entrée. Sans lui, le moindre re-rendu pendant la génération
   // relançait une génération : deux scènes pour la même semaine, et deux fois
@@ -206,11 +210,37 @@ export function Carriere({ onReglages }: Props) {
   return (
     // ⚠️ Trois colonnes qui tiennent DANS l'écran : la page elle-même ne
     // défile jamais, chaque colonne défile de son côté (voir App.css).
-    <section className="carriere">
+    <section className="carriere" data-mobile-vue={vueMobile}>
+      <div className="carriere-mobile-vues" role="group" aria-label={t('car.navigationMobile')}>
+        <button
+          type="button"
+          onClick={() => setVueMobile('jeu')}
+          aria-pressed={vueMobile === 'jeu'}
+          aria-controls="carriere-jeu"
+        >
+          <span aria-hidden="true">📖</span>{t('car.vueJeu')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setVueMobile('joueur')}
+          aria-pressed={vueMobile === 'joueur'}
+          aria-controls="carriere-joueur"
+        >
+          <span aria-hidden="true">👤</span>{t('nav.profil')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setVueMobile('classement')}
+          aria-pressed={vueMobile === 'classement'}
+          aria-controls="carriere-classement"
+        >
+          <span aria-hidden="true">🏆</span>{t('nav.classement')}
+        </button>
+      </div>
       <PanneauJoueur joueur={joueur} />
 
-      <div className="carte jeu">
-        <div className="journal">
+      <div id="carriere-jeu" className="carte jeu">
+        <div className="journal" role="log" aria-live="polite" aria-relevant="additions text" aria-label={t('car.vueJeu')}>
           <AnimatePresence initial={false}>
             {journal.map((e) => (
               <Message key={e.id} entree={e} />
@@ -218,9 +248,9 @@ export function Carriere({ onReglages }: Props) {
           </AnimatePresence>
 
           {enCours && (
-            <div className="msg mj">
+            <div className="msg mj" role="status" aria-label={t('app.chargement')}>
               <div className="bulle">
-                <div className="reflexion">
+                <div className="reflexion" aria-hidden="true">
                   <span /><span /><span />
                 </div>
               </div>
@@ -229,7 +259,7 @@ export function Carriere({ onReglages }: Props) {
           <div ref={finRef} />
         </div>
 
-        {erreur && <div className="alerte" style={{ margin: '0 1.2rem' }}>{erreur}</div>}
+        {erreur && <div className="alerte" role="alert" style={{ margin: '0 1.2rem' }}>{erreur}</div>}
 
         {scenarioActif ? (
           <div className="scenario-choix">
@@ -273,6 +303,11 @@ export function Carriere({ onReglages }: Props) {
             dans le vide. Aucun message d'alerte — juste une invite différente. */}
         <div className="saisie">
           <textarea
+            aria-label={
+              evenementHebdo
+                ? t('car.placeholderEvenement')
+                : avecIA ? t('car.placeholder') : t('car.placeholderSansMJ')
+            }
             placeholder={
               scenarioActif
                 ? t('car.placeholderChoix')
@@ -285,6 +320,7 @@ export function Carriere({ onReglages }: Props) {
             value={texte}
             onChange={(e) => setTexte(e.target.value)}
             onKeyDown={gererClavier}
+            enterKeyHint="send"
             rows={1}
             disabled={enCours || !!scenarioActif || (!avecIA && !evenementHebdo)}
           />

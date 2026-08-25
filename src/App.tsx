@@ -106,13 +106,16 @@ export default function App() {
   }, [ecran, joueur, manager, setEcran]);
 
   return (
-    <div key={langue} className="racine">
+    <div key={langue} className="racine" data-ecran={ecran}>
+      <a className="aller-contenu" href="#contenu-principal">
+        {t('app.allerContenu')}
+      </a>
       <Nav onReglages={() => setReglagesOuverts(true)} />
       {/* Le guide de carrière : une pastille discrète, sur tous les écrans de
           jeu. Il ne monte rien tant qu'il n'y a pas de carrière. */}
       <Guide />
 
-      <main>
+      <main id="contenu-principal" tabIndex={-1}>
         {/* Un écran qui plante ne doit JAMAIS emporter la navigation avec lui. */}
         <Garde key={ecran} onRetour={() => setEcran('accueil')}>
         <AnimatePresence mode="wait">
