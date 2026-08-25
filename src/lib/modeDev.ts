@@ -20,43 +20,28 @@
 const CHANTIERS = ['manager'] as const;
 export type Chantier = (typeof CHANTIERS)[number];
 
-/** Ce qu'on tape dans l'adresse ou dans le stockage local pour ouvrir. */
-const CLE_DEV = 'ovalie-dev';
-
 /**
  * Le mode développeur est-il actif ?
  *
- * Trois façons de l'allumer, et la troisième est celle qui sert vraiment :
+ * Deux façons de l'allumer :
  *
  *   1. **en développement** (`npm run dev`) : toujours ouvert — c'est là qu'on
  *      travaille, et devoir s'authentifier chez soi n'a aucun sens ;
- *   2. **`?dev=1` dans l'adresse** : le passage qu'on utilise une fois ;
- *   3. **`localStorage`** : le passage POSÉ par le précédent, qui survit aux
- *      rechargements. Sans lui, il faudrait remettre `?dev=1` à chaque fois —
- *      y compris après chaque navigation interne du jeu.
+ *   2. **`?dev=1` dans l'adresse** : un accès TEMPORAIRE pour tester la
+ *      production. Dès que l'on revient sur l'adresse normale, le chantier se
+ *      recache. Aucun drapeau n'est plus conservé dans le navigateur.
  *
  * ⚠️ LA LECTURE EST FAITE UNE FOIS, À L'IMPORT. Elle touche `location` et
- * `localStorage` : appelée à chaque rendu, elle ferait un accès au stockage par
- * pion affiché. Et l'état ne change pas en cours de session — sauf à recharger,
- * ce qui relit de toute façon.
+ * l'état ne change pas en cours de session — sauf à recharger, ce qui relit
+ * de toute façon l'adresse.
  */
 function lireModeDev(): boolean {
   if (import.meta.env?.DEV) return true;
   if (typeof window === 'undefined') return false;
   try {
-    const params = new URLSearchParams(window.location.search);
-    const demande = params.get('dev');
-    if (demande === '1') {
-      window.localStorage.setItem(CLE_DEV, '1');
-      return true;
-    }
-    if (demande === '0') {
-      window.localStorage.removeItem(CLE_DEV);
-      return false;
-    }
-    return window.localStorage.getItem(CLE_DEV) === '1';
+    return new URLSearchParams(window.location.search).get('dev') === '1';
   } catch {
-    // Navigation privée, stockage refusé : on reste côté joueur.
+    // Adresse illisible : on reste côté joueur.
     return false;
   }
 }
