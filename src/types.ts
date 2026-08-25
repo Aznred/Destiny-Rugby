@@ -506,6 +506,7 @@ export type Ecran =
   | 'effectif'
   | 'tableau'
   | 'social'
+  | 'finCarriere'
   // ── Le mode manager ─────────────────────────────────────────────────
   | 'creationManager'
   | 'manager';
@@ -811,4 +812,23 @@ export interface LegendeSauvegardee {
   score: number;
   fictif?: boolean; // légende pré-générée (pour peupler le classement)
   reconversion?: string; // ce qu'il est devenu après sa carrière
+}
+
+/** La raison qui a fermé une carrière, conservée jusqu'à ce que le joueur l'ait lue. */
+export type MotifFinCarriere =
+  | 'retraiteChoisie'
+  | 'ageLimite'
+  | 'blessure'
+  | 'radiation'
+  | 'deces'
+  | 'sansClub'
+  | 'autre';
+
+export interface FinCarriere {
+  legendeId: string;
+  motif: MotifFinCarriere;
+  /** Le fait précis (nom de la blessure, décision, incident) quand il existe. */
+  detail?: string;
+  reconversion?: string;
+  destination: 'pantheon' | 'manager';
 }

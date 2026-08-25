@@ -7,6 +7,8 @@ import type {
   EvenementHebdo,
   Joueur,
   LegendeSauvegardee,
+  FinCarriere,
+  MotifFinCarriere,
   BilanEnCours,
   PreAccord,
   TitreGagne,
@@ -431,6 +433,22 @@ export const AGE_RETRAITE_LIBRE = 33;
 export const AGE_RETRAITE_FORCEE = 44;
 
 // ---------------------------------------------------------------------------
+export function motifFinDepuisConsequence(type?: ConsequenceDure): MotifFinCarriere {
+  if (type === 'deces') return 'deces';
+  if (type === 'banRugby') return 'radiation';
+  if (type === 'finDeCarriere') return 'blessure';
+  return 'autre';
+}
+
+function motifFinParDefaut(joueur: Joueur): MotifFinCarriere {
+  if (joueur.age >= AGE_RETRAITE_FORCEE) return 'ageLimite';
+  if (joueur.blessure?.gravite === 'carriere') {
+    return joueur.blessure.nom.toLocaleLowerCase().includes('radiation') ? 'radiation' : 'blessure';
+  }
+  if ((joueur.contrat?.saisons ?? 1) <= 0) return 'sansClub';
+  return 'retraiteChoisie';
+}
+
 // LA RÉCUPÉRATION HEBDOMADAIRE
 // ---------------------------------------------------------------------------
 // ⚠️ ELLE N'EXISTAIT PAS, ET C'ÉTAIT LE BUG signalé en jeu : « impossible de
@@ -768,6 +786,8 @@ interface GameState {
   pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
   scenarioActif: Scenario | null;
+  /** Épilogue à lire avant l'entrée effective dans le Hall des légendes. */
+  finCarriere: FinCarriere | null;
   // ═══ LE RÉCIT DE LA SEMAINE ═════════════════════════════════════════════
   // ⚠️ Demande explicite : « au lieu d'avoir des boutons chaque semaine, l'IA
   // sort un évènement ; le joueur répond en écrivant et l'IA juge ». D'où deux
@@ -958,7 +978,10 @@ interface GameState {
   choisirAgent: (id: string) => boolean;
   /** Intersaison : un meilleur agent te démarche, ou le tien te lâche. */
   mouvementAgents: () => void;
-  prendreRetraite: (reconversion?: string) => void;
+  prendreRetraite: (
+    reconversion?: string, motif?: MotifFinCarriere, detail?: string,
+  ) => void;
+  continuerFinCarriere: () => void;
   fermerTrophee: () => void;
   reinitialiser: () => void;
   // marché des transferts — tout passe par les messages privés de L'Ovale
@@ -1127,6 +1150,7 @@ export const useGame = create<GameState>()(
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
       scenarioActif: null,
+      finCarriere: null,
       attenteEvenement: false,
       avanceRapide: false,
       evenementHebdo: null,
@@ -1201,10 +1225,15 @@ export const useGame = create<GameState>()(
       consommerOuvertureSociale: () => set({ ouvrirSocialSur: null }),
       consommerConversationSocialeCible: () => set({ conversationSocialeCible: null }),
 
-      setEcran: (ecran) => set((s) => ({
-        ecran,
-        ecransVus: s.ecransVus.includes(ecran) ? s.ecransVus : [...s.ecransVus, ecran],
-      })),
+      setEcran: (ecran) => set((s) => {
+        // Tant que l'épilogue n'a pas été lu, aucun bouton de navigation ne
+        // peut téléporter directement vers le Hall et escamoter l'explication.
+        const cible = s.finCarriere ? 'finCarriere' : ecran;
+        return {
+          ecran: cible,
+          ecransVus: s.ecransVus.includes(cible) ? s.ecransVus : [...s.ecransVus, cible],
+        };
+      }),
       fermerGuide: () => set({ guideFerme: true }),
       setIAActivee: (iaActivee) => set({ iaActivee }),
       setModele: (modele) => set({ modele }),
@@ -1281,6 +1310,7 @@ export const useGame = create<GameState>()(
         set({
           joueur,
           ecran: 'carriere',
+          finCarriere: null,
           // ⚠️ Le guide lit `ecransVus` : un écran atteint sans passer par
           // `setEcran` doit s'y inscrire quand même, sinon son étape reste
           // décochée alors qu'on est justement dessus.
@@ -1409,7 +1439,10 @@ export const useGame = create<GameState>()(
         if (r.marche && !suites.finale && !suites.sansClub) get().demanderTransfert();
         if (suites.sansClub) get().retrouverUnClub();
         get().verifierSucces();
-        if (suites.finale) get().prendreRetraite();
+        if (suites.finale) get().prendreRetraite(
+          undefined, motifFinDepuisConsequence(consequence),
+          r.motif ?? r.evenement ?? actionJoueur.slice(0, 120),
+        );
       },
 
       saisonSuivante: () => {
@@ -1490,7 +1523,8 @@ export const useGame = create<GameState>()(
                 + `À ${joueur.age} ans, aucune formation ne te propose de place : la carrière s'arrête ici.`,
             }],
           }));
-          get().prendreRetraite();
+          get().prendreRetraite(undefined, 'sansClub',
+            `Aucune formation n’a proposé de contrat à ${joueur.age} ans.`);
           return;
         }
         // La saison a réellement été jouée journée après journée. Une vieille
@@ -2128,7 +2162,8 @@ export const useGame = create<GameState>()(
                 + `professionnel à cet âge : ta carrière s'arrête ici, et elle s'arrête debout.`,
             }],
           }));
-          get().prendreRetraite();
+          get().prendreRetraite(undefined, 'ageLimite',
+            `La limite de la carrière joueur est fixée à ${AGE_RETRAITE_FORCEE} ans.`);
         }
       },
 
@@ -3065,7 +3100,10 @@ export const useGame = create<GameState>()(
 
         get().signalerDefi('situation');
         get().verifierSucces();
-        if (suites.finale) get().prendreRetraite();
+        if (suites.finale) get().prendreRetraite(
+          undefined, motifFinDepuisConsequence(jugement.consequence),
+          jugement.motif ?? evenementHebdo.titre,
+        );
       },
 
       /**
@@ -3106,7 +3144,8 @@ export const useGame = create<GameState>()(
               + `ne veut de ton nom sur une feuille de match : la carrière s'arrête ici.`,
           }],
         }));
-        get().prendreRetraite();
+        get().prendreRetraite(undefined, 'sansClub',
+          'Après la rupture du contrat, aucun club n’a accepté de relancer la carrière.');
       },
 
       // ---- AGENT (lot 6) : il prélève sa commission, mais ouvre les portes ----
@@ -3288,10 +3327,12 @@ export const useGame = create<GameState>()(
         get().signalerDefi('situation');
         get().verifierSucces();
         // Fin de carrière imposée : on fige la carrière dans le panthéon.
-        if (finale) get().prendreRetraite();
+        if (finale) get().prendreRetraite(
+          undefined, motifFinDepuisConsequence(dur?.type), dur?.motif,
+        );
       },
 
-      prendreRetraite: (reconversion?: string) => {
+      prendreRetraite: (reconversion, motif, detail) => {
         const joueur = get().joueur;
         if (!joueur) return;
         const legende: LegendeSauvegardee = {
@@ -3313,6 +3354,8 @@ export const useGame = create<GameState>()(
           reconversion,
         };
         // ═══ LE CLASSEMENT MONDIAL SE REMPLIT ICI ════════════════════════════
+        const versManager = reconversion === 'entraineur' && chantierVisible('manager');
+        const raison = motif ?? motifFinParDefaut(joueur);
         // ⚠️ BUG SIGNALÉ EN JEU : « le classement fonctionne pas, la table se
         // remplit pas ». La fonction serveur, la base et le barème étaient bons
         // — mais RIEN N'ENVOYAIT JAMAIS. L'envoi était entièrement manuel, et
@@ -3356,8 +3399,14 @@ export const useGame = create<GameState>()(
           //    la liste : c’était déjà une reconversion NARRATIVE avant ce
           //    chantier, et la retirer changerait un texte que le joueur
           //    connaît. Il retombe simplement au Hall, comme les quatre autres.
-          reconversionManager: reconversion === 'entraineur' && chantierVisible('manager')
-            ? legende : null,
+          reconversionManager: versManager ? legende : null,
+          finCarriere: {
+            legendeId: legende.id,
+            motif: raison,
+            detail: detail?.trim() || undefined,
+            reconversion,
+            destination: versManager ? 'manager' : 'pantheon',
+          },
           mouvementsClubs: {},
           journal: [],
           scenarioActif: null,
@@ -3367,9 +3416,22 @@ export const useGame = create<GameState>()(
           tropheesEnAttente: [],
           offres: [],
           offresOuvertes: false,
-          ecran: reconversion === 'entraineur' && chantierVisible('manager')
-            ? 'creationManager' : 'pantheon',
-          ecransVus: [...s.ecransVus, 'pantheon'].filter((e, i, l) => l.indexOf(e) === i),
+          // On ne saute plus directement au Hall : l'épilogue explique
+          // d'abord pourquoi la carrière est terminée et récapitule le bilan.
+          ecran: 'finCarriere',
+          ecransVus: [...s.ecransVus, 'finCarriere'].filter((e, i, l) => l.indexOf(e) === i),
+        }));
+      },
+
+      continuerFinCarriere: () => {
+        const fin = get().finCarriere;
+        const destination = fin?.destination === 'manager' && chantierVisible('manager')
+          ? 'creationManager' : 'pantheon';
+        set((s) => ({
+          finCarriere: null,
+          ecran: destination,
+          ecransVus: s.ecransVus.includes(destination)
+            ? s.ecransVus : [...s.ecransVus, destination],
         }));
       },
 
@@ -3936,6 +3998,7 @@ export const useGame = create<GameState>()(
         set({
           joueur: null,
           journal: [],
+          finCarriere: null,
           scenarioActif: null,
           attenteEvenement: false,
           evenementHebdo: null,
@@ -4089,7 +4152,9 @@ export const useGame = create<GameState>()(
           get().retrouverUnClub();
         }
         if (exclusionSociale) get().retrouverUnClub();
-        if (carriereFinie) get().prendreRetraite();
+        if (carriereFinie) get().prendreRetraite(
+          undefined, motifFinParDefaut(j), entreeDure?.texte,
+        );
       },
 
       // ---- LE FIL DU MONDE, ÉCRIT PAR L'IA ----
@@ -4844,7 +4909,7 @@ export const useGame = create<GameState>()(
               + `À ${joueur.age} ans, il faut raccrocher, et choisir ce que tu fais de la suite.`,
           }],
         }));
-        get().prendreRetraite();
+        get().prendreRetraite(undefined, 'blessure', joueur.blessure?.nom);
       },
 
       // ═══ LA COMMISSION DE DISCIPLINE ════════════════════════════════════
@@ -5546,6 +5611,9 @@ export const useGame = create<GameState>()(
           etat.reparerSilencesClubs();
         }
         // Et la clé Groq personnelle, pour la même raison (`lib/groq.ts` ne
+        // Fermer l'onglet sur l'épilogue ne permet pas de le contourner : au
+        // retour, on reprend l'explication avant d'ouvrir le Hall.
+        if (etat?.finCarriere) etat.setEcran('finCarriere');
         // peut pas lire le store sans créer un cycle d'imports).
         definirCleGroqJoueur(etat?.groqKey ?? '');
       },
@@ -5575,6 +5643,7 @@ export const useGame = create<GameState>()(
         pubs: s.pubs,
         pantheon: s.pantheon,
         scenarioActif: s.scenarioActif,
+        finCarriere: s.finCarriere,
         // La scène de la semaine est persistée : fermer l'onglet en plein
         // milieu ne doit pas escamoter la question qui attend une réponse.
         evenementHebdo: s.evenementHebdo,

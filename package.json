@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "verify:situations": "vite-node scripts/verifierSituations.ts",
-    "verify:social": "vite-node scripts/verifierDisciplineSociale.ts"
+    "verify:social": "vite-node scripts/verifierDisciplineSociale.ts",
+    "verify:fin-carriere": "vite-node scripts/verifierFinCarriere.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -546,7 +546,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             libelleNon={t('pj.confirmerRetraite.non')}
             onOui={() => {
               setConfirmerRetraite(false);
-              prendreRetraite(finDeCarriere ? reconversion : undefined);
+              prendreRetraite(
+                finDeCarriere ? reconversion : undefined,
+                'retraiteChoisie',
+                `Retraite annoncée à ${joueur.age} ans, après ${joueur.saison} saison${joueur.saison > 1 ? 's' : ''}.`,
+              );
             }}
             onNon={() => setConfirmerRetraite(false)}
           />

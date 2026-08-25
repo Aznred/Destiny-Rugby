@@ -27,6 +27,7 @@ import { Profil } from './screens/Profil';
 // dans son propre fichier, chargé au moment où on clique dessus.
 const Boutique = lazy(() => import('./screens/Boutique').then((m) => ({ default: m.Boutique })));
 const Pantheon = lazy(() => import('./screens/Pantheon').then((m) => ({ default: m.Pantheon })));
+const FinCarriere = lazy(() => import('./screens/FinCarriere').then((m) => ({ default: m.FinCarriere })));
 const Classement = lazy(() => import('./screens/Classement').then((m) => ({ default: m.Classement })));
 const Championnats = lazy(() => import('./screens/Championnats').then((m) => ({ default: m.Championnats })));
 const Effectif = lazy(() => import('./screens/Effectif').then((m) => ({ default: m.Effectif })));
@@ -157,6 +158,7 @@ export default function App() {
             <Suspense fallback={<EcranEnRoute />}>
               {ecran === 'boutique' && <Boutique />}
               {ecran === 'pantheon' && <Pantheon />}
+              {ecran === 'finCarriere' && <FinCarriere />}
               {ecran === 'classement' && <Classement />}
               {ecran === 'championnats' && <Championnats />}
               {ecran === 'effectif' && Boolean(joueur || managerActif) && <Effectif />}

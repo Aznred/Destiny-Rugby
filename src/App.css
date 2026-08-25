@@ -898,6 +898,52 @@
 .pack-bonus { font-size: 0.75rem; color: var(--succes); font-weight: 700; }
 
 /* ====== HALL DES LÉGENDES ====== */
+.fin-carriere {
+  width: min(860px, 92vw); margin: clamp(1.2rem, 4vw, 3rem) auto 5rem;
+}
+.fin-carriere-carte {
+  position: relative; overflow: hidden; padding: clamp(1.35rem, 4vw, 2.8rem);
+  text-align: center; border-color: rgba(232, 178, 58, 0.48);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(232, 178, 58, 0.15), transparent 42%),
+    rgba(7, 22, 14, 0.94);
+}
+.fin-carriere-icone { font-size: clamp(3rem, 9vw, 5rem); line-height: 1; margin-bottom: 0.8rem; }
+.fin-carriere h1 {
+  max-width: 18ch; margin: 0.35rem auto 0.8rem; font-family: var(--police-titre);
+  font-size: clamp(1.85rem, 6vw, 3.4rem); line-height: 1.02; text-transform: uppercase;
+}
+.fin-carriere-raison {
+  max-width: 64ch; margin: 0 auto 1.4rem; color: var(--craie-dim); line-height: 1.65;
+}
+.fin-carriere-detail {
+  max-width: 62ch; margin: 0 auto 1.6rem; padding: 0.85rem 1rem; text-align: left;
+  border-left: 3px solid var(--or-400); border-radius: 0 10px 10px 0;
+  background: rgba(232, 178, 58, 0.09);
+}
+.fin-carriere-detail b { color: var(--or-300, var(--or-400)); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.fin-carriere-detail p { margin: 0.3rem 0 0; color: var(--craie); line-height: 1.5; }
+.fin-carriere-nom { font-family: var(--police-forte); font-size: 1.2rem; font-weight: 800; margin-bottom: 0.8rem; }
+.fin-carriere-stats {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.55rem;
+  margin: 0 auto 1.4rem;
+}
+.fin-carriere-stats > div {
+  display: grid; justify-items: center; gap: 0.15rem; padding: 0.7rem 0.3rem;
+  border: 1px solid var(--bordure); border-radius: 10px; background: rgba(255, 255, 255, 0.025);
+}
+.fin-carriere-stats b { font-family: var(--police-forte); color: var(--craie); font-size: 1.05rem; }
+.fin-carriere-stats small { color: var(--brume); font-size: 0.68rem; }
+.fin-carriere-sauvee { color: var(--succes); font-size: 0.85rem; margin: 0 auto 1rem; }
+.fin-carriere-continuer { width: min(100%, 420px); justify-content: center; }
+
+@media (max-width: 700px) {
+  .fin-carriere { width: min(760px, 94vw); margin-top: 0.8rem; }
+  .fin-carriere-carte { padding: 1.25rem 0.9rem; }
+  .fin-carriere-stats { grid-template-columns: repeat(3, 1fr); }
+  .fin-carriere-detail { font-size: 0.88rem; }
+}
+
 .pantheon { width: min(1000px, 92vw); margin: 2rem auto 4rem; }
 .titre-pantheon { font-family: var(--police-titre); text-transform: uppercase; font-size: clamp(1.8rem, 5vw, 3rem); }
 .vide-pantheon { padding: 3rem 2rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
