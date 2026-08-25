@@ -4,6 +4,7 @@ import './App.css';
 import { Analytics } from '@vercel/analytics/react'
 import { useGame } from './store/useGame';
 import { t } from './lib/i18n';
+import { pageVue } from './lib/mesure';
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
 import { Guide } from './components/Guide';
@@ -83,6 +84,13 @@ export default function App() {
   // pas. Le Maître du Jeu passe désormais par Groq (`lib/groq.ts`) : il n'y a
   // ni téléchargement, ni GPU à interroger, ni état à préparer — le premier
   // appel part quand le joueur agit.
+
+  // ⚠️ UN ÉCRAN VAUT UNE PAGE VUE. Le jeu n'a qu'une adresse : sans cette
+  // ligne, toute une session ne compte qu'une page et l'on ne peut pas voir
+  // où les joueurs décrochent. C'est le SEUL endroit qui voit tous les
+  // changements d'écran — six écritures du store posent `ecran:` directement,
+  // sans passer par `setEcran` (création, retraite, ouverture des messages…).
+  useEffect(() => { pageVue(ecran); }, [ecran]);
 
   // Garde-fou : pas d'écran carrière/profil sans joueur.
   useEffect(() => {

@@ -7486,3 +7486,92 @@ npx vite-node scripts/verifMoteur.ts               # l’étalonnage tient malgr
 npx vite-node scripts/verifControle.ts             # franchissements mesurés sur 40 matchs
 npx vite-node scripts/verifTitres.ts               # le titre mondial suit la finale
 ```
+
+
+---
+
+## 📈 GOOGLE TAG MANAGER, ET UN ÉCRAN QUI VAUT UNE PAGE VUE
+
+Demande : poser le conteneur Google Tag Manager `GTM-KF48DSQ9` sur toutes les
+pages du site, puis « ajouter un virtual pageview dans `setEcran()` ».
+
+### Où la balise est posée, et pourquoi à deux endroits
+
+| Fichier | Ce qu'il sert |
+|---|---|
+| `index.html` | Le jeu. La balise est **le plus haut possible dans le `<head>`**, le repli `<noscript>` juste après `<body>`. |
+| `scripts/genPages.cjs` | Les **quatre pages de contenu**. On touche le GÉNÉRATEUR, jamais `public/<slug>/index.html` : ces fichiers sont réécrits à chaque `node scripts/genPages.cjs`, et une balise collée à la main dans le résultat disparaîtrait à la première régénération, sans un mot. |
+
+⚠️ **CONTRAIREMENT À ADSENSE, GTM N'EST PAS CONDITIONNÉ À `PUB_SLOT`.**
+`scriptAdsense()` et `encartPub()` ne rendent rien sans slot, parce qu'une balise
+publicitaire vide n'a aucun intérêt. GTM n'affiche rien : c'est un conteneur de
+mesure, et il a du sens précisément sur une page sans annonce — c'est là qu'on
+veut savoir si quelqu'un lit.
+
+⚠️ **`GTM-KF48DSQ9` EST EN DUR, comme le `ca-pub-…` d'AdSense.** Ces
+identifiants sont publics par construction : Google exige qu'ils figurent en
+clair dans la page. Il n'y a rien à mettre en variable d'environnement.
+
+⚠️ **ET IL NE PEUT PAS EMPÊCHER LE JEU DE SE CHARGER** : le script est `async` et
+sans dépendance. Bloqueur de publicité, réseau coupé, pays où
+`googletagmanager.com` ne répond pas — la page se charge exactement pareil.
+C'est la règle du projet : le jeu reste ENTIER quand un service tiers tombe.
+
+### ⚠️ CE QUE GTM CHARGE NE SE DÉCIDE PAS DANS CE DÉPÔT
+
+C'est sa force (on ajoute une balise sans redéployer) et c'est son risque. Le
+projet a des règles écrites en tête de `src/lib/pub.ts` — « rien ne se charge
+sans consentement », « jamais d'interstitiel ni de pop-up » — et c'est en leur
+nom que le service worker Monetag a été supprimé de `public/`. **Le conteneur
+peut déclencher n'importe quoi**, et ce n'importe quoi échappe au code du jeu.
+Le consentement des balises qu'il déclenche se règle donc **dans l'interface de
+GTM** (mode Consentement de Google), pas ici. Ce fichier ne peut pas le garantir
+à la place de l'administrateur du conteneur.
+
+### `src/lib/mesure.ts` — un écran vaut une page vue
+
+⚠️ **LE JEU N'A QU'UNE SEULE URL.** `setEcran` change un champ du store,
+l'adresse ne bouge jamais — c'est la raison d'être des quatre pages statiques
+générées (voir « DES PAGES DE CONTENU », plus haut). Pour Google Analytics,
+toute une session — accueil, création, carrière, match, classement, boutique —
+compte donc **une seule page vue**, et il devient impossible de voir où les
+joueurs décrochent.
+
+⚠️ **ET UN ROUTEUR NE RÉGLERAIT PAS ÇA POUR CE QU'IL COÛTE**, question posée
+explicitement (« passer à des pages séparées `/classement`, `/carriere` ? »). Les
+écrans sont des VUES d'un état Zustand persisté, pas des documents
+indépendants : leur donner de vraies adresses obligerait à gérer le bouton
+« retour » du navigateur en pleine partie et à synchroniser l'URL avec l'état de
+la carrière — pour un gain nul côté joueur. Un « virtual pageview » donne le
+même entonnoir à l'analyse sans toucher à l'architecture.
+
+⚠️ **ET CE N'EST PROBABLEMENT PAS LA CAUSE D'UN TAUX DE REBOND ÉLEVÉ.** GA4 ne
+compte plus un rebond comme « une seule page vue » : une session est ENGAGÉE dès
+10 secondes passées, une conversion, ou deux pages vues. **Le temps passé compte
+sans changement d'URL** — quelqu'un qui joue cinq minutes sur `carriere` est déjà
+une session engagée. Ce qui ferait vraiment rebondir, c'est un départ sous
+10 secondes depuis l'accueil, ou un abandon à la création. C'est précisément ce
+que les pages vues virtuelles permettent enfin de distinguer.
+
+| | |
+|---|---|
+| `cheminDEcran(ecran)` | `/jeu/<ecran>`. ⚠️ **Le préfixe `/jeu/` n'est pas décoratif** : sans lui, l'écran `guide` entrerait en collision avec la VRAIE page `/guide/` générée par `scripts/genPages.cjs`, et les deux se cumuleraient dans le même rapport. |
+| `pageVue(ecran)` | Pousse `virtual_pageview` dans `dataLayer`. Mémorise le dernier écran annoncé : sans cette mémoire, un remontage de React (changement de langue, réhydratation, `StrictMode` qui monte deux fois en développement) compterait deux pages vues. |
+| `evenementMesure(nom, details)` | Un fait de parcours. ⚠️ **Jamais de donnée de joueur** — ni le nom du personnage, ni le club, ni le pseudo 𝕏 : ils ne répondent à aucune question qu'on se pose sur l'audience, et le jeu ne demande aucun consentement pour les partager. |
+
+⚠️ **L'APPEL VIT DANS `App.tsx`, PAS DANS `setEcran`.** C'est le seul endroit qui
+voit TOUS les changements d'écran : **six écritures du store posent `ecran:`
+directement**, sans passer par `setEcran` (création de carrière, retraite,
+ouverture de L'Ovale sur les messages, mode manager, panthéon, accueil). Les
+patcher une par une aurait raté les six — exactement le défaut déjà payé par le
+guide de carrière, dont les étapes restaient décochées parce que `ecransVus`
+n'était alimenté que par `setEcran`.
+
+⚠️ **ET RIEN NE PEUT CASSER LE JEU** : `dataLayer` n'existe pas si GTM est bloqué
+ou si le code tourne hors navigateur (scripts `verif*.ts`). Chaque fonction sort
+en silence. Aucun écran ne doit dépendre de la présence d'un mouchard.
+
+Vérifié en jeu : `dataLayer` contient bien
+`{"event":"virtual_pageview","page_path":"/jeu/accueil"}` au chargement, puis
+`/jeu/classement` au clic sur l'onglet, et `google_tag_manager` expose la clé
+`GTM-KF48DSQ9` — sur `index.html` comme sur `/guide/`.

@@ -345,6 +345,31 @@ il évolue donc dès la fenêtre internationale suivante. Vérification :
   (les 250 drapeaux ne sont plus recopiés dedans en base 64), et sept écrans
   plus le moteur de match ne sont téléchargés qu'au moment où l'on s'en sert.
 
+## 📈 Mesure d'audience : un écran vaut une page vue
+
+Le conteneur **Google Tag Manager** (`GTM-KF48DSQ9`) est posé sur les cinq pages
+du site : `index.html` pour le jeu, et `scripts/genPages.cjs` pour les quatre
+pages de contenu — c'est le **générateur** qu'on modifie, jamais le HTML qu'il
+écrit, sinon la balise disparaîtrait à la première régénération.
+
+Le script est `async` et sans dépendance : bloqué par un bloqueur de publicité
+ou par un réseau coupé, la page se charge exactement pareil.
+
+⚠️ **Le jeu n'a qu'une seule URL.** Changer d'écran ne change pas l'adresse :
+pour Google Analytics, toute une session — accueil, création, carrière, match,
+classement — ne comptait qu'**une page vue**, et il était impossible de voir où
+les joueurs décrochent. `src/lib/mesure.ts` pousse donc un `virtual_pageview`
+(`/jeu/carriere`, `/jeu/classement`…) à chaque changement d'écran.
+
+Un routeur aurait coûté beaucoup plus cher pour le même résultat : les écrans
+sont des vues d'un état Zustand persisté, pas des documents indépendants — leur
+donner de vraies adresses obligerait à gérer le bouton « retour » du navigateur
+en pleine partie, pour un gain nul côté joueur.
+
+L'appel vit dans `App.tsx` et non dans `setEcran`, parce que **six écritures du
+store posent `ecran:` directement** sans passer par elle. Et rien n'est envoyé
+sur le joueur lui-même : ni son nom, ni son club, ni son pseudo.
+
 ## ⚙️ Activité de l'IA locale, mesurée
 
 L'Ovale a été ramené de **trois appels par semaine à un seul**, commentaires
