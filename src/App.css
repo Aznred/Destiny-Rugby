@@ -1334,8 +1334,9 @@
 .stat-case b { font-family: var(--police-forte); font-size: 1.15rem; color: var(--or-400); }
 .stat-case em { font-style: normal; font-size: 0.7rem; color: var(--brume); }
 
-/* Les trois ambiances : une pastille de dégradé et un nom, rien de plus. */
-.choix-theme { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+/* Les ambiances : une pastille de dégradé et un nom, rien de plus. La grille
+   s'adapte au panneau étroit du téléphone sans réduire les zones tactiles. */
+.choix-theme { display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 0.6rem; }
 .choix-theme button {
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;
   padding: 0.6rem 0.5rem; border-radius: var(--rayon-sm);

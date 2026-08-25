@@ -13,12 +13,17 @@ import type { Theme } from '../types';
 import { LANGUES, nombre, t, tn } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
 
-// Les trois ambiances. `apercu` est le dégradé montré sur la pastille — il
+// Les huit ambiances. `apercu` est le dégradé montré sur la pastille — il
 // reprend exactement les deux extrémités de la rampe de fond du thème.
 const AMBIANCES: { id: Theme; cle: string; apercu: string }[] = [
   { id: 'vert', cle: 'reg.pelouse', apercu: 'linear-gradient(135deg,#08160f,#237a44)' },
   { id: 'bleu', cle: 'reg.nuit', apercu: 'linear-gradient(135deg,#060f1c,#1f5c9c)' },
   { id: 'rouge', cle: 'reg.grenat', apercu: 'linear-gradient(135deg,#1a0709,#8f2733)' },
+  { id: 'violet', cle: 'reg.violet', apercu: 'linear-gradient(135deg,#130a23,#6d38a5)' },
+  { id: 'turquoise', cle: 'reg.turquoise', apercu: 'linear-gradient(135deg,#041716,#18766f)' },
+  { id: 'cuivre', cle: 'reg.cuivre', apercu: 'linear-gradient(135deg,#1b0d06,#92502b)' },
+  { id: 'rose', cle: 'reg.rose', apercu: 'linear-gradient(135deg,#190812,#8c2b68)' },
+  { id: 'carbone', cle: 'reg.carbone', apercu: 'linear-gradient(135deg,#0c0e12,#4b5568)' },
 ];
 
 interface Props {

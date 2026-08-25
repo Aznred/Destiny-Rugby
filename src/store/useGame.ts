@@ -422,8 +422,17 @@ export function appliquerTheme(theme: Theme): void {
   // La barre d'adresse du téléphone suit la couleur du fond : sans ça, elle
   // reste verte sur un thème rouge, et la découpe se voit.
   const meta = document.querySelector('meta[name="theme-color"]');
-  const fond = { vert: '#08160f', bleu: '#060f1c', rouge: '#1a0709' }[theme];
-  if (meta && fond) meta.setAttribute('content', fond);
+  const fonds: Record<Theme, string> = {
+    vert: '#08160f',
+    bleu: '#060f1c',
+    rouge: '#1a0709',
+    violet: '#130a23',
+    turquoise: '#041716',
+    cuivre: '#1b0d06',
+    rose: '#190812',
+    carbone: '#0c0e12',
+  };
+  if (meta) meta.setAttribute('content', fonds[theme]);
 }
 
 // Fin de carrière : libre à partir de 33 ans, imposée à 44.

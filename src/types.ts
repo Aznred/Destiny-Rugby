@@ -406,7 +406,15 @@ export type SuccesDebloques = Record<string, number>;
 // L'ambiance du site. Elle ne repeint que le FOND (la rampe `--pelouse-*` du
 // design system) : l'or, le cuir et la craie restent, quelle que soit la
 // couleur choisie. Voir `index.css` et `appliquerTheme` (store/useGame.ts).
-export type Theme = 'vert' | 'bleu' | 'rouge';
+export type Theme =
+  | 'vert'
+  | 'bleu'
+  | 'rouge'
+  | 'violet'
+  | 'turquoise'
+  | 'cuivre'
+  | 'rose'
+  | 'carbone';
 
 export interface EntreeJournal {
   id: string;

@@ -91,7 +91,7 @@
 }
 
 /* ---------------------------------------------------------------------------
-   LES TROIS AMBIANCES — vert pelouse, bleu nuit, rouge grenat
+   LES HUIT AMBIANCES — une même identité, plusieurs couleurs de stade
    ---------------------------------------------------------------------------
    ⚠️ TOUT LE THÈME TIENT DANS SIX VARIABLES. Le design system entier est bâti
    sur la rampe `--pelouse-*` (le fond, les cartes, les bordures, les jauges) :
@@ -124,6 +124,71 @@
   --surface-solid: #2d0f14;
   --ambiance: rgba(196, 64, 79, 0.18);
   --fond-bas: #120507;
+}
+
+:root[data-theme='violet'] {
+  --pelouse-900: #130a23;
+  --pelouse-800: #211238;
+  --pelouse-700: #31194f;
+  --pelouse-600: #48246f;
+  --pelouse-500: #6d38a5;
+  --pelouse-400: #9b5de5;
+  --surface: rgba(49, 25, 79, 0.55);
+  --surface-solid: #26143e;
+  --ambiance: rgba(155, 93, 229, 0.19);
+  --fond-bas: #08040f;
+}
+
+:root[data-theme='turquoise'] {
+  --pelouse-900: #041716;
+  --pelouse-800: #082827;
+  --pelouse-700: #0d3a38;
+  --pelouse-600: #12514e;
+  --pelouse-500: #18766f;
+  --pelouse-400: #28aaa0;
+  --surface: rgba(13, 58, 56, 0.55);
+  --surface-solid: #0a302e;
+  --ambiance: rgba(40, 170, 160, 0.19);
+  --fond-bas: #020d0c;
+}
+
+:root[data-theme='cuivre'] {
+  --pelouse-900: #1b0d06;
+  --pelouse-800: #2b160b;
+  --pelouse-700: #412012;
+  --pelouse-600: #5d2e19;
+  --pelouse-500: #92502b;
+  --pelouse-400: #c8793f;
+  --surface: rgba(65, 32, 18, 0.55);
+  --surface-solid: #32180d;
+  --ambiance: rgba(200, 121, 63, 0.18);
+  --fond-bas: #100602;
+}
+
+:root[data-theme='rose'] {
+  --pelouse-900: #190812;
+  --pelouse-800: #2a0d1f;
+  --pelouse-700: #3c132d;
+  --pelouse-600: #581c42;
+  --pelouse-500: #8c2b68;
+  --pelouse-400: #c94b92;
+  --surface: rgba(60, 19, 45, 0.55);
+  --surface-solid: #321026;
+  --ambiance: rgba(201, 75, 146, 0.18);
+  --fond-bas: #0e040a;
+}
+
+:root[data-theme='carbone'] {
+  --pelouse-900: #0c0e12;
+  --pelouse-800: #151922;
+  --pelouse-700: #212631;
+  --pelouse-600: #303746;
+  --pelouse-500: #4b5568;
+  --pelouse-400: #737f94;
+  --surface: rgba(33, 38, 49, 0.58);
+  --surface-solid: #191d26;
+  --ambiance: rgba(115, 127, 148, 0.16);
+  --fond-bas: #06070a;
 }
 
 * {
