@@ -22,14 +22,19 @@ import {
 } from '../lib/manager';
 import { matchDuClubSemaine } from '../lib/matchLive';
 import {
+  CLUBS_OBSERVES, coutAmelioration, EMOJI_INSTALLATION, GAIN_ENTRAINEMENT,
+  installationsVierges, NIVEAU_INSTALLATION_MAX, PLACES_ENTRAINEMENT,
+  PROMOTION_PAR_NIVEAU, INCERTITUDE_RECRUTEURS, budgetStructure, TYPES_INSTALLATION,
+} from '../lib/installations';
+import {
   joueurCompatibleManager, noteCompositionManager, POSTES_BANC_MANAGER,
   POSTES_XV_MANAGER, reconcilerCompositionManager,
 } from '../lib/compositionManager';
-import type { CompositionManager, TactiqueManager } from '../types';
+import type { CompositionManager, TactiqueManager, TypeInstallation } from '../types';
 
 const MatchLive = lazy(() => import('../components/MatchLive').then((m) => ({ default: m.MatchLive })));
 
-type VueManager = 'bureau' | 'equipe' | 'match' | 'marche' | 'negociations';
+type VueManager = 'bureau' | 'equipe' | 'club' | 'match' | 'marche' | 'negociations';
 
 function humeurDuBoard(confiance: number): { texte: string; ton: string } {
   if (confiance < CONFIANCE_LICENCIEMENT + 12) return { texte: t('mgr.board.sellette'), ton: 'rouge' };
@@ -50,10 +55,20 @@ export function Manager() {
   const quitterBanc = useGame((s) => s.quitterBanc);
   const definirComposition = useGame((s) => s.definirCompositionManager);
   const definirTactique = useGame((s) => s.definirTactiqueManager);
+  const ameliorerInstallation = useGame((s) => s.ameliorerInstallation);
+  const basculerEntrainement = useGame((s) => s.basculerEntrainement);
   const enregistrerResultat = useGame((s) => s.enregistrerResultatManager);
   const journal = useGame((s) => s.journal);
 
   const [vue, setVue] = useState<VueManager>('bureau');
+  // ⚠️ LES MURS SONT CEUX DU CLUB, pas ceux de l'entraîneur : on lit le club
+  // courant, et un manager qui change de banc découvre ce que l'autre a bâti.
+  const murs = manager?.installations?.[manager.club] ?? installationsVierges();
+  const enveloppe = manager?.club
+    ? budgetStructure(forceEffectif(manager.club, manager.saison), competitionDuClub(manager.club)?.niveau ?? 8)
+    : 0;
+  const placesEntrainement = PLACES_ENTRAINEMENT[Math.min(murs.entrainement, NIVEAU_INSTALLATION_MAX)];
+  const rapportsFrais = manager?.rapports?.filter((r) => r.saison >= (manager.saison ?? 0)).length ?? 0;
   const [raccrocher, setRaccrocher] = useState(false);
   const [clubVise, setClubVise] = useState('');
   const [divisionMarche, setDivisionMarche] = useState(manager?.division ?? 'top14');
@@ -193,6 +208,9 @@ export function Manager() {
           <nav className="manager-onglets" aria-label={t('mgr.navigation')}>
             <button className={vue === 'bureau' ? 'actif' : ''} onClick={() => setVue('bureau')}>🏟️ {t('mgr.bureau')}</button>
             <button className={vue === 'equipe' ? 'actif' : ''} onClick={() => setVue('equipe')}>👥 Composition</button>
+            <button className={vue === 'club' ? 'actif' : ''} onClick={() => setVue('club')}>
+              🏗️ {t('mgr.inst.onglet')} {rapportsFrais > 0 && <i>{rapportsFrais}</i>}
+            </button>
             <button className={vue === 'match' ? 'actif' : ''} onClick={() => setVue('match')}>
               🎮 Match {afficheManager && !resultatManager && <i>1</i>}
             </button>
@@ -373,6 +391,150 @@ export function Manager() {
                   )}
                 </section>
               )}
+            </div>
+          )}
+
+          {vue === 'club' && (
+            <div className="manager-club">
+              <section className="carte manager-inst-tete">
+                <div>
+                  <div className="eyebrow">{t('mgr.inst.eyebrow')}</div>
+                  <h2>🏗️ {t('mgr.inst.titre')}</h2>
+                  <p>{t('mgr.inst.intro')}</p>
+                </div>
+                <div className="manager-note-compo manager-enveloppe">
+                  <b>{nombre(manager.budgetStructure)} €</b>
+                  <span>{t('mgr.inst.budget')}</span>
+                </div>
+              </section>
+
+              <div className="manager-inst-grille">
+                {TYPES_INSTALLATION.map((type: TypeInstallation) => {
+                  const niveau = murs[type];
+                  const cout = coutAmelioration(niveau, enveloppe);
+                  const finance = cout !== null && manager.budgetStructure >= cout;
+                  const n = Math.min(niveau, NIVEAU_INSTALLATION_MAX);
+                  const effet = type === 'formation'
+                    ? t('mgr.inst.effet.formation', { n: String(PROMOTION_PAR_NIVEAU[n]) })
+                    : type === 'entrainement'
+                      ? t('mgr.inst.effet.entrainement', {
+                        places: String(PLACES_ENTRAINEMENT[n]),
+                        gain: GAIN_ENTRAINEMENT[n].toString().replace('.', ','),
+                      })
+                      : t('mgr.inst.effet.recrutement', {
+                        clubs: String(CLUBS_OBSERVES[n]),
+                        precision: INCERTITUDE_RECRUTEURS[n] === 0
+                          ? t('mgr.inst.exact') : `± ${INCERTITUDE_RECRUTEURS[n]}`,
+                      });
+                  return (
+                    <section className="carte manager-inst" key={type}>
+                      <div className="inst-tete">
+                        <span className="inst-emoji" aria-hidden="true">{EMOJI_INSTALLATION[type]}</span>
+                        <div>
+                          <b>{t(`mgr.inst.${type}.nom`)}</b>
+                          <p>{t(`mgr.inst.${type}.desc`)}</p>
+                        </div>
+                      </div>
+                      <div className="inst-marches">
+                        {Array.from({ length: NIVEAU_INSTALLATION_MAX }, (_, i) => (
+                          <i key={i} className={i < niveau ? 'pleine' : ''} />
+                        ))}
+                        <span>{t('mgr.inst.niveau', { n: String(niveau) })}</span>
+                      </div>
+                      <p className="inst-effet">{niveau > 0 ? effet : t('mgr.inst.rien')}</p>
+                      {cout === null ? (
+                        <p className="inst-max">{t('mgr.inst.max')}</p>
+                      ) : (
+                        <button
+                          className="btn primaire"
+                          disabled={!finance}
+                          onClick={() => ameliorerInstallation(type)}
+                        >
+                          {t('mgr.inst.ameliorer', { cout: nombre(cout) })}
+                        </button>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+
+              <section className="carte manager-programme">
+                <div className="comp-tete">
+                  <b>🏋️ {t('mgr.inst.programme')}</b>
+                  <span className="comp-count">{manager.entrainements.length}/{placesEntrainement}</span>
+                </div>
+                {murs.entrainement <= 0 ? (
+                  <p className="manager-vide-texte">{t('mgr.inst.programmeFerme')}</p>
+                ) : (
+                  <>
+                    <p className="manager-vide-texte">{t('mgr.inst.programmeAide')}</p>
+                    <div className="manager-liste-programme">
+                      {[...effectif]
+                        .sort((a, b) => (b.potentiel - b.note) - (a.potentiel - a.note))
+                        .slice(0, 24)
+                        .map((j) => {
+                          const dedans = manager.entrainements.includes(j.nom);
+                          const marge = j.potentiel - j.note;
+                          const complet = !dedans && manager.entrainements.length >= placesEntrainement;
+                          return (
+                            <button
+                              key={j.id}
+                              className={`prog-ligne${dedans ? ' actif' : ''}`}
+                              disabled={complet || marge <= 0}
+                              aria-pressed={dedans}
+                              onClick={() => basculerEntrainement(j.nom)}
+                            >
+                              <span className="prog-nom">{j.duCentre && '🎓 '}{j.nom}</span>
+                              <span className="prog-poste">{nomPoste(j.poste)}</span>
+                              <span className="prog-age">{j.age}</span>
+                              <span className="prog-note">{j.note}</span>
+                              <span className={`prog-marge${marge > 0 ? ' positive' : ''}`}>
+                                {marge > 0 ? `↗ ${j.potentiel}` : '—'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </>
+                )}
+              </section>
+
+              <section className="carte manager-rapports">
+                <div className="comp-tete">
+                  <b>🔎 {t('mgr.inst.rapports')}</b>
+                  <span className="comp-count">{manager.rapports.length}</span>
+                </div>
+                {murs.recrutement <= 0 ? (
+                  <p className="manager-vide-texte">{t('mgr.inst.rapportsFerme')}</p>
+                ) : !manager.rapports.length ? (
+                  <p className="manager-vide-texte">{t('mgr.inst.rapportsAttente')}</p>
+                ) : (
+                  <div className="manager-table-rapports">
+                    <div className="rap-ligne entete">
+                      <span>{t('mgr.inst.col.joueur')}</span>
+                      <span>{t('mgr.inst.col.club')}</span>
+                      <span>{t('mgr.inst.col.age')}</span>
+                      <span>{t('mgr.inst.col.note')}</span>
+                      <span>{t('mgr.inst.col.potentiel')}</span>
+                    </div>
+                    {manager.rapports.map((r) => (
+                      <div className="rap-ligne" key={r.id}>
+                        <span className="rap-nom">
+                          <Drapeau nation={r.nation} taille={14} /> {r.nom}
+                          <em>{nomPoste(r.poste)}</em>
+                        </span>
+                        <span className="rap-club">{r.club}<em>{r.division}</em></span>
+                        <span>{r.age}</span>
+                        <span>{r.note}</span>
+                        <span className="rap-pot">
+                          ↗ {r.potentiel}
+                          {r.incertitude > 0 && <em>± {r.incertitude}</em>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
           )}
 

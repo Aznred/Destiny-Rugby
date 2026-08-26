@@ -8554,3 +8554,184 @@ npx vite-node scripts/verifPyramide.ts    # les divisions gardent leur taille
 npx vite-node scripts/verifGenerations.ts # le championnat respire toujours
 npx vite-node scripts/verifStats.ts       # les 18 classements individuels
 ```
+
+---
+
+## 🏗️ LES INSTALLATIONS DU CLUB — centre de formation, entraînement, recruteurs
+
+Demande : « fais qu'on puisse avoir un centre de formation avec des
+améliorations etc. et des recruteurs pour trouver les pépites ; il peut aussi y
+avoir des gros potentiels dans les petites ligues ; et fais le centre
+d'entraînement aussi pour faire des entraînements perso ».
+
+⚠️ **CE LOT NE POUVAIT PAS ÊTRE ÉCRIT AVANT LES PÉPITES** (section précédente).
+Un service de recrutement branché sur un monde dont la marge potentiel − note
+plafonne à 9 points serait rentré bredouille **à chaque déplacement**, et rien
+n'aurait montré pourquoi. On règle la loi de tirage d'abord, on envoie les
+recruteurs ensuite.
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/installations.ts` | **Les règles, pures** : niveaux, coûts, la troisième enveloppe, et les tables d'effet des trois structures. Aucune dépendance au store ni au DOM. |
+| `src/lib/formation.ts` | 🎓 `promotionDuCentre()` : ce qui sort du cru chaque intersaison. |
+| `src/lib/recruteurs.ts` | 🔎 `explorer()` : où l'on va voir, ce qu'on en rapporte, et ce qu'on croit avoir vu. |
+| `src/lib/effectif.ts` | `setApportsDuCentre()` : le registre de module qui fait exister les jeunes et les programmes dans les effectifs. |
+| `src/screens/Manager.tsx` | L'onglet **🏗️ Le club** : trois cartes, le programme individuel, les rapports. |
+
+### ⚠️ UNE TROISIÈME ENVELOPPE, ET IL EN FALLAIT UNE
+
+Prendre les structures sur le **budget transferts** en aurait fait un arbitrage
+« un joueur ou un centre » — que personne ne tranche en faveur du centre, parce
+que le joueur joue dimanche et que le centre rapporte dans quatre ans. Et chez
+un club amateur, où le budget transferts n'achète plus rien du tout
+(`PRO_JUSQUA`), il n'y aurait même pas eu d'arbitrage : juste un écran mort.
+
+`budgetStructure` sort de **`budgetsDuClub`**, avec les deux autres, et pas d'un
+coin du store : c'est ce qui garantit que les trois partent du même point
+d'origine (`force − 31`) et gardent le même rapport entre elles à tous les
+étages. Mesuré : Top 14 **2 985 000 €** · Pro D2 1 190 000 € · Nationale 2
+**765 000 €** · Régionale 3 **40 000 €** (le plancher).
+
+⚠️ **ELLE SE BANQUE INTÉGRALEMENT**, contrairement aux deux autres (report de
+28 % et 20 %). Ce n'est pas une faveur : la dernière marche coûte **4,6 saisons
+d'enveloppe**, et avec un report partiel elle serait mathématiquement
+inaccessible à un club modeste — la structure la plus intéressante du lot
+n'existerait que pour ceux qui n'en ont pas besoin. Un centre complet coûte
+**10,1 saisons** d'enveloppe à qui reste au même étage, bien moins à qui fait
+monter son club.
+
+### ⚠️ LES MURS APPARTIENNENT AU CLUB, PAS À L'ENTRAÎNEUR
+
+`Manager.installations` est indexé **par nom de club**. On ne démonte pas un
+centre de formation pour l'emporter ailleurs : un manager qui change de banc
+repart du niveau de son nouveau club — souvent zéro — et **retrouve son ancien
+centre s'il y revient**. C'est vérifié nommément par le banc d'essai.
+
+### 🎓 Le centre de formation : on achète une LOI DE TIRAGE
+
+C'est le seul angle sous lequel payer dix saisons d'enveloppe a un sens. Le
+monde produit une pépite pour **1,2 %** de ses jeunes (`PART_PEPITE`) ; un
+centre de niveau 4 en produit **une fois sur cinq**.
+
+| niveau | jeunes / intersaison | pépites mesurées (marge ≥ 22) |
+|---|---|---|
+| 1 | 1 | 1,5 % |
+| 2 | 1 | 4,3 % |
+| 3 | 2 | 9,3 % |
+| 4 | 2 | **12,5 %** |
+
+⚠️ **LE BONUS ORDINAIRE A ÉTÉ DIVISÉ PAR DEUX APRÈS MESURE**, et c'est
+instructif. À `+9`, la marge d'un sortant de niveau 4 valait 12 à 19 points :
+autrement dit **tous** les jeunes du centre étaient des espoirs, et le mot
+« pépite » ne désignait plus rien — 81 % de la promotion passait la barre. Un
+centre doit sortir en majorité des joueurs ordinaires, sinon le tirage rare
+qu'on paie si cher n'est plus distinguable du reste.
+
+⚠️ **UN SORTANT DE CENTRE N'EST PAS PRÊT** : il entre à `force − 9` à `force − 3`
+du groupe (mesuré : 482/482 sous le groupe). Sans ce retard, le centre ferait
+monter la force du club dès la première promotion, et l'intérêt d'un espoir
+serait de jouer tout de suite — c'est-à-dire l'inverse d'un centre de formation.
+
+⚠️ **ET IL RESTE BORNÉ PAR SON ÉTAGE** (`plafondPepite`, même fonction que les
+pépites du monde) : un centre de Fédérale 2 ne peut pas sortir un joueur meilleur
+que n'importe qui en Top 14. Mesuré : 0 dépassement sur 300 promotions.
+
+⚠️ **UN JEUNE DU CENTRE EST PERSISTÉ, PAS DÉTERMINISTE**, et c'est une
+différence de nature avec tout le reste des effectifs. Un joueur du monde se
+retrouve en rejouant sa graine ; celui-ci est la conséquence d'une **décision de
+carrière** (avoir payé, telle saison, dans tel club) — le rejouer demanderait de
+rejouer la carrière. Il vit donc dans la sauvegarde et `effectif.ts` le reçoit
+par registre, exactement comme les transferts annoncés sur L'Ovale. Corollaire
+assumé : le tirage n'a pas de graine, ce qui **interdit** de rouvrir la
+sauvegarde jusqu'à obtenir la bonne promotion.
+
+### 🏋️ Le centre d'entraînement : on rattrape sa marge, on ne la dépasse jamais
+
+`PLACES_ENTRAINEMENT` = 0 · 1 · 2 · 3 · **5** joueurs au programme individuel ;
+`GAIN_ENTRAINEMENT` = +1 à **+3** points par saison, **× 1,5 avant 24 ans** et
+× 0,5 après 28. Le gain est **borné par la marge qui reste** : un cadre de 30 ans
+arrivé à son plafond ne gagne rien — l'y envoyer est une erreur de manager, pas
+un bug, et l'écran désactive sa ligne.
+
+⚠️ **LES GAINS SONT DES INCRÉMENTS DATÉS, PAS UN CUMUL.** Un simple total
+s'appliquerait à **toutes** les saisons du club, y compris celles déjà jouées :
+`effectifDuClub(club, 3)` sert encore à afficher un classement passé, et le
+joueur y aurait rétroactivement gagné des points qu'il n'avait pas. Vérifié : un
+gain acquis en saison 5 laisse la saison 3 **au point près** et ne se voit qu'à
+partir de la saison 5.
+
+⚠️ **LA CLÉ EST `club|nom AFFICHÉ`, donc lue APRÈS `distinguerLesHomonymes`.**
+Les effectifs amateurs contiennent de vrais doublons de nom : créditer
+« Leo BOGALHO » sans son suffixe romain entraînerait **les quatre d'un coup**,
+pour le prix d'une place.
+
+### 🔎 Les recruteurs : on trie par MARGE, et on se trompe
+
+⚠️ **C'EST TOUTE LA DIFFÉRENCE AVEC L'ÉCRAN MARCHÉ, qui existe déjà.** Le Marché
+montre qui est bon **aujourd'hui** — il est trié par note, et il ne remontera
+jamais un joueur de Régionale 2 noté 34. Un recruteur cherche l'écart entre ce
+qu'un joueur vaut et ce qu'il vaudra : c'est le seul angle sous lequel une pépite
+se distingue d'un joueur moyen de son étage.
+
+| niveau | clubs observés | portée sous son étage | ± annoncé |
+|---|---|---|---|
+| 1 | 6 | 2 divisions | ± 9 |
+| 2 | 11 | 3 | ± 6 |
+| 3 | 17 | 5 | ± 3 |
+| 4 | **25** | **10 (toute la pyramide)** | **exact** |
+
+⚠️ **LE RAPPORT DIT CE QUE LE SERVICE CROIT, PAS CE QUI EST.** Sans cette
+incertitude, un rapport serait un oracle : on signerait à coup sûr, et améliorer
+le service ne changerait que le nombre de lignes affichées. Mesuré : un service
+de niveau 1 se trompe sur **7 fiches sur 8**, un service de niveau 4 sur
+**aucune**. C'est ce qui rend le niveau 4 désirable — on cesse de parier.
+
+⚠️ **ET LE TRI PORTE SUR LA MARGE ANNONCÉE**, pas sur la vraie : le service
+hiérarchise ce qu'il croit avoir vu. Trier sur la vérité reviendrait à lui prêter
+une connaissance qu'on vient justement de lui retirer.
+
+⚠️ **LES CLUBS SONT TIRÉS AU SORT, on ne prend pas « les N premiers ».** Le
+vivier est rangé par compétition, donc par ordre de fichier : prendre le début
+renverrait chaque saison le même coin de la même division, et le service n'aurait
+jamais l'air de se déplacer.
+
+### ⚠️ UNE COPIE ASSUMÉE, ET SON GARDE-FOU
+
+`facteurEtage` (installations.ts) est la **même courbe** que `facteurNiveau`
+(recrutementManager.ts). Elle est recopiée parce que `recrutementManager.ts`
+traîne tout `effectif.ts` derrière lui, alors qu'`installations.ts` doit rester
+importable par n'importe quoi. Une copie sans garde-fou finit toujours par
+mentir : le banc d'essai **compare les deux valeur par valeur** sur les onze
+étages du jeu.
+
+### 🩹 Deux défauts de mise en page trouvés à l'écran
+
+- ⚠️ **`.manager-club` était en `grid-template-columns: 1fr`**, c'est-à-dire
+  `minmax(auto, 1fr)` — et cet `auto` est le **min-content** de son plus large
+  enfant. Le tableau des rapports poussait donc **toute la page de 189 px** à
+  375 px de large, alors même qu'il a son propre `overflow-x: auto`. C'est
+  exactement le piège déjà payé par `.grille-poules` et par la feuille de match.
+  `minmax(0, 1fr)` autorise la colonne à se serrer.
+- ⚠️ **`.manager-note-compo` est dimensionnée pour une NOTE** (deux chiffres,
+  `min-width: 112px`) : y mettre un montant en euros demandait 161 px dans une
+  boîte de 110, pour 19 px de débordement résiduel. La boîte garde son allure
+  (`.manager-enveloppe`) mais peut s'élargir et passer à la ligne.
+
+Vérifié à l'écran, 1280 px et 375 px : **0 débordement horizontal**, trois cartes
+sur une rangée en desktop et empilées sur téléphone, boutons à 48 px et lignes de
+programme à 46 px (au-dessus du minimum de 44 px que le projet s'impose), et le
+tableau des rapports défile **dans sa carte**.
+
+### La sauvegarde passe en version 18
+
+Une carrière d'avant ce lot repart avec l'enveloppe normale de son club et
+**rien de construit**. Lui offrir un centre de niveau 1 « pour ne pas la
+pénaliser » lui retirerait le premier achat, qui est justement le moment de
+carrière qu'on vient d'écrire.
+
+```bash
+npx vite-node scripts/verifInstallations.ts # enveloppes, coûts, les trois structures, la boucle par le store
+npx vite-node scripts/verifPepites.ts       # la loi de tirage sur laquelle les recruteurs s'appuient
+npx vite-node scripts/verifManager.ts       # la carrière d'entraîneur n'a pas bougé
+npx vite-node scripts/verifTraductions.ts   # les 34 clés ajoutées, dans les 7 langues
+```

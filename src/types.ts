@@ -742,6 +742,67 @@ export interface ResultatMatchManager {
   essaisContre: number;
 }
 
+// ---------------------------------------------------------------------------
+// LES INSTALLATIONS DU CLUB
+// Demande : « qu'on puisse avoir un centre de formation avec des améliorations,
+// et des recruteurs pour trouver les pépites ; et fais le centre
+// d'entraînement aussi pour faire des entraînements perso ».
+// ---------------------------------------------------------------------------
+export type TypeInstallation = 'formation' | 'entrainement' | 'recrutement';
+
+/** Le niveau de chaque structure, de 0 (rien) à `NIVEAU_INSTALLATION_MAX`. */
+export type InstallationsClub = Record<TypeInstallation, number>;
+
+/**
+ * Un jeune sorti du centre de formation.
+ *
+ * ⚠️ IL EST PERSISTÉ, PAS RECALCULÉ, et c'est une différence de nature avec le
+ * reste des effectifs. Un joueur du monde est déterministe : on le retrouve en
+ * rejouant sa graine. Celui-ci est la CONSÉQUENCE D'UNE DÉCISION de carrière
+ * (avoir payé le centre, telle saison, dans tel club) — le rejouer demanderait
+ * de rejouer la carrière. Il vit donc dans la sauvegarde, comme les transferts
+ * annoncés sur L'Ovale, et `effectif.ts` le reçoit par registre.
+ */
+export interface JeuneForme {
+  id: string;
+  club: string;
+  /** La saison où il sort du centre : il n'existe pas avant. */
+  saison: number;
+  nom: string;
+  poste: PosteId;
+  nation: string;
+  age: number;
+  note: number;
+  potentiel: number;
+}
+
+/** Ce qu'un recruteur ramène d'un déplacement. */
+export interface RapportRecruteur {
+  id: string;
+  saison: number;
+  /** Le club observé, et sa division. */
+  club: string;
+  division: string;
+  niveau: number;
+  nom: string;
+  poste: PosteId;
+  nation: string;
+  age: number;
+  note: number;
+  /**
+   * Le potentiel que le service CROIT avoir vu — pas forcément le vrai.
+   *
+   * ⚠️ C'EST UNE ESTIMATION, ET C'EST LE CŒUR DU SYSTÈME. Un rapport qui
+   * dirait la vérité serait un oracle : on signerait à coup sûr, et améliorer
+   * le service ne changerait que le nombre de lignes affichées. Ici, monter de
+   * niveau, c'est cesser de parier — l'écart à la vérité est tiré dans
+   * `± incertitude` (`INCERTITUDE_RECRUTEURS`), nul au niveau 4.
+   */
+  potentiel: number;
+  /** ± admis par le service. 0 = le rapport ne se trompe plus. */
+  incertitude: number;
+}
+
 export interface Manager {
   nom: string;
   nation: string;
@@ -767,6 +828,16 @@ export interface Manager {
   /** Enveloppes du club, distinctes du salaire personnel de l'entraîneur. */
   budgetTransferts: number;
   budgetSalarial: number;
+  /**
+   * La TROISIÈME enveloppe : les murs, pas les hommes.
+   *
+   * ⚠️ ELLE EST À PART, ET C'EST TOUT L'INTÉRÊT. Prendre les structures sur le
+   * budget transferts en ferait un simple arbitrage « un joueur ou un centre »,
+   * que personne ne résout en faveur du centre — le joueur joue dimanche. Et
+   * chez un club amateur, où le budget transferts n'achète plus rien
+   * (`PRO_JUSQUA`), il n'y aurait tout simplement rien à arbitrer.
+   */
+  budgetStructure: number;
   contrat: { saisons: number; salaire: number } | null;
   decision: DecisionManager | null;
   composition: CompositionManager;
@@ -775,6 +846,36 @@ export interface Manager {
   resultats: Record<string, ResultatMatchManager>;
   negociations: NegociationManager[];
   recrues: RecrueManager[];
+  /**
+   * Les structures, PAR CLUB.
+   *
+   * ⚠️ ELLES APPARTIENNENT AU CLUB, PAS À L'ENTRAÎNEUR, et c'est la seule
+   * lecture qui tienne debout : on ne démonte pas un centre de formation pour
+   * l'emporter ailleurs. Un manager qui change de banc repart donc du niveau
+   * de SON nouveau club — et retrouve son ancien centre s'il y revient.
+   */
+  installations: Record<string, InstallationsClub>;
+  /** Les jeunes réellement sortis du centre, tous clubs confondus. */
+  jeunesFormes: JeuneForme[];
+  /** Les joueurs mis au programme individuel, par leur nom affiché. */
+  entrainements: string[];
+  /**
+   * Ce que le programme individuel a rapporté, sous la clé `club|nom`.
+   *
+   * ⚠️ LA CLÉ EST CELLE DU NOM AFFICHÉ, donc lue APRÈS `distinguerLesHomonymes`
+   * (`lib/effectif.ts`) : les effectifs amateurs contiennent de vrais doublons
+   * de nom, et créditer « Leo BOGALHO » sans son suffixe entraînerait les
+   * quatre d'un coup, pour le prix d'une place.
+   *
+   * ⚠️ ET CE SONT DES INCRÉMENTS DATÉS, PAS UN CUMUL. Un simple total
+   * s'appliquerait à TOUTES les saisons du club, y compris celles déjà jouées :
+   * `effectifDuClub(club, 3)` sert encore à afficher un classement passé, et le
+   * joueur y aurait rétroactivement gagné des points qu'il n'avait pas. On
+   * n'ajoute donc que ce qui a été gagné À CETTE DATE OU AVANT.
+   */
+  progres: Record<string, { depuis: number; gain: number }[]>;
+  /** Les rapports de recrutement, figés à la saison où ils ont été rendus. */
+  rapports: RapportRecruteur[];
   /** Tous les clubs entraînés, dans l’ordre, sans doublon consécutif. */
   clubs: string[];
   titres: string[];

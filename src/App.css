@@ -112,6 +112,56 @@
 .manager-note-compo b { color:var(--or); font-size:1.7rem; line-height:1; }
 .manager-note-compo span { margin-top:.25rem; color:var(--craie-dim); font-size:.72rem; }
 .manager-composition-grille { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(330px,.8fr); gap:1rem; align-items:start; }
+
+/* Les installations du club : trois structures, un programme, un rapport.
+   ⚠️ `minmax(0,1fr)` et pas `1fr` — `1fr` vaut `minmax(auto,1fr)`, et cet
+   `auto` est le min-content de la carte : une ligne de rapport un peu large
+   pousserait alors toute la page de côté (même cause que les poules). */
+.manager-club { display:grid; grid-template-columns:minmax(0,1fr); gap:1rem; }
+.manager-inst-tete { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:1rem; padding:1.2rem; }
+/* ⚠️ `.manager-note-compo` est dimensionnée pour une NOTE (deux chiffres) : on
+   y met ici un montant en euros. Mesuré à 375 px, « 37 370 000 € » demandait
+   161 px dans une boîte de 110 et poussait toute la page de 19 px. La boîte
+   garde son allure, mais elle peut désormais s'élargir et passer à la ligne. */
+.manager-enveloppe { min-width:0; flex:1 1 auto; }
+.manager-enveloppe b { font-size:1.2rem; white-space:nowrap; }
+.manager-inst-tete h2 { margin:.25rem 0; }
+.manager-inst-tete p { max-width:74ch; margin:.25rem 0 0; color:var(--craie-dim); line-height:1.55; }
+.manager-inst-grille { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,268px),1fr)); gap:1rem; }
+.manager-inst { display:flex; flex-direction:column; gap:.7rem; padding:1rem; }
+.inst-tete { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.7rem; align-items:start; }
+.inst-emoji { font-size:1.7rem; line-height:1; }
+.inst-tete b { display:block; color:var(--craie); font-size:1.02rem; }
+.inst-tete p { margin:.3rem 0 0; color:var(--craie-dim); font-size:.82rem; line-height:1.5; }
+.inst-marches { display:flex; align-items:center; gap:.3rem; }
+.inst-marches i { width:100%; height:7px; border-radius:999px; background:rgba(255,255,255,.09); }
+.inst-marches i.pleine { background:var(--or); }
+.inst-marches span { flex:0 0 auto; margin-left:.35rem; color:var(--craie-dim); font-size:.74rem; white-space:nowrap; }
+.inst-effet { margin:0; color:var(--craie); font-size:.84rem; }
+.inst-max { margin:0; color:var(--or); font-size:.84rem; font-weight:700; }
+.manager-inst .btn { margin-top:auto; }
+
+.manager-programme,.manager-rapports { padding:1rem; }
+.manager-vide-texte { margin:.6rem 0 0; color:var(--craie-dim); font-size:.85rem; line-height:1.55; }
+.manager-liste-programme { display:grid; gap:.3rem; margin-top:.7rem; }
+.prog-ligne { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) 44px 44px 62px; align-items:center; gap:.5rem; min-height:46px; padding:.4rem .6rem; border:1px solid rgba(255,255,255,.08); border-radius:10px; color:var(--craie); background:rgba(255,255,255,.025); text-align:left; font:inherit; cursor:pointer; }
+.prog-ligne:disabled { opacity:.42; cursor:not-allowed; }
+.prog-ligne.actif { border-color:rgba(224,176,72,.55); background:rgba(224,176,72,.12); }
+.prog-nom { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.prog-poste { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--craie-dim); font-size:.78rem; }
+.prog-age,.prog-note { color:var(--craie-dim); font-size:.82rem; text-align:right; }
+.prog-marge { color:var(--craie-dim); font-size:.82rem; text-align:right; }
+.prog-marge.positive { color:var(--or); font-weight:700; }
+
+/* ⚠️ Le tableau des rapports DÉFILE DANS SA CARTE, il n'emporte pas la page. */
+.manager-table-rapports { margin-top:.7rem; overflow-x:auto; }
+.rap-ligne { display:grid; grid-template-columns:minmax(150px,1.6fr) minmax(120px,1.2fr) 48px 52px 92px; align-items:center; gap:.5rem; min-height:46px; padding:.4rem .6rem; border-bottom:1px solid rgba(255,255,255,.06); }
+.rap-ligne.entete { color:var(--craie-dim); font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; }
+.rap-nom,.rap-club { display:flex; flex-direction:column; overflow:hidden; }
+.rap-nom em,.rap-club em { color:var(--craie-dim); font-size:.72rem; font-style:normal; }
+.rap-ligne > span:not(.rap-nom):not(.rap-club) { text-align:right; }
+.rap-pot { color:var(--or); font-weight:700; }
+.rap-pot em { margin-left:.3rem; color:var(--craie-dim); font-size:.72rem; font-style:normal; font-weight:400; }
 .manager-xv,.manager-banc-compo,.manager-plan-avant-match { padding:1rem; }
 .manager-liste-compo { display:grid; gap:.35rem; margin-top:.7rem; }
 .manager-slot { display:grid; grid-template-columns:36px minmax(130px,.65fr) minmax(210px,1.35fr); align-items:center; gap:.6rem; min-height:54px; padding:.42rem .55rem; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.025); }

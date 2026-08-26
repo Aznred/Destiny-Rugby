@@ -4,6 +4,7 @@ import type {
   Attributs,
   Ecran,
   EntreeJournal,
+  TypeInstallation,
   EvenementHebdo,
   Joueur,
   LegendeSauvegardee,
@@ -109,7 +110,10 @@ import {
 import { ETAT_PUBS_VIDE, OVAS_PAR_PUB, etatDuJour, pubDisponible, type EtatPubs } from '../lib/pub';
 import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
-import { forceEffectif, forceMoyenneDivision, noteDuClub, setTransfertsSociaux, effectifDuClub } from '../lib/effectif';
+import {
+  forceEffectif, forceMoyenneDivision, noteDuClub, setApportsDuCentre, setTransfertsSociaux,
+  effectifDuClub,
+} from '../lib/effectif';
 import { nomAleatoirePourNation } from '../lib/nomsJoueurs';
 import { chantierVisible } from '../lib/modeDev';
 import { evoluer } from '../lib/progression';
@@ -145,6 +149,12 @@ import {
   prestigeDepuisJoueur, salaireManager, verdictDeSaison, CONFIANCE_LICENCIEMENT,
 } from '../lib/manager';
 import { decisionManagerPour } from '../data/decisionsManager';
+import {
+  budgetStructure, coutAmelioration, gainEntrainement, installationsVierges,
+  niveauInstallation, NIVEAU_INSTALLATION_MAX, PLACES_ENTRAINEMENT,
+} from '../lib/installations';
+import { promotionDuCentre } from '../lib/formation';
+import { explorer } from '../lib/recruteurs';
 import {
   accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, negocierAvecJoueur,
   ouvrirNegociationManager, type LevierRecrutementManager,
@@ -921,6 +931,15 @@ interface GameState {
   accepterDemandesJoueurManager: (id: string) => void;
   signerJoueurManager: (id: string) => void;
   rompreNegociationManager: (id: string) => void;
+  /**
+   * Payer une marche d'une structure du club.
+   *
+   * ⚠️ ELLE APPARTIENT AU CLUB, pas à l'entraîneur : elle reste derrière lui
+   * quand il part, et il la retrouve s'il revient.
+   */
+  ameliorerInstallation: (type: TypeInstallation) => void;
+  /** Mettre un joueur au programme individuel, ou l'en retirer. */
+  basculerEntrainement: (nom: string) => void;
   /** Prendre un banc (premier contrat, ou après un licenciement). */
   signerBanc: (club: string) => void;
   /** Raccrocher : la carrière part au Hall et au classement. */
@@ -1317,6 +1336,7 @@ export const useGame = create<GameState>()(
         oublierResultats();
         setContexteJoueur('', 0);
         setTransfertsSociaux([]);
+        setApportsDuCentre([], {});
         set({
           joueur,
           finCarriere: null,
@@ -3480,6 +3500,7 @@ export const useGame = create<GameState>()(
           argent: 0,
           budgetTransferts: budgets.transferts,
           budgetSalarial: budgets.salarial,
+          budgetStructure: budgetStructure(force, comp?.niveau ?? 8),
           contrat: { saisons: 3, salaire: salaireManager(force) },
           decision: null,
           composition: compositionManagerParDefaut(effectifDuClub(club, 1)),
@@ -3487,6 +3508,14 @@ export const useGame = create<GameState>()(
           resultats: {},
           negociations: [],
           recrues: [],
+          // ⚠️ ON PREND UN CLUB TEL QU'IL EST : rien n'est construit tant que
+          // rien n'a été payé. Offrir un centre de niveau 1 « pour démarrer »
+          // retirerait au premier achat ce qui en fait un moment de carrière.
+          installations: {},
+          jeunesFormes: [],
+          entrainements: [],
+          progres: {},
+          rapports: [],
           clubs: [club],
           titres: [],
           palmares: [],
@@ -3526,6 +3555,64 @@ export const useGame = create<GameState>()(
         }));
       },
 
+      ameliorerInstallation: (type) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const murs = m.installations[m.club] ?? installationsVierges();
+        if (murs[type] >= NIVEAU_INSTALLATION_MAX) return;
+        // ⚠️ LE PRIX SE CALCULE SUR L'ENVELOPPE DE RÉFÉRENCE DU CLUB, pas sur
+        // ce qui reste en caisse : sinon un manager qui a beaucoup épargné
+        // paierait plus cher que celui qui n'a rien mis de côté.
+        const comp = competitionDuClub(m.club);
+        const reference = budgetStructure(forceEffectif(m.club, m.saison), comp?.niveau ?? 8);
+        const cout = coutAmelioration(murs[type], reference);
+        if (cout === null || m.budgetStructure < cout) return;
+
+        const vise = murs[type] + 1;
+        set((st) => ({
+          manager: st.manager && {
+            ...st.manager,
+            budgetStructure: st.manager.budgetStructure - cout,
+            installations: {
+              ...st.manager.installations,
+              [m.club]: { ...murs, [type]: vise },
+            },
+          },
+          journal: [...st.journal, {
+            id: idUnique(),
+            role: 'mj' as const,
+            titre: t('mgr.inst.titre'),
+            texte: t('mgr.inst.journal', {
+              nom: t(`mgr.inst.${type}.nom`),
+              niveau: String(vise),
+              cout: nombre(cout),
+            }),
+            saison: m.saison,
+          }],
+        }));
+      },
+
+      basculerEntrainement: (nom) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const niveau = niveauInstallation(m.installations, m.club, 'entrainement');
+        if (niveau <= 0) return;
+        const places = PLACES_ENTRAINEMENT[Math.min(niveau, NIVEAU_INSTALLATION_MAX)];
+        const dedans = m.entrainements.includes(nom);
+        // ⚠️ ON REFUSE SILENCIEUSEMENT AU-DELÀ DES PLACES, et l'écran désactive
+        // les cases correspondantes : un programme qu'on croirait avoir posé
+        // sans qu'il compte serait le pire des deux mondes.
+        if (!dedans && m.entrainements.length >= places) return;
+        set((st) => ({
+          manager: st.manager && {
+            ...st.manager,
+            entrainements: dedans
+              ? st.manager.entrainements.filter((n) => n !== nom)
+              : [...st.manager.entrainements, nom],
+          },
+        }));
+      },
+
       signerBanc: (club) => {
         const m = get().manager;
         if (!m || !clubParNom(club)) return;
@@ -3545,6 +3632,12 @@ export const useGame = create<GameState>()(
           confiance: 62,
           budgetTransferts: budgets.transferts,
           budgetSalarial: budgets.salarial,
+          // ⚠️ L'ENVELOPPE STRUCTURE REPART DE ZÉRO, ET LES MURS RESTENT. Un
+          // entraîneur n'emporte pas le centre de formation de son ancien club
+          // (`Manager.installations` est indexé PAR CLUB) : il découvre celui
+          // du nouveau, souvent inexistant. L'épargne, elle, appartenait au
+          // club qu'on vient de quitter.
+          budgetStructure: budgetStructure(force, comp?.niveau ?? 8),
           contrat: { saisons: 3, salaire: salaireManager(force) },
           decision: null,
           composition: compositionManagerParDefaut(effectifDuClub(club, m.saison)),
@@ -3871,6 +3964,45 @@ export const useGame = create<GameState>()(
         const saisonsContrat = Math.max(0, (m.contrat?.saisons ?? 1) - 1);
         const budgets = budgetsDuClub(m.club, m.saison + 1);
 
+        // ═══ LES INSTALLATIONS RENDENT LEUR SAISON ═════════════════════════
+        // ⚠️ TOUT SE PASSE ICI, ET AVANT LA CONSTRUCTION DE `suivant`. La
+        // composition est réconciliée quelques lignes plus bas sur
+        // `effectifDuClub(club, saison + 1)` : si les jeunes du centre
+        // n'étaient pas déjà déversés dans le registre, ils n'existeraient pas
+        // encore pour elle, et le manager découvrirait sa promotion sans
+        // pouvoir l'aligner avant l'intersaison suivante.
+        const murs = m.installations[m.club] ?? installationsVierges();
+        const groupe = effectifDuClub(m.club, m.saison);
+
+        // 🎓 Le centre de formation sort sa promotion.
+        const promo = licencie ? [] : promotionDuCentre(m.club, m.saison + 1, murs.formation, groupe);
+        const jeunesFormes = promo.length ? [...m.jeunesFormes, ...promo] : m.jeunesFormes;
+
+        // 🏋️ Le programme individuel rend ce qu'il a fait gagner.
+        const progres = { ...m.progres };
+        const gagnants: string[] = [];
+        if (!licencie && murs.entrainement > 0) {
+          const places = PLACES_ENTRAINEMENT[Math.min(murs.entrainement, NIVEAU_INSTALLATION_MAX)];
+          for (const nom of m.entrainements.slice(0, places)) {
+            const j = groupe.find((x) => x.nom === nom);
+            if (!j) continue;
+            const gain = gainEntrainement(murs.entrainement, j.age, j.potentiel - j.note);
+            if (gain <= 0) continue;
+            const cle = `${m.club}|${nom}`;
+            // Daté : il ne rattrape pas les saisons déjà jouées (voir types.ts).
+            progres[cle] = [...(progres[cle] ?? []), { depuis: m.saison + 1, gain }];
+            gagnants.push(`${nom} +${gain.toString().replace('.', ',')}`);
+          }
+        }
+
+        // 🔎 Les recruteurs rendent leur rapport de la saison à venir.
+        const rapports = licencie || murs.recrutement <= 0
+          ? m.rapports
+          : explorer(m.club, m.saison + 1, murs.recrutement);
+
+        // ⚠️ ON DÉVERSE AVANT DE LIRE L'EFFECTIF SUIVANT, pas après.
+        setApportsDuCentre(jeunesFormes, progres);
+
         const suivant: Manager = {
           ...m,
           saison: m.saison + 1,
@@ -3885,6 +4017,17 @@ export const useGame = create<GameState>()(
             : Math.round(budgets.transferts + m.budgetTransferts * 0.28),
           budgetSalarial: licencie ? 0
             : Math.round(budgets.salarial + m.budgetSalarial * 0.2),
+          // ⚠️ CELLE-CI SE BANQUE INTÉGRALEMENT, contrairement aux deux autres,
+          // et il le faut : la dernière marche d'une structure coûte 4,6
+          // saisons d'enveloppe. Avec un report partiel, elle serait
+          // inaccessible à un club modeste — la structure la plus intéressante
+          // du lot n'existerait que pour ceux qui n'en ont pas besoin.
+          budgetStructure: licencie ? 0 : Math.round(budgets.structure + m.budgetStructure),
+          jeunesFormes,
+          progres,
+          rapports,
+          // Un joueur parti ne suit plus le programme du club.
+          entrainements: licencie ? [] : m.entrainements,
           titres: trophee ? [...m.titres, `${nomDivision(m.division)} (S${m.saison})`] : m.titres,
           palmares: trophee
             ? [...m.palmares, {
@@ -3910,9 +4053,32 @@ export const useGame = create<GameState>()(
         };
         if (!licencie) suivant.decision = decisionManagerPour(suivant);
 
+        // ⚠️ CE QUE LES STRUCTURES ONT PRODUIT SE DIT, sinon elles n'existent
+        // pas. Une promotion qui apparaît en silence dans l'écran Composition
+        // se lit comme un bug d'effectif, et un joueur qui gagne deux points
+        // sans explication passe pour du bruit — c'est exactement ce qui rend
+        // un système de progression invisible « inutile » pour qui y joue.
+        const ditesLe: string[] = [];
+        if (promo.length) {
+          ditesLe.push(t('mgr.inst.promo', {
+            n: String(promo.length),
+            noms: promo.map((j) => `${j.nom} (${j.note}, ↗ ${j.potentiel})`).join(', '),
+          }));
+        }
+        if (gagnants.length) ditesLe.push(t('mgr.inst.progres', { noms: gagnants.join(', ') }));
+        if (rapports.length && rapports !== m.rapports) {
+          ditesLe.push(t('mgr.inst.rapport', { n: String(rapports.length) }));
+        }
+
         set((st) => ({
           manager: suivant,
-          journal: [...st.journal, {
+          journal: [...st.journal, ...(ditesLe.length ? [{
+            id: idUnique(),
+            saison: m.saison,
+            role: 'mj' as const,
+            titre: t('mgr.inst.titre'),
+            texte: ditesLe.join(' '),
+          }] : []), {
             id: idUnique(),
             saison: m.saison,
             role: 'mj' as const,
@@ -5339,7 +5505,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 17,
+      version: 18,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -5580,7 +5746,7 @@ export const useGame = create<GameState>()(
         if (s.manager) {
           const budgets = s.manager.club
             ? budgetsDuClub(s.manager.club, s.manager.saison)
-            : { transferts: 0, salarial: 0 };
+            : { transferts: 0, salarial: 0, structure: 0 };
           s.manager = {
             ...s.manager,
             budgetTransferts: Number.isFinite(s.manager.budgetTransferts)
@@ -5595,6 +5761,18 @@ export const useGame = create<GameState>()(
               : { titulaires: [], remplacants: [], capitaineId: '', buteurId: '' }),
             tactique: { ...TACTIQUE_MANAGER_DEFAUT, ...(s.manager.tactique ?? {}) },
             resultats: s.manager.resultats ?? {},
+            // ⚠️ VERSION 18 — LES INSTALLATIONS DU CLUB. Une carrière d'avant
+            // ce lot n'a ni murs, ni promotion, ni rapports : elle repart avec
+            // l'enveloppe normale de son club et RIEN de construit. Lui offrir
+            // un centre de niveau 1 « pour ne pas la pénaliser » lui retirerait
+            // le premier achat, qui est justement le moment de carrière.
+            budgetStructure: Number.isFinite(s.manager.budgetStructure)
+              ? s.manager.budgetStructure : budgets.structure,
+            installations: s.manager.installations ?? {},
+            jeunesFormes: s.manager.jeunesFormes ?? [],
+            entrainements: s.manager.entrainements ?? [],
+            progres: s.manager.progres ?? {},
+            rapports: s.manager.rapports ?? [],
           };
           if (version < 12 && s.manager.club && !s.manager.decision) {
             s.manager.decision = decisionManagerPour(s.manager);
@@ -5614,6 +5792,11 @@ export const useGame = create<GameState>()(
         // composition des divisions : elles doivent être purgées en même temps.
         oublierResultats();
         setTransfertsSociaux(etat?.transfertsSociaux ?? []);
+        // ⚠️ MÊME RAISON QUE LA LIGNE AU-DESSUS : les jeunes du centre et les
+        // programmes individuels vivent dans un registre de module
+        // (`lib/effectif.ts`). Sans cette ligne, une carrière rechargée verrait
+        // sa promotion s'évaporer et son effectif rétrécir sans un mot.
+        setApportsDuCentre(etat?.manager?.jeunesFormes, etat?.manager?.progres);
         setResultatsJoues(Object.values(etat?.manager?.resultats ?? {}).map((r) => ({
           cle: r.cle,
           match: {

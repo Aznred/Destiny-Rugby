@@ -13,6 +13,7 @@ import { effectifDuClub } from './effectif';
 import { graine } from './championnat';
 import { pseudoStable } from './comptes';
 import { primeDeMatch, salaire } from './offres';
+import { budgetStructure } from './installations';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LE RÉGIME ÉCONOMIQUE D'UN CLUB — professionnel ou amateur
@@ -69,7 +70,7 @@ export function forceDuGroupe(club: string, saison: number): number {
 }
 
 export function budgetsDuClub(club: string, saison: number): {
-  transferts: number; salarial: number;
+  transferts: number; salarial: number; structure: number;
 } {
   const force = forceDuGroupe(club, saison);
   const niveau = competitionDuClub(club)?.niveau ?? 8;
@@ -89,6 +90,12 @@ export function budgetsDuClub(club: string, saison: number): {
       ? arrondir(Math.max(60_000, brut * 8_200 * facteur * 0.18), 5_000)
       : arrondir(Math.max(150_000, brut * 8_200 * facteur), 25_000),
     salarial: arrondir(Math.max(90_000, brut * 1_850 * facteur), 10_000),
+    // ⚠️ LA TROISIÈME ENVELOPPE SORT D'ICI, avec les deux autres, et pas d'un
+    // coin du store : c'est ce qui garantit qu'elles partent toutes du même
+    // point d'origine (`force − 31`) et gardent donc le même rapport entre
+    // elles à tous les étages. Sa formule vit dans `lib/installations.ts`,
+    // qui est pur et mesurable sans navigateur.
+    structure: budgetStructure(force, niveau),
   };
 }
 

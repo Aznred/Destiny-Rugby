@@ -1,4 +1,4 @@
-import type { FamillePoste, Joueur, PosteId, TransfertAnnonce } from '../types';
+import type { FamillePoste, JeuneForme, Joueur, PosteId, TransfertAnnonce } from '../types';
 import { POSTE_PAR_ID, posteDepuisFamille } from '../data/rugby';
 import { COMPETITIONS, competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs';
 import { EFFECTIFS_REELS, NOTE_CLUB_REEL } from '../data/effectifsReels';
@@ -15,6 +15,8 @@ import { generationDuClub } from './generations';
 // NB : prêt à être remplacé par un import CSV réel (voir CLAUDE.md).
 
 export interface Coequipier {
+  /** Sorti du centre de formation du club (🎓 à l'écran). */
+  duCentre?: boolean;
   id: string;
   nom: string;
   poste: PosteId;
@@ -571,9 +573,11 @@ function romain(n: number): string {
 export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
   // ⚠️ Les transferts annoncés sur L'Ovale s'appliquent APRÈS le mercato, et
   // dès la saison 1 (le mercato, lui, ne démarre qu'en saison 2).
-  const liste = appliquerTransfertsSociaux(
+  // ⚠️ ET LES JEUNES DU CENTRE ARRIVENT ENCORE APRÈS : un joueur formé au club
+  // ne peut pas avoir été transféré ailleurs par un tweet la saison d'avant.
+  const liste = appliquerJeunesFormes(nomClub, saison, appliquerTransfertsSociaux(
     nomClub, saison, appliquerMercato(nomClub, saison, effectifBrut(nomClub, saison)),
-  );
+  ));
 
   // ═══ LA GÉNÉRATION DU CLUB ════════════════════════════════════════════════
   // ⚠️ C'EST LE SEUL ENDROIT OÙ ELLE S'APPLIQUE, et c'est délibéré (voir
@@ -583,14 +587,16 @@ export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
   // montre bien des joueurs meilleurs. L'appliquer sur `forceEffectif` seul
   // aurait donné un club qui joue comme 82 avec un effectif affiché à 75.
   const { bonus } = generationDuClub(nomClub, saison, noteDuClub(nomClub));
-  if (Math.abs(bonus) < 0.05) return distinguerLesHomonymes(liste);
-  return distinguerLesHomonymes(liste.map((j) => ({
+  if (Math.abs(bonus) < 0.05) {
+    return appliquerProgres(nomClub, saison, distinguerLesHomonymes(liste));
+  }
+  return appliquerProgres(nomClub, saison, distinguerLesHomonymes(liste.map((j) => ({
     ...j,
     note: Math.max(20, Math.min(99, Math.round(j.note + bonus))),
     // Le potentiel suit : une génération dorée, ce sont des joueurs qui
     // dépassent ce qu'on attendait d'eux, pas seulement une bonne saison.
     potentiel: Math.max(20, Math.min(99, Math.round(j.potentiel + bonus * 0.6))),
-  })));
+  }))));
 }
 
 // Un groupe doit pouvoir aligner un XV et son banc. Les données réelles vont de
@@ -772,6 +778,96 @@ export function setTransfertsSociaux(liste: TransfertAnnonce[] | undefined): voi
   cacheBrut.clear();
   cacheForce.clear();
   cacheReference.clear();
+}
+
+// ---------------------------------------------------------------------------
+// CE QUE LES INSTALLATIONS DU CLUB DÉVERSENT ICI
+// Même principe que les transferts annoncés ci-dessus : le store tient la
+// liste, `effectif.ts` la rend. Deux apports, et ils ne s'appliquent pas au
+// même moment de la chaîne (voir `effectifDuClub`).
+// ---------------------------------------------------------------------------
+let JEUNES_FORMES: JeuneForme[] = [];
+let PROGRES_ENTRAINEMENT: Record<string, { depuis: number; gain: number }[]> = {};
+
+export function setApportsDuCentre(
+  jeunes: JeuneForme[] | undefined,
+  progres: Record<string, { depuis: number; gain: number }[]> | undefined,
+): void {
+  JEUNES_FORMES = jeunes ?? [];
+  PROGRES_ENTRAINEMENT = progres ?? {};
+  cacheBrut.clear();
+  cacheForce.clear();
+  cacheReference.clear();
+}
+
+/**
+ * Les jeunes du centre entrent dans le groupe l'année de leur sortie, puis
+ * vieillissent comme tout le monde.
+ *
+ * ⚠️ ILS PASSENT PAR `noteALAge`, comme les 18 000 autres, et pas par une
+ * courbe à eux : sans ça, un club aurait deux façons de faire progresser ses
+ * joueurs, et l'écran 👥 afficherait des espoirs qui ne suivent pas la même
+ * règle que leurs coéquipiers.
+ */
+function appliquerJeunesFormes(
+  nomClub: string, saison: number, liste: Coequipier[],
+): Coequipier[] {
+  if (!JEUNES_FORMES.length) return liste;
+  const miens = JEUNES_FORMES.filter((j) => j.club === nomClub && j.saison <= saison);
+  if (!miens.length) return liste;
+
+  const sortie = [...liste];
+  for (const j of miens) {
+    const age = j.age + (saison - j.saison);
+    const rng = graine('centre#' + j.id);
+    const vitesseDeclin = rng();
+    // Il raccroche comme un joueur du cru : 33-36 ans.
+    if (age > 33 + Math.floor(rng() * 4)) continue;
+    sortie.push({
+      id: j.id,
+      nom: j.nom,
+      poste: j.poste,
+      age,
+      note: noteALAge(j.note, j.age, j.potentiel, age, vitesseDeclin),
+      potentiel: j.potentiel,
+      nation: j.nation,
+      regen: false,
+      duCentre: true,
+    });
+  }
+  return sortie;
+}
+
+/**
+ * Le programme individuel du centre d'entraînement.
+ *
+ * ⚠️ IL S'APPLIQUE APRÈS `distinguerLesHomonymes`, ET C'EST OBLIGATOIRE. La
+ * clé est `club|nom AFFICHÉ` : les effectifs amateurs contiennent de vrais
+ * doublons de nom, et créditer « Leo BOGALHO » sans son suffixe romain
+ * entraînerait les quatre d'un coup — pour le prix d'une place.
+ *
+ * ⚠️ ET LE POTENTIEL RESTE LE PLAFOND. C'est ce qui empêche le centre de
+ * devenir une machine à fabriquer des stars : on rattrape sa marge, on ne la
+ * dépasse jamais.
+ */
+function appliquerProgres(nomClub: string, saison: number, liste: Coequipier[]): Coequipier[] {
+  if (!Object.keys(PROGRES_ENTRAINEMENT).length) return liste;
+  let touche = false;
+  const sortie = liste.map((j) => {
+    const incrs = PROGRES_ENTRAINEMENT[nomClub + '|' + j.nom];
+    if (!incrs?.length) return j;
+    // ⚠️ SEULEMENT CE QUI ÉTAIT ACQUIS À CETTE DATE. Sans le filtre, un
+    // classement de la saison 3 qu'on rouvre en saison 9 montrerait le joueur
+    // avec six ans d'entraînement qu'il n'avait pas encore faits.
+    let gain = 0;
+    for (const inc of incrs) if (inc.depuis <= saison) gain += inc.gain;
+    if (gain <= 0) return j;
+    const note = Math.min(j.potentiel, Math.round(j.note + gain));
+    if (note === j.note) return j;
+    touche = true;
+    return { ...j, note };
+  });
+  return touche ? sortie : liste;
 }
 
 function appliquerTransfertsSociaux(
