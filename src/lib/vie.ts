@@ -518,8 +518,10 @@ export function reactionsPour(
 // 12 publications pour la semaine 1. C'est ce qui permet de recalculer le fil
 // à l'affichage sans rien sauvegarder — et d'éviter les doublons.
 
+type IdentiteFil = Pick<Joueur, 'club' | 'saison' | 'nom'>;
+
 export function filDeLaSemaine(
-  j: Joueur,
+  j: IdentiteFil,
   comptes: CompteSuivi[],
   numeroSemaine: number,
   combien = 8,

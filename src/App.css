@@ -227,6 +227,98 @@
   .manager-duel { gap:.45rem; }
   .manager-lancer-match .btn { width:100%; min-height:50px; }
 }
+
+/* Bureau V2 : un tableau de club lisible, sans carte de décision hebdomadaire. */
+.manager-bureau { display:grid; grid-template-columns:minmax(0,1fr); gap:1rem; }
+.manager-club-resume { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:clamp(1rem,2.5vw,1.45rem); background:linear-gradient(125deg,rgba(17,58,37,.97),rgba(5,24,16,.98)); overflow:hidden; }
+.manager-club-resume-identite { display:flex; align-items:center; gap:1rem; min-width:0; }
+.manager-club-resume-identite h2 { margin:.18rem 0; font-size:clamp(1.35rem,3vw,2rem); }
+.manager-club-resume-identite p { display:flex; align-items:center; gap:.4rem; margin:0; color:var(--craie-dim); }
+.manager-resume-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:.55rem; }
+.manager-kpis { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:.7rem; }
+.manager-kpis article { display:flex; flex-direction:column; min-height:112px; padding:.9rem; }
+.manager-kpis small { color:var(--craie-dim); font-size:.7rem; text-transform:uppercase; letter-spacing:.045em; }
+.manager-kpis b { margin:.34rem 0 .2rem; color:var(--or); font-size:clamp(1.15rem,2vw,1.48rem); line-height:1.05; }
+.manager-kpis span { margin-top:auto; color:var(--craie-dim); font-size:.73rem; line-height:1.35; }
+.manager-classement-complet { min-width:0; padding:1rem; }
+.manager-classement-complet .comp-tete button { border:0; color:var(--or); background:transparent; }
+.manager-table-classement { margin-top:.7rem; overflow-x:auto; border:1px solid rgba(255,255,255,.07); border-radius:12px; }
+.manager-table-classement table { width:100%; min-width:650px; border-collapse:collapse; }
+.manager-table-classement th,.manager-table-classement td { height:48px; padding:.45rem .65rem; border-bottom:1px solid rgba(255,255,255,.06); text-align:center; font-size:.82rem; }
+.manager-table-classement thead th { height:38px; color:var(--craie-dim); background:rgba(255,255,255,.025); font-size:.67rem; text-transform:uppercase; letter-spacing:.055em; }
+.manager-table-classement tbody th { min-width:210px; text-align:left; font-weight:600; }
+.manager-table-classement tbody th span { display:flex; align-items:center; gap:.6rem; }
+.manager-table-classement tbody tr:last-child > * { border-bottom:0; }
+.manager-table-classement tbody tr.moi { background:rgba(224,176,72,.13); }
+.manager-table-classement tbody tr.moi th,.manager-table-classement tbody tr.moi td:last-child { color:var(--or); }
+.manager-table-classement .positif { color:#61d595; }
+.manager-table-classement .negatif { color:#f08b83; }
+.manager-bureau-bas { display:grid; grid-template-columns:minmax(280px,.7fr) minmax(0,1.3fr); gap:1rem; }
+.manager-prochain-match,.manager-bureau-bas .manager-journal { padding:1rem; }
+.manager-mini-duel { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:.75rem; min-height:120px; text-align:center; }
+.manager-mini-duel strong { color:var(--or); font-size:1.35rem; }
+.manager-prochain-match > p { color:var(--craie-dim); }
+.manager-promotion-centre .prog-ligne { cursor:default; }
+
+/* L'Ovale du manager garde la coque du réseau joueur, avec ses outils métier. */
+.x-manager .x-centre { max-width:1180px; }
+.manager-x-timeline { min-height:calc(100vh - 54px); }
+.x-manager .x-action:disabled { cursor:default; opacity:.72; }
+.manager-x-termes-club { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.manager-x-ventes { min-height:calc(100vh - 54px); padding:1rem; background:#000; }
+.manager-x-vente-intro { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1.1rem; border:1px solid #2f3336; border-radius:16px; background:#080b0e; }
+.manager-x-vente-intro h2 { margin:.25rem 0; }
+.manager-x-vente-intro p { max-width:62ch; margin:.2rem 0 0; color:#8b98a5; }
+.manager-x-vente-intro > strong { display:flex; flex-direction:column; color:#1d9bf0; font-size:1.25rem; text-align:right; }
+.manager-x-vente-intro small { color:#8b98a5; font-size:.7rem; font-weight:400; }
+.manager-x-vente { margin-top:.8rem; overflow:hidden; border:1px solid #2f3336; border-radius:14px; background:#080b0e; }
+.manager-x-vente > header { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:.8rem; padding:.85rem 1rem; border-bottom:1px solid #2f3336; }
+.manager-x-vente > header > div { display:flex; flex-direction:column; }
+.manager-x-vente > header span,.manager-x-effectif small { color:#8b98a5; font-size:.75rem; }
+.manager-x-vente > header > strong { color:#f0f3f4; }
+.manager-x-vente button,.manager-x-effectif button { min-height:36px; padding:.35rem .7rem; border:1px solid #536471; border-radius:999px; color:#f0f3f4; background:transparent; font-weight:700; }
+.manager-x-offres { display:grid; }
+.manager-x-offres > div { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:.8rem; min-height:62px; padding:.55rem 1rem; border-bottom:1px solid #20262d; }
+.manager-x-offres > div:last-child { border-bottom:0; }
+.manager-x-offres span { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; column-gap:.6rem; }
+.manager-x-offres span > *:first-child { grid-row:1/3; }
+.manager-x-offres small { color:#8b98a5; }
+.manager-x-offres strong { color:#00ba7c; }
+.manager-x-offres .x-poster { border-color:#1d9bf0; background:#1d9bf0; }
+.manager-x-sans-offre { margin:0; padding:1rem; color:#8b98a5; }
+.manager-x-effectif { margin-top:1rem; }
+.manager-x-effectif h3 { padding:0 .2rem; }
+.manager-x-effectif > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; }
+.manager-x-effectif article { display:grid; grid-template-columns:minmax(0,1fr) 38px auto auto; align-items:center; gap:.65rem; min-height:64px; padding:.6rem .75rem; border:1px solid #2f3336; border-radius:12px; background:#080b0e; }
+.manager-x-effectif article > span { display:flex; flex-direction:column; min-width:0; }
+.manager-x-effectif article b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.manager-x-effectif article em { display:grid; place-items:center; width:34px; height:34px; border-radius:8px; color:#000; background:#f0c96a; font-style:normal; font-weight:900; }
+.manager-x-effectif article > strong { color:#8b98a5; font-size:.78rem; white-space:nowrap; }
+.manager-x-effectif button:disabled { opacity:.42; cursor:not-allowed; }
+
+@media (max-width:1120px) {
+  .manager-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+
+@media (max-width:760px) {
+  .manager-club-resume { align-items:flex-start; flex-direction:column; }
+  .manager-resume-actions { display:grid; grid-template-columns:1fr 1fr; width:100%; }
+  .manager-resume-actions .btn:last-child { grid-column:1/-1; min-height:48px; }
+  .manager-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; }
+  .manager-kpis article { min-height:104px; }
+  .manager-bureau-bas { grid-template-columns:1fr; width:100%; }
+  .manager-table-classement { width:100%; }
+  .manager-x-ventes { padding:.65rem; }
+  .manager-x-vente-intro { align-items:flex-start; flex-direction:column; }
+  .manager-x-vente-intro > strong { text-align:left; }
+  .manager-x-vente > header { grid-template-columns:minmax(0,1fr) auto; }
+  .manager-x-vente > header > button { grid-column:1/-1; }
+  .manager-x-offres > div { grid-template-columns:minmax(0,1fr) auto; }
+  .manager-x-offres .x-poster { grid-column:1/-1; min-height:42px; }
+  .manager-x-effectif > div { grid-template-columns:1fr; }
+  .manager-x-effectif article { grid-template-columns:minmax(0,1fr) 38px auto; }
+  .manager-x-effectif article button { grid-column:1/-1; min-height:42px; }
+}
 .nav .marque {
   display: flex;
   align-items: center;

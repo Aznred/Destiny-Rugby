@@ -685,6 +685,84 @@ export interface RecrueManager {
   saison: number;
 }
 
+// ---------------------------------------------------------------------------
+// L'OVALE DU MANAGER : négocier avec le club, écouter le vestiaire, vendre
+// ---------------------------------------------------------------------------
+// Demande : « pareil pour X, sauf qu'on l'utilise pour démarcher les joueurs et
+// négocier avec les autres clubs ; que les joueurs puissent demander leur
+// besoin s'ils ne jouent pas assez ou dire qu'ils veulent partir ; pouvoir
+// vendre les joueurs ».
+
+/**
+ * La discussion avec le club VENDEUR, avant celle avec le joueur.
+ *
+ * ⚠️ ELLE VIENT D'ABORD, ET C'EST L'ORDRE DU RUGBY : on s'entend sur
+ * l'indemnité, puis on parle au joueur. L'inverse — se mettre d'accord avec le
+ * joueur puis découvrir que son club ne le lâche pas — n'existe pas dans un
+ * transfert réel, et ferait perdre au manager une négociation entière pour rien.
+ *
+ * ⚠️ ELLE N'EXISTE PAS SOUS LA NATIONALE 2. Les clubs amateurs ne se vendent
+ * pas de joueurs (`PRO_JUSQUA`) : l'indemnité vaut 0, il n'y a rien à négocier,
+ * et on parle directement au joueur.
+ */
+export interface NegociationClubManager {
+  id: string;
+  /** Le compte officiel du club sur L'Ovale (`pseudoStable(club, '_officiel')`). */
+  pseudo: string;
+  club: string;
+  cible: CibleRecrutementManager;
+  /** Ce que le club réclame au départ. */
+  demande: number;
+  /** Ce qu'on propose aujourd'hui. */
+  offre: number;
+  /** Le plancher CACHÉ : sous ce montant, le club raccroche. */
+  plancher: number;
+  patience: number;
+  etat: 'ouverte' | 'accord' | 'rompue';
+  saison: number;
+  semaine: number;
+}
+
+/** Ce qu'un joueur du groupe vient réclamer dans les messages. */
+export interface DemandeJoueur {
+  id: string;
+  pseudo: string;
+  joueurId: string;
+  nom: string;
+  poste: PosteId;
+  note: number;
+  /**
+   * `tempsDeJeu` : il ne joue pas et le fait savoir.
+   * `depart` : il est trop bon pour le banc de ce club, il veut partir.
+   */
+  type: 'tempsDeJeu' | 'depart';
+  saison: number;
+  semaine: number;
+  etat: 'ouverte' | 'acceptee' | 'refusee';
+}
+
+/** Une offre reçue pour un joueur mis sur la liste. */
+export interface OffreVente {
+  id: string;
+  club: string;
+  division: string;
+  montant: number;
+}
+
+/** Un joueur mis sur la liste des transferts. */
+export interface VenteManager {
+  joueurId: string;
+  nom: string;
+  poste: PosteId;
+  age: number;
+  note: number;
+  potentiel: number;
+  /** Ce qu'il vaut au barème du jeu (`valeurMarchande`, la MÊME que pour acheter). */
+  valeur: number;
+  saison: number;
+  offres: OffreVente[];
+}
+
 export interface ChoixDecisionManager {
   id: string;
   label: string;
@@ -845,7 +923,21 @@ export interface Manager {
   /** Indexé par la clé déterministe du calendrier. Un match ne se joue qu'une fois. */
   resultats: Record<string, ResultatMatchManager>;
   negociations: NegociationManager[];
+  /** Les discussions d'indemnité avec les clubs vendeurs. */
+  negociationsClubs: NegociationClubManager[];
   recrues: RecrueManager[];
+  /**
+   * Combien de feuilles de match chaque joueur a eues CETTE SAISON.
+   *
+   * ⚠️ C'EST LA SEULE SOURCE DES DEMANDES DE TEMPS DE JEU, et elle est
+   * mesurée, pas devinée : un joueur se plaint parce qu'il n'a pas joué, pas
+   * parce qu'un tirage l'a désigné. Remis à zéro à chaque intersaison.
+   */
+  tempsDeJeu: Record<string, number>;
+  /** Ce que le vestiaire réclame, et qui attend une réponse. */
+  demandes: DemandeJoueur[];
+  /** Les joueurs qu'on a mis sur la liste des transferts. */
+  ventes: VenteManager[];
   /**
    * Les structures, PAR CLUB.
    *

@@ -2,7 +2,6 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { t, nombre } from '../lib/i18n';
-import { Jauge } from '../components/Jauge';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { Confirmation } from '../components/Confirmation';
@@ -24,7 +23,7 @@ import { matchDuClubSemaine } from '../lib/matchLive';
 import {
   CLUBS_OBSERVES, coutAmelioration, EMOJI_INSTALLATION, GAIN_ENTRAINEMENT,
   installationsVierges, NIVEAU_INSTALLATION_MAX, PLACES_ENTRAINEMENT,
-  PROMOTION_PAR_NIVEAU, INCERTITUDE_RECRUTEURS, budgetStructure, TYPES_INSTALLATION,
+  PROMOTION_PAR_NIVEAU, INCERTITUDE_RECRUTEURS, budgetStructure,
 } from '../lib/installations';
 import {
   joueurCompatibleManager, noteCompositionManager, POSTES_BANC_MANAGER,
@@ -34,7 +33,8 @@ import type { CompositionManager, TactiqueManager, TypeInstallation } from '../t
 
 const MatchLive = lazy(() => import('../components/MatchLive').then((m) => ({ default: m.MatchLive })));
 
-type VueManager = 'bureau' | 'equipe' | 'club' | 'match' | 'marche' | 'negociations';
+type VueManager = 'bureau' | 'equipe' | 'match' | 'marche'
+  | 'formation' | 'recruteurs' | 'entrainement';
 
 function humeurDuBoard(confiance: number): { texte: string; ton: string } {
   if (confiance < CONFIANCE_LICENCIEMENT + 12) return { texte: t('mgr.board.sellette'), ton: 'rouge' };
@@ -47,8 +47,7 @@ export function Manager() {
   const manager = useGame((s) => s.manager);
   const setEcran = useGame((s) => s.setEcran);
   const semaineManager = useGame((s) => s.semaineManager);
-  const repondreDecision = useGame((s) => s.repondreDecisionManager);
-  const contacter = useGame((s) => s.contacterJoueurManager);
+  const contacterClub = useGame((s) => s.contacterClubManager);
   const ouvrirMessages = useGame((s) => s.ouvrirMessagesOvale);
   const ouvrirDiscussion = useGame((s) => s.ouvrirDiscussionOvale);
   const signerBanc = useGame((s) => s.signerBanc);
@@ -119,6 +118,10 @@ export function Manager() {
   const maLigne = classement?.classement.find((l) => l.club === manager.club);
   const sem = semaine(manager.semaine);
   const actives = manager.negociations.filter((n) => n.etat === 'ouverte' || n.etat === 'accord');
+  const dossiersClubs = manager.negociationsClubs.filter((n) => n.etat === 'ouverte' || n.etat === 'accord');
+  const demandesOuvertes = manager.demandes.filter((d) => d.etat === 'ouverte');
+  const alertesOvale = actives.length + dossiersClubs.length + demandesOuvertes.length
+    + manager.ventes.reduce((total, vente) => total + vente.offres.length, 0);
   const composition = compositionMemo;
   const afficheManager = afficheMemo;
   const resultatManager = afficheManager ? manager.resultats[afficheManager.cle] : undefined;
@@ -206,95 +209,90 @@ export function Manager() {
       ) : (
         <>
           <nav className="manager-onglets" aria-label={t('mgr.navigation')}>
-            <button className={vue === 'bureau' ? 'actif' : ''} onClick={() => setVue('bureau')}>🏟️ {t('mgr.bureau')}</button>
+            <button className={vue === 'bureau' ? 'actif' : ''} onClick={() => setVue('bureau')}>🏟️ Club</button>
             <button className={vue === 'equipe' ? 'actif' : ''} onClick={() => setVue('equipe')}>👥 Composition</button>
-            <button className={vue === 'club' ? 'actif' : ''} onClick={() => setVue('club')}>
-              🏗️ {t('mgr.inst.onglet')} {rapportsFrais > 0 && <i>{rapportsFrais}</i>}
-            </button>
             <button className={vue === 'match' ? 'actif' : ''} onClick={() => setVue('match')}>
               🎮 Match {afficheManager && !resultatManager && <i>1</i>}
             </button>
             <button className={vue === 'marche' ? 'actif' : ''} onClick={() => setVue('marche')}>🌍 {t('mgr.marche')}</button>
-            <button className={vue === 'negociations' ? 'actif' : ''} onClick={() => setVue('negociations')}>
-              💬 {t('mgr.negociations')} {actives.length > 0 && <i>{actives.length}</i>}
+            <button onClick={ouvrirMessages}>
+              𝕏 L’Ovale {alertesOvale > 0 && <i>{alertesOvale}</i>}
             </button>
+            <button className={vue === 'formation' ? 'actif' : ''} onClick={() => setVue('formation')}>🎓 Formation</button>
+            <button className={vue === 'recruteurs' ? 'actif' : ''} onClick={() => setVue('recruteurs')}>
+              🔎 Recruteurs {rapportsFrais > 0 && <i>{rapportsFrais}</i>}
+            </button>
+            <button className={vue === 'entrainement' ? 'actif' : ''} onClick={() => setVue('entrainement')}>🏋️ Entraînement</button>
           </nav>
 
           {vue === 'bureau' && (
             <div className="manager-bureau">
-              <aside className="carte manager-club-panel">
-                <div className="cm-tete">
-                  {fiche && <Blason club={fiche} taille={48} />}
-                  <div><strong>{manager.club}</strong><div className="cm-compet">{comp && <LogoCompet id={comp.id} emoji={comp.emoji} taille={20} />}{manager.divisionNom}</div></div>
+              <section className="carte manager-club-resume">
+                <div className="manager-club-resume-identite">
+                  {fiche && <Blason club={fiche} taille={62} />}
+                  <div>
+                    <div className="eyebrow">Tableau de bord · saison {manager.saison}</div>
+                    <h2>{manager.club}</h2>
+                    <p>{comp && <LogoCompet id={comp.id} emoji={comp.emoji} taille={19} />} {manager.divisionNom} · {humeur.texte}</p>
+                  </div>
                 </div>
-                <div className="cm-chiffres compacts">
-                  <div><span>{maLigne ? `${maLigne.position}ᵉ` : '—'}</span><em>{t('mgr.classement')}</em></div>
-                  <div><span>{manager.objectif}ᵉ</span><em>{t('mgr.objectif')}</em></div>
-                  <div><span>{force.toFixed(1)}</span><em>{t('mgr.force')}</em></div>
-                  <div><span>{manager.contrat?.saisons ?? '—'}</span><em>{t('mgr.contrat')}</em></div>
+                <div className="manager-resume-actions">
+                  <button className="btn fantome" onClick={() => setEcran('effectif')}>👥 Effectif</button>
+                  <button className="btn fantome" onClick={ouvrirMessages}>𝕏 L’Ovale</button>
+                  <button className="btn primaire" onClick={() => {
+                    if (afficheManager && !resultatManager) setVue('match'); else semaineManager();
+                  }}>
+                    {afficheManager && !resultatManager ? '🎮 Coacher le match' : '▶ Semaine suivante'}
+                  </button>
                 </div>
-                <Jauge label={t('mgr.prestige')} valeur={manager.prestige} variante="or" />
-                <Jauge label={t('mgr.confiance')} valeur={manager.confiance} variante={manager.confiance < CONFIANCE_DEPART ? 'cuir' : 'vert'} />
-                <p className={`humeur-board ${humeur.ton}`}>{humeur.texte}</p>
-                <div className="manager-budgets">
-                  <span><small>{t('mgr.budgetTransferts')}</small><b>{nombre(manager.budgetTransferts)} €</b></span>
-                  <span><small>{t('mgr.budgetSalarial')}</small><b>{nombre(manager.budgetSalarial)} €</b></span>
-                </div>
-                <div className="actions verticales">
-                  <button className="btn fantome" onClick={() => setEcran('tableau')}>📊 {t('mgr.resultatsMonde')}</button>
-                  <button className="btn fantome" onClick={() => setEcran('effectif')}>👥 {t('mgr.monEffectif')}</button>
-                  <button className="btn fantome" onClick={() => setVue('marche')}>🔎 {t('mgr.recruter')}</button>
-                </div>
-              </aside>
+              </section>
 
-              <main className="manager-recit">
-                {manager.decision ? (
-                  <article className="carte manager-decision">
-                    <div className="manager-decision-emoji">{manager.decision.emoji}</div>
-                    <div className="eyebrow">{t('mgr.decisionSemaine')}</div>
-                    <h2>{manager.decision.titre}</h2>
-                    <p>{manager.decision.texte}</p>
-                    <div className="manager-choix">
-                      {manager.decision.choix.map((choix) => (
-                        <button key={choix.id} onClick={() => repondreDecision(manager.decision!.id, choix.id)}>
-                          <b>{choix.label}</b><span>{choix.consequence}</span>
-                        </button>
-                      ))}
+              <section className="manager-kpis" aria-label="Informations importantes du club">
+                <article className="carte"><small>Classement</small><b>{maLigne ? `${maLigne.position}e` : '—'}</b><span>{maLigne?.points ?? 0} points</span></article>
+                <article className="carte"><small>Objectif du board</small><b>{manager.objectif}e</b><span>{maLigne && maLigne.position <= manager.objectif ? 'Objectif tenu' : 'À rattraper'}</span></article>
+                <article className="carte"><small>Force du groupe</small><b>{force.toFixed(1)}</b><span>{effectif.length} joueurs</span></article>
+                <article className="carte"><small>Confiance</small><b>{Math.round(manager.confiance)}%</b><span>{humeur.texte}</span></article>
+                <article className="carte"><small>Budget transferts</small><b>{nombre(manager.budgetTransferts)} €</b><span>{nombre(manager.budgetSalarial)} € salarial</span></article>
+                <article className="carte"><small>Structures</small><b>{nombre(manager.budgetStructure)} €</b><span>Formation {murs.formation}/4 · Recrutement {murs.recrutement}/4 · Entraînement {murs.entrainement}/4</span></article>
+              </section>
+
+              <section className="carte manager-classement-complet">
+                <div className="comp-tete"><b>📊 {manager.divisionNom}</b><button onClick={() => setEcran('tableau')}>{t('mgr.resultatsMonde')}</button></div>
+                <div className="manager-table-classement" role="region" aria-label={`Classement ${manager.divisionNom}`} tabIndex={0}>
+                  <table>
+                    <thead><tr><th>#</th><th>Club</th><th>J</th><th>G</th><th>N</th><th>P</th><th>+/-</th><th>Pts</th></tr></thead>
+                    <tbody>
+                      {classement?.classement.map((l) => {
+                        const club = clubParNom(l.club);
+                        return (
+                          <tr key={l.club} className={l.club === manager.club ? 'moi' : ''}>
+                            <td>{l.position}</td>
+                            <th scope="row"><span>{club && <Blason club={club} taille={27} />}<b>{l.club}</b></span></th>
+                            <td>{l.joues}</td><td>{l.gagnes}</td><td>{l.nuls}</td><td>{l.perdus}</td>
+                            <td className={l.difference >= 0 ? 'positif' : 'negatif'}>{l.difference > 0 ? '+' : ''}{l.difference}</td>
+                            <td><strong>{l.points}</strong></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section className="manager-bureau-bas">
+                <article className="carte manager-prochain-match">
+                  <div className="comp-tete"><b>🏉 Prochaine échéance</b></div>
+                  {afficheManager ? (
+                    <div className="manager-mini-duel">
+                      <span>{afficheManager.match.domicile}</span><strong>{resultatManager ? `${afficheManager.match.scoreD} – ${afficheManager.match.scoreE}` : 'VS'}</strong><span>{afficheManager.match.exterieur}</span>
                     </div>
-                  </article>
-                ) : (
-                  <article className="carte manager-semaine-prete">
-                    <span>{afficheManager && !resultatManager ? '🏉' : '✓'}</span>
-                    <h2>{afficheManager && !resultatManager ? 'Le match attend tes consignes' : t('mgr.semainePreparee')}</h2>
-                    <p>{afficheManager && !resultatManager
-                      ? `${afficheManager.match.domicile} reçoit ${afficheManager.match.exterieur}. Prépare ton XV puis prends place sur le banc.`
-                      : t('mgr.semainePrepareeTexte')}</p>
-                    <button className="btn primaire grand" onClick={() => {
-                      if (afficheManager && !resultatManager) setVue('match'); else semaineManager();
-                    }}>
-                      {afficheManager && !resultatManager
-                        ? '🧠 Coacher le match'
-                        : manager.semaine >= SEMAINES_PAR_SAISON ? `🏁 ${t('mgr.cloreSaison')}` : `▶ ${t('mgr.semaineSuivante')} (${manager.semaine}/${SEMAINES_PAR_SAISON})`}
-                    </button>
-                  </article>
-                )}
-                <div className="carte manager-journal">
+                  ) : <p>Aucun match cette semaine : récupération et préparation.</p>}
+                </article>
+                <article className="carte manager-journal">
                   <div className="comp-tete"><b>📜 {t('mgr.journal')}</b></div>
-                  <div className="journal">{[...journal].reverse().slice(0, 8).map((e) => <div key={e.id} className="entree"><b>{e.titre}</b><p>{e.texte}</p></div>)}</div>
-                </div>
-              </main>
-
-              <aside className="carte manager-classement">
-                <div className="comp-tete"><b>📊 {manager.divisionNom}</b><button onClick={() => setEcran('tableau')}>{t('mgr.voirTout')}</button></div>
-                <div className="manager-top-classement">
-                  {classement?.classement.slice(0, 8).map((l) => (
-                    <div key={l.club} className={l.club === manager.club ? 'moi' : ''}>
-                      <span>{l.position}</span><b>{l.club}</b><strong>{l.points} pts</strong>
-                    </div>
-                  ))}
-                </div>
-                <p className="manager-prochain">{t('mgr.calendrierComplet')}</p>
-              </aside>
+                  <div className="journal">{[...journal].reverse().slice(0, 5).map((e) => <div key={e.id} className="entree"><b>{e.titre}</b><p>{e.texte}</p></div>)}</div>
+                </article>
+              </section>
             </div>
           )}
 
@@ -373,7 +371,7 @@ export function Manager() {
           {vue === 'match' && (
             <div className="manager-match-centre">
               {!afficheManager ? (
-                <section className="carte manager-match-vide"><span>📆</span><h2>Pas de match cette semaine</h2><p>Le calendrier laisse une fenêtre de récupération. Tu peux préparer la suite puis avancer.</p><button className="btn primaire" disabled={!!manager.decision} onClick={semaineManager}>▶ Semaine suivante</button></section>
+                <section className="carte manager-match-vide"><span>📆</span><h2>Pas de match cette semaine</h2><p>Le calendrier laisse une fenêtre de récupération. Tu peux préparer la suite puis avancer.</p><button className="btn primaire" onClick={semaineManager}>▶ Semaine suivante</button></section>
               ) : (
                 <section className="carte manager-affiche-match">
                   <div className="eyebrow">Journée {afficheManager.journee} · {manager.divisionNom}</div>
@@ -384,8 +382,6 @@ export function Manager() {
                   </div>
                   {resultatManager ? (
                     <div className="manager-match-joue"><b>✓ Résultat enregistré au championnat</b><p>{resultatManager.essaisPour} essai{resultatManager.essaisPour > 1 ? 's' : ''} marqué{resultatManager.essaisPour > 1 ? 's' : ''} · confiance du board mise à jour.</p><button className="btn primaire" onClick={semaineManager}>{manager.semaine >= SEMAINES_PAR_SAISON ? '🏁 Clore la saison' : '▶ Semaine suivante'}</button></div>
-                  ) : manager.decision ? (
-                    <div className="manager-match-bloque"><b>📋 Une décision de bureau attend encore.</b><p>Tranche-la avant le coup d’envoi : elle fait partie de la préparation de la semaine.</p><button className="btn fantome" onClick={() => setVue('bureau')}>Retour au bureau</button></div>
                   ) : (
                     <div className="manager-lancer-match"><p>Le XV, le banc, le capitaine, le buteur et le plan de jeu seront figés au coup d’envoi. Les consignes collectives resteront modifiables en direct.</p><div><button className="btn fantome" onClick={() => setVue('equipe')}>👥 Vérifier la composition</button><button className="btn primaire grand" onClick={() => setMatchOuvert(true)}>🎮 Prendre place sur le banc</button></div></div>
                   )}
@@ -394,13 +390,17 @@ export function Manager() {
             </div>
           )}
 
-          {vue === 'club' && (
+          {(vue === 'formation' || vue === 'recruteurs' || vue === 'entrainement') && (
             <div className="manager-club">
               <section className="carte manager-inst-tete">
                 <div>
                   <div className="eyebrow">{t('mgr.inst.eyebrow')}</div>
-                  <h2>🏗️ {t('mgr.inst.titre')}</h2>
-                  <p>{t('mgr.inst.intro')}</p>
+                  <h2>{vue === 'formation' ? '🎓 Centre de formation' : vue === 'recruteurs' ? '🔎 Recruteurs' : '🏋️ Centre d’entraînement'}</h2>
+                  <p>{vue === 'formation'
+                    ? 'Fais grandir les joueurs du cru et suis chaque promotion sortie par le club.'
+                    : vue === 'recruteurs'
+                      ? 'Développe ton réseau : plus il progresse, plus les rapports sont nombreux et précis.'
+                      : 'Choisis les joueurs qui travaillent individuellement sans jamais dépasser leur potentiel.'}</p>
                 </div>
                 <div className="manager-note-compo manager-enveloppe">
                   <b>{nombre(manager.budgetStructure)} €</b>
@@ -409,7 +409,7 @@ export function Manager() {
               </section>
 
               <div className="manager-inst-grille">
-                {TYPES_INSTALLATION.map((type: TypeInstallation) => {
+                {([vue === 'formation' ? 'formation' : vue === 'recruteurs' ? 'recrutement' : 'entrainement'] as TypeInstallation[]).map((type) => {
                   const niveau = murs[type];
                   const cout = coutAmelioration(niveau, enveloppe);
                   const finance = cout !== null && manager.budgetStructure >= cout;
@@ -458,7 +458,26 @@ export function Manager() {
                 })}
               </div>
 
-              <section className="carte manager-programme">
+              {vue === 'formation' && (
+                <section className="carte manager-rapports manager-promotion-centre">
+                  <div className="comp-tete"><b>🎓 Promotions du club</b><span className="comp-count">{manager.jeunesFormes.filter((j) => j.club === manager.club).length}</span></div>
+                  {manager.jeunesFormes.some((j) => j.club === manager.club) ? (
+                    <div className="manager-liste-programme">
+                      {[...manager.jeunesFormes].filter((j) => j.club === manager.club).reverse().map((j) => (
+                        <div className="prog-ligne" key={j.id}>
+                          <span className="prog-nom"><Drapeau nation={j.nation} taille={14} /> {j.nom}</span>
+                          <span className="prog-poste">{nomPoste(j.poste)}</span>
+                          <span className="prog-age">{j.age}</span>
+                          <span className="prog-note">{j.note}</span>
+                          <span className="prog-marge positive">↗ {j.potentiel}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="manager-vide-texte">La première promotion arrivera à l’intersaison une fois le centre construit.</p>}
+                </section>
+              )}
+
+              {vue === 'entrainement' && <section className="carte manager-programme">
                 <div className="comp-tete">
                   <b>🏋️ {t('mgr.inst.programme')}</b>
                   <span className="comp-count">{manager.entrainements.length}/{placesEntrainement}</span>
@@ -497,9 +516,9 @@ export function Manager() {
                     </div>
                   </>
                 )}
-              </section>
+              </section>}
 
-              <section className="carte manager-rapports">
+              {vue === 'recruteurs' && <section className="carte manager-rapports">
                 <div className="comp-tete">
                   <b>🔎 {t('mgr.inst.rapports')}</b>
                   <span className="comp-count">{manager.rapports.length}</span>
@@ -534,7 +553,7 @@ export function Manager() {
                     ))}
                   </div>
                 )}
-              </section>
+              </section>}
             </div>
           )}
 
@@ -554,7 +573,20 @@ export function Manager() {
               <div className="manager-cibles">
                 {cibles.map((cible) => {
                   const existante = manager.negociations.find((n) => n.joueur.id === cible.id && n.etat !== 'rompue');
+                  const clubDossier = [...manager.negociationsClubs].reverse()
+                    .find((n) => n.cible.id === cible.id && n.saison === manager.saison);
                   const clubCible = clubParNom(cible.club);
+                  const libelleContact = existante?.etat === 'signee'
+                    ? `✓ ${t('mgr.signe')}`
+                    : existante
+                      ? `𝕏 ${t('mgr.reprendreDiscussion')}`
+                      : cible.indemnite <= 0 || clubDossier?.etat === 'accord'
+                        ? `𝕏 Parler à ${cible.nom.split(' ')[0]}`
+                        : clubDossier?.etat === 'ouverte'
+                          ? `𝕏 Reprendre avec ${cible.club}`
+                          : clubDossier?.etat === 'rompue'
+                            ? '⛔ Club vendeur fermé'
+                            : `𝕏 Négocier avec ${cible.club}`;
                   return (
                     <article key={cible.id} className="carte manager-cible">
                       <div className="manager-cible-note">{cible.note}<small>{t('mgr.note')}</small></div>
@@ -563,8 +595,16 @@ export function Manager() {
                         <p>{clubCible && <Blason club={clubCible} taille={18} />} {cible.club}</p>
                         <div className="manager-cible-chiffres"><span>{t('mgr.potentiel')} <b>{cible.potentiel}</b></span><span>{t('mgr.indemnite')} <b>{nombre(cible.indemnite)} €</b></span><span>{t('mgr.salaire')} <b>{nombre(cible.salaireDemande)} €</b></span></div>
                       </div>
-                      <button className="btn primaire" disabled={existante?.etat === 'signee'} onClick={() => existante ? ouvrirDiscussion(existante.pseudo) : contacter(cible)}>
-                        {existante?.etat === 'signee' ? `✓ ${t('mgr.signe')}` : existante ? `𝕏 ${t('mgr.reprendreDiscussion')}` : `𝕏 ${t('mgr.contacter')}`}
+                      <button
+                        className="btn primaire"
+                        disabled={existante?.etat === 'signee' || clubDossier?.etat === 'rompue'}
+                        onClick={() => {
+                          if (existante) ouvrirDiscussion(existante.pseudo);
+                          else if (clubDossier?.etat === 'ouverte') ouvrirDiscussion(clubDossier.pseudo);
+                          else contacterClub(cible);
+                        }}
+                      >
+                        {libelleContact}
                       </button>
                     </article>
                   );
@@ -574,21 +614,6 @@ export function Manager() {
             </div>
           )}
 
-          {vue === 'negociations' && (
-            <div className="manager-negociations">
-              <div className="carte manager-marche-tete"><div><div className="eyebrow">𝕏 L’Ovale</div><h2>💬 {t('mgr.negociationsTitre')}</h2><p>{t('mgr.negociationsIntro')}</p></div><button className="btn primaire" onClick={ouvrirMessages}>𝕏 {t('mgr.ouvrirMessages')}</button></div>
-              <div className="manager-dossiers">
-                {[...manager.negociations].reverse().map((n) => (
-                  <article key={n.id} className="carte manager-dossier" data-etat={n.etat}>
-                    <div><b>{n.joueur.nom}</b><span>{n.joueur.club} · {nomPoste(n.joueur.poste)}</span></div>
-                    <strong>{t(`mgr.etat.${n.etat}`)}</strong>
-                    <button className="btn fantome" onClick={() => ouvrirDiscussion(n.pseudo)}>𝕏 {t('mgr.ouvrir')}</button>
-                  </article>
-                ))}
-                {!manager.negociations.length && <div className="carte manager-vide"><b>{t('mgr.aucuneDiscussion')}</b><p>{t('mgr.aucuneDiscussionTexte')}</p><button className="btn primaire" onClick={() => setVue('marche')}>🔎 {t('mgr.explorerMarche')}</button></div>}
-              </div>
-            </div>
-          )}
         </>
       )}
 

@@ -365,8 +365,8 @@ console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
   ligne('le joueur laisse la place', String(useGame.getState().joueur), useGame.getState().joueur === null);
   ligne('l’objectif tient dans la poule réellement jouée',
     `${m1?.objectif}ᵉ`, !!m1 && m1.objectif >= 1 && m1.objectif <= 12);
-  ligne('une décision narrative attend dès la première semaine',
-    m1?.decision?.titre ?? 'aucune', !!m1?.decision && m1.decision.choix.length === 3);
+  ligne('le bureau ne bloque plus sur une décision narrative',
+    m1?.decision?.titre ?? 'aucune', m1?.decision === null);
   ligne('une feuille de 23 joueurs est prête dès la création',
     `${(m1?.composition.titulaires.length ?? 0) + (m1?.composition.remplacants.length ?? 0)} joueurs`,
     m1?.composition.titulaires.length === 15 && m1.composition.remplacants.length === 8);

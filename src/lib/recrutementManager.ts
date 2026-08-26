@@ -134,7 +134,6 @@ function ciblePour(
   const bonusDuree = rng();
 
   const amateur = estAmateurNiveau(niveauVendeur);
-  const jeunesse = joueur.age <= 24 ? 1.25 : joueur.age >= 32 ? 0.55 : 1;
 
   // ⚠️ LE PLANCHER `Math.max(35, note - 34)` A SAUTÉ, ET C'ÉTAIT LE BUG.
   // Il n'était inactif qu'à partir d'une note de 69 : en dessous — toute la
@@ -150,11 +149,7 @@ function ciblePour(
   // en multiplicateur, un espoir coûtait presque tout le budget d'un club.
   // Le +10 borne la spéculation : on ne paie jamais un joueur plus de dix points
   // au-dessus de ce qu'il vaut aujourd'hui, sinon il jouerait déjà plus haut.
-  const marge = Math.max(0, joueur.potentiel - joueur.note);
-  const valeurJoueur = Math.max(0, joueur.note - 31) + Math.min(10, marge * 0.4);
-  const indemnite = amateur
-    ? 0
-    : arrondir(valeurJoueur ** 2 * 3_000 * facteurNiveau(niveauVendeur) * jeunesse * rarete, 25_000);
+  const indemnite = amateur ? 0 : valeurMarchande(joueur, niveauVendeur, rarete);
 
   // ⚠️ UNE SEULE ÉCHELLE DE RÉMUNÉRATION DANS LE JEU. Le manager réclamait
   // `valeur² × 180`, soit une QUATRIÈME formule de salaire (après `offres.ts`,
@@ -204,6 +199,35 @@ function ciblePour(
  * Le marché d'une compétition. « Tous les clubs » reste borné pour les grands
  * championnats amateurs ; choisir un club donne toujours son effectif complet.
  */
+/**
+ * CE QUE VAUT UN JOUEUR, dans un sens comme dans l'autre.
+ *
+ * ⚠️ UNE SEULE ÉCHELLE, ET C'EST LA RAISON D'ÊTRE DE CETTE FONCTION. Le prix
+ * qu'on paie pour recruter (`ciblePour`) et celui qu'on encaisse en vendant
+ * (`lib/vestiaireManager.ts`) doivent sortir de la MÊME ligne : deux barèmes,
+ * c'est un jour deux vérités — et un manager qui achète 4 M€ ce qu'il revend
+ * 900 000 € le lendemain sans que rien n'ait bougé.
+ *
+ * ⚠️ ET ELLE RENVOIE 0 CHEZ UN AMATEUR. Sous la Nationale 2, le rugby français
+ * ne se vend pas de joueurs (demande explicite) : il n'y a rien à encaisser,
+ * pas plus qu'il n'y a rien à payer.
+ */
+export function valeurMarchande(
+  joueur: { note: number; potentiel: number; age: number },
+  niveau: number,
+  rarete = 1,
+): number {
+  if (estAmateurNiveau(niveau)) return 0;
+  const jeunesse = joueur.age <= 24 ? 1.25 : joueur.age >= 32 ? 0.55 : 1;
+  // Le potentiel entre DANS le carré au lieu de le multiplier — en
+  // multiplicateur, un espoir coûtait presque tout le budget d'un club. Le +10
+  // borne la spéculation : on ne paie jamais dix points au-dessus de la note du
+  // jour, sinon le joueur jouerait déjà plus haut.
+  const marge = Math.max(0, joueur.potentiel - joueur.note);
+  const valeurJoueur = Math.max(0, joueur.note - 31) + Math.min(10, marge * 0.4);
+  return arrondir(valeurJoueur ** 2 * 3_000 * facteurNiveau(niveau) * jeunesse * rarete, 25_000);
+}
+
 export function ciblesDuMarche(
   division: string,
   saison: number,
@@ -352,6 +376,17 @@ export function accepterDemandesJoueur(negociation: NegociationManager): Negocia
   return { ...negociation, offre: { ...negociation.exigences }, etat: 'accord' };
 }
 
-export function coutPremiereSaison(negociation: NegociationManager): number {
-  return negociation.joueur.indemnite + negociation.offre.prime;
+/**
+ * Ce que la signature coûte tout de suite.
+ *
+ * ⚠️ `indemniteNegociee` PASSE DEVANT LE PRIX AFFICHÉ, et c'est tout l'intérêt
+ * d'avoir parlé au club vendeur : sans ce paramètre, on aurait négocié une
+ * indemnité pour finalement payer celle du départ, et la discussion avec le
+ * club n'aurait servi qu'à faire perdre du temps.
+ */
+export function coutPremiereSaison(
+  negociation: NegociationManager, indemniteNegociee?: number,
+): number {
+  const indemnite = indemniteNegociee ?? negociation.joueur.indemnite;
+  return indemnite + negociation.offre.prime;
 }

@@ -252,7 +252,9 @@ function compteCompetition(id: string, nom: string, desc: string, niveau = 1): C
 // L'annuaire complet, mémoïsé par saison + club du joueur (l'effectif change).
 const cache = new Map<string, CompteSuivi[]>();
 
-export function annuaire(j: Joueur): CompteSuivi[] {
+type ContexteSocial = Pick<Joueur, 'club' | 'saison' | 'division'>;
+
+export function annuaire(j: ContexteSocial): CompteSuivi[] {
   const cle = `${j.club}#${j.saison}#${j.division}#${langueCourante()}`;
   const enCache = cache.get(cle);
   if (enCache) return enCache;
@@ -365,7 +367,7 @@ export function annuaire(j: Joueur): CompteSuivi[] {
   return liste;
 }
 
-export function comptePar(j: Joueur, pseudo: string): CompteSuivi | undefined {
+export function comptePar(j: ContexteSocial, pseudo: string): CompteSuivi | undefined {
   return annuaire(j).find((c) => c.pseudo === pseudo);
 }
 
@@ -377,7 +379,7 @@ export function comptePar(j: Joueur, pseudo: string): CompteSuivi | undefined {
 // un fil où seuls des clubs publiaient, et des commentaires signés « Premiership
 // Rugby Cup ». On compose donc un bassin ÉQUILIBRÉ, en piochant dans chaque
 // famille, les comptes suivis en tête.
-export function bassinSocial(j: Joueur, suivis: CompteSuivi[] = []): CompteSuivi[] {
+export function bassinSocial(j: ContexteSocial, suivis: CompteSuivi[] = []): CompteSuivi[] {
   const monde = annuaire(j);
   const parType = (t: CompteSuivi['type'], n: number) =>
     monde.filter((c) => c.type === t).slice(0, n);
