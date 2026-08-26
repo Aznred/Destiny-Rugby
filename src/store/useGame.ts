@@ -53,7 +53,7 @@ import { definirLangue, langueDuNavigateur, nombre, t, type Langue } from '../li
 import { LANGUE_DE_REPLI } from '../lib/cible';
 import type { LigneReelle } from '../lib/moteur/saison';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
-import { LIMITES, ficheDepuisJoueur, scoreDeLaFiche } from '../lib/classementMondial';
+import { LIMITES, ficheDepuisJoueur, ficheDepuisManager, scoreDeLaFiche } from '../lib/classementMondial';
 import { cleAleatoire, envoyerAuClassement } from '../lib/classementEnLigne';
 import {
   COMPETITIONS_U20, competitionsDeLaSaison, fenetreInternationale, fenetreU20,
@@ -3977,12 +3977,27 @@ export const useGame = create<GameState>()(
       //     comble.
       // La fin de saison et la retraite passent outre (`force`) : ce sont les
       // deux moments où la carrière DOIT être posée, quoi qu’il arrive.
+      // ⚠️ ET UNE CARRIÈRE D'ENTRAÎNEUR SE PUBLIE AUSSI. Elle ne se publiait
+      // PAS : cette fonction commençait par `if (!joueur) return`, or
+      // `creerManager` pose `joueur: null`. L'appel de `quitterBanc` était donc
+      // un no-op SILENCIEUX — et avec lui tout l'étage manager du classement,
+      // pourtant écrit, calibré et déployé : `ficheDepuisManager`, le barème
+      // `scoreManager`, les bornes du banc (`ageDebutManagerMin`,
+      // `titresManagerParSaison`…), les trois catégories SQL de
+      // `api/classement.ts` et les quatre onglets de l'écran. Rien n'était
+      // jamais envoyé, et rien ne le disait.
+      //
+      // ⚠️ LE VERROU DU MODE LIBRE RESTE DANS `quitterBanc`, pas ici : c'est
+      // lui qui décide de ne pas appeler. Le remettre aussi dans cette
+      // fonction donnerait deux gardiens pour une seule porte, donc un jour
+      // deux réponses.
       publierAuClassement: (force = false) => {
         const j = get().joueur;
-        if (!j) return;
-        const fiche = ficheDepuisJoueur(
-          j, get().pseudoClassement || undefined, get().cleClassement,
-        );
+        const m = get().manager;
+        if (!j && !m) return;
+        const fiche = j
+          ? ficheDepuisJoueur(j, get().pseudoClassement || undefined, get().cleClassement)
+          : ficheDepuisManager(m!, get().pseudoClassement || undefined, get().cleClassement);
         if (!force) {
           if (fiche.score <= get().dernierScoreEnvoye) return;
           if (Date.now() - dernierEnvoiLe < DELAI_ENVOI) return;

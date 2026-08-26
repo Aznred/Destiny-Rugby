@@ -480,5 +480,64 @@ console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
     `${publie} envoi(s)`, publie === 0);
 }
 
+// ---------------------------------------------------------------------------
+// 6. LA CARRIÈRE D'ENTRAÎNEUR PART VRAIMENT AU CLASSEMENT
+// ---------------------------------------------------------------------------
+// ⚠️ CE CONTRÔLE EXISTE PARCE QUE CELUI DE LA SECTION 5 NE POUVAIT PAS ATTRAPER
+// LE BUG. La section 5 REMPLACE `publierAuClassement` par un espion pour
+// compter les appels : elle vérifie donc que `quitterBanc` APPELLE, jamais que
+// l'appel FASSE quelque chose. Et il ne faisait rien — `publierAuClassement`
+// commençait par `const j = get().joueur; if (!j) return;`, or `creerManager`
+// pose `joueur: null`. Tout l'étage manager du classement (`ficheDepuisManager`,
+// le barème `scoreManager`, les bornes du banc, les trois catégories SQL de
+// `api/classement.ts` et les quatre onglets de l'écran) était écrit, calibré,
+// déployé… et jamais alimenté. Aucune carrière d'entraîneur n'y est arrivée.
+//
+// La leçon est générale : UN BANC D'ESSAI QUI BOUCHONNE LA FONCTION À TESTER NE
+// TESTE QUE SON PROPRE BOUCHON. On intercepte donc le RÉSEAU, pas le store.
+//
+// ⚠️ Il faut une URL : sans `VITE_CLASSEMENT_URL`, `lib/classementEnLigne.ts`
+// n'appelle pas hors production (constante `ACTIF`) — c'est voulu, Vite ne sait
+// pas exécuter une fonction serverless. Le contrôle s'annonce donc IGNORÉ
+// plutôt que de passer au vert sur du vide.
+console.log("\n=== 6. LA CARRIÈRE D'ENTRAÎNEUR PART VRAIMENT AU CLASSEMENT ===");
+{
+  if (!process.env.VITE_CLASSEMENT_URL) {
+    info('contrôle ignoré (pas d’URL)',
+      'VITE_CLASSEMENT_URL=https://exemple.test/api/classement npx vite-node scripts/verifManager.ts');
+  } else {
+    const envoyees: Record<string, unknown>[] = [];
+    const vraiFetch = globalThis.fetch;
+    globalThis.fetch = (async (cible: unknown, init?: { method?: string; body?: string }) => {
+      if (String(cible).includes('classement') && init?.method === 'POST' && init.body) {
+        envoyees.push(JSON.parse(init.body) as Record<string, unknown>);
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true, id: 'test' }) };
+    }) as unknown as typeof globalThis.fetch;
+
+    useGame.getState().creerManager({
+      nom: 'Renaud Bascou', nation: 'France', age: 42, club: 'Stade Nantais', libre: false,
+    });
+
+    ligne('la carrière est bien celle d’un entraîneur',
+      useGame.getState().joueur === null ? 'joueur: null' : '⚠️ un joueur traîne',
+      useGame.getState().joueur === null && !!useGame.getState().manager);
+
+    useGame.getState().publierAuClassement(true);
+    await new Promise((r) => setTimeout(r, 250));
+    globalThis.fetch = vraiFetch;
+
+    ligne('⚠️ une fiche est réellement envoyée',
+      `${envoyees.length} envoi(s)`, envoyees.length === 1);
+    const f = envoyees[0];
+    if (f) {
+      ligne('elle porte le poste « entraineur »', String(f.poste), f.poste === 'entraineur');
+      ligne('elle porte le versant manager', f.manager ? 'présent' : 'absent', !!f.manager);
+      ligne('et le serveur l’accepterait', verdict(f).motif, verdict(f).ok);
+      info('son score', String(f.score));
+    }
+  }
+}
+
 console.log(`\n${echecs === 0 ? '✅ TOUT PASSE' : `❌ ${echecs} ÉCHEC(S)`}`);
 process.exitCode = echecs === 0 ? 0 : 1;
