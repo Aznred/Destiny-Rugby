@@ -633,9 +633,21 @@ export interface CibleRecrutementManager {
   note: number;
   potentiel: number;
   nation: string;
+  /**
+   * Indemnité de transfert réclamée par le club vendeur.
+   * ⚠️ VAUT 0 À PARTIR DE LA NATIONALE 2 (niveau >= 4) : sous cet étage, le
+   * rugby français est amateur et les clubs ne se vendent pas de joueurs.
+   */
   indemnite: number;
+  /** Salaire annuel réclamé. 0 chez un club amateur, qui ne salarie personne. */
   salaireDemande: number;
+  /** Prime à la signature. 0 chez un club amateur. */
   primeDemandee: number;
+  /**
+   * Défraiement par feuille de match réclamé. Le pendant amateur du salaire :
+   * 0 chez un club professionnel, > 0 chez un club amateur. Jamais les deux.
+   */
+  primeMatchDemandee: number;
   dureeDemandee: number;
   roleDemande: RoleRecrueManager;
 }
@@ -643,6 +655,12 @@ export interface CibleRecrutementManager {
 export interface TermesRecrutementManager {
   salaire: number;
   prime: number;
+  /**
+   * Défraiement par feuille de match. ⚠️ Optionnel : les sauvegardes
+   * antérieures au régime amateur ne le portent pas, et tout lecteur doit
+   * faire `?? 0`. Un contrat amateur a `salaire: 0` et `primeMatch > 0`.
+   */
+  primeMatch?: number;
   duree: number;
   role: RoleRecrueManager;
 }

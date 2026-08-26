@@ -8306,3 +8306,141 @@ defined`) : elle date des quelques secondes où le JSX utilisait `<Icone>` avant
 que la ligne d'import ne soit ajoutée, et le lecteur de console ne vide pas son
 historique. Le composant rend bien ses cinq icônes, aucun garde-fou d'erreur ne
 se déclenche, et la compilation est propre.
+
+---
+
+## 💸 LE MARCHÉ DU MANAGER : deux bugs qui se cachaient l'un l'autre
+
+Demande : « attention, les clubs ne font pas de transfert payant jusqu'à
+Fédérale 1 / Nationale 2 : pas de salaire, des primes de match un peu, mais
+sinon rien ».
+
+⚠️ **CE N'ÉTAIT PAS UNE DEMANDE DE RÉALISME, C'ÉTAIT UN BUG.** Mesuré en
+exécutant les formules sur de vrais effectifs, avant toute modification :
+
+| division | meilleure cible | indemnité | salaire demandé | budget du club |
+|---|---|---|---|---|
+| Top 14 | 98 | 7 575 000 € | 735 000 € | 28 650 000 € |
+| Pro D2 | 75 | 1 700 000 € | 305 000 € | 10 625 000 € |
+| **Nationale** | 74 | **3 900 000 €** | 290 000 € | 4 925 000 € |
+| Fédérale 2 | 52 | 2 650 000 € | 220 000 € | 1 050 000 € |
+| **Régionale 3** | 39 | **2 400 000 €** | 220 000 € | **150 000 €** |
+
+Deux absurdités s'y lisent : la **Nationale coûtait plus cher que la Pro D2**, et
+un club de Régionale 3 devait payer **seize fois son budget** pour un joueur de
+village. La cause tient en une ligne, `recrutementManager.ts` :
+
+```ts
+const valeur = Math.max(35, joueur.note - 34);
+```
+
+Ce plancher n'est inactif qu'à partir d'une note de **69**. En dessous — toute la
+Nationale, la Nationale 2, les trois Fédérales, les trois Régionales et une
+partie de la Pro D2 — **tous les joueurs valaient exactement la même chose** :
+35² × 1 850 = 2 266 250 €.
+
+### La frontière demandée tombe pile sur un niveau existant
+
+`n1` Top 14 · `n2` Pro D2 · `n3` Nationale · **`n4` Nationale 2** ·
+**`n5` Fédérale 1** · `n6`-`n10` Fédérales et Régionales. La règle est donc
+`PRO_JUSQUA = 3` : **au-delà, ni indemnité ni salaire, seulement un défraiement
+par feuille de match.**
+
+### ⚠️ POURQUOI UNE RÈGLE MANAGER, ET PAS UNE RETOUCHE DE `PART_AMATEUR`
+
+`lib/offres.ts` porte déjà un régime amateur pour le joueur incarné. Il ne
+convient pas ici, et le vérifier a évité une fausse bonne idée : il est
+**probabiliste** et ne commence qu'à la Fédérale 1 — mesuré, `partAmateur(4)`
+vaut **0** (100 % des clubs de Nationale 2 salarient le joueur incarné) et 0,15
+en Fédérale 1. Le réutiliser tel quel n'aurait **pas** produit ce qui est
+demandé.
+
+Et changer ses valeurs déplacerait l'étalonnage de difficulté du mode joueur —
+qu'**aucun script ne peut mesurer aujourd'hui** (`verifDifficulte.ts` compte des
+saisons sans un seul match joué, voir plus haut). On pose donc la règle du côté
+manager, où elle ne peut rien casser d'autre, et `offres.ts` ne reçoit que **cinq
+mots-clés `export`** — diff de 5 lignes, aucun changement de comportement,
+vérifiable d'un coup d'œil.
+
+### La nouvelle courbe de prix
+
+```ts
+valeurJoueur = max(0, note − 31) + min(10, (potentiel − note) × 0,40)
+indemnite    = valeurJoueur² × 3 000 × facteurNiveau(niveauVendeur) × jeunesse × rarete
+```
+
+- **Le `− 31` est celui de `budgetsDuClub`** : le prix et le budget partent du
+  même point d'origine, donc le rapport prix/budget est constant **par
+  construction** à tous les étages, au lieu de dépendre de deux courbes réglées
+  séparément.
+- **`facteurNiveau` est LA MÊME fonction** pour le prix et pour le budget, d'où
+  son extraction.
+- **Le potentiel entre DANS le carré** au lieu de le multiplier : en
+  multiplicateur, un espoir coûtait presque tout le budget d'un club. Le `+ 10`
+  borne la spéculation — on ne paie jamais dix points au-dessus de la note du
+  jour, sinon le joueur jouerait déjà plus haut.
+
+Et **une seule échelle de rémunération** : `salaireDemande` passe désormais par
+`salaire()` d'`offres.ts`, âge compris, au lieu d'un quatrième barème maison qui
+réclamait 290 000 € pour un joueur de Nationale à qui le mode joueur en propose
+42 000 (× 5,4). ⚠️ L'écart se mesure sur la **force réelle du club vendeur**, pas
+sur `NOTE_PAR_NIVEAU` : la table annonce 64 pour la Nationale quand ses effectifs
+pèsent 53, et passer par elle sous-paierait toute la division.
+
+### ⚠️ LE SECOND BUG : UNE NÉGOCIATION AMATEUR NE POUVAIT PAS ABOUTIR
+
+Trouvé en écrivant le premier correctif, et il aurait été introuvable en jeu.
+`score()` pondère le salaire à 0,52 et la prime à la signature à 0,14. Sur un
+contrat amateur, les deux valent **zéro** : le `Math.max(1, …)` protège de la
+division par zéro, mais `0 / 1 = 0`. Le score plafonnait donc à
+`0,12 × 1,1 + 0,22 = **0,352**` pour un seuil d'accord de **0,94**.
+
+Le joueur aurait refusé indéfiniment, et la négociation se serait toujours
+terminée par « le club se braque » — **un comportement légitime du jeu**. Aucun
+message d'erreur, aucun symptôme distinguable d'une négociation ratée.
+
+L'axe de rémunération est donc **choisi selon le régime** : le salaire chez un
+professionnel, le défraiement chez un amateur. Les poids ne bougent pas, la
+négociation garde la même amplitude des deux côtés. Et le levier 💰 bascule sur
+`primeMatch` chez un amateur — sinon multiplier zéro par 1,12 aurait laissé le
+levier le plus utilisé du jeu sans effet.
+
+### ⚠️ L'ORDRE DES TIRAGES EST PORTEUR
+
+`graine()` est une fermeture à état : seuls le **nombre** et l'**ordre** des
+appels déterminent la suite. Changer ce qu'on fait d'un tirage est sûr ; en
+insérer un décale tout ce qui suit et modifie la durée et la prime de **toutes**
+les cibles du jeu, y compris celles des négociations déjà ouvertes dans une
+sauvegarde en cours. Les quatre tirages sont donc **hissés en tête de
+`ciblePour`**, dans leur ordre historique, et toute l'arithmétique nouvelle se
+fait ensuite. Tout nouvel aléa prend **sa propre graine**.
+
+### Le budget d'un club amateur devient un budget de fonctionnement
+
+« Budget transferts » ne veut plus rien dire quand plus rien ne s'achète — et le
+laisser tel quel en l'ignorant aurait été pire, puisque l'écran affiche les deux
+enveloppes : un manager de Régionale 3 aurait lu « 150 000 € » sur un écran où
+rien n'est achetable. Au-delà du niveau 3, l'enveloppe passe donc à **× 0,18,
+plancher 60 000 €**.
+
+### Mesuré après correction
+
+| division | meilleure cible | indemnité | salaire | prime/match | budget |
+|---|---|---|---|---|---|
+| Top 14 | 93 (22 a) | 15 050 000 € | 410 000 € | — | 28 650 000 € |
+| Pro D2 | 82 (25 a) | 7 125 000 € | 165 000 € | — | 10 625 000 € |
+| Nationale | 74 (30 a) | 4 400 000 € | 80 000 € | — | 4 925 000 € |
+| **Nationale 2** | 74 | **—** | **—** | **1 450 €** | 1 285 000 € |
+| **Fédérale 1** | 66 | — | — | 550 € | 775 000 € |
+| **Fédérale 2** | 63 | — | — | 300 € | 190 000 € |
+| **Régionale 1** | 53 | — | — | 80 € | 245 000 € |
+| **Régionale 3** | 46 | — | — | 30 € | 60 000 € |
+
+La courbe professionnelle est enfin **monotone** (15 M → 7,1 M → 4,4 M) et
+l'inversion Nationale/Pro D2 a disparu. Les défraiements sont aux ordres de
+grandeur du rugby amateur français. Et une négociation **aboutit à tous les
+étages** : mesuré, `rôle + durée + salaire` suffit en amateur, une passe de plus
+en Top 14.
+
+`verifMarche`, `verifTransferts` et `verifEconomie` sont inchangés : le mode
+joueur ne bouge pas.

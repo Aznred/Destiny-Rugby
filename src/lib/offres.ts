@@ -16,7 +16,7 @@ import { agentDe } from '../data/agents';
 
 // Salaire annuel de référence par niveau de division (€). En dessous de la
 // Fédérale 1, c'est du rugby amateur : quelques défraiements, pas un métier.
-const SALAIRE_PAR_NIVEAU: Record<number, number> = {
+export const SALAIRE_PAR_NIVEAU: Record<number, number> = {
   0: 260000, 1: 300000, 2: 90000, 3: 42000, 4: 18000,
   5: 9000, 6: 4500, 7: 2400, 8: 1200, 9: 800, 10: 500,
 };
@@ -60,7 +60,7 @@ export function cote(j: Joueur): number {
  * bouteille jusqu'à 23 ans, touche le plein tarif entre 25 et 31, et voit son
  * contrat se resserrer après 33.
  */
-function salaire(niveau: number, ecart: number, age: number): number {
+export function salaire(niveau: number, ecart: number, age: number): number {
   const base = SALAIRE_PAR_NIVEAU[niveau] ?? 3000;
   // Un joueur nettement au-dessus du club se fait payer davantage — mais moins
   // qu'avant (2,2 → 1,8) : c'est un salaire, pas une prime de transfert.
@@ -89,7 +89,7 @@ const PART_AMATEUR: Record<number, number> = {
   5: 0.15, 6: 0.45, 7: 0.7, 8: 0.85, 9: 0.9, 10: 0.92,
 };
 
-function partAmateur(niveau: number, etranger: boolean): number {
+export function partAmateur(niveau: number, etranger: boolean): number {
   const base = PART_AMATEUR[niveau] ?? 0;
   // À l'étranger, hors élite, le statut professionnel est plus rare encore :
   // l'Ereklasse, la Bundesliga ou le Heartland Championship sont des
@@ -100,7 +100,7 @@ function partAmateur(niveau: number, etranger: boolean): number {
 }
 
 /** Ce club paie-t-il un salaire, ou seulement la feuille de match ? */
-function sansSalaire(club: string, niveau: number, etranger: boolean): boolean {
+export function sansSalaire(club: string, niveau: number, etranger: boolean): boolean {
   const part = partAmateur(niveau, etranger);
   if (part <= 0) return false;
   // Stable pour un club donné : un club amateur ne devient pas professionnel
@@ -113,7 +113,7 @@ function sansSalaire(club: string, niveau: number, etranger: boolean): boolean {
  * que le poste vaudrait en salaire annuel, divisé par une saison pleine : jouer
  * tous les week-ends rapporte l'équivalent, ne pas jouer ne rapporte rien.
  */
-function primeDeMatch(niveau: number, ecart: number, age: number): number {
+export function primeDeMatch(niveau: number, ecart: number, age: number): number {
   const brut = salaire(niveau, ecart, age) / 22;
   const arrondi = brut > 300 ? 50 : brut > 80 ? 10 : 5;
   return Math.max(15, Math.round(brut / arrondi) * arrondi);
