@@ -8444,3 +8444,113 @@ en Top 14.
 
 `verifMarche`, `verifTransferts` et `verifEconomie` sont inchangés : le mode
 joueur ne bouge pas.
+
+---
+
+## 💎 LES PÉPITES — il n'en existait AUCUNE, et c'était mécanique
+
+Demande, dans le lot manager : « des recruteurs pour trouver les pépites ; il
+peut aussi y avoir des gros potentiels dans les petites ligues ».
+
+⚠️ **CE N'ÉTAIT PAS UN RÉGLAGE À MONTER, C'ÉTAIT UNE LOI DE TIRAGE QUI N'EN
+PRODUISAIT PAS.** Le talent inventé est un tirage **uniforme** de ±7 autour de
+la note de la division (`genJoueur` : `floor(rng() * 13) − 6` ; `effectifAmateur` :
+`floor(rng() * 15) − 7`). La marge potentiel − note plafonnait donc à **9 points
+dans toutes les divisions amateurs** — mesuré avant correction, le meilleur
+espoir de Régionale 3 passait de 34 à 39 en huit saisons, et **aucun joueur du
+monde amateur n'atteignait une marge de 14**.
+
+Un recruteur envoyé chercher des pépites serait rentré bredouille **à chaque
+fois**, et pas par malchance : il n'y avait rien à trouver. Écrire les recruteurs
+avant de régler ça, c'était livrer une fonctionnalité qui ne peut pas marcher.
+
+Le joueur incarné, lui, a une queue longue depuis toujours (`creerJoueur` :
+`gen + 18 + rand^1,5 × 44`). C'est elle qu'on rend au reste du monde.
+
+### ⚠️ TROIS GARDE-FOUS, ET C'EST GRÂCE À EUX QUE RIEN D'AUTRE NE BOUGE
+
+1. **GRAINE SÉPARÉE.** `graine()` est une fermeture à état : seuls le **nombre**
+   et l'**ordre** des appels déterminent la suite. Tirer la pépite dans le flux
+   existant décalerait l'âge, la retraite, la nationalité et la note de **tous**
+   les joueurs générés du jeu. `graine('pepite#…')` ne consomme rien.
+2. **ON N'ÉCRASE QUE `potentiel`, JAMAIS LA NOTE DU JOUR.**
+3. **RÉSERVÉ AUX ≤ 23 ANS** (`AGE_PEPITE`). Un potentiel qu'on n'a plus le temps
+   d'atteindre n'est pas une pépite, c'est un chiffre décoratif — et il ferait
+   mentir la marge sur laquelle les recruteurs classeront leurs cibles.
+
+### ⚠️ LES DEUX FABRIQUES NE SE TRAITENT PAS PAREIL, ET C'EST LE PIÈGE
+
+C'est la seule difficulté réelle du lot, et elle ne se voit pas à la lecture.
+
+- **`effectifAmateur`** — on peut écrire le potentiel **directement**. Une pépite
+  a `ageRef ≤ 23`, donc `Math.min(ageRef, AGE_PIC)` vaut `ageRef` : `noteRef` est
+  calculée avec un âge de référence **égal** à l'âge demandé, ce qui fait
+  retomber `noteALAge` sur son point de départ — elle vaut `max(28, noteBase +
+  talent)` borné, **sans que le potentiel n'intervienne**. Et à la saison 1,
+  `age === ageRef`, donc la note du jour vaut `noteRef`.
+- **`genJoueur`** — la note de référence **EST** le potentiel
+  (`noteALAge(potentiel, AGE_PIC, potentiel, …)`), si bien qu'avant 27 ans elle
+  vaut `potentiel − (27 − âge)`. **Ajouter +30 de potentiel ajouterait +30 à la
+  note du jour** et inflaterait toute la division. On **réancre** donc la courbe
+  sur la note de départ calculée SANS la pépite : le joueur démarre exactement
+  là où il démarrait, et progresse vers son potentiel à lui. Les deux formes
+  sont d'ailleurs rigoureusement identiques en l'absence de pépite —
+  l'interpolation retombe sur une pente de 1 point par an et `declin` est nul
+  avant 31 ans.
+
+### ⚠️ UN PLAFOND ABSOLU NE MARCHE PAS — mesuré
+
+Première version, plafond à 94 : elle a sorti un joueur de **Fédérale 2 qui
+culminait à 95**, meilleur que n'importe qui en Top 14, dans un club de sixième
+division. Et rien ne l'en sortirait — le jeu ne fait pas monter un bon joueur de
+club en club, il ne connaît que le mercato circulaire de sa division. La pépite
+serait restée en Fédérale 2 à 95, pour toujours.
+
+Le plafond est donc **relatif à l'étage** : `NOTE_PAR_NIVEAU[niveau] + 32`, soit
+environ trois divisions au-dessus.
+
+| étage | plafond | ce que ça raconte |
+|---|---|---|
+| Nationale 2 | 90 | un gamin qui deviendra une star du Top 14 |
+| Fédérale 1 | 85 | un futur joueur de Top 14 |
+| Fédérale 2 | 79 | un futur joueur de Pro D2 |
+| Fédérale 3 | 74 | un futur joueur de Nationale |
+| Régionale 1 | 70 | idem, depuis plus bas encore |
+| Régionale 2 | 66 | un futur joueur de Fédérale 1 |
+| Régionale 3 | 62 | un futur joueur de Nationale |
+
+### Mesuré (`npx vite-node scripts/verifPepites.ts`)
+
+| | |
+|---|---|
+| pépites dans le monde | **71** sur 8 800 jeunes (**0,81 %**) |
+| étages amateurs qui en ont | **7 sur 7** (n4 à n10) |
+| meilleure pépite amateur | **91** (Nationale 2) · **80** en Fédérale 2 · **62** en Régionale 3 |
+| pépites au-delà du plafond de leur étage | **0** |
+| éclosion réelle | **6/6** gagnent au moins 12 points en 8 saisons (51 → 83, 34 → 61, 48 → 80) |
+
+### ⚠️ ET LA NOTE DU JOUR N'A PAS BOUGÉ D'UN POINT
+
+C'est le contrôle qui compte, et il est **mesuré en remisant la modification**
+(`git stash`) puis en comparant : **0 différence sur 14 612 joueurs et 406 forces
+d'effectif** à la saison 1. Le banc d'essai fige cette empreinte (somme des notes
+et somme des forces, par étage) — toute fuite du potentiel vers la note du jour
+la casse immédiatement.
+
+La seule chose qui bouge, c'est **plus tard**, quand les pépites éclosent. Mesuré
+à la **saison 8**, force moyenne d'effectif par étage :
+
+| | dérive de la moyenne | clubs concernés | plus gros écart |
+|---|---|---|---|
+| tous les étages | **+0,05 à +0,16 point** | 4 à 22 clubs sur 855 | **+2,84** (R C Arpajon Veinazes) |
+
+À comparer au calque « génération dorée » qui fait déjà bouger un club de **±8**.
+La hiérarchie des divisions est intacte, et `verifPyramide` confirme qu'aucune
+division ne change de taille sur douze saisons.
+
+```bash
+npx vite-node scripts/verifPepites.ts     # densité, plafond par étage, empreinte de la saison 1, éclosion
+npx vite-node scripts/verifPyramide.ts    # les divisions gardent leur taille
+npx vite-node scripts/verifGenerations.ts # le championnat respire toujours
+npx vite-node scripts/verifStats.ts       # les 18 classements individuels
+```

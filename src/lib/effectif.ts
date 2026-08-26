@@ -142,9 +142,32 @@ function genJoueur(club: string, slot: number, generation: number, saison: numbe
   age = Math.min(age, retraite);
 
   // Note « au pic » du joueur, puis note effective à son âge actuel.
-  const potentiel = Math.max(30, Math.min(94, noteBase + talent + courbeAge(AGE_PIC)));
+  const potentielBase = Math.max(30, Math.min(94, noteBase + talent + courbeAge(AGE_PIC)));
   const vitesseDeclin = rng();
-  const note = noteALAge(potentiel, AGE_PIC, potentiel, age, vitesseDeclin);
+  const prime = bonusPepite(club + '#' + slot + '#g' + generation, ageDebut);
+  const potentiel = prime > 0
+    ? Math.max(potentielBase, Math.min(plafondPepite(niveau), potentielBase + prime))
+    : potentielBase;
+
+  // ⚠️ ICI LE POTENTIEL COMMANDE DIRECTEMENT LA NOTE DU JOUR, et c'est ce qui
+  // interdit de l'augmenter naïvement : la note de référence EST le potentiel
+  // (`noteALAge(potentiel, AGE_PIC, potentiel, …)`), si bien qu'avant 27 ans
+  // elle vaut `potentiel − (27 − âge)`. Ajouter +30 de potentiel ajouterait
+  // +30 à la note du jour et inflaterait toute la division.
+  //
+  // On RÉANCRE donc la courbe sur la note de départ calculée SANS la pépite :
+  // le joueur démarre exactement là où il démarrait, et ne progresse plus vers
+  // le potentiel ordinaire mais vers le sien. Les deux formes sont d'ailleurs
+  // rigoureusement identiques en l'absence de pépite — l'interpolation retombe
+  // sur une pente de 1 point par an, et `declin` est nul avant 31 ans. La
+  // branche n'existe que pour rendre l'intention lisible.
+  let note: number;
+  if (prime > 0) {
+    const noteDepart = noteALAge(potentielBase, AGE_PIC, potentielBase, ageDebut, vitesseDeclin);
+    note = noteALAge(noteDepart, ageDebut, potentiel, age, vitesseDeclin);
+  } else {
+    note = noteALAge(potentiel, AGE_PIC, potentiel, age, vitesseDeclin);
+  }
 
   return {
     id: `${club}-${slot}-${generation}`,
@@ -208,6 +231,73 @@ export function noteALAge(
 // Courbe d'âge simple, conservée pour la génération procédurale.
 function courbeAge(age: number): number {
   return Math.round(4 - Math.abs(Math.min(age, 34) - 27) * 0.9);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LES PÉPITES — un gros potentiel peut naître n'importe où
+// ═══════════════════════════════════════════════════════════════════════════
+// Demande explicite : « des recruteurs pour trouver les pépites ; il peut aussi
+// y avoir des gros potentiels dans les petites ligues ».
+//
+// ⚠️ IL N'Y EN AVAIT AUCUNE, ET C'EST MESURÉ. Le talent inventé est un tirage
+// UNIFORME de ±7 autour de la note de la division : la marge potentiel − note
+// plafonnait donc à 9 points dans TOUTES les divisions amateurs, le meilleur
+// espoir de Régionale 3 passant de 34 à 39 en huit saisons. Un recruteur envoyé
+// chercher des pépites serait rentré bredouille à chaque fois — non par
+// malchance, mais parce que la loi de tirage n'en produit aucune.
+//
+// Le joueur incarné, lui, a une queue longue depuis toujours (`creerJoueur` :
+// gen + 18 + rand^1,5 × 44). C'est elle qu'on rend au reste du monde.
+//
+// ⚠️ TROIS GARDE-FOUS, ET C'EST GRÂCE À EUX QUE RIEN D'AUTRE NE BOUGE.
+//
+// 1. GRAINE SÉPARÉE. `graine()` est une fermeture à état : seuls le NOMBRE et
+//    l'ORDRE des appels déterminent la suite. Tirer la pépite dans le flux
+//    existant décalerait l'âge, la retraite, la nationalité et la note de TOUS
+//    les joueurs générés du jeu. `graine('pepite#…')` ne consomme rien.
+// 2. ON N'ÉCRASE QUE `potentiel`, JAMAIS LA NOTE DU JOUR. La note de la saison
+//    1 est démontrablement indépendante du potentiel aux deux sites (voir les
+//    commentaires sur place) : la force des effectifs, les classements, les
+//    montées et l'étalonnage des divisions ne bougent pas d'un point.
+// 3. RÉSERVÉ AUX JEUNES (`AGE_PEPITE`). Un potentiel qu'on n'a plus le temps
+//    d'atteindre n'est pas une pépite, c'est un chiffre décoratif — et il
+//    ferait mentir la marge sur laquelle les recruteurs classent leurs cibles.
+export const AGE_PEPITE = 23;
+/** Part de jeunes qui naissent avec une marge hors norme. */
+export const PART_PEPITE = 0.012;
+
+/**
+ * Le supplément de potentiel d'une pépite, ou 0. La loi est très penchée : la
+ * plupart des élus sont de bons espoirs (+14 à +22), une poignée sont des
+ * talents de génération. Sans cette pente, « pépite » désignerait la moitié
+ * d'une classe d'âge et ne voudrait plus rien dire.
+ */
+function bonusPepite(cle: string, ageRef: number): number {
+  if (ageRef > AGE_PEPITE) return 0;
+  const rng = graine('pepite#' + cle);
+  if (rng() >= PART_PEPITE) return 0;
+  return 14 + Math.floor(rng() ** 1.7 * 34);
+}
+
+/**
+ * Le plafond d'une pépite, RELATIF À SON ÉTAGE.
+ *
+ * ⚠️ UN PLAFOND ABSOLU NE MARCHE PAS, et c'est mesuré : à 94, la première
+ * mesure a sorti un joueur de Fédérale 2 qui culminait à 95 — meilleur que
+ * n'importe qui en Top 14, dans un club de sixième division. Le monde ne s'en
+ * remet pas, et rien ne l'en sortirait : le jeu ne fait pas monter un bon
+ * joueur de club en club, il ne connaît que le mercato circulaire de sa
+ * division. La pépite resterait donc en Fédérale 2 à 95, pour toujours.
+ *
+ * Trente-deux points au-dessus de la note de sa division, c'est environ trois
+ * étages : un gamin de Régionale 3 peut devenir un joueur de Nationale (62),
+ * un espoir de Fédérale 2 un joueur de Pro D2 (79), un jeune de Nationale 2
+ * une star du Top 14 (90). C'est exactement l'histoire demandée, et elle
+ * s'arrête là où elle cesserait d'être croyable.
+ */
+export const MARGE_PEPITE = 32;
+export function plafondPepite(niveau: number): number {
+  return Math.min(94, (NOTE_PAR_NIVEAU[niveau] ?? 50) + MARGE_PEPITE);
 }
 
 // ---------------------------------------------------------------------------
@@ -391,7 +481,20 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
     const retraite = Math.max(ageRef, 32 + Math.floor(rng() * 6));
     const vitesseDeclin = rng();
     const talent = Math.floor(rng() * 15) - 7; // −7..+7 autour de la division
-    const potentiel = Math.max(28, Math.min(80, noteBase + talent + courbeAge(AGE_PIC)));
+    const potentielBase = Math.max(28, Math.min(80, noteBase + talent + courbeAge(AGE_PIC)));
+    // ⚠️ ICI ON PEUT ÉCRIRE LE POTENTIEL DIRECTEMENT, sans réancrer la courbe,
+    // et la démonstration tient en deux lignes. Une pépite a `ageRef ≤ 23`,
+    // donc `Math.min(ageRef, AGE_PIC)` vaut `ageRef` : `noteRef` est calculée
+    // avec un âge de référence ÉGAL à l'âge demandé, ce qui fait retomber
+    // `noteALAge` sur son point de départ — elle vaut `max(28, noteBase +
+    // talent)` borné, sans que le potentiel n'intervienne. Et à la saison 1,
+    // `age === ageRef`, donc la note du jour vaut `noteRef`. Le plafond passe
+    // de 80 à 86 : c'est tout l'intérêt, une pépite de Régionale doit pouvoir
+    // viser plus haut que le meilleur joueur ordinaire de son étage.
+    const prime = bonusPepite(nomClub + '#' + brut.nom + '#' + i, ageRef);
+    const potentiel = prime > 0
+      ? Math.max(potentielBase, Math.min(plafondPepite(niveau), potentielBase + prime))
+      : potentielBase;
     const noteRef = noteALAge(
       Math.max(28, noteBase + talent), Math.min(ageRef, AGE_PIC), potentiel, ageRef, vitesseDeclin,
     );

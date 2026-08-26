@@ -448,8 +448,18 @@ console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
   const apres = useGame.getState();
   ligne('la retraite « entraîneur » garde la légende sous la main',
     apres.reconversionManager?.nom ?? 'aucune', !!apres.reconversionManager);
-  ligne('… et emmène à l’écran de création', apres.ecran, apres.ecran === 'creationManager');
+  // ⚠️ ON NE SAUTE PLUS DIRECTEMENT À LA CRÉATION. L'épilogue `finCarriere`
+  // s'est intercalé : il explique POURQUOI la carrière est finie et récapitule
+  // le bilan avant d'orienter vers la suite. Le contrôle porte donc sur les
+  // deux marches — sinon il vérifierait qu'on escamote l'épilogue.
+  ligne('… et passe par l’épilogue de fin de carrière', apres.ecran, apres.ecran === 'finCarriere');
   ligne('… tout en laissant la carrière au Hall', `${apres.pantheon.length} légende(s)`, apres.pantheon.length > 0);
+
+  apres.continuerFinCarriere();
+  const suite = useGame.getState();
+  ligne('… puis l’épilogue emmène à l’écran de création',
+    suite.ecran, suite.ecran === 'creationManager');
+  ligne('… et l’épilogue est consommé', String(suite.finCarriere), suite.finCarriere === null);
 
   const depuis = apres.reconversionManager!;
   const prestigeRecon = prestigeDepuisJoueur(depuis);
