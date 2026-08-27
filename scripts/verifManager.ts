@@ -35,7 +35,7 @@ import { useGame } from '../src/store/useGame';
 import { forceEffectif } from '../src/lib/effectif';
 import { effectifDuClub } from '../src/lib/effectif';
 import { ciblesDuMarche } from '../src/lib/recrutementManager';
-import { SEMAINES_PAR_SAISON } from '../src/data/calendrier';
+import { SEMAINES_PAR_SAISON, horodatageJeu } from '../src/data/calendrier';
 import type { LegendeSauvegardee, Manager } from '../src/types';
 import { compositionManagerParDefaut, TACTIQUE_MANAGER_DEFAUT } from '../src/lib/compositionManager';
 import { matchDuClubSemaine } from '../src/lib/matchLive';
@@ -547,6 +547,42 @@ console.log("\n=== 6. LA CARRIÈRE D'ENTRAÎNEUR PART VRAIMENT AU CLASSEMENT ===
       info('son score', String(f.score));
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n=== 7. UNE CONVERSATION NE REMONTE PAS LE TEMPS ===');
+// ---------------------------------------------------------------------------
+// ⚠️ VU À L'ÉCRAN, ET INTROUVABLE AUTREMENT : l'heure d'un message était semée
+// sur SON IDENTIFIANT, donc tirée indépendamment pour chacun. Un échange de
+// deux lignes affichait la réponse du club à 13:56 sous la question posée à
+// 14:55 — la négociation se lisait à l'envers. On sème désormais sur le FIL, et
+// chaque réplique avance de quelques minutes.
+{
+  const heures = (fil: string, n: number) => Array.from({ length: n }, (_, rang) => {
+    const texte = horodatageJeu(5, `1#${fil}`, rang);
+    const [h, m] = texte.split('·')[1].trim().split(':').map(Number);
+    return h * 60 + m;
+  });
+
+  const fil = heures('provence_rugby_officiel', 8);
+  let croissant = true;
+  for (let i = 1; i < fil.length; i++) if (fil[i] < fil[i - 1]) croissant = false;
+  ligne('les heures d’un fil ne reculent jamais',
+    fil.map((v) => `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`).join(' → '),
+    croissant);
+  ligne('… et elles avancent vraiment',
+    `${fil.at(-1)! - fil[0]} minutes sur 8 messages`, fil.at(-1)! > fil[0]);
+  // Deux fils différents gardent des heures différentes : sans ça, tous les
+  // messages du jeu tomberaient à la même minute et la date perdrait son sens.
+  const autre = heures('as_beziers_herault_officiel', 8);
+  ligne('deux fils ne battent pas à la même heure',
+    `${fil[0]} vs ${autre[0]}`, fil[0] !== autre[0]);
+  // ⚠️ ET ON NE DÉBORDE PAS SUR LE LENDEMAIN : un fil très long se tasse en fin
+  // de soirée plutôt que d'afficher « 27:14 ».
+  const long = heures('provence_rugby_officiel', 400);
+  ligne('un fil très long reste dans la journée',
+    `dernier message à ${Math.floor(long.at(-1)! / 60)}:${String(long.at(-1)! % 60).padStart(2, '0')}`,
+    long.at(-1)! <= 23 * 60 + 59);
 }
 
 console.log(`\n${echecs === 0 ? '✅ TOUT PASSE' : `❌ ${echecs} ÉCHEC(S)`}`);

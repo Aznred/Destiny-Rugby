@@ -65,7 +65,17 @@ export function libelleDateCourte(s: Semaine): string {
  * à chaque ouverture de l'écran, et deux messages de la même semaine ne
  * s'affichent pas tous à la même minute.
  */
-export function horodatageJeu(numeroSemaine: number, graine: string): string {
+/**
+ * L'heure d'un message, dans le temps du jeu.
+ *
+ * ⚠️ `rang` N'EST PAS UN CONFORT : SANS LUI, UNE CONVERSATION REMONTE LE TEMPS.
+ * L'heure était tirée de l'identifiant du message, donc indépendante pour
+ * chacun — vu à l'écran sur un échange de deux lignes : la réponse du club
+ * était datée de 13:56 sous une question posée à 14:55. On sème donc sur le
+ * FIL (son pseudo), pas sur le message, et chaque réplique avance de quelques
+ * minutes. Deux fils gardent des heures différentes, un fil reste dans l'ordre.
+ */
+export function horodatageJeu(numeroSemaine: number, graine: string, rang = 0): string {
   let h = 2166136261;
   for (let i = 0; i < graine.length; i += 1) {
     h ^= graine.charCodeAt(i);
@@ -73,10 +83,15 @@ export function horodatageJeu(numeroSemaine: number, graine: string): string {
   }
   const tirage = (h >>> 0) / 4294967295;
   // On vit entre 8 h et 23 h : personne n'envoie un message de club à 4 h du matin.
-  const heure = 8 + Math.floor(tirage * 16);
-  const minute = Math.floor((tirage * 997) % 60);
+  const depart = (8 + Math.floor(tirage * 14)) * 60 + Math.floor((tirage * 997) % 60);
+  // Un pas propre au fil : deux conversations ne battent pas au même rythme.
+  const pas = 2 + ((h >>> 8) % 9);
+  // Borné à 23:59 : au-delà, l'échange se poursuit simplement dans la soirée.
+  const total = Math.min(23 * 60 + 59, depart + rang * pas);
   const jour = libelleDateCourte(semaine(numeroSemaine));
-  return `${jour} · ${String(heure).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const hh = String(Math.floor(total / 60)).padStart(2, '0');
+  const mm = String(total % 60).padStart(2, '0');
+  return `${jour} · ${hh}:${mm}`;
 }
 
 /**

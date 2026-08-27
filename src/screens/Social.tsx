@@ -55,6 +55,20 @@ function dateEtHeure(element?: { id?: string; semaine?: number; saison?: number 
   return horodatageJeu(element.semaine, `${element.saison ?? 1}#${element.id ?? ''}`);
 }
 
+/**
+ * L'heure d'un message DANS SON FIL.
+ *
+ * ⚠️ ON SÈME SUR LE FIL, PAS SUR LE MESSAGE, et c'est ce qui remet la
+ * conversation dans l'ordre : vu à l'écran, une réponse de club datée 13:56
+ * s'affichait sous la question posée à 14:55.
+ */
+function heureDuFil(
+  fil: string, element: { semaine?: number; saison?: number }, rang: number,
+): string | null {
+  if (!element.semaine) return null;
+  return horodatageJeu(element.semaine, `${element.saison ?? 1}#${fil}`, rang);
+}
+
 // --- Icônes (tracés maison, dans l'esprit de l'interface d'origine) --------
 const Icone = ({ d, ...reste }: { d: string } & React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" aria-hidden width="18" height="18" {...reste}>
@@ -1036,12 +1050,15 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
         )}
         <div className="x-bulles">
           {fil.length === 0 && <p className="x-vide">{t('ov.premierMessage')}</p>}
-          {fil.map((m) => (
-            <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}>
-              <span>{m.texte}</span>
-              {dateEtHeure(m) && <time>{dateEtHeure(m)}</time>}
-            </div>
-          ))}
+          {fil.map((m, rang) => {
+            const heure = actif ? heureDuFil(actif, m, rang) : null;
+            return (
+              <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}>
+                <span>{m.texte}</span>
+                {heure && <time>{heure}</time>}
+              </div>
+            );
+          })}
           {chargement && <div className="x-bulle lui ecrit">{t('ov.ecrit')}</div>}
           <div ref={bas} />
         </div>
@@ -1363,7 +1380,10 @@ function SocialManager() {
             </div>
             <div className="x-fil-messages">
               {dossier && <div className="x-conv-tete"><Avatar avatar={dossier.avatar} taille={36} nom={dossier.nom} /><div><b>{dossier.nom}</b><span className="x-pseudo">@{dossier.pseudo} · {dossier.sous}</span></div></div>}
-              <div className="x-bulles">{messagesActifs.map((m) => <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}><span>{m.texte}</span>{dateEtHeure(m) && <time>{dateEtHeure(m)}</time>}</div>)}<div ref={bas} /></div>
+              <div className="x-bulles">{messagesActifs.map((m, rang) => {
+                const heure = actif ? heureDuFil(actif, m, rang) : null;
+                return <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}><span>{m.texte}</span>{heure && <time>{heure}</time>}</div>;
+              })}<div ref={bas} /></div>
               {actif && dossier?.type === 'club' && <NegociationClubVendeur pseudo={actif} />}
               {actif && dossier?.type === 'joueur' && <NegociationRecrueManager pseudo={actif} />}
               {actif && dossier?.type === 'demande' && <DemandeVestiaireManager pseudo={actif} />}

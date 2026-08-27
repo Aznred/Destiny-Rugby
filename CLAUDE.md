@@ -8735,3 +8735,37 @@ npx vite-node scripts/verifPepites.ts       # la loi de tirage sur laquelle les 
 npx vite-node scripts/verifManager.ts       # la carrière d'entraîneur n'a pas bougé
 npx vite-node scripts/verifTraductions.ts   # les 34 clés ajoutées, dans les 7 langues
 ```
+
+---
+
+## 🕐 UNE CONVERSATION QUI REMONTAIT LE TEMPS
+
+Trouvé en vérifiant la chaîne de transfert du manager au clic, et visible dans
+les deux Ovale — celui du joueur comme celui de l'entraîneur :
+
+```text
+Bonjour, nous souhaitons discuter d'un transfert pour Izack RODDA.  30 août · 14:55
+Nous l'écoutons à partir de 6 800 000 €.                            30 août · 13:56
+```
+
+La réponse du club était datée **une heure avant** la question. `horodatageJeu`
+semait l'heure sur l'**identifiant du message**, donc indépendamment pour
+chacun : dans un fil de huit répliques, l'ordre des heures était un tirage.
+
+⚠️ **ON SÈME DÉSORMAIS SUR LE FIL, PAS SUR LE MESSAGE.** `horodatageJeu(semaine,
+graine, rang)` prend le rang de la réplique dans sa conversation ; l'heure de
+départ vient du pseudo de l'interlocuteur, et chaque message avance d'un pas
+propre au fil (2 à 10 minutes). Deux conversations gardent donc des heures
+différentes — sans quoi tous les messages du jeu tomberaient à la même minute et
+la date perdrait son sens — et une conversation reste dans l'ordre.
+
+⚠️ **ET UN FIL TRÈS LONG NE DÉBORDE PAS SUR LE LENDEMAIN** : le total est borné
+à 23:59 plutôt que d'afficher « 27:14 ».
+
+Mesuré (`verifManager.ts`, section 7) : 11:25 → 11:27 → … → 11:39 sur huit
+messages, deux fils qui ne battent pas à la même heure, et un fil de quatre cents
+répliques qui se tasse en fin de soirée.
+
+```bash
+npx vite-node scripts/verifManager.ts   # section 7 : les heures d'un fil ne reculent jamais
+```
