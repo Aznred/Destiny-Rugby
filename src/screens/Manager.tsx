@@ -14,6 +14,7 @@ import { semaine, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier
 import { TROPHEES } from '../data/trophees';
 import { nomPoste, POSTES } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
+import { CompositionTerrainManager } from '../components/CompositionTerrainManager';
 import { ciblesDuMarche } from '../lib/recrutementManager';
 import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
@@ -26,8 +27,7 @@ import {
   PROMOTION_PAR_NIVEAU, INCERTITUDE_RECRUTEURS, budgetStructure,
 } from '../lib/installations';
 import {
-  joueurCompatibleManager, noteCompositionManager, POSTES_BANC_MANAGER,
-  POSTES_XV_MANAGER, reconcilerCompositionManager,
+  noteCompositionManager, reconcilerCompositionManager,
 } from '../lib/compositionManager';
 import type { CompositionManager, TactiqueManager, TypeInstallation } from '../types';
 
@@ -307,53 +307,13 @@ export function Manager() {
                 <div className="manager-note-compo"><b>{noteCompositionManager(effectif, composition).toFixed(1)}</b><span>note du XV</span></div>
               </section>
 
-              <div className="manager-composition-grille">
-                <section className="carte manager-xv">
-                  <div className="comp-tete"><b>🏉 XV de départ</b><span className="comp-count">15</span></div>
-                  <div className="manager-liste-compo">
-                    {POSTES_XV_MANAGER.map((posteSlot, index) => {
-                      const joueur = effectif.find((j) => j.id === composition.titulaires[index]);
-                      return (
-                        <label key={`${posteSlot}-${index}`} className="manager-slot">
-                          <span className="manager-numero">{index + 1}</span>
-                          <span><b>{nomPoste(posteSlot)}</b><small>{joueur && joueur.poste !== posteSlot ? `Adapté depuis ${nomPoste(joueur.poste)}` : 'Poste naturel'}</small></span>
-                          <select value={joueur?.id ?? ''} onChange={(e) => changerJoueur('titulaires', index, e.target.value)}>
-                            {effectif
-                              .filter((j) => joueurCompatibleManager(j, posteSlot))
-                              .sort((a, b) => (b.poste === posteSlot ? 100 : 0) + b.note - ((a.poste === posteSlot ? 100 : 0) + a.note))
-                              .map((j) => <option key={j.id} value={j.id}>{j.nom} · {j.note} · {nomPoste(j.poste)}</option>)}
-                          </select>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </section>
+              <CompositionTerrainManager effectif={effectif} composition={composition} onPlacer={changerJoueur} />
 
-                <section className="carte manager-banc-compo">
-                  <div className="comp-tete"><b>🪑 Banc</b><span className="comp-count">8</span></div>
-                  <div className="manager-liste-compo">
-                    {POSTES_BANC_MANAGER.map((posteSlot, index) => {
-                      const joueur = effectif.find((j) => j.id === composition.remplacants[index]);
-                      return (
-                        <label key={`${posteSlot}-${index}`} className="manager-slot">
-                          <span className="manager-numero">{index + 16}</span>
-                          <span><b>{nomPoste(posteSlot)}</b><small>{joueur ? `${joueur.note} · ${joueur.age} ans` : '—'}</small></span>
-                          <select value={joueur?.id ?? ''} onChange={(e) => changerJoueur('remplacants', index, e.target.value)}>
-                            {effectif
-                              .filter((j) => joueurCompatibleManager(j, posteSlot))
-                              .sort((a, b) => b.note - a.note)
-                              .map((j) => <option key={j.id} value={j.id}>{j.nom} · {j.note} · {nomPoste(j.poste)}</option>)}
-                          </select>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  <div className="manager-roles">
-                    <label><span>©️ Capitaine</span><select value={composition.capitaineId} onChange={(e) => definirComposition({ ...composition, capitaineId: e.target.value })}>{composition.titulaires.map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom}</option>; })}</select></label>
-                    <label><span>🎯 Buteur</span><select value={composition.buteurId} onChange={(e) => definirComposition({ ...composition, buteurId: e.target.value })}>{[...composition.titulaires, ...composition.remplacants].map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom} · {nomPoste(j.poste)}</option>; })}</select></label>
-                  </div>
-                </section>
-              </div>
+              <section className="carte manager-roles-visuels">
+                <div><b>🪪 Rôles du groupe</b><span>Les badges C et 🎯 apparaissent directement sur les cartes.</span></div>
+                <label><span>©️ Capitaine</span><select value={composition.capitaineId} onChange={(e) => definirComposition({ ...composition, capitaineId: e.target.value })}>{composition.titulaires.map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom}</option>; })}</select></label>
+                <label><span>🎯 Buteur</span><select value={composition.buteurId} onChange={(e) => definirComposition({ ...composition, buteurId: e.target.value })}>{[...composition.titulaires, ...composition.remplacants].map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom} · {nomPoste(j.poste)}</option>; })}</select></label>
+              </section>
 
               <section className="carte manager-plan-avant-match">
                 <div className="comp-tete"><b>🧠 Plan de jeu initial</b><span>modifiable pendant le match</span></div>

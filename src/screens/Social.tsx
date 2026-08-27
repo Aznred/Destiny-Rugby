@@ -1195,22 +1195,25 @@ function DemandeVestiaireManager({ pseudo }: { pseudo: string }) {
   );
 }
 
-function VentesManager() {
+function VentesManager({ recherche = '' }: { recherche?: string }) {
   const manager = useGame((s) => s.manager)!;
   const mettreEnVente = useGame((s) => s.mettreEnVenteManager);
   const retirer = useGame((s) => s.retirerVenteManager);
   const accepter = useGame((s) => s.accepterOffreVenteManager);
-  const effectif = effectifDuClub(manager.club, manager.saison);
+  const filtre = recherche.trim().toLowerCase();
+  const effectif = effectifDuClub(manager.club, manager.saison).filter((joueur) => (
+    !filtre || `${joueur.nom} ${nomPoste(joueur.poste)}`.toLowerCase().includes(filtre)
+  ));
   return (
     <div className="manager-x-ventes">
-      <section className="manager-x-vente-intro"><div><span className="eyebrow">Direction sportive</span><h2>Vendre et gérer les départs</h2><p>Place un joueur sur la liste, compare les projets reçus puis accepte l’offre qui convient au club.</p></div><strong>{nombre(manager.budgetTransferts)} €<small>budget transferts</small></strong></section>
+      <section className="manager-x-vente-intro"><div><span className="eyebrow">Direction sportive</span><h2>Gérer les départs</h2><p>Place un joueur sur la liste, compare les projets reçus puis valide sa destination. Dans le rugby amateur, le départ reste gratuit mais il fonctionne vraiment.</p></div><strong>{nombre(manager.budgetTransferts)} €<small>budget transferts</small></strong></section>
       {manager.ventes.map((vente) => (
         <article className="manager-x-vente" key={vente.joueurId}>
-          <header><div><b>{vente.nom}</b><span>{nomPoste(vente.poste)} · {vente.age} ans · note {vente.note} · potentiel {vente.potentiel}</span></div><strong>{nombre(vente.valeur)} €</strong><button onClick={() => retirer(vente.joueurId)}>Retirer</button></header>
+          <header><div><b>{vente.nom}</b><span>{nomPoste(vente.poste)} · {vente.age} ans · note {vente.note} · potentiel {vente.potentiel}</span></div><strong>{vente.valeur > 0 ? `${nombre(vente.valeur)} €` : 'Départ libre'}</strong><button onClick={() => retirer(vente.joueurId)}>Retirer</button></header>
           {vente.offres.length ? <div className="manager-x-offres">{vente.offres.map((offre) => {
             const club = clubParNom(offre.club);
-            return <div key={offre.id}><span>{club && <Blason club={club} taille={34} />}<b>{offre.club}</b><small>{offre.division}</small></span><strong>{nombre(offre.montant)} €</strong><button className="x-poster" onClick={() => accepter(vente.joueurId, offre.id)}>Accepter</button></div>;
-          })}</div> : <p className="manager-x-sans-offre">Aucune offre payante : sous la Nationale 2, les mouvements restent amateurs.</p>}
+            return <div key={offre.id}><span>{club && <Blason club={club} taille={34} />}<b>{offre.club}</b><small>{offre.division}</small></span><strong>{offre.montant > 0 ? `${nombre(offre.montant)} €` : 'Projet amateur'}</strong><button className="x-poster" onClick={() => accepter(vente.joueurId, offre.id)}>{offre.montant > 0 ? 'Accepter' : 'Valider le départ'}</button></div>;
+          })}</div> : <p className="manager-x-sans-offre">Aucun club ne s’est encore positionné sur ce joueur.</p>}
         </article>
       ))}
       <section className="manager-x-effectif">
@@ -1218,7 +1221,7 @@ function VentesManager() {
         <div>{effectif.map((joueur) => {
           const liste = manager.ventes.some((v) => v.joueurId === joueur.id);
           const valeur = valeurDeVente(joueur, manager.club);
-          return <article key={joueur.id}><span><b>{joueur.nom}</b><small>{nomPoste(joueur.poste)} · {joueur.age} ans</small></span><em>{joueur.note}</em><strong>{valeur > 0 ? `${nombre(valeur)} €` : 'Amateur'}</strong><button disabled={liste || valeur <= 0} onClick={() => mettreEnVente(joueur.id)}>{liste ? 'Sur la liste' : 'Mettre en vente'}</button></article>;
+          return <article key={joueur.id}><em>{joueur.note}</em><span><b>{joueur.nom}</b><small>{nomPoste(joueur.poste)} · {joueur.age} ans</small></span><strong>{valeur > 0 ? `${nombre(valeur)} €` : 'Libre'}</strong><button disabled={liste} onClick={() => mettreEnVente(joueur.id)}>{liste ? 'Sur la liste' : valeur > 0 ? 'Mettre en vente' : 'Proposer un départ'}</button></article>;
         })}</div>
       </section>
     </div>
@@ -1234,17 +1237,22 @@ type DossierManagerSocial = {
   avatar: string;
 };
 
+type OngletManagerSocial = 'timeline' | 'explorer' | 'messages' | 'notifs' | 'profil';
+
 function SocialManager() {
   const manager = useGame((s) => s.manager)!;
   const conversations = useGame((s) => s.conversations ?? {});
   const posts = useGame((s) => s.posts ?? []);
+  const notifs = useGame((s) => s.notifsSocial ?? []);
   const setEcran = useGame((s) => s.setEcran);
   const lireConversation = useGame((s) => s.lireConversation);
   const vivreSemaine = useGame((s) => s.vivreSemaineSociale);
+  const marquerNotifsLues = useGame((s) => s.marquerNotifsLues);
   const ouvrirSocialSur = useGame((s) => s.ouvrirSocialSur);
   const conversationCible = useGame((s) => s.conversationSocialeCible);
   const consommerCible = useGame((s) => s.consommerConversationSocialeCible);
   const consommerOuverture = useGame((s) => s.consommerOuvertureSociale);
+  const [recherche, setRecherche] = useState('');
   const dossiers = useMemo(() => {
     const parPseudo = new Map<string, DossierManagerSocial>();
     for (const n of manager.negociationsClubs) parPseudo.set(n.pseudo, {
@@ -1266,14 +1274,21 @@ function SocialManager() {
       return date(b.pseudo) - date(a.pseudo);
     });
   }, [manager.negociationsClubs, manager.negociations, manager.demandes, conversations]);
-  const [onglet, setOnglet] = useState<'fil' | 'messages' | 'ventes'>(
-    conversationCible || ouvrirSocialSur === 'messages' ? 'messages' : 'fil',
+  const [onglet, setOnglet] = useState<OngletManagerSocial>(
+    conversationCible || ouvrirSocialSur === 'messages' ? 'messages' : 'timeline',
   );
   const [actif, setActif] = useState<string | null>(dossiers[0]?.pseudo ?? null);
-  const fil = actif ? conversations[actif] ?? [] : [];
+  const messagesActifs = actif ? conversations[actif] ?? [] : [];
   const bas = useRef<HTMLDivElement>(null);
+  const nonLuesNotifs = notifs.filter((n) => !n.lue).length;
+  const nonLusMessages = dossiers.filter((d) => (conversations[d.pseudo] ?? []).some((m) => m.de === 'lui' && !m.lu)).length;
+  const club = clubParNom(manager.club);
+  const postsFiltres = recherche.trim()
+    ? chercherPosts(posts, recherche).slice(0, 50)
+    : posts.slice(0, 80);
+
   useEffect(() => { vivreSemaine(); }, [vivreSemaine]);
-  useEffect(() => { bas.current?.scrollIntoView({ block: 'end' }); }, [fil.length]);
+  useEffect(() => { bas.current?.scrollIntoView({ block: 'end' }); }, [messagesActifs.length]);
   useEffect(() => { if (!actif && dossiers[0]) setActif(dossiers[0].pseudo); }, [actif, dossiers]);
   useEffect(() => { if (actif) lireConversation(actif); }, [actif, lireConversation]);
   useEffect(() => {
@@ -1288,25 +1303,56 @@ function SocialManager() {
   }, [conversationCible, consommerCible]);
   const dossier = dossiers.find((n) => n.pseudo === actif);
 
+  const ouvrirOnglet = (cible: OngletManagerSocial) => {
+    setOnglet(cible);
+    if (cible === 'notifs') marquerNotifsLues();
+  };
+  const lien = (cible: OngletManagerSocial, icone: string, label: string, badge?: number) => (
+    <button className={onglet === cible ? 'actif' : ''} onClick={() => ouvrirOnglet(cible)}>
+      <span className="x-cloche"><Icone d={icone} width={24} height={24} />{!!badge && <i className="x-pastille">{badge > 99 ? '99+' : badge}</i>}</span>
+      <span>{label}</span>
+    </button>
+  );
+
   return (
-    <motion.section className="x-app x-manager" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+    <motion.section className="x-app x-manager" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
       <aside className="x-rail">
         <LogoOvale />
         <nav>
-          <button className={onglet === 'fil' ? 'actif' : ''} onClick={() => setOnglet('fil')}><Icone d={I_ACCUEIL} width={24} height={24} /><span>Actualité</span></button>
-          <button className={onglet === 'messages' ? 'actif' : ''} onClick={() => setOnglet('messages')}><Icone d={I_MESSAGE} width={24} height={24} /><span>{t('ov.messages')}</span></button>
-          <button className={onglet === 'ventes' ? 'actif' : ''} onClick={() => setOnglet('ventes')}><span style={{ fontSize: '1.35rem' }}>💶</span><span>Ventes</span></button>
-          <button onClick={() => setEcran('manager')}><span style={{ fontSize: '1.35rem' }}>🏟️</span><span>{t('mgr.bureau')}</span></button>
+          {lien('timeline', I_ACCUEIL, t('ov.accueil'))}
+          {lien('explorer', I_LOUPE, t('ov.explorer'))}
+          {lien('messages', I_MESSAGE, t('ov.messages'), nonLusMessages)}
+          {lien('notifs', I_CLOCHE, t('ov.notifications'), nonLuesNotifs)}
+          {lien('profil', I_PROFIL, t('nav.profil'))}
+          <button onClick={() => setEcran('manager')}><span style={{ fontSize: '1.35rem', lineHeight: 1 }}>🏟️</span><span>{t('mgr.bureau')}</span></button>
         </nav>
-        <button className="x-compte" onClick={() => setEcran('manager')}>
+        <button className="x-compte" onClick={() => setOnglet('profil')}>
           <Avatar avatar={`club:${manager.club}`} club={manager.club} taille={36} nom={manager.club} />
-          <div><b>{manager.nom}</b><span>{manager.club}</span></div>
+          <div><b>{manager.nom}</b><span>@{pseudoDe(manager.club)}</span></div>
         </button>
       </aside>
+
       <div className="x-centre">
-        <header className="x-tetes manager-x-tete"><button className="actif">𝕏 {onglet === 'fil' ? 'Actualité du club' : onglet === 'messages' ? 'Messages & négociations' : 'Marché des départs'}</button><button onClick={() => setEcran('manager')}>← {t('mgr.bureau')}</button></header>
-        {onglet === 'fil' && <div className="manager-x-timeline">{posts.length ? posts.slice(0, 80).map((post) => <Post key={post.id} post={post} lectureSeule onProfil={() => {}} onRecherche={() => {}} />) : <div className="x-vide manager-x-vide"><b>Le fil se prépare</b><p>Les clubs, médias et supporters publieront au rythme des semaines et des résultats.</p></div>}</div>}
-        {onglet === 'ventes' && <VentesManager />}
+        <header className="x-tetes">
+          <button className={onglet === 'timeline' ? 'actif' : ''} onClick={() => ouvrirOnglet('timeline')}>{t('ov.pourVous')}</button>
+          <button className={onglet === 'explorer' ? 'actif' : ''} onClick={() => ouvrirOnglet('explorer')}>{t('ov.explorer')}</button>
+          <button className={onglet === 'messages' ? 'actif' : ''} onClick={() => ouvrirOnglet('messages')}>{t('ov.messages')}{nonLusMessages > 0 && <i className="x-point" />}</button>
+          <button className={onglet === 'notifs' ? 'actif' : ''} onClick={() => ouvrirOnglet('notifs')}>{t('ov.notifs')}{nonLuesNotifs > 0 && <i className="x-point" />}</button>
+          <button className={onglet === 'profil' ? 'actif' : ''} onClick={() => ouvrirOnglet('profil')}>{t('nav.profil')}</button>
+        </header>
+
+        {onglet === 'timeline' && <div className="manager-x-timeline">{postsFiltres.length ? postsFiltres.map((post) => <Post key={post.id} post={post} lectureSeule onProfil={() => {}} onRecherche={(mot) => { setRecherche(mot); setOnglet('timeline'); }} />) : <div className="x-vide manager-x-vide"><b>{recherche ? 'Aucun résultat' : 'Le fil se prépare'}</b><p>{recherche ? `Aucune publication ne correspond à « ${recherche} ».` : 'Les clubs, médias et supporters publieront au rythme des semaines et des résultats.'}</p></div>}</div>}
+
+        {onglet === 'explorer' && (
+          <>
+            <div className="manager-x-explorer-tete">
+              <div><b>Mercato du manager</b><span>Arrivées depuis le marché mondial · départs depuis L’Ovale</span></div>
+              <button className="x-poster" onClick={() => setEcran('manager')}>Ouvrir le bureau</button>
+            </div>
+            <VentesManager recherche={recherche} />
+          </>
+        )}
+
         {onglet === 'messages' && (dossiers.length ? (
           <div className="x-messagerie">
             <div className="x-conversations">
@@ -1317,14 +1363,51 @@ function SocialManager() {
             </div>
             <div className="x-fil-messages">
               {dossier && <div className="x-conv-tete"><Avatar avatar={dossier.avatar} taille={36} nom={dossier.nom} /><div><b>{dossier.nom}</b><span className="x-pseudo">@{dossier.pseudo} · {dossier.sous}</span></div></div>}
-              <div className="x-bulles">{fil.map((m) => <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}><span>{m.texte}</span>{dateEtHeure(m) && <time>{dateEtHeure(m)}</time>}</div>)}<div ref={bas} /></div>
+              <div className="x-bulles">{messagesActifs.map((m) => <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}><span>{m.texte}</span>{dateEtHeure(m) && <time>{dateEtHeure(m)}</time>}</div>)}<div ref={bas} /></div>
               {actif && dossier?.type === 'club' && <NegociationClubVendeur pseudo={actif} />}
               {actif && dossier?.type === 'joueur' && <NegociationRecrueManager pseudo={actif} />}
               {actif && dossier?.type === 'demande' && <DemandeVestiaireManager pseudo={actif} />}
             </div>
           </div>
-        ) : <div className="x-vide manager-x-vide"><b>Aucune discussion en cours</b><p>Explore le marché depuis le bureau, ou attends qu’un joueur du groupe vienne te parler.</p><button className="x-poster" onClick={() => setEcran('manager')}>{t('mgr.explorerMarche')}</button></div>)}
+        ) : <div className="x-vide manager-x-vide"><b>Aucune discussion en cours</b><p>Explore le marché mondial pour contacter un club ou place un joueur sur la liste des départs.</p><button className="x-poster" onClick={() => setOnglet('explorer')}>Explorer le mercato</button></div>)}
+
+        {onglet === 'notifs' && <div className="x-fil">
+          {notifs.length === 0 && <p className="x-vide">Les résultats, offres et demandes du vestiaire apparaîtront ici.</p>}
+          {notifs.map((n) => <div key={n.id} className="x-notif"><span className="x-notif-emoji">{n.emoji}</span><div><b>{n.titre}</b><p>{n.texte}</p>{dateEtHeure(n) && <time className="x-notif-date">{dateEtHeure(n)}</time>}</div></div>)}
+        </div>}
+
+        {onglet === 'profil' && <div className="x-profil manager-x-profil">
+          <div className="x-banniere" />
+          <div className="x-profil-corps">
+            <div className="x-profil-avatar"><Avatar avatar={`club:${manager.club}`} club={manager.club} taille={76} nom={manager.club} /></div>
+            <div className="x-profil-boutons"><button className="x-suivre secondaire" onClick={() => setEcran('manager')}>Ouvrir le bureau</button></div>
+            <h2>{manager.club}<Certifie /></h2>
+            <span className="x-pseudo">@{pseudoDe(manager.club)} · entraîné par {manager.nom}</span>
+            <p className="x-bio">{manager.divisionNom} · saison {manager.saison}. Actualité officielle, résultats et coulisses du club.</p>
+            <div className="x-profil-chiffres"><span><b>{Math.round(manager.prestige)}</b> prestige</span><span><b>{Math.round(manager.confiance)}%</b> confiance</span><span><b>{manager.ventes.length}</b> départs ouverts</span><span><b>{dossiers.length}</b> discussions</span></div>
+          </div>
+        </div>}
       </div>
+
+      <aside className="x-droite">
+        <form className="x-recherche" onSubmit={(e) => { e.preventDefault(); setOnglet(onglet === 'explorer' ? 'explorer' : 'timeline'); }}>
+          <Icone d={I_LOUPE} />
+          <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher dans L’Ovale" />
+          {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}>✕</button>}
+        </form>
+        <div className="x-bloc">
+          <h3>Ton club</h3>
+          <div className="manager-x-club-droite">{club && <Blason club={club} taille={46} />}<span><b>{manager.club}</b><small>{manager.divisionNom}</small></span></div>
+          <div className="x-audience"><div><b>{Math.round(manager.confiance)}%</b><span>confiance</span></div><div><b>{manager.ventes.length}</b><span>départs</span></div><div><b>{dossiers.length}</b><span>dossiers</span></div></div>
+        </div>
+        <div className="x-bloc">
+          <h3>Mercato</h3>
+          <button className="x-tendance" onClick={() => setOnglet('messages')}><span className="x-tendance-cat">Négociations</span><b>#Messages</b><span className="x-tendance-vol">{dossiers.length} dossier(s) · {nonLusMessages} non lu(s)</span></button>
+          <button className="x-tendance" onClick={() => setOnglet('explorer')}><span className="x-tendance-cat">Direction sportive</span><b>#Départs</b><span className="x-tendance-vol">{manager.ventes.length} dossier(s) ouvert(s)</span></button>
+          <button className="x-tendance" onClick={() => setEcran('manager')}><span className="x-tendance-cat">Base mondiale</span><b>#Recrutement</b><span className="x-tendance-vol">tous les championnats</span></button>
+        </div>
+        <div className="x-bloc manager-x-budget"><h3>Budget transferts</h3><b>{nombre(manager.budgetTransferts)} €</b><span>Salaires disponibles : {nombre(manager.budgetSalarial)} €</span></div>
+      </aside>
     </motion.section>
   );
 }

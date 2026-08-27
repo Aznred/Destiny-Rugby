@@ -102,8 +102,9 @@
 .manager-x-vide { display:grid; justify-items:center; gap:.6rem; padding:4rem 1rem; }
 .x-nego-manager[data-etat="signee"] { border-top-color:#00ba7c; }
 
-/* Composition et banc du manager. Les contrôles sont des selects natifs :
-   clavier, lecteur d'écran et pouce obtiennent tous le même outil. */
+/* Composition du manager : le XV se lit désormais sur un vrai terrain. Les
+   cartes se glissent à la souris et se sélectionnent en deux touchers sur
+   mobile ; ce second chemin reste aussi utilisable au clavier. */
 .manager-equipe { display:grid; gap:1rem; }
 .manager-composition-tete { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1.2rem; }
 .manager-composition-tete h2 { margin:.25rem 0; }
@@ -184,6 +185,53 @@
 .manager-lancer-match > div { display:flex; justify-content:center; flex-wrap:wrap; gap:.6rem; margin-top:1rem; }
 .manager-match-joue,.manager-match-bloque { max-width:620px; margin:1rem auto 0; padding:1rem; border:1px solid var(--bordure); border-radius:12px; background:rgba(255,255,255,.025); }
 
+.manager-feuille-visuelle { display:grid; gap:1rem; }
+.manager-compo-aide { display:flex; flex-wrap:wrap; align-items:center; gap:.45rem .9rem; padding:.75rem 1rem; border:1px solid rgba(224,176,72,.22); border-radius:12px; color:var(--craie-dim); background:rgba(224,176,72,.055); font-size:.78rem; }
+.manager-compo-aide b { margin-left:auto; color:var(--or); }
+.manager-terrain-cadre { display:grid; grid-template-columns:28px minmax(0,1fr); min-width:0; padding:.65rem; border:1px solid rgba(224,176,72,.24); border-radius:20px; background:#07150e; box-shadow:0 18px 50px rgba(0,0,0,.25); }
+.manager-terrain-legende { display:flex; flex-direction:column; justify-content:space-between; align-items:center; padding:.35rem 0; color:rgba(255,255,255,.52); font-size:.56rem; letter-spacing:.08em; text-transform:uppercase; writing-mode:vertical-rl; transform:rotate(180deg); }
+.manager-terrain-legende b { color:var(--or); font-size:.68rem; }
+.manager-terrain-xv { position:relative; min-height:720px; overflow:hidden; border:2px solid rgba(255,255,255,.58); border-radius:14px; background:
+  linear-gradient(to bottom,transparent 49.7%,rgba(255,255,255,.7) 49.8%,rgba(255,255,255,.7) 50.2%,transparent 50.3%),
+  repeating-linear-gradient(to bottom,rgba(255,255,255,.055) 0,rgba(255,255,255,.055) 9.8%,rgba(255,255,255,.16) 10%,rgba(255,255,255,.055) 10.2%,rgba(255,255,255,.055) 19.8%),
+  linear-gradient(135deg,#195f38,#0d4028 55%,#123b27);
+}
+.manager-terrain-xv::before,.manager-terrain-xv::after { content:''; position:absolute; left:0; right:0; height:9%; border-top:2px solid rgba(255,255,255,.7); border-bottom:2px solid rgba(255,255,255,.7); pointer-events:none; }
+.manager-terrain-xv::before { top:8%; }
+.manager-terrain-xv::after { bottom:8%; }
+.manager-position { position:absolute; z-index:1; width:clamp(76px,10vw,116px); transform:translate(-50%,-50%); }
+.manager-carte-joueur { position:relative; display:flex; flex-direction:column; align-items:stretch; width:100%; min-height:94px; overflow:hidden; padding:.42rem .45rem .5rem; border:2px solid rgba(248,211,117,.72); border-radius:10px; color:#10130f; background:linear-gradient(150deg,#fff0a8 0%,#d5a440 52%,#a77222 100%); box-shadow:0 6px 14px rgba(0,0,0,.35); text-align:left; cursor:grab; touch-action:manipulation; transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease; }
+.manager-carte-joueur:hover { transform:translateY(-2px); box-shadow:0 9px 20px rgba(0,0,0,.45); }
+.manager-carte-joueur:active { cursor:grabbing; }
+.manager-carte-joueur.selectionnee,.manager-reserve-carte.selectionnee { border-color:#52b9ff; box-shadow:0 0 0 4px rgba(29,155,240,.27),0 10px 24px rgba(0,0,0,.45); }
+.manager-carte-joueur.adaptee { background:linear-gradient(150deg,#d9e1e7,#a1adb4 58%,#66727a); }
+.manager-carte-haut { display:flex; justify-content:space-between; align-items:center; gap:.3rem; }
+.manager-carte-haut i { display:grid; place-items:center; width:22px; height:22px; border-radius:6px; color:#fff; background:#10271b; font-style:normal; font-size:.7rem; font-weight:900; }
+.manager-carte-haut strong { font-size:1.12rem; line-height:1; }
+.manager-carte-joueur > b { margin-top:.38rem; overflow:hidden; font-size:clamp(.62rem,.85vw,.76rem); line-height:1.05; text-overflow:ellipsis; white-space:nowrap; }
+.manager-carte-joueur > small { margin-top:.2rem; overflow:hidden; color:rgba(10,18,12,.72); font-size:.54rem; line-height:1.1; text-overflow:ellipsis; white-space:nowrap; }
+.manager-carte-joueur > em { margin-top:.18rem; color:#6a1a14; font-size:.52rem; font-style:normal; font-weight:800; text-transform:uppercase; }
+.manager-carte-roles { position:absolute; right:.3rem; bottom:.28rem; display:flex; gap:.18rem; }
+.manager-carte-roles i { display:grid; place-items:center; min-width:18px; height:18px; padding:0 .18rem; border-radius:50%; color:#fff; background:#10271b; font-size:.55rem; font-style:normal; font-weight:900; }
+.manager-banc-visuel { padding:1rem; border:1px solid var(--bordure); border-radius:14px; background:rgba(8,28,19,.92); }
+.manager-banc-cartes { display:grid; grid-template-columns:repeat(8,minmax(78px,1fr)); gap:.55rem; margin-top:.75rem; overflow-x:auto; padding:.15rem .05rem .55rem; }
+.manager-banc-cartes .manager-carte-joueur { min-width:84px; }
+.manager-reserves { padding:1rem; border:1px solid var(--bordure); border-radius:14px; background:rgba(8,28,19,.92); }
+.manager-reserves summary { display:flex; align-items:center; justify-content:space-between; cursor:pointer; color:var(--craie); font-weight:800; }
+.manager-reserves summary span { display:grid; place-items:center; min-width:26px; height:26px; border-radius:999px; color:#07150e; background:var(--or); font-size:.72rem; }
+.manager-reserves > p { margin:.45rem 0 .7rem; color:var(--craie-dim); font-size:.76rem; }
+.manager-reserves > div { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:.45rem; }
+.manager-reserve-carte { display:grid; grid-template-columns:38px minmax(0,1fr); align-items:center; gap:.6rem; min-height:54px; padding:.42rem .55rem; border:1px solid rgba(255,255,255,.12); border-radius:10px; color:var(--craie); background:rgba(255,255,255,.035); text-align:left; cursor:grab; }
+.manager-reserve-carte > strong { display:grid; place-items:center; width:36px; height:36px; border-radius:9px; color:#07150e; background:var(--or); }
+.manager-reserve-carte > span { display:flex; flex-direction:column; min-width:0; }
+.manager-reserve-carte b,.manager-reserve-carte small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.manager-reserve-carte small { color:var(--craie-dim); font-size:.68rem; }
+.manager-roles-visuels { display:grid; grid-template-columns:minmax(200px,1fr) minmax(190px,.65fr) minmax(190px,.65fr); align-items:end; gap:.75rem; padding:1rem; }
+.manager-roles-visuels > div { display:flex; flex-direction:column; }
+.manager-roles-visuels > div span { color:var(--craie-dim); font-size:.74rem; }
+.manager-roles-visuels label { display:grid; gap:.3rem; color:var(--craie-dim); font-size:.75rem; }
+.manager-roles-visuels select { width:100%; min-height:44px; padding:.35rem .55rem; border:1px solid var(--bordure); border-radius:9px; color:var(--craie); background:#0a1d13; }
+
 @media (max-width: 1120px) {
   .manager-bureau { grid-template-columns:minmax(235px,.7fr) minmax(390px,1.3fr); }
   .manager-classement { position:static; grid-column:1/-1; }
@@ -226,6 +274,21 @@
   .manager-tactiques-selects { grid-template-columns:1fr; }
   .manager-duel { gap:.45rem; }
   .manager-lancer-match .btn { width:100%; min-height:50px; }
+  .manager-compo-aide { display:grid; }
+  .manager-compo-aide b { margin-left:0; }
+  .manager-terrain-cadre { grid-template-columns:18px minmax(0,1fr); padding:.38rem; border-radius:14px; }
+  .manager-terrain-xv { min-height:560px; }
+  .manager-position { width:clamp(61px,20vw,79px); }
+  .manager-carte-joueur { min-height:80px; padding:.3rem .32rem .4rem; border-radius:8px; }
+  .manager-carte-haut i { width:18px; height:18px; font-size:.58rem; }
+  .manager-carte-haut strong { font-size:.9rem; }
+  .manager-carte-joueur > b { font-size:.57rem; }
+  .manager-carte-joueur > small { font-size:.47rem; }
+  .manager-carte-roles { bottom:.2rem; right:.2rem; }
+  .manager-carte-roles i { min-width:15px; height:15px; font-size:.48rem; }
+  .manager-banc-cartes { grid-template-columns:repeat(8,78px); }
+  .manager-reserves > div { grid-template-columns:1fr; }
+  .manager-roles-visuels { grid-template-columns:1fr; }
 }
 
 /* Bureau V2 : un tableau de club lisible, sans carte de décision hebdomadaire. */
@@ -260,10 +323,15 @@
 .manager-prochain-match > p { color:var(--craie-dim); }
 .manager-promotion-centre .prog-ligne { cursor:default; }
 
-/* L'Ovale du manager garde la coque du réseau joueur, avec ses outils métier. */
-.x-manager .x-centre { max-width:1180px; }
+/* L'Ovale du manager utilise exactement les trois colonnes du réseau joueur.
+   Il doit donc fournir son panneau droit au lieu d'élargir artificiellement la
+   colonne centrale et de laisser une demi-page noire. */
+.x-manager .x-centre { max-width:none; }
 .manager-x-timeline { min-height:calc(100vh - 54px); }
 .x-manager .x-action:disabled { cursor:default; opacity:.72; }
+.manager-x-explorer-tete { display:flex; align-items:center; justify-content:space-between; gap:.8rem; padding:.85rem 1rem; border-bottom:1px solid #2f3336; }
+.manager-x-explorer-tete > div { display:flex; flex-direction:column; min-width:0; }
+.manager-x-explorer-tete span { color:#8b98a5; font-size:.76rem; }
 .manager-x-termes-club { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .manager-x-ventes { min-height:calc(100vh - 54px); padding:1rem; background:#000; }
 .manager-x-vente-intro { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1.1rem; border:1px solid #2f3336; border-radius:16px; background:#080b0e; }
@@ -288,13 +356,21 @@
 .manager-x-sans-offre { margin:0; padding:1rem; color:#8b98a5; }
 .manager-x-effectif { margin-top:1rem; }
 .manager-x-effectif h3 { padding:0 .2rem; }
-.manager-x-effectif > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; }
-.manager-x-effectif article { display:grid; grid-template-columns:minmax(0,1fr) 38px auto auto; align-items:center; gap:.65rem; min-height:64px; padding:.6rem .75rem; border:1px solid #2f3336; border-radius:12px; background:#080b0e; }
+.manager-x-effectif > div { display:grid; grid-template-columns:1fr; gap:.45rem; }
+.manager-x-effectif article { display:grid; grid-template-columns:38px minmax(0,1fr) auto auto; align-items:center; gap:.65rem; min-height:64px; padding:.6rem .75rem; border:1px solid #2f3336; border-radius:12px; background:#080b0e; }
 .manager-x-effectif article > span { display:flex; flex-direction:column; min-width:0; }
 .manager-x-effectif article b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .manager-x-effectif article em { display:grid; place-items:center; width:34px; height:34px; border-radius:8px; color:#000; background:#f0c96a; font-style:normal; font-weight:900; }
 .manager-x-effectif article > strong { color:#8b98a5; font-size:.78rem; white-space:nowrap; }
 .manager-x-effectif button:disabled { opacity:.42; cursor:not-allowed; }
+.manager-x-club-droite { display:flex; align-items:center; gap:.65rem; margin:.25rem 0 .85rem; }
+.manager-x-club-droite > span { display:flex; flex-direction:column; min-width:0; }
+.manager-x-club-droite b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.manager-x-club-droite small { color:var(--x-gris); }
+.manager-x-budget { display:flex; flex-direction:column; }
+.manager-x-budget > b { color:var(--x-bleu); font-size:1.2rem; }
+.manager-x-budget > span { margin-top:.25rem; color:var(--x-gris); font-size:.76rem; }
+.manager-x-profil .x-banniere { background:linear-gradient(130deg,#123e2a 0%,#1d9bf0 115%); }
 
 @media (max-width:1120px) {
   .manager-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
@@ -311,13 +387,25 @@
   .manager-x-ventes { padding:.65rem; }
   .manager-x-vente-intro { align-items:flex-start; flex-direction:column; }
   .manager-x-vente-intro > strong { text-align:left; }
+  .manager-x-explorer-tete { align-items:stretch; flex-direction:column; }
+  .manager-x-explorer-tete .x-poster { min-height:44px; }
   .manager-x-vente > header { grid-template-columns:minmax(0,1fr) auto; }
   .manager-x-vente > header > button { grid-column:1/-1; }
   .manager-x-offres > div { grid-template-columns:minmax(0,1fr) auto; }
   .manager-x-offres .x-poster { grid-column:1/-1; min-height:42px; }
   .manager-x-effectif > div { grid-template-columns:1fr; }
-  .manager-x-effectif article { grid-template-columns:minmax(0,1fr) 38px auto; }
+  .manager-x-effectif article { grid-template-columns:38px minmax(0,1fr) auto; }
   .manager-x-effectif article button { grid-column:1/-1; min-height:42px; }
+}
+
+@media (max-width:700px) {
+  .x-manager .x-rail { overflow-x:auto; padding:.35rem .4rem; }
+  .x-manager .x-logo { flex:none; padding:.45rem; }
+  .x-manager .x-rail nav { flex:1 0 auto; justify-content:center; }
+  .x-manager .x-rail nav button { min-width:44px; min-height:44px; padding:.58rem; }
+  .x-manager .x-compte { display:none; }
+  .x-manager .x-tetes { overflow-x:auto; }
+  .x-manager .x-tetes button { min-width:72px; }
 }
 .nav .marque {
   display: flex;

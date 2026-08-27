@@ -33,6 +33,15 @@ const amateur = effectifDuClub(clubAmateur, 1)[0];
 const valeurAmateur = valeurDeVente(amateur, clubAmateur);
 verifier('un joueur amateur ne produit aucune indemnité', valeurAmateur === 0,
   `${competitionDuClub(clubAmateur)?.nom} · ${valeurAmateur} €`);
+const venteAmateur: VenteManager = {
+  joueurId: amateur.id, nom: amateur.nom, poste: amateur.poste,
+  age: amateur.age, note: amateur.note, potentiel: amateur.potentiel,
+  valeur: valeurAmateur, saison: 1, offres: [],
+};
+const projetsAmateurs = offresPourVente(venteAmateur, clubAmateur, 1);
+verifier('un amateur reçoit des projets de départ gratuits',
+  projetsAmateurs.length > 0 && projetsAmateurs.every((o) => o.montant === 0),
+  `${projetsAmateurs.length} projet(s) à 0 €`);
 
 const joueurVendu = effectifDuClub(clubAcheteur, 1)[0];
 const vente: VenteManager = {

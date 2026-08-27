@@ -179,16 +179,17 @@ export function valeurDeVente(
 /**
  * Qui se manifeste pour un joueur mis sur la liste.
  *
- * ⚠️ AUCUNE OFFRE SOUS LA NATIONALE 2, et c'est la règle donnée : les clubs
- * amateurs ne font pas de transfert payant. Un écran de vente qui afficherait
- * « 0 € » pour un club de Fédérale 3 serait pire qu'un écran vide — il
- * laisserait croire à un bug de calcul.
+ * Sous la Nationale 2, il n'y a toujours AUCUNE INDEMNITÉ : les clubs amateurs
+ * ne s'achètent pas les joueurs. En revanche ils proposent bien un projet au
+ * joueur. L'ancienne version confondait « pas de transfert payant » et « aucun
+ * départ possible » : le bouton restait grisé pendant toute une carrière
+ * amateur et donnait l'impression que le mercato ne fonctionnait pas.
  */
 export function offresPourVente(
   vente: VenteManager, clubVendeur: string, saison: number,
 ): OffreVente[] {
   const niveau = competitionDuClub(clubVendeur)?.niveau ?? 8;
-  if (estAmateurNiveau(niveau) || vente.valeur <= 0) return [];
+  const amateur = estAmateurNiveau(niveau) || vente.valeur <= 0;
 
   const rng = graine(`vente#${clubVendeur}#${vente.joueurId}#${saison}`);
   // Les acheteurs crédibles : le même étage, ou un cran au-dessus. Un club de
@@ -197,7 +198,10 @@ export function offresPourVente(
   const candidats: { club: string; division: string }[] = [];
   for (const c of COMPETITIONS) {
     if (c.niveau > niveau || c.niveau < niveau - 2) continue;
-    if (estAmateurNiveau(c.niveau)) continue;
+    // Un départ amateur reste dans le bassin amateur ou peut offrir un premier
+    // projet semi-pro. Une vente professionnelle, elle, ne redescend pas vers
+    // un club qui ne peut verser aucune indemnité.
+    if (!amateur && estAmateurNiveau(c.niveau)) continue;
     for (const club of c.clubs) {
       if (club.nom !== clubVendeur) candidats.push({ club: club.nom, division: c.nom });
     }
@@ -216,7 +220,7 @@ export function offresPourVente(
       id: `${pris.club}#${vente.joueurId}#${saison}#${i}`,
       club: pris.club,
       division: pris.division,
-      montant: arrondir(vente.valeur * (0.82 + rng() * 0.36), 25_000),
+      montant: amateur ? 0 : arrondir(vente.valeur * (0.82 + rng() * 0.36), 25_000),
     });
   }
   return offres.sort((a, b) => b.montant - a.montant);
