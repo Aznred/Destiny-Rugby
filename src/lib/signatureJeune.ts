@@ -85,6 +85,22 @@ export function rayonAcceptable(age: number, notes: NotesCentre): number {
  * est une option, pas un défaut : sans elle, tout jeune un peu observé partirait
  * dès la première offre et les clubs de village ne garderaient jamais personne.
  */
+/**
+ * LES POIDS DE LA SOMME, DÉCLARÉS UNE SEULE FOIS.
+ *
+ * ⚠️ `scorerOffre` ET `scoreDeRester` DOIVENT LES PARTAGER. Recopiés, ils
+ * divergent — et quand ils divergent, l'option « rester » disparaît sans que
+ * rien ne le signale.
+ *
+ * L'ordre dit la demande : la proximité et le temps de jeu d'abord (« un jeune
+ * de Toulouse pourrait préférer Colomiers parce qu'il aura plus de chances de
+ * jouer »), le blason ensuite.
+ */
+export const POIDS_PROXIMITE = 34;
+export const POIDS_TEMPS_DE_JEU = 38;
+export const POIDS_CENTRE = 22;
+export const POIDS_SPORTIF = 18;
+
 export function scorerOffre(
   jeune: JeuneJoueur,
   offre: OffreDeCentre,
@@ -96,19 +112,19 @@ export function scorerOffre(
 
   // ── proximité ───────────────────────────────────────────────────────────
   // Pleine valeur à la porte de chez soi, zéro à la limite acceptable.
-  const proximite = Math.max(0, 1 - offre.distance / Math.max(1, limite)) * 34;
+  const proximite = Math.max(0, 1 - offre.distance / Math.max(1, limite)) * POIDS_PROXIMITE;
   lignes.push({ libelle: 'proximité', valeur: Math.round(proximite) });
 
   // ── temps de jeu promis ─────────────────────────────────────────────────
-  const jeu = (offre.tempsDeJeuPromis / 100) * 26;
+  const jeu = (offre.tempsDeJeuPromis / 100) * POIDS_TEMPS_DE_JEU;
   lignes.push({ libelle: 'temps de jeu', valeur: Math.round(jeu) });
 
   // ── le centre : réputation, encadrement, installations ──────────────────
-  const centre = (attraitDuCentre(offre.notes) / 100) * 22;
+  const centre = (attraitDuCentre(offre.notes) / 100) * POIDS_CENTRE;
   lignes.push({ libelle: 'centre de formation', valeur: Math.round(centre) });
 
   // ── le niveau du club ───────────────────────────────────────────────────
-  const sportif = Math.max(0, (offre.niveauSportif - 30) / 60) * 18;
+  const sportif = Math.max(0, (offre.niveauSportif - 30) / 60) * POIDS_SPORTIF;
   lignes.push({ libelle: 'niveau du club', valeur: Math.round(sportif) });
 
   // Un entraîneur reconnu rassure la famille, sans pouvoir annuler la distance
@@ -137,13 +153,24 @@ export function scorerOffre(
   return { club: offre.club, total: Math.round(total * 10) / 10, lignes, tropLoin };
 }
 
-/** Ce que vaut, pour le jeune, le fait de simplement rester chez lui. */
+/**
+ * CE QUE VAUT, POUR LE JEUNE, LE FAIT DE SIMPLEMENT RESTER CHEZ LUI.
+ *
+ * ⚠️ CE N'EST PAS UN LOT DE CONSOLATION, C'EST UNE OFFRE CONCURRENTE, et elle
+ * se calcule avec LES MÊMES POIDS que les autres. Chez lui, le garçon est à zéro
+ * kilomètre (pleine proximité) et il joue (plein temps de jeu) : ce sont les
+ * deux termes les plus lourds de la somme. C'est exactement pour ça qu'un club
+ * de village garde parfois son meilleur gamin.
+ *
+ * ⚠️ ET LES CONSTANTES SONT REPRISES DE `scorerOffre`, pas recopiées à la main.
+ * Une version antérieure avait gardé « 22 » pour le temps de jeu après que le
+ * poids soit passé à 38 : mesuré, **soixante jeunes sur soixante partaient**,
+ * et rester chez soi n'existait plus comme option.
+ */
 export function scoreDeRester(jeune: JeuneJoueur, notesActuelles: NotesCentre): number {
-  // Chez lui il est à zéro kilomètre et il joue : ce sont les deux plus gros
-  // termes de la somme. C'est pour ça qu'un club de village garde parfois son
-  // meilleur gamin — jusqu'à ce qu'un vrai centre se manifeste.
   return Math.round(
-    (34 + 22 + (attraitDuCentre(notesActuelles) / 100) * 22) * (0.55 + jeune.attachement / 190),
+    (POIDS_PROXIMITE + POIDS_TEMPS_DE_JEU + (attraitDuCentre(notesActuelles) / 100) * POIDS_CENTRE)
+    * (0.55 + jeune.attachement / 190),
   );
 }
 
@@ -234,7 +261,7 @@ export function peutPayerLaFormation(budgetTransferts: number, indemnite: number
  * exactement le classement des clubs, et le choix n'existerait pas.
  */
 export function promesseDeTempsDeJeu(niveau: number, notes: NotesCentre): number {
-  const parEtage = Math.min(92, 18 + niveau * 9);
+  const parEtage = Math.min(92, 8 + niveau * 13);
   // Un centre qui fait confiance à ses jeunes en promet un peu plus.
   return Math.round(Math.min(96, parEtage + (notes.reputation - 50) * 0.12));
 }

@@ -53,6 +53,16 @@ export interface FicheDetection {
   entretien: boolean;
 }
 
+/**
+ * Le haut de l'échelle de potentiel du jeu.
+ *
+ * ⚠️ UNE FOURCHETTE NE MONTE JAMAIS AU-DESSUS. Bornée à 99 — au-dessus de ce
+ * que `fabriquerJeune` produit réellement —, toute la moitié haute de la
+ * pyramide affichait « … - 99 » et les étoiles ne distinguaient plus rien :
+ * cinq rapports sur cinq rendaient « 4,5 à 5 ★ », mesuré à l'écran.
+ */
+export const POTENTIEL_MAX = 96;
+
 /** Un entretien vaut trois déplacements : on y apprend ce qu'un match ne dit pas. */
 export const VALEUR_ENTRETIEN = 3;
 /** Au-delà, on n'apprend plus rien de neuf. */
@@ -93,7 +103,7 @@ export function flouDeLAge(age: number): number {
 
 /** Le potentiel, sur l'échelle d'étoiles que la demande veut afficher. */
 export function enEtoiles(potentiel: number): number {
-  const brut = 0.5 + ((potentiel - 30) / 66) * 4.5;
+  const brut = 0.5 + ((potentiel - 30) / (POTENTIEL_MAX - 30)) * 4.5;
   return Math.max(0.5, Math.min(5, Math.round(brut * 2) / 2));
 }
 
@@ -126,8 +136,14 @@ export function ficheDe(
 
   // La largeur part du service de recrutement, s'élargit avec la JEUNESSE du
   // garçon, et se resserre avec les visites.
+  // ⚠️ ET LA LARGEUR EST PLAFONNÉE. Sans ce plafond, un garçon de quatorze ans
+  // vu par une cellule modeste ressortait à « 20-96 » : une fourchette qui
+  // couvre toute l'échelle ne dit rien, ne peut pas se tromper, et rend la
+  // différence entre un bon et un mauvais service invisible. Ce qui distingue
+  // les deux services devient alors le TAUX D'ERREUR, ci-dessous, qui est une
+  // information bien plus utile qu'une barre qui déborde.
   const depart = incertitudeDeDepart(notes.recrutement) * flouDeLAge(jeune.age);
-  const demiLargeur = Math.max(1.5, depart * (1 - progres * 0.82));
+  const demiLargeur = Math.max(1.5, Math.min(21, depart * (1 - progres * 0.82)));
 
   // Le centre de la fourchette est décalé, de moins en moins.
   const biaisMax = depart * 0.55 * (1 - progres);
@@ -140,22 +156,21 @@ export function ficheDe(
   const seTrompe = rng() < partErreur;
   const decalage = seTrompe ? (rng() < 0.5 ? -1 : 1) * demiLargeur * (1.05 + rng() * 0.5) : 0;
 
-  const centre = jeune.potentielReel + biais + decalage;
-  let potentielBas = Math.round(centre - demiLargeur);
-  let potentielHaut = Math.round(centre + demiLargeur);
-  // On DÉPLACE la fourchette dans l'échelle avant de la borner. Borner ses
-  // deux extrémités séparément transformait un scout très optimiste en
-  // « 99-99 », soit une fausse certitude parfaite après zéro observation.
-  if (potentielHaut > 99) {
-    potentielBas -= potentielHaut - 99;
-    potentielHaut = 99;
-  }
-  if (potentielBas < 20) {
-    potentielHaut += 20 - potentielBas;
-    potentielBas = 20;
-  }
-  potentielBas = Math.max(20, Math.min(99, potentielBas));
-  potentielHaut = Math.max(potentielBas, Math.min(99, potentielHaut));
+  // ⚠️ ON RAMÈNE LE CENTRE DANS L'ÉCHELLE, PUIS ON TRONQUE. Deux versions
+  // antérieures ont échoué autrement :
+  //
+  //   · borner les deux extrémités séparément transformait un scout très
+  //     optimiste en « 99-99 » — une certitude parfaite après zéro observation ;
+  //   · DÉPLACER la fourchette entière la collait au plafond dès que le garçon
+  //     était bon : mesuré, six fiches sur six affichaient exactement « 72-96 »,
+  //     et le classement du rapport annuel n'avait plus rien pour départager.
+  //
+  // Ramener le centre laisse la largeur dire ce qu'elle a à dire, et deux
+  // garçons différents ne rendent plus la même ligne.
+  const centreBrut = jeune.potentielReel + biais + decalage;
+  const centre = Math.max(24, Math.min(POTENTIEL_MAX - 4, centreBrut));
+  const potentielBas = Math.max(20, Math.min(POTENTIEL_MAX - 2, Math.round(centre - demiLargeur)));
+  const potentielHaut = Math.min(POTENTIEL_MAX, Math.max(potentielBas + 2, Math.round(centre + demiLargeur)));
 
   // ⚠️ LA NOTE DU JOUR SE VOIT, ELLE. On la lit sur un terrain en quatre-vingts
   // minutes ; c'est le POTENTIEL qui se devine. Une note aussi incertaine que le

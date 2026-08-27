@@ -428,7 +428,24 @@ const VILLES: Record<string, Lieu> = {
 };
 
 /** Les clés, de la plus longue à la plus courte — voir l'avertissement ci-dessus. */
-const CLES_TRIEES = Object.keys(VILLES).sort((a, b) => b.length - a.length);
+/**
+ * L'INDEX DES VILLES, NORMALISÉ DES DEUX CÔTÉS.
+ *
+ * ⚠️ LES CLÉS DOIVENT PASSER PAR `cleLieu` ELLES AUSSI, et les oublier a
+ * coûté la moitié de la carte. `cleLieu` remplace les traits d’union par des
+ * espaces : « Clermont-Ferrand » devient « clermont ferrand », qui ne contient
+ * PAS la clé brute « clermont-ferrand ». Toutes les villes composées — et
+ * elles sont légion dans le rugby français : Mont-de-Marsan, Brive-la-
+ * Gaillarde, Aix-en-Provence, Saint-Jean-de-Luz — tombaient donc dans le
+ * tirage au sort, en silence. Mesuré : 236 clubs placés au lieu de 300, dont
+ * quatre du Top 14 et de la Pro D2.
+ *
+ * ⚠️ ET L'ORDRE RESTE DU PLUS LONG AU PLUS COURT : sinon « saint-jean »
+ * attrape « saint-jean-de-luz » et un club basque atterrit dans le Tarn.
+ */
+const INDEX_VILLES: [string, Lieu][] = Object.entries(VILLES)
+  .map(([nom, lieu]) => [cleLieu(nom), lieu] as [string, Lieu])
+  .sort((a, b) => b[0].length - a[0].length);
 
 export function cleLieu(nom: string): string {
   return nom
@@ -487,11 +504,11 @@ export function positionDuClub(nomDuClub: string): PositionClub {
   // ce désaccord impossible.
   const fiche = clubParNom(nomDuClub);
   const cle = cleLieu(fiche?.ville ?? nomDuClub);
-  const villeReconnue = CLES_TRIEES.find((k) => cle.includes(k));
+  const villeReconnue = INDEX_VILLES.find(([k]) => cle.includes(k));
   let pos: PositionClub;
 
   if (villeReconnue) {
-    const [lat, lon, idRegion] = VILLES[villeReconnue];
+    const [, [lat, lon, idRegion]] = villeReconnue;
     pos = { region: idRegion, lat, lon, place: true };
   } else {
     const rng = graine(`geo#${nomDuClub}`);
