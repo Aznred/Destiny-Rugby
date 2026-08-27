@@ -1248,9 +1248,18 @@ export const useGame = create<GameState>()(
       ouvrirSocialSur: null,
       conversationSocialeCible: null,
       ouvrirMessagesOvale: () => set((s) => {
-        const cible = s.approches.find((a) => a.etat === 'ouverte')?.pseudo ?? null;
+        const dansCarriereManager = !!s.manager && !s.joueur;
+        const cible = dansCarriereManager
+          ? [...(s.manager?.demandes ?? []), ...(s.manager?.negociations ?? []),
+              ...(s.manager?.negociationsClubs ?? [])]
+              .reverse()
+              .find((d) => d.etat === 'ouverte' || d.etat === 'accord')?.pseudo ?? null
+          : s.approches.find((a) => a.etat === 'ouverte')?.pseudo ?? null;
         return {
-          ecran: 'social',
+          // Le joueur ouvre l'écran social complet. Le manager reste dans sa
+          // carrière : son L'Ovale est un onglet du bureau, avec la même
+          // messagerie et les mêmes négociations.
+          ecran: dansCarriereManager ? 'manager' : 'social',
           ouvrirSocialSur: 'messages',
           conversationSocialeCible: cible,
           conversations: assurerConversationsApproches(s.joueur, s.approches, s.conversations),
@@ -1268,7 +1277,7 @@ export const useGame = create<GameState>()(
         }
       },
       ouvrirDiscussionOvale: (pseudo) => set((s) => ({
-        ecran: 'social',
+        ecran: s.manager && !s.joueur ? 'manager' : 'social',
         ouvrirSocialSur: 'messages',
         conversationSocialeCible: pseudo,
         ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],

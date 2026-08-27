@@ -305,6 +305,8 @@
 .manager-kpis span { margin-top:auto; color:var(--craie-dim); font-size:.73rem; line-height:1.35; }
 .manager-classement-complet { min-width:0; padding:1rem; }
 .manager-classement-complet .comp-tete button { border:0; color:var(--or); background:transparent; }
+.manager-classement-complet .comp-tete > div { display:flex; flex-direction:column; }
+.manager-classement-complet .comp-tete small { color:var(--craie-dim); font-size:.66rem; font-weight:400; }
 .manager-table-classement { margin-top:.7rem; overflow-x:auto; border:1px solid rgba(255,255,255,.07); border-radius:12px; }
 .manager-table-classement table { width:100%; min-width:650px; border-collapse:collapse; }
 .manager-table-classement th,.manager-table-classement td { height:48px; padding:.45rem .65rem; border-bottom:1px solid rgba(255,255,255,.06); text-align:center; font-size:.82rem; }
@@ -536,6 +538,134 @@
   .x-manager .x-tetes { overflow-x:auto; }
   .x-manager .x-tetes button { min-width:72px; }
 }
+/* Bureau manager V3 : les informations de pilotage tiennent dans le premier
+   écran. Les longues bases (marché, académie, rapports) défilent dans leur
+   propre panneau afin que la navigation et les chiffres importants restent
+   toujours visibles. */
+.manager-ovale { min-width:0; }
+.x-app.x-manager-embarque { width:100%; max-width:none; height:calc(100dvh - 168px); min-height:590px; margin:0; overflow:hidden; border:1px solid #2f3336; border-radius:16px; }
+.x-manager-embarque .x-rail { position:static; top:auto; height:100%; }
+.x-manager-embarque .x-centre,.x-manager-embarque .x-droite { min-height:0; height:100%; overflow-y:auto; overscroll-behavior:contain; }
+.x-manager-embarque .x-tetes { top:0; z-index:3; background:rgba(0,0,0,.92); }
+.x-manager-embarque .x-messagerie { min-height:0; height:calc(100% - 54px); }
+.x-manager-embarque .x-conversations,.x-manager-embarque .x-fil-messages { min-height:0; height:100%; }
+
+@media (min-width:1121px) {
+  .carriere-manager { max-width:1580px; padding:.7rem 1rem 1rem; }
+  .manager-entete { min-height:52px; margin-bottom:.5rem; }
+  .manager-entete h1 { font-size:1.65rem; }
+  .manager-identite-club { padding:.38rem .65rem; }
+  .manager-onglets { gap:.25rem; margin-bottom:.7rem; padding:.28rem; }
+  .manager-onglets button { flex:1 1 auto; min-height:40px; padding:.52rem .65rem; font-size:.78rem; }
+
+  .manager-bureau { grid-template-columns:minmax(0,1.55fr) minmax(310px,.55fr); gap:.7rem; }
+  .manager-club-resume,.manager-kpis { grid-column:1/-1; }
+  .manager-club-resume { min-height:84px; padding:.75rem 1rem; }
+  .manager-club-resume-identite { gap:.75rem; }
+  .manager-club-resume-identite h2 { font-size:1.45rem; }
+  .manager-resume-actions .btn { min-height:38px; padding:.5rem .75rem; }
+  .manager-kpis { gap:.5rem; }
+  .manager-kpis article { min-height:78px; padding:.68rem .75rem; }
+  .manager-kpis small { font-size:.62rem; }
+  .manager-kpis b { margin:.22rem 0 .12rem; font-size:1.18rem; }
+  .manager-kpis span { font-size:.66rem; }
+  .manager-classement-complet { grid-column:1; grid-row:3; padding:.75rem; }
+  .manager-table-classement { margin-top:.45rem; }
+  .manager-table-classement th,.manager-table-classement td { height:39px; padding:.3rem .5rem; font-size:.74rem; }
+  .manager-table-classement thead th { height:31px; font-size:.6rem; }
+  .manager-table-classement tbody th { min-width:180px; }
+  .manager-bureau-bas { grid-column:2; grid-row:3; grid-template-columns:1fr; gap:.7rem; }
+  .manager-prochain-match,.manager-bureau-bas .manager-journal { padding:.72rem; }
+  .manager-mini-duel { min-height:72px; gap:.45rem; font-size:.75rem; }
+  .manager-mini-duel strong { font-size:1.05rem; }
+  .manager-bureau-bas .manager-journal .journal { max-height:132px; }
+  .manager-bureau-bas .journal .entree { padding:.42rem 0; }
+  .manager-bureau-bas .journal .entree b { font-size:.72rem; }
+  .manager-bureau-bas .journal .entree p { display:-webkit-box; margin:.15rem 0 0; overflow:hidden; font-size:.66rem; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+
+  .manager-composition-tete { padding:.78rem 1rem; }
+  .manager-composition-tete h2 { font-size:1.3rem; }
+  .manager-composition-tete p { max-width:90ch; margin:.15rem 0 0; font-size:.75rem; line-height:1.35; }
+  .manager-note-compo { min-width:92px; padding:.62rem; }
+  .manager-note-compo b { font-size:1.4rem; }
+  .manager-feuille-visuelle { grid-template-columns:minmax(0,1fr) minmax(250px,300px); gap:.7rem; }
+  .manager-compo-aide { grid-column:1/-1; padding:.5rem .7rem; font-size:.7rem; }
+  .manager-terrain-cadre { grid-column:1; grid-row:2/4; padding:.45rem; border-radius:15px; }
+  .manager-terrain-xv { min-height:clamp(500px,calc(100dvh - 405px),580px); }
+  .manager-position { width:clamp(68px,7vw,92px); }
+  .manager-carte-joueur { min-height:74px; padding:.3rem .34rem .38rem; border-radius:8px; }
+  .manager-carte-haut i { width:18px; height:18px; font-size:.58rem; }
+  .manager-carte-haut strong { font-size:.92rem; }
+  .manager-carte-joueur > b { margin-top:.24rem; font-size:.6rem; }
+  .manager-carte-joueur > small { margin-top:.12rem; font-size:.47rem; }
+  .manager-banc-visuel { grid-column:2; grid-row:2; padding:.65rem; }
+  .manager-banc-cartes { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.38rem; margin-top:.5rem; overflow:visible; }
+  .manager-banc-cartes .manager-carte-joueur { min-width:0; min-height:70px; }
+  .manager-reserves { grid-column:2; grid-row:3; align-self:start; padding:.72rem; }
+  .manager-reserves > div { grid-template-columns:1fr; max-height:230px; overflow-y:auto; }
+  .manager-roles-visuels { padding:.72rem; }
+  .manager-roles-visuels select { min-height:38px; }
+  .manager-plan-avant-match { padding:.72rem; }
+  .manager-tactiques-selects { gap:.45rem; margin-top:.55rem; }
+  .manager-tactiques-selects select { min-height:38px; font-size:.72rem; }
+
+  .manager-marche { gap:.7rem; }
+  .manager-marche-tete { padding:.8rem 1rem; }
+  .manager-marche-tete h2 { font-size:1.25rem; }
+  .manager-marche-tete p { font-size:.75rem; }
+  .manager-budgets.resume span { padding:.48rem; }
+  .manager-filtres { padding:.7rem; }
+  .manager-filtres > input { min-height:40px; }
+  .manager-cibles { grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; max-height:calc(100dvh - 332px); overflow-y:auto; overscroll-behavior:contain; padding-right:.2rem; }
+  .manager-cible { grid-template-columns:48px minmax(0,1fr); gap:.55rem; padding:.7rem; }
+  .manager-cible-note { width:46px; height:46px; font-size:1.05rem; }
+  .manager-cible > .btn { grid-column:1/-1; width:100%; min-height:36px; }
+  .manager-cible-corps > p { margin:.25rem 0; }
+
+  .manager-club { gap:.7rem; }
+  .manager-inst-tete { padding:.75rem 1rem; }
+  .manager-inst-tete h2 { font-size:1.25rem; }
+  .manager-inst-tete p { margin:.12rem 0 0; font-size:.75rem; line-height:1.35; }
+  .manager-inst-grille { gap:.7rem; }
+  .manager-inst { display:grid; grid-template-columns:minmax(190px,1fr) minmax(160px,.75fr) minmax(220px,1.1fr) auto; align-items:center; gap:.8rem; padding:.7rem .85rem; }
+  .inst-tete { align-items:center; }
+  .inst-emoji { font-size:1.35rem; }
+  .inst-tete p { margin:.12rem 0 0; font-size:.68rem; line-height:1.3; }
+  .inst-effet { font-size:.73rem; }
+  .manager-inst .btn { margin:0; white-space:nowrap; }
+  .manager-club-formation { grid-template-columns:minmax(280px,.55fr) minmax(0,1.45fr); }
+  .manager-club-formation > .manager-inst-tete,.manager-club-formation > .manager-inst-grille { grid-column:1/-1; }
+  .manager-club-formation > .manager-centre-identite { grid-column:1; grid-template-columns:1fr; align-content:start; }
+  .manager-club-formation > .manager-centre-identite .manager-centre-notes { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .manager-club-formation > .manager-academie { grid-column:2; grid-row:3; max-height:calc(100dvh - 335px); overflow-y:auto; overscroll-behavior:contain; }
+  .manager-club-recruteurs > .manager-dossiers-jeunes { max-height:calc(100dvh - 405px); overflow-y:auto; overscroll-behavior:contain; padding-right:.2rem; }
+  .manager-club-entrainement { grid-template-columns:minmax(280px,.58fr) minmax(0,1.42fr); }
+  .manager-club-entrainement > .manager-inst-tete,.manager-club-entrainement > .manager-inst-grille { grid-column:1/-1; }
+  .manager-club-entrainement > .manager-planning-collectif { grid-column:1; }
+  .manager-club-entrainement > .manager-programme { grid-column:2; grid-row:3/5; }
+  .manager-club-entrainement > .manager-programme-jeunes { grid-column:1; }
+  .manager-club-entrainement .manager-liste-programme { max-height:calc(100dvh - 390px); overflow-y:auto; overscroll-behavior:contain; }
+  .manager-planning-collectif > div:last-child { grid-template-columns:repeat(4,minmax(0,1fr)); }
+}
+
+@media (max-width:1120px) {
+  .x-app.x-manager-embarque { height:auto; min-height:calc(100dvh - 150px); overflow:visible; }
+  .x-manager-embarque .x-centre { height:auto; overflow:visible; }
+}
+
+@media (max-width:760px) {
+  .manager-entete { margin-bottom:.55rem; }
+  .manager-entete h1 { font-size:1.35rem; }
+  .manager-onglets { margin-bottom:.65rem; }
+  .manager-onglets button { min-height:42px; padding:.55rem .72rem; }
+  .manager-club-resume { padding:.85rem; }
+  .manager-kpis { gap:.5rem; }
+  .manager-kpis article { min-height:88px; padding:.68rem; }
+  .manager-table-classement th,.manager-table-classement td { height:42px; }
+  .manager-inst { padding:.75rem; }
+  .x-app.x-manager-embarque { min-height:0; border-inline:0; border-radius:12px; }
+}
+
 .nav .marque {
   display: flex;
   align-items: center;

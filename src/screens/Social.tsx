@@ -1256,7 +1256,12 @@ type DossierManagerSocial = {
 
 type OngletManagerSocial = 'timeline' | 'explorer' | 'messages' | 'notifs' | 'profil';
 
-function SocialManager() {
+interface OvaleManagerProps {
+  embarque?: boolean;
+  onRetour?: (destination?: 'bureau' | 'marche') => void;
+}
+
+export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps = {}) {
   const manager = useGame((s) => s.manager)!;
   const conversations = useGame((s) => s.conversations ?? {});
   const posts = useGame((s) => s.posts ?? []);
@@ -1324,6 +1329,10 @@ function SocialManager() {
     setOnglet(cible);
     if (cible === 'notifs') marquerNotifsLues();
   };
+  const retournerAuManager = (destination: 'bureau' | 'marche' = 'bureau') => {
+    if (embarque && onRetour) onRetour(destination);
+    else setEcran('manager');
+  };
   const lien = (cible: OngletManagerSocial, icone: string, label: string, badge?: number) => (
     <button className={onglet === cible ? 'actif' : ''} onClick={() => ouvrirOnglet(cible)}>
       <span className="x-cloche"><Icone d={icone} width={24} height={24} />{!!badge && <i className="x-pastille">{badge > 99 ? '99+' : badge}</i>}</span>
@@ -1332,7 +1341,7 @@ function SocialManager() {
   );
 
   return (
-    <motion.section className="x-app x-manager" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
+    <motion.section className={`x-app x-manager${embarque ? ' x-manager-embarque' : ''}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
       <aside className="x-rail">
         <LogoOvale />
         <nav>
@@ -1341,7 +1350,7 @@ function SocialManager() {
           {lien('messages', I_MESSAGE, t('ov.messages'), nonLusMessages)}
           {lien('notifs', I_CLOCHE, t('ov.notifications'), nonLuesNotifs)}
           {lien('profil', I_PROFIL, t('nav.profil'))}
-          <button onClick={() => setEcran('manager')}><span style={{ fontSize: '1.35rem', lineHeight: 1 }}>🏟️</span><span>{t('mgr.bureau')}</span></button>
+          <button onClick={() => retournerAuManager()}><span style={{ fontSize: '1.35rem', lineHeight: 1 }}>🏟️</span><span>{t('mgr.bureau')}</span></button>
         </nav>
         <button className="x-compte" onClick={() => setOnglet('profil')}>
           <Avatar avatar={`club:${manager.club}`} club={manager.club} taille={36} nom={manager.club} />
@@ -1364,7 +1373,7 @@ function SocialManager() {
           <>
             <div className="manager-x-explorer-tete">
               <div><b>Mercato du manager</b><span>Arrivées depuis le marché mondial · départs depuis L’Ovale</span></div>
-              <button className="x-poster" onClick={() => setEcran('manager')}>Ouvrir le bureau</button>
+              <button className="x-poster" onClick={() => retournerAuManager()}>Ouvrir le bureau</button>
             </div>
             <VentesManager recherche={recherche} />
           </>
@@ -1400,7 +1409,7 @@ function SocialManager() {
           <div className="x-banniere" />
           <div className="x-profil-corps">
             <div className="x-profil-avatar"><Avatar avatar={`club:${manager.club}`} club={manager.club} taille={76} nom={manager.club} /></div>
-            <div className="x-profil-boutons"><button className="x-suivre secondaire" onClick={() => setEcran('manager')}>Ouvrir le bureau</button></div>
+            <div className="x-profil-boutons"><button className="x-suivre secondaire" onClick={() => retournerAuManager()}>Ouvrir le bureau</button></div>
             <h2>{manager.club}<Certifie /></h2>
             <span className="x-pseudo">@{pseudoDe(manager.club)} · entraîné par {manager.nom}</span>
             <p className="x-bio">{manager.divisionNom} · saison {manager.saison}. Actualité officielle, résultats et coulisses du club.</p>
@@ -1424,7 +1433,7 @@ function SocialManager() {
           <h3>Mercato</h3>
           <button className="x-tendance" onClick={() => setOnglet('messages')}><span className="x-tendance-cat">Négociations</span><b>#Messages</b><span className="x-tendance-vol">{dossiers.length} dossier(s) · {nonLusMessages} non lu(s)</span></button>
           <button className="x-tendance" onClick={() => setOnglet('explorer')}><span className="x-tendance-cat">Direction sportive</span><b>#Départs</b><span className="x-tendance-vol">{manager.ventes.length} dossier(s) ouvert(s)</span></button>
-          <button className="x-tendance" onClick={() => setEcran('manager')}><span className="x-tendance-cat">Base mondiale</span><b>#Recrutement</b><span className="x-tendance-vol">tous les championnats</span></button>
+          <button className="x-tendance" onClick={() => retournerAuManager('marche')}><span className="x-tendance-cat">Base mondiale</span><b>#Recrutement</b><span className="x-tendance-vol">tous les championnats</span></button>
         </div>
         <div className="x-bloc manager-x-budget"><h3>Budget transferts</h3><b>{nombre(manager.budgetTransferts)} €</b><span>Salaires disponibles : {nombre(manager.budgetSalarial)} €</span></div>
       </aside>
@@ -1760,7 +1769,7 @@ function SocialJoueur() {
 export function Social() {
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
-  if (manager && !joueur) return <SocialManager />;
+  if (manager && !joueur) return <OvaleManager />;
   if (joueur) return <SocialJoueur />;
   return null;
 }

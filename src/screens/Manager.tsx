@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { t, nombre } from '../lib/i18n';
@@ -9,7 +9,7 @@ import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
 import { COMPETITIONS, clubParNom, competitionDuClub } from '../data/clubs';
 import { effectifDuClub, forceEffectif } from '../lib/effectif';
-import { championnatEnDirect } from '../lib/championnat';
+import { classementManagerEnDirect } from '../lib/tableauManager';
 import { semaine, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
 import { TROPHEES } from '../data/trophees';
 import { nomPoste, POSTES } from '../data/rugby';
@@ -40,9 +40,10 @@ import type {
 } from '../types';
 
 const MatchLive = lazy(() => import('../components/MatchLive').then((m) => ({ default: m.MatchLive })));
+const OvaleManager = lazy(() => import('./Social').then((m) => ({ default: m.OvaleManager })));
 
 type VueManager = 'bureau' | 'equipe' | 'match' | 'marche'
-  | 'formation' | 'recruteurs' | 'entrainement';
+  | 'ovale' | 'formation' | 'recruteurs' | 'entrainement';
 
 function humeurDuBoard(confiance: number): { texte: string; ton: string } {
   if (confiance < CONFIANCE_LICENCIEMENT + 12) return { texte: t('mgr.board.sellette'), ton: 'rouge' };
@@ -80,6 +81,7 @@ export function Manager() {
   const contacterClub = useGame((s) => s.contacterClubManager);
   const ouvrirMessages = useGame((s) => s.ouvrirMessagesOvale);
   const ouvrirDiscussion = useGame((s) => s.ouvrirDiscussionOvale);
+  const ouvertureSociale = useGame((s) => s.ouvrirSocialSur);
   const signerBanc = useGame((s) => s.signerBanc);
   const quitterBanc = useGame((s) => s.quitterBanc);
   const definirComposition = useGame((s) => s.definirCompositionManager);
@@ -115,6 +117,10 @@ export function Manager() {
   const [matchOuvert, setMatchOuvert] = useState(false);
   const [jeuneALiberer, setJeuneALiberer] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (manager && ouvertureSociale) setVue('ovale');
+  }, [manager, ouvertureSociale]);
+
   const saison = manager?.saison ?? 1;
   const prestige = manager?.prestige ?? 0;
   const libre = manager?.libre ?? false;
@@ -123,10 +129,16 @@ export function Manager() {
     [prestige, saison, libre],
   );
   const classement = useMemo(() => {
-    if (!manager?.club || !manager.division) return null;
-    const sem = semaine(manager.semaine);
-    return championnatEnDirect(manager.division, manager.saison, manager.club, sem.journee ?? 0);
-  }, [manager?.club, manager?.division, manager?.saison, manager?.semaine]);
+    if (!manager) return null;
+    return classementManagerEnDirect(manager);
+  }, [manager]);
+  const classementVisible = useMemo(() => {
+    const lignes = classement?.classement ?? [];
+    if (lignes.length <= 5) return lignes;
+    const rang = Math.max(0, lignes.findIndex((l) => l.club === manager?.club));
+    const debut = Math.max(0, Math.min(lignes.length - 5, rang - 2));
+    return lignes.slice(debut, debut + 5);
+  }, [classement, manager?.club]);
   const cibles = useMemo(() => {
     if (!manager?.club) return [];
     return ciblesDuMarche(divisionMarche, manager.saison, manager.club, clubMarche)
@@ -263,7 +275,7 @@ export function Manager() {
               🎮 Match {afficheManager && !resultatManager && <i>1</i>}
             </button>
             <button className={vue === 'marche' ? 'actif' : ''} onClick={() => setVue('marche')}>🌍 {t('mgr.marche')}</button>
-            <button onClick={ouvrirMessages}>
+            <button className={vue === 'ovale' ? 'actif' : ''} onClick={() => { setVue('ovale'); ouvrirMessages(); }}>
               𝕏 L’Ovale {alertesOvale > 0 && <i>{alertesOvale}</i>}
             </button>
             <button className={vue === 'formation' ? 'actif' : ''} onClick={() => setVue('formation')}>🎓 Formation</button>
@@ -286,7 +298,7 @@ export function Manager() {
                 </div>
                 <div className="manager-resume-actions">
                   <button className="btn fantome" onClick={() => setEcran('effectif')}>👥 Effectif</button>
-                  <button className="btn fantome" onClick={ouvrirMessages}>𝕏 L’Ovale</button>
+                  <button className="btn fantome" onClick={() => { setVue('ovale'); ouvrirMessages(); }}>𝕏 L’Ovale</button>
                   <button className="btn primaire" onClick={() => {
                     if (afficheManager && !resultatManager) setVue('match'); else semaineManager();
                   }}>
@@ -305,12 +317,15 @@ export function Manager() {
               </section>
 
               <section className="carte manager-classement-complet">
-                <div className="comp-tete"><b>📊 {manager.divisionNom}</b><button onClick={() => setEcran('tableau')}>{t('mgr.resultatsMonde')}</button></div>
+                <div className="comp-tete">
+                  <div><b>📊 Course au classement · {manager.divisionNom}</b><small>Les cinq clubs autour du tien</small></div>
+                  <button onClick={() => setEcran('tableau')}>Classement complet</button>
+                </div>
                 <div className="manager-table-classement" role="region" aria-label={`Classement ${manager.divisionNom}`} tabIndex={0}>
                   <table>
                     <thead><tr><th>#</th><th>Club</th><th>J</th><th>G</th><th>N</th><th>P</th><th>+/-</th><th>Pts</th></tr></thead>
                     <tbody>
-                      {classement?.classement.map((l) => {
+                      {classementVisible.map((l) => {
                         const club = clubParNom(l.club);
                         return (
                           <tr key={l.club} className={l.club === manager.club ? 'moi' : ''}>
@@ -338,7 +353,7 @@ export function Manager() {
                 </article>
                 <article className="carte manager-journal">
                   <div className="comp-tete"><b>📜 {t('mgr.journal')}</b></div>
-                  <div className="journal">{[...journal].reverse().slice(0, 5).map((e) => <div key={e.id} className="entree"><b>{e.titre}</b><p>{e.texte}</p></div>)}</div>
+                  <div className="journal">{[...journal].reverse().slice(0, 3).map((e) => <div key={e.id} className="entree"><b>{e.titre}</b><p>{e.texte}</p></div>)}</div>
                 </article>
               </section>
             </div>
@@ -399,7 +414,7 @@ export function Manager() {
           )}
 
           {(vue === 'formation' || vue === 'recruteurs' || vue === 'entrainement') && (
-            <div className="manager-club">
+            <div className={`manager-club manager-club-${vue}`}>
               <section className="carte manager-inst-tete">
                 <div>
                   <div className="eyebrow">{t('mgr.inst.eyebrow')}</div>
@@ -818,6 +833,17 @@ export function Manager() {
                 })}
                 {!cibles.length && <div className="carte manager-vide">{t('mgr.marche.aucun')}</div>}
               </div>
+            </div>
+          )}
+
+          {vue === 'ovale' && (
+            <div className="manager-ovale">
+              <Suspense fallback={<div className="carte manager-vide">Ouverture de L’Ovale…</div>}>
+                <OvaleManager
+                  embarque
+                  onRetour={(destination = 'bureau') => setVue(destination)}
+                />
+              </Suspense>
             </div>
           )}
 
