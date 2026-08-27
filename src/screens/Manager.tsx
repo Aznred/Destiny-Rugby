@@ -63,6 +63,16 @@ function etoiles(bas: number, haut: number): string {
   return bas === haut ? `${bas.toFixed(1)} ★` : `${bas.toFixed(1)}–${haut.toFixed(1)} ★`;
 }
 
+function initiales(nom: string): string {
+  return nom
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((partie) => partie[0])
+    .join('')
+    .toUpperCase();
+}
+
 export function Manager() {
   const manager = useGame((s) => s.manager);
   const setEcran = useGame((s) => s.setEcran);
@@ -499,10 +509,16 @@ export function Manager() {
                           return (
                             <article className="manager-jeune-carte" key={j.id}>
                               <header>
-                                <div>
-                                  <span><Drapeau nation={j.nation} taille={15} /> {j.clubOrigine}</span>
-                                  <h3>{j.nom}</h3>
-                                  <p>{j.age} ans · {nomPoste(j.poste)} · {j.taille / 100} m · {j.poids} kg</p>
+                                <div className="manager-jeune-identite">
+                                  <div className="manager-jeune-avatar" aria-hidden="true">
+                                    <b>{initiales(j.nom)}</b>
+                                    <i><Drapeau nation={j.nation} taille={0.72} /></i>
+                                  </div>
+                                  <div className="manager-jeune-titre">
+                                    <span>{j.clubOrigine}</span>
+                                    <h3>{j.nom}</h3>
+                                    <p>{j.age} ans · {nomPoste(j.poste)} · {j.taille / 100} m · {j.poids} kg</p>
+                                  </div>
                                 </div>
                                 <em className={`manager-categorie ${j.categorie}`}>{j.categorie === 'u18' ? 'U18' : j.categorie === 'pret' ? 'PRÊT' : 'ESPOIRS'}</em>
                               </header>
@@ -637,7 +653,8 @@ export function Manager() {
                         <strong className="manager-generation-doree">⭐ Une génération exceptionnelle semble arriver — le scout peut encore se tromper.</strong>
                       )}
                     </div>
-                    <div className="manager-missions">
+                    <div className={`manager-missions${detectionJeunes.deplacementsRestants === 0 ? ' epuise' : ''}`}>
+                      <span className="manager-missions-icone" aria-hidden="true">✈</span>
                       <b>{detectionJeunes.deplacementsRestants}/{detectionJeunes.deplacementsTotal}</b>
                       <span>déplacements restants</span>
                       <small>Entretien = 3 déplacements</small>
@@ -653,17 +670,29 @@ export function Manager() {
                       return (
                         <article className={`carte manager-dossier-jeune${index < detectionJeunes.prioritaires ? ' prioritaire' : ''}`} key={j.id}>
                           <header>
-                            <div>
-                              <span>{index < detectionJeunes.prioritaires ? '⭐ PRIORITAIRE' : 'DOSSIER À SUIVRE'} · confiance {ficheJeune.confiance}%</span>
-                              <h3>{j.nom}</h3>
-                              <p><Drapeau nation={j.nation} taille={14} /> {j.age} ans · {nomPoste(j.poste)} · {j.club} · {nombre(j.distance)} km</p>
+                            <div className="manager-jeune-identite">
+                              <div className="manager-jeune-avatar" aria-hidden="true">
+                                <b>{initiales(j.nom)}</b>
+                                <i><Drapeau nation={j.nation} taille={0.72} /></i>
+                              </div>
+                              <div className="manager-jeune-titre">
+                                <span>{index < detectionJeunes.prioritaires ? '⭐ PRIORITAIRE' : 'DOSSIER À SUIVRE'}</span>
+                                <h3>{j.nom}</h3>
+                                <p>{j.age} ans · {nomPoste(j.poste)}</p>
+                                <small>{j.club} · {nombre(j.distance)} km</small>
+                              </div>
                             </div>
-                            <strong>{ficheJeune.noteObservee}<small>niveau observé</small></strong>
+                            <strong className="manager-note-observee">{ficheJeune.noteObservee}<small>niveau<br />observé</small></strong>
                           </header>
+                          <div className="manager-confiance-scout">
+                            <span>Confiance du recruteur</span>
+                            <i><em style={{ width: `${ficheJeune.confiance}%` }} /></i>
+                            <b>{ficheJeune.confiance}%</b>
+                          </div>
                           <div className="manager-potentiel-cache">
-                            <span>Potentiel estimé</span>
+                            <span>Projection du potentiel</span>
                             <b>{etoiles(ficheJeune.etoilesBas, ficheJeune.etoilesHaut)}</b>
-                            <small>{ficheJeune.potentielBas}–{ficheJeune.potentielHaut} · le potentiel réel reste caché</small>
+                            <small>Fourchette {ficheJeune.potentielBas}–{ficheJeune.potentielHaut} · estimation encore incertaine</small>
                           </div>
                           <div className="manager-jeune-attributs">
                             <span><b>Physique</b>{niveauLisible(j.physique)}</span>
@@ -695,7 +724,7 @@ export function Manager() {
                       <div className="manager-table-rapports">
                         {manager.rapports.map((r) => (
                           <div className="rap-ligne" key={r.id}>
-                            <span className="rap-nom"><Drapeau nation={r.nation} taille={14} /> {r.nom}<em>{nomPoste(r.poste)}</em></span>
+                            <span className="rap-nom"><Drapeau nation={r.nation} taille={0.8} /> {r.nom}<em>{nomPoste(r.poste)}</em></span>
                             <span className="rap-club">{r.club}<em>{r.division}</em></span>
                             <span>{r.age}</span><span>{r.note}</span>
                             <span className="rap-pot">↗ {r.potentiel}{r.incertitude > 0 && <em>± {r.incertitude}</em>}</span>
