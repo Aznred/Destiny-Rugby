@@ -8982,3 +8982,305 @@ npx vite-node scripts/verifMarche.ts        # aucun contrat vide, la part d'amat
 npx vite-node scripts/verifTransferts.ts    # la négociation et ses règles de fenêtre
 npx vite-node scripts/verifManager.ts       # la carrière d'entraîneur, budgets compris
 ```
+
+---
+
+## 🎓 LA FORMATION ET L'ENTRAÎNEMENT PRO — les règles pures
+
+Deux demandes détaillées, livrées en règles mesurables. ⚠️ **Ce lot ne branche
+rien sur un écran** : il pose les modules purs et leur banc d'essai. Le flux
+jouable côté manager vit dans `lib/formationManager.ts`.
+
+### ⚠️ LE JEU N'AVAIT AUCUNE CARTE — `src/data/geographie.ts`
+
+Deux phrases de la demande ont besoin de la même chose : « Toulouse, Castres,
+Colomiers, Montauban se battent pour les mêmes jeunes » et « un joueur de 16 ans
+ne va pas forcément faire 1h30 de route trois fois par semaine ». Or `Club` ne
+portait qu'un `ville?`, renseigné pour 370 clubs sur 756, et rien d'autre.
+
+| | |
+|---|---|
+| 13 régions | centre, rayon, **poids rugby réel** (Occitanie 22 %, Normandie 3 %) et qualité du vivier |
+| `VILLES` | les **coordonnées exactes** de 283 clubs — tout le haut de la pyramide |
+| le reste | tiré, **pondéré par la densité de licenciés** : la carte d'ensemble est juste même si un village est mal placé |
+
+⚠️ **CE QUI EST EXACT ET CE QUI NE L'EST PAS EST ÉCRIT EN TÊTE DE FICHIER.** Le
+jeu n'affiche jamais « région » comme un fait : il affiche une **distance**,
+qui est ce dont la mécanique a besoin.
+
+⚠️ **DEUX BUGS QUI ONT COÛTÉ LA MOITIÉ DE LA CARTE**, et aucun ne se voyait :
+
+1. **`positionDuClub` était appelé tantôt avec le NOM du club, tantôt avec sa
+   VILLE.** « Stade Toulousain » ne contient pas la chaîne « toulouse » : le
+   club le plus important du jeu était donc placé **par tirage**, pendant que le
+   même club appelé « Toulouse » tombait sur la place du Capitole. Mesuré : un
+   jeune « à moins de 60 km de Toulouse » jouait près de La Rochelle. La
+   fonction résout désormais la ville elle-même, et n'accepte que le nom du club.
+2. **Les clés à trait d'union ne matchaient jamais.** `cleLieu` remplace les
+   traits d'union par des espaces, mais les clés de la table les gardaient :
+   « clermont ferrand » ne contient pas « clermont-ferrand ». Toutes les villes
+   composées — Mont-de-Marsan, Brive-la-Gaillarde, Aix-en-Provence — tombaient
+   dans le tirage. **236 clubs placés au lieu de 283.**
+
+⚠️ **ON NE DISPERSE QUE LE TIRAGE, JAMAIS UNE VILLE RECONNUE.** Une version
+dispersait les deux « pour que deux clubs ne soient pas au même point » :
+Toulouse et Colomiers, dix kilomètres en vrai, ressortaient à **129 km**, et un
+réseau de détection « 50 km autour du club » n'attrapait pas sa propre banlieue.
+
+Mesuré : Toulouse → Colomiers **9 km**, → Castres **64**, → Montauban **47**,
+Paris → Nanterre **11**, Toulouse → La Rochelle **350**.
+
+### 💎 `src/lib/jeunes.ts` — dix-sept attributs, et un qu'on ne montre jamais
+
+⚠️ **`potentielReel` EST LE SEUL CHAMP QUE RIEN NE DOIT RENDRE À L'ÉCRAN**, et
+c'est la contrainte qui structure tout le lot : « le potentiel exact ne doit
+jamais être visible ». Il n'a que deux consommateurs — la progression, et
+l'estimation d'un recruteur, qui en produit une fourchette perturbée.
+
+⚠️ **LES COURBES D'ÂGE SONT PAR POSTE, ET CE NE SONT PAS DES COURBES DÉCALÉES.**
+Un ailier vit de vitesse pure : sommet tôt, déclin tôt. Un pilier vit de masse et
+de technique de mêlée : il perce vers 26 ans et tient jusqu'à 33. Décaler une
+seule courbe de deux ans aurait donné le même joueur partout — « le problème
+Football Manager » que la demande nomme.
+
+⚠️ **UNE SEULE LOI DE PUISSANCE NE PEUT PAS FAIRE LA MASSE ET LES EXCEPTIONS.**
+Première version : `socle + rng()^1,6 × 52` a rendu **30 % de potentiels ≥ 80**
+sur les 6 062 jeunes du pays, soit dix-huit cents futurs internationaux par
+promotion — la détection n'avait plus rien à trouver. Rendre l'exposant plus
+raide écrase alors le milieu : tout le monde finit médiocre. On sépare donc,
+comme les pépites du monde adulte : une loi ordinaire pour la masse, un tirage
+**rare et indépendant** (`PART_TALENT`) pour les exceptions. Mesuré :
+**1,9 % ≥ 80, 0,96 % ≥ 88**.
+
+⚠️ **ET LA NOTE PART DE L'ÂGE, PAS DU POTENTIEL MOINS UN RETARD.** La première
+version rendait un gamin de 14 ans noté **68** — un titulaire de Nationale. Un
+enfant de 14 ans n'est pas « un bon joueur en avance » : il vaut 20.
+
+### 🌍 `src/lib/viviers.ts` — les jeunes existent avant qu'on les trouve
+
+« Tu pourrais tomber à 17 ans sur un ailier incroyable de Régionale 2 qui joue
+dans le club de son village, plutôt que toutes les pépites apparaissent
+magiquement dans les académies des grands clubs. »
+
+⚠️ **LA GÉNÉRATION EST PAR COHORTE, PAS PAR SAISON.** « Je ne ferais pas
+apparaître 30 joueurs aléatoires tous les ans » : sans cohorte, le « Jules Fabre,
+15 ans » repéré cette année serait un autre garçon la saison suivante. Vérifié :
+8 jeunes sur 8 retrouvés un an plus vieux, même identifiant, même nom.
+
+⚠️ **LA COURBE DE PRODUCTION EST PLATE EXPRÈS.** Un club de Top 14 ne produit pas
+dix fois plus de gamins qu'un club de village — il a une école plus grosse, pas
+une région dix fois plus peuplée. Ce qui les sépare, c'est la capacité à les
+GARDER, et ça se joue dans le centre de formation. Une courbe raide aurait
+ramené toutes les pépites dans les académies, c'est-à-dire exactement ce que la
+demande écarte. **6 062 garçons dans les 555 clubs français**, déterministes,
+rien à sauvegarder.
+
+### 🏗️ `src/lib/centreFormation.ts` — six notes, six effets différents
+
+| note | ce qu'elle achète |
+|---|---|
+| Installations | la vitesse de progression |
+| Coaching | le développement technique |
+| Recrutement | la **précision** de ce qu'on croit voir |
+| Réseau | le **rayon** géographique (35 × e^(réseau/26) km) |
+| Médical | le risque de blessure |
+| Réputation | la capacité à faire signer, et à garder |
+
+Bandes reprises de la demande (Top 14 70-100 … Régionale 5-30), et **7 % de
+centres remarquables** qui dépassent leur étage — sans eux, le classement des
+centres serait exactement le classement des divisions, et la stratégie « petit
+club formateur qui vend ses jeunes et monte » ne pourrait pas exister. Mesuré :
+**32 clubs sous la Nationale 2** ont un centre au-dessus de leur bande.
+
+⚠️ **ON N'A PAS JETÉ `installations.ts`, ON L'A BRANCHÉ.** Les trois structures
+achetées par paliers restent le LEVIER qu'on paie (avec leur enveloppe et leur
+banc d'essai) ; les six notes sont la SURFACE LISIBLE. Deux systèmes d'achat
+concurrents auraient fini par se contredire.
+
+⚠️ **Réseau : rayon de 1 033 km au Stade Toulousain contre 99 km à Parentis.** La
+courbe est **exponentielle**, pas linéaire : en linéaire, un réseau à 50 verrait
+la moitié de la France et la « détection locale » n'existerait plus.
+
+### 🔎 `src/lib/detection.ts` — la fourchette se resserre
+
+C'est la phrase la plus importante du lot : « ça donne une vraie raison de scout
+**plutôt que juste regarder une base de données** ». L'écran Marché montre déjà
+la note et le potentiel de n'importe quel professionnel ; si la détection des
+jeunes faisait pareil, elle ne serait qu'un second annuaire.
+
+Mesuré sur un garçon de 17 ans dont le potentiel réel est 96 :
+
+| observation | fourchette | étoiles | confiance |
+|---|---|---|---|
+| aucune | 72-96 | 3,5 à 5 ★ | 37 % |
+| 1 match | 74-96 | 3,5 à 5 ★ | 51 % |
+| 3 matchs | 80-96 | 4 à 5 ★ | 65 % |
+| 6 matchs | 84-96 | 4 à 5 ★ | 79 % |
+| 10 matchs + entretien | 88-96 | 4,5 à 5 ★ | 95 % |
+
+⚠️ **DEUX MÉCANISMES DIFFÉRENTS FONT QUE « TON SCOUT PEUT SE TROMPER »**, et il
+faut les deux : ici, une cellule modeste rend une fourchette **fausse** (15 % du
+temps contre 7 % au Stade Toulousain) ; ailleurs, le potentiel lui-même est
+**dynamique**, si bien qu'un rapport juste ne promet rien. Sans le second, payer
+un bon service reviendrait à connaître la fin de l'histoire.
+
+⚠️ **L'ÂGE REND UN JEUNE LISIBLE OU NON**, et ce facteur manquait : sans lui, la
+toute première fiche sur une pépite de 16 ans annonçait déjà « 90-99, 4,5 à
+5 ★ » — le secret était éventé avant d'avoir envoyé qui que ce soit le voir.
+
+⚠️ **ON TRIE SUR LE JOUEUR QU'IL DEVIENDRA, PAS SUR LA MARGE.** Trier sur
+(potentiel − note du jour) paraît juste et c'est faux : la marge dépend surtout
+de l'âge du pic du POSTE. Mesuré, le rapport annuel du Stade Toulousain
+remontait **cinq piliers sur cinq**, saison après saison.
+
+⚠️ **ET LA LARGEUR EST PLAFONNÉE.** Sans plafond, un garçon de 14 ans vu par une
+cellule modeste ressortait à « 20-96 » : une fourchette qui couvre toute
+l'échelle ne dit rien et ne peut pas se tromper. Ce qui distingue alors les deux
+services devient le TAUX D'ERREUR, qui est une information bien plus utile.
+
+### ✍️ `src/lib/signatureJeune.ts` — le meilleur club ne gagne pas automatiquement
+
+⚠️ **LA DISTANCE N'EST PAS UN MALUS, C'EST UN VETO QUI S'OUVRE AVEC L'ÂGE** :
+77 km à 14 ans même pour le meilleur centre du pays, **1 028 km à 19 ans**. À
+quatorze ans on est scolarisé près de chez soi, et aucun prestige ne se négocie
+contre ça.
+
+⚠️ **LES POIDS SONT DÉCLARÉS UNE SEULE FOIS**, et partagés par `scorerOffre` et
+`scoreDeRester`. Recopiés, ils divergent : une version avait gardé « 22 » pour le
+temps de jeu après que le poids soit passé à 38 — mesuré, **soixante jeunes sur
+soixante partaient**, et rester chez soi n'existait plus comme option.
+
+Mesuré sur 60 espoirs autour de Toulouse : **Toulouse 30 · Montauban 17 ·
+Castres 6 · Colomiers 4 · 3 restent chez eux.**
+
+**Indemnité de formation** : 25 500 € pour un départ vers le Top 14 à 19 ans,
+5 500 € vers la Nationale. ⚠️ Elle est payée par le club qui recrute, pas par le
+jeu — sinon la formation serait de l'argent gratuit. Et elle ne dépend **pas** de
+la valeur du joueur : un barème indexé sur le potentiel réel ferait fuiter à
+l'écran le seul chiffre que le jeu s'interdit de montrer.
+
+---
+
+## 🏉 L'ENTRAÎNEMENT DE L'ÉQUIPE PRO
+
+Demande : « planning hebdomadaire + intensité + priorités tactiques + programmes
+individuels + fatigue », **« sans tomber dans le micro-management chiant »**.
+
+⚠️ **CETTE DERNIÈRE PHRASE EST UNE CONTRAINTE DE CONCEPTION, PAS UN VŒU.**
+Quatorze cases × 43 semaines, c'est **602 décisions par saison** : personne ne
+joue à ça deux ans de suite. Trois choses l'empêchent, et il faut les trois — la
+**délégation** (le mode automatique est le défaut et produit une semaine
+correcte), les **cinq curseurs** du mode semi-automatique, et la **semaine type**
+qui se reconduit.
+
+### `src/lib/entrainementPro.ts`
+
+23 séances en 5 familles, 5 intensités, 14 créneaux. ⚠️ **Le gain est concave et
+la fatigue est convexe** : passer de normale à très forte rapporte +50 % de
+progression et coûte **+245 % de risque de blessure**. Deux courbes linéaires
+auraient donné une seule stratégie — tout à fond, toujours.
+
+⚠️ **LES DEUX BOUTS DE SEMAINE NE SONT PAS NÉGOCIABLES** dans le mode
+automatique : lundi reste récupération, vendredi reste mise en place, le week-end
+reste vide. Laisser les curseurs les remplir produirait une équipe rincée au coup
+d'envoi, c'est-à-dire un mode automatique qui joue mal.
+
+⚠️ **LA RÉCUPÉRATION EST PROPORTIONNELLE À CE QU'ON A À RÉCUPÉRER.** La première
+version rendait un forfait : cinq créneaux de repos effaçaient **79 points de
+fatigue par semaine**, plus que tout le travail possible. Mesuré, un titulaire
+finissait la saison à **20 de fatigue quelle que soit l'intensité** — la fatigue
+existait dans le code et nulle part dans le jeu.
+
+⚠️ **LA CHARGE CUMULÉE DOIT DISTINGUER UN TITULAIRE D'UN REMPLAÇANT.** La
+première version convergeait vers **197** pour un titulaire et **83** pour un
+remplaçant : bornées à 100, les deux affichaient « critique » au bout de vingt
+journées, et faire tourner ne servait à rien. Recalée : **83 à 78 min** de match
+par week-end, **63 à 60 min**, **23 à 22 min**. Un joueur cramé perd 2,5 % de
+vitesse, 4,4 % d'endurance, prend +21 % de risque — et surtout **ne progresse
+plus qu'à 75 %** à l'entraînement, ce qui rend la rotation *sportivement*
+intéressante et pas seulement médicale.
+
+### `src/lib/analyseAdversaire.ts` — « la mécanique la plus importante »
+
+⚠️ **LE RAPPORT SE LIT SUR L'ADVERSAIRE RÉEL.** Chaque note de secteur sort de
+l'effectif que le club aligne vraiment cette saison-là, avants et trois-quarts
+séparés — un club peut avoir un pack de Top 14 et une ligne arrière de Pro D2, et
+c'est exactement ce déséquilibre qu'un manager doit pouvoir exploiter. Un tirage
+aurait fait jouer contre un nombre aléatoire, et ça se sentirait à la deuxième
+journée.
+
+⚠️ **UN ANALYSTE MÉDIOCRE REND UN RAPPORT FAUX, PAS UN RAPPORT VIDE.** Mesuré sur
+60 rapports : un analyste à 88 désigne la vraie faiblesse **88 %** du temps, un
+analyste à 18 seulement **42 %**. Un rapport toujours juste ferait du staff une
+décoration.
+
+⚠️ **ON NE PRÉPARE PAS HUIT SECTEURS, ON EN PRÉPARE DEUX OU TROIS.** Une première
+version pondérait chaque secteur par sa note : contre un gros club, les huit
+notes sont hautes, les huit secteurs rapportaient, et **la semaine ciblée, la
+semaine générique et la semaine sans plan rendaient toutes « +15 % »**. Seuls la
+faiblesse et la force **signalées par le rapport** comptent vraiment.
+
+⚠️ **ET LES PLAFONDS ÉTAIENT MAL POSÉS** : à 8 par secteur pour 15 au total, deux
+secteurs au maximum suffisaient à saturer. Un plafond qu'on touche en permanence
+n'est plus un plafond, c'est une valeur fixe.
+
+| semaine | bonus de match |
+|---|---|
+| ciblée sur le rapport | **+11,6 %** |
+| générique | +9 % |
+| sans mise en place le vendredi | +6,3 % |
+| matraquage (6 × mêlée à fond) | +5 % |
+| ciblée mais avec un staff médiocre | +6,3 % |
+
+⚠️ **LE BONUS EST LIÉ AU MATCH, PAS À LA SAISON**, et il est borné à 18 % : le
+score vient de la ligue, et une préparation qui renverserait une hiérarchie
+ferait gagner des matchs qu'on devait perdre.
+
+### `src/lib/cohesion.ts` — cinq secteurs, pas un seul
+
+« Tu changes ton talonneur titulaire ? Cohésion touche 88 → 79. » Une cohésion
+unique ne peut pas dire « ma mêlée tourne mais ma touche est neuve » : elle
+moyennerait les deux et n'orienterait aucune décision.
+
+Mesuré après 30 semaines ensemble puis un changement de talonneur :
+
+```
+avant   melee 94 · touche 94 · ligneArriere 94 · defense 94 · attaque 94
+après   melee 84 · touche 83 · ligneArriere 94 · defense 90 · attaque 92
+recolle 83 → 84 → 86 → 87 → 88 → 89   (cinq semaines)
+```
+
+⚠️ **ON RECOLLE PLUS LENTEMENT QU'ON NE CASSE** : −11 d'un coup, +6 en cinq
+semaines. Une chute regagnée en une semaine rendrait le mercato indolore.
+
+⚠️ **ET IL Y A UN PLANCHER.** Un XV de professionnels qui se connaissent depuis
+une semaine joue mal, pas comme des inconnus ramassés dans la rue. Sans
+plancher, un mercato agité mettait la cohésion à zéro pour six mois — une
+punition sans issue, pas une mécanique. Un gros mercato de cinq titulaires laisse
+la cohésion globale à **71**.
+
+⚠️ **L'EFFET SUR LE JEU EST DÉLIBÉRÉMENT ÉTROIT (±6 %)** : ×0,973 pour un groupe
+neuf contre ×1,051 pour un groupe rodé. Ça fait basculer un match serré — ce
+qu'on veut d'un mercato mal digéré — sans réécrire la hiérarchie.
+
+⚠️ **ON NE STOCKE PAS UNE MATRICE DE 50 × 50** pour les connexions entre joueurs :
+2 500 nombres dans la sauvegarde pour une information lue à quinze endroits, ce
+serait refaire l'erreur déjà payée avec `statsReelles`. La connexion se **déduit**
+du temps passé ensemble dans les mêmes secteurs. Mesuré : charnière rodée **96**,
+nouveau demi de mêlée **59**.
+
+### Ce qui n'est PAS fait dans ce lot, et qu'il faut dire
+
+- **Rien n'est branché sur le store ni sur un écran** : ce sont des règles pures.
+- **Les combinaisons** (maîtrise en %, adversaires qui les analysent) ne sont pas
+  écrites.
+- **Le staff n'est pas un objet du jeu** : les fonctions prennent une note de
+  coach en paramètre, personne ne recrute encore d'entraîneur.
+- **La pré-saison** n'a pas son régime propre.
+- **La forme** (distincte du niveau et de la condition) n'est pas encore séparée
+  dans la fiche joueur : `Joueur.forme` existe déjà et sert à autre chose.
+
+```bash
+npx vite-node scripts/verifFormation.ts       # carte, viviers, potentiel caché, détection, choix
+npx vite-node scripts/verifEntrainementPro.ts # semaine, intensité, charge, préparation, automatismes
+```
