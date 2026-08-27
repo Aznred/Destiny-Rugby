@@ -9284,3 +9284,212 @@ nouveau demi de mêlée **59**.
 npx vite-node scripts/verifFormation.ts       # carte, viviers, potentiel caché, détection, choix
 npx vite-node scripts/verifEntrainementPro.ts # semaine, intensité, charge, préparation, automatismes
 ```
+
+---
+
+## 🏟️ L'ÉCONOMIE DU CLUB — stade, supporters, sponsors, conseil
+
+Demande : « une vraie économie avec stade + infrastructures + supporters +
+sponsors + merchandising + hospitalités, plutôt qu'un simple bouton "améliorer
+stade" », avec cette promesse : « si tu pars de Régionale 3 avec 300 spectateurs
+et une buvette pour arriver 20 saisons plus tard avec ton propre stade de 25 000
+places, tu as une vraie sensation d'avoir construit le club ».
+
+### ⚠️ LE BUDGET N'EST PLUS DÉCLARÉ, IL EST PRODUIT
+
+`lib/economie.ts` posait une fourchette de budget par étage, à plat. Les recettes
+en sont désormais le **résultat** : billets, buvettes, maillots, panneaux
+publicitaires, droits télé. La table reste la **cible d'étalonnage**, et c'est le
+contrôle central du banc — sinon ce lot ne remplacerait pas la table, il la
+contredirait.
+
+Mesuré (médiane de dix clubs par étage) :
+
+| étage | recettes médianes | fourchette attendue | clubs dans la bande |
+|---|---|---|---|
+| Top 14 | **39,0 M€** | 20 – 55 M€ | 10/10 |
+| Pro D2 | 9,8 M€ | 5 – 18 M€ | 10/10 |
+| Nationale | 3,2 M€ | 2 – 6 M€ | 9/10 |
+| Nationale 2 | 1,0 M€ | 0,8 – 2,5 M€ | 9/10 |
+| Fédérale 1 | 420 k€ | 400 k€ – 1,5 M€ | 5/10 |
+| Régionale 3 | 74 k€ | 20 – 100 k€ | 10/10 |
+
+**91 % des cent clubs testés tombent dans la bande de leur étage.**
+
+### `src/lib/supporters.ts` — la fanbase, en trois cercles
+
+⚠️ **C'EST LA VARIABLE CENTRALE DES TROIS BOUCLES**, et aucune ligne de revenu ne
+la contourne : les résultats font la fanbase, la fanbase fait les recettes, les
+recettes paient l'effectif et les murs, l'effectif refait les résultats. Une
+source de revenus qui l'ignorerait ouvrirait une des trois boucles.
+
+⚠️ **LES TROIS CERCLES NE BOUGENT PAS ENSEMBLE**, et c'est ce qui donne sa
+mémoire à la mécanique. Une belle saison recrute surtout des **occasionnels**,
+qui repartent au premier hiver ; il faut plusieurs bonnes saisons d'affilée pour
+qu'ils se sédimentent en réguliers, puis en noyau dur.
+
+C'est ce qui rend vraie la phrase « un club de Régionale que tu amènes en Top 14
+en dix saisons n'aurait pas instantanément 100 000 supporters ». Mesuré, dix
+montées consécutives avec le titre à chaque fois :
+
+```
+66 → 86 → 115 → 155 → 210 → 286 → 393 → 542 → 752 → 1 046 → 1 459
+```
+
+⚠️ **ET LA PART QUI SE DÉPLACE CHUTE AVEC LA TAILLE** (~75 % à 400 supporters,
+~10 % à 150 000). Dans un club de village, presque tous ceux qui « sont du
+club » sont au bord du terrain ; à Toulouse la fanbase se compte en centaines de
+milliers et le stade en fait dix-neuf mille. Une part constante aurait donné soit
+des villages déserts, soit des stades de Top 14 à cent mille places.
+
+### `src/lib/stade.ts` — quatre tribunes, et un prix à trouver
+
+⚠️ **L'ÉLASTICITÉ AU PRIX EST LE CŒUR DU LOT**, et la première version la ratait :
+avec une élasticité constante sous 1, la recette montait **indéfiniment** avec le
+prix. Il n'y avait donc aucune décision à prendre, juste un curseur à pousser.
+La sensibilité croît désormais avec la hausse — un public tolère 20 %
+d'augmentation, pas qu'on triple :
+
+| prix populaire | affluence | remplissage | recette |
+|---|---|---|---|
+| 6 € | 5 982 | 51 % | 64 282 € |
+| 11 € | 3 622 | 31 % | 73 777 € |
+| **14 €** | 2 930 | 25 % | **75 352 €** |
+| 22 € | 1 545 | 13 % | 62 928 € |
+| 33 € | 581 | 5 % | 35 508 € |
+
+⚠️ **ET LA DEMANDE SE CALCULE TRIBUNE PAR TRIBUNE.** Un club qui casse le prix de
+sa populaire et garde une centrale hors de prix doit remplir l'une et pas
+l'autre : c'est ce que « politique tarifaire » veut dire. Une demande globale
+répartie au prorata aurait rendu les quatre prix interchangeables.
+
+⚠️ **LA CAPACITÉ DE SERVICE REND LES BUVETTES INTÉRESSANTES.** Mesuré sur un
+match à 5 558 spectateurs : niveau 3 encaisse 30 013 €, niveau 1 encaisse 3 780 €
+et **perd 11 227 € en files d'attente**. Sans ce plafond, une buvette de niveau 1
+encaisserait autant qu'un niveau 5, et le levier le plus important d'un club
+amateur n'existerait pas.
+
+Sur ce même match : billetterie 113 222 €, buvettes 30 013, boutique 14 197,
+parking 5 558, VIP 19 460 — soit **38 % du chiffre d'affaires qui ne vient pas du
+billet**.
+
+### `src/lib/financesClub.ts` — sponsors, TV, merchandising
+
+⚠️ **ERREUR DE SIGNE, TROUVÉE À LA MESURE.** Les recettes associatives
+s'écrivaient `190 + (niveau − 4) × 24`, c'est-à-dire **plus d'argent par licencié
+à mesure qu'on descend** : 334 € en Régionale 3 contre 214 € en Fédérale 1.
+L'intention était juste — plus on descend, plus la PART des licences est grande —
+mais cette part grandit toute seule parce que les autres recettes s'effondrent.
+Conséquence : la Fédérale 1 sortait sous sa bande et la Régionale 3 au-dessus de
+la sienne.
+
+⚠️ **LE SPONSORING S'AMORTIT TOUT EN HAUT.** Sans frein, il ressortait à
+**21,6 M€ sur 37 M€** en Top 14 — 58 % du budget, contre ~28 % dans la réalité.
+Le frein ne mord qu'au-delà de 45 000 supporters : le bas de la pyramide, où le
+sponsoring local fait vivre le club, n'est pas touché.
+
+⚠️ **LES TROIS OFFRES DOIVENT AVOIR UNE ESPÉRANCE VOISINE**, sinon il n'y a pas
+d'arbitrage entre sécurité et performance — juste un piège. L'offre à bonus
+valait 19 % de moins que l'offre sèche ; ramenée à **9 %** d'écart.
+
+⚠️ **ET LA VIE ASSOCIATIVE FAIT VIVRE LE BAS DE LA PYRAMIDE.** Un club de
+Régionale 3 avec cent spectateurs à 3 € encaisse quatre mille euros de
+billetterie sur une saison. Ce qui le fait vivre, ce sont les licences, la
+subvention, le loto et les repas : **80 % de ses recettes**. C'est vrai, et sans
+ça le club de village serait injouable.
+
+Droits TV : Nationale **365 000 €** → Pro D2 **3,3 M€**. C'est ce qui rend une
+montée « extrêmement importante financièrement », et une descente dangereuse.
+
+### `src/lib/infrastructuresClub.ts` — onze bâtiments et un conseil
+
+Coûts exponentiels (stade 1→2 : 420 000 € · 8→9 : **12,3 M€**), délais en mois,
+et surtout le conseil d'administration.
+
+⚠️ **« ÇA ÉVITE QUE LE JEU DEVIENNE J'AI 10 M€ DONC JE CLIQUE NIVEAU 10 »**, et
+c'est la raison d'être du fichier. Le conseil ne regarde pas la trésorerie, il
+regarde le **retour sur investissement** et la **dette**. Mesuré : un projet à
+9 M€ qui rapporte 120 k€/an est **refusé** malgré 12 M€ en caisse ; un projet à
+900 k€ qui rapporte 190 k€/an passe.
+
+⚠️ **ET « RÉDUIRE » EST LA RÉPONSE LA PLUS INTÉRESSANTE DES TROIS.** Un simple
+oui/non ferait du conseil un portail ; une contre-proposition en fait un
+interlocuteur, et laisse le choix entre un petit projet tout de suite et le vrai
+projet dans deux ans.
+
+**Construire un stade** : 10 000 places à Albi coûtent 36,1 M€ sur 41 mois —
+1,4 M€ de fonds propres, 22,6 M€ de banque, 6,1 M€ de ville, 6,0 M€ de naming, et
+**2,0 M€ d'annuité pendant quinze ans**. Puis on relègue le club :
+
+> l'annuité passe de **65 % à 239 % des recettes**.
+
+C'est exactement le drame que la demande veut rendre possible.
+
+---
+
+## 🃏 LES CARTES DE JOUEUR — « un 82 pilier et un 82 ailier »
+
+Demande : « les cartes pourraient donner toutes les infos importantes sans avoir
+à ouvrir le profil du joueur », et surtout : « je changerais les 6 stats selon le
+poste. Un pilier ne doit pas être jugé sur les mêmes choses qu'un ailier ».
+
+### ⚠️ IL FALLAIT D'ABORD QUE CES QUALITÉS EXISTENT
+
+`Coequipier` porte une note, un potentiel, un âge, un poste — **et aucun
+attribut**. Seul le joueur incarné en a. Six barres tirées de la seule note
+auraient donné six copies du même nombre, c'est-à-dire précisément ce que la
+demande veut éviter.
+
+`src/lib/carteJoueur.ts` les dérive de façon **déterministe** (graine =
+identifiant du joueur), comme le projet le fait déjà pour l'âge et la note des
+joueurs amateurs. Rien à sauvegarder, et une carte ne change jamais entre deux
+ouvertures de l'écran.
+
+```
+PILIER 82   MEL 93  PHY 90  DEF 84  RCK 88  END 82  TEC 75
+AILIER 82   VIT 99  PAS 94  TEC 88  DEF 79  JDP 83  PHY 77
+```
+
+Force : **96 contre 65**. Vitesse : **66 contre 99**.
+
+### ⚠️ ET POURTANT LA NOTE RESTE UNE ÉCHELLE COMMUNE
+
+C'est l'autre moitié du contrôle, et la première version la ratait. Les profils
+de poste ne sommaient pas à zéro : le pilier perdait 2,75 points de moyenne, le
+demi de mêlée en gagnait 1,4. Un pilier noté 82 valait donc **moins** qu'un demi
+noté 82 — alors que le marché, le salary cap, la force d'effectif et les
+classements raisonnent tous sur cette note comme sur une échelle commune.
+
+Chaque ligne de profil somme désormais à zéro : **0,7 point d'écart entre les
+neuf familles**, contre 4,4 avant. Le profil REDISTRIBUE, il n'ajoute jamais.
+
+### Le reste de la carte
+
+- **Statut** : espoir · pro · international · star · majeur. ⚠️ « Espoir » est un
+  **âge et une marge**, pas une note : un 78 de 22 ans à fort potentiel est un
+  espoir, un 78 de 30 ans n'en est pas un. Et la couleur **ne change aucune
+  statistique** — « elles servent à lire l'effectif ».
+- **Adéquation au poste en TROIS niveaux** : naturel · secondaire · hors poste.
+  L'écran n'en disait que deux, si bien qu'un deuxième ligne aligné en troisième
+  ligne était signalé aussi gravement qu'un ailier en pilier. ⚠️ **La note
+  affichée ne bouge pas** (« pas de malus FIFA artificiel du genre −5 général ») :
+  c'est la performance qui paie, ×0,94 en secondaire et ×0,82 hors poste.
+- **Notes de secteur** de l'en-tête, lues sur les joueurs qui jouent ce secteur.
+  Un pack à 88 avec des lignes arrière à 66 donne **conquête 91 · attaque 71**.
+- **Alertes de composition**, dont la **première ligne remplaçante**, bloquante
+  parce que c'est une règle de rugby : sans elle, l'arbitre impose des mêlées
+  simulées. Deux joueurs très fatigués sont un avertissement, pas un blocage.
+
+### ⚠️ CE QUI RESTE À FAIRE SUR CET ÉCRAN
+
+`carteJoueur.ts` est le **socle logique** ; `CompositionTerrainManager.tsx` (le
+terrain, le drag & drop, le tap mobile) existe déjà mais n'affiche encore que la
+note et le poste. Restent à brancher : les six stats sur la carte, les couleurs
+de statut, les badges, le panneau latéral, l'en-tête et les connexions entre
+joueurs — ces dernières pouvant lire `lib/cohesion.ts`, déjà écrit.
+
+```bash
+npx vite-node scripts/verifClubEconomie.ts # fanbase, stade, prix, sponsors, conseil, dette
+npx vite-node scripts/verifCarteJoueur.ts  # six stats par poste, échelle commune, alertes
+npx vite-node scripts/verifEconomieClubs.ts # ⚠️ la table que les recettes doivent viser
+```
