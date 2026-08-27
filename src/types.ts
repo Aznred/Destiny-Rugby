@@ -1,5 +1,6 @@
 // Types du domaine — Destiny Rugby 🏉
 import type { SituationRecrutement } from './lib/economie';
+import type { JeuneJoueur } from './lib/jeunes';
 export type { SituationRecrutement };
 
 // Les 15 postes du rugby, du pilier gauche (1) à l'arrière (15).
@@ -898,6 +899,54 @@ export interface RapportRecruteur {
   incertitude: number;
 }
 
+// ---------------------------------------------------------------------------
+// L'ACADÉMIE DU MANAGER
+// ---------------------------------------------------------------------------
+export type CategorieAcademieManager = 'u18' | 'espoirs' | 'pret';
+
+export type ObjectifJeuneManager =
+  | 'prise_masse' | 'vitesse' | 'passe' | 'jeu_au_pied' | 'defense'
+  | 'melee' | 'touche' | 'endurance' | 'polyvalence';
+
+/** Un jeune qui a réellement choisi le centre du club. Son potentiel reste caché. */
+export interface AcademicienManager extends JeuneJoueur {
+  clubOrigine: string;
+  clubCentre: string;
+  recruteSaison: number;
+  derniereSaison: number;
+  categorie: CategorieAcademieManager;
+  objectif: ObjectifJeuneManager;
+  moral: number;
+  tempsDeJeu: number;
+  anneesFormees: number;
+  mentorId?: string;
+  clubPret?: string;
+  derniereProgression?: {
+    saison: number;
+    noteAvant: number;
+    noteApres: number;
+    potentielEstimeAvant: [number, number];
+    blesse: boolean;
+    resume: string;
+  };
+}
+
+/** L'investissement cumulé de la cellule de détection sur un jeune. */
+export interface ObservationJeuneManager {
+  jeuneId: string;
+  matchs: number;
+  entretien: boolean;
+  saison: number;
+}
+
+export interface ReponseJeuneManager {
+  etat: 'accepte' | 'refuse';
+  texte: string;
+  saison: number;
+}
+
+export type ActionAcademieManager = 'u18' | 'espoirs' | 'pret' | 'senior' | 'liberer';
+
 export interface Manager {
   nom: string;
   nation: string;
@@ -985,6 +1034,16 @@ export interface Manager {
   progres: Record<string, { depuis: number; gain: number }[]>;
   /** Les rapports de recrutement, figés à la saison où ils ont été rendus. */
   rapports: RapportRecruteur[];
+  /** Les jeunes qui ont choisi le centre, avant leur éventuelle intégration senior. */
+  academie: AcademicienManager[];
+  /** Les observations persistent : recharger ne rend jamais un rapport plus précis. */
+  observationsJeunes: Record<string, ObservationJeuneManager>;
+  /** Le nombre de déplacements consommés pendant la saison courante. */
+  missionsJeunes: { saison: number; utilises: number };
+  /** La dernière réponse de chaque jeune à une proposition du club. */
+  reponsesJeunes: Record<string, ReponseJeuneManager>;
+  /** Revenus de formation, sous la clé `club|saison`. */
+  revenusFormation: Record<string, number>;
   /** Tous les clubs entraînés, dans l’ordre, sans doublon consécutif. */
   clubs: string[];
   titres: string[];

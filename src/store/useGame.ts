@@ -29,7 +29,7 @@ import type {
   ProfilSocial,
   DecisionClub,
   Manager, SaisonManager, CibleRecrutementManager, CompositionManager,
-  TactiqueManager, ResultatMatchManager,
+  TactiqueManager, ResultatMatchManager, ActionAcademieManager, ObjectifJeuneManager,
 } from '../types';
 import {
   publierPost, pseudoDe, feedAmbiance, suggestionsLocales,
@@ -152,8 +152,11 @@ import {
   coutAmelioration, gainEntrainement, installationsVierges,
   niveauInstallation, NIVEAU_INSTALLATION_MAX, PLACES_ENTRAINEMENT,
 } from '../lib/installations';
-import { promotionDuCentre } from '../lib/formation';
 import { explorer } from '../lib/recruteurs';
+import {
+  appliquerActionAcademie, evoluerAcademieManager, proposerProjetJeune,
+  tableauDetectionManager,
+} from '../lib/formationManager';
 import {
   accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, masseSalarialeActuelle, negocierAvecJoueur,
   ouvrirNegociationManager, type LevierRecrutementManager,
@@ -949,6 +952,16 @@ interface GameState {
   ameliorerInstallation: (type: TypeInstallation) => void;
   /** Mettre un joueur au programme individuel, ou l'en retirer. */
   basculerEntrainement: (nom: string) => void;
+  /** Investir un déplacement ou un entretien dans un rapport jeune. */
+  observerJeuneManager: (jeuneId: string, entretien?: boolean) => void;
+  /** Présenter le projet du centre ; le jeune reste libre de choisir. */
+  proposerProjetJeuneManager: (jeuneId: string) => void;
+  /** U18, Espoirs, prêt, seniors ou libération. */
+  gererAcademicienManager: (jeuneId: string, action: ActionAcademieManager) => void;
+  /** Définir le programme individuel d'un joueur du centre. */
+  definirObjectifJeuneManager: (jeuneId: string, objectif: ObjectifJeuneManager) => void;
+  /** Associer un cadre du groupe senior au jeune. */
+  definirMentorJeuneManager: (jeuneId: string, mentorId?: string) => void;
   /** Prendre un banc (premier contrat, ou après un licenciement). */
   signerBanc: (club: string) => void;
   /** Raccrocher : la carrière part au Hall et au classement. */
@@ -3525,6 +3538,11 @@ export const useGame = create<GameState>()(
           entrainements: [],
           progres: {},
           rapports: [],
+          academie: [],
+          observationsJeunes: {},
+          missionsJeunes: { saison: 1, utilises: 0 },
+          reponsesJeunes: {},
+          revenusFormation: {},
           negociationsClubs: [],
           tempsDeJeu: {},
           demandes: [],
@@ -3629,6 +3647,123 @@ export const useGame = create<GameState>()(
             entrainements: dedans
               ? st.manager.entrainements.filter((n) => n !== nom)
               : [...st.manager.entrainements, nom],
+          },
+        }));
+      },
+
+      observerJeuneManager: (jeuneId, entretien = false) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const tableau = tableauDetectionManager(m);
+        if (!tableau.fiches.some((f) => f.jeune.id === jeuneId)) return;
+        const actuelle = m.observationsJeunes[jeuneId] ?? {
+          jeuneId, matchs: 0, entretien: false, saison: m.saison,
+        };
+        const cout = entretien ? 3 : 1;
+        if (tableau.deplacementsRestants < cout) return;
+        if (entretien && (actuelle.entretien || actuelle.matchs < 3)) return;
+        if (!entretien && actuelle.matchs >= 10) return;
+        const suivante = {
+          ...actuelle,
+          matchs: entretien ? actuelle.matchs : actuelle.matchs + 1,
+          entretien: actuelle.entretien || entretien,
+          saison: m.saison,
+        };
+        set((st) => ({
+          manager: st.manager && {
+            ...st.manager,
+            observationsJeunes: { ...st.manager.observationsJeunes, [jeuneId]: suivante },
+            missionsJeunes: {
+              saison: m.saison,
+              utilises: tableau.deplacementsUtilises + cout,
+            },
+          },
+        }));
+      },
+
+      proposerProjetJeuneManager: (jeuneId) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const verdict = proposerProjetJeune(m, jeuneId);
+        set((st) => ({
+          manager: st.manager && {
+            ...st.manager,
+            budgetTransferts: verdict.academicien
+              ? st.manager.budgetTransferts - verdict.indemnite
+              : st.manager.budgetTransferts,
+            academie: verdict.academicien
+              ? [...st.manager.academie, verdict.academicien]
+              : st.manager.academie,
+            reponsesJeunes: {
+              ...st.manager.reponsesJeunes,
+              [jeuneId]: { etat: verdict.etat, texte: verdict.texte, saison: m.saison },
+            },
+          },
+          journal: [...st.journal, {
+            id: idUnique(),
+            role: 'mj' as const,
+            saison: m.saison,
+            titre: verdict.etat === 'accepte' ? '🎓 Un jeune choisit le centre' : '🔎 Réponse du jeune',
+            texte: verdict.texte,
+          }],
+        }));
+      },
+
+      gererAcademicienManager: (jeuneId, action) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const resultat = appliquerActionAcademie(m, jeuneId, action);
+        let jeunesFormes = m.jeunesFormes;
+        if (resultat.senior) {
+          const j = resultat.senior;
+          jeunesFormes = [...jeunesFormes, {
+            id: `${j.clubCentre}-academie-${j.id}`,
+            club: j.clubCentre,
+            saison: m.saison,
+            nom: j.nom,
+            poste: j.poste,
+            nation: j.nation,
+            age: j.age,
+            note: Math.round(j.note),
+            // Ce plafond est utilisé par le moteur d'effectif, jamais affiché.
+            potentiel: Math.round(j.potentielReel),
+          }];
+        }
+        set((st) => ({
+          manager: st.manager && {
+            ...st.manager,
+            academie: resultat.academie,
+            jeunesFormes,
+          },
+          journal: [...st.journal, {
+            id: idUnique(), role: 'mj' as const, saison: m.saison,
+            titre: '🎓 Décision du centre', texte: resultat.texte,
+          }],
+        }));
+        if (resultat.senior) setApportsDuCentre(jeunesFormes, m.progres);
+      },
+
+      definirObjectifJeuneManager: (jeuneId, objectif) => {
+        set((st) => ({
+          manager: st.manager && {
+            ...st.manager,
+            academie: st.manager.academie.map((j) => j.id === jeuneId
+              ? { ...j, objectif } : j),
+          },
+        }));
+      },
+
+      definirMentorJeuneManager: (jeuneId, mentorId) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const mentorValide = !mentorId || effectifDuClub(m.club, m.saison)
+          .some((j) => j.id === mentorId && j.age >= 28);
+        if (!mentorValide) return;
+        set((st) => ({
+          manager: st.manager && {
+            ...st.manager,
+            academie: st.manager.academie.map((j) => j.id === jeuneId
+              ? { ...j, mentorId } : j),
           },
         }));
       },
@@ -4295,9 +4430,25 @@ export const useGame = create<GameState>()(
         const murs = m.installations[m.club] ?? installationsVierges();
         const groupe = effectifDuClub(m.club, m.saison);
 
-        // 🎓 Le centre de formation sort sa promotion.
-        const promo = licencie ? [] : promotionDuCentre(m.club, m.saison + 1, murs.formation, groupe);
-        const jeunesFormes = promo.length ? [...m.jeunesFormes, ...promo] : m.jeunesFormes;
+        // 🎓 L'académie ne fabrique plus magiquement des seniors. Les jeunes
+        // repérés, recrutés puis gérés par le manager progressent ici ; leur
+        // intégration au groupe professionnel reste une décision explicite.
+        const bilanAcademie = licencie ? {
+          academie: m.academie,
+          observations: m.observationsJeunes,
+          indemnites: 0,
+          revenus: [],
+          liberes: [],
+          progressions: [],
+        } : evoluerAcademieManager(m);
+        const jeunesFormes = m.jeunesFormes;
+        const cleRevenus = `${m.club}|${m.saison}`;
+        const revenusFormation = bilanAcademie.indemnites > 0
+          ? {
+              ...m.revenusFormation,
+              [cleRevenus]: (m.revenusFormation[cleRevenus] ?? 0) + bilanAcademie.indemnites,
+            }
+          : m.revenusFormation;
 
         // 🏋️ Le programme individuel rend ce qu'il a fait gagner.
         const progres = { ...m.progres };
@@ -4335,7 +4486,7 @@ export const useGame = create<GameState>()(
           // Le board renouvelle une partie des enveloppes. Épargner aide, mais
           // ne permet pas d'empiler dix saisons de budgets sans les dépenser.
           budgetTransferts: licencie ? 0
-            : Math.round(budgets.transferts + m.budgetTransferts * 0.28),
+            : Math.round(budgets.transferts + m.budgetTransferts * 0.28 + bilanAcademie.indemnites),
           budgetSalarial: licencie ? 0
             : Math.round(budgets.salarial + m.budgetSalarial * 0.2),
           // ⚠️ CELLE-CI SE BANQUE INTÉGRALEMENT, contrairement aux deux autres,
@@ -4345,6 +4496,10 @@ export const useGame = create<GameState>()(
           // du lot n'existerait que pour ceux qui n'en ont pas besoin.
           budgetStructure: licencie ? 0 : Math.round(budgets.structure + m.budgetStructure),
           jeunesFormes,
+          academie: bilanAcademie.academie,
+          observationsJeunes: bilanAcademie.observations,
+          missionsJeunes: { saison: m.saison + 1, utilises: 0 },
+          revenusFormation,
           progres,
           rapports,
           // Un joueur parti ne suit plus le programme du club.
@@ -4386,11 +4541,15 @@ export const useGame = create<GameState>()(
         // sans explication passe pour du bruit — c'est exactement ce qui rend
         // un système de progression invisible « inutile » pour qui y joue.
         const ditesLe: string[] = [];
-        if (promo.length) {
-          ditesLe.push(t('mgr.inst.promo', {
-            n: String(promo.length),
-            noms: promo.map((j) => `${j.nom} (${j.note}, ↗ ${j.potentiel})`).join(', '),
-          }));
+        if (bilanAcademie.progressions.length) {
+          ditesLe.push(`Académie : ${bilanAcademie.progressions.slice(0, 5).join(', ')}.`);
+        }
+        if (bilanAcademie.revenus.length) {
+          ditesLe.push(bilanAcademie.revenus.map((r) =>
+            `${r.jeune} rejoint ${r.club} : ${nombre(r.indemnite)} € d’indemnité de formation.`).join(' '));
+        }
+        if (bilanAcademie.liberes.length) {
+          ditesLe.push(`Fin de cycle Espoirs : ${bilanAcademie.liberes.join(', ')}.`);
         }
         if (gagnants.length) ditesLe.push(t('mgr.inst.progres', { noms: gagnants.join(', ') }));
         if (rapports.length && rapports !== m.rapports) {
@@ -5839,7 +5998,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 20,
+      version: 21,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -6141,6 +6300,16 @@ export const useGame = create<GameState>()(
             entrainements: s.manager.entrainements ?? [],
             progres: s.manager.progres ?? {},
             rapports: s.manager.rapports ?? [],
+            // VERSION 21 — le centre devient une vraie filière. Les anciennes
+            // promotions seniors restent intactes ; l'académie démarre vide.
+            academie: s.manager.academie ?? [],
+            observationsJeunes: s.manager.observationsJeunes ?? {},
+            missionsJeunes: s.manager.missionsJeunes ?? {
+              saison: s.manager.saison,
+              utilises: 0,
+            },
+            reponsesJeunes: s.manager.reponsesJeunes ?? {},
+            revenusFormation: s.manager.revenusFormation ?? {},
           };
         }
         // Le mode de simulation saison par saison a été supprimé. On enlève

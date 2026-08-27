@@ -27,6 +27,7 @@ import {
   coutAmelioration, gainEntrainement, installationsVierges,
 } from '../src/lib/installations';
 import { promotionDuCentre } from '../src/lib/formation';
+import { tableauDetectionManager } from '../src/lib/formationManager';
 import { explorer, fenetreDeProspection } from '../src/lib/recruteurs';
 import { SEMAINES_PAR_SAISON } from '../src/data/calendrier';
 import { matchDuClubSemaine } from '../src/lib/matchLive';
@@ -335,6 +336,17 @@ useGame.getState().basculerEntrainement(espoir.nom);
 ligne('un joueur entre au programme individuel',
   espoir.nom, useGame.getState().manager!.entrainements.includes(espoir.nom));
 
+// La nouvelle filière ne déverse plus une promotion magique dans les seniors :
+// on repère, on propose un projet, puis on forme avant d'intégrer.
+const detection = tableauDetectionManager(useGame.getState().manager!);
+for (const fiche of detection.fiches.filter((f) => f.jeune.age >= 17)) {
+  useGame.getState().proposerProjetJeuneManager(fiche.jeune.id);
+  if (useGame.getState().manager!.academie.length) break;
+}
+const signe = useGame.getState().manager!.academie[0];
+ligne('🎓 un jeune choisit réellement le centre',
+  signe ? `${signe.nom} · ${signe.age} ans` : 'aucune signature', !!signe);
+
 // Une saison entière, semaine par semaine.
 for (let i = 0; i < SEMAINES_PAR_SAISON + 1; i++) {
   const courant = useGame.getState().manager;
@@ -360,30 +372,24 @@ for (let i = 0; i < SEMAINES_PAR_SAISON + 1; i++) {
 
 const m2 = useGame.getState().manager!;
 ligne('la saison s’est bien close', `saison ${m2.saison}`, m2.saison === 2);
-ligne('🎓 le centre a sorti une promotion',
-  `${m2.jeunesFormes.length} jeune(s)`, m2.jeunesFormes.length > 0);
-const dansLeGroupe = effectifDuClub(m2.club, m2.saison)
-  .filter((j) => m2.jeunesFormes.some((y) => y.id === j.id));
-ligne('… et elle est VRAIMENT dans l’effectif',
-  `${dansLeGroupe.length}/${m2.jeunesFormes.length}`,
-  dansLeGroupe.length === m2.jeunesFormes.length && dansLeGroupe.length > 0);
-ligne('… marquée comme sortie du centre',
-  dansLeGroupe.every((j) => j.duCentre) ? 'toutes' : 'non', dansLeGroupe.every((j) => j.duCentre));
+const forme = signe ? m2.academie.find((j) => j.id === signe.id) : undefined;
+ligne('🎓 le jeune a vieilli et reçu un bilan expliqué',
+  forme ? `${signe.age} → ${forme.age} ans · note ${signe.note} → ${forme.note}` : 'absent',
+  !!forme && forme.age === signe.age + 1 && !!forme.derniereProgression);
 ligne('🏋️ le programme a rapporté quelque chose',
   `${Object.keys(m2.progres).length} joueur(s) crédité(s)`, Object.keys(m2.progres).length > 0);
 ligne('🔎 les recruteurs ont rendu leur rapport',
   `${m2.rapports.length} fiche(s)`, m2.rapports.length > 0);
 ligne('l’enveloppe s’est renouvelée', `${m2.budgetStructure} €`, m2.budgetStructure > 0);
 
-// ⚠️ LE JEUNE VIEILLIT ET PROGRESSE comme n'importe qui : il passe par
-// `noteALAge`, pas par une courbe à lui.
-const jeune = m2.jeunesFormes[0];
-const a2 = effectifDuClub(m2.club, m2.saison)!.find((j) => j.id === jeune.id);
-const a6 = effectifDuClub(m2.club, m2.saison + 4).find((j) => j.id === jeune.id);
-info('le jeune, saison par saison',
-  `${jeune.nom} : ${a2?.age} ans ${a2?.note} → ${a6?.age} ans ${a6?.note} (↗ ${jeune.potentiel})`);
-ligne('… il vieillit et il progresse',
-  `${a2?.note} → ${a6?.note}`, !!a2 && !!a6 && a6.age > a2.age && a6.note >= a2.note);
+if (forme) useGame.getState().gererAcademicienManager(forme.id, 'senior');
+const m2Integre = useGame.getState().manager!;
+const jeuneSenior = forme
+  ? effectifDuClub(m2Integre.club, m2Integre.saison)
+    .find((j) => j.id === `${forme.clubCentre}-academie-${forme.id}`)
+  : undefined;
+ligne('… puis la décision « intégrer seniors » l’ajoute vraiment au groupe',
+  jeuneSenior ? `${jeuneSenior.nom} · ${jeuneSenior.note}` : 'absent', !!jeuneSenior?.duCentre);
 
 // ⚠️ LES MURS APPARTIENNENT AU CLUB. On change de banc : on ne les emporte pas.
 const autre = COMPETITIONS.find((c) => c.id === 'fed2')!.clubs[0].nom;

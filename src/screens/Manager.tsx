@@ -24,12 +24,20 @@ import { matchDuClubSemaine } from '../lib/matchLive';
 import {
   CLUBS_OBSERVES, coutAmelioration, EMOJI_INSTALLATION, GAIN_ENTRAINEMENT,
   installationsVierges, NIVEAU_INSTALLATION_MAX, PLACES_ENTRAINEMENT,
-  PROMOTION_PAR_NIVEAU, INCERTITUDE_RECRUTEURS, budgetStructure,
+  INCERTITUDE_RECRUTEURS, budgetStructure,
 } from '../lib/installations';
+import { AXES_CENTRE, EMOJI_AXE } from '../lib/centreFormation';
+import {
+  capaciteAcademie, ficheAcademicienManager, nomObjectifJeune, OBJECTIFS_JEUNES,
+  tableauDetectionManager,
+} from '../lib/formationManager';
 import {
   noteCompositionManager, reconcilerCompositionManager,
 } from '../lib/compositionManager';
-import type { CompositionManager, TactiqueManager, TypeInstallation } from '../types';
+import type {
+  CompositionManager, ObjectifJeuneManager,
+  TactiqueManager, TypeInstallation,
+} from '../types';
 
 const MatchLive = lazy(() => import('../components/MatchLive').then((m) => ({ default: m.MatchLive })));
 
@@ -41,6 +49,18 @@ function humeurDuBoard(confiance: number): { texte: string; ton: string } {
   if (confiance < CONFIANCE_DEPART) return { texte: t('mgr.board.doute'), ton: 'orange' };
   if (confiance < 78) return { texte: t('mgr.board.suit'), ton: 'vert' };
   return { texte: t('mgr.board.confiance'), ton: 'or' };
+}
+
+function niveauLisible(note: number): string {
+  if (note >= 82) return 'exceptionnel';
+  if (note >= 68) return 'très bon';
+  if (note >= 54) return 'bon';
+  if (note >= 40) return 'moyen';
+  return 'à développer';
+}
+
+function etoiles(bas: number, haut: number): string {
+  return bas === haut ? `${bas.toFixed(1)} ★` : `${bas.toFixed(1)}–${haut.toFixed(1)} ★`;
 }
 
 export function Manager() {
@@ -56,6 +76,11 @@ export function Manager() {
   const definirTactique = useGame((s) => s.definirTactiqueManager);
   const ameliorerInstallation = useGame((s) => s.ameliorerInstallation);
   const basculerEntrainement = useGame((s) => s.basculerEntrainement);
+  const observerJeune = useGame((s) => s.observerJeuneManager);
+  const proposerProjetJeune = useGame((s) => s.proposerProjetJeuneManager);
+  const gererAcademicien = useGame((s) => s.gererAcademicienManager);
+  const definirObjectifJeune = useGame((s) => s.definirObjectifJeuneManager);
+  const definirMentorJeune = useGame((s) => s.definirMentorJeuneManager);
   const enregistrerResultat = useGame((s) => s.enregistrerResultatManager);
   const journal = useGame((s) => s.journal);
 
@@ -78,6 +103,7 @@ export function Manager() {
   const [recherche, setRecherche] = useState('');
   const [poste, setPoste] = useState('');
   const [matchOuvert, setMatchOuvert] = useState(false);
+  const [jeuneALiberer, setJeuneALiberer] = useState<string | null>(null);
 
   const saison = manager?.saison ?? 1;
   const prestige = manager?.prestige ?? 0;
@@ -110,6 +136,10 @@ export function Manager() {
     () => manager ? matchDuClubSemaine(manager) : null,
     [manager],
   );
+  const detectionJeunes = useMemo(
+    () => manager?.club ? tableauDetectionManager(manager) : null,
+    [manager],
+  );
 
   if (!manager) return null;
 
@@ -128,6 +158,11 @@ export function Manager() {
   const composition = compositionMemo;
   const afficheManager = afficheMemo;
   const resultatManager = afficheManager ? manager.resultats[afficheManager.cle] : undefined;
+  const academieClub = manager.academie.filter((j) => j.clubCentre === manager.club);
+  const mentors = effectif.filter((j) => j.age >= 28).sort((a, b) => b.note - a.note);
+  const revenusFormationClub = Object.entries(manager.revenusFormation)
+    .filter(([cle]) => cle.startsWith(`${manager.club}|`))
+    .reduce((somme, [, montant]) => somme + montant, 0);
 
   const changerJoueur = (zone: 'titulaires' | 'remplacants', index: number, joueurId: string) => {
     const suivante: CompositionManager = {
@@ -378,7 +413,7 @@ export function Manager() {
                   const finance = cout !== null && manager.budgetStructure >= cout;
                   const n = Math.min(niveau, NIVEAU_INSTALLATION_MAX);
                   const effet = type === 'formation'
-                    ? t('mgr.inst.effet.formation', { n: String(PROMOTION_PAR_NIVEAU[n]) })
+                    ? `Académie de ${capaciteAcademie(n)} places · coaching et progression renforcés.`
                     : type === 'entrainement'
                       ? t('mgr.inst.effet.entrainement', {
                         places: String(PLACES_ENTRAINEMENT[n]),
@@ -421,22 +456,95 @@ export function Manager() {
                 })}
               </div>
 
-              {vue === 'formation' && (
-                <section className="carte manager-rapports manager-promotion-centre">
-                  <div className="comp-tete"><b>🎓 Promotions du club</b><span className="comp-count">{manager.jeunesFormes.filter((j) => j.club === manager.club).length}</span></div>
-                  {manager.jeunesFormes.some((j) => j.club === manager.club) ? (
-                    <div className="manager-liste-programme">
-                      {[...manager.jeunesFormes].filter((j) => j.club === manager.club).reverse().map((j) => (
-                        <div className="prog-ligne" key={j.id}>
-                          <span className="prog-nom"><Drapeau nation={j.nation} taille={14} /> {j.nom}</span>
-                          <span className="prog-poste">{nomPoste(j.poste)}</span>
-                          <span className="prog-age">{j.age}</span>
-                          <span className="prog-note">{j.note}</span>
-                          <span className="prog-marge positive">↗ {j.potentiel}</span>
+              {vue === 'formation' && detectionJeunes && (
+                <>
+                  <section className="carte manager-centre-identite">
+                    <div className="manager-centre-score">
+                      <span>Note du centre</span>
+                      <b>{detectionJeunes.noteGlobale}</b>
+                      <small>{detectionJeunes.portee} · rayon {nombre(detectionJeunes.rayon)} km</small>
+                    </div>
+                    <div className="manager-centre-notes" aria-label="Les six notes du centre">
+                      {AXES_CENTRE.map((axe) => (
+                        <div key={axe}>
+                          <span>{EMOJI_AXE[axe]} {axe === 'installations' ? 'Installations' : axe === 'coaching' ? 'Coaching' : axe === 'recrutement' ? 'Recrutement' : axe === 'reseau' ? 'Réseau' : axe === 'medical' ? 'Médical' : 'Réputation'}</span>
+                          <b>{detectionJeunes.notes[axe]}</b>
+                          <i><em style={{ width: `${detectionJeunes.notes[axe]}%` }} /></i>
                         </div>
                       ))}
                     </div>
-                  ) : <p className="manager-vide-texte">La première promotion arrivera à l’intersaison une fois le centre construit.</p>}
+                  </section>
+
+                  <section className="carte manager-academie">
+                    <div className="comp-tete">
+                      <div><b>🎓 U18 et Espoirs</b><small>Chaque potentiel reste une estimation, même après la signature.</small></div>
+                      <span className="comp-count">{academieClub.length}/{detectionJeunes.capacite}</span>
+                    </div>
+                    <div className="manager-formation-finances">
+                      <span>Revenus de formation du club</span>
+                      <b>{nombre(revenusFormationClub)} €</b>
+                      <small>Les indemnités sont versées lorsqu’un autre club recrute un jeune formé ici.</small>
+                    </div>
+                    {!academieClub.length ? (
+                      <div className="manager-vide-action">
+                        <span>🌱</span>
+                        <div><b>Ton académie est prête</b><p>Ouvre les rapports, observe les profils et présente ton projet aux jeunes qui correspondent au club.</p></div>
+                        <button className="btn primaire" onClick={() => setVue('recruteurs')}>Voir la promotion détectée</button>
+                      </div>
+                    ) : (
+                      <div className="manager-jeunes-grille">
+                        {academieClub.map((j) => {
+                          const estimation = ficheAcademicienManager(manager, j, detectionJeunes.notes);
+                          const progression = j.derniereProgression;
+                          return (
+                            <article className="manager-jeune-carte" key={j.id}>
+                              <header>
+                                <div>
+                                  <span><Drapeau nation={j.nation} taille={15} /> {j.clubOrigine}</span>
+                                  <h3>{j.nom}</h3>
+                                  <p>{j.age} ans · {nomPoste(j.poste)} · {j.taille / 100} m · {j.poids} kg</p>
+                                </div>
+                                <em className={`manager-categorie ${j.categorie}`}>{j.categorie === 'u18' ? 'U18' : j.categorie === 'pret' ? 'PRÊT' : 'ESPOIRS'}</em>
+                              </header>
+                              <div className="manager-jeune-kpis">
+                                <span><small>Niveau</small><b>{j.note.toFixed(1)}</b></span>
+                                <span><small>Potentiel estimé</small><b>{etoiles(estimation.etoilesBas, estimation.etoilesHaut)}</b></span>
+                                <span><small>Temps de jeu</small><b>{j.tempsDeJeu}%</b></span>
+                                <span><small>Moral</small><b>{j.moral}%</b></span>
+                              </div>
+                              <p className="manager-jeune-profil">
+                                {niveauLisible(j.physique)} physiquement · {niveauLisible(j.technique)} techniquement · {niveauLisible(j.mental)} mentalement
+                                {j.clubPret && <> · prêté à <b>{j.clubPret}</b></>}
+                              </p>
+                              {progression && (
+                                <p className={`manager-progression-annuelle${progression.blesse ? ' blesse' : ''}`}>
+                                  Saison {progression.saison} : {progression.noteAvant.toFixed(1)} → {progression.noteApres.toFixed(1)} · {progression.resume}
+                                </p>
+                              )}
+                              <div className="manager-actions-academie">
+                                <button disabled={j.age > 18 || j.categorie === 'u18'} onClick={() => gererAcademicien(j.id, 'u18')}>U18</button>
+                                <button disabled={j.categorie === 'espoirs'} onClick={() => gererAcademicien(j.id, 'espoirs')}>Espoirs</button>
+                                <button disabled={j.age < 18 || j.categorie === 'pret'} onClick={() => gererAcademicien(j.id, 'pret')}>Prêter</button>
+                                <button className="primaire" disabled={j.age < 17} onClick={() => gererAcademicien(j.id, 'senior')}>Intégrer seniors</button>
+                                <button className="danger" onClick={() => setJeuneALiberer(j.id)}>Libérer</button>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                </>
+              )}
+
+              {vue === 'entrainement' && (
+                <section className="carte manager-planning-collectif">
+                  <div className="comp-tete"><div><b>📅 Semaine collective</b><small>Le socle commun du groupe, volontairement simple à lire.</small></div></div>
+                  <div>
+                    {[['Lun.', 'Récupération'], ['Mar.', 'Physique'], ['Mer.', 'Technique'], ['Jeu.', 'Tactique'], ['Ven.', 'Léger'], ['Sam.', 'Match'], ['Dim.', 'Repos']].map(([jour, seance]) => (
+                      <span key={jour}><b>{jour}</b><small>{seance}</small></span>
+                    ))}
+                  </div>
                 </section>
               )}
 
@@ -481,42 +589,123 @@ export function Manager() {
                 )}
               </section>}
 
-              {vue === 'recruteurs' && <section className="carte manager-rapports">
-                <div className="comp-tete">
-                  <b>🔎 {t('mgr.inst.rapports')}</b>
-                  <span className="comp-count">{manager.rapports.length}</span>
-                </div>
-                {murs.recrutement <= 0 ? (
-                  <p className="manager-vide-texte">{t('mgr.inst.rapportsFerme')}</p>
-                ) : !manager.rapports.length ? (
-                  <p className="manager-vide-texte">{t('mgr.inst.rapportsAttente')}</p>
-                ) : (
-                  <div className="manager-table-rapports">
-                    <div className="rap-ligne entete">
-                      <span>{t('mgr.inst.col.joueur')}</span>
-                      <span>{t('mgr.inst.col.club')}</span>
-                      <span>{t('mgr.inst.col.age')}</span>
-                      <span>{t('mgr.inst.col.note')}</span>
-                      <span>{t('mgr.inst.col.potentiel')}</span>
-                    </div>
-                    {manager.rapports.map((r) => (
-                      <div className="rap-ligne" key={r.id}>
-                        <span className="rap-nom">
-                          <Drapeau nation={r.nation} taille={14} /> {r.nom}
-                          <em>{nomPoste(r.poste)}</em>
-                        </span>
-                        <span className="rap-club">{r.club}<em>{r.division}</em></span>
-                        <span>{r.age}</span>
-                        <span>{r.note}</span>
-                        <span className="rap-pot">
-                          ↗ {r.potentiel}
-                          {r.incertitude > 0 && <em>± {r.incertitude}</em>}
-                        </span>
-                      </div>
-                    ))}
+              {vue === 'entrainement' && (
+                <section className="carte manager-programme-jeunes">
+                  <div className="comp-tete">
+                    <div><b>🌱 Programmes de l’académie</b><small>Un objectif individuel et un mentor maximum par jeune.</small></div>
+                    <span className="comp-count">{academieClub.length}</span>
                   </div>
-                )}
-              </section>}
+                  {!academieClub.length ? (
+                    <p className="manager-vide-texte">Recrute d’abord un jeune depuis l’onglet Recruteurs.</p>
+                  ) : (
+                    <div className="manager-plans-jeunes">
+                      {academieClub.map((j) => (
+                        <article key={j.id}>
+                          <div>
+                            <b>{j.nom}</b>
+                            <span>{j.age} ans · {nomPoste(j.poste)} · {j.categorie === 'pret' ? `prêt à ${j.clubPret}` : j.categorie.toUpperCase()}</span>
+                          </div>
+                          <label>
+                            <span>Objectif individuel</span>
+                            <select value={j.objectif} onChange={(e) => definirObjectifJeune(j.id, e.target.value as ObjectifJeuneManager)}>
+                              {OBJECTIFS_JEUNES.map((o) => <option key={o.id} value={o.id}>{o.nom} · {o.effet}</option>)}
+                            </select>
+                          </label>
+                          <label>
+                            <span>Mentor senior</span>
+                            <select value={j.mentorId ?? ''} onChange={(e) => definirMentorJeune(j.id, e.target.value || undefined)}>
+                              <option value="">Aucun mentor</option>
+                              {mentors.map((mentor) => <option key={mentor.id} value={mentor.id}>{mentor.nom} · {mentor.age} ans · {mentor.note}</option>)}
+                            </select>
+                          </label>
+                          <p><b>{nomObjectifJeune(j.objectif)}</b> · temps de jeu {j.tempsDeJeu}% · professionnalisme {j.professionnalisme}</p>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {vue === 'recruteurs' && detectionJeunes && (
+                <>
+                  <section className="carte manager-detection-tete">
+                    <div>
+                      <div className="eyebrow">Promotion annuelle · {detectionJeunes.fiches.length} dossiers</div>
+                      <h2>🔎 Les jeunes existent déjà dans leurs clubs</h2>
+                      <p>{nombre(detectionJeunes.candidatsVus)} joueurs dans le rayon du réseau. La cellule en remonte {detectionJeunes.fiches.length}, mais seuls les {detectionJeunes.prioritaires} premiers sont considérés prioritaires.</p>
+                      {detectionJeunes.fiches.filter((f) => f.etoilesHaut >= 4.5).length >= 3 && (
+                        <strong className="manager-generation-doree">⭐ Une génération exceptionnelle semble arriver — le scout peut encore se tromper.</strong>
+                      )}
+                    </div>
+                    <div className="manager-missions">
+                      <b>{detectionJeunes.deplacementsRestants}/{detectionJeunes.deplacementsTotal}</b>
+                      <span>déplacements restants</span>
+                      <small>Entretien = 3 déplacements</small>
+                    </div>
+                  </section>
+
+                  <section className="manager-dossiers-jeunes">
+                    {detectionJeunes.fiches.map((ficheJeune, index) => {
+                      const j = ficheJeune.jeune;
+                      const suivi = manager.observationsJeunes[j.id];
+                      const reponse = manager.reponsesJeunes[j.id];
+                      const dejaSigne = manager.academie.some((a) => a.id === j.id);
+                      return (
+                        <article className={`carte manager-dossier-jeune${index < detectionJeunes.prioritaires ? ' prioritaire' : ''}`} key={j.id}>
+                          <header>
+                            <div>
+                              <span>{index < detectionJeunes.prioritaires ? '⭐ PRIORITAIRE' : 'DOSSIER À SUIVRE'} · confiance {ficheJeune.confiance}%</span>
+                              <h3>{j.nom}</h3>
+                              <p><Drapeau nation={j.nation} taille={14} /> {j.age} ans · {nomPoste(j.poste)} · {j.club} · {nombre(j.distance)} km</p>
+                            </div>
+                            <strong>{ficheJeune.noteObservee}<small>niveau observé</small></strong>
+                          </header>
+                          <div className="manager-potentiel-cache">
+                            <span>Potentiel estimé</span>
+                            <b>{etoiles(ficheJeune.etoilesBas, ficheJeune.etoilesHaut)}</b>
+                            <small>{ficheJeune.potentielBas}–{ficheJeune.potentielHaut} · le potentiel réel reste caché</small>
+                          </div>
+                          <div className="manager-jeune-attributs">
+                            <span><b>Physique</b>{niveauLisible(j.physique)}</span>
+                            <span><b>Technique</b>{niveauLisible(j.technique)}</span>
+                            <span><b>Mental</b>{niveauLisible(j.mental)}</span>
+                            <span><b>Profil</b>{j.style.replace('_', ' ')}</span>
+                            <span><b>Gabarit</b>{j.taille / 100} m · {j.poids} kg</span>
+                            <span><b>Pied</b>{j.piedFort}</span>
+                          </div>
+                          <p className="manager-observation-resume">
+                            {ficheJeune.matchs} match{ficheJeune.matchs > 1 ? 's' : ''} observé{ficheJeune.matchs > 1 ? 's' : ''}
+                            {ficheJeune.entretien ? ' · entretien réalisé' : ' · entretien non réalisé'}
+                          </p>
+                          {reponse && <p className={`manager-reponse-jeune ${reponse.etat}`}>{reponse.texte}</p>}
+                          <div className="manager-actions-detection">
+                            <button disabled={detectionJeunes.deplacementsRestants < 1 || ficheJeune.matchs >= 10 || dejaSigne} onClick={() => observerJeune(j.id)}>👁 Observer un match</button>
+                            <button disabled={detectionJeunes.deplacementsRestants < 3 || ficheJeune.matchs < 3 || ficheJeune.entretien || dejaSigne} onClick={() => observerJeune(j.id, true)}>💬 Entretien famille</button>
+                            <button className="primaire" disabled={dejaSigne || detectionJeunes.occupes >= detectionJeunes.capacite} onClick={() => proposerProjetJeune(j.id)}>{dejaSigne ? '✓ Au centre' : 'Présenter le projet'}</button>
+                          </div>
+                          {suivi && <small className="manager-rapport-date">Dossier suivi depuis la saison {suivi.saison}</small>}
+                        </article>
+                      );
+                    })}
+                  </section>
+
+                  {!!manager.rapports.length && (
+                    <details className="carte manager-rapports-pros">
+                      <summary>Rapports du marché senior <span>{manager.rapports.length}</span></summary>
+                      <div className="manager-table-rapports">
+                        {manager.rapports.map((r) => (
+                          <div className="rap-ligne" key={r.id}>
+                            <span className="rap-nom"><Drapeau nation={r.nation} taille={14} /> {r.nom}<em>{nomPoste(r.poste)}</em></span>
+                            <span className="rap-club">{r.club}<em>{r.division}</em></span>
+                            <span>{r.age}</span><span>{r.note}</span>
+                            <span className="rap-pot">↗ {r.potentiel}{r.incertitude > 0 && <em>± {r.incertitude}</em>}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -615,6 +804,15 @@ export function Manager() {
 
       <button className="btn fantome manager-raccrocher" onClick={() => setRaccrocher(true)}>🚪 {t('mgr.raccrocher')}</button>
       {raccrocher && <Confirmation titre={t('mgr.raccrocherTitre')} message={libre ? t('mgr.raccrocherLibre') : t('mgr.raccrocherClasse')} libelleOui={t('mgr.raccrocher')} onOui={() => { setRaccrocher(false); quitterBanc(); }} onNon={() => setRaccrocher(false)} />}
+      {jeuneALiberer && (
+        <Confirmation
+          titre="Libérer ce jeune ?"
+          message={`${academieClub.find((j) => j.id === jeuneALiberer)?.nom ?? 'Ce joueur'} quittera définitivement le centre de formation.`}
+          libelleOui="Libérer"
+          onOui={() => { gererAcademicien(jeuneALiberer, 'liberer'); setJeuneALiberer(null); }}
+          onNon={() => setJeuneALiberer(null)}
+        />
+      )}
       {matchOuvert && afficheManager && (
         <Suspense fallback={null}>
           <MatchLive
