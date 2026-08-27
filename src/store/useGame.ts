@@ -149,13 +149,13 @@ import {
   prestigeDepuisJoueur, salaireManager, verdictDeSaison, CONFIANCE_LICENCIEMENT,
 } from '../lib/manager';
 import {
-  budgetStructure, coutAmelioration, gainEntrainement, installationsVierges,
+  coutAmelioration, gainEntrainement, installationsVierges,
   niveauInstallation, NIVEAU_INSTALLATION_MAX, PLACES_ENTRAINEMENT,
 } from '../lib/installations';
 import { promotionDuCentre } from '../lib/formation';
 import { explorer } from '../lib/recruteurs';
 import {
-  accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, negocierAvecJoueur,
+  accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, masseSalarialeActuelle, negocierAvecJoueur,
   ouvrirNegociationManager, type LevierRecrutementManager,
 } from '../lib/recrutementManager';
 import {
@@ -3509,7 +3509,7 @@ export const useGame = create<GameState>()(
           argent: 0,
           budgetTransferts: budgets.transferts,
           budgetSalarial: budgets.salarial,
-          budgetStructure: budgetStructure(force, comp?.niveau ?? 8),
+          budgetStructure: budgets.structure,
           contrat: { saisons: 3, salaire: salaireManager(force) },
           decision: null,
           composition: compositionManagerParDefaut(effectifDuClub(club, 1)),
@@ -3579,8 +3579,12 @@ export const useGame = create<GameState>()(
         // ⚠️ LE PRIX SE CALCULE SUR L'ENVELOPPE DE RÉFÉRENCE DU CLUB, pas sur
         // ce qui reste en caisse : sinon un manager qui a beaucoup épargné
         // paierait plus cher que celui qui n'a rien mis de côté.
-        const comp = competitionDuClub(m.club);
-        const reference = budgetStructure(forceEffectif(m.club, m.saison), comp?.niveau ?? 8);
+        // ⚠️ LA RÉFÉRENCE DE PRIX EST L'ENVELOPPE RÉELLEMENT VERSÉE, donc la
+        //    même que celle de la fin de saison. Le prix d'une marche est écrit
+        //    en SAISONS d'enveloppe (`COUT_PAR_NIVEAU`) : deux enveloppes
+        //    différentes des deux côtés, et la courbe de dix saisons ne veut
+        //    plus rien dire — mesuré à 121 saisons en Fédérale 2.
+        const reference = budgetsDuClub(m.club, m.saison).structure;
         const cout = coutAmelioration(murs[type], reference);
         if (cout === null || m.budgetStructure < cout) return;
 
@@ -3653,7 +3657,7 @@ export const useGame = create<GameState>()(
           // (`Manager.installations` est indexé PAR CLUB) : il découvre celui
           // du nouveau, souvent inexistant. L'épargne, elle, appartenait au
           // club qu'on vient de quitter.
-          budgetStructure: budgetStructure(force, comp?.niveau ?? 8),
+          budgetStructure: budgets.structure,
           contrat: { saisons: 3, salaire: salaireManager(force) },
           decision: null,
           composition: compositionManagerParDefaut(effectifDuClub(club, m.saison)),
@@ -4026,7 +4030,15 @@ export const useGame = create<GameState>()(
           (n) => n.cible.id === actuelle.joueur.id && n.etat === 'accord',
         );
         const cout = coutPremiereSaison(actuelle, dossier?.offre);
-        if (m.budgetTransferts < cout || m.budgetSalarial < actuelle.offre.salaire) return;
+        // ⚠️ LE SALARY CAP SE VÉRIFIE SUR LA MASSE, PAS SUR UN SALAIRE ISOLÉ.
+        // L'ancien test comparait le plafond du club au salaire de LA recrue :
+        // il passait donc toujours, puisqu'aucun joueur ne coûte à lui seul
+        // onze millions. « Tu peux avoir énormément d'argent en banque et quand
+        // même être incapable de recruter Dupont parce que tu n'as plus assez
+        // de place sous ton salary cap » : la contrainte porte sur ce qui est
+        // DÉJÀ engagé, plus ce qu'on ajoute.
+        if (m.budgetTransferts < cout) return;
+        if (masseSalarialeActuelle(m.club, m.saison) + actuelle.offre.salaire > m.budgetSalarial) return;
         const transfert: TransfertAnnonce = {
           nom: actuelle.joueur.nom,
           de: actuelle.joueur.club,
@@ -5827,7 +5839,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 19,
+      version: 20,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -6097,6 +6109,33 @@ export const useGame = create<GameState>()(
             // le premier achat, qui est justement le moment de carrière.
             budgetStructure: Number.isFinite(s.manager.budgetStructure)
               ? s.manager.budgetStructure : budgets.structure,
+          };
+          // ⚠️ VERSION 20 — LES TROIS ENVELOPPES SONT REMISES À LEUR NIVEAU.
+          // Les budgets d'avant cette version sortaient de l'ancienne formule
+          // `(force − 31)² × k`, qui ignorait complètement ce que gagne un club
+          // de rugby : mesuré sur une carrière de chantier, l'US Oyonnax
+          // gardait 34 682 500 € de budget transferts alors que la Pro D2
+          // entière tourne autour de 10,7 M€ de produits d'exploitation. Un
+          // magot pareil rend le nouveau marché sans objet — plus rien n'a de
+          // prix quand on peut tout acheter.
+          //
+          // ⚠️ ON REMET, ON NE PLAFONNE PAS. Un plafonnement laisserait la
+          // caisse pleine à ras bord, c'est-à-dire exactement le problème en
+          // plus discret. Et ce qui est perdu n'a jamais été gagné : c'est un
+          // chiffre produit par une formule qu'on vient de retirer.
+          if (version < 20 && s.manager.club) {
+            const remis = budgetsDuClub(s.manager.club, s.manager.saison);
+            s.manager = {
+              ...s.manager,
+              budgetTransferts: remis.transferts,
+              budgetSalarial: remis.salarial,
+              // La structure se banque : on rend l'épargne d'une saison, pas
+              // celle d'une carrière entière comptée en ancienne monnaie.
+              budgetStructure: Math.min(s.manager.budgetStructure, remis.structure * 3),
+            };
+          }
+          s.manager = {
+            ...s.manager,
             installations: s.manager.installations ?? {},
             jeunesFormes: s.manager.jeunesFormes ?? [],
             entrainements: s.manager.entrainements ?? [],

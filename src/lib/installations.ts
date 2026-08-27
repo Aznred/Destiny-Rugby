@@ -12,6 +12,7 @@
 // navigateur (`scripts/verifInstallations.ts`).
 
 import { NOTE_PAR_NIVEAU } from '../data/clubs';
+import { financesDuClub } from './economie';
 import type { InstallationsClub, TypeInstallation } from '../types';
 
 export const NIVEAU_INSTALLATION_MAX = 4;
@@ -37,24 +38,6 @@ export function niveauInstallation(
   return installations?.[club]?.[type] ?? 0;
 }
 
-function arrondir(v: number, pas: number): number {
-  return Math.max(pas, Math.round(v / pas) * pas);
-}
-
-/**
- * Le coefficient de richesse d'un étage.
- *
- * ⚠️ C'EST LA MÊME COURBE QUE `facteurNiveau` (`lib/recrutementManager.ts`),
- * recopiée ici pour une seule raison : `recrutementManager.ts` importe
- * `lib/effectif.ts`, qui est lourd, alors que ce fichier doit rester importable
- * par n'importe quoi. Si l'une des deux bouge, l'autre doit bouger — le banc
- * d'essai compare les deux valeur par valeur, précisément pour que la copie ne
- * puisse pas diverger en silence.
- */
-export function facteurEtage(niveau: number): number {
-  return Math.max(0.28, 1.1 - niveau * 0.075);
-}
-
 /**
  * LA TROISIÈME ENVELOPPE : ce que le club met dans ses murs chaque saison.
  *
@@ -62,16 +45,22 @@ export function facteurEtage(niveau: number): number {
  * structures sur le budget transferts en ferait un arbitrage « un joueur ou un
  * centre » — que personne ne tranche en faveur du centre, parce que le joueur
  * joue dimanche et que le centre rapporte dans quatre ans. Et chez un club
- * amateur, où le budget transferts n'achète plus rien du tout (`PRO_JUSQUA`),
- * il n'y aurait même pas d'arbitrage : juste un écran mort.
+ * amateur, où le budget transferts n'achète presque rien (`PRO_JUSQUA`), il
+ * n'y aurait même pas d'arbitrage : juste un écran mort.
  *
- * Elle part du MÊME point d'origine que les deux autres (`force − 31`), donc
- * le rapport structure/effectif est constant par construction à tous les
- * étages, au lieu de dépendre de deux courbes réglées séparément.
+ * ⚠️ ELLE N'A QU'UNE DÉFINITION, ET CE FICHIER N'EN EST PAS L'AUTEUR. Elle sort
+ * de `financesDuClub` (`lib/economie.ts`), comme les deux autres lignes du
+ * budget. Une version antérieure la calculait ici avec sa PROPRE formule
+ * (`(force − 31)² × 1 100 × facteurEtage`, une copie de `facteurNiveau`) : le
+ * jour où le budget des clubs est passé aux fourchettes réelles, le REVENU a
+ * suivi et le PRIX est resté sur l'ancienne courbe. Mesuré, un centre complet
+ * demandait alors 121 saisons de revenus en Fédérale 2 contre les 10 prévues —
+ * tout le lot « installations » était mort sous la Nationale, sans un
+ * avertissement. Deux formules pour une même enveloppe finissent toujours par
+ * dire deux choses.
  */
-export function budgetStructure(force: number, niveau: number): number {
-  const brut = Math.max(0, force - 31) ** 2;
-  return arrondir(Math.max(40_000, brut * 1_100 * facteurEtage(niveau)), 5_000);
+export function budgetStructure(force: number, niveau: number, reference?: number): number {
+  return financesDuClub(force, niveau, reference).structure;
 }
 
 /**
@@ -86,6 +75,10 @@ export function budgetStructure(force: number, niveau: number): number {
  * courbe qu'on veut, pas une prime aux gros clubs.
  */
 const COUT_PAR_NIVEAU = [0, 0.9, 1.7, 2.9, 4.6];
+
+function arrondir(v: number, pas: number): number {
+  return Math.max(pas, Math.round(v / pas) * pas);
+}
 
 export function coutAmelioration(niveauActuel: number, enveloppeDeReference: number): number | null {
   const vise = niveauActuel + 1;

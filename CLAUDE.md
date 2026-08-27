@@ -8769,3 +8769,216 @@ répliques qui se tasse en fin de soirée.
 ```bash
 npx vite-node scripts/verifManager.ts   # section 7 : les heures d'un fil ne reculent jamais
 ```
+
+---
+
+## 💶 L'ÉCONOMIE REBÂTIE SUR LES CHIFFRES RÉELS DU RUGBY FRANÇAIS
+
+Demande : « revois le système de valeur, budget et transfert par rapport à ça »,
+avec une table d'ordres de grandeur ancrée sur les données LNR (2024/25 :
+464,1 M€ de produits d'exploitation pour les 14 clubs de Top 14, soit ~33,2 M€
+par club ; 170,5 M€ pour les 16 de Pro D2, soit ~10,7 M€ ; salary cap à 11 M€ en
+2026/27) et sur les minima de l'accord collectif du rugby fédéral.
+
+### ⚠️ TROIS DÉFAUTS MESURÉS AVANT D'ÉCRIRE UNE LIGNE
+
+| | avant | maintenant |
+|---|---|---|
+| un joueur noté 98 valait | **13 800 000 €** | 1 165 000 € |
+| un Nationale noté 74 valait | **6 175 000 €** | 35 000 € |
+| « budget transferts » en Top 14 | **28 650 000 €** (le budget du club) | 1 650 000 € (3 % du budget) |
+| masse salariale Nationale 2 / Nationale | **1 230 000 € / 1 110 000 €** — inversée | 390 000 € / 2 180 000 € |
+
+Le barème de valeur était **un barème de football** : au rugby, un transfert
+français se compte en dizaines de milliers d'euros, quand il se compte. Et la
+masse salariale sortait de la FORCE du groupe, si bien qu'un bon club de
+Nationale 2 payait mieux qu'un club moyen de Nationale — une pyramide dont
+l'étage inférieur paie mieux n'en est pas une.
+
+### `src/lib/economie.ts` — LA table, et rien d'autre
+
+⚠️ **UN SEUL FICHIER PORTE LES CHIFFRES**, et il n'importe rien : ni store, ni
+DOM, ni `effectif.ts`. Quatre modules l'avaient chacun leur version — le prix
+d'un joueur dans `recrutementManager.ts`, le salaire dans `offres.ts`, le budget
+du club ailleurs — et les quatre disaient des choses différentes.
+
+`ECONOMIE` donne, par étage : la fourchette de **budget du club**, celle de
+**masse salariale**, le **plafond d'indemnité**, le **salaire typique** et celui
+de la **vedette**. `SALARY_CAP` porte les plafonds de ligue (Top 14 et
+championnats étrangers d'élite 11 M€, Pro D2 6 M€).
+
+| | budget club | masse salariale | salaire typique | vedette | indemnité max |
+|---|---|---|---|---|---|
+| Top 14 | 20 à 55 M€ | 8 à 11 M€ | 250 000 € | 850 000 € | 500 000 € |
+| Pro D2 | 5 à 18 M€ | 2 à 6 M€ | 70 000 € | 220 000 € | 150 000 € |
+| Nationale | 2 à 6 M€ | 0,8 à 2,5 M€ | 35 000 € | 80 000 € | 50 000 € |
+| Nationale 2 | 0,8 à 2,5 M€ | 250 à 900 k€ | 20 000 € | 45 000 € | **0** |
+| Fédérale 1 | 400 k à 1,5 M€ | 100 à 500 k€ | 12 000 € | 32 000 € | 0 |
+| Fédérale 2 | 200 à 700 k€ | 30 à 200 k€ | 5 700 € | 18 000 € | 0 |
+| Fédérale 3 | 100 à 400 k€ | 10 à 100 k€ | 2 400 € | 9 000 € | 0 |
+| Régionale 1 | 70 à 250 k€ | ≤ 50 k€ | 1 500 € | 6 000 € | 0 |
+| Régionale 2 | 40 à 150 k€ | ≤ 25 k€ | **0** | 3 000 € | 0 |
+| Régionale 3 | 20 à 100 k€ | ≤ 8 k€ | **0** | 1 500 € | 0 |
+
+### ⚠️ LA POSITION DANS L'ÉTAGE S'ANCRE SUR LA DIVISION, PAS SUR `NOTE_PAR_NIVEAU`
+
+`positionDansEtage` place un club entre le bas et le haut de sa fourchette selon
+sa force. La première version la comparait à `NOTE_PAR_NIVEAU` — la table que ce
+fichier documente déjà comme **surévaluant les étages** (elle annonce 64 pour la
+Nationale quand ses effectifs pèsent 53). Résultat mesuré : **le SC Albi
+démarrait à 125 % de son propre salary cap**, donc incapable de signer qui que ce
+soit sans qu'aucun écran ne l'explique. L'ancrage est désormais
+`forceMoyenneDivision`, la force RÉELLE de la division cette saison-là.
+
+⚠️ **ET LE PLAFOND NE PEUT JAMAIS TOMBER SOUS CE QUE LE CLUB PAIE DÉJÀ**
+(`masseSalarialeActuelle × 1,15`, borné en haut par le salary cap de la ligue).
+Deux formules indépendantes — une position dans une fourchette d'un côté, une
+somme de salaires de l'autre — ne tombent jamais d'accord : le RC Orléans est
+sorti à 103 % de son plafond au tour suivant. Un club qui démarre saturé n'est
+pas une difficulté de jeu, c'est un écran mort.
+
+### `valeurEstimee` — une cubique bornée, pas un carré libre
+
+```
+valeur = (note − 42 + marge × 0,45)³ × 7,4 × jeunesse,  plafonnée à 1 500 000 €
+```
+
+Le seuil à 42 fait **tomber la valeur à zéro sous la Fédérale 1** : personne n'y
+achète personne, et c'est exact. Le cube donne la rareté du très haut niveau
+(un 96 vaut huit fois un 78) là où le carré aplatissait tout. Et le plafond n'est
+pas décoratif : sans lui, un espoir de 21 ans noté 97 avec de la marge ressortait
+à 1 695 000 €, au-dessus du haut de la table.
+
+| note | profil | table | jeu |
+|---|---|---|---|
+| 96 | superstar internationale | 800 k à 1,5 M€ | 1 165 000 € |
+| 90 | international | 500 k à 1 M€ | 820 000 € |
+| 84 | excellent Top 14 | 300 à 700 k€ | 550 000 € |
+| 78 | titulaire Top 14 | 150 à 400 k€ | 345 000 € |
+| 72 | rotation T14 / excellent Pro D2 | 80 à 250 k€ | 200 000 € |
+| 66 | titulaire Pro D2 | 40 à 120 k€ | 100 000 € |
+| 59 | Nationale | 10 à 60 k€ | 35 000 € |
+| 46 | Fédérale 1 | ≤ 15 k€ | **0 €** |
+
+### ⚠️ ON NE PAIE PAS POUR RECRUTER, ON PAIE POUR LIBÉRER
+
+C'est le cœur du modèle, et c'est la demande : « plutôt que de payer
+systématiquement, tu pourrais attendre sa fin de contrat — coût transfert : 0 € —
+mais Bordeaux, Pau et Montpellier peuvent aussi le contacter ».
+
+`indemniteDeRachat(valeur, saisonsRestantes, niveauVendeur)` vaut **exactement
+zéro à la fin du contrat**, puis 0,55 / 0,35 / 0,15 de la valeur à 3, 2 et
+1 saison restante — **bornée par le plafond de l'étage du vendeur**, pas par la
+valeur du joueur. Aucun transfert n'est payant sous la Nationale.
+
+`saisonsDeContrat(club, idJoueur, saison)` (`recrutementManager.ts`) le rend
+possible : **aucun joueur du jeu n'avait de contrat**, seul le joueur incarné en
+avait un. Il est tiré de façon déterministe (graine = club + joueur) sur 2 à
+4 saisons et **court avec les saisons**. ⚠️ Il est STABLE d'une consultation à
+l'autre — rouvrir le marché ne redonne pas trois ans à un joueur en fin de
+contrat, même protection anti-save-scumming que les plafonds cachés.
+
+`situationDe` en tire ce que l'écran affiche : sous contrat · dernière année ·
+libre · espoir protégé · amateur · prêté. Mesuré sur un marché de 200 cibles en
+Pro D2 : **36 % des transferts ne coûtent rien**, et l'indemnité la plus chère
+relevée est exactement le plafond de l'étage (150 000 €).
+
+### Les salaires : une interpolation géométrique, pas une multiplication bornée
+
+L'ancienne formule multipliait une base d'étage par `1 + ecart/15`, **plafonné à
+1,8** : tout un Top 14 tenait dans un rapport de 2,8, quand la table demandée va
+de 2-6 k€/mois à 75 k€/mois. « Rends les écarts énormes, ça donnera de la
+personnalité aux divisions » — une multiplication bornée ne peut pas produire ça.
+
+On interpole donc **géométriquement** entre le salaire typique de l'étage et
+celui de sa vedette. Mesuré : ×15,5 entre un jeune et une vedette en Top 14
+(contre ×2,8 avant), et chaque division garde sa propre amplitude.
+
+⚠️ **MAIS UNE INTERPOLATION GÉOMÉTRIQUE NE SAIT PAS PARTIR DE ZÉRO — elle y
+reste.** En Régionale 2 et 3, la table donne un salaire typique NUL et une
+vedette à 3 000 € / 1 500 € : la première version rendait donc **0 à tout
+l'étage, vedette comprise**. Le défaut ne s'est vu qu'au bout de la chaîne, dans
+`verifMarche` : un club non amateur y proposait un salaire de zéro euro **et**
+aucun défraiement, c'est-à-dire un contrat vide. On rampe désormais linéairement
+du néant vers la vedette, et **`partAmateur` lit la table** — un étage où
+personne n'est payé n'a aucun club employeur.
+
+### Trois lignes de budget séparées
+
+Demande : « plutôt que d'avoir un budget transferts à la FIFA, sépare les
+lignes ». `financesDuClub` rend le **budget du club**, le **plafond de masse
+salariale**, l'enveloppe **recrutement** (3 % du budget) et l'enveloppe
+**structure** (6 %). `budgetsDuClub` y ajoute la garde sur la masse déjà engagée.
+
+Le salary cap **mord vraiment** : le Stade Toulousain démarre à 7 660 000 €
+engagés sous un plafond de 11 000 000 €, soit de la place pour **trois vedettes**
+et pas une de plus. La signature est refusée si `masseSalarialeActuelle +
+salaire > budgetSalarial`, indépendamment de l'argent en caisse — « tu peux avoir
+énormément d'argent en banque et quand même être incapable de recruter Dupont ».
+
+### ⚠️ ET ÇA A CASSÉ LES INSTALLATIONS, EN SILENCE
+
+Le défaut le plus instructif du lot, et il ne se voyait nulle part.
+`installations.ts` calculait l'enveloppe structure avec sa **propre** formule
+(`(force − 31)² × 1 100 × facteurEtage`, une copie de `facteurNiveau`) pendant
+que la fin de saison la versait depuis `budgetsDuClub`. Le jour où le budget des
+clubs est passé aux fourchettes réelles, le **revenu** a suivi et le **prix** est
+resté sur l'ancienne courbe :
+
+| | centre complet, en saisons de revenus |
+|---|---|
+| Top 14 | 12,0 |
+| Nationale 2 | **110,4** |
+| Fédérale 2 | **121,2** |
+| Fédérale 3 | **136,0** |
+
+Tout le lot « installations » était **mort sous la Nationale**, et
+`verifInstallations` restait au vert — il ne contrôlait qu'un seuil en euros
+(« l'enveloppe de Régionale 3 est entre 40 000 et 60 000 € »), c'est-à-dire
+exactement le genre de test qui ne survit pas à une refonte du budget.
+
+- **La copie a disparu.** `budgetStructure` délègue à `financesDuClub`, et
+  `facteurEtage` / `facteurNiveau` — deux restes de l'ancienne formule que plus
+  rien ne lisait — ont été **supprimées**. Une courbe morte qui semble encore
+  faire autorité, c'est la leçon déjà payée avec `OVAS_PIECE_MAJEURE`.
+- **Le store lit l'enveloppe au même endroit des deux côtés** : le prix d'une
+  marche est écrit en SAISONS d'enveloppe (`COUT_PAR_NIVEAU`), donc le prix de
+  référence DOIT être l'enveloppe réellement versée. Mesuré après : **10,1
+  saisons à tous les étages**, l'écart haut-bas tombant à 1,0 saison.
+- **Le banc ne contrôle plus un montant, il contrôle un EFFORT** — c'est la
+  seule forme qui survivra à la prochaine refonte.
+
+### ⚠️ SAUVEGARDE VERSION 20 — les trois enveloppes sont remises à leur niveau
+
+Les budgets d'avant cette version sortaient de l'ancienne formule. Mesuré sur une
+carrière de chantier : l'US Oyonnax gardait **34 682 500 €** de budget transferts,
+alors que la Pro D2 entière tourne autour de 10,7 M€ de produits d'exploitation.
+Un magot pareil rend le nouveau marché sans objet — plus rien n'a de prix quand
+on peut tout acheter.
+
+⚠️ **ON REMET, ON NE PLAFONNE PAS.** Un plafonnement laisserait la caisse pleine
+à ras bord, c'est-à-dire le même problème en plus discret. Et ce qui est perdu
+n'a jamais été gagné : c'est un chiffre produit par une formule qu'on vient de
+retirer. Vérifié en jeu : 34 682 500 € → 540 000 €.
+
+### Ce qui n'a PAS bougé
+
+⚠️ **AUCUN CRITÈRE SPORTIF.** `cote()` et sa pondération 75/25, le plafond selon
+l'âge, l'interdiction de sauter deux étages, la fenêtre basse progressive et
+`besoinAuPoste` sont **intacts** : ce lot change ce qu'un transfert COÛTE, pas
+qui a le droit de se manifester. `salaire()` d'`offres.ts` est réduite à une
+délégation d'une ligne vers `salaireAnnuel` — il n'y a plus deux barèmes.
+
+⚠️ **ET L'ÉTALONNAGE DE DIFFICULTÉ N'A PAS PU ÊTRE REMESURÉ** :
+`verifDifficulte.ts` et `verifHonneurs.ts` sont cassés depuis la suppression du
+mode « saison par saison » (voir « LES SCRIPTS DE MESURE NE MESURENT PLUS RIEN »)
+— ils comptent des saisons **sans un seul match joué**. S'en servir pour
+retoucher l'économie reviendrait à corriger le jeu pour compenser un test faux.
+
+```bash
+npx vite-node scripts/verifEconomieClubs.ts # les 10 étages contre la table, le cap, le marché gratuit
+npx vite-node scripts/verifInstallations.ts # ⚠️ section 2 : prix et revenu partent de la MÊME enveloppe
+npx vite-node scripts/verifMarche.ts        # aucun contrat vide, la part d'amateurs par étage
+npx vite-node scripts/verifTransferts.ts    # la négociation et ses règles de fenêtre
+npx vite-node scripts/verifManager.ts       # la carrière d'entraîneur, budgets compris
+```

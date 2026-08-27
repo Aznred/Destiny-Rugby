@@ -1,4 +1,6 @@
 // Types du domaine — Destiny Rugby 🏉
+import type { SituationRecrutement } from './lib/economie';
+export type { SituationRecrutement };
 
 // Les 15 postes du rugby, du pilier gauche (1) à l'arrière (15).
 export type PosteId =
@@ -634,11 +636,26 @@ export interface CibleRecrutementManager {
   potentiel: number;
   nation: string;
   /**
-   * Indemnité de transfert réclamée par le club vendeur.
-   * ⚠️ VAUT 0 À PARTIR DE LA NATIONALE 2 (niveau >= 4) : sous cet étage, le
-   * rugby français est amateur et les clubs ne se vendent pas de joueurs.
+   * Indemnité RÉELLEMENT réclamée pour le libérer maintenant.
+   *
+   * ⚠️ ELLE VAUT 0 EN FIN DE CONTRAT, et c'est le cœur du marché du rugby
+   * français : on attend, et on ne paie rien — mais les autres clubs attendent
+   * aussi. Elle vaut 0 également à partir de la Nationale 2, où l'on ne se vend
+   * pas de joueurs. Voir `indemniteDeRachat` (`lib/economie.ts`).
    */
   indemnite: number;
+  /**
+   * Ce que le joueur VAUT, indépendamment de ce qu'il coûte.
+   *
+   * ⚠️ C'est une valeur de jeu, pas un prix : elle sert à comparer deux cibles
+   * et à cadrer une négociation. Un joueur estimé 250 000 € en dernière année
+   * de contrat se libère pour 40 000 € — et pour rien du tout six mois plus
+   * tard.
+   */
+  valeur: number;
+  /** Saisons de contrat restantes chez son club. 0 = il sera libre. */
+  saisonsRestantes: number;
+  situation: SituationRecrutement;
   /** Salaire annuel réclamé. 0 chez un club amateur, qui ne salarie personne. */
   salaireDemande: number;
   /** Prime à la signature. 0 chez un club amateur. */

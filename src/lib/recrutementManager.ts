@@ -9,11 +9,13 @@ import type {
   TermesRecrutementManager,
 } from '../types';
 import { COMPETITIONS, competitionDuClub } from '../data/clubs';
-import { effectifDuClub } from './effectif';
+import { effectifDuClub, forceMoyenneDivision } from './effectif';
 import { graine } from './championnat';
 import { pseudoStable } from './comptes';
 import { primeDeMatch, salaire } from './offres';
-import { budgetStructure } from './installations';
+import {
+  financesDuClub, indemniteDeRachat, salaryCap, situationDe, valeurEstimee,
+} from './economie';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LE RÉGIME ÉCONOMIQUE D'UN CLUB — professionnel ou amateur
@@ -44,15 +46,6 @@ export function estAmateurNiveau(niveau: number): boolean {
   return niveau > PRO_JUSQUA;
 }
 
-/**
- * Le coefficient de richesse d'un étage. ⚠️ C'est LA MÊME fonction pour le prix
- * d'un joueur et pour le budget d'un club : c'est ce qui garantit que le
- * rapport prix/budget reste constant d'une division à l'autre, au lieu de
- * dépendre de deux courbes qu'on aurait réglées séparément.
- */
-export function facteurNiveau(niveau: number): number {
-  return Math.max(0.28, 1.1 - niveau * 0.075);
-}
 export type LevierRecrutementManager = 'salaire' | 'prime' | 'duree' | 'role';
 
 const ORDRE_ROLE: RoleRecrueManager[] = ['espoir', 'rotation', 'cadre'];
@@ -69,34 +62,76 @@ export function forceDuGroupe(club: string, saison: number): number {
   return notes.reduce((s, n) => s + n, 0) / notes.length;
 }
 
+/**
+ * LES ENVELOPPES D'UN CLUB.
+ *
+ * ⚠️ ELLES NE SORTENT PLUS DE LA FORCE DU GROUPE, ET C'ÉTAIT LE BUG. L'ancienne
+ * formule (`(force − 31)² × k × facteurNiveau`) faisait dépendre le budget de
+ * la seule qualité de l'effectif : mesuré, un bon club de Nationale 2 (force
+ * 60,5) affichait **1 230 000 € de masse salariale contre 1 110 000 € pour un
+ * club moyen de Nationale** (58,3). Une pyramide dont l'étage inférieur paie
+ * mieux n'est pas une pyramide.
+ *
+ * On lit désormais la table d'étage (`lib/economie.ts`), et la force ne sert
+ * plus qu'à PLACER le club dans la fourchette de sa division. La hiérarchie est
+ * donc vraie par construction.
+ *
+ * ⚠️ ET `transferts` A CHANGÉ DE NATURE. Ce n'était pas une enveloppe de
+ * transferts, c'était le budget du club : 28 650 000 € en Top 14, de quoi
+ * acheter deux joueurs à 13 M€. Le rugby français n'achète presque personne —
+ * on attend les fins de contrat. C'est maintenant 3 % du budget, soit ~1 M€ en
+ * Top 14 : de quoi libérer deux joueurs en cours de contrat dans l'année.
+ */
 export function budgetsDuClub(club: string, saison: number): {
-  transferts: number; salarial: number; structure: number;
+  transferts: number; salarial: number; structure: number; budget: number;
 } {
   const force = forceDuGroupe(club, saison);
-  const niveau = competitionDuClub(club)?.niveau ?? 8;
-  const facteur = facteurNiveau(niveau);
-  const brut = (force - 31) ** 2;
-  // ⚠️ CHEZ UN CLUB AMATEUR, « BUDGET TRANSFERTS » NE VEUT PLUS RIEN DIRE — il
-  // n'y a plus rien à acheter. L'enveloppe devient un BUDGET DE FONCTIONNEMENT
-  // (frais de mutation, structures), d'où le coefficient 0,18 et le plancher
-  // abaissé de 150 000 à 60 000 €. Mesuré, l'ancien plancher était précisément
-  // ce qui rendait la Régionale 3 absurde : 150 000 € affichés pour un club de
-  // village, à côté de joueurs facturés 2,4 M€. Laisser le chiffre tel quel en
-  // l'ignorant aurait été pire : un nombre mort à l'écran, et l'écran affiche
-  // les deux enveloppes.
-  const amateur = estAmateurNiveau(niveau);
+  const comp = competitionDuClub(club);
+  const niveau = comp?.niveau ?? 8;
+  // La référence, c'est ce que pèsent VRAIMENT les effectifs de la division.
+  const f = financesDuClub(force, niveau, comp ? forceMoyenneDivision(comp.id, saison) : undefined);
+
+  // ⚠️ LE PLAFOND NE PEUT PAS ÊTRE INFÉRIEUR À CE QUE LE CLUB PAIE DÉJÀ, et
+  // c'est une leçon de mesure. Le placement dans la fourchette d'étage et la
+  // somme des salaires individuels sont deux formules INDÉPENDANTES : elles ne
+  // s'accordent jamais parfaitement, et il suffit d'un écart pour qu'un club se
+  // retrouve à 103 % ou 125 % de son propre plafond — donc dans l'incapacité de
+  // recruter qui que ce soit, dès la première seconde, sans explication.
+  // Un club a toujours au moins 15 % de marge sur sa masse actuelle : c'est ce
+  // qui rend la contrainte lisible (« il te reste X ») plutôt qu'absurde.
+  const engagee = masseSalarialeActuelle(club, saison);
+  const cap = salaryCap(niveau);
+  const plancher = Math.round(engagee * 1.15 / 10_000) * 10_000;
+  const salarial = Math.min(cap ?? Number.POSITIVE_INFINITY, Math.max(f.masseMax, plancher));
+
   return {
-    transferts: amateur
-      ? arrondir(Math.max(60_000, brut * 8_200 * facteur * 0.18), 5_000)
-      : arrondir(Math.max(150_000, brut * 8_200 * facteur), 25_000),
-    salarial: arrondir(Math.max(90_000, brut * 1_850 * facteur), 10_000),
-    // ⚠️ LA TROISIÈME ENVELOPPE SORT D'ICI, avec les deux autres, et pas d'un
-    // coin du store : c'est ce qui garantit qu'elles partent toutes du même
-    // point d'origine (`force − 31`) et gardent donc le même rapport entre
-    // elles à tous les étages. Sa formule vit dans `lib/installations.ts`,
-    // qui est pur et mesurable sans navigateur.
-    structure: budgetStructure(force, niveau),
+    budget: f.budget,
+    transferts: f.recrutement,
+    salarial,
+    structure: f.structure,
   };
+}
+
+/**
+ * Ce que le club paie DÉJÀ à ses joueurs — la masse salariale consommée.
+ *
+ * ⚠️ SANS ELLE, LE PLAFOND NE VEUT RIEN DIRE. « Tu peux avoir énormément
+ * d'argent en banque et quand même être incapable de recruter Dupont parce que
+ * tu n'as plus assez de place sous ton salary cap » : c'est la demande, et elle
+ * suppose de savoir ce qui est déjà engagé. On l'estime sur l'effectif réel,
+ * chaque joueur au tarif de son écart au groupe — la même courbe que celle qui
+ * fixe ce qu'on proposera à une recrue.
+ */
+export function masseSalarialeActuelle(club: string, saison: number): number {
+  const niveau = competitionDuClub(club)?.niveau ?? 8;
+  if (estAmateurNiveau(niveau)) return 0;
+  const force = forceDuGroupe(club, saison);
+  let total = 0;
+  // Les 30 premiers : au-delà, ce sont des jeunes du centre qui ne pèsent rien.
+  for (const j of effectifDuClub(club, saison)) {
+    total += salaire(niveau, j.note - force, j.age);
+  }
+  return Math.round(total / 10_000) * 10_000;
 }
 
 function roleAttendu(note: number, potentiel: number, age: number, forceClub: number): RoleRecrueManager {
@@ -149,7 +184,15 @@ function ciblePour(
   // en multiplicateur, un espoir coûtait presque tout le budget d'un club.
   // Le +10 borne la spéculation : on ne paie jamais un joueur plus de dix points
   // au-dessus de ce qu'il vaut aujourd'hui, sinon il jouerait déjà plus haut.
-  const indemnite = amateur ? 0 : valeurMarchande(joueur, niveauVendeur, rarete);
+  // ⚠️ LA VALEUR N'EST PAS LE PRIX, ET C'EST TOUT LE MODÈLE. « Cette valeur ne
+  // signifie pas qu'un club paie réellement cette somme à chaque changement de
+  // club » : on affiche donc ce que le joueur VAUT, et on ne réclame que ce
+  // qu'il faut pour le LIBÉRER avant la fin de son contrat — zéro s'il arrive
+  // au bout, et jamais plus que ce que son étage sait négocier.
+  const valeur = amateur ? 0 : valeurMarchande(joueur, niveauVendeur, rarete);
+  const saisonsRestantes = saisonsDeContrat(club, joueur.id, saison);
+  const situation = situationDe(saisonsRestantes, joueur.age, niveauVendeur);
+  const indemnite = indemniteDeRachat(valeur, saisonsRestantes, niveauVendeur);
 
   // ⚠️ UNE SEULE ÉCHELLE DE RÉMUNÉRATION DANS LE JEU. Le manager réclamait
   // `valeur² × 180`, soit une QUATRIÈME formule de salaire (après `offres.ts`,
@@ -185,6 +228,9 @@ function ciblePour(
     potentiel: joueur.potentiel,
     nation: joueur.nation,
     indemnite,
+    valeur,
+    saisonsRestantes,
+    situation,
     salaireDemande,
     // Un club amateur ne verse aucune prime à la signature : il n'a pas de
     // trésorerie pour ça. Même règle que côté joueur (`offres.ts`).
@@ -218,14 +264,28 @@ export function valeurMarchande(
   rarete = 1,
 ): number {
   if (estAmateurNiveau(niveau)) return 0;
-  const jeunesse = joueur.age <= 24 ? 1.25 : joueur.age >= 32 ? 0.55 : 1;
-  // Le potentiel entre DANS le carré au lieu de le multiplier — en
-  // multiplicateur, un espoir coûtait presque tout le budget d'un club. Le +10
-  // borne la spéculation : on ne paie jamais dix points au-dessus de la note du
-  // jour, sinon le joueur jouerait déjà plus haut.
-  const marge = Math.max(0, joueur.potentiel - joueur.note);
-  const valeurJoueur = Math.max(0, joueur.note - 31) + Math.min(10, marge * 0.4);
-  return arrondir(valeurJoueur ** 2 * 3_000 * facteurNiveau(niveau) * jeunesse * rarete, 25_000);
+  return arrondir(valeurEstimee(joueur) * rarete, 5_000);
+}
+
+/**
+ * COMBIEN DE SAISONS DE CONTRAT IL RESTE À UN JOUEUR DU MONDE.
+ *
+ * ⚠️ AUCUN JOUEUR DU JEU N'AVAIT DE CONTRAT — seul le joueur incarné en a un.
+ * Or c'est LA donnée qui commande tout le nouveau marché : à zéro saison, le
+ * transfert est gratuit et n'importe qui peut se manifester. On la tire donc,
+ * de façon déterministe (graine = joueur + club), sur une durée de vie de
+ * contrat crédible, et on la fait courir avec les saisons.
+ *
+ * ⚠️ ET ELLE EST STABLE D'UNE CONSULTATION À L'AUTRE : rouvrir le marché ne
+ * redonne pas trois ans à un joueur qui était en fin de contrat. C'est la même
+ * protection anti-save-scumming que les plafonds cachés des négociations.
+ */
+export function saisonsDeContrat(club: string, idJoueur: string, saison: number): number {
+  const rng = graine(`contrat#${club}#${idJoueur}`);
+  const duree = 2 + Math.floor(rng() * 3); // 2 à 4 saisons
+  const debut = Math.floor(rng() * duree); // là où il en était à la saison 1
+  const ecoulees = (debut + saison - 1) % duree;
+  return duree - ecoulees - 1;
 }
 
 export function ciblesDuMarche(

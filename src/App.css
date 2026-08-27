@@ -6233,3 +6233,10 @@ select:focus {
   text-transform: uppercase;
   margin-bottom: .45rem;
 }
+
+/* Le marché du manager : la valeur n'est pas le prix, et ça doit se voir. */
+.manager-cible-chiffres .gratuit b { color:#00ba7c; }
+.manager-cible-situation { margin:.35rem 0 0; color:var(--craie-dim); font-size:.74rem; line-height:1.35; }
+.manager-cible-situation.libre,.manager-cible-situation.finDeContrat { color:#7fd6a6; }
+.manager-cible-situation.sousContrat { color:var(--craie-dim); }
+.manager-budgets .masse-saturee b { color:#e8734a; }

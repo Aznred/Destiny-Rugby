@@ -7,8 +7,9 @@
 //
 // Ce que ce script contrôle :
 //   1. la troisième enveloppe est cohérente avec les deux autres ;
-//   2. ⚠️ `facteurEtage` ne peut pas diverger de `facteurNiveau` (c'est une
-//      copie assumée, et une copie sans garde-fou finit toujours par mentir) ;
+//   2. ⚠️ le PRIX d'une marche et le REVENU d'une saison partent de la MÊME
+//      enveloppe — c'est le contrôle qui manquait, et son absence a rendu tout
+//      le lot injouable sous la Nationale lors d'une refonte du budget ;
 //   3. le centre de formation achète une LOI DE TIRAGE, pas des joueurs ;
 //   4. le programme individuel ne dépasse jamais le potentiel, et ne réécrit
 //      pas les saisons déjà jouées ;
@@ -20,10 +21,10 @@
 
 import { COMPETITIONS, NOTE_PAR_NIVEAU } from '../src/data/clubs';
 import { effectifDuClub, forceEffectif, PART_PEPITE, setApportsDuCentre } from '../src/lib/effectif';
-import { budgetsDuClub, facteurNiveau } from '../src/lib/recrutementManager';
+import { budgetsDuClub } from '../src/lib/recrutementManager';
 import {
   CLUBS_OBSERVES, INCERTITUDE_RECRUTEURS, NIVEAU_INSTALLATION_MAX, PLACES_ENTRAINEMENT,
-  budgetStructure, coutAmelioration, facteurEtage, gainEntrainement, installationsVierges,
+  coutAmelioration, gainEntrainement, installationsVierges,
 } from '../src/lib/installations';
 import { promotionDuCentre } from '../src/lib/formation';
 import { explorer, fenetreDeProspection } from '../src/lib/recruteurs';
@@ -70,25 +71,65 @@ const troisOk = TEMOINS.every(([club]) => {
 ligne('la structure reste sous la masse salariale', troisOk ? 'aux trois étages' : 'non', troisOk);
 
 // Le plancher amateur : un club de village a de quoi construire, un jour.
-const r3 = budgetStructure(33, 10);
-ligne('un club de Régionale 3 a une enveloppe', `${r3} €`, r3 >= 40_000 && r3 <= 60_000);
+// ⚠️ ON NE CONTRÔLE PLUS UN MONTANT. L'ancienne version exigeait « entre 40 000
+// et 60 000 € » : un seuil en euros ne survit pas à une refonte du budget, et
+// c'est précisément ce qui s'est passé — il est resté au vert pendant que le
+// lot devenait injouable. Ce qui compte, c'est l'EFFORT que ça représente, et
+// c'est la section 2 qui le mesure.
+const r3 = budgetsDuClub('Parentis', 1).structure;
+ligne('un club de Régionale 3 a une enveloppe', `${r3} €`, r3 > 0);
 
 // ---------------------------------------------------------------------------
-console.log('\n=== 2. ⚠️ LA COPIE DE `facteurNiveau` NE PEUT PAS DIVERGER ===');
+console.log('\n=== 2. ⚠️ LE PRIX ET LE REVENU PARTENT DE LA MÊME ENVELOPPE ===');
 // ---------------------------------------------------------------------------
-// `lib/installations.ts` recopie la courbe de richesse plutôt que d'importer
-// `recrutementManager.ts`, qui traîne tout `effectif.ts` derrière lui. Une
-// copie sans garde-fou finit toujours par mentir : on la compare valeur par
-// valeur, sur les onze étages du jeu.
-const ecarts = Array.from({ length: 11 }, (_, n) => Math.abs(facteurEtage(n) - facteurNiveau(n)));
-const pireEcart = Math.max(...ecarts);
-ligne('les deux courbes de richesse sont identiques',
-  `écart max ${pireEcart}`, pireEcart < 1e-9);
+// ⚠️ C'EST LE CONTRÔLE QUI MANQUAIT, ET SON ABSENCE A COÛTÉ TOUT LE LOT.
+// `installations.ts` calculait l'enveloppe avec sa PROPRE formule — une copie
+// de `facteurNiveau` — pendant que la fin de saison la versait depuis
+// `budgetsDuClub`. Le jour où le budget des clubs est passé aux fourchettes
+// réelles, le REVENU a suivi et le PRIX est resté sur l'ancienne courbe :
+// mesuré, un centre complet demandait 121 saisons de revenus en Fédérale 2
+// contre les 10 prévues. Tout le lot était mort sous la Nationale, et le banc
+// d'essai restait au vert parce qu'il ne contrôlait qu'un montant en euros.
+//
+// La copie a disparu (`budgetStructure` délègue à `financesDuClub`), mais on
+// ne se contente pas de la supprimer : le prix d'une marche est écrit en
+// SAISONS d'enveloppe (`COUT_PAR_NIVEAU`), donc on mesure ce que ça coûte
+// VRAIMENT à chaque étage. C'est la seule forme de contrôle qui survive à la
+// prochaine refonte du budget.
+console.log('\n  étage        | enveloppe/saison | centre complet | en saisons');
+const PYRAMIDE: [string, string][] = [
+  ['Stade Toulousain', 'Top 14'], ['US Oyonnax', 'Pro D2'], ['SC Albi', 'Nationale'],
+  ['RC Orléans', 'Nationale 2'], ['U S Nafarroa', 'Fédérale 1'], ['R C Sablais', 'Fédérale 2'],
+  ['R C Teillois', 'Fédérale 3'], ['Orsay', 'Régionale 1'], ['Chartreuse', 'Régionale 2'],
+  ['Parentis', 'Régionale 3'],
+];
+const courbes = PYRAMIDE.map(([club, nom]) => {
+  const env = budgetsDuClub(club, 1).structure;
+  let cumul = 0;
+  for (let n = 0; n < NIVEAU_INSTALLATION_MAX; n++) cumul += coutAmelioration(n, env)!;
+  const enSaisons = cumul / env;
+  console.log(
+    `  ${nom.padEnd(12)} | ${env.toLocaleString('fr-FR').padStart(16)} | `
+    + `${cumul.toLocaleString('fr-FR').padStart(14)} | ${enSaisons.toFixed(1)}`,
+  );
+  return { nom, enSaisons };
+});
+const hors = courbes.filter((c) => c.enSaisons < 8 || c.enSaisons > 13);
+ligne('un centre complet coûte le même effort partout',
+  hors.length ? hors.map((c) => `${c.nom} ${c.enSaisons.toFixed(1)}`).join(', ')
+    : `8 à 13 saisons aux ${courbes.length} étages`,
+  hors.length === 0);
+// ⚠️ ET AUCUN ÉTAGE N'EST LAISSÉ POUR COMPTE. C'était la forme exacte du bug :
+// jouable en Top 14, hors de portée en Fédérale, sans un avertissement.
+const ecartEtages = Math.max(...courbes.map((c) => c.enSaisons))
+  - Math.min(...courbes.map((c) => c.enSaisons));
+ligne('… et l’écart entre le haut et le bas reste faible',
+  `${ecartEtages.toFixed(1)} saison(s)`, ecartEtages <= 2);
 
 // ---------------------------------------------------------------------------
 console.log('\n=== 3. LE COÛT D’UN CENTRE COMPLET ===');
 // ---------------------------------------------------------------------------
-const enveloppe = budgetStructure(forceEffectif('RC Orléans', 1), 4);
+const enveloppe = budgetsDuClub('RC Orléans', 1).structure;
 let total = 0;
 const marches: string[] = [];
 for (let n = 0; n < NIVEAU_INSTALLATION_MAX; n++) {

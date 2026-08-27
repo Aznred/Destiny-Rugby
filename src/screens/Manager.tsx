@@ -15,7 +15,7 @@ import { TROPHEES } from '../data/trophees';
 import { nomPoste, POSTES } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
 import { CompositionTerrainManager } from '../components/CompositionTerrainManager';
-import { ciblesDuMarche } from '../lib/recrutementManager';
+import { ciblesDuMarche, masseSalarialeActuelle } from '../lib/recrutementManager';
 import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
   noteMaximale, salaireManager,
@@ -68,6 +68,9 @@ export function Manager() {
     : 0;
   const placesEntrainement = PLACES_ENTRAINEMENT[Math.min(murs.entrainement, NIVEAU_INSTALLATION_MAX)];
   const rapportsFrais = manager?.rapports?.filter((r) => r.saison >= (manager.saison ?? 0)).length ?? 0;
+  // La masse déjà engagée : c'est elle qui bloque une signature, pas le solde.
+  const masseEngagee = manager?.club ? masseSalarialeActuelle(manager.club, manager.saison) : 0;
+  const masseSaturee = !!manager && masseEngagee >= manager.budgetSalarial * 0.92;
   const [raccrocher, setRaccrocher] = useState(false);
   const [clubVise, setClubVise] = useState('');
   const [divisionMarche, setDivisionMarche] = useState(manager?.division ?? 'top14');
@@ -521,7 +524,16 @@ export function Manager() {
             <div className="manager-marche">
               <div className="carte manager-marche-tete">
                 <div><div className="eyebrow">{t('mgr.baseMondiale')}</div><h2>🌍 {t('mgr.marcheTitre')}</h2><p>{t('mgr.marcheIntro')}</p></div>
-                <div className="manager-budgets resume"><span>{t('mgr.transferts')} <b>{nombre(manager.budgetTransferts)} €</b></span><span>{t('mgr.salaires')} <b>{nombre(manager.budgetSalarial)} €</b></span></div>
+                {/* ⚠️ LA MASSE ENGAGÉE PASSE DEVANT LE PLAFOND. Un plafond seul
+                    ne dit rien : ce qu'un manager doit lire avant d'ouvrir une
+                    négociation, c'est ce qu'il lui RESTE. */}
+                <div className="manager-budgets resume">
+                  <span>{t('mgr.inst.budget')} <b>{nombre(manager.budgetStructure)} €</b></span>
+                  <span>{t('mgr.transferts')} <b>{nombre(manager.budgetTransferts)} €</b></span>
+                  <span className={masseSaturee ? 'masse-saturee' : ''}>
+                    {t('mgr.salaires')} <b>{nombre(masseEngagee)} / {nombre(manager.budgetSalarial)} €</b>
+                  </span>
+                </div>
               </div>
               <div className="manager-filtres carte">
                 <Selecteur options={optionsDivisions} valeur={divisionMarche} onChange={(v) => { setDivisionMarche(v); setClubMarche(''); }} recherche />
@@ -553,7 +565,24 @@ export function Manager() {
                       <div className="manager-cible-corps">
                         <div className="manager-cible-identite"><Drapeau nation={cible.nation} taille={0.95} /><span><b>{cible.nom}</b><small>{nomPoste(cible.poste)} · {cible.age} {t('gen.ans')}</small></span></div>
                         <p>{clubCible && <Blason club={clubCible} taille={18} />} {cible.club}</p>
-                        <div className="manager-cible-chiffres"><span>{t('mgr.potentiel')} <b>{cible.potentiel}</b></span><span>{t('mgr.indemnite')} <b>{nombre(cible.indemnite)} €</b></span><span>{t('mgr.salaire')} <b>{nombre(cible.salaireDemande)} €</b></span></div>
+                        {/* ⚠️ LA VALEUR ET L'INDEMNITÉ SONT DEUX CHOSES, et les
+                            confondre était tout le défaut de l'ancien marché :
+                            on affichait un prix de football là où le rugby
+                            français attend la fin d'un contrat pour ne rien
+                            payer. On montre donc les deux, plus le temps qui
+                            reste — c'est lui qui décide du prix. */}
+                        <div className="manager-cible-chiffres">
+                          <span>{t('mgr.potentiel')} <b>{cible.potentiel}</b></span>
+                          <span>{t('mgr.valeur')} <b>{nombre(cible.valeur)} €</b></span>
+                          <span className={cible.indemnite === 0 ? 'gratuit' : ''}>
+                            {t('mgr.indemnite')} <b>{cible.indemnite === 0 ? t('mgr.libreGratuit') : `${nombre(cible.indemnite)} €`}</b>
+                          </span>
+                          <span>{t('mgr.salaire')} <b>{nombre(cible.salaireDemande)} €</b></span>
+                        </div>
+                        <p className={`manager-cible-situation ${cible.situation}`}>
+                          {t(`mgr.situation.${cible.situation}`)}
+                          {cible.saisonsRestantes > 0 && ` · ${t('mgr.contratRestant', { n: cible.saisonsRestantes })}`}
+                        </p>
                       </div>
                       <button
                         className="btn primaire"

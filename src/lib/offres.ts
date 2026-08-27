@@ -13,12 +13,21 @@ import { graine } from './championnat';
 import { POSTE_PAR_ID } from '../data/rugby';
 import { effetsTraits } from '../data/traits';
 import { agentDe } from '../data/agents';
+import { etagePaieUnSalaire, salaireAnnuel } from './economie';
 
 // Salaire annuel de référence par niveau de division (€). En dessous de la
 // Fédérale 1, c'est du rugby amateur : quelques défraiements, pas un métier.
+/**
+ * ⚠️ CETTE TABLE A ÉTÉ REMPLACÉE PAR `lib/economie.ts`, et elle ne subsiste que
+ * pour les appelants qui veulent l'ordre de grandeur d'un étage sans passer par
+ * un joueur. Les valeurs sont désormais celles de la table économique réelle
+ * (produits LNR, minima de l'accord collectif) : un salaire de Top 14 n'est plus
+ * « 300 000 € × un facteur borné à 1,8 » mais une interpolation entre le tarif
+ * d'un titulaire et celui d'une vedette. Voir `salaireAnnuel`.
+ */
 export const SALAIRE_PAR_NIVEAU: Record<number, number> = {
-  0: 260000, 1: 300000, 2: 90000, 3: 42000, 4: 18000,
-  5: 9000, 6: 4500, 7: 2400, 8: 1200, 9: 800, 10: 500,
+  0: 230000, 1: 250000, 2: 70000, 3: 35000, 4: 20000,
+  5: 12000, 6: 5700, 7: 2400, 8: 1500, 9: 900, 10: 400,
 };
 
 /** Ce que la notoriété peut ajouter, au maximum, au-dessus du niveau réel. */
@@ -60,16 +69,16 @@ export function cote(j: Joueur): number {
  * bouteille jusqu'à 23 ans, touche le plein tarif entre 25 et 31, et voit son
  * contrat se resserrer après 33.
  */
+/**
+ * ⚠️ UNE SEULE ÉCHELLE DE SALAIRE DANS LE JEU, ET ELLE VIT DANS
+ * `lib/economie.ts`. Cette fonction n'est plus qu'un point d'entrée : le mode
+ * joueur, le marché du manager et les défraiements amateurs lisent tous la même
+ * courbe. Le jour où deux barèmes coexistent, c'est un jour où le jeu propose
+ * 42 000 € pour un poste que le manager facture 290 000 € — c'est arrivé, et
+ * c'est ce qui a motivé l'extraction.
+ */
 export function salaire(niveau: number, ecart: number, age: number): number {
-  const base = SALAIRE_PAR_NIVEAU[niveau] ?? 3000;
-  // Un joueur nettement au-dessus du club se fait payer davantage — mais moins
-  // qu'avant (2,2 → 1,8) : c'est un salaire, pas une prime de transfert.
-  const facteur = Math.max(0.55, Math.min(1.8, 1 + ecart / 15));
-  const parLAge = age <= 20 ? 0.55 : age <= 23 ? 0.78 : age <= 24 ? 0.92
-    : age <= 31 ? 1 : age <= 33 ? 0.9 : 0.72;
-  const brut = base * facteur * parLAge;
-  const arrondi = brut > 50000 ? 5000 : brut > 10000 ? 1000 : 100;
-  return Math.round(brut / arrondi) * arrondi;
+  return salaireAnnuel(niveau, ecart, age);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -90,6 +99,12 @@ const PART_AMATEUR: Record<number, number> = {
 };
 
 export function partAmateur(niveau: number, etranger: boolean): number {
+  // ⚠️ UN ÉTAGE OÙ PERSONNE N'EST PAYÉ N'A AUCUN CLUB EMPLOYEUR. La table
+  //    économique donne un salaire typique nul en Régionale 2 et 3 ; y laisser
+  //    8 à 10 % de clubs « professionnels » leur faisait proposer un salaire de
+  //    zéro euro SANS défraiement — un contrat vide, relevé par `verifMarche`.
+  //    La réponse se lit dans la table, elle ne se redéclare pas ici.
+  if (!etagePaieUnSalaire(niveau)) return 1;
   const base = PART_AMATEUR[niveau] ?? 0;
   // À l'étranger, hors élite, le statut professionnel est plus rare encore :
   // l'Ereklasse, la Bundesliga ou le Heartland Championship sont des
