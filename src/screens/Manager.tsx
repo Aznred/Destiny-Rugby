@@ -370,7 +370,13 @@ export function Manager() {
                 <div className="manager-note-compo"><b>{noteCompositionManager(effectif, composition).toFixed(1)}</b><span>note du XV</span></div>
               </section>
 
-              <CompositionTerrainManager effectif={effectif} composition={composition} onPlacer={changerJoueur} />
+              <CompositionTerrainManager
+                effectif={effectif}
+                composition={composition}
+                onPlacer={changerJoueur}
+                onCapitaine={(id) => definirComposition({ ...composition, capitaineId: id })}
+                onButeur={(id) => definirComposition({ ...composition, buteurId: id })}
+              />
 
               <section className="carte manager-roles-visuels">
                 <div><b>🪪 Rôles du groupe</b><span>Les badges C et 🎯 apparaissent directement sur les cartes.</span></div>

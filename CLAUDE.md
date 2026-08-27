@@ -9480,13 +9480,59 @@ neuf familles**, contre 4,4 avant. Le profil REDISTRIBUE, il n'ajoute jamais.
   parce que c'est une règle de rugby : sans elle, l'arbitre impose des mêlées
   simulées. Deux joueurs très fatigués sont un avertissement, pas un blocage.
 
-### ⚠️ CE QUI RESTE À FAIRE SUR CET ÉCRAN
+### 🃏 L'ÉCRAN DE COMPOSITION EST BRANCHÉ
 
-`carteJoueur.ts` est le **socle logique** ; `CompositionTerrainManager.tsx` (le
-terrain, le drag & drop, le tap mobile) existe déjà mais n'affiche encore que la
-note et le poste. Restent à brancher : les six stats sur la carte, les couleurs
-de statut, les badges, le panneau latéral, l'en-tête et les connexions entre
-joueurs — ces dernières pouvant lire `lib/cohesion.ts`, déjà écrit.
+`CompositionTerrainManager.tsx` lit désormais `lib/carteJoueur.ts`. Le terrain
+vertical, le glisser-déposer et le « touche puis touche » du mobile existaient
+déjà ; ce qui manquait, c'est tout ce qu'une carte peut dire.
+
+**La carte est un BILLET DE MATCH, pas un écusson.** Demande : « cartes type
+billet/stade/vestiaire plutôt que de trop ressembler aux cartes EA ». Trois
+choix écartent délibérément le look FUT :
+
+1. un **talon perforé** de 17 px à gauche, bord en pointillés, avec le numéro de
+   maillot dedans comme un numéro de place ;
+2. le statut est une **bande de 3 px** en haut et un liseré, **jamais un fond
+   doré plein** — c'est le fond intégral qui fait la signature visuelle de FUT ;
+3. les six stats sont imprimées en petites capitales serrées, façon mentions
+   d'un ticket, pas en grosses colonnes centrées.
+
+**Les six stats sortent du poste OÙ IL EST ALIGNÉ**, pas de son poste naturel :
+déplacer un ailier à l'arrière change ce qu'on lit sur sa carte, parce que c'est
+à ce poste-là qu'on le jugera dimanche.
+
+⚠️ **LE TERRAIN DOIT GRANDIR AVEC LES CARTES.** `PLACEMENT_XV` est en
+POURCENTAGES : deux lignes séparées de 13 % ne s'écartent vraiment que si le
+terrain est assez haut. Avec l'ancienne carte de 94 px ça passait ; avec la
+nouvelle, mesuré à l'écran, **douze paires de cartes se chevauchaient** sur un
+terrain plafonné à 505 px par une media query. Le terrain passe à 860 px, la
+carte prend la largeur de son emplacement au lieu d'une largeur fixe qui
+débordait, et le pied de carte ne revient plus à la ligne — cinq chevauchements
+avaient survécu au premier correctif parce que deux badges de plus faisaient
+grandir la carte de dix pixels. **Zéro chevauchement** après correction.
+
+⚠️ **CE QU'ON N'A PAS, ON NE L'INVENTE PAS.** La condition et la forme d'un
+joueur d'effectif n'existent pas encore en mode manager. Les afficher au jugé
+donnerait des chiffres crédibles et faux — pire que de ne rien montrer. `etats`
+et `automatismes` sont donc des props **facultatives**, et les jauges
+correspondantes disparaissent quand elles sont absentes. Le jour où
+`lib/entrainementPro.ts` et `lib/cohesion.ts` seront branchés sur le store,
+il n'y aura qu'à les passer.
+
+Vérifié à l'écran : 23 cartes (15 + 8), en-tête à `NOTE ÉQUIPE 72 · ATTAQUE 78 ·
+DÉFENSE 75 · CONQUÊTE 79 · ⚠️ 2 joueurs hors poste · 🟢 Composition conforme`,
+panneau latéral de 300 px en colonne à partir de 1120 px, brassard posé depuis
+la carte, échange terrain↔terrain et banc→terrain fonctionnels, aucun
+débordement horizontal.
+
+⚠️ **UNE LIMITE DE LA VÉRIFICATION, DITE FRANCHEMENT** : le panneau d'aperçu de
+cette session ne composite pas d'images (aucune capture possible) et l'émulation
+n'est pas descendue sous **732 px**. Tous les chiffres ci-dessus sont des mesures
+exactes du DOM et des tests de collision `elementFromPoint`, pas des impressions
+visuelles — et la branche mobile du CSS (stats masquées, cartes à 75 px) est bien
+active à 732 px. **Le rendu à 375 px n'a pas pu être constaté**, seulement déduit :
+le banc a son propre conteneur défilant et `.ct-plateau` utilise `minmax(0, 1fr)`,
+les deux motifs que le projet impose déjà.
 
 ```bash
 npx vite-node scripts/verifClubEconomie.ts # fanbase, stade, prix, sponsors, conseil, dette

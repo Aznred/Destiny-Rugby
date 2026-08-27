@@ -242,7 +242,19 @@ export function facteurDePerformance(a: Adequation): number {
 
 export type BadgeCarte = 'enForme' | 'blesse' | 'suspendu' | 'espoir' | 'international' | 'fatigue';
 
+/**
+ * ⚠️ NIVEAU, CONDITION ET FORME SONT TROIS CHOSES DIFFÉRENTES — c'est la demande,
+ * et c'est aussi ce que `lib/entrainementPro.ts` modélise. Le NIVEAU est ce que
+ * le joueur sait faire, la CONDITION son état physique, la FORME le moment
+ * qu'il traverse. Les confondre, c'est perdre la question « dois-je titulariser
+ * le joueur de 76 qui est en feu plutôt que celui de 84 qui ne l'est pas ? ».
+ *
+ * ⚠️ TOUS LES CHAMPS SONT FACULTATIFS, et l'écran cache ce qu'il n'a pas. Le
+ * mode manager ne tient pas encore la condition de ses joueurs : afficher un
+ * chiffre au jugé donnerait une valeur crédible et fausse.
+ */
 export interface EtatDuJoueur {
+  condition?: number;
   forme?: number;
   fatigue?: number;
   blesse?: boolean;

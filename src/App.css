@@ -6499,3 +6499,229 @@ select:focus {
 .manager-cible-situation.libre,.manager-cible-situation.finDeContrat { color:#7fd6a6; }
 .manager-cible-situation.sousContrat { color:var(--craie-dim); }
 .manager-budgets .masse-saturee b { color:#e8734a; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   L'ÉCRAN DE COMPOSITION — cartes « billet de match »
+   ═══════════════════════════════════════════════════════════════════════════
+   Demande : « reprendre le plaisir du squad builder FUT mais avec un design
+   original rugby, par exemple cartes type billet/stade/vestiaire plutôt que de
+   trop ressembler aux cartes EA ».
+
+   ⚠️ TROIS CHOIX ÉCARTENT DÉLIBÉRÉMENT LE LOOK EA :
+
+     1. la carte est un BILLET, pas un écusson : talon perforé à gauche avec le
+        numéro de maillot dedans, comme un numéro de place ;
+     2. le statut est une BANDE en haut et un liseré, jamais un fond doré plein.
+        Une carte or intégrale, c'est la signature visuelle de FUT ;
+     3. les six stats sont imprimées en petites capitales serrées, façon
+        mentions d'un ticket, et non en grosses colonnes centrées.
+
+   ⚠️ ET LA COULEUR NE VAUT AUCUN POINT (voir `lib/carteJoueur.ts`) : elle sert
+   à lire un effectif d'un coup d'œil, pas à valoriser une carte. */
+
+.ct-carte {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 128px;
+  padding: 7px 8px 6px 20px;
+  text-align: left;
+  color: var(--craie);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 62px),
+    linear-gradient(158deg, var(--pelouse-700), var(--pelouse-800));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--rayon-sm);
+  box-shadow: var(--ombre-2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  cursor: grab;
+  transition: filter 0.14s ease, box-shadow 0.14s ease;
+}
+.ct-carte:hover { filter: brightness(1.07); }
+.ct-carte:active { cursor: grabbing; box-shadow: var(--ombre-1), inset 0 2px 6px rgba(0, 0, 0, 0.5); }
+.ct-carte:focus-visible { outline: 2px solid var(--or-400); outline-offset: 2px; }
+
+/* Le talon perforé : c'est lui qui fait le billet. */
+.ct-talon {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 17px;
+  display: grid;
+  place-items: center;
+  font: 700 11px/1 'Archivo', system-ui, sans-serif;
+  color: var(--craie-dim);
+  background: rgba(0, 0, 0, 0.26);
+  border-right: 1px dashed rgba(255, 255, 255, 0.28);
+  border-radius: var(--rayon-sm) 0 0 var(--rayon-sm);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.08em;
+}
+
+.ct-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.ct-note { font: 800 21px/1 'Anton', 'Archivo', sans-serif; letter-spacing: 0.02em; }
+.ct-poste { font: 700 9px/1 'Archivo', sans-serif; letter-spacing: 0.14em; color: var(--craie-dim); font-style: normal; }
+.ct-nom {
+  font: 700 11.5px/1.15 'Archivo', sans-serif;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ct-sous { display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: var(--craie-dim); }
+.ct-sous i { font-style: normal; }
+
+/* Les six stats : mentions de billet, deux colonnes de trois. */
+.ct-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px 8px;
+  margin-top: 3px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.16);
+}
+.ct-stats i { display: flex; justify-content: space-between; font-style: normal; font-size: 9.5px; }
+.ct-stats u { text-decoration: none; color: var(--craie-dim); letter-spacing: 0.06em; }
+.ct-stats b { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.ct-pied {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  margin-top: 3px; font-size: 9.5px; color: var(--craie-dim);
+}
+.ct-pied i { font-style: normal; }
+.ct-badge, .ct-role { font-size: 11px; }
+
+/* ── Le statut : une bande, pas un fond ───────────────────────────────────── */
+.ct-carte::before {
+  content: '';
+  position: absolute; inset: 0 0 auto 17px; height: 3px;
+  border-radius: 0 var(--rayon-sm) 0 0;
+  background: var(--ct-teinte, rgba(255, 255, 255, 0.22));
+}
+.ct-espoir { --ct-teinte: #6fd08c; }
+.ct-pro { --ct-teinte: rgba(255, 255, 255, 0.28); }
+.ct-international { --ct-teinte: #55a8f0; }
+.ct-star { --ct-teinte: #b483f0; }
+.ct-majeur {
+  --ct-teinte: var(--or-500);
+  box-shadow: var(--ombre-2), inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(232, 178, 58, 0.4);
+}
+.ct-vide { opacity: 0.55; border-style: dashed; cursor: pointer; }
+
+/* ── L'adéquation au poste : un liseré, jamais un malus sur la note ──────── */
+.ct-adq-secondaire { border-left: 3px solid #e8c15a; }
+.ct-adq-horsPoste { border-left: 3px solid #e3705f; }
+.ct-selection { outline: 2px solid var(--or-400); outline-offset: 2px; }
+
+.ct-compacte { width: 104px; padding-left: 19px; }
+.ct-compacte .ct-note { font-size: 18px; }
+
+/* ── L'en-tête ───────────────────────────────────────────────────────────── */
+.ct-entete {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px;
+  padding: 12px 14px; margin-bottom: 10px;
+  background: linear-gradient(160deg, var(--pelouse-700), var(--pelouse-800));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre-1), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.ct-note-equipe { display: flex; flex-direction: column; align-items: center; min-width: 76px; }
+.ct-note-equipe span { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--craie-dim); }
+.ct-note-equipe strong { font: 800 34px/1 'Anton', sans-serif; color: var(--or-400); }
+.ct-secteurs { display: flex; gap: 14px; margin: 0; }
+.ct-secteurs div { text-align: center; }
+.ct-secteurs dt { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--craie-dim); }
+.ct-secteurs dd { margin: 0; font: 700 19px/1.1 'Archivo', sans-serif; }
+.ct-cohesion { min-width: 190px; font-size: 11px; }
+.ct-cohesion progress { width: 100%; height: 7px; }
+.ct-cohesion em { color: var(--craie-dim); font-size: 10px; }
+.ct-cohesion ul { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 4px 0 0; padding: 0; list-style: none; }
+.ct-cohesion li { display: flex; gap: 4px; font-size: 10px; }
+.ct-cohesion li i { font-style: normal; color: var(--craie-dim); }
+.ct-alertes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; }
+.ct-alertes .ct-bloquant { color: #ffb3a6; }
+.ct-alertes .ct-attention { color: var(--or-200); }
+.ct-alertes .ct-ok { color: #9fe0b4; }
+
+/* ── Le plateau : terrain + panneau ───────────────────────────────────────── */
+/* ⚠️ minmax(0, 1fr) et non 1fr : « 1fr » vaut minmax(auto, 1fr), et cet auto est
+   le min-content du terrain — le piège déjà payé par .grille-poules et par la
+   feuille de match. */
+.ct-plateau { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (min-width: 1120px) { .ct-plateau { grid-template-columns: minmax(0, 1fr) 300px; } }
+
+.ct-panneau {
+  position: relative;
+  padding: 14px;
+  background: linear-gradient(165deg, var(--pelouse-700), var(--pelouse-800));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre-2), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.ct-panneau header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ct-panneau header b { font: 700 16px/1.2 'Archivo', sans-serif; }
+.ct-panneau header strong { font: 800 28px/1 'Anton', sans-serif; color: var(--or-400); }
+.ct-ident { margin: 2px 0 10px; font-size: 12px; color: var(--craie-dim); }
+.ct-adq-txt { display: block; margin-top: 4px; font-style: normal; }
+.ct-fermer {
+  position: absolute; top: 8px; right: 8px; width: 32px; height: 32px;
+  border-radius: var(--rayon-pilule); border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.24); color: var(--craie); cursor: pointer;
+}
+.ct-jauges label { display: grid; grid-template-columns: 74px 1fr 44px; align-items: center; gap: 6px; font-size: 11.5px; margin-bottom: 4px; }
+.ct-jauges progress { width: 100%; height: 8px; }
+.ct-jauges i { font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
+.ct-attributs { list-style: none; margin: 10px 0; padding: 0; }
+.ct-attributs li { display: grid; grid-template-columns: 38px 1fr 30px; align-items: center; gap: 6px; font-size: 11.5px; margin-bottom: 3px; }
+.ct-attributs progress { width: 100%; height: 8px; }
+.ct-attributs b { text-align: right; font-variant-numeric: tabular-nums; }
+.ct-brut summary { cursor: pointer; font-size: 11.5px; color: var(--craie-dim); }
+.ct-brut ul { list-style: none; margin: 6px 0 0; padding: 0; }
+.ct-brut li { display: flex; justify-content: space-between; font-size: 11.5px; }
+.ct-liaisons { margin-top: 10px; font-size: 11.5px; }
+.ct-liaisons span { display: flex; justify-content: space-between; margin-top: 3px; }
+.ct-liaisons .forte b { color: #9fe0b4; }
+.ct-liaisons .moyenne b { color: var(--or-200); }
+.ct-liaisons .faible b { color: #ffb3a6; }
+.ct-actions { display: flex; gap: 8px; margin-top: 12px; }
+.ct-actions button {
+  flex: 1; min-height: 44px; border-radius: var(--rayon-controle);
+  border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(0, 0, 0, 0.22);
+  color: var(--craie); font-size: 12px; cursor: pointer;
+}
+.ct-actions button[aria-pressed='true'] { border-color: var(--or-500); color: var(--or-200); }
+
+/* ⚠️ LE TERRAIN DOIT GRANDIR AVEC LES CARTES, et c'est ce que la première
+   version ratait. Les emplacements (`PLACEMENT_XV`) sont en POURCENTAGES : deux
+   lignes séparées de 13 % ne s'écartent vraiment que si le terrain est assez
+   haut. Avec l'ancienne carte de 94 px ça passait ; avec la nouvelle, mesuré à
+   l'écran, **douze paires de cartes se chevauchaient** sur un terrain plafonné à
+   505 px par une media query. On donne donc au terrain la hauteur qu'exigent six
+   rangées, et à la carte la largeur de son emplacement plutôt qu'une largeur
+   fixe qui déborde. */
+.manager-terrain-xv { min-height: 860px; }
+.manager-position { width: clamp(86px, 9.4vw, 126px); }
+.manager-terrain-xv .ct-carte { width: 100%; padding: 5px 6px 5px 19px; gap: 1px; }
+.manager-terrain-xv .ct-note { font-size: 18px; }
+.manager-terrain-xv .ct-nom { font-size: 10.5px; }
+.manager-terrain-xv .ct-stats { gap: 0 6px; margin-top: 2px; padding-top: 3px; }
+.manager-terrain-xv .ct-stats i { font-size: 8.8px; }
+.manager-terrain-xv .ct-sous { font-size: 8.8px; }
+/* ⚠️ LE PIED NE REVIENT PAS À LA LIGNE. Deux badges plus le capitaine et le
+   buteur faisaient grandir la carte de dix pixels, et une carte plus haute que
+   prévu recommence à toucher sa voisine du dessus : c'est ainsi que cinq
+   chevauchements ont survécu au premier correctif. */
+.manager-terrain-xv .ct-pied { margin-top: 2px; font-size: 8.8px; flex-wrap: nowrap; overflow: hidden; }
+
+/* ⚠️ SUR TÉLÉPHONE, LA CARTE PERD SES SIX STATS mais garde son talon, sa note et
+   sa pastille d'adéquation. À 375 px, quinze cartes de 128 px ne tiennent pas
+   sur un terrain : on garde ce qui sert à COMPOSER, et le détail se lit dans le
+   panneau, qui passe alors en pleine largeur sous le terrain. */
+@media (max-width: 700px) {
+  .manager-terrain-xv { min-height: 640px; }
+  .manager-position { width: clamp(62px, 20vw, 84px); }
+  .ct-carte { width: 78px; padding: 5px 5px 5px 17px; }
+  .ct-note { font-size: 16px; }
+  .ct-nom { font-size: 9.5px; }
+  .ct-stats { display: none; }
+  .ct-compacte { width: 72px; }
+  .ct-entete { gap: 10px; padding: 10px; }
+  .ct-note-equipe strong { font-size: 26px; }
+}
