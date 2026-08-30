@@ -9587,3 +9587,53 @@ npx vite-node scripts/verifCarriereAvancee.ts # 13 contrôles d'interaction + po
 npx vite-node scripts/verifManager.ts          # boucle historique du manager
 npx vite-node scripts/verifHistoire.ts         # 30 saisons, Hall of Fame, ADN et rivalités
 ```
+
+---
+
+## 🧭 CARRIÈRE PROFONDE — délégation, personnes et culture du club
+
+`src/lib/carriereProfonde.ts` est la deuxième couche pure du mode manager. Elle
+est persistée sous `Manager.avancee.profonde` depuis la migration **v23**. Elle
+ne remplace pas `carriereAvancee.ts` : ce dernier reste l'orchestrateur appelé
+par le store après un match, chaque semaine et à l'intersaison.
+
+### Sources de vérité
+
+| Sujet | État / fonction |
+|---|---|
+| Répartition des responsabilités | `delegations` — neuf booléens indépendants |
+| Qualité de la délégation | `directeurSportif` + `decisionsDeleguees` ; aucune décision n'est tirée sans lire la compétence correspondante |
+| Style du coach | `profilManager`, nourri uniquement par `TactiqueManager` après un match réellement joué |
+| Relations entre joueurs | `relations` ; un départ passe par `apresDepartJoueurProfonde` avant de toucher le moral |
+| Intégration et ambitions | `integrations` ; l'ambition reste cachée jusqu'à `ambitionRevelee` |
+| Culture du club | `clubs[club]` contient président, supporters, réputations, popularités, marketing et records |
+| Capitanat | `capitaines` ; les ajustements de note sont transmis à `MatchLive` |
+| Décisions pluriannuelles | `decisionsStrategiques` + `effetsStrategiques`, jamais une simple carte sans état |
+| Mémoire annuelle | `chronologie`, bornée à 600 faits majeurs mais conservée saison par saison |
+
+### Invariants
+
+- **Déléguer doit changer quelque chose.** Les compositions et entraînements
+  délégués sont appliqués dans `semaineManager`; les autres domaines produisent
+  des décisions évaluables et persistantes, jamais un texte décoratif.
+- **Note sportive et valeur culturelle ne fusionnent pas.** `PopulariteJoueur`
+  possède trois échelles de popularité et une valeur marketing. La note du
+  joueur reste dans `Coequipier`.
+- **Direction et supporters ne partagent pas une jauge.** `Manager.confiance`
+  reste celle du board ; `SupportersClub.confiance` explique séparément vente
+  d'une figure, style de jeu, derby et résultats.
+- **Les ambitions ne sont pas des exigences publiques.** Le marché applique
+  `facteurAmbitionRecrutement`, mais l'écran Vestiaire n'affiche le projet que
+  lorsqu'il a été révélé par l'intégration.
+- **Les records viennent des matchs joués.** `apresResultatProfonde` met à jour
+  joueurs, séries, affluence, records et XV historique à partir de la feuille et
+  du score réinjecté dans le championnat.
+- **La géographie reste déterministe.** Faute de coordonnées dans la base des
+  clubs, une paire de clubs reçoit une distance stable par graine ; elle ne
+  change jamais entre deux chargements de la même sauvegarde.
+
+Vérification centrale :
+
+```bash
+npx vite-node scripts/verifCarriereProfonde.ts # 24 contrôles, poids compris
+```

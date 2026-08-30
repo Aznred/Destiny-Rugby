@@ -892,6 +892,38 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   entrer au Hall of Fame du club ou devenir entraîneur, formateur, préparateur,
   recruteur ou directeur sportif après leur retraite.
 
+### Une carrière qui appartient vraiment au manager
+
+- Les neuf responsabilités sportives peuvent être conservées ou déléguées une
+  par une : recrutement, contrats, renouvellements, prêts, jeunes, staff,
+  entraînements, compositions et amicaux. Les résultats d'une délégation
+  dépendent des compétences persistantes du directeur sportif ; les
+  entraînements et compositions délégués modifient réellement l'équipe.
+- Les plans utilisés en match construisent six axes du profil du coach — jeu au
+  large, pied, possession, rythme, défense agressive et conquête — puis des tags
+  comme « Formateur » ou « Rugby offensif ». Les candidatures tiennent compte de
+  la compatibilité entre ce profil et l'ADN du club.
+- Les joueurs ont leurs propres relations, leur adaptation au pays et au club,
+  leur langue, leur cohésion et une ambition cachée. Compatriotes et
+  adaptabilité accélèrent l'intégration ; une ambition incompatible peut rendre
+  une offre financière supérieure insuffisante.
+- Capitaine, vice-capitaine et troisième capitaine forment une vraie hiérarchie.
+  Un brassard mal attribué pénalise le terrain ; le retirer à une figure locale
+  atteint aussi les supporters.
+- La confiance du président et celle des supporters sont séparées. Les publics
+  traditionnels, passionnés, familiaux et occasionnels ne pondèrent pas les
+  mêmes attentes. Popularité locale, nationale, internationale et valeur
+  marketing sont distinctes de la note sportive et produisent des revenus.
+- Les records du club et du championnat, les numéros, les capitanats et le XV
+  historique se recalculent après chaque match. Records, derbys géographiques,
+  titres, changements de président et retraites alimentent une chronologie
+  annuelle consultable saison par saison.
+- Certaines intersaisons donnent une vraie fin aux vétérans : retraite,
+  prolongation courte, division inférieure, étranger, rôle réduit ou retour au
+  club formateur. Les légendes locales reçoivent tifo, hommage et standing
+  ovation. Les décisions stratégiques du président conservent leurs effets
+  pendant plusieurs années.
+
 ### Composer le XV et coacher réellement le match
 
 - La feuille contient **15 titulaires et 8 remplaçants**, poste par poste. Les
@@ -928,6 +960,7 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
 npx vite-node scripts/verifManager.ts        # carrière, calendrier, marché et saison
 npx vite-node scripts/verifManagerMatch.ts   # composition, consignes, banc et résultat réel
 npx vite-node scripts/verifCarriereAvancee.ts # direction, monde IA, mémoire, médical et scouting
+npx vite-node scripts/verifCarriereProfonde.ts # délégation, relations, supporters, records et chronologie
 npx vite-node scripts/verifSituations.ts     # 151 situations, impacts et non-répétition
 ```
 

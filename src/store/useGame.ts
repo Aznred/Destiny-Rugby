@@ -188,6 +188,11 @@ import {
   refuserSelectionAvance, repondreDiscussionAvancee, joueurAgent,
   type DecisionMedicale, type ReponseDiscussion,
 } from '../lib/carriereAvancee';
+import {
+  apresDepartJoueurProfonde, configurerDelegationProfonde, definirCapitainesProfonde,
+  enregistrerTransfertProfonde, facteurAmbitionRecrutement, repondreDecisionStrategiqueProfonde,
+  type DomaineDelegation,
+} from '../lib/carriereProfonde';
 
 // Essais marqués par match, par poste : un ailier finit, un pilier non.
 const ESSAIS_PAR_MATCH: Record<PosteId, number> = {
@@ -982,6 +987,9 @@ interface GameState {
   accepterOffreBancManager: (id: string) => void;
   repondreSelectionManager: (accepter: boolean) => void;
   enregistrerMatchSelectionManager: (scorePour: number, scoreContre: number) => void;
+  configurerDelegationManager: (domaine: DomaineDelegation, delegue: boolean) => void;
+  definirHierarchieCapitainesManager: (capitaineId: string, viceCapitaineId: string, troisiemeCapitaineId: string) => void;
+  repondreDecisionStrategiqueManager: (decisionId: string, choixId: string) => void;
   /** Raccrocher : la carrière part au Hall et au classement. */
   quitterBanc: () => void;
   /**
@@ -3909,6 +3917,40 @@ export const useGame = create<GameState>()(
         set({ manager: { ...m, avancee: enregistrerMatchSelectionAvance(m.avancee, m, scorePour, scoreContre) } });
       },
 
+      configurerDelegationManager: (domaine, delegue) => {
+        const m = get().manager;
+        if (!m?.club || !m.avancee?.profonde) return;
+        set({ manager: { ...m, avancee: { ...m.avancee, profonde: configurerDelegationProfonde(m.avancee.profonde, domaine, delegue) } } });
+      },
+
+      definirHierarchieCapitainesManager: (capitaineId, viceCapitaineId, troisiemeCapitaineId) => {
+        const m = get().manager;
+        if (!m?.club || !m.avancee?.profonde) return;
+        const ids = new Set(effectifDuClub(m.club, m.saison).map((j) => j.id));
+        if (!ids.has(capitaineId) || (viceCapitaineId && !ids.has(viceCapitaineId)) || (troisiemeCapitaineId && !ids.has(troisiemeCapitaineId))) return;
+        const differents = [capitaineId, viceCapitaineId, troisiemeCapitaineId].filter(Boolean);
+        if (new Set(differents).size !== differents.length) return;
+        const profonde = definirCapitainesProfonde(m.avancee.profonde, m, capitaineId, viceCapitaineId, troisiemeCapitaineId);
+        set({ manager: { ...m, composition: { ...m.composition, capitaineId }, avancee: { ...m.avancee, profonde } } });
+      },
+
+      repondreDecisionStrategiqueManager: (decisionId, choixId) => {
+        const m = get().manager;
+        if (!m?.club || !m.avancee?.profonde) return;
+        const resultat = repondreDecisionStrategiqueProfonde(m.avancee.profonde, m, decisionId, choixId);
+        if (!resultat.choix) return;
+        set((s) => ({
+          manager: {
+            ...m,
+            confiance: borne(m.confiance + resultat.choix!.confianceDirection),
+            budgetTransferts: Math.max(0, m.budgetTransferts + resultat.choix!.budgetTransferts),
+            budgetStructure: Math.max(0, m.budgetStructure + resultat.choix!.budgetStructure),
+            avancee: { ...m.avancee!, profonde: resultat.etat },
+          },
+          journal: [...s.journal, { id: idUnique(), saison: m.saison, role: 'joueur' as const, titre: `🏛️ ${resultat.choix!.label}`, texte: resultat.choix!.consequence }],
+        }));
+      },
+
       semaineManager: () => {
         const m = get().manager;
         if (!m) return;
@@ -3921,8 +3963,18 @@ export const useGame = create<GameState>()(
         if (affiche && !m.resultats[affiche.cle]) return;
         if (m.semaine < SEMAINES_PAR_SAISON) {
           const suivante = m.semaine + 1;
-          const avancee = avancerSemaineCarriereAvancee(m, effectifDuClub(m.club, m.saison), suivante);
-          set({ manager: { ...m, semaine: suivante, decision: null, avancee } });
+          const groupe = effectifDuClub(m.club, m.saison);
+          const avancee = avancerSemaineCarriereAvancee(m, groupe, suivante);
+          const delegations = avancee.profonde.delegations;
+          const murs = m.installations[m.club] ?? installationsVierges();
+          const places = PLACES_ENTRAINEMENT[Math.min(murs.entrainement, NIVEAU_INSTALLATION_MAX)];
+          const entrainements = delegations.entrainements
+            ? [...groupe].sort((a, b) => (b.potentiel - b.note) - (a.potentiel - a.note) || a.age - b.age).slice(0, places).map((j) => j.nom)
+            : m.entrainements;
+          const composition = delegations.compositions
+            ? compositionManagerParDefaut(groupe)
+            : m.composition;
+          set({ manager: { ...m, semaine: suivante, decision: null, avancee, entrainements, composition } });
           get().vivreSemaineSociale();
           return;
         }
@@ -4178,11 +4230,13 @@ export const useGame = create<GameState>()(
           ? Math.max(0.86, Math.min(1.14,
             1 + (50 - agent.relationManager) / 500 + (agent.interetFinancier - 50) / 1000))
           : 1;
-        const cibleNegociee = facteurAgent === 1 ? cible : {
+        const facteurAmbition = facteurAmbitionRecrutement(m.avancee?.profonde, cible, m.club);
+        const facteurExigences = facteurAgent * facteurAmbition;
+        const cibleNegociee = facteurExigences === 1 ? cible : {
           ...cible,
-          salaireDemande: Math.round(cible.salaireDemande * facteurAgent),
-          primeDemandee: Math.round(cible.primeDemandee * facteurAgent),
-          primeMatchDemandee: Math.round(cible.primeMatchDemandee * facteurAgent),
+          salaireDemande: Math.round(cible.salaireDemande * facteurExigences),
+          primeDemandee: Math.round(cible.primeDemandee * facteurExigences),
+          primeMatchDemandee: Math.round(cible.primeMatchDemandee * facteurExigences),
         };
         const nego = existante ?? ouvrirNegociationManager(cibleNegociee, m.saison, m.semaine);
         const avancee = !m.avancee || !agent || agent.joueurs.includes(cible.id)
@@ -4309,6 +4363,13 @@ export const useGame = create<GameState>()(
           note: actuelle.joueur.note,
           nation: actuelle.joueur.nation,
         };
+        const avancee = m.avancee?.profonde ? {
+          ...m.avancee,
+          profonde: enregistrerTransfertProfonde(
+            m.avancee.profonde, m, actuelle.joueur, dossier?.offre ?? actuelle.joueur.indemnite,
+            'recrue', actuelle.joueur.club,
+          ),
+        } : m.avancee;
         set((s) => {
           const transfertsSociaux = [...s.transfertsSociaux, transfert];
           setTransfertsSociaux(transfertsSociaux);
@@ -4322,6 +4383,7 @@ export const useGame = create<GameState>()(
               recrues: [...m.recrues, {
                 joueur: actuelle.joueur, termes: actuelle.offre, saison: m.saison,
               }],
+              avancee,
             },
             transfertsSociaux,
             conversations: {
@@ -4474,6 +4536,20 @@ export const useGame = create<GameState>()(
           note: joueur.note,
           nation: joueur.nation,
         };
+        let avancee = m.avancee;
+        if (avancee?.profonde) {
+          const depart = apresDepartJoueurProfonde(avancee.profonde, m, joueurId);
+          const vestiaire = { ...avancee.vestiaire };
+          for (const [id, delta] of Object.entries(depart.moralTouches)) {
+            const profil = vestiaire[id];
+            if (profil) vestiaire[id] = { ...profil, moral: borne(profil.moral + delta), satisfaction: borne(profil.satisfaction + delta) };
+          }
+          avancee = {
+            ...avancee,
+            profonde: enregistrerTransfertProfonde(depart.etat, m, joueur, offre.montant, 'vente', offre.club),
+            vestiaire,
+          };
+        }
         set((s) => {
           const transfertsSociaux = [...s.transfertsSociaux, transfert];
           setTransfertsSociaux(transfertsSociaux);
@@ -4483,6 +4559,7 @@ export const useGame = create<GameState>()(
               budgetTransferts: m.budgetTransferts + offre.montant,
               ventes: m.ventes.filter((v) => v.joueurId !== joueurId),
               entrainements: m.entrainements.filter((n) => n !== joueur.nom),
+              avancee,
               composition: reconcilerCompositionManager(
                 effectifDuClub(m.club, m.saison), m.composition,
               ),
@@ -4613,7 +4690,7 @@ export const useGame = create<GameState>()(
           // Le board renouvelle une partie des enveloppes. Épargner aide, mais
           // ne permet pas d'empiler dix saisons de budgets sans les dépenser.
           budgetTransferts: licencie ? 0
-            : Math.round(budgets.transferts + m.budgetTransferts * 0.28 + bilanAcademie.indemnites),
+            : Math.round(budgets.transferts + m.budgetTransferts * 0.28 + bilanAcademie.indemnites + bilanAvance.revenusMarketing * .35),
           budgetSalarial: licencie ? 0
             : Math.round(budgets.salarial + m.budgetSalarial * 0.2),
           // ⚠️ CELLE-CI SE BANQUE INTÉGRALEMENT, contrairement aux deux autres,
@@ -4621,7 +4698,7 @@ export const useGame = create<GameState>()(
           // saisons d'enveloppe. Avec un report partiel, elle serait
           // inaccessible à un club modeste — la structure la plus intéressante
           // du lot n'existerait que pour ceux qui n'en ont pas besoin.
-          budgetStructure: licencie ? 0 : Math.round(budgets.structure + m.budgetStructure),
+          budgetStructure: licencie ? 0 : Math.round(budgets.structure + m.budgetStructure + bilanAvance.revenusMarketing * .15),
           jeunesFormes,
           academie: bilanAcademie.academie,
           observationsJeunes: bilanAcademie.observations,
@@ -6127,7 +6204,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 22,
+      version: 23,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -6440,7 +6517,9 @@ export const useGame = create<GameState>()(
             reponsesJeunes: s.manager.reponsesJeunes ?? {},
             revenusFormation: s.manager.revenusFormation ?? {},
           };
-          // VERSION 22 — les carrières longues gagnent une mémoire commune.
+          // VERSION 23 — la mémoire longue contient maintenant les personnes,
+          // supporters, délégations, records et décisions pluriannuelles. Le
+          // même assureur initialise cette couche sans toucher aux faits v22.
           // La migration est idempotente : elle conserve tout état déjà écrit
           // et initialise seulement les anciennes sauvegardes.
           s.manager.avancee = assurerEtatCarriereAvancee(

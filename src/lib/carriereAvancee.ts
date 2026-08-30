@@ -22,6 +22,11 @@ import {
 } from './identiteClub';
 import { nomNation } from './nations';
 import { phaseFinaleDe, resoudreToutesDivisions } from './promotion';
+import {
+  apresResultatProfonde, assurerEtatCarriereProfonde, avancerSemaineProfonde,
+  compatibiliteManagerClub, creerEtatCarriereProfonde, finSaisonProfonde,
+  revenusMarketingProfonde, type EtatCarriereProfonde,
+} from './carriereProfonde';
 
 const borne = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -211,6 +216,7 @@ export interface PropositionSelection {
 
 export interface EtatCarriereAvancee {
   version: 1;
+  profonde: EtatCarriereProfonde;
   objectifs: ObjectifDirection[];
   vestiaire: Record<string, ProfilVestiaire>;
   discussions: DiscussionJoueurAvancee[];
@@ -336,6 +342,7 @@ export function creerEtatCarriereAvancee(m: Manager, effectif: Coequipier[]): Et
   const vestiaire = Object.fromEntries(effectif.map((j) => [j.id, profilDuJoueur(j, m.composition.capitaineId, m.saison)]));
   return {
     version: 1,
+    profonde: creerEtatCarriereProfonde(m, effectif),
     objectifs: objectifsDeSaison(m, effectif), vestiaire, discussions: [], promesses: [], medical: [], convocations: [],
     connaissances: {}, agents: rattacherAgents(creerAgents(), effectif), offresBanc: [],
     entraineursIA: monde.entraineursIA, clubsMonde: monde.clubsMonde, actualites: [],
@@ -348,6 +355,7 @@ export function changerClubCarriereAvancee(a: EtatCarriereAvancee | undefined, m
   const etat = a ? assurerEtatCarriereAvancee({ ...m, avancee: a }, effectif) : creerEtatCarriereAvancee(m, effectif);
   return {
     ...etat,
+    profonde: assurerEtatCarriereProfonde(etat.profonde, m, effectif),
     objectifs: objectifsDeSaison(m, effectif),
     vestiaire: Object.fromEntries(effectif.map((j) => [j.id, etat.vestiaire[j.id] ?? profilDuJoueur(j, m.composition.capitaineId, m.saison)])),
     discussions: etat.discussions.map((d) => d.etat === 'ouverte' ? { ...d, etat: 'close' as const, reponse: 'aucunePromesse' as const } : d),
@@ -372,6 +380,7 @@ export function assurerEtatCarriereAvancee(m: Manager, effectif: Coequipier[]): 
   const agents = a.agents?.length ? a.agents : creerAgents();
   return {
     ...a, version: 1, vestiaire,
+    profonde: assurerEtatCarriereProfonde(a.profonde, m, effectif),
     objectifs: a.objectifs?.length ? a.objectifs : objectifsDeSaison(m, effectif),
     agents: rattacherAgents(agents, effectif),
     entraineursIA: a.entraineursIA ?? monde!.entraineursIA,
@@ -547,7 +556,9 @@ export function apresResultatCarriereAvancee(
   })]);
   const leaders = Object.values(a.vestiaire).filter((p) => p.rang === 'leader');
   const soutienLeaders = leaders.reduce((n, p) => n + (p.soutien ? 1 : -1), 0);
-  return { etat: { ...a, objectifs, actualites }, confiance: Math.max(-2, Math.min(2, soutienLeaders)) };
+  const relationMoyenne = moyenneVestiaire(a);
+  const profonde = apresResultatProfonde(a.profonde, m, effectif, resultat, relationMoyenne);
+  return { etat: { ...a, objectifs, actualites, profonde }, confiance: Math.max(-2, Math.min(2, soutienLeaders)) };
 }
 
 export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[], semaineSuivante: number): EtatCarriereAvancee {
@@ -579,7 +590,10 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
     const adversaire = candidats[Math.floor(rng() * candidats.length)]?.nation ?? 'Irlande';
     selection = { ...selection, matchEnAttente: { id: `inter-manager-${m.saison}-${semaineSuivante}`, adversaire, competition: semaineSuivante === 21 ? 'Six Nations / tournoi régional' : 'Tournée internationale', semaine: semaineSuivante } };
   }
-  a = { ...a, medical, convocations: nouvelles, actualites: actualitesBornees(actualites), selection };
+  a = {
+    ...a, medical, convocations: nouvelles, actualites: actualitesBornees(actualites), selection,
+    profonde: avancerSemaineProfonde(a.profonde, m, effectif, semaineSuivante),
+  };
   return mettreAJourPromesses(a, { ...m, semaine: semaineSuivante });
 }
 
@@ -734,7 +748,7 @@ function evoluerMonde(a: EtatCarriereAvancee, m: Manager): Pick<EtatCarriereAvan
   return { clubsMonde, entraineursIA, identites, actualites: actualitesBornees(actualites), offresBanc };
 }
 
-export function finSaisonCarriereAvancee(m: Manager, effectif: Coequipier[], rang: number): { etat: EtatCarriereAvancee; confiance: number; resume: string } {
+export function finSaisonCarriereAvancee(m: Manager, effectif: Coequipier[], rang: number): { etat: EtatCarriereAvancee; confiance: number; resume: string; revenusMarketing: number } {
   let a = assurerEtatCarriereAvancee(m, effectif);
   const objectifs = a.objectifs.map((o) => {
     let reussi = false;
@@ -767,18 +781,21 @@ export function finSaisonCarriereAvancee(m: Manager, effectif: Coequipier[], ran
     clubsMonde: monde.clubsMonde, entraineursIA: monde.entraineursIA, identites: monde.identites,
     actualites: monde.actualites, offresBanc: monde.offresBanc, staffAnciens, propositionSelection,
     rivalites: a.rivalites.map((r) => r.derniereSaison === m.saison ? r : apresLaSaisonRivalite(r, [], m.saison)),
+    profonde: finSaisonProfonde(a.profonde, m, effectif, rang),
   };
   const suivant = { ...m, saison: m.saison + 1, objectif: m.objectif };
   a = { ...a, objectifs: objectifsDeSaison(suivant, effectif), discussions: a.discussions.slice(-60), medical: a.medical.filter((d) => d.semaines > 0), convocations: [], connaissances: Object.fromEntries(Object.entries(a.connaissances).filter(([, c]) => c.derniereSaison >= m.saison - 2)) };
   const reussis = objectifs.filter((o) => o.etat === 'reussi').length;
-  return { etat: a, confiance: Math.round(confiance), resume: `Direction : ${reussis}/${objectifs.length} objectifs atteints (${confiance >= 0 ? '+' : ''}${Math.round(confiance)} confiance).` };
+  const revenusMarketing = revenusMarketingProfonde(a.profonde, m.club);
+  return { etat: a, confiance: Math.round(confiance), revenusMarketing, resume: `Direction : ${reussis}/${objectifs.length} objectifs atteints (${confiance >= 0 ? '+' : ''}${Math.round(confiance)} confiance). Marketing : ${Math.round(revenusMarketing / 1000)} k€.` };
 }
 
 export function postulerBancAvance(a: EtatCarriereAvancee, m: Manager, club: string): EtatCarriereAvancee {
   const force = forceEffectif(club, m.saison);
   const exigePrestige = Math.max(0, force - 14);
   const rng = graine(`candidature#${club}#${m.nom}#${m.saison}`);
-  const accepte = m.prestige + rng() * 12 >= exigePrestige;
+  const compatibilite = compatibiliteManagerClub(a.profonde, a.identites[club]);
+  const accepte = m.prestige + rng() * 12 + (compatibilite - 50) * .12 >= exigePrestige;
   const comp = competitionDuClub(club);
   const offre: OffreBancManager = { id: `candidature-${m.saison}-${club}`, club, division: comp?.id ?? '', salaire: Math.round(Math.max(12_000, force * force * 80) / 1000) * 1000, duree: 2 + Math.floor(rng() * 3), statut: accepte ? 'offre' : 'refusee', exigePrestige, saison: m.saison };
   return { ...a, offresBanc: [...a.offresBanc.filter((o) => o.club !== club || o.saison !== m.saison), offre] };

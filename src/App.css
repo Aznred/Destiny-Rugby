@@ -178,6 +178,9 @@
 .manager-match-vide,.manager-affiche-match { padding:clamp(1rem,4vw,2rem); text-align:center; }
 .manager-match-vide > span { font-size:3rem; }
 .manager-match-vide p,.manager-lancer-match p,.manager-match-bloque p,.manager-match-joue p { color:var(--craie-dim); }
+.manager-contexte-derby { display:flex; align-items:center; justify-content:center; gap:.75rem; flex-wrap:wrap; margin:.8rem auto 0; padding:.65rem .9rem; width:fit-content; max-width:100%; border:1px solid rgba(239,112,51,.45); border-radius:999px; background:rgba(239,112,51,.09); }
+.manager-contexte-derby span { color:#ffb07d; font-weight:800; }
+.manager-contexte-derby small { color:var(--craie-dim); }
 .manager-duel { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1rem; margin:1.5rem 0; }
 .manager-duel > span { display:grid; justify-items:center; gap:.55rem; min-width:0; }
 .manager-duel b { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:clamp(.9rem,2.4vw,1.25rem); }
@@ -1553,11 +1556,120 @@
 .anciens-staff-manager article small { grid-column:1/-1; color:var(--craie-dim); }
 .manager-connaissance-cible { padding:.4rem .55rem; border:1px dashed rgba(224,176,72,.25); border-radius:8px; color:var(--or-200)!important; }
 
+/* Couche profonde : délégation, personnes, supporters, records et chronologie. */
+.decision-strategique-manager { padding:1.2rem; border-color:rgba(224,176,72,.48); background:linear-gradient(140deg,rgba(224,176,72,.14),rgba(6,22,15,.92)); }
+.decision-strategique-manager h2 { margin:.25rem 0; }
+.decision-strategique-manager > p { margin:.25rem 0 1rem; color:var(--craie-dim); }
+.decision-strategique-manager > div:last-child { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
+.decision-strategique-manager button { display:flex; flex-direction:column; gap:.3rem; min-height:110px; padding:.8rem; border:1px solid rgba(224,176,72,.3); border-radius:10px; color:var(--craie); background:rgba(0,0,0,.18); text-align:left; }
+.decision-strategique-manager button:hover { border-color:var(--or-400); transform:translateY(-2px); }
+.decision-strategique-manager button span,.decision-strategique-manager button small { color:var(--craie-dim); }
+
+.delegation-manager { padding:1rem; }
+.delegation-contenu { display:grid; grid-template-columns:minmax(280px,.8fr) minmax(420px,1.5fr); gap:1rem; }
+.fiche-directeur-sportif { padding:.85rem; border:1px solid rgba(224,176,72,.2); border-radius:11px; background:rgba(0,0,0,.15); }
+.fiche-directeur-sportif h3 { margin:.15rem 0; }
+.fiche-directeur-sportif > div:first-child > span,.fiche-directeur-sportif small { color:var(--craie-dim); }
+.fiche-directeur-sportif > div:last-child { display:flex; flex-direction:column; gap:.35rem; margin-top:.75rem; }
+.fiche-directeur-sportif label,.axes-profil-manager label,.profils-supporters label { display:grid; grid-template-columns:92px minmax(0,1fr) 28px; align-items:center; gap:.5rem; font-size:.7rem; }
+.fiche-directeur-sportif i,.axes-profil-manager i,.profils-supporters i,.relations-joueurs-manager article > div > i,.integration-joueurs-manager article > div i { display:block; height:5px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.08); }
+.fiche-directeur-sportif i em,.axes-profil-manager i em,.profils-supporters i em,.relations-joueurs-manager article > div > i em,.integration-joueurs-manager article > div i em { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--or-600),var(--or-300)); }
+.grille-delegations { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.45rem; }
+.grille-delegations > label { display:flex; align-items:center; gap:.55rem; min-height:62px; padding:.55rem; border:1px solid rgba(255,255,255,.08); border-radius:9px; background:rgba(0,0,0,.12); cursor:pointer; }
+.grille-delegations > label.delegue { border-color:rgba(224,176,72,.38); background:rgba(224,176,72,.08); }
+.grille-delegations input { accent-color:var(--or-400); }
+.grille-delegations label span { display:flex; flex-direction:column; }
+.grille-delegations small { color:var(--craie-dim); font-size:.62rem; }
+.journal-delegations { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.4rem; margin-top:.8rem; }
+.journal-delegations article { display:flex; gap:.45rem; padding:.55rem; border-radius:8px; background:rgba(255,255,255,.035); }
+.journal-delegations article > span { font-weight:800; color:var(--or-300); }
+.journal-delegations article.mauvaise > span { color:#ff9d8c; }
+.journal-delegations article div { min-width:0; }
+.journal-delegations b,.journal-delegations small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.journal-delegations small,.journal-delegations p { color:var(--craie-dim); font-size:.62rem; }
+.journal-delegations p { margin:.25rem 0 0; }
+
+.politique-club-manager { display:grid; grid-template-columns:1fr 1fr; gap:1rem; padding:1rem; }
+.president-manager { padding-right:1rem; border-right:1px solid rgba(255,255,255,.08); }
+.president-manager h3,.confiances-club h3 { margin:.25rem 0; }
+.president-manager p { color:var(--craie-dim); font-size:.78rem; }
+.president-manager > div:last-child { display:grid; grid-template-columns:repeat(5,1fr); gap:.35rem; }
+.president-manager > div:last-child span,.trois-reputations span,.confiances-club > div { display:flex; flex-direction:column; }
+.president-manager > div:last-child span { padding:.5rem; border-radius:8px; background:rgba(255,255,255,.045); text-align:center; }
+.president-manager small,.confiances-club small { color:var(--craie-dim); }
+.confiances-club > div { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; margin:.65rem 0; }
+.confiances-club > div span { display:flex; align-items:baseline; justify-content:space-between; padding:.65rem; border:1px solid rgba(105,197,138,.25); border-radius:9px; }
+.confiances-club > div span.danger { border-color:rgba(222,92,74,.4); }
+.confiances-club > div b { font:800 1.7rem/1 'Anton',sans-serif; }
+.confiances-club ul { margin:.5rem 0 0; padding:0; list-style:none; }
+.confiances-club li { display:flex; gap:.35rem; padding:.25rem 0; color:var(--craie-dim); font-size:.72rem; }
+.confiances-club li b { margin-left:auto; }
+.confiances-club li.positif b { color:#8bd8a5; }.confiances-club li.negatif b { color:#ff9d8c; }
+
+.capitaines-manager { padding:1rem; }
+.capitaines-manager > div:last-child { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
+.capitaines-manager label { display:flex; flex-direction:column; gap:.3rem; color:var(--craie-dim); font-size:.72rem; }
+.capitaines-manager select,.chronologie-annuelle-manager select { width:100%; min-height:42px; padding:.55rem; border:1px solid rgba(255,255,255,.12); border-radius:9px; color:var(--craie); background:var(--vert-900); }
+.relations-joueurs-manager { grid-column:span 6; padding:1rem; }
+.relations-joueurs-manager > div:last-child { display:flex; flex-direction:column; gap:.3rem; }
+.relations-joueurs-manager article { display:grid; grid-template-columns:minmax(0,1fr) 75px 110px; align-items:center; gap:.55rem; padding:.55rem; border-bottom:1px solid rgba(255,255,255,.06); }
+.relations-joueurs-manager article > span { display:flex; align-items:center; justify-content:space-between; gap:.4rem; font-size:.72rem; }
+.relations-joueurs-manager article > em { color:var(--or-300); font-size:.64rem; font-style:normal; text-transform:uppercase; }
+.relations-joueurs-manager article > div { display:grid; grid-template-columns:1fr 26px; align-items:center; gap:.4rem; }
+.integration-joueurs-manager { grid-column:span 12; padding:1rem; overflow-x:auto; }
+.integration-joueurs-manager > article,.table-integration-entete { min-width:850px; display:grid; grid-template-columns:minmax(180px,1.5fr) repeat(4,minmax(90px,.75fr)) minmax(180px,1.2fr); align-items:center; gap:.6rem; }
+.table-integration-entete { padding:.35rem .55rem; color:var(--craie-dim); font-size:.62rem; text-transform:uppercase; }
+.integration-joueurs-manager > article { padding:.55rem; border-top:1px solid rgba(255,255,255,.06); }
+.integration-joueurs-manager article > span,.integration-joueurs-manager article > em { display:flex; flex-direction:column; }
+.integration-joueurs-manager article small,.integration-joueurs-manager article > em { color:var(--craie-dim); font-size:.66rem; font-style:normal; }
+.integration-joueurs-manager article > div { display:grid; grid-template-columns:1fr 26px; align-items:center; gap:.35rem; }
+
+.profil-tactique-manager { grid-column:span 7; padding:1rem; }
+.reputation-club-manager { grid-column:span 5; padding:1rem; }
+.marketing-joueurs-manager { grid-column:span 12; padding:1rem; }
+.tags-manager { display:flex; flex-wrap:wrap; gap:.35rem; margin:.55rem 0 .8rem; }
+.tags-manager strong { padding:.35rem .55rem; border-radius:99px; color:var(--or-200); background:rgba(224,176,72,.1); font-size:.68rem; }
+.tags-manager small { color:var(--craie-dim); }
+.axes-profil-manager,.profils-supporters { display:grid; grid-template-columns:1fr 1fr; gap:.45rem 1rem; }
+.axes-profil-manager label { grid-template-columns:115px minmax(0,1fr) 28px; }
+.trois-reputations { display:grid; grid-template-columns:repeat(3,1fr); gap:.4rem; margin-bottom:.8rem; }
+.trois-reputations span { padding:.65rem; border:1px solid rgba(224,176,72,.18); border-radius:9px; text-align:center; }
+.trois-reputations small { color:var(--craie-dim); }.trois-reputations b { font:800 1.45rem/1 'Anton',sans-serif; }
+.marketing-joueurs-manager > div:last-child { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem; }
+.marketing-joueurs-manager article { display:grid; grid-template-columns:minmax(0,1fr) repeat(3,62px) 92px; align-items:center; gap:.4rem; padding:.55rem; border:1px solid rgba(255,255,255,.06); border-radius:8px; }
+.marketing-joueurs-manager article span,.marketing-joueurs-manager article label { display:flex; flex-direction:column; }
+.marketing-joueurs-manager small { color:var(--craie-dim); font-size:.62rem; }.marketing-joueurs-manager article > strong { color:var(--or-300); font-size:.68rem; }
+
+.chronologie-annuelle-manager { padding:1rem; }
+.chronologie-annuelle-manager .comp-tete select { width:auto; min-width:150px; }
+.chronologie-annuelle-manager article { display:grid; grid-template-columns:80px 90px minmax(0,1fr); gap:.65rem; padding:.7rem .35rem; border-left:2px solid rgba(255,255,255,.1); border-bottom:1px solid rgba(255,255,255,.06); }
+.chronologie-annuelle-manager article.importance-3 { border-left-color:var(--or-400); }
+.chronologie-annuelle-manager time { color:var(--or-300); font-weight:700; }
+.chronologie-annuelle-manager article > span { color:var(--craie-dim); font-size:.65rem; text-transform:uppercase; }
+.chronologie-annuelle-manager p { margin:.2rem 0; color:var(--craie-dim); font-size:.75rem; }
+.records-club-manager { grid-column:span 7; padding:1rem; }
+.xv-historique-manager { grid-column:span 5; padding:1rem; }
+.records-club-manager > div:not(.comp-tete) { display:grid; grid-template-columns:1fr 1fr; gap:.3rem; }
+.records-club-manager h3 { margin:1rem 0 .45rem; }
+.records-club-manager article { display:flex; justify-content:space-between; gap:.5rem; padding:.55rem; border-radius:8px; background:rgba(255,255,255,.035); }
+.records-club-manager article span { display:flex; flex-direction:column; }.records-club-manager small { color:var(--craie-dim); }.records-club-manager article strong { color:var(--or-300); text-align:right; }
+.xv-historique-manager > div:last-child { display:grid; grid-template-columns:1fr 1fr; gap:.3rem; }
+.xv-historique-manager article { display:grid; grid-template-columns:28px minmax(0,1fr) auto; align-items:center; gap:.45rem; padding:.5rem; border:1px solid rgba(255,255,255,.06); border-radius:8px; }
+.xv-historique-manager article > small { grid-column:2/-1; color:var(--craie-dim); }
+.numero-xv { display:grid; place-content:center; width:26px; aspect-ratio:1; border-radius:50%; color:#171208; background:var(--or-400); font-weight:800; }
+.xv-historique-manager article span:nth-child(2) { display:flex; flex-direction:column; }.xv-historique-manager article span small { color:var(--craie-dim); }
+.fins-carriere-manager { padding:1rem; }
+.fins-carriere-manager > article { display:grid; grid-template-columns:minmax(160px,.8fr) minmax(0,1.5fr) auto; align-items:center; gap:.7rem; padding:.65rem; border-bottom:1px solid rgba(255,255,255,.06); }
+.fins-carriere-manager article span { display:flex; flex-direction:column; }.fins-carriere-manager article small,.fins-carriere-manager article p { color:var(--craie-dim); }.fins-carriere-manager article.hommage { background:rgba(224,176,72,.08); }.fins-carriere-manager article > strong { color:var(--or-300); }
+
 @media (max-width: 980px) {
   .avance-objectifs { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .direction-marche-coachs,.direction-selection,.hierarchie-vestiaire,.promesses-manager,.infirmerie-manager,.convocations-manager,
   .univers-manager .fil-actualites-manager,.univers-manager .adn-club,.rivalites-manager,.monde-clubs-manager,
   .histoire-manager .palmares-competition,.histoire-manager .hall-club-manager,.carrieres-joueurs-manager,.anciens-staff-manager { grid-column:span 12; }
+  .profil-tactique-manager,.reputation-club-manager,.relations-joueurs-manager,.records-club-manager,.xv-historique-manager { grid-column:span 12; }
+  .delegation-contenu { grid-template-columns:1fr; }
+  .journal-delegations { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .hierarchie-vestiaire article { grid-template-columns:65px minmax(110px,1fr) minmax(140px,1.3fr) minmax(80px,.8fr) 30px 70px; }
   .hierarchie-vestiaire article > small:last-child { grid-column:2/-1; }
 }
@@ -1578,6 +1690,15 @@
   .palmares-competition .comp-tete { align-items:stretch; flex-direction:column; }
   .palmares-competition .comp-tete .selecteur { min-width:0; width:100%; }
   .carrieres-joueurs-manager summary { align-items:flex-start; flex-direction:column; }
+  .decision-strategique-manager > div:last-child,.grille-delegations,.capitaines-manager > div:last-child,.politique-club-manager,.marketing-joueurs-manager > div:last-child,.axes-profil-manager,.profils-supporters,.records-club-manager > div:not(.comp-tete),.xv-historique-manager > div:last-child { grid-template-columns:1fr; }
+  .journal-delegations { grid-template-columns:1fr; }
+  .president-manager { padding:0 0 .8rem; border:0; border-bottom:1px solid rgba(255,255,255,.08); }
+  .president-manager > div:last-child { grid-template-columns:repeat(3,1fr); }
+  .marketing-joueurs-manager article { grid-template-columns:minmax(0,1fr) 68px 82px; }
+  .marketing-joueurs-manager article label:nth-of-type(2),.marketing-joueurs-manager article label:nth-of-type(3) { display:none; }
+  .chronologie-annuelle-manager article { grid-template-columns:62px minmax(0,1fr); }
+  .chronologie-annuelle-manager article > span { grid-column:2; }.chronologie-annuelle-manager article > div { grid-column:2; }
+  .fins-carriere-manager > article { grid-template-columns:1fr; }
 }
 
 .pantheon { width: min(1000px, 92vw); margin: 2rem auto 4rem; }
