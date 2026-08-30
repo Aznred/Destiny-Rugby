@@ -6993,3 +6993,95 @@ select:focus {
   .ct-entete { gap: 10px; padding: 10px; }
   .ct-note-equipe strong { font-size: 26px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Composition manager — grille finale, portraits officiels et repli explicite
+   ═══════════════════════════════════════════════════════════════════════════ */
+.ct-portrait {
+  display:grid;
+  place-items:end center;
+  width:100%;
+  height:36px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:7px;
+  background:linear-gradient(145deg,#465159,#242c31);
+}
+.ct-portrait img { width:100%; height:100%; object-fit:cover; object-position:50% 16%; }
+.ct-portrait-vide { width:82%; height:92%; color:#a7b0b6; fill:currentColor; opacity:.82; }
+.ct-compacte .ct-portrait { height:27px; }
+.ct-panneau header { display:grid; grid-template-columns:52px minmax(0,1fr) auto; align-items:center; padding-right:28px; }
+.ct-panneau .ct-portrait-panneau { width:52px; height:58px; grid-row:1/3; }
+.manager-reserve-carte { grid-template-columns:34px 38px minmax(0,1fr) auto; }
+.manager-reserve-carte .ct-portrait { width:34px; height:40px; }
+
+/* Le terrain était envoyé dans la ligne 2 de sa propre grille : toute la ligne
+   1 devenait un grand vide. Chaque bloc a désormais une place non ambiguë. */
+.manager-feuille-visuelle > .ct-entete,
+.manager-feuille-visuelle > .manager-compo-aide,
+.manager-feuille-visuelle > .ct-plateau,
+.manager-feuille-visuelle > .manager-banc-visuel,
+.manager-feuille-visuelle > .manager-reserves { min-width:0; }
+.ct-plateau > .manager-terrain-cadre { grid-column:1; grid-row:1; }
+.ct-plateau > .ct-panneau { grid-row:1; }
+.manager-terrain-xv { min-height:980px; }
+
+@media (min-width:1121px) {
+  .manager-feuille-visuelle { grid-template-columns:minmax(0,1fr) minmax(265px,310px); grid-auto-rows:auto; }
+  .manager-feuille-visuelle > .ct-entete { grid-column:1/-1; grid-row:1; margin:0; }
+  .manager-feuille-visuelle > .manager-compo-aide { grid-column:1/-1; grid-row:2; }
+  .manager-feuille-visuelle > .ct-plateau { grid-column:1; grid-row:3/5; grid-template-columns:minmax(0,1fr); }
+  .manager-feuille-visuelle > .ct-plateau:has(.ct-panneau) { grid-template-columns:minmax(0,1fr) minmax(260px,300px); }
+  .manager-feuille-visuelle > .manager-banc-visuel { grid-column:2; grid-row:3; align-self:start; }
+  .manager-feuille-visuelle > .manager-reserves { grid-column:2; grid-row:4; align-self:start; }
+  .manager-banc-cartes { grid-template-columns:repeat(2,minmax(0,1fr)); overflow:visible; }
+  .manager-banc-cartes .ct-carte { width:100%; min-width:0; }
+}
+
+@media (max-width:1120px) {
+  .manager-feuille-visuelle { grid-template-columns:minmax(0,1fr); }
+  .manager-feuille-visuelle > * { grid-column:1 !important; grid-row:auto !important; }
+  .ct-plateau { grid-template-columns:minmax(0,1fr); }
+  .ct-plateau > * { grid-column:1 !important; grid-row:auto !important; }
+}
+
+@media (max-width:700px) {
+  .manager-terrain-xv { min-height:650px; }
+  .manager-terrain-xv .ct-portrait { height:20px; }
+  .manager-terrain-xv .ct-sous,
+  .manager-terrain-xv .ct-pied { display:none; }
+  .manager-terrain-xv .ct-carte { padding-block:4px; }
+  .manager-banc-cartes { grid-template-columns:repeat(2,minmax(0,1fr)); overflow:visible; }
+  .manager-banc-cartes .ct-carte { width:100%; }
+  .manager-reserve-carte { grid-template-columns:30px 34px minmax(0,1fr) auto; }
+  .manager-reserve-carte .ct-portrait { width:30px; height:34px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   L'Ovale mobile — recherche toujours accessible et icônes à contraste sûr
+   ═══════════════════════════════════════════════════════════════════════════ */
+.x-recherche-mobile { display:none; }
+.x-app .x-rail nav button svg,
+.x-app .x-tetes button svg,
+.x-app .x-recherche svg,
+.x-app .x-action svg { fill:currentColor !important; color:inherit; }
+.x-app .x-recherche { color:#9aa4ad; }
+.x-app .x-recherche input { min-width:0; }
+.x-tetes-six { grid-template-columns:repeat(6,minmax(0,1fr)); }
+.manager-x-comptes-recherche { border-bottom:1px solid var(--x-trait); }
+.manager-x-comptes-recherche .x-compte-carte { grid-template-columns:40px minmax(0,1fr); }
+.manager-x-comptes-recherche .x-compte-infos > b { display:flex; align-items:center; gap:.25rem; }
+.x-palmares-liste { display:grid; gap:.45rem; }
+.x-palmares-liste article { display:grid; grid-template-columns:32px minmax(0,1fr); align-items:center; gap:.55rem; padding:.55rem 0; border-top:1px solid var(--x-trait); }
+.x-palmares-liste article > span { font-size:1.25rem; }
+.x-palmares-liste article > div { display:flex; flex-direction:column; }
+.x-palmares-liste small { color:var(--x-gris); }
+
+@media (max-width:1150px) {
+  .x-recherche-mobile { display:flex; margin:.65rem .75rem; }
+}
+
+@media (max-width:700px) {
+  .x-recherche-mobile { margin:.55rem .65rem; padding:.58rem .8rem; }
+  .x-tetes-six { width:max-content; min-width:100%; grid-template-columns:repeat(6,minmax(76px,1fr)); }
+}

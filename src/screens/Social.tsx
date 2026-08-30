@@ -34,6 +34,8 @@ import { compact, estCertifie, LIMITE_CARACTERES, pseudoDe, tendances } from '..
 import { annuaire, chercherComptes, chercherPosts, banniereDe, BANNIERES } from '../lib/comptes';
 import { humeur } from '../lib/vie';
 import { SUCCES, descriptionSucces, nomSucces, texteDefi } from '../data/succes';
+import { SUCCES_MANAGER, progressionSuccesManager } from '../data/succesManager';
+import { TROPHEES } from '../data/trophees';
 import { defisDeLaSemaine, cleSemaine, progression } from '../lib/succes';
 import { chercherMedias, reduirePourAvatar, vignetteLocale, type Media as MediaTrouve } from '../lib/images';
 import { semaine, libelleSemaine, horodatageJeu } from '../data/calendrier';
@@ -821,6 +823,61 @@ function PanneauSucces() {
   );
 }
 
+/** La carrière d'entraîneur possède sa collection propre. Le palmarès affiche
+ * les coupes réellement gagnées ; les succès en racontent les grandes étapes. */
+function PanneauSuccesManager() {
+  const manager = useGame((s) => s.manager);
+  const debloques = useGame((s) => s.succesDebloques ?? {});
+  if (!manager) return null;
+  const { faits, total } = progressionSuccesManager(debloques);
+
+  return (
+    <div className="x-succes x-succes-manager">
+      <div className="x-defis x-palmares-manager">
+        <h3>🏆 Palmarès de {manager.nom}</h3>
+        <p className="x-note">Les trophées viennent des finales réellement remportées par ton équipe.</p>
+        {manager.palmares.length ? (
+          <div className="x-palmares-liste">
+            {manager.palmares.slice().reverse().map((titre, index) => (
+              <article key={`${titre.trophee}-${titre.saison}-${index}`}>
+                <span>🏆</span>
+                <div>
+                  <b>{TROPHEES[titre.trophee]?.nom ?? titre.nom}</b>
+                  <small>{titre.club} · saison {titre.saison}</small>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <p className="x-note">La première coupe remportée ouvrira l’armoire à trophées.</p>}
+      </div>
+
+      <div className="x-succes-tete">
+        <h3>🏅 Succès d’entraîneur</h3>
+        <span>{faits} / {total}</span>
+      </div>
+      <div className="x-barre"><i style={{ width: `${total ? (faits / total) * 100 : 0}%` }} /></div>
+      <div className="x-succes-grille">
+        {SUCCES_MANAGER.map((succes) => {
+          const ok = debloques[succes.id] != null;
+          const cache = succes.secret && !ok;
+          return (
+            <div key={succes.id} className={`x-succes-carte${ok ? ' obtenu' : ''}`}>
+              <span className="x-succes-emoji">{cache ? '❔' : succes.emoji}</span>
+              <div>
+                <b>{cache ? t('ov.succesSecret') : succes.nom}</b>
+                <p>{cache ? t('ov.succesSecretAide') : succes.desc}</p>
+              </div>
+              <span className="x-succes-gain">
+                {ok ? `${t('gen.saison')} ${debloques[succes.id]}` : `+${succes.ovas} 🪙`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // --- Négociation d'un contrat, DANS la conversation -------------------------
 // ⚠️ CE BLOC EST LE MARCHÉ DES TRANSFERTS. Il a remplacé le panneau « Choix de
 // carrière », qui présentait des cartes à prendre ou à laisser sans un mot
@@ -1254,7 +1311,7 @@ type DossierManagerSocial = {
   avatar: string;
 };
 
-type OngletManagerSocial = 'timeline' | 'explorer' | 'messages' | 'notifs' | 'profil';
+type OngletManagerSocial = 'timeline' | 'explorer' | 'messages' | 'notifs' | 'succes' | 'profil';
 
 interface OvaleManagerProps {
   embarque?: boolean;
@@ -1308,6 +1365,12 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
   const postsFiltres = recherche.trim()
     ? chercherPosts(posts, recherche).slice(0, 50)
     : posts.slice(0, 80);
+  const resultatsComptes = useMemo(
+    () => recherche.trim() ? chercherComptes({
+      club: manager.club, saison: manager.saison, division: manager.division,
+    }, recherche) : [],
+    [manager.club, manager.division, manager.saison, recherche],
+  );
 
   useEffect(() => { vivreSemaine(); }, [vivreSemaine]);
   useEffect(() => { bas.current?.scrollIntoView({ block: 'end' }); }, [messagesActifs.length]);
@@ -1350,6 +1413,7 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
           {lien('messages', I_MESSAGE, t('ov.messages'), nonLusMessages)}
           {lien('notifs', I_CLOCHE, t('ov.notifications'), nonLuesNotifs)}
           {lien('profil', I_PROFIL, t('nav.profil'))}
+          {lien('succes', I_TROPHEE, t('ov.succes'))}
           <button onClick={() => retournerAuManager()}><span style={{ fontSize: '1.35rem', lineHeight: 1 }}>🏟️</span><span>{t('mgr.bureau')}</span></button>
         </nav>
         <button className="x-compte" onClick={() => setOnglet('profil')}>
@@ -1359,15 +1423,41 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
       </aside>
 
       <div className="x-centre">
-        <header className="x-tetes">
+        <header className="x-tetes x-tetes-six">
           <button className={onglet === 'timeline' ? 'actif' : ''} onClick={() => ouvrirOnglet('timeline')}>{t('ov.pourVous')}</button>
           <button className={onglet === 'explorer' ? 'actif' : ''} onClick={() => ouvrirOnglet('explorer')}>{t('ov.explorer')}</button>
           <button className={onglet === 'messages' ? 'actif' : ''} onClick={() => ouvrirOnglet('messages')}>{t('ov.messages')}{nonLusMessages > 0 && <i className="x-point" />}</button>
           <button className={onglet === 'notifs' ? 'actif' : ''} onClick={() => ouvrirOnglet('notifs')}>{t('ov.notifs')}{nonLuesNotifs > 0 && <i className="x-point" />}</button>
           <button className={onglet === 'profil' ? 'actif' : ''} onClick={() => ouvrirOnglet('profil')}>{t('nav.profil')}</button>
+          <button className={onglet === 'succes' ? 'actif' : ''} onClick={() => ouvrirOnglet('succes')}>{t('ov.succes')}</button>
         </header>
 
-        {onglet === 'timeline' && <div className="manager-x-timeline">{postsFiltres.length ? postsFiltres.map((post) => <Post key={post.id} post={post} lectureSeule onProfil={() => {}} onRecherche={(mot) => { setRecherche(mot); setOnglet('timeline'); }} />) : <div className="x-vide manager-x-vide"><b>{recherche ? 'Aucun résultat' : 'Le fil se prépare'}</b><p>{recherche ? `Aucune publication ne correspond à « ${recherche} ».` : 'Les clubs, médias et supporters publieront au rythme des semaines et des résultats.'}</p></div>}</div>}
+        <form className="x-recherche x-recherche-mobile" onSubmit={(e) => { e.preventDefault(); setOnglet('timeline'); }}>
+          <Icone d={I_LOUPE} />
+          <input value={recherche} onChange={(e) => { setRecherche(e.target.value); setOnglet('timeline'); }} placeholder={t('ov.rechercheComplete')} />
+          {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}>✕</button>}
+        </form>
+
+        {onglet === 'timeline' && <>
+          {recherche.trim() && <div className="x-explorer manager-x-comptes-recherche">
+            <div className="x-bloc-tete"><h3>Comptes pour « {recherche} »</h3></div>
+            {resultatsComptes.map((compte) => <div key={compte.pseudo} className="x-compte-carte">
+              <Avatar avatar={compte.avatar} club={compte.club} taille={40} nom={compte.nom} />
+              <div className="x-compte-infos">
+                <b>{compte.nom}{compte.certifie && <Certifie />}</b>
+                <span className="x-pseudo">@{compte.pseudo} · {compact(compte.abonnes)} {t('gen.abonnes')}</span>
+                {compte.bio && <p>{compte.bio}</p>}
+              </div>
+            </div>)}
+            {!resultatsComptes.length && <p className="x-vide">{t('ov.aucunCompte')}</p>}
+            <div className="x-bloc-tete"><h3>Publications</h3></div>
+          </div>}
+          <div className="manager-x-timeline">
+            {postsFiltres.length
+              ? postsFiltres.map((post) => <Post key={post.id} post={post} lectureSeule onProfil={() => {}} onRecherche={(mot) => { setRecherche(mot); setOnglet('timeline'); }} />)
+              : <div className="x-vide manager-x-vide"><b>{recherche ? 'Aucune publication' : 'Le fil se prépare'}</b><p>{recherche ? `Aucune publication ne correspond à « ${recherche} ».` : 'Les clubs, médias et supporters publieront au rythme des semaines et des résultats.'}</p></div>}
+          </div>
+        </>}
 
         {onglet === 'explorer' && (
           <>
@@ -1416,6 +1506,8 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
             <div className="x-profil-chiffres"><span><b>{Math.round(manager.prestige)}</b> prestige</span><span><b>{Math.round(manager.confiance)}%</b> confiance</span><span><b>{manager.ventes.length}</b> départs ouverts</span><span><b>{dossiers.length}</b> discussions</span></div>
           </div>
         </div>}
+
+        {onglet === 'succes' && <PanneauSuccesManager />}
       </div>
 
       <aside className="x-droite">
@@ -1636,6 +1728,19 @@ function SocialJoueur() {
             {t('nav.profil')}
           </button>
         </header>
+
+        <form
+          className="x-recherche x-recherche-mobile"
+          onSubmit={(e) => { e.preventDefault(); setOnglet('explorer'); }}
+        >
+          <Icone d={I_LOUPE} />
+          <input
+            value={recherche}
+            onChange={(e) => { setRecherche(e.target.value); if (e.target.value) setOnglet('explorer'); }}
+            placeholder={t('ov.rechercheComplete')}
+          />
+          {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}>✕</button>}
+        </form>
 
         {erreur && <div className="x-erreur">⚠️ {erreur}</div>}
 

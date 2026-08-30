@@ -410,7 +410,7 @@ function sansAccent(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-export function chercherComptes(j: Joueur, requete: string, max = 12): CompteSuivi[] {
+export function chercherComptes(j: ContexteSocial, requete: string, max = 12): CompteSuivi[] {
   const q = sansAccent(requete.trim().replace(/^@/, ''));
   if (!q) return [];
   return annuaire(j)

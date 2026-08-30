@@ -15,6 +15,9 @@ import { TROPHEES } from '../data/trophees';
 import { nomPoste, POSTES } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
 import { CompositionTerrainManager } from '../components/CompositionTerrainManager';
+import type { EtatDuJoueur } from '../lib/carteJoueur';
+import { poidsDansSecteur, SECTEURS_COHESION } from '../lib/cohesion';
+import type { Automatismes } from '../lib/cohesion';
 import { ciblesDuMarche, masseSalarialeActuelle } from '../lib/recrutementManager';
 import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
@@ -32,7 +35,8 @@ import {
   tableauDetectionManager,
 } from '../lib/formationManager';
 import {
-  compositionManagerParDefaut, noteCompositionManager, reconcilerCompositionManager,
+  compositionManagerParDefaut, noteCompositionManager, POSTES_XV_MANAGER,
+  reconcilerCompositionManager,
 } from '../lib/compositionManager';
 import {
   assurerEtatCarriereAvancee, indisponiblesCarriereAvancee, moyenneVestiaire,
@@ -98,6 +102,7 @@ export function Manager() {
   const signerBanc = useGame((s) => s.signerBanc);
   const quitterBanc = useGame((s) => s.quitterBanc);
   const definirComposition = useGame((s) => s.definirCompositionManager);
+  const verifierSucces = useGame((s) => s.verifierSucces);
   const definirTactique = useGame((s) => s.definirTactiqueManager);
   const ameliorerInstallation = useGame((s) => s.ameliorerInstallation);
   const basculerEntrainement = useGame((s) => s.basculerEntrainement);
@@ -149,6 +154,9 @@ export function Manager() {
   useEffect(() => {
     if (manager && ouvertureSociale) setVue('ovale');
   }, [manager, ouvertureSociale]);
+  useEffect(() => {
+    if (manager) verifierSucces();
+  }, [manager, verifierSucces]);
 
   const saison = manager?.saison ?? 1;
   const prestige = manager?.prestige ?? 0;
@@ -259,6 +267,34 @@ export function Manager() {
   const rencontreSelection = selectionManager?.matchEnAttente;
   const profonde = avancee?.profonde;
   const vieProfonde = vieClubProfonde(profonde, manager.club);
+  const etatsComposition = new Map<string, EtatDuJoueur>();
+  for (const dossier of dossiersMedicaux) {
+    etatsComposition.set(dossier.joueurId, {
+      condition: dossier.disponibilite,
+      blesse: dossier.semaines > 0,
+    });
+  }
+  for (const convocation of convocationsActives) {
+    etatsComposition.set(convocation.joueurId, {
+      ...etatsComposition.get(convocation.joueurId),
+      enSelection: true,
+    });
+  }
+  const automatismesComposition = profonde ? Object.fromEntries(
+    SECTEURS_COHESION.map((secteur) => {
+      let total = 0;
+      let poids = 0;
+      composition.titulaires.forEach((id, index) => {
+        const integration = profonde.integrations[id];
+        const posteAligne = POSTES_XV_MANAGER[index];
+        if (!integration || !posteAligne) return;
+        const p = poidsDansSecteur(posteAligne, secteur);
+        total += integration.cohesion * p;
+        poids += p;
+      });
+      return [secteur, Math.round(poids > 0 ? total / poids : 45)];
+    }),
+  ) as Automatismes : undefined;
   const decisionStrategique = profonde?.decisionsStrategiques.find((d) => !d.choisie);
   const saisonsMemoire = saisonsChronologie(profonde);
   const chronologieVisible = profonde?.chronologie.filter((e) => e.saison === saisonChronologie).sort((a, b) => a.semaine - b.semaine) ?? [];
@@ -619,6 +655,8 @@ export function Manager() {
                 effectif={effectif}
                 composition={composition}
                 onPlacer={changerJoueur}
+                etats={etatsComposition}
+                automatismes={automatismesComposition}
                 onCapitaine={(id) => definirComposition({ ...composition, capitaineId: id })}
                 onButeur={(id) => definirComposition({ ...composition, buteurId: id })}
               />

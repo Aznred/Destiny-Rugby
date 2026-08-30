@@ -21,7 +21,7 @@
 // de ne rien montrer. `etats` est donc facultatif, et les deux jauges du bas de
 // carte disparaissent quand il est absent.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DragEvent } from 'react';
 import { nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
@@ -38,6 +38,7 @@ import {
 import type { Automatismes } from '../lib/cohesion';
 import type { Coequipier } from '../lib/effectif';
 import type { CompositionManager, PosteId } from '../types';
+import { photoReelle } from '../lib/avatars';
 
 type ZoneComposition = 'titulaires' | 'remplacants';
 
@@ -93,6 +94,30 @@ const PASTILLE_ADEQUATION: Record<Adequation, string> = {
   naturel: '🟢', secondaire: '🟡', horsPoste: '🔴',
 };
 
+/**
+ * Un portrait de composition ne fabrique jamais un autre visage. On montre la
+ * photo officielle présente dans public/photos ; à défaut (ou si le fichier
+ * ne charge plus), la silhouette grise explicite demandée par l'interface.
+ */
+function PortraitComposition({ nom, panneau = false }: { nom: string; panneau?: boolean }) {
+  const photo = photoReelle(nom);
+  const [erreur, setErreur] = useState(false);
+  useEffect(() => setErreur(false), [photo, nom]);
+
+  return (
+    <span className={`ct-portrait${panneau ? ' ct-portrait-panneau' : ''}`} aria-hidden="true">
+      {photo && !erreur ? (
+        <img src={photo} alt="" decoding="async" onError={() => setErreur(true)} />
+      ) : (
+        <svg className="ct-portrait-vide" viewBox="0 0 48 48">
+          <circle cx="24" cy="17" r="9" />
+          <path d="M8 43c1.8-10.3 7.2-15.5 16-15.5S38.2 32.7 40 43H8Z" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
 function CarteJoueur({
   joueur, numero, posteSlot, selectionne, capitaine, buteur, etat, compact,
   surSelection, surDrag, surDrop,
@@ -145,6 +170,7 @@ function CarteJoueur({
         <strong className="ct-note">{joueur?.note ?? '—'}</strong>
         <em className="ct-poste">{nomPoste(posteSlot).slice(0, 3).toUpperCase()}</em>
       </span>
+      {joueur && <PortraitComposition nom={joueur.nom} />}
       <b className="ct-nom">{joueur ? nomCarte(joueur.nom) : t('compo.vide')}</b>
       {joueur && (
         <span className="ct-sous">
@@ -196,6 +222,7 @@ function PanneauJoueur({
     <aside className="ct-panneau" aria-label={t('compo.panneau')}>
       <button type="button" className="ct-fermer" onClick={onFermer} aria-label={t('compo.fermer')}>✕</button>
       <header>
+        <PortraitComposition nom={joueur.nom} panneau />
         <b>{joueur.nom}</b>
         <strong>{joueur.note}</strong>
       </header>
@@ -466,6 +493,7 @@ export function CompositionTerrainManager({
               onDragStart={(e) => demarrerDrag(e, joueur.id)}
               aria-pressed={selection === joueur.id}
             >
+              <PortraitComposition nom={joueur.nom} />
               <strong>{joueur.note}</strong>
               <span>
                 <b>{joueur.nom}</b>

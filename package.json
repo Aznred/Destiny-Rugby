@@ -13,7 +13,8 @@
     "verify:fin-carriere": "vite-node scripts/verifierFinCarriere.ts",
     "verify:formation-manager": "vite-node scripts/verifierFormationManager.ts",
     "verify:carriere-avancee": "vite-node scripts/verifCarriereAvancee.ts",
-    "verify:carriere-profonde": "vite-node scripts/verifCarriereProfonde.ts"
+    "verify:carriere-profonde": "vite-node scripts/verifCarriereProfonde.ts",
+    "verify:experience-manager": "vite-node scripts/verifExperienceManager.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

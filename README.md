@@ -929,6 +929,11 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
 - La feuille contient **15 titulaires et 8 remplaçants**, poste par poste. Les
   joueurs peuvent être échangés sans doublon ; le capitaine et le buteur sont
   désignés séparément et transmis au moteur.
+- La composition prend la forme d'un **squad builder rugby** : terrain vertical,
+  cartes-billets, six attributs propres au poste, adéquation, cohésion par
+  secteur et état médical. Les **1 574 portraits officiels** déjà présents dans
+  `public/photos` sont utilisés ; un joueur sans fichier connu garde une
+  silhouette grise explicite, jamais le visage inventé d'un autre joueur.
 - Le plan initial règle le jeu avec ballon (équilibré, avants, large,
   occupation), la défense (blitz, glissée, repli), le rythme, les pénalités et
   l'heure du banc. Tous ces ordres restent modifiables pendant les 80 minutes.
@@ -955,12 +960,18 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
 - L'écran **Résultats** est désormais commun aux deux carrières : tous les
   championnats, coupes, sélections et la Coupe du monde sont lisibles depuis le
   bureau. L'écran **Effectif** l'est aussi et montre immédiatement les recrues.
+- L'Ovale possède une collection de **20 succès d'entraîneur** et le palmarès du
+  coach. Championnats et coupes sont attribués d'après leurs vraies finales,
+  versés dans la même file de cérémonies 3D que chez le joueur et récompensés en
+  Ovas. Sur mobile, la recherche de comptes reste visible dans le fil et toutes
+  les icônes de navigation conservent un contraste clair.
 
 ```bash
 npx vite-node scripts/verifManager.ts        # carrière, calendrier, marché et saison
 npx vite-node scripts/verifManagerMatch.ts   # composition, consignes, banc et résultat réel
 npx vite-node scripts/verifCarriereAvancee.ts # direction, monde IA, mémoire, médical et scouting
 npx vite-node scripts/verifCarriereProfonde.ts # délégation, relations, supporters, records et chronologie
+npx vite-node scripts/verifExperienceManager.ts # coupes réelles, cérémonie et succès manager
 npx vite-node scripts/verifSituations.ts     # 151 situations, impacts et non-répétition
 ```
 

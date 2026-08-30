@@ -9637,3 +9637,35 @@ Vérification centrale :
 ```bash
 npx vite-node scripts/verifCarriereProfonde.ts # 24 contrôles, poids compris
 ```
+
+---
+
+## Expérience manager — composition, trophées et L'Ovale mobile
+
+- **`src/data/succesManager.ts`** définit 20 succès préfixés `manager_`. Ils
+  partagent le registre persistant `succesDebloques` sans collision avec les
+  succès du joueur, et `verifierSucces` choisit la collection d'après la
+  carrière active.
+- **`saisonManager` ne déduit aucun trophée du rang brut.** Le championnat lit
+  `phaseFinale(...).champion` ; chaque coupe lit le vainqueur final de
+  `coupeEnDirect`. Les ids alimentent `Manager.palmares`, les Ovas et
+  `tropheesEnAttente`, donc la cérémonie 3D existante reste la seule file de
+  présentation pour les deux carrières.
+- **La composition ne fabrique pas de visage.** `photoReelle(nom)` est la seule
+  source des cartes manager. Si l'index officiel ne connaît pas le joueur ou si
+  le fichier échoue, `PortraitComposition` rend une silhouette grise.
+- **La grille de composition a des lignes explicites.** Au format bureau,
+  en-tête et aide occupent toute la largeur, le terrain reste dans la première
+  colonne, banc et réserves dans la seconde. Ne jamais redonner à
+  `.manager-terrain-cadre` une `grid-row` qui s'applique à l'intérieur de
+  `.ct-plateau` : c'était la cause de la ligne vide de près d'un écran entier.
+- **La recherche mobile vit dans `.x-centre`.** La colonne `.x-droite` disparaît
+  sous 1150 px ; le formulaire `.x-recherche-mobile` est donc obligatoire dans
+  les versions joueur et manager. Les SVG utilisent `currentColor` avec une
+  règle spécifique à `.x-app` pour rester visibles sur le fond noir.
+
+Vérification ciblée :
+
+```bash
+npx vite-node scripts/verifExperienceManager.ts
+```

@@ -90,6 +90,7 @@ import {
 } from '../lib/vie';
 import { evaluerSucces, defisDeLaSemaine, cleSemaine } from '../lib/succes';
 import { DEFI_PAR_ID, SUCCES_PAR_ID, type EvenementDefi } from '../data/succes';
+import { evaluerSuccesManager } from '../data/succesManager';
 import { POSTE_PAR_ID, migrerPoste, ATTRIBUTS_LABELS, nomPoste } from '../data/rugby';
 import {
   retourDeMatch, BUDGET_MATCHS_PAR_SAISON, type StatsMatchJoueur,
@@ -4123,6 +4124,7 @@ export const useGame = create<GameState>()(
               + `Le résultat est enregistré dans le championnat.`,
           }],
         }));
+        get().verifierSucces();
       },
 
       contacterClubManager: (cible) => {
@@ -4597,8 +4599,26 @@ export const useGame = create<GameState>()(
         const py = resoudrePyramide(m.division, m.saison, m.club);
         const monte = py.mouvements.some((x) => x.club === m.club && x.sens === 'montee');
         const descendu = py.mouvements.some((x) => x.club === m.club && x.sens === 'descente');
-        const trophee = rang === 1 ? TROPHEE_PAR_DIVISION[m.division] : undefined;
-        const titres = trophee ? [trophee] : [];
+        // Le manager lit les MÊMES finales que la carrière joueur : le rang de
+        // poule qualifie, mais seul le vainqueur du tableau soulève le titre.
+        const phase = phaseFinale(m.division, m.saison, m.club);
+        const tropheeNational = phase.champion === m.club
+          ? TROPHEE_PAR_DIVISION[m.division]
+          : undefined;
+        // Les coupes sont elles aussi résolues par leur vrai tableau. Le mode
+        // manager ne repart donc plus sans trophée après une finale européenne
+        // remportée dans le monde simulé.
+        const tropheesCoupes = coupesDuClub(m.club, m.saison).flatMap((coupeId) => {
+          const tropheeCoupe = TROPHEE_PAR_COUPE[coupeId];
+          if (!tropheeCoupe) return [];
+          const etat = coupeEnDirect(
+            coupeId, m.saison, m.club,
+            SEMAINES.filter((s) => s.type === 'coupe').length,
+          );
+          return etat?.vainqueur === m.club ? [tropheeCoupe] : [];
+        });
+        const titres = [...new Set([...(tropheeNational ? [tropheeNational] : []), ...tropheesCoupes])];
+        const gainTrophees = titres.reduce((total, id) => total + (TROPHEES[id]?.ovas ?? 0), 0);
 
         const v = verdictDeSaison(rang, m.objectif, {
           titres: titres.length, montee: monte, descente: descendu,
@@ -4708,12 +4728,14 @@ export const useGame = create<GameState>()(
           rapports,
           // Un joueur parti ne suit plus le programme du club.
           entrainements: licencie ? [] : m.entrainements,
-          titres: trophee ? [...m.titres, `${nomDivision(m.division)} (S${m.saison})`] : m.titres,
-          palmares: trophee
-            ? [...m.palmares, {
+          titres: titres.length
+            ? [...m.titres, ...titres.map((id) => `${TROPHEES[id]?.nom ?? nomDivision(m.division)} (S${m.saison})`)]
+            : m.titres,
+          palmares: titres.length
+            ? [...m.palmares, ...titres.map((trophee) => ({
               trophee, nom: TROPHEES[trophee]?.nom ?? trophee,
               saison: m.saison, club: m.club, division: m.division,
-            }]
+            }))]
             : m.palmares,
           historique: [...m.historique, { ...ligne, ...(licencie ? { licencie: true } : {}) }],
           // Sans banc, le temps s’arrête : on cherche un club avant de repartir.
@@ -4763,6 +4785,8 @@ export const useGame = create<GameState>()(
 
         set((st) => ({
           manager: suivant,
+          coins: st.coins + gainTrophees,
+          tropheesEnAttente: [...st.tropheesEnAttente, ...titres],
           journal: [...st.journal, ...(ditesLe.length ? [{
             id: idUnique(),
             saison: m.saison,
@@ -4779,7 +4803,7 @@ export const useGame = create<GameState>()(
             texte: t('mgr.journal.bilanTexte', {
               club: m.club, rang, objectif: m.objectif, prestige: prestige.toFixed(0),
             })
-              + (trophee ? ` ${t('mgr.journal.champion')}` : '')
+              + (titres.length ? ` ${titres.map((id) => TROPHEES[id]?.nom ?? id).join(' · ')}.` : '')
               + (monte ? ` ${t('mgr.journal.montee')}` : '')
               + (descendu ? ` ${t('mgr.journal.descente')}` : '')
               + ` ${bilanAvance.resume}`
@@ -4788,6 +4812,7 @@ export const useGame = create<GameState>()(
                 : ` ${t('mgr.journal.confiance', { confiance })}`),
           }],
         }));
+        get().verifierSucces();
       },
 
       quitterBanc: () => {
@@ -5597,22 +5622,26 @@ export const useGame = create<GameState>()(
       // Appelé après chaque action qui fait bouger la carrière. Un succès ne
       // tombe qu'une fois, et rapporte ses Ovas au moment où il tombe.
       verifierSucces: () => {
-        const { joueur, posts, pantheon, succesDebloques, coins } = get();
-        if (!joueur) return;
-        const nouveaux = evaluerSucces(
-          {
-            joueur, posts, abonnes: joueur.abonnes ?? 0, pantheon, coins,
-            succesFaits: Object.keys(succesDebloques).length,
-          },
-          succesDebloques,
-        );
+        const { joueur, manager, posts, pantheon, succesDebloques, coins } = get();
+        if (!joueur && !manager) return;
+        const nouveaux = joueur
+          ? evaluerSucces(
+            {
+              joueur, posts, abonnes: joueur.abonnes ?? 0, pantheon, coins,
+              succesFaits: Object.keys(succesDebloques).length,
+            },
+            succesDebloques,
+          )
+          : evaluerSuccesManager(manager!, succesDebloques);
         if (!nouveaux.length) return;
         const gain = nouveaux.reduce((a, s) => a + s.ovas, 0);
+        const saisonSucces = joueur?.saison ?? manager!.saison;
+        const semaineSucces = joueur?.semaine ?? manager!.semaine;
         set((s) => ({
           coins: s.coins + gain,
           succesDebloques: {
             ...s.succesDebloques,
-            ...Object.fromEntries(nouveaux.map((n) => [n.id, joueur.saison])),
+            ...Object.fromEntries(nouveaux.map((n) => [n.id, saisonSucces])),
           },
           notifsSocial: [
             ...nouveaux.map((n) => ({
@@ -5620,8 +5649,8 @@ export const useGame = create<GameState>()(
               emoji: n.emoji,
               titre: `Succès débloqué : ${n.nom}`,
               texte: n.desc,
-              saison: joueur.saison,
-              semaine: joueur.semaine ?? 1,
+              saison: saisonSucces,
+              semaine: semaineSucces ?? 1,
             })),
             ...s.notifsSocial,
           ].slice(0, 40),
@@ -5629,7 +5658,7 @@ export const useGame = create<GameState>()(
             ...s.journal,
             ...nouveaux.map((n) => ({
               id: idUnique(),
-              saison: joueur.saison,
+              saison: saisonSucces,
               role: 'systeme' as const,
               titre: `${n.emoji} Succès : ${n.nom}`,
               texte: n.desc,
