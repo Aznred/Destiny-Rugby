@@ -9539,3 +9539,51 @@ npx vite-node scripts/verifClubEconomie.ts # fanbase, stade, prix, sponsors, con
 npx vite-node scripts/verifCarteJoueur.ts  # six stats par poste, échelle commune, alertes
 npx vite-node scripts/verifEconomieClubs.ts # ⚠️ la table que les recettes doivent viser
 ```
+
+---
+
+## 🌍 CARRIÈRE MANAGER AVANCÉE — le monde, le vestiaire et la mémoire
+
+La demande de carrière longue est branchée dans `src/lib/carriereAvancee.ts`.
+Ce fichier est **pur** : il ne connaît ni Zustand ni le DOM. Le store l'appelle
+après un match, à chaque changement de semaine et à l'intersaison, puis persiste
+le résultat dans `Manager.avancee` (migration **v22**).
+
+| Système | Source de vérité |
+|---|---|
+| Objectifs multiples et confiance du président | `ObjectifDirection[]`, pondérés 1–3 ; le verdict s'ajoute à `verdictDeSaison` |
+| Marché des entraîneurs | `entraineursIA` + `clubsMonde` pour les **833 clubs**, contrats et licenciements inclus |
+| Vestiaire et promesses | `vestiaire`, `discussions`, `promesses` ; le temps de jeu vient uniquement des feuilles réellement jouées |
+| Médical | `medical` ; repos retire le joueur, traitement/forcer baisse sa note dans `MatchLive` et ouvre l'aggravation |
+| Sélections | `convocations` retire les joueurs du groupe ; `selection` porte la seconde carrière du manager et sa réputation propre |
+| Scouting et agents | `connaissances` masque note/potentiel/salaire ; `agents` représente plusieurs joueurs et garde la relation |
+| Monde, ADN, rivalités | `clubsMonde`, `identites`, `rivalites` ; évolution lente via `identiteClub.ts` |
+| Actualités | uniquement des conséquences de résultats, blessures, sélections, finances rares et changements de coach |
+| Histoire | `histoire`, `carrieresJoueurs`, `staffAnciens` ; les fonctions viennent de `histoire.ts` |
+
+### Invariants à ne pas casser
+
+- **Ne pas régénérer le monde au rendu.** `assurerEtatCarriereAvancee` prend le
+  chemin rapide lorsqu'un état v1 existe. L'initialisation des 833 clubs ne se
+  fait qu'à la création/migration.
+- **Une absence doit atteindre le moteur ET les statistiques.** `Manager.tsx`
+  et `MatchLive.tsx` filtrent la feuille, tandis que `enregistrerResultatManager`
+  refuse de créditer une apparition à l'absent.
+- **Le scouting ne doit jamais lire les valeurs exactes à l'écran** avant le
+  niveau complet. Les vraies valeurs restent dans la cible pour la négociation ;
+  seul `rapportConnaissance` décide ce que l'interface montre.
+- **Les événements financiers restent rares** (environ 1,2 % positif ou négatif
+  par club et par saison) et ne deviennent une actualité que s'ils concernent
+  le club suivi ou un fait important.
+- **La mémoire est bornée sans effacer les faits.** 180 actualités, 60
+  discussions et les rapports de scouting récents ; les saisons de compétition
+  ne sont jamais supprimées, et les anciennes carrières sont compactées par
+  `histoire.ts` en conservant leurs totaux.
+
+Vérifications :
+
+```bash
+npx vite-node scripts/verifCarriereAvancee.ts # 13 contrôles d'interaction + poids initial (≈389 Ko)
+npx vite-node scripts/verifManager.ts          # boucle historique du manager
+npx vite-node scripts/verifHistoire.ts         # 30 saisons, Hall of Fame, ADN et rivalités
+```

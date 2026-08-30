@@ -1049,6 +1049,8 @@ export interface Manager {
   titres: string[];
   palmares: TitreGagne[];
   historique: SaisonManager[];
+  /** Les systèmes persistants des carrières longues (direction, monde et mémoire). */
+  avancee?: import('./lib/carriereAvancee').EtatCarriereAvancee;
   /**
    * Le passé de joueur, quand la carrière vient d’une reconversion.
    *

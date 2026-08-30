@@ -856,18 +856,41 @@ le lendemain, et il n’y aurait plus rien à jouer.
 vraiment les trois familles : les deux barèmes ont été calibrés l’un sur
 l’autre (une grande carrière vaut ~3 990 d’un côté, ~3 444 de l’autre).
 
-### Un vrai bureau, une décision par semaine
+### Une carrière longue qui a de la mémoire
 
-Le manager reprend la boucle de la carrière joueur sans la copier : chaque
-semaine ouvre une **scène de club à trois choix** (cadre mécontent, jeune à
-lancer, pression du board, brassard, entraînement, presse). Le choix agit sur le
-prestige, la confiance et les finances ; tant qu'il n'est pas tranché, on ne
-saute pas à la semaine suivante. Le journal, le calendrier réel et le classement
-de la poule restent les mêmes briques que dans la carrière joueur.
+Le manager reprend le calendrier et les vrais résultats de la carrière joueur,
+mais son monde possède désormais quatre espaces supplémentaires : **Direction**,
+**Vestiaire**, **Monde** et **Histoire**.
 
-Le bureau se partage en cinq espaces : **Bureau**, **Composition**, **Match**,
-**Marché mondial** et **Négociations**. Sur mobile, ils deviennent des onglets tactiles et le récit
-reste la première chose affichée.
+- La direction fixe plusieurs objectifs pondérés — sportif, financier,
+  formation, recrutement et identité — selon les moyens réels du club. La
+  confiance du président additionne ces verdicts et peut mener au licenciement.
+- Le manager reçoit des offres, peut postuler en cours de carrière, négocier sa
+  prolongation, démissionner ou changer de club. Les **833 clubs IA** ont chacun
+  un entraîneur, un contrat et une confiance ; ils licencient, renouvellent et
+  recrutent entre divisions pendant toute la sauvegarde.
+- Le vestiaire possède une hiérarchie, des personnalités et une satisfaction
+  individuelle. Les discussions proposent plusieurs réponses et une parole
+  engageante devient une **promesse datée** dont le jeu mesure réellement le
+  respect. Les leaders diffusent leur soutien ou leur mécontentement.
+- Une blessure sépare douleur, disponibilité et risque : repos, traitement ou
+  joueur forcé. Le choix modifie réellement la feuille de match et peut aggraver
+  une petite blessure en plusieurs mois d'absence. Les internationaux quittent
+  également le groupe pendant les fenêtres de sélection.
+- À réputation suffisante, une sélection nationale peut proposer son banc. La
+  réputation internationale est distincte et les matchs de tournée ou de
+  tournoi se coachent dans le même moteur 2D.
+- Le marché masque les joueurs inconnus derrière des fourchettes. Observations,
+  compétence du recruteur, âge et connaissance du pays resserrent le rapport ;
+  les agents persistent et se souviennent de la relation avec le manager.
+- Le fil d'actualité ne raconte que les faits de la sauvegarde : résultats,
+  blessures, sélections, événements financiers rares et changements de coach.
+  L'ADN des clubs et les rivalités dynamiques évoluent lentement sur plusieurs
+  saisons.
+- Chaque compétition conserve son champion, son finaliste, son classement, ses
+  montées et ses relégations. Les joueurs gardent leurs saisons, puis peuvent
+  entrer au Hall of Fame du club ou devenir entraîneur, formateur, préparateur,
+  recruteur ou directeur sportif après leur retraite.
 
 ### Composer le XV et coacher réellement le match
 
@@ -904,6 +927,7 @@ reste la première chose affichée.
 ```bash
 npx vite-node scripts/verifManager.ts        # carrière, calendrier, marché et saison
 npx vite-node scripts/verifManagerMatch.ts   # composition, consignes, banc et résultat réel
+npx vite-node scripts/verifCarriereAvancee.ts # direction, monde IA, mémoire, médical et scouting
 npx vite-node scripts/verifSituations.ts     # 151 situations, impacts et non-répétition
 ```
 

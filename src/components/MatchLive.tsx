@@ -319,6 +319,10 @@ export function MatchLive({
     composition: CompositionManager;
     tactique: TactiqueManager;
     onTactique: (tactique: TactiqueManager) => void;
+    /** Blessés au repos et internationaux retenus : ils ne peuvent pas être alignés. */
+    indisponibles?: string[];
+    /** Jouer diminué réduit réellement la note transmise au moteur. */
+    penalitesNote?: Record<string, number>;
   };
 }) {
   const iaActivee = useGame((s) => s.iaActivee);
@@ -333,8 +337,14 @@ export function MatchLive({
   // jeu, le passer par l'état de React ferait des centaines de rendus.
   const moteur = useRef<EtatMatch>(null as unknown as EtatMatch);
   if (!moteur.current) {
-    const effectif = (equipe: string) =>
-      (selection ? effectifNational(equipe, saison) : effectifDuClub(equipe, saison));
+    const effectif = (equipe: string) => {
+      const groupe = selection ? effectifNational(equipe, saison) : effectifDuClub(equipe, saison);
+      if (!manager || manager.club !== equipe) return groupe;
+      const absents = new Set(manager.indisponibles ?? []);
+      return groupe
+        .filter((j) => !absents.has(j.id))
+        .map((j) => ({ ...j, note: Math.max(1, j.note - (manager.penalitesNote?.[j.id] ?? 0)) }));
+    };
     // En sélection, « son club » est sa NATION.
     const monEquipe = joueur ? (selection ? nomNation(joueur.nation) : joueur.club) : '';
     const effectifA = effectif(match.domicile);

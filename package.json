@@ -11,7 +11,8 @@
     "verify:situations": "vite-node scripts/verifierSituations.ts",
     "verify:social": "vite-node scripts/verifierDisciplineSociale.ts",
     "verify:fin-carriere": "vite-node scripts/verifierFinCarriere.ts",
-    "verify:formation-manager": "vite-node scripts/verifierFormationManager.ts"
+    "verify:formation-manager": "vite-node scripts/verifierFormationManager.ts",
+    "verify:carriere-avancee": "vite-node scripts/verifCarriereAvancee.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

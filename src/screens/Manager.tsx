@@ -32,8 +32,15 @@ import {
   tableauDetectionManager,
 } from '../lib/formationManager';
 import {
-  noteCompositionManager, reconcilerCompositionManager,
+  compositionManagerParDefaut, noteCompositionManager, reconcilerCompositionManager,
 } from '../lib/compositionManager';
+import {
+  assurerEtatCarriereAvancee, indisponiblesCarriereAvancee, moyenneVestiaire,
+  penalitesMedicales, rapportConnaissance, joueurAgent,
+} from '../lib/carriereAvancee';
+import { hallOfFameDe, totaux } from '../lib/histoire';
+import { rivalitesDe, traitsDominants } from '../lib/identiteClub';
+import { effectifNational, jouerTestMatch } from '../lib/international';
 import type {
   CompositionManager, ObjectifJeuneManager,
   TactiqueManager, TypeInstallation,
@@ -43,7 +50,8 @@ const MatchLive = lazy(() => import('../components/MatchLive').then((m) => ({ de
 const OvaleManager = lazy(() => import('./Social').then((m) => ({ default: m.OvaleManager })));
 
 type VueManager = 'bureau' | 'equipe' | 'match' | 'marche'
-  | 'ovale' | 'formation' | 'recruteurs' | 'entrainement';
+  | 'ovale' | 'formation' | 'recruteurs' | 'entrainement'
+  | 'direction' | 'vestiaire' | 'univers' | 'histoire';
 
 function humeurDuBoard(confiance: number): { texte: string; ton: string } {
   if (confiance < CONFIANCE_LICENCIEMENT + 12) return { texte: t('mgr.board.sellette'), ton: 'rouge' };
@@ -94,6 +102,15 @@ export function Manager() {
   const definirObjectifJeune = useGame((s) => s.definirObjectifJeuneManager);
   const definirMentorJeune = useGame((s) => s.definirMentorJeuneManager);
   const enregistrerResultat = useGame((s) => s.enregistrerResultatManager);
+  const repondreDiscussion = useGame((s) => s.repondreDiscussionAvancee);
+  const deciderMedical = useGame((s) => s.deciderMedicalManager);
+  const observerCible = useGame((s) => s.observerCibleManager);
+  const postulerBanc = useGame((s) => s.postulerBancManager);
+  const negocierContrat = useGame((s) => s.negocierContratManager);
+  const demissionner = useGame((s) => s.demissionnerManager);
+  const accepterOffreBanc = useGame((s) => s.accepterOffreBancManager);
+  const repondreSelection = useGame((s) => s.repondreSelectionManager);
+  const enregistrerMatchSelection = useGame((s) => s.enregistrerMatchSelectionManager);
   const journal = useGame((s) => s.journal);
 
   const [vue, setVue] = useState<VueManager>('bureau');
@@ -115,7 +132,10 @@ export function Manager() {
   const [recherche, setRecherche] = useState('');
   const [poste, setPoste] = useState('');
   const [matchOuvert, setMatchOuvert] = useState(false);
+  const [matchSelectionOuvert, setMatchSelectionOuvert] = useState(false);
   const [jeuneALiberer, setJeuneALiberer] = useState<string | null>(null);
+  const [demission, setDemission] = useState(false);
+  const [competitionHistoire, setCompetitionHistoire] = useState(manager?.division ?? 'top14');
 
   useEffect(() => {
     if (manager && ouvertureSociale) setVue('ovale');
@@ -146,9 +166,24 @@ export function Manager() {
       .filter((c) => !recherche.trim()
         || `${c.nom} ${c.club} ${c.nation}`.toLowerCase().includes(recherche.trim().toLowerCase()));
   }, [manager?.club, manager?.saison, divisionMarche, clubMarche, poste, recherche]);
-  const effectif = useMemo(
+  const effectifBrut = useMemo(
     () => manager?.club ? effectifDuClub(manager.club, manager.saison) : [],
     [manager],
+  );
+  const avancee = useMemo(
+    () => manager ? assurerEtatCarriereAvancee(manager, effectifBrut) : null,
+    [manager, effectifBrut],
+  );
+  const indisponibles = useMemo(
+    () => indisponiblesCarriereAvancee(avancee ?? undefined, manager?.semaine ?? 0),
+    [avancee, manager?.semaine],
+  );
+  const penalitesNote = useMemo(() => penalitesMedicales(avancee ?? undefined), [avancee]);
+  const effectif = useMemo(
+    () => effectifBrut
+      .filter((j) => !indisponibles.includes(j.id))
+      .map((j) => ({ ...j, note: Math.max(1, j.note - (penalitesNote[j.id] ?? 0)) })),
+    [effectifBrut, indisponibles, penalitesNote],
   );
   const compositionMemo = useMemo(
     () => reconcilerCompositionManager(effectif, manager?.composition),
@@ -185,6 +220,20 @@ export function Manager() {
   const revenusFormationClub = Object.entries(manager.revenusFormation)
     .filter(([cle]) => cle.startsWith(`${manager.club}|`))
     .reduce((somme, [, montant]) => somme + montant, 0);
+  const objectifsAvances = avancee?.objectifs ?? [];
+  const discussionsOuvertes = avancee?.discussions.filter((d) => d.etat === 'ouverte') ?? [];
+  const dossiersMedicaux = avancee?.medical.filter((d) => d.semaines > 0) ?? [];
+  const convocationsActives = avancee?.convocations.filter((c) => manager.semaine >= c.debut && manager.semaine <= c.fin) ?? [];
+  const rivalitesClub = rivalitesDe(avancee?.rivalites ?? [], manager.club);
+  const identiteClub = avancee?.identites[manager.club];
+  const hallClub = hallOfFameDe(avancee?.carrieresJoueurs ?? [], manager.club);
+  const archiveVisible = avancee?.histoire[competitionHistoire] ?? [];
+  const selectionManager = avancee?.selection;
+  const rencontreSelection = selectionManager?.matchEnAttente;
+  const matchSelection = useMemo(() => {
+    if (!selectionManager || !rencontreSelection) return null;
+    return jouerTestMatch(selectionManager.nation, rencontreSelection.adversaire, manager.saison, rencontreSelection.id, null);
+  }, [selectionManager, rencontreSelection, manager.saison]);
 
   const changerJoueur = (zone: 'titulaires' | 'remplacants', index: number, joueurId: string) => {
     const suivante: CompositionManager = {
@@ -283,6 +332,14 @@ export function Manager() {
               🔎 Recruteurs {rapportsFrais > 0 && <i>{rapportsFrais}</i>}
             </button>
             <button className={vue === 'entrainement' ? 'actif' : ''} onClick={() => setVue('entrainement')}>🏋️ Entraînement</button>
+            <button className={vue === 'direction' ? 'actif' : ''} onClick={() => setVue('direction')}>
+              🏛️ Direction {objectifsAvances.some((o) => o.etat === 'echoue') && <i>!</i>}
+            </button>
+            <button className={vue === 'vestiaire' ? 'actif' : ''} onClick={() => setVue('vestiaire')}>
+              🗣️ Vestiaire {(discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length) > 0 && <i>{discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length}</i>}
+            </button>
+            <button className={vue === 'univers' ? 'actif' : ''} onClick={() => setVue('univers')}>📰 Monde</button>
+            <button className={vue === 'histoire' ? 'actif' : ''} onClick={() => setVue('histoire')}>📚 Histoire</button>
           </nav>
 
           {vue === 'bureau' && (
@@ -356,6 +413,109 @@ export function Manager() {
                   <div className="journal">{[...journal].reverse().slice(0, 3).map((e) => <div key={e.id} className="entree"><b>{e.titre}</b><p>{e.texte}</p></div>)}</div>
                 </article>
               </section>
+            </div>
+          )}
+
+          {vue === 'direction' && avancee && (
+            <div className="manager-avance-grille">
+              <section className="carte avance-entete">
+                <div><div className="eyebrow">Conseil d’administration · saison {manager.saison}</div><h2>🏛️ Attentes et avenir du manager</h2><p>Les objectifs sont pondérés selon les moyens du club. Ils nourrissent la confiance, les offres reçues et le risque de licenciement.</p></div>
+                <div className={`avance-score ${manager.confiance < CONFIANCE_LICENCIEMENT + 12 ? 'danger' : ''}`}><b>{Math.round(manager.confiance)}</b><span>confiance</span></div>
+              </section>
+
+              <section className="avance-objectifs">
+                {objectifsAvances.map((objectif) => {
+                  const pct = objectif.categorie === 'sportif'
+                    ? Math.min(100, Math.max(0, ((objectif.cible - (maLigne?.position ?? objectif.cible + 3) + 3) / 3) * 100))
+                    : Math.min(100, objectif.progression / Math.max(1, objectif.cible) * 100);
+                  return <article className={`carte objectif-board ${objectif.etat}`} key={objectif.id}>
+                    <header><span>{objectif.categorie}</span><b>{'★'.repeat(objectif.importance)}{'☆'.repeat(3 - objectif.importance)}</b></header>
+                    <h3>{objectif.titre}</h3><p>{objectif.detail}</p>
+                    <i><em style={{ width: `${pct}%` }} /></i><small>{objectif.etat === 'enCours' ? `${Math.round(pct)} %` : objectif.etat === 'reussi' ? '✓ Réussi' : '✕ Manqué'}</small>
+                  </article>;
+                })}
+              </section>
+
+              <section className="carte direction-contrat">
+                <div><div className="eyebrow">Contrat personnel</div><h3>{manager.contrat?.saisons ?? 0} saison(s) · {nombre(manager.contrat?.salaire ?? 0)} €/an</h3><p>Une prolongation dépend de tes résultats, de ta réputation et de la confiance du président.</p></div>
+                <div><button className="btn fantome" onClick={negocierContrat}>Négocier une prolongation</button><button className="btn danger" onClick={() => setDemission(true)}>Démissionner</button></div>
+              </section>
+
+              <section className="carte direction-marche-coachs">
+                <div className="comp-tete"><div><b>📨 Marché des entraîneurs</b><small>Les postes changent dans toutes les divisions, même sans ton intervention.</small></div><span className="comp-count">{avancee.offresBanc.filter((o) => o.statut === 'offre').length}</span></div>
+                <div className="direction-candidature">
+                  <Selecteur options={optionsBancs.filter((o) => o.valeur !== manager.club)} valeur={clubVise || optionsBancs.find((o) => o.valeur !== manager.club)?.valeur || ''} onChange={setClubVise} recherche />
+                  <button className="btn fantome" onClick={() => postulerBanc(clubVise || optionsBancs.find((o) => o.valeur !== manager.club)?.valeur || '')}>Envoyer ma candidature</button>
+                </div>
+                <div className="offres-coachs">
+                  {avancee.offresBanc.slice().reverse().slice(0, 8).map((offre) => <article key={offre.id}>
+                    <span><b>{offre.club}</b><small>{COMPETITIONS.find((c) => c.id === offre.division)?.nom ?? offre.division} · {nombre(offre.salaire)} € · {offre.duree} ans</small></span>
+                    {offre.statut === 'offre' ? <button onClick={() => accepterOffreBanc(offre.id)}>Accepter le banc</button> : <em>{offre.statut === 'refusee' ? 'Candidature refusée' : offre.statut}</em>}
+                  </article>)}
+                  {!avancee.offresBanc.length && <p className="manager-vide-texte">Aucune approche pour l’instant. Une candidature reste possible.</p>}
+                </div>
+              </section>
+
+              {(avancee.propositionSelection || selectionManager) && <section className="carte direction-selection">
+                <div className="comp-tete"><div><b>🌐 Carrière internationale</b><small>Réputation distincte de la réputation en club.</small></div></div>
+                {avancee.propositionSelection && <div className="proposition-selection"><h3>{avancee.propositionSelection.nation} te propose le poste</h3><p>Le cumul avec ton club est autorisé. Tournées, tournoi continental et Coupe du monde feront évoluer ta réputation internationale.</p><div><button className="btn primaire" onClick={() => repondreSelection(true)}>Accepter</button><button className="btn fantome" onClick={() => repondreSelection(false)}>Refuser</button></div></div>}
+                {selectionManager && <div className="selection-manager-kpis"><span><small>Sélection</small><b>{selectionManager.nation}</b></span><span><small>Réputation</small><b>{selectionManager.reputation}</b></span><span><small>Matchs</small><b>{selectionManager.matchs}</b></span><span><small>Victoires</small><b>{selectionManager.victoires}</b></span>{rencontreSelection && <button className="btn primaire" onClick={() => setMatchSelectionOuvert(true)}>Coacher contre {rencontreSelection.adversaire}</button>}</div>}
+              </section>}
+            </div>
+          )}
+
+          {vue === 'vestiaire' && avancee && (
+            <div className="manager-avance-grille">
+              <section className="carte avance-entete"><div><div className="eyebrow">Hiérarchie, personnalités et parole donnée</div><h2>🗣️ Un vestiaire qui se souvient</h2><p>Les leaders diffusent leur soutien ou leur colère. Le temps de jeu réel, les résultats et tes réponses font le reste.</p></div><div className="avance-score"><b>{moyenneVestiaire(avancee)}</b><span>satisfaction</span></div></section>
+
+              {!!discussionsOuvertes.length && <section className="discussions-joueurs">
+                {discussionsOuvertes.map((discussion) => <article className="carte discussion-joueur" key={discussion.id}><header><span>💬 {discussion.nom}</span><em>{discussion.type}</em></header><blockquote>{discussion.texte}</blockquote><div><button onClick={() => repondreDiscussion(discussion.id, 'promettre')}>Je vais te donner ta chance</button><button onClick={() => repondreDiscussion(discussion.id, 'merite')}>Montre-moi davantage</button><button onClick={() => repondreDiscussion(discussion.id, 'aucunePromesse')}>Je ne promets rien</button><button className="danger" onClick={() => repondreDiscussion(discussion.id, 'ecarter')}>Tu n’entres pas dans mes plans</button></div></article>)}
+              </section>}
+
+              <section className="carte hierarchie-vestiaire">
+                <div className="comp-tete"><div><b>👥 Hiérarchie interne</b><small>Les profils ne sont pas de simples étiquettes : ils modifient les réactions.</small></div></div>
+                <div>{Object.values(avancee.vestiaire).sort((a, b) => ['leader', 'influent', 'groupe', 'nouveau'].indexOf(a.rang) - ['leader', 'influent', 'groupe', 'nouveau'].indexOf(b.rang) || b.satisfaction - a.satisfaction).map((profil) => {
+                  const agent = joueurAgent(avancee, profil.joueurId);
+                  return <article key={profil.joueurId}><span className={`rang-vestiaire ${profil.rang}`}>{profil.rang}</span><b>{profil.nom}</b><small>{profil.traits.join(' · ')}</small><i><em style={{ width: `${profil.satisfaction}%` }} /></i><strong>{profil.satisfaction}</strong><span>{profil.soutien ? '🤝 Soutien' : '⚠ Mécontent'}</span><small>{agent ? `Agent : ${agent.nom} · relation ${agent.relationManager}` : ''}</small></article>;
+                })}</div>
+              </section>
+
+              <section className="carte promesses-manager">
+                <div className="comp-tete"><div><b>🤞 Promesses</b><small>Une promesse respectée construit la relation ; une parole rompue atteint aussi l’agent.</small></div><span className="comp-count">{avancee.promesses.filter((p) => p.etat === 'active').length}</span></div>
+                {avancee.promesses.slice().reverse().slice(0, 12).map((p) => <article key={p.id} className={p.etat}><span><b>{p.nom}</b><small>{p.type} · échéance semaine {p.echeance}</small></span><progress value={p.progression} max={p.objectif} /><strong>{p.progression}/{p.objectif}</strong><em>{p.etat}</em></article>)}
+                {!avancee.promesses.length && <p className="manager-vide-texte">Aucune parole formelle donnée.</p>}
+              </section>
+
+              <section className="carte infirmerie-manager">
+                <div className="comp-tete"><div><b>🩺 Décisions médicales</b><small>Disponibilité, douleur et risque d’aggravation sont séparés.</small></div><span className="comp-count">{dossiersMedicaux.length}</span></div>
+                {dossiersMedicaux.map((d) => <article key={d.id}><header><span><b>{d.nom}</b><small>{d.type} · {d.semaines} semaine(s)</small></span><strong>{d.disponibilite}% disponible</strong></header><p>Douleur {d.douleur}/100 · risque d’aggravation {d.risqueAggravation}%{d.penalitePerformance > 0 && ` · performance −${d.penalitePerformance}`}</p>{d.decision === 'attente' ? <div><button onClick={() => deciderMedical(d.id, 'repos')}>Repos · aucun match</button><button onClick={() => deciderMedical(d.id, 'traitement')}>Traitement · 80%</button><button className="danger" onClick={() => deciderMedical(d.id, 'forcer')}>Forcer · 90%</button></div> : <em>Décision : {d.decision}</em>}</article>)}
+                {!dossiersMedicaux.length && <p className="manager-vide-texte">Infirmerie vide.</p>}
+              </section>
+
+              {!!convocationsActives.length && <section className="carte convocations-manager"><div className="comp-tete"><b>🌐 Absents en sélection</b></div>{convocationsActives.map((c) => <p key={c.id}><b>{c.nom}</b> · {c.nation} · {c.competition}</p>)}</section>}
+            </div>
+          )}
+
+          {vue === 'univers' && avancee && (
+            <div className="manager-avance-grille univers-manager">
+              <section className="carte avance-entete"><div><div className="eyebrow">Le monde continue sans toi</div><h2>📰 Actualités issues de la sauvegarde</h2><p>Résultats, blessures, sélections, finances et changements d’entraîneur viennent des systèmes de jeu, jamais d’un tirage décoratif.</p></div><div className="avance-score"><b>{avancee.actualites.length}</b><span>faits mémorisés</span></div></section>
+              <section className="carte fil-actualites-manager"><div className="comp-tete"><b>Fil d’actualité</b></div>{avancee.actualites.slice().reverse().slice(0, 30).map((actu) => <article key={actu.id} className={`importance-${actu.importance}`}><span>{actu.categorie}</span><div><b>{actu.titre}</b><p>{actu.texte}</p><small>S{actu.saison} · semaine {actu.semaine}{actu.club && ` · ${actu.club}`}</small></div></article>)}{!avancee.actualites.length && <p className="manager-vide-texte">La saison vient de commencer. Les vrais événements apparaîtront ici.</p>}</section>
+
+              {identiteClub && <section className="carte adn-club"><div className="comp-tete"><div><b>🧬 ADN de {manager.club}</b><small>Il faut plusieurs saisons cohérentes pour le transformer.</small></div></div><div className="traits-adn">{traitsDominants(identiteClub).map((axe) => <strong key={axe}>{axe}</strong>)}</div><div className="axes-adn">{Object.entries(identiteClub).map(([axe, valeur]) => <label key={axe}><span>{axe}</span><i><em style={{ width: `${valeur}%` }} /></i><b>{Math.round(valeur)}</b></label>)}</div></section>}
+
+              <section className="carte rivalites-manager"><div className="comp-tete"><div><b>⚔️ Rivalités dynamiques</b><small>Les matchs serrés, finales, luttes et transferts les nourrissent lentement.</small></div></div>{rivalitesClub.map((r) => { const autre = r.clubs.find((c) => c !== manager.club); return <article key={r.clubs.join('-')}><span><b>{manager.club} — {autre}</b><small>{r.causes.join(' · ') || 'proximité et histoire en construction'}</small></span><i><em style={{ width: `${r.intensite}%` }} /></i><strong>{Math.round(r.intensite)}/100</strong></article>; })}{!rivalitesClub.length && <p className="manager-vide-texte">Aucune rivalité n’a encore franchi le seuil public de 20/100.</p>}</section>
+
+              <section className="carte monde-clubs-manager"><div className="comp-tete"><div><b>🌍 Clubs et entraîneurs IA</b><small>Richesse, infrastructures, stratégie et carrière du coach évoluent chaque été.</small></div><span className="comp-count">{Object.keys(avancee.clubsMonde).length}</span></div><div>{Object.values(avancee.clubsMonde).sort((a, b) => Math.abs(b.tendance) - Math.abs(a.tendance)).slice(0, 18).map((club) => { const coach = avancee.entraineursIA[club.entraineurId]; return <article key={club.club}><span><b>{club.club}</b><small>{club.strategie} · {club.professionnel ? 'pro' : 'amateur/semi-pro'}</small></span><strong className={club.tendance >= 0 ? 'cl-plus' : 'cl-moins'}>{club.tendance > 0 ? '+' : ''}{club.tendance}</strong><small>💶 {club.richesse} · 🏗️ {club.infrastructures}</small><em>{coach?.nom} · contrat {coach?.contrat ?? 0} an(s)</em></article>; })}</div></section>
+            </div>
+          )}
+
+          {vue === 'histoire' && avancee && (
+            <div className="manager-avance-grille histoire-manager">
+              <section className="carte avance-entete"><div><div className="eyebrow">Aucune saison ne disparaît</div><h2>📚 Mémoire de la sauvegarde</h2><p>Palmarès des compétitions, carrières saison par saison, anciens joueurs, Hall of Fame et reconversions restent consultables.</p></div><div className="avance-score"><b>{Object.values(avancee.histoire).reduce((n, s) => n + s.length, 0)}</b><span>saisons archivées</span></div></section>
+              <section className="carte palmares-competition"><div className="comp-tete"><b>🏆 Palmarès par compétition</b><Selecteur options={optionsDivisions} valeur={competitionHistoire} onChange={setCompetitionHistoire} recherche /></div>{archiveVisible.map((s) => <article key={s.saison}><strong>S{s.saison}</strong><span><b>{s.champion}</b><small>{s.finaliste ? `Finaliste : ${s.finaliste}` : ''}</small></span><em>{s.montees.length ? `⬆ ${s.montees.join(', ')}` : ''}{s.relegations.length ? ` · ⬇ ${s.relegations.join(', ')}` : ''}</em></article>)}{!archiveVisible.length && <p className="manager-vide-texte">Cette compétition sera archivée à la prochaine fin de saison.</p>}</section>
+              <section className="carte hall-club-manager"><div className="comp-tete"><div><b>🏛️ Hall of Fame · {manager.club}</b><small>Score local : fidélité, matchs, titres, capitanat et performances.</small></div><span className="comp-count">{hallClub.length}</span></div>{hallClub.map((f) => <article key={f.id}><strong>{f.score}</strong><span><b>{f.nom}</b><small>{f.rang} · {f.saisonsAuClub} saison(s) · {f.matchsAuClub} matchs</small></span><em>{f.titresAuClub} titre(s)</em></article>)}{!hallClub.length && <p className="manager-vide-texte">Il faut du temps pour devenir une icône. Les carrières sont déjà comptées.</p>}</section>
+              <section className="carte carrieres-joueurs-manager"><div className="comp-tete"><div><b>📈 Historiques de joueurs</b><small>Les totaux survivent aux transferts et à la retraite.</small></div><span className="comp-count">{avancee.carrieresJoueurs.length}</span></div>{avancee.carrieresJoueurs.slice().reverse().slice(0, 25).map((c) => { const total = totaux(c); return <details key={c.id}><summary><span><b>{c.nom}</b><small>{total.clubs.join(' → ')}</small></span><strong>{total.matchs} matchs · {total.essais} essais · {total.selections} sél.</strong></summary><div>{c.saisons.map((s) => <p key={`${s.saison}-${s.club}`}><b>{s.resume ? `${s.saisonsResumees} saisons résumées` : `S${s.saison}`}</b> · {s.club} · {s.matchs} matchs · {s.titularisations} titularisations · {s.minutes} min · {s.essais} essais · note {s.note.toFixed(1)}</p>)}</div></details>; })}</section>
+              <section className="carte anciens-staff-manager"><div className="comp-tete"><div><b>🧑‍🏫 Anciens joueurs reconvertis</b><small>Le personnage staff reste lié à son historique de joueur.</small></div><span className="comp-count">{avancee.staffAnciens.length}</span></div>{avancee.staffAnciens.map((s) => <article key={s.id}><b>{s.nom}</b><span>{s.role}</span><small>{s.club} · réputation {s.reputation} · joueur depuis S{s.joueurDepuis}</small></article>)}{!avancee.staffAnciens.length && <p className="manager-vide-texte">Les premières reconversions apparaîtront avec les retraites du groupe.</p>}</section>
             </div>
           )}
 
@@ -783,6 +943,7 @@ export function Manager() {
               <p className="manager-resultats-marche">{t('mgr.marche.resultats', { n: cibles.length })}</p>
               <div className="manager-cibles">
                 {cibles.map((cible) => {
+                  const connaissance = rapportConnaissance(avancee ?? undefined, cible, murs.recrutement);
                   const existante = manager.negociations.find((n) => n.joueur.id === cible.id && n.etat !== 'rompue');
                   const clubDossier = [...manager.negociationsClubs].reverse()
                     .find((n) => n.cible.id === cible.id && n.saison === manager.saison);
@@ -800,7 +961,7 @@ export function Manager() {
                             : `𝕏 Négocier avec ${cible.club}`;
                   return (
                     <article key={cible.id} className="carte manager-cible">
-                      <div className="manager-cible-note">{cible.note}<small>{t('mgr.note')}</small></div>
+                      <div className="manager-cible-note">{connaissance.note[0] === connaissance.note[1] ? connaissance.note[0] : `${connaissance.note[0]}–${connaissance.note[1]}`}<small>{connaissance.niveau}</small></div>
                       <div className="manager-cible-corps">
                         <div className="manager-cible-identite"><Drapeau nation={cible.nation} taille={0.95} /><span><b>{cible.nom}</b><small>{nomPoste(cible.poste)} · {cible.age} {t('gen.ans')}</small></span></div>
                         <p>{clubCible && <Blason club={clubCible} taille={18} />} {cible.club}</p>
@@ -811,13 +972,14 @@ export function Manager() {
                             payer. On montre donc les deux, plus le temps qui
                             reste — c'est lui qui décide du prix. */}
                         <div className="manager-cible-chiffres">
-                          <span>{t('mgr.potentiel')} <b>{cible.potentiel}</b></span>
+                          <span>{t('mgr.potentiel')} <b>{connaissance.potentiel ? `${connaissance.potentiel[0]}–${connaissance.potentiel[1]}` : '?'}</b></span>
                           <span>{t('mgr.valeur')} <b>{nombre(cible.valeur)} €</b></span>
                           <span className={cible.indemnite === 0 ? 'gratuit' : ''}>
                             {t('mgr.indemnite')} <b>{cible.indemnite === 0 ? t('mgr.libreGratuit') : `${nombre(cible.indemnite)} €`}</b>
                           </span>
-                          <span>{t('mgr.salaire')} <b>{nombre(cible.salaireDemande)} €</b></span>
+                          <span>{t('mgr.salaire')} <b>{connaissance.salaire ? `${nombre(connaissance.salaire[0])}–${nombre(connaissance.salaire[1])} €` : '?'}</b></span>
                         </div>
+                        <p className="manager-connaissance-cible">Rapport {connaissance.niveau}{connaissance.personnalite ? ` · personnalité ${connaissance.personnalite}` : ' · personnalité inconnue'}</p>
                         <p className={`manager-cible-situation ${cible.situation}`}>
                           {t(`mgr.situation.${cible.situation}`)}
                           {cible.saisonsRestantes > 0 && ` · ${t('mgr.contratRestant', { n: cible.saisonsRestantes })}`}
@@ -834,6 +996,7 @@ export function Manager() {
                       >
                         {libelleContact}
                       </button>
+                      <button className="btn fantome" disabled={connaissance.niveau === 'complet'} onClick={() => observerCible(cible)}>👁 Observer davantage</button>
                     </article>
                   );
                 })}
@@ -886,6 +1049,8 @@ export function Manager() {
               composition,
               tactique: manager.tactique,
               onTactique: definirTactique,
+              indisponibles,
+              penalitesNote,
             }}
             onTermine={({ scoreA, scoreB, essaisA, essaisB }) => {
               const domicile = afficheManager.match.domicile === manager.club;
@@ -901,6 +1066,26 @@ export function Manager() {
               });
             }}
             onFermer={() => setMatchOuvert(false)}
+          />
+        </Suspense>
+      )}
+      {demission && <Confirmation titre="Quitter le club ?" message={`Tu démissionneras de ${manager.club} immédiatement. Ta réputation et tout l’historique seront conservés, mais le calendrier s’arrêtera jusqu’à la signature d’un nouveau banc.`} libelleOui="Démissionner" onOui={() => { setDemission(false); demissionner(); }} onNon={() => setDemission(false)} />}
+      {matchSelectionOuvert && selectionManager && rencontreSelection && matchSelection && (
+        <Suspense fallback={null}>
+          <MatchLive
+            match={matchSelection}
+            saison={manager.saison}
+            cle={rencontreSelection.id}
+            titre={`${rencontreSelection.competition} · ${selectionManager.nation}`}
+            selection
+            manager={{
+              club: selectionManager.nation,
+              composition: compositionManagerParDefaut(effectifNational(selectionManager.nation, manager.saison)),
+              tactique: manager.tactique,
+              onTactique: definirTactique,
+            }}
+            onTermine={({ scoreA, scoreB }) => enregistrerMatchSelection(scoreA, scoreB)}
+            onFermer={() => setMatchSelectionOuvert(false)}
           />
         </Suspense>
       )}

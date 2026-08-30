@@ -180,6 +180,14 @@ import { effetsTraits, MAX_TRAITS, TRAIT_PAR_ID } from '../data/traits';
 import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiaire';
 import { interviewAleatoire, scenarioDuPool, type JugementMJ } from '../lib/ia';
 import { agentDe } from '../data/agents';
+import {
+  accepterSelectionAvance, avancerSemaineCarriereAvancee, apresResultatCarriereAvancee,
+  assurerEtatCarriereAvancee, changerClubCarriereAvancee, creerEtatCarriereAvancee,
+  deciderMedical, enregistrerMatchSelectionAvance, finSaisonCarriereAvancee,
+  indisponiblesCarriereAvancee, negocierContratManagerAvance, observerCible, postulerBancAvance,
+  refuserSelectionAvance, repondreDiscussionAvancee, joueurAgent,
+  type DecisionMedicale, type ReponseDiscussion,
+} from '../lib/carriereAvancee';
 
 // Essais marqués par match, par poste : un ailier finit, un pilier non.
 const ESSAIS_PAR_MATCH: Record<PosteId, number> = {
@@ -964,6 +972,16 @@ interface GameState {
   definirMentorJeuneManager: (jeuneId: string, mentorId?: string) => void;
   /** Prendre un banc (premier contrat, ou après un licenciement). */
   signerBanc: (club: string) => void;
+  /** Répondre à une discussion et, le cas échéant, enregistrer une promesse. */
+  repondreDiscussionAvancee: (id: string, reponse: ReponseDiscussion) => void;
+  deciderMedicalManager: (id: string, decision: Exclude<DecisionMedicale, 'attente'>) => void;
+  observerCibleManager: (cible: CibleRecrutementManager) => void;
+  postulerBancManager: (club: string) => void;
+  negocierContratManager: () => void;
+  demissionnerManager: () => void;
+  accepterOffreBancManager: (id: string) => void;
+  repondreSelectionManager: (accepter: boolean) => void;
+  enregistrerMatchSelectionManager: (scorePour: number, scoreContre: number) => void;
   /** Raccrocher : la carrière part au Hall et au classement. */
   quitterBanc: () => void;
   /**
@@ -3576,6 +3594,7 @@ export const useGame = create<GameState>()(
           } : {}),
           ...(libre ? { libre: true } : {}),
         };
+        manager.avancee = creerEtatCarriereAvancee(manager, effectifDuClub(club, 1));
         set((s) => ({
           manager,
           joueur: null,
@@ -3818,9 +3837,76 @@ export const useGame = create<GameState>()(
           ventes: [],
           clubs: m.clubs[m.clubs.length - 1] === club ? m.clubs : [...m.clubs, club],
         };
+        suivant.avancee = changerClubCarriereAvancee(m.avancee, suivant, effectifDuClub(club, m.saison));
         set({
           manager: suivant,
         });
+      },
+
+      repondreDiscussionAvancee: (id, reponse) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
+        set({ manager: { ...m, avancee: repondreDiscussionAvancee(avancee, m, id, reponse) } });
+      },
+
+      deciderMedicalManager: (id, decision) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
+        set({ manager: { ...m, avancee: deciderMedical(avancee, id, decision) } });
+      },
+
+      observerCibleManager: (cible) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
+        const paysConnu = competitionDuClub(cible.club)?.pays === competitionDuClub(m.club)?.pays;
+        set({ manager: { ...m, avancee: observerCible(avancee, cible.id, m.saison, paysConnu) } });
+      },
+
+      postulerBancManager: (club) => {
+        const m = get().manager;
+        if (!m || !clubParNom(club) || club === m.club) return;
+        const avancee = assurerEtatCarriereAvancee(m, m.club ? effectifDuClub(m.club, m.saison) : []);
+        set({ manager: { ...m, avancee: postulerBancAvance(avancee, m, club) } });
+      },
+
+      negocierContratManager: () => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
+        const resultat = negocierContratManagerAvance(avancee, m);
+        set({ manager: { ...m, avancee: resultat.etat, contrat: resultat.contrat, confiance: borne(m.confiance + resultat.confiance) } });
+      },
+
+      demissionnerManager: () => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const avancee = changerClubCarriereAvancee(m.avancee, { ...m, club: '', division: '', divisionNom: '' }, []);
+        set((s) => ({
+          manager: { ...m, club: '', division: '', divisionNom: '', contrat: null, composition: { titulaires: [], remplacants: [], capitaineId: '', buteurId: '' }, confiance: 58, avancee },
+          journal: [...s.journal, { id: idUnique(), saison: m.saison, role: 'mj' as const, titre: '🚪 Démission', texte: `${m.nom} quitte ${m.club}. Sa réputation reste intacte, mais il doit désormais convaincre un nouveau président.` }],
+        }));
+      },
+
+      accepterOffreBancManager: (id) => {
+        const m = get().manager;
+        const offre = m?.avancee?.offresBanc.find((o) => o.id === id && o.statut === 'offre');
+        if (!m || !offre) return;
+        get().signerBanc(offre.club);
+      },
+
+      repondreSelectionManager: (accepter) => {
+        const m = get().manager;
+        if (!m?.avancee?.propositionSelection) return;
+        set({ manager: { ...m, avancee: accepter ? accepterSelectionAvance(m.avancee, m) : refuserSelectionAvance(m.avancee) } });
+      },
+
+      enregistrerMatchSelectionManager: (scorePour, scoreContre) => {
+        const m = get().manager;
+        if (!m?.avancee?.selection?.matchEnAttente) return;
+        set({ manager: { ...m, avancee: enregistrerMatchSelectionAvance(m.avancee, m, scorePour, scoreContre) } });
       },
 
       semaineManager: () => {
@@ -3834,7 +3920,9 @@ export const useGame = create<GameState>()(
         const affiche = matchDuClubSemaine(m);
         if (affiche && !m.resultats[affiche.cle]) return;
         if (m.semaine < SEMAINES_PAR_SAISON) {
-          set({ manager: { ...m, semaine: m.semaine + 1, decision: null } });
+          const suivante = m.semaine + 1;
+          const avancee = avancerSemaineCarriereAvancee(m, effectifDuClub(m.club, m.saison), suivante);
+          set({ manager: { ...m, semaine: suivante, decision: null, avancee } });
           get().vivreSemaineSociale();
           return;
         }
@@ -3899,8 +3987,9 @@ export const useGame = create<GameState>()(
         // a seulement regardé, et les demandes du vestiaire deviendraient
         // fausses sans que rien ne le signale.
         const tempsDeJeu = { ...m.tempsDeJeu };
+        const absents = new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine));
         for (const id of [...m.composition.titulaires, ...m.composition.remplacants]) {
-          if (id) tempsDeJeu[id] = (tempsDeJeu[id] ?? 0) + 1;
+          if (id && !absents.has(id)) tempsDeJeu[id] = (tempsDeJeu[id] ?? 0) + 1;
         }
         const resultats = { ...m.resultats, [resultat.cle]: resultat };
         const avecResultat: Manager = {
@@ -3910,6 +3999,11 @@ export const useGame = create<GameState>()(
           confiance: borne(m.confiance + (victoire ? 2 : nul ? 0 : -2)),
           prestige: borne(m.prestige + (victoire ? 0.35 : nul ? 0.05 : -0.12)),
         };
+        const bilanAvance = apresResultatCarriereAvancee(
+          avecResultat, effectifDuClub(m.club, m.saison), resultat,
+        );
+        avecResultat.avancee = bilanAvance.etat;
+        avecResultat.confiance = borne(avecResultat.confiance + bilanAvance.confiance);
         const matchsJoues = Object.values(resultats)
           .filter((r) => r.saison === m.saison && r.club === m.club).length;
         const besoin = demandeAGenerer(
@@ -4076,9 +4170,31 @@ export const useGame = create<GameState>()(
         }
         const existante = m.negociations.find((n) => n.joueur.id === cible.id
           && (n.etat === 'ouverte' || n.etat === 'accord'));
-        const nego = existante ?? ouvrirNegociationManager(cible, m.saison, m.semaine);
+        const agent = joueurAgent(m.avancee, cible.id);
+        // Un bon historique avec l'agent adoucit légèrement ses exigences ;
+        // son intérêt financier produit l'effet inverse. Le joueur conserve
+        // toutefois ses propres priorités : l'écart reste volontairement borné.
+        const facteurAgent = agent
+          ? Math.max(0.86, Math.min(1.14,
+            1 + (50 - agent.relationManager) / 500 + (agent.interetFinancier - 50) / 1000))
+          : 1;
+        const cibleNegociee = facteurAgent === 1 ? cible : {
+          ...cible,
+          salaireDemande: Math.round(cible.salaireDemande * facteurAgent),
+          primeDemandee: Math.round(cible.primeDemandee * facteurAgent),
+          primeMatchDemandee: Math.round(cible.primeMatchDemandee * facteurAgent),
+        };
+        const nego = existante ?? ouvrirNegociationManager(cibleNegociee, m.saison, m.semaine);
+        const avancee = !m.avancee || !agent || agent.joueurs.includes(cible.id)
+          ? m.avancee
+          : {
+            ...m.avancee,
+            agents: m.avancee.agents.map((a) => a.id === agent.id
+              ? { ...a, joueurs: [...a.joueurs, cible.id] }
+              : a),
+          };
         set((s) => ({
-          manager: existante ? m : { ...m, negociations: [...m.negociations, nego] },
+          manager: existante ? m : { ...m, avancee, negociations: [...m.negociations, nego] },
           conversations: existante ? s.conversations : {
             ...s.conversations,
             [nego.pseudo]: [
@@ -4410,7 +4526,11 @@ export const useGame = create<GameState>()(
         const v = verdictDeSaison(rang, m.objectif, {
           titres: titres.length, montee: monte, descente: descendu,
         });
-        const { prestige, confiance } = appliquerVerdict(m, v);
+        const verdictBoard = appliquerVerdict(m, v);
+        const groupe = effectifDuClub(m.club, m.saison);
+        const bilanAvance = finSaisonCarriereAvancee(m, groupe, rang);
+        const prestige = verdictBoard.prestige;
+        const confiance = borne(verdictBoard.confiance + bilanAvance.confiance);
 
         const ligne: SaisonManager = {
           saison: m.saison, club: m.club, division: m.division,
@@ -4437,8 +4557,6 @@ export const useGame = create<GameState>()(
         // encore pour elle, et le manager découvrirait sa promotion sans
         // pouvoir l'aligner avant l'intersaison suivante.
         const murs = m.installations[m.club] ?? installationsVierges();
-        const groupe = effectifDuClub(m.club, m.saison);
-
         // 🎓 L'académie ne fabrique plus magiquement des seniors. Les jeunes
         // repérés, recrutés puis gérés par le manager progressent ici ; leur
         // intégration au groupe professionnel reste une décision explicite.
@@ -4542,6 +4660,7 @@ export const useGame = create<GameState>()(
           demandes: m.demandes.map((d) => d.etat === 'ouverte'
             ? { ...d, etat: 'refusee' as const } : d),
           ventes: [],
+          avancee: bilanAvance.etat,
         };
 
         // ⚠️ CE QUE LES STRUCTURES ONT PRODUIT SE DIT, sinon elles n'existent
@@ -4586,6 +4705,7 @@ export const useGame = create<GameState>()(
               + (trophee ? ` ${t('mgr.journal.champion')}` : '')
               + (monte ? ` ${t('mgr.journal.montee')}` : '')
               + (descendu ? ` ${t('mgr.journal.descente')}` : '')
+              + ` ${bilanAvance.resume}`
               + (licencie
                 ? ` ${t('mgr.journal.nouveauBanc')}`
                 : ` ${t('mgr.journal.confiance', { confiance })}`),
@@ -6007,7 +6127,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 21,
+      version: 22,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -6320,6 +6440,13 @@ export const useGame = create<GameState>()(
             reponsesJeunes: s.manager.reponsesJeunes ?? {},
             revenusFormation: s.manager.revenusFormation ?? {},
           };
+          // VERSION 22 — les carrières longues gagnent une mémoire commune.
+          // La migration est idempotente : elle conserve tout état déjà écrit
+          // et initialise seulement les anciennes sauvegardes.
+          s.manager.avancee = assurerEtatCarriereAvancee(
+            s.manager,
+            s.manager.club ? effectifDuClub(s.manager.club, s.manager.saison) : [],
+          );
         }
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
