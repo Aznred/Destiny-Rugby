@@ -19,10 +19,11 @@ import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID, descriptionTrait, nomTrait } from '../data/traits';
 import { nombre, t, tn } from '../lib/i18n';
 import { matchDeLaSemaine } from '../lib/matchLive';
-import { matchInternationalDuJoueur, equipeU20 } from '../lib/international';
+import { equipeU20 } from '../lib/international';
 import { coupeEnDirect, coupesDuClub, matchDuTourCourant } from '../lib/coupe';
 import { matchPhaseFinaleDuJoueur } from '../lib/phaseFinale';
-import { convocation, convocationU20 } from '../lib/selection';
+import { situationInternationale } from '../lib/rassemblements';
+import { CalendrierMondial } from './CalendrierMondial';
 import { nomBlessure } from '../lib/blessures';
 import { miseAuBancSociale } from '../data/socialLocalise';
 import { EQUIPEMENT_PAR_ID } from '../data/boutique';
@@ -101,6 +102,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   // LE MATCH DE LA SEMAINE : s'il y en a un, c'est LUI qu'on joue, et c'est lui
   // qui fait passer à la semaine suivante une fois la sirène tombée.
   const [matchOuvert, setMatchOuvert] = useState(false);
+  const [calendrierOuvert, setCalendrierOuvert] = useState(false);
   const [matchTermine, setMatchTermine] = useState(false);
   const matchRegarde = useGame((s) => s.matchRegarde);
   const approches = useGame((s) => s.approches);
@@ -115,18 +117,9 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   // Un espoir de 19 ans n'a aucune chance d'être appelé chez les séniors, mais
   // il peut porter le maillot de son pays chez les moins de 20 ans — Tournoi
   // U20 et Championnat du monde U20 (lib/international.ts).
-  const inter = useMemo(() => {
-    if (semaineActuelle.type !== 'international') return null;
-    if (convocation(joueur).selectionne) {
-      const senior = matchInternationalDuJoueur(joueur, bonusClubDuJoueur(joueur));
-      if (senior) return { affiche: senior, u20: false };
-    }
-    if (convocationU20(joueur).selectionne) {
-      const jeune = matchInternationalDuJoueur(joueur, bonusClubDuJoueur(joueur), true);
-      if (jeune) return { affiche: jeune, u20: true };
-    }
-    return null;
-  }, [joueur, semaineActuelle.type]);
+  const situation = useMemo(() => situationInternationale(joueur), [joueur]);
+  const inter = useMemo(() => situation.match && situation.camp
+    ? { affiche: situation.match, u20: situation.camp.u20 } : null, [situation]);
 
   /**
    * ⚠️ CE WEEK-END, ON NE JOUE PAS POUR SON CLUB.
@@ -177,7 +170,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   ), [joueur, semaineActuelle.type]);
 
   const affiche = useMemo(
-    () => (inter
+    () => (situation.indisponibleClub && !inter ? null : inter
       ? { journee: inter.affiche.journee, match: inter.affiche.match, cle: inter.affiche.cle }
       : coupe
         ? { journee: coupe.journee, match: coupe.match, cle: `${coupe.id}#${joueur.saison}#${joueur.semaine}` }
@@ -188,14 +181,14 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               cle: `phase#${joueur.division}#${joueur.saison}#${joueur.semaine}`,
             }
           : matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur))),
-    [joueur, inter, coupe, phase],
+    [joueur, inter, coupe, phase, situation.indisponibleClub],
   );
   const monEquipe = inter ? (inter.u20 ? equipeU20(joueur.nation) : nomNation(joueur.nation)) : joueur.club;
   const adversaire = affiche
     ? (affiche.match.domicile === monEquipe ? affiche.match.exterieur : affiche.match.domicile)
     : null;
   // Déjà suivi cette semaine ? Alors on repasse sur les boutons classiques.
-  const matchAJouer = !!affiche && !blesse
+  const matchAJouer = !!affiche && !blesse && situation.role !== 'horsGroupe'
     && matchRegarde !== `${joueur.saison}#${joueur.semaine ?? 1}`;
 
   return (
@@ -399,7 +392,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           <button
             type="button"
             className="calendrier-semaine cliquable"
-            onClick={() => setEcran('tableau')}
+            onClick={() => setCalendrierOuvert(true)}
             title={t('pj.calendrierAide')}
           >
             <div className="cal-date">
@@ -454,7 +447,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
                 disabled={aRepondre}
                 title={aRepondre ? motifAttente : t('pj.jouerSemaineAide')}
               >
-                {semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
+                {semaineActuelle.numero >= SEMAINES_PAR_SAISON ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
               </button>
               {/* ⚠️ « ⏩ FIN DE SAISON » A ÉTÉ SUPPRIMÉ (demande explicite : « il
                   faut pas qu'on puisse simuler la saison »). Il sautait à un
@@ -464,7 +457,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
                   semaines sont réellement jouées, une par une. */}
               <button
                 className="btn fantome"
-                onClick={() => setEcran('tableau')}
+                onClick={() => setCalendrierOuvert(true)}
                 title={t('pj.choisirDateAide')}
               >
                 <Icone nom="calendrier" taille={15} /> {t('pj.calendrier')}
@@ -575,6 +568,16 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         )}
       </AnimatePresence>
 
+      <button className="btn fantome" onClick={() => setCalendrierOuvert(true)}>Calendrier mondial / Avancer</button>
+      {situation.annonce && <section className="manager-cal-decision">
+        <b>{situation.camp ? 'En rassemblement' : 'Convocation annoncée'} · {situation.annonce.nation}</b>
+        <p>{situation.annonce.nom} · groupe de 34 · du {libelleDate(semaine(situation.annonce.debut))} au {libelleDate(semaine(situation.annonce.fin))}</p>
+        <p>{situation.camp ? ({ titulaire: 'Titulaire', remplacant: 'Remplaçant', horsGroupe: 'Hors des 23 · tu restes avec la sélection', preparation: 'Préparation / récupération avec la sélection' }[situation.role])
+          : 'Le départ approche. Tu restes disponible pour ton club jusqu’au rassemblement.'}</p>
+        {situation.camp && <small>Ton club poursuit ses rencontres sans toi. Retour après élimination et 5 jours de récupération.</small>}
+      </section>}
+      {calendrierOuvert && createPortal(<CalendrierMondial onFermer={() => setCalendrierOuvert(false)} />, document.body)}
+
       {matchOuvert && affiche && (
         <Suspense fallback={null}>
         <MatchLive
@@ -611,6 +614,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           --------------------------------------------------------------- */}
       {!matchOuvert && createPortal(
         <div className="barre-jouer">
+          <button className="barre-jouer-calendrier" aria-label="Calendrier mondial" onClick={() => setCalendrierOuvert(true)}><Icone nom="calendrier" taille={21} /></button>
           <span className="barre-jouer-info">
             <b>S{joueur.saison}</b> · {libelleDate(semaineActuelle)}
             {matchAJouer && adversaire ? ` · ${adversaire}` : ` · ${libelleSemaine(semaineActuelle, joueur.saison)}`}
@@ -635,7 +639,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               disabled={aRepondre}
               title={aRepondre ? motifAttente : undefined}
             >
-              {aRepondre ? t('pj.reponds') : semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
+              {aRepondre ? t('pj.reponds') : semaineActuelle.numero >= SEMAINES_PAR_SAISON ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
             </button>
           )}
         </div>,

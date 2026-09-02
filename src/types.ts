@@ -169,6 +169,7 @@ export interface Joueur {
   semaine?: number; // semaine en cours dans le calendrier (1 = fin août)
   saisonEnCours?: BilanEnCours;
   selections?: number; // nombre de capes internationales
+  international?: import('./lib/rassemblements').ParcoursInternational;
   stats?: StatsDetaillees; // cumul de carrière
   blessure?: Blessure | null; // blessure en cours
   mentorat?: boolean; // a pris un jeune sous son aile (30 ans et +)

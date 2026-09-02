@@ -1,74 +1,15 @@
-// 🌍 LA COUPE DU MONDE — format 2027 : 24 nations, 6 poules de 4, huitièmes.
-//
-// ═══ LE FORMAT, TEL QU'IL A ÉTÉ DONNÉ ═══════════════════════════════════════
-//
-// Demande explicite, et elle décrit le vrai format de l'édition 2027 :
-//
-//   • **24 équipes en 6 poules de 4.** Chaque équipe joue UNE FOIS contre
-//     chacun de ses trois adversaires : un vrai toutes rondes, plus la poule
-//     tronquée de l'ancien format.
-//   • **Les deux premiers de chaque poule (12) + les quatre meilleurs
-//     troisièmes** = 16 qualifiés.
-//   • **Huitièmes de finale**, puis quarts, demies, **match pour la 3ᵉ place**
-//     et finale.
-//   • **Bonus offensif à QUATRE ESSAIS**, pas à trois essais d'écart.
-//   • Égalité en phase finale : **prolongation**, puis **tirs au but (drops)**.
-//
-// ⚠️ CE FICHIER REMPLACE LE FORMAT PRÉCÉDENT (4 poules de 6, deux matchs
-// chacune, tableau à 8). Il n'en reste rien : ni le tirage, ni la grille, ni le
-// nombre de qualifiés. Ne pas chercher à faire cohabiter les deux.
-//
-// ═══ LA COMPRESSION DU CALENDRIER, ET ELLE EST ASSUMÉE ══════════════════════
-//
-// Le calendrier réserve **trois dates** à la fenêtre d'automne, et la Coupe du
-// monde les remplace (`estAnneeDeCoupeDuMonde`). Une vraie Coupe du monde en
-// prend sept. Il faut donc caser trois tours de poule ET cinq tours de tableau
-// dans trois week-ends :
-//
-//   | date | ce qui se joue |
-//   |------|----------------|
-//   | S10  | 1ᵉʳ tour de poule |
-//   | S11  | **2ᵉ ET 3ᵉ tours de poule** |
-//   | S12  | tout le tableau : huitièmes → quarts → demies → 3ᵉ place → finale |
-//
-// ⚠️ POURQUOI COMPRIMER LES POULES PLUTÔT QUE LE TABLEAU. Le joueur ne dispute
-// qu'UN match par date de calendrier. En étalant les poules sur les trois
-// dates, il jouerait ses trois matchs de poule et **ne jouerait jamais un match
-// à élimination directe de Coupe du monde** — on lui retirerait le seul moment
-// qui compte. En comprimant les poules, il joue deux matchs de poule en direct,
-// son troisième se résout en fond, et il dispute VRAIMENT son huitième.
-//
-// ⚠️ L'ALTERNATIVE A ÉTÉ ÉCARTÉE, chiffres à l'appui : étaler le tournoi
-// demanderait de supprimer la tournée d'automne ET quatre journées de
-// championnat une saison sur quatre — donc de changer le nombre de journées de
-// la saison, et tout l'étalonnage qui en dépend (`verifDifficulte.ts`,
-// `verifPyramide.ts`, la note de saison, les statistiques individuelles).
-//
-// ⚠️ **DÉTERMINISTE, RIEN À SAUVEGARDER**, comme les coupes d'Europe : la
-// graine est `mondial#saison`. Rouvrir l'écran ne rejoue rien.
-
+// Mondial à 24 : trois semaines de poules, puis un tour par semaine.
 import {
-  classer, graine, scorePossible,
+  classer, graine, scorePossible, resultatJoue,
   type LigneTableau, type MatchChampionnat,
 } from './championnat';
 import type { MatchFinal } from './phaseFinale';
 import { forceNation, jouerTestMatch, qualifiesCoupeDuMonde } from './international';
 
-/**
- * Les tours de poule RÉELLEMENT joués : un toutes rondes de quatre en fait
- * trois. À ne pas confondre avec `DATES_POULES`.
- */
 export const JOURNEES_POULES = 3;
 
-/**
- * Les DATES DE CALENDRIER que les poules occupent.
- *
- * ⚠️ DEUX DATES POUR TROIS TOURS, et c'est tout le compromis du fichier (voir
- * l'entête) : la deuxième date en porte deux. C'est ce qui libère la troisième
- * pour le tableau final, et donc ce qui permet au joueur de disputer un
- * huitième de finale de Coupe du monde.
- */
-export const DATES_POULES = 2;
+export const DATES_POULES = 3;
+export const DATES_MONDIAL = 7;
 
 /** Nombre de poules, et de nations par poule. */
 export const NB_POULES = 6;
@@ -102,18 +43,8 @@ export interface EtatMondial {
   tableauJoue: boolean;
 }
 
-/**
- * Combien de tours de poule sont joués après `dates` dates de calendrier.
- *
- * ⚠️ UNE SEULE DÉFINITION DE LA COMPRESSION. Elle est lue par `mondialEnDirect`,
- * par `afficheMondialDe` et par `matchsInternationaux` (international.ts) :
- * trois exemplaires de cette petite règle, et un jour l'écran annoncerait un
- * match que le classement ne connaît pas.
- */
 export function toursDePouleApres(dates: number): number {
-  if (dates <= 0) return 0;
-  if (dates === 1) return 1;
-  return JOURNEES_POULES; // la 2ᵉ date porte les tours 2 et 3
+  return Math.max(0, Math.min(JOURNEES_POULES, Math.floor(dates)));
 }
 
 /**
@@ -135,6 +66,9 @@ function duelNation(
   a: string, b: string, cle: string,
   tour: MatchFinal['tour'], libelle: string,
 ): MatchFinal {
+  const joue = resultatJoue(cle);
+  if (joue && joue.scoreD !== joue.scoreE) return { ...joue, tour, libelle,
+    vainqueur: joue.scoreD > joue.scoreE ? a : b, perdant: joue.scoreD > joue.scoreE ? b : a };
   const rng = graine(cle);
   // Terrain neutre : une Coupe du monde se joue chez un hôte, pas chez l'un des
   // deux. Aucun avantage au « receveur », qui n'en est pas un.
@@ -268,13 +202,7 @@ function classerMondial(equipes: string[], journees: MatchChampionnat[][]): Lign
     .map((l, i) => ({ ...l, position: i + 1 }));
 }
 
-/**
- * L'état de la Coupe du monde à un instant de la saison.
- *
- * @param datesJouees Nombre de DATES DE CALENDRIER de la fenêtre déjà jouées
- *   (0 à 3), pas de tours de poule. La conversion est dans
- *   `toursDePouleApres` — une seule définition, trois lecteurs.
- */
+
 export function mondialEnDirect(saison: number, datesJouees: number): EtatMondial {
   const qualifies = qualifiesCoupeDuMonde(saison);
   const tirage = tirerLesPoules(qualifies, saison);
@@ -335,7 +263,7 @@ export function mondialEnDirect(saison: number, datesJouees: number): EtatMondia
     let tour = seize;
     const perdantsDemies: string[] = [];
 
-    for (let etape = 0; etape < TOURS.length && tour.length > 1; etape++) {
+    for (let etape = 0; etape < Math.min(TOURS.length, datesJouees - DATES_POULES) && tour.length > 1; etape++) {
       const suivants: string[] = [];
       const moitie = Math.floor(tour.length / 2);
       for (let i = 0; i < moitie; i++) {
@@ -353,13 +281,13 @@ export function mondialEnDirect(saison: number, datesJouees: number): EtatMondia
       }
       tour = suivants;
     }
-    vainqueur = tour[0] ?? null;
+    vainqueur = datesJouees >= DATES_MONDIAL ? tour[0] ?? null : null;
 
     // ⚠️ LA PETITE FINALE SE JOUE APRÈS LA FINALE DANS LE CODE, mais elle se
     //    place AVANT dans le tableau affiché (`ORDRE_TOURS`, Tableau.tsx) :
     //    il faut connaître les deux perdants de demies, et on ne les a qu'une
     //    fois les demies jouées.
-    if (perdantsDemies.length === 2) {
+    if (datesJouees >= DATES_MONDIAL && perdantsDemies.length === 2) {
       const p = duelNation(
         perdantsDemies[0], perdantsDemies[1],
         `mondial#${saison}#petiteFinale#${perdantsDemies[0]}#${perdantsDemies[1]}`,
@@ -385,20 +313,10 @@ export function mondialEnDirect(saison: number, datesJouees: number): EtatMondia
   };
 }
 
-/**
- * L'affiche de CETTE nation à la date de calendrier demandée, s'il y en a une.
- *
- * ⚠️ LA DATE 2 PORTE DEUX TOURS DE POULE, et on rend celui du tour 2 : le
- * troisième se résout en fond. C'est la compression décrite en tête de fichier,
- * et c'est ce qui laisse la date 3 au tableau final.
- *
- * ⚠️ AU TABLEAU FINAL, ON REND LE PREMIER MATCH DE SA NATION — son huitième.
- * Les cinq tours tombent le même week-end : rendre le dernier aurait fait jouer
- * une finale à une équipe qui n'a pas passé son huitième.
- */
+
 export function afficheMondialDe(
   etat: EtatMondial, nation: string, dateJournee: number,
-): { match: MatchChampionnat; libelle: string } | null {
+): { match: MatchChampionnat; libelle: string; cle: string } | null {
   if (dateJournee <= DATES_POULES) {
     // date 1 → tour 1 · date 2 → tour 2
     const tour = dateJournee - 1;
@@ -406,11 +324,13 @@ export function afficheMondialDe(
       const m = poule.journees[tour]?.find(
         (x) => x.domicile === nation || x.exterieur === nation,
       );
-      if (m) return { match: m, libelle: `${poule.nom}, journée ${dateJournee}` };
+      if (m) return { match: m, libelle: `${poule.nom}, journée ${dateJournee}`, cle: `mondial#${etat.saison}#poule${etat.poules.indexOf(poule)}#${tour}#${m.domicile}#${m.exterieur}` };
     }
     return null;
   }
-  const f = etat.bracket.find((m) => m.domicile === nation || m.exterieur === nation);
+  const tour = ['huitieme', 'quart', 'demie', 'finale'][dateJournee - DATES_POULES - 1];
+  const f = etat.bracket.find((m) => (m.tour === tour || (tour === 'finale' && m.tour === 'petiteFinale'))
+    && (m.domicile === nation || m.exterieur === nation));
   if (!f) return null;
   return {
     match: {
@@ -420,23 +340,22 @@ export function afficheMondialDe(
       essaisE: Math.max(0, Math.round((f.scoreE - 6) / 7)),
     },
     libelle: f.libelle,
+    cle: `mondial#${etat.saison}#${f.tour}#${f.domicile}#${f.exterieur}`,
   };
 }
 
-/**
- * Les matchs regroupés PAR DATE DE CALENDRIER, pas par tour de poule.
- *
- * ⚠️ C'EST CE QUI PERMET AUX ÉCRANS DE GARDER « journée = date ». La date 2
- * porte deux tours : elle rend donc douze affiches, et c'est exact — deux
- * rondes se sont jouées ce week-end-là. Sans ce regroupement, l'écran Résultats
- * afficherait le tour 3 à la place du tableau final.
- */
+
 export function journeesParDate(etat: EtatMondial): MatchChampionnat[][] {
   const dates: MatchChampionnat[][] = [];
   const tour = (j: number) => etat.poules.flatMap((p) => p.journees[j] ?? []);
-  if (etat.journeesPoulesJouees >= 1) dates.push(tour(0));
-  if (etat.journeesPoulesJouees >= 2) dates.push([...tour(1), ...tour(2)]);
-  if (etat.tableauJoue) dates.push(matchsDuBracket(etat));
+  for (let j = 0; j < etat.journeesPoulesJouees; j++) dates.push(tour(j));
+  for (const nom of ['huitieme', 'quart', 'demie', 'finale']) {
+    const matchs = etat.bracket.filter((m) => m.tour === nom || (nom === 'finale' && m.tour === 'petiteFinale'));
+    if (matchs.length) dates.push(matchs.map((m) => ({ ...m,
+      essaisD: Math.max(0, Math.round((m.scoreD - 6) / 7)),
+      essaisE: Math.max(0, Math.round((m.scoreE - 6) / 7)),
+    })));
+  }
   return dates;
 }
 

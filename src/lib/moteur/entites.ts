@@ -47,6 +47,7 @@ export interface StatsMatch {
   essais: number;
   butsTentes: number;
   butsReussis: number;
+  pointsAuPied?: number;
   // ⚠️ LES DEUX CARTONS SONT SÉPARÉS. Un jaune coûte dix minutes, un rouge coûte
   // le match — les confondre dans un seul compteur rendait la discipline
   // illisible dans les classements comme dans la note de match.

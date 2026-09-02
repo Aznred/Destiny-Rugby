@@ -10,6 +10,7 @@ import { Confirmation } from '../components/Confirmation';
 import type { Joueur } from '../types';
 import { nombre, t, tn } from '../lib/i18n';
 import { titreTraduit } from '../lib/tropheesI18n';
+import { bilanInternational } from '../lib/rassemblements';
 
 // La 3D tire Three.js derrière elle : on ne la charge qu'à l'ouverture du profil.
 import { Icone } from '../components/Icone';
@@ -30,6 +31,7 @@ export function Profil() {
   const [confirmerReset, setConfirmerReset] = useState(false);
 
   if (!joueur) return null;
+  const international = bilanInternational(joueur);
   const poste = POSTE_PAR_ID[joueur.poste];
   const attrs = Object.keys(joueur.attributs) as (keyof Joueur['attributs'])[];
   const moitie = Math.ceil(attrs.length / 2);
@@ -93,13 +95,19 @@ export function Profil() {
           <div className="ressources">
             <span className="pastille"><Icone nom="ballon" taille={14} /> <b>{joueur.matchsJoues}</b> {t('prof.matchs')}</span>
             <span className="pastille"><Icone nom="cible" taille={14} /> <b>{joueur.essais}</b> {t('ml.essais')}</span>
-            {(joueur.selections ?? 0) > 0 && (
+            {international.capes > 0 && (
               <span className="pastille" title={t('prof.capesAide')}>
-                <Icone nom="drapeau" taille={14} /> <b>{joueur.selections}</b> {t('prof.capes')}
+                <Icone nom="drapeau" taille={14} /> <b>{international.capes}</b> {t('prof.capes')}
               </span>
             )}
           </div>
 
+          <section className="manager-cal-decision"><b>Carrière internationale</b>
+            <p>{international.capes} capes · {international.titularisations} titularisations · {international.essais} essais · {international.points} points</p>
+            <p>{international.participations} participation(s) à la Coupe du monde</p>
+            {international.titres.map((titre) => <p key={titre}>{titre}</p>)}
+            {!international.capes && <small>Les convocations dépendent du niveau et de la concurrence à ton poste.</small>}
+          </section>
           {/* Statistiques détaillées de carrière (mode journée par journée) */}
           {joueur.stats && joueur.stats.plaquages + joueur.stats.points > 0 && (
             <div className="stats-detaillees">

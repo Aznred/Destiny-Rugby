@@ -1,5 +1,17 @@
 # Destiny Rugby 🏉
 
+### Calendrier mondial — joueur et entraîneur
+
+- Juillet à juin : 52 week-ends et une clôture après le match d'accès. Avance datée dans les deux carrières.
+- Frise horizontale commune aux deux carrières : raccourcis par mois, repère « Aujourd’hui », matchs et sélections colorés, détail de la date choisie. Les dates passées restent consultables ; avancer nécessite un clic explicite sur le bouton dédié.
+- Clubs et sélections jouent en parallèle. Listes annoncées avant le départ, groupes de 34, rôle titulaire/remplaçant/hors des 23. Un convoqué reste indisponible pour le club pendant le rassemblement.
+- Mondial en saison 2 (2027), puis tous les quatre ans : trois journées de poules, huitièmes, quarts, demies, finale/bronze sur sept dates. Retour après élimination + cinq jours de récupération.
+- Qualifications du jeu : 12 places automatiques, 11 régionales et un repêchage à quatre. Après chaque édition, les deux premiers des six poules sont qualifiés d'office pour la suivante.
+- Profil international : capes, titularisations, essais, points, Six Nations/Grand Chelem, participations et médailles mondiales. Scores du direct persistés, capes comptées une seule fois.
+- Migration v25 : anciennes dates recalées, scores et palmarès conservés. Les anciennes capes n'inventent pas rétroactivement leurs statistiques détaillées.
+- Calendrier hebdomadaire type : les dates officielles sont regroupées dans le week-end voisin ; les quotas régionaux sont des règles de simulation, pas une reproduction des futurs règlements.
+- Contrôle : `npm run verify:calendrier-mondial`.
+
 ### Correctifs carrière entraîneur — septembre 2026
 
 - Calendrier complet partagé avec la carrière joueur, accessible depuis tous les onglets du bureau. Une date cible permet d'avancer avec simulation des matchs par le staff, ou de s'arrêter au prochain rendez-vous.

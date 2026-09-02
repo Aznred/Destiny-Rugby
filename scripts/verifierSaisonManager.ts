@@ -40,14 +40,16 @@ function gagnerJusqua(semaine: number) {
 
 // Avancer librement malgré un match, sans perdre une deuxième journée.
 creer('Stade Toulousain');
-assert.equal(etat().avancerJusquaManager(5).arret, 'match');
-assert.equal(etat().avancerJusquaManager(5, true).semaines, 4);
-assert.equal(manager().semaine, 5);
+const debutChampionnat = CALENDRIER.find((s) => s.type === 'championnat')!.numero;
+const playoffs = (tour: string) => CALENDRIER.find((s) => s.tourFinal === tour)!.numero;
+assert.equal(etat().avancerJusquaManager(debutChampionnat + 4).arret, 'match');
+assert.equal(etat().avancerJusquaManager(debutChampionnat + 4, true).semaines, 4);
+assert.equal(manager().semaine, debutChampionnat + 4);
 const comptes = Object.keys(manager().resultats).length;
 assert.equal(etat().avancerJusquaManager(2, true).semaines, 0);
 assert.equal(etat().avancerJusquaManager(Number.NaN, true).semaines, 0);
 assert.equal(Object.keys(manager().resultats).length, comptes);
-gagnerJusqua(40);
+gagnerJusqua(playoffs('barrage'));
 const ligue = championnatEnDirect('top14', 1, manager().club, 999);
 assert.equal(ligue.classement.find((l) => l.club === manager().club)?.joues, nombreJournees('top14', manager().club));
 assert.equal(Object.values(manager().resultats).filter((r) => r.cle.startsWith('top14#')).length, nombreJournees('top14', manager().club));
@@ -59,8 +61,10 @@ console.log('✓ avance libre, doubles journées et coupe complète');
 for (const division of ['reg3', 'reg2', 'prod2']) {
   creer(COMPETITIONS.find((c) => c.id === division)!.clubs[0].nom);
   const club = manager().club;
-  gagnerJusqua(40);
-  gagnerJusqua(43);
+  gagnerJusqua(playoffs('barrage'));
+  assert.equal(Object.values(manager().resultats).filter((r) => r.cle.startsWith(division + '#')).length,
+    nombreJournees(division, club), 'Chaque journée amateur reste jouable, y compris pendant les dates européennes');
+  gagnerJusqua(playoffs('acces'));
   assert.equal(phaseFinale(division, 1, club).champion, club);
   const py = resoudreSaisonClub(division, 1, club);
   const mouvement = py.mouvements.find((x) => x.club === club);
@@ -78,7 +82,7 @@ console.log('✓ promotion, trophée et tailles des divisions sur trois étages'
 
 // Le finaliste malheureux a son vrai match d'accès, dont le résultat compte.
 creer(COMPETITIONS.find((c) => c.id === 'reg2')!.clubs[0].nom);
-gagnerJusqua(42);
+gagnerJusqua(playoffs('finale'));
 jouer(false);
 etat().semaineManager();
 assert.equal(afficheDuClub(manager())?.tour, 'accession');
@@ -97,14 +101,14 @@ console.log('✓ barrage d’accès et résultats rechargés');
 
 // Une élimination en demi-finale ne doit pas proposer de finale au perdant.
 creer(COMPETITIONS.find((c) => c.id === 'reg3')!.clubs[0].nom);
-gagnerJusqua(41);
+gagnerJusqua(playoffs('demie'));
 jouer(false);
 etat().semaineManager();
 assert.equal(afficheDuClub(manager()), null);
 
 // Une dernière place entraîne bien une descente effective la saison suivante.
 creer('Stade Toulousain');
-for (let garde = 0; manager().semaine < 43 && garde < 100; garde++) {
+for (let garde = 0; manager().semaine < playoffs('acces') && garde < 100; garde++) {
   const a = afficheDuClub(manager());
   if (a && !manager().resultats[a.cle]) jouer(false); else etat().semaineManager();
 }

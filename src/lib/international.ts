@@ -14,17 +14,17 @@
 // Tout est DÉTERMINISTE (graine = compétition + saison + journée) : rien à
 // sauvegarder, rouvrir l'écran ne rejoue rien.
 
-import { calendrier, classer, graine, scorePossible, type LigneTableau, type MatchChampionnat } from './championnat';
+import { calendrier, classer, graine, scorePossible, resultatJoue, versionResultatsJoues, type LigneTableau, type MatchChampionnat } from './championnat';
 import { effectifDuClub, type Coequipier } from './effectif';
 import { POSTE_PAR_ID } from '../data/rugby';
 import { nomNation } from './nations';
-import { semaine, CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier';
+import { CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier';
 // ⚠️ CYCLE ASSUMÉ : `mondial.ts` importe `jouerTestMatch` et
 // `qualifiesCoupeDuMonde` d’ici. Il est sans danger parce que RIEN ne
 // s’exécute à l’évaluation des deux modules — que des déclarations. C’est la
 // même précaution que pour `forceNation`, mémoïsée à la demande.
 import {
-  DATES_POULES, afficheMondialDe, journeesParDate, mondialEnDirect, type PouleMondial,
+  afficheMondialDe, journeesParDate, mondialEnDirect, type PouleMondial,
 } from './mondial';
 import type { MatchFinal } from './phaseFinale';
 import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
@@ -34,6 +34,8 @@ import {
 } from '../data/classementWorldRugby';
 import { COMPETITIONS } from '../data/clubs';
 import { appliquerEchangeWorldRugby } from './classementWorldRugby';
+import { datesCompetitionInternationale, type FenetreMondiale } from '../data/calendrierMondial';
+import { cycleQualification, competitionsQualifications } from './qualificationsMondial';
 import type { Joueur, PosteId } from '../types';
 
 // La hiérarchie mondiale, en « note d'équipe » sur la même échelle que les
@@ -184,7 +186,7 @@ export function classementMondial(saison: number, numeroSemaine?: number): Ligne
   const semaineCourante = numeroSemaine === undefined
     ? undefined
     : Math.max(1, Math.min(CALENDRIER.length, Math.floor(numeroSemaine)));
-  const cleCache = `${saisonCourante}#${semaineCourante ?? 'debut'}`;
+  const cleCache = `${saisonCourante}#${semaineCourante ?? 'debut'}#${versionResultatsJoues()}`;
   const memo = cacheClassementMondial.get(cleCache);
   if (memo) return memo;
 
@@ -241,47 +243,8 @@ export function classementMondial(saison: number, numeroSemaine?: number): Ligne
  *     re-simulations : à la saison 40, c'est neuf éditions à rejouer, et
  *     chacune rejouerait les huit précédentes.
  */
-const cacheQualifies = new Map<number, string[]>();
-
 export function qualifiesCoupeDuMonde(saison: number): string[] {
-  const memo = cacheQualifies.get(saison);
-  if (memo) return memo;
-
-  const rang = classementMondial(Math.max(1, saison - 1));
-  const parRang = rang.map((l) => l.nation);
-
-  // Les héritiers : les trois premiers de chaque poule d'il y a quatre ans.
-  const herites: string[] = [];
-  const precedente = saison - 4;
-  if (precedente >= 8) {
-    // ⚠️ On demande l'édition TERMINÉE (toutes ses dates jouées) : sur une
-    //    édition en cours, les classements de poule ne veulent rien dire.
-    for (const poule of mondialEnDirect(precedente, DATES_POULES + 1).poules) {
-      for (const ligne of poule.classement.slice(0, 3)) herites.push(ligne.club);
-    }
-  }
-
-  const retenus: string[] = [];
-  const vu = new Set<string>();
-  const ajouter = (nation: string) => {
-    if (!nation || vu.has(nation) || retenus.length >= 24) return;
-    vu.add(nation);
-    retenus.push(nation);
-  };
-  for (const n of herites) ajouter(n);
-  // Les places restantes vont au classement mondial. C'est aussi ce qui
-  // rattrape une édition précédente incomplète : on remplit jusqu'à 24.
-  for (const n of parRang) ajouter(n);
-
-  // ⚠️ ON REND LES 24 TRIÉS PAR RANG MONDIAL, et ce n'est pas cosmétique : le
-  //    tirage des poules découpe cette liste en quatre chapeaux de six
-  //    (`tirerLesPoules`). Rendue dans l'ordre d'héritage, elle mettrait les
-  //    trois premiers d'une même poule dans le même chapeau.
-  const position = new Map(parRang.map((n, i) => [n, i]));
-  retenus.sort((a, b) => (position.get(a) ?? 999) - (position.get(b) ?? 999));
-
-  cacheQualifies.set(saison, retenus);
-  return retenus;
+  return cycleQualification(saison).qualifies;
 }
 
 export interface CompetitionInternationale {
@@ -292,7 +255,7 @@ export interface CompetitionInternationale {
   // Nombre de journées réellement disputées (aller simple, éventuellement tronqué).
   journees: number;
   // Type de semaine du calendrier où elle se joue.
-  fenetre: 'automne' | 'tournoi' | 'ete';
+  fenetre: FenetreMondiale;
 }
 
 export const COMPETITIONS_INTERNATIONALES: CompetitionInternationale[] = [
@@ -302,9 +265,9 @@ export const COMPETITIONS_INTERNATIONALES: CompetitionInternationale[] = [
     journees: 5,
   },
   {
-    id: 'rugbyChampionship', nom: 'The Rugby Championship', emoji: '🌏', fenetre: 'tournoi',
+    id: 'rugbyChampionship', nom: 'The Rugby Championship', emoji: '🌏', fenetre: 'sud',
     equipes: ['Afrique du Sud', 'Nouvelle-Zélande', 'Argentine', 'Australie'],
-    journees: 3,
+    journees: 6,
   },
   {
     id: 'autumn', nom: 'Tournée d’automne', emoji: '🍂', fenetre: 'automne',
@@ -329,7 +292,7 @@ export const COMPETITIONS_INTERNATIONALES: CompetitionInternationale[] = [
     journees: 5,
   },
   {
-    id: 'mondialU20', nom: 'Championnat du monde U20', emoji: '🎓', fenetre: 'automne',
+    id: 'mondialU20', nom: 'Championnat du monde U20', emoji: '🎓', fenetre: 'ete',
     equipes: [
       'France U20', 'Irlande U20', 'Angleterre U20', 'Écosse U20', 'Galles U20',
       'Italie U20', 'Afrique du Sud U20', 'Nouvelle-Zélande U20', 'Argentine U20',
@@ -346,7 +309,7 @@ export const COMPETITIONS_INTERNATIONALES: CompetitionInternationale[] = [
       'Russie', 'Biélorussie', 'Uruguay', 'Chili', 'Canada', 'États-Unis',
       'Brésil', 'Kenya', 'Zimbabwe', 'Namibie', 'Samoa', 'Tonga', 'Fidji', 'Corée du Sud',
     ],
-    journees: 1,
+    journees: 3,
   },
 ];
 
@@ -398,7 +361,7 @@ export function competitionsNouvellesNations(): CompetitionInternationale[] {
     equipes: c.equipes.map((e) => e.nom),
     // Aller simple : une journée de moins que le nombre d'équipes, plafonnée
     // au nombre de dates que le calendrier réserve à cette fenêtre.
-    journees: Math.max(1, Math.min(5, c.equipes.length - 1)),
+    journees: Math.max(1, Math.min(c.fenetre === 'automne' ? 4 : 5, c.equipes.length - 1)),
   }));
   return competitionsNouvelles;
 }
@@ -407,11 +370,7 @@ export function competitionsNouvellesNations(): CompetitionInternationale[] {
 export const COUPE_DU_MONDE: CompetitionInternationale = {
   id: 'coupeDuMonde', nom: 'Coupe du monde', emoji: '🌍', fenetre: 'automne',
   equipes: [],
-  // ⚠️ TROIS, PAS QUATRE — c’est le nombre de dates que le calendrier réserve
-  // à la fenêtre d’automne. Elle en déclarait quatre : la dernière n’était
-  // JAMAIS jouée, et le tournoi restait éternellement interrompu. Deux
-  // journées de poule, puis le tableau final (`lib/mondial.ts`).
-  journees: 3,
+  journees: 7,
 };
 
 export function coupeDuMondeDeLaSaison(saison: number): CompetitionInternationale {
@@ -422,12 +381,14 @@ export function competitionsDeLaSaison(saison: number): CompetitionInternational
   const mondial = estAnneeDeCoupeDuMonde(saison);
   return COMPETITIONS_INTERNATIONALES
     .filter((c) => !(mondial && c.id === 'autumn'))
+    .map((c) => mondial && c.id === 'rugbyChampionship' ? { ...c, journees: 3 } : c)
     .concat(mondial ? [coupeDuMondeDeLaSaison(saison)] : [])
     // ⚠️ Les compétitions du lot source viennent APRÈS : c'est
     // `fenetreInternationale` qui choisit celle du week-end, et elle prend la
     // PREMIÈRE de la fenêtre. Les 6 Nations et le Rugby Championship gardent
     // donc la priorité — le reste est consultable dans l'écran Résultats.
-    .concat(competitionsNouvellesNations());
+    .concat(competitionsNouvellesNations().filter((c) => c.id !== 'trcMonde'))
+    .concat(competitionsQualifications(saison));
 }
 
 export function competitionInternationaleParId(id: string, saison: number) {
@@ -442,6 +403,8 @@ export function jouerTestMatch(
   domicile: string, exterieur: string, saison: number, cle: string,
   apport: { nation: string; bonus: number } | null,
 ): MatchChampionnat {
+  const joue = resultatJoue(cle);
+  if (joue) return { ...joue };
   const rng = graine(`inter#${saison}#${cle}`);
   let ecart = forceNation(domicile) + 3 - forceNation(exterieur);
   if (apport && nomNation(apport.nation) === domicile) ecart += apport.bonus;
@@ -536,7 +499,7 @@ function grilleTourneeEte(c: CompetitionInternationale, saison: number): [string
     const chezLui = rng() < 0.5;
     affiches.push(chezLui ? [reste[i], reste[i + 1]] : [reste[i + 1], reste[i]]);
   }
-  return [affiches];
+  return Array.from({ length: c.journees }, () => affiches);
 }
 
 function grille(c: CompetitionInternationale, saison: number): [string, string][][] {
@@ -617,28 +580,12 @@ function fenetreDe(
   retenir: (c: CompetitionInternationale) => boolean,
   equipe?: string,
 ): { competition: CompetitionInternationale; journee: number } | null {
-  const sem = semaine(numeroSemaine);
-  if (sem.type !== 'international') return null;
-  const fenetre: 'automne' | 'tournoi' | 'ete' = sem.competitionInternationale === 'amicaux'
-    ? 'ete'
-    : sem.competitionInternationale === 'autumn' ? 'automne' : 'tournoi';
-  // Combien de semaines de CETTE fenêtre sont déjà passées ?
-  const memeFenetre = (s: typeof sem) => s.type === 'international'
-    && (fenetre === 'ete' ? s.competitionInternationale === 'amicaux'
-      : (s.competitionInternationale === 'autumn') === (fenetre === 'automne'));
-  const dejaFaites = CALENDRIER.slice(0, numeroSemaine - 1).filter(memeFenetre).length;
-  const ouvertes = competitionsDeLaSaison(saison).filter((c) => c.fenetre === fenetre && retenir(c));
-  // ⚠️ LA COMPÉTITION DE **TON** PAYS D'ABORD (correctif signalé en jeu :
-  // « c'est dur d'atteindre des sélections pour des nations faibles alors qu'on
-  // est très bon »). On prenait la PREMIÈRE compétition de la fenêtre, toujours
-  // la même : le Tournoi des 6 Nations en février, la tournée d'automne en
-  // novembre. Un Belge, un Portugais ou un Roumain n'y figure pas — sa
-  // convocation était donc refusée à CHAQUE fenêtre de sa carrière, quel que
-  // soit son niveau, alors que le Rugby Europe Championship existait juste à
-  // côté et qu'il n'y avait personne pour le lui ouvrir.
-  const competition = (equipe && ouvertes.find((c) => c.equipes.includes(equipe))) || ouvertes[0];
-  if (!competition) return null;
-  return { competition, journee: Math.min(competition.journees, dejaFaites + 1) };
+  const ouvertes = competitionsDeLaSaison(saison).filter(retenir).map((competition) => ({
+    competition, journee: datesCompetitionInternationale(competition.id, competition.fenetre, competition.journees, saison).indexOf(numeroSemaine) + 1,
+  })).filter((c) => c.journee > 0 && (!equipe || c.competition.equipes.includes(equipe)));
+  // Le Mondial et les qualifications ont priorité sur les tournois annexes.
+  ouvertes.sort((a,b) => prioriteInternationale(b.competition.id) - prioriteInternationale(a.competition.id));
+  return ouvertes[0] ?? null;
 }
 
 /**
@@ -664,10 +611,7 @@ export function fenetreU20(numeroSemaine: number, saison: number, equipe?: strin
 export function journeesInternationalesA(id: string, numeroSemaine: number, saison: number): number {
   const c = competitionInternationaleParId(id, saison);
   if (!c) return 0;
-  const memeFenetre = (s: (typeof CALENDRIER)[number]) => s.type === 'international'
-    && (c.fenetre === 'ete' ? s.competitionInternationale === 'amicaux'
-      : (s.competitionInternationale === 'autumn') === (c.fenetre === 'automne'));
-  return Math.min(c.journees, CALENDRIER.slice(0, Math.max(0, numeroSemaine - 1)).filter(memeFenetre).length);
+  return datesCompetitionInternationale(c.id, c.fenetre, c.journees, saison).filter((n) => n < numeroSemaine).length;
 }
 
 // --- LE MATCH DU JOUEUR -----------------------------------------------------
@@ -681,10 +625,8 @@ export interface AfficheInternationale {
 // L'affiche de SA sélection cette semaine, s'il est appelé et que sa nation
 // dispute la compétition.
 export function matchInternationalDuJoueur(
-  j: Joueur, bonus = 0, u20 = false,
+  j: Pick<Joueur, 'nation' | 'saison' | 'semaine'>, bonus = 0, u20 = false,
 ): AfficheInternationale | null {
-  const sem = semaine(j.semaine ?? 1);
-  if (sem.type !== 'international') return null;
   const nation = u20 ? equipeU20(j.nation) : nomNation(j.nation);
   const fen = u20
     ? fenetreU20(j.semaine ?? 1, j.saison, nation)
@@ -711,7 +653,7 @@ export function matchInternationalDuJoueur(
       competition: fen.competition,
       journee: fen.journee,
       match: trouve.match,
-      cle: `mondial#${j.saison}#${fen.journee}#${nation}`,
+      cle: trouve.cle,
     };
   }
 
@@ -800,7 +742,7 @@ export function effectifNational(nation: string, saison: number): Coequipier[] {
     for (const c of deux) { pris.add(c); groupe.push(c); }
   }
   for (const c of candidats) {
-    if (groupe.length >= 30) break;
+    if (groupe.length >= 34) break;
     if (!pris.has(c)) { pris.add(c); groupe.push(c); }
   }
 
@@ -811,11 +753,11 @@ export function effectifNational(nation: string, saison: number): Coequipier[] {
   // NOM ET PRÉNOM au vivier réel du pays (comme les regens des clubs réels,
   // voir `lib/effectif.ts`) et leur niveau vient de la force de la sélection —
   // ils sont donc crédibles, et parfaitement déterministes.
-  if (groupe.length < 23) {
+  if (groupe.length < 34) {
     const force = forceNation(nom);
     const donneurs = candidats.length ? candidats : construire(36);
     const postes15 = (Object.keys(POSTE_PAR_ID) as PosteId[]);
-    for (let i = groupe.length; i < 23; i++) {
+    for (let i = groupe.length; i < 34; i++) {
       const rng = graine(`selection#${nom}#${saison}#${i}`);
       const modele = donneurs.length
         ? donneurs[Math.floor(rng() * donneurs.length)]
@@ -840,4 +782,9 @@ export function effectifNational(nation: string, saison: number): Coequipier[] {
 
   cacheSelections.set(cle, groupe);
   return groupe;
+}
+
+export function prioriteInternationale(id: string): number {
+  return id === 'coupeDuMonde' ? 100 : id === 'repechageMondial' ? 90 : id.startsWith('qualif-') ? 80
+    : ['sixNations','rugbyChampionship','autumn','amicaux'].includes(id) ? 50 : 10;
 }

@@ -25,6 +25,8 @@ export interface MatchChampionnat {
 // Les matchs effectivement coachés remplacent leur résultat théorique dans
 // tous les écrans : calendrier, classement et verdict du board. Le registre
 // est réalimenté par la sauvegarde au chargement.
+let revisionResultats = 0;
+export function versionResultatsJoues(): number { return revisionResultats; }
 const RESULTATS_JOUES = new Map<string, MatchChampionnat>();
 
 /** Même registre pour la ligue, les coupes et les rencontres à élimination. */
@@ -33,15 +35,18 @@ export function resultatJoue(cle: string): MatchChampionnat | undefined {
 }
 
 export function enregistrerResultatJoue(cle: string, match: MatchChampionnat): void {
+  revisionResultats++;
   RESULTATS_JOUES.set(cle, { ...match });
 }
 
 export function setResultatsJoues(liste: { cle: string; match: MatchChampionnat }[]): void {
+  revisionResultats++;
   RESULTATS_JOUES.clear();
   for (const { cle, match } of liste) RESULTATS_JOUES.set(cle, { ...match });
 }
 
 export function effacerResultatsJoues(): void {
+  revisionResultats++;
   RESULTATS_JOUES.clear();
 }
 

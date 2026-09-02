@@ -1,3 +1,4 @@
+import { situationInternationale } from '../lib/rassemblements';
 // LE MATCH EN DIRECT — le moteur (lib/moteur/) rendu à l'écran, et JOUABLE.
 //
 // ═══ CE QUI A ÉTÉ REFAIT, ET POURQUOI ════════════════════════════════════════
@@ -347,7 +348,7 @@ export function MatchLive({
         .map((j) => ({ ...j, note: Math.max(1, j.note - (manager.penalitesNote?.[j.id] ?? 0)) }));
     };
     // En sélection, « son club » est sa NATION.
-    const monEquipe = joueur ? (selection ? nomNation(joueur.nation) : joueur.club) : '';
+    const monEquipe = joueur ? (selection ? situationInternationale(joueur).camp?.nation ?? nomNation(joueur.nation) : joueur.club) : '';
     const effectifA = effectif(match.domicile);
     const effectifB = effectif(match.exterieur);
     const coteManager = manager?.club === match.domicile ? 'A'
@@ -378,7 +379,7 @@ export function MatchLive({
             // décident, comme pour le reste du jeu. Déterministe. ⚠️ En
             // sélection, on est toujours titulaire : on n'y est appelé que si
             // on est au niveau.
-            titulaire: selection ? true : estTitulaire(joueur, cle),
+            titulaire: selection ? situationInternationale(joueur).role === 'titulaire' : estTitulaire(joueur, cle),
           }
         : undefined,
       // ⚠️ LE NIVEAU DÉCIDE DE TOUTE LA DISCIPLINE : cartons plus fréquents et

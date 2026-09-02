@@ -31,6 +31,7 @@ export const BUDGET_MATCHS_PAR_SAISON = 3;
 // note, ce qui garantit qu'aucun chemin existant ne change de comportement sans
 // qu'on l'ait voulu.
 export interface StatsMatchJoueur {
+  points?: number;
   essais: number;
   plaquages: number;
   plaquagesManques: number;
@@ -203,6 +204,7 @@ export function detailNote(poste: PosteId, s: StatsMatchJoueur): PostNote[] {
  */
 export function statsPourLaNote(p: Pion): StatsMatchJoueur {
   return {
+    points: p.stats.essais * 5 + (p.stats.pointsAuPied ?? p.stats.butsReussis * 2),
     essais: p.stats.essais,
     plaquages: p.stats.plaquages,
     plaquagesManques: p.stats.plaquagesManques,

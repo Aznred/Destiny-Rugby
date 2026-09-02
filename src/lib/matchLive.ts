@@ -7,7 +7,7 @@
 // d'un espace réellement ouvert. Il ne reste ici que la recherche de l'affiche.
 
 import {
-  calendrier, journeesALaSemaine, jouerRencontre, nombreJournees, pouleDe,
+  calendrier, journeesALaSemaine, jouerRencontre, nombreJournees, pouleDe, estJourneeDe,
   type MatchChampionnat,
 } from './championnat';
 import type { Coequipier } from './effectif';
@@ -132,6 +132,11 @@ export function libelleAfficheManager(affiche: AfficheComplete, division: string
 export function afficheDuClub(c: CarriereDeClub, bonus = 0): AfficheComplete | null {
   if (!c.club || !c.division) return null;
   const sem = semaineDuCalendrier(c.semaine);
+  // Les divisions amateurs jouent leur championnat pendant les dates européennes.
+  if (estJourneeDe(c.division, sem)) {
+    const affiche = matchDuClubSemaine(c, bonus);
+    return affiche ? { ...affiche, nature: 'championnat' } : null;
+  }
 
   // ── Les trois semaines de phase finale ────────────────────────────────────
   if (sem.type === 'phaseFinale' && sem.tourFinal) {

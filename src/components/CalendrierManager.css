@@ -10,38 +10,112 @@
 .manager-cal-commandes .comp-tete small { display: block; margin-top: 7px; }
 .manager-cal-commandes p { font-size: .88rem; line-height: 1.6; color: var(--craie-dim); }
 .manager-cal-commandes small { color: var(--brume); line-height: 1.5; }
-.manager-cal-avance { display: grid; gap: 14px; margin: 18px 0; }
 .manager-cal-boutons { display: flex; flex-wrap: wrap; gap: 10px; }
 .manager-club-formation > .manager-detection-tete,
 .manager-club-formation > .manager-dossiers-jeunes,
 .manager-club-formation > .manager-rapports-pros { grid-column: 1 / -1; }
 .manager-dossier-jeune > small { display: block; margin-top: 6px; color: var(--craie-dim); }
-.manager-cal-avance label { display: grid; gap: 8px; font-size: .85rem; }
-.manager-cal-avance select { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--bordure-forte); border-radius: 8px; background: var(--surface-solid); color: var(--craie); }
-.manager-cal-avance .manager-cal-delegation { display: flex; align-items: center; gap: 10px; }
+.manager-cal-delegation { display: flex; align-items: center; gap: 10px; font-size: .8rem; color: var(--craie-dim); }
 .manager-cal-delegation input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--or-500); }
-.manager-cal-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr)); gap: 12px; }
-.manager-cal-date {
-  display: flex; flex-direction: column; gap: 10px; min-height: 145px; padding: 17px;
-  color: var(--craie); text-align: left; border-left: 3px solid var(--bordure-forte);
-  white-space: normal; overflow-wrap: anywhere;
-}
-.manager-cal-date:disabled { opacity: .65; cursor: default; }
-.manager-cal-date.actuelle { border: 1px solid var(--or-400); border-left: 4px solid var(--or-400); }
-.manager-cal-date.choisie { outline: 2px solid var(--succes); outline-offset: 2px; }
-.manager-cal-date.phaseFinale { border-left-color: var(--or-400); }
-.manager-cal-date.coupe { border-left-color: #8faee8; }
-.manager-cal-date-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.manager-cal-date-tete b { color: var(--or-400); }
-.manager-cal-date-tete small { font-size: .65rem; letter-spacing: .07em; }
-.manager-cal-date > strong { font-size: .83rem; }
-.manager-cal-date > span:not(.manager-cal-date-tete) { font-size: .78rem; color: var(--craie-dim); line-height: 1.5; }
 .manager-cal-score b { color: var(--craie); font-variant-numeric: tabular-nums; }
+.calendrier-mondial-dialog { width: min(1100px, 94vw); max-height: 90dvh; padding: 18px; border: 1px solid var(--bordure-forte); border-radius: 16px; background: var(--surface-solid, #15221b); color: var(--craie); overflow: auto; }
+.calendrier-mondial-dialog::backdrop { background: #000b; }
+.calendrier-mondial-dialog { margin: auto; }
+.barre-jouer-calendrier { flex: 0 0 48px; height: 48px; border: 1px solid var(--bordure-forte); border-radius: 9px; background: var(--surface-solid); color: var(--or-400); }
+@media (max-width: 900px) { .barre-jouer > button.btn { width: auto; min-width: 0; flex: 1 1 0; white-space: normal; } }
+.calendrier-mondial-dialog > details { margin-bottom: 18px; }
 .manager-cal-decision { margin-top: 15px; padding: 15px; border: 1px solid var(--or-400); border-radius: 10px; }
 .manager-cal-decision button { margin: 5px; }
+.manager-cal-principal { min-width: 0; overflow: hidden; }
+.manager-cal-principal .comp-tete { margin-bottom: 12px; }
+.manager-cal-principal h2 { margin: 0; font: 700 1.2rem var(--police-forte); }
+.manager-cal-present { margin-top: 0; }
+.manager-cal-reglement { display: flex; align-items: center; gap: 8px; margin: -5px 3px 0; font-size: .78rem; line-height: 1.6; color: var(--brume); }
+.manager-cal-reglement svg { flex-shrink: 0; color: var(--or-400); }
+.manager-calendrier > details.manager-cal-commandes { padding: 17px 22px; }
+.manager-cal-commandes summary { cursor: pointer; font-size: .84rem; color: var(--craie-dim); }
+
+/* Deux échelles : les mois pour traverser l'année, les points pour choisir la date. */
+.frise-cal { min-width: 0; }
+.frise-cal-navigation { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0 10px; }
+.frise-cal-exercice { font-size: .77rem; font-weight: 600; letter-spacing: .12em; color: var(--brume); white-space: nowrap; }
+.frise-cal-exercice > span { margin: 0 5px; opacity: .55; }
+.frise-cal-parcourir { display: flex; align-items: center; gap: 5px; }
+.frise-cal-parcourir button { border: 1px solid var(--bordure); background: transparent; color: var(--craie-dim); border-radius: 6px; min-height: 32px; }
+.frise-cal-aujourdhui { padding: 5px 12px; font-size: .72rem; margin-right: 4px; }
+.frise-cal-fleche { width: 32px; font: 1.4rem/1 var(--police); }
+.frise-cal-parcourir button:disabled { opacity: .3; cursor: default; }
+.frise-cal-parcourir button:hover:not(:disabled) { border-color: var(--or-400); color: var(--or-400); }
+.frise-cal-mois { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
+.frise-cal-mois button { position: relative; min-height: 42px; padding: 9px 2px 15px; border: 0; border-radius: 5px 5px 0 0; background: transparent; color: var(--craie-dim); font-size: .73rem; }
+.frise-cal-mois button > span { position: absolute; bottom: 2px; left: 0; right: 0; height: 3px; border-radius: 2px; background: var(--bordure); }
+.frise-cal-mois button.passe { color: var(--brume); }
+.frise-cal-mois button.passe > span { background: var(--pelouse-400); opacity: .5; }
+.frise-cal-mois button.choisi { color: var(--or-400); background: linear-gradient(0deg, rgba(232,178,58,.1), transparent); }
+.frise-cal-mois button.choisi > span { background: var(--or-400); opacity: 1; }
+.frise-cal-mois button > .repere-present::after { content: ''; position: absolute; width: 5px; height: 5px; border: 2px solid var(--surface-solid); background: var(--or-400); border-radius: 50%; left: calc(50% - 4px); top: -3px; box-sizing: content-box; }
+.frise-cal-mois button:hover { color: var(--or-400); }
+.frise-cal-legende { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 18px 0 15px; font-size: .66rem; color: var(--craie-dim); }
+.frise-cal-legende > span { display: inline-flex; align-items: center; gap: 6px; }
+.frise-cal-legende > span::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--evenement); }
+.frise-cal-legende > small { margin-left: auto; font-size: .67rem; }
+.frise-cal .championnat { --evenement: var(--succes); }
+.frise-cal .coupe { --evenement: #93b9f1; }
+.frise-cal .phaseFinale { --evenement: var(--or-400); }
+.frise-cal .international { --evenement: #c8a8f0; }
+.frise-cal .treve { --evenement: var(--brume); }
+.frise-cal-rail { position: relative; display: flex; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: var(--bordure-forte) transparent; padding: 5px 0 13px; }
+.frise-cal-etape { flex: 0 0 156px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; padding: 12px 0 10px; border: 0; border-top: 2px solid transparent; border-radius: 7px 7px 0 0; text-align: left; background: transparent; color: var(--craie); white-space: normal; }
+.frise-cal-etape:hover { background: rgba(255,255,255,.035); }
+.frise-cal-etape.choisie { background: linear-gradient(180deg, rgba(232,178,58,.12), rgba(232,178,58,.025)); border-top-color: var(--or-400); }
+.frise-cal-etape:focus-visible { outline: 2px solid var(--or-400); outline-offset: -2px; }
+.frise-cal-statut { padding: 0 14px; min-height: 20px; color: var(--brume); font: 500 .61rem/1.4 var(--police); text-transform: uppercase; letter-spacing: .065em; }
+.frise-cal-jour { padding: 0 14px; font: 700 1.1rem/1.5 var(--police-forte); }
+.frise-cal-etape.actuelle .frise-cal-statut, .frise-cal-etape.choisie .frise-cal-jour { color: var(--or-400); }
+.frise-cal-etape.passee .frise-cal-jour { color: var(--brume); }
+.frise-cal-ligne { height: 32px; position: relative; display: flex; align-items: center; padding-left: 14px; }
+.frise-cal-ligne::before { content: ''; position: absolute; height: 2px; background: rgba(142,163,148,.26); left: 0; right: 0; top: 15px; }
+.frise-cal-ligne i { position: relative; display: block; width: 10px; height: 10px; border: 2px solid var(--evenement); border-radius: 50%; background: var(--surface-solid); }
+.frise-cal-etape.choisie .frise-cal-ligne i { background: var(--or-400); border-color: var(--or-400); box-shadow: 0 0 0 4px rgba(232,178,58,.14); }
+.frise-cal-etape.actuelle .frise-cal-ligne i { background: var(--or-400); border-color: var(--or-400); }
+.frise-cal-etape.passee .frise-cal-ligne i { background: var(--evenement); opacity: .6; }
+.frise-cal-evenement { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 72px; padding: 0 14px; }
+.frise-cal-evenement > strong { font: 600 .72rem/1.4 var(--police-forte); color: var(--evenement); }
+.frise-cal-evenement > span { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--craie-dim); font: .69rem/1.5 var(--police); }
+.frise-cal-evenement > small { display: inline-flex; align-items: center; gap: 5px; font-size: .61rem; color: #c8a8f0; }
+.frise-cal-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .85fr); gap: 24px; margin-top: 17px; padding-top: 21px; border-top: 1px solid var(--bordure); }
+.frise-cal-programme { min-width: 0; }
+.frise-cal-surtitre { text-transform: uppercase; font-size: .62rem; letter-spacing: .1em; color: var(--brume); }
+.frise-cal-programme h3 { margin: 5px 0 9px; font: 700 1.5rem/1.3 var(--police-forte); }
+.frise-cal-programme h3 > small { font-size: .82rem; font-weight: 400; margin-left: 5px; }
+.frise-cal-titre { font-size: .81rem; color: var(--craie-dim); }
+.frise-cal-rencontres { display: grid; gap: 5px; margin-top: 7px; font-size: .78rem; color: var(--brume); line-height: 1.5; }
+.manager-cal-score { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.frise-cal-selections { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 10px; margin-top: 14px; }
+.frise-cal-selections > span { display: inline-flex; align-items: center; gap: 5px; color: #c8a8f0; font-size: .7rem; }
+.frise-cal-selections > small { font-size: .7rem; }
+.frise-cal-actions { align-self: center; display: grid; gap: 13px; min-width: 0; padding-left: 24px; border-left: 1px solid var(--bordure); }
+.frise-cal-actions .manager-cal-boutons { display: grid; gap: 8px; }
+.frise-cal-actions .btn { min-width: 0; min-height: 42px; padding: 10px 13px; font-size: .8rem; white-space: normal; display: flex; justify-content: center; align-items: center; gap: 8px; }
+.frise-cal-actions > small { font-size: .7rem; }
+.calendrier-mondial-dialog > .manager-cal-principal { padding-top: 8px; }
+
+@media (max-width: 720px) {
+  .frise-cal-detail { grid-template-columns: 1fr; gap: 18px; }
+  .frise-cal-actions { border-left: 0; border-top: 1px solid var(--bordure); padding: 18px 0 0; }
+  .frise-cal-mois { grid-template-columns: repeat(12, minmax(42px, 1fr)); overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--bordure-forte) transparent; padding-bottom: 5px; }
+  .frise-cal-legende { gap: 8px 12px; }
+  .frise-cal-legende > small { width: 100%; margin: 0; }
+  .frise-cal-etape { flex-basis: 140px; }
+}
 @media (max-width: 560px) {
   .manager-date-permanente { align-items: stretch; flex-direction: column; }
   .manager-cal-commandes { padding: 16px; }
   .manager-cal-boutons { display: grid; }
-  .manager-cal-avance .btn { white-space: normal; }
+  .calendrier-mondial-dialog { width: calc(100vw - 16px); max-height: 94dvh; padding: 8px; }
+  .calendrier-mondial-dialog > .manager-cal-principal { padding: 12px 8px 20px; }
+  .manager-cal-principal h2 { max-width: 205px; font-size: 1rem; }
+  .frise-cal-aujourdhui { padding: 5px 8px; }
+  .frise-cal-exercice { font-size: .7rem; letter-spacing: .06em; }
+  .manager-cal-reglement { align-items: flex-start; }
 }

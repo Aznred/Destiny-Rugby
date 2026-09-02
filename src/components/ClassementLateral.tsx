@@ -23,11 +23,11 @@ import {
 import { phaseFinale } from '../lib/phaseFinale';
 import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import {
-  fenetreInternationale, internationalEnDirect, journeesInternationalesA,
+  internationalEnDirect, journeesInternationalesA,
 } from '../lib/international';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { Blason, LogoEquipe } from './Blason';
-import { nomNation } from '../lib/nations';
+import { situationInternationale } from '../lib/rassemblements';
 import { semaine, CALENDRIER, libelleSemaine } from '../data/calendrier';
 import { t } from '../lib/i18n';
 import type { Joueur } from '../types';
@@ -69,9 +69,10 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
     const amateur = estAmateur(division);
 
     // ---- FENÊTRE INTERNATIONALE : le classement de MA sélection ----
-    if (!amateur && sem.type === 'international') {
-      const nation = nomNation(joueur.nation);
-      const fenetre = fenetreInternationale(numero, joueur.saison, nation);
+    const rassemblement = situationInternationale(joueur).camp;
+    if (rassemblement) {
+      const nation = rassemblement.nation;
+      const fenetre = { competition: { id: rassemblement.competition, equipes: [nation] } };
       if (fenetre && fenetre.competition.equipes.includes(nation)) {
         const id = fenetre.competition.id;
         const etat = internationalEnDirect(

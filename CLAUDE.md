@@ -1,8 +1,20 @@
 # CLAUDE.md — Destiny Rugby 🏉
 
+## Septembre 2026 — calendrier mondial
+
+`FriseCalendrier` est la navigation commune à `CalendrierManager` et `CalendrierMondial` : mois juillet–juin, rail hebdomadaire défilant, détail de la date et actions séparées. Un clic sur une date (même passée) ne simule rien. Les flèches clavier/Home/End parcourent les points ; le repère courant et la sélection sont distincts. La cible appartient à une saison : au changement d'exercice, on revient au prochain rendez-vous au lieu de conserver un ancien numéro de semaine. Ne pas réintroduire la liste déroulante ni les 53 grandes cartes.
+
+`data/calendrier.ts` ne décrit que les clubs : juillet–juin, 52 week-ends + clôture le 30 juin. Ne jamais terminer une saison sur n'importe quel type `treve` : juillet reste jouable. `calendrierMondial.ts` superpose les sélections ; `numeroDate` trouve le week-end voisin, sans repli silencieux en semaine 1.
+
+`rassemblements.ts` fige les listes à l'annonce dans `Joueur.international`. Groupe de 34 ≠ feuille de 23. Les absents ne jouent pas pour leur club, ni dans le direct ni dans les statistiques de fond. Le manager suit les mêmes fenêtres. L'élimination en poule, huitième ou quart libère le joueur après cinq jours, avant le prochain week-end.
+
+`mondialEnDirect` expose 3 tours de poules + 4 tours éliminatoires, bronze et finale ensemble. Utiliser les clés canoniques d'`afficheMondialDe` ; les scores du direct sont persistés et lus par les tours suivants. La révision du registre invalide les caches des qualifications et du classement mondial. `qualificationsMondial.ts` définit le cycle déterministe 12 automatiques + 11 régionales + repêchage : quotas du jeu, pas règlement officiel futur.
+
+`CalendrierMondial` est accessible au joueur ; le manager garde `CalendrierManager`. `bilanInternational` attend la fin des compétitions avant d'attribuer titres et médailles. La migration v25 recale les dates sans effacer les scores. Tests : `verifierCalendrierMondial.ts`, `verifierSaisonManager.ts`, `verifierFormationManager.ts`.
+
 ## Septembre 2026 — calendrier, résultats et académie du manager
 
-`CalendrierManager` expose les 45 semaines du calendrier commun et une avance datée. `avancerJusquaManager(cible, deleguerMatchs)` simule et enregistre chaque match avant de passer la semaine ; sans délégation, il s'arrête devant un match. Les décisions du club sont affichées et restent bloquantes. La cible est bornée à la clôture de l'exercice.
+`CalendrierManager` expose toutes les dates du calendrier commun et une avance datée. `avancerJusquaManager(cible, deleguerMatchs)` simule et enregistre chaque match avant de passer la semaine ; sans délégation, il s'arrête devant un match. Les décisions du club sont affichées et restent bloquantes. La cible est bornée à la clôture de l'exercice.
 
 `affichesChampionnatDuClub` conserve toutes les journées d'une semaine. L'affiche du match ouvert est figée dans l'écran pour éviter de remplacer le match terminé par le suivant à la sirène. Les poules européennes et les reversés de Champions Cup sont inclus. `duel` lit le registre des scores réels (clés historiques `phase#`, clés `coupe#` et `acces#`) avant de qualifier les clubs.
 

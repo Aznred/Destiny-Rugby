@@ -1951,6 +1951,7 @@ function phaseTirAuBut(e: EtatMatch): void {
     plan.penalites -= 1;
     buteur.stats.butsReussis += 1;
     marquer(e, cote, 3);
+    buteur.stats.pointsAuPied = (buteur.stats.pointsAuPied ?? 0) + 3;
     dire(e, 'but', cote, C.phrase(e.rng, C.PENALITE_BUT, {
       nom: buteur.nom, distance: Math.round(d),
     }), 3, buteur.moi);
@@ -2041,6 +2042,7 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
     plan.essaisTransformes -= 1;
     buteur.stats.butsReussis += 1;
     marquer(e, cote, 2);
+    buteur.stats.pointsAuPied = (buteur.stats.pointsAuPied ?? 0) + 2;
     dire(e, 'but', cote, C.phrase(e.rng, C.TRANSFORMATION, { nom: buteur.nom }), 2, buteur.moi);
   } else {
     plan.essaisSecs -= 1;
@@ -2437,6 +2439,7 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
         plan.penalites -= 1;
         p.stats.butsReussis += 1;
         marquer(e, p.cote, 3);
+        p.stats.pointsAuPied = (p.stats.pointsAuPied ?? 0) + 3;
         dire(e, 'but', p.cote, C.phrase(e.rng, C.DROP, { nom: p.nom }), 3, p.moi);
         if (e.sirene) return clorePeriode(e);
         return preparerCoupEnvoi(e, adverse(p.cote));
@@ -2657,6 +2660,7 @@ function solderLesPoints(e: EtatMatch): void {
         if (m) m.stats.essais += 1;
         if (buteur) { buteur.stats.butsTentes += 1; buteur.stats.butsReussis += 1; }
         marquer(e, cote, 7);
+        if (buteur) buteur.stats.pointsAuPied = (buteur.stats.pointsAuPied ?? 0) + 2;
         if (cote === 'A') e.essaisA += 1; else e.essaisB += 1;
         dire(e, 'essai', cote, C.texteMatch('essaiTransformeFin', {
           nom: m?.nom ?? nomClub(e, cote),
@@ -2675,6 +2679,7 @@ function solderLesPoints(e: EtatMatch): void {
         plan.penalites -= 1;
         if (buteur) { buteur.stats.butsTentes += 1; buteur.stats.butsReussis += 1; }
         marquer(e, cote, 3);
+        if (buteur) buteur.stats.pointsAuPied = (buteur.stats.pointsAuPied ?? 0) + 3;
         dire(e, 'but', cote, C.texteMatch('penaliteFin', {
           nom: buteur?.nom ?? nomClub(e, cote),
         }), 3, buteur?.moi);

@@ -57,8 +57,8 @@ import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import { LIMITES, ficheDepuisJoueur, ficheDepuisManager, scoreDeLaFiche } from '../lib/classementMondial';
 import { cleAleatoire, envoyerAuClassement } from '../lib/classementEnLigne';
 import {
-  COMPETITIONS_U20, competitionsDeLaSaison, fenetreInternationale, fenetreU20,
-  internationalEnDirect, equipeU20,
+  COMPETITIONS_U20, competitionsDeLaSaison,
+  internationalEnDirect,
 } from '../lib/international';
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
 import { appliquerCompte, ecrireCompte, stockageParEmplacement } from '../lib/sauvegardes';
@@ -138,6 +138,8 @@ import {
   semaine, libelleDate, SEMAINES_PAR_SAISON, estAnneeDeCoupeDuMonde, type Semaine,
 } from '../data/calendrier';
 import { convocation, convocationU20 } from '../lib/selection';
+import { actualiserRassemblements, situationInternationale, ajouterMatchInternational, parcoursInternational } from '../lib/rassemblements';
+import { migrerSemaineCalendrier } from '../data/calendrier';
 import {
   resoudrePyramide, nomDivision, resoudreToutesDivisions, oublierResultats,
   equilibrerMouvements, setContexteJoueur, resoudreSaisonClub,
@@ -2386,6 +2388,7 @@ export const useGame = create<GameState>()(
       // Enjamber ces moments-là, c'est exactement ce que faisait l'ancien mode
       // rapide, et c'est ce qu'on ne veut plus.
       avancerJusqua: (cible) => {
+        cible = Number.isFinite(cible) ? Math.min(SEMAINES_PAR_SAISON + 1, Math.max(1, Math.floor(cible))) : 1;
         const depart = get().joueur?.semaine ?? 1;
         let semaines = 0;
         if (!get().joueur || cible <= depart) return { semaines, arret: 'arrive' };
@@ -2434,8 +2437,9 @@ export const useGame = create<GameState>()(
       },
 
       semaineSuivante: () => {
-        const { joueur } = get();
+        let { joueur } = get();
         if (!joueur) return;
+        joueur = actualiserRassemblements(joueur);
         // ⚠️ SANS CONTRAT, ON N'AVANCE PAS. Le panneau « Choix de carrière »
         // portait ce blocage ; il a été supprimé, donc il vit ici (voir
         // `contratBloque`). Sans ça, on jouerait la saison sans club.
@@ -2452,7 +2456,7 @@ export const useGame = create<GameState>()(
         if (!joueur.preAccord && Math.random() < 0.05) get().susciterApproches(1);
 
         // Dernière semaine : on referme la saison (bilan, trophées, mercato).
-        if (sem.type === 'treve') {
+        if (numero >= SEMAINES_PAR_SAISON) {
           get().saisonSuivante();
           return;
         }
@@ -2527,12 +2531,18 @@ export const useGame = create<GameState>()(
               + (resultat.titulaire && !matchDejaVecu ? 1 : 0),
             essais: vecu.essais + (matchDejaVecu ? 0 : resultat.essais),
             notes: resultat.note != null && !matchDejaVecu ? [...vecu.notes, resultat.note] : vecu.notes,
-            capes: vecu.capes + (resultat.cape ? 1 : 0),
+            capes: vecu.capes + (resultat.cape && !matchDejaVecu ? 1 : 0),
             stats: resultat.stats && !matchDejaVecu
               ? additionnerStats(vecu.stats, resultat.stats)
               : vecu.stats,
           },
         };
+
+        if (resultat.cape && !matchDejaVecu) {
+          const bilan = ajouterMatchInternational({ ...j, semaine: numero }, resultat.essais, resultat.stats?.points ?? resultat.essais * 5, resultat.titulaire);
+          j = { ...j, international: bilan.international };
+        }
+        j = actualiserRassemblements(j);
 
         // ---- LOT 6 : le match n'est pas fini quand la sirène sonne ----
         // Un moment décisif (le choix de la 80ᵉ) ou le micro d'après-match.
@@ -4046,7 +4056,14 @@ export const useGame = create<GameState>()(
           if (affiche && !avant.resultats[affiche.cle]) {
             if (!deleguerMatchs) { arret = 'match'; break; }
             const { domicile, exterieur } = affiche.match;
-            const match = jouerRencontre(domicile, exterieur, avant.saison, affiche.cle, null);
+            const groupe = effectifDuClub(avant.club, avant.saison);
+            const absents = new Set(indisponiblesCarriereAvancee(avant.avancee, avant.semaine));
+            const moyenne = (liste: typeof groupe) => {
+              const meilleurs = [...liste].sort((a,b) => b.note - a.note).slice(0,23);
+              return meilleurs.reduce((n,j) => n + j.note,0) / Math.max(1, meilleurs.length);
+            };
+            const bonus = moyenne(groupe.filter((j) => !absents.has(j.id))) - moyenne(groupe);
+            const match = jouerRencontre(domicile, exterieur, avant.saison, affiche.cle, { club: avant.club, bonus });
             const chezMoi = domicile === avant.club;
             get().enregistrerResultatManager({
               cle: affiche.cle, club: avant.club, saison: avant.saison, semaine: avant.semaine,
@@ -5920,6 +5937,8 @@ export const useGame = create<GameState>()(
       enregistrerMatchVecu: (s, contexte) => {
         const { joueur, compteurs } = get();
         if (!joueur) return;
+        const inter = situationInternationale(joueur);
+        if (inter.indisponibleClub && (!inter.match || inter.role === 'horsGroupe')) return;
         const cle = `${joueur.saison}#${joueur.semaine ?? 1}`;
         if (get().matchRegarde === cle) return; // déjà comptabilisé
         const vecu = joueur.saisonEnCours ?? {
@@ -5946,6 +5965,7 @@ export const useGame = create<GameState>()(
             // minutes : au-delà d'une heure, on était sur la feuille de départ.
             titularisations: vecu.titularisations + (s.minutes >= 55 ? 1 : 0),
             essais: vecu.essais + s.essais,
+            capes: vecu.capes + (inter.camp && !inter.camp.u20 && s.minutes > 0 ? 1 : 0),
             notes: [...vecu.notes, retour.note],
             // ⚠️ TOUTE LA FEUILLE EST CUMULÉE. `passesDecisives: 0` et
             // `cartonsRouges: 0` étaient écrits en dur : le joueur humain
@@ -5953,7 +5973,7 @@ export const useGame = create<GameState>()(
             // rouge, quoi qu'il ait fait sur le terrain — et deux succès du jeu
             // ne pouvaient donc pas se débloquer.
             stats: additionnerStats(vecu.stats, {
-              points: s.essais * 5 + s.butsReussis * 2,
+              points: s.points ?? s.essais * 5 + s.butsReussis * 2,
               butsTentes: s.butsTentes,
               butsReussis: s.butsReussis,
               plaquages: s.plaquages,
@@ -5975,6 +5995,22 @@ export const useGame = create<GameState>()(
             }),
           },
         };
+        if (inter.match && s.minutes > 0) {
+          j = ajouterMatchInternational(j, s.essais, s.points ?? s.essais * 5 + s.butsReussis * 2, inter.role === 'titulaire');
+          if (contexte) {
+            const domicile = inter.match.match.domicile === inter.camp!.nation;
+            const match = { ...inter.match.match,
+              scoreD: domicile ? contexte.scorePour : contexte.scoreContre,
+              scoreE: domicile ? contexte.scoreContre : contexte.scorePour,
+            };
+            if (inter.match.competition.id === 'coupeDuMonde' && inter.match.journee > 3 && match.scoreD === match.scoreE) {
+              if (graine(inter.match.cle + '#prolongation')() < 0.5) match.scoreD += 3; else match.scoreE += 3;
+            }
+            const p = parcoursInternational(j);
+            j = { ...j, international: { ...p, resultats: { ...p.resultats, [inter.match.cle]: match } } };
+            enregistrerResultatJoue(inter.match.cle, match);
+          }
+        }
         if (retour.attribut) {
           j = {
             ...j,
@@ -6191,6 +6227,19 @@ export const useGame = create<GameState>()(
             club: joueur.club, nom: joueur.nom, poste: joueur.poste,
             attributs: joueur.attributs,
           };
+          const inter = situationInternationale(joueur);
+          if (inter.match && inter.camp) {
+            const f = inter.match;
+            const cleI = f.competition.id + '#' + joueur.saison;
+            if ((get().journeesReelles[cleI] ?? 0) < f.journee) {
+              const lignes = simulerJourneeInternationale(f.competition.id, joueur.saison, f.journee,
+                inter.role === 'horsGroupe' ? undefined : { ...avatar, club: inter.camp.nation, titulaire: inter.role === 'titulaire' });
+              set((st) => ({
+                statsReelles: { ...st.statsReelles, [cleI]: cumuler(st.statsReelles[cleI] ?? {}, lignes) },
+                journeesReelles: { ...st.journeesReelles, [cleI]: f.journee },
+              }));
+            }
+          }
 
         // ⚠️ UNE SEMAINE EUROPÉENNE OU INTERNATIONALE A AUSSI SES STATISTIQUES.
         // Elles n'existaient pas : le joueur était le seul de la compétition à
@@ -6201,7 +6250,7 @@ export const useGame = create<GameState>()(
           const journee = passeesDuType(numeroJoue, 'coupe') + 1;
           const cleC = `${coupes[0]}#${joueur.saison}`;
           if ((get().journeesReelles[cleC] ?? 0) >= journee) return;
-          const lignesC = simulerJourneeCoupe(coupes[0], joueur.saison, journee, joueur.club, {
+          const lignesC = simulerJourneeCoupe(coupes[0], joueur.saison, journee, joueur.club, inter.indisponibleClub ? undefined : {
             ...avatar, titulaire: estTitulaire(joueur, `${coupes[0]}#${joueur.saison}#${journee}`),
           });
           set((s) => ({
@@ -6210,35 +6259,7 @@ export const useGame = create<GameState>()(
           }));
             return;
           }
-          if (sem.type === 'international' && !estAmateur(division)) {
-          // ⚠️ On rejoue la fenêtre où le joueur est RÉELLEMENT engagé : chez les
-          // A s'il y est appelé, sinon chez les U20 s'il y a l'âge et le niveau.
-          const nation = nomNation(joueur.nation);
-          const equipeJeune = equipeU20(joueur.nation);
-          const fenA = fenetreInternationale(numeroJoue, joueur.saison, nation);
-          const chezLesA = !!fenA && fenA.competition.equipes.includes(nation)
-            && convocation(joueur).selectionne;
-          const fenJ = chezLesA ? null : fenetreU20(numeroJoue, joueur.saison, equipeJeune);
-          const chezLesJeunes = !chezLesA && !!fenJ
-            && fenJ.competition.equipes.includes(equipeJeune)
-            && convocationU20(joueur).selectionne;
-          const fen = chezLesJeunes ? fenJ : fenA;
-          if (!fen) return;
-          const cleI = `${fen.competition.id}#${joueur.saison}`;
-          if ((get().journeesReelles[cleI] ?? 0) >= fen.journee) return;
-          const monEquipe = chezLesJeunes ? equipeJeune : nation;
-          const lignesI = simulerJourneeInternationale(
-            fen.competition.id, joueur.saison, fen.journee,
-            (chezLesA || chezLesJeunes)
-              ? { ...avatar, club: monEquipe, titulaire: true }
-              : undefined,
-          );
-          set((s) => ({
-            statsReelles: { ...s.statsReelles, [cleI]: cumuler(s.statsReelles[cleI] ?? {}, lignesI) },
-            journeesReelles: { ...s.journeesReelles, [cleI]: fen.journee },
-          }));
-            return;
-          }
+
 
           const affiche = matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur));
           if (!affiche) return; // pas de journée cette semaine
@@ -6292,7 +6313,7 @@ export const useGame = create<GameState>()(
           const lignes = simulerJournee(
             division, joueur.saison, journee, joueur.club,
             bonusClubDuJoueur(joueur), numeroPoule,
-            {
+            inter.indisponibleClub ? undefined : {
               club: joueur.club, nom: joueur.nom, poste: joueur.poste,
               attributs: joueur.attributs,
               // Même décision que dans le direct : le match rejoué est le même.
@@ -6475,7 +6496,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 24,
+      version: 25,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -6526,6 +6547,21 @@ export const useGame = create<GameState>()(
           manager?: Manager | null;
         };
         if (!s) return s;
+        if (version < 25) {
+          if (s.joueur) {
+            s.joueur.semaine = migrerSemaineCalendrier(s.joueur.semaine ?? 1);
+            if (s.joueur.entrainementSemaine) s.joueur.entrainementSemaine = migrerSemaineCalendrier(s.joueur.entrainementSemaine);
+          }
+          if (s.manager) {
+            s.manager.semaine = migrerSemaineCalendrier(s.manager.semaine);
+            for (const r of Object.values(s.manager.resultats ?? {})) r.semaine = migrerSemaineCalendrier(r.semaine);
+            if (s.manager.avancee) s.manager.avancee.convocations = [];
+          }
+          if (s.matchRegarde) {
+            const [saison, numero] = s.matchRegarde.split('#');
+            s.matchRegarde = saison + '#' + migrerSemaineCalendrier(Number(numero));
+          }
+        }
         if (version < 2 && s.joueur) {
           s.joueur = { ...s.joueur, poste: migrerPoste(s.joueur.poste as string) };
         }
@@ -6847,6 +6883,8 @@ export const useGame = create<GameState>()(
             essaisE: r.domicile ? r.essaisContre : r.essaisPour,
           },
         })));
+        for (const [cle, match] of Object.entries(etat?.joueur?.international?.resultats ?? {})) enregistrerResultatJoue(cle, match);
+        for (const [cle, match] of Object.entries(etat?.manager?.avancee?.selection?.resultats ?? {})) enregistrerResultatJoue(cle, match);
         // ⚠️ Le thème vit sur <html>, pas dans React : il faut le reposer à la
         // réhydratation, sinon le site repart en vert à chaque rechargement.
         appliquerTheme(etat?.theme ?? 'vert');
@@ -6959,6 +6997,13 @@ export const useGame = create<GameState>()(
  * réglages et la boutique sans payer une seconde sauvegarde à chaque `set()`.
  */
 useGame.subscribe((etat) => ecrireCompte(etat as unknown as Record<string, unknown>));
+// Figer les convocations dès l'annonce, y compris création et rechargement.
+useGame.subscribe((etat, avant) => {
+  if (etat.joueur && etat.joueur !== avant.joueur) {
+    const joueur = actualiserRassemblements(etat.joueur);
+    if (joueur !== etat.joueur) useGame.setState({ joueur });
+  }
+});
 
 // ---- Palmarès : quels titres le joueur remporte-t-il cette saison ? ----
 // On simule d'abord le CLASSEMENT du club dans sa poule (1 à 14). Il découle
@@ -7134,11 +7179,12 @@ function resoudreTrophees(
   // ⚠️ Le même booléen sert à gagner le Tournoi ET à pouvoir en être élu
   // meilleur joueur : deux expressions différentes finiraient par diverger, et
   // on serait meilleur joueur d'un tournoi qu'on n'a pas disputé.
-  const selectionne = capesSaison > 0 || convocation(j, 0.5, saisonEcoulee).selectionne;
+  const matchsInternationaux = Object.values(j.international?.matchs ?? {}).filter((m) => m.saison === saisonEcoulee);
+  const selectionne = j.international ? matchsInternationaux.length > 0 : capesSaison > 0;
 
   const sonTournoi = competitionDeSaNation(nation, saisonEcoulee, 'tournoi');
   const tournoiId = selectionne && sonTournoi ? sonTournoi.id : undefined;
-  if (sonTournoi && selectionne) {
+  if (sonTournoi && selectionne && (!j.international || matchsInternationaux.some((m) => m.competition === sonTournoi.id))) {
     const trophee = TROPHEE_PAR_INTERNATIONAL[sonTournoi.id];
     if (trophee && vainqueurInternational(sonTournoi.id, saisonEcoulee) === nation) {
       trophees.push(trophee);
@@ -7149,7 +7195,9 @@ function resoudreTrophees(
   // tournée d'automne une saison sur quatre — `estAnneeDeCoupeDuMonde` est LA
   // source (le vieux `saison % 4 === 0` en était une deuxième, et les deux ne
   // tombaient pas forcément sur la même année).
-  if (estAnneeDeCoupeDuMonde(saisonEcoulee) && selectionne) {
+  if (estAnneeDeCoupeDuMonde(saisonEcoulee) && (j.international
+    ? j.international.rassemblements.some((r) => r.saison === saisonEcoulee && r.competition === 'coupeDuMonde' && r.retenu)
+    : selectionne)) {
     const mondial = competitionDeSaNation(nation, saisonEcoulee, 'automne');
     const trophee = mondial && TROPHEE_PAR_INTERNATIONAL[mondial.id];
     if (trophee && vainqueurInternational(mondial.id, saisonEcoulee) === nation) {
@@ -7280,7 +7328,7 @@ interface ResultatSemaine {
 // Le joueur dispute-t-il ce match, et comment ? Tout part de son niveau face
 // à celui de son groupe : un joueur au-dessus est titulaire, un joueur en
 // dessous gratte des fins de match, un joueur très en dessous reste en tribune.
-function jouerMatch(j: Joueur, intensite: number): ResultatSemaine {
+function jouerMatch(j: Joueur, intensite: number, role?: 'titulaire' | 'remplacant'): ResultatSemaine {
   const forceGroupe = forceEffectif(j.club, j.saison);
   const perso = noteGlobale(j) * 0.7 + j.reputation * 0.3;
   const ecart = perso - forceGroupe - (intensite - 1) * 6; // une affiche européenne est plus relevée
@@ -7290,8 +7338,8 @@ function jouerMatch(j: Joueur, intensite: number): ResultatSemaine {
   const chanceTitulaire = Math.max(0.05, Math.min(0.95, 0.5 + ecart / 16 + confiance));
   const tirage = Math.random();
   const forceBanc = (j.miseAuBanc?.semaines ?? 0) > 0;
-  const titulaire = !forceBanc && tirage < chanceTitulaire;
-  const remplacant = forceBanc || (!titulaire && tirage < chanceTitulaire + 0.3);
+  const titulaire = role ? role === 'titulaire' : !forceBanc && tirage < chanceTitulaire;
+  const remplacant = role ? role === 'remplacant' : forceBanc || (!titulaire && tirage < chanceTitulaire + 0.3);
 
   if (!titulaire && !remplacant) {
     return {
@@ -7390,8 +7438,7 @@ function jouerMatch(j: Joueur, intensite: number): ResultatSemaine {
  * qu'une cape A — on ne joue pas avec son club le week-end du Tournoi U20.
  */
 export function partEnSelection(j: Joueur, sem: Semaine): boolean {
-  return sem.type === 'international'
-    && (convocation(j).selectionne || convocationU20(j).selectionne);
+  return situationInternationale({ ...j, semaine: sem.numero }).indisponibleClub;
 }
 
 function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
@@ -7408,6 +7455,18 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       aJoue: false, titulaire: false, essais: 0,
       soinBlessure: true,
     };
+  }
+  const inter = situationInternationale(j);
+  if (inter.camp) {
+    if (!inter.match || inter.role === 'horsGroupe' || inter.role === 'preparation') return {
+      emoji: '🏳️', titre: inter.camp.nom + (inter.role === 'horsGroupe' ? ' · hors des 23' : ' · rassemblement'),
+      texte: 'Tu restes avec la sélection. Ton club poursuit son calendrier avec tes remplaçants.',
+      deltas: { forme: 3, moral: inter.role === 'horsGroupe' ? -1 : 1 }, aJoue: false, titulaire: false, essais: 0,
+    };
+    const r = jouerMatch(j, 2, inter.role);
+    return { ...r, emoji: '🏳️', titre: inter.camp.nom + ' · ' + (inter.role === 'titulaire' ? 'titulaire' : 'remplaçant'),
+      texte: inter.match.match.domicile + ' – ' + inter.match.match.exterieur + '. ' + r.texte,
+      cape: r.aJoue && !inter.camp.u20 };
   }
   // ---- PAS DE TRÊVE EN BAS DE LA PYRAMIDE ----
   // Demande explicite : de la Nationale 2 à la Régionale 3, on joue AUSSI les
@@ -7462,7 +7521,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       // la même source que l'écran Résultats, le classement latéral et le
       // palmarès de fin de saison — trois vérités différentes sur « mon club
       // joue-t-il l'Europe ? », c'est le bug du titre fantôme en puissance.
-      if (coupesDuClub(j.club, j.saison).length === 0) {
+      if (!afficheDuClub({ club: j.club, division: j.division ?? 'fed3', saison: j.saison, semaine: j.semaine ?? 1 })) {
         return {
           emoji: '🛌', titre: semaineJouee.libelle,
           texte: 'Week-end sans match : ton club ne dispute pas la coupe d’Europe. Semaine d’entraînement et de récupération.',

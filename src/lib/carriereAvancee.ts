@@ -9,7 +9,10 @@
 import { COMPETITIONS, NOTE_PAR_NIVEAU, competitionDuClub } from '../data/clubs';
 import { SELECTIONS_SENIOR } from '../data/selections';
 import type { Manager, ResultatMatchManager } from '../types';
-import { graine } from './championnat';
+import { graine, enregistrerResultatJoue, type MatchChampionnat } from './championnat';
+import { fenetresDeNation, finDeRassemblement, type RassemblementInternational } from './rassemblements';
+import { effectifNational, matchInternationalDuJoueur } from './international';
+import { libelleDate, semaine as dateSemaine } from '../data/calendrier';
 import type { Coequipier } from './effectif';
 import { forceEffectif } from './effectif';
 import {
@@ -105,6 +108,7 @@ export interface DossierMedical {
 }
 
 export interface ConvocationClub {
+  rassemblement?: RassemblementInternational;
   id: string;
   joueurId: string;
   nom: string;
@@ -224,7 +228,8 @@ export interface CarriereInternationaleManager {
   victoires: number;
   titres: string[];
   depuis: number;
-  matchEnAttente?: { id: string; adversaire: string; competition: string; semaine: number };
+  resultats?: Record<string, MatchChampionnat>;
+  matchEnAttente?: { id: string; adversaire: string; competition: string; semaine: number; match?: MatchChampionnat; domicile?: boolean; elimination?: boolean };
 }
 
 export interface PropositionSelection {
@@ -581,6 +586,28 @@ export function apresResultatCarriereAvancee(
   return { etat: { ...a, objectifs, actualites, profonde }, confiance: Math.max(-2, Math.min(2, soutienLeaders)) };
 }
 
+export function actualiserConvocationsClub(m: Manager, effectif: Coequipier[], numero: number, precedentes: ConvocationClub[]): ConvocationClub[] {
+  const convocations = precedentes.map((c) => c.rassemblement
+    ? { ...c, fin: finDeRassemblement(c.rassemblement, numero) } : c).filter((c) => c.fin >= numero);
+  for (const nation of new Set(effectif.map((j) => nomNation(j.nation)))) {
+    const groupe = effectifNational(nation, m.saison);
+    const noms = new Set(groupe.map((j) => j.nom));
+    for (const camp of fenetresDeNation(nation, m.saison)) {
+      if (camp.annonce > numero || finDeRassemblement(camp, numero) < numero) continue;
+      for (const j of effectif.filter((p) => noms.has(p.nom))) {
+        const id = camp.id + '#' + j.id;
+        if (convocations.some((c) => c.id === id)) continue;
+        // Une seule liste par joueur sur une période : les fenêtres prioritaires viennent d'abord.
+        if (convocations.some((c) => c.joueurId === j.id && c.debut <= camp.fin && c.fin >= camp.debut)) continue;
+        convocations.push({ id, joueurId: j.id, nom: j.nom, nation, debut: camp.debut,
+          fin: finDeRassemblement(camp, numero), competition: camp.nom, rassemblement: camp,
+          titularisations: 0, essais: 0, points: 0 });
+      }
+    }
+  }
+  return convocations;
+}
+
 export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[], semaineSuivante: number): EtatCarriereAvancee {
   let a = assurerEtatCarriereAvancee(m, effectif);
   const medical = a.medical.map((d) => {
@@ -588,27 +615,27 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
     const semaines = Math.max(0, d.semaines - 1);
     return { ...d, semaines, disponibilite: semaines === 0 ? 100 : d.disponibilite };
   });
-  const convocations = a.convocations.filter((c) => c.fin >= semaineSuivante);
-  const fenetre = [9, 21, 36].includes(semaineSuivante);
-  let nouvelles = convocations;
-  let actualites = [...a.actualites];
-  if (fenetre) {
-    const deja = new Set(convocations.map((c) => c.joueurId));
-    for (const j of [...effectif].sort((x, y) => y.note - x.note).slice(0, 10)) {
-      const nation = nomNation(j.nation);
-      const rng = graine(`selection-club#${j.id}#${m.saison}#${semaineSuivante}`);
-      if (!deja.has(j.id) && j.note >= 68 && rng() < Math.min(0.88, (j.note - 62) / 22)) {
-        nouvelles = [...nouvelles, { id: `conv-${m.saison}-${semaineSuivante}-${j.id}`, joueurId: j.id, nom: j.nom, nation, debut: semaineSuivante, fin: semaineSuivante + 1, competition: semaineSuivante === 9 ? 'Tournée d’automne' : semaineSuivante === 21 ? 'Tournoi international' : 'Tournée d’été', titularisations: rng() > 0.35 ? 1 : 0, essais: rng() > 0.78 ? 1 : 0, points: 0 }];
-        actualites.push(nouvelleActualite({ saison: m.saison, semaine: semaineSuivante, categorie: 'international', importance: 2, club: m.club, titre: `Première liste pour ${j.nom}`, texte: `${j.nom} rejoint ${nation}. Le club devra gérer son absence pendant la fenêtre internationale.` }));
-      }
-    }
+  const nouvelles = actualiserConvocationsClub(m, effectif, semaineSuivante, a.convocations);
+  const nouveauxIds = new Set(a.convocations.map((c) => c.id));
+  const actualites = [...a.actualites, ...nouvelles.filter((c) => !nouveauxIds.has(c.id)).map((c) =>
+    nouvelleActualite({ saison: m.saison, semaine: semaineSuivante, categorie: 'international', importance: 2, club: m.club,
+      titre: `Convocation · ${c.nom}`, texte: `${c.nation} · ${c.competition}. Groupe de 34, du ${libelleDate(dateSemaine(c.debut))} au ${libelleDate(dateSemaine(c.fin))}. Le club joue sans lui, même hors des 23.` }))];
+  if (a.selection?.matchEnAttente && a.selection.matchEnAttente.semaine < semaineSuivante) {
+    const attente = a.selection.matchEnAttente;
+    if (attente.match) a = enregistrerMatchSelectionAvance(a, m,
+      attente.domicile ? attente.match.scoreD : attente.match.scoreE,
+      attente.domicile ? attente.match.scoreE : attente.match.scoreD);
   }
   let selection = a.selection;
-  if (selection && fenetre && !selection.matchEnAttente) {
-    const candidats = SELECTIONS_SENIOR.filter((s) => s.nation !== selection!.nation);
-    const rng = graine(`selection-manager#${selection.nation}#${m.saison}#${semaineSuivante}`);
-    const adversaire = candidats[Math.floor(rng() * candidats.length)]?.nation ?? 'Irlande';
-    selection = { ...selection, matchEnAttente: { id: `inter-manager-${m.saison}-${semaineSuivante}`, adversaire, competition: semaineSuivante === 21 ? 'Six Nations / tournoi régional' : 'Tournée internationale', semaine: semaineSuivante } };
+  if (selection && !selection.matchEnAttente) {
+    const affiche = matchInternationalDuJoueur({ nation: selection.nation, saison: m.saison, semaine: semaineSuivante });
+    if (affiche && !selection.resultats?.[affiche.cle]) {
+      const domicile = affiche.match.domicile === nomNation(selection.nation);
+      selection = { ...selection, matchEnAttente: { id: affiche.cle, match: affiche.match, domicile,
+        elimination: affiche.competition.id === 'coupeDuMonde' && affiche.journee > 3,
+        adversaire: domicile ? affiche.match.exterieur : affiche.match.domicile,
+        competition: affiche.competition.nom, semaine: semaineSuivante } };
+    }
   }
   a = {
     ...a, medical, convocations: nouvelles, actualites: actualitesBornees(actualites), selection,
@@ -881,8 +908,18 @@ export function refuserSelectionAvance(a: EtatCarriereAvancee): EtatCarriereAvan
 export function enregistrerMatchSelectionAvance(a: EtatCarriereAvancee, m: Manager, scorePour: number, scoreContre: number): EtatCarriereAvancee {
   const s = a.selection;
   if (!s?.matchEnAttente) return a;
+  if (s.matchEnAttente.elimination && scorePour === scoreContre) {
+    if (graine(s.matchEnAttente.id + '#prolongation')() < 0.5) scorePour += 3; else scoreContre += 3;
+  }
+  const attente = s.matchEnAttente;
+  const match: MatchChampionnat = { domicile: attente.domicile ? nomNation(s.nation) : attente.adversaire,
+    exterieur: attente.domicile ? attente.adversaire : nomNation(s.nation),
+    scoreD: attente.domicile ? scorePour : scoreContre, scoreE: attente.domicile ? scoreContre : scorePour,
+    essaisD: Math.max(0, Math.round(((attente.domicile ? scorePour : scoreContre) - 6) / 7)),
+    essaisE: Math.max(0, Math.round(((attente.domicile ? scoreContre : scorePour) - 6) / 7)) };
+  enregistrerResultatJoue(attente.id, match);
   const victoire = scorePour > scoreContre;
-  const selection = { ...s, matchs: s.matchs + 1, victoires: s.victoires + (victoire ? 1 : 0), reputation: borne(s.reputation + (victoire ? 2 : scorePour === scoreContre ? 0 : -1)), matchEnAttente: undefined };
+  const selection = { ...s, resultats: { ...s.resultats, [attente.id]: match }, matchs: s.matchs + 1, victoires: s.victoires + (victoire ? 1 : 0), reputation: borne(s.reputation + (victoire ? 2 : scorePour === scoreContre ? 0 : -1)), matchEnAttente: undefined };
   return { ...a, selection, actualites: actualitesBornees([...a.actualites, nouvelleActualite({ saison: m.saison, semaine: m.semaine, categorie: 'international', importance: 3, titre: `${s.nation} ${scorePour}-${scoreContre} ${s.matchEnAttente.adversaire}`, texte: victoire ? `${m.nom} signe une victoire internationale qui renforce sa réputation de sélectionneur.` : 'La sélection repart au travail après ce rendez-vous international.' })]) };
 }
 
