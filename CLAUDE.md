@@ -1,5 +1,17 @@
 # CLAUDE.md — Destiny Rugby 🏉
 
+## Septembre 2026 — calendrier, résultats et académie du manager
+
+`CalendrierManager` expose les 45 semaines du calendrier commun et une avance datée. `avancerJusquaManager(cible, deleguerMatchs)` simule et enregistre chaque match avant de passer la semaine ; sans délégation, il s'arrête devant un match. Les décisions du club sont affichées et restent bloquantes. La cible est bornée à la clôture de l'exercice.
+
+`affichesChampionnatDuClub` conserve toutes les journées d'une semaine. L'affiche du match ouvert est figée dans l'écran pour éviter de remplacer le match terminé par le suivant à la sirène. Les poules européennes et les reversés de Champions Cup sont inclus. `duel` lit le registre des scores réels (clés historiques `phase#`, clés `coupe#` et `acces#`) avant de qualifier les clubs.
+
+`resoudreSaisonClub` réserve les échanges proches du manager par paire de divisions : ne plus fusionner par noms de clubs puis supprimer des mouvements pour équilibrer. Les trophées et l'histoire doivent être calculés AVANT `setMouvementsClubs`. Le monde archivé et les budgets lisent cette même résolution/division effective.
+
+Formation : filtrer les joueurs signés dans TOUS les sous-viviers ; réserver deux dossiers à l'école locale ; une intégration interne ne paie pas d'indemnité et ne négocie pas contre son propre club. `motifObservationJeune` accepte aussi les académiciens, dont le suivi est gratuit. Les rapports sont accessibles dans Formation comme dans Recruteurs.
+
+Régressions : `scripts/verifierSaisonManager.ts` couvre avance libre, doubles journées, coupe, playoffs, promotion sur trois étages, barrage d'accès, restauration des scores, recrutement et observation après signature.
+
 Guide d'architecture et de conventions pour travailler sur ce projet.
 **Lis-le avant toute évolution**, et **tiens-le à jour** avec le `README.md` à
 chaque changement notable.

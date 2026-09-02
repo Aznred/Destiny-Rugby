@@ -1,5 +1,13 @@
 # Destiny Rugby 🏉
 
+### Correctifs carrière entraîneur — septembre 2026
+
+- Calendrier complet partagé avec la carrière joueur, accessible depuis tous les onglets du bureau. Une date cible permet d'avancer avec simulation des matchs par le staff, ou de s'arrêter au prochain rendez-vous.
+- Toutes les journées (y compris deux dans la même semaine), les poules européennes, les playoffs et le barrage d'accès sont jouables. Les scores enregistrés déterminent les tours suivants.
+- Les promotions sont conservées dans les échanges de divisions ; titres et historique sont figés avant de reconstruire la saison suivante. Les budgets suivent la division effective.
+- Formation : rapports accessibles directement, jeunes de l'école du club intégrables sans indemnité, suivi gratuit des académiciens et entretien après trois observations. Un jeune recruté ne réapparaît pas dans les dossiers.
+- Contrôles : `npm run verify:saison-manager`, `npm run verify:formation-manager`.
+
 **Le RPG de carrière de rugby où une IA joue le Maître du Jeu.**
 
 Incarne un rugbyman de ses débuts jusqu'au sommet. Tu **écris tes actions** en

@@ -333,6 +333,31 @@ export interface BilanPyramideComplete {
   tournois: { divisionId: string; nom: string; champion: string | null }[];
 }
 
+/**
+ * Les échanges proches du club sont prioritaires PAR PAIRE de divisions.
+ * Dédoublonner les noms puis « équilibrer » supprimait parfois la montée du
+ * champion : les deux résolutions ne choisissaient pas la même poule amateur.
+ */
+export function resoudreSaisonClub(division: string, saison: number, club: string) {
+  const proche = resoudrePyramide(division, saison, club);
+  const complete = resoudreToutesDivisions(saison);
+  const frontiere = (m: MouvementClub) => [m.de, m.vers].sort().join('|');
+  const reservees = new Set(proche.mouvements.map(frontiere));
+  const mouvements = [...proche.mouvements];
+  const deplaces = new Set(mouvements.map((m) => m.club));
+  // Ajouter les autres échanges par couples, jamais un entrant sans sortant.
+  for (const montant of complete.mouvements.filter((m) => m.sens === 'montee')) {
+    if (reservees.has(frontiere(montant)) || deplaces.has(montant.club)) continue;
+    const descendant = complete.mouvements.find((m) => m.de === montant.vers
+      && m.vers === montant.de && m.sens === 'descente' && !deplaces.has(m.club));
+    if (!descendant) continue;
+    mouvements.push(montant, descendant);
+    deplaces.add(montant.club);
+    deplaces.add(descendant.club);
+  }
+  return { ...proche, mouvements };
+}
+
 export function resoudreToutesDivisions(saison: number): BilanPyramideComplete {
   const pyramide = PYRAMIDES[0]; // la pyramide FRANÇAISE : c'est là que se joue la carrière
   const mouvements: MouvementClub[] = [];

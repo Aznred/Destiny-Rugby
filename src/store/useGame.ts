@@ -140,7 +140,7 @@ import {
 import { convocation, convocationU20 } from '../lib/selection';
 import {
   resoudrePyramide, nomDivision, resoudreToutesDivisions, oublierResultats,
-  equilibrerMouvements, setContexteJoueur,
+  equilibrerMouvements, setContexteJoueur, resoudreSaisonClub,
 } from '../lib/promotion';
 // ⚠️ LE MODE MANAGER : ses règles d’accès vivent dans un module pur, sans
 // store ni DOM (`lib/manager.ts`). Le store ne fait qu’appliquer ce qu’elles
@@ -156,7 +156,7 @@ import {
 import { explorer } from '../lib/recruteurs';
 import {
   appliquerActionAcademie, evoluerAcademieManager, proposerProjetJeune,
-  tableauDetectionManager,
+  tableauDetectionManager, motifObservationJeune,
 } from '../lib/formationManager';
 import {
   accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, joueurDejaRecrute,
@@ -167,12 +167,12 @@ import {
   demandeAGenerer, negocierAvecClub, offresPourVente, ouvrirNegociationClub,
   valeurDeVente, type LevierClubManager,
 } from '../lib/vestiaireManager';
-import { setMouvementsClubs } from '../lib/divisions';
+import { competitionEffective, setMouvementsClubs } from '../lib/divisions';
 import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFinale';
 import {
   championnatEnDirect, journeesApres, nombreJournees, graine, rangFinal,
   estAmateur, weekEndsJoues, totalWeekEnds, poulesDe, indexPoule,
-  enregistrerResultatJoue, setResultatsJoues, effacerResultatsJoues,
+  enregistrerResultatJoue, setResultatsJoues, effacerResultatsJoues, jouerRencontre,
 } from '../lib/championnat';
 import {
   compositionManagerParDefaut, reconcilerCompositionManager, TACTIQUE_MANAGER_DEFAUT, EFFECTIF_MINIMUM,
@@ -1043,7 +1043,7 @@ interface GameState {
    * qu'il doit coacher. Un motif d'arrêt commun aurait obligé à mentir dans un
    * des deux cas, et c'est précisément ce que l'écran affiche au joueur.
    */
-  avancerJusquaManager: (numeroSemaine: number) => {
+  avancerJusquaManager: (numeroSemaine: number, deleguerMatchs?: boolean) => {
     semaines: number;
     arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc';
   };
@@ -3728,11 +3728,12 @@ export const useGame = create<GameState>()(
         const m = get().manager;
         if (!m?.club) return;
         const tableau = tableauDetectionManager(m);
-        if (!tableau.fiches.some((f) => f.jeune.id === jeuneId)) return;
+        if (motifObservationJeune(m, jeuneId, entretien)) return;
+        const auCentre = m.academie.some((j) => j.id === jeuneId && j.clubCentre === m.club);
         const actuelle = m.observationsJeunes[jeuneId] ?? {
           jeuneId, matchs: 0, entretien: false, saison: m.saison,
         };
-        const cout = entretien ? 3 : 1;
+        const cout = auCentre ? 0 : entretien ? 3 : 1;
         if (tableau.deplacementsRestants < cout) return;
         if (entretien && (actuelle.entretien || actuelle.matchs < 3)) return;
         if (!entretien && actuelle.matchs >= 10) return;
@@ -3844,7 +3845,7 @@ export const useGame = create<GameState>()(
       signerBanc: (club) => {
         const m = get().manager;
         if (!m || !clubParNom(club)) return;
-        const comp = competitionDuClub(club);
+        const comp = competitionEffective(club);
         const force = forceEffectif(club, m.saison);
         // ⚠️ ON NE VÉRIFIE PAS SEULEMENT « le club existe » : un banc au-dessus
         // de son prestige, c’est exactement le mode libre — et il se déclare à
@@ -4024,7 +4025,9 @@ export const useGame = create<GameState>()(
         get().saisonManager();
       },
 
-      avancerJusquaManager: (cible) => {
+      avancerJusquaManager: (cibleDemandee, deleguerMatchs = false) => {
+        const cible = Number.isFinite(cibleDemandee)
+          ? Math.min(SEMAINES_PAR_SAISON + 1, Math.max(1, Math.floor(cibleDemandee))) : 1;
         const depart = get().manager?.semaine ?? 1;
         let semaines = 0;
         if (!get().manager?.club) return { semaines, arret: 'sansBanc' as const };
@@ -4040,7 +4043,25 @@ export const useGame = create<GameState>()(
           // « saison rapide » qui a été supprimé pour cette raison précise.
           if (avant.decision) { arret = 'decision'; break; }
           const affiche = afficheDuClub(avant);
-          if (affiche && !avant.resultats[affiche.cle]) { arret = 'match'; break; }
+          if (affiche && !avant.resultats[affiche.cle]) {
+            if (!deleguerMatchs) { arret = 'match'; break; }
+            const { domicile, exterieur } = affiche.match;
+            const match = jouerRencontre(domicile, exterieur, avant.saison, affiche.cle, null);
+            const chezMoi = domicile === avant.club;
+            get().enregistrerResultatManager({
+              cle: affiche.cle, club: avant.club, saison: avant.saison, semaine: avant.semaine,
+              journee: affiche.journee, domicile: chezMoi,
+              adversaire: chezMoi ? exterieur : domicile,
+              scorePour: chezMoi ? match.scoreD : match.scoreE,
+              scoreContre: chezMoi ? match.scoreE : match.scoreD,
+              essaisPour: chezMoi ? match.essaisD : match.essaisE,
+              essaisContre: chezMoi ? match.essaisE : match.essaisD,
+            });
+            // Certaines semaines contiennent deux journées : toutes passent
+            // par l'enregistrement normal avant d'avancer la date.
+            if (!get().manager?.resultats[affiche.cle]) { arret = 'match'; break; }
+            continue;
+          }
 
           get().semaineManager();
 
@@ -4102,6 +4123,16 @@ export const useGame = create<GameState>()(
       enregistrerResultatManager: (resultat) => {
         const m = get().manager;
         if (!m?.club || resultat.club !== m.club || m.resultats[resultat.cle]) return;
+        // Pas de nul en match couperet. Le départage est sauvegardé avec le
+        // score, donc identique dans le calendrier, le tableau et le palmarès.
+        if (/^(phase|coupe|acces|tournoi)#/.test(resultat.cle)
+          && resultat.scorePour === resultat.scoreContre) {
+          const victoire = graine(`departage#${resultat.cle}`)() < .5;
+          resultat = { ...resultat,
+            scorePour: resultat.scorePour + (victoire ? 3 : 0),
+            scoreContre: resultat.scoreContre + (victoire ? 0 : 3),
+          };
+        }
         const domicile = resultat.domicile ? resultat.club : resultat.adversaire;
         const exterieur = resultat.domicile ? resultat.adversaire : resultat.club;
         const scoreD = resultat.domicile ? resultat.scorePour : resultat.scoreContre;
@@ -4745,7 +4776,7 @@ export const useGame = create<GameState>()(
         const m = get().manager;
         if (!m || !m.club) return;
         const rang = rangFinal(m.division, m.saison, m.club);
-        const py = resoudrePyramide(m.division, m.saison, m.club);
+        const py = resoudreSaisonClub(m.division, m.saison, m.club);
         const monte = py.mouvements.some((x) => x.club === m.club && x.sens === 'montee');
         const descendu = py.mouvements.some((x) => x.club === m.club && x.sens === 'descente');
 
@@ -4766,31 +4797,22 @@ export const useGame = create<GameState>()(
         // depuis longtemps — « sans ça, la division du club promu ne changeait
         // nulle part et le championnat de la saison suivante était identique au
         // précédent ». Le mode manager ne l'avait simplement jamais reçue.
-        const complete = resoudreToutesDivisions(m.saison);
-        const mouvements = equilibrerMouvements([
-          ...py.mouvements,
-          ...complete.mouvements.filter(
-            (x) => !py.mouvements.some((p) => p.club === x.club),
-          ),
-        ]);
+        const mouvements = py.mouvements;
         const majMouvements = { ...get().mouvementsClubs };
         for (const x of mouvements) majMouvements[x.club] = x.vers;
-        setMouvementsClubs(majMouvements);
-        // La pyramide a changé : les fins de saison mémoïsées sont périmées.
-        oublierResultats();
 
         const divisionSuivante = majMouvements[m.club] ?? m.division;
         const compSuivante = COMPETITIONS.find((c) => c.id === divisionSuivante);
         // Le manager lit les MÊMES finales que la carrière joueur : le rang de
         // poule qualifie, mais seul le vainqueur du tableau soulève le titre.
-        const phase = phaseFinale(m.division, m.saison, m.club);
+        const phase = py.phase;
         const tropheeNational = phase.champion === m.club
           ? TROPHEE_PAR_DIVISION[m.division]
           : undefined;
         // Les coupes sont elles aussi résolues par leur vrai tableau. Le mode
         // manager ne repart donc plus sans trophée après une finale européenne
         // remportée dans le monde simulé.
-        const tropheesCoupes = coupesDuClub(m.club, m.saison).flatMap((coupeId) => {
+        const tropheesCoupes = ['championsCup', 'challengeCup', 'premCup'].flatMap((coupeId) => {
           const tropheeCoupe = TROPHEE_PAR_COUPE[coupeId];
           if (!tropheeCoupe) return [];
           const etat = coupeEnDirect(
@@ -4810,6 +4832,10 @@ export const useGame = create<GameState>()(
         const bilanAvance = finSaisonCarriereAvancee(m, groupe, rang);
         const prestige = verdictBoard.prestige;
         const confiance = borne(verdictBoard.confiance + bilanAvance.confiance);
+
+        // On fige les titres et l'histoire AVANT de changer les poules.
+        setMouvementsClubs(majMouvements);
+        oublierResultats();
 
         const ligne: SaisonManager = {
           saison: m.saison, club: m.club, division: m.division,

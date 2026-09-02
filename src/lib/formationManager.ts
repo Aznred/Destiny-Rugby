@@ -22,7 +22,7 @@ import { effectifDuClub, forceEffectif } from './effectif';
 import { NIVEAU_INSTALLATION_MAX, installationsVierges } from './installations';
 import { familleDe, progresser } from './jeunes';
 import {
-  choisirSonClub, indemniteDeFormation, offreDe,
+  choisirSonClub, indemniteDeFormation, offreDe, rayonAcceptable,
 } from './signatureJeune';
 import { jeunesAPortee, jeunesInternationaux } from './viviers';
 import type { JeuneRepere } from './viviers';
@@ -68,9 +68,11 @@ export function tableauDetectionManager(manager: Manager): TableauDetectionManag
   const notes = notesDuCentre(manager.club, manager.installations);
   const rayon = rayonDeDetection(notes.reseau);
   const portee = etageDeDetection(notes.reseau);
-  const candidatsNationaux = jeunesAPortee(manager.club, manager.saison, rayon, 14);
+  const estDisponible = (j: JeuneRepere) => !manager.academie.some((a) => a.id === j.id)
+    && !manager.jeunesFormes.some((a) => a.id.endsWith(`-academie-${j.id}`));
+  const candidatsNationaux = jeunesAPortee(manager.club, manager.saison, rayon, 14).filter(estDisponible);
   const candidatsEtrangers = portee === 'international'
-    ? jeunesInternationaux(manager.club, manager.saison)
+    ? jeunesInternationaux(manager.club, manager.saison).filter(estDisponible)
     : [];
   const candidats = [
     ...candidatsNationaux,
@@ -84,25 +86,34 @@ export function tableauDetectionManager(manager: Manager): TableauDetectionManag
   const fichesSuivies = suivis.map((j) => ficheDe(
     j, notes, manager.observationsJeunes[j.id], manager.club,
   ));
-  const placesLibres = Math.max(0, combien - fichesSuivies.length);
+  // Le rapport ne doit pas être rempli uniquement de pépites trop éloignées.
+  // L'école du club fournit aussi de vrais dossiers, intégrables sans transfert.
+  const locaux = rapportDeSaison(
+    candidatsNationaux.filter((j) => j.club === manager.club && !manager.observationsJeunes[j.id]),
+    notes, manager.observationsJeunes, manager.club,
+    Math.min(2, Math.max(0, combien - fichesSuivies.length)),
+  );
+  const dejaRetenus = new Set([...fichesSuivies, ...locaux].map((f) => f.jeune.id));
+  const placesLibres = Math.max(0, combien - dejaRetenus.size);
   const placesInternationales = portee === 'international'
     ? Math.min(3, placesLibres, 1 + murs.recrutement)
     : 0;
   const nouveauxInternationaux = rapportDeSaison(
-    candidatsEtrangers.filter((j) => !manager.observationsJeunes[j.id]),
+    candidatsEtrangers.filter((j) => !dejaRetenus.has(j.id)),
     notes,
     manager.observationsJeunes,
     manager.club,
     placesInternationales,
   );
   const nouveauxNationaux = rapportDeSaison(
-    candidatsNationaux.filter((j) => !manager.observationsJeunes[j.id]),
+    candidatsNationaux.filter((j) => !dejaRetenus.has(j.id)
+      && j.distance <= rayonAcceptable(j.age, notes)),
     notes,
     manager.observationsJeunes,
     manager.club,
     Math.max(0, placesLibres - nouveauxInternationaux.length),
   );
-  const fiches = [...fichesSuivies, ...nouveauxInternationaux, ...nouveauxNationaux];
+  const fiches = [...fichesSuivies, ...locaux, ...nouveauxInternationaux, ...nouveauxNationaux];
   const total = deplacementsParSaison(notes.reseau, notes.recrutement);
   const utilises = manager.missionsJeunes.saison === manager.saison
     ? manager.missionsJeunes.utilises : 0;
@@ -135,6 +146,25 @@ export function ficheJeuneManager(manager: Manager, jeuneId: string): FicheDetec
     niveauClub: competitionDuClub(manager.club)?.niveau ?? 8,
   };
   return ficheDe(repere, tableau.notes, manager.observationsJeunes[jeuneId], manager.club);
+}
+
+/** Motif commun au bouton et au store : aucune action silencieusement refusée. */
+export function motifObservationJeune(
+  manager: Manager, jeuneId: string, entretien = false,
+  tableau = tableauDetectionManager(manager),
+): string | null {
+  const interne = manager.academie.find((j) => j.id === jeuneId && j.clubCentre === manager.club);
+  const fiche = interne ? ficheAcademicienManager(manager, interne, tableau.notes)
+    : tableau.fiches.find((f) => f.jeune.id === jeuneId);
+  if (!fiche) return 'Ce dossier n’est plus disponible.';
+  const auCentre = manager.academie.some((j) => j.id === jeuneId && j.clubCentre === manager.club);
+  if (entretien && fiche.entretien) return 'Entretien déjà réalisé.';
+  if (entretien && fiche.matchs < 3) return 'Observe trois matchs avant de rencontrer la famille.';
+  if (!entretien && fiche.matchs >= 10) return 'Observation complète : dix matchs suivis.';
+  if (!auCentre && tableau.deplacementsRestants < (entretien ? 3 : 1)) {
+    return 'Déplacements épuisés pour cette saison. Le suivi des jeunes du club reste gratuit.';
+  }
+  return null;
 }
 
 /** Estimation interne d'un joueur déjà au centre, sans recalculer tout le vivier. */
@@ -185,7 +215,8 @@ export function proposerProjetJeune(manager: Manager, jeuneId: string): VerdictS
 
   const jeune = fiche.jeune;
   const niveauAcheteur = competitionDuClub(manager.club)?.niveau ?? 8;
-  const indemnite = indemniteDeFormation(jeune, niveauAcheteur);
+  const interne = jeune.club === manager.club;
+  const indemnite = interne ? 0 : indemniteDeFormation(jeune, niveauAcheteur);
   if (manager.budgetTransferts < indemnite) {
     return {
       indemnite,
@@ -211,7 +242,10 @@ export function proposerProjetJeune(manager: Manager, jeuneId: string): VerdictS
     notesDeBase(jeune.club),
     manager.saison,
   );
-  if (decision.choix !== manager.club) {
+  if (!interne && jeune.distance > rayonAcceptable(jeune.age, tableau.notes)) {
+    return { indemnite, etat: 'refuse', texte: 'La distance est trop importante pour sa famille à cet âge. Privilégie les dossiers proches du club.' };
+  }
+  if (!interne && decision.choix !== manager.club) {
     const destination = decision.choix;
     return {
       indemnite,
@@ -226,7 +260,8 @@ export function proposerProjetJeune(manager: Manager, jeuneId: string): VerdictS
   return {
     indemnite,
     etat: 'accepte',
-    texte: `${jeune.nom} choisit ${manager.club}. L’indemnité de formation est de ${indemnite.toLocaleString('fr-FR')} €.` ,
+    texte: interne ? `${jeune.nom} intègre le centre depuis l’école de rugby du club, sans indemnité.`
+      : `${jeune.nom} choisit ${manager.club}. L’indemnité de formation est de ${indemnite.toLocaleString('fr-FR')} €.` ,
     academicien: {
       ...jeune,
       clubOrigine: jeune.club,

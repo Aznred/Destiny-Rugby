@@ -9,6 +9,7 @@ import type {
   RecrueManager, RoleRecrueManager, TermesRecrutementManager, TransfertAnnonce,
 } from '../types';
 import { COMPETITIONS, competitionDuClub } from '../data/clubs';
+import { competitionEffective } from './divisions';
 import { effectifDuClub, forceMoyenneDivision } from './effectif';
 import { graine } from './championnat';
 import { pseudoStable } from './comptes';
@@ -86,7 +87,7 @@ export function budgetsDuClub(club: string, saison: number): {
   transferts: number; salarial: number; structure: number; budget: number;
 } {
   const force = forceDuGroupe(club, saison);
-  const comp = competitionDuClub(club);
+  const comp = competitionEffective(club);
   const niveau = comp?.niveau ?? 8;
   // La référence, c'est ce que pèsent VRAIMENT les effectifs de la division.
   const f = financesDuClub(force, niveau, comp ? forceMoyenneDivision(comp.id, saison) : undefined);

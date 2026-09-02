@@ -1,0 +1,47 @@
+.manager-date-permanente {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 0 0 16px; padding: 14px 18px;
+}
+.manager-date-permanente > span { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; color: var(--craie-dim); font-size: .84rem; }
+.manager-date-permanente b { color: var(--or-400); }
+.manager-calendrier { display: grid; gap: 20px; min-width: 0; }
+.manager-cal-commandes { padding: 22px; }
+.manager-cal-commandes .comp-tete { gap: 14px; flex-wrap: wrap; }
+.manager-cal-commandes .comp-tete small { display: block; margin-top: 7px; }
+.manager-cal-commandes p { font-size: .88rem; line-height: 1.6; color: var(--craie-dim); }
+.manager-cal-commandes small { color: var(--brume); line-height: 1.5; }
+.manager-cal-avance { display: grid; gap: 14px; margin: 18px 0; }
+.manager-cal-boutons { display: flex; flex-wrap: wrap; gap: 10px; }
+.manager-club-formation > .manager-detection-tete,
+.manager-club-formation > .manager-dossiers-jeunes,
+.manager-club-formation > .manager-rapports-pros { grid-column: 1 / -1; }
+.manager-dossier-jeune > small { display: block; margin-top: 6px; color: var(--craie-dim); }
+.manager-cal-avance label { display: grid; gap: 8px; font-size: .85rem; }
+.manager-cal-avance select { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--bordure-forte); border-radius: 8px; background: var(--surface-solid); color: var(--craie); }
+.manager-cal-avance .manager-cal-delegation { display: flex; align-items: center; gap: 10px; }
+.manager-cal-delegation input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--or-500); }
+.manager-cal-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr)); gap: 12px; }
+.manager-cal-date {
+  display: flex; flex-direction: column; gap: 10px; min-height: 145px; padding: 17px;
+  color: var(--craie); text-align: left; border-left: 3px solid var(--bordure-forte);
+  white-space: normal; overflow-wrap: anywhere;
+}
+.manager-cal-date:disabled { opacity: .65; cursor: default; }
+.manager-cal-date.actuelle { border: 1px solid var(--or-400); border-left: 4px solid var(--or-400); }
+.manager-cal-date.choisie { outline: 2px solid var(--succes); outline-offset: 2px; }
+.manager-cal-date.phaseFinale { border-left-color: var(--or-400); }
+.manager-cal-date.coupe { border-left-color: #8faee8; }
+.manager-cal-date-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.manager-cal-date-tete b { color: var(--or-400); }
+.manager-cal-date-tete small { font-size: .65rem; letter-spacing: .07em; }
+.manager-cal-date > strong { font-size: .83rem; }
+.manager-cal-date > span:not(.manager-cal-date-tete) { font-size: .78rem; color: var(--craie-dim); line-height: 1.5; }
+.manager-cal-score b { color: var(--craie); font-variant-numeric: tabular-nums; }
+.manager-cal-decision { margin-top: 15px; padding: 15px; border: 1px solid var(--or-400); border-radius: 10px; }
+.manager-cal-decision button { margin: 5px; }
+@media (max-width: 560px) {
+  .manager-date-permanente { align-items: stretch; flex-direction: column; }
+  .manager-cal-commandes { padding: 16px; }
+  .manager-cal-boutons { display: grid; }
+  .manager-cal-avance .btn { white-space: normal; }
+}

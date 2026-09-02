@@ -12,7 +12,7 @@
 // Tout est déterministe (graine = division + saison + tour + équipes) : rouvrir
 // l'écran ne rejoue pas les matchs, et rien n'a besoin d'être sauvegardé.
 
-import { championnatEnDirect, graine, scorePossible, type LigneTableau } from './championnat';
+import { championnatEnDirect, graine, resultatJoue, scorePossible, type LigneTableau } from './championnat';
 import { forceEffectif } from './effectif';
 import { semaine } from '../data/calendrier';
 import type { Joueur } from '../types';
@@ -68,6 +68,24 @@ export function duel(
   libelle: string,
   avantageDomicile = 3,
 ): MatchFinal {
+  // Les anciennes sauvegardes utilisent « phase », le tirage « finale ».
+  // Relire le résultat AVANT de désigner les qualifiés du tour suivant.
+  const division = cle.startsWith('finale#') ? cle.split('#')[1] : undefined;
+  const reel = resultatJoue(cle) ?? (division
+    ? resultatJoue(`phase#${division}#${saison}#${tour}#${domicile}#${exterieur}`)
+    : undefined);
+  if (reel) {
+    let { scoreD, scoreE } = reel;
+    // Réparation des anciennes égalités enregistrées en match couperet.
+    if (scoreD === scoreE) {
+      if (graine(`departage#${cle}`)() < .5) scoreD += 3; else scoreE += 3;
+    }
+    return {
+      tour, libelle, domicile, exterieur, scoreD, scoreE,
+      vainqueur: scoreD > scoreE ? domicile : exterieur,
+      perdant: scoreD > scoreE ? exterieur : domicile,
+    };
+  }
   const rng = graine(cle);
   const fD = forceEffectif(domicile, saison) + avantageDomicile;
   const fE = forceEffectif(exterieur, saison);

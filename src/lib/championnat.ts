@@ -27,6 +27,11 @@ export interface MatchChampionnat {
 // est réalimenté par la sauvegarde au chargement.
 const RESULTATS_JOUES = new Map<string, MatchChampionnat>();
 
+/** Même registre pour la ligue, les coupes et les rencontres à élimination. */
+export function resultatJoue(cle: string): MatchChampionnat | undefined {
+  return RESULTATS_JOUES.get(cle);
+}
+
 export function enregistrerResultatJoue(cle: string, match: MatchChampionnat): void {
   RESULTATS_JOUES.set(cle, { ...match });
 }

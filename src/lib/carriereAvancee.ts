@@ -21,7 +21,7 @@ import {
   intensiteDeDepart, type Identite, type Rivalite,
 } from './identiteClub';
 import { nomNation } from './nations';
-import { phaseFinaleDe, resoudreToutesDivisions } from './promotion';
+import { phaseFinaleDe, resoudreSaisonClub } from './promotion';
 import {
   apresResultatProfonde, assurerEtatCarriereProfonde, avancerSemaineProfonde,
   compatibiliteManagerClub, creerEtatCarriereProfonde, finSaisonProfonde,
@@ -731,7 +731,7 @@ export function rapportConnaissance(a: EtatCarriereAvancee | undefined, cible: {
 
 function archiverMonde(a: EtatCarriereAvancee, m: Manager): HistoireDuMonde {
   let histoire = a.histoire;
-  const bilan = resoudreToutesDivisions(m.saison);
+  const bilan = resoudreSaisonClub(m.division, m.saison, m.club);
   for (const comp of COMPETITIONS) {
     const phase = phaseFinaleDe(comp.id, m.saison);
     if (!phase.champion) continue;

@@ -10,7 +10,9 @@ import type { OptionSelecteur } from '../components/Selecteur';
 import { COMPETITIONS, clubParNom, competitionDuClub } from '../data/clubs';
 import { effectifDuClub, forceEffectif } from '../lib/effectif';
 import { classementManagerEnDirect } from '../lib/tableauManager';
-import { semaine, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
+import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
+import { CalendrierManager } from '../components/CalendrierManager';
+import { competitionEffective } from '../lib/divisions';
 import { TROPHEES } from '../data/trophees';
 import { nomPoste, POSTES } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
@@ -29,7 +31,7 @@ import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
   noteMaximale, salaireManager,
 } from '../lib/manager';
-import { afficheDuClub } from '../lib/matchLive';
+import { afficheDuClub, libelleAfficheManager, type AfficheComplete } from '../lib/matchLive';
 import { porteeSportive } from '../lib/recrutementManager';
 import { LIMITES } from '../lib/classementMondial';
 import {
@@ -40,7 +42,7 @@ import {
 import { AXES_CENTRE, ICONE_AXE } from '../lib/centreFormation';
 import {
   capaciteAcademie, ficheAcademicienManager, nomObjectifJeune, OBJECTIFS_JEUNES,
-  tableauDetectionManager,
+  tableauDetectionManager, motifObservationJeune,
 } from '../lib/formationManager';
 import {
   compositionManagerParDefaut, noteCompositionManager, POSTES_XV_MANAGER,
@@ -66,7 +68,7 @@ import type {
 const MatchLive = lazy(() => import('../components/MatchLive').then((m) => ({ default: m.MatchLive })));
 const OvaleManager = lazy(() => import('./Social').then((m) => ({ default: m.OvaleManager })));
 
-type VueManager = 'bureau' | 'equipe' | 'match' | 'marche'
+type VueManager = 'bureau' | 'equipe' | 'match' | 'marche' | 'calendrier'
   | 'ovale' | 'formation' | 'recruteurs' | 'entrainement'
   | 'direction' | 'vestiaire' | 'univers' | 'histoire';
 
@@ -158,7 +160,7 @@ export function Manager() {
   const [clubMarche, setClubMarche] = useState('');
   const [recherche, setRecherche] = useState('');
   const [poste, setPoste] = useState('');
-  const [matchOuvert, setMatchOuvert] = useState(false);
+  const [matchOuvert, setMatchOuvert] = useState<AfficheComplete | null>(null);
   const [matchSelectionOuvert, setMatchSelectionOuvert] = useState(false);
   const [jeuneALiberer, setJeuneALiberer] = useState<string | null>(null);
   const [demission, setDemission] = useState(false);
@@ -276,7 +278,7 @@ export function Manager() {
   // `>=`, la dernière saison annoncée par l'écran de création serait refusée.
   const finDAge = manager.age > LIMITES.ageManagerMax;
   const fiche = manager.club ? clubParNom(manager.club) : undefined;
-  const comp = manager.club ? competitionDuClub(manager.club) : undefined;
+  const comp = manager.club ? competitionEffective(manager.club, manager.division) : undefined;
   const force = manager.club ? forceEffectif(manager.club, manager.saison) : 0;
   const humeur = humeurDuBoard(manager.confiance);
   const maLigne = classement?.classement.find((l) => l.club === manager.club);
@@ -479,6 +481,10 @@ export function Manager() {
         </div>
       ) : (
         <>
+          <div className="carte manager-date-permanente">
+            <span><Icone nom="calendrier" taille={18} /> <b>{libelleDate(sem)}</b> · saison {manager.saison} · semaine {manager.semaine}/{SEMAINES_PAR_SAISON}</span>
+            <button className="btn primaire" onClick={() => setVue('calendrier')}>Calendrier / Avancer</button>
+          </div>
           {/* ⚠️ ONZE ONGLETS, ONZE TRACÉS — plus onze emoji. Un emoji est dessiné
               par Apple, Google ou Microsoft : la barre changeait d'aspect selon
               la machine, ses couleurs (un manteau bleu ciel, un livre rouge) ne
@@ -495,6 +501,9 @@ export function Manager() {
             </button>
             <button className={vue === 'match' ? 'actif' : ''} onClick={() => setVue('match')}>
               <Icone nom="sifflet" taille={17} /> Match {afficheManager && !resultatManager && <i>1</i>}
+            </button>
+            <button className={vue === 'calendrier' ? 'actif' : ''} onClick={() => setVue('calendrier')}>
+              <Icone nom="calendrier" taille={17} /> Calendrier
             </button>
             <button className={vue === 'marche' ? 'actif' : ''} onClick={() => setVue('marche')}>
               <Icone nom="monde" taille={17} /> {t('mgr.marche')}
@@ -524,6 +533,8 @@ export function Manager() {
               <Icone nom="livre" taille={17} /> Histoire
             </button>
           </nav>
+
+          {vue === 'calendrier' && <CalendrierManager onMatch={() => setVue('match')} />}
 
           {vue === 'bureau' && (
             <div className="manager-bureau">
@@ -869,7 +880,7 @@ export function Manager() {
                 <section className="carte manager-match-vide"><span><Icone nom="calendrier" taille={32} /></span><h2>Pas de match cette semaine</h2><p>Le calendrier laisse une fenêtre de récupération. Tu peux préparer la suite puis avancer.</p><button className="btn primaire" onClick={semaineManager}>▶ Semaine suivante</button></section>
               ) : (
                 <section className="carte manager-affiche-match">
-                  <div className="eyebrow">Journée {afficheManager.journee} · {manager.divisionNom}</div>
+                  <div className="eyebrow">{libelleAfficheManager(afficheManager, manager.divisionNom)}</div>
                   {derbyMemo?.derby && (
                     <div className="manager-contexte-derby">
                       <span><Icone nom="flamme" taille={14} /> Derby à {derbyMemo.distance} km</span>
@@ -883,9 +894,9 @@ export function Manager() {
                     <span>{clubParNom(afficheManager.match.exterieur) && <Blason club={clubParNom(afficheManager.match.exterieur)!} taille={54} />}<b>{afficheManager.match.exterieur}</b></span>
                   </div>
                   {resultatManager ? (
-                    <div className="manager-match-joue"><b><Icone nom="check" taille={14} /> Résultat enregistré au championnat</b><p>{resultatManager.essaisPour} essai{resultatManager.essaisPour > 1 ? 's' : ''} marqué{resultatManager.essaisPour > 1 ? 's' : ''} · confiance du board mise à jour.</p><button className="btn primaire" onClick={semaineManager}>{manager.semaine >= SEMAINES_PAR_SAISON ? 'Clore la saison' : '▶ Semaine suivante'}</button></div>
+                    <div className="manager-match-joue"><b><Icone nom="check" taille={14} /> Résultat enregistré dans la compétition</b><p>{resultatManager.essaisPour} essai{resultatManager.essaisPour > 1 ? 's' : ''} marqué{resultatManager.essaisPour > 1 ? 's' : ''} · confiance du board mise à jour.</p><button className="btn primaire" onClick={semaineManager}>{manager.semaine >= SEMAINES_PAR_SAISON ? 'Clore la saison' : '▶ Semaine suivante'}</button></div>
                   ) : (
-                    <div className="manager-lancer-match"><p>Le XV, le banc, le capitaine, le buteur et le plan de jeu seront figés au coup d’envoi. Les consignes collectives resteront modifiables en direct.</p><div><button className="btn fantome" onClick={() => setVue('equipe')}><Icone nom="equipe" taille={16} /> Vérifier la composition</button><button className="btn primaire grand" onClick={() => setMatchOuvert(true)}><Icone nom="sifflet" taille={18} /> Prendre place sur le banc</button></div></div>
+                    <div className="manager-lancer-match"><p>Le XV, le banc, le capitaine, le buteur et le plan de jeu seront figés au coup d’envoi. Les consignes collectives resteront modifiables en direct.</p><div><button className="btn fantome" onClick={() => setVue('equipe')}><Icone nom="equipe" taille={16} /> Vérifier la composition</button><button className="btn primaire grand" onClick={() => setMatchOuvert(afficheManager)}><Icone nom="sifflet" taille={18} /> Prendre place sur le banc</button></div></div>
                   )}
                 </section>
               )}
@@ -999,6 +1010,8 @@ export function Manager() {
                       <div className="manager-jeunes-grille">
                         {academieClub.map((j) => {
                           const estimation = ficheAcademicienManager(manager, j, detectionJeunes.notes);
+                          const motifObservation = motifObservationJeune(manager, j.id, false, detectionJeunes);
+                          const motifEntretien = motifObservationJeune(manager, j.id, true, detectionJeunes);
                           const progression = j.derniereProgression;
                           return (
                             <article className="manager-jeune-carte" key={j.id}>
@@ -1032,6 +1045,8 @@ export function Manager() {
                                 </p>
                               )}
                               <div className="manager-actions-academie">
+                                <button disabled={!!motifObservation} title={motifObservation ?? 'Suivi interne gratuit'} onClick={() => observerJeune(j.id)}>Observer ({estimation.matchs}/10)</button>
+                                <button disabled={!!motifEntretien} title={motifEntretien ?? 'Entretien interne gratuit'} onClick={() => observerJeune(j.id, true)}>{estimation.entretien ? 'Entretien réalisé' : 'Entretien famille'}</button>
                                 <button disabled={j.age > 18 || j.categorie === 'u18'} onClick={() => gererAcademicien(j.id, 'u18')}>U18</button>
                                 <button disabled={j.categorie === 'espoirs'} onClick={() => gererAcademicien(j.id, 'espoirs')}>Espoirs</button>
                                 <button disabled={j.age < 18 || j.categorie === 'pret'} onClick={() => gererAcademicien(j.id, 'pret')}>Prêter</button>
@@ -1136,7 +1151,7 @@ export function Manager() {
                 </section>
               )}
 
-              {vue === 'recruteurs' && detectionJeunes && (
+              {(vue === 'recruteurs' || vue === 'formation') && detectionJeunes && (
                 <>
                   <section className="carte manager-detection-tete">
                     <div>
@@ -1206,6 +1221,9 @@ export function Manager() {
                             <button disabled={detectionJeunes.deplacementsRestants < 3 || ficheJeune.matchs < 3 || ficheJeune.entretien || dejaSigne} onClick={() => observerJeune(j.id, true)}>Entretien famille</button>
                             <button className="primaire" disabled={dejaSigne || detectionJeunes.occupes >= detectionJeunes.capacite} onClick={() => proposerProjetJeune(j.id)}>{dejaSigne ? 'Au centre' : 'Présenter le projet'}</button>
                           </div>
+                          <small>{j.club === manager.club ? 'École du club : intégration au centre sans indemnité.' : 'Le jeune compare ton projet, la distance et les offres des autres centres.'}</small>
+                          {motifObservationJeune(manager, j.id, false, detectionJeunes) && <small role="status">{motifObservationJeune(manager, j.id, false, detectionJeunes)}</small>}
+                          {ficheJeune.matchs < 3 && <small>Entretien disponible après trois matchs observés.</small>}
                           {suivi && <small className="manager-rapport-date">Dossier suivi depuis la saison {suivi.saison}</small>}
                         </article>
                       );
@@ -1451,13 +1469,13 @@ export function Manager() {
           onNon={() => setJeuneALiberer(null)}
         />
       )}
-      {matchOuvert && afficheManager && (
+      {matchOuvert && (
         <Suspense fallback={null}>
           <MatchLive
-            match={afficheManager.match}
+            match={matchOuvert.match}
             saison={manager.saison}
-            cle={afficheManager.cle}
-            titre={`${manager.divisionNom} · journée ${afficheManager.journee}`}
+            cle={matchOuvert.cle}
+            titre={libelleAfficheManager(matchOuvert, manager.divisionNom)}
             manager={{
               club: manager.club,
               composition,
@@ -1467,19 +1485,19 @@ export function Manager() {
               penalitesNote,
             }}
             onTermine={({ scoreA, scoreB, essaisA, essaisB }) => {
-              const domicile = afficheManager.match.domicile === manager.club;
+              const domicile = matchOuvert.match.domicile === manager.club;
               enregistrerResultat({
-                cle: afficheManager.cle, club: manager.club,
+                cle: matchOuvert.cle, club: manager.club,
                 saison: manager.saison, semaine: manager.semaine,
-                journee: afficheManager.journee, domicile,
-                adversaire: domicile ? afficheManager.match.exterieur : afficheManager.match.domicile,
+                journee: matchOuvert.journee, domicile,
+                adversaire: domicile ? matchOuvert.match.exterieur : matchOuvert.match.domicile,
                 scorePour: domicile ? scoreA : scoreB,
                 scoreContre: domicile ? scoreB : scoreA,
                 essaisPour: domicile ? essaisA : essaisB,
                 essaisContre: domicile ? essaisB : essaisA,
               });
             }}
-            onFermer={() => setMatchOuvert(false)}
+            onFermer={() => setMatchOuvert(null)}
           />
         </Suspense>
       )}
