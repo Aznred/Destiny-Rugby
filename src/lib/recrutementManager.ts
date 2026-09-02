@@ -5,8 +5,8 @@
 // modèle économique reste jouable hors ligne et ne change pas au rechargement.
 
 import type {
-  CibleRecrutementManager, NegociationManager, RoleRecrueManager,
-  TermesRecrutementManager,
+  CibleRecrutementManager, Manager, NegociationClubManager, NegociationManager,
+  RecrueManager, RoleRecrueManager, TermesRecrutementManager, TransfertAnnonce,
 } from '../types';
 import { COMPETITIONS, competitionDuClub } from '../data/clubs';
 import { effectifDuClub, forceMoyenneDivision } from './effectif';
@@ -449,4 +449,129 @@ export function coutPremiereSaison(
 ): number {
   const indemnite = indemniteNegociee ?? negociation.joueur.indemnite;
   return indemnite + negociation.offre.prime;
+}
+
+/**
+ * Une signature est définitive dans ce marché : elle ne peut pas devenir une
+ * nouvelle négociation de contrat en rouvrant l'ancien message du club.
+ */
+export function joueurDejaRecrute(
+  manager: Pick<Manager, 'recrues' | 'negociations'>,
+  cibleId: string,
+): boolean {
+  return manager.recrues.some((r) => r.joueur.id === cibleId)
+    || manager.negociations.some((n) => n.joueur.id === cibleId && n.etat === 'signee');
+}
+
+export interface ReparationRecrutementManager {
+  recrues: RecrueManager[];
+  negociations: NegociationManager[];
+  negociationsClubs: NegociationClubManager[];
+  transfertsSociaux: TransfertAnnonce[];
+  doublonsSupprimes: number;
+  remboursementTransferts: number;
+  remboursementSalarial: number;
+}
+
+const RANG_NEGOCIATION: Record<NegociationManager['etat'], number> = {
+  rompue: 0, ouverte: 1, accord: 2, signee: 3,
+};
+const RANG_NEGOCIATION_CLUB: Record<NegociationClubManager['etat'], number> = {
+  rompue: 0, ouverte: 1, accord: 2,
+};
+
+function cleTransfert(t: TransfertAnnonce): string {
+  const normaliser = (texte: string) => texte.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return [normaliser(t.nom), normaliser(t.de), normaliser(t.vers), t.saison].join('|');
+}
+
+/**
+ * Répare les sauvegardes touchées par l'ancien bouton « Écrire au joueur ».
+ *
+ * Le bouton recréait une négociation avec le même identifiant. Le prochain
+ * levier remplaçait alors aussi l'ancien état `signee`, ce qui autorisait une
+ * deuxième signature, un deuxième débit et un deuxième transfert social.
+ * On conserve la première vraie recrue, ferme son dossier, retire les copies
+ * et rembourse exactement chaque débit surnuméraire.
+ */
+export function reparerRecrutementsDupliques(
+  manager: Pick<Manager, 'recrues' | 'negociations' | 'negociationsClubs'>,
+  transfertsSociaux: TransfertAnnonce[],
+): ReparationRecrutementManager {
+  const recrues: RecrueManager[] = [];
+  const recrueParCible = new Map<string, RecrueManager>();
+  let doublonsSupprimes = 0;
+  let remboursementTransferts = 0;
+  let remboursementSalarial = 0;
+
+  for (const recrue of manager.recrues) {
+    if (!recrueParCible.has(recrue.joueur.id)) {
+      recrueParCible.set(recrue.joueur.id, recrue);
+      recrues.push(recrue);
+      continue;
+    }
+    doublonsSupprimes++;
+    const dossier = [...manager.negociationsClubs].reverse().find((n) => (
+      n.cible.id === recrue.joueur.id && n.saison === recrue.saison && n.etat === 'accord'
+    ));
+    remboursementTransferts += (dossier?.offre ?? recrue.joueur.indemnite) + recrue.termes.prime;
+    remboursementSalarial += recrue.termes.salaire;
+  }
+
+  // Un même id ne doit décrire qu'un dossier. Si plusieurs états survivent,
+  // le plus avancé gagne ; à rang égal, le plus récent porte la dernière offre.
+  const negociationsParId = new Map<string, NegociationManager>();
+  for (const nego of manager.negociations) {
+    const avant = negociationsParId.get(nego.id);
+    if (!avant || RANG_NEGOCIATION[nego.etat] >= RANG_NEGOCIATION[avant.etat]) {
+      negociationsParId.set(nego.id, nego);
+    }
+  }
+
+  const libres: NegociationManager[] = [];
+  const finaleParCible = new Map<string, NegociationManager>();
+  for (const nego of negociationsParId.values()) {
+    const recrue = recrueParCible.get(nego.joueur.id);
+    if (!recrue) {
+      libres.push(nego);
+      continue;
+    }
+    const avant = finaleParCible.get(nego.joueur.id);
+    const priorite = (n: NegociationManager) => (
+      (n.etat === 'signee' ? 10 : 0) + (n.saison === recrue.saison ? 2 : 0) + n.semaine / 100
+    );
+    if (!avant || priorite(nego) >= priorite(avant)) finaleParCible.set(nego.joueur.id, nego);
+  }
+  const finales = [...finaleParCible.entries()].map(([cibleId, nego]) => ({
+    ...nego,
+    offre: { ...recrueParCible.get(cibleId)!.termes },
+    etat: 'signee' as const,
+  }));
+
+  const negociationsClubsParId = new Map<string, NegociationClubManager>();
+  for (const nego of manager.negociationsClubs) {
+    const avant = negociationsClubsParId.get(nego.id);
+    if (!avant || RANG_NEGOCIATION_CLUB[nego.etat] >= RANG_NEGOCIATION_CLUB[avant.etat]) {
+      negociationsClubsParId.set(nego.id, nego);
+    }
+  }
+
+  const transfertsVus = new Set<string>();
+  const transfertsNettoyes = transfertsSociaux.filter((transfert) => {
+    const cle = cleTransfert(transfert);
+    if (transfertsVus.has(cle)) return false;
+    transfertsVus.add(cle);
+    return true;
+  });
+
+  return {
+    recrues,
+    negociations: [...libres, ...finales],
+    negociationsClubs: [...negociationsClubsParId.values()],
+    transfertsSociaux: transfertsNettoyes,
+    doublonsSupprimes,
+    remboursementTransferts,
+    remboursementSalarial,
+  };
 }

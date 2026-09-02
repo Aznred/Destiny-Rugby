@@ -43,7 +43,7 @@ import { avatarInitiales } from '../lib/avatars';
 import { ecouterEtatIA, etatIA } from '../lib/groq';
 import type { CompteSuivi, Joueur, PostSocial } from '../types';
 import { nomPoste } from '../data/rugby';
-import { coutPremiereSaison } from '../lib/recrutementManager';
+import { coutPremiereSaison, joueurDejaRecrute } from '../lib/recrutementManager';
 import { valeurDeVente } from '../lib/vestiaireManager';
 import { effectifDuClub } from '../lib/effectif';
 
@@ -1250,6 +1250,7 @@ function NegociationClubVendeur({ pseudo }: { pseudo: string }) {
   const contacterJoueur = useGame((s) => s.contacterJoueurManager);
   const nego = [...manager.negociationsClubs].reverse().find((n) => n.pseudo === pseudo);
   if (!nego) return null;
+  const transfertFinalise = joueurDejaRecrute(manager, nego.cible.id);
   return (
     <div className="x-nego x-nego-manager" data-etat={nego.etat}>
       <div className="x-nego-tete"><b><Icone d={I_STADE} /> Accord entre clubs</b>{nego.etat === 'ouverte' && <span className="x-nego-patience">{'●'.repeat(nego.patience)}{'○'.repeat(Math.max(0, 4 - nego.patience))}</span>}</div>
@@ -1265,7 +1266,9 @@ function NegociationClubVendeur({ pseudo }: { pseudo: string }) {
           <button onClick={() => negocier(nego.id, 'accepter')}>Accepter {nombre(nego.demande)} €</button>
         </div>
       </>}
-      {nego.etat === 'accord' && <div className="manager-x-signature"><p className="budget-ok">Accord à {nombre(nego.offre)} €. Tu peux maintenant parler au joueur.</p><button className="x-nego-oui" onClick={() => contacterJoueur(nego.cible)}>Écrire à {nego.cible.nom}</button></div>}
+      {nego.etat === 'accord' && (transfertFinalise
+        ? <div className="x-nego-accord"><Icone d={I_OK} /> <b>{t('mgr.x.transfertFinalise')}</b></div>
+        : <div className="manager-x-signature"><p className="budget-ok">Accord à {nombre(nego.offre)} €. Tu peux maintenant parler au joueur.</p><button className="x-nego-oui" onClick={() => contacterJoueur(nego.cible)}>Écrire à {nego.cible.nom}</button></div>)}
       {nego.etat === 'rompue' && <div className="x-nego-accord"><b>Le club a quitté la table des négociations pour cette saison.</b></div>}
     </div>
   );

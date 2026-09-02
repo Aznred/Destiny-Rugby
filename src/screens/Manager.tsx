@@ -22,7 +22,9 @@ import type { EtatDuJoueur } from '../lib/carteJoueur';
 import type { CibleRecrutementManager } from '../types';
 import { poidsDansSecteur, SECTEURS_COHESION } from '../lib/cohesion';
 import type { Automatismes } from '../lib/cohesion';
-import { ciblesDuMarche, masseSalarialeActuelle } from '../lib/recrutementManager';
+import {
+  ciblesDuMarche, joueurDejaRecrute, masseSalarialeActuelle,
+} from '../lib/recrutementManager';
 import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
   noteMaximale, salaireManager,
@@ -186,11 +188,13 @@ export function Manager() {
   }, [classement, manager?.club]);
   const cibles = useMemo(() => {
     if (!manager?.club) return [];
+    const dejaRecrutees = new Set(manager.recrues.map((r) => r.joueur.id));
     return ciblesDuMarche(divisionMarche, manager.saison, manager.club, clubMarche)
+      .filter((c) => !dejaRecrutees.has(c.id))
       .filter((c) => !poste || c.poste === poste)
       .filter((c) => !recherche.trim()
         || `${c.nom} ${c.club} ${c.nation}`.toLowerCase().includes(recherche.trim().toLowerCase()));
-  }, [manager?.club, manager?.saison, divisionMarche, clubMarche, poste, recherche]);
+  }, [manager?.club, manager?.saison, manager?.recrues, divisionMarche, clubMarche, poste, recherche]);
   const effectifBrut = useMemo(
     () => manager?.club ? effectifDuClub(manager.club, manager.saison) : [],
     [manager],
@@ -354,6 +358,45 @@ export function Manager() {
     { valeur: '', label: t('mgr.marche.tousPostes') },
     ...POSTES.map((p) => ({ valeur: p.id, label: nomPoste(p.id), sous: `n° ${p.numero}` })),
   ];
+  const optionRole = (id: string): OptionSelecteur[] => {
+    const joueur = effectif.find((j) => j.id === id);
+    return joueur ? [{
+      valeur: joueur.id,
+      label: joueur.nom,
+      sous: `${nomPoste(joueur.poste)} · ${joueur.age} ${t('compo.ans')}`,
+      vignette: <span className="manager-role-note">{joueur.note}</span>,
+    }] : [];
+  };
+  const optionsCapitaines = composition.titulaires.flatMap(optionRole);
+  const optionsButeurs = [...composition.titulaires, ...composition.remplacants].flatMap(optionRole);
+  const optionsTactiques: Record<keyof TactiqueManager, OptionSelecteur[]> = {
+    attaque: [
+      { valeur: 'equilibre', label: 'Équilibré', sous: 'Alterner jeu au près et au large', vignette: <Icone nom="ballon" taille={16} /> },
+      { valeur: 'avants', label: 'Jeu d’avants', sous: 'Insister dans l’axe et les duels', vignette: <Icone nom="equipe" taille={16} /> },
+      { valeur: 'large', label: 'Jouer au large', sous: 'Écarter vite vers les trois-quarts', vignette: <Icone nom="fleche-droite" taille={16} /> },
+      { valeur: 'occupation', label: 'Occupation au pied', sous: 'Gagner du terrain avant d’attaquer', vignette: <Icone nom="cible" taille={16} /> },
+    ],
+    defense: [
+      { valeur: 'blitz', label: 'Blitz', sous: 'Monter vite pour étouffer l’attaque', vignette: <Icone nom="sifflet" taille={16} /> },
+      { valeur: 'glissee', label: 'Glissée', sous: 'Accompagner le ballon vers la touche', vignette: <Icone nom="fleche-droite" taille={16} /> },
+      { valeur: 'repli', label: 'Repli', sous: 'Sécuriser la profondeur du terrain', vignette: <Icone nom="stade" taille={16} /> },
+    ],
+    rythme: [
+      { valeur: 'gestion', label: 'Gérer', sous: 'Préserver les organismes', vignette: <Icone nom="batterie" taille={16} /> },
+      { valeur: 'normal', label: 'Normal', sous: 'Conserver un tempo équilibré', vignette: <Icone nom="chrono" taille={16} /> },
+      { valeur: 'intense', label: 'Intense', sous: 'Accélérer au prix de plus de fatigue', vignette: <Icone nom="flamme" taille={16} /> },
+    ],
+    penalites: [
+      { valeur: 'mixte', label: 'Selon le terrain', sous: 'Adapter le choix à la situation', vignette: <Icone nom="sifflet" taille={16} /> },
+      { valeur: 'points', label: 'Prendre les points', sous: 'Tenter les pénalités possibles', vignette: <Icone nom="cible" taille={16} /> },
+      { valeur: 'touche', label: 'Chercher la touche', sous: 'Miser sur la conquête et le maul', vignette: <Icone nom="equipe" taille={16} /> },
+    ],
+    remplacements: [
+      { valeur: 'precoces', label: 'Précoces', sous: 'Faire entrer le banc rapidement', vignette: <Icone nom="banc" taille={16} /> },
+      { valeur: 'standard', label: 'Standards', sous: 'Changer au moment habituel', vignette: <Icone nom="chrono" taille={16} /> },
+      { valeur: 'tardifs', label: 'Tardifs', sous: 'Conserver les titulaires plus longtemps', vignette: <Icone nom="batterie" taille={16} /> },
+    ],
+  };
 
   return (
     <motion.section className="carriere-manager" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
@@ -735,18 +778,34 @@ export function Manager() {
 
               <section className="carte manager-roles-visuels">
                 <div><b><Icone nom="profil" taille={16} /> Rôles du groupe</b><span>Le brassard et la cible apparaissent directement sur les cartes.</span></div>
-                <label><span><Icone nom="brassard" taille={14} /> Capitaine</span><select value={composition.capitaineId} onChange={(e) => definirComposition({ ...composition, capitaineId: e.target.value })}>{composition.titulaires.map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom}</option>; })}</select></label>
-                <label><span><Icone nom="cible" taille={14} /> Buteur</span><select value={composition.buteurId} onChange={(e) => definirComposition({ ...composition, buteurId: e.target.value })}>{[...composition.titulaires, ...composition.remplacants].map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom} · {nomPoste(j.poste)}</option>; })}</select></label>
+                <label>
+                  <span><Icone nom="brassard" taille={14} /> Capitaine</span>
+                  <Selecteur
+                    options={optionsCapitaines}
+                    valeur={composition.capitaineId}
+                    onChange={(id) => definirComposition({ ...composition, capitaineId: id })}
+                    recherche
+                  />
+                </label>
+                <label>
+                  <span><Icone nom="cible" taille={14} /> Buteur</span>
+                  <Selecteur
+                    options={optionsButeurs}
+                    valeur={composition.buteurId}
+                    onChange={(id) => definirComposition({ ...composition, buteurId: id })}
+                    recherche
+                  />
+                </label>
               </section>
 
               <section className="carte manager-plan-avant-match">
                 <div className="comp-tete"><b><Icone nom="entraineur" taille={16} /> Plan de jeu initial</b><span>modifiable pendant le match</span></div>
                 <div className="manager-tactiques-selects">
-                  <label><span>Attaque</span><select value={manager.tactique.attaque} onChange={(e) => majTactique('attaque', e.target.value as TactiqueManager['attaque'])}><option value="equilibre">Équilibré</option><option value="avants">Jeu d’avants</option><option value="large">Jouer au large</option><option value="occupation">Occupation au pied</option></select></label>
-                  <label><span>Défense</span><select value={manager.tactique.defense} onChange={(e) => majTactique('defense', e.target.value as TactiqueManager['defense'])}><option value="blitz">Blitz</option><option value="glissee">Glissée</option><option value="repli">Repli</option></select></label>
-                  <label><span>Rythme</span><select value={manager.tactique.rythme} onChange={(e) => majTactique('rythme', e.target.value as TactiqueManager['rythme'])}><option value="gestion">Gérer</option><option value="normal">Normal</option><option value="intense">Intense</option></select></label>
-                  <label><span>Pénalités</span><select value={manager.tactique.penalites} onChange={(e) => majTactique('penalites', e.target.value as TactiqueManager['penalites'])}><option value="mixte">Selon le terrain</option><option value="points">Prendre les points</option><option value="touche">Chercher la touche</option></select></label>
-                  <label><span>Remplacements</span><select value={manager.tactique.remplacements} onChange={(e) => majTactique('remplacements', e.target.value as TactiqueManager['remplacements'])}><option value="precoces">Précoces</option><option value="standard">Standards</option><option value="tardifs">Tardifs</option></select></label>
+                  <label><span>Attaque</span><Selecteur options={optionsTactiques.attaque} valeur={manager.tactique.attaque} onChange={(v) => majTactique('attaque', v as TactiqueManager['attaque'])} /></label>
+                  <label><span>Défense</span><Selecteur options={optionsTactiques.defense} valeur={manager.tactique.defense} onChange={(v) => majTactique('defense', v as TactiqueManager['defense'])} /></label>
+                  <label><span>Rythme</span><Selecteur options={optionsTactiques.rythme} valeur={manager.tactique.rythme} onChange={(v) => majTactique('rythme', v as TactiqueManager['rythme'])} /></label>
+                  <label><span>Pénalités</span><Selecteur options={optionsTactiques.penalites} valeur={manager.tactique.penalites} onChange={(v) => majTactique('penalites', v as TactiqueManager['penalites'])} /></label>
+                  <label><span>Remplacements</span><Selecteur options={optionsTactiques.remplacements} valeur={manager.tactique.remplacements} onChange={(v) => majTactique('remplacements', v as TactiqueManager['remplacements'])} /></label>
                 </div>
               </section>
             </div>
@@ -1291,8 +1350,11 @@ export function Manager() {
             situation: ficheCible.situation,
             saisonsRestantes: ficheCible.saisonsRestantes,
             action: {
-              libelle: `${t('mgr.negocier')} ${ficheCible.club}`,
+              libelle: joueurDejaRecrute(manager, ficheCible.id)
+                ? t('mgr.signe')
+                : `${t('mgr.negocier')} ${ficheCible.club}`,
               onClic: () => contacterClub(ficheCible),
+              desactive: joueurDejaRecrute(manager, ficheCible.id),
             },
             observer: {
               onClic: () => observerCible(ficheCible),

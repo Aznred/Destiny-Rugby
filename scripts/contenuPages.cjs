@@ -19,8 +19,305 @@ const SITE = {
 const PAGES = [
   // ═══════════════════════════════════════════════════════════════════════════
   {
+    slug: 'wiki',
+    court: 'Wiki',
+    classe: 'page-wiki',
+    sansSommaire: true,
+    titre: 'Wiki Destiny Rugby : deux carrières, deux façons de vivre le rugby',
+    description: 'Le centre d’aide illustré de Destiny Rugby : guides complets de la carrière joueur et de la carrière entraîneur, mécaniques, écrans et conseils.',
+    chapo: 'Entre sur le terrain comme **joueur**, ou dirige tout un club comme **entraîneur**. Ce wiki explique les deux boucles de jeu écran par écran, ce que chaque décision change réellement, et les erreurs à éviter pendant une longue carrière.',
+    suite: ['wiki/carriere-joueur', 'wiki/carriere-entraineur', 'guide', 'moteur'],
+    blocs: [
+      { h2: 'Choisis ton parcours', id: 'parcours' },
+      'Les deux carrières partagent le même monde, le même calendrier et le même moteur de match. Ce qui change, c’est ton pouvoir : un joueur ne décide que pour lui-même ; un entraîneur porte les résultats, les contrats et l’avenir du club entier.',
+      { cartesWiki: [
+        {
+          href: '/wiki/carriere-joueur/',
+          image: '/images/wiki/carriere-joueur.png',
+          surtitre: 'De 16 à 44 ans',
+          titre: 'Carrière joueur',
+          texte: 'Crée ton rugbyman, gagne ta place, progresse, négocie tes contrats et construis un palmarès jusqu’à la retraite.',
+          action: 'Ouvrir le guide joueur',
+        },
+        {
+          href: '/wiki/carriere-entraineur/',
+          image: '/images/wiki/carriere-entraineur.png',
+          surtitre: 'Du premier banc au sommet',
+          titre: 'Carrière entraîneur',
+          texte: 'Compose ton XV, entraîne, recrute, gère le vestiaire et réponds aux objectifs de la direction saison après saison.',
+          action: 'Ouvrir le guide entraîneur',
+        },
+      ] },
+
+      { h2: 'Les différences essentielles', id: 'differences' },
+      { tableau: [
+        ['Sujet', 'Carrière joueur', 'Carrière entraîneur'],
+        ['Point de vue', 'Un seul rugbyman', 'Un club entier et éventuellement une sélection'],
+        ['Départ', '16 à 30 ans, club français au choix', '20 à 60 ans, premier banc selon le prestige'],
+        ['Match', 'Décisions de ton joueur pendant le direct', 'Composition, plan de jeu, banc et consignes en direct'],
+        ['Progression', 'Attributs, potentiel, forme, moral, réputation', 'Prestige, profil tactique, confiance et réputation internationale'],
+        ['Marché', 'Les clubs et agents te contactent', 'Tu observes, négocies et finances les recrues'],
+        ['Échec possible', 'Banc, blessure, suspension, carrière écourtée', 'Promesse rompue, budget raté, vestiaire perdu, licenciement'],
+        ['Trace laissée', 'Statistiques, titres et distinctions', 'Trophées, records, identité de jeu et histoire du club'],
+      ] },
+
+      { h2: 'Comment utiliser ce wiki', id: 'utiliser' },
+      { parcours: [
+        { titre: 'Commencer', texte: 'Lis d’abord la création et les choix qui ne pourront plus être modifiés.' },
+        { titre: 'Comprendre', texte: 'Repère la boucle d’une semaine avant d’avancer la première saison.' },
+        { titre: 'Décider', texte: 'Consulte les sections match, progression ou marché quand une décision arrive.' },
+        { titre: 'Construire', texte: 'Reviens aux conseils de long terme avant l’intersaison et les changements de club.' },
+      ] },
+      { encadre: 'La carrière entraîneur est encore masquée dans la version publique pendant sa stabilisation. En développement elle est ouverte automatiquement ; sur une version de test, ajoute `?dev=1` à l’adresse. Le wiki la documente entièrement pour préparer sa sortie.' },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    slug: 'wiki/carriere-joueur',
+    court: 'Carrière joueur',
+    classe: 'page-wiki',
+    imageSociale: '/images/wiki/carriere-joueur.png',
+    titre: 'Carrière joueur : de la première licence à la légende',
+    description: 'Wiki illustré de la carrière joueur dans Destiny Rugby : création, semaines, matchs, progression, mercato, sélections, blessures et retraite.',
+    chapo: 'Tu incarnes **un seul rugbyman**. Ta place dans le XV, ton niveau, tes contrats et ta réputation se gagnent semaine après semaine. Ce guide suit tout le parcours, de la création du joueur jusqu’au Hall des Légendes.',
+    suite: ['wiki', 'wiki/carriere-entraineur', 'guide', 'moteur', 'pyramide'],
+    blocs: [
+      {
+        image: '/images/wiki/carriere-joueur.png',
+        alt: 'Un jeune rugbyman quitte le tunnel des vestiaires et regarde le terrain éclairé qui l’attend.',
+        legende: 'La carrière joueur commence modestement : une place dans le groupe, une semaine après l’autre, puis peut mener jusqu’aux plus grands stades.',
+        prioritaire: true,
+      },
+
+      { h2: 'La boucle complète en un regard', id: 'boucle' },
+      { parcours: [
+        { titre: 'Créer', texte: 'Poste, nation, club, âge et deux traits façonnent le départ.' },
+        { titre: 'Vivre la semaine', texte: 'Entraînement, match, récupération et événement hors terrain.' },
+        { titre: 'Faire sa saison', texte: 'Le temps de jeu et les statistiques produisent une vraie note de saison.' },
+        { titre: 'Choisir la suite', texte: 'Prolonger, signer ailleurs, viser une sélection ou préparer la retraite.' },
+      ] },
+      'Une saison dure **44 semaines**, d’août à juin. Toutes les dates intermédiaires sont jouées, même quand tu avances directement jusqu’à un rendez-vous plus lointain : le championnat, la fatigue, les blessures et les statistiques ne sont jamais sautés.',
+
+      { h2: '1. Créer son joueur', id: 'creation-joueur' },
+      'Tu peux commencer entre **16 et 30 ans**. Commencer jeune donne plus de saisons pour atteindre le potentiel ; commencer plus tard crée une carrière courte, déjà sous pression. Le choix de la nation ouvre ensuite les sélections U20 puis seniors quand ton niveau le permet.',
+      { h3: 'Le poste définit ce que le jeu attend de toi' },
+      'Les quinze postes sont jouables. La note de match n’emploie pas le même barème pour tout le monde : un pilier est récompensé pour la mêlée, le travail au ras et les plaquages ; un demi d’ouverture pour la distribution et le pied ; un ailier pour les mètres, les franchissements et les essais. Choisis le métier que tu veux exercer, pas seulement les attributs les plus élevés au départ.',
+      { tableau: [
+        ['Famille', 'Postes', 'Ce qui pèse particulièrement'],
+        ['Première ligne', '1, 2, 3', 'Mêlée, touches du talonneur, ballons portés, plaquages'],
+        ['Deuxième / troisième ligne', '4 à 8', 'Conquête, activité défensive, mètres au contact, grattages'],
+        ['Charnière', '9, 10', 'Passes, animation, occupation, jeu au pied et décisions'],
+        ['Centres', '12, 13', 'Franchissements, défense, création et continuité'],
+        ['Triangle arrière', '11, 14, 15', 'Mètres, essais, réceptions, relances et couverture au pied'],
+      ] },
+      { h3: 'Le club fixe la difficulté immédiate' },
+      'Les **655 clubs français** et les dix divisions, de la Régionale 3 au Top 14, sont disponibles au départ. Dans un petit club, tu joues davantage mais les infrastructures et la visibilité sont modestes. Dans un grand club, la concurrence à ton poste peut te garder hors du groupe. La force de l’effectif, pas le prestige du nom, décide de ton temps de jeu.',
+      { h3: 'Deux traits, pour toute la carrière' },
+      'Tu choisis deux traits de caractère parmi douze. Chaque avantage possède une contrepartie : **Guerrier** aide la note et le capitanat mais augmente le risque et la gravité des blessures ; **Bourreau de travail** accélère la progression mais coûte dans les grands rendez-vous ; **Ambitieux** attire davantage d’offres mais fragilise le moral et le vestiaire. Ils ne pourront pas être remplacés ensuite.',
+      { encadre: 'Bon réflexe : ouvre l’effectif dès la création. Compare ta note aux joueurs du même poste. C’est la façon la plus sûre de savoir si tu seras titulaire, remplaçant ou hors groupe.' },
+
+      { h2: '2. Lire l’écran Carrière', id: 'ecran-carriere' },
+      'Le bureau du joueur rassemble quatre informations qu’il faut lire ensemble : **ta fiche** indique forme, moral et état physique ; **le calendrier** montre le prochain rendez-vous ; **le journal** garde les conséquences de tes choix ; **le classement latéral** situe ton club sans quitter la semaine en cours.',
+      { liste: [
+        '**Carrière** : avancer, répondre au Maître du Jeu et suivre la semaine.',
+        '**Profil** : consulter les statistiques, le palmarès, les faits marquants et la note globale.',
+        '**Mon équipe** : comprendre la concurrence dans ton club ou ta sélection.',
+        '**Résultats** : lire les championnats, coupes, classements individuels et rencontres internationales.',
+        '**𝕏 L’Ovale** : suivre l’actualité, les réactions et surtout les messages privés des clubs et agents.',
+      ] },
+
+      { h2: '3. Jouer une semaine', id: 'semaine-joueur' },
+      'Chaque semaine peut combiner un match, une séance d’entraînement, une scène de vie et la récupération. Certaines semaines n’ont pas de match, mais elles font quand même évoluer l’état du joueur et du monde.',
+      { h3: 'L’entraînement est une orientation continue' },
+      'Tu choisis un secteur de travail, puis il reste actif jusqu’à ce que tu le changes. La progression dépend de l’âge, du potentiel, de la formation du club et du trait de travail. Se disperser en changeant à chaque semaine est rarement utile : renforce d’abord les attributs clés de ton poste, puis corrige un point faible précis.',
+      { h3: 'La forme et le moral ne sont pas des décorations' },
+      'La forme revient vers une base qui dépend de l’endurance et de l’âge. Le moral, la confiance du staff, une blessure ou une suspension peuvent peser sur la sélection et la performance. Après 28 ans, la récupération de base descend progressivement ; après 31 ans, le déclin des attributs commence à compter dans le bilan de saison.',
+      { h3: 'La vie hors du terrain a de vraies conséquences' },
+      'Vestiaire, médias, argent, proches, soirées et discipline produisent des choix ou des réponses libres. Le jugement peut faire bouger moral, réputation, argent et relations. Une décision grave peut mener à une suspension, une rupture de contrat, une perte définitive de potentiel ou une fin de carrière. Le jeu reste jouable sans service d’intelligence artificielle : chaque situation possède un scénario et un barème local.',
+
+      { h2: '4. Le match : décider au bon moment', id: 'match-joueur' },
+      'Le moteur joue les trente rugbymen sur un terrain aux dimensions réelles. Tu ne diriges pas toute l’équipe : le direct ralentit quand ton joueur doit prendre une décision. Chaque carte annonce la **chance exacte de réussite**, ce que la réussite apporte et ce que l’échec risque de coûter.',
+      { liste: [
+        '**En attaque** : passer, conserver, crocheter, raffuter, jouer après contact, taper ou tenter un geste lié au poste.',
+        '**En défense** : plaquer, gratter, monter, couvrir ou contenir selon la situation.',
+        '**Après une percée** : une seconde décision peut s’enchaîner immédiatement ; le combo s’arrête après deux maillons.',
+        '**Si tu ne choisis rien** : le moteur poursuit le match normalement. Ton absence de clic ne bloque pas les vingt-neuf autres joueurs.',
+      ] },
+      'La feuille de match conserve **23 familles de statistiques par joueur** : essais, mètres, franchissements, passes décisives, plaquages, grattages, mêlées, touches, jeu au pied, discipline et bien d’autres. La note finale vient de ces faits et du rôle de ton poste, pas d’un récit estimé.',
+      { encadre: 'Un pourcentage élevé n’est pas toujours le meilleur choix. À 74 minutes, une pénalité de sécurité peut valoir plus qu’un geste spectaculaire à 82 %, surtout si ta forme est basse.' },
+
+      { h2: '5. Gagner sa place et progresser', id: 'progression-joueur' },
+      'Le temps de jeu compare ton niveau aux concurrents du même poste. Être dans un club plus fort n’accélère pas automatiquement une carrière : passer une saison hors du groupe produit peu de statistiques et dégrade le bilan. À l’inverse, être un cadre dans une division inférieure peut construire une saison notée très haut.',
+      'À l’intersaison, la note de saison assemble temps de jeu, statistiques attendues pour le poste, niveau face au groupe, forme, moral et rang du club. Elle distribue ensuite la progression vers les attributs clés, fait bouger le potentiel et alimente la cote sur le marché. Les jeunes bénéficient de la formation ; les joueurs en fin de carrière doivent compenser le déclin par la performance et le choix du bon niveau.',
+
+      { h2: '6. Contrats, agents et transferts', id: 'mercato-joueur' },
+      'Il n’existe pas de grand panneau magique d’offres. Tout passe par les messages privés de **𝕏 L’Ovale**. Un badge signale qu’un club ou un agent t’a écrit. Un club ne démarche en principe qu’un joueur à qui il reste au plus un an de contrat : avec un contrat initial de deux ou trois ans, le premier mercato peut donc tarder.',
+      { parcours: [
+        { titre: 'Approche', texte: 'Le club ouvre une conversation privée et présente son projet.' },
+        { titre: 'Négociation', texte: 'Salaire, prime, durée et temps de jeu garanti consomment sa patience.' },
+        { titre: 'Préaccord', texte: 'La signature est enregistrée, mais tu restes dans ton club actuel.' },
+        { titre: 'Intersaison', texte: 'Le transfert devient effectif après le dernier match et les titres.' },
+      ] },
+      'Le plafond du club reste caché. Accepter vite sécurise l’offre ; insister peut améliorer les conditions ou rompre entièrement le dossier. Les clubs ne sautent normalement pas deux étages, sauf pour les très jeunes espoirs. Ta nation, le pays où tu joues, la réputation, l’âge et l’agent modifient aussi les destinations possibles.',
+
+      { h2: '7. Sélections, titres et réputation', id: 'selection-joueur' },
+      'Les groupes nationaux réunissent les meilleurs joueurs disponibles du pays, tous clubs confondus. Une convocation dépend du poste, du niveau et de la concurrence réelle. Les U20 ouvrent une première porte aux jeunes ; les sélections seniors et leurs compétitions deviennent ensuite un second calendrier.',
+      'Titres de club, compétitions internationales et **distinctions individuelles** sont séparés. Les honneurs individuels comparent ta saison, tes statistiques de poste, le rang du club, les grands matchs et la réputation à un rival qui change chaque année. Les trophées gagnés rejoignent l’armoire 3D et la carrière conserve chaque saison dans son palmarès.',
+
+      { h2: '8. Blessures, discipline et fin de carrière', id: 'fin-joueur' },
+      'Une blessure peut réduire la forme, éloigner du groupe ou modifier définitivement vitesse et potentiel. Une suspension se règle après le match devant la commission : les sanctions professionnelles sont plus lourdes qu’en amateur. Si blessure et suspension se chevauchent, seule la plus longue absence commande la date de retour.',
+      'Le déclin commence à **31 ans** et s’accélère après 34. La retraite est forcée au plus tard à 44 ans, mais tu peux raccrocher avant depuis l’écran Carrière. La fiche finale rejoint le Hall des Légendes avec les statistiques, titres, distinctions, faits marquants et un score comparable aux autres carrières. Une reconversion peut ensuite ouvrir la carrière entraîneur avec un prestige de départ calculé sur ce que le joueur a réellement accompli.',
+
+      { h2: 'Les cinq réflexes qui évitent une saison perdue', id: 'conseils-joueur' },
+      { liste: [
+        '**Regarde la concurrence avant de signer.** Une division plus haute ne vaut rien si trois meilleurs joueurs ferment ton poste.',
+        '**Garde de la forme pour les grandes semaines.** Coupe d’Europe, sélection et phase finale peuvent se suivre.',
+        '**Lis les messages privés.** Les agents, prolongations et offres n’arrivent nulle part ailleurs.',
+        '**Juge une offre sur le rôle, pas seulement le salaire.** Le temps de jeu nourrit toute la progression suivante.',
+        '**Prépare la sortie.** Après 31 ans, une baisse de niveau ou un retour dans une division plus faible peut prolonger la carrière et le palmarès.',
+      ] },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    slug: 'wiki/carriere-entraineur',
+    court: 'Carrière entraîneur',
+    classe: 'page-wiki',
+    imageSociale: '/images/wiki/carriere-entraineur.png',
+    titre: 'Carrière entraîneur : bâtir un club, gagner et durer',
+    description: 'Wiki illustré du mode entraîneur de Destiny Rugby : prestige, direction, composition, tactiques, recrutement, vestiaire, staff et histoire du club.',
+    chapo: 'Tu ne joues plus un homme : tu réponds de **tout le club**. Choisir les vingt-trois, protéger un blessé, tenir une promesse, recruter dans le budget et gagner le dimanche composent une seule carrière.',
+    suite: ['wiki', 'wiki/carriere-joueur', 'moteur', 'pyramide', 'journal'],
+    blocs: [
+      {
+        image: '/images/wiki/carriere-entraineur.png',
+        alt: 'Un entraîneur de rugby déplace les pions de son tableau tactique au bord d’un terrain sous la pluie.',
+        legende: 'Le prestige ouvre les portes, mais ce sont les objectifs, le vestiaire et les résultats qui permettent de rester sur le banc.',
+        prioritaire: true,
+      },
+      { encadre: 'État actuel : ce mode est complet mais encore masqué au public pendant sa stabilisation. Il est visible automatiquement en développement et via `?dev=1` sur une version de test.' },
+
+      { h2: 'La boucle complète en un regard', id: 'boucle-entraineur' },
+      { parcours: [
+        { titre: 'Préparer', texte: 'Effectif, responsabilités, entraînement, médical et objectifs.' },
+        { titre: 'Composer', texte: 'Quinze titulaires, huit remplaçants, capitaine, buteur et plan.' },
+        { titre: 'Coacher', texte: 'Consignes, rythme et changements jusqu’à la sirène.' },
+        { titre: 'Construire', texte: 'Bilan, recrutement, contrats, prestige et prochain projet.' },
+      ] },
+      'La carrière entraîneur utilise le même monde que la carrière joueur, mais à l’échelle d’un club. Les résultats coachés remplacent les scores théoriques dans le calendrier et le classement. Les transferts changent réellement les effectifs et la force des équipes. Le monde conserve donc les conséquences de tes saisons.',
+
+      { h2: '1. Commencer sa carrière', id: 'creation-entraineur' },
+      'Un entraîneur peut commencer entre **20 et 60 ans** et poursuit au plus tard jusqu’à 80 ans. Trois portes existent : la carrière classique, la reconversion d’un ancien joueur et le mode libre.',
+      { tableau: [
+        ['Départ', 'Prestige initial', 'Règle'],
+        ['Carrière classique', '6', 'Premiers bancs en Régionale ; carrière classée'],
+        ['Reconversion joueur', '12 à 48', 'Selon le niveau, la longévité et le palmarès du joueur ; carrière mixte classée'],
+        ['Mode libre', 'Accès direct au club choisi', 'Aucune place au classement mondial'],
+      ] },
+      'Un grand joueur ne devient pas automatiquement un entraîneur d’élite. Même la meilleure reconversion plafonne à 48 de prestige : assez pour recevoir des projets solides, pas pour s’installer directement sur le banc d’un géant. La partie doit encore raconter une ascension.',
+      { h3: 'Le prestige est ta clé d’accès' },
+      'Le prestige va de 0 à 100 et fixe les clubs prêts à étudier ta candidature. À 6, quelques dizaines de clubs régionaux sont ouverts ; à 40, une grande partie du monde jusqu’à la Fédérale 1 devient accessible ; à 60, les projets de Nationale entrent dans la course ; à 100, les **855 clubs des 33 compétitions** peuvent appeler.',
+
+      { h2: '2. Le bureau de l’entraîneur', id: 'bureau-entraineur' },
+      'Le bureau est un poste de travail, pas une page de statistiques. Il rassemble le prochain match, les objectifs, la confiance, les budgets, les nouvelles du club et l’accès aux décisions. Les autres vues répondent chacune à une question précise.',
+      { tableau: [
+        ['Espace', 'À quoi il sert'],
+        ['Bureau', 'Voir l’urgence de la semaine, la confiance, le prestige, les budgets et le prochain match'],
+        ['Composition', 'Construire la feuille 1 à 23, choisir capitaine, buteur et remplaçants'],
+        ['Match', 'Lancer la rencontre et modifier les consignes en direct'],
+        ['Marché', 'Chercher des joueurs dans tous les championnats et ouvrir un dossier'],
+        ['Négociations', 'Suivre patience, conditions, indemnité et marge budgétaire'],
+        ['Direction', 'Lire les objectifs pondérés et la confiance du président'],
+        ['Vestiaire', 'Gérer hiérarchie, satisfaction, promesses, leadership et capitaines'],
+        ['Monde', 'Suivre les autres entraîneurs, sélections, événements et mouvements'],
+        ['Histoire', 'Relire champions, records, derbys, chronologie et figures du club'],
+      ] },
+
+      { h2: '3. Une semaine ne se saute pas', id: 'semaine-entraineur' },
+      'Chaque semaine peut présenter une décision stable, tirée à partir du club, de la saison et de la date. Stabilité, ambition sportive et prudence financière n’ont pas les mêmes effets. Tant que la décision n’est pas résolue, le calendrier refuse d’avancer. Une semaine de match reste également verrouillée jusqu’à la sirène.',
+      { liste: [
+        '**Avant le match** : vérifier disponibilités, fatigue, sélectionnés et feuille 1 à 23.',
+        '**Pendant le match** : adapter rythme, défense, occupation, stratégie de pénalité et banc.',
+        '**Après le match** : lire le score réel, les blessures, la réaction du vestiaire et les objectifs concernés.',
+        '**Sans match** : traiter direction, recrutement, entraînement, contrat ou scène de club avant la date suivante.',
+      ] },
+
+      { h2: '4. Direction, confiance et licenciement', id: 'direction' },
+      'La direction ne juge jamais le rang brut. Elle compare le résultat aux moyens et à plusieurs objectifs pondérés : sportif, finances, formation, recrutement et identité. Finir huitième avec le budget du dernier peut être une réussite ; finir troisième avec le meilleur effectif peut être un échec.',
+      'La **confiance du président** et celle des **supporters** sont séparées. Le président regarde le projet et les engagements ; les publics traditionnels, passionnés, familiaux ou occasionnels ne réagissent pas aux mêmes décisions. Sous 18 de confiance du board, le licenciement devient la conclusion de la saison. Tu conserves ton prestige et peux rebondir ailleurs.',
+      { encadre: 'Lis les pondérations avant de recruter. Si la formation et les finances valent plus que le classement, une recrue chère de 31 ans peut faire gagner trois matchs et perdre le verdict de saison.' },
+
+      { h2: '5. Composer le XV', id: 'composition' },
+      'La feuille contient **15 titulaires et 8 remplaçants**. Le squad builder place les cartes sur un terrain vertical et affiche les attributs utiles au poste, l’adéquation, la cohésion du secteur et l’état médical. Un joueur choisi deux fois est échangé, jamais dupliqué.',
+      { liste: [
+        '**Poste naturel** : une grosse note générale ne compense pas toujours une mauvaise adéquation.',
+        '**Cohésion** : les relations et l’habitude de jouer ensemble renforcent les secteurs.',
+        '**État médical** : disponible ne signifie pas sans risque ; forcer peut transformer une douleur en longue absence.',
+        '**Capitanat** : capitaine, vice-capitaine et troisième capitaine forment une hiérarchie persistante.',
+        '**Buteur** : il est choisi séparément du capitaine et doit réellement posséder le pied nécessaire.',
+      ] },
+      'Retirer le brassard à une figure locale peut toucher le joueur, le groupe et les supporters. À l’inverse, choisir uniquement le plus célèbre sans tenir compte du leadership pénalise le terrain. Le bon capitaine est une décision sportive et humaine.',
+
+      { h2: '6. Construire et modifier le plan de jeu', id: 'tactique' },
+      'Le plan initial commande réellement le moteur. Il règle le jeu avec ballon — équilibré, avants, large ou occupation —, la défense — blitz, glissée ou repli —, le rythme, les choix sur pénalité et l’heure prévue du banc.',
+      { tableau: [
+        ['Réglage', 'Effet principal', 'Risque'],
+        ['Avants', 'Plus de jeu près des rucks et de puissance', 'Prévisible, fatigue du paquet'],
+        ['Large', 'Davantage de chaînes de passes et d’espace', 'Turnovers et défense exposée'],
+        ['Occupation', 'Plus de pression territoriale au pied', 'Rendre la possession'],
+        ['Rythme élevé', 'Actions plus rapides et pression accrue', 'Fatigue et lucidité en fin de match'],
+        ['Blitz', 'Montée agressive et pression sur les lanceurs', 'Intervalle derrière la ligne'],
+        ['Glissée / repli', 'Protège l’extérieur et la profondeur', 'Laisse du temps au porteur'],
+      ] },
+      'Toutes les consignes restent modifiables pendant les 80 minutes. Un changement manuel part au prochain arrêt de jeu ; le banc automatique suit le timing prévu. Les plans joués construisent aussi ton identité de coach — jeu au large, occupation, possession, rythme, défense agressive et conquête — qui influence ensuite la compatibilité avec les clubs.',
+
+      { h2: '7. Recruter sans aveugler le club', id: 'recrutement' },
+      'Le marché mondial part des joueurs réellement présents dans les effectifs. Les inconnus apparaissent avec des fourchettes : l’observation, le niveau du recruteur, l’âge et la connaissance du pays resserrent le rapport. Une réputation ou une belle carte ne remplace pas le scouting.',
+      { parcours: [
+        { titre: 'Observer', texte: 'Le recruteur réduit l’incertitude sur note, potentiel et adaptation.' },
+        { titre: 'Contacter', texte: 'La conversation privée s’ouvre sur 𝕏 L’Ovale.' },
+        { titre: 'Négocier', texte: 'Salaire, prime, durée et rôle affrontent patience et ambition cachée.' },
+        { titre: 'Signer', texte: 'Indemnité, prime et salaire sont contrôlés avant le transfert réel.' },
+      ] },
+      'Deux enveloppes ne doivent pas être confondues : le **budget transferts** paie l’indemnité et la prime ; le **budget salarial** absorbe le salaire annuel. Un accord verbal peut donc échouer au contrôle final si l’une des marges manque. Après signature, le joueur quitte vraiment son ancien club, rejoint ton effectif et change la force utilisée par les futurs résultats.',
+      { h3: 'Le joueur choisit aussi' },
+      'Les relations, la langue, le pays, les compatriotes, le temps d’adaptation et une ambition cachée entrent dans la décision. Une meilleure offre financière peut être refusée si le rôle, le niveau du championnat ou le projet contredit les attentes du joueur. Les agents conservent leur mémoire des négociations précédentes.',
+
+      { h2: '8. Vestiaire, promesses et médical', id: 'vestiaire' },
+      'Le vestiaire possède une hiérarchie, des personnalités et une satisfaction individuelle. Une discussion propose plusieurs réponses ; une parole engageante devient une **promesse datée** que le jeu vérifie. Les leaders diffusent leur soutien ou leur mécontentement, si bien qu’un conflit individuel peut devenir collectif.',
+      'Le médical sépare douleur, disponibilité et risque. Repos, traitement ou joueur forcé changent la feuille et la probabilité d’aggravation. Les internationaux quittent aussi le groupe pendant les fenêtres de sélection : une composition valide en championnat peut ne plus l’être la semaine suivante.',
+
+      { h2: '9. Déléguer sans abandonner', id: 'delegation' },
+      'Neuf responsabilités peuvent rester entre tes mains ou être confiées au staff : recrutement, contrats, renouvellements, prêts, jeunes, staff, entraînements, compositions et amicaux. La délégation agit réellement ; son résultat dépend des compétences persistantes du directeur sportif et des personnes en poste.',
+      'Déléguer sert à fixer ton style de partie. Garde la composition et le match si tu veux vivre chaque samedi ; conserve recrutement et contrats si tu préfères bâtir l’effectif ; délègue les amicaux ou certains renouvellements pour accélérer. Vérifie régulièrement le journal de délégation : une décision cohérente pour le staff peut contredire ton projet.',
+
+      { h2: '10. Un monde qui poursuit sa propre carrière', id: 'monde' },
+      'Les autres clubs ont leurs entraîneurs, contrats et confiances. Ils licencient, prolongent et recrutent pendant toute la sauvegarde. Les champions, finalistes, montées, relégations, records et changements de président restent dans l’histoire. Les joueurs vieillissent, prennent leur retraite puis peuvent devenir entraîneur, formateur, préparateur, recruteur ou directeur sportif.',
+      'À réputation suffisante, une sélection nationale peut proposer un second banc. La réputation internationale est distincte de celle en club, et les tournées comme les tournois se coachent dans le même moteur. Gérer deux calendriers augmente le prestige, mais aussi les absences et les décisions à enchaîner.',
+
+      { h2: '11. Fin de saison, changement de banc et héritage', id: 'fin-entraineur' },
+      'Le verdict de saison fait bouger confiance et prestige, applique les objectifs, renouvelle une partie des budgets et ouvre le marché des entraîneurs. Tu peux recevoir des offres, postuler, négocier une prolongation, démissionner ou accepter un autre banc. L’ADN du club et ton profil tactique comptent dans les candidatures, pas seulement le score.',
+      'La carrière s’achève au plus tard après 80 ans. Elle rejoint alors le Hall avec les trophées, succès, clubs entraînés, sélections, records et score. Une carrière issue d’un ancien joueur cumule les deux versants dans la catégorie **Joueur + entraîneur** du classement mondial.',
+
+      { h2: 'Plan conseillé pour la première saison', id: 'premiere-saison' },
+      { liste: [
+        '**Semaine 1 : audite l’effectif.** Deux options crédibles par poste et un buteur fiable passent avant un grand nom supplémentaire.',
+        '**Lis les objectifs pondérés.** Ils définissent la vraie condition de réussite de la saison.',
+        '**Choisis peu de changements tactiques.** Un plan stable permet de comprendre pourquoi une rencontre bascule.',
+        '**Observe avant d’acheter.** Garde une réserve pour les blessures et la fenêtre suivante.',
+        '**Promets rarement, tiens toujours.** Une promesse évite un conflit immédiat mais crée une échéance mesurée.',
+        '**Délègue par blocs cohérents.** Contrats et renouvellements vont bien ensemble ; composition et match aussi.',
+        '**Juge le projet sur deux saisons.** Formation, cohésion et identité demandent plus de temps qu’un classement de septembre.',
+      ] },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
     slug: 'guide',
-    court: 'Guide',
+    court: 'Guide express',
     titre: 'Guide de Destiny Rugby : mener une carrière de rugbyman',
     description: 'Comment jouer : créer son joueur, traverser une saison de 44 semaines, jouer ses matchs, négocier ses contrats et raccrocher au bon moment.',
     chapo: 'Destiny Rugby est un jeu de rôle de carrière : tu incarnes **un seul rugbyman**, de son premier match en Régionale 3 jusqu\'à sa retraite. Pas de gestion d\'effectif, pas de budget à équilibrer, tu ne contrôles qu\'un homme, et tout le reste t\'arrive.',

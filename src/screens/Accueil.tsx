@@ -22,10 +22,11 @@ const Hero3D = lazy(() =>
  * ⚠️ La liste est recopiée ici À LA MAIN, et c'est assumé : `scripts/genPages.cjs`
  * tourne à la construction (Node, CommonJS) et le jeu à l'exécution (navigateur,
  * ESM). Les faire partager un module obligerait à embarquer tout le texte des
- * quatre pages dans le bundle — plusieurs dizaines de kilo-octets pour afficher
- * quatre liens.
+ * les pages dans le bundle — plusieurs dizaines de kilo-octets pour afficher
+ * quelques liens.
  */
 const PAGES_CONTENU = [
+  { slug: 'wiki', ico: 'livre' as const, titre: 'accueil.lien.wiki', desc: 'accueil.lien.wikiDesc' },
   { slug: 'guide', ico: 'livre' as const, titre: 'accueil.lien.guide', desc: 'accueil.lien.guideDesc' },
   { slug: 'pyramide', ico: 'stade' as const, titre: 'accueil.lien.pyramide', desc: 'accueil.lien.pyramideDesc' },
   { slug: 'moteur', ico: 'reglages' as const, titre: 'accueil.lien.moteur', desc: 'accueil.lien.moteurDesc' },
@@ -47,7 +48,7 @@ const apparait = {
 // juge ». C'est le bon échange sous les deux angles. Pour le joueur, trois
 // promesses valent moins qu'une porte d'entrée qui explique vraiment. Et pour
 // l'examen AdSense, la section « Comprendre le jeu » est la seule de l'accueil
-// qui MÈNE À DU CONTENU — quatre pages en HTML complet, lisibles sans
+// qui MÈNE À DU CONTENU — des pages en HTML complet, lisibles sans
 // JavaScript. La remonter, c'est mettre le contenu éditorial au-dessus de la
 // ligne de flottaison plutôt que sous une pile d'arguments.
 // Les clés `acc.f1…f3` restent dans le dictionnaire : elles ne coûtent rien et
@@ -158,7 +159,7 @@ export function Accueil() {
         </section>
       )}
 
-      {/* ⚠️ DE VRAIS LIENS, PAS DES BOUTONS. Ces quatre pages sont du HTML
+      {/* ⚠️ DE VRAIS LIENS, PAS DES BOUTONS. Ces pages sont du HTML
           statique servi depuis `public/` (voir `scripts/genPages.cjs`) : elles
           existent à leur propre adresse, elles se lisent sans JavaScript, et
           elles portent le contenu éditorial du site. Un `<a href>` est donc

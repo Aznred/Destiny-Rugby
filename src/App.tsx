@@ -186,10 +186,11 @@ export default function App() {
             site tenait dans quatre phrases de `<noscript>`.
 
             La publicité vit désormais sur de VRAIES pages de contenu, en HTML
-            statique, à de vraies adresses : /guide/, /pyramide/, /moteur/ et
-            /journal/ (voir `scripts/genPages.cjs`). Le jeu, lui, n'en porte
-            plus une seule — et c'est très bien ainsi : une bannière au milieu
-            d'une décision de carrière est une pub qui nuit au jeu. */}
+            statique, à de vraies adresses : /wiki/ et ses deux dossiers,
+            /guide/, /pyramide/, /moteur/ et /journal/ (voir
+            `scripts/genPages.cjs`). Le jeu, lui, n'en porte plus une seule — et
+            c'est très bien ainsi : une bannière au milieu d'une décision de
+            carrière est une pub qui nuit au jeu. */}
       </main>
 
       <AnimatePresence>

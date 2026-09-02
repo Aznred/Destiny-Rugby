@@ -7678,3 +7678,143 @@ select:focus {
 /* Le repli d'un logo de compétition est désormais un tracé, pas un caractère. */
 .logo-compet.vide { display: grid; place-items: center; color: var(--craie-dim); }
 .balle { display: inline-flex; align-items: center; color: var(--or-400); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Composition — cartes découpées, portraits fondus et échange lisible
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Le billet garde son talon rugby, mais perd la forme de simple rectangle :
+   deux angles opposés sont plus généreux, comme un billet fraîchement coupé. */
+.manager-equipe .ct-carte,
+.manager-equipe .manager-reserve-carte {
+  border-radius: 7px 18px 7px 15px;
+  transform-origin: center;
+  transition:
+    transform 0.18s cubic-bezier(.2,.8,.2,1),
+    opacity 0.16s ease,
+    filter 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.manager-equipe .ct-carte { overflow: hidden; isolation: isolate; }
+.manager-equipe .ct-talon { border-radius: 6px 0 0 14px; }
+.manager-equipe .ct-carte::before { border-radius: 0 16px 0 0; }
+.manager-equipe .ct-carte:hover,
+.manager-equipe .manager-reserve-carte:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08) saturate(1.03);
+}
+
+/* Les WebP officiels sont détourés. Le cadre gris les faisait pourtant passer
+   pour des vignettes rectangulaires : sans fond ni bord, le métal de la carte
+   apparaît directement derrière le joueur et son ombre suffit à le détacher. */
+.manager-equipe .ct-portrait {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.manager-equipe .ct-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 3%;
+  transform: scale(1.04);
+  transform-origin: 50% 4%;
+  filter: drop-shadow(0 4px 3px rgba(0,0,0,.52)) saturate(1.06);
+}
+.manager-equipe .ct-portrait-vide {
+  filter: drop-shadow(0 3px 2px rgba(0,0,0,.45));
+}
+.manager-equipe .manager-reserve-carte > strong {
+  border: 1px solid var(--r-trait);
+  border-radius: 12px 6px 12px 6px;
+  background: rgba(0,0,0,.22);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1);
+}
+
+/* Pendant l'échange, la source s'efface et la destination se soulève. Le
+   liseré intérieur désigne sans ambiguïté la carte qui sera remplacée. */
+@keyframes ct-cible-respire {
+  0%, 100% { box-shadow: var(--ombre-2), 0 0 0 2px rgba(240,201,106,.28), 0 12px 24px rgba(0,0,0,.38); }
+  50% { box-shadow: var(--ombre-2), 0 0 0 4px rgba(240,201,106,.42), 0 16px 30px rgba(0,0,0,.48); }
+}
+.manager-equipe .ct-carte.ct-en-drag,
+.manager-equipe .manager-reserve-carte.ct-en-drag {
+  opacity: .34;
+  transform: scale(.95) rotate(-1.5deg);
+  filter: saturate(.55);
+}
+.manager-equipe .ct-carte.ct-cible-depot {
+  z-index: 8;
+  transform: translateY(-7px) scale(1.045);
+  border-color: var(--or-300);
+  filter: brightness(1.14) saturate(1.08);
+  animation: ct-cible-respire .9s ease-in-out infinite;
+}
+.manager-equipe .ct-carte.ct-cible-depot::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  z-index: 5;
+  border: 1px dashed rgba(255,236,181,.9);
+  border-radius: 4px 13px 4px 10px;
+  background: radial-gradient(circle at 50% 45%, rgba(240,201,106,.16), transparent 62%);
+  pointer-events: none;
+}
+.ct-fantome-drag {
+  position: fixed !important;
+  top: -2000px !important;
+  left: -2000px !important;
+  z-index: 9999 !important;
+  margin: 0 !important;
+  opacity: .96 !important;
+  transform: rotate(2.5deg) scale(1.04) !important;
+  filter: drop-shadow(0 18px 16px rgba(0,0,0,.62)) brightness(1.08) !important;
+  pointer-events: none !important;
+}
+
+/* Les rôles et le plan de jeu emploient la liste maison : vignette, seconde
+   ligne explicative et menu cohérent avec le vestiaire, sans panneau natif de
+   plusieurs centaines de pixels comme celui de la capture d'origine. */
+.manager-role-note {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(240,201,106,.55);
+  border-radius: 12px 6px 12px 6px;
+  color: var(--or-200);
+  background: linear-gradient(150deg, rgba(240,201,106,.19), rgba(0,0,0,.22));
+  font: 800 .82rem/1 'Archivo', sans-serif;
+}
+.manager-roles-visuels .sel-declencheur {
+  min-height: 54px;
+  padding: .48rem .68rem;
+  border-radius: 7px 16px 7px 13px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.055), transparent 48%),
+    rgba(4,13,9,.72);
+}
+.manager-roles-visuels .sel-menu { min-width: 260px; }
+.manager-tactiques-selects .sel-declencheur {
+  min-height: 48px;
+  padding: .5rem .58rem;
+  border-radius: 7px 14px 7px 12px;
+  font-size: .84rem;
+}
+.manager-tactiques-selects .sel-vignette { color: var(--or-300); }
+.manager-tactiques-selects .sel-menu { width: max(100%, 250px); }
+.manager-tactiques-selects label:nth-child(n+4) .sel-menu { left: auto; right: 0; }
+
+@media (max-width: 700px) {
+  .manager-roles-visuels .sel-menu,
+  .manager-tactiques-selects .sel-menu { width: 100%; min-width: 0; left: 0; right: auto; }
+  .manager-roles-visuels .sel-declencheur { min-height: 50px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manager-equipe .ct-carte.ct-cible-depot { animation: none; }
+}

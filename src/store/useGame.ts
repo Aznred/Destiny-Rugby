@@ -159,8 +159,9 @@ import {
   tableauDetectionManager,
 } from '../lib/formationManager';
 import {
-  accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, masseSalarialeActuelle, negocierAvecJoueur,
-  ouvrirNegociationManager, type LevierRecrutementManager,
+  accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, joueurDejaRecrute,
+  masseSalarialeActuelle, negocierAvecJoueur, ouvrirNegociationManager,
+  reparerRecrutementsDupliques, type LevierRecrutementManager,
 } from '../lib/recrutementManager';
 import {
   demandeAGenerer, negocierAvecClub, offresPourVente, ouvrirNegociationClub,
@@ -4151,6 +4152,12 @@ export const useGame = create<GameState>()(
       contacterClubManager: (cible) => {
         const m = get().manager;
         if (!m?.club || cible.club === m.club) return;
+        // Une signature est un état terminal. L'ancien fil du club reste
+        // consultable, mais ne doit jamais recréer un contrat pour sa recrue.
+        if (joueurDejaRecrute(m, cible.id)) {
+          get().contacterJoueurManager(cible);
+          return;
+        }
         // En amateur, il n'existe aucune indemnité : le parcours saute
         // naturellement le club vendeur et ouvre directement le joueur.
         if (cible.indemnite <= 0) {
@@ -4233,6 +4240,20 @@ export const useGame = create<GameState>()(
       contacterJoueurManager: (cible) => {
         const m = get().manager;
         if (!m?.club || cible.club === m.club) return;
+        const signee = [...m.negociations].reverse().find((n) => (
+          n.joueur.id === cible.id && n.etat === 'signee'
+        ));
+        if (joueurDejaRecrute(m, cible.id)) {
+          // On rouvre seulement le reçu de la signature. Si une vieille
+          // sauvegarde n'a plus son dossier, on sort sans fabriquer de contrat.
+          if (signee) set((s) => ({
+            ouvrirSocialSur: 'messages',
+            conversationSocialeCible: signee.pseudo,
+            ecran: 'social',
+            ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
+          }));
+          return;
+        }
         // ⚠️ ON NE PARLE AU JOUEUR QU'UNE FOIS LE CLUB D'ACCORD, et c'est
         // l'ordre du rugby : se mettre d'accord avec un joueur puis découvrir
         // que son club ne le lâche pas n'existe pas dans un transfert réel, et
@@ -4363,6 +4384,9 @@ export const useGame = create<GameState>()(
         const m = get().manager;
         const actuelle = m?.negociations.find((n) => n.id === id);
         if (!m?.club || !actuelle || actuelle.etat !== 'accord') return;
+        // Défense en profondeur : même si une ancienne interface ou un double
+        // clic parvient jusqu'ici, aucun débit ni transfert ne peut être rejoué.
+        if (joueurDejaRecrute(m, actuelle.joueur.id)) return;
         const dossier = m.negociationsClubs.find(
           (n) => n.cible.id === actuelle.joueur.id && n.etat === 'accord',
         );
@@ -6278,7 +6302,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 23,
+      version: 24,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -6600,6 +6624,25 @@ export const useGame = create<GameState>()(
             s.manager,
             s.manager.club ? effectifDuClub(s.manager.club, s.manager.saison) : [],
           );
+
+          // VERSION 24 — UNE SIGNATURE NE PEUT PLUS ÊTRE REJOUÉE.
+          // Le bouton du club vendeur permettait de recréer une négociation
+          // portant le même id qu'un contrat signé. Un levier remplaçait alors
+          // aussi l'état `signee`, puis débitait de nouveau les deux budgets.
+          // On garde la première recrue, ferme le dossier, retire les annonces
+          // identiques et rembourse exactement les signatures surnuméraires.
+          if (version < 24) {
+            const repare = reparerRecrutementsDupliques(s.manager, s.transfertsSociaux ?? []);
+            s.manager = {
+              ...s.manager,
+              recrues: repare.recrues,
+              negociations: repare.negociations,
+              negociationsClubs: repare.negociationsClubs,
+              budgetTransferts: s.manager.budgetTransferts + repare.remboursementTransferts,
+              budgetSalarial: s.manager.budgetSalarial + repare.remboursementSalarial,
+            };
+            s.transfertsSociaux = repare.transfertsSociaux;
+          }
         }
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus

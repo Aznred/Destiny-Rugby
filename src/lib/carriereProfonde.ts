@@ -7,6 +7,7 @@
 // une couleur différente à deux sauvegardes de trente saisons.
 
 import { competitionDuClub } from '../data/clubs';
+import { distanceKm, positionDuClub } from '../data/geographie';
 import { POSTE_PAR_ID } from '../data/rugby';
 import type { Manager, PosteId, ResultatMatchManager, TactiqueManager } from '../types';
 import { graine } from './championnat';
@@ -509,9 +510,12 @@ function profilApresMatch(profil: ProfilTactiqueManager, tactique: TactiqueManag
 }
 
 export function contexteDerby(clubA: string, clubB: string): { derby: boolean; distance: number; motivation: number; pression: number; medias: number } {
-  const rng = graine(`distance-clubs#${[clubA, clubB].sort().join('#')}`);
-  const memeCompetition = competitionDuClub(clubA)?.id === competitionDuClub(clubB)?.id;
-  const distance = Math.round(8 + rng() * (memeCompetition ? 220 : 760));
+  // ⚠️ UNE DISTANCE N'EST PAS UN ALÉA. L'ancienne version tirait un nombre
+  // stable à partir des deux noms : Toulouse–Montpellier pouvait ainsi devenir
+  // un « derby à 16 km ». La géographie du centre de formation possède déjà
+  // les coordonnées réelles des villes connues et un repli déterministe pour
+  // les villages ; le match doit lire cette même source de vérité.
+  const distance = distanceKm(positionDuClub(clubA), positionDuClub(clubB));
   const derby = distance <= 55;
   return { derby, distance, motivation: derby ? 2 : 0, pression: derby ? 18 : 0, medias: derby ? 24 : 0 };
 }

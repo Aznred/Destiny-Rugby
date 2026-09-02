@@ -4663,7 +4663,8 @@ les lire.
 | `scripts/contenuPages.cjs` | **Le texte, et rien d'autre.** Séparé du rendu pour qu'on puisse corriger une phrase sans toucher au HTML. |
 | `scripts/genPages.cjs` | Le rendu : HTML, métadonnées, JSON-LD, sommaire automatique, et **régénération du sitemap**. |
 | `public/contenu.css` | Feuille autonome. ⚠️ Elle ne partage RIEN avec `src/App.css`, qui n'existe qu'une fois compilé par Vite. |
-| `public/<slug>/index.html` | ⚠️ **GÉNÉRÉ.** Quatre pages : `/guide/`, `/pyramide/`, `/moteur/`, `/journal/`. |
+| `public/<slug>/index.html` | ⚠️ **GÉNÉRÉ.** Sept pages : `/wiki/`, ses dossiers joueur et entraîneur, `/guide/`, `/pyramide/`, `/moteur/`, `/journal/`. |
+| `public/images/wiki/` | Deux illustrations originales 16:9, sans logo ni personne réelle, utilisées dans le hub, les articles et leurs cartes sociales. |
 
 ```bash
 node scripts/genPages.cjs                    # sans annonces
@@ -4689,15 +4690,32 @@ s'il change dans le jeu, il faut le changer là aussi.
   notifications publicitaires, en contradiction frontale avec les règles écrites
   dans `lib/pub.ts` (« jamais de pop-up », « rien sans consentement ») et un
   risque supplémentaire pour l'examen AdSense.
-- **L'accueil renvoie vers les quatre pages** par de VRAIS `<a href>`. Un
+- **L'accueil renvoie vers les sept pages** par de VRAIS `<a href>`. Un
   `onClick` ne crée aucun lien pour un moteur de recherche.
 - **Le `<noscript>` porte les mêmes liens** : c'est le seul chemin d'un robot
   sans JavaScript vers le contenu.
 
-⚠️ **`/guide/` NE MARCHE PAS EN `npm run dev`** — le repli SPA de Vite intercepte
-l'adresse. Il faut `/guide/index.html` en développement. **En production c'est
-correct** : vérifié sur `npm run build` + `vite preview`, `dist/guide/index.html`
-est bien servi à `/guide/`.
+⚠️ **LES ADRESSES DE DOSSIER NE MARCHENT PAS EN `npm run dev`** — le repli SPA
+de Vite intercepte `/guide/` comme `/wiki/carriere-joueur/`. Il faut ajouter
+`index.html` en développement. **En production c'est correct** : les fichiers
+existent dans `dist/<slug>/index.html` et le serveur statique les sert à leur
+adresse propre.
+
+### Le wiki des deux carrières
+
+`/wiki/` est un hub narratif avec deux grandes cartes illustrées. Les dossiers
+`/wiki/carriere-joueur/` et `/wiki/carriere-entraineur/` documentent la boucle
+de semaine, les écrans, le match, la progression ou le prestige, le marché et la
+fin de carrière. Le joueur porte 10 chapitres ; l'entraîneur 13, car direction,
+composition, tactique, scouting, vestiaire, délégation et histoire du monde y
+sont séparés.
+
+Le générateur comprend désormais trois blocs éditoriaux en plus du texte, des
+listes et des tableaux : `image` (figure légendée et image sociale), `parcours`
+(étapes numérotées responsives) et `cartesWiki` (portes d'entrée illustrées).
+Sur téléphone, les cartes passent en une colonne, les parcours en une colonne
+sous 430 px et les tableaux défilent dans leur propre cadre. Vérifié à 1280×720
+et 390×844 : images chargées, aucun débordement horizontal.
 
 ---
 
@@ -4866,12 +4884,12 @@ sauvegarde.
 Demande : « comprendre le jeu, ça serait bien de l’avoir à la place du MJ qui
 juge etc ». La section `features` (« Un MJ qui juge vraiment », « Une progression
 vivante », « Ta légende sur 15 ans ») **a été retirée** ; la section
-**« Comprendre le jeu »** — les quatre pages de contenu en HTML statique — prend
+**« Comprendre le jeu »** — les pages de contenu en HTML statique — prend
 sa place, juste sous le hero.
 
 ⚠️ **C’est aussi le bon geste pour l’examen AdSense**, et c’est ce qui a fait
 trancher sans hésiter : c’est la seule section de l’accueil qui **mène à du
-contenu** (4 pages, ~3 355 mots, lisibles sans JavaScript). Trois promesses
+contenu** (7 pages, ~6 900 mots, lisibles sans JavaScript). Trois promesses
 marketing au-dessus d’elles, c’était repousser le contenu éditorial sous la ligne
 de flottaison — exactement le reproche qui a valu le blocage.
 
@@ -4957,7 +4975,7 @@ npx vite-node scripts/verifNoms.ts   # style par pays, 202 nations, particules, 
 
 ⚠️ **LE PROBLÈME DE CONTENU EST RÉGLÉ, MAIS IL RESTE UNE ÉTAPE AVANT DE DEMANDER
 L’EXAMEN** : **aucun code AdSense n’est actuellement servi**. Ni `index.html`, ni
-les quatre pages générées ne portent le script — `scripts/genPages.cjs` ne l’émet
+les sept pages générées ne portent le script — `scripts/genPages.cjs` ne l’émet
 que si la variable `PUB_SLOT` est renseignée, et `<Pub />` a été retiré du jeu.
 Un examen lancé sur un site sans code AdSense se solde par « code introuvable ».
 
@@ -4970,8 +4988,8 @@ L’ordre à respecter :
    `/moteur/`, `/journal/`, `/ads.txt` et `/sitemap.xml` répondent bien ;
 4. seulement alors, demander l’examen.
 
-Ce qui est prêt : 4 pages de contenu (11 Ko chacune, ~3 355 mots), `ads.txt` à la
-racine avec le bon `pub-…`, un `sitemap.xml` à 5 entrées, des `<a href>` réels
+Ce qui est prêt : 7 pages de contenu (~6 900 mots), `ads.txt` à la
+racine avec le bon `pub-…`, un `sitemap.xml` à 8 entrées, des `<a href>` réels
 depuis l’accueil **et** depuis le `<noscript>`, et plus aucun service worker de
 régie.
 
@@ -7546,7 +7564,7 @@ pages du site, puis « ajouter un virtual pageview dans `setEcran()` ».
 | Fichier | Ce qu'il sert |
 |---|---|
 | `index.html` | Le jeu. La balise est **le plus haut possible dans le `<head>`**, le repli `<noscript>` juste après `<body>`. |
-| `scripts/genPages.cjs` | Les **quatre pages de contenu**. On touche le GÉNÉRATEUR, jamais `public/<slug>/index.html` : ces fichiers sont réécrits à chaque `node scripts/genPages.cjs`, et une balise collée à la main dans le résultat disparaîtrait à la première régénération, sans un mot. |
+| `scripts/genPages.cjs` | Les **sept pages de contenu**. On touche le GÉNÉRATEUR, jamais `public/<slug>/index.html` : ces fichiers sont réécrits à chaque `node scripts/genPages.cjs`, et une balise collée à la main dans le résultat disparaîtrait à la première régénération, sans un mot. |
 
 ⚠️ **CONTRAIREMENT À ADSENSE, GTM N'EST PAS CONDITIONNÉ À `PUB_SLOT`.**
 `scriptAdsense()` et `encartPub()` ne rendent rien sans slot, parce qu'une balise
@@ -7577,7 +7595,7 @@ GTM** (mode Consentement de Google), pas ici. Ce fichier ne peut pas le garantir
 ### `src/lib/mesure.ts` — un écran vaut une page vue
 
 ⚠️ **LE JEU N'A QU'UNE SEULE URL.** `setEcran` change un champ du store,
-l'adresse ne bouge jamais — c'est la raison d'être des quatre pages statiques
+l'adresse ne bouge jamais — c'est la raison d'être des sept pages statiques
 générées (voir « DES PAGES DE CONTENU », plus haut). Pour Google Analytics,
 toute une session — accueil, création, carrière, match, classement, boutique —
 compte donc **une seule page vue**, et il devient impossible de voir où les
@@ -9653,7 +9671,19 @@ npx vite-node scripts/verifCarriereProfonde.ts # 24 contrôles, poids compris
   présentation pour les deux carrières.
 - **La composition ne fabrique pas de visage.** `photoReelle(nom)` est la seule
   source des cartes manager. Si l'index officiel ne connaît pas le joueur ou si
-  le fichier échoue, `PortraitComposition` rend une silhouette grise.
+  le fichier échoue, `PortraitComposition` rend une silhouette grise. Les WebP
+  transparents n'ont ni fond ni bord propres : le métal de `.ct-r-*` apparaît
+  derrière le joueur et son `drop-shadow` suffit à le détacher.
+- **La sélection et le glisser-déposer ont deux états distincts.** Un drag ne
+  doit plus ouvrir `PanneauJoueur` ni déplacer la grille : `joueurGlisse` atténue
+  la source, `cibleDepot` soulève la destination et `dragend` nettoie les deux.
+  La sélection tactile garde l'échange « joueur puis poste ». Tant qu'une fiche
+  est ouverte, un `pointerdown` hors `.ct-panneau` et hors carte la ferme ; Échap
+  fait de même.
+- **Les rôles et tactiques utilisent `Selecteur`.** Ne pas réintroduire de
+  `<select>` natif dans `manager-roles-visuels` ou
+  `manager-tactiques-selects` : les options portent note, poste ou explication,
+  et le menu maison est mesuré pour rester dans les 390 px du mobile.
 - **La grille de composition a des lignes explicites.** Au format bureau,
   en-tête et aide occupent toute la largeur, le terrain reste dans la première
   colonne, banc et réserves dans la seconde. Ne jamais redonner à

@@ -30,9 +30,9 @@
 // générées en HTML COMPLET, avec leur texte dans la source. Elles n'ont besoin
 // ni de React, ni de JavaScript, ni même de CSS externe pour être lues.
 //
-// Elles vivent dans `public/`, que Vite recopie tel quel : `/guide/`,
-// `/pyramide/`, `/moteur/`, `/journal/`. Le jeu, lui, reste l'application d'une
-// seule page à la racine.
+// Elles vivent dans `public/`, que Vite recopie tel quel : `/wiki/` et ses deux
+// dossiers carrière, `/guide/`, `/pyramide/`, `/moteur/`, `/journal/`. Le jeu,
+// lui, reste l'application d'une seule page à la racine.
 //
 // ⚠️ LE CONTENU DOIT RESTER VRAI. Du remplissage tombe sous exactement la même
 // règle que le vide (« contenu à faible valeur informative »). Chaque chiffre
@@ -81,6 +81,45 @@ function bloc(b) {
   if (typeof b === 'string') return `      <p>${riche(b)}</p>`;
   if (b.h2) return `      <h2 id="${b.id}">${echapper(b.h2)}</h2>`;
   if (b.h3) return `      <h3>${echapper(b.h3)}</h3>`;
+  if (b.image) {
+    return [
+      '      <figure class="figure-wiki">',
+      `        <img src="${echapper(b.image)}" alt="${echapper(b.alt || '')}" width="1672" height="941" loading="${b.prioritaire ? 'eager' : 'lazy'}"${b.prioritaire ? ' fetchpriority="high"' : ''} />`,
+      b.legende ? `        <figcaption>${riche(b.legende)}</figcaption>` : '',
+      '      </figure>',
+    ].filter(Boolean).join('\n');
+  }
+  if (b.parcours) {
+    return [
+      '      <ol class="parcours-wiki" aria-label="Les étapes du parcours">',
+      ...b.parcours.map((etape, i) => [
+        '        <li>',
+        `          <span class="parcours-numero">${String(i + 1).padStart(2, '0')}</span>`,
+        `          <strong>${echapper(etape.titre)}</strong>`,
+        `          <small>${riche(etape.texte)}</small>`,
+        '        </li>',
+      ].join('\n')),
+      '      </ol>',
+    ].join('\n');
+  }
+  if (b.cartesWiki) {
+    return [
+      '      <div class="wiki-choix">',
+      ...b.cartesWiki.map((carte) => [
+        `        <a class="wiki-carte" href="${echapper(carte.href)}">`,
+        `          <img src="${echapper(carte.image)}" alt="" width="1672" height="941" loading="lazy" />`,
+        '          <span class="wiki-carte-voile"></span>',
+        '          <span class="wiki-carte-contenu">',
+        `            <small>${echapper(carte.surtitre)}</small>`,
+        `            <strong>${echapper(carte.titre)}</strong>`,
+        `            <span>${riche(carte.texte)}</span>`,
+        `            <b>${echapper(carte.action)} <span aria-hidden="true">→</span></b>`,
+        '          </span>',
+        '        </a>',
+      ].join('\n')),
+      '      </div>',
+    ].join('\n');
+  }
   if (b.liste) {
     return `      <ul>\n${b.liste.map((x) => `        <li>${riche(x)}</li>`).join('\n')}\n      </ul>`;
   }
@@ -167,6 +206,7 @@ function scriptAdsense() {
 
 /** Le sommaire, construit à partir des titres de niveau 2. */
 function sommaire(page) {
+  if (page.sansSommaire) return '';
   const titres = page.blocs.filter((b) => b && b.h2);
   if (titres.length < 3) return '';
   return [
@@ -181,16 +221,21 @@ function sommaire(page) {
 
 function rendre(page, toutes) {
   const url = `${SITE.origine}/${page.slug}/`;
+  const imagePrioritaire = page.blocs.find((b) => b && b.image && b.prioritaire);
+  const blocsCorps = imagePrioritaire ? page.blocs.filter((b) => b !== imagePrioritaire) : page.blocs;
   // ⚠️ L'ENCART TOMBE APRÈS LE PREMIER TIERS, pas au milieu exact : on veut
   // qu'il arrive une fois le lecteur entré dans le sujet, jamais avant.
-  const coupe = Math.max(3, Math.floor(page.blocs.length / 3));
+  const coupe = Math.max(3, Math.floor(blocsCorps.length / 3));
   const corps = [
-    ...page.blocs.slice(0, coupe).map(bloc),
+    ...blocsCorps.slice(0, coupe).map(bloc),
     encartPub(),
-    ...page.blocs.slice(coupe).map(bloc),
+    ...blocsCorps.slice(coupe).map(bloc),
   ].filter(Boolean).join('\n');
 
-  const autres = toutes.filter((p) => p.slug !== page.slug);
+  const autres = (page.suite || toutes.map((p) => p.slug))
+    .filter((slug) => slug !== page.slug)
+    .map((slug) => toutes.find((p) => p.slug === slug))
+    .filter(Boolean);
 
   return `<!doctype html>
 <html lang="fr">
@@ -207,7 +252,7 @@ ${gtmTete()}
   <meta property="og:title" content="${echapper(page.titre)}" />
   <meta property="og:description" content="${echapper(page.description)}" />
   <meta property="og:url" content="${url}" />
-  <meta property="og:image" content="${SITE.origine}/og.png" />
+  <meta property="og:image" content="${SITE.origine}${page.imageSociale || '/og.png'}" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/contenu.css" />
@@ -224,7 +269,7 @@ ${JSON.stringify({
   }, null, 2)}
   </script>
 ${scriptAdsense()}</head>
-<body>
+<body class="${echapper(page.classe || '')}">
 ${gtmCorps()}
   <header class="entete">
     <a class="marque" href="/">🏉 ${echapper(SITE.nom)}</a>
@@ -236,9 +281,10 @@ ${toutes.map((p) => `      <a href="/${p.slug}/"${p.slug === page.slug ? ' aria-
 
   <main>
     <article>
-      <p class="fil"><a href="/">Accueil</a> › ${echapper(page.court)}</p>
+      <p class="fil"><a href="/">Accueil</a>${page.slug.startsWith('wiki/') ? ' › <a href="/wiki/">Wiki</a>' : ''} › ${echapper(page.court)}</p>
       <h1>${echapper(page.titre)}</h1>
       <p class="chapo">${riche(page.chapo)}</p>
+${imagePrioritaire ? bloc(imagePrioritaire) : ''}
 ${sommaire(page)}
 ${corps}
     </article>

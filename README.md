@@ -364,11 +364,17 @@ il évolue donc dès la fenêtre internationale suivante. Vérification :
 - **Premier chargement allégé** : la feuille de style passe de **503 à 112 Ko**
   (les 250 drapeaux ne sont plus recopiés dedans en base 64), et sept écrans
   plus le moteur de match ne sont téléchargés qu'au moment où l'on s'en sert.
+- **Un wiki illustré des deux carrières** : `/wiki/` mène vers deux dossiers
+  complets, `/wiki/carriere-joueur/` et `/wiki/carriere-entraineur/`. Environ
+  **6 900 mots**, deux illustrations originales, des parcours visuels, tableaux,
+  conseils et sommaires documentent les mécaniques réelles sans charger React.
+  Les pages sont générées depuis `scripts/contenuPages.cjs`, jamais retouchées
+  directement dans `public/`.
 
 ## 📈 Mesure d'audience : un écran vaut une page vue
 
-Le conteneur **Google Tag Manager** (`GTM-KF48DSQ9`) est posé sur les cinq pages
-du site : `index.html` pour le jeu, et `scripts/genPages.cjs` pour les quatre
+Le conteneur **Google Tag Manager** (`GTM-KF48DSQ9`) est posé sur les huit pages
+du site : `index.html` pour le jeu, et `scripts/genPages.cjs` pour les sept
 pages de contenu — c'est le **générateur** qu'on modifie, jamais le HTML qu'il
 écrit, sinon la balise disparaîtrait à la première régénération.
 
@@ -936,6 +942,12 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   secteur et état médical. Les **1 574 portraits officiels** déjà présents dans
   `public/photos` sont utilisés ; un joueur sans fichier connu garde une
   silhouette grise explicite, jamais le visage inventé d'un autre joueur.
+- Les portraits détourés reposent directement sur le métal de la carte, sans
+  vignette grise rapportée. Pendant un échange, la carte prise s'efface et la
+  cible se soulève avec un liseré doré. La fiche joueur se ferme au clic
+  extérieur ou avec Échap ; sur mobile, « joueur puis poste » reste disponible.
+- Capitaine, buteur et plan de jeu utilisent les listes visuelles du jeu avec
+  note, poste et courte explication, plutôt que les menus natifs du système.
 - Le plan initial règle le jeu avec ballon (équilibré, avants, large,
   occupation), la défense (blitz, glissée, repli), le rythme, les pénalités et
   l'heure du banc. Tous ces ordres restent modifiables pendant les 80 minutes.

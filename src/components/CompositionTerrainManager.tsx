@@ -21,8 +21,8 @@
 // de ne rien montrer. `etats` est donc facultatif, et les deux jauges du bas de
 // carte disparaissent quand il est absent.
 
-import { useEffect, useMemo, useState } from 'react';
-import type { DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { DragEvent, RefObject } from 'react';
 import { nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../lib/compositionManager';
@@ -155,7 +155,7 @@ function PortraitComposition({ nom, panneau = false }: { nom: string; panneau?: 
 
 function CarteJoueur({
   joueur, numero, posteSlot, selectionne, capitaine, buteur, etat, compact,
-  surSelection, surDrag, surDrop,
+  enGlisse, cibleDepot, surSelection, surDrag, surDragFin, surSurvolDepot, surDrop,
 }: {
   joueur?: Coequipier;
   numero: number;
@@ -165,8 +165,12 @@ function CarteJoueur({
   buteur: boolean;
   etat?: EtatDuJoueur;
   compact?: boolean;
+  enGlisse: boolean;
+  cibleDepot: boolean;
   surSelection: () => void;
   surDrag: (e: DragEvent<HTMLButtonElement>) => void;
+  surDragFin: () => void;
+  surSurvolDepot: (survole: boolean) => void;
   surDrop: (e: DragEvent<HTMLButtonElement>) => void;
 }) {
   const adequation: Adequation = joueur
@@ -194,11 +198,21 @@ function CarteJoueur({
         `ct-adq-${adequation}`,
         selectionne ? 'ct-selection' : '',
         compact ? 'ct-compacte' : '',
+        enGlisse ? 'ct-en-drag' : '',
+        cibleDepot ? 'ct-cible-depot' : '',
       ].filter(Boolean).join(' ')}
       draggable={!!joueur}
       onClick={surSelection}
       onDragStart={surDrag}
-      onDragOver={(e) => e.preventDefault()}
+      onDragEnd={surDragFin}
+      onDragEnter={() => surSurvolDepot(true)}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) surSurvolDepot(false);
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
       onDrop={surDrop}
       aria-pressed={selectionne}
       aria-label={joueur
@@ -262,7 +276,7 @@ function CarteJoueur({
 /** Le panneau latéral, ouvert quand une carte est sélectionnée. */
 function PanneauJoueur({
   joueur, posteSlot, etat, automatismes, coequipiers, capitaine, buteur,
-  onCapitaine, onButeur, onFermer,
+  panneauRef, onCapitaine, onButeur, onFermer,
 }: {
   joueur: Coequipier;
   posteSlot?: PosteId;
@@ -271,6 +285,7 @@ function PanneauJoueur({
   coequipiers: Map<PosteId, Coequipier>;
   capitaine: boolean;
   buteur: boolean;
+  panneauRef: RefObject<HTMLElement | null>;
   onCapitaine?: (id: string) => void;
   onButeur?: (id: string) => void;
   onFermer: () => void;
@@ -283,7 +298,7 @@ function PanneauJoueur({
     .filter((l): l is { poste: PosteId; joueur: Coequipier } => !!l.joueur);
 
   return (
-    <aside className={`ct-panneau ct-r-${rarete}`} aria-label={t('compo.panneau')}>
+    <aside ref={panneauRef} className={`ct-panneau ct-r-${rarete}`} aria-label={t('compo.panneau')}>
       <button type="button" className="ct-fermer" onClick={onFermer} aria-label={t('compo.fermer')}>
         <Icone nom="croix" taille={16} />
       </button>
@@ -381,6 +396,9 @@ export function CompositionTerrainManager({
   effectif, composition, onPlacer, etats, automatismes, onCapitaine, onButeur,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
+  const [joueurGlisse, setJoueurGlisse] = useState<string | null>(null);
+  const [cibleDepot, setCibleDepot] = useState<string | null>(null);
+  const panneauRef = useRef<HTMLElement>(null);
   const parId = useMemo(() => new Map(effectif.map((j) => [j.id, j])), [effectif]);
   const surFeuille = useMemo(
     () => new Set([...composition.titulaires, ...composition.remplacants]),
@@ -411,6 +429,29 @@ export function CompositionTerrainManager({
     return m;
   }, [titulaires]);
 
+  // La fiche latérale se referme dès que l'entraîneur reprend son travail
+  // ailleurs dans l'écran. Les cartes restent exclues de ce gestionnaire : un
+  // clic sur une autre carte doit encore permettre l'échange tactile.
+  useEffect(() => {
+    if (!selection) return;
+    const fermerHorsPanneau = (e: PointerEvent) => {
+      const cible = e.target;
+      if (!(cible instanceof Element)) return;
+      if (panneauRef.current?.contains(cible)) return;
+      if (cible.closest('.ct-carte, .manager-reserve-carte')) return;
+      setSelection(null);
+    };
+    const fermerAvecEchap = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelection(null);
+    };
+    document.addEventListener('pointerdown', fermerHorsPanneau);
+    window.addEventListener('keydown', fermerAvecEchap);
+    return () => {
+      document.removeEventListener('pointerdown', fermerHorsPanneau);
+      window.removeEventListener('keydown', fermerAvecEchap);
+    };
+  }, [selection]);
+
   const choisirOuPlacer = (zone: ZoneComposition, index: number, joueurId?: string) => {
     if (selection && selection !== joueurId) {
       onPlacer(zone, index, selection);
@@ -424,17 +465,37 @@ export function CompositionTerrainManager({
     if (!joueurId) return;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', joueurId);
-    setSelection(joueurId);
+
+    // Le fantôme natif reprend maintenant la vraie carte, légèrement inclinée,
+    // au lieu d'un rectangle translucide différent selon le navigateur.
+    const fantome = e.currentTarget.cloneNode(true) as HTMLElement;
+    const largeur = e.currentTarget.getBoundingClientRect().width;
+    fantome.classList.add('ct-fantome-drag');
+    fantome.style.width = `${largeur}px`;
+    document.body.appendChild(fantome);
+    e.dataTransfer.setDragImage(fantome, largeur / 2, 32);
+    window.setTimeout(() => fantome.remove(), 0);
+
+    setSelection(null);
+    setJoueurGlisse(joueurId);
+    setCibleDepot(null);
+  };
+
+  const terminerDrag = () => {
+    setJoueurGlisse(null);
+    setCibleDepot(null);
   };
 
   const deposer = (e: DragEvent<HTMLButtonElement>, zone: ZoneComposition, index: number) => {
     e.preventDefault();
-    const joueurId = e.dataTransfer.getData('text/plain') || selection;
+    const joueurId = e.dataTransfer.getData('text/plain') || joueurGlisse;
     if (joueurId) onPlacer(zone, index, joueurId);
     setSelection(null);
+    terminerDrag();
   };
 
   const joueurSelectionne = selection ? parId.get(selection) : undefined;
+  const joueurEnMouvement = joueurGlisse ? parId.get(joueurGlisse) : joueurSelectionne;
   const slotDuSelectionne = selection
     ? POSTES_XV_MANAGER[composition.titulaires.indexOf(selection)] : undefined;
 
@@ -481,7 +542,7 @@ export function CompositionTerrainManager({
       <div className="manager-compo-aide" aria-live="polite">
         <span><Icone nom="equipe" taille={14} /> {t('compo.aideGlisser')}</span>
         <span><Icone nom="cible" taille={14} /> {t('compo.aideMobile')}</span>
-        {joueurSelectionne && <b>{joueurSelectionne.nom}</b>}
+        {joueurEnMouvement && <b>{joueurEnMouvement.nom}</b>}
       </div>
 
       <div className="ct-plateau">
@@ -503,8 +564,12 @@ export function CompositionTerrainManager({
                     capitaine={composition.capitaineId === joueur?.id}
                     buteur={composition.buteurId === joueur?.id}
                     etat={joueur ? etats?.get(joueur.id) : undefined}
+                    enGlisse={joueurGlisse === joueur?.id}
+                    cibleDepot={cibleDepot === `titulaires-${index}` && joueurGlisse !== joueur?.id}
                     surSelection={() => choisirOuPlacer('titulaires', index, joueur?.id)}
                     surDrag={(e) => demarrerDrag(e, joueur?.id)}
+                    surDragFin={terminerDrag}
+                    surSurvolDepot={(survole) => setCibleDepot(survole ? `titulaires-${index}` : null)}
                     surDrop={(e) => deposer(e, 'titulaires', index)}
                   />
                 </div>
@@ -522,6 +587,7 @@ export function CompositionTerrainManager({
             coequipiers={parPoste}
             capitaine={composition.capitaineId === joueurSelectionne.id}
             buteur={composition.buteurId === joueurSelectionne.id}
+            panneauRef={panneauRef}
             onCapitaine={onCapitaine}
             onButeur={onButeur}
             onFermer={() => setSelection(null)}
@@ -548,8 +614,12 @@ export function CompositionTerrainManager({
                 buteur={composition.buteurId === joueur?.id}
                 etat={joueur ? etats?.get(joueur.id) : undefined}
                 compact
+                enGlisse={joueurGlisse === joueur?.id}
+                cibleDepot={cibleDepot === `remplacants-${index}` && joueurGlisse !== joueur?.id}
                 surSelection={() => choisirOuPlacer('remplacants', index, joueur?.id)}
                 surDrag={(e) => demarrerDrag(e, joueur?.id)}
+                surDragFin={terminerDrag}
+                surSurvolDepot={(survole) => setCibleDepot(survole ? `remplacants-${index}` : null)}
                 surDrop={(e) => deposer(e, 'remplacants', index)}
               />
             );
@@ -571,10 +641,12 @@ export function CompositionTerrainManager({
                 `ct-r-${rareteDe(joueur)}`,
                 estPepite(joueur) ? 'ct-pepite' : '',
                 selection === joueur.id ? 'selectionnee' : '',
+                joueurGlisse === joueur.id ? 'ct-en-drag' : '',
               ].filter(Boolean).join(' ')}
               draggable
               onClick={() => setSelection(selection === joueur.id ? null : joueur.id)}
               onDragStart={(e) => demarrerDrag(e, joueur.id)}
+              onDragEnd={terminerDrag}
               aria-pressed={selection === joueur.id}
               title={`${joueur.nom} · ${NOM_RARETE[rareteDe(joueur)]}`}
             >
