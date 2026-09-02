@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useGame } from '../store/useGame';
 import { Icone, type NomIcone } from './Icone';
@@ -23,7 +24,9 @@ interface MenuMobileProps {
 
 function MenuMobile({ ecran, joueurPresent, onFermer, onNaviguer, onReglages }: MenuMobileProps) {
   const { overlayRef, dialogRef } = useModalDialog(onFermer);
-  const entree = (cible: Ecran, icone: string, label: string) => (
+  // ⚠️ L'ICÔNE EST UN NŒUD REACT, PLUS UNE CHAÎNE : elle porte désormais un
+  // tracé (`components/Icone.tsx`) et non un caractère de la police emoji.
+  const entree = (cible: Ecran, icone: ReactNode, label: string) => (
     <button
       type="button"
       className={ecran === cible ? 'actif' : ''}
@@ -49,15 +52,15 @@ function MenuMobile({ ecran, joueurPresent, onFermer, onNaviguer, onReglages }: 
         <div className="nav-mobile-menu-tete">
           <h2 id="nav-mobile-menu-titre">{t('nav.menu')}</h2>
           <button type="button" className="nav-mobile-fermer" onClick={onFermer} aria-label={t('nav.fermerMenu')}>
-            ✕
+            <Icone nom="croix" taille={18} />
           </button>
         </div>
         <div className="nav-mobile-menu-grille">
-          {joueurPresent && entree('profil', '👤', t('nav.profil'))}
-          {entree('championnats', '🏟️', t('nav.clubs'))}
-          {entree('classement', '🏆', t('nav.classement'))}
-          {entree('pantheon', '⭐', t('nav.hall'))}
-          {entree('boutique', '🛍️', t('nav.boutique'))}
+          {joueurPresent && entree('profil', <Icone nom="profil" taille={19} />, t('nav.profil'))}
+          {entree('championnats', <Icone nom="stade" taille={19} />, t('nav.clubs'))}
+          {entree('classement', <Icone nom="trophee" taille={19} />, t('nav.classement'))}
+          {entree('pantheon', <Icone nom="institution" taille={19} />, t('nav.hall'))}
+          {entree('boutique', <Icone nom="boutique" taille={19} />, t('nav.boutique'))}
           <button type="button" onClick={() => { onFermer(); onReglages(); }}>
             <Icone nom="reglages" />
             <b>{t('nav.reglages')}</b>
@@ -125,7 +128,7 @@ export function Nav({ onReglages }: NavProps) {
           onClick={() => naviguer('accueil')}
           aria-label={t('nav.accueil')}
         >
-          <span className="balle" aria-hidden="true">🏉</span>
+          <span className="balle" aria-hidden="true"><Icone nom="ballon" taille={22} /></span>
           <span className="mot">
             Destiny <b>Rugby</b>
           </span>

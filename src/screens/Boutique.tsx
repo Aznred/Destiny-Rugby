@@ -15,6 +15,7 @@ import { IconeArticle } from '../components/ModeleObjet';
 // qu'une carrière existe, ce cadre montrait le JOUEUR à la place du ballon
 // survolé — cinq articles, la même image. L'aperçu de la boutique ne monte donc
 // que le ballon.
+import { Icone } from '../components/Icone';
 const Apercu3D = lazy(() =>
   import('../components/Hero3D').then((m) => ({ default: m.ApercuBallon })),
 );
@@ -68,7 +69,7 @@ export function Boutique() {
           <div className="eyebrow">{t('bo.titre')}</div>
           <h1>{t('bo.chapo')}</h1>
         </div>
-        <div className="solde">🪙 <b>{coins}</b> Ovas</div>
+        <div className="solde"><Icone nom="ova" taille={17} /> <b>{coins}</b> Ovas</div>
       </div>
 
       {flash && <div className="flash-boutique">{flash}</div>}
@@ -98,7 +99,7 @@ export function Boutique() {
               <p style={{ color: 'var(--craie-dim)' }}>{t('bo.apercuAide')}</p>
               {inventaire.includes(apercu) ? (
                 skinActif === apercu ? (
-                  <span className="badge-cle ok">✓ {t('bo.equipe')}</span>
+                  <span className="badge-cle ok"><Icone nom="check" taille={13} /> {t('bo.equipe')}</span>
                 ) : (
                   <button className="btn primaire" onClick={() => { choisirSkin(apercu); message(t('bo.equipeMsg')); }}>
                     {t('bo.equiper')}
@@ -116,7 +117,7 @@ export function Boutique() {
                   onClick={() => basculerEquipement(articleVu.id)}
                 >
                   {equipementActif[articleVu.categorie] === articleVu.id
-                    ? `✓ ${t('bo.porte')}`
+                    ? t('bo.porte')
                     : t('bo.equiper')}
                 </button>
               ) : articleVu.parPub ? (
@@ -135,7 +136,7 @@ export function Boutique() {
                     else message(t('bo.pasAssez'));
                   }}
                 >
-                  🪙 {articleVu.prix}
+                  <Icone nom="ova" taille={15} /> {articleVu.prix}
                 </button>
               )}
             </>
@@ -178,7 +179,7 @@ export function Boutique() {
                     else message(t('bo.pasAssez'));
                   }}
                 >
-                  🪙 {s.prix}
+                  <Icone nom="ova" taille={14} /> {s.prix}
                 </button>
               )}
             </div>
@@ -227,14 +228,14 @@ export function Boutique() {
                       pas de prix barré, pas de fausse promo — juste ce qu'il
                       faut faire pour l'avoir. */}
                   {!possede && e.parPub && (
-                    <div className="article-detail etiquette-pub">🎬 {t('pub.gratuitPub')}</div>
+                    <div className="article-detail etiquette-pub"><Icone nom="video" taille={14} /> {t('pub.gratuitPub')}</div>
                   )}
                   {possede ? (
                     <button
                       className={porte ? 'btn fantome petit' : 'btn primaire petit'}
                       onClick={() => basculerEquipement(e.id)}
                     >
-                      {porte ? `✓ ${t('bo.porte')}` : t('bo.equiper')}
+                      {porte ? t('bo.porte') : t('bo.equiper')}
                     </button>
                   ) : e.parPub ? (
                     <BoutonDeblocageParPub
@@ -250,7 +251,7 @@ export function Boutique() {
                         else message(t('bo.pasAssez'));
                       }}
                     >
-                      🪙 {e.prix}
+                      <Icone nom="ova" taille={14} /> {e.prix}
                     </button>
                   )}
                 </div>
@@ -294,7 +295,7 @@ export function Boutique() {
                     else message(t('bo.pasAssez'));
                   }}
                 >
-                  🪙 {prix}
+                  <Icone nom="ova" taille={14} /> {prix}
                 </button>
               )}
             </div>
@@ -318,7 +319,7 @@ export function Boutique() {
       <div className="grille-boutique">
         {PACKS.map((p) => (
           <div key={p.id} className="carte article pack">
-            <div className="pack-ovas">🪙 {p.ovas}</div>
+            <div className="pack-ovas"><Icone nom="ova" taille={16} /> {p.ovas}</div>
             {p.bonus && <div className="pack-bonus">{p.bonus}</div>}
             <button className="btn fantome petit" disabled title={t('bout.paiementDemo')}>
               {p.prix}

@@ -32,6 +32,7 @@ import { semaine, CALENDRIER, libelleSemaine } from '../data/calendrier';
 import { t } from '../lib/i18n';
 import type { Joueur } from '../types';
 import type { LigneTableau } from '../lib/championnat';
+import { Icone } from './Icone';
 
 // Nombre de semaines d'un type donné déjà passées avant celle-ci.
 function passees(numero: number, type: string): number {
@@ -172,7 +173,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
       <div className="cl-lat-tete">
         <div>
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <LogoCompet id={vue.logo} emoji={vue.emoji} taille={18} /> {t('cl.titre')}
+            <LogoCompet id={vue.logo} taille={18} /> {t('cl.titre')}
           </div>
           <b>{vue.titre}</b>
         </div>
@@ -203,7 +204,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
 
       {vue.phase.length ? (
         <div className="cl-lat-pied">
-          <div className="eyebrow" style={{ marginBottom: '0.3rem' }}>🔥 {t('cl.phaseFinale')}</div>
+          <div className="eyebrow" style={{ marginBottom: '0.3rem' }}><Icone nom="flamme" taille={14} /> {t('cl.phaseFinale')}</div>
           {vue.phase.map((m) => (
             <div
               key={m.libelle}

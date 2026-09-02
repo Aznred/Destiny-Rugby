@@ -8,6 +8,7 @@ import { Drapeau } from '../components/Drapeau';
 import { nomNationTraduit } from '../lib/nations';
 import { nombre, t } from '../lib/i18n';
 import { Blason } from '../components/Blason';
+import { Icone } from '../components/Icone';
 import { LogoCompet } from '../components/LogoCompet';
 import { LIMITES } from '../lib/classementMondial';
 import {
@@ -127,7 +128,7 @@ export function CreationManager() {
               className={`mode-manager ${!libre ? 'actif' : ''}`}
               onClick={() => setLibre(false)}
             >
-              <span className="mode-titre">🎖️ {t('mgr.creation.modeCarriere')}</span>
+              <span className="mode-titre"><Icone nom="trophee" taille={17} /> {t('mgr.creation.modeCarriere')}</span>
               <span className="mode-desc">{t('mgr.creation.modeCarriereTexte')}</span>
             </button>
             <button
@@ -135,7 +136,7 @@ export function CreationManager() {
               className={`mode-manager ${libre ? 'actif' : ''}`}
               onClick={() => setLibre(true)}
             >
-              <span className="mode-titre">🔓 {t('mgr.creation.modeLibre')}</span>
+              <span className="mode-titre"><Icone nom="etoile" taille={17} /> {t('mgr.creation.modeLibre')}</span>
               <span className="mode-desc">{t('mgr.creation.modeLibreTexte')}</span>
             </button>
           </div>
@@ -235,7 +236,7 @@ export function CreationManager() {
               <div>
                 <strong>{choisi.club.nom}</strong>
                 <div className="cm-compet">
-                  <LogoCompet id={choisi.competition.id} emoji={choisi.competition.emoji} taille={20} />
+                  <LogoCompet id={choisi.competition.id} taille={20} />
                   {choisi.competition.nom}
                 </div>
               </div>
@@ -251,7 +252,7 @@ export function CreationManager() {
             </div>
             {choisi.ambitieux && (
               <p className="cm-note">
-                ⚠️ {t('mgr.creation.clubAmbitieuxAide')}
+                <Icone nom="alerte" taille={15} /> {t('mgr.creation.clubAmbitieuxAide')}
               </p>
             )}
           </div>
@@ -259,7 +260,7 @@ export function CreationManager() {
 
         <div className="actions">
           <button className="btn primaire grand" onClick={valider} disabled={!choisi}>
-            {libre ? `🔓 ${t('mgr.creation.prendreLibre')}` : `🎖️ ${t('mgr.signer')}`}
+            <><Icone nom={libre ? 'etoile' : 'signature'} taille={19} /> {libre ? t('mgr.creation.prendreLibre') : t('mgr.signer')}</>
           </button>
         </div>
       </div>

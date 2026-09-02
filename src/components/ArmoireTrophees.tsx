@@ -43,6 +43,7 @@ import {
   cadrage, disposerArmoire, detecterEtageres, estBouclier, MAX_PIECES,
   type Boite, type DimensionsArmoire, type Geometrie, type Modele, type Place, type TailleModele,
 } from '../lib/armoire';
+import { Icone } from './Icone';
 
 const MODELE_ARMOIRE = '/m3d/armoire.glb';
 // Le meuble est ramené à cette hauteur : toute la scène (caméra, sol, tablettes)
@@ -326,13 +327,13 @@ export function ArmoireTrophees({ palmares, nom, onFermer }: Props) {
             <div className="eyebrow">{t('arm.eyebrow')}</div>
             <h2>{nom}</h2>
           </div>
-          <button className="armoire-fermer" onClick={onFermer} aria-label={t('reg.fermer')}>✕</button>
+          <button className="armoire-fermer" onClick={onFermer} aria-label={t('reg.fermer')}><Icone nom="croix" taille={18} /></button>
         </header>
 
         <div className="armoire-canvas">
           {pieces.length === 0 ? (
             <div className="armoire-vide">
-              <div style={{ fontSize: '2.6rem' }}>🗄️</div>
+              <div className="vide-icone"><Icone nom="trophee" taille={40} /></div>
               <p>{t('arm.vide')}</p>
             </div>
           ) : (

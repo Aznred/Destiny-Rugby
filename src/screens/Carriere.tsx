@@ -27,6 +27,7 @@ import { labelAttribut, nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
 import type { EntreeJournal } from '../types';
 
+import { Icone } from '../components/Icone';
 interface Props {
   onReglages: () => void;
 }
@@ -218,7 +219,7 @@ export function Carriere({ onReglages }: Props) {
           aria-pressed={vueMobile === 'jeu'}
           aria-controls="carriere-jeu"
         >
-          <span aria-hidden="true">📖</span>{t('car.vueJeu')}
+          <Icone nom="livre" taille={17} />{t('car.vueJeu')}
         </button>
         <button
           type="button"
@@ -226,7 +227,7 @@ export function Carriere({ onReglages }: Props) {
           aria-pressed={vueMobile === 'joueur'}
           aria-controls="carriere-joueur"
         >
-          <span aria-hidden="true">👤</span>{t('nav.profil')}
+          <Icone nom="profil" taille={17} />{t('nav.profil')}
         </button>
         <button
           type="button"
@@ -234,7 +235,7 @@ export function Carriere({ onReglages }: Props) {
           aria-pressed={vueMobile === 'classement'}
           aria-controls="carriere-classement"
         >
-          <span aria-hidden="true">🏆</span>{t('nav.classement')}
+          <Icone nom="trophee" taille={17} />{t('nav.classement')}
         </button>
       </div>
       <PanneauJoueur joueur={joueur} />

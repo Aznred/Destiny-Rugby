@@ -14,6 +14,8 @@ import { Drapeau } from '../components/Drapeau';
 import { nomNationTraduit } from '../lib/nations';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
+import { Icone } from '../components/Icone';
+import { chantierVisible } from '../lib/modeDev';
 import type { PosteId } from '../types';
 
 // ⚠️ L’ÂGE DE DÉPART EST BORNÉ, MAIS PAS PENDANT LA FRAPPE. Voir le champ
@@ -28,10 +30,71 @@ const AGE_MAX = LIMITES.ageDebutMax;
 const AGE_DEFAUT = 18;
 const bornerAge = (n: number) => Math.max(AGE_MIN, Math.min(AGE_MAX, n));
 
+/**
+ * LE CHOIX DE CARRIÈRE — joueur ou entraîneur.
+ *
+ * Demande : « gérer la création, pouvoir choisir entre entraîneur ou joueur ».
+ *
+ * ⚠️ IL N'Y AVAIT AUCUN ENDROIT OÙ CHOISIR. Les deux portes étaient sur
+ * l'accueil, côte à côte, et l'écran de création ne parlait que du joueur : on
+ * ne DÉCIDAIT rien, on cliquait sur l'un des deux boutons sans savoir ce qu'on
+ * échangeait. Ici le choix est posé, les deux modes sont décrits, et la
+ * différence qui compte vraiment est écrite noir sur blanc — un joueur démarre
+ * à 16-24 ans en bas de la pyramide, un entraîneur démarre à 30-60 ans avec un
+ * prestige de 6, c'est-à-dire en Régionale lui aussi.
+ *
+ * ⚠️ ET IL S'EFFACE QUAND LE MODE ENTRAÎNEUR EST FERMÉ. `chantierVisible`
+ * décide (voir `lib/modeDev.ts`) : sans lui, un joueur ordinaire verrait un
+ * choix à deux branches dont une le renverrait à l'accueil. Un choix qui n'en
+ * est pas un est pire que pas de choix du tout.
+ */
+function ChoixDeCarriere({ onJoueur, onEntraineur }: {
+  onJoueur: () => void; onEntraineur: () => void;
+}) {
+  return (
+    <div className="champ cr-modes">
+      <label>{t('cr.mode')}</label>
+      <div className="cr-modes-grille">
+        <button type="button" className="cr-mode" onClick={onJoueur}>
+          <span className="cr-mode-ico"><Icone nom="joueur" taille={30} /></span>
+          <b>{t('cr.modeJoueur')}</b>
+          <span className="cr-mode-desc">{t('cr.modeJoueurTexte')}</span>
+          {/* ⚠️ LES BORNES VIENNENT DE `LIMITES`, ELLES NE SONT PAS RECOPIÉES.
+              Écrites en dur dans la traduction, elles annonçaient 16-24 et
+              30-60 quand le jeu accepte 16-30 et 20-60 : deux endroits qui
+              décrivent la même règle finissent toujours par diverger. C'est le
+              même raccordement que fait déjà le champ « âge » plus bas. */}
+          <em className="cr-mode-suite">
+            {t('cr.modeJoueurSuite', { min: AGE_MIN, max: AGE_MAX })}
+          </em>
+        </button>
+        <button type="button" className="cr-mode" onClick={onEntraineur}>
+          <span className="cr-mode-ico"><Icone nom="entraineur" taille={30} /></span>
+          <b>{t('cr.modeEntraineur')}</b>
+          <span className="cr-mode-desc">{t('cr.modeEntraineurTexte')}</span>
+          <em className="cr-mode-suite">
+            {t('cr.modeEntraineurSuite', {
+              min: LIMITES.ageDebutManagerMin,
+              max: LIMITES.ageDebutManagerMax,
+              fin: LIMITES.ageManagerMax,
+            })}
+          </em>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Creation() {
   const creerJoueur = useGame((s) => s.creerJoueur);
   const setEcran = useGame((s) => s.setEcran);
   const traitsDebloques = useGame((s) => s.traitsDebloques);
+  // ⚠️ LE CHOIX N'EST DEMANDÉ QUE S'IL EXISTE. Chantier fermé : on ouvre
+  // directement la fiche du joueur, comme avant ce lot.
+  const choixPossible = chantierVisible('manager');
+  const [mode, setMode] = useState<'joueur' | 'entraineur' | null>(
+    choixPossible ? null : 'joueur',
+  );
 
   const [nom, setNom] = useState('');
   const [poste, setPoste] = useState<PosteId>('demi_ouverture');
@@ -88,8 +151,8 @@ export function Creation() {
         valeur: d.id,
         label: d.nom,
         sous: `${d.clubs.length} ${t('gen.clubs')}`,
-        vignette: <LogoCompet id={d.id} emoji={d.emoji} taille={24} />,
-        groupe: d.zone === 'France' ? `🇫🇷 ${t('cr.pyramide')}` : `🌍 ${nomNationTraduit(d.pays)}`,
+        vignette: <LogoCompet id={d.id} taille={24} />,
+        groupe: d.zone === 'France' ? t('cr.pyramide') : nomNationTraduit(d.pays),
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -113,15 +176,29 @@ export function Creation() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <button className="btn fantome" onClick={() => setEcran('accueil')} style={{ marginBottom: '1rem' }}>
+      <button
+        className="btn fantome"
+        onClick={() => (mode && choixPossible ? setMode(null) : setEcran('accueil'))}
+        style={{ marginBottom: '1rem' }}
+      >
         {t('gen.retour')}
       </button>
       <div className="eyebrow">{t('cr.eyebrow')}</div>
-      <h1>{t('cr.titre')}</h1>
+      <h1>{mode ? t('cr.titre') : t('cr.titreChoix')}</h1>
       <p style={{ color: 'var(--craie-dim)', margin: '0.6rem 0 2rem', maxWidth: '60ch' }}>
-        {t('cr.chapo')}
+        {mode ? t('cr.chapo') : t('cr.chapoChoix')}
       </p>
 
+      {!mode && (
+        <div className="carte" style={{ padding: '1.6rem' }}>
+          <ChoixDeCarriere
+            onJoueur={() => setMode('joueur')}
+            onEntraineur={() => setEcran('creationManager')}
+          />
+        </div>
+      )}
+
+      {mode === 'joueur' && (
       <div className="carte" style={{ padding: '1.6rem' }}>
         <div className="grille-2">
           <div className="champ">
@@ -261,12 +338,12 @@ export function Creation() {
                   <div className="trait-tete">
                     <span className="trait-emoji">{tr.emoji}</span>
                     <b>{nomTrait(tr.id)}</b>
-                    {choisi && <span className="trait-check">✓</span>}
+                    {choisi && <span className="trait-check"><Icone nom="check" taille={13} /></span>}
                   </div>
                   <div className="trait-desc">{descriptionTrait(tr.id)}</div>
                   {!ouvert && (
                     <div className="trait-prix">
-                      🔒 {t('cr.traitVerrouille', { prix: tr.prix ?? 0 })}
+                      <Icone nom="verrou" taille={13} /> {t('cr.traitVerrouille', { prix: tr.prix ?? 0 })}
                     </div>
                   )}
                 </button>
@@ -278,10 +355,11 @@ export function Creation() {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
           <button className="btn primaire grand" onClick={valider}>
-            {t('cr.lancer')} 🏉
+            <Icone nom="ballon" taille={20} /> {t('cr.lancer')}
           </button>
         </div>
       </div>
+      )}
     </motion.section>
   );
 }

@@ -24,6 +24,8 @@ import { useTenue } from '../lib/tenue';
 import { modeAllege } from '../lib/modeles';
 import { useModalDialog } from '../lib/useModalDialog';
 import { t } from '../lib/i18n';
+import { Icone } from './Icone';
+import type { NomIcone } from './Icone';
 
 /**
  * ⚠️ DOIT VALOIR LA MÊME CHOSE QUE `TAILLE` DANS `Rugbyman3D.tsx`.
@@ -43,13 +45,16 @@ function Lumieres() {
   );
 }
 
-export function PortraitJoueur({ repli = '🏉' }: { repli?: string }) {
+// ⚠️ LE REPLI EST UN NOM D'ICÔNE, PLUS UN EMOJI. C'est ce qui s'affiche quand
+// le joueur n'a pas de portrait : un ballon 🏉 de la police système au milieu
+// d'un avatar rond ne ressemble à rien de ce que le jeu dessine ailleurs.
+export function PortraitJoueur({ repli = 'ballon' }: { repli?: NomIcone }) {
   const tenue = useTenue();
   const allege = useMemo(modeAllege, []);
   const [ouvert, setOuvert] = useState(false);
 
   if (allege || !tenue.nom) {
-    return <div className="grand-avatar">{repli}</div>;
+    return <div className="grand-avatar"><Icone nom={repli} taille={40} /></div>;
   }
 
   return (
@@ -85,7 +90,7 @@ export function PortraitJoueur({ repli = '🏉' }: { repli?: string }) {
             </group>
           </Suspense>
         </Canvas>
-        <span className="portrait-loupe" aria-hidden="true">⛶</span>
+        <span className="portrait-loupe" aria-hidden="true"><Icone nom="plein-ecran" taille={15} /></span>
       </button>
 
       {ouvert && <VueEntiere onFermer={() => setOuvert(false)} />}
@@ -118,7 +123,7 @@ function VueEntiere({ onFermer }: { onFermer: () => void }) {
             <div className="eyebrow">{t('prof.tonJoueur')}</div>
             <h2>{tenue.nom}</h2>
           </div>
-          <button type="button" className="btn fantome petit" onClick={onFermer}>✕</button>
+          <button type="button" className="btn fantome petit" onClick={onFermer}><Icone nom="croix" taille={17} /></button>
         </div>
 
         <div className="modale-joueur-scene">

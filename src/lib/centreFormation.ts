@@ -46,13 +46,14 @@ export const AXES_CENTRE: AxeCentre[] = [
   'installations', 'coaching', 'recrutement', 'reseau', 'medical', 'reputation',
 ];
 
-export const EMOJI_AXE: Record<AxeCentre, string> = {
-  installations: '🏗️',
-  coaching: '🧑‍🏫',
-  recrutement: '🔎',
-  reseau: '🌍',
-  medical: '⚕️',
-  reputation: '⭐',
+/** Les six axes, en noms d'icônes dessinées (voir `components/Icone.tsx`). */
+export const ICONE_AXE: Record<AxeCentre, 'stade' | 'entraineur' | 'loupe' | 'monde' | 'soin' | 'etoile'> = {
+  installations: 'stade',
+  coaching: 'entraineur',
+  recrutement: 'loupe',
+  reseau: 'monde',
+  medical: 'soin',
+  reputation: 'etoile',
 };
 
 /**

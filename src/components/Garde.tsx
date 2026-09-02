@@ -10,6 +10,7 @@
 
 import { Component, type ReactNode } from 'react';
 import { t } from '../lib/i18n';
+import { Icone } from './Icone';
 
 // ⚠️ App monte ce garde avec key={ecran} : changer d'écran le remonte à neuf,
 // il n'y a donc rien à réinitialiser à la main.
@@ -34,7 +35,7 @@ export class Garde extends Component<Props, State> {
     return (
       <section className="section" style={{ padding: '3rem 0' }}>
         <div className="carte" style={{ padding: '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '2.4rem' }}>🚧</div>
+          <div className="vide-icone"><Icone nom="alerte" taille={38} /></div>
           <h2 style={{ margin: '0.6rem 0' }}>{t('garde.titre')}</h2>
           <p style={{ color: 'var(--craie-dim)', maxWidth: '52ch', margin: '0 auto 1rem' }}>
             {t('garde.texte')}

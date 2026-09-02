@@ -282,6 +282,18 @@ export function badgesDe(
   return b;
 }
 
+/**
+ * ⚠️ CETTE TABLE N'EST PLUS LUE, ET ELLE EST CONSERVÉE EXPRÈS COMME DOCUMENT.
+ * L'écran de composition rendait ces six emoji ; il rend maintenant six tracés
+ * (`ICONE_BADGE`, dans `components/CompositionTerrainManager.tsx`), pour la
+ * raison écrite en tête de `components/Icone.tsx` : un emoji est dessiné par
+ * Apple, Google ou Microsoft, il est en couleur — jamais la nôtre — et sa ligne
+ * de base varie d'une machine à l'autre.
+ *
+ * Elle reste ici parce qu'elle DIT ce que chaque badge veut signifier, en une
+ * ligne, et qu'un tracé abstrait ne le dit pas. Quiconque ajoute un badge peut
+ * s'y référer pour choisir l'icône juste.
+ */
 export const EMOJI_BADGE: Record<BadgeCarte, string> = {
   enForme: '🔥', blesse: '🚑', suspendu: '🔴', espoir: '🌱',
   international: '🏳️', fatigue: '🥵',
@@ -388,3 +400,131 @@ export function alertesDeComposition(
 export function oublierAttributs(): void {
   cache.clear();
 }
+
+// ---------------------------------------------------------------------------
+// LA RARETÉ D'UNE CARTE — bronze, argent, or, épique, mythique, légende
+// ---------------------------------------------------------------------------
+// Demande : « faire comme sur FIFA des raretés de carte en mode bronze argent
+// or mythique rouge épique etc. en fonction du potentiel, de la qualité du
+// joueur etc. »
+//
+// ⚠️ LA RARETÉ N'EST PAS LE STATUT, ET LES DEUX COEXISTENT. `statutDe` répond à
+// « quel rôle tient-il dans un effectif » (espoir, cadre, star) : c'est une aide
+// de lecture pour composer. La rareté répond à « que vaut cette carte », et
+// c'est ce qu'on collectionne. Les confondre ferait d'un espoir de 19 ans une
+// carte bronze alors que c'est précisément la carte qu'on veut garder.
+//
+// ⚠️ ET ELLE NE CHANGE TOUJOURS AUCUNE STATISTIQUE. La règle posée plus haut
+// pour le statut vaut telle quelle : « les couleurs ne changeraient pas
+// artificiellement les stats comme FUT ». Une carte légende n'est pas meilleure
+// qu'une carte or de même note — elle est plus rare.
+
+export type RareteCarte =
+  | 'bronze' | 'argent' | 'or' | 'epique' | 'mythique' | 'legende';
+
+export const ORDRE_RARETE: RareteCarte[] = [
+  'bronze', 'argent', 'or', 'epique', 'mythique', 'legende',
+];
+
+/**
+ * CE QUE VAUT UNE CARTE : la note d'aujourd'hui, plus ce qu'il reste à venir.
+ *
+ * ⚠️ LE POTENTIEL PÈSE MOINS À MESURE QU'ON VIEILLIT, et ce n'est pas un
+ * détail d'équilibrage : une marge de quinze points à 19 ans est une promesse,
+ * la même marge à 30 ans est une statistique morte — il ne reste plus assez de
+ * saisons pour la combler (`noteALAge` fait progresser jusqu'à 27 ans puis
+ * décliner). Sans cette pondération, un joueur de 33 ans noté 74 pour un
+ * potentiel de 88 sortirait en carte épique alors qu'il ne progressera plus
+ * jamais.
+ *
+ * ⚠️ ET LA PART DE POTENTIEL EST BORNÉE À 12 POINTS. Au-delà, un espoir de
+ * 17 ans noté 55 pour un potentiel de 95 passerait devant un international
+ * confirmé : on collectionnerait des promesses, plus des joueurs.
+ */
+export function valeurDeCarte(j: Pick<Coequipier, 'note' | 'potentiel' | 'age'>): number {
+  const poids = j.age <= 20 ? 0.55
+    : j.age <= 23 ? 0.44
+      : j.age <= 26 ? 0.28
+        : j.age <= 29 ? 0.12
+          : 0;
+  const marge = Math.max(0, (j.potentiel ?? j.note) - j.note);
+  return j.note + Math.min(12, marge * poids);
+}
+
+/**
+ * LES SIX PALIERS.
+ *
+ * ⚠️ ILS SONT CALÉS SUR LA PYRAMIDE DU JEU, pas sur une échelle abstraite.
+ * Chaque rareté correspond à un étage réel : une montée se lit alors dans la
+ * COULEUR des cartes de son effectif, et c'est ce qui fait de la promotion une
+ * récompense visible autant que sportive.
+ *
+ *   bronze   < 48   Régionale, Fédérale 3
+ *   argent   < 59   Fédérale 2 et 1, bas de Nationale
+ *   or       < 70   Nationale, Nationale 2, bas de Pro D2
+ *   épique   < 81   Pro D2, rotation de Top 14
+ *   mythique < 90   titulaire de Top 14
+ *   légende  ≥ 90   international confirmé
+ *
+ * ⚠️ ILS ONT ÉTÉ MESURÉS SUR LES VRAIS EFFECTIFS, pas posés au jugé — c'est le
+ * seul moyen de savoir si l'échelle sépare vraiment quelque chose. Le premier
+ * réglage (52/62/72/80/88) donnait **100 % de cartes bronze en Régionale 1 ET
+ * en Régionale 3** : deux divisions entières indistinguables, donc aucun
+ * progrès lisible pendant les premières saisons — exactement là où l'on
+ * commence en mode entraîneur. Il rendait aussi 38 % de cartes mythiques en
+ * Top 14, ce qui fait beaucoup pour un métal censé se remarquer.
+ *
+ * Mesuré avec ce réglage (`scripts/verifRaretes.ts`, six clubs par étage) :
+ *
+ *   Top 14       argent 4 % · or 31 % · épique 23 % · mythique 37 % · légende 5 %
+ *   Pro D2       bronze 4 % · argent 45 % · or 28 % · épique 23 %
+ *   Nationale    bronze 43 % · argent 40 % · or 16 %
+ *   Fédérale 1   bronze 9 % · argent 66 % · or 25 %
+ *   Fédérale 3   bronze 73 % · argent 27 %
+ *   Régionale 1  bronze 89 % · argent 11 %
+ *   Régionale 3  bronze 100 %
+ *
+ * ⚠️ ET LA RÉGIONALE 3 RESTE ENTIÈREMENT BRONZE, volontairement. C'est le fond
+ * de la pyramide : y voir des cartes dorées viderait de son sens tout ce qu'on
+ * gagne en montant. La lecture doit être « je pars de rien », pas « tout le
+ * monde brille ».
+ */
+const SEUILS_RARETE: [RareteCarte, number][] = [
+  ['bronze', 48], ['argent', 59], ['or', 70],
+  ['epique', 81], ['mythique', 90],
+];
+
+export function rareteDe(j: Pick<Coequipier, 'note' | 'potentiel' | 'age'>): RareteCarte {
+  const v = valeurDeCarte(j);
+  for (const [rarete, plafond] of SEUILS_RARETE) if (v < plafond) return rarete;
+  return 'legende';
+}
+
+/**
+ * ⚠️ UNE PÉPITE SE SIGNALE EN PLUS DE SA RARETÉ, elle ne la remplace pas. Un
+ * espoir de 18 ans noté 48 pour un potentiel de 84 reste une carte bronze —
+ * c'est ce qu'il vaut aujourd'hui — mais elle porte un liseré vert. Le
+ * remonter d'un cran ferait mentir la couleur sur ce qu'on aligne dimanche.
+ */
+export function estPepite(j: Pick<Coequipier, 'note' | 'potentiel' | 'age'>): boolean {
+  return j.age <= 23 && (j.potentiel ?? j.note) - j.note >= 12;
+}
+
+/**
+ * LE NOM D'UNE RARETÉ.
+ *
+ * ⚠️ IL VIT ICI, PAS DANS UN COMPOSANT. Trois écrans l'affichent — la carte de
+ * composition, la fiche d'un joueur, la carte du marché — et une table recopiée
+ * finit toujours par diverger d'une copie à l'autre. C'est aussi la règle du
+ * projet pour les composants React : un fichier qui exporte à la fois un
+ * composant et une constante casse le rafraîchissement à chaud de Vite.
+ *
+ * ⚠️ ET CE N'EST VOLONTAIREMENT PAS TRADUIT. « Bronze », « Or », « Épique » et
+ * « Légende » sont les mêmes mots dans les sept langues du jeu ou presque, et
+ * les traduire au mot près donnerait des libellés plus longs que la pastille
+ * qui les porte. Le jour où l'un d'eux gêne, il prendra une clé — pas les six.
+ */
+export const NOM_RARETE: Record<RareteCarte, string> = {
+  bronze: 'Bronze', argent: 'Argent', or: 'Or',
+  epique: 'Épique', mythique: 'Mythique', legende: 'Légende',
+};

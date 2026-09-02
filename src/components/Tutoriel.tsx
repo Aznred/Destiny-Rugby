@@ -28,14 +28,15 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { t } from '../lib/i18n';
+import { Icone } from './Icone';
 
 /** Les étapes, dans l'ordre. Chaque clé est résolue par `t()`. */
 const ETAPES = [
-  { emoji: '🏉', titre: 'tuto.e1.titre', texte: 'tuto.e1.texte' },
-  { emoji: '👤', titre: 'tuto.e2.titre', texte: 'tuto.e2.texte' },
-  { emoji: '📅', titre: 'tuto.e3.titre', texte: 'tuto.e3.texte' },
-  { emoji: '✍️', titre: 'tuto.e4.titre', texte: 'tuto.e4.texte' },
-  { emoji: '🏆', titre: 'tuto.e5.titre', texte: 'tuto.e5.texte' },
+  { icone: 'ballon' as const, titre: 'tuto.e1.titre', texte: 'tuto.e1.texte' },
+  { icone: 'profil' as const, titre: 'tuto.e2.titre', texte: 'tuto.e2.texte' },
+  { icone: 'calendrier' as const, titre: 'tuto.e3.titre', texte: 'tuto.e3.texte' },
+  { icone: 'signature' as const, titre: 'tuto.e4.titre', texte: 'tuto.e4.texte' },
+  { icone: 'trophee' as const, titre: 'tuto.e5.titre', texte: 'tuto.e5.texte' },
 ] as const;
 
 export function Tutoriel() {
@@ -80,10 +81,10 @@ export function Tutoriel() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
       >
-        <button type="button" className="tuto-fermer" onClick={fermer} aria-label={t('tuto.passer')}>✕</button>
+        <button type="button" className="tuto-fermer" onClick={fermer} aria-label={t('tuto.passer')}><Icone nom="croix" taille={17} /></button>
 
         <div className="eyebrow">{t('tuto.titre')}</div>
-        <div className="tuto-emoji" aria-hidden="true">{e.emoji}</div>
+        <div className="tuto-emoji" aria-hidden="true"><Icone nom={e.icone} taille={36} /></div>
         <h2>{t(e.titre)}</h2>
         <p className="tuto-texte">{t(e.texte)}</p>
 

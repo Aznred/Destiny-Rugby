@@ -16,6 +16,7 @@ import { FicheClub } from '../components/FicheClub';
 import type { Club } from '../types';
 import { t, tn } from '../lib/i18n';
 
+import { Icone } from '../components/Icone';
 type Zone = 'France' | 'Monde' | 'Nations';
 
 // La note affichée sur la carte d'un club : celle de la base d'origine, sinon
@@ -48,20 +49,20 @@ export function Championnats() {
       transition={{ duration: 0.4 }}
     >
       <div className="eyebrow">{t('ch.eyebrow')}</div>
-      <h1>🌍 {t('ch.titre')}</h1>
+      <h1><Icone nom="monde" taille={26} /> {t('ch.titre')}</h1>
       <p style={{ color: 'var(--craie-dim)', maxWidth: '64ch', margin: '0.6rem 0 1.2rem' }}>
         {t('ch.chapo')}
       </p>
 
       <div className="onglets">
         <button className={zone === 'France' ? 'actif' : ''} onClick={() => setZone('France')}>
-          🇫🇷 {t('ch.france')}
+          {t('ch.france')}
         </button>
         <button className={zone === 'Monde' ? 'actif' : ''} onClick={() => setZone('Monde')}>
-          🌐 {t('ch.monde')}
+          <Icone nom="monde" taille={16} /> {t('ch.monde')}
         </button>
         <button className={zone === 'Nations' ? 'actif' : ''} onClick={() => setZone('Nations')}>
-          🏳️ {t('ch.selections')}
+          <Icone nom="drapeau" taille={16} /> {t('ch.selections')}
         </button>
       </div>
 
@@ -71,7 +72,6 @@ export function Championnats() {
             key={comp.id}
             id={comp.id}
             nom={comp.nom}
-            emoji={comp.emoji}
             pays={comp.pays}
             drapeaux={comp.drapeaux}
             clubs={comp.clubs}
@@ -87,7 +87,6 @@ export function Championnats() {
             key={coupe.id}
             id={coupe.id}
             nom={coupe.nom}
-            emoji={coupe.emoji}
             pays={coupe.pays}
             drapeaux={coupe.drapeaux}
             clubs={coupe.clubs}
@@ -103,13 +102,13 @@ export function Championnats() {
         <>
           <BlocSelections
             titre={t('ch.seniors')}
-            emoji="🏳️"
+            emoji="drapeau"
             note={t('ch.noteSeniors')}
             selections={SELECTIONS_SENIOR}
           />
           <BlocSelections
             titre={t('ch.u20')}
-            emoji="🌱"
+            emoji="pousse"
             note={t('ch.noteU20')}
             selections={SELECTIONS_U20}
           />
@@ -166,11 +165,10 @@ function BlocSelections({
 }
 
 function BlocCompetition({
-  id, nom, emoji, pays, drapeaux, clubs, note, niveau, onClub,
+  id, nom, pays, drapeaux, clubs, note, niveau, onClub,
 }: {
   id: string;
   nom: string;
-  emoji: string;
   pays: string;
   drapeaux: string[];
   clubs: Club[];
@@ -184,7 +182,7 @@ function BlocCompetition({
     <div className="carte bloc-competition">
       <div className="comp-tete">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-          <LogoCompet id={id} emoji={emoji} taille={30} titre={nom} />
+          <LogoCompet id={id} taille={30} titre={nom} />
           <b>{nom}</b>
           <span className="comp-pays" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
             {drapeaux.map((d) => (

@@ -127,6 +127,26 @@ export interface ConnaissanceJoueur {
 export interface RapportConnaissance {
   niveau: 'inconnu' | 'partiel' | 'complet';
   note: [number, number];
+  /**
+   * LE « GÉNÉRAL » QU'ON IMPRIME SUR LA CARTE : l'estimation centrale du
+   * service de recrutement.
+   *
+   * ⚠️ IL A FALLU L'AJOUTER, ET C'ÉTAIT LE BUG SIGNALÉ (« dans le marché
+   * mondial, fix les généraux »). L'écran n'avait que `note`, une FOURCHETTE,
+   * et l'imprimait telle quelle : « 78–100 », « 81–100 », « 74–100 ». Trois
+   * défauts d'un coup — une amplitude de vingt-quatre points qui ne dit rien,
+   * une borne haute à 100 alors qu'aucun joueur du jeu ne dépasse 99 (donc un
+   * chiffre visiblement faux sur presque toutes les cartes), et surtout
+   * l'impossibilité de comparer deux cibles d'un coup d'œil : c'est justement
+   * ce qu'un général sert à faire.
+   *
+   * On rend donc les deux : un NOMBRE à afficher en gros, et la MARGE qui
+   * l'accompagne. L'incertitude du scouting est conservée entière — elle est
+   * simplement dite « 84 ± 9 » au lieu de « 75–93 ».
+   */
+  estimation: number;
+  /** La marge d'erreur du rapport, en points. Zéro quand il est complet. */
+  marge: number;
   potentiel: [number, number] | null;
   salaire: [number, number] | null;
   personnalite: TraitPersonnalite | null;
@@ -647,6 +667,16 @@ export function observerCible(a: EtatCarriereAvancee, joueurId: string, saison: 
   return { ...a, connaissances: { ...a.connaissances, [joueurId]: { joueurId, observations: Math.min(6, (actuelle?.observations ?? 0) + 1), derniereSaison: saison, paysConnu: actuelle?.paysConnu || paysConnu } } };
 }
 
+/**
+ * ⚠️ AUCUNE NOTE DU JEU N'ATTEINT 100, et c'est la borne qui manquait. Les
+ * effectifs plafonnent à 99 (`attributsDe`, `noteALAge`, le générateur de
+ * monde) : borner l'intervalle à 100 faisait apparaître un chiffre impossible
+ * en haut de presque toutes les cartes du marché — « 81–100 », « 74–100 » —
+ * c'est-à-dire un général visiblement faux.
+ */
+const NOTE_PLAFOND = 99;
+const borneNote = (v: number) => Math.max(1, Math.min(NOTE_PLAFOND, Math.round(v)));
+
 export function rapportConnaissance(a: EtatCarriereAvancee | undefined, cible: { id: string; note: number; potentiel: number; salaireDemande: number; age: number }, niveauRecrutement: number): RapportConnaissance {
   const c = a?.connaissances[cible.id];
   const observations = c?.observations ?? 0;
@@ -656,16 +686,44 @@ export function rapportConnaissance(a: EtatCarriereAvancee | undefined, cible: {
   const pays = c?.paysConnu ? -2 : 2;
   const incertitude = Math.max(0, 10 - observations * 2 - niveauRecrutement * 1.25 + age + pays);
   const decalage = Math.round((rng() * 2 - 1) * incertitude * 0.45);
-  const intervalle = (v: number, ecart: number): [number, number] => [Math.max(0, Math.round(v + decalage - ecart)), Math.min(100, Math.round(v + decalage + ecart))];
-  if (niveau === 'inconnu') return { niveau, note: intervalle(cible.note, Math.max(7, incertitude)), potentiel: null, salaire: null, personnalite: null };
+  /**
+   * ⚠️ LA MARGE D'UN RAPPORT INCONNU EST DIVISÉE PAR DEUX (`max(7, …)` devenait
+   * ±12 avec un service de niveau 0, soit une fourchette de VINGT-QUATRE
+   * points). Ce n'est pas un assouplissement du scouting : l'incertitude
+   * globale — décalage compris — reste du même ordre, mais elle est désormais
+   * DITE au bon endroit. Une fourchette qui couvre du remplaçant de Fédérale à
+   * l'international ne permet aucune décision, donc elle ne coûte rien à celui
+   * qui ne scoute pas : c'était le vrai défaut. À ±5 par défaut, observer un
+   * joueur change réellement ce qu'on sait de lui.
+   */
+  const ecartInconnu = Math.max(4, Math.min(9, incertitude * 0.55));
+  const intervalle = (v: number, ecart: number): [number, number] => [
+    borneNote(v + decalage - ecart), borneNote(v + decalage + ecart),
+  ];
+  if (niveau === 'inconnu') {
+    return {
+      niveau,
+      note: intervalle(cible.note, ecartInconnu),
+      estimation: borneNote(cible.note + decalage),
+      marge: Math.round(ecartInconnu),
+      potentiel: null,
+      salaire: null,
+      personnalite: null,
+    };
+  }
   const salaireEcart = niveau === 'complet' ? 0.08 : 0.28;
   const mesure = (v: number, ecart: number): [number, number] => niveau === 'complet'
-    ? [Math.max(0, Math.round(v - ecart)), Math.min(100, Math.round(v + ecart))]
+    ? [borneNote(v - ecart), borneNote(v + ecart)]
     : intervalle(v, ecart);
+  const ecartNote = niveau === 'complet' ? 0 : Math.max(2, incertitude * 0.4);
   return {
     niveau,
-    note: mesure(cible.note, niveau === 'complet' ? 0 : Math.max(3, incertitude * 0.55)),
-    potentiel: mesure(cible.potentiel, niveau === 'complet' ? 2 : Math.max(5, incertitude * 0.8)),
+    note: mesure(cible.note, ecartNote),
+    // Un rapport complet donne la vraie note ; un rapport partiel garde son
+    // décalage, sinon observer une seule fois vaudrait déjà certitude.
+    estimation: niveau === 'complet' ? borneNote(cible.note) : borneNote(cible.note + decalage),
+    marge: Math.round(ecartNote),
+    potentiel: mesure(cible.potentiel, niveau === 'complet' ? 2 : Math.max(4, incertitude * 0.6)),
     salaire: [Math.max(0, Math.round(cible.salaireDemande * (1 - salaireEcart) / 1000) * 1000), Math.round(cible.salaireDemande * (1 + salaireEcart) / 1000) * 1000],
     personnalite: niveau === 'complet' ? profilDuJoueur({ id: cible.id, nom: '', poste: 'arriere', age: cible.age, note: cible.note, potentiel: cible.potentiel, nation: '', regen: false }, '', 1).traits[0] : null,
   };

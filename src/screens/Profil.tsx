@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
+import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { Jauge } from '../components/Jauge';
@@ -11,6 +12,7 @@ import { nombre, t, tn } from '../lib/i18n';
 import { titreTraduit } from '../lib/tropheesI18n';
 
 // La 3D tire Three.js derrière elle : on ne la charge qu'à l'ouverture du profil.
+import { Icone } from '../components/Icone';
 const Portrait = lazy(() =>
   import('../components/PortraitJoueur').then((m) => ({ default: m.PortraitJoueur })),
 );
@@ -44,8 +46,8 @@ export function Profil() {
       <div className="carte profil-tete">
         {/* ⚠️ TON joueur, en 3D, avec la tenue que tu lui as achetée — plus un
             emoji générique. Il retombe sur l'emoji sur machine modeste. */}
-        <Suspense fallback={<div className="grand-avatar">{poste.categorie === 'Avant' ? '🛡️' : '⚡'}</div>}>
-          <Portrait repli={poste.categorie === 'Avant' ? '🛡️' : '⚡'} />
+        <Suspense fallback={<div className="grand-avatar"><Icone nom={poste.categorie === 'Avant' ? 'bouclier' : 'eclair'} taille={40} /></div>}>
+          <Portrait repli={poste.categorie === 'Avant' ? 'bouclier' : 'eclair'} />
         </Suspense>
         <div style={{ flex: 1 }}>
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -56,7 +58,7 @@ export function Profil() {
             <span className="pastille">{t('prof.noteGlobale')} <b>{moyenne(joueur)}</b></span>
             <span className="pastille">{t('gen.saison')} <b>{joueur.saison}</b></span>
             <span className="pastille">{joueur.age} {t('gen.ans')}</span>
-            <span className="pastille">💰 <b>{nombre(joueur.argent)} €</b></span>
+            <span className="pastille"><Icone nom="euro" taille={14} /> <b>{nombre(joueur.argent)} €</b></span>
           </div>
         </div>
         <button className="btn primaire" onClick={() => setEcran('carriere')}>
@@ -89,11 +91,11 @@ export function Profil() {
         <div className="carte" style={{ padding: '1.6rem' }}>
           <div className="eyebrow" style={{ marginBottom: '1rem' }}>{t('prof.palmares')}</div>
           <div className="ressources">
-            <span className="pastille">🏉 <b>{joueur.matchsJoues}</b> {t('prof.matchs')}</span>
-            <span className="pastille">🎯 <b>{joueur.essais}</b> {t('ml.essais')}</span>
+            <span className="pastille"><Icone nom="ballon" taille={14} /> <b>{joueur.matchsJoues}</b> {t('prof.matchs')}</span>
+            <span className="pastille"><Icone nom="cible" taille={14} /> <b>{joueur.essais}</b> {t('ml.essais')}</span>
             {(joueur.selections ?? 0) > 0 && (
               <span className="pastille" title={t('prof.capesAide')}>
-                🏳️ <b>{joueur.selections}</b> {t('prof.capes')}
+                <Icone nom="drapeau" taille={14} /> <b>{joueur.selections}</b> {t('prof.capes')}
               </span>
             )}
           </div>
@@ -118,13 +120,13 @@ export function Profil() {
               <Stat label={t('prof.passesDecisives')} valeur={joueur.stats.passesDecisives} />
               <Stat
                 label={t('prof.cartons')}
-                valeur={`${joueur.stats.cartonsJaunes} 🟨 · ${joueur.stats.cartonsRouges} 🟥`}
+                valeur={<>{joueur.stats.cartonsJaunes}<i className="carton-jaune" /> · {joueur.stats.cartonsRouges}<i className="carton-rouge" /></>}
               />
             </div>
           )}
           <div className="bloc-titres" style={{ marginTop: '1rem' }}>
             {joueur.titres.length ? (
-              joueur.titres.map((titre, i) => <span key={i} className="medaille">🏆 {titreTraduit(titre)}</span>)
+              joueur.titres.map((titre, i) => <span key={i} className="medaille"><Icone nom="trophee" taille={13} /> {titreTraduit(titre)}</span>)
             ) : (
               <span style={{ color: 'var(--brume)', fontSize: '0.9rem' }}>
                 {t('prof.aucunTitre')}
@@ -177,7 +179,7 @@ export function Profil() {
 }
 
 // Une statistique de carrière : valeur en gros, précision en dessous.
-function Stat({ label, valeur, aide }: { label: string; valeur: number | string; aide?: string }) {
+function Stat({ label, valeur, aide }: { label: string; valeur: ReactNode; aide?: string }) {
   return (
     <div className="stat-case">
       <span className="stat-label">{label}</span>

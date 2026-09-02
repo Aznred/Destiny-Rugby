@@ -12,6 +12,8 @@
 // clic. Chaque colonne dit à quoi elle correspond au survol.
 
 import { useState } from 'react';
+import { Icone } from '../Icone';
+import type { NomIcone } from '../Icone';
 import type { BilanMatch } from '../../lib/moteur/moteur';
 import type { EtatMatch } from '../../lib/moteur/etat';
 import type { StatsMatch } from '../../lib/moteur/entites';
@@ -27,9 +29,9 @@ interface ColonneFeuille {
   valeur: (s: StatsMatch) => number;
 }
 
-const VUES_FEUILLE: { id: string; nomCle: string; emoji: string; colonnes: ColonneFeuille[] }[] = [
+const VUES_FEUILLE: { id: string; nomCle: string; icone: NomIcone; colonnes: ColonneFeuille[] }[] = [
   {
-    id: 'general', nomCle: 'ml.vue.general', emoji: '📋',
+    id: 'general', nomCle: 'ml.vue.general', icone: 'journal' as const,
     colonnes: [
       { cle: 'metres', entete: 'm', titreCle: 'ml.stat.metres', valeur: (s) => s.metres },
       { cle: 'plaquages', entete: 'plq', titreCle: 'ml.stat.plaquages', valeur: (s) => s.plaquages },
@@ -38,7 +40,7 @@ const VUES_FEUILLE: { id: string; nomCle: string; emoji: string; colonnes: Colon
     ],
   },
   {
-    id: 'attaque', nomCle: 'ml.vue.attaque', emoji: '⚡',
+    id: 'attaque', nomCle: 'ml.vue.attaque', icone: 'eclair' as const,
     colonnes: [
       { cle: 'courses', entete: 'crs', titreCle: 'ml.stat.courses', valeur: (s) => s.courses },
       { cle: 'franchissements', entete: 'frn', titreCle: 'ml.stat.franchissements', valeur: (s) => s.franchissements },
@@ -48,7 +50,7 @@ const VUES_FEUILLE: { id: string; nomCle: string; emoji: string; colonnes: Colon
     ],
   },
   {
-    id: 'defense', nomCle: 'ml.vue.defense', emoji: '🛡️',
+    id: 'defense', nomCle: 'ml.vue.defense', icone: 'bouclier' as const,
     colonnes: [
       { cle: 'plaquages', entete: 'plq', titreCle: 'ml.stat.plaquages', valeur: (s) => s.plaquages },
       { cle: 'plaquagesManques', entete: 'mqs', titreCle: 'ml.stat.plaquagesManques', valeur: (s) => s.plaquagesManques },
@@ -57,7 +59,7 @@ const VUES_FEUILLE: { id: string; nomCle: string; emoji: string; colonnes: Colon
     ],
   },
   {
-    id: 'conquete', nomCle: 'ml.vue.conquete', emoji: '🌀',
+    id: 'conquete', nomCle: 'ml.vue.conquete', icone: 'poignee' as const,
     colonnes: [
       { cle: 'melees', entete: 'mêl', titreCle: 'ml.stat.melees', valeur: (s) => s.melees },
       { cle: 'touchesGagnees', entete: 'tch', titreCle: 'ml.stat.touchesGagnees', valeur: (s) => s.touchesGagnees },
@@ -65,7 +67,7 @@ const VUES_FEUILLE: { id: string; nomCle: string; emoji: string; colonnes: Colon
     ],
   },
   {
-    id: 'pied', nomCle: 'ml.vue.pied', emoji: '🦵',
+    id: 'pied', nomCle: 'ml.vue.pied', icone: 'cible' as const,
     colonnes: [
       { cle: 'coupsDePied', entete: 'cdp', titreCle: 'ml.stat.coupsDePied', valeur: (s) => s.coupsDePied },
       { cle: 'metresAuPied', entete: 'm/p', titreCle: 'ml.stat.metresAuPied', valeur: (s) => s.metresAuPied },
@@ -75,10 +77,10 @@ const VUES_FEUILLE: { id: string; nomCle: string; emoji: string; colonnes: Colon
     ],
   },
   {
-    id: 'discipline', nomCle: 'ml.vue.discipline', emoji: '🟨',
+    id: 'discipline', nomCle: 'ml.vue.discipline', icone: 'carton' as const,
     colonnes: [
-      { cle: 'cartonsJaunes', entete: '🟨', titreCle: 'ml.stat.cartonsJaunes', valeur: (s) => s.cartonsJaunes },
-      { cle: 'cartonsRouges', entete: '🟥', titreCle: 'ml.stat.cartonsRouges', valeur: (s) => s.cartonsRouges },
+      { cle: 'cartonsJaunes', entete: 'CJ', titreCle: 'ml.stat.cartonsJaunes', valeur: (s) => s.cartonsJaunes },
+      { cle: 'cartonsRouges', entete: 'CR', titreCle: 'ml.stat.cartonsRouges', valeur: (s) => s.cartonsRouges },
       { cle: 'plaquagesManques', entete: 'mqs', titreCle: 'ml.stat.plaquagesManques', valeur: (s) => s.plaquagesManques },
       { cle: 'distance', entete: 'km', titreCle: 'ml.stat.distance', valeur: (s) => s.distanceParcourue / 1000 },
     ],
@@ -108,11 +110,11 @@ export function FeuilleMatch({
   return (
     <div className="ml-fil ml-feuille">
       <div className="ml-resume">
-        <span>🏉 {stats.essaisA} - {stats.essaisB} {t('ml.essais')}</span>
-        <span>🔒 {e.compteurs.rucks} {t('ml.rucks')}</span>
-        <span>🙌 {e.compteurs.touches} {t('ml.touches')}</span>
-        <span>🌀 {e.compteurs.melees} {t('ml.melees')}</span>
-        <span>⚡ {e.compteurs.percees} {t('ml.percees')}</span>
+        <span><Icone nom="ballon" taille={13} /> {stats.essaisA} - {stats.essaisB} {t('ml.essais')}</span>
+        <span><Icone nom="poignee" taille={13} /> {e.compteurs.rucks} {t('ml.rucks')}</span>
+        <span><Icone nom="equipe" taille={13} /> {e.compteurs.touches} {t('ml.touches')}</span>
+        <span><Icone nom="halteres" taille={13} /> {e.compteurs.melees} {t('ml.melees')}</span>
+        <span><Icone nom="eclair" taille={13} /> {e.compteurs.percees} {t('ml.percees')}</span>
       </div>
 
       {/* ⚠️ LA SANCTION EST ANNONCÉE ICI, PAS SEULEMENT DANS LE JOURNAL.
@@ -122,7 +124,7 @@ export function FeuilleMatch({
           provoquée. */}
       {(stats.discipline.citation || stats.discipline.blessure) && (
         <div className="ml-sanction">
-          <b>⚖️ {t('ml.sanction.titre')}</b>
+          <b><Icone nom="institution" taille={15} /> {t('ml.sanction.titre')}</b>
           {stats.discipline.citation && (
             <p>{t('ml.sanction.suspension', {
               n: stats.discipline.citation.semaines,
@@ -132,7 +134,7 @@ export function FeuilleMatch({
             })}</p>
           )}
           {stats.discipline.blessure && (
-            <p>🚑 {stats.discipline.blessure.nom} : {t('ml.sanction.semaines', {
+            <p><Icone nom="soin" taille={14} /> {stats.discipline.blessure.nom} : {t('ml.sanction.semaines', {
               n: stats.discipline.blessure.semaines,
             })}</p>
           )}
@@ -149,7 +151,7 @@ export function FeuilleMatch({
       {maNote && (
         <details className="ml-ma-note" open>
           <summary>
-            ⭐ {t('ml.maNote')} : <b>{maNote.note}/10</b>
+            <Icone nom="etoile" taille={14} /> {t('ml.maNote')} : <b>{maNote.note}/10</b>
             <span> · {t('ml.noteExplication')}</span>
           </summary>
           <div className="ml-note-detail">
@@ -173,13 +175,13 @@ export function FeuilleMatch({
             className={`chip-cat${vueFeuille === v.id ? ' actif' : ''}`}
             onClick={() => setVueFeuille(v.id)}
           >
-            {v.emoji} {t(v.nomCle)}
+            <Icone nom={v.icone} taille={14} /> {t(v.nomCle)}
           </button>
         ))}
       </div>
       {[e.clubA, e.clubB].map((club) => (
         <div key={club} className="ml-bilan-groupe">
-          <div className="ml-bilan-tete">📋 {club}</div>
+          <div className="ml-bilan-tete"><Icone nom="journal" taille={14} /> {club}</div>
           <div className="ml-bilan-entete" style={{ gridTemplateColumns: grilleColonnes }}>
             <span /><span>{t('ml.joueur')}</span>
             {colonnes.map((c) => <span key={c.cle} title={t(c.titreCle)}>{c.entete}</span>)}

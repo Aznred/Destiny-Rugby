@@ -1,4 +1,6 @@
 import { Fragment, Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Icone } from '../components/Icone';
+import type { NomIcone } from '../components/Icone';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useGame, classementComplet, palmaresDepuisLibelles } from '../store/useGame';
 import { POSTE_PAR_ID, migrerPoste, nomPoste } from '../data/rugby';
@@ -212,11 +214,11 @@ function PanneauFiche({
             posé sous une ligne de tableau : un bouton pleine largeur en tête
             lui donnait l'air d'une modale, et volait la place du nom. */}
         <button type="button" className="fc-fermer" onClick={onFermer} aria-label={t('clst.fermer')}>
-          ✕
+          <Icone nom="croix" taille={18} />
         </button>
       </header>
 
-      {fiche.partielle && <p className="fc-note">🕰️ {t('clst.ficheAncienne')}</p>}
+      {fiche.partielle && <p className="fc-note"><Icone nom="chrono" taille={14} /> {t('clst.ficheAncienne')}</p>}
 
       {/* ═══ LES CHIFFRES ═══════════════════════════════════════════════ */}
       <div className="fc-tuiles">
@@ -238,7 +240,7 @@ function PanneauFiche({
       <div className="fc-colonnes">
         {fiche.clubs.length > 0 && (
           <div className="fc-bloc">
-            <div className="fc-titre">🏟️ {t('clst.clubs')}</div>
+            <div className="fc-titre"><Icone nom="stade" taille={15} /> {t('clst.clubs')}</div>
             <div className="parcours-clubs">
               {fiche.clubs.map((nom, i) => {
                 const c = clubParNom(nom);
@@ -254,7 +256,7 @@ function PanneauFiche({
         )}
 
         <div className="fc-bloc">
-          <div className="fc-titre">🏆 {t('clst.armoire')}</div>
+          <div className="fc-titre"><Icone nom="trophee" taille={15} /> {t('clst.armoire')}</div>
           {/* ⚠️ PLUS DE LISTE DE MÉDAILLES, JUSTE LA PORTE DE L'ARMOIRE (demande
               explicite). Une carrière à dix titres empilait dix étiquettes
               grises qui répétaient, en moins bien, ce que le meuble en 3D montre
@@ -264,7 +266,7 @@ function PanneauFiche({
               ⚠️ Et c'est l'armoire de CE joueur-là, pas la sienne. */}
           {fiche.palmares.length > 0 ? (
             <button type="button" className="fc-armoire" onClick={onArmoire}>
-              🗄️ {t('clst.ouvrirArmoire')}
+              <Icone nom="trophee" taille={16} /> {t('clst.ouvrirArmoire')}
             </button>
           ) : (
             <p className="fc-note">{t('clst.aucunTitre')}</p>
@@ -324,14 +326,17 @@ export function Classement() {
   // ses catégories ni faire remonter une fiche créée pendant les essais du
   // développeur. Le classement « Joueurs » est alors l'unique vue publique.
   const [categorie, setCategorie] = useState<Categorie>(managerVisible ? 'total' : 'joueur');
-  const categories: ReadonlyArray<readonly [Categorie, string, string]> = managerVisible
+  // ⚠️ LE SECOND MEMBRE EST UN NOM D'ICÔNE, plus un emoji : deux des quatre
+  // étaient des séquences composées (🧑‍🏫 = personne + ZWJ + école) que Windows
+  // rend en DEUX glyphes côte à côte.
+  const categories: ReadonlyArray<readonly [Categorie, NomIcone, string]> = managerVisible
     ? [
-        ['total', '🌍', 'Total'],
-        ['joueur', '🏉', 'Joueurs'],
-        ['entraineur', '🧑‍🏫', 'Entraîneurs'],
-        ['joueurEntraineur', '⭐', 'Joueur + entraîneur'],
+        ['total', 'monde', 'Total'],
+        ['joueur', 'ballon', 'Joueurs'],
+        ['entraineur', 'entraineur', 'Entraîneurs'],
+        ['joueurEntraineur', 'etoile', 'Joueur + entraîneur'],
       ]
-    : [['joueur', '🏉', 'Joueurs']];
+    : [['joueur', 'ballon', 'Joueurs']];
   /** Le pseudo en cours de saisie, ou `null` quand on ne l'édite pas. */
   const [pseudoEnCours, setPseudoEnCours] = useState<string | null>(null);
 
@@ -395,7 +400,7 @@ export function Classement() {
       transition={{ duration: 0.4 }}
     >
       <div className="eyebrow">{t('clst.eyebrow')}</div>
-      <h1>🏆 {t('clst.h1')}</h1>
+      <h1><Icone nom="trophee" taille={26} /> {t('clst.h1')}</h1>
       <p style={{ color: 'var(--craie-dim)', maxWidth: '64ch', margin: '0.6rem 0 1.4rem' }}>
         {t('clst.chapo')}
       </p>
@@ -416,7 +421,7 @@ export function Classement() {
 
       {/* ═══ LE TABLEAU MONDIAL — TOUJOURS AFFICHÉ, AVEC SON ÉTAT ════════ */}
       <div className="carte tableau-classement mondial">
-        <h2 style={{ marginTop: 0 }}>🌍 {t('clst.mondialTitre')}</h2>
+        <h2 style={{ marginTop: 0 }}><Icone nom="monde" taille={22} /> {t('clst.mondialTitre')}</h2>
         <p className="aide">{t('clst.mondialIntro')}</p>
 
         {/* ═══ LES QUATRE CLASSEMENTS ══════════════════════════════════
@@ -430,20 +435,20 @@ export function Classement() {
             d’un côté, ~3 444 de l’autre). Sans cette calibration, le
             classement total ne serait qu’un des deux, déguisé. */}
         <div className="onglets-classement">
-          {categories.map(([id, emoji, libelle]) => (
+          {categories.map(([id, icone, libelle]) => (
             <button
               key={id}
               type="button"
               className={`chip-comp${categorie === id ? ' actif' : ''}`}
               onClick={() => { setCategorie(id); setPage(1); setLigneOuverte(null); }}
             >
-              {emoji} {libelle}
+              <Icone nom={icone} taille={16} /> {libelle}
             </button>
           ))}
         </div>
         {mondial?.etat === 'ok' && mondial.filtreIgnore && (
           <p className="aide">
-            ⚠️ Le serveur n’a pas pu filtrer par catégorie (base restée au
+            <Icone nom="alerte" taille={14} /> Le serveur n’a pas pu filtrer par catégorie (base restée au
             schéma v1) : c’est le classement complet qui s’affiche.
             Voir <code>serveur/MIGRATION-FICHES.md</code>.
           </p>
@@ -452,15 +457,15 @@ export function Classement() {
         {mondial === null && <p className="aide">⏳ {t('clst.chargement')}</p>}
 
         {mondial?.etat === 'hors-ligne' && (
-          <p className="aide">💻 {t('clst.horsLigne')}</p>
+          <p className="aide"><Icone nom="reglages" taille={14} /> {t('clst.horsLigne')}</p>
         )}
 
         {mondial?.etat === 'panne' && (
-          <p className="aide">⛔ {t('clst.panne', { erreur: mondial.erreur })}</p>
+          <p className="aide"><Icone nom="stop" taille={14} /> {t('clst.panne', { erreur: mondial.erreur })}</p>
         )}
 
         {mondial?.etat === 'ok' && mondial.lignes.length === 0 && (
-          <p className="aide">🌱 {t('clst.mondialVide')}</p>
+          <p className="aide"><Icone nom="pousse" taille={14} /> {t('clst.mondialVide')}</p>
         )}
 
         {mondial?.etat === 'ok' && mondial.lignes.length > 0 && (
@@ -494,7 +499,7 @@ export function Classement() {
                 title={t('clst.voirDetails')}
               >
                 <span className="c-rang">
-                  {rang === 1 ? '🥇' : rang === 2 ? '🥈' : rang === 3 ? '🥉' : rang}
+                  {rang <= 3 ? <span className={`podium podium-${rang}`}><Icone nom="medaille" taille={17} /></span> : rang}
                 </span>
                 <span className="c-joueur">
                   {/* ⚠️ `migrerPoste('entraineur')` REND « arrière » : la
@@ -502,10 +507,10 @@ export function Classement() {
                       valeur de repli est le poste 15. Un entraîneur
                       s’affichait donc « ⚡ Arrière ». */}
                   {l.poste === 'entraineur' ? (
-                    <span className="c-emoji">🧑‍🏫</span>
+                    <span className="c-emoji"><Icone nom="entraineur" taille={17} /></span>
                   ) : l.poste ? (
                     <span className="c-emoji">
-                      {POSTE_PAR_ID[migrerPoste(l.poste)].categorie === 'Avant' ? '🛡️' : '⚡'}
+                      <Icone nom={POSTE_PAR_ID[migrerPoste(l.poste)].categorie === 'Avant' ? 'bouclier' : 'eclair'} taille={17} />
                     </span>
                   ) : null}
                   <span>
@@ -575,7 +580,7 @@ export function Classement() {
                     title={t('clst.maPlaceAide')}
                     onClick={() => setPage(maPage)}
                   >
-                    🎯 {t('clst.maPlace')}
+                    <Icone nom="cible" taille={15} /> {t('clst.maPlace')}
                   </button>
                 )}
               </div>
@@ -658,7 +663,7 @@ export function Classement() {
                   className="btn fantome petit"
                   onClick={() => setPseudoEnCours(pseudoClassement)}
                 >
-                  ✏️ {t('clst.changerPseudo')}
+                  <Icone nom="signature" taille={15} /> {t('clst.changerPseudo')}
                 </button>
               </>
             )}
@@ -678,7 +683,7 @@ export function Classement() {
       {liste.length === 0 ? (
         <div className="carte classement-vide">
           <p>
-            🏟️ <b>{t('clst.vide')}</b>
+            <Icone nom="stade" taille={16} /> <b>{t('clst.vide')}</b>
           </p>
           <p className="aide">
             Aucune carrière n'a encore été menée à son terme sur cet appareil.
@@ -704,11 +709,11 @@ export function Classement() {
             title={t('clst.voirDetails')}
           >
             <span className="c-rang">
-              {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+              {i < 3 ? <span className={`podium podium-${i + 1}`}><Icone nom="medaille" taille={17} /></span> : i + 1}
             </span>
             <span className="c-joueur">
               <span className="c-emoji">
-                {POSTE_PAR_ID[migrerPoste(l.poste)].categorie === 'Avant' ? '🛡️' : '⚡'}
+                <Icone nom={POSTE_PAR_ID[migrerPoste(l.poste)].categorie === 'Avant' ? 'bouclier' : 'eclair'} taille={17} />
               </span>
               <span>
                 <b>{l.nom}</b>

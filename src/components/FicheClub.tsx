@@ -9,6 +9,7 @@ import { t } from '../lib/i18n';
 import { Blason } from './Blason';
 import { Drapeau } from './Drapeau';
 import type { Club } from '../types';
+import { Icone } from './Icone';
 
 // Fiche d'un club : son effectif complet, poste par poste. Ouverte au clic sur
 // un club dans l'écran Championnats.
@@ -80,7 +81,7 @@ export function FicheClub({
             )}
           </div>
           <button className="btn fantome petit fiche-club-fermer" onClick={onFermer} aria-label={t('reg.fermer')}>
-            ✕
+            <Icone nom="croix" taille={18} />
           </button>
         </div>
 
@@ -102,7 +103,7 @@ export function FicheClub({
                   <span className="j-drapeau"><Drapeau nation={j.nation} taille={0.95} /></span>
                   <span className="j-nom">
                     {j.nom}
-                    {j.regen && <span title={t('eff.regen')}> 🌱</span>}
+                    {j.regen && <span title={t('eff.regen')}> <Icone nom="pousse" taille={13} /></span>}
                     {estEspoir(j) && (
                       <span className="j-tendance monte" title={t('eff.espoir', { n: j.potentiel })}>
                         ↗ {j.potentiel}

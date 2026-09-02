@@ -82,6 +82,7 @@
 // ⚠️ `createPortal(document.body)` obligatoire : le `backdrop-filter` des
 // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
 
+import { Icone } from './Icone';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
@@ -1134,7 +1135,7 @@ export function MatchLive({
             <b>{e.clubB}</b>
             {clubB ? <Blason club={clubB} taille={26} /> : <LogoEquipe nom={e.clubB} taille={26} />}
           </div>
-          <button className="ml-fermer" onClick={onFermer} title={t('ml.fermerAide')}>✕</button>
+          <button className="ml-fermer" onClick={onFermer} title={t('ml.fermerAide')}><Icone nom="croix" taille={18} /></button>
         </header>
         <div className="ml-progression" title={titre}>
           <span style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} />
@@ -1252,12 +1253,12 @@ export function MatchLive({
                 <div className="ml-hud">
                   <div className="ml-hud-haut">
                     <span className="ml-tag" style={{ borderColor: e.possession === 'A' ? couleurA : couleurB }}>
-                      🏉 {e.possession === 'A' ? e.clubA : e.clubB} · {possession}%
+                      <Icone nom="ballon" taille={13} /> {e.possession === 'A' ? e.clubA : e.clubB} · {possession}%
                     </span>
                     {e.phase !== 'jeuCourant' && (
                       <span className="ml-tag">{CLE_PHASE[e.phase] ? t(CLE_PHASE[e.phase]) : e.phase}</span>
                     )}
-                    {!enJeu && <span className="ml-tag">🛡️ {t(CLE_SYSTEME[e.systeme] ?? `ml.systeme.${e.systeme}`)}</span>}
+                    {!enJeu && <span className="ml-tag"><Icone nom="bouclier" taille={12} /> {t(CLE_SYSTEME[e.systeme] ?? `ml.systeme.${e.systeme}`)}</span>}
                   </div>
 
                   {/* ---------- LE SOUFFLE ----------
@@ -1275,7 +1276,7 @@ export function MatchLive({
                       data-bas={monPion.endurance < 30 ? 'oui' : undefined}
                       title={t('ml.enduranceAide')}
                     >
-                      <b>🫁</b>
+                      <b><Icone nom="coeur" taille={13} /></b>
                       <span><span style={{ width: `${Math.max(0, Math.min(100, monPion.endurance))}%` }} /></span>
                     </div>
                   )}
@@ -1297,7 +1298,7 @@ export function MatchLive({
                       qu’on est en train de jouer. */}
                   {echo && (
                     <div className="ml-retombee" role="status">
-                      <b>🎁 {echo.texte}</b>
+                      <b><Icone nom="cadeau" taille={14} /> {echo.texte}</b>
                     </div>
                   )}
 
@@ -1323,7 +1324,7 @@ export function MatchLive({
                   {enJeu && !jePeuxJouer && (
                     <div className="ml-cluster">
                       <span className="ml-attente">
-                        {monPion && monPion.sanction > 0 ? `🟨 ${t('ml.sanctionne')}` : `🪑 ${t('ml.surLeBanc')}`}
+                        {monPion && monPion.sanction > 0 ? t('ml.sanctionne') : t('ml.surLeBanc')}
                       </span>
                     </div>
                   )}
@@ -1333,9 +1334,9 @@ export function MatchLive({
                     <div className="ml-tuto" onClick={() => setTutoMatchVu(true)}>
                       <div className="ml-tuto-carte">
                         <b>⏸️ {t('ml.tuto.titre')}</b>
-                        <p>🏉 {t('ml.tuto.file')}</p>
+                        <p><Icone nom="ballon" taille={14} /> {t('ml.tuto.file')}</p>
                         <p>⏱️ {t('ml.tuto.carte')}</p>
-                        <p>🎬 {t('ml.tuto.ralenti')}</p>
+                        <p><Icone nom="video" taille={14} /> {t('ml.tuto.ralenti')}</p>
                         <button type="button" className="btn vert"
                           onClick={(ev) => { ev.stopPropagation(); setTutoMatchVu(true); }}>
                           {t('ml.tuto.compris')}
@@ -1350,7 +1351,7 @@ export function MatchLive({
                       sanction qu'on n'a pas vue venir n'apprend rien. */}
                   {e.bagarre && (
                     <div className="ml-bagarre" role="alertdialog" aria-label={t('ml.bagarre.titre')}>
-                      <b>💢 {t('ml.bagarre.titre')}</b>
+                      <b>{t('ml.bagarre.titre')}</b>
                       <p>{t('ml.bagarre.texte', { nom: e.bagarre.adversaire.nom })}</p>
                       <div className="ml-ordres">
                         {ORDRES.map((o) => (
@@ -1473,7 +1474,7 @@ export function MatchLive({
                             deux cartes coup sur coup, sans le repos habituel,
                             ça ressemble à une répétition. */}
                         {decision.enchaine
-                          ? `⚡ ${t('ml.dec.enchaine')}`
+                          ? t('ml.dec.enchaine')
                           : `${decision.emoji} ${t(decision.cle)}`}
                       </b>
                       <div className="ml-dec-options">
@@ -1498,8 +1499,8 @@ export function MatchLive({
                             </b>
                             {/* Les deux faces du pari, une ligne chacune. Un
                                 pourcentage seul ne dit pas s'il faut le prendre. */}
-                            <span className="ml-dec-gain">✅ {t(o.gain)}</span>
-                            <span className="ml-dec-risque">⚠️ {t(o.risque)}</span>
+                            <span className="ml-dec-gain"><Icone nom="check" taille={12} /> {t(o.gain)}</span>
+                            <span className="ml-dec-risque"><Icone nom="alerte" taille={12} /> {t(o.risque)}</span>
                           </button>
                         ))}
                         <button
@@ -1536,7 +1537,7 @@ export function MatchLive({
                     setTempo(suivant === 'jouer' ? 'decisions' : 'suivre');
                   }}
                 >
-                  {enJeu ? `🎮 ${t('ml.mode.jouer')}` : `👁️ ${t('ml.mode.regarder')}`}
+                  {enJeu ? <><Icone nom="sifflet" taille={14} /> {t('ml.mode.jouer')}</> : <><Icone nom="oeil" taille={14} /> {t('ml.mode.regarder')}</>}
                 </button>
               )}
               {!e.fini && (
@@ -1594,25 +1595,25 @@ export function MatchLive({
           <div className="ml-tiroir" role="dialog" aria-label={t('ml.plus')}>
             <div className="ml-tiroir-onglets">
               {([
-                ['fil', '📜', 'ml.onglet.fil'],
-                ['consigne', '📣', 'ml.onglet.consigne'],
-                ['tactique', '🧠', 'mgr.tactique'],
-                ['commandes', '❓', 'ml.commandes.titre'],
+                ['fil', 'journal', 'ml.onglet.fil'],
+                ['consigne', 'sifflet', 'ml.onglet.consigne'],
+                ['tactique', 'entraineur', 'mgr.tactique'],
+                ['commandes', 'livre', 'ml.commandes.titre'],
               ] as const)
                 .filter(([id]) => (id !== 'consigne' || !!monPion)
                   && (id !== 'tactique' || !!manager)
                   && (id !== 'fil' || !large))
-                .map(([id, emoji, cleOnglet]) => (
+                .map(([id, icone, cleOnglet]) => (
                   <button
                     key={id}
                     type="button"
                     className={`chip-cat${tiroir === id ? ' actif' : ''}`}
                     onClick={() => setTiroir(id)}
                   >
-                    {emoji} {t(cleOnglet)}
+                    <Icone nom={icone} taille={14} /> {t(cleOnglet)}
                   </button>
                 ))}
-              <button type="button" className="ml-tiroir-fermer" onClick={() => setTiroir(null)}>✕</button>
+              <button type="button" className="ml-tiroir-fermer" onClick={() => setTiroir(null)}><Icone nom="croix" taille={17} /></button>
             </div>
 
             {tiroir === 'fil' && (
@@ -1640,13 +1641,13 @@ export function MatchLive({
                     est la seule question qui reste : « qu'est-ce que je suis
                     censé faire ? ». */}
                 <div className="ml-commandes-liste">
-                  <span>🏉 {t('ml.commandes.file')}</span>
+                  <span><Icone nom="ballon" taille={13} /> {t('ml.commandes.file')}</span>
                   <span>⏸️ {t('ml.commandes.carte')}</span>
                   <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> : {t('ml.commandes.chiffres')}</span>
                   <span>⏭️ {t('ml.commandes.laisser')}</span>
-                  <span>🎬 {t('ml.commandes.ralenti')}</span>
-                  <span>📣 {t('ml.commandes.consigne')}</span>
-                  <span>💢 {t('ml.commandes.bagarre')}</span>
+                  <span><Icone nom="video" taille={13} /> {t('ml.commandes.ralenti')}</span>
+                  <span><Icone nom="sifflet" taille={13} /> {t('ml.commandes.consigne')}</span>
+                  <span><Icone nom="alerte" taille={13} /> {t('ml.commandes.bagarre')}</span>
                 </div>
               </div>
             )}
@@ -1660,20 +1661,20 @@ export function MatchLive({
 
 const OPTIONS_TACTIQUES = {
   attaque: [
-    ['equilibre', '⚖️ Équilibré'], ['avants', '🧱 Jeu d’avants'],
-    ['large', '↔️ Jouer au large'], ['occupation', '🦶 Occupation'],
+    ['equilibre', 'Équilibré'], ['avants', 'Jeu d’avants'],
+    ['large', 'Jouer au large'], ['occupation', 'Occupation'],
   ],
   defense: [
-    ['blitz', '⚡ Blitz'], ['glissee', '↔️ Glissée'], ['repli', '🛡️ Repli'],
+    ['blitz', 'Blitz'], ['glissee', 'Glissée'], ['repli', 'Repli'],
   ],
   rythme: [
-    ['gestion', '🧊 Gérer'], ['normal', '▶️ Normal'], ['intense', '🔥 Intense'],
+    ['gestion', 'Gérer'], ['normal', 'Normal'], ['intense', 'Intense'],
   ],
   penalites: [
-    ['mixte', '🧠 Selon le terrain'], ['points', '🎯 Prendre les points'], ['touche', '🚩 Chercher la touche'],
+    ['mixte', 'Selon le terrain'], ['points', 'Prendre les points'], ['touche', 'Chercher la touche'],
   ],
   remplacements: [
-    ['precoces', '⏱️ Précoces'], ['standard', '🔄 Standards'], ['tardifs', '⌛ Tardifs'],
+    ['precoces', 'Précoces'], ['standard', 'Standards'], ['tardifs', 'Tardifs'],
   ],
 } as const;
 
@@ -1695,7 +1696,7 @@ function CoachingManager({
   return (
     <div className="ml-coaching-manager">
       <div className="ml-coaching-manager-tete">
-        <b>🧠 Banc tactique</b>
+        <b><Icone nom="banc" taille={15} /> Banc tactique</b>
         <span>Les changements s’appliquent à la prochaine action.</span>
       </div>
       {(Object.keys(OPTIONS_TACTIQUES) as (keyof typeof OPTIONS_TACTIQUES)[]).map((cle) => (
@@ -1752,7 +1753,7 @@ function Coaching({
       />
       <button className="x-poster" disabled={!consigneTexte.trim() || envoiConsigne}
         onClick={() => void envoyerConsigne()}>
-        {envoiConsigne ? '…' : `📣 ${t('ml.transmettre')}`}
+        {envoiConsigne ? '…' : t('ml.transmettre')}
       </button>
       {e.consigne && e.consigne !== CONSIGNE_NEUTRE && (
         <span className="ml-consigne">{e.consigne.libelle}</span>
@@ -1808,7 +1809,7 @@ function ecartsDeFeuille(avant: StatsMatch | null, apres: StatsMatch): string[] 
     }
   }
   const m = Math.round(apres.metres - avant.metres);
-  if (m > 0 && sortie.length < 3) sortie.push(`📏 +${m} m`);
+  if (m > 0 && sortie.length < 3) sortie.push(`+${m} m`);
   return sortie;
 }
 

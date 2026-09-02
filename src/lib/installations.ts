@@ -19,10 +19,17 @@ export const NIVEAU_INSTALLATION_MAX = 4;
 
 export const TYPES_INSTALLATION: TypeInstallation[] = ['formation', 'entrainement', 'recrutement'];
 
-export const EMOJI_INSTALLATION: Record<TypeInstallation, string> = {
-  formation: '🎓',
-  entrainement: '🏋️',
-  recrutement: '🔎',
+/**
+ * ⚠️ CE SONT DES NOMS D'ICÔNES DESSINÉES, PLUS DES EMOJI. La table s'appelait
+ * `EMOJI_INSTALLATION` et rendait 🎓 🏋️ 🔎 : trois pictogrammes dessinés par le
+ * système d'exploitation, dans des couleurs qui ne sont pas celles du jeu et
+ * avec une ligne de base qui varie d'une machine à l'autre. Les tracés de
+ * `components/Icone.tsx` prennent la couleur du texte et s'alignent dessus.
+ */
+export const ICONE_INSTALLATION: Record<TypeInstallation, 'formation' | 'halteres' | 'loupe'> = {
+  formation: 'formation',
+  entrainement: 'halteres',
+  recrutement: 'loupe',
 };
 
 /** Un club qu'on prend en main n'a rien de construit tant qu'on n'a rien payé. */

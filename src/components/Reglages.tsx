@@ -12,6 +12,7 @@ import {
 import type { Theme } from '../types';
 import { LANGUES, nombre, t, tn } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
+import { Icone } from './Icone';
 
 // Les huit ambiances. `apercu` est le dégradé montré sur la pastille — il
 // reprend exactement les deux extrémités de la rampe de fond du thème.
@@ -116,7 +117,7 @@ export function Reglages({ onFermer }: Props) {
               {!iaActivee
                 ? t('reg.iaInactive')
                 : etat.disponible
-                  ? `✓ ${t('reg.iaPrete')}`
+                  ? t('reg.iaPrete')
                   : etat.quotaEpuise
                     ? t('reg.iaQuota')
                     : t('reg.iaSansCle')}
@@ -246,7 +247,7 @@ export function Reglages({ onFermer }: Props) {
         <div className="champ">
           <label>{t('reg.rythme')}</label>
           <p className="aide">
-            📅 {t('reg.rythmeAide')}
+            <Icone nom="calendrier" taille={15} /> {t('reg.rythmeAide')}
           </p>
         </div>
 
@@ -260,12 +261,12 @@ export function Reglages({ onFermer }: Props) {
             plus, c'est pire qu'une fonction manquante : c'est un mensonge. */}
 
         <details className="tuto">
-          <summary>📘 {t('reg.tutoriel')}</summary>
+          <summary><Icone nom="livre" taille={16} /> {t('reg.tutoriel')}</summary>
           <p className="aide">{t('reg.tutorielAide')}</p>
         </details>
 
         <div className="note-sans-cle">
-          🎮 {t('reg.sansCleAide')}
+          <Icone nom="sifflet" taille={15} /> {t('reg.sansCleAide')}
         </div>
 
         {/* ⚠️ IL N'Y A PLUS DE BOUTON « ENREGISTRER », et ce n'est pas un oubli.

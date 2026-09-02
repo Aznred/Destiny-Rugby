@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { t } from '../lib/i18n';
+import { Icone } from './Icone';
 
 // Liste déroulante maison : un <select> natif ne peut afficher ni drapeau ni
 // style personnalisé (le menu est rendu par l'OS). Celui-ci suit le thème du
@@ -156,7 +157,7 @@ export function Selecteur({
           <span className="sel-label">{o.label}</span>
           {o.sous && <span className="sel-sous">{o.sous}</span>}
         </span>
-        {o.valeur === valeur && <span className="sel-check">✓</span>}
+        {o.valeur === valeur && <span className="sel-check"><Icone nom="check" taille={13} /></span>}
       </button>,
     );
   });

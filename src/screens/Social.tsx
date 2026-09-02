@@ -87,6 +87,17 @@ const I_CLOCHE = 'M12 2a6 6 0 0 0-6 6c0 4.5-1.5 6-2 7h16c-.5-1-2-2.5-2-7a6 6 0 0
 const I_TROPHEE = 'M6 3h12v2h3v3a4 4 0 0 1-4 4h-.4A6 6 0 0 1 13 15.8V19h3v2H8v-2h3v-3.2A6 6 0 0 1 7.4 12H7a4 4 0 0 1-4-4V5h3V3Zm0 4H5v1a2 2 0 0 0 1 1.7V7Zm12 0v2.7A2 2 0 0 0 19 8V7h-1Z';
 const I_LOUPE = 'M10.5 3a7.5 7.5 0 1 0 4.6 13.4l4.2 4.3 1.5-1.5-4.3-4.2A7.5 7.5 0 0 0 10.5 3Zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Z';
 const I_PROFIL = 'M12 3a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm0 11c-4.4 0-8 2.4-8 5.3V21h16v-1.7c0-2.9-3.6-5.3-8-5.3Z';
+// ⚠️ QUATRE TRACÉS DE PLUS, MÊME FAMILLE QUE LES SEPT AUTRES. L'Ovale dessine
+// déjà ses icônes en chemins pleins (I_ACCUEIL, I_COEUR…) : ajouter ici plutôt
+// que d'importer `components/Icone` garde une seule facture graphique pour
+// tout l'écran — les icônes du réseau sont PLEINES, celles du jeu sont au
+// TRAIT, et c'est précisément ce qui fait que L'Ovale ne ressemble pas au
+// reste du jeu (« le seul écran qui sort du thème stade », voir CLAUDE.md).
+const I_CROIX = 'm12 10.6 5.3-5.3 1.4 1.4-5.3 5.3 5.3 5.3-1.4 1.4-5.3-5.3-5.3 5.3-1.4-1.4 5.3-5.3-5.3-5.3 1.4-1.4 5.3 5.3Z';
+const I_IMAGE = 'M3 5.5A2.5 2.5 0 0 1 5.5 3h13A2.5 2.5 0 0 1 21 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5v-13Zm2.4 12.9h13.2l-4.5-5.6-3 3.4-2.2-2.2-3.5 4.4ZM8.6 10a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z';
+const I_STADE = 'M3 18.6v-6.4C3 8.6 7 6 12 6s9 2.6 9 6.2v6.4H3Zm3.6-2h1.8v-3.4H6.6v3.4Zm4.5 0h1.8v-4.6h-1.8v4.6Zm4.5 0h1.8v-3.4h-1.8v3.4Z';
+const I_OK = 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1.2 14.6-4.2-4.2 1.6-1.6 2.6 2.6 5.4-5.8 1.7 1.6-7.1 7.4Z';
+const I_BALLON = 'M4.9 19.1C2.8 17 3.6 11 7.4 7.2S17 2.9 19.1 4.9s1.3 8-2.5 11.8-9.6 4.5-11.7 2.4Zm3.9-3.5 6.8-6.8-1.4-1.4-6.8 6.8 1.4 1.4Z';
 
 const EMOJIS_PROFIL = ['🏉', '💪', '🔥', '🐐', '⚡', '🦁', '🐓', '🌊', '🎯', '👑', '🥇', '😎'];
 
@@ -96,7 +107,7 @@ function LogoOvale() {
       <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden>
         <path d="M2.5 2h5.2l4.6 6.2L17.2 2H21l-6.8 8.6L21.6 22h-5.2l-5-6.7L5.6 22H2l7.2-9.1L2.5 2Z" />
       </svg>
-      <b>🏉</b>
+      <b><Icone d={I_BALLON} /></b>
     </span>
   );
 }
@@ -163,7 +174,7 @@ function Avatar({
           ? <img className="x-photo" src={choix} alt="" />
           : choix && choix !== 'club'
             ? <span style={{ fontSize: taille * 0.55 }}>{choix}</span>
-            : data ? <Blason club={data} taille={taille} /> : <span>🏉</span>}
+            : data ? <Blason club={data} taille={taille} /> : <span><Icone d={I_BALLON} /></span>}
       </span>
     );
   }
@@ -171,7 +182,7 @@ function Avatar({
     const data = clubParNom(avatar.slice(5));
     return (
       <span className="x-avatar" style={style}>
-        {data ? <Blason club={data} taille={taille} /> : <span>🏟️</span>}
+        {data ? <Blason club={data} taille={taille} /> : <span><Icone d={I_STADE} /></span>}
       </span>
     );
   }
@@ -192,10 +203,18 @@ function Avatar({
 // Retrouve un compte par son @ — dans l'annuaire, sinon reconstruit depuis les
 // publications (comptes inventés par l'IA), sinon une fiche minimale. Un profil
 // s'ouvre TOUJOURS.
+/**
+ * ⚠️ ELLE NE PREND PLUS UN `Joueur`, MAIS UN CONTEXTE SOCIAL. C'est ce qui
+ * permet à l'entraîneur d'ouvrir les mêmes profils que le joueur : `annuaire`
+ * n'a jamais eu besoin que du club, de la saison et de la division — le reste
+ * de la fiche du joueur ne servait à rien ici, et exiger un `Joueur` entier
+ * fermait la fonction au mode manager, qui n'en a pas.
+ */
 function compteDepuis(
-  joueur: Joueur, pseudo: string, posts: PostSocial[], fiches: CompteSuivi[] = [],
+  contexte: Pick<Joueur, 'club' | 'saison' | 'division'>,
+  pseudo: string, posts: PostSocial[], fiches: CompteSuivi[] = [],
 ): CompteSuivi {
-  const connu = annuaire(joueur).find((c) => c.pseudo === pseudo)
+  const connu = annuaire(contexte).find((c) => c.pseudo === pseudo)
     // ⚠️ Puis les fiches DÉJÀ AFFICHÉES (comptes suivis, suggestions d'Explorer).
     // Sans elles, ouvrir un compte hors annuaire recalculait ses abonnés à
     // partir des vues d'un post : le chiffre du profil ne collait pas à celui
@@ -312,7 +331,7 @@ function Post({
           {post.media?.url && <Media media={post.media} legende={post.texte} />}
           {post.action?.type === 'transfert' && post.action.joueur && (
             <div className="x-annonce">
-              🔁 <b>{post.action.joueur}</b> : {post.action.de} → {post.action.vers}
+              <Icone d={I_REPOST} /> <b>{post.action.joueur}</b> : {post.action.de} → {post.action.vers}
               <span>{t('ov.transfertApplique')}</span>
             </div>
           )}
@@ -445,7 +464,7 @@ function Composer() {
         {media?.url && (
           <div className="x-media-choisi">
             <img src={media.url} alt="" />
-            <button onClick={() => setMedia(undefined)} title={t('ov.retirer')}>✕</button>
+            <button onClick={() => setMedia(undefined)} title={t('ov.retirer')}><Icone d={I_CROIX} /></button>
           </div>
         )}
 
@@ -461,7 +480,7 @@ function Composer() {
               <button className="x-poster" onClick={() => void lancerRecherche(requete)} disabled={chargeMedia}>
                 {chargeMedia ? '…' : t('ov.chercher')}
               </button>
-              <button className="x-fermer-galerie" onClick={() => setGalerie(null)}>✕</button>
+              <button className="x-fermer-galerie" onClick={() => setGalerie(null)}><Icone d={I_CROIX} /></button>
             </div>
             <div className="x-galerie-grille">
               {galerie.length === 0 && !chargeMedia && <p className="x-vide">{t('ov.rienTrouve')}</p>}
@@ -491,7 +510,7 @@ function Composer() {
         </div>
         <p className="x-ton-desc">
           {t(`ov.tonDesc.${tonChoisi.id}`)}
-          {tonChoisi.risque > 0.2 && <b className="x-risque"> ⚠️ {t('ov.risqueTon')}</b>}
+          {tonChoisi.risque > 0.2 && <b className="x-risque"> {t('ov.risqueTon')}</b>}
         </p>
         <div className="x-composer-pied">
           <button
@@ -499,7 +518,7 @@ function Composer() {
             title={tenorKey ? t('ov.ajouterMedia') : t('ov.ajouterImage')}
             onClick={() => { setGalerie([]); void lancerRecherche(requete || 'rugby'); }}
           >
-            {tenorKey ? 'GIF' : '🖼️'}
+            {tenorKey ? 'GIF' : <Icone d={I_IMAGE} />}
           </button>
           <span className={`x-compteur${restant < 40 ? ' bas' : ''}`}>{restant}</span>
           <button
@@ -535,8 +554,8 @@ function Profil({
   const siens = posts.filter((p) => p.pseudo === compte.pseudo);
 
   const ETAT: Record<string, string> = {
-    ami: `💚 ${t('ov.relationAmi')}`, cordial: `🙂 ${t('ov.relationCordial')}`, neutre: `· ${t('ov.relationNeutre')}`,
-    froid: `🧊 ${t('ov.relationFroid')}`, ennemi: `💢 ${t('ov.relationEnnemi')}`,
+    ami: t('ov.relationAmi'), cordial: t('ov.relationCordial'), neutre: t('ov.relationNeutre'),
+    froid: t('ov.relationFroid'), ennemi: t('ov.relationEnnemi'),
   };
 
   return (
@@ -567,7 +586,7 @@ function Profil({
         {compte.bio && <p className="x-bio">{compte.bio}</p>}
         <div className="x-profil-chiffres">
           <span><b>{compact(compte.abonnes)}</b> {t('gen.abonnes')}</span>
-          {compte.club && <span>🏟️ {compte.club}</span>}
+          {compte.club && <span><Icone d={I_STADE} /> {compte.club}</span>}
           <span className="x-relation" data-etat={humeur(relation)}>
             {ETAT[humeur(relation)]}
           </span>
@@ -648,7 +667,7 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
                 {brouillon.avatar.startsWith('data:')
                   ? <img className="x-photo" src={brouillon.avatar} alt="" />
                   : brouillon.avatar === 'club'
-                    ? (clubParNom(joueur.club) ? <Blason club={clubParNom(joueur.club)!} taille={46} /> : <span>🏉</span>)
+                    ? (clubParNom(joueur.club) ? <Blason club={clubParNom(joueur.club)!} taille={46} /> : <span><Icone d={I_BALLON} /></span>)
                     : <span style={{ fontSize: 26 }}>{brouillon.avatar}</span>}
               </span>
               <div>
@@ -675,7 +694,7 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
             {/* Un fichier du disque : redimensionné en 160×160 avant d'être
                 rangé dans la sauvegarde (le localStorage plafonne à ~5 Mo). */}
             <label className="x-fichier">
-              📁 {t('ov.importerPhoto')}
+              {t('ov.importerPhoto')}
               <input
                 type="file"
                 accept="image/*"
@@ -834,13 +853,13 @@ function PanneauSuccesManager() {
   return (
     <div className="x-succes x-succes-manager">
       <div className="x-defis x-palmares-manager">
-        <h3>🏆 Palmarès de {manager.nom}</h3>
+        <h3>Palmarès de {manager.nom}</h3>
         <p className="x-note">Les trophées viennent des finales réellement remportées par ton équipe.</p>
         {manager.palmares.length ? (
           <div className="x-palmares-liste">
             {manager.palmares.slice().reverse().map((titre, index) => (
               <article key={`${titre.trophee}-${titre.saison}-${index}`}>
-                <span>🏆</span>
+                <span><Icone d={I_TROPHEE} /></span>
                 <div>
                   <b>{TROPHEES[titre.trophee]?.nom ?? titre.nom}</b>
                   <small>{titre.club} · saison {titre.saison}</small>
@@ -852,7 +871,7 @@ function PanneauSuccesManager() {
       </div>
 
       <div className="x-succes-tete">
-        <h3>🏅 Succès d’entraîneur</h3>
+        <h3>Succès d’entraîneur</h3>
         <span>{faits} / {total}</span>
       </div>
       <div className="x-barre"><i style={{ width: `${total ? (faits / total) * 100 : 0}%` }} /></div>
@@ -868,7 +887,7 @@ function PanneauSuccesManager() {
                 <p>{cache ? t('ov.succesSecretAide') : succes.desc}</p>
               </div>
               <span className="x-succes-gain">
-                {ok ? `${t('gen.saison')} ${debloques[succes.id]}` : `+${succes.ovas} 🪙`}
+                {ok ? `${t('gen.saison')} ${debloques[succes.id]}` : `+${succes.ovas}`}
               </span>
             </div>
           );
@@ -895,7 +914,7 @@ function Negociation({ pseudo }: { pseudo: string }) {
   if (accord) {
     return (
       <div className="x-nego x-nego-accord">
-        🤝 <b>{t('ov.accordTrouve')}</b> : {resumerTermes(accord.offre)}.
+        <b>{t('ov.accordTrouve')}</b> : {resumerTermes(accord.offre)}.
         <span>{t('ov.accordIntersaison')}</span>
       </div>
     );
@@ -905,7 +924,7 @@ function Negociation({ pseudo }: { pseudo: string }) {
   return (
     <div className="x-nego">
       <div className="x-nego-tete">
-        <b>{approche.prolongation ? `📄 ${t('ov.prolongation')}` : `✍️ ${t('ov.propositionContrat')}`}</b>
+        <b>{approche.prolongation ? t('ov.prolongation') : t('ov.propositionContrat')}</b>
         {/* La patience se voit : c'est le seul indice sur ce qu'il reste à jouer. */}
         <span className="x-nego-patience" title={t('ov.patienceAide')}>
           {'●'.repeat(Math.max(0, approche.patience))}
@@ -928,7 +947,7 @@ function Negociation({ pseudo }: { pseudo: string }) {
       </div>
       <div className="x-nego-fin">
         <button className="x-nego-oui" onClick={() => accepter(approche.id)}>
-          🤝 {t('ov.accepterOffre')}
+          {t('ov.accepterOffre')}
         </button>
         {confirme ? (
           <button className="x-nego-non" onClick={() => refuser(approche.id)}>
@@ -976,7 +995,7 @@ function CabinetAgent({ pseudo }: { pseudo: string }) {
           </button>
         ) : (
           <button className="x-nego-oui" onClick={() => choisir(agent.id)}>
-            🤝 {t('ov.confierInterets')}
+            {t('ov.confierInterets')}
           </button>
         )}
       </div>
@@ -1101,7 +1120,7 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
         )}
         {dossierActif && (
           <div className="x-suivi-recrutement" role="status">
-            <b>👀 {t('recrut.suivi.titre', { club: dossierActif.club })}</b>
+            <b>{t('recrut.suivi.titre', { club: dossierActif.club })}</b>
             <span>{t('recrut.suivi.examen')}</span>
           </div>
         )}
@@ -1174,7 +1193,7 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
   return (
     <div className="x-nego x-nego-manager" data-etat={nego.etat}>
       <div className="x-nego-tete">
-        <b>✍️ {t('mgr.x.offreContrat')}</b>
+        <b>{t('mgr.x.offreContrat')}</b>
         {nego.etat === 'ouverte' && (
           <span className="x-nego-patience" title={t('mgr.x.patience')}>
             {'●'.repeat(nego.patience)}{'○'.repeat(Math.max(0, 4 - nego.patience))}
@@ -1197,13 +1216,13 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
       {nego.etat === 'ouverte' && (
         <>
           <div className="x-nego-leviers">
-            <button onClick={() => negocier(nego.id, 'salaire')}>💶 {t('mgr.x.augmenterSalaire')}</button>
-            <button onClick={() => negocier(nego.id, 'prime')}>🎁 {t('mgr.x.augmenterPrime')}</button>
-            <button onClick={() => negocier(nego.id, 'duree')}>📄 {t('mgr.x.allonger')}</button>
-            <button onClick={() => negocier(nego.id, 'role')}>⭐ {t('mgr.x.meilleurRole')}</button>
+            <button onClick={() => negocier(nego.id, 'salaire')}>{t('mgr.x.augmenterSalaire')}</button>
+            <button onClick={() => negocier(nego.id, 'prime')}>{t('mgr.x.augmenterPrime')}</button>
+            <button onClick={() => negocier(nego.id, 'duree')}>{t('mgr.x.allonger')}</button>
+            <button onClick={() => negocier(nego.id, 'role')}>{t('mgr.x.meilleurRole')}</button>
           </div>
           <div className="x-nego-fin">
-            <button className="x-nego-oui" onClick={() => accepterDemandes(nego.id)}>🤝 {t('mgr.x.accepterDemandes')}</button>
+            <button className="x-nego-oui" onClick={() => accepterDemandes(nego.id)}>{t('mgr.x.accepterDemandes')}</button>
             <button className="x-nego-non" onClick={() => rompre(nego.id)}>{t('mgr.x.arreter')}</button>
           </div>
         </>
@@ -1215,12 +1234,12 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
               ? t('mgr.x.budgetValide', { cout: nombre(cout) })
               : t('mgr.x.budgetInsuffisant', { cout: nombre(cout) })}
           </p>
-          <button className="x-nego-oui" disabled={!budgetOk} onClick={() => signer(nego.id)}>✍️ {t('mgr.x.signerJoueur')}</button>
+          <button className="x-nego-oui" disabled={!budgetOk} onClick={() => signer(nego.id)}>{t('mgr.x.signerJoueur')}</button>
           <button className="x-nego-non" onClick={() => rompre(nego.id)}>{t('mgr.x.arreter')}</button>
         </div>
       )}
-      {nego.etat === 'signee' && <div className="x-nego-accord">✅ <b>{t('mgr.x.transfertFinalise')}</b></div>}
-      {nego.etat === 'rompue' && <div className="x-nego-accord">⛔ <b>{t('mgr.x.discussionClose')}</b></div>}
+      {nego.etat === 'signee' && <div className="x-nego-accord"><Icone d={I_OK} /> <b>{t('mgr.x.transfertFinalise')}</b></div>}
+      {nego.etat === 'rompue' && <div className="x-nego-accord"><b>{t('mgr.x.discussionClose')}</b></div>}
     </div>
   );
 }
@@ -1233,7 +1252,7 @@ function NegociationClubVendeur({ pseudo }: { pseudo: string }) {
   if (!nego) return null;
   return (
     <div className="x-nego x-nego-manager" data-etat={nego.etat}>
-      <div className="x-nego-tete"><b>🏟️ Accord entre clubs</b>{nego.etat === 'ouverte' && <span className="x-nego-patience">{'●'.repeat(nego.patience)}{'○'.repeat(Math.max(0, 4 - nego.patience))}</span>}</div>
+      <div className="x-nego-tete"><b><Icone d={I_STADE} /> Accord entre clubs</b>{nego.etat === 'ouverte' && <span className="x-nego-patience">{'●'.repeat(nego.patience)}{'○'.repeat(Math.max(0, 4 - nego.patience))}</span>}</div>
       <div className="manager-x-termes manager-x-termes-club">
         <span><small>Demande</small><b>{nombre(nego.demande)} €</b></span>
         <span><small>Ton offre</small><b>{nombre(nego.offre)} €</b></span>
@@ -1241,13 +1260,13 @@ function NegociationClubVendeur({ pseudo }: { pseudo: string }) {
       {nego.etat === 'ouverte' && <>
         <p className="x-nego-offre">Le prix minimum du club reste caché. Chaque tentative use sa patience.</p>
         <div className="x-nego-leviers">
-          <button onClick={() => negocier(nego.id, 'monter')}>💶 Monter l’offre</button>
-          <button onClick={() => negocier(nego.id, 'bonus')}>🎯 Ajouter des bonus</button>
-          <button onClick={() => negocier(nego.id, 'accepter')}>🤝 Accepter {nombre(nego.demande)} €</button>
+          <button onClick={() => negocier(nego.id, 'monter')}>Monter l’offre</button>
+          <button onClick={() => negocier(nego.id, 'bonus')}>Ajouter des bonus</button>
+          <button onClick={() => negocier(nego.id, 'accepter')}>Accepter {nombre(nego.demande)} €</button>
         </div>
       </>}
-      {nego.etat === 'accord' && <div className="manager-x-signature"><p className="budget-ok">✅ Accord à {nombre(nego.offre)} €. Tu peux maintenant parler au joueur.</p><button className="x-nego-oui" onClick={() => contacterJoueur(nego.cible)}>Écrire à {nego.cible.nom}</button></div>}
-      {nego.etat === 'rompue' && <div className="x-nego-accord">⛔ <b>Le club a quitté la table des négociations pour cette saison.</b></div>}
+      {nego.etat === 'accord' && <div className="manager-x-signature"><p className="budget-ok">Accord à {nombre(nego.offre)} €. Tu peux maintenant parler au joueur.</p><button className="x-nego-oui" onClick={() => contacterJoueur(nego.cible)}>Écrire à {nego.cible.nom}</button></div>}
+      {nego.etat === 'rompue' && <div className="x-nego-accord"><b>Le club a quitté la table des négociations pour cette saison.</b></div>}
     </div>
   );
 }
@@ -1259,12 +1278,12 @@ function DemandeVestiaireManager({ pseudo }: { pseudo: string }) {
   if (!demande) return null;
   return (
     <div className="x-nego x-nego-manager" data-etat={demande.etat}>
-      <div className="x-nego-tete"><b>{demande.type === 'depart' ? '🚪 Demande de départ' : '👕 Temps de jeu'}</b></div>
+      <div className="x-nego-tete"><b>{demande.type === 'depart' ? 'Demande de départ' : 'Temps de jeu'}</b></div>
       <p className="x-nego-offre">{demande.nom} · {nomPoste(demande.poste)} · note {demande.note}</p>
       {demande.etat === 'ouverte' ? <div className="x-nego-fin">
         <button className="x-nego-oui" onClick={() => repondre(demande.id, true)}>{demande.type === 'depart' ? 'Accepter et le mettre en vente' : 'Promettre plus de temps de jeu'}</button>
         <button className="x-nego-non" onClick={() => repondre(demande.id, false)}>Refuser</button>
-      </div> : <div className="x-nego-accord">{demande.etat === 'acceptee' ? '✅ Demande acceptée' : '⛔ Demande refusée'}</div>}
+      </div> : <div className="x-nego-accord">{demande.etat === 'acceptee' ? 'Demande acceptée' : 'Demande refusée'}</div>}
     </div>
   );
 }
@@ -1311,7 +1330,15 @@ type DossierManagerSocial = {
   avatar: string;
 };
 
-type OngletManagerSocial = 'timeline' | 'explorer' | 'messages' | 'notifs' | 'succes' | 'profil';
+/**
+ * ⚠️ « compte » EST NOUVEAU, et c'est ce qui manquait pour rendre les profils
+ * cliquables côté entraîneur (demande : « pouvoir cliquer sur les profils,
+ * aussi dans le X de l'entraîneur »). L'onglet existait déjà dans le L'Ovale du
+ * joueur ; celui du manager passait `onProfil={() => {}}` — un clic sur un nom
+ * ne faisait littéralement rien, sans même un curseur pour le signaler.
+ */
+type OngletManagerSocial =
+  | 'timeline' | 'explorer' | 'messages' | 'notifs' | 'succes' | 'profil' | 'compte';
 
 interface OvaleManagerProps {
   embarque?: boolean;
@@ -1357,6 +1384,7 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
     conversationCible || ouvrirSocialSur === 'messages' ? 'messages' : 'timeline',
   );
   const [actif, setActif] = useState<string | null>(dossiers[0]?.pseudo ?? null);
+  const [profilVu, setProfilVu] = useState<string | null>(null);
   const messagesActifs = actif ? conversations[actif] ?? [] : [];
   const bas = useRef<HTMLDivElement>(null);
   const nonLuesNotifs = notifs.filter((n) => !n.lue).length;
@@ -1396,6 +1424,24 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
     if (embarque && onRetour) onRetour(destination);
     else setEcran('manager');
   };
+
+  /**
+   * Ouvrir le profil d'un compte, exactement comme le fait le L'Ovale du
+   * joueur : annuaire d'abord, repli reconstruit depuis les publications
+   * ensuite (`compteDepuis`). Le sien renvoie sur son propre onglet.
+   */
+  const monPseudo = pseudoDe(manager.club);
+  const contexteSocial = {
+    club: manager.club, saison: manager.saison, division: manager.division,
+  };
+  const compteVu = profilVu
+    ? compteDepuis(contexteSocial, profilVu, posts, resultatsComptes)
+    : undefined;
+  const ouvrirProfil = (pseudo: string) => {
+    if (pseudo === monPseudo) { setOnglet('profil'); setProfilVu(null); return; }
+    setProfilVu(pseudo);
+    setOnglet('compte');
+  };
   const lien = (cible: OngletManagerSocial, icone: string, label: string, badge?: number) => (
     <button className={onglet === cible ? 'actif' : ''} onClick={() => ouvrirOnglet(cible)}>
       <span className="x-cloche"><Icone d={icone} width={24} height={24} />{!!badge && <i className="x-pastille">{badge > 99 ? '99+' : badge}</i>}</span>
@@ -1414,7 +1460,13 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
           {lien('notifs', I_CLOCHE, t('ov.notifications'), nonLuesNotifs)}
           {lien('profil', I_PROFIL, t('nav.profil'))}
           {lien('succes', I_TROPHEE, t('ov.succes'))}
-          <button onClick={() => retournerAuManager()}><span style={{ fontSize: '1.35rem', lineHeight: 1 }}>🏟️</span><span>{t('mgr.bureau')}</span></button>
+          {/* ⚠️ LE BOUTON « BUREAU » A ÉTÉ RETIRÉ (demande explicite). Il était
+              là du temps où L'Ovale du manager s'ouvrait en plein écran ; il
+              est devenu un ONGLET du bureau (`vue === 'ovale'`), donc le bouton
+              faisait sortir d'un onglet vers l'onglet d'à côté, en doublon avec
+              la barre d'onglets qui reste visible juste au-dessus. Deux chemins
+              pour le même geste, dont un qui ressemble à une sortie de secours :
+              c'est ce qui faisait croire qu'on quittait le réseau. */}
         </nav>
         <button className="x-compte" onClick={() => setOnglet('profil')}>
           <Avatar avatar={`club:${manager.club}`} club={manager.club} taille={36} nom={manager.club} />
@@ -1435,26 +1487,29 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
         <form className="x-recherche x-recherche-mobile" onSubmit={(e) => { e.preventDefault(); setOnglet('timeline'); }}>
           <Icone d={I_LOUPE} />
           <input value={recherche} onChange={(e) => { setRecherche(e.target.value); setOnglet('timeline'); }} placeholder={t('ov.rechercheComplete')} />
-          {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}>✕</button>}
+          {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}><Icone d={I_CROIX} /></button>}
         </form>
 
         {onglet === 'timeline' && <>
           {recherche.trim() && <div className="x-explorer manager-x-comptes-recherche">
             <div className="x-bloc-tete"><h3>Comptes pour « {recherche} »</h3></div>
+            {/* Le compte entier est cliquable, comme dans L'Ovale du joueur. */}
             {resultatsComptes.map((compte) => <div key={compte.pseudo} className="x-compte-carte">
-              <Avatar avatar={compte.avatar} club={compte.club} taille={40} nom={compte.nom} />
-              <div className="x-compte-infos">
+              <button className="x-lien-profil" onClick={() => ouvrirProfil(compte.pseudo)}>
+                <Avatar avatar={compte.avatar} club={compte.club} taille={40} nom={compte.nom} />
+              </button>
+              <button className="x-compte-infos x-lien-profil" onClick={() => ouvrirProfil(compte.pseudo)}>
                 <b>{compte.nom}{compte.certifie && <Certifie />}</b>
                 <span className="x-pseudo">@{compte.pseudo} · {compact(compte.abonnes)} {t('gen.abonnes')}</span>
                 {compte.bio && <p>{compte.bio}</p>}
-              </div>
+              </button>
             </div>)}
             {!resultatsComptes.length && <p className="x-vide">{t('ov.aucunCompte')}</p>}
             <div className="x-bloc-tete"><h3>Publications</h3></div>
           </div>}
           <div className="manager-x-timeline">
             {postsFiltres.length
-              ? postsFiltres.map((post) => <Post key={post.id} post={post} lectureSeule onProfil={() => {}} onRecherche={(mot) => { setRecherche(mot); setOnglet('timeline'); }} />)
+              ? postsFiltres.map((post) => <Post key={post.id} post={post} lectureSeule onProfil={ouvrirProfil} onRecherche={(mot) => { setRecherche(mot); setOnglet('timeline'); }} />)
               : <div className="x-vide manager-x-vide"><b>{recherche ? 'Aucune publication' : 'Le fil se prépare'}</b><p>{recherche ? `Aucune publication ne correspond à « ${recherche} ».` : 'Les clubs, médias et supporters publieront au rythme des semaines et des résultats.'}</p></div>}
           </div>
         </>}
@@ -1463,7 +1518,11 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
           <>
             <div className="manager-x-explorer-tete">
               <div><b>Mercato du manager</b><span>Arrivées depuis le marché mondial · départs depuis L’Ovale</span></div>
-              <button className="x-poster" onClick={() => retournerAuManager()}>Ouvrir le bureau</button>
+              {/* Le bouton mène là où L'Ovale ne va pas : le MARCHÉ, pas le
+                  bureau. « Ouvrir le bureau » renvoyait à l'onglet d'à côté. */}
+              <button className="x-poster" onClick={() => retournerAuManager('marche')}>
+                {t('mgr.marche')}
+              </button>
             </div>
             <VentesManager recherche={recherche} />
           </>
@@ -1478,7 +1537,17 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
               })}
             </div>
             <div className="x-fil-messages">
-              {dossier && <div className="x-conv-tete"><Avatar avatar={dossier.avatar} taille={36} nom={dossier.nom} /><div><b>{dossier.nom}</b><span className="x-pseudo">@{dossier.pseudo} · {dossier.sous}</span></div></div>}
+              {dossier && (
+                <div className="x-conv-tete">
+                  <Avatar avatar={dossier.avatar} taille={36} nom={dossier.nom} />
+                  {/* Le nom en tête de conversation ouvre la fiche : c'est là
+                      qu'on se demande « c'est qui, ce joueur ? ». */}
+                  <button className="x-lien-profil" onClick={() => ouvrirProfil(dossier.pseudo)}>
+                    <b>{dossier.nom}</b>
+                    <span className="x-pseudo">@{dossier.pseudo} · {dossier.sous}</span>
+                  </button>
+                </div>
+              )}
               <div className="x-bulles">{messagesActifs.map((m, rang) => {
                 const heure = actif ? heureDuFil(actif, m, rang) : null;
                 return <div key={m.id} className={`x-bulle ${m.de === 'moi' ? 'moi' : 'lui'}`}><span>{m.texte}</span>{heure && <time>{heure}</time>}</div>;
@@ -1499,13 +1568,29 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
           <div className="x-banniere" />
           <div className="x-profil-corps">
             <div className="x-profil-avatar"><Avatar avatar={`club:${manager.club}`} club={manager.club} taille={76} nom={manager.club} /></div>
-            <div className="x-profil-boutons"><button className="x-suivre secondaire" onClick={() => retournerAuManager()}>Ouvrir le bureau</button></div>
+            {/* Plus de « Ouvrir le bureau » ici non plus : sur SON PROPRE
+                profil, le bouton ne parlait même pas du profil. */}
             <h2>{manager.club}<Certifie /></h2>
             <span className="x-pseudo">@{pseudoDe(manager.club)} · entraîné par {manager.nom}</span>
             <p className="x-bio">{manager.divisionNom} · saison {manager.saison}. Actualité officielle, résultats et coulisses du club.</p>
             <div className="x-profil-chiffres"><span><b>{Math.round(manager.prestige)}</b> prestige</span><span><b>{Math.round(manager.confiance)}%</b> confiance</span><span><b>{manager.ventes.length}</b> départs ouverts</span><span><b>{dossiers.length}</b> discussions</span></div>
           </div>
         </div>}
+
+        {onglet === 'compte' && compteVu && (
+          <Profil
+            compte={compteVu}
+            onFermer={() => { setProfilVu(null); setOnglet('timeline'); }}
+            // ⚠️ PAS DE MESSAGERIE DEPUIS UN PROFIL EN MODE ENTRAÎNEUR. Les
+            // conversations d'un manager sont des DOSSIERS (une négociation,
+            // une demande du vestiaire) créés par le store : ouvrir un fil vide
+            // avec un supporter croisé dans le fil donnerait une conversation
+            // que rien ne peut faire avancer. On le renvoie à ses dossiers.
+            onMessage={() => setOnglet('messages')}
+            onProfil={ouvrirProfil}
+            onRecherche={(mot) => { setRecherche(mot); setOnglet('timeline'); }}
+          />
+        )}
 
         {onglet === 'succes' && <PanneauSuccesManager />}
       </div>
@@ -1514,7 +1599,7 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
         <form className="x-recherche" onSubmit={(e) => { e.preventDefault(); setOnglet(onglet === 'explorer' ? 'explorer' : 'timeline'); }}>
           <Icone d={I_LOUPE} />
           <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher dans L’Ovale" />
-          {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}>✕</button>}
+          {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}><Icone d={I_CROIX} /></button>}
         </form>
         <div className="x-bloc">
           <h3>Ton club</h3>
@@ -1695,7 +1780,7 @@ function SocialJoueur() {
           {lien('profil', I_PROFIL, t('nav.profil'))}
           {lien('succes', I_TROPHEE, t('ov.succes'))}
           <button onClick={() => setEcran('carriere')}>
-            <span style={{ fontSize: '1.35rem', lineHeight: 1 }}>🏉</span> <span>{t('ov.maCarriere')}</span>
+            <span className="x-cloche"><Icone d={I_BALLON} /></span> <span>{t('ov.maCarriere')}</span>
           </button>
         </nav>
         <button className="x-compte" onClick={() => setOnglet('profil')}>
@@ -1739,10 +1824,10 @@ function SocialJoueur() {
             onChange={(e) => { setRecherche(e.target.value); if (e.target.value) setOnglet('explorer'); }}
             placeholder={t('ov.rechercheComplete')}
           />
-          {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}>✕</button>}
+          {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}><Icone d={I_CROIX} /></button>}
         </form>
 
-        {erreur && <div className="x-erreur">⚠️ {erreur}</div>}
+        {erreur && <div className="x-erreur">{erreur}</div>}
 
         {onglet === 'timeline' && (
           <>
@@ -1839,7 +1924,7 @@ function SocialJoueur() {
             placeholder={t('ov.rechercheComplete')}
           />
           {recherche && (
-            <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}>✕</button>
+            <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}><Icone d={I_CROIX} /></button>
           )}
         </form>
         <div className="x-bloc">

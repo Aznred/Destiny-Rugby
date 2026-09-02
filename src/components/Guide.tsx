@@ -22,6 +22,7 @@ import { t } from '../lib/i18n';
 import {
   CHAPITRES, ETAPES_GUIDE, avancement, etapeCourante, type ContexteGuide,
 } from '../data/guide';
+import { Icone } from './Icone';
 
 export function Guide() {
   const joueur = useGame((s) => s.joueur);
@@ -67,7 +68,7 @@ export function Guide() {
           onClick={() => setOuvert(true)}
           aria-label={t('guide.ouvrir')}
         >
-          <span className="guide-jauge">🎓 {faites}/{total}</span>
+          <span className="guide-jauge"><Icone nom="formation" taille={14} /> {faites}/{total}</span>
           {/* ⚠️ L'ÉTAPE EN COURS EST ÉCRITE SUR LA PASTILLE, pas cachée derrière
               un clic : sinon il faut déjà savoir qu'on a besoin d'aide pour
               aller la chercher. Elle passe en icône seule sous 560 px. */}
@@ -103,7 +104,7 @@ export function Guide() {
                   onClick={() => setOuvert(false)}
                   aria-label={t('clst.fermer')}
                 >
-                  ✕
+                  <Icone nom="croix" taille={17} />
                 </button>
               </header>
 
@@ -123,7 +124,7 @@ export function Guide() {
                         key={e.id}
                         className={`guide-etape-ligne${ok ? ' faite' : ''}${active ? ' active' : ''}`}
                       >
-                        <span className="guide-coche">{ok ? '✓' : e.emoji}</span>
+                        <span className="guide-coche">{ok ? <Icone nom="check" taille={14} /> : e.emoji}</span>
                         <div>
                           <b>{t(`guide.${e.id}.titre`)}</b>
                           {/* ⚠️ LE TEXTE EST TOUJOURS LISIBLE, même sur une étape

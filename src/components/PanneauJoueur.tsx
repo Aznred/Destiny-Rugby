@@ -8,6 +8,7 @@ import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
 import { Blason, LogoEquipe } from './Blason';
 import { Icone } from './Icone';
+import type { NomIcone } from './Icone';
 import { LogoCompet } from './LogoCompet';
 import { Drapeau } from './Drapeau';
 import { nomNation, nomNationTraduit } from '../lib/nations';
@@ -39,14 +40,18 @@ import { EQUIPEMENT_PAR_ID } from '../data/boutique';
 const MatchLive = lazy(() => import('./MatchLive').then((m) => ({ default: m.MatchLive })));
 import type { Joueur } from '../types';
 
-const EMOJI_POSTE: Record<string, string> = {
-  Avant: '🛡️',
-  Arrière: '⚡',
+// ⚠️ DES NOMS D'ICÔNES, PLUS DES EMOJI : c'est le repli de l'avatar quand le
+// joueur n'a ni portrait ni écusson de club, donc la première chose qu'on voit
+// de lui — et 🛡️ n'a ni la même forme ni la même couleur d'un système à l'autre.
+const ICONE_POSTE: Record<string, NomIcone> = {
+  Avant: 'bouclier',
+  Arrière: 'eclair',
 };
 
 // Un pictogramme par type de semaine du calendrier.
-const EMOJI_SEMAINE: Record<string, string> = {
-  championnat: '🏉', coupe: '🌍', international: '🏳️', phaseFinale: '🔥', treve: '🛌',
+const ICONE_SEMAINE: Record<string, NomIcone> = {
+  championnat: 'ballon', coupe: 'monde', international: 'drapeau',
+  phaseFinale: 'flamme', treve: 'calendrier',
 };
 
 export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
@@ -201,7 +206,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         <div className="avatar avatar-club" title={equipeDuWeekEnd ?? joueur.club}>
           {equipeDuWeekEnd
             ? <LogoEquipe nom={equipeDuWeekEnd} taille={44} />
-            : clubData ? <Blason club={clubData} taille={44} /> : EMOJI_POSTE[poste.categorie]}
+            : clubData ? <Blason club={clubData} taille={44} /> : <Icone nom={ICONE_POSTE[poste.categorie]} taille={30} />}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="nom">{joueur.nom}</div>
@@ -223,7 +228,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
 
       {(joueur.traits?.length || joueur.capitaine || tenue.length > 0) && (
         <div className="ressources" style={{ marginBottom: '0.2rem' }}>
-          {joueur.capitaine && <span className="pastille pastille-capitaine">©️ {t('pj.capitaine')}</span>}
+          {joueur.capitaine && <span className="pastille pastille-capitaine"><Icone nom="brassard" taille={13} /> {t('pj.capitaine')}</span>}
           {(joueur.traits ?? []).map((id) => {
             const trait = TRAIT_PAR_ID[id];
             return trait ? (
@@ -241,7 +246,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       <div className="ressources">
         <span className="pastille">{t('gen.saison')} <b>{joueur.saison}</b></span>
         <span className="pastille">{joueur.age} {t('gen.ans')}</span>
-        <span className="pastille">💰 <b>{nombre(joueur.argent)} €</b></span>
+        <span className="pastille"><Icone nom="euro" taille={13} /> <b>{nombre(joueur.argent)} €</b></span>
       </div>
       <div className="ressources" style={{ marginTop: '-0.4rem' }}>
         {/* ⚠️ Le club reste affiché À CÔTÉ de la sélection, jamais remplacé :
@@ -254,11 +259,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           </span>
         )}
         <span className="pastille" title={t('pj.clubDivision')}>
-          {clubData ? <Blason club={clubData} taille={18} /> : '🏟️'} <b>{joueur.club}</b>
+          {clubData ? <Blason club={clubData} taille={18} /> : <Icone nom="stade" taille={16} />} <b>{joueur.club}</b>
           {division && (
             <>
               {' · '}
-              <LogoCompet id={division.id} emoji={division.emoji} taille={16} />
+              <LogoCompet id={division.id} taille={16} />
               {' '}{division.nom}
             </>
           )}
@@ -267,7 +272,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
 
       {joueur.blessure && (
         <div className="bandeau-blessure" data-gravite={joueur.blessure.gravite}>
-          🚑 <b>{nomBlessure(joueur.blessure)}</b>
+          <Icone nom="soin" taille={14} /> <b>{nomBlessure(joueur.blessure)}</b>
           <span>
             {joueur.blessure.gravite === 'carriere'
               ? t('pj.carriereTerminee')
@@ -280,7 +285,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         const sanction = miseAuBancSociale(joueur.miseAuBanc!.semaines);
         return (
           <div className="bandeau-blessure" data-gravite="banc">
-            🪑 <b>{sanction.titre}</b>
+            <Icone nom="banc" taille={14} /> <b>{sanction.titre}</b>
             <span>{sanction.texte}</span>
           </div>
         );
@@ -306,11 +311,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       </div>
 
       <div className="ressources pj-stats">
-        <span className="pastille">🏉 <b>{joueur.matchsJoues}</b></span>
-        <span className="pastille">🎯 <b>{joueur.essais}</b></span>
+        <span className="pastille"><Icone nom="ballon" taille={13} /> <b>{joueur.matchsJoues}</b></span>
+        <span className="pastille"><Icone nom="cible" taille={13} /> <b>{joueur.essais}</b></span>
         {joueur.noteSaison != null && (
           <span className="pastille" title={t('pj.noteSaison')}>
-            ⭐ <b>{joueur.noteSaison.toFixed(1)}</b>/10
+            <Icone nom="etoile" taille={13} /> <b>{joueur.noteSaison.toFixed(1)}</b>/10
           </span>
         )}
         {/* ⚠️ « 0 k€ » N'EST PAS UN CONTRAT LISIBLE. Un club amateur ne verse pas
@@ -323,7 +328,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               ? t('pj.contratAide', { salaire: nombre(contrat.salaire) })
               : t('pj.contratAideAmateur', { prime: nombre(contrat.primeMatch ?? 0) })}
           >
-            📄{' '}
+            <Icone nom="contrat" taille={13} />{' '}
             <b>
               {contrat.salaire > 0
                 ? `${Math.round(contrat.salaire / 1000)} k€`
@@ -334,7 +339,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         )}
         {amis.length > 0 && (
           <span className="pastille" title={t('pj.vestiaire', { joueurs: amis.map((r) => r.nom).join(', ') })}>
-            🤝 <b>{amis.length}</b>
+            <Icone nom="poignee" taille={13} /> <b>{amis.length}</b>
           </span>
         )}
       </div>
@@ -350,7 +355,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           de contrat ne se cache pas derrière un badge. */}
       {contrat && (contrat.saisons <= 1 || ouvertes > 0) && !joueur.preAccord && (
         <button type="button" className="alerte-contrat" onClick={ouvrirMessagesOvale}>
-          <b>✍️ {contrat.saisons <= 0 ? t('pj.contratFini') : t('pj.contratDerniereAnnee')}</b>
+          <b><Icone nom="signature" taille={15} /> {contrat.saisons <= 0 ? t('pj.contratFini') : t('pj.contratDerniereAnnee')}</b>
           <span>
             {ouvertes > 0
               ? t('pj.propositions', { n: ouvertes })
@@ -365,7 +370,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               veut. */}
           <div className="entrainement">
             <div className="entr-tete">
-              💪 <b>{t('pj.travailles')}</b>
+              <Icone nom="halteres" taille={14} /> <b>{t('pj.travailles')}</b>
               <span>
                 {blesse ? t('pj.infirmerie')
                   : joueur.entrainementFocus
@@ -402,18 +407,18 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               <span>{t('pj.semaine', { n: semaineActuelle.numero, total: SEMAINES_PAR_SAISON })}</span>
             </div>
             <div className="cal-libelle">
-              {EMOJI_SEMAINE[semaineActuelle.type]} {libelleSemaine(semaineActuelle, joueur.saison)}
-              <i className="cal-lien">🗓️ {t('pj.calendrier')}</i>
+              <Icone nom={ICONE_SEMAINE[semaineActuelle.type] ?? 'ballon'} taille={14} /> {libelleSemaine(semaineActuelle, joueur.saison)}
+              <i className="cal-lien"><Icone nom="calendrier" taille={13} /> {t('pj.calendrier')}</i>
             </div>
             <div className="cal-barre">
               <span style={{ width: `${(semaineActuelle.numero / SEMAINES_PAR_SAISON) * 100}%` }} />
             </div>
             {vecu && (
               <div className="cal-bilan">
-                🏉 {tn('pj.bilanMatch', vecu.matchs)} · 🎯 {tn('pj.bilanEssai', vecu.essais)}
+                <Icone nom="ballon" taille={13} /> {tn('pj.bilanMatch', vecu.matchs)} · <Icone nom="cible" taille={13} /> {tn('pj.bilanEssai', vecu.essais)}
                 {vecu.notes.length > 0 &&
-                  ` · ⭐ ${(vecu.notes.reduce((a, b) => a + b, 0) / vecu.notes.length).toFixed(1)}/10`}
-                {vecu.capes > 0 && ` · 🏳️ ${tn('pj.bilanSelection', vecu.capes)}`}
+                  ` · ${(vecu.notes.reduce((a, b) => a + b, 0) / vecu.notes.length).toFixed(1)}/10`}
+                {vecu.capes > 0 && ` · ${tn('pj.bilanSelection', vecu.capes)}`}
               </div>
             )}
           </button>
@@ -434,7 +439,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               title={aRepondre ? motifAttente : t('pj.suivreDirect', { domicile: affiche!.match.domicile, exterieur: affiche!.match.exterieur })}
             >
               ▶️ <b>{aRepondre
-                ? `✍️ ${t('pj.reponds')}`
+                ? t('pj.reponds')
                 : inter ? t(inter.u20 ? 'pj.jouerU20' : 'pj.jouerSelection') : t('pj.jouerMatch')}</b>
               <span>
                 {inter ? `${inter.affiche.competition.emoji} ${inter.affiche.competition.nom}` : `J${affiche!.journee}`}
@@ -462,7 +467,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
                 onClick={() => setEcran('tableau')}
                 title={t('pj.choisirDateAide')}
               >
-                🗓️ {t('pj.calendrier')}
+                <Icone nom="calendrier" taille={15} /> {t('pj.calendrier')}
               </button>
             </div>
           )}
@@ -508,7 +513,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         )}
         {joueur.mentorat && (
           <button disabled title={t('pj.mentoratAide')}>
-            <Icone nom="mentor" /><span>{t('pj.mentor')} ✓</span>
+            <Icone nom="mentor" /><span>{t('pj.mentor')} <Icone nom="check" taille={12} /></span>
           </button>
         )}
         <button
@@ -540,7 +545,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       <AnimatePresence>
         {confirmerRetraite && (
           <Confirmation
-            titre={`🏛️ ${t('pj.confirmerRetraite.titre')}`}
+            titre={t('pj.confirmerRetraite.titre')}
             message={t('pj.confirmerRetraite.message')}
             libelleOui={t('pj.confirmerRetraite.oui')}
             libelleNon={t('pj.confirmerRetraite.non')}
@@ -557,7 +562,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         )}
         {confirmerTransfert && (
           <Confirmation
-            titre={`📣 ${t('pj.confirmerTransfert.titre')}`}
+            titre={t('pj.confirmerTransfert.titre')}
             message={t('pj.confirmerTransfert.message')}
             libelleOui={t('pj.confirmerTransfert.oui')}
             libelleNon={t('pj.confirmerTransfert.non')}
@@ -619,7 +624,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               title={aRepondre ? motifAttente : undefined}
             >
               {aRepondre
-                ? `✍️ ${t('pj.reponds')}`
+                ? t('pj.reponds')
                 : `▶️ ${inter ? t(inter.u20 ? 'pj.jouerU20Court' : 'pj.jouerSelectionCourt') : t('pj.jouerMatch')}`}
             </button>
           ) : (
@@ -630,7 +635,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               disabled={aRepondre}
               title={aRepondre ? motifAttente : undefined}
             >
-              {aRepondre ? `✍️ ${t('pj.reponds')}` : semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
+              {aRepondre ? t('pj.reponds') : semaineActuelle.type === 'treve' ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
             </button>
           )}
         </div>,

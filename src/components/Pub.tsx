@@ -17,6 +17,7 @@ import {
   CLIENT_PUB, SLOT_PUB, DUREE_PUB_MAISON_S, OVAS_PAR_PUB, PUBS_PAR_JOUR,
   attenteLisible, chargerRegie, pubDisponible,
 } from '../lib/pub';
+import { Icone } from './Icone';
 
 // ---------------------------------------------------------------------------
 // LE CONSENTEMENT
@@ -154,7 +155,7 @@ export function CartePubRecompensee() {
     <>
       <div className="carte article carte-pub">
         <div className="pastille-equipement" style={{ background: 'radial-gradient(circle at 32% 28%, #d8a94a, #10171200 72%)' }}>
-          <span>🎬</span>
+          <span><Icone nom="video" taille={22} /></span>
         </div>
         <div className="article-nom">{t('pub.recompenseTitre')}</div>
         <div className="article-detail">
@@ -176,7 +177,7 @@ export function CartePubRecompensee() {
             onClick={() => { setGain(null); setOuverte(true); }}
           >
             {dispo.possible
-              ? `🎬 ${t('pub.regarder')}`
+              ? t('pub.regarder')
               : dispo.restantes === 0
                 ? t('pub.demain')
                 : attenteLisible(dispo.attente)}
@@ -241,7 +242,7 @@ export function BoutonDeblocageParPub({ id, onDebloque }: { id: string; onDebloq
         onClick={(e) => { e.stopPropagation(); setOuverte(true); }}
       >
         {dispo.possible
-          ? `🎬 ${t('pub.debloquer')}`
+          ? t('pub.debloquer')
           : dispo.restantes === 0
             ? t('pub.demain')
             : attenteLisible(dispo.attente)}

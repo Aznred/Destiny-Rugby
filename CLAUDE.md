@@ -9669,3 +9669,415 @@ Vérification ciblée :
 ```bash
 npx vite-node scripts/verifExperienceManager.ts
 ```
+
+---
+
+## 🃏 RARETÉS DE CARTE, GÉNÉRAL DU MARCHÉ, PLUSIEURS PARTIES
+
+Six demandes d'un seul message, traitées ensemble parce qu'elles se tiennent :
+
+> « améliore le côté compo en entraîneur : déjà, sur le terrain, voir la tête du
+> joueur, pas la moitié ; faire comme sur FIFA des raretés de carte en mode
+> bronze argent or mythique rouge épique etc. en fonction du potentiel, de la
+> qualité du joueur etc. ; refaire toutes les icônes en créé ou généré au lieu
+> des emojis ; et dans le marché mondial, fix les généraux, retirer le bureau de
+> X, pouvoir cliquer sur les profils, aussi dans le X de l'entraîneur ; et faire
+> en sorte de pouvoir avoir plusieurs sauvegardes de joueurs et entraîneur ; de
+> plus gérer la création, pouvoir choisir entre entraîneur ou joueur, et faire le
+> relais en fin de carrière joueur, le parcours entraîneur. »
+
+### 1. ⚠️ LE PORTRAIT : UN PROBLÈME DE RAPPORT, PAS DE RECADRAGE
+
+« Voir la tête du joueur, pas la moitié. » Les photos officielles font
+**800 × 1200** avec le visage dans le tiers haut ; le portrait de carte mesurait
+**36 px de haut pour ~110 de large**, soit une fenêtre de rapport **3 : 1**
+recadrée à `object-position: 50% 16%`.
+
+**Aucun `object-position` ne fait tenir un visage dans une bande trois fois plus
+large que haute.** Le front et le menton tombaient hors cadre à chaque fois,
+quel que soit le décalage — ce n'était pas un réglage à corriger, c'était une
+géométrie impossible.
+
+| | avant | après |
+|---|---|---|
+| portrait sur le terrain | 110 × 36 (rapport 3,05) | **58 × 58** (carré, centré) |
+| `object-position` | `50% 16%` | **`50% 3%`** |
+| hauteur de carte | 128 px | 153 px |
+| hauteur du terrain | 980 px | **1 240 px** |
+| chevauchements de cartes | 0 | **0** |
+
+⚠️ **DEUX PIÈGES MESURÉS EN CHEMIN, ET AUCUN NE SE VOIT À LA RELECTURE.**
+
+1. **Un portrait PLEINE LARGEUR demandait 78 px de haut pour montrer un
+   visage** — la carte passait à 173 px et **six paires de cartes se touchaient
+   sur le terrain** (les emplacements sont en pourcentages : une carte plus haute
+   rattrape sa voisine du dessus, c'est le piège déjà payé deux fois). À largeur
+   CONTRAINTE, le même visage tient dans 58 px. Le portrait est plus PETIT, et
+   pourtant on y voit enfin la tête : c'est le rapport qui comptait, pas la
+   surface.
+2. **`object-position: 3 %` est calculé, pas choisi.** Dans un cadre carré,
+   `object-fit: cover` met l'image à l'échelle par sa LARGEUR : la tête tombe
+   entre 2,2 et 25,4 px d'une image rendue à 87 px de haut, et le décalage vaut
+   `p × (87 − 58)`. À 8 % il descend de 2,3 px et rogne déjà le crâne ; à 3 % il
+   descend de 0,9 px et tout tient.
+
+⚠️ **ET UN CHEVAUCHEMENT ANTÉRIEUR A ÉTÉ TROUVÉ AU PASSAGE.** Les deux deuxièmes
+lignes sont posés à 39 % et 61 %, soit 22 % de la largeur du terrain — **71 px**
+sur les 322 d'un téléphone de 375. La carte, elle, mesurait 75 px
+(`clamp(62px, 20vw, 84px)`). Quatre pixels de recouvrement, sur toutes les
+compositions, depuis toujours. La largeur de carte suit désormais le terrain le
+plus étroit : `clamp(56px, 18vw, 76px)`.
+
+### 2. LES SIX RARETÉS — `rareteDe()`, dans `lib/carteJoueur.ts`
+
+⚠️ **LA RARETÉ N'EST PAS LE STATUT, ET LES DEUX COEXISTENT SUR LA CARTE.**
+`statutDe` (espoir · pro · international · star · majeur) répond à « quel RÔLE
+tient-il dans l'effectif » : c'est une aide pour composer, et elle reste la bande
+du haut. `rareteDe` répond à « que VAUT cette carte » : c'est le métal, et c'est
+ce qu'on collectionne. Les confondre ferait d'un espoir de 19 ans une carte
+bronze — précisément la carte qu'on veut garder. Mesuré : sur quatre cas types,
+**4 sur 4 divergent**.
+
+⚠️ **LE POTENTIEL PÈSE MOINS À MESURE QU'ON VIEILLIT**, et ce n'est pas de
+l'équilibrage : une marge de quinze points à 19 ans est une promesse, la même à
+30 ans est une statistique morte (`noteALAge` fait progresser jusqu'à 27 ans puis
+décliner). Le poids passe de **0,55 avant 21 ans à 0 après 29**, et la part de
+potentiel est **bornée à 12 points** — sans ce plafond, un gamin noté 50 pour un
+potentiel de 95 passerait devant un international, et l'on collectionnerait des
+promesses plutôt que des joueurs.
+
+⚠️ **LES SEUILS ONT ÉTÉ MESURÉS SUR LES VRAIS EFFECTIFS, PAS POSÉS AU JUGÉ.** Le
+premier réglage (52/62/72/80/88) donnait **100 % de cartes bronze en Régionale 1
+ET en Régionale 3** — deux divisions entières indistinguables, donc aucun progrès
+lisible pendant les premières saisons, c'est-à-dire là où l'on commence en mode
+entraîneur. Il rendait aussi 38 % de cartes mythiques en Top 14, ce qui fait
+beaucoup pour un métal censé se remarquer.
+
+Réglage retenu : **48 / 59 / 70 / 81 / 90**. Mesuré sur six clubs par étage
+(`scripts/verifRaretes.ts`) :
+
+| étage | répartition |
+|---|---|
+| Top 14 | argent 4 % · or 31 % · **épique 23 % · mythique 37 % · légende 5 %** |
+| Pro D2 | bronze 4 % · argent 45 % · or 28 % · épique 23 % |
+| Nationale | bronze 43 % · argent 40 % · or 16 % |
+| Fédérale 1 | bronze 9 % · argent 66 % · or 25 % |
+| Fédérale 3 | bronze 73 % · argent 27 % |
+| Régionale 1 | bronze 89 % · argent 11 % |
+| Régionale 3 | **bronze 100 %** |
+
+⚠️ **LA RÉGIONALE 3 RESTE ENTIÈREMENT BRONZE, VOLONTAIREMENT.** C'est le fond de
+la pyramide : y voir des cartes dorées viderait de son sens tout ce qu'on gagne
+en montant. La lecture doit être « je pars de rien », pas « tout le monde
+brille ». C'est ce qui fait de la montée une récompense VISIBLE.
+
+⚠️ **ET LA COULEUR NE VAUT TOUJOURS AUCUN POINT.** La règle posée pour le statut
+vaut telle quelle : la rareté n'entre dans AUCUN calcul de performance. Une carte
+légende n'est pas meilleure qu'une carte or de même note — elle est plus rare.
+`verifCarteJoueur.ts` et `verifDifficulte.ts` sont inchangés.
+
+⚠️ **ON NE FAIT PAS UNE CARTE FUT** (la contrainte d'origine du squad builder
+tient toujours) : le fond doré plein est LEUR signature. Ici le métal est un
+dégradé sombre de la teinte avec un liseré et un reflet oblique — la carte reste
+un billet de match, elle change seulement de papier. Talon perforé, bande de
+statut et mentions serrées sont intacts. Seules les **deux dernières** raretés
+rayonnent : une lueur sur les six niveaux, c'est un effectif entier qui brille,
+donc plus aucune hiérarchie.
+
+**La pépite est un liseré, pas un cran de rareté.** Un espoir de 18 ans noté 48
+reste une carte bronze — c'est ce qu'il vaut dimanche ; le remonter d'un cran
+ferait mentir le métal sur ce qu'on aligne.
+
+### 3. ⚠️ LE GÉNÉRAL DU MARCHÉ ÉTAIT UNE FOURCHETTE, ET ELLE ÉTAIT FAUSSE
+
+« Fix les généraux. » La carte du marché imprimait `RapportConnaissance.note`
+telle quelle : **« 78–100 », « 81–100 », « 74–100 »**. Trois défauts d'un coup :
+
+1. une amplitude de **vingt-quatre points**, qui ne permet aucune décision ;
+2. une borne haute à **100**, alors qu'aucun joueur du jeu ne dépasse 99 — donc
+   un chiffre visiblement faux sur presque toutes les cartes ;
+3. l'impossibilité de comparer deux cibles d'un coup d'œil, ce qui est
+   pourtant à quoi un général sert.
+
+`RapportConnaissance` porte désormais **`estimation`** (le nombre qu'on imprime)
+et **`marge`**. L'incertitude du scouting n'est pas retirée : elle est DITE
+autrement — « 90 ± 7 » au lieu de « 83–97 » — et elle se referme en observant.
+
+| | avant | après |
+|---|---|---|
+| affichage | `78–100` | **`90` + `± 7`** |
+| borne haute | 100 (impossible) | **99** |
+| marge sans observation | ± 12 | **± 7** |
+| après 4 observations | ± 0 mais fourchette de 4 | **± 0, note exacte** |
+
+⚠️ **CE N'EST PAS UN ASSOUPLISSEMENT DU SCOUTING.** Une fourchette qui couvre du
+remplaçant de Fédérale à l'international ne permet aucune décision, donc elle ne
+coûte rien à celui qui ne scoute pas : c'était le vrai défaut. À ±7 par défaut,
+observer un joueur change réellement ce qu'on sait de lui — et le bouton
+« Observer davantage » redevient un choix.
+
+### 4. LES PROFILS S'OUVRENT — `components/FicheJoueur.tsx`
+
+⚠️ **IL N'EXISTAIT AUCUNE FICHE DE JOUEUR EN MODE ENTRAÎNEUR**, et c'est pour ça
+que rien n'était cliquable. `PanneauJoueur` est la fiche du joueur INCARNÉ (elle
+porte l'entraînement, la retraite, le marché — des actions qu'un manager ne peut
+pas faire sur quelqu'un d'autre) ; `FicheClub` montre un effectif, pas un homme.
+Un manager qui repérait un nom sur le marché ou dans une conversation n'avait
+littéralement nulle part où aller.
+
+- **Elle ne montre que ce qu'on sait** : le rapport de scouting est facultatif,
+  et quand il est fourni c'est LUI qui commande la note affichée. Afficher la
+  vérité derrière un rapport incomplet viderait le scouting de son sens.
+- **Elle porte la classe de rareté** : le métal du liseré dit à quel joueur on a
+  affaire avant même qu'on lise le chiffre.
+- **Les six axes sont ceux du poste**, comme sur la carte de composition.
+- ⚠️ **Elle vit au niveau de l'ÉCRAN, pas dans la carte du marché.** Montée dans
+  la boucle des cibles, elle serait démontée à chaque re-rendu de la liste (une
+  observation, un filtre, une frappe dans la recherche) et se refermerait toute
+  seule.
+- `createPortal(document.body)` obligatoire, comme toutes les modales du jeu.
+
+Côté L'Ovale du manager, l'onglet **`compte`** a été ajouté : il n'existait que
+dans le L'Ovale du joueur, et celui du manager passait `onProfil={() => {}}` — un
+clic sur un nom ne faisait rien, sans même un curseur pour le signaler.
+`compteDepuis` prend maintenant un **contexte social** (`club`, `saison`,
+`division`) au lieu d'un `Joueur` entier : c'est tout ce dont `annuaire` a besoin,
+et exiger un `Joueur` fermait la fonction au mode manager, qui n'en a pas.
+
+⚠️ **PAS DE MESSAGERIE DEPUIS UN PROFIL EN MODE ENTRAÎNEUR.** Les conversations
+d'un manager sont des DOSSIERS créés par le store (une négociation, une demande
+du vestiaire) : ouvrir un fil vide avec un supporter croisé dans le fil donnerait
+une conversation que rien ne peut faire avancer.
+
+### 5. ⚠️ LE BOUTON « BUREAU » DE X A ÉTÉ RETIRÉ
+
+Demande explicite. Il datait du temps où L'Ovale du manager s'ouvrait en plein
+écran ; il est devenu un ONGLET du bureau (`vue === 'ovale'`), si bien que le
+bouton faisait sortir d'un onglet vers l'onglet d'à côté, en doublon avec la
+barre d'onglets restée visible juste au-dessus. **Deux chemins pour le même
+geste, dont un qui ressemble à une sortie de secours** : c'est ce qui donnait
+l'impression de quitter le réseau. Les trois occurrences (rail, en-tête
+d'Explorer, profil du club) sont parties ; celle d'Explorer est remplacée par un
+lien vers le **marché**, c'est-à-dire là où L'Ovale ne va pas.
+
+### 6. PLUSIEURS PARTIES — `lib/sauvegardes.ts`
+
+⚠️ **LE JEU N'AVAIT QU'UNE SEULE PARTIE, ET C'ÉTAIT STRUCTUREL.** Le store est
+persisté sous la clé `destin-ovalie`, une et une seule ; créer une carrière
+écrasait la précédente sans un mot. Pire : `creerManager` met `joueur` à null et
+`creerJoueur` met `manager` à null — **les deux modes se chassent l'un l'autre**,
+donc essayer le mode entraîneur coûtait sa carrière de joueur.
+
+⚠️ **ON NE TOUCHE PAS À L'ÉTAT DU JEU, ON DÉTOURNE SON STOCKAGE.** C'est le seul
+choix qui ne demande aucune réécriture du store et qui ne peut donc rien casser :
+`persist` écrit toujours sous le même nom, et un adaptateur de `Storage` redirige
+ce nom vers l'emplacement ACTIF. Le store ne sait même pas que les emplacements
+existent.
+
+| Règle | Pourquoi |
+|---|---|
+| **l'emplacement 1 garde la clé historique** | sans quoi tout le monde perdrait sa partie au premier chargement de cette version |
+| **seule la clé du jeu est redirigée** | un adaptateur qui préfixerait TOUT déplacerait aussi le pointeur d'emplacement : on ne retrouverait plus sa partie |
+| **six emplacements, pas plus** | `localStorage` plafonne vers 5 Mo, et le jeu a déjà payé ce mur une fois (migration « quota exceeded ») |
+| **changer de partie RECHARGE la page** | `persist.rehydrate()` FUSIONNE : tout champ absent de la sauvegarde visée garderait la valeur de la partie qu'on quitte |
+| **l'index n'est pas persisté, il est lu** | `persist` écrit plusieurs fois par seconde ; tenir un index à jour doublerait le coût de chaque sauvegarde pour une information qu'on ne regarde qu'en ouvrant l'écran |
+| **on ne supprime pas la partie ouverte** | le store réécrirait dessus dans la milliseconde : le bouton n'effacerait rien et passerait pour cassé |
+
+⚠️ **LE REPLI MÉMOIRE EST AU NIVEAU DU MODULE**, et l'oublier a coûté un faux
+positif immédiat : avec une mémoire par appelant, l'adaptateur du store écrivait
+dans une carte et `listerEmplacements` lisait dans une autre — la partie
+« existait » sans jamais apparaître dans la liste.
+
+Vérifié en jeu : une carrière d'entraîneur en emplacement 1, une carrière de
+joueur en emplacement 2, **les deux intactes**, et le résumé de chaque
+emplacement lu sans charger la partie.
+
+### 7. LE CHOIX DE CARRIÈRE, ET LE RELAIS DE FIN DE CARRIÈRE
+
+**À la création** : l'écran POSE la question au lieu de laisser deux boutons sans
+description sur l'accueil. Un choix qui engage quinze saisons a besoin d'assez de
+place pour dire ce qu'on échange — 16-24 ans en bas de la pyramide d'un côté,
+30-60 ans et un prestige de 6 de l'autre. ⚠️ Le choix ne s'affiche que si
+`chantierVisible('manager')` : un choix à deux branches dont une renvoie à
+l'accueil est pire que pas de choix du tout.
+
+**À la retraite** : `continuerFinCarriere` prend désormais une **destination**.
+
+⚠️ **LE RELAIS EXISTAIT, ET IL ÉTAIT PRESQUE INATTEIGNABLE.** Le seul chemin
+passait par la liste « Après ta carrière » du panneau de jeu, qui ne s'affiche
+QUE pendant la dernière saison et QUE si l'on prend sa retraite volontairement.
+Une carrière arrêtée par une blessure, par la limite d'âge ou faute de club n'y
+avait jamais droit — **et ce sont justement les fins de carrière subies qui
+donnent envie d'entraîner.** La proposition est donc sur l'épilogue, où toutes
+les carrières passent.
+
+- **Le prestige de départ est annoncé avant de cliquer** : c'est la seule chose
+  qui change vraiment entre un inconnu et une légende (`prestigeDepuisJoueur`,
+  plafonné à 48). La cacher ferait de ce bouton un saut dans le vide.
+- **Deux motifs ferment la porte** : un décès et une radiation à vie ne se
+  prolongent pas par une carrière d'entraîneur.
+- **La légende est retrouvée même si rien ne l'avait posée** : `reconversionManager`
+  n'est pas persisté (c'est un ordre donné à un écran), on le reprend au Hall.
+
+### 8. LES ICÔNES — 41 tracés de plus, zéro emoji dans le chrome
+
+`components/Icone.tsx` passe de **12 à 53 tracés**. Les raisons n'ont pas changé
+depuis « ÇA FAIT TROP IA » : un emoji est dessiné par Apple, Google ou Microsoft,
+il est en couleur — jamais la nôtre — et sa ligne de base varie d'une machine à
+l'autre.
+
+⚠️ **ILS SE DISTINGUENT À 18 PIXELS, et c'est la seule contrainte qui compte pour
+les onze onglets du bureau** : onze onglets dont deux se ressemblent, c'est onze
+onglets qu'on relit à chaque fois. Chacun tient sur une silhouette différente —
+rond, carré, triangle, trait — avant de tenir sur un détail. Ceux de la feuille
+de match sont lus à **11 px** dans le pied d'une carte de 110 : deux traits
+maximum.
+
+Mesuré en jeu, sur les dix onglets du bureau : **zéro emoji restant** hors du
+JOURNAL (le récit garde les siens, comme `data/situations.ts`) et des étoiles
+typographiques du scouting. `EMOJI_INSTALLATION` et `EMOJI_AXE` sont devenues
+`ICONE_INSTALLATION` et `ICONE_AXE` — des noms de tracés. `EMOJI_BADGE` est
+conservée **comme document** : elle dit en une ligne ce que chaque badge veut
+signifier, ce qu'un tracé abstrait ne dit pas.
+
+### Les scripts
+
+```bash
+npx vite-node scripts/verifRaretes.ts      # raretés, général du marché, emplacements, relais de fin de carrière
+npx vite-node scripts/verifCarteJoueur.ts  # les six stats par poste, l'échelle commune, les alertes
+npx vite-node scripts/verifManager.ts      # la carrière d'entraîneur, budgets et reconversion
+npx vite-node scripts/verifCarriereAvancee.ts # le scouting, le vestiaire, le monde
+```
+
+---
+
+## 🧹 LES BORNES D'ÂGE, LE COMPTE DE L'APPAREIL, ET PLUS UN EMOJI DANS LES MENUS
+
+Quatre retours d'un même message, et le troisième est le plus profond.
+
+### 1. ⚠️ LES BORNES D'ÂGE ÉTAIENT ÉCRITES EN DUR DANS SEPT LANGUES
+
+« Petite erreur : joueur c'est de 16 à 30 et entraîneur 20 à 60. » Exact — et
+l'écran de choix de carrière annonçait « 16-24 » et « 30-60 ». Les deux valeurs
+justes vivaient déjà dans `LIMITES` (`ageDebutMax: 30`, `ageDebutManagerMin: 20`)
+mais avaient été RECOPIÉES dans la traduction, donc dans sept langues à la fois.
+
+C'est très exactement la faute déjà payée entre `Creation` et `verifierFiche`
+(« 21 refus sur 21 portaient ce seul motif »), et le fichier la documentait
+lui-même : **« `Creation` LIT `ageDebutMax` D'ICI. C'est le seul moyen que les
+deux ne puissent plus diverger. »** Les chaînes portent désormais `{min}`,
+`{max}` et `{fin}` ; l'écran passe les valeurs de `LIMITES`.
+
+### 2. LA LIMITE D'ÂGE D'UN ENTRAÎNEUR : 70 → 80, ET ELLE S'APPLIQUE
+
+« Fais que le max âge ça soit 80 environ. » L'arithmétique lui donne raison :
+l'écran laisse prendre un premier banc à **60 ans**, or une carrière d'entraîneur
+qui vaut la peine d'être menée en dure quinze ou vingt. À 70, quelqu'un qui
+démarre au plus tard était refusé au classement **dès sa onzième saison**.
+
+⚠️ **ET PERSONNE NE L'APPLIQUAIT AU JEU.** Le manager vieillissait d'un an par
+saison sans qu'aucune borne ne l'arrête, alors que `verifierFiche` refuse une
+fiche au-delà de `ageManagerMax` : un banc tenu trop longtemps sortait du
+classement **en silence** — le même défaut que la carrière de joueur qui
+continuait après une blessure de fin de carrière (« la règle existait dans les
+données, personne ne l'appliquait au jeu »). L'écran manager affiche maintenant
+une carte de fin de parcours à 80 ans passés, et elle mène au Hall.
+
+⚠️ **LA FERMETURE NE SE FAIT PAS DEPUIS LE STORE.** `quitterBanc` vide le journal
+et emmène au Hall : appelé dans la foulée de la fin de saison, il effacerait
+l'entrée qu'on vient d'écrire et la carrière s'arrêterait sans un mot.
+
+⚠️ **`SCORE_MAX` A BOUGÉ : 116 995 → 123 045.** Il dépend de
+`SAISONS_MAX_MANAGER = ageManagerMax − ageDebutMin + 1`. Le `check` de la colonne
+`score` est en dur dans les **deux** fichiers SQL et dans deux guides : tous
+passent de `117000` à `123100`. C'est la cinquième fois que ce plafond bouge, et
+les deux premières ont fait refuser par la base des scores que le jeu produisait.
+
+### 3. ⚠️ LE TUTORIEL REVENAIT — ET IL N'ÉTAIT QUE LE SYMPTÔME VISIBLE
+
+« Bug quand on switch de sauvegarde : ça nous remet le tuto. » Le tutoriel, oui,
+mais aussi : la langue repassait à celle du navigateur, le thème au vert, les
+Ovas à zéro, la boutique se vidait, les succès et le Hall des légendes
+disparaissaient. `persist` écrit TOUT l'état dans l'emplacement actif, et rien
+de tout cela n'appartient à une carrière.
+
+Le projet le disait déjà pour les archétypes : **« un archétype débloqué
+appartient au COMPTE, pas à la carrière : on ne rachète pas ses caractères à
+chaque fois qu'on raccroche. »** La règle est simplement généralisée.
+
+`lib/sauvegardes.ts` gagne `CLES_COMPTE` — dix-neuf champs écrits à part, dans
+`destin-ovalie:compte`, partagés par les six emplacements :
+
+| Famille | Champs |
+|---|---|
+| Réglages | `theme`, `langue`, `langueManuelle`, `iaActivee`, `groqKey`, `tenorKey`, `modele`, `pubConsentement`, `pubs` |
+| Ce qu'on a payé | `coins`, `inventaire`, `skinActif`, `equipements`, `equipementActif`, `traitsDebloques` |
+| Ce qui traverse les carrières | `succesDebloques`, `pantheon` |
+| L'onboarding | `tutoVu`, `tutoMatchVu` |
+
+⚠️ **CE QUI RESTE PAR CARRIÈRE, ET POURQUOI.** `defis` suit la semaine de jeu ;
+`ecransVus` et `guideFerme` pilotent le guide, qui explique LA carrière en
+cours ; et surtout **`cleClassement`** — chaque carrière doit garder SA ligne au
+classement mondial. Partagée, six carrières se disputeraient une seule ligne et
+l'on n'en verrait qu'une : c'est le piège « DEUX JOUEURS, UN SEUL PSEUDO », dans
+l'autre sens.
+
+⚠️ **ON N'ANALYSE PAS LE GROS JSON À CHAQUE ÉCRITURE.** `persist` sauvegarde
+plusieurs fois par seconde pendant un match : re-découper le blob de la partie
+doublerait le coût de chaque sauvegarde. Le compte est lu une fois (dans `merge`,
+au chargement) et réécrit **seulement quand l'une de ses clés a changé** —
+`ecrireCompte` compare le JSON de ses seuls champs à celui de la dernière
+écriture. Gagner un Ova écrit ; jouer une minute de match n'écrit rien.
+
+⚠️ **ET LE REPLI MÉMOIRE EST AU NIVEAU DU MODULE.** Avec une mémoire par
+appelant, l'adaptateur du store écrivait dans une carte et `listerEmplacements`
+lisait dans une autre : la partie « existait » sans jamais apparaître dans la
+liste. Le banc d'essai l'a attrapé à sa première exécution.
+
+Vérifié en jeu : tutoriel passé puis langue mise en anglais dans l'emplacement 2,
+retour à l'emplacement 1 → **anglais conservé, tutoriel toujours passé**.
+
+### 4. PLUS UN EMOJI DANS LES MENUS — 53 tracés, 30 fichiers
+
+`components/Icone.tsx` passe de **12 à 53 tracés**. Les raisons n'ont pas changé
+depuis « ÇA FAIT TROP IA » : un emoji est dessiné par Apple, Google ou Microsoft,
+il est en couleur — jamais la nôtre — et sa ligne de base varie d'une machine à
+l'autre. Deux cas valaient à eux seuls le déplacement :
+
+- **🧑‍🏫 est une séquence composée** (personne + ZWJ + école). Windows la rend en
+  DEUX glyphes côte à côte : l'onglet « Entraîneurs » du classement affichait
+  une personne PUIS une école.
+- **🫵 (« c'est toi ») date d'Unicode 14.** Il revenait six fois dans l'écran
+  Résultats — c'est le repère qui permet de se retrouver dans un classement de
+  cent lignes — et les appareils qui ne l'ont pas affichaient un carré vide,
+  c'est-à-dire aucun repère du tout. Il devient une pastille dorée.
+
+Trois tables de données sont devenues des tables de NOMS D'ICÔNES —
+`ICONE_INSTALLATION`, `ICONE_AXE`, `ICONE_SEMAINE` (deux fois), `ICONE_POSTE` —
+et `LogoCompet` rend un tracé au lieu d'un emoji pour les **sept compétitions
+sur trente-trois** qui n'ont pas de logo officiel.
+
+Mesuré à l'écran, écran par écran : **zéro emoji** sur l'accueil, l'atlas des
+clubs, le classement, le Hall, et les dix onglets du bureau d'entraîneur.
+
+⚠️ **CE QUI RESTE, ET POURQUOI ON LE GARDE :**
+
+| Où | Quoi | Raison |
+|---|---|---|
+| Journal, fil de L'Ovale, situations | les emoji du RÉCIT | c'est du texte, pas une icône — même règle que `data/situations.ts` |
+| Boutique, traits | l'emblème de chaque article et de chaque archétype | ce sont **36 + 24 identités de produit**, pas un jeu d'icônes ; leur vrai aperçu est le `.glb` |
+| L'Ovale | `EMOJIS_PROFIL` | c'est la photo de profil que LE JOUEUR choisit — une fonctionnalité, pas un pictogramme d'interface |
+| Fil de match | `EMOJI_EVT`, `geste.emoji` | le marqueur d'une ligne de commentaire et les gestes du moteur (`moteur/controle.ts`) |
+| Partout | `★ ☆ ✓ ✕ → ↑ ↓` | de la TYPOGRAPHIE monochrome, pas des emoji : elle prend déjà la couleur du texte |
+
+### 5. L'affiche de la semaine porte les écussons
+
+« Dans la carrière, rajoute les blasons des équipes. » Le jeu embarque
+**957 écussons** et les montre partout — atlas, classements, cartes d'offres,
+feuille de match. La seule case où l'on regarde « qui on joue dimanche » les
+ignorait et affichait deux noms nus. `Blason` retombe déjà sur un écusson dessiné
+quand le club n'a pas de logo : aucun des 855 clubs ne laisse de trou.
+
+⚠️ **LE NOM RESTE SOUS L'ÉCUSSON**, il ne le remplace pas : des centaines de
+clubs amateurs n'ont qu'un blason généré à partir de leurs initiales. Le logo dit
+« je reconnais », le nom dit « c'est bien eux ».

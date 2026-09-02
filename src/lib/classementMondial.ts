@@ -296,10 +296,18 @@ export const LIMITES = {
    * ⚠️ UN ENTRAÎNEUR NE RACCROCHE PAS À 44 ANS. `ageMax` borne la carrière de
    * JOUEUR (`AGE_RETRAITE_FORCEE`) ; appliquée telle quelle à un banc, elle
    * refuserait toute reconversion — un joueur qui arrête à 36 ans et entraîne
-   * quinze saisons finit à 51. Soixante-dix ans, c’est la limite de ce qu’on
-   * a vu dans le métier, et elle borne aussi le nombre de saisons annonçables.
+   * quinze saisons finit à 51.
+   *
+   * ⚠️ RELEVÉE DE 70 À 80 À LA DEMANDE, et l'arithmétique lui donne raison :
+   * l'écran laisse prendre un premier banc à **60 ans**
+   * (`ageDebutManagerMax`), or une carrière d'entraîneur qui vaut la peine
+   * d'être menée en dure quinze ou vingt. À 70, quelqu'un qui commence à 60
+   * était refusé au classement dès sa onzième saison — la même impasse
+   * qu'« ageDebut hors bornes » côté joueur, et tout aussi silencieuse. Quatre-
+   * vingts ans laisse vingt saisons à qui démarre au plus tard, et reste dans
+   * ce qu'on a vu dans le métier.
    */
-  ageManagerMax: 70,
+  ageManagerMax: 80,
   /**
    * ⚠️ ET `ageDebut` NE VEUT PAS DIRE LA MÊME CHOSE SUR UN BANC. Pour un
    * joueur — et pour un ancien joueur devenu entraîneur — c'est l'âge de ses

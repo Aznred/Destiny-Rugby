@@ -427,8 +427,10 @@ s'affiche dans ⚙️ ; il n'est associé à aucun coût ni quota.
   d'élévation à trois niveaux, des boutons dessinés comme des touches — liseré
   clair en haut, bord sombre en bas, ils s'éclairent au lieu de sauter —, une
   échelle de rayons, un grain de 3,5 % qui casse le lissé des dégradés, et
-  **douze icônes dessinées** (`src/components/Icone.tsx`) sans une dépendance de
-  plus. Le récit de carrière quitte l'italique et le cadre en pointillés pour un
+  **cinquante-trois icônes dessinées** (`src/components/Icone.tsx`) sans une
+  dépendance de plus — les onze onglets du bureau d’entraîneur, les badges des
+  cartes de composition, le marché et les parties sauvegardées n’utilisent plus
+  un seul emoji. Le récit de carrière quitte l'italique et le cadre en pointillés pour un
   filet doré, et le fil s'ancre en bas comme une messagerie.
 - **Trois ambiances** — Pelouse, Nuit, Grenat. La couleur du stade change, les
   dorures et le cuir restent.
@@ -975,6 +977,60 @@ npx vite-node scripts/verifExperienceManager.ts # coupes réelles, cérémonie e
 npx vite-node scripts/verifSituations.ts     # 151 situations, impacts et non-répétition
 ```
 
+
+## 🃏 Cartes, marché lisible et plusieurs parties
+
+- **Six raretés de carte** — bronze · argent · or · épique · mythique · légende.
+  Elles suivent la note ET le potentiel, le potentiel pesant d'autant moins qu'on
+  vieillit (une marge de quinze points à 19 ans est une promesse, la même à
+  30 ans est une statistique morte). Les seuils sont **mesurés sur les vrais
+  effectifs** : un Top 14 sort 5 % de cartes légende et 37 % de mythiques, la
+  Régionale 3 reste **entièrement bronze**. Monter d'une division se voit donc à
+  la couleur de son effectif. ⚠️ La rareté **ne change aucune statistique** : ce
+  n'est pas FUT, c'est une aide de lecture — et elle cohabite avec le STATUT
+  (espoir, cadre, star), qui reste la bande du haut de la carte.
+- **On voit enfin le visage du joueur.** Le portrait de carte était une bande de
+  110 × 36 pixels : aucun recadrage ne fait tenir une tête dans un rapport 3 : 1.
+  Il est devenu un carré de 58 × 58 calé sur le haut de la photo. Le terrain
+  grandit en conséquence, et **zéro carte n'en touche une autre** — sur
+  ordinateur comme à 375 px, où un chevauchement de quatre pixels traînait
+  depuis toujours entre les deux deuxièmes lignes.
+- **Le marché mondial affiche un vrai général.** Il imprimait la fourchette du
+  rapport de scouting telle quelle — « 78–100 », « 81–100 » : vingt-quatre points
+  d'amplitude, une borne haute que personne n'atteint dans le jeu, et aucun moyen
+  de comparer deux cibles. C'est maintenant **un nombre et sa marge** (« 90 ± 7 »),
+  et la marge se referme vraiment quand on observe.
+- **Les profils s'ouvrent.** Une fiche de joueur (portrait, rareté, six axes du
+  poste, valeur, indemnité, situation contractuelle) s'ouvre depuis le marché
+  **et depuis L'Ovale de l'entraîneur**, où un clic sur un nom ne faisait
+  jusqu'ici rien du tout. Elle ne montre que ce que le service de recrutement
+  sait : un rapport incomplet reste incomplet.
+- **Six emplacements de sauvegarde.** On peut mener plusieurs carrières en
+  parallèle, joueur comme entraîneur — jusqu'ici créer l'une effaçait l'autre en
+  silence, les deux modes se chassant l'un l'autre dans la même sauvegarde. Les
+  parties se listent depuis l'accueil, avec leur club, leur saison et leur
+  niveau, sans avoir à les charger.
+- **La création demande enfin quelle carrière on veut**, joueur ou entraîneur,
+  et décrit les deux plutôt que de poser deux boutons côte à côte.
+- **Les menus n’ont plus un seul emoji.** Cinquante-trois tracés maison (`src/components/Icone.tsx`)
+  remplacent les pictogrammes du système dans la navigation, les réglages, la boutique, le
+  classement, le Hall, l’atlas, la fiche de carrière, la feuille de match et les onze onglets du
+  bureau d’entraîneur. Deux cas justifiaient à eux seuls le déplacement : 🧑‍🏫 est une séquence
+  composée que Windows rend en **deux** glyphes, et 🫵 (« c’est toi », six fois dans l’écran
+  Résultats) date d’Unicode 14 — les appareils qui ne l’ont pas affichaient un carré vide, donc
+  aucun repère dans un classement de cent lignes. Le récit, lui, garde ses emoji : c’est du texte.
+- **Les réglages, les Ovas et le tutoriel suivent l’APPAREIL, plus la carrière.** Changer de partie
+  remettait la langue du navigateur, le thème vert, zéro Ova, une boutique vide et le tutoriel du
+  premier lancement. Dix-neuf champs vivent désormais à côté des emplacements et sont partagés par
+  les six ; la ligne de classement mondial, elle, reste propre à chaque carrière.
+- **L’affiche de la semaine porte les écussons** des deux clubs, comme partout ailleurs dans le jeu.
+
+- **La fin de carrière ouvre le banc.** La reconversion en entraîneur existait,
+  mais il fallait la cocher dans une liste qui ne s'affiche qu'en prenant sa
+  retraite volontairement, la dernière saison : une carrière stoppée par une
+  blessure ou par l'âge n'y avait jamais droit — alors que ce sont justement les
+  fins subies qui donnent envie d'entraîner. La proposition est maintenant sur
+  l'épilogue, avec le prestige de départ annoncé avant de cliquer.
 ## 🗺️ Idées d'évolution
 
 👉 La liste complète et **ordonnée** des évolutions prévues (9 lots, des

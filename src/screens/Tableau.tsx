@@ -8,6 +8,8 @@
 //   3. l'ARBRE des phases finales (barrages → demies → finale, quarts compris
 //      en coupe), affiché dès que la phase régulière est terminée.
 
+import { Icone } from '../components/Icone';
+import type { NomIcone } from '../components/Icone';
 import { useMemo, useState } from 'react';
 import { locale, t } from '../lib/i18n';
 import { motion } from 'framer-motion';
@@ -59,9 +61,20 @@ function noteWorldRugby(note: number): string {
 }
 
 // Le pictogramme de chaque type de semaine, dans la frise du calendrier.
-const EMOJI_SEMAINE: Record<string, string> = {
-  championnat: '🏉', coupe: '⭐', international: '🏳️', phaseFinale: '🔥', treve: '🏖️',
+const ICONE_SEMAINE: Record<string, NomIcone> = {
+  championnat: 'ballon', coupe: 'etoile', international: 'drapeau', phaseFinale: 'flamme', treve: 'calendrier',
 };
+
+/**
+ * ⚠️ « C'EST TOI » N'EST PLUS 🫵. Le doigt pointé revenait SIX FOIS dans
+ * l'écran — c'est le repère qui permet de se retrouver dans un classement de
+ * cent lignes — et c'est l'un des emoji les plus récents (Unicode 14) : les
+ * appareils qui ne l'ont pas affichent un carré vide, donc aucun repère du
+ * tout. Une pastille dorée porte la couleur du jeu et existe partout.
+ */
+function MoiPastille() {
+  return <em className="cl-moi">{t('tb.moi')}</em>;
+}
 
 function Rencontre({ match, mien }: { match: MatchChampionnat; mien: boolean }) {
   return (
@@ -173,7 +186,7 @@ function Frise({
               ? t('tb.jouerJusqua', { date: libelleDate(s), n: s.numero - semaineActuelle })
               : `${libelleDate(s)} - ${libelleSemaine(s)}${aDesMatchs ? ` (J${premiere}${derniere > premiere ? `-${derniere}` : ''})` : ''}`}
           >
-            <span className="frise-emoji">{aVenir ? '▶' : EMOJI_SEMAINE[s.type] ?? '🏉'}</span>
+            <span className="frise-emoji">{aVenir ? '▶' : <Icone nom={ICONE_SEMAINE[s.type] ?? 'ballon'} taille={14} />}</span>
             <b>{aDesMatchs ? `J${premiere}` : '-'}</b>
             <i>{libelleDate(s)}</i>
           </button>
@@ -229,7 +242,7 @@ function ClassementsJoueurs({
   return (
     <div className="carte bloc-competition">
       <div className="comp-tete">
-        <b>🥇 {t('tb.statsJoueurs')}</b>
+        <b><Icone nom="medaille" taille={16} /> {t('tb.statsJoueurs')}</b>
         <span className="comp-count">
           {reelles
             ? `${t('tb.statsReelles', { n: rejouees })}${rejouees < journees ? ` / ${journees}` : ''}`
@@ -262,7 +275,7 @@ function ClassementsJoueurs({
                 <span className="st-pos" data-tete={i < 3 ? 'oui' : undefined}>{i + 1}</span>
                 {club ? <Blason club={club} taille={20} /> : <span />}
                 <span className="st-nom">
-                  <b>{l.nom}{l.moi && ' 🫵'}</b>
+                  <b>{l.nom}{l.moi && <MoiPastille />}</b>
                   <i>{nomPoste(l.poste)} · {l.club}</i>
                 </span>
                 <span className="st-matchs">{l.matchs} m.</span>
@@ -298,7 +311,7 @@ function Tableau1({ lignes, club, tete = 6 }: { lignes: LigneTableau[]; club: st
           <div key={l.club} className="classement-ligne" data-moi={moi ? 'oui' : undefined}>
             <span className="cl-pos" data-tete={l.position <= tete ? 'oui' : undefined}>{l.position}</span>
             {data ? <Blason club={data} taille={22} /> : <span />}
-            <span className="cl-nom">{l.club}{moi && ' 🫵'}</span>
+            <span className="cl-nom">{l.club}{moi && <MoiPastille />}</span>
             <span className="cl-pts">{l.points}</span>
             <span>{l.joues}</span>
             <span>{l.gagnes}</span>
@@ -523,32 +536,32 @@ export function Tableau() {
           valeur: maDivision,
           label: COMPETITIONS.find((c) => c.id === maDivision)?.nom ?? maDivision,
           sous: t('tb.tonChampionnat'),
-          vignette: <LogoCompet id={maDivision} emoji="⭐" taille={22} />,
+          vignette: <LogoCompet id={maDivision} emoji="etoile" taille={22} />,
           groupe: t('tb.mesCompetitions'),
         }]
       : []),
     ...mesCoupes.map((id) => {
       const c = COUPES_EUROPE.find((x) => x.id === id)!;
-      return { valeur: id, label: c.nom, sous: t('tb.clubEngage'), vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: t('tb.mesCompetitions') };
+      return { valeur: id, label: c.nom, sous: t('tb.clubEngage'), vignette: <LogoCompet id={c.id} taille={22} />, groupe: t('tb.mesCompetitions') };
     }),
     ...(maSelection
       ? [{
           valeur: maSelection,
           label: internationales.find((c) => c.id === maSelection)!.nom,
           sous: t('tb.taSelection', { nation: maNation }),
-          vignette: <LogoCompet id={maSelection} emoji="🏳️" taille={22} />,
+          vignette: <LogoCompet id={maSelection} emoji="drapeau" taille={22} />,
           groupe: t('tb.mesCompetitions'),
         }]
       : []),
     ...COUPES_EUROPE.filter((c) => !mesCoupes.includes(c.id)).map((c) => ({
-      valeur: c.id, label: c.nom, sous: nomNationTraduit(c.pays), vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: t('tb.coupesEurope'),
+      valeur: c.id, label: c.nom, sous: nomNationTraduit(c.pays), vignette: <LogoCompet id={c.id} taille={22} />, groupe: t('tb.coupesEurope'),
     })),
     ...internationales.filter((c) => c.id !== maSelection).map((c) => ({
       valeur: c.id, label: c.nom, sous: t('tb.nombreSelections', { n: c.equipes.length }),
-      vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: t('tb.selections'),
+      vignette: <LogoCompet id={c.id} taille={22} />, groupe: t('tb.selections'),
     })),
     ...COMPETITIONS.filter((c) => c.id !== maDivision).map((c) => ({
-      valeur: c.id, label: c.nom, sous: nomNationTraduit(c.pays), vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />, groupe: t('tb.championnats'),
+      valeur: c.id, label: c.nom, sous: nomNationTraduit(c.pays), vignette: <LogoCompet id={c.id} taille={22} />, groupe: t('tb.championnats'),
     })),
   ];
 
@@ -563,7 +576,7 @@ export function Tableau() {
         ← {joueur ? t('gen.retourCarriere') : t('mgr.retourBureau')}
       </button>
       <div className="eyebrow">{libelleSemaine(semActuelle, carriere.saison)} · {t('gen.saison').toLowerCase()} {carriere.saison}</div>
-      <h1>📊 {t('tb.titre')}</h1>
+      <h1><Icone nom="resultats" taille={26} /> {t('tb.titre')}</h1>
 
       <div className="barre-competitions">
         <div className="barre-selecteur">
@@ -579,7 +592,7 @@ export function Tableau() {
             className={`chip-comp${choix === maDivision ? ' actif' : ''}`}
             onClick={() => { setChoix(maDivision); setJourneeVue(null); setPouleVue(null); }}
           >
-            <LogoCompet id={maDivision} emoji="⭐" taille={18} /> {t('tb.monChampionnat')}
+            <LogoCompet id={maDivision} emoji="etoile" taille={18} /> {t('tb.monChampionnat')}
           </button>
         )}
         {maSelection && (
@@ -588,7 +601,7 @@ export function Tableau() {
             onClick={() => { setChoix(maSelection); setJourneeVue(null); setPouleVue(null); }}
             title={t('tb.nationDispute', { nation: maNation })}
           >
-            <LogoCompet id={maSelection} emoji="🏳️" taille={18} /> {t('tb.maSelection')}
+            <LogoCompet id={maSelection} emoji="drapeau" taille={18} /> {t('tb.maSelection')}
           </button>
         )}
         {mesCoupes.map((id) => {
@@ -600,7 +613,7 @@ export function Tableau() {
               onClick={() => { setChoix(id); setJourneeVue(null); setPouleVue(null); }}
               title={t('tb.clubDispute', { competition: c.nom })}
             >
-              <LogoCompet id={c.id} emoji={c.emoji} taille={18} /> {c.nom}
+              <LogoCompet id={c.id} taille={18} /> {c.nom}
             </button>
           );
         })}
@@ -612,7 +625,7 @@ export function Tableau() {
           haut du tableau et SA nation — pas l’annuaire des fédérations. */}
       <div className="carte bloc-competition">
         <div className="comp-tete">
-          <b>🌍 {t('intl.classementMondial')}</b>
+          <b><Icone nom="monde" taille={16} /> {t('intl.classementMondial')}</b>
           <span className="comp-count">
             {classementMondialOuvert
               ? t('intl.nations', { n: rangMondial.length })
@@ -649,7 +662,7 @@ export function Tableau() {
                 <div key={l.nation} className="classement-ligne" data-moi={l.nation === maNation ? 'oui' : undefined}>
                   <span className="cl-pos" data-tete={l.rang <= 12 ? 'oui' : undefined}>{l.rang}</span>
                   <LogoEquipe nom={l.nation} taille={22} />
-                  <span className="cl-nom">{nomNationTraduit(l.nation)}{l.nation === maNation && ' 🫵'}</span>
+                  <span className="cl-nom">{nomNationTraduit(l.nation)}{l.nation === maNation && <MoiPastille />}</span>
                   <span className="cl-pts">{noteWorldRugby(l.points)}</span>
                   {/* La flèche est LE point de la demande : elle dit que ce
                       tableau vit. Zéro se lit « = », pas un blanc. */}
@@ -700,7 +713,7 @@ export function Tableau() {
           C’est ce qui donne un horizon à une carrière de sélection. */}
       <div className="carte bloc-competition">
         <div className="comp-tete">
-          <b>🌍 {t('mond.titre')}</b>
+          <b><Icone nom="monde" taille={16} /> {t('mond.titre')}</b>
           <span className="comp-count">
             {saisonMondial === carriere.saison
               ? t('mond.cetteSaison')
@@ -730,7 +743,7 @@ export function Tableau() {
                     >
                       <LogoEquipe nom={nation} taille={22} />
                       <span className="cl-nom" style={{ gridColumn: 'span 3' }}>
-                        {nomNationTraduit(nation)}{nation === maNation && ' 🫵'}
+                        {nomNationTraduit(nation)}{nation === maNation && <MoiPastille />}
                       </span>
                     </div>
                   ))}
@@ -754,18 +767,18 @@ export function Tableau() {
       {coupe && (
         <>
           <p className="intro-comp">
-            <LogoCompet id={coupe.id} emoji={coupe.emoji} taille={20} /> <b>{coupe.nom}</b> : {t('tb.journeesPoules', { n: coupe.journeesJouees, total: coupe.totalJournees })}{' '}
+            <LogoCompet id={coupe.id} taille={20} /> <b>{coupe.nom}</b> : {t('tb.journeesPoules', { n: coupe.journeesJouees, total: coupe.totalJournees })}{' '}
             {coupe.engage
               ? t('tb.clubEngage')
               : t('tb.clubPasEngage')}
-            {coupe.vainqueur && ` 🏆 ${t('tb.vainqueur', { club: coupe.vainqueur })}`}
+            {coupe.vainqueur && <> <Icone nom="trophee" taille={13} /> {t('tb.vainqueur', { club: coupe.vainqueur })}</>}
           </p>
 
           {matchsCoupeVisibles.length > 0 && (
             <div className="carte bloc-competition">
               <div className="comp-tete">
-                <b>🔥 {t('tb.tableauFinal')}</b>
-                {coupe.vainqueur && <span className="comp-count">🏆 {coupe.vainqueur}</span>}
+                <b><Icone nom="flamme" taille={16} /> {t('tb.tableauFinal')}</b>
+                {coupe.vainqueur && <span className="comp-count"><Icone nom="trophee" taille={14} /> {coupe.vainqueur}</span>}
               </div>
               <Arbre matchs={matchsCoupeVisibles} club={carriere.club} />
             </div>
@@ -800,7 +813,7 @@ export function Tableau() {
       {inter && (
         <>
           <p className="intro-comp">
-            <LogoCompet id={inter.etat.id} emoji={inter.etat.emoji} taille={20} /> <b>{inter.etat.nom}</b> :{' '}
+            <LogoCompet id={inter.etat.id} taille={20} /> <b>{inter.etat.nom}</b> :{' '}
             {inter.etat.journeesJouees > 0
               ? t('tb.journeesSur', { n: inter.etat.journeesJouees, total: inter.etat.totalJournees })
               : t('tb.competitionPasCommencee')}
@@ -817,9 +830,9 @@ export function Tableau() {
               {inter.etat.bracket && inter.etat.bracket.length > 0 && (
                 <div className="carte bloc-competition">
                   <div className="comp-tete">
-                    <b>🔥 {t('tb.tableauFinal')}</b>
+                    <b><Icone nom="flamme" taille={16} /> {t('tb.tableauFinal')}</b>
                     {inter.etat.vainqueur && (
-                      <span className="comp-count">🏆 {nomNationTraduit(inter.etat.vainqueur)}</span>
+                      <span className="comp-count"><Icone nom="trophee" taille={14} /> {nomNationTraduit(inter.etat.vainqueur)}</span>
                     )}
                   </div>
                   <Arbre matchs={inter.etat.bracket} club={maNation} />
@@ -855,7 +868,7 @@ export function Tableau() {
                 <div key={l.club} className="classement-ligne" data-moi={l.club === maNation ? 'oui' : undefined}>
                   <span className="cl-pos" data-tete={l.position === 1 ? 'oui' : undefined}>{l.position}</span>
                   <LogoEquipe nom={l.club} taille={22} />
-                  <span className="cl-nom">{nomNationTraduit(l.club)}{l.club === maNation && ' 🫵'}</span>
+                  <span className="cl-nom">{nomNationTraduit(l.club)}{l.club === maNation && <MoiPastille />}</span>
                   <span className="cl-pts">{l.points}</span>
                   <span>{l.joues}</span><span>{l.gagnes}</span><span>{l.nuls}</span><span>{l.perdus}</span>
                   <span className={l.difference >= 0 ? 'cl-plus' : 'cl-moins'}>
@@ -900,7 +913,7 @@ export function Tableau() {
       {etat && (
         <>
           <p className="intro-comp">
-            <LogoCompet id={competition?.id} emoji={competition?.emoji} taille={20} /> <b>{competition?.nom}</b> :{' '}
+            <LogoCompet id={competition?.id} taille={20} /> <b>{competition?.nom}</b> :{' '}
             {derniere > 0
               ? t('tb.saisonResume', { n: derniere, total: etat.totalJournees })
               : t('tb.saisonPasCommencee')}
@@ -919,7 +932,7 @@ export function Tableau() {
                   title={p.slice(0, 4).join(' · ') + '…'}
                 >
                   {t('tb.poule', { n: i + 1 })}
-                  {choix === maDivision && i === maPoule && ' 🫵'}
+                  {choix === maDivision && i === maPoule && <MoiPastille />}
                 </button>
               ))}
             </div>
@@ -937,12 +950,12 @@ export function Tableau() {
           {tournoi && matchsTournoiVisibles.length > 0 && (
             <div className="carte bloc-competition">
               <div className="comp-tete">
-                <b>🏆 {tournoi.nom}</b>
+                <b><Icone nom="trophee" taille={16} /> {tournoi.nom}</b>
                 <span className="comp-count">{t('tb.nombreQualifies', { n: tournoi.qualifies.length })}</span>
               </div>
               <p className="intro-comp" style={{ margin: '0 0 0.6rem' }}>
                 {t('tb.tournoiAide')}
-                {finaleTerminee && tournoi.champion && <> 🏆 {t('tb.vainqueur', { club: tournoi.champion })}</>}
+                {finaleTerminee && tournoi.champion && <> <Icone nom="trophee" taille={13} /> {t('tb.vainqueur', { club: tournoi.champion })}</>}
               </p>
               <Arbre matchs={matchsTournoiVisibles} club={carriere.club} />
             </div>
@@ -951,13 +964,13 @@ export function Tableau() {
           {phase && matchsPhaseVisibles.length > 0 && (
             <div className="carte bloc-competition">
               <div className="comp-tete">
-                <b>🔥 {t('cl.phaseFinale')}</b>
+                <b><Icone nom="flamme" taille={16} /> {t('cl.phaseFinale')}</b>
                 <span className="comp-count">{t('tb.nombreQualifies', { n: phase.qualifies.length })}</span>
               </div>
               <Arbre matchs={matchsPhaseVisibles} club={carriere.club} />
               {finaleTerminee && phase.champion && phase.finaliste && (
                 <p style={{ color: 'var(--craie-dim)', fontSize: '0.85rem', marginTop: '0.7rem' }}>
-                  🏆 Champion : <b>{phase.champion}</b>. {phase.finaliste} est battu en finale, il
+                  <Icone nom="trophee" taille={14} /> Champion : <b>{phase.champion}</b>. {phase.finaliste} est battu en finale, il
                   disputera le match d’accès à la division supérieure contre son avant-dernier.
                 </p>
               )}
@@ -977,7 +990,7 @@ export function Tableau() {
           {/* ---------- LE CALENDRIER DE L'ANNÉE ---------- */}
           <div className="carte bloc-competition">
             <div className="comp-tete">
-              <b>🗓️ {t('tb.calendrier')}</b>
+              <b><Icone nom="calendrier" taille={16} /> {t('tb.calendrier')}</b>
               <span className="comp-count">{t('tb.nombreJournees', { n: total })}</span>
             </div>
             <p className="intro-comp" style={{ margin: '0 0 0.6rem' }}>
@@ -1054,7 +1067,7 @@ export function Tableau() {
       )}
       {bilanAvance && (
         <Confirmation
-          titre="🗓️ Avance terminée"
+          titre="Avance terminée"
           message={bilanAvance}
           libelleOui="Retour à la carrière"
           libelleNon="Rester ici"

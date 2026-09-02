@@ -11,6 +11,7 @@ import { titreTraduit } from '../lib/tropheesI18n';
 // ⚠️ CHARGÉE À LA DEMANDE. L'armoire tire tout Three.js ET un modèle 3D par
 // trophée : la mettre en import direct la ferait entrer dans le chunk du Hall,
 // que l'on ouvre parfois juste pour lire un classement.
+import { Icone } from '../components/Icone';
 const ArmoireTrophees = lazy(() =>
   import('../components/ArmoireTrophees').then((m) => ({ default: m.ArmoireTrophees })),
 );
@@ -45,7 +46,7 @@ export function Pantheon() {
       transition={{ duration: 0.4 }}
     >
       <div className="eyebrow">{t('hall.eyebrow')}</div>
-      <h1 className="titre-pantheon">🏛️ {t('hall.titrePantheon')}</h1>
+      <h1 className="titre-pantheon"><Icone nom="institution" taille={28} /> {t('hall.titrePantheon')}</h1>
       <p style={{ color: 'var(--craie-dim)', maxWidth: '62ch', margin: '0.6rem 0 1.4rem' }}>
         {t('hall.chapo')}
       </p>
@@ -64,7 +65,7 @@ export function Pantheon() {
 
       {legendes.length === 0 ? (
         <div className="carte vide-pantheon">
-          <div style={{ fontSize: '2.4rem' }}>🏉</div>
+          <div className="vide-icone"><Icone nom="ballon" taille={38} /></div>
           <h2>{t('hall.vide')}</h2>
           <p style={{ color: 'var(--craie-dim)' }}>{t('hall.videAide')}</p>
           {joueur ? (
@@ -89,7 +90,7 @@ export function Pantheon() {
             >
               <div className="legende-rang">#{i + 1}</div>
               <div className="legende-avatar">
-                {POSTE_PAR_ID[migrerPoste(l.poste)].categorie === 'Avant' ? '🛡️' : '⚡'}
+                <Icone nom={POSTE_PAR_ID[migrerPoste(l.poste)].categorie === 'Avant' ? 'bouclier' : 'eclair'} taille={20} />
               </div>
               <div style={{ flex: 1 }}>
                 <div className="legende-nom">{l.nom}</div>
@@ -98,15 +99,15 @@ export function Pantheon() {
                 </div>
                 <div className="legende-stats">
                   <span>{t('clst.note')} <b>{l.note}</b></span>
-                  <span>🎯 <b>{l.essais}</b></span>
-                  <span>🏉 <b>{l.matchsJoues}</b></span>
-                  <span>⭐ <b>{l.reputation}</b></span>
+                  <span><Icone nom="cible" taille={14} /> <b>{l.essais}</b></span>
+                  <span><Icone nom="ballon" taille={14} /> <b>{l.matchsJoues}</b></span>
+                  <span><Icone nom="etoile" taille={14} /> <b>{l.reputation}</b></span>
                 </div>
                 {(l.titres ?? []).length > 0 && (
                   <>
                     <div className="legende-titres">
                       {(l.titres ?? []).map((titre, j) => (
-                        <span key={j} className="medaille">🏆 {titreTraduit(titre)}</span>
+                        <span key={j} className="medaille"><Icone nom="trophee" taille={13} /> {titreTraduit(titre)}</span>
                       ))}
                     </div>
                     <button

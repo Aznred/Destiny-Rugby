@@ -27,11 +27,15 @@ import { nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import {
-  EMOJI_BADGE, adequationAuPoste, alertesDeComposition, badgesDe,
+  adequationAuPoste, alertesDeComposition, badgesDe,
   facteurDePerformance, notesDeLEquipe, statsDeCarte, statutDe, valeurAxe,
-  attributsDe, ABREVIATION, axesDe,
+  attributsDe, ABREVIATION, axesDe, rareteDe, estPepite, NOM_RARETE,
 } from '../lib/carteJoueur';
-import type { Adequation, EtatDuJoueur, StatutCarte } from '../lib/carteJoueur';
+import type {
+  Adequation, BadgeCarte, EtatDuJoueur, RareteCarte, StatutCarte,
+} from '../lib/carteJoueur';
+import { Icone } from './Icone';
+import type { NomIcone } from './Icone';
 import {
   SECTEURS_COHESION, cohesionGlobale, connexion, libelleCohesion,
 } from '../lib/cohesion';
@@ -90,14 +94,45 @@ function nomCarte(nom: string): string {
   return `${morceaux[0]} ${morceaux.at(-1)}`;
 }
 
-const PASTILLE_ADEQUATION: Record<Adequation, string> = {
-  naturel: '🟢', secondaire: '🟡', horsPoste: '🔴',
+/**
+ * ⚠️ TROIS PASTILLES DESSINÉES, PLUS TROIS EMOJI. 🟢🟡🔴 sont trois disques de
+ * la police emoji du système : ils n'ont ni la même taille ni le même vert d'un
+ * appareil à l'autre, et aucun de ces verts n'est celui du jeu. Ce sont
+ * désormais trois cercles pleins en `currentColor`, coloriés par leur classe.
+ */
+function PastilleAdequation({ adequation }: { adequation: Adequation }) {
+  return (
+    <svg
+      className={`ct-pastille ct-pastille-${adequation}`}
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+    >
+      <circle cx="6" cy="6" r="4.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Les badges temporaires, en tracés plutôt qu'en emoji système. */
+const ICONE_BADGE: Record<BadgeCarte, NomIcone> = {
+  enForme: 'flamme', blesse: 'soin', suspendu: 'carton', espoir: 'pousse',
+  international: 'drapeau', fatigue: 'batterie',
 };
+
 
 /**
  * Un portrait de composition ne fabrique jamais un autre visage. On montre la
  * photo officielle présente dans public/photos ; à défaut (ou si le fichier
  * ne charge plus), la silhouette grise explicite demandée par l'interface.
+ *
+ * ⚠️ ON VOIT LA TÊTE ENTIÈRE, ET C'ÉTAIT LE BUG SIGNALÉ (« déjà sur le terrain
+ * voir la tête du joueur, pas la moitié »). Les photos officielles font
+ * 800 × 1200 avec le visage dans le tiers haut ; le portrait mesurait 36 px de
+ * haut pour 110 de large, soit une bande de rapport 3 : 1 recadrée à
+ * `object-position: 50% 16%`. Le front et le menton tombaient hors du cadre à
+ * chaque fois, quel que soit le décalage — un rapport aussi plat NE PEUT PAS
+ * contenir un visage. Le portrait est désormais un carré (`aspect-ratio: 1`)
+ * calé sur le haut de l'image : c'est la géométrie qui règle le problème, pas
+ * un réglage de recadrage.
  */
 function PortraitComposition({ nom, panneau = false }: { nom: string; panneau?: boolean }) {
   const photo = photoReelle(nom);
@@ -137,6 +172,11 @@ function CarteJoueur({
   const adequation: Adequation = joueur
     ? adequationAuPoste(joueur.poste, posteSlot) : 'naturel';
   const statut: StatutCarte | undefined = joueur ? statutDe(joueur) : undefined;
+  // ⚠️ LA RARETÉ ET LE STATUT COHABITENT, ils ne disent pas la même chose : la
+  // rareté est le MÉTAL de la carte (ce qu'elle vaut), le statut reste la bande
+  // du haut (le rôle dans l'effectif). Voir `lib/carteJoueur.ts`.
+  const rarete: RareteCarte | undefined = joueur ? rareteDe(joueur) : undefined;
+  const pepite = joueur ? estPepite(joueur) : false;
   const badges = joueur ? badgesDe(joueur, etat ?? {}).slice(0, 2) : [];
   // ⚠️ LES SIX STATS SORTENT DU POSTE OÙ IL EST ALIGNÉ, pas de son poste
   // naturel. Déplacer un ailier à l'arrière doit changer ce qu'on lit sur sa
@@ -149,6 +189,8 @@ function CarteJoueur({
       className={[
         'ct-carte',
         statut ? `ct-${statut}` : 'ct-vide',
+        rarete ? `ct-r-${rarete}` : '',
+        pepite ? 'ct-pepite' : '',
         `ct-adq-${adequation}`,
         selectionne ? 'ct-selection' : '',
         compact ? 'ct-compacte' : '',
@@ -161,9 +203,12 @@ function CarteJoueur({
       aria-pressed={selectionne}
       aria-label={joueur
         ? `${numero}, ${nomPoste(posteSlot)}, ${joueur.nom}, ${t('compo.note')} ${joueur.note}`
-          + `, ${t(`compo.adq.${adequation}`)}`
+          + `, ${rarete ? NOM_RARETE[rarete] : ''}, ${t(`compo.adq.${adequation}`)}`
         : `${numero}, ${nomPoste(posteSlot)}, ${t('compo.vide')}`}
-      title={joueur ? `${joueur.nom} · ${nomPoste(joueur.poste)} · ${joueur.age} ${t('compo.ans')}` : nomPoste(posteSlot)}
+      title={joueur
+        ? `${joueur.nom} · ${nomPoste(joueur.poste)} · ${joueur.age} ${t('compo.ans')}`
+          + `${rarete ? ` · ${NOM_RARETE[rarete]}` : ''}`
+        : nomPoste(posteSlot)}
     >
       <span className="ct-talon" aria-hidden="true">{numero}</span>
       <span className="ct-tete">
@@ -175,7 +220,9 @@ function CarteJoueur({
       {joueur && (
         <span className="ct-sous">
           <i>{joueur.age} {t('compo.ans')}</i>
-          <i className="ct-adq" title={t(`compo.adq.${adequation}`)}>{PASTILLE_ADEQUATION[adequation]}</i>
+          <i className="ct-adq" title={t(`compo.adq.${adequation}`)}>
+            <PastilleAdequation adequation={adequation} />
+          </i>
         </span>
       )}
       {!compact && stats.length > 0 && (
@@ -186,11 +233,27 @@ function CarteJoueur({
         </span>
       )}
       <span className="ct-pied">
-        {etat?.condition !== undefined && <i className="ct-cond">🟢 {etat.condition}%</i>}
-        {etat?.forme !== undefined && <i className="ct-forme">🔥 {etat.forme}</i>}
-        {badges.map((b) => <i key={b} className="ct-badge" title={t(`compo.badge.${b}`)}>{EMOJI_BADGE[b]}</i>)}
-        {capitaine && <i className="ct-role" title={t('compo.capitaine')}>©️</i>}
-        {buteur && <i className="ct-role" title={t('compo.buteur')}>🎯</i>}
+        {etat?.condition !== undefined && (
+          <i className="ct-cond"><Icone nom="coeur" taille={11} /> {etat.condition}%</i>
+        )}
+        {etat?.forme !== undefined && (
+          <i className="ct-forme"><Icone nom="flamme" taille={11} /> {etat.forme}</i>
+        )}
+        {badges.map((b) => (
+          <i key={b} className={`ct-badge ct-badge-${b}`} title={t(`compo.badge.${b}`)}>
+            <Icone nom={ICONE_BADGE[b]} taille={12} />
+          </i>
+        ))}
+        {capitaine && (
+          <i className="ct-role" title={t('compo.capitaine')}>
+            <Icone nom="brassard" taille={12} />
+          </i>
+        )}
+        {buteur && (
+          <i className="ct-role" title={t('compo.buteur')}>
+            <Icone nom="cible" taille={12} />
+          </i>
+        )}
       </span>
     </button>
   );
@@ -213,14 +276,17 @@ function PanneauJoueur({
   onFermer: () => void;
 }) {
   const attributs = attributsDe(joueur);
+  const rarete = rareteDe(joueur);
   const adequation = posteSlot ? adequationAuPoste(joueur.poste, posteSlot) : 'naturel';
   const liaisons = (PARTENAIRES[joueur.poste] ?? [])
     .map((p) => ({ poste: p, joueur: coequipiers.get(p) }))
     .filter((l): l is { poste: PosteId; joueur: Coequipier } => !!l.joueur);
 
   return (
-    <aside className="ct-panneau" aria-label={t('compo.panneau')}>
-      <button type="button" className="ct-fermer" onClick={onFermer} aria-label={t('compo.fermer')}>✕</button>
+    <aside className={`ct-panneau ct-r-${rarete}`} aria-label={t('compo.panneau')}>
+      <button type="button" className="ct-fermer" onClick={onFermer} aria-label={t('compo.fermer')}>
+        <Icone nom="croix" taille={16} />
+      </button>
       <header>
         <PortraitComposition nom={joueur.nom} panneau />
         <b>{joueur.nom}</b>
@@ -228,9 +294,13 @@ function PanneauJoueur({
       </header>
       <p className="ct-ident">
         {nomPoste(joueur.poste)} · {joueur.nation} · {joueur.age} {t('compo.ans')}
+        <em className={`ct-rarete ct-r-txt-${rarete}`}>
+          <Icone nom="etoile" taille={12} /> {NOM_RARETE[rarete]}
+          {estPepite(joueur) && <b className="ct-pepite-txt"> · {t('compo.badge.espoir')}</b>}
+        </em>
         {posteSlot && adequation !== 'naturel' && (
           <em className={`ct-adq-txt ct-adq-${adequation}`}>
-            {PASTILLE_ADEQUATION[adequation]} {t(`compo.adq.${adequation}`)}
+            <PastilleAdequation adequation={adequation} /> {t(`compo.adq.${adequation}`)}
             {' '}({Math.round((1 - facteurDePerformance(adequation)) * 100)} %)
           </em>
         )}
@@ -294,12 +364,12 @@ function PanneauJoueur({
       <div className="ct-actions">
         {onCapitaine && (
           <button type="button" onClick={() => onCapitaine(joueur.id)} aria-pressed={capitaine}>
-            ©️ {t('compo.capitaine')}
+            <Icone nom="brassard" taille={16} /> {t('compo.capitaine')}
           </button>
         )}
         {onButeur && (
           <button type="button" onClick={() => onButeur(joueur.id)} aria-pressed={buteur}>
-            🎯 {t('compo.buteur')}
+            <Icone nom="cible" taille={16} /> {t('compo.buteur')}
           </button>
         )}
       </div>
@@ -396,16 +466,21 @@ export function CompositionTerrainManager({
         <ul className="ct-alertes">
           {alertes.map((a) => (
             <li key={a.cle} className={`ct-${a.gravite}`}>
-              {a.gravite === 'ok' ? '🟢' : a.gravite === 'bloquant' ? '⛔' : '⚠️'}
+              <Icone nom={a.gravite === 'ok' ? 'ok' : a.gravite === 'bloquant' ? 'stop' : 'alerte'} taille={14} />
               {' '}{t(a.cle, a.valeur ? { n: a.valeur } : undefined)}
             </li>
           ))}
         </ul>
       </div>
 
+      {/* ⚠️ LES DEUX AIDES ONT PERDU LEURS EMOJI DANS LE DICTIONNAIRE (↕️ et 📱),
+          et c'est volontaire : un emoji collé au début d'une chaîne traduite se
+          retrouve dans les sept langues, il ne se colore pas avec le texte et
+          il change de taille d'un système à l'autre. L'icône est posée par
+          l'écran, à côté de la phrase. */}
       <div className="manager-compo-aide" aria-live="polite">
-        <span>{t('compo.aideGlisser')}</span>
-        <span>{t('compo.aideMobile')}</span>
+        <span><Icone nom="equipe" taille={14} /> {t('compo.aideGlisser')}</span>
+        <span><Icone nom="cible" taille={14} /> {t('compo.aideMobile')}</span>
         {joueurSelectionne && <b>{joueurSelectionne.nom}</b>}
       </div>
 
@@ -455,7 +530,10 @@ export function CompositionTerrainManager({
       </div>
 
       <div className="manager-banc-visuel">
-        <div className="comp-tete"><b>🪑 {t('compo.banc')}</b><span className="comp-count">8</span></div>
+        <div className="comp-tete">
+          <b><Icone nom="banc" taille={16} /> {t('compo.banc')}</b>
+          <span className="comp-count">8</span>
+        </div>
         <div className="manager-banc-cartes">
           {POSTES_BANC_MANAGER.map((posteSlot, index) => {
             const joueur = remplacants[index];
@@ -487,11 +565,18 @@ export function CompositionTerrainManager({
             <button
               type="button"
               key={joueur.id}
-              className={`manager-reserve-carte ct-${statutDe(joueur)}${selection === joueur.id ? ' selectionnee' : ''}`}
+              className={[
+                'manager-reserve-carte',
+                `ct-${statutDe(joueur)}`,
+                `ct-r-${rareteDe(joueur)}`,
+                estPepite(joueur) ? 'ct-pepite' : '',
+                selection === joueur.id ? 'selectionnee' : '',
+              ].filter(Boolean).join(' ')}
               draggable
               onClick={() => setSelection(selection === joueur.id ? null : joueur.id)}
               onDragStart={(e) => demarrerDrag(e, joueur.id)}
               aria-pressed={selection === joueur.id}
+              title={`${joueur.nom} · ${NOM_RARETE[rareteDe(joueur)]}`}
             >
               <PortraitComposition nom={joueur.nom} />
               <strong>{joueur.note}</strong>
@@ -500,7 +585,11 @@ export function CompositionTerrainManager({
                 <small>{nomPoste(joueur.poste)} · {joueur.age} {t('compo.ans')}</small>
               </span>
               {badgesDe(joueur, etats?.get(joueur.id) ?? {}).slice(0, 1)
-                .map((b) => <i key={b} className="ct-badge">{EMOJI_BADGE[b]}</i>)}
+                .map((b) => (
+                  <i key={b} className={`ct-badge ct-badge-${b}`}>
+                    <Icone nom={ICONE_BADGE[b]} taille={13} />
+                  </i>
+                ))}
             </button>
           ))}
         </div>

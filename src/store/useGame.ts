@@ -61,23 +61,23 @@ import {
   internationalEnDirect, equipeU20,
 } from '../lib/international';
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
+import { appliquerCompte, ecrireCompte, stockageParEmplacement } from '../lib/sauvegardes';
 
 // Les journées complètes utilisent le moteur lourd chargé à la demande. Une
 // file unique empêche plusieurs clics rapides (ou une avance calendrier) de
 // rejouer en parallèle la même journée et d'écraser leurs cumuls respectifs.
 let fileStatsReelles: Promise<void> = Promise.resolve();
 
-// Les scripts de vérification et le rendu serveur n'ont pas de localStorage.
-// Un stockage mémoire silencieux garde alors exactement la même API sans
-// inonder la sortie d'avertissements ni faire échouer l'import du store.
-const memoireHorsNavigateur = new Map<string, string>();
-const stockageJeu = createJSONStorage(() => (typeof localStorage !== 'undefined'
-  ? localStorage
-  : {
-      getItem: (nom: string) => memoireHorsNavigateur.get(nom) ?? null,
-      setItem: (nom: string, valeur: string) => { memoireHorsNavigateur.set(nom, valeur); },
-      removeItem: (nom: string) => { memoireHorsNavigateur.delete(nom); },
-    }));
+// ⚠️ LA PARTIE VA DANS L'EMPLACEMENT ACTIF, plus dans une clé unique. Le store
+// écrit toujours sous le même nom (`destin-ovalie`) et ne sait rien des
+// emplacements : c'est l'adaptateur de `lib/sauvegardes.ts` qui redirige ce nom
+// vers l'emplacement en cours. Sans ce détour, créer une carrière d'entraîneur
+// écrasait la carrière de joueur — les deux modes se chassent l'un l'autre
+// (`creerManager` pose `joueur: null`, `creerJoueur` pose `manager: null`).
+//
+// Il gère aussi le cas des scripts de vérification et du rendu serveur, qui
+// n'ont pas de `localStorage` : le repli mémoire vit dans l'adaptateur.
+const stockageJeu = createJSONStorage(() => stockageParEmplacement());
 
 // Combien de week-ends de ce type se sont écoulés AVANT cette semaine.
 function passeesDuType(numeroSemaine: number, type: string): number {
@@ -1059,7 +1059,18 @@ interface GameState {
   prendreRetraite: (
     reconversion?: string, motif?: MotifFinCarriere, detail?: string,
   ) => void;
-  continuerFinCarriere: () => void;
+  /**
+   * Referme l'épilogue.
+   *
+   * ⚠️ LA DESTINATION EST DEVENUE UN PARAMÈTRE, et c'était le chaînon manquant
+   * du « relais » demandé (« faire le relais en fin de carrière joueur, le
+   * parcours entraîneur »). Elle était figée à la création de l'épilogue,
+   * d'après la reconversion cochée AVANT de raccrocher — or on ne coche cette
+   * liste qu'en prenant sa retraite volontairement. Une carrière arrêtée par
+   * une blessure, par la limite d'âge ou faute de club n'avait donc jamais
+   * accès au banc, quoi qu'ait voulu le joueur.
+   */
+  continuerFinCarriere: (destination?: 'pantheon' | 'manager') => void;
   fermerTrophee: () => void;
   reinitialiser: () => void;
   // marché des transferts — tout passe par les messages privés de L'Ovale
@@ -3511,12 +3522,22 @@ export const useGame = create<GameState>()(
         }));
       },
 
-      continuerFinCarriere: () => {
+      continuerFinCarriere: (choisie) => {
         const fin = get().finCarriere;
-        const destination = fin?.destination === 'manager' && chantierVisible('manager')
-          ? 'creationManager' : 'pantheon';
+        // La reconversion cochée avant de raccrocher reste la proposition par
+        // défaut ; le bouton de l'épilogue peut la contredire.
+        const voulue = choisie ?? (fin?.destination === 'manager' ? 'manager' : 'pantheon');
+        const versManager = voulue === 'manager' && chantierVisible('manager');
+        const destination = versManager ? 'creationManager' : 'pantheon';
         set((s) => ({
           finCarriere: null,
+          // ⚠️ ON REPOSE LA LÉGENDE SOUS LA MAIN DE L'ÉCRAN DE CRÉATION. Elle
+          // n'est pas persistée (c'est un ordre donné à un écran, pas un état
+          // du monde) : après un rechargement en plein épilogue, elle a disparu
+          // et il faut la reprendre au Hall, où elle vient d'être archivée.
+          reconversionManager: versManager
+            ? s.reconversionManager ?? s.pantheon.find((l) => l.id === fin?.legendeId) ?? null
+            : null,
           ecran: destination,
           ecransVus: s.ecransVus.includes(destination)
             ? s.ecransVus : [...s.ecransVus, destination],
@@ -4783,6 +4804,22 @@ export const useGame = create<GameState>()(
           ditesLe.push(t('mgr.inst.rapport', { n: String(rapports.length) }));
         }
 
+        // ⚠️ UN ENTRAÎNEUR RACCROCHE, LUI AUSSI — et ça manquait. Le manager
+        // vieillissait d'un an par saison sans qu'aucune borne ne l'arrête,
+        // alors que le crible du classement refuse une fiche au-delà de
+        // `ageManagerMax`. Un banc tenu trop longtemps sortait donc du
+        // classement EN SILENCE, exactement comme la carrière de joueur qui
+        // continuait après une blessure de fin de carrière : la règle existait
+        // dans les données, personne ne l'appliquait au jeu.
+        //
+        // ⚠️ MAIS ON NE FERME PAS LA PARTIE DEPUIS ICI. `quitterBanc` vide le
+        // journal et emmène au Hall : appelé dans la foulée, il effacerait
+        // l'entrée qu'on vient d'écrire et la carrière s'arrêterait sans un
+        // mot. L'écran manager voit `age > ageManagerMax` et pose la question
+        // (voir `screens/Manager.tsx`) — même principe que la retraite du
+        // joueur, qui passe par un épilogue plutôt que par un `set()` muet.
+        const finDAge = suivant.age > LIMITES.ageManagerMax;
+
         set((st) => ({
           manager: suivant,
           coins: st.coins + gainTrophees,
@@ -4810,7 +4847,15 @@ export const useGame = create<GameState>()(
               + (licencie
                 ? ` ${t('mgr.journal.nouveauBanc')}`
                 : ` ${t('mgr.journal.confiance', { confiance })}`),
-          }],
+          }, ...(finDAge ? [{
+            id: idUnique(),
+            saison: m.saison,
+            role: 'mj' as const,
+            titre: t('mgr.journal.finDAgeTitre'),
+            texte: t('mgr.journal.finDAgeTexte', {
+              nom: suivant.nom, age: suivant.age, saisons: suivant.historique.length,
+            }),
+          }] : [])],
         }));
         get().verifierSucces();
       },
@@ -6667,9 +6712,37 @@ export const useGame = create<GameState>()(
         groqKey: s.groqKey,
         modele: s.modele,
       }),
+
+      /**
+       * ⚠️ CE QUI APPARTIENT À L'APPAREIL SE POSE PAR-DESSUS LA PARTIE.
+       *
+       * Bug signalé : « quand on switch de sauvegarde, ça nous remet le tuto ».
+       * Et le tutoriel n'était que le symptôme le plus visible — `persist` écrit
+       * TOUT dans l'emplacement actif, si bien qu'ouvrir une autre partie
+       * rendait aussi la langue du navigateur, le thème vert, zéro Ova, une
+       * boutique vide et un Hall des légendes remis à zéro.
+       *
+       * `merge` est le bon endroit : il est appelé une seule fois, au chargement
+       * de l'emplacement, avec l'état lu et l'état initial. Le faire dans
+       * `onRehydrateStorage` reviendrait à écraser l'état APRÈS que React s'y
+       * soit abonné, donc à peindre l'écran deux fois.
+       */
+      merge: (persiste, courant) => appliquerCompte({
+        ...courant,
+        ...(persiste as Partial<GameState>),
+      }) as GameState,
     },
   ),
 );
+
+/**
+ * ⚠️ ET LE COMPTE SE RÉÉCRIT QUAND IL BOUGE, PAS QUAND LA PARTIE BOUGE.
+ * `ecrireCompte` compare le JSON de ses seules clés à celui de la dernière
+ * écriture et sort en silence s'il est identique : gagner un Ova écrit, jouer
+ * une minute de match n'écrit rien. C'est ce qui permet de partager les
+ * réglages et la boutique sans payer une seconde sauvegarde à chaque `set()`.
+ */
+useGame.subscribe((etat) => ecrireCompte(etat as unknown as Record<string, unknown>));
 
 // ---- Palmarès : quels titres le joueur remporte-t-il cette saison ? ----
 // On simule d'abord le CLASSEMENT du club dans sa poule (1 à 14). Il découle

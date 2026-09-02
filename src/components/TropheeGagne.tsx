@@ -7,6 +7,7 @@ import type { Group } from 'three';
 import { TROPHEES } from '../data/trophees';
 import { t, tn } from '../lib/i18n';
 import { descriptionTrophee, nomTrophee } from '../lib/tropheesI18n';
+import { Icone } from './Icone';
 
 // Modèle du trophée : recentré, normalisé, en rotation continue sur lui-même.
 function ModeleTrophee({ url }: { url: string }) {
@@ -80,7 +81,7 @@ export function TropheeGagne({ tropheeId, index, total, onFermer }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
         >
-          🏆 {t('trophee.remporte')}{total > 1 ? ` · ${index} / ${total}` : ''}
+          <Icone nom="trophee" taille={17} /> {t('trophee.remporte')}{total > 1 ? ` · ${index} / ${total}` : ''}
         </motion.div>
 
         <motion.h2

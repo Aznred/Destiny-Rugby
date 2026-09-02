@@ -110,14 +110,14 @@ create table if not exists classement (
   -- Sur une base déjà en ligne :
   --   alter table classement drop constraint if exists classement_score_check;
   --   alter table classement add constraint classement_score_check
-  --     check (score >= 0 and score <= 117000);
+  --     check (score >= 0 and score <= 123100);
   -- ⚠️ TROISIÈME DÉPLACEMENT : le mode manager ajoute un second barème, et
   --    une carrière « joueur + entraîneur » cumule les deux versants.
   --    82 500 → 117 000. Sur une base déjà en ligne :
   --      alter table classement drop constraint classement_score_check;
   --      alter table classement add constraint classement_score_check
-  --        check (score >= 0 and score <= 117000);
-  score    integer not null check (score >= 0 and score <= 117000),
+  --        check (score >= 0 and score <= 123100);
+  score    integer not null check (score >= 0 and score <= 123100),
   cree_le  timestamptz not null default now(),
   maj_le   timestamptz not null default now(),
 

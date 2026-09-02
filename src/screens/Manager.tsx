@@ -15,7 +15,11 @@ import { TROPHEES } from '../data/trophees';
 import { nomPoste, POSTES } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
 import { CompositionTerrainManager } from '../components/CompositionTerrainManager';
+import { Icone } from '../components/Icone';
+import { FicheJoueur } from '../components/FicheJoueur';
+import { rareteDe } from '../lib/carteJoueur';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
+import type { CibleRecrutementManager } from '../types';
 import { poidsDansSecteur, SECTEURS_COHESION } from '../lib/cohesion';
 import type { Automatismes } from '../lib/cohesion';
 import { ciblesDuMarche, masseSalarialeActuelle } from '../lib/recrutementManager';
@@ -24,12 +28,13 @@ import {
   noteMaximale, salaireManager,
 } from '../lib/manager';
 import { matchDuClubSemaine } from '../lib/matchLive';
+import { LIMITES } from '../lib/classementMondial';
 import {
-  CLUBS_OBSERVES, coutAmelioration, EMOJI_INSTALLATION, GAIN_ENTRAINEMENT,
+  CLUBS_OBSERVES, coutAmelioration, ICONE_INSTALLATION, GAIN_ENTRAINEMENT,
   installationsVierges, NIVEAU_INSTALLATION_MAX, PLACES_ENTRAINEMENT,
   INCERTITUDE_RECRUTEURS, budgetStructure,
 } from '../lib/installations';
-import { AXES_CENTRE, EMOJI_AXE } from '../lib/centreFormation';
+import { AXES_CENTRE, ICONE_AXE } from '../lib/centreFormation';
 import {
   capaciteAcademie, ficheAcademicienManager, nomObjectifJeune, OBJECTIFS_JEUNES,
   tableauDetectionManager,
@@ -148,6 +153,9 @@ export function Manager() {
   const [matchSelectionOuvert, setMatchSelectionOuvert] = useState(false);
   const [jeuneALiberer, setJeuneALiberer] = useState<string | null>(null);
   const [demission, setDemission] = useState(false);
+  // La fiche ouverte depuis le marché. Demande : « pouvoir cliquer sur les
+  // profils » — voir `components/FicheJoueur.tsx`.
+  const [ficheCible, setFicheCible] = useState<CibleRecrutementManager | null>(null);
   const [competitionHistoire, setCompetitionHistoire] = useState(manager?.division ?? 'top14');
   const [saisonChronologie, setSaisonChronologie] = useState(manager?.saison ?? 1);
 
@@ -236,6 +244,9 @@ export function Manager() {
   if (!manager) return null;
 
   const sansBanc = !manager.club;
+  // ⚠️ STRICTEMENT SUPÉRIEUR : on entraîne JUSQU'À `ageManagerMax` inclus. À
+  // `>=`, la dernière saison annoncée par l'écran de création serait refusée.
+  const finDAge = manager.age > LIMITES.ageManagerMax;
   const fiche = manager.club ? clubParNom(manager.club) : undefined;
   const comp = manager.club ? competitionDuClub(manager.club) : undefined;
   const force = manager.club ? forceEffectif(manager.club, manager.saison) : 0;
@@ -330,7 +341,7 @@ export function Manager() {
   }));
   const optionsDivisions: OptionSelecteur[] = COMPETITIONS.map((c) => ({
     valeur: c.id, label: c.nom, sous: `${c.pays} · ${c.clubs.length} ${t('mgr.clubs')}`,
-    vignette: <LogoCompet id={c.id} emoji={c.emoji} taille={22} />,
+    vignette: <LogoCompet id={c.id} taille={22} />,
   }));
   const competitionMarche = COMPETITIONS.find((c) => c.id === divisionMarche);
   const optionsClubs: OptionSelecteur[] = [
@@ -353,7 +364,7 @@ export function Manager() {
             {' · '}{t('gen.saison').toLowerCase()} {manager.saison}
             {!sansBanc && ` · ${libelleSemaine(sem, manager.saison)}`}
           </div>
-          <h1>🧑‍🏫 {manager.nom}</h1>
+          <h1><Icone nom="entraineur" taille={26} /> {manager.nom}</h1>
         </div>
         {!sansBanc && fiche && (
           <div className="manager-identite-club">
@@ -363,7 +374,28 @@ export function Manager() {
         )}
       </header>
 
-      {sansBanc ? (
+      {/* ═══ LA LIMITE D'ÂGE ══════════════════════════════════════════════════
+          ⚠️ ELLE PASSE DEVANT TOUT LE RESTE, y compris « sans banc ». Le
+          manager vieillissait d'un an par saison sans qu'aucune borne ne
+          l'arrête, alors que le crible du classement refuse une fiche au-delà
+          de `LIMITES.ageManagerMax` : une carrière tenue trop longtemps sortait
+          du classement EN SILENCE. Elle se termine donc pour de bon, et l'écran
+          dit pourquoi — comme l'épilogue d'une carrière de joueur, et pour la
+          même raison : une partie qui s'arrête sans un mot se lit comme un
+          bug. */}
+      {finDAge ? (
+        <div className="carte manager-sans-banc manager-fin-age">
+          <div className="fin-age-icone" aria-hidden="true"><Icone nom="institution" taille={38} /></div>
+          <h2>{t('mgr.finAgeTitre')}</h2>
+          <p>{t('mgr.finAgeTexte', {
+            nom: manager.nom, age: manager.age, max: LIMITES.ageManagerMax,
+            saisons: manager.historique.length, titres: manager.palmares.length,
+          })}</p>
+          <button className="btn primaire grand" onClick={quitterBanc}>
+            <Icone nom="trophee" taille={19} /> {t('mgr.finAgeBouton')}
+          </button>
+        </div>
+      ) : sansBanc ? (
         <div className="carte manager-sans-banc">
           <h2>{t('mgr.sansClub')}</h2>
           <p>{t('mgr.sansClubTexte', {
@@ -375,34 +407,55 @@ export function Manager() {
             <Selecteur id="banc" options={optionsBancs} valeur={clubVise || optionsBancs[0]?.valeur || ''} onChange={setClubVise} recherche />
           </div>
           <button className="btn primaire grand" disabled={!optionsBancs.length} onClick={() => signerBanc(clubVise || optionsBancs[0].valeur)}>
-            ✍️ {t('mgr.signer')}
+            <Icone nom="signature" taille={18} /> {t('mgr.signer')}
           </button>
         </div>
       ) : (
         <>
+          {/* ⚠️ ONZE ONGLETS, ONZE TRACÉS — plus onze emoji. Un emoji est dessiné
+              par Apple, Google ou Microsoft : la barre changeait d'aspect selon
+              la machine, ses couleurs (un manteau bleu ciel, un livre rouge) ne
+              sont pas celles du jeu, et sa ligne de base varie d'un système à
+              l'autre — d'où des libellés qui ne s'alignaient pas entre eux. Les
+              icônes de `components/Icone.tsx` prennent la couleur du texte, donc
+              l'or de l'onglet actif. Voir « ÇA FAIT TROP IA » dans CLAUDE.md. */}
           <nav className="manager-onglets" aria-label={t('mgr.navigation')}>
-            <button className={vue === 'bureau' ? 'actif' : ''} onClick={() => setVue('bureau')}>🏟️ Club</button>
-            <button className={vue === 'equipe' ? 'actif' : ''} onClick={() => setVue('equipe')}>👥 Composition</button>
+            <button className={vue === 'bureau' ? 'actif' : ''} onClick={() => setVue('bureau')}>
+              <Icone nom="stade" taille={17} /> Club
+            </button>
+            <button className={vue === 'equipe' ? 'actif' : ''} onClick={() => setVue('equipe')}>
+              <Icone nom="equipe" taille={17} /> Composition
+            </button>
             <button className={vue === 'match' ? 'actif' : ''} onClick={() => setVue('match')}>
-              🎮 Match {afficheManager && !resultatManager && <i>1</i>}
+              <Icone nom="sifflet" taille={17} /> Match {afficheManager && !resultatManager && <i>1</i>}
             </button>
-            <button className={vue === 'marche' ? 'actif' : ''} onClick={() => setVue('marche')}>🌍 {t('mgr.marche')}</button>
+            <button className={vue === 'marche' ? 'actif' : ''} onClick={() => setVue('marche')}>
+              <Icone nom="monde" taille={17} /> {t('mgr.marche')}
+            </button>
             <button className={vue === 'ovale' ? 'actif' : ''} onClick={() => { setVue('ovale'); ouvrirMessages(); }}>
-              𝕏 L’Ovale {alertesOvale > 0 && <i>{alertesOvale}</i>}
+              <Icone nom="ovale" taille={17} /> L’Ovale {alertesOvale > 0 && <i>{alertesOvale}</i>}
             </button>
-            <button className={vue === 'formation' ? 'actif' : ''} onClick={() => setVue('formation')}>🎓 Formation</button>
+            <button className={vue === 'formation' ? 'actif' : ''} onClick={() => setVue('formation')}>
+              <Icone nom="formation" taille={17} /> Formation
+            </button>
             <button className={vue === 'recruteurs' ? 'actif' : ''} onClick={() => setVue('recruteurs')}>
-              🔎 Recruteurs {rapportsFrais > 0 && <i>{rapportsFrais}</i>}
+              <Icone nom="loupe" taille={17} /> Recruteurs {rapportsFrais > 0 && <i>{rapportsFrais}</i>}
             </button>
-            <button className={vue === 'entrainement' ? 'actif' : ''} onClick={() => setVue('entrainement')}>🏋️ Entraînement</button>
+            <button className={vue === 'entrainement' ? 'actif' : ''} onClick={() => setVue('entrainement')}>
+              <Icone nom="halteres" taille={17} /> Entraînement
+            </button>
             <button className={vue === 'direction' ? 'actif' : ''} onClick={() => setVue('direction')}>
-              🏛️ Direction {objectifsAvances.some((o) => o.etat === 'echoue') && <i>!</i>}
+              <Icone nom="institution" taille={17} /> Direction {objectifsAvances.some((o) => o.etat === 'echoue') && <i>!</i>}
             </button>
             <button className={vue === 'vestiaire' ? 'actif' : ''} onClick={() => setVue('vestiaire')}>
-              🗣️ Vestiaire {(discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length) > 0 && <i>{discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length}</i>}
+              <Icone nom="maillot" taille={17} /> Vestiaire {(discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length) > 0 && <i>{discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length}</i>}
             </button>
-            <button className={vue === 'univers' ? 'actif' : ''} onClick={() => setVue('univers')}>📰 Monde</button>
-            <button className={vue === 'histoire' ? 'actif' : ''} onClick={() => setVue('histoire')}>📚 Histoire</button>
+            <button className={vue === 'univers' ? 'actif' : ''} onClick={() => setVue('univers')}>
+              <Icone nom="journal" taille={17} /> Monde
+            </button>
+            <button className={vue === 'histoire' ? 'actif' : ''} onClick={() => setVue('histoire')}>
+              <Icone nom="livre" taille={17} /> Histoire
+            </button>
           </nav>
 
           {vue === 'bureau' && (
@@ -413,16 +466,16 @@ export function Manager() {
                   <div>
                     <div className="eyebrow">Tableau de bord · saison {manager.saison}</div>
                     <h2>{manager.club}</h2>
-                    <p>{comp && <LogoCompet id={comp.id} emoji={comp.emoji} taille={19} />} {manager.divisionNom} · {humeur.texte}</p>
+                    <p>{comp && <LogoCompet id={comp.id} taille={19} />} {manager.divisionNom} · {humeur.texte}</p>
                   </div>
                 </div>
                 <div className="manager-resume-actions">
-                  <button className="btn fantome" onClick={() => setEcran('effectif')}>👥 Effectif</button>
+                  <button className="btn fantome" onClick={() => setEcran('effectif')}><Icone nom="equipe" taille={16} /> Effectif</button>
                   <button className="btn fantome" onClick={() => { setVue('ovale'); ouvrirMessages(); }}>𝕏 L’Ovale</button>
                   <button className="btn primaire" onClick={() => {
                     if (afficheManager && !resultatManager) setVue('match'); else semaineManager();
                   }}>
-                    {afficheManager && !resultatManager ? '🎮 Coacher le match' : '▶ Semaine suivante'}
+                    {afficheManager && !resultatManager ? 'Coacher le match' : 'Semaine suivante'}
                   </button>
                 </div>
               </section>
@@ -438,7 +491,7 @@ export function Manager() {
 
               <section className="carte manager-classement-complet">
                 <div className="comp-tete">
-                  <div><b>📊 Course au classement · {manager.divisionNom}</b><small>Les cinq clubs autour du tien</small></div>
+                  <div><b><Icone nom="resultats" taille={16} /> Course au classement · {manager.divisionNom}</b><small>Les cinq clubs autour du tien</small></div>
                   <button onClick={() => setEcran('tableau')}>Classement complet</button>
                 </div>
                 <div className="manager-table-classement" role="region" aria-label={`Classement ${manager.divisionNom}`} tabIndex={0}>
@@ -464,15 +517,34 @@ export function Manager() {
 
               <section className="manager-bureau-bas">
                 <article className="carte manager-prochain-match">
-                  <div className="comp-tete"><b>🏉 Prochaine échéance</b></div>
+                  <div className="comp-tete"><b><Icone nom="ballon" taille={16} /> Prochaine échéance</b></div>
+                  {/* ⚠️ DEUX NOMS NE FONT PAS UNE AFFICHE. Le jeu embarque
+                      957 écussons et les montre partout ailleurs — atlas,
+                      classements, cartes d'offres, feuille de match : la seule
+                      case où l'on regarde « qui on joue dimanche » les
+                      ignorait. `Blason` retombe déjà sur un écusson dessiné
+                      quand le club n'a pas de logo, donc aucun club du monde ne
+                      laisse un trou. */}
                   {afficheManager ? (
                     <div className="manager-mini-duel">
-                      <span>{afficheManager.match.domicile}</span><strong>{resultatManager ? `${afficheManager.match.scoreD} – ${afficheManager.match.scoreE}` : 'VS'}</strong><span>{afficheManager.match.exterieur}</span>
+                      <span>
+                        {clubParNom(afficheManager.match.domicile) && (
+                          <Blason club={clubParNom(afficheManager.match.domicile)!} taille={38} />
+                        )}
+                        <i>{afficheManager.match.domicile}</i>
+                      </span>
+                      <strong>{resultatManager ? `${afficheManager.match.scoreD} – ${afficheManager.match.scoreE}` : 'VS'}</strong>
+                      <span>
+                        {clubParNom(afficheManager.match.exterieur) && (
+                          <Blason club={clubParNom(afficheManager.match.exterieur)!} taille={38} />
+                        )}
+                        <i>{afficheManager.match.exterieur}</i>
+                      </span>
                     </div>
                   ) : <p>Aucun match cette semaine : récupération et préparation.</p>}
                 </article>
                 <article className="carte manager-journal">
-                  <div className="comp-tete"><b>📜 {t('mgr.journal')}</b></div>
+                  <div className="comp-tete"><b><Icone nom="journal" taille={16} /> {t('mgr.journal')}</b></div>
                   <div className="journal">{[...journal].reverse().slice(0, 3).map((e) => <div key={e.id} className="entree"><b>{e.titre}</b><p>{e.texte}</p></div>)}</div>
                 </article>
               </section>
@@ -482,13 +554,13 @@ export function Manager() {
           {vue === 'direction' && avancee && (
             <div className="manager-avance-grille">
               <section className="carte avance-entete">
-                <div><div className="eyebrow">Conseil d’administration · saison {manager.saison}</div><h2>🏛️ Attentes et avenir du manager</h2><p>Les objectifs sont pondérés selon les moyens du club. Ils nourrissent la confiance, les offres reçues et le risque de licenciement.</p></div>
+                <div><div className="eyebrow">Conseil d’administration · saison {manager.saison}</div><h2><Icone nom="institution" taille={20} /> Attentes et avenir du manager</h2><p>Les objectifs sont pondérés selon les moyens du club. Ils nourrissent la confiance, les offres reçues et le risque de licenciement.</p></div>
                 <div className={`avance-score ${manager.confiance < CONFIANCE_LICENCIEMENT + 12 ? 'danger' : ''}`}><b>{Math.round(manager.confiance)}</b><span>confiance</span></div>
               </section>
 
               {decisionStrategique && <section className="carte decision-strategique-manager">
                 <div className="eyebrow">Décision pluriannuelle · {decisionStrategique.choix[0]?.duree ?? 3} saisons</div>
-                <h2>⚖️ {decisionStrategique.titre}</h2><p>{decisionStrategique.texte}</p>
+                <h2>{decisionStrategique.titre}</h2><p>{decisionStrategique.texte}</p>
                 <div>{decisionStrategique.choix.map((choix) => <button key={choix.id} onClick={() => repondreDecisionStrategique(decisionStrategique.id, choix.id)}><b>{choix.label}</b><span>{choix.consequence}</span><small>Direction {choix.confianceDirection >= 0 ? '+' : ''}{choix.confianceDirection} · Supporters {choix.confianceSupporters >= 0 ? '+' : ''}{choix.confianceSupporters}</small></button>)}</div>
               </section>}
 
@@ -506,7 +578,7 @@ export function Manager() {
               </section>
 
               {profonde && <section className="carte delegation-manager">
-                <div className="comp-tete"><div><b>🧑‍💼 Répartition des responsabilités</b><small>Tu peux tout contrôler ou laisser le directeur sportif agir selon ses vraies compétences.</small></div><span className="comp-count">{DOMAINES_DELEGATION.filter((d) => profonde.delegations[d]).length}/9</span></div>
+                <div className="comp-tete"><div><b><Icone nom="entraineur" taille={16} /> Répartition des responsabilités</b><small>Tu peux tout contrôler ou laisser le directeur sportif agir selon ses vraies compétences.</small></div><span className="comp-count">{DOMAINES_DELEGATION.filter((d) => profonde.delegations[d]).length}/9</span></div>
                 <div className="delegation-contenu">
                   <div className="fiche-directeur-sportif"><div><span>Directeur sportif</span><h3>{profonde.directeurSportif.nom}</h3><small>Réputation {profonde.directeurSportif.reputation} · {nombre(profonde.directeurSportif.salaire)} €/an</small></div><div>{[
                     ['Évaluation', profonde.directeurSportif.evaluation], ['Recrutement', profonde.directeurSportif.recrutement], ['Négociation', profonde.directeurSportif.negociation], ['Formation', profonde.directeurSportif.formation], ['Staff', profonde.directeurSportif.gestionStaff], ['Tactique', profonde.directeurSportif.tactique],
@@ -527,7 +599,7 @@ export function Manager() {
               </section>
 
               <section className="carte direction-marche-coachs">
-                <div className="comp-tete"><div><b>📨 Marché des entraîneurs</b><small>Les postes changent dans toutes les divisions, même sans ton intervention.</small></div><span className="comp-count">{avancee.offresBanc.filter((o) => o.statut === 'offre').length}</span></div>
+                <div className="comp-tete"><div><b><Icone nom="poignee" taille={16} /> Marché des entraîneurs</b><small>Les postes changent dans toutes les divisions, même sans ton intervention.</small></div><span className="comp-count">{avancee.offresBanc.filter((o) => o.statut === 'offre').length}</span></div>
                 <div className="direction-candidature">
                   <Selecteur options={optionsBancs.filter((o) => o.valeur !== manager.club)} valeur={clubVise || optionsBancs.find((o) => o.valeur !== manager.club)?.valeur || ''} onChange={setClubVise} recherche />
                   <button className="btn fantome" onClick={() => postulerBanc(clubVise || optionsBancs.find((o) => o.valeur !== manager.club)?.valeur || '')}>Envoyer ma candidature</button>
@@ -542,7 +614,7 @@ export function Manager() {
               </section>
 
               {(avancee.propositionSelection || selectionManager) && <section className="carte direction-selection">
-                <div className="comp-tete"><div><b>🌐 Carrière internationale</b><small>Réputation distincte de la réputation en club.</small></div></div>
+                <div className="comp-tete"><div><b><Icone nom="monde" taille={16} /> Carrière internationale</b><small>Réputation distincte de la réputation en club.</small></div></div>
                 {avancee.propositionSelection && <div className="proposition-selection"><h3>{avancee.propositionSelection.nation} te propose le poste</h3><p>Le cumul avec ton club est autorisé. Tournées, tournoi continental et Coupe du monde feront évoluer ta réputation internationale.</p><div><button className="btn primaire" onClick={() => repondreSelection(true)}>Accepter</button><button className="btn fantome" onClick={() => repondreSelection(false)}>Refuser</button></div></div>}
                 {selectionManager && <div className="selection-manager-kpis"><span><small>Sélection</small><b>{selectionManager.nation}</b></span><span><small>Réputation</small><b>{selectionManager.reputation}</b></span><span><small>Matchs</small><b>{selectionManager.matchs}</b></span><span><small>Victoires</small><b>{selectionManager.victoires}</b></span>{rencontreSelection && <button className="btn primaire" onClick={() => setMatchSelectionOuvert(true)}>Coacher contre {rencontreSelection.adversaire}</button>}</div>}
               </section>}
@@ -551,10 +623,10 @@ export function Manager() {
 
           {vue === 'vestiaire' && avancee && (
             <div className="manager-avance-grille">
-              <section className="carte avance-entete"><div><div className="eyebrow">Hiérarchie, personnalités et parole donnée</div><h2>🗣️ Un vestiaire qui se souvient</h2><p>Les leaders diffusent leur soutien ou leur colère. Le temps de jeu réel, les résultats et tes réponses font le reste.</p></div><div className="avance-score"><b>{moyenneVestiaire(avancee)}</b><span>satisfaction</span></div></section>
+              <section className="carte avance-entete"><div><div className="eyebrow">Hiérarchie, personnalités et parole donnée</div><h2><Icone nom="maillot" taille={20} /> Un vestiaire qui se souvient</h2><p>Les leaders diffusent leur soutien ou leur colère. Le temps de jeu réel, les résultats et tes réponses font le reste.</p></div><div className="avance-score"><b>{moyenneVestiaire(avancee)}</b><span>satisfaction</span></div></section>
 
               {profonde && <section className="carte capitaines-manager">
-                <div className="comp-tete"><div><b>©️ Conseil des capitaines</b><small>Leadership, expérience, ancienneté, respect, sang-froid et discipline rendent le brassard crédible — ou contesté.</small></div></div>
+                <div className="comp-tete"><div><b><Icone nom="brassard" taille={16} /> Conseil des capitaines</b><small>Leadership, expérience, ancienneté, respect, sang-froid et discipline rendent le brassard crédible — ou contesté.</small></div></div>
                 <div>{[
                   ['Capitaine', profonde.capitaines.capitaineId || manager.composition.capitaineId, (id: string) => definirHierarchieCapitaines(id, profonde.capitaines.viceCapitaineId, profonde.capitaines.troisiemeCapitaineId)],
                   ['Vice-capitaine', profonde.capitaines.viceCapitaineId, (id: string) => definirHierarchieCapitaines(profonde.capitaines.capitaineId || manager.composition.capitaineId, id, profonde.capitaines.troisiemeCapitaineId)],
@@ -563,24 +635,24 @@ export function Manager() {
               </section>}
 
               {!!discussionsOuvertes.length && <section className="discussions-joueurs">
-                {discussionsOuvertes.map((discussion) => <article className="carte discussion-joueur" key={discussion.id}><header><span>💬 {discussion.nom}</span><em>{discussion.type}</em></header><blockquote>{discussion.texte}</blockquote><div><button onClick={() => repondreDiscussion(discussion.id, 'promettre')}>Je vais te donner ta chance</button><button onClick={() => repondreDiscussion(discussion.id, 'merite')}>Montre-moi davantage</button><button onClick={() => repondreDiscussion(discussion.id, 'aucunePromesse')}>Je ne promets rien</button><button className="danger" onClick={() => repondreDiscussion(discussion.id, 'ecarter')}>Tu n’entres pas dans mes plans</button></div></article>)}
+                {discussionsOuvertes.map((discussion) => <article className="carte discussion-joueur" key={discussion.id}><header><span>{discussion.nom}</span><em>{discussion.type}</em></header><blockquote>{discussion.texte}</blockquote><div><button onClick={() => repondreDiscussion(discussion.id, 'promettre')}>Je vais te donner ta chance</button><button onClick={() => repondreDiscussion(discussion.id, 'merite')}>Montre-moi davantage</button><button onClick={() => repondreDiscussion(discussion.id, 'aucunePromesse')}>Je ne promets rien</button><button className="danger" onClick={() => repondreDiscussion(discussion.id, 'ecarter')}>Tu n’entres pas dans mes plans</button></div></article>)}
               </section>}
 
               <section className="carte hierarchie-vestiaire">
-                <div className="comp-tete"><div><b>👥 Hiérarchie interne</b><small>Les profils ne sont pas de simples étiquettes : ils modifient les réactions.</small></div></div>
+                <div className="comp-tete"><div><b><Icone nom="equipe" taille={16} /> Hiérarchie interne</b><small>Les profils ne sont pas de simples étiquettes : ils modifient les réactions.</small></div></div>
                 <div>{Object.values(avancee.vestiaire).sort((a, b) => ['leader', 'influent', 'groupe', 'nouveau'].indexOf(a.rang) - ['leader', 'influent', 'groupe', 'nouveau'].indexOf(b.rang) || b.satisfaction - a.satisfaction).map((profil) => {
                   const agent = joueurAgent(avancee, profil.joueurId);
-                  return <article key={profil.joueurId}><span className={`rang-vestiaire ${profil.rang}`}>{profil.rang}</span><b>{profil.nom}</b><small>{profil.traits.join(' · ')}</small><i><em style={{ width: `${profil.satisfaction}%` }} /></i><strong>{profil.satisfaction}</strong><span>{profil.soutien ? '🤝 Soutien' : '⚠ Mécontent'}</span><small>{agent ? `Agent : ${agent.nom} · relation ${agent.relationManager}` : ''}</small></article>;
+                  return <article key={profil.joueurId}><span className={`rang-vestiaire ${profil.rang}`}>{profil.rang}</span><b>{profil.nom}</b><small>{profil.traits.join(' · ')}</small><i><em style={{ width: `${profil.satisfaction}%` }} /></i><strong>{profil.satisfaction}</strong><span>{profil.soutien ? <><Icone nom="poignee" taille={13} /> Soutien</> : <><Icone nom="alerte" taille={13} /> Mécontent</>}</span><small>{agent ? `Agent : ${agent.nom} · relation ${agent.relationManager}` : ''}</small></article>;
                 })}</div>
               </section>
 
               {profonde && <section className="carte relations-joueurs-manager">
-                <div className="comp-tete"><div><b>🔗 Relations entre joueurs</b><small>Amitié, respect, rivalité, mentorat, conflit et famille continuent d’exister sans passer par le manager.</small></div><span className="comp-count">{profonde.relations.length}</span></div>
+                <div className="comp-tete"><div><b><Icone nom="poignee" taille={16} /> Relations entre joueurs</b><small>Amitié, respect, rivalité, mentorat, conflit et famille continuent d’exister sans passer par le manager.</small></div><span className="comp-count">{profonde.relations.length}</span></div>
                 <div>{profonde.relations.filter((r) => effectifBrut.some((j) => j.id === r.joueurA) && effectifBrut.some((j) => j.id === r.joueurB)).slice(0, 18).map((relation) => { const a = effectifBrut.find((j) => j.id === relation.joueurA); const b = effectifBrut.find((j) => j.id === relation.joueurB); return <article key={relation.id} className={relation.type}><span><b>{a?.nom}</b><i>↔</i><b>{b?.nom}</b></span><em>{relation.type}</em><div><i><em style={{ width: `${relation.intensite}%` }} /></i><strong>{relation.intensite}</strong></div></article>; })}</div>
               </section>}
 
               {profonde && <section className="carte integration-joueurs-manager">
-                <div className="comp-tete"><div><b>🌐 Adaptation et projets de vie</b><small>Compatriotes, langue et adaptabilité accélèrent l’intégration. L’argent ne suffit pas toujours à retenir un joueur.</small></div></div>
+                <div className="comp-tete"><div><b><Icone nom="monde" taille={16} /> Adaptation et projets de vie</b><small>Compatriotes, langue et adaptabilité accélèrent l’intégration. L’argent ne suffit pas toujours à retenir un joueur.</small></div></div>
                 <div className="table-integration-entete"><span>Joueur</span><span>Pays</span><span>Club</span><span>Langue</span><span>Cohésion</span><span>Projet</span></div>
                 {effectifBrut.map((j) => profonde.integrations[j.id]).filter(Boolean).sort((a, b) => a.cohesion - b.cohesion).slice(0, 20).map((integration) => <article key={integration.joueurId}><span><b>{integration.nom}</b><small>{nomNation(integration.nation)} · adaptabilité {integration.adaptabilite}</small></span>{[
                   integration.adaptationPays, integration.adaptationClub, integration.langue, integration.cohesion,
@@ -588,55 +660,55 @@ export function Manager() {
               </section>}
 
               <section className="carte promesses-manager">
-                <div className="comp-tete"><div><b>🤞 Promesses</b><small>Une promesse respectée construit la relation ; une parole rompue atteint aussi l’agent.</small></div><span className="comp-count">{avancee.promesses.filter((p) => p.etat === 'active').length}</span></div>
+                <div className="comp-tete"><div><b><Icone nom="signature" taille={16} /> Promesses</b><small>Une promesse respectée construit la relation ; une parole rompue atteint aussi l’agent.</small></div><span className="comp-count">{avancee.promesses.filter((p) => p.etat === 'active').length}</span></div>
                 {avancee.promesses.slice().reverse().slice(0, 12).map((p) => <article key={p.id} className={p.etat}><span><b>{p.nom}</b><small>{p.type} · échéance semaine {p.echeance}</small></span><progress value={p.progression} max={p.objectif} /><strong>{p.progression}/{p.objectif}</strong><em>{p.etat}</em></article>)}
                 {!avancee.promesses.length && <p className="manager-vide-texte">Aucune parole formelle donnée.</p>}
               </section>
 
               <section className="carte infirmerie-manager">
-                <div className="comp-tete"><div><b>🩺 Décisions médicales</b><small>Disponibilité, douleur et risque d’aggravation sont séparés.</small></div><span className="comp-count">{dossiersMedicaux.length}</span></div>
+                <div className="comp-tete"><div><b><Icone nom="soin" taille={16} /> Décisions médicales</b><small>Disponibilité, douleur et risque d’aggravation sont séparés.</small></div><span className="comp-count">{dossiersMedicaux.length}</span></div>
                 {dossiersMedicaux.map((d) => <article key={d.id}><header><span><b>{d.nom}</b><small>{d.type} · {d.semaines} semaine(s)</small></span><strong>{d.disponibilite}% disponible</strong></header><p>Douleur {d.douleur}/100 · risque d’aggravation {d.risqueAggravation}%{d.penalitePerformance > 0 && ` · performance −${d.penalitePerformance}`}</p>{d.decision === 'attente' ? <div><button onClick={() => deciderMedical(d.id, 'repos')}>Repos · aucun match</button><button onClick={() => deciderMedical(d.id, 'traitement')}>Traitement · 80%</button><button className="danger" onClick={() => deciderMedical(d.id, 'forcer')}>Forcer · 90%</button></div> : <em>Décision : {d.decision}</em>}</article>)}
                 {!dossiersMedicaux.length && <p className="manager-vide-texte">Infirmerie vide.</p>}
               </section>
 
-              {!!convocationsActives.length && <section className="carte convocations-manager"><div className="comp-tete"><b>🌐 Absents en sélection</b></div>{convocationsActives.map((c) => <p key={c.id}><b>{c.nom}</b> · {c.nation} · {c.competition}</p>)}</section>}
+              {!!convocationsActives.length && <section className="carte convocations-manager"><div className="comp-tete"><b><Icone nom="drapeau" taille={16} /> Absents en sélection</b></div>{convocationsActives.map((c) => <p key={c.id}><b>{c.nom}</b> · {c.nation} · {c.competition}</p>)}</section>}
             </div>
           )}
 
           {vue === 'univers' && avancee && (
             <div className="manager-avance-grille univers-manager">
-              <section className="carte avance-entete"><div><div className="eyebrow">Le monde continue sans toi</div><h2>📰 Actualités issues de la sauvegarde</h2><p>Résultats, blessures, sélections, finances et changements d’entraîneur viennent des systèmes de jeu, jamais d’un tirage décoratif.</p></div><div className="avance-score"><b>{avancee.actualites.length}</b><span>faits mémorisés</span></div></section>
-              {profonde && <section className="carte profil-tactique-manager"><div className="comp-tete"><div><b>🧠 Ton identité d’entraîneur</b><small>Elle se construit sur les consignes réellement utilisées en match et influence les clubs prêts à te recruter.</small></div><span className="comp-count">{profonde.profilManager.matchsObserves} matchs</span></div><div className="tags-manager">{profonde.tagsManager.map((tag) => <strong key={tag}>🏷️ {tag}</strong>)}{!profonde.tagsManager.length && <small>Les premiers tags apparaîtront quand ton style deviendra lisible.</small>}</div><div className="axes-profil-manager">{[
+              <section className="carte avance-entete"><div><div className="eyebrow">Le monde continue sans toi</div><h2><Icone nom="journal" taille={20} /> Actualités issues de la sauvegarde</h2><p>Résultats, blessures, sélections, finances et changements d’entraîneur viennent des systèmes de jeu, jamais d’un tirage décoratif.</p></div><div className="avance-score"><b>{avancee.actualites.length}</b><span>faits mémorisés</span></div></section>
+              {profonde && <section className="carte profil-tactique-manager"><div className="comp-tete"><div><b><Icone nom="entraineur" taille={16} /> Ton identité d’entraîneur</b><small>Elle se construit sur les consignes réellement utilisées en match et influence les clubs prêts à te recruter.</small></div><span className="comp-count">{profonde.profilManager.matchsObserves} matchs</span></div><div className="tags-manager">{profonde.tagsManager.map((tag) => <strong key={tag}>{tag}</strong>)}{!profonde.tagsManager.length && <small>Les premiers tags apparaîtront quand ton style deviendra lisible.</small>}</div><div className="axes-profil-manager">{[
                 ['Jeu au large', profonde.profilManager.jeuAuLarge], ['Jeu au pied', profonde.profilManager.jeuAuPied], ['Possession', profonde.profilManager.possession], ['Rythme', profonde.profilManager.rythme], ['Défense agressive', profonde.profilManager.defenseAgressive], ['Conquête', profonde.profilManager.conquete],
               ].map(([label, valeur]) => <label key={String(label)}><span>{label}</span><i><em style={{ width: `${valeur}%` }} /></i><b>{valeur}</b></label>)}</div></section>}
 
-              {vieProfonde && <section className="carte reputation-club-manager"><div className="comp-tete"><div><b>📣 Réputation et publics</b><small>Être immense localement ne signifie pas encore être connu à l’étranger.</small></div></div><div className="trois-reputations"><span><small>Locale</small><b>{vieProfonde.reputations.locale}</b></span><span><small>Nationale</small><b>{vieProfonde.reputations.nationale}</b></span><span><small>Internationale</small><b>{vieProfonde.reputations.internationale}</b></span></div><div className="profils-supporters">{Object.entries(vieProfonde.supporters.profils).map(([profil, part]) => <label key={profil}><span>{profil}</span><i><em style={{ width: `${part}%` }} /></i><b>{part}%</b></label>)}</div></section>}
+              {vieProfonde && <section className="carte reputation-club-manager"><div className="comp-tete"><div><b><Icone nom="journal" taille={16} /> Réputation et publics</b><small>Être immense localement ne signifie pas encore être connu à l’étranger.</small></div></div><div className="trois-reputations"><span><small>Locale</small><b>{vieProfonde.reputations.locale}</b></span><span><small>Nationale</small><b>{vieProfonde.reputations.nationale}</b></span><span><small>Internationale</small><b>{vieProfonde.reputations.internationale}</b></span></div><div className="profils-supporters">{Object.entries(vieProfonde.supporters.profils).map(([profil, part]) => <label key={profil}><span>{profil}</span><i><em style={{ width: `${part}%` }} /></i><b>{part}%</b></label>)}</div></section>}
 
-              {vieProfonde && <section className="carte marketing-joueurs-manager"><div className="comp-tete"><div><b>⭐ Niveau sportif ≠ valeur culturelle</b><small>Popularité et marketing rapportent maillots, sponsors, réseaux et affluence. Dernière saison : {nombre(vieProfonde.revenuMarketingDerniereSaison)} €.</small></div></div><div>{Object.values(vieProfonde.popularites).sort((a, b) => b.locale - a.locale).slice(0, 16).map((p) => { const joueur = effectifBrut.find((j) => j.id === p.joueurId); return <article key={p.joueurId}><span><b>{p.nom}</b><small>Général {joueur?.note ?? '—'}</small></span><label><small>Local</small><b>{p.locale}</b></label><label><small>National</small><b>{p.nationale}</b></label><label><small>International</small><b>{p.internationale}</b></label><strong>Marketing {p.marketing}</strong></article>; })}</div></section>}
+              {vieProfonde && <section className="carte marketing-joueurs-manager"><div className="comp-tete"><div><b><Icone nom="etoile" taille={16} /> Niveau sportif ≠ valeur culturelle</b><small>Popularité et marketing rapportent maillots, sponsors, réseaux et affluence. Dernière saison : {nombre(vieProfonde.revenuMarketingDerniereSaison)} €.</small></div></div><div>{Object.values(vieProfonde.popularites).sort((a, b) => b.locale - a.locale).slice(0, 16).map((p) => { const joueur = effectifBrut.find((j) => j.id === p.joueurId); return <article key={p.joueurId}><span><b>{p.nom}</b><small>Général {joueur?.note ?? '—'}</small></span><label><small>Local</small><b>{p.locale}</b></label><label><small>National</small><b>{p.nationale}</b></label><label><small>International</small><b>{p.internationale}</b></label><strong>Marketing {p.marketing}</strong></article>; })}</div></section>}
               <section className="carte fil-actualites-manager"><div className="comp-tete"><b>Fil d’actualité</b></div>{avancee.actualites.slice().reverse().slice(0, 30).map((actu) => <article key={actu.id} className={`importance-${actu.importance}`}><span>{actu.categorie}</span><div><b>{actu.titre}</b><p>{actu.texte}</p><small>S{actu.saison} · semaine {actu.semaine}{actu.club && ` · ${actu.club}`}</small></div></article>)}{!avancee.actualites.length && <p className="manager-vide-texte">La saison vient de commencer. Les vrais événements apparaîtront ici.</p>}</section>
 
-              {identiteClub && <section className="carte adn-club"><div className="comp-tete"><div><b>🧬 ADN de {manager.club}</b><small>Il faut plusieurs saisons cohérentes pour le transformer.</small></div></div><div className="traits-adn">{traitsDominants(identiteClub).map((axe) => <strong key={axe}>{axe}</strong>)}</div><div className="axes-adn">{Object.entries(identiteClub).map(([axe, valeur]) => <label key={axe}><span>{axe}</span><i><em style={{ width: `${valeur}%` }} /></i><b>{Math.round(valeur)}</b></label>)}</div></section>}
+              {identiteClub && <section className="carte adn-club"><div className="comp-tete"><div><b><Icone nom="formation" taille={16} /> ADN de {manager.club}</b><small>Il faut plusieurs saisons cohérentes pour le transformer.</small></div></div><div className="traits-adn">{traitsDominants(identiteClub).map((axe) => <strong key={axe}>{axe}</strong>)}</div><div className="axes-adn">{Object.entries(identiteClub).map(([axe, valeur]) => <label key={axe}><span>{axe}</span><i><em style={{ width: `${valeur}%` }} /></i><b>{Math.round(valeur)}</b></label>)}</div></section>}
 
-              <section className="carte rivalites-manager"><div className="comp-tete"><div><b>⚔️ Rivalités dynamiques</b><small>Les matchs serrés, finales, luttes et transferts les nourrissent lentement.</small></div></div>{rivalitesClub.map((r) => { const autre = r.clubs.find((c) => c !== manager.club); return <article key={r.clubs.join('-')}><span><b>{manager.club} — {autre}</b><small>{r.causes.join(' · ') || 'proximité et histoire en construction'}</small></span><i><em style={{ width: `${r.intensite}%` }} /></i><strong>{Math.round(r.intensite)}/100</strong></article>; })}{!rivalitesClub.length && <p className="manager-vide-texte">Aucune rivalité n’a encore franchi le seuil public de 20/100.</p>}</section>
+              <section className="carte rivalites-manager"><div className="comp-tete"><div><b><Icone nom="sifflet" taille={16} /> Rivalités dynamiques</b><small>Les matchs serrés, finales, luttes et transferts les nourrissent lentement.</small></div></div>{rivalitesClub.map((r) => { const autre = r.clubs.find((c) => c !== manager.club); return <article key={r.clubs.join('-')}><span><b>{manager.club} — {autre}</b><small>{r.causes.join(' · ') || 'proximité et histoire en construction'}</small></span><i><em style={{ width: `${r.intensite}%` }} /></i><strong>{Math.round(r.intensite)}/100</strong></article>; })}{!rivalitesClub.length && <p className="manager-vide-texte">Aucune rivalité n’a encore franchi le seuil public de 20/100.</p>}</section>
 
-              <section className="carte monde-clubs-manager"><div className="comp-tete"><div><b>🌍 Clubs et entraîneurs IA</b><small>Richesse, infrastructures, stratégie et carrière du coach évoluent chaque été.</small></div><span className="comp-count">{Object.keys(avancee.clubsMonde).length}</span></div><div>{Object.values(avancee.clubsMonde).sort((a, b) => Math.abs(b.tendance) - Math.abs(a.tendance)).slice(0, 18).map((club) => { const coach = avancee.entraineursIA[club.entraineurId]; return <article key={club.club}><span><b>{club.club}</b><small>{club.strategie} · {club.professionnel ? 'pro' : 'amateur/semi-pro'}</small></span><strong className={club.tendance >= 0 ? 'cl-plus' : 'cl-moins'}>{club.tendance > 0 ? '+' : ''}{club.tendance}</strong><small>💶 {club.richesse} · 🏗️ {club.infrastructures}</small><em>{coach?.nom} · contrat {coach?.contrat ?? 0} an(s)</em></article>; })}</div></section>
+              <section className="carte monde-clubs-manager"><div className="comp-tete"><div><b><Icone nom="monde" taille={16} /> Clubs et entraîneurs IA</b><small>Richesse, infrastructures, stratégie et carrière du coach évoluent chaque été.</small></div><span className="comp-count">{Object.keys(avancee.clubsMonde).length}</span></div><div>{Object.values(avancee.clubsMonde).sort((a, b) => Math.abs(b.tendance) - Math.abs(a.tendance)).slice(0, 18).map((club) => { const coach = avancee.entraineursIA[club.entraineurId]; return <article key={club.club}><span><b>{club.club}</b><small>{club.strategie} · {club.professionnel ? 'pro' : 'amateur/semi-pro'}</small></span><strong className={club.tendance >= 0 ? 'cl-plus' : 'cl-moins'}>{club.tendance > 0 ? '+' : ''}{club.tendance}</strong><small><Icone nom="euro" taille={12} /> {club.richesse} · <Icone nom="stade" taille={12} /> {club.infrastructures}</small><em>{coach?.nom} · contrat {coach?.contrat ?? 0} an(s)</em></article>; })}</div></section>
             </div>
           )}
 
           {vue === 'histoire' && avancee && (
             <div className="manager-avance-grille histoire-manager">
-              <section className="carte avance-entete"><div><div className="eyebrow">Aucune saison ne disparaît</div><h2>📚 Mémoire de la sauvegarde</h2><p>Palmarès des compétitions, carrières saison par saison, anciens joueurs, Hall of Fame et reconversions restent consultables.</p></div><div className="avance-score"><b>{Object.values(avancee.histoire).reduce((n, s) => n + s.length, 0)}</b><span>saisons archivées</span></div></section>
-              {profonde && <section className="carte chronologie-annuelle-manager"><div className="comp-tete"><div><b>🗓️ L’année en événements</b><small>Transferts, licenciements, sélections, records, titres, retraites et décisions majeures restent consultables saison par saison.</small></div><select value={saisonChronologie} onChange={(e) => setSaisonChronologie(Number(e.target.value))}><option value={manager.saison}>Saison {manager.saison}</option>{saisonsMemoire.filter((s) => s !== manager.saison).map((s) => <option key={s} value={s}>Saison {s}</option>)}</select></div><div>{chronologieVisible.map((evenement) => <article key={evenement.id} className={`importance-${evenement.importance}`}><time>{evenement.mois}</time><span>{evenement.categorie}</span><div><b>{evenement.titre}</b><p>{evenement.texte}</p></div></article>)}{!chronologieVisible.length && <p className="manager-vide-texte">Aucun événement majeur enregistré pour cette saison. Les faits ordinaires restent dans le journal du club.</p>}</div></section>}
+              <section className="carte avance-entete"><div><div className="eyebrow">Aucune saison ne disparaît</div><h2><Icone nom="livre" taille={20} /> Mémoire de la sauvegarde</h2><p>Palmarès des compétitions, carrières saison par saison, anciens joueurs, Hall of Fame et reconversions restent consultables.</p></div><div className="avance-score"><b>{Object.values(avancee.histoire).reduce((n, s) => n + s.length, 0)}</b><span>saisons archivées</span></div></section>
+              {profonde && <section className="carte chronologie-annuelle-manager"><div className="comp-tete"><div><b><Icone nom="chrono" taille={16} /> L’année en événements</b><small>Transferts, licenciements, sélections, records, titres, retraites et décisions majeures restent consultables saison par saison.</small></div><select value={saisonChronologie} onChange={(e) => setSaisonChronologie(Number(e.target.value))}><option value={manager.saison}>Saison {manager.saison}</option>{saisonsMemoire.filter((s) => s !== manager.saison).map((s) => <option key={s} value={s}>Saison {s}</option>)}</select></div><div>{chronologieVisible.map((evenement) => <article key={evenement.id} className={`importance-${evenement.importance}`}><time>{evenement.mois}</time><span>{evenement.categorie}</span><div><b>{evenement.titre}</b><p>{evenement.texte}</p></div></article>)}{!chronologieVisible.length && <p className="manager-vide-texte">Aucun événement majeur enregistré pour cette saison. Les faits ordinaires restent dans le journal du club.</p>}</div></section>}
 
-              {vieProfonde && <section className="carte records-club-manager"><div className="comp-tete"><div><b>🏆 Records de {manager.club}</b><small>Ils sont recalculés après chaque match et une notification marque chaque nouveau sommet.</small></div><span className="comp-count">{Object.keys(vieProfonde.records.club).length}</span></div><div>{Object.values(vieProfonde.records.club).map((record) => <article key={record.id}><span><b>{record.libelle}</b><small>{record.joueurNom || record.adversaire || `Saison ${record.saison}`}</small></span><strong>{record.valeur.toLocaleString('fr-FR')} {record.unite}</strong></article>)}{!Object.keys(vieProfonde.records.club).length && <p className="manager-vide-texte">Le premier match joué ouvrira le livre des records.</p>}</div><h3>Records du championnat</h3><div>{Object.values(vieProfonde.records.championnat).map((record) => <article key={record.id}><span><b>{record.libelle}</b><small>Saison {record.saison}</small></span><strong>{record.valeur.toLocaleString('fr-FR')} {record.unite}</strong></article>)}</div></section>}
+              {vieProfonde && <section className="carte records-club-manager"><div className="comp-tete"><div><b><Icone nom="trophee" taille={16} /> Records de {manager.club}</b><small>Ils sont recalculés après chaque match et une notification marque chaque nouveau sommet.</small></div><span className="comp-count">{Object.keys(vieProfonde.records.club).length}</span></div><div>{Object.values(vieProfonde.records.club).map((record) => <article key={record.id}><span><b>{record.libelle}</b><small>{record.joueurNom || record.adversaire || `Saison ${record.saison}`}</small></span><strong>{record.valeur.toLocaleString('fr-FR')} {record.unite}</strong></article>)}{!Object.keys(vieProfonde.records.club).length && <p className="manager-vide-texte">Le premier match joué ouvrira le livre des records.</p>}</div><h3>Records du championnat</h3><div>{Object.values(vieProfonde.records.championnat).map((record) => <article key={record.id}><span><b>{record.libelle}</b><small>Saison {record.saison}</small></span><strong>{record.valeur.toLocaleString('fr-FR')} {record.unite}</strong></article>)}</div></section>}
 
-              {vieProfonde && <section className="carte xv-historique-manager"><div className="comp-tete"><div><b>👕 XV historique du club</b><small>Matchs, essais, points, capitanat, fidélité et numéro porté composent le score.</small></div></div><div>{POSTES.map((poste) => { const joueur = vieProfonde.records.xvHistorique[poste.id]; return <article key={poste.id}><span className="numero-xv">{poste.numero}</span><span><small>{nomPoste(poste.id)}</small><b>{joueur?.nom ?? 'Place à écrire'}</b></span><strong>{joueur ? `${joueur.scoreHistorique} pts` : '—'}</strong>{joueur && <small>{joueur.matchs} m. · {joueur.essais} e. · {joueur.capitanats} cap.</small>}</article>; })}</div></section>}
+              {vieProfonde && <section className="carte xv-historique-manager"><div className="comp-tete"><div><b><Icone nom="maillot" taille={16} /> XV historique du club</b><small>Matchs, essais, points, capitanat, fidélité et numéro porté composent le score.</small></div></div><div>{POSTES.map((poste) => { const joueur = vieProfonde.records.xvHistorique[poste.id]; return <article key={poste.id}><span className="numero-xv">{poste.numero}</span><span><small>{nomPoste(poste.id)}</small><b>{joueur?.nom ?? 'Place à écrire'}</b></span><strong>{joueur ? `${joueur.scoreHistorique} pts` : '—'}</strong>{joueur && <small>{joueur.matchs} m. · {joueur.essais} e. · {joueur.capitanats} cap.</small>}</article>; })}</div></section>}
 
-              {profonde && !!profonde.finsCarriere.length && <section className="carte fins-carriere-manager"><div className="comp-tete"><div><b>🎖️ Derniers chapitres</b><small>Retraites, retours au club formateur et rôles réduits donnent une fin aux personnages.</small></div></div>{profonde.finsCarriere.slice().reverse().slice(0, 18).map((fin) => <article key={`${fin.joueurId}-${fin.saison}`} className={fin.hommage ? 'hommage' : ''}><span><b>{fin.nom}</b><small>{fin.age} ans · saison {fin.saison} · {fin.choix}</small></span><p>{fin.texte}</p>{fin.hommage && <strong>🏟️ Tifo · hommage · standing ovation</strong>}</article>)}</section>}
-              <section className="carte palmares-competition"><div className="comp-tete"><b>🏆 Palmarès par compétition</b><Selecteur options={optionsDivisions} valeur={competitionHistoire} onChange={setCompetitionHistoire} recherche /></div>{archiveVisible.map((s) => <article key={s.saison}><strong>S{s.saison}</strong><span><b>{s.champion}</b><small>{s.finaliste ? `Finaliste : ${s.finaliste}` : ''}</small></span><em>{s.montees.length ? `⬆ ${s.montees.join(', ')}` : ''}{s.relegations.length ? ` · ⬇ ${s.relegations.join(', ')}` : ''}</em></article>)}{!archiveVisible.length && <p className="manager-vide-texte">Cette compétition sera archivée à la prochaine fin de saison.</p>}</section>
-              <section className="carte hall-club-manager"><div className="comp-tete"><div><b>🏛️ Hall of Fame · {manager.club}</b><small>Score local : fidélité, matchs, titres, capitanat et performances.</small></div><span className="comp-count">{hallClub.length}</span></div>{hallClub.map((f) => <article key={f.id}><strong>{f.score}</strong><span><b>{f.nom}</b><small>{f.rang} · {f.saisonsAuClub} saison(s) · {f.matchsAuClub} matchs</small></span><em>{f.titresAuClub} titre(s)</em></article>)}{!hallClub.length && <p className="manager-vide-texte">Il faut du temps pour devenir une icône. Les carrières sont déjà comptées.</p>}</section>
-              <section className="carte carrieres-joueurs-manager"><div className="comp-tete"><div><b>📈 Historiques de joueurs</b><small>Les totaux survivent aux transferts et à la retraite.</small></div><span className="comp-count">{avancee.carrieresJoueurs.length}</span></div>{avancee.carrieresJoueurs.slice().reverse().slice(0, 25).map((c) => { const total = totaux(c); return <details key={c.id}><summary><span><b>{c.nom}</b><small>{total.clubs.join(' → ')}</small></span><strong>{total.matchs} matchs · {total.essais} essais · {total.selections} sél.</strong></summary><div>{c.saisons.map((s) => <p key={`${s.saison}-${s.club}`}><b>{s.resume ? `${s.saisonsResumees} saisons résumées` : `S${s.saison}`}</b> · {s.club} · {s.matchs} matchs · {s.titularisations} titularisations · {s.minutes} min · {s.essais} essais · note {s.note.toFixed(1)}</p>)}</div></details>; })}</section>
-              <section className="carte anciens-staff-manager"><div className="comp-tete"><div><b>🧑‍🏫 Anciens joueurs reconvertis</b><small>Le personnage staff reste lié à son historique de joueur.</small></div><span className="comp-count">{avancee.staffAnciens.length}</span></div>{avancee.staffAnciens.map((s) => <article key={s.id}><b>{s.nom}</b><span>{s.role}</span><small>{s.club} · réputation {s.reputation} · joueur depuis S{s.joueurDepuis}</small></article>)}{!avancee.staffAnciens.length && <p className="manager-vide-texte">Les premières reconversions apparaîtront avec les retraites du groupe.</p>}</section>
+              {profonde && !!profonde.finsCarriere.length && <section className="carte fins-carriere-manager"><div className="comp-tete"><div><b><Icone nom="trophee" taille={16} /> Derniers chapitres</b><small>Retraites, retours au club formateur et rôles réduits donnent une fin aux personnages.</small></div></div>{profonde.finsCarriere.slice().reverse().slice(0, 18).map((fin) => <article key={`${fin.joueurId}-${fin.saison}`} className={fin.hommage ? 'hommage' : ''}><span><b>{fin.nom}</b><small>{fin.age} ans · saison {fin.saison} · {fin.choix}</small></span><p>{fin.texte}</p>{fin.hommage && <strong><Icone nom="stade" taille={14} /> Tifo · hommage · standing ovation</strong>}</article>)}</section>}
+              <section className="carte palmares-competition"><div className="comp-tete"><b><Icone nom="trophee" taille={16} /> Palmarès par compétition</b><Selecteur options={optionsDivisions} valeur={competitionHistoire} onChange={setCompetitionHistoire} recherche /></div>{archiveVisible.map((s) => <article key={s.saison}><strong>S{s.saison}</strong><span><b>{s.champion}</b><small>{s.finaliste ? `Finaliste : ${s.finaliste}` : ''}</small></span><em>{s.montees.length ? `↑ ${s.montees.join(', ')}` : ''}{s.relegations.length ? ` · ↓ ${s.relegations.join(', ')}` : ''}</em></article>)}{!archiveVisible.length && <p className="manager-vide-texte">Cette compétition sera archivée à la prochaine fin de saison.</p>}</section>
+              <section className="carte hall-club-manager"><div className="comp-tete"><div><b><Icone nom="institution" taille={16} /> Hall of Fame · {manager.club}</b><small>Score local : fidélité, matchs, titres, capitanat et performances.</small></div><span className="comp-count">{hallClub.length}</span></div>{hallClub.map((f) => <article key={f.id}><strong>{f.score}</strong><span><b>{f.nom}</b><small>{f.rang} · {f.saisonsAuClub} saison(s) · {f.matchsAuClub} matchs</small></span><em>{f.titresAuClub} titre(s)</em></article>)}{!hallClub.length && <p className="manager-vide-texte">Il faut du temps pour devenir une icône. Les carrières sont déjà comptées.</p>}</section>
+              <section className="carte carrieres-joueurs-manager"><div className="comp-tete"><div><b><Icone nom="resultats" taille={16} /> Historiques de joueurs</b><small>Les totaux survivent aux transferts et à la retraite.</small></div><span className="comp-count">{avancee.carrieresJoueurs.length}</span></div>{avancee.carrieresJoueurs.slice().reverse().slice(0, 25).map((c) => { const total = totaux(c); return <details key={c.id}><summary><span><b>{c.nom}</b><small>{total.clubs.join(' → ')}</small></span><strong>{total.matchs} matchs · {total.essais} essais · {total.selections} sél.</strong></summary><div>{c.saisons.map((s) => <p key={`${s.saison}-${s.club}`}><b>{s.resume ? `${s.saisonsResumees} saisons résumées` : `S${s.saison}`}</b> · {s.club} · {s.matchs} matchs · {s.titularisations} titularisations · {s.minutes} min · {s.essais} essais · note {s.note.toFixed(1)}</p>)}</div></details>; })}</section>
+              <section className="carte anciens-staff-manager"><div className="comp-tete"><div><b><Icone nom="entraineur" taille={16} /> Anciens joueurs reconvertis</b><small>Le personnage staff reste lié à son historique de joueur.</small></div><span className="comp-count">{avancee.staffAnciens.length}</span></div>{avancee.staffAnciens.map((s) => <article key={s.id}><b>{s.nom}</b><span>{s.role}</span><small>{s.club} · réputation {s.reputation} · joueur depuis S{s.joueurDepuis}</small></article>)}{!avancee.staffAnciens.length && <p className="manager-vide-texte">Les premières reconversions apparaîtront avec les retraites du groupe.</p>}</section>
             </div>
           )}
 
@@ -645,7 +717,7 @@ export function Manager() {
               <section className="carte manager-composition-tete">
                 <div>
                   <div className="eyebrow">Feuille de match · 23 joueurs</div>
-                  <h2>👥 Ton XV, ton banc, tes rôles</h2>
+                  <h2><Icone nom="equipe" taille={20} /> Ton XV, ton banc, tes rôles</h2>
                   <p>Chaque choix est transmis au moteur. Un joueur hors de son poste perd la cohérence collective ; le buteur et le capitaine influencent réellement les pénalités et la discipline.</p>
                 </div>
                 <div className="manager-note-compo"><b>{noteCompositionManager(effectif, composition).toFixed(1)}</b><span>note du XV</span></div>
@@ -662,13 +734,13 @@ export function Manager() {
               />
 
               <section className="carte manager-roles-visuels">
-                <div><b>🪪 Rôles du groupe</b><span>Les badges C et 🎯 apparaissent directement sur les cartes.</span></div>
-                <label><span>©️ Capitaine</span><select value={composition.capitaineId} onChange={(e) => definirComposition({ ...composition, capitaineId: e.target.value })}>{composition.titulaires.map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom}</option>; })}</select></label>
-                <label><span>🎯 Buteur</span><select value={composition.buteurId} onChange={(e) => definirComposition({ ...composition, buteurId: e.target.value })}>{[...composition.titulaires, ...composition.remplacants].map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom} · {nomPoste(j.poste)}</option>; })}</select></label>
+                <div><b><Icone nom="profil" taille={16} /> Rôles du groupe</b><span>Le brassard et la cible apparaissent directement sur les cartes.</span></div>
+                <label><span><Icone nom="brassard" taille={14} /> Capitaine</span><select value={composition.capitaineId} onChange={(e) => definirComposition({ ...composition, capitaineId: e.target.value })}>{composition.titulaires.map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom}</option>; })}</select></label>
+                <label><span><Icone nom="cible" taille={14} /> Buteur</span><select value={composition.buteurId} onChange={(e) => definirComposition({ ...composition, buteurId: e.target.value })}>{[...composition.titulaires, ...composition.remplacants].map((id) => { const j = effectif.find((x) => x.id === id); return j && <option key={id} value={id}>{j.nom} · {nomPoste(j.poste)}</option>; })}</select></label>
               </section>
 
               <section className="carte manager-plan-avant-match">
-                <div className="comp-tete"><b>🧠 Plan de jeu initial</b><span>modifiable pendant le match</span></div>
+                <div className="comp-tete"><b><Icone nom="entraineur" taille={16} /> Plan de jeu initial</b><span>modifiable pendant le match</span></div>
                 <div className="manager-tactiques-selects">
                   <label><span>Attaque</span><select value={manager.tactique.attaque} onChange={(e) => majTactique('attaque', e.target.value as TactiqueManager['attaque'])}><option value="equilibre">Équilibré</option><option value="avants">Jeu d’avants</option><option value="large">Jouer au large</option><option value="occupation">Occupation au pied</option></select></label>
                   <label><span>Défense</span><select value={manager.tactique.defense} onChange={(e) => majTactique('defense', e.target.value as TactiqueManager['defense'])}><option value="blitz">Blitz</option><option value="glissee">Glissée</option><option value="repli">Repli</option></select></label>
@@ -683,13 +755,13 @@ export function Manager() {
           {vue === 'match' && (
             <div className="manager-match-centre">
               {!afficheManager ? (
-                <section className="carte manager-match-vide"><span>📆</span><h2>Pas de match cette semaine</h2><p>Le calendrier laisse une fenêtre de récupération. Tu peux préparer la suite puis avancer.</p><button className="btn primaire" onClick={semaineManager}>▶ Semaine suivante</button></section>
+                <section className="carte manager-match-vide"><span><Icone nom="calendrier" taille={32} /></span><h2>Pas de match cette semaine</h2><p>Le calendrier laisse une fenêtre de récupération. Tu peux préparer la suite puis avancer.</p><button className="btn primaire" onClick={semaineManager}>▶ Semaine suivante</button></section>
               ) : (
                 <section className="carte manager-affiche-match">
                   <div className="eyebrow">Journée {afficheManager.journee} · {manager.divisionNom}</div>
                   {derbyMemo?.derby && (
                     <div className="manager-contexte-derby">
-                      <span>🔥 Derby à {derbyMemo.distance} km</span>
+                      <span><Icone nom="flamme" taille={14} /> Derby à {derbyMemo.distance} km</span>
                       <b>+{derbyMemo.motivation} de motivation</b>
                       <small>Pression {derbyMemo.pression}/100 · exposition médias +{derbyMemo.medias}%</small>
                     </div>
@@ -700,9 +772,9 @@ export function Manager() {
                     <span>{clubParNom(afficheManager.match.exterieur) && <Blason club={clubParNom(afficheManager.match.exterieur)!} taille={54} />}<b>{afficheManager.match.exterieur}</b></span>
                   </div>
                   {resultatManager ? (
-                    <div className="manager-match-joue"><b>✓ Résultat enregistré au championnat</b><p>{resultatManager.essaisPour} essai{resultatManager.essaisPour > 1 ? 's' : ''} marqué{resultatManager.essaisPour > 1 ? 's' : ''} · confiance du board mise à jour.</p><button className="btn primaire" onClick={semaineManager}>{manager.semaine >= SEMAINES_PAR_SAISON ? '🏁 Clore la saison' : '▶ Semaine suivante'}</button></div>
+                    <div className="manager-match-joue"><b><Icone nom="check" taille={14} /> Résultat enregistré au championnat</b><p>{resultatManager.essaisPour} essai{resultatManager.essaisPour > 1 ? 's' : ''} marqué{resultatManager.essaisPour > 1 ? 's' : ''} · confiance du board mise à jour.</p><button className="btn primaire" onClick={semaineManager}>{manager.semaine >= SEMAINES_PAR_SAISON ? 'Clore la saison' : '▶ Semaine suivante'}</button></div>
                   ) : (
-                    <div className="manager-lancer-match"><p>Le XV, le banc, le capitaine, le buteur et le plan de jeu seront figés au coup d’envoi. Les consignes collectives resteront modifiables en direct.</p><div><button className="btn fantome" onClick={() => setVue('equipe')}>👥 Vérifier la composition</button><button className="btn primaire grand" onClick={() => setMatchOuvert(true)}>🎮 Prendre place sur le banc</button></div></div>
+                    <div className="manager-lancer-match"><p>Le XV, le banc, le capitaine, le buteur et le plan de jeu seront figés au coup d’envoi. Les consignes collectives resteront modifiables en direct.</p><div><button className="btn fantome" onClick={() => setVue('equipe')}><Icone nom="equipe" taille={16} /> Vérifier la composition</button><button className="btn primaire grand" onClick={() => setMatchOuvert(true)}><Icone nom="sifflet" taille={18} /> Prendre place sur le banc</button></div></div>
                   )}
                 </section>
               )}
@@ -714,7 +786,7 @@ export function Manager() {
               <section className="carte manager-inst-tete">
                 <div>
                   <div className="eyebrow">{t('mgr.inst.eyebrow')}</div>
-                  <h2>{vue === 'formation' ? '🎓 Centre de formation' : vue === 'recruteurs' ? '🔎 Recruteurs' : '🏋️ Centre d’entraînement'}</h2>
+                  <h2><Icone nom={vue === 'formation' ? 'formation' : vue === 'recruteurs' ? 'loupe' : 'halteres'} taille={20} /> {vue === 'formation' ? 'Centre de formation' : vue === 'recruteurs' ? 'Recruteurs' : 'Centre d’entraînement'}</h2>
                   <p>{vue === 'formation'
                     ? 'Fais grandir les joueurs du cru et suis chaque promotion sortie par le club.'
                     : vue === 'recruteurs'
@@ -748,7 +820,7 @@ export function Manager() {
                   return (
                     <section className="carte manager-inst" key={type}>
                       <div className="inst-tete">
-                        <span className="inst-emoji" aria-hidden="true">{EMOJI_INSTALLATION[type]}</span>
+                        <span className="inst-emoji" aria-hidden="true"><Icone nom={ICONE_INSTALLATION[type]} taille={22} /></span>
                         <div>
                           <b>{t(`mgr.inst.${type}.nom`)}</b>
                           <p>{t(`mgr.inst.${type}.desc`)}</p>
@@ -788,7 +860,7 @@ export function Manager() {
                     <div className="manager-centre-notes" aria-label="Les six notes du centre">
                       {AXES_CENTRE.map((axe) => (
                         <div key={axe}>
-                          <span>{EMOJI_AXE[axe]} {axe === 'installations' ? 'Installations' : axe === 'coaching' ? 'Coaching' : axe === 'recrutement' ? 'Recrutement' : axe === 'reseau' ? 'Réseau' : axe === 'medical' ? 'Médical' : 'Réputation'}</span>
+                          <span><Icone nom={ICONE_AXE[axe]} taille={14} /> {axe === 'installations' ? 'Installations' : axe === 'coaching' ? 'Coaching' : axe === 'recrutement' ? 'Recrutement' : axe === 'reseau' ? 'Réseau' : axe === 'medical' ? 'Médical' : 'Réputation'}</span>
                           <b>{detectionJeunes.notes[axe]}</b>
                           <i><em style={{ width: `${detectionJeunes.notes[axe]}%` }} /></i>
                         </div>
@@ -798,7 +870,7 @@ export function Manager() {
 
                   <section className="carte manager-academie">
                     <div className="comp-tete">
-                      <div><b>🎓 U18 et Espoirs</b><small>Chaque potentiel reste une estimation, même après la signature.</small></div>
+                      <div><b><Icone nom="formation" taille={16} /> U18 et Espoirs</b><small>Chaque potentiel reste une estimation, même après la signature.</small></div>
                       <span className="comp-count">{academieClub.length}/{detectionJeunes.capacite}</span>
                     </div>
                     <div className="manager-formation-finances">
@@ -808,7 +880,7 @@ export function Manager() {
                     </div>
                     {!academieClub.length ? (
                       <div className="manager-vide-action">
-                        <span>🌱</span>
+                        <span><Icone nom="pousse" taille={16} /></span>
                         <div><b>Ton académie est prête</b><p>Ouvre les rapports, observe les profils et présente ton projet aux jeunes qui correspondent au club.</p></div>
                         <button className="btn primaire" onClick={() => setVue('recruteurs')}>Voir la promotion détectée</button>
                       </div>
@@ -866,7 +938,7 @@ export function Manager() {
 
               {vue === 'entrainement' && (
                 <section className="carte manager-planning-collectif">
-                  <div className="comp-tete"><div><b>📅 Semaine collective</b><small>Le socle commun du groupe, volontairement simple à lire.</small></div></div>
+                  <div className="comp-tete"><div><b><Icone nom="chrono" taille={16} /> Semaine collective</b><small>Le socle commun du groupe, volontairement simple à lire.</small></div></div>
                   <div>
                     {[['Lun.', 'Récupération'], ['Mar.', 'Physique'], ['Mer.', 'Technique'], ['Jeu.', 'Tactique'], ['Ven.', 'Léger'], ['Sam.', 'Match'], ['Dim.', 'Repos']].map(([jour, seance]) => (
                       <span key={jour}><b>{jour}</b><small>{seance}</small></span>
@@ -877,7 +949,7 @@ export function Manager() {
 
               {vue === 'entrainement' && <section className="carte manager-programme">
                 <div className="comp-tete">
-                  <b>🏋️ {t('mgr.inst.programme')}</b>
+                  <b><Icone nom="halteres" taille={16} /> {t('mgr.inst.programme')}</b>
                   <span className="comp-count">{manager.entrainements.length}/{placesEntrainement}</span>
                 </div>
                 {murs.entrainement <= 0 ? (
@@ -901,7 +973,7 @@ export function Manager() {
                               aria-pressed={dedans}
                               onClick={() => basculerEntrainement(j.nom)}
                             >
-                              <span className="prog-nom">{j.duCentre && '🎓 '}{j.nom}</span>
+                              <span className="prog-nom">{j.duCentre && <Icone nom="formation" taille={12} />}{' '}{j.nom}</span>
                               <span className="prog-poste">{nomPoste(j.poste)}</span>
                               <span className="prog-age">{j.age}</span>
                               <span className="prog-note">{j.note}</span>
@@ -919,7 +991,7 @@ export function Manager() {
               {vue === 'entrainement' && (
                 <section className="carte manager-programme-jeunes">
                   <div className="comp-tete">
-                    <div><b>🌱 Programmes de l’académie</b><small>Un objectif individuel et un mentor maximum par jeune.</small></div>
+                    <div><b><Icone nom="pousse" taille={16} /> Programmes de l’académie</b><small>Un objectif individuel et un mentor maximum par jeune.</small></div>
                     <span className="comp-count">{academieClub.length}</span>
                   </div>
                   {!academieClub.length ? (
@@ -958,14 +1030,14 @@ export function Manager() {
                   <section className="carte manager-detection-tete">
                     <div>
                       <div className="eyebrow">Promotion annuelle · {detectionJeunes.fiches.length} dossiers</div>
-                      <h2>🔎 Les jeunes existent déjà dans leurs clubs</h2>
+                      <h2><Icone nom="loupe" taille={20} /> Les jeunes existent déjà dans leurs clubs</h2>
                       <p>{nombre(detectionJeunes.candidatsVus)} joueurs dans le rayon du réseau. La cellule en remonte {detectionJeunes.fiches.length}, mais seuls les {detectionJeunes.prioritaires} premiers sont considérés prioritaires.</p>
                       {detectionJeunes.fiches.filter((f) => f.etoilesHaut >= 4.5).length >= 3 && (
-                        <strong className="manager-generation-doree">⭐ Une génération exceptionnelle semble arriver — le scout peut encore se tromper.</strong>
+                        <strong className="manager-generation-doree"><Icone nom="etoile" taille={14} /> Une génération exceptionnelle semble arriver — le scout peut encore se tromper.</strong>
                       )}
                     </div>
                     <div className={`manager-missions${detectionJeunes.deplacementsRestants === 0 ? ' epuise' : ''}`}>
-                      <span className="manager-missions-icone" aria-hidden="true">✈</span>
+                      <span className="manager-missions-icone" aria-hidden="true"><Icone nom="loupe" taille={16} /></span>
                       <b>{detectionJeunes.deplacementsRestants}/{detectionJeunes.deplacementsTotal}</b>
                       <span>déplacements restants</span>
                       <small>Entretien = 3 déplacements</small>
@@ -987,7 +1059,7 @@ export function Manager() {
                                 <i><Drapeau nation={j.nation} taille={0.72} /></i>
                               </div>
                               <div className="manager-jeune-titre">
-                                <span>{index < detectionJeunes.prioritaires ? '⭐ PRIORITAIRE' : 'DOSSIER À SUIVRE'}</span>
+                                <span>{index < detectionJeunes.prioritaires ? 'PRIORITAIRE' : 'DOSSIER À SUIVRE'}</span>
                                 <h3>{j.nom}</h3>
                                 <p>{j.age} ans · {nomPoste(j.poste)}</p>
                                 <small>{j.club} · {nombre(j.distance)} km</small>
@@ -1019,9 +1091,9 @@ export function Manager() {
                           </p>
                           {reponse && <p className={`manager-reponse-jeune ${reponse.etat}`}>{reponse.texte}</p>}
                           <div className="manager-actions-detection">
-                            <button disabled={detectionJeunes.deplacementsRestants < 1 || ficheJeune.matchs >= 10 || dejaSigne} onClick={() => observerJeune(j.id)}>👁 Observer un match</button>
-                            <button disabled={detectionJeunes.deplacementsRestants < 3 || ficheJeune.matchs < 3 || ficheJeune.entretien || dejaSigne} onClick={() => observerJeune(j.id, true)}>💬 Entretien famille</button>
-                            <button className="primaire" disabled={dejaSigne || detectionJeunes.occupes >= detectionJeunes.capacite} onClick={() => proposerProjetJeune(j.id)}>{dejaSigne ? '✓ Au centre' : 'Présenter le projet'}</button>
+                            <button disabled={detectionJeunes.deplacementsRestants < 1 || ficheJeune.matchs >= 10 || dejaSigne} onClick={() => observerJeune(j.id)}><Icone nom="oeil" taille={15} /> Observer un match</button>
+                            <button disabled={detectionJeunes.deplacementsRestants < 3 || ficheJeune.matchs < 3 || ficheJeune.entretien || dejaSigne} onClick={() => observerJeune(j.id, true)}>Entretien famille</button>
+                            <button className="primaire" disabled={dejaSigne || detectionJeunes.occupes >= detectionJeunes.capacite} onClick={() => proposerProjetJeune(j.id)}>{dejaSigne ? 'Au centre' : 'Présenter le projet'}</button>
                           </div>
                           {suivi && <small className="manager-rapport-date">Dossier suivi depuis la saison {suivi.saison}</small>}
                         </article>
@@ -1052,7 +1124,7 @@ export function Manager() {
           {vue === 'marche' && (
             <div className="manager-marche">
               <div className="carte manager-marche-tete">
-                <div><div className="eyebrow">{t('mgr.baseMondiale')}</div><h2>🌍 {t('mgr.marcheTitre')}</h2><p>{t('mgr.marcheIntro')}</p></div>
+                <div><div className="eyebrow">{t('mgr.baseMondiale')}</div><h2><Icone nom="monde" taille={22} /> {t('mgr.marcheTitre')}</h2><p>{t('mgr.marcheIntro')}</p></div>
                 {/* ⚠️ LA MASSE ENGAGÉE PASSE DEVANT LE PLAFOND. Un plafond seul
                     ne dit rien : ce qu'un manager doit lire avant d'ouvrir une
                     négociation, c'est ce qu'il lui RESTE. */}
@@ -1079,7 +1151,7 @@ export function Manager() {
                     .find((n) => n.cible.id === cible.id && n.saison === manager.saison);
                   const clubCible = clubParNom(cible.club);
                   const libelleContact = existante?.etat === 'signee'
-                    ? `✓ ${t('mgr.signe')}`
+                    ? t('mgr.signe')
                     : existante
                       ? `𝕏 ${t('mgr.reprendreDiscussion')}`
                       : cible.indemnite <= 0 || clubDossier?.etat === 'accord'
@@ -1087,13 +1159,41 @@ export function Manager() {
                         : clubDossier?.etat === 'ouverte'
                           ? `𝕏 Reprendre avec ${cible.club}`
                           : clubDossier?.etat === 'rompue'
-                            ? '⛔ Club vendeur fermé'
+                            ? 'Club vendeur fermé'
                             : `𝕏 Négocier avec ${cible.club}`;
+                  const rarete = rareteDe(cible);
                   return (
-                    <article key={cible.id} className="carte manager-cible">
-                      <div className="manager-cible-note">{connaissance.note[0] === connaissance.note[1] ? connaissance.note[0] : `${connaissance.note[0]}–${connaissance.note[1]}`}<small>{connaissance.niveau}</small></div>
+                    <article key={cible.id} className={`carte manager-cible ct-r-${rarete}`}>
+                      {/* ⚠️ UN GÉNÉRAL EST UN NOMBRE, PAS UNE FOURCHETTE, et
+                          c'est le bug signalé. La carte imprimait `note` telle
+                          quelle : « 78–100 », « 81–100 », « 74–100 » — vingt-
+                          quatre points d'amplitude, une borne haute que personne
+                          n'atteint dans le jeu (les effectifs plafonnent à 99),
+                          et surtout aucun moyen de comparer deux cibles d'un
+                          coup d'œil, ce qui est précisément à quoi sert un
+                          général. L'incertitude du scouting n'est pas retirée :
+                          elle est DITE en marge (`± 6`), et elle se referme en
+                          observant. Voir `rapportConnaissance`. */}
+                      <div className="manager-cible-note">
+                        {connaissance.estimation}
+                        {connaissance.marge > 0 && <b className="mgr-marge">± {connaissance.marge}</b>}
+                        <small>{t(`mgr.rapport.${connaissance.niveau}`)}</small>
+                      </div>
                       <div className="manager-cible-corps">
-                        <div className="manager-cible-identite"><Drapeau nation={cible.nation} taille={0.95} /><span><b>{cible.nom}</b><small>{nomPoste(cible.poste)} · {cible.age} {t('gen.ans')}</small></span></div>
+                        <div className="manager-cible-identite">
+                          <Drapeau nation={cible.nation} taille={0.95} />
+                          {/* Demande : « pouvoir cliquer sur les profils ». Le
+                              nom EST le lien — c'est ce qu'on vise. */}
+                          <button
+                            type="button"
+                            className="manager-cible-nom"
+                            onClick={() => setFicheCible(cible)}
+                            aria-label={`${t('mgr.voirProfil')} : ${cible.nom}`}
+                          >
+                            <b>{cible.nom}</b>
+                            <small>{nomPoste(cible.poste)} · {cible.age} {t('gen.ans')}</small>
+                          </button>
+                        </div>
                         <p>{clubCible && <Blason club={clubCible} taille={18} />} {cible.club}</p>
                         {/* ⚠️ LA VALEUR ET L'INDEMNITÉ SONT DEUX CHOSES, et les
                             confondre était tout le défaut de l'ancien marché :
@@ -1109,24 +1209,45 @@ export function Manager() {
                           </span>
                           <span>{t('mgr.salaire')} <b>{connaissance.salaire ? `${nombre(connaissance.salaire[0])}–${nombre(connaissance.salaire[1])} €` : '?'}</b></span>
                         </div>
-                        <p className="manager-connaissance-cible">Rapport {connaissance.niveau}{connaissance.personnalite ? ` · personnalité ${connaissance.personnalite}` : ' · personnalité inconnue'}</p>
+                        <p className="manager-connaissance-cible">
+                          <Icone nom="oeil" taille={13} /> {t(`mgr.rapport.${connaissance.niveau}`)}
+                          {connaissance.personnalite
+                            ? ` · ${connaissance.personnalite}`
+                            : ` · ${t('mgr.personnaliteInconnue')}`}
+                        </p>
                         <p className={`manager-cible-situation ${cible.situation}`}>
                           {t(`mgr.situation.${cible.situation}`)}
                           {cible.saisonsRestantes > 0 && ` · ${t('mgr.contratRestant', { n: cible.saisonsRestantes })}`}
                         </p>
                       </div>
-                      <button
-                        className="btn primaire"
-                        disabled={existante?.etat === 'signee' || clubDossier?.etat === 'rompue'}
-                        onClick={() => {
-                          if (existante) ouvrirDiscussion(existante.pseudo);
-                          else if (clubDossier?.etat === 'ouverte') ouvrirDiscussion(clubDossier.pseudo);
-                          else contacterClub(cible);
-                        }}
-                      >
-                        {libelleContact}
-                      </button>
-                      <button className="btn fantome" disabled={connaissance.niveau === 'complet'} onClick={() => observerCible(cible)}>👁 Observer davantage</button>
+                      {/* ⚠️ LES ACTIONS SONT DANS LEUR PROPRE COLONNE, et ce
+                          n'est pas cosmétique. `.manager-cible` est une grille
+                          à trois colonnes (56 px · 1fr · auto) : posés en
+                          enfants directs, les boutons au-delà du troisième
+                          retombaient en ligne 2, dans la colonne de 56 px de la
+                          pastille de note. Mesuré à l'écran, « Observer
+                          davantage » s'affichait sur quatre lignes dans 56 px —
+                          un défaut qui existait DÉJÀ avec deux boutons, et que
+                          le troisième rendait seulement impossible à ignorer. */}
+                      <div className="manager-cible-actions">
+                        <button
+                          className="btn primaire"
+                          disabled={existante?.etat === 'signee' || clubDossier?.etat === 'rompue'}
+                          onClick={() => {
+                            if (existante) ouvrirDiscussion(existante.pseudo);
+                            else if (clubDossier?.etat === 'ouverte') ouvrirDiscussion(clubDossier.pseudo);
+                            else contacterClub(cible);
+                          }}
+                        >
+                          {libelleContact}
+                        </button>
+                        <button className="btn fantome" disabled={connaissance.niveau === 'complet'} onClick={() => observerCible(cible)}>
+                          <Icone nom="oeil" taille={16} /> {t('mgr.observerPlus')}
+                        </button>
+                        <button className="btn fantome" onClick={() => setFicheCible(cible)}>
+                          <Icone nom="profil" taille={16} /> {t('mgr.voirProfil')}
+                        </button>
+                      </div>
                     </article>
                   );
                 })}
@@ -1151,12 +1272,41 @@ export function Manager() {
 
       {manager.historique.length > 0 && vue === 'bureau' && (
         <div className="carte bloc-competition manager-historique">
-          <div className="comp-tete"><b>📋 {t('mgr.parcours')}</b><span className="comp-count">{manager.historique.length}</span></div>
-          <div className="classement-tableau tableau-live histo-manager">{[...manager.historique].reverse().map((h) => <div key={`${h.saison}-${h.club}`} className="classement-ligne"><span className="cl-pos">S{h.saison}</span><span className="cl-nom">{h.club}</span><span>{h.divisionNom}</span><span className={h.tenu ? 'cl-plus' : 'cl-moins'}>{h.rang}ᵉ / {h.objectif}ᵉ</span><span>{h.titres.map((id) => TROPHEES[id]?.nom ?? id).join(', ')}{h.montee && ' ⬆️'}{h.descente && ' ⬇️'}{h.licencie && ' 📉'}</span></div>)}</div>
+          <div className="comp-tete"><b><Icone nom="journal" taille={16} /> {t('mgr.parcours')}</b><span className="comp-count">{manager.historique.length}</span></div>
+          <div className="classement-tableau tableau-live histo-manager">{[...manager.historique].reverse().map((h) => <div key={`${h.saison}-${h.club}`} className="classement-ligne"><span className="cl-pos">S{h.saison}</span><span className="cl-nom">{h.club}</span><span>{h.divisionNom}</span><span className={h.tenu ? 'cl-plus' : 'cl-moins'}>{h.rang}ᵉ / {h.objectif}ᵉ</span><span>{h.titres.map((id) => TROPHEES[id]?.nom ?? id).join(', ')}{h.montee && ' — montée'}{h.descente && ' — descente'}{h.licencie && ' — licencié'}</span></div>)}</div>
         </div>
       )}
 
-      <button className="btn fantome manager-raccrocher" onClick={() => setRaccrocher(true)}>🚪 {t('mgr.raccrocher')}</button>
+      {/* ⚠️ LA FICHE VIT AU NIVEAU DE L'ÉCRAN, pas dans la carte du marché.
+          Montée dans la boucle des cibles, elle serait démontée à chaque
+          re-rendu de la liste (une observation, un filtre, une frappe dans le
+          champ de recherche) et se refermerait toute seule. */}
+      {ficheCible && (
+        <FicheJoueur
+          joueur={ficheCible}
+          rapport={rapportConnaissance(avancee ?? undefined, ficheCible, murs.recrutement)}
+          marche={{
+            valeur: ficheCible.valeur,
+            indemnite: ficheCible.indemnite,
+            situation: ficheCible.situation,
+            saisonsRestantes: ficheCible.saisonsRestantes,
+            action: {
+              libelle: `${t('mgr.negocier')} ${ficheCible.club}`,
+              onClic: () => contacterClub(ficheCible),
+            },
+            observer: {
+              onClic: () => observerCible(ficheCible),
+              desactive: rapportConnaissance(avancee ?? undefined, ficheCible, murs.recrutement)
+                .niveau === 'complet',
+            },
+          }}
+          onFermer={() => setFicheCible(null)}
+        />
+      )}
+
+      <button className="btn fantome manager-raccrocher" onClick={() => setRaccrocher(true)}>
+        <Icone nom="retraite" taille={17} /> {t('mgr.raccrocher')}
+      </button>
       {raccrocher && <Confirmation titre={t('mgr.raccrocherTitre')} message={libre ? t('mgr.raccrocherLibre') : t('mgr.raccrocherClasse')} libelleOui={t('mgr.raccrocher')} onOui={() => { setRaccrocher(false); quitterBanc(); }} onNon={() => setRaccrocher(false)} />}
       {jeuneALiberer && (
         <Confirmation

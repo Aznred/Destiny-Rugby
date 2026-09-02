@@ -7085,3 +7085,596 @@ select:focus {
   .x-recherche-mobile { margin:.55rem .65rem; padding:.58rem .8rem; }
   .x-tetes-six { width:max-content; min-width:100%; grid-template-columns:repeat(6,minmax(76px,1fr)); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LES RARETÉS DE CARTE — bronze · argent · or · épique · mythique · légende
+   ═══════════════════════════════════════════════════════════════════════════
+   Demande : « faire comme sur FIFA des raretés de carte en mode bronze argent
+   or mythique rouge épique etc. en fonction du potentiel, de la qualité du
+   joueur etc. »
+
+   ⚠️ LA RARETÉ EST UN MÉTAL, LE STATUT RESTE UNE BANDE. Les deux coexistent sur
+   la même carte et ne disent pas la même chose : le métal, c'est ce que la
+   carte VAUT (`rareteDe`) ; la bande du haut, c'est le RÔLE dans l'effectif
+   (`statutDe`). Peindre les deux au même endroit aurait fait perdre l'une des
+   deux lectures — or c'est la seconde qui sert à composer un XV.
+
+   ⚠️ ET ON NE FAIT TOUJOURS PAS UNE CARTE FUT. Le fond doré plein, c'est leur
+   signature ; ici le métal est un DÉGRADÉ SOMBRE de la teinte, avec un liseré
+   et un reflet oblique — la carte reste un billet de match, elle change
+   seulement de papier. Les trois choix de la section « billet » plus haut
+   (talon perforé, bande de statut, mentions serrées) sont intacts.
+
+   ⚠️ LA COULEUR NE VAUT AUCUN POINT. Règle déjà posée pour le statut, elle vaut
+   telle quelle : `lib/carteJoueur.ts` ne fait entrer la rareté dans AUCUN
+   calcul de performance. Une carte légende n'est pas meilleure qu'une carte or
+   de même note, elle est plus rare. */
+
+.ct-carte,
+.manager-reserve-carte {
+  --r-haut: var(--pelouse-700);
+  --r-bas: var(--pelouse-800);
+  --r-trait: rgba(255, 255, 255, 0.12);
+  --r-eclat: rgba(255, 255, 255, 0.07);
+}
+
+.ct-r-bronze   { --r-haut:#5c3d22; --r-bas:#2a1c11; --r-trait:rgba(201,138,75,.5);   --r-eclat:rgba(240,190,140,.16); }
+.ct-r-argent   { --r-haut:#5d666e; --r-bas:#242a30; --r-trait:rgba(205,214,221,.5);  --r-eclat:rgba(235,243,250,.18); }
+.ct-r-or       { --r-haut:#7a5c14; --r-bas:#2e2409; --r-trait:rgba(240,200,90,.58);  --r-eclat:rgba(255,226,150,.2); }
+.ct-r-epique   { --r-haut:#4e2872; --r-bas:#1e0f2f; --r-trait:rgba(197,139,255,.55); --r-eclat:rgba(220,180,255,.2); }
+.ct-r-mythique { --r-haut:#0c5f59; --r-bas:#052623; --r-trait:rgba(87,232,216,.55);  --r-eclat:rgba(160,255,240,.2); }
+.ct-r-legende  { --r-haut:#7d1c1c; --r-bas:#320a0a; --r-trait:rgba(255,120,100,.62); --r-eclat:rgba(255,190,170,.24); }
+
+/* Le métal : un dégradé sombre plus un reflet oblique. Pas d'aplat plein. */
+.ct-carte.ct-r-bronze, .ct-carte.ct-r-argent, .ct-carte.ct-r-or,
+.ct-carte.ct-r-epique, .ct-carte.ct-r-mythique, .ct-carte.ct-r-legende {
+  background:
+    linear-gradient(158deg, var(--r-eclat), rgba(255, 255, 255, 0) 46%),
+    linear-gradient(168deg, var(--r-haut), var(--r-bas) 78%);
+  border-color: var(--r-trait);
+}
+.manager-reserve-carte.ct-r-bronze, .manager-reserve-carte.ct-r-argent,
+.manager-reserve-carte.ct-r-or, .manager-reserve-carte.ct-r-epique,
+.manager-reserve-carte.ct-r-mythique, .manager-reserve-carte.ct-r-legende {
+  background:
+    linear-gradient(158deg, var(--r-eclat), rgba(255, 255, 255, 0) 52%),
+    linear-gradient(168deg, var(--r-haut), var(--r-bas) 82%);
+  border-color: var(--r-trait);
+}
+
+/* ⚠️ SEULES LES DEUX DERNIÈRES RARETÉS RAYONNENT, et c'est ce qui les rend
+   rares. Une lueur sur les six niveaux, c'est un effectif entier qui brille :
+   plus aucune carte ne se détache, et la hiérarchie disparaît. */
+.ct-carte.ct-r-mythique { box-shadow: var(--ombre-2), 0 0 0 1px rgba(87, 232, 216, 0.32); }
+.ct-carte.ct-r-legende {
+  box-shadow: var(--ombre-2), 0 0 0 1px rgba(255, 120, 100, 0.42),
+    0 0 16px -6px rgba(255, 110, 90, 0.5);
+}
+
+/* La note prend la teinte du métal : c'est elle qu'on lit en premier. */
+.ct-r-bronze   .ct-note, .ct-r-bronze   > strong { color: #e0a86a; }
+.ct-r-argent   .ct-note, .ct-r-argent   > strong { color: #dde5ec; }
+.ct-r-or       .ct-note, .ct-r-or       > strong { color: var(--or-400); }
+.ct-r-epique   .ct-note, .ct-r-epique   > strong { color: #d7abff; }
+.ct-r-mythique .ct-note, .ct-r-mythique > strong { color: #6ff0e0; }
+.ct-r-legende  .ct-note, .ct-r-legende  > strong { color: #ff8f7e; }
+
+/* ⚠️ LA PÉPITE EST UN LISERÉ, PAS UN CRAN DE RARETÉ. Un espoir de 18 ans noté
+   48 reste une carte bronze : c'est ce qu'il vaut dimanche. Le remonter d'un
+   cran ferait mentir le métal sur ce qu'on aligne. */
+.ct-pepite { border-bottom: 2px solid #6fd08c; }
+.ct-pepite-txt { color: #9fe0b4; font-style: normal; }
+
+/* Le nom de la rareté, dans le panneau latéral. */
+.ct-rarete {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 5px; font-style: normal; font-weight: 700;
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.ct-rarete svg { flex: 0 0 auto; }
+.ct-r-txt-bronze { color: #e0a86a; }
+.ct-r-txt-argent { color: #dde5ec; }
+.ct-r-txt-or { color: var(--or-400); }
+.ct-r-txt-epique { color: #d7abff; }
+.ct-r-txt-mythique { color: #6ff0e0; }
+.ct-r-txt-legende { color: #ff8f7e; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE PORTRAIT : on voit la TÊTE, plus une bande de front
+   ═══════════════════════════════════════════════════════════════════════════
+   Bug signalé : « déjà sur le terrain, voir la tête du joueur, pas la moitié ».
+
+   ⚠️ CE N'ÉTAIT PAS UN PROBLÈME DE RECADRAGE, C'EN ÉTAIT UN DE RAPPORT. Les
+   photos officielles font 800 × 1200 avec le visage dans le tiers haut ; le
+   portrait mesurait 36 px de haut pour ~110 de large, soit une fenêtre de
+   rapport 3 : 1. Aucun `object-position` ne fait tenir un visage dans une bande
+   trois fois plus large que haute, on montrait forcément une tranche. Le
+   portrait est donc un CARRÉ (`aspect-ratio: 1`), calé sur le haut de l'image,
+   et c'est la géométrie qui règle ça, pas un réglage de décalage. */
+.ct-portrait {
+  height: auto;
+  aspect-ratio: 1 / 1;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(160deg, #3d474e, #1b2126);
+}
+/* ⚠️ 3 % ET PAS 8 %, ET C'EST CALCULÉ. Sur une source de 800 × 1200, la tête
+   occupe environ y = 30 à 350. Dans un cadre carré, `object-fit: cover` met
+   l'image à l'échelle par sa LARGEUR : la tête tombe alors entre 2,2 et 25,4 px
+   d'une image rendue à 87 px de haut. Le décalage `object-position` vaut
+   p × (87 − 58) : à 8 % il descend de 2,3 px et rogne déjà le haut du crâne.
+   À 3 %, il descend de 0,9 px et la tête entière tient dans le cadre, torse
+   compris. */
+.ct-portrait img { object-position: 50% 3%; }
+.ct-portrait-vide { width: 66%; height: 66%; }
+
+/* ⚠️ LE PORTRAIT DU TERRAIN EST UN CARRÉ CENTRÉ, PAS UNE BANDE PLEINE LARGEUR.
+   Mesuré à l'écran : en pleine largeur (93 px) il fallait 78 px de haut pour
+   voir un visage, la carte passait de 128 à 173 px, et le banc d'essai a relevé
+   **six chevauchements de cartes sur le terrain** — les emplacements sont en
+   POURCENTAGES, une carte plus haute rattrape sa voisine du dessus. À largeur
+   contrainte, le même visage tient dans 58 px de haut : la carte revient à
+   ~153 px et les quinze cartes se séparent de nouveau. Le portrait est plus
+   PETIT qu'une bande pleine largeur, et pourtant on y voit enfin la tête —
+   c'est le rapport qui comptait, pas la surface.
+
+   ⚠️ ET LE TERRAIN GRANDIT QUAND MÊME. La rangée la plus serrée (le pilier
+   gauche à 84 % et le deuxième ligne à 71 %) n'a que 13 % de hauteur entre deux
+   centres de carte : il faut donc `hauteur de carte ÷ 0,13`, soit 1 180 px pour
+   une carte de 153. On prend 1 240 px de marge, parce qu'un badge de plus dans
+   le pied suffirait sinon à recréer un contact. */
+.manager-terrain-xv { min-height: 1240px; }
+.manager-terrain-xv .ct-portrait { width: 58px; max-height: 58px; margin-inline: auto; }
+.ct-compacte .ct-portrait { width: 52px; height: auto; max-height: 52px; margin-inline: auto; }
+.manager-reserve-carte .ct-portrait { width: 38px; height: 38px; aspect-ratio: 1 / 1; }
+.ct-panneau .ct-portrait-panneau { width: 62px; height: 62px; aspect-ratio: 1 / 1; }
+.manager-reserve-carte { grid-template-columns: 38px 38px minmax(0, 1fr) auto; }
+
+/* Les pastilles et badges dessinés, qui remplacent les emoji du système. */
+.ct-pastille { width: 9px; height: 9px; vertical-align: -1px; }
+.ct-pastille-naturel { color: #6fd08c; }
+.ct-pastille-secondaire { color: #e8c15a; }
+.ct-pastille-horsPoste { color: #e3705f; }
+
+.ct-badge, .ct-role, .ct-cond, .ct-forme {
+  display: inline-flex; align-items: center; gap: 2px;
+}
+.ct-badge svg, .ct-role svg, .ct-cond svg, .ct-forme svg { flex: 0 0 auto; }
+.ct-badge-blesse { color: #ff9d8e; }
+.ct-badge-suspendu { color: #e3705f; }
+.ct-badge-espoir { color: #6fd08c; }
+.ct-badge-enForme { color: #ffb066; }
+.ct-badge-fatigue { color: #e8c15a; }
+.ct-badge-international { color: #7fc4ff; }
+.ct-forme { color: #ffb066; }
+.ct-cond { color: #9fe0b4; }
+.ct-role { color: var(--or-200); }
+
+.ct-alertes li { display: flex; align-items: center; gap: 5px; }
+.ct-alertes svg { flex: 0 0 auto; }
+.comp-tete b { display: inline-flex; align-items: center; gap: 6px; }
+.ct-fermer { display: grid; place-items: center; }
+.ct-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+
+@media (max-width: 700px) {
+  /* Sur téléphone la carte perd ses six stats (voir plus haut) : le portrait
+     garde donc toute la place, et c'est LUI qu'on regarde pour reconnaître un
+     joueur quand il n'y a plus de chiffres. */
+  /* ⚠️ MÊME ARITHMÉTIQUE, AUTRE ÉCHELLE. À 375 px le terrain ne fait plus que
+     ~345 px de large et la carte tombe à 78 px : un portrait de 44 px la laisse
+     autour de 118 px, donc 118 ÷ 0,13 ≈ 910 px de terrain. On ne descend pas en
+     dessous sous prétexte que l'écran est petit — c'est là que les cartes se
+     touchent le plus vite. */
+  /* ⚠️ `height: auto` EST OBLIGATOIRE ICI, et l'oublier a coûté un portrait de
+     44 × 20. La règle mobile d'origine posait `.manager-terrain-xv .ct-portrait
+     { height: 20px }` — deux classes, donc plus spécifique que le `height: auto`
+     de `.ct-portrait` : elle gagnait quelle que soit sa position dans le
+     fichier, et `max-height` ne peut pas rattraper une hauteur PLUS PETITE.
+     Mesuré à l'écran : 20 px de haut pour 44 de large, c'est-à-dire la bande
+     qu'on cherchait justement à supprimer. */
+  /* 990 px : la paire la plus serrée en portrait est le 10 (56 %, 36 %) et le
+     9 (40 %, 45 %) — 16 % d'écart horizontal pour une carte de 75 px sur un
+     terrain de 322, donc elles se croisent, et 9 % d'écart vertical pour une
+     carte de 86 px. Il faut 86 ÷ 0,09 = 956 px. Mesuré, pas déduit. */
+  .manager-terrain-xv { min-height: 990px; }
+  .manager-terrain-xv .ct-portrait { width: 44px; height: auto; max-height: 44px; }
+  .ct-compacte .ct-portrait { width: 42px; height: auto; max-height: 42px; }
+  .manager-reserve-carte { grid-template-columns: 34px 34px minmax(0, 1fr) auto; }
+  .manager-reserve-carte .ct-portrait { width: 34px; height: 34px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LA FICHE D'UN JOUEUR — la modale ouverte depuis un nom
+   ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ ELLE PORTE LA CLASSE DE RARETÉ (`ct-r-*`), comme les cartes de
+   composition : le métal du liseré est la première chose qui dit à quel joueur
+   on a affaire, avant même de lire le chiffre. */
+.fj-fond {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; align-items: safe center; justify-items: center;
+  padding: 4vh 3vw;
+  background: rgba(3, 8, 6, 0.72);
+  overflow-y: auto;
+}
+.fj-carte {
+  position: relative;
+  width: min(520px, 100%);
+  padding: 1.3rem 1.4rem 1.5rem;
+  border: 1px solid var(--r-trait, rgba(255, 255, 255, 0.14));
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre-3, var(--ombre-2));
+  background:
+    linear-gradient(158deg, var(--r-eclat, rgba(255, 255, 255, 0.07)), rgba(255, 255, 255, 0) 44%),
+    linear-gradient(170deg, var(--r-haut, var(--pelouse-700)), var(--r-bas, var(--pelouse-800)) 76%);
+  color: var(--craie);
+}
+.fj-fermer {
+  position: absolute; top: 10px; right: 10px;
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: var(--rayon-pilule);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.28); color: var(--craie); cursor: pointer;
+}
+.fj-tete {
+  display: grid; grid-template-columns: 78px minmax(0, 1fr) auto;
+  align-items: center; gap: 0.9rem; padding-right: 44px;
+}
+/* Même règle que sur le terrain : un portrait de visage est un CARRÉ. */
+.fj-portrait {
+  display: grid; place-items: center;
+  width: 78px; height: 78px; aspect-ratio: 1 / 1;
+  overflow: hidden; border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(160deg, #3d474e, #1b2126);
+}
+.fj-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%; }
+.fj-portrait-vide { width: 62%; height: 62%; color: #a7b0b6; fill: currentColor; opacity: 0.82; }
+.fj-identite { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fj-identite b { font: 700 1.05rem/1.2 'Archivo', sans-serif; }
+.fj-identite span {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.8rem; color: var(--craie-dim);
+}
+.fj-club { min-width: 0; }
+.fj-note { display: flex; flex-direction: column; align-items: center; min-width: 62px; }
+.fj-note strong { font: 800 2.1rem/1 'Anton', sans-serif; }
+.fj-note em { font-style: normal; font-size: 0.72rem; color: var(--craie-dim); }
+.fj-note small {
+  font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--craie-dim);
+}
+
+.fj-etiquettes { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.85rem 0 0.7rem; }
+.fj-etiquettes > span {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--rayon-pilule);
+  background: rgba(0, 0, 0, 0.22);
+}
+.fj-pepite { color: #9fe0b4; }
+.fj-scouting, .fj-statut { color: var(--craie-dim); }
+
+.fj-axes { list-style: none; margin: 0.6rem 0; padding: 0; }
+.fj-axes li {
+  display: grid; grid-template-columns: 42px minmax(0, 1fr) 32px;
+  align-items: center; gap: 8px; font-size: 0.78rem; margin-bottom: 4px;
+}
+.fj-axes progress { width: 100%; height: 9px; }
+.fj-axes b { text-align: right; font-variant-numeric: tabular-nums; }
+
+.fj-brut summary { cursor: pointer; font-size: 0.78rem; color: var(--craie-dim); }
+.fj-brut ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.fj-brut li { display: flex; justify-content: space-between; font-size: 0.78rem; }
+
+.fj-chiffres {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px; margin: 0.9rem 0 0.6rem;
+}
+.fj-chiffres div {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px; border-radius: var(--rayon-sm);
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.fj-chiffres em {
+  font-style: normal; font-size: 0.62rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--craie-dim);
+}
+.fj-chiffres b { font: 700 0.95rem/1.2 'Archivo', sans-serif; }
+.fj-gratuit b { color: #00ba7c; }
+
+.fj-situation, .fj-personnalite {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0.35rem 0 0; font-size: 0.78rem; color: var(--craie-dim);
+}
+.fj-situation.libre, .fj-situation.finDeContrat { color: #7fd6a6; }
+.fj-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1rem; }
+.fj-actions .btn { flex: 1 1 160px; min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+
+@media (max-width: 560px) {
+  .fj-carte { padding: 1.1rem 1rem 1.2rem; }
+  .fj-tete { grid-template-columns: 62px minmax(0, 1fr) auto; }
+  .fj-portrait { width: 62px; height: 62px; }
+  .fj-note strong { font-size: 1.7rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LES PARTIES — six emplacements
+   ═══════════════════════════════════════════════════════════════════════════ */
+.accueil-parties {
+  margin-top: 1.1rem;
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 46px;
+}
+.accueil-sauvegardes { padding-top: 0; }
+.sv-panneau { padding: 1.3rem 1.4rem 1.4rem; }
+.sv-tete { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.sv-tete h2 { display: flex; align-items: center; gap: 9px; margin: 0.2rem 0 0; }
+.sv-fermer {
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: var(--rayon-pilule); border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.24); color: var(--craie); cursor: pointer;
+}
+.sv-chapo { margin: 0.5rem 0 1rem; color: var(--craie-dim); font-size: 0.86rem; max-width: 62ch; }
+.sv-liste { display: grid; gap: 8px; }
+
+.sv-ligne {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) 46px;
+  align-items: center; gap: 10px;
+  padding: 10px 12px; min-height: 62px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--rayon-controle);
+  background: rgba(0, 0, 0, 0.2);
+  text-align: left; color: var(--craie);
+}
+.sv-libre { cursor: pointer; border-style: dashed; opacity: 0.82; }
+.sv-libre:hover { opacity: 1; filter: brightness(1.08); }
+.sv-actif { border-color: var(--or-500); background: rgba(232, 178, 58, 0.09); }
+.sv-num {
+  display: grid; place-items: center; width: 34px; height: 34px;
+  border-radius: var(--rayon-pilule); background: rgba(0, 0, 0, 0.32);
+  font: 700 0.85rem/1 'Archivo', sans-serif; color: var(--craie-dim);
+}
+.sv-corps {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  background: none; border: 0; padding: 0; text-align: left;
+  color: inherit; cursor: pointer; font: inherit;
+}
+.sv-corps:disabled { cursor: default; }
+.sv-corps b { display: flex; align-items: center; gap: 6px; font-size: 0.94rem; }
+.sv-corps small { color: var(--craie-dim); font-size: 0.76rem; }
+.sv-pastille {
+  font-style: normal; font-size: 0.62rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--or-200);
+  border: 1px solid var(--or-500); border-radius: var(--rayon-pilule);
+  padding: 1px 7px;
+}
+.sv-supprimer {
+  width: 44px; height: 44px; display: grid; place-items: center;
+  border-radius: var(--rayon-controle); border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.24); color: var(--craie-dim); cursor: pointer;
+}
+.sv-supprimer:hover:not(:disabled) { color: #ff9d8e; border-color: rgba(255, 120, 100, 0.4); }
+.sv-supprimer:disabled { opacity: 0.35; cursor: not-allowed; }
+.sv-nouvelle {
+  margin-top: 0.9rem; min-height: 46px;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .sv-ligne { grid-template-columns: 30px minmax(0, 1fr) 44px; padding: 9px 10px; }
+  .sv-num { width: 30px; height: 30px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE CHOIX DE CARRIÈRE — joueur ou entraîneur
+   ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ DEUX CARTES, PAS DEUX BOUTONS. Ce choix engage quinze saisons : il a
+   besoin d'assez de place pour dire ce qu'on échange, sinon on clique au
+   hasard — c'est exactement ce que faisaient les deux boutons de l'accueil. */
+.cr-modes-grille {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.cr-mode {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 1.2rem 1.1rem; min-height: 190px; text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--rayon);
+  background:
+    linear-gradient(158deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 52%),
+    linear-gradient(168deg, var(--pelouse-700), var(--pelouse-800));
+  box-shadow: var(--ombre-1), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  color: var(--craie); cursor: pointer;
+  transition: filter 0.14s ease, border-color 0.14s ease;
+}
+.cr-mode:hover { filter: brightness(1.07); border-color: var(--or-500); }
+.cr-mode:focus-visible { outline: 2px solid var(--or-400); outline-offset: 2px; }
+.cr-mode-ico { color: var(--or-400); }
+.cr-mode b { font: 700 1.05rem/1.2 'Archivo', sans-serif; }
+.cr-mode-desc { font-size: 0.85rem; color: var(--craie-dim); line-height: 1.45; }
+.cr-mode-suite {
+  margin-top: auto; font-style: normal; font-size: 0.76rem;
+  color: var(--or-200); border-top: 1px dashed rgba(255, 255, 255, 0.14);
+  padding-top: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE RELAIS DE FIN DE CARRIÈRE — de joueur à entraîneur
+   ═══════════════════════════════════════════════════════════════════════════ */
+.fin-relais {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  justify-content: space-between;
+  margin: 1.1rem 0 0.4rem; padding: 0.95rem 1.05rem;
+  border: 1px solid var(--or-500); border-radius: var(--rayon);
+  background: rgba(232, 178, 58, 0.08);
+  text-align: left;
+}
+.fin-relais-texte { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 260px; }
+.fin-relais-texte b { display: flex; align-items: center; gap: 7px; color: var(--or-200); }
+.fin-relais-texte span { font-size: 0.83rem; color: var(--craie-dim); line-height: 1.45; }
+.fin-relais .btn { display: inline-flex; align-items: center; gap: 7px; min-height: 46px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE MARCHÉ — un général lisible, un nom cliquable, des onglets dessinés
+   ═══════════════════════════════════════════════════════════════════════════ */
+.manager-onglets button {
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.manager-onglets button svg { flex: 0 0 auto; }
+
+/* La marge du rapport, sous le général. Elle DOIT rester petite : le nombre
+   est ce qu'on compare, la marge est ce qui le nuance.
+
+   ⚠️ ELLE HÉRITE DE LA COULEUR DE LA PASTILLE, elle ne prend pas `--craie-dim`.
+   Vu à l'écran : la pastille de note est dorée avec un texte SOMBRE
+   (`color: #07150e`) — une craie claire dessus est illisible, et le « ± 7 »
+   disparaissait purement et simplement. */
+.mgr-marge {
+  display: block; font: 700 0.66rem/1 'Archivo', sans-serif;
+  color: inherit; opacity: 0.72; margin-top: 1px;
+}
+/* ⚠️ LA PASTILLE DE NOTE DOIT RESPIRER : elle porte désormais trois lignes (le
+   général, sa marge, le niveau du rapport) là où elle n'en avait qu'une et
+   demie. Figée à 54 × 54, la marge débordait sur le libellé. */
+.manager-cible { grid-template-columns: 62px minmax(0, 1fr); }
+.manager-cible-note { width: 60px; height: auto; min-height: 60px; padding: 6px 4px; line-height: 1.05; }
+
+/* ⚠️ LES ACTIONS PRENNENT TOUTE LA LARGEUR, ELLES NE FONT PAS UNE COLONNE.
+   Une troisième colonne de 190 px paraissait plus propre : mesurée à l'écran,
+   elle laissait 100 px au corps de la carte sur la grille à trois cartes du
+   mode bureau, et le nom du joueur — l'information principale — s'affichait
+   « Antoine … » sur quatre lignes. Une carte de marché est d'abord un NOM et un
+   général ; les boutons passent dessous. */
+.manager-cible-actions {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+/* L'action principale tient la largeur : c'est elle qu'on vise. */
+.manager-cible-actions .btn:first-child { grid-column: 1 / -1; }
+.manager-cible-actions .btn { min-height: 44px; width: 100%; font-size: 0.8rem; }
+
+@media (max-width: 560px) {
+  .manager-cible-actions { grid-template-columns: 1fr; }
+}
+
+.manager-cible-nom {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  background: none; border: 0; padding: 0; text-align: left;
+  color: inherit; font: inherit; cursor: pointer;
+}
+.manager-cible-nom b { text-decoration: underline; text-decoration-color: transparent; transition: text-decoration-color 0.14s ease; }
+.manager-cible-nom:hover b { text-decoration-color: var(--or-400); }
+.manager-cible-nom:focus-visible { outline: 2px solid var(--or-400); outline-offset: 3px; border-radius: 4px; }
+.manager-cible-profil { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.manager-connaissance-cible { display: flex; align-items: center; gap: 6px; }
+.manager-cible .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.manager-raccrocher { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Le compte cliquable de L'Ovale du manager : même affordance que côté joueur. */
+.manager-x-comptes-recherche .x-compte-infos {
+  background: none; border: 0; padding: 0; text-align: left;
+  color: inherit; font: inherit; cursor: pointer;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.x-conv-tete .x-lien-profil {
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  background: none; border: 0; padding: 0; color: inherit; font: inherit;
+  cursor: pointer; min-width: 0;
+}
+
+@media (max-width: 700px) {
+  /* ⚠️ DEUX CARTES DE LA MÊME RANGÉE SE TOUCHAIENT, et c'est un défaut
+     ANTÉRIEUR à ce lot : les deuxièmes lignes sont posés à 39 % et 61 %, soit
+     22 % de la largeur du terrain — 71 px sur les 322 px d'un téléphone de
+     375. La carte, elle, mesurait 75 px (`clamp(62px, 20vw, 84px)`). Mesuré :
+     4 px de recouvrement, sur toutes les compositions, depuis toujours. Le
+     terrain le plus étroit commande donc la largeur de carte, et pas
+     l'inverse. */
+  .manager-position { width: clamp(56px, 18vw, 76px); }
+}
+
+/* Les deux aides de la composition portent maintenant un tracé plutôt qu'un
+   emoji : elles doivent l'aligner sur la ligne de texte. */
+.manager-compo-aide span { display: inline-flex; align-items: center; gap: 6px; }
+.manager-compo-aide svg { flex: 0 0 auto; }
+
+/* Un bouton d'accueil qui porte un tracé doit l'aligner sur son libellé. */
+.cta-groupe .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; }
+
+/* ── L'affiche de la semaine porte les écussons ───────────────────────────── */
+/* ⚠️ LE NOM RESTE SOUS L'ÉCUSSON, il ne le remplace pas : 855 clubs, dont des
+   centaines d'amateurs dont l'écusson est un blason généré à partir des
+   initiales. Le logo dit « je reconnais », le nom dit « c'est bien eux ». */
+.manager-mini-duel > span {
+  display: flex; flex-direction: column; align-items: center; gap: 0.45rem;
+  min-width: 0;
+}
+.manager-mini-duel > span i {
+  font-style: normal; line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .manager-mini-duel > span { gap: 0.3rem; }
+}
+
+/* ── Le podium du classement ──────────────────────────────────────────────── */
+/* ⚠️ UN SEUL TRACÉ, TROIS TEINTES. 🥇🥈🥉 sont trois emoji distincts dessinés
+   par le système ; ici c'est la même médaille, colorée par sa classe — la même
+   règle que les raretés de carte, et le même bénéfice : l'or du jeu, pas celui
+   d'Apple. */
+.podium { display: inline-flex; }
+.podium-1 { color: #f0c96a; }
+.podium-2 { color: #cfd8de; }
+.podium-3 { color: #d09a63; }
+
+/* Les vignettes de section qui portent désormais un tracé plutôt qu'un emoji. */
+.vide-icone { display: grid; place-items: center; color: var(--craie-dim); margin-bottom: 0.6rem; }
+.onglets-classement .chip-comp,
+.fc-titre,
+.tuto-emoji,
+.guide-jauge,
+.guide-coche,
+.sel-check,
+.trait-check,
+.badge-cle,
+.solde,
+.pack-ovas,
+.etiquette-pub,
+.fin-carriere-sauvee,
+.nav-mobile-menu-grille button,
+.carriere-onglets button { display: inline-flex; align-items: center; gap: 6px; }
+.fc-titre svg, .solde svg, .pack-ovas svg { flex: 0 0 auto; }
+.tuto-emoji { justify-content: center; color: var(--or-400); }
+.vide-icone svg { color: var(--craie-dim); }
+
+/* ── « C'est toi » dans un classement ─────────────────────────────────────── */
+/* ⚠️ 🫵 EST UN EMOJI D'UNICODE 14 : les appareils qui ne l'ont pas affichaient
+   un carré vide, c'est-à-dire aucun repère du tout dans un classement de cent
+   lignes. Une pastille dorée existe partout et porte la couleur du jeu. */
+.cl-moi {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  font: 700 0.62rem/1.5 'Archivo', sans-serif; font-style: normal;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--or-200); border: 1px solid var(--or-500);
+  border-radius: var(--rayon-pilule); vertical-align: 1px;
+}
+.frise-emoji { display: inline-flex; align-items: center; justify-content: center; }
+
+/* ── Les deux cartons du profil ───────────────────────────────────────────── */
+/* ⚠️ 🟨 ET 🟥 SONT DEUX EMOJI QUI DOIVENT SE RESSEMBLER pour se comparer, et
+   c'est justement ce qu'un système d'exploitation ne garantit pas : ni la même
+   taille, ni les mêmes coins. Deux rectangles dessinés, oui. */
+.carton-jaune, .carton-rouge {
+  display: inline-block; width: 9px; height: 13px;
+  margin-left: 4px; border-radius: 2px; vertical-align: -1px;
+}
+.carton-jaune { background: #e8c15a; }
+.carton-rouge { background: #d8493c; }
+
+/* Le repli d'un logo de compétition est désormais un tracé, pas un caractère. */
+.logo-compet.vide { display: grid; place-items: center; color: var(--craie-dim); }
+.balle { display: inline-flex; align-items: center; color: var(--or-400); }

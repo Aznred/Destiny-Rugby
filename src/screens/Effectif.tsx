@@ -17,6 +17,7 @@ import { Drapeau } from '../components/Drapeau';
 import { effectifNational } from '../lib/international';
 import { maSelection } from '../lib/selection';
 
+import { Icone } from '../components/Icone';
 /**
  * La force d’un groupe : la moyenne pondérée de ses 23 meilleurs, XV de départ
  * ×1 et remplaçants ×0,5.
@@ -155,7 +156,7 @@ export function Effectif() {
         <div style={{ flex: 1 }}>
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             {enSelection
-              ? <>🏳️ {selection!.u20 ? t('eff.groupeU20') : t('eff.groupeNational')} · {t('gen.saison')} {carriere.saison}</>
+              ? <><Icone nom="drapeau" taille={15} /> {selection!.u20 ? t('eff.groupeU20') : t('eff.groupeNational')} · {t('gen.saison')} {carriere.saison}</>
               : <><LogoCompet id={division?.id} taille={18} /> {division?.nom ?? t('eff.divisionInconnue')} · {t('gen.saison')} {carriere.saison}</>}
           </div>
           <h1>{enSelection ? selection!.equipe : carriere.club}</h1>
@@ -202,7 +203,7 @@ export function Effectif() {
               <span className="j-nom">
                 {l.nom}
                 {'moi' in l && l.moi && <em> {t('eff.toi')}</em>}
-                {l.regen && <span title={t('eff.regen')}> 🌱</span>}
+                {l.regen && <span title={t('eff.regen')}> <Icone nom="pousse" taille={13} /></span>}
                 {/* Trajectoire : espoir en progression, ou cadre sur le déclin. */}
                 {!('moi' in l) && estEspoir(l) && (
                   <span className="j-tendance monte" title={t('eff.espoir', { n: l.potentiel })}>
