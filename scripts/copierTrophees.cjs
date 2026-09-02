@@ -55,6 +55,35 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const RACINE = path.join(__dirname, '..');
+
+// ⚠️ LES MODÈLES BRUTS NE VIVENT PLUS DANS LE DÉPÔT. Les .glb livrés (~90 Mo
+// pièce, 3,7 Go en tout) ont été sortis vers un atelier voisin : le dépôt n'a
+// plus à les porter, et `public/m3d/` — le seul dossier que le JEU lit — reste
+// à 114 Mo. Ce script les cherche dans cet ordre, et prend le premier qui
+// existe :
+//
+//   1. $DESTINY_ASSETS                    si l'atelier est rangé ailleurs
+//   2. ../../destiny-rugby-assets-bruts   l'emplacement par défaut
+//   3. la racine du dépôt                 l'ancien, pour une copie qui les
+//                                         aurait encore sous la main
+//
+// L'arborescence de l'atelier REPRODUIT celle du dépôt (`sources/modeles/…`,
+// `new model boutique/`) : les chemins de `LOTS` restent donc écrits tels
+// qu'ils l'ont toujours été, et rien d'autre dans ce fichier ne bouge.
+const ATELIERS = [
+  process.env.DESTINY_ASSETS,
+  path.join(RACINE, '..', '..', 'destiny-rugby-assets-bruts'),
+  RACINE,
+].filter(Boolean);
+
+/** Le premier atelier où ce lot est réellement livré, sinon `null`. */
+function trouverLot(dossier) {
+  for (const base of ATELIERS) {
+    const p = path.join(base, dossier);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
 const DEST = path.join(RACINE, 'public', 'm3d');
 const TAILLE_TEXTURE = 1024;
 // La densité des trophées historiques (86 000 à 104 000 sommets). Au-delà, on
@@ -220,9 +249,9 @@ let traites = 0;
 let sautes = 0;
 
 for (const lot of LOTS) {
-const SRC = path.join(RACINE, lot.dossier);
+const SRC = trouverLot(lot.dossier);
 console.log(`\n▸ ${lot.dossier}/ — ${lot.intitule}`);
-if (!fs.existsSync(SRC)) {
+if (!SRC) {
   avertissements.push(`dossier source absent : ${lot.dossier}/`);
   continue;
 }

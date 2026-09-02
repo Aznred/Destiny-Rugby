@@ -641,7 +641,17 @@
   .manager-club-formation > .manager-centre-identite { grid-column:1; grid-template-columns:1fr; align-content:start; }
   .manager-club-formation > .manager-centre-identite .manager-centre-notes { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .manager-club-formation > .manager-academie { grid-column:2; grid-row:3; max-height:calc(100dvh - 335px); overflow-y:auto; overscroll-behavior:contain; }
-  .manager-club-recruteurs > .manager-dossiers-jeunes { max-height:calc(100dvh - 405px); overflow-y:auto; overscroll-behavior:contain; padding-right:.2rem; }
+  /* ⚠️ LES RANGÉES SE MESURENT SUR LEUR CONTENU, SINON LA LISTE ÉCRASE SES
+     CARTES AU LIEU DE DÉFILER. `.manager-dossier-jeune` porte un
+     `overflow:hidden` (le liseré doré du haut doit suivre les coins arrondis),
+     or un conteneur de défilement a une taille minimale automatique NULLE : les
+     rangées `auto` de cette grille à hauteur bornée n'avaient donc plus aucun
+     plancher, et se partageaient la hauteur disponible. Mesuré : 8 dossiers de
+     439 px rendus dans des rangées de 112 px, `scrollHeight === clientHeight`
+     — donc pas de barre de défilement non plus, et les trois boutons d'action
+     (observer, entretien, présenter le projet) hors du cadre. L'écran des
+     recruteurs était inutilisable. */
+  .manager-club-recruteurs > .manager-dossiers-jeunes { align-content:start; grid-auto-rows:min-content; max-height:calc(100dvh - 405px); overflow-y:auto; overscroll-behavior:contain; padding-right:.2rem; }
   .manager-club-entrainement { grid-template-columns:minmax(280px,.58fr) minmax(0,1.42fr); }
   .manager-club-entrainement > .manager-inst-tete,.manager-club-entrainement > .manager-inst-grille { grid-column:1/-1; }
   .manager-club-entrainement > .manager-planning-collectif { grid-column:1; }

@@ -7,7 +7,7 @@ import { LogoCompet } from '../components/LogoCompet';
 import { Confirmation } from '../components/Confirmation';
 import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
-import { COMPETITIONS, clubParNom, competitionDuClub } from '../data/clubs';
+import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { effectifDuClub, forceEffectif } from '../lib/effectif';
 import { classementManagerEnDirect } from '../lib/tableauManager';
 import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
@@ -25,7 +25,7 @@ import type { CibleRecrutementManager } from '../types';
 import { poidsDansSecteur, SECTEURS_COHESION } from '../lib/cohesion';
 import type { Automatismes } from '../lib/cohesion';
 import {
-  ciblesDuMarche, joueurDejaRecrute, masseSalarialeActuelle,
+  budgetsDuClub, ciblesDuMarche, joueurDejaRecrute, masseSalarialeActuelle,
 } from '../lib/recrutementManager';
 import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
@@ -37,7 +37,7 @@ import { LIMITES } from '../lib/classementMondial';
 import {
   CLUBS_OBSERVES, coutAmelioration, ICONE_INSTALLATION, GAIN_ENTRAINEMENT,
   installationsVierges, NIVEAU_INSTALLATION_MAX, PLACES_ENTRAINEMENT,
-  INCERTITUDE_RECRUTEURS, budgetStructure,
+  INCERTITUDE_RECRUTEURS,
 } from '../lib/installations';
 import { AXES_CENTRE, ICONE_AXE } from '../lib/centreFormation';
 import {
@@ -146,9 +146,14 @@ export function Manager() {
   // ⚠️ LES MURS SONT CEUX DU CLUB, pas ceux de l'entraîneur : on lit le club
   // courant, et un manager qui change de banc découvre ce que l'autre a bâti.
   const murs = manager?.installations?.[manager.club] ?? installationsVierges();
-  const enveloppe = manager?.club
-    ? budgetStructure(forceEffectif(manager.club, manager.saison), competitionDuClub(manager.club)?.niveau ?? 8)
-    : 0;
+  // ⚠️ LA MÊME ENVELOPPE QUE CELLE QUE LE STORE FACTURE, et c'est tout le
+  // correctif. Cet écran la recalculait avec sa propre formule (forceEffectif +
+  // competitionDuClub, sans référence d'étage) tandis que `ameliorerInstallation`
+  // lit `budgetsDuClub`. Mesuré sur 8 étages : 5 divergeaient, et sur 2 d'entre
+  // eux l'écran annonçait MOINS cher que le store — en Nationale, 125 000 €
+  // affichés contre 315 000 € exigés. Le bouton s'allumait, le clic ne faisait
+  // rien, et rien ne l'expliquait. Banc : scripts/verifEnveloppeStructure.ts.
+  const enveloppe = manager?.club ? budgetsDuClub(manager.club, manager.saison).structure : 0;
   const placesEntrainement = PLACES_ENTRAINEMENT[Math.min(murs.entrainement, NIVEAU_INSTALLATION_MAX)];
   const rapportsFrais = manager?.rapports?.filter((r) => r.saison >= (manager.saison ?? 0)).length ?? 0;
   // La masse déjà engagée : c'est elle qui bloque une signature, pas le solde.

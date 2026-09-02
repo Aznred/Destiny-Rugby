@@ -12,7 +12,6 @@
 // navigateur (`scripts/verifInstallations.ts`).
 
 import { NOTE_PAR_NIVEAU } from '../data/clubs';
-import { financesDuClub } from './economie';
 import type { InstallationsClub, TypeInstallation } from '../types';
 
 export const NIVEAU_INSTALLATION_MAX = 4;
@@ -55,20 +54,16 @@ export function niveauInstallation(
  * amateur, où le budget transferts n'achète presque rien (`PRO_JUSQUA`), il
  * n'y aurait même pas d'arbitrage : juste un écran mort.
  *
- * ⚠️ ELLE N'A QU'UNE DÉFINITION, ET CE FICHIER N'EN EST PAS L'AUTEUR. Elle sort
- * de `financesDuClub` (`lib/economie.ts`), comme les deux autres lignes du
- * budget. Une version antérieure la calculait ici avec sa PROPRE formule
- * (`(force − 31)² × 1 100 × facteurEtage`, une copie de `facteurNiveau`) : le
- * jour où le budget des clubs est passé aux fourchettes réelles, le REVENU a
- * suivi et le PRIX est resté sur l'ancienne courbe. Mesuré, un centre complet
- * demandait alors 121 saisons de revenus en Fédérale 2 contre les 10 prévues —
- * tout le lot « installations » était mort sous la Nationale, sans un
- * avertissement. Deux formules pour une même enveloppe finissent toujours par
- * dire deux choses.
+ * ⚠️ CE FICHIER N'EN EST PAS L'AUTEUR, ET IL N'EN OFFRE PLUS D'ACCÈS. Elle sort
+ * de `budgetsDuClub` (`lib/recrutementManager.ts`), avec les deux autres lignes
+ * du budget. Il a existé ici un raccourci `budgetStructure(force, niveau)` :
+ * l'écran des installations l'appelait, le store appelait `budgetsDuClub`, et
+ * les deux ne tombaient pas d'accord — mesuré, 5 étages sur 8 divergeaient, et
+ * en Nationale l'écran annonçait 125 000 € quand le store en exigeait 315 000.
+ * Le bouton « Améliorer » s'allumait, et le clic ne faisait rien.
+ * **Ne pas rouvrir ce raccourci** : un seul appelant suffit à recréer l'écart.
+ * Banc de mesure : `scripts/verifEnveloppeStructure.ts`.
  */
-export function budgetStructure(force: number, niveau: number, reference?: number): number {
-  return financesDuClub(force, niveau, reference).structure;
-}
 
 /**
  * Le prix d'une marche, en saisons d'enveloppe.

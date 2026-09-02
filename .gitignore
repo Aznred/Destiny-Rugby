@@ -28,8 +28,12 @@ dist-ssr
 .env.local
 .env.*.local
 
-# Modèles 3D livrés bruts (~90 Mo pièce) : la version compressée vit dans
-# public/m3d/, produite par `node scripts/copierTrophees.cjs`.
-sources/modeles/cosmetiques/
-# Second lot de cosmétiques, livré à la racine : 15 fichiers, 1,3 Go.
-"new model boutique/"
+# ── MODÈLES 3D BRUTS — hors du dépôt ───────────────────────────────────────
+# Les .glb livrés (~90 Mo pièce, 3,7 Go) vivent dans un atelier voisin,
+# `../destiny-rugby-assets-bruts/` : voir son LISEZ-MOI. Le jeu ne lit que
+# `public/m3d/` (114 Mo), produit par `node scripts/copierTrophees.cjs`.
+#
+# ⚠️ Ces motifs ne suffisent pas à eux seuls : un fichier DÉJÀ suivi le reste
+# malgré .gitignore. Ils ont été retirés de l'index avec `git rm --cached`.
+sources/modeles/
+new model boutique/
