@@ -29,7 +29,8 @@ import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
   noteMaximale, salaireManager,
 } from '../lib/manager';
-import { matchDuClubSemaine } from '../lib/matchLive';
+import { afficheDuClub } from '../lib/matchLive';
+import { porteeSportive } from '../lib/recrutementManager';
 import { LIMITES } from '../lib/classementMondial';
 import {
   CLUBS_OBSERVES, coutAmelioration, ICONE_INSTALLATION, GAIN_ENTRAINEMENT,
@@ -102,6 +103,12 @@ export function Manager() {
   const manager = useGame((s) => s.manager);
   const setEcran = useGame((s) => s.setEcran);
   const semaineManager = useGame((s) => s.semaineManager);
+  const avancerJusquaManager = useGame((s) => s.avancerJusquaManager);
+  // Ce que la dernière avance a joué, et pourquoi elle s'est arrêtée. Un saut
+  // muet se lit comme un bouton qui n'a rien fait.
+  const [avanceFaite, setAvanceFaite] = useState<
+    { semaines: number; arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' } | null
+  >(null);
   const contacterClub = useGame((s) => s.contacterClubManager);
   const ouvrirMessages = useGame((s) => s.ouvrirMessagesOvale);
   const ouvrirDiscussion = useGame((s) => s.ouvrirDiscussionOvale);
@@ -207,10 +214,27 @@ export function Manager() {
     () => indisponiblesCarriereAvancee(avancee ?? undefined, manager?.semaine ?? 0),
     [avancee, manager?.semaine],
   );
+  // ⚠️ TOUTES LES AFFICHES, PAS SEULEMENT LE CHAMPIONNAT. 
+  // ne lit que la grille des journées : premier de sa poule, un manager
+  // traversait les demies et la finale sans qu’aucun match ne lui soit proposé
+  // — c’est le « je n’ai pas fait les play-offs ».  couvre les
+  // trois natures de week-end ().
   const afficheMemo = useMemo(
-    () => manager ? matchDuClubSemaine(manager) : null,
+    () => manager ? afficheDuClub(manager) : null,
     [manager],
   );
+  /**
+   * ⚠️ ON AVANCE JUSQU'AU PROCHAIN RENDEZ-VOUS, PAS D'UN NOMBRE DE SEMAINES.
+   * Un « +4 semaines » forcerait à compter soi-même où tombe le prochain match,
+   * et un saut qui s'arrête tout seul deux semaines plus tôt paraîtrait cassé.
+   * On vise la fin de saison : `avancerJusquaManager` s'arrête de lui-même à la
+   * première chose qui demande l'entraîneur, et le dit.
+   */
+  const avancerSemaines = () => {
+    const r = avancerJusquaManager(SEMAINES_PAR_SAISON);
+    if (r.semaines > 0) setAvanceFaite(r);
+  };
+
   const derbyMemo = useMemo(() => {
     if (!manager?.club || !afficheMemo) return null;
     const adversaire = afficheMemo.match.domicile === manager.club
@@ -515,6 +539,19 @@ export function Manager() {
                 <div className="manager-resume-actions">
                   <button className="btn fantome" onClick={() => setEcran('effectif')}><Icone nom="equipe" taille={16} /> Effectif</button>
                   <button className="btn fantome" onClick={() => { setVue('ovale'); ouvrirMessages(); }}>𝕏 L’Ovale</button>
+                  {/* ⚠️ L'AVANCE RAPIDE EST À CÔTÉ DE LA SEMAINE, PAS À SA PLACE.
+                      Retour de jeu : « rajoute qu'on puisse simuler les semaines
+                      comme dans la carrière joueur ». Elle ne s'affiche que
+                      lorsqu'il n'y a rien à faire ce week-end — proposer de
+                      sauter alors qu'un match attend serait proposer de
+                      l'escamoter, ce que le mode « saison rapide » faisait et
+                      qui lui a valu d'être supprimé. */}
+                  {!(afficheManager && !resultatManager) && !manager.decision
+                    && manager.semaine < SEMAINES_PAR_SAISON && (
+                    <button className="btn fantome" onClick={avancerSemaines}>
+                      <Icone nom="chrono" taille={16} /> {t('mgr.avancer')}
+                    </button>
+                  )}
                   <button className="btn primaire" onClick={() => {
                     if (afficheManager && !resultatManager) setVue('match'); else semaineManager();
                   }}>
@@ -522,6 +559,21 @@ export function Manager() {
                   </button>
                 </div>
               </section>
+
+              {/* ⚠️ UNE AVANCE MUETTE SE LIT COMME UN BOUTON CASSÉ. Le joueur
+                  doit savoir combien de semaines sont parties ET ce qui l'a
+                  arrêté — c'est exactement ce que la frise du calendrier fait
+                  déjà côté carrière joueur. */}
+              {avanceFaite && (
+                <p className="manager-avance-bilan" role="status">
+                  <Icone nom="chrono" taille={14} />{' '}
+                  {t('mgr.avanceFaite', { n: avanceFaite.semaines })}
+                  {' · '}{t(`mgr.avanceArret.${avanceFaite.arret}`)}
+                  <button type="button" className="btn fantome petit" onClick={() => setAvanceFaite(null)}>
+                    <Icone nom="croix" taille={13} />
+                  </button>
+                </p>
+              )}
 
               <section className="manager-kpis" aria-label="Informations importantes du club">
                 <article className="carte"><small>Classement</small><b>{maLigne ? `${maLigne.position}e` : '—'}</b><span>{maLigne?.points ?? 0} points</span></article>
@@ -1205,6 +1257,10 @@ export function Manager() {
               <div className="manager-cibles">
                 {cibles.map((cible) => {
                   const connaissance = rapportConnaissance(avancee ?? undefined, cible, murs.recrutement);
+                  // ⚠️ LE PRESTIGE ENTRE DANS LA PORTÉE : c'est la jauge centrale
+                  // du mode, elle n'ouvrait que des BANCS et n'aidait jamais à
+                  // convaincre un joueur.
+                  const portee = porteeSportive(cible, manager.club, manager.saison, manager.prestige);
                   const existante = manager.negociations.find((n) => n.joueur.id === cible.id && n.etat !== 'rompue');
                   const clubDossier = [...manager.negociationsClubs].reverse()
                     .find((n) => n.cible.id === cible.id && n.saison === manager.saison);
@@ -1278,6 +1334,22 @@ export function Manager() {
                           {t(`mgr.situation.${cible.situation}`)}
                           {cible.saisonsRestantes > 0 && ` · ${t('mgr.contratRestant', { n: cible.saisonsRestantes })}`}
                         </p>
+                        {/* ⚠️ CE QUI MANQUAIT AU MARCHÉ : UN CRITÈRE SPORTIF.
+                            `score()` ne pèse que du contractuel, et dans le bas
+                            de la pyramide les exigences contractuelles sont
+                            dérisoires — il ne restait donc AUCUN obstacle entre
+                            un club de Régionale 3 et le meilleur joueur du
+                            monde. La portée est affichée AVANT le bouton, avec
+                            son motif : un refus qu'on ne comprend pas se lit
+                            comme un bug. */}
+                        {!portee.aPortee && (
+                          <p className="manager-cible-portee">
+                            <Icone nom="stop" taille={13} />{' '}
+                            {portee.motif === 'etage'
+                              ? t('mgr.horsPorteeEtage')
+                              : t('mgr.horsPorteeNiveau', { plafond: Math.round(portee.plafond) })}
+                          </p>
+                        )}
                       </div>
                       {/* ⚠️ LES ACTIONS SONT DANS LEUR PROPRE COLONNE, et ce
                           n'est pas cosmétique. `.manager-cible` est une grille
@@ -1291,7 +1363,7 @@ export function Manager() {
                       <div className="manager-cible-actions">
                         <button
                           className="btn primaire"
-                          disabled={existante?.etat === 'signee' || clubDossier?.etat === 'rompue'}
+                          disabled={!portee.aPortee || existante?.etat === 'signee' || clubDossier?.etat === 'rompue'}
                           onClick={() => {
                             if (existante) ouvrirDiscussion(existante.pseudo);
                             else if (clubDossier?.etat === 'ouverte') ouvrirDiscussion(clubDossier.pseudo);

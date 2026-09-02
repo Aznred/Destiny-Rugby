@@ -83,7 +83,7 @@ const stockageJeu = createJSONStorage(() => stockageParEmplacement());
 function passeesDuType(numeroSemaine: number, type: string): number {
   return SEMAINES.slice(0, Math.max(0, numeroSemaine - 1)).filter((s) => s.type === type).length;
 }
-import { matchDeLaSemaine, matchDuClubSemaine } from '../lib/matchLive';
+import { matchDeLaSemaine, afficheDuClub } from '../lib/matchLive';
 import {
   filDeLaSemaine, messageSpontane, invitationCoequipier, effetSurRelation, reponseLocale,
   tonDuMessage, reactionsPour,
@@ -161,7 +161,7 @@ import {
 import {
   accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, joueurDejaRecrute,
   masseSalarialeActuelle, negocierAvecJoueur, ouvrirNegociationManager,
-  reparerRecrutementsDupliques, type LevierRecrutementManager,
+  reparerRecrutementsDupliques, type LevierRecrutementManager, porteeSportive,
 } from '../lib/recrutementManager';
 import {
   demandeAGenerer, negocierAvecClub, offresPourVente, ouvrirNegociationClub,
@@ -175,7 +175,7 @@ import {
   enregistrerResultatJoue, setResultatsJoues, effacerResultatsJoues,
 } from '../lib/championnat';
 import {
-  compositionManagerParDefaut, reconcilerCompositionManager, TACTIQUE_MANAGER_DEFAUT,
+  compositionManagerParDefaut, reconcilerCompositionManager, TACTIQUE_MANAGER_DEFAUT, EFFECTIF_MINIMUM,
 } from '../lib/compositionManager';
 import { risqueDeBlessure, tirerBlessure, messageBlessure, deltasBlessure } from '../lib/blessures';
 import { effetsTraits, MAX_TRAITS, TRAIT_PAR_ID } from '../data/traits';
@@ -1032,6 +1032,20 @@ interface GameState {
   avancerJusqua: (numeroSemaine: number) => {
     semaines: number;
     arret: 'arrive' | 'question' | 'saison' | 'contrat' | 'fin';
+  };
+  /**
+   * La même chose sur un banc. Retour de jeu : « rajoute qu'on puisse simuler
+   * les semaines comme dans la carrière joueur ».
+   *
+   * ⚠️ ELLE NE PEUT PAS ÊTRE `avancerJusqua` AVEC UN `if`. Les deux carrières
+   * s'arrêtent sur des choses différentes — le joueur sur une scène du MJ et
+   * sur son contrat, l'entraîneur sur une DÉCISION du board et sur un MATCH
+   * qu'il doit coacher. Un motif d'arrêt commun aurait obligé à mentir dans un
+   * des deux cas, et c'est précisément ce que l'écran affiche au joueur.
+   */
+  avancerJusquaManager: (numeroSemaine: number) => {
+    semaines: number;
+    arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc';
   };
   setTheme: (t: Theme) => void;
   setLangue: (l: Langue) => void;
@@ -3982,7 +3996,13 @@ export const useGame = create<GameState>()(
         // Le championnat du manager est désormais joué, pas seulement simulé.
         // Tant que l'affiche de cette semaine n'a pas atteint la sirène, le
         // calendrier ne peut pas l'effacer en passant au lundi suivant.
-        const affiche = matchDuClubSemaine(m);
+        // ⚠️ TOUTES LES AFFICHES, PAS SEULEMENT LE CHAMPIONNAT.
+        // `matchDuClubSemaine` ne lit que la grille des journées : une semaine
+        // de PHASE FINALE ou de COUPE n'en contient aucune, donc le verrou ne
+        // se déclenchait pas et le calendrier passait par-dessus le match.
+        // C'est l'autre moitié du « je n'ai pas fait les play-offs » : même
+        // avec un match proposé à l'écran, la semaine pouvait avancer sans lui.
+        const affiche = afficheDuClub(m);
         if (affiche && !m.resultats[affiche.cle]) return;
         if (m.semaine < SEMAINES_PAR_SAISON) {
           const suivante = m.semaine + 1;
@@ -4002,6 +4022,43 @@ export const useGame = create<GameState>()(
           return;
         }
         get().saisonManager();
+      },
+
+      avancerJusquaManager: (cible) => {
+        const depart = get().manager?.semaine ?? 1;
+        let semaines = 0;
+        if (!get().manager?.club) return { semaines, arret: 'sansBanc' as const };
+        if (cible <= depart) return { semaines, arret: 'arrive' as const };
+
+        let arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' = 'arrive';
+        while ((get().manager?.semaine ?? 1) < cible) {
+          const avant = get().manager;
+          if (!avant?.club) { arret = 'sansBanc'; break; }
+          // ⚠️ ON S'ARRÊTE À CE QUI DEMANDE L'ENTRAÎNEUR, exactement comme la
+          // carrière joueur s'arrête sur une scène du MJ. Enjamber une décision
+          // du board ou un match à coacher, c'est refaire l'ancien mode
+          // « saison rapide » qui a été supprimé pour cette raison précise.
+          if (avant.decision) { arret = 'decision'; break; }
+          const affiche = afficheDuClub(avant);
+          if (affiche && !avant.resultats[affiche.cle]) { arret = 'match'; break; }
+
+          get().semaineManager();
+
+          const apres = get().manager;
+          if (!apres) { arret = 'sansBanc'; break; }
+          // ⚠️ ON NE COMPTE QUE CE QUI A VRAIMENT ÉTÉ JOUÉ. `semaineManager`
+          // peut refuser en silence (un match non joué, plus de banc) : compter
+          // quand même annoncerait des semaines qui n'ont pas eu lieu — le
+          // défaut déjà payé côté joueur.
+          if (apres.saison === avant.saison && apres.semaine === avant.semaine) {
+            arret = apres.club ? 'match' : 'sansBanc';
+            break;
+          }
+          semaines++;
+          if (apres.saison !== avant.saison) { arret = 'saison'; break; }
+          if (!apres.club) { arret = 'sansBanc'; break; }
+        }
+        return { semaines, arret };
       },
 
       repondreDecisionManager: (decisionId, choixId) => {
@@ -4152,6 +4209,13 @@ export const useGame = create<GameState>()(
       contacterClubManager: (cible) => {
         const m = get().manager;
         if (!m?.club || cible.club === m.club) return;
+        // ⚠️ LE VERROU SPORTIF EST ICI, PAS SEULEMENT SUR LE BOUTON. L'écran
+        // grise déjà l'action, mais un bouton désactivé n'est pas une règle :
+        // c'est le store qui décide qui peut être contacté, exactement comme
+        // `signerBanc` refuse un club au-dessus du prestige. Sans lui, le jour
+        // où un second chemin ouvre une négociation (une carte de décision, un
+        // dossier de L'Ovale), le critère sportif disparaîtrait en silence.
+        if (!porteeSportive(cible, m.club, m.saison, m.prestige).aPortee) return;
         // Une signature est un état terminal. L'ancien fil du club reste
         // consultable, mais ne doit jamais recréer un contrat pour sa recrue.
         if (joueurDejaRecrute(m, cible.id)) {
@@ -4194,7 +4258,15 @@ export const useGame = create<GameState>()(
           },
           ouvrirSocialSur: 'messages',
           conversationSocialeCible: nego.pseudo,
-          ecran: 'social',
+          // ⚠️ UN MANAGER RESTE DANS SON BUREAU. Retour de jeu : « quand on
+          // est dans le marché, fais que ça ouvre le X du bureau, pas celui de
+          // la page ». L'Ovale du manager est un ONGLET de l'écran manager
+          // (`vue === 'ovale'`) : forcer `ecran: 'social'` le sortait de son
+          // bureau vers l'écran plein du joueur, perdant les onglets Marché,
+          // Composition et Club au moment précis où il négocie.
+          // `ouvrirDiscussionOvale` posait déjà la bonne règle depuis
+          // longtemps — ces trois écritures ne l'avaient jamais reprise.
+          ecran: s.manager && !s.joueur ? 'manager' : 'social',
           ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
         }));
       },
@@ -4249,7 +4321,7 @@ export const useGame = create<GameState>()(
           if (signee) set((s) => ({
             ouvrirSocialSur: 'messages',
             conversationSocialeCible: signee.pseudo,
-            ecran: 'social',
+            ecran: s.manager && !s.joueur ? 'manager' : 'social',
             ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
           }));
           return;
@@ -4315,7 +4387,15 @@ export const useGame = create<GameState>()(
           },
           ouvrirSocialSur: 'messages',
           conversationSocialeCible: nego.pseudo,
-          ecran: 'social',
+          // ⚠️ UN MANAGER RESTE DANS SON BUREAU. Retour de jeu : « quand on
+          // est dans le marché, fais que ça ouvre le X du bureau, pas celui de
+          // la page ». L'Ovale du manager est un ONGLET de l'écran manager
+          // (`vue === 'ovale'`) : forcer `ecran: 'social'` le sortait de son
+          // bureau vers l'écran plein du joueur, perdant les onglets Marché,
+          // Composition et Club au moment précis où il négocie.
+          // `ouvrirDiscussionOvale` posait déjà la bonne règle depuis
+          // longtemps — ces trois écritures ne l'avaient jamais reprise.
+          ecran: s.manager && !s.joueur ? 'manager' : 'social',
           ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
         }));
       },
@@ -4534,8 +4614,32 @@ export const useGame = create<GameState>()(
       mettreEnVenteManager: (joueurId) => {
         const m = get().manager;
         if (!m?.club || m.ventes.some((v) => v.joueurId === joueurId)) return;
-        const joueur = effectifDuClub(m.club, m.saison).find((j) => j.id === joueurId);
+        const groupe = effectifDuClub(m.club, m.saison);
+        const joueur = groupe.find((j) => j.id === joueurId);
         if (!joueur) return;
+        // ⚠️ ON NE VEND PAS TOUT L'EFFECTIF. Retour de jeu : « on peut vendre
+        // tout l'effectif sans problème ». Un club qui n'a plus 23 joueurs ne
+        // peut pas remplir une feuille de match — et `composerParDefaut` se
+        // contentait de rendre une feuille trouée, sans que rien ne l'explique.
+        //
+        // ⚠️ LE PLANCHER COMPTE LES JOUEURS QUI RESTENT, ventes en cours
+        // COMPRISES : lister six joueurs un par un contournerait un contrôle
+        // qui ne regarderait que le groupe du jour. Vingt-six, c'est les 23 de
+        // la feuille plus trois de marge — un club qui descend à 23 n'a plus
+        // aucun remplaçant en cas de blessure, et c'est déjà une décision.
+        const restants = groupe.length - m.ventes.filter(
+          (v) => v.saison === m.saison && groupe.some((j) => j.id === v.joueurId),
+        ).length;
+        if (restants <= EFFECTIF_MINIMUM) {
+          set((s2) => ({
+            journal: [...s2.journal, {
+              id: idUnique(), saison: m.saison, role: 'mj' as const,
+              titre: t('mgr.effectifMinTitre'),
+              texte: t('mgr.effectifMinTexte', { min: EFFECTIF_MINIMUM }),
+            }],
+          }));
+          return;
+        }
         const vente = {
           joueurId: joueur.id,
           nom: joueur.nom,
@@ -4644,6 +4748,39 @@ export const useGame = create<GameState>()(
         const py = resoudrePyramide(m.division, m.saison, m.club);
         const monte = py.mouvements.some((x) => x.club === m.club && x.sens === 'montee');
         const descendu = py.mouvements.some((x) => x.club === m.club && x.sens === 'descente');
+
+        // ═══ LA PYRAMIDE BOUGE AUSSI POUR L'ENTRAÎNEUR ═════════════════════
+        // ⚠️ ELLE NE BOUGEAIT PAS DU TOUT, ET C'ÉTAIT LE BUG SIGNALÉ (« gros
+        // problème : on ne monte pas de division »). Le mouvement du club était
+        // pourtant CALCULÉ — `monte` et `descendu` alimentaient déjà le verdict
+        // du board, le prestige et la ligne d'historique — mais `suivant`
+        // recopiait `division`, `divisionNom` et `objectif` de la saison
+        // précédente : on gagnait sa Régionale 2, on lisait « ⬆ montée » dans
+        // son bilan, et on rejouait la Régionale 2 la saison suivante.
+        //
+        // ⚠️ ET IL NE SUFFIT PAS DE CHANGER LE CHAMP. `lib/divisions.ts` tient
+        // un REGISTRE DE MODULE que lisent le championnat, le calendrier, les
+        // classements et l'atlas : sans `setMouvementsClubs`, le club serait
+        // promu dans sa fiche et resterait dans l'ancienne poule partout
+        // ailleurs. C'est exactement la ligne que la carrière joueur commente
+        // depuis longtemps — « sans ça, la division du club promu ne changeait
+        // nulle part et le championnat de la saison suivante était identique au
+        // précédent ». Le mode manager ne l'avait simplement jamais reçue.
+        const complete = resoudreToutesDivisions(m.saison);
+        const mouvements = equilibrerMouvements([
+          ...py.mouvements,
+          ...complete.mouvements.filter(
+            (x) => !py.mouvements.some((p) => p.club === x.club),
+          ),
+        ]);
+        const majMouvements = { ...get().mouvementsClubs };
+        for (const x of mouvements) majMouvements[x.club] = x.vers;
+        setMouvementsClubs(majMouvements);
+        // La pyramide a changé : les fins de saison mémoïsées sont périmées.
+        oublierResultats();
+
+        const divisionSuivante = majMouvements[m.club] ?? m.division;
+        const compSuivante = COMPETITIONS.find((c) => c.id === divisionSuivante);
         // Le manager lit les MÊMES finales que la carrière joueur : le rang de
         // poule qualifie, mais seul le vainqueur du tableau soulève le titre.
         const phase = phaseFinale(m.division, m.saison, m.club);
@@ -4785,11 +4922,16 @@ export const useGame = create<GameState>()(
           historique: [...m.historique, { ...ligne, ...(licencie ? { licencie: true } : {}) }],
           // Sans banc, le temps s’arrête : on cherche un club avant de repartir.
           club: licencie ? '' : m.club,
-          division: licencie ? '' : m.division,
-          divisionNom: licencie ? '' : m.divisionNom,
+          // ⚠️ LA DIVISION SUIT LE MOUVEMENT DU CLUB, pas la saison précédente.
+          division: licencie ? '' : divisionSuivante,
+          divisionNom: licencie ? '' : (compSuivante?.nom ?? m.divisionNom),
           contrat: licencie ? null : { saisons: saisonsContrat, salaire: m.contrat?.salaire ?? 0 },
+          // ⚠️ ET L'OBJECTIF SE RECALCULE DANS LA NOUVELLE DIVISION. Un promu
+          // en Nationale ne se voit pas demander le rang qu'il visait en
+          // Nationale 2 : `objectifDuBoard` classe l'effectif dans SA poule,
+          // et la poule vient de changer.
           objectif: licencie ? 0
-            : objectifDuBoard(m.club, competitionDuClub(m.club), m.saison + 1),
+            : objectifDuBoard(m.club, compSuivante ?? competitionDuClub(m.club), m.saison + 1),
           decision: null,
           composition: licencie
             ? m.composition
@@ -4846,6 +4988,11 @@ export const useGame = create<GameState>()(
 
         set((st) => ({
           manager: suivant,
+          // ⚠️ LE REGISTRE DE MODULE NE SUFFIT PAS : il vit en mémoire et
+          // disparaît au rechargement. Sans cette ligne, un club promu
+          // redescendait tout seul au premier F5 — c'est pour ça que la
+          // réhydratation repose `setMouvementsClubs(etat.mouvementsClubs)`.
+          mouvementsClubs: majMouvements,
           coins: st.coins + gainTrophees,
           tropheesEnAttente: [...st.tropheesEnAttente, ...titres],
           journal: [...st.journal, ...(ditesLe.length ? [{

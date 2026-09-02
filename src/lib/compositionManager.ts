@@ -121,3 +121,18 @@ export function noteCompositionManager(effectif: Coequipier[], composition: Comp
 export function joueurCompatibleManager(joueur: Coequipier, poste: PosteId): boolean {
   return joueur.poste === poste || memeFamille(joueur.poste, poste) || memeCategorie(joueur.poste, poste);
 }
+
+/**
+ * ⚠️ LE PLANCHER D'EFFECTIF — « on peut vendre tout l'effectif sans problème ».
+ *
+ * Vingt-trois, c'est la feuille de match ; vingt-six laisse trois joueurs de
+ * marge, c'est-à-dire de quoi encaisser une blessure et une suspension sans se
+ * retrouver à composer avec des trous. En dessous, `composerParDefaut` rendait
+ * une feuille incomplète — sans erreur, sans message, et le match se jouait à
+ * quatorze.
+ *
+ * ⚠️ IL VIT ICI, avec les quinze postes et les huit profils de banc, parce que
+ * c'est le fichier qui fait autorité sur « ce qu'il faut pour aligner une
+ * équipe ». Posé dans le store, il serait un nombre magique de plus.
+ */
+export const EFFECTIF_MINIMUM = 26;

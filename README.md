@@ -1024,6 +1024,20 @@ npx vite-node scripts/verifSituations.ts     # 151 situations, impacts et non-r�
   niveau, sans avoir à les charger.
 - **La création demande enfin quelle carrière on veut**, joueur ou entraîneur,
   et décrit les deux plutôt que de poser deux boutons côte à côte.
+- **Le marché d’un entraîneur a enfin un critère SPORTIF.** `score()` ne pesait que du
+  contractuel — et en Régionale les exigences contractuelles se satisfont d’un clic : il n’y
+  avait donc aucun obstacle entre un club de Régionale 3 et le meilleur joueur du monde.
+  Mesuré : un club de Régionale 3 atteint **27 cibles sur 360**, un Top 14 les 360. Dans sa
+  propre division il en garde 44 sur 72 — le marché est borné, pas mort.
+- **On monte enfin de division.** Le mouvement du club était calculé depuis toujours (il
+  alimentait le prestige et le bilan) mais la division était recopiée d’une saison à l’autre :
+  on gagnait sa Régionale 2 et on la rejouait. Et les **play-offs** sont désormais proposés :
+  les semaines de phase finale n’ont pas de journée de championnat, donc l’ancienne recherche
+  d’affiche ne trouvait jamais rien.
+- **Le banc n’impose plus de poste**, on y met qui on veut ; la règle « première ligne
+  remplaçante » reste bloquante. Les cartes portent le **numéro de maillot** au lieu d’un
+  abrégé de poste illisible, et on ne peut plus vendre tout son effectif.
+
 - **Les menus n’ont plus un seul emoji.** Cinquante-trois tracés maison (`src/components/Icone.tsx`)
   remplacent les pictogrammes du système dans la navigation, les réglages, la boutique, le
   classement, le Hall, l’atlas, la fiche de carrière, la feuille de match et les onze onglets du

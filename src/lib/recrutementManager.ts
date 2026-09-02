@@ -575,3 +575,99 @@ export function reparerRecrutementsDupliques(
     remboursementSalarial,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LA PORTÉE SPORTIVE — « c'est trop facile de recruter qui on veut »
+// ═══════════════════════════════════════════════════════════════════════════
+// Retour de jeu, et c'est un défaut de conception, pas un réglage : de la
+// Régionale 3 à la Nationale, on signait n'importe qui.
+//
+// ⚠️ LA CAUSE : LA NÉGOCIATION N'AVAIT AUCUN CRITÈRE SPORTIF. `score()` ne
+// pèse que du CONTRACTUEL — rémunération, prime, durée, rôle — et rien n'y
+// demande jamais « ce joueur accepterait-il seulement ce club ? ». Or dans le
+// bas de la pyramide, les exigences contractuelles sont dérisoires (un
+// défraiement de trente euros la feuille de match) : elles se satisfont d'un
+// clic, et il ne restait donc AUCUN obstacle entre un club de Régionale 3 et
+// le meilleur joueur du monde.
+//
+// ⚠️ ET LA RÈGLE EXISTE DÉJÀ, DE L'AUTRE CÔTÉ. `lib/offres.ts` la tient pour
+// le joueur incarné depuis longtemps, sous deux formes : « on ne saute pas deux
+// étages d'un coup » et un plafond de niveau au-dessus duquel un club ne fait
+// pas rêver. C'est littéralement le même problème vu du banc — le mode manager
+// ne l'avait simplement jamais reçu. On le reprend donc mot pour mot plutôt que
+// d'inventer une seconde doctrine qui dirait un jour le contraire.
+
+/**
+ * Ce qu'un club peut convaincre AU-DESSUS de la moyenne de son groupe.
+ *
+ * ⚠️ IL EN FAUT UNE, ET ELLE DOIT ÊTRE PETITE. À zéro, un club ne pourrait
+ * jamais recruter mieux que ce qu'il a déjà : aucun effectif ne progresserait
+ * par le marché, et la seule voie de progression serait le centre de formation.
+ * Quatre points, c'est le renfort qui fait une saison sans faire un miracle.
+ */
+const MARGE_ATTRACTIVITE = 4;
+
+export interface PorteeSportive {
+  /** Ce club peut-il seulement espérer ce joueur ? */
+  aPortee: boolean;
+  /** La note la plus haute que le club peut convaincre aujourd'hui. */
+  plafond: number;
+  /** Ce qui bloque, quand ça bloque. */
+  motif?: 'niveau' | 'etage';
+  /** Combien d'étages séparent le joueur du club (positif = il descend). */
+  chute: number;
+}
+
+/**
+ * ⚠️ LE SAUT D'ÉTAGE EST PLUS LARGE EN AMATEUR, ET C'EST VOULU. Dans le monde
+ * professionnel, changer de club est une décision sportive : on ne descend pas
+ * de trois divisions. En Fédérale et en Régionale, on bouge pour un travail,
+ * une mutation, un retour au pays — le sportif ne commande plus seul. Sans
+ * cette ouverture, un club de Régionale 3 ne pourrait même pas recruter en
+ * Fédérale 3, ce qui est pourtant le mouvement le plus banal de la pyramide.
+ */
+function chuteMax(age: number, niveauClub: number): number {
+  return (age <= 22 ? 3 : 2) + (niveauClub >= 4 ? 2 : 0);
+}
+
+/**
+ * Ce club peut-il attirer ce joueur ?
+ *
+ * ⚠️ DEUX CRITÈRES, ET IL FAUT LES DEUX. Le PLAFOND DE NIVEAU règle le cas
+ * général — un groupe à 30 ne convainc pas un joueur à 90 — mais il laisse
+ * passer le club au groupe anormalement fort pour son étage. Le SAUT D'ÉTAGE
+ * ferme celui-là : on ne dégringole pas la pyramide entière pour un
+ * défraiement.
+ *
+ * ⚠️ LE PRESTIGE DE L'ENTRAÎNEUR COMPTE, un peu. C'est la jauge centrale du
+ * mode, et il serait étrange qu'elle n'ouvre que des BANCS sans jamais aider à
+ * convaincre un joueur. Divisé par 10, il vaut au mieux dix points de plafond
+ * à 100 de prestige : de quoi faire signer un renfort qu'on n'aurait pas eu,
+ * jamais de quoi renverser la hiérarchie.
+ */
+export function porteeSportive(
+  cible: Pick<CibleRecrutementManager, 'note' | 'age' | 'club' | 'situation'>,
+  club: string,
+  saison: number,
+  prestige = 0,
+): PorteeSportive {
+  const comp = competitionDuClub(club);
+  const niveauClub = comp?.niveau ?? 8;
+  const niveauJoueur = competitionDuClub(cible.club)?.niveau ?? niveauClub;
+
+  // Un joueur libre a moins d'options : il regarde un cran plus bas.
+  const libre = cible.situation === 'libre' || cible.situation === 'finDeContrat';
+  // Un jeune descend pour jouer, un vétéran pour finir : ce sont les deux âges
+  // où l'on accepte un club en dessous de son niveau.
+  const age = cible.age <= 22 ? 3 : cible.age >= 32 ? 3 : 0;
+
+  const plafond = forceDuGroupe(club, saison)
+    + MARGE_ATTRACTIVITE + age + (libre ? 2 : 0) + prestige / 10;
+
+  const chute = niveauClub - niveauJoueur;
+  if (chute > chuteMax(cible.age, niveauClub)) {
+    return { aPortee: false, plafond, motif: 'etage', chute };
+  }
+  if (cible.note > plafond) return { aPortee: false, plafond, motif: 'niveau', chute };
+  return { aPortee: true, plafond, chute };
+}

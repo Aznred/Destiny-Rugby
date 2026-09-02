@@ -30,15 +30,17 @@ import {
 import {
   SCORE_MAX, categorieDeLaFiche, ficheDepuisManager, scoreDeLaFiche, verifierFiche,
 } from '../src/lib/classementMondial';
-import { competitionDuClub } from '../src/data/clubs';
+import { competitionDuClub, COMPETITIONS } from '../src/data/clubs';
 import { useGame } from '../src/store/useGame';
 import { forceEffectif } from '../src/lib/effectif';
 import { effectifDuClub } from '../src/lib/effectif';
 import { ciblesDuMarche } from '../src/lib/recrutementManager';
-import { SEMAINES_PAR_SAISON, horodatageJeu } from '../src/data/calendrier';
+import { SEMAINES_PAR_SAISON, horodatageJeu, CALENDRIER } from '../src/data/calendrier';
 import type { LegendeSauvegardee, Manager } from '../src/types';
 import { compositionManagerParDefaut, TACTIQUE_MANAGER_DEFAUT } from '../src/lib/compositionManager';
-import { matchDuClubSemaine } from '../src/lib/matchLive';
+import { matchDuClubSemaine, afficheDuClub } from '../src/lib/matchLive';
+import { rangFinal } from '../src/lib/championnat';
+import { competitionEffective } from '../src/lib/divisions';
 
 let echecs = 0;
 function ligne(nom: string, valeur: string | number, ok: boolean): void {
@@ -583,6 +585,73 @@ console.log('\n=== 7. UNE CONVERSATION NE REMONTE PAS LE TEMPS ===');
   ligne('un fil très long reste dans la journée',
     `dernier message à ${Math.floor(long.at(-1)! / 60)}:${String(long.at(-1)! % 60).padStart(2, '0')}`,
     long.at(-1)! <= 23 * 60 + 59);
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n=== 8. LA PYRAMIDE BOUGE AUSSI POUR UN ENTRAÎNEUR ===');
+// ---------------------------------------------------------------------------
+// ⚠️ C'ÉTAIT LE « GROS PROBLÈME : ON NE MONTE PAS DE DIVISION ». Le mouvement du
+// club était CALCULÉ depuis toujours — `monte` et `descendu` alimentaient le
+// verdict du board, le prestige et la ligne d'historique — mais `suivant`
+// recopiait `division` de la saison précédente : on gagnait sa Régionale 2, on
+// lisait « ⬆ montée » dans son bilan, et on rejouait la Régionale 2.
+{
+  console.log('');
+  const nomDiv = (id: string) => COMPETITIONS.find((c) => c.id === id)?.nom ?? id;
+  // Labastide-Beauvoir finit PREMIER de Régionale 3 à la saison 1 : c'est le
+  // cas rapporté (« premier, et je ne monte pas »), pas un club moyen.
+  useGame.getState().creerManager({
+    nom: 'Banc d’essai', nation: 'France', club: 'Labastide-Beauvoir', age: 34, libre: true,
+  });
+  const depart = useGame.getState().manager!;
+  info('club de départ', `${depart.club} · ${nomDiv(depart.division)}`);
+  info('rang final de la saison 1', String(rangFinal(depart.division, 1, depart.club)));
+
+  useGame.getState().saisonManager();
+  const apres = useGame.getState().manager!;
+  ligne('un champion de sa division CHANGE de division',
+    `${nomDiv(depart.division)} → ${nomDiv(apres.division)}`,
+    apres.division !== depart.division);
+  ligne('… et son nom de division suit',
+    apres.divisionNom,
+    apres.divisionNom === nomDiv(apres.division));
+  // ⚠️ LE REGISTRE DE MODULE DOIT SUIVRE, sinon le club serait promu dans sa
+  // fiche et resterait dans l'ancienne poule partout ailleurs (classement,
+  // calendrier, atlas). C'est la ligne que la carrière joueur commente depuis
+  // longtemps et que le mode manager n'avait jamais reçue.
+  const effective = competitionEffective(apres.club, apres.division);
+  ligne('le reste du jeu voit la même division',
+    `${nomDiv(effective?.id ?? '?')} vs ${nomDiv(apres.division)}`,
+    effective?.id === apres.division);
+  ligne('l’objectif est recalculé dans la NOUVELLE division',
+    `${apres.objectif}ᵉ`, apres.objectif > 0);
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n=== 9. LES PLAY-OFFS ET LES COUPES SONT PROPOSÉS ===');
+// ---------------------------------------------------------------------------
+// ⚠️ `matchDuClubSemaine` NE LIT QUE LA GRILLE DES JOURNÉES. Les trois semaines
+// de phase finale du calendrier n'ont pas de journée — elles ont un `tourFinal`
+// — et les huit dates de coupe non plus. Premier de sa poule, un manager
+// traversait donc demies et finale sans qu'aucun match ne lui soit proposé.
+{
+  console.log('');
+  const clubR2 = COMPETITIONS.find((c) => c.id === 'reg2')!.clubs[0].nom;
+  let phases = 0; let championnat = 0;
+  for (let s = 1; s <= CALENDRIER.length; s++) {
+    const a = afficheDuClub({ club: clubR2, division: 'reg2', saison: 1, semaine: s });
+    if (!a) continue;
+    if (a.nature === 'phaseFinale') phases++; else if (a.nature === 'championnat') championnat++;
+  }
+  info(`${clubR2} sur une saison`, `${championnat} journées · ${phases} match(s) de phase finale`);
+  ligne('un club qualifié a bien un match de phase finale', `${phases}`, phases > 0);
+
+  let coupes = 0;
+  for (let s = 1; s <= CALENDRIER.length; s++) {
+    const a = afficheDuClub({ club: 'Stade Toulousain', division: 'top14', saison: 1, semaine: s });
+    if (a?.nature === 'coupe') coupes++;
+  }
+  ligne('un club européen a ses dates de coupe', `${coupes} match(s)`, coupes > 0);
 }
 
 console.log(`\n${echecs === 0 ? '✅ TOUT PASSE' : `❌ ${echecs} ÉCHEC(S)`}`);

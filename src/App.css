@@ -7818,3 +7818,37 @@ select:focus {
 @media (prefers-reduced-motion: reduce) {
   .manager-equipe .ct-carte.ct-cible-depot { animation: none; }
 }
+
+/* ── Le numéro de maillot en tête de carte ────────────────────────────────── */
+/* ⚠️ IL REMPLACE L'ABRÉGÉ DU POSTE, qui ne se lisait pas : « DEM » désigne deux
+   postes, « TRO » trois, « DEU » deux. Le numéro est la convention du rugby et
+   il tient en deux caractères — donc plus gros, donc lisible sur une carte de
+   76 px. Il est doré : c'est le repère qu'on cherche quand on relit sa
+   composition, pas la note. */
+.ct-numero {
+  font: 700 13px/1 'Archivo', sans-serif;
+  font-style: normal;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--or-400);
+}
+/* Le talon garde sa perforation, il ne porte plus de texte. */
+.ct-talon { min-width: 0; }
+@media (max-width: 700px) {
+  .ct-numero { font-size: 11px; }
+}
+
+/* ── Le bilan d'une avance rapide (bureau d'entraîneur) ───────────────────── */
+/* ⚠️ IL EST DANS LE FLUX, PAS EN SURIMPRESSION. Un bandeau flottant qui annonce
+   « 6 semaines jouées » couvrirait justement les chiffres qui viennent de
+   changer. Il se place au-dessus des indicateurs, là où l'œil arrive. */
+.manager-avance-bilan {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  margin: 0 0 0.9rem; padding: 0.6rem 0.85rem;
+  background: var(--surface-solid); border: 1px solid var(--bordure);
+  border-left: 3px solid var(--or-500);
+  border-radius: 0 var(--rayon-sm) var(--rayon-sm) 0;
+  box-shadow: var(--arete);
+  font-size: 0.88rem; color: var(--craie-dim);
+}
+.manager-avance-bilan button { margin-left: auto; min-height: 32px; padding: 0 0.5rem; }

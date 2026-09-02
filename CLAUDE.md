@@ -10111,3 +10111,205 @@ quand le club n'a pas de logo : aucun des 855 clubs ne laisse de trou.
 ⚠️ **LE NOM RESTE SOUS L'ÉCUSSON**, il ne le remplace pas : des centaines de
 clubs amateurs n'ont qu'un blason généré à partir de leurs initiales. Le logo dit
 « je reconnais », le nom dit « c'est bien eux ».
+
+---
+
+## 🧱 LE MARCHÉ SE FERME, LA PYRAMIDE S'OUVRE, ET LE BANC SE LIBÈRE
+
+Sept retours de jeu en deux messages, et deux d'entre eux étaient des défauts de
+conception, pas des réglages.
+
+### 1. LE MARCHÉ N'AVAIT AUCUN CRITÈRE SPORTIF
+
+« C'est trop facile de recruter qui on veut, de la Régionale 3 à la Nationale. »
+Exact, et la cause est nette : **`score()` ne pèse que du CONTRACTUEL** —
+rémunération, prime, durée, rôle — et rien n'y demande jamais « ce joueur
+accepterait-il seulement ce club ? ». Or dans le bas de la pyramide les exigences
+contractuelles sont dérisoires (un défraiement de trente euros la feuille de
+match) : elles se satisfont d'un clic, et il ne restait donc **aucun obstacle**
+entre un club de Régionale 3 et le meilleur joueur du monde.
+
+⚠️ **ET LA RÈGLE EXISTE DÉJÀ, DE L'AUTRE CÔTÉ.** `lib/offres.ts` la tient pour le
+joueur incarné depuis longtemps, sous deux formes : « on ne saute pas deux étages
+d'un coup » et un plafond de niveau au-dessus duquel un club ne fait pas rêver.
+C'est littéralement le même problème vu du banc ; le mode manager ne l'avait
+simplement jamais reçu. `porteeSportive` la reprend mot pour mot plutôt que
+d'inventer une seconde doctrine qui dirait un jour le contraire.
+
+| Critère | Ce qu'il règle |
+|---|---|
+| **plafond de niveau** force du groupe + 4 + âge + libre + prestige/10 | le cas général : un groupe à 30 ne convainc pas un joueur à 90 |
+| **saut d'étage** 2 en pro, +2 en amateur, +1 avant 23 ans | le club au groupe anormalement fort pour son étage |
+
+⚠️ **LE SAUT EST PLUS LARGE EN AMATEUR, ET C'EST VOULU.** Dans le monde
+professionnel, changer de club est une décision sportive. En Fédérale et en
+Régionale, on bouge pour un travail, une mutation, un retour au pays. Sans cette
+ouverture, un club de Régionale 3 ne pourrait même pas recruter en Fédérale 3, ce
+qui est pourtant le mouvement le plus banal de la pyramide.
+
+⚠️ **LE PRESTIGE COMPTE, UN PEU.** C'est la jauge centrale du mode, et il serait
+étrange qu'elle n'ouvre que des BANCS sans jamais aider à convaincre un joueur.
+Divisé par 10, il vaut au mieux dix points de plafond à 100 : de quoi arracher un
+renfort qu'on n'aurait pas eu, jamais de quoi renverser la hiérarchie.
+
+Mesuré, un manager de chaque étage devant le MÊME marché de 360 cibles :
+
+| club | groupe | à portée | meilleure recrue |
+|---|---|---|---|
+| Régionale 3 | 34 | **27 / 360** | 41 |
+| Fédérale 3 | 43 | 65 / 360 | 50 |
+| Fédérale 1 | 58 | 207 / 360 | 64 |
+| Nationale | 57 | 194 / 360 | 64 |
+| Pro D2 | 68 | 281 / 360 | 77 |
+| Top 14 | 89 | **360 / 360** | 93 |
+
+⚠️ **ET LE MARCHÉ N'EST PAS MORT POUR AUTANT** : c'était le risque, et il est
+mesuré à l'écran. Dans sa PROPRE division, un club de Régionale 3 garde
+**44 cibles sur 72**. Ce qu'il perd, ce sont les meilleurs de sa poule et tout ce
+qui est au-dessus.
+
+⚠️ **LE VERROU EST DANS LE STORE, PAS SEULEMENT SUR LE BOUTON.** L'écran grise
+l'action et DIT pourquoi (« ton effectif ne convainc pas au-delà de 40 », « il ne
+descendrait pas de tant de divisions ») : un refus qu'on ne comprend pas se lit
+comme un bug. Mais `contacterClubManager` refuse aussi, exactement comme
+`signerBanc` refuse un club au-dessus du prestige. Le jour où un second chemin
+ouvre une négociation, le critère sportif ne disparaîtra pas en silence.
+
+⚠️ **UNE TENSION ASSUMÉE** : la portée se calcule sur la note RÉELLE, la carte
+affiche l'ESTIMATION du scouting (« 45 ± 7 »). Deux cartes voisines peuvent donc
+sembler identiques et ne pas se comporter pareil. C'est la doctrine du scouting
+appliquée jusqu'au bout, mais c'est à surveiller si le retour de jeu le signale.
+
+### 2. ON POUVAIT VENDRE TOUT L'EFFECTIF
+
+`composerParDefaut` se contentait alors de rendre une feuille trouée, sans erreur
+et sans message : le match se jouait à quatorze. **`EFFECTIF_MINIMUM = 26`** vit
+dans `lib/compositionManager.ts`, le fichier qui fait autorité sur « ce qu'il
+faut pour aligner une équipe » : posé dans le store, ce serait un nombre magique
+de plus. Vingt-trois pour la feuille, trois de marge pour une blessure.
+
+⚠️ **LE PLANCHER COMPTE LES VENTES EN COURS**, sinon lister six joueurs un par un
+contournerait un contrôle qui ne regarderait que le groupe du jour. Et le refus
+s'écrit dans le journal : un bouton qui ne fait rien passe pour cassé.
+
+### 3. « ON NE MONTE PAS DE DIVISION » — calculé, jamais appliqué
+
+Le plus grave du lot. `monte` et `descendu` alimentaient DÉJÀ le verdict du
+board, le prestige et la ligne d'historique, mais `suivant` recopiait `division`,
+`divisionNom` et `objectif` de la saison précédente. **On gagnait sa Régionale 2,
+on lisait « montée » dans son bilan, et on rejouait la Régionale 2.**
+
+Et il ne suffisait pas de changer le champ : `lib/divisions.ts` tient un registre
+de module que lisent le championnat, le calendrier, les classements et l'atlas.
+Sans `setMouvementsClubs`, le club aurait été promu dans sa fiche et resté dans
+l'ancienne poule partout ailleurs. C'est exactement la ligne que la carrière
+joueur commente depuis longtemps — « sans ça, la division du club promu ne
+changeait nulle part » — et que le mode manager n'avait jamais reçue.
+
+Mesuré sur le club qui finit PREMIER de Régionale 3 :
+
+```
+départ    Labastide-Beauvoir · Régionale 3 · rang final 1
+saison 1  Régionale 3 vers Régionale 2   MONTÉE     objectif 12e
+saison 2  Régionale 2 vers Régionale 3   descente   (un promu qui finit dernier)
+```
+
+⚠️ **L'OBJECTIF SE RECALCULE DANS LA NOUVELLE DIVISION.** Un promu en Nationale
+ne se voit pas demander le rang qu'il visait en Nationale 2 : `objectifDuBoard`
+classe l'effectif dans SA poule, et la poule vient de changer.
+
+⚠️ **ET `mouvementsClubs` EST ÉCRIT DANS L'ÉTAT, pas seulement dans le
+registre** — celui-ci vit en mémoire et disparaît au rechargement. Sans cette
+ligne, un club promu redescendait tout seul au premier F5.
+
+### 4. « JE N'AI PAS FAIT LES PLAY-OFFS ALORS QUE PREMIER »
+
+`matchDuClubSemaine` **ne connaît que le championnat**, et c'est écrit dans son
+code : elle lit `journeesALaSemaine`, la grille des journées. Les trois semaines
+de PHASE FINALE du calendrier n'ont pas de journée — elles ont un `tourFinal` —
+et les huit dates de COUPE non plus. Premier de sa poule, un manager traversait
+donc demies et finale sans qu'aucun match ne lui soit proposé, et le titre se
+décidait dans le monde simulé sans lui.
+
+⚠️ **LA CARRIÈRE JOUEUR LES CHERCHAIT DÉJÀ, mais dans son ÉCRAN**, en appelant
+trois fonctions à la main depuis `PanneauJoueur`. Une règle de jeu qui vit dans
+un composant ne peut pas servir à un second mode. **`afficheDuClub`**
+(`lib/matchLive.ts`) la remonte, et les deux carrières lisent la même.
+
+⚠️ **ET LE VERROU DE SEMAINE LA LIT AUSSI.** `semaineManager` s'appuyait sur
+`matchDuClubSemaine` : même avec un match proposé à l'écran, la semaine pouvait
+avancer par-dessus. C'était l'autre moitié du bug.
+
+Mesuré : un club de Régionale 2 obtient **16 journées + 1 barrage** ; le Stade
+Toulousain, **4 dates de coupe d'Europe**.
+
+### 5. L'avance rapide arrive sur le banc
+
+`avancerJusquaManager` rejoue `semaineManager()` jusqu'à la fin de saison et
+**s'arrête à la première chose qui demande l'entraîneur** : une décision du
+board, un match à coacher, la fin de saison, un banc perdu. Le bandeau dit
+combien de semaines sont parties ET ce qui a arrêté — un saut muet se lit comme
+un bouton cassé.
+
+⚠️ **ELLE NE PEUT PAS ÊTRE `avancerJusqua` AVEC UN `if`.** Les deux carrières
+s'arrêtent sur des choses différentes : le joueur sur une scène du MJ et sur son
+contrat, l'entraîneur sur une décision du board et sur un match. Un motif d'arrêt
+commun aurait obligé à mentir dans un des deux cas, et c'est précisément ce que
+l'écran affiche au joueur.
+
+⚠️ **ET LE BOUTON DISPARAÎT QUAND UN MATCH ATTEND.** Proposer de sauter alors
+qu'il y a un match à coacher, c'est proposer de l'escamoter — ce que le mode
+« saison rapide » faisait, et qui lui a valu d'être supprimé.
+
+### 6. Le numéro de maillot remplace l'abrégé du poste
+
+« C'est pas très lisible. » Trois lettres tronquées ne se lisent pas : **« DEM »
+vaut pour demi de mêlée ET demi d'ouverture**, « TRO » pour les trois troisièmes
+lignes, « DEU » pour les deux deuxièmes lignes. Le numéro de maillot est la
+convention du rugby : il DIT le poste, sans ambiguïté et en deux caractères, donc
+assez gros pour se lire sur une carte de 76 px.
+
+⚠️ **LE TALON PERD SON NUMÉRO, PAS SA PERFORATION.** Il l'écrivait à la verticale
+dans dix-sept pixels de large. Il reste ce qu'il a toujours été : ce qui fait de
+la carte un billet de match plutôt qu'un écusson FUT.
+
+### 7. Le banc n'impose plus de poste
+
+⚠️ **`POSTES_BANC_MANAGER` SERVAIT À DEUX CHOSES QU'ON AVAIT CONFONDUES** :
+composer le banc PAR DÉFAUT — elle le fait toujours, et c'est très bien, un banc
+automatique doit être un vrai banc de rugby — et CONTRAINDRE les huit
+emplacements à l'écran, ce qui n'a aucune raison d'être. Un entraîneur choisit
+son banc : sept avants et un arrière si son match l'exige.
+
+⚠️ **ET LA RÈGLE DE RUGBY N'EST PAS PERDUE** : l'alerte « première ligne
+remplaçante » reste **bloquante**. On remplace un interdit par un avertissement,
+et c'est la bonne forme — la règle porte sur la COMPOSITION, pas sur l'ordre des
+cases. Vérifié en jeu : un pilier gauche posé au 23 (autrefois réservé au
+deuxième centre) s'affiche `ct-adq-naturel`, sans fausse alerte « hors poste ».
+
+### 8. Le marché ouvre le X DU BUREAU
+
+Trois écritures du store forçaient `ecran: 'social'` — l'écran plein du joueur —
+alors que L'Ovale du manager est un **onglet** de son bureau. Négocier le sortait
+donc de son bureau au moment précis où il a besoin des onglets Marché,
+Composition et Club. `ouvrirDiscussionOvale` posait la bonne règle depuis
+longtemps (`s.manager && !s.joueur ? 'manager' : 'social'`) ; ces trois-là ne
+l'avaient jamais reprise. Vérifié en jeu : après un contact, l'écran reste le
+bureau et l'onglet actif devient « L'Ovale ».
+
+### Vérifié
+
+`verifManager` gagne deux sections — **8** la pyramide, **9** les play-offs et
+les coupes. Sans elles, la montée se recasserait sans que rien ne le dise, ce qui
+est exactement ce qui vient d'arriver. À l'écran, en Régionale 3 : bornes de
+création **16-30** et **20-60**, **0 chevauchement** sur les quinze cartes du
+terrain, **0 débordement horizontal**, numéros 1 à 23 affichés, et **44 cibles
+sur 72** à portée dans sa propre division.
+
+```bash
+npx vite-node scripts/verifManager.ts       # 8 : la montée · 9 : les play-offs
+npx vite-node scripts/verifManagerMatch.ts  # la feuille et le coaching
+npx vite-node scripts/verifPyramide.ts      # les divisions gardent leur taille
+npx vite-node scripts/verifCoupesEurope.ts  # le tour avance, les scores sont du rugby
+npx vite-node scripts/verifRaretes.ts       # raretés, marché, emplacements
+```

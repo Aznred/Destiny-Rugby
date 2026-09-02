@@ -224,10 +224,21 @@ function CarteJoueur({
           + `${rarete ? ` · ${NOM_RARETE[rarete]}` : ''}`
         : nomPoste(posteSlot)}
     >
-      <span className="ct-talon" aria-hidden="true">{numero}</span>
+      {/* ⚠️ LE TALON NE PORTE PLUS LE NUMÉRO. Il l'écrivait à la verticale
+          dans dix-sept pixels de large : illisible, et redondant depuis que la
+          tête l'affiche. Il reste ce qu'il a toujours été — la perforation qui
+          fait de la carte un billet de match plutôt qu'un écusson FUT. */}
+      <span className="ct-talon" aria-hidden="true" />
       <span className="ct-tete">
         <strong className="ct-note">{joueur?.note ?? '—'}</strong>
-        <em className="ct-poste">{nomPoste(posteSlot).slice(0, 3).toUpperCase()}</em>
+        {/* ⚠️ LE NUMÉRO DE MAILLOT, PAS L'ABRÉGÉ DU POSTE. Retour de jeu :
+            « mets le numéro qui joue au lieu de l'abrégé du poste, c'est pas
+            très lisible ». Trois lettres tronquées ne se lisent pas — « DEM »
+            vaut pour demi de mêlée ET demi d'ouverture, « TRO » pour les trois
+            troisièmes lignes, « DEU » pour les deux deuxièmes lignes. Le numéro
+            de maillot, lui, est la convention du rugby : il DIT le poste, sans
+            ambiguïté et en deux caractères. */}
+        <em className="ct-numero">{numero}</em>
       </span>
       {joueur && <PortraitComposition nom={joueur.nom} />}
       <b className="ct-nom">{joueur ? nomCarte(joueur.nom) : t('compo.vide')}</b>
@@ -601,11 +612,28 @@ export function CompositionTerrainManager({
           <span className="comp-count">8</span>
         </div>
         <div className="manager-banc-cartes">
-          {POSTES_BANC_MANAGER.map((posteSlot, index) => {
+          {/* ⚠️ LE BANC N'IMPOSE PLUS DE POSTE. Retour de jeu : « sur le banc,
+              pas de postes prédéfinis, on met qui on veut ». `POSTES_BANC_MANAGER`
+              servait à DEUX choses qu'on avait confondues — composer le banc par
+              défaut (elle le fait toujours, et c'est très bien : un banc
+              automatique doit être un vrai banc de rugby), et CONTRAINDRE les
+              huit emplacements à l'écran, ce qui n'a aucune raison d'être. Un
+              entraîneur choisit son banc : sept avants et un arrière si son
+              match l'exige.
+              ⚠️ ET LA RÈGLE DE RUGBY N'EST PAS PERDUE : l'alerte « première
+              ligne remplaçante » (`alertesComposition`) reste bloquante. On
+              remplace un interdit par un avertissement — c'est la bonne forme,
+              parce que la règle porte sur la COMPOSITION, pas sur l'ordre des
+              cases. */}
+          {Array.from({ length: 8 }, (_, index) => {
             const joueur = remplacants[index];
+            // Le poste affiché est celui du joueur qui est là, à défaut le
+            // profil par défaut de l'emplacement (une case vide doit dire à
+            // quoi elle sert, sinon on ne sait pas quoi y mettre).
+            const posteSlot = joueur?.poste ?? POSTES_BANC_MANAGER[index];
             return (
               <CarteJoueur
-                key={`${posteSlot}-${index}`}
+                key={`banc-${index}`}
                 joueur={joueur}
                 numero={index + 16}
                 posteSlot={posteSlot}
