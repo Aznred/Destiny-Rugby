@@ -29,6 +29,45 @@ export function mouvementsClubs(): Record<string, string> {
   return MOUVEMENTS;
 }
 
+/**
+ * QUAND CHAQUE CLUB EST ARRIVÉ DANS SA DIVISION.
+ *
+ * ⚠️ LE REGISTRE N'AVAIT AUCUNE DIMENSION SAISON, ET C'EST CE QUI DONNAIT UNE
+ * COUPE D'EUROPE FAUSSE. `MOUVEMENTS` dit seulement « ce club joue en Top 14 » ;
+ * il ne dit pas depuis quand. Or la qualification européenne se calcule sur le
+ * classement de la saison PASSÉE (`classementFinal`, lib/coupe.ts), et cette
+ * fonction reconstruisait ce classement avec la composition D'AUJOURD'HUI. Un
+ * club promu se retrouvait donc classé dans un Top 14 où il n'avait jamais
+ * joué — et, si son effectif le portait dans les huit premiers, il héritait
+ * d'un billet de Champions Cup. Retour de jeu : « je viens de monter en Top 14,
+ * je devrais être en Challenge Cup, pas en Champions Cup ».
+ *
+ * On retient donc la saison d'arrivée. Un club arrivé POUR la saison N n'a pas
+ * joué la saison N-1 dans cette division : il est classé dernier pour la
+ * qualification, ce qui l'envoie naturellement en Challenge Cup. C'est aussi la
+ * règle réelle : un promu de Pro D2 ne prend pas la place d'un habitué.
+ */
+let ARRIVEES: Record<string, number> = {};
+
+export function setArriveesClubs(a: Record<string, number> | undefined): void {
+  ARRIVEES = a ?? {};
+}
+
+export function arriveesClubs(): Record<string, number> {
+  return ARRIVEES;
+}
+
+/**
+ * Ce club jouait-il déjà dans cette division à la fin de la saison donnée ?
+ *
+ * Sans information d'arrivée, on répond oui : c'est le comportement d'avant, et
+ * il vaut mieux qu'un club de toujours reste qualifiable.
+ */
+export function etaitDansLaDivision(club: string, saison: number): boolean {
+  const arrivee = ARRIVEES[club];
+  return arrivee === undefined || arrivee <= saison;
+}
+
 // Division réellement occupée par un club, montées/descentes comprises.
 export function divisionEffective(club: string, divisionDeBase?: string): string | undefined {
   return MOUVEMENTS[club] ?? divisionDeBase;

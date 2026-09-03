@@ -8,6 +8,7 @@
 //   3. l'ARBRE des phases finales (barrages → demies → finale, quarts compris
 //      en coupe), affiché dès que la phase régulière est terminée.
 
+import { journeesDuClassement } from '../lib/tableauManager';
 import { Icone } from '../components/Icone';
 import type { NomIcone } from '../components/Icone';
 import { useMemo, useState } from 'react';
@@ -451,7 +452,18 @@ export function Tableau() {
     const total = nombreJournees(choix, ancre, numeroPoule);
     // ⚠️ Chaque étage a son propre calendrier : de la Nationale 2 à la
     // Régionale 3, on joue aussi les week-ends de Coupe d'Europe et de Tournoi.
-    const jouees = journeesALaSemaine(choix, numero, total);
+    // ⚠️ DANS SA PROPRE DIVISION, LA JOURNÉE DU JOUR COMPTE DÈS QU’ELLE EST
+    //    JOUÉE. `journeesALaSemaine` ne compte que les week-ends strictement
+    //    antérieurs : cet écran affichait donc un classement en retard d’une
+    //    journée entre le coup de sifflet final et le passage à la semaine
+    //    suivante, alors que le bureau de l’entraîneur, lui, était à jour.
+    //    `journeesDuClassement` est désormais la seule définition des deux.
+    const jouees = sien
+      ? journeesDuClassement(
+        { club: carriere.club, division: choix, saison: carriere.saison, semaine: numero },
+        numeroPoule,
+      )
+      : journeesALaSemaine(choix, numero, total);
     return {
       etat: championnatEnDirect(choix, carriere.saison, ancre, jouees, bonus, numeroPoule),
       phase: jouees >= total ? phaseFinale(choix, carriere.saison, ancre, bonus, numeroPoule) : null,

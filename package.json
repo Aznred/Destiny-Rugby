@@ -22,7 +22,9 @@
     "verify:distances-transferts": "vite-node scripts/verifDistancesEtTransferts.ts",
     "verify:enveloppe": "vite-node scripts/verifEnveloppeStructure.ts",
     "verify:portee": "vite-node scripts/verifPorteeMarche.ts",
-    "verify:note-transfert": "vite-node scripts/verifNoteTransfert.ts"
+    "verify:note-transfert": "vite-node scripts/verifNoteTransfert.ts",
+    "verify:europe-promu": "vite-node scripts/verifEuropePromu.ts",
+    "verify:classement-ajour": "vite-node scripts/verifClassementAJour.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

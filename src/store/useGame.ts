@@ -169,7 +169,7 @@ import {
   demandeAGenerer, negocierAvecClub, offresPourVente, ouvrirNegociationClub,
   valeurDeVente, type LevierClubManager,
 } from '../lib/vestiaireManager';
-import { competitionEffective, setMouvementsClubs } from '../lib/divisions';
+import { competitionEffective, setArriveesClubs, setMouvementsClubs } from '../lib/divisions';
 import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFinale';
 import {
   championnatEnDirect, journeesApres, nombreJournees, graine, rangFinal,
@@ -901,6 +901,15 @@ interface GameState {
   /** Une langue choisie dans les réglages prime toujours sur la détection IP. */
   langueManuelle: boolean;
   mouvementsClubs: Record<string, string>; // club → division après montées/descentes
+  /**
+   * club → saison où il est ARRIVÉ dans sa division actuelle.
+   *
+   * ⚠️ INDISPENSABLE À LA COUPE D'EUROPE. La qualification se calcule sur le
+   * classement de la saison passée ; sans savoir depuis quand un club est là,
+   * un promu se voyait classé dans un championnat qu'il n'avait pas joué et
+   * pouvait décrocher une Champions Cup. Voir `etaitDansLaDivision`.
+   */
+  arriveesClubs: Record<string, number>;
   // Lot 7 — réseau social « L'Ovale », succès et défis
   posts: PostSocial[]; // fil : publications du joueur ET du monde (récentes en tête)
   filSemaine: string; // « saison#semaine » de la dernière fournée générée
@@ -1286,7 +1295,7 @@ export const useGame = create<GameState>()(
       theme: 'vert',
       langue: langueDuNavigateur(LANGUE_DE_REPLI),
       langueManuelle: false,
-      mouvementsClubs: {},
+      mouvementsClubs: {}, arriveesClubs: {},
       posts: [],
       filSemaine: '',
       matchRegarde: '',
@@ -1445,6 +1454,7 @@ export const useGame = create<GameState>()(
         // Nouvelle carrière = pyramide remise à son état d'origine, et plus
         // aucun transfert annoncé sur L'Ovale ne traîne.
         setMouvementsClubs({});
+        setArriveesClubs({});
         // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
         // du joueur précédent sont périmés (voir lib/promotion.ts).
         oublierResultats();
@@ -1463,7 +1473,7 @@ export const useGame = create<GameState>()(
           attenteEvenement: false,
           evenementHebdo: null,
           evenementsVus: [],
-          mouvementsClubs: {},
+          mouvementsClubs: {}, arriveesClubs: {},
           compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsArgentIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           // Nouvelle carrière : timeline et défis repartent de zéro. Les SUCCÈS,
           // eux, sont un palmarès de joueur — ils traversent les carrières (et
@@ -2173,8 +2183,14 @@ export const useGame = create<GameState>()(
         // sans ça, la division du club promu ne changeait nulle part et le
         // championnat de la saison suivante était identique au précédent.
         const majMouvements = { ...get().mouvementsClubs };
-        for (const m of mouvements) majMouvements[m.club] = m.vers;
+        const majArrivees = { ...get().arriveesClubs };
+        for (const m of mouvements) {
+          majMouvements[m.club] = m.vers;
+          // Il arrive POUR la saison suivante : il n'a pas joué celle qui finit.
+          majArrivees[m.club] = (get().joueur?.saison ?? 1) + 1;
+        }
         setMouvementsClubs(majMouvements);
+        setArriveesClubs(majArrivees);
         oublierResultats(); // la pyramide a changé : les résultats mémoïsés sont périmés
 
         if (complete.tournois.length) {
@@ -2278,6 +2294,7 @@ export const useGame = create<GameState>()(
           compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsArgentIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           tropheesEnAttente: [...s.tropheesEnAttente, ...gagnes],
           mouvementsClubs: majMouvements,
+          arriveesClubs: majArrivees,
           journal: [...s.journal, ...entrees],
         }));
         get().verifierSucces();
@@ -3526,6 +3543,7 @@ export const useGame = create<GameState>()(
         // Classement reste là pour renvoyer une carrière en cours ou réessayer.
         get().publierAuClassement(true);
         setMouvementsClubs({});
+        setArriveesClubs({});
         // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
         // du joueur précédent sont périmés (voir lib/promotion.ts).
         oublierResultats();
@@ -3563,7 +3581,7 @@ export const useGame = create<GameState>()(
             reconversion,
             destination: versManager ? 'manager' : 'pantheon',
           },
-          mouvementsClubs: {},
+          mouvementsClubs: {}, arriveesClubs: {},
           journal: [],
           scenarioActif: null,
           attenteEvenement: false,
@@ -4848,7 +4866,12 @@ export const useGame = create<GameState>()(
         // précédent ». Le mode manager ne l'avait simplement jamais reçue.
         const mouvements = py.mouvements;
         const majMouvements = { ...get().mouvementsClubs };
-        for (const x of mouvements) majMouvements[x.club] = x.vers;
+        const majArrivees = { ...get().arriveesClubs };
+        for (const x of mouvements) {
+          majMouvements[x.club] = x.vers;
+          // Il arrive POUR la saison suivante : il n'a pas joué celle qui finit.
+          majArrivees[x.club] = m.saison + 1;
+        }
 
         const divisionSuivante = majMouvements[m.club] ?? m.division;
         const compSuivante = COMPETITIONS.find((c) => c.id === divisionSuivante);
@@ -4884,6 +4907,7 @@ export const useGame = create<GameState>()(
 
         // On fige les titres et l'histoire AVANT de changer les poules.
         setMouvementsClubs(majMouvements);
+        setArriveesClubs(majArrivees);
         oublierResultats();
 
         const ligne: SaisonManager = {
@@ -5068,6 +5092,7 @@ export const useGame = create<GameState>()(
           // redescendait tout seul au premier F5 — c'est pour ça que la
           // réhydratation repose `setMouvementsClubs(etat.mouvementsClubs)`.
           mouvementsClubs: majMouvements,
+          arriveesClubs: majArrivees,
           coins: st.coins + gainTrophees,
           tropheesEnAttente: [...st.tropheesEnAttente, ...titres],
           journal: [...st.journal, ...(ditesLe.length ? [{
@@ -5116,12 +5141,13 @@ export const useGame = create<GameState>()(
         // se contournerait en retirant le drapeau.
         if (!m.libre) get().publierAuClassement(true);
         setMouvementsClubs({});
+        setArriveesClubs({});
         effacerResultatsJoues();
         oublierResultats();
         setContexteJoueur('', 0);
         set((s) => ({
           manager: null,
-          mouvementsClubs: {},
+          mouvementsClubs: {}, arriveesClubs: {},
           journal: [],
           ecran: 'pantheon',
           ecransVus: s.ecransVus.includes('pantheon') ? s.ecransVus : [...s.ecransVus, 'pantheon'],
@@ -5190,6 +5216,7 @@ export const useGame = create<GameState>()(
 
       reinitialiser: () => {
         setMouvementsClubs({});
+        setArriveesClubs({});
         // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
         // du joueur précédent sont périmés (voir lib/promotion.ts).
         oublierResultats();
@@ -5205,7 +5232,7 @@ export const useGame = create<GameState>()(
           tropheesEnAttente: [],
           approches: [],
           dossiersRecrutement: {},
-          mouvementsClubs: {},
+          mouvementsClubs: {}, arriveesClubs: {},
           compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsArgentIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           posts: [],
           filSemaine: '',
@@ -6895,6 +6922,7 @@ export const useGame = create<GameState>()(
       // module : au retour d'une sauvegarde, il faut la lui rendre.
       onRehydrateStorage: () => (etat) => {
         setMouvementsClubs(etat?.mouvementsClubs ?? {});
+        setArriveesClubs(etat?.arriveesClubs ?? {});
         // Les fins de saison mémoïsées (lib/promotion.ts) sont calculées sur la
         // composition des divisions : elles doivent être purgées en même temps.
         oublierResultats();

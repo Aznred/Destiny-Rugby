@@ -46,7 +46,7 @@
 
 import { COUPES_EUROPE } from '../data/mondeReel';
 import { forceEffectif } from './effectif';
-import { clubsDeDivision } from './divisions';
+import { clubsDeDivision, etaitDansLaDivision} from './divisions';
 import {
   championnatEnDirect, classer, graine, jouerRencontre,
   type LigneTableau, type MatchChampionnat,
@@ -178,6 +178,17 @@ const TAILLE_POULE_EUROPE = 6;
  * C'est ce qui permet de connaître les qualifiés d'une saison qu'on n'a pas
  * « rejouée » écran par écran.
  */
+/**
+ * Le classement final d'une division, tel qu'il servira à qualifier en Europe.
+ *
+ * ⚠️ LES PROMUS DE CETTE SAISON PASSENT DERNIERS, et c'est tout le correctif.
+ * Cette fonction reconstruit le classement de la saison `saison` avec la
+ * composition ACTUELLE de la division : un club qui vient de monter s'y voyait
+ * donc attribuer un rang dans un championnat qu'il n'avait pas disputé, et
+ * pouvait finir dans les huit premiers — donc en Champions Cup. On les relègue
+ * en fin de liste : ils restent qualifiables en Challenge Cup, comme dans la
+ * vraie vie, mais ne prennent plus la place d'un habitué.
+ */
 function classementFinal(ligue: string, saison: number): string[] {
   const clubs = clubsDeDivision(ligue);
   if (!clubs.length) return [];
@@ -185,7 +196,10 @@ function classementFinal(ligue: string, saison: number): string[] {
   const ordre = etat.classement.map((l) => l.club);
   // Ceinture : un club de la division absent du classement (poule partielle)
   // ne doit pas disparaître de la qualification.
-  return [...ordre, ...clubs.filter((c) => !ordre.includes(c))];
+  const complet = [...ordre, ...clubs.filter((c) => !ordre.includes(c))];
+  const habitues = complet.filter((c) => etaitDansLaDivision(c, saison));
+  const promus = complet.filter((c) => !etaitDansLaDivision(c, saison));
+  return [...habitues, ...promus];
 }
 
 /**
