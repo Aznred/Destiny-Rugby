@@ -639,7 +639,7 @@
   .manager-budgets.resume span { padding:.48rem; }
   .manager-filtres { padding:.7rem; }
   .manager-filtres > input { min-height:40px; }
-  .manager-cibles { grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; max-height:calc(100dvh - 332px); overflow-y:auto; overscroll-behavior:contain; padding-right:.2rem; }
+  .manager-cibles { grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; padding-right:.2rem; }
   .manager-cible { grid-template-columns:48px minmax(0,1fr); gap:.55rem; padding:.7rem; }
   .manager-cible-note { width:46px; height:46px; font-size:1.05rem; }
   .manager-cible > .btn { grid-column:1/-1; width:100%; min-height:36px; }
@@ -660,7 +660,14 @@
   .manager-club-formation > .manager-inst-tete,.manager-club-formation > .manager-inst-grille { grid-column:1/-1; }
   .manager-club-formation > .manager-centre-identite { grid-column:1; grid-template-columns:1fr; align-content:start; }
   .manager-club-formation > .manager-centre-identite .manager-centre-notes { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .manager-club-formation > .manager-academie { grid-column:2; grid-row:3; max-height:calc(100dvh - 335px); overflow-y:auto; overscroll-behavior:contain; }
+  .manager-club-formation > .manager-academie { grid-column:2; }
+  /* ⚠️ PLEINE LARGEUR, ET PLACÉ EXPLICITEMENT. La Formation est une grille à
+     deux colonnes ; sans ça la barre de filtres tombait dans la colonne
+     étroite. Les numéros de rangée en dur ont été retirés : il a suffi
+     d'ajouter un enfant (cette barre) pour que tout se télescope. */
+  .manager-club-formation > .manager-detection-tete,
+  .manager-club-formation > .manager-filtres-jeunes,
+  .manager-club-formation > .manager-dossiers-jeunes { grid-column:1/-1; }
   /* ⚠️ LES RANGÉES SE MESURENT SUR LEUR CONTENU, SINON LA LISTE ÉCRASE SES
      CARTES AU LIEU DE DÉFILER. `.manager-dossier-jeune` porte un
      `overflow:hidden` (le liseré doré du haut doit suivre les coins arrondis),
@@ -671,13 +678,12 @@
      — donc pas de barre de défilement non plus, et les trois boutons d'action
      (observer, entretien, présenter le projet) hors du cadre. L'écran des
      recruteurs était inutilisable. */
-  .manager-club-recruteurs > .manager-dossiers-jeunes { align-content:start; grid-auto-rows:min-content; max-height:calc(100dvh - 405px); overflow-y:auto; overscroll-behavior:contain; padding-right:.2rem; }
+  .manager-club-recruteurs > .manager-dossiers-jeunes { align-content:start; grid-auto-rows:min-content; padding-right:.2rem; }
   .manager-club-entrainement { grid-template-columns:minmax(280px,.58fr) minmax(0,1.42fr); }
   .manager-club-entrainement > .manager-inst-tete,.manager-club-entrainement > .manager-inst-grille { grid-column:1/-1; }
   .manager-club-entrainement > .manager-planning-collectif { grid-column:1; }
-  .manager-club-entrainement > .manager-programme { grid-column:2; grid-row:3/5; }
+  .manager-club-entrainement > .manager-programme { grid-column:2; }
   .manager-club-entrainement > .manager-programme-jeunes { grid-column:1; }
-  .manager-club-entrainement .manager-liste-programme { max-height:calc(100dvh - 390px); overflow-y:auto; overscroll-behavior:contain; }
   .manager-planning-collectif > div:last-child { grid-template-columns:repeat(4,minmax(0,1fr)); }
 
   /* La carrière entraîneur occupe exactement la fenêtre, sous la navigation
@@ -737,6 +743,16 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-right: .35rem;
+    /* ⚠️ LES RANGÉES SE MESURENT SUR LEUR CONTENU, SINON ELLES SE PARTAGENT
+       LA HAUTEUR. La zone est à la fois un élément flexible à hauteur
+       DÉFINIE et une grille : ses rangées `auto` se répartissent donc cette
+       hauteur au lieu de déborder. Et comme les `.carte` portent
+       `overflow`, leur taille minimale automatique vaut ZÉRO — rien ne les
+       empêche de rétrécir. Mesuré : le bandeau de détection rendu sur 40 px
+       pour 104 voulus, la grille des dossiers sur 84 px pour 2 716. C'est le
+       même piège que sur `.manager-dossier-jeune`, un cran plus haut. */
+    align-content: start;
+    grid-auto-rows: max-content;
   }
   /* Les dossiers de détection s'affichent aussi dans Formation : même liste,
      même plancher de rangée que dans Recruteurs — sans quoi la grille écrase
