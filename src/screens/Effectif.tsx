@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import {Fragment, useEffect, useMemo, useState} from 'react';
 import { motion } from 'framer-motion';
 import { useGame, noteGlobale } from '../store/useGame';
 import { effectifDuClub, noteDuClub, forceEffectif, estEspoir, estDeclinant } from '../lib/effectif';
+import { blessuresParJoueur } from '../lib/carriereAvancee';
 import { EFFECTIFS_REELS } from '../data/effectifsReels';
 import { POSTES, nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
@@ -39,6 +40,17 @@ function forceDuGroupe(groupe: { note: number }[]): number {
 export function Effectif() {
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
+  // ⚠️ LES BLESSURES ÉTAIENT INVISIBLES. Le dossier médical existe depuis le
+  //    lot « carrière avancée » — gravité, type, semaines d’absence — et la
+  //    composition écarte déjà les indisponibles. Mais RIEN ne le montrait :
+  //    on découvrait qu’un joueur manquait en cherchant pourquoi la feuille
+  //    avait changé. Retour de jeu : « on ne sait pas trop quel joueur a des
+  //    blessures ».
+  const blessures = useMemo(
+    () => blessuresParJoueur(manager?.avancee?.medical),
+    [manager?.avancee?.medical],
+  );
+  const [blessureOuverte, setBlessureOuverte] = useState<string | null>(null);
   const setEcran = useGame((s) => s.setEcran);
 
   const viser = useGame((s) => s.ouvrirEffectifSur);
@@ -189,7 +201,8 @@ export function Effectif() {
             <span>{poste.numero}</span>
           </div>
           {joueurs.map((l) => (
-            <div key={l.id} className={`ligne-joueur ${'moi' in l && l.moi ? 'moi' : ''}`}>
+            <Fragment key={l.id}>
+            <div className={`ligne-joueur ${'moi' in l && l.moi ? 'moi' : ''}`}>
               {/* Seuils relatifs au niveau du club : « or » = cadre, « gris » = espoir. */}
               {/* ⚠️ Le seuil est RELATIF au groupe affiché. Comparer un XV
                   national à la note d’un club de Fédérale peindrait les
@@ -216,8 +229,49 @@ export function Effectif() {
                   </span>
                 )}
               </span>
+              {(() => {
+                const b = blessures.get(l.id);
+                if (!b) return null;
+                // Trois gravités, trois couleurs, et la durée en clair : c’est ce
+                // qu’on veut lire d’un coup d’œil sur une liste de trente noms.
+                return (
+                  <button
+                    type="button"
+                    className={`j-blessure ${b.gravite}`}
+                    onClick={() => setBlessureOuverte(blessureOuverte === l.id ? null : l.id)}
+                    title={`${b.type} · ${b.semaines} ${b.semaines > 1 ? 'semaines' : 'semaine'}`}
+                    aria-expanded={blessureOuverte === l.id}
+                  >
+                    <Icone nom="soin" taille={13} />
+                    <em>{b.semaines} sem.</em>
+                  </button>
+                );
+              })()}
               <span className="j-age">{l.age} {t('gen.ans')}</span>
             </div>
+            {blessureOuverte === l.id && blessures.get(l.id) && (() => {
+              const b = blessures.get(l.id)!;
+              const mots: Record<string, string> = {
+                legere: 'Blessure légère', moyenne: 'Blessure moyenne', grave: 'Grosse blessure',
+              };
+              const decisions: Record<string, string> = {
+                attente: 'Le staff attend ta décision',
+                repos: 'Mis au repos',
+                traitement: 'Sous traitement — il peut jouer diminué',
+                forcer: 'Aligné malgré la blessure',
+              };
+              return (
+                <div className={`j-blessure-detail ${b.gravite}`} role="status">
+                  <b><Icone nom="soin" taille={14} /> {mots[b.gravite] ?? b.gravite} · {b.type}</b>
+                  <span>
+                    Indisponible {b.semaines} {b.semaines > 1 ? 'semaines' : 'semaine'}
+                    {b.douleur > 0 && ` · douleur ${b.douleur}/10`}
+                  </span>
+                  <em>{decisions[b.decision] ?? b.decision}</em>
+                </div>
+              );
+            })()}
+            </Fragment>
           ))}
         </div>
       ))}

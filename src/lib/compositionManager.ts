@@ -43,11 +43,22 @@ function prendre(
   return joueur;
 }
 
-export function compositionManagerParDefaut(effectif: Coequipier[]): CompositionManager {
+/**
+ * La feuille par défaut — sans les blessés.
+ *
+ * ⚠️ `indisponibles` EST LA CORRECTION. Le dossier médical existait, personne
+ * ne le lisait : on pouvait aligner un joueur absent six semaines, et rien ne
+ * l'indiquait. Les blessés sont désormais mis de côté comme s'ils n'étaient pas
+ * dans le groupe — le remplaçant naturel prend la place, comme pour un retraité.
+ */
+export function compositionManagerParDefaut(
+  effectif: Coequipier[], indisponibles: ReadonlySet<string> = new Set(),
+): CompositionManager {
+  const dispo = indisponibles.size ? effectif.filter((j) => !indisponibles.has(j.id)) : effectif;
   const pris = new Set<string>();
-  const titulaires = POSTES_XV_MANAGER.map((poste) => prendre(effectif, pris, poste)?.id ?? '').filter(Boolean);
-  const remplacants = POSTES_BANC_MANAGER.map((poste) => prendre(effectif, pris, poste)?.id ?? '').filter(Boolean);
-  const joueurs = [...titulaires, ...remplacants].map((id) => effectif.find((j) => j.id === id)).filter(Boolean) as Coequipier[];
+  const titulaires = POSTES_XV_MANAGER.map((poste) => prendre(dispo, pris, poste)?.id ?? '').filter(Boolean);
+  const remplacants = POSTES_BANC_MANAGER.map((poste) => prendre(dispo, pris, poste)?.id ?? '').filter(Boolean);
+  const joueurs = [...titulaires, ...remplacants].map((id) => dispo.find((j) => j.id === id)).filter(Boolean) as Coequipier[];
   const buteur = [...joueurs].sort((a, b) => {
     const bonus = (j: Coequipier) => j.poste === 'demi_ouverture' ? 8 : j.poste === 'arriere' ? 5 : j.poste === 'demi_melee' ? 3 : 0;
     return (b.note + bonus(b)) - (a.note + bonus(a));
@@ -70,10 +81,13 @@ export function compositionManagerParDefaut(effectif: Coequipier[]): Composition
  */
 export function reconcilerCompositionManager(
   effectif: Coequipier[], composition?: Partial<CompositionManager> | null,
+  indisponibles: ReadonlySet<string> = new Set(),
 ): CompositionManager {
-  const defaut = compositionManagerParDefaut(effectif);
+  const defaut = compositionManagerParDefaut(effectif, indisponibles);
   if (!composition) return defaut;
-  const ids = new Set(effectif.map((j) => j.id));
+  // ⚠️ UN BLESSÉ SORT DE LA FEUILLE, même s'il y était la semaine d'avant :
+  //    sinon la composition sauvegardée le réintroduisait à chaque réconciliation.
+  const ids = new Set(effectif.filter((x) => !indisponibles.has(x.id)).map((x) => x.id));
   const pris = new Set<string>();
   const remplir = (source: string[] | undefined, postes: PosteId[], secours: string[]) => postes.map((_, i) => {
     const souhaite = source?.[i];

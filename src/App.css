@@ -2348,6 +2348,51 @@
 .j-note[data-niveau='gris'] { background: rgba(255, 255, 255, 0.08); color: var(--craie-dim); }
 .j-drapeau { flex: none; font-size: 1.05rem; line-height: 1; }
 .j-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ══ LES BLESSURES SE VOIENT DANS L'EFFECTIF ═══════════════════════════════
+   Le dossier médical existait (gravité, type, semaines) et la composition
+   écartait déjà les indisponibles — mais rien ne le MONTRAIT : on découvrait
+   qu'un joueur manquait en cherchant pourquoi la feuille avait changé.
+   Trois gravités, trois couleurs, la durée en clair, et le détail au clic. */
+.j-blessure {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  flex: none;
+  padding: .16rem .42rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  font: 700 .7rem/1 'Archivo', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background .16s ease, border-color .16s ease;
+}
+.j-blessure em { font-style: normal; opacity: .9; }
+.j-blessure.legere  { color: #e8c15a; border-color: rgba(232, 193, 90, .34); background: rgba(232, 193, 90, .10); }
+.j-blessure.moyenne { color: #e89a4a; border-color: rgba(232, 154, 74, .38); background: rgba(232, 154, 74, .12); }
+.j-blessure.grave   { color: #e2685c; border-color: rgba(226, 104, 92, .42); background: rgba(226, 104, 92, .14); }
+.j-blessure:hover { filter: brightness(1.18); }
+
+.j-blessure-detail {
+  display: grid;
+  gap: .18rem;
+  margin: -.2rem 0 .45rem;
+  padding: .55rem .8rem;
+  border-left: 3px solid var(--bordure-forte);
+  border-radius: 0 10px 10px 0;
+  background: rgba(255, 255, 255, .035);
+}
+.j-blessure-detail b { display: inline-flex; align-items: center; gap: .4rem; font-size: .84rem; }
+.j-blessure-detail span { color: var(--craie-dim); font-size: .8rem; }
+.j-blessure-detail em { color: var(--brume); font-size: .78rem; font-style: normal; }
+.j-blessure-detail.legere  { border-left-color: #e8c15a; }
+.j-blessure-detail.moyenne { border-left-color: #e89a4a; }
+.j-blessure-detail.grave   { border-left-color: #e2685c; }
+
+@media (max-width: 560px) {
+  .j-blessure em { display: none; }
+}
+
 .j-age { color: var(--brume); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
 /* Trajectoire de carrière : ↗ espoir qui progresse, ↘ ancien qui décline. */
 .j-tendance {

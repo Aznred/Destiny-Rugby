@@ -3929,7 +3929,7 @@ export const useGame = create<GameState>()(
           budgetStructure: budgets.structure,
           contrat: { saisons: 3, salaire: salaireManager(force) },
           decision: null,
-          composition: compositionManagerParDefaut(effectifDuClub(club, m.saison)),
+          composition: compositionManagerParDefaut(effectifDuClub(club, m.saison), new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))),
           tactique: { ...TACTIQUE_MANAGER_DEFAUT },
           negociations: m.negociations.map((n) => (
             n.etat === 'ouverte' || n.etat === 'accord' ? { ...n, etat: 'rompue' as const } : n
@@ -4075,9 +4075,20 @@ export const useGame = create<GameState>()(
           const entrainements = delegations.entrainements
             ? [...groupe].sort((a, b) => (b.potentiel - b.note) - (a.potentiel - a.note) || a.age - b.age).slice(0, places).map((j) => j.nom)
             : m.entrainements;
+          // ⚠️ UN BLESSÉ SORT DE LA FEUILLE, MÊME SANS DÉLÉGATION. La composition
+          //    n’était recalculée QUE si le manager avait délégué ce domaine :
+          //    sinon la feuille sauvegardée gardait le joueur, et on se
+          //    retrouvait à aligner un homme absent six semaines. Mesuré en jeu :
+          //    deux blessés « repos » et « attente » toujours titularisés.
+          //    On réconcilie donc toujours — les choix du manager sur les autres
+          //    postes sont préservés, seuls les indisponibles sont évincés.
+          //
+          // ⚠️ ET ON LIT L’ÉTAT NEUF, pas l’ancien : `avancee` et `suivante`
+          //    portent les blessures qui viennent de tomber cette semaine.
+          const absents = new Set(indisponiblesCarriereAvancee(avancee, suivante));
           const composition = delegations.compositions
-            ? compositionManagerParDefaut(groupe)
-            : m.composition;
+            ? compositionManagerParDefaut(groupe, absents)
+            : reconcilerCompositionManager(groupe, m.composition, absents);
           set({ manager: { ...m, semaine: suivante, decision: null, avancee, entrainements, composition } });
           get().vivreSemaineSociale();
           return;
@@ -4178,7 +4189,7 @@ export const useGame = create<GameState>()(
         const m = get().manager;
         if (!m?.club) return;
         const effectif = effectifDuClub(m.club, m.saison);
-        set({ manager: { ...m, composition: reconcilerCompositionManager(effectif, composition) } });
+        set({ manager: { ...m, composition: reconcilerCompositionManager(effectif, composition, new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))) } });
       },
 
       definirTactiqueManager: (tactique) => {
@@ -5034,7 +5045,7 @@ export const useGame = create<GameState>()(
           decision: null,
           composition: licencie
             ? m.composition
-            : reconcilerCompositionManager(effectifDuClub(m.club, m.saison + 1), m.composition),
+            : reconcilerCompositionManager(effectifDuClub(m.club, m.saison + 1), m.composition, new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))),
           negociations: m.negociations.map((n) => (
             n.etat === 'ouverte' || n.etat === 'accord' ? { ...n, etat: 'rompue' as const } : n
           )),

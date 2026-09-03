@@ -107,6 +107,22 @@ export interface DossierMedical {
   semaine: number;
 }
 
+
+/** Les dossiers en cours, par identifiant de joueur — pour l'écran et la compo. */
+export function blessuresParJoueur(
+  medical: readonly DossierMedical[] | undefined,
+): Map<string, DossierMedical> {
+  const par = new Map<string, DossierMedical>();
+  for (const d of medical ?? []) {
+    if (d.semaines <= 0) continue;
+    // Le dossier le plus grave l'emporte si un joueur en cumule deux.
+    const avant = par.get(d.joueurId);
+    if (!avant || d.semaines > avant.semaines) par.set(d.joueurId, d);
+  }
+  return par;
+}
+
+
 export interface ConvocationClub {
   rassemblement?: RassemblementInternational;
   id: string;
