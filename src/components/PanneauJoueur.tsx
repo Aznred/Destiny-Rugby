@@ -13,6 +13,7 @@ import { LogoCompet } from './LogoCompet';
 import { Drapeau } from './Drapeau';
 import { nomNation, nomNationTraduit } from '../lib/nations';
 import { Confirmation } from './Confirmation';
+import { Selecteur } from './Selecteur';
 import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON, CALENDRIER } from '../data/calendrier';
 import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store/useGame';
 import { amisPresents } from '../lib/vestiaire';
@@ -523,15 +524,15 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           <label htmlFor="reconversion">
             {t('pj.apresCarriere')} {joueur.age >= AGE_RETRAITE_FORCEE && `- ${t('pj.derniereSaison')}`}
           </label>
-          <select
+          <Selecteur
             id="reconversion"
-            value={reconversion}
-            onChange={(e) => setReconversion(e.target.value)}
-          >
-            {RECONVERSIONS.map((r) => (
-              <option key={r.id} value={r.id}>{r.emoji} {t(`pj.reconversion.${r.id}`)}</option>
-            ))}
-          </select>
+            options={RECONVERSIONS.map((r) => ({
+              valeur: r.id,
+              label: t(`pj.reconversion.${r.id}`),
+            }))}
+            valeur={reconversion}
+            onChange={setReconversion}
+          />
         </div>
       )}
 

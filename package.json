@@ -18,7 +18,9 @@
     "verify:carriere-profonde": "vite-node scripts/verifCarriereProfonde.ts",
     "verify:experience-manager": "vite-node scripts/verifExperienceManager.ts",
     "verify:distances-transferts": "vite-node scripts/verifDistancesEtTransferts.ts",
-    "verify:enveloppe": "vite-node scripts/verifEnveloppeStructure.ts"
+    "verify:enveloppe": "vite-node scripts/verifEnveloppeStructure.ts",
+    "verify:portee": "vite-node scripts/verifPorteeMarche.ts",
+    "verify:note-transfert": "vite-node scripts/verifNoteTransfert.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

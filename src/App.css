@@ -169,7 +169,7 @@
 .manager-numero { display:grid; place-items:center; width:32px; height:32px; border-radius:8px; color:#06150e; background:var(--or); font-weight:900; }
 .manager-slot > span:nth-child(2) { display:flex; flex-direction:column; min-width:0; }
 .manager-slot small { overflow:hidden; color:var(--craie-dim); font-size:.7rem; text-overflow:ellipsis; white-space:nowrap; }
-.manager-slot select,.manager-roles select,.manager-tactiques-selects select { width:100%; min-height:42px; padding:.35rem .55rem; border:1px solid var(--bordure); border-radius:9px; color:var(--craie); background:#0a1d13; }
+.manager-slot .sel-declencheur,.manager-roles .sel-declencheur,.manager-tactiques-selects .sel-declencheur { width:100%; min-height:42px; padding:.35rem .55rem; border:1px solid var(--bordure); border-radius:9px; color:var(--craie); background:#0a1d13; }
 .manager-roles { display:grid; grid-template-columns:1fr; gap:.6rem; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--bordure); }
 .manager-roles label,.manager-tactiques-selects label { display:grid; gap:.3rem; color:var(--craie-dim); font-size:.78rem; }
 .manager-plan-avant-match .comp-tete span { color:var(--craie-dim); font-size:.75rem; }
@@ -233,7 +233,7 @@
 .manager-roles-visuels > div { display:flex; flex-direction:column; }
 .manager-roles-visuels > div span { color:var(--craie-dim); font-size:.74rem; }
 .manager-roles-visuels label { display:grid; gap:.3rem; color:var(--craie-dim); font-size:.75rem; }
-.manager-roles-visuels select { width:100%; min-height:44px; padding:.35rem .55rem; border:1px solid var(--bordure); border-radius:9px; color:var(--craie); background:#0a1d13; }
+.manager-roles-visuels .sel-declencheur { width:100%; min-height:44px; padding:.35rem .55rem; border:1px solid var(--bordure); border-radius:9px; color:var(--craie); background:#0a1d13; }
 
 @media (max-width: 1120px) {
   .manager-bureau { grid-template-columns:minmax(235px,.7fr) minmax(390px,1.3fr); }
@@ -273,7 +273,7 @@
   .manager-note-compo { grid-template-columns:auto auto; justify-content:center; gap:.5rem; }
   .manager-composition-grille { grid-template-columns:1fr; }
   .manager-slot { grid-template-columns:34px minmax(0,1fr); }
-  .manager-slot select { grid-column:1/-1; min-height:48px; }
+  .manager-slot .sel-declencheur { grid-column:1/-1; min-height:48px; }
   .manager-tactiques-selects { grid-template-columns:1fr; }
   .manager-duel { gap:.45rem; }
   .manager-lancer-match .btn { width:100%; min-height:50px; }
@@ -392,7 +392,7 @@
 .manager-plans-jeunes article > div b,.manager-plans-jeunes article > div span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .manager-plans-jeunes article > div span,.manager-plans-jeunes label span,.manager-plans-jeunes article > p { color:var(--craie-dim); font-size:.7rem; }
 .manager-plans-jeunes label { display:grid; gap:.25rem; }
-.manager-plans-jeunes select { width:100%; min-height:40px; padding:.35rem .5rem; border:1px solid var(--bordure); border-radius:8px; color:var(--craie); background:#0a1d13; }
+.manager-plans-jeunes .sel-declencheur { width:100%; min-height:40px; padding:.35rem .5rem; font-size:.86rem; border:1px solid var(--bordure); border-radius:8px; color:var(--craie); background:#0a1d13; }
 .manager-plans-jeunes article > p { grid-column:1/-1; margin:0; }
 
 .manager-detection-tete { position:relative; display:flex; justify-content:space-between; align-items:center; gap:1.2rem; padding:1.2rem; overflow:hidden; background:radial-gradient(circle at 88% 18%,rgba(224,176,72,.11),transparent 30%),linear-gradient(135deg,rgba(20,74,48,.38),rgba(5,26,17,.7)); }
@@ -450,7 +450,7 @@
   .manager-actions-academie button.primaire,.manager-actions-academie button.danger,.manager-actions-detection button.primaire { flex-basis:100%; margin-left:0; }
   .manager-plans-jeunes article { grid-template-columns:1fr; }
   .manager-plans-jeunes article > p { grid-column:auto; }
-  .manager-plans-jeunes select { min-height:46px; }
+  .manager-plans-jeunes .sel-declencheur { min-height:46px; }
   .manager-planning-collectif > div:last-child { grid-template-columns:repeat(4,minmax(0,1fr)); }
   .manager-detection-tete { align-items:stretch; flex-direction:column; }
   .manager-missions { min-width:0; }
@@ -546,7 +546,7 @@
    propre panneau afin que la navigation et les chiffres importants restent
    toujours visibles. */
 .manager-ovale { min-width:0; }
-.x-app.x-manager-embarque { width:100%; max-width:none; height:calc(100dvh - 168px); min-height:590px; margin:0; overflow:hidden; border:1px solid #2f3336; border-radius:16px; }
+.x-app.x-manager-embarque { width:100%; max-width:none; height:100%; min-height:0; margin:0; overflow:hidden; border:1px solid #2f3336; border-radius:16px; }
 .x-manager-embarque .x-rail { position:static; top:auto; height:100%; }
 .x-manager-embarque .x-centre,.x-manager-embarque .x-droite { min-height:0; height:100%; overflow-y:auto; overscroll-behavior:contain; }
 .x-manager-embarque .x-tetes { top:0; z-index:3; background:rgba(0,0,0,.92); }
@@ -607,10 +607,10 @@
   .manager-reserves { grid-column:2; grid-row:3; align-self:start; padding:.72rem; }
   .manager-reserves > div { grid-template-columns:1fr; max-height:230px; overflow-y:auto; }
   .manager-roles-visuels { padding:.72rem; }
-  .manager-roles-visuels select { min-height:38px; }
+  .manager-roles-visuels .sel-declencheur { min-height:38px; }
   .manager-plan-avant-match { padding:.72rem; }
   .manager-tactiques-selects { gap:.45rem; margin-top:.55rem; }
-  .manager-tactiques-selects select { min-height:38px; font-size:.72rem; }
+  .manager-tactiques-selects .sel-declencheur { min-height:38px; font-size:.72rem; }
 
   .manager-marche { gap:.7rem; }
   .manager-marche-tete { padding:.8rem 1rem; }
@@ -659,7 +659,67 @@
   .manager-club-entrainement > .manager-programme-jeunes { grid-column:1; }
   .manager-club-entrainement .manager-liste-programme { max-height:calc(100dvh - 390px); overflow-y:auto; overscroll-behavior:contain; }
   .manager-planning-collectif > div:last-child { grid-template-columns:repeat(4,minmax(0,1fr)); }
+
+  /* La carrière entraîneur occupe exactement la fenêtre, sous la navigation
+     du site : en-tête, date, onglets et bouton d'action gardent leur hauteur
+     naturelle, et la zone de contenu prend tout ce qui reste. Aucun nombre
+     magique à recalibrer si l'en-tête change de hauteur. */
+  .carriere-manager {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 78px);
+    overflow: hidden;
+  }
+
+  /* ══ LE BUREAU TIENT DANS L'ÉCRAN ══════════════════════════════════════════
+     Demande : « que toute l'UI de la carrière entraîneur rentre sans avoir à
+     scroller ». Mesuré à 1500 × 900 avant ce lot, en dépassement de PAGE :
+     Vestiaire +3 234 px, Formation +2 936, Monde +1 657, Composition +1 282,
+     Histoire +623, Direction +614. On déroulait quatre écrans pour atteindre
+     une carte, et l'en-tête, les onglets et le bouton « Calendrier / Avancer »
+     disparaissaient en route.
+
+     ⚠️ C'EST LA ZONE D'ONGLET QUI DÉFILE, PLUS LA PAGE. La fenêtre ne bouge
+     plus d'un pixel : la navigation, le nom du club, la date et l'action
+     principale restent sous les yeux en permanence. On change d'onglet sans
+     jamais avoir à remonter.
+
+     ⚠️ ET ON NE BORNE PAS LES CARTES UNE À UNE. Essayé d'abord, mesuré ensuite :
+     un plafond par carte laissait le Vestiaire à +1 698 px (sept panneaux sur
+     trois rangées, chacun à sa hauteur d'écran) et créait deux barres de
+     défilement imbriquées — celle de la carte et celle de la page. Une seule
+     zone qui défile vaut mieux que sept.
+
+     ⚠️ ET PAS DE NOMBRE MAGIQUE. Un premier essai plafonnait la zone à
+     `calc(100dvh - 386px)` : il fallait recalibrer ce 386 à chaque hauteur
+     d'écran testée (390, 400, 380…) parce que le chrome au-dessus change
+     d'un onglet à l'autre. La colonne flexible mesure ce qui reste, elle. */
+  .manager-avance-grille,
+  .manager-bureau,
+  .manager-club,
+  .manager-equipe,
+  .manager-calendrier,
+  .manager-marche,
+  .manager-ovale {
+    flex: 1 1 auto;
+    /* ⚠️ `min-height: 0` EST INDISPENSABLE : un élément flexible refuse par
+       défaut de descendre sous sa taille de contenu, et la zone déborderait
+       de la colonne au lieu de défiler. */
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: .35rem;
+  }
+  /* Les dossiers de détection s'affichent aussi dans Formation : même liste,
+     même plancher de rangée que dans Recruteurs — sans quoi la grille écrase
+     ses cartes au lieu de les laisser défiler. */
+  .manager-club-formation > .manager-dossiers-jeunes {
+    align-content: start;
+    grid-auto-rows: min-content;
+  }
 }
+
+
 
 @media (max-width:1120px) {
   .x-app.x-manager-embarque { height:auto; min-height:calc(100dvh - 150px); overflow:visible; }
@@ -833,7 +893,7 @@
 .champ input[type='text'],
 .champ input[type='number'],
 .champ input[type='password'],
-.champ select,
+.champ .sel-declencheur,
 .champ textarea {
   width: 100%;
   background: rgba(4, 13, 9, 0.6);
@@ -846,7 +906,7 @@
   transition: border 0.18s ease, box-shadow 0.18s ease;
 }
 .champ input:focus,
-.champ select:focus,
+.champ .sel-declencheur.ouvert,
 .champ textarea:focus {
   outline: none;
   border-color: var(--or-500);
@@ -1619,7 +1679,7 @@
 .capitaines-manager { padding:1rem; }
 .capitaines-manager > div:last-child { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
 .capitaines-manager label { display:flex; flex-direction:column; gap:.3rem; color:var(--craie-dim); font-size:.72rem; }
-.capitaines-manager select,.chronologie-annuelle-manager select { width:100%; min-height:42px; padding:.55rem; border:1px solid rgba(255,255,255,.12); border-radius:9px; color:var(--craie); background:var(--vert-900); }
+.capitaines-manager .sel-declencheur,.chronologie-annuelle-manager .sel-declencheur { width:100%; min-height:42px; padding:.55rem; border:1px solid rgba(255,255,255,.12); border-radius:9px; color:var(--craie); background:var(--vert-900); }
 .relations-joueurs-manager { grid-column:span 6; padding:1rem; }
 .relations-joueurs-manager > div:last-child { display:flex; flex-direction:column; gap:.3rem; }
 .relations-joueurs-manager article { display:grid; grid-template-columns:minmax(0,1fr) 75px 110px; align-items:center; gap:.55rem; padding:.55rem; border-bottom:1px solid rgba(255,255,255,.06); }
@@ -1651,7 +1711,7 @@
 .marketing-joueurs-manager small { color:var(--craie-dim); font-size:.62rem; }.marketing-joueurs-manager article > strong { color:var(--or-300); font-size:.68rem; }
 
 .chronologie-annuelle-manager { padding:1rem; }
-.chronologie-annuelle-manager .comp-tete select { width:auto; min-width:150px; }
+.chronologie-annuelle-manager .comp-tete .selecteur { width:auto; min-width:170px; }
 .chronologie-annuelle-manager article { display:grid; grid-template-columns:80px 90px minmax(0,1fr); gap:.65rem; padding:.7rem .35rem; border-left:2px solid rgba(255,255,255,.1); border-bottom:1px solid rgba(255,255,255,.06); }
 .chronologie-annuelle-manager article.importance-3 { border-left-color:var(--or-400); }
 .chronologie-annuelle-manager time { color:var(--or-300); font-weight:700; }
@@ -2270,7 +2330,7 @@
   font-size: 1rem;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
-.sel-declencheur:hover { border-color: var(--bordure-forte); }
+.sel-declencheur:hover { border-color: var(--bordure-forte); background: rgba(8, 22, 15, 0.72); }
 .sel-declencheur.ouvert,
 .sel-declencheur:focus-visible {
   outline: none;
@@ -2285,30 +2345,66 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sel-sous { font-size: 0.76rem; color: var(--brume); }
+.sel-sous {
+  font-size: 0.76rem;
+  color: var(--brume);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Le chevron est un tracé de `Icone.tsx`, plus le caractère « ▾ » : celui-ci
+   est dessiné par la police du système, à une graisse qui n'est jamais la
+   nôtre et avec une ligne de base qui bouge d'une machine à l'autre. */
 .sel-chevron {
+  display: flex;
   flex: none;
   color: var(--or-400);
-  font-size: 0.85rem;
-  transition: transform 0.18s ease;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.18s ease;
 }
-.sel-declencheur.ouvert .sel-chevron { transform: rotate(180deg); }
+.sel-declencheur.ouvert .sel-chevron { transform: rotate(180deg); color: var(--or-300); }
 
+/* ⚠️ `position: fixed` ET DANS UN PORTAIL. Le menu vivait en `absolute` sous
+   son déclencheur : un seul ancêtre en `overflow:hidden`/`auto` suffisait à le
+   rogner, et le bureau de l'entraîneur en est plein. Les coordonnées sont
+   posées en ligne par `placer()` (composant), pas ici. */
 .sel-menu {
-  position: absolute;
-  z-index: 60;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  background: linear-gradient(180deg, #0f2a1b, #0a1f14);
+  position: fixed;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #123020, #08190f);
   border: 1px solid var(--bordure-forte);
   border-radius: var(--rayon-sm);
-  box-shadow: var(--ombre);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(255, 255, 255, 0.04) inset;
   overflow: hidden;
+  transform-origin: top center;
 }
-.sel-recherche { padding: 0.55rem; border-bottom: 1px solid var(--bordure); }
+.sel-menu.vers-haut { transform-origin: bottom center; }
+/* Un liseré doré discret : le menu appartient au même monde que les cartes. */
+.sel-menu::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--or-500), transparent);
+  opacity: 0.55;
+}
+.sel-menu.vers-haut::before { top: auto; bottom: 0; }
+
+.sel-recherche {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem;
+  border-bottom: 1px solid var(--bordure);
+  color: var(--brume);
+}
+.sel-recherche svg { flex: none; }
 .sel-recherche input {
   width: 100%;
+  min-width: 0;
   background: rgba(4, 13, 9, 0.7);
   border: 1px solid var(--bordure);
   border-radius: 8px;
@@ -2316,17 +2412,31 @@
   padding: 0.5rem 0.7rem;
   font-family: var(--police);
   font-size: 0.92rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
-.sel-recherche input:focus { outline: none; border-color: var(--or-500); }
-.sel-liste { max-height: 280px; overflow-y: auto; padding: 0.3rem; }
+.sel-recherche input:focus {
+  outline: none;
+  border-color: var(--or-500);
+  box-shadow: 0 0 0 2px rgba(232, 178, 58, 0.14);
+}
+.sel-liste {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.3rem;
+  scrollbar-width: thin;
+}
 .sel-groupe {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   font-family: var(--police-forte);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 0.64rem;
   color: var(--or-400);
-  padding: 0.6rem 0.6rem 0.3rem;
+  padding: 0.55rem 0.6rem 0.3rem;
+  background: linear-gradient(180deg, #123020 72%, rgba(18, 48, 32, 0));
 }
 .sel-option {
   width: 100%;
@@ -2341,14 +2451,23 @@
   padding: 0.5rem 0.6rem;
   font-family: var(--police);
   font-size: 0.94rem;
+  transition: background 0.14s ease, border-color 0.14s ease;
 }
-.sel-option.survol { background: rgba(255, 255, 255, 0.06); }
+.sel-option.survol { background: rgba(255, 255, 255, 0.07); }
+.sel-option:active { background: rgba(255, 255, 255, 0.11); }
 .sel-option.choisie {
   background: linear-gradient(180deg, rgba(232, 178, 58, 0.16), rgba(232, 178, 58, 0.05));
   border-color: var(--bordure-forte);
 }
+.sel-option.choisie .sel-label { color: var(--or-200, var(--craie)); }
 .sel-check { color: var(--or-400); font-weight: 800; flex: none; }
 .sel-vide { padding: 1rem; text-align: center; color: var(--brume); font-size: 0.9rem; }
+
+/* Sur téléphone, la cible tactile prime : options plus hautes, texte lisible. */
+@media (max-width: 700px) {
+  .sel-option { padding: 0.62rem 0.6rem; font-size: 0.98rem; }
+  .sel-declencheur { min-height: 46px; }
+}
 
 /* ====== CÉRÉMONIE DE TROPHÉE ====== */
 .overlay-trophee {
@@ -2986,7 +3105,7 @@
 .pj-actions .badge-offres { position: absolute; top: -6px; right: -4px; }
 .pj-reconversion { margin: 0.5rem 0 0; }
 .pj-reconversion label { font-size: 0.72rem; }
-.pj-reconversion select { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
+.pj-reconversion .sel-declencheur { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
 
 /* Colonne du milieu et classement : mêmes économies de place. */
 .carriere .journal { padding: 0.9rem; gap: 0.7rem; }
@@ -3088,7 +3207,7 @@
   .pj-actions button { font-size: 1.05rem; }
   .pj-actions button span { font-size: 0.76rem; }
   .pj-reconversion label { font-size: 0.8rem; }
-  .pj-reconversion select { font-size: 0.86rem; }
+  .pj-reconversion .sel-declencheur { font-size: 0.86rem; }
 
   /* Le classement latéral : même traitement, mêmes raisons. */
   .cl-lat-nom, .cl-lat-pts { font-size: 0.86rem; }
@@ -4438,7 +4557,7 @@
 .ml-tiroir .ml-coaching-manager fieldset button { min-height:46px; text-align:center; }
 .ml-changement-manuel > div { display:grid !important; grid-template-columns:1fr !important; }
 .ml-changement-manuel label { display:grid; gap:.2rem; color:var(--craie-dim); font-size:.7rem; }
-.ml-changement-manuel select { width:100%; min-height:38px; padding:.3rem; border:1px solid rgba(255,255,255,.14); border-radius:7px; color:var(--craie); background:#08180f; }
+.ml-changement-manuel .sel-declencheur { width:100%; min-height:38px; padding:.3rem .5rem; border-radius:7px; font-size:.85rem; }
 .ml-changement-manuel button:disabled { opacity:.55; }
 .ml-banc-vide { color:var(--craie-dim); font-size:.75rem; }
 
@@ -7808,7 +7927,6 @@ select:focus {
     linear-gradient(135deg, rgba(255,255,255,.055), transparent 48%),
     rgba(4,13,9,.72);
 }
-.manager-roles-visuels .sel-menu { min-width: 260px; }
 .manager-tactiques-selects .sel-declencheur {
   min-height: 48px;
   padding: .5rem .58rem;
@@ -7816,12 +7934,12 @@ select:focus {
   font-size: .84rem;
 }
 .manager-tactiques-selects .sel-vignette { color: var(--or-300); }
-.manager-tactiques-selects .sel-menu { width: max(100%, 250px); }
-.manager-tactiques-selects label:nth-child(n+4) .sel-menu { left: auto; right: 0; }
+/* ⚠️ LES RÈGLES `.manager-*  .sel-menu` ONT ÉTÉ RETIRÉES, pas oubliées : le
+   menu est désormais rendu dans un portail sur `document.body`, donc aucun
+   sélecteur de descendance ne l'atteint plus. Largeur, débordement et
+   retournement se calculent dans `placer()` (`components/Selecteur.tsx`). */
 
 @media (max-width: 700px) {
-  .manager-roles-visuels .sel-menu,
-  .manager-tactiques-selects .sel-menu { width: 100%; min-width: 0; left: 0; right: auto; }
   .manager-roles-visuels .sel-declencheur { min-height: 50px; }
 }
 

@@ -652,9 +652,12 @@ export function porteeSportive(
   saison: number,
   prestige = 0,
 ): PorteeSportive {
-  const comp = competitionDuClub(club);
+  // ⚠️ LA DIVISION EFFECTIVE, PAS CELLE D'ORIGINE. Un club promu joue dans sa
+  // nouvelle poule partout ailleurs dans le mode ; le marché doit le juger sur
+  // celle-là, sinon la promotion n'ouvre aucun recrutement.
+  const comp = competitionEffective(club);
   const niveauClub = comp?.niveau ?? 8;
-  const niveauJoueur = competitionDuClub(cible.club)?.niveau ?? niveauClub;
+  const niveauJoueur = competitionEffective(cible.club)?.niveau ?? niveauClub;
 
   // Un joueur libre a moins d'options : il regarde un cran plus bas.
   const libre = cible.situation === 'libre' || cible.situation === 'finDeContrat';
@@ -662,8 +665,32 @@ export function porteeSportive(
   // où l'on accepte un club en dessous de son niveau.
   const age = cible.age <= 22 ? 3 : cible.age >= 32 ? 3 : 0;
 
-  const plafond = forceDuGroupe(club, saison)
-    + MARGE_ATTRACTIVITE + age + (libre ? 2 : 0) + prestige / 10;
+  // ⚠️ L'ANCRE EST LE PLUS HAUT DES DEUX : SON GROUPE, OU SA DIVISION.
+  //
+  // Le plafond n'a longtemps lu que `forceDuGroupe`, et c'était une IMPASSE
+  // pour tout club plus faible que son étage — c'est-à-dire pour tout promu.
+  // On compare une note INDIVIDUELLE à une MOYENNE d'effectif : le meilleur
+  // joueur d'une poule est toujours très au-dessus de la moyenne de la poule.
+  // Mesuré en Nationale 2 (notes réelles : q1 57, médiane 61) :
+  //
+  //   groupe 45 → plafond 49 →  1 % de sa PROPRE division à portée
+  //   groupe 50 → plafond 54 → 10 %  (40 % en visant un vétéran libre)
+  //   groupe 64 → plafond 68 → 93 %
+  //
+  // Autrement dit : on montait de division, on avait besoin de se renforcer,
+  // et la règle interdisait TOUT recrutement — y compris les moins bons de sa
+  // nouvelle poule et les fins de carrière. Le garde-fou censé empêcher une
+  // Régionale 3 de signer le meilleur joueur du monde empêchait surtout un
+  // club en difficulté de signer qui que ce soit.
+  //
+  // Ancrer sur `forceMoyenneDivision` ne rouvre PAS la porte du haut : c'est la
+  // référence de l'étage où l'on joue, donc ~34 en Régionale 3 et ~86 en
+  // Top 14. Un club garde toujours accès au marché de sa division ; il ne gagne
+  // rien au-dessus.
+  const reference = comp
+    ? Math.max(forceDuGroupe(club, saison), forceMoyenneDivision(comp.id, saison))
+    : forceDuGroupe(club, saison);
+  const plafond = reference + MARGE_ATTRACTIVITE + age + (libre ? 2 : 0) + prestige / 10;
 
   const chute = niveauClub - niveauJoueur;
   if (chute > chuteMax(cible.age, niveauClub)) {

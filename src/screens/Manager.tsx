@@ -742,7 +742,19 @@ export function Manager() {
                   ['Capitaine', profonde.capitaines.capitaineId || manager.composition.capitaineId, (id: string) => definirHierarchieCapitaines(id, profonde.capitaines.viceCapitaineId, profonde.capitaines.troisiemeCapitaineId)],
                   ['Vice-capitaine', profonde.capitaines.viceCapitaineId, (id: string) => definirHierarchieCapitaines(profonde.capitaines.capitaineId || manager.composition.capitaineId, id, profonde.capitaines.troisiemeCapitaineId)],
                   ['3e capitaine', profonde.capitaines.troisiemeCapitaineId, (id: string) => definirHierarchieCapitaines(profonde.capitaines.capitaineId || manager.composition.capitaineId, profonde.capitaines.viceCapitaineId, id)],
-                ].map(([label, valeur, changer]) => <label key={String(label)}><span>{String(label)}</span><select value={String(valeur)} onChange={(e) => (changer as (id: string) => void)(e.target.value)}><option value="">Non désigné</option>{effectifBrut.map((j) => <option key={j.id} value={j.id}>{j.nom} · {j.age} ans · {nomPoste(j.poste)}</option>)}</select></label>)}</div>
+                ].map(([label, valeur, changer]) => <label key={String(label)}><span>{String(label)}</span><Selecteur
+                  options={[
+                    { valeur: '', label: 'Non désigné' },
+                    ...effectifBrut.map((j) => ({
+                      valeur: j.id,
+                      label: j.nom,
+                      sous: `${j.age} ans · ${nomPoste(j.poste)}`,
+                    })),
+                  ]}
+                  valeur={String(valeur)}
+                  onChange={changer as (id: string) => void}
+                  recherche
+                /></label>)}</div>
               </section>}
 
               {!!discussionsOuvertes.length && <section className="discussions-joueurs">
@@ -809,7 +821,7 @@ export function Manager() {
           {vue === 'histoire' && avancee && (
             <div className="manager-avance-grille histoire-manager">
               <section className="carte avance-entete"><div><div className="eyebrow">Aucune saison ne disparaît</div><h2><Icone nom="livre" taille={20} /> Mémoire de la sauvegarde</h2><p>Palmarès des compétitions, carrières saison par saison, anciens joueurs, Hall of Fame et reconversions restent consultables.</p></div><div className="avance-score"><b>{Object.values(avancee.histoire).reduce((n, s) => n + s.length, 0)}</b><span>saisons archivées</span></div></section>
-              {profonde && <section className="carte chronologie-annuelle-manager"><div className="comp-tete"><div><b><Icone nom="chrono" taille={16} /> L’année en événements</b><small>Transferts, licenciements, sélections, records, titres, retraites et décisions majeures restent consultables saison par saison.</small></div><select value={saisonChronologie} onChange={(e) => setSaisonChronologie(Number(e.target.value))}><option value={manager.saison}>Saison {manager.saison}</option>{saisonsMemoire.filter((s) => s !== manager.saison).map((s) => <option key={s} value={s}>Saison {s}</option>)}</select></div><div>{chronologieVisible.map((evenement) => <article key={evenement.id} className={`importance-${evenement.importance}`}><time>{evenement.mois}</time><span>{evenement.categorie}</span><div><b>{evenement.titre}</b><p>{evenement.texte}</p></div></article>)}{!chronologieVisible.length && <p className="manager-vide-texte">Aucun événement majeur enregistré pour cette saison. Les faits ordinaires restent dans le journal du club.</p>}</div></section>}
+              {profonde && <section className="carte chronologie-annuelle-manager"><div className="comp-tete"><div><b><Icone nom="chrono" taille={16} /> L’année en événements</b><small>Transferts, licenciements, sélections, records, titres, retraites et décisions majeures restent consultables saison par saison.</small></div><Selecteur options={[{ valeur: String(manager.saison), label: `Saison ${manager.saison}` }, ...saisonsMemoire.filter((s) => s !== manager.saison).map((s) => ({ valeur: String(s), label: `Saison ${s}` }))]} valeur={String(saisonChronologie)} onChange={(v) => setSaisonChronologie(Number(v))} /></div><div>{chronologieVisible.map((evenement) => <article key={evenement.id} className={`importance-${evenement.importance}`}><time>{evenement.mois}</time><span>{evenement.categorie}</span><div><b>{evenement.titre}</b><p>{evenement.texte}</p></div></article>)}{!chronologieVisible.length && <p className="manager-vide-texte">Aucun événement majeur enregistré pour cette saison. Les faits ordinaires restent dans le journal du club.</p>}</div></section>}
 
               {vieProfonde && <section className="carte records-club-manager"><div className="comp-tete"><div><b><Icone nom="trophee" taille={16} /> Records de {manager.club}</b><small>Ils sont recalculés après chaque match et une notification marque chaque nouveau sommet.</small></div><span className="comp-count">{Object.keys(vieProfonde.records.club).length}</span></div><div>{Object.values(vieProfonde.records.club).map((record) => <article key={record.id}><span><b>{record.libelle}</b><small>{record.joueurNom || record.adversaire || `Saison ${record.saison}`}</small></span><strong>{record.valeur.toLocaleString('fr-FR')} {record.unite}</strong></article>)}{!Object.keys(vieProfonde.records.club).length && <p className="manager-vide-texte">Le premier match joué ouvrira le livre des records.</p>}</div><h3>Records du championnat</h3><div>{Object.values(vieProfonde.records.championnat).map((record) => <article key={record.id}><span><b>{record.libelle}</b><small>Saison {record.saison}</small></span><strong>{record.valeur.toLocaleString('fr-FR')} {record.unite}</strong></article>)}</div></section>}
 
@@ -1137,16 +1149,26 @@ export function Manager() {
                           </div>
                           <label>
                             <span>Objectif individuel</span>
-                            <select value={j.objectif} onChange={(e) => definirObjectifJeune(j.id, e.target.value as ObjectifJeuneManager)}>
-                              {OBJECTIFS_JEUNES.map((o) => <option key={o.id} value={o.id}>{o.nom} · {o.effet}</option>)}
-                            </select>
+                            <Selecteur
+                              options={OBJECTIFS_JEUNES.map((o) => ({ valeur: o.id, label: o.nom, sous: o.effet }))}
+                              valeur={j.objectif}
+                              onChange={(v) => definirObjectifJeune(j.id, v as ObjectifJeuneManager)}
+                            />
                           </label>
                           <label>
                             <span>Mentor senior</span>
-                            <select value={j.mentorId ?? ''} onChange={(e) => definirMentorJeune(j.id, e.target.value || undefined)}>
-                              <option value="">Aucun mentor</option>
-                              {mentors.map((mentor) => <option key={mentor.id} value={mentor.id}>{mentor.nom} · {mentor.age} ans · {mentor.note}</option>)}
-                            </select>
+                            <Selecteur
+                              options={[
+                                { valeur: '', label: 'Aucun mentor' },
+                                ...mentors.map((mentor) => ({
+                                  valeur: mentor.id,
+                                  label: mentor.nom,
+                                  sous: `${mentor.age} ans · note ${mentor.note}`,
+                                })),
+                              ]}
+                              valeur={j.mentorId ?? ''}
+                              onChange={(v) => definirMentorJeune(j.id, v || undefined)}
+                            />
                           </label>
                           <p><b>{nomObjectifJeune(j.objectif)}</b> · temps de jeu {j.tempsDeJeu}% · professionnalisme {j.professionnalisme}</p>
                         </article>

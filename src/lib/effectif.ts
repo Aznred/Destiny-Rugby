@@ -17,6 +17,21 @@ import { generationDuClub } from './generations';
 export interface Coequipier {
   /** Sorti du centre de formation du club (🎓 à l'écran). */
   duCentre?: boolean;
+  /**
+   * Ce joueur ne suit PAS le cycle de génération de son nouveau club.
+   *
+   * ⚠️ C'EST CE QUI FAIT QUE LA NOTE DU MARCHÉ EST LA VRAIE NOTE. Le bonus de
+   * `generationDuClub` s'applique à tout l'effectif, donc il s'appliquait aussi
+   * à une recrue — qui perdait au passage le bonus de son ANCIEN club et
+   * héritait de celui du nouveau. Mesuré à la saison 3 sur 70 clubs : de −3,5
+   * à +5,2, soit près de NEUF points d'écart possible. Un joueur affiché 74 sur
+   * le marché arrivait à 65, sans que rien ne l'explique.
+   *
+   * Une génération, c'est une promotion de joueurs que le club a vue grandir
+   * ensemble ; un trentenaire acheté cet été n'en fait pas partie. Il garde
+   * donc la note sur laquelle on l'a acheté.
+   */
+  horsGeneration?: boolean;
   id: string;
   nom: string;
   poste: PosteId;
@@ -590,13 +605,18 @@ export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
   if (Math.abs(bonus) < 0.05) {
     return appliquerProgres(nomClub, saison, distinguerLesHomonymes(liste));
   }
-  return appliquerProgres(nomClub, saison, distinguerLesHomonymes(liste.map((j) => ({
-    ...j,
-    note: Math.max(20, Math.min(99, Math.round(j.note + bonus))),
-    // Le potentiel suit : une génération dorée, ce sont des joueurs qui
-    // dépassent ce qu'on attendait d'eux, pas seulement une bonne saison.
-    potentiel: Math.max(20, Math.min(99, Math.round(j.potentiel + bonus * 0.6))),
-  }))));
+  return appliquerProgres(nomClub, saison, distinguerLesHomonymes(liste.map((j) => (
+    // ⚠️ UNE RECRUE NE SUIT PAS LA GÉNÉRATION DE SON NOUVEAU CLUB. Elle arrive
+    // avec la note sur laquelle on l'a achetée ; lui appliquer le cycle du club
+    // acheteur, c'est faire mentir la fiche du marché de plusieurs points.
+    j.horsGeneration ? j : {
+      ...j,
+      note: Math.max(20, Math.min(99, Math.round(j.note + bonus))),
+      // Le potentiel suit : une génération dorée, ce sont des joueurs qui
+      // dépassent ce qu'on attendait d'eux, pas seulement une bonne saison.
+      potentiel: Math.max(20, Math.min(99, Math.round(j.potentiel + bonus * 0.6))),
+    }
+  ))));
 }
 
 // Un groupe doit pouvoir aligner un XV et son banc. Les données réelles vont de
@@ -877,26 +897,57 @@ function appliquerTransfertsSociaux(
   const concernes = TRANSFERTS_SOCIAUX.filter((t) => t.saison <= saison);
   if (!concernes.length) return liste;
 
-  // Les partants s'en vont.
-  const partis = new Set(
-    concernes.filter((t) => t.de === nomClub).map((t) => normaliser(t.nom)),
-  );
-  let sortie = partis.size ? liste.filter((j) => !partis.has(normaliser(j.nom))) : liste;
+  // ⚠️ SEUL LE DERNIER MOUVEMENT D'UN JOUEUR COMPTE, et c'était le bug. Les
+  // départs se calculaient sur la liste d'ORIGINE, puis la boucle des arrivées
+  // rajoutait tout ce qui pointait vers ce club — sans regarder si le joueur
+  // en était reparti depuis. Conséquence : une recrue mise en vente était
+  // retirée d'une liste où elle ne figurait pas encore, puis remise aussitôt
+  // par la boucle d'arrivée. « On peut pas virer les joueurs qu'on a
+  // recrutés » : ils revenaient à chaque rendu.
+  //
+  // Les annonces sont chronologiques (le store ajoute en fin de tableau) : la
+  // dernière qui concerne un joueur dit donc où il se trouve aujourd'hui. Ça
+  // gère du même coup les allers-retours et les reventes en chaîne.
+  const dernier = new Map<string, TransfertAnnonce>();
+  for (const t of concernes) dernier.set(normaliser(t.nom), t);
 
-  // Les arrivants débarquent — avec leurs vraies caractéristiques quand on les
-  // retrouve dans leur ancien club, sinon avec ce qu'annonçait le post.
-  for (const t of concernes) {
+  // Ceux dont le dernier mouvement les emmène ailleurs quittent le groupe.
+  let sortie = liste.filter((j) => {
+    const t = dernier.get(normaliser(j.nom));
+    return !t || t.vers === nomClub;
+  });
+
+  // Les arrivants débarquent — avec la note EXACTE qu'affichait le marché.
+  //
+  // ⚠️ ON REPREND LE JOUEUR AVEC LE BONUS DE SON ANCIEN CLUB, et on le marque
+  // `horsGeneration`. `effectifBrut` rend la note NUE, alors que la fiche du
+  // marché lit `effectifDuClub` — donc la note bonifiée par la génération du
+  // club vendeur. Sans ce report, un joueur affiché 74 chez un club en pleine
+  // génération dorée arrivait à 69 (bonus source perdu), puis repartait à 65
+  // chez un acheteur en creux (bonus destination appliqué). Neuf points
+  // d'écart, jamais annoncés : « ils ont pas du tout les bons généraux ».
+  for (const [cle, t] of dernier) {
     if (t.vers !== nomClub) continue;
-    if (sortie.some((j) => normaliser(j.nom) === normaliser(t.nom))) continue;
-    const ancien = effectifBrut(t.de, saison).find((j) => normaliser(j.nom) === normaliser(t.nom));
+    if (sortie.some((j) => normaliser(j.nom) === cle)) continue;
+    const ancien = effectifBrut(t.de, saison).find((j) => normaliser(j.nom) === cle);
     const noteAnnoncee = Number.isFinite(t.note) ? Math.max(30, Math.min(95, t.note!)) : 60;
     const age = ancien?.age ?? (Number.isFinite(t.age) ? t.age! : 26);
+    // Le bonus du club d'origine, calculé exactement comme dans `effectifDuClub`.
+    const bonusSource = ancien
+      ? generationDuClub(t.de, saison, noteDuClub(t.de)).bonus
+      : 0;
     sortie = [
       ...sortie,
       ancien
-        ? { ...ancien, id: `${nomClub}-ovale-${normaliser(t.nom)}` }
+        ? {
+            ...ancien,
+            id: `${nomClub}-ovale-${cle}`,
+            horsGeneration: true,
+            note: Math.max(20, Math.min(99, Math.round(ancien.note + bonusSource))),
+            potentiel: Math.max(20, Math.min(99, Math.round(ancien.potentiel + bonusSource * 0.6))),
+          }
         : {
-            id: `${nomClub}-ovale-${normaliser(t.nom)}`,
+            id: `${nomClub}-ovale-${cle}`,
             nom: t.nom,
             poste: posteConcret((t.poste ?? 'centre') as FamillePoste, nomClub + t.nom),
             age,
@@ -904,6 +955,7 @@ function appliquerTransfertsSociaux(
             potentiel: Math.min(95, noteAnnoncee + Math.max(0, 27 - age)),
             nation: t.nation ?? 'France',
             regen: false,
+            horsGeneration: true,
           },
     ];
   }

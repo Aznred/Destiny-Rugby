@@ -42,7 +42,9 @@ export type NomIcone =
   // ── Les menus, la boutique, le palmarès ──────────────────────────────────
   | 'boutique' | 'ova' | 'check' | 'verrou' | 'video' | 'medaille'
   | 'bouclier' | 'eclair' | 'calendrier' | 'image' | 'dossier' | 'cadeau'
-  | 'contrat' | 'porte' | 'plein-ecran' | 'mallette' | 'repost';
+  | 'contrat' | 'porte' | 'plein-ecran' | 'mallette' | 'repost'
+  // ── Les listes déroulantes ───────────────────────────────────────────────
+  | 'chevron';
 
 interface Props {
   nom: NomIcone;
@@ -469,6 +471,14 @@ const TRACES: Record<NomIcone, React.ReactNode> = {
   // ⚠️ UNE COCHE NUE, distincte de `ok` (une coche DANS un cercle). Les deux
   // servent : `ok` est un verdict qui doit se voir seul, `check` accompagne un
   // libellé (« ✓ Équipé », « ✓ Ta carrière est sauvegardée »).
+  // Le chevron des listes déroulantes. Il remplace le caractère « ▾ », qui
+  // est un GLYPHE DE POLICE : dessiné par le système, jamais à la même
+  // graisse que le reste, et décalé d'un ou deux pixels selon la machine.
+  chevron: (
+    <>
+      <path d="m6 9.5 6 6 6-6" />
+    </>
+  ),
   check: (
     <>
       <path d="m5 12.6 4.6 4.6L19 6.8" />

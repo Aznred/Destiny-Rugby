@@ -84,6 +84,7 @@ import { situationInternationale } from '../lib/rassemblements';
 // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
 
 import { Icone } from './Icone';
+import { Selecteur } from './Selecteur';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
@@ -1723,8 +1724,8 @@ function CoachingManager({
         <legend>Changement manuel</legend>
         {banc.length ? (
           <div>
-            <label><span>Sortir</span><select value={sortantActif} onChange={(ev) => setSortant(ev.target.value)}>{terrain.map((p) => <option key={p.sourceId} value={p.sourceId}>n° {p.numero} · {p.nom} · {Math.round(p.endurance)} %</option>)}</select></label>
-            <label><span>Faire entrer</span><select value={entrantActif} onChange={(ev) => setEntrant(ev.target.value)}>{banc.map((p) => <option key={p.sourceId} value={p.sourceId}>n° {p.numero} · {p.nom}</option>)}</select></label>
+            <label><span>Sortir</span><Selecteur options={terrain.map((p) => ({ valeur: p.sourceId, label: `n° ${p.numero} · ${p.nom}`, sous: `${Math.round(p.endurance)} % d'endurance` }))} valeur={sortantActif} onChange={setSortant} /></label>
+            <label><span>Faire entrer</span><Selecteur options={banc.map((p) => ({ valeur: p.sourceId, label: `n° ${p.numero} · ${p.nom}` }))} valeur={entrantActif} onChange={setEntrant} /></label>
             <button type="button" disabled={!sortantActif || !entrantActif || !!demande} onClick={() => demanderRemplacement(e, cote, entrantActif, sortantActif)}>{demande ? '⏳ Prévu au prochain arrêt' : '🔄 Programmer le changement'}</button>
           </div>
         ) : <span className="ml-banc-vide">Les huit remplaçants sont entrés.</span>}
