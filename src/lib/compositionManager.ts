@@ -136,3 +136,25 @@ export function joueurCompatibleManager(joueur: Coequipier, poste: PosteId): boo
  * équipe ». Posé dans le store, il serait un nombre magique de plus.
  */
 export const EFFECTIF_MINIMUM = 26;
+
+/**
+ * Le plancher de VENTE — et ce n’est PAS le même nombre que celui du dessus.
+ *
+ * ⚠️ LES DEUX ONT LONGTEMPS VALU 26, ET C’ÉTAIT UN BUG BLOQUANT.
+ * `completerEffectif` (lib/effectif.ts) complète TOUT groupe jusqu’à 26 avec
+ * des joueurs inventés : un club modeste en compte donc exactement 26, jamais
+ * moins. Le garde de vente, lui, refusait dès `restants <= 26`. Résultat :
+ * dans un club rempli au minimum — c’est-à-dire la majorité des clubs
+ * amateurs — **on ne pouvait vendre absolument personne**, et le refus
+ * s’expliquait par un message qui n’avait aucun sens (« il te faut 26
+ * joueurs » alors qu’on en avait 26).
+ *
+ * ⚠️ ET LE REMPLISSAGE REND CE PLANCHER SÛR. Puisque le groupe est complété
+ * à 26 quoi qu’il arrive, vendre ne peut PAS empêcher d’aligner une équipe :
+ * le club remplace le partant par un joueur de complément, plus faible. La
+ * sanction est sportive, pas administrative — c’est ce qu’on veut.
+ *
+ * Vingt-trois, c’est la feuille de match : en dessous, on jouerait vraiment
+ * à moins de quinze plus le banc.
+ */
+export const EFFECTIF_MINIMUM_VENTE = 23;

@@ -211,6 +211,45 @@ export function valeurEstimee(
 }
 
 /**
+ * L'INDEMNITÉ QU'UN CLUB AMATEUR VERSE VRAIMENT.
+ *
+ * ⚠️ C'ÉTAIT ZÉRO, ET ÇA VIDAIT LE MODE DE SON ÉCONOMIE. `valeurMarchande`
+ * rendait `0` dès `estAmateurNiveau(niveau)`, c'est-à-dire à partir de la
+ * Nationale 2 — soit SEPT divisions françaises sur dix, et précisément celles
+ * où commence toute carrière d'entraîneur. Conséquence mesurée : de la
+ * Régionale 3 à la Nationale 2, chaque joueur valait 0 €, chaque offre reçue
+ * valait 0 €, et vendre son meilleur élément ne rapportait pas un centime. Le
+ * marché existait à l'écran et ne servait à rien.
+ *
+ * ⚠️ ON NE FAIT PAS DES AMATEURS DES PROS POUR AUTANT. Dans le rugby français,
+ * un club de Fédérale n'achète pas un joueur : il verse une indemnité de
+ * formation ou de mutation, sans commune mesure avec un transfert
+ * professionnel. La courbe ci-dessous garde donc cet ordre de grandeur — on
+ * passe de quelques centaines d'euros en Régionale à quelques dizaines de
+ * milliers en Nationale 2, là où le barème pro démarrerait à des centaines de
+ * milliers.
+ */
+const PART_INDEMNITE_AMATEUR: Record<number, number> = {
+  4: 0.09,   // Nationale 2 — semi-pro, les indemnités existent vraiment
+  5: 0.035,  // Fédérale 1
+  6: 0.018,  // Fédérale 2
+  7: 0.009,  // Fédérale 3
+  8: 0.005,  // Régionale 1
+  9: 0.003,  // Régionale 2
+  10: 0.002, // Régionale 3
+};
+
+export function indemniteAmateur(
+  joueur: { note: number; potentiel: number; age: number },
+  niveau: number,
+): number {
+  const part = PART_INDEMNITE_AMATEUR[niveau] ?? 0.002;
+  const brut = valeurEstimee(joueur) * part;
+  // En dessous de 200 €, ça ne vaut pas la peine d'être écrit sur une fiche.
+  return brut < 200 ? 0 : Math.round(brut / 100) * 100;
+}
+
+/**
  * LE SALAIRE ANNUEL d'un joueur, à son étage et pour ce qu'il y pèse.
  *
  * ⚠️ L'ÉCART DE SALAIRE ÉTAIT BEAUCOUP TROP ÉTROIT — c'est le second défaut

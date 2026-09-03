@@ -15,7 +15,7 @@ import { graine } from './championnat';
 import { pseudoStable } from './comptes';
 import { primeDeMatch, salaire } from './offres';
 import {
-  financesDuClub, indemniteDeRachat, salaryCap, situationDe, valeurEstimee,
+  financesDuClub, indemniteAmateur, indemniteDeRachat, salaryCap, situationDe, valeurEstimee,
 } from './economie';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -264,7 +264,10 @@ export function valeurMarchande(
   niveau: number,
   rarete = 1,
 ): number {
-  if (estAmateurNiveau(niveau)) return 0;
+  // ⚠️ PLUS DE ZÉRO SEC : voir indemniteAmateur (lib/economie.ts). Sept des dix
+  //    divisions françaises sont amateurs, et la carrière d’entraîneur commence
+  //    là — rendre 0 y supprimait purement et simplement le marché.
+  if (estAmateurNiveau(niveau)) return indemniteAmateur(joueur, niveau);
   return arrondir(valeurEstimee(joueur) * rarete, 5_000);
 }
 

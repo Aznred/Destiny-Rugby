@@ -532,12 +532,41 @@ export function genererOffres(j: Joueur, ctx: ContexteOffres): OffreContrat[] {
 }
 
 // Le club actuel propose systématiquement une prolongation en fin de contrat.
+/**
+ * La prolongation proposée par le club actuel — quand il en veut encore.
+ *
+ * ⚠️ ELLE ÉTAIT INCONDITIONNELLE, ET C'ÉTAIT LE BUG. Cette fonction rendait
+ * TOUJOURS une offre : ni l'âge, ni le niveau, ni la saison écoulée n'entraient
+ * en jeu. On pouvait donc rester au même club de 20 à 44 ans en signant
+ * prolongation sur prolongation, sans jamais avoir à se battre pour une place —
+ * mesuré : seize saisons d'affilée au même club, sans une seule remise en
+ * question. Un club de rugby ne renouvelle pas un joueur qui a décroché.
+ *
+ * ⚠️ LE CRITÈRE EST LE MÊME QUE POUR RECRUTER : l'écart entre la cote du joueur
+ * et la note du club. On ne réinvente pas une seconde doctrine — un club garde
+ * qui il recruterait. Le seuil est simplement plus INDULGENT que pour une
+ * arrivée : on pardonne à celui qui est déjà là (l'attachement, le vestiaire,
+ * le coût d'un remplaçant), mais pas indéfiniment.
+ */
 export function offreProlongation(j: Joueur, comp: Competition | undefined, saison: number): OffreContrat | null {
   if (!comp) return null;
   const note = noteDuClub(j.club);
+  const ecart = cote(j) - note;
+
+  // ⚠️ TROP FAIBLE POUR SON CLUB : on ne prolonge pas. La marge de tolérance se
+  // resserre avec l'âge — à 22 ans on parie sur la marge de progression, à 35
+  // on regarde ce que le joueur vaut aujourd'hui.
+  const tolerance = j.age <= 23 ? 14 : j.age <= 29 ? 10 : j.age <= 33 ? 6 : 3;
+  if (ecart < -tolerance) return null;
+
+  // ⚠️ ET UNE SAISON RATÉE COMPTE. `noteSaison` est la note sur 10 de l'année
+  // écoulée ; en dessous de 4 chez un joueur qui n'est déjà pas au niveau, le
+  // club passe à autre chose plutôt que de reconduire par habitude.
+  if ((j.noteSaison ?? 6) < 4 && ecart < 0) return null;
+
   const etranger = comp.zone === 'Monde';
   const amateur = sansSalaire(j.club, comp.niveau, etranger);
-  const sal = amateur ? 0 : salaire(comp.niveau, cote(j) - note, j.age);
+  const sal = amateur ? 0 : salaire(comp.niveau, ecart, j.age);
   compteurOffre += 1;
   return {
     id: `prolong-${saison}-${compteurOffre}`,
@@ -548,8 +577,9 @@ export function offreProlongation(j: Joueur, comp: Competition | undefined, sais
     noteClub: Math.round(note),
     salaire: sal,
     prime: amateur ? 0 : Math.round(sal * 0.15),
-    primeMatch: amateur ? primeDeMatch(comp.niveau, cote(j) - note, j.age) : 0,
-    saisons: 2 + Math.floor(Math.random() * 3),
+    primeMatch: amateur ? primeDeMatch(comp.niveau, ecart, j.age) : 0,
+    // Un vétéran ne signe plus pour quatre ans : le club s'engage à l'année.
+    saisons: j.age >= 34 ? 1 : j.age >= 31 ? 1 + Math.floor(Math.random() * 2) : 2 + Math.floor(Math.random() * 3),
     etranger: false,
     argumentaire: 'Ton club veut te garder : tu connais le vestiaire, le public t\'a adopté.',
   };

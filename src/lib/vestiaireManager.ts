@@ -13,7 +13,7 @@
 import { competitionDuClub, COMPETITIONS } from '../data/clubs';
 import { graine } from './championnat';
 import { pseudoStable } from './comptes';
-import { estAmateurNiveau, forceDuGroupe, valeurMarchande } from './recrutementManager';
+import { estAmateurNiveau, forceDuGroupe, saisonsDeContrat, valeurMarchande } from './recrutementManager';
 import type {
   CibleRecrutementManager, DemandeJoueur, Manager, NegociationClubManager, OffreVente, VenteManager,
 } from '../types';
@@ -149,7 +149,44 @@ export function demandeAGenerer(
     // ne joue pas. Celui qui se plaint, c'est celui qui a des arguments.
     && j.note >= force - 3
   ));
-  if (!laises.length) return null;
+  if (!laises.length) {
+    // ⚠️ ON N'ÉTAIT CONVOITÉ QUE QUAND ON BOUDAIT. Jusqu'ici, la seule façon
+    // qu'un joueur bouge était qu'il se PLAIGNE de son temps de jeu : une star
+    // alignée tous les week-ends ne recevait donc jamais la moindre marque
+    // d'intérêt, et le manager n'avait aucun moyen de faire rentrer de l'argent
+    // sans d'abord mettre au placard son meilleur élément. Retour de jeu :
+    // « ils se font pas acheter ou reçoivent pas d'offres en fonction du
+    // potentiel ou du niveau ».
+    //
+    // ⚠️ LE CRITÈRE EST CELUI QU'ON ATTEND : trop bon pour son étage, ou jeune
+    // avec de la marge. Un club supérieur remarque d'abord celui qui dépasse,
+    // ensuite celui qui promet. Le tirage est SEEDÉ sur la semaine : la même
+    // sauvegarde rejouée donne la même convoitise, et recharger la page ne fait
+    // pas apparaître une offre qui n'était pas là.
+    const convoitables = effectif.filter((j) => {
+      if (dejaVus.has(j.id) || j.age < AGE_MIN_DEMANDE) return false;
+      const auDessus = j.note - force;
+      const marge = j.potentiel - j.note;
+      return auDessus >= 5 || (j.age <= 23 && marge >= 8 && auDessus >= -2);
+    });
+    if (!convoitables.length) return null;
+
+    // Plus le joueur dépasse son étage, plus les clubs sont insistants — mais
+    // ça reste un évènement : une fois toutes les huit journées environ.
+    const lui = convoitables.sort((a, b) => (b.note - b.age * 0.3) - (a.note - a.age * 0.3))[0];
+    const interet = Math.min(0.3, 0.05 + Math.max(0, lui.note - force) * 0.025);
+    const dé = graine(`convoitise#${m.club}#${lui.id}#${m.saison}#${m.semaine}`)();
+    if (dé > interet) return null;
+
+    return {
+      pseudo: pseudoStable(lui.nom),
+      joueurId: lui.id,
+      nom: lui.nom,
+      poste: lui.poste,
+      note: lui.note,
+      type: 'depart',
+    };
+  }
 
   const lui = laises.sort((a, b) => b.note - a.note)[0];
   return {
@@ -170,10 +207,31 @@ export function demandeAGenerer(
 // ---------------------------------------------------------------------------
 
 /** Ce qu'on peut espérer d'un joueur du groupe, au barème du jeu. */
+/**
+ * CE QUE VAUT UN JOUEUR QU'ON MET SUR LA LISTE — contrat compris.
+ *
+ * ⚠️ LE CONTRAT ÉTAIT IGNORÉ, ET C'EST CE QUI FAISAIT « TOUT LE MONDE EST
+ * LIBRE ». `saisonsDeContrat` existe depuis le lot du marché mondial et donne à
+ * CHAQUE joueur du monde une durée de contrat déterministe (2 à 4 saisons, qui
+ * s'écoulent) — le commentaire de cette fonction dit même qu'elle « commande
+ * tout le nouveau marché ». Mais la vente, elle, ne la lisait pas : on vendait
+ * un cadre sous contrat trois ans au même prix qu'un joueur libre dans un mois,
+ * et l'écran ne montrait nulle part qu'un contrat existait.
+ *
+ * ⚠️ À ZÉRO SAISON RESTANTE, ON NE TOUCHE RIEN. C'est la règle du rugby comme
+ * du football : un joueur en fin de contrat part libre. Vendre, c'est donc
+ * arbitrer — encaisser maintenant, ou garder et perdre l'indemnité.
+ */
 export function valeurDeVente(
-  j: Pick<Coequipier, 'note' | 'potentiel' | 'age'>, club: string,
+  j: Pick<Coequipier, 'note' | 'potentiel' | 'age' | 'id'>, club: string, saison = 1,
 ): number {
-  return valeurMarchande(j, competitionDuClub(club)?.niveau ?? 8);
+  const base = valeurMarchande(j, competitionDuClub(club)?.niveau ?? 8);
+  if (base <= 0) return 0;
+  const restantes = saisonsDeContrat(club, j.id, saison);
+  // Trois ans et plus : plein tarif. Un an : le club acheteur sait qu'il peut
+  // attendre, il ne paie qu'une part. Zéro : départ libre.
+  const part = restantes <= 0 ? 0 : restantes === 1 ? 0.5 : restantes === 2 ? 0.8 : 1;
+  return Math.round(base * part);
 }
 
 /**
@@ -216,11 +274,19 @@ export function offresPourVente(
     if (vus.has(pris.club)) continue;
     vus.add(pris.club);
     // Autour de la valeur du barème : on ne brade pas, on ne s'envole pas.
+    //
+    // ⚠️ UN CLUB AMATEUR NE PAYAIT RIEN, MÊME QUAND LE JOUEUR VALAIT QUELQUE
+    // CHOSE. Ce `montant: 0` était le second verrou du marché amateur : même
+    // après avoir donné une vraie indemnité au barème, toutes les offres reçues
+    // sous la Nationale restaient à zéro. On verse donc l'indemnité — au pas de
+    // 500 € et non de 25 000, parce qu'on parle de milliers d'euros, pas de
+    // millions.
+    const pas = amateur ? 500 : 25_000;
     offres.push({
       id: `${pris.club}#${vente.joueurId}#${saison}#${i}`,
       club: pris.club,
       division: pris.division,
-      montant: amateur ? 0 : arrondir(vente.valeur * (0.82 + rng() * 0.36), 25_000),
+      montant: vente.valeur <= 0 ? 0 : arrondir(vente.valeur * (0.82 + rng() * 0.36), pas),
     });
   }
   return offres.sort((a, b) => b.montant - a.montant);

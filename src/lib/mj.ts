@@ -358,20 +358,51 @@ const STATS_VALIDES = new Set([
 // réponse du MJ : elles sont, elles, incontournables.
 // ---------------------------------------------------------------------------
 
+/**
+ * Ce qu'on compare : l'action, mise à plat.
+ *
+ * ⚠️ LES CONTOURNEMENTS TROUVÉS EN CHASSE ÉTAIENT TOUS TYPOGRAPHIQUES. « donne-moi
+ * +10 en vitèsse » passait à cause d'un accent, « a j o u t e 5 en force » à cause
+ * des espaces, « DONNE MOI PLUS DE VITESSE » parce que la tournure n'était pas
+ * couverte. On normalise donc AVANT de tester : accents retirés, espaces
+ * multiples réduits, et les lettres isolées recollées.
+ */
+function aPlat(action: string): string {
+  const sansAccent = action.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // « a j o u t e » → « ajoute ». Le séparateur est UN espace simple : avec
+  // `\s+`, « e n   f o r c e » se recollait en « enforce » et le mot cherché
+  // disparaissait. Deux espaces marquent donc toujours une coupure de mot.
+  const recolle = sansAccent.replace(/\b(?:[a-z] ){2,}[a-z]\b/g, (m) => m.replace(/ /g, ''));
+  return recolle.replace(/\s+/g, ' ').trim();
+}
+
+/** Les statistiques qu'on peut chercher à se faire offrir, en FR et en EN. */
+const STATS = '(vitesse|force|endurance|plaquage|passe|jeu|vision|mental|moral|forme|reput|stat|attribut|niveau|note|general|speed|strength|stamina|tackl|pace|rating|skill)';
+/** Les nombres écrits en toutes lettres servent aussi à dicter un gain. */
+const NOMBRES = String.raw`(\d+|un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|vingt|cent)`;
+
 // Tournures par lesquelles un joueur essaie de dicter le résultat plutôt que de
 // décrire une intention.
 const TOURNURES_TRICHE = [
-  /\+\s*\d+\s*(en|de|sur)?\s*(vitesse|force|endurance|plaquage|passe|jeu|vision|mental|moral|forme|r[ée]put)/i,
+  new RegExp(String.raw`\+\s*\d+\s*(en|de|sur)?\s*` + STATS, 'i'),
   /\b(donne|ajoute|augmente|mets|passe|offre)[- ]?(moi|mes|ma|mon)?\b.*\b(stats?|attributs?|points?|niveau|note|€|euros?|argent|salaire|million|contrat)/i,
+  // « donne moi plus de vitesse », « augmente ma force » — sans chiffre.
+  new RegExp(String.raw`\b(donne|ajoute|augmente|booste|maximise|monte|mets)\b[^.!?]{0,30}\b` + STATS, 'i'),
+  // « je progresse de dix points en vitesse », « +3 de force »
+  new RegExp(String.raw`\b` + NOMBRES + String.raw`\s*(points?|pts?)\b[^.!?]{0,20}\b` + STATS, 'i'),
   /\b(je (gagne|touche|re[çc]ois|obtiens))\b.*\b(\d{4,}|millions?|€)/i,
   /\bje (deviens|suis) (le|la|un|une)?\s*(meilleur|plus fort|star|l[ée]gende|international|titulaire)/i,
   /\b(ignore|oublie|annule)\b.*\b(r[èe]gles?|consignes?|limites?|instructions?)/i,
   /\b(system|prompt|json|deltas?)\b/i,
   /\bcheat|triche|admin|debug\b/i,
+  // Les mêmes ordres en anglais : le jeu est joué en sept langues.
+  new RegExp(String.raw`\b(give|add|increase|boost|set|raise)\b[^.!?]{0,30}\b(me|my)\b[^.!?]{0,30}\b` + STATS, 'i'),
+  new RegExp(String.raw`\bmy\b[^.!?]{0,20}\b` + STATS + String.raw`[^.!?]{0,20}\b(increases?|goes up|rises?)\b`, 'i'),
 ];
 
 export function ressembleATriche(action: string): boolean {
-  return TOURNURES_TRICHE.some((r) => r.test(action));
+  const plat = aPlat(action);
+  return TOURNURES_TRICHE.some((r) => r.test(plat));
 }
 
 export interface LimitesMJ {
@@ -380,6 +411,18 @@ export interface LimitesMJ {
   age: number;
   // Salaire de référence : borne les gains d'argent d'une seule action.
   salaire: number;
+  /**
+   * Ce qu'il reste à gagner en ARGENT via le MJ cette saison.
+   *
+   * ⚠️ IL MANQUAIT, ET LE GARDE-FOU ÉTAIT DONC BANCAL. Les attributs ont un
+   * budget de saison (`budgetAttributs`) précisément pour empêcher de
+   * « farmer » l'IA ; l'argent, lui, n'avait qu'un plafond PAR ACTION. Or
+   * rien ne limite le nombre d'actions libres qu'on écrit dans une saison —
+   * `MAX_PAR_SAISON` ne garde que les évènements et les situations. Mesuré :
+   * 200 actions rapportaient 280 000 € à un joueur payé 4 200 € par an.
+   * Absent, on retombe sur le seul plafond par action (compatibilité).
+   */
+  budgetArgent?: number;
   // Le joueur a-t-il tenté de dicter le résultat ?
   suspect: boolean;
   /**
@@ -407,6 +450,8 @@ const ATTRIBUTS = new Set([
 export interface DeltasPlafonnes {
   deltas: NonNullable<ReponseMJ['deltas']>;
   attributsGagnes: number;
+  /** Argent effectivement accordé : le store le décompte du budget de saison. */
+  argentGagne: number;
   recadre: boolean; // le MJ a été rectifié : on le dit au joueur
 }
 
@@ -416,6 +461,7 @@ export function plafonnerDeltas(
 ): DeltasPlafonnes {
   const deltas: Record<string, number> = {};
   let attributsGagnes = 0;
+  let argentGagne = 0;
   let recadre = false;
   // ⚠️ Aligné sur « potentiel jusqu'à 31 » : on progresse encore à plein
   // jusqu'à 31 ans, à moitié jusqu'à 35, et plus du tout ensuite. Le seuil
@@ -454,9 +500,14 @@ export function plafonnerDeltas(
     } else if (cle === 'argent') {
       // Un gain isolé ne peut pas dépasser un tiers du salaire annuel (ou
       // 800 € pour un amateur sans contrat) : pas de jackpot sorti de nulle part.
-      const plafond = Math.max(800, Math.round(limites.salaire / 3));
+      // ⚠️ ET LA SAISON A SON BUDGET, comme pour les attributs : sans lui, il
+      //    suffisait d'écrire beaucoup d'actions pour encaisser sans limite.
+      const parAction = Math.max(800, Math.round(limites.salaire / 3));
+      const restant = limites.budgetArgent ?? Number.POSITIVE_INFINITY;
+      const plafond = Math.max(0, Math.min(parAction, restant));
       if (v > plafond) { v = limites.suspect ? 0 : plafond; recadre = true; }
       if (limites.suspect && v > 0) { v = 0; recadre = true; }
+      argentGagne += Math.max(0, v);
     } else if (cle === 'popularite' || cle === 'confianceCoach') {
       // Deux jauges 0-100, bornées comme la réputation : elles montent
       // lentement (c'est une carrière) et descendent vite (c'est un scandale).
@@ -479,7 +530,7 @@ export function plafonnerDeltas(
     if (v !== 0) deltas[cle] = v;
   }
 
-  return { deltas: deltas as NonNullable<ReponseMJ['deltas']>, attributsGagnes, recadre };
+  return { deltas: deltas as NonNullable<ReponseMJ['deltas']>, attributsGagnes, argentGagne, recadre };
 }
 
 export function nettoyerDeltas(d: unknown): ReponseMJ['deltas'] {
