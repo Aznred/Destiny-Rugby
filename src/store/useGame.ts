@@ -440,6 +440,20 @@ export interface CreationInput {
 // Le gros de la progression doit venir du TERRAIN (lib/progression.ts), pas du
 // dialogue avec l'IA — sinon il suffirait d'enchaîner les actions.
 export const BUDGET_IA_PAR_SAISON = 4;
+/**
+ * Ce que le MJ peut faire gagner en ARGENT sur une saison, en années de salaire.
+ *
+ * ⚠️ IL N'EXISTAIT PAS. Les attributs avaient leur budget de saison depuis
+ * toujours ; l'argent n'avait qu'un plafond PAR ACTION (salaire / 3). Comme
+ * rien ne limite le NOMBRE d'actions libres écrites dans une saison —
+ * `MAX_PAR_SAISON` ne garde que les évènements et les situations —, il
+ * suffisait d'en enchaîner : mesuré, 200 actions rapportaient 280 000 € à un
+ * joueur payé 4 200 € par an, soit 66 années de salaire.
+ *
+ * Une demi-année de salaire par saison, c'est une prime exceptionnelle ou un
+ * contrat publicitaire : ça existe, ça ne se répète pas toutes les semaines.
+ */
+export const BUDGET_ARGENT_PAR_SAISON = 0.5;
 
 // ---------------------------------------------------------------------------
 // L'AMBIANCE DU SITE
@@ -865,6 +879,8 @@ interface GameState {
     augmentations?: number;
     /** Primes déjà versées par le MJ cette saison, en € (`PART_PRIMES_PAR_SAISON`). */
     primesIA?: number;
+    /** Argent déjà accordé par le MJ cette saison (voir BUDGET_ARGENT_PAR_SAISON). */
+    gainsArgentIA?: number;
   };
   tropheesEnAttente: string[]; // file des trophées à afficher en 3D
   /**
@@ -1263,7 +1279,7 @@ export const useGame = create<GameState>()(
       evenementsVus: [],
       ecransVus: [],
       guideFerme: false,
-      compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
+      compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsArgentIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
       tropheesEnAttente: [],
       approches: [],
       dossiersRecrutement: {},
@@ -1358,7 +1374,19 @@ export const useGame = create<GameState>()(
       setGroqKey: (groqKey) => { definirCleGroqJoueur(groqKey); set({ groqKey }); },
 
       creerJoueur: (input) => {
-        const attributs = attributsDeBase(input.poste);
+        // ⚠️ ON VALIDE À LA PORTE, PAS DANS L’ÉCRAN. `Creation` borne déjà
+        //    l’âge et n’offre que les quinze postes, mais ce n’est pas le seul
+        //    chemin : une sauvegarde ancienne ou abîmée passe aussi par ici.
+        //    Mesuré sans ces lignes : un âge à 0, 999, -5 ou NaN était accepté
+        //    tel quel, et un poste inconnu faisait PLANTER la création
+        //    (« Cannot read properties of undefined »), donc écran noir.
+        const poste: PosteId = POSTE_PAR_ID[input.poste] ? input.poste : 'demi_ouverture';
+        const ageDemande = Number(input.age);
+        const age = Number.isFinite(ageDemande)
+          ? Math.min(LIMITES.ageMax, Math.max(LIMITES.ageDebutMin, Math.round(ageDemande)))
+          : LIMITES.ageDebutMin;
+        input = { ...input, poste, age };
+        const attributs = attributsDeBase(poste);
         const gen = noteGlobale({ attributs });
         const salaireDepart = Math.max(0, Math.round(noteDuClub(input.club) * 60));
         // ⚠️ LE NOM SE TIRE AVANT TOUT LE RESTE, et ce n’était pas le cas :
@@ -1436,7 +1464,7 @@ export const useGame = create<GameState>()(
           evenementHebdo: null,
           evenementsVus: [],
           mouvementsClubs: {},
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsArgentIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           // Nouvelle carrière : timeline et défis repartent de zéro. Les SUCCÈS,
           // eux, sont un palmarès de joueur — ils traversent les carrières (et
           // ne peuvent donc pas être refarmés pour des Ovas).
@@ -1476,8 +1504,11 @@ export const useGame = create<GameState>()(
         // ⚖️ Le MJ propose, le jeu dispose : ses deltas passent par un plafond
         // que rien ne peut contourner (voir lib/iaLocale.ts). Le budget de
         // progression par saison empêche de « farmer » l'IA.
-        const { deltas, attributsGagnes, recadre } = plafonnerDeltas(r.deltas ?? {}, {
+        const { deltas, attributsGagnes, argentGagne, recadre } = plafonnerDeltas(r.deltas ?? {}, {
           budgetAttributs: Math.max(0, BUDGET_IA_PAR_SAISON - compteurs.gainsIA),
+          budgetArgent: Math.max(0, Math.round(
+            (joueur.contrat?.salaire ?? 0) * BUDGET_ARGENT_PAR_SAISON,
+          ) - (compteurs.gainsArgentIA ?? 0)),
           age: joueur.age,
           salaire: joueur.contrat?.salaire ?? 0,
           abonnes: joueur.abonnes ?? 0,
@@ -1545,6 +1576,7 @@ export const useGame = create<GameState>()(
           compteurs: {
             ...s.compteurs,
             gainsIA: s.compteurs.gainsIA + attributsGagnes,
+            gainsArgentIA: (s.compteurs.gainsArgentIA ?? 0) + argentGagne,
             ovasActions: (s.compteurs.ovasActions ?? 0) + primeAction,
             augmentations: (s.compteurs.augmentations ?? 0) + (suites.augmentation ? 1 : 0),
             primesIA: (s.compteurs.primesIA ?? 0) + suites.primeVersee,
@@ -2243,7 +2275,7 @@ export const useGame = create<GameState>()(
           statsReelles: {},
           journeesReelles: {},
           coins: s.coins + gain,
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsArgentIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           tropheesEnAttente: [...s.tropheesEnAttente, ...gagnes],
           mouvementsClubs: majMouvements,
           journal: [...s.journal, ...entrees],
@@ -5174,7 +5206,7 @@ export const useGame = create<GameState>()(
           approches: [],
           dossiersRecrutement: {},
           mouvementsClubs: {},
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
+          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsArgentIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
           posts: [],
           filSemaine: '',
           notifsSocial: [],

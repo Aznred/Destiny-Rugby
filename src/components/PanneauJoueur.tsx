@@ -2,7 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence } from 'framer-motion';
 import { Jauge } from './Jauge';
-import { useGame, noteGlobale, bonusClubDuJoueur } from '../store/useGame';
+import { useGame, noteGlobale, bonusClubDuJoueur, contratBloque } from '../store/useGame';
 import { POSTE_PAR_ID, labelAttribut, nomPoste } from '../data/rugby';
 import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
@@ -68,6 +68,17 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   const motifAttente = evenementHebdo
     ? t('pj.attenteSituation')
     : t('pj.attenteChoix');
+  // ⚠️ SANS CONTRAT, LA SEMAINE NE PART PAS — ET ÇA DOIT SE VOIR.
+  // `semaineSuivante()` refuse d'avancer tant que le contrat est expiré
+  // (`contratBloque`, store), mais ce refus était MUET côté bouton : celui-ci
+  // restait vert et actif, et son infobulle promettait de jouer la semaine.
+  // Mesuré : 294 appels d’affilée sans le moindre effet, et reproduit dans le
+  // jeu — trois clics, zéro entrée de journal. L'encart `.alerte-contrat`
+  // existait bien et disait au joueur qu’il est libre ; ce qui manquait,
+  // c'était le VERROU sur l'action.
+  const sansContrat = contratBloque(joueur);
+  const bloque = aRepondre || sansContrat;
+  const motifBlocage = sansContrat ? t('pj.sansContrat') : motifAttente;
   const semaineActuelle = semaine(joueur.semaine ?? 1);
   const vecu = joueur.saisonEnCours;
   const prendreRetraite = useGame((s) => s.prendreRetraite);
@@ -429,8 +440,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               type="button"
               className="btn match-semaine"
               onClick={() => setMatchOuvert(true)}
-              disabled={aRepondre}
-              title={aRepondre ? motifAttente : t('pj.suivreDirect', { domicile: affiche!.match.domicile, exterieur: affiche!.match.exterieur })}
+              disabled={bloque}
+              title={bloque ? motifBlocage : t('pj.suivreDirect', { domicile: affiche!.match.domicile, exterieur: affiche!.match.exterieur })}
             >
               ▶️ <b>{aRepondre
                 ? t('pj.reponds')
@@ -445,8 +456,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               <button
                 className="btn vert"
                 onClick={semaineSuivante}
-                disabled={aRepondre}
-                title={aRepondre ? motifAttente : t('pj.jouerSemaineAide')}
+                disabled={bloque}
+                title={bloque ? motifBlocage : t('pj.jouerSemaineAide')}
               >
                 {semaineActuelle.numero >= SEMAINES_PAR_SAISON ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
               </button>
@@ -625,8 +636,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               type="button"
               className="btn primaire"
               onClick={() => setMatchOuvert(true)}
-              disabled={aRepondre}
-              title={aRepondre ? motifAttente : undefined}
+              disabled={bloque}
+              title={bloque ? motifBlocage : undefined}
             >
               {aRepondre
                 ? t('pj.reponds')
@@ -637,8 +648,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               type="button"
               className="btn vert"
               onClick={semaineSuivante}
-              disabled={aRepondre}
-              title={aRepondre ? motifAttente : undefined}
+              disabled={bloque}
+              title={bloque ? motifBlocage : undefined}
             >
               {aRepondre ? t('pj.reponds') : semaineActuelle.numero >= SEMAINES_PAR_SAISON ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
             </button>
