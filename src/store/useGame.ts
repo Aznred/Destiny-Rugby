@@ -162,13 +162,17 @@ import {
 } from '../lib/formationManager';
 import {
   accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, joueurDejaRecrute,
-  masseSalarialeActuelle, negocierAvecJoueur, ouvrirNegociationManager,
-  reparerRecrutementsDupliques, type LevierRecrutementManager, porteeSportive,
+  negocierAvecJoueur, ouvrirNegociationManager,
+  reparerRecrutementsDupliques, salairesEffectif, situationSalariale,
+  type LevierRecrutementManager, porteeSportive,
 } from '../lib/recrutementManager';
 import {
   demandeAGenerer, negocierAvecClub, offresPourVente, ouvrirNegociationClub,
   valeurDeVente, type LevierClubManager,
 } from '../lib/vestiaireManager';
+import { avatarPourCompte } from '../lib/avatars';
+import { reportsBudgets, renouvelerBudgets, reparerPlafondSalarial } from '../lib/tresorerieManager';
+import { objectifsDeSaison } from '../lib/objectifsManager';
 import { competitionEffective, setArriveesClubs, setMouvementsClubs } from '../lib/divisions';
 import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFinale';
 import {
@@ -187,10 +191,11 @@ import { agentDe } from '../data/agents';
 import {
   accepterSelectionAvance, avancerSemaineCarriereAvancee, apresResultatCarriereAvancee,
   assurerEtatCarriereAvancee, changerClubCarriereAvancee, creerEtatCarriereAvancee,
-  deciderMedical, enregistrerMatchSelectionAvance, finSaisonCarriereAvancee,
+  deciderMedical, definirChargeEntrainement, enregistrerMatchSelectionAvance, finSaisonCarriereAvancee,
   indisponiblesCarriereAvancee, negocierContratManagerAvance, observerCible, postulerBancAvance,
-  refuserSelectionAvance, repondreDiscussionAvancee, joueurAgent,
-  type DecisionMedicale, type ReponseDiscussion,
+  refuserSelectionAvance, repondreDiscussionAvancee, joueurAgent, ouvrirRenegociationJoueur,
+  signerRenegociationJoueur,
+  type DecisionMedicale, type PlanChargeHebdo, type ReponseDiscussion,
 } from '../lib/carriereAvancee';
 import {
   apresDepartJoueurProfonde, configurerDelegationProfonde, definirCapitainesProfonde,
@@ -1009,6 +1014,8 @@ interface GameState {
   /** Répondre à une discussion et, le cas échéant, enregistrer une promesse. */
   repondreDiscussionAvancee: (id: string, reponse: ReponseDiscussion) => void;
   deciderMedicalManager: (id: string, decision: Exclude<DecisionMedicale, 'attente'>) => void;
+  definirChargeEntrainementManager: (axe: keyof PlanChargeHebdo, niveau: PlanChargeHebdo[keyof PlanChargeHebdo]) => void;
+  ouvrirRenegociationJoueurManager: (joueurId: string) => void;
   observerCibleManager: (cible: CibleRecrutementManager) => void;
   postulerBancManager: (club: string) => void;
   negocierContratManager: () => void;
@@ -3727,16 +3734,8 @@ export const useGame = create<GameState>()(
         if (!m?.club) return;
         const murs = m.installations[m.club] ?? installationsVierges();
         if (murs[type] >= NIVEAU_INSTALLATION_MAX) return;
-        // ⚠️ LE PRIX SE CALCULE SUR L'ENVELOPPE DE RÉFÉRENCE DU CLUB, pas sur
-        // ce qui reste en caisse : sinon un manager qui a beaucoup épargné
-        // paierait plus cher que celui qui n'a rien mis de côté.
-        // ⚠️ LA RÉFÉRENCE DE PRIX EST L'ENVELOPPE RÉELLEMENT VERSÉE, donc la
-        //    même que celle de la fin de saison. Le prix d'une marche est écrit
-        //    en SAISONS d'enveloppe (`COUT_PAR_NIVEAU`) : deux enveloppes
-        //    différentes des deux côtés, et la courbe de dix saisons ne veut
-        //    plus rien dire — mesuré à 121 saisons en Fédérale 2.
-        const reference = budgetsDuClub(m.club, m.saison).structure;
-        const cout = coutAmelioration(murs[type], reference);
+        // Même tarif fixe que celui annoncé dans les trois écrans de structures.
+        const cout = coutAmelioration(murs[type]);
         if (cout === null || m.budgetStructure < cout) return;
 
         const vise = murs[type] + 1;
@@ -3961,6 +3960,39 @@ export const useGame = create<GameState>()(
         if (!m?.club) return;
         const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
         set({ manager: { ...m, avancee: deciderMedical(avancee, id, decision) } });
+      },
+
+      definirChargeEntrainementManager: (axe, niveau) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
+        set({ manager: { ...m, avancee: definirChargeEntrainement(avancee, axe, niveau) } });
+      },
+
+      ouvrirRenegociationJoueurManager: (joueurId) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const groupe = effectifDuClub(m.club, m.saison);
+        const avancee = assurerEtatCarriereAvancee(m, groupe);
+        const existante = [...m.negociations].reverse().find((n) => n.joueur.id === joueurId
+          && n.nature !== 'recrutement' && (n.etat === 'ouverte' || n.etat === 'accord'));
+        const nego = existante ?? ouvrirRenegociationJoueur(avancee, m, groupe, joueurId);
+        if (!nego) return;
+        set((s) => ({
+          manager: existante ? { ...m, avancee } : { ...m, avancee, negociations: [...m.negociations, nego] },
+          conversations: existante ? s.conversations : { ...s.conversations, [nego.pseudo]: [
+            ...(s.conversations[nego.pseudo] ?? []),
+            { id: idUnique(), pseudo: nego.pseudo, de: 'moi' as const,
+              texte: nego.nature === 'revalorisation' ? 'Parlons de ta revalorisation.' : 'Je veux te proposer une prolongation.',
+              saison: m.saison, semaine: m.semaine, creeLe: Date.now(), lu: true },
+            { id: idUnique(), pseudo: nego.pseudo, de: 'lui' as const,
+              texte: `Mon agent attend ${nombre(nego.exigences.salaire)} € par an, ${nego.exigences.duree} saison(s) et un statut ${nego.exigences.role}.`,
+              saison: m.saison, semaine: m.semaine, creeLe: Date.now() + 1, lu: false },
+          ] },
+          ouvrirSocialSur: 'messages', conversationSocialeCible: nego.pseudo,
+          ecran: s.manager && !s.joueur ? 'manager' : 'social',
+          ecransVus: s.ecransVus.includes('social') ? s.ecransVus : [...s.ecransVus, 'social'],
+        }));
       },
 
       observerCibleManager: (cible) => {
@@ -4463,7 +4495,17 @@ export const useGame = create<GameState>()(
           primeDemandee: Math.round(cible.primeDemandee * facteurExigences),
           primeMatchDemandee: Math.round(cible.primeMatchDemandee * facteurExigences),
         };
-        const nego = existante ?? ouvrirNegociationManager(cibleNegociee, m.saison, m.semaine);
+        const profilVestiaire = m.avancee?.vestiaire[cible.id];
+        const profilMedical = m.avancee?.profilsMedicaux[cible.id];
+        const risqueMedical = profilMedical
+          ? Math.min(100, profilMedical.fragiliteNaturelle * .4 + profilMedical.historique.length * 10
+            + Object.values(profilMedical.sequelles).reduce((n, x) => n + (x ?? 0), 0))
+          : undefined;
+        const nego = existante ?? ouvrirNegociationManager(cibleNegociee, m.saison, m.semaine, {
+          nature: 'recrutement', satisfaction: profilVestiaire?.satisfaction,
+          performance: cible.note, risqueMedical,
+          interetExterieur: Math.max(0, (cible.note - forceEffectif(m.club, m.saison)) * 10),
+        });
         const avancee = !m.avancee || !agent || agent.joueurs.includes(cible.id)
           ? m.avancee
           : {
@@ -4573,6 +4615,33 @@ export const useGame = create<GameState>()(
         const m = get().manager;
         const actuelle = m?.negociations.find((n) => n.id === id);
         if (!m?.club || !actuelle || actuelle.etat !== 'accord') return;
+        if (actuelle.nature === 'prolongation' || actuelle.nature === 'revalorisation') {
+          const groupe = effectifDuClub(m.club, m.saison);
+          const avancee = assurerEtatCarriereAvancee(m, groupe);
+          const salaireActuel = salairesEffectif(m.club, m.saison, m.recrues, avancee.contratsJoueurs)
+            .find((j) => j.joueurId === actuelle.joueur.id || j.nom === actuelle.joueur.nom)?.salaire ?? 0;
+          const margeAvecRemplacement = situationSalariale({ ...m, avancee }).disponible + salaireActuel;
+          if (actuelle.offre.salaire > margeAvecRemplacement || actuelle.offre.prime > m.budgetTransferts) return;
+          const signee = { ...actuelle, etat: 'signee' as const };
+          set((s) => ({
+            manager: {
+              ...m, budgetTransferts: m.budgetTransferts - actuelle.offre.prime,
+              negociations: m.negociations.map((n) => n.id === id ? signee : n),
+              avancee: signerRenegociationJoueur(avancee, signee),
+            },
+            conversations: { ...s.conversations, [actuelle.pseudo]: [
+              ...(s.conversations[actuelle.pseudo] ?? []),
+              { id: idUnique(), pseudo: actuelle.pseudo, de: 'moi' as const,
+                texte: 'Le contrat est prêt. Bienvenue pour la suite.', saison: m.saison, semaine: m.semaine, creeLe: Date.now(), lu: true },
+              { id: idUnique(), pseudo: actuelle.pseudo, de: 'lui' as const,
+                texte: 'Accord signé. Je me projette avec le club.', saison: m.saison, semaine: m.semaine, creeLe: Date.now() + 1, lu: false },
+            ] },
+            journal: [...s.journal, { id: idUnique(), saison: m.saison, role: 'mj' as const,
+              titre: `Contrat · ${actuelle.joueur.nom}`,
+              texte: `${actuelle.offre.duree} saison(s), ${nombre(actuelle.offre.salaire)} € par an, statut ${actuelle.offre.role}.` }],
+          }));
+          return;
+        }
         // Défense en profondeur : même si une ancienne interface ou un double
         // clic parvient jusqu'ici, aucun débit ni transfert ne peut être rejoué.
         if (joueurDejaRecrute(m, actuelle.joueur.id)) return;
@@ -4588,7 +4657,7 @@ export const useGame = create<GameState>()(
         // de place sous ton salary cap » : la contrainte porte sur ce qui est
         // DÉJÀ engagé, plus ce qu'on ajoute.
         if (m.budgetTransferts < cout) return;
-        if (masseSalarialeActuelle(m.club, m.saison) + actuelle.offre.salaire > m.budgetSalarial) return;
+        if (actuelle.offre.salaire > situationSalariale(m).disponible) return;
         const transfert: TransfertAnnonce = {
           nom: actuelle.joueur.nom,
           de: actuelle.joueur.club,
@@ -4614,10 +4683,11 @@ export const useGame = create<GameState>()(
             manager: {
               ...m,
               budgetTransferts: m.budgetTransferts - cout,
-              budgetSalarial: m.budgetSalarial - actuelle.offre.salaire,
               negociations: m.negociations.map((n) => n.id === id ? signee : n),
               recrues: [...m.recrues, {
-                joueur: actuelle.joueur, termes: actuelle.offre, saison: m.saison,
+                club: m.club, joueur: actuelle.joueur, termes: actuelle.offre, saison: m.saison,
+                accordClub: dossier ? { clubVendeur: dossier.club, indemnite: dossier.offre,
+                  bonus: dossier.bonus ?? 0, pourcentageRevente: dossier.pourcentageRevente ?? 0 } : undefined,
               }],
               avancee,
             },
@@ -4681,6 +4751,8 @@ export const useGame = create<GameState>()(
         if (accepter && demande.type === 'depart' && !ventes.some((v) => v.joueurId === demande.joueurId)) {
           const joueur = effectifDuClub(m.club, m.saison).find((j) => j.id === demande.joueurId);
           if (joueur) {
+            const profilMedical = m.avancee?.profilsMedicaux[joueur.id];
+            const contratJoueur = m.avancee?.contratsJoueurs[joueur.id];
             const vente = {
               joueurId: joueur.id,
               nom: joueur.nom,
@@ -4688,7 +4760,11 @@ export const useGame = create<GameState>()(
               age: joueur.age,
               note: joueur.note,
               potentiel: joueur.potentiel,
-              valeur: valeurDeVente(joueur, m.club),
+              valeur: valeurDeVente(joueur, m.club, m.saison, {
+                historiqueMedical: profilMedical?.historique.length,
+                sequelles: Object.values(profilMedical?.sequelles ?? {}).reduce((n, x) => n + (x ?? 0), 0),
+                contratFin: contratJoueur?.fin,
+              }),
               saison: m.saison,
               offres: [],
             };
@@ -4749,6 +4825,8 @@ export const useGame = create<GameState>()(
           }));
           return;
         }
+        const profilMedical = m.avancee?.profilsMedicaux[joueur.id];
+        const contratJoueur = m.avancee?.contratsJoueurs[joueur.id];
         const vente = {
           joueurId: joueur.id,
           nom: joueur.nom,
@@ -4756,7 +4834,11 @@ export const useGame = create<GameState>()(
           age: joueur.age,
           note: joueur.note,
           potentiel: joueur.potentiel,
-          valeur: valeurDeVente(joueur, m.club),
+          valeur: valeurDeVente(joueur, m.club, m.saison, {
+            historiqueMedical: profilMedical?.historique.length,
+            sequelles: Object.values(profilMedical?.sequelles ?? {}).reduce((n, x) => n + (x ?? 0), 0),
+            contratFin: contratJoueur?.fin,
+          }),
           saison: m.saison,
           offres: [],
         };
@@ -4796,6 +4878,11 @@ export const useGame = create<GameState>()(
           note: joueur.note,
           nation: joueur.nation,
         };
+        const contratOrigine = m.recrues.findLast((r) => r.club === m.club
+          && (r.joueur.id === joueurId || r.joueur.nom === joueur.nom));
+        const partRevente = contratOrigine?.accordClub?.pourcentageRevente ?? 0;
+        const reversement = Math.round(offre.montant * partRevente / 100);
+        const montantNet = Math.max(0, offre.montant - reversement);
         let avancee = m.avancee;
         if (avancee?.profonde) {
           const depart = apresDepartJoueurProfonde(avancee.profonde, m, joueurId);
@@ -4816,7 +4903,7 @@ export const useGame = create<GameState>()(
           return {
             manager: {
               ...m,
-              budgetTransferts: m.budgetTransferts + offre.montant,
+              budgetTransferts: m.budgetTransferts + montantNet,
               ventes: m.ventes.filter((v) => v.joueurId !== joueurId),
               entrainements: m.entrainements.filter((n) => n !== joueur.nom),
               avancee,
@@ -4829,8 +4916,8 @@ export const useGame = create<GameState>()(
               id: idUnique(), saison: m.saison, role: 'mj' as const,
               titre: t('mgr.x.venteConclue', { joueur: joueur.nom }),
               texte: t('mgr.x.venteConclueTexte', {
-                club: offre.club, montant: nombre(offre.montant),
-              }),
+                club: offre.club, montant: nombre(montantNet),
+              }) + (reversement > 0 ? ` ${nombre(reversement)} € sont reversés à ${contratOrigine?.accordClub?.clubVendeur}.` : ''),
             }],
           };
         });
@@ -4913,6 +5000,8 @@ export const useGame = create<GameState>()(
         const verdictBoard = appliquerVerdict(m, v);
         const groupe = effectifDuClub(m.club, m.saison);
         const bilanAvance = finSaisonCarriereAvancee(m, groupe, rang);
+        // Les reports se mesurent dans l'ancienne division, avant les mouvements.
+        const reports = reportsBudgets(m);
         const prestige = verdictBoard.prestige;
         const confiance = borne(verdictBoard.confiance + bilanAvance.confiance);
 
@@ -4988,6 +5077,21 @@ export const useGame = create<GameState>()(
           ? m.rapports
           : explorer(m.club, m.saison + 1, murs.recrutement);
 
+        // Les bonus négociés avec le club vendeur sont différés, mais réels :
+        // ils deviennent dus si la recrue participe à au moins la moitié des
+        // rencontres de sa première saison. Ils sortent de l'enveloppe suivante.
+        const matchsJouesSaison = Math.max(1, Object.keys(m.resultats).length);
+        const bonusConditionnels = m.recrues.filter((r) => r.club === m.club && r.saison === m.saison && (r.accordClub?.bonus ?? 0) > 0)
+          .reduce((total, r) => {
+            const joueur = groupe.find((j) => j.id === r.joueur.id || j.nom === r.joueur.nom);
+            const feuilles = joueur ? (m.tempsDeJeu[joueur.id] ?? 0) : 0;
+            return total + (feuilles >= matchsJouesSaison / 2 ? (r.accordClub?.bonus ?? 0) : 0);
+          }, 0);
+        const budgetsRenouveles = renouvelerBudgets(
+          m, budgets, bilanAcademie.indemnites, bilanAvance.revenusMarketing, reports,
+        );
+        budgetsRenouveles.budgetTransferts = Math.max(0, budgetsRenouveles.budgetTransferts - bonusConditionnels);
+
         // ⚠️ ON DÉVERSE AVANT DE LIRE L'EFFECTIF SUIVANT, pas après.
         setApportsDuCentre(jeunesFormes, progres);
 
@@ -5001,16 +5105,8 @@ export const useGame = create<GameState>()(
           argent: m.argent + (m.contrat?.salaire ?? 0),
           // Le board renouvelle une partie des enveloppes. Épargner aide, mais
           // ne permet pas d'empiler dix saisons de budgets sans les dépenser.
-          budgetTransferts: licencie ? 0
-            : Math.round(budgets.transferts + m.budgetTransferts * 0.28 + bilanAcademie.indemnites + bilanAvance.revenusMarketing * .35),
-          budgetSalarial: licencie ? 0
-            : Math.round(budgets.salarial + m.budgetSalarial * 0.2),
-          // ⚠️ CELLE-CI SE BANQUE INTÉGRALEMENT, contrairement aux deux autres,
-          // et il le faut : la dernière marche d'une structure coûte 4,6
-          // saisons d'enveloppe. Avec un report partiel, elle serait
-          // inaccessible à un club modeste — la structure la plus intéressante
-          // du lot n'existerait que pour ceux qui n'en ont pas besoin.
-          budgetStructure: licencie ? 0 : Math.round(budgets.structure + m.budgetStructure + bilanAvance.revenusMarketing * .15),
+          ...(licencie ? { budgetTransferts: 0, budgetSalarial: 0, budgetStructure: 0 }
+            : budgetsRenouveles),
           jeunesFormes,
           academie: bilanAcademie.academie,
           observationsJeunes: bilanAcademie.observations,
@@ -5058,6 +5154,8 @@ export const useGame = create<GameState>()(
           ventes: [],
           avancee: bilanAvance.etat,
         };
+        suivant.avancee = { ...bilanAvance.etat, objectifs: objectifsDeSaison(suivant,
+          suivant.club ? effectifDuClub(suivant.club, suivant.saison) : []) };
 
         // ⚠️ CE QUE LES STRUCTURES ONT PRODUIT SE DIT, sinon elles n'existent
         // pas. Une promotion qui apparaît en silence dans l'écran Composition
@@ -5065,6 +5163,7 @@ export const useGame = create<GameState>()(
         // sans explication passe pour du bruit — c'est exactement ce qui rend
         // un système de progression invisible « inutile » pour qui y joue.
         const ditesLe: string[] = [];
+        if (bonusConditionnels > 0) ditesLe.push(`${nombre(bonusConditionnels)} € de bonus de transfert déclenchés`);
         if (bilanAcademie.progressions.length) {
           ditesLe.push(`Académie : ${bilanAcademie.progressions.slice(0, 5).join(', ')}.`);
         }
@@ -6566,7 +6665,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 25,
+      version: 28,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -6615,8 +6714,42 @@ export const useGame = create<GameState>()(
           langueManuelle?: boolean;
           rythme?: unknown;
           manager?: Manager | null;
+          mouvementsClubs?: Record<string, string>;
         };
         if (!s) return s;
+        // ⚠️ VERSION 27 — LES ANCIENS AVATARS EXTERNES SONT RÉÉCRITS EN LOCAL.
+        // `photoDe` pointait sur `randomuser.me`, un service qui ne répond plus :
+        // chaque compte sans portrait officiel tombait donc sur le monogramme de
+        // repli, et sur un réseau social ça se voit tout de suite (« les joueurs
+        // n'ont pas de photo de profil sur X »). Le code a été corrigé et sert
+        // désormais `public/photos/`, mais les URL mortes sont PERSISTÉES dans
+        // les posts, les comptes suivis et les conversations : sans cette
+        // réécriture, une partie en cours garderait ses trous pour toujours.
+        //
+        // On ne touche qu'aux `photo:http…` : un `photo:/photos/…` local, un
+        // `club:`, un `compet:`, un `initiales:` ou `moi` sont déjà justes.
+        if (version < 27) {
+          const localiser = (avatar: unknown, nom: string): string => {
+            if (typeof avatar !== 'string') return avatarPourCompte(nom, 'joueur');
+            if (!avatar.startsWith('photo:initiales:') && !(avatar.startsWith('photo:') && avatar.includes('randomuser.me/'))) return avatar;
+            return avatarPourCompte(nom, 'joueur');
+          };
+          if (Array.isArray(s.posts)) {
+            s.posts = s.posts.map((p) => (p && typeof p === 'object'
+              ? { ...p, avatar: localiser((p as { avatar?: unknown }).avatar, String((p as { auteur?: string }).auteur ?? '')) }
+              : p));
+          }
+          if (Array.isArray(s.comptesSuivis)) {
+            s.comptesSuivis = s.comptesSuivis.map((c) => (c && typeof c === 'object'
+              ? { ...c, avatar: localiser((c as { avatar?: unknown }).avatar, String((c as { nom?: string }).nom ?? '')) }
+              : c));
+          }
+          if (Array.isArray(s.notifsSocial)) {
+            s.notifsSocial = s.notifsSocial.map((n) => (n && typeof n === 'object' && 'avatar' in n
+              ? { ...n, avatar: localiser((n as { avatar?: unknown }).avatar, String((n as { auteur?: string }).auteur ?? '')) }
+              : n));
+          }
+        }
         if (version < 25) {
           if (s.joueur) {
             s.joueur.semaine = migrerSemaineCalendrier(s.joueur.semaine ?? 1);
@@ -6922,6 +7055,16 @@ export const useGame = create<GameState>()(
             };
             s.transfertsSociaux = repare.transfertsSociaux;
           }
+        }
+        if (version < 27 && s.manager?.club) {
+          // Restaurer le monde avant de mesurer les charges et les objectifs.
+          setMouvementsClubs(s.mouvementsClubs ?? {});
+          setTransfertsSociaux(s.transfertsSociaux ?? []);
+          setApportsDuCentre(s.manager.jeunesFormes, s.manager.progres);
+          s.manager.recrues = s.manager.recrues.map((r) => ({ ...r, club: r.club ?? s.transfertsSociaux?.find((t) =>
+            t.nom === r.joueur.nom && t.de === r.joueur.club && t.saison === r.saison)?.vers }));
+          s.manager.budgetSalarial = reparerPlafondSalarial(s.manager, s.transfertsSociaux ?? []);
+          s.manager.avancee = assurerEtatCarriereAvancee(s.manager, effectifDuClub(s.manager.club, s.manager.saison));
         }
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus

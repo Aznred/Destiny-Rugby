@@ -81,74 +81,16 @@ const r3 = budgetsDuClub('Parentis', 1).structure;
 ligne('un club de Régionale 3 a une enveloppe', `${r3} €`, r3 > 0);
 
 // ---------------------------------------------------------------------------
-console.log('\n=== 2. ⚠️ LE PRIX ET LE REVENU PARTENT DE LA MÊME ENVELOPPE ===');
-// ---------------------------------------------------------------------------
-// ⚠️ C'EST LE CONTRÔLE QUI MANQUAIT, ET SON ABSENCE A COÛTÉ TOUT LE LOT.
-// `installations.ts` calculait l'enveloppe avec sa PROPRE formule — une copie
-// de `facteurNiveau` — pendant que la fin de saison la versait depuis
-// `budgetsDuClub`. Le jour où le budget des clubs est passé aux fourchettes
-// réelles, le REVENU a suivi et le PRIX est resté sur l'ancienne courbe :
-// mesuré, un centre complet demandait 121 saisons de revenus en Fédérale 2
-// contre les 10 prévues. Tout le lot était mort sous la Nationale, et le banc
-// d'essai restait au vert parce qu'il ne contrôlait qu'un montant en euros.
-//
-// La copie a disparu (`budgetStructure` délègue à `financesDuClub`), mais on
-// ne se contente pas de la supprimer : le prix d'une marche est écrit en
-// SAISONS d'enveloppe (`COUT_PAR_NIVEAU`), donc on mesure ce que ça coûte
-// VRAIMENT à chaque étage. C'est la seule forme de contrôle qui survive à la
-// prochaine refonte du budget.
-console.log('\n  étage        | enveloppe/saison | centre complet | en saisons');
-const PYRAMIDE: [string, string][] = [
-  ['Stade Toulousain', 'Top 14'], ['US Oyonnax', 'Pro D2'], ['SC Albi', 'Nationale'],
-  ['RC Orléans', 'Nationale 2'], ['U S Nafarroa', 'Fédérale 1'], ['R C Sablais', 'Fédérale 2'],
-  ['R C Teillois', 'Fédérale 3'], ['Orsay', 'Régionale 1'], ['Chartreuse', 'Régionale 2'],
-  ['Parentis', 'Régionale 3'],
-];
-const courbes = PYRAMIDE.map(([club, nom]) => {
-  const env = budgetsDuClub(club, 1).structure;
-  let cumul = 0;
-  for (let n = 0; n < NIVEAU_INSTALLATION_MAX; n++) cumul += coutAmelioration(n, env)!;
-  const enSaisons = cumul / env;
-  console.log(
-    `  ${nom.padEnd(12)} | ${env.toLocaleString('fr-FR').padStart(16)} | `
-    + `${cumul.toLocaleString('fr-FR').padStart(14)} | ${enSaisons.toFixed(1)}`,
-  );
-  return { nom, enSaisons };
-});
-const hors = courbes.filter((c) => c.enSaisons < 8 || c.enSaisons > 13);
-ligne('un centre complet coûte le même effort partout',
-  hors.length ? hors.map((c) => `${c.nom} ${c.enSaisons.toFixed(1)}`).join(', ')
-    : `8 à 13 saisons aux ${courbes.length} étages`,
-  hors.length === 0);
-// ⚠️ ET AUCUN ÉTAGE N'EST LAISSÉ POUR COMPTE. C'était la forme exacte du bug :
-// jouable en Top 14, hors de portée en Fédérale, sans un avertissement.
-const ecartEtages = Math.max(...courbes.map((c) => c.enSaisons))
-  - Math.min(...courbes.map((c) => c.enSaisons));
-ligne('… et l’écart entre le haut et le bas reste faible',
-  `${ecartEtages.toFixed(1)} saison(s)`, ecartEtages <= 2);
+console.log('\n=== 2. PRIX FIXES ET EFFORT PAR DIVISION ===');
+const prix = [0, 1, 2, 3].map(coutAmelioration);
+ligne('les quatre prix fixes', prix.join(' / '), JSON.stringify(prix) === JSON.stringify([40_000, 250_000, 1_200_000, 5_000_000]));
+const total = prix.reduce((s, p) => s + (p ?? 0), 0);
+const pro = budgetsDuClub('Stade Toulousain', 1).structure;
+ligne('un centre complet coûte 6 490 000 €', String(total), total === 6_490_000);
+ligne('la montée raccourcit l’effort d’épargne', 'Top 14 / Régionale 3', total / pro < total / r3);
+ligne('la Régionale ne finance pas le dernier palier en une carrière', String(coutAmelioration(3)! / r3), coutAmelioration(3)! / r3 > 100);
+ligne('au maximum, il n’y a plus rien à payer', String(coutAmelioration(NIVEAU_INSTALLATION_MAX)), coutAmelioration(NIVEAU_INSTALLATION_MAX) === null);
 
-// ---------------------------------------------------------------------------
-console.log('\n=== 3. LE COÛT D’UN CENTRE COMPLET ===');
-// ---------------------------------------------------------------------------
-const enveloppe = budgetsDuClub('RC Orléans', 1).structure;
-let total = 0;
-const marches: string[] = [];
-for (let n = 0; n < NIVEAU_INSTALLATION_MAX; n++) {
-  const c = coutAmelioration(n, enveloppe)!;
-  total += c;
-  marches.push(String(c));
-}
-info('les quatre marches', marches.join(' → '));
-const saisons = total / enveloppe;
-ligne('un centre complet coûte une carrière de patience',
-  `${saisons.toFixed(1)} saisons d’enveloppe`, saisons >= 8 && saisons <= 12);
-ligne('… et la dernière marche est atteignable',
-  'l’enveloppe se banque intégralement (store)', coutAmelioration(3, enveloppe)! / enveloppe < 5);
-ligne('au maximum, il n’y a plus rien à payer',
-  String(coutAmelioration(NIVEAU_INSTALLATION_MAX, enveloppe)),
-  coutAmelioration(NIVEAU_INSTALLATION_MAX, enveloppe) === null);
-
-// ---------------------------------------------------------------------------
 console.log('\n=== 4. 🎓 LE CENTRE ACHÈTE UNE LOI DE TIRAGE ===');
 // ---------------------------------------------------------------------------
 // ⚠️ C'EST LE SEUL CONTRÔLE QUI JUSTIFIE DE PAYER. Un centre qui sortirait des

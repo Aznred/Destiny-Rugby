@@ -27,7 +27,7 @@ function arrondir(v: number, pas: number): number {
 // 1. NÉGOCIER L'INDEMNITÉ AVEC LE CLUB VENDEUR
 // ---------------------------------------------------------------------------
 
-export type LevierClubManager = 'monter' | 'bonus' | 'accepter';
+export type LevierClubManager = 'monter' | 'bonus' | 'revente' | 'accepter';
 
 /**
  * Le plancher d'un club vendeur, en part de ce qu'il réclame.
@@ -51,6 +51,9 @@ export function ouvrirNegociationClub(
 ): NegociationClubManager {
   const rng = graine(`indemnite#${cible.club}#${cible.id}#${saison}`);
   const part = PLANCHER_MIN + rng() * (PLANCHER_MAX - PLANCHER_MIN);
+  const besoins: NonNullable<NegociationClubManager['besoinVendeur']>[] = [
+    'finances', 'remplacement', 'garderCadre', 'degraisser',
+  ];
   return {
     id: `club-${cible.id}-${saison}`,
     // ⚠️ LE PSEUDO DOIT ÊTRE CELUI DE L'ANNUAIRE. Avec un identifiant inventé
@@ -67,6 +70,11 @@ export function ouvrirNegociationClub(
     etat: 'ouverte',
     saison,
     semaine,
+    bonus: 0,
+    pourcentageRevente: 0,
+    besoinVendeur: besoins[Math.floor(rng() * besoins.length)],
+    urgence: 20 + Math.round(rng() * 75),
+    alternatives: Math.floor(rng() * 4),
   };
 }
 
@@ -87,24 +95,32 @@ export function negocierAvecClub(
   }
 
   let { offre, plancher, patience } = nego;
+  let bonus = nego.bonus ?? 0;
+  let pourcentageRevente = nego.pourcentageRevente ?? 0;
   if (levier === 'monter') {
     offre = Math.min(nego.demande, arrondir(offre * (1 + PAS_MONTEE), 25_000));
-  } else {
+  } else if (levier === 'bonus') {
     // ⚠️ LE BONUS CONDITIONNEL NE COÛTE RIEN TOUT DE SUITE, et c'est ce qui en
     // fait un vrai levier : on paie en pourcentage de ce que le joueur fera.
     // Le club cède donc un peu — mais il n'est pas dupe, et sa patience
     // s'use : on ne peut pas empiler les promesses.
     plancher = arrondir(plancher * (1 - REMISE_BONUS), 25_000);
+    bonus = Math.min(nego.demande * .3, bonus + arrondir(nego.demande * .06, 10_000));
+  } else {
+    // Un pourcentage à la revente vaut davantage pour un club formateur, mais
+    // reste différé : il ne réduit le prix comptant que de façon limitée.
+    pourcentageRevente = Math.min(20, pourcentageRevente + 10);
+    plancher = arrondir(plancher * .95, 25_000);
   }
   patience -= 1;
 
   if (offre >= plancher) {
-    return { negociation: { ...nego, offre, plancher, patience, etat: 'accord' }, accord: true };
+    return { negociation: { ...nego, offre, plancher, patience, bonus, pourcentageRevente, etat: 'accord' }, accord: true };
   }
   if (patience <= 0) {
-    return { negociation: { ...nego, offre, plancher, patience: 0, etat: 'rompue' }, accord: false };
+    return { negociation: { ...nego, offre, plancher, patience: 0, bonus, pourcentageRevente, etat: 'rompue' }, accord: false };
   }
-  return { negociation: { ...nego, offre, plancher, patience }, accord: false };
+  return { negociation: { ...nego, offre, plancher, patience, bonus, pourcentageRevente }, accord: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +201,7 @@ export function demandeAGenerer(
       poste: lui.poste,
       note: lui.note,
       type: 'depart',
+      raison: m.avancee?.contratsJoueurs[lui.id]?.offresExterieures ? 'offreRecue' : 'ambition',
     };
   }
 
@@ -199,6 +216,14 @@ export function demandeAGenerer(
     // C'est la différence entre les deux messages, et elle décide de ce que le
     // manager peut faire — donner du temps de jeu, ou vendre.
     type: lui.note >= force + 2 ? 'depart' : 'tempsDeJeu',
+    // ⚠️ UN DOSSIER ABSENT N'EST PAS UN CONFLIT. Ces trois lectures sont
+    // optionnelles (`?.`) : sans valeur par défaut, TypeScript refuse la
+    // comparaison — et à l'exécution `undefined < 35` vaut `false`, ce qui
+    // aurait silencieusement rangé tout le monde dans « temps de jeu ». On
+    // prend donc le repli le plus NEUTRE : pas de dossier, pas de grief.
+    raison: (m.avancee?.vestiaire[lui.id]?.relationManager ?? 100) < 35 ? 'conflitManager'
+      : (m.avancee?.profonde.integrations[lui.id]?.bonheur ?? 100) < 38 ? 'famillePays'
+        : m.avancee?.contratsJoueurs[lui.id]?.demandeRevalorisation ? 'contrat' : 'tempsDeJeu',
   };
 }
 
@@ -224,14 +249,20 @@ export function demandeAGenerer(
  */
 export function valeurDeVente(
   j: Pick<Coequipier, 'note' | 'potentiel' | 'age' | 'id'>, club: string, saison = 1,
+  contexte?: { historiqueMedical?: number; sequelles?: number; contratFin?: number },
 ): number {
   const base = valeurMarchande(j, competitionDuClub(club)?.niveau ?? 8);
   if (base <= 0) return 0;
-  const restantes = saisonsDeContrat(club, j.id, saison);
+  const restantes = contexte?.contratFin !== undefined
+    ? Math.max(0, contexte.contratFin - saison) : saisonsDeContrat(club, j.id, saison);
   // Trois ans et plus : plein tarif. Un an : le club acheteur sait qu'il peut
   // attendre, il ne paie qu'une part. Zéro : départ libre.
   const part = restantes <= 0 ? 0 : restantes === 1 ? 0.5 : restantes === 2 ? 0.8 : 1;
-  return Math.round(base * part);
+  // La visite médicale ne détruit pas une valeur sur une petite contusion.
+  // Les récidives et séquelles durables, elles, réduisent le risque que prend
+  // l'acheteur et donc ce qu'il accepte de garantir au vendeur.
+  const medical = Math.max(.62, 1 - (contexte?.historiqueMedical ?? 0) * .025 - (contexte?.sequelles ?? 0) * .006);
+  return Math.round(base * part * medical);
 }
 
 /**

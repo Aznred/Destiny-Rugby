@@ -1,29 +1,10 @@
-// LES PHOTOS DE PROFIL DE L'OVALE
-//
-// ⚠️ Tous les comptes de personnes portaient un EMOJI (🏉, 🧣, 🎙️…). Sur un
-// réseau calqué sur X, ça se voit tout de suite : ça fait maquette, pas réseau
-// social. Il fallait de vraies photos — sans base de données, sans clé, et sans
-// casser le mode hors ligne.
-//
-// SOLUTION : `randomuser.me/api/portraits/...` sert des portraits libres à des
-// URL FIXES et prévisibles (`men/34.jpg`, `women/12.jpg`). Aucune requête d'API
-// n'est nécessaire : on construit l'URL de façon DÉTERMINISTE à partir du nom,
-// et le navigateur la charge comme n'importe quelle image. Deux ouvertures de
-// l'écran donnent donc exactement le même visage pour le même compte.
-//
-// Et si le réseau est muet, `<Avatar>` bascule sur `avatarInitiales()` : une
-// pastille SVG avec les initiales sur un dégradé, générée en local, sans une
-// seule requête. Le fil n'a jamais de trou.
-//
-// Les CLUBS gardent leur écusson (`club:<nom>`) et les CHAMPIONNATS leur logo
-// (`compet:<id>`) : eux ont une vraie identité visuelle, ce serait absurde de
-// leur coller une photo de passant.
+// LES PHOTOS DE PROFIL DE L’OVALE
+// Portraits officiels locaux en priorité ; portrait stable du catalogue sinon.
+// Les initiales servent de repli local, les clubs gardent leur écusson.
 
 import { graine } from './championnat';
 import { PHOTO_JOUEUR } from '../data/photosJoueurs';
 
-const PORTRAITS = 'https://randomuser.me/api/portraits';
-const NB_PORTRAITS = 99; // 0 à 98 dans chaque série
 
 // Prénoms féminins courants — les données amateurs mélangent les sections d'un
 // club, on y croise donc de vraies joueuses. Une liste courte suffit : le reste
@@ -46,11 +27,47 @@ export function estFeminin(nom: string): boolean {
   return PRENOMS_FEMININS.has(sansAccent(nom.trim().split(/\s+/)[0] ?? ''));
 }
 
-// L'URL d'un portrait, stable pour un nom donné.
+/**
+ * L'URL d'un portrait, stable pour un nom donné — et SERVIE EN LOCAL.
+ *
+ * ⚠️ ELLE POINTAIT SUR `randomuser.me`, ET C'EST POURQUOI LES PROFILS ÉTAIENT
+ * VIDES. L'intention d'origine était bonne (« il fallait de vraies photos, sans
+ * base de données et sans clé ») et le repli sur les initiales évitait le trou
+ * dans le fil. Mais le service ne répond pas : chaque joueur sans portrait
+ * officiel se retrouvait donc avec un monogramme, et sur un réseau social ça se
+ * voit immédiatement. Retour de jeu : « les joueurs n'ont pas de photo de profil
+ * sur X ». C'était aussi le dernier asset RÉSEAU EXTERNE du jeu, à rebours de
+ * la règle maison — le mode hors ligne devait rester entier.
+ *
+ * ⚠️ ON PIOCHE DANS NOS PROPRES PHOTOS. `public/photos/` embarque 1 574
+ * portraits officiels, dont seuls 84 % des joueurs du Top 14 et 23 % de la
+ * Régionale portent le leur. Les autres reçoivent donc un visage du pool, tiré
+ * de façon DÉTERMINISTE sur leur nom : deux ouvertures de l'écran donnent le
+ * même visage, et le fil ressemble enfin à un réseau social. Un remplaçant de
+ * Fédérale peut porter le visage d'un joueur connu — c'est exactement le
+ * compromis que le jeu fait déjà pour les regens, qui empruntent l'identité
+ * d'un joueur réel de leur club.
+ *
+ * ⚠️ SAUF POUR LES FEMMES. Le pool est celui du rugby masculin ; coller un
+ * visage d'homme sur une joueuse serait pire que pas de photo. Les effectifs
+ * amateurs mélangent les sections d'un club, on en croise donc vraiment. Elles
+ * gardent le monogramme local, qui ne raconte rien de faux.
+ */
 export function photoDe(nom: string, feminin = estFeminin(nom)): string {
+  if (feminin) return avatarInitiales(nom);
+  const pool = poolDePhotos();
+  if (!pool.length) return avatarInitiales(nom);
   const rng = graine('portrait#' + nom);
-  const n = Math.floor(rng() * NB_PORTRAITS);
-  return `${PORTRAITS}/${feminin ? 'women' : 'men'}/${n}.jpg`;
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+// Tous les portraits disponibles, une seule fois, triés pour que le tirage
+// déterministe ne dépende pas de l'ordre d'énumération de l'objet.
+let poolPhotos: string[] | null = null;
+function poolDePhotos(): string[] {
+  if (poolPhotos) return poolPhotos;
+  poolPhotos = [...new Set(Object.values(PHOTO_JOUEUR))].sort();
+  return poolPhotos;
 }
 
 // L'écriture stockée dans `CompteSuivi.avatar` et `PostSocial.avatar`.

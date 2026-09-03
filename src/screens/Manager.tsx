@@ -12,6 +12,8 @@ import { effectifDuClub, forceEffectif } from '../lib/effectif';
 import { classementManagerEnDirect } from '../lib/tableauManager';
 import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
 import { CalendrierManager } from '../components/CalendrierManager';
+import { TresorerieManager } from '../components/TresorerieManager';
+import { evaluerObjectif } from '../lib/objectifsManager';
 import { competitionEffective } from '../lib/divisions';
 import { TROPHEES } from '../data/trophees';
 import { nomPoste, POSTES } from '../data/rugby';
@@ -25,7 +27,7 @@ import type { CibleRecrutementManager, PosteId } from '../types';
 import { poidsDansSecteur, SECTEURS_COHESION } from '../lib/cohesion';
 import type { Automatismes } from '../lib/cohesion';
 import {
-  budgetsDuClub, ciblesDuMarche, joueurDejaRecrute, masseSalarialeActuelle,
+  ciblesDuMarche, joueurDejaRecrute, situationSalariale,
 } from '../lib/recrutementManager';
 import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
@@ -49,8 +51,9 @@ import {
   reconcilerCompositionManager,
 } from '../lib/compositionManager';
 import {
-  assurerEtatCarriereAvancee, indisponiblesCarriereAvancee, moyenneVestiaire,
-  penalitesMedicales, rapportConnaissance, joueurAgent,
+  assurerEtatCarriereAvancee, chargeTotaleEntrainement, indisponiblesCarriereAvancee,
+  moyenneVestiaire, penalitesMedicales, rapportConnaissance, risqueMedicalJoueur,
+  risqueMoyenGroupe, joueurAgent,
 } from '../lib/carriereAvancee';
 import { hallOfFameDe, totaux } from '../lib/histoire';
 import { rivalitesDe, traitsDominants } from '../lib/identiteClub';
@@ -68,7 +71,7 @@ import type {
 const MatchLive = lazy(() => import('../components/MatchLive').then((m) => ({ default: m.MatchLive })));
 const OvaleManager = lazy(() => import('./Social').then((m) => ({ default: m.OvaleManager })));
 
-type VueManager = 'bureau' | 'equipe' | 'match' | 'marche' | 'calendrier'
+type VueManager = 'bureau' | 'equipe' | 'match' | 'tresorerie' | 'marche' | 'calendrier'
   | 'ovale' | 'formation' | 'recruteurs' | 'entrainement'
   | 'direction' | 'vestiaire' | 'univers' | 'histoire';
 
@@ -130,6 +133,8 @@ export function Manager() {
   const enregistrerResultat = useGame((s) => s.enregistrerResultatManager);
   const repondreDiscussion = useGame((s) => s.repondreDiscussionAvancee);
   const deciderMedical = useGame((s) => s.deciderMedicalManager);
+  const definirChargeEntrainement = useGame((s) => s.definirChargeEntrainementManager);
+  const ouvrirRenegociationJoueur = useGame((s) => s.ouvrirRenegociationJoueurManager);
   const observerCible = useGame((s) => s.observerCibleManager);
   const postulerBanc = useGame((s) => s.postulerBancManager);
   const negocierContrat = useGame((s) => s.negocierContratManager);
@@ -146,19 +151,13 @@ export function Manager() {
   // ⚠️ LES MURS SONT CEUX DU CLUB, pas ceux de l'entraîneur : on lit le club
   // courant, et un manager qui change de banc découvre ce que l'autre a bâti.
   const murs = manager?.installations?.[manager.club] ?? installationsVierges();
-  // ⚠️ LA MÊME ENVELOPPE QUE CELLE QUE LE STORE FACTURE, et c'est tout le
-  // correctif. Cet écran la recalculait avec sa propre formule (forceEffectif +
-  // competitionDuClub, sans référence d'étage) tandis que `ameliorerInstallation`
-  // lit `budgetsDuClub`. Mesuré sur 8 étages : 5 divergeaient, et sur 2 d'entre
-  // eux l'écran annonçait MOINS cher que le store — en Nationale, 125 000 €
-  // affichés contre 315 000 € exigés. Le bouton s'allumait, le clic ne faisait
-  // rien, et rien ne l'expliquait. Banc : scripts/verifEnveloppeStructure.ts.
-  const enveloppe = manager?.club ? budgetsDuClub(manager.club, manager.saison).structure : 0;
+  // Les tarifs fixes sont partagés avec le store.
   const placesEntrainement = PLACES_ENTRAINEMENT[Math.min(murs.entrainement, NIVEAU_INSTALLATION_MAX)];
   const rapportsFrais = manager?.rapports?.filter((r) => r.saison >= (manager.saison ?? 0)).length ?? 0;
   // La masse déjà engagée : c'est elle qui bloque une signature, pas le solde.
-  const masseEngagee = manager?.club ? masseSalarialeActuelle(manager.club, manager.saison) : 0;
-  const masseSaturee = !!manager && masseEngagee >= manager.budgetSalarial * 0.92;
+  const salaires = manager?.club ? situationSalariale(manager) : null;
+  const masseEngagee = salaires?.engagee ?? 0;
+  const masseSaturee = !!salaires && masseEngagee >= salaires.plafond * 0.92;
   const [raccrocher, setRaccrocher] = useState(false);
   const [clubVise, setClubVise] = useState('');
   const [divisionMarche, setDivisionMarche] = useState(manager?.division ?? 'top14');
@@ -313,6 +312,13 @@ export function Manager() {
     if (!manager || !selection || !rencontre) return null;
     return jouerTestMatch(selection.nation, rencontre.adversaire, manager.saison, rencontre.id, null);
   }, [avancee?.selection, manager]);
+  const risquesBlessureMatch = useMemo(() => {
+    if (!manager || !avancee) return {};
+    const intensite = manager.tactique.rythme === 'intense' ? 1.25 : manager.tactique.rythme === 'gestion' ? .82 : 1;
+    return Object.fromEntries(effectifBrut.map((j) => [j.id, risqueMedicalJoueur(
+      avancee.profilsMedicaux[j.id], j, avancee.chargeEntrainement, 'match', intensite,
+    )]));
+  }, [avancee, effectifBrut, manager]);
 
   if (!manager) return null;
 
@@ -339,9 +345,12 @@ export function Manager() {
   const revenusFormationClub = Object.entries(manager.revenusFormation)
     .filter(([cle]) => cle.startsWith(`${manager.club}|`))
     .reduce((somme, [, montant]) => somme + montant, 0);
-  const objectifsAvances = avancee?.objectifs ?? [];
+  const objectifsAvances = (avancee?.objectifs ?? []).map((o) => evaluerObjectif(o, manager, effectifBrut, maLigne?.joues ? maLigne.position : undefined));
   const discussionsOuvertes = avancee?.discussions.filter((d) => d.etat === 'ouverte') ?? [];
-  const dossiersMedicaux = avancee?.medical.filter((d) => d.semaines > 0) ?? [];
+  const dossiersMedicaux = avancee?.medical.filter((d) => (d.phase ?? (d.semaines > 0 ? 'diagnostic' : 'clos')) !== 'clos') ?? [];
+  const chargeHebdo = avancee?.chargeEntrainement;
+  const chargeTotale = chargeHebdo ? chargeTotaleEntrainement(chargeHebdo) : 0;
+  const risqueGroupe = avancee ? risqueMoyenGroupe(avancee, effectifBrut) : 0;
   const convocationsActives = avancee?.convocations.filter((c) => manager.semaine >= c.debut && manager.semaine <= c.fin) ?? [];
   const rivalitesClub = rivalitesDe(avancee?.rivalites ?? [], manager.club);
   const identiteClub = avancee?.identites[manager.club];
@@ -542,10 +551,10 @@ export function Manager() {
             <button className={vue === 'equipe' ? 'actif' : ''} onClick={() => setVue('equipe')}>
               <Icone nom="equipe" taille={17} /> Composition
             </button>
-            <button className={vue === 'match' ? 'actif' : ''} onClick={() => setVue('match')}>
-              <Icone nom="sifflet" taille={17} /> Match {afficheManager && !resultatManager && <i>1</i>}
+            <button className={vue === 'tresorerie' ? 'actif' : ''} onClick={() => setVue('tresorerie')}>
+              <Icone nom="euro" taille={17} /> Trésorerie
             </button>
-            <button className={vue === 'calendrier' ? 'actif' : ''} onClick={() => setVue('calendrier')}>
+            <button className={vue === 'calendrier' || vue === 'match' ? 'actif' : ''} onClick={() => setVue('calendrier')}>
               <Icone nom="calendrier" taille={17} /> Calendrier
             </button>
             <button className={vue === 'marche' ? 'actif' : ''} onClick={() => setVue('marche')}>
@@ -564,7 +573,7 @@ export function Manager() {
               <Icone nom="halteres" taille={17} /> Entraînement
             </button>
             <button className={vue === 'direction' ? 'actif' : ''} onClick={() => setVue('direction')}>
-              <Icone nom="institution" taille={17} /> Direction {objectifsAvances.some((o) => o.etat === 'echoue') && <i>!</i>}
+              <Icone nom="institution" taille={17} /> Direction
             </button>
             <button className={vue === 'vestiaire' ? 'actif' : ''} onClick={() => setVue('vestiaire')}>
               <Icone nom="maillot" taille={17} /> Vestiaire {(discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length) > 0 && <i>{discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length}</i>}
@@ -578,6 +587,7 @@ export function Manager() {
           </nav>
 
           {vue === 'calendrier' && <CalendrierManager onMatch={() => setVue('match')} />}
+          {vue === 'tresorerie' && <TresorerieManager manager={manager} onMarche={() => setVue('marche')} onStructures={() => setVue('formation')} />}
 
           {vue === 'bureau' && (
             <div className="manager-bureau">
@@ -634,7 +644,7 @@ export function Manager() {
                 <article className="carte"><small>Objectif du board</small><b>{manager.objectif}e</b><span>{maLigne && maLigne.position <= manager.objectif ? 'Objectif tenu' : 'À rattraper'}</span></article>
                 <article className="carte"><small>Force du groupe</small><b>{force.toFixed(1)}</b><span>{effectif.length} joueurs</span></article>
                 <article className="carte"><small>Confiance</small><b>{Math.round(manager.confiance)}%</b><span>{humeur.texte}</span></article>
-                <article className="carte"><small>Budget transferts</small><b>{nombre(manager.budgetTransferts)} €</b><span>{nombre(manager.budgetSalarial)} € salarial</span></article>
+                <article className="carte"><small>Budget transferts</small><b>{nombre(manager.budgetTransferts)} €</b><span>Marge salariale : {nombre(salaires?.disponible ?? 0)} € / an</span></article>
                 <article className="carte"><small>Structures</small><b>{nombre(manager.budgetStructure)} €</b><span>Formation {murs.formation}/4 · Recrutement {murs.recrutement}/4 · Entraînement {murs.entrainement}/4</span></article>
               </section>
 
@@ -726,16 +736,18 @@ export function Manager() {
 
               <section className="avance-objectifs">
                 {objectifsAvances.map((objectif) => {
-                  const pct = objectif.categorie === 'sportif'
-                    ? Math.min(100, Math.max(0, ((objectif.cible - (maLigne?.position ?? objectif.cible + 3) + 3) / 3) * 100))
-                    : Math.min(100, objectif.progression / Math.max(1, objectif.cible) * 100);
                   return <article className={`carte objectif-board ${objectif.etat}`} key={objectif.id}>
                     <header><span>{objectif.categorie}</span><b>{'★'.repeat(objectif.importance)}{'☆'.repeat(3 - objectif.importance)}</b></header>
                     <h3>{objectif.titre}</h3><p>{objectif.detail}</p>
-                    <i><em style={{ width: `${pct}%` }} /></i><small>{objectif.etat === 'enCours' ? `${Math.round(pct)} %` : objectif.etat === 'reussi' ? '✓ Réussi' : '✕ Manqué'}</small>
+                    <b className="objectif-mesure">{objectif.libelle}</b>
+                    <i><em style={{ width: `${objectif.pourcentage}%` }} /></i><small>{objectif.atteint ? 'Objectif tenu à ce jour' : 'En cours'} · bilan à la clôture</small>
                   </article>;
                 })}
               </section>
+              {avancee?.dernierBilanObjectifs && <details className="carte bilan-objectifs-manager">
+                <summary>Bilan des objectifs · saison {avancee.dernierBilanObjectifs.saison} · {avancee.dernierBilanObjectifs.club}</summary>
+                <ul>{avancee.dernierBilanObjectifs.objectifs.map((o) => <li key={o.id}><b>{o.etat === 'reussi' ? 'Réussi' : 'Manqué'}</b> — {o.titre}</li>)}</ul>
+              </details>}
 
               {profonde && <section className="carte delegation-manager">
                 <div className="comp-tete"><div><b><Icone nom="entraineur" taille={16} /> Répartition des responsabilités</b><small>Tu peux tout contrôler ou laisser le directeur sportif agir selon ses vraies compétences.</small></div><span className="comp-count">{DOMAINES_DELEGATION.filter((d) => profonde.delegations[d]).length}/9</span></div>
@@ -818,6 +830,21 @@ export function Manager() {
                 })}</div>
               </section>
 
+              <section className="carte contrats-effectif-manager">
+                <div className="comp-tete"><div><b><Icone nom="signature" taille={16} /> Contrats et marché</b><small>Durée, statut, satisfaction, motivations et concurrence déterminent le rapport de force.</small></div><span className="comp-count">{Object.values(avancee.contratsJoueurs).filter((c) => c.club === manager.club).length}</span></div>
+                <div>{effectifBrut.map((j) => ({ j, c: avancee.contratsJoueurs[j.id] })).filter(({ c }) => c).sort((a, b) => a.c.fin - b.c.fin || b.c.interetExterieur - a.c.interetExterieur).map(({ j, c }) => {
+                  const nego = manager.negociations.findLast((n) => n.joueur.id === j.id && n.nature !== 'recrutement');
+                  return <article key={j.id} className={c.demandeRevalorisation ? 'revalorisation' : ''}>
+                    <span><b>{j.nom}</b><small>{c.role} · fin S{c.fin} · {c.option === 'aucune' ? 'sans option' : `option ${c.option}`}</small></span>
+                    <div><small>Salaire</small><strong>{c.salaire > 0 ? `${nombre(c.salaire)} €` : 'amateur'}</strong></div>
+                    <div><small>Satisfaction</small><strong>{c.satisfaction}/100</strong></div>
+                    <div><small>Intérêt extérieur</small><strong>{c.interetExterieur}/100 · {c.offresExterieures} offre(s)</strong></div>
+                    <small className="motivations-contrat">{c.motivations.map((m) => `${m.type} ${m.importance}`).join(' · ')}</small>
+                    <button className={c.demandeRevalorisation ? 'danger' : ''} disabled={nego?.etat === 'signee' && nego.saison === manager.saison} onClick={() => ouvrirRenegociationJoueur(j.id)}>{nego?.etat === 'ouverte' || nego?.etat === 'accord' ? 'Reprendre la négociation' : c.demandeRevalorisation ? 'Négocier la revalorisation' : c.fin <= manager.saison + 1 ? 'Prolonger' : 'Ouvrir les discussions'}</button>
+                  </article>;
+                })}</div>
+              </section>
+
               {profonde && <section className="carte relations-joueurs-manager">
                 <div className="comp-tete"><div><b><Icone nom="poignee" taille={16} /> Relations entre joueurs</b><small>Amitié, respect, rivalité, mentorat, conflit et famille continuent d’exister sans passer par le manager.</small></div><span className="comp-count">{profonde.relations.length}</span></div>
                 <div>{profonde.relations.filter((r) => effectifBrut.some((j) => j.id === r.joueurA) && effectifBrut.some((j) => j.id === r.joueurB)).slice(0, 18).map((relation) => { const a = effectifBrut.find((j) => j.id === relation.joueurA); const b = effectifBrut.find((j) => j.id === relation.joueurB); return <article key={relation.id} className={relation.type}><span><b>{a?.nom}</b><i>↔</i><b>{b?.nom}</b></span><em>{relation.type}</em><div><i><em style={{ width: `${relation.intensite}%` }} /></i><strong>{relation.intensite}</strong></div></article>; })}</div>
@@ -838,8 +865,18 @@ export function Manager() {
               </section>
 
               <section className="carte infirmerie-manager">
-                <div className="comp-tete"><div><b><Icone nom="soin" taille={16} /> Décisions médicales</b><small>Disponibilité, douleur et risque d’aggravation sont séparés.</small></div><span className="comp-count">{dossiersMedicaux.length}</span></div>
-                {dossiersMedicaux.map((d) => <article key={d.id}><header><span><b>{d.nom}</b><small>{d.type} · {d.semaines} semaine(s)</small></span><strong>{d.disponibilite}% disponible</strong></header><p>Douleur {d.douleur}/100 · risque d’aggravation {d.risqueAggravation}%{d.penalitePerformance > 0 && ` · performance −${d.penalitePerformance}`}</p>{d.decision === 'attente' ? <div><button onClick={() => deciderMedical(d.id, 'repos')}>Repos · aucun match</button><button onClick={() => deciderMedical(d.id, 'traitement')}>Traitement · 80%</button><button className="danger" onClick={() => deciderMedical(d.id, 'forcer')}>Forcer · 90%</button></div> : <em>Décision : {d.decision}</em>}</article>)}
+                <div className="comp-tete"><div><b><Icone nom="soin" taille={16} /> Cellule médicale</b><small>Diagnostic progressif, guérison, condition, rythme et rechute sont suivis séparément.</small></div><span className="comp-count">{dossiersMedicaux.length}</span></div>
+                {dossiersMedicaux.map((d) => {
+                  const phase = d.phase ?? 'diagnostic';
+                  const profil = avancee.profilsMedicaux[d.joueurId];
+                  const diagnosticEnAttente = phase === 'suspicion';
+                  const reprise = phase === 'reprise';
+                  return <article key={d.id} className={`phase-${phase}`}><header><span><b>{d.nom}</b><small>{diagnosticEnAttente ? d.diagnosticInitial : d.type} · {d.zone} · {d.origine}{d.minute ? ` à la ${d.minute}e` : ''}</small></span><strong>{phase} · {d.disponibilite}%</strong></header>
+                    <div className="medical-fitness"><span><small>Guérison</small><b>{d.guerison ?? 0}%</b></span><span><small>Condition</small><b>{d.condition ?? 0}%</b></span><span><small>Rythme</small><b>{d.rythme ?? 0}%</b></span><span><small>Rechute</small><b>{d.risqueRechute ?? d.risqueAggravation}%</b></span></div>
+                    <p>{diagnosticEnAttente ? `Examens : résultat dans ${d.diagnosticDans ?? 0} semaine(s).` : `${d.semaines} semaine(s) de soins · douleur ${d.douleur}/100`}{d.protocoleCommotion && ' · protocole commotion obligatoire'}{profil?.historique.length ? ` · ${profil.historique.length} antécédent(s), ${profil.commotions} commotion(s)` : ''}</p>
+                    {diagnosticEnAttente ? <em>Le staff protège le joueur jusqu’au diagnostic.</em> : d.decision === 'attente' ? <div>{reprise ? <><button onClick={() => deciderMedical(d.id, 'reserve')}>Réserves</button><button onClick={() => deciderMedical(d.id, 'reprise20')}>20 minutes</button><button onClick={() => deciderMedical(d.id, 'reprise40')}>40 minutes</button><button className="danger" onClick={() => deciderMedical(d.id, 'retourDirect')}>Retour direct</button></> : <><button onClick={() => deciderMedical(d.id, 'repos')}>Repos complet</button><button onClick={() => deciderMedical(d.id, 'disponible')}>Disponible si besoin</button>{!d.protocoleCommotion && <button className="danger" onClick={() => deciderMedical(d.id, 'forcer')}>Forcer le retour</button>}</>}</div> : <em>Plan actuel : {d.decision}</em>}
+                  </article>;
+                })}
                 {!dossiersMedicaux.length && <p className="manager-vide-texte">Infirmerie vide.</p>}
               </section>
 
@@ -990,7 +1027,7 @@ export function Manager() {
               <div className="manager-inst-grille">
                 {([vue === 'formation' ? 'formation' : vue === 'recruteurs' ? 'recrutement' : 'entrainement'] as TypeInstallation[]).map((type) => {
                   const niveau = murs[type];
-                  const cout = coutAmelioration(niveau, enveloppe);
+                  const cout = coutAmelioration(niveau);
                   const finance = cout !== null && manager.budgetStructure >= cout;
                   const n = Math.min(niveau, NIVEAU_INSTALLATION_MAX);
                   const effet = type === 'formation'
@@ -1021,6 +1058,7 @@ export function Manager() {
                         <span>{t('mgr.inst.niveau', { n: String(niveau) })}</span>
                       </div>
                       <p className="inst-effet">{niveau > 0 ? effet : t('mgr.inst.rien')}</p>
+                      <div className="inst-prix-fixes" aria-label="Prix fixes par niveau">{Array.from({ length: NIVEAU_INSTALLATION_MAX }, (_, i) => <span key={i}>N{i + 1} · {nombre(coutAmelioration(i)!)} €</span>)}</div>
                       {cout === null ? (
                         <p className="inst-max">{t('mgr.inst.max')}</p>
                       ) : (
@@ -1032,6 +1070,7 @@ export function Manager() {
                           {t('mgr.inst.ameliorer', { cout: nombre(cout) })}
                         </button>
                       )}
+                      {cout !== null && !finance && <p className="inst-effet">Il manque {nombre(cout - manager.budgetStructure)} € dans l’enveloppe structures.</p>}
                     </section>
                   );
                 })}
@@ -1130,12 +1169,11 @@ export function Manager() {
 
               {vue === 'entrainement' && (
                 <section className="carte manager-planning-collectif">
-                  <div className="comp-tete"><div><b><Icone nom="chrono" taille={16} /> Semaine collective</b><small>Le socle commun du groupe, volontairement simple à lire.</small></div></div>
-                  <div>
-                    {[['Lun.', 'Récupération'], ['Mar.', 'Physique'], ['Mer.', 'Technique'], ['Jeu.', 'Tactique'], ['Ven.', 'Léger'], ['Sam.', 'Match'], ['Dim.', 'Repos']].map(([jour, seance]) => (
-                      <span key={jour}><b>{jour}</b><small>{seance}</small></span>
-                    ))}
-                  </div>
+                  <div className="comp-tete"><div><b><Icone nom="chrono" taille={16} /> Charge de la semaine</b><small>Chaque activité fatigue différemment les postes et les zones du corps.</small></div><span className={`charge-risque risque-${risqueGroupe >= 65 ? 'haut' : risqueGroupe >= 40 ? 'moyen' : 'bas'}`}>Risque groupe {risqueGroupe}/100</span></div>
+                  {chargeHebdo && <div className="reglages-charge">{([
+                    ['physique', 'Physique'], ['contacts', 'Contacts'], ['sprint', 'Sprint'], ['melee', 'Mêlée'], ['recuperation', 'Récupération'],
+                  ] as const).map(([axe, label]) => <article key={axe}><span><b>{label}</b><small>{axe === 'recuperation' ? 'réduit fatigue et risque' : axe === 'melee' ? 'avants · dos/épaules' : axe === 'sprint' ? 'trois-quarts · ischios/chevilles' : axe === 'contacts' ? 'commotions/épaules' : 'condition générale'}</small></span><div>{([0, 1, 2, 3] as const).map((niveau) => <button key={niveau} className={chargeHebdo[axe] === niveau ? 'actif' : ''} onClick={() => definirChargeEntrainement(axe, niveau)}>{['Aucun', 'Léger', 'Normal', 'Fort'][niveau]}</button>)}</div></article>)}</div>}
+                  <p className="bilan-charge">Charge nette {chargeTotale.toFixed(1)} · une charge élevée améliore le rythme mais cumule fatigue et risque de récidive.</p>
                 </section>
               )}
 
@@ -1388,7 +1426,7 @@ export function Manager() {
                   <span>{t('mgr.inst.budget')} <b>{nombre(manager.budgetStructure)} €</b></span>
                   <span>{t('mgr.transferts')} <b>{nombre(manager.budgetTransferts)} €</b></span>
                   <span className={masseSaturee ? 'masse-saturee' : ''}>
-                    {t('mgr.salaires')} <b>{nombre(masseEngagee)} / {nombre(manager.budgetSalarial)} €</b>
+                    {t('mgr.salaires')} <b>{nombre(masseEngagee)} / {nombre(salaires?.plafond ?? 0)} €</b>
                   </span>
                 </div>
               </div>
@@ -1613,8 +1651,9 @@ export function Manager() {
               onTactique: definirTactique,
               indisponibles,
               penalitesNote,
+              risquesBlessure: risquesBlessureMatch,
             }}
-            onTermine={({ scoreA, scoreB, essaisA, essaisB }) => {
+            onTermine={({ scoreA, scoreB, essaisA, essaisB, blessures }) => {
               const domicile = matchOuvert.match.domicile === manager.club;
               enregistrerResultat({
                 cle: matchOuvert.cle, club: manager.club,
@@ -1625,6 +1664,7 @@ export function Manager() {
                 scoreContre: domicile ? scoreB : scoreA,
                 essaisPour: domicile ? essaisA : essaisB,
                 essaisContre: domicile ? essaisB : essaisA,
+                blessures,
               });
             }}
             onFermer={() => setMatchOuvert(null)}

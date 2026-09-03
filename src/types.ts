@@ -624,6 +624,16 @@ export interface SaisonManager {
 }
 
 export type RoleRecrueManager = 'cadre' | 'rotation' | 'espoir';
+export type OptionContratManager = 'aucune' | 'club' | 'joueur' | 'matchs';
+export type MotivationContratManager =
+  | 'argent' | 'ambition' | 'tempsDeJeu' | 'stabilite'
+  | 'attachement' | 'pays' | 'entraineur' | 'agent';
+
+export interface OffreConcurrenteManager {
+  club: string;
+  niveau: 'interet' | 'offre' | 'priorite';
+  salaireEstime: number;
+}
 
 /** Un joueur réellement présent dans un effectif du monde, repéré par le manager. */
 export interface CibleRecrutementManager {
@@ -682,6 +692,16 @@ export interface TermesRecrutementManager {
   primeMatch?: number;
   duree: number;
   role: RoleRecrueManager;
+  /** Primes et protections qui rendent deux offres au même salaire différentes. */
+  primeTitularisation?: number;
+  primeVictoire?: number;
+  primeEssai?: number;
+  primeTitre?: number;
+  option?: OptionContratManager;
+  optionMatchs?: number;
+  clauseLiberation?: number;
+  clauseRelegation?: boolean;
+  hausseMontee?: number;
 }
 
 /** Une discussion de recrutement menée dans les messages de L'Ovale. */
@@ -696,12 +716,31 @@ export interface NegociationManager {
   etat: 'ouverte' | 'accord' | 'signee' | 'rompue';
   saison: number;
   semaine: number;
+  /** Recrutement externe, prolongation ou revalorisation d'un joueur du club. */
+  nature?: 'recrutement' | 'prolongation' | 'revalorisation';
+  motivations?: { type: MotivationContratManager; importance: number }[];
+  interet?: number;
+  offresConcurrentes?: OffreConcurrenteManager[];
+  examenMedical?: {
+    risque: 'faible' | 'modere' | 'eleve';
+    reserve: string;
+    effetSalaire: number;
+  };
+  historique?: { tour: number; resume: string; score: number }[];
 }
 
 export interface RecrueManager {
+  /** Club signataire, conservé quand l'entraîneur change de banc. */
+  club?: string;
   joueur: CibleRecrutementManager;
   termes: TermesRecrutementManager;
   saison: number;
+  accordClub?: {
+    clubVendeur: string;
+    indemnite: number;
+    bonus: number;
+    pourcentageRevente: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -740,6 +779,12 @@ export interface NegociationClubManager {
   etat: 'ouverte' | 'accord' | 'rompue';
   saison: number;
   semaine: number;
+  /** Conditions différées réellement inscrites dans l'accord. */
+  bonus?: number;
+  pourcentageRevente?: number;
+  besoinVendeur?: 'finances' | 'remplacement' | 'garderCadre' | 'degraisser';
+  urgence?: number;
+  alternatives?: number;
 }
 
 /** Ce qu'un joueur du groupe vient réclamer dans les messages. */
@@ -755,6 +800,7 @@ export interface DemandeJoueur {
    * `depart` : il est trop bon pour le banc de ce club, il veut partir.
    */
   type: 'tempsDeJeu' | 'depart';
+  raison?: 'tempsDeJeu' | 'conflitManager' | 'ambition' | 'contrat' | 'famillePays' | 'offreRecue';
   saison: number;
   semaine: number;
   etat: 'ouverte' | 'acceptee' | 'refusee';
@@ -837,6 +883,7 @@ export interface ResultatMatchManager {
   scoreContre: number;
   essaisPour: number;
   essaisContre: number;
+  blessures?: { joueurId: string; minute: number; activite: string }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -972,6 +1019,7 @@ export interface Manager {
   argent: number;
   /** Enveloppes du club, distinctes du salaire personnel de l'entraîneur. */
   budgetTransferts: number;
+  /** Plafond annuel, pas un solde : la masse engagée se déduit à la lecture. */
   budgetSalarial: number;
   /**
    * La TROISIÈME enveloppe : les murs, pas les hommes.

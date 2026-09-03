@@ -6,9 +6,10 @@
 
 import type {
   CibleRecrutementManager, Manager, NegociationClubManager, NegociationManager,
-  RecrueManager, RoleRecrueManager, TermesRecrutementManager, TransfertAnnonce,
+  MotivationContratManager, RecrueManager, RoleRecrueManager,
+  TermesRecrutementManager, TransfertAnnonce,
 } from '../types';
-import { COMPETITIONS, competitionDuClub } from '../data/clubs';
+import { COMPETITIONS } from '../data/clubs';
 import { competitionEffective } from './divisions';
 import { effectifDuClub, forceMoyenneDivision } from './effectif';
 import { graine } from './championnat';
@@ -47,7 +48,17 @@ export function estAmateurNiveau(niveau: number): boolean {
   return niveau > PRO_JUSQUA;
 }
 
-export type LevierRecrutementManager = 'salaire' | 'prime' | 'duree' | 'role';
+export type LevierRecrutementManager =
+  | 'salaire' | 'prime' | 'duree' | 'role' | 'bonus' | 'option' | 'clause';
+
+export interface ContexteNegociationManager {
+  nature?: 'recrutement' | 'prolongation' | 'revalorisation';
+  attachement?: number;
+  satisfaction?: number;
+  performance?: number;
+  interetExterieur?: number;
+  risqueMedical?: number;
+}
 
 const ORDRE_ROLE: RoleRecrueManager[] = ['espoir', 'rotation', 'cadre'];
 
@@ -123,16 +134,38 @@ export function budgetsDuClub(club: string, saison: number): {
  * chaque joueur au tarif de son écart au groupe — la même courbe que celle qui
  * fixe ce qu'on proposera à une recrue.
  */
-export function masseSalarialeActuelle(club: string, saison: number): number {
-  const niveau = competitionDuClub(club)?.niveau ?? 8;
-  if (estAmateurNiveau(niveau)) return 0;
+export function salairesEffectif(
+  club: string, saison: number, recrues: RecrueManager[] = [],
+  contratsJoueurs?: Record<string, { joueurId: string; nom: string; club: string; fin: number; salaire: number; derniereNegociation?: number }>,
+) {
+  const niveau = competitionEffective(club)?.niveau ?? 8;
   const force = forceDuGroupe(club, saison);
-  let total = 0;
-  // Les 30 premiers : au-delà, ce sont des jeunes du centre qui ne pèsent rien.
-  for (const j of effectifDuClub(club, saison)) {
-    total += salaire(niveau, j.note - force, j.age);
-  }
-  return Math.round(total / 10_000) * 10_000;
+  return effectifDuClub(club, saison).map((j) => {
+    // L'identifiant peut changer après un transfert ; le nom conservé par
+    // l'annonce permet de retrouver le contrat dans le nouvel effectif.
+    const contrat = recrues.findLast((r) => (r.joueur.id === j.id || r.joueur.nom === j.nom)
+      && (!r.club || r.club === club)
+      && r.saison <= saison && r.saison + r.termes.duree > saison);
+    const contratInterne = contratsJoueurs && Object.values(contratsJoueurs).find((c) =>
+      (c.joueurId === j.id || c.nom === j.nom) && c.club === club && c.fin > saison
+        && c.derniereNegociation !== undefined);
+    const montant = contrat?.termes.salaire ?? contratInterne?.salaire
+      ?? (estAmateurNiveau(niveau) ? 0 : salaire(niveau, j.note - force, j.age));
+    return { joueurId: j.id, nom: j.nom, salaire: Math.round(montant), negocie: !!contrat || !!contratInterne };
+  });
+}
+
+export function masseSalarialeActuelle(club: string, saison: number, recrues: RecrueManager[] = []): number {
+  return salairesEffectif(club, saison, recrues).reduce((total, j) => total + j.salaire, 0);
+}
+
+/** Le plafond est annuel : signer consomme la marge, jamais le plafond. */
+export function situationSalariale(m: Pick<Manager, 'club' | 'saison' | 'recrues' | 'budgetSalarial' | 'avancee'>) {
+  const cap = salaryCap(competitionEffective(m.club)?.niveau ?? 8);
+  const plafond = Math.min(m.budgetSalarial, cap ?? Infinity);
+  const engagee = salairesEffectif(m.club, m.saison, m.recrues, m.avancee?.contratsJoueurs)
+    .reduce((total, j) => total + j.salaire, 0);
+  return { cap, plafond, engagee, disponible: plafond - engagee };
 }
 
 function roleAttendu(note: number, potentiel: number, age: number, forceClub: number): RoleRecrueManager {
@@ -329,13 +362,44 @@ export function ouvrirNegociationManager(
   cible: CibleRecrutementManager,
   saison: number,
   semaine: number,
+  contexte: ContexteNegociationManager = {},
 ): NegociationManager {
+  const profilRng = graine(`contrat-profil#${cible.id}#${saison}`);
+  const motivationsPossibles: MotivationContratManager[] = cible.age <= 24
+    ? ['tempsDeJeu', 'ambition', 'stabilite', 'entraineur', 'argent', 'pays']
+    : cible.age >= 30
+      ? ['stabilite', 'attachement', 'argent', 'tempsDeJeu', 'pays', 'agent']
+      : ['argent', 'ambition', 'tempsDeJeu', 'agent', 'entraineur', 'stabilite'];
+  const motivations = motivationsPossibles
+    .map((type, index) => ({ type, importance: 48 + Math.round(profilRng() * 47) - index * 2 }))
+    .sort((a, b) => b.importance - a.importance)
+    .slice(0, 3);
+  const risqueMedical = Math.max(0, Math.min(100, contexte.risqueMedical ?? 18 + Math.round(profilRng() * 32)));
+  const performance = Math.max(0, Math.min(100, contexte.performance ?? cible.note));
+  const attachement = Math.max(0, Math.min(100, contexte.attachement ?? (contexte.nature === 'recrutement' ? 30 : 55)));
+  const satisfaction = Math.max(0, Math.min(100, contexte.satisfaction ?? 58));
+  // Une explosion sportive et la concurrence font monter la demande ; une
+  // blessure lourde, l'attachement et un projet heureux la tempèrent.
+  const facteur = Math.max(.78, Math.min(1.34,
+    1 + (performance - 65) / 360 + (contexte.interetExterieur ?? 0) / 650
+      - risqueMedical / 900 - Math.max(0, attachement - 55) / 900
+      + Math.max(0, 45 - satisfaction) / 520));
   const exigences: TermesRecrutementManager = {
-    salaire: cible.salaireDemande,
-    prime: cible.primeDemandee,
+    salaire: cible.salaireDemande > 0 ? arrondir(cible.salaireDemande * facteur, 5_000) : 0,
+    prime: cible.primeDemandee > 0 ? arrondir(cible.primeDemandee * facteur, 2_500) : 0,
     primeMatch: cible.primeMatchDemandee,
     duree: cible.dureeDemandee,
     role: cible.roleDemande,
+    primeTitularisation: cible.salaireDemande > 0 ? arrondir(cible.salaireDemande * .012, 500) : 0,
+    primeVictoire: cible.salaireDemande > 0 ? arrondir(cible.salaireDemande * .008, 500) : 0,
+    primeEssai: cible.salaireDemande > 0 ? arrondir(cible.salaireDemande * .01, 500) : 0,
+    primeTitre: cible.salaireDemande > 0 ? arrondir(cible.salaireDemande * .08, 2_500) : 0,
+    option: motivations.some((m) => m.type === 'stabilite') ? 'joueur' : cible.age <= 23 ? 'matchs' : 'aucune',
+    optionMatchs: cible.age <= 23 ? 12 : undefined,
+    clauseLiberation: motivations.some((m) => m.type === 'ambition') && cible.valeur > 0
+      ? arrondir(cible.valeur * 1.35, 25_000) : undefined,
+    clauseRelegation: motivations.some((m) => m.type === 'ambition'),
+    hausseMontee: cible.salaireDemande > 0 ? 15 : undefined,
   };
   const rang = Math.max(0, ORDRE_ROLE.indexOf(cible.roleDemande) - 1);
   // ⚠️ ON N'OUVRE PAS SOUS ZÉRO. `arrondir()` renvoie au minimum son pas : sur
@@ -355,12 +419,37 @@ export function ouvrirNegociationManager(
         : 0,
       duree: Math.max(1, cible.dureeDemandee - 1),
       role: ORDRE_ROLE[rang],
+      primeTitularisation: 0,
+      primeVictoire: 0,
+      primeEssai: 0,
+      primeTitre: 0,
+      option: 'aucune',
+      clauseRelegation: false,
     },
     exigences,
     patience: 4,
     etat: 'ouverte',
     saison,
     semaine,
+    nature: contexte.nature ?? 'recrutement',
+    motivations,
+    interet: Math.max(5, Math.min(100, Math.round(
+      56 + (satisfaction - 50) * .25 + (attachement - 50) * .2
+        - (contexte.interetExterieur ?? 0) * .24,
+    ))),
+    offresConcurrentes: Array.from({ length: Math.min(3, Math.floor((contexte.interetExterieur ?? profilRng() * 70) / 24)) }, (_, i) => {
+      const clubs = COMPETITIONS.flatMap((c) => c.clubs.map((club) => club.nom)).filter((club) => club !== cible.club);
+      const club = clubs[Math.floor(profilRng() * clubs.length)] ?? 'Club concurrent';
+      return { club, niveau: i === 0 && performance >= 74 ? 'offre' as const : 'interet' as const,
+        salaireEstime: cible.salaireDemande > 0 ? arrondir(cible.salaireDemande * (.92 + profilRng() * .24), 5_000) : 0 };
+    }),
+    examenMedical: {
+      risque: risqueMedical >= 62 ? 'eleve' : risqueMedical >= 34 ? 'modere' : 'faible',
+      reserve: risqueMedical >= 62 ? 'Contrat court ou garanties médicales conseillés.'
+        : risqueMedical >= 34 ? 'Historique à surveiller pendant la visite.' : 'Aucune réserve majeure.',
+      effetSalaire: -Math.round(risqueMedical / 12),
+    },
+    historique: [],
   };
 }
 
@@ -394,7 +483,14 @@ function score(offre: TermesRecrutementManager, exigences: TermesRecrutementMana
     : Math.min(1.15, offre.prime / Math.max(1, exigences.prime));
   const duree = Math.min(1.1, offre.duree / Math.max(1, exigences.duree));
   const role = ORDRE_ROLE.indexOf(offre.role) >= ORDRE_ROLE.indexOf(exigences.role) ? 1 : 0.55;
-  return remuneration * 0.52 + prime * 0.14 + duree * 0.12 + role * 0.22;
+  const primesPerformance = Math.min(1.1,
+    ((offre.primeTitularisation ?? 0) + (offre.primeVictoire ?? 0) + (offre.primeEssai ?? 0) + (offre.primeTitre ?? 0))
+      / Math.max(1, (exigences.primeTitularisation ?? 0) + (exigences.primeVictoire ?? 0) + (exigences.primeEssai ?? 0) + (exigences.primeTitre ?? 0)));
+  const protections = (offre.option === exigences.option ? .5 : 0)
+    + (!!offre.clauseLiberation === !!exigences.clauseLiberation ? .25 : 0)
+    + (offre.clauseRelegation === exigences.clauseRelegation ? .25 : 0);
+  return remuneration * 0.44 + prime * 0.1 + duree * 0.1 + role * 0.2
+    + primesPerformance * .1 + protections * .06;
 }
 
 export function negocierAvecJoueur(
@@ -422,6 +518,21 @@ export function negocierAvecJoueur(
   if (levier === 'role') {
     offre.role = ORDRE_ROLE[Math.min(ORDRE_ROLE.length - 1, ORDRE_ROLE.indexOf(offre.role) + 1)];
   }
+  if (levier === 'bonus') {
+    offre.primeTitularisation = arrondir(Math.max(500, (offre.primeTitularisation ?? 0) * 1.5), 500);
+    offre.primeVictoire = arrondir(Math.max(500, (offre.primeVictoire ?? 0) * 1.5), 500);
+    offre.primeEssai = arrondir(Math.max(500, (offre.primeEssai ?? 0) * 1.5), 500);
+    offre.primeTitre = arrondir(Math.max(2_500, (offre.primeTitre ?? 0) * 1.5), 2_500);
+  }
+  if (levier === 'option') {
+    offre.option = negociation.exigences.option ?? 'joueur';
+    offre.optionMatchs = negociation.exigences.optionMatchs;
+  }
+  if (levier === 'clause') {
+    offre.clauseLiberation = negociation.exigences.clauseLiberation;
+    offre.clauseRelegation = negociation.exigences.clauseRelegation;
+    offre.hausseMontee = negociation.exigences.hausseMontee;
+  }
   const accord = score(offre, negociation.exigences) >= 0.94;
   const patience = Math.max(0, negociation.patience - 1);
   return {
@@ -431,6 +542,12 @@ export function negocierAvecJoueur(
       offre,
       patience,
       etat: accord ? 'accord' : patience === 0 ? 'rompue' : 'ouverte',
+      interet: Math.max(0, (negociation.interet ?? 55) - (accord ? 0 : 5)),
+      historique: [...(negociation.historique ?? []), {
+        tour: (negociation.historique?.length ?? 0) + 1,
+        resume: levier,
+        score: Math.round(score(offre, negociation.exigences) * 100),
+      }],
     },
   };
 }

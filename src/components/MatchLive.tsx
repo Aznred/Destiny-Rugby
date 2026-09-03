@@ -290,6 +290,12 @@ const CONTACTS = new Set<ActionJoueur>([
 /** La durée du plan quand il n’y a rien de spectaculaire à regarder. */
 const REJEU_COURT = 1.5;
 
+function aleaMedicalStable(cle: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < cle.length; i++) h = Math.imul(h ^ cle.charCodeAt(i), 16777619);
+  return (h >>> 0) / 4294967296;
+}
+
 /** Une vibration courte, si le téléphone en a une. Silencieuse partout ailleurs. */
 function vibrer(ms: number): void {
   try {
@@ -315,6 +321,7 @@ export function MatchLive({
    *  semaine suivante quand on referme la fenêtre. */
   onTermine?: (resultat: {
     scoreA: number; scoreB: number; essaisA: number; essaisB: number;
+    blessures: { joueurId: string; minute: number; activite: string }[];
   }) => void;
   joueur?: Joueur | null;
   manager?: {
@@ -326,6 +333,8 @@ export function MatchLive({
     indisponibles?: string[];
     /** Jouer diminué réduit réellement la note transmise au moteur. */
     penalitesNote?: Record<string, number>;
+    /** Risque 0-100 calculé par la carrière pour chaque joueur de la feuille. */
+    risquesBlessure?: Record<string, number>;
   };
 }) {
   const iaActivee = useGame((s) => s.iaActivee);
@@ -401,6 +410,8 @@ export function MatchLive({
   }
   const e = moteur.current;
   const monPion = e.pions.find((p) => p.moi);
+  const blessuresManager = useRef<{ joueurId: string; minute: number; activite: string }[]>([]);
+  const minuteMedicale = useRef(-1);
 
   const [, redessiner] = useState(0);
   const [enPause, setEnPause] = useState(false);
@@ -835,11 +846,33 @@ export function MatchLive({
       }
 
       avancer(e, dtReel * facteurTempo(tempo, enMoment));
+      // Une blessure du groupe du manager se produit pendant le match : le
+      // joueur reste au sol, le banc est appelé et le premier diagnostic ne
+      // sera connu qu'après la sirène. Le tirage est séparé du RNG sportif afin
+      // que cette vérification ne change jamais un score ou une trajectoire.
+      const minute = Math.floor(e.minute);
+      if (manager?.risquesBlessure && coteManager && minute >= 3 && minute !== minuteMedicale.current
+        && blessuresManager.current.length === 0) {
+        minuteMedicale.current = minute;
+        const terrain = e.pions.filter((p) => p.cote === coteManager && p.surLeTerrain && p.sanction <= 0 && p.sourceId);
+        const touche = terrain.find((p) => aleaMedicalStable(`${cle}#${minute}#${p.sourceId}`)
+          < (manager.risquesBlessure?.[p.sourceId] ?? 0) / 600_000);
+        if (touche) {
+          const banc = e.pions.filter((p) => p.cote === coteManager && !p.surLeTerrain && p.minutes === 0 && p.sourceId);
+          const entrant = banc.find((p) => p.poste === touche.poste)
+            ?? banc.find((p) => p.avant === touche.avant) ?? banc[0];
+          const activite = touche.avant ? 'contacts' : touche.poste.includes('ailier') || touche.poste === 'arriere' ? 'sprint' : 'match';
+          blessuresManager.current.push({ joueurId: touche.sourceId, minute, activite });
+          ajouterCommentaire(e, 'jeu', coteManager, `${touche.nom} reste au sol. Le staff médical demande sa sortie.`, 0, true);
+          if (entrant) demanderRemplacement(e, coteManager, entrant.sourceId, touche.sourceId);
+          else touche.surLeTerrain = false;
+        }
+      }
       redessiner((n) => n + 1);
     };
     brut = requestAnimationFrame(image);
     return () => { actif = false; cancelAnimationFrame(brut); };
-  }, [enPause, tempo, enJeu, e, fermerDecision]);
+  }, [enPause, tempo, enJeu, e, fermerDecision, manager, coteManager, cle]);
 
   // ⚠️ LES CHIFFRES CHOISISSENT SUR LA CARTE — c'est le SEUL clavier du match,
   // maintenant qu'on ne pilote plus rien. Une carte à dix secondes se joue à la
@@ -957,7 +990,7 @@ export function MatchLive({
   useEffect(() => {
     if (!e.fini || dejaEnregistre.current) return;
     dejaEnregistre.current = true;
-    onTermine?.({ scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB });
+    onTermine?.({ scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB, blessures: blessuresManager.current });
     if (!monPion) return;
     // ⚠️ Le RÉSULTAT part avec les statistiques : c'est ce qui permet à la
     // feuille de match d'être la seule entrée du journal pour ce week-end.

@@ -66,27 +66,42 @@ export function niveauInstallation(
  */
 
 /**
- * Le prix d'une marche, en saisons d'enveloppe.
+ * LE PRIX D'UNE MARCHE — UN PALIER FIXE, EN EUROS.
  *
- * ⚠️ L'ENVELOPPE SE BANQUE INTÉGRALEMENT d'une saison à l'autre (le store),
- * et il le faut : à 4,6 saisons de budget, la dernière marche serait
- * inaccessible à un club modeste avec un report partiel — la structure la plus
- * intéressante du lot n'existerait que pour ceux qui n'en ont pas besoin.
- * Le prix total d'un centre complet fait donc ~10 saisons d'enveloppe pour qui
- * reste au même étage, et bien moins pour qui fait monter son club : c'est la
- * courbe qu'on veut, pas une prime aux gros clubs.
+ * ⚠️ IL ÉTAIT PROPORTIONNEL À L'ENVELOPPE DU CLUB, ET C'EST CE QUI LE RENDAIT
+ * INATTEIGNABLE. Le prix valait `enveloppe × COUT_PAR_NIVEAU[vise]`, donc il
+ * MONTAIT avec le championnat : un club qui progressait voyait le tarif grimper
+ * exactement au même rythme que ses moyens, et la structure restait toujours à
+ * la même distance. Retour de jeu : « les structures n'ont pas de prix fixe et
+ * augmentent en fonction du championnat, donc impossible de les augmenter ;
+ * fais plutôt des paliers, le prix est fixe mais un club de Régionale ne pourra
+ * jamais avoir le meilleur ».
+ *
+ * ⚠️ ET C'EST LE PRIX FIXE QUI CRÉE LA HIÉRARCHIE, pas un plafond artificiel.
+ * On ne dit nulle part « la Régionale n'a pas droit au niveau 4 » : le tarif
+ * suffit. Mesuré en saisons d'enveloppe, avec les revenus réels du jeu :
+ *
+ *   étage         N1     N2      N3      N4      → plafond atteignable
+ *   Top 14       0,0    0,1     0,4     1,5      les quatre marches
+ *   Pro D2       0,0    0,3     1,4     5,8      les quatre, en y consacrant une carrière
+ *   Nationale    0,1    0,8     3,8    15,9      trois marches
+ *   Nationale 2  0,4    2,4    11,4    47,6      deux, la troisième au très long terme
+ *   Fédérale 1   0,7    4,2    20,0    83,3      deux marches
+ *   Régionale 1  2,7   16,7    80,0   333,3      une marche
+ *   Régionale 3  8,0   50,0   240,0  1000,0      une marche, et il faut la vouloir
+ *
+ * L'enveloppe se banque intégralement d'une saison à l'autre (le store), donc
+ * ces durées sont des durées d'ÉPARGNE, pas des refus.
  */
-const COUT_PAR_NIVEAU = [0, 0.9, 1.7, 2.9, 4.6];
+const PRIX_PAR_NIVEAU = [0, 40_000, 250_000, 1_200_000, 5_000_000];
 
-function arrondir(v: number, pas: number): number {
-  return Math.max(pas, Math.round(v / pas) * pas);
-}
-
-export function coutAmelioration(niveauActuel: number, enveloppeDeReference: number): number | null {
+export function coutAmelioration(niveauActuel: number): number | null {
+  if (!Number.isInteger(niveauActuel) || niveauActuel < 0) return null;
   const vise = niveauActuel + 1;
   if (vise > NIVEAU_INSTALLATION_MAX) return null;
-  return arrondir(enveloppeDeReference * COUT_PAR_NIVEAU[vise], 5_000);
+  return PRIX_PAR_NIVEAU[vise];
 }
+
 
 // ---------------------------------------------------------------------------
 // 🎓 LE CENTRE DE FORMATION

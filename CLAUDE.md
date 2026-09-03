@@ -57,7 +57,7 @@ Ce ne sont pas des suggestions. Elles ont toutes été demandées explicitement.
 
 ## Stack
 
-Vite 8 · React 19 · TypeScript · Zustand (+ persist, **migration v25**) ·
+Vite 8 · React 19 · TypeScript · Zustand (+ persist, **migration v27**) ·
 Framer Motion · Three.js (`@react-three/fiber` + `@react-three/drei`) ·
 Groq (API distante) · Neon (Postgres serverless) · déployé sur Vercel.
 
@@ -163,7 +163,7 @@ Toute clé inconnue est ignorée par `nettoyerDeltas()`.
 ### Manager
 
 On prend un banc (`CreationManager`), on compose, on recrute, on fait monter le
-club. Le bureau a 13 onglets : Club, Composition, Match, Calendrier, Marché
+club. Le bureau a 13 onglets : Club, Composition, Trésorerie, Calendrier, Marché
 mondial, L'Ovale, Formation, Recruteurs, Entraînement, Direction, Vestiaire,
 Monde, Histoire.
 
@@ -242,9 +242,35 @@ appelait `budgetsDuClub`, et **5 étages sur 8 divergeaient** — en Nationale,
 s'allumait et un clic sans effet. **Ne pas rouvrir ce raccourci.**
 Banc : `npm run verify:enveloppe`.
 
-L'enveloppe structure **se banque intégralement** d'une saison à l'autre
-(les deux autres sont partiellement reportées) : la dernière marche coûte 4,6
-saisons de budget, un centre complet ~10 saisons.
+L'enveloppe structure **se banque intégralement** d'une saison à l'autre.
+Les prix sont fixes : **40 000 / 250 000 / 1 200 000 / 5 000 000 €** par
+palier et par structure. `coutAmelioration(niveau)` ne prend aucun budget.
+
+**Trésorerie** remplace Match dans les onglets ; Calendrier et Club gardent
+l'accès aux rencontres. `situationSalariale` fait autorité pour le plafond,
+la masse engagée et la marge. Le plafond ne se débite jamais à la signature.
+Le salaire signé remplace le barème de la recrue jusqu'à la fin du contrat.
+`tresorerieManager.ts` partage les reports entre l'écran et la clôture :
+28 % du recrutement restant, 20 % de la marge salariale libre, 100 % des structures.
+
+Les objectifs sont mesurés par `objectifsManager.ts`, à l'écran et au bilan.
+Le store renouvelle les priorités **après** la division, le budget et l'effectif
+de la saison suivante. Le dernier bilan reste dans `dernierBilanObjectifs`.
+Bancs : `verify:tresorerie`, `verify:structures`, `verify:enveloppe`.
+
+La santé longue vit dans `EtatCarriereAvancee` : `profilsMedicaux` conserve
+fragilités, historique, commotions et séquelles ; `medical` conserve les
+épisodes et leurs phases suspicion → diagnostic → guérison → reprise. Ne pas
+ramener la disponibilité médicale à `semaines > 0` : la guérison à 100 % ne
+rend pas la condition ni le rythme. `chargeEntrainement` alimente le risque par
+activité et par poste. Le protocole commotion refuse le retour forcé.
+
+Les contrats de l'effectif vivent dans `contratsJoueurs`. Une signature interne
+doit passer par `ouvrirRenegociationJoueur` puis `signerRenegociationJoueur` ;
+elle remplace le salaire courant dans `situationSalariale`. Les négociations
+externes conservent l'ordre club vendeur → joueur et portent les bonus et la
+part à la revente dans `RecrueManager.accordClub`. Banc :
+`npm run verify:sante-contrats`.
 
 ---
 

@@ -1,5 +1,16 @@
 # Destiny Rugby 🏉
 
+### Trésorerie, objectifs et structures du manager
+
+- **Trésorerie** remplace l’onglet Match. Les matchs restent accessibles depuis Calendrier et le prochain rendez-vous du Club.
+- Trois enveloppes lisibles : recrutement disponible, masse salariale engagée et plafond annuel, épargne des structures. Détail des salaires, des reports et de la rémunération personnelle.
+- Une signature ne débite plus le plafond salarial. Le contrat signé remplace le barème de la recrue ; un départ libère sa charge. L’Ovale, le marché et la signature utilisent la même marge, limitée par le salary cap.
+- À la clôture : report de 28 % du recrutement restant, 20 % de la **marge salariale inutilisée**, 100 % de l’épargne structures. Les nouvelles dotations suivent la division obtenue.
+- Structures : **40 000 / 250 000 / 1 200 000 / 5 000 000 €** pour passer aux niveaux 1 à 4, par structure. Les tarifs restent fixes après une montée et plusieurs achats sont possibles dans une même saison si l’enveloppe le permet.
+- Direction : deux priorités complémentaires tournent selon la saison et le groupe (jeunes, recrutement, ancrage local, essais, victoires). Chaque objectif montre sa mesure réelle ; le dernier bilan reste consultable. Les attentes de la nouvelle saison sont fixées après les changements de division et de budget.
+- L’Ovale utilise les portraits locaux disponibles et un repli local valide. La migration v27 répare les anciens avatars et rembourse les débits salariaux identifiables dans les sauvegardes.
+- Vérifications : `npm run verify:tresorerie`, `npm run verify:structures`, `npm run verify:enveloppe`.
+
 ### Calendrier mondial — joueur et entraîneur
 
 - Juillet à juin : 52 week-ends et une clôture après le match d'accès. Avance datée dans les deux carrières.
@@ -901,16 +912,26 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   individuelle. Les discussions proposent plusieurs réponses et une parole
   engageante devient une **promesse datée** dont le jeu mesure réellement le
   respect. Les leaders diffusent leur soutien ou leur mécontentement.
-- Une blessure sépare douleur, disponibilité et risque : repos, traitement ou
-  joueur forcé. Le choix modifie réellement la feuille de match et peut aggraver
-  une petite blessure en plusieurs mois d'absence. Les internationaux quittent
-  également le groupe pendant les fenêtres de sélection.
+- Chaque joueur possède une fragilité naturelle et des fragilités par zone
+  (genou, cheville, épaule, ischio, commotion, dos). Fatigue, poste, âge,
+  activité, charge collective, contacts et antécédents composent le risque.
+  Le diagnostic passe de la suspicion aux examens, puis distingue guérison,
+  condition, rythme et risque de rechute. Le retour se fait par les réserves,
+  20 ou 40 minutes, ou directement avec un risque réel ; le protocole commotion
+  reste impossible à contourner. Les séquelles suivent le joueur entre les saisons.
 - À réputation suffisante, une sélection nationale peut proposer son banc. La
   réputation internationale est distincte et les matchs de tournée ou de
   tournoi se coachent dans le même moteur 2D.
 - Le marché masque les joueurs inconnus derrière des fourchettes. Observations,
   compétence du recruteur, âge et connaissance du pays resserrent le rapport ;
   les agents persistent et se souviennent de la relation avec le manager.
+- Les contrats suivent salaire, durée, primes de titularisation, victoire,
+  essai et titre, statut, options et clauses. Argent, ambition, temps de jeu,
+  stabilité, attachement, pays, entraîneur et agent ont des poids propres.
+  Performances, satisfaction, fin de contrat et offres concurrentes déclenchent
+  prolongations ou revalorisations dans L'Ovale. Les clubs vendeurs négocient
+  aussi besoin, urgence, bonus différés et pourcentage à la revente ; la visite
+  médicale agit sur les exigences et la valeur.
 - Le fil d'actualité ne raconte que les faits de la sauvegarde : résultats,
   blessures, sélections, événements financiers rares et changements de coach.
   L'ADN des clubs et les rivalités dynamiques évoluent lentement sur plusieurs

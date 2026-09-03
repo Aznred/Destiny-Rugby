@@ -39,11 +39,11 @@ import { TROPHEES } from '../data/trophees';
 import { defisDeLaSemaine, cleSemaine, progression } from '../lib/succes';
 import { chercherMedias, reduirePourAvatar, vignetteLocale, type Media as MediaTrouve } from '../lib/images';
 import { semaine, libelleSemaine, horodatageJeu } from '../data/calendrier';
-import { avatarInitiales } from '../lib/avatars';
+import { avatarInitiales, avatarPourCompte } from '../lib/avatars';
 import { ecouterEtatIA, etatIA } from '../lib/groq';
 import type { CompteSuivi, Joueur, PostSocial } from '../types';
 import { nomPoste } from '../data/rugby';
-import { coutPremiereSaison, joueurDejaRecrute } from '../lib/recrutementManager';
+import { coutPremiereSaison, joueurDejaRecrute, salairesEffectif, situationSalariale } from '../lib/recrutementManager';
 import { valeurDeVente } from '../lib/vestiaireManager';
 import { effectifDuClub } from '../lib/effectif';
 
@@ -149,6 +149,11 @@ function Avatar({
 }: { avatar: string; club?: string; taille?: number; nom?: string }) {
   const joueur = useGame((s) => s.joueur);
   const style = { width: taille, height: taille };
+  // Les conversations et les anciennes publications peuvent encore porter
+  // l'ancien hébergeur. Leur affichage bénéficie aussi des portraits locaux.
+  if (avatar?.startsWith('photo:') && (avatar.includes('randomuser.me/') || avatar.startsWith('photo:initiales:'))) {
+    avatar = avatarPourCompte(nom, 'joueur');
+  }
 
   if (avatar?.startsWith('photo:')) {
     return (
@@ -1186,14 +1191,18 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
   const accordClub = manager.negociationsClubs.find(
     (n) => n.cible.id === nego.joueur.id && n.etat === 'accord',
   );
-  const cout = coutPremiereSaison(nego, accordClub?.offre);
-  const budgetOk = manager.budgetTransferts >= cout && manager.budgetSalarial >= nego.offre.salaire;
+  const interne = nego.nature === 'prolongation' || nego.nature === 'revalorisation';
+  const salaireActuel = interne ? salairesEffectif(manager.club, manager.saison, manager.recrues, manager.avancee?.contratsJoueurs)
+    .find((j) => j.joueurId === nego.joueur.id || j.nom === nego.joueur.nom)?.salaire ?? 0 : 0;
+  const cout = interne ? nego.offre.prime : coutPremiereSaison(nego, accordClub?.offre);
+  const margeSalaire = situationSalariale(manager).disponible + salaireActuel;
+  const budgetOk = manager.budgetTransferts >= cout && margeSalaire >= nego.offre.salaire;
   const role = t(`mgr.role.${nego.offre.role}`);
 
   return (
     <div className="x-nego x-nego-manager" data-etat={nego.etat}>
       <div className="x-nego-tete">
-        <b>{t('mgr.x.offreContrat')}</b>
+        <b>{interne ? nego.nature === 'revalorisation' ? 'Revalorisation' : 'Prolongation' : t('mgr.x.offreContrat')}</b>
         {nego.etat === 'ouverte' && (
           <span className="x-nego-patience" title={t('mgr.x.patience')}>
             {'●'.repeat(nego.patience)}{'○'.repeat(Math.max(0, 4 - nego.patience))}
@@ -1205,13 +1214,21 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
         <span><small>{t('mgr.x.prime')}</small><b>{nombre(nego.offre.prime)} €</b></span>
         <span><small>{t('mgr.x.duree')}</small><b>{nego.offre.duree} {t('mgr.x.ans')}</b></span>
         <span><small>{t('mgr.x.role')}</small><b>{role}</b></span>
+        <span><small>Primes performance</small><b>{nombre((nego.offre.primeTitularisation ?? 0) + (nego.offre.primeVictoire ?? 0) + (nego.offre.primeEssai ?? 0) + (nego.offre.primeTitre ?? 0))} €</b></span>
+        <span><small>Option</small><b>{nego.offre.option ?? 'aucune'}{nego.offre.optionMatchs ? ` · ${nego.offre.optionMatchs} matchs` : ''}</b></span>
+        <span><small>Clause</small><b>{nego.offre.clauseLiberation ? `${nombre(nego.offre.clauseLiberation)} €` : nego.offre.clauseRelegation ? 'départ si relégation' : 'aucune'}</b></span>
       </div>
-      <p className="x-nego-offre">
+      {!interne && <p className="x-nego-offre">
         {t('mgr.x.indemniteClub', {
           club: nego.joueur.club,
           montant: nombre(accordClub?.offre ?? nego.joueur.indemnite),
         })}
-      </p>
+      </p>}
+      <div className="nego-contexte-reel">
+        <p><b>Priorités :</b> {(nego.motivations ?? []).map((m) => `${m.type} ${m.importance}`).join(' · ') || 'profil en cours'}</p>
+        <p><b>Intérêt :</b> {nego.interet ?? 50}/100 · <b>Concurrence :</b> {nego.offresConcurrentes?.length ? nego.offresConcurrentes.map((o) => `${o.club} (${o.niveau})`).join(', ') : 'aucune offre connue'}</p>
+        {nego.examenMedical && <p className={`examen-${nego.examenMedical.risque}`}><b>Visite médicale :</b> risque {nego.examenMedical.risque} · {nego.examenMedical.reserve}</p>}
+      </div>
 
       {nego.etat === 'ouverte' && (
         <>
@@ -1220,6 +1237,9 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
             <button onClick={() => negocier(nego.id, 'prime')}>{t('mgr.x.augmenterPrime')}</button>
             <button onClick={() => negocier(nego.id, 'duree')}>{t('mgr.x.allonger')}</button>
             <button onClick={() => negocier(nego.id, 'role')}>{t('mgr.x.meilleurRole')}</button>
+            <button onClick={() => negocier(nego.id, 'bonus')}>Primes de performance</button>
+            <button onClick={() => negocier(nego.id, 'option')}>Option contractuelle</button>
+            <button onClick={() => negocier(nego.id, 'clause')}>Clauses et garanties</button>
           </div>
           <div className="x-nego-fin">
             <button className="x-nego-oui" onClick={() => accepterDemandes(nego.id)}>{t('mgr.x.accepterDemandes')}</button>
@@ -1257,12 +1277,15 @@ function NegociationClubVendeur({ pseudo }: { pseudo: string }) {
       <div className="manager-x-termes manager-x-termes-club">
         <span><small>Demande</small><b>{nombre(nego.demande)} €</b></span>
         <span><small>Ton offre</small><b>{nombre(nego.offre)} €</b></span>
+        <span><small>Bonus différés</small><b>{nombre(nego.bonus ?? 0)} €</b></span>
+        <span><small>Part à la revente</small><b>{nego.pourcentageRevente ?? 0}%</b></span>
       </div>
       {nego.etat === 'ouverte' && <>
-        <p className="x-nego-offre">Le prix minimum du club reste caché. Chaque tentative use sa patience.</p>
+        <p className="x-nego-offre">Besoin vendeur : {nego.besoinVendeur ?? 'non communiqué'} · urgence {nego.urgence ?? 50}/100 · {nego.alternatives ?? 0} alternative(s). Le prix minimum reste caché.</p>
         <div className="x-nego-leviers">
           <button onClick={() => negocier(nego.id, 'monter')}>Monter l’offre</button>
           <button onClick={() => negocier(nego.id, 'bonus')}>Ajouter des bonus</button>
+          <button onClick={() => negocier(nego.id, 'revente')}>10% à la revente</button>
           <button onClick={() => negocier(nego.id, 'accepter')}>Accepter {nombre(nego.demande)} €</button>
         </div>
       </>}
@@ -1277,14 +1300,16 @@ function NegociationClubVendeur({ pseudo }: { pseudo: string }) {
 function DemandeVestiaireManager({ pseudo }: { pseudo: string }) {
   const manager = useGame((s) => s.manager)!;
   const repondre = useGame((s) => s.repondreDemandeManager);
+  const ouvrirContrat = useGame((s) => s.ouvrirRenegociationJoueurManager);
   const demande = [...manager.demandes].reverse().find((d) => d.pseudo === pseudo);
   if (!demande) return null;
   return (
     <div className="x-nego x-nego-manager" data-etat={demande.etat}>
       <div className="x-nego-tete"><b>{demande.type === 'depart' ? 'Demande de départ' : 'Temps de jeu'}</b></div>
-      <p className="x-nego-offre">{demande.nom} · {nomPoste(demande.poste)} · note {demande.note}</p>
+      <p className="x-nego-offre">{demande.nom} · {nomPoste(demande.poste)} · note {demande.note} · raison : {(demande.raison ?? demande.type).replace(/([A-Z])/g, ' $1').toLowerCase()}</p>
       {demande.etat === 'ouverte' ? <div className="x-nego-fin">
         <button className="x-nego-oui" onClick={() => repondre(demande.id, true)}>{demande.type === 'depart' ? 'Accepter et le mettre en vente' : 'Promettre plus de temps de jeu'}</button>
+        {demande.type === 'depart' && <button onClick={() => ouvrirContrat(demande.joueurId)}>Proposer un nouveau contrat</button>}
         <button className="x-nego-non" onClick={() => repondre(demande.id, false)}>Refuser</button>
       </div> : <div className="x-nego-accord">{demande.etat === 'acceptee' ? 'Demande acceptée' : 'Demande refusée'}</div>}
     </div>
@@ -1316,7 +1341,13 @@ function VentesManager({ recherche = '' }: { recherche?: string }) {
         <h3>Effectif du club</h3>
         <div>{effectif.map((joueur) => {
           const liste = manager.ventes.some((v) => v.joueurId === joueur.id);
-          const valeur = valeurDeVente(joueur, manager.club);
+          const profilMedical = manager.avancee?.profilsMedicaux[joueur.id];
+          const contratJoueur = manager.avancee?.contratsJoueurs[joueur.id];
+          const valeur = valeurDeVente(joueur, manager.club, manager.saison, {
+            historiqueMedical: profilMedical?.historique.length,
+            sequelles: Object.values(profilMedical?.sequelles ?? {}).reduce((n, x) => n + (x ?? 0), 0),
+            contratFin: contratJoueur?.fin,
+          });
           return <article key={joueur.id}><em>{joueur.note}</em><span><b>{joueur.nom}</b><small>{nomPoste(joueur.poste)} · {joueur.age} ans</small></span><strong>{valeur > 0 ? `${nombre(valeur)} €` : 'Libre'}</strong><button disabled={liste} onClick={() => mettreEnVente(joueur.id)}>{liste ? 'Sur la liste' : valeur > 0 ? 'Mettre en vente' : 'Proposer un départ'}</button></article>;
         })}</div>
       </section>
@@ -1615,7 +1646,7 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
           <button className="x-tendance" onClick={() => setOnglet('explorer')}><span className="x-tendance-cat">Direction sportive</span><b>#Départs</b><span className="x-tendance-vol">{manager.ventes.length} dossier(s) ouvert(s)</span></button>
           <button className="x-tendance" onClick={() => retournerAuManager('marche')}><span className="x-tendance-cat">Base mondiale</span><b>#Recrutement</b><span className="x-tendance-vol">tous les championnats</span></button>
         </div>
-        <div className="x-bloc manager-x-budget"><h3>Budget transferts</h3><b>{nombre(manager.budgetTransferts)} €</b><span>Salaires disponibles : {nombre(manager.budgetSalarial)} €</span></div>
+        <div className="x-bloc manager-x-budget"><h3>Budget transferts</h3><b>{nombre(manager.budgetTransferts)} €</b><span>Marge salariale : {nombre(situationSalariale(manager).disponible)} € / an</span></div>
       </aside>
     </motion.section>
   );
