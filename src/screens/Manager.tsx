@@ -21,7 +21,7 @@ import { Icone } from '../components/Icone';
 import { FicheJoueur } from '../components/FicheJoueur';
 import { rareteDe } from '../lib/carteJoueur';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
-import type { CibleRecrutementManager } from '../types';
+import type { CibleRecrutementManager, PosteId } from '../types';
 import { poidsDansSecteur, SECTEURS_COHESION } from '../lib/cohesion';
 import type { Automatismes } from '../lib/cohesion';
 import {
@@ -42,7 +42,7 @@ import {
 import { AXES_CENTRE, ICONE_AXE } from '../lib/centreFormation';
 import {
   capaciteAcademie, ficheAcademicienManager, nomObjectifJeune, OBJECTIFS_JEUNES,
-  tableauDetectionManager, motifObservationJeune,
+  tableauDetectionManager, motifObservationJeune, vivierFiltre,
 } from '../lib/formationManager';
 import {
   compositionManagerParDefaut, noteCompositionManager, POSTES_XV_MANAGER,
@@ -165,6 +165,13 @@ export function Manager() {
   const [clubMarche, setClubMarche] = useState('');
   const [recherche, setRecherche] = useState('');
   const [poste, setPoste] = useState('');
+  // Le vivier des jeunes : poste, âge et recherche. Vide = le rapport annuel.
+  const [posteJeune, setPosteJeune] = useState('');
+  const [ageJeune, setAgeJeune] = useState(0);
+  const [rechercheJeune, setRechercheJeune] = useState('');
+  const [vivierOuvert, setVivierOuvert] = useState(false);
+  // Le marché mondial gagne le même filtre d'âge que le vivier.
+  const [ageMarche, setAgeMarche] = useState('');
   const [matchOuvert, setMatchOuvert] = useState<AfficheComplete | null>(null);
   const [matchSelectionOuvert, setMatchSelectionOuvert] = useState(false);
   const [jeuneALiberer, setJeuneALiberer] = useState<string | null>(null);
@@ -206,9 +213,20 @@ export function Manager() {
     return ciblesDuMarche(divisionMarche, manager.saison, manager.club, clubMarche)
       .filter((c) => !dejaRecrutees.has(c.id))
       .filter((c) => !poste || c.poste === poste)
+      // ⚠️ L'ÂGE EST UNE TRANCHE, PAS UN NOMBRE. Personne ne cherche « un
+      //    joueur de 27 ans » : on cherche un espoir, un joueur dans ses
+      //    années pleines, ou un cadre d'expérience. Les bornes suivent les
+      //    paliers que le jeu utilise déjà (formation < 23, pic à 27,
+      //    déclin après 31).
+      .filter((c) => {
+        if (!ageMarche) return true;
+        if (ageMarche === 'espoir') return c.age <= 22;
+        if (ageMarche === 'pleine') return c.age >= 23 && c.age <= 29;
+        return c.age >= 30;
+      })
       .filter((c) => !recherche.trim()
         || `${c.nom} ${c.club} ${c.nation}`.toLowerCase().includes(recherche.trim().toLowerCase()));
-  }, [manager?.club, manager?.saison, manager?.recrues, divisionMarche, clubMarche, poste, recherche]);
+  }, [manager?.club, manager?.saison, manager?.recrues, divisionMarche, clubMarche, poste, recherche, ageMarche]);
   const effectifBrut = useMemo(
     () => manager?.club ? effectifDuClub(manager.club, manager.saison) : [],
     [manager],
@@ -269,6 +287,26 @@ export function Manager() {
     () => manager?.club ? tableauDetectionManager(manager) : null,
     [manager],
   );
+  // Les âges réellement présents dans le vivier : on ne propose pas un filtre
+  // « 19 ans » si le rayon n'en contient aucun.
+  const agesDuVivier = useMemo<number[]>(
+    () => (detectionJeunes
+      ? [...new Set(detectionJeunes.vivier.map((j) => j.age))].sort((a, b) => a - b)
+      : []),
+    [detectionJeunes],
+  );
+  const filtreJeuneActif = vivierOuvert || !!posteJeune || ageJeune > 0 || !!rechercheJeune.trim();
+  // ⚠️ ON NE CONSTRUIT LES FICHES QUE QUAND LE VIVIER EST OUVERT. Un rayon
+  //    national ramène plusieurs centaines de garçons : en calculer la fiche
+  //    à chaque frappe dans le champ de recherche n'aurait aucun intérêt.
+  const vivier = useMemo(() => {
+    if (!manager || !detectionJeunes || !filtreJeuneActif) return null;
+    return vivierFiltre(manager, {
+      poste: posteJeune as PosteId | '',
+      age: ageJeune,
+      recherche: rechercheJeune,
+    }, 60, detectionJeunes);
+  }, [manager, detectionJeunes, filtreJeuneActif, posteJeune, ageJeune, rechercheJeune]);
   const matchSelection = useMemo(() => {
     const selection = avancee?.selection;
     const rencontre = selection?.matchEnAttente;
@@ -659,6 +697,17 @@ export function Manager() {
                   <div className="journal">{[...journal].reverse().slice(0, 3).map((e) => <div key={e.id} className="entree"><b>{e.titre}</b><p>{e.texte}</p></div>)}</div>
                 </article>
               </section>
+              {/* ⚠️ LE PARCOURS EST DU CONTENU DE CET ONGLET, ET IL DOIT VIVRE
+                  DEDANS. Il était rendu en FRÈRE de `.manager-bureau`, tout en
+                  étant conditionné à `vue === 'bureau'` : hors de la zone qui
+                  défile, il gardait sa hauteur entière (une ligne par saison)
+                  et se posait par-dessus le tableau de bord. */}
+            {manager.historique.length > 0 && (
+              <div className="carte bloc-competition manager-historique">
+                <div className="comp-tete"><b><Icone nom="journal" taille={16} /> {t('mgr.parcours')}</b><span className="comp-count">{manager.historique.length}</span></div>
+                <div className="classement-tableau tableau-live histo-manager">{[...manager.historique].reverse().map((h) => <div key={`${h.saison}-${h.club}`} className="classement-ligne"><span className="cl-pos">S{h.saison}</span><span className="cl-nom">{h.club}</span><span>{h.divisionNom}</span><span className={h.tenu ? 'cl-plus' : 'cl-moins'}>{h.rang}ᵉ / {h.objectif}ᵉ</span><span>{h.titres.map((id) => TROPHEES[id]?.nom ?? id).join(', ')}{h.montee && ' — montée'}{h.descente && ' — descente'}{h.licencie && ' — licencié'}</span></div>)}</div>
+              </div>
+            )}
             </div>
           )}
 
@@ -1197,14 +1246,65 @@ export function Manager() {
                     </div>
                   </section>
 
+                  {/* ⚠️ LE VIVIER N'EST PAS UN CONTOURNEMENT DU CENTRE, C'EST SA
+                      RÉCOMPENSE. La « promotion annuelle » reste ce que la cellule
+                      remonte d'elle-même. Ces filtres ouvrent tout ce qui est à
+                      PORTÉE — et la portée, c'est le rayon du réseau : 50 km pour
+                      un club de Régionale, la France pour un gros centre. On ne
+                      gagne pas l'accès en filtrant, on gagne la portée en
+                      améliorant le centre. */}
+                  <section className="carte manager-filtres-jeunes">
+                    <div className="manager-filtres-jeunes-tete">
+                      <b><Icone nom="loupe" taille={15} /> Chercher dans le vivier</b>
+                      <small>{nombre(detectionJeunes.candidatsVus)} garçons à portée · rayon {nombre(detectionJeunes.rayon)} km</small>
+                    </div>
+                    <div className="manager-filtres-jeunes-champs">
+                      <Selecteur
+                        options={[{ valeur: '', label: 'Tous les postes' }, ...POSTES.map((p) => ({ valeur: p.id, label: nomPoste(p.id), sous: `n° ${p.numero}` }))]}
+                        valeur={posteJeune}
+                        onChange={setPosteJeune}
+                      />
+                      <Selecteur
+                        options={[{ valeur: '0', label: 'Tous les âges' }, ...agesDuVivier.map((a) => ({ valeur: String(a), label: `${a} ans` }))]}
+                        valeur={String(ageJeune)}
+                        onChange={(v) => setAgeJeune(Number(v))}
+                      />
+                      <input
+                        value={rechercheJeune}
+                        onChange={(e) => setRechercheJeune(e.target.value)}
+                        placeholder="Nom ou club…"
+                        aria-label="Chercher un jeune par nom ou par club"
+                      />
+                      <button
+                        type="button"
+                        className={`btn ${filtreJeuneActif ? 'primaire' : 'fantome'}`}
+                        onClick={() => {
+                          if (filtreJeuneActif) {
+                            setVivierOuvert(false); setPosteJeune(''); setAgeJeune(0); setRechercheJeune('');
+                          } else setVivierOuvert(true);
+                        }}
+                      >
+                        {filtreJeuneActif ? 'Revenir à la promotion' : 'Voir tout le vivier'}
+                      </button>
+                    </div>
+                    {filtreJeuneActif && vivier && (
+                      <p className="manager-filtres-jeunes-bilan">
+                        {vivier.total === 0
+                          ? 'Aucun garçon ne correspond — élargis le filtre, ou fais progresser le réseau du centre pour agrandir le rayon.'
+                          : `${nombre(vivier.total)} garçon${vivier.total > 1 ? 's' : ''} à portée${vivier.total > vivier.fiches.length ? ` · les ${vivier.fiches.length} plus proches sont affichés` : ''}`}
+                      </p>
+                    )}
+                  </section>
+
+
                   <section className="manager-dossiers-jeunes">
-                    {detectionJeunes.fiches.map((ficheJeune, index) => {
+                    {(vivier ? vivier.fiches : detectionJeunes.fiches).map((ficheJeune, index) => {
                       const j = ficheJeune.jeune;
                       const suivi = manager.observationsJeunes[j.id];
                       const reponse = manager.reponsesJeunes[j.id];
                       const dejaSigne = manager.academie.some((a) => a.id === j.id);
                       return (
-                        <article className={`carte manager-dossier-jeune${index < detectionJeunes.prioritaires ? ' prioritaire' : ''}`} key={j.id}>
+                        <article className={`carte manager-dossier-jeune${!vivier && index < detectionJeunes.prioritaires ? ' prioritaire' : ''}`} key={j.id}>
                           <header>
                             <div className="manager-jeune-identite">
                               <div className="manager-jeune-avatar" aria-hidden="true">
@@ -1212,7 +1312,7 @@ export function Manager() {
                                 <i><Drapeau nation={j.nation} taille={0.72} /></i>
                               </div>
                               <div className="manager-jeune-titre">
-                                <span>{index < detectionJeunes.prioritaires ? 'PRIORITAIRE' : 'DOSSIER À SUIVRE'}</span>
+                                <span>{!vivier && index < detectionJeunes.prioritaires ? 'PRIORITAIRE' : 'DOSSIER À SUIVRE'}</span>
                                 <h3>{j.nom}</h3>
                                 <p>{j.age} ans · {nomPoste(j.poste)}</p>
                                 <small>{j.club} · {nombre(j.distance)} km</small>
@@ -1296,6 +1396,16 @@ export function Manager() {
                 <Selecteur options={optionsDivisions} valeur={divisionMarche} onChange={(v) => { setDivisionMarche(v); setClubMarche(''); }} recherche />
                 <Selecteur options={optionsClubs} valeur={clubMarche} onChange={setClubMarche} recherche />
                 <Selecteur options={optionsPostes} valeur={poste} onChange={setPoste} />
+                <Selecteur
+                  options={[
+                    { valeur: '', label: 'Tous les âges' },
+                    { valeur: 'espoir', label: 'Espoirs', sous: '22 ans et moins' },
+                    { valeur: 'pleine', label: 'Années pleines', sous: 'de 23 à 29 ans' },
+                    { valeur: 'experience', label: 'Expérience', sous: '30 ans et plus' },
+                  ]}
+                  valeur={ageMarche}
+                  onChange={setAgeMarche}
+                />
                 <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder={t('mgr.marche.rechercher')} aria-label={t('mgr.marche.rechercher')} />
               </div>
               <p className="manager-resultats-marche">{t('mgr.marche.resultats', { n: cibles.length })}</p>
@@ -1444,13 +1554,6 @@ export function Manager() {
           )}
 
         </>
-      )}
-
-      {manager.historique.length > 0 && vue === 'bureau' && (
-        <div className="carte bloc-competition manager-historique">
-          <div className="comp-tete"><b><Icone nom="journal" taille={16} /> {t('mgr.parcours')}</b><span className="comp-count">{manager.historique.length}</span></div>
-          <div className="classement-tableau tableau-live histo-manager">{[...manager.historique].reverse().map((h) => <div key={`${h.saison}-${h.club}`} className="classement-ligne"><span className="cl-pos">S{h.saison}</span><span className="cl-nom">{h.club}</span><span>{h.divisionNom}</span><span className={h.tenu ? 'cl-plus' : 'cl-moins'}>{h.rang}ᵉ / {h.objectif}ᵉ</span><span>{h.titres.map((id) => TROPHEES[id]?.nom ?? id).join(', ')}{h.montee && ' — montée'}{h.descente && ' — descente'}{h.licencie && ' — licencié'}</span></div>)}</div>
-        </div>
       )}
 
       {/* ⚠️ LA FICHE VIT AU NIVEAU DE L'ÉCRAN, pas dans la carte du marché.

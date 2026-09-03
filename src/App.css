@@ -64,7 +64,22 @@
 .manager-marche-tete h2 { margin:.25rem 0; }
 .manager-marche-tete p { margin:.2rem 0 0; color:var(--craie-dim); }
 .manager-budgets.resume { min-width:min(360px,100%); }
-.manager-filtres { display:grid; grid-template-columns:1.3fr 1.2fr .9fr 1fr; gap:.65rem; }
+.manager-filtres { display:grid; grid-template-columns:1.25fr 1.15fr .95fr .95fr 1fr; gap:.65rem; }
+/* La barre du vivier des jeunes : poste, âge, recherche, bascule. */
+.manager-filtres-jeunes { display:grid; gap:.6rem; padding:.85rem 1rem; }
+.manager-filtres-jeunes-tete { display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.manager-filtres-jeunes-tete b { display:inline-flex; align-items:center; gap:.4rem; }
+.manager-filtres-jeunes-tete small { color:var(--craie-dim); }
+.manager-filtres-jeunes-champs { display:grid; grid-template-columns:1.1fr .9fr 1.3fr auto; gap:.6rem; align-items:center; }
+.manager-filtres-jeunes-champs input { min-height:44px; padding:.55rem .8rem; border:1px solid var(--bordure); border-radius:var(--rayon-sm); color:var(--craie); background:rgba(4,13,9,.6); font-family:var(--police); }
+.manager-filtres-jeunes-champs input:focus { outline:none; border-color:var(--or-500); box-shadow:0 0 0 3px rgba(232,178,58,.18); }
+.manager-filtres-jeunes-champs .btn { margin:0; white-space:nowrap; }
+.manager-filtres-jeunes-bilan { margin:0; color:var(--craie-dim); font-size:.82rem; }
+@media (max-width:760px) {
+  .manager-filtres-jeunes-champs { grid-template-columns:1fr 1fr; }
+  .manager-filtres-jeunes-champs input,
+  .manager-filtres-jeunes-champs .btn { grid-column:1/-1; }
+}
 .manager-filtres > input { width:100%; min-height:46px; border:1px solid var(--bordure); border-radius:10px; padding:0 .8rem; color:var(--craie); background:rgba(0,0,0,.24); }
 .manager-resultats-marche { margin:0; color:var(--craie-dim); font-size:.85rem; }
 .manager-cibles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; }
@@ -88,6 +103,11 @@
 .manager-dossier[data-etat="signee"] { border-color:rgba(64,190,121,.45); }
 .manager-vide { grid-column:1/-1; text-align:center; color:var(--craie-dim); }
 .manager-historique,.manager-raccrocher { margin-top:1rem; }
+/* ⚠️ LE PARCOURS EST DANS LA GRILLE DU BUREAU, donc il lui faut sa largeur.
+   Il vivait en frère de `.manager-bureau` — hors de la zone qui défile, à sa
+   hauteur entière (une ligne par saison jouée), posé par-dessus le tableau
+   de bord. Rentré dans la grille, il en devient une rangée pleine largeur. */
+.manager-bureau > .manager-historique { grid-column: 1 / -1; margin-top: 0; }
 .manager-sans-banc { max-width:780px; margin:0 auto; }
 .x-manager .x-centre { max-width:1100px; }
 .x-manager .x-messagerie { min-height:calc(100vh - 110px); }
@@ -670,6 +690,14 @@
     height: calc(100dvh - 78px);
     overflow: hidden;
   }
+  /* ⚠️ TOUT CE QUI N'EST PAS LA ZONE DE CONTENU GARDE SA HAUTEUR. Un enfant
+     de conteneur flex se COMPRIME par défaut (`flex-shrink: 1`) : sans cette
+     ligne, le navigateur rabotait l'en-tête, la barre de date ET la barre
+     d'onglets pour faire tenir un contenu trop grand — on voyait les
+     onglets coupés en deux et le tableau de bord tronqué. Seule la zone de
+     contenu doit céder, et elle défile.
+     Les sélecteurs de zone qui suivent reposent leur `flex: 1 1 auto`. */
+  .carriere-manager > * { flex: 0 0 auto; }
 
   /* ══ LE BUREAU TIENT DANS L'ÉCRAN ══════════════════════════════════════════
      Demande : « que toute l'UI de la carrière entraîneur rentre sans avoir à

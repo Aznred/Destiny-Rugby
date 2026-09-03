@@ -7,6 +7,7 @@ import { POSTES_PAR_FAMILLE } from '../data/rugby';
 import type {
   AcademicienManager, ActionAcademieManager, Manager, ObjectifJeuneManager,
   ObservationJeuneManager,
+  PosteId,
 } from '../types';
 import { graine } from './championnat';
 import {
@@ -53,6 +54,8 @@ export interface TableauDetectionManager {
   rayon: number;
   portee: ReturnType<typeof etageDeDetection>;
   fiches: FicheDetection[];
+  /** TOUT ce qui est à portée du rayon, pas seulement le rapport annuel. */
+  vivier: JeuneRepere[];
   prioritaires: number;
   candidatsVus: number;
   deplacementsTotal: number;
@@ -124,6 +127,7 @@ export function tableauDetectionManager(manager: Manager): TableauDetectionManag
     rayon,
     portee,
     fiches,
+    vivier: candidats,
     prioritaires: Math.min(5, 2 + murs.recrutement),
     candidatsVus: candidats.length,
     deplacementsTotal: total,
@@ -133,6 +137,75 @@ export function tableauDetectionManager(manager: Manager): TableauDetectionManag
     occupes: manager.academie.filter((j) => j.clubCentre === manager.club).length,
   };
 }
+
+/** Ce qu'on peut demander au vivier, en plus de ce que la cellule remonte. */
+export interface FiltresVivier {
+  /** Poste exact (`''` = tous). */
+  poste?: PosteId | '';
+  /** Âge exact (`0` = tous). */
+  age?: number;
+  /** Nom ou club, insensible aux accents. */
+  recherche?: string;
+  /** Ne garder que les dossiers déjà observés. */
+  suivisSeulement?: boolean;
+}
+
+const sansAccent = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/**
+ * LE VIVIER COMPLET, FILTRÉ.
+ *
+ * ⚠️ CE N'EST PAS UN CONTOURNEMENT DU NIVEAU DU CENTRE, C'EST SA RÉCOMPENSE.
+ * Demande : « pouvoir filtrer plus, avoir accès à tous les jeunes dans un rayon
+ * en fonction du niveau du centre, et filtrer par poste et âge ». Le rapport
+ * annuel (`fiches`) reste ce que la CELLULE remonte d'elle-même — 8 à 20 noms
+ * qu'elle a jugés dignes d'un dossier. Le vivier, lui, est tout ce qui est à
+ * PORTÉE : c'est `rayonDeDetection(notes.reseau)` qui en fixe l'étendue, donc
+ * un club de Régionale voit ses 50 km et le Stade Toulousain voit la France.
+ * Améliorer le centre élargit le rayon ET resserre les fourchettes — on ne
+ * gagne pas l'accès, on gagne la portée et la précision.
+ *
+ * ⚠️ ON PLAFONNE CE QU'ON REND. Un rayon national ramène plusieurs centaines de
+ * garçons ; construire une fiche pour chacun à chaque frappe dans le champ de
+ * recherche ferait ramer l'écran pour rien. `max` borne la liste rendue, et
+ * `total` dit combien répondent vraiment au filtre — c'est ce nombre qui doit
+ * s'afficher, pas la longueur du tableau.
+ */
+export function vivierFiltre(
+  manager: Manager,
+  filtres: FiltresVivier = {},
+  max = 60,
+  tableau = tableauDetectionManager(manager),
+): { fiches: FicheDetection[]; total: number; ages: number[] } {
+  const q = sansAccent((filtres.recherche ?? '').trim());
+  const retenus = tableau.vivier.filter((j) => {
+    if (filtres.poste && j.poste !== filtres.poste) return false;
+    if (filtres.age && j.age !== filtres.age) return false;
+    if (filtres.suivisSeulement && !manager.observationsJeunes[j.id]) return false;
+    if (q && !sansAccent(`${j.nom} ${j.club}`).includes(q)) return false;
+    return true;
+  });
+
+  // Les dossiers suivis d'abord — on ne perd pas de vue un garçon qu'on observe
+  // depuis trois matchs parce qu'un autre est plus proche. Ensuite la distance :
+  // c'est le critère qu'un centre de formation regarde en premier.
+  retenus.sort((a, b) => {
+    const sa = manager.observationsJeunes[a.id] ? 1 : 0;
+    const sb = manager.observationsJeunes[b.id] ? 1 : 0;
+    if (sa !== sb) return sb - sa;
+    return a.distance - b.distance;
+  });
+
+  const ages = [...new Set(tableau.vivier.map((j) => j.age))].sort((a, b) => a - b);
+  return {
+    fiches: retenus.slice(0, max).map((j) => ficheDe(
+      j, tableau.notes, manager.observationsJeunes[j.id], manager.club,
+    )),
+    total: retenus.length,
+    ages,
+  };
+}
+
 
 export function ficheJeuneManager(manager: Manager, jeuneId: string): FicheDetection | undefined {
   const tableau = tableauDetectionManager(manager);
