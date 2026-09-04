@@ -239,6 +239,7 @@ export function Manager() {
     () => indisponiblesCarriereAvancee(avancee ?? undefined, manager?.semaine ?? 0),
     [avancee, manager?.semaine],
   );
+  const indisponiblesSet = useMemo(() => new Set(indisponibles), [indisponibles]);
   // ⚠️ TOUTES LES AFFICHES, PAS SEULEMENT LE CHAMPIONNAT. 
   // ne lit que la grille des journées : premier de sa poule, un manager
   // traversait les demies et la finale sans qu’aucun match ne lui soit proposé
@@ -273,11 +274,16 @@ export function Manager() {
     return Object.fromEntries([...new Set([...Object.keys(medicales), ...Object.keys(capitanat)])]
       .map((id) => [id, (medicales[id] ?? 0) + (capitanat[id] ?? 0) - (derbyMemo?.motivation ?? 0)]));
   }, [avancee, derbyMemo?.motivation, effectifBrut]);
-  const effectif = useMemo(
+  const effectifComplet = useMemo(
     () => effectifBrut
-      .filter((j) => !indisponibles.includes(j.id))
       .map((j) => ({ ...j, note: Math.max(1, j.note - (penalitesNote[j.id] ?? 0)) })),
-    [effectifBrut, indisponibles, penalitesNote],
+    [effectifBrut, penalitesNote],
+  );
+  // La disponibilité décide de la feuille, jamais de l'appartenance au club.
+  // Les blessés et internationaux restent donc dans l'effectif affiché.
+  const effectif = useMemo(
+    () => effectifComplet.filter((j) => !indisponiblesSet.has(j.id)),
+    [effectifComplet, indisponiblesSet],
   );
   const compositionMemo = useMemo(
     () => reconcilerCompositionManager(effectif, manager?.composition),
@@ -645,7 +651,7 @@ export function Manager() {
               <section className="manager-kpis" aria-label="Informations importantes du club">
                 <article className="carte"><small>Classement</small><b>{maLigne ? `${maLigne.position}e` : '—'}</b><span>{maLigne?.points ?? 0} points</span></article>
                 <article className="carte"><small>Objectif du board</small><b>{manager.objectif}e</b><span>{maLigne && maLigne.position <= manager.objectif ? 'Objectif tenu' : 'À rattraper'}</span></article>
-                <article className="carte"><small>Force du groupe</small><b>{force.toFixed(1)}</b><span>{effectif.length} joueurs</span></article>
+                <article className="carte"><small>Force du groupe</small><b>{force.toFixed(1)}</b><span>{t('compo.effectifTotal', { n: effectifComplet.length })}{indisponibles.length ? ` · ${t('compo.indisponibles', { n: indisponibles.length })}` : ''}</span></article>
                 <article className="carte"><small>Confiance</small><b>{Math.round(manager.confiance)}%</b><span>{humeur.texte}</span></article>
                 <article className="carte"><small>Budget transferts</small><b>{nombre(manager.budgetTransferts)} €</b><span>Marge salariale : {nombre(salaires?.disponible ?? 0)} € / an</span></article>
                 <article className="carte"><small>Structures</small><b>{nombre(manager.budgetStructure)} €</b><span>Formation {murs.formation}/4 · Recrutement {murs.recrutement}/4 · Entraînement {murs.entrainement}/4</span></article>
@@ -971,7 +977,7 @@ export function Manager() {
             <div className="manager-equipe">
               <section className="carte manager-composition-tete">
                 <div>
-                  <div className="eyebrow">Feuille de match · 23 joueurs</div>
+                  <div className="eyebrow">{t('compo.feuilleEffectif', { feuille: composition.titulaires.length + composition.remplacants.length, effectif: effectifComplet.length })}</div>
                   <h2><Icone nom="equipe" taille={20} /> Ton XV, ton banc, tes rôles</h2>
                   <p>Chaque choix est transmis au moteur. Un joueur hors de son poste perd la cohérence collective ; le buteur et le capitaine influencent réellement les pénalités et la discipline.</p>
                 </div>
@@ -980,9 +986,11 @@ export function Manager() {
 
               <CompositionTerrainManager
                 effectif={effectif}
+                effectifComplet={effectifComplet}
                 composition={composition}
                 onPlacer={changerJoueur}
                 etats={etatsComposition}
+                indisponibles={indisponiblesSet}
                 automatismes={automatismesComposition}
                 onCapitaine={(id) => definirComposition({ ...composition, capitaineId: id })}
                 onButeur={(id) => definirComposition({ ...composition, buteurId: id })}

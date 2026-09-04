@@ -14,6 +14,7 @@
     "verify:formation-manager": "vite-node scripts/verifierFormationManager.ts",
     "verify:navigation-manager": "vite-node scripts/verifierNavigationManager.ts",
     "verify:navigation-joueur": "vite-node scripts/verifierNavigationJoueur.ts",
+    "verify:effectif-manager": "vite-node scripts/verifierEffectifManager.ts",
     "verify:saison-manager": "vite-node scripts/verifierSaisonManager.ts",
     "verify:calendrier-mondial": "vite-node scripts/verifierCalendrierMondial.ts",
     "verify:carriere-avancee": "vite-node scripts/verifCarriereAvancee.ts",

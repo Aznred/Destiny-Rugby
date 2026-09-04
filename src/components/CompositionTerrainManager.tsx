@@ -47,11 +47,16 @@ import { photoReelle } from '../lib/avatars';
 type ZoneComposition = 'titulaires' | 'remplacants';
 
 interface Props {
+  /** Joueurs alignables cette semaine. */
   effectif: Coequipier[];
+  /** Tout le groupe sous contrat, indisponibles compris. */
+  effectifComplet?: Coequipier[];
   composition: CompositionManager;
   onPlacer: (zone: ZoneComposition, index: number, joueurId: string) => void;
   /** Facultatif : condition, forme, blessure, suspension, sélection. */
   etats?: Map<string, EtatDuJoueur>;
+  /** Joueurs visibles dans le groupe mais impossibles à aligner. */
+  indisponibles?: ReadonlySet<string>;
   /** Facultatif : les cinq secteurs d'automatismes (`lib/cohesion.ts`). */
   automatismes?: Automatismes;
   onCapitaine?: (joueurId: string) => void;
@@ -404,20 +409,25 @@ function PanneauJoueur({
 }
 
 export function CompositionTerrainManager({
-  effectif, composition, onPlacer, etats, automatismes, onCapitaine, onButeur,
+  effectif, effectifComplet = effectif, composition, onPlacer, etats, indisponibles,
+  automatismes, onCapitaine, onButeur,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
   const [joueurGlisse, setJoueurGlisse] = useState<string | null>(null);
   const [cibleDepot, setCibleDepot] = useState<string | null>(null);
+  const [reservesOuvertes, setReservesOuvertes] = useState(true);
   const panneauRef = useRef<HTMLElement>(null);
-  const parId = useMemo(() => new Map(effectif.map((j) => [j.id, j])), [effectif]);
+  const parId = useMemo(
+    () => new Map(effectifComplet.map((j) => [j.id, j])),
+    [effectifComplet],
+  );
   const surFeuille = useMemo(
     () => new Set([...composition.titulaires, ...composition.remplacants]),
     [composition.titulaires, composition.remplacants],
   );
   const reserves = useMemo(
-    () => effectif.filter((j) => !surFeuille.has(j.id)).sort((a, b) => b.note - a.note),
-    [effectif, surFeuille],
+    () => effectifComplet.filter((j) => !surFeuille.has(j.id)).sort((a, b) => b.note - a.note),
+    [effectifComplet, surFeuille],
   );
 
   const titulaires = useMemo(
@@ -465,6 +475,10 @@ export function CompositionTerrainManager({
 
   const choisirOuPlacer = (zone: ZoneComposition, index: number, joueurId?: string) => {
     if (selection && selection !== joueurId) {
+      if (indisponibles?.has(selection)) {
+        setSelection(null);
+        return;
+      }
       onPlacer(zone, index, selection);
       setSelection(null);
       return;
@@ -473,7 +487,7 @@ export function CompositionTerrainManager({
   };
 
   const demarrerDrag = (e: DragEvent<HTMLButtonElement>, joueurId?: string) => {
-    if (!joueurId) return;
+    if (!joueurId || indisponibles?.has(joueurId)) return;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', joueurId);
 
@@ -500,7 +514,7 @@ export function CompositionTerrainManager({
   const deposer = (e: DragEvent<HTMLButtonElement>, zone: ZoneComposition, index: number) => {
     e.preventDefault();
     const joueurId = e.dataTransfer.getData('text/plain') || joueurGlisse;
-    if (joueurId) onPlacer(zone, index, joueurId);
+    if (joueurId && !indisponibles?.has(joueurId)) onPlacer(zone, index, joueurId);
     setSelection(null);
     terminerDrag();
   };
@@ -599,8 +613,8 @@ export function CompositionTerrainManager({
             capitaine={composition.capitaineId === joueurSelectionne.id}
             buteur={composition.buteurId === joueurSelectionne.id}
             panneauRef={panneauRef}
-            onCapitaine={onCapitaine}
-            onButeur={onButeur}
+            onCapitaine={indisponibles?.has(joueurSelectionne.id) ? undefined : onCapitaine}
+            onButeur={indisponibles?.has(joueurSelectionne.id) ? undefined : onButeur}
             onFermer={() => setSelection(null)}
           />
         )}
@@ -655,43 +669,58 @@ export function CompositionTerrainManager({
         </div>
       </div>
 
-      <details className="manager-reserves" open={reserves.length <= 8}>
+      <details
+        className="manager-reserves"
+        open={reservesOuvertes}
+        onToggle={(e) => setReservesOuvertes(e.currentTarget.open)}
+      >
         <summary>{t('compo.effectifDispo')} <span>{reserves.length}</span></summary>
         <p>{t('compo.aideReserve')}</p>
         <div>
-          {reserves.map((joueur) => (
-            <button
-              type="button"
-              key={joueur.id}
-              className={[
-                'manager-reserve-carte',
-                `ct-${statutDe(joueur)}`,
-                `ct-r-${rareteDe(joueur)}`,
-                estPepite(joueur) ? 'ct-pepite' : '',
-                selection === joueur.id ? 'selectionnee' : '',
-                joueurGlisse === joueur.id ? 'ct-en-drag' : '',
-              ].filter(Boolean).join(' ')}
-              draggable
-              onClick={() => setSelection(selection === joueur.id ? null : joueur.id)}
-              onDragStart={(e) => demarrerDrag(e, joueur.id)}
-              onDragEnd={terminerDrag}
-              aria-pressed={selection === joueur.id}
-              title={`${joueur.nom} · ${NOM_RARETE[rareteDe(joueur)]}`}
-            >
-              <PortraitComposition nom={joueur.nom} />
-              <strong>{joueur.note}</strong>
-              <span>
-                <b>{joueur.nom}</b>
-                <small>{nomPoste(joueur.poste)} · {joueur.age} {t('compo.ans')}</small>
-              </span>
-              {badgesDe(joueur, etats?.get(joueur.id) ?? {}).slice(0, 1)
-                .map((b) => (
-                  <i key={b} className={`ct-badge ct-badge-${b}`}>
-                    <Icone nom={ICONE_BADGE[b]} taille={13} />
-                  </i>
-                ))}
-            </button>
-          ))}
+          {reserves.map((joueur) => {
+            const etat = etats?.get(joueur.id) ?? {};
+            const indisponible = indisponibles?.has(joueur.id) ?? false;
+            const raison = etat.enSelection
+              ? t('compo.badge.international')
+              : etat.suspendu
+                ? t('compo.badge.suspendu')
+                : etat.blesse ? t('compo.badge.blesse') : '';
+            return (
+              <button
+                type="button"
+                key={joueur.id}
+                className={[
+                  'manager-reserve-carte',
+                  `ct-${statutDe(joueur)}`,
+                  `ct-r-${rareteDe(joueur)}`,
+                  estPepite(joueur) ? 'ct-pepite' : '',
+                  indisponible ? 'ct-indisponible' : '',
+                  selection === joueur.id ? 'selectionnee' : '',
+                  joueurGlisse === joueur.id ? 'ct-en-drag' : '',
+                ].filter(Boolean).join(' ')}
+                draggable={!indisponible}
+                onClick={() => setSelection(selection === joueur.id ? null : joueur.id)}
+                onDragStart={(e) => demarrerDrag(e, joueur.id)}
+                onDragEnd={terminerDrag}
+                aria-pressed={selection === joueur.id}
+                aria-disabled={indisponible}
+                title={`${joueur.nom} · ${NOM_RARETE[rareteDe(joueur)]}${raison ? ` · ${raison}` : ''}`}
+              >
+                <PortraitComposition nom={joueur.nom} />
+                <strong>{joueur.note}</strong>
+                <span>
+                  <b>{joueur.nom}</b>
+                  <small>{nomPoste(joueur.poste)} · {joueur.age} {t('compo.ans')}{raison && <em> · {raison}</em>}</small>
+                </span>
+                {badgesDe(joueur, etat).slice(0, 1)
+                  .map((b) => (
+                    <i key={b} className={`ct-badge ct-badge-${b}`} title={t(`compo.badge.${b}`)}>
+                      <Icone nom={ICONE_BADGE[b]} taille={13} />
+                    </i>
+                  ))}
+              </button>
+            );
+          })}
         </div>
       </details>
     </section>

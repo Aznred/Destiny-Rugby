@@ -249,6 +249,9 @@
 .manager-reserve-carte > span { display:flex; flex-direction:column; min-width:0; }
 .manager-reserve-carte b,.manager-reserve-carte small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .manager-reserve-carte small { color:var(--craie-dim); font-size:.68rem; }
+.manager-reserve-carte small em { color:var(--or-300); font-style:normal; font-weight:800; }
+.manager-reserve-carte.ct-indisponible { cursor:pointer; opacity:.68; filter:saturate(.58); }
+.manager-reserve-carte.ct-indisponible:hover { opacity:.86; filter:saturate(.72); }
 .manager-roles-visuels { display:grid; grid-template-columns:minmax(200px,1fr) minmax(190px,.65fr) minmax(190px,.65fr); align-items:end; gap:.75rem; padding:1rem; }
 .manager-roles-visuels > div { display:flex; flex-direction:column; }
 .manager-roles-visuels > div span { color:var(--craie-dim); font-size:.74rem; }
