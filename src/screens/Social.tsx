@@ -1297,6 +1297,73 @@ function NegociationClubVendeur({ pseudo }: { pseudo: string }) {
   );
 }
 
+/**
+ * L'APPROCHE REÇUE — un club vient chercher un joueur qu'on garde.
+ *
+ * ⚠️ LES QUATRE RÉPONSES NE SE VALENT PAS, et l'écran doit le dire avant le
+ * clic. « Refuser » laisse la porte entrouverte ; « pas disponible » la ferme
+ * pour la saison mais s'entend dans le vestiaire ; « négocier » ouvre la table
+ * et engage à vendre si l'accord tombe. Un bouton qui ne prévient pas de ce
+ * qu'il déclenche est un piège, pas une décision.
+ */
+function ApprocheClubCarte({ pseudo }: { pseudo: string }) {
+  const manager = useGame((s) => s.manager)!;
+  const repondre = useGame((s) => s.repondreApprocheManager);
+  const negocier = useGame((s) => s.negocierApprocheManager);
+  const exiger = useGame((s) => s.exigerSurApprocheManager);
+  const approche = [...(manager.avancee?.approches ?? [])].reverse().find((a) => a.pseudo === pseudo);
+  if (!approche) return null;
+  const besoins: Record<typeof approche.besoin, string> = {
+    poste: 'trou au poste', blessure: 'aucune solution disponible',
+    ambition: 'renforcement ambitieux', remplacement: 'remplacement anticipé',
+  };
+  return (
+    <div className="x-nego x-nego-manager x-approche" data-etat={approche.etat}>
+      <div className="x-nego-tete">
+        <b><Icone d={I_STADE} /> Offre pour {approche.nom}</b>
+        {approche.etat === 'negociation' && <span className="x-nego-patience">{'●'.repeat(approche.patience)}{'○'.repeat(Math.max(0, 4 - approche.patience))}</span>}
+      </div>
+      <div className="manager-x-termes manager-x-termes-club">
+        <span><small>Leur offre</small><b>{nombre(approche.offre)} €</b></span>
+        <span><small>Ta demande</small><b>{nombre(approche.demande)} €</b></span>
+        <span><small>Bonus différés</small><b>{nombre(approche.bonus)} €</b></span>
+        <span><small>Part à la revente</small><b>{approche.pourcentageRevente}%</b></span>
+      </div>
+      <p className="x-nego-offre">
+        {approche.club} · {approche.division} · {nomPoste(approche.poste)} {approche.age} ans, note {approche.note}.
+        Contrat restant : {approche.saisonsRestantes} saison(s). Motif : {besoins[approche.besoin]} ·
+        urgence {approche.urgence}/100 · {approche.alternatives} alternative(s) dans leur groupe.
+      </p>
+      {approche.etat === 'ouverte' && <div className="x-nego-leviers">
+        <button className="x-nego-oui" onClick={() => repondre(approche.id, 'accepter')}>Accepter {nombre(approche.offre)} €</button>
+        <button onClick={() => repondre(approche.id, 'negocier')}>Négocier</button>
+        <button onClick={() => repondre(approche.id, 'refuser')}>Refuser</button>
+        <button className="x-nego-non" onClick={() => repondre(approche.id, 'indisponible')}>Il n’est pas disponible</button>
+      </div>}
+      {approche.etat === 'negociation' && <>
+        <label className="x-approche-exigence">
+          <span>Ce que tu réclames</span>
+          <input type="number" step={25_000} min={0} value={approche.demande}
+            onChange={(e) => exiger(approche.id, Number(e.target.value))} />
+        </label>
+        <div className="x-nego-leviers">
+          <button onClick={() => negocier(approche.id, 'exiger')}>Qu’ils montent</button>
+          <button onClick={() => negocier(approche.id, 'bonus')}>Accepter des bonus</button>
+          <button onClick={() => negocier(approche.id, 'revente')}>+10% à la revente</button>
+          <button className="x-nego-oui" onClick={() => negocier(approche.id, 'accepter')}>Prendre {nombre(approche.offre)} €</button>
+        </div>
+      </>}
+      {approche.etat === 'conclue' && <div className="x-nego-accord"><Icone d={I_OK} /> <b>Transfert conclu avec {approche.club}.</b></div>}
+      {approche.etat === 'rompue' && <div className="x-nego-accord"><b>Négociations terminées : le club s’est retiré.</b></div>}
+      {(approche.etat === 'refusee' || approche.etat === 'indisponible') && <div className="x-nego-accord">
+        <b>{approche.etat === 'refusee' ? 'Offre refusée.' : 'Joueur déclaré indisponible.'}</b>
+        {approche.reaction && <span>{approche.reaction === 'demandeDepart'
+          ? ' Le joueur a demandé son départ.' : ' Le joueur a accepté la décision.'}</span>}
+      </div>}
+    </div>
+  );
+}
+
 function DemandeVestiaireManager({ pseudo }: { pseudo: string }) {
   const manager = useGame((s) => s.manager)!;
   const repondre = useGame((s) => s.repondreDemandeManager);
@@ -1358,7 +1425,7 @@ function VentesManager({ recherche = '' }: { recherche?: string }) {
 type DossierManagerSocial = {
   id: string;
   pseudo: string;
-  type: 'club' | 'joueur' | 'demande';
+  type: 'club' | 'joueur' | 'demande' | 'approche';
   nom: string;
   sous: string;
   avatar: string;
@@ -1409,11 +1476,20 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
       sous: `${d.type === 'depart' ? 'Demande de départ' : 'Temps de jeu'} · ${d.etat}`,
       avatar: `initiales:${d.nom}`,
     });
+    // ⚠️ LES APPROCHES PASSENT APRÈS LES AUTRES DOSSIERS, et ce n'est pas un
+    // détail d'ordre : elles utilisent le compte `_recrutement` du club, jamais
+    // son compte `_officiel`. Sans ce suffixe, un club à qui on achète un
+    // joueur et qui vient en même temps chercher un des nôtres écraserait la
+    // conversation de l'autre dossier — deux négociations dans un seul fil.
+    for (const a of manager.avancee?.approches ?? []) parPseudo.set(a.pseudo, {
+      id: a.id, pseudo: a.pseudo, type: 'approche', nom: a.club,
+      sous: `Offre pour ${a.nom} · ${a.etat}`, avatar: `club:${a.club}`,
+    });
     return [...parPseudo.values()].sort((a, b) => {
       const date = (p: string) => conversations[p]?.at(-1)?.creeLe ?? 0;
       return date(b.pseudo) - date(a.pseudo);
     });
-  }, [manager.negociationsClubs, manager.negociations, manager.demandes, conversations]);
+  }, [manager.negociationsClubs, manager.negociations, manager.demandes, manager.avancee?.approches, conversations]);
   const [onglet, setOnglet] = useState<OngletManagerSocial>(
     conversationCible || ouvrirSocialSur === 'messages' ? 'messages' : 'timeline',
   );
@@ -1589,6 +1665,7 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
               {actif && dossier?.type === 'club' && <NegociationClubVendeur pseudo={actif} />}
               {actif && dossier?.type === 'joueur' && <NegociationRecrueManager pseudo={actif} />}
               {actif && dossier?.type === 'demande' && <DemandeVestiaireManager pseudo={actif} />}
+              {actif && dossier?.type === 'approche' && <ApprocheClubCarte pseudo={actif} />}
             </div>
           </div>
         ) : <div className="x-vide manager-x-vide"><b>Aucune discussion en cours</b><p>Explore le marché mondial pour contacter un club ou place un joueur sur la liste des départs.</p><button className="x-poster" onClick={() => setOnglet('explorer')}>Explorer le mercato</button></div>)}

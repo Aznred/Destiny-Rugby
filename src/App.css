@@ -496,6 +496,14 @@
 .manager-x-explorer-tete > div { display:flex; flex-direction:column; min-width:0; }
 .manager-x-explorer-tete span { color:#8b98a5; font-size:.76rem; }
 .manager-x-termes-club { grid-template-columns:repeat(2,minmax(0,1fr)); }
+/* Une approche reçue n'a pas la même couleur qu'un dossier qu'on a ouvert :
+   c'est le club d'en face qui a pris l'initiative, et le liseré le dit. */
+.x-approche { border-left:3px solid var(--or-500); }
+.x-approche[data-etat="conclue"] { border-left-color:#7fcfa0; }
+.x-approche[data-etat="rompue"],.x-approche[data-etat="refusee"],.x-approche[data-etat="indisponible"] { border-left-color:#6b7681; }
+.x-approche-exigence { display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin:.6rem 0; padding:.55rem .7rem; border:1px solid #2f3336; border-radius:10px; background:#080b0e; }
+.x-approche-exigence span { color:#8b98a5; font-size:.76rem; }
+.x-approche-exigence input { width:150px; padding:.45rem .6rem; border:1px solid #2f3336; border-radius:8px; color:var(--craie); background:#0d1216; font:inherit; text-align:right; }
 .manager-x-ventes { min-height:calc(100vh - 54px); padding:1rem; background:#000; }
 .manager-x-vente-intro { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1.1rem; border:1px solid #2f3336; border-radius:16px; background:#080b0e; }
 .manager-x-vente-intro h2 { margin:.25rem 0; }
@@ -1617,8 +1625,8 @@
 .discussion-joueur button.danger,.infirmerie-manager button.danger { color:#ffb0a3; border-color:rgba(222,92,74,.35); }
 .hierarchie-vestiaire { grid-column:span 8; padding:1rem; }
 .contrats-effectif-manager { grid-column:span 12; padding:1rem; }
-.contrats-effectif-manager > div:last-child { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; margin-top:.7rem; }
-.contrats-effectif-manager article { display:grid; grid-template-columns:minmax(140px,1.2fr) repeat(3,minmax(85px,.65fr)); gap:.45rem; align-items:center; padding:.7rem; border:1px solid rgba(255,255,255,.075); border-radius:10px; background:rgba(255,255,255,.025); }
+.contrats-effectif-manager > div:last-child { display:grid; grid-template-columns:1fr; gap:.4rem; margin-top:.7rem; }
+.contrats-effectif-manager article { display:grid; grid-template-columns:minmax(180px,1.7fr) repeat(6,minmax(92px,.62fr)) 152px; gap:.55rem; align-items:center; padding:.7rem; border:1px solid rgba(255,255,255,.075); border-radius:10px; background:rgba(255,255,255,.025); }
 .contrats-effectif-manager article.revalorisation { border-color:rgba(222,92,74,.42); background:rgba(222,92,74,.05); }
 .contrats-effectif-manager article > span,.contrats-effectif-manager article > div { display:flex; flex-direction:column; }.contrats-effectif-manager small { color:var(--craie-dim); font-size:.65rem; }
 .contrats-effectif-manager .motivations-contrat { grid-column:1/-2; }
@@ -1651,6 +1659,35 @@
 .infirmerie-manager article.phase-reprise { border-left:3px solid #7fcfa0; padding-left:.7rem; }
 .nego-contexte-reel { display:grid; gap:.25rem; margin:.65rem 0; padding:.65rem; border-left:3px solid var(--or-500); background:rgba(224,176,72,.05); }.nego-contexte-reel p { margin:0; color:#aeb8c2; font-size:.73rem; line-height:1.45; }.nego-contexte-reel .examen-eleve { color:#ff9d8c; }
 .convocations-manager p { margin:.4rem 0; padding:.55rem; border-radius:8px; background:rgba(85,168,240,.09); }
+
+/* Le compte à rebours d'un contrat : il se lit d'un coup d'œil ou il ne sert à
+   rien. Vert tant qu'on a le temps, ambre à un an, rouge à six mois. */
+.contrats-effectif-manager article.palier-danger { border-color:rgba(222,92,74,.34); }
+.contrats-effectif-manager article.palier-libre { border-color:rgba(222,92,74,.55); background:rgba(222,92,74,.06); }
+.echeance-contrat strong { color:#8bd8a5; }
+.echeance-contrat.discussions strong { color:var(--craie); }
+.echeance-contrat.reflexion strong { color:var(--or-300); }
+.echeance-contrat.danger strong,.echeance-contrat.libre strong { color:#ff9d8c; }
+
+.disponibilite-manager { grid-column:span 12; padding:1rem; overflow-x:auto; }
+.disponibilite-manager > article,.table-disponibilite-entete { min-width:820px; display:grid; grid-template-columns:minmax(180px,1.6fr) repeat(4,minmax(78px,.55fr)) minmax(120px,.9fr); align-items:center; gap:.6rem; }
+.table-disponibilite-entete { padding:.35rem .55rem; color:var(--craie-dim); font-size:.62rem; text-transform:uppercase; }
+.disponibilite-manager > article { padding:.55rem; border-top:1px solid rgba(255,255,255,.06); font-size:.76rem; }
+.disponibilite-manager article > span { display:flex; flex-direction:column; }
+.disponibilite-manager article small { color:var(--craie-dim); font-size:.65rem; }
+.disponibilite-manager article > strong { text-align:right; }
+.disponibilite-manager article > em { display:grid; grid-template-columns:1fr 42px; align-items:center; gap:.4rem; font-style:normal; }
+.disponibilite-manager article > em i { display:block; height:5px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.08); }
+.disponibilite-manager article > em i b { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--or-600),var(--or-300)); }
+.disponibilite-manager article.moyenne > em i b { background:linear-gradient(90deg,#a8791f,#f0c66b); }
+.disponibilite-manager article.fragile > em i b { background:linear-gradient(90deg,#8d3226,#de5c4a); }
+.disponibilite-manager .historique-blessures { grid-column:1/-1; padding-top:.2rem; }
+
+.approches-manager { grid-column:span 12; padding:1rem; }
+.approches-manager article { display:grid; grid-template-columns:minmax(160px,1.6fr) minmax(100px,.6fr) 132px; align-items:center; gap:.6rem; padding:.6rem 0; border-top:1px solid rgba(255,255,255,.06); }
+.approches-manager article > span { display:flex; flex-direction:column; }
+.approches-manager article > strong { color:var(--or-200); text-align:right; }
+.approches-manager button { min-height:38px; padding:.45rem .6rem; border:1px solid rgba(224,176,72,.35); border-radius:8px; color:var(--or-200); background:rgba(224,176,72,.08); font-size:.7rem; }
 
 .univers-manager .fil-actualites-manager { grid-column:span 7; padding:1rem; }
 .univers-manager .adn-club { grid-column:span 5; padding:1rem; }
@@ -1801,7 +1838,7 @@
 
 @media (max-width: 980px) {
   .avance-objectifs { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .direction-marche-coachs,.direction-selection,.hierarchie-vestiaire,.contrats-effectif-manager,.promesses-manager,.infirmerie-manager,.convocations-manager,
+  .direction-marche-coachs,.direction-selection,.hierarchie-vestiaire,.contrats-effectif-manager,.promesses-manager,.infirmerie-manager,.convocations-manager,.approches-manager,.disponibilite-manager,
   .univers-manager .fil-actualites-manager,.univers-manager .adn-club,.rivalites-manager,.monde-clubs-manager,
   .histoire-manager .palmares-competition,.histoire-manager .hall-club-manager,.carrieres-joueurs-manager,.anciens-staff-manager { grid-column:span 12; }
   .profil-tactique-manager,.reputation-club-manager,.relations-joueurs-manager,.records-club-manager,.xv-historique-manager { grid-column:span 12; }
@@ -1818,6 +1855,7 @@
   .avance-objectifs,.discussions-joueurs,.monde-clubs-manager > div:last-child { grid-template-columns:1fr; }
   .contrats-effectif-manager > div:last-child { grid-template-columns:1fr; }
   .contrats-effectif-manager article { grid-template-columns:1fr 1fr; }.contrats-effectif-manager article > span,.contrats-effectif-manager .motivations-contrat,.contrats-effectif-manager button { grid-column:1/-1; }
+  .approches-manager article { grid-template-columns:1fr; }.approches-manager article > strong { text-align:left; }
   .reglages-charge article { grid-template-columns:1fr; }.reglages-charge article > div { grid-template-columns:repeat(2,1fr); }
   .infirmerie-manager .medical-fitness { grid-template-columns:repeat(2,1fr); }
   .direction-contrat { align-items:flex-start; flex-direction:column; }

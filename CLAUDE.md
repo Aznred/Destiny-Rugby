@@ -126,7 +126,7 @@ GÉNÉRÉS.** Ne jamais les éditer à la main.
 clubs) et `scripts/vedettes.cjs` (~450 internationaux notés à la main), puis
 on relance `genMonde.cjs`. **Viser zéro avertissement en console.**
 
-### Bibliothèque (`src/lib/`) — 70 modules purs
+### Bibliothèque (`src/lib/`) — 81 modules purs
 
 Les règles du jeu vivent ici, **sans store ni DOM**, pour être mesurables sans
 navigateur. Les plus structurants :
@@ -134,7 +134,8 @@ navigateur. Les plus structurants :
 - **Progression** — `progression.ts` (note de saison → points d'attributs),
   `effectif.ts` (`effectifDuClub`, `noteALAge`, `forceEffectif`).
 - **Marché** — `offres.ts` (côté joueur), `recrutementManager.ts` (côté
-  entraîneur, **et c'est lui qui détient `budgetsDuClub`**), `negociation.ts`.
+  entraîneur, **et c'est lui qui détient `budgetsDuClub`**), `negociation.ts`,
+  `vestiaireManager.ts` (vendre), `approchesClubs.ts` (**se faire acheter**).
 - **Monde** — `divisions.ts` (le registre des montées/descentes), `championnat.ts`,
   `coupe.ts`, `phaseFinale.ts`, `promotion.ts`, `calendrier`/`mondial`.
 - **Manager** — `manager.ts`, `carriereAvancee.ts` (couche 1 : monde, vestiaire,
@@ -265,12 +266,42 @@ ramener la disponibilité médicale à `semaines > 0` : la guérison à 100 % ne
 rend pas la condition ni le rythme. `chargeEntrainement` alimente le risque par
 activité et par poste. Le protocole commotion refuse le retour forcé.
 
+**La disponibilité se COMPTE, elle ne se reconstitue pas.**
+`ProfilMedicalJoueur.disponibilites` porte une ligne par saison (matchs
+possibles, disponibles, titularisations, semaines et jours d'absence),
+incrémentée dans `traiterMedicalApresMatch` et dans l'avance hebdomadaire.
+La relire après coup à partir des dossiers médicaux donnerait un chiffre faux :
+une absence pour sélection, un dossier clos ou une arrivée en cours de saison
+n'ont pas la même base. `disponibiliteJoueur(profil, saison, n)` agrège.
+
 Les contrats de l'effectif vivent dans `contratsJoueurs`. Une signature interne
 doit passer par `ouvrirRenegociationJoueur` puis `signerRenegociationJoueur` ;
 elle remplace le salaire courant dans `situationSalariale`. Les négociations
 externes conservent l'ordre club vendeur → joueur et portent les bonus et la
-part à la revente dans `RecrueManager.accordClub`. Banc :
-`npm run verify:sante-contrats`.
+part à la revente dans `RecrueManager.accordClub`.
+
+`moisRestantsContrat` / `palierContrat` sont **la seule** définition des paliers
+de fin de contrat (serein / discussions 18 / réflexion 12 / danger 6 / libre) :
+l'écran, la pression du marché et l'appétit des prétendants lisent celles-là.
+`ContratJoueurAvance.attachement` (0-100) n'est pas la satisfaction — c'est le
+lien construit avec CE club (ancienneté, formation, matchs, brassard, titres,
+personnalité). Il tempère la demande salariale et décide de la réaction à un
+refus. Ne pas le confondre avec la motivation `attachement`, qui n'est qu'une
+préférence déclarée.
+
+`lib/approchesClubs.ts` porte les **approches reçues** : un club vient chercher
+un joueur qu'on n'a PAS mis en vente. C'est l'inverse de `NegociationClubManager`
+— ici l'acheteur monte vers un **plafond caché** borné par son enveloppe réelle
+(`budgetsDuClub`), et son besoin, ses alternatives et son urgence sont lus dans
+son effectif, jamais tirés au sort. Les fenêtres (`FENETRES_APPROCHE`) ne
+s'ouvrent qu'à partir de la 16ᵉ semaine, l'avance rapide s'arrête dessus
+(`arret: 'approche'`), et une approche expire au bout de 4 semaines **ou au
+changement de saison** — sans quoi un dossier oublié bloquerait le marché pour
+toute la carrière. Refuser coûte toujours quelque chose : `reactionAuRefus`
+décide entre « il comprend » et une demande de départ officielle.
+
+Banc : `npm run verify:sante-contrats` (30 contrôles, dont la mesure « une
+stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
 
 ---
 
@@ -306,7 +337,7 @@ part à la revente dans `RecrueManager.accordClub`. Banc :
 
 ## Bancs de mesure
 
-**76 scripts** dans `scripts/verif*.ts`, à lancer sans navigateur. Les
+**83 scripts** dans `scripts/verif*.ts`, à lancer sans navigateur. Les
 principaux sont déclarés dans `package.json` :
 
 ```bash

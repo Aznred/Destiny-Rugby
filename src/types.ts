@@ -787,6 +787,55 @@ export interface NegociationClubManager {
   alternatives?: number;
 }
 
+/**
+ * L'APPROCHE D'UN CLUB POUR UN JOUEUR QU'ON N'A PAS MIS EN VENTE.
+ *
+ * ⚠️ C'EST L'INVERSE DE `NegociationClubManager`, et c'est pour ça qu'elle a
+ * son propre type. Là-bas on achète : on monte vers un plancher caché. Ici on
+ * vend sans l'avoir demandé, donc c'est l'acheteur qui monte vers un PLAFOND
+ * caché — et la vraie décision n'est pas le montant, c'est d'ouvrir la porte ou
+ * non. Refuser est un choix légitime, mais le joueur, lui, l'apprend.
+ *
+ * ⚠️ LE PLAFOND EST FIGÉ À LA NAISSANCE (graine = club + joueur + saison).
+ * Recharger la sauvegarde ne fait pas monter l'offre : même protection
+ * anti-save-scumming que le plancher des clubs vendeurs.
+ */
+export interface ApprocheClubManager {
+  id: string;
+  /** Le compte du club acheteur sur L'Ovale (`pseudoStable(club, '_recrutement')`). */
+  pseudo: string;
+  club: string;
+  division: string;
+  joueurId: string;
+  nom: string;
+  poste: PosteId;
+  age: number;
+  note: number;
+  saisonsRestantes: number;
+  /** Ce que l'acheteur pose sur la table aujourd'hui. */
+  offre: number;
+  /** Ce qu'on réclame en face. */
+  demande: number;
+  /** Le PLAFOND CACHÉ de l'acheteur : au-dessus, il s'en va. */
+  plafond: number;
+  /** Conditions différées réellement inscrites dans l'accord. */
+  bonus: number;
+  pourcentageRevente: number;
+  /** Pourquoi ce club-là, cette semaine-là. */
+  besoin: 'poste' | 'blessure' | 'ambition' | 'remplacement';
+  urgence: number;
+  alternatives: number;
+  patience: number;
+  etat: 'ouverte' | 'negociation' | 'accord' | 'refusee' | 'indisponible' | 'rompue' | 'conclue';
+  saison: number;
+  semaine: number;
+  /** Ce que le joueur a répondu au refus. Écrit une seule fois. */
+  reaction?: 'comprend' | 'demandeDepart';
+}
+
+export type ReponseApprocheManager = 'accepter' | 'negocier' | 'refuser' | 'indisponible';
+export type LevierApprocheManager = 'exiger' | 'bonus' | 'revente' | 'accepter';
+
 /** Ce qu'un joueur du groupe vient réclamer dans les messages. */
 export interface DemandeJoueur {
   id: string;

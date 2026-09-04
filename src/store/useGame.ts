@@ -30,6 +30,7 @@ import type {
   DecisionClub,
   Manager, SaisonManager, CibleRecrutementManager, CompositionManager,
   TactiqueManager, ResultatMatchManager, ActionAcademieManager, ObjectifJeuneManager,
+  ReponseApprocheManager, LevierApprocheManager, ApprocheClubManager, DemandeJoueur,
 } from '../types';
 import {
   publierPost, pseudoDe, feedAmbiance, suggestionsLocales,
@@ -170,6 +171,9 @@ import {
   demandeAGenerer, negocierAvecClub, offresPourVente, ouvrirNegociationClub,
   valeurDeVente, type LevierClubManager,
 } from '../lib/vestiaireManager';
+import {
+  exigerSurApproche, negocierApproche, reactionAuRefus, repondreApproche,
+} from '../lib/approchesClubs';
 import { avatarPourCompte } from '../lib/avatars';
 import { reportsBudgets, renouvelerBudgets, reparerPlafondSalarial } from '../lib/tresorerieManager';
 import { objectifsDeSaison } from '../lib/objectifsManager';
@@ -195,7 +199,7 @@ import {
   indisponiblesCarriereAvancee, negocierContratManagerAvance, observerCible, postulerBancAvance,
   refuserSelectionAvance, repondreDiscussionAvancee, joueurAgent, ouvrirRenegociationJoueur,
   signerRenegociationJoueur,
-  type DecisionMedicale, type PlanChargeHebdo, type ReponseDiscussion,
+  type DecisionMedicale, type EtatCarriereAvancee, type PlanChargeHebdo, type ReponseDiscussion,
 } from '../lib/carriereAvancee';
 import {
   apresDepartJoueurProfonde, configurerDelegationProfonde, definirCapitainesProfonde,
@@ -1016,6 +1020,14 @@ interface GameState {
   deciderMedicalManager: (id: string, decision: Exclude<DecisionMedicale, 'attente'>) => void;
   definirChargeEntrainementManager: (axe: keyof PlanChargeHebdo, niveau: PlanChargeHebdo[keyof PlanChargeHebdo]) => void;
   ouvrirRenegociationJoueurManager: (joueurId: string) => void;
+  /** Répondre à un club venu chercher un joueur qu'on n'a pas mis en vente. */
+  repondreApprocheManager: (id: string, reponse: ReponseApprocheManager) => void;
+  /** Une marche de négociation face à l'acheteur, du côté vendeur. */
+  negocierApprocheManager: (id: string, levier: LevierApprocheManager) => void;
+  /** Fixer soi-même le montant réclamé pour libérer le joueur. */
+  exigerSurApprocheManager: (id: string, montant: number) => void;
+  /** Encaisser une approche conclue. Interne : appelée par les deux au-dessus. */
+  conclureApprocheInterne: (approche: ApprocheClubManager, avancee: EtatCarriereAvancee) => void;
   observerCibleManager: (cible: CibleRecrutementManager) => void;
   postulerBancManager: (club: string) => void;
   negocierContratManager: () => void;
@@ -1079,7 +1091,7 @@ interface GameState {
    */
   avancerJusquaManager: (numeroSemaine: number, deleguerMatchs?: boolean) => {
     semaines: number;
-    arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc';
+    arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche';
   };
   setTheme: (t: Theme) => void;
   setLangue: (l: Langue) => void;
@@ -3995,6 +4007,181 @@ export const useGame = create<GameState>()(
         }));
       },
 
+      /**
+       * ⚠️ REFUSER DOIT COÛTER QUELQUE CHOSE, SINON L'APPROCHE EST DÉCORATIVE.
+       * Le joueur apprend toujours qu'un club est venu : c'est son agent qui
+       * l'appelle, pas le manager. Selon son attachement, sa satisfaction, son
+       * temps de jeu et l'étage du prétendant, il comprend — ou il demande
+       * officiellement son départ, et cette demande entre dans le même fil de
+       * L'Ovale que les autres, avec les mêmes réponses possibles.
+       */
+      repondreApprocheManager: (id, reponse) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const groupe = effectifDuClub(m.club, m.saison);
+        const avancee = assurerEtatCarriereAvancee(m, groupe);
+        const actuelle = avancee.approches.find((a) => a.id === id);
+        if (!actuelle || actuelle.etat !== 'ouverte') return;
+        const resultat = repondreApproche(actuelle, reponse);
+        if (resultat.accord) {
+          get().conclureApprocheInterne(resultat.approche, avancee);
+          return;
+        }
+        if (reponse === 'negocier') {
+          set({ manager: { ...m, avancee: { ...avancee,
+            approches: avancee.approches.map((a) => a.id === id ? resultat.approche : a) } } });
+          return;
+        }
+        // Refus ou « il n'est pas disponible » : la réaction du joueur.
+        const contrat = avancee.contratsJoueurs[actuelle.joueurId];
+        const joueur = groupe.find((j) => j.id === actuelle.joueurId);
+        if (!contrat || !joueur) return;
+        const matchs = Math.max(1, Object.values(m.resultats).filter((r) => r.saison === m.saison && r.club === m.club).length);
+        const reaction = reactionAuRefus(actuelle, contrat, avancee.vestiaire[actuelle.joueurId], {
+          partDeJeu: (m.tempsDeJeu[actuelle.joueurId] ?? 0) / matchs,
+          monterDEtage: (competitionEffective(actuelle.club)?.niveau ?? 9) < (competitionEffective(m.club)?.niveau ?? 9),
+          indisponible: indisponiblesCarriereAvancee(avancee, m.semaine).includes(actuelle.joueurId),
+        });
+        const profil = avancee.vestiaire[actuelle.joueurId];
+        const partant = reaction.reaction === 'demandeDepart';
+        const demande: DemandeJoueur | null = partant && !m.demandes.some((d) => d.joueurId === actuelle.joueurId && d.etat === 'ouverte')
+          ? { id: idUnique(), pseudo: pseudoStable(actuelle.nom), joueurId: actuelle.joueurId,
+            nom: actuelle.nom, poste: actuelle.poste, note: actuelle.note, type: 'depart',
+            raison: 'offreRecue', saison: m.saison, semaine: m.semaine, etat: 'ouverte' }
+          : null;
+        const approcheFinale: ApprocheClubManager = { ...resultat.approche, reaction: reaction.reaction };
+        set((s) => ({
+          manager: {
+            ...m,
+            demandes: demande ? [...m.demandes, demande] : m.demandes,
+            avancee: {
+              ...avancee,
+              approches: avancee.approches.map((a) => a.id === id ? approcheFinale : a),
+              vestiaire: profil ? { ...avancee.vestiaire, [actuelle.joueurId]: {
+                ...profil, satisfaction: borne(profil.satisfaction + reaction.satisfaction),
+                moral: borne(profil.moral + reaction.moral), soutien: !partant && profil.soutien,
+              } } : avancee.vestiaire,
+              contratsJoueurs: { ...avancee.contratsJoueurs, [actuelle.joueurId]: {
+                ...contrat, satisfaction: borne(contrat.satisfaction + reaction.satisfaction),
+              } },
+            },
+          },
+          conversations: { ...s.conversations, [actuelle.pseudo]: [
+            ...(s.conversations[actuelle.pseudo] ?? []),
+            { id: idUnique(), pseudo: actuelle.pseudo, de: 'moi' as const,
+              texte: reponse === 'indisponible'
+                ? `${actuelle.nom} n’est pas disponible. Ne revenez pas cette saison.`
+                : `Nous refusons votre offre pour ${actuelle.nom}.`,
+              saison: m.saison, semaine: m.semaine, creeLe: Date.now(), lu: true },
+            { id: idUnique(), pseudo: actuelle.pseudo, de: 'lui' as const,
+              texte: reponse === 'indisponible' ? 'Message reçu. Nous cherchons ailleurs.'
+                : 'Dommage. Nous restons attentifs à sa situation.',
+              saison: m.saison, semaine: m.semaine, creeLe: Date.now() + 1, lu: false },
+          ] },
+          notifsSocial: [{
+            id: idUnique(), emoji: partant ? '😡' : '💬',
+            titre: `${actuelle.nom} · réaction au refus`, texte: reaction.texte,
+            saison: m.saison, semaine: m.semaine, creeLe: Date.now(), lue: false,
+          }, ...s.notifsSocial].slice(0, 40),
+        }));
+      },
+
+      negocierApprocheManager: (id, levier) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
+        const actuelle = avancee.approches.find((a) => a.id === id);
+        if (!actuelle || actuelle.etat !== 'negociation') return;
+        const resultat = negocierApproche(actuelle, levier);
+        if (resultat.accord) {
+          get().conclureApprocheInterne(resultat.approche, avancee);
+          return;
+        }
+        set((s) => ({
+          manager: { ...m, avancee: { ...avancee,
+            approches: avancee.approches.map((a) => a.id === id ? resultat.approche : a) } },
+          conversations: { ...s.conversations, [actuelle.pseudo]: [
+            ...(s.conversations[actuelle.pseudo] ?? []),
+            { id: idUnique(), pseudo: actuelle.pseudo, de: 'moi' as const,
+              texte: levier === 'exiger' ? `Il nous faut ${nombre(resultat.approche.demande)} €.`
+                : levier === 'bonus' ? 'Nous acceptons une part en bonus différés.'
+                  : 'Nous voulons un pourcentage à la revente.',
+              saison: m.saison, semaine: m.semaine, creeLe: Date.now(), lu: true },
+            { id: idUnique(), pseudo: actuelle.pseudo, de: 'lui' as const,
+              texte: resultat.approche.etat === 'rompue'
+                ? 'Négociations terminées. Nous nous tournons vers une autre piste.'
+                : `Nous montons à ${nombre(resultat.approche.offre)} €. Il nous reste ${resultat.approche.patience} marche(s).`,
+              saison: m.saison, semaine: m.semaine, creeLe: Date.now() + 1, lu: false },
+          ] },
+        }));
+      },
+
+      exigerSurApprocheManager: (id, montant) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
+        set({ manager: { ...m, avancee: { ...avancee,
+          approches: avancee.approches.map((a) => a.id === id ? exigerSurApproche(a, montant) : a) } } });
+      },
+
+      /**
+       * Encaisser une approche conclue. Interne : elle réutilise EXACTEMENT le
+       * chemin d'une vente ordinaire — part à la revente due au club formateur,
+       * annonce de transfert, deuil du vestiaire, ligne au journal.
+       */
+      conclureApprocheInterne: (approche: ApprocheClubManager, avancee: EtatCarriereAvancee) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const joueur = effectifDuClub(m.club, m.saison).find((j) => j.id === approche.joueurId);
+        if (!joueur) return;
+        const contratOrigine = m.recrues.findLast((r) => r.club === m.club
+          && (r.joueur.id === approche.joueurId || r.joueur.nom === joueur.nom));
+        const partRevente = contratOrigine?.accordClub?.pourcentageRevente ?? 0;
+        const reversement = Math.round(approche.offre * partRevente / 100);
+        const montantNet = Math.max(0, approche.offre - reversement);
+        const transfert: TransfertAnnonce = {
+          nom: joueur.nom, de: m.club, vers: approche.club, saison: m.saison,
+          poste: POSTE_PAR_ID[joueur.poste]?.famille, age: joueur.age,
+          note: joueur.note, nation: joueur.nation,
+        };
+        let suite = avancee;
+        if (suite.profonde) {
+          const depart = apresDepartJoueurProfonde(suite.profonde, m, approche.joueurId);
+          const vestiaire = { ...suite.vestiaire };
+          for (const [id, delta] of Object.entries(depart.moralTouches)) {
+            const profil = vestiaire[id];
+            if (profil) vestiaire[id] = { ...profil, moral: borne(profil.moral + delta), satisfaction: borne(profil.satisfaction + delta) };
+          }
+          suite = { ...suite, vestiaire,
+            profonde: enregistrerTransfertProfonde(depart.etat, m, joueur, approche.offre, 'vente', approche.club) };
+        }
+        suite = { ...suite, approches: suite.approches.map((a) => a.id === approche.id
+          ? { ...approche, etat: 'conclue' as const } : a) };
+        set((s) => {
+          const transfertsSociaux = [...s.transfertsSociaux, transfert];
+          setTransfertsSociaux(transfertsSociaux);
+          return {
+            manager: {
+              ...m, avancee: suite,
+              budgetTransferts: m.budgetTransferts + montantNet,
+              ventes: m.ventes.filter((v) => v.joueurId !== approche.joueurId),
+              entrainements: m.entrainements.filter((n) => n !== joueur.nom),
+              composition: reconcilerCompositionManager(effectifDuClub(m.club, m.saison), m.composition),
+            },
+            transfertsSociaux,
+            journal: [...s.journal, {
+              id: idUnique(), saison: m.saison, role: 'mj' as const,
+              titre: `Départ · ${joueur.nom}`,
+              texte: `${approche.club} l’emporte pour ${nombre(montantNet)} €`
+                + (approche.bonus > 0 ? `, plus ${nombre(approche.bonus)} € de bonus différés` : '')
+                + (approche.pourcentageRevente > 0 ? ` et ${approche.pourcentageRevente} % à la revente` : '')
+                + (reversement > 0 ? `. ${nombre(reversement)} € sont reversés à ${contratOrigine?.accordClub?.clubVendeur}` : '')
+                + '.',
+            }],
+          };
+        });
+      },
+
       observerCibleManager: (cible) => {
         const m = get().manager;
         if (!m?.club) return;
@@ -4121,7 +4308,26 @@ export const useGame = create<GameState>()(
           const composition = delegations.compositions
             ? compositionManagerParDefaut(groupe, absents)
             : reconcilerCompositionManager(groupe, m.composition, absents);
-          set({ manager: { ...m, semaine: suivante, decision: null, avancee, entrainements, composition } });
+          // ⚠️ UNE APPROCHE QUI N'OUVRE PAS DE CONVERSATION N'EXISTE PAS. Elle
+          // naît dans la couche pure (`avancerSemaineCarriereAvancee`), qui ne
+          // connaît ni les messages ni les notifications : c'est ici, et
+          // seulement ici, que le club écrit vraiment sur L'Ovale.
+          const connues = new Set((m.avancee?.approches ?? []).map((a) => a.id));
+          const neuve = avancee.approches.find((a) => !connues.has(a.id));
+          set((s) => ({
+            manager: { ...m, semaine: suivante, decision: null, avancee, entrainements, composition },
+            conversations: neuve ? { ...s.conversations, [neuve.pseudo]: [
+              ...(s.conversations[neuve.pseudo] ?? []),
+              { id: idUnique(), pseudo: neuve.pseudo, de: 'lui' as const,
+                texte: `Nous souhaitons recruter ${neuve.nom}. Nous proposons ${nombre(neuve.offre)} € d’indemnité.`,
+                saison: m.saison, semaine: suivante, creeLe: Date.now(), lu: false },
+            ] } : s.conversations,
+            notifsSocial: neuve ? [{
+              id: idUnique(), emoji: '📨', titre: `Offre — ${neuve.nom}`,
+              texte: `${neuve.club} veut le recruter. ${nombre(neuve.offre)} € sur la table.`,
+              saison: m.saison, semaine: suivante, creeLe: Date.now(), lue: false,
+            }, ...s.notifsSocial].slice(0, 40) : s.notifsSocial,
+          }));
           get().vivreSemaineSociale();
           return;
         }
@@ -4136,7 +4342,7 @@ export const useGame = create<GameState>()(
         if (!get().manager?.club) return { semaines, arret: 'sansBanc' as const };
         if (cible <= depart) return { semaines, arret: 'arrive' as const };
 
-        let arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' = 'arrive';
+        let arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche' = 'arrive';
         while ((get().manager?.semaine ?? 1) < cible) {
           const avant = get().manager;
           if (!avant?.club) { arret = 'sansBanc'; break; }
@@ -4188,6 +4394,12 @@ export const useGame = create<GameState>()(
           semaines++;
           if (apres.saison !== avant.saison) { arret = 'saison'; break; }
           if (!apres.club) { arret = 'sansBanc'; break; }
+          // ⚠️ ON S'ARRÊTE SUR UNE OFFRE REÇUE, exactement comme sur une
+          // décision du board. L'approche a une patience de quelques semaines :
+          // l'enjamber en avance rapide, c'est répondre « non » à la place du
+          // manager sans le lui avoir demandé.
+          const connues = new Set((avant.avancee?.approches ?? []).map((a) => a.id));
+          if ((apres.avancee?.approches ?? []).some((a) => !connues.has(a.id))) { arret = 'approche'; break; }
         }
         return { semaines, arret };
       },
@@ -4627,7 +4839,9 @@ export const useGame = create<GameState>()(
             manager: {
               ...m, budgetTransferts: m.budgetTransferts - actuelle.offre.prime,
               negociations: m.negociations.map((n) => n.id === id ? signee : n),
-              avancee: signerRenegociationJoueur(avancee, signee),
+              avancee: signerRenegociationJoueur(avancee, signee, {
+                semaine: m.semaine, feuilles: m.tempsDeJeu[actuelle.joueur.id] ?? 0,
+              }),
             },
             conversations: { ...s.conversations, [actuelle.pseudo]: [
               ...(s.conversations[actuelle.pseudo] ?? []),

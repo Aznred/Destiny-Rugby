@@ -919,6 +919,11 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   condition, rythme et risque de rechute. Le retour se fait par les réserves,
   20 ou 40 minutes, ou directement avec un risque réel ; le protocole commotion
   reste impossible à contourner. Les séquelles suivent le joueur entre les saisons.
+- Une page **Disponibilité** compte, match par match, ce que le club a joué
+  pendant qu'un joueur lui appartenait, les rencontres où il était réellement
+  sélectionnable, ses titularisations et ses jours d'absence, sur trois saisons.
+  Chaque blessure y reste listée avec sa durée. C'est le chiffre qu'on regarde
+  avant de garantir un contrat long à un joueur de 32 ans.
 - À réputation suffisante, une sélection nationale peut proposer son banc. La
   réputation internationale est distincte et les matchs de tournée ou de
   tournoi se coachent dans le même moteur 2D.
@@ -932,6 +937,26 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   prolongations ou revalorisations dans L'Ovale. Les clubs vendeurs négocient
   aussi besoin, urgence, bonus différés et pourcentage à la revente ; la visite
   médicale agit sur les exigences et la valeur.
+- La fin de contrat se lit **en mois**, pas en saisons : serein, premières
+  discussions à 18, réflexion à 12, danger à 6, puis libre. Plus l'échéance
+  approche, plus les prétendants se positionnent — et un statut « cadre »
+  inscrit au contrat devient une promesse que le jeu mesure sur les feuilles
+  de match réellement obtenues.
+- Chaque joueur porte un **attachement au club de 0 à 100**, distinct de sa
+  satisfaction : ancienneté, formation au club, matchs, brassard, titres et
+  personnalité le font monter lentement ; les déceptions le font baisser. Il
+  tempère les exigences salariales et décide de la réaction à un refus.
+- **Un club peut venir chercher un joueur qu'on n'a pas mis en vente.** L'offre
+  arrive sur L'Ovale avec le besoin réel de l'acheteur (son effectif à ce poste,
+  ses alternatives, son urgence, son enveloppe de transferts) et quatre
+  réponses : accepter, négocier, refuser, ou le déclarer indisponible. En
+  négociation, on réclame un montant, on accepte des bonus différés ou un
+  pourcentage à la revente, et l'acheteur monte vers un **plafond caché** —
+  une contre-offre absurde met simplement fin aux discussions. Mesuré :
+  une stratégie mixte conclut 16 fois sur 17, la gourmandise pure 9 fois sur 17.
+- **Le joueur apprend toujours qu'on a refusé.** Loyal, heureux et titulaire, il
+  comprend ; ambitieux, mécontent et privé d'un étage supérieur, il demande
+  officiellement son départ, et sa satisfaction en paie le prix.
 - Le fil d'actualité ne raconte que les faits de la sauvegarde : résultats,
   blessures, sélections, événements financiers rares et changements de coach.
   L'ADN des clubs et les rivalités dynamiques évoluent lentement sur plusieurs

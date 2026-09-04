@@ -9,13 +9,14 @@
 import { COMPETITIONS, NOTE_PAR_NIVEAU, competitionDuClub } from '../data/clubs';
 import { SELECTIONS_SENIOR } from '../data/selections';
 import type {
-  Manager, MotivationContratManager, NegociationManager, OptionContratManager,
+  ApprocheClubManager, Manager, MotivationContratManager, NegociationManager, OptionContratManager,
   ResultatMatchManager, RoleRecrueManager,
 } from '../types';
+import { approcheAGenerer } from './approchesClubs';
 import { graine, enregistrerResultatJoue, type MatchChampionnat } from './championnat';
 import { fenetresDeNation, finDeRassemblement, type RassemblementInternational } from './rassemblements';
 import { effectifNational, matchInternationalDuJoueur } from './international';
-import { libelleDate, semaine as dateSemaine } from '../data/calendrier';
+import { libelleDate, semaine as dateSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
 import type { Coequipier } from './effectif';
 import { forceEffectif } from './effectif';
 import {
@@ -120,6 +121,28 @@ export interface HistoriqueMedicalJoueur {
   gravite: DossierMedical['gravite'];
   rechute: boolean;
   sequelle: number;
+  /** Jours d'absence réellement facturés. Optionnel : les dossiers antérieurs ne l'ont pas. */
+  jours?: number;
+}
+
+/**
+ * UNE SAISON DE DISPONIBILITÉ, COMPTÉE ET NON ESTIMÉE.
+ *
+ * ⚠️ C'EST LE CHIFFRE QUI MANQUAIT AVANT DE SIGNER UN GROS CONTRAT. Un
+ * excellent joueur de 32 ans à 68 % de disponibilité et un jeune jamais blessé
+ * ne se prolongent pas de la même façon — mais encore faut-il que l'écran le
+ * dise. Ces quatre compteurs sont incrémentés après chaque match et chaque
+ * semaine, jamais reconstruits après coup.
+ */
+export interface DisponibiliteSaison {
+  saison: number;
+  /** Matchs que le club a joués pendant qu'il appartenait au groupe. */
+  possibles: number;
+  /** Ceux où il était réellement sélectionnable (ni blessé, ni en sélection). */
+  disponibles: number;
+  titularisations: number;
+  semainesBlessees: number;
+  joursBlesse: number;
 }
 
 export interface ProfilMedicalJoueur {
@@ -132,6 +155,8 @@ export interface ProfilMedicalJoueur {
   fatigue: number;
   condition: number;
   rythme: number;
+  /** Les quatre dernières saisons, la plus récente en dernier. */
+  disponibilites?: DisponibiliteSaison[];
 }
 
 export interface ContratJoueurAvance {
@@ -149,6 +174,21 @@ export interface ContratJoueurAvance {
   offresExterieures: number;
   demandeRevalorisation: boolean;
   derniereNegociation?: number;
+  /** La saison où il est arrivé au club. Sert d'ancienneté à l'attachement. */
+  arrivee?: number;
+  /**
+   * L'ATTACHEMENT AU CLUB, 0-100.
+   *
+   * ⚠️ CE N'EST PAS LA SATISFACTION. La satisfaction dit s'il est content
+   * cette saison ; l'attachement dit s'il se voit finir ici. Un joueur peut
+   * être mécontent de son temps de jeu et refuser malgré tout de partir, ou
+   * adorer le club et vouloir quand même découvrir l'étage du dessus. Il monte
+   * lentement — ancienneté, matchs, brassard, titres — et ne redescend
+   * brutalement que si on le déçoit.
+   */
+  attachement: number;
+  /** Club formateur : il y a signé son premier contrat. Pèse lourd et ne change jamais. */
+  formeAuClub?: boolean;
 }
 
 export interface DossierMedical {
@@ -340,6 +380,8 @@ export interface EtatCarriereAvancee {
   profilsMedicaux: Record<string, ProfilMedicalJoueur>;
   chargeEntrainement: PlanChargeHebdo;
   contratsJoueurs: Record<string, ContratJoueurAvance>;
+  /** Les clubs qui viennent chercher un joueur qu'on n'a pas mis en vente. */
+  approches: ApprocheClubManager[];
   convocations: ConvocationClub[];
   connaissances: Record<string, ConnaissanceJoueur>;
   agents: AgentPersistant[];
@@ -396,7 +438,61 @@ function profilMedicalInitial(j: Coequipier): ProfilMedicalJoueur {
       commotion: zone(avant ? 7 : 2), dos: zone(avant ? 8 : 1),
     },
     historique: [], commotions: 0, sequelles: {}, fatigue: 20, condition: 100, rythme: 100,
+    disponibilites: [],
   };
+}
+
+/** La ligne de la saison en cours, créée à la volée et jamais dupliquée. */
+function ligneDisponibilite(profil: ProfilMedicalJoueur, saison: number): DisponibiliteSaison[] {
+  const lignes = [...(profil.disponibilites ?? [])];
+  if (!lignes.some((d) => d.saison === saison)) {
+    lignes.push({ saison, possibles: 0, disponibles: 0, titularisations: 0, semainesBlessees: 0, joursBlesse: 0 });
+  }
+  // Quatre saisons suffisent : l'écran en montre trois, la quatrième sert de
+  // marge quand une carrière chevauche deux clubs la même année.
+  return lignes.sort((a, b) => a.saison - b.saison).slice(-4);
+}
+
+/**
+ * Le bilan de disponibilité sur les N dernières saisons — le chiffre qu'on
+ * regarde AVANT de signer trois ans à un joueur de 32 ans.
+ */
+export function disponibiliteJoueur(
+  profil: ProfilMedicalJoueur | undefined, saison: number, saisons = 3,
+): { possibles: number; disponibles: number; titularisations: number; joursBlesse: number; part: number } {
+  const lignes = (profil?.disponibilites ?? []).filter((d) => d.saison > saison - saisons);
+  const total = lignes.reduce((n, d) => ({
+    possibles: n.possibles + d.possibles,
+    disponibles: n.disponibles + d.disponibles,
+    titularisations: n.titularisations + d.titularisations,
+    joursBlesse: n.joursBlesse + d.joursBlesse,
+  }), { possibles: 0, disponibles: 0, titularisations: 0, joursBlesse: 0 });
+  return { ...total, part: total.possibles ? Math.round(total.disponibles * 1000 / total.possibles) / 10 : 100 };
+}
+
+/**
+ * LE COMPTE À REBOURS DU CONTRAT, en mois de saison.
+ *
+ * ⚠️ LE TIMING EST LE VRAI SUJET D'UNE PROLONGATION. À vingt-quatre mois, le
+ * joueur est tranquille et ne coûte rien à faire attendre ; à six, chaque
+ * semaine qui passe donne un argument à ses prétendants, et à zéro il part
+ * libre. Cette fonction est la SEULE définition de ces paliers : l'écran, la
+ * pression du marché et le texte de l'agent lisent tous celle-ci.
+ */
+export function moisRestantsContrat(fin: number, saison: number, semaine: number): number {
+  const saisonsPleines = Math.max(0, fin - saison - 1);
+  const moisDeLaSaison = Math.max(0, Math.round((SEMAINES_PAR_SAISON - semaine) / SEMAINES_PAR_SAISON * 12));
+  return saisonsPleines * 12 + (fin > saison ? moisDeLaSaison : 0);
+}
+
+export type PalierContrat = 'serein' | 'discussions' | 'reflexion' | 'danger' | 'libre';
+
+export function palierContrat(mois: number): PalierContrat {
+  if (mois <= 0) return 'libre';
+  if (mois <= 6) return 'danger';
+  if (mois <= 12) return 'reflexion';
+  if (mois <= 18) return 'discussions';
+  return 'serein';
 }
 
 function motivationsContrat(p: ProfilVestiaire, j: Coequipier): ContratJoueurAvance['motivations'] {
@@ -415,15 +511,59 @@ function contratJoueurInitial(m: Manager, j: Coequipier, p: ProfilVestiaire): Co
   const niveau = competitionDuClub(m.club)?.niveau ?? 8;
   const role: RoleRecrueManager = j.age <= 23 && j.potentiel >= j.note + 4 ? 'espoir'
     : j.note >= forceEffectif(m.club, m.saison) + 1 ? 'cadre' : 'rotation';
+  // ⚠️ L'ANCIENNETÉ EXISTE AVANT LA PREMIÈRE SEMAINE DE JEU. Un groupe qu'on
+  // reprend n'est pas composé de treize inconnus arrivés hier : sans ce passé
+  // tiré une fois pour toutes, aucun joueur n'aurait d'attachement crédible
+  // avant la cinquième saison de la sauvegarde.
+  const anciennete = Math.min(Math.max(0, j.age - 18), Math.floor(rng() * (j.age >= 29 ? 8 : 4)));
+  const formeAuClub = j.age - anciennete <= 20 && rng() > .58;
   return {
     joueurId: j.id, nom: j.nom, club: m.club, debut: m.saison,
+    arrivee: m.saison - anciennete, formeAuClub,
     fin: m.saison + 1 + Math.floor(rng() * (j.age >= 31 ? 2 : 4)),
     salaire: niveau > 3 ? 0 : Math.round(salaire(niveau, j.note - forceDuGroupe(m.club, m.saison), j.age)),
     role, option: j.age <= 23 ? 'club' : rng() > .72 ? 'joueur' : 'aucune',
     motivations: motivationsContrat(p, j), satisfaction: p.satisfaction,
+    attachement: attachementInitial(j, p, anciennete, formeAuClub),
     interetExterieur: Math.max(0, borne((j.note - forceEffectif(m.club, m.saison)) * 9 + rng() * 28)),
     offresExterieures: 0, demandeRevalorisation: false,
   };
+}
+
+/**
+ * L'ATTACHEMENT DE DÉPART : ancienneté, formation au club, personnalité.
+ *
+ * ⚠️ IL N'EST PAS TIRÉ AU SORT. Les trois entrées sont déjà déterminées à ce
+ * moment-là, et c'est ce qui permet à l'écran d'expliquer un chiffre — « douze
+ * ans au club, formé ici » — plutôt que d'afficher une jauge inexplicable.
+ */
+function attachementInitial(
+  j: Coequipier, p: ProfilVestiaire, anciennete: number, formeAuClub: boolean,
+): number {
+  return borne(
+    22 + Math.min(38, anciennete * 5.5) + (formeAuClub ? 20 : 0)
+    + (p.traits.includes('loyal') ? 16 : 0) + (p.traits.includes('leader') ? 6 : 0)
+    - (p.traits.includes('mercenaire') ? 20 : 0) - (p.traits.includes('ambitieux') ? 6 : 0)
+    + (j.age >= 30 ? 6 : 0),
+  );
+}
+
+/**
+ * L'attachement d'une semaine à l'autre. Il monte LENTEMENT — jouer, porter le
+ * brassard, gagner des titres, rester — et ne chute que sur une vraie déception.
+ */
+function evoluerAttachement(
+  c: ContratJoueurAvance, m: Manager, j: Coequipier, p: ProfilVestiaire | undefined, partDeJeu: number,
+): number {
+  const anciennete = Math.max(0, m.saison - (c.arrivee ?? c.debut));
+  const capitaine = m.composition.capitaineId === j.id;
+  const titres = m.palmares.filter((t) => t.club === m.club).length;
+  const gain = 0.10 + anciennete * 0.035 + partDeJeu * 0.14 + (capitaine ? 0.12 : 0)
+    + (c.formeAuClub ? 0.05 : 0) + Math.min(0.2, titres * 0.05);
+  const perte = Math.max(0, 48 - c.satisfaction) * 0.022
+    + Math.max(0, 45 - (p?.relationManager ?? 55)) * 0.018
+    + (p?.traits.includes('mercenaire') ? 0.06 : 0);
+  return borne(c.attachement + gain - perte);
 }
 
 function normaliserDossier(d: DossierMedical): DossierMedical {
@@ -499,7 +639,8 @@ export function creerEtatCarriereAvancee(m: Manager, effectif: Coequipier[]): Et
     version: 1,
     profonde: creerEtatCarriereProfonde(m, effectif),
     objectifs: objectifsDeSaison(m, effectif), vestiaire, discussions: [], promesses: [], medical: [],
-    profilsMedicaux, chargeEntrainement: { ...CHARGE_HEBDO_DEFAUT }, contratsJoueurs, convocations: [],
+    profilsMedicaux, chargeEntrainement: { ...CHARGE_HEBDO_DEFAUT }, contratsJoueurs,
+    approches: [], convocations: [],
     connaissances: {}, agents: rattacherAgents(creerAgents(), effectif), offresBanc: [],
     entraineursIA: monde.entraineursIA, clubsMonde: monde.clubsMonde, actualites: [],
     histoire: {}, carrieresJoueurs: [], identites: monde.identites, rivalites: [], staffAnciens: [],
@@ -517,6 +658,9 @@ export function changerClubCarriereAvancee(a: EtatCarriereAvancee | undefined, m
     discussions: etat.discussions.map((d) => d.etat === 'ouverte' ? { ...d, etat: 'close' as const, reponse: 'aucunePromesse' as const } : d),
     promesses: etat.promesses.map((p) => p.etat === 'active' ? { ...p, etat: 'rompue' as const } : p),
     medical: etat.medical.map(normaliserDossier).filter((d) => d.phase === 'clos'), convocations: [],
+    // Les clubs ne poursuivent pas une approche auprès d'un entraîneur qui a
+    // quitté le banc : c'est au nouveau club de traiter ses propres dossiers.
+    approches: [],
   };
 }
 
@@ -530,8 +674,20 @@ export function assurerEtatCarriereAvancee(m: Manager, effectif: Coequipier[]): 
     vestiaire[j.id] ??= profilDuJoueur(j, m.composition.capitaineId, m.saison);
     vestiaire[j.id] = { ...vestiaire[j.id], nom: j.nom, derniereSaison: m.saison };
     profilsMedicaux[j.id] ??= profilMedicalInitial(j);
+    profilsMedicaux[j.id] = { ...profilsMedicaux[j.id], disponibilites: profilsMedicaux[j.id].disponibilites ?? [] };
     contratsJoueurs[j.id] ??= contratJoueurInitial(m, j, vestiaire[j.id]);
-    contratsJoueurs[j.id] = { ...contratsJoueurs[j.id], nom: j.nom, club: m.club };
+    // ⚠️ UNE SAUVEGARDE ANTÉRIEURE N'A NI ATTACHEMENT NI ANCIENNETÉ, et un
+    // `?? 0` les laisserait tous à zéro : le premier club venu emporterait
+    // l'effectif entier. On rejoue donc le calcul initial, qui ne dépend que
+    // de données déjà présentes (âge, traits) — jamais d'un tirage nouveau.
+    const initial = contratsJoueurs[j.id].attachement === undefined
+      ? contratJoueurInitial(m, j, vestiaire[j.id]) : null;
+    contratsJoueurs[j.id] = {
+      ...contratsJoueurs[j.id], nom: j.nom, club: m.club,
+      attachement: contratsJoueurs[j.id].attachement ?? initial!.attachement,
+      arrivee: contratsJoueurs[j.id].arrivee ?? initial?.arrivee ?? contratsJoueurs[j.id].debut,
+      formeAuClub: contratsJoueurs[j.id].formeAuClub ?? initial?.formeAuClub ?? false,
+    };
   }
   // Chemin courant : aucun monde de 850 clubs n'est régénéré à chaque rendu.
   // Les trois registres n'ont besoin d'un repli que pour une sauvegarde bêta
@@ -541,6 +697,7 @@ export function assurerEtatCarriereAvancee(m: Manager, effectif: Coequipier[]): 
   const agents = a.agents?.length ? a.agents : creerAgents();
   return {
     ...a, version: 1, vestiaire, profilsMedicaux, contratsJoueurs,
+    approches: a.approches ?? [],
     chargeEntrainement: a.chargeEntrainement ?? { ...CHARGE_HEBDO_DEFAUT },
     medical: (a.medical ?? []).map(normaliserDossier),
     profonde: assurerEtatCarriereProfonde(a.profonde, m, effectif),
@@ -739,10 +896,25 @@ function traiterMedicalApresMatch(a: EtatCarriereAvancee, m: Manager, effectif: 
     return d;
   });
 
+  // ⚠️ LA DISPONIBILITÉ SE COMPTE ICI, MATCH PAR MATCH. La reconstituer après
+  // coup à partir des dossiers médicaux donnerait un chiffre faux : une absence
+  // pour sélection, un dossier clos ou un joueur arrivé en cours de saison
+  // n'auraient pas la même base de matchs possibles.
+  const absents = new Set(indisponiblesCarriereAvancee(a, m.semaine));
   for (const j of effectif) {
     const profil = profilsMedicaux[j.id] ?? profilMedicalInitial(j);
     const joue = alignes.has(j.id);
-    profilsMedicaux[j.id] = { ...profil, fatigue: borne(profil.fatigue + (joue ? (m.composition.titulaires.includes(j.id) ? 15 : 8) : -7)), condition: borne(profil.condition + (joue ? -3 : 2)), rythme: borne(profil.rythme + (joue ? 5 : -1)) };
+    const lignes = ligneDisponibilite(profil, m.saison);
+    const index = lignes.findIndex((d) => d.saison === m.saison);
+    lignes[index] = {
+      ...lignes[index],
+      possibles: lignes[index].possibles + 1,
+      disponibles: lignes[index].disponibles + (absents.has(j.id) ? 0 : 1),
+      titularisations: lignes[index].titularisations + (m.composition.titulaires.includes(j.id) ? 1 : 0),
+    };
+    profilsMedicaux[j.id] = { ...profil, disponibilites: lignes,
+      fatigue: borne(profil.fatigue + (joue ? (m.composition.titulaires.includes(j.id) ? 15 : 8) : -7)),
+      condition: borne(profil.condition + (joue ? -3 : 2)), rythme: borne(profil.rythme + (joue ? 5 : -1)) };
   }
 
   const actifs = new Set(medical.filter((d) => d.phase !== 'clos').map((d) => d.joueurId));
@@ -879,17 +1051,28 @@ function actualiserContratsJoueurs(a: EtatCarriereAvancee, m: Manager, effectif:
     const attendu = c.role === 'cadre' ? .68 : c.role === 'rotation' ? .32 : .14;
     const satisfaction = borne(c.satisfaction + (part - attendu) * 5 + ((a.vestiaire[j.id]?.satisfaction ?? 55) - 55) * .035);
     const valeurSportive = Math.max(0, j.note - force) * 10 + Math.max(0, j.potentiel - j.note) * 3;
-    const finProche = c.fin <= m.saison + 1 ? 18 : 0;
+    // ⚠️ LA FIN DE CONTRAT SE LIT EN MOIS, PAS EN SAISONS. Un « fin de contrat
+    // la saison prochaine » traitait de la même façon un joueur à dix-huit mois
+    // et un joueur à quatre : l'un est tranquille, l'autre est à deux semaines
+    // de pouvoir signer ailleurs. Les paliers de `palierContrat` commandent
+    // maintenant la pression du marché comme le texte de l'écran.
+    const mois = moisRestantsContrat(c.fin, m.saison, semaineSuivante);
+    const palier = palierContrat(mois);
+    const finProche = palier === 'libre' ? 34 : palier === 'danger' ? 26 : palier === 'reflexion' ? 16 : palier === 'discussions' ? 7 : 0;
     const interetExterieur = borne(c.interetExterieur * .72 + valeurSportive + finProche + Math.max(0, 45 - satisfaction) * .35);
     const rng = graine(`offres-contrat#${j.id}#${m.saison}#${semaineSuivante}`);
     const fenetre = [7, 15, 23, 31, 39].includes(semaineSuivante);
-    const nouvellesOffres = fenetre && rng() < interetExterieur / 140 ? 1 : 0;
+    // À six mois, les prétendants ne se contentent plus de regarder.
+    const appetit = palier === 'danger' || palier === 'libre' ? 95 : 140;
+    const nouvellesOffres = fenetre && rng() < interetExterieur / appetit ? 1 : 0;
     const niveau = competitionDuClub(m.club)?.niveau ?? 8;
     const marche = niveau > 3 ? 0 : salaire(niveau, j.note - force, j.age);
     const explosion = j.age <= 27 && part >= .55 && j.note >= force + 2;
     contrats[j.id] = { ...c, nom: j.nom, club: m.club, satisfaction, interetExterieur,
+      attachement: evoluerAttachement(c, m, j, a.vestiaire[j.id], part),
       offresExterieures: Math.min(5, c.offresExterieures + nouvellesOffres),
-      demandeRevalorisation: c.demandeRevalorisation || (explosion && c.salaire < marche * .88) || (c.fin <= m.saison + 1 && interetExterieur >= 62) };
+      demandeRevalorisation: c.demandeRevalorisation || (explosion && c.salaire < marche * .88)
+        || ((palier === 'danger' || palier === 'reflexion') && interetExterieur >= 62) };
   }
   return contrats;
 }
@@ -899,10 +1082,19 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
   const avantMedical = a.medical.map(normaliserDossier);
   let medical = avantMedical.map(faireEvoluerDossier);
   const profilsMedicaux = { ...a.profilsMedicaux };
+  const soignes = new Set(avantMedical.filter((d) => d.phase !== 'clos' && (d.disponibilite ?? 0) < 100).map((d) => d.joueurId));
   for (const j of effectif) {
     const profil = profilsMedicaux[j.id] ?? profilMedicalInitial(j);
     const charge = Math.max(0, chargePourJoueur(a.chargeEntrainement, j) + (m.entrainements.includes(j.nom) ? 1.5 : 0));
-    profilsMedicaux[j.id] = { ...profil, fatigue: borne(profil.fatigue + charge * 1.7 - a.chargeEntrainement.recuperation * 4),
+    const lignes = ligneDisponibilite(profil, m.saison);
+    if (soignes.has(j.id)) {
+      const index = lignes.findIndex((d) => d.saison === m.saison);
+      lignes[index] = { ...lignes[index],
+        semainesBlessees: lignes[index].semainesBlessees + 1,
+        joursBlesse: lignes[index].joursBlesse + 7 };
+    }
+    profilsMedicaux[j.id] = { ...profil, disponibilites: lignes,
+      fatigue: borne(profil.fatigue + charge * 1.7 - a.chargeEntrainement.recuperation * 4),
       condition: borne(profil.condition + (charge <= 5 ? 2 : charge >= 9 ? -2 : 1)), rythme: borne(profil.rythme + 1) };
   }
   // Une blessure passée laisse enfin une trace durable : récidive et séquelle
@@ -912,8 +1104,12 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
     const profil = profilsMedicaux[d.joueurId];
     if (!profil || profil.historique.some((h) => h.saison === d.saison && h.semaine === d.semaine && h.type === d.type)) continue;
     const sequelle = d.gravite === 'grave' ? 8 : d.gravite === 'moyenne' ? 3 : 1;
+    // Les jours d'absence sont ce que l'écran « Disponibilité » affiche à côté
+    // de chaque blessure : on les fige à la clôture du dossier, à partir de la
+    // semaine où il s'est ouvert.
+    const jours = Math.max(3, (semaineSuivante - d.semaine) * 7);
     profilsMedicaux[d.joueurId] = { ...profil,
-      historique: [...profil.historique, { zone: d.zone, type: d.type, saison: d.saison, semaine: d.semaine, gravite: d.gravite, rechute: !!d.rechute, sequelle }].slice(-24),
+      historique: [...profil.historique, { zone: d.zone, type: d.type, saison: d.saison, semaine: d.semaine, gravite: d.gravite, rechute: !!d.rechute, sequelle, jours }].slice(-24),
       commotions: profil.commotions + (d.zone === 'commotion' ? 1 : 0),
       zones: { ...profil.zones, [d.zone]: borne(profil.zones[d.zone] + sequelle) },
       sequelles: { ...profil.sequelles, [d.zone]: Math.min(30, (profil.sequelles[d.zone] ?? 0) + sequelle) } };
@@ -955,8 +1151,30 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
         competition: affiche.competition.nom, semaine: semaineSuivante } };
     }
   }
+  const contratsJoueurs = actualiserContratsJoueurs(a, m, effectif, semaineSuivante);
+  // ⚠️ L'APPROCHE NAÎT APRÈS LES CONTRATS DE LA SEMAINE, jamais avant : c'est
+  // l'`interetExterieur` fraîchement recalculé qui désigne le convoité. Dans
+  // l'autre ordre, un joueur qui vient d'exploser devait attendre une semaine
+  // de plus pour être remarqué.
+  // ⚠️ UNE OFFRE NE RESTE PAS SUR LA TABLE INDÉFINIMENT. Sans péremption, un
+  // manager qui n'ouvre jamais ses messages bloquait tout le marché : la
+  // condition « une approche à la fois » ne se libérait plus, et plus aucun
+  // club ne venait jamais. Quatre semaines, puis ils vont voir ailleurs.
+  // ⚠️ ET LA SAISON COMPTE AUTANT QUE LES SEMAINES. Au 1er juillet, la semaine
+  // repart à 1 : `semaineSuivante - x.semaine` devient négatif, une approche
+  // laissée ouverte en juin n'expirait donc JAMAIS et bloquait le marché pour
+  // toute la carrière.
+  const perimees = (a.approches ?? []).map((x) => (x.etat === 'ouverte' || x.etat === 'negociation')
+    && (x.saison < m.saison || semaineSuivante - x.semaine >= 4) ? { ...x, etat: 'rompue' as const } : x);
+  const approche = approcheAGenerer(m, effectif, contratsJoueurs, profilsMedicaux, perimees, semaineSuivante);
+  const approches = approche ? [...perimees, approche] : perimees;
+  if (approche) actualites.push(nouvelleActualite({
+    saison: m.saison, semaine: semaineSuivante, categorie: 'transfert', importance: 3, club: m.club,
+    titre: `${approche.club} se positionne sur ${approche.nom}`,
+    texte: `Offre d'ouverture : ${approche.offre.toLocaleString('fr-FR')} € pour ${approche.saisonsRestantes} saison(s) de contrat restantes.`,
+  }));
   a = {
-    ...a, medical, profilsMedicaux, contratsJoueurs: actualiserContratsJoueurs(a, m, effectif, semaineSuivante),
+    ...a, medical, profilsMedicaux, contratsJoueurs, approches,
     convocations: nouvelles, actualites: actualitesBornees(actualites), selection,
     profonde: avancerSemaineProfonde(a.profonde, m, effectif, semaineSuivante),
   };
@@ -1047,7 +1265,11 @@ export function ouvrirRenegociationJoueur(
   };
   const nego = ouvrirNegociationManager(cible, m.saison, m.semaine, {
     nature: revalorisation ? 'revalorisation' : 'prolongation',
-    attachement: contrat.motivations.find((x) => x.type === 'attachement')?.importance ?? 45,
+    // ⚠️ C'EST L'ATTACHEMENT MESURÉ QUI PARLE, pas l'importance déclarée d'une
+    // motivation. Un joueur peut avoir « attachement » en tête de ses
+    // priorités et n'être là que depuis un an : ce qui tempère sa demande,
+    // c'est le lien réellement construit avec CE club.
+    attachement: contrat.attachement,
     satisfaction: contrat.satisfaction, performance: j.note,
     interetExterieur: contrat.interetExterieur + contrat.offresExterieures * 12, risqueMedical,
   });
@@ -1055,13 +1277,31 @@ export function ouvrirRenegociationJoueur(
     motivations: contrat.motivations, nature: revalorisation ? 'revalorisation' : 'prolongation' };
 }
 
-export function signerRenegociationJoueur(a: EtatCarriereAvancee, nego: NegociationManager): EtatCarriereAvancee {
+export function signerRenegociationJoueur(
+  a: EtatCarriereAvancee, nego: NegociationManager,
+  contexte: { semaine?: number; feuilles?: number } = {},
+): EtatCarriereAvancee {
+  const semaine = contexte.semaine ?? 1;
   const contrat = a.contratsJoueurs[nego.joueur.id];
   if (!contrat || nego.nature === 'recrutement') return a;
-  return { ...a, contratsJoueurs: { ...a.contratsJoueurs, [nego.joueur.id]: {
+  // ⚠️ UN STATUT PROMIS EST UNE PROMESSE, PAS UNE ÉTIQUETTE. Signer « cadre »
+  // et laisser le joueur sur le banc doit se payer exactement comme une parole
+  // donnée dans le vestiaire — c'est ce que le système de promesses fait déjà,
+  // il suffisait de l'y brancher. Sans elle, le rôle inscrit au contrat ne
+  // servait qu'à calculer une satisfaction lente et invisible.
+  const promesses = nego.offre.role === 'cadre' && !a.promesses.some((p) => p.joueurId === nego.joueur.id && p.etat === 'active')
+    ? [...a.promesses, {
+      id: `promesse-role-${nego.joueur.id}-${nego.saison}`, joueurId: nego.joueur.id, nom: nego.joueur.nom,
+      type: 'ROLE_PROMISE' as const, date: semaine, echeance: Math.min(43, semaine + 12), objectif: 7,
+      depart: contexte.feuilles ?? 0, progression: 0, etat: 'active' as const,
+    }]
+    : a.promesses;
+  return { ...a, promesses, contratsJoueurs: { ...a.contratsJoueurs, [nego.joueur.id]: {
     ...contrat, debut: nego.saison, fin: nego.saison + nego.offre.duree,
     salaire: nego.offre.salaire, role: nego.offre.role,
     option: nego.offre.option ?? 'aucune', satisfaction: borne(contrat.satisfaction + 14),
+    // Prolonger, c'est aussi choisir de rester : le lien avec le club y gagne.
+    attachement: borne(contrat.attachement + 5),
     demandeRevalorisation: false, offresExterieures: 0, interetExterieur: borne(contrat.interetExterieur - 24),
     derniereNegociation: nego.saison,
   } } };

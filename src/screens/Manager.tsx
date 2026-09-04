@@ -51,8 +51,9 @@ import {
   reconcilerCompositionManager,
 } from '../lib/compositionManager';
 import {
-  assurerEtatCarriereAvancee, chargeTotaleEntrainement, indisponiblesCarriereAvancee,
-  moyenneVestiaire, penalitesMedicales, rapportConnaissance, risqueMedicalJoueur,
+  assurerEtatCarriereAvancee, chargeTotaleEntrainement, disponibiliteJoueur,
+  indisponiblesCarriereAvancee, moisRestantsContrat, moyenneVestiaire, palierContrat,
+  penalitesMedicales, rapportConnaissance, risqueMedicalJoueur,
   risqueMoyenGroupe, joueurAgent,
 } from '../lib/carriereAvancee';
 import { hallOfFameDe, totaux } from '../lib/histoire';
@@ -112,7 +113,7 @@ export function Manager() {
   // Ce que la dernière avance a joué, et pourquoi elle s'est arrêtée. Un saut
   // muet se lit comme un bouton qui n'a rien fait.
   const [avanceFaite, setAvanceFaite] = useState<
-    { semaines: number; arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' } | null
+    { semaines: number; arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche' } | null
   >(null);
   const contacterClub = useGame((s) => s.contacterClubManager);
   const ouvrirMessages = useGame((s) => s.ouvrirMessagesOvale);
@@ -332,10 +333,12 @@ export function Manager() {
   const humeur = humeurDuBoard(manager.confiance);
   const maLigne = classement?.classement.find((l) => l.club === manager.club);
   const sem = semaine(manager.semaine);
+  const approchesEnCours = (avancee?.approches ?? []).filter((a) => a.etat === 'ouverte' || a.etat === 'negociation');
   const actives = manager.negociations.filter((n) => n.etat === 'ouverte' || n.etat === 'accord');
   const dossiersClubs = manager.negociationsClubs.filter((n) => n.etat === 'ouverte' || n.etat === 'accord');
   const demandesOuvertes = manager.demandes.filter((d) => d.etat === 'ouverte');
   const alertesOvale = actives.length + dossiersClubs.length + demandesOuvertes.length
+    + approchesEnCours.length
     + manager.ventes.reduce((total, vente) => total + vente.offres.length, 0);
   const composition = compositionMemo;
   const afficheManager = afficheMemo;
@@ -834,12 +837,22 @@ export function Manager() {
                 <div className="comp-tete"><div><b><Icone nom="signature" taille={16} /> Contrats et marché</b><small>Durée, statut, satisfaction, motivations et concurrence déterminent le rapport de force.</small></div><span className="comp-count">{Object.values(avancee.contratsJoueurs).filter((c) => c.club === manager.club).length}</span></div>
                 <div>{effectifBrut.map((j) => ({ j, c: avancee.contratsJoueurs[j.id] })).filter(({ c }) => c).sort((a, b) => a.c.fin - b.c.fin || b.c.interetExterieur - a.c.interetExterieur).map(({ j, c }) => {
                   const nego = manager.negociations.findLast((n) => n.joueur.id === j.id && n.nature !== 'recrutement');
-                  return <article key={j.id} className={c.demandeRevalorisation ? 'revalorisation' : ''}>
+                  const mois = moisRestantsContrat(c.fin, manager.saison, manager.semaine);
+                  const palier = palierContrat(mois);
+                  const dispo = disponibiliteJoueur(avancee.profilsMedicaux[j.id], manager.saison);
+                  return <article key={j.id} className={`${c.demandeRevalorisation ? 'revalorisation ' : ''}palier-${palier}`}>
                     <span><b>{j.nom}</b><small>{c.role} · fin S{c.fin} · {c.option === 'aucune' ? 'sans option' : `option ${c.option}`}</small></span>
+                    {/* ⚠️ LE COMPTE À REBOURS EST LA VRAIE INFORMATION. « Fin
+                        S4 » ne dit pas s'il faut agir cette semaine ; « 6 mois »
+                        si. Les paliers viennent de `palierContrat`, la seule
+                        définition, et colorent la ligne. */}
+                    <div className={`echeance-contrat ${palier}`}><small>Échéance</small><strong>{mois <= 0 ? 'Libre' : `${mois} mois`}</strong></div>
                     <div><small>Salaire</small><strong>{c.salaire > 0 ? `${nombre(c.salaire)} €` : 'amateur'}</strong></div>
                     <div><small>Satisfaction</small><strong>{c.satisfaction}/100</strong></div>
+                    <div><small>Attachement</small><strong>{c.attachement}/100{c.formeAuClub ? ' · formé ici' : ''}</strong></div>
+                    <div><small>Disponibilité</small><strong>{dispo.possibles ? `${dispo.part}%` : '—'}</strong></div>
                     <div><small>Intérêt extérieur</small><strong>{c.interetExterieur}/100 · {c.offresExterieures} offre(s)</strong></div>
-                    <small className="motivations-contrat">{c.motivations.map((m) => `${m.type} ${m.importance}`).join(' · ')}</small>
+                    <small className="motivations-contrat">{c.motivations.map((m) => `${m.type} ${m.importance}`).join(' · ')}{palier === 'danger' ? ' · les clubs peuvent se positionner librement' : palier === 'libre' ? ' · il part libre en fin de saison' : ''}</small>
                     <button className={c.demandeRevalorisation ? 'danger' : ''} disabled={nego?.etat === 'signee' && nego.saison === manager.saison} onClick={() => ouvrirRenegociationJoueur(j.id)}>{nego?.etat === 'ouverte' || nego?.etat === 'accord' ? 'Reprendre la négociation' : c.demandeRevalorisation ? 'Négocier la revalorisation' : c.fin <= manager.saison + 1 ? 'Prolonger' : 'Ouvrir les discussions'}</button>
                   </article>;
                 })}</div>
@@ -879,6 +892,39 @@ export function Manager() {
                 })}
                 {!dossiersMedicaux.length && <p className="manager-vide-texte">Infirmerie vide.</p>}
               </section>
+
+              {/* ⚠️ LA DISPONIBILITÉ EST UNE PAGE À PART, pas une ligne perdue
+                  dans l'infirmerie. C'est le chiffre qu'on veut voir AVANT de
+                  signer trois ans à un joueur de 32 ans : combien de matchs le
+                  club a joués pendant qu'il était là, combien il en a été
+                  réellement disponible, et ce que ses blessures lui ont coûté
+                  en jours. Tout est compté match par match — jamais estimé. */}
+              <section className="carte disponibilite-manager">
+                <div className="comp-tete"><div><b><Icone nom="resultats" taille={16} /> Disponibilité · trois dernières saisons</b><small>Matchs possibles, matchs réellement disponibles, titularisations et jours perdus. C’est ce bilan que regarde un club avant de garantir un long contrat.</small></div></div>
+                <div className="table-disponibilite-entete"><span>Joueur</span><span>Possibles</span><span>Disponible</span><span>Titulaire</span><span>Jours blessé</span><span>Taux</span></div>
+                {effectifBrut.map((j) => ({ j, d: disponibiliteJoueur(avancee.profilsMedicaux[j.id], manager.saison), p: avancee.profilsMedicaux[j.id] }))
+                  .filter(({ d }) => d.possibles > 0)
+                  .sort((a, b) => a.d.part - b.d.part).slice(0, 20)
+                  .map(({ j, d, p }) => <article key={j.id} className={d.part < 70 ? 'fragile' : d.part < 88 ? 'moyenne' : ''}>
+                    <span><b>{j.nom}</b><small>{j.age} ans · {nomPoste(j.poste)}{p?.commotions ? ` · ${p.commotions} commotion(s)` : ''}</small></span>
+                    <strong>{d.possibles}</strong><strong>{d.disponibles}</strong><strong>{d.titularisations}</strong>
+                    <strong>{d.joursBlesse}</strong>
+                    <em><i><b style={{ width: `${d.part}%` }} /></i>{d.part}%</em>
+                    <small className="historique-blessures">{(p?.historique ?? []).slice(-4).reverse()
+                      .map((h) => `${h.type} — ${h.jours ?? '?'} j`).join(' · ') || 'Aucune blessure enregistrée'}</small>
+                  </article>)}
+                {!effectifBrut.some((j) => disponibiliteJoueur(avancee.profilsMedicaux[j.id], manager.saison).possibles > 0)
+                  && <p className="manager-vide-texte">Le premier match joué ouvrira les compteurs de disponibilité.</p>}
+              </section>
+
+              {!!approchesEnCours.length && <section className="carte approches-manager">
+                <div className="comp-tete"><div><b><Icone nom="monde" taille={16} /> Clubs qui se positionnent</b><small>Ils viennent chercher un joueur que tu n’as pas mis en vente. La réponse se donne dans L’Ovale — et le joueur l’apprendra.</small></div><span className="comp-count">{approchesEnCours.length}</span></div>
+                {approchesEnCours.map((a) => <article key={a.id}>
+                  <span><b>{a.nom}</b><small>{a.club} · {a.division} · {a.saisonsRestantes} saison(s) de contrat</small></span>
+                  <strong>{nombre(a.offre)} €</strong>
+                  <button onClick={() => { setVue('ovale'); ouvrirMessages(); }}>Répondre</button>
+                </article>)}
+              </section>}
 
               {!!convocationsActives.length && <section className="carte convocations-manager"><div className="comp-tete"><b><Icone nom="drapeau" taille={16} /> Absents en sélection</b></div>{convocationsActives.map((c) => <p key={c.id}><b>{c.nom}</b> · {c.nation} · {c.competition}</p>)}</section>}
             </div>

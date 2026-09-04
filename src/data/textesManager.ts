@@ -398,4 +398,5 @@ export const TEXTES_MANAGER: Record<string, Traduction> = {
   'mgr.avanceArret.match': tr('un match t’attend.', 'a match is waiting for you.', 'te espera un partido.', 'ti aspetta una partita.', 'ein Spiel wartet auf dich.', 'um jogo espera por ti.', '試合が待っています。'),
   'mgr.avanceArret.saison': tr('la saison est terminée.', 'the season is over.', 'la temporada ha terminado.', 'la stagione è finita.', 'die Saison ist vorbei.', 'a época terminou.', 'シーズンが終了しました。'),
   'mgr.avanceArret.sansBanc': tr('tu n’as plus de banc.', 'you no longer have a bench.', 'ya no tienes banquillo.', 'non hai più una panchina.', 'du hast keine Bank mehr.', 'já não tens banco.', '指揮を執るクラブがありません。'),
+  'mgr.avanceArret.approche': tr('un club est venu chercher un de tes joueurs.', 'a club has come for one of your players.', 'un club ha venido a por uno de tus jugadores.', 'un club è venuto a prendere un tuo giocatore.', 'ein Verein will einen deiner Spieler.', 'um clube veio buscar um dos teus jogadores.', 'あるクラブが選手の獲得に動きました。'),
 };

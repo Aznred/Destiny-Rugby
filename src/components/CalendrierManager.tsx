@@ -65,6 +65,7 @@ export function CalendrierManager({ onMatch }: { onMatch: () => void }) {
     arrive: 'Date atteinte.', match: 'Un match attend ton coaching.',
     decision: 'Réponds à la décision du club pour continuer.',
     saison: 'Saison clôturée : le nouveau calendrier est prêt.', sansBanc: 'Signe un nouveau banc pour continuer.',
+    approche: 'Un club est venu chercher un de tes joueurs : réponds dans L’Ovale.',
   };
   const lancer = (prochainRendezVous = false) => {
     const r = avancer(prochainRendezVous ? SEMAINES_PAR_SAISON : selection, prochainRendezVous ? false : deleguer);
