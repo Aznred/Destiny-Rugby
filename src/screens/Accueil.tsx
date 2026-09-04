@@ -112,9 +112,9 @@ export function Accueil() {
                     « Commencer » ouvre maintenant une page qui POSE la
                     question et décrit les deux carrières (`screens/Creation`).
 
-                    ⚠️ Et le chantier reste fermé côté joueur ordinaire : le
-                    choix ne s'affiche que si `chantierVisible('manager')`,
-                    exactement comme le bouton qu'il remplace. */}
+                    Le choix entraîneur est maintenant public. Le garde commun
+                    reste là pour pouvoir isoler un futur chantier sans créer
+                    une deuxième logique de navigation. */}
                 <button className="btn primaire grand" onClick={() => setEcran('creation')}>
                   {managerVisible ? t('accueil.commencerChoix') : t('accueil.commencer')}
                 </button>

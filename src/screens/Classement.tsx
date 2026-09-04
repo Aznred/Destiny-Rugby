@@ -322,9 +322,8 @@ export function Classement() {
    * part dans la requête et que changer d’onglet revient page 1.
    */
   type Categorie = 'total' | 'joueur' | 'entraineur' | 'joueurEntraineur';
-  // Tant que le mode est en chantier, le classement public ne doit ni annoncer
-  // ses catégories ni faire remonter une fiche créée pendant les essais du
-  // développeur. Le classement « Joueurs » est alors l'unique vue publique.
+  // Les quatre catégories sont publiques avec le mode entraîneur. Le repli
+  // « Joueurs » reste utile si un futur chantier réactive ce garde central.
   const [categorie, setCategorie] = useState<Categorie>(managerVisible ? 'total' : 'joueur');
   // ⚠️ LE SECOND MEMBRE EST UN NOM D'ICÔNE, plus un emoji : deux des quatre
   // étaient des séquences composées (🧑‍🏫 = personne + ZWJ + école) que Windows

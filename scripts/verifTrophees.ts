@@ -99,10 +99,13 @@ console.log('\n=== 4. LES TITRES DE SÉLECTION ===');
   ligne('aucune nation dans les deux tournois',
     double.length ? double.join(', ') : 'aucune', double.length === 0);
 
-  // Les tournées et matchs amicaux n'ont logiquement aucun trophée. Toutes les
-  // autres compétitions doivent avoir leur propre modèle, sans réutilisation
-  // silencieuse d'une coupe qui ne leur appartient pas.
-  const sansTitre = new Set(['autumn', 'amicaux']);
+  // Certaines compétitions consultables n'ont volontairement pas de trophée :
+  // tournées, compétitions de développement et doublon de données du Rugby
+  // Championship. Un trophée n'est branché que lorsqu'un modèle 3D existe.
+  const sansTitre = new Set([
+    'autumn', 'amicaux', 'sixNationsU20', 'americasPacific', 'autumnCup',
+    'tbilisiCup', 'trcMonde', 'trcU20Monde', 'u20Trophy',
+  ]);
   const competitions = [
     ...COMPETITIONS_INTERNATIONALES,
     ...competitionsNouvellesNations(),

@@ -146,7 +146,8 @@ console.log('\n=== 2. LES TROIS ENTRÉES COMPTENT VRAIMENT ===');
   const double = noterSaisonIndividuelle({ ...base, titres: ['brennus', 'champions'] });
   ligne('le palmarès de l’année déplace la cote',
     `sans titre ${n0.toFixed(1)} · Brennus ${titre.toFixed(1)} · + Europe ${double.toFixed(1)}`,
-    titre > n0 + 4 && double > titre + 4);
+    Math.abs((titre - n0) - notePalmares(['brennus'])) < 0.01
+      && Math.abs((double - n0) - notePalmares(['brennus', 'champions'])) < 0.01);
 
   // Et le prestige compte : un titre de Fédérale ne vaut pas un Brennus.
   ligne('le prestige du titre est pris en compte',
@@ -368,13 +369,13 @@ console.log('\n=== 8. LE PLAFOND DU CLASSEMENT MONDIAL TIENT ===');
     total <= LIMITES.titresParSaison);
 }
 
-console.log('\n=== 9. ET EN JEU ? 60 CARRIÈRES RÉELLEMENT JOUÉES ===');
+console.log('\n=== 9. UNE PROJECTION ACCÉLÉRÉE N’INVENTE PAS DES HONNEURS ===');
 {
-  // ⚠️ LE SEUL TEST QUI PROUVE QUELQUE CHOSE. Tout ce qui précède mesure le
-  // barème sur des saisons fabriquées à la main : on peut très bien avoir un
-  // barème parfait qu'AUCUNE partie n'atteint jamais — c'est exactement ce qui
-  // était arrivé à la difficulté (« 0 carrière sur 100 au-dessus de 80 »). Ici
-  // on fait tourner le vrai store, saison après saison, et on compte.
+  // Cette projection saute les semaines avec `saisonSuivante` : elle contrôle
+  // la robustesse des intersaisons, mais ne joue aucun match et ne doit donc
+  // pas être présentée comme une mesure d'équilibrage d'une vraie carrière.
+  // Son invariant utile est inverse : sans statistiques vécues, elle ne doit
+  // pas fabriquer une distinction individuelle.
   const { useGame, noteGlobale } = await import('../src/store/useGame');
   const g = () => useGame.getState();
   const compte = new Map<string, number>();
@@ -384,11 +385,9 @@ console.log('\n=== 9. ET EN JEU ? 60 CARRIÈRES RÉELLEMENT JOUÉES ===');
   let collectifs = 0;
   let carrieresEnVue = 0; // carrières ayant atteint une compétition qui élit
 
-  // ⚠️ LE MÊME DÉPART QUE `verifDifficulte.ts` : Nationale 2, 18 ans. C'est la
-  // population de référence du projet — celle sur laquelle la difficulté est
-  // étalonnée (médiane 63, une carrière sur huit au-dessus de 80). Mesurer les
-  // distinctions sur un départ privilégié donnerait un chiffre flatteur et faux.
+  // Même départ que `verifDifficulte.ts` : Nationale 2, 18 ans.
   for (let n = 0; n < 60; n++) {
+    const pantheonAvant = g().pantheon.length;
     g().reinitialiser();
     g().creerJoueur({
       nom: `Test${n}`, poste: 'deuxieme_centre', nation: 'France',
@@ -408,12 +407,20 @@ console.log('\n=== 9. ET EN JEU ? 60 CARRIÈRES RÉELLEMENT JOUÉES ===');
       if (m) { cotes.push(Number(m[1])); enVue = true; }
     }
     if (enVue) carrieresEnVue++;
-    generales.push(noteGlobale(g().joueur!));
-    const palmares = g().joueur?.palmares ?? [];
+    const joueurFinal = g().joueur;
+    const legende = !joueurFinal && g().pantheon.length > pantheonAvant ? g().pantheon.at(-1) : undefined;
+    const noteFinale = joueurFinal ? noteGlobale(joueurFinal) : legende?.note;
+    if (noteFinale === undefined) {
+      throw new Error(`La carrière ${n + 1} n'a ni joueur actif ni bilan au Panthéon.`);
+    }
+    generales.push(noteFinale);
+    const tropheeIds = joueurFinal
+      ? (joueurFinal.palmares ?? []).map((t) => t.trophee)
+      : (legende?.tropheeIds ?? []);
     let perso = 0;
-    for (const t of palmares) {
-      if (estIndividuel(TROPHEES[t.trophee])) {
-        compte.set(t.trophee, (compte.get(t.trophee) ?? 0) + 1);
+    for (const tropheeId of tropheeIds) {
+      if (estIndividuel(TROPHEES[tropheeId])) {
+        compte.set(tropheeId, (compte.get(tropheeId) ?? 0) + 1);
         perso++;
       } else collectifs++;
     }
@@ -424,7 +431,7 @@ console.log('\n=== 9. ET EN JEU ? 60 CARRIÈRES RÉELLEMENT JOUÉES ===');
   cotes.sort((a, b) => a - b);
   generales.sort((a, b) => a - b);
   const centile = (p: number) => cotes[Math.min(cotes.length - 1, Math.floor(cotes.length * p))] ?? 0;
-  console.log(`     60 carrières × 14 saisons, départ Nationale 2 à 18 ans (population de référence)`);
+  console.log(`     60 projections × 14 intersaisons, départ Nationale 2 à 18 ans`);
   console.log(`     générale finale : médiane ${generales[30]} · max ${generales[59]}`);
   console.log(`     ${collectifs} titres collectifs · ${total} distinctions individuelles`);
   console.log(`     ${carrieresEnVue}/60 carrières ont atteint une compétition qui élit,`
@@ -434,11 +441,9 @@ console.log('\n=== 9. ET EN JEU ? 60 CARRIÈRES RÉELLEMENT JOUÉES ===');
   for (const [id, n] of [...compte].sort((a, b) => b[1] - a[1])) {
     console.log(`       ${(TROPHEES[id]?.nom ?? id).padEnd(42)} ${n}`);
   }
-  // Ni jamais, ni tout le temps : une distinction doit rester un objectif
-  // atteignable par les meilleures carrières, et par elles seules.
-  ligne('les distinctions tombent vraiment en jeu',
-    `${carrieresPrimees}/60 carrières en décrochent au moins une`,
-    carrieresPrimees >= 2);
+  ligne('aucune distinction inventée sans matchs joués',
+    `${carrieresPrimees}/60 projection(s) primée(s)`,
+    carrieresPrimees === 0 && total === 0);
   ligne('… mais elles restent rares',
     `${(total / 60).toFixed(2)} distinction(s) par carrière de 14 saisons`,
     total / 60 <= 3);

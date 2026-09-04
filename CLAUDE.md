@@ -369,9 +369,9 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
 
 ## Chantiers en cours / dette
 
-- **Le mode entraîneur est encore caché** (`lib/modeDev.ts`, `CHANTIERS`) :
-  visible en `npm run dev` ou avec `?dev=1`. Le retirer de `CHANTIERS` le
-  publiera sans rien réécrire.
+- **Le mode entraîneur est public** : création directe et reconversion sont
+  ouvertes en production. `lib/modeDev.ts` conserve le garde central pour de
+  futurs modules réellement inachevés.
 - **La carrière joueur reste française** à la création ; l'étranger s'atteint
   ensuite par le marché. Les championnats du monde sont surtout du contenu
   consultable pour la carrière joueur.

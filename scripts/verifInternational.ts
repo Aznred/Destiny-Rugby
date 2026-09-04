@@ -6,6 +6,7 @@ import {
 } from '../src/lib/international';
 import { mondialEnDirect } from '../src/lib/mondial';
 import { CALENDRIER } from '../src/data/calendrier';
+import { datesCompetitionInternationale } from '../src/data/calendrierMondial';
 import { simulerJourneeInternationale, simulerJourneeCoupe } from '../src/lib/moteur/saison';
 import type { Joueur } from '../src/types';
 
@@ -96,7 +97,9 @@ console.log('\n=== 7. ⚠️ LA COUPE DU MONDE SE JOUE VRAIMENT ===');
     console.log(`  ${ok ? "✅" : "❌"} ${nom.padEnd(46)} ${valeur}`);
   };
 
-  const SAISONS = [4, 8, 12];
+  // Saison 1 = 2026-2027 : le premier Mondial tombe donc en saison 2,
+  // puis tous les quatre ans (voir `estAnneeDeCoupeDuMonde`).
+  const SAISONS = [2, 6, 10];
   let vainqueurs: string[] = [];
   let sansFinale = 0;
   let nulsEnTableau = 0;
@@ -108,7 +111,7 @@ console.log('\n=== 7. ⚠️ LA COUPE DU MONDE SE JOUE VRAIMENT ===');
   let troisiemesHorsPoule = 0;
 
   for (const saison of SAISONS) {
-    const m = mondialEnDirect(saison, 3);
+    const m = mondialEnDirect(saison, 7);
     // ⚠️ FORMAT 2027 : six poules de QUATRE, en toutes rondes. Chaque nation
     //    joue exactement TROIS matchs, contre ses trois adversaires, une fois
     //    chacun. L’ancien format (4 poules de 6, deux matchs) ne pouvait pas
@@ -146,11 +149,11 @@ console.log('\n=== 7. ⚠️ LA COUPE DU MONDE SE JOUE VRAIMENT ===');
     if (m.vainqueur) vainqueurs.push(m.vainqueur);
   }
 
-  const m4 = mondialEnDirect(4, 3);
-  console.log(`  ${"poules".padEnd(46)} ${m4.poules.map((p) => p.equipes.length).join(" · ")}`);
-  console.log(`  ${"tableau".padEnd(46)} ${m4.bracket.map((f) => f.tour).join(" · ")}`);
-  console.log(`  ${"finale".padEnd(46)} ${m4.bracket.find((f) => f.tour === "finale")?.libelle ?? "aucune"}`);
-  console.log(`  ${"3e place".padEnd(46)} ${m4.troisieme ?? "aucun"}`);
+  const mondialComplet = mondialEnDirect(2, 7);
+  console.log(`  ${"poules".padEnd(46)} ${mondialComplet.poules.map((p) => p.equipes.length).join(" · ")}`);
+  console.log(`  ${"tableau".padEnd(46)} ${mondialComplet.bracket.map((f) => f.tour).join(" · ")}`);
+  console.log(`  ${"finale".padEnd(46)} ${mondialComplet.bracket.find((f) => f.tour === "finale")?.libelle ?? "aucune"}`);
+  console.log(`  ${"3e place".padEnd(46)} ${mondialComplet.troisieme ?? "aucun"}`);
 
   dit(`six poules de quatre, en toutes rondes`,
     poulesIncompletes ? `${poulesIncompletes} anomalie(s)` : `6 poules de 4, 3 matchs chacun`,
@@ -173,9 +176,9 @@ console.log('\n=== 7. ⚠️ LA COUPE DU MONDE SE JOUE VRAIMENT ===');
 
   // ⚠️ ET LE TITRE VA AU VAINQUEUR DE LA FINALE, pas au premier d’un tableau.
   // C’est le chemin exact que suit `resoudreTrophees` (store).
-  const etat = internationalEnDirect('coupeDuMonde', 4, 3, null);
+  const etat = internationalEnDirect('coupeDuMonde', 2, 7, null);
   dit(`le vainqueur du jeu est celui de la finale`,
-    `${etat?.vainqueur ?? "aucun"}`, !!etat?.vainqueur && etat.vainqueur === m4.vainqueur);
+    `${etat?.vainqueur ?? "aucun"}`, !!etat?.vainqueur && etat.vainqueur === mondialComplet.vainqueur);
   // Et une saison ordinaire n’en a pas : c’est la tournée d’automne.
   const auto = internationalEnDirect('autumn', 5, 3, null);
   dit(`une saison ordinaire n’a pas de Mondial`,
@@ -268,8 +271,9 @@ console.log('\n=== 9. ⚠️ LE CLASSEMENT MONDIAL BOUGE, ET SUR LES BONS RÉSUL
   // nation qui gagnait cinq matchs en février après en avoir perdu trois en
   // novembre descendait, et le contrôle criait au bug (1/4). Le test était
   // faux, pas le classement : on borne à la fenêtre qu’on mesure.
-  const avant = classementMondial(2, 22);
-  const apres = classementMondial(2, 30);
+  const datesTournoi = datesCompetitionInternationale('sixNations', 'tournoi', 5, 2);
+  const avant = classementMondial(2, datesTournoi[0]);
+  const apres = classementMondial(2, datesTournoi.at(-1)! + 1);
   const rangDe = (l: typeof avant, n: string) => l.find((x) => x.nation === n)?.points ?? 0;
   // Une nation qui a tout gagné au Tournoi doit avoir MONTÉ.
   const bilans = new Map<string, number>();

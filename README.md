@@ -840,12 +840,9 @@ vérification — est dans [`CLAUDE.md`](CLAUDE.md), sections
 
 ## 🧑‍🏫 Le mode manager — bureau, récit et recrutement
 
-> ⚠️ **CACHÉ POUR L’INSTANT.** Le mode est entier et jouable, mais ses portes
-> d’entrée restent fermées pendant la phase de stabilisation : composition et
-> coaching sont maintenant jouables, mais on ne veut pas qu’un joueur tombe sur
-> un chantier avant sa passe complète de test et le
-> prenne pour un bug. Pour l’ouvrir : `?dev=1` dans l’adresse (voir
-> `src/lib/modeDev.ts`).
+> ✅ **OUVERT À TOUS.** Le mode entraîneur est proposé directement lors de la
+> création d’une partie. Il est également accessible comme reconversion après
+> une carrière joueur, sans option de développement dans l’adresse.
 
 On peut désormais mener une **carrière d’entraîneur**, à côté de la carrière de
 joueur. Elle se lance depuis l’accueil (« 🧑‍🏫 Devenir entraîneur ») ou à la

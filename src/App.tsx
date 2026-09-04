@@ -60,10 +60,9 @@ export default function App() {
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
   const managerVisible = chantierVisible('manager');
-  // Une sauvegarde de chantier peut rester sur l'appareil du développeur.
-  // Tant que le chantier est fermé, elle ne doit compter comme une carrière
-  // active sur AUCUN écran public — mais on la conserve pour la prochaine
-  // session de développement.
+  // Ce filtre reste le garde-fou commun aux futurs chantiers. Le mode manager
+  // est public aujourd'hui, donc une sauvegarde entraîneur compte normalement
+  // comme carrière active sur tous les écrans partagés.
   const managerActif = managerVisible ? manager : null;
   const setEcran = useGame((s) => s.setEcran);
   const tropheesEnAttente = useGame((s) => s.tropheesEnAttente);
@@ -113,9 +112,7 @@ export default function App() {
   useEffect(() => { pageVue(ecran); }, [ecran]);
 
   // Garde-fou : pas d'écran carrière/profil sans joueur, et aucune porte
-  // indirecte vers le chantier manager. Masquer le bouton de l'accueil ne
-  // suffisait pas : une ancienne sauvegarde pouvait encore rouvrir le bureau
-  // depuis la navigation ou les écrans partagés.
+  // indirecte vers une fonctionnalité qui serait remise en chantier.
   useEffect(() => {
     if (
       ((ecran === 'carriere' || ecran === 'profil') && !joueur)

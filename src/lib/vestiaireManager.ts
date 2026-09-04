@@ -268,11 +268,11 @@ export function valeurDeVente(
 /**
  * Qui se manifeste pour un joueur mis sur la liste.
  *
- * Sous la Nationale 2, il n'y a toujours AUCUNE INDEMNITÉ : les clubs amateurs
- * ne s'achètent pas les joueurs. En revanche ils proposent bien un projet au
- * joueur. L'ancienne version confondait « pas de transfert payant » et « aucun
- * départ possible » : le bouton restait grisé pendant toute une carrière
- * amateur et donnait l'impression que le mercato ne fonctionnait pas.
+ * Sous la Nationale 2, les clubs ne versent pas un prix de transfert
+ * professionnel : ils règlent une petite indemnité de formation. L'ancienne
+ * version confondait « pas de gros transfert payant » et « aucun départ
+ * possible » : le bouton restait grisé pendant toute une carrière amateur et
+ * donnait l'impression que le mercato ne fonctionnait pas.
  */
 export function offresPourVente(
   vente: VenteManager, clubVendeur: string, saison: number,

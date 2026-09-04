@@ -610,7 +610,6 @@ export const TROPHEE_PAR_INTERNATIONAL: Record<string, string> = {
   americasChamp: 'americasChamp',
   nationsCupM: 'nationsCup',
   pacificChallenge: 'pacificChallenge',
-  trcMonde: 'rugbyChampionship',
   coupeDuMonde: 'monde',
 };
 

@@ -22,7 +22,9 @@ function verifier(ok: boolean, message: string): void {
 console.log('=== 1. BIBLIOTHÈQUE ===');
 const ids = new Set<string>();
 const categories = new Map<string, number>();
-verifier(SITUATIONS.length === 151, `${SITUATIONS.length} situations (151 attendues)`);
+// Le catalogue s'enrichit régulièrement : on protège son socle sans rendre
+// chaque ajout légitime incompatible avec ce contrôle.
+verifier(SITUATIONS.length >= 151, `${SITUATIONS.length} situations (au moins 151 attendues)`);
 for (const situation of SITUATIONS) {
   verifier(!!situation.id && !ids.has(situation.id), `identifiant unique : ${situation.id}`);
   ids.add(situation.id);

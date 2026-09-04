@@ -288,9 +288,9 @@ function ciblePour(
  * c'est un jour deux vérités — et un manager qui achète 4 M€ ce qu'il revend
  * 900 000 € le lendemain sans que rien n'ait bougé.
  *
- * ⚠️ ET ELLE RENVOIE 0 CHEZ UN AMATEUR. Sous la Nationale 2, le rugby français
- * ne se vend pas de joueurs (demande explicite) : il n'y a rien à encaisser,
- * pas plus qu'il n'y a rien à payer.
+ * Chez un amateur, il ne s'agit pas d'un prix de transfert professionnel mais
+ * d'une indemnité de formation mesurée en milliers d'euros. Elle garde le
+ * marché des divisions de départ vivant sans leur prêter des millions.
  */
 export function valeurMarchande(
   joueur: { note: number; potentiel: number; age: number },

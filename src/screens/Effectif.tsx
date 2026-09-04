@@ -50,6 +50,13 @@ export function Effectif() {
     () => blessuresParJoueur(manager?.avancee?.medical),
     [manager?.avancee?.medical],
   );
+  const semaineManager = manager?.semaine ?? -1;
+  const selectionsActives = useMemo(
+    () => new Map((manager?.avancee?.convocations ?? [])
+      .filter((convocation) => semaineManager >= convocation.debut && semaineManager <= convocation.fin)
+      .map((convocation) => [convocation.joueurId, convocation])),
+    [manager?.avancee?.convocations, semaineManager],
+  );
   const [blessureOuverte, setBlessureOuverte] = useState<string | null>(null);
   const setEcran = useGame((s) => s.setEcran);
 
@@ -229,6 +236,19 @@ export function Effectif() {
                   </span>
                 )}
               </span>
+              {(() => {
+                const convocation = selectionsActives.get(l.id);
+                if (!convocation) return null;
+                return (
+                  <span
+                    className="j-selection"
+                    title={`${t('compo.badge.international')} · ${convocation.nation} · ${convocation.competition}`}
+                  >
+                    <Icone nom="drapeau" taille={13} />
+                    <em>{t('compo.badge.international')}</em>
+                  </span>
+                );
+              })()}
               {(() => {
                 const b = blessures.get(l.id);
                 if (!b) return null;

@@ -2416,6 +2416,13 @@
 .j-note[data-niveau='gris'] { background: rgba(255, 255, 255, 0.08); color: var(--craie-dim); }
 .j-drapeau { flex: none; font-size: 1.05rem; line-height: 1; }
 .j-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.j-selection {
+  display:inline-flex; align-items:center; gap:.3rem; flex:none; padding:.16rem .42rem;
+  border:1px solid rgba(104,174,255,.4); border-radius:999px;
+  background:rgba(64,137,222,.13); color:#91c4ff;
+  font:700 .7rem/1 'Archivo',system-ui,sans-serif;
+}
+.j-selection em { color:inherit; font-style:normal; }
 
 /* ══ LES BLESSURES SE VOIENT DANS L'EFFECTIF ═══════════════════════════════
    Le dossier médical existait (gravité, type, semaines) et la composition
@@ -2458,7 +2465,7 @@
 .j-blessure-detail.grave   { border-left-color: #e2685c; }
 
 @media (max-width: 560px) {
-  .j-blessure em { display: none; }
+  .j-blessure em,.j-selection em { display: none; }
 }
 
 .j-age { color: var(--brume); font-size: 0.82rem; font-variant-numeric: tabular-nums; }

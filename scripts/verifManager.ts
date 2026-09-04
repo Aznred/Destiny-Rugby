@@ -38,7 +38,7 @@ import { ciblesDuMarche } from '../src/lib/recrutementManager';
 import { SEMAINES_PAR_SAISON, horodatageJeu, CALENDRIER } from '../src/data/calendrier';
 import type { LegendeSauvegardee, Manager } from '../src/types';
 import { compositionManagerParDefaut, TACTIQUE_MANAGER_DEFAUT } from '../src/lib/compositionManager';
-import { matchDuClubSemaine, afficheDuClub } from '../src/lib/matchLive';
+import { afficheDuClub } from '../src/lib/matchLive';
 import { rangFinal } from '../src/lib/championnat';
 import { competitionEffective } from '../src/lib/divisions';
 
@@ -402,7 +402,10 @@ console.log('\n=== 6. LA BOUCLE ENTIÈRE, PAR LE STORE ===');
       useGame.getState().repondreDecisionManager(courant.decision.id, courant.decision.choix[0].id);
     }
     const prepare = useGame.getState().manager!;
-    const affiche = matchDuClubSemaine(prepare);
+    // Une saison manager comprend aussi les coupes et phases finales. Ne
+    // regarder que le championnat laissait la simulation bloquée devant un
+    // match obligatoire pourtant invisible au banc d'essai.
+    const affiche = afficheDuClub(prepare);
     if (affiche && !prepare.resultats[affiche.cle]) {
       const semaineAvant = prepare.semaine;
       useGame.getState().semaineManager();

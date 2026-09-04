@@ -3585,13 +3585,9 @@ export const useGame = create<GameState>()(
           // ENTRAÎNEUR » : la légende part au Hall ET reste sous la main de
           // l’écran de création, qui en tire le prestige de départ
           // (`prestigeDepuisJoueur`). Le Hall reste la sortie par défaut.
-          // ⚠️ ET LA PORTE NE S’OUVRE QUE POUR LE DÉVELOPPEUR TANT QUE LE
-          //    MODE EST EN CHANTIER (demande explicite). Sans ce garde, un
-          //    joueur qui choisit « Entraîneur » à la retraite atterrirait sur
-          //    un écran qu’on ne veut pas encore montrer. Le choix reste dans
-          //    la liste : c’était déjà une reconversion NARRATIVE avant ce
-          //    chantier, et la retirer changerait un texte que le joueur
-          //    connaît. Il retombe simplement au Hall, comme les quatre autres.
+          // La reconversion entraîneur est publique. Le garde central demeure
+          // pour qu'une éventuelle remise en chantier fasse retomber proprement
+          // la carrière au Hall, sans casser les anciennes sauvegardes.
           reconversionManager: versManager ? legende : null,
           finCarriere: {
             legendeId: legende.id,
@@ -6278,7 +6274,11 @@ export const useGame = create<GameState>()(
         if (!nouveaux.length) return;
         const gain = nouveaux.reduce((a, s) => a + s.ovas, 0);
         const saisonSucces = joueur?.saison ?? manager!.saison;
-        const semaineSucces = joueur?.semaine ?? manager!.semaine;
+        // `semaine` est facultative sur les anciennes sauvegardes joueur.
+        // Son absence ne signifie pas qu'une carrière entraîneur existe :
+        // l'ancien repli lisait alors `manager.semaine` sur `null` et faisait
+        // planter des actions aussi courantes qu'un post ou un transfert.
+        const semaineSucces = joueur ? (joueur.semaine ?? 1) : manager!.semaine;
         set((s) => ({
           coins: s.coins + gain,
           succesDebloques: {

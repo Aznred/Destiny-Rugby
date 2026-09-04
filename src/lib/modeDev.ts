@@ -1,7 +1,8 @@
 // 🔒 LES CHANTIERS EN COURS — visibles par le développeur, pas par les joueurs.
 //
-// Demande explicite : « cache le mode entraîneur pour l'instant, il doit être
-// accessible que par moi le dev pour voir les bugs etc ».
+// Le mode entraîneur a terminé sa phase privée : il est désormais public et
+// ne figure donc plus dans cette liste. L'interrupteur reste disponible pour
+// de futurs modules réellement inachevés.
 //
 // ⚠️ CE N'EST PAS UNE SÉCURITÉ, ET IL NE FAUT PAS LE PRÉSENTER COMME TELLE.
 // Tout ce qui est livré au navigateur est lisible : quelqu'un de motivé
@@ -10,15 +11,16 @@
 // évite qu'un joueur ordinaire tombe sur un mode inachevé, se demande pourquoi
 // il ne peut pas composer son XV, et le prenne pour un bug.
 //
-// ⚠️ ET IL NE SUPPRIME RIEN. Le mode entraîneur est entièrement là : store,
-// écrans, banc d'essai, classement à catégories. Ce fichier décide si ses
-// PORTES s'affichent, et `App.tsx` bloque aussi les accès indirects provenant
-// d'une ancienne sauvegarde de chantier. Le jour où la couche 2 est prête, on
-// retire `manager` de `CHANTIERS` et tout apparaît — sans rien réécrire.
+// ⚠️ ET IL NE SUPPRIME RIEN. Ce fichier décide seulement si les portes d'une
+// fonctionnalité en chantier s'affichent dans une version publique.
+
+export type Chantier = 'manager';
 
 /** Les fonctionnalités encore en chantier, cachées par défaut. */
-const CHANTIERS = ['manager'] as const;
-export type Chantier = (typeof CHANTIERS)[number];
+const CHANTIERS: readonly Chantier[] = [];
+
+/** Contrat explicite consommé par les contrôles de la version publique. */
+export const MODE_ENTRAINEUR_PUBLIC = !CHANTIERS.includes('manager');
 
 /**
  * Le mode développeur est-il actif ?

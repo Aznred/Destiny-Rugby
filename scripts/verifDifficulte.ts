@@ -5,6 +5,7 @@ import { jouerUneSaison } from './_saison';
 const g = () => useGame.getState();
 let titres = 0, gros = 0, monde = 0; const gens: number[] = [];
 for (let n = 0; n < 100; n++) {
+  const pantheonAvant = g().pantheon.length;
   g().reinitialiser();
   g().creerJoueur({ nom: 'T', poste: 'deuxieme_centre', nation: 'France', club: 'Stade Nantais', division: 'nationale2', age: 18 });
   for (let s = 0; s < 12; s++) {
@@ -15,11 +16,17 @@ for (let n = 0; n < 100; n++) {
     // l'étalonnage de difficulté s'effondre artificiellement.
     jouerUneSaison(g, (p) => useGame.setState(p));
   }
-  const j = g().joueur!;
-  gens.push(noteGlobale(j));
-  titres += j.titres.length;
-  if (j.titres.length >= 3) gros++;
-  if (j.titres.some((t) => t.startsWith('Coupe du monde'))) monde++;
+  const j = g().joueur;
+  const legende = !j && g().pantheon.length > pantheonAvant ? g().pantheon.at(-1) : undefined;
+  const note = j ? noteGlobale(j) : legende?.note;
+  const titresCarriere = j?.titres ?? legende?.titres;
+  if (note === undefined || !titresCarriere) {
+    throw new Error(`La carrière ${n + 1} n'a ni joueur actif ni bilan au Panthéon.`);
+  }
+  gens.push(note);
+  titres += titresCarriere.length;
+  if (titresCarriere.length >= 3) gros++;
+  if (titresCarriere.some((t) => t.startsWith('Coupe du monde'))) monde++;
 }
 gens.sort((a, b) => a - b);
 const partAu = (seuil: number) => gens.filter((g) => g >= seuil).length;

@@ -68,7 +68,7 @@ const PAGES = [
         { titre: 'Décider', texte: 'Consulte les sections match, progression ou marché quand une décision arrive.' },
         { titre: 'Construire', texte: 'Reviens aux conseils de long terme avant l’intersaison et les changements de club.' },
       ] },
-      { encadre: 'La carrière entraîneur est encore masquée dans la version publique pendant sa stabilisation. En développement elle est ouverte automatiquement ; sur une version de test, ajoute `?dev=1` à l’adresse. Le wiki la documente entièrement pour préparer sa sortie.' },
+      { encadre: 'La carrière entraîneur est ouverte à tous. Choisis « Commencer une carrière », puis « Entraîneur », ou poursuis après la retraite d’un joueur en choisissant cette reconversion.' },
     ],
   },
 
@@ -197,7 +197,7 @@ const PAGES = [
         legende: 'Le prestige ouvre les portes, mais ce sont les objectifs, le vestiaire et les résultats qui permettent de rester sur le banc.',
         prioritaire: true,
       },
-      { encadre: 'État actuel : ce mode est complet mais encore masqué au public pendant sa stabilisation. Il est visible automatiquement en développement et via `?dev=1` sur une version de test.' },
+      { encadre: 'Ce mode est désormais public : depuis l’accueil, choisis « Commencer une carrière », puis « Entraîneur ». Aucune option de développement n’est nécessaire.' },
 
       { h2: 'La boucle complète en un regard', id: 'boucle-entraineur' },
       { parcours: [
