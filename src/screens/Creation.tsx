@@ -163,7 +163,7 @@ export function Creation() {
       division.clubs.map((c) => ({
         valeur: c.nom,
         label: c.nom,
-        sous: c.ville,
+        sous: c.ville ? `${c.ville}${c.departementNum ? ` (${c.departementNum})` : ''}` : undefined,
         vignette: <Blason club={c} taille={26} />,
       })),
     [division],

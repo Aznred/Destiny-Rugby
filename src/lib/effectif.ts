@@ -457,11 +457,11 @@ function effectifDesNouvellesLigues(
 }
 
 // ---------------------------------------------------------------------------
-// EFFECTIFS AMATEURS (Nationale 2 → Régionale 3)
-// Les données fournies donnent le NOM et le POSTE réels des 12 086 licenciés,
-// mais ni âge ni note : on les tire de façon déterministe (seed = club + nom)
-// autour du niveau de la division. Le vieillissement, la retraite et les regens
-// suivent exactement la même mécanique que les effectifs pros.
+// EFFECTIFS FFR (Nationale → Régionale 3)
+// La base Mon Club House donne les 73 999 licenciés masculins de rugby
+// compétition. Elle ne fournit ni âge ni poste pour les nouveaux venus : le
+// poste est réparti de façon équilibrée et l'âge est tiré de façon déterministe
+// (seed = club + nom). Les quelques postes déjà connus sont conservés.
 // ---------------------------------------------------------------------------
 interface JoueurAmateur { nom: string; poste: FamillePoste | null }
 
@@ -619,9 +619,9 @@ export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
   ))));
 }
 
-// Un groupe doit pouvoir aligner un XV et son banc. Les données réelles vont de
-// 11 joueurs (Canterbury) à 113 (certains clubs régionaux) : quand il en manque,
-// le club complète avec des joueurs inventés, poste par poste.
+// Un groupe doit pouvoir aligner un XV et son banc. Quand une source publique
+// fournit moins de 26 joueurs, le club ajoute uniquement les renforts inventés
+// qui lui manquent, poste par poste.
 const EFFECTIF_MINIMUM = 26;
 
 function completerEffectif(
@@ -684,8 +684,10 @@ function effectifBrut(nomClub: string, saison: number): Coequipier[] {
 function construireEffectif(nomClub: string, saison: number): Coequipier[] {
   const division = competitionDuClub(nomClub);
   const niveau = division?.niveau ?? 6;
-  if (EFFECTIFS_REELS[nomClub]) return effectifReel(nomClub, saison, niveau);
+  // Les données FFR 2026-2027 passent avant l'ancienne base 2025-2026 pour les
+  // clubs de Nationale qui viennent de monter, descendre ou changer d'effectif.
   if (EFFECTIFS_AMATEURS[nomClub]) return effectifAmateur(nomClub, saison, niveau);
+  if (EFFECTIFS_REELS[nomClub]) return effectifReel(nomClub, saison, niveau);
   const nouveau = effectifNouveau(nomClub);
   if (nouveau) return effectifDesNouvellesLigues(nomClub, saison, nouveau);
   // Un club français dont la source amateur ne donne aucun licencié : effectif

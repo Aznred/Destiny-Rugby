@@ -6,7 +6,7 @@
 // les liens, les réputations, les records et les choix politiques qui donnent
 // une couleur différente à deux sauvegardes de trente saisons.
 
-import { competitionDuClub } from '../data/clubs';
+import { clubParNom, competitionDuClub } from '../data/clubs';
 import { distanceKm, positionDuClub } from '../data/geographie';
 import { POSTE_PAR_ID } from '../data/rugby';
 import type { Manager, PosteId, ResultatMatchManager, TactiqueManager } from '../types';
@@ -509,15 +509,39 @@ function profilApresMatch(profil: ProfilTactiqueManager, tactique: TactiqueManag
   };
 }
 
-export function contexteDerby(clubA: string, clubB: string): { derby: boolean; distance: number; motivation: number; pression: number; medias: number } {
+export function contexteDerby(clubA: string, clubB: string): {
+  derby: boolean;
+  distance: number;
+  type: 'local' | 'departemental' | 'regional' | null;
+  libelle: string;
+  motivation: number;
+  pression: number;
+  medias: number;
+} {
   // ⚠️ UNE DISTANCE N'EST PAS UN ALÉA. L'ancienne version tirait un nombre
   // stable à partir des deux noms : Toulouse–Montpellier pouvait ainsi devenir
   // un « derby à 16 km ». La géographie du centre de formation possède déjà
   // les coordonnées réelles des villes connues et un repli déterministe pour
   // les villages ; le match doit lire cette même source de vérité.
   const distance = distanceKm(positionDuClub(clubA), positionDuClub(clubB));
-  const derby = distance <= 55;
-  return { derby, distance, motivation: derby ? 2 : 0, pression: derby ? 18 : 0, medias: derby ? 24 : 0 };
+  const a = clubParNom(clubA);
+  const b = clubParNom(clubB);
+  const memeDepartement = !!a?.departementNum && a.departementNum === b?.departementNum;
+  const memeLigue = !!a?.ligue && a.ligue === b?.ligue;
+  const type = distance <= 55 ? 'local'
+    : memeDepartement && distance <= 95 ? 'departemental'
+      : memeLigue && distance <= 120 ? 'regional'
+        : null;
+  const intensite = type === 'local' ? 3 : type === 'departemental' ? 2 : type === 'regional' ? 1 : 0;
+  return {
+    derby: type !== null,
+    distance,
+    type,
+    libelle: type === 'local' ? 'Derby local' : type === 'departemental' ? 'Derby départemental' : type === 'regional' ? 'Derby régional' : '',
+    motivation: intensite,
+    pression: intensite * 8,
+    medias: intensite * 10,
+  };
 }
 
 function ajouterMotif(supporters: SupportersClub, texte: string, delta: number, m: Manager): SupportersClub {

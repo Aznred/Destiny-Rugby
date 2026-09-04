@@ -6,26 +6,22 @@
 // joueur de 16 ans ne va pas forcément faire 1h30 de route trois fois par
 // semaine ».
 //
-// Les deux ont besoin de la même chose : une POSITION. Le jeu n'en avait
-// aucune — `Club` porte un `ville?` pour 370 clubs sur 756, et rien d'autre.
+// Les deux ont besoin de la même chose : une POSITION.
 //
 // ⚠️ CE QUI EST EXACT ET CE QUI NE L'EST PAS, DIT FRANCHEMENT.
 //
-//   · Les 13 régions, leurs centres et leur POIDS RUGBY sont réels : la
+//   · Les régions, leurs centres et leur POIDS RUGBY sont réels : la
 //     répartition des licenciés FFR est massivement concentrée dans le
 //     Sud-Ouest, et c'est elle qui fait qu'un vivier occitan sort plus de
 //     joueurs qu'un vivier normand.
-//   · `VILLES` porte les COORDONNÉES RÉELLES des villes de rugby
-//     reconnaissables — tout le Top 14, la Pro D2, la Nationale, la
-//     Nationale 2, la Fédérale 1 et l'essentiel des Fédérale 2. C'est là que
-//     se joue la concurrence dont parle la demande, donc c'est là qu'il
-//     fallait être juste au kilomètre près.
-//   · **Les clubs de village non listés sont placés par TIRAGE**, pondéré par
-//     le poids rugby de chaque région. La répartition d'ensemble est donc
-//     correcte — dense dans le Sud-Ouest, clairsemée en Bretagne — mais un
-//     club pris isolément peut être ailleurs qu'en vrai. On ne prétend pas le
-//     contraire, et le jeu ne montre jamais « région » comme un fait : il
-//     montre une DISTANCE, qui est ce dont la mécanique a besoin.
+//   · Les clubs importés de Nationale à Régionale 3 portent directement leur
+//     commune, leur département, leur ligue et les coordonnées FFR : leurs
+//     distances ne sont donc plus estimées.
+//   · `VILLES` conserve les coordonnées réelles des clubs professionnels et
+//     étrangers déjà reconnus par le jeu.
+//   · Le tirage déterministe ne sert plus que de repli lorsqu'aucune de ces
+//     deux sources ne fournit une position. La ligue FFR, si elle est connue,
+//     impose alors au moins la bonne région.
 //
 // ⚠️ ET LE TIRAGE EST DÉTERMINISTE (graine = nom du club). Un club ne
 // déménage pas parce qu'on relance le jeu, et rien n'a besoin d'être
@@ -70,6 +66,8 @@ export const REGIONS: RegionRugby[] = [
   { id: 'centrevaldeloire', nom: 'Centre-Val de Loire', lat: 47.50, lon: 1.70, rayon: 135, poids: 3, qualite: -1.0 },
   { id: 'normandie', nom: 'Normandie', lat: 49.10, lon: 0.10, rayon: 125, poids: 3, qualite: -1.1 },
   { id: 'corse', nom: 'Corse', lat: 42.15, lon: 9.10, rayon: 60, poids: 0.5, qualite: -2.0 },
+  { id: 'reunion', nom: 'La Réunion', lat: -21.13, lon: 55.53, rayon: 45, poids: 0.1, qualite: -1.2 },
+  { id: 'nouvellecaledonie', nom: 'Nouvelle-Calédonie', lat: -22.27, lon: 166.45, rayon: 90, poids: 0.1, qualite: -0.6 },
 ];
 
 export function region(id: string): RegionRugby {
@@ -456,6 +454,28 @@ export function cleLieu(nom: string): string {
     .trim();
 }
 
+const REGION_PAR_LIGUE: Record<string, string> = {
+  'auvergne rhone alpes': 'auvergnerhonealpes',
+  'bourgogne franche comte': 'bourgognefranchecomte',
+  bretagne: 'bretagne',
+  'centre val de loire': 'centrevaldeloire',
+  corse: 'corse',
+  'grand est': 'grandest',
+  'hauts de france': 'hautsdefrance',
+  'ile de france': 'iledefrance',
+  normandie: 'normandie',
+  'nouvelle aquitaine': 'nouvelleaquitaine',
+  occitanie: 'occitanie',
+  'pays de la loire': 'paysdelaloire',
+  'provence alpes cote d azur': 'paca',
+  reunion: 'reunion',
+  'nouvelle caledonie': 'nouvellecaledonie',
+};
+
+function regionDeLigue(ligue?: string): string | undefined {
+  return ligue ? REGION_PAR_LIGUE[cleLieu(ligue)] : undefined;
+}
+
 export interface PositionClub {
   region: string;
   lat: number;
@@ -503,6 +523,17 @@ export function positionDuClub(nomDuClub: string): PositionClub {
   // Rochelle. Un point d'entrée unique, qui prend toujours le nom du club, rend
   // ce désaccord impossible.
   const fiche = clubParNom(nomDuClub);
+  if (Number.isFinite(fiche?.latitude) && Number.isFinite(fiche?.longitude)) {
+    const lat = fiche!.latitude!;
+    const lon = fiche!.longitude!;
+    const idRegion = regionDeLigue(fiche?.ligue)
+      ?? [...REGIONS].sort((a, b) => (
+        (a.lat - lat) ** 2 + (a.lon - lon) ** 2 - ((b.lat - lat) ** 2 + (b.lon - lon) ** 2)
+      ))[0].id;
+    const exacte = { region: idRegion, lat, lon, place: true };
+    cache.set(nomDuClub, exacte);
+    return exacte;
+  }
   const cle = cleLieu(fiche?.ville ?? nomDuClub);
   const villeReconnue = INDEX_VILLES.find(([k]) => cle.includes(k));
   let pos: PositionClub;
@@ -512,12 +543,15 @@ export function positionDuClub(nomDuClub: string): PositionClub {
     pos = { region: idRegion, lat, lon, place: true };
   } else {
     const rng = graine(`geo#${nomDuClub}`);
-    const total = REGIONS.reduce((s, r) => s + r.poids, 0);
-    let tir = rng() * total;
-    let idRegion = REGIONS[REGIONS.length - 1].id;
-    for (const r of REGIONS) {
-      tir -= r.poids;
-      if (tir <= 0) { idRegion = r.id; break; }
+    let idRegion = regionDeLigue(fiche?.ligue);
+    if (!idRegion) {
+      const total = REGIONS.reduce((s, r) => s + r.poids, 0);
+      let tir = rng() * total;
+      idRegion = REGIONS[REGIONS.length - 1].id;
+      for (const r of REGIONS) {
+        tir -= r.poids;
+        if (tir <= 0) { idRegion = r.id; break; }
+      }
     }
     const r = region(idRegion);
     const angle = rng() * Math.PI * 2;

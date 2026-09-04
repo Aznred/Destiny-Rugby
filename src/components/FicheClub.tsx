@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { effectifDuClub, forceEffectif, noteDuClub, estEspoir, estDeclinant } from '../lib/effectif';
 import { aEffectifReel } from '../data/effectifsReels';
+import { EFFECTIFS_AMATEURS } from '../data/amateurs';
 import { generationDuClub, libelleGeneration } from '../lib/generations';
 import { POSTES, nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
@@ -29,7 +30,7 @@ export function FicheClub({
   const effectif = useMemo(() => effectifDuClub(club.nom, saison), [club.nom, saison]);
   const noteClub = noteDuClub(club.nom);
   const force = Math.round(forceEffectif(club.nom, saison));
-  const reel = aEffectifReel(club.nom);
+  const reel = aEffectifReel(club.nom) || club.nom in EFFECTIFS_AMATEURS;
   const gen = generationDuClub(club.nom, saison, noteDuClub(club.nom));
   const generation = libelleGeneration(gen);
 
@@ -58,7 +59,7 @@ export function FicheClub({
           <Blason club={club} taille={56} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="eyebrow">
-              {competition ?? t('fc.club')}{club.ville ? ` · ${club.ville}` : ''} · {t('gen.saison')} {saison}
+              {competition ?? t('fc.club')}{club.ville ? ` · ${club.ville}` : ''}{club.departementNum ? ` (${club.departementNum})` : ''} · {t('gen.saison')} {saison}
             </div>
             <h2>{club.nom}</h2>
             <p className="fiche-club-stats">

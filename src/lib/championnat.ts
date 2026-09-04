@@ -12,6 +12,7 @@
 import { forceEffectif } from './effectif';
 import { clubsDeDivision } from './divisions';
 import { CALENDRIER, NB_JOURNEES, type Semaine, type TypeSemaine } from '../data/calendrier';
+import { clubParNom } from '../data/clubs';
 
 export interface MatchChampionnat {
   domicile: string;
@@ -123,13 +124,98 @@ export function totalWeekEnds(divisionId: string): number {
   return CALENDRIER.filter((s) => types.includes(s.type)).length;
 }
 
+function distanceEntreClubs(a: string, b: string): number {
+  const ca = clubParNom(a);
+  const cb = clubParNom(b);
+  if (!Number.isFinite(ca?.latitude) || !Number.isFinite(ca?.longitude)
+    || !Number.isFinite(cb?.latitude) || !Number.isFinite(cb?.longitude)) return Number.POSITIVE_INFINITY;
+  const rad = (degres: number) => degres * Math.PI / 180;
+  const dLat = rad(cb!.latitude! - ca!.latitude!);
+  const dLon = rad(cb!.longitude! - ca!.longitude!);
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(rad(ca!.latitude!)) * Math.cos(rad(cb!.latitude!)) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** Forme des groupes équilibrés en prenant, autour d'un club, ses voisins. */
+function decouperGeographiquement(noms: string[]): string[][] {
+  if (noms.length <= TAILLE_POULE_MAX) return [[...noms]];
+  const nombrePoules = Math.ceil(noms.length / TAILLE_POULE);
+  const tailleBase = Math.floor(noms.length / nombrePoules);
+  const grandes = noms.length % nombrePoules;
+  const restants = [...noms].sort((a, b) => {
+    const ca = clubParNom(a);
+    const cb = clubParNom(b);
+    return (ca?.longitude ?? 999) - (cb?.longitude ?? 999)
+      || (ca?.latitude ?? 999) - (cb?.latitude ?? 999)
+      || a.localeCompare(b, 'fr');
+  });
+  const poules: string[][] = [];
+  for (let numero = 0; numero < nombrePoules; numero++) {
+    const taille = tailleBase + (numero < grandes ? 1 : 0);
+    const tete = restants.shift();
+    if (!tete) break;
+    const voisins = restants
+      .map((club) => ({ club, distance: distanceEntreClubs(tete, club) }))
+      .sort((a, b) => a.distance - b.distance || a.club.localeCompare(b.club, 'fr'))
+      .slice(0, Math.max(0, taille - 1))
+      .map(({ club }) => club);
+    const retenus = new Set(voisins);
+    poules.push([tete, ...voisins]);
+    for (let i = restants.length - 1; i >= 0; i--) {
+      if (retenus.has(restants[i])) restants.splice(i, 1);
+    }
+  }
+  return poules;
+}
+
+/** Une ligue isolée peut n'avoir qu'un à trois clubs à cet échelon (Corse). */
+function rattacherPetitesPoules(poulesInitiales: string[][]): string[][] {
+  const poules = poulesInitiales.map((poule) => [...poule]);
+  for (;;) {
+    const index = poules.findIndex((poule) => poule.length <= 3);
+    if (index < 0 || poules.length <= 1) return poules;
+    const petite = poules[index];
+    let cible = -1;
+    let meilleureDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < poules.length; i++) {
+      if (i === index || poules[i].length + petite.length > TAILLE_POULE_MAX) continue;
+      const distance = Math.min(...petite.flatMap((a) => poules[i].map((b) => distanceEntreClubs(a, b))));
+      if (distance < meilleureDistance) {
+        meilleureDistance = distance;
+        cible = i;
+      }
+    }
+    if (cible < 0) return poules;
+    poules[cible].push(...petite);
+    poules.splice(index, 1);
+  }
+}
+
 // TOUTES les poules d'une division. Une division de 12 à 16 clubs n'en a
-// qu'une ; les grandes divisions amateurs sont découpées en poules de 12,
-// dans l'ordre du fichier (donc géographique).
+// qu'une. Les autres sont regroupées avec les coordonnées FFR : un club joue
+// donc contre ses vrais voisins plutôt que contre les onze lignes suivantes
+// d'un fichier. En régionale, chaque ligue est traitée séparément ; seuls les
+// groupes isolés de trois clubs ou moins rejoignent la poule jouable la plus
+// proche.
 export function poulesDe(divisionId: string): string[][] {
   const noms = clubsDeDivision(divisionId);
   if (!noms.length) return [];
   if (noms.length <= TAILLE_POULE_MAX) return [noms];
+  if (estAmateur(divisionId)) {
+    if (divisionId.startsWith('reg')) {
+      const parLigue = new Map<string, string[]>();
+      for (const nom of noms) {
+        const ligue = clubParNom(nom)?.ligue ?? 'sans-ligue';
+        if (!parLigue.has(ligue)) parLigue.set(ligue, []);
+        parLigue.get(ligue)!.push(nom);
+      }
+      return rattacherPetitesPoules([...parLigue.entries()]
+        .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+        .flatMap(([, clubs]) => decouperGeographiquement(clubs)));
+    }
+    return decouperGeographiquement(noms);
+  }
   const poules: string[][] = [];
   for (let i = 0; i < noms.length; i += TAILLE_POULE) poules.push(noms.slice(i, i + TAILLE_POULE));
   // Une poule résiduelle de 1 ou 2 clubs ne veut rien dire : on la reverse

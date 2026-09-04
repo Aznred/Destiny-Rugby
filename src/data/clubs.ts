@@ -1,15 +1,14 @@
-// Base de données des clubs et championnats — saison 2025-2026.
+// Base de données des clubs et championnats.
 //
 // • Top 14 / Pro D2 / Nationale et TOUS les championnats du monde couverts par
 //   la base réelle viennent du fichier GÉNÉRÉ `mondeReel.ts` (effectifs réels,
 //   classements de la saison passée, logos officiels).
-// • Nationale 2 / Fédérale 1-2-3 restent des listes FFR saisies à la main :
-//   la base ne descend pas jusque-là. Leurs blasons sont générés (initiales +
-//   couleurs), les autres affichent leur vrai logo.
+// • Nationale → Régionale 3 : composition 2026-2027, communes, départements
+//   et coordonnées importés de Mon Club House FFR (`amateurs.ts`).
 
 import type { Club, Competition } from '../types';
 import { COMPETITIONS_REELLES } from './mondeReel';
-import { CLUBS_REGIONAUX, LOGO_AMATEUR } from './amateurs';
+import { CLUBS_AMATEURS, CLUBS_REGIONAUX, LOGO_AMATEUR, type ClubAmateurFfr } from './amateurs';
 import { COMPETITIONS_NOUVELLES } from './nouvellesLigues';
 import { CODE_PAR_NATION } from './nations';
 
@@ -41,6 +40,31 @@ function club(nom: string, ville?: string): Club {
   // ses vrais écussons ; le blason généré ne sert plus que de repli.
   const logo = LOGO_AMATEUR[nom];
   return { nom, ville, c1, c2, ...(logo ? { logo } : {}) };
+}
+
+/** Transforme une fiche FFR en club du jeu sans perdre sa géographie. */
+function clubFfr(fiche: ClubAmateurFfr): Club {
+  const { c1, c2 } = couleurs(fiche.nom);
+  return {
+    nom: fiche.nom,
+    ville: fiche.ville,
+    departement: fiche.departement,
+    departementNum: fiche.departementNum,
+    codePostal: fiche.codePostal,
+    ligue: fiche.ligue,
+    latitude: fiche.latitude,
+    longitude: fiche.longitude,
+    structureId: fiche.structureId,
+    ffrCode: fiche.ffrCode,
+    c1,
+    c2,
+    ...(fiche.logo ? { logo: fiche.logo } : {}),
+  };
+}
+
+function clubsFfr(id: string, repli: Club[] = []): Club[] {
+  const liste = CLUBS_AMATEURS[id];
+  return liste?.length ? liste.map(clubFfr) : repli;
 }
 
 // Mots gardés en MAJUSCULES lors du reformatage des noms officiels FFR.
@@ -416,23 +440,18 @@ UNION SPORTIVE VICQUOISE XV|Vic-en-Bigorre
 XV ERDRE|XV de l'Erdre
 `);
 
-// ---------- FRANCE — divisions régionales (données fournies) ----------
-// Les clubs de Régionale 1-2-3 viennent du fichier généré `amateurs.ts` : on
-// n'a que leur nom et leur logo, la ville n'est pas dans la source.
+// ---------- FRANCE — divisions régionales (données FFR) ----------
 function regionale(id: string): Club[] {
-  return (CLUBS_REGIONAUX[id] ?? []).map((c) => {
-    const { c1, c2 } = couleurs(c.nom);
-    return { nom: c.nom, c1, c2, ...(c.logo ? { logo: c.logo } : {}) };
-  });
+  return clubsFfr(id, (CLUBS_REGIONAUX[id] ?? []).map(clubFfr));
 }
 
 // Divisions amateurs françaises : la base pro ne descend pas sous la Nationale,
 // mais les effectifs et les logos amateurs couvrent tout jusqu'à la Régionale 3.
 const AMATEURS: Competition[] = [
-  { id: 'nationale2', nom: 'Nationale 2', pays: 'France', drapeaux: ['fr'], emoji: '🎖️', niveau: 4, zone: 'France', clubs: NATIONALE2 },
-  { id: 'fed1', nom: 'Fédérale 1', pays: 'France', drapeaux: ['fr'], emoji: '🏉', niveau: 5, zone: 'France', clubs: FEDERALE1 },
-  { id: 'fed2', nom: 'Fédérale 2', pays: 'France', drapeaux: ['fr'], emoji: '🏉', niveau: 6, zone: 'France', clubs: FEDERALE2 },
-  { id: 'fed3', nom: 'Fédérale 3', pays: 'France', drapeaux: ['fr'], emoji: '🏉', niveau: 7, zone: 'France', clubs: FEDERALE3 },
+  { id: 'nationale2', nom: 'Nationale 2', pays: 'France', drapeaux: ['fr'], emoji: '🎖️', niveau: 4, zone: 'France', clubs: clubsFfr('nationale2', NATIONALE2) },
+  { id: 'fed1', nom: 'Fédérale 1', pays: 'France', drapeaux: ['fr'], emoji: '🏉', niveau: 5, zone: 'France', clubs: clubsFfr('fed1', FEDERALE1) },
+  { id: 'fed2', nom: 'Fédérale 2', pays: 'France', drapeaux: ['fr'], emoji: '🏉', niveau: 6, zone: 'France', clubs: clubsFfr('fed2', FEDERALE2) },
+  { id: 'fed3', nom: 'Fédérale 3', pays: 'France', drapeaux: ['fr'], emoji: '🏉', niveau: 7, zone: 'France', clubs: clubsFfr('fed3', FEDERALE3) },
   { id: 'reg1', nom: 'Régionale 1', pays: 'France', drapeaux: ['fr'], emoji: '🥉', niveau: 8, zone: 'France', clubs: regionale('reg1'), note: 'Le premier échelon régional : le vrai rugby du dimanche.' },
   { id: 'reg2', nom: 'Régionale 2', pays: 'France', drapeaux: ['fr'], emoji: '🥉', niveau: 9, zone: 'France', clubs: regionale('reg2') },
   { id: 'reg3', nom: 'Régionale 3', pays: 'France', drapeaux: ['fr'], emoji: '🥉', niveau: 10, zone: 'France', clubs: regionale('reg3'), note: 'Tout en bas de la pyramide, c\'est ici que naissent les légendes.' },
@@ -474,7 +493,9 @@ const NOUVELLES: Competition[] = COMPETITIONS_NOUVELLES.map((c) => ({
 // Toutes les compétitions : les trois divisions professionnelles françaises et
 // les championnats du monde viennent de la base réelle, le reste est saisi ici.
 export const COMPETITIONS: Competition[] = [
-  ...COMPETITIONS_REELLES.filter((c) => c.zone === 'France'),
+  ...COMPETITIONS_REELLES.filter((c) => c.zone === 'France').map((c) => (
+    c.id === 'nationale' ? { ...c, clubs: clubsFfr('nationale', c.clubs) } : c
+  )),
   ...AMATEURS,
   ...COMPETITIONS_REELLES.filter((c) => c.zone === 'Monde'),
   ...NOUVELLES,

@@ -207,7 +207,7 @@ function BlocCompetition({
             <Blason club={club} taille={40} />
             <div style={{ minWidth: 0 }}>
               <div className="club-nom">{club.nom}</div>
-              {club.ville && <div className="club-ville">{club.ville}</div>}
+              {club.ville && <div className="club-ville">{club.ville}{club.departementNum ? ` (${club.departementNum})` : ''}</div>}
             </div>
             {/* ⚠️ LA NOTE DES CLUBS DES NOUVELLES LIGUES MANQUAIT (retour de
                 jeu). L'atlas ne lisait que `NOTE_CLUB_REEL` — les 143 clubs de

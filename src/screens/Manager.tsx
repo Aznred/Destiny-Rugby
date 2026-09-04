@@ -1040,7 +1040,7 @@ export function Manager() {
                   <div className="eyebrow">{libelleAfficheManager(afficheManager, manager.divisionNom)}</div>
                   {derbyMemo?.derby && (
                     <div className="manager-contexte-derby">
-                      <span><Icone nom="flamme" taille={14} /> Derby à {derbyMemo.distance} km</span>
+                      <span><Icone nom="flamme" taille={14} /> {derbyMemo.libelle} · {derbyMemo.distance} km</span>
                       <b>+{derbyMemo.motivation} de motivation</b>
                       <small>Pression {derbyMemo.pression}/100 · exposition médias +{derbyMemo.medias}%</small>
                     </div>

@@ -4,7 +4,7 @@ import { CALENDRIER, SEMAINES_PAR_SAISON } from '../src/data/calendrier';
 import { useGame } from '../src/store/useGame';
 import { afficheDuClub } from '../src/lib/matchLive';
 import { phaseFinale } from '../src/lib/phaseFinale';
-import { championnatEnDirect, nombreJournees, setResultatsJoues } from '../src/lib/championnat';
+import { championnatEnDirect, nombreJournees, pouleDe, setResultatsJoues } from '../src/lib/championnat';
 import { clubsDeDivision, divisionEffective } from '../src/lib/divisions';
 import { oublierResultats, resoudreSaisonClub } from '../src/lib/promotion';
 import { tableauDetectionManager, motifObservationJeune, proposerProjetJeune } from '../src/lib/formationManager';
@@ -63,7 +63,8 @@ for (const division of ['reg3', 'reg2', 'prod2']) {
   const club = manager().club;
   gagnerJusqua(playoffs('barrage'));
   assert.equal(Object.values(manager().resultats).filter((r) => r.cle.startsWith(division + '#')).length,
-    nombreJournees(division, club), 'Chaque journée amateur reste jouable, y compris pendant les dates européennes');
+    (pouleDe(division, club).length - 1) * 2,
+    'Chaque match amateur reste jouable, y compris avec les journées exemptes des poules impaires');
   gagnerJusqua(playoffs('acces'));
   assert.equal(phaseFinale(division, 1, club).champion, club);
   const py = resoudreSaisonClub(division, 1, club);

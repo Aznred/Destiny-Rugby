@@ -531,6 +531,16 @@ export type Ecran =
 export interface Club {
   nom: string;
   ville?: string;
+  /** Données administratives FFR, présentes pour les clubs français importés. */
+  departement?: string;
+  departementNum?: string;
+  codePostal?: string;
+  ligue?: string;
+  /** Coordonnées de la commune du club (pas une position tirée au hasard). */
+  latitude?: number;
+  longitude?: number;
+  structureId?: number;
+  ffrCode?: string;
   c1: string; // couleurs du blason généré (repli quand il n'y a pas de logo)
   c2: string;
   logo?: string; // logo officiel (public/logos/*.png)
