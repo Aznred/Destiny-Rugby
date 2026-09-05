@@ -405,9 +405,10 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   avec décisions du manager, packs, marché, enchères, échanges, coupes maison,
   objectifs, palmarès. Serveur (`serveur/carriereApi.ts` + `api/carriere.ts`),
   écran (`screens/CarriereEnLigne.tsx`) et banc (`npm run verify:carriere`,
-  144 contrôles). **Il reste à appliquer `serveur/schema-carriere.sql` sur
-  Neon** et à poser `CRON_SECRET` ; en local, `vite.config.ts` branche le même
-  gestionnaire sur un fichier JSON, donc le mode se teste entièrement sans base.
+  144 contrôles). **Il reste à déployer la base — marche à suivre complète dans
+  `serveur/MISE-EN-LIGNE.md`** : les trois schémas SQL dans l'ordre puis
+  `CRON_SECRET`. En local, `vite.config.ts` branche le même gestionnaire sur un
+  fichier JSON, donc le mode se teste entièrement sans base.
 
   Les quatre invariants, en une ligne chacun — ils commandent tout le reste :
   1. **Le serveur est la source de vérité.** Le client DEMANDE une action, il ne

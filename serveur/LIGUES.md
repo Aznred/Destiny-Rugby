@@ -649,10 +649,24 @@ relief, une lumière.
 
 ### Déployer la base
 
-Le seul vrai reste avant que le mode soit jouable en ligne : appliquer
-`schema-carriere.sql` sur Neon (marche à suivre dans `VERCEL.md`) et poser
-`CRON_SECRET` pour l'horloge automatique (`/api/carriere?horloge=1`), qui fait
-avancer les matchs des ligues où personne n'est connecté.
+**Marche à suivre complète : [`MISE-EN-LIGNE.md`](MISE-EN-LIGNE.md).**
+
+En deux lignes : appliquer `schema-vercel.sql`, puis `schema-ligues.sql`, puis
+`schema-carriere.sql` — ⚠️ **dans cet ordre**, le dernier ajoutant une colonne à
+la table `comptes` créée par le deuxième — et poser `CRON_SECRET` pour l'horloge
+(`/api/carriere?horloge=1`), déclarée dans `vercel.json`.
+
+> ⚠️ **L'horloge n'est PAS ce qui fait avancer les matchs.** Une ligue avance à
+> chaque LECTURE : dès que quelqu'un ouvre l'écran, les rencontres dont la
+> fenêtre s'est fermée se jouent, les Ovas tombent, les enchères se closent. Le
+> cron ne sert qu'au cas où personne n'ouvre le jeu pendant des jours. Un
+> passage par nuit suffit donc — ce que le plan Hobby de Vercel autorise
+> exactement (une exécution par jour).
+
+Mesuré à froid : **1,1 s** de démarrage (774 ms de modules, 357 ms pour bâtir le
+catalogue de 78 083 joueurs) et **3,7 Mo** de données embarquées dans la
+fonction. Très en dessous des limites de Vercel ; la première ouverture de la
+journée paraît un peu lente, ensuite l'instance reste chaude.
 
 ### ⚠️ La dette de doublon — neuf modules qui ne servent plus qu'à leur banc
 
