@@ -24,6 +24,16 @@
 - **Les packs tirent dans le vivier réel** — 78 083 joueurs, du Top 14 à la
   Régionale 3 et seize championnats étrangers. 26 joueurs à 88+ dans tout le
   jeu, et **un joueur n'existe qu'une fois par ligue**.
+- **Vingt-trois packs, en quatre rayons** : le volume (dont Or et Élite
+  garantis), le poste (première ligne, charnière, finisseurs…), le championnat
+  (Top 14, Japon, Îles du Pacifique, Terroir) et la génération. La garantie se
+  tient sur la DERNIÈRE carte, pour qu'elle reste invisible quand le hasard a
+  déjà fait le travail.
+- **Un calendrier** : le prochain match avec l'heure d'ouverture de sa fenêtre,
+  le compte à rebours, l'agenda du club, les prochaines journées de toute la
+  ligue — et des rappels par notification tant que le jeu est ouvert.
+- **Le créateur fixe les Ovas de départ**, de 0 à 100 000. Le plafond n'est pas
+  décoratif : c'est le seul robinet d'Ovas qu'il ouvre lui-même.
 - **Ouvrir un pack est une séquence** : la pochette se déchire, les cartes se
   retournent une à une de la moins bonne à la meilleure, et la lueur du fond
   annonce la rareté avant le nom.
@@ -33,7 +43,7 @@
   chaque manager, points marqués et encaissés, bonus, forme sur cinq matchs — et
   un clic ouvre la **fiche d'un adversaire** (effectif complet, derniers
   résultats, palmarès). Sur les cartes, le blason du club réel du joueur.
-- **Mesuré** (`npm run verify:carriere`, 122 contrôles) : scores moyens 19,9 et
+- **Mesuré** (`npm run verify:carriere`, 144 contrôles) : scores moyens 19,9 et
   maximum 35 sur 120 rencontres — jamais de 200-150 ; un direct suivi minute par
   minute donne le même score qu'un match joué d'un bloc ; rapport OVA premier /
   dernier de **1,63** sur une saison.
@@ -646,7 +656,7 @@ saisons de jeu — donnent 9 Élite et **zéro Star**. En packer un est un
 
 ### Ce qui se mesure plutôt que de se supposer
 
-Le banc (`npm run verify:carriere`, 122 contrôles, une minute) joue près de deux
+Le banc (`npm run verify:carriere`, 144 contrôles, une minute) joue près de deux
 cents matchs complets sans navigateur ni base. Ce qu'il dit :
 
 - **les scores tiennent debout** — sur 120 rencontres entre deux effectifs
@@ -837,7 +847,7 @@ scripts/
   verifMatchJouable.ts  # caméra, sens du stick, rythme des moments, durée réelle d'un match
   verifMarche.ts        # marché : variété des clubs, saut d'étage interdit, salaires par âge
   verifClassement.ts    # joue le tricheur : chaque attaque du classement doit être refusée
-  verifCarriere.ts      # la Carrière en ligne : scores, direct, packs, économie, marché, refus (122 contrôles)
+  verifCarriere.ts      # la Carrière en ligne : scores, direct, packs, économie, marché, refus (144 contrôles)
   verifLigue.ts         # ⚠️ le socle du 1er lot — plus branché au jeu
   verifLogosSelections.ts # signatures des images et couverture du classement World Rugby
 sources/                # matières premières rangées : data, logos, compétitions, modèles 3D

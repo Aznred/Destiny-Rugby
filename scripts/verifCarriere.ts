@@ -20,8 +20,7 @@
 //  10. la phase finale, et l’identité de la ligue (logo, trophée)
 
 import {
-  agirCarriere, avancerCarriere, classementCarriere, creerCarriere, vueCarriere,
-} from '../src/lib/ligue/carriere';
+  agirCarriere, avancerCarriere, classementCarriere, creerCarriere, vueCarriere, DOTATION_MAX, } from '../src/lib/ligue/carriere';
 import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere';
 import {
   avancerMatchEnLigne, cibleDeScore, commanderMatchEnLigne, conclureMatchEnLigne,
@@ -30,9 +29,11 @@ import {
 } from '../src/lib/ligue/matchCarriere';
 import {
   catalogueMondialCarriere, catalogueParRarete, coequipierDepuisCarte,
-  competitionsCarriere, dotationBronzeCarriere, emblemesCarriere, emblemeValide, PACKS_CARRIERE, rareteCarriere, rayonDePack, tropheesCarriere,
+  competitionsCarriere, dotationBronzeCarriere, emblemesCarriere, emblemeValide, PACKS_CARRIERE,
+  RARETES_CARRIERE, rareteCarriere, rayonDePack, tropheesCarriere,
 } from '../src/lib/ligue/catalogueCarriere';
 import { compositionManagerParDefaut } from '../src/lib/compositionManager';
+const nomPosteCourt = (f: string) => f.replace('demi_melee', '9').replace('demi_ouverture', '10');
 
 let ko = 0;
 const dire = (ok: boolean, quoi: string, detail = '') => {
@@ -253,16 +254,16 @@ titre('4. L’ABSENCE NE BLOQUE JAMAIS LA LIGUE');
   const jouees = e.rencontres.filter((r) => r.resultat);
   dire(jouees.length >= 2, '⚠️ la fenêtre fermée JOUE les matchs sans personne', `${jouees.length} rencontre(s)`);
   dire(jouees.every((r) => r.resultat!.origine === 'absence'), 'et les marque comme jouées en l’absence des managers');
-  dire(e.clubs.every((c) => c.ova > 0), 'les OVA du match sont versés à tout le monde',
-    e.clubs.map((c) => nb(c.ova)).join(' · '));
+  dire(e.clubs.every((c) => c.ovas > 0), 'les Ovas du match sont versés à tout le monde',
+    e.clubs.map((c) => nb(c.ovas)).join(' · '));
   const classement = classementCarriere(e);
   dire(classement.reduce((s, l) => s + l.joues, 0) === jouees.length * 2,
     'le classement compte exactement les matchs joués');
 
   // Idempotence : une deuxième avance à la même date ne double rien.
-  const avant = e.clubs.map((c) => c.ova).join('|');
+  const avant = e.clubs.map((c) => c.ovas).join('|');
   const encore = avancerCarriere(e, T0 + 7 * JOUR + 3600_000, 'graine-tick');
-  dire(encore.clubs.map((c) => c.ova).join('|') === avant,
+  dire(encore.clubs.map((c) => c.ovas).join('|') === avant,
     '⚠️ rejouer l’avance NE VERSE PAS deux fois les récompenses');
 }
 
@@ -284,18 +285,36 @@ titre('5. LES PACKS : LE VIVIER MONDIAL, ET L’UNICITÉ PAR LIGUE');
   dire(rareteCarriere(48) === 'bronze' && rareteCarriere(50) === 'argent' && rareteCarriere(65) === 'or'
     && rareteCarriere(80) === 'elite' && rareteCarriere(88) === 'star', 'les cinq seuils de rareté sont ceux annoncés');
 
-  const avants = rayonDePack('or', 'avants');
-  const arrieres = rayonDePack('or', 'arrieres');
+  const pack = (id: string) => PACKS_CARRIERE.find((p) => p.id === id)!;
+  const avants = rayonDePack('or', pack('avants'));
+  const arrieres = rayonDePack('or', pack('arrieres'));
   dire(avants.length > 100 && arrieres.length > 100 && avants.length + arrieres.length === bandes.or.length,
     '⚠️ le pack Avants et le pack Arrières se partagent exactement le catalogue',
     `${nb(avants.length)} + ${nb(arrieres.length)}`);
-  dire(rayonDePack('or', 'france').every((c) => c.pays === 'France'), 'le pack France ne contient que la France');
-  dire(rayonDePack('or', 'international').every((c) => c.pays !== 'France'), 'le pack International n’en contient aucun');
+  dire(rayonDePack('or', pack('france')).every((c) => c.pays === 'France'), 'le pack France ne contient que la France');
+  dire(rayonDePack('or', pack('international')).every((c) => c.pays !== 'France'), 'le pack International n’en contient aucun');
+  dire(rayonDePack('or', pack('charniere')).every((c) => c.famille === 'demi_melee' || c.famille === 'demi_ouverture'),
+    'le pack Charnière ne contient que des 9 et des 10', `${rayonDePack('or', pack('charniere')).length} joueurs`);
+  dire(rayonDePack('or', pack('top14')).every((c) => c.championnat === 'Top 14'), 'le pack Top 14 ne contient que le Top 14');
+  dire(rayonDePack('argent', pack('espoirs')).every((c) => c.age <= 23), 'le pack Espoirs ne contient que des moins de 23 ans');
+  dire(rayonDePack('or', pack('iles')).every((c) => ['Fidji', 'Samoa', 'Tonga'].includes(c.nation)), 'le pack Îles ne contient que les trois nations du Pacifique');
+  // ⚠️ UN PACK NE DOIT PAS ANNONCER UNE BANDE QU'IL NE PEUT PAS SERVIR. Le
+  // seuil n'est pas le même pour tous : la bande Star ne compte que 26 joueurs
+  // dans TOUT le jeu, donc en avoir un ou deux dans un pack thématique est
+  // normal — c'est même ce qui la rend précieuse. Pour les autres bandes, un
+  // vivier sous cinq joueurs veut dire que la probabilité affichée est un
+  // mensonge. Mesuré à l'écriture : la Pro D2 annonçait de l'Élite alors
+  // qu'elle n'en a qu'UN, et le pack Terroir de l'Or alors que les six
+  // championnats amateurs n'en comptent pas un seul.
+  const creux = PACKS_CARRIERE.flatMap((p) => RARETES_CARRIERE
+    .filter((r) => p.probabilites[r] > 0 && rayonDePack(r, p).length < (r === 'star' ? 1 : 5))
+    .map((r) => `${p.id}/${r}`));
+  dire(creux.length === 0, '⚠️ aucun pack n’annonce une bande qu’il ne peut pas servir', creux.join(' · ') || 'aucun creux');
 
   // Ouverture réelle : 60 packs Premium dans une ligue.
   let e = ligue(4);
   const club = e.clubs[0];
-  e.clubs[0].ova = 200_000;
+  e.clubs[0].ovas = 200_000;
   const tirees: string[] = [];
   for (let n = 0; n < 60; n++) {
     e = agirCarriere(e, club.compteId, { type: 'ouvrirPack', packId: 'premium' }, T0 + n * 1000, `pack-${n}`);
@@ -347,8 +366,8 @@ titre('6. L’ÉCONOMIE D’UNE SAISON, ET L’ANTI-BOULE-DE-NEIGE');
   dire(e.histoire.length === 1, 'le champion entre dans l’histoire de la ligue',
     e.histoire.map((h) => `${h.nom} → ${e.clubs.find((c) => c.id === h.vainqueur)?.nom}`).join(''));
 
-  const soldes = e.clubs.map((c) => c.ova).sort((a, b) => b - a);
-  console.log(`     OVA en fin de saison : ${soldes.map(nb).join(' · ')}`);
+  const soldes = e.clubs.map((c) => c.ovas).sort((a, b) => b - a);
+  console.log(`     Ovas en fin de saison : ${soldes.map(nb).join(' · ')}`);
   const rapport = soldes[0] / Math.max(1, soldes[soldes.length - 1]);
   dire(soldes[soldes.length - 1] > 12_000, 'même le dernier finit la saison avec de quoi jouer au marché', nb(soldes[soldes.length - 1]));
   dire(rapport < 2.2, '⚠️ ANTI-BOULE-DE-NEIGE : le premier ne gagne pas le double du dernier',
@@ -391,7 +410,7 @@ titre('7. LE MARCHÉ ENTRE AMIS');
 {
   let e = ligue(4);
   const [colin, hugo] = e.clubs;
-  for (const club of e.clubs) club.ova = 50_000;
+  for (const club of e.clubs) club.ovas = 50_000;
   // Colin remplit son effectif pour pouvoir vendre sans casser sa profondeur.
   for (let n = 0; n < 6; n++) {
     e = agirCarriere(e, colin.compteId, { type: 'ouvrirPack', packId: 'premium' }, T0 + n * 1000, `p-${n}`);
@@ -403,27 +422,27 @@ titre('7. LE MARCHÉ ENTRE AMIS');
   dire(e.cartes.find((c) => c.id === aVendre.id)!.verrou === e.ventes[0].id,
     '⚠️ et elle est VERROUILLÉE : impossible de la vendre deux fois');
 
-  const soldeColin = e.clubs.find((c) => c.id === colin.id)!.ova;
-  const soldeHugo = e.clubs.find((c) => c.id === hugo.id)!.ova;
+  const soldeColin = e.clubs.find((c) => c.id === colin.id)!.ovas;
+  const soldeHugo = e.clubs.find((c) => c.id === hugo.id)!.ovas;
   e = agirCarriere(e, hugo.compteId, { type: 'acheter', venteId: e.ventes[0].id }, T0 + 1000, 'a');
   dire(e.cartes.find((c) => c.id === aVendre.id)!.proprietaire === hugo.id, 'l’acheteur reçoit la carte');
-  dire(e.clubs.find((c) => c.id === colin.id)!.ova === soldeColin + 9_000, 'le vendeur est crédité', '+9 000 OVA');
-  dire(e.clubs.find((c) => c.id === hugo.id)!.ova === soldeHugo - 9_000, 'l’acheteur est débité', '−9 000 OVA');
+  dire(e.clubs.find((c) => c.id === colin.id)!.ovas === soldeColin + 9_000, 'le vendeur est crédité', '+9 000 Ovas');
+  dire(e.clubs.find((c) => c.id === hugo.id)!.ovas === soldeHugo - 9_000, 'l’acheteur est débité', '−9 000 Ovas');
   dire(e.cartes.find((c) => c.id === aVendre.id)!.clubs.length === 2, 'la carte garde la trace de ses clubs successifs');
 
-  // Enchère : la surenchère rend ses OVA au perdant.
+  // Enchère : la surenchère rend ses Ovas au perdant.
   const autre = e.cartes.filter((c) => c.proprietaire === colin.id && c.origine !== 'formation').sort((a, b) => b.note - a.note)[0];
   e = agirCarriere(e, colin.compteId, { type: 'vendre', carteId: autre.id, prix: 1_000, mode: 'enchere', dureeHeures: 2 }, T0 + 2000, 'e');
   const enchere = e.ventes[e.ventes.length - 1].id;
   e = agirCarriere(e, hugo.compteId, { type: 'encherir', venteId: enchere, montant: 1_500 }, T0 + 3000, 'e1');
-  const apresPremiere = e.clubs.find((c) => c.id === hugo.id)!.ova;
+  const apresPremiere = e.clubs.find((c) => c.id === hugo.id)!.ovas;
   e = agirCarriere(e, e.clubs[2].compteId, { type: 'encherir', venteId: enchere, montant: 3_000 }, T0 + 4000, 'e2');
-  dire(e.clubs.find((c) => c.id === hugo.id)!.ova === apresPremiere + 1_500,
-    '⚠️ un enchérisseur dépassé RÉCUPÈRE ses OVA immédiatement');
+  dire(e.clubs.find((c) => c.id === hugo.id)!.ovas === apresPremiere + 1_500,
+    '⚠️ un enchérisseur dépassé RÉCUPÈRE ses Ovas immédiatement');
   e = avancerCarriere(e, T0 + 3 * 3600_000, 'fin-enchere');
   const vendue = e.ventes.find((v) => v.id === enchere)!;
   dire(vendue.etat === 'vendue' && e.cartes.find((c) => c.id === autre.id)!.proprietaire === e.clubs[2].id,
-    'à l’expiration, la carte part au plus offrant', `${nb(vendue.enchere!.montant)} OVA`);
+    'à l’expiration, la carte part au plus offrant', `${nb(vendue.enchere!.montant)} Ovas`);
 
   // Échange croisé.
   const mien = e.cartes.filter((c) => c.proprietaire === colin.id && c.origine !== 'formation')[0];
@@ -431,7 +450,7 @@ titre('7. LE MARCHÉ ENTRE AMIS');
   if (mien && sien) {
     e = agirCarriere(e, colin.compteId, {
       type: 'proposerEchange', vers: hugo.id, cartesDonnees: [mien.id], cartesDemandees: [sien.id],
-      ovaDonnes: 2_000, ovaDemandes: 0,
+      ovasDonnes: 2_000, ovasDemandes: 0,
     }, T0 + 5000, 'ec');
     dire(e.echanges.length === 1, 'une offre d’échange se propose');
     e = agirCarriere(e, hugo.compteId, { type: 'repondreEchange', echangeId: e.echanges[0].id, accepter: true }, T0 + 6000, 'ec2');
@@ -454,7 +473,7 @@ titre('8. CE QUE LE SERVEUR REFUSE');
         erreur instanceof Error ? erreur.message : 'erreur inconnue');
     }
   };
-  refuse('ouvrir un pack sans les OVA', () =>
+  refuse('ouvrir un pack sans les Ovas', () =>
     agirCarriere(e, colin.compteId, { type: 'ouvrirPack', packId: 'premium' }, T0, 'x'));
   refuse('vendre la carte d’un autre club', () => {
     const sienne = e.cartes.find((c) => c.proprietaire === hugo.id)!;
@@ -529,7 +548,7 @@ titre('9. LA COUPE MAISON DU COMMISSAIRE');
   dire(e.histoire.some((h) => h.nom === 'Christmas Cup'), 'et son nom entre dans l’histoire de la ligue');
   const gains = e.transactions.filter((t) => t.nature === 'competition' && t.libelle.startsWith('Christmas'));
   dire(gains.length === 4, '⚠️ TOUS LES PARTICIPANTS touchent quelque chose, pas seulement le vainqueur',
-    gains.map((g) => nb(g.ova)).join(' · '));
+    gains.map((g) => nb(g.ovas)).join(' · '));
 }
 
 
@@ -587,7 +606,7 @@ titre('10. LA PHASE FINALE, ET L’IDENTITÉ DE LA LIGUE');
 
   // ⚠️ L'argent suit le classement régulier, le trophée suit la finale.
   const premier = regulier[0].clubId;
-  const gains = new Map(e.transactions.filter((t) => t.nature === 'competition').map((t) => [t.clubId, t.ova]));
+  const gains = new Map(e.transactions.filter((t) => t.nature === 'competition').map((t) => [t.clubId, t.ovas]));
   dire(gains.size === 6, 'les six clubs touchent une dotation de compétition');
   if (fini.vainqueur !== premier) {
     dire(gains.get(fini.vainqueur!)! >= gains.get(premier)!,
@@ -619,6 +638,87 @@ titre('10. LA PHASE FINALE, ET L’IDENTITÉ DE LA LIGUE');
   dire(coupes.length >= 40 && !coupes.some((t) => t.nom.startsWith('Meilleur')),
     'les trophées proposés sont les trophées d’ÉQUIPE, pas les distinctions individuelles',
     `${coupes.length} trophées`);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+titre('11. LES GARANTIES, ET LA DOTATION DE DÉPART');
+// ═══════════════════════════════════════════════════════════════════════════
+{
+  console.log(`     ${PACKS_CARRIERE.length} packs en boutique · ${new Set(PACKS_CARRIERE.map((p) => p.famille)).size} rayons`);
+  dire(PACKS_CARRIERE.length >= 20, 'la boutique propose une vraie variété de packs', `${PACKS_CARRIERE.length} packs`);
+  dire(new Set(PACKS_CARRIERE.map((p) => p.id)).size === PACKS_CARRIERE.length, 'aucun identifiant de pack en double');
+  dire(PACKS_CARRIERE.every((p) => p.promesse && p.promesse.length > 20), 'chaque pack dit ce qu’il promet');
+  // ⚠️ Une ligue créée AVANT une mise à jour doit voir les nouveaux packs, sans
+  // que ses prix bougent : la présentation se rafraîchit, l'économie non.
+  {
+    const ancienne = ligue(4);
+    ancienne.packs = ancienne.packs.filter((p) => p.id === 'bronze' || p.id === 'standard');
+    ancienne.packs[0].prix = 42;
+    const apres = avancerCarriere(ancienne, T0 + 1000, 'maj');
+    dire(apres.packs.length === PACKS_CARRIERE.length, '⚠️ une ligue ancienne récupère les packs ajoutés depuis',
+      `${ancienne.packs.length} → ${apres.packs.length}`);
+    dire(apres.packs.find((p) => p.id === 'bronze')!.prix === 42,
+      'et son économie n’est PAS écrasée au passage', 'prix maison conservé');
+  }
+  dire(PACKS_CARRIERE.every((p) => {
+    const total = RARETES_CARRIERE.reduce((s, r) => s + p.probabilites[r], 0);
+    return total > 99.9 && total < 100.1;
+  }), 'et chaque pack a des probabilités qui font 100 %');
+
+  // ── La garantie tient, sur 60 ouvertures ─────────────────────────────────
+  let e = ligue(4);
+  const club = e.clubs[0];
+  e.clubs[0].ovas = 900_000;
+  let sansOr = 0;
+  const positions: number[] = [];
+  for (let n = 0; n < 60; n++) {
+    const avant = e.cartes.length;
+    e = agirCarriere(e, club.compteId, { type: 'ouvrirPack', packId: 'or' }, T0 + n * 1000, `g-${n}`);
+    const tirees = e.cartes.slice(avant);
+    const rang = tirees.findIndex((c) => c.rarete === 'or' || c.rarete === 'elite' || c.rarete === 'star');
+    if (rang < 0) sansOr++; else positions.push(rang);
+  }
+  dire(sansOr === 0, '⚠️ « Or garanti » tient sa promesse sur 60 ouvertures', `${60 - sansOr}/60`);
+  // ⚠️ La garantie doit être INVISIBLE quand le hasard a déjà fait le travail :
+  // si elle tombait toujours sur la dernière carte, la séquence serait connue
+  // d'avance et la révélation n'aurait plus d'intérêt.
+  const surLaDerniere = positions.filter((r) => r === 2).length;
+  dire(surLaDerniere < 45, 'et elle ne tombe pas systématiquement sur la dernière carte',
+    `${surLaDerniere}/60 sur la 3ᵉ carte`);
+
+  let sansElite = 0;
+  for (let n = 0; n < 20; n++) {
+    const avant = e.cartes.length;
+    e = agirCarriere(e, club.compteId, { type: 'ouvrirPack', packId: 'elite' }, T0 + 100_000 + n * 1000, `el-${n}`);
+    if (!e.cartes.slice(avant).some((c) => c.rarete === 'elite' || c.rarete === 'star')) sansElite++;
+  }
+  dire(sansElite === 0, '⚠️ « Élite garantie » aussi', `${20 - sansElite}/20`);
+
+  // Un pack filtré ne rend que ce qu'il annonce.
+  const avantCharniere = e.cartes.length;
+  e = agirCarriere(e, club.compteId, { type: 'ouvrirPack', packId: 'charniere' }, T0 + 200_000, 'ch');
+  const charniere = e.cartes.slice(avantCharniere);
+  dire(charniere.every((c) => c.famille === 'demi_melee' || c.famille === 'demi_ouverture'),
+    'un pack Charnière ne rend que des demis', charniere.map((c) => `${c.note} ${nomPosteCourt(c.famille)}`).join(' · '));
+  const avantGrand = e.cartes.length;
+  e = agirCarriere(e, club.compteId, { type: 'ouvrirPack', packId: 'grand' }, T0 + 300_000, 'gr');
+  dire(e.cartes.length - avantGrand === 8, 'le Grand pack rend bien huit cartes', `${e.cartes.length - avantGrand}`);
+
+  // ── La dotation de départ ────────────────────────────────────────────────
+  const creer = (dotationOvas?: number) => creerCarriere({
+    id: `dot-${dotationOvas}`, nom: 'Ligue dotée', code: `DR-D${dotationOvas}`, compteId: 'compte-d',
+    pseudo: 'Dorian', clubNom: 'Club doté', rythme: 1, maxClubs: 4, dotationOvas,
+  }, T0, 'graine-dotation');
+  dire(creer(25_000).clubs[0].ovas === 25_000, 'le créateur fixe les Ovas de départ', '25 000');
+  dire(creer(0).clubs[0].ovas === 0, 'il peut n’en donner aucun — tout se gagne alors sur le terrain');
+  dire(creer().clubs[0].ovas === 1000, 'sans réglage, la dotation vaut 1 000');
+  // ⚠️ LE SEUL ROBINET D'OVAS QUE LE CRÉATEUR OUVRE LUI-MÊME. Sans plafond, il
+  // se donne dix millions et le marché de la ligue n'existe plus.
+  dire(creer(10_000_000).clubs[0].ovas === DOTATION_MAX,
+    '⚠️ et une dotation démesurée est RAMENÉE au plafond', `${nb(DOTATION_MAX)} Ovas`);
+  dire(creer(-500).clubs[0].ovas === 0, 'une dotation négative devient zéro');
+  dire(creer(1234).clubs[0].ovas === 1200, 'les montants sont arrondis à la centaine', '1 234 → 1 200');
 }
 
 console.log(`\n  ${ko === 0 ? '✅ La carrière en ligne tient.' : `❌ ${ko} contrôle(s) en échec.`}\n`);

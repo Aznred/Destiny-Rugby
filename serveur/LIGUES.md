@@ -3,7 +3,7 @@
 > **État : le mode est jouable de bout en bout.** Compte, ligue privée, code
 > d'invitation, trente licenciés de Régionale 3 au départ, championnat, matchs en direct avec
 > décisions du manager, packs, marché, enchères, échanges, coupes maison,
-> objectifs, palmarès, écusson de club. Serveur + écran + banc (**122 contrôles**,
+> objectifs, palmarès, écusson de club. Serveur + écran + banc (**144 contrôles**,
 > `npm run verify:carriere`). **Ce qui manque encore : la base Neon déployée**
 > (le schéma est écrit, il n'est pas appliqué) — en local, tout tourne sur un
 > stockage fichier.
@@ -98,7 +98,7 @@ jeu reste cosmétique (`MONETISATION.md`) et s'arrête à la porte de la ligue.
 | `src/lib/carriereEnLigneClient.ts` | Le client : sept fonctions, aucune règle. |
 | `src/screens/CarriereEnLigne.tsx` | L'écran : sept onglets + le direct. |
 
-Banc : **`npm run verify:carriere`** — 122 contrôles, sans navigateur ni base.
+Banc : **`npm run verify:carriere`** — 144 contrôles, sans navigateur ni base.
 Compter environ **une minute** : il joue près de deux cents matchs complets.
 
 ---
@@ -563,6 +563,88 @@ aucune n'est décorative :
 
 ---
 
+### Vingt-trois packs, en quatre rayons
+
+Le VOLUME (Bronze, Standard, Premium, Or garanti, Grand pack, Élite garantie),
+le POSTE (Avants, Arrières, Première ligne, Charnière, Troisième ligne,
+Finisseurs), le MONDE (France, International, Top 14, Pro D2, Îles Britanniques,
+Hémisphère Sud, Japon, Îles du Pacifique, Terroir) et l'ÂGE (Espoirs,
+Confirmés). Un manager à qui il manque un talonneur ne doit pas avoir à ouvrir
+des packs génériques en espérant tomber dessus.
+
+Le filtre est passé d'un mot-clé à quatre valeurs à une **structure** :
+catégorie, familles de poste, championnats, pays, nations, âge minimum et
+maximum. Chaque champ est un ET, l'intérieur d'un champ est un OU.
+
+⚠️ **La garantie est ce qui fait acheter, et elle se tient sur la DERNIÈRE
+carte.** Forcer la bande dès le premier tirage ferait d'un « Or garanti » un
+pack qui commence toujours par de l'Or puis retombe : on apprendrait en trois
+ouvertures que seule la carte n°1 compte. En la gardant pour la fin, et
+seulement si le tirage normal n'a rien donné, la promesse est tenue sans que la
+séquence devienne prévisible. Mesuré sur 60 ouvertures : **60/60 tiennent la
+promesse, et seulement 24 fois sur 60 la garantie a servi** — le reste du temps
+le hasard avait déjà fait le travail.
+
+> ⚠️ **Un pack ne doit pas annoncer une bande qu'il ne peut pas servir**, et le
+> banc l'a attrapé : le pack Pro D2 annonçait de l'Élite alors que la Pro D2
+> n'en compte **qu'un seul**, et le pack Terroir de l'Or alors que les six
+> championnats amateurs n'en comptent **pas un**. Le seuil n'est pas le même
+> pour toutes les bandes : la bande Star ne compte que 26 joueurs dans tout le
+> jeu, donc en avoir un ou deux dans un pack thématique est normal — c'est même
+> ce qui la rend précieuse.
+
+⚠️ **Les packs sont copiés dans la ligue à sa création, et c'est voulu** : prix
+et probabilités ne doivent pas changer sous les pieds des membres en pleine
+saison. Mais sans rien, une ligue créée avant une mise à jour resterait
+éternellement à sept packs. `completerPacks` ajoute donc les manquants et ne
+rafraîchit, sur ceux qui existent, que la **présentation** (nom, promesse,
+rayon, garantie annoncée). Le prix et les probabilités restent ceux de la ligue.
+
+### Le calendrier, et les rappels
+
+Un onglet dédié : le prochain match avec la date et l'heure d'ouverture de sa
+fenêtre, le compte à rebours, l'agenda des huit prochains rendez-vous du club,
+les six prochaines journées de toute la ligue, et les derniers résultats.
+
+> ⚠️ **Ce que les rappels sont, et ce qu'ils ne sont pas.** Ce sont des
+> notifications de NAVIGATEUR, déclenchées par l'onglet ouvert : une journée qui
+> s'ouvre, un match qui commence, le tien qui se termine. Elles ne réveillent
+> pas un téléphone éteint — ça demanderait un service worker et un serveur de
+> push, qui n'existent pas encore. **L'écran le dit**, plutôt que de laisser
+> croire à une alerte qui n'arrivera jamais.
+>
+> ⚠️ Et ils se décident sur la DIFFÉRENCE entre deux vues, jamais sur l'état
+> courant : sans ça, chaque sondage — il y en a un toutes les deux secondes
+> pendant un direct — reposterait la même notification.
+
+### La dotation de départ, et le nom de la monnaie
+
+Le créateur choisit ce que chaque club reçoit en arrivant, de **0** (« tout se
+gagne ») à **100 000 Ovas**. ⚠️ **Le plafond n'est pas décoratif** : c'est le
+seul robinet d'Ovas que le créateur ouvre lui-même. Sans lui, il se donne dix
+millions et le marché de la ligue n'existe plus. Une valeur hors bornes est
+ramenée dans l'intervalle, pas refusée.
+
+La monnaie s'appelle désormais **Ovas** partout — dans le code (`club.ovas`)
+comme à l'écran.
+
+> ⚠️ **Elle porte donc le même nom que la monnaie de la Boutique solo**
+> (`joueur.ovas`). C'était justement ce qu'un choix antérieur voulait éviter.
+> Le renommage a été demandé explicitement ; l'invariant, lui, ne bouge pas :
+> **aucun pont entre les deux, dans aucun sens, jamais.** Elles se distinguent
+> désormais par leur porteur — `joueur.ovas` pour la Boutique, `club.ovas` pour
+> une ligue — et par rien d'autre. À surveiller lors de tout code qui toucherait
+> aux deux.
+
+Et elle a enfin sa **pièce** (`components/PieceOvas.tsx`) plutôt que deux
+cercles au trait. ⚠️ Ce n'est pas une icône, et c'est pour ça qu'elle n'est pas
+dans `Icone.tsx` : le jeu de pictogrammes suit une règle stricte (grille de 24,
+`currentColor`, une épaisseur de trait) qui fait sa cohérence, et qui interdit
+précisément la matière dont une pièce a besoin — un métal, une tranche, un
+relief, une lumière.
+
+---
+
 ## Ce qui reste à faire
 
 ### Déployer la base
@@ -608,7 +690,7 @@ en ligne). En attendant, ne pas les prendre pour la description du mode.
 ## Commandes
 
 ```bash
-npm run verify:carriere   # 122 contrôles, sans navigateur ni base (~1 min)
+npm run verify:carriere   # 144 contrôles, sans navigateur ni base (~1 min)
 npm run verify:ligue      # ⚠️ le socle du premier lot — voir la dette ci-dessus
 npm run dev               # /api/carriere tourne sur un fichier JSON local
 npm run build             # tsc -b && vite build

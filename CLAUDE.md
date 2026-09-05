@@ -170,7 +170,7 @@ utilisés. `npm run verify:ligue` mesure donc du code que le jeu n'exécute
 jamais — **dette à trancher, décrite dans `serveur/LIGUES.md`.**
 
 Détail complet, chiffres mesurés et invariants : **`serveur/LIGUES.md`**.
-Banc du mode : `npm run verify:carriere` (122 contrôles, ~1 min).
+Banc du mode : `npm run verify:carriere` (144 contrôles, ~1 min).
 
 ---
 
@@ -367,7 +367,7 @@ stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
 principaux sont déclarés dans `package.json` :
 
 ```bash
-npm run verify:carriere           # la Carrière en ligne (122 contrôles, ~1 min)
+npm run verify:carriere           # la Carrière en ligne (144 contrôles, ~1 min)
 npm run verify:ligue              # ⚠️ le socle du 1er lot — plus branché au jeu
 npm run verify:enveloppe          # une seule définition de l'enveloppe structure
 npm run verify:saison-manager     # avance libre, coupes, playoffs, promotions
@@ -405,7 +405,7 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   avec décisions du manager, packs, marché, enchères, échanges, coupes maison,
   objectifs, palmarès. Serveur (`serveur/carriereApi.ts` + `api/carriere.ts`),
   écran (`screens/CarriereEnLigne.tsx`) et banc (`npm run verify:carriere`,
-  122 contrôles). **Il reste à appliquer `serveur/schema-carriere.sql` sur
+  144 contrôles). **Il reste à appliquer `serveur/schema-carriere.sql` sur
   Neon** et à poser `CRON_SECRET` ; en local, `vite.config.ts` branche le même
   gestionnaire sur un fichier JSON, donc le mode se teste entièrement sans base.
 
@@ -415,10 +415,13 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
      `useState` qui contienne un OVA, une carte ou un score.
   2. **Un joueur n'existe qu'une fois par ligue** — le tirage de pack exclut
      tous les `sourceId` déjà possédés dans CETTE ligue.
-  3. **Rien ne traverse d'une ligue à l'autre**, ni OVA ni carte. Pas de
+  3. **Rien ne traverse d'une ligue à l'autre**, ni Ovas ni carte. Pas de
      portefeuille global.
-  4. **Aucun OVA ne s'achète en argent réel.** ⚠️ Et l'**OVA** d'une ligue n'est
-     PAS l'**Ovas** de la Boutique solo : deux monnaies, aucun pont, jamais.
+  4. **Aucun Ovas ne s'achète en argent réel.** ⚠️ Et les **Ovas** d'une ligue
+     (`club.ovas`) ne sont PAS les **Ovas** de la Boutique solo (`joueur.ovas`).
+     Depuis le renommage demandé, elles portent le MÊME nom et ne se distinguent
+     plus que par leur porteur : redoubler d'attention dans tout code qui
+     toucherait aux deux. Deux monnaies, aucun pont, jamais.
 
   **Trois choses qui ne se retouchent pas sans relire `serveur/LIGUES.md` :**
   - **Le vivier ne se matérialise jamais.** 78 083 joueurs, 26,6 Mo de JSON ; une

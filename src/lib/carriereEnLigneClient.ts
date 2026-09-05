@@ -3,7 +3,7 @@ import type { CommandeCarriere, VueCarriereEnLigne } from './ligue/typesCarriere
 export interface CompteCarriere { id: string; pseudo: string; identifiant?: string }
 export interface SessionCarriere {
   compte: CompteCarriere;
-  ligues: { id: string; nom: string; etat: string; clubNom: string; ova: number }[];
+  ligues: { id: string; nom: string; etat: string; clubNom: string; ovas: number }[];
 }
 export class ErreurCarriere extends Error {
   statut: number;
@@ -50,7 +50,7 @@ export const chargerLigueCarriere = (id: string, signal?: AbortSignal) => requet
 export const identifierCarriere = (action: 'inscription' | 'connexion', identifiant: string, motDePasse: string, pseudo: string) =>
   requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo });
 export const deconnecterCarriere = () => requete<{ ok: boolean }>({ action: 'deconnexion' });
-export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean }
+export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number }
 export const creerLigueCarriere = (nom: string, clubNom: string, rythme: 1 | 2, maxClubs: number, identite: IdentiteLigue = {}) =>
   requete<VueCarriereEnLigne>({ action: 'creer', nom, clubNom, rythme, maxClubs, ...identite });
 export const rejoindreLigueCarriere = (code: string, clubNom: string, embleme?: string) => requete<VueCarriereEnLigne>({ action: 'rejoindre', code, clubNom, embleme });

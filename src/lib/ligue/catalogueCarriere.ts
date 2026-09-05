@@ -9,17 +9,135 @@ import { posteDepuisFamille, POSTE_PAR_ID } from '../../data/rugby';
 import type { FamillePoste } from '../../types';
 import type { Coequipier } from '../effectif';
 import { graine, melanger } from './aleatoire';
-import type { CarteCarriere, PackCarriere, RareteCarriere } from './typesCarriere';
+import type { CarteCarriere, FiltrePack, PackCarriere, RareteCarriere } from './typesCarriere';
 
 export const RARETES_CARRIERE: RareteCarriere[] = ['bronze', 'argent', 'or', 'elite', 'star'];
+// ═══════════════════════════════════════════════════════════════════════════
+// LES PACKS
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ TROIS AXES, ET C'EST CE QUI FAIT UNE BOUTIQUE PLUTÔT QU'UNE LISTE : le
+// VOLUME (combien de cartes, à quelle qualité), le POSTE (renforcer sa
+// première ligne, sa charnière) et le MONDE (le Top 14, le Japon, les Îles).
+// Un manager à qui il manque un talonneur ne doit pas avoir à ouvrir des packs
+// génériques en espérant tomber dessus.
+//
+// ⚠️ LA GARANTIE EST CE QUI FAIT ACHETER, ET CE QUI COÛTE CHER. « Au moins une
+// carte en Or » transforme un tirage en promesse. Le prix d'un pack garanti
+// n'est donc pas celui d'un pack ordinaire un peu meilleur : c'est celui de la
+// carte garantie. S'il paraît bas au regard du marché (un Or vaut 12 000 à
+// 40 000 OVA), c'est parce qu'il ne dit rien de QUEL Or — ce sera le plus
+// souvent un 66, pas un 79.
+//
+// ⚠️ ET LES PROBABILITÉS SONT LE LEVIER D'ÉQUILIBRAGE, AVANT LE PRIX. Elles
+// sont copiées dans l'état de la ligue à sa création, donc modifiables côté
+// serveur sans toucher au code. Voir `serveur/LIGUES.md`.
+const CHAMPIONNATS_SUD = ['Super Rugby Pacific', 'Bunnings NPC'];
+const CHAMPIONNATS_JAPON = ['Japan Rugby League One : D1', 'Japan Rugby League One : D2', 'Japan Rugby League One : D3'];
+const CHAMPIONNATS_NORD = ['Gallagher Premiership', 'United Rugby Championship', 'RFU Championship', 'Championship Cup'];
+const CHAMPIONNATS_AMATEURS = ['Fédérale 1', 'Fédérale 2', 'Fédérale 3', 'Régionale 1', 'Régionale 2', 'Régionale 3'];
+const NATIONS_ILES = ['Fidji', 'Samoa', 'Tonga'];
+
+/** Le tirage courant, celui de la plupart des packs thématiques. */
+const MIXTE = { bronze: 48, argent: 37, or: 14, elite: .95, star: .05 };
+
 export const PACKS_CARRIERE: PackCarriere[] = [
-  { id: 'bronze', nom: 'Bronze', prix: 250, cartes: 3, probabilites: { bronze: 90, argent: 9.5, or: .5, elite: 0, star: 0 } },
-  { id: 'standard', nom: 'Standard', prix: 700, cartes: 3, probabilites: { bronze: 48, argent: 37, or: 14, elite: .95, star: .05 } },
-  { id: 'premium', nom: 'Premium', prix: 1800, cartes: 3, probabilites: { bronze: 15, argent: 40, or: 42, elite: 2.8, star: .2 } },
-  { id: 'avants', nom: 'Avants', prix: 800, cartes: 3, filtre: 'avants', probabilites: { bronze: 48, argent: 37, or: 14, elite: .95, star: .05 } },
-  { id: 'arrieres', nom: 'Arrières', prix: 800, cartes: 3, filtre: 'arrieres', probabilites: { bronze: 48, argent: 37, or: 14, elite: .95, star: .05 } },
-  { id: 'france', nom: 'France', prix: 800, cartes: 3, filtre: 'france', probabilites: { bronze: 48, argent: 37, or: 14, elite: .95, star: .05 } },
-  { id: 'international', nom: 'International', prix: 1000, cartes: 3, filtre: 'international', probabilites: { bronze: 35, argent: 44, or: 19.9, elite: 1, star: .1 } },
+  // ── Le volume ────────────────────────────────────────────────────────────
+  { id: 'bronze', nom: 'Bronze', prix: 250, cartes: 3, famille: 'general',
+    promesse: 'De la profondeur, pas cher. De quoi faire tourner un effectif.',
+    probabilites: { bronze: 90, argent: 9.5, or: .5, elite: 0, star: 0 } },
+  { id: 'standard', nom: 'Standard', prix: 700, cartes: 3, famille: 'general',
+    promesse: 'Le pack de tous les jours. Une chance sur sept de toucher de l’Or.',
+    probabilites: MIXTE },
+  { id: 'premium', nom: 'Premium', prix: 1800, cartes: 3, famille: 'general',
+    promesse: 'Quatre cartes sur dix sont en Or. C’est ici que se construit un XV.',
+    probabilites: { bronze: 15, argent: 40, or: 42, elite: 2.8, star: .2 } },
+  { id: 'or', nom: 'Or garanti', prix: 3200, cartes: 3, famille: 'general', garantie: 'or',
+    promesse: 'Au moins une carte en Or, c’est écrit. Les deux autres se jouent.',
+    probabilites: { bronze: 20, argent: 42, or: 35, elite: 2.7, star: .3 } },
+  { id: 'grand', nom: 'Grand pack', prix: 4500, cartes: 8, famille: 'general', garantie: 'or',
+    promesse: 'Huit cartes d’un coup, dont une en Or au minimum. De quoi refaire un banc.',
+    probabilites: { bronze: 34, argent: 40, or: 24, elite: 1.8, star: .2 } },
+  { id: 'elite', nom: 'Élite garantie', prix: 11000, cartes: 3, famille: 'general', garantie: 'elite',
+    promesse: 'Un joueur à 80 ou plus, garanti. Il n’y en a que 416 dans tout le jeu.',
+    probabilites: { bronze: 8, argent: 30, or: 55, elite: 6.4, star: .6 } },
+
+  // ── Les postes ───────────────────────────────────────────────────────────
+  { id: 'avants', nom: 'Avants', prix: 800, cartes: 3, famille: 'poste',
+    filtre: { categorie: 'avant' },
+    promesse: 'Uniquement les postes 1 à 8. Pour renforcer le paquet.',
+    probabilites: MIXTE },
+  { id: 'arrieres', nom: 'Arrières', prix: 800, cartes: 3, famille: 'poste',
+    filtre: { categorie: 'arriere' },
+    promesse: 'Uniquement les postes 9 à 15. Pour ouvrir le jeu.',
+    probabilites: MIXTE },
+  { id: 'premiereLigne', nom: 'Première ligne', prix: 950, cartes: 3, famille: 'poste',
+    filtre: { familles: ['pilier', 'talonneur'] },
+    promesse: 'Piliers et talonneurs. Les postes qu’on ne trouve jamais au marché.',
+    probabilites: MIXTE },
+  { id: 'charniere', nom: 'Charnière', prix: 1100, cartes: 3, famille: 'poste',
+    filtre: { familles: ['demi_melee', 'demi_ouverture'] },
+    promesse: 'Le 9 et le 10. Deux postes qui décident d’un match à eux seuls.',
+    probabilites: { bronze: 40, argent: 40, or: 18, elite: 1.8, star: .2 } },
+  { id: 'troisiemeLigne', nom: 'Troisième ligne', prix: 900, cartes: 3, famille: 'poste',
+    filtre: { familles: ['troisieme_ligne'] },
+    promesse: 'Les 6, 7 et 8 — les plaqueurs, les gratteurs, les porteurs de ballon.',
+    probabilites: MIXTE },
+  { id: 'finisseurs', nom: 'Finisseurs', prix: 1000, cartes: 3, famille: 'poste',
+    filtre: { familles: ['ailier', 'centre', 'arriere'] },
+    promesse: 'Ailiers, centres et arrières. Ceux qui vont marquer les essais.',
+    probabilites: MIXTE },
+
+  // ── Le monde ─────────────────────────────────────────────────────────────
+  { id: 'france', nom: 'France', prix: 800, cartes: 3, famille: 'monde',
+    filtre: { pays: ['France'] },
+    promesse: 'Du Top 14 à la Régionale 3, uniquement le championnat français.',
+    probabilites: MIXTE },
+  { id: 'international', nom: 'International', prix: 1000, cartes: 3, famille: 'monde',
+    filtre: { horsFrance: true },
+    promesse: 'Les seize championnats étrangers. Le meilleur taux d’Argent et d’Or.',
+    probabilites: { bronze: 35, argent: 44, or: 19.9, elite: 1, star: .1 } },
+  { id: 'top14', nom: 'Top 14', prix: 2600, cartes: 3, famille: 'monde',
+    filtre: { championnats: ['Top 14'] },
+    promesse: 'Le meilleur championnat du monde. Pas une seule carte Bronze.',
+    probabilites: { bronze: 0, argent: 22, or: 66, elite: 11, star: 1 } },
+  { id: 'prod2', nom: 'Pro D2', prix: 1500, cartes: 3, famille: 'monde',
+    filtre: { championnats: ['Pro D2'] },
+    promesse: 'L’antichambre. Des joueurs solides à un prix raisonnable.',
+    // ⚠️ NI ÉLITE NI STAR : mesuré, la Pro D2 compte UNE carte à 80+ et zéro à
+    // 88+. Les annoncer, c'était vendre une chance qui n'existe pas.
+    probabilites: { bronze: 2, argent: 48, or: 50, elite: 0, star: 0 } },
+  { id: 'nord', nom: 'Îles Britanniques', prix: 2000, cartes: 3, famille: 'monde',
+    filtre: { championnats: CHAMPIONNATS_NORD },
+    promesse: 'Premiership, URC et Championship. L’école du combat.',
+    probabilites: { bronze: 6, argent: 44, or: 46, elite: 3.6, star: .4 } },
+  { id: 'sud', nom: 'Hémisphère Sud', prix: 2200, cartes: 3, famille: 'monde',
+    filtre: { championnats: CHAMPIONNATS_SUD },
+    promesse: 'Super Rugby et NPC. Le rugby de mouvement, et des mains en or.',
+    probabilites: { bronze: 4, argent: 40, or: 51, elite: 4.5, star: .5 } },
+  { id: 'japon', nom: 'Japon', prix: 1300, cartes: 3, famille: 'monde',
+    filtre: { championnats: CHAMPIONNATS_JAPON },
+    promesse: 'La League One, où finissent les internationaux du monde entier.',
+    probabilites: { bronze: 12, argent: 46, or: 39.6, elite: 2.2, star: .2 } },
+  { id: 'iles', nom: 'Îles du Pacifique', prix: 1700, cartes: 3, famille: 'monde',
+    filtre: { nations: NATIONS_ILES },
+    promesse: 'Fidji, Samoa, Tonga. De la puissance, et de l’imprévisible.',
+    probabilites: { bronze: 14, argent: 42, or: 40, elite: 3.6, star: .4 } },
+  { id: 'terroir', nom: 'Terroir', prix: 400, cartes: 5, famille: 'monde',
+    filtre: { championnats: CHAMPIONNATS_AMATEURS },
+    promesse: 'Cinq licenciés de Fédérale et de Régionale. Le vrai rugby du dimanche.',
+    // ⚠️ AUCUN OR : les six championnats amateurs ne comptent pas un seul
+    // joueur à 65 ou plus. C'est le pack du volume, il l'assume.
+    probabilites: { bronze: 82, argent: 18, or: 0, elite: 0, star: 0 } },
+
+  // ── L'âge ────────────────────────────────────────────────────────────────
+  { id: 'espoirs', nom: 'Espoirs', prix: 1200, cartes: 3, famille: 'age',
+    filtre: { ageMax: 23 },
+    promesse: 'Moins de 23 ans. Ils ne sont pas encore bons — ils vont le devenir.',
+    probabilites: { bronze: 40, argent: 40, or: 18.5, elite: 1.4, star: .1 } },
+  { id: 'confirmes', nom: 'Confirmés', prix: 1600, cartes: 3, famille: 'age',
+    filtre: { ageMin: 26, ageMax: 30 },
+    promesse: 'Entre 26 et 30 ans : le sommet d’une carrière, sans le déclin.',
+    probabilites: { bronze: 20, argent: 42, or: 35, elite: 2.7, star: .3 } },
 ];
 
 export function rareteCarriere(note: number): RareteCarriere {
@@ -119,14 +237,26 @@ export function carteDepuisSource(source: SourceCarte, ligueId: string, propriet
 
 /** Le catalogue rangé par bande ET par filtre de pack, calculé une seule fois. */
 const RAYONS = new Map<string, readonly SourceCarte[]>();
-export function rayonDePack(rarete: RareteCarriere, filtre: PackCarriere['filtre']): readonly SourceCarte[] {
-  const cle = `${rarete}#${filtre ?? 'tout'}`;
+/**
+ * ⚠️ LA CLÉ EST L'IDENTIFIANT DU PACK, PAS SON FILTRE. Le filtre est un objet :
+ * l'utiliser comme clé de cache donnerait `[object Object]` pour les vingt-trois
+ * packs, qui partageraient alors tous le rayon du premier calculé — un pack
+ * Charnière rendrait des piliers. Deux packs qui partagent un filtre calculent
+ * donc deux fois le même rayon, et c'est un très petit prix.
+ */
+export function rayonDePack(rarete: RareteCarriere, pack: Pick<PackCarriere, 'id' | 'filtre'>): readonly SourceCarte[] {
+  const cle = `${rarete}#${pack.id}`;
   const connu = RAYONS.get(cle);
   if (connu) return connu;
   const bande = catalogueParRarete()[rarete];
-  const rayon = filtre ? bande.filter((c) => carteDansPack(c as CarteCarriere, { filtre } as PackCarriere)) : bande;
+  const rayon = pack.filtre ? bande.filter((c) => carteDansPack(c, pack.filtre)) : bande;
   RAYONS.set(cle, rayon);
   return rayon;
+}
+
+/** Les bandes qu'une garantie accepte : celle demandée, et toutes au-dessus. */
+export function bandesGaranties(garantie: RareteCarriere): RareteCarriere[] {
+  return RARETES_CARRIERE.slice(RARETES_CARRIERE.indexOf(garantie));
 }
 
 /**
@@ -331,13 +461,25 @@ export function dotationBronzeCarriere(
 export function coequipierDepuisCarte(c: CarteCarriere): Coequipier {
   return { id: c.id, nom: c.nom, poste: c.poste, age: c.age, note: c.note, potentiel: c.potentiel, nation: c.nation, regen: c.origine === 'formation', horsGeneration: true };
 }
-export function carteDansPack(c: CarteCarriere, pack: PackCarriere): boolean {
-  if (pack.filtre === 'france') return c.pays === 'France';
-  if (pack.filtre === 'international') return c.pays !== 'France';
+/**
+ * Une carte entre-t-elle dans ce pack ? Chaque champ du filtre est un ET ; à
+ * l'intérieur d'un champ, c'est un OU.
+ */
+export function carteDansPack(c: Pick<CarteCarriere, 'poste' | 'famille' | 'pays' | 'nation' | 'championnat' | 'age'>, filtre?: FiltrePack): boolean {
+  if (!filtre) return true;
   // ⚠️ « Avant » PORTE UNE MAJUSCULE dans `data/rugby.ts`. Comparé en
   // minuscules, le pack Avants ne trouvait personne et le pack Arrières
   // renvoyait tout le catalogue, piliers compris.
-  if (pack.filtre === 'avants') return POSTE_PAR_ID[c.poste].categorie === 'Avant';
-  if (pack.filtre === 'arrieres') return POSTE_PAR_ID[c.poste].categorie !== 'Avant';
+  if (filtre.categorie) {
+    const avant = POSTE_PAR_ID[c.poste].categorie === 'Avant';
+    if (avant !== (filtre.categorie === 'avant')) return false;
+  }
+  if (filtre.familles && !filtre.familles.includes(c.famille)) return false;
+  if (filtre.championnats && !filtre.championnats.includes(c.championnat)) return false;
+  if (filtre.pays && !filtre.pays.includes(c.pays)) return false;
+  if (filtre.nations && !filtre.nations.includes(c.nation)) return false;
+  if (filtre.horsFrance && c.pays === 'France') return false;
+  if (filtre.ageMax !== undefined && c.age > filtre.ageMax) return false;
+  if (filtre.ageMin !== undefined && c.age < filtre.ageMin) return false;
   return true;
 }

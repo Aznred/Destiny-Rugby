@@ -10,7 +10,7 @@
 // produit. Tout passe par `commanderCarriere`, le serveur tranche, et l'écran
 // affiche la vue qu'on lui rend. C'est l'invariant n°1 du mode — le client
 // DEMANDE une action, il ne DÉCLARE jamais un état — et il se voit ici : le
-// composant n'a pas de `useState` qui contienne un OVA, une carte ou un score.
+// composant n'a pas de `useState` qui contienne un Ovas, une carte ou un score.
 //
 // ⚠️ ET IL N'IMPORTE PAS LE MOTEUR DE MATCH. `lib/ligue/matchCarriere.ts`
 // tourne côté serveur ; en tirer les libellés ferait entrer les 3 500 lignes du
@@ -25,6 +25,7 @@ import { Selecteur } from '../components/Selecteur';
 import { CompositionTerrainManager } from '../components/CompositionTerrainManager';
 import { Drapeau } from '../components/Drapeau';
 import { EcussonClub } from '../components/EcussonClub';
+import { PieceOvas } from '../components/PieceOvas';
 import { useGame } from '../store/useGame';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { photoReelle } from '../lib/avatars';
@@ -42,11 +43,12 @@ import type { IdentiteLigue } from '../lib/carriereEnLigneClient';
 import type { CataloguesIdentite, GroupeEmblemes, SessionCarriere, TropheeLigue } from '../lib/carriereEnLigneClient';
 import './CarriereEnLigne.css';
 
-type Onglet = 'club' | 'composition' | 'effectif' | 'packs' | 'marche' | 'competitions' | 'histoire';
+type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'packs' | 'marche' | 'competitions' | 'histoire';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
 type VueRencontre = VueCarriereEnLigne['rencontres'][number];
 const ONGLETS: { id: Onglet; label: string; icone: NomIcone }[] = [
-  { id: 'club', label: 'Le club', icone: 'stade' }, { id: 'composition', label: 'Composition', icone: 'maillot' },
+  { id: 'club', label: 'Le club', icone: 'stade' }, { id: 'calendrier', label: 'Calendrier', icone: 'calendrier' },
+  { id: 'composition', label: 'Composition', icone: 'maillot' },
   { id: 'effectif', label: 'Effectif', icone: 'equipe' }, { id: 'packs', label: 'Packs', icone: 'cadeau' },
   { id: 'marche', label: 'Marché', icone: 'poignee' }, { id: 'competitions', label: 'Compétitions', icone: 'trophee' },
   { id: 'histoire', label: 'Histoire', icone: 'journal' },
@@ -364,6 +366,44 @@ export function CarriereEnLigne() {
   }, []);
   useEffect(() => { void chargerSession(); }, [chargerSession]);
 
+  // ⚠️ LES RAPPELS SE DÉCIDENT SUR LA DIFFÉRENCE ENTRE DEUX VUES, jamais sur
+  // l'état courant : sans ça, chaque sondage — il y en a un toutes les deux
+  // secondes pendant un direct — reposterait la même notification. On compare
+  // donc ce qui vient d'arriver à ce qu'on avait, et on ne prévient que de ce
+  // qui a CHANGÉ.
+  const rappels = useRappels(ligueId ?? '');
+  const prevenirRef = useRef(rappels.prevenir);
+  prevenirRef.current = rappels.prevenir;
+  const comparerPourRappels = useCallback((avant: VueCarriereEnLigne | null, apres: VueCarriereEnLigne) => {
+    if (!avant || avant.id !== apres.id) return;
+    const mien = (r: VueRencontre) => r.domicile === apres.monClubId || r.exterieur === apres.monClubId;
+    const nom = (id: string) => apres.clubs.find(c => c.id === id)?.nom ?? 'Club';
+    for (const r of apres.rencontres.filter(mien)) {
+      const vieux = avant.rencontres.find(x => x.id === r.id);
+      const adversaire = nom(r.domicile === apres.monClubId ? r.exterieur : r.domicile);
+      if (!vieux) continue;
+      const etaitOuverte = vieux.ouvre <= avant.rencontres[0]?.ouvre;
+      void etaitOuverte;
+      if (!vieux.match && r.match && !r.match.termine) {
+        prevenirRef.current('Le match a commencé', `${nom(r.domicile)} – ${nom(r.exterieur)}, journée ${r.journee}. Rejoins le direct pour piloter ton équipe.`);
+      }
+      if (!vieux.resultat && r.resultat) {
+        const chezMoi = r.domicile === apres.monClubId;
+        const pour = chezMoi ? r.resultat.pointsD : r.resultat.pointsE;
+        const contre = chezMoi ? r.resultat.pointsE : r.resultat.pointsD;
+        prevenirRef.current(pour > contre ? 'Victoire !' : pour === contre ? 'Match nul' : 'Défaite',
+          `${pour} – ${contre} contre ${adversaire}, journée ${r.journee}.`);
+      }
+    }
+    // Une nouvelle journée s'ouvre : c'est le rendez-vous à ne pas rater.
+    const ouverte = apres.rencontres.find(r => mien(r) && !r.resultat && r.ouvre <= maintenantISO());
+    const ouverteAvant = avant.rencontres.find(r => mien(r) && !r.resultat && r.ouvre <= maintenantISO());
+    if (ouverte && ouverte.id !== ouverteAvant?.id) {
+      prevenirRef.current(`Journée ${ouverte.journee} : à toi de jouer`,
+        `${nom(ouverte.domicile)} – ${nom(ouverte.exterieur)}. La fenêtre est ouverte jusqu’au ${dateLongue(ouverte.ferme)}.`);
+    }
+  }, []);
+
   // Un seul appel à la fois. Une réponse ancienne ne peut pas annuler une action récente.
   useEffect(() => {
     if (!ligueId) return;
@@ -375,7 +415,11 @@ export function CarriereEnLigne() {
       try {
         const suivante = await chargerLigueCarriere(ligueId, controleur.signal);
         if (actif && version === versionRequete.current) {
-          setVue(avant => !avant || avant.id !== suivante.id || suivante.version >= avant.version ? suivante : avant);
+          setVue(avant => {
+            if (avant && avant.id === suivante.id && suivante.version < avant.version) return avant;
+            comparerPourRappels(avant, suivante);
+            return suivante;
+          });
         }
       } catch (e) { if (actif) setErreur(messageErreur(e)); }
       if (actif) {
@@ -385,7 +429,8 @@ export function CarriereEnLigne() {
     };
     void actualiser();
     return () => { actif = false; controleur.abort(); clearTimeout(minuterie); };
-  }, [ligueId]);
+  }, [ligueId, comparerPourRappels]);
+
 
   const ouvrir = (suivante: VueCarriereEnLigne) => {
     versionRequete.current++; setVue(suivante); setLigueId(suivante.id); setOnglet('club'); setMatchId(null); setErreur('');
@@ -434,10 +479,11 @@ export function CarriereEnLigne() {
         setOccupe(true); setErreur(''); try { ouvrir(await creerLigueCarriere(nom, clubNom, rythme, max, identite)); } catch (e) { setErreur(messageErreur(e)); } finally { setOccupe(false); }
       }} onRejoindre={async (code, clubNom, embleme) => { setOccupe(true); setErreur(''); try { ouvrir(await rejoindreLigueCarriere(code, clubNom, embleme)); } catch (e) { setErreur(messageErreur(e)); } finally { setOccupe(false); } }} />
       : <>
-        <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / Saison {vue.saison}</span></div><h1>{club?.nom}</h1><p>{vue.clubs.length} clubs · {vue.rythme} match{vue.rythme > 1 ? 's' : ''} par semaine · {vue.phase === 'salon' ? 'Inscriptions ouvertes' : vue.phase === 'saison' ? 'Saison en cours' : 'Intersaison'}</p></div><div className="cel-portefeuille"><Icone nom="ova" taille={25} /><strong>{montant(club?.ova ?? 0)}</strong><span>OVA de cette ligue</span></div></header>
+        <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / Saison {vue.saison}</span></div><h1>{club?.nom}</h1><p>{vue.clubs.length} clubs · {vue.rythme} match{vue.rythme > 1 ? 's' : ''} par semaine · {vue.phase === 'salon' ? 'Inscriptions ouvertes' : vue.phase === 'saison' ? 'Saison en cours' : 'Intersaison'}</p></div><div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>Ovas de cette ligue</span></div></header>
         <nav className="cel-onglets" aria-label="Club en ligne">{ONGLETS.map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} copier={async () => { try { await navigator.clipboard.writeText(vue.code); setNotification('Code d’invitation copié. Partage-le avec tes amis.'); } catch { setNotification(`Code d’invitation : ${vue.code}`); } }} />}
+          {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} />}
           {onglet === 'composition' && <Composition key={vue.id} vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'effectif' && <Effectif vue={vue} />}
           {onglet === 'packs' && <Packs vue={vue} agir={agir} occupe={occupe} />}
@@ -460,7 +506,8 @@ function Portail({ session, occupe, ouvrirLigue, onCreer, onRejoindre }: { sessi
   const [mode, setMode] = useState<'creer' | 'rejoindre'>('creer'); const [nom, setNom] = useState(''); const [club, setClub] = useState(''); const [code, setCode] = useState(''); const [rythme, setRythme] = useState('1'); const [max, setMax] = useState('8');
   const [embleme, setEmbleme] = useState<string | undefined>(); const [choixOuvert, setChoixOuvert] = useState(false);
   const [logo, setLogo] = useState<string | undefined>(); const [tropheeId, setTropheeId] = useState<string | undefined>(); const [playoffs, setPlayoffs] = useState(false);
-  return <><header className="cel-titre"><div className="eyebrow">Bienvenue au club, {session.compte.pseudo}</div><h1>Vos rendez-vous rugby.</h1><p>Chaque ligue a ses clubs, ses cartes, ses OVA et son histoire.</p></header><div className="cel-portail"><div><h2>Mes ligues <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <button className="cel-ligue" key={l.id} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} /><span><em>{l.nom}</em><b>{l.clubNom}</b><small>{l.etat === 'salon' ? 'En préparation' : l.etat === 'saison' ? 'Saison en cours' : 'Intersaison'} · {montant(l.ova)} OVA</small></span><Icone nom="fleche-droite" /></button>)}</div> : <Vide titre="Tout commence avec votre ligue">Invite tes amis ou rejoins leur vestiaire avec le code qu’ils t’ont partagé.</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme) as 1 | 2, Number(max), { embleme, logo, tropheeId, playoffs }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>Créer une ligue</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>Rejoindre des amis</button></div><h2>{mode === 'creer' ? 'Le coup d’envoi vous appartient.' : 'Une place vous attend.'}</h2>{mode === 'creer' ? <Champ label="Nom de la ligue"><input required minLength={3} maxLength={50} placeholder="La Ligue du dimanche" value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label="Code d’invitation"><input required autoCapitalize="characters" maxLength={20} placeholder="Code reçu de ton ami" value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label="Nom de ton club"><input required minLength={3} maxLength={40} placeholder="Les XV du quartier" value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>Écusson</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? 'Changer d’écusson' : 'Choisir un vrai écusson de club'}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Choix label="Rythme" valeur={rythme} onChange={setRythme} options={[["1", '1 match / semaine'], ["2", '2 matchs / semaine']]} /><Choix label="Places" valeur={max} onChange={setMax} options={[4, 6, 8, 10, 12, 16, 20].map(n => [String(n), `${n} clubs`])} /></div><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>Phase finale</b>Les quatre premiers se disputent le titre en demi-finales puis en finale. Le classement décide de l’argent, la finale décide du trophée.</span></label></>}<p className="cel-note">Chaque club reçoit 30 joueurs Bronze autour de 35 GEN. Les matchs se jouent aussi pendant vos absences.</p><button className="btn primaire" disabled={occupe}>{occupe ? 'Préparation…' : mode === 'creer' ? 'Créer ma ligue privée' : 'Rejoindre la ligue'}<Icone nom="fleche-droite" taille={18} /></button></form></div></>;
+  const [dotation, setDotation] = useState('1000');
+  return <><header className="cel-titre"><div className="eyebrow">Bienvenue au club, {session.compte.pseudo}</div><h1>Vos rendez-vous rugby.</h1><p>Chaque ligue a ses clubs, ses cartes, ses Ovas et son histoire.</p></header><div className="cel-portail"><div><h2>Mes ligues <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <button className="cel-ligue" key={l.id} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} /><span><em>{l.nom}</em><b>{l.clubNom}</b><small>{l.etat === 'salon' ? 'En préparation' : l.etat === 'saison' ? 'Saison en cours' : 'Intersaison'} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>)}</div> : <Vide titre="Tout commence avec votre ligue">Invite tes amis ou rejoins leur vestiaire avec le code qu’ils t’ont partagé.</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme) as 1 | 2, Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>Créer une ligue</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>Rejoindre des amis</button></div><h2>{mode === 'creer' ? 'Le coup d’envoi vous appartient.' : 'Une place vous attend.'}</h2>{mode === 'creer' ? <Champ label="Nom de la ligue"><input required minLength={3} maxLength={50} placeholder="La Ligue du dimanche" value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label="Code d’invitation"><input required autoCapitalize="characters" maxLength={20} placeholder="Code reçu de ton ami" value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label="Nom de ton club"><input required minLength={3} maxLength={40} placeholder="Les XV du quartier" value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>Écusson</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? 'Changer d’écusson' : 'Choisir un vrai écusson de club'}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Choix label="Rythme" valeur={rythme} onChange={setRythme} options={[["1", '1 match / semaine'], ["2", '2 matchs / semaine']]} /><Choix label="Places" valeur={max} onChange={setMax} options={[4, 6, 8, 10, 12, 16, 20].map(n => [String(n), `${n} clubs`])} /></div><Choix label="Ovas au départ" valeur={dotation} onChange={setDotation} options={[['0', 'Aucun — tout se gagne'], ['500', '500 Ovas'], ['1000', '1 000 Ovas · recommandé'], ['2500', '2 500 Ovas'], ['5000', '5 000 Ovas'], ['10000', '10 000 Ovas'], ['25000', '25 000 Ovas'], ['50000', '50 000 Ovas'], ['100000', '100 000 Ovas · démarrage lancé']]} /><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>Phase finale</b>Les quatre premiers se disputent le titre en demi-finales puis en finale. Le classement décide de l’argent, la finale décide du trophée.</span></label></>}<p className="cel-note">Chaque club reçoit 30 joueurs Bronze autour de 35 GEN. Les matchs se jouent aussi pendant vos absences.</p><button className="btn primaire" disabled={occupe}>{occupe ? 'Préparation…' : mode === 'creer' ? 'Créer ma ligue privée' : 'Rejoindre la ligue'}<Icone nom="fleche-droite" taille={18} /></button></form></div></>;
 }
 
 function Bureau({ vue, proprietaire, agir, occupe, suivre, copier }: { vue: VueCarriereEnLigne; proprietaire: boolean; agir: Agir; occupe: boolean; suivre: (id: string) => void; copier: () => void }) {
@@ -469,7 +516,7 @@ function Bureau({ vue, proprietaire, agir, occupe, suivre, copier }: { vue: VueC
   const mesCartes = vue.cartes.filter(c => c.proprietaire === vue.monClubId);
   const prochaine = vue.rencontres.find(r => !r.resultat && (r.domicile === vue.monClubId || r.exterieur === vue.monClubId));
   const moyenne = mesCartes.length ? Math.round(mesCartes.reduce((s, c) => s + c.note, 0) / mesCartes.length) : 0;
-  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? 'Avant le premier coup de sifflet' : 'Le prochain rendez-vous'}</div>{vue.phase === 'salon' ? <><h2>Rassemblez votre XV de clubs.</h2><p>Le vestiaire est ouvert. Partage le code, compose ton équipe et lance la saison quand tes amis sont là.</p><button className="cel-invitation" onClick={copier}><span>CODE D’INVITATION</span><b>{vue.code}</b><Icone nom="dossier" taille={19} /></button><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Lancer la saison</button>}<small>{vue.clubs.length} / {vue.maxClubs} clubs inscrits{vue.clubs.length < 2 ? ' · Au moins 2 pour démarrer' : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : <><h2>La saison a livré son verdict.</h2><p>Retrouve les trophées dans l’histoire de la ligue.</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Démarrer la saison suivante</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>Ton vestiaire</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>GEN moyen</span></div><div><b>{mesCartes.length}</b><span>joueurs</span></div><div><b>{mesCartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length}</b><span>blessés</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>Écusson choisi à l’inscription — il ne change plus.</small></span></div><p className="cel-note">Fais grandir ton club grâce aux matchs, aux objectifs et au marché de la ligue.</p></div></div><div className="cel-grille-bureau"><div className="cel-panneau"><h2>Le championnat</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>Objectifs de la période</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>Jusqu’au {date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} OVA</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? 'Récompense reçue' : 'Récupérer'}</button></div>) : <p className="cel-note">Les premiers objectifs arrivent au lancement de la saison.</p>}</div></div></>;
+  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? 'Avant le premier coup de sifflet' : 'Le prochain rendez-vous'}</div>{vue.phase === 'salon' ? <><h2>Rassemblez votre XV de clubs.</h2><p>Le vestiaire est ouvert. Partage le code, compose ton équipe et lance la saison quand tes amis sont là.</p><button className="cel-invitation" onClick={copier}><span>CODE D’INVITATION</span><b>{vue.code}</b><Icone nom="dossier" taille={19} /></button><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Lancer la saison</button>}<small>{vue.clubs.length} / {vue.maxClubs} clubs inscrits{vue.clubs.length < 2 ? ' · Au moins 2 pour démarrer' : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : <><h2>La saison a livré son verdict.</h2><p>Retrouve les trophées dans l’histoire de la ligue.</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Démarrer la saison suivante</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>Ton vestiaire</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>GEN moyen</span></div><div><b>{mesCartes.length}</b><span>joueurs</span></div><div><b>{mesCartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length}</b><span>blessés</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>Écusson choisi à l’inscription — il ne change plus.</small></span></div><p className="cel-note">Fais grandir ton club grâce aux matchs, aux objectifs et au marché de la ligue.</p></div></div><div className="cel-grille-bureau"><div className="cel-panneau"><h2>Le championnat</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>Objectifs de la période</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>Jusqu’au {date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} Ovas</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? 'Récompense reçue' : 'Récupérer'}</button></div>) : <p className="cel-note">Les premiers objectifs arrivent au lancement de la saison.</p>}</div></div></>;
 }
 
 /**
@@ -914,7 +961,7 @@ function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occ
     const cartes = suivante.cartes.filter(c => nouvelles.includes(c.id));
     if (cartes.length) setOuverture({ cartes, pack: nomPack });
   };
-  const solde = club?.ova ?? 0;
+  const solde = club?.ovas ?? 0;
   const vedette = vue.packs.find(p => p.id === 'premium') ?? vue.packs[0];
   const autres = vue.packs.filter(p => p !== vedette);
 
@@ -926,19 +973,32 @@ function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occ
         <p>Du Top 14 à la Régionale 3, et tous les championnats étrangers.
           <b> Un joueur déjà pris dans la ligue ne sort plus d’un pack</b> — pour l’avoir, il faut aller voir celui qui l’a.</p>
       </div>
-      <div className="cel-portefeuille"><Icone nom="ova" taille={25} /><strong>{montant(solde)}</strong><span>disponibles</span></div>
+      <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(solde)}</strong><span>disponibles</span></div>
     </section>
 
     {vedette && <PackBoutique pack={vedette} solde={solde} occupe={occupe} vedette onOuvrir={ouvrir} />}
-    <div className="cel-grille-packs">
-      {autres.map(p => <PackBoutique key={p.id} pack={p} solde={solde} occupe={occupe} onOuvrir={ouvrir} />)}
-    </div>
+    {RAYONS_BOUTIQUE.map(([famille, titre, sous]) => {
+      const dedans = autres.filter(p => (p.famille ?? 'general') === famille);
+      if (!dedans.length) return null;
+      return <section key={famille} className="cel-rayon">
+        <div className="cel-rayon-tete"><h3>{titre}</h3><small>{sous}</small></div>
+        <div className="cel-grille-packs">{dedans.map(p => <PackBoutique key={p.id} pack={p} solde={solde} occupe={occupe} onOuvrir={ouvrir} />)}</div>
+      </section>;
+    })}
 
     {ouverture && <OuverturePack cartes={ouverture.cartes} pack={ouverture.pack} onFermer={() => setOuverture(null)} />}
   </>;
 }
 
-/** Ce que chaque pack promet, en une phrase — pas un tableau de pourcentages. */
+/** Les rayons de la boutique, dans l'ordre où on les parcourt. */
+const RAYONS_BOUTIQUE: [string, string, string][] = [
+  ['general', 'Les packs du vestiaire', 'Du volume, ou des garanties.'],
+  ['poste', 'Par poste', 'Quand il manque un talonneur, on ne joue pas au hasard.'],
+  ['monde', 'Par championnat', 'Le Top 14, le Japon, les Îles — ou le rugby du dimanche.'],
+  ['age', 'Par génération', 'Ceux qui vont devenir bons, et ceux qui le sont déjà.'],
+];
+
+/** Repli quand un pack n'a pas de promesse écrite dans les données. */
 const PROMESSE_PACK: Record<string, string> = {
   bronze: 'De la profondeur, pas cher. De quoi faire tourner un effectif.',
   standard: 'Le pack de tous les jours. Une chance sur sept de toucher de l’Or.',
@@ -983,19 +1043,22 @@ function PackBoutique({ pack, solde, occupe, vedette = false, onOuvrir }: {
       <b>{pack.cartes}</b>
       <small>cartes</small>
     </div>
+    {pack.garantie && <span className={`cel-pack-garantie ${pack.garantie}`}>
+      <Icone nom="ok" taille={13} />{RARETES[pack.garantie]} garanti
+    </span>}
     <div className="cel-pack-corps">
       <div className="eyebrow">{rare >= 40 ? 'Le plus généreux' : rare >= 14 ? 'Équilibré' : 'Volume'}</div>
       <h3>Pack {pack.nom}</h3>
-      <p>{PROMESSE_PACK[pack.id] ?? `${pack.cartes} cartes du vivier mondial.`}</p>
+      <p>{pack.promesse ?? PROMESSE_PACK[pack.id] ?? `${pack.cartes} cartes du vivier mondial.`}</p>
       <div className="cel-pack-barre" title={bandes.map(([r, v]) => `${RARETES[r]} ${v < 1 ? v.toFixed(2) : v.toFixed(0)} %`).join(' · ')}>
         {bandes.map(([r, v]) => <i key={r} className={r} style={{ flexGrow: Math.max(v, 0.6) }} />)}
       </div>
       <ul className="cel-pack-odds">{bandes.map(([r, v]) =>
         <li key={r}><i className={`cel-pastille ${r}`} />{RARETES[r]}<b>{v < 1 ? v.toFixed(2) : v.toFixed(0)} %</b></li>)}</ul>
       <button className="btn primaire cel-pack-acheter" disabled={occupe || trop} onClick={() => { void onOuvrir(pack.id, pack.nom); }}>
-        <Icone nom="ova" taille={18} />{montant(pack.prix)}
+        <PieceOvas taille={19} />{montant(pack.prix)}
       </button>
-      {trop && <small className="cel-pack-manque">Il te manque {montant(pack.prix - solde)} OVA</small>}
+      {trop && <small className="cel-pack-manque">Il te manque {montant(pack.prix - solde)} Ovas</small>}
     </div>
   </article>;
 }
@@ -1015,8 +1078,8 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
   const [cible, setCible] = useState('');
   const [donnees, setDonnees] = useState<string[]>([]);
   const [demandees, setDemandees] = useState<string[]>([]);
-  const [ovaDonnes, setOvaDonnes] = useState('0');
-  const [ovaDemandes, setOvaDemandes] = useState('0');
+  const [ovasDonnes, setOvaDonnes] = useState('0');
+  const [ovasDemandes, setOvaDemandes] = useState('0');
 
   const carte = (id: string) => vue.cartes.find(c => c.id === id);
   const mesCartes = vue.cartes.filter(c => c.proprietaire === vue.monClubId);
@@ -1038,13 +1101,13 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
         <CarteJoueurEnLigne carte={c} proprietaire={nomClub(vue, v.vendeurId)} compacte />
         <div className="cel-vente-corps">
           <div className="eyebrow">{v.type === 'enchere' ? 'Enchère' : 'Vente directe'} · clôture {dateHeure(v.expireLe)}</div>
-          <strong>{montant(v.enchere?.montant ?? v.prix)} OVA</strong>
+          <strong>{montant(v.enchere?.montant ?? v.prix)} Ovas</strong>
           {v.enchere && <small>Meilleure offre : {nomClub(vue, v.enchere.clubId)}</small>}
           {mienne ? (v.type === 'directe' || !v.enchere
             ? <button className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'annulerVente', venteId: v.id }); }}>Retirer de la vente</button>
             : <small>Une enchère est en cours : la vente ira à son terme.</small>)
             : v.type === 'directe'
-              ? <button className="btn primaire" disabled={occupe || (club?.ova ?? 0) < v.prix} onClick={() => { void agir({ type: 'acheter', venteId: v.id }); }}>Acheter</button>
+              ? <button className="btn primaire" disabled={occupe || (club?.ovas ?? 0) < v.prix} onClick={() => { void agir({ type: 'acheter', venteId: v.id }); }}>Acheter</button>
               : <div className="cel-encherir">
                 <input type="number" min={minimum} step={25} value={enchere[v.id] ?? String(minimum)} onChange={e => setEnchere({ ...enchere, [v.id]: e.target.value })} aria-label="Montant de l’enchère" />
                 <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'encherir', venteId: v.id, montant: Number(enchere[v.id] ?? minimum) }); }}>Enchérir</button>
@@ -1059,7 +1122,7 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
         <p className="cel-note">Ton effectif ne peut pas descendre sous 26 joueurs, et chaque ligne doit garder de quoi composer une feuille. C’est le serveur qui le vérifie.</p>
         <div className="cel-grille-consignes">
           <Choix label="Joueur" valeur={carteId} options={[['', 'Choisis un joueur'], ...vendables.sort((a, b) => b.note - a.note).map(c => [c.id, `${c.note} · ${c.nom} (${nomPoste(c.poste)})`] as [string, string])]} onChange={setCarteId} />
-          <Champ label="Prix de départ (OVA)"><input type="number" min={1} step={100} value={prix} onChange={e => setPrix(e.target.value)} required /></Champ>
+          <Champ label="Prix de départ (Ovas)"><input type="number" min={1} step={100} value={prix} onChange={e => setPrix(e.target.value)} required /></Champ>
           <Choix label="Type" valeur={mode} options={[['directe', 'Vente directe'], ['enchere', 'Aux enchères']]} onChange={setMode} />
           <Choix label="Durée" valeur={duree} options={[['2', '2 heures'], ['6', '6 heures'], ['24', '24 heures'], ['72', '3 jours'], ['168', '7 jours']]} onChange={setDuree} />
         </div>
@@ -1074,9 +1137,9 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
         return <article key={e.id} className="cel-panneau cel-echange">
           <div className="eyebrow">{recu ? `Offre de ${nomClub(vue, e.de)}` : `Ton offre à ${nomClub(vue, e.vers)}`} · expire {dateHeure(e.expireLe)}</div>
           <div className="cel-echange-cotes">
-            <div><h3>{nomClub(vue, e.de)} donne</h3><div className="cel-grille-cartes petites">{e.cartesDonnees.map(id => carte(id)).filter(Boolean).map(c => <CarteJoueurEnLigne key={c!.id} carte={c!} compacte />)}</div>{e.ovaDonnes > 0 && <b className="cel-ova-echange">+ {montant(e.ovaDonnes)} OVA</b>}</div>
+            <div><h3>{nomClub(vue, e.de)} donne</h3><div className="cel-grille-cartes petites">{e.cartesDonnees.map(id => carte(id)).filter(Boolean).map(c => <CarteJoueurEnLigne key={c!.id} carte={c!} compacte />)}</div>{e.ovasDonnes > 0 && <b className="cel-ovas-echange">+ {montant(e.ovasDonnes)} Ovas</b>}</div>
             <Icone nom="repost" taille={26} />
-            <div><h3>{nomClub(vue, e.vers)} donne</h3><div className="cel-grille-cartes petites">{e.cartesDemandees.map(id => carte(id)).filter(Boolean).map(c => <CarteJoueurEnLigne key={c!.id} carte={c!} compacte />)}</div>{e.ovaDemandes > 0 && <b className="cel-ova-echange">+ {montant(e.ovaDemandes)} OVA</b>}</div>
+            <div><h3>{nomClub(vue, e.vers)} donne</h3><div className="cel-grille-cartes petites">{e.cartesDemandees.map(id => carte(id)).filter(Boolean).map(c => <CarteJoueurEnLigne key={c!.id} carte={c!} compacte />)}</div>{e.ovasDemandes > 0 && <b className="cel-ovas-echange">+ {montant(e.ovasDemandes)} Ovas</b>}</div>
           </div>
           <div className="cel-actions">
             {recu ? <>
@@ -1086,17 +1149,168 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
           </div>
         </article>;
       })}
-      <form className="cel-panneau" onSubmit={async ev => { ev.preventDefault(); const v = await agir({ type: 'proposerEchange', vers: cible, cartesDonnees: donnees, cartesDemandees: demandees, ovaDonnes: Number(ovaDonnes), ovaDemandes: Number(ovaDemandes) }); if (v) { setDonnees([]); setDemandees([]); } }}>
+      <form className="cel-panneau" onSubmit={async ev => { ev.preventDefault(); const v = await agir({ type: 'proposerEchange', vers: cible, cartesDonnees: donnees, cartesDemandees: demandees, ovasDonnes: Number(ovasDonnes), ovasDemandes: Number(ovasDemandes) }); if (v) { setDonnees([]); setDemandees([]); } }}>
         <h2>Proposer un échange</h2>
-        <p className="cel-note">« Je te donne mon 8 contre ton ailier + 15 000 OVA. » Les deux doivent accepter ; le serveur valide ensuite la transaction d’un bloc.</p>
+        <p className="cel-note">« Je te donne mon 8 contre ton ailier + 15 000 Ovas. » Les deux doivent accepter ; le serveur valide ensuite la transaction d’un bloc.</p>
         <Choix label="Avec qui ?" valeur={cible} options={[['', 'Choisis un club'], ...vue.clubs.filter(c => c.id !== vue.monClubId).map(c => [c.id, c.nom] as [string, string])]} onChange={v => { setCible(v); setDemandees([]); }} />
         {cible && <div className="cel-deux">
-          <div><h3>Je donne</h3><div className="cel-choix-cartes">{vendables.sort((a, b) => b.note - a.note).map(c => <button type="button" key={c.id} className={donnees.includes(c.id) ? 'actif' : ''} onClick={() => basculer(donnees, setDonnees, c.id)}><b>{c.note}</b>{c.nom}<small>{nomPoste(c.poste)}</small></button>)}</div><Champ label="+ OVA de ma part"><input type="number" min={0} step={100} value={ovaDonnes} onChange={e => setOvaDonnes(e.target.value)} /></Champ></div>
-          <div><h3>Je demande</h3><div className="cel-choix-cartes">{siennes.filter(c => !c.verrou).sort((a, b) => b.note - a.note).map(c => <button type="button" key={c.id} className={demandees.includes(c.id) ? 'actif' : ''} onClick={() => basculer(demandees, setDemandees, c.id)}><b>{c.note}</b>{c.nom}<small>{nomPoste(c.poste)}</small></button>)}</div><Champ label="+ OVA de sa part"><input type="number" min={0} step={100} value={ovaDemandes} onChange={e => setOvaDemandes(e.target.value)} /></Champ></div>
+          <div><h3>Je donne</h3><div className="cel-choix-cartes">{vendables.sort((a, b) => b.note - a.note).map(c => <button type="button" key={c.id} className={donnees.includes(c.id) ? 'actif' : ''} onClick={() => basculer(donnees, setDonnees, c.id)}><b>{c.note}</b>{c.nom}<small>{nomPoste(c.poste)}</small></button>)}</div><Champ label="+ Ovas de ma part"><input type="number" min={0} step={100} value={ovasDonnes} onChange={e => setOvaDonnes(e.target.value)} /></Champ></div>
+          <div><h3>Je demande</h3><div className="cel-choix-cartes">{siennes.filter(c => !c.verrou).sort((a, b) => b.note - a.note).map(c => <button type="button" key={c.id} className={demandees.includes(c.id) ? 'actif' : ''} onClick={() => basculer(demandees, setDemandees, c.id)}><b>{c.note}</b>{c.nom}<small>{nomPoste(c.poste)}</small></button>)}</div><Champ label="+ Ovas de sa part"><input type="number" min={0} step={100} value={ovasDemandes} onChange={e => setOvaDemandes(e.target.value)} /></Champ></div>
         </div>}
         <button className="btn primaire" disabled={occupe || !cible || (!donnees.length && !demandees.length)}>Envoyer la proposition</button>
       </form>
     </>}
+  </>;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LE CALENDRIER, ET LES RAPPELS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const dateLongue = (iso: string) => new Date(iso).toLocaleString('fr-FR', {
+  weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+});
+/** « dans 2 j », « dans 4 h », « il y a 20 min » — l'échelle qui compte ici. */
+function delai(iso: string, maintenant = Date.now()): string {
+  const ms = Date.parse(iso) - maintenant;
+  const passe = ms < 0;
+  const min = Math.round(Math.abs(ms) / 60_000);
+  const texte = min < 60 ? `${min} min` : min < 60 * 24 ? `${Math.round(min / 60)} h` : `${Math.round(min / (60 * 24))} j`;
+  return passe ? `il y a ${texte}` : `dans ${texte}`;
+}
+
+/**
+ * ⚠️ CE QUE CES RAPPELS SONT, ET CE QU'ILS NE SONT PAS. Ce sont des
+ * notifications de NAVIGATEUR, déclenchées par l'onglet ouvert : elles
+ * préviennent quand une fenêtre de journée s'ouvre, quand un match commence ou
+ * quand le tien se termine, tant que Destiny Rugby tourne quelque part. Elles
+ * ne réveillent pas un téléphone éteint — ça demanderait un service worker et
+ * un serveur de push, qui n'existent pas encore. L'écran le dit, plutôt que de
+ * laisser croire à une alerte qui n'arrivera jamais.
+ */
+type EtatRappels = 'indisponible' | 'refuse' | 'inactif' | 'actif';
+function useRappels(ligueId: string) {
+  const supporte = typeof Notification !== 'undefined';
+  const cle = `destiny.rappels.${ligueId}`;
+  const [etat, setEtat] = useState<EtatRappels>(() => {
+    if (!supporte) return 'indisponible';
+    if (Notification.permission === 'denied') return 'refuse';
+    try { return localStorage.getItem(cle) === '1' && Notification.permission === 'granted' ? 'actif' : 'inactif'; }
+    catch { return 'inactif'; }
+  });
+  const basculer = useCallback(async () => {
+    if (!supporte) return;
+    if (etat === 'actif') {
+      try { localStorage.removeItem(cle); } catch { /* navigation privée */ }
+      return setEtat('inactif');
+    }
+    const accord = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+    if (accord !== 'granted') return setEtat(accord === 'denied' ? 'refuse' : 'inactif');
+    try { localStorage.setItem(cle, '1'); } catch { /* navigation privée */ }
+    setEtat('actif');
+  }, [cle, etat, supporte]);
+  const prevenir = useCallback((titre: string, corps: string) => {
+    if (etat !== 'actif' || !supporte || Notification.permission !== 'granted') return;
+    try { new Notification(titre, { body: corps, icon: '/favicon.svg', tag: `${ligueId}-${titre}` }); }
+    catch { /* certains navigateurs refusent hors service worker */ }
+  }, [etat, ligueId, supporte]);
+  return { etat, basculer, prevenir };
+}
+
+function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; suivre: (id: string) => void }) {
+  const rappels = useRappels(vue.id);
+  const maintenant = maintenantISO();
+  const miennes = vue.rencontres.filter(r => r.domicile === vue.monClubId || r.exterieur === vue.monClubId);
+  const aVenir = miennes.filter(r => !r.resultat);
+  const jouees = miennes.filter(r => r.resultat).slice(-8).reverse();
+  const prochaine = aVenir[0];
+  const parJournee = new Map<number, VueRencontre[]>();
+  for (const r of vue.rencontres.filter(r => !r.resultat)) {
+    if (!parJournee.has(r.journee)) parJournee.set(r.journee, []);
+    parJournee.get(r.journee)!.push(r);
+  }
+  const journees = [...parJournee.keys()].sort((a, b) => a - b).slice(0, 6);
+
+  if (!vue.rencontres.length) return <Vide icone="calendrier" titre="Le calendrier arrive au coup d’envoi">Quand le créateur lancera la saison, toutes les journées apparaîtront ici, avec leurs dates.</Vide>;
+
+  return <>
+    {prochaine && <section className="cel-panneau cel-prochain">
+      <div className="cel-prochain-corps">
+        <div className="eyebrow">Ton prochain match · journée {prochaine.journee}</div>
+        <h2 className="cel-nom-ligue">
+          <Ecusson nom={nomClub(vue, prochaine.domicile)} logo={vue.clubs.find(c => c.id === prochaine.domicile)?.embleme} />
+          {nomClub(vue, prochaine.domicile)} <em>reçoit</em> {nomClub(vue, prochaine.exterieur)}
+          <Ecusson nom={nomClub(vue, prochaine.exterieur)} logo={vue.clubs.find(c => c.id === prochaine.exterieur)?.embleme} />
+        </h2>
+        <p className="cel-fenetre">
+          <Icone nom="chrono" taille={16} />
+          {prochaine.ouvre > maintenant
+            ? <>Fenêtre ouverte le <b>{dateLongue(prochaine.ouvre)}</b> — {delai(prochaine.ouvre)}</>
+            : <>À jouer avant le <b>{dateLongue(prochaine.ferme)}</b> — {delai(prochaine.ferme)}</>}
+        </p>
+        <small className="cel-note">Les deux managers s’arrangent sur l’heure exacte. Passé la limite, la rencontre se joue toute seule avec vos compositions enregistrées.</small>
+      </div>
+      <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande />
+    </section>}
+
+    <section className="cel-panneau">
+      <div className="cel-titre-ligne">
+        <h2>Me prévenir</h2>
+        <button className={`cel-interrupteur${rappels.etat === 'actif' ? ' actif' : ''}`} disabled={rappels.etat === 'indisponible' || rappels.etat === 'refuse'}
+          onClick={() => { void rappels.basculer(); }} aria-pressed={rappels.etat === 'actif'}>
+          <i /><span>{rappels.etat === 'actif' ? 'Activé' : 'Désactivé'}</span>
+        </button>
+      </div>
+      <p className="cel-note">
+        {rappels.etat === 'indisponible' ? 'Ce navigateur ne sait pas afficher de notification.'
+          : rappels.etat === 'refuse' ? 'Les notifications sont bloquées pour ce site. Réautorise-les dans les réglages de ton navigateur.'
+            : <>Une notification quand une journée s’ouvre, quand ton match commence et quand il se termine.
+              <b> Il faut que Destiny Rugby soit ouvert quelque part</b> — ce ne sont pas encore des alertes qui réveillent un téléphone fermé.</>}
+      </p>
+    </section>
+
+    {aVenir.length > 1 && <section className="cel-panneau">
+      <div className="cel-titre-ligne"><h2>Tes rendez-vous</h2><small>{aVenir.length} matchs à venir</small></div>
+      <div className="cel-agenda">{aVenir.slice(0, 8).map(r => {
+        const chezMoi = r.domicile === vue.monClubId;
+        const adversaire = chezMoi ? r.exterieur : r.domicile;
+        const ouverte = r.ouvre <= maintenant && r.ferme >= maintenant;
+        return <button key={r.id} className={`cel-agenda-ligne${ouverte ? ' ouverte' : ''}`} onClick={() => suivre(r.id)} disabled={!r.match}>
+          <span className="cel-agenda-jour">
+            <b>{new Date(r.ouvre).getDate()}</b>
+            <small>{new Date(r.ouvre).toLocaleDateString('fr-FR', { month: 'short' })}</small>
+          </span>
+          <Ecusson nom={nomClub(vue, adversaire)} logo={vue.clubs.find(c => c.id === adversaire)?.embleme} />
+          <span className="cel-agenda-corps">
+            <b>{chezMoi ? 'Reçoit' : 'Se déplace à'} {nomClub(vue, adversaire)}</b>
+            <small>Journée {r.journee} · {JOURS[new Date(r.ouvre).getDay()]} au {JOURS[new Date(r.ferme).getDay()]} · {delai(r.ouvre)}</small>
+          </span>
+          {ouverte && <em className="cel-agenda-ouverte">Fenêtre ouverte</em>}
+        </button>;
+      })}</div>
+    </section>}
+
+    <section className="cel-panneau">
+      <div className="cel-titre-ligne"><h2>Toute la ligue</h2><small>{journees.length} prochaines journées</small></div>
+      {journees.map(j => {
+        const liste = parJournee.get(j)!;
+        return <div key={j} className="cel-journee">
+          <div className="cel-journee-tete">
+            <b>Journée {j}</b>
+            <small>{dateLongue(liste[0].ouvre)} → {dateLongue(liste[0].ferme)}</small>
+          </div>
+          <div className="cel-grille-rencontres">{liste.map(r =>
+            <Rencontre key={r.id} vue={vue} rencontre={r} agir={agir} occupe={occupe} suivre={suivre} />)}</div>
+        </div>;
+      })}
+    </section>
+
+    {jouees.length > 0 && <section className="cel-panneau">
+      <div className="cel-titre-ligne"><h2>Tes derniers matchs</h2><Icone nom="resultats" /></div>
+      <div className="cel-grille-rencontres">{jouees.map(r =>
+        <Rencontre key={r.id} vue={vue} rencontre={r} agir={agir} occupe={occupe} suivre={suivre} />)}</div>
+    </section>}
   </>;
 }
 
@@ -1134,15 +1348,15 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
       if (v) setNouvelle(false);
     }}>
       <h2>Ta coupe, tes traditions</h2>
-      <p className="cel-note">Deux coupes par saison au maximum : au-delà, la dotation en OVA déséquilibrerait l’économie de la ligue.</p>
+      <p className="cel-note">Deux coupes par saison au maximum : au-delà, la dotation en Ovas déséquilibrerait l’économie de la ligue.</p>
       <div className="cel-grille-consignes">
         <Champ label="Nom de la coupe"><input required minLength={2} maxLength={40} value={nom} onChange={e => setNom(e.target.value)} /></Champ>
         <Champ label="Nom du trophée"><input required minLength={2} maxLength={40} value={trophee} onChange={e => setTrophee(e.target.value)} /></Champ>
         <Choix label="Format" valeur={format} options={[['elimination', 'Élimination directe'], ['championnat', 'Championnat aller-retour']]} onChange={setFormat} />
         <Champ label="Début"><input type="date" required value={debut} onChange={e => setDebut(e.target.value)} /></Champ>
-        <Champ label="Vainqueur (OVA)"><input type="number" min={0} max={10000} step={500} value={vainqueur} onChange={e => setVainqueur(e.target.value)} /></Champ>
-        <Champ label="Finaliste (OVA)"><input type="number" min={0} max={5000} step={500} value={finaliste} onChange={e => setFinaliste(e.target.value)} /></Champ>
-        <Champ label="Chaque participant (OVA)"><input type="number" min={0} max={1000} step={100} value={participation} onChange={e => setParticipation(e.target.value)} /></Champ>
+        <Champ label="Vainqueur (Ovas)"><input type="number" min={0} max={10000} step={500} value={vainqueur} onChange={e => setVainqueur(e.target.value)} /></Champ>
+        <Champ label="Finaliste (Ovas)"><input type="number" min={0} max={5000} step={500} value={finaliste} onChange={e => setFinaliste(e.target.value)} /></Champ>
+        <Champ label="Chaque participant (Ovas)"><input type="number" min={0} max={1000} step={100} value={participation} onChange={e => setParticipation(e.target.value)} /></Champ>
       </div>
       <ChoixCompetition logo={logoCoupe} tropheeId={tropheeCoupe} onLogo={setLogoCoupe} onTrophee={setTropheeCoupe} />
       {format === 'championnat' && <label className="cel-bascule"><input type="checkbox" checked={playoffsCoupe} onChange={e => setPlayoffsCoupe(e.target.checked)} /><span><b>Phase finale</b>Les quatre premiers se disputent le trophée après les journées de poule.</span></label>}
@@ -1186,10 +1400,10 @@ function Histoire({ vue }: { vue: VueCarriereEnLigne }) {
     </section>
     <section className="cel-panneau">
       <div className="cel-titre-ligne"><h2>Le journal de ton club</h2><Icone nom="journal" /></div>
-      <div className="cel-journal">{[...vue.transactions].reverse().slice(0, 60).map(t => <p key={t.id} className={t.ova >= 0 ? 'credit' : 'debit'}>
+      <div className="cel-journal">{[...vue.transactions].reverse().slice(0, 60).map(t => <p key={t.id} className={t.ovas >= 0 ? 'credit' : 'debit'}>
         <Icone nom={NATURES[t.nature]?.icone ?? 'journal'} taille={16} />
         <span><b>{NATURES[t.nature]?.label ?? t.nature}</b>{t.libelle}</span>
-        <em>{t.ova > 0 ? '+' : ''}{montant(t.ova)}</em>
+        <em>{t.ovas > 0 ? '+' : ''}{montant(t.ovas)}</em>
         <small>{dateHeure(t.date)}</small>
       </p>)}</div>
       {!vue.transactions.length && <p className="cel-note">Rien ne s’est encore passé.</p>}

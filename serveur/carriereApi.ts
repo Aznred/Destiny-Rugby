@@ -196,7 +196,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
           const ligues = await stockage.ligues(compte.id);
           return res.status(200).json({ compte: publicCompte(compte), ligues: ligues.map(({ etat: e }) => {
             const club = e.clubs.find(c => c.compteId === compte.id)!;
-            return { id: e.id, nom: e.nom, etat: e.phase, clubNom: club.nom, ova: club.ova };
+            return { id: e.id, nom: e.nom, etat: e.phase, clubNom: club.nom, ovas: club.ovas };
           }) });
         }
         if (!idValide(id)) throw new ErreurHttp(404, 'Ligue introuvable.');
@@ -215,6 +215,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
             rythme: corps.rythme, maxClubs: Number(corps.maxClubs),
             embleme: corps.embleme,
             logo: corps.logo, tropheeId: corps.tropheeId, playoffs: corps.playoffs === true,
+            dotationOvas: typeof corps.dotationOvas === 'number' ? corps.dotationOvas : undefined,
           }, maintenant, randomBytes(24).toString('hex'));
           if (await stockage.creerLigue({ id, code, etat: e, comptes: comptesEtat(e), version: 0 })) return res.status(201).json(vueCarriere(e, compte.id));
         }

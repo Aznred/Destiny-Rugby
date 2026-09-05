@@ -48,7 +48,7 @@ export interface PackCarriere {
   famille?: 'general' | 'poste' | 'monde' | 'age';
 }
 export interface ClubCarriere {
-  id: string; compteId: string; pseudo: string; nom: string; ova: number;
+  id: string; compteId: string; pseudo: string; nom: string; ovas: number;
   /** Chemin d'un vrai écusson de club (`emblemeValide` fait foi). */
   embleme?: string;
   composition: CompositionManager; strategie: StrategieEnLigne;
@@ -79,12 +79,12 @@ export interface VenteCarriere {
 }
 export interface EchangeCarriere {
   id: string; de: string; vers: string; cartesDonnees: string[]; cartesDemandees: string[];
-  ovaDonnes: number; ovaDemandes: number; expireLe: string;
+  ovasDonnes: number; ovasDemandes: number; expireLe: string;
   etat: 'propose' | 'accepte' | 'refuse' | 'annule' | 'expire';
 }
 export interface TransactionCarriere {
   id: string; clubId: string; nature: 'dotation' | 'pack' | 'vente' | 'enchere' | 'echange' | 'match' | 'objectif' | 'competition';
-  ova: number; cartes: string[]; libelle: string; date: string;
+  ovas: number; cartes: string[]; libelle: string; date: string;
 }
 export interface ObjectifCarriere {
   id: string; clubId: string; libelle: string; type: 'participer' | 'gagner' | 'essais' | 'formation' | 'penalites' | 'serie';
@@ -105,6 +105,8 @@ export interface EtatCarriereEnLigne {
   rythme: 1 | 2; maxClubs: number; graine: string; debutSaison?: string;
   /** L'identité de la ligue : son logo, son trophée, sa phase finale. */
   logo?: string; tropheeId?: string; playoffs?: boolean;
+  /** Ce que chaque club reçoit en arrivant. Fixé à la création, jamais après. */
+  dotationOvas: number;
   clubs: ClubCarriere[]; cartes: CarteCarriere[]; packs: PackCarriere[];
   competitions: CompetitionCarriere[]; rencontres: RencontreCarriere[];
   ventes: VenteCarriere[]; echanges: EchangeCarriere[]; transactions: TransactionCarriere[];
@@ -122,7 +124,7 @@ export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' |
 export interface CreationCarriere {
   id: string; nom: string; code: string; compteId: string; pseudo: string; clubNom: string;
   rythme: 1 | 2; maxClubs: number; embleme?: string;
-  logo?: string; tropheeId?: string; playoffs?: boolean;
+  logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number;
 }
 export type CommandeCarriere =
   // ⚠️ L'ÉCUSSON SE CHOISIT À L'INSCRIPTION, ET PLUS JAMAIS APRÈS. Il n'y a
@@ -138,7 +140,7 @@ export type CommandeCarriere =
   | { type: 'acheter'; venteId: string }
   | { type: 'encherir'; venteId: string; montant: number }
   | { type: 'annulerVente'; venteId: string }
-  | { type: 'proposerEchange'; vers: string; cartesDonnees: string[]; cartesDemandees: string[]; ovaDonnes: number; ovaDemandes: number }
+  | { type: 'proposerEchange'; vers: string; cartesDonnees: string[]; cartesDemandees: string[]; ovasDonnes: number; ovasDemandes: number }
   | { type: 'repondreEchange'; echangeId: string; accepter: boolean }
   | { type: 'annulerEchange'; echangeId: string }
   | { type: 'reclamerObjectif'; objectifId: string }

@@ -4,7 +4,7 @@ import type { CompositionManager } from '../../types';
 import { compositionManagerParDefaut, EFFECTIF_MINIMUM, joueurCompatibleManager, POSTES_BANC_MANAGER, POSTES_XV_MANAGER, reconcilerCompositionManager } from '../compositionManager';
 import { affichesToutesRondes } from './calendrier';
 import { graine as hasard, tirerPondere } from './aleatoire';
-import { carteDepuisSource, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere';
+import { bandesGaranties, carteDepuisSource, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere';
 import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere';
 
@@ -14,9 +14,9 @@ const SEMAINE = 7 * JOUR;
 const copier = <T>(x: T): T => structuredClone(x);
 /**
  * ⚠️ LE NOM DE L'ERREUR EST UNE INTERFACE, PAS UNE DÉCORATION. `carriereApi`
- * distingue une règle du jeu (« OVA insuffisants », qui se lit à l'écran et
+ * distingue une règle du jeu (« Ovas insuffisants », qui se lit à l'écran et
  * rend un 400) d'une panne (une erreur SQL, qui rend un 503 sans jamais
- * exposer sa pile). Sans ce nom, « il te manque 200 OVA » remontait au joueur
+ * exposer sa pile). Sans ce nom, « il te manque 200 Ovas » remontait au joueur
  * en « le serveur de carrière est indisponible ».
  */
 export class ErreurCarriere extends Error {
@@ -33,10 +33,10 @@ const cartesClub = (etat: EtatCarriereEnLigne, clubId: string) => etat.cartes.fi
 const clubParId = (etat: EtatCarriereEnLigne, id: string) => { const club = etat.clubs.find(c => c.id === id); exiger(club, 'Club introuvable dans cette ligue.'); return club; };
 const monClub = (etat: EtatCarriereEnLigne, compteId: string) => { const club = etat.clubs.find(c => c.compteId === compteId); exiger(club, 'Vous ne faites pas partie de cette ligue.'); return club; };
 const carteParId = (etat: EtatCarriereEnLigne, id: string) => { const carte = etat.cartes.find(c => c.id === id); exiger(carte, 'Carte introuvable dans cette ligue.'); return carte; };
-function journal(etat: EtatCarriereEnLigne, club: ClubCarriere, nature: TransactionCarriere['nature'], ova: number, cartes: string[], libelle: string, date: string) {
-  exiger(Number.isSafeInteger(club.ova + ova) && club.ova + ova >= 0, 'OVA insuffisants.');
-  club.ova += ova;
-  etat.transactions.push({ id: prochainId(etat, 'transaction', etat.transactions.length), clubId: club.id, nature, ova, cartes, libelle, date });
+function journal(etat: EtatCarriereEnLigne, club: ClubCarriere, nature: TransactionCarriere['nature'], ovas: number, cartes: string[], libelle: string, date: string) {
+  exiger(Number.isSafeInteger(club.ovas + ovas) && club.ovas + ovas >= 0, 'Ovas insuffisants.');
+  club.ovas += ovas;
+  etat.transactions.push({ id: prochainId(etat, 'transaction', etat.transactions.length), clubId: club.id, nature, ovas, cartes, libelle, date });
 }
 function ajusterComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, maintenant: number) {
   const cartes = cartesClub(etat, club.id);
@@ -77,6 +77,14 @@ function verifierComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, vale
   });
 }
 
+/** De 0 à 100 000, par pas de 100. Hors bornes, on ramène au défaut. */
+const DOTATION_DEFAUT = 1000;
+export const DOTATION_MAX = 100_000;
+function dotationValide(valeur: unknown): number {
+  if (typeof valeur !== 'number' || !Number.isFinite(valeur)) return DOTATION_DEFAUT;
+  return Math.min(DOTATION_MAX, Math.max(0, Math.round(valeur / 100) * 100));
+}
+
 function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string, nom: string, maintenant: number, graine: string, embleme?: unknown) {
   identifiant(compteId); texte(pseudo); texte(nom, 40);
   exiger(etat.phase === 'salon', 'Les inscriptions sont closes pour cette saison.');
@@ -88,9 +96,9 @@ function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string
   // inscrits le même jour ne peuvent pas recevoir le même licencié.
   const cartes = dotationBronzeCarriere(etat.id, id, graine, new Set(etat.cartes.map(c => c.sourceId)), etat.saison);
   exiger(cartes.length === 30, 'Le vivier de départ est épuisé pour cette ligue.');
-  const club: ClubCarriere = { id, compteId, pseudo: pseudo.trim(), nom: nom.trim(), ova: 0, composition: compositionManagerParDefaut(cartes.map(coequipierDepuisCarte)), strategie: copier(STRATEGIE_EN_LIGNE_DEFAUT), rejointLe: dateServeur(maintenant), embleme: emblemeValide(embleme) ? embleme : undefined };
+  const club: ClubCarriere = { id, compteId, pseudo: pseudo.trim(), nom: nom.trim(), ovas: 0, composition: compositionManagerParDefaut(cartes.map(coequipierDepuisCarte)), strategie: copier(STRATEGIE_EN_LIGNE_DEFAUT), rejointLe: dateServeur(maintenant), embleme: emblemeValide(embleme) ? embleme : undefined };
   etat.clubs.push(club); etat.cartes.push(...cartes);
-  journal(etat, club, 'dotation', 1000, cartes.map(c => c.id), 'Dotation de départ : 30 licenciés de Régionale 3 et 1 000 OVA', dateServeur(maintenant));
+  journal(etat, club, 'dotation', etat.dotationOvas, cartes.map(c => c.id), `Dotation de départ : 30 licenciés de Régionale 3 et ${etat.dotationOvas.toLocaleString('fr-FR')} Ovas`, dateServeur(maintenant));
   renouvelerObjectifs(etat, maintenant);
 }
 
@@ -109,6 +117,11 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
     logo: logoCompetitionValide(config.logo) ? config.logo : undefined,
     tropheeId: tropheeValide(config.tropheeId) ? config.tropheeId : undefined,
     playoffs: config.playoffs === true,
+    // ⚠️ BORNÉE, ET C'EST TOUTE LA DIFFÉRENCE ENTRE UN RÉGLAGE ET UNE FAILLE.
+    // La dotation de départ est le seul robinet d'Ovas que le créateur ouvre
+    // lui-même : sans plafond, il se donne dix millions et le marché de la
+    // ligue n'existe plus. 100 000 Ovas, c'est déjà trois saisons de gains.
+    dotationOvas: dotationValide(config.dotationOvas),
     clubs: [], cartes: [], packs: copier(PACKS_CARRIERE), competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
   ajouterClub(etat, config.compteId, config.pseudo, config.clubNom, maintenant, graine, config.embleme);
   return etat;
@@ -116,19 +129,37 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
 
 function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string) {
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
-  entier(pack.prix, 1); entier(pack.cartes, 1, 10);
+  entier(pack.prix, 1); entier(pack.cartes, 1, 12);
   exiger(RARETES_CARRIERE.every(r => Number.isFinite(pack.probabilites[r]) && pack.probabilites[r] >= 0), 'Probabilités de pack invalides.');
-  exiger(club.ova >= pack.prix, 'OVA insuffisants pour ce pack.');
+  exiger(club.ovas >= pack.prix, 'Ovas insuffisants pour ce pack.');
   // ⚠️ L'UNICITÉ PAR LIGUE SE TIENT ICI. Un joueur déjà possédé — par n'importe
   // quel club de CETTE ligue — ne peut plus sortir d'un pack : c'est ce qui
   // oblige à aller parler à celui qui l'a. Il reste évidemment disponible dans
   // toutes les autres ligues.
   const pris = new Set(etat.cartes.map(c => c.sourceId));
-  const rayons = RARETES_CARRIERE.map(r => rayonDePack(r, pack.filtre));
+  const rayons = RARETES_CARRIERE.map(r => rayonDePack(r, pack));
   exiger(rayons.some((rayon, i) => pack.probabilites[RARETES_CARRIERE[i]] > 0 && rayon.length > pris.size), 'Ce pack est épuisé dans votre ligue.');
   const rng = hasard(`${graine}:${etat.version}:${club.id}`); const tirees: CarteCarriere[] = [];
+  // ⚠️ LA GARANTIE SE TIENT SUR LA DERNIÈRE CARTE, PAS SUR LA PREMIÈRE. Forcer
+  // la bande dès le premier tirage ferait d'un « Or garanti » un pack qui
+  // commence toujours par de l'Or puis retombe : le joueur apprendrait en trois
+  // ouvertures que seule la carte n°1 compte. En la gardant pour la fin, et
+  // SEULEMENT si le tirage normal n'a rien donné, la promesse est tenue sans
+  // que la séquence devienne prévisible — et la plupart du temps elle ne sert
+  // même pas, parce que le hasard a déjà fait le travail.
+  const bandes = pack.garantie ? bandesGaranties(pack.garantie) : [];
   for (let n = 0; n < pack.cartes; n++) {
-    const i = tirerPondere(RARETES_CARRIERE.map((r, b) => rayons[b].length ? pack.probabilites[r] : 0), rng);
+    const derniere = n === pack.cartes - 1;
+    const doitGarantir = derniere && bandes.length > 0 && !tirees.some(c => bandes.includes(c.rarete));
+    const poids = RARETES_CARRIERE.map((r, b) => {
+      if (!rayons[b].length) return 0;
+      if (doitGarantir && !bandes.includes(r)) return 0;
+      return pack.probabilites[r];
+    });
+    // Une garantie impossible (bande épuisée dans la ligue) ne bloque pas
+    // l'ouverture : on retombe sur le tirage ordinaire plutôt que de refuser
+    // un pack déjà payé.
+    const i = tirerPondere(poids.some(x => x > 0) ? poids : RARETES_CARRIERE.map((r, b) => rayons[b].length ? pack.probabilites[r] : 0), rng);
     exiger(i >= 0, 'Ce pack ne contient plus de joueurs disponibles.');
     const source = tirerDuRayon(rayons[i], pris, rng);
     exiger(source, 'Ce pack ne contient plus de joueurs disponibles.');
@@ -208,7 +239,7 @@ export function classementCarriere(etat: EtatCarriereEnLigne, competitionId?: st
 /**
  * ⚠️ TOUT LE MONDE TOUCHE, ET LE PODIUM DÉCROÎT. « Éviter que le premier
  * devienne encore plus imbattable simplement parce qu'il gagne davantage
- * d'OVA. » Un club à zéro en fin de saison ne peut plus rien acheter, donc plus
+ * d'Ovas. » Un club à zéro en fin de saison ne peut plus rien acheter, donc plus
  * rien négocier : il décroche pour de bon, et une ligue qui perd un manager en
  * perd deux. Le champion gagne surtout un trophée et une ligne d'histoire.
  *
@@ -315,10 +346,10 @@ function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, ma
     const autre = cote === 'domicile' ? 'exterieur' : 'domicile'; const club = clubParId(etat, r[cote]);
     const victoire = m.score[cote] > m.score[autre], nul = m.score[cote] === m.score[autre];
     // ⚠️ LE RAPPORT VICTOIRE / DÉFAITE EST LE VRAI RÉGLAGE ANTI-BOULE-DE-NEIGE,
-    // pas le montant. Une grosse victoire rapporte 2 050 OVA, une défaite sèche
+    // pas le montant. Une grosse victoire rapporte 2 050 Ovas, une défaite sèche
     // 600 : trois fois et demie sur le meilleur des cas, deux fois sur le cas
     // courant. Doubler l'écart, et le premier de la ligue s'achète l'effectif
-    // qui garantit qu'il restera premier. Le reste des OVA vient de ce que tout
+    // qui garantit qu'il restera premier. Le reste des Ovas vient de ce que tout
     // le monde touche — participation, objectifs, dotation de compétition.
     const performance = (m.essais[cote] >= 4 ? 150 : 0) + (victoire && m.essais[autre] === 0 ? 200 : 0)
       + (victoire && cote === 'exterieur' ? 100 : 0) + (m.score[cote] >= 30 ? 100 : 0);
@@ -386,17 +417,47 @@ function expirerMarche(etat: EtatCarriereEnLigne, maintenant: number) {
       const vendeur = clubParId(etat, v.vendeurId), acheteur = clubParId(etat, v.enchere.clubId);
       transferer(carte, acheteur, etat.saison); v.etat = 'vendue'; v.acheteurId = acheteur.id;
       journal(etat, vendeur, 'enchere', v.enchere.montant, [carte.id], `Vente aux enchères : ${carte.nom}`, date);
-      journal(etat, acheteur, 'enchere', 0, [carte.id], `Enchère remportée : ${carte.nom} (${v.enchere.montant} OVA déjà réservés)`, date);
+      journal(etat, acheteur, 'enchere', 0, [carte.id], `Enchère remportée : ${carte.nom} (${v.enchere.montant} Ovas déjà réservés)`, date);
       ajusterComposition(etat, vendeur, maintenant); ajusterComposition(etat, acheteur, maintenant);
     } else { v.etat = 'expiree'; delete carte.verrou; }
   }
   for (const e of etat.echanges.filter(e => e.etat === 'propose' && Date.parse(e.expireLe) <= maintenant)) {
     e.etat = 'expire'; for (const id of e.cartesDonnees) delete carteParId(etat, id).verrou;
-    journal(etat, clubParId(etat, e.de), 'echange', e.ovaDonnes, [], 'Offre expirée : OVA réservés restitués', date);
+    journal(etat, clubParId(etat, e.de), 'echange', e.ovasDonnes, [], 'Offre expirée : Ovas réservés restitués', date);
+  }
+}
+
+/**
+ * ⚠️ LES PACKS SONT COPIÉS DANS LA LIGUE, ET ÇA A DEUX CONSÉQUENCES OPPOSÉES.
+ *
+ * D'un côté c'est voulu : les prix et les probabilités d'une ligue en cours ne
+ * doivent pas changer sous les pieds de ses membres parce qu'on a retouché le
+ * catalogue. Une économie qui bouge en plein milieu d'une saison, c'est une
+ * économie à laquelle personne ne fait confiance.
+ *
+ * De l'autre, sans rien, une ligue créée avant une mise à jour resterait
+ * éternellement avec sept packs alors que le jeu en propose vingt-trois.
+ *
+ * On complète donc, sans écraser : les packs ABSENTS sont ajoutés tels quels,
+ * et pour ceux qui existent déjà on ne rafraîchit que la PRÉSENTATION (nom,
+ * promesse, rayon, garantie annoncée). Le prix et les probabilités — ce qui
+ * fait l'économie — restent ceux de la ligue.
+ */
+function completerPacks(etat: EtatCarriereEnLigne) {
+  const connus = new Map(etat.packs.map(p => [p.id, p]));
+  for (const modele of PACKS_CARRIERE) {
+    const existant = connus.get(modele.id);
+    if (!existant) { etat.packs.push(copier(modele)); continue; }
+    existant.nom = modele.nom;
+    existant.promesse = modele.promesse;
+    existant.famille = modele.famille;
+    existant.garantie = modele.garantie;
+    existant.filtre = copier(modele.filtre);
   }
 }
 
 function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: string) {
+  completerPacks(etat);
   renouvelerObjectifs(etat, maintenant);
   // La récupération est attachée aux dates des rencontres, pas au nombre d'actualisations.
   for (const c of etat.cartes) if (c.blesseJusqua && Date.parse(c.blesseJusqua) <= maintenant) delete c.blesseJusqua;
@@ -467,16 +528,16 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       case 'encherir': {
         entier(commande.montant, 1); const v = nouveau.ventes.find(v => v.id === commande.venteId);
         exiger(v && v.etat === 'ouverte' && v.type === 'enchere' && Date.parse(v.expireLe) > maintenant, 'Cette enchère est fermée.'); exiger(v.vendeurId !== club.id, 'Vous ne pouvez pas enchérir sur votre carte.');
-        exiger(commande.montant >= (v.enchere ? v.enchere.montant + Math.max(25, Math.ceil(v.enchere.montant * .05)) : v.prix), 'Votre offre doit dépasser la meilleure enchère d’au moins 5 % (minimum 25 OVA).');
-        if (v.enchere) journal(nouveau, clubParId(nouveau, v.enchere.clubId), 'enchere', v.enchere.montant, [], 'Enchère dépassée : OVA restitués', date);
-        journal(nouveau, club, 'enchere', -commande.montant, [], 'OVA réservés pour une enchère', date); v.enchere = { clubId: club.id, montant: commande.montant }; break;
+        exiger(commande.montant >= (v.enchere ? v.enchere.montant + Math.max(25, Math.ceil(v.enchere.montant * .05)) : v.prix), 'Votre offre doit dépasser la meilleure enchère d’au moins 5 % (minimum 25 Ovas).');
+        if (v.enchere) journal(nouveau, clubParId(nouveau, v.enchere.clubId), 'enchere', v.enchere.montant, [], 'Enchère dépassée : Ovas restitués', date);
+        journal(nouveau, club, 'enchere', -commande.montant, [], 'Ovas réservés pour une enchère', date); v.enchere = { clubId: club.id, montant: commande.montant }; break;
       }
       case 'annulerVente': {
         const v = nouveau.ventes.find(v => v.id === commande.venteId); exiger(v && v.vendeurId === club.id && v.etat === 'ouverte' && !v.enchere, 'Cette vente ne peut pas être annulée.');
         v.etat = 'annulee'; delete carteParId(nouveau, v.carteId).verrou; break;
       }
       case 'proposerEchange': {
-        clubLibre(nouveau, club.id); listeIds(commande.cartesDonnees, 10); listeIds(commande.cartesDemandees, 10); entier(commande.ovaDonnes); entier(commande.ovaDemandes);
+        clubLibre(nouveau, club.id); listeIds(commande.cartesDonnees, 10); listeIds(commande.cartesDemandees, 10); entier(commande.ovasDonnes); entier(commande.ovasDemandes);
         exiger(commande.vers !== club.id, 'Choisissez un autre club.'); const destinataire = clubParId(nouveau, commande.vers);
         exiger(commande.cartesDonnees.length + commande.cartesDemandees.length > 0, 'Un échange doit contenir au moins une carte.');
         exiger(nouveau.echanges.filter(e => e.de === club.id && e.etat === 'propose').length < 10, 'Vous avez déjà dix offres en cours.');
@@ -484,8 +545,8 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         for (const id of commande.cartesDemandees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === destinataire.id && !c.verrou, 'Une carte demandée est indisponible.'); }
         verifierDepart(nouveau, club.id, commande.cartesDonnees, commande.cartesDemandees); verifierDepart(nouveau, destinataire.id, commande.cartesDemandees, commande.cartesDonnees);
         const id = prochainId(nouveau, 'echange', nouveau.echanges.length);
-        nouveau.echanges.push({ id, de: club.id, vers: destinataire.id, cartesDonnees: [...commande.cartesDonnees], cartesDemandees: [...commande.cartesDemandees], ovaDonnes: commande.ovaDonnes, ovaDemandes: commande.ovaDemandes, expireLe: dateServeur(maintenant + 48 * HEURE), etat: 'propose' });
-        commande.cartesDonnees.forEach(c => { carteParId(nouveau, c).verrou = id; }); journal(nouveau, club, 'echange', -commande.ovaDonnes, [], 'OVA réservés pour une proposition d’échange', date); break;
+        nouveau.echanges.push({ id, de: club.id, vers: destinataire.id, cartesDonnees: [...commande.cartesDonnees], cartesDemandees: [...commande.cartesDemandees], ovasDonnes: commande.ovasDonnes, ovasDemandes: commande.ovasDemandes, expireLe: dateServeur(maintenant + 48 * HEURE), etat: 'propose' });
+        commande.cartesDonnees.forEach(c => { carteParId(nouveau, c).verrou = id; }); journal(nouveau, club, 'echange', -commande.ovasDonnes, [], 'Ovas réservés pour une proposition d’échange', date); break;
       }
       case 'repondreEchange':
       case 'annulerEchange': {
@@ -498,15 +559,15 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
           for (const id of e.cartesDonnees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === e.de && c.verrou === e.id, 'Une carte proposée n’est plus disponible.'); }
           for (const id of e.cartesDemandees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === e.vers && !c.verrou, 'Une carte demandée n’est plus disponible.'); }
           verifierDepart(nouveau, e.de, e.cartesDonnees, e.cartesDemandees); verifierDepart(nouveau, e.vers, e.cartesDemandees, e.cartesDonnees);
-          // Les OVA entrants ne servent pas à garantir les OVA promis : le solde doit exister.
-          exiger(destinataire.ova >= e.ovaDemandes, 'Le destinataire ne dispose plus des OVA nécessaires.');
-          journal(nouveau, destinataire, 'echange', e.ovaDonnes - e.ovaDemandes, [...e.cartesDonnees, ...e.cartesDemandees], 'Échange accepté', date);
-          journal(nouveau, emetteur, 'echange', e.ovaDemandes, [...e.cartesDonnees, ...e.cartesDemandees], 'Échange accepté (OVA donnés déjà réservés)', date);
+          // Les Ovas entrants ne servent pas à garantir les Ovas promis : le solde doit exister.
+          exiger(destinataire.ovas >= e.ovasDemandes, 'Le destinataire ne dispose plus des Ovas nécessaires.');
+          journal(nouveau, destinataire, 'echange', e.ovasDonnes - e.ovasDemandes, [...e.cartesDonnees, ...e.cartesDemandees], 'Échange accepté', date);
+          journal(nouveau, emetteur, 'echange', e.ovasDemandes, [...e.cartesDonnees, ...e.cartesDemandees], 'Échange accepté (Ovas donnés déjà réservés)', date);
           e.cartesDonnees.forEach(id => transferer(carteParId(nouveau, id), destinataire, nouveau.saison)); e.cartesDemandees.forEach(id => transferer(carteParId(nouveau, id), emetteur, nouveau.saison)); e.etat = 'accepte';
           ajusterComposition(nouveau, emetteur, maintenant); ajusterComposition(nouveau, destinataire, maintenant);
         } else {
           e.etat = annule ? 'annule' : 'refuse'; e.cartesDonnees.forEach(id => { delete carteParId(nouveau, id).verrou; });
-          journal(nouveau, emetteur, 'echange', e.ovaDonnes, [], 'Offre close : OVA réservés restitués', date);
+          journal(nouveau, emetteur, 'echange', e.ovasDonnes, [], 'Offre close : Ovas réservés restitués', date);
         }
         break;
       }
