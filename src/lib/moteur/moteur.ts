@@ -109,6 +109,10 @@ export interface Avatar {
 }
 
 export interface OptionsMatch {
+  /** Un générateur dont le serveur conserve l'état permet les reprises exactes. */
+  rng?: () => number;
+  scoreSurTerrain?: boolean;
+  meteoTir?: 'sec' | 'pluie' | 'vent';
   /**
    * ⚠️ LE NIVEAU COMMANDE TOUTE LA DISCIPLINE (cartons, bagarres, sanctions
    * d'après-match). Il vaut `pro` PAR DÉFAUT, et ce défaut n'est pas neutre :
@@ -193,7 +197,7 @@ export function creerMatch(
   scoreCibleA: number, scoreCibleB: number,
   cle: string, avatar?: Avatar, options: OptionsMatch = {},
 ): EtatMatch {
-  const rng = graine('moteur2#' + cle);
+  const rng = options.rng ?? graine('moteur2#' + cle);
   const pions: Pion[] = [];
 
   const monter = (eff: Coequipier[], cote: Cote, club: string) => {
@@ -258,6 +262,7 @@ export function creerMatch(
     placement: null, cibleRenvoi: null, tir: null, penalite: null,
     remplacementsA: 0, remplacementsB: 0, remplacementsDemandes: {}, prochaineDecision: 1, compteur: 0,
     commentaires: [], fini: false, rng,
+    scoreSurTerrain: options.scoreSurTerrain, meteoTir: options.meteoTir,
     niveau: options.niveau ?? 'pro',
     controle: options.controle ?? false,
     intention: null,
@@ -1868,10 +1873,57 @@ function probaTir(dist: number, ecartAxe: number, pied: number): number {
   return borner(base + (pied - 60) / 420, 0.25, 0.97);
 }
 
+/** Même calcul pour la décision affichée et le tir réellement joué. */
+export function probabilitePenalite(e: EtatMatch, buteur: Pion, distance: number, angle: number): number {
+  const pression = e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7 ? 0.06 : 0;
+  const meteo = e.meteoTir === 'pluie' ? 0.08 : e.meteoTir === 'vent' ? 0.13 : 0;
+  return borner(probaTir(distance, angle, buteur.pied)
+    - (100 - buteur.endurance) * 0.0018 - meteo - pression
+    + (buteur.pied - 60) / 350, 0.04, 0.97);
+}
+
+/**
+ * La pénalité en cours, telle qu'on la POSE À UN ENTRAÎNEUR : d'où, pour qui,
+ * avec quel buteur et quelles chances. ⚠️ La distance et l'angle sont calculés
+ * ICI, avec les mêmes lignes que `phasePenalite` — un écran qui referait le
+ * calcul de son côté annoncerait « 42 m, 71 % » sur un tir que le moteur joue
+ * à 38 m. C'est le genre d'écart qu'on ne voit jamais et qui rend une décision
+ * incompréhensible.
+ */
+export interface PenaliteEnCours {
+  cote: Cote; distance: number; angle: number; probabilite: number;
+  buteur: string; buteurId: string; aPortee: boolean;
+}
+export function infoPenalite(e: EtatMatch): PenaliteEnCours | null {
+  if (e.fini || e.phase !== 'penalite' || !e.penalite) return null;
+  const cote = e.penalite.pour;
+  const liste = surLeTerrain(e, cote);
+  if (!liste.length) return null;
+  const buteur = liste.find((p) => p.buteur) ?? [...liste].sort((a, b) => b.pied - a.pied)[0];
+  const distance = metresAvantLaLigne(e.penalite.lieu, cote) + 11;
+  const angle = Math.abs(e.penalite.lieu.y - AXE);
+  return {
+    cote, distance: Math.round(distance), angle: Math.round(angle),
+    probabilite: probabilitePenalite(e, buteur, distance, angle),
+    buteur: buteur.nom, buteurId: buteur.sourceId, aPortee: distance < 52 && angle < 30,
+  };
+}
+
+/** Le coach choisit ; les phases habituelles du moteur exécutent sa décision. */
+export function choisirPenalite(e: EtatMatch, cote: Cote, choix: NonNullable<EtatMatch['choixPenalite']>): boolean {
+  if (e.fini || e.phase !== 'penalite' || e.penalite?.pour !== cote) return false;
+  e.choixPenalite = choix;
+  e.minuteur = 0;
+  phasePenalite(e);
+  return true;
+}
+
 function phasePenalite(e: EtatMatch): void {
   if (e.minuteur > 0) return;
   const info = e.penalite;
   e.penalite = null;
+  const choix = e.choixPenalite;
+  delete e.choixPenalite;
   if (!info) return reprendreJeu(e, e.ballon);
   const cote = info.pour;
   const plan = planDe(e, cote);
@@ -1901,7 +1953,7 @@ function phasePenalite(e: EtatMatch): void {
     : ordrePenalite === 'touche'
       ? (plan.penalites > 0 ? 0.28 : 0.015)
       : (plan.penalites > 0 ? 0.93 : 0.07);
-  const veutTirer = aPortee && !besoinEssai && e.rng() < chanceTir;
+  const veutTirer = choix ? choix === 'points' : aPortee && !besoinEssai && e.rng() < chanceTir;
 
   if (veutTirer) {
     e.tir = { buteur, distance: dist, angle: ecartAxe, valeur: 3, suite: 'coupEnvoi' };
@@ -1912,8 +1964,12 @@ function phasePenalite(e: EtatMatch): void {
   }
 
   const s = sens(cote);
+  if (choix === 'melee') {
+    arret(e, 'melee', cote, info.lieu);
+    return;
+  }
   const chanceTouche = ordrePenalite === 'touche' ? 0.97 : ordrePenalite === 'points' ? 0.42 : 0.72;
-  if (metresAvantLaLigne(info.lieu, cote) > 8 && e.rng() < chanceTouche) {
+  if (choix === 'touche' || (!choix && metresAvantLaLigne(info.lieu, cote) > 8 && e.rng() < chanceTouche)) {
     // Pénaltouche : on gagne le terrain ET on garde le ballon.
     const gain = borner(28 + buteur.pied / 3, 20, 48);
     const arrivee = {
@@ -1946,9 +2002,11 @@ function phaseTirAuBut(e: EtatMatch): void {
   const plan = planDe(e, cote);
   buteur.stats.butsTentes += 1;
 
-  const reussi = plan.penalites > 0 && e.rng() < Math.max(0.85, probaTir(d, angle, buteur.pied));
+  const reussi = e.scoreSurTerrain
+    ? e.rng() < probabilitePenalite(e, buteur, d, angle)
+    : plan.penalites > 0 && e.rng() < Math.max(0.85, probaTir(d, angle, buteur.pied));
   if (reussi) {
-    plan.penalites -= 1;
+    plan.penalites = Math.max(0, plan.penalites - 1);
     buteur.stats.butsReussis += 1;
     marquer(e, cote, 3);
     buteur.stats.pointsAuPied = (buteur.stats.pointsAuPied ?? 0) + 3;
@@ -2615,7 +2673,7 @@ function clorePeriode(e: EtatMatch): void {
     }));
     return;
   }
-  solderLesPoints(e);
+  if (!e.scoreSurTerrain) solderLesPoints(e);
   // ⚠️ LA COMMISSION SE RÉUNIT APRÈS LE COUP DE SIFFLET, pas pendant. C'est ici
   // qu'un carton rouge ou un coup de poing devient une suspension de carrière —
   // `MatchLive` la lit dans le bilan et la fait appliquer par le store.
@@ -2710,7 +2768,7 @@ function impactTactique(e: EtatMatch, cote: Cote): number {
   const t = e.tactiques[cote];
   if (!t) return 0;
   const adverseT = e.tactiques[adverse(cote)];
-  let impact = t.rythme === 'intense' ? 3 : t.rythme === 'gestion' ? -2 : 0;
+  let impact = (t.rythme === 'intense' ? 3 : t.rythme === 'gestion' ? -2 : 0) + (e.impactBanc?.[cote] ?? 0);
   impact += t.attaque === 'large' ? 1 : t.attaque === 'occupation' ? -1 : 0;
   if (adverseT) {
     if (t.attaque === 'large' && adverseT.defense === 'blitz') impact += 2;
@@ -2737,10 +2795,14 @@ function recomposerPlan(e: EtatMatch, cote: Cote, total: number): void {
  * banc et, tant qu'il reste du temps, le potentiel de marque du match.
  */
 export function appliquerTactiqueEquipe(
-  e: EtatMatch, cote: Cote, tactique: TactiqueManager, annoncer = true,
+  e: EtatMatch, cote: Cote, tactique: TactiqueManager, annoncer = true, impactSupplementaire?: number,
 ): void {
   const ancienA = impactTactique(e, 'A');
   const ancienB = impactTactique(e, 'B');
+  if (impactSupplementaire !== undefined) {
+    e.impactBanc ??= {};
+    e.impactBanc[cote] = impactSupplementaire;
+  }
   e.tactiques[cote] = { ...tactique };
   const nouveauA = impactTactique(e, 'A');
   const nouveauB = impactTactique(e, 'B');

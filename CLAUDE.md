@@ -14,10 +14,11 @@ y est arrivé.
 
 ## Le projet en une phrase
 
-RPG de **rugby** solo, en français, jouable dans le navigateur. Deux carrières :
-on incarne **un joueur** de ses débuts au sommet, ou **un entraîneur** qui prend
-un banc et fait monter son club. Un **Maître du Jeu servi par Groq** juge les
-actions écrites et fait évoluer les statistiques.
+RPG de **rugby** en français, jouable dans le navigateur. **Trois modes** : on
+incarne **un joueur** de ses débuts au sommet, on prend **un banc d'entraîneur**
+et on fait monter son club — les deux en solo — ou on rejoint une **Carrière en
+ligne**, une ligue privée entre potes qui dure des semaines. Un **Maître du Jeu
+servi par Groq** juge les actions écrites et fait évoluer les statistiques.
 
 En ligne : **destiny-rugby.fr** (Vercel).
 
@@ -100,9 +101,9 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 ### Écrans (`src/screens/`)
 
 `Accueil` · `Creation` / `CreationManager` · `Carriere` (le MJ) · `Manager`
-(le bureau, 13 onglets) · `Profil` · `Effectif` · `Championnats` ·
-`Classement` · `Tableau` · `Social` (L'Ovale) · `Boutique` · `Pantheon` ·
-`FinCarriere`.
+(le bureau, 13 onglets) · `CarriereEnLigne` (la ligue entre potes, 7 onglets +
+le direct) · `Profil` · `Effectif` · `Championnats` · `Classement` · `Tableau` ·
+`Social` (L'Ovale) · `Boutique` · `Pantheon` · `FinCarriere`.
 
 ### Données réelles (`src/data/`)
 
@@ -145,6 +146,31 @@ navigateur. Les plus structurants :
 - **IA** — `groq.ts`, `mj.ts`, `ia.ts`, `iaSociale.ts`.
 - **Économie** — `economie.ts` (`financesDuClub` : **la** formule), `stade.ts`,
   `supporters.ts`, `financesClub.ts`.
+
+### `src/lib/ligue/` — la Carrière en ligne
+
+**Ces fichiers tournent des deux côtés** — navigateur ET fonctions serverless —
+comme `classementMondial.ts` : aucun import du store, aucun DOM, aucune horloge
+implicite (`Date.now()` se passe en paramètre), aucun texte affichable.
+
+Quatre modules portent le mode :
+
+| Module | Ce qu'il détient |
+|---|---|
+| `typesCarriere.ts` | Le vocabulaire : ligue, club, carte, vente, échange, objectif, commande. |
+| `catalogueCarriere.ts` | **Le vivier mondial** (78 083 joueurs réels), la dotation de 30 licenciés de Régionale 3, les 7 packs, les 1 353 écussons. |
+| `carriere.ts` | **Toutes les règles** : saison, calendrier, packs, marché, enchères, échanges, objectifs, coupes, classement, récompenses. |
+| `matchCarriere.ts` | **Le match** : stratégies, horloge, décisions en direct, remplacements, feuille. |
+
+⚠️ **Neuf autres modules du dossier ne servent plus qu'à leur propre banc**
+(`types`, `rarete`, `identite`, `reglages`, `vivier`, `dotation`, `valeur`,
+`packs`, `ova`, `index`). C'est le socle du premier lot, construit sur un autre
+modèle de vivier ; seuls `aleatoire.ts` et `calendrier.ts` en sont encore
+utilisés. `npm run verify:ligue` mesure donc du code que le jeu n'exécute
+jamais — **dette à trancher, décrite dans `serveur/LIGUES.md`.**
+
+Détail complet, chiffres mesurés et invariants : **`serveur/LIGUES.md`**.
+Banc du mode : `npm run verify:carriere` (122 contrôles, ~1 min).
 
 ---
 
@@ -337,10 +363,12 @@ stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
 
 ## Bancs de mesure
 
-**83 scripts** dans `scripts/verif*.ts`, à lancer sans navigateur. Les
+**89 scripts** dans `scripts/verif*.ts`, à lancer sans navigateur. Les
 principaux sont déclarés dans `package.json` :
 
 ```bash
+npm run verify:carriere           # la Carrière en ligne (122 contrôles, ~1 min)
+npm run verify:ligue              # ⚠️ le socle du 1er lot — plus branché au jeu
 npm run verify:enveloppe          # une seule définition de l'enveloppe structure
 npm run verify:saison-manager     # avance libre, coupes, playoffs, promotions
 npm run verify:calendrier-mondial # le calendrier des sélections
@@ -368,6 +396,48 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
 ---
 
 ## Chantiers en cours / dette
+
+- **LA CARRIÈRE EN LIGNE — jouable de bout en bout, base non déployée.**
+  2 à 20 potes, ligue privée, **30 vrais licenciés de Régionale 3** au départ,
+  écusson d’un vrai club (choisi À L’INSCRIPTION, jamais modifiable ensuite),
+  logo et trophée de championnat, phase finale en option,
+  championnat, matchs en direct
+  avec décisions du manager, packs, marché, enchères, échanges, coupes maison,
+  objectifs, palmarès. Serveur (`serveur/carriereApi.ts` + `api/carriere.ts`),
+  écran (`screens/CarriereEnLigne.tsx`) et banc (`npm run verify:carriere`,
+  122 contrôles). **Il reste à appliquer `serveur/schema-carriere.sql` sur
+  Neon** et à poser `CRON_SECRET` ; en local, `vite.config.ts` branche le même
+  gestionnaire sur un fichier JSON, donc le mode se teste entièrement sans base.
+
+  Les quatre invariants, en une ligne chacun — ils commandent tout le reste :
+  1. **Le serveur est la source de vérité.** Le client DEMANDE une action, il ne
+     DÉCLARE jamais un état. Ça se vérifie à l'œil : l'écran n'a pas un seul
+     `useState` qui contienne un OVA, une carte ou un score.
+  2. **Un joueur n'existe qu'une fois par ligue** — le tirage de pack exclut
+     tous les `sourceId` déjà possédés dans CETTE ligue.
+  3. **Rien ne traverse d'une ligue à l'autre**, ni OVA ni carte. Pas de
+     portefeuille global.
+  4. **Aucun OVA ne s'achète en argent réel.** ⚠️ Et l'**OVA** d'une ligue n'est
+     PAS l'**Ovas** de la Boutique solo : deux monnaies, aucun pont, jamais.
+
+  **Trois choses qui ne se retouchent pas sans relire `serveur/LIGUES.md` :**
+  - **Le vivier ne se matérialise jamais.** 78 083 joueurs, 26,6 Mo de JSON ; une
+    ligue est une ligne de jsonb réécrite toutes les deux secondes en direct.
+    Une carte n'existe qu'une fois DISTRIBUÉE ; le reste se déduit.
+  - **Un match n'est pas stocké, il est rejoué** depuis sa graine, ses deux
+    feuilles gelées et le journal des ordres. C'est ce qui fait que deux
+    managers voient rigoureusement le même match. ⚠️ Le pas de rejoue reste à
+    **0,6 seconde** : un pas plus large rate la phase « pénalité » (2,5 s) et
+    surtout dépasse la minute demandée, donc applique un ordre au mauvais tick.
+    Il n'y a rien à y gagner — mesuré 267 ms à 8 s contre 285 ms à 0,6 s.
+  - **Presque la moitié des écussons du jeu ont un fond blanc opaque** (mesuré :
+    46 sur 108). Un filtre CSS ne peut pas l’enlever sans trouer les blancs
+    INTÉRIEURS ; le détourage part des bords (`components/EcussonClub.tsx`).
+    Les 599 écussons distants (API FFR, pas de CORS) passent par un relais
+    serveur à LISTE BLANCHE FERMÉE — jamais un proxy ouvert.
+  - **Les archives s'élaguent.** Le détail (fil + feuille de match, 15 Ko) n'est
+    gardé que pour les **vingt dernières** rencontres ; les statistiques
+    individuelles sont créditées aux cartes avant l'élagage.
 
 - **Le mode entraîneur est public** : création directe et reconversion sont
   ouvertes en production. `lib/modeDev.ts` conserve le garde central pour de

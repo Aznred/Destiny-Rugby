@@ -48,8 +48,8 @@ const bornerAge = (n: number) => Math.max(AGE_MIN, Math.min(AGE_MAX, n));
  * choix à deux branches dont une le renverrait à l'accueil. Un choix qui n'en
  * est pas un est pire que pas de choix du tout.
  */
-function ChoixDeCarriere({ onJoueur, onEntraineur }: {
-  onJoueur: () => void; onEntraineur: () => void;
+function ChoixDeCarriere({ onJoueur, onEntraineur, onEnLigne }: {
+  onJoueur: () => void; onEntraineur: () => void; onEnLigne: () => void;
 }) {
   return (
     <div className="champ cr-modes">
@@ -79,6 +79,12 @@ function ChoixDeCarriere({ onJoueur, onEntraineur }: {
               fin: LIMITES.ageManagerMax,
             })}
           </em>
+        </button>
+        <button type="button" className="cr-mode" onClick={onEnLigne}>
+          <span className="cr-mode-ico"><Icone nom="equipe" taille={30} /></span>
+          <b>Carrière en ligne</b>
+          <span className="cr-mode-desc">Crée ton club, retrouve tes amis dans une ligue privée et construis votre histoire, saison après saison.</span>
+          <em className="cr-mode-suite">30 Bronze au départ · Packs, marché et duels tactiques en direct</em>
         </button>
       </div>
     </div>
@@ -194,6 +200,7 @@ export function Creation() {
           <ChoixDeCarriere
             onJoueur={() => setMode('joueur')}
             onEntraineur={() => setEcran('creationManager')}
+            onEnLigne={() => setEcran('carriereEnLigne')}
           />
         </div>
       )}

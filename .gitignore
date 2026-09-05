@@ -37,3 +37,4 @@ dist-ssr
 # malgré .gitignore. Ils ont été retirés de l'index avec `git rm --cached`.
 sources/modeles/
 new model boutique/
+node_modules/.destiny

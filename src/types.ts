@@ -521,6 +521,7 @@ export type Ecran =
   | 'finCarriere'
   // ── Le mode manager ─────────────────────────────────────────────────
   | 'creationManager'
+  | 'carriereEnLigne'
   | 'manager';
 
 // ---------------------------------------------------------------------------

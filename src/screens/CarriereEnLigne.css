@@ -1,0 +1,1444 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LA CARRIÈRE EN LIGNE
+   ═══════════════════════════════════════════════════════════════════════════
+   Le mode reprend la matière du jeu — stade nocturne, cuir, pelouse, dorures —
+   et lui ajoute ce qui lui est propre : les cinq raretés, qui doivent se
+   reconnaître d'un coup d'œil de l'autre bout de la pièce.
+
+   ⚠️ LA RARETÉ EST UNE COULEUR ET UNE MATIÈRE, PAS UN LISERÉ. Cinq cadres qui
+   ne diffèrent que par la teinte de leur bordure ne se distinguent pas dans une
+   grille de trente cartes : c'est le fond qui doit changer. Chaque bande a donc
+   son dégradé, sa dorure et sa lueur, du bronze mat jusqu'au halo de la Star.
+
+   ⚠️ RESPONSIVE DANS LES DEUX SENS. Les paliers du projet sont
+   560 / 700 / 760 / 1120 / 1121+. Une grille écrite pour un téléphone laisse un
+   écran de 1 920 px à moitié vide ; une grille écrite pour 1 920 px écrase le
+   téléphone. Les deux sont traitées, en bas de ce fichier. */
+
+.cel {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 1.2rem 1rem 5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* ── Le fil du haut : d'où l'on vient, qui l'on est ─────────────────────── */
+.cel-fil {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+.cel-fil > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--police-forte);
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brume);
+  margin-right: auto;
+}
+.cel-retour { transform: rotate(180deg); }
+.cel-presence {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--succes);
+  box-shadow: 0 0 0 3px rgba(72, 196, 122, 0.16);
+  animation: cel-pouls 2.6s ease-in-out infinite;
+}
+.cel-presence.interrompue { background: var(--danger); box-shadow: 0 0 0 3px rgba(224, 90, 77, 0.16); }
+@keyframes cel-pouls { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.cel-compte {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.42rem 0.8rem;
+  border-radius: var(--rayon-pilule);
+  border: 1px solid var(--bordure);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--craie-dim);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.cel-compte:hover { border-color: var(--bordure-forte); color: var(--craie); }
+
+.cel-erreur, .cel-notification {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--rayon-sm);
+  border: 1px solid rgba(224, 90, 77, 0.35);
+  background: rgba(224, 90, 77, 0.1);
+  color: #ffd9d4;
+}
+.cel-erreur p { margin: 0; flex: 1; }
+.cel-erreur svg { color: var(--danger); flex-shrink: 0; }
+.cel-notification {
+  border-color: var(--bordure-forte);
+  background: rgba(232, 178, 58, 0.1);
+  color: var(--or-200);
+}
+.cel-notification button { margin-left: auto; color: inherit; opacity: 0.7; }
+.cel-notification button:hover { opacity: 1; }
+
+/* ⚠️ `min-width: 0` SUR TOUT ITEM DE GRILLE OU DE FLEX QUI CONTIENT UN
+   CONTENEUR DE DÉFILEMENT. C'est le piège documenté du projet, vu ici en
+   vrai : le classement est un tableau à cellules `white-space: nowrap` posé
+   dans un `.cel-table-scroll` en `overflow-x: auto`. Le conteneur clippe bien,
+   mais son PARENT — un item de grille à `min-width: auto` — prend quand même
+   la largeur minimale du contenu. Mesuré sur un écran de 375 px : le panneau
+   faisait 399 px, le document 410, et toute la page partait en défilement
+   horizontal, y compris la barre de navigation du jeu. */
+.cel-grille-bureau > *, .cel-portail > *, .cel-deux > *, .cel-echange-cotes > *, .cel-vente > * {
+  min-width: 0;
+}
+
+.cel-panneau {
+  position: relative;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre-2), var(--arete);
+  padding: 1.2rem 1.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.cel-panneau h2 { margin: 0; font-family: var(--police-titre); font-size: 1.35rem; letter-spacing: 0.01em; }
+.cel-panneau h3 { margin: 0; font-family: var(--police-forte); font-size: 0.95rem; color: var(--craie-dim); }
+.cel-panneau p { margin: 0; color: var(--craie-dim); line-height: 1.55; }
+.cel-sous-titre { margin: 0.6rem 0 0 !important; font-family: var(--police-forte); color: var(--or-400) !important; }
+.cel-note { font-size: 0.87rem; color: var(--brume); }
+.cel-note b { color: var(--craie-dim); }
+.cel-titre-ligne { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; }
+.cel-titre-ligne svg { color: var(--or-400); opacity: 0.65; }
+.cel-titre-ligne small { color: var(--brume); font-size: 0.8rem; }
+.cel-actions { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+.cel-actions small { color: var(--brume); font-size: 0.82rem; }
+.cel-deux { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+.cel-champ { display: flex; flex-direction: column; gap: 0.35rem; }
+.cel-champ > span {
+  font-family: var(--police-forte);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brume);
+}
+.cel-champ input {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--rayon-controle);
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--craie);
+  font-family: var(--police);
+  font-size: 0.95rem;
+}
+.cel-champ input:focus-visible { outline: 2px solid var(--or-500); outline-offset: 1px; border-color: transparent; }
+
+.cel-vide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+  color: var(--brume);
+}
+.cel-vide svg { color: var(--or-400); opacity: 0.35; }
+.cel-vide h3 { margin: 0.4rem 0 0; font-family: var(--police-titre); font-size: 1.25rem; color: var(--craie); }
+.cel-vide p { margin: 0; max-width: 42ch; }
+
+/* ── L'écusson : deux lettres dans un bouclier ──────────────────────────── */
+.cel-ecusson {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  color: var(--or-500);
+  flex-shrink: 0;
+}
+.cel-ecusson b {
+  position: absolute;
+  font-family: var(--police-titre);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  color: var(--craie);
+  transform: translateY(-1px);
+}
+.cel-ecusson.grand b { font-size: 1.5rem; transform: translateY(-2px); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   L'ENTRÉE — la promesse, avant même d'avoir un compte
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cel-entree { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 2rem; align-items: center; padding: 1.5rem 0 2rem; }
+.cel-promesse h1 {
+  font-family: var(--police-titre);
+  font-size: clamp(2.4rem, 5.5vw, 4.2rem);
+  line-height: 0.95;
+  margin: 0.5rem 0 0.8rem;
+  text-transform: uppercase;
+}
+.cel-promesse h1 span {
+  background: linear-gradient(100deg, var(--or-400), var(--cuir-400));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.cel-promesse > p { color: var(--craie-dim); max-width: 46ch; line-height: 1.6; margin: 0 0 1.4rem; }
+
+/* Le billet : un ticket de match, pas une carte de plus. */
+.cel-billet {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  padding: 1.1rem 1.3rem;
+  border-radius: var(--rayon);
+  border: 1px dashed var(--bordure-forte);
+  background:
+    linear-gradient(140deg, rgba(232, 178, 58, 0.09), transparent 55%),
+    var(--surface-solid);
+  box-shadow: var(--ombre-2);
+  max-width: 30rem;
+}
+/* Les deux encoches du ticket, comme sur un vrai contremarque. */
+.cel-billet::before, .cel-billet::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--fond-bas);
+  top: 50%;
+  transform: translateY(-50%);
+}
+.cel-billet::before { left: -10px; }
+.cel-billet::after { right: -10px; }
+.cel-billet b { font-family: var(--police-titre); color: var(--or-400); letter-spacing: 0.14em; font-size: 0.82rem; }
+.cel-billet span { font-size: 0.85rem; color: var(--brume); }
+.cel-billet strong { font-family: var(--police-titre); font-size: 2.1rem; color: var(--craie); line-height: 1; }
+.cel-billet strong small { font-size: 0.7rem; letter-spacing: 0.1em; color: var(--brume); }
+.cel-billet p { grid-column: 1 / -1; margin: 0.35rem 0 0; font-size: 0.78rem; color: var(--brume); letter-spacing: 0.04em; }
+
+.cel-auth { max-width: 27rem; width: 100%; justify-self: end; }
+.cel-auth .btn { width: 100%; }
+
+.cel-titre { padding: 0.6rem 0 0.2rem; }
+.cel-titre h1 { font-family: var(--police-titre); font-size: clamp(1.9rem, 4vw, 2.9rem); margin: 0.3rem 0 0.4rem; text-transform: uppercase; }
+.cel-titre p { margin: 0; color: var(--brume); }
+
+.cel-portail { display: grid; grid-template-columns: 1fr 26rem; gap: 1.6rem; align-items: start; }
+.cel-portail > div > h2 { font-family: var(--police-titre); font-size: 1.3rem; margin: 0 0 0.8rem; display: flex; align-items: baseline; gap: 0.6rem; }
+.cel-portail > div > h2 small { font-family: var(--police-forte); font-size: 0.78rem; color: var(--or-400); }
+.cel-ligues { display: flex; flex-direction: column; gap: 0.7rem; }
+.cel-ligue {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure);
+  background: var(--surface);
+  color: var(--craie);
+  text-align: left;
+  box-shadow: var(--arete);
+  transition: transform 0.16s ease, border-color 0.2s ease;
+}
+.cel-ligue:hover { transform: translateX(3px); border-color: var(--bordure-forte); }
+.cel-ligue span { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 0; }
+.cel-ligue em { font-style: normal; font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--or-400); }
+.cel-ligue b { font-family: var(--police-forte); font-size: 1.05rem; }
+.cel-ligue small { color: var(--brume); font-size: 0.82rem; }
+.cel-ligue > svg { color: var(--or-500); opacity: 0.55; }
+
+.cel-bascules { display: flex; gap: 0.4rem; padding: 0.25rem; border-radius: var(--rayon-pilule); background: rgba(0, 0, 0, 0.3); }
+.cel-bascules button {
+  flex: 1;
+  padding: 0.55rem 0.6rem;
+  border-radius: var(--rayon-pilule);
+  color: var(--brume);
+  font-family: var(--police-forte);
+  font-size: 0.85rem;
+}
+.cel-bascules button.actif { background: rgba(232, 178, 58, 0.14); color: var(--or-200); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   L'EN-TÊTE DU CLUB
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cel-entete {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.2rem 1.4rem;
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure);
+  background:
+    radial-gradient(120% 160% at 0% 0%, rgba(232, 178, 58, 0.12), transparent 60%),
+    var(--surface);
+  box-shadow: var(--ombre-2), var(--arete);
+}
+.cel-entete > div { flex: 1; min-width: 0; }
+.cel-entete .eyebrow span { color: var(--brume); letter-spacing: 0.1em; }
+.cel-entete h1 { font-family: var(--police-titre); font-size: clamp(1.6rem, 3.4vw, 2.4rem); margin: 0.2rem 0 0.25rem; text-transform: uppercase; }
+.cel-entete p { margin: 0; color: var(--brume); font-size: 0.88rem; }
+/* ⚠️ LE SOLDE D'OVA A LA MÊME MATIÈRE QUE CELUI DE LA BOUTIQUE (`.solde`), et
+   ce n'est pas de la coquetterie : c'est la MÊME unité visuelle dans deux
+   écrans différents. Une gélule dorée pour l'un et un bloc rectangulaire pour
+   l'autre, et le joueur ne sait plus s'il regarde la même chose. (Les deux
+   monnaies restent évidemment sans aucun pont — voir `serveur/LIGUES.md`.) */
+.cel-portefeuille {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: var(--rayon-pilule);
+  border: 1px solid var(--bordure-forte);
+  background: rgba(232, 178, 58, 0.12);
+  color: var(--or-400);
+  font-family: var(--police-forte);
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+.cel-portefeuille svg { color: var(--or-400); flex-shrink: 0; }
+.cel-portefeuille strong { font-size: 1.4rem; line-height: 1; }
+.cel-portefeuille span {
+  font-family: var(--police);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brume);
+  border-left: 1px solid var(--bordure);
+  padding-left: 0.55rem;
+}
+
+/* ── Les onglets ────────────────────────────────────────────────────────── */
+.cel-onglets {
+  display: flex;
+  gap: 0.3rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: thin;
+}
+/* ⚠️ DES ONGLETS EN MATIÈRE, PAS DES ÉTIQUETTES GRISES. La première version
+   posait du texte `--brume` sur un fond transparent : sept mots gris alignés,
+   sans relief, sans arête, sans état — exactement le rendu qu'on ne veut pas.
+   Ce qui les rend « posés », ce sont trois choses et elles coûtent trois
+   lignes : un fond sombre qui les détache du panneau, un liseré clair sur
+   l'arête haute (`--arete`), et un actif qui S'ENFONCE au lieu de simplement
+   changer de couleur — le doré vient du dessous, comme une lumière de stade. */
+.cel-onglets button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.62rem 1.05rem;
+  border-radius: var(--rayon-controle);
+  color: var(--craie-dim);
+  font-family: var(--police-forte);
+  font-size: 0.88rem;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(0, 0, 0, 0.26));
+  box-shadow: var(--ombre-1), var(--arete);
+  transition: color 0.15s ease, background 0.2s ease, border-color 0.2s ease, transform 0.12s ease;
+}
+.cel-onglets button:hover {
+  color: var(--craie);
+  border-color: var(--bordure);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(0, 0, 0, 0.22));
+}
+.cel-onglets button:active { transform: translateY(1px); }
+.cel-onglets button.actif {
+  color: #17110a;
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--or-400), var(--or-500));
+  box-shadow: 0 6px 16px -6px rgba(232, 178, 58, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.cel-onglets button.actif svg { opacity: 1; }
+.cel-onglets button svg { opacity: 0.72; }
+.cel-onglets button:hover svg { opacity: 1; }
+/* Les onglets internes (le direct, le marché) restent plus discrets : ils ne
+   doivent pas concurrencer la navigation principale juste au-dessus. */
+.cel-onglets.secondaires button {
+  font-size: 0.83rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--rayon-pilule);
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: none;
+}
+.cel-onglets.secondaires button.actif {
+  color: var(--or-200);
+  background: rgba(232, 178, 58, 0.16);
+  border-color: var(--bordure-forte);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE BUREAU
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cel-grille-bureau { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 1.1rem; align-items: start; }
+.cel-rendezvous h2 { font-family: var(--police-titre); font-size: 1.6rem; }
+.cel-invitation {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.1rem 1rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: var(--rayon-sm);
+  border: 1px dashed var(--bordure-forte);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--craie);
+  text-align: left;
+}
+.cel-invitation:hover { background: rgba(232, 178, 58, 0.08); }
+.cel-invitation span { font-size: 0.68rem; letter-spacing: 0.2em; color: var(--brume); }
+.cel-invitation b { font-family: var(--police-titre); font-size: 1.4rem; letter-spacing: 0.12em; color: var(--or-400); }
+.cel-invitation svg { grid-row: span 2; color: var(--or-500); opacity: 0.7; }
+
+.cel-chiffres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+.cel-chiffres div {
+  padding: 0.7rem 0.4rem;
+  border-radius: var(--rayon-sm);
+  background: rgba(0, 0, 0, 0.26);
+  text-align: center;
+}
+.cel-chiffres b { display: block; font-family: var(--police-titre); font-size: 1.7rem; color: var(--or-400); line-height: 1; }
+.cel-chiffres span { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brume); }
+
+.cel-raretés { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.cel-rarete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--rayon-pilule);
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 0.76rem;
+  color: var(--craie-dim);
+}
+.cel-rarete b { color: var(--craie); font-family: var(--police-forte); }
+.cel-rarete i, .cel-pastille {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+.cel-rarete.bronze i, .cel-pastille.bronze { background: #b06a3a; }
+.cel-rarete.argent i, .cel-pastille.argent { background: #b9c4cc; }
+.cel-rarete.or i, .cel-pastille.or { background: var(--or-400); }
+.cel-rarete.elite i, .cel-pastille.elite { background: #7fd3ff; }
+.cel-rarete.star i, .cel-pastille.star { background: linear-gradient(135deg, #ff7bd5, #ffd76e); }
+
+.cel-objectif {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem 0.8rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.cel-objectif:last-child { border-bottom: 0; }
+.cel-objectif b { font-family: var(--police-forte); font-size: 0.93rem; display: block; }
+.cel-objectif small { color: var(--brume); font-size: 0.78rem; }
+.cel-objectif > span { font-family: var(--police-forte); color: var(--or-400); font-size: 0.88rem; white-space: nowrap; }
+.cel-objectif progress {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 5px;
+  appearance: none;
+  border: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+}
+.cel-objectif progress::-webkit-progress-bar { background: rgba(0, 0, 0, 0.4); }
+.cel-objectif progress::-webkit-progress-value { background: linear-gradient(90deg, var(--pelouse-500), var(--or-500)); }
+.cel-objectif progress::-moz-progress-bar { background: var(--or-500); }
+.cel-objectif .btn { grid-column: 1 / -1; justify-self: start; padding: 0.35rem 0.9rem; font-size: 0.8rem; }
+
+/* ── Le tableau ─────────────────────────────────────────────────────────── */
+.cel-table-scroll { overflow-x: auto; margin: 0 -0.3rem; padding: 0 0.3rem; }
+.cel-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.cel-table th, .cel-table td { padding: 0.5rem 0.55rem; text-align: center; white-space: nowrap; }
+.cel-table thead th {
+  font-family: var(--police-forte);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brume);
+  border-bottom: 1px solid var(--bordure);
+}
+.cel-table tbody th { text-align: left; font-weight: 600; color: var(--craie); }
+.cel-table tbody th small { display: block; color: var(--brume); font-weight: 400; font-size: 0.74rem; }
+.cel-table tbody tr { border-bottom: 1px solid rgba(255, 255, 255, 0.045); }
+.cel-table tbody tr:last-child { border-bottom: 0; }
+.cel-table tbody tr.moi { background: rgba(232, 178, 58, 0.08); }
+.cel-table tbody tr.moi th { color: var(--or-200); }
+.cel-table td b { color: var(--or-400); font-family: var(--police-forte); }
+
+/* ── Une affiche ────────────────────────────────────────────────────────── */
+.cel-grille-rencontres { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 0.7rem; }
+.cel-rencontre {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--rayon-sm);
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.24);
+}
+.cel-rencontre.grande { border-color: var(--bordure-forte); background: rgba(0, 0, 0, 0.3); padding: 1.1rem 1.2rem; }
+.cel-rencontre-date { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brume); }
+.cel-direct-label { color: var(--danger); animation: cel-pouls 1.8s ease-in-out infinite; }
+.cel-affiche { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0.7rem; }
+.cel-affiche b { font-family: var(--police-forte); font-size: 0.95rem; }
+.cel-affiche b:last-of-type { text-align: right; }
+.cel-affiche strong { font-family: var(--police-titre); font-size: 1.5rem; color: var(--or-400); white-space: nowrap; }
+.cel-rencontre.grande .cel-affiche strong { font-size: 2.2rem; }
+.cel-rencontre .btn { align-self: flex-start; padding: 0.45rem 1rem; font-size: 0.84rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE DIRECT
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cel-direct { display: flex; flex-direction: column; gap: 0.9rem; }
+.cel-tableau-bord {
+  position: relative;
+  padding: 1.3rem 1.4rem 1.1rem;
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure-forte);
+  background:
+    radial-gradient(120% 200% at 50% -30%, rgba(52, 163, 90, 0.22), transparent 62%),
+    var(--surface-solid);
+  box-shadow: var(--ombre-3), var(--arete);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.cel-quitter { position: absolute; top: 0.7rem; right: 0.7rem; padding: 0.35rem 0.8rem; font-size: 0.78rem; }
+.cel-score-direct { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; }
+.cel-camp { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; text-align: center; }
+.cel-camp b { font-family: var(--police-forte); font-size: 1rem; }
+.cel-camp small { color: var(--brume); font-size: 0.78rem; }
+.cel-camp.moi b { color: var(--or-200); }
+.cel-camp.moi .cel-ecusson { color: var(--or-400); }
+.cel-chrono { text-align: center; }
+.cel-chrono strong {
+  display: block;
+  font-family: var(--police-titre);
+  font-size: clamp(2.2rem, 6vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.cel-chrono strong em { font-style: normal; color: var(--brume); font-size: 0.6em; }
+.cel-chrono span {
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0.15rem 0.7rem;
+  border-radius: var(--rayon-pilule);
+  background: rgba(0, 0, 0, 0.35);
+  font-family: var(--police-forte);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  color: var(--craie-dim);
+}
+.cel-chrono span.bat { color: var(--succes); animation: cel-pouls 2s ease-in-out infinite; }
+.cel-jauge-possession { position: relative; height: 22px; border-radius: var(--rayon-pilule); background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.cel-jauge-possession i { display: block; height: 100%; background: linear-gradient(90deg, var(--pelouse-500), var(--pelouse-400)); transition: width 0.6s ease; }
+.cel-jauge-possession span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--police-forte);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--craie);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+.cel-signal {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--rayon-sm);
+  border: 1px solid rgba(232, 178, 58, 0.28);
+  background: rgba(232, 178, 58, 0.08);
+  color: var(--or-200);
+  font-size: 0.88rem;
+}
+
+/* ⚠️ LA DÉCISION EST LE SEUL MOMENT OÙ L'ÉCRAN ATTEND LE JOUEUR. Elle doit
+   donc dominer le reste : cadre doré, fond plus dense, et un anneau qui pulse
+   pour dire que le chrono est arrêté et qu'on l'attend. */
+.cel-decision {
+  padding: 1.3rem 1.4rem;
+  border-radius: var(--rayon);
+  border: 1px solid var(--or-500);
+  background:
+    radial-gradient(120% 180% at 50% 0%, rgba(232, 178, 58, 0.2), transparent 60%),
+    var(--surface-solid);
+  box-shadow: var(--ombre-3), 0 0 0 4px rgba(232, 178, 58, 0.1);
+  animation: cel-appel 2.4s ease-in-out infinite;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+@keyframes cel-appel {
+  0%, 100% { box-shadow: var(--ombre-3), 0 0 0 4px rgba(232, 178, 58, 0.1); }
+  50% { box-shadow: var(--ombre-3), 0 0 0 9px rgba(232, 178, 58, 0.045); }
+}
+.cel-decision h2 { margin: 0; font-family: var(--police-titre); font-size: 1.7rem; }
+.cel-decision p { margin: 0; color: var(--craie-dim); }
+.cel-decision p b { color: var(--or-400); font-size: 1.1em; }
+.cel-decision small { color: var(--brume); font-size: 0.8rem; }
+.cel-decision-choix { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.5rem; }
+.cel-decision-choix .btn { padding: 0.7rem 0.9rem; font-size: 0.9rem; }
+
+.cel-fil-match { gap: 0; max-height: 30rem; overflow-y: auto; }
+.cel-ligne-fil {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.5rem 0.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  margin: 0 !important;
+  animation: cel-arrive 0.35s ease;
+}
+@keyframes cel-arrive { from { opacity: 0; transform: translateY(-6px); } }
+.cel-ligne-fil b { font-family: var(--police-titre); color: var(--brume); font-size: 0.9rem; }
+.cel-ligne-fil span { color: var(--craie-dim); line-height: 1.45; }
+.cel-ligne-fil em { font-style: normal; font-family: var(--police-forte); color: var(--or-400); }
+.cel-ligne-fil.moi span { color: var(--craie); }
+.cel-ligne-fil.essai { background: linear-gradient(90deg, rgba(52, 163, 90, 0.16), transparent 70%); }
+.cel-ligne-fil.essai b { color: var(--pelouse-400); }
+.cel-ligne-fil.but b { color: var(--or-400); }
+.cel-ligne-fil.carton { background: linear-gradient(90deg, rgba(224, 90, 77, 0.14), transparent 70%); }
+.cel-ligne-fil.jalon span { color: var(--or-200); font-family: var(--police-forte); }
+
+.cel-grille-consignes { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.8rem; }
+.cel-liste-pions { display: flex; flex-direction: column; gap: 0.3rem; max-height: 26rem; overflow-y: auto; }
+.cel-liste-pions button {
+  display: grid;
+  grid-template-columns: 1.9rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--rayon-sm);
+  border: 1px solid transparent;
+  background: rgba(0, 0, 0, 0.24);
+  color: var(--craie-dim);
+  text-align: left;
+  font-size: 0.88rem;
+}
+.cel-liste-pions button:hover:not(:disabled) { border-color: var(--bordure); color: var(--craie); }
+.cel-liste-pions button:disabled { opacity: 0.4; cursor: not-allowed; }
+.cel-liste-pions button.actif { border-color: var(--or-500); background: rgba(232, 178, 58, 0.12); color: var(--or-200); }
+.cel-liste-pions b { font-family: var(--police-titre); color: var(--or-400); text-align: center; }
+.cel-liste-pions small { color: var(--brume); font-size: 0.76rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LES CARTES — cinq raretés, cinq matières
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cel-grille-cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: 0.75rem; }
+.cel-grille-cartes.petites { grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
+.cel-carte {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.7rem 0.6rem 0.5rem;
+  border-radius: var(--rayon-sm);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: var(--craie);
+  text-align: center;
+  overflow: hidden;
+  box-shadow: var(--ombre-2), var(--arete);
+  transition: transform 0.18s ease, box-shadow 0.2s ease;
+}
+button.cel-carte { cursor: pointer; }
+button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3), var(--arete); }
+.cel-carte-tete { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.4rem; width: 100%; }
+.cel-carte-tete b { font-family: var(--police-titre); font-size: 1.75rem; line-height: 1; }
+.cel-carte-tete em {
+  font-style: normal;
+  font-family: var(--police-forte);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  text-align: left;
+  line-height: 1.15;
+}
+.cel-carte-portrait {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  margin: 0.15rem 0;
+}
+.cel-carte-portrait img { width: 100%; height: 100%; object-fit: cover; }
+.cel-carte-portrait svg { opacity: 0.35; }
+.cel-carte-nom { font-family: var(--police-forte); font-size: 0.88rem; line-height: 1.2; }
+.cel-carte-club { font-size: 0.72rem; opacity: 0.72; line-height: 1.25; }
+.cel-carte-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.15rem 0.3rem;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.cel-carte-stats i { font-style: normal; font-size: 0.72rem; display: flex; justify-content: center; gap: 0.25rem; }
+.cel-carte-stats i b { opacity: 0.62; font-weight: 700; font-size: 0.66rem; }
+.cel-carte-pied {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
+  margin-top: 0.35rem;
+}
+.cel-carte-pied i {
+  font-style: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--rayon-pilule);
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+}
+.cel-carte-pied i.alerte { background: rgba(224, 90, 77, 0.25); color: #ffd9d4; }
+.cel-carte-pied i.proprio { background: rgba(255, 255, 255, 0.12); }
+
+/* Les cinq matières. Le fond porte la rareté, pas seulement la bordure. */
+.cel-carte.bronze { background: linear-gradient(168deg, #4a2d1c 0%, #2b1a10 55%, #1d120b 100%); }
+.cel-carte.bronze .cel-carte-tete b { color: #e0a273; }
+.cel-carte.argent { background: linear-gradient(168deg, #4d565e 0%, #2b3238 55%, #1b2024 100%); }
+.cel-carte.argent .cel-carte-tete b { color: #e6eef5; }
+.cel-carte.or {
+  background: linear-gradient(168deg, #6d5218 0%, #372a0f 55%, #21190a 100%);
+  border-color: rgba(232, 178, 58, 0.35);
+}
+.cel-carte.or .cel-carte-tete b { color: var(--or-400); }
+.cel-carte.elite {
+  background: linear-gradient(168deg, #123f57 0%, #0d2434 55%, #07161f 100%);
+  border-color: rgba(127, 211, 255, 0.4);
+  box-shadow: var(--ombre-2), var(--arete), 0 0 22px -8px rgba(127, 211, 255, 0.5);
+}
+.cel-carte.elite .cel-carte-tete b { color: #a9e4ff; }
+.cel-carte.star {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 123, 213, 0.3), transparent 60%),
+    linear-gradient(168deg, #3d1436 0%, #23102a 55%, #140a19 100%);
+  border-color: rgba(255, 200, 120, 0.55);
+  box-shadow: var(--ombre-3), var(--arete), 0 0 30px -6px rgba(255, 150, 220, 0.55);
+}
+.cel-carte.star .cel-carte-tete b {
+  background: linear-gradient(120deg, #ffd76e, #ff7bd5);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* Le reflet qui balaie une carte Star : une seule, sinon c'est un sapin. */
+.cel-carte.star::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background: linear-gradient(105deg, transparent 44%, rgba(255, 255, 255, 0.16) 50%, transparent 56%);
+  animation: cel-reflet 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes cel-reflet { 0%, 60% { transform: translateX(-60%); } 100% { transform: translateX(60%); } }
+.cel-carte.compacte { padding: 0.5rem 0.45rem 0.4rem; }
+.cel-carte.compacte .cel-carte-portrait { width: 46px; height: 46px; }
+.cel-carte.compacte .cel-carte-tete b { font-size: 1.4rem; }
+
+.cel-filtres { flex-direction: row; align-items: end; flex-wrap: wrap; gap: 1rem; }
+.cel-filtres > div:first-child { flex: 1; min-width: 12rem; }
+.cel-filtres h2 { font-family: var(--police-titre); }
+.cel-filtres .cel-champ { min-width: 12rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LA BOUTIQUE DE PACKS
+   ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ UN PACK SE VEND PAR CE QU'IL PROMET, PAS PAR SON TABLEAU DE COTES. La
+   première version alignait cinq lignes de pourcentages sous une icône grise,
+   toutes les cartes identiques : c'est un relevé, pas une vitrine. Trois choses
+   la transforment, et aucune n'est décorative :
+
+   1. LA POCHETTE PREND LA COULEUR DE SA MEILLEURE BANDE. On reconnaît un
+      Premium d'un Bronze de l'autre bout de la page, sans lire un mot.
+   2. LES COTES DEVIENNENT UNE BARRE. On voit d'un coup d'œil qu'un Premium est
+      quatre fois plus doré qu'un Bronze. Les chiffres restent listés en
+      dessous : c'est une économie, cacher ce qu'on achète serait malhonnête.
+   3. LE PACK PHARE EST PLUS GRAND. Une grille de sept tuiles identiques ne
+      guide personne ; une vitrine a toujours un article en devanture. */
+.cel-boutique-tete {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.2rem 0.2rem;
+}
+.cel-boutique-tete > div:first-child { flex: 1; min-width: 18rem; }
+.cel-boutique-tete h2 { margin: 0.2rem 0 0.3rem; font-family: var(--police-titre); font-size: clamp(1.5rem, 3vw, 2.1rem); text-transform: uppercase; }
+.cel-boutique-tete p { margin: 0; color: var(--brume); font-size: 0.88rem; line-height: 1.5; max-width: 62ch; }
+.cel-boutique-tete b { color: var(--craie-dim); }
+
+.cel-grille-packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); gap: 0.9rem; }
+
+/* Chaque bande a sa teinte : c'est elle qui colore toute la tuile. */
+.cel-pack.teinte-bronze { --pack: #b06a3a; }
+.cel-pack.teinte-argent { --pack: #b9c4cc; }
+.cel-pack.teinte-or { --pack: var(--or-400); }
+.cel-pack.teinte-elite { --pack: #7fd3ff; }
+.cel-pack.teinte-star { --pack: #ff7bd5; }
+
+.cel-pack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.1rem 1rem 1rem;
+  border-radius: var(--rayon);
+  border: 1px solid color-mix(in srgb, var(--pack, var(--or-500)) 30%, transparent);
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--pack, var(--or-500)) 16%, transparent), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(0, 0, 0, 0.3)),
+    var(--surface-solid);
+  box-shadow: var(--ombre-2), var(--arete);
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+}
+.cel-pack:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--pack, var(--or-500)) 65%, transparent);
+  box-shadow: var(--ombre-3), var(--arete), 0 0 32px -12px var(--pack, var(--or-500));
+}
+/* La lueur qui monte du bas de la tuile, comme un projecteur de vitrine. */
+.cel-pack-lueur {
+  position: absolute;
+  inset: auto -20% -55% -20%;
+  height: 70%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--pack, var(--or-500)) 26%, transparent), transparent 72%);
+  pointer-events: none;
+  opacity: 0.7;
+  transition: opacity 0.25s ease;
+}
+.cel-pack:hover .cel-pack-lueur { opacity: 1; }
+
+/* La pochette : un objet, pas une icône dans un carré. */
+.cel-pack-pochette {
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.1rem;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--rayon-sm);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--pack, var(--or-500)) 34%, transparent);
+  background:
+    radial-gradient(110% 80% at 50% 110%, color-mix(in srgb, var(--pack, var(--or-500)) 34%, transparent), transparent 66%),
+    linear-gradient(168deg, #1b1209 0%, #100b06 60%, #080505 100%);
+  color: var(--pack, var(--or-400));
+}
+/* Le rabat argenté qui barre la pochette en diagonale. */
+.cel-pack-rabat {
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(104deg, transparent 44%, rgba(255, 255, 255, 0.13) 50%, transparent 56%);
+  transform: translateX(-40%);
+  transition: transform 0.7s ease;
+}
+.cel-pack:hover .cel-pack-rabat { transform: translateX(40%); }
+.cel-pack-pochette svg { filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--pack, var(--or-500)) 60%, transparent)); }
+.cel-pack-pochette b { font-family: var(--police-titre); font-size: 1.5rem; line-height: 1; color: var(--craie); }
+.cel-pack-pochette small { font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--brume); }
+
+.cel-pack-corps { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; }
+.cel-pack-corps .eyebrow { color: var(--pack, var(--or-400)); font-size: 0.62rem; }
+.cel-pack h3 { margin: 0; font-family: var(--police-titre); font-size: 1.25rem; color: var(--craie); text-transform: uppercase; }
+.cel-pack-corps p { margin: 0; font-size: 0.82rem; color: var(--brume); line-height: 1.45; }
+
+/* La barre de cotes : la lecture en un coup d'œil. */
+.cel-pack-barre {
+  display: flex;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+  cursor: help;
+}
+.cel-pack-barre i { display: block; }
+.cel-pack-barre i.bronze { background: #b06a3a; }
+.cel-pack-barre i.argent { background: #b9c4cc; }
+.cel-pack-barre i.or { background: var(--or-400); }
+.cel-pack-barre i.elite { background: #7fd3ff; }
+.cel-pack-barre i.star { background: linear-gradient(90deg, #ff7bd5, #ffd76e); }
+
+.cel-pack-odds { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.15rem 0.7rem; }
+.cel-pack-odds li { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--brume); }
+.cel-pack-odds li b { font-family: var(--police-forte); color: var(--craie-dim); font-weight: 600; }
+.cel-pack-acheter { margin-top: auto; width: 100%; }
+.cel-pack-manque { color: var(--brume); font-size: 0.74rem; text-align: center; }
+
+/* ── Le pack en devanture ───────────────────────────────────────────────── */
+.cel-pack.vedette {
+  display: grid;
+  grid-template-columns: minmax(14rem, 22rem) 1fr;
+  align-items: center;
+  gap: 1.6rem;
+  padding: 1.4rem;
+}
+.cel-pack.vedette .cel-pack-pochette { aspect-ratio: 4 / 3; }
+.cel-pack.vedette h3 { font-size: clamp(1.5rem, 3vw, 2.1rem); }
+.cel-pack.vedette .cel-pack-corps p { font-size: 0.92rem; max-width: 52ch; }
+.cel-pack.vedette .cel-pack-acheter { width: auto; align-self: flex-start; padding-left: 2rem; padding-right: 2rem; }
+
+/* ⚠️ `position: fixed` DANS UN PARENT À `backdrop-filter` EST PIÉGÉ. Les
+   panneaux de cet écran en ont un : le voile d'ouverture de pack est donc posé
+   en `position: fixed` depuis la racine de l'écran, qui n'en a pas. */
+.cel-ouverture {
+  position: fixed;
+  overflow: hidden;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(3, 8, 5, 0.86);
+  animation: cel-voile 0.25s ease;
+}
+@keyframes cel-voile { from { opacity: 0; } }
+.cel-ouverture-contenu {
+  width: min(52rem, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.6rem;
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure-forte);
+  background: var(--surface-solid);
+  box-shadow: var(--ombre-3);
+  text-align: center;
+}
+.cel-ouverture-contenu h2 { margin: 0; font-family: var(--police-titre); font-size: 1.7rem; min-height: 2.1rem; }
+.cel-ouverture-contenu .btn { align-self: center; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   L'OUVERTURE D'UN PACK
+   ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ LA LUEUR ANNONCE LA RARETÉ AVANT LE NOM. `.rarete-*` est posé sur le voile
+   par la meilleure carte du lot : le halo qui monte derrière la pochette est
+   déjà rose-or quand c'est une Star. C'est ce qui fait qu'on retient son
+   souffle — une révélation qui n'annonce rien n'a aucun suspense. */
+.cel-halo {
+  position: absolute;
+  left: 50%;
+  bottom: -30vh;
+  width: min(120vw, 1100px);
+  height: 110vh;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(closest-side, var(--lueur, rgba(232, 178, 58, 0.3)), transparent 72%);
+  opacity: 0;
+  animation: cel-monte-halo 1.1s 0.15s ease-out forwards;
+}
+.cel-ouverture.rarete-bronze { --lueur: rgba(176, 106, 58, 0.34); }
+.cel-ouverture.rarete-argent { --lueur: rgba(185, 196, 204, 0.3); }
+.cel-ouverture.rarete-or { --lueur: rgba(232, 178, 58, 0.38); }
+.cel-ouverture.rarete-elite { --lueur: rgba(127, 211, 255, 0.42); }
+.cel-ouverture.rarete-star { --lueur: rgba(255, 123, 213, 0.5); }
+@keyframes cel-monte-halo { from { opacity: 0; transform: translateX(-50%) translateY(18vh); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+/* La pochette : un objet qu'on prend en main, pas un bouton. */
+.cel-pochette {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0;
+  color: var(--craie);
+  animation: cel-pochette-entre 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.25) backwards;
+}
+@keyframes cel-pochette-entre { from { opacity: 0; transform: translateY(40px) scale(0.9); } }
+.cel-pochette-corps {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 0.35rem;
+  width: min(15rem, 62vw);
+  aspect-ratio: 5 / 7;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--bordure-forte);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(232, 178, 58, 0.24), transparent 62%),
+    linear-gradient(168deg, #23150c 0%, #140c07 60%, #0b0705 100%);
+  box-shadow: var(--ombre-3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  animation: cel-pochette-respire 2.6s ease-in-out infinite;
+}
+@keyframes cel-pochette-respire {
+  0%, 100% { transform: translateY(0) rotate(-0.6deg); }
+  50% { transform: translateY(-9px) rotate(0.6deg); }
+}
+/* La bande dorée qui balaie la pochette : l'objet a l'air neuf, sous cellophane. */
+.cel-pochette-bande {
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(102deg, transparent 42%, rgba(255, 255, 255, 0.2) 50%, transparent 58%);
+  animation: cel-reflet 3.4s ease-in-out infinite;
+}
+.cel-pochette-corps svg { color: var(--or-400); filter: drop-shadow(0 4px 12px rgba(232, 178, 58, 0.45)); }
+.cel-pochette-corps b { font-family: var(--police-titre); font-size: 1.1rem; letter-spacing: 0.14em; color: var(--or-200); }
+.cel-pochette-corps small { font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--brume); }
+.cel-pochette-appel {
+  font-family: var(--police-forte);
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--or-400);
+  animation: cel-pouls 2s ease-in-out infinite;
+}
+.cel-pochette:hover .cel-pochette-corps { border-color: var(--or-500); box-shadow: var(--ombre-3), 0 0 34px -8px rgba(232, 178, 58, 0.7); }
+
+/* La révélation : chaque carte se retourne sur elle-même, la plus belle en dernier. */
+.cel-revelation { perspective: 1200px; }
+.cel-revele { position: relative; transform-style: preserve-3d; }
+.cel-revele.vue { animation: cel-retourne 0.62s cubic-bezier(0.2, 0.85, 0.3, 1.2) backwards; }
+@keyframes cel-retourne {
+  0% { transform: rotateY(-92deg) scale(0.9); opacity: 0; }
+  55% { opacity: 1; }
+  100% { transform: rotateY(0) scale(1); opacity: 1; }
+}
+/* ⚠️ Le flash ne se déclenche QUE sur les deux bandes hautes. Un éclat sur
+   chaque carte, et il ne veut plus rien dire : c'est le contraste avec les
+   cartes ordinaires qui fait l'événement. */
+.cel-revele.elite::after, .cel-revele.star::after {
+  content: '';
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, var(--eclat), transparent 70%);
+  animation: cel-eclat 0.9s 0.28s ease-out backwards;
+}
+.cel-revele.elite { --eclat: rgba(169, 228, 255, 0.75); }
+.cel-revele.star { --eclat: rgba(255, 150, 220, 0.85); }
+@keyframes cel-eclat { from { opacity: 0.95; transform: scale(0.4); } to { opacity: 0; transform: scale(1.35); } }
+.cel-dos-carte {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 5 / 7;
+  border-radius: var(--rayon-sm);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 8px, transparent 8px 16px),
+    linear-gradient(168deg, #1b2a20, #0b1610);
+  color: var(--or-500);
+  opacity: 0.55;
+}
+
+/* Le sélecteur d'écusson. */
+.cel-emblemes { width: min(62rem, 100%); text-align: left; }
+.cel-emblemes-liste { display: flex; flex-direction: column; gap: 1rem; max-height: 52vh; overflow-y: auto; align-content: start; }
+.cel-emblemes-liste h3 { margin: 0 0 0.45rem; font-family: var(--police-forte); font-size: 0.86rem; color: var(--or-400); }
+.cel-emblemes-liste h3 small { color: var(--brume); font-weight: 400; }
+.cel-emblemes-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.2rem, 1fr)); gap: 0.5rem; }
+.cel-emblemes-grille button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.55rem 0.35rem;
+  border-radius: var(--rayon-sm);
+  border: 1px solid transparent;
+  background: rgba(0, 0, 0, 0.26);
+  color: var(--craie-dim);
+}
+.cel-emblemes-grille button:hover { border-color: var(--bordure-forte); background: rgba(232, 178, 58, 0.08); color: var(--craie); }
+.cel-emblemes-grille button.actif { border-color: var(--or-500); background: rgba(232, 178, 58, 0.14); }
+.cel-emblemes-grille img { width: 42px; height: 42px; object-fit: contain; }
+.cel-emblemes-grille span { font-size: 0.66rem; line-height: 1.2; text-align: center; }
+.cel-identite-club {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--rayon-controle);
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.22);
+}
+.cel-identite-club span { display: flex; flex-direction: column; min-width: 0; }
+.cel-identite-club b { font-family: var(--police-forte); font-size: 0.95rem; }
+.cel-identite-club small { color: var(--brume); font-size: 0.74rem; }
+
+.cel-choix-embleme {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--rayon-controle);
+  border: 1px dashed var(--bordure-forte);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--craie-dim);
+  text-align: left;
+  width: 100%;
+}
+.cel-choix-embleme:hover { background: rgba(232, 178, 58, 0.08); color: var(--craie); }
+.cel-choix-embleme > span { flex: 1; font-size: 0.86rem; }
+.cel-choix-embleme svg:last-child { color: var(--or-500); opacity: 0.7; }
+.cel-ecusson-logo { width: 42px; height: 42px; object-fit: contain; flex-shrink: 0; }
+.cel-ecusson-logo.grand { width: 72px; height: 72px; }
+/* ⚠️ PAS DE PLAQUE SOUS UN ÉCUSSON. Le jeu pose ailleurs un disque sombre
+   derrière les blasons (`.blason-logo`) ; ici les logos sont DÉTOURÉS
+   (`components/EcussonClub.tsx`), donc une plaque ne ferait que redessiner le
+   fond qu'on vient d'enlever. */
+.ecusson-club, .cel-carte-blason { object-fit: contain; flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   L'IDENTITÉ D'UNE COMPÉTITION
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cel-nom-ligue { display: inline-flex; align-items: center; gap: 0.5rem; }
+.cel-logo-ligue { width: 22px; height: 22px; object-fit: contain; flex-shrink: 0; }
+.cel-logo-ligue.grand { width: 34px; height: 34px; }
+/* ── Les trophées ───────────────────────────────────────────────────────── */
+.cel-vignette-trophee { object-fit: contain; flex-shrink: 0; }
+.cel-vignette-trophee.vide {
+  display: grid;
+  place-items: center;
+  border-radius: var(--rayon-sm);
+  background: color-mix(in srgb, var(--teinte, var(--or-500)) 14%, rgba(0, 0, 0, 0.3));
+  color: var(--teinte, var(--or-400));
+}
+.cel-apercu-trophee {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--rayon);
+  border: 1px solid color-mix(in srgb, var(--teinte, var(--or-500)) 45%, transparent);
+  background:
+    radial-gradient(120% 140% at 12% 0%, color-mix(in srgb, var(--teinte, var(--or-500)) 20%, transparent), transparent 62%),
+    rgba(0, 0, 0, 0.28);
+}
+.cel-apercu-trophee > div { min-width: 0; }
+.cel-apercu-trophee b { display: block; font-family: var(--police-titre); font-size: 1.15rem; color: var(--craie); }
+.cel-apercu-trophee p { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--brume); line-height: 1.45; }
+.cel-grille-trophees { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 0.4rem; }
+.cel-grille-trophees button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--rayon-sm);
+  border: 1px solid transparent;
+  border-left: 3px solid var(--teinte, var(--or-500));
+  background: rgba(0, 0, 0, 0.26);
+  color: var(--craie-dim);
+  text-align: left;
+  font-size: 0.85rem;
+}
+.cel-grille-trophees button:hover { background: color-mix(in srgb, var(--teinte, var(--or-500)) 12%, transparent); color: var(--craie); }
+.cel-grille-trophees button.actif { border-color: var(--teinte, var(--or-500)); background: color-mix(in srgb, var(--teinte, var(--or-500)) 18%, transparent); color: var(--craie); }
+.cel-grille-trophees svg { color: var(--teinte, var(--or-400)); flex-shrink: 0; }
+
+.cel-bascule {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--rayon-sm);
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+.cel-bascule:hover { border-color: var(--bordure-forte); }
+.cel-bascule input { width: 18px; height: 18px; accent-color: var(--or-500); flex-shrink: 0; margin-top: 1px; }
+.cel-bascule span { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.82rem; color: var(--brume); line-height: 1.45; }
+.cel-bascule b { font-family: var(--police-forte); font-size: 0.9rem; color: var(--craie); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE CLASSEMENT DÉTAILLÉ, ET LA FICHE D'UN CLUB
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cel-classement tbody th { padding-left: 0; }
+.cel-club-lien {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--rayon-sm);
+  color: inherit;
+  text-align: left;
+  width: 100%;
+}
+.cel-club-lien:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+.cel-club-lien:disabled { cursor: default; }
+.cel-club-lien > span { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.cel-club-lien small { color: var(--brume); font-weight: 400; font-size: 0.72rem; }
+.cel-club-lien .cel-ecusson { width: 26px; height: 26px; }
+.cel-club-lien .cel-ecusson svg { width: 26px; height: 26px; }
+.cel-club-lien .cel-ecusson b { font-size: 0.62rem; }
+
+.cel-forme { display: inline-flex; gap: 0.18rem; }
+.cel-forme i {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  font-style: normal;
+  font-family: var(--police-forte);
+  font-size: 0.62rem;
+  color: #0a1410;
+}
+.cel-forme i.V { background: var(--pelouse-400); }
+.cel-forme i.N { background: var(--brume); }
+.cel-forme i.D { background: var(--danger); color: #fff1ef; }
+.cel-forme em { color: var(--brume); font-style: normal; }
+
+.cel-fiche-club { width: min(64rem, 100%); text-align: left; }
+.cel-fiche-tete { display: flex; align-items: center; gap: 1rem; }
+.cel-fiche-tete > div { flex: 1; min-width: 0; }
+.cel-fiche-tete h2 { margin: 0.15rem 0; font-family: var(--police-titre); font-size: 1.7rem; }
+.cel-fiche-tete p { margin: 0; color: var(--brume); font-size: 0.88rem; }
+.cel-fiche-chiffres { grid-template-columns: repeat(4, 1fr); }
+.cel-fiche-resultats { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.cel-fiche-resultats span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--rayon-sm);
+  background: rgba(0, 0, 0, 0.26);
+  border-left: 3px solid var(--brume);
+}
+.cel-fiche-resultats span.V { border-left-color: var(--pelouse-400); }
+.cel-fiche-resultats span.D { border-left-color: var(--danger); }
+.cel-fiche-resultats small { color: var(--brume); font-size: 0.7rem; }
+.cel-fiche-resultats b { font-family: var(--police-titre); font-size: 1rem; }
+.cel-fiche-titres { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.cel-fiche-titres span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--rayon-pilule);
+  background: rgba(232, 178, 58, 0.12);
+  border: 1px solid var(--bordure-forte);
+  font-size: 0.82rem;
+  color: var(--or-200);
+}
+.cel-fiche-titres svg { color: var(--or-400); }
+.cel-fiche-titres small { color: var(--brume); }
+
+/* ⚠️ LE BLASON DÉBORDE DU PORTRAIT, MAIS LE PORTRAIT NE DÉBORDE DE RIEN.
+   Première version : `overflow: visible` sur `.cel-carte-portrait` pour laisser
+   dépasser l'écusson. Ça a aussi débridé la PHOTO du joueur, qui n'était plus
+   découpée par le disque : les photos sortaient de la carte et passaient
+   par-dessus le nom. Le portrait garde donc son `overflow: hidden` d'origine,
+   et l'écusson est posé dans un cadre qui l'entoure. */
+.cel-carte-vignette {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  margin: 0.15rem 0;
+}
+.cel-carte-blason {
+  position: absolute;
+  right: -5px;
+  bottom: -3px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.75));
+  pointer-events: none;
+}
+/* ⚠️ LA PHOTO EST POSÉE EN ABSOLU, ET C'EST LA SEULE FAÇON FIABLE.
+   Le portrait est une grille dont la rangée est en `auto` : le `height: 100%`
+   de l'image s'y résout de façon CYCLIQUE (la rangée dépend du contenu, le
+   contenu dépend de la rangée), donc le navigateur l'ignore et garde le rapport
+   d'origine — mesuré : une image de 60 × 90 dans un cadre de 62. Elle était
+   bien coupée par l'`overflow`, mais `object-fit: cover` recadrait alors sur
+   90 px de haut au lieu de 62 et les visages descendaient hors du disque.
+   `align-self: stretch` ne suffit pas : la cyclicité reste. En absolu, le cadre
+   de référence est le bloc positionné, il est définitivement 62 × 62. */
+.cel-carte-portrait { position: relative; }
+.cel-carte-portrait > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ⚠️ 1 353 ÉCUSSONS DANS UNE SEULE LISTE. `content-visibility` est ce qui rend
+   la chose tenable : le navigateur ne met en page et ne dessine que les
+   sections qui approchent de l'écran. C'est le même remède que pour l'atlas des
+   655 clubs du mode solo. */
+.cel-emblemes-liste section { content-visibility: auto; contain-intrinsic-size: auto 200px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE MARCHÉ
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cel-grille-ventes { display: grid; grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); gap: 0.9rem; }
+.cel-vente {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 0.9rem;
+  padding: 0.9rem;
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure);
+  background: var(--surface);
+  box-shadow: var(--ombre-2), var(--arete);
+}
+.cel-vente-corps { display: flex; flex-direction: column; gap: 0.4rem; justify-content: center; }
+.cel-vente-corps strong { font-family: var(--police-titre); font-size: 1.5rem; color: var(--or-400); }
+.cel-vente-corps small { color: var(--brume); font-size: 0.8rem; }
+.cel-encherir { display: flex; gap: 0.4rem; }
+.cel-encherir input {
+  width: 7.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--rayon-controle);
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--craie);
+}
+.cel-encherir .btn { padding: 0.45rem 0.9rem; font-size: 0.84rem; }
+.cel-apercu-vente { display: grid; place-items: center; }
+.cel-apercu-vente .cel-carte { width: 12rem; }
+
+.cel-choix-cartes { display: flex; flex-wrap: wrap; gap: 0.35rem; max-height: 18rem; overflow-y: auto; align-content: start; }
+.cel-choix-cartes button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--rayon-pilule);
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.24);
+  color: var(--craie-dim);
+  font-size: 0.82rem;
+}
+.cel-choix-cartes button:hover { border-color: var(--bordure-forte); color: var(--craie); }
+.cel-choix-cartes button.actif { border-color: var(--or-500); background: rgba(232, 178, 58, 0.14); color: var(--or-200); }
+.cel-choix-cartes b { font-family: var(--police-titre); color: var(--or-400); }
+.cel-choix-cartes small { color: var(--brume); font-size: 0.72rem; }
+
+.cel-echange-cotes { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; }
+.cel-echange-cotes > svg { color: var(--or-400); opacity: 0.6; }
+.cel-echange-cotes h3 { margin-bottom: 0.45rem; }
+.cel-ova-echange { display: inline-block; margin-top: 0.4rem; color: var(--or-400); font-family: var(--police-forte); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LA COMPOSITION, ET L'HISTOIRE
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cel-tete-compo { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 1.2rem; }
+.cel-tete-compo > div:first-child { flex: 1; min-width: 16rem; }
+.cel-note-compo { text-align: center; padding: 0 0.5rem; }
+.cel-note-compo b { display: block; font-family: var(--police-titre); font-size: 2.2rem; color: var(--or-400); line-height: 1; }
+.cel-note-compo span { font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brume); }
+
+.cel-palmares { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 0.7rem; }
+.cel-palmares article {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.8rem 1rem;
+  border-radius: var(--rayon-sm);
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.24);
+}
+.cel-palmares article.moi { border-color: var(--bordure-forte); background: rgba(232, 178, 58, 0.09); }
+.cel-palmares svg { color: var(--or-400); flex-shrink: 0; }
+.cel-palmares div { flex: 1; min-width: 0; }
+.cel-palmares b { display: block; font-family: var(--police-forte); }
+.cel-palmares small { color: var(--brume); font-size: 0.78rem; }
+.cel-palmares span { font-family: var(--police-titre); color: var(--or-200); font-size: 0.95rem; text-align: right; }
+
+.cel-journal { display: flex; flex-direction: column; max-height: 34rem; overflow-y: auto; }
+.cel-journal p {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.2rem 0.6rem;
+  padding: 0.5rem 0.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  margin: 0 !important;
+}
+.cel-journal svg { grid-row: span 2; color: var(--brume); }
+.cel-journal span { display: flex; flex-direction: column; min-width: 0; }
+.cel-journal b { font-family: var(--police-forte); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brume); }
+.cel-journal em { font-style: normal; font-family: var(--police-titre); font-size: 1rem; }
+.cel-journal p.credit em { color: var(--succes); }
+.cel-journal p.debit em { color: var(--danger); }
+.cel-journal small { grid-column: 3; color: var(--brume); font-size: 0.72rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — dans les deux sens
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 1500px) {
+  .cel { max-width: 1720px; }
+  .cel-grille-cartes { grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); }
+  .cel-grille-packs { grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
+}
+@media (max-width: 1120px) {
+  .cel-grille-bureau { grid-template-columns: 1fr; }
+  .cel-portail { grid-template-columns: 1fr; }
+  .cel-auth { justify-self: stretch; max-width: none; }
+  .cel-entree { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+@media (max-width: 760px) {
+  .cel-pack.vedette { grid-template-columns: 1fr; gap: 1rem; padding: 1.1rem; }
+  .cel-pack.vedette .cel-pack-acheter { width: 100%; }
+
+  .cel { padding: 0.9rem 0.7rem 4.5rem; gap: 0.9rem; }
+  .cel-entete { flex-direction: column; align-items: flex-start; gap: 0.9rem; }
+  .cel-portefeuille { width: 100%; }
+  .cel-deux { grid-template-columns: 1fr; }
+  .cel-vente { grid-template-columns: 1fr; }
+  .cel-apercu-vente .cel-carte, .cel-vente .cel-carte { width: min(12rem, 100%); margin: 0 auto; }
+  .cel-echange-cotes { grid-template-columns: 1fr; }
+  .cel-echange-cotes > svg { justify-self: center; transform: rotate(90deg); }
+  .cel-grille-cartes { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.55rem; }
+  .cel-panneau { padding: 1rem; }
+  .cel-billet { grid-template-columns: 1fr auto; }
+}
+@media (max-width: 560px) {
+  .cel-score-direct { grid-template-columns: 1fr; gap: 0.5rem; }
+  .cel-camp { flex-direction: row; gap: 0.5rem; }
+  .cel-camp small { margin-left: auto; }
+  .cel-chrono { order: -1; }
+  .cel-decision-choix { grid-template-columns: 1fr; }
+  .cel-chiffres { grid-template-columns: 1fr; }
+  .cel-grille-cartes { grid-template-columns: repeat(2, 1fr); }
+  .cel-carte-stats { grid-template-columns: repeat(2, 1fr); }
+  .cel-affiche { grid-template-columns: 1fr; text-align: center; gap: 0.3rem; }
+  .cel-affiche b:last-of-type { text-align: center; }
+  .cel-fil > span { order: 3; width: 100%; margin-right: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cel-presence, .cel-direct-label, .cel-chrono span.bat, .cel-decision, .cel-carte.star::after { animation: none; }
+  .cel-ligne-fil, .cel-halo, .cel-pochette, .cel-pochette-corps, .cel-pochette-bande,
+  .cel-pochette-appel, .cel-revele.vue, .cel-revele.elite::after, .cel-revele.star::after { animation: none; }
+}

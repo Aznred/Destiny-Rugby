@@ -395,6 +395,11 @@ export interface EtatMatch {
   consigne?: ConsigneJoueur;
   fini: boolean;
   rng: () => number;
+  /** Options serveur : aucune incidence sur les carrières locales existantes. */
+  scoreSurTerrain?: boolean;
+  meteoTir?: 'sec' | 'pluie' | 'vent';
+  impactBanc?: Partial<Record<Cote, number>>;
+  choixPenalite?: 'points' | 'touche' | 'rapide' | 'melee';
 
   // ── LE JOUEUR AUX COMMANDES ──────────────────────────────────────────────
   /** Le niveau du match : il commande toute la discipline. */

@@ -1,5 +1,46 @@
 # Destiny Rugby 🏉
 
+### Carrière en ligne — le troisième mode, jouable de bout en bout
+
+- **Une ligue privée entre potes** : 2 à 20 clubs, code d'invitation,
+  championnat aller-retour, coupes inventées par le créateur, palmarès. Écran
+  dédié à sept onglets + le direct.
+- **On démarre avec trente VRAIS licenciés de Régionale 3** (30 à 40 GEN, avec
+  leur nom et leur club), tous les clubs exactement à 35 de moyenne — et on
+  choisit l'écusson d'un vrai club parmi 1 353, du Stade Toulousain au club du
+  coin.
+- **Le championnat a son identité** : logo de la compétition (parmi les 60 du
+  jeu), trophée soulevé (parmi les 46 trophées d'équipe de l'armoire, avec son
+  image 3D), et **phase finale en option** — demi-finales 1ᵉʳ-4ᵉ et 2ᵉ-3ᵉ puis
+  finale. Le classement décide de l'argent, la finale décide du trophée.
+- **Les matchs se regardent et se pilotent.** 80 minutes de rugby à 4 s de vraie
+  vie par minute (5 min 20). Mentalité, jeu, rythme, défense et rucks atteignent
+  réellement le moteur ; les remplacements se font en direct ; et sur une
+  pénalité **le chrono s'arrête et on demande au manager** — trois points,
+  touche, jeu rapide ou mêlée — avec le pourcentage que le moteur jouera. Sans
+  réponse en 20 s, l'IA tranche selon les consignes enregistrées.
+- **Une absence ne bloque jamais la ligue** : à la fermeture de la fenêtre, la
+  rencontre se joue seule avec les compositions et consignes enregistrées.
+- **Les packs tirent dans le vivier réel** — 78 083 joueurs, du Top 14 à la
+  Régionale 3 et seize championnats étrangers. 26 joueurs à 88+ dans tout le
+  jeu, et **un joueur n'existe qu'une fois par ligue**.
+- **Ouvrir un pack est une séquence** : la pochette se déchire, les cartes se
+  retournent une à une de la moins bonne à la meilleure, et la lueur du fond
+  annonce la rareté avant le nom.
+- **Marché, enchères et échanges croisés** entre managers, avec verrou de carte
+  et plancher d'effectif tenus par le serveur.
+- **Le classement montre les clubs, pas des lignes** : écusson et pseudo de
+  chaque manager, points marqués et encaissés, bonus, forme sur cinq matchs — et
+  un clic ouvre la **fiche d'un adversaire** (effectif complet, derniers
+  résultats, palmarès). Sur les cartes, le blason du club réel du joueur.
+- **Mesuré** (`npm run verify:carriere`, 122 contrôles) : scores moyens 19,9 et
+  maximum 35 sur 120 rencontres — jamais de 200-150 ; un direct suivi minute par
+  minute donne le même score qu'un match joué d'un bloc ; rapport OVA premier /
+  dernier de **1,63** sur une saison.
+- ⚠️ **Il reste à appliquer `serveur/schema-carriere.sql` sur Neon.** En local,
+  `npm run dev` branche le même serveur sur un fichier JSON : le mode se teste
+  entièrement. Détail complet : `serveur/LIGUES.md`.
+
 ### Trésorerie, objectifs et structures du manager
 
 - **Trésorerie** remplace l’onglet Match. Les matchs restent accessibles depuis Calendrier et le prochain rendez-vous du Club.
@@ -532,6 +573,104 @@ npx vite-node scripts/verifClassement.ts
 L'écran Classement affiche **en clair** la fiche qui partirait et le verdict que
 le serveur rendrait : rien n'est caché, parce que rien n'a besoin de l'être.
 
+## 🤝 La Carrière en ligne — la ligue privée entre potes
+
+**Le troisième mode du jeu.** Deux à vingt potes, une ligue **privée**, chacun
+son club, un championnat étalé sur plusieurs semaines à un ou deux matchs par
+semaine, une monnaie (**l'OVA**), des packs tirés du vivier mondial réel, un
+marché et des échanges entre eux, des coupes inventées par le commissaire, et
+une histoire qui traverse les saisons.
+
+Ce n'est pas un clone de FUT posé sur du rugby. Le moment visé n'est pas « j'ai
+packé un 90 », c'est *« j'ai packé ce 74 à la première saison, personne n'en
+voulait, Hugo m'a proposé 90 000 OVA pour lui, j'ai refusé, et il nous a fait
+gagner la finale »*. Tout le réglage sert cette phrase.
+
+**On commence avec trente vrais licenciés de Régionale 3** autour de 35 GEN,
+tous les clubs exactement au même niveau, et on construit. Une saison rapporte de quoi ouvrir une
+quinzaine de packs Premium — pas de quoi s'offrir une équipe de stars.
+
+### Regarder son match doit servir à quelque chose
+
+Un match, ce sont **80 minutes de rugby** jouées par le moteur du jeu, à raison
+de quatre secondes de vraie vie par minute — **5 min 20** en tout. Pendant ce
+temps, le manager n'est pas spectateur :
+
+- il change sa **mentalité**, son **jeu**, son **rythme**, sa **défense** et sa
+  **contestation des rucks**, et ça atteint réellement le moteur ;
+- il fait ses **remplacements** ;
+- et sur une pénalité, **le chrono s'arrête et on lui demande** : les trois
+  points, la touche, jouer vite, ou la mêlée. Le pourcentage annoncé est celui
+  que le moteur jouera vraiment.
+
+L'adversaire, lui, ne voit pas ses réglages — seulement une impression :
+*« l'adversaire semble jouer beaucoup plus offensivement »*. À lui de lire le
+jeu.
+
+**Et une absence ne bloque jamais la ligue.** À la fermeture de la fenêtre d'une
+journée, les rencontres non jouées se jouent toutes seules avec les compositions
+et les consignes enregistrées — même moteur, mêmes règles.
+
+### Quatre invariants, et chacun a une raison
+
+1. **Le serveur est la source de vérité.** Le client demande une action, il ne
+   déclare jamais un état. « Je veux ouvrir un pack », jamais « j'ai
+   100 000 OVA ». Ça se vérifie à l'œil : l'écran n'a pas un seul état React qui
+   contienne un OVA, une carte ou un score.
+2. **Un joueur n'existe qu'une fois par ligue.** Si Dupont appartient à Colin
+   RFC, personne d'autre ne peut l'avoir — donc il faut aller parler à Colin.
+3. **Rien ne traverse d'une ligue à l'autre**, ni OVA ni carte. Pas de
+   portefeuille global : sinon un vétéran de 500 heures arrive chez ses potes
+   avec un trésor et l'économie est morte au premier jour.
+4. **Aucun OVA ne s'achète en argent réel.** La monétisation du jeu reste
+   cosmétique et s'arrête à la porte de la ligue.
+
+### Le vivier, c'est le monde entier — et il est pyramidal
+
+Les packs ne contiennent pas des cartes inventées : ce sont les **78 083 joueurs
+réels** de la base du jeu, du Top 14 à la Régionale 3, plus les seize
+championnats étrangers. On peut y trouver un pilier de Régionale à 41 comme un
+international à 90.
+
+| bande | notes | joueurs dans tout le jeu |
+|---|---|---|
+| Bronze | 30-49 | 67 514 |
+| Argent | 50-64 | 6 415 |
+| Or | 65-79 | 3 712 |
+| Élite | 80-87 | 416 |
+| **Star** | **88+** | **26** |
+
+Vingt-six joueurs à 88 et plus. Mesuré : **soixante packs Premium** — quatre
+saisons de jeu — donnent 9 Élite et **zéro Star**. En packer un est un
+événement, et l'unicité par ligue fait le reste.
+
+### Ce qui se mesure plutôt que de se supposer
+
+Le banc (`npm run verify:carriere`, 122 contrôles, une minute) joue près de deux
+cents matchs complets sans navigateur ni base. Ce qu'il dit :
+
+- **les scores tiennent debout** — sur 120 rencontres entre deux effectifs
+  Bronze, moyenne **19,9**, médiane 20, **maximum 35**. Jamais de 200-150 :
+  le moteur reçoit un score cible tiré de la force des deux feuilles et refuse
+  l'essai qui le dépasserait ;
+- **le direct est déterministe** — un match suivi minute par minute donne
+  exactement le même score et le même fil qu'un match joué d'un bloc. C'est ce
+  qui garantit que deux managers voient la même rencontre ;
+- **l'anti-boule-de-neige tient** — sur une saison à six clubs, le champion
+  finit à 27 350 OVA et le dernier à 16 800. **Rapport 1,63.** Un club à zéro ne
+  peut plus rien acheter, donc plus rien négocier, donc il décroche pour de bon.
+
+Et parce qu'on mesure, on trouve : le **pack Avants ne contenait personne**
+(une majuscule oubliée dans une comparaison), une ligue **grossissait sans fin**
+(6,5 Mo projetés pour une saison à vingt clubs, ramenés à 1 Mo), et le
+classement faisait **déborder toute la page sur mobile**. Les trois sont
+corrigés, et le pourquoi est écrit à l'endroit exact où ils vivaient.
+
+> **Il reste une étape avant de jouer en ligne pour de vrai** : appliquer
+> `serveur/schema-carriere.sql` sur Neon. En local, le mode se teste
+> entièrement — `npm run dev` branche le même serveur sur un fichier JSON.
+> Tout le détail vit dans **`serveur/LIGUES.md`**.
+
 ## 🧠 Le Maître du Jeu tourne sur Groq — et le quota ne se voit pas
 
 Le jeu embarque **sa propre clé** : aucun joueur n'a rien à saisir, rien à
@@ -671,6 +810,17 @@ src/
   lib/armoire.ts        # étagères mesurées sur le modèle 3D, titres au sol, boucliers adossés, cadrage
   lib/honneurs.ts       # les distinctions individuelles : note de saison + stats + palmarès de l'année
   lib/classementEnLigne.ts # envoi / lecture du classement mondial (sans serveur : le jeu continue)
+  lib/ligue/            # LA CARRIÈRE EN LIGNE — tourne AUSSI côté serveur
+    typesCarriere.ts    # le vocabulaire : ligue, club, carte, vente, échange, objectif, commande
+    catalogueCarriere.ts# LE VIVIER MONDIAL (78 083 joueurs réels), la dotation de 30 Bronze, les 7 packs
+    carriere.ts         # TOUTES LES RÈGLES : saison, packs, marché, enchères, échanges, coupes, récompenses
+    matchCarriere.ts    # LE MATCH : stratégies, horloge, décisions en direct, remplacements, feuille
+    aleatoire.ts        # le PRNG déterministe, le mélange, le tirage pondéré
+    calendrier.ts       # toutes rondes, équilibre des réceptions, fenêtres de journée
+    ⚠️ types/rarete/identite/reglages/vivier/dotation/valeur/packs/ova = socle du 1er lot,
+       plus branché au jeu (dette décrite dans serveur/LIGUES.md)
+  lib/carriereEnLigneClient.ts # le client HTTP du mode : 7 fonctions, aucune règle
+api/carriere.ts         # la fonction serverless de la Carrière en ligne
 api/classement.ts       # la fonction serverless Vercel — voir serveur/VERCEL.md
   lib/effectif.ts       # effectif réel ou généré, progression/déclin, force d'effectif, note des clubs
 scripts/
@@ -687,6 +837,8 @@ scripts/
   verifMatchJouable.ts  # caméra, sens du stick, rythme des moments, durée réelle d'un match
   verifMarche.ts        # marché : variété des clubs, saut d'étage interdit, salaires par âge
   verifClassement.ts    # joue le tricheur : chaque attaque du classement doit être refusée
+  verifCarriere.ts      # la Carrière en ligne : scores, direct, packs, économie, marché, refus (122 contrôles)
+  verifLigue.ts         # ⚠️ le socle du 1er lot — plus branché au jeu
   verifLogosSelections.ts # signatures des images et couverture du classement World Rugby
 sources/                # matières premières rangées : data, logos, compétitions, modèles 3D
 serveur/                # le classement en ligne (Deno, déployé à part — pas dans le bundle)
@@ -694,6 +846,8 @@ serveur/                # le classement en ligne (Deno, déployé à part — pa
   schema.sql            # table (pseudo, score, cree_le), RLS sans droit d'insertion
   README.md             # déploiement, et ce que la protection ne peut pas faire
   MIGRATION-FICHES.md   # passer la base en v2 : armoires, clubs et stats dans le classement
+  LIGUES.md             # LE MODE EN LIGNE : invariants, chiffres mesurés, feuille de route en 7 lots
+  schema-ligues.sql     # 14 tables : comptes, sessions, ligues, cartes, marché, journal, palmarès
   copierLogos.cjs       # sources/logos/clubs/** → public/logos/ (à plat, dédoublonnés)
   store/useGame.ts      # store Zustand (joueur, journal, Ovas, panthéon, scénarios, offres…)
   lib/progression.ts    # note de saison + évolution des attributs et du potentiel
