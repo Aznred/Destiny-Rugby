@@ -1,0 +1,19 @@
+.bp3 { --bp3-color:#dca575;overflow:hidden;border:1px solid var(--bordure);border-radius:var(--rayon);background:radial-gradient(ellipse at 50% 40%,color-mix(in srgb,var(--bp3-color) 10%,transparent),transparent 65%),var(--surface-solid); }
+.bp3-scene {position:relative;height:470px;cursor:grab;touch-action:pan-y;outline-offset:-4px;}
+.bp3-scene:active {cursor:grabbing;}
+.bp3-scene:focus-visible {outline:2px solid var(--bp3-color);}
+.bp3-etiquette {display:flex;flex-direction:column;align-items:center;width:160px;color:var(--craie);text-shadow:0 2px 5px #000;font-size:12px;gap:4px;}
+.bp3-etiquette small {color:#d9cba6;}
+.bp3-geste {position:absolute;bottom:10px;left:12px;right:12px;text-align:center;font-size:12px;color:var(--craie-dim);pointer-events:none;}
+.bp3-details {text-align:center;padding:20px 24px 26px;border-top:1px solid var(--bordure);}
+.bp3-details h3 {font:28px var(--police-titre);text-transform:uppercase;margin:8px 0;color:var(--bp3-color);}
+.bp3-details p {margin:8px 0;color:var(--craie-dim);}
+.bp3-prix {display:block;font-size:26px;color:var(--or-400);margin-top:14px;}
+.bp3-prix small {font-size:13px;}
+.bp3-message {min-height:20px;font-size:12px;}
+.bp3-details details {max-width:440px;margin:14px auto 0;font-size:12px;color:var(--craie-dim);}
+.bp3-details summary {cursor:pointer;}
+.bp3-details ul {list-style:none;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:12px;}
+.bp3-details li {display:flex;gap:5px;}
+.bp3-erreur {padding:60px 20px;text-align:center;}
+@media(max-width:600px){.bp3-scene{height:360px}.bp3-etiquette{width:105px;font-size:10px}.bp3-geste{font-size:10px}.bp3-details{padding:14px}.bp3-details h3{font-size:24px}}

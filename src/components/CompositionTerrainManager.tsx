@@ -22,7 +22,7 @@
 // carte disparaissent quand il est absent.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { DragEvent, RefObject } from 'react';
+import type { DragEvent, RefObject, ReactNode } from 'react';
 import { nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../lib/compositionManager';
@@ -47,6 +47,7 @@ import { photoReelle } from '../lib/avatars';
 type ZoneComposition = 'titulaires' | 'remplacants';
 
 interface Props {
+  rendreCarte?: (joueur: Coequipier) => ReactNode;
   /** Joueurs alignables cette semaine. */
   effectif: Coequipier[];
   /** Tout le groupe sous contrat, indisponibles compris. */
@@ -160,9 +161,10 @@ function PortraitComposition({ nom, panneau = false }: { nom: string; panneau?: 
 
 function CarteJoueur({
   joueur, numero, posteSlot, selectionne, capitaine, buteur, etat, compact,
-  enGlisse, cibleDepot, surSelection, surDrag, surDragFin, surSurvolDepot, surDrop,
+  rendreCarte, enGlisse, cibleDepot, surSelection, surDrag, surDragFin, surSurvolDepot, surDrop,
 }: {
   joueur?: Coequipier;
+  rendreCarte?: Props['rendreCarte'];
   numero: number;
   posteSlot: PosteId;
   selectionne: boolean;
@@ -184,7 +186,7 @@ function CarteJoueur({
   // ⚠️ LA RARETÉ ET LE STATUT COHABITENT, ils ne disent pas la même chose : la
   // rareté est le MÉTAL de la carte (ce qu'elle vaut), le statut reste la bande
   // du haut (le rôle dans l'effectif). Voir `lib/carteJoueur.ts`.
-  const rarete: RareteCarte | undefined = joueur ? rareteDe(joueur) : undefined;
+  const rarete: RareteCarte | undefined = joueur && !rendreCarte ? rareteDe(joueur) : undefined;
   const pepite = joueur ? estPepite(joueur) : false;
   const badges = joueur ? badgesDe(joueur, etat ?? {}).slice(0, 2) : [];
   // ⚠️ LES SIX STATS SORTENT DU POSTE OÙ IL EST ALIGNÉ, pas de son poste
@@ -197,6 +199,7 @@ function CarteJoueur({
       type="button"
       className={[
         'ct-carte',
+        joueur && rendreCarte ? 'ct-fut' : '',
         statut ? `ct-${statut}` : 'ct-vide',
         rarete ? `ct-r-${rarete}` : '',
         pepite ? 'ct-pepite' : '',
@@ -229,6 +232,7 @@ function CarteJoueur({
           + `${rarete ? ` · ${NOM_RARETE[rarete]}` : ''}`
         : nomPoste(posteSlot)}
     >
+      {joueur && rendreCarte ? <>{rendreCarte(joueur)}<span className="ct-fut-indicateurs"><b>{numero}</b><span title={t(`compo.adq.${adequation}`)}><PastilleAdequation adequation={adequation} /></span>{capitaine && <i title="Capitaine">C</i>}{buteur && <i title="Buteur">B</i>}{etat?.condition !== undefined && <small>{etat.condition}%</small>}</span></> : <>
       {/* ⚠️ LE TALON NE PORTE PLUS LE NUMÉRO. Il l'écrivait à la verticale
           dans dix-sept pixels de large : illisible, et redondant depuis que la
           tête l'affiche. Il reste ce qu'il a toujours été — la perforation qui
@@ -285,6 +289,7 @@ function CarteJoueur({
           </i>
         )}
       </span>
+      </>}
     </button>
   );
 }
@@ -410,7 +415,7 @@ function PanneauJoueur({
 
 export function CompositionTerrainManager({
   effectif, effectifComplet = effectif, composition, onPlacer, etats, indisponibles,
-  automatismes, onCapitaine, onButeur,
+  automatismes, onCapitaine, onButeur, rendreCarte,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
   const [joueurGlisse, setJoueurGlisse] = useState<string | null>(null);
@@ -525,7 +530,7 @@ export function CompositionTerrainManager({
     ? POSTES_XV_MANAGER[composition.titulaires.indexOf(selection)] : undefined;
 
   return (
-    <section className="manager-feuille-visuelle" aria-label={t('compo.titre')}>
+    <section className={`manager-feuille-visuelle${rendreCarte ? ' ct-feuille-fut' : ''}`} aria-label={t('compo.titre')}>
       {/* ── L'EN-TÊTE ─────────────────────────────────────────────────────── */}
       <div className="ct-entete">
         <div className="ct-note-equipe">
@@ -582,6 +587,7 @@ export function CompositionTerrainManager({
               return (
                 <div className="manager-position" key={`${posteSlot}-${index}`} style={{ left: `${x}%`, top: `${y}%` }}>
                   <CarteJoueur
+                    rendreCarte={rendreCarte}
                     joueur={joueur}
                     numero={index + 1}
                     posteSlot={posteSlot}
@@ -647,6 +653,7 @@ export function CompositionTerrainManager({
             const posteSlot = joueur?.poste ?? POSTES_BANC_MANAGER[index];
             return (
               <CarteJoueur
+                    rendreCarte={rendreCarte}
                 key={`banc-${index}`}
                 joueur={joueur}
                 numero={index + 16}
@@ -691,6 +698,7 @@ export function CompositionTerrainManager({
                 key={joueur.id}
                 className={[
                   'manager-reserve-carte',
+                  rendreCarte ? 'ct-reserve-fut' : '',
                   `ct-${statutDe(joueur)}`,
                   `ct-r-${rareteDe(joueur)}`,
                   estPepite(joueur) ? 'ct-pepite' : '',
@@ -706,7 +714,8 @@ export function CompositionTerrainManager({
                 aria-disabled={indisponible}
                 title={`${joueur.nom} · ${NOM_RARETE[rareteDe(joueur)]}${raison ? ` · ${raison}` : ''}`}
               >
-                <PortraitComposition nom={joueur.nom} />
+                {!rendreCarte && <PortraitComposition nom={joueur.nom} />}
+                {rendreCarte ? <>{rendreCarte(joueur)}{raison && <small className="ct-fut-raison">{raison}</small>}</> : <>
                 <strong>{joueur.note}</strong>
                 <span>
                   <b>{joueur.nom}</b>
@@ -718,6 +727,7 @@ export function CompositionTerrainManager({
                       <Icone nom={ICONE_BADGE[b]} taille={13} />
                     </i>
                   ))}
+                </>}
               </button>
             );
           })}

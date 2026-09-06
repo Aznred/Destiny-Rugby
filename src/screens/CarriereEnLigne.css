@@ -256,6 +256,8 @@
 .cel-ligue:hover { transform: translateX(3px); border-color: var(--bordure-forte); }
 .cel-ligue span { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 0; }
 .cel-ligue em { font-style: normal; font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--or-400); }
+.cel-ligue .cel-ligue-nom { display: flex; flex-direction: row; align-items: center; gap: 0.42rem; }
+.cel-logo-ligue.cel-logo-ligue-liste { width: 20px; height: 20px; flex: 0 0 20px; object-fit: contain; }
 .cel-ligue b { font-family: var(--police-forte); font-size: 1.05rem; }
 .cel-ligue small { color: var(--brume); font-size: 0.82rem; }
 .cel-ligue > svg { color: var(--or-500); opacity: 0.55; }

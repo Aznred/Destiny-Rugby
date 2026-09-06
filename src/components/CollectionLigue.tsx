@@ -1,0 +1,73 @@
+import { useEffect, useMemo, useState } from 'react';
+import { chargerCollectionCarriere, chargerEmblemesCarriere } from '../lib/carriereEnLigneClient';
+import type { PageCollection, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
+import { NOMS_PACK } from '../lib/presentationPacks';
+import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
+import { EcussonClub } from './EcussonClub';
+import './CollectionLigue.css';
+
+const POSTES = [['pilier', 'Pilier'], ['talonneur', 'Talonneur'], ['deuxieme_ligne', 'Deuxième ligne'], ['troisieme_ligne', 'Troisième ligne'], ['demi_melee', 'Demi de mêlée'], ['demi_ouverture', 'Demi d’ouverture'], ['centre', 'Centre'], ['ailier', 'Ailier'], ['arriere', 'Arrière']];
+const nombre = (n: number) => n.toLocaleString('fr-FR');
+
+export function CollectionLigue({ vue }: { vue: VueCarriereEnLigne }) {
+  const [filtres, setFiltres] = useState({ q: '', rarete: '', poste: '', statut: '', club: '', tri: 'note', page: '1' });
+  const [donnees, setDonnees] = useState<PageCollection | null>(null);
+  const [charge, setCharge] = useState(true);
+  const [erreur, setErreur] = useState('');
+  const [revision, setRevision] = useState(0);
+  const [logos, setLogos] = useState<Map<string, string>>(new Map());
+  const etatCartes = useMemo(() => vue.cartes.map(c => `${c.id}:${c.proprietaire}:${c.note}:${c.rarete}`).join('|'), [vue.cartes]);
+  useEffect(() => {
+    let vivant = true;
+    void chargerEmblemesCarriere().then(catalogue => { if (vivant) setLogos(new Map(catalogue.groupes.flatMap(g => g.emblemes.map(e => [e.nom, e.logo] as const)))); }).catch(() => {});
+    return () => { vivant = false; };
+  }, []);
+  useEffect(() => {
+    const controle = new AbortController();
+    setCharge(true); setErreur('');
+    const attente = setTimeout(() => {
+      void chargerCollectionCarriere(vue.id, filtres, controle.signal).then(resultat => {
+        if (!controle.signal.aborted) setDonnees(resultat);
+      }).catch(e => {
+        if (!controle.signal.aborted) { setDonnees(null); setErreur(e instanceof Error ? e.message : 'Collection indisponible.'); }
+      }).finally(() => { if (!controle.signal.aborted) setCharge(false); });
+    }, 250);
+    return () => { clearTimeout(attente); controle.abort(); };
+  }, [vue.id, vue.saison, etatCartes, filtres, revision]);
+  function changer(cle: keyof typeof filtres, valeur: string) { setFiltres(f => ({ ...f, [cle]: valeur, ...(cle === 'page' ? {} : { page: '1' }) })); }
+  const club = (id: string | null) => vue.clubs.find(c => c.id === id)?.nom ?? 'Club de la ligue';
+  return <section className="cel-collection" aria-label="Collection de la ligue">
+    <header className="cel-panneau cel-collection-header"><div><div className="eyebrow">Le catalogue des joueurs</div><h2>Collection</h2><p>Les joueurs du jeu, leur premier club et celui qui les possède aujourd’hui dans ta ligue.</p></div>
+      {donnees && <div className="cel-collection-counts"><span><b>{nombre(donnees.catalogueTotal)}</b> joueurs</span><span><b>{nombre(donnees.packes)}</b> déjà packés</span><span><b>{nombre(donnees.distribues)}</b> distribués</span></div>}
+    </header>
+    <div className="cel-panneau cel-collection-filters">
+      <label className="cel-collection-search">Rechercher<input type="search" placeholder="Nom, club réel, nation, championnat…" maxLength={100} value={filtres.q} onChange={e => changer('q', e.target.value)} /></label>
+      <label>Rareté<select value={filtres.rarete} onChange={e => changer('rarete', e.target.value)}><option value="">Toutes</option>{Object.entries(NOMS_PACK).map(([r, nom]) => <option key={r} value={r}>{nom}</option>)}</select></label>
+      <label>Poste<select value={filtres.poste} onChange={e => changer('poste', e.target.value)}><option value="">Tous</option>{POSTES.map(([id, nom]) => <option key={id} value={id}>{nom}</option>)}</select></label>
+      <label>Disponibilité<select value={filtres.statut} onChange={e => changer('statut', e.target.value)}><option value="">Tous les joueurs</option><option value="libre">Pas encore distribués</option><option value="pack">Déjà packés</option><option value="distribue">Déjà distribués</option><option value="moi">Dans mon effectif</option></select></label>
+      <label>Détenus par<select value={filtres.club} onChange={e => changer('club', e.target.value)}><option value="">Tous les clubs</option>{vue.clubs.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}</select></label>
+      <label>Trier<select value={filtres.tri} onChange={e => changer('tri', e.target.value)}><option value="note">Meilleure note</option><option value="nom">Nom A–Z</option></select></label>
+    </div>
+    {erreur && <div className="cel-erreur" role="alert"><p>{erreur}</p><button className="btn fantome" onClick={() => setRevision(n => n + 1)}>Réessayer</button></div>}
+    <div className="cel-collection-toolbar" aria-live="polite"><span>{charge ? 'Chargement des joueurs…' : `${nombre(donnees?.total ?? 0)} joueurs trouvés`}</span><button className="btn fantome" disabled={charge} onClick={() => setRevision(n => n + 1)}>Actualiser</button></div>
+    <div aria-busy={charge} className="cel-collection-grid">
+      {!charge && donnees?.joueurs.map(({ carte, obtenuPar, obtention, obtenuLe }) => {
+        const clubDetenteur = carte.proprietaire ? vue.clubs.find(c => c.id === carte.proprietaire) : undefined;
+        const decouverte = Boolean(clubDetenteur);
+        return <article key={carte.sourceId} className={`cel-collection-entry${decouverte ? ' est-decouverte' : ' est-inconnue'}`}>
+        <CarteJoueurEnLigne carte={carte} logoClub={logos.get(carte.clubReel)} etatCollection={decouverte ? 'decouverte' : 'inconnue'} />
+        {clubDetenteur && <div className="cel-collection-club" title={`Carte détenue par ${clubDetenteur.nom}`}>
+          <EcussonClub logo={clubDetenteur.embleme ?? logos.get(clubDetenteur.nom)} nom={clubDetenteur.nom} taille={42} />
+        </div>}
+        <div className="cel-collection-owner">
+          <strong>{carte.proprietaire ? `Chez ${club(carte.proprietaire)}` : 'Pas encore distribué'}</strong>
+          <span>{obtention === 'pack' ? `Packé par ${club(obtenuPar)}` : obtention === 'dotation' ? `Dotation de ${club(obtenuPar)}` : obtention === 'inconnue' ? 'Origine non renseignée' : 'Encore dans le vivier de la ligue'}</span>
+          {obtenuLe && <small>{new Date(obtenuLe).toLocaleDateString('fr-FR')}</small>}
+        </div>
+      </article>;
+      })}
+    </div>
+    {!charge && donnees?.total === 0 && <p className="cel-panneau">Aucun joueur ne correspond à ces filtres.</p>}
+    {donnees && <nav className="cel-collection-pagination" aria-label="Pages de la collection"><button className="btn fantome" disabled={charge || donnees.page <= 1} onClick={() => changer('page', String(donnees.page - 1))}>Précédent</button><span>Page {donnees.page} / {donnees.pages}</span><button className="btn fantome" disabled={charge || donnees.page >= donnees.pages} onClick={() => changer('page', String(donnees.page + 1))}>Suivant</button></nav>}
+  </section>;
+}

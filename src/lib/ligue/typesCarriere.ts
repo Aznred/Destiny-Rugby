@@ -115,7 +115,7 @@ export interface EtatCarriereEnLigne {
 export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' | 'clubs' | 'cartes' | 'rencontres' | 'objectifs' | 'transactions' | 'echanges'> {
   monClubId: string;
   clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie'> & { composition?: CompositionManager; strategie?: StrategieEnLigne })[];
-  /** Seulement les cartes distribuées ; le vivier libre ne quitte jamais le serveur. */
+  /** Vue courante : cartes distribuées seulement. Le catalogue public est consulté séparément, par pages. */
   cartes: CarteCarriere[];
   rencontres: (Omit<RencontreCarriere, 'match'> & { match?: VueMatchEnLigne })[];
   objectifs: ObjectifCarriere[]; transactions: TransactionCarriere[]; echanges: EchangeCarriere[];
@@ -149,3 +149,16 @@ export type CommandeCarriere =
   | { type: 'lancerMatch'; matchId: string }
   | { type: 'actualiser' };
 
+
+/** Catalogue public paginé ; aucune graine, transaction financière ou identité de compte. */
+export interface EntreeCollection {
+  carte: CarteCarriere;
+  obtenuPar: string | null;
+  obtention: 'pack' | 'dotation' | 'inconnue' | null;
+  obtenuLe: string | null;
+}
+export interface PageCollection {
+  joueurs: EntreeCollection[];
+  total: number; page: number; pages: number;
+  catalogueTotal: number; distribues: number; packes: number;
+}

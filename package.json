@@ -34,7 +34,8 @@
     "verify:sante-contrats": "vite-node scripts/verifSanteContrats.ts",
     "verify:paliers": "vite-node scripts/verifPaliersStructures.ts",
     "verify:ligue": "vite-node scripts/verifLigue.ts",
-    "verify:carriere": "vite-node scripts/verifCarriere.ts"
+    "verify:carriere": "vite-node scripts/verifCarriere.ts",
+    "verify:collection": "vite-node scripts/verifierCollection.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

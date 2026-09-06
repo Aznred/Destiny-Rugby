@@ -196,10 +196,20 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
           const ligues = await stockage.ligues(compte.id);
           return res.status(200).json({ compte: publicCompte(compte), ligues: ligues.map(({ etat: e }) => {
             const club = e.clubs.find(c => c.compteId === compte.id)!;
-            return { id: e.id, nom: e.nom, etat: e.phase, clubNom: club.nom, ovas: club.ovas };
+            return {
+              id: e.id, nom: e.nom, etat: e.phase, clubNom: club.nom, ovas: club.ovas,
+              clubEmbleme: club.embleme, logo: e.logo,
+            };
           }) });
         }
         if (!idValide(id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+        if (url.searchParams.get('collection') === '1') {
+          const ligne = await stockage.ligue(id);
+          if (!ligne || !ligne.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+          const { collectionCarriere } = await import('../src/lib/ligue/collectionCarriere.js');
+          return res.status(200).json(collectionCarriere(ligne.etat, compte.id, url.searchParams));
+        }
+
         const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}`, (e, n, g) => actualiserCarriere(e, n, g));
         return res.status(200).json(vueCarriere(e, compte.id));
       }

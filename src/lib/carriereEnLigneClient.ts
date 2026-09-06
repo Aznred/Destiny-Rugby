@@ -1,9 +1,12 @@
-import type { CommandeCarriere, VueCarriereEnLigne } from './ligue/typesCarriere.js';
+import type { CommandeCarriere, VueCarriereEnLigne, PageCollection } from './ligue/typesCarriere.js';
 
 export interface CompteCarriere { id: string; pseudo: string; identifiant?: string }
 export interface SessionCarriere {
   compte: CompteCarriere;
-  ligues: { id: string; nom: string; etat: string; clubNom: string; ovas: number }[];
+  ligues: {
+    id: string; nom: string; etat: string; clubNom: string; ovas: number;
+    clubEmbleme?: string; logo?: string;
+  }[];
 }
 export class ErreurCarriere extends Error {
   statut: number;
@@ -56,3 +59,8 @@ export const creerLigueCarriere = (nom: string, clubNom: string, rythme: 1 | 2, 
 export const rejoindreLigueCarriere = (code: string, clubNom: string, embleme?: string) => requete<VueCarriereEnLigne>({ action: 'rejoindre', code, clubNom, embleme });
 export const commanderCarriere = (ligue: string, commande: CommandeCarriere, requeteId: string) =>
   requete<VueCarriereEnLigne>({ action: 'commande', ligue, commande, requeteId });
+
+export function chargerCollectionCarriere(ligue: string, filtres: Record<string, string>, signal?: AbortSignal) {
+  const params = new URLSearchParams({ ...filtres, ligue, collection: '1' });
+  return requete<PageCollection>(undefined, undefined, signal, `?${params}`);
+}

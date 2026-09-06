@@ -1,0 +1,37 @@
+import { POSTE_PAR_ID } from '../data/rugby';
+import type { CarteCarriere } from './ligue/typesCarriere';
+import type { CompositionManager } from '../types';
+import { POSTES_XV_MANAGER, POSTES_BANC_MANAGER } from './compositionManager';
+import { adequationAuPoste, facteurDePerformance } from './carteJoueur';
+
+/** Affectation globale des 23 places, avec priorité au XV et première ligne spécialisée. */
+export function meilleureComposition(cartes: CarteCarriere[], maintenant = Date.now()): CompositionManager | null {
+  const joueurs = cartes.filter(c => !c.blesseJusqua || Date.parse(c.blesseJusqua) <= maintenant).sort((a,b) => a.id.localeCompare(b.id));
+  if (joueurs.length < 23) return null;
+  const postes = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER];
+  const couts = postes.map((poste, i) => joueurs.map(c => {
+    if ((i < 3 || (i >= 15 && i < 18)) && POSTE_PAR_ID[c.poste].famille !== POSTE_PAR_ID[poste].famille) return 1e9;
+    const note = c.note * facteurDePerformance(adequationAuPoste(c.poste, poste));
+    return -(note * (i < 15 ? 100 : 1) - c.fatigue * .001);
+  }));
+  // Algorithme hongrois rectangulaire : aucun doublon et optimum global du score.
+  const n = 23, m = joueurs.length;
+  const u = Array(n+1).fill(0), v = Array(m+1).fill(0), p = Array(m+1).fill(0), way = Array(m+1).fill(0);
+  for (let i=1;i<=n;i++) {
+    p[0]=i; let j0=0; const minv=Array(m+1).fill(Infinity), used=Array(m+1).fill(false);
+    do {
+      used[j0]=true; const i0=p[j0]; let delta=Infinity, j1=0;
+      for (let j=1;j<=m;j++) if (!used[j]) { const cur=couts[i0-1][j-1]-u[i0]-v[j]; if(cur<minv[j]) {minv[j]=cur;way[j]=j0;} if(minv[j]<delta) {delta=minv[j];j1=j;} }
+      for(let j=0;j<=m;j++) { if(used[j]) {u[p[j]]+=delta;v[j]-=delta;} else minv[j]-=delta; }
+      j0=j1;
+    } while(p[j0]!==0);
+    do { const j1=way[j0];p[j0]=p[j1];j0=j1; } while(j0!==0);
+  }
+  const choix=Array<number>(23).fill(-1);
+  for(let j=1;j<=m;j++) if(p[j]) choix[p[j]-1]=j-1;
+  if(choix.some((j,i)=>j<0 || couts[i][j]>=1e9)) return null;
+  const feuille=choix.map(j=>joueurs[j]), xv=feuille.slice(0,15);
+  const capitaine=[...xv].sort((a,b)=>(b.age*1.4+b.note)-(a.age*1.4+a.note))[0];
+  const buteur=[...xv].sort((a,b)=>(b.statistiques.PIED ?? b.note)-(a.statistiques.PIED ?? a.note))[0];
+  return {titulaires:xv.map(c=>c.id),remplacants:feuille.slice(15).map(c=>c.id),capitaineId:capitaine.id,buteurId:buteur.id};
+}
