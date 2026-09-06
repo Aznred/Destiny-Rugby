@@ -397,7 +397,7 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
 
 ## Chantiers en cours / dette
 
-- **LA CARRIÈRE EN LIGNE — jouable de bout en bout, base non déployée.**
+- **LA CARRIÈRE EN LIGNE — en production, il reste `CRON_SECRET`.**
   2 à 20 potes, ligue privée, **30 vrais licenciés de Régionale 3** au départ,
   écusson d’un vrai club (choisi À L’INSCRIPTION, jamais modifiable ensuite),
   logo et trophée de championnat, phase finale en option,
@@ -405,13 +405,24 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   avec décisions du manager, packs, marché, enchères, échanges, coupes maison,
   objectifs, palmarès. Serveur (`serveur/carriereApi.ts` + `api/carriere.ts`),
   écran (`screens/CarriereEnLigne.tsx`) et banc (`npm run verify:carriere`,
-  144 contrôles). **Il reste à déployer la base — marche à suivre complète dans
-  `serveur/MISE-EN-LIGNE.md`** : les trois schémas SQL dans l'ordre puis
-  `CRON_SECRET`. ⚠️ **La console SQL de Vercel refuse un script à plusieurs
-  instructions** (« cannot insert multiple commands into a prepared statement » :
-  le pilote HTTP de Neon passe par des prepared statements) — `npm run
-  base:appliquer` les envoie une par une, après avoir montré quelle base
-  `DATABASE_URL` désigne vraiment.
+  144 contrôles). Les 19 tables sont posées sur la base Neon du site (mesuré le
+  6 septembre 2026 : inscription en production → HTTP 200). Marche à suivre
+  complète dans `serveur/MISE-EN-LIGNE.md`.
+
+  ⚠️ **`DATABASE_URL` NE DÉSIGNE QU'UNE BASE, ET UN PROJET PEUT EN AVOIR
+  PLUSIEURS.** Le piège a coûté une soirée : les tables créées dans la base
+  fraîchement ajoutée, le site — qui lit l'autre — répondant toujours « base
+  non initialisée ». Le repère qui tranche est `select count(*) from
+  classement` : `api/classement.ts` et `api/carriere.ts` lisent le MÊME
+  `process.env.DATABASE_URL`, donc là où il y a des scores, il y a la bonne
+  base. Ici c'est `ep-wispy-wildflower-…` (`classement` : 444 lignes).
+
+  ⚠️ **La console SQL de Vercel refuse un script à plusieurs instructions**
+  (« cannot insert multiple commands into a prepared statement » : le pilote
+  HTTP de Neon passe par des prepared statements). `npm run base:appliquer`
+  découpe les schémas et les envoie une par une, après avoir montré la base
+  visée. La console de Neon, elle, accepte les scripts entiers.
+
   En local, `vite.config.ts` branche le même gestionnaire sur un
   fichier JSON, donc le mode se teste entièrement sans base.
 
