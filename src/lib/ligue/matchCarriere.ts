@@ -51,7 +51,8 @@ import {
 import type { EtatMatch } from '../moteur/etat.js';
 import type { Cote } from '../moteur/terrain.js';
 import { scorePossible } from '../championnat.js';
-import { feuilleDepuisComposition } from '../compositionManager.js';
+import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../compositionManager.js';
+import { adequationAuPoste, facteurDePerformance } from '../carteJoueur.js';
 import type { CompositionManager, PosteId, TactiqueManager } from '../../types.js';
 import type { Coequipier } from '../effectif.js';
 import { graine } from './aleatoire.js';
@@ -362,6 +363,49 @@ export function presenceActive(etat: EtatMatchEnLigne, cote: CoteEnLigne, mainte
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** La force d'une feuille : le XV pèse presque quatre fois le banc. */
+/** Les 23 postes de la feuille, dans l'ordre 1 → 23. */
+const POSTES_FEUILLE = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER];
+
+/**
+ * La feuille gelée d'une équipe — et LE seul endroit où un joueur hors de son
+ * poste paie ce qu'il coûte.
+ *
+ * ⚠️ POURQUOI LA NOTE, ET PAS UN REFUS. Composer librement fait partie du jeu :
+ * on aligne un troisième ligne au centre quand on n'a personne d'autre, et
+ * l'écran promet que ça « perd la cohérence collective ». La règle serveur ne
+ * juge donc plus le placement (sauf la première ligne, où le règlement
+ * commande) ; c'est ici que le prix se paie, une fois pour toutes, au moment
+ * de geler la feuille.
+ *
+ * ⚠️ ET LE PRIX SE PAIE PARTOUT D'UN COUP, parce que la feuille gelée est
+ * l'unique entrée du moteur : `forceFeuille` en tire la puissance de l'équipe,
+ * `cibleDeScore` en tire le score visé, et chaque duel lit la note du pion.
+ * Une seule multiplication suffit à faire descendre les trois.
+ *
+ * ⚠️ ELLE NE CHANGE RIEN AUX MATCHS DÉJÀ CRÉÉS. Une rencontre garde la feuille
+ * gelée à sa création et se rejoue depuis elle : les matchs en cours quand
+ * cette règle est arrivée continuent avec l'ancien barème, sans rupture de
+ * déterminisme.
+ *
+ * Le barème est celui du jeu entier (`facteurDePerformance`) : 100 % à son
+ * poste ou dans sa famille, 94 % dans une famille voisine, 82 % ailleurs.
+ */
+export function feuilleGeleeEnLigne(
+  effectif: readonly Coequipier[], composition: CompositionManager,
+): Coequipier[] {
+  const parId = new Map(effectif.map(j => [j.id, j]));
+  return [...composition.titulaires, ...composition.remplacants].map((id, i) => {
+    const joueur = parId.get(id);
+    if (!joueur) return null;
+    const poste = POSTES_FEUILLE[i] ?? joueur.poste;
+    const facteur = facteurDePerformance(adequationAuPoste(joueur.poste, poste));
+    // Le numéro dans le dos devient celui du poste occupé — c'est déjà ce que
+    // faisait `feuilleDepuisComposition`, et le moteur en a besoin pour la
+    // mêlée, la touche et les remplacements.
+    return { ...joueur, poste, note: Math.round(joueur.note * facteur) };
+  }).filter((j): j is Coequipier => j !== null);
+}
+
 export function forceFeuille(feuille: readonly Coequipier[]): number {
   if (!feuille.length) return 35;
   const moyenne = (l: readonly Coequipier[]) => l.length ? l.reduce((s, j) => s + j.note, 0) / l.length : 0;
@@ -618,7 +662,7 @@ function clore(etat: EtatMatchEnLigne, e: EtatMatch): void {
 export function creerMatchEnLigne(p: ParametresCreationMatch): EtatMatchEnLigne {
   const geler = (equipe: EquipeMatchEnLigne): FeuilleGelee => ({
     clubId: equipe.clubId, nom: equipe.nom,
-    feuille: feuilleDepuisComposition(equipe.effectif, equipe.composition),
+    feuille: feuilleGeleeEnLigne(equipe.effectif, equipe.composition),
     capitaineId: equipe.composition.capitaineId, buteurId: equipe.composition.buteurId,
   });
   const equipes = { domicile: geler(p.domicile), exterieur: geler(p.exterieur) };

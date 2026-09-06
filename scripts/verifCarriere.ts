@@ -24,7 +24,7 @@ import {
 import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere';
 import {
   avancerMatchEnLigne, cibleDeScore, commanderMatchEnLigne, conclureMatchEnLigne,
-  creerMatchEnLigne, decisionIA, forceFeuille, MS_PAR_MINUTE, STRATEGIE_EN_LIGNE_DEFAUT,
+  creerMatchEnLigne, decisionIA, feuilleGeleeEnLigne, forceFeuille, MS_PAR_MINUTE, STRATEGIE_EN_LIGNE_DEFAUT,
   strategieValide, impactStrategie, tactiqueDepuisStrategie, mentaliteAppliquee,
 } from '../src/lib/ligue/matchCarriere';
 import {
@@ -33,6 +33,7 @@ import {
   RARETES_CARRIERE, rareteCarriere, rayonDePack, tropheesCarriere,
 } from '../src/lib/ligue/catalogueCarriere';
 import { compositionManagerParDefaut } from '../src/lib/compositionManager';
+import { codeDansLaRecherche, lienInvitation } from '../src/lib/invitationLigue';
 const nomPosteCourt = (f: string) => f.replace('demi_melee', '9').replace('demi_ouverture', '10');
 
 let ko = 0;
@@ -500,6 +501,65 @@ titre('8. CE QUE LE SERVEUR REFUSE');
       type: 'composition',
       composition: { titulaires: e.cartes.filter((c) => c.proprietaire === colin.id).slice(0, 14).map((c) => c.id), remplacants: [], capitaineId: '', buteurId: '' },
     }, T0, 'x'));
+
+  // ── LE PLACEMENT HORS POSTE : AUTORISÉ, ET PAYANT ────────────────────────
+  // ⚠️ La règle a longtemps refusé tout croisement avant ↔ arrière. Elle
+  // contredisait le mode solo, le texte de l'écran et le barème du jeu, et
+  // surtout elle jetait TOUTE la feuille pour un seul pion mal placé.
+  {
+    const cartesColin = e.cartes.filter((c) => c.proprietaire === colin.id);
+    const compo = structuredClone(e.clubs.find((c) => c.id === colin.id)!.composition);
+    const croise = structuredClone(compo);
+    [croise.titulaires[7], croise.titulaires[13]] = [croise.titulaires[13], croise.titulaires[7]];
+    let acceptee = false;
+    try { agirCarriere(e, colin.compteId, { type: 'composition', composition: croise }, T0, 'x'); acceptee = true; } catch { /* refusée */ }
+    dire(acceptee, 'un troisième ligne peut jouer à l’aile', 'le jeu le note « hors poste », il ne l’interdit pas');
+
+    const melee = structuredClone(compo);
+    [melee.titulaires[0], melee.titulaires[13]] = [melee.titulaires[13], melee.titulaires[0]];
+    refuse('mais un ailier ne joue PAS pilier', () =>
+      agirCarriere(e, colin.compteId, { type: 'composition', composition: melee }, T0, 'x'));
+
+    const effectif = cartesColin.map(coequipierDepuisCarte);
+    const rangee = forceFeuille(feuilleGeleeEnLigne(effectif, compo));
+    const empilee = structuredClone(compo);
+    const tous = [...empilee.titulaires, ...empilee.remplacants]
+      .sort((a, b) => cartesColin.find((c) => c.id === b)!.note - cartesColin.find((c) => c.id === a)!.note);
+    empilee.titulaires = tous.slice(0, 15); empilee.remplacants = tous.slice(15);
+    const brute = forceFeuille(feuilleGeleeEnLigne(effectif, empilee));
+    dire(brute < rangee, '⚠️ et empiler ses meilleurs sans regarder le poste COÛTE',
+      `${rangee.toFixed(1)} rangée contre ${brute.toFixed(1)} au petit bonheur`);
+  }
+
+  // ── UNE LIGUE PLUS VIEILLE QUE LE CODE QUI LA RELIT ──────────────────────
+  // ⚠️ Le type dit `dotationOvas: number` ; le jsonb enregistré la veille, lui,
+  // n'a rien à cet endroit. Sans rattrapage, l'adhésion mourait sur
+  // `undefined.toLocaleString()` et la ligue devenait impossible à rejoindre.
+  {
+    const ancienne = structuredClone(e) as Record<string, unknown> & typeof e;
+    ancienne.phase = 'salon';
+    delete (ancienne as { dotationOvas?: number }).dotationOvas;
+    for (const c of ancienne.clubs) delete (c as { ovas?: number }).ovas;
+    let rejointe = false; let ovasRecus = -1;
+    try {
+      const apres = agirCarriere(ancienne, 'compte-neuf-0000', { type: 'rejoindre', pseudo: 'Neuf', clubNom: 'Club Neuf' }, T0, 'x');
+      rejointe = true; ovasRecus = apres.clubs[apres.clubs.length - 1].ovas;
+    } catch { /* échec */ }
+    dire(rejointe, '⚠️ une ligue d’avant le réglage des Ovas reste rejoignable', `dotation ramenée à ${ovasRecus}`);
+  }
+
+  // ── LE LIEN D'INVITATION ─────────────────────────────────────────────────
+  {
+    const faux = { origin: 'https://destiny-rugby.fr', pathname: '/' };
+    const lien = lienInvitation(e.code, faux);
+    dire(lien === `https://destiny-rugby.fr/?ligue=${e.code}`, 'le lien d’invitation porte le code de la ligue', lien);
+    dire(codeDansLaRecherche(new URL(lien).search) === e.code, 'et le code se relit à l’arrivée');
+    dire(codeDansLaRecherche('?ligue=dr-1eb837651f') === 'DR-1EB837651F', 'un code tapé en minuscules est accepté');
+    dire(codeDansLaRecherche('?ligue=') === null && codeDansLaRecherche('') === null
+      && codeDansLaRecherche('?ligue=ab') === null && codeDansLaRecherche('?ligue=un%20code') === null,
+      '⚠️ et une adresse sans code, ou avec n’importe quoi, ne déclenche rien');
+  }
+
   refuse('gérer la rencontre d’un autre', () => {
     const ailleurs = e.rencontres.find((r) => r.domicile !== colin.id && r.exterieur !== colin.id)!;
     agirCarriere(e, colin.compteId, { type: 'lancerMatch', matchId: ailleurs.id }, T0, 'x');

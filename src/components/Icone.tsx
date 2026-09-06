@@ -42,7 +42,7 @@ export type NomIcone =
   // ── Les menus, la boutique, le palmarès ──────────────────────────────────
   | 'boutique' | 'ova' | 'check' | 'verrou' | 'video' | 'medaille'
   | 'bouclier' | 'eclair' | 'calendrier' | 'image' | 'dossier' | 'cadeau'
-  | 'contrat' | 'porte' | 'plein-ecran' | 'mallette' | 'repost'
+  | 'contrat' | 'porte' | 'plein-ecran' | 'mallette' | 'repost' | 'lien' | 'partage'
   // ── Les listes déroulantes ───────────────────────────────────────────────
   | 'chevron';
 
@@ -572,6 +572,21 @@ const TRACES: Record<NomIcone, React.ReactNode> = {
     </>
   ),
   // Deux flèches en boucle : le repost, le transfert annoncé.
+  // Deux maillons de chaîne : le lien qu’on copie et qu’on colle.
+  lien: (
+    <>
+      <path d="M10.2 13.8a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5" />
+      <path d="M13.8 10.2a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5" />
+    </>
+  ),
+  // La flèche qui sort d’une boîte : envoyer à quelqu’un.
+  partage: (
+    <>
+      <path d="M12 3.6v11" />
+      <path d="m8.4 7.2 3.6-3.6 3.6 3.6" />
+      <path d="M5.4 13.2v5.4a1.8 1.8 0 0 0 1.8 1.8h9.6a1.8 1.8 0 0 0 1.8-1.8v-5.4" />
+    </>
+  ),
   repost: (
     <>
       <path d="M4.6 9.4V8a2 2 0 0 1 2-2h9.8" />

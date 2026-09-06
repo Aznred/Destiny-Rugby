@@ -6,6 +6,7 @@ import { useGame } from './store/useGame';
 import { langueDepuisAdresseIP, t } from './lib/i18n';
 import { pageVue } from './lib/mesure';
 import { chantierVisible } from './lib/modeDev';
+import { capterInvitation } from './lib/invitationLigue';
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
 import { Guide } from './components/Guide';
@@ -105,6 +106,14 @@ export default function App() {
   // ni téléchargement, ni GPU à interroger, ni état à préparer — le premier
   // appel part quand le joueur agit.
 
+  // ⚠️ UN LIEN D’INVITATION OUVRE LE JEU SUR LA CARRIÈRE EN LIGNE.
+  //    `/?ligue=DR-…` arrive sur l’accueil comme n’importe quelle adresse :
+  //    sans ce branchement, l’invité tombe sur la page d’accueil du jeu et
+  //    n’a aucune idée de ce qu’on l’a invité à faire. `capterInvitation`
+  //    met le code de côté et nettoie l’adresse ; l’écran le retrouve ensuite,
+  //    même après une inscription et un rechargement.
+  //    Une seule fois, à l’ouverture : les dépendances vides sont voulues.
+  useEffect(() => { if (capterInvitation()) setEcran('carriereEnLigne'); }, [setEcran]);
   // ⚠️ UN ÉCRAN VAUT UNE PAGE VUE. Le jeu n'a qu'une adresse : sans cette
   // ligne, toute une session ne compte qu'une page et l'on ne peut pas voir
   // où les joueurs décrochent. C'est le SEUL endroit qui voit tous les

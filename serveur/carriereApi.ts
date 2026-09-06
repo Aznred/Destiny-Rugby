@@ -225,6 +225,16 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
         const code = texte(corps.code, 5, 30, 'Code').toUpperCase();
         const ligne = await stockage.ligueParCode(code);
         if (!ligne) throw new ErreurHttp(404, 'Code de ligue introuvable.');
+        // ⚠️ UN LIEN D'INVITATION SE CLIQUE DEUX FOIS. On le range dans une
+        // boucle de messages, on y revient le lendemain, on le rouvre depuis
+        // l'historique du navigateur. La deuxième fois, la règle d'adhésion
+        // répondait « Ce compte possède déjà un club dans cette ligue » — une
+        // erreur, pour quelqu'un qui voulait simplement entrer chez lui.
+        // Membre déjà inscrit : on ouvre la ligue, c'est tout ce qu'il demande.
+        if (ligne.comptes.includes(compte.id)) {
+          const e = await appliquer(ligne.id, compte.id, `lecture-${Math.floor(maintenant / 2000)}`, (e, n, g) => actualiserCarriere(e, n, g));
+          return res.status(200).json(vueCarriere(e, compte.id));
+        }
         const e = await appliquer(ligne.id, compte.id, `adhesion-${compte.id}`, (e, n, g) => agirCarriere(e, compte.id,
           { type: 'rejoindre', pseudo: compte.pseudo, clubNom: texte(corps.clubNom, 3, 40, 'Nom du club'), embleme: corps.embleme as string | undefined }, n, g), true);
         return res.status(200).json(vueCarriere(e, compte.id));

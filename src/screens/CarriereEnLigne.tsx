@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Icone, type NomIcone } from '../components/Icone';
+import { lienInvitation, invitationEnAttente, oublierInvitation } from '../lib/invitationLigue';
 import { Selecteur } from '../components/Selecteur';
 import { CompositionTerrainManager } from '../components/CompositionTerrainManager';
 import { Drapeau } from '../components/Drapeau';
@@ -30,7 +31,7 @@ import { useGame } from '../store/useGame';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { photoReelle } from '../lib/avatars';
 import { POSTES_XV_MANAGER } from '../lib/compositionManager';
-import type { CompositionManager } from '../types';
+import type { CompositionManager, PosteId } from '../types';
 import type { Coequipier } from '../lib/effectif';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
 import type { CarteCarriere, CommandeCarriere, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
@@ -349,6 +350,16 @@ export function CarriereEnLigne() {
   const [charge, setCharge] = useState(true);
   const [erreur, setErreur] = useState('');
   const [notification, setNotification] = useState('');
+  // ⚠️ UN REFUS DOIT SE VOIR, MÊME À MILLE PIXELS DE LÀ. La bannière vit en
+  //    haut de l’écran, alors que les boutons qui échouent sont au milieu
+  //    d’une longue page — le terrain de composition fait deux hauteurs
+  //    d’écran à lui seul. Sans ce recentrage, « Enregistrer la feuille »
+  //    refusée ne donnait RIEN à voir : le joueur cliquait, rien ne bougeait,
+  //    et il en concluait que le jeu n’enregistrait pas.
+  const refErreur = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (erreur) refErreur.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [erreur]);
   const [occupe, setOccupe] = useState(false);
   const [ligueId, setLigueId] = useState<string | null>(null);
   const [vue, setVue] = useState<VueCarriereEnLigne | null>(null);
@@ -466,7 +477,7 @@ export function CarriereEnLigne() {
       <span><i className={`cel-presence${erreur ? ' interrompue' : ''}`} /> Carrière en ligne</span>
       {session && <button className="cel-compte" onClick={() => { void quitterCompte(); }} disabled={occupe} title="Se déconnecter"><Icone nom="profil" taille={16} />{session.compte.pseudo}<Icone nom="porte" taille={15} /></button>}
     </div>
-    {erreur && <div className="cel-erreur" role="alert"><Icone nom="alerte" taille={22} /><p>{erreur}</p><button className="btn fantome" disabled={occupe} onClick={() => { if (ligueId) void ouvrirLigue(ligueId); else void chargerSession(); }}>Réessayer</button></div>}
+    {erreur && <div className="cel-erreur" role="alert" ref={refErreur}><Icone nom="alerte" taille={22} /><p>{erreur}</p><button className="btn fantome" disabled={occupe} onClick={() => { if (ligueId) void ouvrirLigue(ligueId); else void chargerSession(); }}>Réessayer</button></div>}
     {notification && <div className="cel-notification" role="status">{notification}<button aria-label="Fermer la notification" onClick={() => setNotification('')}><Icone nom="croix" taille={16} /></button></div>}
     {charge ? <Vide icone="chrono" titre="Ouverture du vestiaire">Nous retrouvons ton compte et tes ligues.</Vide>
       : !session ? <Connexion occupe={occupe} onConnexion={async (action, identifiant, motDePasse, pseudo) => {
@@ -477,12 +488,12 @@ export function CarriereEnLigne() {
       }} />
       : !vue ? <Portail session={session} occupe={occupe} ouvrirLigue={ouvrirLigue} onCreer={async (nom, clubNom, rythme, max, identite) => {
         setOccupe(true); setErreur(''); try { ouvrir(await creerLigueCarriere(nom, clubNom, rythme, max, identite)); } catch (e) { setErreur(messageErreur(e)); } finally { setOccupe(false); }
-      }} onRejoindre={async (code, clubNom, embleme) => { setOccupe(true); setErreur(''); try { ouvrir(await rejoindreLigueCarriere(code, clubNom, embleme)); } catch (e) { setErreur(messageErreur(e)); } finally { setOccupe(false); } }} />
+      }} onRejoindre={async (code, clubNom, embleme) => { setOccupe(true); setErreur(''); try { ouvrir(await rejoindreLigueCarriere(code, clubNom, embleme)); oublierInvitation(); } catch (e) { setErreur(messageErreur(e)); } finally { setOccupe(false); } }} />
       : <>
         <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / Saison {vue.saison}</span></div><h1>{club?.nom}</h1><p>{vue.clubs.length} clubs · {vue.rythme} match{vue.rythme > 1 ? 's' : ''} par semaine · {vue.phase === 'salon' ? 'Inscriptions ouvertes' : vue.phase === 'saison' ? 'Saison en cours' : 'Intersaison'}</p></div><div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>Ovas de cette ligue</span></div></header>
         <nav className="cel-onglets" aria-label="Club en ligne">{ONGLETS.map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
-          {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} copier={async () => { try { await navigator.clipboard.writeText(vue.code); setNotification('Code d’invitation copié. Partage-le avec tes amis.'); } catch { setNotification(`Code d’invitation : ${vue.code}`); } }} />}
+          {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} />}
           {onglet === 'composition' && <Composition key={vue.id} vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'effectif' && <Effectif vue={vue} />}
@@ -496,27 +507,77 @@ export function CarriereEnLigne() {
 }
 
 function Connexion({ onConnexion, occupe }: { occupe: boolean; onConnexion: (action: 'connexion' | 'inscription', identifiant: string, motDePasse: string, pseudo: string) => Promise<void> }) {
-  const [inscription, setInscription] = useState(false);
+  // ⚠️ QUELQU’UN QUI ARRIVE PAR UN LIEN N’A PRESQUE JAMAIS DE COMPTE. On lui
+  //    ouvre donc « Créer mon compte », et on lui dit pourquoi il est là :
+  //    sans ce mot, un formulaire de connexion nu après avoir cliqué sur une
+  //    invitation ressemble à une erreur d’aiguillage.
+  const invitation = invitationEnAttente();
+  const [inscription, setInscription] = useState(Boolean(invitation));
   const [identifiant, setIdentifiant] = useState(''); const [pseudo, setPseudo] = useState(''); const [motDePasse, setMotDePasse] = useState('');
   const soumettre = (e: FormEvent) => { e.preventDefault(); void onConnexion(inscription ? 'inscription' : 'connexion', identifiant, motDePasse, pseudo); };
-  return <div className="cel-entree"><div className="cel-promesse"><div className="eyebrow">Une ligue. Vos clubs. Votre histoire.</div><h1>Le rugby se vit<br /><span>entre amis.</span></h1><p>Trente joueurs Bronze, un maillot à défendre et des mois pour bâtir une équipe qui compte. Le prochain grand rendez-vous, c’est le vôtre.</p><div className="cel-billet"><b>SAISON 01</b><span>30 joueurs au départ</span><strong>35 <small>GEN</small></strong><p>Championnats privés · Marché entre amis · Matchs en direct</p></div></div><form className="cel-panneau cel-auth" onSubmit={soumettre}><div className="eyebrow">Ton vestiaire t’attend</div><h2>{inscription ? 'Créer mon compte' : 'Retrouver mes ligues'}</h2><p>Un compte pour retrouver tes clubs sur tous tes appareils.</p><Champ label="Identifiant"><input autoComplete="username" required minLength={3} maxLength={60} value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="ton-identifiant" /></Champ>{inscription && <Champ label="Nom du manager"><input required minLength={2} maxLength={32} value={pseudo} onChange={e => setPseudo(e.target.value)} placeholder="Ton pseudo" /></Champ>}<Champ label="Mot de passe"><input type="password" autoComplete={inscription ? 'new-password' : 'current-password'} required minLength={inscription ? 10 : 1} maxLength={128} value={motDePasse} onChange={e => setMotDePasse(e.target.value)} placeholder={inscription ? '10 caractères minimum' : 'Ton mot de passe'} /></Champ><button className="btn primaire" disabled={occupe}>{occupe ? 'Connexion en cours…' : inscription ? 'Créer mon compte' : 'Se connecter'}<Icone nom="fleche-droite" taille={17} /></button><button className="btn fantome" type="button" onClick={() => setInscription(!inscription)}>{inscription ? 'J’ai déjà un compte' : 'Créer un compte'}</button></form></div>;
+  return <div className="cel-entree"><div className="cel-promesse"><div className="eyebrow">Une ligue. Vos clubs. Votre histoire.</div><h1>Le rugby se vit<br /><span>entre amis.</span></h1><p>Trente joueurs Bronze, un maillot à défendre et des mois pour bâtir une équipe qui compte. Le prochain grand rendez-vous, c’est le vôtre.</p><div className="cel-billet"><b>SAISON 01</b><span>30 joueurs au départ</span><strong>35 <small>GEN</small></strong><p>Championnats privés · Marché entre amis · Matchs en direct</p></div></div><form className="cel-panneau cel-auth" onSubmit={soumettre}>{invitation && <p className="cel-invite"><Icone nom="cadeau" taille={18} />Tu es invité à rejoindre une ligue. Crée ton compte, et le vestiaire s’ouvre juste après.</p>}<div className="eyebrow">Ton vestiaire t’attend</div><h2>{inscription ? 'Créer mon compte' : 'Retrouver mes ligues'}</h2><p>Un compte pour retrouver tes clubs sur tous tes appareils.</p><Champ label="Identifiant"><input autoComplete="username" required minLength={3} maxLength={60} value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="ton-identifiant" /></Champ>{inscription && <Champ label="Nom du manager"><input required minLength={2} maxLength={32} value={pseudo} onChange={e => setPseudo(e.target.value)} placeholder="Ton pseudo" /></Champ>}<Champ label="Mot de passe"><input type="password" autoComplete={inscription ? 'new-password' : 'current-password'} required minLength={inscription ? 10 : 1} maxLength={128} value={motDePasse} onChange={e => setMotDePasse(e.target.value)} placeholder={inscription ? '10 caractères minimum' : 'Ton mot de passe'} /></Champ><button className="btn primaire" disabled={occupe}>{occupe ? 'Connexion en cours…' : inscription ? 'Créer mon compte' : 'Se connecter'}<Icone nom="fleche-droite" taille={17} /></button><button className="btn fantome" type="button" onClick={() => setInscription(!inscription)}>{inscription ? 'J’ai déjà un compte' : 'Créer un compte'}</button></form></div>;
 }
 
 function Portail({ session, occupe, ouvrirLigue, onCreer, onRejoindre }: { session: SessionCarriere; occupe: boolean; ouvrirLigue: (id: string) => Promise<void>; onCreer: (nom: string, club: string, rythme: 1 | 2, max: number, identite?: IdentiteLigue) => Promise<void>; onRejoindre: (code: string, club: string, embleme?: string) => Promise<void> }) {
-  const [mode, setMode] = useState<'creer' | 'rejoindre'>('creer'); const [nom, setNom] = useState(''); const [club, setClub] = useState(''); const [code, setCode] = useState(''); const [rythme, setRythme] = useState('1'); const [max, setMax] = useState('8');
+  // ⚠️ ARRIVER PAR UN LIEN, C’EST DÉJÀ AVOIR RÉPONDU À LA QUESTION. Sans ça,
+  //    l’invité tombe sur « Créer une ligue » avec un formulaire vide, et le
+  //    code qu’on vient de lui donner est à ressaisir alors qu’on l’a en main.
+  const invitation = invitationEnAttente();
+  const [mode, setMode] = useState<'creer' | 'rejoindre'>(invitation ? 'rejoindre' : 'creer'); const [nom, setNom] = useState(''); const [club, setClub] = useState(''); const [code, setCode] = useState(invitation ?? ''); const [rythme, setRythme] = useState('1'); const [max, setMax] = useState('8');
   const [embleme, setEmbleme] = useState<string | undefined>(); const [choixOuvert, setChoixOuvert] = useState(false);
   const [logo, setLogo] = useState<string | undefined>(); const [tropheeId, setTropheeId] = useState<string | undefined>(); const [playoffs, setPlayoffs] = useState(false);
   const [dotation, setDotation] = useState('1000');
   return <><header className="cel-titre"><div className="eyebrow">Bienvenue au club, {session.compte.pseudo}</div><h1>Vos rendez-vous rugby.</h1><p>Chaque ligue a ses clubs, ses cartes, ses Ovas et son histoire.</p></header><div className="cel-portail"><div><h2>Mes ligues <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <button className="cel-ligue" key={l.id} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} /><span><em>{l.nom}</em><b>{l.clubNom}</b><small>{l.etat === 'salon' ? 'En préparation' : l.etat === 'saison' ? 'Saison en cours' : 'Intersaison'} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>)}</div> : <Vide titre="Tout commence avec votre ligue">Invite tes amis ou rejoins leur vestiaire avec le code qu’ils t’ont partagé.</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme) as 1 | 2, Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>Créer une ligue</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>Rejoindre des amis</button></div><h2>{mode === 'creer' ? 'Le coup d’envoi vous appartient.' : 'Une place vous attend.'}</h2>{mode === 'creer' ? <Champ label="Nom de la ligue"><input required minLength={3} maxLength={50} placeholder="La Ligue du dimanche" value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label="Code d’invitation"><input required autoCapitalize="characters" maxLength={20} placeholder="Code reçu de ton ami" value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label="Nom de ton club"><input required minLength={3} maxLength={40} placeholder="Les XV du quartier" value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>Écusson</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? 'Changer d’écusson' : 'Choisir un vrai écusson de club'}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Choix label="Rythme" valeur={rythme} onChange={setRythme} options={[["1", '1 match / semaine'], ["2", '2 matchs / semaine']]} /><Choix label="Places" valeur={max} onChange={setMax} options={[4, 6, 8, 10, 12, 16, 20].map(n => [String(n), `${n} clubs`])} /></div><Choix label="Ovas au départ" valeur={dotation} onChange={setDotation} options={[['0', 'Aucun — tout se gagne'], ['500', '500 Ovas'], ['1000', '1 000 Ovas · recommandé'], ['2500', '2 500 Ovas'], ['5000', '5 000 Ovas'], ['10000', '10 000 Ovas'], ['25000', '25 000 Ovas'], ['50000', '50 000 Ovas'], ['100000', '100 000 Ovas · démarrage lancé']]} /><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>Phase finale</b>Les quatre premiers se disputent le titre en demi-finales puis en finale. Le classement décide de l’argent, la finale décide du trophée.</span></label></>}<p className="cel-note">Chaque club reçoit 30 joueurs Bronze autour de 35 GEN. Les matchs se jouent aussi pendant vos absences.</p><button className="btn primaire" disabled={occupe}>{occupe ? 'Préparation…' : mode === 'creer' ? 'Créer ma ligue privée' : 'Rejoindre la ligue'}<Icone nom="fleche-droite" taille={18} /></button></form></div></>;
 }
 
-function Bureau({ vue, proprietaire, agir, occupe, suivre, copier }: { vue: VueCarriereEnLigne; proprietaire: boolean; agir: Agir; occupe: boolean; suivre: (id: string) => void; copier: () => void }) {
+// ---------------------------------------------------------------------------
+// INVITER SES AMIS
+// ---------------------------------------------------------------------------
+// ⚠️ TROIS BOUTONS PLUTÔT QU'UN, PARCE QU'ON N'INVITE PAS PARTOUT PAREIL. Le
+// lien est ce qu'on colle dans une boucle de messages — l'ami clique et arrive
+// directement sur l'inscription de la ligue. Le code reste là pour ce qui se
+// dicte au téléphone ou se tape à côté de soi. Et sur un téléphone, `partager`
+// ouvre la feuille du système : c'est le chemin le plus court vers WhatsApp.
+//
+// ⚠️ `navigator.clipboard` N'EXISTE PAS PARTOUT : il demande un contexte
+// sécurisé, donc rien en http simple, et Safari le refuse hors geste direct.
+// Chaque bouton a donc un repli qui AFFICHE la valeur — l'utilisateur la
+// sélectionne à la main plutôt que de se demander pourquoi rien ne se passe.
+function Invitation({ code, notifier }: { code: string; notifier: (message: string) => void }) {
+  const lien = lienInvitation(code);
+  const partageable = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const copier = async (valeur: string, succes: string, repli: string) => {
+    try { await navigator.clipboard.writeText(valeur); notifier(succes); }
+    catch { notifier(repli); }
+  };
+  return <div className="cel-invitation">
+    <span>Invite tes amis</span>
+    <b>{code}</b>
+    <em>{lien}</em>
+    <div className="cel-invitation-actions">
+      <button type="button" className="btn primaire" onClick={() => { void copier(lien, 'Lien d’invitation copié. Colle-le dans votre groupe.', lien); }}>
+        <Icone nom="lien" taille={16} />Copier le lien
+      </button>
+      <button type="button" className="btn fantome" onClick={() => { void copier(code, 'Code d’invitation copié.', `Code d’invitation : ${code}`); }}>
+        <Icone nom="dossier" taille={16} />Copier le code
+      </button>
+      {partageable && <button type="button" className="btn fantome" onClick={() => {
+        // Un partage annulé n'est pas une erreur : l'utilisateur a fermé la feuille.
+        void navigator.share({ title: 'Destiny Rugby', text: 'Rejoins ma ligue privée sur Destiny Rugby.', url: lien }).catch(() => {});
+      }}>
+        <Icone nom="partage" taille={16} />Partager
+      </button>}
+    </div>
+  </div>;
+}
+
+function Bureau({ vue, proprietaire, agir, occupe, suivre, notifier }: { vue: VueCarriereEnLigne; proprietaire: boolean; agir: Agir; occupe: boolean; suivre: (id: string) => void; notifier: (message: string) => void }) {
   const [ficheClub, setFicheClub] = useState<string | null>(null);
   const monClub = vue.clubs.find(c => c.id === vue.monClubId);
   const mesCartes = vue.cartes.filter(c => c.proprietaire === vue.monClubId);
   const prochaine = vue.rencontres.find(r => !r.resultat && (r.domicile === vue.monClubId || r.exterieur === vue.monClubId));
   const moyenne = mesCartes.length ? Math.round(mesCartes.reduce((s, c) => s + c.note, 0) / mesCartes.length) : 0;
-  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? 'Avant le premier coup de sifflet' : 'Le prochain rendez-vous'}</div>{vue.phase === 'salon' ? <><h2>Rassemblez votre XV de clubs.</h2><p>Le vestiaire est ouvert. Partage le code, compose ton équipe et lance la saison quand tes amis sont là.</p><button className="cel-invitation" onClick={copier}><span>CODE D’INVITATION</span><b>{vue.code}</b><Icone nom="dossier" taille={19} /></button><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Lancer la saison</button>}<small>{vue.clubs.length} / {vue.maxClubs} clubs inscrits{vue.clubs.length < 2 ? ' · Au moins 2 pour démarrer' : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : <><h2>La saison a livré son verdict.</h2><p>Retrouve les trophées dans l’histoire de la ligue.</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Démarrer la saison suivante</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>Ton vestiaire</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>GEN moyen</span></div><div><b>{mesCartes.length}</b><span>joueurs</span></div><div><b>{mesCartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length}</b><span>blessés</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>Écusson choisi à l’inscription — il ne change plus.</small></span></div><p className="cel-note">Fais grandir ton club grâce aux matchs, aux objectifs et au marché de la ligue.</p></div></div><div className="cel-grille-bureau"><div className="cel-panneau"><h2>Le championnat</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>Objectifs de la période</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>Jusqu’au {date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} Ovas</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? 'Récompense reçue' : 'Récupérer'}</button></div>) : <p className="cel-note">Les premiers objectifs arrivent au lancement de la saison.</p>}</div></div></>;
+  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? 'Avant le premier coup de sifflet' : 'Le prochain rendez-vous'}</div>{vue.phase === 'salon' ? <><h2>Rassemblez votre XV de clubs.</h2><p>Le vestiaire est ouvert. Partage le code, compose ton équipe et lance la saison quand tes amis sont là.</p><Invitation code={vue.code} notifier={notifier} /><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Lancer la saison</button>}<small>{vue.clubs.length} / {vue.maxClubs} clubs inscrits{vue.clubs.length < 2 ? ' · Au moins 2 pour démarrer' : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : <><h2>La saison a livré son verdict.</h2><p>Retrouve les trophées dans l’histoire de la ligue.</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Démarrer la saison suivante</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>Ton vestiaire</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>GEN moyen</span></div><div><b>{mesCartes.length}</b><span>joueurs</span></div><div><b>{mesCartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length}</b><span>blessés</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>Écusson choisi à l’inscription — il ne change plus.</small></span></div><p className="cel-note">Fais grandir ton club grâce aux matchs, aux objectifs et au marché de la ligue.</p></div></div><div className="cel-grille-bureau"><div className="cel-panneau"><h2>Le championnat</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>Objectifs de la période</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>Jusqu’au {date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} Ovas</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? 'Récompense reçue' : 'Récupérer'}</button></div>) : <p className="cel-note">Les premiers objectifs arrivent au lancement de la saison.</p>}</div></div></>;
 }
 
 /**
@@ -830,6 +891,15 @@ function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agi
 // tableur. Le propriétaire dans la ligue s'affiche à part, quand il compte
 // (sur le marché).
 
+// ⚠️ SUR LA CARTE, LE NUMÉRO DIT DÉJÀ LE POSTE. « Deuxième ligne (4) » à côté
+//    d’un « 4 » en gros, c’est la même information deux fois — et ces quatre
+//    caractères de trop suffisaient à faire passer le libellé sur deux lignes,
+//    ce qui décalait la photo, le nom et les statistiques d’une carte à
+//    l’autre. On retire la parenthèse ici seulement : l’écran de composition,
+//    lui, a la place et distingue vraiment le 4 du 5.
+//    La parenthèse chiffrée est la même dans les sept langues : c’est un chiffre.
+
+const libellePosteCarte = (poste: PosteId) => nomPoste(poste).replace(/\s*\(\d+\)\s*$/, '');
 function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, compacte = false }: { carte: CarteCarriere; proprietaire?: string; logoClub?: string; onClick?: () => void; compacte?: boolean }) {
   const photo = carte.photo ?? photoReelle(carte.nom);
   const stats = Object.entries(carte.statistiques);
@@ -837,7 +907,7 @@ function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, compacte =
   return <Balise type={onClick ? 'button' : undefined} className={`cel-carte ${carte.rarete}${compacte ? ' compacte' : ''}`} onClick={onClick}>
     <span className="cel-carte-tete">
       <b>{carte.note}</b>
-      <em>{POSTE_PAR_ID[carte.poste]?.numero ?? ''} · {nomPoste(carte.poste)}</em>
+      <em title={nomPoste(carte.poste)}>{POSTE_PAR_ID[carte.poste]?.numero ?? ''} · {libellePosteCarte(carte.poste)}</em>
       <Drapeau nation={carte.nation} taille={0.95} />
     </span>
     <span className="cel-carte-vignette">

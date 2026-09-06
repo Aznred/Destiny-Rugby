@@ -1,7 +1,7 @@
 /** Règles exécutées exclusivement par le serveur ; chaque commande travaille sur une copie. */
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import type { CompositionManager } from '../../types.js';
-import { compositionManagerParDefaut, EFFECTIF_MINIMUM, joueurCompatibleManager, POSTES_BANC_MANAGER, POSTES_XV_MANAGER, reconcilerCompositionManager } from '../compositionManager.js';
+import { compositionManagerParDefaut, EFFECTIF_MINIMUM, POSTES_BANC_MANAGER, POSTES_XV_MANAGER, reconcilerCompositionManager } from '../compositionManager.js';
 import { affichesToutesRondes } from './calendrier.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { bandesGaranties, carteDepuisSource, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
@@ -72,8 +72,26 @@ function verifierComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, vale
     exiger(c.proprietaire === club.id, 'Cette carte appartient à un autre club.');
     exiger(!c.blesseJusqua || Date.parse(c.blesseJusqua) <= maintenant, 'Un joueur blessé ne peut pas être aligné.');
     const poste = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER][i];
-    exiger(joueurCompatibleManager(coequipierDepuisCarte(c), poste), 'Ce joueur ne peut pas occuper ce poste.');
-    if (i < 3 || (i >= 15 && i < 18)) exiger(c.famille === POSTE_PAR_ID[poste].famille, 'La première ligne nécessite des spécialistes.');
+    // ⚠️ UN JOUEUR HORS DE SON POSTE EST AUTORISÉ, ET IL COÛTE.
+    //
+    // La règle a longtemps refusé tout croisement avant ↔ arrière
+    // (`joueurCompatibleManager`). Elle contredisait trois choses à la fois :
+    // le mode entraîneur solo, qui laisse composer librement ; le texte de
+    // l'écran, qui promet « un joueur hors de son poste perd la cohérence
+    // collective » ; et le barème du jeu lui-même — `adequationAuPoste` note
+    // ces placements « hors poste » à 82 %, pas « interdits ».
+    //
+    // Pour le joueur, ça donnait le pire des messages : il range ses recrues,
+    // clique « Enregistrer la feuille », et le serveur jette TOUTE la feuille
+    // pour un seul pion. La sanction est désormais sur le terrain, où elle a
+    // un sens — `feuilleGeleeEnLigne` pèse la note par l'adéquation avant de
+    // geler la feuille du match.
+    //
+    // ⚠️ SAUF LA PREMIÈRE LIGNE. Celle-là reste fermée aux non-spécialistes,
+    // et ce n'est pas une question d'équilibrage : une mêlée avec un ailier au
+    // pilier, c'est un arbitre qui ordonne des mêlées simulées. Le règlement
+    // du rugby l'exige, le jeu aussi.
+    if (i < 3 || (i >= 15 && i < 18)) exiger(c.famille === POSTE_PAR_ID[poste].famille, 'La première ligne nécessite des spécialistes : pilier, talonneur, pilier.');
   });
 }
 
@@ -486,15 +504,39 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
 }
 
 /** Appelé par lecture, cron et commande. Les résultats et récompenses sont idempotents. */
+/**
+ * L'état tel qu'il revient du stockage — copié, et complété de ce que les
+ * versions précédentes n'écrivaient pas encore.
+ *
+ * ⚠️ UNE LIGUE EN BASE EST PLUS VIEILLE QUE LE CODE QUI LA RELIT. Le type dit
+ * `dotationOvas: number`, et TypeScript le garantit… pour les états que ce
+ * code a écrits. Les lignes enregistrées AVANT l'arrivée du champ n'ont rien à
+ * cet endroit, et le compilateur ne peut rien y voir : c'est du jsonb.
+ *
+ * Ce qu'on a mesuré sans ce filet : un ami qui rejoint une ligue créée la
+ * veille tombe sur `undefined.toLocaleString()`, l'API rend « Demande
+ * invalide. », et la ligue devient impossible à rejoindre POUR TOUJOURS —
+ * l'écran n'offre aucune issue et rien dans le message ne dit pourquoi.
+ *
+ * Le remplissage est écrit dans l'état retourné, donc la première commande
+ * venue le persiste et le trou se referme de lui-même.
+ */
+function reprendre(etat: EtatCarriereEnLigne): EtatCarriereEnLigne {
+  const nouveau = copier(etat);
+  if (!Number.isFinite(nouveau.dotationOvas)) nouveau.dotationOvas = DOTATION_DEFAUT;
+  for (const club of nouveau.clubs) if (!Number.isFinite(club.ovas)) club.ovas = 0;
+  return nouveau;
+}
+
 export function avancerCarriere(etat: EtatCarriereEnLigne, maintenant: number, graine: string): EtatCarriereEnLigne {
-  dateServeur(maintenant); const nouveau = copier(etat); avancerInterne(nouveau, maintenant, graine);
+  dateServeur(maintenant); const nouveau = reprendre(etat); avancerInterne(nouveau, maintenant, graine);
   nouveau.version = etat.version + 1; return nouveau;
 }
 
 export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, commande: CommandeCarriere, maintenant: number, graine: string): EtatCarriereEnLigne {
   identifiant(compteId); dateServeur(maintenant);
   exiger(commande && typeof commande === 'object' && typeof commande.type === 'string', 'Commande invalide.');
-  const nouveau = copier(etat); const date = dateServeur(maintenant);
+  const nouveau = reprendre(etat); const date = dateServeur(maintenant);
   if (commande.type === 'rejoindre') {
     ajouterClub(nouveau, compteId, commande.pseudo, commande.clubNom, maintenant, graine, commande.embleme);
   } else {

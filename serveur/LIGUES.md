@@ -563,6 +563,97 @@ aucune n'est décorative :
 
 ---
 
+### On invite par un lien, pas par une dictée
+
+Le code `DR-XXXXXXXXXX` existait déjà, mais il se dictait : l'ami devait ouvrir
+le jeu, trouver la Carrière en ligne, cliquer « Rejoindre des amis » et recopier
+dix caractères. Le lien fait tout ça à sa place :
+
+```
+https://destiny-rugby.fr/?ligue=DR-9F2A10C4B7
+```
+
+`lib/invitationLigue.ts` le fabrique depuis `origin + pathname` — jamais depuis
+une adresse en dur, pour que le lien reste juste sur une préversion, sur
+localhost et le jour d'un changement de domaine.
+
+⚠️ **LE CODE DOIT SURVIVRE À L'INSCRIPTION.** Un lien d'invitation tombe presque
+toujours sur quelqu'un qui n'a pas de compte : il va s'inscrire, peut-être
+recharger, peut-être revenir dix minutes plus tard dans le même onglet. Or on
+retire le paramètre de la barre d'adresse tout de suite — un rechargement ne
+doit pas relancer une adhésion, et l'adresse ne doit pas traîner. D'où deux
+mémoires : une variable de module pour la vie de la page, un `sessionStorage`
+pour le rechargement. **Et l'URL n'est nettoyée que si le rangement a réussi** :
+en navigation privée `sessionStorage` lève, et effacer le paramètre sans avoir
+rien gardé perdrait l'invitation au premier F5.
+
+Le parcours mesuré de bout en bout dans le navigateur : lien → écran de la
+Carrière en ligne → « Crée ton compte » avec le mot d'accueil → formulaire
+« Rejoindre » **code déjà rempli** → club créé, 1 000 Ovas, invitation oubliée.
+
+⚠️ **UN LIEN SE CLIQUE DEUX FOIS.** On le range dans une boucle de messages, on
+y revient le lendemain, on le rouvre depuis l'historique. La règle d'adhésion
+répondait alors « Ce compte possède déjà un club dans cette ligue » — une erreur
+pour quelqu'un qui voulait simplement entrer chez lui. Le serveur ouvre
+désormais la ligue au membre déjà inscrit (`carriereApi.ts`, action `rejoindre`).
+
+### ⚠️ Hors de son poste : autorisé, et payant
+
+La règle serveur refusait tout croisement avant ↔ arrière sur la feuille de
+match (`joueurCompatibleManager`). Elle contredisait trois choses à la fois :
+
+- le **mode entraîneur solo**, qui laisse composer librement ;
+- le **texte de l'écran**, qui promet « un joueur hors de son poste perd la
+  cohérence collective » ;
+- le **barème du jeu lui-même** — `adequationAuPoste` note ces placements
+  « hors poste » à 82 %, pas « interdits ».
+
+Et pour le joueur, ça donnait le pire des messages : il range ses recrues,
+clique « Enregistrer la feuille », et le serveur jette TOUTE la feuille pour un
+seul pion. C'est ce qui remontait sous la forme « ça n'enregistre pas la feuille
+de match ».
+
+La sanction est passée là où elle a un sens : **`feuilleGeleeEnLigne`**
+(`matchCarriere.ts`) pèse la note de chaque joueur par son adéquation au moment
+de geler la feuille. Une seule multiplication, et elle descend partout d'un
+coup, parce que la feuille gelée est l'unique entrée du moteur : `forceFeuille`
+en tire la puissance de l'équipe, `cibleDeScore` le score visé, chaque duel la
+note du pion. Mesuré : une feuille rangée vaut **36,3** de force, les mêmes 23
+joueurs empilés par note sans regarder le poste **30,1**.
+
+⚠️ **SAUF LA PREMIÈRE LIGNE**, qui reste fermée aux non-spécialistes. Ce n'est
+pas de l'équilibrage : une mêlée avec un ailier au pilier, c'est un arbitre qui
+ordonne des mêlées simulées. Le règlement l'exige, le jeu aussi.
+
+⚠️ **ET LE MODE SOLO, LUI, N'APPLIQUE TOUJOURS RIEN.** `facteurDePerformance`
+n'y sert qu'à AFFICHER un « −18 % » que personne ne prélève. C'est une dette
+connue, laissée en place : y toucher déplace l'équilibrage de la carrière
+entraîneur, qui se mesure sur cent carrières de douze saisons.
+
+### ⚠️ Une ligue en base est plus vieille que le code qui la relit
+
+Le type dit `dotationOvas: number`, et TypeScript le garantit… pour les états
+que ce code a écrits. Les lignes enregistrées **avant** l'arrivée du champ n'ont
+rien à cet endroit, et le compilateur ne peut rien y voir : c'est du jsonb.
+
+Mesuré sans filet : un ami qui rejoint une ligue créée la veille tombe sur
+`undefined.toLocaleString()`, l'API rend « Demande invalide. » — un message qui
+ne dit rien — et **la ligue devient impossible à rejoindre pour toujours**.
+
+`reprendre(etat)` (`carriere.ts`) est désormais le seul point d'entrée d'un état
+qui revient du stockage : il copie ET complète ce qui manque. Le remplissage est
+écrit dans l'état retourné, donc la première commande venue le persiste et le
+trou se referme de lui-même. **Tout champ ajouté au schéma passe par là.**
+
+### ⚠️ Un refus doit se voir, même à mille pixels de là
+
+La bannière d'erreur vit en haut de l'écran ; les boutons qui échouent sont au
+milieu d'une longue page — le terrain de composition fait deux hauteurs d'écran
+à lui seul. Sans recentrage, une commande refusée ne donnait rien à voir : on
+clique, rien ne bouge, on en conclut que le jeu n'enregistre pas.
+`CarriereEnLigne.tsx` fait défiler la bannière jusqu'au regard dès qu'elle
+apparaît.
+
 ### Vingt-trois packs, en quatre rayons
 
 Le VOLUME (Bronze, Standard, Premium, Or garanti, Grand pack, Élite garantie),
