@@ -1,11 +1,11 @@
-import type { Joueur } from '../types';
-import { datesCompetitionInternationale, numeroDate } from '../data/calendrierMondial';
-import { competitionsDeLaSaison, COMPETITIONS_U20, equipeU20 } from './international';
-import { matchInternationalDuJoueur, prioriteInternationale, internationalEnDirect } from './international';
-import { nomNation } from './nations';
-import { convocation, convocationU20 } from './selection';
-import { graine, type MatchChampionnat } from './championnat';
-import { mondialEnDirect, DATES_MONDIAL } from './mondial';
+import type { Joueur } from '../types.js';
+import { datesCompetitionInternationale, numeroDate } from '../data/calendrierMondial.js';
+import { competitionsDeLaSaison, COMPETITIONS_U20, equipeU20 } from './international.js';
+import { matchInternationalDuJoueur, prioriteInternationale, internationalEnDirect } from './international.js';
+import { nomNation } from './nations.js';
+import { convocation, convocationU20 } from './selection.js';
+import { graine, type MatchChampionnat } from './championnat.js';
+import { mondialEnDirect, DATES_MONDIAL } from './mondial.js';
 
 export interface RassemblementInternational {
   id: string; saison: number; competition: string; nom: string; nation: string; u20: boolean;

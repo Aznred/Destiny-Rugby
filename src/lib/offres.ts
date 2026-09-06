@@ -6,14 +6,14 @@
 // clubs étrangers n'entrent en jeu qu'à partir d'une certaine notoriété : on ne
 // s'expatrie pas quand personne ne vous connaît.
 
-import type { Joueur, OffreContrat, PosteId } from '../types';
-import { COMPETITIONS, NOTE_PAR_NIVEAU, type Competition } from '../data/clubs';
-import { noteDuClub, effectifDuClub } from './effectif';
-import { graine } from './championnat';
-import { POSTE_PAR_ID } from '../data/rugby';
-import { effetsTraits } from '../data/traits';
-import { agentDe } from '../data/agents';
-import { etagePaieUnSalaire, salaireAnnuel } from './economie';
+import type { Joueur, OffreContrat, PosteId } from '../types.js';
+import { COMPETITIONS, NOTE_PAR_NIVEAU, type Competition } from '../data/clubs.js';
+import { noteDuClub, effectifDuClub } from './effectif.js';
+import { graine } from './championnat.js';
+import { POSTE_PAR_ID } from '../data/rugby.js';
+import { effetsTraits } from '../data/traits.js';
+import { agentDe } from '../data/agents.js';
+import { etagePaieUnSalaire, salaireAnnuel } from './economie.js';
 
 // Salaire annuel de référence par niveau de division (€). En dessous de la
 // Fédérale 1, c'est du rugby amateur : quelques défraiements, pas un métier.

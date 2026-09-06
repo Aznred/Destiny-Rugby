@@ -1,8 +1,8 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, vueCarriere } from '../src/lib/ligue/carriere';
-import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere';
-import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage';
+import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, vueCarriere } from '../src/lib/ligue/carriere.js';
+import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
+import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
 
 export interface RequeteCarriere {
   method?: string; url?: string; body?: unknown;
@@ -114,7 +114,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
       // pendant un direct. La liste est publique et ne change jamais, donc
       // elle se met en cache côté navigateur.
       if (url.searchParams.get('emblemes') === '1') {
-        const { emblemesCarriere, competitionsCarriere, tropheesCarriere } = await import('../src/lib/ligue/catalogueCarriere');
+        const { emblemesCarriere, competitionsCarriere, tropheesCarriere } = await import('../src/lib/ligue/catalogueCarriere.js');
         res.setHeader('Cache-Control', 'public, max-age=86400');
         return res.status(200).json({ groupes: emblemesCarriere(), competitions: competitionsCarriere(), trophees: tropheesCarriere() });
       }
@@ -134,7 +134,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
       // n'importe quelle adresse — y compris nos propres services internes.
       const ecusson = url.searchParams.get('ecusson');
       if (ecusson) {
-        const { emblemeValide } = await import('../src/lib/ligue/catalogueCarriere');
+        const { emblemeValide } = await import('../src/lib/ligue/catalogueCarriere.js');
         if (!emblemeValide(ecusson) || !ecusson.startsWith('https://')) {
           throw new ErreurHttp(404, 'Écusson inconnu.');
         }

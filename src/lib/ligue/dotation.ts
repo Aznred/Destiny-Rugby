@@ -21,10 +21,10 @@
 // distribuée sort du stock : elle n'est plus dans les packs, elle n'est plus
 // sur le marché, elle appartient à quelqu'un. C'est l'invariant du mode.
 
-import type { FamillePoste } from '../../types';
-import type { CarteJoueur, IdCarte, IdClub, TypeLigue } from './types';
-import { QUOTAS_POSTE, TAILLE_EFFECTIF } from './vivier';
-import { graine, melanger } from './aleatoire';
+import type { FamillePoste } from '../../types.js';
+import type { CarteJoueur, IdCarte, IdClub, TypeLigue } from './types.js';
+import { QUOTAS_POSTE, TAILLE_EFFECTIF } from './vivier.js';
+import { graine, melanger } from './aleatoire.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LES PALIERS DE LA DOTATION

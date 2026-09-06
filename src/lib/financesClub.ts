@@ -20,11 +20,11 @@
 // refait les résultats. Aucune ligne de revenu ne contourne la fanbase — sinon
 // une des trois boucles serait ouverte, et l'ensemble ne tiendrait pas.
 
-import { graine } from './championnat';
-import { notorieteDuClub, total } from './supporters';
-import type { Fanbase } from './supporters';
-import { MATCHS_PAYANTS_PAR_SAISON, capacite, chargesDuStade } from './stade';
-import type { Stade } from './stade';
+import { graine } from './championnat.js';
+import { notorieteDuClub, total } from './supporters.js';
+import type { Fanbase } from './supporters.js';
+import { MATCHS_PAYANTS_PAR_SAISON, capacite, chargesDuStade } from './stade.js';
+import type { Stade } from './stade.js';
 
 // ---------------------------------------------------------------------------
 // LES DROITS TÉLÉ

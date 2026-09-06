@@ -22,15 +22,15 @@
 //    jeu ; c'est `moteur.ts` qui l'applique. Sans cette séparation, `bagarre.ts`
 //    devrait importer `moteur.ts`, qui l'importe déjà — un cycle.
 
-import { CARTON, CHAMBRAGE, phrase, texteMatch } from './commentaire';
-import type { Pion } from './entites';
-import { stopper } from './entites';
+import { CARTON, CHAMBRAGE, phrase, texteMatch } from './commentaire.js';
+import type { Pion } from './entites.js';
+import { stopper } from './entites.js';
 import {
   ajouterCommentaire, type Bagarre, type EtatMatch, type NiveauMatch,
   type OrdreBagarre,
-} from './etat';
-import { surLeTerrain } from './tactique';
-import { adverse, borner, distance2, type Cote, type Vec } from './terrain';
+} from './etat.js';
+import { surLeTerrain } from './tactique.js';
+import { adverse, borner, distance2, type Cote, type Vec } from './terrain.js';
 
 /** Le pion du joueur incarné, s'il est bien sur le terrain et pas sanctionné. */
 export function monPion(e: EtatMatch): Pion | undefined {

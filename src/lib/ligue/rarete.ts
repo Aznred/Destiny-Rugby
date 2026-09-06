@@ -18,7 +18,7 @@
 // nous, et ne s'aligne pas sur une ligne de texte. Chaque rareté sort donc une
 // COULEUR, et l'écran la peint lui-même.
 
-import type { Rarete } from './types';
+import type { Rarete } from './types.js';
 
 interface BandeRarete {
   id: Rarete;

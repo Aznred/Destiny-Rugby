@@ -16,7 +16,7 @@
 //
 // Clés : `sit.<id>.titre` / `.txt` / `.c<n>` (libellé du choix) / `.r<n>` (récit).
 
-import type { Traduction } from '../lib/i18n';
+import type { Traduction } from '../lib/i18n.js';
 
 // Le deuxième lot de situations (club, argent, chute, études, après-carrière)
 // est traduit plus bas, dans sa propre section.

@@ -21,12 +21,12 @@
 // `plan.ts` : des fonctions pures, testables sans navigateur, et lisibles par
 // l'écran de création comme par le banc d'essai.
 
-import { COMPETITIONS, NOTE_PAR_NIVEAU, clubParNom, competitionDuClub } from '../data/clubs';
-import { forceEffectif } from './effectif';
+import { COMPETITIONS, NOTE_PAR_NIVEAU, clubParNom, competitionDuClub } from '../data/clubs.js';
+import { forceEffectif } from './effectif.js';
 // La POULE réellement jouée, celle que lisent `championnatEnDirect` et
 // `rangFinal` : une grande division amateur est découpée en poules de douze.
-import { pouleDe } from './championnat';
-import type { Club, Competition, LegendeSauvegardee, Manager } from '../types';
+import { pouleDe } from './championnat.js';
+import type { Club, Competition, LegendeSauvegardee, Manager } from '../types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LE PRESTIGE — la monnaie du mode manager

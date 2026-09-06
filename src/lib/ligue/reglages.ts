@@ -14,7 +14,7 @@
 // MÊME fonction — une seule définition des bornes, donc pas d'écran qui accepte
 // ce que l'API refusera.
 
-import type { ModeEquite, ReglagesLigue, TypeLigue } from './types';
+import type { ModeEquite, ReglagesLigue, TypeLigue } from './types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LES BORNES

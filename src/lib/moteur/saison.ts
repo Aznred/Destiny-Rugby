@@ -6,13 +6,13 @@
 // regardé en direct et celui rejoué ici sont rigoureusement identiques — mêmes
 // essais, mêmes plaquages, mêmes minutes. Aucun double comptage possible.
 
-import { affichesDeLaJournee } from '../championnat';
-import { effectifDuClub } from '../effectif';
-import { coupeEnDirect, matchsDuTourCourant } from '../coupe';
-import { affichesInternationales, effectifNational } from '../international';
-import { avancer, bilan, creerMatch } from './moteur';
-import type { AttributsPion } from './entites';
-import type { PosteId } from '../../types';
+import { affichesDeLaJournee } from '../championnat.js';
+import { effectifDuClub } from '../effectif.js';
+import { coupeEnDirect, matchsDuTourCourant } from '../coupe.js';
+import { affichesInternationales, effectifNational } from '../international.js';
+import { avancer, bilan, creerMatch } from './moteur.js';
+import type { AttributsPion } from './entites.js';
+import type { PosteId } from '../../types.js';
 
 // ⚠️ LA FEUILLE COMPLÈTE REMONTE JUSQU'AUX CLASSEMENTS. Ce qui n'est pas dans
 // cette structure n'existe pas pour l'écran Résultats, même si le moteur l'a
@@ -51,7 +51,7 @@ export const MAX_MATCHS_PAR_JOURNEE = 8;
 // ⚠️ `estTitulaire` vit dans `moteur/titulaire.ts` : le store l'appelle à chaque
 // semaine, et l'importer d'ici tirait TOUT le moteur dans le chunk principal.
 // On la ré-exporte pour les appelants historiques.
-export { estTitulaire } from './titulaire';
+export { estTitulaire } from './titulaire.js';
 
 // Joue un match complet sans rendu et renvoie l'état final.
 export function jouerSansRendu(

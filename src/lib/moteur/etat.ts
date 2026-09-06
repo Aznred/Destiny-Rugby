@@ -4,9 +4,9 @@
 // `phasesArretees.ts` puissent la lire sans importer `moteur.ts`, qui les
 // importe : sans ça, on aurait un cycle d'imports.
 
-import type { Pion } from './entites';
-import type { Cote, Vec } from './terrain';
-import type { TactiqueManager } from '../../types';
+import type { Pion } from './entites.js';
+import type { Cote, Vec } from './terrain.js';
+import type { TactiqueManager } from '../../types.js';
 
 export type Phase =
   | 'coupEnvoi'      // engagement et renvois après un score

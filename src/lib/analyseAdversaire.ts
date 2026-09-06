@@ -21,11 +21,11 @@
 // Un bonus permanent aurait transformé la préparation en une deuxième courbe de
 // progression, et la demande dit exactement le contraire.
 
-import { effectifDuClub } from './effectif';
-import { familleDe } from './jeunes';
-import { graine } from './championnat';
-import { JOURS, seance } from './entrainementPro';
-import type { SemaineEntrainement, TypeSeance } from './entrainementPro';
+import { effectifDuClub } from './effectif.js';
+import { familleDe } from './jeunes.js';
+import { graine } from './championnat.js';
+import { JOURS, seance } from './entrainementPro.js';
+import type { SemaineEntrainement, TypeSeance } from './entrainementPro.js';
 
 export type SecteurAdverse =
   | 'melee' | 'touche' | 'ruck' | 'jeuAuLarge' | 'defenseAxe'

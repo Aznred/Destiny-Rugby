@@ -6,38 +6,38 @@
 // recrutement, histoire, identité) au lieu d'ajouter des scènes sans mémoire.
 // Elle reste pure : le store décide quand l'appeler et persiste le résultat.
 
-import { COMPETITIONS, NOTE_PAR_NIVEAU, competitionDuClub } from '../data/clubs';
-import { SELECTIONS_SENIOR } from '../data/selections';
+import { COMPETITIONS, NOTE_PAR_NIVEAU, competitionDuClub } from '../data/clubs.js';
+import { SELECTIONS_SENIOR } from '../data/selections.js';
 import type {
   ApprocheClubManager, Manager, MotivationContratManager, NegociationManager, OptionContratManager,
   ResultatMatchManager, RoleRecrueManager,
-} from '../types';
-import { approcheAGenerer } from './approchesClubs';
-import { graine, enregistrerResultatJoue, type MatchChampionnat } from './championnat';
-import { fenetresDeNation, finDeRassemblement, type RassemblementInternational } from './rassemblements';
-import { effectifNational, matchInternationalDuJoueur } from './international';
-import { libelleDate, semaine as dateSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
-import type { Coequipier } from './effectif';
-import { forceEffectif } from './effectif';
+} from '../types.js';
+import { approcheAGenerer } from './approchesClubs.js';
+import { graine, enregistrerResultatJoue, type MatchChampionnat } from './championnat.js';
+import { fenetresDeNation, finDeRassemblement, type RassemblementInternational } from './rassemblements.js';
+import { effectifNational, matchInternationalDuJoueur } from './international.js';
+import { libelleDate, semaine as dateSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier.js';
+import type { Coequipier } from './effectif.js';
+import { forceEffectif } from './effectif.js';
 import {
   ajouterSaison, archiver, compacter, elaguer,
   type CarriereJoueur, type HistoireDuMonde, type SaisonDeJoueur,
-} from './histoire';
+} from './histoire.js';
 import {
   apresLaSaison, apresLaSaisonRivalite, clePaire, identiteHistorique,
   intensiteDeDepart, type Identite, type Rivalite,
-} from './identiteClub';
-import { nomNation } from './nations';
-import { evaluerObjectif, objectifsDeSaison, type IndicateurObjectif } from './objectifsManager';
-import { phaseFinaleDe, resoudreSaisonClub } from './promotion';
+} from './identiteClub.js';
+import { nomNation } from './nations.js';
+import { evaluerObjectif, objectifsDeSaison, type IndicateurObjectif } from './objectifsManager.js';
+import { phaseFinaleDe, resoudreSaisonClub } from './promotion.js';
 import {
   apresResultatProfonde, assurerEtatCarriereProfonde, avancerSemaineProfonde,
   compatibiliteManagerClub, creerEtatCarriereProfonde, finSaisonProfonde,
   revenusMarketingProfonde, type EtatCarriereProfonde,
-} from './carriereProfonde';
-import { salaire } from './offres';
-import { forceDuGroupe, ouvrirNegociationManager, salairesEffectif } from './recrutementManager';
-import { pseudoStable } from './comptes';
+} from './carriereProfonde.js';
+import { salaire } from './offres.js';
+import { forceDuGroupe, ouvrirNegociationManager, salairesEffectif } from './recrutementManager.js';
+import { pseudoStable } from './comptes.js';
 
 const borne = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 

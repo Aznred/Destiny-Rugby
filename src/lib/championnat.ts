@@ -9,10 +9,10 @@
 // Tout est DÉTERMINISTE (graine = division + saison + journée) : rouvrir le
 // tableau ne rejoue pas les matchs, et rien n'a besoin d'être sauvegardé.
 
-import { forceEffectif } from './effectif';
-import { clubsDeDivision } from './divisions';
-import { CALENDRIER, NB_JOURNEES, type Semaine, type TypeSemaine } from '../data/calendrier';
-import { clubParNom } from '../data/clubs';
+import { forceEffectif } from './effectif.js';
+import { clubsDeDivision } from './divisions.js';
+import { CALENDRIER, NB_JOURNEES, type Semaine, type TypeSemaine } from '../data/calendrier.js';
+import { clubParNom } from '../data/clubs.js';
 
 export interface MatchChampionnat {
   domicile: string;

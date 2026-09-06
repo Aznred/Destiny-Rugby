@@ -1,5 +1,5 @@
-import type { LegendeSauvegardee } from '../types';
-import { migrerPoste } from './rugby';
+import type { LegendeSauvegardee } from '../types.js';
+import { migrerPoste } from './rugby.js';
 
 // Légendes pré-générées pour peupler le classement (le vrai multijoueur en ligne
 // nécessitera un backend — voir CLAUDE.md). Marquées `fictif: true`.

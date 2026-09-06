@@ -24,10 +24,10 @@
 // traduction (`traduireSituation`, `traduireEvenement`…) renvoient l'objet
 // d'origine intact : jamais de trou, jamais de « sit.bizutage.titre » à l'écran.
 
-import type { Traduction } from '../lib/i18n';
+import type { Traduction } from '../lib/i18n.js';
 
-import { TEXTES_SITUATIONS } from './textesSituations';
-import { TEXTES_SITUATIONS_ETENDUES } from './situationsEtendues';
+import { TEXTES_SITUATIONS } from './textesSituations.js';
+import { TEXTES_SITUATIONS_ETENDUES } from './situationsEtendues.js';
 
 export const TEXTES_CONTENU: Record<string, Traduction> = {
   // ═══════════════════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
-import { creerGestionnaireCarriere } from '../serveur/carriereApi';
-import type { RequeteCarriere, ReponseCarriere } from '../serveur/carriereApi';
-import { stockageNeon } from '../serveur/carriereStockage';
+import { creerGestionnaireCarriere } from '../serveur/carriereApi.js';
+import type { RequeteCarriere, ReponseCarriere } from '../serveur/carriereApi.js';
+import { stockageNeon } from '../serveur/carriereStockage.js';
 
 export const config = { runtime: 'nodejs' };
 

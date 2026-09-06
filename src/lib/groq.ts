@@ -18,7 +18,7 @@
 // ⚙️ Réglages : elle prend alors la priorité, ce qui lui rend l'IA même quand
 // le quota du site est épuisé.
 
-import { t } from './i18n';
+import { t } from './i18n.js';
 
 const URL_GROQ = 'https://api.groq.com/openai/v1/chat/completions';
 

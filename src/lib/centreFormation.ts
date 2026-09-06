@@ -24,12 +24,12 @@
 // démonte pas un centre de formation pour l'emporter ailleurs — c'est la même
 // règle que `Manager.installations`, indexé par club.
 
-import { competitionDuClub } from '../data/clubs';
-import { distanceKm, positionDuClub } from '../data/geographie';
-import { graine } from './championnat';
-import { forceEffectif } from './effectif';
-import { NIVEAU_INSTALLATION_MAX, niveauInstallation } from './installations';
-import type { InstallationsClub } from '../types';
+import { competitionDuClub } from '../data/clubs.js';
+import { distanceKm, positionDuClub } from '../data/geographie.js';
+import { graine } from './championnat.js';
+import { forceEffectif } from './effectif.js';
+import { NIVEAU_INSTALLATION_MAX, niveauInstallation } from './installations.js';
+import type { InstallationsClub } from '../types.js';
 
 export interface NotesCentre {
   installations: number;

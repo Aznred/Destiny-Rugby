@@ -1,12 +1,12 @@
 /** Règles exécutées exclusivement par le serveur ; chaque commande travaille sur une copie. */
-import { POSTE_PAR_ID } from '../../data/rugby';
-import type { CompositionManager } from '../../types';
-import { compositionManagerParDefaut, EFFECTIF_MINIMUM, joueurCompatibleManager, POSTES_BANC_MANAGER, POSTES_XV_MANAGER, reconcilerCompositionManager } from '../compositionManager';
-import { affichesToutesRondes } from './calendrier';
-import { graine as hasard, tirerPondere } from './aleatoire';
-import { bandesGaranties, carteDepuisSource, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere';
-import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere';
-import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere';
+import { POSTE_PAR_ID } from '../../data/rugby.js';
+import type { CompositionManager } from '../../types.js';
+import { compositionManagerParDefaut, EFFECTIF_MINIMUM, joueurCompatibleManager, POSTES_BANC_MANAGER, POSTES_XV_MANAGER, reconcilerCompositionManager } from '../compositionManager.js';
+import { affichesToutesRondes } from './calendrier.js';
+import { graine as hasard, tirerPondere } from './aleatoire.js';
+import { bandesGaranties, carteDepuisSource, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
+import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
+import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 
 const HEURE = 3_600_000;
 const JOUR = 24 * HEURE;

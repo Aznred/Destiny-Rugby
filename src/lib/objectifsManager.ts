@@ -1,11 +1,11 @@
-import type { Manager } from '../types';
-import type { Coequipier } from './effectif';
-import type { ObjectifDirection } from './carriereAvancee';
-import { competitionEffective } from './divisions';
-import { graine } from './championnat';
-import { nomNation } from './nations';
-import { situationSalariale } from './recrutementManager';
-import { nombre } from './i18n';
+import type { Manager } from '../types.js';
+import type { Coequipier } from './effectif.js';
+import type { ObjectifDirection } from './carriereAvancee.js';
+import { competitionEffective } from './divisions.js';
+import { graine } from './championnat.js';
+import { nomNation } from './nations.js';
+import { situationSalariale } from './recrutementManager.js';
+import { nombre } from './i18n.js';
 
 export type IndicateurObjectif = 'classement' | 'masseSalariale' | 'reserveTransferts'
   | 'feuillesJeunes' | 'recruesJeunes' | 'locaux' | 'essais' | 'victoires' | 'defensesSolides';

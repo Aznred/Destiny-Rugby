@@ -11,8 +11,8 @@
 // que `lib/manager.ts` : ce sont des chiffres qu'on veut pouvoir mesurer sans
 // navigateur (`scripts/verifInstallations.ts`).
 
-import { NOTE_PAR_NIVEAU } from '../data/clubs';
-import type { InstallationsClub, TypeInstallation } from '../types';
+import { NOTE_PAR_NIVEAU } from '../data/clubs.js';
+import type { InstallationsClub, TypeInstallation } from '../types.js';
 
 export const NIVEAU_INSTALLATION_MAX = 4;
 

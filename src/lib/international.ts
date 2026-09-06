@@ -14,29 +14,29 @@
 // Tout est DÉTERMINISTE (graine = compétition + saison + journée) : rien à
 // sauvegarder, rouvrir l'écran ne rejoue rien.
 
-import { calendrier, classer, graine, scorePossible, resultatJoue, versionResultatsJoues, type LigneTableau, type MatchChampionnat } from './championnat';
-import { effectifDuClub, type Coequipier } from './effectif';
-import { POSTE_PAR_ID } from '../data/rugby';
-import { nomNation } from './nations';
-import { CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier';
+import { calendrier, classer, graine, scorePossible, resultatJoue, versionResultatsJoues, type LigneTableau, type MatchChampionnat } from './championnat.js';
+import { effectifDuClub, type Coequipier } from './effectif.js';
+import { POSTE_PAR_ID } from '../data/rugby.js';
+import { nomNation } from './nations.js';
+import { CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier.js';
 // ⚠️ CYCLE ASSUMÉ : `mondial.ts` importe `jouerTestMatch` et
 // `qualifiesCoupeDuMonde` d’ici. Il est sans danger parce que RIEN ne
 // s’exécute à l’évaluation des deux modules — que des déclarations. C’est la
 // même précaution que pour `forceNation`, mémoïsée à la demande.
 import {
   afficheMondialDe, journeesParDate, mondialEnDirect, type PouleMondial,
-} from './mondial';
-import type { MatchFinal } from './phaseFinale';
-import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
+} from './mondial.js';
+import type { MatchFinal } from './phaseFinale.js';
+import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues.js';
 import {
   NOTE_NOUVEAU_MEMBRE,
   NOTE_WORLD_RUGBY_INITIALE,
-} from '../data/classementWorldRugby';
-import { COMPETITIONS } from '../data/clubs';
-import { appliquerEchangeWorldRugby } from './classementWorldRugby';
-import { datesCompetitionInternationale, type FenetreMondiale } from '../data/calendrierMondial';
-import { cycleQualification, competitionsQualifications } from './qualificationsMondial';
-import type { Joueur, PosteId } from '../types';
+} from '../data/classementWorldRugby.js';
+import { COMPETITIONS } from '../data/clubs.js';
+import { appliquerEchangeWorldRugby } from './classementWorldRugby.js';
+import { datesCompetitionInternationale, type FenetreMondiale } from '../data/calendrierMondial.js';
+import { cycleQualification, competitionsQualifications } from './qualificationsMondial.js';
+import type { Joueur, PosteId } from '../types.js';
 
 // La hiérarchie mondiale, en « note d'équipe » sur la même échelle que les
 // clubs. Elle sert à jouer les matchs : deux points d'écart ≈ une possession.

@@ -1,7 +1,7 @@
-import { calendrier, classer, versionResultatsJoues } from './championnat';
-import { forceNation, jouerTestMatch, type CompetitionInternationale } from './international';
-import { mondialEnDirect, DATES_POULES } from './mondial';
-import { estAnneeDeCoupeDuMonde } from '../data/calendrier';
+import { calendrier, classer, versionResultatsJoues } from './championnat.js';
+import { forceNation, jouerTestMatch, type CompetitionInternationale } from './international.js';
+import { mondialEnDirect, DATES_POULES } from './mondial.js';
+import { estAnneeDeCoupeDuMonde } from '../data/calendrier.js';
 
 const AUTOMATIQUES_2027 = ['France', 'Afrique du Sud', 'Nouvelle-Zélande', 'Angleterre', 'Irlande',
   'Écosse', 'Italie', 'Pays de Galles', 'Australie', 'Fidji', 'Japon', 'Argentine'];

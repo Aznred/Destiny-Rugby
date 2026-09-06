@@ -9,7 +9,7 @@
 // notoriété qui donne accès à l'étranger, `salaire` pèse sur la négociation, et
 // `drame` est le risque d'incident médiatique à l'intersaison.
 
-import { t } from '../lib/i18n';
+import { t } from '../lib/i18n.js';
 
 export interface Agent {
   id: string;

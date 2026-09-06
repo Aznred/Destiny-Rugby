@@ -16,12 +16,12 @@
 // substitue à l'estimation — sinon on se verrait dans le classement avec des
 // chiffres qui ne sont pas les siens.
 
-import type { Joueur, PosteId, StatsDetaillees } from '../types';
-import { graine, journeesALaSemaine, nombreJournees, poulesDe } from './championnat';
-import { effectifDuClub, forceEffectif, type Coequipier } from './effectif';
-import { nomPoste as nomPosteTraduit } from '../data/rugby';
-import { nombre, t } from './i18n';
-import type { LigneReelle } from './moteur/saison';
+import type { Joueur, PosteId, StatsDetaillees } from '../types.js';
+import { graine, journeesALaSemaine, nombreJournees, poulesDe } from './championnat.js';
+import { effectifDuClub, forceEffectif, type Coequipier } from './effectif.js';
+import { nomPoste as nomPosteTraduit } from '../data/rugby.js';
+import { nombre, t } from './i18n.js';
+import type { LigneReelle } from './moteur/saison.js';
 
 export interface LigneStats {
   nom: string;

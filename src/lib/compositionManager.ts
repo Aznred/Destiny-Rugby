@@ -1,8 +1,8 @@
-import { POSTE_PAR_ID } from '../data/rugby';
+import { POSTE_PAR_ID } from '../data/rugby.js';
 import type {
   CompositionManager, PosteId, TactiqueManager,
-} from '../types';
-import type { Coequipier } from './effectif';
+} from '../types.js';
+import type { Coequipier } from './effectif.js';
 
 export const POSTES_XV_MANAGER: PosteId[] = [
   'pilier_gauche', 'talonneur', 'pilier_droit', 'deuxieme_ligne_g', 'deuxieme_ligne_d',

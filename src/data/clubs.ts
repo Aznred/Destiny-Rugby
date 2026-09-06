@@ -6,11 +6,11 @@
 // • Nationale → Régionale 3 : composition 2026-2027, communes, départements
 //   et coordonnées importés de Mon Club House FFR (`amateurs.ts`).
 
-import type { Club, Competition } from '../types';
-import { COMPETITIONS_REELLES } from './mondeReel';
-import { CLUBS_AMATEURS, CLUBS_REGIONAUX, LOGO_AMATEUR, type ClubAmateurFfr } from './amateurs';
-import { COMPETITIONS_NOUVELLES } from './nouvellesLigues';
-import { CODE_PAR_NATION } from './nations';
+import type { Club, Competition } from '../types.js';
+import { COMPETITIONS_REELLES } from './mondeReel.js';
+import { CLUBS_AMATEURS, CLUBS_REGIONAUX, LOGO_AMATEUR, type ClubAmateurFfr } from './amateurs.js';
+import { COMPETITIONS_NOUVELLES } from './nouvellesLigues.js';
+import { CODE_PAR_NATION } from './nations.js';
 
 export type { Club, Competition };
 

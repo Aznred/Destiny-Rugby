@@ -1,7 +1,7 @@
-import type { Manager, TransfertAnnonce } from '../types';
-import { competitionEffective } from './divisions';
-import { salaryCap } from './economie';
-import { budgetsDuClub, situationSalariale } from './recrutementManager';
+import type { Manager, TransfertAnnonce } from '../types.js';
+import { competitionEffective } from './divisions.js';
+import { salaryCap } from './economie.js';
+import { budgetsDuClub, situationSalariale } from './recrutementManager.js';
 
 export const REPORT_TRANSFERTS = 0.28;
 export const REPORT_SALARIAL = 0.20;

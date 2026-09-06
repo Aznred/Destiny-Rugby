@@ -29,11 +29,11 @@
 // les notes changer, des joueurs disparaître : les ligues en cours ne bougent
 // pas d'un pouce.
 
-import type { FamillePoste } from '../../types';
-import { EFFECTIFS_REELS } from '../../data/effectifsReels';
-import type { CarteJoueur, IdCarte } from './types';
-import { rareteDeLaNote } from './rarete';
-import { graine, melanger } from './aleatoire';
+import type { FamillePoste } from '../../types.js';
+import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
+import type { CarteJoueur, IdCarte } from './types.js';
+import { rareteDeLaNote } from './rarete.js';
+import { graine, melanger } from './aleatoire.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LA SOURCE — les vrais pros, dédoublonnés

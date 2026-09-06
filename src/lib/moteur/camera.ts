@@ -40,7 +40,7 @@
 // matrice des deux côtés, un pivot ne peut pas désaccorder l'image et la
 // commande.
 
-import { LARGEUR, LONGUEUR, borner, type Cote, type Vec } from './terrain';
+import { LARGEUR, LONGUEUR, borner, type Cote, type Vec } from './terrain.js';
 
 /** À quelle distance on regarde le jeu. */
 export type Cadrage = 'large' | 'suivi' | 'proche';

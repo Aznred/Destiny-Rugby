@@ -21,12 +21,12 @@
 // pendule, et le demi de mêlée en sentinelle derrière la ligne. C'est EUX qui
 // couvrent le jeu au pied — sans ce rideau, la moindre chandelle valait un essai.
 
-import type { Pion } from './entites';
-import { PHASES_ARRETEES, type EtatMatch, type SystemeDefensif } from './etat';
+import type { Pion } from './entites.js';
+import { PHASES_ARRETEES, type EtatMatch, type SystemeDefensif } from './etat.js';
 import {
   AXE, LARGEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, distance, distance2,
   ligneDefendue, melanger, metresAvantLaLigne, sens, type Cote, type Vec,
-} from './terrain';
+} from './terrain.js';
 
 // ---------------------------------------------------------------------------
 // Utilitaires partagés

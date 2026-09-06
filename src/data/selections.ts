@@ -3,10 +3,10 @@
 // ajoutées dans `sources/competitions/ligues/`, puis on en déduit la liste
 // dédoublonnée des sélections, séniors et U20.
 
-import { COMPETITIONS_NATIONS } from './mondeReel';
-import { COMPETITIONS_NATIONS_NOUVELLES } from './nouvellesLigues';
-import { CLASSEMENT_WORLD_RUGBY_INITIAL } from './classementWorldRugby';
-import { nomNation } from '../lib/nations';
+import { COMPETITIONS_NATIONS } from './mondeReel.js';
+import { COMPETITIONS_NATIONS_NOUVELLES } from './nouvellesLigues.js';
+import { CLASSEMENT_WORLD_RUGBY_INITIAL } from './classementWorldRugby.js';
+import { nomNation } from '../lib/nations.js';
 
 export interface Selection {
   nom: string;

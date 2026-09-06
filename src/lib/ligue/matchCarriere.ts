@@ -47,14 +47,14 @@
 import {
   appliquerTactiqueEquipe, avancer, bilan, choisirPenalite, creerMatch,
   demanderRemplacement, infoPenalite,
-} from '../moteur/moteur';
-import type { EtatMatch } from '../moteur/etat';
-import type { Cote } from '../moteur/terrain';
-import { scorePossible } from '../championnat';
-import { feuilleDepuisComposition } from '../compositionManager';
-import type { CompositionManager, PosteId, TactiqueManager } from '../../types';
-import type { Coequipier } from '../effectif';
-import { graine } from './aleatoire';
+} from '../moteur/moteur.js';
+import type { EtatMatch } from '../moteur/etat.js';
+import type { Cote } from '../moteur/terrain.js';
+import { scorePossible } from '../championnat.js';
+import { feuilleDepuisComposition } from '../compositionManager.js';
+import type { CompositionManager, PosteId, TactiqueManager } from '../../types.js';
+import type { Coequipier } from '../effectif.js';
+import { graine } from './aleatoire.js';
 
 /** Les deux camps, nommés comme la rencontre les nomme. */
 export type CoteEnLigne = 'domicile' | 'exterieur';

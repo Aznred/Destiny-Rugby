@@ -11,9 +11,9 @@
 // Le POTENTIEL lui-même bouge : une saison énorme chez un jeune relève son
 // plafond, une saison ratée le rabote. Rien n'est écrit d'avance.
 
-import type { Attributs, Joueur, PosteId } from '../types';
-import { POSTE_PAR_ID } from '../data/rugby';
-import { effetsTraits } from '../data/traits';
+import type { Attributs, Joueur, PosteId } from '../types.js';
+import { POSTE_PAR_ID } from '../data/rugby.js';
+import { effetsTraits } from '../data/traits.js';
 
 const ATTRS: (keyof Attributs)[] = [
   'vitesse', 'force', 'endurance', 'plaquage',

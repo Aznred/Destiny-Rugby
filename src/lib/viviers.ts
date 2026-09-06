@@ -21,13 +21,13 @@
 // mémoïsés. C'est aussi ce qui interdit de rouvrir sa sauvegarde jusqu'à
 // tomber sur la bonne pépite.
 
-import { COMPETITIONS, NOTE_PAR_NIVEAU, competitionDuClub } from '../data/clubs';
-import { distanceKm, positionDuClub, region } from '../data/geographie';
-import type { PositionClub } from '../data/geographie';
-import { effectifDuClub, noteAmateur } from './effectif';
-import { graine } from './championnat';
-import { AGE_MAX_JEUNE, AGE_MIN_JEUNE, fabriquerJeune } from './jeunes';
-import type { JeuneJoueur } from './jeunes';
+import { COMPETITIONS, NOTE_PAR_NIVEAU, competitionDuClub } from '../data/clubs.js';
+import { distanceKm, positionDuClub, region } from '../data/geographie.js';
+import type { PositionClub } from '../data/geographie.js';
+import { effectifDuClub, noteAmateur } from './effectif.js';
+import { graine } from './championnat.js';
+import { AGE_MAX_JEUNE, AGE_MIN_JEUNE, fabriquerJeune } from './jeunes.js';
+import type { JeuneJoueur } from './jeunes.js';
 
 /**
  * COMBIEN DE JEUNES SORTENT DE CE CLUB CHAQUE ANNÉE.

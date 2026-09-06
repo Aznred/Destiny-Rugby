@@ -17,13 +17,13 @@
 // signerait à coup sûr, et améliorer le service ne changerait que le nombre de
 // lignes. Ici, monter de niveau, c'est cesser de parier.
 
-import { COMPETITIONS, competitionDuClub } from '../data/clubs';
-import { graine } from './championnat';
-import { effectifDuClub } from './effectif';
+import { COMPETITIONS, competitionDuClub } from '../data/clubs.js';
+import { graine } from './championnat.js';
+import { effectifDuClub } from './effectif.js';
 import {
   CLUBS_OBSERVES, INCERTITUDE_RECRUTEURS, NIVEAU_INSTALLATION_MAX, PORTEE_RECRUTEURS, seuilInteret,
-} from './installations';
-import type { RapportRecruteur } from '../types';
+} from './installations.js';
+import type { RapportRecruteur } from '../types.js';
 
 /** L'âge au-delà duquel un « espoir » n'en est plus un. */
 const AGE_MAX_CIBLE = 23;

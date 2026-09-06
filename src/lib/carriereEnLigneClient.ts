@@ -1,4 +1,4 @@
-import type { CommandeCarriere, VueCarriereEnLigne } from './ligue/typesCarriere';
+import type { CommandeCarriere, VueCarriereEnLigne } from './ligue/typesCarriere.js';
 
 export interface CompteCarriere { id: string; pseudo: string; identifiant?: string }
 export interface SessionCarriere {

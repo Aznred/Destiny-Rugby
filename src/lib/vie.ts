@@ -17,11 +17,11 @@
 // Seule limite tenue : pas d'insulte discriminatoire (racisme, homophobie…),
 // on reste dans la vanne de vestiaire et le clash sportif.
 
-import type { CompteSuivi, Joueur, PostSocial } from '../types';
-import { libelleDate, semaine, type Semaine } from '../data/calendrier';
-import { graine } from './championnat';
-import { competitionDuClub } from '../data/clubs';
-import { audienceDe, statsDePost, statsDepuisVues } from './social';
+import type { CompteSuivi, Joueur, PostSocial } from '../types.js';
+import { libelleDate, semaine, type Semaine } from '../data/calendrier.js';
+import { graine } from './championnat.js';
+import { competitionDuClub } from '../data/clubs.js';
+import { audienceDe, statsDePost, statsDepuisVues } from './social.js';
 
 // Relation avec un compte : −100 (ennemi juré) à +100 (ami proche).
 export const RELATION_NEUTRE = 0;

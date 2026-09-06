@@ -39,7 +39,7 @@
 // le bonus sur `forceEffectif` seul aurait donné un club qui gagne 82 avec un
 // effectif affiché à 75 : deux vérités, et le joueur a raison de ne pas y croire.
 
-import { graine } from './championnat';
+import { graine } from './championnat.js';
 
 export interface Generation {
   /** Ce qui s'ajoute à la note de CHAQUE joueur du club cette saison. */

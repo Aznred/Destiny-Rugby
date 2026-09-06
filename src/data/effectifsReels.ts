@@ -17,7 +17,7 @@
 // « deuxieme_ligne »…). `PosteId`, ce sont les quinze maillots numérotés — le
 // générateur écrivait donc un type que les valeurs ne respectaient pas, et le
 // fichier généré ne compilait plus tant qu'on ne le rectifiait pas à la main.
-import type { FamillePoste } from '../types';
+import type { FamillePoste } from '../types.js';
 
 export interface JoueurReel {
   nom: string;

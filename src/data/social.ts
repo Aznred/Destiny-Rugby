@@ -9,7 +9,7 @@
 // La mécanique (qui répond, combien d'abonnés, quelle sanction) est dans
 // `src/lib/social.ts`.
 
-import type { StatVariable } from '../types';
+import type { StatVariable } from '../types.js';
 
 // --- Comptes qui peuplent la timeline -------------------------------------
 

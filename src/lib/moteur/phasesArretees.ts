@@ -14,8 +14,8 @@
 // l'équipe qui ne lançait pas : ses trois-quarts se retrouvaient DERRIÈRE
 // l'attaque, et toute la défense était traversée dès la première passe.
 
-import type { Pion } from './entites';
-import { AXE, LARGEUR, LONGUEUR, MILIEU, borner, sens, type Cote, type Vec } from './terrain';
+import type { Pion } from './entites.js';
+import { AXE, LARGEUR, LONGUEUR, MILIEU, borner, sens, type Cote, type Vec } from './terrain.js';
 
 export type Placement = Record<string, Vec>;
 

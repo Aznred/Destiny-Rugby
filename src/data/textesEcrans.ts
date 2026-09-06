@@ -11,7 +11,7 @@
 // Mêmes règles que le dictionnaire principal : clés `zone.element`, français
 // obligatoire, les six autres langues facultatives (repli sur le français).
 
-import type { Traduction } from '../lib/i18n';
+import type { Traduction } from '../lib/i18n.js';
 
 export const TEXTES_ECRANS: Record<string, Traduction> = {
   // --- ÉCRAN PROFIL ---------------------------------------------------------

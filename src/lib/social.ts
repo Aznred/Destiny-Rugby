@@ -12,26 +12,26 @@
 // Tout est déterministe à partir d'une graine (id du post) : rouvrir la
 // timeline ne rejoue pas les réactions.
 
-import type { CompteSuivi, Joueur, PostSocial } from '../types';
+import type { CompteSuivi, Joueur, PostSocial } from '../types.js';
 import {
   AMBIANCE, COMPTES, MOTS_INTERDITS, REPONSES_NEGATIVES, REPONSES_POSITIVES,
   TON_PAR_ID, type Compte, type TypeCompte,
-} from '../data/social';
+} from '../data/social.js';
 import {
   ambiancesSocialesTraduites, reponsesSocialesTraduites, sanctionEmbrouilleSociale,
-} from '../data/socialLocalise';
+} from '../data/socialLocalise.js';
 import {
   evaluerEmbrouilleSociale, type SanctionSociale,
-} from './disciplineSociale';
-import { graine } from './championnat';
-import { libelleDate, semaine } from '../data/calendrier';
-import { effetsTraits } from '../data/traits';
-import { nomDivision } from './promotion';
-import { POSTE_PAR_ID } from '../data/rugby';
-import { nomNation, nomNationTraduit } from './nations';
-import { avatarPourCompte } from './avatars';
-import { annuaire } from './comptes';
-import { t } from './i18n';
+} from './disciplineSociale.js';
+import { graine } from './championnat.js';
+import { libelleDate, semaine } from '../data/calendrier.js';
+import { effetsTraits } from '../data/traits.js';
+import { nomDivision } from './promotion.js';
+import { POSTE_PAR_ID } from '../data/rugby.js';
+import { nomNation, nomNationTraduit } from './nations.js';
+import { avatarPourCompte } from './avatars.js';
+import { annuaire } from './comptes.js';
+import { t } from './i18n.js';
 
 export const LIMITE_CARACTERES = 280;
 

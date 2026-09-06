@@ -18,17 +18,17 @@
 // surpaie, et une contre-offre absurde ferme la porte au lieu de faire monter
 // l'offre de 10 000 € de plus.
 
-import { COMPETITIONS, competitionDuClub } from '../data/clubs';
-import { graine } from './championnat';
-import { pseudoStable } from './comptes';
-import { effectifDuClub } from './effectif';
-import { budgetsDuClub, estAmateurNiveau } from './recrutementManager';
-import { valeurDeVente } from './vestiaireManager';
+import { COMPETITIONS, competitionDuClub } from '../data/clubs.js';
+import { graine } from './championnat.js';
+import { pseudoStable } from './comptes.js';
+import { effectifDuClub } from './effectif.js';
+import { budgetsDuClub, estAmateurNiveau } from './recrutementManager.js';
+import { valeurDeVente } from './vestiaireManager.js';
 import type {
   ApprocheClubManager, LevierApprocheManager, Manager, ReponseApprocheManager,
-} from '../types';
-import type { ProfilMedicalJoueur, ProfilVestiaire, ContratJoueurAvance } from './carriereAvancee';
-import type { Coequipier } from './effectif';
+} from '../types.js';
+import type { ProfilMedicalJoueur, ProfilVestiaire, ContratJoueurAvance } from './carriereAvancee.js';
+import type { Coequipier } from './effectif.js';
 
 function arrondir(v: number, pas: number): number {
   return Math.max(0, Math.round(v / pas) * pas);

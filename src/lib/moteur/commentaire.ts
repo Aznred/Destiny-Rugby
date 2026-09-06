@@ -4,11 +4,11 @@
 // variables sont substituées AVANT le tirage des alternatives : un `{nom}`
 // niché dans une alternative casserait la reconnaissance.
 
-import { langueCourante } from '../i18n';
+import { langueCourante } from '../i18n.js';
 import {
   COMMENTAIRES_DIRECTS, POOLS_COMMENTAIRES,
   type CleCommentaireDirect, type IdPoolCommentaire,
-} from '../../data/commentairesMatch';
+} from '../../data/commentairesMatch.js';
 
 export type Variables = Record<string, string | number>;
 

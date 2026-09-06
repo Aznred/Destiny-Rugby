@@ -23,7 +23,7 @@
 // sous sa valeur, c'est une bonne affaire ; vendu 98 % en dessous, c'est un
 // cadeau déguisé.
 
-import type { CarteJoueur, ModeEquite } from './types';
+import type { CarteJoueur, ModeEquite } from './types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LE BARÈME

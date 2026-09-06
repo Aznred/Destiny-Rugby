@@ -44,11 +44,11 @@
 //    `moments.ts`, il lit l'état et propose ; le déterminisme du moteur est
 //    intact, et deux joueurs qui font les mêmes choix vivent le même match.
 
-import { ACTION_PAR_ID, actionsDisponibles } from './controle';
-import { enjeuDe } from './moteur';
-import type { ActionJoueur, EtatMatch } from './etat';
-import type { Pion } from './entites';
-import { momentDuJoueur, type TypeMoment } from './moments';
+import { ACTION_PAR_ID, actionsDisponibles } from './controle.js';
+import { enjeuDe } from './moteur.js';
+import type { ActionJoueur, EtatMatch } from './etat.js';
+import type { Pion } from './entites.js';
+import { momentDuJoueur, type TypeMoment } from './moments.js';
 
 /**
  * ⚠️ DIX SECONDES, EN TEMPS RÉEL, PENDANT QUE LE JEU EST FIGÉ. C'est la demande

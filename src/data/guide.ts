@@ -24,7 +24,7 @@
 //     jamais assez tôt pour la deviner. Le guide l'EXPLIQUE d'emblée et coche
 //     ses étapes le jour venu.
 
-import type { Ecran, Joueur } from '../types';
+import type { Ecran, Joueur } from '../types.js';
 
 /** Ce que le guide a besoin de savoir de la partie pour cocher ses cases. */
 export interface ContexteGuide {

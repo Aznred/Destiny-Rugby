@@ -1,13 +1,13 @@
-import type { FamillePoste, JeuneForme, Joueur, PosteId, TransfertAnnonce } from '../types';
-import { POSTE_PAR_ID, posteDepuisFamille } from '../data/rugby';
-import { COMPETITIONS, competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs';
-import { EFFECTIFS_REELS, NOTE_CLUB_REEL } from '../data/effectifsReels';
-import { EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../data/amateurs';
+import type { FamillePoste, JeuneForme, Joueur, PosteId, TransfertAnnonce } from '../types.js';
+import { POSTE_PAR_ID, posteDepuisFamille } from '../data/rugby.js';
+import { COMPETITIONS, competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs.js';
+import { EFFECTIFS_REELS, NOTE_CLUB_REEL } from '../data/effectifsReels.js';
+import { EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../data/amateurs.js';
 import {
   effectifNouveau, NOTE_CLUB_NOUVEAU, type JoueurNouveau,
-} from '../data/nouvellesLigues';
-import { mercatoReel, type RecrueReelle } from './mercato';
-import { generationDuClub } from './generations';
+} from '../data/nouvellesLigues.js';
+import { mercatoReel, type RecrueReelle } from './mercato.js';
+import { generationDuClub } from './generations.js';
 
 // Génération DÉTERMINISTE de l'effectif d'un club : même club + même saison
 // => même équipe. Les joueurs vieillissent d'un an par saison ; passé leur âge

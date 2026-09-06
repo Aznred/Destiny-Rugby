@@ -36,7 +36,7 @@
 // récompensée jouée « à la maison » (un encart du jeu, avec son compte à
 // rebours) pour que la mécanique soit jouable et testable dès maintenant.
 
-import { t } from './i18n';
+import { t } from './i18n.js';
 
 /**
  * L'IDENTIFIANT ADSENSE DU SITE.

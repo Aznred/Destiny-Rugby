@@ -14,9 +14,9 @@
 // « de base » de la saison, pas en cascade sur les mercatos précédents — sinon
 // il faudrait rejouer toutes les saisons à chaque affichage.
 
-import type { FamillePoste } from '../types';
-import { MERCATO_REEL } from '../data/mercato';
-import { POSTES_AMATEURS } from '../data/amateurs';
+import type { FamillePoste } from '../types.js';
+import { MERCATO_REEL } from '../data/mercato.js';
+import { POSTES_AMATEURS } from '../data/amateurs.js';
 
 export interface RecrueReelle {
   nom: string;

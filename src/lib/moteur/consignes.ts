@@ -10,9 +10,9 @@
 //      « reste dans l'axe et attends le ballon dans la poche », que les
 //      mots-clés rateraient.
 
-import { appelIAJSON, type MessageIA } from '../groq';
-import { consigneDeLangue } from '../i18n';
-import type { ConsigneJoueur } from './etat';
+import { appelIAJSON, type MessageIA } from '../groq.js';
+import { consigneDeLangue } from '../i18n.js';
+import type { ConsigneJoueur } from './etat.js';
 
 export const CONSIGNE_NEUTRE: ConsigneJoueur = {
   profondeur: 0, largeur: 0, agressivite: 0.3, libelle: 'Jeu normal',

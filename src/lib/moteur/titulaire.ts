@@ -12,8 +12,8 @@
 // (`moteur/saison.ts`) : si les deux tiraient chacun de leur côté, le match
 // qu'on regarde et celui rejoué en fond ne donneraient pas la même feuille.
 
-import { graine } from '../championnat';
-import type { Joueur } from '../../types';
+import { graine } from '../championnat.js';
+import type { Joueur } from '../../types.js';
 
 // La confiance du staff et le niveau décident, de façon déterministe.
 export function estTitulaire(j: Joueur, cle: string): boolean {

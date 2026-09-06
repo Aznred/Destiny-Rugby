@@ -2,9 +2,9 @@
 import {
   classer, graine, scorePossible, resultatJoue,
   type LigneTableau, type MatchChampionnat,
-} from './championnat';
-import type { MatchFinal } from './phaseFinale';
-import { forceNation, jouerTestMatch, qualifiesCoupeDuMonde } from './international';
+} from './championnat.js';
+import type { MatchFinal } from './phaseFinale.js';
+import { forceNation, jouerTestMatch, qualifiesCoupeDuMonde } from './international.js';
 
 export const JOURNEES_POULES = 3;
 

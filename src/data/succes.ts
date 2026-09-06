@@ -22,8 +22,8 @@
 // de 12 à 15 saisons : **≈ 500 Ovas**, dont ~250 de succès, ~120 de défis,
 // ~60 de trophées et ~70 de saisons, situations et retraite.
 
-import type { Joueur, PostSocial, LegendeSauvegardee } from '../types';
-import { langueCourante } from '../lib/i18n';
+import type { Joueur, PostSocial, LegendeSauvegardee } from '../types.js';
+import { langueCourante } from '../lib/i18n.js';
 
 export interface ContexteSucces {
   joueur: Joueur;

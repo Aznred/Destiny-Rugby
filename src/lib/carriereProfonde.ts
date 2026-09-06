@@ -6,14 +6,14 @@
 // les liens, les réputations, les records et les choix politiques qui donnent
 // une couleur différente à deux sauvegardes de trente saisons.
 
-import { clubParNom, competitionDuClub } from '../data/clubs';
-import { distanceKm, positionDuClub } from '../data/geographie';
-import { POSTE_PAR_ID } from '../data/rugby';
-import type { Manager, PosteId, ResultatMatchManager, TactiqueManager } from '../types';
-import { graine } from './championnat';
-import type { Coequipier } from './effectif';
-import type { Identite } from './identiteClub';
-import { nomNation } from './nations';
+import { clubParNom, competitionDuClub } from '../data/clubs.js';
+import { distanceKm, positionDuClub } from '../data/geographie.js';
+import { POSTE_PAR_ID } from '../data/rugby.js';
+import type { Manager, PosteId, ResultatMatchManager, TactiqueManager } from '../types.js';
+import { graine } from './championnat.js';
+import type { Coequipier } from './effectif.js';
+import type { Identite } from './identiteClub.js';
+import { nomNation } from './nations.js';
 
 const borne = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 const moyenne = (nombres: number[]) => nombres.length

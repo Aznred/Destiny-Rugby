@@ -13,11 +13,11 @@
 // moral, la division, la notoriété, le contrat… On ne propose pas « premier
 // contrat pro » à un joueur de 33 ans, ni « la retraite approche » à un espoir.
 
-import type { ConsequenceDure, Joueur, StatVariable } from '../types';
-import type { Scenario } from './scenarios';
-import { t } from '../lib/i18n';
-import { SITUATIONS_SUPPLEMENTAIRES } from './situationsSupplementaires';
-import { SITUATIONS_ETENDUES } from './situationsEtendues';
+import type { ConsequenceDure, Joueur, StatVariable } from '../types.js';
+import type { Scenario } from './scenarios.js';
+import { t } from '../lib/i18n.js';
+import { SITUATIONS_SUPPLEMENTAIRES } from './situationsSupplementaires.js';
+import { SITUATIONS_ETENDUES } from './situationsEtendues.js';
 
 // Ce que peut déclencher un choix, en plus des stats. C'est LE point d'entrée
 // des évènements durs (voir `lib/consequences.ts`).

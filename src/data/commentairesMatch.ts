@@ -1,4 +1,4 @@
-import type { Langue } from '../lib/i18n';
+import type { Langue } from '../lib/i18n.js';
 
 export type IdPoolCommentaire =
   | 'essai' | 'precision' | 'transformation' | 'transformationRatee'

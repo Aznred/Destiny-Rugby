@@ -1,5 +1,5 @@
-import type { StatVariable } from '../types';
-import { t } from '../lib/i18n';
+import type { StatVariable } from '../types.js';
+import { t } from '../lib/i18n.js';
 
 // Évènements aléatoires jouables SANS IA : un pool crédible avec récit, bonus,
 // malus et récompense en Ovas. Le MJ IA reste dispo pour les actions libres.

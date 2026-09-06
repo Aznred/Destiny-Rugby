@@ -8,9 +8,9 @@
 // Les DÉFIS DE LA SEMAINE sont tirés au sort de façon déterministe : trois
 // objectifs par semaine de jeu, les mêmes tant que la semaine ne change pas.
 
-import { DEFIS, SUCCES, type ContexteSucces, type Defi, type Succes } from '../data/succes';
-import type { SuccesDebloques } from '../types';
-import { graine } from './championnat';
+import { DEFIS, SUCCES, type ContexteSucces, type Defi, type Succes } from '../data/succes.js';
+import type { SuccesDebloques } from '../types.js';
+import { graine } from './championnat.js';
 
 export function evaluerSucces(c: ContexteSucces, deja: SuccesDebloques): Succes[] {
   const nouveaux: Succes[] = [];

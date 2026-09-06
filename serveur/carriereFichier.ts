@@ -3,7 +3,7 @@
 // await entre la comparaison de version et le commit dans ce processus unique.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage';
+import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
 
 interface BaseLocale {
   comptes: CompteStocke[];

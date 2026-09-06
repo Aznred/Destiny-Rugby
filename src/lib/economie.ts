@@ -26,7 +26,7 @@
 // CONSTRUCTION, et aucun club ne peut plus doubler la division du dessus. La
 // force ne sert plus qu'à placer un club DANS la fourchette de son étage.
 
-import { NOTE_PAR_NIVEAU } from '../data/clubs';
+import { NOTE_PAR_NIVEAU } from '../data/clubs.js';
 
 /** Le dernier étage professionnel : au-delà, plus d'indemnité ni de salaire. */
 export const PRO_JUSQUA = 3;

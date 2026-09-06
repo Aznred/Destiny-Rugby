@@ -8,9 +8,9 @@
 // pivote pas sur place, il décrit une courbe ; un pilier met deux secondes à se
 // mettre en route. Le rendu n'a plus besoin d'aucune transition CSS.
 
-import type { Coequipier } from '../effectif';
-import type { PosteId } from '../../types';
-import { AXE, LARGEUR, LONGUEUR, borner, type Cote, type Vec } from './terrain';
+import type { Coequipier } from '../effectif.js';
+import type { PosteId } from '../../types.js';
+import { AXE, LARGEUR, LONGUEUR, borner, type Cote, type Vec } from './terrain.js';
 
 // ⚠️ LA FEUILLE DE MATCH COMPLÈTE, JOUEUR PAR JOUEUR (demande explicite : « je
 // veux que chaque joueur ait de vraies stats, pas des stats simulées ; pour les

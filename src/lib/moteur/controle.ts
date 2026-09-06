@@ -28,13 +28,13 @@
 // vérifie ce qui est possible, il pose l'intention ; le moteur la consomme au
 // bon endroit de sa boucle (contact, ruck, choix de combinaison).
 
-import { calmerLeJeu, frapper, monPion, provoquer } from './bagarre';
-import type { Pion } from './entites';
-import type { ActionJoueur, EtatMatch } from './etat';
-import { surLeTerrain } from './tactique';
+import { calmerLeJeu, frapper, monPion, provoquer } from './bagarre.js';
+import type { Pion } from './entites.js';
+import type { ActionJoueur, EtatMatch } from './etat.js';
+import { surLeTerrain } from './tactique.js';
 import {
   LARGEUR, LIGNE_A, LIGNE_B, adverse, dansSes22, dansSonCamp, distance2,
-} from './terrain';
+} from './terrain.js';
 
 export type FamilleAction = 'ballon' | 'attaque' | 'defense' | 'discipline';
 

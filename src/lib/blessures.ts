@@ -4,8 +4,8 @@
 // grand que la forme est basse, que le joueur enchaîne les minutes et qu'il
 // vieillit. Une blessure va de la semaine de repos à la fin de carrière.
 
-import type { Blessure, GraviteBlessure, Joueur } from '../types';
-import { langueCourante } from './i18n';
+import type { Blessure, GraviteBlessure, Joueur } from '../types.js';
+import { langueCourante } from './i18n.js';
 
 interface Modele {
   gravite: GraviteBlessure;

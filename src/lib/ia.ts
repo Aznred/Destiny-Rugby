@@ -12,19 +12,19 @@
 
 import type {
   ConsequenceDure, DecisionClub, EvenementHebdo, Joueur, StatVariable,
-} from '../types';
-import type { Scenario, ChoixScenario } from '../data/scenarios';
-import { SCENARIOS } from '../data/scenarios';
-import { interviewPour, type Interview } from '../data/interviews';
+} from '../types.js';
+import type { Scenario, ChoixScenario } from '../data/scenarios.js';
+import { SCENARIOS } from '../data/scenarios.js';
+import { interviewPour, type Interview } from '../data/interviews.js';
 import {
   fichePersonnage, lireConsequence, lireDecisionClub, nettoyerDeltas,
   niveauDuJoueur, plafonnerDeltas, ressembleATriche,
   PERSONNALITE_MJ, POUVOIRS_CARRIERE, STATS_AUTORISEES,
-} from './mj';
-import { consequenceAutorisee, niveauDeFaute } from './consequences';
-import { appelIAJSON } from './groq';
-import { consigneDeLangue, t } from './i18n';
-import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
+} from './mj.js';
+import { consequenceAutorisee, niveauDeFaute } from './consequences.js';
+import { appelIAJSON } from './groq.js';
+import { consigneDeLangue, t } from './i18n.js';
+import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby.js';
 
 // --------------------------------------------------------------------------
 // Pré-écrit → Scenario (le mode SANS CLÉ, qui doit rester complet)

@@ -14,8 +14,8 @@
 // quelques points en une saison, et vérifie qu'il faut une décennie pour
 // retourner un club.
 
-import { competitionDuClub } from '../data/clubs';
-import { graine } from './championnat';
+import { competitionDuClub } from '../data/clubs.js';
+import { graine } from './championnat.js';
 
 export type AxeIdentite =
   | 'formation' | 'offensif' | 'defensif' | 'joueursLocaux' | 'international'

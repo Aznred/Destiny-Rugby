@@ -23,7 +23,7 @@
 //    portefeuille OVA global. » Chaque nouvelle ligue repart de zéro pour tout
 //    le monde ; un vétéran de 500 heures n'arrive pas avec un trésor.
 
-import type { ReglagesLigue } from './types';
+import type { ReglagesLigue } from './types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LE BARÈME

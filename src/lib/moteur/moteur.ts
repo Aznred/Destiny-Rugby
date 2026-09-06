@@ -21,47 +21,47 @@
 // DT exacts. Le match suivi en direct (appels de 16 ms) et le même match rejoué
 // en fond (appels de 8 s) donnent donc rigoureusement le même résultat.
 
-import { graine, scorePossible } from '../championnat';
-import type { Coequipier } from '../effectif';
-import type { PosteId, TactiqueManager } from '../../types';
-import { POSTE_PAR_ID } from '../../data/rugby';
+import { graine, scorePossible } from '../championnat.js';
+import type { Coequipier } from '../effectif.js';
+import type { PosteId, TactiqueManager } from '../../types.js';
+import { POSTE_PAR_ID } from '../../data/rugby.js';
 import {
   ORDRE_MAILLOTS, creerPion, deplacer, stopper,
   type AttributsPion, type Pion, type StatsMatch,
-} from './entites';
+} from './entites.js';
 import {
   PHASES_ARRETEES, ajouterCommentaire, disciplineVide,
   type ActionJoueur, type ConsigneJoueur, type DisciplineMatch, type EtatMatch,
   type IntentionPied, type Lancement, type NiveauMatch, type OrdreBagarre,
   type Phase, type PlanDeScore, type TypeCommentaire,
-} from './etat';
+} from './etat.js';
 import {
   apresGesteIllegal, chauffer, donnerOrdre, frictions, irregularite, refroidir,
   resoudreBagarre, sanctionApresMatch, vieillirBulles,
-} from './bagarre';
+} from './bagarre.js';
 import {
   consommerIntention, demanderAction, intentionEst, intervalle, metresDeLaLigne,
   pressionDevant, receveurCote, receveurPour,
-} from './controle';
-import { POUSSEES, bonusElan, fondreElan, pousserElan } from './elan';
+} from './controle.js';
+import { POUSSEES, bonusElan, fondreElan, pousserElan } from './elan.js';
 import {
   choisirCoteOuvert, choisirSysteme, placerEquipes, plusProche, surLeTerrain,
   surnombreAuLarge, vitesseMontee, numero as maillot,
-} from './tactique';
+} from './tactique.js';
 import {
   placementCoupEnvoi, placementInitial, placementMelee, placementRenvoi22,
   placementRuck, placementTir, placementTouche,
-} from './phasesArretees';
-import { decomposer } from './plan';
-import * as C from './commentaire';
+} from './phasesArretees.js';
+import { decomposer } from './plan.js';
+import * as C from './commentaire.js';
 import {
   AXE, LARGEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
   dansLes22Adverses, dansSes22, dansSonCamp, distance, distance2, franchieLigne,
   horsDuTerrain, melanger, metresAvantLaLigne, sens, type Cote, type Vec,
-} from './terrain';
+} from './terrain.js';
 
-export type { EtatMatch, Commentaire } from './etat';
-export type { Pion } from './entites';
+export type { EtatMatch, Commentaire } from './etat.js';
+export type { Pion } from './entites.js';
 
 // Pas de simulation, en secondes. Exporté : l'affichage en a besoin pour
 // interpoler entre deux pas (voir `MatchLive.tsx`).

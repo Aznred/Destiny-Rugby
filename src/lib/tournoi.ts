@@ -17,9 +17,9 @@
 // Tout est déterministe (graine = division + saison + tour) : rien à
 // sauvegarder, et rouvrir l'écran ne rejoue pas le tournoi.
 
-import { poulesDe, type LigneTableau } from './championnat';
-import { phaseFinale, duel, type MatchFinal } from './phaseFinale';
-import { forceEffectif } from './effectif';
+import { poulesDe, type LigneTableau } from './championnat.js';
+import { phaseFinale, duel, type MatchFinal } from './phaseFinale.js';
+import { forceEffectif } from './effectif.js';
 
 export interface QualifieTournoi {
   club: string;

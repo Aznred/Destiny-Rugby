@@ -22,12 +22,12 @@
 // que le club a une belle réputation, ce qui est exactement ce que la demande
 // écarte.
 
-import { competitionDuClub } from '../data/clubs';
-import { graine } from './championnat';
-import { attraitDuCentre, notesDuCentre } from './centreFormation';
-import type { NotesCentre } from './centreFormation';
-import type { JeuneJoueur } from './jeunes';
-import type { InstallationsClub } from '../types';
+import { competitionDuClub } from '../data/clubs.js';
+import { graine } from './championnat.js';
+import { attraitDuCentre, notesDuCentre } from './centreFormation.js';
+import type { NotesCentre } from './centreFormation.js';
+import type { JeuneJoueur } from './jeunes.js';
+import type { InstallationsClub } from '../types.js';
 
 export interface OffreDeCentre {
   club: string;

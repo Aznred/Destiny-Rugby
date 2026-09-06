@@ -11,16 +11,16 @@
 // bouche-trous un peu plus souvent ne changerait rien à une carrière, et
 // l'améliorer ne se verrait nulle part.
 
-import { POSTES } from '../data/rugby';
-import { competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs';
-import { forceEffectif, plafondPepite } from './effectif';
-import { nomAleatoirePourNation } from './nomsJoueurs';
+import { POSTES } from '../data/rugby.js';
+import { competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs.js';
+import { forceEffectif, plafondPepite } from './effectif.js';
+import { nomAleatoirePourNation } from './nomsJoueurs.js';
 import {
   BONUS_POTENTIEL_CENTRE, CHANCE_PEPITE_CENTRE, CHANCE_UN_DE_PLUS,
   NIVEAU_INSTALLATION_MAX, PROMOTION_PAR_NIVEAU,
-} from './installations';
-import type { Coequipier } from './effectif';
-import type { JeuneForme } from '../types';
+} from './installations.js';
+import type { Coequipier } from './effectif.js';
+import type { JeuneForme } from '../types.js';
 
 /**
  * La promotion d'une saison.

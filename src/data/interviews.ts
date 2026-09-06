@@ -5,7 +5,7 @@
 // aussi (popularité). Les deux jauges existent vraiment — la confiance du coach
 // pèse sur ton temps de jeu, la popularité sur ta réputation et le marché.
 
-import type { StatVariable } from '../types';
+import type { StatVariable } from '../types.js';
 
 export interface TonInterview {
   texte: string;

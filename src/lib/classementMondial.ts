@@ -744,7 +744,7 @@ export const RECOMMANDATIONS_SERVEUR_LISTE = [
 // côté serveur. Si tu le copies dans une Edge Function, tu peux supprimer cette
 // section — le serveur reçoit une fiche déjà faite, il n'a qu'à la vérifier.
 
-import type { Joueur, LegendeSauvegardee, Manager } from '../types';
+import type { Joueur, LegendeSauvegardee, Manager } from '../types.js';
 
 function moyenne(valeurs: number[]): number {
   return Math.round(valeurs.reduce((a, b) => a + b, 0) / (valeurs.length || 1));

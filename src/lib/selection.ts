@@ -5,14 +5,14 @@
 // se joue pas au même niveau qu'une place chez les Belges — d'où les paliers
 // ci-dessous, calqués sur la hiérarchie mondiale.
 
-import type { Joueur } from '../types';
-import { nomNation } from './nations';
-import { EFFECTIFS_REELS } from '../data/effectifsReels';
-import { POSTE_PAR_ID } from '../data/rugby';
-import { noteALAge } from './effectif';
+import type { Joueur } from '../types.js';
+import { nomNation } from './nations.js';
+import { EFFECTIFS_REELS } from '../data/effectifsReels.js';
+import { POSTE_PAR_ID } from '../data/rugby.js';
+import { noteALAge } from './effectif.js';
 // ⚠️ `international.ts` n'importe PAS `selection.ts` : le sens unique est
 // vérifié, il n'y a pas de cycle. C'est lui qui sait écrire « Galles U20 ».
-import { equipeU20 } from './international';
+import { equipeU20 } from './international.js';
 
 // Niveau (générale + réputation) exigé pour être appelé, par nation.
 const NIVEAU_EXIGE: Record<string, number> = {

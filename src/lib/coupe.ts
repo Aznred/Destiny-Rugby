@@ -44,14 +44,14 @@
 // Tout reste DÉTERMINISTE (graine = coupe + saison) : rien à sauvegarder,
 // rouvrir l'écran ne rejoue rien.
 
-import { COUPES_EUROPE } from '../data/mondeReel';
-import { forceEffectif } from './effectif';
-import { clubsDeDivision, etaitDansLaDivision} from './divisions';
+import { COUPES_EUROPE } from '../data/mondeReel.js';
+import { forceEffectif } from './effectif.js';
+import { clubsDeDivision, etaitDansLaDivision} from './divisions.js';
 import {
   championnatEnDirect, classer, graine, jouerRencontre,
   type LigneTableau, type MatchChampionnat,
-} from './championnat';
-import { duel, type MatchFinal } from './phaseFinale';
+} from './championnat.js';
+import { duel, type MatchFinal } from './phaseFinale.js';
 
 export interface PouleCoupe {
   nom: string;

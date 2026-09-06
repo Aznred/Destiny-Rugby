@@ -19,9 +19,9 @@
 // recalculer à la volée reviendrait à l'oublier à chaque rechargement, donc à
 // supprimer la mécanique.
 
-import type { PosteId } from '../types';
-import { familleDe } from './jeunes';
-import type { SecteurCohesion } from './entrainementPro';
+import type { PosteId } from '../types.js';
+import { familleDe } from './jeunes.js';
+import type { SecteurCohesion } from './entrainementPro.js';
 
 export const SECTEURS_COHESION: SecteurCohesion[] = [
   'melee', 'touche', 'ligneArriere', 'defense', 'attaque',

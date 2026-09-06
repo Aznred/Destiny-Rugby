@@ -15,7 +15,7 @@
 // sans message. Sa carrière n'entrait jamais au classement (voir la migration
 // v3 de `serveur/schema-vercel.sql`). On ne recommence pas.
 
-import { graine } from './aleatoire';
+import { graine } from './aleatoire.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LE CODE D'INVITATION

@@ -20,9 +20,9 @@
 // (`lib/viviers.ts`), exactement comme les effectifs : rien à sauvegarder, et
 // il vieillit tout seul d'une saison à l'autre.
 
-import type { FamillePoste, PosteId } from '../types';
-import { POSTES, POSTES_PAR_FAMILLE } from '../data/rugby';
-import { graine } from './championnat';
+import type { FamillePoste, PosteId } from '../types.js';
+import { POSTES, POSTES_PAR_FAMILLE } from '../data/rugby.js';
+import { graine } from './championnat.js';
 
 /** L'âge auquel un jeune entre dans le vivier, et celui où il en sort. */
 export const AGE_MIN_JEUNE = 14;

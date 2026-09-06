@@ -1,6 +1,6 @@
-import type { FamillePoste, Poste, PosteId } from '../types';
-import { ZONES } from './nations';
-import { t } from '../lib/i18n';
+import type { FamillePoste, Poste, PosteId } from '../types.js';
+import { ZONES } from './nations.js';
+import { t } from '../lib/i18n.js';
 
 // LES 15 POSTES DU RUGBY, numérotés comme sur le maillot (1 à 15).
 // Chaque poste garde sa « famille » : c'est elle que les données réelles

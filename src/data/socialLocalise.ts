@@ -1,6 +1,6 @@
-import type { Ambiance } from './social';
-import { langueCourante, locale, type Langue } from '../lib/i18n';
-import type { SanctionSociale as SanctionEmbrouille } from '../lib/disciplineSociale';
+import type { Ambiance } from './social.js';
+import { langueCourante, locale, type Langue } from '../lib/i18n.js';
+import type { SanctionSociale as SanctionEmbrouille } from '../lib/disciplineSociale.js';
 
 type Reactions = { positifDebut: string[]; positifFin: string[]; negatifDebut: string[]; negatifFin: string[] };
 

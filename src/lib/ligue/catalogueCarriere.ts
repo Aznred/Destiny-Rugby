@@ -1,15 +1,15 @@
-import { EFFECTIFS_REELS } from '../../data/effectifsReels';
-import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/amateurs';
-import { PHOTO_JOUEUR } from '../../data/photosJoueurs';
-import { COMPETITIONS } from '../../data/clubs';
-import { LOGO_COMPETITION } from '../../data/logosCompetitions';
-import { LOGO_COMPETITION_NOUVEAU } from '../../data/nouvellesLigues';
-import { TROPHEES } from '../../data/trophees';
-import { posteDepuisFamille, POSTE_PAR_ID } from '../../data/rugby';
-import type { FamillePoste } from '../../types';
-import type { Coequipier } from '../effectif';
-import { graine, melanger } from './aleatoire';
-import type { CarteCarriere, FiltrePack, PackCarriere, RareteCarriere } from './typesCarriere';
+import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
+import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/amateurs.js';
+import { PHOTO_JOUEUR } from '../../data/photosJoueurs.js';
+import { COMPETITIONS } from '../../data/clubs.js';
+import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
+import { LOGO_COMPETITION_NOUVEAU } from '../../data/nouvellesLigues.js';
+import { TROPHEES } from '../../data/trophees.js';
+import { posteDepuisFamille, POSTE_PAR_ID } from '../../data/rugby.js';
+import type { FamillePoste } from '../../types.js';
+import type { Coequipier } from '../effectif.js';
+import { graine, melanger } from './aleatoire.js';
+import type { CarteCarriere, FiltrePack, PackCarriere, RareteCarriere } from './typesCarriere.js';
 
 export const RARETES_CARRIERE: RareteCarriere[] = ['bronze', 'argent', 'or', 'elite', 'star'];
 // ═══════════════════════════════════════════════════════════════════════════

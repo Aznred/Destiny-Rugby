@@ -1,4 +1,4 @@
-import type { Traduction } from '../lib/i18n';
+import type { Traduction } from '../lib/i18n.js';
 
 /** Textes auparavant écrits directement dans les composants et données. */
 export const TEXTES_SUPPLEMENTAIRES: Record<string, Traduction> = {

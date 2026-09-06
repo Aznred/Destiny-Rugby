@@ -1,4 +1,4 @@
-import type { StatVariable } from '../types';
+import type { StatVariable } from '../types.js';
 
 // Scénarios à choix jouables SANS clé IA : une situation, 2-3 options, chacune
 // avec son issue (récit + variations de stats + Ovas). Le MJ IA reste dispo en

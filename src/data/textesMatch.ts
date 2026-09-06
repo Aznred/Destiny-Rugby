@@ -1,4 +1,4 @@
-import type { Traduction } from '../lib/i18n';
+import type { Traduction } from '../lib/i18n.js';
 
 /** Libellés de la feuille et de l'état du moteur de match. */
 export const TEXTES_MATCH: Record<string, Traduction> = {

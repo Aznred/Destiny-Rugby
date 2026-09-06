@@ -14,9 +14,9 @@
 //     (`BUDGET_MATCHS_PAR_SAISON`) que rien ne contourne — sinon il suffirait
 //     de regarder tous ses matchs pour exploser le plafond de carrière.
 
-import type { Pion } from './entites';
-import type { AttributId, Joueur, PosteId, StatVariable } from '../../types';
-import { POSTE_PAR_ID } from '../../data/rugby';
+import type { Pion } from './entites.js';
+import type { AttributId, Joueur, PosteId, StatVariable } from '../../types.js';
+import { POSTE_PAR_ID } from '../../data/rugby.js';
 
 // ⚠️ TROIS POINTS PAR SAISON, PAS PLUS. C'est ~+0,4 de générale par saison, soit
 // environ +4 sur une carrière de douze saisons : de quoi sentir qu'un grand

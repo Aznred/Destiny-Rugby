@@ -29,9 +29,9 @@
 // changer la vitesse d'affichage ne change pas le match, seulement le nombre de
 // secondes réelles qu'il met à se jouer.
 
-import type { EtatMatch } from './etat';
-import type { Pion } from './entites';
-import { distance2 } from './terrain';
+import type { EtatMatch } from './etat.js';
+import type { Pion } from './entites.js';
+import { distance2 } from './terrain.js';
 
 /** Pourquoi le jeu vient de ralentir. */
 export type TypeMoment =

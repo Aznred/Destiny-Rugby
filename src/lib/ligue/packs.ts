@@ -33,10 +33,10 @@
 // journée la bande « rare » se tarit. Si ce chiffre te déplaît, le levier est
 // `PYRAMIDE` (vivier.ts) ou le prix ci-dessous — dans cet ordre.
 
-import type { FamillePoste } from '../../types';
-import type { CarteJoueur, Rarete } from './types';
-import { rangRarete, rareteDeLaNote } from './rarete';
-import { tirerPondere } from './aleatoire';
+import type { FamillePoste } from '../../types.js';
+import type { CarteJoueur, Rarete } from './types.js';
+import { rangRarete, rareteDeLaNote } from './rarete.js';
+import { tirerPondere } from './aleatoire.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LE CATALOGUE

@@ -12,7 +12,7 @@
 //
 // Déploiement de l'autre bout : `serveur/VERCEL.md`.
 
-import type { CategorieCarriere, FicheCarriere } from './classementMondial';
+import type { CategorieCarriere, FicheCarriere } from './classementMondial.js';
 
 /**
  * Une identité de ligne pour cette installation, tirée au hasard une fois.

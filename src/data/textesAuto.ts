@@ -16,7 +16,7 @@
 // source française/anglaise. Le vérificateur impose désormais une couverture
 // complète dans les sept langues avant livraison.
 
-import type { Langue } from '../lib/i18n';
+import type { Langue } from '../lib/i18n.js';
 
 export const TEXTES_AUTO: Record<string, Partial<Record<Langue, string>>> = {
   'ov.retirer': { es: 'Quitar', it: 'Rimuovi', de: 'Entfernen', pt: 'Remover', ja: '削除' },

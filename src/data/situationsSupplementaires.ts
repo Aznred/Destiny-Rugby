@@ -5,8 +5,8 @@
 // réponse modifie réellement la sauvegarde via les mêmes `IssueSituation` que
 // la base historique.
 
-import type { Joueur, StatVariable } from '../types';
-import type { IssueSituation, Situation } from './situations';
+import type { Joueur, StatVariable } from '../types.js';
+import type { IssueSituation, Situation } from './situations.js';
 
 type Cat = Situation['categorie'];
 type Deltas = Partial<Record<StatVariable, number>>;

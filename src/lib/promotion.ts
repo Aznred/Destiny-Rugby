@@ -15,11 +15,11 @@
 // `lib/divisions.ts` : dès la saison suivante, les poules, les classements et
 // l'écran Championnats tiennent compte des mouvements.
 
-import { COMPETITIONS } from '../data/clubs';
-import { clubsDeDivision } from './divisions';
-import { poulesDe } from './championnat';
-import { tournoiDeFinDAnnee } from './tournoi';
-import { phaseFinale, matchAcces, type PhaseFinale, type MatchFinal } from './phaseFinale';
+import { COMPETITIONS } from '../data/clubs.js';
+import { clubsDeDivision } from './divisions.js';
+import { poulesDe } from './championnat.js';
+import { tournoiDeFinDAnnee } from './tournoi.js';
+import { phaseFinale, matchAcces, type PhaseFinale, type MatchFinal } from './phaseFinale.js';
 
 export interface MouvementClub {
   club: string;

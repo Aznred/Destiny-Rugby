@@ -16,10 +16,10 @@
 // spectateur mais tu remplis moins », et un stade à moitié vide coûte aussi ses
 // buvettes et sa boutique.
 
-import { competitionDuClub } from '../data/clubs';
-import { graine } from './championnat';
-import { partQuiSeDeplace, total } from './supporters';
-import type { Fanbase } from './supporters';
+import { competitionDuClub } from '../data/clubs.js';
+import { graine } from './championnat.js';
+import { partQuiSeDeplace, total } from './supporters.js';
+import type { Fanbase } from './supporters.js';
 
 export type Tribune = 'populaire' | 'laterale' | 'centrale' | 'vip';
 export const TRIBUNES: Tribune[] = ['populaire', 'laterale', 'centrale', 'vip'];

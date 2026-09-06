@@ -2,8 +2,8 @@
 // Portraits officiels locaux en priorité ; portrait stable du catalogue sinon.
 // Les initiales servent de repli local, les clubs gardent leur écusson.
 
-import { graine } from './championnat';
-import { PHOTO_JOUEUR } from '../data/photosJoueurs';
+import { graine } from './championnat.js';
+import { PHOTO_JOUEUR } from '../data/photosJoueurs.js';
 
 
 // Prénoms féminins courants — les données amateurs mélangent les sections d'un

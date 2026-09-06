@@ -2,31 +2,31 @@
 // intégrer. Les nombres cachés restent dans ce module et ne sont jamais rendus
 // directement par l'écran manager.
 
-import { COMPETITIONS, competitionDuClub } from '../data/clubs';
-import { POSTES_PAR_FAMILLE } from '../data/rugby';
+import { COMPETITIONS, competitionDuClub } from '../data/clubs.js';
+import { POSTES_PAR_FAMILLE } from '../data/rugby.js';
 import type {
   AcademicienManager, ActionAcademieManager, Manager, ObjectifJeuneManager,
   ObservationJeuneManager,
   PosteId,
-} from '../types';
-import { graine } from './championnat';
+} from '../types.js';
+import { graine } from './championnat.js';
 import {
   centresQuiObservent, etageDeDetection, notesDeBase, notesDuCentre,
   noteGlobaleCentre, rayonDeDetection, risqueCorrige,
-} from './centreFormation';
-import type { NotesCentre } from './centreFormation';
+} from './centreFormation.js';
+import type { NotesCentre } from './centreFormation.js';
 import {
   deplacementsParSaison, ficheDe, rapportDeSaison,
-} from './detection';
-import type { FicheDetection } from './detection';
-import { effectifDuClub, forceEffectif } from './effectif';
-import { NIVEAU_INSTALLATION_MAX, installationsVierges } from './installations';
-import { familleDe, progresser } from './jeunes';
+} from './detection.js';
+import type { FicheDetection } from './detection.js';
+import { effectifDuClub, forceEffectif } from './effectif.js';
+import { NIVEAU_INSTALLATION_MAX, installationsVierges } from './installations.js';
+import { familleDe, progresser } from './jeunes.js';
 import {
   choisirSonClub, indemniteDeFormation, offreDe, rayonAcceptable,
-} from './signatureJeune';
-import { jeunesAPortee, jeunesInternationaux } from './viviers';
-import type { JeuneRepere } from './viviers';
+} from './signatureJeune.js';
+import { jeunesAPortee, jeunesInternationaux } from './viviers.js';
+import type { JeuneRepere } from './viviers.js';
 
 export const OBJECTIFS_JEUNES: { id: ObjectifJeuneManager; nom: string; effet: string }[] = [
   { id: 'prise_masse', nom: 'Prise de masse', effet: 'physique et gabarit' },

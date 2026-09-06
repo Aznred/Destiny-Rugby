@@ -12,10 +12,10 @@
 // Tout est déterministe (graine = division + saison + tour + équipes) : rouvrir
 // l'écran ne rejoue pas les matchs, et rien n'a besoin d'être sauvegardé.
 
-import { championnatEnDirect, graine, resultatJoue, scorePossible, type LigneTableau } from './championnat';
-import { forceEffectif } from './effectif';
-import { semaine } from '../data/calendrier';
-import type { Joueur } from '../types';
+import { championnatEnDirect, graine, resultatJoue, scorePossible, type LigneTableau } from './championnat.js';
+import { forceEffectif } from './effectif.js';
+import { semaine } from '../data/calendrier.js';
+import type { Joueur } from '../types.js';
 
 /**
  * ⚠️ `huitieme` ET `petiteFinale` NE SERVENT QU'À LA COUPE DU MONDE

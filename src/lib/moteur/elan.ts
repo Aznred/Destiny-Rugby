@@ -26,8 +26,8 @@
 //    l'équipe jusqu'à la sirène. La demi-vie est courte — une possession, deux
 //    au plus.
 
-import type { EtatMatch } from './etat';
-import type { Cote } from './terrain';
+import type { EtatMatch } from './etat.js';
+import type { Cote } from './terrain.js';
 
 /**
  * Ce que chaque évènement pousse, du point de vue de celui à qui ça arrive.

@@ -38,13 +38,13 @@
 // exceptionnelle pour l'emporter. Mesuré par `scripts/verifHonneurs.ts` :
 // une saison correcte (6/10) n'en rapporte AUCUNE.
 
-import type { PosteId, StatsDetaillees } from '../types';
-import { graine } from './championnat';
-import { PROFILS } from './statsJoueurs';
+import type { PosteId, StatsDetaillees } from '../types.js';
+import { graine } from './championnat.js';
+import { PROFILS } from './statsJoueurs.js';
 import {
   HONNEUR_CHAMPIONS_CUP, HONNEUR_FINALE_MONDE, HONNEUR_MONDIAL, HONNEUR_PAR_INTERNATIONAL,
   MEILLEUR_JOUEUR_PAR_DIVISION, TROPHEES,
-} from '../data/trophees';
+} from '../data/trophees.js';
 
 /** La saison écoulée, vue par le jury. Tout ce dont on a besoin, et rien de plus. */
 export interface SaisonJugee {

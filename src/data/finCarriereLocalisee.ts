@@ -1,5 +1,5 @@
-import type { FinCarriere, LegendeSauvegardee, MotifFinCarriere } from '../types';
-import { langueCourante, type Langue } from '../lib/i18n';
+import type { FinCarriere, LegendeSauvegardee, MotifFinCarriere } from '../types.js';
+import { langueCourante, type Langue } from '../lib/i18n.js';
 
 interface LibellesFinCarriere {
   eyebrow: string;

@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere';
+import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 
 export interface CompteStocke { id: string; identifiant: string; pseudo: string; empreinte: string }
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne }

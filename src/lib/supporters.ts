@@ -17,9 +17,9 @@
 // deuxième écriture de la division — et la sensation d'avoir CONSTRUIT le club
 // disparaîtrait, puisque tout serait acquis à la montée.
 
-import { competitionDuClub } from '../data/clubs';
-import { graine } from './championnat';
-import { forceEffectif } from './effectif';
+import { competitionDuClub } from '../data/clubs.js';
+import { graine } from './championnat.js';
+import { forceEffectif } from './effectif.js';
 
 export interface Fanbase {
   /** Ceux qui viennent quoi qu'il arrive. Ils ne partent presque jamais. */

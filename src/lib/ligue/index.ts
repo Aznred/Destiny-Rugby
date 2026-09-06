@@ -16,14 +16,14 @@
 // (`src/data/effectifsReels.ts`), et il ne les lit qu'à la CRÉATION d'une
 // ligue. Ensuite, la base est la vérité.
 
-export * from './types';
-export * from './aleatoire';
-export * from './rarete';
-export * from './identite';
-export * from './reglages';
-export * from './vivier';
-export * from './dotation';
-export * from './valeur';
-export * from './packs';
-export * from './ova';
-export * from './calendrier';
+export * from './types.js';
+export * from './aleatoire.js';
+export * from './rarete.js';
+export * from './identite.js';
+export * from './reglages.js';
+export * from './vivier.js';
+export * from './dotation.js';
+export * from './valeur.js';
+export * from './packs.js';
+export * from './ova.js';
+export * from './calendrier.js';

@@ -26,9 +26,9 @@
  * Japon 963, Géorgie 461, Portugal 325…).
  */
 
-import { EFFECTIFS_REELS } from '../data/effectifsReels';
-import { CLUBS_NOUVEAUX, effectifNouveau } from '../data/nouvellesLigues';
-import { NATIONS_PAR_ZONE } from '../data/rugby';
+import { EFFECTIFS_REELS } from '../data/effectifsReels.js';
+import { CLUBS_NOUVEAUX, effectifNouveau } from '../data/nouvellesLigues.js';
+import { NATIONS_PAR_ZONE } from '../data/rugby.js';
 
 /**
  * Combien de prénoms on cherche avant de s'arrêter.

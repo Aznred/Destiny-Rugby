@@ -10,7 +10,7 @@
 // bissextiles ni les décalages réels d'un exercice à l'autre — le but est de
 // donner un fil crédible, pas un almanach.
 
-import { locale, t } from '../lib/i18n';
+import { locale, t } from '../lib/i18n.js';
 
 export type TypeSemaine =
   | 'championnat'

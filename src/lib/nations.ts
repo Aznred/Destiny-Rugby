@@ -1,5 +1,5 @@
-import { CODE_PAR_NATION } from '../data/nations';
-import { langueCourante } from './i18n';
+import { CODE_PAR_NATION } from '../data/nations.js';
+import { langueCourante } from './i18n.js';
 
 const CODES: Record<string, string> = {
   ...CODE_PAR_NATION,

@@ -11,10 +11,10 @@
 
 import type {
   ActionClub, ConsequenceDure, DecisionClub, Joueur, ReponseMJ,
-} from '../types';
-import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby';
-import { consigneDeLangue, t } from './i18n';
-import { appelIAJSON, erreurSilencieuse } from './groq';
+} from '../types.js';
+import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby.js';
+import { consigneDeLangue, t } from './i18n.js';
+import { appelIAJSON, erreurSilencieuse } from './groq.js';
 
 // ⚠️ COMPACTÉE (économie de tokens). Une fiche sur neuf lignes, renvoyée à
 // CHAQUE action, pour une information qui tient en trois. Les titres sont

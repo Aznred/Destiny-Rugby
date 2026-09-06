@@ -33,7 +33,7 @@
 // Tous les types marqués « côté serveur » décrivent ce que la base garde. Le
 // client en reçoit des projections, jamais le droit de les écrire.
 
-import type { FamillePoste } from '../../types';
+import type { FamillePoste } from '../../types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LES IDENTIFIANTS

@@ -8,15 +8,15 @@
 // Rien n'est stocké : tout est DÉTERMINISTE (nom du club, nom du joueur), donc
 // deux ouvertures de l'écran donnent exactement les mêmes comptes.
 
-import type { CompteSuivi, Joueur } from '../types';
-import { COMPETITIONS, competitionDuClub } from '../data/clubs';
-import { COUPES_EUROPE } from '../data/mondeReel';
-import { effectifDuClub } from './effectif';
-import { nomPoste } from '../data/rugby';
-import { langueCourante, t } from './i18n';
-import { COMPTES } from '../data/social';
-import { graine } from './championnat';
-import { avatarPourCompte, comptesLambda } from './avatars';
+import type { CompteSuivi, Joueur } from '../types.js';
+import { COMPETITIONS, competitionDuClub } from '../data/clubs.js';
+import { COUPES_EUROPE } from '../data/mondeReel.js';
+import { effectifDuClub } from './effectif.js';
+import { nomPoste } from '../data/rugby.js';
+import { langueCourante, t } from './i18n.js';
+import { COMPTES } from '../data/social.js';
+import { graine } from './championnat.js';
+import { avatarPourCompte, comptesLambda } from './avatars.js';
 
 // Bannières possibles — choisies de façon déterministe. ⚠️ Elles étaient six :
 // une bannière sur six comptes était identique à la précédente. Vingt motifs,

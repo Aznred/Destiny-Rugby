@@ -13,7 +13,7 @@
 // suite d'un choix explicite du joueur (prendre le volant ivre, frapper
 // quelqu'un, publier une insanité). Le jeu ne punit pas au hasard.
 
-import type { ActionClub, Blessure, ConsequenceDure, Joueur } from '../types';
+import type { ActionClub, Blessure, ConsequenceDure, Joueur } from '../types.js';
 
 export interface EffetDur {
   joueur: Joueur;

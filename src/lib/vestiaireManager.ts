@@ -10,14 +10,14 @@
 // négociation qui se modifie en place ne redessinerait rien à l'écran. C'est la
 // même règle que `lib/negociation.ts` du côté joueur.
 
-import { competitionDuClub, COMPETITIONS } from '../data/clubs';
-import { graine } from './championnat';
-import { pseudoStable } from './comptes';
-import { estAmateurNiveau, forceDuGroupe, saisonsDeContrat, valeurMarchande } from './recrutementManager';
+import { competitionDuClub, COMPETITIONS } from '../data/clubs.js';
+import { graine } from './championnat.js';
+import { pseudoStable } from './comptes.js';
+import { estAmateurNiveau, forceDuGroupe, saisonsDeContrat, valeurMarchande } from './recrutementManager.js';
 import type {
   CibleRecrutementManager, DemandeJoueur, Manager, NegociationClubManager, OffreVente, VenteManager,
-} from '../types';
-import type { Coequipier } from './effectif';
+} from '../types.js';
+import type { Coequipier } from './effectif.js';
 
 function arrondir(v: number, pas: number): number {
   return Math.max(0, Math.round(v / pas) * pas);

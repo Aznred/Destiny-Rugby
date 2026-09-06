@@ -1,9 +1,9 @@
-import type { Manager } from '../types';
+import type { Manager } from '../types.js';
 import {
   championnatEnDirect, journeesALaSemaine, nombreJournees, resultatJoue,
   type EtatChampionnat,
-} from './championnat';
-import { matchDuClubSemaine, type CarriereDeClub } from './matchLive';
+} from './championnat.js';
+import { matchDuClubSemaine, type CarriereDeClub } from './matchLive.js';
 
 /**
  * COMBIEN DE JOURNÉES LE CLASSEMENT DOIT COMPTER, POUR UNE CARRIÈRE DONNÉE.

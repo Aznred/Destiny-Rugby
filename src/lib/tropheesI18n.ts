@@ -2,8 +2,8 @@
 // `api/classement.ts` charge `data/trophees.ts` dans Node sur Vercel : importer
 // i18n depuis ce module serveur ferait dépendre la fonction de toute l'interface.
 
-import { TROPHEES, type Trophee } from '../data/trophees';
-import { t } from './i18n';
+import { TROPHEES, type Trophee } from '../data/trophees.js';
+import { t } from './i18n.js';
 
 /** Nom pour les cartes et le palmarès ; les données source restent immuables. */
 export function nomTrophee(trophee: Trophee | undefined): string {

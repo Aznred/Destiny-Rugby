@@ -1,4 +1,4 @@
-import type { Traduction } from '../lib/i18n';
+import type { Traduction } from '../lib/i18n.js';
 
 const tr = (fr: string, en: string, es: string, it: string, de: string, pt: string, ja: string): Traduction => (
   { fr, en, es, it, de, pt, ja }

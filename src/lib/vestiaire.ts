@@ -4,9 +4,9 @@
 // des types avec qui ça ne passe pas, et parfois le brassard. Ces liens ne sont
 // pas décoratifs — ils modifient les notes de match et le moral.
 
-import type { Joueur, Relation } from '../types';
-import { effectifDuClub } from './effectif';
-import { effetsTraits } from '../data/traits';
+import type { Joueur, Relation } from '../types.js';
+import { effectifDuClub } from './effectif.js';
+import { effetsTraits } from '../data/traits.js';
 
 // PRNG déterministe (même graine = même vestiaire).
 function graine(s: string): () => number {

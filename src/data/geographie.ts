@@ -27,8 +27,8 @@
 // déménage pas parce qu'on relance le jeu, et rien n'a besoin d'être
 // sauvegardé — même règle que les effectifs et les championnats.
 
-import { graine } from '../lib/championnat';
-import { clubParNom } from './clubs';
+import { graine } from '../lib/championnat.js';
+import { clubParNom } from './clubs.js';
 
 export interface RegionRugby {
   id: string;

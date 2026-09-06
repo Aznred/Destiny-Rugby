@@ -9,8 +9,8 @@
 // composants : c'est la condition du rafraîchissement à chaud de React.)
 
 import { useMemo } from 'react';
-import { useGame } from '../store/useGame';
-import type { CategorieEquipement } from '../data/boutique';
+import { useGame } from '../store/useGame.js';
+import type { CategorieEquipement } from '../data/boutique.js';
 
 export interface TenueRugbyman {
   /** Couleurs par défaut quand rien n'est équipé : celles du club. */

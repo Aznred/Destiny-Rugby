@@ -14,9 +14,9 @@
 // de le réduire, aller chercher un naming ou la mairie — et parfois attendre un
 // an. C'est ça, diriger un club.
 
-import { graine } from './championnat';
-import { capacite } from './stade';
-import type { Stade } from './stade';
+import { graine } from './championnat.js';
+import { capacite } from './stade.js';
+import type { Stade } from './stade.js';
 
 export type Batiment =
   | 'stade' | 'terrain' | 'musculation' | 'medical' | 'formation'

@@ -7,9 +7,9 @@
 // des impacts déterministes. Il ne s'agit donc pas de doublons ajoutés sous des
 // noms différents, mais de 500 scènes réellement tirables par le moteur.
 
-import type { Langue, Traduction } from '../lib/i18n';
-import type { StatVariable } from '../types';
-import type { IssueSituation, Situation } from './situations';
+import type { Langue, Traduction } from '../lib/i18n.js';
+import type { StatVariable } from '../types.js';
+import type { IssueSituation, Situation } from './situations.js';
 
 type Localise = Record<Langue, string>;
 type Categorie = Situation['categorie'];

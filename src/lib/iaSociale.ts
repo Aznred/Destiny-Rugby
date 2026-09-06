@@ -14,18 +14,18 @@
 // joueurs non-humains, entre clubs existants, et jamais le joueur lui-même
 // (pour lui, ça passe par une offre de contrat, qui reste refusable).
 
-import type { CompteSuivi, Joueur, MessageDM, PostSocial } from '../types';
-import { appelIAJSON, type MessageIA } from './groq';
-import { POSTE_PAR_ID } from '../data/rugby';
-import { nomNation } from './nations';
-import { competitionDuClub } from '../data/clubs';
-import { effectifDuClub } from './effectif';
-import { libelleDate, semaine } from '../data/calendrier';
-import { imagePourRequete } from './images';
-import { audienceDe, statsDePost } from './social';
-import { graine } from './championnat';
-import { avatarPourCompte } from './avatars';
-import { consigneDeLangue } from './i18n';
+import type { CompteSuivi, Joueur, MessageDM, PostSocial } from '../types.js';
+import { appelIAJSON, type MessageIA } from './groq.js';
+import { POSTE_PAR_ID } from '../data/rugby.js';
+import { nomNation } from './nations.js';
+import { competitionDuClub } from '../data/clubs.js';
+import { effectifDuClub } from './effectif.js';
+import { libelleDate, semaine } from '../data/calendrier.js';
+import { imagePourRequete } from './images.js';
+import { audienceDe, statsDePost } from './social.js';
+import { graine } from './championnat.js';
+import { avatarPourCompte } from './avatars.js';
+import { consigneDeLangue } from './i18n.js';
 
 export interface ContexteSocial {
   joueur: Joueur;

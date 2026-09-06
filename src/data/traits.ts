@@ -5,7 +5,7 @@
 // match, cartons, marché). Un trait donne toujours quelque chose ET coûte
 // quelque chose — sinon ce serait un bonus déguisé.
 
-import { t } from '../lib/i18n';
+import { t } from '../lib/i18n.js';
 
 export interface Trait {
   id: string;

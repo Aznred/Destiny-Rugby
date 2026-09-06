@@ -22,10 +22,10 @@
 // stable, ici l'identifiant du joueur. Rien à sauvegarder, et la carte d'un
 // joueur ne change jamais entre deux ouvertures de l'écran.
 
-import { POSTES } from '../data/rugby';
-import type { AttributId, FamillePoste, PosteId } from '../types';
-import { graine } from './championnat';
-import type { Coequipier } from './effectif';
+import { POSTES } from '../data/rugby.js';
+import type { AttributId, FamillePoste, PosteId } from '../types.js';
+import { graine } from './championnat.js';
+import type { Coequipier } from './effectif.js';
 
 /**
  * Les six axes affichables, dont cinq propres au rugby qui n'existent pas dans

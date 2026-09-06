@@ -16,15 +16,15 @@
 // Convention des clés : `zone.element`. Un suffixe `.pluriel` fournit la forme
 // plurielle utilisée par `tn()`.
 
-import type { Traduction } from '../lib/i18n';
-import { TEXTES_ECRANS } from './textesEcrans';
-import { TEXTES_CONTENU } from './textesContenu';
-import { TEXTES_AUTO } from './textesAuto';
-import { TEXTES_SUPPLEMENTAIRES } from './textesSupplementaires';
-import { TEXTES_TROPHEES } from './textesTrophees';
-import { TEXTES_SOCIAUX } from './textesSociaux';
-import { TEXTES_MATCH } from './textesMatch';
-import { TEXTES_MANAGER } from './textesManager';
+import type { Traduction } from '../lib/i18n.js';
+import { TEXTES_ECRANS } from './textesEcrans.js';
+import { TEXTES_CONTENU } from './textesContenu.js';
+import { TEXTES_AUTO } from './textesAuto.js';
+import { TEXTES_SUPPLEMENTAIRES } from './textesSupplementaires.js';
+import { TEXTES_TROPHEES } from './textesTrophees.js';
+import { TEXTES_SOCIAUX } from './textesSociaux.js';
+import { TEXTES_MATCH } from './textesMatch.js';
+import { TEXTES_MANAGER } from './textesManager.js';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues

@@ -8,16 +8,16 @@ import type {
   CibleRecrutementManager, Manager, NegociationClubManager, NegociationManager,
   MotivationContratManager, RecrueManager, RoleRecrueManager,
   TermesRecrutementManager, TransfertAnnonce,
-} from '../types';
-import { COMPETITIONS } from '../data/clubs';
-import { competitionEffective } from './divisions';
-import { effectifDuClub, forceMoyenneDivision } from './effectif';
-import { graine } from './championnat';
-import { pseudoStable } from './comptes';
-import { primeDeMatch, salaire } from './offres';
+} from '../types.js';
+import { COMPETITIONS } from '../data/clubs.js';
+import { competitionEffective } from './divisions.js';
+import { effectifDuClub, forceMoyenneDivision } from './effectif.js';
+import { graine } from './championnat.js';
+import { pseudoStable } from './comptes.js';
+import { primeDeMatch, salaire } from './offres.js';
 import {
   financesDuClub, indemniteAmateur, indemniteDeRachat, salaryCap, situationDe, valeurEstimee,
-} from './economie';
+} from './economie.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LE RÉGIME ÉCONOMIQUE D'UN CLUB — professionnel ou amateur

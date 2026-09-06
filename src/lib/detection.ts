@@ -22,10 +22,10 @@
 // d'observations). C'est la même protection anti-save-scumming que les plafonds
 // cachés des négociations et que les contrats du marché.
 
-import { graine } from './championnat';
-import { incertitudeDeDepart } from './centreFormation';
-import type { NotesCentre } from './centreFormation';
-import type { JeuneRepere } from './viviers';
+import { graine } from './championnat.js';
+import { incertitudeDeDepart } from './centreFormation.js';
+import type { NotesCentre } from './centreFormation.js';
+import type { JeuneRepere } from './viviers.js';
 
 /** Ce que le club a accumulé sur un jeune. Persisté : c'est un investissement. */
 export interface Observation {

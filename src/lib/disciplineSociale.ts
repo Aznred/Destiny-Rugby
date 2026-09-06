@@ -4,10 +4,10 @@
 // évalue une embrouille (publique ou privée), choisit une réponse graduée du
 // club et applique réellement la sanction à la carrière.
 
-import type { CompteSuivi, Joueur } from '../types';
-import { MOTS_INTERDITS } from '../data/social';
-import { graine as creerGraine } from './championnat';
-import { appliquerConsequence } from './consequences';
+import type { CompteSuivi, Joueur } from '../types.js';
+import { MOTS_INTERDITS } from '../data/social.js';
+import { graine as creerGraine } from './championnat.js';
+import { appliquerConsequence } from './consequences.js';
 
 export type NiveauSanctionSociale =
   | 'avertissement'

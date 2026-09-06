@@ -26,7 +26,7 @@
 // structure ci-dessous est donc dimensionnée, et `scripts/verifHistoire.ts`
 // MESURE le poids d'une carrière de trente ans — c'est le contrôle central.
 
-import type { PosteId } from '../types';
+import type { PosteId } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // L'ARCHIVE D'UNE SAISON DE COMPÉTITION

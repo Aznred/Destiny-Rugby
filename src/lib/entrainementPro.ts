@@ -25,7 +25,7 @@
 // dans la semaine, c'est la préparation du match (`lib/analyseAdversaire.ts`)
 // et les automatismes (`lib/cohesion.ts`).
 
-import { graine } from './championnat';
+import { graine } from './championnat.js';
 
 // ---------------------------------------------------------------------------
 // LES SÉANCES

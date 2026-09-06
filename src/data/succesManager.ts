@@ -5,7 +5,7 @@
 // lisent des faits déjà enregistrés : matchs, saisons, promotions, palmarès,
 // formation et décisions. Aucun succès ne dépend d'un tirage d'affichage.
 
-import type { Manager, SuccesDebloques } from '../types';
+import type { Manager, SuccesDebloques } from '../types.js';
 
 export interface SuccesManager {
   id: string;

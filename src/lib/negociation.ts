@@ -22,11 +22,11 @@
 // naissance de l'approche, et il ne bouge plus — sinon il suffirait de rouvrir
 // la conversation pour retenter sa chance (« save-scumming »).
 
-import type { Joueur, OffreContrat } from '../types';
-import { agentDe } from '../data/agents';
-import { graine } from './championnat';
-import { pseudoStable } from './comptes';
-import { nombre, t } from './i18n';
+import type { Joueur, OffreContrat } from '../types.js';
+import { agentDe } from '../data/agents.js';
+import { graine } from './championnat.js';
+import { pseudoStable } from './comptes.js';
+import { nombre, t } from './i18n.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. UNE APPROCHE

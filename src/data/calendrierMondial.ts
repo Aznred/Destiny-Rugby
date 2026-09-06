@@ -1,4 +1,4 @@
-import { CALENDRIER, estAnneeDeCoupeDuMonde } from './calendrier';
+import { CALENDRIER, estAnneeDeCoupeDuMonde } from './calendrier.js';
 
 export type FenetreMondiale = 'ete' | 'sud' | 'automne' | 'tournoi';
 export function numeroDate(mois: number, jour: number): number {

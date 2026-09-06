@@ -14,8 +14,8 @@
 // accès au store. Le store appelle `setMouvementsClubs()` à la création, à la
 // réhydratation et à chaque fin de saison.
 
-import { COMPETITIONS, competitionDuClub } from '../data/clubs';
-import type { Competition } from '../types';
+import { COMPETITIONS, competitionDuClub } from '../data/clubs.js';
+import type { Competition } from '../types.js';
 
 let MOUVEMENTS: Record<string, string> = {};
 const cacheCompo = new Map<string, string[]>();

@@ -11,7 +11,7 @@
 // calcul de la note des clubs, dans le générateur. Seules les sélections
 // nationales gardent leur classement, faute d'effectif à afficher.
 
-import type { Competition, CompetitionCoupe, CompetitionNations } from '../types';
+import type { Competition, CompetitionCoupe, CompetitionNations } from '../types.js';
 
 export const COMPETITIONS_REELLES: Competition[] = [
   {

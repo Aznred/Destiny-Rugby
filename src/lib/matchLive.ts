@@ -9,10 +9,10 @@
 import {
   calendrier, journeesALaSemaine, jouerRencontre, nombreJournees, pouleDe, estJourneeDe,
   type MatchChampionnat,
-} from './championnat';
-import type { Coequipier } from './effectif';
-import { POSTE_PAR_ID } from '../data/rugby';
-import type { Joueur, PosteId } from '../types';
+} from './championnat.js';
+import type { Coequipier } from './effectif.js';
+import { POSTE_PAR_ID } from '../data/rugby.js';
+import type { Joueur, PosteId } from '../types.js';
 
 export interface AfficheSemaine {
   journee: number;
@@ -98,10 +98,10 @@ export function nomPoste(c: Coequipier): string {
 // règle de jeu qui vit dans un composant ne peut pas servir à un second mode :
 // on la remonte donc ici, et les deux carrières lisent la même.
 
-import { phaseFinale } from './phaseFinale';
-import { coupeEnDirect, coupesDuClub, matchDuTourCourant } from './coupe';
-import { semaine as semaineDuCalendrier, CALENDRIER } from '../data/calendrier';
-import { divisionAuDessus, divisionEnDessous, resoudrePyramide } from './promotion';
+import { phaseFinale } from './phaseFinale.js';
+import { coupeEnDirect, coupesDuClub, matchDuTourCourant } from './coupe.js';
+import { semaine as semaineDuCalendrier, CALENDRIER } from '../data/calendrier.js';
+import { divisionAuDessus, divisionEnDessous, resoudrePyramide } from './promotion.js';
 
 /** D'où vient l'affiche du week-end. Le rendu s'en sert pour l'annoncer. */
 export type NatureAffiche = 'championnat' | 'phaseFinale' | 'coupe';
