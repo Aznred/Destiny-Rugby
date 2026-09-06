@@ -244,6 +244,22 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
       // Les erreurs de règles sont lisibles ; ne jamais exposer une erreur SQL ou une pile.
       if (erreur instanceof Error && erreur.name === 'ErreurCarriere') return res.status(400).json({ erreur: erreur.message });
       if (erreur instanceof SyntaxError || erreur instanceof TypeError) return res.status(400).json({ erreur: 'Demande invalide.' });
+      // ⚠️ UNE BASE NON INITIALISÉE N'EST PAS UN SECRET, C'EST UN ÉTAT DE
+      // DÉPLOIEMENT — et le taire coûte cher. Tant que les schémas SQL n'ont
+      // pas été passés, TOUTE requête échouait sur un « réessayez dans un
+      // instant » qui invitait justement à ne rien faire, alors qu'il manquait
+      // une action précise. Postgres nomme ces deux cas : 42P01 (table
+      // absente) et 42703 (colonne absente, typiquement `schema-carriere.sql`
+      // passé sans `schema-ligues.sql`). On les distingue, sans jamais rendre
+      // la requête ni la pile.
+      const code = (erreur as { code?: string })?.code;
+      if (code === '42P01' || code === '42703') {
+        return res.status(503).json({
+          erreur: 'La base de la Carrière en ligne n’est pas encore initialisée. '
+            + 'Il reste à exécuter serveur/schema-ligues.sql puis serveur/schema-carriere.sql '
+            + '(dans cet ordre) — voir serveur/MISE-EN-LIGNE.md.',
+        });
+      }
       return res.status(503).json({ erreur: 'Le serveur de carrière est indisponible. Réessayez dans un instant.' });
     }
   }
