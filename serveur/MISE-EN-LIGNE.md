@@ -41,12 +41,38 @@ dont la Carrière en ligne a besoin pour fonctionner.
 
 ## Étape 2 — Les tables, dans cet ordre
 
-Dans **Storage → ta base → Query** (ou le SQL Editor de Neon), colle et exécute
-les fichiers **l'un après l'autre**, dans cet ordre :
+### ⚠️ D'abord : SUR QUELLE BASE ?
 
-1. [`schema-vercel.sql`](schema-vercel.sql) — le classement mondial. À passer
-   même si tu ne t'en sers pas : rien d'autre n'en dépend, mais c'est le socle
-   historique du dossier.
+Un projet Vercel peut avoir **plusieurs bases connectées**, et l'application
+n'en lit qu'une seule : celle que désigne la variable `DATABASE_URL`. Créer les
+tables dans l'autre est un piège parfait — la console dit « success », et le
+site répond quand même *« La base de la Carrière en ligne n'est pas encore
+initialisée »*, parce qu'il regarde ailleurs.
+
+**Le test qui tranche, en une requête.** Dans **Storage → la base → Query** :
+
+```sql
+select count(*) from classement;
+```
+
+- La requête **répond un nombre > 0** → c'est la base historique du jeu, celle
+  que `DATABASE_URL` désigne. **C'est là qu'il faut passer les schémas.**
+- La requête **échoue** (`relation "classement" does not exist`) → cette base
+  n'est pas celle du site. Change de base dans le sélecteur.
+
+Le repère vaut parce que le classement mondial tourne depuis longtemps :
+`api/classement.ts` et `api/carriere.ts` lisent **le même**
+`process.env.DATABASE_URL`. Là où il y a des scores, il y a la bonne base.
+
+Une fois la bonne base identifiée, **déconnecte les autres du projet** (Storage
+→ la base de trop → **Disconnect from project**) : tant qu'elles sont
+connectées, un redéploiement peut réécrire `DATABASE_URL` et tout basculer sur
+la mauvaise sans prévenir.
+
+### Les fichiers, dans l'ordre
+
+1. [`schema-vercel.sql`](schema-vercel.sql) — le classement mondial. Déjà passé
+   si tu as suivi [`VERCEL.md`](VERCEL.md).
 2. [`schema-ligues.sql`](schema-ligues.sql) — il crée `comptes` et `sessions`.
 3. [`schema-carriere.sql`](schema-carriere.sql) — il **ajoute une colonne à
    `comptes`** et crée les trois tables du mode.
@@ -57,7 +83,49 @@ les fichiers **l'un après l'autre**, dans cet ordre :
 > encore. Les trois fichiers sont écrits en `if not exists` — on peut donc les
 > rejouer sans rien casser si on s'est trompé.
 
-Vérifie que tout est là :
+### Comment les exécuter
+
+⚠️ **Coller un fichier entier dans la console SQL de Vercel ne marche pas.**
+Elle répond :
+
+```
+cannot insert multiple commands into a prepared statement
+```
+
+Ce n'est pas un défaut du fichier : le pilote HTTP de Neon passe par des
+*prepared statements*, qui n'acceptent **qu'une instruction à la fois**. Or
+`schema-ligues.sql` en contient 31 et `schema-carriere.sql` 6.
+
+**La bonne méthode — depuis ta machine, en une commande.** Récupère la chaîne de
+connexion (Storage → la base → **`.env.local`** ou *Connection string*), mets-la
+dans un fichier `.env` à la racine du dépôt — il est déjà ignoré par git :
+
+```
+DATABASE_URL=postgres://…
+```
+
+puis :
+
+```bash
+npm run base:appliquer
+```
+
+`scripts/appliquerSchema.mjs` fait ce que ferait `psql` : il découpe les deux
+fichiers en instructions (en respectant les commentaires et les chaînes) et les
+envoie **une par une**, dans l'ordre. Avant d'écrire quoi que ce soit il affiche
+l'hôte visé, les tables déjà présentes et le nombre de lignes de `classement` —
+le test de la bonne base est donc refait pour toi — puis il demande
+confirmation. À la première erreur il s'arrête en montrant l'instruction fautive.
+
+**Les deux solutions de repli**, si tu préfères ne rien lancer en local :
+
+- **La console de Neon** (`console.neon.tech` → ton projet → *SQL Editor*)
+  accepte, elle, un script multi-instructions : on peut y coller les fichiers
+  entiers. C'est la même base que celle vue depuis Vercel.
+- **À la main dans la console Vercel** : exécuter les instructions une par une,
+  en coupant à chaque `;` de fin de ligne. 37 copier-coller au total.
+
+Vérifie ensuite que tout est là :
 
 ```sql
 select table_name from information_schema.tables

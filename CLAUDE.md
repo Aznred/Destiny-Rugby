@@ -407,7 +407,12 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   écran (`screens/CarriereEnLigne.tsx`) et banc (`npm run verify:carriere`,
   144 contrôles). **Il reste à déployer la base — marche à suivre complète dans
   `serveur/MISE-EN-LIGNE.md`** : les trois schémas SQL dans l'ordre puis
-  `CRON_SECRET`. En local, `vite.config.ts` branche le même gestionnaire sur un
+  `CRON_SECRET`. ⚠️ **La console SQL de Vercel refuse un script à plusieurs
+  instructions** (« cannot insert multiple commands into a prepared statement » :
+  le pilote HTTP de Neon passe par des prepared statements) — `npm run
+  base:appliquer` les envoie une par une, après avoir montré quelle base
+  `DATABASE_URL` désigne vraiment.
+  En local, `vite.config.ts` branche le même gestionnaire sur un
   fichier JSON, donc le mode se teste entièrement sans base.
 
   Les quatre invariants, en une ligne chacun — ils commandent tout le reste :

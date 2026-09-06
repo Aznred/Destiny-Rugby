@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "data:ffr": "node scripts/importEffectifsFfr.cjs",
+    "base:appliquer": "node scripts/appliquerSchema.mjs serveur/schema-ligues.sql serveur/schema-carriere.sql",
     "preview": "vite preview",
     "verify:situations": "vite-node scripts/verifierSituations.ts",
     "verify:social": "vite-node scripts/verifierDisciplineSociale.ts",
