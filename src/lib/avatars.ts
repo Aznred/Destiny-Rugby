@@ -4,6 +4,7 @@
 
 import { graine } from './championnat.js';
 import { PHOTO_JOUEUR } from '../data/photosJoueurs.js';
+import { PHOTO_JOUEUR_MAJ } from '../data/photosMaj.js';
 
 
 // Prénoms féminins courants — les données amateurs mélangent les sections d'un
@@ -89,29 +90,31 @@ export function normaliserNom(nom: string): string {
 // là où la base écrit « Will SKELTON ». On construit donc un second index par
 // NOM DE FAMILLE, utilisé seulement quand ce nom est unique parmi les photos —
 // sinon on risquerait de coller le visage d'un homonyme.
-let parNomDeFamille: Map<string, string | null> | null = null;
+let parMotsDuNom: Map<string, string | null> | null = null;
 
-function indexNomDeFamille(): Map<string, string | null> {
-  if (parNomDeFamille) return parNomDeFamille;
+function signatureNom(nom: string): string {
+  return nom.split(' ').filter(Boolean).sort().join('|');
+}
+
+function indexMotsDuNom(): Map<string, string | null> {
+  if (parMotsDuNom) return parMotsDuNom;
   const index = new Map<string, string | null>();
-  for (const [cle, chemin] of Object.entries(PHOTO_JOUEUR)) {
-    const mots = cle.split(' ');
-    if (mots.length < 2) continue;
-    const famille = mots.slice(1).join(' ');
+  for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ })) {
+    const signature = signatureNom(cle);
+    if (!signature.includes('|')) continue;
     // `null` = ambigu, on ne s'en sert plus.
-    index.set(famille, index.has(famille) ? null : chemin);
+    const connu = index.get(signature);
+    index.set(signature, connu && connu !== chemin ? null : chemin);
   }
-  parNomDeFamille = index;
+  parMotsDuNom = index;
   return index;
 }
 
 export function photoReelle(nom: string): string | undefined {
   const cle = normaliserNom(nom);
-  const exacte = PHOTO_JOUEUR[cle];
+  const exacte = PHOTO_JOUEUR_MAJ[cle] ?? PHOTO_JOUEUR[cle];
   if (exacte) return exacte;
-  const mots = cle.split(' ');
-  if (mots.length < 2) return undefined;
-  return indexNomDeFamille().get(mots.slice(1).join(' ')) ?? undefined;
+  return indexMotsDuNom().get(signatureNom(cle)) ?? undefined;
 }
 
 export function avatarPourCompte(nom: string, type: TypeAvatar, club?: string): string {

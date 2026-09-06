@@ -4,7 +4,7 @@ import type { CompositionManager } from '../../types.js';
 import { compositionManagerParDefaut, EFFECTIF_MINIMUM, POSTES_BANC_MANAGER, POSTES_XV_MANAGER, reconcilerCompositionManager } from '../compositionManager.js';
 import { affichesToutesRondes } from './calendrier.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
-import { bandesGaranties, carteDepuisSource, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
+import { bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
 import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 
@@ -12,6 +12,28 @@ const HEURE = 3_600_000;
 const JOUR = 24 * HEURE;
 const SEMAINE = 7 * JOUR;
 const copier = <T>(x: T): T => structuredClone(x);
+let sourcesParId: Map<string, ReturnType<typeof catalogueMondialCarriere>[number]> | undefined;
+
+function actualiserCartesProfessionnelles(cartes: CarteCarriere[]): void {
+  sourcesParId ??= new Map(catalogueMondialCarriere().map(source => [source.sourceId, source]));
+  for (const carte of cartes) {
+    const source = sourcesParId.get(carte.sourceId);
+    if (!source || source.origine !== 'professionnel') continue;
+    // L'identité de collection et la valeur sportive suivent le catalogue actuel.
+    // L'historique de propriété, la fatigue, les blessures et les statistiques de
+    // carrière restent ceux de cette carte déjà distribuée.
+    carte.nom = source.nom;
+    carte.note = source.note;
+    carte.potentiel = Math.max(carte.potentiel, source.potentiel);
+    carte.rarete = source.rarete;
+    carte.photo = source.photo;
+    carte.statistiques = { ...source.statistiques };
+    carte.clubReel = source.clubReel;
+    carte.championnat = source.championnat;
+    carte.pays = source.pays;
+    carte.nation = source.nation;
+  }
+}
 /**
  * ⚠️ LE NOM DE L'ERREUR EST UNE INTERFACE, PAS UNE DÉCORATION. `carriereApi`
  * distingue une règle du jeu (« Ovas insuffisants », qui se lit à l'écran et
@@ -525,6 +547,7 @@ function reprendre(etat: EtatCarriereEnLigne): EtatCarriereEnLigne {
   const nouveau = copier(etat);
   if (!Number.isFinite(nouveau.dotationOvas)) nouveau.dotationOvas = DOTATION_DEFAUT;
   for (const club of nouveau.clubs) if (!Number.isFinite(club.ovas)) club.ovas = 0;
+  actualiserCartesProfessionnelles(nouveau.cartes);
   return nouveau;
 }
 

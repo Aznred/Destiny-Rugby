@@ -1,6 +1,8 @@
 import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
 import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/amateurs.js';
 import { PHOTO_JOUEUR } from '../../data/photosJoueurs.js';
+import { EVALUATION_JOUEUR_MAJ } from '../../data/evaluationsJoueursMaj.js';
+import { photoReelle } from '../avatars.js';
 import { COMPETITIONS } from '../../data/clubs.js';
 import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
 import { LOGO_COMPETITION_NOUVEAU } from '../../data/nouvellesLigues.js';
@@ -173,11 +175,13 @@ export function catalogueMondialCarriere(): readonly SourceCarte[] {
     const competition = clubs.get(club);
     for (const j of effectif) {
       const sourceId = `reel:${normaliser(j.nom)}`;
-      const note = Math.max(30, j.note);
+      const evaluation = EVALUATION_JOUEUR_MAJ[normaliser(j.nom)];
+      const classementMagazine = evaluation && /^(RugbyPass|FloRugby|We Talk Rugby)/.test(evaluation.source);
+      const note = classementMagazine ? evaluation.note : Math.max(30, j.note, evaluation?.note ?? 0);
       ajouter({ sourceId, nom: j.nom, famille: j.poste, poste: posteDepuisFamille(j.poste, 0), note,
         potentiel: Math.max(note, j.potentiel), age: j.age, nation: nationLisible(j.nation),
         clubReel: club, championnat: competition?.nom ?? 'Championnat professionnel', pays: competition?.pays ?? 'France',
-        photo: PHOTO_JOUEUR[normaliser(j.nom)], origine: 'professionnel', rarete: rareteCarriere(note),
+        photo: photoReelle(j.nom), origine: 'professionnel', rarete: rareteCarriere(note),
         statistiques: statistiquesCarte(note, j.poste, sourceId) });
     }
   }

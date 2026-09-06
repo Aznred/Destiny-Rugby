@@ -38,7 +38,9 @@ export function collectionCarriere(etat: EtatCarriereEnLigne, compteId: string, 
   const page = Math.min(pages, Math.max(1, Number.isFinite(demande) ? Math.floor(demande) : 1));
   const joueurs = correspond.slice((page - 1) * 24, page * 24).map(({ source }) => {
     const existante = possedees.get(source.sourceId);
-    const carte: CarteCarriere = existante ?? { ...source, id: `catalogue:${source.sourceId}`, proprietaire: null, fatigue: 0, matchs: 0, essais: 0, clubs: [] };
+    const carte: CarteCarriere = existante
+      ? { ...existante, ...source, id: existante.id, proprietaire: existante.proprietaire, fatigue: existante.fatigue, matchs: existante.matchs, essais: existante.essais, clubs: existante.clubs }
+      : { ...source, id: `catalogue:${source.sourceId}`, proprietaire: null, fatigue: 0, matchs: 0, essais: 0, clubs: [] };
     const origine = existante && origines.get(existante.id);
     return { carte, obtenuPar: origine ? origine.club : null, obtention: origine ? origine.nature : existante ? 'inconnue' as const : null, obtenuLe: origine ? origine.date : null };
   });
