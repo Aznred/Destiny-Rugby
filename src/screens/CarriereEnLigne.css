@@ -1699,106 +1699,96 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 
 .cel-terrain-direct{width:100%;max-height:520px;border:2px solid #e4e8cf;border-radius:12px;margin:20px 0}
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   LA COMPOSITION EN LIGNE TIENT DANS L'ÉCRAN
-   ═══════════════════════════════════════════════════════════════════════════
-   ⚠️ RETOUR DE JEU : « la composition ne rentre pas dans la page ». Mesuré à
-   1 440 × 900, l'onglet réclamait 1 942 px de haut — et pas parce qu'il y avait
-   trop à montrer :
-
-   — le terrain était figé à 650 px pendant que le rail de droite (le banc en
-     DEUX colonnes de 104 px, donc quatre rangées, puis les réserves) en
-     réclamait 1 116. La grille étirait le plateau à la hauteur du rail :
-     **477 px de vide noir sous la pelouse**, mesurés ;
-   — et rien ne ramenait jamais la feuille à la taille de la fenêtre : les trois
-     blocs de l'onglet étaient empilés les uns sous les autres.
-
-   Sur grand écran, l'onglet devient donc une surface de travail : la hauteur
-   est celle de la fenêtre, le terrain prend TOUT ce qui reste, ses cartes se
-   mesurent SUR LUI (unités de conteneur : elles rapetissent avec la pelouse au
-   lieu d'aller se chevaucher), le banc passe en quatre colonnes et seules les
-   réserves défilent, dans leur cadre.
-
-   Sous 1 121 px on ne touche à rien : sur téléphone et tablette, une page qui
-   défile reste la bonne réponse. */
+/* Composition : le terrain occupe la hauteur disponible, les panneaux de
+   détail s'ouvrent par-dessus pour préserver la taille des cartes. */
+.ct-fut-nom { display: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 11px/16px var(--police-forte); color: #fff; text-shadow: 0 1px 3px #000; }
 @media (min-width: 1121px) {
-  /* ⚠️ UN PLANCHER, PAS UNE CAMISOLE. `height: 100dvh` seul écrasait la pelouse
-     à 220 px sur une fenêtre de 900 px — des cartes de 23 px, illisibles. Le
-     `max()` dit les deux choses à la fois : prends la fenêtre, mais jamais
-     moins de 62 rem. Au-delà d'environ 1 060 px de fenêtre, l'onglet ne défile
-     plus du tout ; en dessous il reste un doigt de défilement, au lieu du
-     millier de pixels d'avant. 4,45 rem, c'est la barre de navigation, qui est
-     collante et reste donc dans le flux au-dessus de `.cel`. */
-  .cel:has(> .cel-compo) { height: max(calc(100dvh - 4.45rem), 62rem); padding-bottom: 1.1rem; gap: 0.6rem; }
-  /* L'en-tête du club se resserre : sur cet onglet, la place va au terrain. */
-  .cel:has(> .cel-compo) > .cel-entete { padding: 0.65rem 1rem; }
-  .cel:has(> .cel-compo) > .cel-entete h1 { font-size: 1.45rem; }
-  .cel > .cel-compo { display: flex; flex-direction: column; gap: 0.6rem; flex: 1; min-height: 0; }
-
-  /* La barre du haut tient sur une ligne : le compteur et le titre côte à côte,
-     l'explication tombe (elle répète ce que la feuille montre déjà). */
-  .cel-compo > .cel-tete-compo { padding: 0.55rem 1.1rem; gap: 1rem; }
-  .cel-compo > .cel-tete-compo > div:first-child { display: flex; align-items: baseline; gap: 0.7rem; }
-  .cel-compo > .cel-tete-compo h2 { margin: 0; font-size: 1.1rem; }
-  .cel-compo > .cel-tete-compo p { display: none; }
-  .cel-compo > .cel-tete-compo .eyebrow { margin: 0; }
-  .cel-compo .cel-note-compo b { font-size: 1.7rem; }
-
-  .cel-compo > .manager-feuille-visuelle { flex: 1 1 0; min-height: 0; }
-  /* Ouvertes, les consignes prennent leur place sur le terrain — jamais sur la
-     fenêtre : elles défilent chez elles. */
-  .cel-compo > .cel-consignes-repliables { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: 0.6rem 1.1rem; }
-
-  /* Une seule rangée d'en-tête (les compteurs à gauche, l'aide au glisser à
-     droite, au-dessus du banc), puis le banc, puis les réserves. Le plateau
-     couvre les deux dernières rangées : la pelouse descend jusqu'en bas au lieu
-     de laisser un trou. */
-  .cel-compo .manager-feuille-visuelle {
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 355px);
+  .cel:has(> .cel-compo) {
+    height: calc(100dvh - 4.45rem); min-height: 0; max-width: 1800px;
+    padding: .5rem 1rem; gap: .5rem;
+    display: grid; grid-template-columns: auto minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
-    gap: 0.6rem;
+    position: relative;
   }
-  .cel-compo .manager-feuille-visuelle > .ct-entete { grid-column: 1; grid-row: 1; margin: 0; padding: 0.5rem 0.8rem; }
-  .cel-compo .manager-feuille-visuelle > .manager-compo-aide { grid-column: 2; grid-row: 1; align-self: center; margin: 0; }
-  /* Le plateau ne descend jamais sous 27 rem : ouvrir les consignes doit
-     ajouter un peu de défilement, pas écraser la pelouse à 300 px. */
-  .cel-compo .manager-feuille-visuelle > .ct-plateau { grid-column: 1; grid-row: 2 / 4; min-height: 27rem; align-items: stretch; }
-  .cel-compo .manager-feuille-visuelle > .manager-banc-visuel { grid-column: 2; grid-row: 2; align-self: start; }
-  /* ⚠️ `align-self: start` (App.css, ≥ 1 121 px) laissait les réserves prendre
-     leur hauteur naturelle : au lieu de défiler chez elles, elles débordaient
-     sous la fenêtre et ramenaient la barre de défilement. Et le défilement est
-     posé sur le `<details>` lui-même, pas sur la grille de cartes : depuis
-     `::details-content`, les enfants d'un `<details>` ne sont plus des éléments
-     flexibles du bloc, un `flex: 1` sur la grille ne la contraignait pas. */
-  .cel-compo .manager-feuille-visuelle > .manager-reserves {
-    grid-column: 2; grid-row: 3; align-self: stretch; min-height: 0; overflow-y: auto;
+  .cel:has(> .cel-compo) > .cel-fil { grid-column: 1; grid-row: 1; flex-wrap: nowrap; gap: .5rem; }
+  .cel:has(> .cel-compo) > .cel-fil > span { display: none; }
+  .cel:has(> .cel-compo) > .cel-entete { grid-column: 2; grid-row: 1; padding: .35rem .8rem; gap: .7rem; box-shadow: none; }
+  .cel:has(> .cel-compo) > .cel-entete > :is(.cel-ecusson, .cel-ecusson-logo) { width: 38px; height: 38px; }
+  .cel:has(> .cel-compo) > .cel-entete h1 { font-size: 1.15rem; margin: 0; }
+  .cel:has(> .cel-compo) > .cel-entete p { display: none; }
+  .cel:has(> .cel-compo) > .cel-entete .eyebrow { font-size: .6rem; margin: 0; }
+  .cel:has(> .cel-compo) > .cel-onglets { grid-column: 1 / -1; grid-row: 2; margin: 0; }
+  .cel:has(> .cel-compo) > :is(.cel-erreur, .cel-notification) { position: absolute; top: .5rem; left: 25%; right: 1rem; z-index: 20; }
+  .cel > .cel-compo { grid-column: 1 / -1; grid-row: 3; display: flex; flex-direction: column; gap: .5rem; min-height: 0; position: relative; }
+  .cel-compo > .cel-tete-compo { flex: none; flex-wrap: nowrap; padding: .45rem .85rem; gap: .8rem; }
+  .cel-compo > .cel-tete-compo > div:first-child { min-width: 0; }
+  .cel-compo > .cel-tete-compo h2 { margin: 0; font-size: 1.25rem; }
+  .cel-compo > .cel-tete-compo p { display: none; }
+  .cel-compo > .cel-tete-compo .eyebrow { margin: 0 0 .15rem; font-size: .6rem; }
+  .cel-compo .cel-note-compo b { font-size: 1.7rem; }
+  .cel-compo > .manager-feuille-visuelle {
+    flex: 1; min-height: 0; position: relative;
+    grid-template-columns: minmax(0, 1fr) clamp(310px, 25vw, 410px);
+    grid-template-rows: auto minmax(0, 1fr) auto; gap: .5rem;
   }
-  .cel-compo .manager-reserves > summary { position: sticky; top: -0.2rem; z-index: 2; padding: 0.2rem 0; background: rgba(8, 28, 19, 0.97); }
-  .cel-compo .manager-reserves > p { margin: 0.3rem 0 0.5rem; }
-
-  /* ⚠️ LE CADRE RESTE UNE GRILLE À DEUX COLONNES : la légende (« en-but
-     adverse ») est écrite à la verticale dans une bande de 28 px. Passée en
-     colonne flex, elle revenait à l'horizontale au-dessus du terrain et lui
-     volait 99 px. On ne change donc QUE la rangée, pour qu'elle prenne la
-     hauteur disponible. */
-  .cel-compo .ct-plateau > .manager-terrain-cadre { grid-template-rows: minmax(0, 1fr); min-height: 0; }
-  .cel-compo .ct-plateau > .ct-panneau { min-height: 0; overflow-y: auto; }
-  .cel-compo .ct-feuille-fut .manager-terrain-xv { height: 100%; min-height: 0; container-type: size; }
-  /* ⚠️ LA CARTE SE MESURE SUR LA PELOUSE, PAS SUR LA FENÊTRE. `PLACEMENT_XV`
-     place les quinze cartes en POURCENTAGES : leur écart rétrécit avec le
-     terrain, donc une largeur en `vw` finissait fatalement par les faire se
-     chevaucher dès que la pelouse raccourcissait. Les deux bornes sont celles
-     que la feuille impose vraiment : 20 % de la largeur (sur une même ligne,
-     les deux postes les plus serrés sont à 22 % l’un de l’autre) et 11,2 % de
-     la hauteur — la carte fait 1,75 fois sa largeur, badge compris, et le
-     couple vertical le plus serré, le n° 9 et le n° 12, n’a que 21 % de hauteur
-     entre les deux. */
-  .cel-compo .ct-feuille-fut .manager-position { width: max(2.9rem, min(20cqw, 11.2cqh)); }
-
-  /* Le banc en quatre colonnes : deux rangées au lieu de quatre, et des cartes
-     de la taille de celles du terrain — c'est la même feuille de match. */
-  .cel-compo .ct-feuille-fut .manager-banc-cartes { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-  .cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut { max-width: none; }
-  .cel-compo .ct-feuille-fut .manager-reserves > div { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 8px; }
+  .cel-compo .manager-feuille-visuelle > .ct-entete { grid-column: 1; grid-row: 1; margin: 0; padding: .35rem .7rem; align-items: center; }
+  .cel-compo .ct-note-equipe strong { font-size: 1.7rem; }
+  .cel-compo .manager-feuille-visuelle > .manager-compo-aide { grid-column: 2; grid-row: 1; margin: 0; padding: .4rem .6rem; font-size: .7rem; }
+  .cel-compo .manager-feuille-visuelle > .ct-plateau { grid-column: 1; grid-row: 2 / 4; min-height: 0; align-items: stretch; position: relative; grid-template-columns: minmax(0, 1fr); }
+  .cel-compo .ct-plateau > .manager-terrain-cadre { grid-template-rows: minmax(0, 1fr); min-height: 0; padding: .45rem; border-radius: 16px; }
+  .cel-compo .ct-feuille-fut .manager-terrain-xv { height: 100%; min-height: 0; container-type: size; box-shadow: inset 0 0 80px #051d1955; }
+  .cel-compo .ct-feuille-fut .manager-position { width: min(11cqw, calc((32cqh - 40px) / 1.5)); left: var(--x) !important; top: var(--y) !important; }
+  .cel-compo .ct-fut-nom { display: block; }
+  /* Cinq lignes décalées : l'espace entre les postes accueille des cartes plus grandes. */
+  .cel-compo .manager-position:nth-child(1) { --x: 20%; --y: 82%; }
+  .cel-compo .manager-position:nth-child(2) { --x: 50%; --y: 82%; }
+  .cel-compo .manager-position:nth-child(3) { --x: 80%; --y: 82%; }
+  .cel-compo .manager-position:nth-child(4) { --x: 35%; --y: 66%; }
+  .cel-compo .manager-position:nth-child(5) { --x: 65%; --y: 66%; }
+  .cel-compo .manager-position:nth-child(6) { --x: 20%; --y: 50%; }
+  .cel-compo .manager-position:nth-child(7) { --x: 80%; --y: 50%; }
+  .cel-compo .manager-position:nth-child(8) { --x: 50%; --y: 50%; }
+  .cel-compo .manager-position:nth-child(9) { --x: 35%; --y: 34%; }
+  .cel-compo .manager-position:nth-child(10) { --x: 65%; --y: 34%; }
+  .cel-compo .manager-position:nth-child(11) { --x: 8%; --y: 18%; }
+  .cel-compo .manager-position:nth-child(12) { --x: 23%; --y: 18%; }
+  .cel-compo .manager-position:nth-child(13) { --x: 77%; --y: 18%; }
+  .cel-compo .manager-position:nth-child(14) { --x: 92%; --y: 18%; }
+  .cel-compo .manager-position:nth-child(15) { --x: 50%; --y: 18%; }
+  .cel-compo .ct-feuille-fut .ct-fut-indicateurs { font-size: 10px; min-height: 16px; gap: 4px; padding: 1px 4px; border: 1px solid #ffffff20; }
+  .cel-compo .ct-feuille-fut .ct-fut-indicateurs svg { width: 9px; height: 9px; }
+  .cel-compo .manager-feuille-visuelle > .manager-banc-visuel { grid-column: 2; grid-row: 2; align-self: stretch; min-height: 0; padding: .7rem; display: flex; flex-direction: column; background: linear-gradient(145deg, #132c30, #091b21); border-color: #b7dcd329; }
+  .cel-compo .ct-feuille-fut .manager-banc-cartes { flex: 1; min-height: 0; container-type: size; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); align-items: center; gap: 6px; }
+  .cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut { width: min(100%, 24cqh); max-width: 108px; justify-self: center; }
+  .cel-compo .manager-feuille-visuelle > .manager-reserves { grid-column: 2; grid-row: 3; min-height: 0; margin: 0; padding: .7rem; }
+  .cel-compo .manager-feuille-visuelle > .manager-reserves[open] { max-height: none; grid-area: auto; position: absolute; inset: 0 0 0 auto; width: clamp(310px, 25vw, 410px); z-index: 12; overflow-y: auto; background: #0d2428; box-shadow: -12px 0 36px #0006; }
+  .cel-compo .manager-reserves > summary { position: sticky; top: -.7rem; z-index: 2; padding: .5rem 0; background: #0d2428; font-size: .85rem; }
+  .cel-compo .ct-feuille-fut .manager-reserves > div { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .cel-compo .ct-feuille-fut .ct-reserve-fut { max-width: none; }
+  .cel-compo .ct-plateau > .ct-panneau { position: absolute; right: 0; top: 0; bottom: 0; width: 300px; z-index: 15; overflow-y: auto; box-shadow: -12px 0 35px #0008; }
+  .cel-compo > .cel-consignes-repliables { flex: none; padding: .45rem .85rem; }
+  .cel-compo .cel-consignes-repliables h2 { font-size: 1rem; margin: 0; }
+  .cel-compo .cel-consignes-repliables > summary > span { display: flex; align-items: baseline; gap: .7rem; }
+  .cel-compo > .cel-consignes-repliables[open] { position: absolute; bottom: 0; left: 0; right: 0; max-height: 70%; overflow-y: auto; z-index: 18; background: #10252d; box-shadow: 0 -16px 50px #0008; }
+  .cel-compo :is(button, summary):focus-visible { outline: 3px solid #ffe08a; outline-offset: 3px; }
+  .cel-compo .manager-position:has(:focus-visible), .cel-compo .manager-position:hover { z-index: 5; }
+}
+@media (min-width: 1121px) {
+  .cel:has(> .cel-compo) > .cel-entete .cel-portefeuille { flex: 0 0 auto; padding: .25rem .65rem; }
+  .cel-compo .cel-consignes-repliables > summary { min-height: 24px; }
+  .cel-compo .cel-consignes-repliables h2 { line-height: 1.2; }
+}
+@media (min-width: 1121px) and (max-height: 820px) {
+  .cel:has(> .cel-compo) { gap: .35rem; padding-top: .25rem; padding-bottom: .25rem; }
+  .cel:has(> .cel-compo) > .cel-entete { padding-block: .2rem; }
+  .cel:has(> .cel-compo) > .cel-entete > :is(.cel-ecusson, .cel-ecusson-logo) { width: 30px; height: 30px; }
+  .cel:has(> .cel-compo) > .cel-onglets button { padding-block: .4rem; }
+  .cel-compo > .cel-tete-compo { padding-block: .3rem; }
+  .cel-compo > .cel-tete-compo > div:first-child { display: flex; align-items: center; gap: .7rem; }
+  .cel-compo > .cel-tete-compo h2 { font-size: 1rem; line-height: 1.2; }
+  .cel-compo .cel-tete-compo .btn { padding-block: .5rem; }
+  .cel-compo .ct-entete .ct-note-equipe { display: flex; align-items: center; gap: .5rem; }
+  .cel-compo .ct-entete .ct-note-equipe strong { font-size: 1.5rem; line-height: 1; }
+  .cel-compo .ct-entete .ct-secteurs > div { display: flex; align-items: center; gap: .4rem; }
+  .cel-compo > .cel-consignes-repliables { padding-block: .25rem; }
 }

@@ -237,7 +237,7 @@ function CarteJoueur({
           + `${rarete ? ` · ${NOM_RARETE[rarete]}` : ''}`
         : nomPoste(posteSlot)}
     >
-      {joueur && rendreCarte ? <>{rendreCarte(joueur)}<span className="ct-fut-indicateurs"><b>{numero}</b><span title={t(`compo.adq.${adequation}`)}><PastilleAdequation adequation={adequation} /></span>{capitaine && <i title="Capitaine">C</i>}{buteur && <i title="Buteur">B</i>}{etat?.condition !== undefined && <small>{etat.condition}%</small>}</span></> : <>
+      {joueur && rendreCarte ? <>{rendreCarte(joueur)}<span className="ct-fut-nom">{nomCarte(joueur.nom)}</span><span className="ct-fut-indicateurs"><b>{numero}</b><span title={t(`compo.adq.${adequation}`)}><PastilleAdequation adequation={adequation} /></span>{capitaine && <i title="Capitaine">C</i>}{buteur && <i title="Buteur">B</i>}{etat?.condition !== undefined && <small>{etat.condition}%</small>}</span></> : <>
       {/* ⚠️ LE TALON NE PORTE PLUS LE NUMÉRO. Il l'écrivait à la verticale
           dans dix-sept pixels de large : illisible, et redondant depuis que la
           tête l'affiche. Il reste ce qu'il a toujours été — la perforation qui
@@ -423,9 +423,10 @@ export function CompositionTerrainManager({
   automatismes, onCapitaine, onButeur, rendreCarte,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
+  const [ficheMasquee, setFicheMasquee] = useState<string | null>(null);
   const [joueurGlisse, setJoueurGlisse] = useState<string | null>(null);
   const [cibleDepot, setCibleDepot] = useState<string | null>(null);
-  const [reservesOuvertes, setReservesOuvertes] = useState(true);
+  const [reservesOuvertes, setReservesOuvertes] = useState(!rendreCarte);
   const panneauRef = useRef<HTMLElement>(null);
   const parId = useMemo(
     () => new Map(effectifComplet.map((j) => [j.id, j])),
@@ -619,7 +620,7 @@ export function CompositionTerrainManager({
           </div>
         </div>
 
-        {joueurSelectionne && (
+        {joueurSelectionne && (!rendreCarte || ficheMasquee !== selection) && (
           <PanneauJoueur
             joueur={joueurSelectionne}
             posteSlot={slotDuSelectionne}
@@ -631,7 +632,7 @@ export function CompositionTerrainManager({
             panneauRef={panneauRef}
             onCapitaine={indisponibles?.has(joueurSelectionne.id) ? undefined : onCapitaine}
             onButeur={indisponibles?.has(joueurSelectionne.id) ? undefined : onButeur}
-            onFermer={() => setSelection(null)}
+            onFermer={() => { if (rendreCarte) setFicheMasquee(selection); else setSelection(null); }}
           />
         )}
       </div>

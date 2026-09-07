@@ -1,0 +1,15 @@
+import { createRoot } from 'react-dom/client';
+import { Composition } from '../src/screens/CarriereEnLigne';
+import { POSTES_XV_MANAGER } from '../src/lib/compositionManager';
+import type { CarteCarriere, VueCarriereEnLigne } from '../src/lib/ligue/typesCarriere';
+import '../src/index.css';
+import '../src/App.css';
+import '../src/screens/CarriereEnLigne.css';
+import { chargerTextes } from '../src/lib/i18n';
+import { TEXTES } from '../src/data/textes';
+import 'flag-icons/css/flag-icons.min.css';
+chargerTextes(TEXTES);
+const noms = ['Cyril Baille', 'Peato Mauvaka', 'Uini Atonio', 'Thibaud Flament', 'Emmanuel Meafou', 'François Cros', 'Charles Ollivon', 'Grégory Alldritt', 'Antoine Dupont', 'Romain Ntamack', 'Louis Bielle-Biarrey', 'Yoram Moefana', 'Gaël Fickou', 'Damian Penaud', 'Thomas Ramos'];
+const cartes = Array.from({length: 150}, (_, i) => ({id: `apercu-${i}`, sourceId: '', nom: noms[i % 15], poste: POSTES_XV_MANAGER[i % 15], note: i === 8 ? 95 : 78 + i % 10, potentiel: 90, age: 26, nation: 'France', clubReel: 'Stade Toulousain', championnat: 'Top 14', pays: 'France', origine: 'professionnel', rarete: i === 8 ? 'star' : i % 3 ? 'elite' : 'or', statistiques: {VIT: 82, PAS: 85, DEF: 80, PHY: 85, PIED: 80, CON: 84}, proprietaire: 'apercu', fatigue: 0, matchs: 0, essais: 0, clubs: []} as CarteCarriere));
+const vue = {monClubId: 'apercu', cartes, clubs: [{id: 'apercu', composition: {titulaires: cartes.slice(0, 15).map(c => c.id), remplacants: cartes.slice(15, 23).map(c => c.id), capitaineId: 'apercu-8', buteurId: 'apercu-14'}}]} as VueCarriereEnLigne;
+createRoot(document.getElementById('root')!).render(<><nav className="nav"><b className="marque">Destiny Rugby</b><div className="liens"><button>Accueil</button><button className="actif">En ligne</button><button>Bureau</button><button>Clubs</button><button>Classement</button><button>Boutique</button></div></nav><main><section className="cel"><div className="cel-fil"><button className="btn fantome">Mes ligues</button><span>Carrière en ligne</span><button className="cel-compte">Aperçu local</button></div><header className="cel-entete"><span className="cel-ecusson grand">DR</span><div><div className="eyebrow">Ligue de démonstration / Saison 1</div><h1>Destiny Rugby</h1><p>4 clubs · 2 matchs par semaine</p></div><div className="cel-portefeuille"><strong>12 500</strong><span>Ovas de cette ligue</span></div></header><nav className="cel-onglets">{['Le club', 'Calendrier', 'Composition', 'Effectif', 'Collection', 'Packs', 'Marché', 'Compétitions', 'Histoire'].map(n => <button key={n} className={n === 'Composition' ? 'actif' : ''}>{n}</button>)}</nav><Composition vue={vue} agir={async () => null} occupe={false}/></section></main></>);

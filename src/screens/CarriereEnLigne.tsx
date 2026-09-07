@@ -836,7 +836,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
 // du mode en ligne, c'est d'où vient l'effectif — les cartes possédées dans
 // CETTE ligue — et le fait que la feuille part au serveur au lieu du store.
 
-function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
+export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
   const cartes = useMemo(() => vue.cartes.filter(c => c.proprietaire === vue.monClubId), [vue.cartes, vue.monClubId]);
   const effectifComplet = useMemo(() => cartes.map(carteEnJoueur), [cartes]);
