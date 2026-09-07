@@ -145,12 +145,26 @@ export function useGlisserDeposer(
 
   /** Fabrique le clone qui suivra le pointeur. */
   const souleverCarte = useCallback((p: Prise) => {
-    const clone = p.source.cloneNode(true) as HTMLElement;
-    clone.className = `${p.source.className} ct-fantome`;
+    // Le bouton contient aussi le numéro, la condition et son fond de case.
+    // Ne soulever que la carte, avec ses dimensions réelles à l'écran.
+    const visuel = p.source.querySelector<HTMLElement>('.dr-player') ?? p.source;
+    const cadre = visuel.getBoundingClientRect();
+    const origine = p.source.getBoundingClientRect();
+    p.decalageX -= cadre.left - origine.left;
+    p.decalageY -= cadre.top - origine.top;
+    p.largeur = cadre.width;
+    p.hauteur = cadre.height;
+    const clone = visuel.cloneNode(true) as HTMLElement;
+    clone.classList.add('ct-fantome');
     clone.removeAttribute('data-depot');
     clone.setAttribute('aria-hidden', 'true');
     clone.style.width = `${p.largeur}px`;
     clone.style.height = `${p.hauteur}px`;
+    Object.assign(clone.style, {
+      position: 'fixed', left: '0', top: '0', margin: '0',
+      zIndex: '10000', pointerEvents: 'none', transformOrigin: 'center',
+      willChange: 'transform',
+    });
     document.body.appendChild(clone);
     fantome.current = clone;
 
