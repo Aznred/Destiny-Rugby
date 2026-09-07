@@ -44,7 +44,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
       <path d={SILHOUETTE} transform="translate(6 8) scale(.95 .956)" stroke={bord} opacity=".55" fill="none" />
     </svg>
     <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</em><Drapeau nation={carte.nation} taille={1.15} />{blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}</span>
-    <span className="dr-player-photo">{photo && photo !== photoRatee ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotoRatee(photo)} /> : <img draggable={false} src="/photos/alexandre_langlois.webp" alt="Portrait non disponible" className="dr-player-silhouette" />}</span>
+    <span className="dr-player-photo">{photo && photo !== photoRatee ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotoRatee(photo)} /> : <img draggable={false} src="/photos/adam_hastings.webp" alt="Portrait par défaut" />}</span>
     <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{carte.clubReel}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>
     <span className="dr-player-rarity">{NOMS_PACK[carte.rarete]}<i> · {carte.age} ans</i></span>

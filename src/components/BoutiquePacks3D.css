@@ -17,3 +17,5 @@
 .bp3-details li {display:flex;gap:5px;}
 .bp3-erreur {padding:60px 20px;text-align:center;}
 @media(max-width:600px){.bp3-scene{height:360px}.bp3-etiquette{width:105px;font-size:10px}.bp3-geste{font-size:10px}.bp3-details{padding:14px}.bp3-details h3{font-size:24px}}
+
+.bp3-secours{height:100%;overflow:auto;padding:24px 24px 50px}.bp3-secours>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}.bp3-secours button{display:flex;flex-direction:column;gap:12px;padding:24px 12px;border:2px solid;border-radius:14px;background:#142238;color:#fff;cursor:pointer}.bp3-secours button:disabled{opacity:.5;cursor:default}
