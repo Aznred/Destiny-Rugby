@@ -1461,9 +1461,9 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
    terrain s'adapte à la fenêtre et les cartes gardent assez d'espace entre les
    lignes pour rester sélectionnables. */
 .cel .ct-feuille-fut .manager-terrain-xv {
-  min-height: clamp(540px, calc(100vh - 350px), 720px);
+  min-height: clamp(610px, calc(100vh - 250px), 720px);
 }
-.cel .ct-feuille-fut .manager-position { width: clamp(48px, 5vw, 62px); }
+.cel .ct-feuille-fut .manager-position { width: clamp(58px, 5.5vw, 68px); }
 .cel .ct-feuille-fut .ct-fut-indicateurs {
   gap: 2px;
   padding: 1px 2px;
@@ -1476,6 +1476,24 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
   .cel .ct-feuille-fut .manager-terrain-xv { min-height: 540px; }
   .cel .ct-feuille-fut .manager-position { width: clamp(44px, 15vw, 58px); }
 }
+
+/* Les consignes sont utiles mais ne doivent pas repousser le terrain hors de
+   la fenêtre. Elles restent accessibles, fermées par défaut, juste sous la
+   feuille. */
+.cel-consignes-repliables > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+.cel-consignes-repliables > summary::-webkit-details-marker { display: none; }
+.cel-consignes-repliables > summary span { display: grid; gap: 0.15rem; }
+.cel-consignes-repliables > summary h2 { margin: 0; }
+.cel-consignes-repliables > summary small { color: var(--brume); }
+.cel-consignes-repliables[open] > summary { padding-bottom: 0.8rem; border-bottom: 1px solid var(--bordure); }
+.cel-consignes-contenu { padding-top: 0.15rem; }
 
 .cel-palmares { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 0.7rem; }
 .cel-palmares article {

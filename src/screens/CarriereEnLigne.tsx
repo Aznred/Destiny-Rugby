@@ -888,22 +888,24 @@ function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agi
       onButeur={id => setBrouillon({ ...composition, buteurId: id })}
     />
 
-    <section className="cel-panneau">
-      <div className="cel-titre-ligne"><h2>Consignes enregistrées</h2><Icone nom="sifflet" /></div>
-      <p className="cel-note">⚠️ Ce sont elles qui entraînent ton équipe <b>quand tu n’es pas là</b> — et elles servent de point de départ quand tu l’es. Un match ne s’annule jamais faute de manager.</p>
-      <div className="cel-grille-consignes">
-        <Choix label="Mentalité" valeur={strategie.mentalite} options={MENTALITES} onChange={v => majStrategie('mentalite', v)} />
-        <Choix label="Jeu" valeur={strategie.jeu} options={JEUX} onChange={v => majStrategie('jeu', v)} />
-        <Choix label="Rythme" valeur={strategie.rythme} options={RYTHMES} onChange={v => majStrategie('rythme', v)} />
-        <Choix label="Défense" valeur={strategie.defense} options={DEFENSES} onChange={v => majStrategie('defense', v)} />
-        <Choix label="Rucks" valeur={strategie.rucks} options={RUCKS} onChange={v => majStrategie('rucks', v)} />
-        <Choix label="Remplacements" valeur={strategie.remplacements} options={TIMINGS} onChange={v => majStrategie('remplacements', v)} />
-        <Choix label="Pénalité à moins de 35 m" valeur={strategie.penaliteCourte} options={PENALITES} onChange={v => majStrategie('penaliteCourte', v)} />
-        <Choix label="Pénalité au-delà de 35 m" valeur={strategie.penaliteLongue} options={PENALITES} onChange={v => majStrategie('penaliteLongue', v)} />
-        <Choix label="Si mené après la 60ᵉ" valeur={strategie.bascule60} options={MENTALITES} onChange={v => majStrategie('bascule60', v)} />
-        <Choix label="Si mené de 8+ après la 70ᵉ" valeur={strategie.bascule70} options={MENTALITES} onChange={v => majStrategie('bascule70', v)} />
+    <details className="cel-panneau cel-consignes-repliables">
+      <summary><span><h2>Consignes enregistrées</h2><small>Ouvrir pour ajuster la stratégie</small></span><Icone nom="sifflet" /></summary>
+      <div className="cel-consignes-contenu">
+        <p className="cel-note">⚠️ Ce sont elles qui entraînent ton équipe <b>quand tu n’es pas là</b> — et elles servent de point de départ quand tu l’es. Un match ne s’annule jamais faute de manager.</p>
+        <div className="cel-grille-consignes">
+          <Choix label="Mentalité" valeur={strategie.mentalite} options={MENTALITES} onChange={v => majStrategie('mentalite', v)} />
+          <Choix label="Jeu" valeur={strategie.jeu} options={JEUX} onChange={v => majStrategie('jeu', v)} />
+          <Choix label="Rythme" valeur={strategie.rythme} options={RYTHMES} onChange={v => majStrategie('rythme', v)} />
+          <Choix label="Défense" valeur={strategie.defense} options={DEFENSES} onChange={v => majStrategie('defense', v)} />
+          <Choix label="Rucks" valeur={strategie.rucks} options={RUCKS} onChange={v => majStrategie('rucks', v)} />
+          <Choix label="Remplacements" valeur={strategie.remplacements} options={TIMINGS} onChange={v => majStrategie('remplacements', v)} />
+          <Choix label="Pénalité à moins de 35 m" valeur={strategie.penaliteCourte} options={PENALITES} onChange={v => majStrategie('penaliteCourte', v)} />
+          <Choix label="Pénalité au-delà de 35 m" valeur={strategie.penaliteLongue} options={PENALITES} onChange={v => majStrategie('penaliteLongue', v)} />
+          <Choix label="Si mené après la 60ᵉ" valeur={strategie.bascule60} options={MENTALITES} onChange={v => majStrategie('bascule60', v)} />
+          <Choix label="Si mené de 8+ après la 70ᵉ" valeur={strategie.bascule70} options={MENTALITES} onChange={v => majStrategie('bascule70', v)} />
+        </div>
       </div>
-    </section>
+    </details>
   </>;
 }
 
