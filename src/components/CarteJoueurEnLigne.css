@@ -53,3 +53,19 @@ button.cel-carte.dr-player:hover { box-shadow: none; filter: drop-shadow(0 9px 1
 .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut { width:100%;max-width:104px;min-width:0; }
 .ct-feuille-fut .manager-reserves > div { grid-template-columns:repeat(auto-fill,minmax(84px,104px));justify-content:center;gap:12px; }
 .ct-feuille-fut .ct-reserve-fut { max-width:104px; }
+
+/* ⚠️ SOUS 66 PX, UNE CARTE NE MONTRE PLUS SES SIX STATISTIQUES. Les tailles
+   sont en `cqw` : à 51 px de large, le nom tombe à 3 px et les stats à 2 px —
+   ce n'est plus de l'information, c'est du grain. Quand la feuille en ligne se
+   met à la hauteur de la fenêtre, la carte garde donc ce qui sert à composer
+   (la note, le poste, la photo, le nom) et laisse le détail à la fiche qui
+   s'ouvre au clic. La carte est son propre conteneur (`container-type:
+   inline-size`), la règle vaut donc partout où elle devient minuscule. */
+@container (max-width: 66px) {
+  .dr-player-stats, .dr-player-rarity, .dr-player-status { display: none; }
+  .dr-player-identity { top: 66%; height: 22%; }
+  .dr-player-identity strong { font-size: 8cqw; }
+  .dr-player-identity small { display: none; }
+  .dr-player-rating > em { display: none; }
+  .dr-player-rating > b { font-size: 24cqw; }
+}

@@ -10337,3 +10337,76 @@ npx vite-node scripts/verifPyramide.ts      # les divisions gardent leur taille
 npx vite-node scripts/verifCoupesEurope.ts  # le tour avance, les scores sont du rugby
 npx vite-node scripts/verifRaretes.ts       # raretés, marché, emplacements
 ```
+
+---
+
+## La composition en ligne tenait sur deux écrans
+
+Retour de jeu : « la composition dans la ligue en ligne ne rentre pas dans la
+page ». Mesuré à **1 440 × 900** : l'onglet réclamait **1 942 px** de hauteur —
+et pas parce qu'il y avait trop à montrer.
+
+### 1. 477 px de vide noir sous la pelouse
+
+Le terrain était figé à **650 px** ; le rail de droite (le banc en **deux**
+colonnes de 104 px, donc quatre rangées, puis les réserves) en réclamait
+**1 116**. Comme `.ct-plateau` couvre les deux rangées de la grille, il était
+**étiré à la hauteur du rail** : la pelouse s'arrêtait à 650 px et le reste était
+du noir. On ne voyait donc pas « trop de contenu », on voyait un trou.
+
+### 2. Rien ne ramenait jamais la feuille à la fenêtre
+
+Les trois blocs de l'onglet (la barre du haut, la feuille, les consignes)
+étaient trois enfants directs de `.cel`, empilés. Impossible d'écrire « la
+feuille prend ce qui reste ». Ils vivent maintenant dans un `.cel-compo`, et
+au-delà de 1 121 px `.cel:has(> .cel-compo)` vaut
+`max(calc(100dvh - 4.45rem), 62rem)`.
+
+⚠️ **UN PLANCHER, PAS UNE CAMISOLE.** `height: 100dvh` seul écrasait la pelouse à
+**220 px** sur une fenêtre de 900 — des cartes de 23 px. Le `max()` dit les deux
+choses : prends la fenêtre, jamais moins de 62 rem. Au-delà d'environ **1 060 px
+de fenêtre, l'onglet ne défile plus du tout** ; en dessous il reste un doigt de
+défilement au lieu du millier de pixels d'avant. Un écran de 900 px de haut ne
+peut PAS tout montrer à taille lisible : 15 cartes + banc + réserves + en-têtes
+demandent ~1 060 px, c'est de l'arithmétique, pas un réglage.
+
+### 3. La carte se mesure sur la pelouse, pas sur la fenêtre
+
+`PLACEMENT_XV` place les quinze cartes en **pourcentages** : leur écart rétrécit
+avec le terrain. Une largeur en `vw` finissait donc fatalement par les faire se
+chevaucher dès que la pelouse raccourcissait. Le terrain est devenu un conteneur
+(`container-type: size`) et la carte vaut `max(2.9rem, min(20cqw, 11.2cqh))` —
+20 % de la largeur (sur une même ligne, les deux postes les plus serrés sont à
+22 % l'un de l'autre) et 11,2 % de la hauteur (la carte fait 1,75 fois sa
+largeur, badge compris, et le couple vertical le plus serré, le n° 9 et le
+n° 12, n'a que 21 % entre les deux). Mesuré : **0 chevauchement** à 1 800 × 900,
+1 500 × 1 200, 1 280 × 800.
+
+### Trois pièges rencontrés en chemin
+
+⚠️ **LA LÉGENDE DU TERRAIN EST VERTICALE.** `.manager-terrain-cadre` est une
+grille de deux colonnes, 28 px pour « en-but adverse » écrit en
+`writing-mode: vertical-rl`. Passé en colonne flex pour étirer la pelouse, ce
+texte revenait à l'horizontale AU-DESSUS d'elle et lui volait 99 px. On ne
+touche donc qu'à la rangée : `grid-template-rows: minmax(0, 1fr)`.
+
+⚠️ **`<details>` N'EST PAS UN CONTENEUR FLEX.** Depuis `::details-content`, les
+enfants d'un `<details>` ne sont plus des éléments flexibles de son bloc : le
+`flex: 1; overflow: auto` posé sur la grille des réserves ne la contraignait pas
+et elle débordait sous la fenêtre. Le défilement est posé sur le `<details>`
+lui-même, avec un `<summary>` collant.
+
+⚠️ **`align-self: start` (App.css, ≥ 1 121 px)** laissait les réserves prendre
+leur hauteur naturelle. Sans `stretch`, tout le travail sur la hauteur ne servait
+à rien.
+
+### Et la carte géante de la mise en vente
+
+`.cel-apercu-vente .cel-carte.dr-player.dr-player { width: 12rem }` gagnait déjà
+contre la règle générique `width: 100%` — mais à la spécificité, donc une seule
+classe ajoutée ailleurs suffisait à la reperdre, et l'aperçu remplissait alors
+tout le panneau. C'est maintenant la **piste de grille** qui vaut 12 rem
+(`grid-template-columns: min(12rem, 100%)`) : quoi que la carte demande, elle
+tient dedans. Vérifié en forçant `width: 100% !important` sur la carte — elle
+reste à 192 px.
+

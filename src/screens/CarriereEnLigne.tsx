@@ -872,7 +872,11 @@ function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agi
 
   if (cartes.length < 23) return <Vide icone="equipe" titre="Ton effectif est trop court">Il faut au moins 23 joueurs disponibles pour composer une feuille de match.</Vide>;
 
-  return <>
+  // ⚠️ UN SEUL BLOC, PAS UN FRAGMENT. Les trois morceaux de l’onglet (la barre
+  // du haut, la feuille, les consignes) étaient trois enfants directs de `.cel` :
+  // impossible alors de dire « la feuille prend ce qui reste de la fenêtre ».
+  // Regroupés ici, ils forment la colonne qui tient dans l’écran.
+  return <section className="cel-compo">
     <section className="cel-panneau cel-tete-compo">
       <div><div className="eyebrow">Feuille de {composition.titulaires.length + composition.remplacants.length} sur {cartes.length} joueurs</div><h2>Ton XV, ton banc, tes rôles</h2><p>Le capitaine tient la discipline, le buteur tire les pénalités. Un joueur hors de son poste perd la cohérence collective.</p></div>
       <div className="cel-note-compo"><b>{noteXV.toFixed(1)}</b><span>note du XV</span></div>
@@ -906,7 +910,7 @@ function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agi
         </div>
       </div>
     </details>
-  </>;
+  </section>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
