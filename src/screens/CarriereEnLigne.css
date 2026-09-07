@@ -1455,6 +1455,28 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-note-compo b { display: block; font-family: var(--police-titre); font-size: 2.2rem; color: var(--or-400); line-height: 1; }
 .cel-note-compo span { font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brume); }
 
+/* La composition en ligne doit se consulter d'un seul regard. Le composant est
+   aussi utilisé par le mode Manager, où les cartes restent volontairement
+   grandes ; ces règles ne s'appliquent donc qu'à la ligue. La hauteur du
+   terrain s'adapte à la fenêtre et les cartes gardent assez d'espace entre les
+   lignes pour rester sélectionnables. */
+.cel .ct-feuille-fut .manager-terrain-xv {
+  min-height: clamp(540px, calc(100vh - 350px), 720px);
+}
+.cel .ct-feuille-fut .manager-position { width: clamp(48px, 5vw, 62px); }
+.cel .ct-feuille-fut .ct-fut-indicateurs {
+  gap: 2px;
+  padding: 1px 2px;
+  font-size: 8px;
+  border-radius: 5px;
+}
+.cel .ct-feuille-fut .ct-fut-indicateurs svg { width: 7px; height: 7px; }
+
+@media (max-width: 700px) {
+  .cel .ct-feuille-fut .manager-terrain-xv { min-height: 540px; }
+  .cel .ct-feuille-fut .manager-position { width: clamp(44px, 15vw, 58px); }
+}
+
 .cel-palmares { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 0.7rem; }
 .cel-palmares article {
   display: flex;
