@@ -1,3 +1,4 @@
+import { RoueCartes } from '../components/RoueCartes';
 // ═══════════════════════════════════════════════════════════════════════════
 // LA CARRIÈRE EN LIGNE — le troisième mode
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1009,6 +1010,7 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
   const [rareteMarche, setRareteMarche] = useState('');
   const normaliserRecherche = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const correspond = (c: CarteCarriere) => (!rareteMarche || c.rarete === rareteMarche) && normaliserRecherche(`${c.nom} ${c.clubReel} ${nomPoste(c.poste)}`).includes(normaliserRecherche(rechercheMarche));
+  const [venteSelectionnee, setVenteSelectionnee] = useState('');
   const [prix, setPrix] = useState('5000');
   const [mode, setMode] = useState('directe');
   const [duree, setDuree] = useState('24');
@@ -1031,7 +1033,8 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
       <button key={id} className={sousOnglet === id ? 'actif' : ''} onClick={() => setSousOnglet(id)}>{label}</button>)}</nav>
 
     <div className="cel-deux"><Champ label="Rechercher un joueur, un club ou un poste"><input type="search" value={rechercheMarche} onChange={e => setRechercheMarche(e.target.value)} placeholder="Nom du joueur…" /></Champ><Choix label="Rareté" valeur={rareteMarche} onChange={setRareteMarche} options={[["", "Toutes"], ["bronze", "Bronze"], ["argent", "Argent"], ["or", "Or"], ["elite", "Élite"], ["star", "Mythique"]]} /></div>
-    {sousOnglet === 'encours' && (ouvertes.length ? <div className="cel-grille-ventes">{ouvertes.map(v => {
+    {sousOnglet === 'encours' && <RoueCartes titre="Les joueurs sur le marché" cartes={ouvertes.map(v=>carte(v.carteId)!).filter(Boolean)} selection={venteSelectionnee} onChoisir={setVenteSelectionnee} vide={rechercheMarche || rareteMarche ? 'Aucun joueur ne correspond à ces filtres.' : 'Aucun joueur en vente pour le moment.'} />}
+    {sousOnglet === 'encours' && (ouvertes.length ? <div className="cel-grille-ventes">{ouvertes.filter(v=>v.carteId===venteSelectionnee).map(v => {
       const c = carte(v.carteId);
       if (!c) return null;
       const mienne = v.vendeurId === vue.monClubId;
@@ -1053,12 +1056,13 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
               </div>}
         </div>
       </article>;
-    })}</div> : <Vide icone="poignee" titre="Le marché est calme">Personne n’a mis de joueur en vente pour le moment. À toi d’ouvrir le bal.</Vide>)}
+    })}</div> : null)}
 
     {sousOnglet === 'vendre' && <>
-      <form className="cel-panneau" onSubmit={async e => { e.preventDefault(); const v = await agir({ type: 'vendre', carteId, prix: Number(prix), mode: mode as 'directe' | 'enchere', dureeHeures: Number(duree) }); if (v) setCarteId(''); }}>
+      <RoueCartes titre="Choisis ta carte à vendre ou échanger" cartes={vendables.filter(correspond).sort((a,b)=>b.note-a.note)} selection={carteId} onChoisir={setCarteId} vide={mesCartes.length ? 'Aucune carte disponible avec ces filtres. Les cartes verrouillées ne peuvent pas être vendues.' : 'Ton effectif ne contient encore aucune carte.'} />
+      {carteId && vendables.some(c=>c.id===carteId && correspond(c)) && <form className="cel-panneau" onSubmit={async e => { e.preventDefault(); const v = await agir({ type: 'vendre', carteId, prix: Number(prix), mode: mode as 'directe' | 'enchere', dureeHeures: Number(duree) }); if (v) setCarteId(''); }}>
         <h2>Mettre un joueur sur le marché</h2>
-        <p className="cel-note">Ton effectif ne peut pas descendre sous 26 joueurs, et chaque ligne doit garder de quoi composer une feuille. C’est le serveur qui le vérifie.</p>
+        <p className="cel-note">Choisis le prix, le type et la durée de vente. Ton effectif doit conserver au moins 26 joueurs et les postes nécessaires.</p>
         <div className="cel-grille-consignes">
           <Champ label="Prix de départ (Ovas)"><input type="number" min={1} step={100} value={prix} onChange={e => setPrix(e.target.value)} required /></Champ>
           <Choix label="Type" valeur={mode} options={[['directe', 'Vente directe'], ['enchere', 'Aux enchères']]} onChange={setMode} />
@@ -1066,7 +1070,7 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
         </div>
         {carteId && carte(carteId) && <div className="cel-apercu-vente"><CarteJoueurEnLigne carte={carte(carteId)!} /></div>}
         <button className="btn primaire" disabled={occupe || !carteId}>Publier l’annonce</button><button type="button" className="btn fantome" disabled={!carteId} onClick={() => { setDonnees([carteId]); setSousOnglet('echanges'); }}>Échanger cette carte</button>
-      </form>
+      </form>}
     </>}
 
     {sousOnglet === 'echanges' && <>
