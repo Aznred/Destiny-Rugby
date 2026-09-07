@@ -144,6 +144,11 @@ export type CommandeCarriere =
   | { type: 'ouvrirPack'; packId: IdPackCarriere }
   | { type: 'ouvrirPackGratuit'; attributionId: string }
   | { type: 'venteRapide'; carteId: string }
+  // ⚠️ LE LOT PART D'UN SEUL BLOC, et c'est tout l'intérêt : le plancher
+  // d'effectif se vérifie sur l'ENSEMBLE des sortants. Vendre les mêmes cartes
+  // une par une passerait les quatre premières puis échouerait sur la
+  // cinquième, en laissant l'effectif à moitié démantelé.
+  | { type: 'venteRapideGroupee'; carteIds: string[] }
   | { type: 'vendre'; carteId: string; prix: number; mode: 'directe' | 'enchere'; dureeHeures: number }
   | { type: 'acheter'; venteId: string }
   | { type: 'encherir'; venteId: string; montant: number }

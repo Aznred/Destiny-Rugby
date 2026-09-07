@@ -101,6 +101,22 @@ function transferer(carte: CarteCarriere, destinataire: ClubCarriere, saison: nu
   carte.proprietaire = destinataire.id; delete carte.verrou;
   carte.clubs.push({ clubId: destinataire.id, saison });
 }
+/**
+ * ⚠️ UN JOUEUR ALIGNÉ NE QUITTE PAS LE CLUB. Vendre, vendre rapidement ou
+ * échanger un titulaire ou un remplaçant était permis : la feuille se
+ * réparait toute seule derrière (`ajusterComposition`), et on découvrait le
+ * dimanche que le numéro 10 avait été remplacé par le premier venu du même
+ * poste. On refuse maintenant le départ tant que la carte est sur la feuille —
+ * la sortir du XV ou du banc est un geste conscient, et il reste à un clic.
+ *
+ * `ajusterComposition` garde tout son sens : elle rattrape les départs SUBIS
+ * (blessure, carte achetée par un autre club, expiration d'enchère), pas ceux
+ * qu'on décide.
+ */
+function verifierHorsFeuille(club: ClubCarriere, sortants: string[]) {
+  const feuille = new Set([...(club.composition?.titulaires ?? []), ...(club.composition?.remplacants ?? [])]);
+  exiger(!sortants.some(id => feuille.has(id)), 'Ce joueur est sur ta feuille de match. Sors-le du XV ou du banc avant de le laisser partir.');
+}
 function verifierDepart(etat: EtatCarriereEnLigne, clubId: string, sortants: string[], entrants: string[] = []) {
   const restants = cartesClub(etat, clubId).filter(c => !sortants.includes(c.id) && !c.verrou).map(coequipierDepuisCarte);
   restants.push(...entrants.map(id => coequipierDepuisCarte(carteParId(etat, id))));
@@ -617,14 +633,23 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         club.packsGratuits = club.packsGratuits!.filter(pack => pack.id !== attribution.id);
         break;
       }
-      case 'venteRapide': {
-        clubLibre(nouveau, club.id); identifiant(commande.carteId);
-        const carte = carteParId(nouveau, commande.carteId);
-        exiger(carte.proprietaire === club.id && !carte.verrou, 'Cette carte ne peut pas être vendue rapidement.');
-        verifierDepart(nouveau, club.id, [carte.id]);
-        const valeur = valeurVenteRapide(carte);
-        journal(nouveau, club, 'venteRapide', valeur, [carte.id], `Vente rapide : ${carte.nom}`, date);
-        nouveau.cartes = nouveau.cartes.filter(c => c.id !== carte.id);
+      // ⚠️ UNE SEULE VOIE POUR UNE CARTE OU POUR VINGT. Le lot n'est pas une
+      // boucle sur la vente unitaire : le plancher d'effectif et la profondeur
+      // aux postes se vérifient sur TOUS les sortants à la fois, sinon on
+      // laisserait passer les premières ventes avant de refuser la dernière.
+      case 'venteRapide':
+      case 'venteRapideGroupee': {
+        clubLibre(nouveau, club.id);
+        const ids = commande.type === 'venteRapide' ? [commande.carteId] : commande.carteIds;
+        listeIds(ids, 30); exiger(ids.length > 0, 'Choisissez au moins une carte à vendre.');
+        const lot = ids.map(id => carteParId(nouveau, id));
+        for (const carte of lot) exiger(carte.proprietaire === club.id && !carte.verrou, `${carte.nom} ne peut pas être vendu rapidement.`);
+        verifierHorsFeuille(club, ids); verifierDepart(nouveau, club.id, ids);
+        const valeur = lot.reduce((total, carte) => total + valeurVenteRapide(carte), 0);
+        const libelle = lot.length === 1 ? `Vente rapide : ${lot[0].nom}` : `Vente rapide : ${lot.length} joueurs`;
+        journal(nouveau, club, 'venteRapide', valeur, ids, libelle, date);
+        const partants = new Set(ids);
+        nouveau.cartes = nouveau.cartes.filter(c => !partants.has(c.id));
         ajusterComposition(nouveau, club, maintenant);
         break;
       }
@@ -632,7 +657,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         clubLibre(nouveau, club.id); identifiant(commande.carteId); entier(commande.prix, 1); entier(commande.dureeHeures, 1, 168);
         exiger(commande.mode === 'directe' || commande.mode === 'enchere', 'Type de vente invalide.');
         const carte = carteParId(nouveau, commande.carteId); exiger(carte.proprietaire === club.id && !carte.verrou, 'Cette carte ne peut pas être mise en vente.');
-        verifierDepart(nouveau, club.id, [carte.id]); const id = prochainId(nouveau, 'vente', nouveau.ventes.length); carte.verrou = id;
+        verifierHorsFeuille(club, [carte.id]); verifierDepart(nouveau, club.id, [carte.id]); const id = prochainId(nouveau, 'vente', nouveau.ventes.length); carte.verrou = id;
         nouveau.ventes.push({ id, carteId: carte.id, vendeurId: club.id, type: commande.mode, prix: commande.prix, expireLe: dateServeur(maintenant + commande.dureeHeures * HEURE), etat: 'ouverte' }); break;
       }
       case 'acheter': {
@@ -662,6 +687,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         exiger(nouveau.echanges.filter(e => e.de === club.id && e.etat === 'propose').length < 10, 'Vous avez déjà dix offres en cours.');
         for (const id of commande.cartesDonnees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === club.id && !c.verrou, 'Une carte proposée est indisponible.'); }
         for (const id of commande.cartesDemandees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === destinataire.id && !c.verrou, 'Une carte demandée est indisponible.'); }
+        verifierHorsFeuille(club, commande.cartesDonnees);
         verifierDepart(nouveau, club.id, commande.cartesDonnees, commande.cartesDemandees); verifierDepart(nouveau, destinataire.id, commande.cartesDemandees, commande.cartesDonnees);
         const id = prochainId(nouveau, 'echange', nouveau.echanges.length);
         nouveau.echanges.push({ id, de: club.id, vers: destinataire.id, cartesDonnees: [...commande.cartesDonnees], cartesDemandees: [...commande.cartesDemandees], ovasDonnes: commande.ovasDonnes, ovasDemandes: commande.ovasDemandes, expireLe: dateServeur(maintenant + 48 * HEURE), etat: 'propose' });
@@ -677,6 +703,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
           clubLibre(nouveau, e.de); clubLibre(nouveau, e.vers);
           for (const id of e.cartesDonnees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === e.de && c.verrou === e.id, 'Une carte proposée n’est plus disponible.'); }
           for (const id of e.cartesDemandees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === e.vers && !c.verrou, 'Une carte demandée n’est plus disponible.'); }
+          verifierHorsFeuille(emetteur, e.cartesDonnees); verifierHorsFeuille(destinataire, e.cartesDemandees);
           verifierDepart(nouveau, e.de, e.cartesDonnees, e.cartesDemandees); verifierDepart(nouveau, e.vers, e.cartesDemandees, e.cartesDonnees);
           // Les Ovas entrants ne servent pas à garantir les Ovas promis : le solde doit exister.
           exiger(destinataire.ovas >= e.ovasDemandes, 'Le destinataire ne dispose plus des Ovas nécessaires.');

@@ -1,0 +1,66 @@
+/* LA FICHE DE MARCHÉ — deux colonnes : la carte, puis ce qu'on en fait.
+   Les champs reprennent `.cel-champ` de l'écran Carrière en ligne : la modale
+   ne s'ouvre que depuis lui, et deux styles de champ côte à côte dans la même
+   fenêtre se verraient tout de suite. */
+
+.modale.mm {
+  width: min(920px, 100%);
+  padding: 1.4rem;
+  position: relative;
+}
+.mm-fermer { position: absolute; top: 0.9rem; right: 0.9rem; z-index: 2; }
+.mm-corps {
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  gap: 1.6rem;
+  align-items: start;
+}
+/* La carte garde sa taille de carte : la règle générique des cartes de ligue
+   leur donne 100 % de leur conteneur, c'est donc la COLONNE qui la borne. */
+.mm-carte { display: grid; grid-template-columns: min(15rem, 100%); justify-content: center; }
+
+.mm-details { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.mm-entete h2 { font-family: var(--police-forte); font-size: 1.6rem; margin: 0.15rem 0 0; }
+
+.mm-lignes { display: flex; flex-direction: column; gap: 0.55rem; margin: 0; }
+.mm-lignes > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+  padding-bottom: 0.55rem; border-bottom: 1px solid var(--bordure);
+}
+.mm-lignes > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.mm-lignes dt { color: var(--craie-dim); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.mm-lignes dd { margin: 0; text-align: right; font-weight: 600; }
+.mm-lignes dd i { color: var(--craie-dim); font-style: normal; font-weight: 400; }
+.mm-lignes dd small { color: var(--craie-dim); font-size: 0.78rem; font-weight: 400; }
+.mm-prix { font-family: var(--police-titre); font-size: 1.6rem; color: var(--or-400); }
+
+/* ⚠️ LES CHIFFRES DU REBOURS SONT EN CHASSE FIXE ET EN LARGEUR RÉSERVÉE. Une
+   seconde qui passe de « 9 » à « 10 » élargit le nombre, et toute la ligne
+   sautait à chaque tic — c'est le genre de tremblement qu'on ne remarque
+   qu'inconsciemment, et qui fait « pas fini ». */
+.mm-rebours { display: inline-flex; align-items: baseline; gap: 0.1rem; font-family: var(--police-titre); font-size: 1.35rem; color: var(--craie); font-variant-numeric: tabular-nums; }
+.mm-rebours span { min-width: 1.5ch; text-align: center; }
+.mm-rebours i { color: var(--craie-dim); font-style: normal; }
+.mm-fini { color: var(--danger); font-family: var(--police-titre); font-size: 1.2rem; }
+.mm-echeance { display: block; }
+
+.mm-actions, .mm-formulaire { display: flex; flex-direction: column; gap: 0.7rem; }
+.mm-boutons { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.mm-boutons .btn { flex: 1 1 8rem; }
+.mm-note { color: var(--craie-dim); font-size: 0.84rem; line-height: 1.5; margin: 0; }
+.mm-note.alerte { color: var(--danger); }
+
+.mm-rapide {
+  display: flex; flex-direction: column; gap: 0.7rem;
+  padding: 0.9rem; border-radius: var(--rayon);
+  border: 1px dashed var(--bordure); background: rgba(0, 0, 0, 0.18);
+}
+.mm-rapide .eyebrow { margin-bottom: 0.2rem; }
+
+@media (max-width: 760px) {
+  .modale.mm { padding: 1.1rem; }
+  .mm-corps { grid-template-columns: minmax(0, 1fr); gap: 1.1rem; }
+  .mm-carte { grid-template-columns: min(11rem, 60%); }
+  .mm-entete h2 { font-size: 1.35rem; }
+  .mm-lignes > div { gap: 0.6rem; }
+}

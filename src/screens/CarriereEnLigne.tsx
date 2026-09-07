@@ -31,7 +31,7 @@ import { Confirmation } from '../components/Confirmation';
 import { useGame } from '../store/useGame';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { meilleureComposition } from '../lib/meilleureComposition';
-import { POSTES_XV_MANAGER } from '../lib/compositionManager';
+import { EFFECTIF_MINIMUM, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import type { CompositionManager } from '../types';
 import type { Coequipier } from '../lib/effectif';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
@@ -51,6 +51,7 @@ import OuverturePack from '../components/OuverturePack';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { valeurVenteRapide } from '../lib/ligue/venteRapideCarriere';
+import { ModaleMarche } from '../components/ModaleMarche';
 
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
@@ -140,6 +141,19 @@ function Choix({ label, valeur, options, onChange }: { label: string; valeur: st
 }
 function Vide({ icone = 'stade', titre, children }: { icone?: NomIcone; titre: string; children: ReactNode }) {
   return <div className="cel-vide"><Icone nom={icone} taille={34} /><h3>{titre}</h3><p>{children}</p></div>;
+}
+
+/**
+ * ⚠️ UN JOUEUR ALIGNÉ NE SE VEND PAS, et l'écran doit le dire AVANT le clic.
+ * Le serveur refuse le départ d'un titulaire ou d'un remplaçant
+ * (`verifierHorsFeuille`) ; ici on retrouve le maillot qu'il porte, pour que le
+ * bouton grisé ait une raison lisible plutôt qu'un message d'erreur après coup.
+ */
+function feuilleDeMatch(club?: VueCarriereEnLigne['clubs'][number]): Map<string, string> {
+  const feuille = new Map<string, string>();
+  club?.composition?.titulaires.forEach((id, i) => { if (id) feuille.set(id, `titulaire nº ${POSTE_PAR_ID[POSTES_XV_MANAGER[i]]?.numero ?? i + 1}`); });
+  club?.composition?.remplacants.forEach((id, i) => { if (id) feuille.set(id, `remplaçant nº ${16 + i}`); });
+  return feuille;
 }
 /**
  * L'écusson d'un club : son vrai blason s'il en a choisi un, sinon ses
@@ -932,34 +946,88 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
 //    lui, a la place et distingue vraiment le 4 du 5.
 //    La parenthèse chiffrée est la même dans les sept langues : c’est un chiffre.
 
+/**
+ * ⚠️ LE PLANCHER D'EFFECTIF SE VÉRIFIE AVANT LE CLIC, PAS APRÈS. Le serveur
+ * refuse un départ qui descendrait sous `EFFECTIF_MINIMUM` joueurs disponibles
+ * — mais découvrir ça après avoir coché douze cartes, c'est douze clics pour
+ * rien. On compte donc ici ce qui restera, avec la même définition que
+ * `verifierDepart` : les cartes verrouillées (déjà en vente, déjà promises à
+ * un échange) ne comptent pas dans l'effectif disponible.
+ */
 function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const logos = useLogosDeClub();
   const [tri, setTri] = useState('note');
   const [famille, setFamille] = useState('');
-  const [aVendre, setAVendre] = useState<CarteCarriere | null>(null);
-  const cartes = vue.cartes.filter(c => c.proprietaire === vue.monClubId)
+  const [demande, setDemande] = useState<CarteCarriere[] | null>(null);
+  const [selection, setSelection] = useState<string[]>([]);
+  const feuille = feuilleDeMatch(vue.clubs.find(c => c.id === vue.monClubId));
+  const toutes = vue.cartes.filter(c => c.proprietaire === vue.monClubId);
+  const cartes = toutes
     .filter(c => !famille || c.famille === famille)
     .sort((a, b) => tri === 'note' ? b.note - a.note : tri === 'poste' ? (POSTE_PAR_ID[a.poste]?.numero ?? 0) - (POSTE_PAR_ID[b.poste]?.numero ?? 0) : tri === 'age' ? a.age - b.age : a.nom.localeCompare(b.nom, 'fr'));
-  const familles = [...new Set(vue.cartes.filter(c => c.proprietaire === vue.monClubId).map(c => c.famille))];
+  const familles = [...new Set(toutes.map(c => c.famille))];
+
+  const cessible = (c: CarteCarriere) => !c.verrou && !feuille.has(c.id);
+  const choisies = toutes.filter(c => selection.includes(c.id) && cessible(c));
+  const total = choisies.reduce((somme, c) => somme + valeurVenteRapide(c), 0);
+  const disponibles = toutes.filter(c => !c.verrou).length;
+  const restants = disponibles - choisies.length;
+  const basculer = (id: string) => setSelection(liste => liste.includes(id) ? liste.filter(x => x !== id) : [...liste, id]);
+  const vendre = (lot: CarteCarriere[]) => {
+    setDemande(null); setSelection([]);
+    void agir(lot.length === 1 ? { type: 'venteRapide', carteId: lot[0].id } : { type: 'venteRapideGroupee', carteIds: lot.map(c => c.id) });
+  };
+
   return <>
     <section className="cel-panneau cel-filtres">
       <div><div className="eyebrow">{cartes.length} joueurs sous contrat</div><h2>Ton effectif</h2></div>
       <Choix label="Trier par" valeur={tri} options={[['note', 'Note (GEN)'], ['poste', 'Numéro de maillot'], ['age', 'Âge'], ['nom', 'Nom']]} onChange={setTri} />
       <Choix label="Poste" valeur={famille} options={[['', 'Tous les postes'], ...familles.map(f => [f, nomPoste(POSTES_XV_MANAGER.find(p => POSTE_PAR_ID[p].famille === f) ?? 'arriere')] as [string, string])]} onChange={setFamille} />
-    </section>
-    <div className="cel-grille-cartes">{cartes.map(c => <div className="cel-carte-quick" key={c.id}>
-      <CarteJoueurEnLigne carte={c} logoClub={logos.get(c.clubReel)} />
-      <button className="cel-vente-rapide" type="button" disabled={occupe || Boolean(c.verrou)} onClick={() => setAVendre(c)}>
-        Vente rapide · {montant(valeurVenteRapide(c))} Ovas
+      <button type="button" className="btn fantome petit" disabled={!cartes.some(cessible)}
+        onClick={() => setSelection(liste => cartes.filter(cessible).every(c => liste.includes(c.id)) ? [] : [...new Set([...liste, ...cartes.filter(cessible).map(c => c.id)])])}>
+        {cartes.filter(cessible).every(c => selection.includes(c.id)) && cartes.some(cessible) ? 'Tout décocher' : 'Tout cocher'}
       </button>
-    </div>)}</div>
+    </section>
+
+    <div className="cel-grille-cartes">{cartes.map(c => {
+      const maillot = feuille.get(c.id);
+      const libre = cessible(c);
+      const choisie = libre && selection.includes(c.id);
+      return <div className={`cel-carte-quick${choisie ? ' choisie' : ''}`} key={c.id}>
+        {libre && <button type="button" className="cel-coche" aria-pressed={choisie} aria-label={`Sélectionner ${c.nom}`} onClick={() => basculer(c.id)}><Icone nom="check" taille={13} /></button>}
+        <CarteJoueurEnLigne carte={c} logoClub={logos.get(c.clubReel)} onClick={libre ? () => basculer(c.id) : undefined} />
+        <button className="cel-vente-rapide" type="button" disabled={occupe || !libre}
+          title={maillot ? `Sur la feuille de match (${maillot}) : sors-le du XV ou du banc pour le vendre.` : undefined}
+          onClick={() => setDemande([c])}>
+          {maillot ? `Sur la feuille · ${maillot}` : c.verrou ? 'Déjà sur le marché' : `Vente rapide · ${montant(valeurVenteRapide(c))} Ovas`}
+        </button>
+      </div>;
+    })}</div>
     {!cartes.length && <Vide icone="equipe" titre="Aucun joueur à ce poste">Ouvre un pack ou passe par le marché pour renforcer ta ligne.</Vide>}
-    {aVendre && <Confirmation
-      titre="Vendre cette carte ?"
-      message={`${aVendre.nom} sera retiré définitivement de ton effectif contre ${montant(valeurVenteRapide(aVendre))} Ovas. Cette action est irréversible.`}
-      libelleOui={`Vendre pour ${montant(valeurVenteRapide(aVendre))} Ovas`}
-      onNon={() => setAVendre(null)}
-      onOui={() => { const carteId = aVendre.id; setAVendre(null); void agir({ type: 'venteRapide', carteId }); }}
+
+    {/* La barre ne s'affiche qu'une fois quelque chose de coché : tant qu'on
+        regarde son effectif, rien ne doit recouvrir la dernière rangée. */}
+    {choisies.length > 0 && <div className="cel-barre-selection" role="region" aria-label="Sélection à vendre">
+      <div>
+        <b>{choisies.length} joueur{choisies.length > 1 ? 's' : ''} sélectionné{choisies.length > 1 ? 's' : ''}</b>
+        <small>{montant(total)} Ovas · il resterait {restants} joueurs disponibles</small>
+      </div>
+      <div className="cel-barre-actions">
+        <button type="button" className="btn fantome" onClick={() => setSelection([])}>Annuler</button>
+        <button type="button" className="btn primaire" disabled={occupe || restants < EFFECTIF_MINIMUM} onClick={() => setDemande(choisies)}>
+          {restants < EFFECTIF_MINIMUM ? `Garde au moins ${EFFECTIF_MINIMUM} joueurs` : `Tout vendre · ${montant(total)} Ovas`}
+        </button>
+      </div>
+    </div>}
+
+    {demande && <Confirmation
+      titre={demande.length === 1 ? 'Vendre cette carte ?' : `Vendre ces ${demande.length} cartes ?`}
+      message={demande.length === 1
+        ? `${demande[0].nom} sera retiré définitivement de ton effectif contre ${montant(valeurVenteRapide(demande[0]))} Ovas. Cette action est irréversible.`
+        : `${demande.map(c => c.nom).join(', ')} quitteront définitivement ton effectif contre ${montant(demande.reduce((s, c) => s + valeurVenteRapide(c), 0))} Ovas au total. Cette action est irréversible.`}
+      libelleOui={`Vendre pour ${montant(demande.reduce((s, c) => s + valeurVenteRapide(c), 0))} Ovas`}
+      onNon={() => setDemande(null)}
+      onOui={() => vendre(demande)}
     />}
   </>;
 }
@@ -1044,6 +1112,7 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
 
 function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
+  const logos = useLogosDeClub();
   const [sousOnglet, setSousOnglet] = useState<'encours' | 'vendre' | 'echanges'>('encours');
   const [carteId, setCarteId] = useState('');
   const [rechercheMarche, setRechercheMarche] = useState('');
@@ -1051,10 +1120,11 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
   const normaliserRecherche = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const correspond = (c: CarteCarriere) => (!rareteMarche || c.rarete === rareteMarche) && normaliserRecherche(`${c.nom} ${c.clubReel} ${nomPoste(c.poste)}`).includes(normaliserRecherche(rechercheMarche));
   const [venteSelectionnee, setVenteSelectionnee] = useState('');
-  const [prix, setPrix] = useState('5000');
-  const [mode, setMode] = useState('directe');
-  const [duree, setDuree] = useState('24');
-  const [enchere, setEnchere] = useState<Record<string, string>>({});
+  // \u26a0\ufe0f LA MODALE NE RETIENT QU'UN IDENTIFIANT DE CARTE. Y garder l'objet
+  // `vente` ou la carte fige un instantan\u00e9 : apr\u00e8s une ench\u00e8re, elle
+  // continuerait d'afficher l'ancienne meilleure offre alors que le serveur a
+  // d\u00e9j\u00e0 r\u00e9pondu. Tout est relu dans `vue` \u00e0 chaque rendu.
+  const [apercu, setApercu] = useState('');
   const [cible, setCible] = useState('');
   const [donnees, setDonnees] = useState<string[]>([]);
   const [demandees, setDemandees] = useState<string[]>([]);
@@ -1068,50 +1138,45 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
   const siennes = vue.cartes.filter(c => c.proprietaire === cible);
   const basculer = (liste: string[], set: (l: string[]) => void, id: string) => set(liste.includes(id) ? liste.filter(x => x !== id) : [...liste, id]);
 
+  // La carte ouverte dans la fiche, et l'annonce qui la porte s'il y en a une.
+  const feuille = feuilleDeMatch(club);
+  const carteApercue = apercu ? carte(apercu) : undefined;
+  const venteApercue = vue.ventes.find(v => v.carteId === apercu && v.etat === 'ouverte' && v.expireLe > maintenantISO());
+  /**
+   * ⚠️ ON NE REFERME PAS APRÈS UNE ENCHÈRE. Acheter, publier, retirer ou vendre
+   * rapidement changent l'état de la carte : la fiche n'a plus rien à montrer.
+   * Enchérir, non — on veut voir sa propre offre s'inscrire, et rester là pour
+   * la suivante.
+   */
+  const agirDepuisFiche = (commande: CommandeCarriere) => {
+    void agir(commande).then(suivante => {
+      if (!suivante || commande.type === 'encherir') return;
+      setApercu(''); setCarteId(''); setVenteSelectionnee('');
+    });
+  };
+
   return <>
     <nav className="cel-onglets secondaires">{([['encours', `À vendre (${ouvertes.length})`], ['vendre', 'Mettre en vente'], ['echanges', `Échanges (${vue.echanges.filter(e => e.etat === 'propose').length})`]] as const).map(([id, label]) =>
       <button key={id} className={sousOnglet === id ? 'actif' : ''} onClick={() => setSousOnglet(id)}>{label}</button>)}</nav>
 
     <div className="cel-deux"><Champ label="Rechercher un joueur, un club ou un poste"><input type="search" value={rechercheMarche} onChange={e => setRechercheMarche(e.target.value)} placeholder="Nom du joueur…" /></Champ><Choix label="Rareté" valeur={rareteMarche} onChange={setRareteMarche} options={[["", "Toutes"], ["bronze", "Bronze"], ["argent", "Argent"], ["or", "Or"], ["elite", "Élite"], ["star", "Mythique"]]} /></div>
-    {sousOnglet === 'encours' && <RoueCartes titre="Les joueurs sur le marché" cartes={ouvertes.map(v=>carte(v.carteId)!).filter(Boolean)} selection={venteSelectionnee} onChoisir={setVenteSelectionnee} vide={rechercheMarche || rareteMarche ? 'Aucun joueur ne correspond à ces filtres.' : 'Aucun joueur en vente pour le moment.'} />}
-    {sousOnglet === 'encours' && (ouvertes.length ? <div className="cel-grille-ventes">{ouvertes.filter(v=>v.carteId===venteSelectionnee).map(v => {
-      const c = carte(v.carteId);
-      if (!c) return null;
-      const mienne = v.vendeurId === vue.monClubId;
-      const minimum = v.enchere ? v.enchere.montant + Math.max(25, Math.ceil(v.enchere.montant * 0.05)) : v.prix;
-      return <article key={v.id} className="cel-vente">
-        <CarteJoueurEnLigne carte={c} proprietaire={nomClub(vue, v.vendeurId)} />
-        <div className="cel-vente-corps">
-          <div className="eyebrow">{v.type === 'enchere' ? 'Enchère' : 'Vente directe'} · clôture {dateHeure(v.expireLe)}</div>
-          <strong>{montant(v.enchere?.montant ?? v.prix)} Ovas</strong>
-          {v.enchere && <small>Meilleure offre : {nomClub(vue, v.enchere.clubId)}</small>}
-          {mienne ? (v.type === 'directe' || !v.enchere
-            ? <button className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'annulerVente', venteId: v.id }); }}>Retirer de la vente</button>
-            : <small>Une enchère est en cours : la vente ira à son terme.</small>)
-            : v.type === 'directe'
-              ? <button className="btn primaire" disabled={occupe || (club?.ovas ?? 0) < v.prix} onClick={() => { void agir({ type: 'acheter', venteId: v.id }); }}>Acheter</button>
-              : <div className="cel-encherir">
-                <input type="number" min={minimum} step={25} value={enchere[v.id] ?? String(minimum)} onChange={e => setEnchere({ ...enchere, [v.id]: e.target.value })} aria-label="Montant de l’enchère" />
-                <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'encherir', venteId: v.id, montant: Number(enchere[v.id] ?? minimum) }); }}>Enchérir</button>
-              </div>}
-        </div>
-      </article>;
-    })}</div> : null)}
+    {/* ⚠️ LA ROUE OUVRE LA FICHE, ELLE NE DÉROULE PLUS UN PANNEAU EN DESSOUS.
+        L'annonce s'affichait sous la roue : il fallait cliquer une carte, puis
+        descendre la page pour lire le prix et le vendeur, et la carte qu'on
+        venait de choisir sortait de l'écran. Tout tient maintenant dans une
+        fiche — la carte à gauche, l'annonce et ses boutons à droite. */}
+    {sousOnglet === 'encours' && <RoueCartes titre="Les joueurs sur le marché" cartes={ouvertes.map(v=>carte(v.carteId)!).filter(Boolean)} selection={venteSelectionnee} onChoisir={id => { setVenteSelectionnee(id); setApercu(id); }} vide={rechercheMarche || rareteMarche ? 'Aucun joueur ne correspond à ces filtres.' : 'Aucun joueur en vente pour le moment.'} />}
 
-    {sousOnglet === 'vendre' && <>
-      <RoueCartes titre="Choisis ta carte à vendre ou échanger" cartes={vendables.filter(correspond).sort((a,b)=>b.note-a.note)} selection={carteId} onChoisir={setCarteId} vide={mesCartes.length ? 'Aucune carte disponible avec ces filtres. Les cartes verrouillées ne peuvent pas être vendues.' : 'Ton effectif ne contient encore aucune carte.'} />
-      {carteId && vendables.some(c=>c.id===carteId && correspond(c)) && <form className="cel-panneau" onSubmit={async e => { e.preventDefault(); const v = await agir({ type: 'vendre', carteId, prix: Number(prix), mode: mode as 'directe' | 'enchere', dureeHeures: Number(duree) }); if (v) setCarteId(''); }}>
-        <h2>Mettre un joueur sur le marché</h2>
-        <p className="cel-note">Choisis le prix, le type et la durée de vente. Ton effectif doit conserver au moins 26 joueurs et les postes nécessaires.</p>
-        <div className="cel-grille-consignes">
-          <Champ label="Prix de départ (Ovas)"><input type="number" min={1} step={100} value={prix} onChange={e => setPrix(e.target.value)} required /></Champ>
-          <Choix label="Type" valeur={mode} options={[['directe', 'Vente directe'], ['enchere', 'Aux enchères']]} onChange={setMode} />
-          <Choix label="Durée" valeur={duree} options={[['2', '2 heures'], ['6', '6 heures'], ['24', '24 heures'], ['72', '3 jours'], ['168', '7 jours']]} onChange={setDuree} />
-        </div>
-        {carteId && carte(carteId) && <div className="cel-apercu-vente"><CarteJoueurEnLigne carte={carte(carteId)!} /></div>}
-        <button className="btn primaire" disabled={occupe || !carteId}>Publier l’annonce</button><button type="button" className="btn fantome" disabled={!carteId} onClick={() => { setDonnees([carteId]); setSousOnglet('echanges'); }}>Échanger cette carte</button>
-      </form>}
-    </>}
+    {sousOnglet === 'vendre' && <RoueCartes titre="Choisis ta carte à vendre ou échanger" cartes={vendables.filter(correspond).sort((a,b)=>b.note-a.note)} selection={carteId} onChoisir={id => { setCarteId(id); setApercu(id); }} vide={mesCartes.length ? 'Aucune carte disponible avec ces filtres. Les cartes verrouillées ne peuvent pas être vendues.' : 'Ton effectif ne contient encore aucune carte.'} />}
+
+    {carteApercue && <ModaleMarche
+      carte={carteApercue} vente={venteApercue} monClubId={vue.monClubId} ovas={club?.ovas ?? 0}
+      logoClub={logos.get(carteApercue.clubReel)} nomDe={id => nomClub(vue, id)} occupe={occupe}
+      surLaFeuille={feuille.get(carteApercue.id)}
+      effectifApresDepart={{ restants: mesCartes.filter(c => !c.verrou).length - 1, minimum: EFFECTIF_MINIMUM }}
+      onFermer={() => setApercu('')} onAgir={agirDepuisFiche}
+      onEchanger={() => { setDonnees([carteApercue.id]); setApercu(''); setSousOnglet('echanges'); }}
+    />}
 
     {sousOnglet === 'echanges' && <>
       {vue.echanges.filter(e => e.etat === 'propose').map(e => {
@@ -1136,7 +1201,9 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
         <p className="cel-note">« Je te donne mon 8 contre ton ailier + 15 000 Ovas. » Les deux doivent accepter ; le serveur valide ensuite la transaction d’un bloc.</p>
         <Choix label="Avec qui ?" valeur={cible} options={[['', 'Choisis un club'], ...vue.clubs.filter(c => c.id !== vue.monClubId).map(c => [c.id, c.nom] as [string, string])]} onChange={v => { setCible(v); setDemandees([]); }} />
         {cible && <div className="cel-deux">
-          <div><h3>Je donne</h3><div className="cel-choix-cartes">{vendables.sort((a, b) => b.note - a.note).map(c => <button type="button" key={c.id} className={donnees.includes(c.id) ? 'actif' : ''} onClick={() => basculer(donnees, setDonnees, c.id)}><b>{c.note}</b>{c.nom}<small>{nomPoste(c.poste)}</small></button>)}</div><Champ label="+ Ovas de ma part"><input type="number" min={0} step={100} value={ovasDonnes} onChange={e => setOvaDonnes(e.target.value)} /></Champ></div>
+          {/* Un titulaire ou un remplaçant ne part pas non plus par un échange :
+              le bouton dit lequel il est plutôt que son poste. */}
+          <div><h3>Je donne</h3><div className="cel-choix-cartes">{vendables.sort((a, b) => b.note - a.note).map(c => <button type="button" key={c.id} className={donnees.includes(c.id) ? 'actif' : ''} disabled={feuille.has(c.id)} title={feuille.has(c.id) ? `Sur la feuille de match (${feuille.get(c.id)}).` : undefined} onClick={() => basculer(donnees, setDonnees, c.id)}><b>{c.note}</b>{c.nom}<small>{feuille.get(c.id) ?? nomPoste(c.poste)}</small></button>)}</div><Champ label="+ Ovas de ma part"><input type="number" min={0} step={100} value={ovasDonnes} onChange={e => setOvaDonnes(e.target.value)} /></Champ></div>
           <div><h3>Je demande</h3><div className="cel-choix-cartes">{siennes.filter(c => !c.verrou).sort((a, b) => b.note - a.note).map(c => <button type="button" key={c.id} className={demandees.includes(c.id) ? 'actif' : ''} onClick={() => basculer(demandees, setDemandees, c.id)}><b>{c.note}</b>{c.nom}<small>{nomPoste(c.poste)}</small></button>)}</div><Champ label="+ Ovas de sa part"><input type="number" min={0} step={100} value={ovasDemandes} onChange={e => setOvaDemandes(e.target.value)} /></Champ></div>
         </div>}
         <button className="btn primaire" disabled={occupe || !cible || (!donnees.length && !demandees.length)}>Envoyer la proposition</button>

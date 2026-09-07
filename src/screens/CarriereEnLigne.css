@@ -691,6 +691,37 @@
 }
 .cel-vente-rapide:hover:not(:disabled) { border-color: var(--or-400); background: rgba(232, 178, 58, 0.15); }
 .cel-vente-rapide:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── LA SÉLECTION MULTIPLE DE L'EFFECTIF ───────────────────────────────────
+   Une case à cocher posée SUR la carte plutôt qu'à côté : la carte est déjà
+   toute la surface cliquable, la case dit juste où on en est. */
+.cel-carte-quick { position: relative; }
+.cel-coche {
+  position: absolute; top: 0.35rem; left: 0.35rem; z-index: 2;
+  width: 1.5rem; height: 1.5rem; display: grid; place-items: center;
+  border-radius: 0.45rem; cursor: pointer;
+  border: 1px solid rgba(255, 245, 219, 0.45); background: rgba(4, 12, 8, 0.62);
+  color: transparent; backdrop-filter: blur(2px);
+}
+.cel-coche:hover { border-color: var(--or-400); }
+.cel-carte-quick.choisie .cel-coche { background: var(--or-500); border-color: var(--or-200); color: #12100a; }
+.cel-carte-quick.choisie > .cel-carte.dr-player { filter: drop-shadow(0 0 12px rgba(241, 203, 89, 0.55)) brightness(1.06); }
+.cel-carte-quick.choisie .cel-vente-rapide { border-color: var(--or-400); }
+
+/* ⚠️ LA BARRE COLLE AU BAS DE LA FENÊTRE, PAS AU BAS DE LA LISTE. Avec
+   quarante cartes, un bouton posé après la grille demande de redescendre tout
+   l'effectif pour valider ce qu'on vient de cocher en haut. */
+.cel-barre-selection {
+  position: sticky; bottom: 0.6rem; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.8rem;
+  margin-top: 0.9rem; padding: 0.75rem 1rem;
+  border-radius: var(--rayon); border: 1px solid var(--or-500);
+  background: rgba(10, 22, 16, 0.94); box-shadow: var(--ombre-2);
+  backdrop-filter: blur(8px);
+}
+.cel-barre-selection b { display: block; font-family: var(--police-forte); }
+.cel-barre-selection small { color: var(--craie-dim); font-size: 0.8rem; }
+.cel-barre-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .cel-carte {
   position: relative;
   display: flex;

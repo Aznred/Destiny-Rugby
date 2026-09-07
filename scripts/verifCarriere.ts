@@ -22,7 +22,8 @@
 import {
   agirCarriere, avancerCarriere, classementCarriere, creerCarriere, vueCarriere, DOTATION_MAX,
   PACKS_GRATUITS_PAR_JOUR, poidsPackQuotidien, } from '../src/lib/ligue/carriere';
-import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere';
+import type { EtatCarriereEnLigne, RareteCarriere } from '../src/lib/ligue/typesCarriere';
+import { valeurVenteRapide, plafondVenteRapide } from '../src/lib/ligue/venteRapideCarriere';
 import {
   avancerMatchEnLigne, cibleDeScore, commanderMatchEnLigne, conclureMatchEnLigne,
   creerMatchEnLigne, decisionIA, feuilleGeleeEnLigne, forceFeuille, MS_PAR_MINUTE, STRATEGIE_EN_LIGNE_DEFAUT,
@@ -443,8 +444,32 @@ titre('7. LE MARCHÉ ENTRE AMIS');
   for (let n = 0; n < 6; n++) {
     e = agirCarriere(e, colin.compteId, { type: 'ouvrirPack', packId: 'premium' }, T0 + n * 1000, `p-${n}`);
   }
-  const aVendre = e.cartes.filter((c) => c.proprietaire === colin.id && c.origine !== 'formation')
-    .sort((a, b) => b.note - a.note)[0];
+  // ⚠️ ON NE VEND QUE CE QUI N'EST PAS SUR LA FEUILLE. Un titulaire ou un
+  // remplaçant ne quitte plus le club (`verifierHorsFeuille`) : il tiendrait
+  // son poste dimanche.
+  const surLaFeuille = (etat: typeof e, clubId: string) => {
+    const club = etat.clubs.find((c) => c.id === clubId)!;
+    return new Set([...club.composition.titulaires, ...club.composition.remplacants]);
+  };
+  const cessibles = (etat: typeof e, clubId: string) => {
+    const feuille = surLaFeuille(etat, clubId);
+    return etat.cartes.filter((c) => c.proprietaire === clubId && c.origine !== 'formation' && !c.verrou && !feuille.has(c.id));
+  };
+  const aligne = e.cartes.find((c) => c.proprietaire === colin.id && surLaFeuille(e, colin.id).has(c.id))!;
+  try {
+    agirCarriere(e, colin.compteId, { type: 'vendre', carteId: aligne.id, prix: 9_000, mode: 'directe', dureeHeures: 24 }, T0, 'refus');
+    dire(false, '⚠️ un joueur ALIGNÉ ne se vend pas', 'accepté !');
+  } catch (erreur) {
+    dire(erreur instanceof Error && erreur.name === 'ErreurCarriere', '⚠️ un joueur ALIGNÉ ne se vend pas', aligne.nom);
+  }
+  try {
+    agirCarriere(e, colin.compteId, { type: 'venteRapide', carteId: aligne.id }, T0, 'refus2');
+    dire(false, 'ni ne part en vente rapide', 'accepté !');
+  } catch (erreur) {
+    dire(erreur instanceof Error && erreur.name === 'ErreurCarriere', 'ni ne part en vente rapide', aligne.nom);
+  }
+
+  const aVendre = cessibles(e, colin.id).sort((a, b) => b.note - a.note)[0];
   e = agirCarriere(e, colin.compteId, { type: 'vendre', carteId: aVendre.id, prix: 9_000, mode: 'directe', dureeHeures: 24 }, T0, 'v');
   dire(e.ventes.length === 1 && e.ventes[0].etat === 'ouverte', 'une carte se met en vente', `${aVendre.nom} (${aVendre.note})`);
   dire(e.cartes.find((c) => c.id === aVendre.id)!.verrou === e.ventes[0].id,
@@ -472,9 +497,9 @@ titre('7. LE MARCHÉ ENTRE AMIS');
   dire(vendue.etat === 'vendue' && e.cartes.find((c) => c.id === autre.id)!.proprietaire === e.clubs[2].id,
     'à l’expiration, la carte part au plus offrant', `${nb(vendue.enchere!.montant)} Ovas`);
 
-  // Échange croisé.
-  const mien = e.cartes.filter((c) => c.proprietaire === colin.id && c.origine !== 'formation')[0];
-  const sien = e.cartes.filter((c) => c.proprietaire === hugo.id && c.origine !== 'formation')[0];
+  // Échange croisé — des deux côtés, une carte qui n'est pas sur la feuille.
+  const mien = cessibles(e, colin.id)[0];
+  const sien = cessibles(e, hugo.id)[0];
   if (mien && sien) {
     e = agirCarriere(e, colin.compteId, {
       type: 'proposerEchange', vers: hugo.id, cartesDonnees: [mien.id], cartesDemandees: [sien.id],
@@ -485,6 +510,30 @@ titre('7. LE MARCHÉ ENTRE AMIS');
     dire(e.cartes.find((c) => c.id === mien.id)!.proprietaire === hugo.id
       && e.cartes.find((c) => c.id === sien.id)!.proprietaire === colin.id,
       '⚠️ LES DEUX ONT ACCEPTÉ : les cartes changent de mains ensemble');
+  }
+
+  // ── La vente rapide, à l'unité et par lot ────────────────────────────────
+  const plafonds: [RareteCarriere, number][] = [['bronze', 50], ['argent', 250], ['or', 1_000], ['elite', 10_000], ['star', 20_000]];
+  dire(plafonds.every(([rarete, plafond]) => plafondVenteRapide(rarete) === plafond),
+    'les plafonds de vente rapide tiennent la bande', plafonds.map(([r, p]) => `${r} ${nb(p)}`).join(' · '));
+  dire(catalogueMondialCarriere().every((source) => valeurVenteRapide(source) <= plafondVenteRapide(source.rarete)),
+    '⚠️ et AUCUNE carte du vivier ne dépasse le plafond de sa bande', `${nb(catalogueMondialCarriere().length)} joueurs vérifiés`);
+
+  const lot = cessibles(e, colin.id).slice(0, 3);
+  const avantLot = e.clubs.find((c) => c.id === colin.id)!.ovas;
+  const attendu = lot.reduce((somme, c) => somme + valeurVenteRapide(c), 0);
+  e = agirCarriere(e, colin.compteId, { type: 'venteRapideGroupee', carteIds: lot.map((c) => c.id) }, T0 + 7000, 'vr');
+  dire(e.clubs.find((c) => c.id === colin.id)!.ovas === avantLot + attendu,
+    'une vente rapide GROUPÉE crédite la somme du lot', `${lot.length} cartes → +${nb(attendu)} Ovas`);
+  dire(lot.every((c) => !e.cartes.some((x) => x.id === c.id)), 'et les trois cartes quittent la ligue ensemble');
+  dire(e.transactions.filter((t) => t.nature === 'venteRapide').at(-1)!.cartes.length === 3,
+    '⚠️ en UNE écriture au journal, pas trois', e.transactions.filter((t) => t.nature === 'venteRapide').at(-1)!.libelle);
+  try {
+    agirCarriere(e, colin.compteId, { type: 'venteRapideGroupee', carteIds: cessibles(e, colin.id).map((c) => c.id) }, T0 + 8000, 'vr2');
+    dire(false, '⚠️ un lot qui viderait l’effectif est refusé EN ENTIER', 'accepté !');
+  } catch (erreur) {
+    dire(erreur instanceof Error && erreur.name === 'ErreurCarriere',
+      '⚠️ un lot qui viderait l’effectif est refusé EN ENTIER', erreur instanceof Error ? erreur.message : '');
   }
 }
 
