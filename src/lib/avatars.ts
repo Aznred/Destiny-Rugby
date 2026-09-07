@@ -1,3 +1,4 @@
+import { PHOTOS_NEW_MAJ } from '../data/photosNewMaj.js';
 // LES PHOTOS DE PROFIL DE L’OVALE
 // Portraits officiels locaux en priorité ; portrait stable du catalogue sinon.
 // Les initiales servent de repli local, les clubs gardent leur écusson.
@@ -99,7 +100,7 @@ function signatureNom(nom: string): string {
 function indexMotsDuNom(): Map<string, string | null> {
   if (parMotsDuNom) return parMotsDuNom;
   const index = new Map<string, string | null>();
-  for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ })) {
+  for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ, ...PHOTOS_NEW_MAJ })) {
     const signature = signatureNom(cle);
     if (!signature.includes('|')) continue;
     // `null` = ambigu, on ne s'en sert plus.
@@ -112,7 +113,7 @@ function indexMotsDuNom(): Map<string, string | null> {
 
 export function photoReelle(nom: string): string | undefined {
   const cle = normaliserNom(nom);
-  const exacte = PHOTO_JOUEUR_MAJ[cle] ?? PHOTO_JOUEUR[cle];
+  const exacte = PHOTOS_NEW_MAJ[cle] ?? PHOTO_JOUEUR_MAJ[cle] ?? PHOTO_JOUEUR[cle];
   if (exacte) return exacte;
   return indexMotsDuNom().get(signatureNom(cle)) ?? undefined;
 }
