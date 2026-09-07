@@ -185,7 +185,9 @@ export function catalogueMondialCarriere(): readonly SourceCarte[] {
       ajouter({ sourceId, nom: j.nom, famille: j.poste, poste: posteDepuisFamille(j.poste, 0), note,
         potentiel: Math.max(note, j.potentiel), age: j.age, nation: nationLisible(j.nation),
         clubReel: maj?.club ?? lnr?.club ?? club, championnat: maj ? 'Gallagher Premiership' : lnr?.championnat ?? competition?.nom ?? 'Championnat professionnel', pays: competition?.pays ?? 'France',
-        photo: lnr?.photo ?? photoReelle(j.nom), origine: 'professionnel', rarete: rareteCarriere(note),
+        // L'index consolidé corrige aussi les variantes de prénom et les URL
+        // LNR devenues obsolètes ; l'URL brute ne sert qu'en dernier recours.
+        photo: photoReelle(j.nom) ?? lnr?.photo, origine: 'professionnel', rarete: rareteCarriere(note),
         statistiques: statistiquesCarte(note, j.poste, sourceId) });
     }
   }

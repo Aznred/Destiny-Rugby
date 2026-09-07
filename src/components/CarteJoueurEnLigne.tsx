@@ -21,9 +21,12 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
   carte: CarteCarriere; proprietaire?: string; logoClub?: string; onClick?: () => void; compacte?: boolean; etatCollection?: 'inconnue' | 'decouverte';
 }) {
   const id = useId().replaceAll(':', '');
-  const [photoRatee, setPhotoRatee] = useState<string>();
+  const [photosRatees, setPhotosRatees] = useState<Set<string>>(() => new Set());
   const blason = useBlasonCarte(carte.clubReel, logoClub);
-  const photo = carte.photo ?? photoReelle(carte.nom);
+  const photoIndexee = photoReelle(carte.nom);
+  // Les cartes déjà distribuées peuvent conserver une ancienne URL. Si elle
+  // échoue, on retente le portrait actuellement indexé avant le repli neutre.
+  const photo = [carte.photo, photoIndexee].find((candidate) => candidate && !photosRatees.has(candidate));
   const [clair, couleur, sombre, bord] = PALETTES[carte.rarete];
   const stats = Object.entries(carte.statistiques).slice(0, 6);
   const Balise = onClick ? 'button' : 'div';
@@ -44,7 +47,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
       <path d={SILHOUETTE} transform="translate(6 8) scale(.95 .956)" stroke={bord} opacity=".55" fill="none" />
     </svg>
     <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</em><Drapeau nation={carte.nation} taille={1.15} />{blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}</span>
-    <span className="dr-player-photo">{photo && photo !== photoRatee ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotoRatee(photo)} /> : <img draggable={false} src="/photos/adam_hastings.webp" alt="Portrait par défaut" />}</span>
+    <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src="/photos/adam_hastings.webp" alt="Portrait par défaut" />}</span>
     <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{carte.clubReel}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>
     <span className="dr-player-rarity">{NOMS_PACK[carte.rarete]}<i> · {carte.age} ans</i></span>

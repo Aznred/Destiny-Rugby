@@ -92,9 +92,22 @@ export function normaliserNom(nom: string): string {
 // NOM DE FAMILLE, utilisé seulement quand ce nom est unique parmi les photos —
 // sinon on risquerait de coller le visage d'un homonyme.
 let parMotsDuNom: Map<string, string | null> | null = null;
+let parPrenomNom: Map<string, string | null> | null = null;
+let parNomDeFamille: Map<string, string | null> | null = null;
 
 function signatureNom(nom: string): string {
   return nom.split(' ').filter(Boolean).sort().join('|');
+}
+
+function prenomNom(nom: string): string {
+  const mots = nom.split(' ').filter(Boolean);
+  return mots.length > 1 ? `${mots[0]}|${mots[mots.length - 1]}` : '';
+}
+
+function ajouterSiUnique(index: Map<string, string | null>, cle: string, chemin: string): void {
+  if (!cle) return;
+  const connu = index.get(cle);
+  index.set(cle, connu && connu !== chemin ? null : chemin);
 }
 
 function indexMotsDuNom(): Map<string, string | null> {
@@ -104,10 +117,30 @@ function indexMotsDuNom(): Map<string, string | null> {
     const signature = signatureNom(cle);
     if (!signature.includes('|')) continue;
     // `null` = ambigu, on ne s'en sert plus.
-    const connu = index.get(signature);
-    index.set(signature, connu && connu !== chemin ? null : chemin);
+    ajouterSiUnique(index, signature, chemin);
   }
   parMotsDuNom = index;
+  return index;
+}
+
+function indexPrenomNom(): Map<string, string | null> {
+  if (parPrenomNom) return parPrenomNom;
+  const index = new Map<string, string | null>();
+  for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ, ...PHOTOS_NEW_MAJ })) {
+    ajouterSiUnique(index, prenomNom(cle), chemin);
+  }
+  parPrenomNom = index;
+  return index;
+}
+
+function indexNomDeFamille(): Map<string, string | null> {
+  if (parNomDeFamille) return parNomDeFamille;
+  const index = new Map<string, string | null>();
+  for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ, ...PHOTOS_NEW_MAJ })) {
+    const mots = cle.split(' ').filter(Boolean);
+    ajouterSiUnique(index, mots.length > 1 ? mots[mots.length - 1] : '', chemin);
+  }
+  parNomDeFamille = index;
   return index;
 }
 
@@ -115,7 +148,11 @@ export function photoReelle(nom: string): string | undefined {
   const cle = normaliserNom(nom);
   const exacte = PHOTOS_NEW_MAJ[cle] ?? PHOTO_JOUEUR_MAJ[cle] ?? PHOTO_JOUEUR[cle];
   if (exacte) return exacte;
-  return indexMotsDuNom().get(signatureNom(cle)) ?? undefined;
+  const mots = cle.split(' ').filter(Boolean);
+  return indexMotsDuNom().get(signatureNom(cle))
+    ?? indexPrenomNom().get(prenomNom(cle))
+    ?? (mots.length > 1 ? indexNomDeFamille().get(mots[mots.length - 1]) : undefined)
+    ?? undefined;
 }
 
 export function avatarPourCompte(nom: string, type: TypeAvatar, club?: string): string {

@@ -20,7 +20,8 @@
 //  10. la phase finale, et l’identité de la ligue (logo, trophée)
 
 import {
-  agirCarriere, avancerCarriere, classementCarriere, creerCarriere, vueCarriere, DOTATION_MAX, } from '../src/lib/ligue/carriere';
+  agirCarriere, avancerCarriere, classementCarriere, creerCarriere, vueCarriere, DOTATION_MAX,
+  PACKS_GRATUITS_PAR_JOUR, poidsPackQuotidien, } from '../src/lib/ligue/carriere';
 import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere';
 import {
   avancerMatchEnLigne, cibleDeScore, commanderMatchEnLigne, conclureMatchEnLigne,
@@ -95,8 +96,34 @@ titre('1. LA LIGUE, ET LES 30 BRONZE DU DÉPART');
     '⚠️ deux amis inscrits le même jour ne reçoivent JAMAIS le même licencié',
     `${e.cartes.length} licenciés distincts`);
   dire(e.cartes.length === 6 * 30, 'la ligue ne stocke QUE les cartes distribuées', `${nb(e.cartes.length)} cartes`);
+  dire(e.clubs.every(c => c.packsGratuits?.length === PACKS_GRATUITS_PAR_JOUR), 'chaque club reçoit dix packs gratuits par jour');
+  const vue = vueCarriere(e, e.clubs[0].compteId);
+  dire(vue.clubs.find(c => c.id === e.clubs[0].id)?.packsGratuits?.length === 10
+    && vue.clubs.filter(c => c.id !== e.clubs[0].id).every(c => !c.packsGratuits), 'les packs gratuits restent privés à leur destinataire');
   const poids = JSON.stringify(e).length;
   dire(poids < 900_000, 'et l’état complet d’une ligue de six tient sous 900 Ko', `${nb(poids / 1024)} Ko`);
+}
+
+// Le pack Élite reste plus rare que le Bronze, mais le dernier dispose d'un
+// vrai rattrapage sans garantie artificielle.
+{
+  const bronze = PACKS_CARRIERE.find(p => p.id === 'bronze')!;
+  const elite = PACKS_CARRIERE.find(p => p.id === 'elite')!;
+  dire(poidsPackQuotidien(elite, 0, 6) < poidsPackQuotidien(bronze, 0, 6), 'les meilleurs packs quotidiens restent les plus rares');
+  dire(poidsPackQuotidien(elite, 5, 6) > poidsPackQuotidien(elite, 0, 6), 'le dernier a davantage de chances de recevoir un pack rare');
+  let e = ligue(2);
+  const club = e.clubs[0];
+  const cadeau = club.packsGratuits![0];
+  const solde = club.ovas;
+  const cartesAvant = e.cartes.length;
+  e = agirCarriere(e, club.compteId, { type: 'ouvrirPackGratuit', attributionId: cadeau.id }, T0 + 1000, 'cadeau');
+  dire(e.clubs[0].ovas === solde && e.cartes.length > cartesAvant, 'ouvrir un pack quotidien ne coûte aucun Ova');
+  dire(e.clubs[0].packsGratuits?.length === 9, 'un cadeau ouvert disparaît du stock');
+  let refuse = false;
+  try { agirCarriere(e, club.compteId, { type: 'ouvrirPackGratuit', attributionId: cadeau.id }, T0 + 2000, 'doublon'); } catch { refuse = true; }
+  dire(refuse, 'un pack quotidien ne peut pas être ouvert deux fois');
+  e = avancerCarriere(e, T0 + JOUR + 1000, 'lendemain');
+  dire(e.clubs[0].packsGratuits?.length === 19, 'le lendemain ajoute bien un nouveau lot de dix');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

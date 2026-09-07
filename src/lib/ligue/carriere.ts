@@ -6,11 +6,13 @@ import { affichesToutesRondes } from './calendrier.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
 import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
-import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
+import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
+import { valeurVenteRapide } from './venteRapideCarriere.js';
 
 const HEURE = 3_600_000;
 const JOUR = 24 * HEURE;
 const SEMAINE = 7 * JOUR;
+export const PACKS_GRATUITS_PAR_JOUR = 10;
 const copier = <T>(x: T): T => structuredClone(x);
 let sourcesParId: Map<string, ReturnType<typeof catalogueMondialCarriere>[number]> | undefined;
 
@@ -59,6 +61,33 @@ function journal(etat: EtatCarriereEnLigne, club: ClubCarriere, nature: Transact
   exiger(Number.isSafeInteger(club.ovas + ovas) && club.ovas + ovas >= 0, 'Ovas insuffisants.');
   club.ovas += ovas;
   etat.transactions.push({ id: prochainId(etat, 'transaction', etat.transactions.length), clubId: club.id, nature, ovas, cartes, libelle, date });
+}
+
+/** Tous les packs restent possibles ; le prix sert d'indice de rareté. */
+export function poidsPackQuotidien(pack: PackCarriere, rang: number, clubs: number, classementActif = true): number {
+  const indiceRarete = Math.max(0, Math.min(1, Math.log(Math.max(250, pack.prix) / 250) / Math.log(8500 / 250)));
+  const poidsBase = 1 / (1 + 6 * indiceRarete ** 2);
+  const retard = classementActif && clubs > 1 ? Math.max(0, Math.min(1, rang / (clubs - 1))) : 0;
+  return poidsBase * (1 + 3 * retard * indiceRarete);
+}
+
+function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number): void {
+  const jour = dateServeur(maintenant).slice(0, 10);
+  const classement = classementCarriere(etat);
+  const classementActif = classement.some(ligne => ligne.joues > 0);
+  for (const club of etat.clubs) {
+    club.packsGratuits ??= [];
+    if (club.dernierLotPacksGratuits === jour) continue;
+    const rang = Math.max(0, classement.findIndex(ligne => ligne.clubId === club.id));
+    const poids = etat.packs.map(pack => poidsPackQuotidien(pack, rang, etat.clubs.length, classementActif));
+    const rng = hasard(`${etat.graine}:packs-quotidiens:${jour}:${club.id}`);
+    for (let i = 0; i < PACKS_GRATUITS_PAR_JOUR; i++) {
+      const index = tirerPondere(poids, rng);
+      exiger(index >= 0, 'Aucun pack quotidien disponible.');
+      club.packsGratuits.push({ id: `${club.id}:quotidien:${jour}:${i}`, packId: etat.packs[index].id, recuLe: dateServeur(maintenant) });
+    }
+    club.dernierLotPacksGratuits = jour;
+  }
 }
 function ajusterComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, maintenant: number) {
   const cartes = cartesClub(etat, club.id);
@@ -164,14 +193,15 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
     dotationOvas: dotationValide(config.dotationOvas),
     clubs: [], cartes: [], packs: copier(PACKS_CARRIERE), competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
   ajouterClub(etat, config.compteId, config.pseudo, config.clubNom, maintenant, graine, config.embleme);
+  attribuerPacksQuotidiens(etat, maintenant);
   return etat;
 }
 
-function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string) {
+function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false) {
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
   entier(pack.prix, 1); entier(pack.cartes, 1, 12);
   exiger(RARETES_CARRIERE.every(r => Number.isFinite(pack.probabilites[r]) && pack.probabilites[r] >= 0), 'Probabilités de pack invalides.');
-  exiger(club.ovas >= pack.prix, 'Ovas insuffisants pour ce pack.');
+  if (!gratuit) exiger(club.ovas >= pack.prix, 'Ovas insuffisants pour ce pack.');
   // ⚠️ L'UNICITÉ PAR LIGUE SE TIENT ICI. Un joueur déjà possédé — par n'importe
   // quel club de CETTE ligue — ne peut plus sortir d'un pack : c'est ce qui
   // oblige à aller parler à celui qui l'a. Il reste évidemment disponible dans
@@ -209,7 +239,7 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
     rayons[i] = rayons[i].filter(c => c.sourceId !== source.sourceId);
     pris.add(carte.sourceId); etat.cartes.push(carte); tirees.push(carte);
   }
-  journal(etat, club, 'pack', -pack.prix, tirees.map(c => c.id), `Pack ${pack.nom} : ${tirees.map(c => c.nom).join(', ')}`, dateServeur(maintenant));
+  journal(etat, club, 'pack', gratuit ? 0 : -pack.prix, tirees.map(c => c.id), `${gratuit ? 'Pack quotidien offert' : `Pack ${pack.nom}`} : ${tirees.map(c => c.nom).join(', ')}`, dateServeur(maintenant));
 }
 
 function renouvelerObjectifs(etat: EtatCarriereEnLigne, maintenant: number) {
@@ -504,6 +534,7 @@ function completerPacks(etat: EtatCarriereEnLigne) {
 
 function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: string) {
   completerPacks(etat);
+  attribuerPacksQuotidiens(etat, maintenant);
   renouvelerObjectifs(etat, maintenant);
   // La récupération est attachée aux dates des rencontres, pas au nombre d'actualisations.
   for (const c of etat.cartes) if (c.blesseJusqua && Date.parse(c.blesseJusqua) <= maintenant) delete c.blesseJusqua;
@@ -565,6 +596,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
   const nouveau = reprendre(etat); const date = dateServeur(maintenant);
   if (commande.type === 'rejoindre') {
     ajouterClub(nouveau, compteId, commande.pseudo, commande.clubNom, maintenant, graine, commande.embleme);
+    attribuerPacksQuotidiens(nouveau, maintenant);
   } else {
     const club = monClub(nouveau, compteId); avancerInterne(nouveau, maintenant, graine);
     switch (commande.type) {
@@ -577,6 +609,25 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       case 'strategie': club.strategie = strategieValide(commande.strategie); break;
 
       case 'ouvrirPack': identifiant(commande.packId); ouvrirPack(nouveau, club, commande.packId, maintenant, graine); break;
+      case 'ouvrirPackGratuit': {
+        identifiant(commande.attributionId);
+        const attribution = club.packsGratuits?.find(pack => pack.id === commande.attributionId);
+        exiger(attribution, 'Ce pack quotidien a déjà été ouvert ou n’existe pas.');
+        ouvrirPack(nouveau, club, attribution.packId, maintenant, graine, true);
+        club.packsGratuits = club.packsGratuits!.filter(pack => pack.id !== attribution.id);
+        break;
+      }
+      case 'venteRapide': {
+        clubLibre(nouveau, club.id); identifiant(commande.carteId);
+        const carte = carteParId(nouveau, commande.carteId);
+        exiger(carte.proprietaire === club.id && !carte.verrou, 'Cette carte ne peut pas être vendue rapidement.');
+        verifierDepart(nouveau, club.id, [carte.id]);
+        const valeur = valeurVenteRapide(carte);
+        journal(nouveau, club, 'venteRapide', valeur, [carte.id], `Vente rapide : ${carte.nom}`, date);
+        nouveau.cartes = nouveau.cartes.filter(c => c.id !== carte.id);
+        ajusterComposition(nouveau, club, maintenant);
+        break;
+      }
       case 'vendre': {
         clubLibre(nouveau, club.id); identifiant(commande.carteId); entier(commande.prix, 1); entier(commande.dureeHeures, 1, 168);
         exiger(commande.mode === 'directe' || commande.mode === 'enchere', 'Type de vente invalide.');
@@ -676,7 +727,7 @@ export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCar
   const club = monClub(etat, compteId);
   const { graine: _secret, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
   return copier({ ...publics, monClubId: club.id,
-    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, ...reste } = c; return c.id === club.id ? { ...reste, composition, strategie } : reste; }),
+    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, packsGratuits, dernierLotPacksGratuits, ...reste } = c; return c.id === club.id ? { ...reste, composition, strategie, packsGratuits, dernierLotPacksGratuits } : reste; }),
     cartes: etat.cartes.filter(c => c.proprietaire !== null),
     rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: vueMatchEnLigne(match, club.id) } : reste; }),
     objectifs: etat.objectifs.filter(o => o.clubId === club.id), transactions: etat.transactions.filter(t => t.clubId === club.id),

@@ -682,6 +682,15 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 .cel-grille-cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: 0.75rem; }
 .cel-grille-cartes.petites { grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
+.cel-carte-quick { display: flex; min-width: 0; flex-direction: column; gap: 0.45rem; }
+.cel-carte-quick > .cel-carte { flex: 1; }
+.cel-vente-rapide {
+  width: 100%; padding: 0.5rem 0.65rem; border: 1px solid rgba(232, 178, 58, 0.28);
+  border-radius: var(--rayon-sm); background: rgba(232, 178, 58, 0.08); color: var(--or-200);
+  font: 700 0.76rem var(--police-corps); letter-spacing: 0.02em; cursor: pointer;
+}
+.cel-vente-rapide:hover:not(:disabled) { border-color: var(--or-400); background: rgba(232, 178, 58, 0.15); }
+.cel-vente-rapide:disabled { opacity: 0.4; cursor: not-allowed; }
 .cel-carte {
   position: relative;
   display: flex;
@@ -871,6 +880,20 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-boutique-tete h2 { margin: 0.2rem 0 0.3rem; font-family: var(--police-titre); font-size: clamp(1.5rem, 3vw, 2.1rem); text-transform: uppercase; }
 .cel-boutique-tete p { margin: 0; color: var(--brume); font-size: 0.88rem; line-height: 1.5; max-width: 62ch; }
 .cel-boutique-tete b { color: var(--craie-dim); }
+.cel-packs-quotidiens { margin: 1rem 0 1.25rem; padding: 1rem; border: 1px solid rgba(232,178,58,.34); border-radius: var(--rayon); background: radial-gradient(circle at 92% 0, rgba(232,178,58,.16), transparent 35%), rgba(5,22,15,.72); box-shadow: var(--arete); }
+.cel-packs-quotidiens-tete { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+.cel-packs-quotidiens-tete h3 { margin:.2rem 0; font-family:var(--police-titre); font-size:clamp(1.2rem,2.5vw,1.65rem); text-transform:uppercase; }
+.cel-packs-quotidiens-tete p { max-width:68ch; margin:0; color:var(--brume); font-size:.84rem; line-height:1.45; }
+.cel-packs-quotidiens-tete > strong { padding:.45rem .7rem; border:1px solid var(--or-400); border-radius:var(--rayon-pilule); color:var(--or-200); font-family:var(--police-forte); white-space:nowrap; }
+.cel-packs-gratuits-liste { display:grid; grid-template-columns:repeat(auto-fill,minmax(126px,1fr)); gap:.55rem; margin-top:.9rem; }
+.cel-packs-gratuits-liste button { display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; align-items:center; gap:.05rem .55rem; min-width:0; padding:.55rem .65rem; border:1px solid var(--bordure); border-radius:var(--rayon-sm); color:var(--craie); background:rgba(0,0,0,.3); text-align:left; }
+.cel-packs-gratuits-liste button:hover:not(:disabled) { border-color:var(--or-400); transform:translateY(-1px); }
+.cel-packs-gratuits-liste b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.78rem; }
+.cel-packs-gratuits-liste small { color:var(--or-300); font-size:.67rem; text-transform:uppercase; letter-spacing:.08em; }
+.cel-pack-gratuit-sceau { grid-row:1/3; display:grid; place-items:center; width:32px; height:32px; border-radius:50%; color:#171209; background:linear-gradient(145deg,var(--or-200),var(--or-500)); box-shadow:0 0 14px rgba(232,178,58,.18); }
+.cel-pack-gratuit-sceau.elite { color:#eaffff; background:linear-gradient(145deg,#22b9df,#063c67); }
+.cel-pack-gratuit-sceau.star { color:#fff0ea; background:linear-gradient(145deg,#e93450,#520d2d); }
+@media(max-width:560px) { .cel-packs-quotidiens-tete { align-items:center; } .cel-packs-quotidiens-tete p { font-size:.78rem; } .cel-packs-gratuits-liste { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 .cel-grille-packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); gap: 0.9rem; }
 

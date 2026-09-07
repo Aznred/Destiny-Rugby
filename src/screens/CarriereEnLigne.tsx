@@ -27,6 +27,7 @@ import { Selecteur } from '../components/Selecteur';
 import { CompositionTerrainManager } from '../components/CompositionTerrainManager';
 import { EcussonClub } from '../components/EcussonClub';
 import { PieceOvas } from '../components/PieceOvas';
+import { Confirmation } from '../components/Confirmation';
 import { useGame } from '../store/useGame';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { meilleureComposition } from '../lib/meilleureComposition';
@@ -49,6 +50,7 @@ import { CollectionLigue } from '../components/CollectionLigue';
 import OuverturePack from '../components/OuverturePack';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
+import { valeurVenteRapide } from '../lib/ligue/venteRapideCarriere';
 
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
@@ -516,7 +518,7 @@ export function CarriereEnLigne() {
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} />}
           {onglet === 'composition' && <Composition key={vue.id} vue={vue} agir={agir} occupe={occupe} />}
-          {onglet === 'effectif' && <Effectif vue={vue} />}
+          {onglet === 'effectif' && <Effectif vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'collection' && <CollectionLigue vue={vue} />}
           {onglet === 'packs' && <Packs vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'marche' && <Marche vue={vue} agir={agir} occupe={occupe} />}
@@ -930,10 +932,11 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
 //    lui, a la place et distingue vraiment le 4 du 5.
 //    La parenthèse chiffrée est la même dans les sept langues : c’est un chiffre.
 
-function Effectif({ vue }: { vue: VueCarriereEnLigne }) {
+function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const logos = useLogosDeClub();
   const [tri, setTri] = useState('note');
   const [famille, setFamille] = useState('');
+  const [aVendre, setAVendre] = useState<CarteCarriere | null>(null);
   const cartes = vue.cartes.filter(c => c.proprietaire === vue.monClubId)
     .filter(c => !famille || c.famille === famille)
     .sort((a, b) => tri === 'note' ? b.note - a.note : tri === 'poste' ? (POSTE_PAR_ID[a.poste]?.numero ?? 0) - (POSTE_PAR_ID[b.poste]?.numero ?? 0) : tri === 'age' ? a.age - b.age : a.nom.localeCompare(b.nom, 'fr'));
@@ -944,8 +947,20 @@ function Effectif({ vue }: { vue: VueCarriereEnLigne }) {
       <Choix label="Trier par" valeur={tri} options={[['note', 'Note (GEN)'], ['poste', 'Numéro de maillot'], ['age', 'Âge'], ['nom', 'Nom']]} onChange={setTri} />
       <Choix label="Poste" valeur={famille} options={[['', 'Tous les postes'], ...familles.map(f => [f, nomPoste(POSTES_XV_MANAGER.find(p => POSTE_PAR_ID[p].famille === f) ?? 'arriere')] as [string, string])]} onChange={setFamille} />
     </section>
-    <div className="cel-grille-cartes">{cartes.map(c => <CarteJoueurEnLigne key={c.id} carte={c} logoClub={logos.get(c.clubReel)} />)}</div>
+    <div className="cel-grille-cartes">{cartes.map(c => <div className="cel-carte-quick" key={c.id}>
+      <CarteJoueurEnLigne carte={c} logoClub={logos.get(c.clubReel)} />
+      <button className="cel-vente-rapide" type="button" disabled={occupe || Boolean(c.verrou)} onClick={() => setAVendre(c)}>
+        Vente rapide · {montant(valeurVenteRapide(c))} Ovas
+      </button>
+    </div>)}</div>
     {!cartes.length && <Vide icone="equipe" titre="Aucun joueur à ce poste">Ouvre un pack ou passe par le marché pour renforcer ta ligne.</Vide>}
+    {aVendre && <Confirmation
+      titre="Vendre cette carte ?"
+      message={`${aVendre.nom} sera retiré définitivement de ton effectif contre ${montant(valeurVenteRapide(aVendre))} Ovas. Cette action est irréversible.`}
+      libelleOui={`Vendre pour ${montant(valeurVenteRapide(aVendre))} Ovas`}
+      onNon={() => setAVendre(null)}
+      onOui={() => { const carteId = aVendre.id; setAVendre(null); void agir({ type: 'venteRapide', carteId }); }}
+    />}
   </>;
 }
 
@@ -985,7 +1000,20 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
       if (cartes.length) setOuverture({ cartes, pack: nomPack, garantie: vue.packs.find(p => p.id === packId)?.garantie });
     } finally { achatEnCours.current = false; }
   };
+  const ouvrirGratuit = async (attributionId: string, packId: string, nomPack: string) => {
+    if (achatEnCours.current || ouverture) return;
+    achatEnCours.current = true;
+    try {
+      const avant = new Set(vue.transactions.map(t => t.id));
+      const suivante = await agir({ type: 'ouvrirPackGratuit', attributionId });
+      if (!suivante) return;
+      const nouvelles = suivante.transactions.filter(t => !avant.has(t.id) && t.nature === 'pack' && t.clubId === vue.monClubId).flatMap(t => t.cartes);
+      const cartes = suivante.cartes.filter(c => nouvelles.includes(c.id));
+      if (cartes.length) setOuverture({ cartes, pack: `${nomPack} · offert`, garantie: vue.packs.find(p => p.id === packId)?.garantie });
+    } finally { achatEnCours.current = false; }
+  };
   const solde = club?.ovas ?? 0;
+  const packsGratuits = club?.packsGratuits ?? [];
 
   return <>
     <section className="cel-boutique-tete">
@@ -996,6 +1024,12 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
           <b> Un joueur déjà pris dans la ligue ne sort plus d’un pack</b> — pour l’avoir, il faut aller voir celui qui l’a.</p>
       </div>
       <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(solde)}</strong><span>disponibles</span></div>
+    </section>
+
+    <section className="cel-packs-quotidiens">
+      <div className="cel-packs-quotidiens-tete"><div><div className="eyebrow">Coup de pouce quotidien</div><h3>{packsGratuits.length} pack{packsGratuits.length > 1 ? 's' : ''} gratuit{packsGratuits.length > 1 ? 's' : ''} à ouvrir</h3><p>Dix nouveaux packs arrivent chaque jour. Plus ton club descend au classement, plus ses chances de recevoir les packs rares augmentent.</p></div><strong>10 / jour</strong></div>
+      {packsGratuits.length ? <div className="cel-packs-gratuits-liste">{packsGratuits.slice(0, 20).map(attribution => { const pack = vue.packs.find(p => p.id === attribution.packId); return pack ? <button key={attribution.id} disabled={occupe || ouverture !== null} onClick={() => { void ouvrirGratuit(attribution.id, pack.id, pack.nom); }}><span className={`cel-pack-gratuit-sceau ${pack.garantie ?? 'bronze'}`}><Icone nom="cadeau" taille={17} /></span><b>{pack.nom}</b><small>Offert</small></button> : null; })}</div> : <p className="cel-note">Les dix packs du jour ont été ouverts. Le prochain lot arrivera demain.</p>}
+      {packsGratuits.length > 20 && <small className="cel-note">Ouvre quelques packs pour afficher les {packsGratuits.length - 20} suivants.</small>}
     </section>
 
     <BoutiquePacks3D packs={vue.packs} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={ouvrir} />

@@ -47,12 +47,18 @@ export interface PackCarriere {
   /** Le rayon de la boutique où il est présenté. */
   famille?: 'general' | 'poste' | 'monde' | 'age';
 }
+export interface PackGratuitCarriere {
+  id: string; packId: IdPackCarriere; recuLe: string;
+}
 export interface ClubCarriere {
   id: string; compteId: string; pseudo: string; nom: string; ovas: number;
   /** Chemin d'un vrai écusson de club (`emblemeValide` fait foi). */
   embleme?: string;
   composition: CompositionManager; strategie: StrategieEnLigne;
   rejointLe: string;
+  /** Lots quotidiens non ouverts. Le serveur seul choisit leur type. */
+  packsGratuits?: PackGratuitCarriere[];
+  dernierLotPacksGratuits?: string;
 }
 export interface ResultatCarriere {
   pointsD: number; pointsE: number; essaisD: number; essaisE: number;
@@ -83,7 +89,7 @@ export interface EchangeCarriere {
   etat: 'propose' | 'accepte' | 'refuse' | 'annule' | 'expire';
 }
 export interface TransactionCarriere {
-  id: string; clubId: string; nature: 'dotation' | 'pack' | 'vente' | 'enchere' | 'echange' | 'match' | 'objectif' | 'competition';
+  id: string; clubId: string; nature: 'dotation' | 'pack' | 'vente' | 'venteRapide' | 'enchere' | 'echange' | 'match' | 'objectif' | 'competition';
   ovas: number; cartes: string[]; libelle: string; date: string;
 }
 export interface ObjectifCarriere {
@@ -114,7 +120,7 @@ export interface EtatCarriereEnLigne {
 }
 export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' | 'clubs' | 'cartes' | 'rencontres' | 'objectifs' | 'transactions' | 'echanges'> {
   monClubId: string;
-  clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie'> & { composition?: CompositionManager; strategie?: StrategieEnLigne })[];
+  clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie' | 'packsGratuits' | 'dernierLotPacksGratuits'> & { composition?: CompositionManager; strategie?: StrategieEnLigne; packsGratuits?: PackGratuitCarriere[]; dernierLotPacksGratuits?: string })[];
   /** Vue courante : cartes distribuées seulement. Le catalogue public est consulté séparément, par pages. */
   cartes: CarteCarriere[];
   rencontres: (Omit<RencontreCarriere, 'match'> & { match?: VueMatchEnLigne })[];
@@ -136,6 +142,8 @@ export type CommandeCarriere =
   | { type: 'composition'; composition: CompositionManager }
   | { type: 'strategie'; strategie: StrategieEnLigne }
   | { type: 'ouvrirPack'; packId: IdPackCarriere }
+  | { type: 'ouvrirPackGratuit'; attributionId: string }
+  | { type: 'venteRapide'; carteId: string }
   | { type: 'vendre'; carteId: string; prix: number; mode: 'directe' | 'enchere'; dureeHeures: number }
   | { type: 'acheter'; venteId: string }
   | { type: 'encherir'; venteId: string; montant: number }

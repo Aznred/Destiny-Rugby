@@ -6,6 +6,17 @@ import { collectionCarriere } from '../src/lib/ligue/collectionCarriere';
 import { creerGestionnaireCarriere } from '../serveur/carriereApi';
 import type { StockageCarriere } from '../serveur/carriereStockage';
 import type { ReponseCarriere } from '../serveur/carriereApi';
+import { photoReelle } from '../src/lib/avatars';
+import { cleBlasonCarte } from '../src/lib/useBlasonCarte';
+
+assert.equal(photoReelle('Will SKELTON'), '/photos/william_skelton.webp');
+assert.equal(photoReelle('Jiuta WAINIQOLO'), '/photos/jiuta_naqoli_wainiqolo.webp');
+assert.equal(photoReelle('Huw JONES'), '/photos/new%20maj/urc_huw_jones.webp');
+assert.equal(cleBlasonCarte('Montpellier Hérault Rugby'), 'montpellierhr');
+const clubsDesJoueurs = new Map(catalogueMondialCarriere().filter(c => ['Will SKELTON', 'Jiuta WAINIQOLO', 'Huw JONES'].includes(c.nom)).map(c => [c.nom, c.clubReel]));
+assert.equal(clubsDesJoueurs.get('Will SKELTON'), 'Stade Rochelais');
+assert.equal(clubsDesJoueurs.get('Jiuta WAINIQOLO'), 'Lyon OU');
+assert.equal(clubsDesJoueurs.get('Huw JONES'), 'RC Toulon');
 
 const e = creerCarriere({ id: '12345678-1234-1234-1234-123456789abc', nom: 'Collection test', code: 'DR-TEST', compteId: 'compte-a', pseudo: 'Alice', clubNom: 'Club A', rythme: 1, maxClubs: 4 }, Date.now(), 'test-collection');
 e.logo = 'https://logos.test/ligue.webp';
