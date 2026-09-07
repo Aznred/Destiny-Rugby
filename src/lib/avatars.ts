@@ -87,72 +87,173 @@ export function normaliserNom(nom: string): string {
     .trim();
 }
 
-// ⚠️ Les prénoms ne concordent pas toujours : le fichier dit « william_skelton »
-// là où la base écrit « Will SKELTON ». On construit donc un second index par
-// NOM DE FAMILLE, utilisé seulement quand ce nom est unique parmi les photos —
-// sinon on risquerait de coller le visage d'un homonyme.
-let parMotsDuNom: Map<string, string | null> | null = null;
-let parPrenomNom: Map<string, string | null> | null = null;
-let parNomDeFamille: Map<string, string | null> | null = null;
+// ⚠️ LES NOMS NE CONCORDENT JAMAIS EXACTEMENT, ET C'EST LA PREMIÈRE CAUSE DE
+// CARTE GRISE. Le fichier dit « william_skelton » là où la base écrit « Will
+// SKELTON » ; il dit « aaron_grandidier_nkanang », « levani_botia_veivuke »,
+// « dany_priso_mouangue », « santiago_arata_perrone » là où la feuille de match
+// s'arrête au nom court ; il écrit « david_ainuu » quand la base met une
+// apostrophe (« David AINU'U », normalisé « david ainu u »). Mesuré avant
+// correction : 86 joueurs du Top 14 sur 677 n'avaient AUCUNE photo alors que
+// leur portrait était bien dans `public/photos/`.
+//
+// On construit donc, EN UN SEUL PARCOURS des trois index, cinq tables de
+// rattrapage. Chacune n'accepte une clé que si elle désigne UN SEUL portrait
+// (`ajouterSiUnique` pose `null` dès qu'il y a conflit) : mieux vaut pas de
+// visage qu'un homonyme.
+interface IndexPhotos {
+  /** Les mots du nom, triés : rattrape « nom prénom » et les inversions. */
+  signature: Map<string, string | null>;
+  /** Premier et dernier mot : rattrape les prénoms d'usage (« Will » / « William »). */
+  prenomNom: Map<string, string | null>;
+  /** Le nom collé, sans séparateur : rattrape « ainu u » ↔ « ainuu ». */
+  colle: Map<string, string | null>;
+  /** Chaque début de nom : rattrape les noms composés tronqués par la feuille. */
+  prefixe: Map<string, string | null>;
+  /** Deux mots du nom dans l'ordre : rattrape « Thibaut MOTASSI » ↔ « thibaut robert motassi dibongue ». */
+  paire: Map<string, string | null>;
+  /** Nom de famille + initiale du prénom : rattrape « Tom » ↔ « Thomas », « Sam » ↔ « Samuel ». */
+  familleInitiale: Map<string, string | null>;
+  /**
+   * Le seul nom de famille — avec le prénom du portrait, parce qu'on ne s'en
+   * sert QUE si les deux prénoms s'emboîtent (« Riko » dans « Eneriko »).
+   *
+   * ⚠️ LE NOM DE FAMILLE SEUL DONNAIT DE FAUX VISAGES. Mesuré sur le Top 14 :
+   * il rattrapait 5 joueurs et en trompait 14 — Sacha ELISSALDE recevait la
+   * tête de Gabriel ELISSALDE, Louis VERMEULEN celle de Jacques VERMEULEN,
+   * Mako VUNIPOLA celle de son frère. Une carte au mauvais visage est pire
+   * qu'une carte sans visage.
+   */
+  famille: Map<string, { prenom: string; chemin: string } | null>;
+}
+let index: IndexPhotos | null = null;
+
+function motsDe(nom: string): string[] {
+  return nom.split(' ').filter(Boolean);
+}
 
 function signatureNom(nom: string): string {
-  return nom.split(' ').filter(Boolean).sort().join('|');
+  return motsDe(nom).sort().join('|');
 }
 
 function prenomNom(nom: string): string {
-  const mots = nom.split(' ').filter(Boolean);
+  const mots = motsDe(nom);
   return mots.length > 1 ? `${mots[0]}|${mots[mots.length - 1]}` : '';
 }
 
-function ajouterSiUnique(index: Map<string, string | null>, cle: string, chemin: string): void {
+function ajouterSiUnique(table: Map<string, string | null>, cle: string, chemin: string): void {
   if (!cle) return;
-  const connu = index.get(cle);
-  index.set(cle, connu && connu !== chemin ? null : chemin);
+  const connu = table.get(cle);
+  table.set(cle, connu && connu !== chemin ? null : chemin);
 }
 
-function indexMotsDuNom(): Map<string, string | null> {
-  if (parMotsDuNom) return parMotsDuNom;
-  const index = new Map<string, string | null>();
+function indexPhotos(): IndexPhotos {
+  if (index) return index;
+  const table = (): Map<string, string | null> => new Map<string, string | null>();
+  const construit: IndexPhotos = { signature: table(), prenomNom: table(), colle: table(), prefixe: table(), paire: table(), familleInitiale: table(), famille: new Map() };
   for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ, ...PHOTOS_NEW_MAJ })) {
-    const signature = signatureNom(cle);
-    if (!signature.includes('|')) continue;
-    // `null` = ambigu, on ne s'en sert plus.
-    ajouterSiUnique(index, signature, chemin);
+    const mots = motsDe(cle);
+    ajouterSiUnique(construit.colle, mots.join(''), chemin);
+    if (mots.length < 2) continue;
+    const famille = mots[mots.length - 1];
+    ajouterSiUnique(construit.signature, signatureNom(cle), chemin);
+    ajouterSiUnique(construit.prenomNom, prenomNom(cle), chemin);
+    ajouterSiUnique(construit.familleInitiale, `${famille}|${mots[0][0]}`, chemin);
+    const connu = construit.famille.get(famille);
+    construit.famille.set(famille, connu && connu.chemin !== chemin ? null : { prenom: mots[0], chemin });
+    // Les débuts stricts seulement : le nom entier, c'est déjà l'index exact.
+    for (let n = 2; n < mots.length; n++) ajouterSiUnique(construit.prefixe, mots.slice(0, n).join('|'), chemin);
+    for (let i = 0; i < mots.length - 1; i++) {
+      for (let j = i + 1; j < mots.length; j++) ajouterSiUnique(construit.paire, `${mots[i]}|${mots[j]}`, chemin);
+    }
   }
-  parMotsDuNom = index;
-  return index;
+  index = construit;
+  return construit;
 }
 
-function indexPrenomNom(): Map<string, string | null> {
-  if (parPrenomNom) return parPrenomNom;
-  const index = new Map<string, string | null>();
-  for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ, ...PHOTOS_NEW_MAJ })) {
-    ajouterSiUnique(index, prenomNom(cle), chemin);
-  }
-  parPrenomNom = index;
-  return index;
+function photoExacte(cle: string): string | undefined {
+  return PHOTOS_NEW_MAJ[cle] ?? PHOTO_JOUEUR_MAJ[cle] ?? PHOTO_JOUEUR[cle];
 }
 
-function indexNomDeFamille(): Map<string, string | null> {
-  if (parNomDeFamille) return parNomDeFamille;
-  const index = new Map<string, string | null>();
-  for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ, ...PHOTOS_NEW_MAJ })) {
-    const mots = cle.split(' ').filter(Boolean);
-    ajouterSiUnique(index, mots.length > 1 ? mots[mots.length - 1] : '', chemin);
-  }
-  parNomDeFamille = index;
-  return index;
+/**
+ * ⚠️ LES PORTRAITS ONT PERDU LEURS LETTRES ACCENTUÉES À L'ASPIRATION. Le
+ * fichier s'appelle `gal_drean` pour « Gaël DRÉAN », `jrmy_sinzelle` pour
+ * « Jérémy SINZELLE », `lon_boulier` pour « Léon BOULIER » : la lettre accentuée
+ * n'a pas été translittérée, elle a été SUPPRIMÉE. Retirer l'accent (« gael »)
+ * ne retombe donc jamais dessus — il faut retirer la lettre entière.
+ */
+function sansLettresAccentuees(nom: string): string {
+  return normaliserNom(nom.normalize('NFD').replace(/[a-zA-Z](?=[̀-ͯ])/g, ''));
 }
+
+/** Deux prénoms dont l'un est le début ou la fin de l'autre : Riko/Eneriko. */
+function emboites(a: string, b: string): boolean {
+  const [court, long] = a.length < b.length ? [a, b] : [b, a];
+  return court.length >= 3 && (long.startsWith(court) || long.endsWith(court));
+}
+
+/** Les clés obtenues en retirant UN caractère : une lettre perdue en route. */
+function amputations(cle: string): string[] {
+  if (cle.length > 40) return [];
+  const sortie: string[] = [];
+  for (let i = 0; i < cle.length; i++) sortie.push(cle.slice(0, i) + cle.slice(i + 1));
+  return sortie;
+}
+
+// `photoReelle` est appelée à chaque rendu de carte, de portrait de composition
+// et de post du fil social : on garde le résultat, index compris.
+const memoire = new Map<string, string | undefined>();
 
 export function photoReelle(nom: string): string | undefined {
+  if (memoire.has(nom)) return memoire.get(nom);
+  const trouvee = chercherPhoto(nom);
+  memoire.set(nom, trouvee);
+  return trouvee;
+}
+
+function chercherPhoto(nom: string): string | undefined {
   const cle = normaliserNom(nom);
-  const exacte = PHOTOS_NEW_MAJ[cle] ?? PHOTO_JOUEUR_MAJ[cle] ?? PHOTO_JOUEUR[cle];
-  if (exacte) return exacte;
-  const mots = cle.split(' ').filter(Boolean);
-  return indexMotsDuNom().get(signatureNom(cle))
-    ?? indexPrenomNom().get(prenomNom(cle))
-    ?? (mots.length > 1 ? indexNomDeFamille().get(mots[mots.length - 1]) : undefined)
-    ?? undefined;
+  if (!cle) return undefined;
+  // Deux écritures du même joueur : celle de la base, et celle qu'a produite
+  // l'aspiration des portraits en perdant les lettres accentuées.
+  const ecritures = [...new Set([cle, sansLettresAccentuees(nom)])].filter(Boolean);
+  for (const ecriture of ecritures) {
+    const exacte = photoExacte(ecriture);
+    if (exacte) return exacte;
+  }
+  const tables = indexPhotos();
+  const pistes: (string | null | undefined)[] = [];
+  for (const ecriture of ecritures) {
+    const mots = motsDe(ecriture);
+    const famille = mots[mots.length - 1];
+    pistes.push(
+      tables.signature.get(signatureNom(ecriture)),
+      tables.prenomNom.get(prenomNom(ecriture)),
+      tables.colle.get(mots.join('')),
+      // Le PORTRAIT porte le nom long (« aaron grandidier nkanang »), la
+      // feuille de match le nom court (« Aaron GRANDIDIER »).
+      mots.length > 1 ? tables.prefixe.get(mots.join('|')) : undefined,
+    );
+    if (mots.length < 2) continue;
+    // Et l'inverse : la feuille donne le nom long, le portrait le nom court. On
+    // raccourcit par la fin, jamais en dessous de deux mots — un prénom seul
+    // attraperait n'importe qui.
+    //
+    // ⚠️ CONTRE L'INDEX EXACT SEULEMENT. Confronté aux DÉBUTS de nom, ce
+    // raccourci donnait à Jean-Luc DU PREEZ le visage de Jean-Luc DU PLESSIS :
+    // il revient à jeter le nom de famille et à ne garder que le prénom.
+    for (let n = mots.length - 1; n >= 2; n--) pistes.push(photoExacte(mots.slice(0, n).join(' ')));
+    // Une seule lettre en moins, et là encore contre l'index exact seul : c'est
+    // la trace d'un caractère perdu en route (« rhan janse van rensburg »,
+    // « giovanni habel kuffner »), pas une ressemblance approximative.
+    for (const variante of amputations(ecriture)) pistes.push(photoExacte(variante));
+    pistes.push(tables.paire.get(`${mots[0]}|${famille}`), tables.familleInitiale.get(`${famille}|${mots[0][0]}`));
+    // Le nom de famille seul, et seulement si les prénoms s'emboîtent :
+    // « Riko » est la fin d'« Eneriko », « Sacha » n'est rien de « Gabriel ».
+    const seul = tables.famille.get(famille);
+    if (seul && emboites(mots[0], seul.prenom)) pistes.push(seul.chemin);
+  }
+  for (const piste of pistes) if (piste) return piste;
+  return undefined;
 }
 
 export function avatarPourCompte(nom: string, type: TypeAvatar, club?: string): string {

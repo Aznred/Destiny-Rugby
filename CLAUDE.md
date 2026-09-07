@@ -358,6 +358,23 @@ stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
 - **`Trophee.individuel` est LE champ qui range un trophée** : il commande sa
   place dans l'armoire ET la façon dont on le gagne.
 - **Draco** : `useGLTF(url, true)` charge le décodeur depuis un CDN Google.
+- **UNE PHOTO DE JOUEUR N'EST PAS FORCÉMENT UN JOUEUR.** Le site source rend une
+  silhouette grise « portrait indisponible » : elle a été aspirée 181 fois sous
+  181 noms, indexée comme un vrai portrait, et gagnait donc contre le vrai
+  visage rangé ailleurs. Elle se reconnaît à son empreinte md5, jamais à son
+  nom. Un seul exemplaire subsiste, `public/photos/silhouette.webp`, qui sert de
+  repli aux cartes. Ménage : `node scripts/nettoyerPhotos.cjs` puis
+  `node scripts/copierPhotosJoueurs.cjs`. Banc : `npm run verify:photos`.
+- **Les noms de fichiers de portraits ne concordent pas avec la base** (nom
+  composé tronqué, lettre accentuée mangée, apostrophe recollée) :
+  `lib/avatars.ts` essaie sept écritures, chacune refusée si elle désigne deux
+  portraits. **Ne pas rouvrir la piste du nom de famille SEUL** — mesuré, elle
+  rattrapait 5 joueurs du Top 14 et en trompait 14.
+- **Un `translateZ` négatif rend un élément incliquable** sous
+  `transform-style: preserve-3d` : il est dessiné derrière le fond de son
+  parent, et le test de survol suit le dessin. C'était le cas des cartes
+  latérales de `RoueCartes.tsx` — le relief se fabrique en avançant la carte de
+  devant, jamais en reculant les autres.
 
 ---
 
@@ -376,6 +393,7 @@ npm run verify:carriere-avancee   # 13 contrôles + poids de l'état
 npm run verify:carriere-profonde  # 24 contrôles
 npm run verify:formation-manager
 npm run verify:distances-transferts
+npm run verify:photos             # portraits des cartes : liens morts, silhouettes, Top 14
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
 ```

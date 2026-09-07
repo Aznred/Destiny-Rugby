@@ -35,7 +35,8 @@
     "verify:paliers": "vite-node scripts/verifPaliersStructures.ts",
     "verify:ligue": "vite-node scripts/verifLigue.ts",
     "verify:carriere": "vite-node scripts/verifCarriere.ts",
-    "verify:collection": "vite-node scripts/verifierCollection.ts"
+    "verify:collection": "vite-node scripts/verifierCollection.ts",
+    "verify:photos": "vite-node scripts/verifPhotosCartes.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

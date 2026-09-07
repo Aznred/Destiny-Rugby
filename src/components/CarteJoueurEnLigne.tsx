@@ -17,6 +17,19 @@ const PALETTES = {
 };
 const SILHOUETTE = 'M120 7 C107 23 83 21 65 29 L15 47 L15 282 Q15 314 57 326 Q101 338 120 351 Q139 338 183 326 Q225 314 225 282 L225 47 L175 29 C157 21 133 23 120 7Z';
 
+/**
+ * LE JOUEUR SANS PORTRAIT GARDE LA SILHOUETTE GRISE — c'est le repli voulu.
+ *
+ * ⚠️ MAIS ELLE A SON PROPRE FICHIER, ET C'EST TOUT LE BUG. Le repli pointait
+ * sur `/photos/adam_hastings.webp`, qui n'était pas le portrait d'Adam
+ * Hastings : c'était cette silhouette-là, enregistrée 181 fois sous 181 noms de
+ * joueurs par l'aspirateur de portraits (voir `scripts/nettoyerPhotos.cjs`).
+ * Indexée comme un vrai visage, elle passait AVANT la photo réelle rangée dans
+ * `photos/maj/`. Un seul exemplaire subsiste donc, sous un nom qui ne
+ * revendique personne, et il ne sert que quand on n'a vraiment rien.
+ */
+const SANS_PHOTO = '/photos/silhouette.webp';
+
 export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, compacte = false, etatCollection }: {
   carte: CarteCarriere; proprietaire?: string; logoClub?: string; onClick?: () => void; compacte?: boolean; etatCollection?: 'inconnue' | 'decouverte';
 }) {
@@ -47,7 +60,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
       <path d={SILHOUETTE} transform="translate(6 8) scale(.95 .956)" stroke={bord} opacity=".55" fill="none" />
     </svg>
     <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</em><Drapeau nation={carte.nation} taille={1.15} />{blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}</span>
-    <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src="/photos/adam_hastings.webp" alt="Portrait par défaut" />}</span>
+    <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src={SANS_PHOTO} alt="Portrait par défaut" />}</span>
     <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{carte.clubReel}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>
     <span className="dr-player-rarity">{NOMS_PACK[carte.rarete]}<i> · {carte.age} ans</i></span>

@@ -39,6 +39,17 @@
   annonce la rareté avant le nom.
 - **Marché, enchères et échanges croisés** entre managers, avec verrou de carte
   et plancher d'effectif tenus par le serveur.
+- **La roue du marché tourne comme le présentoir des packs** : le glissement
+  suit la main image par image (position continue, amortissement exponentiel),
+  la roue se cale sur la carte de face au relâchement, et un clic ramène
+  n'importe quelle carte au centre. Elle mesurait auparavant le geste sans rien
+  bouger jusqu'au relâchement, et ses sept places, posées tous les 45° sur un
+  demi-tour, ramenaient la troisième carte de gauche exactement sur la première
+  de droite : les cartes s'empilaient au premier plan. Deux pièges à ne pas
+  rouvrir dans `RoueCartes.tsx` : **un `translateZ` négatif rend la carte
+  incliquable** (`preserve-3d` la dessine sous le fond de la scène, et le survol
+  suit le dessin), et **une transition CSS sur `transform`** rajouterait une
+  demi-seconde de retard sur une position déjà amortie.
 - **Le classement montre les clubs, pas des lignes** : écusson et pseudo de
   chaque manager, points marqués et encaissés, bonus, forme sur cinq matchs — et
   un clic ouvre la **fiche d'un adversaire** (effectif complet, derniers
@@ -1166,9 +1177,28 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   désignés séparément et transmis au moteur.
 - La composition prend la forme d'un **squad builder rugby** : terrain vertical,
   cartes-billets, six attributs propres au poste, adéquation, cohésion par
-  secteur et état médical. Les **1 574 portraits officiels** déjà présents dans
+  secteur et état médical. Les **portraits officiels** déjà présents dans
   `public/photos` sont utilisés ; un joueur sans fichier connu garde une
   silhouette grise explicite, jamais le visage inventé d'un autre joueur.
+- **La silhouette grise a son propre fichier, et un seul.** Le site source sert
+  une image « portrait indisponible » quand il n'a pas la photo : elle avait été
+  aspirée **181 fois, sous 181 noms de joueurs**, puis indexée comme un vrai
+  portrait — elle passait donc AVANT le vrai visage rangé dans `photos/maj/`, et
+  le repli de la carte pointait lui-même sur l'une de ces copies
+  (`adam_hastings.webp`). Elle vit maintenant dans `photos/silhouette.webp`, ne
+  revendique personne, et `scripts/nettoyerPhotos.cjs` la reconnaît à l'octet
+  près. Dans la foulée, 99 entrées de `photosMaj.ts` qui promettaient un `.webp`
+  absent ont été raccrochées au fichier réellement présent.
+- **Les noms ne concordent pas d'un fichier à l'autre**, et c'était la première
+  cause de carte grise : la feuille dit « Aaron GRANDIDIER » quand le fichier
+  s'appelle `aaron_grandidier_nkanang`, « Gaël DRÉAN » quand l'aspiration a
+  mangé la lettre accentuée (`gal_drean`), « David AINU'U » quand l'apostrophe a
+  disparu (`david_ainuu`). `lib/avatars.ts` essaie sept écritures, chacune
+  refusée dès qu'elle désigne deux portraits. Le nom de famille SEUL n'est plus
+  une piste : mesuré, il rattrapait 5 joueurs du Top 14 et en trompait 14 —
+  Sacha ELISSALDE recevait le visage de Gabriel ELISSALDE. **Couverture du
+  Top 14 : 88 % (594 sur 677)** contre 84 % dont 22 fausses photos grises.
+  Banc : `npm run verify:photos`.
 - Les portraits détourés reposent directement sur le métal de la carte, sans
   vignette grise rapportée. Pendant un échange, la carte prise s'efface et la
   cible se soulève avec un liseré doré. La fiche joueur se ferme au clic
