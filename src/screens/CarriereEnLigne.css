@@ -1422,7 +1422,10 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 }
 .cel-encherir .btn { padding: 0.45rem 0.9rem; font-size: 0.84rem; }
 .cel-apercu-vente { display: grid; place-items: center; }
-.cel-apercu-vente .cel-carte { width: 12rem; }
+/* La règle générique des cartes de ligue leur donne 100 % de la largeur de leur
+   conteneur. Dans le formulaire de mise en vente, l'aperçu doit au contraire
+   rester une carte, pas devenir une affiche pleine page. */
+.cel-apercu-vente .cel-carte.dr-player.dr-player { width: 12rem; }
 
 .cel-choix-cartes { display: flex; flex-wrap: wrap; gap: 0.35rem; max-height: 18rem; overflow-y: auto; align-content: start; }
 .cel-choix-cartes button {
@@ -1656,7 +1659,7 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
   .cel-portefeuille { width: 100%; }
   .cel-deux { grid-template-columns: 1fr; }
   .cel-vente { grid-template-columns: 1fr; }
-  .cel-apercu-vente .cel-carte, .cel-vente .cel-carte { width: min(12rem, 100%); margin: 0 auto; }
+  .cel-apercu-vente .cel-carte.dr-player.dr-player, .cel-vente .cel-carte { width: min(12rem, 100%); margin: 0 auto; }
   .cel-echange-cotes { grid-template-columns: 1fr; }
   .cel-echange-cotes > svg { justify-self: center; transform: rotate(90deg); }
   .cel-grille-cartes { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.55rem; }
