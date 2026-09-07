@@ -1900,7 +1900,7 @@ export function infoPenalite(e: EtatMatch): PenaliteEnCours | null {
   const liste = surLeTerrain(e, cote);
   if (!liste.length) return null;
   const buteur = liste.find((p) => p.buteur) ?? [...liste].sort((a, b) => b.pied - a.pied)[0];
-  const distance = metresAvantLaLigne(e.penalite.lieu, cote) + 11;
+  const distance = Math.max(0, metresAvantLaLigne(e.penalite.lieu, cote));
   const angle = Math.abs(e.penalite.lieu.y - AXE);
   return {
     cote, distance: Math.round(distance), angle: Math.round(angle),
@@ -1932,7 +1932,7 @@ function phasePenalite(e: EtatMatch): void {
   const buteurDesigne = liste.find((p) => p.buteur);
   const buteur = buteurDesigne ?? [...liste].sort((a, b) => b.pied - a.pied)[0];
 
-  const dist = metresAvantLaLigne(info.lieu, cote) + 11;
+  const dist = Math.max(0, metresAvantLaLigne(info.lieu, cote));
   const ecartAxe = Math.abs(info.lieu.y - AXE);
   const restantes = 80 - e.minute;
   const diff = ecart(e, cote);

@@ -102,7 +102,7 @@ export interface HistoireCarriere {
 export interface EtatCarriereEnLigne {
   schema: 1; id: string; nom: string; code: string; createurId: string; creeLe: string;
   version: number; saison: number; phase: 'salon' | 'saison' | 'intersaison';
-  rythme: 1 | 2; maxClubs: number; graine: string; debutSaison?: string;
+  rythme: number; maxClubs: number; graine: string; debutSaison?: string;
   /** L'identité de la ligue : son logo, son trophée, sa phase finale. */
   logo?: string; tropheeId?: string; playoffs?: boolean;
   /** Ce que chaque club reçoit en arrivant. Fixé à la création, jamais après. */
@@ -123,7 +123,7 @@ export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' |
 }
 export interface CreationCarriere {
   id: string; nom: string; code: string; compteId: string; pseudo: string; clubNom: string;
-  rythme: 1 | 2; maxClubs: number; embleme?: string;
+  rythme: number; maxClubs: number; embleme?: string;
   logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number;
 }
 export type CommandeCarriere =

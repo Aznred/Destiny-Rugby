@@ -1641,3 +1641,10 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
   .cel-ligne-fil, .cel-halo, .cel-pochette, .cel-pochette-corps, .cel-pochette-bande,
   .cel-pochette-appel, .cel-revele.vue, .cel-revele.elite::after, .cel-revele.star::after { animation: none; }
 }
+
+.cel-roue-cartes { display:flex; gap:24px; overflow-x:auto; padding:32px 20px; scroll-snap-type:x mandatory; perspective:1000px; }
+.cel-roue-cartes > button { flex:0 0 220px; border:0; background:transparent; cursor:pointer; scroll-snap-align:center; transition:transform .25s,filter .25s; }
+.cel-roue-cartes > button:hover,.cel-roue-cartes > button.active { transform:translateY(-12px) scale(1.04); filter:drop-shadow(0 12px 20px #c6ad5960); }
+@media(prefers-reduced-motion:reduce){.cel-roue-cartes > button{transition:none}}
+
+.cel-terrain-direct{width:100%;max-height:520px;border:2px solid #e4e8cf;border-radius:12px;margin:20px 0}

@@ -145,3 +145,6 @@ export const EVALUATION_JOUEUR_MAJ: Record<string, { note: number; source: strin
   "zac ward": { note: 79, source: "Statistiques clubs (4 catégories)" },
   "zander fagerson": { note: 81, source: "RugbyPass #90" },
 };
+
+// Ajustements de jeu demandés par le créateur.
+Object.assign(EVALUATION_JOUEUR_MAJ, {"maxime lucu":{"note":93,"source":"Ajustement jeu"},"matthieu jalibert":{"note":93,"source":"Ajustement jeu"},"mathieu jalibert":{"note":93,"source":"Ajustement jeu"},"thomas ramos":{"note":93,"source":"Ajustement jeu"},"jack willis":{"note":92,"source":"Ajustement jeu"},"peato mauvaka":{"note":90,"source":"Ajustement jeu"},"emmanuel meafou":{"note":88,"source":"Ajustement jeu"},"emilien gailleton":{"note":88,"source":"Ajustement jeu"},"nicolas deportere":{"note":88,"source":"Ajustement jeu"},"oscar jegou":{"note":87,"source":"Ajustement jeu"},"baptiste serin":{"note":87,"source":"Ajustement jeu"},"theo attissogbe":{"note":86,"source":"Ajustement jeu"},"mickael guillard":{"note":88,"source":"Ajustement jeu"},"jiuta wainiqolo":{"note":87,"source":"Ajustement jeu"},"lenni nouchi":{"note":85,"source":"Ajustement jeu"}});

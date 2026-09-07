@@ -388,6 +388,18 @@ export function CarriereEnLigne() {
   // donc ce qui vient d'arriver à ce qu'on avait, et on ne prévient que de ce
   // qui a CHANGÉ.
   const rappels = useRappels(ligueId ?? '');
+  const rappelsEnvoyes = useRef(new Set<string>());
+  useEffect(() => {
+    if (!vue) return;
+    const verifier = () => { for (const r of vue.rencontres) {
+      const restant = Date.parse(r.ferme) - Date.now();
+      if (!r.resultat && !r.match && [r.domicile,r.exterieur].includes(vue.monClubId) && restant > 0 && restant <= 120000 && !rappelsEnvoyes.current.has(r.id)) {
+        rappelsEnvoyes.current.add(r.id);
+        rappels.prevenir('Coup d’envoi dans deux minutes', 'Ton équipe entre sur le terrain. Tu peux rejoindre le direct.');
+      }
+    }};
+    verifier(); const timer = setInterval(verifier, 1000); return () => clearInterval(timer);
+  }, [vue, rappels.prevenir]);
   const prevenirRef = useRef(rappels.prevenir);
   prevenirRef.current = rappels.prevenir;
   const comparerPourRappels = useCallback((avant: VueCarriereEnLigne | null, apres: VueCarriereEnLigne) => {
@@ -403,6 +415,8 @@ export function CarriereEnLigne() {
       if (!vieux.match && r.match && !r.match.termine) {
         prevenirRef.current('Le match a commencé', `${nom(r.domicile)} – ${nom(r.exterieur)}, journée ${r.journee}. Rejoins le direct pour piloter ton équipe.`);
       }
+      if (r.match?.decision && r.match.decision.jusqua !== vieux.match?.decision?.jusqua) prevenirRef.current('Décision à prendre', 'Une pénalité : choisis les points, la touche ou le jeu rapide.');
+      if (r.match && vieux.match && r.match.essais.domicile + r.match.essais.exterieur > vieux.match.essais.domicile + vieux.match.essais.exterieur) prevenirRef.current('Essai !', `${nom(r.domicile)} ${r.match.score.domicile} – ${r.match.score.exterieur} ${nom(r.exterieur)}`);
       if (!vieux.resultat && r.resultat) {
         const chezMoi = r.domicile === apres.monClubId;
         const pour = chezMoi ? r.resultat.pointsD : r.resultat.pointsE;
@@ -524,7 +538,7 @@ function Connexion({ onConnexion, occupe }: { occupe: boolean; onConnexion: (act
   return <div className="cel-entree"><div className="cel-promesse"><div className="eyebrow">Une ligue. Vos clubs. Votre histoire.</div><h1>Le rugby se vit<br /><span>entre amis.</span></h1><p>Trente joueurs Bronze, un maillot à défendre et des mois pour bâtir une équipe qui compte. Le prochain grand rendez-vous, c’est le vôtre.</p><div className="cel-billet"><b>SAISON 01</b><span>30 joueurs au départ</span><strong>35 <small>GEN</small></strong><p>Championnats privés · Marché entre amis · Matchs en direct</p></div></div><form className="cel-panneau cel-auth" onSubmit={soumettre}>{invitation && <p className="cel-invite"><Icone nom="cadeau" taille={18} />Tu es invité à rejoindre une ligue. Crée ton compte, et le vestiaire s’ouvre juste après.</p>}<div className="eyebrow">Ton vestiaire t’attend</div><h2>{inscription ? 'Créer mon compte' : 'Retrouver mes ligues'}</h2><p>Un compte pour retrouver tes clubs sur tous tes appareils.</p><Champ label="Identifiant"><input autoComplete="username" required minLength={3} maxLength={60} value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="ton-identifiant" /></Champ>{inscription && <Champ label="Nom du manager"><input required minLength={2} maxLength={32} value={pseudo} onChange={e => setPseudo(e.target.value)} placeholder="Ton pseudo" /></Champ>}<Champ label="Mot de passe"><input type="password" autoComplete={inscription ? 'new-password' : 'current-password'} required minLength={inscription ? 10 : 1} maxLength={128} value={motDePasse} onChange={e => setMotDePasse(e.target.value)} placeholder={inscription ? '10 caractères minimum' : 'Ton mot de passe'} /></Champ><button className="btn primaire" disabled={occupe}>{occupe ? 'Connexion en cours…' : inscription ? 'Créer mon compte' : 'Se connecter'}<Icone nom="fleche-droite" taille={17} /></button><button className="btn fantome" type="button" onClick={() => setInscription(!inscription)}>{inscription ? 'J’ai déjà un compte' : 'Créer un compte'}</button></form></div>;
 }
 
-function Portail({ session, occupe, ouvrirLigue, onCreer, onRejoindre }: { session: SessionCarriere; occupe: boolean; ouvrirLigue: (id: string) => Promise<void>; onCreer: (nom: string, club: string, rythme: 1 | 2, max: number, identite?: IdentiteLigue) => Promise<void>; onRejoindre: (code: string, club: string, embleme?: string) => Promise<void> }) {
+function Portail({ session, occupe, ouvrirLigue, onCreer, onRejoindre }: { session: SessionCarriere; occupe: boolean; ouvrirLigue: (id: string) => Promise<void>; onCreer: (nom: string, club: string, rythme: number, max: number, identite?: IdentiteLigue) => Promise<void>; onRejoindre: (code: string, club: string, embleme?: string) => Promise<void> }) {
   // ⚠️ ARRIVER PAR UN LIEN, C’EST DÉJÀ AVOIR RÉPONDU À LA QUESTION. Sans ça,
   //    l’invité tombe sur « Créer une ligue » avec un formulaire vide, et le
   //    code qu’on vient de lui donner est à ressaisir alors qu’on l’a en main.
@@ -533,7 +547,7 @@ function Portail({ session, occupe, ouvrirLigue, onCreer, onRejoindre }: { sessi
   const [embleme, setEmbleme] = useState<string | undefined>(); const [choixOuvert, setChoixOuvert] = useState(false);
   const [logo, setLogo] = useState<string | undefined>(); const [tropheeId, setTropheeId] = useState<string | undefined>(); const [playoffs, setPlayoffs] = useState(false);
   const [dotation, setDotation] = useState('1000');
-  return <><header className="cel-titre"><div className="eyebrow">Bienvenue au club, {session.compte.pseudo}</div><h1>Vos rendez-vous rugby.</h1><p>Chaque ligue a ses clubs, ses cartes, ses Ovas et son histoire.</p></header><div className="cel-portail"><div><h2>Mes ligues <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <button className="cel-ligue" key={l.id} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}</em><b>{l.clubNom}</b><small>{l.etat === 'salon' ? 'En préparation' : l.etat === 'saison' ? 'Saison en cours' : 'Intersaison'} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>)}</div> : <Vide titre="Tout commence avec votre ligue">Invite tes amis ou rejoins leur vestiaire avec le code qu’ils t’ont partagé.</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme) as 1 | 2, Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>Créer une ligue</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>Rejoindre des amis</button></div><h2>{mode === 'creer' ? 'Le coup d’envoi vous appartient.' : 'Une place vous attend.'}</h2>{mode === 'creer' ? <Champ label="Nom de la ligue"><input required minLength={3} maxLength={50} placeholder="La Ligue du dimanche" value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label="Code d’invitation"><input required autoCapitalize="characters" maxLength={20} placeholder="Code reçu de ton ami" value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label="Nom de ton club"><input required minLength={3} maxLength={40} placeholder="Les XV du quartier" value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>Écusson</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? 'Changer d’écusson' : 'Choisir un vrai écusson de club'}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Choix label="Rythme" valeur={rythme} onChange={setRythme} options={[["1", '1 match / semaine'], ["2", '2 matchs / semaine']]} /><Choix label="Places" valeur={max} onChange={setMax} options={[4, 6, 8, 10, 12, 16, 20].map(n => [String(n), `${n} clubs`])} /></div><Choix label="Ovas au départ" valeur={dotation} onChange={setDotation} options={[['0', 'Aucun — tout se gagne'], ['500', '500 Ovas'], ['1000', '1 000 Ovas · recommandé'], ['2500', '2 500 Ovas'], ['5000', '5 000 Ovas'], ['10000', '10 000 Ovas'], ['25000', '25 000 Ovas'], ['50000', '50 000 Ovas'], ['100000', '100 000 Ovas · démarrage lancé']]} /><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>Phase finale</b>Les quatre premiers se disputent le titre en demi-finales puis en finale. Le classement décide de l’argent, la finale décide du trophée.</span></label></>}<p className="cel-note">Chaque club reçoit 30 joueurs Bronze autour de 35 GEN. Les matchs se jouent aussi pendant vos absences.</p><button className="btn primaire" disabled={occupe}>{occupe ? 'Préparation…' : mode === 'creer' ? 'Créer ma ligue privée' : 'Rejoindre la ligue'}<Icone nom="fleche-droite" taille={18} /></button></form></div></>;
+  return <><header className="cel-titre"><div className="eyebrow">Bienvenue au club, {session.compte.pseudo}</div><h1>Vos rendez-vous rugby.</h1><p>Chaque ligue a ses clubs, ses cartes, ses Ovas et son histoire.</p></header><div className="cel-portail"><div><h2>Mes ligues <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <button className="cel-ligue" key={l.id} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}</em><b>{l.clubNom}</b><small>{l.etat === 'salon' ? 'En préparation' : l.etat === 'saison' ? 'Saison en cours' : 'Intersaison'} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>)}</div> : <Vide titre="Tout commence avec votre ligue">Invite tes amis ou rejoins leur vestiaire avec le code qu’ils t’ont partagé.</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme), Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>Créer une ligue</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>Rejoindre des amis</button></div><h2>{mode === 'creer' ? 'Le coup d’envoi vous appartient.' : 'Une place vous attend.'}</h2>{mode === 'creer' ? <Champ label="Nom de la ligue"><input required minLength={3} maxLength={50} placeholder="La Ligue du dimanche" value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label="Code d’invitation"><input required autoCapitalize="characters" maxLength={20} placeholder="Code reçu de ton ami" value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label="Nom de ton club"><input required minLength={3} maxLength={40} placeholder="Les XV du quartier" value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>Écusson</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? 'Changer d’écusson' : 'Choisir un vrai écusson de club'}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Champ label="Matchs par semaine"><input type="number" min={1} max={7} required value={rythme} onChange={e => setRythme(e.target.value)} /></Champ><Champ label="Nombre de clubs"><input type="number" min={2} max={64} required value={max} onChange={e => setMax(e.target.value)} /></Champ></div><Champ label="Ovas au départ"><input type="number" min={0} max={100000} required value={dotation} onChange={e => setDotation(e.target.value)} /></Champ><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>Phase finale</b>Les qualifiés, dont le nombre dépend du nombre de clubs, se disputent le titre en demi-finales puis en finale. Le classement décide de l’argent, la finale décide du trophée.</span></label></>}<p className="cel-note">Chaque club reçoit 30 joueurs Bronze autour de 35 GEN. Les matchs se jouent aussi pendant vos absences.</p><button className="btn primaire" disabled={occupe}>{occupe ? 'Préparation…' : mode === 'creer' ? 'Créer ma ligue privée' : 'Rejoindre la ligue'}<Icone nom="fleche-droite" taille={18} /></button></form></div></>;
 }
 
 // ---------------------------------------------------------------------------
@@ -709,10 +723,10 @@ function FicheClubEnLigne({ vue, clubId, onFermer }: { vue: VueCarriereEnLigne; 
   </div>;
 }
 
-function Rencontre({ vue, rencontre: r, agir, occupe, suivre, grande = false }: { vue: VueCarriereEnLigne; rencontre: VueRencontre; agir: Agir; occupe: boolean; suivre: (id: string) => void; grande?: boolean }) {
+function Rencontre({ vue, rencontre: r, occupe, suivre, grande = false }: { vue: VueCarriereEnLigne; rencontre: VueRencontre; agir: Agir; occupe: boolean; suivre: (id: string) => void; grande?: boolean }) {
   const moi = r.domicile === vue.monClubId || r.exterieur === vue.monClubId;
-  const ouverte = r.ouvre <= maintenantISO() && r.ferme >= maintenantISO();
-  return <article className={`cel-rencontre${grande ? ' grande' : ''}`}><div className="cel-rencontre-date">Journée {r.journee} · {date(r.ouvre)} au {date(r.ferme)}{r.match && !r.match.termine && <b className="cel-direct-label"> EN DIRECT · {r.match.minute}′</b>}</div><div className="cel-affiche"><b>{nomClub(vue, r.domicile)}</b><strong>{r.resultat ? `${r.resultat.pointsD} – ${r.resultat.pointsE}` : r.match ? `${r.match.score.domicile} – ${r.match.score.exterieur}` : 'VS'}</strong><b>{nomClub(vue, r.exterieur)}</b></div>{r.match ? <button className="btn fantome" onClick={() => suivre(r.id)}>{r.match.termine ? 'Voir le match' : 'Rejoindre le direct'}<Icone nom="fleche-droite" taille={15} /></button> : !r.resultat && moi ? <button className="btn primaire" disabled={occupe || !ouverte} onClick={async () => { const v = await agir({ type: 'lancerMatch', matchId: r.id }); if (v) suivre(r.id); }}>{ouverte ? 'Donner le coup d’envoi' : 'Fenêtre à venir'}</button> : null}</article>;
+  const ouverte = Date.parse(r.ferme) - Date.now() <= 120_000;
+  return <article className={`cel-rencontre${grande ? ' grande' : ''}`}><div className="cel-rencontre-date">Journée {r.journee} · {dateHeure(r.ferme)}{r.match && !r.match.termine && <b className="cel-direct-label"> EN DIRECT · {r.match.minute}′</b>}</div><div className="cel-affiche"><b>{nomClub(vue, r.domicile)}</b><strong>{r.resultat ? `${r.resultat.pointsD} – ${r.resultat.pointsE}` : r.match ? `${r.match.score.domicile} – ${r.match.score.exterieur}` : 'VS'}</strong><b>{nomClub(vue, r.exterieur)}</b></div>{r.match ? <button className="btn fantome" onClick={() => suivre(r.id)}>{r.match.termine ? 'Voir le match' : 'Rejoindre le direct'}<Icone nom="fleche-droite" taille={15} /></button> : !r.resultat && moi ? <button className="btn primaire" disabled={occupe || !ouverte} onClick={() => suivre(r.id)}>{ouverte ? 'Rejoindre le direct' : 'Accès 2 min avant'}</button> : null}</article>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -744,7 +758,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, enCours]);
 
-  if (!m) return <Vide icone="chrono" titre="Le match n’a pas encore commencé">Reviens quand le coup d’envoi aura été donné.</Vide>;
+  if (!m) return <><button className="btn fantome" onClick={fermer}>Fermer</button><Vide icone="chrono" titre="Les équipes entrent sur le terrain">Coup d’envoi automatique le {dateHeure(r.ferme)}. Le direct apparaîtra ici.</Vide></>;
   const strategie = m.maStrategie ?? STRATEGIE_VIDE;
   const changer = <K extends keyof StrategieEnLigne>(cle: K, valeur: string) => {
     void agir({ type: 'match', matchId, action: { type: 'strategie', strategie: { ...strategie, [cle]: valeur } as StrategieEnLigne } });
@@ -753,6 +767,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   const restants = 8 - m.remplacementsFaits;
 
   return <div className="cel-direct">
+    {m.terrain && <svg className="cel-terrain-direct" viewBox="0 0 122 70" role="img" aria-label="Positions réelles des joueurs et du ballon"><rect width="122" height="70" fill="#246a45" />{[11,33,51,61,71,89,111].map(x => <line key={x} x1={x} x2={x} y1={0} y2={70} stroke="#ffffff99" strokeWidth={.3} />)}{m.terrain.pions.map(p => <g key={p.id} style={{transform: `translate(${p.x}px, ${p.y}px)`,transition:'transform 2s linear'}}><title>{p.nom}</title><circle r={1.5} fill={p.cote==='A'?'#56c8fa':'#fd766c'} stroke="white" strokeWidth={.2}/><text textAnchor="middle" dy=".6" fontSize="1.8" fill="#102032">{p.numero}</text></g>)}<ellipse cx={m.terrain.ballon.x} cy={m.terrain.ballon.y} rx={1} ry={.6} fill="white" stroke="#312d20" strokeWidth={.2}/></svg>}
     <div className="cel-tableau-bord">
       <button className="btn fantome cel-quitter" onClick={fermer}><Icone nom="croix" taille={15} /> Fermer</button>
       <div className="cel-score-direct">
@@ -990,6 +1005,10 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
   const club = vue.clubs.find(c => c.id === vue.monClubId);
   const [sousOnglet, setSousOnglet] = useState<'encours' | 'vendre' | 'echanges'>('encours');
   const [carteId, setCarteId] = useState('');
+  const [rechercheMarche, setRechercheMarche] = useState('');
+  const [rareteMarche, setRareteMarche] = useState('');
+  const normaliserRecherche = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const correspond = (c: CarteCarriere) => (!rareteMarche || c.rarete === rareteMarche) && normaliserRecherche(`${c.nom} ${c.clubReel} ${nomPoste(c.poste)}`).includes(normaliserRecherche(rechercheMarche));
   const [prix, setPrix] = useState('5000');
   const [mode, setMode] = useState('directe');
   const [duree, setDuree] = useState('24');
@@ -1003,7 +1022,7 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
   const carte = (id: string) => vue.cartes.find(c => c.id === id);
   const mesCartes = vue.cartes.filter(c => c.proprietaire === vue.monClubId);
   const vendables = mesCartes.filter(c => !c.verrou);
-  const ouvertes = vue.ventes.filter(v => v.etat === 'ouverte' && v.expireLe > maintenantISO());
+  const ouvertes = vue.ventes.filter(v => v.etat === 'ouverte' && v.expireLe > maintenantISO() && Boolean(carte(v.carteId) && correspond(carte(v.carteId)!)));
   const siennes = vue.cartes.filter(c => c.proprietaire === cible);
   const basculer = (liste: string[], set: (l: string[]) => void, id: string) => set(liste.includes(id) ? liste.filter(x => x !== id) : [...liste, id]);
 
@@ -1011,13 +1030,14 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
     <nav className="cel-onglets secondaires">{([['encours', `À vendre (${ouvertes.length})`], ['vendre', 'Mettre en vente'], ['echanges', `Échanges (${vue.echanges.filter(e => e.etat === 'propose').length})`]] as const).map(([id, label]) =>
       <button key={id} className={sousOnglet === id ? 'actif' : ''} onClick={() => setSousOnglet(id)}>{label}</button>)}</nav>
 
+    <div className="cel-deux"><Champ label="Rechercher un joueur, un club ou un poste"><input type="search" value={rechercheMarche} onChange={e => setRechercheMarche(e.target.value)} placeholder="Nom du joueur…" /></Champ><Choix label="Rareté" valeur={rareteMarche} onChange={setRareteMarche} options={[["", "Toutes"], ["bronze", "Bronze"], ["argent", "Argent"], ["or", "Or"], ["elite", "Élite"], ["star", "Mythique"]]} /></div>
     {sousOnglet === 'encours' && (ouvertes.length ? <div className="cel-grille-ventes">{ouvertes.map(v => {
       const c = carte(v.carteId);
       if (!c) return null;
       const mienne = v.vendeurId === vue.monClubId;
       const minimum = v.enchere ? v.enchere.montant + Math.max(25, Math.ceil(v.enchere.montant * 0.05)) : v.prix;
       return <article key={v.id} className="cel-vente">
-        <CarteJoueurEnLigne carte={c} proprietaire={nomClub(vue, v.vendeurId)} compacte />
+        <CarteJoueurEnLigne carte={c} proprietaire={nomClub(vue, v.vendeurId)} />
         <div className="cel-vente-corps">
           <div className="eyebrow">{v.type === 'enchere' ? 'Enchère' : 'Vente directe'} · clôture {dateHeure(v.expireLe)}</div>
           <strong>{montant(v.enchere?.montant ?? v.prix)} Ovas</strong>
@@ -1040,13 +1060,12 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
         <h2>Mettre un joueur sur le marché</h2>
         <p className="cel-note">Ton effectif ne peut pas descendre sous 26 joueurs, et chaque ligne doit garder de quoi composer une feuille. C’est le serveur qui le vérifie.</p>
         <div className="cel-grille-consignes">
-          <Choix label="Joueur" valeur={carteId} options={[['', 'Choisis un joueur'], ...vendables.sort((a, b) => b.note - a.note).map(c => [c.id, `${c.note} · ${c.nom} (${nomPoste(c.poste)})`] as [string, string])]} onChange={setCarteId} />
           <Champ label="Prix de départ (Ovas)"><input type="number" min={1} step={100} value={prix} onChange={e => setPrix(e.target.value)} required /></Champ>
           <Choix label="Type" valeur={mode} options={[['directe', 'Vente directe'], ['enchere', 'Aux enchères']]} onChange={setMode} />
           <Choix label="Durée" valeur={duree} options={[['2', '2 heures'], ['6', '6 heures'], ['24', '24 heures'], ['72', '3 jours'], ['168', '7 jours']]} onChange={setDuree} />
         </div>
         {carteId && carte(carteId) && <div className="cel-apercu-vente"><CarteJoueurEnLigne carte={carte(carteId)!} /></div>}
-        <button className="btn primaire" disabled={occupe || !carteId}>Publier l’annonce</button>
+        <button className="btn primaire" disabled={occupe || !carteId}>Publier l’annonce</button><button type="button" className="btn fantome" disabled={!carteId} onClick={() => { setDonnees([carteId]); setSousOnglet('echanges'); }}>Échanger cette carte</button>
       </form>
     </>}
 
@@ -1168,7 +1187,7 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
             ? <>Fenêtre ouverte le <b>{dateLongue(prochaine.ouvre)}</b> — {delai(prochaine.ouvre)}</>
             : <>À jouer avant le <b>{dateLongue(prochaine.ferme)}</b> — {delai(prochaine.ferme)}</>}
         </p>
-        <small className="cel-note">Les deux managers s’arrangent sur l’heure exacte. Passé la limite, la rencontre se joue toute seule avec vos compositions enregistrées.</small>
+        <small className="cel-note">Coup d’envoi automatique à la date de clôture indiquée. Le direct est accessible deux minutes avant, avec vos compositions enregistrées.</small>
       </div>
       <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande />
     </section>}
@@ -1256,7 +1275,7 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
 
   return <>
     <section className="cel-panneau cel-filtres">
-      <div><div className="eyebrow">{vue.competitions.length} compétition{vue.competitions.length > 1 ? 's' : ''} dans cette ligue</div><h2 className="cel-nom-ligue">{competition?.logo && <img className="cel-logo-ligue" src={competition.logo} alt="" />}{competition?.nom ?? 'Le calendrier'}</h2><p className="cel-note">{competition ? `${competition.trophee}${competition.playoffs ? ' · phase finale à quatre' : ''}` : ''}</p></div>
+      <div><div className="eyebrow">{vue.competitions.length} compétition{vue.competitions.length > 1 ? 's' : ''} dans cette ligue</div><h2 className="cel-nom-ligue">{competition?.logo && <img className="cel-logo-ligue" src={competition.logo} alt="" />}{competition?.nom ?? 'Le calendrier'}</h2><p className="cel-note">{competition ? `${competition.trophee}${competition.playoffs ? ' · phase finale adaptée au nombre de clubs' : ''}` : ''}</p></div>
       {vue.competitions.length > 1 && <Choix label="Compétition" valeur={competition?.id ?? ''} options={vue.competitions.map(c => [c.id, c.nom])} onChange={setOuverte} />}
       {proprietaire && vue.phase === 'saison' && <button className="btn fantome" onClick={() => setNouvelle(!nouvelle)}><Icone nom="trophee" taille={17} />{nouvelle ? 'Fermer' : 'Créer une coupe'}</button>}
     </section>
@@ -1278,7 +1297,7 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
         <Champ label="Chaque participant (Ovas)"><input type="number" min={0} max={1000} step={100} value={participation} onChange={e => setParticipation(e.target.value)} /></Champ>
       </div>
       <ChoixCompetition logo={logoCoupe} tropheeId={tropheeCoupe} onLogo={setLogoCoupe} onTrophee={setTropheeCoupe} />
-      {format === 'championnat' && <label className="cel-bascule"><input type="checkbox" checked={playoffsCoupe} onChange={e => setPlayoffsCoupe(e.target.checked)} /><span><b>Phase finale</b>Les quatre premiers se disputent le trophée après les journées de poule.</span></label>}
+      {format === 'championnat' && <label className="cel-bascule"><input type="checkbox" checked={playoffsCoupe} onChange={e => setPlayoffsCoupe(e.target.checked)} /><span><b>Phase finale</b>Les qualifiés, dont le nombre dépend du nombre de clubs, se disputent le trophée après les journées de poule.</span></label>}
       <h3 className="cel-sous-titre">Participants</h3>
       <div className="cel-choix-cartes">{vue.clubs.map(c => <button type="button" key={c.id} className={participants.includes(c.id) ? 'actif' : ''} onClick={() => setParticipants(participants.includes(c.id) ? participants.filter(x => x !== c.id) : [...participants, c.id])}>{c.nom}</button>)}</div>
       <button className="btn primaire" disabled={occupe || participants.length < 2}>Créer la {nom}</button>

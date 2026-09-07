@@ -215,8 +215,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
       }
       if (action === 'creer') {
         if ((await stockage.ligues(compte.id)).length >= 20) throw new ErreurHttp(400, 'Vous participez déjà à 20 ligues.');
-        if (corps.rythme !== 1 && corps.rythme !== 2) throw new ErreurHttp(400, 'Choisissez un ou deux matchs par semaine.');
-        if (!Number.isInteger(corps.maxClubs) || Number(corps.maxClubs) < 2 || Number(corps.maxClubs) > 20) throw new ErreurHttp(400, 'Une ligue accueille de 2 à 20 clubs.');
+        if (!Number.isInteger(corps.rythme) || Number(corps.rythme) < 1 || Number(corps.rythme) > 7) throw new ErreurHttp(400, 'Choisissez entre 1 et 7 matchs par semaine.');
+        if (!Number.isInteger(corps.maxClubs) || Number(corps.maxClubs) < 2 || Number(corps.maxClubs) > 64) throw new ErreurHttp(400, 'Une ligue accueille de 2 à 64 clubs.');
         for (let essai = 0; essai < 3; essai++) {
           const id = randomUUID();
           const code = `DR-${randomBytes(5).toString('hex').toUpperCase()}`;

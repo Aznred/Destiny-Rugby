@@ -1,3 +1,4 @@
+import { useGlisserDeposer } from './GlisserDeposer';
 // ═══════════════════════════════════════════════════════════════════════════
 // L'ÉCRAN DE COMPOSITION — le terrain, les cartes, le panneau
 // ═══════════════════════════════════════════════════════════════════════════
@@ -161,9 +162,11 @@ function PortraitComposition({ nom, panneau = false }: { nom: string; panneau?: 
 
 function CarteJoueur({
   joueur, numero, posteSlot, selectionne, capitaine, buteur, etat, compact,
-  rendreCarte, enGlisse, cibleDepot, surSelection, surDrag, surDragFin, surSurvolDepot, surDrop,
+  poignee, depot, rendreCarte, enGlisse, cibleDepot, surSelection, surDrag, surDragFin, surSurvolDepot, surDrop,
 }: {
   joueur?: Coequipier;
+  poignee?: ReturnType<typeof useGlisserDeposer>['poignee'] extends (...args: never[]) => infer R ? R : never;
+  depot?: string;
   rendreCarte?: Props['rendreCarte'];
   numero: number;
   posteSlot: PosteId;
@@ -209,7 +212,9 @@ function CarteJoueur({
         enGlisse ? 'ct-en-drag' : '',
         cibleDepot ? 'ct-cible-depot' : '',
       ].filter(Boolean).join(' ')}
-      draggable={!!joueur}
+      {...poignee}
+      data-depot={depot}
+      draggable={false}
       onClick={surSelection}
       onDragStart={surDrag}
       onDragEnd={surDragFin}
@@ -491,6 +496,10 @@ export function CompositionTerrainManager({
     setSelection(selection === joueurId ? null : joueurId ?? null);
   };
 
+  const glisser = useGlisserDeposer((cible, id) => {
+    const [zone, index] = cible.split('-');
+    if ((zone === 'titulaires' || zone === 'remplacants') && !indisponibles?.has(id)) onPlacer(zone, Number(index), id);
+  });
   const demarrerDrag = (e: DragEvent<HTMLButtonElement>, joueurId?: string) => {
     if (!joueurId || indisponibles?.has(joueurId)) return;
     e.dataTransfer.effectAllowed = 'move';
@@ -597,7 +606,8 @@ export function CompositionTerrainManager({
                     etat={joueur ? etats?.get(joueur.id) : undefined}
                     enGlisse={joueurGlisse === joueur?.id}
                     cibleDepot={cibleDepot === `titulaires-${index}` && joueurGlisse !== joueur?.id}
-                    surSelection={() => choisirOuPlacer('titulaires', index, joueur?.id)}
+                    poignee={glisser.poignee(joueur?.id, `titulaires-${index}`)} depot={`titulaires-${index}`}
+                    surSelection={() => { if (!glisser.vientDeGlisser()) choisirOuPlacer('titulaires', index, joueur?.id); }}
                     surDrag={(e) => demarrerDrag(e, joueur?.id)}
                     surDragFin={terminerDrag}
                     surSurvolDepot={(survole) => setCibleDepot(survole ? `titulaires-${index}` : null)}
@@ -665,7 +675,8 @@ export function CompositionTerrainManager({
                 compact
                 enGlisse={joueurGlisse === joueur?.id}
                 cibleDepot={cibleDepot === `remplacants-${index}` && joueurGlisse !== joueur?.id}
-                surSelection={() => choisirOuPlacer('remplacants', index, joueur?.id)}
+                poignee={glisser.poignee(joueur?.id, `remplacants-${index}`)} depot={`remplacants-${index}`}
+                surSelection={() => { if (!glisser.vientDeGlisser()) choisirOuPlacer('remplacants', index, joueur?.id); }}
                 surDrag={(e) => demarrerDrag(e, joueur?.id)}
                 surDragFin={terminerDrag}
                 surSurvolDepot={(survole) => setCibleDepot(survole ? `remplacants-${index}` : null)}
@@ -706,8 +717,9 @@ export function CompositionTerrainManager({
                   selection === joueur.id ? 'selectionnee' : '',
                   joueurGlisse === joueur.id ? 'ct-en-drag' : '',
                 ].filter(Boolean).join(' ')}
-                draggable={!indisponible}
-                onClick={() => setSelection(selection === joueur.id ? null : joueur.id)}
+                {...glisser.poignee(indisponible ? undefined : joueur.id, null)}
+                draggable={false}
+                onClick={() => { if (!glisser.vientDeGlisser()) setSelection(selection === joueur.id ? null : joueur.id); }}
                 onDragStart={(e) => demarrerDrag(e, joueur.id)}
                 onDragEnd={terminerDrag}
                 aria-pressed={selection === joueur.id}

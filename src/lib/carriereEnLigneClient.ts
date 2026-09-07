@@ -54,7 +54,7 @@ export const identifierCarriere = (action: 'inscription' | 'connexion', identifi
   requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo });
 export const deconnecterCarriere = () => requete<{ ok: boolean }>({ action: 'deconnexion' });
 export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number }
-export const creerLigueCarriere = (nom: string, clubNom: string, rythme: 1 | 2, maxClubs: number, identite: IdentiteLigue = {}) =>
+export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number, maxClubs: number, identite: IdentiteLigue = {}) =>
   requete<VueCarriereEnLigne>({ action: 'creer', nom, clubNom, rythme, maxClubs, ...identite });
 export const rejoindreLigueCarriere = (code: string, clubNom: string, embleme?: string) => requete<VueCarriereEnLigne>({ action: 'rejoindre', code, clubNom, embleme });
 export const commanderCarriere = (ligue: string, commande: CommandeCarriere, requeteId: string) =>

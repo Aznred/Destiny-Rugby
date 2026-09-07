@@ -1,3 +1,5 @@
+import { JOUEURS_NEW_MAJ } from '../../data/photosNewMaj.js';
+import { LNR_MAJ } from '../../data/lnrMaj.js';
 import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
 import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/amateurs.js';
 import { PHOTO_JOUEUR } from '../../data/photosJoueurs.js';
@@ -53,13 +55,13 @@ export const PACKS_CARRIERE: PackCarriere[] = [
   { id: 'premium', nom: 'Premium', prix: 1800, cartes: 3, famille: 'general',
     promesse: 'Quatre cartes sur dix sont en Or. C’est ici que se construit un XV.',
     probabilites: { bronze: 15, argent: 40, or: 42, elite: 2.8, star: .2 } },
-  { id: 'or', nom: 'Or garanti', prix: 3200, cartes: 3, famille: 'general', garantie: 'or',
+  { id: 'or', nom: 'Or garanti', prix: 2600, cartes: 3, famille: 'general', garantie: 'or',
     promesse: 'Au moins une carte en Or, c’est écrit. Les deux autres se jouent.',
     probabilites: { bronze: 20, argent: 42, or: 35, elite: 2.7, star: .3 } },
   { id: 'grand', nom: 'Grand pack', prix: 4500, cartes: 8, famille: 'general', garantie: 'or',
     promesse: 'Huit cartes d’un coup, dont une en Or au minimum. De quoi refaire un banc.',
     probabilites: { bronze: 34, argent: 40, or: 24, elite: 1.8, star: .2 } },
-  { id: 'elite', nom: 'Élite garantie', prix: 11000, cartes: 3, famille: 'general', garantie: 'elite',
+  { id: 'elite', nom: 'Élite garantie', prix: 8500, cartes: 3, famille: 'general', garantie: 'elite',
     promesse: 'Un joueur à 80 ou plus, garanti. Il n’y en a que 416 dans tout le jeu.',
     probabilites: { bronze: 8, argent: 30, or: 55, elite: 6.4, star: .6 } },
 
@@ -98,10 +100,10 @@ export const PACKS_CARRIERE: PackCarriere[] = [
     filtre: { horsFrance: true },
     promesse: 'Les seize championnats étrangers. Le meilleur taux d’Argent et d’Or.',
     probabilites: { bronze: 35, argent: 44, or: 19.9, elite: 1, star: .1 } },
-  { id: 'top14', nom: 'Top 14', prix: 2600, cartes: 3, famille: 'monde',
+  { id: 'top14', nom: 'Top 14', prix: 3400, cartes: 3, famille: 'monde',
     filtre: { championnats: ['Top 14'] },
     promesse: 'Le meilleur championnat du monde. Pas une seule carte Bronze.',
-    probabilites: { bronze: 0, argent: 22, or: 66, elite: 11, star: 1 } },
+    probabilites: { bronze: 0, argent: 30, or: 65, elite: 4.7, star: .3 } },
   { id: 'prod2', nom: 'Pro D2', prix: 1500, cartes: 3, famille: 'monde',
     filtre: { championnats: ['Pro D2'] },
     promesse: 'L’antichambre. Des joueurs solides à un prix raisonnable.',
@@ -175,13 +177,15 @@ export function catalogueMondialCarriere(): readonly SourceCarte[] {
     const competition = clubs.get(club);
     for (const j of effectif) {
       const sourceId = `reel:${normaliser(j.nom)}`;
+      const lnr = LNR_MAJ[normaliser(j.nom)];
+      const maj = JOUEURS_NEW_MAJ[normaliser(j.nom)];
       const evaluation = EVALUATION_JOUEUR_MAJ[normaliser(j.nom)];
-      const classementMagazine = evaluation && /^(RugbyPass|FloRugby|We Talk Rugby)/.test(evaluation.source);
+      const classementMagazine = evaluation && /^(RugbyPass|FloRugby|We Talk Rugby|Ajustement jeu)/.test(evaluation.source);
       const note = classementMagazine ? evaluation.note : Math.max(30, j.note, evaluation?.note ?? 0);
       ajouter({ sourceId, nom: j.nom, famille: j.poste, poste: posteDepuisFamille(j.poste, 0), note,
         potentiel: Math.max(note, j.potentiel), age: j.age, nation: nationLisible(j.nation),
-        clubReel: club, championnat: competition?.nom ?? 'Championnat professionnel', pays: competition?.pays ?? 'France',
-        photo: photoReelle(j.nom), origine: 'professionnel', rarete: rareteCarriere(note),
+        clubReel: maj?.club ?? lnr?.club ?? club, championnat: maj ? 'Gallagher Premiership' : lnr?.championnat ?? competition?.nom ?? 'Championnat professionnel', pays: competition?.pays ?? 'France',
+        photo: lnr?.photo ?? photoReelle(j.nom), origine: 'professionnel', rarete: rareteCarriere(note),
         statistiques: statistiquesCarte(note, j.poste, sourceId) });
     }
   }

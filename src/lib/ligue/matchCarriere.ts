@@ -297,6 +297,7 @@ export interface EtatMatchEnLigne {
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {
   id: string;
+  terrain?: { ballon: {x:number;y:number}; pions: {id:string;numero:number;nom:string;cote:string;x:number;y:number}[] };
   minute: number;
   termine: boolean;
   score: Paire;
@@ -319,16 +320,8 @@ export interface VueMatchEnLigne {
 // 3. LE TEMPS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * ⚠️ QUATRE SECONDES DE VRAIE VIE POUR UNE MINUTE DE RUGBY — soit 5 min 20 de
- * match. Le compromis a deux bornes. Trop rapide (une seconde par minute), on
- * n'a le temps de rien : le changement tactique arrive après l'essai qu'il
- * devait empêcher, et regarder son match ne sert plus à rien. Trop lent (le
- * temps réel), personne ne reste quatre-vingts minutes devant un onglet.
- * L'écran sonde à 2 s : l'horloge avance d'une demi-minute entre deux
- * rafraîchissements, ce qui se lit comme un vrai chrono.
- */
-export const MS_PAR_MINUTE = 4_000;
+/** Une minute de rugby correspond à une minute réelle, hors arrêts de décision. */
+export const MS_PAR_MINUTE = 60_000;
 /** Ce qu'un manager a pour trancher une pénalité avant que l'IA ne le fasse. */
 export const DELAI_DECISION = 20_000;
 /** Au-delà, on considère que le manager a fermé l'onglet. */
@@ -881,6 +874,10 @@ export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string): VueMatc
     fil: etat.fil, stats: etat.stats, feuille: etat.feuille,
     remplacementsFaits: 0, surLeTerrain: [], surLeBanc: [],
   };
+  if (!etat.termine) {
+    const terrain = rejouer(etat, etat.horloge, null);
+    vue.terrain = {ballon: {...terrain.ballon}, pions: terrain.pions.filter(p => p.surLeTerrain).map(p => ({id:p.id, numero:p.numero, nom:p.nom, cote:p.cote, x:p.pos.x, y:p.pos.y}))};
+  }
   if (!monCote || etat.termine) return vue;
   vue.monCote = monCote;
   vue.maStrategie = strategieA(etat, monCote, etat.horloge);

@@ -122,7 +122,7 @@ const DOTATION_DEFAUT = 1000;
 export const DOTATION_MAX = 100_000;
 function dotationValide(valeur: unknown): number {
   if (typeof valeur !== 'number' || !Number.isFinite(valeur)) return DOTATION_DEFAUT;
-  return Math.min(DOTATION_MAX, Math.max(0, Math.round(valeur / 100) * 100));
+  return Math.min(DOTATION_MAX, Math.max(0, Math.round(valeur)));
 }
 
 function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string, nom: string, maintenant: number, graine: string, embleme?: unknown) {
@@ -144,8 +144,8 @@ function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string
 
 export function creerCarriere(config: CreationCarriere, maintenant: number, graine: string): EtatCarriereEnLigne {
   exiger(config && typeof config === 'object', 'Paramètres invalides.');
-  identifiant(config.id); texte(config.nom, 60); texte(config.code, 32); entier(config.maxClubs, 2, 20);
-  exiger(config.rythme === 1 || config.rythme === 2, 'Choisissez un ou deux matchs par semaine.');
+  identifiant(config.id); texte(config.nom, 60); texte(config.code, 32); entier(config.maxClubs, 2, 64);
+  entier(config.rythme, 1, 7);
   texte(graine, 200);
   const etat: EtatCarriereEnLigne = { schema: 1, id: config.id, nom: config.nom.trim(), code: config.code, createurId: config.compteId, creeLe: dateServeur(maintenant), version: 1, saison: 1, phase: 'salon', rythme: config.rythme, maxClubs: config.maxClubs, graine,
     // ⚠️ LE VIVIER NE SE COPIE PAS DANS LA LIGUE. Le catalogue mondial compte
@@ -177,8 +177,8 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
   // oblige à aller parler à celui qui l'a. Il reste évidemment disponible dans
   // toutes les autres ligues.
   const pris = new Set(etat.cartes.map(c => c.sourceId));
-  const rayons = RARETES_CARRIERE.map(r => rayonDePack(r, pack));
-  exiger(rayons.some((rayon, i) => pack.probabilites[RARETES_CARRIERE[i]] > 0 && rayon.length > pris.size), 'Ce pack est épuisé dans votre ligue.');
+  const rayons = RARETES_CARRIERE.map(r => rayonDePack(r, pack).filter(c => !pris.has(c.sourceId)));
+  exiger(rayons.some((rayon, i) => pack.probabilites[RARETES_CARRIERE[i]] > 0 && rayon.length > 0), 'Ce pack est épuisé dans votre ligue.');
   const rng = hasard(`${graine}:${etat.version}:${club.id}`); const tirees: CarteCarriere[] = [];
   // ⚠️ LA GARANTIE SE TIENT SUR LA DERNIÈRE CARTE, PAS SUR LA PREMIÈRE. Forcer
   // la bande dès le premier tirage ferait d'un « Or garanti » un pack qui
@@ -188,6 +188,8 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
   // que la séquence devienne prévisible — et la plupart du temps elle ne sert
   // même pas, parce que le hasard a déjà fait le travail.
   const bandes = pack.garantie ? bandesGaranties(pack.garantie) : [];
+  exiger(rayons.reduce((n, rayon) => n + rayon.length, 0) >= pack.cartes, 'Pas assez de joueurs disponibles pour ce pack.');
+  exiger(!pack.garantie || bandes.some(r => rayons[RARETES_CARRIERE.indexOf(r)].length > 0), 'La garantie de ce pack est épuisée. Aucun Ova débité.');
   for (let n = 0; n < pack.cartes; n++) {
     const derniere = n === pack.cartes - 1;
     const doitGarantir = derniere && bandes.length > 0 && !tirees.some(c => bandes.includes(c.rarete));
@@ -204,6 +206,7 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
     const source = tirerDuRayon(rayons[i], pris, rng);
     exiger(source, 'Ce pack ne contient plus de joueurs disponibles.');
     const carte = carteDepuisSource(source, etat.id, club.id, etat.saison);
+    rayons[i] = rayons[i].filter(c => c.sourceId !== source.sourceId);
     pris.add(carte.sourceId); etat.cartes.push(carte); tirees.push(carte);
   }
   journal(etat, club, 'pack', -pack.prix, tirees.map(c => c.id), `Pack ${pack.nom} : ${tirees.map(c => c.nom).join(', ')}`, dateServeur(maintenant));
@@ -329,16 +332,11 @@ function avancerCompetitions(etat: EtatCarriereEnLigne, maintenant: number) {
         : rangs.indexOf(r.domicile) <= rangs.indexOf(r.exterieur) ? r.domicile : r.exterieur;
       const debut = Math.max(...matchs.map(r => Date.parse(r.ferme)));
       if (derniere === c.journeesRegulieres) {
-        // Demi-finales : 1ᵉʳ contre 4ᵉ, 2ᵉ contre 3ᵉ, chez le mieux classé.
-        ajouterRencontres(etat, c, derniere + 1, [
-          { domicile: rangs[0], exterieur: rangs[3] },
-          { domicile: rangs[1], exterieur: rangs[2] },
-        ], debut);
-      } else if (derniere === c.journeesRegulieres + 1) {
-        const demies = matchs.filter(r => r.journee === derniere);
-        ajouterRencontres(etat, c, derniere + 1, [
-          { domicile: gagnantDe(demies[0]), exterieur: gagnantDe(demies[1]) },
-        ], debut);
+        const nombre = Math.min(rangs.length, Math.max(4, 2 ** Math.floor(Math.log2(rangs.length / 2))));
+        ajouterRencontres(etat, c, derniere + 1, Array.from({length: nombre / 2}, (_, i) => ({domicile: rangs[i], exterieur: rangs[nombre - 1 - i]})), debut);
+      } else if (matchs.filter(r => r.journee === derniere).length > 1) {
+        const qualifies = matchs.filter(r => r.journee === derniere).map(gagnantDe).sort((a,b) => rangs.indexOf(a)-rangs.indexOf(b));
+        ajouterRencontres(etat, c, derniere + 1, Array.from({length: qualifies.length / 2}, (_, i) => ({domicile: qualifies[i], exterieur: qualifies[qualifies.length - 1 - i]})), debut);
       } else {
         const finale = matchs.find(r => r.journee === derniere)!;
         const champion = gagnantDe(finale);
@@ -372,7 +370,9 @@ function lancerRencontre(etat: EtatCarriereEnLigne, r: RencontreCarriere, mainte
   const equipe = (id: string) => {
     const club = clubParId(etat, id); ajusterComposition(etat, club, maintenant);
     const cartes = cartesClub(etat, id).filter(c => !c.blesseJusqua || Date.parse(c.blesseJusqua) <= maintenant);
-    return { clubId: id, nom: club.nom, effectif: cartes.map(c => ({ ...coequipierDepuisCarte(c), note: Math.max(20, c.note - Math.round(c.fatigue * .12)) })), composition: club.composition, strategie: club.strategie };
+    const titulaires = cartes.filter(c => club.composition.titulaires.includes(c.id));
+    const collectif = (c: CarteCarriere) => Math.min(3, titulaires.filter(j => j.id !== c.id && ((c.clubReel && j.clubReel === c.clubReel) || (c.nation && j.nation === c.nation))).length * .3);
+    return { clubId: id, nom: club.nom, effectif: cartes.map(c => ({ ...coequipierDepuisCarte(c), note: Math.max(20, Math.min(99, c.note + collectif(c)) - Math.round(c.fatigue * .12)) })), composition: club.composition, strategie: club.strategie };
   };
   r.match = creerMatchEnLigne({ id: r.id, domicile: equipe(r.domicile), exterieur: equipe(r.exterieur), debut: maintenant, graine: Math.floor(hasard(`${graine}:${r.id}`)() * 2 ** 31) });
 }
@@ -488,6 +488,12 @@ function completerPacks(etat: EtatCarriereEnLigne) {
   for (const modele of PACKS_CARRIERE) {
     const existant = connus.get(modele.id);
     if (!existant) { etat.packs.push(copier(modele)); continue; }
+    // Migration ciblée des anciens tarifs officiels ; conserver les réglages personnalisés.
+    const anciens: Record<string, number> = {top14:2600, or:3200, elite:11000};
+    if (existant.prix === anciens[modele.id]) {
+      existant.prix = modele.prix;
+      if (modele.id === 'top14' && existant.probabilites.elite === 11 && existant.probabilites.star === 1) existant.probabilites = copier(modele.probabilites);
+    }
     existant.nom = modele.nom;
     existant.promesse = modele.promesse;
     existant.famille = modele.famille;
@@ -501,24 +507,21 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
   renouvelerObjectifs(etat, maintenant);
   // La récupération est attachée aux dates des rencontres, pas au nombre d'actualisations.
   for (const c of etat.cartes) if (c.blesseJusqua && Date.parse(c.blesseJusqua) <= maintenant) delete c.blesseJusqua;
-  let traites = 0;
   for (const r of etat.rencontres) {
-    if (r.resultat || traites >= 8) continue;
+    if (r.resultat) continue;
     // ⚠️ LA FENÊTRE FERMÉE JOUE LE MATCH, MÊME SI PERSONNE N'EST VENU. C'est
     // l'invariant du mode : « un match ne doit jamais bloquer toute la ligue ».
     // Les compositions et les consignes enregistrées entraînent les deux
     // équipes, et c'est exactement le même moteur qu'en direct.
     if (!r.match && Date.parse(r.ferme) <= maintenant) {
       lancerRencontre(etat, r, Date.parse(r.ferme), `${etat.graine}:${r.id}`);
-      r.match = conclureMatchEnLigne(r.match!);
-      traites++;
+      r.match = avancerMatchEnLigne(r.match!, maintenant);
     } else if (r.match) {
       // Un direct lancé puis abandonné se termine tout seul : on ne laisse pas
       // une rencontre ouverte au-delà de sa durée réelle plus une heure.
       r.match = r.match.debut + DUREE_REELLE + HEURE < maintenant
         ? conclureMatchEnLigne(r.match)
         : avancerMatchEnLigne(r.match, maintenant);
-      traites++;
     }
     enregistrerResultat(etat, r, maintenant, graine);
   }
@@ -659,7 +662,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       case 'match': {
         const r = nouveau.rencontres.find(r => r.id === commande.matchId); exiger(r && [r.domicile, r.exterieur].includes(club.id), 'Vous ne pouvez gérer que votre propre rencontre.');
         exiger(!r.resultat, 'Ce match est déjà terminé.');
-        if (!r.match) { clubLibre(nouveau, r.domicile); clubLibre(nouveau, r.exterieur); lancerRencontre(nouveau, r, maintenant, `${nouveau.graine}:${r.id}`); }
+        if (!r.match) { exiger(maintenant >= Date.parse(r.ferme), 'Le match débutera automatiquement à l’heure prévue.'); clubLibre(nouveau, r.domicile); clubLibre(nouveau, r.exterieur); lancerRencontre(nouveau, r, Date.parse(r.ferme), `${nouveau.graine}:${r.id}`); }
         if (commande.type === 'match') r.match = commanderMatchEnLigne(r.match!, club.id, commande.action, maintenant);
         enregistrerResultat(nouveau, r, maintenant, graine); avancerCompetitions(nouveau, maintenant); break;
       }
