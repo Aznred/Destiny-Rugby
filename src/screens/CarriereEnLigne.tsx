@@ -1341,11 +1341,18 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
         <h2>Proposer un échange</h2>
         <p className="cel-note">« Je te donne mon 8 contre ton ailier + 15 000 Ovas. » Les deux doivent accepter ; le serveur valide ensuite la transaction d’un bloc.</p>
         <Choix label="Avec qui ?" valeur={cible} options={[['', 'Choisis un club'], ...vue.clubs.filter(c => c.id !== vue.monClubId).map(c => [c.id, c.nom] as [string, string])]} onChange={v => { setCible(v); setDemandees([]); }} />
-        {cible && <div className="cel-deux">
-          {/* Un titulaire ou un remplaçant ne part pas non plus par un échange :
-              le bouton dit lequel il est plutôt que son poste. */}
-          <div><h3>Je donne</h3><div className="cel-choix-cartes">{vendables.sort((a, b) => b.note - a.note).map(c => <button type="button" key={c.id} className={donnees.includes(c.id) ? 'actif' : ''} disabled={feuille.has(c.id)} title={feuille.has(c.id) ? `Sur la feuille de match (${feuille.get(c.id)}).` : undefined} onClick={() => basculer(donnees, setDonnees, c.id)}><b>{c.note}</b>{c.nom}<small>{feuille.get(c.id) ?? nomPoste(c.poste)}</small></button>)}</div><Champ label="+ Ovas de ma part"><input type="number" min={0} step={100} value={ovasDonnes} onChange={e => setOvaDonnes(e.target.value)} /></Champ></div>
-          <div><h3>Je demande</h3><div className="cel-choix-cartes">{siennes.filter(c => !c.verrou).sort((a, b) => b.note - a.note).map(c => <button type="button" key={c.id} className={demandees.includes(c.id) ? 'actif' : ''} onClick={() => basculer(demandees, setDemandees, c.id)}><b>{c.note}</b>{c.nom}<small>{nomPoste(c.poste)}</small></button>)}</div><Champ label="+ Ovas de sa part"><input type="number" min={0} step={100} value={ovasDemandes} onChange={e => setOvaDemandes(e.target.value)} /></Champ></div>
+        {cible && <div>
+          <p className="cel-note">Fais tourner les roues et clique sur les joueurs à échanger. Clique à nouveau pour les retirer. Tes joueurs sur la feuille de match ne sont pas disponibles.</p>
+
+          <RoueCartes titre={"Je donne"} cartes={vendables.filter(c => !feuille.has(c.id)).filter(correspond).sort((a, b) => b.note - a.note)} selections={donnees} onChoisir={id => basculer(donnees, setDonnees, id)} vide="Aucun joueur disponible avec ces filtres." />
+          <p className="cel-note" aria-live="polite">{donnees.length} joueur(s) sélectionné(s)</p>
+          <div className="cel-actions">{donnees.map(id => <button type="button" className="btn fantome" key={id} onClick={() => basculer(donnees, setDonnees, id)} aria-label={`Retirer ${carte(id)?.nom} de l’échange`}>{carte(id)?.nom} ×</button>)}</div>
+          <Champ label="+ Ovas de ma part"><input type="number" min={0} step={100} value={ovasDonnes} onChange={e => setOvaDonnes(e.target.value)} /></Champ>
+
+          <RoueCartes titre={`Je demande · ${nomClub(vue, cible)}`} cartes={siennes.filter(c => !c.verrou).filter(correspond).sort((a, b) => b.note - a.note)} selections={demandees} onChoisir={id => basculer(demandees, setDemandees, id)} vide="Aucun joueur disponible avec ces filtres." />
+          <p className="cel-note" aria-live="polite">{demandees.length} joueur(s) sélectionné(s)</p>
+          <div className="cel-actions">{demandees.map(id => <button type="button" className="btn fantome" key={id} onClick={() => basculer(demandees, setDemandees, id)} aria-label={`Retirer ${carte(id)?.nom} de l’échange`}>{carte(id)?.nom} ×</button>)}</div>
+          <Champ label="+ Ovas de sa part"><input type="number" min={0} step={100} value={ovasDemandes} onChange={e => setOvaDemandes(e.target.value)} /></Champ>
         </div>}
         <button className="btn primaire" disabled={occupe || !cible || (!donnees.length && !demandees.length)}>Envoyer la proposition</button>
       </form>

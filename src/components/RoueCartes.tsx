@@ -66,14 +66,14 @@ interface Mouvement {
   touchee: boolean;
 }
 
-export function RoueCartes({ cartes, onChoisir, selection, titre, vide = 'Aucun joueur ne correspond à ta recherche.' }: {
-  cartes: CarteCarriere[]; onChoisir: (id: string) => void; selection?: string; titre: string; vide?: string;
+export function RoueCartes({ cartes, onChoisir, selection, selections, titre, vide = 'Aucun joueur ne correspond à ta recherche.' }: {
+  cartes: CarteCarriere[]; onChoisir: (id: string) => void; selection?: string; selections?: string[]; titre: string; vide?: string;
 }) {
   // Une nouvelle recherche remet la roue sur son premier résultat.
-  return <Roue key={cartes.map((c) => c.id).join('|')} cartes={cartes} onChoisir={onChoisir} selection={selection} titre={titre} vide={vide} />;
+  return <Roue key={cartes.map((c) => c.id).join('|')} cartes={cartes} onChoisir={onChoisir} selection={selection} selections={selections} titre={titre} vide={vide} />;
 }
 
-function Roue({ cartes, onChoisir, selection, titre, vide }: Parameters<typeof RoueCartes>[0]) {
+function Roue({ cartes, onChoisir, selection, selections, titre, vide }: Parameters<typeof RoueCartes>[0]) {
   const n = cartes.length;
   const visibles = Math.min(PLACES, n);
   const [centre, setCentre] = useState(0);
@@ -203,10 +203,11 @@ function Roue({ cartes, onChoisir, selection, titre, vide }: Parameters<typeof R
       {Array.from({ length: visibles }, (_, i) => {
         const place = centre + i - decalage;
         const carte = cartes[modulo(place, n)];
+        const choisie = selections ? selections.includes(carte.id) : selection === carte.id;
         return <button
           type="button" key={carte.id} ref={(noeud) => { noeuds.current[i] = noeud; }}
-          className={`rc-carte${selection === carte.id ? ' choisie' : ''}`}
-          aria-label={`Choisir ${carte.nom}, ${carte.note} GEN`} aria-pressed={selection === carte.id}
+          className={`rc-carte${choisie ? ' choisie' : ''}`}
+          aria-label={`${choisie && selections ? 'Retirer' : 'Choisir'} ${carte.nom}, ${carte.note} GEN`} aria-pressed={choisie}
           onClick={() => {
             if (performance.now() < ignorer.current) return;
             mouvement.current.touchee = true;
