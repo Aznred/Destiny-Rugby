@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { creerCarriere } from '../src/lib/ligue/carriere';
-import { catalogueMondialCarriere, carteDepuisSource } from '../src/lib/ligue/catalogueCarriere';
+import { catalogueMondialCarriere, carteDepuisSource, emblemesCarriere } from '../src/lib/ligue/catalogueCarriere';
 import { collectionCarriere } from '../src/lib/ligue/collectionCarriere';
 import { creerGestionnaireCarriere } from '../serveur/carriereApi';
 import type { StockageCarriere } from '../serveur/carriereStockage';
@@ -13,6 +13,22 @@ assert.equal(photoReelle('Will SKELTON'), '/photos/william_skelton.webp');
 assert.equal(photoReelle('Jiuta WAINIQOLO'), '/photos/jiuta_naqoli_wainiqolo.webp');
 assert.equal(photoReelle('Huw JONES'), '/photos/new%20maj/urc_huw_jones.webp');
 assert.equal(cleBlasonCarte('Montpellier Hérault Rugby'), 'montpellierhr');
+
+// ⚠️ CHAQUE CLUB DU CATALOGUE DOIT RETROUVER SON ÉCUSSON. Le blason se cherche
+// par le NOM du club : il suffit qu'une source renomme « US Oyonnax » en
+// « Oyonnax Rugby » pour que la carte sorte sans écusson, sans erreur et sans
+// que personne le voie passer. Quatre clubs de Pro D2 sur seize étaient dans ce
+// cas — Biarritz, Grenoble, Oyonnax, Valence Romans, soit 151 cartes. Le
+// rattrapage vit dans `ALIASES` (lib/useBlasonCarte.ts) ; ce contrôle est ce
+// qui oblige à l'y ajouter.
+{
+  const normaliserNomClub = (nom: string) => nom.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ecussons = new Map(emblemesCarriere().flatMap((g) => g.emblemes.map((e) => [normaliserNomClub(e.nom), e.logo] as const)));
+  const clubs = [...new Set(catalogueMondialCarriere().map((c) => c.clubReel))];
+  const orphelins = clubs.filter((club) => !ecussons.get(cleBlasonCarte(club)));
+  assert.equal(orphelins.length, 0,
+    `${orphelins.length} club(s) sans écusson sur leurs cartes : ${orphelins.slice(0, 6).join(', ')} — ajouter l'alias dans lib/useBlasonCarte.ts`);
+}
 const clubsDesJoueurs = new Map(catalogueMondialCarriere().filter(c => ['Will SKELTON', 'Jiuta WAINIQOLO', 'Huw JONES'].includes(c.nom)).map(c => [c.nom, c.clubReel]));
 assert.equal(clubsDesJoueurs.get('Will SKELTON'), 'Stade Rochelais');
 assert.equal(clubsDesJoueurs.get('Jiuta WAINIQOLO'), 'Lyon OU');

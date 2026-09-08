@@ -23,6 +23,10 @@ const NOMS = [
   ['Naoto SAITO', 'Stade Toulousain'],
   // Japon et Super Rugby Pacific (rugby_players.json) : fond blanc d'origine.
   ['Ardie SAVEA', 'Kobelco Kobe Steelers'], ['Anton LIENERT-BROWN', 'Kobelco Kobe Steelers'],
+  // Les quatre clubs de Pro D2 dont le nom LNR avait dérivé : ils doivent
+  // retrouver leur écusson (voir ALIASES dans lib/useBlasonCarte.ts).
+  ['Joueur BIARRITZ', 'Biarritz Olympique PB'], ['Joueur GRENOBLE', 'FC Grenoble Rugby'],
+  ['Joueur OYONNAX', 'Oyonnax Rugby'], ['Joueur VALENCE', 'Valence Romans'],
   ['Richie MOUNGA', 'Toshiba Brave Lupus'], ['Damian MCKENZIE', 'Chiefs'],
 ];
 const cartes = NOMS.map(([nom, clubReel], i) => ({
