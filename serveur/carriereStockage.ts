@@ -50,6 +50,26 @@ export interface StockageCarriere {
 
 /** Une seule ligne versionnée protège toutes les ressources d'une même ligue.
  * Un achat concurrent perd le CAS et relit l'état avant de recalculer son action. */
+/**
+ * ⚠️ UNE MIGRATION ET UN DÉPLOIEMENT NE SONT JAMAIS SIMULTANÉS, et ça s'est
+ * payé cash : le code qui écrit `echeance` est parti en production avant que la
+ * colonne existe. Résultat, `alter table` en retard d'une minute et TOUTES les
+ * écritures de la carrière échouaient — l'écran annonçait « la base n'est pas
+ * encore initialisée » alors que les ligues s'affichaient juste au-dessus.
+ *
+ * Toute requête qui touche une colonne récente passe donc par ici : on tente la
+ * version complète, et sur `42703` (« column does not exist ») on retombe sur
+ * celle d'avant. Le jeu perd l'optimisation, jamais la partie. C'est la même
+ * cascade que `api/classement.ts` tient entre ses schémas v3, v2 et v1.
+ */
+async function sansColonne<T>(complete: () => Promise<T>, repli: () => Promise<T>): Promise<T> {
+  try { return await complete(); }
+  catch (erreur) {
+    if ((erreur as { code?: string }).code !== '42703') throw erreur;
+    return repli();
+  }
+}
+
 export function stockageNeon(url: string): StockageCarriere {
   const sql = neon(url);
   const ligne = (r: Record<string, unknown>): LigueStockee => ({
@@ -127,16 +147,25 @@ export function stockageNeon(url: string): StockageCarriere {
      * traverser le réseau qu'un entier ; c'est tout l'intérêt de cette lecture.
      */
     async entete(id) {
-      const r = await sql`
-        select (donnees->>'version')::int as version, comptes,
-               extract(epoch from echeance) * 1000 as echeance
-        from carriere_ligues where id=${id}`;
+      // ⚠️ SANS LA COLONNE, ON RÉPOND « JE NE SAIS PAS » — voir `sansColonne`.
+      const r = await sansColonne(
+        () => sql`
+          select (donnees->>'version')::int as version, comptes,
+                 extract(epoch from echeance) * 1000 as echeance
+          from carriere_ligues where id=${id}`,
+        () => sql`select (donnees->>'version')::int as version, comptes from carriere_ligues where id=${id}`,
+      );
       if (!r[0]) return null;
       const e = Number(r[0].echeance);
       return { version: Number(r[0].version), comptes: r[0].comptes as string[], echeance: Number.isFinite(e) ? e : null };
     },
     async rafraichirEcheance(id, echeance) {
-      await sql`update carriere_ligues set echeance=to_timestamp(${echeance / 1000}) where id=${id}`;
+      // Sans la colonne, il n'y a rien à repousser : la lecture conditionnelle
+      // ne s'arme pas, et le mode retrouve exactement son comportement d'avant.
+      await sansColonne(
+        () => sql`update carriere_ligues set echeance=to_timestamp(${echeance / 1000}) where id=${id}`,
+        async () => [],
+      );
     },
     async ligueParCode(code) { const r = await sql`select * from carriere_ligues where code=${code}`; return r[0] ? ligne(r[0]) : null; },
     async creerLigue(l) {
@@ -147,12 +176,24 @@ export function stockageNeon(url: string): StockageCarriere {
       return (await sql`select 1 from carriere_commandes where ligue=${ligue} and compte=${compte} and requete=${requete}`).length > 0;
     },
     async comparerEtEcrire(l, version, compte, requete) {
-      const r = await sql`with modification as (
-        update carriere_ligues set donnees=${JSON.stringify(l.etat)}::jsonb,comptes=${l.comptes},version=version+1,echeance=to_timestamp(${echeanceLigue(l.etat, Date.now()) / 1000})
+      // ⚠️ L'ÉCRITURE DOIT PASSER MÊME SANS LA COLONNE. C'est celle qui enregistre
+      // tout ce que fait un manager : la faire dépendre d'une migration récente,
+      // c'est arrêter le jeu le temps d'un `alter table`.
+      const echeance = echeanceLigue(l.etat, Date.now()) / 1000;
+      const ecrire = (avecEcheance: boolean) => avecEcheance
+        ? sql`with modification as (
+        update carriere_ligues set donnees=${JSON.stringify(l.etat)}::jsonb,comptes=${l.comptes},version=version+1,echeance=to_timestamp(${echeance})
+        where id=${l.id} and version=${version} and not exists (
+          select 1 from carriere_commandes where ligue=${l.id} and compte=${compte} and requete=${requete}
+        ) returning id
+      ) insert into carriere_commandes (ligue,compte,requete) select id,${compte},${requete} from modification returning ligue`
+        : sql`with modification as (
+        update carriere_ligues set donnees=${JSON.stringify(l.etat)}::jsonb,comptes=${l.comptes},version=version+1
         where id=${l.id} and version=${version} and not exists (
           select 1 from carriere_commandes where ligue=${l.id} and compte=${compte} and requete=${requete}
         ) returning id
       ) insert into carriere_commandes (ligue,compte,requete) select id,${compte},${requete} from modification returning ligue`;
+      const r = await sansColonne(() => ecrire(true), () => ecrire(false));
       return r.length === 1;
     },
     async actives() { return (await sql`select id from carriere_ligues where donnees->>'phase'='saison'`).map(r => String(r.id)); },
