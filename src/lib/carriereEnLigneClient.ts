@@ -34,16 +34,15 @@ async function requete<T>(corps?: unknown, ligue?: string, signal?: AbortSignal,
     if (signal?.aborted) throw erreur;
     throw new ErreurCarriere('Le serveur de carrière en ligne est momentanément inaccessible. Vérifie ta connexion puis réessaie.', 0);
   }
+  const donnees = await reponse.json().catch(() => null) as (T & { erreur?: string; message?: string; inchange?: boolean }) | null;
   /**
-   * ⚠️ 304 N'EST PAS UNE ERREUR, C'EST UNE BONNE NOUVELLE : la vue qu'on a
-   * déjà est la bonne. Le serveur répond ça quand la version annoncée est
-   * encore à jour et qu'aucune échéance n'est passée — il n'a alors PAS lu
-   * l'état de la ligue, et c'est tout l'intérêt. Le corps est vide : le
-   * traiter comme une réponse illisible aurait affiché une erreur au joueur
-   * à chaque sondage réussi.
+   * ⚠️ « INCHANGÉ » N'EST PAS UNE ERREUR, C'EST UNE BONNE NOUVELLE : la vue
+   * qu'on a déjà est la bonne. Le serveur répond ça quand la version annoncée
+   * est encore à jour et qu'aucune échéance n'est passée — il n'a alors PAS lu
+   * l'état de la ligue, et c'est tout l'intérêt. Vingt octets au lieu de
+   * quatre cent mille.
    */
-  if (reponse.status === 304) return INCHANGE as T;
-  const donnees = await reponse.json().catch(() => null) as (T & { erreur?: string; message?: string }) | null;
+  if (donnees?.inchange === true) return INCHANGE as T;
   if (!reponse.ok || !donnees) {
     throw new ErreurCarriere(donnees?.erreur ?? donnees?.message ??
       (reponse.status === 401 ? 'Connecte-toi pour retrouver tes ligues.' :

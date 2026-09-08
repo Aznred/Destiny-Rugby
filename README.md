@@ -129,6 +129,36 @@
   refus dit son chiffre, et « Tout cocher » coche exactement ce qui est
   vendable — le plus petit du lot maximum et de ce que le plancher de 26
   joueurs autorise.
+- 💸 **Le mode en ligne consommait 15 fois trop de réseau, et ça se payait.** Le
+  quota de transfert de la base (5 Go/mois) est parti en huit jours — 6,1 Go —
+  et la base a fini par refuser jusqu'au moindre `select`. Aucun bug : l'écran
+  sonde toutes les 10 secondes, et **chaque sondage relisait ET réécrivait
+  l'état complet de la ligue**, 300 à 400 Ko à huit clubs. `avancerCarriere`
+  incrémente son compteur de version à chaque appel, même quand il n'a rien
+  trouvé à faire : une simple lecture renvoyait donc tout l'état vers la base.
+  Un onglet laissé ouvert coûtait une centaine de mégaoctets par heure ; l'écran
+  « Mes ligues » faisait pire, en rapatriant l'état complet de **chacune** de tes
+  ligues pour en afficher sept champs.
+  Quatre corrections, **aucune visible en jeu** :
+  1. Un état identique **ne se réécrit plus** — et la version cesse donc de
+     bouger toute seule, ce qui rend possible le point suivant.
+  2. **Le sondage annonce sa version** : si elle est encore bonne et qu'aucune
+     échéance n'est passée, le serveur répond « inchangé » **sans avoir lu la
+     ligue**. Vingt octets au lieu de quatre cent mille.
+  3. La liste des ligues **se calcule dans Postgres**, plus dans la fonction.
+  4. **Onglet caché, aucun sondage** ; et après une minute sans rien, on passe à
+     30 secondes. Le direct reste à 2 secondes, l'approche d'un match à 10.
+  Mesuré dans le navigateur, une minute sur l'écran d'une ligue : **15 sondages,
+  1 réponse complète (57 Ko) et 14 à 17 octets** — au lieu de 15 fois 57 Ko en
+  lecture ET autant en écriture.
+  ⚠️ **La pièce qui pourrait figer une ligue est calculée bêtement, exprès.**
+  Répondre « inchangé » saute l'avance de l'horloge : si l'échéance retenue
+  était trop lointaine, un match ne partirait plus, une enchère ne se clôturerait
+  plus. On prend donc **la plus petite date future trouvée n'importe où dans
+  l'état**, plus le prochain minuit. Énumérer les échéances une par une aurait
+  été un catalogue à tenir à jour — et le jour où quelqu'un ajoute une règle
+  datée en l'oubliant, la ligue se fige sans que personne comprenne. Au pire,
+  ici, on relit un peu trop tôt. Banc : `verify:carriere`, section 14.
 - 🔄 **Un onglet ouvert pendant un déploiement se recharge tout seul.** Les
   écrans sont chargés à la demande et chaque morceau porte l'empreinte de son
   contenu dans son nom ; un nouveau build les renomme tous. Une page restée

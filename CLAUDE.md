@@ -500,6 +500,38 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   En local, `vite.config.ts` branche le même gestionnaire sur un
   fichier JSON, donc le mode se teste entièrement sans base.
 
+  ⚠️ **CE MODE SE PAIE AU TRANSFERT, PAS AU CALCUL.** Le quota Neon (5 Go/mois)
+  a été épuisé en huit jours — **6,1 Go**, la base refusant ensuite jusqu'au
+  `select 1` (HTTP 402). Aucun bug : l'écran sonde toutes les 10 s (2 s en
+  direct), et **chaque sondage relisait ET réécrivait l'état complet** de la
+  ligue — 300 à 400 Ko à huit clubs. `avancerCarriere` incrémente `version` à
+  CHAQUE appel, même sans rien à faire : une simple lecture renvoyait donc tout
+  l'état vers la base. Un onglet ouvert = ~100 Mo/h ; l'écran « Mes ligues »
+  faisait pire, `select *` sur TOUTES les ligues du compte pour en afficher sept
+  champs. Quatre corrections, mesurées à 15 sondages sur 60 s : **1 réponse
+  complète (57 Ko) et 14 à 17 octets.**
+  1. `appliquer` **n'écrit plus un état identique** (comparaison JSON, version
+     neutralisée) — et la version cesse donc de bouger toute seule, ce qui rend
+     le reste possible.
+  2. **Lecture conditionnelle** : le client annonce sa version (`&v=`), le
+     serveur lit `version, comptes, echeance` (quelques octets) et répond
+     `{inchange:true}` sans toucher au jsonb. Sans `v`, comportement d'avant.
+  3. `ligues(compte)` **projette en SQL** (`jsonb_array_elements`) au lieu de
+     rapatrier les états ; `nombreLigues` compte au lieu de lister.
+  4. L'écran **ne sonde plus quand l'onglet est caché** et passe à 30 s après
+     une minute sans changement. Le direct (2 s) et l'approche d'un match
+     (10 s) ne bougent pas.
+  ⚠️ **L'ÉCHÉANCE EST LA PIÈCE QUI PEUT FIGER LA LIGUE**
+  (`lib/ligue/echeanceCarriere.ts`). Répondre « inchangé » saute
+  `avancerInterne` : si l'échéance était trop LOINTAINE, un match ne partirait
+  plus. Elle est donc calculée **bêtement exprès** — la plus petite date future
+  trouvée N'IMPORTE OÙ dans l'état, plus le prochain minuit (les packs
+  quotidiens ne dépendent d'aucune date écrite). Énumérer les échéances une par
+  une serait un catalogue à tenir : le jour où quelqu'un ajoute une règle datée
+  en l'oubliant, la ligue se fige. Ici, au pire, on relit trop tôt.
+  Banc : `verify:carriere`, section 14. Colonne : `carriere_ligues.echeance`
+  (migration additive dans `serveur/schema-carriere.sql`).
+
   ⚠️ **LE COLLECTIF A UNE SEULE FORMULE**, dans `lib/ligue/collectifCarriere.ts` :
   l'écran de composition et `lancerRencontre` appellent la MÊME fonction. Deux
   formules donneraient un jour deux vérités — un manager qui compose pour 78 et

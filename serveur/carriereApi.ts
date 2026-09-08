@@ -266,8 +266,17 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
         if (Number.isInteger(connue) && connue > 0) {
           const entete = await stockage.entete(id);
           if (!entete || !entete.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+          /**
+           * ⚠️ UN CORPS MINUSCULE PLUTÔT QU'UN VRAI 304. La réponse HTTP 304
+           * serait la forme juste, mais elle exige un corps VIDE — donc un
+           * `end()` que `ReponseCarriere` n'expose pas : le contrat volontaire
+           * de ce module est de ne rien supposer de son hôte, pour tourner
+           * derrière Vercel comme derrière le serveur de développement de Vite.
+           * L'ajouter pour l'occasion, c'était le premier écart. Vingt octets
+           * contre quatre cent mille, le gain est le même.
+           */
           if (entete.version === connue && entete.echeance !== null && maintenant < entete.echeance) {
-            return res.status(304).end();
+            return res.status(200).json({ inchange: true });
           }
         }
         const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}`, (e, n, g) => actualiserCarriere(e, n, g));

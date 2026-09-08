@@ -36,6 +36,7 @@ import {
 } from '../src/lib/ligue/catalogueCarriere';
 import { compositionManagerParDefaut } from '../src/lib/compositionManager';
 import { collectifCarriere, bonusCollectif } from '../src/lib/ligue/collectifCarriere';
+import { echeanceLigue, prochainJour } from '../src/lib/ligue/echeanceCarriere';
 import { codeDansLaRecherche, lienInvitation } from '../src/lib/invitationLigue';
 const nomPosteCourt = (f: string) => f.replace('demi_melee', '9').replace('demi_ouverture', '10');
 
@@ -1083,6 +1084,74 @@ titre('13. LES FAVORIS');
   const rachetee = f.cartes.find((c) => c.id === aVendre.id)!;
   dire(rachetee.proprietaire === hugo.id && rachetee.favori === undefined,
     '⚠️ le favori TOMBE quand la carte change de club', `${rachetee.nom} → ${hugo.nom}`);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+titre('14. L’ÉCHÉANCE QUI PERMET DE NE PAS RELIRE');
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ C'EST LA PIÈCE DONT UNE ERREUR FIGE LA LIGUE. Le serveur répond « rien
+// n'a changé » à un sondage — sans lire l'état, donc sans faire avancer
+// l'horloge — tant que la version tient ET que cette échéance est devant nous.
+// Une échéance trop LOINTAINE, et un match ne part plus, une enchère ne se
+// close plus, les packs quotidiens n'arrivent plus. Une échéance trop PROCHE
+// ne coûte qu'une relecture inutile. Ce banc vérifie donc qu'on se trompe
+// toujours du bon côté.
+{
+  const e = ligue(4);
+  const maintenant = Date.parse(e.creeLe) + JOUR;
+
+  // ⚠️ AUCUNE DATE DE L'ÉTAT NE PASSE AVANT L'ÉCHÉANCE. C'est l'invariant : si
+  // une seule date future se trouvait AVANT elle, ce serait une échéance qu'on
+  // manquerait, et la ligue se figerait jusqu'à la suivante.
+  const echeance = echeanceLigue(e, maintenant);
+  const datesFutures: number[] = [];
+  const visiter = (v: unknown, p = 0) => {
+    if (p > 8 || v == null) return;
+    if (typeof v === 'string') {
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) {
+        const t = Date.parse(v);
+        if (Number.isFinite(t) && t > maintenant) datesFutures.push(t);
+      }
+      return;
+    }
+    if (Array.isArray(v)) { for (const x of v) visiter(x, p + 1); return; }
+    if (typeof v === 'object') for (const x of Object.values(v)) visiter(x, p + 1);
+  };
+  visiter(e);
+  const plusProche = Math.min(...datesFutures);
+  dire(echeance <= plusProche,
+    '⚠️ l’échéance ne DÉPASSE JAMAIS la plus proche date future de l’état',
+    `${new Date(echeance).toISOString()} ≤ ${new Date(plusProche).toISOString()}`);
+
+  // La clôture d'une rencontre en fait partie : c'est elle qui lance le match
+  // quand personne n'est venu, l'invariant n°1 du mode.
+  const prochaineCloture = Math.min(...e.rencontres.filter((r) => !r.resultat)
+    .map((r) => Date.parse(r.ferme)).filter((t) => t > maintenant));
+  dire(!Number.isFinite(prochaineCloture) || echeance <= prochaineCloture,
+    'et notamment jamais la clôture de la prochaine rencontre',
+    `${new Date(echeance).toISOString()} ≤ ${new Date(prochaineCloture).toISOString()}`);
+
+  // ⚠️ MINUIT COMPTE AUSSI, ET IL N'EST ÉCRIT NULLE PART. Les dix packs
+  // quotidiens se déclenchent sur un changement de jour, pas sur une date
+  // rangée dans l'état : sans lui, une ligue endormie ne les recevrait qu'à la
+  // première action d'un manager.
+  dire(echeanceLigue({}, maintenant) === prochainJour(maintenant),
+    '⚠️ un état SANS aucune date retient quand même le prochain minuit',
+    new Date(echeanceLigue({}, maintenant)).toISOString());
+  dire(Number.isFinite(echeanceLigue({}, maintenant)),
+    'elle est toujours un instant valide — jamais `null`, jamais `NaN`');
+
+  // Une date PASSÉE n'est pas une échéance : elle ne retiendrait rien.
+  const veille = { quand: new Date(maintenant - JOUR).toISOString() };
+  dire(echeanceLigue(veille, maintenant) === prochainJour(maintenant),
+    'une date déjà passée ne compte pas');
+
+  // Et la plus proche gagne, même enfouie.
+  const enfoui = { a: { b: [{ c: new Date(maintenant + 60_000).toISOString() }] }, d: new Date(maintenant + JOUR).toISOString() };
+  dire(echeanceLigue(enfoui, maintenant) === maintenant + 60_000,
+    '⚠️ et elle se trouve même au fond d’une structure imbriquée',
+    'la minute suivante l’emporte sur le lendemain');
 }
 
 console.log(`\n  ${ko === 0 ? '✅ La carrière en ligne tient.' : `❌ ${ko} contrôle(s) en échec.`}\n`);
