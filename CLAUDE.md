@@ -521,6 +521,15 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   4. L'écran **ne sonde plus quand l'onglet est caché** et passe à 30 s après
      une minute sans changement. Le direct (2 s) et l'approche d'un match
      (10 s) ne bougent pas.
+  ⚠️ **UNE MIGRATION ET UN DÉPLOIEMENT NE SONT JAMAIS SIMULTANÉS**, et ça s'est
+  payé cash : le code qui écrit `echeance` est parti en production avant
+  l'`alter table`. Toutes les écritures de la carrière échouaient (`42703`), et
+  l'écran annonçait « la base n'est pas encore initialisée » **alors que les
+  ligues s'affichaient juste au-dessus**. Toute requête qui touche une colonne
+  récente passe donc par `sansColonne()` dans `carriereStockage.ts` : on tente la
+  version complète, et sur `42703` on retombe sur celle d'avant. Le jeu perd
+  l'optimisation, jamais la partie — même cascade que `api/classement.ts` entre
+  ses schémas v3/v2/v1. **Écrire le repli AVANT de déployer, pas après.**
   ⚠️ **L'ÉCHÉANCE EST LA PIÈCE QUI PEUT FIGER LA LIGUE**
   (`lib/ligue/echeanceCarriere.ts`). Répondre « inchangé » saute
   `avancerInterne` : si l'échéance était trop LOINTAINE, un match ne partirait
