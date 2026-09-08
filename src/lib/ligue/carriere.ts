@@ -3,6 +3,7 @@ import { POSTE_PAR_ID } from '../../data/rugby.js';
 import type { CompositionManager } from '../../types.js';
 import { compositionManagerParDefaut, EFFECTIF_MINIMUM, POSTES_BANC_MANAGER, POSTES_XV_MANAGER, reconcilerCompositionManager } from '../compositionManager.js';
 import { affichesToutesRondes } from './calendrier.js';
+import { horairesChampionnat } from './horaires.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
 import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
@@ -107,7 +108,11 @@ function clubLibre(etat: EtatCarriereEnLigne, clubId: string) {
   exiger(!etat.rencontres.some(r => r.match && !r.resultat && (r.domicile === clubId || r.exterieur === clubId)), 'Votre équipe joue actuellement ; attendez la fin du match.');
 }
 function transferer(carte: CarteCarriere, destinataire: ClubCarriere, saison: number) {
-  carte.proprietaire = destinataire.id; delete carte.verrou;
+  // ⚠️ LE FAVORI NE SUIT PAS LA CARTE CHEZ L'ACHETEUR. C'est une marque posée
+  // par UN manager sur SON effectif — « celui-là, je ne le brade pas ». La
+  // laisser au nouveau propriétaire lui protégerait une carte qu'il n'a jamais
+  // choisi de protéger, et surtout sans qu'il sache pourquoi.
+  carte.proprietaire = destinataire.id; delete carte.verrou; delete carte.favori;
   carte.clubs.push({ clubId: destinataire.id, saison });
 }
 /**
@@ -289,7 +294,13 @@ function calendrierCompetition(etat: EtatCarriereEnLigne, competition: Competiti
   if (competition.format === 'championnat') {
     const aller = affichesToutesRondes(competition.participants);
     const retour = aller.map(j => j.map(r => ({ domicile: r.exterieur, exterieur: r.domicile })));
-    [...aller, ...retour].forEach((paires, i) => ajouterRencontres(etat, competition, i + 1, paires, debut + i * SEMAINE / etat.rythme));
+    [...aller, ...retour].forEach((paires, i) => {
+      const horaires = horairesChampionnat(debut, etat.rythme, i, paires.length);
+      paires.forEach((paire, index) => etat.rencontres.push({
+        id: prochainId(etat, 'rencontre', etat.rencontres.length), competitionId: competition.id,
+        journee: i + 1, ...paire, ouvre: dateServeur(debut), ferme: dateServeur(horaires[index]),
+      }));
+    });
   } else {
     // Un premier tour réduit au plus proche tableau de puissance de deux ; les autres sont exempts.
     const taille = 2 ** Math.floor(Math.log2(competition.participants.length));
@@ -738,6 +749,25 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
           e.etat = annule ? 'annule' : 'refuse'; e.cartesDonnees.forEach(id => { delete carteParId(nouveau, id).verrou; });
           journal(nouveau, emetteur, 'echange', e.ovasDonnes, [], 'Offre close : Ovas réservés restitués', date);
         }
+        break;
+      }
+      /**
+       * ⚠️ LE FAVORI EST UN GARDE-FOU, PAS UN VERROU. Il n'empêche AUCUNE
+       * vente : la carte se vend, s'échange, se brade encore d'un clic. Il la
+       * retire seulement de « Tout cocher », le geste qui coche cinquante
+       * joueurs d'un coup et où l'on ne relit pas la liste. C'est là qu'on
+       * perd son meilleur ailier, pas dans une vente qu'on a choisie.
+       *
+       * ⚠️ ET IL VIT SUR LE SERVEUR, pas dans le navigateur. Une marque rangée
+       * en `localStorage` disparaîtrait au changement de téléphone et ne
+       * suivrait pas le manager qui joue sur deux écrans — alors qu'elle vaut
+       * précisément pour la session où l'on vide son effectif à la hâte.
+       */
+      case 'favori': {
+        identifiant(commande.carteId);
+        const carte = carteParId(nouveau, commande.carteId);
+        exiger(carte.proprietaire === club.id, 'Cette carte ne t’appartient pas.');
+        if (commande.valeur) carte.favori = true; else delete carte.favori;
         break;
       }
       case 'reclamerObjectif': {

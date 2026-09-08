@@ -49,6 +49,12 @@ type ZoneComposition = 'titulaires' | 'remplacants';
 
 interface Props {
   rendreCarte?: (joueur: Coequipier) => ReactNode;
+  /**
+   * Ce qui se glisse SOUS la ligne d'indicateurs (numero, adequation, forme).
+   * Le mode en ligne y pose la barre de collectif du joueur : elle appartient
+   * a la carte, mais elle se lit avec la forme, pas par-dessus le portrait.
+   */
+  rendreSousCarte?: (joueur: Coequipier) => ReactNode;
   /** Joueurs alignables cette semaine. */
   effectif: Coequipier[];
   /** Tout le groupe sous contrat, indisponibles compris. */
@@ -162,12 +168,13 @@ function PortraitComposition({ nom, panneau = false }: { nom: string; panneau?: 
 
 function CarteJoueur({
   joueur, numero, posteSlot, selectionne, capitaine, buteur, etat, compact,
-  poignee, depot, rendreCarte, enGlisse, cibleDepot, surSelection, surDrag, surDragFin, surSurvolDepot, surDrop,
+  poignee, depot, rendreCarte, rendreSousCarte, enGlisse, cibleDepot, surSelection, surDrag, surDragFin, surSurvolDepot, surDrop,
 }: {
   joueur?: Coequipier;
   poignee?: ReturnType<typeof useGlisserDeposer>['poignee'] extends (...args: never[]) => infer R ? R : never;
   depot?: string;
   rendreCarte?: Props['rendreCarte'];
+  rendreSousCarte?: Props['rendreSousCarte'];
   numero: number;
   posteSlot: PosteId;
   selectionne: boolean;
@@ -237,7 +244,7 @@ function CarteJoueur({
           + `${rarete ? ` · ${NOM_RARETE[rarete]}` : ''}`
         : nomPoste(posteSlot)}
     >
-      {joueur && rendreCarte ? <>{rendreCarte(joueur)}<span className="ct-fut-nom">{nomCarte(joueur.nom)}</span><span className="ct-fut-indicateurs"><b>{numero}</b><span title={t(`compo.adq.${adequation}`)}><PastilleAdequation adequation={adequation} /></span>{capitaine && <i title="Capitaine">C</i>}{buteur && <i title="Buteur">B</i>}{etat?.condition !== undefined && <small>{etat.condition}%</small>}</span></> : <>
+      {joueur && rendreCarte ? <>{rendreCarte(joueur)}<span className="ct-fut-nom">{nomCarte(joueur.nom)}</span><span className="ct-fut-indicateurs"><b>{numero}</b><span title={t(`compo.adq.${adequation}`)}><PastilleAdequation adequation={adequation} /></span>{capitaine && <i title="Capitaine">C</i>}{buteur && <i title="Buteur">B</i>}{etat?.condition !== undefined && <small>{etat.condition}%</small>}</span>{rendreSousCarte?.(joueur)}</> : <>
       {/* ⚠️ LE TALON NE PORTE PLUS LE NUMÉRO. Il l'écrivait à la verticale
           dans dix-sept pixels de large : illisible, et redondant depuis que la
           tête l'affiche. Il reste ce qu'il a toujours été — la perforation qui
@@ -420,7 +427,7 @@ function PanneauJoueur({
 
 export function CompositionTerrainManager({
   effectif, effectifComplet = effectif, composition, onPlacer, etats, indisponibles,
-  automatismes, onCapitaine, onButeur, rendreCarte,
+  automatismes, onCapitaine, onButeur, rendreCarte, rendreSousCarte,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
   const [ficheMasquee, setFicheMasquee] = useState<string | null>(null);
@@ -598,6 +605,7 @@ export function CompositionTerrainManager({
                 <div className="manager-position" key={`${posteSlot}-${index}`} style={{ left: `${x}%`, top: `${y}%` }}>
                   <CarteJoueur
                     rendreCarte={rendreCarte}
+                    rendreSousCarte={rendreSousCarte}
                     joueur={joueur}
                     numero={index + 1}
                     posteSlot={posteSlot}
@@ -665,6 +673,7 @@ export function CompositionTerrainManager({
             return (
               <CarteJoueur
                     rendreCarte={rendreCarte}
+                    rendreSousCarte={rendreSousCarte}
                 key={`banc-${index}`}
                 joueur={joueur}
                 numero={index + 16}

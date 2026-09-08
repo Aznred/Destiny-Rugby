@@ -5,6 +5,12 @@
 .dr-player-rating { position: absolute; top: 16%; left: 11%; width: 28%; display: flex; flex-direction: column; align-items: center; gap: 5px; color: #201814; }
 .dr-player-rating > b { font-family: var(--police-titre); font-size: 19cqw; line-height: .95; }
 .dr-player-rating > em { font-style: normal; font-size: 4.2cqw; line-height: 1.15; text-transform: uppercase; font-weight: 800; }
+/* ⚠️ LE LOGO DU CHAMPIONNAT SE MESURE EN `cqw`, PAS EN PIXELS. L'écusson du
+   club au-dessus est posé à 25 px fixes : sur les cartes réduites du terrain,
+   il occupe déjà plus que sa colonne. Un second badge en pixels aurait poussé
+   la colonne dans le portrait. En unités de conteneur, il vaut un quart de la
+   colonne quelle que soit la taille de la carte. */
+.dr-player-compet { width: 10cqw; height: 10cqw; object-fit: contain; filter: drop-shadow(0 1px 2px #0006); }
 .dr-player-photo { position: absolute; top: 12%; right: 9%; width: 57%; height: 49%; display: grid; align-items: end; justify-items: center; overflow: hidden; mask-image: linear-gradient(black 88%, transparent); }
 .dr-player-photo img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; }
 .dr-player-photo > svg { color: #231b21; width: 85%; height: 85%; opacity: .4; }

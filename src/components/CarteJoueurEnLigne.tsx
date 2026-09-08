@@ -6,6 +6,7 @@ import { photoReelle } from '../lib/avatars';
 import { Drapeau } from './Drapeau';
 import { useBlasonCarte } from '../lib/useBlasonCarte';
 import { EcussonClub } from './EcussonClub';
+import { logoChampionnat } from '../lib/logoChampionnat';
 import './CarteJoueurEnLigne.css';
 
 const PALETTES = {
@@ -36,6 +37,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
   const id = useId().replaceAll(':', '');
   const [photosRatees, setPhotosRatees] = useState<Set<string>>(() => new Set());
   const blason = useBlasonCarte(carte.clubReel, logoClub);
+  const competition = logoChampionnat(carte.championnat);
   const photoIndexee = photoReelle(carte.nom);
   // Les cartes déjà distribuées peuvent conserver une ancienne URL. Si elle
   // échoue, on retente le portrait actuellement indexé avant le repli neutre.
@@ -59,7 +61,14 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
       </g>
       <path d={SILHOUETTE} transform="translate(6 8) scale(.95 .956)" stroke={bord} opacity=".55" fill="none" />
     </svg>
-    <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</em><Drapeau nation={carte.nation} taille={1.15} />{blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}</span>
+    {/* ⚠️ LE CHAMPIONNAT SOUS L'ÉCUSSON, ET SEULEMENT S'IL EN A UN VRAI. La
+        colonne de gauche disait déjà la note, le poste, la nation et le club :
+        il manquait l'étage où le joueur évolue, la seule information qui
+        explique pourquoi deux cartes de même note ne valent pas pareil. On
+        n'affiche RIEN quand le championnat n'a pas de logo — le repli en ballon
+        générique de `LogoCompet` se lirait ici comme un blason de compétition
+        que personne ne reconnaîtrait. */}
+    <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</em><Drapeau nation={carte.nation} taille={1.15} />{blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</span>
     <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src={SANS_PHOTO} alt="Portrait par défaut" />}</span>
     <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{carte.clubReel}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>

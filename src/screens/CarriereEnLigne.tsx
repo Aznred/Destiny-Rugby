@@ -48,7 +48,8 @@ import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 export { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import { CollectionLigue } from '../components/CollectionLigue';
 import OuverturePack from '../components/OuverturePack';
-import { NOMS_PACK } from '../lib/presentationPacks';
+import { prechargerOuverturePack } from '../lib/prechargementPacks';
+import { NOMS_PACK, apparencePack } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from '../lib/ligue/venteRapideCarriere';
 import { collectifCarriere, paliersCollectif, bonusCollectif, COLLECTIF_MAX } from '../lib/ligue/collectifCarriere';
@@ -952,11 +953,18 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
           Ce sont pourtant les deux seules valeurs qu’on vient voir. */}
       <div className="cel-chiffres-compo">
         <div className="cel-note-compo"><b>{noteXV.toFixed(1)}</b><span>note du XV</span></div>
-        <div className={`cel-collectif cel-collectif-${paliersCollectif(collectif.total)}`}>
-          <div><b>{collectif.total}</b><span>collectif</span></div>
+        {/* ⚠️ UNE BARRE, ET RIEN AUTOUR. Trois versions ont été nécessaires : un
+            pavé encadré avec le palier écrit et trois lignes de règle, puis la
+            même chose sans le texte, puis ceci. Demandé en jeu, dans l’ordre —
+            « retire le texte en dessous, fait juste une barre », puis « rends-la
+            plus petite, juste une barre à côté de la note, pas aussi gros, pas
+            avec un rectangle autour ». Le chiffre reste, en petit ; le palier et
+            la règle vivent dans le `title`. */}
+        <div className={`cel-collectif cel-collectif-${paliersCollectif(collectif.total)}`}
+          title={`Collectif ${collectif.total}/100 — ${PALIERS_COLLECTIF[paliersCollectif(collectif.total)]}. Quatre joueurs d’un même club réel les mettent tous les quatre au maximum ; à défaut la nation, puis le championnat, qui demandent la moitié du XV. Le banc ne compte pas.`}>
+          <span>collectif</span>
           <div className="cel-collectif-jauge"><i style={{ width: `${collectif.total}%` }} /></div>
-          <em>{PALIERS_COLLECTIF[paliersCollectif(collectif.total)]}</em>
-          <small>Quatre joueurs d’un même club réel les mettent tous les quatre au maximum. À défaut la nation, puis le championnat, qui demandent la moitié du XV. Le banc ne compte pas.</small>
+          <b>{collectif.total}</b>
         </div>
       </div>
       <div><div className="eyebrow">Feuille de {composition.titulaires.length + composition.remplacants.length} sur {cartes.length} joueurs</div><h2>Ton XV, ton banc, tes rôles</h2><p>Le capitaine tient la discipline, le buteur tire les pénalités. Un joueur hors de son poste perd la cohérence collective.</p></div>
@@ -968,15 +976,26 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
       rendreCarte={joueur => {
         const carte = cartes.find(c => c.id === joueur.id);
         if (!carte) return null;
-        const affinite = collectif.parCarte[carte.id];
-        return <>
-          <CarteJoueurEnLigne carte={carte} compacte />
-          {/* ⚠️ PAS DE PASTILLE SUR LE BANC. Le collectif ne compte que le XV de
-              départ : un remplaçant n'a pas d'entrée, et lui coller un « 0 »
-              annoncerait une pénalité qu'il ne subit pas. */}
-          {affinite && <span className={`cel-pastille-collectif ${paliersCollectif(affinite.points * (100 / COLLECTIF_MAX))}`}
-            title={legendeAffinite(affinite)}>{affinite.points}</span>}
-        </>;
+        return <CarteJoueurEnLigne carte={carte} compacte />;
+      }}
+      /**
+       * ⚠️ LE COLLECTIF PASSE SOUS LA FORME, IL NE SE POSE PLUS SUR LE PORTRAIT.
+       * C'était une pastille chiffrée collée en haut à droite de la carte : elle
+       * recouvrait le visage et se lisait comme un badge de rareté de plus.
+       * Demandé en jeu — « pour les joueurs mets une barre en dessous de la forme
+       * plutôt » : elle rejoint la ligne du numéro, de l'adéquation et de la
+       * condition, là où on lit déjà l'état du joueur.
+       *
+       * ⚠️ RIEN SOUS UN REMPLAÇANT. Le banc n'entre pas dans le collectif : il
+       * n'a pas d'entrée dans `parCarte`, et lui dessiner une barre vide
+       * annoncerait un zéro — donc une pénalité — qu'il ne subit pas.
+       */
+      rendreSousCarte={joueur => {
+        const affinite = collectif.parCarte[joueur.id];
+        if (!affinite) return null;
+        return <span className={`cel-barre-collectif ${paliersCollectif(affinite.points * (100 / COLLECTIF_MAX))}`} title={legendeAffinite(affinite)}>
+          <i style={{ width: `${affinite.points * (100 / COLLECTIF_MAX)}%` }} />
+        </span>;
       }}
       effectif={effectif} effectifComplet={effectifComplet} composition={composition}
       onPlacer={changerJoueur} etats={etats} indisponibles={indisponibles}
@@ -1042,8 +1061,16 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
     .filter(c => !famille || c.famille === famille)
     .sort((a, b) => tri === 'note' ? b.note - a.note : tri === 'poste' ? (POSTE_PAR_ID[a.poste]?.numero ?? 0) - (POSTE_PAR_ID[b.poste]?.numero ?? 0) : tri === 'age' ? a.age - b.age : a.nom.localeCompare(b.nom, 'fr'));
   const familles = [...new Set(toutes.map(c => c.famille))];
+  const favoris = cartes.filter(c => c.favori && cessible(c)).length;
 
   const cessible = (c: CarteCarriere) => !c.verrou && !feuille.has(c.id);
+  /**
+   * ⚠️ LE FAVORI SORT DU LOT, PAS DE LA VENTE. On peut toujours vendre un
+   * joueur marque - le cocher a la main, cliquer sa vente rapide. Ce qu'il
+   * ne subit plus, c'est « Tout cocher » : le geste qui prend cinquante
+   * cartes d'un coup et ou personne ne relit la liste avant de valider.
+   */
+  const groupable = (c: CarteCarriere) => cessible(c) && !c.favori;
   const choisies = toutes.filter(c => selection.includes(c.id) && cessible(c));
   const total = choisies.reduce((somme, c) => somme + valeurVenteRapide(c), 0);
   const disponibles = toutes.filter(c => !c.verrou).length;
@@ -1069,18 +1096,29 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
       <div><div className="eyebrow">{cartes.length} joueurs sous contrat</div><h2>Ton effectif</h2></div>
       <Choix label="Trier par" valeur={tri} options={[['note', 'Note (GEN)'], ['poste', 'Numéro de maillot'], ['age', 'Âge'], ['nom', 'Nom']]} onChange={setTri} />
       <Choix label="Poste" valeur={famille} options={[['', 'Tous les postes'], ...familles.map(f => [f, nomPoste(POSTES_XV_MANAGER.find(p => POSTE_PAR_ID[p].famille === f) ?? 'arriere')] as [string, string])]} onChange={setFamille} />
-      <button type="button" className="btn fantome petit" disabled={!cartes.some(cessible)}
-        onClick={() => setSelection(liste => cartes.filter(cessible).every(c => liste.includes(c.id)) ? [] : [...new Set([...liste, ...cartes.filter(cessible).map(c => c.id)])].slice(0, maximumVendable))}>
-        {cartes.filter(cessible).every(c => selection.includes(c.id)) && cartes.some(cessible) ? 'Tout décocher' : 'Tout cocher'}
+      <button type="button" className="btn fantome petit" disabled={!cartes.some(groupable)}
+        title={favoris ? `${favoris} favori${favoris > 1 ? 's' : ''} rest${favoris > 1 ? 'ent' : 'e'} hors du lot.` : undefined}
+        onClick={() => setSelection(liste => cartes.filter(groupable).every(c => liste.includes(c.id)) ? [] : [...new Set([...liste, ...cartes.filter(groupable).map(c => c.id)])].slice(0, maximumVendable))}>
+        {cartes.filter(groupable).every(c => selection.includes(c.id)) && cartes.some(groupable) ? 'Tout décocher' : 'Tout cocher'}
       </button>
+      {favoris > 0 && <small className="cel-note-favoris"><Icone nom="etoile" taille={13} /> {favoris} favori{favoris > 1 ? 's' : ''} écarté{favoris > 1 ? 's' : ''} de « Tout cocher »</small>}
     </section>
 
     <div className="cel-grille-cartes">{cartes.map(c => {
       const maillot = feuille.get(c.id);
       const libre = cessible(c);
       const choisie = libre && selection.includes(c.id);
-      return <div className={`cel-carte-quick${choisie ? ' choisie' : ''}`} key={c.id}>
+      return <div className={`cel-carte-quick${choisie ? ' choisie' : ''}${c.favori ? ' favorite' : ''}`} key={c.id}>
         {libre && <button type="button" className="cel-coche" aria-pressed={choisie} aria-label={`Sélectionner ${c.nom}`} onClick={() => basculer(c.id)}><Icone nom="check" taille={13} /></button>}
+        {/* ⚠️ L'ÉTOILE RESTE CLIQUABLE SUR UN JOUEUR ALIGNÉ. On marque son
+            capitaine PENDANT qu'il est titulaire, pas après l'avoir sorti :
+            c'est exactement le moment où l'on sait qu'il compte. */}
+        <button type="button" className="cel-favori" aria-pressed={Boolean(c.favori)} disabled={occupe}
+          aria-label={c.favori ? `Retirer ${c.nom} des favoris` : `Garder ${c.nom} - il sortira de « Tout cocher »`}
+          title={c.favori ? 'Favori : écarté de « Tout cocher ». Il reste vendable à l’unité.' : 'Marquer comme favori : il ne sera plus pris par « Tout cocher ».'}
+          onClick={() => { void agir({ type: 'favori', carteId: c.id, valeur: !c.favori }); }}>
+          <Icone nom="etoile" taille={14} />
+        </button>
         <CarteJoueurEnLigne carte={c} logoClub={logos.get(c.clubReel)} onClick={libre ? () => basculer(c.id) : undefined} />
         <button className="cel-vente-rapide" type="button" disabled={occupe || !libre}
           title={maillot ? `Sur la feuille de match (${maillot}) : sors-le du XV ou du banc pour le vendre.` : undefined}
@@ -1143,32 +1181,46 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
  */
 export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
-  const [ouverture, setOuverture] = useState<{ cartes: CarteCarriere[]; pack: string; garantie?: VueCarriereEnLigne['packs'][number]['garantie'] } | null>(null);
+  const [ouverture, setOuverture] = useState<{ cartes: CarteCarriere[] | null; pack: string; garantie?: VueCarriereEnLigne['packs'][number]['garantie'] } | null>(null);
+  /**
+   * ⚠️ LE MODULE 3D ARRIVE PENDANT QU'ON REGARDE LE PRÉSENTOIR. Il pesait
+   * son import dynamique EN PLUS de l'aller-retour serveur, l'un après
+   * l'autre, au moment précis où l'écran devait bouger.
+   */
+  useEffect(() => { prechargerOuverturePack(); }, []);
   const achatEnCours = useRef(false);
-  const ouvrir = async (packId: string, nomPack: string) => {
+  /**
+   * ⚠️ LA POCHETTE S'AFFICHE AU CLIC, PAS À LA RÉPONSE. On ouvrait la modale
+   * seulement une fois le serveur revenu : entre les deux, le bouton était
+   * grisé et il ne se passait RIEN — signé en jeu comme « de la latence en
+   * attendant que le pack s'affiche ». La commande part maintenant en même
+   * temps que la pochette apparaît, à la couleur que le pack garantit ; les
+   * cartes se glissent dedans quand elles arrivent, et le manager a déjà
+   * commencé son geste.
+   *
+   * ⚠️ UN REFUS REFERME LA POCHETTE. Ovas insuffisants, pack déjà ouvert,
+   * réseau coupé : `agir` ne rend rien et affiche le message. Laisser la
+   * modale ouverte donnerait une pochette qu'aucun geste n'ouvrirait jamais.
+   */
+  const lancerOuverture = async (commande: CommandeCarriere, nomPack: string, packId: string, suffixe = '') => {
     if (achatEnCours.current || ouverture) return;
     achatEnCours.current = true;
+    const pack = vue.packs.find(p => p.id === packId);
+    if (pack) prechargerOuverturePack(apparencePack(pack));
+    setOuverture({ cartes: null, pack: `${nomPack}${suffixe}`, garantie: pack?.garantie });
     try {
       const avant = new Set(vue.transactions.map(t => t.id));
-      const suivante = await agir({ type: 'ouvrirPack', packId });
-      if (!suivante) return;
+      const suivante = await agir(commande);
+      if (!suivante) { setOuverture(null); return; }
       const nouvelles = suivante.transactions.filter(t => !avant.has(t.id) && t.nature === 'pack' && t.clubId === vue.monClubId).flatMap(t => t.cartes);
       const cartes = suivante.cartes.filter(c => nouvelles.includes(c.id));
-      if (cartes.length) setOuverture({ cartes, pack: nomPack, garantie: vue.packs.find(p => p.id === packId)?.garantie });
-    } finally { achatEnCours.current = false; }
+      setOuverture(courant => courant ? (cartes.length ? { ...courant, cartes } : null) : courant);
+    } catch { setOuverture(null); }
+    finally { achatEnCours.current = false; }
   };
-  const ouvrirGratuit = async (attributionId: string, packId: string, nomPack: string) => {
-    if (achatEnCours.current || ouverture) return;
-    achatEnCours.current = true;
-    try {
-      const avant = new Set(vue.transactions.map(t => t.id));
-      const suivante = await agir({ type: 'ouvrirPackGratuit', attributionId });
-      if (!suivante) return;
-      const nouvelles = suivante.transactions.filter(t => !avant.has(t.id) && t.nature === 'pack' && t.clubId === vue.monClubId).flatMap(t => t.cartes);
-      const cartes = suivante.cartes.filter(c => nouvelles.includes(c.id));
-      if (cartes.length) setOuverture({ cartes, pack: `${nomPack} · offert`, garantie: vue.packs.find(p => p.id === packId)?.garantie });
-    } finally { achatEnCours.current = false; }
-  };
+  const ouvrir = (packId: string, nomPack: string) => lancerOuverture({ type: 'ouvrirPack', packId }, nomPack, packId);
+  const ouvrirGratuit = (attributionId: string, packId: string, nomPack: string) =>
+    lancerOuverture({ type: 'ouvrirPackGratuit', attributionId }, nomPack, packId, ' · offert');
   const solde = club?.ovas ?? 0;
   const packsGratuits = club?.packsGratuits ?? [];
 
@@ -1185,7 +1237,7 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
 
     <section className="cel-packs-quotidiens">
       <div className="cel-packs-quotidiens-tete"><div><div className="eyebrow">Coup de pouce quotidien</div><h3>{packsGratuits.length} pack{packsGratuits.length > 1 ? 's' : ''} gratuit{packsGratuits.length > 1 ? 's' : ''} à ouvrir</h3><p>{vue.phase === 'salon' ? 'Le premier lot tombe au coup d’envoi de la saison, pour tout le monde le même jour. Ensuite, dix nouveaux packs chaque jour.' : 'Dix nouveaux packs arrivent chaque jour. Plus ton club descend au classement, plus ses chances de recevoir les packs rares augmentent.'}</p></div><strong>10 / jour</strong></div>
-      {packsGratuits.length ? <div className="cel-packs-gratuits-liste">{packsGratuits.slice(0, 20).map(attribution => { const pack = vue.packs.find(p => p.id === attribution.packId); return pack ? <button key={attribution.id} disabled={occupe || ouverture !== null} onClick={() => { void ouvrirGratuit(attribution.id, pack.id, pack.nom); }}><span className={`cel-pack-gratuit-sceau ${pack.garantie ?? 'bronze'}`}><Icone nom="cadeau" taille={17} /></span><b>{pack.nom}</b><small>Offert</small></button> : null; })}</div> : <p className="cel-note">{vue.phase === 'salon' ? 'La saison n’est pas lancée : les packs quotidiens attendent le coup d’envoi.' : 'Les dix packs du jour ont été ouverts. Le prochain lot arrivera demain.'}</p>}
+      {packsGratuits.length ? <div className="cel-packs-gratuits-liste">{packsGratuits.slice(0, 20).map(attribution => { const pack = vue.packs.find(p => p.id === attribution.packId); return pack ? <button key={attribution.id} disabled={occupe || ouverture !== null} onPointerEnter={() => prechargerOuverturePack(apparencePack(pack))} onFocus={() => prechargerOuverturePack(apparencePack(pack))} onClick={() => { void ouvrirGratuit(attribution.id, pack.id, pack.nom); }}><span className={`cel-pack-gratuit-sceau ${pack.garantie ?? 'bronze'}`}><Icone nom="cadeau" taille={17} /></span><b>{pack.nom}</b><small>Offert</small></button> : null; })}</div> : <p className="cel-note">{vue.phase === 'salon' ? 'La saison n’est pas lancée : les packs quotidiens attendent le coup d’envoi.' : 'Les dix packs du jour ont été ouverts. Le prochain lot arrivera demain.'}</p>}
       {packsGratuits.length > 20 && <small className="cel-note">Ouvre quelques packs pour afficher les {packsGratuits.length - 20} suivants.</small>}
     </section>
 

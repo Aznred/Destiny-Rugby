@@ -39,7 +39,22 @@ export default function BoutiquePacks3D({packs,solde,occupe,onOuvrir}: {packs:Pa
   useEffect(()=>{vivant.current=true;const media=window.matchMedia('(prefers-reduced-motion: reduce)');const change=()=>{mouvement.current.calme=media.matches;};media.addEventListener('change',change);return()=>{vivant.current=false;media.removeEventListener('change',change);};},[]);
   mouvement.current.bloque=occupe||achat!==null;
   const pack=packs[selection % packs.length];
-  async function acheter(slot:number){const p=packs[modulo(slot,packs.length)];if(!p||occupe||verrou.current)return;if(solde<p.prix){setMessage(`Il te manque ${(p.prix-solde).toLocaleString('fr-FR')} Ovas.`);return;}verrou.current=true;setAchat(p.id);setMessage('Ouverture du pack…');mouvement.current.cible=slot;try{await new Promise(resolve=>window.setTimeout(resolve,mouvement.current.calme?0:380));if(vivant.current)await onOuvrir(p.id,p.nom);}finally{verrou.current=false;if(vivant.current){setAchat(null);setMessage('');}}}
+  /**
+   * ⚠️ LA POCHETTE OUVERTE ARRIVE PENDANT QU'ON HÉSITE. Les cinq pochettes
+   * FERMÉES sont déjà en mémoire — c'est ce présentoir qui les affiche. La
+   * variante OUVERTE, elle, n'était demandée qu'à la révélation : 1,2 Mo au
+   * pire moment. On la prend pour le pack qui est SOUS LES YEUX, jamais pour
+   * les dix — ce serait douze mégaoctets pour une seule pochette vue.
+   */
+  useEffect(()=>{if(pack)useGLTF.preload(modelePack(apparencePack(pack),true));},[pack]);
+  /**
+   * ⚠️ PLUS DE PAUSE AVANT D'APPELER LE SERVEUR. Un `setTimeout` de 380 ms
+   * s'exécutait AVANT `onOuvrir`, pour laisser le présentoir zoomer sur la
+   * pochette choisie — 380 ms ajoutées à l'aller-retour, l'une après l'autre.
+   * La modale s'ouvrant maintenant dès le clic, ce zoom passait de toute
+   * façon derrière elle : on ne payait plus que l'attente.
+   */
+  async function acheter(slot:number){const p=packs[modulo(slot,packs.length)];if(!p||occupe||verrou.current)return;if(solde<p.prix){setMessage(`Il te manque ${(p.prix-solde).toLocaleString('fr-FR')} Ovas.`);return;}verrou.current=true;setAchat(p.id);setMessage('Ouverture du pack…');mouvement.current.cible=slot;try{await onOuvrir(p.id,p.nom);}finally{verrou.current=false;if(vivant.current){setAchat(null);setMessage('');}}}
   function toucher(slot:number){if(performance.now()<ignorer.current||drag.current.distance>6)return;setSelection(modulo(slot,packs.length));void acheter(slot);}
 
   if(!pack)return <p>Aucun pack disponible.</p>;

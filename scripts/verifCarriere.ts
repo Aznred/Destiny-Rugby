@@ -1023,4 +1023,66 @@ titre('12. LE COLLECTIF');
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+titre('13. LES FAVORIS');
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ LE FAVORI EST UN GARDE-FOU D'ÉCRAN, PAS UNE RÈGLE DE JEU. Il n'interdit
+// aucune vente : il retire seulement la carte de « Tout cocher », le geste qui
+// en sélectionne cinquante d'un coup et où personne ne relit la liste. Ce banc
+// tient les deux bouts — qu'il se pose et se retire, et qu'il ne se transforme
+// JAMAIS en verrou déguisé.
+{
+  let e = ligue(2);
+  const [colin, hugo] = e.clubs;
+  // On travaille sur des cartes HORS FEUILLE : un titulaire ne part pas, et
+  // ce banc mesure le favori, pas la protection de la feuille de match.
+  const surLaFeuille = new Set([...colin.composition.titulaires, ...colin.composition.remplacants]);
+  const libres = e.cartes.filter((c) => c.proprietaire === colin.id && !c.verrou && !surLaFeuille.has(c.id));
+  const mienne = libres[0];
+
+  e = agirCarriere(e, colin.compteId, { type: 'favori', carteId: mienne.id, valeur: true }, T0, 'f1');
+  dire(e.cartes.find((c) => c.id === mienne.id)?.favori === true,
+    'on marque un joueur de son effectif comme favori', mienne.nom);
+  e = agirCarriere(e, colin.compteId, { type: 'favori', carteId: mienne.id, valeur: false }, T0, 'f2');
+  dire(e.cartes.find((c) => c.id === mienne.id)?.favori === undefined,
+    '⚠️ et on le retire VRAIMENT — pas un `false` qui traîne dans le jsonb');
+
+  // ⚠️ Il ne protège de rien, et c'est le contrat. Le confondre avec un verrou
+  // ferait vivre deux règles pour un même geste : celle de l'écran et celle du
+  // serveur, qui finiraient par diverger.
+  e = agirCarriere(e, colin.compteId, { type: 'favori', carteId: mienne.id, valeur: true }, T0, 'f3');
+  let vendu = e;
+  try {
+    vendu = agirCarriere(e, colin.compteId, { type: 'venteRapide', carteId: mienne.id }, T0, 'f4');
+    dire(!vendu.cartes.some((c) => c.id === mienne.id),
+      '⚠️ un favori se vend quand même : il écarte du LOT, il ne verrouille pas');
+  } catch (erreur) {
+    dire(false, '⚠️ un favori se vend quand même : il écarte du LOT, il ne verrouille pas',
+      erreur instanceof Error ? erreur.message : 'refusé');
+  }
+
+  const sienne = e.cartes.find((c) => c.proprietaire === hugo.id && !c.verrou)!;
+  try {
+    agirCarriere(e, colin.compteId, { type: 'favori', carteId: sienne.id, valeur: true }, T0, 'f5');
+    dire(false, '⚠️ on ne marque pas la carte d’un AUTRE club', 'accepté !');
+  } catch (erreur) {
+    dire(erreur instanceof Error && erreur.name === 'ErreurCarriere',
+      '⚠️ on ne marque pas la carte d’un AUTRE club',
+      erreur instanceof Error ? erreur.message : 'erreur inconnue');
+  }
+
+  // ⚠️ ET IL NE SUIT PAS LA CARTE CHEZ L'ACHETEUR. C'est la marque d'UN manager
+  // sur SON effectif ; la léguer protégerait au nouveau propriétaire une carte
+  // qu'il n'a jamais choisi de protéger, sans qu'il sache pourquoi.
+  const aVendre = libres[1];
+  let f = agirCarriere(e, colin.compteId, { type: 'favori', carteId: aVendre.id, valeur: true }, T0, 'f6');
+  f = agirCarriere(f, colin.compteId, { type: 'vendre', carteId: aVendre.id, prix: 100, mode: 'directe', dureeHeures: 2 }, T0, 'f7');
+  const vente = f.ventes.find((v) => v.carteId === aVendre.id)!;
+  f = agirCarriere(f, hugo.compteId, { type: 'acheter', venteId: vente.id }, T0 + 1000, 'f8');
+  const rachetee = f.cartes.find((c) => c.id === aVendre.id)!;
+  dire(rachetee.proprietaire === hugo.id && rachetee.favori === undefined,
+    '⚠️ le favori TOMBE quand la carte change de club', `${rachetee.nom} → ${hugo.nom}`);
+}
+
 console.log(`\n  ${ko === 0 ? '✅ La carrière en ligne tient.' : `❌ ${ko} contrôle(s) en échec.`}\n`);

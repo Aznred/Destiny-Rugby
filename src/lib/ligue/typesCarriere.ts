@@ -33,6 +33,11 @@ export interface CarteCarriere {
   /** Les notes sont celles du jeu, pas des mesures officielles. */
   statistiques: Record<string, number>;
   proprietaire: string | null; verrou?: string;
+  /**
+   * Marque posee par le proprietaire : ce joueur-la ne part pas dans un lot.
+   * Elle n'INTERDIT rien - elle exclut la carte de « Tout cocher ».
+   */
+  favori?: boolean;
   fatigue: number; blesseJusqua?: string;
   matchs: number; essais: number; clubs: { clubId: string; saison: number }[];
 }
@@ -156,6 +161,7 @@ export type CommandeCarriere =
   | { type: 'proposerEchange'; vers: string; cartesDonnees: string[]; cartesDemandees: string[]; ovasDonnes: number; ovasDemandes: number }
   | { type: 'repondreEchange'; echangeId: string; accepter: boolean }
   | { type: 'annulerEchange'; echangeId: string }
+  | { type: 'favori'; carteId: string; valeur: boolean }
   | { type: 'reclamerObjectif'; objectifId: string }
   | { type: 'creerCoupe'; nom: string; trophee: string; participants: string[]; format: 'elimination' | 'championnat'; debut: string; recompenseParticipation: number; recompenseVainqueur: number; recompenseFinaliste: number; logo?: string; tropheeId?: string; playoffs?: boolean }
   | { type: 'match'; matchId: string; action: CommandeMatchEnLigne }

@@ -67,6 +67,8 @@ function Modele({ url, calme, transition }: { url: string; calme: boolean; trans
   return <group ref={ref}><primitive object={clone} /></group>;
 }
 
+// ⚠️ Le préchargement des pochettes NE VIT PAS ICI : il partirait avec le
+// module 3D qu'il est justement censé devancer. Voir `lib/prechargementPacks.ts`.
 export default function Pack3D({ rarete, ouvert, calme, transition }: { rarete: RareteCarriere; ouvert: boolean; calme: boolean; transition: string }) {
   const [deplie, setDeplie] = useState(false);
   useEffect(() => {

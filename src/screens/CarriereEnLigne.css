@@ -467,7 +467,12 @@
 }
 .cel-invite svg { flex: none; color: var(--or-400); }
 
-.cel-chiffres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+/* ⚠️ QUATRE CHIFFRES, DONC QUATRE COLONNES QUAND ELLES TIENNENT. La grille en
+   trois colonnes datait d'avant le collectif : il tombait seul sur une
+   deuxième rangée, à gauche, et se lisait comme un bloc égaré plutôt que
+   comme l'un des chiffres du vestiaire. `auto-fit` les remet en ligne dès que
+   la place existe, et les replie proprement à deux quand elle manque. */
+.cel-chiffres { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: 0.6rem; }
 .cel-chiffres div {
   padding: 0.7rem 0.4rem;
   border-radius: var(--rayon-sm);
@@ -740,6 +745,25 @@
 .cel-carte-quick.choisie .cel-coche { background: var(--or-500); border-color: var(--or-200); color: #12100a; }
 .cel-carte-quick.choisie > .cel-carte.dr-player { filter: drop-shadow(0 0 12px rgba(241, 203, 89, 0.55)) brightness(1.06); }
 .cel-carte-quick.choisie .cel-vente-rapide { border-color: var(--or-400); }
+
+/* ⚠️ L'ÉTOILE EN FACE DE LA COCHE, ET C'EST VOULU. Les deux gestes de la carte
+   sont opposés — « prends-le dans le lot » à gauche, « laisse-le tranquille »
+   à droite — donc ils ne se touchent pas et on ne clique pas l'un pour
+   l'autre. Éteinte elle reste discrète ; allumée elle est dorée, visible d'un
+   coup d'œil sur une grille de cinquante cartes. */
+.cel-favori {
+  position: absolute; top: 0.35rem; right: 0.35rem; z-index: 2;
+  width: 1.5rem; height: 1.5rem; display: grid; place-items: center;
+  border-radius: 0.45rem; cursor: pointer;
+  border: 1px solid rgba(255, 245, 219, 0.28); background: rgba(4, 12, 8, 0.62);
+  color: rgba(255, 245, 219, 0.4); backdrop-filter: blur(2px);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.cel-favori:hover:not(:disabled) { border-color: var(--or-400); color: var(--or-300); }
+.cel-favori:disabled { cursor: default; opacity: 0.5; }
+.cel-carte-quick.favorite .cel-favori { background: var(--or-500); border-color: var(--or-200); color: #12100a; }
+.cel-carte-quick.favorite > .cel-carte.dr-player { filter: drop-shadow(0 0 8px rgba(241, 203, 89, 0.35)); }
+.cel-note-favoris { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--or-300); font-size: 0.72rem; }
 
 /* ⚠️ LA BARRE COLLE AU BAS DE LA FENÊTRE, PAS AU BAS DE LA LISTE. Avec
    quarante cartes, un bouton posé après la grille demande de redescendre tout
@@ -1931,19 +1955,26 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
    donne l'envie de le faire monter. Les quatre teintes suivent les paliers de
    `paliersCollectif` — du rouge sourd de l'équipe qui ne se connaît pas au
    doré de celle qui joue ensemble depuis toujours. */
+/* ⚠️ UNE SEULE LIGNE : le chiffre, le mot, la jauge. Le pavé d'explication qui
+   vivait ici prenait la moitié de la barre d'en-tête sur un écran de bureau
+   pour redire la règle que l'infobulle des pastilles donne déjà, joueur par
+   joueur. La jauge occupe la place restante : plus la barre est large, plus
+   elle se lit de loin. */
+/* ⚠️ UNE BARRE POSÉE À CÔTÉ DE LA NOTE, SANS CADRE. Elle a d'abord été un pavé
+   encadré avec le palier écrit et la règle en trois lignes, puis le même pavé
+   sans texte. Demandé en jeu : « plus petite, juste une barre à côté de la
+   note, pas aussi gros, pas de rectangle autour ». Le cadre et le fond ont
+   disparu, le chiffre est passé de 1,9 rem à 1 rem et il ferme la ligne au
+   lieu de l'ouvrir : ce qu'on lit d'abord, c'est le remplissage. */
 .cel-collectif {
   --teinte: var(--or-400);
-  display: flex; flex-direction: column; gap: 0.3rem;
-  min-width: 12rem; padding: 0.6rem 0.8rem;
-  border-radius: var(--rayon-controle);
-  border: 1px solid color-mix(in srgb, var(--teinte) 35%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--teinte) 12%, transparent), rgba(0, 0, 0, 0.24));
+  display: flex; align-items: center; gap: 0.45rem;
+  min-width: 9rem; max-width: 20rem; flex: 1 1 11rem;
+  padding: 0 0.2rem;
 }
-.cel-collectif > div:first-child { display: flex; align-items: baseline; gap: 0.4rem; }
-.cel-collectif b { font-family: var(--police-titre); font-size: 1.9rem; line-height: 1; color: var(--teinte); }
-.cel-collectif span { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--craie-dim); }
-.cel-collectif em { font-style: normal; font-size: 0.8rem; color: var(--craie); }
-.cel-collectif small { font-size: 0.68rem; line-height: 1.4; color: var(--craie-dim); }
+.cel-collectif b { font-family: var(--police-forte); font-size: 1rem; line-height: 1; color: var(--teinte); }
+.cel-collectif span { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--craie-dim); }
+.cel-collectif .cel-collectif-jauge { flex: 1; min-width: 3rem; }
 .cel-collectif-jauge { height: 5px; border-radius: 3px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
 .cel-collectif-jauge i { display: block; height: 100%; border-radius: 3px; background: var(--teinte); transition: width 0.3s ease; }
 .cel-collectif-neuf { --teinte: #c9524a; }
@@ -1952,23 +1983,24 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-collectif-solide { --teinte: #7fc98a; }
 .cel-collectif-fusionnel { --teinte: #58d2b4; }
 
-/* La pastille posée sur la carte du terrain : le chiffre du joueur, sa raison
-   dans l'infobulle. Elle ne prend pas le clic — la carte se glisse encore. */
-.cel-pastille-collectif {
-  position: absolute; top: -6px; right: -6px; z-index: 3;
-  min-width: 1.35rem; height: 1.35rem; padding: 0 0.2rem;
-  display: grid; place-items: center; pointer-events: none;
-  border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.5);
-  font: 700 0.72rem/1 var(--police-forte); color: #12100a;
-  background: var(--teinte, #d9c15a);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+/* ⚠️ LE COLLECTIF DU JOUEUR EST UNE BARRE SOUS LA FORME, PAS UNE PASTILLE SUR
+   SON VISAGE. La pastille chiffrée se posait en haut à droite de la carte : à
+   cette taille elle recouvrait le portrait et se lisait comme un badge de
+   rareté de plus. Demandé en jeu — « pour les joueurs mets une barre en dessous
+   de la forme plutôt ». Elle prolonge donc la ligne du numéro et de la
+   condition, et ne prend pas le clic : la carte se glisse encore. */
+.cel-barre-collectif {
+  display: block; width: 100%; height: 3px; margin-top: 2px;
+  border-radius: 2px; overflow: hidden; pointer-events: none;
+  background: rgba(0, 0, 0, 0.55);
 }
-.cel-pastille-collectif.neuf { --teinte: #c9524a; color: #fff; }
-.cel-pastille-collectif.fragile { --teinte: #d08a3c; }
-.cel-pastille-collectif.correct { --teinte: #d9c15a; }
-.cel-pastille-collectif.solide { --teinte: #7fc98a; }
-.cel-pastille-collectif.fusionnel { --teinte: #58d2b4; }
-@media (max-width: 700px) { .cel-collectif { min-width: 0; flex: 1 1 100%; } .cel-collectif small { display: none; } }
+.cel-barre-collectif i { display: block; height: 100%; border-radius: 2px; background: var(--teinte, #d9c15a); }
+.cel-barre-collectif.neuf { --teinte: #c9524a; }
+.cel-barre-collectif.fragile { --teinte: #d08a3c; }
+.cel-barre-collectif.correct { --teinte: #d9c15a; }
+.cel-barre-collectif.solide { --teinte: #7fc98a; }
+.cel-barre-collectif.fusionnel { --teinte: #58d2b4; }
+@media (max-width: 700px) { .cel-collectif { min-width: 0; max-width: none; flex: 1 1 100%; } }
 
 /* Le collectif dans les chiffres du vestiaire : même bloc que les autres, mais
    il porte la couleur de son palier — c'est ce qui le fait remarquer sans
