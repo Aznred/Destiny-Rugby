@@ -1548,6 +1548,11 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
    ═══════════════════════════════════════════════════════════════════════════ */
 .cel-tete-compo { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 1.2rem; }
 .cel-tete-compo > div:first-child { flex: 1; min-width: 16rem; }
+/* Les deux chiffres de la feuille — la note et le collectif — restent
+   ensemble et passent devant l'explication sur un écran étroit. */
+.cel-chiffres-compo { display: flex; align-items: stretch; gap: 0.8rem; order: -1; }
+.cel-chiffres-compo .cel-note-compo { display: grid; align-content: center; }
+@media (max-width: 760px) { .cel-tete-compo > div:first-child { min-width: 0; } .cel-chiffres-compo { width: 100%; } }
 .cel-note-compo { text-align: center; padding: 0 0.5rem; }
 .cel-note-compo b { display: block; font-family: var(--police-titre); font-size: 2.2rem; color: var(--or-400); line-height: 1; }
 .cel-note-compo span { font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brume); }
@@ -1964,3 +1969,13 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-pastille-collectif.solide { --teinte: #7fc98a; }
 .cel-pastille-collectif.fusionnel { --teinte: #58d2b4; }
 @media (max-width: 700px) { .cel-collectif { min-width: 0; flex: 1 1 100%; } .cel-collectif small { display: none; } }
+
+/* Le collectif dans les chiffres du vestiaire : même bloc que les autres, mais
+   il porte la couleur de son palier — c'est ce qui le fait remarquer sans
+   ajouter une ligne d'explication à un panneau déjà dense. */
+.cel-chiffre-collectif b { color: var(--teinte, var(--or-400)) !important; }
+.cel-chiffre-collectif.cel-collectif-neuf { --teinte: #c9524a; }
+.cel-chiffre-collectif.cel-collectif-fragile { --teinte: #d08a3c; }
+.cel-chiffre-collectif.cel-collectif-correct { --teinte: #d9c15a; }
+.cel-chiffre-collectif.cel-collectif-solide { --teinte: #7fc98a; }
+.cel-chiffre-collectif.cel-collectif-fusionnel { --teinte: #58d2b4; }

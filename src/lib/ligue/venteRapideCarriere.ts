@@ -20,8 +20,13 @@ const BAREME: Record<RareteCarriere, { debut: number; fin: number; plafond: numb
  * invalide » — un message qui ne dit rien, sur une action qui paraissait
  * permise. La borne est ici, elle est importée par les deux, et l’écran
  * l’applique AVANT le clic.
+ *
+ * Portée de 40 à 100 à la demande : un effectif qui a tourné plusieurs saisons
+ * se vide par paquets, et recommencer trois fois la même sélection n'est pas un
+ * garde-fou, c'est une corvée. Cent identifiants pèsent trois kilo-octets — le
+ * corps d'une commande en accepte vingt-quatre.
  */
-export const LOT_VENTE_RAPIDE_MAX = 40;
+export const LOT_VENTE_RAPIDE_MAX = 100;
 
 /** Le plafond de la bande, celui que l'écran annonce avant de vendre. */
 export function plafondVenteRapide(rarete: RareteCarriere): number {

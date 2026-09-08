@@ -74,7 +74,11 @@
   ne compte que le XV de départ**, et un remplaçant plafonne à 4 sur 10.
   ⚠️ **Une seule formule pour l’écran et pour le terrain** : `lancerRencontre`
   appelle exactement la fonction qui affiche le chiffre. Banc :
-  `npm run verify:carriere`, section 12.
+  Il se lit à DEUX endroits : en tête de la composition, à côté de la note du
+  XV — les deux seuls chiffres qu'on vient voir passent donc avant le
+  paragraphe, sinon ils tombaient hors écran sur téléphone — et dans les
+  chiffres du vestiaire, à côté du GEN moyen, pour ne pas être réservé à ceux
+  qui savent déjà qu'il existe. Banc : `npm run verify:carriere`, section 12.
 - **Marché, enchères et échanges croisés** entre managers, avec verrou de carte
   et plancher d'effectif tenus par le serveur.
 - **Une carte du marché s'ouvre en fiche** : la carte à gauche, l'affaire à
@@ -98,7 +102,8 @@
   lot à 30 cartes sans que l’écran le sache : avec 59 joueurs sous contrat,
   « Tout cocher » en envoyait 59 et le serveur répondait par un message qui ne
   nomme rien, sur une action qu’il présentait comme permise. La borne
-  (`LOT_VENTE_RAPIDE_MAX`) est maintenant **importée par les deux côtés**, le
+  (`LOT_VENTE_RAPIDE_MAX`, portée à **100** à la demande) est maintenant
+  **importée par les deux côtés**, le
   refus dit son chiffre, et « Tout cocher » coche exactement ce qui est
   vendable — le plus petit du lot maximum et de ce que le plancher de 26
   joueurs autorise.
