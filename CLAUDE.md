@@ -358,6 +358,20 @@ stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
 - **`Trophee.individuel` est LE champ qui range un trophée** : il commande sa
   place dans l'armoire ET la façon dont on le gagne.
 - **Draco** : `useGLTF(url, true)` charge le décodeur depuis un CDN Google.
+- **RIEN NE DÉFEND `public/`, IL FAUT DONC LE MESURER.** Le 7 septembre 2026,
+  un commit de 3 117 fichiers appelé « fix » (`906590a`) a emporté **439
+  binaires** au passage : **71 `.glb`**, `og.png`, `ads.txt`, 106 logos sources.
+  Ni le build (Vite ne LIT pas `public/`, il le recopie), ni le typage (une URL
+  est une chaîne), ni le lint n'ont bronché. La panne s'est vue **en
+  production**, sur un téléphone, en ouvrant un trophée : « Could not load
+  /m3d/six-nations.glb : responded with 404 ». Tout a été repris de `906590a~1`
+  (`git checkout 906590a~1 -- <chemins>`), octet pour octet.
+  ⚠️ **Un binaire absent ne se regénère pas, il se retrouve** : les `.glb`
+  bruts ne sont plus dans le dépôt, `copierTrophees.cjs` n'aurait rien eu à
+  recompresser. Le réflexe est `git log --all --diff-filter=D --name-only --
+  public/<chemin>`. Garde : `npm run verify:assets` relit les 6 212 chemins
+  écrits en dur dans `src/` et `index.html` — commentaires retirés, sinon il
+  réclamait le retour d'une silhouette supprimée exprès.
 - **UN PORTRAIT SE RAPATRIE, IL NE SE POINTE PAS.** `rugby_players.json`
   (Japan League One D1/D2/D3, Super Rugby Pacific) ne donne que des URL
   distantes : `npm run data:photos-monde` les télécharge, les redimensionne à
@@ -404,6 +418,7 @@ npm run verify:carriere-profonde  # 24 contrôles
 npm run verify:formation-manager
 npm run verify:distances-transferts
 npm run verify:photos             # portraits des cartes : liens morts, silhouettes, Top 14
+npm run verify:assets             # tout chemin /m3d /logos /photos écrit en dur existe vraiment
 npm run verify:triche             # 40 tentatives de triche, toutes refusées
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons

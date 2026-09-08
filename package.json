@@ -38,6 +38,7 @@
     "verify:carriere": "vite-node scripts/verifCarriere.ts",
     "verify:collection": "vite-node scripts/verifierCollection.ts",
     "verify:photos": "vite-node scripts/verifPhotosCartes.ts",
+    "verify:assets": "vite-node scripts/verifAssets.ts",
     "verify:triche": "vite-node scripts/verifTriche.ts"
   },
   "dependencies": {

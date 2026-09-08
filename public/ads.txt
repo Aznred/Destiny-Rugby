@@ -1,0 +1,29 @@
+# Destiny Rugby — https://destiny-rugby.fr/ads.txt
+#
+# ⚠️ CE FICHIER DOIT ÊTRE SERVI À LA RACINE DU DOMAINE, littéralement à
+# `/ads.txt`. C'est pour ça qu'il vit dans `public/` : Vite copie ce dossier tel
+# quel à la racine du site au build. Le déplacer dans `src/` ou le renommer le
+# rendrait invisible, et Google cesserait de diffuser des annonces sans autre
+# explication qu'un « site non validé » dans la console AdSense.
+#
+# ⚠️ ET IL DOIT ÊTRE SERVI PAR LE DOMAINE QUI AFFICHE LES ANNONCES. Sur un
+# sous-domaine (preview Vercel, préproduction), Google lit l'ads.txt du domaine
+# racine, pas celui du sous-domaine.
+#
+# Ce qu'il déclare : le seul vendeur autorisé à monétiser cet inventaire.
+# Format (spécification IAB) : <domaine de la régie>, <identifiant éditeur>,
+# <type de relation>, <identifiant de certification>.
+#   · google.com          la régie
+#   · pub-6166322317354663 l'identifiant éditeur du site — le même que le
+#                          `ca-pub-…` de `src/lib/pub.ts`, sans le préfixe `ca-`
+#   · DIRECT               la relation est directe, sans revendeur
+#   · f08c47fec0942fa0     l'identifiant TAG de Google, identique pour tous
+#
+# Un ads.txt n'est pas un secret : il est PUBLIC par construction, c'est même
+# tout son intérêt — n'importe qui doit pouvoir vérifier qui a le droit de
+# vendre les espaces de ce site. Rien à cacher, rien à mettre en variable
+# d'environnement.
+#
+# Fourni par l'utilisateur depuis sa console AdSense (validation de propriété
+# du site par extrait ads.txt).
+google.com, pub-6166322317354663, DIRECT, f08c47fec0942fa0
