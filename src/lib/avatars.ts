@@ -6,6 +6,7 @@ import { PHOTOS_NEW_MAJ } from '../data/photosNewMaj.js';
 import { graine } from './championnat.js';
 import { PHOTO_JOUEUR } from '../data/photosJoueurs.js';
 import { PHOTO_JOUEUR_MAJ } from '../data/photosMaj.js';
+import { PHOTO_JOUEUR_MONDE } from '../data/photosMonde.js';
 
 
 // Prénoms féminins courants — les données amateurs mélangent les sections d'un
@@ -111,8 +112,12 @@ interface IndexPhotos {
   prefixe: Map<string, string | null>;
   /** Deux mots du nom dans l'ordre : rattrape « Thibaut MOTASSI » ↔ « thibaut robert motassi dibongue ». */
   paire: Map<string, string | null>;
-  /** Nom de famille + initiale du prénom : rattrape « Tom » ↔ « Thomas », « Sam » ↔ « Samuel ». */
-  familleInitiale: Map<string, string | null>;
+  /**
+   * Nom de famille + initiale du prénom, avec le prénom du portrait :
+   * rattrape « Tom » ↔ « Thomas », « Sam » ↔ « Samuel », et seulement quand les
+   * deux prénoms sont compatibles (`prenomsCompatibles`).
+   */
+  familleInitiale: Map<string, { prenom: string; chemin: string } | null>;
   /**
    * Le seul nom de famille — avec le prénom du portrait, parce qu'on ne s'en
    * sert QUE si les deux prénoms s'emboîtent (« Riko » dans « Eneriko »).
@@ -149,17 +154,22 @@ function ajouterSiUnique(table: Map<string, string | null>, cle: string, chemin:
 function indexPhotos(): IndexPhotos {
   if (index) return index;
   const table = (): Map<string, string | null> => new Map<string, string | null>();
-  const construit: IndexPhotos = { signature: table(), prenomNom: table(), colle: table(), prefixe: table(), paire: table(), familleInitiale: table(), famille: new Map() };
-  for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ, ...PHOTOS_NEW_MAJ })) {
+  const construit: IndexPhotos = { signature: table(), prenomNom: table(), colle: table(), prefixe: table(), paire: table(), familleInitiale: new Map(), famille: new Map() };
+  // ⚠️ L'ORDRE DIT QUI GAGNE UN DOUBLON. Les jeux déjà en place passent APRÈS
+  // le nouveau : un joueur présent dans deux championnats garde le visage qu'il
+  // avait hier, et les 1 830 portraits du Japon et du Super Rugby ne comblent
+  // que les trous.
+  for (const [cle, chemin] of Object.entries({ ...PHOTO_JOUEUR_MONDE, ...PHOTO_JOUEUR, ...PHOTO_JOUEUR_MAJ, ...PHOTOS_NEW_MAJ })) {
     const mots = motsDe(cle);
     ajouterSiUnique(construit.colle, mots.join(''), chemin);
     if (mots.length < 2) continue;
     const famille = mots[mots.length - 1];
     ajouterSiUnique(construit.signature, signatureNom(cle), chemin);
     ajouterSiUnique(construit.prenomNom, prenomNom(cle), chemin);
-    ajouterSiUnique(construit.familleInitiale, `${famille}|${mots[0][0]}`, chemin);
-    const connu = construit.famille.get(famille);
-    construit.famille.set(famille, connu && connu.chemin !== chemin ? null : { prenom: mots[0], chemin });
+    for (const [table, cle] of [[construit.familleInitiale, `${famille}|${mots[0][0]}`], [construit.famille, famille]] as const) {
+      const connu = table.get(cle);
+      table.set(cle, connu && connu.chemin !== chemin ? null : { prenom: mots[0], chemin });
+    }
     // Les débuts stricts seulement : le nom entier, c'est déjà l'index exact.
     for (let n = 2; n < mots.length; n++) ajouterSiUnique(construit.prefixe, mots.slice(0, n).join('|'), chemin);
     for (let i = 0; i < mots.length - 1; i++) {
@@ -171,7 +181,7 @@ function indexPhotos(): IndexPhotos {
 }
 
 function photoExacte(cle: string): string | undefined {
-  return PHOTOS_NEW_MAJ[cle] ?? PHOTO_JOUEUR_MAJ[cle] ?? PHOTO_JOUEUR[cle];
+  return PHOTOS_NEW_MAJ[cle] ?? PHOTO_JOUEUR_MAJ[cle] ?? PHOTO_JOUEUR[cle] ?? PHOTO_JOUEUR_MONDE[cle];
 }
 
 /**
@@ -185,10 +195,28 @@ function sansLettresAccentuees(nom: string): string {
   return normaliserNom(nom.normalize('NFD').replace(/[a-zA-Z](?=[̀-ͯ])/g, ''));
 }
 
-/** Deux prénoms dont l'un est le début ou la fin de l'autre : Riko/Eneriko. */
-function emboites(a: string, b: string): boolean {
-  const [court, long] = a.length < b.length ? [a, b] : [b, a];
-  return court.length >= 3 && (long.startsWith(court) || long.endsWith(court));
+/**
+ * Deux prénoms qui peuvent désigner la même personne : le plus court se lit
+ * DANS le plus long, lettre à lettre et dans l'ordre. « Tom » se lit dans
+ * « THOMas », « Sam » dans « SAMuel », « Riko » dans « eneRIKO », « Will » dans
+ * « WILLiam ».
+ *
+ * ⚠️ L'INITIALE COMMUNE NE SUFFIT PAS, ET ÇA S'EST VU. La règle acceptait tout
+ * prénom de même première lettre : le jour où les portraits japonais sont
+ * entrés, Mako VUNIPOLA a hérité du visage de Manu VUNIPOLA — son cousin. Le
+ * « k » ne se lit pas dans « manu » ; la sous-séquence tranche ce que
+ * l'initiale laissait passer.
+ */
+function prenomsCompatibles(a: string, b: string): boolean {
+  const [court, long] = a.length <= b.length ? [a, b] : [b, a];
+  if (court.length < 3) return false;
+  // Les trois mêmes premières lettres : les diminutifs qui CHANGENT la fin du
+  // prénom (Dave/David, Nick/Nicholas, Harry/Harrison, Jonny/Jonathan).
+  if (court.slice(0, 3) === long.slice(0, 3)) return true;
+  // Ou le prénom court lu dans le long, lettre à lettre : Tom/THOMas.
+  let i = 0;
+  for (const lettre of long) if (lettre === court[i] && ++i === court.length) return true;
+  return false;
 }
 
 /** Les clés obtenues en retirant UN caractère : une lettre perdue en route. */
@@ -246,11 +274,12 @@ function chercherPhoto(nom: string): string | undefined {
     // la trace d'un caractère perdu en route (« rhan janse van rensburg »,
     // « giovanni habel kuffner »), pas une ressemblance approximative.
     for (const variante of amputations(ecriture)) pistes.push(photoExacte(variante));
-    pistes.push(tables.paire.get(`${mots[0]}|${famille}`), tables.familleInitiale.get(`${famille}|${mots[0][0]}`));
-    // Le nom de famille seul, et seulement si les prénoms s'emboîtent :
-    // « Riko » est la fin d'« Eneriko », « Sacha » n'est rien de « Gabriel ».
-    const seul = tables.famille.get(famille);
-    if (seul && emboites(mots[0], seul.prenom)) pistes.push(seul.chemin);
+    pistes.push(tables.paire.get(`${mots[0]}|${famille}`));
+    // Les deux pistes par nom de famille — la plus étroite d'abord — et jamais
+    // sans que les prénoms puissent désigner la même personne.
+    for (const trouve of [tables.familleInitiale.get(`${famille}|${mots[0][0]}`), tables.famille.get(famille)]) {
+      if (trouve && prenomsCompatibles(mots[0], trouve.prenom)) pistes.push(trouve.chemin);
+    }
   }
   for (const piste of pistes) if (piste) return piste;
   return undefined;

@@ -28,7 +28,7 @@ const crypto = require('node:crypto');
 const RACINE = path.join(__dirname, '..');
 const PUBLIC = path.join(RACINE, 'public');
 const DONNEES = path.join(RACINE, 'src', 'data');
-const DOSSIERS = ['photos', 'photos/maj', 'photos/new maj'];
+const DOSSIERS = ['photos', 'photos/maj', 'photos/new maj', 'photos/monde'];
 
 const empreinte = (fichier) => crypto.createHash('md5').update(fs.readFileSync(fichier)).digest('hex');
 const estImage = (nom) => /\.(webp|png|jpe?g)$/i.test(nom);

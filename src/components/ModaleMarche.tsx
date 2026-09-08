@@ -166,6 +166,8 @@ function Annonce({ carte, vente, monClubId, ovas, nomDe, occupe, onAgir }: {
 
 // ── LA MISE EN VENTE : prix, type, durée — ou la vente rapide ──────────────
 
+/** Le pas des prix du marché : 50 Ovas, la plus petite vente rapide. */
+const PRIX_PAS = 50;
 const DUREES: [string, string][] = [['2', '2 heures'], ['6', '6 heures'], ['24', '24 heures'], ['72', '3 jours'], ['168', '7 jours']];
 const TYPES: [string, string][] = [['directe', 'Vente directe'], ['enchere', 'Aux enchères'], ['echange', 'Échange contre une carte']];
 
@@ -212,8 +214,14 @@ function MiseEnVente({ carte, occupe, surLaFeuille, effectif, onAgir, onEchanger
     }}>
       <div className="cel-champ"><span>Type de vente</span><Selecteur valeur={mode} onChange={setMode} options={TYPES.map(([valeur, label]) => ({ valeur, label }))} /></div>
       {!echange && <>
+        {/* ⚠️ LE PAS ET LE MINIMUM DOIVENT S'ACCORDER, sinon le navigateur
+            refuse le formulaire sans que personne comprenne pourquoi. Le champ
+            était `min=1 step=100` avec 5000 dedans : les seules valeurs
+            acceptées étaient 1, 101, 201… et publier une annonce au prix
+            proposé par défaut affichait « les deux valeurs valides les plus
+            proches sont 4901 et 5001 ». */}
         <label className="cel-champ"><span>{mode === 'enchere' ? 'Mise à prix (Ovas)' : 'Prix (Ovas)'}</span>
-          <input type="number" min={1} step={100} value={prix} onChange={(e) => setPrix(e.target.value)} required />
+          <input type="number" min={PRIX_PAS} step={PRIX_PAS} value={prix} onChange={(e) => setPrix(e.target.value)} required />
         </label>
         <div className="cel-champ"><span>Durée</span><Selecteur valeur={duree} onChange={setDuree} options={DUREES.map(([valeur, label]) => ({ valeur, label }))} /></div>
       </>}

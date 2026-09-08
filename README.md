@@ -39,6 +39,31 @@
   annonce la rareté avant le nom.
 - **Marché, enchères et échanges croisés** entre managers, avec verrou de carte
   et plancher d'effectif tenus par le serveur.
+- **Une carte du marché s'ouvre en fiche** : la carte à gauche, l'affaire à
+  droite. Si elle est en vente : le vendeur, le prix, le temps restant au
+  **compte à rebours à la seconde** (heures, minutes, secondes) et le bouton
+  d'achat. Si elle est aux enchères : la meilleure offre, **le dernier
+  enchérisseur** et le champ d'enchère, borné au pas du serveur — quand
+  quelqu'un surenchérit pendant qu'on hésite, le minimum remonte tout seul. Si
+  c'est une des nôtres : le formulaire de mise en vente (prix, vente directe,
+  enchères ou échange, durée) et la vente rapide, confirmée en deux temps dans
+  le panneau plutôt que par une seconde fenêtre.
+- ⚠️ **Un joueur aligné ne quitte pas le club.** Vendre, vendre rapidement ou
+  échanger un titulaire ou un remplaçant était permis : la feuille se réparait
+  toute seule derrière, et on découvrait le dimanche que le numéro 10 avait été
+  remplacé par le premier venu du même poste. Le serveur refuse maintenant le
+  départ (`verifierHorsFeuille`), et l'écran l'écrit **avant le clic** — le
+  bouton porte le maillot du joueur (« Sur la feuille · titulaire nº 10 »)
+  plutôt qu'un message d'erreur après coup. La réconciliation automatique garde
+  son rôle pour les départs SUBIS : blessure, carte achetée, enchère perdue.
+- **La vente rapide se fait aussi par lot** : on coche des cartes dans
+  l'effectif, une barre annonce le total en Ovas et ce qu'il resterait de
+  joueurs, et tout part en **une seule commande** — donc en une seule écriture
+  au journal. Vendre les mêmes cartes une par une passerait les quatre
+  premières puis échouerait sur la cinquième, en laissant l'effectif à moitié
+  démantelé. Plafonds par bande : **Bronze 50 · Argent 250 · Or 1 000 ·
+  Élite 10 000 · Mythique 20 000 Ovas**, la note faisant progresser la valeur
+  entre la moitié du plafond et le plafond.
 - **La roue du marché tourne comme le présentoir des packs** : le glissement
   suit la main image par image (position continue, amortissement exponentiel),
   la roue se cale sur la carte de face au relâchement, et un clic ramène
@@ -1189,6 +1214,27 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   revendique personne, et `scripts/nettoyerPhotos.cjs` la reconnaît à l'octet
   près. Dans la foulée, 99 entrées de `photosMaj.ts` qui promettaient un `.webp`
   absent ont été raccrochées au fichier réellement présent.
+- **Le Japon et le Super Rugby ont leurs visages** : `rugby_players.json`
+  (1 847 joueurs, 36 clubs) a été rapatrié en local par
+  `npm run data:photos-monde` — **jamais en URL distante**, le jeu doit rester
+  entier hors ligne. Les originaux font jusqu'à 500 Ko en 720 × 1080 quand une
+  carte n'en affiche pas 250 px : redimensionnés à 600 px et encodés en WebP,
+  les **1 830 portraits** tiennent dans 72 Mo. Couverture : **Japan League One
+  D1 97 %** (640/663), D2 98 %, D3 96 %, **Super Rugby Pacific 77 %** — la
+  source ne contient aucun joueur des Blues et ignore Moana Pasifika.
+- **Et ils sont détourés automatiquement** (`node scripts/detourerPhotos.cjs`).
+  Ces photos arrivent sur le fond du studio ; collées telles quelles, elles
+  dessinent un carré blanc au milieu de la carte. Le détourage part des BORDS —
+  un fond touche le cadre, un joueur non — suit le dégradé du mur de proche en
+  proche, et s'arrête au premier contour. Deux seuils : en dessous de 24 le
+  pixel est du fond, entre 24 et 34 il est à moitié transparent et on lui retire
+  la couleur qu'il a absorbée, sans quoi il reste un liseré clair autour des
+  cheveux. **Le seuil doux était à 62 et il mangeait des visages** : une peau
+  claire n'est qu'à ~40 du gris d'un mur de studio, et deux portraits sur
+  trente-six sortaient avec un trou dans la figure. Un fond non uniforme, un
+  résultat qui mange plus de 92 % de l'image ou qui laisse le haut du cadre
+  opaque : on rend la photo telle quelle. Mesuré : **1 580 détourés, 256
+  laissés, 0 échec.**
 - **Les noms ne concordent pas d'un fichier à l'autre**, et c'était la première
   cause de carte grise : la feuille dit « Aaron GRANDIDIER » quand le fichier
   s'appelle `aaron_grandidier_nkanang`, « Gaël DRÉAN » quand l'aspiration a

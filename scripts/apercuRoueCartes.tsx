@@ -21,6 +21,9 @@ const NOMS = [
   ['Santiago ARATA', 'Castres Olympique'], ['Thibaut MOTASSI', 'Stade Français Paris'],
   ['Antoine DUPONT', 'Stade Toulousain'], ['Thomas RAMOS', 'Stade Toulousain'],
   ['Naoto SAITO', 'Stade Toulousain'],
+  // Japon et Super Rugby Pacific (rugby_players.json) : fond blanc d'origine.
+  ['Ardie SAVEA', 'Kobelco Kobe Steelers'], ['Anton LIENERT-BROWN', 'Kobelco Kobe Steelers'],
+  ['Richie MOUNGA', 'Toshiba Brave Lupus'], ['Damian MCKENZIE', 'Chiefs'],
 ];
 const cartes = NOMS.map(([nom, clubReel], i) => ({
   id: String(i), nom, clubReel, note: 75 + i, rarete: i % 3 ? 'or' : 'elite',

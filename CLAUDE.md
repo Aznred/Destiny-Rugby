@@ -358,6 +358,16 @@ stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
 - **`Trophee.individuel` est LE champ qui range un trophée** : il commande sa
   place dans l'armoire ET la façon dont on le gagne.
 - **Draco** : `useGLTF(url, true)` charge le décodeur depuis un CDN Google.
+- **UN PORTRAIT SE RAPATRIE, IL NE SE POINTE PAS.** `rugby_players.json`
+  (Japan League One D1/D2/D3, Super Rugby Pacific) ne donne que des URL
+  distantes : `npm run data:photos-monde` les télécharge, les redimensionne à
+  600 px et les range dans `public/photos/monde/` (1 830 portraits, 72 Mo).
+  Le jeu doit rester entier hors ligne — c'est la règle qui a fait supprimer
+  `randomuser.me`. Puis `node scripts/detourerPhotos.cjs` retire le fond de
+  studio : il part des BORDS, suit le dégradé du mur, s'arrête au premier
+  contour, et **ne réécrit rien quand il n'est pas sûr**. Son seuil doux
+  (34) ne se remonte pas : à 62, il entrait par une joue claire et laissait un
+  trou dans le visage.
 - **UNE PHOTO DE JOUEUR N'EST PAS FORCÉMENT UN JOUEUR.** Le site source rend une
   silhouette grise « portrait indisponible » : elle a été aspirée 181 fois sous
   181 noms, indexée comme un vrai portrait, et gagnait donc contre le vrai
@@ -443,6 +453,14 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
 
   En local, `vite.config.ts` branche le même gestionnaire sur un
   fichier JSON, donc le mode se teste entièrement sans base.
+
+  ⚠️ **UN JOUEUR SUR LA FEUILLE DE MATCH NE PART PAS.** `verifierHorsFeuille`
+  refuse la vente, la vente rapide et l'échange d'un titulaire ou d'un
+  remplaçant, à la proposition pour ses propres cartes et à l'acceptation pour
+  celles d'en face. `ajusterComposition` ne rattrape que les départs SUBIS
+  (blessure, carte achetée, enchère perdue). La vente rapide accepte un lot
+  (`venteRapideGroupee`) : le plancher d'effectif se vérifie sur TOUS les
+  sortants d'un coup, jamais carte par carte.
 
   Les quatre invariants, en une ligne chacun — ils commandent tout le reste :
   1. **Le serveur est la source de vérité.** Le client DEMANDE une action, il ne

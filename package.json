@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "data:ffr": "node scripts/importEffectifsFfr.cjs",
+    "data:photos-monde": "node scripts/importerPhotosMondiales.cjs",
     "base:appliquer": "node scripts/appliquerSchema.mjs serveur/schema-ligues.sql serveur/schema-carriere.sql",
     "preview": "vite preview",
     "verify:situations": "vite-node scripts/verifierSituations.ts",
@@ -57,6 +58,7 @@
     "@types/three": "0.182.0",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
+    "sharp": "^0.35.4",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
     "vite-node": "6.0.0"
