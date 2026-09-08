@@ -358,6 +358,24 @@ stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
 - **`Trophee.individuel` est LE champ qui range un trophée** : il commande sa
   place dans l'armoire ET la façon dont on le gagne.
 - **Draco** : `useGLTF(url, true)` charge le décodeur depuis un CDN Google.
+- **UN ONGLET OUVERT AVANT UN DÉPLOIEMENT RÉCLAME DES MORCEAUX QUI N'EXISTENT
+  PLUS.** Signalé en jeu : « Failed to fetch dynamically imported module :
+  /assets/Hero3D-hyV7P-g2.js ». Les écrans sont chargés à la demande et chaque
+  morceau porte l'empreinte de son contenu dans son nom ; un nouveau build les
+  renomme tous. La page ouverte tient encore l'ANCIENNE liste, celle que son
+  `index.html` lui a donnée — et elle ne s'en aperçoit qu'au moment d'aller
+  chercher un morceau qu'elle n'a pas encore. **Revenir à l'accueil n'y change
+  rien** : la liste est la même. Seul un rechargement relit `index.html`
+  (`max-age=0, must-revalidate`) et récupère la nouvelle.
+  `lib/moduleObsolete.ts` reconnaît l'erreur (trois formulations selon le
+  navigateur, il n'existe pas de code) et recharge — depuis `Garde`
+  (`componentDidCatch`), depuis `main.tsx` avant même que React existe, et sur
+  les rejets non rattrapés des préchargements.
+  ⚠️ **UNE SEULE FOIS PAR RÉPIT (30 s).** Si le fichier est réellement absent du
+  déploiement, recharger à chaque erreur enferme le joueur dans une boucle où il
+  ne peut même plus lire le message. Mesuré dans le navigateur : première erreur
+  → `navigation.type === 'reload'`, seconde erreur dans le répit → la page reste
+  et l'écran d'erreur s'affiche.
 - **RIEN NE DÉFEND `public/`, IL FAUT DONC LE MESURER.** Le 7 septembre 2026,
   un commit de 3 117 fichiers appelé « fix » (`906590a`) a emporté **439
   binaires** au passage : **71 `.glb`**, `og.png`, `ads.txt`, 106 logos sources.

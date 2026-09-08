@@ -11,6 +11,7 @@
 import { Component, type ReactNode } from 'react';
 import { t } from '../lib/i18n';
 import { Icone } from './Icone';
+import { moduleObsolete, rechargerPourModuleObsolete } from '../lib/moduleObsolete';
 
 // ⚠️ App monte ce garde avec key={ecran} : changer d'écran le remonte à neuf,
 // il n'y a donc rien à réinitialiser à la main.
@@ -28,6 +29,24 @@ export class Garde extends Component<Props, State> {
 
   static getDerivedStateFromError(e: unknown): State {
     return { erreur: e instanceof Error ? e.message : String(e) };
+  }
+
+  /**
+   * ⚠️ UN MORCEAU MANQUANT N'EST PAS UNE SAUVEGARDE ABÎMÉE, C'EST UNE PAGE
+   * PÉRIMÉE. « Failed to fetch dynamically imported module :
+   * /assets/Hero3D-hyV7P-g2.js » — signalé en jeu — veut dire que l'onglet a
+   * été ouvert avant un déploiement et réclame un fichier dont l'empreinte a
+   * changé. Le message « une donnée de ta sauvegarde n'a pas été comprise » est
+   * alors doublement faux : rien n'est cassé, et revenir à l'accueil n'y change
+   * rien puisque la liste des morceaux reste la même. Seul un rechargement
+   * relit `index.html` et récupère la nouvelle liste.
+   *
+   * Le garde-fou du garde-fou est dans `rechargerPourModuleObsolete` : une
+   * seule tentative par répit, sinon un fichier réellement absent enfermerait
+   * le joueur dans une boucle où il ne peut même plus lire l'erreur.
+   */
+  componentDidCatch(erreur: unknown) {
+    if (moduleObsolete(erreur)) rechargerPourModuleObsolete();
   }
 
   render() {

@@ -8,6 +8,13 @@ import './index.css'
 // l'écran des championnats soit chargé. À l'entrée, c'est déterministe.
 import 'flag-icons/css/flag-icons.min.css'
 import { chargerTextes } from './lib/i18n'
+import { moduleObsolete, rechargerPourModuleObsolete, surveillerModulesObsoletes } from './lib/moduleObsolete'
+
+// ⚠️ LA SURVEILLANCE S'INSTALLE AVANT TOUT LE RESTE. Les deux imports de
+// `demarrer()` sont eux-mêmes des morceaux chargés à la demande : après un
+// déploiement, un onglet resté ouvert peut échouer AVANT que React existe, et
+// la page reste alors blanche — pas même l'écran d'erreur pour le dire.
+surveillerModulesObsoletes()
 
 // L'application et le gros dictionnaire multilingue sont deux chunks séparés,
 // chargés en parallèle. `t()` est tout de même prêt avant le premier rendu,
@@ -26,4 +33,7 @@ async function demarrer() {
   )
 }
 
-void demarrer()
+void demarrer().catch((erreur) => {
+  if (moduleObsolete(erreur) && rechargerPourModuleObsolete()) return
+  throw erreur
+})

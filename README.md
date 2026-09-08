@@ -129,6 +129,19 @@
   refus dit son chiffre, et « Tout cocher » coche exactement ce qui est
   vendable — le plus petit du lot maximum et de ce que le plancher de 26
   joueurs autorise.
+- 🔄 **Un onglet ouvert pendant un déploiement se recharge tout seul.** Les
+  écrans sont chargés à la demande et chaque morceau porte l'empreinte de son
+  contenu dans son nom ; un nouveau build les renomme tous. Une page restée
+  ouverte tient encore l'ancienne liste et découvre le problème au pire moment —
+  signalé en jeu : « Failed to fetch dynamically imported module :
+  /assets/Hero3D-hyV7P-g2.js », sur un écran qui annonçait à tort une sauvegarde
+  abîmée. ⚠️ **Revenir à l'accueil n'y changeait rien** : la liste des morceaux
+  était la même. Le jeu reconnaît maintenant l'erreur (trois formulations selon
+  le navigateur — il n'existe pas de code pour ça) et **recharge**, ce qui relit
+  `index.html` et récupère la nouvelle liste. **Une seule fois par répit de
+  30 secondes** : si le fichier manque vraiment, recharger en boucle empêcherait
+  même de lire le message. Mesuré dans le navigateur : première erreur →
+  rechargement, seconde dans le répit → la page reste.
 - ⭐ **Les favoris échappent à « Tout cocher ».** Une étoile sur chaque carte de
   l'effectif : marquée, elle n'est plus prise par la sélection en masse.
   ⚠️ **Ce n'est PAS un verrou** — le joueur se vend encore d'un clic, se coche
@@ -1366,6 +1379,14 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   État après passe complète : **5 324 portraits, 98,7 % détourés**. Le reste,
   ce sont des drapeaux tenus à bout de bras et des fonds de studio colorés :
   l'algorithme refuse, et il a raison de refuser.
+- **Les refusés se ramassent dans un dossier** :
+  `node scripts/photosNonDetourees.cjs` copie les **68 portraits** que le script
+  laisse tels quels dans `../photos-a-detourer/` (hors du dépôt : dans `public/`
+  ils seraient servis par le site), en gardant leur sous-dossier d'origine, avec
+  un `LISEZ-MOI.md` qui les inventorie. Une fois retouchés à la main,
+  `node scripts/photosNonDetourees.cjs --retour` les remet en place — et il **ne
+  reprend que ceux qui ont vraiment été détourés**, pour qu'un fichier inchangé
+  n'apparaisse pas modifié dans git à cause du seul ré-encodage.
 - **Les noms ne concordent pas d'un fichier à l'autre**, et c'était la première
   cause de carte grise : la feuille dit « Aaron GRANDIDIER » quand le fichier
   s'appelle `aaron_grandidier_nkanang`, « Gaël DRÉAN » quand l'aspiration a
