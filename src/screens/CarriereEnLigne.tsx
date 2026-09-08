@@ -52,6 +52,7 @@ import { NOMS_PACK } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from '../lib/ligue/venteRapideCarriere';
 import { collectifCarriere, paliersCollectif, bonusCollectif, COLLECTIF_MAX } from '../lib/ligue/collectifCarriere';
+import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire';
@@ -86,6 +87,27 @@ const PALIERS_COLLECTIF: Record<ReturnType<typeof paliersCollectif>, string> = {
   solide: 'groupe solide',
   fusionnel: 'ils jouent ensemble depuis toujours',
 };
+
+/**
+ * ⚠️ L'INFOBULLE DIT CE QU'IL FAUT CHANGER, PAS SEULEMENT CE QUI EST. Le chiffre
+ * seul laisse le manager deviner : il doit lire « 3 du même club, il en faut 4 »
+ * pour savoir quelle carte poser. On nomme donc l'affinité qui COMPTE (la
+ * meilleure des trois), sa taille de groupe, et le palier suivant s'il existe.
+ */
+const NOM_AFFINITE: Record<Affinite, string> = { club: 'du même club réel', nation: 'de la même nation', championnat: 'du même championnat' };
+function legendeAffinite(a: AffiniteCarte): string {
+  const bonus = bonusCollectif(a.points);
+  const entete = `Collectif ${a.points}/${COLLECTIF_MAX} · ${bonus >= 0 ? '+' : ''}${bonus} de note`;
+  const detail = `${a.club} du même club · ${a.nation} de la même nation · ${a.championnat} du même championnat`;
+  if (!a.meilleure) return `${entete}\naucune affinité sur cette feuille\n${detail}`;
+  const tailles: Record<Affinite, number> = { club: a.club, nation: a.nation, championnat: a.championnat };
+  const compte = `${tailles[a.meilleure]} titulaires ${NOM_AFFINITE[a.meilleure]}`;
+  // ⚠️ ON NE PROPOSE PAS DE PROGRÈS À QUI EST DÉJÀ AU MAXIMUM. « Il manque 3
+  // joueurs de son club » sous un 10/10 se lit comme un reproche absurde.
+  const manque = a.points < COLLECTIF_MAX && a.club > 0 && a.club < 4
+    ? `\nIl manque ${4 - a.club} joueur${4 - a.club > 1 ? 's' : ''} de son club pour le maximum.` : '';
+  return `${entete}\n${compte}${manque}\n${detail}`;
+}
 
 /**
  * ⚠️ LA MÊME CONVERSION QUE LE SERVEUR, RECOPIÉE EN CINQ LIGNES. L'importer de
@@ -634,7 +656,7 @@ function Bureau({ vue, proprietaire, agir, occupe, suivre, notifier }: { vue: Vu
   // le cacher derrière un onglet, c'est le réserver à ceux qui savent déjà
   // qu'il existe.
   const collectif = collectifCarriere(mesCartes, monClub?.composition ?? COMPOSITION_VIDE);
-  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? 'Avant le premier coup de sifflet' : 'Le prochain rendez-vous'}</div>{vue.phase === 'salon' ? <><h2>Rassemblez votre XV de clubs.</h2><p>Le vestiaire est ouvert. Partage le code, compose ton équipe et lance la saison quand tes amis sont là.</p><Invitation code={vue.code} notifier={notifier} /><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Lancer la saison</button>}<small>{vue.clubs.length} / {vue.maxClubs} clubs inscrits{vue.clubs.length < 2 ? ' · Au moins 2 pour démarrer' : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : <><h2>La saison a livré son verdict.</h2><p>Retrouve les trophées dans l’histoire de la ligue.</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Démarrer la saison suivante</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>Ton vestiaire</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>GEN moyen</span></div><div><b>{mesCartes.length}</b><span>joueurs</span></div><div><b>{mesCartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length}</b><span>blessés</span></div><div className={`cel-chiffre-collectif cel-collectif-${paliersCollectif(collectif.total)}`} title={`${PALIERS_COLLECTIF[paliersCollectif(collectif.total)]} — même club réel, même nation, même championnat, et quatre fois plus dans l'unité.`}><b>{collectif.total}</b><span>collectif</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>Écusson choisi à l’inscription — il ne change plus.</small></span></div><p className="cel-note">Fais grandir ton club grâce aux matchs, aux objectifs et au marché de la ligue.</p></div></div><div className="cel-grille-bureau"><div className="cel-panneau"><h2>Le championnat</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>Objectifs de la période</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>Jusqu’au {date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} Ovas</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? 'Récompense reçue' : 'Récupérer'}</button></div>) : <p className="cel-note">Les premiers objectifs arrivent au lancement de la saison.</p>}</div></div></>;
+  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? 'Avant le premier coup de sifflet' : 'Le prochain rendez-vous'}</div>{vue.phase === 'salon' ? <><h2>Rassemblez votre XV de clubs.</h2><p>Le vestiaire est ouvert. Partage le code, compose ton équipe et lance la saison quand tes amis sont là.</p><Invitation code={vue.code} notifier={notifier} /><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Lancer la saison</button>}<small>{vue.clubs.length} / {vue.maxClubs} clubs inscrits{vue.clubs.length < 2 ? ' · Au moins 2 pour démarrer' : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : <><h2>La saison a livré son verdict.</h2><p>Retrouve les trophées dans l’histoire de la ligue.</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Démarrer la saison suivante</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>Ton vestiaire</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>GEN moyen</span></div><div><b>{mesCartes.length}</b><span>joueurs</span></div><div><b>{mesCartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length}</b><span>blessés</span></div><div className={`cel-chiffre-collectif cel-collectif-${paliersCollectif(collectif.total)}`} title={`${PALIERS_COLLECTIF[paliersCollectif(collectif.total)]} — quatre joueurs d'un même club réel suffisent à les mettre au maximum ; une nation ou un championnat partagés par tout le XV valent 100. Le banc ne compte pas.`}><b>{collectif.total}</b><span>collectif</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>Écusson choisi à l’inscription — il ne change plus.</small></span></div><p className="cel-note">Fais grandir ton club grâce aux matchs, aux objectifs et au marché de la ligue.</p></div></div><div className="cel-grille-bureau"><div className="cel-panneau"><h2>Le championnat</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>Objectifs de la période</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>Jusqu’au {date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} Ovas</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? 'Récompense reçue' : 'Récupérer'}</button></div>) : <p className="cel-note">Les premiers objectifs arrivent au lancement de la saison.</p>}</div></div></>;
 }
 
 /**
@@ -934,7 +956,7 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
           <div><b>{collectif.total}</b><span>collectif</span></div>
           <div className="cel-collectif-jauge"><i style={{ width: `${collectif.total}%` }} /></div>
           <em>{PALIERS_COLLECTIF[paliersCollectif(collectif.total)]}</em>
-          <small>Même club réel, même nation, même championnat — et quatre fois plus dans l’unité (première ligne, charnière, centres…).</small>
+          <small>Quatre joueurs d’un même club réel les mettent tous les quatre au maximum. À défaut la nation, puis le championnat, qui demandent la moitié du XV. Le banc ne compte pas.</small>
         </div>
       </div>
       <div><div className="eyebrow">Feuille de {composition.titulaires.length + composition.remplacants.length} sur {cartes.length} joueurs</div><h2>Ton XV, ton banc, tes rôles</h2><p>Le capitaine tient la discipline, le buteur tire les pénalités. Un joueur hors de son poste perd la cohérence collective.</p></div>
@@ -947,22 +969,13 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
         const carte = cartes.find(c => c.id === joueur.id);
         if (!carte) return null;
         const affinite = collectif.parCarte[carte.id];
-        const points = affinite?.points ?? 0;
-        const bonus = bonusCollectif(points);
         return <>
           <CarteJoueurEnLigne carte={carte} compacte />
-          {/* La pastille dit le chiffre ET sa raison : sans le « pourquoi »,
-              on ne sait pas quoi changer sur la feuille. */}
-          <span className={`cel-pastille-collectif ${paliersCollectif(points * (100 / COLLECTIF_MAX))}`}
-            title={`Collectif ${points}/${COLLECTIF_MAX} · ${bonus >= 0 ? '+' : ''}${bonus} de note\n`
-              + `${affinite?.club ? 'club réel partagé' : ''}${affinite?.club && (affinite.nation || affinite.championnat) ? ' · ' : ''}`
-              + `${affinite?.nation ? 'même nation' : ''}${affinite?.nation && affinite.championnat ? ' · ' : ''}`
-              + `${affinite?.championnat ? 'même championnat' : ''}${!affinite?.club && !affinite?.nation && !affinite?.championnat ? 'aucune affinité sur cette feuille' : ''}`}>
-            {/* ⚠️ LA PASTILLE ARRONDIT, L'INFOBULLE DÉTAILLE. « 4,2 » sur une
-                pastille de vingt pixels, c'est trois caractères illisibles pour
-                une précision dont personne ne fait rien en composant. */}
-            {Math.round(points)}
-          </span>
+          {/* ⚠️ PAS DE PASTILLE SUR LE BANC. Le collectif ne compte que le XV de
+              départ : un remplaçant n'a pas d'entrée, et lui coller un « 0 »
+              annoncerait une pénalité qu'il ne subit pas. */}
+          {affinite && <span className={`cel-pastille-collectif ${paliersCollectif(affinite.points * (100 / COLLECTIF_MAX))}`}
+            title={legendeAffinite(affinite)}>{affinite.points}</span>}
         </>;
       }}
       effectif={effectif} effectifComplet={effectifComplet} composition={composition}

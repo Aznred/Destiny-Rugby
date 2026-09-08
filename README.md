@@ -58,22 +58,36 @@
   forte à la plus faible — le **club réel** (ils jouent vraiment ensemble), la
   **nation**, le **championnat** — et un coéquipier ne compte qu’une fois, par
   son lien le plus fort.
-  ⚠️ **Le rugby n’est pas le football** : FIFA compte les liens entre voisins
-  de la formation, ici le voisin c’est l’**unité** — première ligne, deuxième
-  ligne, troisième ligne, charnière, centres, triangle arrière. Deux piliers du
-  même club poussent réellement ensemble ; deux ailiers du même club ne se
-  touchent pas du match. Un lien dans l’unité vaut donc quatre fois un lien
-  ailleurs sur le terrain. L’unité se compte **en proportion** de ce qu’elle
-  pourrait réaliser, sinon un pilier (deux partenaires) sortait à 10 et son
-  deuxième ligne (un seul) à 6 pour le même travail.
-  Mesuré : un XV entièrement d’un même club **100/100**, la dotation de départ
-  **43/100**, un XV sans aucune affinité **1/100**. La note d’un joueur bouge
-  de **−1 à +3** — l’ancien barème, invisible, donnait +0,3 par coéquipier de
-  même club **ou** nation plafonné à +3, si bien que n’importe quel XV français
-  touchait le maximum sans rien construire. Le banc ne gonfle rien : **le total
-  ne compte que le XV de départ**, et un remplaçant plafonne à 4 sur 10.
+  ⚠️ **On compte des GROUPES, pas des paires** — et c’est une correction venue
+  du jeu. La première version pesait chaque lien deux à deux en donnant quatre
+  fois plus de poids aux liens à l’intérieur de l’unité (première ligne,
+  charnière, centres) : un XV entièrement d’un même club sortait bien à 100,
+  mais tout le reste s’effondrait — **43** pour la dotation de départ, **1**
+  pour un XV dépareillé. Trop sévère : une échelle qui ne récompense qu’un cas
+  impossible à réunir ne se joue pas davantage qu’une échelle plate.
+  La règle tient maintenant dans la tête pendant qu’on compose : un joueur
+  regarde **combien de coéquipiers du XV** il retrouve pour chaque affinité, et
+  garde la meilleure des trois. Le club monte en trois marches — **2 → 5,
+  3 → 8, 4 → 10** : quatre joueurs d’un même club suffisent à mettre ces
+  quatre-là au maximum, ce qui rend une équipe **hybride** jouable. La nation
+  et le championnat demandent la moitié du XV pour valoir autant, et les trois
+  quarts pour valoir le maximum.
+  Mesuré : un XV entièrement d’un même club **100/100**, un XV d’une même
+  nation en quinze clubs différents **100/100**, un XV d’un même championnat
+  **100/100**, un XV sans aucune affinité **11/100**, et quatre Toulousains
+  posés dans ce XV dépareillé sortent à **10 sur 10 chacun** (l’équipe passe de
+  11 à 37). La note d’un joueur bouge de **−1 à +3** — l’ancien barème,
+  invisible, donnait +0,3 par coéquipier de même club **ou** nation plafonné à
+  +3, si bien que n’importe quel XV français touchait le maximum sans rien
+  construire.
+  ⚠️ **Le banc ne compte pas du tout** : ni comme bénéficiaire, ni comme
+  partenaire. Un remplaçant n’a **aucune** note de collectif — donc pas de
+  pastille sur sa carte, et surtout **pas de pénalité** quand il entre à la
+  60ᵉ minute. C’est aussi ce qui interdit la recette évidente : garnir huit
+  places du banc d’un même club pour gonfler le total sans que personne ne joue
+  ensemble.
   ⚠️ **Une seule formule pour l’écran et pour le terrain** : `lancerRencontre`
-  appelle exactement la fonction qui affiche le chiffre. Banc :
+  appelle exactement la fonction qui affiche le chiffre.
   Il se lit à DEUX endroits : en tête de la composition, à côté de la note du
   XV — les deux seuls chiffres qu'on vient voir passent donc avant le
   paragraphe, sinon ils tombaient hors écran sur téléphone — et dans les

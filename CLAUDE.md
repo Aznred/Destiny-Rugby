@@ -458,11 +458,21 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   ⚠️ **LE COLLECTIF A UNE SEULE FORMULE**, dans `lib/ligue/collectifCarriere.ts` :
   l'écran de composition et `lancerRencontre` appellent la MÊME fonction. Deux
   formules donneraient un jour deux vérités — un manager qui compose pour 78 et
-  une équipe qui entre sur le terrain avec autre chose. Le barème est calibré,
-  pas choisi : club 4 / nation 1,6 / championnat 0,8 dans l’unité, huit fois
-  moins ailleurs. Le remonter sans mesurer ramène le défaut d’origine — un
-  premier essai donnait 72/100 à la dotation de départ et 88 à un XV construit,
-  une échelle où tout le monde a la même note et que personne ne joue.
+  une équipe qui entre sur le terrain avec autre chose. **On compte des GROUPES,
+  pas des paires** : un joueur regarde combien de titulaires il retrouve pour
+  chaque affinité (club réel, nation, championnat), garde la MEILLEURE des
+  trois, et les paliers font le reste — club 2 → 5, 3 → 8, **4 → 10**, nation et
+  championnat 4 → 4, 6 → 6, 8 → 8, 11 → 10. Mesuré : même club 100, même nation
+  (quinze clubs différents) 100, même championnat 100, rien en commun 11, et
+  quatre joueurs d’un même club posés dans ce XV dépareillé valent 10 sur 10
+  chacun. **Deux pesées ratées avant celle-là** : la première donnait 72/100 à
+  la dotation de départ et 88 à un XV construit (échelle plate) ; la seconde,
+  qui pesait l’unité quatre fois plus, tombait à 43 pour la dotation et 1 pour
+  un XV dépareillé — refusée en jeu, « trop sévère ».
+  ⚠️ **LE BANC N’EST PAS DANS `parCarte`**, et une absence n’est PAS un zéro :
+  zéro point vaut −1 de note. `lancerRencontre` teste donc la présence de
+  l’entrée avant d’appeler `bonusCollectif`, sans quoi un remplaçant entrerait
+  à la 60ᵉ minute avec une note rabotée pour n’avoir pas été aligné.
 
   ⚠️ **UN JOUEUR SUR LA FEUILLE DE MATCH NE PART PAS.** `verifierHorsFeuille`
   refuse la vente, la vente rapide et l'échange d'un titulaire ou d'un

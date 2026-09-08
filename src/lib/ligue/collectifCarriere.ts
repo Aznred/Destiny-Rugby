@@ -4,21 +4,30 @@
 // avait déjà un : une ligne perdue au milieu du lancement de match donnait
 // +0,3 par coéquipier de même club ou de même nation, plafonné à +3. Personne
 // ne pouvait le voir, donc personne ne pouvait le jouer. Une feuille se compose
-// autrement quand on SAIT qu'aligner la première ligne du Stade Toulousain au
-// complet rapporte quelque chose.
+// autrement quand on SAIT qu'aligner quatre Toulousains rapporte quelque chose.
 //
-// ⚠️ ET LE RUGBY N'EST PAS LE FOOTBALL. FIFA compte les liens entre voisins de
-// la formation ; ici, le voisin, c'est l'UNITÉ — la première ligne, la
-// charnière, la paire de centres. Deux piliers du même club poussent
-// réellement ensemble en mêlée ; deux ailiers du même club ne se touchent pas
-// du match. Un lien à l'intérieur de l'unité vaut donc trois fois un lien
-// ailleurs sur le terrain, et c'est ce qui rend la règle vraie plutôt que
-// décorative.
+// ⚠️ ON COMPTE DES GROUPES, PAS DES PAIRES — et c'est la correction demandée en
+// jeu (« c'est trop sévère »). La première version pesait chaque lien deux à
+// deux, en donnant quatre fois plus de poids aux liens à l'intérieur de l'unité
+// (première ligne, charnière, centres). Résultat mesuré : un XV entièrement
+// d'un même club sortait à 100, mais tout le reste s'effondrait — 43 pour la
+// dotation de départ, 1 pour un XV dépareillé. Une échelle qui ne récompense
+// qu'un cas impossible à réunir ne se joue pas davantage qu'une échelle plate.
 //
-// Trois affinités, de la plus forte à la plus faible : le CLUB RÉEL (ils
-// jouent vraiment ensemble), la NATION (même sélection, même école de jeu), le
-// CHAMPIONNAT (mêmes règles arbitrales, même rythme de saison). Un coéquipier
-// ne compte qu'une fois, par son lien le plus fort.
+// La règle est maintenant celle qu'on peut tenir dans la tête en composant :
+//
+//   • un joueur regarde COMBIEN DE COÉQUIPIERS DU XV il retrouve, pour chacune
+//     des trois affinités — même CLUB RÉEL, même NATION, même CHAMPIONNAT ;
+//   • il garde sa MEILLEURE des trois, jamais la somme ;
+//   • le club monte beaucoup plus vite : QUATRE JOUEURS DU MÊME CLUB SUFFISENT
+//     À METTRE CES QUATRE-LÀ AU MAXIMUM. C'est ce qui rend une équipe HYBRIDE
+//     jouable — un bloc toulousain au milieu d'un XV cosmopolite reste payant ;
+//   • une nation ou un championnat partagés par tout le XV donnent 100.
+//
+// ⚠️ LE BANC NE COMPTE PAS. Ni comme bénéficiaire, ni comme partenaire. Un
+// remplaçant ne joue pas les 80 minutes et n'a pas à gonfler le total parce
+// qu'on aurait garni huit places d'un même club. Il n'a donc NI bonus NI
+// pénalité : `parCarte` ne contient que le XV de départ.
 
 import type { CompositionManager } from '../../types.js';
 import type { CarteCarriere } from './typesCarriere.js';
@@ -26,120 +35,105 @@ import type { CarteCarriere } from './typesCarriere.js';
 /** Le maximum d'un joueur. Le total d'équipe est la moyenne du XV sur 100. */
 export const COLLECTIF_MAX = 10;
 
-/**
- * ⚠️ LES UNITÉS DU XV, par index dans `POSTES_XV_MANAGER`
- * (lib/compositionManager.ts). Ce sont les groupes
- * qui travaillent ensemble sur un temps de jeu : la première ligne pousse, la
- * charnière décide, les centres se relaient, le triangle arrière se couvre.
- */
-const UNITES: readonly (readonly number[])[] = [
-  [0, 1, 2],        // première ligne
-  [3, 4],           // deuxième ligne
-  [5, 6, 7],        // troisième ligne
-  [8, 9],           // charnière
-  [11, 12],         // centres
-  [10, 13, 14],     // triangle arrière
-];
+export type Affinite = 'club' | 'nation' | 'championnat';
 
 /**
- * ⚠️ LE CLUB RÉEL ÉCRASE LE RESTE, ET C'EST MESURÉ. Un premier barème donnait
- * au partage de la NATION presque autant qu'au partage du club : les trente
- * licenciés de Régionale 3 de la dotation de départ — tous français, tous du
- * même championnat — sortaient à 72 sur 100, une équipe entièrement d'un même
- * club à 88, et un XV délibérément dépareillé à 64. Une échelle où tout le
- * monde a la même note ne dit rien et ne se joue pas. Partager une nation ou un
- * championnat est presque gratuit dans ce jeu ; jouer ensemble, non.
+ * ⚠️ LES PALIERS, ET ILS SE LISENT DE HAUT EN BAS. Chaque ligne est
+ * `[taille du groupe, points]`, la première atteinte gagne. La taille COMPTE LE
+ * JOUEUR LUI-MÊME : « club 4 » veut dire quatre joueurs du même club sur la
+ * feuille, lui compris — la formulation demandée en jeu.
+ *
+ * Le club grimpe en trois marches parce qu'il est rare et cher à réunir ; la
+ * nation et le championnat demandent la moitié du XV pour valoir autant, et
+ * les trois quarts pour valoir le maximum. Le championnat démarre plus bas que
+ * la nation : partager le Top 14 à deux ne veut pas dire grand-chose.
  */
-const DANS_UNITE = { club: 4, nation: 1.6, championnat: 0.8 } as const;
-const AILLEURS = { club: 0.5, nation: 0.15, championnat: 0.08 } as const;
-/** Ce que l'unité peut apporter, et ce que le reste du terrain peut ajouter. */
-const PART_UNITE = 6;
-const PART_AILLEURS = 4;
+const PALIERS: Readonly<Record<Affinite, readonly (readonly [number, number])[]>> = {
+  club: [[4, 10], [3, 8], [2, 5]],
+  nation: [[11, 10], [8, 8], [6, 6], [4, 4], [2, 2]],
+  championnat: [[11, 10], [8, 8], [6, 6], [4, 4], [2, 1]],
+};
 
 export interface AffiniteCarte {
   /** De 0 à `COLLECTIF_MAX`. */
   points: number;
-  /** Le détail, pour que l'écran puisse dire POURQUOI. */
+  /** La taille du groupe pour chaque affinité, le joueur lui-même compris. */
   club: number;
   nation: number;
   championnat: number;
+  /** Celle qui a donné les points — pour que l'écran puisse dire POURQUOI. */
+  meilleure: Affinite | null;
 }
 
 export interface CollectifEquipe {
-  /** De 0 à 100 : la moyenne du XV. */
+  /** De 0 à 100 : la moyenne du XV de départ. */
   total: number;
   parCarte: Record<string, AffiniteCarte>;
 }
 
-const memeClub = (a: CarteCarriere, b: CarteCarriere) => Boolean(a.clubReel) && a.clubReel === b.clubReel;
-const memeNation = (a: CarteCarriere, b: CarteCarriere) => Boolean(a.nation) && a.nation === b.nation;
-const memeChampionnat = (a: CarteCarriere, b: CarteCarriere) => Boolean(a.championnat) && a.championnat === b.championnat;
-
-function uniteDe(index: number): readonly number[] {
-  return UNITES.find((u) => u.includes(index)) ?? [];
+/** Ce que vaut un groupe de cette taille pour cette affinité. */
+function niveau(affinite: Affinite, taille: number): number {
+  for (const [seuil, points] of PALIERS[affinite]) if (taille >= seuil) return points;
+  return 0;
 }
 
 /**
  * Le collectif d'une feuille de match.
  *
- * ⚠️ L'UNITÉ SE COMPTE EN PROPORTION, PAS EN SOMME. Une première ligne a deux
- * partenaires, une charnière un seul : à sommer les liens, le pilier d'une
- * équipe entièrement toulousaine sortait à 10 sur 10 et son deuxième ligne à 6,
- * pour exactement le même travail. On mesure donc ce que l'unité réalise SUR CE
- * QU'ELLE POURRAIT réaliser.
- *
- * ⚠️ LES REMPLAÇANTS COMPTENT, MAIS MOINS. Ils ne sont pas encore dans la
- * machine : pas d'unité, donc pas de lien fort — seulement ce que leur donne le
- * reste de la feuille, soit 4 sur 10 au mieux. C'est aussi ce qui évite qu'on
- * garnisse le banc d'un même club pour gonfler le total : **le total d'équipe
- * ne compte que le XV de départ.**
+ * ⚠️ ON NE COMPTE QUE LES TITULAIRES, des deux côtés du calcul : le banc n'est
+ * ni servi ni compté comme partenaire. Une carte du banc n'apparaît donc PAS
+ * dans `parCarte` — et l'appelant doit lire cette absence comme « aucun effet »,
+ * jamais comme « zéro point » : zéro point vaut −1 de note.
  */
 export function collectifCarriere(
   cartes: readonly CarteCarriere[],
-  composition: Pick<CompositionManager, 'titulaires' | 'remplacants'>,
+  composition: Pick<CompositionManager, 'titulaires'>,
 ): CollectifEquipe {
   const parId = new Map(cartes.map((c) => [c.id, c]));
-  const titulaires = composition.titulaires.map((id) => parId.get(id));
-  const remplacants = composition.remplacants.map((id) => parId.get(id));
-  const parCarte: Record<string, AffiniteCarte> = {};
+  const titulaires = composition.titulaires
+    .map((id) => parId.get(id))
+    .filter((c): c is CarteCarriere => Boolean(c));
 
-  const affinite = (carte: CarteCarriere, index: number): AffiniteCarte => {
-    const unite = index >= 0 ? uniteDe(index) : [];
-    const partenaires = Math.max(0, unite.length - 1);
-    let club = 0;
-    let nation = 0;
-    let championnat = 0;
-    let dansUnite = 0;
-    let ailleurs = 0;
-    for (const [autreIndex, autre] of titulaires.entries()) {
-      if (!autre || autre.id === carte.id) continue;
-      const ensemble = unite.includes(autreIndex);
-      const bareme = ensemble ? DANS_UNITE : AILLEURS;
-      // Un coéquipier ne compte qu'UNE fois, par son lien le plus fort : sans
-      // ça, un joueur du même club ET du même championnat compterait double, et
-      // le championnat n'ajouterait qu'un bruit proportionnel au club.
-      const points = memeClub(carte, autre) ? bareme.club
-        : memeNation(carte, autre) ? bareme.nation
-          : memeChampionnat(carte, autre) ? bareme.championnat : 0;
-      if (!points) continue;
-      if (memeClub(carte, autre)) club += points;
-      else if (memeNation(carte, autre)) nation += points;
-      else championnat += points;
-      if (ensemble) dansUnite += points; else ailleurs += points;
+  // Les groupes du XV : combien de titulaires portent ce club, cette nation, ce
+  // championnat. Une valeur vide (carte sans club réel connu) ne fait pas
+  // groupe — sinon tous les inconnus se reconnaîtraient entre eux.
+  const compter = (cle: (c: CarteCarriere) => string | undefined) => {
+    const tailles = new Map<string, number>();
+    for (const c of titulaires) {
+      const valeur = cle(c);
+      if (valeur) tailles.set(valeur, (tailles.get(valeur) ?? 0) + 1);
     }
-    const partUnite = partenaires
-      ? (dansUnite / (partenaires * DANS_UNITE.club)) * PART_UNITE
-      : 0;
-    const points = Math.max(0, Math.min(COLLECTIF_MAX, partUnite + Math.min(PART_AILLEURS, ailleurs)));
-    return { points: Math.round(points * 10) / 10, club, nation, championnat };
+    return (c: CarteCarriere) => {
+      const valeur = cle(c);
+      return valeur ? tailles.get(valeur) ?? 0 : 0;
+    };
   };
+  const tailleClub = compter((c) => c.clubReel);
+  const tailleNation = compter((c) => c.nation);
+  const tailleChampionnat = compter((c) => c.championnat);
 
-  for (const [index, carte] of titulaires.entries()) if (carte) parCarte[carte.id] = affinite(carte, index);
-  for (const carte of remplacants) if (carte && !parCarte[carte.id]) parCarte[carte.id] = affinite(carte, -1);
+  const parCarte: Record<string, AffiniteCarte> = {};
+  for (const carte of titulaires) {
+    const club = tailleClub(carte);
+    const nation = tailleNation(carte);
+    const championnat = tailleChampionnat(carte);
+    // ⚠️ LA MEILLEURE, PAS LA SOMME. Un Toulousain français du Top 14 remplit
+    // les trois cases ; les additionner ferait payer trois fois la même
+    // évidence, et le club — le seul lien qu'on construise vraiment — se
+    // noierait dans deux affinités qu'on a sans rien faire.
+    const scores: readonly (readonly [Affinite, number])[] = [
+      ['club', niveau('club', club)],
+      ['nation', niveau('nation', nation)],
+      ['championnat', niveau('championnat', championnat)],
+    ];
+    let meilleure: Affinite | null = null;
+    let points = 0;
+    for (const [nom, valeur] of scores) if (valeur > points) { points = valeur; meilleure = nom; }
+    parCarte[carte.id] = { points, club, nation, championnat, meilleure };
+  }
 
-  const presents = titulaires.filter(Boolean) as CarteCarriere[];
-  const total = presents.length
-    ? Math.round((presents.reduce((somme, c) => somme + parCarte[c.id].points, 0) / presents.length) * (100 / COLLECTIF_MAX))
+  const total = titulaires.length
+    ? Math.round((titulaires.reduce((somme, c) => somme + parCarte[c.id].points, 0) / titulaires.length) * (100 / COLLECTIF_MAX))
     : 0;
   return { total, parCarte };
 }
@@ -151,10 +145,11 @@ export function collectifCarriere(
  * qu'un bonus qu'on prend quand il tombe — jamais une contrainte qui fait
  * hésiter entre le meilleur joueur et celui qui parle la même langue que sa
  * charnière. Elle reste à −1 parce que le mode distribue des cartes au hasard :
- * une dotation de trente licenciés de Régionale 3 n'a aucun collectif au
- * départ, et il ne s'agit pas de punir un joueur pour ce que les packs lui ont
- * donné. L'ancien barème allait de 0 à +3 ; la moyenne d'un XV ordinaire bouge
- * donc à peine, et un XV construit gagne un point de note complet.
+ * on ne punit pas un manager pour ce que les packs lui ont donné.
+ *
+ * ⚠️ ELLE NE S'APPLIQUE PAS AU BANC. Un remplaçant n'a pas d'entrée dans
+ * `parCarte` : l'appelant doit alors laisser sa note tranquille, et surtout pas
+ * appeler cette fonction avec 0.
  */
 export function bonusCollectif(points: number): number {
   const borne = Math.max(0, Math.min(COLLECTIF_MAX, points));

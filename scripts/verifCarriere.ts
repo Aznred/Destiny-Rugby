@@ -894,49 +894,96 @@ titre('12. LE COLLECTIF');
 // ═══════════════════════════════════════════════════════════════════════════
 {
   const catalogue = catalogueMondialCarriere();
-  const feuille = (sources: typeof catalogue) => {
+  const feuille = (sources: readonly (typeof catalogue)[number][]) => {
     const cartes = sources.slice(0, 23).map((source, i) => carteDepuisSource(source, 'ligue', 'club', 1 + i));
     const composition = compositionManagerParDefaut(cartes.map(coequipierDepuisCarte));
     return { cartes, composition, collectif: collectifCarriere(cartes, composition) };
   };
+  const grouper = (cle: (s: (typeof catalogue)[number]) => string) => {
+    const m = new Map<string, (typeof catalogue)[number][]>();
+    for (const s of catalogue) { if (!m.has(cle(s))) m.set(cle(s), []); m.get(cle(s))!.push(s); }
+    return [...m].sort((a, b) => b[1].length - a[1].length)[0][1];
+  };
 
   // Un XV entièrement tiré du même club réel : le maximum.
-  const parClub = new Map<string, typeof catalogue>();
-  for (const source of catalogue) {
-    if (!parClub.has(source.clubReel)) parClub.set(source.clubReel, []);
-    parClub.get(source.clubReel)!.push(source);
-  }
-  const gros = [...parClub].sort((a, b) => b[1].length - a[1].length)[0][1];
-  const ensemble = feuille(gros);
-  dire(ensemble.collectif.total === 100, "⚠️ un XV entièrement d’un MÊME CLUB atteint le maximum",
+  const ensemble = feuille(grouper((s) => s.clubReel));
+  dire(ensemble.collectif.total === 100, '⚠️ un XV entièrement d’un MÊME CLUB atteint le maximum',
     `${ensemble.collectif.total}/100`);
+
+  // ⚠️ ET UNE MÊME NATION AUSSI, C’EST LA DEMANDE. La première version comptait
+  // les liens deux à deux en pesant l’unité quatre fois plus : un XV d’une même
+  // nation mais de quinze clubs différents sortait à 43, jugé « trop sévère »
+  // en jeu. On compte maintenant la TAILLE DU GROUPE, et tout le XV d’une même
+  // nation — ou d’un même championnat — vaut 100.
+  const clubsVus = new Set<string>();
+  const uneNation = grouper((s) => s.nation).filter((s) => {
+    if (clubsVus.has(s.clubReel)) return false;
+    clubsVus.add(s.clubReel); return true;
+  });
+  const nation = feuille(uneNation);
+  dire(nation.collectif.total === 100, '⚠️ un XV d’une MÊME NATION vaut 100, même en quinze clubs différents',
+    `${nation.collectif.total}/100 · ${new Set(nation.cartes.slice(0, 15).map((c) => c.clubReel)).size} clubs`);
+
+  const clubsVus2 = new Set<string>();
+  const unChampionnat = grouper((s) => s.championnat).filter((s) => {
+    if (clubsVus2.has(s.clubReel)) return false;
+    clubsVus2.add(s.clubReel); return true;
+  });
+  dire(feuille(unChampionnat).collectif.total === 100, 'et un XV d’un MÊME CHAMPIONNAT aussi',
+    `${feuille(unChampionnat).collectif.total}/100`);
 
   // Un XV où personne ne partage rien : le plancher.
   const nations = new Set<string>();
-  const disparate = feuille(catalogue.filter((s) => {
+  const disparate = catalogue.filter((s) => {
     if (nations.has(s.nation)) return false;
-    nations.add(s.nation);
-    return true;
-  }));
-  dire(disparate.collectif.total <= 10, "⚠️ et un XV sans aucune affinité tombe au plancher",
-    `${disparate.collectif.total}/100`);
-  dire(disparate.collectif.total < ensemble.collectif.total - 60,
+    nations.add(s.nation); return true;
+  });
+  const sansRien = feuille(disparate);
+  dire(sansRien.collectif.total <= 15, '⚠️ et un XV sans aucune affinité tombe au plancher',
+    `${sansRien.collectif.total}/100`);
+  dire(sansRien.collectif.total < ensemble.collectif.total - 60,
     'l’échelle DISCRIMINE : entre les deux, plus de soixante points',
-    `${disparate.collectif.total} contre ${ensemble.collectif.total}`);
+    `${sansRien.collectif.total} contre ${ensemble.collectif.total}`);
 
-  // ⚠️ LE BANC NE GONFLE PAS LE TOTAL. Sinon la recette serait connue en un
-  // jour : huit joueurs d’un même club sur le banc, et le XV en profite sans
-  // que personne ne joue ensemble.
-  const melange = [...disparate.cartes.slice(0, 15), ...gros.slice(0, 8).map((source, i) => carteDepuisSource(source, "ligue", "club", 100 + i))];
-  const compoMelange = { ...disparate.composition, remplacants: melange.slice(15).map((c) => c.id) };
-  dire(collectifCarriere(melange, compoMelange).total === disparate.collectif.total,
-    '⚠️ un banc d’un même club NE CHANGE PAS le collectif de l’équipe',
+  // ⚠️ L’HYBRIDE, ET C’EST LA SECONDE DEMANDE : quatre joueurs d’un même club
+  // se suffisent à eux-mêmes. On part du XV dépareillé et on ne change QUE le
+  // club réel de quelques titulaires — ni les notes, ni les postes.
+  const bloc = (n: number) => {
+    const g = feuille(disparate);
+    const ids = g.composition.titulaires.slice(0, n);
+    for (const id of ids) g.cartes.find((c) => c.id === id)!.clubReel = 'Stade Toulousain';
+    const c = collectifCarriere(g.cartes, g.composition);
+    return { points: ids.map((id) => c.parCarte[id].points), total: c.total };
+  };
+  const quatre = bloc(4);
+  dire(quatre.points.every((p) => p === 10), '⚠️ QUATRE joueurs d’un même club sont au MAXIMUM, à eux seuls',
+    `${quatre.points.join(' / ')} sur 10 · l’équipe passe de ${sansRien.collectif.total} à ${quatre.total}`);
+  dire(bloc(3).points.every((p) => p === 8) && bloc(2).points.every((p) => p === 5),
+    'à trois ils valent 8, à deux 5 — le bloc se construit, il ne se décrète pas',
+    `3 → ${bloc(3).points[0]} · 2 → ${bloc(2).points[0]}`);
+
+  // ⚠️ LE BANC NE COMPTE PAS DU TOUT, et c’est la troisième demande. Ni comme
+  // bénéficiaire (pas d’entrée, donc pas de pénalité à l’entrée en jeu), ni
+  // comme partenaire — sinon la recette serait connue en un jour : huit joueurs
+  // d’un même club sur le banc, et le XV en profite sans que personne ne joue.
+  dire(sansRien.composition.remplacants.every((id) => !sansRien.collectif.parCarte[id]),
+    '⚠️ un remplaçant n’a AUCUNE note de collectif',
+    `${sansRien.composition.remplacants.filter((id) => sansRien.collectif.parCarte[id]).length} sur ${sansRien.composition.remplacants.length} en portent une`);
+  const memeClub = grouper((s) => s.clubReel);
+  // Le XV reste RIGOUREUSEMENT le meme : on ne remplace que le banc.
+  const melange = [
+    ...sansRien.composition.titulaires.map((id) => sansRien.cartes.find((c) => c.id === id)!),
+    ...memeClub.slice(0, 8).map((source, i) => carteDepuisSource(source, 'ligue', 'club', 100 + i)),
+  ];
+  const compoMelange = { ...sansRien.composition, remplacants: melange.slice(15).map((c) => c.id) };
+  dire(collectifCarriere(melange, compoMelange).total === sansRien.collectif.total,
+    '⚠️ un banc entier d’un même club NE CHANGE RIEN au collectif',
     `${collectifCarriere(melange, compoMelange).total}/100`);
 
   // Le barème de note, et ses deux bouts.
-  dire(bonusCollectif(0) === -1 && bonusCollectif(10) === 3, "le bonus de note va de −1 à +3",
+  dire(bonusCollectif(0) === -1 && bonusCollectif(10) === 3, 'le bonus de note va de −1 à +3',
     `${bonusCollectif(0)} → +${bonusCollectif(10)}`);
-  dire(bonusCollectif(-50) === -1 && bonusCollectif(9999) === 3, "et il reste borné hors de l’échelle");
+  dire(bonusCollectif(-50) === -1 && bonusCollectif(9999) === 3, 'et il reste borné hors de l’échelle');
 
   // ⚠️ L’ÉCRAN ET LE SERVEUR PARTAGENT LA FORMULE. Le collectif affiché à la
   // composition doit être celui qui entre sur le terrain : c’est la raison
@@ -952,15 +999,27 @@ titre('12. LE COLLECTIF');
     const jouee = e.rencontres.find((r) => r.id === rencontre.id)!;
     const cote = jouee.match?.equipes?.domicile.clubId === club.id ? 'domicile' : 'exterieur';
     const gelee = jouee.match?.equipes?.[cote];
+    const note = (c: (typeof cartesClub)[number], bonus: number) =>
+      Math.round(Math.max(20, Math.min(99, c.note + bonus) - Math.round(c.fatigue * 0.12)));
+
     const titulaire = club.composition.titulaires[0];
     const carte = cartesClub.find((c) => c.id === titulaire)!;
     const aligne = gelee?.feuille.find((j) => j.id === titulaire);
     const bonus = bonusCollectif(attendu.parCarte[titulaire]?.points ?? 0);
-    const attenduNote = Math.max(20, Math.min(99, carte.note + bonus) - Math.round(carte.fatigue * 0.12));
     // La feuille gelée arrondit la note à l’entier : on compare donc à l’arrondi.
-    dire(Boolean(aligne) && aligne?.note === Math.round(attenduNote),
+    dire(Boolean(aligne) && aligne?.note === note(carte, bonus),
       '⚠️ la note qui entre sur le terrain porte EXACTEMENT le bonus annoncé',
-      `${carte.note} → ${aligne?.note} (collectif ${bonus >= 0 ? "+" : ""}${bonus})`);
+      `${carte.note} → ${aligne?.note} (collectif ${bonus >= 0 ? '+' : ''}${bonus})`);
+
+    // ⚠️ ET LE REMPLAÇANT N’EST PAS PUNI POUR AVOIR ÉTÉ SUR LE BANC. Lire son
+    // absence de `parCarte` comme « zéro point » lui coûterait −1 de note à la
+    // 60ᵉ minute, pour une règle à laquelle il n’a pas participé.
+    const remplacant = club.composition.remplacants[0];
+    const carteBanc = cartesClub.find((c) => c.id === remplacant)!;
+    const surLeBanc = gelee?.feuille.find((j) => j.id === remplacant);
+    dire(Boolean(surLeBanc) && surLeBanc?.note === note(carteBanc, 0),
+      '⚠️ et un remplaçant entre avec sa note INTACTE, ni bonus ni pénalité',
+      `${carteBanc.note} → ${surLeBanc?.note}`);
   }
 }
 

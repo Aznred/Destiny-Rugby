@@ -434,7 +434,11 @@ function lancerRencontre(etat: EtatCarriereEnLigne, r: RencontreCarriere, mainte
     // un manager qui compose pour 78 de collectif et une équipe qui entre sur
     // le terrain avec autre chose.
     const affinites = collectifCarriere(cartes, club.composition).parCarte;
-    const collectif = (c: CarteCarriere) => bonusCollectif(affinites[c.id]?.points ?? 0);
+    // ⚠️ UNE CARTE ABSENTE DE `parCarte` N'EST PAS UNE CARTE À ZÉRO POINT. Le
+    // banc et la réserve ne sont pas comptés dans le collectif ; leur passer 0
+    // leur infligerait la pénalité de −1 pour n'avoir pas été alignés, et un
+    // remplaçant entrerait à la 60ᵉ minute avec une note rabotée sans raison.
+    const collectif = (c: CarteCarriere) => (affinites[c.id] ? bonusCollectif(affinites[c.id].points) : 0);
     return { clubId: id, nom: club.nom, effectif: cartes.map(c => ({ ...coequipierDepuisCarte(c), note: Math.max(20, Math.min(99, c.note + collectif(c)) - Math.round(c.fatigue * .12)) })), composition: club.composition, strategie: club.strategie };
   };
   r.match = creerMatchEnLigne({ id: r.id, domicile: equipe(r.domicile), exterieur: equipe(r.exterieur), debut: maintenant, graine: Math.floor(hasard(`${graine}:${r.id}`)() * 2 ** 31) });
