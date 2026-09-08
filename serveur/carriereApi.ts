@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, vueCarriere } from '../src/lib/ligue/carriere.js';
+import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
 
@@ -82,7 +83,33 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
         throw new ErreurHttp(404, 'Ligue introuvable.');
       }
       if (await stockage.dejaTraitee(id, compte, requete)) return ligne.etat;
-      const suivant = operation(ligne.etat, Date.now(), randomBytes(24).toString('hex'));
+      const maintenant = Date.now();
+      const suivant = operation(ligne.etat, maintenant, randomBytes(24).toString('hex'));
+      /**
+       * ⚠️ UN ÉTAT IDENTIQUE NE SE RÉÉCRIT PAS — et c'était la plus grosse fuite
+       * du mode. `avancerCarriere` incrémente `version` À CHAQUE APPEL, même
+       * quand il n'a rien trouvé à faire : un simple sondage de lecture
+       * renvoyait donc les 300 à 400 Ko de l'état vers la base, six fois par
+       * minute et par onglet ouvert. Lecture PLUS écriture, pour rien.
+       *
+       * On compare donc l'état produit à celui qu'on a lu, en neutralisant le
+       * compteur de version — le seul champ qui bouge toujours. Identiques : on
+       * garde l'ancien, on n'écrit pas, et la version reste stable. C'est ce qui
+       * rend la lecture conditionnelle possible plus bas : une version qui
+       * s'incrémente toute seule ne dit plus rien à personne.
+       *
+       * ⚠️ ON REPOUSSE QUAND MÊME L'ÉCHÉANCE. Une date peut passer sans rien
+       * changer (`echeanceCarriere` est volontairement large et retient parfois
+       * une date qui n'était l'échéance de rien). Sans ce rafraîchissement,
+       * l'échéance resterait éternellement dans le passé et chaque sondage
+       * relirait l'état entier — exactement ce qu'on cherche à éviter.
+       */
+      const memeEtat = JSON.stringify({ ...suivant, version: ligne.etat.version }) === JSON.stringify(ligne.etat);
+      if (memeEtat) {
+        const echeance = echeanceLigue(ligne.etat, maintenant);
+        if (ligne.echeance !== echeance) await stockage.rafraichirEcheance(id, echeance).catch(() => {});
+        return ligne.etat;
+      }
       const maj: LigueStockee = { ...ligne, etat: suivant, comptes: comptesEtat(suivant) };
       if (await stockage.comparerEtEcrire(maj, ligne.version, compte, requete)) return suivant;
     }
@@ -201,13 +228,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
         const id = url.searchParams.get('ligue');
         if (!id) {
           const ligues = await stockage.ligues(compte.id);
-          return res.status(200).json({ compte: publicCompte(compte), ligues: ligues.map(({ etat: e }) => {
-            const club = e.clubs.find(c => c.compteId === compte.id)!;
-            return {
-              id: e.id, nom: e.nom, etat: e.phase, clubNom: club.nom, ovas: club.ovas,
-              clubEmbleme: club.embleme, logo: e.logo,
-            };
-          }) });
+          // ⚠️ LE RÉSUMÉ ARRIVE DÉJÀ TAILLÉ. `stockage.ligues` rendait l'état
+          // complet de chaque ligue pour qu'on en extraie ces sept champs ici :
+          // 400 Ko traversaient le réseau par ligue et par ouverture d'écran.
+          // C'est Postgres qui les extrait maintenant.
+          return res.status(200).json({ compte: publicCompte(compte), ligues: ligues.map(l => ({
+            id: l.id, nom: l.nom, etat: l.phase, clubNom: l.clubNom, ovas: l.ovas,
+            clubEmbleme: l.clubEmbleme, logo: l.logo,
+          })) });
         }
         if (!idValide(id)) throw new ErreurHttp(404, 'Ligue introuvable.');
         if (url.searchParams.get('collection') === '1') {
@@ -217,11 +245,38 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
           return res.status(200).json(collectionCarriere(ligne.etat, compte.id, url.searchParams));
         }
 
+        /**
+         * ⚠️ LE SONDAGE QUI NE LIT RIEN. C'est ici que se joue l'essentiel du
+         * transfert : l'écran redemande la ligue toutes les dix secondes, et
+         * neuf fois sur dix rien n'a bougé. On lisait quand même les 300 à
+         * 400 Ko de l'état pour s'en apercevoir.
+         *
+         * Le client annonce la version qu'il détient (`&v=`). Deux octets de
+         * plus dans l'URL suffisent à répondre par un 304 : version identique
+         * ET aucune échéance passée, donc rien n'a pu changer ni de la main
+         * d'un manager (la version aurait bougé) ni toute seule (l'échéance
+         * serait derrière nous).
+         *
+         * ⚠️ SANS `v`, ON RÉPOND COMME AVANT. Un client d'une version
+         * antérieure, un onglet resté ouvert, un appel à la main : tous
+         * continuent de recevoir la vue complète. L'optimisation ne peut pas
+         * casser ce qui ne la connaît pas.
+         */
+        const connue = Number(url.searchParams.get('v'));
+        if (Number.isInteger(connue) && connue > 0) {
+          const entete = await stockage.entete(id);
+          if (!entete || !entete.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+          if (entete.version === connue && entete.echeance !== null && maintenant < entete.echeance) {
+            return res.status(304).end();
+          }
+        }
         const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}`, (e, n, g) => actualiserCarriere(e, n, g));
         return res.status(200).json(vueCarriere(e, compte.id));
       }
       if (action === 'creer') {
-        if ((await stockage.ligues(compte.id)).length >= 20) throw new ErreurHttp(400, 'Vous participez déjà à 20 ligues.');
+        // ⚠️ COMPTER, C'EST COMPTER. Ce plafond lisait la liste entière — donc,
+        // avant, l'état complet de vingt ligues — pour en prendre la longueur.
+        if (await stockage.nombreLigues(compte.id) >= 20) throw new ErreurHttp(400, 'Vous participez déjà à 20 ligues.');
         if (!Number.isInteger(corps.rythme) || Number(corps.rythme) < 1 || Number(corps.rythme) > 7) throw new ErreurHttp(400, 'Choisissez entre 1 et 7 matchs par semaine.');
         if (!Number.isInteger(corps.maxClubs) || Number(corps.maxClubs) < 2 || Number(corps.maxClubs) > 64) throw new ErreurHttp(400, 'Une ligue accueille de 2 à 64 clubs.');
         for (let essai = 0; essai < 3; essai++) {

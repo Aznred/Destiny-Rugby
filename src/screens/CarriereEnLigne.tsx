@@ -38,7 +38,7 @@ import type { EtatDuJoueur } from '../lib/carteJoueur';
 import type { CarteCarriere, CommandeCarriere, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
 import type { StrategieEnLigne } from '../lib/ligue/matchCarriere';
 import {
-  chargerSessionCarriere, chargerLigueCarriere, identifierCarriere, deconnecterCarriere,
+  chargerSessionCarriere, chargerLigueCarriere, identifierCarriere, deconnecterCarriere, INCHANGE,
   creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, chargerEmblemesCarriere, ErreurCarriere,
 } from '../lib/carriereEnLigneClient';
 import type { IdentiteLigue } from '../lib/carriereEnLigneClient';
@@ -489,31 +489,86 @@ export function CarriereEnLigne() {
     }
   }, []);
 
-  // Un seul appel à la fois. Une réponse ancienne ne peut pas annuler une action récente.
+  /**
+   * Un seul appel à la fois. Une réponse ancienne ne peut pas annuler une
+   * action récente.
+   *
+   * ⚠️ ET CHAQUE SONDAGE COÛTE UNE LECTURE COMPLÈTE DE LA LIGUE. Le serveur
+   * relit l'état entier — 300 à 400 Ko pour une ligue à huit clubs — à chaque
+   * passage. À six sondages par minute, un seul onglet laissé ouvert consomme
+   * une centaine de mégaoctets par heure côté base ; le quota de transfert Neon
+   * (5 Go par mois) est parti en huit jours, dont 6,1 Go consommés.
+   *
+   * Trois freins, aucun visible en jeu :
+   *
+   *   • ONGLET CACHÉ, AUCUN SONDAGE. Un onglet en arrière-plan n'affiche rien à
+   *     personne. Il repart d'un coup au retour, donc on ne voit jamais de
+   *     retard — c'est même plus frais qu'avant, où l'on tombait sur la réponse
+   *     d'un sondage vieux de dix secondes.
+   *   • RIEN NE BOUGE, ON ESPACE. Après une minute sans le moindre changement
+   *     de version, on passe à trente secondes. La première réponse différente
+   *     ramène aussitôt à dix.
+   *   • LE DIRECT NE CHANGE PAS. Deux secondes pendant un match, dix secondes
+   *     dès qu'une rencontre s'ouvre dans les cinq minutes : ce sont les seuls
+   *     moments où la fraîcheur se voit, et ils ne sont pas touchés.
+   */
   useEffect(() => {
     if (!ligueId) return;
     let actif = true;
     let minuterie: ReturnType<typeof setTimeout>;
+    let inchanges = 0;
     const controleur = new AbortController();
+
+    const prochainPas = () => {
+      const vue = derniereVue.current;
+      if (vue?.rencontres.some(r => r.match && !r.match.termine)) return 2000;
+      const bientot = Date.now() + 5 * 60_000;
+      if (vue?.rencontres.some(r => !r.resultat && Date.parse(r.ouvre) <= bientot && Date.parse(r.ferme) >= Date.now())) return 10_000;
+      return inchanges >= 6 ? 30_000 : 10_000;
+    };
+    const programmer = () => {
+      clearTimeout(minuterie);
+      if (!actif || document.hidden) return;
+      minuterie = setTimeout(() => { void actualiser(); }, prochainPas());
+    };
+
     const actualiser = async () => {
       const version = versionRequete.current;
       try {
-        const suivante = await chargerLigueCarriere(ligueId, controleur.signal);
-        if (actif && version === versionRequete.current) {
+        // On annonce la version qu'on tient : si elle est encore bonne, le
+        // serveur répond « inchangé » sans avoir lu l'état de la ligue.
+        const connue = derniereVue.current?.id === ligueId ? derniereVue.current.version : undefined;
+        const suivante = await chargerLigueCarriere(ligueId, controleur.signal, connue);
+        if (suivante === INCHANGE) { inchanges++; }
+        else if (actif && version === versionRequete.current) {
           setVue(avant => {
             if (avant && avant.id === suivante.id && suivante.version < avant.version) return avant;
+            // Une version identique, c'est un sondage pour rien : on les compte
+            // pour savoir quand lever le pied.
+            if (avant && avant.id === suivante.id && avant.version === suivante.version) inchanges++;
+            else inchanges = 0;
             comparerPourRappels(avant, suivante);
             return suivante;
           });
         }
       } catch (e) { if (actif) setErreur(messageErreur(e)); }
-      if (actif) {
-        const direct = derniereVue.current?.rencontres.some(r => r.match && !r.match.termine);
-        minuterie = setTimeout(() => { void actualiser(); }, direct ? 2000 : 10000);
-      }
+      programmer();
     };
+
+    // Au retour sur l'onglet, on ne PROGRAMME pas : on rafraîchit tout de suite,
+    // sinon le joueur regarderait jusqu'à trente secondes un écran d'avant.
+    const surVisibilite = () => {
+      if (document.hidden) { clearTimeout(minuterie); return; }
+      inchanges = 0;
+      void actualiser();
+    };
+    document.addEventListener('visibilitychange', surVisibilite);
+
     void actualiser();
-    return () => { actif = false; controleur.abort(); clearTimeout(minuterie); };
+    return () => {
+      actif = false; controleur.abort(); clearTimeout(minuterie);
+      document.removeEventListener('visibilitychange', surVisibilite);
+    };
   }, [ligueId, comparerPourRappels]);
 
 

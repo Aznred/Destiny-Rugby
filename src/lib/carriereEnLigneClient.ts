@@ -13,6 +13,13 @@ export class ErreurCarriere extends Error {
   constructor(message: string, statut: number) { super(message); this.statut = statut; }
 }
 
+/**
+ * Le jeton que rend une lecture conditionnelle quand rien n'a bougé. On le
+ * reconnaît par identité (`===`), jamais par un champ : aucune vue de ligue
+ * ne peut lui ressembler par accident.
+ */
+export const INCHANGE = Symbol('vue inchangée') as unknown as never;
+
 /** Les cookies de session restent HttpOnly. Le client ne conserve aucun portefeuille. */
 async function requete<T>(corps?: unknown, ligue?: string, signal?: AbortSignal, chemin?: string): Promise<T> {
   let reponse: Response;
@@ -27,6 +34,15 @@ async function requete<T>(corps?: unknown, ligue?: string, signal?: AbortSignal,
     if (signal?.aborted) throw erreur;
     throw new ErreurCarriere('Le serveur de carrière en ligne est momentanément inaccessible. Vérifie ta connexion puis réessaie.', 0);
   }
+  /**
+   * ⚠️ 304 N'EST PAS UNE ERREUR, C'EST UNE BONNE NOUVELLE : la vue qu'on a
+   * déjà est la bonne. Le serveur répond ça quand la version annoncée est
+   * encore à jour et qu'aucune échéance n'est passée — il n'a alors PAS lu
+   * l'état de la ligue, et c'est tout l'intérêt. Le corps est vide : le
+   * traiter comme une réponse illisible aurait affiché une erreur au joueur
+   * à chaque sondage réussi.
+   */
+  if (reponse.status === 304) return INCHANGE as T;
   const donnees = await reponse.json().catch(() => null) as (T & { erreur?: string; message?: string }) | null;
   if (!reponse.ok || !donnees) {
     throw new ErreurCarriere(donnees?.erreur ?? donnees?.message ??
@@ -49,7 +65,15 @@ export const chargerEmblemesCarriere = () =>
     .catch((e) => { emblemesEnCache = undefined; throw e; }));
 
 export const chargerSessionCarriere = (signal?: AbortSignal) => requete<SessionCarriere>(undefined, undefined, signal);
-export const chargerLigueCarriere = (id: string, signal?: AbortSignal) => requete<VueCarriereEnLigne>(undefined, id, signal);
+/**
+ * ⚠️ ON ANNONCE LA VERSION QU'ON DÉTIENT. Deux octets dans l'URL, et le
+ * serveur répond 304 sans lire les 300 à 400 Ko de l'état quand rien n'a
+ * changé. Sans `version`, on reçoit la vue complète comme avant — c'est le
+ * cas du tout premier chargement, qui n'a rien à comparer.
+ */
+export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?: number) =>
+  requete<VueCarriereEnLigne>(undefined, undefined, signal,
+    `?ligue=${encodeURIComponent(id)}${version ? `&v=${version}` : ''}`);
 export const identifierCarriere = (action: 'inscription' | 'connexion', identifiant: string, motDePasse: string, pseudo: string) =>
   requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo });
 export const deconnecterCarriere = () => requete<{ ok: boolean }>({ action: 'deconnexion' });

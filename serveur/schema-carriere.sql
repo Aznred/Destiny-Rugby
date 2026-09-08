@@ -13,6 +13,13 @@ create table if not exists carriere_ligues (
   cree_le timestamptz not null default now()
 );
 create index if not exists carriere_ligues_comptes_idx on carriere_ligues using gin(comptes);
+-- ⚠️ LA PROCHAINE DATE À LAQUELLE LA LIGUE PEUT BOUGER TOUTE SEULE. Sans elle,
+-- répondre « rien n'a changé » à un sondage obligeait à relire l'état entier
+-- (300 à 400 Ko) rien que pour le constater — le quota de transfert Neon est
+-- parti en huit jours à ce rythme. Avec elle, une lecture conditionnelle tient
+-- en trois colonnes de quelques octets. NULL veut dire « on ne sait pas » : la
+-- lecture retombe alors sur le comportement d'avant, jamais sur une ligue figée.
+alter table carriere_ligues add column if not exists echeance timestamptz;
 create table if not exists carriere_commandes (
   ligue uuid not null references carriere_ligues(id),
   compte text not null,

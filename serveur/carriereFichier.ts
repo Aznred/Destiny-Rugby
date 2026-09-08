@@ -4,6 +4,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
+import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 
 interface BaseLocale {
   comptes: CompteStocke[];
@@ -22,6 +23,9 @@ export function stockageFichier(fichier: string): StockageCarriere {
     renameSync(`${fichier}.tmp`, fichier);
   };
   const copie = <T>(v: T): T => structuredClone(v);
+  // L'échéance ne vaut que pour ce processus : le serveur de développement
+  // redémarre souvent, et une échéance perdue coûte une relecture, rien de plus.
+  const echeances: Record<string, number> = {};
   const cleRecu = (l: string, c: string, r: string) => JSON.stringify([l, c, r]);
   return {
     async compteParIdentifiant(i) { return copie(base.comptes.find(c => c.identifiant === i) ?? null); },
@@ -42,8 +46,28 @@ export function stockageFichier(fichier: string): StockageCarriere {
       // Le quota est un frein opérationnel local ; les données du jeu sont persistées.
       return base.debits[cle].nombre <= maximum;
     },
-    async ligues(compte) { return copie(base.ligues.filter(l => l.comptes.includes(compte))); },
-    async ligue(id) { return copie(base.ligues.find(l => l.id === id) ?? null); },
+    // Le serveur de développement rend le MÊME résumé que Neon : sans ça, un
+    // champ manquant ne se verrait qu'en production.
+    async ligues(compte) {
+      return base.ligues.filter(l => l.comptes.includes(compte)).map(l => {
+        const club = l.etat.clubs.find(c => c.compteId === compte);
+        return {
+          id: l.etat.id, nom: l.etat.nom, phase: l.etat.phase, logo: l.etat.logo,
+          clubNom: club?.nom ?? '', ovas: club?.ovas ?? 0, clubEmbleme: club?.embleme,
+        };
+      });
+    },
+    async nombreLigues(compte) { return base.ligues.filter(l => l.comptes.includes(compte)).length; },
+    async ligue(id) {
+      const l = base.ligues.find(x => x.id === id);
+      return l ? { ...copie(l), echeance: echeances[id] ?? null } : null;
+    },
+    async entete(id) {
+      const l = base.ligues.find(x => x.id === id);
+      // La version de l'ÉTAT, comme Neon : c'est celle que l'écran connaît.
+      return l ? { version: l.etat.version, comptes: [...l.comptes], echeance: echeances[id] ?? null } : null;
+    },
+    async rafraichirEcheance(id, echeance) { echeances[id] = echeance; },
     async ligueParCode(code) { return copie(base.ligues.find(l => l.code === code) ?? null); },
     async creerLigue(l) {
       if (base.ligues.some(x => x.id === l.id || x.code === l.code)) return false;
@@ -55,6 +79,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
       const cle = cleRecu(l.id, compte, requete);
       if (index < 0 || base.ligues[index].version !== version || base.recus[cle]) return false;
       base.ligues[index] = copie({ ...l, version: version + 1 });
+      echeances[l.id] = echeanceLigue(l.etat, Date.now());
       base.recus[cle] = true; sauver(); return true;
     },
     async actives() { return base.ligues.filter(l => l.etat.phase === 'saison').map(l => l.id); },
