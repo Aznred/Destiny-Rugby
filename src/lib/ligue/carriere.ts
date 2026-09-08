@@ -7,7 +7,8 @@ import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
 import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
-import { valeurVenteRapide } from './venteRapideCarriere.js';
+import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
+import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
 
 const HEURE = 3_600_000;
 const JOUR = 24 * HEURE;
@@ -427,8 +428,13 @@ function lancerRencontre(etat: EtatCarriereEnLigne, r: RencontreCarriere, mainte
   const equipe = (id: string) => {
     const club = clubParId(etat, id); ajusterComposition(etat, club, maintenant);
     const cartes = cartesClub(etat, id).filter(c => !c.blesseJusqua || Date.parse(c.blesseJusqua) <= maintenant);
-    const titulaires = cartes.filter(c => club.composition.titulaires.includes(c.id));
-    const collectif = (c: CarteCarriere) => Math.min(3, titulaires.filter(j => j.id !== c.id && ((c.clubReel && j.clubReel === c.clubReel) || (c.nation && j.nation === c.nation))).length * .3);
+    // ⚠️ LE COLLECTIF EST CALCULÉ LÀ OÙ LE MATCH SE PRÉPARE, et par le MÊME
+    // module que celui qui l'affiche à l'écran de composition
+    // (`collectifCarriere`). Deux formules donneraient un jour deux vérités :
+    // un manager qui compose pour 78 de collectif et une équipe qui entre sur
+    // le terrain avec autre chose.
+    const affinites = collectifCarriere(cartes, club.composition).parCarte;
+    const collectif = (c: CarteCarriere) => bonusCollectif(affinites[c.id]?.points ?? 0);
     return { clubId: id, nom: club.nom, effectif: cartes.map(c => ({ ...coequipierDepuisCarte(c), note: Math.max(20, Math.min(99, c.note + collectif(c)) - Math.round(c.fatigue * .12)) })), composition: club.composition, strategie: club.strategie };
   };
   r.match = creerMatchEnLigne({ id: r.id, domicile: equipe(r.domicile), exterieur: equipe(r.exterieur), debut: maintenant, graine: Math.floor(hasard(`${graine}:${r.id}`)() * 2 ** 31) });
@@ -652,7 +658,9 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       case 'venteRapideGroupee': {
         clubLibre(nouveau, club.id);
         const ids = commande.type === 'venteRapide' ? [commande.carteId] : commande.carteIds;
-        listeIds(ids, 30); exiger(ids.length > 0, 'Choisissez au moins une carte à vendre.');
+        exiger(Array.isArray(ids) && ids.length > 0, 'Choisissez au moins une carte à vendre.');
+        exiger(ids.length <= LOT_VENTE_RAPIDE_MAX, `Vends au maximum ${LOT_VENTE_RAPIDE_MAX} joueurs à la fois.`);
+        listeIds(ids, LOT_VENTE_RAPIDE_MAX);
         const lot = ids.map(id => carteParId(nouveau, id));
         for (const carte of lot) exiger(carte.proprietaire === club.id && !carte.verrou, `${carte.nom} ne peut pas être vendu rapidement.`);
         verifierHorsFeuille(club, ids); verifierDepart(nouveau, club.id, ids);

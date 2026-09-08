@@ -23,18 +23,19 @@ import {
   agirCarriere, avancerCarriere, classementCarriere, creerCarriere, vueCarriere, DOTATION_MAX,
   PACKS_GRATUITS_PAR_JOUR, poidsPackQuotidien, } from '../src/lib/ligue/carriere';
 import type { EtatCarriereEnLigne, RareteCarriere } from '../src/lib/ligue/typesCarriere';
-import { valeurVenteRapide, plafondVenteRapide } from '../src/lib/ligue/venteRapideCarriere';
+import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide, plafondVenteRapide } from '../src/lib/ligue/venteRapideCarriere';
 import {
   avancerMatchEnLigne, cibleDeScore, commanderMatchEnLigne, conclureMatchEnLigne,
   creerMatchEnLigne, decisionIA, feuilleGeleeEnLigne, forceFeuille, MS_PAR_MINUTE, STRATEGIE_EN_LIGNE_DEFAUT,
   strategieValide, impactStrategie, tactiqueDepuisStrategie, mentaliteAppliquee,
 } from '../src/lib/ligue/matchCarriere';
 import {
-  catalogueMondialCarriere, catalogueParRarete, coequipierDepuisCarte,
+  catalogueMondialCarriere, carteDepuisSource, catalogueParRarete, coequipierDepuisCarte,
   competitionsCarriere, dotationBronzeCarriere, emblemesCarriere, emblemeValide, PACKS_CARRIERE,
   RARETES_CARRIERE, rareteCarriere, rayonDePack, tropheesCarriere,
 } from '../src/lib/ligue/catalogueCarriere';
 import { compositionManagerParDefaut } from '../src/lib/compositionManager';
+import { collectifCarriere, bonusCollectif } from '../src/lib/ligue/collectifCarriere';
 import { codeDansLaRecherche, lienInvitation } from '../src/lib/invitationLigue';
 const nomPosteCourt = (f: string) => f.replace('demi_melee', '9').replace('demi_ouverture', '10');
 
@@ -544,6 +545,21 @@ titre('7. LE MARCHÉ ENTRE AMIS');
   dire(lot.every((c) => !e.cartes.some((x) => x.id === c.id)), 'et les trois cartes quittent la ligue ensemble');
   dire(e.transactions.filter((t) => t.nature === 'venteRapide').at(-1)!.cartes.length === 3,
     '⚠️ en UNE écriture au journal, pas trois', e.transactions.filter((t) => t.nature === 'venteRapide').at(-1)!.libelle);
+  // ⚠️ LA BORNE DU LOT EST LA MÊME DES DEUX CÔTÉS, ET ELLE SE DIT. Le serveur
+  // refusait au-delà de 30 cartes avec « Liste invalide » — un message qui ne
+  // nomme rien, sur une action que l'écran présentait comme permise : avec 59
+  // joueurs sous contrat, « Tout cocher » tombait dedans à chaque fois.
+  try {
+    agirCarriere(e, colin.compteId, {
+      type: 'venteRapideGroupee',
+      carteIds: new Array(LOT_VENTE_RAPIDE_MAX + 1).fill(0).map((_, i) => `carte-${i}`),
+    }, T0 + 7500, 'lot');
+    dire(false, 'un lot trop gros est refusé AVEC son chiffre', 'accepté !');
+  } catch (erreur) {
+    const message = erreur instanceof Error ? erreur.message : '';
+    dire(message.includes(String(LOT_VENTE_RAPIDE_MAX)), 'un lot trop gros est refusé AVEC son chiffre', message);
+  }
+
   try {
     agirCarriere(e, colin.compteId, { type: 'venteRapideGroupee', carteIds: cessibles(e, colin.id).map((c) => c.id) }, T0 + 8000, 'vr2');
     dire(false, '⚠️ un lot qui viderait l’effectif est refusé EN ENTIER', 'accepté !');
@@ -871,6 +887,81 @@ titre('11. LES GARANTIES, ET LA DOTATION DE DÉPART');
     '⚠️ et une dotation démesurée est RAMENÉE au plafond', `${nb(DOTATION_MAX)} Ovas`);
   dire(creer(-500).clubs[0].ovas === 0, 'une dotation négative devient zéro');
   dire(creer(1234).clubs[0].ovas === 1200, 'les montants sont arrondis à la centaine', '1 234 → 1 200');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+titre('12. LE COLLECTIF');
+// ═══════════════════════════════════════════════════════════════════════════
+{
+  const catalogue = catalogueMondialCarriere();
+  const feuille = (sources: typeof catalogue) => {
+    const cartes = sources.slice(0, 23).map((source, i) => carteDepuisSource(source, 'ligue', 'club', 1 + i));
+    const composition = compositionManagerParDefaut(cartes.map(coequipierDepuisCarte));
+    return { cartes, composition, collectif: collectifCarriere(cartes, composition) };
+  };
+
+  // Un XV entièrement tiré du même club réel : le maximum.
+  const parClub = new Map<string, typeof catalogue>();
+  for (const source of catalogue) {
+    if (!parClub.has(source.clubReel)) parClub.set(source.clubReel, []);
+    parClub.get(source.clubReel)!.push(source);
+  }
+  const gros = [...parClub].sort((a, b) => b[1].length - a[1].length)[0][1];
+  const ensemble = feuille(gros);
+  dire(ensemble.collectif.total === 100, "⚠️ un XV entièrement d’un MÊME CLUB atteint le maximum",
+    `${ensemble.collectif.total}/100`);
+
+  // Un XV où personne ne partage rien : le plancher.
+  const nations = new Set<string>();
+  const disparate = feuille(catalogue.filter((s) => {
+    if (nations.has(s.nation)) return false;
+    nations.add(s.nation);
+    return true;
+  }));
+  dire(disparate.collectif.total <= 10, "⚠️ et un XV sans aucune affinité tombe au plancher",
+    `${disparate.collectif.total}/100`);
+  dire(disparate.collectif.total < ensemble.collectif.total - 60,
+    'l’échelle DISCRIMINE : entre les deux, plus de soixante points',
+    `${disparate.collectif.total} contre ${ensemble.collectif.total}`);
+
+  // ⚠️ LE BANC NE GONFLE PAS LE TOTAL. Sinon la recette serait connue en un
+  // jour : huit joueurs d’un même club sur le banc, et le XV en profite sans
+  // que personne ne joue ensemble.
+  const melange = [...disparate.cartes.slice(0, 15), ...gros.slice(0, 8).map((source, i) => carteDepuisSource(source, "ligue", "club", 100 + i))];
+  const compoMelange = { ...disparate.composition, remplacants: melange.slice(15).map((c) => c.id) };
+  dire(collectifCarriere(melange, compoMelange).total === disparate.collectif.total,
+    '⚠️ un banc d’un même club NE CHANGE PAS le collectif de l’équipe',
+    `${collectifCarriere(melange, compoMelange).total}/100`);
+
+  // Le barème de note, et ses deux bouts.
+  dire(bonusCollectif(0) === -1 && bonusCollectif(10) === 3, "le bonus de note va de −1 à +3",
+    `${bonusCollectif(0)} → +${bonusCollectif(10)}`);
+  dire(bonusCollectif(-50) === -1 && bonusCollectif(9999) === 3, "et il reste borné hors de l’échelle");
+
+  // ⚠️ L’ÉCRAN ET LE SERVEUR PARTAGENT LA FORMULE. Le collectif affiché à la
+  // composition doit être celui qui entre sur le terrain : c’est la raison
+  // d’être du module partagé. La feuille GELÉE du match porte les notes telles
+  // que le moteur les a reçues, bonus de collectif compris.
+  {
+    let e = ligue(2);
+    const club = e.clubs[0];
+    const cartesClub = e.cartes.filter((c) => c.proprietaire === club.id);
+    const attendu = collectifCarriere(cartesClub, club.composition);
+    const rencontre = e.rencontres.find((r) => [r.domicile, r.exterieur].includes(club.id))!;
+    e = avancerCarriere(e, Date.parse(rencontre.ferme) + 1000, 'coup-denvoi');
+    const jouee = e.rencontres.find((r) => r.id === rencontre.id)!;
+    const cote = jouee.match?.equipes?.domicile.clubId === club.id ? 'domicile' : 'exterieur';
+    const gelee = jouee.match?.equipes?.[cote];
+    const titulaire = club.composition.titulaires[0];
+    const carte = cartesClub.find((c) => c.id === titulaire)!;
+    const aligne = gelee?.feuille.find((j) => j.id === titulaire);
+    const bonus = bonusCollectif(attendu.parCarte[titulaire]?.points ?? 0);
+    const attenduNote = Math.max(20, Math.min(99, carte.note + bonus) - Math.round(carte.fatigue * 0.12));
+    // La feuille gelée arrondit la note à l’entier : on compare donc à l’arrondi.
+    dire(Boolean(aligne) && aligne?.note === Math.round(attenduNote),
+      '⚠️ la note qui entre sur le terrain porte EXACTEMENT le bonus annoncé',
+      `${carte.note} → ${aligne?.note} (collectif ${bonus >= 0 ? "+" : ""}${bonus})`);
+  }
 }
 
 console.log(`\n  ${ko === 0 ? '✅ La carrière en ligne tient.' : `❌ ${ko} contrôle(s) en échec.`}\n`);

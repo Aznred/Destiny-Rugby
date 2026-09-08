@@ -1917,3 +1917,50 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
   .cel-compo .ct-entete .ct-secteurs > div { display: flex; align-items: center; gap: .4rem; }
   .cel-compo > .cel-consignes-repliables { padding-block: .25rem; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE COLLECTIF — ce que vaut une équipe qui se connaît
+   ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ IL SE LIT AVANT DE SE CALCULER. Le chiffre seul ne dit rien : c'est la
+   jauge qui donne l'échelle, la couleur qui donne le verdict et la phrase qui
+   donne l'envie de le faire monter. Les quatre teintes suivent les paliers de
+   `paliersCollectif` — du rouge sourd de l'équipe qui ne se connaît pas au
+   doré de celle qui joue ensemble depuis toujours. */
+.cel-collectif {
+  --teinte: var(--or-400);
+  display: flex; flex-direction: column; gap: 0.3rem;
+  min-width: 12rem; padding: 0.6rem 0.8rem;
+  border-radius: var(--rayon-controle);
+  border: 1px solid color-mix(in srgb, var(--teinte) 35%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--teinte) 12%, transparent), rgba(0, 0, 0, 0.24));
+}
+.cel-collectif > div:first-child { display: flex; align-items: baseline; gap: 0.4rem; }
+.cel-collectif b { font-family: var(--police-titre); font-size: 1.9rem; line-height: 1; color: var(--teinte); }
+.cel-collectif span { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--craie-dim); }
+.cel-collectif em { font-style: normal; font-size: 0.8rem; color: var(--craie); }
+.cel-collectif small { font-size: 0.68rem; line-height: 1.4; color: var(--craie-dim); }
+.cel-collectif-jauge { height: 5px; border-radius: 3px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
+.cel-collectif-jauge i { display: block; height: 100%; border-radius: 3px; background: var(--teinte); transition: width 0.3s ease; }
+.cel-collectif-neuf { --teinte: #c9524a; }
+.cel-collectif-fragile { --teinte: #d08a3c; }
+.cel-collectif-correct { --teinte: #d9c15a; }
+.cel-collectif-solide { --teinte: #7fc98a; }
+.cel-collectif-fusionnel { --teinte: #58d2b4; }
+
+/* La pastille posée sur la carte du terrain : le chiffre du joueur, sa raison
+   dans l'infobulle. Elle ne prend pas le clic — la carte se glisse encore. */
+.cel-pastille-collectif {
+  position: absolute; top: -6px; right: -6px; z-index: 3;
+  min-width: 1.35rem; height: 1.35rem; padding: 0 0.2rem;
+  display: grid; place-items: center; pointer-events: none;
+  border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.5);
+  font: 700 0.72rem/1 var(--police-forte); color: #12100a;
+  background: var(--teinte, #d9c15a);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.cel-pastille-collectif.neuf { --teinte: #c9524a; color: #fff; }
+.cel-pastille-collectif.fragile { --teinte: #d08a3c; }
+.cel-pastille-collectif.correct { --teinte: #d9c15a; }
+.cel-pastille-collectif.solide { --teinte: #7fc98a; }
+.cel-pastille-collectif.fusionnel { --teinte: #58d2b4; }
+@media (max-width: 700px) { .cel-collectif { min-width: 0; flex: 1 1 100%; } .cel-collectif small { display: none; } }

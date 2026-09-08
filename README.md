@@ -52,6 +52,29 @@
 - **Ouvrir un pack est une séquence** : la pochette se déchire, les cartes se
   retournent une à une de la moins bonne à la meilleure, et la lueur du fond
   annonce la rareté avant le nom.
+- **LE COLLECTIF, et il se voit.** Une équipe qui se connaît joue mieux : la
+  composition affiche une note de 0 à 100, chaque carte du terrain porte la
+  sienne de 0 à 10, et l’infobulle dit POURQUOI. Trois affinités, de la plus
+  forte à la plus faible — le **club réel** (ils jouent vraiment ensemble), la
+  **nation**, le **championnat** — et un coéquipier ne compte qu’une fois, par
+  son lien le plus fort.
+  ⚠️ **Le rugby n’est pas le football** : FIFA compte les liens entre voisins
+  de la formation, ici le voisin c’est l’**unité** — première ligne, deuxième
+  ligne, troisième ligne, charnière, centres, triangle arrière. Deux piliers du
+  même club poussent réellement ensemble ; deux ailiers du même club ne se
+  touchent pas du match. Un lien dans l’unité vaut donc quatre fois un lien
+  ailleurs sur le terrain. L’unité se compte **en proportion** de ce qu’elle
+  pourrait réaliser, sinon un pilier (deux partenaires) sortait à 10 et son
+  deuxième ligne (un seul) à 6 pour le même travail.
+  Mesuré : un XV entièrement d’un même club **100/100**, la dotation de départ
+  **43/100**, un XV sans aucune affinité **1/100**. La note d’un joueur bouge
+  de **−1 à +3** — l’ancien barème, invisible, donnait +0,3 par coéquipier de
+  même club **ou** nation plafonné à +3, si bien que n’importe quel XV français
+  touchait le maximum sans rien construire. Le banc ne gonfle rien : **le total
+  ne compte que le XV de départ**, et un remplaçant plafonne à 4 sur 10.
+  ⚠️ **Une seule formule pour l’écran et pour le terrain** : `lancerRencontre`
+  appelle exactement la fonction qui affiche le chiffre. Banc :
+  `npm run verify:carriere`, section 12.
 - **Marché, enchères et échanges croisés** entre managers, avec verrou de carte
   et plancher d'effectif tenus par le serveur.
 - **Une carte du marché s'ouvre en fiche** : la carte à gauche, l'affaire à
@@ -71,6 +94,14 @@
   bouton porte le maillot du joueur (« Sur la feuille · titulaire nº 10 »)
   plutôt qu'un message d'erreur après coup. La réconciliation automatique garde
   son rôle pour les départs SUBIS : blessure, carte achetée, enchère perdue.
+- ⚠️ **« Liste invalide » à la vente rapide, corrigé.** Le serveur bornait le
+  lot à 30 cartes sans que l’écran le sache : avec 59 joueurs sous contrat,
+  « Tout cocher » en envoyait 59 et le serveur répondait par un message qui ne
+  nomme rien, sur une action qu’il présentait comme permise. La borne
+  (`LOT_VENTE_RAPIDE_MAX`) est maintenant **importée par les deux côtés**, le
+  refus dit son chiffre, et « Tout cocher » coche exactement ce qui est
+  vendable — le plus petit du lot maximum et de ce que le plancher de 26
+  joueurs autorise.
 - **La vente rapide se fait aussi par lot** : on coche des cartes dans
   l'effectif, une barre annonce le total en Ovas et ce qu'il resterait de
   joueurs, et tout part en **une seule commande** — donc en une seule écriture

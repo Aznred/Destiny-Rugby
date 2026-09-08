@@ -50,7 +50,8 @@ import { CollectionLigue } from '../components/CollectionLigue';
 import OuverturePack from '../components/OuverturePack';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
-import { valeurVenteRapide } from '../lib/ligue/venteRapideCarriere';
+import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from '../lib/ligue/venteRapideCarriere';
+import { collectifCarriere, paliersCollectif, bonusCollectif, COLLECTIF_MAX } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire';
@@ -71,6 +72,20 @@ const dateHeure = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: 
 const nomClub = (vue: VueCarriereEnLigne, id: string) => vue.clubs.find(c => c.id === id)?.nom ?? 'Club';
 const messageErreur = (e: unknown) => e instanceof Error ? e.message : 'Cette action n’a pas pu être enregistrée.';
 const maintenantISO = () => new Date().toISOString();
+const COMPOSITION_VIDE: CompositionManager = { titulaires: [], remplacants: [], capitaineId: '', buteurId: '' };
+
+/**
+ * ⚠️ LE COLLECTIF SE DIT EN MOTS, PAS SEULEMENT EN CHIFFRES. « 43 » ne veut
+ * rien dire tant qu'on ne sait pas si c'est bien ou mal ; « groupe fragile »
+ * se comprend sans mode d'emploi, et donne envie de le rendre solide.
+ */
+const PALIERS_COLLECTIF: Record<ReturnType<typeof paliersCollectif>, string> = {
+  neuf: 'inconnus les uns des autres',
+  fragile: 'groupe fragile',
+  correct: 'ça commence à se connaître',
+  solide: 'groupe solide',
+  fusionnel: 'ils jouent ensemble depuis toujours',
+};
 
 /**
  * ⚠️ LA MÊME CONVERSION QUE LE SERVEUR, RECOPIÉE EN CINQ LIGNES. L'importer de
@@ -863,7 +878,13 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
     blesse: Boolean(c.blesseJusqua && c.blesseJusqua > maintenantISO()),
   }])), [cartes]);
   const [brouillon, setBrouillon] = useState<CompositionManager | null>(null);
-  const composition = brouillon ?? club?.composition ?? { titulaires: [], remplacants: [], capitaineId: '', buteurId: '' };
+  // ⚠️ LA FEUILLE VIDE EST UNE CONSTANTE, PAS UN LITTÉRAL. Recréée à chaque
+  // rendu, elle changeait d'identité en permanence : le calcul du collectif
+  // (`useMemo`) se refaisait pour rien à chaque frappe.
+  const composition = useMemo(
+    () => brouillon ?? club?.composition ?? COMPOSITION_VIDE,
+    [brouillon, club?.composition],
+  );
   const strategie = club?.strategie ?? STRATEGIE_VIDE;
   const modifie = brouillon !== null;
   const optimale = useMemo(() => meilleureComposition(cartes), [cartes]);
@@ -885,6 +906,10 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
   };
   const noteXV = composition.titulaires.length
     ? composition.titulaires.reduce((s, id) => s + (cartes.find(c => c.id === id)?.note ?? 0), 0) / composition.titulaires.length : 0;
+  // ⚠️ LE MÊME MODULE QUE LE SERVEUR. `lancerRencontre` appelle exactement
+  // cette fonction pour préparer le match : ce que l'écran annonce est ce qui
+  // entrera sur le terrain, et il n'y a qu'une formule à faire évoluer.
+  const collectif = useMemo(() => collectifCarriere(cartes, composition), [cartes, composition]);
 
   if (cartes.length < 23) return <Vide icone="equipe" titre="Ton effectif est trop court">Il faut au moins 23 joueurs disponibles pour composer une feuille de match.</Vide>;
 
@@ -896,12 +921,39 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
     <section className="cel-panneau cel-tete-compo">
       <div><div className="eyebrow">Feuille de {composition.titulaires.length + composition.remplacants.length} sur {cartes.length} joueurs</div><h2>Ton XV, ton banc, tes rôles</h2><p>Le capitaine tient la discipline, le buteur tire les pénalités. Un joueur hors de son poste perd la cohérence collective.</p></div>
       <div className="cel-note-compo"><b>{noteXV.toFixed(1)}</b><span>note du XV</span></div>
+      <div className={`cel-collectif cel-collectif-${paliersCollectif(collectif.total)}`}>
+        <div><b>{collectif.total}</b><span>collectif</span></div>
+        <div className="cel-collectif-jauge"><i style={{ width: `${collectif.total}%` }} /></div>
+        <em>{PALIERS_COLLECTIF[paliersCollectif(collectif.total)]}</em>
+        <small>Même club réel, même nation, même championnat — et trois fois plus dans l’unité (première ligne, charnière, centres…).</small>
+      </div>
       <button className="btn" disabled={occupe || !optimale} title={optimale ? "Optimiser le XV et le banc selon les notes et les postes" : "Il manque des joueurs disponibles ou des spécialistes en première ligne"} onClick={() => { if (optimale) setBrouillon(optimale); }}>Assembler la meilleure équipe</button>
       <button className="btn primaire" disabled={occupe || !modifie} onClick={async () => { const v = await agir({ type: 'composition', composition }); if (v) setBrouillon(null); }}>{modifie ? 'Enregistrer la feuille' : 'Feuille enregistrée'}</button>
     </section>
 
     <CompositionTerrainManager
-      rendreCarte={joueur => { const carte = cartes.find(c => c.id === joueur.id); return carte ? <CarteJoueurEnLigne carte={carte} compacte /> : null; }}
+      rendreCarte={joueur => {
+        const carte = cartes.find(c => c.id === joueur.id);
+        if (!carte) return null;
+        const affinite = collectif.parCarte[carte.id];
+        const points = affinite?.points ?? 0;
+        const bonus = bonusCollectif(points);
+        return <>
+          <CarteJoueurEnLigne carte={carte} compacte />
+          {/* La pastille dit le chiffre ET sa raison : sans le « pourquoi »,
+              on ne sait pas quoi changer sur la feuille. */}
+          <span className={`cel-pastille-collectif ${paliersCollectif(points * (100 / COLLECTIF_MAX))}`}
+            title={`Collectif ${points}/${COLLECTIF_MAX} · ${bonus >= 0 ? '+' : ''}${bonus} de note\n`
+              + `${affinite?.club ? 'club réel partagé' : ''}${affinite?.club && (affinite.nation || affinite.championnat) ? ' · ' : ''}`
+              + `${affinite?.nation ? 'même nation' : ''}${affinite?.nation && affinite.championnat ? ' · ' : ''}`
+              + `${affinite?.championnat ? 'même championnat' : ''}${!affinite?.club && !affinite?.nation && !affinite?.championnat ? 'aucune affinité sur cette feuille' : ''}`}>
+            {/* ⚠️ LA PASTILLE ARRONDIT, L'INFOBULLE DÉTAILLE. « 4,2 » sur une
+                pastille de vingt pixels, c'est trois caractères illisibles pour
+                une précision dont personne ne fait rien en composant. */}
+            {Math.round(points)}
+          </span>
+        </>;
+      }}
       effectif={effectif} effectifComplet={effectifComplet} composition={composition}
       onPlacer={changerJoueur} etats={etats} indisponibles={indisponibles}
       onCapitaine={id => setBrouillon({ ...composition, capitaineId: id })}
@@ -972,7 +1024,17 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
   const total = choisies.reduce((somme, c) => somme + valeurVenteRapide(c), 0);
   const disponibles = toutes.filter(c => !c.verrou).length;
   const restants = disponibles - choisies.length;
-  const basculer = (id: string) => setSelection(liste => liste.includes(id) ? liste.filter(x => x !== id) : [...liste, id]);
+  /**
+   * ⚠️ COMBIEN DE CARTES ON PEUT COCHER, ET C’EST LE PLUS PETIT DES DEUX.
+   * Le serveur refuse les lots de plus de `LOT_VENTE_RAPIDE_MAX` cartes ET les
+   * départs qui passent sous le plancher d’effectif. Laisser cocher au-delà,
+   * c’était promettre une vente qui repartait en « Liste invalide » — signalé
+   * en jeu avec 59 joueurs sous contrat, où « Tout cocher » en envoyait 59.
+   */
+  const maximumVendable = Math.max(0, Math.min(LOT_VENTE_RAPIDE_MAX, disponibles - EFFECTIF_MINIMUM));
+  const basculer = (id: string) => setSelection(liste => liste.includes(id)
+    ? liste.filter(x => x !== id)
+    : liste.length >= maximumVendable ? liste : [...liste, id]);
   const vendre = (lot: CarteCarriere[]) => {
     setDemande(null); setSelection([]);
     void agir(lot.length === 1 ? { type: 'venteRapide', carteId: lot[0].id } : { type: 'venteRapideGroupee', carteIds: lot.map(c => c.id) });
@@ -984,7 +1046,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
       <Choix label="Trier par" valeur={tri} options={[['note', 'Note (GEN)'], ['poste', 'Numéro de maillot'], ['age', 'Âge'], ['nom', 'Nom']]} onChange={setTri} />
       <Choix label="Poste" valeur={famille} options={[['', 'Tous les postes'], ...familles.map(f => [f, nomPoste(POSTES_XV_MANAGER.find(p => POSTE_PAR_ID[p].famille === f) ?? 'arriere')] as [string, string])]} onChange={setFamille} />
       <button type="button" className="btn fantome petit" disabled={!cartes.some(cessible)}
-        onClick={() => setSelection(liste => cartes.filter(cessible).every(c => liste.includes(c.id)) ? [] : [...new Set([...liste, ...cartes.filter(cessible).map(c => c.id)])])}>
+        onClick={() => setSelection(liste => cartes.filter(cessible).every(c => liste.includes(c.id)) ? [] : [...new Set([...liste, ...cartes.filter(cessible).map(c => c.id)])].slice(0, maximumVendable))}>
         {cartes.filter(cessible).every(c => selection.includes(c.id)) && cartes.some(cessible) ? 'Tout décocher' : 'Tout cocher'}
       </button>
     </section>
@@ -1010,7 +1072,10 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
     {choisies.length > 0 && <div className="cel-barre-selection" role="region" aria-label="Sélection à vendre">
       <div>
         <b>{choisies.length} joueur{choisies.length > 1 ? 's' : ''} sélectionné{choisies.length > 1 ? 's' : ''}</b>
-        <small>{montant(total)} Ovas · il resterait {restants} joueurs disponibles</small>
+        <small>{montant(total)} Ovas · il resterait {restants} joueurs disponibles
+          {choisies.length >= maximumVendable && (maximumVendable === LOT_VENTE_RAPIDE_MAX
+            ? ` · maximum ${LOT_VENTE_RAPIDE_MAX} par lot`
+            : ` · c’est tout ce que le plancher de ${EFFECTIF_MINIMUM} joueurs autorise`)}</small>
       </div>
       <div className="cel-barre-actions">
         <button type="button" className="btn fantome" onClick={() => setSelection([])}>Annuler</button>

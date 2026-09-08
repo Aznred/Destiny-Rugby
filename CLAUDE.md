@@ -455,6 +455,15 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   En local, `vite.config.ts` branche le même gestionnaire sur un
   fichier JSON, donc le mode se teste entièrement sans base.
 
+  ⚠️ **LE COLLECTIF A UNE SEULE FORMULE**, dans `lib/ligue/collectifCarriere.ts` :
+  l'écran de composition et `lancerRencontre` appellent la MÊME fonction. Deux
+  formules donneraient un jour deux vérités — un manager qui compose pour 78 et
+  une équipe qui entre sur le terrain avec autre chose. Le barème est calibré,
+  pas choisi : club 4 / nation 1,6 / championnat 0,8 dans l’unité, huit fois
+  moins ailleurs. Le remonter sans mesurer ramène le défaut d’origine — un
+  premier essai donnait 72/100 à la dotation de départ et 88 à un XV construit,
+  une échelle où tout le monde a la même note et que personne ne joue.
+
   ⚠️ **UN JOUEUR SUR LA FEUILLE DE MATCH NE PART PAS.** `verifierHorsFeuille`
   refuse la vente, la vente rapide et l'échange d'un titulaire ou d'un
   remplaçant, à la proposition pour ses propres cartes et à l'acceptation pour

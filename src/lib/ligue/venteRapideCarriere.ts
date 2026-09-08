@@ -13,6 +13,16 @@ const BAREME: Record<RareteCarriere, { debut: number; fin: number; plafond: numb
   star: { debut: 88, fin: 99, plafond: 20_000, pas: 500 },
 };
 
+/**
+ * ⚠️ COMBIEN DE CARTES PARTENT D'UN COUP, ET LE MÊME NOMBRE DES DEUX CÔTÉS.
+ * Le serveur bornait le lot à 30 sans que l’écran le sache : avec 59 joueurs
+ * sous contrat, « Tout cocher » en envoyait 33 et le serveur répondait « Liste
+ * invalide » — un message qui ne dit rien, sur une action qui paraissait
+ * permise. La borne est ici, elle est importée par les deux, et l’écran
+ * l’applique AVANT le clic.
+ */
+export const LOT_VENTE_RAPIDE_MAX = 40;
+
 /** Le plafond de la bande, celui que l'écran annonce avant de vendre. */
 export function plafondVenteRapide(rarete: RareteCarriere): number {
   return BAREME[rarete].plafond;
