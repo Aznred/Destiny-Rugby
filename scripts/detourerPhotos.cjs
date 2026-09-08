@@ -63,6 +63,12 @@ const SATURATION_FOND = 22;
 /** Bornes de sécurité : au-delà, on a mangé le joueur ou on n'a rien fait. */
 const PART_MINIMALE = 0.03;
 const PART_MAXIMALE = 0.92;
+/**
+ * Part du fond retiré qui a le droit de se trouver À L'INTÉRIEUR de la
+ * silhouette. Au-delà, la propagation est entrée dans le joueur — voir le
+ * garde-fou mesuré plus bas.
+ */
+const PART_INTERIEURE_MAXIMALE = 0.025;
 
 const distance = (r1, v1, b1, r2, v2, b2) => Math.sqrt((r1 - r2) ** 2 + (v1 - v2) ** 2 + (b1 - b2) ** 2);
 
@@ -186,6 +192,45 @@ async function detourer(fichier) {
   let hautOpaque = 0;
   for (let x = 0; x < w; x++) if (opaque(x, marge)) hautOpaque++;
   if (hautOpaque > w * 0.25) return false;
+
+  /**
+   * ⚠️ LE VRAI DANGER N'EST PAS DE TROP EN LAISSER, C'EST DE TROUER LE JOUEUR —
+   * et aucun des garde-fous précédents ne le voyait. Rieko Ioane, bras levés
+   * sur fond blanc, est ressorti avec des trous dans les cheveux, dans les bras
+   * et dans le maillot : la propagation était entrée par le blanc du fond,
+   * avait suivi le blanc du lettrage « Bank of Ireland » et s'était répandue
+   * dans tout le maillot. Eddie Swart, maillot BLANC des Sharks, est ressorti
+   * en trim gris sur un torse transparent. Les deux passaient : le fond était
+   * uniforme, le haut du cadre nettoyé, la part retirée entre 3 % et 92 %.
+   *
+   * Ce qui les distingue d'un bon détourage, c'est OÙ le fond est parti. Sur
+   * chaque ligne, entre le premier et le dernier pixel du joueur, il ne doit
+   * presque rien y avoir de retiré. Mesuré sur huit portraits : un détourage
+   * propre reste entre 0,0 % et 3,2 % (Jamie Osborne 0,0 · Aaron Smith 0,1 ·
+   * Bundee Aki 2,7 · Siya Kolisi 2,6 · Thomas Clarkson 3,2), les deux abîmés
+   * sautent à 29,2 % (Ioane) et 43,7 % (Swart).
+   *
+   * ⚠️ LE SEUIL EST À 2,5 %, ET C'EST UN CHOIX DE PRUDENCE. À 12 %, Thomas
+   * Clarkson passait avec ses 3,2 % — et son maillot ressortait mordu de blanc
+   * en bas à gauche, là où le fond s'était faufilé sous le bras. Un portrait
+   * refusé garde son fond, ce qui se corrige plus tard ; un portrait troué est
+   * écrit sur le disque et se voit en jeu. Le prix payé est connu : un joueur
+   * mains sur les hanches, qui a de vrais vides entre bras et torse, peut se
+   * faire refuser à tort. C'est le bon sens de l'erreur.
+   */
+  let retiresTotal = 0;
+  let retiresDedans = 0;
+  for (let y = 0; y < h; y++) {
+    let gauche = -1;
+    let droite = -1;
+    for (let x = 0; x < w; x++) if (opaque(x, y)) { if (gauche < 0) gauche = x; droite = x; }
+    for (let x = 0; x < w; x++) {
+      if (opaque(x, y)) continue;
+      retiresTotal++;
+      if (gauche >= 0 && x > gauche && x < droite) retiresDedans++;
+    }
+  }
+  if (retiresTotal && retiresDedans / retiresTotal > PART_INTERIEURE_MAXIMALE) return false;
 
 
   // On rend au pixel la couleur qu'il aurait sans le fond derrière lui : sinon

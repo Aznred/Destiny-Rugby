@@ -1061,7 +1061,6 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
     .filter(c => !famille || c.famille === famille)
     .sort((a, b) => tri === 'note' ? b.note - a.note : tri === 'poste' ? (POSTE_PAR_ID[a.poste]?.numero ?? 0) - (POSTE_PAR_ID[b.poste]?.numero ?? 0) : tri === 'age' ? a.age - b.age : a.nom.localeCompare(b.nom, 'fr'));
   const familles = [...new Set(toutes.map(c => c.famille))];
-  const favoris = cartes.filter(c => c.favori && cessible(c)).length;
 
   const cessible = (c: CarteCarriere) => !c.verrou && !feuille.has(c.id);
   /**
@@ -1071,6 +1070,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
    * cartes d'un coup et ou personne ne relit la liste avant de valider.
    */
   const groupable = (c: CarteCarriere) => cessible(c) && !c.favori;
+  const favoris = cartes.filter(c => c.favori && cessible(c)).length;
   const choisies = toutes.filter(c => selection.includes(c.id) && cessible(c));
   const total = choisies.reduce((somme, c) => somme + valeurVenteRapide(c), 0);
   const disponibles = toutes.filter(c => !c.verrou).length;

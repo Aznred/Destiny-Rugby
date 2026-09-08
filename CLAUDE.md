@@ -382,6 +382,18 @@ stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
   contour, et **ne réécrit rien quand il n'est pas sûr**. Son seuil doux
   (34) ne se remonte pas : à 62, il entrait par une joue claire et laissait un
   trou dans le visage.
+  ⚠️ **ET LE VRAI DANGER EST DE TROUER LE JOUEUR, PAS D'EN LAISSER.** Signalé en
+  jeu (« beaucoup ne sont pas détourées, Ioane par exemple ») : forcer les
+  récalcitrantes en a détruit une sur deux. Rieko Ioane, bras levés sur fond
+  blanc, est ressorti troué — la propagation était entrée par le blanc du
+  lettrage « Bank of Ireland » ; Eddie Swart, maillot BLANC des Sharks, en trim
+  gris sur un torse transparent. **Aucun garde-fou ne les voyait** : fond
+  uniforme, haut du cadre nettoyé, part retirée entre 3 % et 92 %. Le critère qui
+  les sépare est **OÙ le fond est parti** — sur chaque ligne, entre le premier et
+  le dernier pixel du joueur, un détourage propre ne retire que **0 à 3,2 %**
+  (mesuré sur Osborne, Smith, Aki, Kolisi, Clarkson) quand les deux abîmés
+  montent à **29 %** et **44 %**. `PART_INTERIEURE_MAXIMALE = 0.12` tranche entre
+  les deux groupes et laisse passer les bras écartés.
 - **UNE PHOTO DE JOUEUR N'EST PAS FORCÉMENT UN JOUEUR.** Le site source rend une
   silhouette grise « portrait indisponible » : elle a été aspirée 181 fois sous
   181 noms, indexée comme un vrai portrait, et gagnait donc contre le vrai
@@ -488,6 +500,15 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   zéro point vaut −1 de note. `lancerRencontre` teste donc la présence de
   l’entrée avant d’appeler `bonusCollectif`, sans quoi un remplaçant entrerait
   à la 60ᵉ minute avec une note rabotée pour n’avoir pas été aligné.
+
+  ⚠️ **LE FAVORI N'EST PAS UN VERROU.** `carte.favori` (commande `favori`, côté
+  serveur) n'interdit AUCUNE vente : il retire seulement la carte de
+  « Tout cocher » dans l'effectif — le geste qui en sélectionne cinquante d'un
+  coup et où personne ne relit la liste. En faire un verrou créerait une
+  deuxième règle de départ à côté de `verifierHorsFeuille`, et les deux
+  finiraient par diverger. Il **tombe au transfert** (`transferer`) : c'est la
+  marque d'UN manager sur SON effectif, pas une propriété de la carte. Banc :
+  `verify:carriere`, section 13.
 
   ⚠️ **UN JOUEUR SUR LA FEUILLE DE MATCH NE PART PAS.** `verifierHorsFeuille`
   refuse la vente, la vente rapide et l'échange d'un titulaire ou d'un

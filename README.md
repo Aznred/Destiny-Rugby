@@ -88,11 +88,19 @@
   ensemble.
   ⚠️ **Une seule formule pour l’écran et pour le terrain** : `lancerRencontre`
   appelle exactement la fonction qui affiche le chiffre.
-  Il se lit à DEUX endroits : en tête de la composition, à côté de la note du
-  XV — les deux seuls chiffres qu'on vient voir passent donc avant le
-  paragraphe, sinon ils tombaient hors écran sur téléphone — et dans les
-  chiffres du vestiaire, à côté du GEN moyen, pour ne pas être réservé à ceux
-  qui savent déjà qu'il existe. Banc : `npm run verify:carriere`, section 12.
+  Il se lit à TROIS endroits, et **partout comme une barre** : en tête de la
+  composition à côté de la note du XV, dans les chiffres du vestiaire à côté du
+  GEN moyen, et **sous chaque joueur du terrain**, dans la ligne qui porte déjà
+  son numéro et sa condition.
+  ⚠️ **Trois versions ont été nécessaires, toutes trois demandées en jeu.** Un
+  pavé encadré avec le palier écrit et la règle en trois lignes — « retire le
+  texte en dessous, fait juste une barre » ; le même pavé sans texte — « rends-la
+  plus petite, juste une barre à côté de la note, pas aussi gros, pas de
+  rectangle autour ». Et pour les joueurs, une pastille chiffrée collée en haut
+  à droite de la carte, qui recouvrait le portrait et se lisait comme un badge
+  de rareté de plus — « mets une barre en dessous de la forme plutôt ». Le
+  palier et la règle vivent maintenant dans les infobulles.
+  Banc : `npm run verify:carriere`, section 12.
 - **Marché, enchères et échanges croisés** entre managers, avec verrou de carte
   et plancher d'effectif tenus par le serveur.
 - **Une carte du marché s'ouvre en fiche** : la carte à gauche, l'affaire à
@@ -121,6 +129,28 @@
   refus dit son chiffre, et « Tout cocher » coche exactement ce qui est
   vendable — le plus petit du lot maximum et de ce que le plancher de 26
   joueurs autorise.
+- ⭐ **Les favoris échappent à « Tout cocher ».** Une étoile sur chaque carte de
+  l'effectif : marquée, elle n'est plus prise par la sélection en masse.
+  ⚠️ **Ce n'est PAS un verrou** — le joueur se vend encore d'un clic, se coche
+  encore à la main, part encore dans un échange. Ce qu'il ne subit plus, c'est
+  le geste où l'on coche cinquante cartes d'un coup sans relire la liste : c'est
+  là qu'on perd son meilleur ailier, pas dans une vente qu'on a choisie. Le
+  favori vit **sur le serveur** (il suivrait mal un changement de téléphone
+  depuis un `localStorage`) et **tombe au transfert** : c'est la marque d'un
+  manager sur son effectif, pas une propriété de la carte.
+- ⚡ **L'ouverture d'un pack ne fait plus attendre.** Trois attentes
+  s'additionnaient au moment précis où l'écran devait bouger : une pause
+  décorative de 380 ms **avant même** d'appeler le serveur, l'aller-retour
+  pendant lequel rien ne s'affichait, puis l'import du module 3D et le
+  téléchargement de la pochette ouverte (1,2 Mo) une fois la modale déjà là. La
+  pochette s'ouvre maintenant **au clic**, à la couleur que le pack garantit,
+  pendant que la commande vole ; le module 3D est réchauffé dès l'entrée en
+  boutique et le modèle du pack qu'on regarde se télécharge pendant qu'on hésite.
+  Mesuré, avec un réseau ralenti à 1,5 s : **43 ms** du clic à la pochette.
+  ⚠️ **Et le geste n'est pas perdu** : toucher la pochette avant la réponse
+  affiche « Ouverture… » et l'animation repart toute seule quand les cartes
+  arrivent — refuser le clic aurait obligé à toucher deux fois sans jamais dire
+  pourquoi la première n'avait rien fait.
 - **La vente rapide se fait aussi par lot** : on coche des cartes dans
   l'effectif, une barre annonce le total en Ovas et ce qu'il resterait de
   joueurs, et tout part en **une seule commande** — donc en une seule écriture
@@ -1320,6 +1350,22 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   résultat qui mange plus de 92 % de l'image ou qui laisse le haut du cadre
   opaque : on rend la photo telle quelle. Mesuré : **1 580 détourés, 256
   laissés, 0 échec.**
+  ⚠️ **Le vrai danger est de TROUER le joueur, pas d'en laisser** — et aucun de
+  ces garde-fous ne le voyait. Signalé en jeu (« beaucoup ne sont pas détourées,
+  Ioane par exemple »), forcer les récalcitrantes en a détruit **une sur deux** :
+  Rieko Ioane, bras levés sur fond blanc, est ressorti troué dans les cheveux,
+  les bras et le maillot — la propagation était entrée par le blanc du fond puis
+  avait suivi le blanc du lettrage « Bank of Ireland » ; Eddie Swart, maillot
+  BLANC des Sharks, en trim gris sur un torse transparent. Les deux passaient
+  tous les contrôles. Le critère qui les sépare d'un bon détourage, c'est **OÙ**
+  le fond est parti : sur chaque ligne, entre le premier et le dernier pixel du
+  joueur, un détourage propre ne retire que **0 à 3,2 %** (Osborne 0,0 · Smith
+  0,1 · Kolisi 2,6 · Aki 2,7 · Clarkson 3,2) quand les deux abîmés montent à
+  **29 %** et **44 %**. Le seuil est posé à **12 %** — assez haut pour laisser
+  passer les bras écartés, qui creusent de vrais vides intérieurs.
+  État après passe complète : **5 324 portraits, 98,7 % détourés**. Le reste,
+  ce sont des drapeaux tenus à bout de bras et des fonds de studio colorés :
+  l'algorithme refuse, et il a raison de refuser.
 - **Les noms ne concordent pas d'un fichier à l'autre**, et c'était la première
   cause de carte grise : la feuille dit « Aaron GRANDIDIER » quand le fichier
   s'appelle `aaron_grandidier_nkanang`, « Gaël DRÉAN » quand l'aspiration a
@@ -1330,6 +1376,15 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   Sacha ELISSALDE recevait le visage de Gabriel ELISSALDE. **Couverture du
   Top 14 : 88 % (594 sur 677)** contre 84 % dont 22 fausses photos grises.
   Banc : `npm run verify:photos`.
+- 🏆 **La carte dit aussi DANS QUEL CHAMPIONNAT le joueur évolue.** Le logo
+  officiel de sa compétition se pose sous l'écusson de son club, dans la colonne
+  qui porte déjà la note, le poste et la nation : c'est l'information qui
+  explique pourquoi deux cartes de même note ne valent pas la même chose.
+  Mesuré : **20 championnats sur 22 ont leur logo**, et ils couvrent 99,9 % des
+  78 083 joueurs du vivier. Les deux exceptions (« Autres clubs européens »,
+  « Championnat professionnel ») ne sont pas des compétitions mais des
+  fourre-tout : **on n'affiche rien** plutôt que le ballon générique de repli,
+  qui se lirait comme un blason de championnat que personne ne reconnaîtrait.
 - Les portraits détourés reposent directement sur le métal de la carte, sans
   vignette grise rapportée. Pendant un échange, la carte prise s'efface et la
   cible se soulève avec un liseré doré. La fiche joueur se ferme au clic
