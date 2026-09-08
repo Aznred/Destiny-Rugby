@@ -48,6 +48,7 @@ import { photoReelle } from '../lib/avatars';
 type ZoneComposition = 'titulaires' | 'remplacants';
 
 interface Props {
+  lienEntre?: (a: string, b: string) => { couleur: string; libelle: string };
   rendreCarte?: (joueur: Coequipier) => ReactNode;
   /**
    * Ce qui se glisse SOUS la ligne d'indicateurs (numero, adequation, forme).
@@ -78,6 +79,20 @@ const PLACEMENT_XV = [
   [23, 57], [77, 57], [50, 58],
   [40, 45], [56, 36],
   [12, 18], [36, 24], [64, 23], [88, 18], [50, 9],
+] as const;
+
+// Six lignes de rugby, décalées pour laisser les cartes et leurs liens lisibles.
+const PLACEMENT_LIGUE = [
+  [25, 86], [50, 86], [75, 86],
+  [38, 71.6], [62, 71.6],
+  [20, 57.2], [80, 57.2], [50, 57.2],
+  [37, 42.8], [63, 42.8],
+  [10, 28.4], [28, 28.4], [72, 28.4], [90, 28.4], [50, 14],
+] as const;
+const LIENS_XV = [
+  [0, 1], [1, 2], [0, 3], [1, 3], [1, 4], [2, 4], [3, 4],
+  [3, 5], [3, 7], [4, 7], [4, 6], [5, 7], [7, 6],
+  [7, 8], [8, 9], [8, 11], [9, 12], [10, 11], [11, 12], [12, 13], [11, 14], [12, 14],
 ] as const;
 
 /**
@@ -427,13 +442,15 @@ function PanneauJoueur({
 
 export function CompositionTerrainManager({
   effectif, effectifComplet = effectif, composition, onPlacer, etats, indisponibles,
-  automatismes, onCapitaine, onButeur, rendreCarte, rendreSousCarte,
+  automatismes, onCapitaine, onButeur, rendreCarte, rendreSousCarte, lienEntre,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
   const [ficheMasquee, setFicheMasquee] = useState<string | null>(null);
   const [joueurGlisse, setJoueurGlisse] = useState<string | null>(null);
   const [cibleDepot, setCibleDepot] = useState<string | null>(null);
   const [reservesOuvertes, setReservesOuvertes] = useState(!rendreCarte);
+  const [groupe, setGroupe] = useState<'banc' | 'reserves'>('banc');
+  const [detailsSelection, setDetailsSelection] = useState(false);
   const panneauRef = useRef<HTMLElement>(null);
   const parId = useMemo(
     () => new Map(effectifComplet.map((j) => [j.id, j])),
@@ -477,7 +494,7 @@ export function CompositionTerrainManager({
       const cible = e.target;
       if (!(cible instanceof Element)) return;
       if (panneauRef.current?.contains(cible)) return;
-      if (cible.closest('.ct-carte, .manager-reserve-carte')) return;
+      if (cible.closest('.ct-carte, .manager-reserve-carte, .ct-selection-actions, .ct-groupes')) return;
       setSelection(null);
     };
     const fermerAvecEchap = (e: KeyboardEvent) => {
@@ -490,6 +507,23 @@ export function CompositionTerrainManager({
       window.removeEventListener('keydown', fermerAvecEchap);
     };
   }, [selection]);
+
+  useEffect(() => setDetailsSelection(false), [selection]);
+
+  const choisirReserve = (joueurId: string) => {
+    if (indisponibles?.has(joueurId)) return;
+    if (selection) {
+      for (const zone of ['titulaires', 'remplacants'] as const) {
+        const index = composition[zone].indexOf(selection);
+        if (index >= 0) {
+          onPlacer(zone, index, joueurId);
+          setSelection(null);
+          return;
+        }
+      }
+    }
+    setSelection(selection === joueurId ? null : joueurId);
+  };
 
   const choisirOuPlacer = (zone: ZoneComposition, index: number, joueurId?: string) => {
     if (selection && selection !== joueurId) {
@@ -547,7 +581,7 @@ export function CompositionTerrainManager({
     ? POSTES_XV_MANAGER[composition.titulaires.indexOf(selection)] : undefined;
 
   return (
-    <section className={`manager-feuille-visuelle${rendreCarte ? ' ct-feuille-fut' : ''}`} aria-label={t('compo.titre')}>
+    <section className={`manager-feuille-visuelle${rendreCarte ? ' ct-feuille-fut' : ''}`} data-groupe={groupe} aria-label={t('compo.titre')}>
       {/* ── L'EN-TÊTE ─────────────────────────────────────────────────────── */}
       <div className="ct-entete">
         <div className="ct-note-equipe">
@@ -579,6 +613,10 @@ export function CompositionTerrainManager({
             </li>
           ))}
         </ul>
+        {rendreCarte && <div className="ct-apercu-selection">
+          {joueurSelectionne ? <>{rendreCarte(joueurSelectionne)}<b>{joueurSelectionne.nom}</b><span>{nomPoste(joueurSelectionne.poste)} · {joueurSelectionne.note} GEN</span></> : <p>Choisis une carte pour voir le joueur et le remplacer.</p>}
+          <div className="ct-legende-liens"><span><i style={{ background: '#78e354' }} /> Même club</span><span><i style={{ background: '#f3ce50' }} /> Nation ou championnat</span><span><i style={{ background: '#cf6158' }} /> Aucune affinité commune</span></div>
+        </div>}
       </div>
 
       {/* ⚠️ LES DEUX AIDES ONT PERDU LEURS EMOJI DANS LE DICTIONNAIRE (↕️ et 📱),
@@ -598,9 +636,18 @@ export function CompositionTerrainManager({
             <span>{t('compo.enButAdverse')}</span><b>{t('compo.tonXV')}</b><span>{t('compo.tonEnBut')}</span>
           </div>
           <div className="manager-terrain-xv">
+            {rendreCarte && lienEntre && <svg className="ct-liens-collectif" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Liens d’affinité entre les titulaires">
+              {LIENS_XV.map(([a, b]) => {
+                const ja = titulaires[a], jb = titulaires[b];
+                if (!ja || !jb) return null;
+                const lien = lienEntre(ja.id, jb.id);
+                const [ax, ay] = PLACEMENT_LIGUE[a], [bx, by] = PLACEMENT_LIGUE[b];
+                return <line key={`${a}-${b}`} x1={ax} y1={ay} x2={bx} y2={by} stroke={lien.couleur} vectorEffect="non-scaling-stroke" className={selection && selection !== ja.id && selection !== jb.id ? 'ct-lien-estompe' : ''}><title>{ja.nom} — {jb.nom} : {lien.libelle}</title></line>;
+              })}
+            </svg>}
             {POSTES_XV_MANAGER.map((posteSlot, index) => {
               const joueur = titulaires[index];
-              const [x, y] = PLACEMENT_XV[index];
+              const [x, y] = rendreCarte ? PLACEMENT_LIGUE[index] : PLACEMENT_XV[index];
               return (
                 <div className="manager-position" key={`${posteSlot}-${index}`} style={{ left: `${x}%`, top: `${y}%` }}>
                   <CarteJoueur
@@ -628,7 +675,7 @@ export function CompositionTerrainManager({
           </div>
         </div>
 
-        {joueurSelectionne && (!rendreCarte || ficheMasquee !== selection) && (
+        {joueurSelectionne && (!rendreCarte || (detailsSelection && ficheMasquee !== selection)) && (
           <PanneauJoueur
             joueur={joueurSelectionne}
             posteSlot={slotDuSelectionne}
@@ -644,6 +691,22 @@ export function CompositionTerrainManager({
           />
         )}
       </div>
+
+      {rendreCarte && <>
+        <div className="ct-selection-actions" aria-live="polite">
+          {joueurSelectionne ? <>
+            <b>{joueurSelectionne.nom} · {joueurSelectionne.note} GEN · {nomPoste(joueurSelectionne.poste)}</b>
+            <span>Choisis un autre joueur pour les permuter.</span>
+            <button type="button" onClick={() => { setFicheMasquee(null); setDetailsSelection(true); }}>Fiche et rôles</button>
+            <button type="button" onClick={() => setSelection(null)}>Annuler la sélection</button>
+          </> : <span>Sélectionne un joueur du XV, du banc ou des réserves, puis son remplaçant.</span>}
+        </div>
+        <nav className="ct-groupes" aria-label="Joueurs hors du terrain">
+          <button type="button" aria-pressed={groupe === 'banc'} onClick={() => setGroupe('banc')}>Remplaçants · {remplacants.filter(Boolean).length} / 8</button>
+          <button type="button" aria-pressed={groupe === 'reserves'} onClick={() => setGroupe('reserves')}>Réserves · {reserves.length}</button>
+          <span>Fais défiler les cartes horizontalement</span>
+        </nav>
+      </>}
 
       <div className="manager-banc-visuel">
         <div className="comp-tete">
@@ -699,7 +762,7 @@ export function CompositionTerrainManager({
 
       <details
         className="manager-reserves"
-        open={reservesOuvertes}
+        open={Boolean(rendreCarte) || reservesOuvertes}
         onToggle={(e) => setReservesOuvertes(e.currentTarget.open)}
       >
         <summary>{t('compo.effectifDispo')} <span>{reserves.length}</span></summary>
@@ -729,7 +792,7 @@ export function CompositionTerrainManager({
                 ].filter(Boolean).join(' ')}
                 {...glisser.poignee(indisponible ? undefined : joueur.id, null)}
                 draggable={false}
-                onClick={() => { if (!glisser.vientDeGlisser()) setSelection(selection === joueur.id ? null : joueur.id); }}
+                onClick={() => { if (!glisser.vientDeGlisser()) choisirReserve(joueur.id); }}
                 onDragStart={(e) => demarrerDrag(e, joueur.id)}
                 onDragEnd={terminerDrag}
                 aria-pressed={selection === joueur.id}
@@ -737,7 +800,7 @@ export function CompositionTerrainManager({
                 title={`${joueur.nom} · ${NOM_RARETE[rareteDe(joueur)]}${raison ? ` · ${raison}` : ''}`}
               >
                 {!rendreCarte && <PortraitComposition nom={joueur.nom} />}
-                {rendreCarte ? <>{rendreCarte(joueur)}{raison && <small className="ct-fut-raison">{raison}</small>}</> : <>
+                {rendreCarte ? <>{rendreCarte(joueur)}<b className="ct-fut-nom">{joueur.nom}</b><small>{nomPoste(joueur.poste)}</small>{raison && <small className="ct-fut-raison">{raison}</small>}</> : <>
                 <strong>{joueur.note}</strong>
                 <span>
                   <b>{joueur.nom}</b>

@@ -896,6 +896,8 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
 // CETTE ligue — et le fait que la feuille part au serveur au lieu du store.
 
 export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
+  const [vueEtendue, setVueEtendue] = useState(true);
+  const [consignesOuvertes, setConsignesOuvertes] = useState(false);
   const club = vue.clubs.find(c => c.id === vue.monClubId);
   const cartes = useMemo(() => vue.cartes.filter(c => c.proprietaire === vue.monClubId), [vue.cartes, vue.monClubId]);
   const effectifComplet = useMemo(() => cartes.map(carteEnJoueur), [cartes]);
@@ -945,8 +947,10 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
   // du haut, la feuille, les consignes) étaient trois enfants directs de `.cel` :
   // impossible alors de dire « la feuille prend ce qui reste de la fenêtre ».
   // Regroupés ici, ils forment la colonne qui tient dans l’écran.
-  return <section className="cel-compo">
+  return <section className={`cel-compo${vueEtendue ? ' cel-compo-etendue' : ''}`}>
     <section className="cel-panneau cel-tete-compo">
+      <button className="btn" aria-pressed={vueEtendue} onClick={() => setVueEtendue(!vueEtendue)}>{vueEtendue ? 'Réduire la vue' : 'Vue équipe entière'}</button>
+      <button className="btn" aria-expanded={consignesOuvertes} onClick={() => setConsignesOuvertes(!consignesOuvertes)}>Consignes</button>
       {/* ⚠️ LES DEUX CHIFFRES D’ABORD, LA PHRASE ENSUITE. Sur téléphone,
           l’en-tête se lit de haut en bas : la note du XV et le collectif
           se retrouvaient sous trois lignes d’explication, donc hors écran.
@@ -973,6 +977,12 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
     </section>
 
     <CompositionTerrainManager
+      lienEntre={(a, b) => {
+        const ca = cartes.find(c => c.id === a), cb = cartes.find(c => c.id === b);
+        if (ca?.clubReel && ca.clubReel === cb?.clubReel) return { couleur: '#78e354', libelle: `Même club : ${ca.clubReel}` };
+        const commun = [ca?.nation && ca.nation === cb?.nation ? ca.nation : '', ca?.championnat && ca.championnat === cb?.championnat ? ca.championnat : ''].filter(Boolean);
+        return commun.length ? { couleur: '#f3ce50', libelle: commun.join(' · ') } : { couleur: '#cf6158', libelle: 'Aucune affinité commune' };
+      }}
       rendreCarte={joueur => {
         const carte = cartes.find(c => c.id === joueur.id);
         if (!carte) return null;
@@ -1003,7 +1013,7 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
       onButeur={id => setBrouillon({ ...composition, buteurId: id })}
     />
 
-    <details className="cel-panneau cel-consignes-repliables">
+    <details className="cel-panneau cel-consignes-repliables" open={consignesOuvertes} onToggle={e => setConsignesOuvertes(e.currentTarget.open)}>
       <summary><span><h2>Consignes enregistrées</h2><small>Ouvrir pour ajuster la stratégie</small></span><Icone nom="sifflet" /></summary>
       <div className="cel-consignes-contenu">
         <p className="cel-note">⚠️ Ce sont elles qui entraînent ton équipe <b>quand tu n’es pas là</b> — et elles servent de point de départ quand tu l’es. Un match ne s’annule jamais faute de manager.</p>

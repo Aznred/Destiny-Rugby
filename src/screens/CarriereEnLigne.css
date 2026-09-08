@@ -1888,27 +1888,11 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
     height: 100%; min-height: calc((1.5 * var(--ct-carte) + 40px) / 0.15);
     box-shadow: inset 0 0 80px #051d1955;
   }
-  .cel-compo .ct-feuille-fut .manager-position { width: var(--ct-carte); left: var(--x) !important; top: var(--y) !important; }
   .cel-compo .ct-fut-nom { display: block; }
   /* ⚠️ SIX RANGÉES, ET L’ARRIÈRE TOUT SEUL DERRIÈRE. Il partageait la ligne des
      ailiers et des centres : sur un terrain de rugby, le 15 est le dernier
      rempart, et le voir aligné avec ses trois-quarts est la première chose qui
      sonne faux quand on regarde la feuille. */
-  .cel-compo .manager-position:nth-child(1) { --x: 20%; --y: 85%; }
-  .cel-compo .manager-position:nth-child(2) { --x: 50%; --y: 85%; }
-  .cel-compo .manager-position:nth-child(3) { --x: 80%; --y: 85%; }
-  .cel-compo .manager-position:nth-child(4) { --x: 35%; --y: 70%; }
-  .cel-compo .manager-position:nth-child(5) { --x: 65%; --y: 70%; }
-  .cel-compo .manager-position:nth-child(6) { --x: 18%; --y: 55%; }
-  .cel-compo .manager-position:nth-child(7) { --x: 82%; --y: 55%; }
-  .cel-compo .manager-position:nth-child(8) { --x: 50%; --y: 55%; }
-  .cel-compo .manager-position:nth-child(9) { --x: 36%; --y: 40%; }
-  .cel-compo .manager-position:nth-child(10) { --x: 60%; --y: 40%; }
-  .cel-compo .manager-position:nth-child(11) { --x: 9%; --y: 25%; }
-  .cel-compo .manager-position:nth-child(12) { --x: 30%; --y: 25%; }
-  .cel-compo .manager-position:nth-child(13) { --x: 70%; --y: 25%; }
-  .cel-compo .manager-position:nth-child(14) { --x: 91%; --y: 25%; }
-  .cel-compo .manager-position:nth-child(15) { --x: 50%; --y: 10%; }
   .cel-compo .ct-feuille-fut .ct-fut-indicateurs { font-size: 10px; min-height: 16px; gap: 4px; padding: 1px 4px; border: 1px solid #ffffff20; }
   .cel-compo .ct-feuille-fut .ct-fut-indicateurs svg { width: 9px; height: 9px; }
   .cel-compo .manager-feuille-visuelle > .manager-banc-visuel { grid-column: 2; grid-row: 2; align-self: stretch; min-height: 0; padding: .7rem; display: flex; flex-direction: column; background: linear-gradient(145deg, #132c30, #091b21); border-color: #b7dcd329; }
@@ -2011,3 +1995,105 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-chiffre-collectif.cel-collectif-correct { --teinte: #d9c15a; }
 .cel-chiffre-collectif.cel-collectif-solide { --teinte: #7fc98a; }
 .cel-chiffre-collectif.cel-collectif-fusionnel { --teinte: #58d2b4; }
+/* Le constructeur de XV : terrain complet et banc dans la même vue. */
+.cel:has(> .cel-compo) { height: auto; grid-template-rows: auto auto auto; }
+.cel > .cel-compo { min-height: 720px; height: calc(100dvh - 200px); }
+.cel > .cel-compo.cel-compo-etendue { position: fixed; inset: 0; z-index: 100; height: 100dvh; min-height: 0; padding: 10px 16px; box-sizing: border-box; background: radial-gradient(ellipse at 55% 35%, #173b37, #07141d 80%); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.cel-compo > .cel-tete-compo { display: flex; align-items: center; flex-wrap: wrap; flex: none; min-height: 48px; margin: 0; padding: 6px 12px; gap: 12px; }
+.cel-compo > .cel-tete-compo p, .cel-compo > .cel-tete-compo .eyebrow { display: none; }
+.cel-compo > .cel-tete-compo h2 { font-size: 17px; }
+.cel-compo > .cel-tete-compo .btn { font-size: 12px; padding: 8px 12px; min-height: 38px; }
+.cel-compo > .cel-tete-compo .cel-chiffres-compo { margin-right: auto; }
+.cel-compo > .cel-consignes-repliables { display: none; }
+.cel-compo > .manager-feuille-visuelle { flex: 1; min-height: 0; min-width: 0; display: grid; grid-template-columns: 180px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 34px 34px 166px; gap: 6px 14px; }
+.cel-compo .manager-feuille-visuelle > .ct-entete { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; margin: 0; overflow-y: auto; min-height: 0; border: 0; background: #07182099; }
+.cel-compo .ct-entete .ct-note-equipe { display: flex; justify-content: space-between; align-items: center; }
+.cel-compo .ct-note-equipe strong { font-size: 28px; }
+.cel-compo .ct-entete .ct-secteurs { display: flex; justify-content: space-between; margin: 0; }
+.cel-compo .ct-entete .ct-secteurs dt { font-size: 9px; }
+.cel-compo .ct-entete .ct-secteurs dd { font-size: 18px; }
+.cel-compo .ct-alertes { font-size: 10px; }
+.cel-compo .ct-apercu-selection { display: flex; flex-direction: column; gap: 8px; font-size: 12px; text-align: center; }
+.cel-compo .ct-apercu-selection > .dr-player { width: 140px; max-width: 100%; align-self: center; }
+.cel-compo .ct-apercu-selection p { color: #b7cbd1; line-height: 1.5; }
+.cel-compo .ct-legende-liens { display: grid; gap: 8px; margin-top: 8px; text-align: left; font-size: 10px; color: #d3e3df; }
+.cel-compo .ct-legende-liens span { display: flex; align-items: center; gap: 7px; }
+.cel-compo .ct-legende-liens i { display: block; width: 15px; height: 3px; flex: none; }
+.cel-compo .manager-feuille-visuelle > .manager-compo-aide { display: none; }
+.cel-compo .manager-feuille-visuelle > .ct-plateau { grid-column: 2; grid-row: 1; display: block; height: 100%; min-height: 0; overflow: visible; position: relative; }
+.cel-compo .ct-plateau > .manager-terrain-cadre { display: block; height: 100%; min-height: 0; padding: 0; border: 0; background: transparent; box-sizing: border-box; }
+.cel-compo .manager-terrain-legende { display: none; }
+.cel-compo .ct-feuille-fut .manager-terrain-xv {
+  container-type: size; position: relative; display: block; height: 100%; min-height: 0; padding: 0;
+  border: 1px solid #91bca854; border-radius: 14px; overflow: visible;
+  background: repeating-linear-gradient(0deg, #163e2ed9 0%, #163e2ed9 10%, #194b34d9 10%, #194b34d9 20%);
+  box-shadow: inset 0 0 100px #021211b0;
+}
+.cel-compo .ct-feuille-fut .manager-position { position: absolute; width: min(90px, 16cqh, 8cqw); transform: translate(-50%, -50%); z-index: 2; margin: 0; }
+.cel-compo .ct-feuille-fut .manager-position .ct-carte { width: 100%; padding: 0; }
+.cel-compo .ct-feuille-fut .ct-fut-nom { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 0; font-size: 10px; line-height: 13px; }
+.cel-compo .ct-feuille-fut .ct-fut-indicateurs { font-size: 10px; padding: 0 3px; min-height: 13px; gap: 4px; }
+.cel-compo .ct-feuille-fut .ct-fut-indicateurs svg { width: 8px; height: 8px; }
+.cel-compo .ct-feuille-fut .cel-barre-collectif { margin-top: 1px; height: 2px; }
+.cel-compo .ct-liens-collectif { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; }
+.cel-compo .ct-liens-collectif line { stroke-width: 2.5; opacity: .85; filter: drop-shadow(0 0 3px #d2ed5455); }
+.cel-compo .ct-liens-collectif .ct-lien-estompe { opacity: .18; }
+.cel-compo .ct-selection-actions { grid-column: 1 / -1; grid-row: 2; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: #071922; border-radius: 7px; font-size: 12px; color: #c4dadc; }
+.cel-compo .ct-selection-actions b { color: #f6d476; }
+.cel-compo .ct-selection-actions span { flex: 1; }
+.cel-compo :is(.ct-selection-actions, .ct-groupes) button { border: 1px solid #a9bdc34d; background: #132c38; color: white; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px; min-height: 30px; }
+.cel-compo .ct-groupes { grid-column: 1 / -1; grid-row: 3; display: flex; gap: 8px; align-items: center; }
+.cel-compo .ct-groupes button[aria-pressed="true"] { background: #efd06a; color: #071922; font-weight: 800; }
+.cel-compo .ct-groupes span { margin-left: auto; color: #c4dadc; font-size: 11px; }
+.cel-compo .manager-feuille-visuelle > :is(.manager-banc-visuel, .manager-reserves, .manager-reserves[open]) { grid-column: 1 / -1; grid-row: 4; position: static; inset: auto; display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; max-height: none; align-self: stretch; margin: 0; padding: 0; box-sizing: border-box; overflow: hidden; background: #142b35; border: 1px solid #a9bdc32e; border-radius: 10px; box-shadow: none; }
+.cel-compo .ct-feuille-fut[data-groupe="banc"] > .manager-reserves,
+.cel-compo .ct-feuille-fut[data-groupe="reserves"] > .manager-banc-visuel { display: none; }
+.cel-compo .ct-feuille-fut :is(.manager-banc-visuel > .comp-tete, .manager-reserves > summary, .manager-reserves > p) { display: none; }
+.cel-compo .ct-feuille-fut :is(.manager-banc-cartes, .manager-reserves > div) { container-type: normal; contain: inline-size; display: flex; flex-direction: row; align-items: flex-start; justify-content: flex-start; gap: 18px; width: 100%; height: 100%; min-width: 0; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 6px 14px; box-sizing: border-box; scrollbar-color: #efd06a #142b35; scroll-snap-type: x proximity; }
+.cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut,
+.cel-compo .ct-feuille-fut .manager-reserve-carte.ct-reserve-fut { flex: 0 0 88px; width: 88px; min-width: 88px; max-width: 88px; scroll-snap-align: start; padding: 0; text-align: center; }
+.cel-compo .ct-feuille-fut .ct-reserve-fut > small { display: none; }
+.cel-compo .ct-feuille-fut .ct-reserve-fut .dr-player :is(b, small) { white-space: nowrap; }
+.cel-compo .ct-reserve-fut .dr-player-stats small, .cel-compo .ct-reserve-fut .dr-player-identity small { font-size: 3.8cqw; color: inherit; }
+.cel-compo .ct-reserve-fut .dr-player-status { font-size: 2.8cqw; color: inherit; }
+.cel-compo .ct-plateau > .ct-panneau { position: absolute; right: 0; top: 0; bottom: 0; width: 280px; z-index: 15; overflow: auto; }
+.cel-compo :is(button, summary):focus-visible { outline: 3px solid #ffe08a; outline-offset: 3px; }
+.cel-compo .manager-position:hover, .cel-compo .manager-position:has(:focus-visible) { z-index: 5; }
+@media (min-height: 950px) {
+  .cel-compo > .manager-feuille-visuelle { grid-template-rows: minmax(0, 1fr) 38px 36px 202px; }
+  .cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut,
+  .cel-compo .ct-feuille-fut .manager-reserve-carte.ct-reserve-fut { flex-basis: 110px; width: 110px; min-width: 110px; max-width: 110px; }
+}
+@media (max-width: 850px) {
+  .cel-compo > .manager-feuille-visuelle { grid-template-columns: 110px minmax(0, 1fr); gap: 5px; }
+  .cel-compo .manager-feuille-visuelle > .ct-entete { padding: 5px; }
+  .cel-compo > .cel-tete-compo h2 { display: none; }
+  .cel-compo .ct-selection-actions { font-size: 10px; gap: 6px; }
+  .cel-compo .ct-selection-actions > span { display: none; }
+  .cel-compo .ct-feuille-fut .manager-position { width: min(72px, 16cqh, 10cqw); }
+}
+@media (max-width: 600px) {
+  .cel > .cel-compo.cel-compo-etendue { padding: 6px; }
+  .cel-compo > .manager-feuille-visuelle { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) 48px 34px 146px; }
+  .cel-compo .manager-feuille-visuelle > .ct-entete { display: none; }
+  .cel-compo .manager-feuille-visuelle > .ct-plateau { grid-column: 1; }
+  .cel-compo .ct-groupes span { display: none; }
+  .cel-compo .ct-feuille-fut .manager-position { width: min(64px, 16cqh, 12cqw); }
+  .cel-compo .ct-selection-actions { flex-wrap: wrap; gap: 3px 6px; padding: 3px; }
+  .cel-compo .ct-selection-actions b { flex: 1 1 100%; }
+  .cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut,
+  .cel-compo .ct-feuille-fut .manager-reserve-carte.ct-reserve-fut { flex-basis: 76px; width: 76px; min-width: 76px; max-width: 76px; }
+}
+.cel-compo .ct-entete > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.cel-compo .ct-entete .ct-secteurs { flex-wrap: wrap; gap: 8px; }
+.cel-compo .ct-entete .ct-secteurs > div { display: block; min-width: 0; }
+.cel-compo .ct-entete .ct-alertes { margin: 0; padding: 0; }
+.cel-compo .manager-banc-cartes .ct-fut-indicateurs { display: none; }
+.cel-compo > .cel-consignes-repliables[open] { display: block; position: absolute; inset: 80px 20px 180px 210px; z-index: 40; max-height: none; overflow-y: auto; background: #102630; box-shadow: 0 20px 80px #000c; }
+@media (max-width: 600px) { .cel-compo > .cel-consignes-repliables[open] { inset: 110px 8px 170px; } }
+.cel-compo .manager-feuille-visuelle > .ct-entete { flex-wrap: nowrap; overflow-x: hidden; gap: 6px; }
+.cel-compo .ct-entete > * { flex-shrink: 0; width: 100%; }
+.cel-compo .ct-entete .ct-secteurs { flex-wrap: nowrap; gap: 4px; }
+.cel-compo .ct-entete .ct-secteurs dt { font-size: 8px; }
+.cel-compo .ct-apercu-selection > .dr-player { flex: none; width: 110px; }
+@media (min-height: 850px) { .cel-compo .ct-apercu-selection > .dr-player { width: 140px; } }
