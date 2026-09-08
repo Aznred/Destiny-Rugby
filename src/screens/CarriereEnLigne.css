@@ -262,16 +262,49 @@
 .cel-ligue small { color: var(--brume); font-size: 0.82rem; }
 .cel-ligue > svg { color: var(--or-500); opacity: 0.55; }
 
-.cel-bascules { display: flex; gap: 0.4rem; padding: 0.25rem; border-radius: var(--rayon-pilule); background: rgba(0, 0, 0, 0.3); }
+/* ⚠️ UN BOUTON SANS `background` PREND CELUI DU NAVIGATEUR, et ça se voyait :
+   « Rejoindre des amis » sortait en gris souris (rgb(107,107,107), le
+   `buttonface` de Chrome) avec un liseré blanc de 2 px, à côté d'un actif à
+   peine teinté. Deux dalles grises au milieu d'un formulaire doré — le rendu
+   qu'on ne veut nulle part. La bascule reprend donc la matière des onglets du
+   jeu : une piste sombre creusée, un état inactif en relief léger, et un actif
+   qui s'allume en doré avec du texte sombre. */
+.cel-bascules {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.28rem;
+  border-radius: var(--rayon-pilule);
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.34);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+}
 .cel-bascules button {
   flex: 1;
-  padding: 0.55rem 0.6rem;
+  padding: 0.62rem 0.7rem;
+  border: 1px solid transparent;
   border-radius: var(--rayon-pilule);
-  color: var(--brume);
+  background: transparent;
+  color: var(--craie-dim);
   font-family: var(--police-forte);
   font-size: 0.85rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.2s ease, border-color 0.2s ease, transform 0.12s ease;
 }
-.cel-bascules button.actif { background: rgba(232, 178, 58, 0.14); color: var(--or-200); }
+.cel-bascules button:hover {
+  color: var(--craie);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.18));
+}
+.cel-bascules button:active { transform: translateY(1px); }
+.cel-bascules button:focus-visible { outline: 2px solid var(--or-400); outline-offset: 2px; }
+.cel-bascules button.actif {
+  color: #17110a;
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--or-400), var(--or-500));
+  box-shadow: 0 6px 16px -6px rgba(232, 178, 58, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.cel-bascules button.actif:hover { color: #17110a; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    L'EN-TÊTE DU CLUB
@@ -1524,10 +1557,24 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
    grandes ; ces règles ne s'appliquent donc qu'à la ligue. La hauteur du
    terrain s'adapte à la fenêtre et les cartes gardent assez d'espace entre les
    lignes pour rester sélectionnables. */
+/* ⚠️ LA CARTE SE MESURE SUR LA LARGEUR DU TERRAIN, ET LE TERRAIN PREND LA
+   HAUTEUR QUI VA AVEC. Les deux tailles étaient posées à la main, sans lien
+   entre elles ni avec le placement des postes : mesuré sur un téléphone de
+   375 px, des cartes de 56 × 95 sur un terrain de 320 × 540 donnaient
+   QUATORZE paires de cartes superposées — le pilier sous le deuxième ligne,
+   l'ouvreur sur le centre. Les deux contraintes se lisent dans
+   `PLACEMENT_XV` (CompositionTerrainManager.tsx) : deux postes voisins sont
+   séparés d'au moins 13 % de la largeur et 13 % de la hauteur. La carte ne
+   peut donc pas dépasser 12,5 % de la largeur, et le terrain doit être assez
+   haut pour que 13 % de sa hauteur porte une carte entière.
+   Toucher à ces deux nombres sans rouvrir `PLACEMENT_XV`, c'est ramener les
+   chevauchements. */
 .cel .ct-feuille-fut .manager-terrain-xv {
-  min-height: clamp(610px, calc(100vh - 250px), 720px);
+  container-type: inline-size;
+  --ct-carte: min(12.5cqw, 68px);
+  min-height: calc((1.5 * var(--ct-carte) + 14px) / 0.13);
 }
-.cel .ct-feuille-fut .manager-position { width: clamp(58px, 5.5vw, 68px); }
+.cel .ct-feuille-fut .manager-position { width: var(--ct-carte); }
 .cel .ct-feuille-fut .ct-fut-indicateurs {
   gap: 2px;
   padding: 1px 2px;
@@ -1537,8 +1584,8 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel .ct-feuille-fut .ct-fut-indicateurs svg { width: 7px; height: 7px; }
 
 @media (max-width: 700px) {
-  .cel .ct-feuille-fut .manager-terrain-xv { min-height: 540px; }
-  .cel .ct-feuille-fut .manager-position { width: clamp(44px, 15vw, 58px); }
+  /* La règle ci-dessus tient déjà le téléphone : la carte suit la largeur du
+     terrain, le terrain suit la carte. Rien à forcer ici. */
 }
 
 /* Les consignes sont utiles mais ne doivent pas repousser le terrain hors de
@@ -1789,26 +1836,50 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
   .cel-compo .ct-note-equipe strong { font-size: 1.7rem; }
   .cel-compo .manager-feuille-visuelle > .manager-compo-aide { grid-column: 2; grid-row: 1; margin: 0; padding: .4rem .6rem; font-size: .7rem; }
   .cel-compo .manager-feuille-visuelle > .ct-plateau { grid-column: 1; grid-row: 2 / 4; min-height: 0; align-items: stretch; position: relative; grid-template-columns: minmax(0, 1fr); }
+  /* ⚠️ LA TAILLE DES CARTES SE DÉDUIT DE L’ÉCART ENTRE LES RANGÉES, PAS DE LA
+     LARGEUR DU TERRAIN. La formule précédente donnait 58 px de large — donc
+     119 px de haut, talon compris — pour des rangées espacées de 64 px :
+     mesuré à l’écran, CHAQUE rangée mordait sur celle du dessus, l’arrière se
+     retrouvait à cheval sur les ailiers et une carte sur deux passait sous sa
+     voisine. Une carte fait 1,5 fois sa largeur, plus ~40 px de nom et de
+     badges ; il en faut donc autant que l’écart entre deux rangées (15 % de la
+     hauteur). Le `min-height` garantit ce que le plancher de 50 px exige, et
+     le plateau défile quand la fenêtre est trop courte — un terrain écrasé se
+     lit moins bien qu’un terrain qu’on fait glisser de deux centimètres. */
+  .cel-compo .ct-plateau { overflow: auto; overscroll-behavior: contain; }
   .cel-compo .ct-plateau > .manager-terrain-cadre { grid-template-rows: minmax(0, 1fr); min-height: 0; padding: .45rem; border-radius: 16px; }
-  .cel-compo .ct-feuille-fut .manager-terrain-xv { height: 100%; min-height: 0; container-type: size; box-shadow: inset 0 0 80px #051d1955; }
-  .cel-compo .ct-feuille-fut .manager-position { width: min(11cqw, calc((32cqh - 40px) / 1.5)); left: var(--x) !important; top: var(--y) !important; }
+  .cel-compo .ct-feuille-fut .manager-terrain-xv {
+    /* ⚠️ LA CARTE SE MESURE SUR LA LARGEUR, LE TERRAIN SUIT EN HAUTEUR. Tirer
+       la largeur de la carte de la hauteur du terrain (`cqh`) alors que cette
+       hauteur venait elle-même de la carte donnait un point fixe : les cartes
+       restaient collées à leur plancher de 50 px, même sur un écran de 1 000 px
+       de haut. La largeur vient donc de la fenêtre, et la hauteur du terrain
+       s'en déduit. */
+    --ct-carte: clamp(50px, 3.8vw, 72px);
+    height: 100%; min-height: calc((1.5 * var(--ct-carte) + 40px) / 0.15);
+    box-shadow: inset 0 0 80px #051d1955;
+  }
+  .cel-compo .ct-feuille-fut .manager-position { width: var(--ct-carte); left: var(--x) !important; top: var(--y) !important; }
   .cel-compo .ct-fut-nom { display: block; }
-  /* Cinq lignes décalées : l'espace entre les postes accueille des cartes plus grandes. */
-  .cel-compo .manager-position:nth-child(1) { --x: 20%; --y: 82%; }
-  .cel-compo .manager-position:nth-child(2) { --x: 50%; --y: 82%; }
-  .cel-compo .manager-position:nth-child(3) { --x: 80%; --y: 82%; }
-  .cel-compo .manager-position:nth-child(4) { --x: 35%; --y: 66%; }
-  .cel-compo .manager-position:nth-child(5) { --x: 65%; --y: 66%; }
-  .cel-compo .manager-position:nth-child(6) { --x: 20%; --y: 50%; }
-  .cel-compo .manager-position:nth-child(7) { --x: 80%; --y: 50%; }
-  .cel-compo .manager-position:nth-child(8) { --x: 50%; --y: 50%; }
-  .cel-compo .manager-position:nth-child(9) { --x: 35%; --y: 34%; }
-  .cel-compo .manager-position:nth-child(10) { --x: 65%; --y: 34%; }
-  .cel-compo .manager-position:nth-child(11) { --x: 8%; --y: 18%; }
-  .cel-compo .manager-position:nth-child(12) { --x: 23%; --y: 18%; }
-  .cel-compo .manager-position:nth-child(13) { --x: 77%; --y: 18%; }
-  .cel-compo .manager-position:nth-child(14) { --x: 92%; --y: 18%; }
-  .cel-compo .manager-position:nth-child(15) { --x: 50%; --y: 18%; }
+  /* ⚠️ SIX RANGÉES, ET L’ARRIÈRE TOUT SEUL DERRIÈRE. Il partageait la ligne des
+     ailiers et des centres : sur un terrain de rugby, le 15 est le dernier
+     rempart, et le voir aligné avec ses trois-quarts est la première chose qui
+     sonne faux quand on regarde la feuille. */
+  .cel-compo .manager-position:nth-child(1) { --x: 20%; --y: 85%; }
+  .cel-compo .manager-position:nth-child(2) { --x: 50%; --y: 85%; }
+  .cel-compo .manager-position:nth-child(3) { --x: 80%; --y: 85%; }
+  .cel-compo .manager-position:nth-child(4) { --x: 35%; --y: 70%; }
+  .cel-compo .manager-position:nth-child(5) { --x: 65%; --y: 70%; }
+  .cel-compo .manager-position:nth-child(6) { --x: 18%; --y: 55%; }
+  .cel-compo .manager-position:nth-child(7) { --x: 82%; --y: 55%; }
+  .cel-compo .manager-position:nth-child(8) { --x: 50%; --y: 55%; }
+  .cel-compo .manager-position:nth-child(9) { --x: 36%; --y: 40%; }
+  .cel-compo .manager-position:nth-child(10) { --x: 60%; --y: 40%; }
+  .cel-compo .manager-position:nth-child(11) { --x: 9%; --y: 25%; }
+  .cel-compo .manager-position:nth-child(12) { --x: 30%; --y: 25%; }
+  .cel-compo .manager-position:nth-child(13) { --x: 70%; --y: 25%; }
+  .cel-compo .manager-position:nth-child(14) { --x: 91%; --y: 25%; }
+  .cel-compo .manager-position:nth-child(15) { --x: 50%; --y: 10%; }
   .cel-compo .ct-feuille-fut .ct-fut-indicateurs { font-size: 10px; min-height: 16px; gap: 4px; padding: 1px 4px; border: 1px solid #ffffff20; }
   .cel-compo .ct-feuille-fut .ct-fut-indicateurs svg { width: 9px; height: 9px; }
   .cel-compo .manager-feuille-visuelle > .manager-banc-visuel { grid-column: 2; grid-row: 2; align-self: stretch; min-height: 0; padding: .7rem; display: flex; flex-direction: column; background: linear-gradient(145deg, #132c30, #091b21); border-color: #b7dcd329; }

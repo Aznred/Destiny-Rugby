@@ -72,6 +72,14 @@ export function poidsPackQuotidien(pack: PackCarriere, rang: number, clubs: numb
 }
 
 function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number): void {
+  // ⚠️ RIEN AVANT LE COUP D'ENVOI. Le lot quotidien tombait dès la création de
+  // la ligue : un créateur qui attend ses amis pendant trois jours ouvrait
+  // trente packs et se présentait au premier match avec un effectif que
+  // personne ne pouvait rattraper. Les packs sont une récompense de saison, pas
+  // une avance sur inscription — le salon n'en distribue plus, et
+  // `demarrerSaison` donne le premier lot au moment où tout le monde part
+  // ensemble.
+  if (etat.phase === 'salon') return;
   const jour = dateServeur(maintenant).slice(0, 10);
   const classement = classementCarriere(etat);
   const classementActif = classement.some(ligne => ligne.joues > 0);
@@ -294,6 +302,9 @@ function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
   exiger(etat.clubs.length >= 2, 'Invitez au moins un autre manager pour commencer.');
   if (etat.phase === 'intersaison') etat.saison++;
   etat.phase = 'saison'; etat.debutSaison = dateServeur(maintenant);
+  // Le coup d'envoi ouvre le robinet des packs quotidiens, pour tout le monde
+  // le même jour.
+  attribuerPacksQuotidiens(etat, maintenant);
   // ⚠️ LA PHASE FINALE DEMANDE QUATRE CLUBS. À trois, une demi-finale à deux
   // n'a pas de sens : le championnat couronne alors son premier, comme si le
   // réglage n'existait pas. Mieux vaut l'ignorer que produire un tableau bancal.

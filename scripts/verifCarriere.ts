@@ -98,6 +98,22 @@ titre('1. LA LIGUE, ET LES 30 BRONZE DU DÉPART');
     `${e.cartes.length} licenciés distincts`);
   dire(e.cartes.length === 6 * 30, 'la ligue ne stocke QUE les cartes distribuées', `${nb(e.cartes.length)} cartes`);
   dire(e.clubs.every(c => c.packsGratuits?.length === PACKS_GRATUITS_PAR_JOUR), 'chaque club reçoit dix packs gratuits par jour');
+  // ⚠️ MAIS PAS AVANT LE COUP D'ENVOI. Un créateur qui attend ses amis pendant
+  // trois jours accumulait trente packs et se présentait au premier match avec
+  // une avance que personne ne pouvait rattraper.
+  {
+    const salon = creerCarriere({
+      id: 'ligue-salon', nom: 'Salon', code: 'DR-SALON', compteId: 'compte-1', pseudo: 'Colin',
+      clubNom: 'Colin RFC', rythme: 1, maxClubs: 20,
+    }, T0, 'graine-salon');
+    dire(salon.phase === 'salon' && salon.clubs.every((c) => !c.packsGratuits?.length),
+      '⚠️ le SALON ne distribue AUCUN pack quotidien');
+    const rejoint = agirCarriere(salon, 'compte-2', { type: 'rejoindre', pseudo: 'Ami', clubNom: 'Club 2' }, T0 + JOUR, 'g2');
+    dire(rejoint.clubs.every((c) => !c.packsGratuits?.length), 'ni le lendemain, ni à l’arrivée d’un ami');
+    const lancee = agirCarriere(rejoint, 'compte-1', { type: 'demarrerSaison' }, T0 + JOUR, 'g3');
+    dire(lancee.clubs.every((c) => c.packsGratuits?.length === PACKS_GRATUITS_PAR_JOUR),
+      'et le coup d’envoi les donne à tout le monde le même jour');
+  }
   const vue = vueCarriere(e, e.clubs[0].compteId);
   dire(vue.clubs.find(c => c.id === e.clubs[0].id)?.packsGratuits?.length === 10
     && vue.clubs.filter(c => c.id !== e.clubs[0].id).every(c => !c.packsGratuits), 'les packs gratuits restent privés à leur destinataire');

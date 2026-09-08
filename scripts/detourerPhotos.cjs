@@ -177,9 +177,15 @@ async function detourer(fichier) {
   const opaque = (x, y) => alpha[y * w + x] > 40;
   const marge = Math.round(Math.min(w, h) * 0.04);
   if ([[marge, marge], [w - 1 - marge, marge]].some(([x, y]) => opaque(x, y))) return false;
+  // ⚠️ ET LE HAUT SE MESURE LARGE. Un joueur qui lève un ballon, une coupe de
+  // cheveux qui touche le cadre : le sujet a le droit d'entamer la première
+  // ligne. On ne refuse que si le haut est un MUR — c'est-à-dire s'il est
+  // opaque sur plus du quart de sa largeur. Le seuil a d'abord été à 6 %, et il
+  // recalait des portraits parfaitement détourables (Fraser McReight, son
+  // ballon au-dessus de l'épaule : 8 %).
   let hautOpaque = 0;
   for (let x = 0; x < w; x++) if (opaque(x, marge)) hautOpaque++;
-  if (hautOpaque > w * 0.06) return false;
+  if (hautOpaque > w * 0.25) return false;
 
 
   // On rend au pixel la couleur qu'il aurait sans le fond derrière lui : sinon

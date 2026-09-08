@@ -34,6 +34,21 @@
   ligue — et des rappels par notification tant que le jeu est ouvert.
 - **Le créateur fixe les Ovas de départ**, de 0 à 100 000. Le plafond n'est pas
   décoratif : c'est le seul robinet d'Ovas qu'il ouvre lui-même.
+- ⚠️ **Les dix packs quotidiens ne tombent qu'au coup d'envoi.** Ils étaient
+  distribués dès la création : un créateur qui attendait ses amis pendant trois
+  jours ouvrait trente packs et se présentait au premier match avec une avance
+  que personne ne pouvait rattraper. Le salon n'en donne plus aucun, et
+  `demarrerSaison` sert le premier lot à tout le monde le même jour.
+- **Le terrain de composition ne superpose plus ses cartes.** La taille des
+  cartes et la hauteur du terrain étaient posées à la main, sans lien entre
+  elles ni avec le placement des postes : mesuré, **quatorze paires de cartes se
+  chevauchaient sur téléphone** et cinq rangées sur six sur un écran de 1 440.
+  Les deux contraintes se lisent maintenant dans `PLACEMENT_XV` — deux postes
+  voisins sont séparés d'au moins 13 % de la largeur et de la hauteur — donc la
+  carte ne dépasse pas 12,5 % de la largeur du terrain, et le terrain prend la
+  hauteur qui porte une carte entière entre deux rangées. **Et l'arrière a sa
+  ligne à lui** : il partageait celle des ailiers et des centres, ce qui est la
+  première chose qui sonne faux quand on regarde une feuille de match.
 - **Ouvrir un pack est une séquence** : la pochette se déchire, les cartes se
   retournent une à une de la moins bonne à la meilleure, et la lueur du fond
   annonce la rareté avant le nom.
