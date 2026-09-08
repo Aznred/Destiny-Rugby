@@ -374,14 +374,24 @@ export async function POST(req: Request): Promise<Response> {
   // score le plus bas n'écrivait donc RIEN — sans erreur et sans message, le
   // serveur répondant `ok` : sa carrière n'entrait jamais au classement.
   //
-  // ⚠️ ET LE REPLI SUR LE PSEUDO EST DÉLIBÉRÉ. Une fiche sans clé vient d'un
-  // onglet resté ouvert sur l'ancien bundle : elle retrouve exactement l'ancien
-  // comportement — sa ligne historique, avec son bug — plutôt que de se voir
-  // refusée. Le préfixe garantit qu'une clé tirée au hasard ne tombera jamais
-  // sur une identité héritée.
+  // ⚠️ ET LE REPLI NE SE DÉDUIT PLUS DU PSEUDO : C'ÉTAIT UNE PORTE OUVERTE.
+  // La clé est le DROIT D’ÉCRIRE sur une ligne. Tant qu’elle valait
+  // `v1:<pseudo>`, il suffisait de poster une fiche valide sans clé, au nom
+  // de quelqu’un d’autre, pour réécrire SA ligne : son nom, sa nation, son
+  // palmarès, ses clubs. Le score ne pouvait pas baisser (`greatest`), mais
+  // l’identité affichée sous ce score devenait celle de l’attaquant — et le
+  // pseudo est la seule chose que tout le monde voit dans le classement.
+  //
+  // Le repli existe toujours, pour l’onglet resté ouvert sur un ancien
+  // bundle : il est simplement rattaché à l'APPAREIL plutôt qu'au pseudo.
+  // L’empreinte est salée côté serveur (`SEL_APPAREIL`) et ne sort jamais :
+  // personne ne peut donc viser la ligne d’un autre. Le prix à payer est
+  // connu et acceptable : un très ancien client qui change de réseau crée une
+  // nouvelle ligne, exactement comme lorsqu’on vide son navigateur — et il
+  // repart avec une vraie clé dès qu’il recharge la page.
   const cle = typeof f.cle === 'string' && f.cle.trim()
     ? f.cle.trim().slice(0, 40)
-    : `v1:${pseudo}`;
+    : `v1d:${appareil.slice(0, 32)}`;
 
   try {
     const ecrit = await sql`

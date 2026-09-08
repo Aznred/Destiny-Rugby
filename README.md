@@ -94,6 +94,26 @@
   chaque manager, points marqués et encaissés, bonus, forme sur cinq matchs — et
   un clic ouvre la **fiche d'un adversaire** (effectif complet, derniers
   résultats, palmarès). Sur les cartes, le blason du club réel du joueur.
+- **Le mode en ligne a été attaqué, commande par commande.**
+  `npm run verify:triche` tient **quarante tentatives fermées** : se créditer
+  des Ovas par une commande inventée ou par des champs parasites, vendre la
+  carte d’un autre, vendre trente fois la même dans un lot, mettre en vente à
+  un prix négatif ou astronomique, réclamer l’objectif du voisin, ouvrir un
+  pack sans le payer ou le pack quotidien d’un autre, aligner une carte qu’on
+  ne possède pas, lancer la saison sans être le créateur, se créer une coupe à
+  un million d’Ovas de récompense, donner des ordres dans le match des autres,
+  rembobiner l’horloge. Le banc vérifie aussi que **le total d’Ovas d’une ligue
+  ne bouge pas** au fil d’une vente, d’une enchère perdue ou d’un échange
+  annulé, et que la vue serveur ne laisse sortir ni la graine des tirages, ni
+  la composition, ni le journal financier des adversaires.
+- **Deux failles corrigées à cette occasion.** La ligne du classement mondial
+  était adressable par `v1:<pseudo>` quand le client n’envoyait pas de clé :
+  poster une fiche valide au nom de quelqu’un d’autre réécrivait son nom, sa
+  nation et son palmarès. La clé de repli est maintenant l’empreinte salée de
+  l’appareil, qui ne sort jamais du serveur. Et le relais d’écussons suivait
+  les redirections : un serveur autorisé qui redirige aurait fait pointer NOTRE
+  serveur où il voulait, depuis l’intérieur. Une redirection est désormais un
+  refus.
 - **Mesuré** (`npm run verify:carriere`, 144 contrôles) : scores moyens 19,9 et
   maximum 35 sur 120 rencontres — jamais de 200-150 ; un direct suivi minute par
   minute donne le même score qu'un match joué d'un bloc ; rapport OVA premier /

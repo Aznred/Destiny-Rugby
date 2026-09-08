@@ -404,6 +404,7 @@ npm run verify:carriere-profonde  # 24 contrôles
 npm run verify:formation-manager
 npm run verify:distances-transferts
 npm run verify:photos             # portraits des cartes : liens morts, silhouettes, Top 14
+npm run verify:triche             # 40 tentatives de triche, toutes refusées
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
 ```
@@ -461,6 +462,30 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   (blessure, carte achetée, enchère perdue). La vente rapide accepte un lot
   (`venteRapideGroupee`) : le plancher d'effectif se vérifie sur TOUS les
   sortants d'un coup, jamais carte par carte.
+
+  ⚠️ **CE QUI PROTÈGE DU TRICHEUR, ET CE QUI N'Y SERT À RIEN.** Tout ce que le
+  navigateur envoie est fabricable à la main : la seule question est ce que le
+  SERVEUR accepte. Ce qui protège tient en trois lignes — le serveur RECALCULE
+  (score du classement, résultat d'un match rejoué depuis sa graine), il BORNE
+  (`entier()` plafonne à 1 000 000, `verifierFiche` croise chaque champ avec
+  les autres) et il VÉRIFIE LA PROPRIÉTÉ (une carte, un objectif, un pack
+  quotidien appartiennent à un club). Le débit et l'obscurité ne protègent
+  rien. **`npm run verify:triche` tient quarante tentatives de triche fermées**
+  — s'en donner des Ovas, s'ouvrir des packs, jouer à la place d'un autre,
+  rembobiner l'horloge, faire sortir la graine des tirages.
+
+  ⚠️ **UNE CLÉ D’ÉCRITURE NE SE DÉDUIT JAMAIS D’UNE DONNÉE PUBLIQUE.** Le
+  classement mondial identifiait sa ligne par `v1:<pseudo>` quand le client
+  n'envoyait pas de clé : il suffisait de poster une fiche valide au nom d'un
+  autre pour réécrire SA ligne. Le repli est maintenant l'empreinte salée de
+  l'appareil, qui ne sort jamais du serveur (`api/classement.ts`).
+
+  ⚠️ **DEUX RISQUES RESTENT OUVERTS, ET C’EST ASSUMÉ.** Une ligue entre potes
+  ne peut pas empêcher qu'on s'y inscrive deux fois pour se transférer ses
+  propres cartes — c’est une ligue privée, on choisit ses amis. Et la carrière
+  SOLO vit dans le navigateur : elle est modifiable, par construction. Elle ne
+  donne rien à personne d’autre — le classement mondial recalcule tout ce
+  qu’elle prétend.
 
   Les quatre invariants, en une ligne chacun — ils commandent tout le reste :
   1. **Le serveur est la source de vérité.** Le client DEMANDE une action, il ne

@@ -139,7 +139,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
           throw new ErreurHttp(404, 'Écusson inconnu.');
         }
         if (!res.envoyer) throw new ErreurHttp(501, 'Relais indisponible sur cet hôte.');
-        const amont = await fetch(ecusson, { signal: AbortSignal.timeout(8000) });
+        // ⚠️ ET IL NE SUIT AUCUNE REDIRECTION. La liste blanche ne contrôle que
+        // l'adresse DEMANDÉE : si l'un des serveurs autorisés répond un jour
+        // « 302 vers http://169.254.169.254/… », c'est notre serveur qui va
+        // chercher la page — et il le fait depuis l'intérieur, là où personne
+        // d'autre n'a le droit d'aller. Une redirection est donc une erreur,
+        // pas un détour : la liste blanche perd son sens dès qu'on la suit.
+        const amont = await fetch(ecusson, { signal: AbortSignal.timeout(8000), redirect: 'manual' });
+        if (amont.status >= 300 && amont.status < 400) throw new ErreurHttp(502, 'La source redirige : écusson refusé.');
         if (!amont.ok) throw new ErreurHttp(502, 'Écusson indisponible à la source.');
         const type = amont.headers.get('content-type') ?? '';
         if (!type.startsWith('image/')) throw new ErreurHttp(502, 'La source n’a pas renvoyé une image.');
