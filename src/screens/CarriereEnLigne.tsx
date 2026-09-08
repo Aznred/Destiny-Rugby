@@ -36,7 +36,8 @@ import type { CompositionManager } from '../types';
 import type { Coequipier } from '../lib/effectif';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
 import type { CarteCarriere, CommandeCarriere, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
-import type { StrategieEnLigne } from '../lib/ligue/matchCarriere';
+import type { OrdreFil, StrategieEnLigne } from '../lib/ligue/matchCarriere';
+import TerrainEnDirect, { type CouleursDirect } from '../components/match/TerrainEnDirect';
 import {
   chargerSessionCarriere, chargerLigueCarriere, identifierCarriere, deconnecterCarriere, INCHANGE,
   creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, chargerEmblemesCarriere, ErreurCarriere,
@@ -425,6 +426,10 @@ export function CarriereEnLigne() {
   const [vue, setVue] = useState<VueCarriereEnLigne | null>(null);
   const [onglet, setOnglet] = useState<Onglet>('club');
   const [matchId, setMatchId] = useState<string | null>(null);
+  // ⚠️ LU PAR LA BOUCLE DE SONDAGE, qui n'est montée qu'une fois : sans cette
+  // référence, elle ne saurait jamais qu'on vient d'ouvrir un direct.
+  const directOuvert = useRef<string | null>(null);
+  directOuvert.current = matchId;
   const versionRequete = useRef(0);
   const derniereVue = useRef(vue);
   derniereVue.current = vue;
@@ -521,7 +526,16 @@ export function CarriereEnLigne() {
 
     const prochainPas = () => {
       const vue = derniereVue.current;
-      if (vue?.rencontres.some(r => r.match && !r.match.termine)) return 2000;
+      // ⚠️ LES DEUX SECONDES SONT RÉSERVÉES À CELUI QUI REGARDE. Un match dure
+      // quatre-vingts minutes réelles : sonder toutes les deux secondes pour
+      // TOUS les membres de la ligue, c'était deux mille quatre cents lectures
+      // complètes de l'état par match et par onglet ouvert. Le match avance de
+      // toute façon à chaque lecture, d'où qu'elle vienne — un direct laissé
+      // sans spectateur ne se bloque donc pas, il coûte simplement cinq fois
+      // moins cher.
+      const suivi = directOuvert.current;
+      if (suivi && vue?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine)) return 2000;
+      if (vue?.rencontres.some(r => r.match && !r.match.termine)) return 10_000;
       const bientot = Date.now() + 5 * 60_000;
       if (vue?.rencontres.some(r => !r.resultat && Date.parse(r.ouvre) <= bientot && Date.parse(r.ferme) >= Date.now())) return 10_000;
       return inchanges >= 6 ? 30_000 : 10_000;
@@ -619,8 +633,14 @@ export function CarriereEnLigne() {
         setOccupe(true); setErreur(''); try { ouvrir(await creerLigueCarriere(nom, clubNom, rythme, max, identite)); } catch (e) { setErreur(messageErreur(e)); } finally { setOccupe(false); }
       }} onRejoindre={async (code, clubNom, embleme) => { setOccupe(true); setErreur(''); try { ouvrir(await rejoindreLigueCarriere(code, clubNom, embleme)); oublierInvitation(); } catch (e) { setErreur(messageErreur(e)); } finally { setOccupe(false); } }} />
       : <>
-        <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / Saison {vue.saison}</span></div><h1>{club?.nom}</h1><p>{vue.clubs.length} clubs · {vue.rythme} match{vue.rythme > 1 ? 's' : ''} par semaine · {vue.phase === 'salon' ? 'Inscriptions ouvertes' : vue.phase === 'saison' ? 'Saison en cours' : 'Intersaison'}</p></div><div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>Ovas de cette ligue</span></div></header>
-        <nav className="cel-onglets" aria-label="Club en ligne">{ONGLETS.map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>
+        {/* ⚠️ LE DIRECT PREND L'ÉCRAN. Sur un téléphone, l'en-tête du club
+            et la barre d'onglets mangeaient 370 des 812 pixels : le terrain
+            commençait sous le pli, et suivre son match demandait de faire
+            défiler la page à chaque phase. Ni l'un ni l'autre ne servent
+            pendant une rencontre — le direct a son propre bouton « Fermer »,
+            qui ramène exactement là d'où l'on vient. */}
+        {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / Saison {vue.saison}</span></div><h1>{club?.nom}</h1><p>{vue.clubs.length} clubs · {vue.rythme} match{vue.rythme > 1 ? 's' : ''} par semaine · {vue.phase === 'salon' ? 'Inscriptions ouvertes' : vue.phase === 'saison' ? 'Saison en cours' : 'Intersaison'}</p></div><div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>Ovas de cette ligue</span></div></header>}
+        {!rencontre && <nav className="cel-onglets" aria-label="Club en ligne">{ONGLETS.map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} />}
@@ -853,6 +873,71 @@ function Rencontre({ vue, rencontre: r, occupe, suivre, grande = false }: { vue:
 // LUI qui tranche pendant que le chrono s'arrête. Ce que l'écran ne fait
 // jamais, en revanche, c'est décider à la place du serveur : chaque geste part
 // en commande et le match revient recalculé.
+//
+// ⚠️ ET LA RENCONTRE DURE VRAIMENT QUATRE-VINGTS MINUTES. Une minute de jeu
+// vaut une minute de vie : on ouvre l'onglet, on regarde une phase, on part
+// faire autre chose, on revient à la 63ᵉ. C'est ce qui donne son prix à une
+// décision — elle se prend une fois, à l'instant où elle se pose.
+
+/** Le chronomètre du stade, en minutes et secondes de jeu. */
+const chrono = (minutes: number) => {
+  const total = Math.max(0, Math.min(80 * 60, Math.round(minutes * 60)));
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+};
+
+/**
+ * Ce que le fil dit d'un ordre venu de mon banc.
+ *
+ * ⚠️ ON DISTINGUE CE QUE J'AI FAIT DE CE QUE MON ADJOINT A FAIT À MA PLACE. Une
+ * décision laissée sans réponse est tranchée par l'IA d'après les consignes
+ * enregistrées ; elle entre au journal comme les miennes, parce que la rejoue en
+ * a besoin. Écrire « Tu prends les trois points » à un manager parti chercher un
+ * café lui apprendrait qu'il a fait un choix qu'il n'a pas fait.
+ */
+const ORDRES_FIL: Record<OrdreFil, [moi: string, adjoint: string]> = {
+  consignes: ['Tes consignes partent au terrain.', 'Consignes appliquées depuis le banc.'],
+  remplacement: ['Tu lances un changement.', 'Ton adjoint lance un changement.'],
+  points: ['Tu prends les trois points.', 'Ton adjoint prend les trois points.'],
+  touche: ['Tu vas chercher la touche.', 'Ton adjoint va chercher la touche.'],
+  rapide: ['Tu fais jouer la pénalité à la main.', 'Ton adjoint fait jouer vite.'],
+  melee: ['Tu demandes la mêlée.', 'Ton adjoint demande la mêlée.'],
+};
+
+/**
+ * Huit teintes de maillot — et AUCUNE dans le vert.
+ *
+ * ⚠️ LA PELOUSE OCCUPE DÉJÀ UNE TEINTE, ET C'EST LA PLUS GRANDE SURFACE DE
+ * L'ÉCRAN. Une roue de couleurs tirée librement finit un jour sur un maillot
+ * vert : mesuré en jeu, l'équipe visiteuse s'est retrouvée à quinze pastilles
+ * vertes sur un terrain vert, invisibles. Le vert (95° à 165°) est donc absent
+ * de la liste, comme il l'est des maillots dans un vrai stade à pelouse.
+ */
+const TEINTES_MAILLOT = [355, 25, 45, 195, 220, 262, 300, 330];
+
+/**
+ * Les deux couleurs de maillot du direct.
+ *
+ * ⚠️ ELLES SONT SÉPARÉES DE FORCE. Une ligue entre amis n'a pas de couleurs de
+ * club — chacun choisit un écusson, pas un maillot. Deux teintes voisines et
+ * les trente pastilles deviennent un seul nuage : on ne sait plus qui attaque.
+ * Deux clubs qui tomberaient sur des teintes proches sont donc écartés d'un
+ * demi-tour de la liste.
+ */
+function couleursDirect(idDomicile: string, idExterieur: string): CouleursDirect {
+  const rang = (id: string) => {
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+    return (h >>> 0) % TEINTES_MAILLOT.length;
+  };
+  const a = rang(idDomicile);
+  let b = rang(idExterieur);
+  const ecart = Math.abs(a - b);
+  if (Math.min(ecart, TEINTES_MAILLOT.length - ecart) < 2) b = (a + 4) % TEINTES_MAILLOT.length;
+  return {
+    domicile: `hsl(${TEINTES_MAILLOT[a]} 72% 55%)`,
+    exterieur: `hsl(${TEINTES_MAILLOT[b]} 72% 55%)`,
+  };
+}
 
 function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereEnLigne; rencontre: VueRencontre; agir: Agir; occupe: boolean; fermer: () => void }) {
   const m = r.match;
@@ -873,6 +958,18 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, enCours]);
 
+  // ⚠️ LE CHRONO NE PEUT PAS ATTENDRE LE SERVEUR. Il ne répond que toutes les
+  // deux secondes : un chrono qui avance par bonds de deux secondes montre
+  // l'attente au lieu de la cacher. On l'ancre sur le dernier relevé, on le
+  // fait courir en local, et le relevé suivant recale. Le compte à rebours de
+  // la décision tourne sur le même battement.
+  const [, battement] = useState(0);
+  useEffect(() => { const t = setInterval(() => battement(n => n + 1), 1000); return () => clearInterval(t); }, []);
+  const horlogeServeur = m?.horloge ?? 0;
+  const ancre = useRef({ horloge: horlogeServeur, recu: Date.now() });
+  useEffect(() => { ancre.current = { horloge: horlogeServeur, recu: Date.now() }; }, [horlogeServeur]);
+  const couleurs = useMemo(() => couleursDirect(r.domicile, r.exterieur), [r.domicile, r.exterieur]);
+
   if (!m) return <><button className="btn fantome" onClick={fermer}>Fermer</button><Vide icone="chrono" titre="Les équipes entrent sur le terrain">Coup d’envoi automatique le {dateHeure(r.ferme)}. Le direct apparaîtra ici.</Vide></>;
   const strategie = m.maStrategie ?? STRATEGIE_VIDE;
   const changer = <K extends keyof StrategieEnLigne>(cle: K, valeur: string) => {
@@ -880,37 +977,57 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   };
   const mien = m.monCote === 'domicile' ? 'domicile' : 'exterieur';
   const restants = 8 - m.remplacementsFaits;
+  // Une décision en attente gèle le chrono du serveur : l'écran le gèle aussi,
+  // sinon il continuerait de courir pendant qu'on réfléchit.
+  const gele = Boolean(m.decision);
+  const minuteVive = m.termine ? 80
+    : Math.min(80, ancre.current.horloge + (gele ? 0 : (Date.now() - ancre.current.recu) / 60_000));
+  const resteDecision = m.decision
+    ? Math.max(0, Math.min(20, Math.ceil((m.decision.jusqua - Date.now()) / 1000)))
+    : 0;
 
   return <div className="cel-direct">
-    {m.terrain && <svg className="cel-terrain-direct" viewBox="0 0 122 70" role="img" aria-label="Positions réelles des joueurs et du ballon"><rect width="122" height="70" fill="#246a45" />{[11,33,51,61,71,89,111].map(x => <line key={x} x1={x} x2={x} y1={0} y2={70} stroke="#ffffff99" strokeWidth={.3} />)}{m.terrain.pions.map(p => <g key={p.id} style={{transform: `translate(${p.x}px, ${p.y}px)`,transition:'transform 2s linear'}}><title>{p.nom}</title><circle r={1.5} fill={p.cote==='A'?'#56c8fa':'#fd766c'} stroke="white" strokeWidth={.2}/><text textAnchor="middle" dy=".6" fontSize="1.8" fill="#102032">{p.numero}</text></g>)}<ellipse cx={m.terrain.ballon.x} cy={m.terrain.ballon.y} rx={1} ry={.6} fill="white" stroke="#312d20" strokeWidth={.2}/></svg>}
+    {m.terrain && <TerrainEnDirect
+      terrain={m.terrain}
+      nomDomicile={nomClub(vue, r.domicile)}
+      nomExterieur={nomClub(vue, r.exterieur)}
+      couleurs={couleurs}
+      monCote={m.monCote}
+    />}
     <div className="cel-tableau-bord">
       <button className="btn fantome cel-quitter" onClick={fermer}><Icone nom="croix" taille={15} /> Fermer</button>
       <div className="cel-score-direct">
         <div className={`cel-camp${m.monCote === 'domicile' ? ' moi' : ''}`}><Ecusson nom={nomClub(vue, r.domicile)} logo={vue.clubs.find(c => c.id === r.domicile)?.embleme} /><b>{nomClub(vue, r.domicile)}</b><small>{m.essais.domicile} essai{m.essais.domicile > 1 ? 's' : ''}</small></div>
-        <div className="cel-chrono"><strong>{m.score.domicile} <em>–</em> {m.score.exterieur}</strong><span className={m.termine ? '' : 'bat'}>{m.termine ? 'TERMINÉ' : `${m.minute}′`}</span></div>
+        <div className="cel-chrono"><strong>{m.score.domicile} <em>–</em> {m.score.exterieur}</strong><span className={m.termine ? '' : gele ? 'gele' : 'bat'}>{m.termine ? 'TERMINÉ' : chrono(minuteVive)}</span></div>
         <div className={`cel-camp${m.monCote === 'exterieur' ? ' moi' : ''}`}><Ecusson nom={nomClub(vue, r.exterieur)} logo={vue.clubs.find(c => c.id === r.exterieur)?.embleme} /><b>{nomClub(vue, r.exterieur)}</b><small>{m.essais.exterieur} essai{m.essais.exterieur > 1 ? 's' : ''}</small></div>
       </div>
       <div className="cel-jauge-possession" title="Possession"><i style={{ width: `${m.stats.domicile.possession}%` }} /><span>{m.stats.domicile.possession}% possession {m.stats.exterieur.possession}%</span></div>
       {m.signalAdverse && SIGNAUX[m.signalAdverse] && <p className="cel-signal"><Icone nom="oeil" taille={17} />{SIGNAUX[m.signalAdverse]}</p>}
     </div>
 
+    {/* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).
+        Le serveur ne propose plus une décision sur chacune des vingt-quatre
+        pénalités d'un match — à soixante-dix mètres des poteaux, « je prends
+        les points ? » n'est pas une question — mais sur les six ou sept qui se
+        jouent dans la zone où le choix compte vraiment. */}
     {m.decision && <div className="cel-decision" role="alertdialog" aria-label="Décision de pénalité">
-      <div className="eyebrow">{m.decision.horloge >= 1 ? `${Math.floor(m.decision.horloge)}ᵉ minute` : 'Pénalité'} · {m.score.domicile} – {m.score.exterieur}</div>
-      <h2>Pénalité à {m.decision.distance} mètres.</h2>
-      <p>{m.decision.buteur} au pied. Le moteur lui donne <b>{m.decision.probabilite} %</b> de réussite depuis cette position.</p>
+      <div className="eyebrow">{m.decision.horloge >= 1 ? `${Math.floor(m.decision.horloge)}ᵉ minute` : 'Pénalité'} · {m.score.domicile} – {m.score.exterieur} · le chrono est arrêté</div>
+      <h2>Pénalité à {m.decision.distance} mètres de leur ligne.</h2>
+      <p>{m.decision.buteur} au pied. Le moteur lui donne <b>{m.decision.probabilite} %</b> de réussite depuis cette position{m.decision.aPortee ? '' : ' — c’est au-delà de sa portée raisonnable'}.</p>
       <div className="cel-decision-choix">
         <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'points' } }); }}><Icone nom="cible" taille={19} />Prendre les 3 points</button>
         <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'touche' } }); }}><Icone nom="drapeau" taille={19} />Chercher la touche</button>
         <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'rapide' } }); }}><Icone nom="eclair" taille={19} />Jouer vite</button>
         <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'melee' } }); }}><Icone nom="pousse" taille={19} />Mêlée</button>
       </div>
-      <small>Sans réponse, ton adjoint tranchera selon tes consignes enregistrées.</small>
+      <div className="cel-sablier" aria-hidden><i style={{ width: `${(resteDecision / 20) * 100}%` }} /></div>
+      <small>{resteDecision} seconde{resteDecision > 1 ? 's' : ''} — sans réponse, ton adjoint tranchera selon tes consignes enregistrées.</small>
     </div>}
 
     <nav className="cel-onglets secondaires">{([['fil', 'Le fil'], ['consignes', 'Consignes'], ['banc', 'Le banc'], ['stats', 'Statistiques']] as const).map(([id, label]) =>
       <button key={id} className={ongletDirect === id ? 'actif' : ''} onClick={() => setOngletDirect(id)}>{label}</button>)}</nav>
 
-    {ongletDirect === 'fil' && <div className="cel-panneau cel-fil-match">{m.fil.length ? [...m.fil].reverse().map((l, i) => <p key={`${l.minute}-${i}`} className={`cel-ligne-fil ${l.type}${l.cote === mien ? ' moi' : ''}`}><b>{l.minute}′</b><span>{l.texte}</span>{l.points ? <em>+{l.points}</em> : null}</p>) : <p className="cel-note">Le coup d’envoi vient d’être donné.</p>}</div>}
+    {ongletDirect === 'fil' && <div className="cel-panneau cel-fil-match">{m.fil.length ? [...m.fil].reverse().map((l, i) => <p key={`${l.minute}-${i}`} className={`cel-ligne-fil ${l.type}${l.cote === mien ? ' moi' : ''}`}><b>{l.minute}′</b><span>{l.ordre ? ORDRES_FIL[l.ordre][l.auto ? 1 : 0] : l.texte}</span>{l.points ? <em>+{l.points}</em> : null}</p>) : <p className="cel-note">Le coup d’envoi vient d’être donné.</p>}</div>}
 
     {ongletDirect === 'consignes' && (m.monCote ? <div className="cel-panneau cel-consignes">
       <p className="cel-note">Chaque changement atteint réellement le moteur : la mentalité et la contestation des rucks déplacent le potentiel de marque, le jeu et la défense changent les duels.</p>

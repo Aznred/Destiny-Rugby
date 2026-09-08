@@ -43,12 +43,32 @@
 // rester sous la cible, jamais la dépasser franchement.
 //
 // Mesuré sur 400 rencontres (`npm run verify:carriere`).
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ L'HORLOGE EST CONTINUE — ET ELLE NE L'A PAS TOUJOURS ÉTÉ
+// ═══════════════════════════════════════════════════════════════════════════
+// `EtatMatch.minute` est un ENTIER (`Math.floor(t / 60)`). Tant que la rejoue
+// s'arrêtait dessus, demander « le match à la 30ᵉ 03 » le poussait en réalité
+// jusqu'à la 31ᵉ pile — puis plus rien pendant cinquante-sept secondes réelles,
+// jusqu'à ce que l'horloge murale rattrape la 31ᵉ. Le direct était donc une
+// PHOTO QUI SE TÉLÉPORTAIT UNE FOIS PAR MINUTE : le ballon passait de la ligne
+// des 55 m à celle des 35 m sans qu'on ait rien vu, et « suivre le match »
+// n'existait pas.
+//
+// La rejoue vise donc `e.t / 60` — les minutes de jeu au centième. Un sondage
+// toutes les deux secondes avance le moteur de deux secondes de jeu, et les
+// pions se déplacent d'une foulée, pas d'une phase entière.
+//
+// ⚠️ ET LE RÉSULTAT D'UN MATCH N'EN BOUGE PAS. Jouer d'un bloc, c'est pousser
+// jusqu'à la 80ᵉ : `e.minute < 80` et `e.t / 60 < 80` s'arrêtent au MÊME tick,
+// celui où `e.t` franchit 4 800. Les scores mesurés par le banc d'essai sont
+// donc les mêmes qu'avant, à la virgule près.
 
 import {
   appliquerTactiqueEquipe, avancer, bilan, choisirPenalite, creerMatch,
-  demanderRemplacement, infoPenalite,
+  demanderRemplacement, facteurHorloge, infoPenalite, type PenaliteEnCours,
 } from '../moteur/moteur.js';
-import type { EtatMatch } from '../moteur/etat.js';
+import type { EtatMatch, Phase } from '../moteur/etat.js';
 import type { Cote } from '../moteur/terrain.js';
 import { scorePossible } from '../championnat.js';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../compositionManager.js';
@@ -212,15 +232,97 @@ export interface EvenementMatchEnLigne {
   horloge: number;
   cote: CoteEnLigne;
   commande: CommandeMatchEnLigne;
+  /**
+   * ⚠️ CET ORDRE EST CELUI DE L'ADJOINT, PAS DU MANAGER. Une décision de
+   * pénalité laissée sans réponse est tranchée par l'IA d'après les consignes
+   * enregistrées — et elle entre au journal exactement comme les autres, sinon
+   * la rejoue ne la reproduirait pas. Le fil, lui, ne doit surtout pas écrire
+   * « Tu prends les trois points » à quelqu'un qui n'a rien touché.
+   */
+  auto?: true;
 }
+
+/** Un ordre de manager, tel que le fil le montre à CELUI QUI L'A DONNÉ. */
+export type OrdreFil = 'consignes' | 'remplacement' | ChoixPenaliteEnLigne;
 
 export interface LigneFil {
   minute: number; texte: string; type: string; cote?: CoteEnLigne; points?: number;
+  /**
+   * ⚠️ UN ORDRE N'A PAS DE TEXTE ICI, IL A UNE CLÉ. `lib/ligue/` ne porte
+   * aucune phrase affichable (l'écran est en sept langues) — et surtout, ces
+   * lignes ne sont PAS dans le fil partagé : `vueMatchEnLigne` ne les ajoute
+   * qu'au manager concerné. Écrire « consignes changées » dans le fil commun
+   * dirait à l'adversaire quand on bouge, ce que `signalAdverse` s'applique
+   * justement à ne laisser deviner qu'à moitié.
+   */
+  ordre?: OrdreFil;
+  /** L'ordre a été tranché par l'adjoint, pas par le manager. */
+  auto?: true;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LE TERRAIN, TEL QUE L'ÉCRAN LE REDESSINE
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ ON ENVOIE LES VITESSES, PAS SEULEMENT LES POSITIONS. Le serveur ne parle
+// que toutes les deux secondes ; sans vecteur vitesse, l'écran n'aurait qu'un
+// diaporama à deux images par seconde de retard. Avec, il extrapole à soixante
+// images par seconde entre deux relevés — `position + vitesse × temps` — et
+// recale en douceur quand la vérité arrive. C'est exactement ce que fait le
+// match de carrière, à ceci près que là-bas le moteur tourne dans l'onglet.
+//
+// ⚠️ ET LA CADENCE EST INDISPENSABLE. Une seconde réelle ne vaut pas une
+// seconde de mouvement : pendant une mêlée, l'horloge avale cinquante secondes
+// pour sept secondes de jeu. Extrapoler sans elle ferait traverser le terrain
+// aux joueurs pendant une touche.
+
+export interface PionDirect {
+  id: string; numero: number; nom: string; poste: PosteId; cote: CoteEnLigne;
+  x: number; y: number; vx: number; vy: number;
+}
+
+export interface VolDirect {
+  de: { x: number; y: number }; vers: { x: number; y: number };
+  duree: number; ecoule: number; hauteur: number;
+}
+
+export interface TerrainDirect {
+  pions: PionDirect[];
+  ballon: { x: number; y: number };
+  /** Le pion qui porte le ballon : l'écran le colle à sa main. */
+  porteurId?: string;
+  vol?: VolDirect;
+  phase: Phase;
+  systeme: string;
+  possession: CoteEnLigne;
+  /** Secondes SIMULÉES écoulées par seconde réelle dans la phase en cours. */
+  cadence: number;
+  /** Minutes de jeu au centième au moment du relevé. */
+  horloge: number;
+  /** La décision de l'arbitre, tant qu'elle est fraîche (secondes simulées). */
+  sifflet?: { cle: string; club: string; fautif: string; restant: number };
+}
+
+/**
+ * ⚠️ ON NE RÉVEILLE LE MANAGER QUE DANS LES 50 MÈTRES ADVERSES.
+ *
+ * Demande, mot pour mot : « quand il y a une pénalité dans les 50 mètres
+ * adverses à son avantage il peut décider de la pénalité ». C'est aussi la
+ * seule zone où la question se pose : à 70 mètres des poteaux, « je prends les
+ * trois points ? » n'est pas un choix, c'est une faute de goût — l'ouvreur
+ * dégage, et personne n'a besoin d'un entraîneur pour ça.
+ *
+ * Le chiffre compte double, parce que CHAQUE décision gèle le chronomètre le
+ * temps qu'on réponde : toutes pénalités confondues, c'était douze arrêts par
+ * match. Les pénalités hors zone repartent donc sans interruption, exactement
+ * comme si personne ne regardait.
+ */
+export const METRES_DECISION = 50;
 
 export interface DecisionEnAttente {
   cote: CoteEnLigne; distance: number; angle: number; probabilite: number;
   buteur: string; horloge: number;
+  /** Le buteur peut-il raisonnablement tenter les poteaux d'ici ? */
+  aPortee: boolean;
   /** Date limite réelle (ms). Passée, l'IA tranche et le jeu repart. */
   jusqua: number;
 }
@@ -243,11 +345,31 @@ export interface EquipeMatchEnLigne {
   effectif: Coequipier[];
   composition: CompositionManager;
   strategie?: StrategieEnLigne;
+  /**
+   * Le collectif du XV, de 0 à 100 (`collectifCarriere`).
+   *
+   * ⚠️ IL NE SERT PLUS SEULEMENT À AJUSTER LES NOTES. Demande : « il faut que
+   * le collectif compte dans l'influence du jeu aussi sur les erreurs entre
+   * équipiers ». Le voici donc porté jusqu'au moteur, qui en fait ce que
+   * personne d'autre ne peut faire : une passe qui part devant, un ballon
+   * lâché à la réception, un offload donné dans le vide.
+   */
+  collectif?: number;
 }
 
-/** La feuille GELÉE : 1 → 23, plus le brassard et la cible. */
+/** La feuille GELÉE : 1 → 23, plus le brassard, la cible et le collectif. */
 export interface FeuilleGelee {
   clubId: string; nom: string; feuille: Coequipier[]; capitaineId: string; buteurId: string;
+  /**
+   * ⚠️ GELÉ AVEC LA FEUILLE, ET C'EST INDISPENSABLE. Le collectif se calcule
+   * depuis les cartes du club ; un transfert conclu à la 50ᵉ minute changerait
+   * la valeur, donc la rejoue, donc le score déjà annoncé. Il vit ici comme le
+   * reste de la feuille : figé au coup d'envoi.
+   *
+   * Absent sur les matchs créés avant cette règle : le moteur retombe alors
+   * sur le neutre, et ces rencontres se rejouent exactement comme avant.
+   */
+  collectif?: number;
 }
 
 export interface ParametresCreationMatch {
@@ -297,8 +419,10 @@ export interface EtatMatchEnLigne {
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {
   id: string;
-  terrain?: { ballon: {x:number;y:number}; pions: {id:string;numero:number;nom:string;cote:string;x:number;y:number}[] };
+  terrain?: TerrainDirect;
   minute: number;
+  /** La même, au centième : l'écran fait avancer son chrono entre deux relevés. */
+  horloge: number;
   termine: boolean;
   score: Paire;
   essais: Paire;
@@ -340,6 +464,15 @@ export const DUREE_REELLE = 80 * MS_PAR_MINUTE;
 export function minuteCible(etat: EtatMatchEnLigne, maintenant: number): number {
   return Math.max(etat.horloge, Math.min(80, (maintenant - etat.debut - etat.gel) / MS_PAR_MINUTE));
 }
+
+/**
+ * Les minutes de jeu du moteur, AU CENTIÈME.
+ *
+ * ⚠️ ET PAS `e.minute`, QUI EST UN ENTIER. Toute la rejoue vise cette valeur :
+ * s'arrêter sur `e.minute` revient à ne jamais s'arrêter ailleurs qu'au début
+ * d'une minute, donc à jouer le direct par bonds de soixante secondes.
+ */
+const minuteExacte = (e: EtatMatch): number => Math.min(80, e.t / 60);
 
 /** Le gel ne se relâche jamais non plus : il ne fait que s'ajouter. */
 function gelJusqua(etat: EtatMatchEnLigne, instant: number): number {
@@ -435,6 +568,7 @@ export function cibleDeScore(forceD: number, forceE: number, cle: string): Paire
  * source de vérité, seulement un raccourci.
  */
 const CACHE = new Map<string, { moteur: EtatMatch; minute: number }>();
+const MOTEUR_VERS_COTE: Record<Cote, CoteEnLigne> = { A: 'domicile', B: 'exterieur' };
 const CACHE_MAX = 16;
 const cleCache = (etat: EtatMatchEnLigne) => `${etat.cle}#${etat.journal.length}`;
 
@@ -443,11 +577,28 @@ function ranger(cle: string, moteur: EtatMatch): void {
     const plusAncienne = CACHE.keys().next().value;
     if (plusAncienne !== undefined) CACHE.delete(plusAncienne);
   }
-  CACHE.set(cle, { moteur, minute: moteur.minute });
+  CACHE.set(cle, { moteur, minute: minuteExacte(moteur) });
+}
+
+/**
+ * La pénalité qui MÉRITE qu'on réveille un entraîneur : à son avantage, dans
+ * les 50 mètres adverses, et pour un camp dont on a des nouvelles.
+ *
+ * ⚠️ ELLE SERT AUX DEUX BOUTS, ET C'EST OBLIGATOIRE. `pousser` s'arrête
+ * dessus ; `avancerMatchEnLigne` en fait une décision. Si les deux critères
+ * divergeaient d'un mètre, le moteur s'arrêterait sur une pénalité dont
+ * personne ne ferait jamais rien — et le match resterait figé là pour toujours,
+ * puisque plus aucun tick ne le sortirait de la phase.
+ */
+function penaliteADecider(e: EtatMatch, camps: readonly Cote[]): PenaliteEnCours | null {
+  if (e.fini || e.phase !== 'penalite' || !e.penalite) return null;
+  if (!camps.includes(e.penalite.pour)) return null;
+  const info = infoPenalite(e);
+  return info && info.distance <= METRES_DECISION ? info : null;
 }
 
 /** Avance le moteur, en s'arrêtant sur une pénalité si un manager doit trancher. */
-function pousser(e: EtatMatch, jusqua: number, arretSur: Cote | null): void {
+function pousser(e: EtatMatch, jusqua: number, arretSur: readonly Cote[]): void {
   // ⚠️ UN PAS DE 0,6 SECONDE, TOUJOURS LE MÊME, ET POUR DEUX RAISONS.
   //
   // La première est la décision du manager : la phase « pénalité » ne dure que
@@ -465,8 +616,8 @@ function pousser(e: EtatMatch, jusqua: number, arretSur: Cote | null): void {
   // match complet prend 267 ms au lieu de 285 (le prix est celui des ticks du
   // moteur, pas celui des appels). Il n'y a donc rien à gagner à élargir.
   let garde = 0;
-  while (!e.fini && e.minute < jusqua && garde++ < 40_000) {
-    if (arretSur && e.phase === 'penalite' && e.penalite?.pour === arretSur) return;
+  while (!e.fini && minuteExacte(e) < jusqua && garde++ < 40_000) {
+    if (arretSur.length && penaliteADecider(e, arretSur)) return;
     avancer(e, 0.6);
   }
 }
@@ -506,11 +657,19 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
     etat.cibles.domicile, etat.cibles.exterieur, etat.cle, undefined,
     {
       rng: graine(`match#${etat.cle}`),
+      // ⚠️ LE CŒUR DU DIRECT. Sans lui, les cinquante secondes d'une mêlée
+      // montrent sept secondes d'animation étirées cinq fois : des joueurs qui
+      // marchent au ralenti pendant plus de la moitié du match. Retour de jeu,
+      // mot pour mot : « c'est lent, les joueurs sont mal placés, prends le
+      // même moteur que sur le mode carrière solo ». C'est bien le même moteur
+      // — c'est son horloge qui était étirée.
+      tempsReel: true,
       scoreSurTerrain: true,
       compositionA: equipes.domicile.feuille, compositionB: equipes.exterieur.feuille,
       tactiqueA: tactiqueDepuisStrategie(strategieD), tactiqueB: tactiqueDepuisStrategie(strategieE),
       capitaineAId: equipes.domicile.capitaineId, capitaineBId: equipes.exterieur.capitaineId,
       buteurAId: equipes.domicile.buteurId, buteurBId: equipes.exterieur.buteurId,
+      cohesionA: equipes.domicile.collectif, cohesionB: equipes.exterieur.collectif,
     },
   );
   e.impactBanc = { A: impactStrategie(strategieD), B: impactStrategie(strategieE) };
@@ -518,7 +677,7 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
 }
 
 /** Reconstruit l'état du moteur à la minute demandée. */
-function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: CoteEnLigne | null): EtatMatch {
+function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly CoteEnLigne[]): EtatMatch {
   const cle = cleCache(etat);
   const garde = CACHE.get(cle);
   let e: EtatMatch;
@@ -533,10 +692,10 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: CoteEnLigne |
   for (let i = depart; i < etat.journal.length; i++) {
     const ev = etat.journal[i];
     if (ev.horloge > jusqua) break;
-    pousser(e, ev.horloge, null);
+    pousser(e, ev.horloge, []);
     appliquerAuMoteur(e, ev);
   }
-  pousser(e, jusqua, arretSur ? MOTEUR[arretSur] : null);
+  pousser(e, jusqua, arretSur.map((c) => MOTEUR[c]));
   ranger(cle, e);
   return e;
 }
@@ -627,8 +786,46 @@ function extraireFeuille(e: EtatMatch): LigneFeuilleMatch[] {
   }).sort((a, b) => a.cote === b.cote ? a.numero - b.numero : a.cote === 'domicile' ? -1 : 1);
 }
 
+/** Deux décimales : le terrain se dessine au centimètre, pas au micron. */
+const r2 = (n: number): number => Math.round(n * 100) / 100;
+
+/**
+ * Le terrain tel que l'écran va le redessiner : trente pions avec leur vecteur
+ * vitesse, le ballon (porté, en vol ou au sol), la phase et la cadence.
+ */
+function extraireTerrain(e: EtatMatch): TerrainDirect {
+  const terrain: TerrainDirect = {
+    pions: e.pions.filter((p) => p.surLeTerrain).map((p) => ({
+      id: p.id, numero: p.numero, nom: p.nom, poste: p.poste,
+      cote: MOTEUR_VERS_COTE[p.cote],
+      x: r2(p.pos.x), y: r2(p.pos.y), vx: r2(p.vitesse.x), vy: r2(p.vitesse.y),
+    })),
+    ballon: { x: r2(e.ballon.x), y: r2(e.ballon.y) },
+    phase: e.phase,
+    systeme: e.systeme,
+    possession: MOTEUR_VERS_COTE[e.possession],
+    cadence: r2(1 / facteurHorloge(e.phase, e.tempsReel)),
+    horloge: r2(minuteExacte(e)),
+  };
+  if (e.porteur) terrain.porteurId = e.porteur.id;
+  if (e.vol) {
+    terrain.vol = {
+      de: { x: r2(e.vol.de.x), y: r2(e.vol.de.y) },
+      vers: { x: r2(e.vol.vers.x), y: r2(e.vol.vers.y) },
+      duree: r2(e.vol.duree), ecoule: r2(e.vol.ecoule), hauteur: r2(e.vol.hauteur),
+    };
+  }
+  if (e.sifflet) {
+    terrain.sifflet = {
+      cle: e.sifflet.cle, club: e.sifflet.club, fautif: e.sifflet.fautif,
+      restant: r2(e.sifflet.restant),
+    };
+  }
+  return terrain;
+}
+
 function relever(etat: EtatMatchEnLigne, e: EtatMatch): void {
-  etat.horloge = Math.min(80, e.minute);
+  etat.horloge = minuteExacte(e);
   etat.score = { domicile: e.scoreA, exterieur: e.scoreB };
   etat.essais = { domicile: e.essaisA, exterieur: e.essaisB };
   etat.penalites = extrairePenalites(e);
@@ -657,6 +854,7 @@ export function creerMatchEnLigne(p: ParametresCreationMatch): EtatMatchEnLigne 
     clubId: equipe.clubId, nom: equipe.nom,
     feuille: feuilleGeleeEnLigne(equipe.effectif, equipe.composition),
     capitaineId: equipe.composition.capitaineId, buteurId: equipe.composition.buteurId,
+    collectif: equipe.collectif,
   });
   const equipes = { domicile: geler(p.domicile), exterieur: geler(p.exterieur) };
   const cle = `${p.id}#${p.graine >>> 0}`;
@@ -705,31 +903,31 @@ export function avancerMatchEnLigne(etat: EtatMatchEnLigne, maintenant: number):
       strategieA(suivant, d.cote, d.horloge), d.distance,
       d.distance < 52 && d.angle < 30, Math.round(d.horloge), ecart,
     );
-    suivant.journal.push({ horloge: d.horloge, cote: d.cote, commande: { type: 'decision', choix } });
+    suivant.journal.push({ horloge: d.horloge, cote: d.cote, commande: { type: 'decision', choix }, auto: true });
     suivant.gel = gelJusqua(etat, limite);
     delete suivant.decision;
   }
 
   // ── 2. On avance jusqu'à l'heure qu'il est ────────────────────────────────
-  // Un manager présent a le droit de trancher SES pénalités : on arrête le
-  // moteur sur la sienne. Si les deux regardent, la sienne arrivera au tour
-  // suivant — deux pénalités ne tombent jamais dans la même seconde de jeu.
-  const arret = presenceActive(suivant, 'domicile', maintenant) ? 'domicile' as const
-    : presenceActive(suivant, 'exterieur', maintenant) ? 'exterieur' as const : null;
+  // ⚠️ LES DEUX CAMPS SONT ÉCOUTÉS, PAS SEULEMENT LE PREMIER. La rejoue ne
+  // s'arrêtait que sur les pénalités d'UN seul camp — celui de l'équipe à
+  // domicile dès qu'elle regardait. Le manager visiteur, présent devant son
+  // écran, ne se voyait alors JAMAIS proposer la moindre décision de tout le
+  // match : le moteur traversait ses pénalités sans marquer l'arrêt.
+  const arret = COTES.filter((c) => presenceActive(suivant, c, maintenant));
   const e = rejouer(suivant, minuteCible(suivant, maintenant), arret);
   relever(suivant, e);
 
   // ── 3. Une pénalité arrêtée devant un manager présent devient une décision ─
-  const penalite = infoPenalite(e);
-  if (penalite && !e.fini) {
-    const cote: CoteEnLigne = penalite.cote === 'A' ? 'domicile' : 'exterieur';
-    if (presenceActive(suivant, cote, maintenant)) {
-      suivant.decision = {
-        cote, distance: penalite.distance, angle: penalite.angle,
-        probabilite: Math.round(penalite.probabilite * 100), buteur: penalite.buteur,
-        horloge: suivant.horloge, jusqua: maintenant + DELAI_DECISION,
-      };
-    }
+  const penalite = penaliteADecider(e, arret.map((c) => MOTEUR[c]));
+  if (penalite) {
+    suivant.decision = {
+      cote: MOTEUR_VERS_COTE[penalite.cote],
+      distance: penalite.distance, angle: penalite.angle,
+      probabilite: Math.round(penalite.probabilite * 100), buteur: penalite.buteur,
+      aPortee: penalite.aPortee,
+      horloge: suivant.horloge, jusqua: maintenant + DELAI_DECISION,
+    };
   }
 
   if (e.fini || suivant.horloge >= 80) clore(suivant, e);
@@ -766,7 +964,7 @@ export function commanderMatchEnLigne(
     return avancerMatchEnLigne(marque, maintenant);
   }
 
-  const moteur = rejouer(marque, horloge, null);
+  const moteur = rejouer(marque, horloge, []);
   if (commande.type === 'remplacement') {
     // Le moteur refuse un entrant déjà utilisé ou un sortant absent. On le lui
     // demande AVANT d'écrire au journal : un ordre mort y resterait pour
@@ -821,7 +1019,7 @@ export function conclureMatchEnLigne(etat: EtatMatchEnLigne): EtatMatchEnLigne {
   if (etat.termine) return etat;
   const suivant: EtatMatchEnLigne = { ...etat, presence: {}, decision: undefined };
   if (!suivant.equipes) { suivant.termine = true; return suivant; }
-  clore(suivant, rejouer(suivant, 80, null));
+  clore(suivant, rejouer(suivant, 80, []));
   return suivant;
 }
 
@@ -866,27 +1064,58 @@ export function signalAdverse(etat: EtatMatchEnLigne, moi: CoteEnLigne): string 
   return undefined;
 }
 
+/**
+ * Les ordres que J'AI donnés, ajoutés à MON fil.
+ *
+ * ⚠️ SANS EUX, PILOTER SON MATCH SE FAIT À L'AVEUGLE. Une consigne part au
+ * serveur, revient appliquée… et rien ne le dit à l'écran : le moteur annonce
+ * bien le changement de plan, mais dans un commentaire de type `jeu` — la
+ * catégorie des en-avants et des passes au large, quatre-vingts lignes par
+ * match, que le fil de la ligue ne garde pas. Le manager cliquait donc dans le
+ * vide. Ces lignes-là sont reconstruites du JOURNAL, qui est persisté : elles
+ * survivent au rechargement comme le reste du match.
+ */
+function mesOrdres(etat: EtatMatchEnLigne, monCote: CoteEnLigne): LigneFil[] {
+  const lignes: LigneFil[] = [];
+  for (const ev of etat.journal) {
+    if (ev.cote !== monCote || ev.commande.type === 'presence') continue;
+    const ordre: OrdreFil = ev.commande.type === 'strategie' ? 'consignes'
+      : ev.commande.type === 'remplacement' ? 'remplacement' : ev.commande.choix;
+    const ligne: LigneFil = { minute: Math.min(80, Math.round(ev.horloge)), texte: '', type: 'ordre', cote: monCote, ordre };
+    if (ev.auto) ligne.auto = true;
+    lignes.push(ligne);
+  }
+  return lignes;
+}
+
 export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string): VueMatchEnLigne {
   const monCote = etat.equipes ? COTES.find((c) => etat.equipes![c].clubId === clubId) : undefined;
   const vue: VueMatchEnLigne = {
-    id: etat.id, minute: Math.floor(etat.horloge), termine: etat.termine,
+    id: etat.id, minute: Math.floor(etat.horloge), horloge: r2(etat.horloge), termine: etat.termine,
     score: etat.score, essais: etat.essais, penalites: etat.penalites,
     fil: etat.fil, stats: etat.stats, feuille: etat.feuille,
     remplacementsFaits: 0, surLeTerrain: [], surLeBanc: [],
   };
-  if (!etat.termine) {
-    const terrain = rejouer(etat, etat.horloge, null);
-    vue.terrain = {ballon: {...terrain.ballon}, pions: terrain.pions.filter(p => p.surLeTerrain).map(p => ({id:p.id, numero:p.numero, nom:p.nom, cote:p.cote, x:p.pos.x, y:p.pos.y}))};
-  }
-  if (!monCote || etat.termine) return vue;
+  if (etat.termine) return vue;
+
+  // ⚠️ UNE SEULE REJOUE POUR TOUT LE MONDE. Le terrain et le banc sortent du
+  // MÊME état du moteur : deux appels, c'était deux fois le coût pour la même
+  // image — et, sur un démarrage à froid où le cache est vide, deux rejoues
+  // complètes du match à chaque sondage.
+  const e = rejouer(etat, etat.horloge, []);
+  vue.terrain = extraireTerrain(e);
+  if (!monCote) return vue;
+
   vue.monCote = monCote;
   vue.maStrategie = strategieA(etat, monCote, etat.horloge);
   vue.signalAdverse = signalAdverse(etat, monCote);
   if (etat.decision && etat.decision.cote === monCote) vue.decision = etat.decision;
+  // Le tri est stable : à minute égale, le récit du match passe avant mes ordres.
+  const ordres = mesOrdres(etat, monCote);
+  if (ordres.length) vue.fil = [...etat.fil, ...ordres].sort((a, b) => a.minute - b.minute).slice(-FIL_MAX);
 
-  // Le banc et le terrain viennent du moteur : un remplaçant déjà entré ne doit
-  // plus apparaître comme disponible, et un exclu ne doit plus être remplaçable.
-  const e = rejouer(etat, etat.horloge, null);
+  // Le banc vient du moteur : un remplaçant déjà entré ne doit plus apparaître
+  // comme disponible, et un exclu ne doit plus être remplaçable.
   const cible = MOTEUR[monCote];
   vue.remplacementsFaits = cible === 'A' ? e.remplacementsA : e.remplacementsB;
   for (const p of e.pions) {

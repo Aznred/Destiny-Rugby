@@ -160,7 +160,7 @@ Quatre modules portent le mode :
 | `typesCarriere.ts` | Le vocabulaire : ligue, club, carte, vente, échange, objectif, commande. |
 | `catalogueCarriere.ts` | **Le vivier mondial** (78 083 joueurs réels), la dotation de 30 licenciés de Régionale 3, les 7 packs, les 1 353 écussons. |
 | `carriere.ts` | **Toutes les règles** : saison, calendrier, packs, marché, enchères, échanges, objectifs, coupes, classement, récompenses. |
-| `matchCarriere.ts` | **Le match** : stratégies, horloge, décisions en direct, remplacements, feuille. |
+| `matchCarriere.ts` | **Le match** : stratégies, horloge continue, décisions en direct, remplacements, terrain rejouable, feuille. |
 
 ⚠️ **Neuf autres modules du dossier ne servent plus qu'à leur propre banc**
 (`types`, `rarete`, `identite`, `reglages`, `vivier`, `dotation`, `valeur`,
@@ -170,7 +170,7 @@ utilisés. `npm run verify:ligue` mesure donc du code que le jeu n'exécute
 jamais — **dette à trancher, décrite dans `serveur/LIGUES.md`.**
 
 Détail complet, chiffres mesurés et invariants : **`serveur/LIGUES.md`**.
-Banc du mode : `npm run verify:carriere` (144 contrôles, ~1 min).
+Banc du mode : `npm run verify:carriere` (208 contrôles, ~3 min).
 
 ---
 
@@ -438,7 +438,7 @@ stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
 principaux sont déclarés dans `package.json` :
 
 ```bash
-npm run verify:carriere           # la Carrière en ligne (144 contrôles, ~1 min)
+npm run verify:carriere           # la Carrière en ligne (208 contrôles, ~3 min)
 npm run verify:ligue              # ⚠️ le socle du 1er lot — plus branché au jeu
 npm run verify:enveloppe          # une seule définition de l'enveloppe structure
 npm run verify:saison-manager     # avance libre, coupes, playoffs, promotions
@@ -475,11 +475,13 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   2 à 20 potes, ligue privée, **30 vrais licenciés de Régionale 3** au départ,
   écusson d’un vrai club (choisi À L’INSCRIPTION, jamais modifiable ensuite),
   logo et trophée de championnat, phase finale en option,
-  championnat, matchs en direct
-  avec décisions du manager, packs, marché, enchères, échanges, coupes maison,
+  championnat, **matchs en direct à la vitesse réelle** (80 minutes de vraie
+  vie, terrain animé à 60 images par seconde par interpolation d'Hermite,
+  décision de pénalité dans les 50 mètres adverses, consignes et remplacements
+  qui atteignent le moteur), packs, marché, enchères, échanges, coupes maison,
   objectifs, palmarès. Serveur (`serveur/carriereApi.ts` + `api/carriere.ts`),
   écran (`screens/CarriereEnLigne.tsx`) et banc (`npm run verify:carriere`,
-  144 contrôles). Les 19 tables sont posées sur la base Neon du site (mesuré le
+  208 contrôles). Les 19 tables sont posées sur la base Neon du site (mesuré le
   6 septembre 2026 : inscription en production → HTTP 200). Marche à suivre
   complète dans `serveur/MISE-EN-LIGNE.md`.
 
@@ -512,7 +514,12 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   complète (57 Ko) et 14 à 17 octets.**
   1. `appliquer` **n'écrit plus un état identique** (comparaison JSON, version
      neutralisée) — et la version cesse donc de bouger toute seule, ce qui rend
-     le reste possible.
+     le reste possible. ⚠️ La comparaison passe par `empreinteEcriture`, qui
+     **retire du calcul l'horloge, le score, le fil et les statistiques d'un
+     match en cours** : ces six champs se reconstruisent de la graine et du
+     journal, et sans ce retrait un direct réécrivait la ligue entière toutes
+     les deux secondes pendant quatre-vingts minutes. La lecture rend l'état
+     AVANCÉ (sinon le match ne bouge plus) mais garde la version STOCKÉE.
   2. **Lecture conditionnelle** : le client annonce sa version (`&v=`), le
      serveur lit `version, comptes, echeance` (quelques octets) et répond
      `{inchange:true}` sans toucher au jsonb. Sans `v`, comportement d'avant.
@@ -559,6 +566,19 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   zéro point vaut −1 de note. `lancerRencontre` teste donc la présence de
   l’entrée avant d’appeler `bonusCollectif`, sans quoi un remplaçant entrerait
   à la 60ᵉ minute avec une note rabotée pour n’avoir pas été aligné.
+
+  ⚠️ **ET IL SE JOUE AUSSI ENTRE ÉQUIPIERS, PAS SEULEMENT DANS LES NOTES.**
+  Demande : « il faut que le collectif compte dans l’influence du jeu aussi sur
+  les erreurs entre équipiers ». Le total d’équipe part donc entier au moteur
+  (`EtatMatch.cohesion`, gelé avec la feuille) et `erreurDeLiaison` en fait ce
+  qu’une note ne peut pas dire : une passe qui part devant, un ballon lâché à la
+  réception, un offload donné dans le vide. **Rien d’autre** — la vitesse, le
+  plaquage et le pied d’un joueur ne doivent rien à ses voisins. Amplitude
+  ±30 % sur des risques qui valent quelques pour cent ; mesuré à 12 matchs par
+  palier : **23,2 en-avants à 0 de collectif, 18,7 à 50, 14,8 à 100**, et un
+  match SANS collectif joue exactement comme à 50 — la carrière solo ne bouge
+  pas d’un tick. Le mode distribue des cartes au hasard : on ne punit pas un
+  manager pour ce que les packs lui ont donné.
 
   ⚠️ **LE FAVORI N'EST PAS UN VERROU.** `carte.favori` (commande `favori`, côté
   serveur) n'interdit AUCUNE vente : il retire seulement la carte de

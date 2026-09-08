@@ -578,6 +578,104 @@
    LE DIRECT
    ═══════════════════════════════════════════════════════════════════════════ */
 .cel-direct { display: flex; flex-direction: column; gap: 0.9rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LA SCÈNE — le terrain du direct
+   ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ ELLE EST DIMENSIONNÉE PAR UN RAPPORT, PAS PAR UNE HAUTEUR FIXE. La caméra
+   (`moteur/camera.ts`) construit son cadre avec le rapport largeur/hauteur du
+   conteneur : une hauteur en pixels donnerait un cadre différent sur chaque
+   écran, et le pivot en portrait ne tomberait plus juste. Le `slice` du SVG
+   garantit qu'on ne borde jamais de vide autour de la pelouse. */
+.cel-scene {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  max-height: 62vh;
+  border-radius: var(--rayon);
+  border: 1px solid var(--bordure-forte);
+  overflow: hidden;
+  background: #0b2b1a;
+  box-shadow: var(--ombre-3), var(--arete);
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* En portrait, le terrain pivote d'un quart de tour : la scène se redresse
+   avec lui, sinon on regarderait un match debout dans une fente de 16/9. */
+@media (orientation: portrait) and (max-width: 760px) {
+  .cel-scene { aspect-ratio: 3 / 4; max-height: 58vh; }
+}
+.cel-pelouse { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.cel-ballon { filter: drop-shadow(0 0.4px 0.6px rgba(0, 0, 0, 0.55)); }
+.cel-fleche-ballon path { fill: rgba(255, 240, 200, 0.92); }
+
+/* ⚠️ « pointer-events: none » sur la couche, « auto » sur ce qui se touche :
+   sinon le bandeau couvre tout le terrain et le bouton de cadrage n'est plus
+   cliquable. */
+.cel-hud { position: absolute; inset: 0; pointer-events: none; }
+.cel-hud button { pointer-events: auto; }
+.cel-hud-haut {
+  position: absolute;
+  top: 0.45rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.cel-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--rayon-pilule);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(6, 18, 12, 0.72);
+  font-family: var(--police-forte);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  color: var(--craie);
+  backdrop-filter: blur(3px);
+}
+.cel-tag i { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45); }
+/* La décision de l'arbitre, en grand : une sanction qu'on ne voit pas est une
+   sanction qui n'existe pas pour celui qui regarde. */
+.cel-sifflet {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 82%;
+  padding: 0.35rem 1rem 0.45rem;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(6, 18, 12, 0.9);
+}
+.cel-sifflet b {
+  display: block;
+  font-family: var(--police-titre);
+  letter-spacing: 0.06em;
+  font-size: clamp(0.95rem, 3.6vw, 1.35rem);
+  color: var(--craie);
+}
+.cel-sifflet span { font-size: 0.7rem; color: var(--craie-dim); }
+.cel-cadrage {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--rayon-pilule);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(6, 18, 12, 0.78);
+  color: var(--craie);
+  font-family: var(--police-forte);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.cel-cadrage:hover { border-color: var(--or-500); color: var(--or-200); }
 .cel-tableau-bord {
   position: relative;
   padding: 1.3rem 1.4rem 1.1rem;
@@ -619,6 +717,10 @@
   color: var(--craie-dim);
 }
 .cel-chrono span.bat { color: var(--succes); animation: cel-pouls 2s ease-in-out infinite; }
+/* ⚠️ LE CHRONO ARRÊTÉ DOIT SE VOIR. Pendant une décision, le serveur gèle
+   l'horloge : un chrono qui reste vert et pulse laisserait croire qu'on perd
+   du temps de jeu à réfléchir. */
+.cel-chrono span.gele { color: var(--or-200); }
 .cel-jauge-possession { position: relative; height: 22px; border-radius: var(--rayon-pilule); background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .cel-jauge-possession i { display: block; height: 100%; background: linear-gradient(90deg, var(--pelouse-500), var(--pelouse-400)); transition: width 0.6s ease; }
 .cel-jauge-possession span {
@@ -671,6 +773,8 @@
 .cel-decision small { color: var(--brume); font-size: 0.8rem; }
 .cel-decision-choix { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.5rem; }
 .cel-decision-choix .btn { padding: 0.7rem 0.9rem; font-size: 0.9rem; }
+.cel-sablier { height: 4px; border-radius: var(--rayon-pilule); background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.cel-sablier i { display: block; height: 100%; background: var(--or-400); transition: width 1s linear; }
 
 .cel-fil-match { gap: 0; max-height: 30rem; overflow-y: auto; }
 .cel-ligne-fil {
@@ -693,6 +797,11 @@
 .cel-ligne-fil.but b { color: var(--or-400); }
 .cel-ligne-fil.carton { background: linear-gradient(90deg, rgba(224, 90, 77, 0.14), transparent 70%); }
 .cel-ligne-fil.jalon span { color: var(--or-200); font-family: var(--police-forte); }
+/* ⚠️ MES ORDRES NE SONT PAS DU RÉCIT, et ils ne doivent pas s'y confondre : le
+   fil raconte le match à tout le monde, ces lignes-là ne parlent qu'à moi. */
+.cel-ligne-fil.ordre { background: linear-gradient(90deg, rgba(232, 178, 58, 0.1), transparent 70%); }
+.cel-ligne-fil.ordre b { color: var(--or-400); }
+.cel-ligne-fil.ordre span { color: var(--or-200); font-style: italic; }
 
 .cel-grille-consignes { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.8rem; }
 .cel-liste-pions { display: flex; flex-direction: column; gap: 0.3rem; max-height: 26rem; overflow-y: auto; }
@@ -1827,7 +1936,7 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-roue-cartes > button:hover,.cel-roue-cartes > button.active { transform:translateY(-12px) scale(1.04); filter:drop-shadow(0 12px 20px #c6ad5960); }
 @media(prefers-reduced-motion:reduce){.cel-roue-cartes > button{transition:none}}
 
-.cel-terrain-direct{width:100%;max-height:520px;border:2px solid #e4e8cf;border-radius:12px;margin:20px 0}
+
 
 /* Composition : le terrain occupe la hauteur disponible, les panneaux de
    détail s'ouvrent par-dessus pour préserver la taille des cartes. */

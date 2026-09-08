@@ -195,26 +195,156 @@ coup de sifflet final. Le score affiché est celui qui a réellement été marqu
 
 ## L'horloge, la présence et les décisions
 
-**Quatre secondes de vraie vie pour une minute de rugby** — soit **5 min 20**
-par match. Le compromis a deux bornes : trop rapide, le changement tactique
-arrive après l'essai qu'il devait empêcher et regarder son match ne sert plus à
-rien ; trop lent, personne ne reste quatre-vingts minutes devant un onglet.
-L'écran sonde à 2 s, donc l'horloge avance d'une demi-minute entre deux
-rafraîchissements, ce qui se lit comme un vrai chrono.
+**Une minute de rugby vaut une minute de vraie vie.** Un match occupe donc
+quatre-vingts minutes réelles : on ouvre l'onglet, on regarde une phase, on part
+faire autre chose, on revient à la 63ᵉ. C'est ce qui donne son prix à une
+décision — elle se pose une fois, à l'instant où elle se pose.
+
+**Et le match se regarde à la vitesse réelle**, pas au ralenti. Voir la section
+suivante : c'est le chantier qui a demandé le plus de mesures.
 
 **La présence est déclarée, pas devinée.** L'écran du direct envoie un battement
 toutes les 12 secondes ; le serveur ne propose une décision qu'à un manager dont
 il a des nouvelles depuis moins de 45 s. Sans ça, un match lancé puis abandonné
 resterait figé sur une pénalité que personne ne tranchera jamais.
 
-Quand une pénalité tombe devant un manager présent, **le chrono s'arrête** (le
-gel est compté à part et ne se relâche jamais) et l'écran demande : prendre les
-trois points, chercher la touche, jouer vite, ou demander la mêlée. Le
-pourcentage annoncé est celui que le moteur jouera réellement — c'est la même
-fonction (`probabilitePenalite`), pas une estimation d'écran. Sans réponse en
-20 secondes, **l'IA tranche selon les consignes enregistrées**, et la situation
-passe avant la consigne : « toujours les points » à la 79ᵉ en étant mené de cinq
-ne se joue pas, il faut un essai.
+Quand une pénalité tombe **dans les 50 mètres adverses** devant un manager
+présent, **le chrono s'arrête** (le gel est compté à part et ne se relâche
+jamais) et l'écran demande : prendre les trois points, chercher la touche, jouer
+vite, ou demander la mêlée. Le pourcentage annoncé est celui que le moteur jouera
+réellement — c'est la même fonction (`probabilitePenalite`), pas une estimation
+d'écran. Sans réponse en 20 secondes, **l'IA tranche selon les consignes
+enregistrées**, et la situation passe avant la consigne : « toujours les points »
+à la 79ᵉ en étant mené de cinq ne se joue pas, il faut un essai.
+
+⚠️ **LES 50 MÈTRES NE SONT PAS UN DÉTAIL DE CONFORT.** Un match siffle **24,1
+pénalités** ; ne réveiller le manager que dans la zone où le choix existe en
+laisse **6,7 par équipe**, soit une toutes les douze minutes. Au-delà, « je prends
+les points ? » n'est pas une question, c'est une faute de goût — et chaque appel
+gèle le chronomètre vingt secondes.
+
+⚠️ **ET LES DEUX MANAGERS SONT ÉCOUTÉS.** La rejoue ne s'arrêtait que sur les
+pénalités d'UN camp — le premier trouvé présent, donc toujours le club à
+domicile dès qu'il regardait. Le visiteur ne se voyait proposer **aucune**
+décision de tout le match. Mesuré par le banc : domicile 5, extérieur 4.
+
+---
+
+## ⚠️ Le direct : un vrai match, à la vitesse d'un vrai match
+
+Retour de jeu, mot pour mot : « **c'est lent, les joueurs sont mal placés, prends
+le même moteur que sur le mode carrière solo** », puis « je veux un vrai match
+comme si on regardait un match qui se jouait en temps réel, comme dans la vraie
+vie — une mêlée prend une trentaine de secondes ».
+
+C'était bien le même moteur. Quatre défauts se cumulaient, et chacun suffisait.
+
+### 1. Le match avançait par bonds d'une minute
+
+`EtatMatch.minute` est un **entier** (`Math.floor(t / 60)`). Tant que la rejoue
+s'arrêtait dessus, demander « le match à la 30ᵉ 03 » le poussait en réalité
+jusqu'à la 31ᵉ pile — puis plus rien pendant cinquante-sept secondes réelles. Le
+terrain était **une photo qui se téléportait une fois par minute** : le ballon
+passait de la ligne des 55 m à celle des 35 m sans qu'on ait rien vu.
+
+La rejoue vise donc `e.t / 60`, les minutes au centième. **Et le résultat d'un
+match n'en bouge pas** : jouer d'un bloc, c'est pousser jusqu'à la 80ᵉ, et
+`e.minute < 80` comme `e.t / 60 < 80` s'arrêtent au même tick.
+
+### 2. Le serveur répondait « rien n'a changé » pendant tout le match
+
+L'échéance d'une ligue est « la plus petite date future trouvée dans l'état »
+(`echeanceCarriere.ts`). Une rencontre **en cours** ne porte aucune date : sa
+clôture est derrière nous, et ce qui doit se produire, c'est le prochain instant,
+tout le temps. L'échéance retenue était donc la rencontre suivante — un jour plus
+tard. Résultat : chaque sondage recevait `{inchange:true}` **sans que le serveur
+ne lise l'état, donc sans faire avancer le match**. Le terrain n'avançait plus
+que sur le battement de présence, toutes les douze secondes.
+
+Tant qu'une rencontre est en cours, l'échéance est donc **maintenant**.
+
+⚠️ **ET ÇA NE RÉÉCRIT PAS LA LIGUE POUR AUTANT.** Un direct fait bouger
+l'horloge, le score, le fil et les statistiques à chaque sondage : les 300 à
+400 Ko de l'état repartaient vers la base deux mille quatre cents fois par
+rencontre. Or ces six champs **ne sont pas de l'information** — ils se
+reconstruisent de la graine, des feuilles gelées et du journal. `empreinteEcriture`
+les retire de la comparaison : une lecture rend l'état AVANCÉ sans l'écrire, et
+seul un vrai changement (un ordre au journal, une décision en attente, le gel du
+chrono, la sirène) déclenche une écriture.
+
+### 3. Plus de la moitié du match était au ralenti
+
+Le moteur **compresse** les phases arrêtées à l'image : la mêlée se met en place
+en sept secondes, le chronomètre en avale cinquante. C'est le bon choix pour la
+carrière solo, qui traverse un match en cinq minutes de manette. Étirées sur les
+cinquante secondes réelles de la Carrière en ligne, ces sept secondes donnent des
+joueurs qui **marchent au ralenti**. Mesuré :
+
+| | |
+|---|---|
+| animation d'un match complet | **42,7 min** pour 80 min d'horloge |
+| dont phases arrêtées | **9,7 min** d'animation pour **47,6 min** d'horloge |
+| étirement moyen des arrêts | **×4,9** |
+
+`EtatMatch.tempsReel` supprime l'étirement : une seconde de jeu, une seconde à
+l'écran. Une mêlée dure ce que dure une mêlée. Le prix est le nombre de ticks —
+4 800 secondes simulées au lieu de 2 560, soit **566 ms** pour rejouer un match
+complet au lieu de 428 — et il ne se paie qu'au démarrage à froid : en direct, la
+rejoue repart du cache et n'avance que de deux secondes à la fois.
+
+⚠️ **LES SCORES NE BOUGENT PAS.** Le budget d'horloge de chaque arrêt est
+inchangé, donc la structure du match aussi : mesuré sur 120 rencontres, score
+moyen **20,7** (contre 20,8), **2,74** essais par équipe, maximum **36**.
+
+### 4. Une formation figée devient une photo
+
+Le placement d'une phase arrêtée est calculé une fois puis tenu. À la vitesse
+réelle, les huit avants arrivent en sept secondes et **restent immobiles
+quarante secondes**. `animerArret` joue donc les arrêts en plusieurs temps :
+
+- **la mêlée** — les deux packs se présentent face à face, se lient à 45 %, puis
+  le plus fort pousse ;
+- **la touche** — l'alignement, d'abord espacé et en retrait, se resserre à
+  mesure que le lanceur se prépare ;
+- **le tir au but** — le buteur recule de sept mètres, prend son temps, s'élance.
+
+⚠️ **ET PERSONNE NE SE TÉLÉPORTE PLUS.** `installerPlacement` replace d'office
+un joueur à plus de 26 mètres de sa marque, parce que la carrière solo ne lui
+laisse que sept secondes à l'écran. Regardée à la vitesse réelle, la même
+téléportation se voit — c'est une bonne part du « les joueurs sont mal placés ».
+En temps réel, le seuil est infini : une mêlée dure cinquante secondes, il y a
+tout le temps d'y courir.
+
+### Ce que l'écran en fait : on interpole, on n'extrapole pas
+
+Le serveur envoie trente positions **et leurs vecteurs vitesse** toutes les deux
+secondes (`TerrainDirect`) ; `components/match/TerrainEnDirect.tsx` en fait
+soixante images par seconde, avec la vraie pelouse et la caméra du match de
+carrière (`moteur/camera.ts`, pivot d'un quart de tour en portrait).
+
+Première version : on prolongeait `position + vitesse × temps` jusqu'au relevé
+suivant. **C'est faux, et ça se voit.** Un joueur ne court pas deux secondes en
+ligne droite ; à neuf mètres par seconde, deux secondes de prédiction sont
+dix-huit mètres d'erreur possible.
+
+Le match se rend donc avec **un relevé de retard** (2,4 s), en interpolant entre
+les deux relevés qui encadrent l'instant — non pas par un `lerp` (une droite
+entre deux points distants de deux secondes coupe les courbes et fait patiner les
+appuis) mais par une **spline d'Hermite** dont les tangentes sont les vecteurs
+vitesse des deux bouts. La trajectoire passe exactement par les deux positions
+vraies et repart dans la bonne direction. Le retard ne se voit pas : il n'y a
+rien à côté pour le comparer.
+
+⚠️ **LE TEMPS SIMULÉ VIENT DE L'HORLOGE DU MATCH, PAS DE LA MONTRE.** Une
+décision de pénalité gèle le chrono du serveur : les deux relevés portent alors
+la même minute, les tangentes s'annulent, et le terrain s'immobilise exactement
+comme le jeu.
+
+⚠️ **ET LES DEUX SECONDES SONT RÉSERVÉES À CELUI QUI REGARDE.** Sonder à 2 s pour
+tous les membres de la ligue, c'était 2 400 lectures complètes de l'état par
+rencontre et par onglet ouvert. Le match avance de toute façon à chaque lecture,
+d'où qu'elle vienne : un direct sans spectateur ne se bloque pas, il coûte cinq
+fois moins cher.
 
 **Aucune absence ne bloque la ligue.** À la fermeture de la fenêtre d'une
 journée, les rencontres non jouées se jouent toutes seules avec les compositions
@@ -422,6 +552,21 @@ mémorisé continuait d'appeler **l'ancien module** : on modifiait
 `carriereApi.ts`, le serveur de dev répondait comme avant, et on cherchait le
 bug ailleurs. Seul le stockage se garde désormais entre deux requêtes ; le
 gestionnaire est recréé à chaque fois — c'est une fermeture, ça ne coûte rien.
+
+⚠️ **LE STOCKAGE, LUI, RESTE EN MÉMOIRE.** `stockage ??= stockageFichier(…)`
+charge `node_modules/.destiny/carriere.json` à la PREMIÈRE requête et n'y
+retouche plus. Réécrire ce fichier pendant que le serveur tourne ne sert donc à
+rien : il faut le redémarrer. Le piège coûte dix minutes à chaque fois.
+
+**Pour regarder un direct sans attendre une journée de championnat** :
+
+```
+npx vite-node scripts/_semerDirect.ts     # une ligue à deux clubs, coup d'envoi il y a 20 s
+npm run dev                                # puis se connecter avec colin / motdepasse123
+```
+
+Le script écrit une ligue complète (saison lancée, première rencontre ouverte)
+dans le stockage de développement. Redémarrer le serveur APRÈS l'avoir lancé.
 
 ---
 

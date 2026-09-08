@@ -13,12 +13,20 @@
   jeu), trophée soulevé (parmi les 46 trophées d'équipe de l'armoire, avec son
   image 3D), et **phase finale en option** — demi-finales 1ᵉʳ-4ᵉ et 2ᵉ-3ᵉ puis
   finale. Le classement décide de l'argent, la finale décide du trophée.
-- **Les matchs se regardent et se pilotent.** 80 minutes de rugby à 4 s de vraie
-  vie par minute (5 min 20). Mentalité, jeu, rythme, défense et rucks atteignent
-  réellement le moteur ; les remplacements se font en direct ; et sur une
-  pénalité **le chrono s'arrête et on demande au manager** — trois points,
-  touche, jeu rapide ou mêlée — avec le pourcentage que le moteur jouera. Sans
-  réponse en 20 s, l'IA tranche selon les consignes enregistrées.
+- **Les matchs se regardent et se pilotent, en temps réel.** Une minute de rugby
+  vaut une minute de vraie vie : la rencontre occupe ses quatre-vingts minutes,
+  on ouvre l'onglet, on part, on revient à la 63ᵉ. **Et c'est un vrai match, pas
+  un ralenti** — la mêlée se présente, se lie et pousse pendant ses cinquante
+  secondes, la touche se resserre, le buteur recule et s'élance. Le terrain est
+  celui de la carrière solo (même moteur, même pelouse, même caméra qui pivote
+  d'un quart de tour sur téléphone), animé à soixante images par seconde à partir
+  de trente positions et de leurs vecteurs vitesse.
+  Mentalité, jeu, rythme, défense et rucks atteignent réellement le moteur ; les
+  remplacements se font en direct ; et sur une pénalité **dans les 50 mètres
+  adverses, le chrono s'arrête et on demande au manager** — trois points, touche,
+  jeu rapide ou mêlée — avec le pourcentage que le moteur jouera. Sans réponse en
+  20 s, l'adjoint tranche selon les consignes enregistrées, et le fil dit lequel
+  des deux a décidé.
 - **Une absence ne bloque jamais la ligue** : à la fermeture de la fenêtre, la
   rencontre se joue seule avec les compositions et consignes enregistrées.
 - **Les packs tirent dans le vivier réel** — 78 083 joueurs, du Top 14 à la
@@ -237,8 +245,8 @@
   les redirections : un serveur autorisé qui redirige aurait fait pointer NOTRE
   serveur où il voulait, depuis l’intérieur. Une redirection est désormais un
   refus.
-- **Mesuré** (`npm run verify:carriere`, 144 contrôles) : scores moyens 19,9 et
-  maximum 35 sur 120 rencontres — jamais de 200-150 ; un direct suivi minute par
+- **Mesuré** (`npm run verify:carriere`, 208 contrôles) : scores moyens 20,7 et
+  maximum 36 sur 120 rencontres — jamais de 200-150 ; un direct suivi minute par
   minute donne le même score qu'un match joué d'un bloc ; rapport OVA premier /
   dernier de **1,63** sur une saison.
 - ⚠️ **Il reste à appliquer `serveur/schema-carriere.sql` sur Neon.** En local,
@@ -850,16 +858,25 @@ saisons de jeu — donnent 9 Élite et **zéro Star**. En packer un est un
 
 ### Ce qui se mesure plutôt que de se supposer
 
-Le banc (`npm run verify:carriere`, 144 contrôles, une minute) joue près de deux
+Le banc (`npm run verify:carriere`, 208 contrôles, trois minutes) joue près de deux
 cents matchs complets sans navigateur ni base. Ce qu'il dit :
 
 - **les scores tiennent debout** — sur 120 rencontres entre deux effectifs
-  Bronze, moyenne **19,9**, médiane 20, **maximum 35**. Jamais de 200-150 :
+  Bronze, moyenne **20,7**, médiane 21, **maximum 36**. Jamais de 200-150 :
   le moteur reçoit un score cible tiré de la force des deux feuilles et refuse
   l'essai qui le dépasserait ;
 - **le direct est déterministe** — un match suivi minute par minute donne
   exactement le même score et le même fil qu'un match joué d'un bloc. C'est ce
   qui garantit que deux managers voient la même rencontre ;
+- **le direct avance en continu** — le plus grand bond entre deux sondages de
+  deux secondes est de **0,1 minute**, et le terrain change à chaque relevé.
+  Avant, il se téléportait une fois par minute : `EtatMatch.minute` est un
+  entier, et la rejoue s'arrêtait dessus ;
+- **la pénalité ne réveille le manager que là où le choix existe** — 24,1
+  pénalités par match, dont **6,7 par équipe dans les 50 mètres adverses**, les
+  seules qui gèlent le chronomètre ;
+- **le collectif se joue entre équipiers** — un XV qui ne se connaît pas lâche
+  **23,2 ballons** par match, un bloc constitué **14,8** ;
 - **l'anti-boule-de-neige tient** — sur une saison à six clubs, le champion
   finit à 27 350 OVA et le dernier à 16 800. **Rapport 1,63.** Un club à zéro ne
   peut plus rien acheter, donc plus rien négocier, donc il décroche pour de bon.
@@ -1005,7 +1022,8 @@ src/
   lib/moteur/controle.ts # les 25 actions du joueur en match : contexte, coût, recharge
   lib/moteur/camera.ts  # la caméra du direct : cadrage en mètres, quart de tour en portrait
   lib/moteur/moments.ts # « c'est à toi » : le match ralentit en temps réel sur tes actions
-  components/match/     # la scène du direct : pelouse, feuille de match
+  components/match/     # la scène du direct : pelouse, feuille de match,
+  #                       TerrainEnDirect.tsx (le direct EN LIGNE : interpolation d'Hermite)
   lib/moteur/bagarre.ts # tension, provocations, bagarres, cartons et commission de discipline
   lib/mj.ts             # prompt système du Maître du Jeu, parsing JSON et GARDE-FOUS
   lib/iaSociale.ts      # publications, commentaires et messages privés écrits par l'IA
@@ -1018,7 +1036,8 @@ src/
     typesCarriere.ts    # le vocabulaire : ligue, club, carte, vente, échange, objectif, commande
     catalogueCarriere.ts# LE VIVIER MONDIAL (78 083 joueurs réels), la dotation de 30 Bronze, les 7 packs
     carriere.ts         # TOUTES LES RÈGLES : saison, packs, marché, enchères, échanges, coupes, récompenses
-    matchCarriere.ts    # LE MATCH : stratégies, horloge, décisions en direct, remplacements, feuille
+    matchCarriere.ts    # LE MATCH : stratégies, horloge continue, décisions dans les 50 m,
+    #                     remplacements, terrain rejouable (positions + vitesses), feuille
     aleatoire.ts        # le PRNG déterministe, le mélange, le tirage pondéré
     calendrier.ts       # toutes rondes, équilibre des réceptions, fenêtres de journée
     ⚠️ types/rarete/identite/reglages/vivier/dotation/valeur/packs/ova = socle du 1er lot,
@@ -1041,7 +1060,7 @@ scripts/
   verifMatchJouable.ts  # caméra, sens du stick, rythme des moments, durée réelle d'un match
   verifMarche.ts        # marché : variété des clubs, saut d'étage interdit, salaires par âge
   verifClassement.ts    # joue le tricheur : chaque attaque du classement doit être refusée
-  verifCarriere.ts      # la Carrière en ligne : scores, direct, packs, économie, marché, refus (144 contrôles)
+  verifCarriere.ts      # la Carrière en ligne : scores, direct, packs, économie, marché, refus (208 contrôles)
   verifLigue.ts         # ⚠️ le socle du 1er lot — plus branché au jeu
   verifLogosSelections.ts # signatures des images et couverture du classement World Rugby
 sources/                # matières premières rangées : data, logos, compétitions, modèles 3D

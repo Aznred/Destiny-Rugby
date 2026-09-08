@@ -1,5 +1,98 @@
 # CLAUDE.md — Destiny Rugby 🏉
 
+## Septembre 2026 — le direct de la Carrière en ligne, en temps réel
+
+Demande : « qu'on suive le match comme le match de carrière, mais il dure
+réellement 80 min IRL ; sur une pénalité dans les 50 mètres adverses le manager
+décide ; les consignes et les remplacements doivent vraiment impacter le jeu ;
+les joueurs jouent comme en carrière mais tiennent 80 min sans mettre 200
+points ». Puis, après essai : « c'est lent, les joueurs sont mal placés, prends
+le même moteur que sur le mode carrière solo ». C'était bien le même moteur —
+**quatre défauts empilés**, chacun suffisant à lui seul.
+
+**1. Le match avançait par bonds d'une minute.** `EtatMatch.minute` est un
+entier ; la rejoue s'arrêtait dessus, donc « le match à la 30ᵉ 03 » poussait
+jusqu'à la 31ᵉ pile puis plus rien pendant 57 secondes réelles. Le terrain était
+une photo qui se téléportait une fois par minute. La rejoue vise `e.t / 60`.
+Le résultat d'un match ne bouge pas : `e.minute < 80` et `e.t / 60 < 80`
+s'arrêtent au même tick. Mesuré : plus grand bond **0,1 minute** entre deux
+sondages de 2 s, 30 images différentes sur 30 sondages.
+
+**2. Le serveur répondait « rien n'a changé » pendant tout le match.**
+`echeanceLigue` retient la plus petite date FUTURE de l'état ; une rencontre en
+cours n'en porte aucune (sa clôture est derrière), donc l'échéance était la
+rencontre suivante — un jour plus tard. Chaque sondage recevait
+`{inchange:true}` sans lecture, donc **sans faire avancer le match** : il ne
+bougeait que sur le battement de présence, toutes les 12 s. Un direct en cours
+rend maintenant l'échéance immédiate. ⚠️ Et pour que ça ne réécrive pas la ligue
+toutes les deux secondes, `empreinteEcriture` retire de la comparaison
+l'horloge, le score, le fil et les stats d'un match en cours — six champs qui se
+reconstruisent de la graine et du journal. La lecture rend l'état AVANCÉ (sinon
+plus rien ne bouge) mais garde la version STOCKÉE.
+
+**3. Plus de la moitié du match était au ralenti.** Le moteur compresse les
+phases arrêtées à l'image (mêlée : 7 s vues pour 50 s d'horloge), ce qui est
+juste pour la carrière solo — un match en 5 min de manette. Étiré sur le temps
+réel, ça donne ×4,9 de ralenti. Mesuré : **42,7 min d'animation pour 80 min
+d'horloge, dont 9,7 min étirées sur 47,6**. `EtatMatch.tempsReel` supprime
+l'étirement (`facteurHorloge` = 1, durée visuelle = durée d'horloge). Coût :
+566 ms pour rejouer un match au lieu de 428 — et rien ne change aux scores
+(20,7 de moyenne, 2,74 essais, max 36 sur 120 rencontres).
+
+**4. Une formation figée devient une photo.** Le placement d'un arrêt est calculé
+une fois puis tenu : à vitesse réelle, les huit avants arrivent en 7 s et
+restent immobiles 40. `animerArret` joue la mêlée en trois temps (présentation,
+liaison à 45 %, poussée du pack le plus fort), resserre l'alignement de touche,
+et donne au buteur son rituel. ⚠️ Et `installerPlacement` ne téléporte plus
+personne en temps réel : le seuil des 26 mètres existait parce que la carrière
+solo ne laisse que 7 secondes à l'écran — c'était une bonne part du « les
+joueurs sont mal placés ».
+
+**Côté écran** (`components/match/TerrainEnDirect.tsx`) : la vraie pelouse et la
+caméra du match de carrière, 60 images par seconde à partir de trente positions
+et de leurs vecteurs vitesse. ⚠️ **On interpole, on n'extrapole pas.** Prolonger
+`position + vitesse × temps` sur deux secondes, c'est 18 mètres d'erreur
+possible pour un ailier lancé. Le match se rend avec 2,4 s de retard, par
+**spline d'Hermite** entre les deux relevés qui encadrent l'instant : la
+trajectoire passe exactement par les deux positions vraies et repart dans la
+bonne direction. Le temps simulé vient de l'horloge du MATCH, pas de la montre —
+une décision gèle le chrono du serveur, les tangentes s'annulent, le terrain
+s'immobilise comme le jeu.
+
+**La pénalité ne réveille plus le manager que dans les 50 mètres adverses.**
+Un match siffle 24,1 pénalités ; il en reste 6,7 par équipe dans la zone où
+« je prends les points ? » est une question. ⚠️ Et **les deux managers sont
+écoutés** : la rejoue ne s'arrêtait que sur les pénalités du premier camp trouvé
+présent, donc toujours le club à domicile — le visiteur ne voyait AUCUNE
+décision de tout le match.
+
+**Le fil dit enfin ce que le manager a fait.** Le moteur annonce les changements
+de plan dans un commentaire de type `jeu` — 83 lignes par match, que le fil de
+la ligue ne garde pas : on cliquait dans le vide. Les ordres sont reconstruits du
+JOURNAL dans `vueMatchEnLigne`, ajoutés **au seul manager concerné** (les écrire
+dans le fil commun dirait à l'adversaire quand on bouge, ce que `signalAdverse`
+s'applique à ne laisser deviner qu'à moitié), et une décision tranchée par l'IA
+s'affiche « ton adjoint », pas « toi ». Le changement de plan lui-même ne dit
+plus le détail des réglages, pour la même raison.
+
+**Le collectif se joue aussi entre équipiers.** Demande : « il faut que le
+collectif compte dans l'influence du jeu aussi sur les erreurs entre équipiers ».
+Le total d'équipe part entier au moteur (`EtatMatch.cohesion`, gelé avec la
+feuille) et `erreurDeLiaison` en fait ce qu'une note ne peut pas dire : passe qui
+part devant, ballon lâché à la réception, offload dans le vide. Rien d'autre —
+la vitesse et le plaquage d'un joueur ne doivent rien à ses voisins. Mesuré :
+**23,2 en-avants à 0 de collectif, 18,7 à 50, 14,8 à 100**, et un match sans
+collectif joue exactement comme à 50 (la carrière solo ne bouge pas d'un tick).
+
+⚠️ **Ce qui reste cher** : pendant qu'on regarde, le serveur relit l'état complet
+de la ligue toutes les deux secondes. Le sondage rapide est désormais réservé à
+celui qui a le direct ouvert (les autres passent à 10 s), mais un match suivi de
+bout en bout coûte encore ~2 400 lectures. La vraie réponse serait une colonne
+dédiée à la rencontre en cours plutôt que le jsonb entier.
+
+Bancs : `npm run verify:carriere`, section 3 (horloge continue, seuil des 50 m,
+les deux managers, collectif et fautes de liaison).
+
 ## Septembre 2026 — calendrier mondial
 
 `FriseCalendrier` est la navigation commune à `CalendrierManager` et `CalendrierMondial` : mois juillet–juin, rail hebdomadaire défilant, détail de la date et actions séparées. Un clic sur une date (même passée) ne simule rien. Les flèches clavier/Home/End parcourent les points ; le repère courant et la sélection sont distincts. La cible appartient à une saison : au changement d'exercice, on revient au prochain rendez-vous au lieu de conserver un ancien numéro de semaine. Ne pas réintroduire la liste déroulante ni les 53 grandes cartes.

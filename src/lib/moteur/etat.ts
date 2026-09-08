@@ -351,6 +351,17 @@ export interface EtatMatch {
   ajustementTactiqueB: number;
   /** Seul le côté coaché en direct en possède une ; l'autre garde son IA. */
   tactiques: Partial<Record<Cote, TactiqueManager>>;
+  /**
+   * CE QUE L'ÉQUIPE SE CONNAÎT, de 0 à 100. Absent = 50, c'est-à-dire neutre.
+   *
+   * ⚠️ ELLE NE TOUCHE QUE LES ERREURS ENTRE COÉQUIPIERS — la passe qui part
+   * devant, le ballon lâché à la réception, l'offload donné à personne. Un
+   * groupe qui se connaît ne court pas plus vite et ne plaque pas plus fort :
+   * il se comprend. C'est exactement ce que le collectif de la Carrière en
+   * ligne mesure (quatre joueurs d'un même club réel, une nation partagée),
+   * et c'est pour ça qu'il entre ici et nulle part ailleurs.
+   */
+  cohesion?: Partial<Record<Cote, number>>;
   essaisA: number;
   essaisB: number;
 
@@ -380,6 +391,14 @@ export interface EtatMatch {
 
   // Phases arrêtées
   placement: Record<string, Vec> | null;
+  /**
+   * Ce que dure la phase arrêtée en cours, en secondes simulées.
+   *
+   * ⚠️ SANS ELLE, ON NE SAIT PAS OÙ ON EN EST. `minuteur` dit ce qu'il RESTE ;
+   * pour jouer une mêlée en trois temps (les packs se font face, ils se lient,
+   * ils poussent) il faut savoir quelle fraction est écoulée.
+   */
+  dureeArret?: number;
   cibleRenvoi: Vec | null;   // où va tomber le coup d'envoi (sert au placement)
   tir: { buteur: Pion; distance: number; angle: number; valeur: number; suite: 'renvoi' | 'coupEnvoi' } | null;
   penalite: { pour: Cote; lieu: Vec; motif: string } | null;
@@ -395,6 +414,21 @@ export interface EtatMatch {
   consigne?: ConsigneJoueur;
   fini: boolean;
   rng: () => number;
+  /**
+   * ⚠️ LE MATCH SE REGARDE EN TEMPS RÉEL — une seconde de jeu, une seconde à
+   * l'écran, et rien n'est ni accéléré ni ralenti.
+   *
+   * La carrière solo joue un match en cinq minutes de manette : les phases
+   * arrêtées y sont COMPRESSÉES à l'image (la mêlée se met en place en sept
+   * secondes, le chrono en avale cinquante). C'est le bon choix pour un match
+   * qu'on traverse, et le mauvais pour un match qu'on SUIT : étirées sur les
+   * cinquante secondes réelles de la Carrière en ligne, ces sept secondes
+   * d'animation donnent des joueurs qui marchent au ralenti.
+   *
+   * En temps réel, la mêlée dure ce que dure une mêlée. Le match coûte plus de
+   * ticks (4 800 secondes simulées au lieu de 2 560) et c'est le prix à payer.
+   */
+  tempsReel?: boolean;
   /** Options serveur : aucune incidence sur les carrières locales existantes. */
   scoreSurTerrain?: boolean;
   meteoTir?: 'sec' | 'pluie' | 'vent';

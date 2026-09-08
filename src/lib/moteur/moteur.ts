@@ -95,9 +95,98 @@ const ARRETS: Record<string, { visuel: number; horloge: number }> = {
   bagarre: { visuel: 6, horloge: 0 },
 };
 
-function facteurHorloge(phase: Phase): number {
+/**
+ * Le rapport entre le chronomètre du match et ce qu'on regarde.
+ *
+ * ⚠️ EXPORTÉ POUR LE DIRECT EN LIGNE. Là-bas, une minute de jeu vaut une minute
+ * réelle : pendant une mêlée, cinquante secondes d'horloge ne montrent que sept
+ * secondes de mouvement. L'écran a besoin de ce rapport pour extrapoler les
+ * positions entre deux relevés du serveur sans faire courir les joueurs sept
+ * fois trop vite.
+ */
+export function facteurHorloge(phase: Phase, tempsReel = false): number {
+  if (tempsReel) return 1;
   const a = ARRETS[phase];
   return a ? a.horloge / a.visuel : 1;
+}
+
+/**
+ * Ce que dure une phase arrêtée À L'ÉCRAN, en secondes simulées.
+ *
+ * ⚠️ EN TEMPS RÉEL, CE QU'ON REGARDE DURE CE QUE LE CHRONO AVALE. C'est la
+ * seule définition qui donne un match « comme à la télévision » : la mêlée se
+ * met en place, se lie et pousse pendant cinquante secondes, la touche prend
+ * ses trente-cinq secondes, et le buteur a le temps de son rituel.
+ */
+function dureeArret(e: EtatMatch, phase: Phase): number {
+  const a = ARRETS[phase];
+  const duree = !a ? 3 : e.tempsReel ? a.horloge : a.visuel;
+  e.dureeArret = duree;
+  return duree;
+}
+
+/** Ce qui est déjà écoulé de la phase arrêtée, de 0 à 1. */
+function avancementArret(e: EtatMatch): number {
+  const total = e.dureeArret ?? 0;
+  return total > 0 ? borner(1 - e.minuteur / total, 0, 1) : 1;
+}
+
+/**
+ * LES PHASES ARRÊTÉES QUI SE JOUENT VRAIMENT.
+ *
+ * ⚠️ EN TEMPS RÉEL, UNE FORMATION FIGÉE DEVIENT UNE PHOTO. Le placement d'une
+ * mêlée est calculé une fois puis tenu : à la vitesse de la carrière solo, les
+ * huit avants mettent sept secondes à s'y rendre et le ballon sort. Étiré sur
+ * les cinquante secondes réelles d'une mêlée, le même placement donne quarante
+ * secondes de joueurs immobiles — et c'est ça, « les joueurs sont mal placés ».
+ *
+ * Une mêlée se joue donc en trois temps, comme sur un terrain : les deux packs
+ * se présentent face à face, ils se lient, puis le plus fort pousse. Une touche
+ * se forme : l'alignement se resserre à mesure que le lanceur se prépare. Un
+ * tir au but a son rituel : le buteur recule, prend son temps, et s'élance.
+ *
+ * ⚠️ ON DÉPLACE LA CIBLE, PAS LE PION. Les joueurs gardent leur inertie et
+ * courent vers leur nouvelle marque — c'est ce qui rend la liaison d'une mêlée
+ * lisible plutôt que saccadée.
+ */
+function animerArret(e: EtatMatch): void {
+  const p = avancementArret(e);
+  if (e.phase === 'melee') {
+    // Avant la liaison, chaque pack recule d'un mètre sept de SON côté ; une
+    // fois lié, l'ensemble dérive dans le sens du pack le plus fort.
+    const ecart = Math.max(0, 1 - p / 0.45) * 1.7;
+    const avants = (cote: Cote) => surLeTerrain(e, cote).filter((q) => q.avant);
+    const moy = (l: Pion[]) => (l.length ? l.reduce((a, b) => a + b.puissance, 0) / l.length : 50);
+    const dom = borner((moy(avants(e.possession)) - moy(avants(adverse(e.possession)))) / 18, -1, 1);
+    const derive = Math.max(0, p - 0.5) / 0.5 * dom * 1.6 * sens(e.possession);
+    for (const pion of e.pions) {
+      if (!pion.surLeTerrain || pion.role !== 'melee') continue;
+      pion.cible = { x: pion.cible.x - sens(pion.cote) * ecart + derive, y: pion.cible.y };
+    }
+    return;
+  }
+  if (e.phase === 'touche') {
+    // L'alignement se resserre : d'abord espacé et en retrait, puis à sa place.
+    const bord = e.ballon.y < AXE ? 0 : LARGEUR;
+    const vers = bord === 0 ? 1 : -1;
+    const large = Math.max(0, 1 - p / 0.6);
+    for (const pion of e.pions) {
+      if (!pion.surLeTerrain || pion.role !== 'alignement') continue;
+      const profondeur = Math.abs(pion.cible.y - bord);
+      pion.cible = {
+        x: pion.cible.x - sens(pion.cote) * large * 1.6,
+        y: borner(bord + vers * (profondeur * (1 + large * 0.35)), 2.5, LARGEUR - 2.5),
+      };
+    }
+    return;
+  }
+  if (e.phase === 'tirAuBut' && e.tir) {
+    // Le rituel du buteur : il recule de sept mètres, souffle, puis s'élance.
+    const buteur = e.tir.buteur;
+    if (!buteur.surLeTerrain) return;
+    const recul = p < 0.72 ? Math.min(1, p / 0.25) * 7 : Math.max(0, (1 - p) / 0.28) * 7;
+    buteur.cible = { x: e.ballon.x - sens(buteur.cote) * recul, y: e.ballon.y };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +221,14 @@ export interface OptionsMatch {
   capitaineBId?: string;
   buteurAId?: string;
   buteurBId?: string;
+  /**
+   * Ce que chaque équipe se connaît, de 0 à 100 (50 = neutre, absent = neutre).
+   * Voir `EtatMatch.cohesion` : cela ne joue QUE sur les fautes de liaison.
+   */
+  cohesionA?: number;
+  cohesionB?: number;
+  /** Le match se regarde à la vitesse réelle : voir `EtatMatch.tempsReel`. */
+  tempsReel?: boolean;
 }
 
 function planVide(total: number, rng: () => number): PlanDeScore {
@@ -262,6 +359,7 @@ export function creerMatch(
     placement: null, cibleRenvoi: null, tir: null, penalite: null,
     remplacementsA: 0, remplacementsB: 0, remplacementsDemandes: {}, prochaineDecision: 1, compteur: 0,
     commentaires: [], fini: false, rng,
+    tempsReel: options.tempsReel,
     scoreSurTerrain: options.scoreSurTerrain, meteoTir: options.meteoTir,
     niveau: options.niveau ?? 'pro',
     controle: options.controle ?? false,
@@ -279,6 +377,7 @@ export function creerMatch(
     discipline: disciplineVide(),
   };
 
+  e.minuteur = dureeArret(e, 'coupEnvoi');
   e.cibleRenvoi = {
     x: MILIEU + sens(possession) * 30,
     y: borner(AXE + (rng() < 0.5 ? 1 : -1) * 16, 8, LARGEUR - 8),
@@ -291,6 +390,9 @@ export function creerMatch(
   dire(e, 'jalon', null, C.texteMatch('coupEnvoiMatch', { clubA, clubB }));
   // Le plan d'avant-match compte déjà. Il est appliqué une fois, puis tout
   // changement en direct ne modifiera que la différence restante.
+  if (options.cohesionA !== undefined || options.cohesionB !== undefined) {
+    e.cohesion = { A: options.cohesionA, B: options.cohesionB };
+  }
   if (options.tactiqueA) appliquerTactiqueEquipe(e, 'A', options.tactiqueA, false);
   if (options.tactiqueB) appliquerTactiqueEquipe(e, 'B', options.tactiqueB, false);
   return e;
@@ -327,7 +429,7 @@ function tick(e: EtatMatch): void {
     e.echappee.restant -= dt;
     if (e.echappee.restant <= 0 || e.porteur !== e.echappee.pion) e.echappee = null;
   }
-  const dtHorloge = dt * facteurHorloge(e.phase);
+  const dtHorloge = dt * facteurHorloge(e.phase, e.tempsReel);
   e.t += dtHorloge;
   e.minute = Math.min(80, Math.floor(e.t / 60));
 
@@ -391,6 +493,9 @@ function tick(e: EtatMatch): void {
         if (c && p.surLeTerrain) p.cible = c;
       }
     }
+    // ⚠️ APRÈS LE PLACEMENT, JAMAIS AVANT : la formation repose les cibles de
+    // tout le monde, et l'animation de l'arrêt les déplace à partir de là.
+    if (e.tempsReel && e.minuteur > 0) animerArret(e);
   }
   // ⚠️ APRÈS LE PLACEMENT, ET À CHAQUE TICK. La tactique repose les cibles de
   // tout le monde toutes les trois images ; si le pilotage passait avant, la
@@ -583,6 +688,14 @@ function dire(
 // secondes pendant l'arrêt.
 function installerPlacement(e: EtatMatch, placement: Record<string, Vec>, seuil = 26): void {
   e.placement = placement;
+  // ⚠️ EN TEMPS RÉEL, PERSONNE NE SE TÉLÉPORTE. Le seuil existe parce qu'un
+  // joueur qui vient d'aplatir dans l'en-but a cent mètres à faire et que la
+  // carrière solo ne lui laisse que sept secondes à l'écran. Regardée à la
+  // vitesse réelle, la même téléportation se voit — et c'est précisément le
+  // « les joueurs sont mal placés » du retour de jeu : ils n'étaient pas mal
+  // placés, ils APPARAISSAIENT à leur place. Une mêlée dure cinquante
+  // secondes : à huit mètres par seconde, il y a tout le temps d'y courir.
+  if (e.tempsReel) seuil = Infinity;
   for (const p of e.pions) {
     if (!p.surLeTerrain || p.sanction > 0) continue;
     const c = placement[p.id];
@@ -632,7 +745,7 @@ function preparerCoupEnvoi(e: EtatMatch, pour: Cote): void {
   e.phasesDepuisArret = 0;
   e.ballon = { x: MILIEU, y: AXE };
   e.phase = 'coupEnvoi';
-  e.minuteur = ARRETS.coupEnvoi.visuel;
+  e.minuteur = dureeArret(e, 'coupEnvoi');
   e.ouvert = e.rng() < 0.5 ? 1 : -1;
   // Le point de chute est décidé MAINTENANT : les deux équipes se placent en
   // fonction de lui, exactement comme sur un terrain. ⚠️ S'il a déjà été fixé
@@ -1163,6 +1276,30 @@ function passeEnAvant(e: EtatMatch, p: Pion): void {
  * coûter. Sans ça, raffut puis offload était une machine à franchir sans aucun
  * revers possible.
  */
+/**
+ * LE FACTEUR D'ERREUR ENTRE COÉQUIPIERS, tiré de la cohésion de l'équipe.
+ *
+ * ⚠️ IL NE MULTIPLIE QUE DES FAUTES DE LIAISON, jamais une aptitude. Demande,
+ * mot pour mot : « il faut que le collectif compte dans l'influence du jeu
+ * aussi sur les erreurs entre équipiers ». C'est le bon endroit, et le seul :
+ * une passe qui part devant, un ballon lâché à la réception ou un offload
+ * donné dans le vide sont EXACTEMENT ce qui sépare une ligne rodée d'un XV de
+ * gens qui se sont rencontrés au vestiaire. La vitesse, le plaquage et le pied
+ * d'un joueur ne doivent rien à ses voisins — ils restent hors d'ici.
+ *
+ * L'amplitude est volontairement contenue : ±30 % sur des risques qui valent
+ * quelques pour cent. Sur un match, cela se compte en une ou deux fautes de
+ * main — assez pour qu'on sente la différence entre un groupe neuf et un bloc
+ * constitué, jamais assez pour qu'une feuille dépareillée soit ingagnable. Le
+ * mode distribue des cartes au hasard : on ne punit pas un manager pour ce que
+ * les packs lui ont donné.
+ */
+function erreurDeLiaison(e: EtatMatch, cote: Cote): number {
+  const c = e.cohesion?.[cote];
+  if (c === undefined) return 1;
+  return borner(1 + ((50 - c) / 100) * 0.6, 0.7, 1.3);
+}
+
 function receptionRatee(e: EtatMatch, receveur: Pion, longueur: number, offload: boolean): boolean {
   let plusProche = 99;
   for (const d of surLeTerrain(e, adverse(receveur.cote))) {
@@ -1170,9 +1307,9 @@ function receptionRatee(e: EtatMatch, receveur: Pion, longueur: number, offload:
     plusProche = Math.min(plusProche, distance(d.pos, receveur.pos));
   }
   const mains = 0.55 + receveur.passe / 200 + receveur.endurance / 900;
-  const risque = (offload ? 0.020 : 0.0045)
+  const risque = ((offload ? 0.020 : 0.0045)
     + Math.max(0, 4 - plusProche) * 0.006
-    + Math.max(0, longueur - 9) / 600;
+    + Math.max(0, longueur - 9) / 600) * erreurDeLiaison(e, receveur.cote);
   return e.rng() < Math.max(0, risque / mains);
 }
 
@@ -1229,15 +1366,19 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
 
   // ⚠️ LE RECEVEUR A DÉRIVÉ DEVANT : soit le passeur retient son geste, soit il
   // la lâche quand même et l'arbitre siffle. Voir `passeEnAvant`.
+  // ⚠️ LA PASSE EN AVANT EST UNE FAUTE DE TIMING, PAS DE GESTE : le receveur a
+  // dérivé devant, ou le passeur ne l'a pas vu partir. C'est la première chose
+  // qu'une ligne rodée cesse de faire — d'où la cohésion, ici comme au sol.
+  const liaison = erreurDeLiaison(e, p.cote);
   const avance = (cible.x - p.pos.x) * s;
   if (avance > 0.4) {
-    const risque = Math.min(0.22, Math.max(0, avance - 1.4) * 0.038) * (1.3 - p.vision / 200);
+    const risque = Math.min(0.22, Math.max(0, avance - 1.4) * 0.038) * (1.3 - p.vision / 200) * liaison;
     if (e.rng() < risque) return passeEnAvant(e, p);
     cible.x = p.pos.x - s * 0.4;
   }
 
   // En-avant : rare, mais plus fréquent sous pression et chez un avant.
-  const risque = 0.010 + Math.max(0, 3 - pression) * 0.007 + d / 1800;
+  const risque = (0.010 + Math.max(0, 3 - pression) * 0.007 + d / 1800) * liaison;
   if (e.rng() < risque * (1.35 - p.passe / 220)) {
     p.stats.passes -= 1;
     return enAvant(e, p);
@@ -1701,8 +1842,7 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec): void {
   e.perceeSignalee = false;
   e.ballon = { x: borner(lieu.x, LIGNE_A + 1, LIGNE_B - 1), y: lieu.y };
   e.phase = quoi;
-  const a = ARRETS[quoi];
-  e.minuteur = a ? a.visuel : 3;
+  e.minuteur = dureeArret(e, quoi);
   e.ouvert = choisirCoteOuvert(e);
 
   if (quoi === 'touche') {
@@ -1958,7 +2098,7 @@ function phasePenalite(e: EtatMatch): void {
   if (veutTirer) {
     e.tir = { buteur, distance: dist, angle: ecartAxe, valeur: 3, suite: 'coupEnvoi' };
     e.phase = 'tirAuBut';
-    e.minuteur = ARRETS.tirAuBut.visuel;
+    e.minuteur = dureeArret(e, 'tirAuBut');
     e.placement = placementTir(e.pions, info.lieu, cote);
     return;
   }
@@ -2108,7 +2248,7 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   }
 
   e.phase = 'apresEssai';
-  e.minuteur = ARRETS.apresEssai.visuel;
+  e.minuteur = dureeArret(e, 'apresEssai');
   e.possession = adverse(cote);
   // ⚠️ Dès l'essai marqué, tout le monde regagne le centre pour le coup
   // d'envoi. Ils ont la célébration + la transformation pour y arriver.
@@ -2664,7 +2804,7 @@ function clorePeriode(e: EtatMatch): void {
     e.sirene = false;
     e.t = DUREE_PERIODE;
     e.phase = 'miTemps';
-    e.minuteur = ARRETS.miTemps.visuel;
+    e.minuteur = dureeArret(e, 'miTemps');
     e.porteur = null;
     e.vol = null;
     e.placement = null;
@@ -2813,10 +2953,13 @@ export function appliquerTactiqueEquipe(
   if (deltaB) recomposerPlan(e, 'B', e.planB.total + deltaB);
   e.ajustementTactiqueA = nouveauA;
   e.ajustementTactiqueB = nouveauB;
-  if (annoncer) {
-    const club = nomClub(e, cote);
-    dire(e, 'jeu', cote, `${club} change son plan : ${tactique.attaque}, défense ${tactique.defense}, rythme ${tactique.rythme}.`);
-  }
+  // ⚠️ LA PHRASE NE DIT PLUS LE DÉTAIL DU PLAN, et ce n'est pas une perte.
+  // En ligne, le fil est LU PAR LES DEUX MANAGERS : « défense blitz, rythme
+  // intense » annoncerait à l'adversaire exactement ce qu'il doit contrer, et
+  // réduirait à néant le filtre de `signalAdverse` — qui ne laisse justement
+  // passer qu'une impression. Celui qui donne l'ordre le relit, lui, dans son
+  // propre panneau de consignes.
+  if (annoncer) dire(e, 'jeu', cote, C.texteMatch('changementDePlan', { club: nomClub(e, cote) }));
 }
 
 /** Programme un changement au prochain arrêt de jeu. */

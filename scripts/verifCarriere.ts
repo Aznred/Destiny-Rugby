@@ -26,9 +26,12 @@ import type { EtatCarriereEnLigne, RareteCarriere } from '../src/lib/ligue/types
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide, plafondVenteRapide } from '../src/lib/ligue/venteRapideCarriere';
 import {
   avancerMatchEnLigne, cibleDeScore, commanderMatchEnLigne, conclureMatchEnLigne,
-  creerMatchEnLigne, decisionIA, feuilleGeleeEnLigne, forceFeuille, MS_PAR_MINUTE, STRATEGIE_EN_LIGNE_DEFAUT,
-  strategieValide, impactStrategie, tactiqueDepuisStrategie, mentaliteAppliquee,
+  creerMatchEnLigne, decisionIA, feuilleGeleeEnLigne, forceFeuille, METRES_DECISION, MS_PAR_MINUTE,
+  STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, impactStrategie, tactiqueDepuisStrategie,
+  mentaliteAppliquee, vueMatchEnLigne,
 } from '../src/lib/ligue/matchCarriere';
+import { avancer, creerMatch } from '../src/lib/moteur/moteur';
+import { graine as graineMoteur } from '../src/lib/ligue/aleatoire';
 import {
   catalogueMondialCarriere, carteDepuisSource, catalogueParRarete, coequipierDepuisCarte,
   competitionsCarriere, dotationBronzeCarriere, emblemesCarriere, emblemeValide, PACKS_CARRIERE,
@@ -187,7 +190,17 @@ titre('2. LES SCORES — « surtout pas 200-150 »');
   dire(moyEssais >= 1 && moyEssais <= 5, 'le nombre d’essais par équipe est réaliste', moyEssais.toFixed(2));
   dire(moyPenalites >= 0.8 && moyPenalites <= 5, 'le nombre de pénalités passées est réaliste', moyPenalites.toFixed(2));
   dire(scores.some((s) => s !== scores[0]), 'les scores varient d’un match à l’autre');
-  dire(parMatch < 400, 'un match complet se rejoue en moins de 400 ms', `${parMatch.toFixed(0)} ms`);
+  // ⚠️ LE SEUIL EST PASSÉ DE 400 À 800 ms, ET C'EST UN PRIX ASSUMÉ. Le direct
+  // se joue en TEMPS RÉEL (`EtatMatch.tempsReel`) : une seconde de jeu vaut une
+  // seconde à l'écran, donc le moteur simule les 4 800 secondes du match au lieu
+  // des 2 560 que la carrière solo compresse. Deux fois plus de ticks, deux fois
+  // plus de temps — mais une mêlée dure enfin cinquante secondes au lieu d'être
+  // étirée cinq fois. Le coût ne se paie qu'au démarrage à froid : en direct, la
+  // rejoue repart du cache et n'avance que de deux secondes à la fois.
+  // Mesuré : 566 ms sur une machine au repos, 844 ms pendant un `npm run build`
+  // concurrent. Le seuil laisse la marge d'une machine chargée sans laisser
+  // passer une vraie régression — c'était 428 ms avant le temps réel.
+  dire(parMatch < 1100, 'un match complet se rejoue en moins de 1,1 s', `${parMatch.toFixed(0)} ms`);
 
   // La cible de score suit bien l'écart de force, avantage du terrain compris.
   const faible = cibleDeScore(35, 35, 'egal');
@@ -285,6 +298,125 @@ titre('3. LA REJOUE EST DÉTERMINISTE, ET LE DIRECT S’ARRÊTE SUR LES DÉCISIO
     'l’IA prend les points au calme, et va en touche quand il faut un essai');
   dire(strategieValide({ mentalite: 'invincible', rythme: 'lent' }).mentalite === 'equilibree',
     'une stratégie inventée par un client bricolé est ramenée au défaut');
+
+  // ── L'HORLOGE CONTINUE ───────────────────────────────────────────────────
+  // ⚠️ LE DÉFAUT QUI RENDAIT LE DIRECT ILLISIBLE. `EtatMatch.minute` est un
+  // entier : tant que la rejoue s'arrêtait dessus, un sondage à la 30ᵉ 03
+  // poussait le moteur jusqu'à la 31ᵉ pile, puis PLUS RIEN pendant cinquante-
+  // sept secondes réelles. Le terrain était une photo qui se téléportait une
+  // fois par minute, et « suivre le match » n'existait pas.
+  {
+    let suivi = creerMatchEnLigne(params);
+    const horloges: number[] = [];
+    const positions: string[] = [];
+    for (let pas = 1; pas <= 30; pas++) {
+      suivi = avancerMatchEnLigne(suivi, T0 + pas * 2000);
+      horloges.push(suivi.horloge);
+      const t = vueMatchEnLigne(suivi, 'A').terrain;
+      if (t) positions.push(t.pions.map((p) => `${p.x},${p.y}`).join('|'));
+    }
+    const bonds = horloges.slice(1).map((h, i) => h - horloges[i]);
+    const plusGrandBond = Math.max(...bonds);
+    dire(plusGrandBond < 0.2, '⚠️ le direct avance en CONTINU, pas par bonds d’une minute entière',
+      `plus grand bond : ${plusGrandBond.toFixed(3)} minute`);
+    // ⚠️ PAS TRENTE SUR TRENTE, ET C'EST NORMAL. Quand les vingt-deux joueurs
+    // d'une touche sont en place et attendent le lancer, deux relevés distants
+    // de deux secondes sont légitimement identiques — c'est du rugby, pas un
+    // gel. Ce qu'on interdit ici, c'est l'ancien défaut : UNE seule image par
+    // minute de jeu, soit deux ou trois sur trente.
+    dire(new Set(positions).size >= 18, 'et le terrain change à presque chaque sondage de deux secondes',
+      `${new Set(positions).size} images différentes sur 30 sondages`);
+    const t = vueMatchEnLigne(suivi, 'A').terrain;
+    dire(t !== undefined && t.pions.length === 30, 'le terrain envoyé porte les trente joueurs',
+      `${t?.pions.length ?? 0} pions`);
+    dire(Boolean(t && t.pions.every((p) => Number.isFinite(p.vx) && Number.isFinite(p.vy))),
+      '⚠️ avec leur VECTEUR VITESSE — c’est lui qui laisse l’écran extrapoler entre deux relevés');
+    dire(Boolean(t && t.cadence > 0), 'et la cadence de la phase, sans quoi on courrait sept fois trop vite',
+      `cadence ${t?.cadence} en phase « ${t?.phase} »`);
+  }
+
+  // ── LA PÉNALITÉ SE DÉCIDE DANS LES 50 MÈTRES ADVERSES ───────────────────
+  {
+    let zone = creerMatchEnLigne(params);
+    let horlogeReelle = T0;
+    const distances: number[] = [];
+    for (let pas = 1; pas <= 1600 && !zone.termine; pas++) {
+      horlogeReelle += 4_000;
+      zone = commanderMatchEnLigne(zone, 'A', { type: 'presence' }, horlogeReelle);
+      if (zone.decision) {
+        distances.push(zone.decision.distance);
+        horlogeReelle += 21_000;
+        zone = avancerMatchEnLigne(zone, horlogeReelle);
+      }
+    }
+    dire(distances.length > 0, 'le manager présent est appelé sur ses pénalités', `${distances.length} appels`);
+    dire(distances.every((d) => d <= METRES_DECISION),
+      `⚠️ et JAMAIS au-delà de ${METRES_DECISION} m : à 70 m des poteaux, « je prends les points ? » n’est pas une question`,
+      distances.length ? `de ${Math.min(...distances)} à ${Math.max(...distances)} m` : '');
+    dire(zone.termine, 'et le match va au bout malgré les arrêts');
+  }
+
+  // ── LES DEUX MANAGERS TRANCHENT, PAS SEULEMENT CELUI DE DOMICILE ────────
+  // ⚠️ LE VISITEUR NE VOYAIT JAMAIS UNE SEULE DÉCISION. La rejoue ne s'arrêtait
+  // que sur les pénalités d'UN camp — le premier trouvé présent, donc toujours
+  // le club à domicile dès qu'il regardait.
+  {
+    let deux = creerMatchEnLigne(params);
+    let horlogeReelle = T0;
+    const vues = { A: 0, B: 0 };
+    for (let pas = 1; pas <= 1600 && !deux.termine; pas++) {
+      horlogeReelle += 4_000;
+      deux = commanderMatchEnLigne(deux, 'A', { type: 'presence' }, horlogeReelle);
+      deux = commanderMatchEnLigne(deux, 'B', { type: 'presence' }, horlogeReelle);
+      if (deux.decision) {
+        vues[deux.decision.cote === 'domicile' ? 'A' : 'B'] += 1;
+        horlogeReelle += 21_000;
+        deux = avancerMatchEnLigne(deux, horlogeReelle);
+      }
+    }
+    dire(vues.A > 0 && vues.B > 0,
+      '⚠️ quand les DEUX regardent, chacun se voit proposer SES pénalités',
+      `domicile ${vues.A} · extérieur ${vues.B}`);
+  }
+
+  // ── LE COLLECTIF SE JOUE AUSSI ENTRE ÉQUIPIERS ──────────────────────────
+  // Demande : « il faut que le collectif compte dans l'influence du jeu aussi
+  // sur les erreurs entre équipiers ». Il déplaçait les NOTES, donc la cible de
+  // score ; il déplace maintenant les FAUTES DE LIAISON — passe en avant,
+  // ballon lâché à la réception, offload dans le vide.
+  {
+    const fautes = (cohesion: number | undefined) => {
+      let total = 0;
+      for (let i = 0; i < 12; i++) {
+        const lot = dotationBronzeCarriere('m', `coh-${i}`, `coh-${i}`);
+        const feuille = lot.map(coequipierDepuisCarte);
+        const compo = compositionManagerParDefaut(feuille);
+        const ordre = [...compo.titulaires, ...compo.remplacants]
+          .map((id) => feuille.find((j) => j.id === id))
+          .filter((j): j is NonNullable<typeof j> => Boolean(j));
+        const e = creerMatch('A', 'B', ordre, ordre, 24, 21, `coh${i}`, undefined, {
+          rng: graineMoteur(`coh${i}`), scoreSurTerrain: true,
+          compositionA: ordre, compositionB: ordre,
+          cohesionA: cohesion, cohesionB: cohesion,
+        });
+        while (!e.fini) avancer(e, 0.6);
+        total += e.compteurs.enAvants;
+      }
+      return total / 12;
+    };
+    const inconnus = fautes(0);
+    const neutre = fautes(50);
+    const rodes = fautes(100);
+    const absent = fautes(undefined);
+    console.log(`     en-avants par match : inconnus ${inconnus.toFixed(1)} · neutre ${neutre.toFixed(1)} · rodés ${rodes.toFixed(1)}`);
+    dire(inconnus > rodes * 1.2,
+      '⚠️ un XV qui ne se connaît pas LÂCHE PLUS DE BALLONS qu’un bloc constitué',
+      `${inconnus.toFixed(1)} contre ${rodes.toFixed(1)} en-avants`);
+    dire(neutre > rodes && inconnus > neutre, 'et l’échelle est monotone entre les deux');
+    dire(Math.abs(absent - neutre) < 0.01,
+      '⚠️ un match SANS collectif joue exactement comme à 50 : la carrière solo ne bouge pas',
+      `${absent.toFixed(1)} contre ${neutre.toFixed(1)}`);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

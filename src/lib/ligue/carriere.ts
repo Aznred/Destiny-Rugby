@@ -444,13 +444,20 @@ function lancerRencontre(etat: EtatCarriereEnLigne, r: RencontreCarriere, mainte
     // (`collectifCarriere`). Deux formules donneraient un jour deux vérités :
     // un manager qui compose pour 78 de collectif et une équipe qui entre sur
     // le terrain avec autre chose.
-    const affinites = collectifCarriere(cartes, club.composition).parCarte;
+    const equipeCollectif = collectifCarriere(cartes, club.composition);
+    const affinites = equipeCollectif.parCarte;
     // ⚠️ UNE CARTE ABSENTE DE `parCarte` N'EST PAS UNE CARTE À ZÉRO POINT. Le
     // banc et la réserve ne sont pas comptés dans le collectif ; leur passer 0
     // leur infligerait la pénalité de −1 pour n'avoir pas été alignés, et un
     // remplaçant entrerait à la 60ᵉ minute avec une note rabotée sans raison.
     const collectif = (c: CarteCarriere) => (affinites[c.id] ? bonusCollectif(affinites[c.id].points) : 0);
-    return { clubId: id, nom: club.nom, effectif: cartes.map(c => ({ ...coequipierDepuisCarte(c), note: Math.max(20, Math.min(99, c.note + collectif(c)) - Math.round(c.fatigue * .12)) })), composition: club.composition, strategie: club.strategie };
+    // ⚠️ LE COLLECTIF PART AUSSI ENTIER AU MOTEUR, et pas seulement réparti
+    // dans les notes. Une note dit ce que vaut un joueur ; elle ne peut pas
+    // dire que deux joueurs se comprennent. Les fautes de liaison — passe en
+    // avant, ballon lâché à la réception, offload dans le vide — sont le seul
+    // endroit du moteur où « ils se connaissent » a un sens, et c'est là que
+    // le total d'équipe va (voir `erreurDeLiaison` dans `moteur/moteur.ts`).
+    return { clubId: id, nom: club.nom, effectif: cartes.map(c => ({ ...coequipierDepuisCarte(c), note: Math.max(20, Math.min(99, c.note + collectif(c)) - Math.round(c.fatigue * .12)) })), composition: club.composition, strategie: club.strategie, collectif: equipeCollectif.total };
   };
   r.match = creerMatchEnLigne({ id: r.id, domicile: equipe(r.domicile), exterieur: equipe(r.exterieur), debut: maintenant, graine: Math.floor(hasard(`${graine}:${r.id}`)() * 2 ** 31) });
 }
@@ -801,6 +808,40 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
     }
   }
   nouveau.version = etat.version + 1; return nouveau;
+}
+
+/**
+ * L'état tel qu'on le COMPARE avant d'écrire, débarrassé de ce qu'une simple
+ * lecture recalcule.
+ *
+ * ⚠️ SANS ELLE, REGARDER UN MATCH RÉÉCRIT LA LIGUE TOUTES LES DEUX SECONDES.
+ * Un direct fait bouger l'horloge, le score, le fil et les statistiques à chaque
+ * sondage : l'état produit n'est jamais identique au précédent, donc les 300 à
+ * 400 Ko de la ligue repartaient vers la base deux mille quatre cents fois par
+ * rencontre. Or ces six champs ne sont PAS de l'information : ils se
+ * reconstruisent intégralement de la graine, des feuilles gelées et du journal
+ * — c'est tout le principe de `matchCarriere.ts`, « on ne stocke pas un match,
+ * on stocke de quoi le rejouer ».
+ *
+ * ⚠️ ET CE QUI EST VRAIMENT NOUVEAU DÉCLENCHE TOUJOURS UNE ÉCRITURE : un ordre
+ * au journal, une décision en attente avec sa date limite, le gel du chrono, la
+ * présence d'un manager, et bien sûr la sirène (`termine`) avec le score final.
+ * Un match TERMINÉ garde donc tous ses champs comparés : son fil et sa feuille
+ * sont, eux, la seule trace qui restera.
+ */
+const DERIVES_DU_DIRECT = ['horloge', 'score', 'essais', 'penalites', 'fil', 'stats'] as const;
+
+export function empreinteEcriture(etat: EtatCarriereEnLigne, version: number): string {
+  return JSON.stringify({
+    ...etat,
+    version,
+    rencontres: etat.rencontres.map((r) => {
+      if (!r.match || r.match.termine) return r;
+      const durable: Record<string, unknown> = { ...r.match };
+      for (const cle of DERIVES_DU_DIRECT) delete durable[cle];
+      return { ...r, match: durable };
+    }),
+  });
 }
 
 export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCarriereEnLigne {

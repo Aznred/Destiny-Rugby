@@ -68,8 +68,36 @@ export function prochainJour(maintenant: number): number {
   return minuit.getTime();
 }
 
+/**
+ * ⚠️ UN MATCH EN DIRECT EST UNE ÉCHÉANCE PERMANENTE, ET AUCUNE DATE NE LE DIT.
+ *
+ * C'est le trou de la méthode « la plus petite date future » : une rencontre en
+ * cours ne porte aucune date d'échéance — sa clôture est DERRIÈRE nous, et ce
+ * qui doit se produire, c'est le prochain instant, tout le temps. La plus petite
+ * date future trouvée dans l'état était donc la rencontre SUIVANTE, un jour plus
+ * tard, ou minuit.
+ *
+ * Conséquence mesurée dans le navigateur : pendant les quatre-vingts minutes
+ * d'un direct, CHAQUE sondage recevait « rien n'a changé » sans que le serveur
+ * ne lise l'état — donc sans faire avancer le match. Le terrain n'avançait plus
+ * que sur le battement de présence, toutes les douze secondes, par bonds. C'est
+ * une bonne part du « c'est lent, les joueurs sont mal placés ».
+ *
+ * Tant qu'une rencontre est en cours, l'échéance est donc MAINTENANT : la
+ * lecture conditionnelle se désarme, l'état est relu, le match avance.
+ */
+function directEnCours(etat: unknown): boolean {
+  const rencontres = (etat as { rencontres?: unknown } | null)?.rencontres;
+  if (!Array.isArray(rencontres)) return false;
+  return rencontres.some((r) => {
+    const match = (r as { match?: { termine?: boolean } } | null)?.match;
+    return Boolean(match) && match?.termine !== true;
+  });
+}
+
 /** L'échéance à retenir pour une ligue : la plus proche des deux. */
 export function echeanceLigue(etat: unknown, maintenant: number): number {
+  if (directEnCours(etat)) return maintenant;
   const dansLEtat = prochaineEcheance(etat, maintenant);
   const jour = prochainJour(maintenant);
   return dansLEtat === null ? jour : Math.min(dansLEtat, jour);

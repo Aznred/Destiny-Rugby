@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, vueCarriere } from '../src/lib/ligue/carriere.js';
+import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, empreinteEcriture, vueCarriere } from '../src/lib/ligue/carriere.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
@@ -104,11 +104,23 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
        * l'échéance resterait éternellement dans le passé et chaque sondage
        * relirait l'état entier — exactement ce qu'on cherche à éviter.
        */
-      const memeEtat = JSON.stringify({ ...suivant, version: ligne.etat.version }) === JSON.stringify(ligne.etat);
+      const memeEtat = empreinteEcriture(suivant, ligne.etat.version) === empreinteEcriture(ligne.etat, ligne.etat.version);
       if (memeEtat) {
         const echeance = echeanceLigue(ligne.etat, maintenant);
         if (ligne.echeance !== echeance) await stockage.rafraichirEcheance(id, echeance).catch(() => {});
-        return ligne.etat;
+        // ⚠️ ON NE RÉÉCRIT PAS, MAIS ON REND BIEN L'ÉTAT AVANCÉ. Rendre l'état
+        // LU ferait revivre indéfiniment la même seconde de match : pendant un
+        // direct, la seule chose qui bouge est justement ce que
+        // « empreinteEcriture » ignore — l'horloge, le score, le fil, le
+        // terrain. Mesuré dans le navigateur : les trente joueurs restaient
+        // figés, deux minutes durant.
+        //
+        // ⚠️ ET LA VERSION RESTE CELLE QUI EST STOCKÉE. « avancerCarriere »
+        // l'incrémente à chaque appel ; la laisser filer rendrait au client des
+        // numéros qui n'existent nulle part, et la première VRAIE écriture lui
+        // reviendrait avec une version PLUS PETITE — que l'écran ignore, parce
+        // qu'il refuse par principe de revenir en arrière.
+        return { ...suivant, version: ligne.etat.version };
       }
       const maj: LigueStockee = { ...ligne, etat: suivant, comptes: comptesEtat(suivant) };
       if (await stockage.comparerEtEcrire(maj, ligne.version, compte, requete)) return suivant;
