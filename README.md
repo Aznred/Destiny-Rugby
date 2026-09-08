@@ -1381,9 +1381,11 @@ mais son monde possède désormais quatre espaces supplémentaires : **Direction
   l'algorithme refuse, et il a raison de refuser.
 - **Les refusés se ramassent dans un dossier** :
   `node scripts/photosNonDetourees.cjs` copie les **68 portraits** que le script
-  laisse tels quels dans `../photos-a-detourer/` (hors du dépôt : dans `public/`
-  ils seraient servis par le site), en gardant leur sous-dossier d'origine, avec
-  un `LISEZ-MOI.md` qui les inventorie. Une fois retouchés à la main,
+  laisse tels quels dans **`photos-a-detourer/`** (2,8 Mo, suivi par git pour se
+  retoucher depuis n'importe quelle machine — mais **pas dans `public/`**, où ils
+  seraient servis par le site et pèseraient deux fois dans le build, avec et sans
+  leur fond), en gardant leur sous-dossier d'origine, avec un `LISEZ-MOI.md` qui
+  les inventorie. Une fois retouchés à la main,
   `node scripts/photosNonDetourees.cjs --retour` les remet en place — et il **ne
   reprend que ceux qui ont vraiment été détourés**, pour qu'un fichier inchangé
   n'apparaisse pas modifié dans git à cause du seul ré-encodage.

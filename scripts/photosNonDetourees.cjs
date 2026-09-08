@@ -12,13 +12,15 @@
 // modèle de segmentation). Ce script les rassemble dans un dossier, et sait les
 // remettre à leur place une fois retouchés.
 //
-//   node scripts/photosNonDetourees.cjs            → extrait vers ../photos-a-detourer/
+//   node scripts/photosNonDetourees.cjs            → extrait vers photos-a-detourer/
 //   node scripts/photosNonDetourees.cjs --retour   → replace les fichiers retouchés
 //
-// ⚠️ LE DOSSIER VIT HORS DU DÉPÔT (`../photos-a-detourer/`, à côté de
-// `Destiny Rugby/`). Posé dans `public/`, il serait servi par le site et
-// compterait dans le poids du build ; posé ailleurs dans le dépôt, il ferait
-// doublon dans git à chaque retouche.
+// ⚠️ LE DOSSIER EST DANS LE DÉPÔT, MAIS PAS DANS `public/`. Demandé en jeu :
+// « copie-les moi juste dans un dossier dans le git, que je les détoure moi-même ».
+// Suivis par git, ils se retrouvent sur n'importe quelle machine et se
+// retouchent d'où on veut. Dans `public/`, en revanche, ils seraient SERVIS par
+// le site et compteraient deux fois dans le poids du build — une fois avec leur
+// fond, une fois sans.
 //
 // ⚠️ UN PORTRAIT DÉTOURÉ N'A PAS QUATRE COINS TRANSPARENTS. Il est coupé aux
 // épaules : ses deux coins du BAS sont pleins de maillot. C'est l'erreur qui a
@@ -30,7 +32,7 @@ const path = require('node:path');
 const sharp = require('sharp');
 
 const RACINE = path.join(__dirname, '..');
-const SORTIE = path.resolve(RACINE, '..', 'photos-a-detourer');
+const SORTIE = path.join(RACINE, 'photos-a-detourer');
 /** Les quatre dossiers de portraits, et le nom qu'ils portent dans la sortie. */
 const DOSSIERS = [
   ['public/photos', 'photos'],
