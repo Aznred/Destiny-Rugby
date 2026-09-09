@@ -35,12 +35,12 @@ import { EFFECTIF_MINIMUM, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import type { CompositionManager } from '../types';
 import type { Coequipier } from '../lib/effectif';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
-import type { CarteCarriere, CommandeCarriere, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
+import type { CarteCarriere, CommandeCarriere, StatistiquesGlobalesCarriere, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
 import type { OrdreFil, StrategieEnLigne } from '../lib/ligue/matchCarriere';
 import TerrainEnDirect, { type CouleursDirect } from '../components/match/TerrainEnDirect';
 import {
   chargerSessionCarriere, chargerLigueCarriere, identifierCarriere, deconnecterCarriere, INCHANGE,
-  creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, chargerEmblemesCarriere, ErreurCarriere,
+  creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, ErreurCarriere,
 } from '../lib/carriereEnLigneClient';
 import type { IdentiteLigue } from '../lib/carriereEnLigneClient';
 import type { CataloguesIdentite, GroupeEmblemes, SessionCarriere, TropheeLigue } from '../lib/carriereEnLigneClient';
@@ -52,13 +52,14 @@ import OuverturePack from '../components/OuverturePack';
 import { prechargerOuverturePack } from '../lib/prechargementPacks';
 import { NOMS_PACK, apparencePack } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
+import Pack3D from '../components/Pack3D';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from '../lib/ligue/venteRapideCarriere';
 import { collectifCarriere, paliersCollectif, bonusCollectif, COLLECTIF_MAX } from '../lib/ligue/collectifCarriere';
 import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 import { packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
 
-type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire';
+type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'secret';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
 type VueRencontre = VueCarriereEnLigne['rencontres'][number];
 const ONGLETS: { id: Onglet; label: string; icone: NomIcone }[] = [
@@ -641,7 +642,7 @@ export function CarriereEnLigne() {
             pendant une rencontre — le direct a son propre bouton « Fermer »,
             qui ramène exactement là d'où l'on vient. */}
         {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / Saison {vue.saison}</span></div><h1>{club?.nom}</h1><p>{vue.clubs.length} clubs · {vue.rythme} match{vue.rythme > 1 ? 's' : ''} par semaine · {vue.phase === 'salon' ? 'Inscriptions ouvertes' : vue.phase === 'saison' ? 'Saison en cours' : 'Intersaison'}</p></div><div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>Ovas de cette ligue</span></div></header>}
-        {!rencontre && <nav className="cel-onglets" aria-label="Club en ligne">{ONGLETS.map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
+        {!rencontre && <nav className="cel-onglets" aria-label="Club en ligne">{[...ONGLETS, ...(session.compte.administrateur ? [{ id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} />}
@@ -652,6 +653,7 @@ export function CarriereEnLigne() {
           {onglet === 'marche' && <Marche vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'competitions' && <Competitions vue={vue} agir={agir} occupe={occupe} proprietaire={session.compte.id === vue.createurId} suivre={setMatchId} />}
           {onglet === 'histoire' && <Histoire vue={vue} />}
+          {onglet === 'secret' && session.compte.administrateur && <StatistiquesSecretes />}
         </>}
       </>}
   </section>;
@@ -1837,8 +1839,54 @@ const NATURES: Record<string, { label: string; icone: NomIcone }> = {
   objectif: { label: 'Objectif', icone: 'cible' }, competition: { label: 'Compétition', icone: 'trophee' },
 };
 
+function PochetteRecord({ rarete }: { rarete: CarteCarriere['rarete'] }) {
+  return <div className={`cel-pochette-record ${rarete}`} aria-label={`Pochette ${RARETES[rarete]}`}>
+    <Pack3D rarete={rarete} ouvert={false} calme transition="record" />
+  </div>;
+}
+
+function StatistiquesSecretes() {
+  const [stats, setStats] = useState<StatistiquesGlobalesCarriere | null>(null);
+  const [erreur, setErreur] = useState('');
+  useEffect(() => {
+    const controleur = new AbortController();
+    void chargerStatistiquesGlobales(controleur.signal).then(setStats).catch(e => {
+      if (!controleur.signal.aborted) setErreur(messageErreur(e));
+    });
+    return () => controleur.abort();
+  }, []);
+  if (erreur) return <Vide icone="alerte" titre="Statistiques indisponibles">{erreur}</Vide>;
+  if (!stats) return <Vide icone="chrono" titre="Calcul des records">La base prépare les agrégats sans télécharger les ligues.</Vide>;
+  return <section className="cel-panneau cel-stats-secret">
+    <div className="cel-titre-ligne"><div><div className="eyebrow">Réservé au compte kiri</div><h2>Les chiffres de tout le jeu</h2></div><Icone nom="medaille" taille={28} /></div>
+    <div className="cel-stats-compteurs">
+      <article><strong>{montant(stats.ligues)}</strong><span>ligues créées</span></article>
+      <article><strong>{montant(stats.comptes)}</strong><span>comptes</span></article>
+      <article><strong>{montant(stats.clubs)}</strong><span>clubs engagés</span></article>
+      <article><strong>{montant(stats.packsOuverts)}</strong><span>packs ouverts</span></article>
+      <article><strong>{montant(stats.matchsJoues)}</strong><span>matchs joués</span></article>
+      <article><strong>{montant(stats.ovasDepensesPacks)}</strong><span>Ovas dépensés en packs</span></article>
+      <article><strong>{montant(stats.volumeMarche)}</strong><span>Ovas passés sur le marché</span></article>
+    </div>
+    <div className="cel-records">
+      <article><Icone nom="cadeau" taille={24} /><div><small>Plus grand ouvreur</small><b>{stats.meilleurOuvreur?.pseudo ?? 'Pas encore de pack'}</b><span>{stats.meilleurOuvreur ? `${montant(stats.meilleurOuvreur.packs)} packs · ${stats.meilleurOuvreur.ligue}` : '—'}</span></div></article>
+      <article>{stats.meilleurPack && <PochetteRecord rarete={stats.meilleurPack.apparence} />}<div><small>Meilleur pack</small><b>{stats.meilleurPack?.joueur ?? 'Pas encore de record'}</b><span>{stats.meilleurPack ? `${stats.meilleurPack.note} GEN · ${stats.meilleurPack.pseudo} · ${stats.meilleurPack.ligue}` : '—'}</span></div></article>
+      <article><Icone nom="poignee" taille={24} /><div><small>Plus gros achat</small><b>{stats.plusGrosAchat?.joueur || 'Pas encore de vente'}</b><span>{stats.plusGrosAchat ? `${montant(stats.plusGrosAchat.montant)} Ovas · ${stats.plusGrosAchat.pseudo} · ${stats.plusGrosAchat.ligue}` : '—'}</span></div></article>
+    </div>
+  </section>;
+}
+
 function Histoire({ vue }: { vue: VueCarriereEnLigne }) {
   return <>
+    <section className="cel-panneau">
+      <div className="cel-titre-ligne"><div><div className="eyebrow">Visible par toute la ligue</div><h2>Les records du vestiaire</h2></div><Icone nom="medaille" /></div>
+      <div className="cel-records">
+        <article><Icone nom="cadeau" taille={24} /><div><small>Plus grand ouvreur</small><b>{vue.statistiques.meilleurOuvreur?.pseudo ?? 'Pas encore de pack'}</b><span>{vue.statistiques.meilleurOuvreur ? `${montant(vue.statistiques.meilleurOuvreur.packs)} packs ouverts` : 'Le record attend son premier nom.'}</span></div></article>
+        <article>{vue.statistiques.meilleurPack && <PochetteRecord rarete={vue.statistiques.meilleurPack.apparence} />}<div><small>Meilleur pack</small><b>{vue.statistiques.meilleurPack?.joueur ?? 'Pas encore de record'}</b><span>{vue.statistiques.meilleurPack ? `${vue.statistiques.meilleurPack.note} GEN · ${vue.statistiques.meilleurPack.pseudo} · ${vue.statistiques.meilleurPack.pack}` : '—'}</span></div></article>
+        <article><Icone nom="poignee" taille={24} /><div><small>Plus gros achat</small><b>{vue.statistiques.plusGrosAchat?.joueur ?? 'Pas encore de vente'}</b><span>{vue.statistiques.plusGrosAchat ? `${montant(vue.statistiques.plusGrosAchat.montant)} Ovas · ${vue.statistiques.plusGrosAchat.pseudo}` : '—'}</span></div></article>
+      </div>
+      <div className="cel-packs-clubs">{vue.statistiques.parClub.map(c => <span key={c.clubId}><b>{c.pseudo}</b><em>{montant(c.packs)} pack{c.packs > 1 ? 's' : ''}</em></span>)}</div>
+    </section>
     <section className="cel-panneau">
       <div className="cel-titre-ligne"><h2>Palmarès de la ligue</h2><Icone nom="medaille" /></div>
       {vue.histoire.length ? <div className="cel-palmares">{[...vue.histoire].reverse().map((h, i) => <article key={`${h.competitionId}-${i}`} className={h.vainqueur === vue.monClubId ? 'moi' : ''}>

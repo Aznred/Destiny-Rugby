@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
+import type { EtatCarriereEnLigne, StatistiquesGlobalesCarriere } from '../src/lib/ligue/typesCarriere.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 
 export interface CompteStocke { id: string; identifiant: string; pseudo: string; empreinte: string }
@@ -39,6 +39,8 @@ export interface StockageCarriere {
   ligues(compte: string): Promise<ResumeLigue[]>;
   /** Pour le plafond de 20 ligues : un compte, pas une liste. */
   nombreLigues(compte: string): Promise<number>;
+  /** Agrégats administrateur calculés dans Postgres : aucun état JSON ne traverse le réseau. */
+  statistiquesGlobales(): Promise<StatistiquesGlobalesCarriere>;
   ligue(id: string): Promise<LigueStockee | null>;
   ligueParCode(code: string): Promise<LigueStockee | null>;
   creerLigue(ligue: LigueStockee): Promise<boolean>;
@@ -134,6 +136,70 @@ export function stockageNeon(url: string): StockageCarriere {
     async nombreLigues(compte) {
       const r = await sql`select count(*)::int as n from carriere_ligues where ${compte}::uuid=any(comptes)`;
       return Number(r[0]?.n ?? 0);
+    },
+    async statistiquesGlobales() {
+      const r = await sql`
+        with tx as (
+          select l.id as ligue_id, l.donnees->>'nom' as ligue, l.donnees as donnees, t
+          from carriere_ligues l
+          cross join lateral jsonb_array_elements(coalesce(l.donnees->'transactions','[]'::jsonb)) t
+        ), ouvreurs as (
+          select ligue_id, ligue, t->>'clubId' as club_id, count(*)::int as packs
+          from tx where t->>'nature'='pack' group by ligue_id, ligue, t->>'clubId'
+          order by packs desc limit 1
+        ), meilleurs as (
+          select x.*, (select c from jsonb_array_elements(coalesce(x.donnees->'cartes','[]'::jsonb)) c
+                         where c->>'id' in (select jsonb_array_elements_text(coalesce(x.t->'cartes','[]'::jsonb)))
+                         order by (c->>'note')::int desc limit 1) as carte
+          from tx x where t->>'nature'='pack'
+          order by coalesce((t->'meta'->>'meilleureNote')::int,
+            (select max((c->>'note')::int) from jsonb_array_elements(coalesce(x.donnees->'cartes','[]'::jsonb)) c
+             where c->>'id' in (select jsonb_array_elements_text(coalesce(x.t->'cartes','[]'::jsonb)))),0) desc,
+            t->>'date' desc limit 1
+        ), ventes_vendues as (
+          select l.id as ligue_id, l.donnees->>'nom' as ligue, l.donnees, v,
+                 case when v->>'type'='enchere' then coalesce((v->'enchere'->>'montant')::bigint,(v->>'prix')::bigint)
+                      else (v->>'prix')::bigint end as montant
+          from carriere_ligues l
+          cross join lateral jsonb_array_elements(coalesce(l.donnees->'ventes','[]'::jsonb)) v
+          where v->>'etat'='vendue' and v->>'acheteurId' is not null
+        ), achats as (
+          select x.*, (select c from jsonb_array_elements(coalesce(x.donnees->'cartes','[]'::jsonb)) c
+                         where c->>'id'=x.v->>'carteId' limit 1) as carte
+          from ventes_vendues x order by montant desc limit 1
+        )
+        select
+          (select count(*)::int from carriere_ligues) as ligues,
+          (select count(*)::int from comptes) as comptes,
+          (select coalesce(sum(jsonb_array_length(coalesce(donnees->'clubs','[]'::jsonb))),0)::int from carriere_ligues) as clubs,
+          (select count(*)::int from tx where t->>'nature'='pack') as packs_ouverts,
+          (select count(*)::int from carriere_ligues l cross join lateral jsonb_array_elements(coalesce(l.donnees->'rencontres','[]'::jsonb)) m where m ? 'resultat') as matchs_joues,
+          (select coalesce(sum(abs((t->>'ovas')::bigint)),0)::bigint from tx where t->>'nature'='pack' and (t->>'ovas')::bigint < 0) as ovas_packs,
+          (select coalesce(sum(montant),0)::bigint from ventes_vendues) as volume_marche,
+          (select jsonb_build_object('pseudo',coalesce(c->>'pseudo',c->>'nom'),'packs',o.packs,'ligue',o.ligue)
+             from ouvreurs o, carriere_ligues l cross join lateral jsonb_array_elements(l.donnees->'clubs') c
+             where l.id=o.ligue_id and c->>'id'=o.club_id limit 1) as meilleur_ouvreur,
+          (select jsonb_build_object('pseudo',coalesce(c->>'pseudo',c->>'nom'),'pack',coalesce(m.t->'meta'->>'packNom',split_part(m.t->>'libelle',':',1),'Pack'),
+                    'apparence',coalesce(m.t->'meta'->>'packApparence',m.carte->>'rarete','bronze'),
+                    'note',coalesce((m.t->'meta'->>'meilleureNote')::int,(m.carte->>'note')::int,0),
+                    'joueur',coalesce(m.t->'meta'->>'meilleurJoueur',m.carte->>'nom','Joueur'),
+                    'portrait',coalesce(m.t->'meta'->>'meilleurPortrait',m.carte->>'photo'),'ligue',m.ligue)
+             from meilleurs m, carriere_ligues l cross join lateral jsonb_array_elements(l.donnees->'clubs') c
+             where l.id=m.ligue_id and c->>'id'=m.t->>'clubId' limit 1) as meilleur_pack,
+          (select jsonb_build_object('pseudo',coalesce(c->>'pseudo',c->>'nom'),
+                    'joueur',coalesce(a.v->>'joueurNom',a.carte->>'nom','Joueur du marché'),
+                    'montant',a.montant,'ligue',a.ligue)
+             from achats a, carriere_ligues l cross join lateral jsonb_array_elements(l.donnees->'clubs') c
+             where l.id=a.ligue_id and c->>'id'=a.v->>'acheteurId' limit 1) as plus_gros_achat`;
+      const x = r[0] ?? {};
+      return {
+        ligues: Number(x.ligues ?? 0), comptes: Number(x.comptes ?? 0), clubs: Number(x.clubs ?? 0),
+        packsOuverts: Number(x.packs_ouverts ?? 0), matchsJoues: Number(x.matchs_joues ?? 0),
+        ovasDepensesPacks: Number(x.ovas_packs ?? 0), volumeMarche: Number(x.volume_marche ?? 0),
+        meilleurOuvreur: x.meilleur_ouvreur as StatistiquesGlobalesCarriere['meilleurOuvreur'],
+        meilleurPack: x.meilleur_pack as StatistiquesGlobalesCarriere['meilleurPack'],
+        plusGrosAchat: x.plus_gros_achat as StatistiquesGlobalesCarriere['plusGrosAchat'],
+      };
     },
     async ligue(id) { const r = await sql`select * from carriere_ligues where id=${id}`; return r[0] ? ligne(r[0]) : null; },
     /**

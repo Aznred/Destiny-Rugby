@@ -87,6 +87,8 @@ export interface VenteCarriere {
   id: string; carteId: string; vendeurId: string; type: 'directe' | 'enchere';
   prix: number; expireLe: string; etat: 'ouverte' | 'vendue' | 'annulee' | 'expiree';
   enchere?: { clubId: string; montant: number }; acheteurId?: string;
+  /** Conservé après la vente, même si la carte quitte ensuite la ligue. */
+  joueurNom?: string;
 }
 export interface EchangeCarriere {
   id: string; de: string; vers: string; cartesDonnees: string[]; cartesDemandees: string[];
@@ -96,6 +98,22 @@ export interface EchangeCarriere {
 export interface TransactionCarriere {
   id: string; clubId: string; nature: 'dotation' | 'pack' | 'vente' | 'venteRapide' | 'enchere' | 'echange' | 'match' | 'objectif' | 'competition';
   ovas: number; cartes: string[]; libelle: string; date: string;
+  /** Petit résumé durable pour les records, sans devoir conserver la carte. */
+  meta?: { packId?: string; packNom?: string; packApparence?: RareteCarriere; meilleureNote?: number; meilleurJoueur?: string; meilleurPortrait?: string };
+}
+export interface StatistiquesLigueCarriere {
+  packsOuverts: number;
+  parClub: { clubId: string; pseudo: string; nom: string; packs: number }[];
+  meilleurOuvreur?: { clubId: string; pseudo: string; packs: number };
+  meilleurPack?: { clubId: string; pseudo: string; pack: string; apparence: RareteCarriere; note: number; joueur: string; portrait?: string; date: string };
+  plusGrosAchat?: { clubId: string; pseudo: string; joueur: string; montant: number; date: string };
+}
+export interface StatistiquesGlobalesCarriere {
+  ligues: number; comptes: number; clubs: number; packsOuverts: number; matchsJoues: number;
+  ovasDepensesPacks: number; volumeMarche: number;
+  meilleurOuvreur?: { pseudo: string; packs: number; ligue: string };
+  meilleurPack?: { pseudo: string; pack: string; apparence: RareteCarriere; note: number; joueur: string; portrait?: string; ligue: string };
+  plusGrosAchat?: { pseudo: string; joueur: string; montant: number; ligue: string };
 }
 export interface ObjectifCarriere {
   id: string; clubId: string; libelle: string; type: 'participer' | 'gagner' | 'essais' | 'formation' | 'penalites' | 'serie';
@@ -131,6 +149,8 @@ export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' |
   rencontres: (Omit<RencontreCarriere, 'match'> & { match?: VueMatchEnLigne })[];
   objectifs: ObjectifCarriere[]; transactions: TransactionCarriere[]; echanges: EchangeCarriere[];
   classement: LigneClassementCarriere[]; vivierDisponible: number;
+  /** Records publics de cette ligue, visibles dans son journal. */
+  statistiques: StatistiquesLigueCarriere;
 }
 export interface CreationCarriere {
   id: string; nom: string; code: string; compteId: string; pseudo: string; clubNom: string;

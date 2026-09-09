@@ -70,19 +70,46 @@ function protegerOrigine(req: RequeteCarriere) {
 }
 
 /** Aucune empreinte, graine ou identité privée ne part dans la vue. */
-const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo });
+const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, administrateur: c.identifiant === 'kiri' });
 const comptesEtat = (e: EtatCarriereEnLigne) => e.clubs.map(c => c.compteId);
 
 export function creerGestionnaireCarriere(stockage: StockageCarriere) {
+  // Les fonctions serverless chaudes réutilisent ces caches. Une vérification
+  // d'en-tête minuscule garde la cohérence entre instances sans retransférer
+  // les centaines de Ko de la ligue à chaque sondage de direct.
+  const liguesChaudes = new Map<string, LigueStockee>();
+  const sessionsChaudes = new Map<string, { compte: CompteStocke; jusqua: number }>();
+  const memoriserLigue = (id: string, ligne: LigueStockee) => {
+    liguesChaudes.delete(id);
+    liguesChaudes.set(id, ligne);
+    if (liguesChaudes.size > 32) liguesChaudes.delete(liguesChaudes.keys().next().value as string);
+  };
+  async function lireLigue(id: string, connue?: { version: number; comptes: string[]; echeance: number | null }) {
+    const cache = liguesChaudes.get(id);
+    if (!cache) {
+      const ligne = await stockage.ligue(id);
+      if (ligne) memoriserLigue(id, ligne);
+      return ligne;
+    }
+    const entete = connue ?? await stockage.entete(id);
+    if (entete && entete.version === cache.etat.version) {
+      const ligne = { ...cache, comptes: entete.comptes, echeance: entete.echeance };
+      memoriserLigue(id, ligne); return ligne;
+    }
+    const ligne = await stockage.ligue(id);
+    if (ligne) memoriserLigue(id, ligne); else liguesChaudes.delete(id);
+    return ligne;
+  }
   async function appliquer(id: string, compte: string, requete: string,
     operation: (etat: EtatCarriereEnLigne, maintenant: number, graine: string) => EtatCarriereEnLigne,
-    autoriserInscription = false) {
+    autoriserInscription = false, verifierRecu = true,
+    enteteConnue?: { version: number; comptes: string[]; echeance: number | null }) {
     for (let tentative = 0; tentative < 8; tentative++) {
-      const ligne = await stockage.ligue(id);
+      const ligne = await lireLigue(id, tentative === 0 ? enteteConnue : undefined);
       if (!ligne || (!autoriserInscription && compte !== 'horloge' && !ligne.comptes.includes(compte))) {
         throw new ErreurHttp(404, 'Ligue introuvable.');
       }
-      if (await stockage.dejaTraitee(id, compte, requete)) return ligne.etat;
+      if (verifierRecu && await stockage.dejaTraitee(id, compte, requete)) return ligne.etat;
       const maintenant = Date.now();
       const suivant = operation(ligne.etat, maintenant, randomBytes(24).toString('hex'));
       /**
@@ -107,7 +134,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
       const memeEtat = empreinteEcriture(suivant, ligne.etat.version) === empreinteEcriture(ligne.etat, ligne.etat.version);
       if (memeEtat) {
         const echeance = echeanceLigue(ligne.etat, maintenant);
-        if (ligne.echeance !== echeance) await stockage.rafraichirEcheance(id, echeance).catch(() => {});
+        // En direct `echeanceLigue` vaut « maintenant » afin de laisser passer
+        // chaque sondage. L'écrire toutes les deux secondes ne sert à rien :
+        // l'ancienne échéance, déjà passée, produit exactement le même effet et
+        // évite une UPDATE/WAL permanente pendant 80 minutes.
+        if (echeance > maintenant && ligne.echeance !== echeance) await stockage.rafraichirEcheance(id, echeance).catch(() => {});
         // ⚠️ ON NE RÉÉCRIT PAS, MAIS ON REND BIEN L'ÉTAT AVANCÉ. Rendre l'état
         // LU ferait revivre indéfiniment la même seconde de match : pendant un
         // direct, la seule chose qui bouge est justement ce que
@@ -120,10 +151,16 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
         // numéros qui n'existent nulle part, et la première VRAIE écriture lui
         // reviendrait avec une version PLUS PETITE — que l'écran ignore, parce
         // qu'il refuse par principe de revenir en arrière.
-        return { ...suivant, version: ligne.etat.version };
+        const avance = { ...suivant, version: ligne.etat.version };
+        memoriserLigue(id, { ...ligne, etat: avance, echeance });
+        return avance;
       }
       const maj: LigueStockee = { ...ligne, etat: suivant, comptes: comptesEtat(suivant) };
-      if (await stockage.comparerEtEcrire(maj, ligne.version, compte, requete)) return suivant;
+      if (await stockage.comparerEtEcrire(maj, ligne.version, compte, requete)) {
+        memoriserLigue(id, { ...maj, version: ligne.version + 1, echeance: echeanceLigue(suivant, maintenant) });
+        return suivant;
+      }
+      liguesChaudes.delete(id);
     }
     throw new ErreurHttp(409, 'La ligue vient de changer. Réessayez dans un instant.');
   }
@@ -225,18 +262,29 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
         }
         const jeton = randomBytes(32).toString('hex');
         await stockage.ouvrirSession(empreinteJeton(jeton), compte.id, maintenant + DUREE_SESSION);
+        sessionsChaudes.set(empreinteJeton(jeton), { compte, jusqua: maintenant + 60_000 });
         cookie(req, res, jeton);
         return res.status(200).json({ compte: publicCompte(compte) });
       }
       const jeton = lireJeton(req);
-      const compte = jeton ? await stockage.session(empreinteJeton(jeton), maintenant) : null;
+      const empreinteSession = jeton ? empreinteJeton(jeton) : '';
+      const sessionChaude = empreinteSession ? sessionsChaudes.get(empreinteSession) : undefined;
+      const compte = sessionChaude && sessionChaude.jusqua > maintenant ? sessionChaude.compte
+        : empreinteSession ? await stockage.session(empreinteSession, maintenant) : null;
+      if (compte && (!sessionChaude || sessionChaude.jusqua <= maintenant)) sessionsChaudes.set(empreinteSession, { compte, jusqua: maintenant + 60_000 });
       if (!compte) throw new ErreurHttp(401, 'Connectez-vous pour retrouver vos ligues.');
-      if (!await stockage.limiter(`jeu:${compte.id}`, 240, 60_000, maintenant)) throw new ErreurHttp(429, 'Trop de demandes. Patientez quelques secondes.');
+      // Un GET de sondage est une lecture sûre. Le limiter SQL écrivait une
+      // ligne à chaque consultation et gonflait à lui seul le WAL / l'historique.
+      if (req.method === 'POST' && !await stockage.limiter(`jeu:${compte.id}`, 240, 60_000, maintenant)) throw new ErreurHttp(429, 'Trop de demandes. Patientez quelques secondes.');
       if (action === 'deconnexion') {
-        await stockage.fermerSession(empreinteJeton(jeton)); cookie(req, res, '', true);
+        await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);
         return res.status(200).json({ ok: true });
       }
       if (req.method === 'GET') {
+        if (url.searchParams.get('statistiques') === 'globales') {
+          if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
+          return res.status(200).json(await stockage.statistiquesGlobales());
+        }
         const id = url.searchParams.get('ligue');
         if (!id) {
           const ligues = await stockage.ligues(compte.id);
@@ -275,8 +323,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
          * casser ce qui ne la connaît pas.
          */
         const connue = Number(url.searchParams.get('v'));
+        let enteteConnue: { version: number; comptes: string[]; echeance: number | null } | undefined;
         if (Number.isInteger(connue) && connue > 0) {
           const entete = await stockage.entete(id);
+          enteteConnue = entete ?? undefined;
           if (!entete || !entete.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
           /**
            * ⚠️ UN CORPS MINUSCULE PLUTÔT QU'UN VRAI 304. La réponse HTTP 304
@@ -291,7 +341,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
             return res.status(200).json({ inchange: true });
           }
         }
-        const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}`, (e, n, g) => actualiserCarriere(e, n, g));
+        const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue);
         return res.status(200).json(vueCarriere(e, compte.id));
       }
       if (action === 'creer') {

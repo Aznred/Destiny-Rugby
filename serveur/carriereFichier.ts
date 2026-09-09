@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname } from 'node:path';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
+import { vueCarriere } from '../src/lib/ligue/carriere.js';
 
 interface BaseLocale {
   comptes: CompteStocke[];
@@ -58,6 +59,22 @@ export function stockageFichier(fichier: string): StockageCarriere {
       });
     },
     async nombreLigues(compte) { return base.ligues.filter(l => l.comptes.includes(compte)).length; },
+    async statistiquesGlobales() {
+      const vues = base.ligues.flatMap(l => l.etat.clubs[0] ? [{ ligue: l.etat.nom, etat: l.etat, stats: vueCarriere(l.etat, l.etat.clubs[0].compteId).statistiques }] : []);
+      const ouvreurs = vues.flatMap(v => v.stats.parClub.map(c => ({ pseudo: c.pseudo, packs: c.packs, ligue: v.ligue }))).sort((a, b) => b.packs - a.packs);
+      const meilleurs = vues.flatMap(v => v.stats.meilleurPack ? [{ ...v.stats.meilleurPack, ligue: v.ligue }] : []).sort((a, b) => b.note - a.note);
+      const achats = vues.flatMap(v => v.stats.plusGrosAchat ? [{ ...v.stats.plusGrosAchat, ligue: v.ligue }] : []).sort((a, b) => b.montant - a.montant);
+      const transactions = base.ligues.flatMap(l => l.etat.transactions);
+      return {
+        ligues: base.ligues.length, comptes: base.comptes.length,
+        clubs: base.ligues.reduce((n, l) => n + l.etat.clubs.length, 0),
+        packsOuverts: transactions.filter(t => t.nature === 'pack').length,
+        matchsJoues: base.ligues.reduce((n, l) => n + l.etat.rencontres.filter(m => m.resultat).length, 0),
+        ovasDepensesPacks: transactions.filter(t => t.nature === 'pack' && t.ovas < 0).reduce((n, t) => n - t.ovas, 0),
+        volumeMarche: base.ligues.flatMap(l => l.etat.ventes).filter(v => v.etat === 'vendue').reduce((n, v) => n + (v.type === 'enchere' ? v.enchere?.montant ?? v.prix : v.prix), 0),
+        meilleurOuvreur: ouvreurs[0], meilleurPack: meilleurs[0], plusGrosAchat: achats[0],
+      };
+    },
     async ligue(id) {
       const l = base.ligues.find(x => x.id === id);
       return l ? { ...copie(l), echeance: echeances[id] ?? null } : null;

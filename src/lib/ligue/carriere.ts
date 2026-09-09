@@ -59,10 +59,10 @@ const cartesClub = (etat: EtatCarriereEnLigne, clubId: string) => etat.cartes.fi
 const clubParId = (etat: EtatCarriereEnLigne, id: string) => { const club = etat.clubs.find(c => c.id === id); exiger(club, 'Club introuvable dans cette ligue.'); return club; };
 const monClub = (etat: EtatCarriereEnLigne, compteId: string) => { const club = etat.clubs.find(c => c.compteId === compteId); exiger(club, 'Vous ne faites pas partie de cette ligue.'); return club; };
 const carteParId = (etat: EtatCarriereEnLigne, id: string) => { const carte = etat.cartes.find(c => c.id === id); exiger(carte, 'Carte introuvable dans cette ligue.'); return carte; };
-function journal(etat: EtatCarriereEnLigne, club: ClubCarriere, nature: TransactionCarriere['nature'], ovas: number, cartes: string[], libelle: string, date: string) {
+function journal(etat: EtatCarriereEnLigne, club: ClubCarriere, nature: TransactionCarriere['nature'], ovas: number, cartes: string[], libelle: string, date: string, meta?: TransactionCarriere['meta']) {
   exiger(Number.isSafeInteger(club.ovas + ovas) && club.ovas + ovas >= 0, 'Ovas insuffisants.');
   club.ovas += ovas;
-  etat.transactions.push({ id: prochainId(etat, 'transaction', etat.transactions.length), clubId: club.id, nature, ovas, cartes, libelle, date });
+  etat.transactions.push({ id: prochainId(etat, 'transaction', etat.transactions.length), clubId: club.id, nature, ovas, cartes, libelle, date, meta });
 }
 
 /** Tous les packs restent possibles ; le prix sert d'indice de rareté. */
@@ -329,7 +329,11 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
     rayons[i] = rayons[i].filter(c => c.sourceId !== source.sourceId);
     pris.add(carte.sourceId); etat.cartes.push(carte); tirees.push(carte);
   }
-  journal(etat, club, 'pack', gratuit ? 0 : -pack.prix, tirees.map(c => c.id), `${gratuit ? 'Pack quotidien offert' : `Pack ${pack.nom}`} : ${tirees.map(c => c.nom).join(', ')}`, dateServeur(maintenant));
+  const meilleure = [...tirees].sort((a, b) => b.note - a.note)[0];
+  journal(etat, club, 'pack', gratuit ? 0 : -pack.prix, tirees.map(c => c.id), `${gratuit ? 'Pack quotidien offert' : `Pack ${pack.nom}`} : ${tirees.map(c => c.nom).join(', ')}`, dateServeur(maintenant), {
+    packId: pack.id, packNom: pack.nom, packApparence: meilleure.rarete,
+    meilleureNote: meilleure.note, meilleurJoueur: meilleure.nom, meilleurPortrait: meilleure.photo,
+  });
 }
 
 function renouvelerObjectifs(etat: EtatCarriereEnLigne, maintenant: number) {
@@ -621,7 +625,7 @@ function expirerMarche(etat: EtatCarriereEnLigne, maintenant: number) {
     if (etat.rencontres.some(r => r.match && !r.resultat && [r.domicile, r.exterieur].some(id => id === v.vendeurId || id === v.enchere?.clubId))) continue;
     if (v.enchere) {
       const vendeur = clubParId(etat, v.vendeurId), acheteur = clubParId(etat, v.enchere.clubId);
-      transferer(carte, acheteur, etat.saison); v.etat = 'vendue'; v.acheteurId = acheteur.id;
+      transferer(carte, acheteur, etat.saison); v.etat = 'vendue'; v.acheteurId = acheteur.id; v.joueurNom = carte.nom;
       journal(etat, vendeur, 'enchere', v.enchere.montant, [carte.id], `Vente aux enchères : ${carte.nom}`, date);
       journal(etat, acheteur, 'enchere', 0, [carte.id], `Enchère remportée : ${carte.nom} (${v.enchere.montant} Ovas déjà réservés)`, date);
       ajusterComposition(etat, vendeur, maintenant); ajusterComposition(etat, acheteur, maintenant);
@@ -788,7 +792,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         const vendeur = clubParId(nouveau, v.vendeurId), carte = carteParId(nouveau, v.carteId);
         exiger(carte.proprietaire === vendeur.id && carte.verrou === v.id, 'La propriété de cette carte a changé.');
         journal(nouveau, club, 'vente', -v.prix, [carte.id], `Achat : ${carte.nom}`, date); journal(nouveau, vendeur, 'vente', v.prix, [carte.id], `Vente : ${carte.nom}`, date);
-        transferer(carte, club, nouveau.saison); v.etat = 'vendue'; v.acheteurId = club.id;
+        transferer(carte, club, nouveau.saison); v.etat = 'vendue'; v.acheteurId = club.id; v.joueurNom = carte.nom;
         ajusterComposition(nouveau, vendeur, maintenant); ajusterComposition(nouveau, club, maintenant); break;
       }
       case 'encherir': {
@@ -932,6 +936,34 @@ export function empreinteEcriture(etat: EtatCarriereEnLigne, version: number): s
   });
 }
 
+function statistiquesLigue(etat: EtatCarriereEnLigne) {
+  const cartes = new Map(etat.cartes.map(c => [c.id, c]));
+  const parClub = etat.clubs.map(club => ({
+    clubId: club.id, pseudo: club.pseudo, nom: club.nom,
+    packs: etat.transactions.filter(t => t.clubId === club.id && t.nature === 'pack').length,
+  })).sort((a, b) => b.packs - a.packs || a.pseudo.localeCompare(b.pseudo, 'fr'));
+  const packs = etat.transactions.filter(t => t.nature === 'pack');
+  const candidats = packs.map(t => {
+    const meilleureCarte = t.cartes.map(id => cartes.get(id)).filter((c): c is CarteCarriere => Boolean(c)).sort((a, b) => b.note - a.note)[0];
+    const club = etat.clubs.find(c => c.id === t.clubId);
+    const note = t.meta?.meilleureNote ?? meilleureCarte?.note;
+    if (!club || note == null) return null;
+    return { clubId: club.id, pseudo: club.pseudo, pack: t.meta?.packNom ?? t.libelle.split(':')[0].replace(/^Pack quotidien offert$/, 'Pack quotidien'),
+      apparence: t.meta?.packApparence ?? meilleureCarte?.rarete ?? 'bronze' as const, note,
+      joueur: t.meta?.meilleurJoueur ?? meilleureCarte?.nom ?? 'Joueur', portrait: t.meta?.meilleurPortrait ?? meilleureCarte?.photo, date: t.date };
+  }).filter((x): x is NonNullable<typeof x> => Boolean(x)).sort((a, b) => b.note - a.note || b.date.localeCompare(a.date));
+  const achats = etat.ventes.filter(v => v.etat === 'vendue' && v.acheteurId).map(v => {
+    const club = etat.clubs.find(c => c.id === v.acheteurId);
+    if (!club) return null;
+    return { clubId: club.id, pseudo: club.pseudo, joueur: v.joueurNom ?? cartes.get(v.carteId)?.nom ?? 'Joueur du marché',
+      montant: v.type === 'enchere' ? v.enchere?.montant ?? v.prix : v.prix,
+      date: v.expireLe };
+  }).filter((x): x is NonNullable<typeof x> => Boolean(x)).sort((a, b) => b.montant - a.montant);
+  return { packsOuverts: packs.length, parClub,
+    meilleurOuvreur: parClub[0]?.packs ? { clubId: parClub[0].clubId, pseudo: parClub[0].pseudo, packs: parClub[0].packs } : undefined,
+    meilleurPack: candidats[0], plusGrosAchat: achats[0] };
+}
+
 export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCarriereEnLigne {
   const club = monClub(etat, compteId);
   const { graine: _secret, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
@@ -940,6 +972,6 @@ export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCar
     cartes: etat.cartes.filter(c => c.proprietaire !== null),
     rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: vueMatchEnLigne(match, club.id) } : reste; }),
     objectifs: etat.objectifs.filter(o => o.clubId === club.id), transactions: etat.transactions.filter(t => t.clubId === club.id),
-    echanges: etat.echanges.filter(e => e.de === club.id || e.vers === club.id), classement: classementCarriere(etat),
+    echanges: etat.echanges.filter(e => e.de === club.id || e.vers === club.id), classement: classementCarriere(etat), statistiques: statistiquesLigue(etat),
     vivierDisponible: vivierRestant(new Set(etat.cartes.map(c => c.sourceId))) });
 }
