@@ -473,6 +473,8 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
 
 - **LA CARRIÈRE EN LIGNE — en production, il reste `CRON_SECRET`.**
   2 à 20 potes, ligue privée, **30 vrais licenciés de Régionale 3** au départ,
+  **inscriptions ouvertes jusqu'à la première journée** (l'arrivant entre dans le
+  championnat en cours et le calendrier est retiré au sort avec lui),
   écusson d’un vrai club (choisi À L’INSCRIPTION, jamais modifiable ensuite),
   logo et trophée de championnat, phase finale en option,
   championnat, **matchs en direct à la vitesse réelle** (80 minutes de vraie

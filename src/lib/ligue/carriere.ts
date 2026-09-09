@@ -88,7 +88,13 @@ function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number)
   for (const club of etat.clubs) {
     club.packsGratuits ??= [];
     if (club.dernierLotPacksGratuits === jour) continue;
-    const rang = Math.max(0, classement.findIndex(ligne => ligne.clubId === club.id));
+    // ⚠️ UN CLUB HORS CLASSEMENT EST DERNIER, PAS PREMIER. Celui qui a rejoint
+    // après le coup d'envoi n'a pas de ligne au championnat en cours :
+    // `findIndex` rend -1, et le `Math.max(0, …)` d'avant le traitait comme le
+    // leader — donc les pires chances de packs rares, pour l'effectif le plus
+    // faible de la ligue. Le rattrapage doit jouer POUR lui.
+    const place = classement.findIndex(ligne => ligne.clubId === club.id);
+    const rang = place >= 0 ? place : Math.max(0, etat.clubs.length - 1);
     const poids = etat.packs.map(pack => poidsPackQuotidien(pack, rang, etat.clubs.length, classementActif));
     const rng = hasard(`${etat.graine}:packs-quotidiens:${jour}:${club.id}`);
     for (let i = 0; i < PACKS_GRATUITS_PAR_JOUR; i++) {
@@ -184,9 +190,62 @@ function dotationValide(valeur: unknown): number {
   return Math.min(DOTATION_MAX, Math.max(0, Math.round(valeur)));
 }
 
+/**
+ * Vrai tant que la saison en cours n'a pas commencé à se jouer : salon,
+ * intersaison, ou saison lancée dont aucune rencontre n'a de résultat ni de
+ * match en route. On regarde TOUTES les compétitions de la saison, coupes
+ * maison comprises : la première balle jouée ferme la porte, quelle qu'elle
+ * soit.
+ */
+function avantLaPremiereJournee(etat: EtatCarriereEnLigne, maintenant: number): boolean {
+  if (etat.phase !== 'saison') return true;
+  const enCours = new Set(etat.competitions.filter(c => c.saison === etat.saison).map(c => c.id));
+  // ⚠️ UNE FENÊTRE FERMÉE COMPTE COMME JOUÉE, MÊME SI PERSONNE N'A ENCORE
+  // RÉVEILLÉ LA LIGUE. Le match ne se matérialise (`r.match`) qu'au premier
+  // appel qui avance l'horloge — une lecture, une commande ou le cron. Entre la
+  // fin de la fenêtre et ce réveil, la ligue est en sommeil : sans cette
+  // troisième condition, le premier qui ouvre le lien d'invitation à cet
+  // instant redessinerait un calendrier dont la première journée a déjà sonné.
+  return !etat.rencontres.some(r => enCours.has(r.competitionId)
+    && (r.resultat || r.match || Date.parse(r.ferme) <= maintenant));
+}
+
+/**
+ * L'arrivant entre dans le championnat de la saison en cours, dont AUCUNE
+ * affiche n'a encore été jouée : on jette le calendrier et on le retire au sort
+ * à n clubs au lieu de n-1.
+ *
+ * ⚠️ LES COUPES MAISON NE SONT PAS TOUCHÉES. Leurs participants ont été choisis
+ * un par un par le commissaire : y ajouter quelqu'un d'office reviendrait à
+ * décider à sa place. Il l'invitera à la prochaine.
+ */
+function integrerAuChampionnat(etat: EtatCarriereEnLigne, clubId: string) {
+  const championnat = etat.competitions.find(c =>
+    c.saison === etat.saison && c.etat === 'enCours' && c.format === 'championnat');
+  if (!championnat || championnat.participants.includes(clubId)) return;
+  championnat.participants.push(clubId);
+  etat.rencontres = etat.rencontres.filter(r => r.competitionId !== championnat.id);
+  // La phase finale se rouvre si l'arrivant fait passer la ligue à quatre.
+  championnat.playoffs = Boolean(etat.playoffs) && championnat.participants.length >= 4;
+  calendrierCompetition(etat, championnat);
+  championnat.journeesRegulieres = Math.max(...etat.rencontres.filter(r => r.competitionId === championnat.id).map(r => r.journee));
+}
+
 function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string, nom: string, maintenant: number, graine: string, embleme?: unknown) {
   identifiant(compteId); texte(pseudo); texte(nom, 40);
-  exiger(etat.phase === 'salon', 'Les inscriptions sont closes pour cette saison.');
+  // ⚠️ LA PORTE SE FERME À LA PREMIÈRE JOURNÉE, PAS AU CLIC DE LANCEMENT. Le
+  // créateur lance la saison dès qu'il a deux clubs ; fermer les inscriptions à
+  // cet instant condamnait l'ami qui ouvre le lien le lendemain à attendre des
+  // semaines, et une ligue qui refuse un manager en perd souvent deux. Tant
+  // qu'aucune rencontre de la saison n'a été jouée ni même donné son coup
+  // d'envoi, rien n'est faussé : on l'inscrit et on retire le calendrier au sort
+  // avec lui (`integrerAuChampionnat`).
+  //
+  // ⚠️ APRÈS, C'EST NON — et ce n'est pas une précaution de principe. Le
+  // classement d'un championnat où les clubs n'ont pas joué le même nombre de
+  // matchs ne veut plus rien dire, et la dotation de fin de saison, distribuée
+  // par rang, serait reprise à ceux qui étaient là depuis le début.
+  exiger(avantLaPremiereJournee(etat, maintenant), 'Les inscriptions sont closes : la première journée est jouée.');
   exiger(etat.clubs.length < etat.maxClubs, 'Cette ligue est complète.');
   exiger(!etat.clubs.some(c => c.compteId === compteId), 'Ce compte possède déjà un club dans cette ligue.');
   exiger(!etat.clubs.some(c => c.nom.toLocaleLowerCase('fr') === nom.trim().toLocaleLowerCase('fr')), 'Ce nom de club est déjà pris.');
@@ -199,6 +258,7 @@ function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string
   etat.clubs.push(club); etat.cartes.push(...cartes);
   journal(etat, club, 'dotation', etat.dotationOvas, cartes.map(c => c.id), `Dotation de départ : 30 licenciés de Régionale 3 et ${etat.dotationOvas.toLocaleString('fr-FR')} Ovas`, dateServeur(maintenant));
   renouvelerObjectifs(etat, maintenant);
+  if (etat.phase === 'saison') integrerAuChampionnat(etat, club.id);
 }
 
 export function creerCarriere(config: CreationCarriere, maintenant: number, graine: string): EtatCarriereEnLigne {
@@ -285,9 +345,25 @@ function renouvelerObjectifs(etat: EtatCarriereEnLigne, maintenant: number) {
   }
 }
 
+/**
+ * ⚠️ LE NUMÉRO SUIT LE PLUS GRAND DÉJÀ ATTRIBUÉ, PAS LA LONGUEUR DU TABLEAU.
+ * Tant que rien n'est jamais retiré, les deux donnent le même résultat. Mais
+ * redessiner le calendrier d'un championnat (`integrerAuChampionnat`) retire
+ * ses affiches : repartir de la longueur redonnerait des numéros déjà pris par
+ * une coupe maison créée entre-temps, et deux rencontres partageraient un
+ * identifiant — donc un manager lancerait le match d'un autre.
+ */
+function prochainIdRencontre(etat: EtatCarriereEnLigne): string {
+  const plusHaut = etat.rencontres.reduce((haut, r) => {
+    const n = Number(r.id.slice(r.id.lastIndexOf(':') + 1));
+    return Number.isFinite(n) && n > haut ? n : haut;
+  }, 0);
+  return `${etat.id}:rencontre:${plusHaut + 1}`;
+}
+
 function ajouterRencontres(etat: EtatCarriereEnLigne, competition: CompetitionCarriere, journee: number, paires: { domicile: string; exterieur: string }[], debut: number) {
   const intervalle = SEMAINE / etat.rythme;
-  for (const paire of paires) etat.rencontres.push({ id: prochainId(etat, 'rencontre', etat.rencontres.length), competitionId: competition.id, journee, ...paire, ouvre: dateServeur(debut), ferme: dateServeur(debut + intervalle) });
+  for (const paire of paires) etat.rencontres.push({ id: prochainIdRencontre(etat), competitionId: competition.id, journee, ...paire, ouvre: dateServeur(debut), ferme: dateServeur(debut + intervalle) });
 }
 function calendrierCompetition(etat: EtatCarriereEnLigne, competition: CompetitionCarriere) {
   const debut = Date.parse(competition.debut);
@@ -297,7 +373,7 @@ function calendrierCompetition(etat: EtatCarriereEnLigne, competition: Competiti
     [...aller, ...retour].forEach((paires, i) => {
       const horaires = horairesChampionnat(debut, etat.rythme, i, paires.length);
       paires.forEach((paire, index) => etat.rencontres.push({
-        id: prochainId(etat, 'rencontre', etat.rencontres.length), competitionId: competition.id,
+        id: prochainIdRencontre(etat), competitionId: competition.id,
         journee: i + 1, ...paire, ouvre: dateServeur(debut), ferme: dateServeur(horaires[index]),
       }));
     });

@@ -39,7 +39,9 @@
     "verify:collection": "vite-node scripts/verifierCollection.ts",
     "verify:photos": "vite-node scripts/verifPhotosCartes.ts",
     "verify:assets": "vite-node scripts/verifAssets.ts",
-    "verify:triche": "vite-node scripts/verifTriche.ts"
+    "verify:triche": "vite-node scripts/verifTriche.ts",
+    "mesure:poids-ligue": "vite-node scripts/mesurePoidsLigue.ts",
+    "mesure:transfert-ligue": "vite-node scripts/mesureTransfertLigue.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

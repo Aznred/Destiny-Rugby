@@ -805,8 +805,42 @@ titre('8. CE QUE LE SERVEUR REFUSE');
     const ailleurs = e.rencontres.find((r) => r.domicile !== colin.id && r.exterieur !== colin.id)!;
     agirCarriere(e, colin.compteId, { type: 'lancerMatch', matchId: ailleurs.id }, T0, 'x');
   });
-  refuse('rejoindre une ligue déjà lancée', () =>
-    agirCarriere(e, 'compte-inconnu', { type: 'rejoindre', pseudo: 'Tricheur', clubNom: 'Club fantôme' }, T0, 'x'));
+  // ⚠️ LA FENÊTRE D'INSCRIPTION VA JUSQU'À LA PREMIÈRE JOURNÉE. Le créateur
+  // lance la saison dès qu'il a deux clubs : fermer la porte à cet instant
+  // condamnait l'ami qui ouvre le lien le lendemain. Tant qu'aucune balle n'a
+  // été jouée, l'arrivant entre ET le calendrier est retiré au sort avec lui.
+  {
+    const avant = e.clubs.length;
+    const affichesAvant = e.rencontres.length;
+    const tardive = agirCarriere(e, 'compte-tardif', { type: 'rejoindre', pseudo: 'Tardif', clubNom: 'Les Retardataires' }, T0, 'x');
+    const arrivant = tardive.clubs.find((c) => c.compteId === 'compte-tardif');
+    dire(!!arrivant && tardive.clubs.length === avant + 1,
+      'on rejoint tant que la 1re journée n’est pas jouée', `${tardive.clubs.length} clubs`);
+    dire(tardive.cartes.filter((c) => c.proprietaire === arrivant?.id).length === 30,
+      'et l’arrivant reçoit les mêmes 30 licenciés que les autres');
+    const championnat = tardive.competitions.find((c) => c.saison === tardive.saison && c.nom.startsWith('Championnat ·'))!;
+    dire(championnat.participants.includes(arrivant!.id),
+      '⚠️ il ENTRE dans le championnat en cours', `${championnat.participants.length} participants`);
+    dire(tardive.rencontres.length > affichesAvant,
+      'et le calendrier est retiré au sort avec lui', `${affichesAvant} → ${tardive.rencontres.length} affiches`);
+    dire(tardive.rencontres.some((r) => r.domicile === arrivant!.id || r.exterieur === arrivant!.id),
+      'il a bien des affiches à son nom');
+    dire(new Set(tardive.rencontres.map((r) => r.id)).size === tardive.rencontres.length,
+      '⚠️ et AUCUN identifiant de rencontre n’est en double après le retirage');
+    dire(classementCarriere(tardive).some((l) => l.clubId === arrivant!.id),
+      'il figure au classement, à zéro match');
+
+    // … et la porte se ferme dès que la première journée est dans les livres.
+    // ⚠️ Un match dure QUATRE-VINGTS MINUTES DE VRAIE VIE : la fenêtre qui se
+    // ferme donne le coup d'envoi, pas le coup de sifflet final. On avance de
+    // deux heures au-delà, sinon la rencontre est en cours et pas encore jouée.
+    const journee1 = tardive.rencontres.filter((r) => r.journee === 1);
+    const apresJ1 = avancerCarriere(tardive, Math.max(...journee1.map((r) => Date.parse(r.ferme))) + 2 * 3600_000, 'apres-j1');
+    dire(apresJ1.rencontres.filter((r) => r.journee === 1).every((r) => !!r.resultat),
+      'la première journée se joue', `${journee1.length} matchs`);
+    refuse('⚠️ rejoindre APRÈS la première journée', () =>
+      agirCarriere(apresJ1, 'compte-trop-tard', { type: 'rejoindre', pseudo: 'Trop tard', clubNom: 'Les Trop Tard' }, T0 + 30 * JOUR, 'y'));
+  }
 
   // La vue ne laisse jamais fuiter ce qui ne regarde pas le joueur.
   const vue = vueCarriere(e, colin.compteId);

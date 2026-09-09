@@ -120,6 +120,22 @@
   c'est une des nôtres : le formulaire de mise en vente (prix, vente directe,
   enchères ou échange, durée) et la vente rapide, confirmée en deux temps dans
   le panneau plutôt que par une seconde fenêtre.
+- ⚠️ **On rejoint une ligue tant que la première journée n’est pas jouée.**
+  Les inscriptions se fermaient au clic de « Lancer la saison » — or le créateur
+  lance dès qu’il a deux clubs, et l’ami qui ouvrait le lien le lendemain se
+  voyait répondre « Les inscriptions sont closes pour cette saison », sans autre
+  issue que d’attendre des semaines. Tant qu’aucune rencontre de la saison n’a
+  été jouée **ni vu sa fenêtre se fermer**, l’arrivant entre **et le calendrier
+  est retiré au sort avec lui** — à n clubs au lieu de n‑1, phase finale rouverte
+  s’il fait passer la ligue à quatre. Après la première balle jouée, c’est non :
+  un classement où les clubs n’ont pas joué le même nombre de matchs ne veut plus
+  rien dire, et la dotation de fin de saison, distribuée par rang, serait reprise
+  à ceux qui étaient là depuis le début. Les coupes maison ne sont pas touchées :
+  leurs participants ont été choisis un par un par le commissaire.
+  ⚠️ **Le numéro d’une rencontre suit désormais le plus grand déjà attribué**, pas
+  la longueur du tableau : retirer les affiches d’un championnat pour les
+  redessiner redonnait sinon des numéros déjà pris par une coupe créée
+  entre-temps. Banc : `npm run verify:carriere`, section 8.
 - ⚠️ **Un joueur aligné ne quitte pas le club.** Vendre, vendre rapidement ou
   échanger un titulaire ou un remplaçant était permis : la feuille se réparait
   toute seule derrière, et on découvrait le dimanche que le numéro 10 avait été
