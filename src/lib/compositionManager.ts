@@ -59,10 +59,9 @@ export function compositionManagerParDefaut(
   const titulaires = POSTES_XV_MANAGER.map((poste) => prendre(dispo, pris, poste)?.id ?? '').filter(Boolean);
   const remplacants = POSTES_BANC_MANAGER.map((poste) => prendre(dispo, pris, poste)?.id ?? '').filter(Boolean);
   const joueurs = [...titulaires, ...remplacants].map((id) => dispo.find((j) => j.id === id)).filter(Boolean) as Coequipier[];
-  const buteur = [...joueurs].sort((a, b) => {
-    const bonus = (j: Coequipier) => j.poste === 'demi_ouverture' ? 8 : j.poste === 'arriere' ? 5 : j.poste === 'demi_melee' ? 3 : 0;
-    return (b.note + bonus(b)) - (a.note + bonus(a));
-  })[0];
+  // Le rôle dépend de l'adresse réelle au pied, pas du GEN ni du numéro 10.
+  // Le GEN reste uniquement le repli des anciens effectifs sans statistique.
+  const buteur = [...joueurs].sort((a, b) => (b.jeuAuPied ?? b.note) - (a.jeuAuPied ?? a.note))[0];
   const capitaine = [...titulaires]
     .map((id) => effectif.find((j) => j.id === id))
     .filter(Boolean)

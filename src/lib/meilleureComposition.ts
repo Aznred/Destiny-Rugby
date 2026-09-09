@@ -74,6 +74,6 @@ export function meilleureComposition(cartes: CarteCarriere[], maintenant = Date.
   }
   const feuille=choix.map(j=>joueurs[j]), xv=feuille.slice(0,15);
   const capitaine=[...xv].sort((a,b)=>(b.age*1.4+b.note)-(a.age*1.4+a.note))[0];
-  const buteur=[...xv].sort((a,b)=>(b.statistiques.PIED ?? b.note)-(a.statistiques.PIED ?? a.note))[0];
+  const buteur=[...xv].sort((a,b)=>(b.statistiques.JDP ?? b.note)-(a.statistiques.JDP ?? a.note))[0];
   return {titulaires:xv.map(c=>c.id),remplacants:feuille.slice(15).map(c=>c.id),capitaineId:capitaine.id,buteurId:buteur.id};
 }

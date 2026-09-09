@@ -251,6 +251,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
         ]);
         if (autorisations.some(v => !v)) throw new ErreurHttp(429, 'Trop de tentatives. Patientez quelques minutes.');
         const mot = texte(corps.motDePasse, 10, 200, 'Mot de passe');
+        if (action === 'inscription' && corps.confirmationMotDePasse !== mot) throw new ErreurHttp(400, 'Les deux mots de passe ne correspondent pas.');
         let compte = await stockage.compteParIdentifiant(identifiant);
         if (action === 'inscription') {
           if (compte) throw new ErreurHttp(409, 'Cet identifiant est déjà utilisé.');

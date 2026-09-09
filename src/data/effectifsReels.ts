@@ -656,7 +656,7 @@ const BRUT: Record<string, string[]> = {
     'Hugo AURADOU|2|23|76|78|16',
     'Dan ROBSON|4|35|74|74|2',
     'Aymeric LUC|8|28|74|74|16',
-    'Fabien BRAU-BOIRIE|6|20|73|84|16',
+    'Fabien BRAU-BOIRIE|6|20|83|84|16',
     'Reece HEWAT|3|28|72|72|4',
     'Jon ZABALA|0|30|71|71|14',
     'Sacha ZEGUEUR|3|28|71|71|16',
@@ -5577,7 +5577,7 @@ const BRUT: Record<string, string[]> = {
     'Taiga KATO|4|22|48|51|23',
   ],
   'Yokohama Canon Eagles': [
-    'Faf DE KLERK|4|34|84|84|0',
+    'Faf DE KLERK|4|34|92|92|0',
     'Jesse KRIEL|6|31|83|83|0',
     'Billy HARMON|3|31|74|74|28',
     'Yu TAMURA|5|37|73|73|23',

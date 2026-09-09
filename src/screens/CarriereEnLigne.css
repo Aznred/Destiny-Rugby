@@ -1762,6 +1762,7 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-stats-compteurs article { padding: .85rem; border-left: 2px solid var(--or-400); background: rgba(232, 178, 58, .055); }
 .cel-stats-compteurs strong { display: block; font-family: var(--police-titre); font-size: 1.55rem; color: var(--or-200); }
 .cel-stats-compteurs span { color: var(--brume); font-size: .76rem; }
+.cel-erreur-champ { margin: -.35rem 0 .25rem; color: var(--danger); font-size: .78rem; }
 .cel-palmares article {
   display: flex;
   align-items: center;

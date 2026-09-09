@@ -117,12 +117,19 @@ export interface StrategieEnLigne {
   /** Mentalité prise si elle est menée de plus de 7 points après la 70ᵉ. */
   bascule70: MentaliteEnLigne;
   remplacements: 'precoces' | 'standard' | 'tardifs';
+  /** Niveau de risque sur les passes, relances et soutiens offensifs. */
+  risqueOffensif: 'prudent' | 'mesure' | 'audacieux';
+  /** Fréquence voulue des coups de pied hors pénalités. */
+  frequencePied: 'rare' | 'equilibree' | 'frequente';
+  /** Plan automatiquement appliqué avec au moins huit points d'avance après la 65e. */
+  gestionAvance: 'defensive' | 'equilibree' | 'offensive';
 }
 
 export const STRATEGIE_EN_LIGNE_DEFAUT: StrategieEnLigne = {
   mentalite: 'equilibree', jeu: 'possession', rythme: 'normal', defense: 'normale',
   rucks: 'normal', penaliteCourte: 'points', penaliteLongue: 'touche',
   bascule60: 'offensive', bascule70: 'tresOffensive', remplacements: 'standard',
+  risqueOffensif: 'mesure', frequencePied: 'equilibree', gestionAvance: 'defensive',
 };
 
 export const MENTALITES: readonly MentaliteEnLigne[] = ['tresDefensive', 'defensive', 'equilibree', 'offensive', 'tresOffensive'];
@@ -155,6 +162,9 @@ export function strategieValide(brut: unknown): StrategieEnLigne {
     bascule60: dans(s.bascule60, MENTALITES, 'offensive'),
     bascule70: dans(s.bascule70, MENTALITES, 'tresOffensive'),
     remplacements: dans(s.remplacements, ['precoces', 'standard', 'tardifs'] as const, 'standard'),
+    risqueOffensif: dans(s.risqueOffensif, ['prudent', 'mesure', 'audacieux'] as const, 'mesure'),
+    frequencePied: dans(s.frequencePied, ['rare', 'equilibree', 'frequente'] as const, 'equilibree'),
+    gestionAvance: dans(s.gestionAvance, ['defensive', 'equilibree', 'offensive'] as const, 'defensive'),
   };
 }
 
@@ -172,7 +182,8 @@ export function strategieValide(brut: unknown): StrategieEnLigne {
  */
 export function tactiqueDepuisStrategie(s: StrategieEnLigne): TactiqueManager {
   return {
-    attaque: s.jeu === 'large' || s.jeu === 'rapide' ? 'large'
+    attaque: s.frequencePied === 'frequente' ? 'occupation'
+      : s.jeu === 'large' || s.jeu === 'rapide' ? 'large'
       : s.jeu === 'occupation' || s.jeu === 'jeuAuPied' ? 'occupation'
         : s.jeu === 'axe' || s.jeu === 'conservation' ? 'avants' : 'equilibre',
     defense: s.defense === 'agressive' ? 'blitz' : s.defense === 'conservatrice' ? 'repli' : 'glissee',
@@ -186,14 +197,17 @@ export function tactiqueDepuisStrategie(s: StrategieEnLigne): TactiqueManager {
 
 /** Le supplément d'agressivité, en points de potentiel de marque. */
 export function impactStrategie(s: StrategieEnLigne): number {
-  const mentalite = { tresDefensive: -5, defensive: -2.5, equilibree: 0, offensive: 2.5, tresOffensive: 5 }[s.mentalite];
-  const rucks = { faible: -1.5, normal: 0, forte: 1.5 }[s.rucks];
-  const defense = { conservatrice: -1, normale: 0, agressive: 1 }[s.defense];
-  return mentalite + rucks + defense;
+  const mentalite = { tresDefensive: -7, defensive: -3.5, equilibree: 0, offensive: 3.5, tresOffensive: 7 }[s.mentalite];
+  const rucks = { faible: -2, normal: 0, forte: 2 }[s.rucks];
+  const defense = { conservatrice: -1.5, normale: 0, agressive: 1.5 }[s.defense];
+  const risque = { prudent: -2.5, mesure: 0, audacieux: 2.5 }[s.risqueOffensif];
+  const pied = { rare: .8, equilibree: 0, frequente: 1.2 }[s.frequencePied];
+  return mentalite + rucks + defense + risque + pied;
 }
 
 /** La mentalité réellement appliquée à cette minute, bascules comprises. */
 export function mentaliteAppliquee(s: StrategieEnLigne, minute: number, ecart: number): MentaliteEnLigne {
+  if (minute >= 65 && ecart >= 8) return s.gestionAvance;
   if (minute >= 70 && ecart <= -8) return s.bascule70;
   if (minute >= 60 && ecart < 0) return s.bascule60;
   return s.mentalite;
@@ -622,12 +636,33 @@ function pousser(e: EtatMatch, jusqua: number, arretSur: readonly Cote[]): void 
   }
 }
 
+/**
+ * Coupe l'avance aux minutes tactiques. Sans ces paliers, les bascules 60/65/70
+ * n'étaient recalculées qu'après un clic du manager et restaient décoratives
+ * lors des matchs joués en son absence.
+ */
+function pousserAvecBascules(e: EtatMatch, etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote[]): void {
+  for (const seuil of [60, 65, 70]) {
+    if (minuteExacte(e) >= seuil || seuil > jusqua) continue;
+    pousser(e, seuil, arretSur);
+    if (minuteExacte(e) + 1e-9 < seuil) return;
+    for (const cote of COTES) {
+      const moteur = MOTEUR[cote];
+      const ecart = moteur === 'A' ? e.scoreA - e.scoreB : e.scoreB - e.scoreA;
+      const strategie = strategieA(etat, cote, seuil);
+      const effective = { ...strategie, mentalite: mentaliteAppliquee(strategie, seuil, ecart) };
+      appliquerTactiqueEquipe(e, moteur, tactiqueDepuisStrategie(effective), true, impactStrategie(effective));
+    }
+  }
+  pousser(e, jusqua, arretSur);
+}
+
 /** La stratégie d'un camp telle qu'elle était à une minute donnée. */
 function strategieA(etat: EtatMatchEnLigne, cote: CoteEnLigne, horloge: number): StrategieEnLigne {
-  let s = etat.strategies[cote];
+  let s = strategieValide(etat.strategies[cote]);
   for (const ev of etat.journal) {
     if (ev.horloge > horloge) break;
-    if (ev.cote === cote && ev.commande.type === 'strategie') s = ev.commande.strategie;
+    if (ev.cote === cote && ev.commande.type === 'strategie') s = strategieValide(ev.commande.strategie);
   }
   return s;
 }
@@ -692,10 +727,10 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
   for (let i = depart; i < etat.journal.length; i++) {
     const ev = etat.journal[i];
     if (ev.horloge > jusqua) break;
-    pousser(e, ev.horloge, []);
+    pousserAvecBascules(e, etat, ev.horloge, []);
     appliquerAuMoteur(e, ev);
   }
-  pousser(e, jusqua, arretSur.map((c) => MOTEUR[c]));
+  pousserAvecBascules(e, etat, jusqua, arretSur.map((c) => MOTEUR[c]));
   ranger(cle, e);
   return e;
 }

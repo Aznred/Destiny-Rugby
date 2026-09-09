@@ -109,6 +109,12 @@ function ajusterComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, maint
   const cartes = cartesClub(etat, club.id);
   club.composition = reconcilerCompositionManager(cartes.map(coequipierDepuisCarte), club.composition,
     new Set(cartes.filter(c => c.blesseJusqua && Date.parse(c.blesseJusqua) > maintenant).map(c => c.id)));
+  if (!club.buteurManuel) {
+    const parId = new Map(cartes.map(c => [c.id, c]));
+    const meilleur = club.composition.titulaires.map(id => parId.get(id)).filter((c): c is CarteCarriere => Boolean(c))
+      .sort((a, b) => (b.statistiques.JDP ?? b.note) - (a.statistiques.JDP ?? a.note))[0];
+    if (meilleur) club.composition.buteurId = meilleur.id;
+  }
 }
 function clubLibre(etat: EtatCarriereEnLigne, clubId: string) {
   exiger(!etat.rencontres.some(r => r.match && !r.resultat && (r.domicile === clubId || r.exterieur === clubId)), 'Votre équipe joue actuellement ; attendez la fin du match.');
@@ -387,11 +393,27 @@ function calendrierCompetition(etat: EtatCarriereEnLigne, competition: Competiti
       ouverture = Math.max(...horaires);
     });
   } else {
-    // Un premier tour réduit au plus proche tableau de puissance de deux ; les autres sont exempts.
-    const taille = 2 ** Math.floor(Math.log2(competition.participants.length));
-    const n = competition.participants.length === taille ? taille / 2 : competition.participants.length - taille;
-    const paires = Array.from({ length: n }, (_, i) => ({ domicile: competition.participants[i * 2], exterieur: competition.participants[i * 2 + 1] }));
+    // Tout le monde possible joue dès le premier tour. Avec dix clubs cela
+    // donne bien cinq affiches, puis un seul exempt si le tour suivant est impair.
+    const paires = Array.from({ length: Math.floor(competition.participants.length / 2) }, (_, i) => ({ domicile: competition.participants[i * 2], exterieur: competition.participants[i * 2 + 1] }));
     ajouterRencontres(etat, competition, 1, paires, debut);
+  }
+}
+
+/** Répare les calendriers déjà enregistrés par les anciennes règles, seulement tant qu'aucun match n'a commencé. */
+function reparerCalendriers(etat: EtatCarriereEnLigne) {
+  for (const competition of etat.competitions.filter(c => c.etat === 'enCours')) {
+    const matchs = etat.rencontres.filter(r => r.competitionId === competition.id);
+    if (!matchs.length || matchs.some(r => r.match || r.resultat)) continue;
+    const premierTour = matchs.filter(r => r.journee === 1).length;
+    const journees = [...new Set(matchs.map(r => r.journee))];
+    const ouvertures = new Set(journees.map(j => matchs.find(r => r.journee === j)?.ouvre));
+    const championnatMalDate = competition.format === 'championnat' && journees.length > 1 && ouvertures.size < journees.length;
+    const coupeAncienne = competition.format === 'elimination' && premierTour !== Math.floor(competition.participants.length / 2);
+    if (!championnatMalDate && !coupeAncienne) continue;
+    etat.rencontres = etat.rencontres.filter(r => r.competitionId !== competition.id);
+    calendrierCompetition(etat, competition);
+    competition.journeesRegulieres = Math.max(...etat.rencontres.filter(r => r.competitionId === competition.id).map(r => r.journee));
   }
 }
 function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
@@ -717,23 +739,28 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
  * Le remplissage est écrit dans l'état retourné, donc la première commande
  * venue le persiste et le trou se referme de lui-même.
  */
-function reprendre(etat: EtatCarriereEnLigne): EtatCarriereEnLigne {
+function reprendre(etat: EtatCarriereEnLigne, maintenant: number): EtatCarriereEnLigne {
   const nouveau = copier(etat);
   if (!Number.isFinite(nouveau.dotationOvas)) nouveau.dotationOvas = DOTATION_DEFAUT;
-  for (const club of nouveau.clubs) if (!Number.isFinite(club.ovas)) club.ovas = 0;
+  for (const club of nouveau.clubs) {
+    if (!Number.isFinite(club.ovas)) club.ovas = 0;
+    club.strategie = strategieValide(club.strategie);
+  }
   actualiserCartesProfessionnelles(nouveau.cartes);
+  for (const club of nouveau.clubs) ajusterComposition(nouveau, club, maintenant);
+  reparerCalendriers(nouveau);
   return nouveau;
 }
 
 export function avancerCarriere(etat: EtatCarriereEnLigne, maintenant: number, graine: string): EtatCarriereEnLigne {
-  dateServeur(maintenant); const nouveau = reprendre(etat); avancerInterne(nouveau, maintenant, graine);
+  dateServeur(maintenant); const nouveau = reprendre(etat, maintenant); avancerInterne(nouveau, maintenant, graine);
   nouveau.version = etat.version + 1; return nouveau;
 }
 
 export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, commande: CommandeCarriere, maintenant: number, graine: string): EtatCarriereEnLigne {
   identifiant(compteId); dateServeur(maintenant);
   exiger(commande && typeof commande === 'object' && typeof commande.type === 'string', 'Commande invalide.');
-  const nouveau = reprendre(etat); const date = dateServeur(maintenant);
+  const nouveau = reprendre(etat, maintenant); const date = dateServeur(maintenant);
   if (commande.type === 'rejoindre') {
     ajouterClub(nouveau, compteId, commande.pseudo, commande.clubNom, maintenant, graine, commande.embleme);
     attribuerPacksQuotidiens(nouveau, maintenant);
@@ -742,7 +769,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
     switch (commande.type) {
       case 'actualiser': break;
       case 'demarrerSaison': exiger(compteId === nouveau.createurId, 'Seul le créateur peut lancer la saison.'); demarrerSaison(nouveau, maintenant); break;
-      case 'composition': clubLibre(nouveau, club.id); verifierComposition(nouveau, club, commande.composition, maintenant); club.composition = copier(commande.composition); break;
+      case 'composition': clubLibre(nouveau, club.id); verifierComposition(nouveau, club, commande.composition, maintenant); club.composition = copier(commande.composition); club.buteurManuel = true; break;
       // ⚠️ On n'enregistre JAMAIS la stratégie telle qu'elle arrive : une valeur
       // inconnue est remplacée par le défaut, jamais refusée. C'est la même
       // fonction que le match en direct, donc un seul endroit décide.
@@ -968,7 +995,7 @@ export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCar
   const club = monClub(etat, compteId);
   const { graine: _secret, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
   return copier({ ...publics, monClubId: club.id,
-    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, packsGratuits, dernierLotPacksGratuits, ...reste } = c; return c.id === club.id ? { ...reste, composition, strategie, packsGratuits, dernierLotPacksGratuits } : reste; }),
+    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, packsGratuits, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club.id ? { ...reste, composition, strategie, packsGratuits, dernierLotPacksGratuits } : reste; }),
     cartes: etat.cartes.filter(c => c.proprietaire !== null),
     rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: vueMatchEnLigne(match, club.id) } : reste; }),
     objectifs: etat.objectifs.filter(o => o.clubId === club.id), transactions: etat.transactions.filter(t => t.clubId === club.id),

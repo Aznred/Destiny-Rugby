@@ -490,7 +490,8 @@ export function dotationBronzeCarriere(
 }
 
 export function coequipierDepuisCarte(c: CarteCarriere): Coequipier {
-  return { id: c.id, nom: c.nom, poste: c.poste, age: c.age, note: c.note, potentiel: c.potentiel, nation: c.nation, regen: c.origine === 'formation', horsGeneration: true };
+  return { id: c.id, nom: c.nom, poste: c.poste, age: c.age, note: c.note, potentiel: c.potentiel,
+    jeuAuPied: c.statistiques.JDP, nation: c.nation, regen: c.origine === 'formation', horsGeneration: true };
 }
 /**
  * Une carte entre-t-elle dans ce pack ? Chaque champ du filtre est un ET ; à

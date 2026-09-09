@@ -60,6 +60,8 @@ export interface ClubCarriere {
   /** Chemin d'un vrai écusson de club (`emblemeValide` fait foi). */
   embleme?: string;
   composition: CompositionManager; strategie: StrategieEnLigne;
+  /** Absent/faux tant que le jeu choisit lui-même le buteur. */
+  buteurManuel?: boolean;
   rejointLe: string;
   /** Lots quotidiens non ouverts. Le serveur seul choisit leur type. */
   packsGratuits?: PackGratuitCarriere[];
@@ -143,7 +145,7 @@ export interface EtatCarriereEnLigne {
 }
 export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' | 'clubs' | 'cartes' | 'rencontres' | 'objectifs' | 'transactions' | 'echanges'> {
   monClubId: string;
-  clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie' | 'packsGratuits' | 'dernierLotPacksGratuits'> & { composition?: CompositionManager; strategie?: StrategieEnLigne; packsGratuits?: PackGratuitCarriere[]; dernierLotPacksGratuits?: string })[];
+  clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie' | 'packsGratuits' | 'dernierLotPacksGratuits' | 'buteurManuel'> & { composition?: CompositionManager; strategie?: StrategieEnLigne; packsGratuits?: PackGratuitCarriere[]; dernierLotPacksGratuits?: string })[];
   /** Vue courante : cartes distribuées seulement. Le catalogue public est consulté séparément, par pages. */
   cartes: CarteCarriere[];
   rencontres: (Omit<RencontreCarriere, 'match'> & { match?: VueMatchEnLigne })[];

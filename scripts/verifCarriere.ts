@@ -89,6 +89,9 @@ titre('1. LA LIGUE, ET LES 30 BRONZE DU DÉPART');
       const composition = compositionManagerParDefaut(cartes.map(coequipierDepuisCarte));
       dire(composition.titulaires.length === 15 && composition.remplacants.length === 8,
         'une feuille de 15 + 8 est composable immédiatement');
+      const titulaires = composition.titulaires.map(id => cartes.find(c => c.id === id)!);
+      const meilleurPied = [...titulaires].sort((a, b) => (b.statistiques.JDP ?? b.note) - (a.statistiques.JDP ?? a.note))[0];
+      dire(composition.buteurId === meilleurPied.id, 'le buteur automatique est le meilleur au jeu au pied', `${meilleurPied.nom} · ${meilleurPied.statistiques.JDP} JDP`);
       const familles = new Set(cartes.map((c) => c.famille));
       dire(familles.size === 9, 'les neuf familles de poste sont couvertes', `${familles.size}/9`);
     }
@@ -886,6 +889,16 @@ titre('9. LA COUPE MAISON DU COMMISSAIRE');
   const gains = e.transactions.filter((t) => t.nature === 'competition' && t.libelle.startsWith('Christmas'));
   dire(gains.length === 4, '⚠️ TOUS LES PARTICIPANTS touchent quelque chose, pas seulement le vainqueur',
     gains.map((g) => nb(g.ovas)).join(' · '));
+
+  let dix = ligue(10);
+  dix = agirCarriere(dix, dix.clubs[0].compteId, {
+    type: 'creerCoupe', nom: 'Coupe à dix', trophee: 'Coupe des dix',
+    participants: dix.clubs.map(c => c.id), format: 'elimination', debut: new Date(T0 + JOUR).toISOString(),
+    recompenseParticipation: 0, recompenseVainqueur: 1000, recompenseFinaliste: 500,
+  }, T0, 'coupe-dix');
+  const coupeDix = dix.competitions.find(c => c.nom === 'Coupe à dix')!;
+  dire(dix.rencontres.filter(r => r.competitionId === coupeDix.id && r.journee === 1).length === 5,
+    '⚠️ dix clubs jouent cinq matchs dès le premier tour');
 }
 
 

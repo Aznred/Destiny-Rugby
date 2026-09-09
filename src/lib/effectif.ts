@@ -38,6 +38,8 @@ export interface Coequipier {
   age: number;
   note: number; // note générale À CET ÂGE
   potentiel: number; // note visée au pic de carrière (27 ans)
+  /** Statistique spécifique utilisée lorsque le jeu choisit automatiquement le buteur. */
+  jeuAuPied?: number;
   nation: string; // drapeau + nom (ex. « 🇫🇯 Fidji »)
   regen: boolean; // true si ce joueur a remplacé un retraité
 }

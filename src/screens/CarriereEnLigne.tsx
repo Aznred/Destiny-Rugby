@@ -121,7 +121,8 @@ function legendeAffinite(a: AffiniteCarte): string {
  */
 const carteEnJoueur = (c: CarteCarriere): Coequipier => ({
   id: c.id, nom: c.nom, poste: c.poste, age: c.age, note: c.note,
-  potentiel: c.potentiel, nation: c.nation, regen: c.origine === 'formation', horsGeneration: true,
+  potentiel: c.potentiel, jeuAuPied: c.statistiques.JDP,
+  nation: c.nation, regen: c.origine === 'formation', horsGeneration: true,
 });
 
 // Les libellés français des consignes. Le serveur ne connaît que les codes.
@@ -132,10 +133,14 @@ const DEFENSES: [string, string][] = [['conservatrice', 'Conservatrice'], ['norm
 const RUCKS: [string, string][] = [['faible', 'Faible engagement'], ['normal', 'Normal'], ['forte', 'Forte contestation']];
 const PENALITES: [string, string][] = [['points', 'Prendre les points'], ['touche', 'Chercher la touche'], ['rapide', 'Jouer rapidement'], ['melee', 'Demander la mêlée']];
 const TIMINGS: [string, string][] = [['precoces', 'Précoces'], ['standard', 'Standard'], ['tardifs', 'Tardifs']];
+const RISQUES: [string, string][] = [['prudent', 'Prudent'], ['mesure', 'Mesuré'], ['audacieux', 'Audacieux']];
+const FREQUENCES_PIED: [string, string][] = [['rare', 'Rare'], ['equilibree', 'Équilibrée'], ['frequente', 'Fréquente']];
+const GESTION_AVANCE: [string, string][] = [['defensive', 'Fermer le match'], ['equilibree', 'Rester équilibré'], ['offensive', 'Continuer d’attaquer']];
 const STRATEGIE_VIDE: StrategieEnLigne = {
   mentalite: 'equilibree', jeu: 'possession', rythme: 'normal', defense: 'normale', rucks: 'normal',
   penaliteCourte: 'points', penaliteLongue: 'touche', bascule60: 'offensive', bascule70: 'tresOffensive',
   remplacements: 'standard',
+  risqueOffensif: 'mesure', frequencePied: 'equilibree', gestionAvance: 'defensive',
 };
 const SIGNAUX: Record<string, string> = {
   'ligue.match.signal.beaucoupPlusOffensif': 'L’adversaire semble jouer beaucoup plus offensivement.',
@@ -625,9 +630,9 @@ export function CarriereEnLigne() {
     {erreur && <div className="cel-erreur" role="alert" ref={refErreur}><Icone nom="alerte" taille={22} /><p>{erreur}</p><button className="btn fantome" disabled={occupe} onClick={() => { if (ligueId) void ouvrirLigue(ligueId); else void chargerSession(); }}>Réessayer</button></div>}
     {notification && <div className="cel-notification" role="status">{notification}<button aria-label="Fermer la notification" onClick={() => setNotification('')}><Icone nom="croix" taille={16} /></button></div>}
     {charge ? <Vide icone="chrono" titre="Ouverture du vestiaire">Nous retrouvons ton compte et tes ligues.</Vide>
-      : !session ? <Connexion occupe={occupe} onConnexion={async (action, identifiant, motDePasse, pseudo) => {
+      : !session ? <Connexion occupe={occupe} onConnexion={async (action, identifiant, motDePasse, pseudo, confirmationMotDePasse) => {
         setOccupe(true); setErreur('');
-        try { await identifierCarriere(action, identifiant, motDePasse, pseudo); await chargerSession(); }
+        try { await identifierCarriere(action, identifiant, motDePasse, pseudo, confirmationMotDePasse); await chargerSession(); }
         catch (e) { setErreur(messageErreur(e)); }
         finally { setOccupe(false); }
       }} />
@@ -659,16 +664,16 @@ export function CarriereEnLigne() {
   </section>;
 }
 
-function Connexion({ onConnexion, occupe }: { occupe: boolean; onConnexion: (action: 'connexion' | 'inscription', identifiant: string, motDePasse: string, pseudo: string) => Promise<void> }) {
+function Connexion({ onConnexion, occupe }: { occupe: boolean; onConnexion: (action: 'connexion' | 'inscription', identifiant: string, motDePasse: string, pseudo: string, confirmationMotDePasse: string) => Promise<void> }) {
   // ⚠️ QUELQU’UN QUI ARRIVE PAR UN LIEN N’A PRESQUE JAMAIS DE COMPTE. On lui
   //    ouvre donc « Créer mon compte », et on lui dit pourquoi il est là :
   //    sans ce mot, un formulaire de connexion nu après avoir cliqué sur une
   //    invitation ressemble à une erreur d’aiguillage.
   const invitation = invitationEnAttente();
   const [inscription, setInscription] = useState(Boolean(invitation));
-  const [identifiant, setIdentifiant] = useState(''); const [pseudo, setPseudo] = useState(''); const [motDePasse, setMotDePasse] = useState('');
-  const soumettre = (e: FormEvent) => { e.preventDefault(); void onConnexion(inscription ? 'inscription' : 'connexion', identifiant, motDePasse, pseudo); };
-  return <div className="cel-entree"><div className="cel-promesse"><div className="eyebrow">Une ligue. Vos clubs. Votre histoire.</div><h1>Le rugby se vit<br /><span>entre amis.</span></h1><p>Trente joueurs Bronze, un maillot à défendre et des mois pour bâtir une équipe qui compte. Le prochain grand rendez-vous, c’est le vôtre.</p><div className="cel-billet"><b>SAISON 01</b><span>30 joueurs au départ</span><strong>35 <small>GEN</small></strong><p>Championnats privés · Marché entre amis · Matchs en direct</p></div></div><form className="cel-panneau cel-auth" onSubmit={soumettre}>{invitation && <p className="cel-invite"><Icone nom="cadeau" taille={18} />Tu es invité à rejoindre une ligue. Crée ton compte, et le vestiaire s’ouvre juste après.</p>}<div className="eyebrow">Ton vestiaire t’attend</div><h2>{inscription ? 'Créer mon compte' : 'Retrouver mes ligues'}</h2><p>Un compte pour retrouver tes clubs sur tous tes appareils.</p><Champ label="Identifiant"><input autoComplete="username" required minLength={3} maxLength={60} value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="ton-identifiant" /></Champ>{inscription && <Champ label="Nom du manager"><input required minLength={2} maxLength={32} value={pseudo} onChange={e => setPseudo(e.target.value)} placeholder="Ton pseudo" /></Champ>}<Champ label="Mot de passe"><input type="password" autoComplete={inscription ? 'new-password' : 'current-password'} required minLength={inscription ? 10 : 1} maxLength={128} value={motDePasse} onChange={e => setMotDePasse(e.target.value)} placeholder={inscription ? '10 caractères minimum' : 'Ton mot de passe'} /></Champ><button className="btn primaire" disabled={occupe}>{occupe ? 'Connexion en cours…' : inscription ? 'Créer mon compte' : 'Se connecter'}<Icone nom="fleche-droite" taille={17} /></button><button className="btn fantome" type="button" onClick={() => setInscription(!inscription)}>{inscription ? 'J’ai déjà un compte' : 'Créer un compte'}</button></form></div>;
+  const [identifiant, setIdentifiant] = useState(''); const [pseudo, setPseudo] = useState(''); const [motDePasse, setMotDePasse] = useState(''); const [confirmation, setConfirmation] = useState('');
+  const soumettre = (e: FormEvent) => { e.preventDefault(); if (inscription && motDePasse !== confirmation) return; void onConnexion(inscription ? 'inscription' : 'connexion', identifiant, motDePasse, pseudo, confirmation); };
+  return <div className="cel-entree"><div className="cel-promesse"><div className="eyebrow">Une ligue. Vos clubs. Votre histoire.</div><h1>Le rugby se vit<br /><span>entre amis.</span></h1><p>Trente joueurs Bronze, un maillot à défendre et des mois pour bâtir une équipe qui compte. Le prochain grand rendez-vous, c’est le vôtre.</p><div className="cel-billet"><b>SAISON 01</b><span>30 joueurs au départ</span><strong>35 <small>GEN</small></strong><p>Championnats privés · Marché entre amis · Matchs en direct</p></div></div><form className="cel-panneau cel-auth" onSubmit={soumettre}>{invitation && <p className="cel-invite"><Icone nom="cadeau" taille={18} />Tu es invité à rejoindre une ligue. Crée ton compte, et le vestiaire s’ouvre juste après.</p>}<div className="eyebrow">Ton vestiaire t’attend</div><h2>{inscription ? 'Créer mon compte' : 'Retrouver mes ligues'}</h2><p>Un compte pour retrouver tes clubs sur tous tes appareils.</p><Champ label="Identifiant"><input autoComplete="username" required minLength={3} maxLength={60} value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="ton-identifiant" /></Champ>{inscription && <Champ label="Nom du manager"><input required minLength={2} maxLength={32} value={pseudo} onChange={e => setPseudo(e.target.value)} placeholder="Ton pseudo" /></Champ>}<Champ label="Mot de passe"><input type="password" autoComplete={inscription ? 'new-password' : 'current-password'} required minLength={inscription ? 10 : 1} maxLength={128} value={motDePasse} onChange={e => setMotDePasse(e.target.value)} placeholder={inscription ? '10 caractères minimum' : 'Ton mot de passe'} /></Champ>{inscription && <><Champ label="Vérifier le mot de passe"><input type="password" autoComplete="new-password" required minLength={10} maxLength={128} value={confirmation} onChange={e => setConfirmation(e.target.value)} placeholder="Retape exactement le même mot de passe" /></Champ>{confirmation && confirmation !== motDePasse && <p className="cel-erreur-champ">Les deux mots de passe ne correspondent pas.</p>}</>}<button className="btn primaire" disabled={occupe || Boolean(inscription && motDePasse !== confirmation)}>{occupe ? 'Connexion en cours…' : inscription ? 'Créer mon compte' : 'Se connecter'}<Icone nom="fleche-droite" taille={17} /></button><button className="btn fantome" type="button" onClick={() => setInscription(!inscription)}>{inscription ? 'J’ai déjà un compte' : 'Créer un compte'}</button></form></div>;
 }
 
 function Portail({ session, occupe, ouvrirLigue, onCreer, onRejoindre }: { session: SessionCarriere; occupe: boolean; ouvrirLigue: (id: string) => Promise<void>; onCreer: (nom: string, club: string, rythme: number, max: number, identite?: IdentiteLigue) => Promise<void>; onRejoindre: (code: string, club: string, embleme?: string) => Promise<void> }) {
@@ -1044,7 +1049,10 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
         <Choix label="Jeu" valeur={strategie.jeu} options={JEUX} onChange={v => changer('jeu', v)} />
         <Choix label="Rythme" valeur={strategie.rythme} options={RYTHMES} onChange={v => changer('rythme', v)} />
         <Choix label="Défense" valeur={strategie.defense} options={DEFENSES} onChange={v => changer('defense', v)} />
-        <Choix label="Rucks" valeur={strategie.rucks} options={RUCKS} onChange={v => changer('rucks', v)} />
+          <Choix label="Rucks" valeur={strategie.rucks} options={RUCKS} onChange={v => changer('rucks', v)} />
+          <Choix label="Risque offensif" valeur={strategie.risqueOffensif} options={RISQUES} onChange={v => changer('risqueOffensif', v)} />
+          <Choix label="Fréquence du jeu au pied" valeur={strategie.frequencePied} options={FREQUENCES_PIED} onChange={v => changer('frequencePied', v)} />
+          <Choix label="Avec 8+ points d’avance après la 65ᵉ" valeur={strategie.gestionAvance} options={GESTION_AVANCE} onChange={v => changer('gestionAvance', v)} />
       </div>
     </div> : <div className="cel-panneau"><p className="cel-note">Tu n’es pas sur le banc de cette rencontre : tu la regardes comme un spectateur.</p></div>)}
 
@@ -1203,11 +1211,14 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
           <Choix label="Rythme" valeur={strategie.rythme} options={RYTHMES} onChange={v => majStrategie('rythme', v)} />
           <Choix label="Défense" valeur={strategie.defense} options={DEFENSES} onChange={v => majStrategie('defense', v)} />
           <Choix label="Rucks" valeur={strategie.rucks} options={RUCKS} onChange={v => majStrategie('rucks', v)} />
+          <Choix label="Risque offensif" valeur={strategie.risqueOffensif} options={RISQUES} onChange={v => majStrategie('risqueOffensif', v)} />
+          <Choix label="Fréquence du jeu au pied" valeur={strategie.frequencePied} options={FREQUENCES_PIED} onChange={v => majStrategie('frequencePied', v)} />
           <Choix label="Remplacements" valeur={strategie.remplacements} options={TIMINGS} onChange={v => majStrategie('remplacements', v)} />
           <Choix label="Pénalité à moins de 35 m" valeur={strategie.penaliteCourte} options={PENALITES} onChange={v => majStrategie('penaliteCourte', v)} />
           <Choix label="Pénalité au-delà de 35 m" valeur={strategie.penaliteLongue} options={PENALITES} onChange={v => majStrategie('penaliteLongue', v)} />
           <Choix label="Si mené après la 60ᵉ" valeur={strategie.bascule60} options={MENTALITES} onChange={v => majStrategie('bascule60', v)} />
           <Choix label="Si mené de 8+ après la 70ᵉ" valeur={strategie.bascule70} options={MENTALITES} onChange={v => majStrategie('bascule70', v)} />
+          <Choix label="Avec 8+ points d’avance après la 65ᵉ" valeur={strategie.gestionAvance} options={GESTION_AVANCE} onChange={v => majStrategie('gestionAvance', v)} />
         </div>
       </div>
     </details>
@@ -1728,11 +1739,13 @@ function nomTour(index: number, total: number, taillePremier = 2 ** Math.max(0, 
 }
 
 function matchsParTour(nombreParticipants: number): number[] {
-  const puissance = 2 ** Math.floor(Math.log2(nombreParticipants));
-  const premier = nombreParticipants === puissance ? puissance / 2 : nombreParticipants - puissance;
-  const tours = [premier];
-  let restants = nombreParticipants - premier;
-  while (restants > 1) { tours.push(restants / 2); restants /= 2; }
+  const tours: number[] = [];
+  let restants = nombreParticipants;
+  while (restants > 1) {
+    const matchs = Math.floor(restants / 2);
+    tours.push(matchs);
+    restants -= matchs;
+  }
   return tours;
 }
 

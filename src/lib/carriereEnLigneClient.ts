@@ -75,8 +75,8 @@ export const chargerStatistiquesGlobales = (signal?: AbortSignal) =>
 export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?: number) =>
   requete<VueCarriereEnLigne>(undefined, undefined, signal,
     `?ligue=${encodeURIComponent(id)}${version ? `&v=${version}` : ''}`);
-export const identifierCarriere = (action: 'inscription' | 'connexion', identifiant: string, motDePasse: string, pseudo: string) =>
-  requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo });
+export const identifierCarriere = (action: 'inscription' | 'connexion', identifiant: string, motDePasse: string, pseudo: string, confirmationMotDePasse = '') =>
+  requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo, confirmationMotDePasse });
 export const deconnecterCarriere = () => requete<{ ok: boolean }>({ action: 'deconnexion' });
 export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number }
 export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number, maxClubs: number, identite: IdentiteLigue = {}) =>
