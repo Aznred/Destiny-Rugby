@@ -1913,6 +1913,21 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
   .cel-billet { grid-template-columns: 1fr auto; }
 }
 @media (max-width: 560px) {
+  /* ⚠️ LE RENDEZ-VOUS TENAIT EN SIX LIGNES SUR UN TÉLÉPHONE. La ligne était un
+     flex de quatre éléments dont le dernier, « Fenêtre ouverte », est en
+     `nowrap` : à 375 px il ne restait qu'une soixantaine de pixels au nom du
+     club, qui se cassait mot par mot — des cartes de 200 px de haut pour une
+     information de deux lignes. En grille, le texte prend toute la largeur
+     restante et l'étiquette passe dessous. */
+  .cel-agenda-ligne {
+    display: grid;
+    grid-template-columns: 44px auto minmax(0, 1fr);
+    column-gap: 0.55rem;
+    row-gap: 0.25rem;
+    align-items: center;
+  }
+  .cel-agenda-ouverte { grid-column: 2 / -1; }
+
   .cel-score-direct { grid-template-columns: 1fr; gap: 0.5rem; }
   .cel-camp { flex-direction: row; gap: 0.5rem; }
   .cel-camp small { margin-left: auto; }
@@ -2158,7 +2173,20 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-compo .ct-feuille-fut[data-groupe="banc"] > .manager-reserves,
 .cel-compo .ct-feuille-fut[data-groupe="reserves"] > .manager-banc-visuel { display: none; }
 .cel-compo .ct-feuille-fut :is(.manager-banc-visuel > .comp-tete, .manager-reserves > summary, .manager-reserves > p) { display: none; }
-.cel-compo .ct-feuille-fut :is(.manager-banc-cartes, .manager-reserves > div) { container-type: normal; contain: inline-size; display: flex; flex-direction: row; align-items: flex-start; justify-content: flex-start; gap: 18px; width: 100%; height: 100%; min-width: 0; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 6px 14px; box-sizing: border-box; scrollbar-color: #efd06a #142b35; scroll-snap-type: x proximity; }
+/* ⚠️ `--gd-axe` REND L'AXE DU DOIGT À CELUI QUI DÉFILE. Une poignée de
+   glisser-déposer porte `touch-action: pan-y` (voir `GlisserDeposer.tsx`) :
+   dans une liste verticale c'est exactement ce qu'il faut, le doigt fait
+   défiler et l'appui maintenu prend la carte. Mais le banc et la réserve
+   défilent À L'HORIZONTALE : `pan-y` disait au navigateur d'ignorer le geste
+   latéral, et la bande restait bloquée sur ses quatre premières cartes —
+   signalé en jeu, « pas possible de slide dans le banc ou la réserve ».
+
+   ⚠️ ON REND LES DEUX SENS, PAS SEULEMENT L'HORIZONTAL. Avec le seul `pan-x`,
+   c'est le geste vertical qui se perdait : un doigt posé sur une carte du banc
+   ne faisait plus défiler la page. Les deux axes cohabitent parce que la prise
+   ne s'ouvre qu'après 180 ms SANS mouvement — dès que le doigt bouge, c'est un
+   défilement et le glisser abandonne de lui-même. */
+.cel-compo .ct-feuille-fut :is(.manager-banc-cartes, .manager-reserves > div) { --gd-axe: pan-x pan-y; container-type: normal; contain: inline-size; display: flex; flex-direction: row; align-items: flex-start; justify-content: flex-start; gap: 18px; width: 100%; height: 100%; min-width: 0; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 6px 14px; box-sizing: border-box; scrollbar-color: #efd06a #142b35; scroll-snap-type: x proximity; }
 .cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut,
 .cel-compo .ct-feuille-fut .manager-reserve-carte.ct-reserve-fut { flex: 0 0 88px; width: 88px; min-width: 88px; max-width: 88px; scroll-snap-align: start; padding: 0; text-align: center; }
 .cel-compo .ct-feuille-fut .ct-reserve-fut > small { display: none; }
@@ -2206,3 +2234,39 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-compo .ct-entete .ct-secteurs dt { font-size: 8px; }
 .cel-compo .ct-apercu-selection > .dr-player { flex: none; width: 110px; }
 @media (min-height: 850px) { .cel-compo .ct-apercu-selection > .dr-player { width: 140px; } }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LA FEUILLE RÉDUITE SUR UN TÉLÉPHONE
+   ════════════════════════════════════════════════════════════════════════════
+   ⚠️ LA VUE « RÉDUITE » NE RÉDUISAIT RIEN, ELLE ÉCRASAIT. Hors plein écran, le
+   bloc garde une hauteur fixe (`min-height: 720px`) et sa grille réserve
+   228 px aux trois bandes du bas, le terrain prenant « tout le reste ». Sur un
+   téléphone, ce reste était NÉGATIF : mesuré à 375 px, le terrain tombait à
+   **2 pixels de haut** — les quinze cartes empilées en un trait illisible —
+   suivi d'un grand vide noir, puisque la hauteur fixe restait, elle.
+   Signé en jeu : « si on réduit sur tél, pas possible de voir la compo ».
+
+   Sous 700 px, la feuille redevient donc un document qui défile : plus de
+   hauteur imposée, plus de `1fr` à se partager, et un terrain qui a sa propre
+   hauteur au lieu de la quémander à ce qui reste. La vue plein écran
+   (`.cel-compo-etendue`), elle, tient déjà dans l'écran et ne bouge pas. */
+@media (max-width: 700px) {
+  .cel > .cel-compo:not(.cel-compo-etendue) { height: auto; min-height: 0; }
+  .cel-compo:not(.cel-compo-etendue) > .manager-feuille-visuelle {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-auto-rows: auto;
+    gap: 10px;
+  }
+  /* La colonne de gauche (note, secteurs, aperçu) redit ce que la barre du haut
+     affiche déjà : sur un téléphone elle ne vaut pas la moitié de la largeur. */
+  .cel-compo:not(.cel-compo-etendue) .manager-feuille-visuelle > .ct-entete { display: none; }
+  .cel-compo:not(.cel-compo-etendue) .manager-feuille-visuelle > .ct-plateau { grid-column: 1; height: auto; }
+  .cel-compo:not(.cel-compo-etendue) .ct-plateau > .manager-terrain-cadre {
+    height: min(68vh, 560px);
+    min-height: 400px;
+  }
+  .cel-compo:not(.cel-compo-etendue) .manager-feuille-visuelle > :is(.manager-banc-visuel, .manager-reserves) {
+    height: 158px;
+  }
+}

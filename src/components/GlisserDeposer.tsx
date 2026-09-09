@@ -293,7 +293,14 @@ export function useGlisserDeposer(
   const poignee = useCallback((joueurId: string | undefined, origine: CleDepot | null) => {
     if (!joueurId) return {};
     return {
-      style: { touchAction: 'pan-y' as const },
+      // ⚠️ L'AXE VIENT DU CONTENEUR, PAS DE LA POIGNÉE. `pan-y` est le bon
+      // réglage dans une liste verticale : le doigt fait défiler, l'appui
+      // maintenu prend la carte. Dans une bande qui défile À L'HORIZONTALE
+      // (le banc, la réserve), il interdisait au navigateur de suivre le geste
+      // latéral — la bande ne bougeait plus d'un pixel. Le conteneur pose
+      // `--gd-axe` et la poignée s'y range ; sans variable, on garde `pan-y`
+      // et rien ne change ailleurs dans le jeu.
+      style: { touchAction: 'var(--gd-axe, pan-y)' },
       onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
         // Clic droit, clic molette, ou deuxième doigt : on ne s'en mêle pas.
         if (e.button !== 0 || prise.current) return;

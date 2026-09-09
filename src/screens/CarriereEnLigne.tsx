@@ -1627,11 +1627,15 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
           {nomClub(vue, prochaine.domicile)} <em>reçoit</em> {nomClub(vue, prochaine.exterieur)}
           <Ecusson nom={nomClub(vue, prochaine.exterieur)} logo={vue.clubs.find(c => c.id === prochaine.exterieur)?.embleme} />
         </h2>
+        {/* ⚠️ LA PHRASE TIENT DANS UN SEUL ÉLÉMENT. Le `p` est un flex : chaque
+            morceau de texte y devenait une boîte à part, et sur un téléphone
+            « À jouer avant le », la date et le délai se rangeaient en trois
+            colonnes au lieu de se lire comme une ligne. */}
         <p className="cel-fenetre">
           <Icone nom="chrono" taille={16} />
-          {prochaine.ouvre > maintenant
+          <span>{prochaine.ouvre > maintenant
             ? <>Fenêtre ouverte le <b>{dateLongue(prochaine.ouvre)}</b> — {delai(prochaine.ouvre)}</>
-            : <>À jouer avant le <b>{dateLongue(prochaine.ferme)}</b> — {delai(prochaine.ferme)}</>}
+            : <>À jouer avant le <b>{dateLongue(prochaine.ferme)}</b> — {delai(prochaine.ferme)}</>}</span>
         </p>
         <small className="cel-note">Coup d’envoi automatique à la date de clôture indiquée. Le direct est accessible deux minutes avant, avec vos compositions enregistrées.</small>
       </div>
