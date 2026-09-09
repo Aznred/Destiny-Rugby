@@ -266,6 +266,8 @@ export const PHOTO_JOUEUR_MONDE: Record<string, string> = {
   "ezra paulo": "/photos/monde/jpn_ezra_paulo.webp",
   "fabian holland": "/photos/monde/srp_fabian_holland.webp",
   "faf de klerk": "/photos/monde/jpn_faf_de_klerk.webp",
+  "pieter steph du toit": "/photos/monde/jpn_pieter_steph_du_toit.webp",
+  "thomas du toit": "/photos/monde/jpn_thomas_du_toit.webp",
   "fakataha havili": "/photos/monde/jpn_fakataha_havili.webp",
   "faulua makisi": "/photos/monde/jpn_faulua_makisi.webp",
   "fc du plessis": "/photos/monde/jpn_fc_du_plessis.webp",

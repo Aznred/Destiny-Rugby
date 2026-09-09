@@ -370,12 +370,17 @@ function calendrierCompetition(etat: EtatCarriereEnLigne, competition: Competiti
   if (competition.format === 'championnat') {
     const aller = affichesToutesRondes(competition.participants);
     const retour = aller.map(j => j.map(r => ({ domicile: r.exterieur, exterieur: r.domicile })));
+    let ouverture = debut;
     [...aller, ...retour].forEach((paires, i) => {
       const horaires = horairesChampionnat(debut, etat.rythme, i, paires.length);
       paires.forEach((paire, index) => etat.rencontres.push({
         id: prochainIdRencontre(etat), competitionId: competition.id,
-        journee: i + 1, ...paire, ouvre: dateServeur(debut), ferme: dateServeur(horaires[index]),
+        journee: i + 1, ...paire, ouvre: dateServeur(ouverture), ferme: dateServeur(horaires[index]),
       }));
+      // La journée suivante s'ouvre quand la dernière affiche de celle-ci se
+      // ferme. Chaque rendez-vous a ainsi sa vraie date au lieu de réutiliser
+      // le lancement de saison pendant tout le calendrier.
+      ouverture = Math.max(...horaires);
     });
   } else {
     // Un premier tour réduit au plus proche tableau de puissance de deux ; les autres sont exempts.

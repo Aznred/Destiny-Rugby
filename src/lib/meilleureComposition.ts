@@ -3,6 +3,7 @@ import type { CarteCarriere } from './ligue/typesCarriere';
 import type { CompositionManager } from '../types';
 import { POSTES_XV_MANAGER, POSTES_BANC_MANAGER } from './compositionManager';
 import { adequationAuPoste, facteurDePerformance } from './carteJoueur';
+import { bonusCollectif, collectifCarriere } from './ligue/collectifCarriere';
 
 /** Affectation globale des 23 places, avec priorité au XV et première ligne spécialisée. */
 export function meilleureComposition(cartes: CarteCarriere[], maintenant = Date.now()): CompositionManager | null {
@@ -30,6 +31,47 @@ export function meilleureComposition(cartes: CarteCarriere[], maintenant = Date.
   const choix=Array<number>(23).fill(-1);
   for(let j=1;j<=m;j++) if(p[j]) choix[p[j]-1]=j-1;
   if(choix.some((j,i)=>j<0 || couts[i][j]>=1e9)) return null;
+  /**
+   * L'affectation hongroise donne le meilleur XV par GEN pur. Le collectif
+   * dépend cependant du groupe entier et ne peut pas entrer dans une matrice
+   * joueur/poste. On affine donc cette feuille avec son vrai score de match :
+   * GEN au poste + bonus (ou malus) de collectif, puis GEN du banc.
+   */
+  const score = (selection: number[]) => {
+    const titulaires = selection.slice(0, 15).map(index => joueurs[index]);
+    const composition = { titulaires: titulaires.map(c => c.id) };
+    const collectif = collectifCarriere(titulaires, composition);
+    const scoreXV = titulaires.reduce((total, carte, i) => {
+      const bonus = bonusCollectif(collectif.parCarte[carte.id]?.points ?? 0);
+      return total + (carte.note + bonus) * facteurDePerformance(adequationAuPoste(carte.poste, postes[i]));
+    }, 0);
+    const scoreBanc = selection.slice(15).reduce((total, index, i) => {
+      const carte = joueurs[index];
+      return total + carte.note * facteurDePerformance(adequationAuPoste(carte.poste, postes[i + 15]));
+    }, 0);
+    return scoreXV * 100 + scoreBanc;
+  };
+  let meilleurScore = score(choix);
+  // Échanges et remplacements successifs : chaque mouvement doit augmenter le
+  // total réel. L'ordre stable des joueurs rend le résultat reproductible.
+  for (let tour = 0; tour < 23; tour++) {
+    let meilleurChoix: number[] | null = null;
+    let scoreTour = meilleurScore;
+    for (let place = 0; place < 23; place++) for (let candidat = 0; candidat < m; candidat++) {
+      if (choix[place] === candidat || couts[place][candidat] >= 1e9) continue;
+      const essai = [...choix];
+      const autrePlace = essai.indexOf(candidat);
+      if (autrePlace >= 0) {
+        if (couts[autrePlace][essai[place]] >= 1e9) continue;
+        [essai[place], essai[autrePlace]] = [essai[autrePlace], essai[place]];
+      } else essai[place] = candidat;
+      const valeur = score(essai);
+      if (valeur > scoreTour + 1e-6) { scoreTour = valeur; meilleurChoix = essai; }
+    }
+    if (!meilleurChoix) break;
+    choix.splice(0, choix.length, ...meilleurChoix);
+    meilleurScore = scoreTour;
+  }
   const feuille=choix.map(j=>joueurs[j]), xv=feuille.slice(0,15);
   const capitaine=[...xv].sort((a,b)=>(b.age*1.4+b.note)-(a.age*1.4+a.note))[0];
   const buteur=[...xv].sort((a,b)=>(b.statistiques.PIED ?? b.note)-(a.statistiques.PIED ?? a.note))[0];

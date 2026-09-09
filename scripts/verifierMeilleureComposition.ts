@@ -16,4 +16,12 @@ for(const i of [0,1,2,15,16,17]) {const id=[...c.titulaires,...c.remplacants][i]
 assert.equal(meilleureComposition(cartes.slice(0,22)),null);
 assert.equal(meilleureComposition(cartes.map(x=>({...x,poste:'ailier_gauche',famille:'ailier'}))),null);
 assert.deepEqual(meilleureComposition([...cartes].reverse()),c);
-console.log('OK composition : 23 joueurs distincts, meilleur titulaire, blessé exclu, spécialistes, rôles et ordre stable.');
+const cartesCollectif=postes.map((poste,i)=>({
+  id:`c${i}`,poste,famille:POSTE_PAR_ID[poste].famille,note:70,age:25,fatigue:0,
+  clubReel:[0,3,6].includes(i)?'Bloc':`Club ${i}`,nation:`Nation ${i}`,championnat:`Championnat ${i}`,
+  statistiques:{PIED:50},
+} as CarteCarriere));
+cartesCollectif.push({...cartesCollectif[9],id:'bloc-quatre',note:68,clubReel:'Bloc',nation:'Autre',championnat:'Autre'});
+const avecCollectif=meilleureComposition(cartesCollectif)!;
+assert.ok(avecCollectif.titulaires.includes('bloc-quatre'), 'le total GEN + collectif doit battre le GEN individuel');
+console.log('OK composition : 23 joueurs distincts, collectif + GEN optimisés, blessé exclu, spécialistes, rôles et ordre stable.');

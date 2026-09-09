@@ -49,7 +49,7 @@ export const PACKS_CARRIERE: PackCarriere[] = [
   { id: 'bronze', nom: 'Bronze', prix: 250, cartes: 3, famille: 'general',
     promesse: 'De la profondeur, pas cher. De quoi faire tourner un effectif.',
     probabilites: { bronze: 90, argent: 9.5, or: .5, elite: 0, star: 0 } },
-  { id: 'standard', nom: 'Standard', prix: 700, cartes: 3, famille: 'general',
+  { id: 'standard', nom: 'Argent', prix: 700, cartes: 3, famille: 'general',
     promesse: 'Le pack de tous les jours. Une chance sur sept de toucher de l’Or.',
     probabilites: MIXTE },
   { id: 'premium', nom: 'Premium', prix: 1800, cartes: 3, famille: 'general',
@@ -143,6 +143,27 @@ export const PACKS_CARRIERE: PackCarriere[] = [
     promesse: 'Entre 26 et 30 ans : le sommet d’une carrière, sans le déclin.',
     probabilites: { bronze: 20, argent: 42, or: 35, elite: 2.7, star: .3 } },
 ];
+
+const PACKS_PERMANENTS = ['bronze', 'standard', 'or'] as const;
+
+/** Bronze, Argent et Or restent disponibles ; deux packs spéciaux tournent chaque jour. */
+export function packsBoutiqueDuJour(
+  packs: readonly PackCarriere[],
+  maintenant: number | Date = Date.now(),
+): PackCarriere[] {
+  const instant = maintenant instanceof Date ? maintenant.getTime() : maintenant;
+  const cleParis = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(instant);
+  const numeroJour = Math.floor(Date.parse(`${cleParis}T00:00:00Z`) / 86_400_000);
+  const permanents = PACKS_PERMANENTS
+    .map(id => packs.find(pack => pack.id === id))
+    .filter((pack): pack is PackCarriere => Boolean(pack));
+  const tournants = packs.filter(pack => !PACKS_PERMANENTS.includes(pack.id as typeof PACKS_PERMANENTS[number]));
+  if (tournants.length <= 2) return [...permanents, ...tournants];
+  const depart = ((numeroJour * 2) % tournants.length + tournants.length) % tournants.length;
+  return [...permanents, tournants[depart], tournants[(depart + 1) % tournants.length]];
+}
 
 export function rareteCarriere(note: number): RareteCarriere {
   return note >= 88 ? 'star' : note >= 80 ? 'elite' : note >= 65 ? 'or' : note >= 50 ? 'argent' : 'bronze';

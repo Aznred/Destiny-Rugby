@@ -56,6 +56,7 @@ import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from '../lib/ligue/venteRapid
 import { collectifCarriere, paliersCollectif, bonusCollectif, COLLECTIF_MAX } from '../lib/ligue/collectifCarriere';
 import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
+import { packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
 
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
@@ -1149,7 +1150,7 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
         </div>
       </div>
       <div><div className="eyebrow">Feuille de {composition.titulaires.length + composition.remplacants.length} sur {cartes.length} joueurs</div><h2>Ton XV, ton banc, tes rôles</h2><p>Le capitaine tient la discipline, le buteur tire les pénalités. Un joueur hors de son poste perd la cohérence collective.</p></div>
-      <button className="btn" disabled={occupe || !optimale} title={optimale ? "Optimiser le XV et le banc selon les notes et les postes" : "Il manque des joueurs disponibles ou des spécialistes en première ligne"} onClick={() => { if (optimale) setBrouillon(optimale); }}>Assembler la meilleure équipe</button>
+      <button className="btn" disabled={occupe || !optimale} title={optimale ? "Optimiser le total GEN + collectif, en respectant les postes" : "Il manque des joueurs disponibles ou des spécialistes en première ligne"} onClick={() => { if (optimale) setBrouillon(optimale); }}>Assembler la meilleure équipe</button>
       <button className="btn primaire" disabled={occupe || !modifie} onClick={async () => { const v = await agir({ type: 'composition', composition }); if (v) setBrouillon(null); }}>{modifie ? 'Enregistrer la feuille' : 'Feuille enregistrée'}</button>
     </section>
 
@@ -1368,6 +1369,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
  */
 export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
+  const packsDuJour = packsBoutiqueDuJour(vue.packs);
   const [ouverture, setOuverture] = useState<{ cartes: CarteCarriere[] | null; pack: string; garantie?: VueCarriereEnLigne['packs'][number]['garantie'] } | null>(null);
   /**
    * ⚠️ LE MODULE 3D ARRIVE PENDANT QU'ON REGARDE LE PRÉSENTOIR. Il pesait
@@ -1428,7 +1430,8 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
       {packsGratuits.length > 20 && <small className="cel-note">Ouvre quelques packs pour afficher les {packsGratuits.length - 20} suivants.</small>}
     </section>
 
-    <BoutiquePacks3D packs={vue.packs} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={ouvrir} />
+    <div className="cel-note">Bronze, Argent et Or sont toujours disponibles. Les deux autres packs changent chaque jour.</div>
+    <BoutiquePacks3D packs={packsDuJour} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={ouvrir} />
 
     {ouverture && <OuverturePack cartes={ouverture.cartes} pack={ouverture.pack} garantie={ouverture.garantie} rendreCarte={carte => <CarteJoueurEnLigne carte={carte} />} onFermer={() => setOuverture(null)} />}
   </>;
