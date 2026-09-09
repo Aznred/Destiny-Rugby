@@ -866,7 +866,14 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         exiger(compteId === nouveau.createurId, 'Seul le créateur peut créer une coupe.'); exiger(nouveau.phase === 'saison', 'Lancez une saison avant de créer une coupe.');
         texte(commande.nom); texte(commande.trophee); listeIds(commande.participants); exiger(commande.participants.length >= 2, 'Une coupe nécessite au moins deux clubs.'); commande.participants.forEach(id => clubParId(nouveau, id));
         exiger(commande.format === 'elimination' || commande.format === 'championnat', 'Format de coupe invalide.');
-        entier(commande.recompenseParticipation, 0, 1000); entier(commande.recompenseVainqueur, 0, 10000); entier(commande.recompenseFinaliste, 0, 5000);
+        // Le commissaire fixe librement le cash prize. La seule borne restante
+        // est celle des entiers sûrs, indispensable pour que les soldes et les
+        // transactions ne perdent jamais de précision en base.
+        entier(commande.recompenseParticipation, 0, Number.MAX_SAFE_INTEGER);
+        entier(commande.recompenseVainqueur, 0, Number.MAX_SAFE_INTEGER);
+        entier(commande.recompenseFinaliste, 0, Number.MAX_SAFE_INTEGER);
+        exiger(Number.isSafeInteger(commande.recompenseParticipation + commande.recompenseVainqueur)
+          && Number.isSafeInteger(commande.recompenseParticipation + commande.recompenseFinaliste), 'Cash prize trop élevé.');
         exiger(typeof commande.debut === 'string' && Number.isFinite(Date.parse(commande.debut)) && Date.parse(commande.debut) >= maintenant && Date.parse(commande.debut) <= maintenant + 90 * JOUR, 'La coupe doit débuter dans les 90 prochains jours.');
         exiger(nouveau.competitions.filter(c => c.saison === nouveau.saison).length < 3, 'Deux coupes par saison au maximum pour préserver l’économie.');
         const c: CompetitionCarriere = { id: prochainId(nouveau, 'competition', nouveau.competitions.length), nom: commande.nom.trim(), trophee: commande.trophee.trim(), format: commande.format, participants: [...commande.participants], saison: nouveau.saison, debut: new Date(commande.debut).toISOString(), etat: 'enCours', recompenseParticipation: commande.recompenseParticipation, recompenseVainqueur: commande.recompenseVainqueur, recompenseFinaliste: commande.recompenseFinaliste,

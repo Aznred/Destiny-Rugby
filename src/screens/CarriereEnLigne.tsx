@@ -1609,15 +1609,18 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
   const rappels = useRappels(vue.id);
   const maintenant = maintenantISO();
   const miennes = vue.rencontres.filter(r => r.domicile === vue.monClubId || r.exterieur === vue.monClubId);
-  const aVenir = miennes.filter(r => !r.resultat);
+  const aVenir = miennes.filter(r => !r.resultat).sort((a, b) => Date.parse(a.ferme) - Date.parse(b.ferme));
   const jouees = miennes.filter(r => r.resultat).slice(-8).reverse();
   const prochaine = aVenir[0];
-  const parJournee = new Map<number, VueRencontre[]>();
-  for (const r of vue.rencontres.filter(r => !r.resultat)) {
-    if (!parJournee.has(r.journee)) parJournee.set(r.journee, []);
-    parJournee.get(r.journee)!.push(r);
+  const parRendezVous = new Map<string, VueRencontre[]>();
+  for (const r of vue.rencontres.filter(r => !r.resultat).sort((a, b) => Date.parse(a.ferme) - Date.parse(b.ferme))) {
+    // Deux compétitions ont chacune une « journée 1 » : les regrouper sous
+    // le seul numéro de journée cachait la coupe au milieu du championnat.
+    const cle = `${r.competitionId}:${r.journee}`;
+    if (!parRendezVous.has(cle)) parRendezVous.set(cle, []);
+    parRendezVous.get(cle)!.push(r);
   }
-  const journees = [...parJournee.keys()].sort((a, b) => a - b).slice(0, 6);
+  const rendezVous = [...parRendezVous.values()];
 
   if (!vue.rencontres.length) return <Vide icone="calendrier" titre="Le calendrier arrive au coup d’envoi">Quand le créateur lancera la saison, toutes les journées apparaîtront ici, avec leurs dates.</Vide>;
 
@@ -1683,12 +1686,15 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
     </section>}
 
     <section className="cel-panneau">
-      <div className="cel-titre-ligne"><h2>Toute la ligue</h2><small>{journees.length} prochaines journées</small></div>
-      {journees.map(j => {
-        const liste = parJournee.get(j)!;
-        return <div key={j} className="cel-journee">
+      <div className="cel-titre-ligne"><h2>Toute la ligue</h2><small>{rendezVous.reduce((total, liste) => total + liste.length, 0)} matchs programmés</small></div>
+      {rendezVous.map(liste => {
+        const premiere = liste[0];
+        const competition = vue.competitions.find(c => c.id === premiere.competitionId);
+        const tailles = competition?.format === 'elimination' ? matchsParTour(competition.participants.length) : [];
+        const tour = competition?.format === 'elimination' ? nomTour(premiere.journee - 1, tailles.length, tailles[0]) : `Journée ${premiere.journee}`;
+        return <div key={`${premiere.competitionId}:${premiere.journee}`} className="cel-journee">
           <div className="cel-journee-tete">
-            <b>Journée {j}</b>
+            <b>{competition?.nom} · {tour}</b>
             <small>{dateLongue(liste[0].ouvre)} → {dateLongue(liste[0].ferme)}</small>
           </div>
           <div className="cel-grille-rencontres">{liste.map(r =>
@@ -1709,6 +1715,57 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
 // LES COMPÉTITIONS — le championnat, et les coupes inventées par le créateur
 // ═══════════════════════════════════════════════════════════════════════════
 
+function nomTour(index: number, total: number, taillePremier = 2 ** Math.max(0, total - 1)): string {
+  if (index === 0 && taillePremier !== 2 ** Math.max(0, total - 1)) return 'Tour préliminaire';
+  const restant = total - index;
+  if (restant === 1) return 'Finale';
+  if (restant === 2) return 'Demi-finales';
+  if (restant === 3) return 'Quarts de finale';
+  if (restant === 4) return 'Huitièmes de finale';
+  return index === 0 ? 'Tour préliminaire' : `Tour ${index + 1}`;
+}
+
+function matchsParTour(nombreParticipants: number): number[] {
+  const puissance = 2 ** Math.floor(Math.log2(nombreParticipants));
+  const premier = nombreParticipants === puissance ? puissance / 2 : nombreParticipants - puissance;
+  const tours = [premier];
+  let restants = nombreParticipants - premier;
+  while (restants > 1) { tours.push(restants / 2); restants /= 2; }
+  return tours;
+}
+
+function TableauCoupe({ vue, competition, rencontres, suivre }: {
+  vue: VueCarriereEnLigne;
+  competition: VueCarriereEnLigne['competitions'][number];
+  rencontres: VueRencontre[];
+  suivre: (id: string) => void;
+}) {
+  const tailles = matchsParTour(competition.participants.length);
+  const intervalle = 7 * 86_400_000 / vue.rythme;
+  return <section className="cel-panneau">
+    <div className="cel-titre-ligne"><h2>Tableau</h2><small>{competition.participants.length} clubs · {tailles.reduce((s, n) => s + n, 0)} matchs</small></div>
+    <div className="cel-tableau-coupe">{tailles.map((taille, index) => {
+      const journee = index + 1;
+      const matchs = rencontres.filter(r => r.journee === journee);
+      const datePrevue = new Date(Date.parse(competition.debut) + (index + 1) * intervalle).toISOString();
+      return <div className="cel-tour-coupe" key={journee}>
+        <div><b>{nomTour(index, tailles.length, tailles[0])}</b><small>{date(matchs[0]?.ferme ?? datePrevue)}</small></div>
+        {Array.from({ length: taille }, (_, numero) => {
+          const rencontre = matchs[numero];
+          if (!rencontre) return <article className="cel-match-tableau attente" key={numero}>
+            <span><i />À déterminer</span><em>VS</em><span><i />À déterminer</span>
+          </article>;
+          return <button className="cel-match-tableau" key={rencontre.id} onClick={() => suivre(rencontre.id)} disabled={!rencontre.match}>
+            <span><Ecusson nom={nomClub(vue, rencontre.domicile)} logo={vue.clubs.find(c => c.id === rencontre.domicile)?.embleme} />{nomClub(vue, rencontre.domicile)}{rencontre.resultat && <strong>{rencontre.resultat.pointsD}</strong>}</span>
+            <em>VS</em>
+            <span><Ecusson nom={nomClub(vue, rencontre.exterieur)} logo={vue.clubs.find(c => c.id === rencontre.exterieur)?.embleme} />{nomClub(vue, rencontre.exterieur)}{rencontre.resultat && <strong>{rencontre.resultat.pointsE}</strong>}</span>
+          </button>;
+        })}
+      </div>;
+    })}</div>
+  </section>;
+}
+
 function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; proprietaire: boolean; suivre: (id: string) => void }) {
   const [nouvelle, setNouvelle] = useState(false);
   const [ficheClub, setFicheClub] = useState<string | null>(null);
@@ -1728,7 +1785,7 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
 
   return <>
     <section className="cel-panneau cel-filtres">
-      <div><div className="eyebrow">{vue.competitions.length} compétition{vue.competitions.length > 1 ? 's' : ''} dans cette ligue</div><h2 className="cel-nom-ligue">{competition?.logo && <img className="cel-logo-ligue" src={competition.logo} alt="" />}{competition?.nom ?? 'Le calendrier'}</h2><p className="cel-note">{competition ? `${competition.trophee}${competition.playoffs ? ' · phase finale adaptée au nombre de clubs' : ''}` : ''}</p></div>
+      <div><div className="eyebrow">{vue.competitions.length} compétition{vue.competitions.length > 1 ? 's' : ''} dans cette ligue</div><h2 className="cel-nom-ligue">{competition?.logo && <img className="cel-logo-ligue" src={competition.logo} alt="" />}{competition?.nom ?? 'Le calendrier'}</h2><p className="cel-note">{competition ? `${competition.trophee}${competition.playoffs ? ' · phase finale adaptée au nombre de clubs' : ''} · ${montant(competition.recompenseVainqueur)} Ovas au vainqueur` : ''}</p></div>
       {vue.competitions.length > 1 && <Choix label="Compétition" valeur={competition?.id ?? ''} options={vue.competitions.map(c => [c.id, c.nom])} onChange={setOuverte} />}
       {proprietaire && vue.phase === 'saison' && <button className="btn fantome" onClick={() => setNouvelle(!nouvelle)}><Icone nom="trophee" taille={17} />{nouvelle ? 'Fermer' : 'Créer une coupe'}</button>}
     </section>
@@ -1745,9 +1802,9 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
         <Champ label="Nom du trophée"><input required minLength={2} maxLength={40} value={trophee} onChange={e => setTrophee(e.target.value)} /></Champ>
         <Choix label="Format" valeur={format} options={[['elimination', 'Élimination directe'], ['championnat', 'Championnat aller-retour']]} onChange={setFormat} />
         <Champ label="Début"><input type="date" required value={debut} onChange={e => setDebut(e.target.value)} /></Champ>
-        <Champ label="Vainqueur (Ovas)"><input type="number" min={0} max={10000} step={500} value={vainqueur} onChange={e => setVainqueur(e.target.value)} /></Champ>
-        <Champ label="Finaliste (Ovas)"><input type="number" min={0} max={5000} step={500} value={finaliste} onChange={e => setFinaliste(e.target.value)} /></Champ>
-        <Champ label="Chaque participant (Ovas)"><input type="number" min={0} max={1000} step={100} value={participation} onChange={e => setParticipation(e.target.value)} /></Champ>
+        <Champ label="Vainqueur (Ovas)"><input type="number" min={0} step={1} value={vainqueur} onChange={e => setVainqueur(e.target.value)} /></Champ>
+        <Champ label="Finaliste (Ovas)"><input type="number" min={0} step={1} value={finaliste} onChange={e => setFinaliste(e.target.value)} /></Champ>
+        <Champ label="Chaque participant (Ovas)"><input type="number" min={0} step={1} value={participation} onChange={e => setParticipation(e.target.value)} /></Champ>
       </div>
       <ChoixCompetition logo={logoCoupe} tropheeId={tropheeCoupe} onLogo={setLogoCoupe} onTrophee={setTropheeCoupe} />
       {format === 'championnat' && <label className="cel-bascule"><input type="checkbox" checked={playoffsCoupe} onChange={e => setPlayoffsCoupe(e.target.checked)} /><span><b>Phase finale</b>Les qualifiés, dont le nombre dépend du nombre de clubs, se disputent le trophée après les journées de poule.</span></label>}
@@ -1757,6 +1814,7 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
     </form>}
 
     {competition?.format === 'championnat' && <section className="cel-panneau"><h2>Classement</h2><Classement vue={vue} onClub={setFicheClub} /></section>}
+    {competition?.format === 'elimination' && <TableauCoupe vue={vue} competition={competition} rencontres={rencontres} suivre={suivre} />}
     {ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}
 
     {journees.map(j => <section key={j} className="cel-panneau">

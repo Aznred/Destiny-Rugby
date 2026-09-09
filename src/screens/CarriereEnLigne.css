@@ -1882,6 +1882,24 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-journee-tete b { font-family: var(--police-titre); font-size: 1rem; color: var(--or-400); }
 .cel-journee-tete small { color: var(--brume); font-size: 0.78rem; }
 
+/* Le tableau d'une coupe reste lisible de gauche à droite, avec les tours
+   futurs visibles avant même que leurs qualifiés soient connus. */
+.cel-tableau-coupe { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 1rem; overflow-x: auto; padding: 0.8rem 0 0.35rem; }
+.cel-tour-coupe { display: flex; flex-direction: column; justify-content: space-around; gap: 0.7rem; min-width: 0; }
+.cel-tour-coupe > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; color: var(--or-400); text-transform: uppercase; letter-spacing: 0.08em; }
+.cel-tour-coupe > div:first-child small { color: var(--brume); letter-spacing: 0; text-transform: none; }
+.cel-match-tableau { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 0.45rem; min-height: 78px; padding: 0.65rem; border: 1px solid rgba(210, 174, 74, 0.3); border-radius: 12px; background: rgba(4, 18, 30, 0.72); color: var(--blanc); text-align: left; }
+.cel-match-tableau:not(:disabled) { cursor: pointer; }
+.cel-match-tableau:not(:disabled):hover { border-color: var(--or-400); transform: translateY(-1px); }
+.cel-match-tableau > span { display: flex; align-items: center; gap: 0.35rem; min-width: 0; font-weight: 700; }
+.cel-match-tableau > span:last-child { flex-direction: row-reverse; text-align: right; }
+.cel-match-tableau .cel-ecusson { width: 26px; height: 26px; flex: 0 0 26px; }
+.cel-match-tableau strong { margin-left: auto; color: var(--or-300); font-size: 1.15rem; }
+.cel-match-tableau > span:last-child strong { margin: 0 auto 0 0; }
+.cel-match-tableau > em { color: var(--or-400); font-family: var(--police-titre); font-style: normal; }
+.cel-match-tableau.attente { opacity: 0.52; border-style: dashed; }
+.cel-match-tableau.attente i { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.08); }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE — dans les deux sens
    ═══════════════════════════════════════════════════════════════════════════ */

@@ -868,10 +868,12 @@ titre('9. LA COUPE MAISON DU COMMISSAIRE');
     type: 'creerCoupe', nom: 'Christmas Cup', trophee: 'Coupe de Noël',
     participants: e.clubs.map((c) => c.id), format: 'elimination',
     debut: new Date(T0 + JOUR).toISOString(),
-    recompenseParticipation: 1_000, recompenseVainqueur: 10_000, recompenseFinaliste: 5_000,
+    recompenseParticipation: 4_321, recompenseVainqueur: 123_456, recompenseFinaliste: 65_432,
   }, T0, 'coupe');
   const coupe = e.competitions.find((c) => c.nom === 'Christmas Cup')!;
   dire(Boolean(coupe), 'le créateur invente une coupe');
+  dire(coupe.recompenseVainqueur === 123_456 && coupe.recompenseFinaliste === 65_432 && coupe.recompenseParticipation === 4_321,
+    '⚠️ le commissaire fixe librement les trois montants du cash prize');
   dire(e.rencontres.filter((r) => r.competitionId === coupe.id).length === 2,
     'un tableau à quatre commence par deux demi-finales');
   for (let semaine = 1; semaine <= 20; semaine++) {
