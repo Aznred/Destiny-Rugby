@@ -1584,15 +1584,20 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
         const chezMoi = r.domicile === vue.monClubId;
         const adversaire = chezMoi ? r.exterieur : r.domicile;
         const ouverte = r.ouvre <= maintenant && r.ferme >= maintenant;
+        const competition = vue.competitions.find(c => c.id === r.competitionId);
+        // Le rendez-vous réel est la clôture : c'est l'instant du coup d'envoi
+        // automatique. `ouvre` est seulement le début de la fenêtre de jeu et
+        // peut être identique pour plusieurs journées déjà programmées.
+        const rendezVous = r.ferme;
         return <button key={r.id} className={`cel-agenda-ligne${ouverte ? ' ouverte' : ''}`} onClick={() => suivre(r.id)} disabled={!r.match}>
           <span className="cel-agenda-jour">
-            <b>{new Date(r.ouvre).getDate()}</b>
-            <small>{new Date(r.ouvre).toLocaleDateString('fr-FR', { month: 'short' })}</small>
+            <b>{new Date(rendezVous).getDate()}</b>
+            <small>{new Date(rendezVous).toLocaleDateString('fr-FR', { month: 'short' })}</small>
           </span>
           <Ecusson nom={nomClub(vue, adversaire)} logo={vue.clubs.find(c => c.id === adversaire)?.embleme} />
           <span className="cel-agenda-corps">
             <b>{chezMoi ? 'Reçoit' : 'Se déplace à'} {nomClub(vue, adversaire)}</b>
-            <small>Journée {r.journee} · {JOURS[new Date(r.ouvre).getDay()]} au {JOURS[new Date(r.ferme).getDay()]} · {delai(r.ouvre)}</small>
+            <small>{competition?.nom} · journée {r.journee} · {JOURS[new Date(rendezVous).getDay()]} · {delai(rendezVous)}</small>
           </span>
           {ouverte && <em className="cel-agenda-ouverte">Fenêtre ouverte</em>}
         </button>;
