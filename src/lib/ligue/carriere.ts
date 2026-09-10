@@ -1,3 +1,4 @@
+import { catalogueAdmin } from './atelierCatalogue.js';
 /** Règles exécutées exclusivement par le serveur ; chaque commande travaille sur une copie. */
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import type { CompositionManager } from '../../types.js';
@@ -5,7 +6,7 @@ import { compositionManagerParDefaut, EFFECTIF_MINIMUM, POSTES_BANC_MANAGER, POS
 import { affichesToutesRondes } from './calendrier.js';
 import { horairesChampionnat } from './horaires.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
-import { bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
+import { packsCatalogueAdmin, bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
 import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
@@ -16,19 +17,21 @@ const JOUR = 24 * HEURE;
 const SEMAINE = 7 * JOUR;
 export const PACKS_GRATUITS_PAR_JOUR = 10;
 const copier = <T>(x: T): T => structuredClone(x);
+let catalogueSources: ReturnType<typeof catalogueMondialCarriere> | undefined;
 let sourcesParId: Map<string, ReturnType<typeof catalogueMondialCarriere>[number]> | undefined;
 
 function actualiserCartesProfessionnelles(cartes: CarteCarriere[]): void {
-  sourcesParId ??= new Map(catalogueMondialCarriere().map(source => [source.sourceId, source]));
+  const catalogueActuel = catalogueMondialCarriere();
+  if (catalogueSources !== catalogueActuel) { catalogueSources = catalogueActuel; sourcesParId = new Map(catalogueActuel.map(source => [source.sourceId, source])); }
   for (const carte of cartes) {
-    const source = sourcesParId.get(carte.sourceId);
-    if (!source || source.origine !== 'professionnel') continue;
+    const source = sourcesParId!.get(carte.sourceId);
+    if (!source || (source.origine !== 'professionnel' && !catalogueAdmin().joueurs[carte.sourceId])) continue;
     // L'identité de collection et la valeur sportive suivent le catalogue actuel.
     // L'historique de propriété, la fatigue, les blessures et les statistiques de
     // carrière restent ceux de cette carte déjà distribuée.
     carte.nom = source.nom;
     carte.note = source.note;
-    carte.potentiel = Math.max(carte.potentiel, source.potentiel);
+    carte.potentiel = catalogueAdmin().joueurs[carte.sourceId] ? source.potentiel : Math.max(carte.potentiel, source.potentiel);
     carte.rarete = source.rarete;
     carte.photo = source.photo;
     carte.statistiques = { ...source.statistiques };
@@ -287,7 +290,7 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
     // lui-même : sans plafond, il se donne dix millions et le marché de la
     // ligue n'existe plus. 100 000 Ovas, c'est déjà trois saisons de gains.
     dotationOvas: dotationValide(config.dotationOvas),
-    clubs: [], cartes: [], packs: copier(PACKS_CARRIERE), competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
+    clubs: [], cartes: [], packs: copier(packsCatalogueAdmin()), competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
   ajouterClub(etat, config.compteId, config.pseudo, config.clubNom, maintenant, graine, config.embleme);
   attribuerPacksQuotidiens(etat, maintenant);
   return etat;
@@ -322,7 +325,7 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
     const poids = RARETES_CARRIERE.map((r, b) => {
       if (!rayons[b].length) return 0;
       if (doitGarantir && !bandes.includes(r)) return 0;
-      return pack.probabilites[r];
+      return doitGarantir ? pack.probabilites[r] || 1 : pack.probabilites[r];
     });
     // Une garantie impossible (bande épuisée dans la ligue) ne bloque pas
     // l'ouverture : on retombe sur le tirage ordinaire plutôt que de refuser
@@ -676,8 +679,13 @@ function expirerMarche(etat: EtatCarriereEnLigne, maintenant: number) {
  * fait l'économie — restent ceux de la ligue.
  */
 function completerPacks(etat: EtatCarriereEnLigne) {
+  for (const edition of Object.values(catalogueAdmin().packs)) {
+    const i = etat.packs.findIndex(p => p.id === edition.id);
+    if(i < 0) etat.packs.push(copier(edition)); else etat.packs[i] = copier(edition);
+  }
   const connus = new Map(etat.packs.map(p => [p.id, p]));
   for (const modele of PACKS_CARRIERE) {
+    if (catalogueAdmin().packs[modele.id]) continue;
     const existant = connus.get(modele.id);
     if (!existant) { etat.packs.push(copier(modele)); continue; }
     // Migration ciblée des anciens tarifs officiels ; conserver les réglages personnalisés.
@@ -747,6 +755,7 @@ function reprendre(etat: EtatCarriereEnLigne, maintenant: number): EtatCarriereE
     club.strategie = strategieValide(club.strategie);
   }
   actualiserCartesProfessionnelles(nouveau.cartes);
+  nouveau.catalogueRevision = catalogueAdmin().revision;
   for (const club of nouveau.clubs) ajusterComposition(nouveau, club, maintenant);
   reparerCalendriers(nouveau);
   return nouveau;

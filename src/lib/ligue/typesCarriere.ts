@@ -131,6 +131,7 @@ export interface HistoireCarriere {
 }
 /** État exclusivement serveur. Écriture atomique avec comparaison de version en base. */
 export interface EtatCarriereEnLigne {
+  catalogueRevision?: number;
   schema: 1; id: string; nom: string; code: string; createurId: string; creeLe: string;
   version: number; saison: number; phase: 'salon' | 'saison' | 'intersaison';
   rythme: number; maxClubs: number; graine: string; debutSaison?: string;

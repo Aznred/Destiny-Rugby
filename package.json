@@ -44,6 +44,7 @@
     "mesure:transfert-ligue": "vite-node scripts/mesureTransfertLigue.ts",
     "horloge:matchs": "node --env-file-if-exists=.env scripts/horlogeMatchs.mjs",
     "videos:moments": "node scripts/genererMoments.mjs",
+    "verify:atelier": "vite-node scripts/verifierAtelier.ts",
     "verify:direct-push": "vite-node scripts/verifierDirectPush.ts"
   },
   "dependencies": {

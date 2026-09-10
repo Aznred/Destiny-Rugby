@@ -1,3 +1,6 @@
+import { statistiquesCarte } from './statistiquesCarte.js';
+export { statistiquesCarte } from './statistiquesCarte.js';
+import { catalogueAdmin, type CatalogueAdmin } from './atelierCatalogue.js';
 import { JOUEURS_NEW_MAJ } from '../../data/photosNewMaj.js';
 import { LNR_MAJ } from '../../data/lnrMaj.js';
 import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
@@ -156,13 +159,14 @@ export function packsBoutiqueDuJour(
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(instant);
   const numeroJour = Math.floor(Date.parse(`${cleParis}T00:00:00Z`) / 86_400_000);
+  const personnalisations = packs.filter(p => p.id.startsWith('kiri-'));
   const permanents = PACKS_PERMANENTS
     .map(id => packs.find(pack => pack.id === id))
     .filter((pack): pack is PackCarriere => Boolean(pack));
-  const tournants = packs.filter(pack => !PACKS_PERMANENTS.includes(pack.id as typeof PACKS_PERMANENTS[number]));
-  if (tournants.length <= 2) return [...permanents, ...tournants];
+  const tournants = packs.filter(pack => !pack.id.startsWith('kiri-') && !PACKS_PERMANENTS.includes(pack.id as typeof PACKS_PERMANENTS[number]));
+  if (tournants.length <= 2) return [...permanents, ...personnalisations, ...tournants];
   const depart = ((numeroJour * 2) % tournants.length + tournants.length) % tournants.length;
-  return [...permanents, tournants[depart], tournants[(depart + 1) % tournants.length]];
+  return [...permanents, ...personnalisations, tournants[depart], tournants[(depart + 1) % tournants.length]];
 }
 
 export function rareteCarriere(note: number): RareteCarriere {
@@ -170,22 +174,29 @@ export function rareteCarriere(note: number): RareteCarriere {
 }
 const normaliser = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const nationLisible = (s: string) => s.replace(/[^\p{L}\p{M}\s'-]/gu, '').trim();
-const borner = (n: number) => Math.max(20, Math.min(99, Math.round(n)));
 
-export function statistiquesCarte(note: number, famille: FamillePoste, cle: string): Record<string, number> {
-  const rng = graine(cle);
-  const avant = ['pilier', 'talonneur', 'deuxieme_ligne', 'troisieme_ligne'].includes(famille);
-  const demi = famille === 'demi_melee' || famille === 'demi_ouverture';
-  const valeur = (bonus = 0) => borner(note + bonus + Math.round(rng() * 8) - 4);
-  return avant
-    ? { MEL: valeur(famille === 'pilier' ? 7 : 0), PHY: valeur(6), DEF: valeur(3), RCK: valeur(4), END: valeur(), TEC: valeur(-4) }
-    : { VIT: valeur(demi ? 1 : 6), PAS: valeur(demi ? 6 : 1), JDP: valeur(demi || famille === 'arriere' ? 5 : -4), TEC: valeur(3), DEF: valeur(-2), PHY: valeur(-3) };
-}
+
 
 export type SourceCarte = Omit<CarteCarriere, 'id' | 'proprietaire' | 'fatigue' | 'matchs' | 'essais' | 'clubs'>;
 let catalogue: SourceCarte[] | undefined;
-/** Les identités viennent des effectifs réels. Les notes FFR sont estimées dans le jeu. */
+const cataloguesAdmin = new WeakMap<CatalogueAdmin, readonly SourceCarte[]>();
 export function catalogueMondialCarriere(): readonly SourceCarte[] {
+  const config = catalogueAdmin();
+  if (!Object.keys(config.joueurs).length) return catalogueBaseCarriere();
+  const connu = cataloguesAdmin.get(config); if (connu) return connu;
+  const resultat = catalogueBaseCarriere().map(source => {
+    const edition = config.joueurs[source.sourceId];
+    return edition ? { ...source, ...edition, rarete: rareteCarriere(edition.note), statistiques: statistiquesCarte(edition.note, source.famille, source.sourceId) } : source;
+  });
+  cataloguesAdmin.set(config, resultat); return resultat;
+}
+export function packsCatalogueAdmin(): PackCarriere[] {
+  const editions = catalogueAdmin().packs;
+  return [...PACKS_CARRIERE.map(p => editions[p.id] ?? p), ...Object.values(editions).filter(p => !PACKS_CARRIERE.some(b => b.id === p.id))];
+}
+
+/** Les identités viennent des effectifs réels. Les notes FFR sont estimées dans le jeu. */
+export function catalogueBaseCarriere(): readonly SourceCarte[] {
   if (catalogue) return catalogue;
   const joueurs = new Map<string, SourceCarte>();
   const clubs = new Map(COMPETITIONS.flatMap(c => c.clubs.map(club => [club.nom, c] as const)));
@@ -249,12 +260,15 @@ export function catalogueMondialCarriere(): readonly SourceCarte[] {
  * `sourceId` déjà possédés.
  */
 export function catalogueParRarete(): Readonly<Record<RareteCarriere, readonly SourceCarte[]>> {
+  const source = catalogueMondialCarriere();
+  if (source !== dernierCatalogue) { parRarete = undefined; RAYONS.clear(); vestiaires.clear(); dernierCatalogue = source; }
   if (parRarete) return parRarete;
   const vide = { bronze: [], argent: [], or: [], elite: [], star: [] } as Record<RareteCarriere, SourceCarte[]>;
   for (const j of catalogueMondialCarriere()) vide[j.rarete].push(j);
   parRarete = vide;
   return parRarete;
 }
+let dernierCatalogue: readonly SourceCarte[] | undefined;
 let parRarete: Record<RareteCarriere, SourceCarte[]> | undefined;
 
 /** Une source du catalogue devient une carte de ligue au moment où elle sort. */
@@ -276,10 +290,10 @@ const RAYONS = new Map<string, readonly SourceCarte[]>();
  * donc deux fois le même rayon, et c'est un très petit prix.
  */
 export function rayonDePack(rarete: RareteCarriere, pack: Pick<PackCarriere, 'id' | 'filtre'>): readonly SourceCarte[] {
-  const cle = `${rarete}#${pack.id}`;
+  const bande = catalogueParRarete()[rarete];
+  const cle = `${rarete}#${pack.id}#${JSON.stringify(pack.filtre)}`;
   const connu = RAYONS.get(cle);
   if (connu) return connu;
-  const bande = catalogueParRarete()[rarete];
   const rayon = pack.filtre ? bande.filter((c) => carteDansPack(c, pack.filtre)) : bande;
   RAYONS.set(cle, rayon);
   return rayon;
@@ -443,6 +457,7 @@ const CHAMPIONNAT_DEPART = 'Régionale 3';
 const vestiaires = new Map<string, readonly SourceCarte[]>();
 /** Les licenciés de Régionale 3 d'une famille de poste, rangés par note. */
 function vestiaireDeDepart(famille: FamillePoste, note: number): readonly SourceCarte[] {
+  catalogueParRarete();
   const cle = `${famille}#${note}`;
   const connu = vestiaires.get(cle);
   if (connu) return connu;

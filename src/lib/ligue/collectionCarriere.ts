@@ -2,12 +2,14 @@ import { catalogueMondialCarriere } from './catalogueCarriere.js';
 import type { CarteCarriere, EtatCarriereEnLigne, PageCollection } from './typesCarriere.js';
 
 const normaliser = (texte: string) => texte.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr');
+let dernierCatalogue: ReturnType<typeof catalogueMondialCarriere> | undefined;
 let index: { source: ReturnType<typeof catalogueMondialCarriere>[number]; recherche: string }[] | undefined;
 
 /** Une page à la demande, au lieu d'envoyer 67 000 joueurs à chaque sondage de ligue. */
 export function collectionCarriere(etat: EtatCarriereEnLigne, compteId: string, params: URLSearchParams): PageCollection {
   const monClub = etat.clubs.find(c => c.compteId === compteId);
   if (!monClub) throw new Error('Membre requis');
+  if (dernierCatalogue !== catalogueMondialCarriere()) { dernierCatalogue = catalogueMondialCarriere(); index = undefined; }
   index ??= catalogueMondialCarriere().map(source => ({ source, recherche: normaliser(`${source.nom} ${source.clubReel} ${source.nation} ${source.championnat}`) }));
   const possedees = new Map(etat.cartes.map(c => [c.sourceId, c]));
   const origines = new Map<string, { club: string; nature: 'pack' | 'dotation'; date: string }>();

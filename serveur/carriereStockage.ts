@@ -1,3 +1,4 @@
+import { atelierNeon, type StockageAtelier } from './atelierStockage.js';
 import { neon } from '@neondatabase/serverless';
 import { pushNeon, type StockagePush } from './pushStockage.js';
 import type { EtatCarriereEnLigne, StatistiquesGlobalesCarriere } from '../src/lib/ligue/typesCarriere.js';
@@ -18,6 +19,7 @@ export interface ResumeLigue {
   clubNom: string; ovas: number; clubEmbleme?: string;
 }
 export interface StockageCarriere {
+  atelier?: StockageAtelier;
   push?: StockagePush;
   compteParIdentifiant(identifiant: string): Promise<CompteStocke | null>;
   creerCompte(compte: CompteStocke): Promise<boolean>;
@@ -82,6 +84,7 @@ export function stockageNeon(url: string): StockageCarriere {
     echeance: r.echeance == null ? null : Date.parse(String(r.echeance)),
   });
   return {
+    atelier: atelierNeon(url),
     push: pushNeon(url),
     async compteParIdentifiant(identifiant) {
       const r = await sql`select id, identifiant, pseudo, empreinte from comptes where identifiant=${identifiant}`;

@@ -66,14 +66,14 @@ let compte: string | null='compte-a';
 const stockage = {
  limiter: async()=>true,
  session:async()=>compte?{id:compte,identifiant:'secret',pseudo:'Test',empreinte:'secret'}:null,
- ligues:async()=>[{id:e.id,code:e.code,version:e.version,comptes:['compte-a','compte-b'],etat:e}],
+ ligues:async()=>[{id:e.id,nom:e.nom,phase:e.phase,clubNom:e.clubs[0].nom,ovas:e.clubs[0].ovas,clubEmbleme:e.clubs[0].embleme,logo:e.logo}],
  ligue:async()=>({id:e.id,code:e.code,version:e.version,comptes:['compte-a','compte-b'],etat:e}),
 } as unknown as StockageCarriere;
 const api=creerGestionnaireCarriere(stockage);
 async function get() {
  let statut=200; let resultat: unknown;
  const res: ReponseCarriere={status(n){statut=n;return res},setHeader(){},json(v){resultat=v}};
- await api.handler({method:'GET',url:`/api/carriere?ligue=${e.id}&collection=1`,headers:{cookie:`destiny_carriere=${'a'.repeat(64)}`}},res);
+ await api.handler({method:'GET',url:`/api/carriere?ligue=${e.id}&collection=1`,headers:{cookie:compte?`destiny_carriere=${compte}`:''}},res);
  return {statut,resultat};
 }
 assert.equal((await get()).statut,200);
@@ -82,7 +82,7 @@ assert.ok(!publicJSON.includes('compte-a')&&!publicJSON.includes('empreinte')&&!
 const session = await (async () => {
  let resultat: unknown;
  const res: ReponseCarriere={status(){return res},setHeader(){},json(v){resultat=v}};
- await api.handler({method:'GET',url:'/api/carriere',headers:{cookie:`destiny_carriere=${'a'.repeat(64)}`}},res);
+ await api.handler({method:'GET',url:'/api/carriere',headers:{cookie:compte?`destiny_carriere=${compte}`:''}},res);
  return resultat as { ligues: { clubEmbleme?: string; logo?: string }[] };
 })();
 assert.equal(session.ligues[0].clubEmbleme, e.clubs[0].embleme);

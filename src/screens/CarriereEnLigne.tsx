@@ -1,3 +1,4 @@
+import { AtelierKiri } from '../components/AtelierKiri';
 import { RoueCartes } from '../components/RoueCartes';
 // ═══════════════════════════════════════════════════════════════════════════
 // LA CARRIÈRE EN LIGNE — le troisième mode
@@ -61,7 +62,7 @@ import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 import { packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
 
-type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'secret';
+type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'secret' | 'atelier';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
 type VueRencontre = VueCarriereEnLigne['rencontres'][number];
 const ONGLETS: { id: Onglet; label: string; icone: NomIcone }[] = [
@@ -601,7 +602,7 @@ export function CarriereEnLigne() {
             pendant une rencontre — le direct a son propre bouton « Fermer »,
             qui ramène exactement là d'où l'on vient. */}
         {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / Saison {vue.saison}</span></div><h1>{club?.nom}</h1><p>{vue.clubs.length} clubs · {vue.rythme} match{vue.rythme > 1 ? 's' : ''} par semaine · {vue.phase === 'salon' ? 'Inscriptions ouvertes' : vue.phase === 'saison' ? 'Saison en cours' : 'Intersaison'}</p></div><div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>Ovas de cette ligue</span></div></header>}
-        {!rencontre && <nav className="cel-onglets" aria-label="Club en ligne">{[...ONGLETS, ...(session.compte.administrateur ? [{ id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
+        {!rencontre && <nav className="cel-onglets" aria-label="Club en ligne">{[...ONGLETS, ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} />}
@@ -613,6 +614,7 @@ export function CarriereEnLigne() {
           {onglet === 'competitions' && <Competitions vue={vue} agir={agir} occupe={occupe} proprietaire={session.compte.id === vue.createurId} suivre={setMatchId} />}
           {onglet === 'histoire' && <Histoire vue={vue} />}
           {onglet === 'secret' && session.compte.administrateur && <StatistiquesSecretes />}
+          {onglet === 'atelier' && session.compte.administrateur && <AtelierKiri />}
         </>}
       </>}
   </section>;

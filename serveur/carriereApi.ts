@@ -1,3 +1,5 @@
+import { contexteAtelier, enregistrerAtelier, vueAtelier } from './atelierAdmin.js';
+import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
@@ -75,6 +77,12 @@ const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, adminis
 const comptesEtat = (e: EtatCarriereEnLigne) => e.clubs.map(c => c.compteId);
 
 export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer?: (etat: EtatCarriereEnLigne) => Promise<void>) {
+  let catalogueCache: CatalogueAdmin = CATALOGUE_ADMIN_VIDE;
+  async function avecAtelier<T>(operation: () => Promise<T>): Promise<T> {
+    const config = await stockage.atelier?.lire() ?? CATALOGUE_ADMIN_VIDE;
+    if(config.revision !== catalogueCache.revision) catalogueCache = config;
+    return contexteAtelier.run(catalogueCache, operation);
+  }
   const notifier = async (etat: EtatCarriereEnLigne) => {
     await programmer?.(etat);
     if (stockage.push) await notifierMatchs(stockage.push, etat).catch(() => console.warn('[push] Service temporairement indisponible'));
@@ -247,7 +255,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
 
       const maintenant = Date.now();
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
-      if (JSON.stringify(corps).length > 24_000) throw new ErreurHttp(413, 'Demande trop volumineuse.');
+      if (JSON.stringify(corps).length > (corps.action === 'atelier' ? 120_000 : 24_000)) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;
       if (action === 'inscription' || action === 'connexion') {
         const identifiant = texte(corps.identifiant, 3, 100, 'Identifiant').toLocaleLowerCase('fr');
@@ -286,6 +294,12 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       // Un GET de sondage est une lecture sûre. Le limiter SQL écrivait une
       // ligne à chaque consultation et gonflait à lui seul le WAL / l'historique.
       if (req.method === 'POST' && !await stockage.limiter(`jeu:${compte.id}`, 240, 60_000, maintenant)) throw new ErreurHttp(429, 'Trop de demandes. Patientez quelques secondes.');
+      if (url.searchParams.has('atelier') || action === 'atelier') {
+        if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
+        if (req.method === 'GET') return res.status(200).json(vueAtelier(url.searchParams.get('q') ?? ''));
+        if (!stockage.atelier) throw new ErreurHttp(503, 'Atelier indisponible sur ce serveur.');
+        return res.status(200).json(await enregistrerAtelier(stockage.atelier, corps));
+      }
       if (action === 'deconnexion') {
         await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);
         return res.status(200).json({ ok: true });
@@ -380,11 +394,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
            * L'ajouter pour l'occasion, c'était le premier écart. Vingt octets
            * contre quatre cent mille, le gain est le même.
            */
-          if (entete.version === connue && entete.echeance !== null && maintenant < entete.echeance) {
+          if ((liguesChaudes.get(id)?.etat.catalogueRevision ?? 0) === catalogueAdmin().revision && entete.version === connue && entete.echeance !== null && maintenant < entete.echeance) {
             return res.status(200).json({ inchange: true });
           }
         }
-        const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue);
+        const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue);
         return res.status(200).json(vueCarriere(e, compte.id));
       }
       if (action === 'creer') {
@@ -418,7 +432,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // erreur, pour quelqu'un qui voulait simplement entrer chez lui.
         // Membre déjà inscrit : on ouvre la ligue, c'est tout ce qu'il demande.
         if (ligne.comptes.includes(compte.id)) {
-          const e = await appliquer(ligne.id, compte.id, `lecture-${Math.floor(maintenant / 2000)}`, (e, n, g) => actualiserCarriere(e, n, g));
+          const e = await appliquer(ligne.id, compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g));
           return res.status(200).json(vueCarriere(e, compte.id));
         }
         const e = await appliquer(ligne.id, compte.id, `adhesion-${compte.id}`, (e, n, g) => agirCarriere(e, compte.id,
@@ -459,8 +473,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       return res.status(503).json({ erreur: 'Le serveur de carrière est indisponible. Réessayez dans un instant.' });
     }
   }
-  return { handler, avancerLigues, actualiserLigue: async (id: string) => {
+  return { handler: async (req: RequeteCarriere, res: ReponseCarriere) => {
+    try { return await avecAtelier(() => handler(req,res)); }
+    catch { return res.status(503).json({erreur:'Le catalogue est momentanément indisponible. Réessaie dans un instant.'}); }
+  }, avancerLigues: () => avecAtelier(avancerLigues), actualiserLigue: (id: string) => avecAtelier(async () => {
     if (!await stockage.entete(id)) return;
     return appliquer(id, 'horloge', `queue-${randomUUID()}`, (e,n,g) => actualiserCarriere(e,n,g), false, false);
-  } };
+  }) };
 }

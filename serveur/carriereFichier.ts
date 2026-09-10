@@ -1,3 +1,4 @@
+import { CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 // Serveur de développement uniquement. Jamais importé par la fonction Vercel.
 // Les écritures sont synchrones et remplacent atomiquement le fichier : aucun
 // await entre la comparaison de version et le commit dans ce processus unique.
@@ -9,6 +10,7 @@ import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import { vueCarriere } from '../src/lib/ligue/carriere.js';
 
 interface BaseLocale {
+  atelier?: CatalogueAdmin;
   push?: BasePush;
   comptes: CompteStocke[];
   sessions: Record<string, { compte: string; expiration: number }>;
@@ -32,6 +34,13 @@ export function stockageFichier(fichier: string): StockageCarriere {
   const echeances: Record<string, number> = {};
   const cleRecu = (l: string, c: string, r: string) => JSON.stringify([l, c, r]);
   return {
+    atelier: {
+      async lire() { return copie(base.atelier ?? CATALOGUE_ADMIN_VIDE); },
+      async ecrire(configuration, revision) {
+        if ((base.atelier?.revision ?? 0) !== revision) return false;
+        base.atelier = copie(configuration); sauver(); return true;
+      },
+    },
     push: pushLocal(base.push, sauver),
     async compteParIdentifiant(i) { return copie(base.comptes.find(c => c.identifiant === i) ?? null); },
     async creerCompte(c) {

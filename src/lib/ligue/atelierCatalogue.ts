@@ -1,0 +1,14 @@
+import type { PackCarriere } from './typesCarriere.js';
+
+export interface EditionJoueur { note: number; potentiel: number; photo?: string }
+export interface CatalogueAdmin {
+  revision: number;
+  packs: Record<string, PackCarriere>;
+  joueurs: Record<string, EditionJoueur>;
+}
+export const CATALOGUE_ADMIN_VIDE: CatalogueAdmin = { revision: 0, packs: {}, joueurs: {} };
+// Le serveur fournit un contexte par requête ; aucun réglage mutable partagé
+// entre deux requêtes concurrentes. Le navigateur garde le catalogue de base.
+let contexte = () => CATALOGUE_ADMIN_VIDE;
+export function fournirCatalogueAdmin(fournisseur: () => CatalogueAdmin) { contexte = fournisseur; }
+export function catalogueAdmin() { return contexte(); }
