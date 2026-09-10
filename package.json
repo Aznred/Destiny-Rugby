@@ -45,7 +45,8 @@
     "horloge:matchs": "node --env-file-if-exists=.env scripts/horlogeMatchs.mjs",
     "videos:moments": "node scripts/genererMoments.mjs",
     "verify:atelier": "vite-node scripts/verifierAtelier.ts",
-    "verify:direct-push": "vite-node scripts/verifierDirectPush.ts"
+    "verify:direct-push": "vite-node scripts/verifierDirectPush.ts",
+    "verify:calendrier-carriere": "vite-node scripts/verifierCalendrierCarriere.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

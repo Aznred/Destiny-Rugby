@@ -414,8 +414,41 @@ function calendrierCompetition(etat: EtatCarriereEnLigne, competition: Competiti
   }
 }
 
+/**
+ * Répare l'ancien calendrier qui donnait la date de lancement de saison comme
+ * ouverture à TOUTES les journées. Les clôtures étaient déjà correctes : on
+ * les conserve, ainsi que chaque résultat, et la journée suivante s'ouvre à
+ * la dernière clôture de la précédente.
+ *
+ * Cette réparation reste sûre après le début de la saison puisqu'elle ne
+ * touche jamais une affiche jouée ou déjà lancée.
+ */
+export function reparerOuverturesCalendrier(etat: EtatCarriereEnLigne): number {
+  let corrigees = 0;
+  for (const competition of etat.competitions.filter(c => c.etat === 'enCours' && c.format === 'championnat')) {
+    const matchs = etat.rencontres.filter(r => r.competitionId === competition.id);
+    const journees = [...new Set(matchs.map(r => r.journee))].sort((a, b) => a - b);
+    let ouverture = Date.parse(competition.debut);
+    if (!Number.isFinite(ouverture)) continue;
+    for (const journee of journees) {
+      const affiches = matchs.filter(r => r.journee === journee);
+      const date = dateServeur(ouverture);
+      for (const rencontre of affiches) {
+        if (!rencontre.match && !rencontre.resultat && rencontre.ouvre !== date) {
+          rencontre.ouvre = date;
+          corrigees++;
+        }
+      }
+      const fermetures = affiches.map(r => Date.parse(r.ferme)).filter(Number.isFinite);
+      if (fermetures.length) ouverture = Math.max(...fermetures);
+    }
+  }
+  return corrigees;
+}
+
 /** Répare les calendriers déjà enregistrés par les anciennes règles, seulement tant qu'aucun match n'a commencé. */
 function reparerCalendriers(etat: EtatCarriereEnLigne) {
+  reparerOuverturesCalendrier(etat);
   for (const competition of etat.competitions.filter(c => c.etat === 'enCours')) {
     const matchs = etat.rencontres.filter(r => r.competitionId === competition.id);
     if (!matchs.length || matchs.some(r => r.match || r.resultat)) continue;
