@@ -95,6 +95,27 @@ function directEnCours(etat: unknown): boolean {
   });
 }
 
+/**
+ * Prochain instant où le serveur doit réveiller une ligue pour ses matchs.
+ *
+ * Cette date est volontairement plus étroite que `echeanceLigue` : minuit,
+ * une enchère ou un objectif peuvent être régularisés lors de la prochaine
+ * ouverture de la ligue. Les matchs, eux, doivent avancer en arrière-plan
+ * pour produire le direct et les notifications push.
+ */
+export function prochaineEcheanceMatch(etat: unknown, maintenant: number): number | null {
+  const source = etat as { phase?: string; rencontres?: { ouvre: string; ferme: string; match?: { termine?: boolean }; resultat?: unknown }[] } | null;
+  if (source?.phase !== 'saison') return null;
+  const rencontres = source.rencontres ?? [];
+  if (rencontres.some(r => r.match && r.match.termine !== true)) return maintenant;
+  if (rencontres.some(r => !r.resultat && !r.match && Date.parse(r.ferme) <= maintenant)) return maintenant;
+  const dates = rencontres
+    .filter(r => !r.resultat && !r.match)
+    .flatMap(r => [Date.parse(r.ouvre), Date.parse(r.ferme) - 120_000, Date.parse(r.ferme)])
+    .filter(t => Number.isFinite(t) && t > maintenant);
+  return dates.length ? Math.min(...dates) : null;
+}
+
 /** L'échéance à retenir pour une ligue : la plus proche des deux. */
 export function echeanceLigue(etat: unknown, maintenant: number): number {
   if (directEnCours(etat)) return maintenant;

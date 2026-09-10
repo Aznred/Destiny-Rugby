@@ -8,6 +8,9 @@ export interface SessionCarriere {
     clubEmbleme?: string; logo?: string;
   }[];
 }
+export interface MiseAJourDirectCarriere {
+  id: string; version: number; rencontre: VueCarriereEnLigne['rencontres'][number];
+}
 export class ErreurCarriere extends Error {
   statut: number;
   constructor(message: string, statut: number) { super(message); this.statut = statut; }
@@ -75,6 +78,9 @@ export const chargerStatistiquesGlobales = (signal?: AbortSignal) =>
 export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?: number) =>
   requete<VueCarriereEnLigne>(undefined, undefined, signal,
     `?ligue=${encodeURIComponent(id)}${version ? `&v=${version}` : ''}`);
+export const chargerDirectCarriere = (id: string, matchId: string, signal?: AbortSignal, version?: number) =>
+  requete<MiseAJourDirectCarriere>(undefined, undefined, signal,
+    `?ligue=${encodeURIComponent(id)}&direct=${encodeURIComponent(matchId)}${version ? `&v=${version}` : ''}`);
 export const identifierCarriere = (action: 'inscription' | 'connexion', identifiant: string, motDePasse: string, pseudo: string, confirmationMotDePasse = '') =>
   requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo, confirmationMotDePasse });
 export const deconnecterCarriere = () => requete<{ ok: boolean }>({ action: 'deconnexion' });

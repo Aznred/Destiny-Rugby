@@ -3,7 +3,7 @@ import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../sr
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
-import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, empreinteEcriture, vueCarriere } from '../src/lib/ligue/carriere.js';
+import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, empreinteEcriture, vueCarriere, vueRencontreCarriere } from '../src/lib/ligue/carriere.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
@@ -223,12 +223,19 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     await stockage.nettoyerPresences(Date.now() - 24 * 60 * 60_000).catch(() => {});
     const ids = await stockage.actives();
     let traitees = 0;
-    for (const id of ids) {
-      try {
-        await appliquer(id, 'horloge', `tick-${randomUUID()}`, (e, n, g) => actualiserCarriere(e, n, g), false, false);
-        traitees++;
-      } catch { console.warn('[horloge] Une ligue sera reprise au prochain passage'); }
-    }
+    let index = 0;
+    // Une concurrence bornée absorbe un pic sans ouvrir des centaines de
+    // connexions Neon dans la même fonction Vercel.
+    const ouvrier = async () => {
+      while (index < ids.length) {
+        const id = ids[index++];
+        try {
+          await appliquer(id, 'horloge', `tick-${randomUUID()}`, (e, n, g) => actualiserCarriere(e, n, g), false, false);
+          traitees++;
+        } catch { console.warn('[horloge] Une ligue sera reprise au prochain passage'); }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(8, ids.length) }, () => ouvrier()));
     return traitees;
   }
   async function handler(req: RequeteCarriere, res: ReponseCarriere) {
@@ -439,7 +446,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             return res.status(200).json({ inchange: true });
           }
         }
+        const direct = url.searchParams.get('direct');
+        if (direct && (direct.length > 250 || /[\p{Cc}]/u.test(direct))) throw new ErreurHttp(400, 'Match invalide.');
         const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue);
+        if (direct) {
+          const rencontre = vueRencontreCarriere(e, compte.id, direct);
+          if (!rencontre) throw new ErreurHttp(404, 'Match introuvable.');
+          return res.status(200).json({ id: e.id, version: e.version, rencontre });
+        }
         return res.status(200).json(vueCarriere(e, compte.id));
       }
       if (action === 'creer') {

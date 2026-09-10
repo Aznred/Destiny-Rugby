@@ -9,7 +9,8 @@ import {stockageFichier} from '../serveur/carriereFichier';
 import {creerGestionnaireCarriere,empreinteJeton} from '../serveur/carriereApi';
 import {prochainReveilMatch} from '../serveur/horlogeVercel';
 import {momentsDepuisFil} from '../src/lib/ligue/momentsForts';
-import {creerCarriere} from '../src/lib/ligue/carriere';
+import {agirCarriere,creerCarriere} from '../src/lib/ligue/carriere';
+import {prochaineEcheanceMatch} from '../src/lib/ligue/echeanceCarriere';
 import type {EtatCarriereEnLigne} from '../src/lib/ligue/typesCarriere';
 import type {LigneFil} from '../src/lib/ligue/matchCarriere';
 const now=1700000000000;
@@ -27,6 +28,8 @@ assert.equal(prochainReveilMatch({...e,phase:'salon'},now),null);
 const futur=structuredClone(e);delete futur.rencontres[0].match;futur.rencontres[0].ouvre=new Date(now+600000).toISOString();futur.rencontres[0].ferme=new Date(now+1200000).toISOString();
 assert.equal(prochainReveilMatch(futur,now),now+600000);
 assert.equal(prochainReveilMatch(futur,now+600001),now+1080000);
+assert.equal(prochaineEcheanceMatch(futur,now),now+600000);
+assert.equal(prochaineEcheanceMatch({...futur,phase:'salon'},now),null);
 const moments=momentsDepuisFil('match',fil);
 assert.deepEqual(moments,momentsDepuisFil('match',fil));
 assert.deepEqual(moments[1].score,{domicile:7,exterieur:0});
@@ -69,7 +72,9 @@ try{
  const id='a0000000-0000-4000-8000-000000000001',compte='a0000000-0000-4000-8000-000000000002';
  await db.creerCompte({id:compte,identifiant:'testpush',pseudo:'Test',empreinte:'unused'});
  await db.ouvrirSession(empreinteJeton('jeton-test'),compte,Date.now()+60000);
- const etat=creerCarriere({id,nom:'Test push',code:'DR-PUSH',compteId:compte,pseudo:'Test',clubNom:'Test RFC',rythme:1,maxClubs:2},now,'push-test');
+ let etat=creerCarriere({id,nom:'Test push',code:'DR-PUSH',compteId:compte,pseudo:'Test',clubNom:'Test RFC',rythme:1,maxClubs:2},now,'push-test');
+ etat=agirCarriere(etat,'b0000000-0000-4000-8000-000000000002',{type:'rejoindre',pseudo:'Adversaire',clubNom:'Adversaire RFC'},now,'push-adversaire');
+ etat=agirCarriere(etat,compte,{type:'demarrerSaison'},now,'push-saison');
  await db.creerLigue({id,code:'DR-PUSH',version:0,comptes:[compte],etat});
  const api=creerGestionnaireCarriere(db);
  async function appel(body:object,auth=true,origin='http://localhost'){
@@ -78,6 +83,16 @@ try{
    await api.handler({method:'POST',url:'/api/carriere',headers:{host:'localhost',origin,'content-type':'application/json',cookie:auth?'destiny_carriere=jeton-test':''},body},res);
    return {status,donnees};
  }
+ async function lire(url:string){
+   let status=200;let donnees:any;
+   const res={status(n:number){status=n;return res;},setHeader(){},json(x:unknown){donnees=x;}};
+   await api.handler({method:'GET',url,headers:{host:'localhost',origin:'http://localhost',cookie:'destiny_carriere=jeton-test'}},res);
+   return {status,donnees};
+ }
+ const delta=await lire(`/api/carriere?ligue=${id}&direct=${encodeURIComponent(etat.rencontres[0].id)}`);
+ assert.equal(delta.status,200);
+ assert.equal(delta.donnees.rencontre.id,etat.rencontres[0].id);
+ assert.equal(delta.donnees.clubs,undefined,'Le direct ne doit pas renvoyer la ligue complète');
  assert.equal((await appel({action:'push',operation:'activer',ligue:id,abonnement},false)).status,401);
  assert.equal((await appel({action:'push',operation:'activer',ligue:id,abonnement},true,'https://evil.example')).status,403);
  assert.equal((await appel({action:'push',operation:'activer',ligue:'b0000000-0000-4000-8000-000000000001',abonnement})).status,404);

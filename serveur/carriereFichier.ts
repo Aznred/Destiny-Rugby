@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { pushLocal, type BasePush } from './pushStockage.js';
 import { dirname } from 'node:path';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
-import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
+import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
 import { vueCarriere } from '../src/lib/ligue/carriere.js';
 
 interface BaseLocale {
@@ -32,6 +32,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
   // L'échéance ne vaut que pour ce processus : le serveur de développement
   // redémarre souvent, et une échéance perdue coûte une relecture, rien de plus.
   const echeances: Record<string, number> = {};
+  const reveilsMatch: Record<string, number | null> = {};
   const presences = new Map<string, { match: string; compte: string; vu: number }>();
   const cleRecu = (l: string, c: string, r: string) => JSON.stringify([l, c, r]);
   return {
@@ -111,6 +112,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
       if (index < 0 || base.ligues[index].version !== version || (recu && base.recus[cle])) return false;
       base.ligues[index] = copie({ ...l, version: version + 1 });
       echeances[l.id] = echeanceLigue(l.etat, Date.now());
+      reveilsMatch[l.id] = prochaineEcheanceMatch(l.etat, Date.now());
       if (recu) base.recus[cle] = true;
       sauver(); return true;
     },
@@ -126,7 +128,15 @@ export function stockageFichier(fichier: string): StockageCarriere {
     },
     async nettoyerPresences(avant) {
       for (const [cle, p] of presences) if (p.vu < avant) presences.delete(cle);
+      for (const [cle, s] of Object.entries(base.sessions)) if (s.expiration < Date.now()) delete base.sessions[cle];
+      for (const [cle, d] of Object.entries(base.debits)) if (d.debut < avant) delete base.debits[cle];
     },
-    async actives() { return base.ligues.filter(l => l.etat.phase === 'saison' && (echeances[l.id] ?? 0) <= Date.now()).map(l => l.id); },
+    async actives() {
+      const maintenant = Date.now();
+      return base.ligues.filter(l => {
+        const reveil = reveilsMatch[l.id] ?? prochaineEcheanceMatch(l.etat, maintenant);
+        return reveil !== null && reveil <= maintenant;
+      }).map(l => l.id);
+    },
   };
 }

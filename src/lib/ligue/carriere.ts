@@ -1127,3 +1127,12 @@ export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCar
     echanges: etat.echanges.filter(e => e.de === club.id || e.vers === club.id), classement: classementCarriere(etat), statistiques: statistiquesLigue(etat),
     vivierDisponible: vivierRestant(new Set(etat.cartes.map(c => c.sourceId))) });
 }
+
+/** Vue minimale d'un direct : quelques dizaines de Ko au lieu de toute la ligue. */
+export function vueRencontreCarriere(etat: EtatCarriereEnLigne, compteId: string, matchId: string): VueCarriereEnLigne['rencontres'][number] | null {
+  const club = monClub(etat, compteId);
+  const rencontre = etat.rencontres.find(r => r.id === matchId);
+  if (!rencontre) return null;
+  const { match, ...publics } = rencontre;
+  return copier(match ? { ...publics, match: vueMatchEnLigne(match, club.id) } : publics);
+}

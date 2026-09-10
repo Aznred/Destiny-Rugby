@@ -24,13 +24,37 @@ alter table carriere_ligues add column if not exists echeance timestamptz;
 -- polling et permettent à l'horloge de trouver ses ligues par index.
 alter table carriere_ligues add column if not exists etat_version integer;
 alter table carriere_ligues add column if not exists phase text;
+alter table carriere_ligues add column if not exists resume jsonb;
+-- Réveil strictement réservé aux matchs. `echeance` comprend aussi minuit et
+-- sert au polling client ; l'utiliser pour le cron chargeait toutes les ligues
+-- chaque nuit, même celles qui n'avaient aucun match à calculer.
+alter table carriere_ligues add column if not exists reveil_match timestamptz;
 update carriere_ligues
-set etat_version=coalesce((donnees->>'version')::integer,0), phase=donnees->>'phase'
+set etat_version=coalesce((donnees->>'version')::integer,0), phase=donnees->>'phase',
+    resume=jsonb_build_object(
+      'nom',donnees->'nom','phase',donnees->'phase','logo',donnees->'logo',
+      'clubs',coalesce((select jsonb_agg(jsonb_build_object(
+        'compteId',c->'compteId','nom',c->'nom','ovas',c->'ovas','embleme',c->'embleme'))
+        from jsonb_array_elements(coalesce(donnees->'clubs','[]'::jsonb)) c),'[]'::jsonb))
 where etat_version is distinct from coalesce((donnees->>'version')::integer,0)
-   or phase is distinct from donnees->>'phase';
+   or phase is distinct from donnees->>'phase' or resume is null;
 alter table carriere_ligues alter column etat_version set default 0;
 alter table carriere_ligues alter column etat_version set not null;
 create index if not exists carriere_ligues_echeance_idx on carriere_ligues (echeance,id) where phase='saison';
+update carriere_ligues l set reveil_match=case
+  when exists (select 1 from jsonb_array_elements(coalesce(l.donnees->'rencontres','[]'::jsonb)) r
+               where r ? 'match' and coalesce((r->'match'->>'termine')::boolean,false)=false) then now()
+  when exists (select 1 from jsonb_array_elements(coalesce(l.donnees->'rencontres','[]'::jsonb)) r
+               where not (r ? 'resultat') and not (r ? 'match') and (r->>'ferme')::timestamptz<=now()) then now()
+  else (select min(v.instant) from jsonb_array_elements(coalesce(l.donnees->'rencontres','[]'::jsonb)) r
+        cross join lateral (values ((r->>'ouvre')::timestamptz),
+          ((r->>'ferme')::timestamptz-interval '2 minutes'),((r->>'ferme')::timestamptz)) v(instant)
+        where not (r ? 'resultat') and not (r ? 'match') and v.instant>now()) end
+where l.phase='saison' and l.reveil_match is null
+  and exists (select 1 from jsonb_array_elements(coalesce(l.donnees->'rencontres','[]'::jsonb)) r
+              where not (r ? 'resultat'));
+create index if not exists carriere_ligues_reveil_match_idx on carriere_ligues (reveil_match,id)
+  where phase='saison' and reveil_match is not null;
 create table if not exists carriere_commandes (
   ligue uuid not null references carriere_ligues(id),
   compte text not null,

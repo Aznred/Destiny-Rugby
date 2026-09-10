@@ -8,7 +8,8 @@
 // joue en direct — les deux postes qui avaient vidé le quota Neon.
 
 import { gzipSync } from 'node:zlib';
-import { agirCarriere, avancerCarriere, creerCarriere, empreinteEcriture, vueCarriere } from '../src/lib/ligue/carriere';
+import assert from 'node:assert/strict';
+import { agirCarriere, avancerCarriere, creerCarriere, empreinteEcriture, vueCarriere, vueRencontreCarriere } from '../src/lib/ligue/carriere';
 import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere';
 
 const T0 = Date.parse('2026-09-07T10:00:00.000Z');
@@ -77,14 +78,20 @@ console.log('\n  ─── Un direct : qui écrit, qui ne fait que lire ? ──
   const sondages = 2 * (DUREE / 2_000);
   const etat = poids(e);
   const vue = poids(vueCarriere(e, 'compte-1'));
+  const deltaDirect = { id: e.id, version: e.version, rencontre: vueRencontreCarriere(e, 'compte-1', r.id) };
+  const delta = poids(deltaDirect);
+  const deltaGzip = gz(deltaDirect);
+  assert.ok(deltaDirect.rencontre && delta < vue / 2, 'Le direct doit rester nettement plus petit que la vue complète');
   const petitBattement = poids(presence);
   console.log('');
   console.log(`      Sur un match complet de 80 minutes, à 20 clubs :`);
   console.log(`        présences  ${nb(battements)} × ${petitBattement} o = ${mo(battements * petitBattement)} de données logiques`);
   console.log(`        évité      ${nb(battements)} × ${ko(etat)} = ${mo(battements * etat)} de réécritures du JSONB`);
   console.log(`        sondages   ${nb(sondages)} en-têtes relationnels ; l’état chaud reste en mémoire serveur`);
-  console.log(`        sortant    ${nb(sondages)} × ${ko(vue)} = ${mo(sondages * vue)} envoyés aux navigateurs`);
-  console.log(`        reçus      ${nb(sondages)} × ${ko(gz(vueCarriere(e, 'compte-1')))} = ${mo(sondages * gz(vueCarriere(e, 'compte-1')))} après compression HTTP`);
+  console.log(`        ancien     ${nb(sondages)} × ${ko(vue)} = ${mo(sondages * vue)} envoyés aux navigateurs`);
+  console.log(`        direct     ${nb(sondages)} × ${ko(delta)} = ${mo(sondages * delta)} avant compression`);
+  console.log(`        reçus      ${nb(sondages)} × ${ko(deltaGzip)} = ${mo(sondages * deltaGzip)} après compression HTTP`);
+  console.log(`        économie   ${((1 - delta / vue) * 100).toFixed(1)} % sur le corps du direct`);
   console.log('');
   console.log(`      Une saison de 380 matchs tous suivis évite ${mo(380 * battements * etat)} de`);
   console.log(`      réécritures JSONB dues aux présences ; seuls les vrais événements persistent.`);

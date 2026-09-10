@@ -43,7 +43,7 @@ import type { CouleursDirect } from '../components/match/TerrainEnDirect';
 import { NotificationsMatch } from '../components/NotificationsMatch';
 import { DirectCinema } from '../components/match/DirectCinema';
 import {
-  chargerSessionCarriere, chargerLigueCarriere, identifierCarriere, deconnecterCarriere, INCHANGE,
+  chargerSessionCarriere, chargerLigueCarriere, chargerDirectCarriere, identifierCarriere, deconnecterCarriere, INCHANGE,
   creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, signalerPresenceCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, ErreurCarriere,
 } from '../lib/carriereEnLigneClient';
 import type { IdentiteLigue } from '../lib/carriereEnLigneClient';
@@ -515,6 +515,20 @@ export function CarriereEnLigne() {
         // On annonce la version qu'on tient : si elle est encore bonne, le
         // serveur répond « inchangé » sans avoir lu l'état de la ligue.
         const connue = derniereVue.current?.id === ligueId ? derniereVue.current.version : undefined;
+        const suivi = directOuvert.current;
+        const directActif = suivi && derniereVue.current?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine);
+        if (directActif) {
+          const delta = await chargerDirectCarriere(ligueId, suivi, controleur.signal, connue);
+          if (actif && version === versionRequete.current) setVue(avant => avant && avant.id === delta.id && delta.version >= avant.version ? {
+            // La version de la vue complète reste celle réellement chargée.
+            // Sinon une vente faite pendant le direct pourrait faire monter la
+            // version du delta, puis masquer la vue complète qui la contient.
+            ...avant,
+            rencontres: avant.rencontres.map(r => r.id === delta.rencontre.id ? delta.rencontre : r),
+          } : avant);
+          programmer();
+          return;
+        }
         const suivante = await chargerLigueCarriere(ligueId, controleur.signal, connue);
         if (suivante === INCHANGE) { inchanges++; }
         else if (actif && version === versionRequete.current) {
