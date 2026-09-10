@@ -20,6 +20,17 @@ create index if not exists carriere_ligues_comptes_idx on carriere_ligues using 
 -- en trois colonnes de quelques octets. NULL veut dire « on ne sait pas » : la
 -- lecture retombe alors sur le comportement d'avant, jamais sur une ligue figée.
 alter table carriere_ligues add column if not exists echeance timestamptz;
+-- Ces deux champs minuscules évitent de décompresser `donnees` pour chaque
+-- polling et permettent à l'horloge de trouver ses ligues par index.
+alter table carriere_ligues add column if not exists etat_version integer;
+alter table carriere_ligues add column if not exists phase text;
+update carriere_ligues
+set etat_version=coalesce((donnees->>'version')::integer,0), phase=donnees->>'phase'
+where etat_version is distinct from coalesce((donnees->>'version')::integer,0)
+   or phase is distinct from donnees->>'phase';
+alter table carriere_ligues alter column etat_version set default 0;
+alter table carriere_ligues alter column etat_version set not null;
+create index if not exists carriere_ligues_echeance_idx on carriere_ligues (echeance,id) where phase='saison';
 create table if not exists carriere_commandes (
   ligue uuid not null references carriere_ligues(id),
   compte text not null,
@@ -32,5 +43,16 @@ create table if not exists carriere_debits (
   debut bigint not null,
   nombre integer not null check (nombre > 0)
 );
+-- Un battement de présence change toutes les 12 secondes. Le garder ici évite
+-- de réécrire 400 à 900 Ko de JSONB pour quelques octets.
+create table if not exists carriere_presences (
+  ligue uuid not null references carriere_ligues(id) on delete cascade,
+  match text not null,
+  compte text not null,
+  vu_le timestamptz not null,
+  primary key (ligue,match,compte)
+);
+create index if not exists carriere_presences_vu_idx on carriere_presences (ligue,vu_le);
+create index if not exists carriere_presences_nettoyage_idx on carriere_presences (vu_le);
 -- Ne pas purger carriere_commandes pendant la vie d'une ligue : ses reçus
 -- interdisent qu'une ancienne requête rejouée rachète un pack ou un joueur.

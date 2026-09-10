@@ -6,6 +6,7 @@ import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonneme
 import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, empreinteEcriture, vueCarriere } from '../src/lib/ligue/carriere.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
+import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
 
 export interface RequeteCarriere {
@@ -113,6 +114,40 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     if (ligne) memoriserLigue(id, ligne); else liguesChaudes.delete(id);
     return ligne;
   }
+  async function avecPresences(etat: EtatCarriereEnLigne, maintenant: number) {
+    if (!etat.rencontres.some(r => r.match && !r.match.termine)) return { etat, externes: false };
+    const lignes = await stockage.presencesActives(etat.id, maintenant - DELAI_PRESENCE);
+    if (lignes === null) return { etat, externes: false };
+    const clubs = new Map(etat.clubs.map(c => [c.compteId, c.id]));
+    const parMatch = new Map<string, Record<string, number>>();
+    for (const p of lignes) {
+      let presences = parMatch.get(p.match);
+      if (!presences) { presences = {}; parMatch.set(p.match, presences); }
+      presences[p.compte] = p.vu;
+    }
+    return {
+      externes: true,
+      etat: {
+        ...etat,
+        rencontres: etat.rencontres.map(r => {
+          if (!r.match || r.match.termine) return r;
+          const presence: typeof r.match.presence = {};
+          for (const [compte, vu] of Object.entries(parMatch.get(r.id) ?? {})) {
+            const club = clubs.get(compte);
+            if (club === r.domicile) presence.domicile = vu;
+            if (club === r.exterieur) presence.exterieur = vu;
+          }
+          return { ...r, match: { ...r.match, presence } };
+        }),
+      },
+    };
+  }
+  const sansPresences = (etat: EtatCarriereEnLigne): EtatCarriereEnLigne => ({
+    ...etat,
+    rencontres: etat.rencontres.map(r => r.match && !r.match.termine
+      ? { ...r, match: { ...r.match, presence: {} } }
+      : r),
+  });
   async function appliquer(id: string, compte: string, requete: string,
     operation: (etat: EtatCarriereEnLigne, maintenant: number, graine: string) => EtatCarriereEnLigne,
     autoriserInscription = false, verifierRecu = true,
@@ -124,7 +159,12 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (verifierRecu && await stockage.dejaTraitee(id, compte, requete)) return ligne.etat;
       const maintenant = Date.now();
-      const suivant = operation(ligne.etat, maintenant, randomBytes(24).toString('hex'));
+      const presence = await avecPresences(ligne.etat, maintenant);
+      const suivant = operation(presence.etat, maintenant, randomBytes(24).toString('hex'));
+      // Une présence extérieure sert au calcul de la décision, puis disparaît
+      // du gros agrégat. Sa petite ligne dédiée reste la seule source durable.
+      const durable = presence.externes ? sansPresences(suivant) : suivant;
+      const ancienDurable = presence.externes ? sansPresences(ligne.etat) : ligne.etat;
       /**
        * ⚠️ UN ÉTAT IDENTIQUE NE SE RÉÉCRIT PAS — et c'était la plus grosse fuite
        * du mode. `avancerCarriere` incrémente `version` À CHAQUE APPEL, même
@@ -144,7 +184,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
        * l'échéance resterait éternellement dans le passé et chaque sondage
        * relirait l'état entier — exactement ce qu'on cherche à éviter.
        */
-      const memeEtat = empreinteEcriture(suivant, ligne.etat.version) === empreinteEcriture(ligne.etat, ligne.etat.version);
+      const memeEtat = empreinteEcriture(durable, ligne.etat.version) === empreinteEcriture(ancienDurable, ligne.etat.version);
       if (memeEtat) {
         const echeance = echeanceLigue(ligne.etat, maintenant);
         // En direct `echeanceLigue` vaut « maintenant » afin de laisser passer
@@ -169,17 +209,18 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         await notifier(avance);
         return avance;
       }
-      const maj: LigueStockee = { ...ligne, etat: suivant, comptes: comptesEtat(suivant) };
-      if (await stockage.comparerEtEcrire(maj, ligne.version, compte, requete)) {
-        memoriserLigue(id, { ...maj, version: ligne.version + 1, echeance: echeanceLigue(suivant, maintenant) });
-        await notifier(suivant);
-        return suivant;
+      const maj: LigueStockee = { ...ligne, etat: durable, comptes: comptesEtat(durable) };
+      if (await stockage.comparerEtEcrire(maj, ligne.version, verifierRecu ? { compte, requete } : undefined)) {
+        memoriserLigue(id, { ...maj, version: ligne.version + 1, echeance: echeanceLigue(durable, maintenant) });
+        await notifier(durable);
+        return durable;
       }
       liguesChaudes.delete(id);
     }
     throw new ErreurHttp(409, 'La ligue vient de changer. Réessayez dans un instant.');
   }
   async function avancerLigues() {
+    await stockage.nettoyerPresences(Date.now() - 24 * 60 * 60_000).catch(() => {});
     const ids = await stockage.actives();
     let traitees = 0;
     for (const id of ids) {
@@ -445,8 +486,45 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const requete = texte(corps.requeteId, 16, 100, 'Requête');
         const commande = objet(corps.commande);
         if (commande.type === 'rejoindre') throw new ErreurHttp(400, 'Utilisez le code pour rejoindre la ligue.');
+        // Les anciennes PWA peuvent conserver plusieurs jours l'ancien client,
+        // qui envoyait encore la présence comme une commande. On l'allège aussi
+        // côté serveur pour qu'elles ne recommencent pas à réécrire le JSONB.
+        if (commande.type === 'match') {
+          const actionMatch = objet(commande.action);
+          if (actionMatch.type === 'presence') {
+            const matchId = texte(commande.matchId, 1, 100, 'Match');
+            const ligne = await lireLigue(id);
+            const club = ligne?.etat.clubs.find(c => c.compteId === compte.id);
+            const rencontre = ligne?.etat.rencontres.find(r => r.id === matchId && r.match && !r.match.termine);
+            if (!ligne || !ligne.comptes.includes(compte.id) || !club || !rencontre
+              || (rencontre.domicile !== club.id && rencontre.exterieur !== club.id)) {
+              throw new ErreurHttp(400, 'Ce direct n’est pas disponible.');
+            }
+            if (await stockage.marquerPresence(id, matchId, compte.id, maintenant)) {
+              return res.status(200).json(vueCarriere(ligne.etat, compte.id));
+            }
+          }
+        }
         const e = await appliquer(id, compte.id, requete, (e, n, g) => agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g));
         return res.status(200).json(vueCarriere(e, compte.id));
+      }
+      if (action === 'presence') {
+        const id = texte(corps.ligue, 36, 36, 'Ligue');
+        if (!idValide(id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+        const matchId = texte(corps.matchId, 1, 100, 'Match');
+        const ligne = await lireLigue(id);
+        if (!ligne || !ligne.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+        const club = ligne.etat.clubs.find(c => c.compteId === compte.id);
+        const rencontre = ligne.etat.rencontres.find(r => r.id === matchId && r.match && !r.match.termine);
+        if (!club || !rencontre || (rencontre.domicile !== club.id && rencontre.exterieur !== club.id)) {
+          throw new ErreurHttp(400, 'Ce direct n’est pas disponible.');
+        }
+        if (await stockage.marquerPresence(id, matchId, compte.id, maintenant)) return res.status(200).json({ ok: true });
+        // Pendant une migration sans la table dédiée, le fonctionnement ancien
+        // reste disponible afin de ne jamais casser un direct en cours.
+        await appliquer(id, compte.id, `presence-${Math.floor(maintenant / 10_000)}`,
+          (e, n, g) => agirCarriere(e, compte.id, { type: 'match', matchId, action: { type: 'presence' } }, n, g));
+        return res.status(200).json({ ok: true });
       }
       throw new ErreurHttp(400, 'Action inconnue.');
     } catch (erreur) {

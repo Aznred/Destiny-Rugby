@@ -84,6 +84,9 @@ export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number,
 export const rejoindreLigueCarriere = (code: string, clubNom: string, embleme?: string) => requete<VueCarriereEnLigne>({ action: 'rejoindre', code, clubNom, embleme });
 export const commanderCarriere = (ligue: string, commande: CommandeCarriere, requeteId: string) =>
   requete<VueCarriereEnLigne>({ action: 'commande', ligue, commande, requeteId });
+/** Battement léger : le serveur répond seulement `{ok:true}` et ne renvoie pas la ligue. */
+export const signalerPresenceCarriere = (ligue: string, matchId: string) =>
+  requete<{ ok: boolean }>({ action: 'presence', ligue, matchId });
 
 export function chargerCollectionCarriere(ligue: string, filtres: Record<string, string>, signal?: AbortSignal) {
   const params = new URLSearchParams({ ...filtres, ligue, collection: '1' });

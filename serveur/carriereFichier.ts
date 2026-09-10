@@ -32,6 +32,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
   // L'échéance ne vaut que pour ce processus : le serveur de développement
   // redémarre souvent, et une échéance perdue coûte une relecture, rien de plus.
   const echeances: Record<string, number> = {};
+  const presences = new Map<string, { match: string; compte: string; vu: number }>();
   const cleRecu = (l: string, c: string, r: string) => JSON.stringify([l, c, r]);
   return {
     atelier: {
@@ -104,13 +105,27 @@ export function stockageFichier(fichier: string): StockageCarriere {
       base.ligues.push(copie(l)); sauver(); return true;
     },
     async dejaTraitee(l, c, r) { return Boolean(base.recus[cleRecu(l, c, r)]); },
-    async comparerEtEcrire(l, version, compte, requete) {
+    async comparerEtEcrire(l, version, recu) {
       const index = base.ligues.findIndex(x => x.id === l.id);
-      const cle = cleRecu(l.id, compte, requete);
-      if (index < 0 || base.ligues[index].version !== version || base.recus[cle]) return false;
+      const cle = recu ? cleRecu(l.id, recu.compte, recu.requete) : '';
+      if (index < 0 || base.ligues[index].version !== version || (recu && base.recus[cle])) return false;
       base.ligues[index] = copie({ ...l, version: version + 1 });
       echeances[l.id] = echeanceLigue(l.etat, Date.now());
-      base.recus[cle] = true; sauver(); return true;
+      if (recu) base.recus[cle] = true;
+      sauver(); return true;
+    },
+    async marquerPresence(ligue, match, compte, maintenant) {
+      presences.set(JSON.stringify([ligue, match, compte]), { match, compte, vu: maintenant });
+      return true;
+    },
+    async presencesActives(ligue, depuis) {
+      return [...presences.entries()].flatMap(([cle, p]) => {
+        if (p.vu < depuis) { presences.delete(cle); return []; }
+        return JSON.parse(cle)[0] === ligue ? [copie(p)] : [];
+      });
+    },
+    async nettoyerPresences(avant) {
+      for (const [cle, p] of presences) if (p.vu < avant) presences.delete(cle);
     },
     async actives() { return base.ligues.filter(l => l.etat.phase === 'saison' && (echeances[l.id] ?? 0) <= Date.now()).map(l => l.id); },
   };

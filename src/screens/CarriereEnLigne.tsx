@@ -44,7 +44,7 @@ import { NotificationsMatch } from '../components/NotificationsMatch';
 import { DirectCinema } from '../components/match/DirectCinema';
 import {
   chargerSessionCarriere, chargerLigueCarriere, identifierCarriere, deconnecterCarriere, INCHANGE,
-  creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, ErreurCarriere,
+  creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, signalerPresenceCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, ErreurCarriere,
 } from '../lib/carriereEnLigneClient';
 import type { IdentiteLigue } from '../lib/carriereEnLigneClient';
 import type { CataloguesIdentite, GroupeEmblemes, SessionCarriere, TropheeLigue } from '../lib/carriereEnLigneClient';
@@ -928,8 +928,9 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   // personne ne tranchera jamais.
   useEffect(() => {
     if (!enCours) return;
-    const battement = setInterval(() => { void agir({ type: 'match', matchId, action: { type: 'presence' } }); }, 12_000);
-    void agir({ type: 'match', matchId, action: { type: 'presence' } });
+    const signaler = () => { void signalerPresenceCarriere(vue.id, matchId); };
+    const battement = setInterval(signaler, 12_000);
+    signaler();
     return () => clearInterval(battement);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, enCours]);

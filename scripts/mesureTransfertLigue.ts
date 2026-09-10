@@ -67,24 +67,26 @@ console.log('\n  ─── Un direct : qui écrit, qui ne fait que lire ? ──
   console.log(`      40 sondages de 2 s : ${nb(ecritures)} écriture(s), ${nb(lectures)} lecture(s)`);
   console.log(`      soit ${ko(octetsLus / lectures)} rendus en moyenne par sondage`);
 
-  // Le battement de présence, lui, est une COMMANDE : il change l'état durable.
-  const avecPresence = agirCarriere(e, 'compte-1', { type: 'match', matchId: r.id, action: { type: 'presence' } }, t, 'presence');
-  const changeParPresence = empreinteEcriture(avecPresence, e.version) !== empreinteEcriture(e, e.version);
-  console.log(`      un battement de présence change l’état durable : ${changeParPresence ? 'OUI → écriture' : 'non'}`);
+  // Le moteur sait toujours recevoir une présence, mais l'API ne la range plus
+  // dans cet agrégat : elle fait un UPSERT de trois identifiants et une date.
+  const presence = { ligue: e.id, match: r.id, compte: 'compte-1', vu: t };
+  console.log(`      un battement écrit ${poids(presence)} octets logiques dans carriere_presences, pas l’état`);
 
   const DUREE = 80 * 60_000;
   const battements = 2 * (DUREE / 12_000);       // deux managers devant leur match
   const sondages = 2 * (DUREE / 2_000);
   const etat = poids(e);
   const vue = poids(vueCarriere(e, 'compte-1'));
+  const petitBattement = poids(presence);
   console.log('');
   console.log(`      Sur un match complet de 80 minutes, à 20 clubs :`);
-  console.log(`        écritures  ${nb(battements)} × ${ko(etat)} = ${mo(battements * etat)} réécrits dans la ligne`);
-  console.log(`        lectures   ${nb(sondages)} × ${ko(etat)} = ${mo(sondages * etat)} lus dans la base`);
+  console.log(`        présences  ${nb(battements)} × ${petitBattement} o = ${mo(battements * petitBattement)} de données logiques`);
+  console.log(`        évité      ${nb(battements)} × ${ko(etat)} = ${mo(battements * etat)} de réécritures du JSONB`);
+  console.log(`        sondages   ${nb(sondages)} en-têtes relationnels ; l’état chaud reste en mémoire serveur`);
   console.log(`        sortant    ${nb(sondages)} × ${ko(vue)} = ${mo(sondages * vue)} envoyés aux navigateurs`);
   console.log(`        reçus      ${nb(sondages)} × ${ko(gz(vueCarriere(e, 'compte-1')))} = ${mo(sondages * gz(vueCarriere(e, 'compte-1')))} après compression HTTP`);
   console.log('');
-  console.log(`      Une saison de 380 matchs tous suivis : ${mo(380 * battements * etat)} écrits,`);
-  console.log(`      ${mo(380 * sondages * etat)} lus, ${mo(380 * sondages * gz(vueCarriere(e, 'compte-1')))} sortis.`);
+  console.log(`      Une saison de 380 matchs tous suivis évite ${mo(380 * battements * etat)} de`);
+  console.log(`      réécritures JSONB dues aux présences ; seuls les vrais événements persistent.`);
   console.log(`\n      (mesure faite en ${nb(Date.now() - debut)} ms)\n`);
 }

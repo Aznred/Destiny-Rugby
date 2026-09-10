@@ -6,6 +6,7 @@ import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 
 export interface CompteStocke { id: string; identifiant: string; pseudo: string; empreinte: string }
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
+export interface PresenceMatchStockee { match: string; compte: string; vu: number }
 /**
  * ⚠️ L'ÉCRAN « MES LIGUES » N'A BESOIN QUE DE ÇA, et il téléchargeait tout.
  * `ligues()` faisait `select *` : pour afficher sept champs par ligue, il
@@ -49,8 +50,12 @@ export interface StockageCarriere {
   ligueParCode(code: string): Promise<LigueStockee | null>;
   creerLigue(ligue: LigueStockee): Promise<boolean>;
   dejaTraitee(ligue: string, compte: string, requete: string): Promise<boolean>;
-  /** Le nouvel état et le reçu d'idempotence sont écrits indivisiblement. */
-  comparerEtEcrire(ligue: LigueStockee, version: number, compte: string, requete: string): Promise<boolean>;
+  /** Le nouvel état et, pour une commande utilisateur, son reçu sont écrits indivisiblement. */
+  comparerEtEcrire(ligue: LigueStockee, version: number, recu?: { compte: string; requete: string }): Promise<boolean>;
+  /** Battement minuscule du direct, séparé du gros JSON de la ligue. `false`/`null` = migration pas encore appliquée. */
+  marquerPresence(ligue: string, match: string, compte: string, maintenant: number): Promise<boolean>;
+  presencesActives(ligue: string, depuis: number): Promise<PresenceMatchStockee[] | null>;
+  nettoyerPresences(avant: number): Promise<void>;
   actives(): Promise<string[]>;
 }
 
@@ -207,7 +212,7 @@ export function stockageNeon(url: string): StockageCarriere {
         plusGrosAchat: x.plus_gros_achat as StatistiquesGlobalesCarriere['plusGrosAchat'],
       };
     },
-    async ligue(id) { const r = await sql`select * from carriere_ligues where id=${id}`; return r[0] ? ligne(r[0]) : null; },
+    async ligue(id) { const r = await sql`select id,code,version,comptes,donnees,echeance from carriere_ligues where id=${id}`; return r[0] ? ligne(r[0]) : null; },
     /**
      * ⚠️ ON DEMANDE `donnees->>'version'`, PAS `version`. Ce sont DEUX
      * compteurs : celui de la ligne sert au verrou optimiste d'écriture, celui
@@ -219,13 +224,14 @@ export function stockageNeon(url: string): StockageCarriere {
      * traverser le réseau qu'un entier ; c'est tout l'intérêt de cette lecture.
      */
     async entete(id) {
-      // ⚠️ SANS LA COLONNE, ON RÉPOND « JE NE SAIS PAS » — voir `sansColonne`.
+      // `etat_version` évite à Postgres de décompresser le JSONB TOASTé à
+      // chaque sondage. Le repli garde le déploiement compatible avant migration.
       const r = await sansColonne(
-        () => sql`
-          select (donnees->>'version')::int as version, comptes,
-                 extract(epoch from echeance) * 1000 as echeance
-          from carriere_ligues where id=${id}`,
-        () => sql`select (donnees->>'version')::int as version, comptes from carriere_ligues where id=${id}`,
+        () => sql`select etat_version as version, comptes, extract(epoch from echeance) * 1000 as echeance from carriere_ligues where id=${id}`,
+        () => sansColonne(
+          () => sql`select (donnees->>'version')::int as version, comptes, extract(epoch from echeance) * 1000 as echeance from carriere_ligues where id=${id}`,
+          () => sql`select (donnees->>'version')::int as version, comptes from carriere_ligues where id=${id}`,
+        ),
       );
       if (!r[0]) return null;
       const e = Number(r[0].echeance);
@@ -239,37 +245,64 @@ export function stockageNeon(url: string): StockageCarriere {
         async () => [],
       );
     },
-    async ligueParCode(code) { const r = await sql`select * from carriere_ligues where code=${code}`; return r[0] ? ligne(r[0]) : null; },
+    async ligueParCode(code) { const r = await sql`select id,code,version,comptes,donnees,echeance from carriere_ligues where code=${code}`; return r[0] ? ligne(r[0]) : null; },
     async creerLigue(l) {
-      const r = await sql`insert into carriere_ligues (id,code,version,comptes,donnees) values (${l.id},${l.code},${l.version},${l.comptes},${JSON.stringify(l.etat)}::jsonb) on conflict do nothing returning id`;
+      const r = await sansColonne(
+        () => sql`insert into carriere_ligues (id,code,version,etat_version,phase,comptes,donnees,echeance) values (${l.id},${l.code},${l.version},${l.etat.version},${l.etat.phase},${l.comptes},${JSON.stringify(l.etat)}::jsonb,to_timestamp(${echeanceLigue(l.etat, Date.now()) / 1000})) on conflict do nothing returning id`,
+        () => sql`insert into carriere_ligues (id,code,version,comptes,donnees) values (${l.id},${l.code},${l.version},${l.comptes},${JSON.stringify(l.etat)}::jsonb) on conflict do nothing returning id`,
+      );
       return r.length === 1;
     },
     async dejaTraitee(ligue, compte, requete) {
       return (await sql`select 1 from carriere_commandes where ligue=${ligue} and compte=${compte} and requete=${requete}`).length > 0;
     },
-    async comparerEtEcrire(l, version, compte, requete) {
+    async comparerEtEcrire(l, version, recu) {
       // ⚠️ L'ÉCRITURE DOIT PASSER MÊME SANS LA COLONNE. C'est celle qui enregistre
       // tout ce que fait un manager : la faire dépendre d'une migration récente,
       // c'est arrêter le jeu le temps d'un `alter table`.
       const echeance = echeanceLigue(l.etat, Date.now()) / 1000;
-      const ecrire = (avecEcheance: boolean) => avecEcheance
-        ? sql`with modification as (
-        update carriere_ligues set donnees=${JSON.stringify(l.etat)}::jsonb,comptes=${l.comptes},version=version+1,echeance=to_timestamp(${echeance})
-        where id=${l.id} and version=${version} and not exists (
-          select 1 from carriere_commandes where ligue=${l.id} and compte=${compte} and requete=${requete}
-        ) returning id
-      ) insert into carriere_commandes (ligue,compte,requete) select id,${compte},${requete} from modification returning ligue`
-        : sql`with modification as (
-        update carriere_ligues set donnees=${JSON.stringify(l.etat)}::jsonb,comptes=${l.comptes},version=version+1
-        where id=${l.id} and version=${version} and not exists (
-          select 1 from carriere_commandes where ligue=${l.id} and compte=${compte} and requete=${requete}
-        ) returning id
-      ) insert into carriere_commandes (ligue,compte,requete) select id,${compte},${requete} from modification returning ligue`;
-      const r = await sansColonne(() => ecrire(true), () => ecrire(false));
+      const donnees = JSON.stringify(l.etat);
+      const ecrire = (colonnes: 'toutes' | 'echeance' | 'anciennes') => {
+        const modification = recu
+          ? colonnes === 'toutes'
+            ? sql`with modification as (update carriere_ligues set donnees=${donnees}::jsonb,comptes=${l.comptes},version=version+1,etat_version=${l.etat.version},phase=${l.etat.phase},echeance=to_timestamp(${echeance}) where id=${l.id} and version=${version} and not exists (select 1 from carriere_commandes where ligue=${l.id} and compte=${recu.compte} and requete=${recu.requete}) returning id) insert into carriere_commandes (ligue,compte,requete) select id,${recu.compte},${recu.requete} from modification returning ligue`
+            : colonnes === 'echeance'
+              ? sql`with modification as (update carriere_ligues set donnees=${donnees}::jsonb,comptes=${l.comptes},version=version+1,echeance=to_timestamp(${echeance}) where id=${l.id} and version=${version} and not exists (select 1 from carriere_commandes where ligue=${l.id} and compte=${recu.compte} and requete=${recu.requete}) returning id) insert into carriere_commandes (ligue,compte,requete) select id,${recu.compte},${recu.requete} from modification returning ligue`
+              : sql`with modification as (update carriere_ligues set donnees=${donnees}::jsonb,comptes=${l.comptes},version=version+1 where id=${l.id} and version=${version} and not exists (select 1 from carriere_commandes where ligue=${l.id} and compte=${recu.compte} and requete=${recu.requete}) returning id) insert into carriere_commandes (ligue,compte,requete) select id,${recu.compte},${recu.requete} from modification returning ligue`
+          : colonnes === 'toutes'
+            ? sql`update carriere_ligues set donnees=${donnees}::jsonb,comptes=${l.comptes},version=version+1,etat_version=${l.etat.version},phase=${l.etat.phase},echeance=to_timestamp(${echeance}) where id=${l.id} and version=${version} returning id`
+            : colonnes === 'echeance'
+              ? sql`update carriere_ligues set donnees=${donnees}::jsonb,comptes=${l.comptes},version=version+1,echeance=to_timestamp(${echeance}) where id=${l.id} and version=${version} returning id`
+              : sql`update carriere_ligues set donnees=${donnees}::jsonb,comptes=${l.comptes},version=version+1 where id=${l.id} and version=${version} returning id`;
+        return modification;
+      };
+      const r = await sansColonne(() => ecrire('toutes'), () => sansColonne(() => ecrire('echeance'), () => ecrire('anciennes')));
       return r.length === 1;
     },
+    async marquerPresence(ligue, match, compte, maintenant) {
+      try {
+        await sql`insert into carriere_presences (ligue,match,compte,vu_le) values (${ligue},${match},${compte},to_timestamp(${maintenant / 1000})) on conflict (ligue,match,compte) do update set vu_le=excluded.vu_le`;
+        return true;
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return false;
+        throw erreur;
+      }
+    },
+    async presencesActives(ligue, depuis) {
+      try {
+        const r = await sql`select match,compte,extract(epoch from vu_le)*1000 as vu from carriere_presences where ligue=${ligue} and vu_le>=to_timestamp(${depuis / 1000})`;
+        return r.map(x => ({ match: String(x.match), compte: String(x.compte), vu: Number(x.vu) }));
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return null;
+        throw erreur;
+      }
+    },
+    async nettoyerPresences(avant) {
+      try { await sql`delete from carriere_presences where vu_le<to_timestamp(${avant / 1000})`; }
+      catch (erreur) { if ((erreur as { code?: string }).code !== '42P01') throw erreur; }
+    },
     async actives() { return (await sansColonne(
-      () => sql`select id from carriere_ligues where donnees->>'phase'='saison' and (echeance is null or echeance<=now()) order by echeance nulls first`,
+      () => sql`select id from carriere_ligues where phase='saison' and (echeance is null or echeance<=now()) order by echeance nulls first`,
       () => sql`select id from carriere_ligues where donnees->>'phase'='saison'`,
     )).map(r => String(r.id)); },
   };
