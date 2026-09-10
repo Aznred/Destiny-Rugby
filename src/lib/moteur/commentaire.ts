@@ -33,11 +33,21 @@ export const ESSAI = [
   'ESSAI DE {nom} ! Il aplatit {precision}, {le stade explose|c’est magnifique|quelle fin d’action}.',
   'Il y va… ESSAI ! {nom} {precision}, imparable.',
   'ESSAI ! Personne ne rattrape {nom}, il aplatit {precision}.',
+  '{nom} fixe le dernier défenseur et va au bout : ESSAI {precision} !',
+  'Le ballon ressort vite, {nom} attaque l’espace et marque {precision} !',
+  'Après une longue séquence, {nom} trouve enfin la brèche : ESSAI !',
+  '{nom} résiste au retour et tend le bras : cinq points !',
+  'Essai en première main ! {nom} conclut le mouvement {precision}.',
+  'Turnover, relance, accélération : {nom} termine le travail {precision} !',
+  '{nom} ramasse au ras et s’arrache jusqu’à la ligne : ESSAI !',
+  'La défense glisse trop tard, {nom} déborde et aplatit {precision}.',
 ];
 
 export const ESSAI_PRECISION = [
   'à la pointe du ballon', 'en coin', 'sous les poteaux', 'au terme d’une action de cent mètres',
   'après avoir résisté à deux plaquages', 'd’un plongeon',
+  'le long de la ligne de touche', 'après une passe intérieure', 'au pied du poteau',
+  'sur une passe sautée', 'après un petit coup de pied à suivre', 'à la sortie d’un ruck rapide',
 ];
 
 export const TRANSFORMATION = [
@@ -56,11 +66,17 @@ export const PENALITE_BUT = [
   'Pénalité de {nom}, trois points de plus.',
   '{nom} l’ajuste depuis {distance} mètres, c’est bon.',
   'Trois points au pied de {nom}, {distance} mètres.',
+  '{nom} prend son temps et récompense la faute : trois points.',
+  'Le ballon fend les poteaux depuis {distance} mètres, signé {nom}.',
+  '{nom} ne laisse rien passer : pénalité réussie.',
 ];
 
 export const PENALITE_RATEE = [
   '{nom} manque la pénalité de {distance} mètres.',
   'La pénalité de {nom} passe à côté, {distance} mètres.',
+  'Le ballon fuit à droite : échec de {nom}.',
+  '{nom} trouve le poteau, pas les trois points.',
+  'Tentative trop courte de {nom} depuis {distance} mètres.',
 ];
 
 export const DROP = [
@@ -72,6 +88,11 @@ export const PENALITE = [
   'Pénalité pour {club} : {motif}.',
   'Coup de sifflet : {motif}. Pénalité pour {club}.',
   'M. l’arbitre siffle {motif}, pénalité {club}.',
+  'Avantage terminé : {motif}. {club} récupère une pénalité.',
+  'Le capitaine montre les poteaux après cette faute : {motif}.',
+  'Le sifflet coupe l’action, {motif} contre la défense.',
+  'L’arbitre est formel : {motif}. Ballon à {club}.',
+  'La pression paie pour {club} : {motif}.',
 ];
 
 // ⚠️ CETTE LISTE EST UNE TABLE DE TRADUCTION, PAS UN POOL DE TIRAGE. Les motifs
@@ -86,6 +107,8 @@ export const MOTIFS_PENALITE = [
   // Les motifs de discipline (moteur/bagarre.ts) : ils passent par la même
   // table, ce qui leur donne les sept langues sans mécanique de plus.
   'coup de poing', 'bagarre générale', 'antijeu', 'coup de poing relevé sur les images',
+  'hors-jeu au ruck', 'soutien qui plonge au ruck', 'mêlée écroulée',
+  'maul écroulé', 'plaquage sans ballon',
 ];
 
 export const PLAQUAGE = [
@@ -106,18 +129,29 @@ export const RUCK_GRATTAGE = [
   'Grattage de {nom} ! Ballon récupéré au sol.',
   '{nom} est dans le ruck, il arrache le ballon !',
   'Turnover ! {nom} sort le ballon du regroupement.',
+  '{nom} reste sur ses appuis et gagne la pénalité au sol !',
+  'Le soutien arrive trop tard : {nom} gratte ce ballon.',
+  '{nom} verrouille le ballon, turnover pour son équipe !',
+  'Quel contest de {nom} ! Le ruck change de camp.',
 ];
 
 export const EN_AVANT = [
   'En-avant de {nom}, mêlée pour {club}.',
   'Le ballon échappe à {nom}, en-avant.',
   'Ballon perdu par {nom}, l’arbitre siffle l’en-avant.',
+  '{nom} ne maîtrise pas la réception : ballon tombé vers l’avant.',
+  'Passe trop dure, {nom} échappe le ballon. Mêlée adverse.',
+  'Sous la pression, {nom} commet l’en-avant.',
+  'Le ballon rebondit sur les mains de {nom} : mêlée pour {club}.',
 ];
 
 export const PASSE_AVANT = [
   'Passe en avant de {nom}, mêlée pour {club}.',
   'Le ballon part devant sur la passe de {nom}, l’arbitre siffle.',
   '{nom} a lâché sa passe en avant, mêlée {club}.',
+  'La passe de {nom} flotte vers l’avant : le juge de touche l’a vue.',
+  '{nom} force la transmission, son partenaire était devant.',
+  'Mouvement stoppé : passe en avant de {nom}.',
 ];
 
 export const PIED_DEGAGEMENT = [
@@ -161,32 +195,54 @@ export const PIED_TRANSVERSALE = [
 export const TOUCHE_GAGNEE = [
   'Touche de {club}, ballon propre pour {nom}.',
   '{nom} prend l’alignement, ballon assuré.',
+  'Lancer précis, {nom} domine dans les airs pour {club}.',
+  '{club} varie l’alignement et trouve {nom} au premier bloc.',
+  '{nom} capte au fond de la touche, le maul peut se former.',
+  'Combinaison propre de {club}, ballon sécurisé par {nom}.',
 ];
 
 export const TOUCHE_PERDUE = [
   'Touche ratée ! {club} récupère l’alignement.',
   'Lancer pas droit, le ballon change de camp.',
   '{nom} contre en touche, quel timing !',
+  'Le lancer est trop long, {club} hérite du ballon.',
+  'Mauvaise coordination dans l’alignement : touche volée par {club}.',
+  '{nom} surgit devant le sauteur et subtilise le lancer !',
 ];
 
 export const MELEE_GAGNEE = [
   'Mêlée solide de {club}, ballon sorti.',
   'Ballon propre en sortie de mêlée pour {club}.',
+  'Les huit de {club} restent liés, la mêlée est maîtrisée.',
+  '{club} stabilise puis libère vite pour son demi de mêlée.',
+  'Introduction nette, talonnage propre : possession {club}.',
+  'Le pack de {club} absorbe la poussée et conserve son ballon.',
 ];
 
 export const MELEE_DOMINEE = [
   'La mêlée de {club} recule, pénalité contre elle.',
   'Mêlée dominatrice ! {club} avance et obtient la pénalité.',
+  'Le pack de {club} enfonce son vis-à-vis : bras tendu de l’arbitre.',
+  'Grosse poussée de {club}, la première ligne adverse se désunit.',
+  '{club} tourne la mêlée et gagne le coup de sifflet.',
+  'Les crampons labourent la pelouse : {club} prend nettement le dessus.',
 ];
 
 export const MAUL = [
   'Ballon porté de {club}, ça avance !',
   'Le maul se met en route pour {club}.',
+  'Les avants de {club} se lient autour du ballon et avancent.',
+  'Ballon caché au cœur du maul, {club} gagne mètre après mètre.',
+  'Le paquet de {club} change d’axe et repart vers la ligne.',
+  'Maul compact de {club}, la défense recule encore.',
 ];
 
 export const MAUL_ESSAI = [
   'ESSAI au terme du ballon porté ! {nom} pose le ballon.',
   'Le maul enfonce tout : ESSAI de {nom} !',
+  'Le ballon porté traverse la ligne, {nom} aplatit derrière ses avants !',
+  'La défense s’écroule dans l’en-but : essai collectif conclu par {nom}.',
+  'Tout le pack pousse jusqu’au bout, {nom} libère le ballon et marque !',
 ];
 
 export const CARTON = [
@@ -221,11 +277,17 @@ export const REMPLACEMENT = [
 export const PICK_AND_GO = [
   '{nom} repart au ras, il gagne le premier mètre.',
   'Pick and go de {nom}, ça pilonne.',
+  '{nom} plonge sur le ballon et repart dans l’axe.',
+  'Une passe courte au ras pour {nom}, encore deux mètres.',
+  '{nom} baisse les épaules et attaque le petit côté.',
 ];
 
 export const PERCUSSION = [
   '{nom} percute au ras, la défense recule.',
   'Un temps de plus par {nom} dans l’axe.',
+  '{nom} arrive lancé sur l’épaule intérieure du défenseur.',
+  'Course droite de {nom}, point de fixation créé.',
+  '{nom} gagne le duel au centre du terrain et présente vite.',
 ];
 
 export const ECARTEMENT = [

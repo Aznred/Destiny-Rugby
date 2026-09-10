@@ -35,7 +35,7 @@ export const PHASES_ARRETEES: Set<Phase> = new Set<Phase>([
 export type TypeCommentaire =
   | 'essai' | 'but' | 'butRate' | 'plaquage' | 'franchissement' | 'ruck'
   | 'melee' | 'touche' | 'maul' | 'pied' | 'penalite' | 'carton'
-  | 'remplacement' | 'jalon' | 'jeu';
+  | 'remplacement' | 'jalon' | 'faute' | 'jeu';
 
 export interface Commentaire {
   seconde?: number;

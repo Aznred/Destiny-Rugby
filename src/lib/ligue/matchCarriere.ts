@@ -755,7 +755,12 @@ function adopterCache(avant: EtatMatchEnLigne, apres: EtatMatchEnLigne, moteur: 
 // 6. LA LECTURE DU MOTEUR
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TYPES_FIL = new Set(['essai', 'but', 'butRate', 'penalite', 'franchissement', 'carton', 'blessure', 'jalon', 'remplacement']);
+const TYPES_FIL = new Set([
+  'essai', 'but', 'butRate', 'penalite', 'franchissement', 'carton', 'blessure', 'jalon', 'remplacement',
+  // Ces phases étaient bien simulées mais supprimées du récit de la carrière.
+  // Le fil conserve leurs moments significatifs, sans ajouter chaque plaquage.
+  'melee', 'touche', 'maul', 'ruck', 'faute',
+]);
 const FIL_MAX = 240;
 
 function extraireFil(e: EtatMatch): LigneFil[] {

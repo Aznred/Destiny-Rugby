@@ -139,7 +139,7 @@ function couleursDe(nom: string): [string, string] {
 const EMOJI: Record<TypeCommentaire, string> = {
   essai: '🏉', but: '🎯', butRate: '❌', plaquage: '💥', franchissement: '⚡',
   ruck: '🔒', melee: '🌀', touche: '🙌', maul: '🚂', pied: '🦶', penalite: '⚖️',
-  carton: '🟨', remplacement: '🔄', jalon: '🔔', jeu: '•',
+  carton: '🟨', remplacement: '🔄', jalon: '🔔', faute: '🫴', jeu: '•',
 };
 
 const CLE_PHASE: Record<string, string> = {

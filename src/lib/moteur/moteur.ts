@@ -1229,7 +1229,7 @@ function poserSifflet(e: EtatMatch, cle: string, pour: Cote, fautif?: Pion): voi
 function enAvant(e: EtatMatch, p: Pion): void {
   p.stats.passesRatees += 1;
   e.compteurs.enAvants += 1;
-  dire(e, 'jeu', p.cote, C.phrase(e.rng, C.EN_AVANT, {
+  dire(e, 'faute', p.cote, C.phrase(e.rng, C.EN_AVANT, {
     nom: p.nom, club: nomClub(e, adverse(p.cote)),
   }), 0, p.moi);
   poserSifflet(e, 'ml.sifflet.enAvant', adverse(p.cote), p);
@@ -1256,7 +1256,7 @@ function passeEnAvant(e: EtatMatch, p: Pion): void {
   p.stats.passes -= 1;
   p.stats.passesRatees += 1;
   e.compteurs.enAvants += 1;
-  dire(e, 'jeu', p.cote, C.phrase(e.rng, C.PASSE_AVANT, {
+  dire(e, 'faute', p.cote, C.phrase(e.rng, C.PASSE_AVANT, {
     nom: p.nom, club: nomClub(e, adverse(p.cote)),
   }), 0, p.moi);
   poserSifflet(e, 'ml.sifflet.passeAvant', adverse(p.cote), p);
@@ -1739,7 +1739,10 @@ function phaseRuck(e: EtatMatch): void {
   // toutes causes confondues).
   if (e.rng() < 0.085) {
     const pour = e.rng() < 0.55 ? attaque : defense;
-    const motif = pour === attaque ? 'plaqueur qui ne se relève pas' : 'ballon tenu au sol';
+    const motifs = pour === attaque
+      ? ['plaqueur qui ne se relève pas', 'hors-jeu au ruck', 'entrée par le côté au ruck']
+      : ['ballon tenu au sol', 'soutien qui plonge au ruck', 'entrée par le côté au ruck'];
+    const motif = motifs[Math.floor(e.rng() * motifs.length)]!;
     return siffler(e, pour, e.ballon, motif);
   }
 
@@ -1816,6 +1819,10 @@ function phaseMaul(e: EtatMatch, dt: number): void {
     }
   }
   if (e.minuteur <= 0) {
+    // Quand le ballon porté s'arrête, la défense peut l'écrouler au lieu de
+    // subir une nouvelle phase. La faute reste rare, mais donne enfin au maul
+    // une autre issue visible que « ruck » ou « essai ».
+    if (e.rng() < 0.07) return siffler(e, cote, e.ballon, 'maul écroulé');
     // Le maul s'arrête : le 8 ou le 9 relance.
     formerRuck(e, e.ballon);
   }
@@ -1877,11 +1884,11 @@ function phaseMelee(e: EtatMatch): void {
   // La mêlée adverse domine : pénalité.
   if (e.rng() < borner(0.10 - dom / 160, 0.02, 0.3)) {
     dire(e, 'melee', adverse(cote), C.phrase(e.rng, C.MELEE_DOMINEE, { club: nomClub(e, adverse(cote)) }));
-    return siffler(e, adverse(cote), e.ballon, 'faute technique en mêlée');
+    return siffler(e, adverse(cote), e.ballon, e.rng() < 0.5 ? 'faute technique en mêlée' : 'mêlée écroulée');
   }
   if (dom > 6 && e.rng() < 0.2) {
     dire(e, 'melee', cote, C.phrase(e.rng, C.MELEE_DOMINEE, { club: nomClub(e, cote) }));
-    return siffler(e, cote, e.ballon, 'faute technique en mêlée');
+    return siffler(e, cote, e.ballon, e.rng() < 0.5 ? 'faute technique en mêlée' : 'mêlée écroulée');
   }
   dire(e, 'melee', cote, C.phrase(e.rng, C.MELEE_GAGNEE, { club: nomClub(e, cote) }));
   // ⚠️ LA MÊLÉE GAGNÉE EST CRÉDITÉE AUX HUIT, pas au numéro 8. Une mêlée se
