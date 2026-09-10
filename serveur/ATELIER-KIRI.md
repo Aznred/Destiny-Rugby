@@ -2,7 +2,7 @@
 
 Dans Carrière en ligne, ouvrir une ligue puis l’onglet Atelier Kiri. Cet onglet et les lectures/écritures de /api/carriere?atelier=1 sont réservés à la session dont l’identifiant serveur est exactement kiri. Le pseudo affiché ou un paramètre client ne donne aucun droit.
 
-L’atelier permet de créer des packs, modifier leur nom, description, prix, volume, probabilités, garantie et filtres de poste/championnat. Les autres filtres existants sont conservés et peuvent être retirés. Les nouveaux packs kiri-* restent disponibles chaque jour. Les probabilités totalisent 100 % ; le serveur contrôle le vivier et la garantie.
+L’atelier permet de créer des packs, modifier leur nom, description, prix, volume, probabilités, garantie et filtres de poste, championnat et nation. Le sélecteur de nation permet de limiter un pack aux joueurs d’une seule sélection nationale. Les autres filtres existants sont conservés et peuvent être retirés. Les nouveaux packs kiri-* restent disponibles chaque jour. Les probabilités totalisent 100 % ; le serveur contrôle le vivier et la garantie.
 
 La recherche donne accès au catalogue mondial de joueurs (40 résultats par page de recherche). GEN de 20 à 99, potentiel et photo sont modifiables. La rareté et les statistiques sportives suivent le GEN. Les photos PNG/JPEG/WebP importées sont réduites à 320 px et conservées dans la base ; une URL HTTPS est également acceptée. Limites : 90 Ko par portrait, 3 Mo de personnalisations, 2 000 joueurs et 100 packs.
 

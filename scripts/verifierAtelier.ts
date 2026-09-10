@@ -29,7 +29,7 @@ try {
   assert.equal((await appel(autre)).statut,404,'Le pseudo Kiri ne donne pas accès');
   assert.equal((await appel(autre,{action:'atelier',operation:'pack'})).statut,404);
   assert.equal((await appel(kiri,{action:'atelier'},'https://evil.example')).statut,403);
-  const initial=await appel(kiri);assert.equal(initial.statut,200);assert.ok(initial.donnees.joueurs.length<=40);
+  const initial=await appel(kiri);assert.equal(initial.statut,200);assert.ok(initial.donnees.joueurs.length<=40);assert.ok(initial.donnees.nations.includes('France'));
   const now=Date.now();
   const ligue=()=>creerCarriere({id:randomUUID(),nom:'Test atelier',code:'TEST',compteId:kiri,pseudo:'Kiri',clubNom:'Kiri RFC',rythme:1,maxClubs:2},now,'atelier');
   const l1=ligue(),l2=ligue(),joueur=l1.cartes[0];
@@ -72,6 +72,8 @@ try {
   const commande={action:'atelier',operation:'pack',revision:1,pack};
   assert.equal((await appel(kiri,{...commande,pack:{...pack,probabilites:{...pack.probabilites,bronze:50}}})).statut,400);
   assert.equal((await appel(kiri,commande)).statut,200);
+  const packFrance={...pack,id:'kiri-france',nom:'France uniquement',garantie:undefined,probabilites:{bronze:100,argent:0,or:0,elite:0,star:0},filtre:{nations:['France']}};
+  assert.equal((await appel(kiri,{action:'atelier',operation:'pack',revision:2,pack:packFrance})).statut,200);
   const final=await db.atelier!.lire();
   contexteAtelier.run(final,()=>{
     const l=avancerCarriere(l1,now,'test');
@@ -81,6 +83,8 @@ try {
     assert.equal(cartes.length,2);assert.ok(cartes.some(c=>c.rarete==='star'),'La garantie fonctionne même avec un poids nul');
     assert.equal(resultat.clubs[0].ovas,l.clubs[0].ovas-1);
     assert.ok(ligue().packs.some(p=>p.id===pack.id),'Les nouvelles ligues héritent aussi du pack');
+    const filtreNation=final.packs[packFrance.id];
+    for(const rarete of ['bronze','argent','or','elite','star'] as const) assert.ok(rayonDePack(rarete,filtreNation).every(c=>c.nation==='France'),'Le filtre nation exclut les autres nations');
   });
   console.log('OK — accès Kiri, usurpation du pseudo refusée, origine, validations, conflit, persistance, GEN et photos sur deux ligues, collection, raretés, contextes concurrents, boutique et ouverture garantie.');
 } finally { rmSync(dossier,{recursive:true,force:true}); }

@@ -62,7 +62,14 @@ export function vueAtelier(q: string) {
   const recherche=normaliser(q.slice(0,100));
   const catalogue=catalogueMondialCarriere();
   const joueurs=catalogue.filter(c=>normaliser(`${c.nom} ${c.clubReel}`).includes(recherche));
-  return {revision:catalogueAdmin().revision,packs:packsCatalogueAdmin(),joueurs:joueurs.slice(0,40),total:joueurs.length,championnats:[...new Set(catalogue.map(c=>c.championnat))].sort()};
+  return {
+    revision:catalogueAdmin().revision,
+    packs:packsCatalogueAdmin(),
+    joueurs:joueurs.slice(0,40),
+    total:joueurs.length,
+    championnats:[...new Set(catalogue.map(c=>c.championnat))].sort((a,b)=>a.localeCompare(b,'fr')),
+    nations:[...new Set(catalogue.map(c=>c.nation).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr')),
+  };
 }
 export async function enregistrerAtelier(stockage: StockageAtelier, corps: Record<string,unknown>) {
   const courant=catalogueAdmin();
