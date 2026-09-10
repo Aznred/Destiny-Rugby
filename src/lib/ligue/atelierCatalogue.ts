@@ -1,6 +1,6 @@
 import type { PackCarriere } from './typesCarriere.js';
 
-export interface EditionJoueur { note: number; potentiel: number; photo?: string }
+export interface EditionJoueur { note: number; potentiel: number; photo?: string; nation?: string }
 export interface CatalogueAdmin {
   revision: number;
   packs: Record<string, PackCarriere>;

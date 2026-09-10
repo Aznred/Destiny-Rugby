@@ -41,7 +41,8 @@ try {
   }
   const chaude=await lireLigue(l1.id);
   const avant=structuredClone(joueur);
-  const edition={action:'atelier',operation:'joueur',revision:0,sourceId:joueur.sourceId,joueur:{note:94,potentiel:96,photo:'https://example.org/photo.webp'}};
+  const nationInitiale=joueur.nation,nationCible=initial.donnees.nations.find((n:string)=>n!==nationInitiale) as string;
+  const edition={action:'atelier',operation:'joueur',revision:0,sourceId:joueur.sourceId,joueur:{note:94,potentiel:96,photo:'https://example.org/photo.webp',nation:nationCible}};
   assert.equal((await appel(kiri,{...edition,joueur:{...edition.joueur,note:101}})).statut,400);
   assert.equal((await appel(kiri,edition)).statut,200);
   assert.equal((await appel(kiri,edition)).statut,400,'Révision périmée refusée');
@@ -58,11 +59,13 @@ try {
     assert.equal(nouveau.note,94);assert.equal(nouveau.rarete,'star');
     for(const l of [l1,l2]) {
       const resultat=avancerCarriere(l,now,'test');const carte=resultat.cartes.find(c=>c.sourceId===joueur.sourceId)!;
-      assert.equal(carte.note,94);assert.equal(carte.photo,edition.joueur.photo);assert.equal(carte.proprietaire,l.clubs[0].id);assert.equal(carte.matchs,avant.matchs);
+      assert.equal(carte.note,94);assert.equal(carte.photo,edition.joueur.photo);assert.equal(carte.nation,nationCible);assert.equal(carte.proprietaire,l.clubs[0].id);assert.equal(carte.matchs,avant.matchs);
       assert.equal(resultat.catalogueRevision,1);
     }
     assert.ok(rayonDePack('star',{id:'test'}).some(c=>c.sourceId===joueur.sourceId));
     assert.ok(!rayonDePack('bronze',{id:'test'}).some(c=>c.sourceId===joueur.sourceId));
+    assert.ok(rayonDePack('star',{id:'nation-cible',filtre:{nations:[nationCible]}}).some(c=>c.sourceId===joueur.sourceId));
+    assert.ok(!rayonDePack('star',{id:'nation-initiale',filtre:{nations:[nationInitiale]}}).some(c=>c.sourceId===joueur.sourceId));
     const page=collectionCarriere(l1,kiri,new URLSearchParams({q:joueur.nom}));
     assert.ok(JSON.stringify(page).includes('https://example.org/photo.webp'));
   });
@@ -86,6 +89,6 @@ try {
     const filtreNation=final.packs[packFrance.id];
     for(const rarete of ['bronze','argent','or','elite','star'] as const) assert.ok(rayonDePack(rarete,filtreNation).every(c=>c.nation==='France'),'Le filtre nation exclut les autres nations');
   });
-  console.log('OK — accès Kiri, usurpation du pseudo refusée, origine, validations, conflit, persistance, GEN et photos sur deux ligues, collection, raretés, contextes concurrents, boutique et ouverture garantie.');
+  console.log('OK — accès Kiri, validations, conflit, persistance, GEN, photos et nation sur deux ligues, filtres nation, collection, raretés, contextes concurrents, boutique et garantie.');
 } finally { rmSync(dossier,{recursive:true,force:true}); }
 process.exit(0);

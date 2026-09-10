@@ -82,7 +82,9 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
     const id=texte(corps.sourceId,250), source=catalogueMondialCarriere().find(c=>c.sourceId===id);
     if(!source) refuser('Joueur introuvable.');
     const j=objet(corps.joueur);
-    const edition: EditionJoueur={note:entier(j.note,20,99),potentiel:entier(j.potentiel,20,99),photo:validerPhoto(j.photo)};
+    const nation=texte(j.nation,80);
+    if(!new Set(catalogueMondialCarriere().map(c=>c.nation)).has(nation)) refuser('Nation inconnue dans le catalogue.');
+    const edition: EditionJoueur={note:entier(j.note,20,99),potentiel:entier(j.potentiel,20,99),photo:validerPhoto(j.photo),nation};
     if(edition.potentiel<edition.note) refuser('Le potentiel doit être au moins égal au GEN.');
     suivant.joueurs[id]=edition;
     if(Object.keys(suivant.joueurs).length>2000) refuser('Maximum de 2 000 joueurs personnalisés.');
