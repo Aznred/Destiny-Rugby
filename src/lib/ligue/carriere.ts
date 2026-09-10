@@ -11,6 +11,7 @@ import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creer
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
+import { estPuissanceDeDeux, nombreQualifiesPoules, repartirPoules } from './poulesCarriere.js';
 
 const HEURE = 3_600_000;
 const JOUR = 24 * HEURE;
@@ -395,9 +396,19 @@ function calendrierCompetition(etat: EtatCarriereEnLigne, competition: Competiti
       // le lancement de saison pendant tout le calendrier.
       ouverture = Math.max(...horaires);
     });
+  } else if (competition.format === 'poules') {
+    competition.poules ??= repartirPoules(competition.participants);
+    competition.qualifies ??= nombreQualifiesPoules(competition.participants.length);
+    const calendriers = competition.poules.map(poule => affichesToutesRondes(poule));
+    const journees = Math.max(...calendriers.map(calendrier => calendrier.length));
+    const intervalle = SEMAINE / etat.rythme;
+    for (let journee = 0; journee < journees; journee++) {
+      const paires = calendriers.flatMap(calendrier => calendrier[journee] ?? []);
+      ajouterRencontres(etat, competition, journee + 1, paires, debut + journee * intervalle);
+    }
+    competition.journeesRegulieres = journees;
   } else {
-    // Tout le monde possible joue dès le premier tour. Avec dix clubs cela
-    // donne bien cinq affiches, puis un seul exempt si le tour suivant est impair.
+    // Le tableau direct n'est utilisé que lorsque chaque tour peut être complet.
     const paires = Array.from({ length: Math.floor(competition.participants.length / 2) }, (_, i) => ({ domicile: competition.participants[i * 2], exterieur: competition.participants[i * 2 + 1] }));
     ajouterRencontres(etat, competition, 1, paires, debut);
   }
@@ -413,7 +424,13 @@ function reparerCalendriers(etat: EtatCarriereEnLigne) {
     const ouvertures = new Set(journees.map(j => matchs.find(r => r.journee === j)?.ouvre));
     const championnatMalDate = competition.format === 'championnat' && journees.length > 1 && ouvertures.size < journees.length;
     const coupeAncienne = competition.format === 'elimination' && premierTour !== Math.floor(competition.participants.length / 2);
-    if (!championnatMalDate && !coupeAncienne) continue;
+    const eliminationIrreguliere = competition.format === 'elimination' && !estPuissanceDeDeux(competition.participants.length);
+    if (!championnatMalDate && !coupeAncienne && !eliminationIrreguliere) continue;
+    if (eliminationIrreguliere) {
+      competition.format = 'poules';
+      competition.poules = repartirPoules(competition.participants);
+      competition.qualifies = nombreQualifiesPoules(competition.participants.length);
+    }
     etat.rencontres = etat.rencontres.filter(r => r.competitionId !== competition.id);
     calendrierCompetition(etat, competition);
     competition.journeesRegulieres = Math.max(...etat.rencontres.filter(r => r.competitionId === competition.id).map(r => r.journee));
@@ -445,8 +462,13 @@ function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
 
 export function classementCarriere(etat: EtatCarriereEnLigne, competitionId?: string): LigneClassementCarriere[] {
   const competition = competitionId ? etat.competitions.find(c => c.id === competitionId) : etat.competitions.find(c => c.saison === etat.saison && c.nom.startsWith('Championnat ·'));
-  const lignes = (competition?.participants ?? etat.clubs.map(c => c.id)).map(id => ({ clubId: id, nom: clubParId(etat, id).nom, points: 0, joues: 0, gagnes: 0, nuls: 0, perdus: 0, pour: 0, contre: 0, difference: 0, bonus: 0 }));
-  for (const rencontre of etat.rencontres.filter(r => r.competitionId === competition?.id && r.resultat)) {
+  return classementCompetition(etat, competition?.id, competition?.participants ?? etat.clubs.map(c => c.id));
+}
+
+function classementCompetition(etat: EtatCarriereEnLigne, competitionId: string | undefined, participants: readonly string[], journeeMax = Infinity): LigneClassementCarriere[] {
+  const lignes = participants.map(id => ({ clubId: id, nom: clubParId(etat, id).nom, points: 0, joues: 0, gagnes: 0, nuls: 0, perdus: 0, pour: 0, contre: 0, difference: 0, bonus: 0 }));
+  const ids = new Set(participants);
+  for (const rencontre of etat.rencontres.filter(r => r.competitionId === competitionId && r.journee <= journeeMax && ids.has(r.domicile) && ids.has(r.exterieur) && r.resultat)) {
     const r = rencontre.resultat!;
     for (const [id, points, contre, essais, essaisAdverses] of [[rencontre.domicile, r.pointsD, r.pointsE, r.essaisD, r.essaisE], [rencontre.exterieur, r.pointsE, r.pointsD, r.essaisE, r.essaisD]] as const) {
       const l = lignes.find(c => c.clubId === id)!; const victoire = points > contre, nul = points === contre;
@@ -456,6 +478,33 @@ export function classementCarriere(etat: EtatCarriereEnLigne, competitionId?: st
     }
   }
   return lignes.sort((a, b) => b.points - a.points || b.difference - a.difference || b.pour - a.pour || (a.clubId < b.clubId ? -1 : 1));
+}
+
+const comparerInterPoules = (a: LigneClassementCarriere, b: LigneClassementCarriere) =>
+  b.points * Math.max(1, a.joues) - a.points * Math.max(1, b.joues)
+  || b.difference * Math.max(1, a.joues) - a.difference * Math.max(1, b.joues)
+  || b.pour * Math.max(1, a.joues) - a.pour * Math.max(1, b.joues)
+  || (a.clubId < b.clubId ? -1 : 1);
+
+function qualificationsPoules(etat: EtatCarriereEnLigne, c: CompetitionCarriere) {
+  const classements = c.poules!.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres));
+  const qualifies: { ligne: LigneClassementCarriere; rang: number }[] = [];
+  for (let rang = 0; qualifies.length < c.qualifies!; rang++) {
+    const niveau = classements.map(poule => poule[rang]).filter((ligne): ligne is LigneClassementCarriere => Boolean(ligne)).sort(comparerInterPoules);
+    qualifies.push(...niveau.slice(0, c.qualifies! - qualifies.length).map(ligne => ({ ligne, rang })));
+  }
+  const tetes = qualifies.slice(0, c.qualifies! / 2);
+  const bas = qualifies.slice(c.qualifies! / 2);
+  // Le meilleur repêché rencontre le meilleur premier, comme annoncé dans le
+  // créateur. Les autres places basses sont ensuite prises du moins bon au meilleur.
+  const repeches = bas.filter(q => q.rang >= 2).sort((a,b) => comparerInterPoules(a.ligne,b.ligne));
+  const autres = bas.filter(q => q.rang < 2).reverse();
+  return {
+    classements,
+    ordre: qualifies.map(q => q.ligne.clubId),
+    repeches: repeches.map(q => q.ligne.clubId),
+    paires: tetes.map((q,index) => ({ domicile:q.ligne.clubId, exterieur:(repeches[index] ?? autres[index - repeches.length]).ligne.clubId })),
+  };
 }
 
 /**
@@ -521,6 +570,29 @@ function avancerCompetitions(etat: EtatCarriereEnLigne, maintenant: number) {
         const champion = gagnantDe(finale);
         cloturerCompetition(etat, c, champion,
           finale.domicile === champion ? finale.exterieur : finale.domicile, maintenant, rangs);
+      }
+    } else if (c.format === 'poules') {
+      const derniere = Math.max(...matchs.map(r => r.journee));
+      const classementReference = c.phaseFinaleSeed ?? c.participants;
+      const gagnant = (r: RencontreCarriere) => r.resultat!.pointsD !== r.resultat!.pointsE
+        ? (r.resultat!.pointsD > r.resultat!.pointsE ? r.domicile : r.exterieur)
+        : r.resultat!.essaisD !== r.resultat!.essaisE
+          ? (r.resultat!.essaisD > r.resultat!.essaisE ? r.domicile : r.exterieur)
+          : classementReference.indexOf(r.domicile) <= classementReference.indexOf(r.exterieur) ? r.domicile : r.exterieur;
+      const debut = Math.max(...matchs.map(r => Date.parse(r.ferme)));
+      if (derniere === c.journeesRegulieres) {
+        const qualification = qualificationsPoules(etat,c);
+        c.phaseFinaleSeed = qualification.ordre; c.repeches = qualification.repeches;
+        ajouterRencontres(etat,c,derniere+1,qualification.paires,debut);
+      } else {
+        const tour = matchs.filter(r => r.journee === derniere);
+        if (tour.length > 1) {
+          const suivants = tour.map(gagnant).sort((a,b)=>classementReference.indexOf(a)-classementReference.indexOf(b));
+          ajouterRencontres(etat,c,derniere+1,Array.from({length:suivants.length/2},(_,i)=>({domicile:suivants[i],exterieur:suivants[suivants.length-1-i]})),debut);
+        } else {
+          const finale=tour[0],champion=gagnant(finale);
+          cloturerCompetition(etat,c,champion,finale.domicile===champion?finale.exterieur:finale.domicile,maintenant);
+        }
       }
     } else {
       // La prolongation virtuelle est déterministe : essais, puis meilleur rang de championnat.
@@ -905,7 +977,8 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       case 'creerCoupe': {
         exiger(compteId === nouveau.createurId, 'Seul le créateur peut créer une coupe.'); exiger(nouveau.phase === 'saison', 'Lancez une saison avant de créer une coupe.');
         texte(commande.nom); texte(commande.trophee); listeIds(commande.participants); exiger(commande.participants.length >= 2, 'Une coupe nécessite au moins deux clubs.'); commande.participants.forEach(id => clubParId(nouveau, id));
-        exiger(commande.format === 'elimination' || commande.format === 'championnat', 'Format de coupe invalide.');
+        exiger(commande.format === 'elimination' || commande.format === 'championnat' || commande.format === 'poules', 'Format de coupe invalide.');
+        if (commande.format === 'poules') exiger(commande.participants.length >= 3, 'Une phase de poules nécessite au moins trois clubs.');
         // Le commissaire fixe librement le cash prize. La seule borne restante
         // est celle des entiers sûrs, indispensable pour que les soldes et les
         // transactions ne perdent jamais de précision en base.
@@ -916,10 +989,17 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
           && Number.isSafeInteger(commande.recompenseParticipation + commande.recompenseFinaliste), 'Cash prize trop élevé.');
         exiger(typeof commande.debut === 'string' && Number.isFinite(Date.parse(commande.debut)) && Date.parse(commande.debut) >= maintenant && Date.parse(commande.debut) <= maintenant + 90 * JOUR, 'La coupe doit débuter dans les 90 prochains jours.');
         exiger(nouveau.competitions.filter(c => c.saison === nouveau.saison).length < 3, 'Deux coupes par saison au maximum pour préserver l’économie.');
-        const c: CompetitionCarriere = { id: prochainId(nouveau, 'competition', nouveau.competitions.length), nom: commande.nom.trim(), trophee: commande.trophee.trim(), format: commande.format, participants: [...commande.participants], saison: nouveau.saison, debut: new Date(commande.debut).toISOString(), etat: 'enCours', recompenseParticipation: commande.recompenseParticipation, recompenseVainqueur: commande.recompenseVainqueur, recompenseFinaliste: commande.recompenseFinaliste,
+        // Un tableau direct reste parfait à 4, 8, 16… Pour 10 ou tout autre
+        // nombre irrégulier, les poules évitent les exemptions arbitraires.
+        const format = commande.format === 'elimination' && !estPuissanceDeDeux(commande.participants.length) ? 'poules' : commande.format;
+        const rangChampionnat = new Map(classementCarriere(nouveau).map((ligne, index) => [ligne.clubId, index]));
+        const participants = [...commande.participants].sort((a, b) => (rangChampionnat.get(a) ?? 999) - (rangChampionnat.get(b) ?? 999));
+        const c: CompetitionCarriere = { id: prochainId(nouveau, 'competition', nouveau.competitions.length), nom: commande.nom.trim(), trophee: commande.trophee.trim(), format, participants, saison: nouveau.saison, debut: new Date(commande.debut).toISOString(), etat: 'enCours', recompenseParticipation: commande.recompenseParticipation, recompenseVainqueur: commande.recompenseVainqueur, recompenseFinaliste: commande.recompenseFinaliste,
           logo: logoCompetitionValide(commande.logo) ? commande.logo : undefined,
           tropheeId: tropheeValide(commande.tropheeId) ? commande.tropheeId : undefined,
-          playoffs: commande.format === 'championnat' && commande.playoffs === true && commande.participants.length >= 4 };
+          playoffs: format === 'championnat' && commande.playoffs === true && commande.participants.length >= 4,
+          poules: format === 'poules' ? repartirPoules(participants) : undefined,
+          qualifies: format === 'poules' ? nombreQualifiesPoules(commande.participants.length) : undefined };
         nouveau.competitions.push(c); calendrierCompetition(nouveau, c);
         c.journeesRegulieres = Math.max(...nouveau.rencontres.filter(r => r.competitionId === c.id).map(r => r.journee));
         break;
@@ -1004,6 +1084,9 @@ export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCar
   const club = monClub(etat, compteId);
   const { graine: _secret, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
   return copier({ ...publics, monClubId: club.id,
+    competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
+      ? { ...c, classementsPoules: c.poules.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres)) }
+      : c),
     clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, packsGratuits, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club.id ? { ...reste, composition, strategie, packsGratuits, dernierLotPacksGratuits } : reste; }),
     cartes: etat.cartes.filter(c => c.proprietaire !== null),
     rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: vueMatchEnLigne(match, club.id) } : reste; }),

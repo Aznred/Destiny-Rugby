@@ -76,11 +76,15 @@ export interface RencontreCarriere {
   ouvre: string; ferme: string; match?: EtatMatchEnLigne; resultat?: ResultatCarriere;
 }
 export interface CompetitionCarriere {
-  id: string; nom: string; trophee: string; format: 'championnat' | 'elimination';
+  id: string; nom: string; trophee: string; format: 'championnat' | 'elimination' | 'poules';
   /** Logo de la compétition et identifiant du trophée soulevé. */
   logo?: string; tropheeId?: string;
   /** Championnat : une phase finale à quatre couronne le champion. */
   playoffs?: boolean; journeesRegulieres?: number;
+  /** Coupe avec poules : groupes, taille du tableau, ordre des qualifiés et repêchés. */
+  poules?: string[][]; qualifies?: number; phaseFinaleSeed?: string[]; repeches?: string[];
+  /** Classements calculés pour l'affichage, jamais persistés par le moteur. */
+  classementsPoules?: LigneClassementCarriere[][];
   participants: string[]; saison: number; debut: string; etat: 'enCours' | 'terminee';
   recompenseParticipation: number; recompenseVainqueur: number; recompenseFinaliste: number;
   vainqueur?: string; finaliste?: string;
@@ -186,7 +190,7 @@ export type CommandeCarriere =
   | { type: 'annulerEchange'; echangeId: string }
   | { type: 'favori'; carteId: string; valeur: boolean }
   | { type: 'reclamerObjectif'; objectifId: string }
-  | { type: 'creerCoupe'; nom: string; trophee: string; participants: string[]; format: 'elimination' | 'championnat'; debut: string; recompenseParticipation: number; recompenseVainqueur: number; recompenseFinaliste: number; logo?: string; tropheeId?: string; playoffs?: boolean }
+  | { type: 'creerCoupe'; nom: string; trophee: string; participants: string[]; format: 'elimination' | 'championnat' | 'poules'; debut: string; recompenseParticipation: number; recompenseVainqueur: number; recompenseFinaliste: number; logo?: string; tropheeId?: string; playoffs?: boolean }
   | { type: 'match'; matchId: string; action: CommandeMatchEnLigne }
   | { type: 'lancerMatch'; matchId: string }
   | { type: 'actualiser' };

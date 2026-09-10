@@ -1903,6 +1903,21 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 /* Le tableau d'une coupe reste lisible de gauche à droite, avec les tours
    futurs visibles avant même que leurs qualifiés soient connus. */
 .cel-tableau-coupe { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 1rem; overflow-x: auto; padding: 0.8rem 0 0.35rem; }
+.cel-grille-poules { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: .85rem; margin-top: 1rem; }
+.cel-poule { min-width: 0; overflow: hidden; border: 1px solid var(--bordure); border-radius: var(--rayon); background: color-mix(in srgb, var(--surface) 88%, var(--or-500) 12%); }
+.cel-poule h3 { padding: .8rem 1rem; border-bottom: 1px solid var(--bordure); background: linear-gradient(110deg, color-mix(in srgb, var(--or-500) 16%, transparent), transparent); }
+.cel-poule .cel-table-scroll { margin: 0; }
+.cel-poule .cel-table { min-width: 100%; }
+.cel-poule .cel-table th, .cel-poule .cel-table td { padding: .68rem .55rem; }
+.cel-poule tr.qualifie td:first-child { box-shadow: inset 3px 0 var(--or-400); }
+.cel-statut-qualif { display: inline-grid; place-items: center; min-width: 1.25rem; height: 1.25rem; margin-left: .35rem; padding: 0 .2rem; border-radius: 999px; background: var(--or-500); color: #17130a; font: 800 .65rem/1 var(--police-forte); font-style: normal; }
+.cel-statut-qualif.repeche { background: var(--brume); color: var(--surface); }
+.cel-statut-qualif.attente { border: 1px solid var(--or-400); background: transparent; color: var(--or-400); }
+.cel-apercu-format { display: flex; align-items: flex-start; gap: .8rem; margin: 1rem 0; padding: 1rem; border: 1px solid color-mix(in srgb, var(--or-400) 55%, var(--bordure)); border-radius: var(--rayon-controle); background: linear-gradient(110deg, color-mix(in srgb, var(--or-500) 13%, var(--surface)), var(--surface)); }
+.cel-apercu-format svg { flex: 0 0 auto; color: var(--or-400); }
+.cel-apercu-format div { display: grid; gap: .25rem; }
+.cel-apercu-format b { font-family: var(--police-forte); color: var(--craie); }
+.cel-apercu-format span { color: var(--brume); font-size: .82rem; line-height: 1.45; }
 .cel-tour-coupe { display: flex; flex-direction: column; justify-content: space-around; gap: 0.7rem; min-width: 0; }
 .cel-tour-coupe > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; color: var(--or-400); text-transform: uppercase; letter-spacing: 0.08em; }
 .cel-tour-coupe > div:first-child small { color: var(--brume); letter-spacing: 0; text-transform: none; }

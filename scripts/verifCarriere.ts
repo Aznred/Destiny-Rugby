@@ -896,9 +896,30 @@ titre('9. LA COUPE MAISON DU COMMISSAIRE');
     participants: dix.clubs.map(c => c.id), format: 'elimination', debut: new Date(T0 + JOUR).toISOString(),
     recompenseParticipation: 0, recompenseVainqueur: 1000, recompenseFinaliste: 500,
   }, T0, 'coupe-dix');
-  const coupeDix = dix.competitions.find(c => c.nom === 'Coupe à dix')!;
-  dire(dix.rencontres.filter(r => r.competitionId === coupeDix.id && r.journee === 1).length === 5,
-    '⚠️ dix clubs jouent cinq matchs dès le premier tour');
+  let coupeDix = dix.competitions.find(c => c.nom === 'Coupe à dix')!;
+  dire(coupeDix.format === 'poules' && coupeDix.poules?.map(p => p.length).join(',') === '4,3,3',
+    '⚠️ dix clubs passent par trois poules équilibrées', coupeDix.poules?.map(p => p.length).join(' · '));
+  dire(coupeDix.qualifies === 8 && dix.rencontres.filter(r => r.competitionId === coupeDix.id).length === 12,
+    'les poules conduisent à huit qualifiés en quarts, sans exemption arbitraire');
+  for (let semaine = 1; semaine <= 8; semaine++) {
+    dix = avancerCarriere(dix, T0 + semaine * 7 * JOUR, `dix-${semaine}`);
+    coupeDix = dix.competitions.find(c => c.id === coupeDix.id)!;
+    if (dix.rencontres.some(r => r.competitionId === coupeDix.id && r.journee === (coupeDix.journeesRegulieres ?? 0) + 1)) break;
+  }
+  const quarts = dix.rencontres.filter(r => r.competitionId === coupeDix.id && r.journee === (coupeDix.journeesRegulieres ?? 0) + 1);
+  dire(quarts.length === 4 && coupeDix.repeches?.length === 2,
+    'les deux meilleurs troisièmes sont repêchés dans quatre quarts', `${coupeDix.repeches?.length ?? 0} repêchés`);
+  dire(quarts[0]?.domicile === coupeDix.phaseFinaleSeed?.[0] && quarts[0]?.exterieur === coupeDix.repeches?.[0],
+    'le meilleur premier affronte le meilleur troisième repêché');
+
+  let impair = ligue(7);
+  impair = agirCarriere(impair, impair.clubs[0].compteId, {
+    type: 'creerCoupe', nom: 'Coupe impaire', trophee: 'Trophée impair', participants: impair.clubs.map(c => c.id),
+    format: 'elimination', debut: new Date(T0 + JOUR).toISOString(), recompenseParticipation: 0, recompenseVainqueur: 1000, recompenseFinaliste: 500,
+  }, T0, 'coupe-impaire');
+  const coupeImpaire = impair.competitions.find(c => c.nom === 'Coupe impaire')!;
+  dire(coupeImpaire.format === 'poules' && coupeImpaire.poules?.map(p => p.length).join(',') === '4,3' && coupeImpaire.qualifies === 4,
+    '⚠️ un nombre impair passe aussi par des poules vers une vraie demi-finale');
 }
 
 
