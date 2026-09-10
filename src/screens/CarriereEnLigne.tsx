@@ -834,9 +834,9 @@ function Rencontre({ vue, rencontre: r, occupe, suivre, grande = false }: { vue:
   const domicile = vue.clubs.find(c => c.id === r.domicile);
   const exterieur = vue.clubs.find(c => c.id === r.exterieur);
   return <article className={`cel-rencontre${grande ? ' grande' : ''}`}><div className="cel-rencontre-date">Journée {r.journee} · {dateHeure(r.ferme)}{r.match && !r.match.termine && <b className="cel-direct-label"> EN DIRECT · {r.match.minute}′</b>}</div><div className="cel-affiche">
-    <span className="cel-equipe-affiche"><b>{nomClub(vue, r.domicile)}</b><Ecusson nom={nomClub(vue, r.domicile)} logo={domicile?.embleme} /></span>
+    <span className="cel-equipe-affiche"><b>{nomClub(vue, r.domicile)}</b><span className="cel-blason-affiche"><Ecusson nom={nomClub(vue, r.domicile)} logo={domicile?.embleme} /></span></span>
     <strong>{r.resultat ? `${r.resultat.pointsD} – ${r.resultat.pointsE}` : r.match ? `${r.match.score.domicile} – ${r.match.score.exterieur}` : 'VS'}</strong>
-    <span className="cel-equipe-affiche"><b>{nomClub(vue, r.exterieur)}</b><Ecusson nom={nomClub(vue, r.exterieur)} logo={exterieur?.embleme} /></span>
+    <span className="cel-equipe-affiche"><b>{nomClub(vue, r.exterieur)}</b><span className="cel-blason-affiche"><Ecusson nom={nomClub(vue, r.exterieur)} logo={exterieur?.embleme} /></span></span>
   </div>{r.match ? <button className="btn fantome" onClick={() => suivre(r.id)}>{r.match.termine ? 'Voir le match' : 'Rejoindre le direct'}<Icone nom="fleche-droite" taille={15} /></button> : !r.resultat && moi ? <button className="btn primaire" disabled={occupe || !ouverte} onClick={() => suivre(r.id)}>{ouverte ? 'Rejoindre le direct' : 'Accès 2 min avant'}</button> : null}</article>;
 }
 

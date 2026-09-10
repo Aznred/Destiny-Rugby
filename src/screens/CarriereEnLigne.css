@@ -571,7 +571,9 @@
 .cel-equipe-affiche { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: .4rem; }
 .cel-equipe-affiche:last-child { align-items: flex-end; text-align: right; }
 .cel-equipe-affiche b { font-family: var(--police-forte); font-size: 0.95rem; }
-.cel-equipe-affiche .cel-ecusson, .cel-equipe-affiche .cel-ecusson-logo { width: 34px; height: 34px; }
+.cel-blason-affiche { display: grid; place-items: center; width: 54px; height: 54px; padding: 5px; border: 1px solid rgba(210, 174, 74, 0.24); border-radius: 15px; background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.1), rgba(255,255,255,.025) 68%); box-shadow: inset 0 0 18px rgba(210,174,74,.05); }
+.cel-equipe-affiche .cel-ecusson, .cel-equipe-affiche .cel-ecusson-logo { width: 44px !important; height: 44px !important; }
+.cel-equipe-affiche .cel-ecusson b { font-size: .62rem; }
 .cel-affiche strong { font-family: var(--police-titre); font-size: 1.5rem; color: var(--or-400); white-space: nowrap; }
 .cel-rencontre.grande .cel-affiche strong { font-size: 2.2rem; }
 .cel-rencontre .btn { align-self: flex-start; padding: 0.45rem 1rem; font-size: 0.84rem; }
