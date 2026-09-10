@@ -1,0 +1,110 @@
+{
+  "essai_1": {
+    "src": "/moments/essai_1.mp4",
+    "duree": 10
+  },
+  "essai_2": {
+    "src": "/moments/essai_2.mp4",
+    "duree": 10
+  },
+  "essai_3": {
+    "src": "/moments/essai_3.mp4",
+    "duree": 10
+  },
+  "transformation_1": {
+    "src": "/moments/transformation_1.mp4",
+    "duree": 7
+  },
+  "transformation_2": {
+    "src": "/moments/transformation_2.mp4",
+    "duree": 7
+  },
+  "transformation_3": {
+    "src": "/moments/transformation_3.mp4",
+    "duree": 7
+  },
+  "penalite_reussie_1": {
+    "src": "/moments/penalite_reussie_1.mp4",
+    "duree": 7
+  },
+  "penalite_reussie_2": {
+    "src": "/moments/penalite_reussie_2.mp4",
+    "duree": 7
+  },
+  "penalite_reussie_3": {
+    "src": "/moments/penalite_reussie_3.mp4",
+    "duree": 7
+  },
+  "butRate_1": {
+    "src": "/moments/butRate_1.mp4",
+    "duree": 7
+  },
+  "butRate_2": {
+    "src": "/moments/butRate_2.mp4",
+    "duree": 7
+  },
+  "butRate_3": {
+    "src": "/moments/butRate_3.mp4",
+    "duree": 7
+  },
+  "penalite_1": {
+    "src": "/moments/penalite_1.mp4",
+    "duree": 7
+  },
+  "penalite_2": {
+    "src": "/moments/penalite_2.mp4",
+    "duree": 7
+  },
+  "penalite_3": {
+    "src": "/moments/penalite_3.mp4",
+    "duree": 7
+  },
+  "carton_1": {
+    "src": "/moments/carton_1.mp4",
+    "duree": 7
+  },
+  "carton_2": {
+    "src": "/moments/carton_2.mp4",
+    "duree": 7
+  },
+  "carton_3": {
+    "src": "/moments/carton_3.mp4",
+    "duree": 7
+  },
+  "franchissement_1": {
+    "src": "/moments/franchissement_1.mp4",
+    "duree": 7
+  },
+  "franchissement_2": {
+    "src": "/moments/franchissement_2.mp4",
+    "duree": 7
+  },
+  "franchissement_3": {
+    "src": "/moments/franchissement_3.mp4",
+    "duree": 7
+  },
+  "remplacement_1": {
+    "src": "/moments/remplacement_1.mp4",
+    "duree": 7
+  },
+  "remplacement_2": {
+    "src": "/moments/remplacement_2.mp4",
+    "duree": 7
+  },
+  "remplacement_3": {
+    "src": "/moments/remplacement_3.mp4",
+    "duree": 7
+  },
+  "jalon_1": {
+    "src": "/moments/jalon_1.mp4",
+    "duree": 7
+  },
+  "jalon_2": {
+    "src": "/moments/jalon_2.mp4",
+    "duree": 7
+  },
+  "jalon_3": {
+    "src": "/moments/jalon_3.mp4",
+    "duree": 7
+  }
+}

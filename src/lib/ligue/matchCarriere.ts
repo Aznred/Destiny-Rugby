@@ -1,3 +1,4 @@
+import { momentsDepuisFil } from './momentsForts.js';
 // LE MATCH DE LA CARRIÈRE EN LIGNE — 80 minutes de rugby arbitrées par le serveur
 //
 // ═══════════════════════════════════════════════════════════════════════════
@@ -260,6 +261,7 @@ export interface EvenementMatchEnLigne {
 export type OrdreFil = 'consignes' | 'remplacement' | ChoixPenaliteEnLigne;
 
 export interface LigneFil {
+  id?: string; seconde?: number; score?: Paire;
   minute: number; texte: string; type: string; cote?: CoteEnLigne; points?: number;
   /**
    * ⚠️ UN ORDRE N'A PAS DE TEXTE ICI, IL A UNE CLÉ. `lib/ligue/` ne porte
@@ -432,6 +434,8 @@ export interface EtatMatchEnLigne {
 
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {
+  moments?: import('./momentsForts.js').MomentFort[];
+  gele?: boolean;
   id: string;
   terrain?: TerrainDirect;
   minute: number;
@@ -751,14 +755,16 @@ function adopterCache(avant: EtatMatchEnLigne, apres: EtatMatchEnLigne, moteur: 
 // 6. LA LECTURE DU MOTEUR
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TYPES_FIL = new Set(['essai', 'but', 'butRate', 'carton', 'jalon', 'remplacement']);
-const FIL_MAX = 80;
+const TYPES_FIL = new Set(['essai', 'but', 'butRate', 'penalite', 'franchissement', 'carton', 'blessure', 'jalon', 'remplacement']);
+const FIL_MAX = 240;
 
 function extraireFil(e: EtatMatch): LigneFil[] {
   const lignes: LigneFil[] = [];
-  for (const c of e.commentaires) {
+  for (const [index, c] of e.commentaires.entries()) {
     if (!TYPES_FIL.has(c.type)) continue;
     lignes.push({
+      id: `evenement-${index}`, seconde: c.seconde ?? c.minute * 60,
+      score: { domicile: c.scoreA, exterieur: c.scoreB },
       minute: Math.min(80, Math.round(c.minute)), texte: c.texte, type: c.type,
       cote: c.cote === 'A' ? 'domicile' : c.cote === 'B' ? 'exterieur' : undefined,
       points: c.points || undefined,
@@ -1129,6 +1135,7 @@ export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string): VueMatc
     id: etat.id, minute: Math.floor(etat.horloge), horloge: r2(etat.horloge), termine: etat.termine,
     score: etat.score, essais: etat.essais, penalites: etat.penalites,
     fil: etat.fil, stats: etat.stats, feuille: etat.feuille,
+    moments: momentsDepuisFil(etat.id, etat.fil), gele: Boolean(etat.decision),
     remplacementsFaits: 0, surLeTerrain: [], surLeBanc: [],
   };
   if (etat.termine) return vue;

@@ -38,6 +38,7 @@ export type TypeCommentaire =
   | 'remplacement' | 'jalon' | 'jeu';
 
 export interface Commentaire {
+  seconde?: number;
   minute: number;
   texte: string;
   type: TypeCommentaire;
@@ -556,6 +557,7 @@ export function ajouterCommentaire(
   points = 0, moi = false,
 ): void {
   e.commentaires.push({
+    seconde: Math.min(4800, Math.floor(e.t)),
     minute: Math.min(80, Math.floor(e.t / 60)), texte, type, cote, points,
     scoreA: e.scoreA, scoreB: e.scoreB, moi,
   });

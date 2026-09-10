@@ -112,7 +112,7 @@ function ballonDe(T: TerrainDirect, pions: Map<string, Vec>, sim: number): Ballo
   }
   if (T.porteurId) {
     const p = pions.get(T.porteurId);
-    if (p) return { x: p.x, y: p.y, h: 0 };
+    if (p) return { x: p.x + 1.25, y: p.y + 0.7, h: 0 };
   }
   return { x: T.ballon.x, y: T.ballon.y, h: 0 };
 }
@@ -127,7 +127,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const ballon = useRef<Ballon>({ x: LONGUEUR / 2, y: LARGEUR / 2, h: 0 });
   /** Le relevé effectivement montré : c'est lui qui commande le bandeau. */
   const [affiche, setAffiche] = useState<TerrainDirect>(terrain);
-  const [cadrage, setCadrage] = useState<Cadrage>('suivi');
+  const [cadrage, setCadrage] = useState<Cadrage>('large');
   const [, redessiner] = useState(0);
 
   // ⚠️ TOUT CE QUE LA BOUCLE LIT PASSE PAR UNE RÉFÉRENCE. Elle est montée une
@@ -235,7 +235,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   // pixels par mètre change avec le cadrage, l'orientation et la taille de
   // l'écran : sans ce plancher, un joueur fait trois pixels sur un téléphone.
   const pxParMetre = vue ? boite.current.largeur / vue.W : 4;
-  const rayon = Math.max(0.86, 3.6 / pxParMetre);
+  const rayon = Math.max(0.86, 5.5 / pxParMetre);
   const tailleTexte = Math.max(rayon * 1.16, 7.6 / pxParMetre);
   const trait = Math.max(rayon * 0.18, 1.5 / pxParMetre);
   const b = ballon.current;

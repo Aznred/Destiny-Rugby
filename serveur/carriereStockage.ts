@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { pushNeon, type StockagePush } from './pushStockage.js';
 import type { EtatCarriereEnLigne, StatistiquesGlobalesCarriere } from '../src/lib/ligue/typesCarriere.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 
@@ -17,6 +18,7 @@ export interface ResumeLigue {
   clubNom: string; ovas: number; clubEmbleme?: string;
 }
 export interface StockageCarriere {
+  push?: StockagePush;
   compteParIdentifiant(identifiant: string): Promise<CompteStocke | null>;
   creerCompte(compte: CompteStocke): Promise<boolean>;
   session(empreinte: string, maintenant: number): Promise<CompteStocke | null>;
@@ -80,6 +82,7 @@ export function stockageNeon(url: string): StockageCarriere {
     echeance: r.echeance == null ? null : Date.parse(String(r.echeance)),
   });
   return {
+    push: pushNeon(url),
     async compteParIdentifiant(identifiant) {
       const r = await sql`select id, identifiant, pseudo, empreinte from comptes where identifiant=${identifiant}`;
       return (r[0] as CompteStocke) ?? null;
@@ -262,6 +265,9 @@ export function stockageNeon(url: string): StockageCarriere {
       const r = await sansColonne(() => ecrire(true), () => ecrire(false));
       return r.length === 1;
     },
-    async actives() { return (await sql`select id from carriere_ligues where donnees->>'phase'='saison'`).map(r => String(r.id)); },
+    async actives() { return (await sansColonne(
+      () => sql`select id from carriere_ligues where donnees->>'phase'='saison' and (echeance is null or echeance<=now()) order by echeance nulls first`,
+      () => sql`select id from carriere_ligues where donnees->>'phase'='saison'`,
+    )).map(r => String(r.id)); },
   };
 }

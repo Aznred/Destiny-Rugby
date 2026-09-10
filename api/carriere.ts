@@ -1,8 +1,10 @@
+import { programmerMatchsVercel } from '../serveur/horlogeVercel.js';
 import { creerGestionnaireCarriere } from '../serveur/carriereApi.js';
 import type { RequeteCarriere, ReponseCarriere } from '../serveur/carriereApi.js';
 import { stockageNeon } from '../serveur/carriereStockage.js';
 
 export const config = { runtime: 'nodejs' };
+export const maxDuration = 60;
 
 /**
  * ⚠️ LA RÉPONSE VERCEL EST ENRICHIE, PAS REMPLACÉE. Le gestionnaire a besoin
@@ -26,6 +28,6 @@ export default async function handler(req: RequeteCarriere, res: ReponseHote) {
     reponse.setHeader('Cache-Control', 'no-store');
     return reponse.status(503).json({ erreur: 'La Carrière en ligne attend la configuration de son serveur.' });
   }
-  gestionnaire ??= creerGestionnaireCarriere(stockageNeon(process.env.DATABASE_URL));
+  gestionnaire ??= creerGestionnaireCarriere(stockageNeon(process.env.DATABASE_URL), programmerMatchsVercel);
   return gestionnaire.handler(req, reponse);
 }

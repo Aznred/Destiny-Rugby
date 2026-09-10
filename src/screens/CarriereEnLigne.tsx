@@ -37,7 +37,9 @@ import type { Coequipier } from '../lib/effectif';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
 import type { CarteCarriere, CommandeCarriere, StatistiquesGlobalesCarriere, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
 import type { OrdreFil, StrategieEnLigne } from '../lib/ligue/matchCarriere';
-import TerrainEnDirect, { type CouleursDirect } from '../components/match/TerrainEnDirect';
+import type { CouleursDirect } from '../components/match/TerrainEnDirect';
+import { NotificationsMatch } from '../components/NotificationsMatch';
+import { DirectCinema } from '../components/match/DirectCinema';
 import {
   chargerSessionCarriere, chargerLigueCarriere, identifierCarriere, deconnecterCarriere, INCHANGE,
   creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, ErreurCarriere,
@@ -429,12 +431,16 @@ export function CarriereEnLigne() {
     if (erreur) refErreur.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [erreur]);
   const [occupe, setOccupe] = useState(false);
-  const [ligueId, setLigueId] = useState<string | null>(null);
+  const [ligueId, setLigueId] = useState<string | null>(() => new URLSearchParams(location.search).get('directLigue'));
   const [vue, setVue] = useState<VueCarriereEnLigne | null>(null);
   const [onglet, setOnglet] = useState<Onglet>('club');
-  const [matchId, setMatchId] = useState<string | null>(null);
+  const [matchId, setMatchId] = useState<string | null>(() => new URLSearchParams(location.search).get('directMatch'));
   // ⚠️ LU PAR LA BOUCLE DE SONDAGE, qui n'est montée qu'une fois : sans cette
   // référence, elle ne saurait jamais qu'on vient d'ouvrir un direct.
+  useEffect(() => {
+    const ouvrir = () => { const q = new URLSearchParams(location.search); if(q.has('directLigue')) { setLigueId(q.get('directLigue')); setMatchId(q.get('directMatch')); } };
+    window.addEventListener('destiny-ouvrir-match',ouvrir); return () => window.removeEventListener('destiny-ouvrir-match',ouvrir);
+  },[]);
   const directOuvert = useRef<string | null>(null);
   directOuvert.current = matchId;
   const versionRequete = useRef(0);
@@ -448,58 +454,6 @@ export function CarriereEnLigne() {
     finally { setCharge(false); }
   }, []);
   useEffect(() => { void chargerSession(); }, [chargerSession]);
-
-  // ⚠️ LES RAPPELS SE DÉCIDENT SUR LA DIFFÉRENCE ENTRE DEUX VUES, jamais sur
-  // l'état courant : sans ça, chaque sondage — il y en a un toutes les deux
-  // secondes pendant un direct — reposterait la même notification. On compare
-  // donc ce qui vient d'arriver à ce qu'on avait, et on ne prévient que de ce
-  // qui a CHANGÉ.
-  const rappels = useRappels(ligueId ?? '');
-  const rappelsEnvoyes = useRef(new Set<string>());
-  useEffect(() => {
-    if (!vue) return;
-    const verifier = () => { for (const r of vue.rencontres) {
-      const restant = Date.parse(r.ferme) - Date.now();
-      if (!r.resultat && !r.match && [r.domicile,r.exterieur].includes(vue.monClubId) && restant > 0 && restant <= 120000 && !rappelsEnvoyes.current.has(r.id)) {
-        rappelsEnvoyes.current.add(r.id);
-        rappels.prevenir('Coup d’envoi dans deux minutes', 'Ton équipe entre sur le terrain. Tu peux rejoindre le direct.');
-      }
-    }};
-    verifier(); const timer = setInterval(verifier, 1000); return () => clearInterval(timer);
-  }, [vue, rappels.prevenir]);
-  const prevenirRef = useRef(rappels.prevenir);
-  prevenirRef.current = rappels.prevenir;
-  const comparerPourRappels = useCallback((avant: VueCarriereEnLigne | null, apres: VueCarriereEnLigne) => {
-    if (!avant || avant.id !== apres.id) return;
-    const mien = (r: VueRencontre) => r.domicile === apres.monClubId || r.exterieur === apres.monClubId;
-    const nom = (id: string) => apres.clubs.find(c => c.id === id)?.nom ?? 'Club';
-    for (const r of apres.rencontres.filter(mien)) {
-      const vieux = avant.rencontres.find(x => x.id === r.id);
-      const adversaire = nom(r.domicile === apres.monClubId ? r.exterieur : r.domicile);
-      if (!vieux) continue;
-      const etaitOuverte = vieux.ouvre <= avant.rencontres[0]?.ouvre;
-      void etaitOuverte;
-      if (!vieux.match && r.match && !r.match.termine) {
-        prevenirRef.current('Le match a commencé', `${nom(r.domicile)} – ${nom(r.exterieur)}, journée ${r.journee}. Rejoins le direct pour piloter ton équipe.`);
-      }
-      if (r.match?.decision && r.match.decision.jusqua !== vieux.match?.decision?.jusqua) prevenirRef.current('Décision à prendre', 'Une pénalité : choisis les points, la touche ou le jeu rapide.');
-      if (r.match && vieux.match && r.match.essais.domicile + r.match.essais.exterieur > vieux.match.essais.domicile + vieux.match.essais.exterieur) prevenirRef.current('Essai !', `${nom(r.domicile)} ${r.match.score.domicile} – ${r.match.score.exterieur} ${nom(r.exterieur)}`);
-      if (!vieux.resultat && r.resultat) {
-        const chezMoi = r.domicile === apres.monClubId;
-        const pour = chezMoi ? r.resultat.pointsD : r.resultat.pointsE;
-        const contre = chezMoi ? r.resultat.pointsE : r.resultat.pointsD;
-        prevenirRef.current(pour > contre ? 'Victoire !' : pour === contre ? 'Match nul' : 'Défaite',
-          `${pour} – ${contre} contre ${adversaire}, journée ${r.journee}.`);
-      }
-    }
-    // Une nouvelle journée s'ouvre : c'est le rendez-vous à ne pas rater.
-    const ouverte = apres.rencontres.find(r => mien(r) && !r.resultat && r.ouvre <= maintenantISO());
-    const ouverteAvant = avant.rencontres.find(r => mien(r) && !r.resultat && r.ouvre <= maintenantISO());
-    if (ouverte && ouverte.id !== ouverteAvant?.id) {
-      prevenirRef.current(`Journée ${ouverte.journee} : à toi de jouer`,
-        `${nom(ouverte.domicile)} – ${nom(ouverte.exterieur)}. La fenêtre est ouverte jusqu’au ${dateLongue(ouverte.ferme)}.`);
-    }
-  }, []);
 
   /**
    * Un seul appel à la fois. Une réponse ancienne ne peut pas annuler une
@@ -568,7 +522,7 @@ export function CarriereEnLigne() {
             // pour savoir quand lever le pied.
             if (avant && avant.id === suivante.id && avant.version === suivante.version) inchanges++;
             else inchanges = 0;
-            comparerPourRappels(avant, suivante);
+
             return suivante;
           });
         }
@@ -590,7 +544,7 @@ export function CarriereEnLigne() {
       actif = false; controleur.abort(); clearTimeout(minuterie);
       document.removeEventListener('visibilitychange', surVisibilite);
     };
-  }, [ligueId, comparerPourRappels]);
+  }, [ligueId]);
 
 
   const ouvrir = (suivante: VueCarriereEnLigne) => {
@@ -992,21 +946,14 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   const restants = 8 - m.remplacementsFaits;
   // Une décision en attente gèle le chrono du serveur : l'écran le gèle aussi,
   // sinon il continuerait de courir pendant qu'on réfléchit.
-  const gele = Boolean(m.decision);
+  const gele = m.gele ?? Boolean(m.decision);
   const minuteVive = m.termine ? 80
     : Math.min(80, ancre.current.horloge + (gele ? 0 : (Date.now() - ancre.current.recu) / 60_000));
   const resteDecision = m.decision
     ? Math.max(0, Math.min(20, Math.ceil((m.decision.jusqua - Date.now()) / 1000)))
     : 0;
 
-  return <div className="cel-direct">
-    {m.terrain && <TerrainEnDirect
-      terrain={m.terrain}
-      nomDomicile={nomClub(vue, r.domicile)}
-      nomExterieur={nomClub(vue, r.exterieur)}
-      couleurs={couleurs}
-      monCote={m.monCote}
-    />}
+  return <div className="cel-direct cel-direct-cinema">
     <div className="cel-tableau-bord">
       <button className="btn fantome cel-quitter" onClick={fermer}><Icone nom="croix" taille={15} /> Fermer</button>
       <div className="cel-score-direct">
@@ -1017,6 +964,9 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
       <div className="cel-jauge-possession" title="Possession"><i style={{ width: `${m.stats.domicile.possession}%` }} /><span>{m.stats.domicile.possession}% possession {m.stats.exterieur.possession}%</span></div>
       {m.signalAdverse && SIGNAUX[m.signalAdverse] && <p className="cel-signal"><Icone nom="oeil" taille={17} />{SIGNAUX[m.signalAdverse]}</p>}
     </div>
+
+    <DirectCinema match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs} />
+    <details><summary>Recevoir les alertes sur mon téléphone</summary><NotificationsMatch ligue={vue.id} /></details>
 
     {/* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).
         Le serveur ne propose plus une décision sur chacune des vingt-quatre
@@ -1037,7 +987,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
       <small>{resteDecision} seconde{resteDecision > 1 ? 's' : ''} — sans réponse, ton adjoint tranchera selon tes consignes enregistrées.</small>
     </div>}
 
-    <nav className="cel-onglets secondaires">{([['fil', 'Le fil'], ['consignes', 'Consignes'], ['banc', 'Le banc'], ['stats', 'Statistiques']] as const).map(([id, label]) =>
+    <nav className="cel-onglets secondaires">{([['fil', 'Journal du match'], ['consignes', 'Consignes'], ['banc', 'Le banc'], ['stats', 'Statistiques']] as const).map(([id, label]) =>
       <button key={id} className={ongletDirect === id ? 'actif' : ''} onClick={() => setOngletDirect(id)}>{label}</button>)}</nav>
 
     {ongletDirect === 'fil' && <div className="cel-panneau cel-fil-match">{m.fil.length ? [...m.fil].reverse().map((l, i) => <p key={`${l.minute}-${i}`} className={`cel-ligne-fil ${l.type}${l.cote === mien ? ' moi' : ''}`}><b>{l.minute}′</b><span>{l.ordre ? ORDRES_FIL[l.ordre][l.auto ? 1 : 0] : l.texte}</span>{l.points ? <em>+{l.points}</em> : null}</p>) : <p className="cel-note">Le coup d’envoi vient d’être donné.</p>}</div>}
@@ -1580,46 +1530,8 @@ function delai(iso: string, maintenant = Date.now()): string {
   return passe ? `il y a ${texte}` : `dans ${texte}`;
 }
 
-/**
- * ⚠️ CE QUE CES RAPPELS SONT, ET CE QU'ILS NE SONT PAS. Ce sont des
- * notifications de NAVIGATEUR, déclenchées par l'onglet ouvert : elles
- * préviennent quand une fenêtre de journée s'ouvre, quand un match commence ou
- * quand le tien se termine, tant que Destiny Rugby tourne quelque part. Elles
- * ne réveillent pas un téléphone éteint — ça demanderait un service worker et
- * un serveur de push, qui n'existent pas encore. L'écran le dit, plutôt que de
- * laisser croire à une alerte qui n'arrivera jamais.
- */
-type EtatRappels = 'indisponible' | 'refuse' | 'inactif' | 'actif';
-function useRappels(ligueId: string) {
-  const supporte = typeof Notification !== 'undefined';
-  const cle = `destiny.rappels.${ligueId}`;
-  const [etat, setEtat] = useState<EtatRappels>(() => {
-    if (!supporte) return 'indisponible';
-    if (Notification.permission === 'denied') return 'refuse';
-    try { return localStorage.getItem(cle) === '1' && Notification.permission === 'granted' ? 'actif' : 'inactif'; }
-    catch { return 'inactif'; }
-  });
-  const basculer = useCallback(async () => {
-    if (!supporte) return;
-    if (etat === 'actif') {
-      try { localStorage.removeItem(cle); } catch { /* navigation privée */ }
-      return setEtat('inactif');
-    }
-    const accord = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
-    if (accord !== 'granted') return setEtat(accord === 'denied' ? 'refuse' : 'inactif');
-    try { localStorage.setItem(cle, '1'); } catch { /* navigation privée */ }
-    setEtat('actif');
-  }, [cle, etat, supporte]);
-  const prevenir = useCallback((titre: string, corps: string) => {
-    if (etat !== 'actif' || !supporte || Notification.permission !== 'granted') return;
-    try { new Notification(titre, { body: corps, icon: '/favicon.svg', tag: `${ligueId}-${titre}` }); }
-    catch { /* certains navigateurs refusent hors service worker */ }
-  }, [etat, ligueId, supporte]);
-  return { etat, basculer, prevenir };
-}
-
 function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; suivre: (id: string) => void }) {
-  const rappels = useRappels(vue.id);
+
   const maintenant = maintenantISO();
   const miennes = vue.rencontres.filter(r => r.domicile === vue.monClubId || r.exterieur === vue.monClubId);
   const aVenir = miennes.filter(r => !r.resultat).sort((a, b) => Date.parse(a.ferme) - Date.parse(b.ferme));
@@ -1661,21 +1573,7 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
       <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande />
     </section>}
 
-    <section className="cel-panneau">
-      <div className="cel-titre-ligne">
-        <h2>Me prévenir</h2>
-        <button className={`cel-interrupteur${rappels.etat === 'actif' ? ' actif' : ''}`} disabled={rappels.etat === 'indisponible' || rappels.etat === 'refuse'}
-          onClick={() => { void rappels.basculer(); }} aria-pressed={rappels.etat === 'actif'}>
-          <i /><span>{rappels.etat === 'actif' ? 'Activé' : 'Désactivé'}</span>
-        </button>
-      </div>
-      <p className="cel-note">
-        {rappels.etat === 'indisponible' ? 'Ce navigateur ne sait pas afficher de notification.'
-          : rappels.etat === 'refuse' ? 'Les notifications sont bloquées pour ce site. Réautorise-les dans les réglages de ton navigateur.'
-            : <>Une notification quand une journée s’ouvre, quand ton match commence et quand il se termine.
-              <b> Il faut que Destiny Rugby soit ouvert quelque part</b> — ce ne sont pas encore des alertes qui réveillent un téléphone fermé.</>}
-      </p>
-    </section>
+    <NotificationsMatch ligue={vue.id} />
 
     {aVenir.length > 1 && <section className="cel-panneau">
       <div className="cel-titre-ligne"><h2>Tes rendez-vous</h2><small>{aVenir.length} matchs à venir</small></div>

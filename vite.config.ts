@@ -56,6 +56,7 @@ function carriereEnDeveloppement(): Plugin {
               socket: req.socket,
             }, reponse);
           } catch (erreur) {
+            if (req.destroyed || (erreur as {code?:string}).code === 'ECONNRESET') return;
             console.error('[carriere]', erreur);
             suite(erreur as Error);
           }

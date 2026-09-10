@@ -113,7 +113,12 @@ export default function App() {
   //    met le code de côté et nettoie l’adresse ; l’écran le retrouve ensuite,
   //    même après une inscription et un rechargement.
   //    Une seule fois, à l’ouverture : les dépendances vides sont voulues.
-  useEffect(() => { if (capterInvitation()) setEcran('carriereEnLigne'); }, [setEcran]);
+  useEffect(() => {
+    const ouvrir = () => setEcran('carriereEnLigne');
+    window.addEventListener('destiny-ouvrir-match',ouvrir);
+    return () => window.removeEventListener('destiny-ouvrir-match',ouvrir);
+  },[setEcran]);
+  useEffect(() => { if (capterInvitation() || new URLSearchParams(location.search).has('directLigue')) setEcran('carriereEnLigne'); }, [setEcran]);
   // ⚠️ UN ÉCRAN VAUT UNE PAGE VUE. Le jeu n'a qu'une adresse : sans cette
   // ligne, toute une session ne compte qu'une page et l'on ne peut pas voir
   // où les joueurs décrochent. C'est le SEUL endroit qui voit tous les

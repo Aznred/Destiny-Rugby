@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
 import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, empreinteEcriture, vueCarriere } from '../src/lib/ligue/carriere.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
@@ -73,7 +74,11 @@ function protegerOrigine(req: RequeteCarriere) {
 const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, administrateur: c.identifiant === 'kiri' });
 const comptesEtat = (e: EtatCarriereEnLigne) => e.clubs.map(c => c.compteId);
 
-export function creerGestionnaireCarriere(stockage: StockageCarriere) {
+export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer?: (etat: EtatCarriereEnLigne) => Promise<void>) {
+  const notifier = async (etat: EtatCarriereEnLigne) => {
+    await programmer?.(etat);
+    if (stockage.push) await notifierMatchs(stockage.push, etat).catch(() => console.warn('[push] Service temporairement indisponible'));
+  };
   // Les fonctions serverless chaudes réutilisent ces caches. Une vérification
   // d'en-tête minuscule garde la cohérence entre instances sans retransférer
   // les centaines de Ko de la ligue à chaque sondage de direct.
@@ -153,11 +158,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
         // qu'il refuse par principe de revenir en arrière.
         const avance = { ...suivant, version: ligne.etat.version };
         memoriserLigue(id, { ...ligne, etat: avance, echeance });
+        await notifier(avance);
         return avance;
       }
       const maj: LigueStockee = { ...ligne, etat: suivant, comptes: comptesEtat(suivant) };
       if (await stockage.comparerEtEcrire(maj, ligne.version, compte, requete)) {
         memoriserLigue(id, { ...maj, version: ligne.version + 1, echeance: echeanceLigue(suivant, maintenant) });
+        await notifier(suivant);
         return suivant;
       }
       liguesChaudes.delete(id);
@@ -168,8 +175,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
     const ids = await stockage.actives();
     let traitees = 0;
     for (const id of ids) {
-      await appliquer(id, 'horloge', `tick-${Math.floor(Date.now() / 15_000)}`, (e, n, g) => actualiserCarriere(e, n, g));
-      traitees++;
+      try {
+        await appliquer(id, 'horloge', `tick-${randomUUID()}`, (e, n, g) => actualiserCarriere(e, n, g), false, false);
+        traitees++;
+      } catch { console.warn('[horloge] Une ligue sera reprise au prochain passage'); }
     }
     return traitees;
   }
@@ -281,6 +290,39 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
         await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);
         return res.status(200).json({ ok: true });
       }
+      if (url.searchParams.has('push') || action === 'push') {
+        const configPush = configurationPush();
+        const id = String(req.method === 'GET' ? url.searchParams.get('ligue') ?? '' : corps.ligue ?? '');
+        const membre = idValide(id) ? await stockage.entete(id) : null;
+        if (!membre?.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+        if (req.method === 'GET') return res.status(200).json({ disponible: Boolean(configPush && stockage.push), clePublique: configPush?.publicKey });
+        if (!stockage.push) throw new ErreurHttp(503, 'Le service de notifications attend son installation.');
+        if (corps.operation === 'supprimer') {
+          const endpoint = texte(corps.endpoint, 10, 2048, 'Abonnement');
+          await stockage.push.supprimer(compte.id,idPush(endpoint),id);
+          return res.status(200).json({ ok:true });
+        }
+        let abonnement;
+        try { abonnement = validerAbonnement(corps.abonnement); } catch { throw new ErreurHttp(400,'Abonnement de notification invalide.'); }
+        if (corps.operation === 'etat') {
+          const actif = (await stockage.push.lister(id)).some(a => a.compte === compte.id && a.id === idPush(abonnement.endpoint));
+          return res.status(200).json({ actif });
+        }
+        if (!configPush) throw new ErreurHttp(503, 'Les notifications attendent la configuration du serveur.');
+        if (corps.operation === 'tester') {
+          const actif = (await stockage.push.lister(id)).some(a => a.compte === compte.id && a.id === idPush(abonnement.endpoint));
+          if (!actif) throw new ErreurHttp(403,'Active les notifications avant de les tester.');
+          if (!await stockage.limiter(`push-test:${compte.id}`,3,60000,maintenant)) throw new ErreurHttp(429,'Patiente une minute avant un nouveau test.');
+          await envoyerPush(abonnement,{title:'Destiny Rugby',body:'Les alertes de match arrivent ici, même lorsque le jeu est fermé.',tag:`test-${maintenant}`,url:`/?directLigue=${id}`});
+        } else if (corps.operation === 'activer') {
+          const existants = await stockage.push.lister(id);
+          if (existants.filter(a => a.compte === compte.id).length >= 8 && !existants.some(a => a.id === idPush(abonnement.endpoint))) throw new ErreurHttp(400,'Huit appareils sont déjà abonnés à cette ligue.');
+          await stockage.push.enregistrer({id:idPush(abonnement.endpoint),compte:compte.id,ligue:id,cree:maintenant,abonnement});
+          const liguePush = await lireLigue(id);
+          if (liguePush) await programmer?.(liguePush.etat);
+        } else throw new ErreurHttp(400,'Action de notification inconnue.');
+        return res.status(200).json({ok:true});
+      }
       if (req.method === 'GET') {
         if (url.searchParams.get('statistiques') === 'globales') {
           if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
@@ -356,9 +398,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
           const code = `DR-${randomBytes(5).toString('hex').toUpperCase()}`;
           const e = creerCarriere({ id, code, compteId: compte.id, pseudo: compte.pseudo,
             nom: texte(corps.nom, 3, 40, 'Nom de ligue'), clubNom: texte(corps.clubNom, 3, 40, 'Nom du club'),
-            rythme: corps.rythme, maxClubs: Number(corps.maxClubs),
-            embleme: corps.embleme,
-            logo: corps.logo, tropheeId: corps.tropheeId, playoffs: corps.playoffs === true,
+            rythme: Number(corps.rythme), maxClubs: Number(corps.maxClubs),
+            embleme: typeof corps.embleme === 'string' ? corps.embleme : undefined,
+            logo: typeof corps.logo === 'string' ? corps.logo : undefined, tropheeId: typeof corps.tropheeId === 'string' ? corps.tropheeId : undefined, playoffs: corps.playoffs === true,
             dotationOvas: typeof corps.dotationOvas === 'number' ? corps.dotationOvas : undefined,
           }, maintenant, randomBytes(24).toString('hex'));
           if (await stockage.creerLigue({ id, code, etat: e, comptes: comptesEtat(e), version: 0 })) return res.status(201).json(vueCarriere(e, compte.id));
@@ -417,5 +459,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere) {
       return res.status(503).json({ erreur: 'Le serveur de carrière est indisponible. Réessayez dans un instant.' });
     }
   }
-  return { handler, avancerLigues };
+  return { handler, avancerLigues, actualiserLigue: async (id: string) => {
+    if (!await stockage.entete(id)) return;
+    return appliquer(id, 'horloge', `queue-${randomUUID()}`, (e,n,g) => actualiserCarriere(e,n,g), false, false);
+  } };
 }

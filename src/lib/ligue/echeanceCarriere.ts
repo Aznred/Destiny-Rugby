@@ -98,7 +98,10 @@ function directEnCours(etat: unknown): boolean {
 /** L'échéance à retenir pour une ligue : la plus proche des deux. */
 export function echeanceLigue(etat: unknown, maintenant: number): number {
   if (directEnCours(etat)) return maintenant;
+  const rencontres = (etat as {rencontres?: {ferme:string;match?:unknown;resultat?:unknown}[]})?.rencontres ?? [];
+  const rappels = rencontres.filter(r=>!r.match&&!r.resultat).map(r=>Date.parse(r.ferme)-120000).filter(t=>t>maintenant);
+  const prochainRappel = rappels.length ? Math.min(...rappels) : Infinity;
   const dansLEtat = prochaineEcheance(etat, maintenant);
   const jour = prochainJour(maintenant);
-  return dansLEtat === null ? jour : Math.min(dansLEtat, jour);
+  return Math.min(dansLEtat ?? jour, jour, prochainRappel);
 }

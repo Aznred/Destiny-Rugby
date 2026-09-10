@@ -37,3 +37,13 @@ void demarrer().catch((erreur) => {
   if (moduleObsolete(erreur) && rechargerPourModuleObsolete()) return
   throw erreur
 })
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', event => {
+    if(event.data?.type !== 'ouvrir-match') return;
+    const url = new URL(event.data.url,location.origin);
+    if(url.origin !== location.origin) return;
+    history.replaceState(null,'',url.pathname+url.search);
+    window.dispatchEvent(new Event('destiny-ouvrir-match'));
+  });
+}

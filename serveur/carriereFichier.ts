@@ -2,12 +2,14 @@
 // Les écritures sont synchrones et remplacent atomiquement le fichier : aucun
 // await entre la comparaison de version et le commit dans ce processus unique.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { pushLocal, type BasePush } from './pushStockage.js';
 import { dirname } from 'node:path';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import { vueCarriere } from '../src/lib/ligue/carriere.js';
 
 interface BaseLocale {
+  push?: BasePush;
   comptes: CompteStocke[];
   sessions: Record<string, { compte: string; expiration: number }>;
   ligues: LigueStockee[];
@@ -24,11 +26,13 @@ export function stockageFichier(fichier: string): StockageCarriere {
     renameSync(`${fichier}.tmp`, fichier);
   };
   const copie = <T>(v: T): T => structuredClone(v);
+  base.push ??= { abonnements: [], envois: {} };
   // L'échéance ne vaut que pour ce processus : le serveur de développement
   // redémarre souvent, et une échéance perdue coûte une relecture, rien de plus.
   const echeances: Record<string, number> = {};
   const cleRecu = (l: string, c: string, r: string) => JSON.stringify([l, c, r]);
   return {
+    push: pushLocal(base.push, sauver),
     async compteParIdentifiant(i) { return copie(base.comptes.find(c => c.identifiant === i) ?? null); },
     async creerCompte(c) {
       if (base.comptes.some(x => x.identifiant === c.identifiant)) return false;
@@ -99,6 +103,6 @@ export function stockageFichier(fichier: string): StockageCarriere {
       echeances[l.id] = echeanceLigue(l.etat, Date.now());
       base.recus[cle] = true; sauver(); return true;
     },
-    async actives() { return base.ligues.filter(l => l.etat.phase === 'saison').map(l => l.id); },
+    async actives() { return base.ligues.filter(l => l.etat.phase === 'saison' && (echeances[l.id] ?? 0) <= Date.now()).map(l => l.id); },
   };
 }
