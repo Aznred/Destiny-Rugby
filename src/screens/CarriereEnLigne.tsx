@@ -831,7 +831,13 @@ function FicheClubEnLigne({ vue, clubId, onFermer }: { vue: VueCarriereEnLigne; 
 function Rencontre({ vue, rencontre: r, occupe, suivre, grande = false }: { vue: VueCarriereEnLigne; rencontre: VueRencontre; agir: Agir; occupe: boolean; suivre: (id: string) => void; grande?: boolean }) {
   const moi = r.domicile === vue.monClubId || r.exterieur === vue.monClubId;
   const ouverte = Date.parse(r.ferme) - Date.now() <= 120_000;
-  return <article className={`cel-rencontre${grande ? ' grande' : ''}`}><div className="cel-rencontre-date">Journée {r.journee} · {dateHeure(r.ferme)}{r.match && !r.match.termine && <b className="cel-direct-label"> EN DIRECT · {r.match.minute}′</b>}</div><div className="cel-affiche"><b>{nomClub(vue, r.domicile)}</b><strong>{r.resultat ? `${r.resultat.pointsD} – ${r.resultat.pointsE}` : r.match ? `${r.match.score.domicile} – ${r.match.score.exterieur}` : 'VS'}</strong><b>{nomClub(vue, r.exterieur)}</b></div>{r.match ? <button className="btn fantome" onClick={() => suivre(r.id)}>{r.match.termine ? 'Voir le match' : 'Rejoindre le direct'}<Icone nom="fleche-droite" taille={15} /></button> : !r.resultat && moi ? <button className="btn primaire" disabled={occupe || !ouverte} onClick={() => suivre(r.id)}>{ouverte ? 'Rejoindre le direct' : 'Accès 2 min avant'}</button> : null}</article>;
+  const domicile = vue.clubs.find(c => c.id === r.domicile);
+  const exterieur = vue.clubs.find(c => c.id === r.exterieur);
+  return <article className={`cel-rencontre${grande ? ' grande' : ''}`}><div className="cel-rencontre-date">Journée {r.journee} · {dateHeure(r.ferme)}{r.match && !r.match.termine && <b className="cel-direct-label"> EN DIRECT · {r.match.minute}′</b>}</div><div className="cel-affiche">
+    <span className="cel-equipe-affiche"><b>{nomClub(vue, r.domicile)}</b><Ecusson nom={nomClub(vue, r.domicile)} logo={domicile?.embleme} /></span>
+    <strong>{r.resultat ? `${r.resultat.pointsD} – ${r.resultat.pointsE}` : r.match ? `${r.match.score.domicile} – ${r.match.score.exterieur}` : 'VS'}</strong>
+    <span className="cel-equipe-affiche"><b>{nomClub(vue, r.exterieur)}</b><Ecusson nom={nomClub(vue, r.exterieur)} logo={exterieur?.embleme} /></span>
+  </div>{r.match ? <button className="btn fantome" onClick={() => suivre(r.id)}>{r.match.termine ? 'Voir le match' : 'Rejoindre le direct'}<Icone nom="fleche-droite" taille={15} /></button> : !r.resultat && moi ? <button className="btn primaire" disabled={occupe || !ouverte} onClick={() => suivre(r.id)}>{ouverte ? 'Rejoindre le direct' : 'Accès 2 min avant'}</button> : null}</article>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1711,7 +1717,7 @@ function ClassementsPoules({ vue, competition, onClub }: {
           const enCourse = !competition.phaseFinaleSeed && rang === placesDirectes && (competition.qualifies ?? 0) % groupes.length !== 0;
           return <tr key={ligne.clubId} className={`${ligne.clubId === vue.monClubId ? 'moi ' : ''}${qualifie ? 'qualifie' : ''}`}>
             <td><b>{rang + 1}</b>{qualifie && <i className="cel-statut-qualif">Q</i>}{repeches.has(ligne.clubId) && <i className="cel-statut-qualif repeche">R</i>}{enCourse && <i className="cel-statut-qualif attente" title="En course pour le repêchage">R?</i>}</td>
-            <th><button className="cel-club-lien" onClick={() => onClub(ligne.clubId)}>{ligne.nom}</button></th>
+            <th><button className="cel-club-lien cel-club-poule" onClick={() => onClub(ligne.clubId)}><span>{ligne.nom}</span><Ecusson nom={ligne.nom} logo={vue.clubs.find(c => c.id === ligne.clubId)?.embleme} /></button></th>
             <td>{ligne.joues}</td><td>{ligne.difference > 0 ? '+' : ''}{ligne.difference}</td><td><b>{ligne.points}</b></td>
           </tr>;
         })}</tbody></table></div>
@@ -1737,7 +1743,9 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
   const rencontres = vue.rencontres.filter(r => r.competitionId === competition?.id);
   const journees = [...new Set(rencontres.map(r => r.journee))].sort((a, b) => a - b);
   const formatEffectif = format === 'elimination' && !estPuissanceDeDeux(participants.length) ? 'poules' : format;
-  const apercuPoules = formatEffectif === 'poules' && participants.length >= 3 ? repartirPoules(participants) : [];
+  const rangs = new Map(vue.classement.map((ligne, index) => [ligne.clubId, index]));
+  const participantsOrdonnes = [...participants].sort((a, b) => (rangs.get(a) ?? 999) - (rangs.get(b) ?? 999));
+  const apercuPoules = formatEffectif === 'poules' && participants.length >= 3 ? repartirPoules(participantsOrdonnes) : [];
   const qualifiesApercu = apercuPoules.length ? nombreQualifiesPoules(participants.length) : 0;
 
   return <>
@@ -1767,7 +1775,8 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
       {format === 'championnat' && <label className="cel-bascule"><input type="checkbox" checked={playoffsCoupe} onChange={e => setPlayoffsCoupe(e.target.checked)} /><span><b>Phase finale</b>Les qualifiés, dont le nombre dépend du nombre de clubs, se disputent le trophée après les journées de poule.</span></label>}
       <h3 className="cel-sous-titre">Participants</h3>
       <div className="cel-choix-cartes">{vue.clubs.map(c => <button type="button" key={c.id} className={participants.includes(c.id) ? 'actif' : ''} onClick={() => setParticipants(participants.includes(c.id) ? participants.filter(x => x !== c.id) : [...participants, c.id])}>{c.nom}</button>)}</div>
-      {apercuPoules.length > 0 && <div className="cel-apercu-format"><Icone nom="trophee" taille={20} /><div><b>{apercuPoules.length} poules de {apercuPoules.map(p => p.length).join(' · ')} clubs</b><span>Les {qualifiesApercu} meilleurs vont en {qualifiesApercu === 8 ? 'quarts de finale' : qualifiesApercu === 4 ? 'demi-finales' : 'finale'}. Les places restantes repêchent les meilleurs au même rang.</span></div></div>}
+      {apercuPoules.length > 0 && <><div className="cel-apercu-format"><Icone nom="trophee" taille={20} /><div><b>{apercuPoules.length} poules de {apercuPoules.map(p => p.length).join(' · ')} clubs</b><span>Les {qualifiesApercu} meilleurs vont en {qualifiesApercu === 8 ? 'quarts de finale' : qualifiesApercu === 4 ? 'demi-finales' : 'finale'}. Les places restantes repêchent les meilleurs au même rang.</span></div></div>
+        <div className="cel-composition-poules">{apercuPoules.map((poule, index) => <article key={index}><h4>Poule {String.fromCharCode(65 + index)}</h4>{poule.map(id => { const club = vue.clubs.find(c => c.id === id); return <span key={id}><b>{club?.nom}</b><Ecusson nom={club?.nom ?? 'Club'} logo={club?.embleme} /></span>; })}</article>)}</div></>}
       {format === 'elimination' && formatEffectif === 'poules' && <p className="cel-note">Avec {participants.length} clubs, la coupe passera automatiquement par des poules afin que personne ne soit exempt au hasard.</p>}
       <button className="btn primaire" disabled={occupe || participants.length < (formatEffectif === 'poules' ? 3 : 2)}>Créer la {nom}</button>
     </form>}

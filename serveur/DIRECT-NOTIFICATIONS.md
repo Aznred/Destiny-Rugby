@@ -28,6 +28,24 @@ Le direct affiche maintenant un terrain 2D avec les positions du serveur, des pi
    pendant un match de test. Vérifier un essai, une transformation, une pénalité,
    un carton, la fin du match et le clic qui ouvre la bonne rencontre.
 
+## Mettre à jour une installation Vercel existante
+
+1. Ne pas régénérer les clés VAPID à chaque mise à jour : les trois variables
+   `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY` et `WEB_PUSH_SUBJECT` doivent
+   rester identiques, sinon les téléphones déjà inscrits devront se réabonner.
+2. Vérifier dans Vercel, **Settings → Environment Variables**, que ces trois
+   variables, `DATABASE_URL` et `CRON_SECRET` ciblent bien **Production**.
+3. Réappliquer `node scripts/appliquerSchema.mjs serveur/schema-push.sql` si la
+   migration push n'a jamais été exécutée. Le schéma est idempotent.
+4. Pousser la version sur la branche de production ou relancer un déploiement
+   depuis **Deployments → Redeploy**. Une modification des variables ne touche
+   que les nouveaux déploiements.
+5. Dans Vercel, vérifier que `api/matchs.ts` apparaît comme consommateur du
+   topic `destiny-matchs`, puis consulter les Runtime Logs lors du test.
+6. Sur le téléphone, ouvrir Calendrier, activer les notifications et lancer
+   « Envoyer une notification de test ». Si la permission avait été refusée,
+   la réautoriser dans les réglages du téléphone avant de recommencer.
+
 Le test réel sur téléphone et le déploiement exigent les accès à l'hébergement
 et un téléphone autorisant les alertes. Une compilation locale ne valide pas
 la livraison par Apple/Google. Le système, le réseau et le mode Concentration
