@@ -138,6 +138,8 @@ titre('1. LA LIGUE, ET LES 30 BRONZE DU DÉPART');
   dire(poidsPackQuotidien(elite, 5, 6) > poidsPackQuotidien(elite, 0, 6), 'le dernier a davantage de chances de recevoir un pack rare');
   let e = ligue(2);
   const club = e.clubs[0];
+  const packForce = e.packs.find(p => p.id !== club.packsGratuits?.[0]?.packId) ?? e.packs[0];
+  club.packsGratuitsProgrammes = { '2026-09-08': Array(10).fill(packForce.id) };
   const cadeau = club.packsGratuits![0];
   const solde = club.ovas;
   const cartesAvant = e.cartes.length;
@@ -149,6 +151,11 @@ titre('1. LA LIGUE, ET LES 30 BRONZE DU DÉPART');
   dire(refuse, 'un pack quotidien ne peut pas être ouvert deux fois');
   e = avancerCarriere(e, T0 + JOUR + 1000, 'lendemain');
   dire(e.clubs[0].packsGratuits?.length === 19, 'le lendemain ajoute bien un nouveau lot de dix');
+  dire(e.clubs[0].packsGratuits?.slice(-10).every(p => p.packId === packForce.id) === true,
+    'un lot administrateur programmé arrive au jour demandé');
+  dire(!e.clubs[0].packsGratuitsProgrammes, 'la programmation consommée est supprimée');
+  dire(!('packsGratuitsProgrammes' in (vueCarriere(e, club.compteId).clubs[0] as object)),
+    'la programmation administrateur reste privée');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

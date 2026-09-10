@@ -101,10 +101,17 @@ function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number)
     const rang = place >= 0 ? place : Math.max(0, etat.clubs.length - 1);
     const poids = etat.packs.map(pack => poidsPackQuotidien(pack, rang, etat.clubs.length, classementActif));
     const rng = hasard(`${etat.graine}:packs-quotidiens:${jour}:${club.id}`);
+    const programmes = club.packsGratuitsProgrammes?.[jour] ?? [];
     for (let i = 0; i < PACKS_GRATUITS_PAR_JOUR; i++) {
-      const index = tirerPondere(poids, rng);
+      const force = programmes[i];
+      const indexForce = force ? etat.packs.findIndex(pack => pack.id === force) : -1;
+      const index = indexForce >= 0 ? indexForce : tirerPondere(poids, rng);
       exiger(index >= 0, 'Aucun pack quotidien disponible.');
       club.packsGratuits.push({ id: `${club.id}:quotidien:${jour}:${i}`, packId: etat.packs[index].id, recuLe: dateServeur(maintenant) });
+    }
+    if (club.packsGratuitsProgrammes?.[jour]) {
+      delete club.packsGratuitsProgrammes[jour];
+      if (!Object.keys(club.packsGratuitsProgrammes).length) delete club.packsGratuitsProgrammes;
     }
     club.dernierLotPacksGratuits = jour;
   }
@@ -1120,7 +1127,7 @@ export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCar
     competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
       ? { ...c, classementsPoules: c.poules.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres)) }
       : c),
-    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, packsGratuits, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club.id ? { ...reste, composition, strategie, packsGratuits, dernierLotPacksGratuits } : reste; }),
+    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, packsGratuits, packsGratuitsProgrammes: _programmes, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club.id ? { ...reste, composition, strategie, packsGratuits, dernierLotPacksGratuits } : reste; }),
     cartes: etat.cartes.filter(c => c.proprietaire !== null),
     rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: vueMatchEnLigne(match, club.id) } : reste; }),
     objectifs: etat.objectifs.filter(o => o.clubId === club.id), transactions: etat.transactions.filter(t => t.clubId === club.id),

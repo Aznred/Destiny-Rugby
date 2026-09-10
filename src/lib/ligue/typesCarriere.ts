@@ -65,6 +65,8 @@ export interface ClubCarriere {
   rejointLe: string;
   /** Lots quotidiens non ouverts. Le serveur seul choisit leur type. */
   packsGratuits?: PackGratuitCarriere[];
+  /** Lots planifiés par l'administrateur, indexés par jour UTC. Jamais exposés aux autres clubs. */
+  packsGratuitsProgrammes?: Record<string, IdPackCarriere[]>;
   dernierLotPacksGratuits?: string;
 }
 export interface ResultatCarriere {
@@ -150,7 +152,7 @@ export interface EtatCarriereEnLigne {
 }
 export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' | 'clubs' | 'cartes' | 'rencontres' | 'objectifs' | 'transactions' | 'echanges'> {
   monClubId: string;
-  clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie' | 'packsGratuits' | 'dernierLotPacksGratuits' | 'buteurManuel'> & { composition?: CompositionManager; strategie?: StrategieEnLigne; packsGratuits?: PackGratuitCarriere[]; dernierLotPacksGratuits?: string })[];
+  clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie' | 'packsGratuits' | 'packsGratuitsProgrammes' | 'dernierLotPacksGratuits' | 'buteurManuel'> & { composition?: CompositionManager; strategie?: StrategieEnLigne; packsGratuits?: PackGratuitCarriere[]; dernierLotPacksGratuits?: string })[];
   /** Vue courante : cartes distribuées seulement. Le catalogue public est consulté séparément, par pages. */
   cartes: CarteCarriere[];
   rencontres: (Omit<RencontreCarriere, 'match'> & { match?: VueMatchEnLigne })[];
