@@ -2203,9 +2203,6 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-compo .ct-apercu-selection { display: flex; flex-direction: column; gap: 8px; font-size: 12px; text-align: center; }
 .cel-compo .ct-apercu-selection > .dr-player { width: 140px; max-width: 100%; align-self: center; }
 .cel-compo .ct-apercu-selection p { color: #b7cbd1; line-height: 1.5; }
-.cel-compo .ct-legende-liens { display: grid; gap: 8px; margin-top: 8px; text-align: left; font-size: 10px; color: #d3e3df; }
-.cel-compo .ct-legende-liens span { display: flex; align-items: center; gap: 7px; }
-.cel-compo .ct-legende-liens i { display: block; width: 15px; height: 3px; flex: none; }
 .cel-compo .manager-feuille-visuelle > .manager-compo-aide { display: none; }
 .cel-compo .manager-feuille-visuelle > .ct-plateau { grid-column: 2; grid-row: 1; display: block; height: 100%; min-height: 0; overflow: visible; position: relative; }
 .cel-compo .ct-plateau > .manager-terrain-cadre { display: block; height: 100%; min-height: 0; padding: 0; border: 0; background: transparent; box-sizing: border-box; }
@@ -2222,9 +2219,6 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-compo .ct-feuille-fut .ct-fut-indicateurs { font-size: 10px; padding: 0 3px; min-height: 13px; gap: 4px; }
 .cel-compo .ct-feuille-fut .ct-fut-indicateurs svg { width: 8px; height: 8px; }
 .cel-compo .ct-feuille-fut .cel-barre-collectif { margin-top: 1px; height: 2px; }
-.cel-compo .ct-liens-collectif { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; }
-.cel-compo .ct-liens-collectif line { stroke-width: 2.5; opacity: .85; filter: drop-shadow(0 0 3px #d2ed5455); }
-.cel-compo .ct-liens-collectif .ct-lien-estompe { opacity: .18; }
 .cel-compo .ct-selection-actions { grid-column: 1 / -1; grid-row: 2; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: #071922; border-radius: 7px; font-size: 12px; color: #c4dadc; }
 .cel-compo .ct-selection-actions b { color: #f6d476; }
 .cel-compo .ct-selection-actions span { flex: 1; }

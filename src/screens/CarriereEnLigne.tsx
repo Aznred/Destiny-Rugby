@@ -1148,12 +1148,6 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
     </section>
 
     <CompositionTerrainManager
-      lienEntre={(a, b) => {
-        const ca = cartes.find(c => c.id === a), cb = cartes.find(c => c.id === b);
-        if (ca?.clubReel && ca.clubReel === cb?.clubReel) return { couleur: '#78e354', libelle: `Même club : ${ca.clubReel}` };
-        const commun = [ca?.nation && ca.nation === cb?.nation ? ca.nation : '', ca?.championnat && ca.championnat === cb?.championnat ? ca.championnat : ''].filter(Boolean);
-        return commun.length ? { couleur: '#f3ce50', libelle: commun.join(' · ') } : { couleur: '#cf6158', libelle: 'Aucune affinité commune' };
-      }}
       rendreCarte={joueur => {
         const carte = cartes.find(c => c.id === joueur.id);
         if (!carte) return null;

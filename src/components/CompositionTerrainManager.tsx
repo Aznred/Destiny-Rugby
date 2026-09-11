@@ -48,7 +48,6 @@ import { photoReelle } from '../lib/avatars';
 type ZoneComposition = 'titulaires' | 'remplacants';
 
 interface Props {
-  lienEntre?: (a: string, b: string) => { couleur: string; libelle: string };
   rendreCarte?: (joueur: Coequipier) => ReactNode;
   /**
    * Ce qui se glisse SOUS la ligne d'indicateurs (numero, adequation, forme).
@@ -81,7 +80,7 @@ const PLACEMENT_XV = [
   [12, 18], [36, 24], [64, 23], [88, 18], [50, 9],
 ] as const;
 
-// Six lignes de rugby, décalées pour laisser les cartes et leurs liens lisibles.
+// Six lignes de rugby, décalées pour laisser les cartes lisibles.
 const PLACEMENT_LIGUE = [
   [25, 86], [50, 86], [75, 86],
   [38, 71.6], [62, 71.6],
@@ -89,12 +88,6 @@ const PLACEMENT_LIGUE = [
   [37, 42.8], [63, 42.8],
   [10, 28.4], [28, 28.4], [72, 28.4], [90, 28.4], [50, 14],
 ] as const;
-const LIENS_XV = [
-  [0, 1], [1, 2], [0, 3], [1, 3], [1, 4], [2, 4], [3, 4],
-  [3, 5], [3, 7], [4, 7], [4, 6], [5, 7], [7, 6],
-  [7, 8], [8, 9], [8, 11], [9, 12], [10, 11], [11, 12], [12, 13], [11, 14], [12, 14],
-] as const;
-
 /**
  * ⚠️ LES PARTENAIRES DIRECTS D'UN POSTE, pour les liaisons du panneau. La
  * demande donne les trois qui comptent : la charnière, la première ligne, et le
@@ -442,7 +435,7 @@ function PanneauJoueur({
 
 export function CompositionTerrainManager({
   effectif, effectifComplet = effectif, composition, onPlacer, etats, indisponibles,
-  automatismes, onCapitaine, onButeur, rendreCarte, rendreSousCarte, lienEntre,
+  automatismes, onCapitaine, onButeur, rendreCarte, rendreSousCarte,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
   const [ficheMasquee, setFicheMasquee] = useState<string | null>(null);
@@ -615,7 +608,6 @@ export function CompositionTerrainManager({
         </ul>
         {rendreCarte && <div className="ct-apercu-selection">
           {joueurSelectionne ? <>{rendreCarte(joueurSelectionne)}<b>{joueurSelectionne.nom}</b><span>{nomPoste(joueurSelectionne.poste)} · {joueurSelectionne.note} GEN</span></> : <p>Choisis une carte pour voir le joueur et le remplacer.</p>}
-          <div className="ct-legende-liens"><span><i style={{ background: '#78e354' }} /> Même club</span><span><i style={{ background: '#f3ce50' }} /> Nation ou championnat</span><span><i style={{ background: '#cf6158' }} /> Aucune affinité commune</span></div>
         </div>}
       </div>
 
@@ -636,15 +628,6 @@ export function CompositionTerrainManager({
             <span>{t('compo.enButAdverse')}</span><b>{t('compo.tonXV')}</b><span>{t('compo.tonEnBut')}</span>
           </div>
           <div className="manager-terrain-xv">
-            {rendreCarte && lienEntre && <svg className="ct-liens-collectif" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Liens d’affinité entre les titulaires">
-              {LIENS_XV.map(([a, b]) => {
-                const ja = titulaires[a], jb = titulaires[b];
-                if (!ja || !jb) return null;
-                const lien = lienEntre(ja.id, jb.id);
-                const [ax, ay] = PLACEMENT_LIGUE[a], [bx, by] = PLACEMENT_LIGUE[b];
-                return <line key={`${a}-${b}`} x1={ax} y1={ay} x2={bx} y2={by} stroke={lien.couleur} vectorEffect="non-scaling-stroke" className={selection && selection !== ja.id && selection !== jb.id ? 'ct-lien-estompe' : ''}><title>{ja.nom} — {jb.nom} : {lien.libelle}</title></line>;
-              })}
-            </svg>}
             {POSTES_XV_MANAGER.map((posteSlot, index) => {
               const joueur = titulaires[index];
               const [x, y] = rendreCarte ? PLACEMENT_LIGUE[index] : PLACEMENT_XV[index];
