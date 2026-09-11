@@ -299,7 +299,7 @@ function GrilleChoix({ titre, sousTitre, compte, children, onFermer, onEffacer, 
       {entete}
       <div className="cel-emblemes-liste">{children}</div>
       <div className="cel-actions">
-        <button className="btn primaire" onClick={onFermer}>Fermer</button>
+        <button className="btn primaire" onClick={onFermer}>{t('online.common.close')}</button>
         {onEffacer && <button className="btn fantome" onClick={() => { onEffacer(); onFermer(); }}>{libelleEffacer ?? 'Effacer'}</button>}
         {compte && <small>{compte}</small>}
       </div>
@@ -405,10 +405,10 @@ function ChoixEmbleme({ valeur, onChoisir, onFermer }: { valeur?: string; onChoi
               <EcussonClub logo={e.logo} taille={42} /><span>{e.nom}</span>
             </button>)}</div>
         </section>)}
-        {groupes && !filtres.length && <p className="cel-note">Aucun club ne correspond à « {recherche} ».</p>}
+        {groupes && !filtres.length && <p className="cel-note">{t('online.collection.empty')}</p>}
       </div>
       <div className="cel-actions">
-        <button className="btn primaire" onClick={onFermer}>Fermer</button>
+        <button className="btn primaire" onClick={onFermer}>{t('online.common.close')}</button>
         {valeur && <button className="btn fantome" onClick={() => { onChoisir(undefined); onFermer(); }}>Revenir aux initiales</button>}
         <small>{filtres.reduce((n, g) => n + g.emblemes.length, 0)} écussons dans {filtres.length} championnats.</small>
       </div>
@@ -669,7 +669,7 @@ function Portail({ session, occupe, ouvrirLigue, onCreer, onRejoindre }: { sessi
   const [embleme, setEmbleme] = useState<string | undefined>(); const [choixOuvert, setChoixOuvert] = useState(false);
   const [logo, setLogo] = useState<string | undefined>(); const [tropheeId, setTropheeId] = useState<string | undefined>(); const [playoffs, setPlayoffs] = useState(false);
   const [dotation, setDotation] = useState('1000');
-  return <><header className="cel-titre"><div className="eyebrow">{t('online.portal.welcome', { name: session.compte.pseudo })}</div><h1>{t('online.portal.title')}</h1><p>Chaque ligue a ses clubs, ses cartes, ses Ovas et son histoire.</p></header><div className="cel-portail"><div><h2>{t('online.myLeagues')} <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <button className="cel-ligue" key={l.id} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}</em><b>{l.clubNom}</b><small>{t(`online.phase.${l.etat === 'salon' ? 'lobby' : l.etat === 'saison' ? 'season' : 'break'}`)} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>)}</div> : <Vide titre={t('online.portal.create')}>Invite tes amis ou rejoins leur vestiaire avec le code partagé.</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme), Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>{t('online.portal.create')}</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>{t('online.portal.join')}</button></div><h2>{mode === 'creer' ? t('online.portal.create') : t('online.portal.join')}</h2>{mode === 'creer' ? <Champ label={t('online.portal.leagueName')}><input required minLength={3} maxLength={50} value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label={t('online.portal.inviteCode')}><input required autoCapitalize="characters" maxLength={20} value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label={t('online.portal.clubName')}><input required minLength={3} maxLength={40} value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>Écusson</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? 'Changer d’écusson' : 'Choisir un écusson'}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Champ label="Matchs par semaine"><input type="number" min={1} max={7} required value={rythme} onChange={e => setRythme(e.target.value)} /></Champ><Champ label="Nombre de clubs"><input type="number" min={2} max={64} required value={max} onChange={e => setMax(e.target.value)} /></Champ></div><Champ label="Ovas au départ"><input type="number" min={0} max={100000} required value={dotation} onChange={e => setDotation(e.target.value)} /></Champ><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>Phase finale</b>Les qualifiés disputent le titre après le championnat.</span></label></>}<p className="cel-note">Chaque club reçoit 30 joueurs Bronze autour de 35 GEN.</p><button className="btn primaire" disabled={occupe}>{occupe ? t('online.auth.connecting') : mode === 'creer' ? t('online.portal.createPrivate') : t('online.portal.joinLeague')}<Icone nom="fleche-droite" taille={18} /></button></form></div></>;
+  return <><header className="cel-titre"><div className="eyebrow">{t('online.portal.welcome', { name: session.compte.pseudo })}</div><h1>{t('online.portal.title')}</h1><p>{t('online.portal.description')}</p></header><div className="cel-portail"><div><h2>{t('online.myLeagues')} <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <button className="cel-ligue" key={l.id} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}</em><b>{l.clubNom}</b><small>{t(`online.phase.${l.etat === 'salon' ? 'lobby' : l.etat === 'saison' ? 'season' : 'break'}`)} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>)}</div> : <Vide titre={t('online.portal.create')}>{t('online.portal.empty')}</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme), Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>{t('online.portal.create')}</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>{t('online.portal.join')}</button></div><h2>{mode === 'creer' ? t('online.portal.create') : t('online.portal.join')}</h2>{mode === 'creer' ? <Champ label={t('online.portal.leagueName')}><input required minLength={3} maxLength={50} value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label={t('online.portal.inviteCode')}><input required autoCapitalize="characters" maxLength={20} value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label={t('online.portal.clubName')}><input required minLength={3} maxLength={40} value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>{t('online.portal.badge')}</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? t('online.portal.changeBadge') : t('online.portal.chooseBadge')}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Champ label={t('online.portal.matchesPerWeek')}><input type="number" min={1} max={7} required value={rythme} onChange={e => setRythme(e.target.value)} /></Champ><Champ label={t('online.portal.clubCount')}><input type="number" min={2} max={64} required value={max} onChange={e => setMax(e.target.value)} /></Champ></div><Champ label={t('online.portal.startingOvas')}><input type="number" min={0} max={100000} required value={dotation} onChange={e => setDotation(e.target.value)} /></Champ><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>{t('online.competition.knockout')}</b>{t('online.competition.knockoutHelp')}</span></label></>}<p className="cel-note">{t('online.portal.initialSquad')}</p><button className="btn primaire" disabled={occupe}>{occupe ? t('online.auth.connecting') : mode === 'creer' ? t('online.portal.createPrivate') : t('online.portal.joinLeague')}<Icone nom="fleche-droite" taille={18} /></button></form></div></>;
 }
 
 // ---------------------------------------------------------------------------
@@ -718,10 +718,6 @@ function Bureau({ vue, proprietaire, agir, occupe, suivre, notifier }: { vue: Vu
   const monClub = vue.clubs.find(c => c.id === vue.monClubId);
   const mesCartes = vue.cartes.filter(c => c.proprietaire === vue.monClubId);
   const prochaine = vue.rencontres.find(r => !r.resultat && (r.domicile === vue.monClubId || r.exterieur === vue.monClubId));
-  // ⚠️ REJOINDRE ENTRE DEUX SAISONS N'EST PAS « LA SAISON EST FINIE ». Un club
-  // inscrit pendant l'intersaison n'a ni affiche ni ligne au classement : sans
-  // ce cas, l'écran lui annonçait le verdict d'un championnat auquel il n'a
-  // jamais pris part, sans rien dire de ce qui l'attend.
   const arriveeEnCoursDeSaison = !prochaine && !vue.classement.some(l => l.clubId === vue.monClubId);
   const moyenne = mesCartes.length ? Math.round(mesCartes.reduce((s, c) => s + c.note, 0) / mesCartes.length) : 0;
   // ⚠️ LE COLLECTIF SE VOIT DEPUIS LE VESTIAIRE, pas seulement depuis l'écran
@@ -729,7 +725,7 @@ function Bureau({ vue, proprietaire, agir, occupe, suivre, notifier }: { vue: Vu
   // le cacher derrière un onglet, c'est le réserver à ceux qui savent déjà
   // qu'il existe.
   const collectif = collectifCarriere(mesCartes, monClub?.composition ?? COMPOSITION_VIDE);
-  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? 'Avant le premier coup de sifflet' : 'Le prochain rendez-vous'}</div>{vue.phase === 'salon' ? <><h2>Rassemblez votre XV de clubs.</h2><p>Le vestiaire est ouvert. Partage le code, compose ton équipe et lance la saison quand tes amis sont là.</p><Invitation code={vue.code} notifier={notifier} /><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Lancer la saison</button>}<small>{vue.clubs.length} / {vue.maxClubs} clubs inscrits{vue.clubs.length < 2 ? ' · Au moins 2 pour démarrer' : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : arriveeEnCoursDeSaison ? <><h2>Ton club est inscrit. Le championnat t’attend.</h2><p>Tu as rejoint entre deux saisons : ton championnat commence au prochain coup d’envoi. D’ici là, le marché, les enchères, les échanges et les packs quotidiens te sont ouverts — de quoi arriver avec un effectif prêt.</p></> : <><h2>La saison a livré son verdict.</h2><p>Retrouve les trophées dans l’histoire de la ligue.</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>Démarrer la saison suivante</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>Ton vestiaire</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>GEN moyen</span></div><div><b>{mesCartes.length}</b><span>joueurs</span></div><div><b>{mesCartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length}</b><span>blessés</span></div><div className={`cel-chiffre-collectif cel-collectif-${paliersCollectif(collectif.total)}`} title={`${PALIERS_COLLECTIF[paliersCollectif(collectif.total)]} — quatre joueurs d'un même club réel suffisent à les mettre au maximum ; une nation ou un championnat partagés par tout le XV valent 100. Le banc ne compte pas.`}><b>{collectif.total}</b><span>collectif</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>Écusson choisi à l’inscription — il ne change plus.</small></span></div><p className="cel-note">Fais grandir ton club grâce aux matchs, aux objectifs et au marché de la ligue.</p></div></div><div className="cel-grille-bureau"><div className="cel-panneau"><h2>Le championnat</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>Objectifs de la période</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>Jusqu’au {date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} Ovas</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? 'Récompense reçue' : 'Récupérer'}</button></div>) : <p className="cel-note">Les premiers objectifs arrivent au lancement de la saison.</p>}</div></div></>;
+  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? t('online.dashboard.beforeKickoff') : t('online.dashboard.next')}</div>{vue.phase === 'salon' ? <><h2>{t('online.dashboard.gather')}</h2><p>{t('online.dashboard.lobbyHelp')}</p><Invitation code={vue.code} notifier={notifier} /><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>{t('online.dashboard.startSeason')}</button>}<small>{t('online.dashboard.registered', { count: vue.clubs.length, max: vue.maxClubs })}{vue.clubs.length < 2 ? ` · ${t('online.dashboard.minimum')}` : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : arriveeEnCoursDeSaison ? <><h2>{t('online.dashboard.joinedBreak')}</h2><p>{t('online.dashboard.joinedBreakHelp')}</p></> : <><h2>{t('online.dashboard.seasonOver')}</h2><p>{t('online.dashboard.seasonOverHelp')}</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>{t('online.dashboard.startNextSeason')}</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>{t('online.dashboard.clubhouse')}</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>{t('online.dashboard.average')}</span></div><div><b>{mesCartes.length}</b><span>{t('online.common.players')}</span></div><div><b>{mesCartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length}</b><span>{t('online.common.injured')}</span></div><div className={`cel-chiffre-collectif cel-collectif-${paliersCollectif(collectif.total)}`} title={`${PALIERS_COLLECTIF[paliersCollectif(collectif.total)]}`}><b>{collectif.total}</b><span>{t('online.dashboard.chemistry')}</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>{t('online.dashboard.badgeLocked')}</small></span></div><p className="cel-note">{t('online.dashboard.growClub')}</p></div></div><div className="cel-grille-bureau"><div className="cel-panneau"><h2>{t('online.dashboard.league')}</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>{t('online.dashboard.objectives')}</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>{date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} Ovas</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? t('online.dashboard.rewardReceived') : t('online.dashboard.claim')}</button></div>) : <p className="cel-note">{t('online.dashboard.objectivesSoon')}</p>}</div></div></>;
 }
 
 /**
@@ -759,7 +755,7 @@ function formeDuClub(vue: VueCarriereEnLigne, clubId: string): ('V' | 'N' | 'D')
  */
 function Classement({ vue, onClub }: { vue: VueCarriereEnLigne; onClub?: (clubId: string) => void }) {
   const logos = useLogosDeClub();
-  if (!vue.classement.length) return <p className="cel-note">Le classement sera établi au début de la saison.</p>;
+  if (!vue.classement.length) return <p className="cel-note">{t('online.table.pending')}</p>;
   const joue = vue.classement.some(l => l.joues > 0);
   return <div className="cel-table-scroll"><table className="cel-table cel-classement">
     <thead><tr>
@@ -825,7 +821,7 @@ function FicheClubEnLigne({ vue, clubId, onFermer }: { vue: VueCarriereEnLigne; 
           <h2>{club.nom}</h2>
           <p>{cartes.length} joueurs · {moyenne} GEN moyen · XV à {moyenneXV}{titres.length ? ` · ${titres.length} trophée${titres.length > 1 ? 's' : ''}` : ''}</p>
         </div>
-        <button className="btn fantome" onClick={onFermer}><Icone nom="croix" taille={15} /> Fermer</button>
+        <button className="btn fantome" onClick={onFermer}><Icone nom="croix" taille={15} /> {t('online.common.close')}</button>
       </header>
 
       {ligne && ligne.joues > 0 && <div className="cel-chiffres cel-fiche-chiffres">
@@ -835,7 +831,7 @@ function FicheClubEnLigne({ vue, clubId, onFermer }: { vue: VueCarriereEnLigne; 
         <div><b>{ligne.contre}</b><span>encaissés</span></div>
       </div>}
 
-      {rencontres.length > 0 && <><h3 className="cel-sous-titre">Derniers résultats</h3>
+      {rencontres.length > 0 && <><h3 className="cel-sous-titre">{t('online.club.results')}</h3>
         <div className="cel-fiche-resultats">{rencontres.map(r => {
           const chezMoi = r.domicile === clubId;
           const pour = chezMoi ? r.resultat!.pointsD : r.resultat!.pointsE;
@@ -846,10 +842,10 @@ function FicheClubEnLigne({ vue, clubId, onFermer }: { vue: VueCarriereEnLigne; 
           </span>;
         })}</div></>}
 
-      {titres.length > 0 && <><h3 className="cel-sous-titre">Palmarès</h3>
+      {titres.length > 0 && <><h3 className="cel-sous-titre">{t('online.club.honours')}</h3>
         <div className="cel-fiche-titres">{titres.map((h, i) => <span key={i}><Icone nom="trophee" taille={16} />{h.trophee} <small>saison {h.saison}</small></span>)}</div></>}
 
-      <h3 className="cel-sous-titre">L’effectif</h3>
+      <h3 className="cel-sous-titre">{t('online.club.squad')}</h3>
       <div className="cel-grille-cartes">{cartes.map(c => <CarteJoueurEnLigne key={c.id} carte={c} logoClub={logos.get(c.clubReel)} />)}</div>
     </div>
   </div>;
@@ -864,7 +860,7 @@ function Rencontre({ vue, rencontre: r, occupe, suivre, grande = false }: { vue:
     <span className="cel-equipe-affiche"><b>{nomClub(vue, r.domicile)}</b><span className="cel-blason-affiche"><Ecusson nom={nomClub(vue, r.domicile)} logo={domicile?.embleme} /></span></span>
     <strong>{r.resultat ? `${r.resultat.pointsD} – ${r.resultat.pointsE}` : r.match ? `${r.match.score.domicile} – ${r.match.score.exterieur}` : 'VS'}</strong>
     <span className="cel-equipe-affiche"><b>{nomClub(vue, r.exterieur)}</b><span className="cel-blason-affiche"><Ecusson nom={nomClub(vue, r.exterieur)} logo={exterieur?.embleme} /></span></span>
-  </div>{r.match ? <button className="btn fantome" onClick={() => suivre(r.id)}>{r.match.termine ? 'Voir le match' : 'Rejoindre le direct'}<Icone nom="fleche-droite" taille={15} /></button> : !r.resultat && moi ? <button className="btn primaire" disabled={occupe || !ouverte} onClick={() => suivre(r.id)}>{ouverte ? 'Rejoindre le direct' : 'Accès 2 min avant'}</button> : null}</article>;
+  </div>{r.match ? <button className="btn fantome" onClick={() => suivre(r.id)}>{r.match.termine ? t('online.match.watch') : t('online.match.join')}<Icone nom="fleche-droite" taille={15} /></button> : !r.resultat && moi ? <button className="btn primaire" disabled={occupe || !ouverte} onClick={() => suivre(r.id)}>{ouverte ? t('online.match.join') : '−2 min'}</button> : null}</article>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -974,7 +970,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   useEffect(() => { ancre.current = { horloge: horlogeServeur, recu: Date.now() }; }, [horlogeServeur]);
   const couleurs = useMemo(() => couleursDirect(r.domicile, r.exterieur), [r.domicile, r.exterieur]);
 
-  if (!m) return <><button className="btn fantome" onClick={fermer}>Fermer</button><Vide icone="chrono" titre="Les équipes entrent sur le terrain">Coup d’envoi automatique le {dateHeure(r.ferme)}. Le direct apparaîtra ici.</Vide></>;
+  if (!m) return <><button className="btn fantome" onClick={fermer}>{t('online.common.close')}</button><Vide icone="chrono" titre={t('online.match.teamsEntering')}>{t('online.match.kickoffAt', { date: dateHeure(r.ferme) })}</Vide></>;
   const strategie = m.maStrategie ?? STRATEGIE_VIDE;
   const changer = <K extends keyof StrategieEnLigne>(cle: K, valeur: string) => {
     void agir({ type: 'match', matchId, action: { type: 'strategie', strategie: { ...strategie, [cle]: valeur } as StrategieEnLigne } });
@@ -1003,7 +999,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     </div>
 
     <DirectCinema match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs} />
-    <details><summary>Recevoir les alertes sur mon téléphone</summary><NotificationsMatch ligue={vue.id} /></details>
+    <details><summary>{t('online.match.alerts')}</summary><NotificationsMatch ligue={vue.id} /></details>
 
     {/* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).
         Le serveur ne propose plus une décision sur chacune des vingt-quatre
@@ -1027,7 +1023,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     <nav className="cel-onglets secondaires">{([['fil', 'Journal du match'], ['consignes', 'Consignes'], ['banc', 'Le banc'], ['stats', 'Statistiques']] as const).map(([id, label]) =>
       <button key={id} className={ongletDirect === id ? 'actif' : ''} onClick={() => setOngletDirect(id)}>{label}</button>)}</nav>
 
-    {ongletDirect === 'fil' && <div className="cel-panneau cel-fil-match">{m.fil.length ? [...m.fil].reverse().map((l, i) => <p key={`${l.minute}-${i}`} className={`cel-ligne-fil ${l.type}${l.cote === mien ? ' moi' : ''}`}><b>{l.minute}′</b><span>{l.ordre ? ORDRES_FIL[l.ordre][l.auto ? 1 : 0] : l.texte}</span>{l.points ? <em>+{l.points}</em> : null}</p>) : <p className="cel-note">Le coup d’envoi vient d’être donné.</p>}</div>}
+    {ongletDirect === 'fil' && <div className="cel-panneau cel-fil-match">{m.fil.length ? [...m.fil].reverse().map((l, i) => <p key={`${l.minute}-${i}`} className={`cel-ligne-fil ${l.type}${l.cote === mien ? ' moi' : ''}`}><b>{l.minute}′</b><span>{l.ordre ? ORDRES_FIL[l.ordre][l.auto ? 1 : 0] : l.texte}</span>{l.points ? <em>+{l.points}</em> : null}</p>) : <p className="cel-note">{t('online.match.started')}</p>}</div>}
 
     {ongletDirect === 'consignes' && (m.monCote ? <div className="cel-panneau cel-consignes">
       <p className="cel-note">Chaque changement atteint réellement le moteur : la mentalité et la contestation des rucks déplacent le potentiel de marque, le jeu et la défense changent les duels.</p>
@@ -1044,11 +1040,11 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     </div> : <div className="cel-panneau"><p className="cel-note">Tu n’es pas sur le banc de cette rencontre : tu la regardes comme un spectateur.</p></div>)}
 
     {ongletDirect === 'banc' && (m.monCote ? <div className="cel-panneau cel-banc">
-      <div className="cel-titre-ligne"><h2>Remplacements</h2><small>{restants} changement{restants > 1 ? 's' : ''} restant{restants > 1 ? 's' : ''}</small></div>
+      <div className="cel-titre-ligne"><h2>{t('online.match.substitutions')}</h2><small>{restants}</small></div>
       <p className="cel-note">{sortant ? 'Choisis maintenant le joueur qui entre.' : 'Choisis d’abord le joueur qui sort.'}</p>
       <div className="cel-deux">
-        <div><h3>Sur le terrain</h3><div className="cel-liste-pions">{m.surLeTerrain.map(p => <button key={p.carteId} className={sortant === p.carteId ? 'actif' : ''} onClick={() => setSortant(sortant === p.carteId ? '' : p.carteId)}><b>{p.numero}</b>{p.nom}<small>{nomPoste(p.poste)}</small></button>)}</div></div>
-        <div><h3>Sur le banc</h3><div className="cel-liste-pions">{m.surLeBanc.length ? m.surLeBanc.map(p => <button key={p.carteId} disabled={!sortant || occupe || restants <= 0} onClick={async () => { await agir({ type: 'match', matchId, action: { type: 'remplacement', sortantId: sortant, entrantId: p.carteId } }); setSortant(''); }}><b>{p.numero}</b>{p.nom}<small>{nomPoste(p.poste)}</small></button>) : <p className="cel-note">Le banc est vide.</p>}</div></div>
+        <div><h3>{t('online.match.pitch')}</h3><div className="cel-liste-pions">{m.surLeTerrain.map(p => <button key={p.carteId} className={sortant === p.carteId ? 'actif' : ''} onClick={() => setSortant(sortant === p.carteId ? '' : p.carteId)}><b>{p.numero}</b>{p.nom}<small>{nomPoste(p.poste)}</small></button>)}</div></div>
+        <div><h3>{t('online.match.bench')}</h3><div className="cel-liste-pions">{m.surLeBanc.length ? m.surLeBanc.map(p => <button key={p.carteId} disabled={!sortant || occupe || restants <= 0} onClick={async () => { await agir({ type: 'match', matchId, action: { type: 'remplacement', sortantId: sortant, entrantId: p.carteId } }); setSortant(''); }}><b>{p.numero}</b>{p.nom}<small>{nomPoste(p.poste)}</small></button>) : <p className="cel-note">—</p>}</div></div>
       </div>
     </div> : <div className="cel-panneau"><p className="cel-note">Seul l’entraîneur de l’équipe peut faire entrer un remplaçant.</p></div>)}
 
@@ -1146,8 +1142,8 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
           <b>{collectif.total}</b>
         </div>
       </div>
-      <div><div className="eyebrow">Feuille de {composition.titulaires.length + composition.remplacants.length} sur {cartes.length} joueurs</div><h2>Ton XV, ton banc, tes rôles</h2><p>Le capitaine tient la discipline, le buteur tire les pénalités. Un joueur hors de son poste perd la cohérence collective.</p></div>
-      <button className="btn" disabled={occupe || !optimale} title={optimale ? "Optimiser le total GEN + collectif, en respectant les postes" : "Il manque des joueurs disponibles ou des spécialistes en première ligne"} onClick={() => { if (optimale) setBrouillon(optimale); }}>Assembler la meilleure équipe</button>
+      <div><div className="eyebrow">{composition.titulaires.length + composition.remplacants.length} / {cartes.length}</div><h2>{t('online.lineup.title')}</h2><p>Le capitaine tient la discipline, le buteur tire les pénalités.</p></div>
+      <button className="btn" disabled={occupe || !optimale} onClick={() => { if (optimale) setBrouillon(optimale); }}>{t('online.lineup.best')}</button>
       <button className="btn primaire" disabled={occupe || !modifie} onClick={async () => { const v = await agir({ type: 'composition', composition }); if (v) setBrouillon(null); }}>{modifie ? 'Enregistrer la feuille' : 'Feuille enregistrée'}</button>
     </section>
 
@@ -1189,7 +1185,7 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
     />
 
     <details className="cel-panneau cel-consignes-repliables" open={consignesOuvertes} onToggle={e => setConsignesOuvertes(e.currentTarget.open)}>
-      <summary><span><h2>Consignes enregistrées</h2><small>Ouvrir pour ajuster la stratégie</small></span><Icone nom="sifflet" /></summary>
+      <summary><span><h2>{t('online.lineup.instructions')}</h2><small>{t('online.common.save')}</small></span><Icone nom="sifflet" /></summary>
       <div className="cel-consignes-contenu">
         <p className="cel-note">⚠️ Ce sont elles qui entraînent ton équipe <b>quand tu n’es pas là</b> — et elles servent de point de départ quand tu l’es. Un match ne s’annule jamais faute de manager.</p>
         <div className="cel-grille-consignes">
@@ -1281,7 +1277,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
 
   return <>
     <section className="cel-panneau cel-filtres">
-      <div><div className="eyebrow">{cartes.length} joueurs sous contrat</div><h2>Ton effectif</h2></div>
+      <div><div className="eyebrow">{cartes.length} {t('online.common.players')}</div><h2>{t('online.squad.title')}</h2></div>
       <Choix label="Trier par" valeur={tri} options={[['note', 'Note (GEN)'], ['poste', 'Numéro de maillot'], ['age', 'Âge'], ['nom', 'Nom']]} onChange={setTri} />
       <Choix label="Poste" valeur={famille} options={[['', 'Tous les postes'], ...familles.map(f => [f, nomPoste(POSTES_XV_MANAGER.find(p => POSTE_PAR_ID[p].famille === f) ?? 'arriere')] as [string, string])]} onChange={setFamille} />
       <button type="button" className="btn fantome petit" disabled={!cartes.some(groupable)}
@@ -1328,7 +1324,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
             : ` · c’est tout ce que le plancher de ${EFFECTIF_MINIMUM} joueurs autorise`)}</small>
       </div>
       <div className="cel-barre-actions">
-        <button type="button" className="btn fantome" onClick={() => setSelection([])}>Annuler</button>
+        <button type="button" className="btn fantome" onClick={() => setSelection([])}>{t('online.common.cancel')}</button>
         <button type="button" className="btn primaire" disabled={occupe || restants < EFFECTIF_MINIMUM} onClick={() => setDemande(choisies)}>
           {restants < EFFECTIF_MINIMUM ? `Garde au moins ${EFFECTIF_MINIMUM} joueurs` : `Tout vendre · ${montant(total)} Ovas`}
         </button>
@@ -1490,7 +1486,7 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
     <nav className="cel-onglets secondaires">{([['encours', `À vendre (${ouvertes.length})`], ['vendre', 'Mettre en vente'], ['echanges', `Échanges (${vue.echanges.filter(e => e.etat === 'propose').length})`]] as const).map(([id, label]) =>
       <button key={id} className={sousOnglet === id ? 'actif' : ''} onClick={() => setSousOnglet(id)}>{label}</button>)}</nav>
 
-    <div className="cel-deux"><Champ label="Rechercher un joueur, un club ou un poste"><input type="search" value={rechercheMarche} onChange={e => setRechercheMarche(e.target.value)} placeholder="Nom du joueur…" /></Champ><Choix label="Rareté" valeur={rareteMarche} onChange={setRareteMarche} options={[["", "Toutes"], ["bronze", "Bronze"], ["argent", "Argent"], ["or", "Or"], ["elite", "Élite"], ["star", "Mythique"]]} /></div>
+    <div className="cel-deux"><Champ label={t('online.market.search')}><input type="search" value={rechercheMarche} onChange={e => setRechercheMarche(e.target.value)} /></Champ><Choix label={t('online.collection.rarity')} valeur={rareteMarche} onChange={setRareteMarche} options={[["", t('online.collection.all')], ["bronze", "Bronze"], ["argent", "Argent"], ["or", "Or"], ["elite", "Élite"], ["star", "Mythique"]]} /></div>
     {/* ⚠️ LA ROUE OUVRE LA FICHE, ELLE NE DÉROULE PLUS UN PANNEAU EN DESSOUS.
         L'annonce s'affichait sous la roue : il fallait cliquer une carte, puis
         descendre la page pour lire le prix et le vendeur, et la carte qu'on
@@ -1528,7 +1524,7 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
         </article>;
       })}
       <form className="cel-panneau" onSubmit={async ev => { ev.preventDefault(); const v = await agir({ type: 'proposerEchange', vers: cible, cartesDonnees: donnees, cartesDemandees: demandees, ovasDonnes: Number(ovasDonnes), ovasDemandes: Number(ovasDemandes) }); if (v) { setDonnees([]); setDemandees([]); } }}>
-        <h2>Proposer un échange</h2>
+        <h2>{t('online.market.trade')}</h2>
         <p className="cel-note">« Je te donne mon 8 contre ton ailier + 15 000 Ovas. » Les deux doivent accepter ; le serveur valide ensuite la transaction d’un bloc.</p>
         <Choix label="Avec qui ?" valeur={cible} options={[['', 'Choisis un club'], ...vue.clubs.filter(c => c.id !== vue.monClubId).map(c => [c.id, c.nom] as [string, string])]} onChange={v => { setCible(v); setDemandees([]); }} />
         {cible && <div>
@@ -1544,7 +1540,7 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
           <div className="cel-actions">{demandees.map(id => <button type="button" className="btn fantome" key={id} onClick={() => basculer(demandees, setDemandees, id)} aria-label={`Retirer ${carte(id)?.nom} de l’échange`}>{carte(id)?.nom} ×</button>)}</div>
           <Champ label="+ Ovas de sa part"><input type="number" min={0} step={100} value={ovasDemandes} onChange={e => setOvaDemandes(e.target.value)} /></Champ>
         </div>}
-        <button className="btn primaire" disabled={occupe || !cible || (!donnees.length && !demandees.length)}>Envoyer la proposition</button>
+        <button className="btn primaire" disabled={occupe || !cible || (!donnees.length && !demandees.length)}>{t('online.market.send')}</button>
       </form>
     </>}
   </>;
@@ -1584,12 +1580,12 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
   }
   const rendezVous = [...parRendezVous.values()];
 
-  if (!vue.rencontres.length) return <Vide icone="calendrier" titre="Le calendrier arrive au coup d’envoi">Quand le créateur lancera la saison, toutes les journées apparaîtront ici, avec leurs dates.</Vide>;
+  if (!vue.rencontres.length) return <Vide icone="calendrier" titre={t('online.calendar.empty')}>{t('online.loading')}</Vide>;
 
   return <>
     {prochaine && <section className="cel-panneau cel-prochain">
       <div className="cel-prochain-corps">
-        <div className="eyebrow">Ton prochain match · journée {prochaine.journee}</div>
+        <div className="eyebrow">{t('online.calendar.next', { day: prochaine.journee })}</div>
         <h2 className="cel-nom-ligue">
           <Ecusson nom={nomClub(vue, prochaine.domicile)} logo={vue.clubs.find(c => c.id === prochaine.domicile)?.embleme} />
           {nomClub(vue, prochaine.domicile)} <em>reçoit</em> {nomClub(vue, prochaine.exterieur)}
@@ -1613,7 +1609,7 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
     <NotificationsMatch ligue={vue.id} />
 
     {aVenir.length > 1 && <section className="cel-panneau">
-      <div className="cel-titre-ligne"><h2>Tes rendez-vous</h2><small>{aVenir.length} matchs à venir</small></div>
+      <div className="cel-titre-ligne"><h2>{t('online.calendar.mine')}</h2><small>{aVenir.length} {t('online.common.matches')}</small></div>
       <div className="cel-agenda">{aVenir.slice(0, 8).map(r => {
         const chezMoi = r.domicile === vue.monClubId;
         const adversaire = chezMoi ? r.exterieur : r.domicile;
@@ -1633,13 +1629,13 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
             <b>{chezMoi ? 'Reçoit' : 'Se déplace à'} {nomClub(vue, adversaire)}</b>
             <small>{competition?.nom} · journée {r.journee} · {JOURS[new Date(rendezVous).getDay()]} · {delai(rendezVous)}</small>
           </span>
-          {ouverte && <em className="cel-agenda-ouverte">Fenêtre ouverte</em>}
+          {ouverte && <em className="cel-agenda-ouverte">{t('online.calendar.open')}</em>}
         </button>;
       })}</div>
     </section>}
 
     <section className="cel-panneau">
-      <div className="cel-titre-ligne"><h2>Toute la ligue</h2><small>{rendezVous.reduce((total, liste) => total + liste.length, 0)} matchs programmés</small></div>
+      <div className="cel-titre-ligne"><h2>{t('online.calendar.all')}</h2><small>{rendezVous.reduce((total, liste) => total + liste.length, 0)} {t('online.common.matches')}</small></div>
       {rendezVous.map(liste => {
         const premiere = liste[0];
         const competition = vue.competitions.find(c => c.id === premiere.competitionId);
@@ -1660,7 +1656,7 @@ function Calendrier({ vue, agir, occupe, suivre }: { vue: VueCarriereEnLigne; ag
     </section>
 
     {jouees.length > 0 && <section className="cel-panneau">
-      <div className="cel-titre-ligne"><h2>Tes derniers matchs</h2><Icone nom="resultats" /></div>
+      <div className="cel-titre-ligne"><h2>{t('online.calendar.recent')}</h2><Icone nom="resultats" /></div>
       <div className="cel-grille-rencontres">{jouees.map(r =>
         <Rencontre key={r.id} vue={vue} rencontre={r} agir={agir} occupe={occupe} suivre={suivre} />)}</div>
     </section>}
@@ -1703,7 +1699,7 @@ function TableauCoupe({ vue, competition, rencontres, suivre }: {
   const tailles = matchsParTour(nombreTableau);
   const intervalle = 7 * 86_400_000 / vue.rythme;
   return <section className="cel-panneau">
-    <div className="cel-titre-ligne"><h2>Phase finale</h2><small>{nombreTableau} qualifiés · {tailles.reduce((s, n) => s + n, 0)} matchs</small></div>
+    <div className="cel-titre-ligne"><h2>{t('online.competition.knockout')}</h2><small>{nombreTableau} · {tailles.reduce((s, n) => s + n, 0)} {t('online.common.matches')}</small></div>
     <div className="cel-tableau-coupe">{tailles.map((taille, index) => {
       const journee = debutTableau + index;
       const matchs = rencontres.filter(r => r.journee === journee);
@@ -1736,9 +1732,9 @@ function ClassementsPoules({ vue, competition, onClub }: {
   const repeches = new Set(competition.repeches ?? []);
   const placesDirectes = Math.floor((competition.qualifies ?? 2) / Math.max(1, groupes.length));
   return <section className="cel-panneau cel-poules">
-    <div className="cel-titre-ligne"><div><div className="eyebrow">Première phase</div><h2>Classement des poules</h2></div><small>{groupes.length} poules · {competition.qualifies} places en phase finale</small></div>
+    <div className="cel-titre-ligne"><div><div className="eyebrow">1</div><h2>{t('online.competition.groups')}</h2></div><small>{groupes.length} · {competition.qualifies}</small></div>
     <div className="cel-grille-poules">{groupes.map((lignes, groupe) => <article className="cel-poule" key={groupe}>
-      <h3>Poule {String.fromCharCode(65 + groupe)}</h3>
+      <h3>{t('online.competition.group', { name: String.fromCharCode(65 + groupe) })}</h3>
       <div className="cel-table-scroll"><table className="cel-table"><thead><tr><th>#</th><th>Club</th><th>J</th><th>Diff.</th><th>Pts</th></tr></thead>
         <tbody>{lignes.map((ligne, rang) => {
           const qualifie = qualifies.has(ligne.clubId) || (!competition.phaseFinaleSeed && rang < placesDirectes);
@@ -1780,7 +1776,7 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
     <section className="cel-panneau cel-filtres">
       <div><div className="eyebrow">{vue.competitions.length} compétition{vue.competitions.length > 1 ? 's' : ''} dans cette ligue</div><h2 className="cel-nom-ligue">{competition?.logo && <img className="cel-logo-ligue" src={competition.logo} alt="" />}{competition?.nom ?? 'Le calendrier'}</h2><p className="cel-note">{competition ? `${competition.trophee}${competition.playoffs ? ' · phase finale adaptée au nombre de clubs' : ''} · ${montant(competition.recompenseVainqueur)} Ovas au vainqueur` : ''}</p></div>
       {vue.competitions.length > 1 && <Choix label="Compétition" valeur={competition?.id ?? ''} options={vue.competitions.map(c => [c.id, c.nom])} onChange={setOuverte} />}
-      {proprietaire && vue.phase === 'saison' && <button className="btn fantome" onClick={() => setNouvelle(!nouvelle)}><Icone nom="trophee" taille={17} />{nouvelle ? 'Fermer' : 'Créer une coupe'}</button>}
+      {proprietaire && vue.phase === 'saison' && <button className="btn fantome" onClick={() => setNouvelle(!nouvelle)}><Icone nom="trophee" taille={17} />{nouvelle ? t('online.common.close') : t('online.competition.create')}</button>}
     </section>
 
     {nouvelle && <form className="cel-panneau" onSubmit={async e => {
@@ -1791,25 +1787,25 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
       <h2>Ta coupe, tes traditions</h2>
       <p className="cel-note">Deux coupes par saison au maximum : au-delà, la dotation en Ovas déséquilibrerait l’économie de la ligue.</p>
       <div className="cel-grille-consignes">
-        <Champ label="Nom de la coupe"><input required minLength={2} maxLength={40} value={nom} onChange={e => setNom(e.target.value)} /></Champ>
-        <Champ label="Nom du trophée"><input required minLength={2} maxLength={40} value={trophee} onChange={e => setTrophee(e.target.value)} /></Champ>
+        <Champ label={t('online.competition.name')}><input required minLength={2} maxLength={40} value={nom} onChange={e => setNom(e.target.value)} /></Champ>
+        <Champ label={t('online.competition.trophyName')}><input required minLength={2} maxLength={40} value={trophee} onChange={e => setTrophee(e.target.value)} /></Champ>
         <Choix label="Format" valeur={format} options={[['poules', 'Poules puis phase finale'], ['elimination', 'Élimination directe'], ['championnat', 'Championnat aller-retour']]} onChange={setFormat} />
-        <Champ label="Début"><input type="date" required value={debut} onChange={e => setDebut(e.target.value)} /></Champ>
+        <Champ label={t('online.competition.start')}><input type="date" required value={debut} onChange={e => setDebut(e.target.value)} /></Champ>
         <Champ label="Vainqueur (Ovas)"><input type="number" min={0} step={1} value={vainqueur} onChange={e => setVainqueur(e.target.value)} /></Champ>
         <Champ label="Finaliste (Ovas)"><input type="number" min={0} step={1} value={finaliste} onChange={e => setFinaliste(e.target.value)} /></Champ>
         <Champ label="Chaque participant (Ovas)"><input type="number" min={0} step={1} value={participation} onChange={e => setParticipation(e.target.value)} /></Champ>
       </div>
       <ChoixCompetition logo={logoCoupe} tropheeId={tropheeCoupe} onLogo={setLogoCoupe} onTrophee={setTropheeCoupe} />
       {format === 'championnat' && <label className="cel-bascule"><input type="checkbox" checked={playoffsCoupe} onChange={e => setPlayoffsCoupe(e.target.checked)} /><span><b>Phase finale</b>Les qualifiés, dont le nombre dépend du nombre de clubs, se disputent le trophée après les journées de poule.</span></label>}
-      <h3 className="cel-sous-titre">Participants</h3>
+      <h3 className="cel-sous-titre">{t('online.competition.participants')}</h3>
       <div className="cel-choix-cartes">{vue.clubs.map(c => <button type="button" key={c.id} className={participants.includes(c.id) ? 'actif' : ''} onClick={() => setParticipants(participants.includes(c.id) ? participants.filter(x => x !== c.id) : [...participants, c.id])}>{c.nom}</button>)}</div>
       {apercuPoules.length > 0 && <><div className="cel-apercu-format"><Icone nom="trophee" taille={20} /><div><b>{apercuPoules.length} poules de {apercuPoules.map(p => p.length).join(' · ')} clubs</b><span>Les {qualifiesApercu} meilleurs vont en {qualifiesApercu === 8 ? 'quarts de finale' : qualifiesApercu === 4 ? 'demi-finales' : 'finale'}. Les places restantes repêchent les meilleurs au même rang.</span></div></div>
         <div className="cel-composition-poules">{apercuPoules.map((poule, index) => <article key={index}><h4>Poule {String.fromCharCode(65 + index)}</h4>{poule.map(id => { const club = vue.clubs.find(c => c.id === id); return <span key={id}><b>{club?.nom}</b><Ecusson nom={club?.nom ?? 'Club'} logo={club?.embleme} /></span>; })}</article>)}</div></>}
       {format === 'elimination' && formatEffectif === 'poules' && <p className="cel-note">Avec {participants.length} clubs, la coupe passera automatiquement par des poules afin que personne ne soit exempt au hasard.</p>}
-      <button className="btn primaire" disabled={occupe || participants.length < (formatEffectif === 'poules' ? 3 : 2)}>Créer la {nom}</button>
+      <button className="btn primaire" disabled={occupe || participants.length < (formatEffectif === 'poules' ? 3 : 2)}>{t('online.competition.createNamed', { name: nom })}</button>
     </form>}
 
-    {competition?.format === 'championnat' && <section className="cel-panneau"><h2>Classement</h2><Classement vue={vue} onClub={setFicheClub} /></section>}
+    {competition?.format === 'championnat' && <section className="cel-panneau"><h2>{t('online.table.rank')}</h2><Classement vue={vue} onClub={setFicheClub} /></section>}
     {competition?.format === 'poules' && <ClassementsPoules vue={vue} competition={competition} onClub={setFicheClub} />}
     {(competition?.format === 'elimination' || competition?.format === 'poules') && <TableauCoupe vue={vue} competition={competition} rencontres={rencontres} suivre={suivre} />}
     {ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}
@@ -1819,7 +1815,7 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
       <div className="cel-grille-rencontres">{rencontres.filter(r => r.journee === j).map(r => <Rencontre key={r.id} vue={vue} rencontre={r} agir={agir} occupe={occupe} suivre={suivre} />)}</div>
     </section>)}
 
-    {!vue.competitions.length && <Vide icone="trophee" titre="La saison n’a pas encore commencé">Le créateur de la ligue lancera le championnat quand tout le monde sera là.</Vide>}
+    {!vue.competitions.length && <Vide icone="trophee" titre={t('online.competition.notStarted')}>{t('online.competition.notStartedHelp')}</Vide>}
   </>;
 }
 
@@ -1874,7 +1870,7 @@ function StatistiquesSecretes() {
 function Histoire({ vue }: { vue: VueCarriereEnLigne }) {
   return <>
     <section className="cel-panneau">
-      <div className="cel-titre-ligne"><div><div className="eyebrow">Visible par toute la ligue</div><h2>Les records du vestiaire</h2></div><Icone nom="medaille" /></div>
+      <div className="cel-titre-ligne"><div><div className="eyebrow">{t('online.title')}</div><h2>{t('online.history.records')}</h2></div><Icone nom="medaille" /></div>
       <div className="cel-records">
         <article><Icone nom="cadeau" taille={24} /><div><small>Plus grand ouvreur</small><b>{vue.statistiques.meilleurOuvreur?.pseudo ?? 'Pas encore de pack'}</b><span>{vue.statistiques.meilleurOuvreur ? `${montant(vue.statistiques.meilleurOuvreur.packs)} packs ouverts` : 'Le record attend son premier nom.'}</span></div></article>
         <article>{vue.statistiques.meilleurPack && <PochetteRecord rarete={vue.statistiques.meilleurPack.apparence} />}<div><small>Meilleur pack</small><b>{vue.statistiques.meilleurPack?.joueur ?? 'Pas encore de record'}</b><span>{vue.statistiques.meilleurPack ? `${vue.statistiques.meilleurPack.note} GEN · ${vue.statistiques.meilleurPack.pseudo} · ${vue.statistiques.meilleurPack.pack}` : '—'}</span></div></article>
@@ -1883,15 +1879,15 @@ function Histoire({ vue }: { vue: VueCarriereEnLigne }) {
       <div className="cel-packs-clubs">{vue.statistiques.parClub.map(c => <span key={c.clubId}><b>{c.pseudo}</b><em>{montant(c.packs)} pack{c.packs > 1 ? 's' : ''}</em></span>)}</div>
     </section>
     <section className="cel-panneau">
-      <div className="cel-titre-ligne"><h2>Palmarès de la ligue</h2><Icone nom="medaille" /></div>
+      <div className="cel-titre-ligne"><h2>{t('online.history.honours')}</h2><Icone nom="medaille" /></div>
       {vue.histoire.length ? <div className="cel-palmares">{[...vue.histoire].reverse().map((h, i) => <article key={`${h.competitionId}-${i}`} className={h.vainqueur === vue.monClubId ? 'moi' : ''}>
         {h.logo ? <img className="cel-logo-ligue grand" src={h.logo} alt="" /> : <Icone nom="trophee" taille={30} />}
         <div><b>{h.trophee}</b><small>{h.nom} · saison {h.saison}</small></div>
         <span>{nomClub(vue, h.vainqueur)}</span>
-      </article>)}</div> : <p className="cel-note">Aucun trophée n’a encore été soulevé. Le premier restera dans les mémoires.</p>}
+      </article>)}</div> : <p className="cel-note">{t('online.history.empty')}</p>}
     </section>
     <section className="cel-panneau">
-      <div className="cel-titre-ligne"><h2>Le journal de ton club</h2><Icone nom="journal" /></div>
+      <div className="cel-titre-ligne"><h2>{t('online.history.journal')}</h2><Icone nom="journal" /></div>
       <div className="cel-journal">{[...vue.transactions].reverse().slice(0, 60).map(t => <p key={t.id} className={t.ovas >= 0 ? 'credit' : 'debit'}>
         <Icone nom={NATURES[t.nature]?.icone ?? 'journal'} taille={16} />
         <span><b>{NATURES[t.nature]?.label ?? t.nature}</b>{t.libelle}</span>
