@@ -7,7 +7,7 @@ import { stockageFichier } from '../serveur/carriereFichier';
 import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereApi';
 import { contexteAtelier, validerPhoto } from '../serveur/atelierAdmin';
 import { CATALOGUE_ADMIN_VIDE } from '../src/lib/ligue/atelierCatalogue';
-import { catalogueMondialCarriere, rayonDePack, packsBoutiqueDuJour } from '../src/lib/ligue/catalogueCarriere';
+import { catalogueMondialCarriere, rayonDePack, packsBoutiqueDuJour, packsCatalogueAdmin } from '../src/lib/ligue/catalogueCarriere';
 import { creerCarriere, avancerCarriere, agirCarriere } from '../src/lib/ligue/carriere';
 import { collectionCarriere } from '../src/lib/ligue/collectionCarriere';
 
@@ -90,6 +90,12 @@ try {
     const filtreNation=final.packs[packFrance.id];
     for(const rarete of ['bronze','argent','or','elite','star'] as const) assert.ok(rayonDePack(rarete,filtreNation).every(c=>c.nation==='France'),'Le filtre nation exclut les autres nations');
   });
-  console.log('OK — accès Kiri, validations, persistance, joueurs, filtres, liste privée des packs et garantie.');
+  assert.equal((await appel(kiri,{action:'atelier',operation:'supprimerPack',revision:3,packId:'bronze'})).statut,400,'Les packs intégrés sont protégés');
+  assert.equal((await appel(kiri,{action:'atelier',operation:'supprimerPack',revision:3,packId:pack.id})).statut,200);
+  const apresSuppression=await db.atelier!.lire();
+  assert.equal(apresSuppression.revision,4);
+  assert.ok(!apresSuppression.packs[pack.id],'Le pack personnalisé est supprimé du stockage');
+  contexteAtelier.run(apresSuppression,()=>assert.ok(!packsCatalogueAdmin().some(p=>p.id===pack.id),'Le pack supprimé quitte la liste de l’Atelier'));
+  console.log('OK — accès Kiri, validations, persistance, joueurs, filtres, suppression, liste privée des packs et garantie.');
 } finally { rmSync(dossier,{recursive:true,force:true}); }
 process.exit(0);

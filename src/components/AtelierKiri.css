@@ -58,6 +58,9 @@
 .ak-resume { display: grid; gap: .35rem; margin: 1rem 0; padding: 1rem; border: 1px solid color-mix(in srgb, var(--or-400) 55%, var(--bordure)); border-radius: var(--rayon-controle); background: linear-gradient(120deg, color-mix(in srgb, var(--or-500) 15%, var(--surface)), var(--surface)); }
 .ak-resume b { font: 700 1.2rem/1.2 var(--police-titre); }
 .ak-resume span, .ak-resume p { color: var(--brume); font-size: .78rem; }
+.ak-actions-pack { display: flex; flex-wrap: wrap; gap: .65rem; align-items: center; }
+.ak-supprimer { border-color: #a54c43; background: color-mix(in srgb, #a54c43 16%, var(--surface)); color: #ffd2cd; }
+.ak-supprimer:hover { border-color: #d46b60; background: color-mix(in srgb, #a54c43 28%, var(--surface)); }
 .ak-erreur, .ak-succes { margin: 0; padding: .75rem 1rem; border: 1px solid; border-radius: var(--rayon-controle); font-size: .8rem; }
 .ak-erreur { border-color: #a54c43; background: #3a211f; color: #ffd2cd; }
 .ak-succes { border-color: #4f815c; background: #1d3524; color: #d8f3df; }

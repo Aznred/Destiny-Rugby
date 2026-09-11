@@ -78,6 +78,10 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
   if(corps.operation === 'pack') {
     const pack=validerPack(corps.pack); suivant.packs[pack.id]=pack;
     if(Object.keys(suivant.packs).length>100) refuser('Maximum de 100 packs personnalisés.');
+  } else if(corps.operation === 'supprimerPack') {
+    const id=texte(corps.packId,80);
+    if(!id.startsWith('kiri-') || !suivant.packs[id]) refuser('Seuls les packs créés dans l’Atelier peuvent être supprimés.');
+    delete suivant.packs[id];
   } else if(corps.operation === 'joueur') {
     const id=texte(corps.sourceId,250), source=catalogueMondialCarriere().find(c=>c.sourceId===id);
     if(!source) refuser('Joueur introuvable.');
