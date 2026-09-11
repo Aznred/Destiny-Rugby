@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { catalogueBaseCarriere, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack } from '../src/lib/ligue/catalogueCarriere';
+import { catalogueBaseCarriere, packsBoutiqueDuJour, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack } from '../src/lib/ligue/catalogueCarriere';
 import { TEXTES_EN_LIGNE } from '../src/data/textesEnLigne';
 
 const ids = ['nationale', 'federales', 'premiership', 'urc', 'superRugby', 'leagueOne', 'sixNations',
@@ -18,6 +18,8 @@ for (const [cle, traduction] of Object.entries(TEXTES_EN_LIGNE)) {
     assert.ok(traduction[langue]?.trim(), `${cle} n'est pas traduit en ${langue}.`);
   }
 }
+const aujourdHui = packsBoutiqueDuJour(PACKS_CARRIERE, Date.parse('2026-09-11T12:00:00+02:00'));
+assert.deepEqual(aujourdHui.slice(3).map(pack => pack.id), ['springboks', 'premiership', 'top14'], 'La sélection du 11 septembre doit contenir les trois packs annoncés.');
 console.log(`OK — ${ids.length} nouveaux packs, ${catalogue.length} joueurs et ${Object.keys(TEXTES_EN_LIGNE).length} textes en 7 langues contrôlés.`);
 
 function rayonsUniques(rayons: readonly { sourceId: string }[]): number {

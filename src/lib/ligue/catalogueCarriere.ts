@@ -216,6 +216,10 @@ export const PACKS_CARRIERE: PackCarriere[] = [
 ];
 
 const PACKS_PERMANENTS = ['bronze', 'standard', 'or'] as const;
+/** Sélections éditoriales datées en heure de Paris. Elles prennent le pas sur la rotation normale. */
+const PACKS_MIS_EN_AVANT_PAR_JOUR: Readonly<Record<string, readonly string[]>> = {
+  '2026-09-11': ['springboks', 'premiership', 'top14'],
+};
 
 /** Bronze, Argent et Or restent disponibles ; deux packs spéciaux tournent chaque jour. */
 export function packsBoutiqueDuJour(
@@ -230,6 +234,10 @@ export function packsBoutiqueDuJour(
   const permanents = PACKS_PERMANENTS
     .map(id => packs.find(pack => pack.id === id))
     .filter((pack): pack is PackCarriere => Boolean(pack));
+  const misEnAvant = (PACKS_MIS_EN_AVANT_PAR_JOUR[cleParis] ?? [])
+    .map(id => packs.find(pack => pack.id === id))
+    .filter((pack): pack is PackCarriere => Boolean(pack));
+  if (misEnAvant.length) return [...permanents, ...misEnAvant.filter(pack => !permanents.some(p => p.id === pack.id))];
   const tournants = packs.filter(pack => !pack.id.startsWith('kiri-') && !PACKS_PERMANENTS.includes(pack.id as typeof PACKS_PERMANENTS[number]));
   // Les créations Kiri restent dans le catalogue de l'Atelier et dans l'état
   // des ligues pour les distributions programmées. Les montrer ici dès leur
