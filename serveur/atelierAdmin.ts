@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { CATALOGUE_ADMIN_VIDE, catalogueAdmin, fournirCatalogueAdmin, type CatalogueAdmin, type EditionJoueur } from '../src/lib/ligue/atelierCatalogue.js';
-import { bandesGaranties, carteDansPack, catalogueMondialCarriere, packsCatalogueAdmin, RARETES_CARRIERE } from '../src/lib/ligue/catalogueCarriere.js';
+import { bandesGaranties, carteDansPack, catalogueBaseCarriere, catalogueMondialCarriere, packsCatalogueAdmin, RARETES_CARRIERE } from '../src/lib/ligue/catalogueCarriere.js';
 import type { PackCarriere, RareteCarriere } from '../src/lib/ligue/typesCarriere.js';
 import type { StockageAtelier } from './atelierStockage.js';
 
@@ -62,6 +62,7 @@ export function vueAtelier(q: string) {
   const recherche=normaliser(q.slice(0,100));
   const catalogue=catalogueMondialCarriere();
   const joueurs=catalogue.filter(c=>normaliser(`${c.nom} ${c.clubReel}`).includes(recherche));
+  const clubs=[...new Map(catalogueBaseCarriere().map(c=>[c.clubReel,{nom:c.clubReel,championnat:c.championnat}])).values()].sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
   return {
     revision:catalogueAdmin().revision,
     packs:packsCatalogueAdmin(),
@@ -69,6 +70,7 @@ export function vueAtelier(q: string) {
     total:joueurs.length,
     championnats:[...new Set(catalogue.map(c=>c.championnat))].sort((a,b)=>a.localeCompare(b,'fr')),
     nations:[...new Set(catalogue.map(c=>c.nation).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr')),
+    clubs,
   };
 }
 export async function enregistrerAtelier(stockage: StockageAtelier, corps: Record<string,unknown>) {
@@ -88,7 +90,10 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
     const j=objet(corps.joueur);
     const nation=texte(j.nation,80);
     if(!new Set(catalogueMondialCarriere().map(c=>c.nation)).has(nation)) refuser('Nation inconnue dans le catalogue.');
-    const edition: EditionJoueur={note:entier(j.note,20,99),potentiel:entier(j.potentiel,20,99),photo:validerPhoto(j.photo),nation};
+    const clubDemande=j.clubReel===undefined?source.clubReel:texte(j.clubReel,100);
+    const club=catalogueBaseCarriere().find(c=>c.clubReel===clubDemande);
+    if(!club) refuser('Club inconnu dans le catalogue.');
+    const edition: EditionJoueur={note:entier(j.note,20,99),potentiel:entier(j.potentiel,20,99),photo:validerPhoto(j.photo),nation,clubReel:club.clubReel,championnat:club.championnat};
     if(edition.potentiel<edition.note) refuser('Le potentiel doit être au moins égal au GEN.');
     suivant.joueurs[id]=edition;
     if(Object.keys(suivant.joueurs).length>2000) refuser('Maximum de 2 000 joueurs personnalisés.');

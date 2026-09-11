@@ -42,8 +42,10 @@ try {
   const chaude=await lireLigue(l1.id);
   const avant=structuredClone(joueur);
   const nationInitiale=joueur.nation,nationCible=initial.donnees.nations.find((n:string)=>n!==nationInitiale) as string;
-  const edition={action:'atelier',operation:'joueur',revision:0,sourceId:joueur.sourceId,joueur:{note:94,potentiel:96,photo:'https://example.org/photo.webp',nation:nationCible}};
+  const clubCible=initial.donnees.clubs.find((c:{nom:string})=>c.nom!==joueur.clubReel) as {nom:string;championnat:string};
+  const edition={action:'atelier',operation:'joueur',revision:0,sourceId:joueur.sourceId,joueur:{note:94,potentiel:96,photo:'https://example.org/photo.webp',nation:nationCible,clubReel:clubCible.nom}};
   assert.equal((await appel(kiri,{...edition,joueur:{...edition.joueur,note:101}})).statut,400);
+  assert.equal((await appel(kiri,{...edition,joueur:{...edition.joueur,clubReel:'Club inventé'}})).statut,400);
   assert.equal((await appel(kiri,edition)).statut,200);
   assert.equal((await appel(kiri,edition)).statut,400,'Révision périmée refusée');
   assert.throws(()=>validerPhoto('javascript:alert(1)'));
@@ -56,10 +58,10 @@ try {
   assert.equal(stockageFichier(fichier) && (await stockageFichier(fichier).atelier!.lire()).revision,1,'Persistance après redémarrage');
   contexteAtelier.run(config,()=>{
     const nouveau=catalogueMondialCarriere().find(c=>c.sourceId===joueur.sourceId)!;
-    assert.equal(nouveau.note,94);assert.equal(nouveau.rarete,'star');
+    assert.equal(nouveau.note,94);assert.equal(nouveau.rarete,'star');assert.equal(nouveau.clubReel,clubCible.nom);assert.equal(nouveau.championnat,clubCible.championnat);
     for(const l of [l1,l2]) {
       const resultat=avancerCarriere(l,now,'test');const carte=resultat.cartes.find(c=>c.sourceId===joueur.sourceId)!;
-      assert.equal(carte.note,94);assert.equal(carte.photo,edition.joueur.photo);assert.equal(carte.nation,nationCible);assert.equal(carte.proprietaire,l.clubs[0].id);assert.equal(carte.matchs,avant.matchs);
+      assert.equal(carte.note,94);assert.equal(carte.photo,edition.joueur.photo);assert.equal(carte.nation,nationCible);assert.equal(carte.clubReel,clubCible.nom);assert.equal(carte.championnat,clubCible.championnat);assert.equal(carte.proprietaire,l.clubs[0].id);assert.equal(carte.matchs,avant.matchs);
       assert.equal(resultat.catalogueRevision,1);
     }
     assert.ok(rayonDePack('star',{id:'test'}).some(c=>c.sourceId===joueur.sourceId));
