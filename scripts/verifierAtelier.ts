@@ -80,7 +80,8 @@ try {
   const final=await db.atelier!.lire();
   contexteAtelier.run(final,()=>{
     const l=avancerCarriere(l1,now,'test');
-    assert.ok(packsBoutiqueDuJour(l.packs).some(p=>p.id===pack.id),'Pack Kiri visible tous les jours');
+    assert.ok(l.packs.some(p=>p.id===pack.id),'Pack Kiri conservé dans la liste de la ligue');
+    assert.ok(!packsBoutiqueDuJour(l.packs).some(p=>p.id===pack.id),'Pack Kiri absent de la boutique tant qu’il n’est pas distribué');
     const resultat=agirCarriere(l,kiri,{type:'ouvrirPack',packId:pack.id},now,'test-garantie');
     const cartes=resultat.cartes.slice(l.cartes.length);
     assert.equal(cartes.length,2);assert.ok(cartes.some(c=>c.rarete==='star'),'La garantie fonctionne même avec un poids nul');
@@ -89,6 +90,6 @@ try {
     const filtreNation=final.packs[packFrance.id];
     for(const rarete of ['bronze','argent','or','elite','star'] as const) assert.ok(rayonDePack(rarete,filtreNation).every(c=>c.nation==='France'),'Le filtre nation exclut les autres nations');
   });
-  console.log('OK — accès Kiri, validations, conflit, persistance, GEN, photos et nation sur deux ligues, filtres nation, collection, raretés, contextes concurrents, boutique et garantie.');
+  console.log('OK — accès Kiri, validations, persistance, joueurs, filtres, liste privée des packs et garantie.');
 } finally { rmSync(dossier,{recursive:true,force:true}); }
 process.exit(0);

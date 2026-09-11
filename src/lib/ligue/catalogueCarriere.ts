@@ -227,14 +227,16 @@ export function packsBoutiqueDuJour(
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(instant);
   const numeroJour = Math.floor(Date.parse(`${cleParis}T00:00:00Z`) / 86_400_000);
-  const personnalisations = packs.filter(p => p.id.startsWith('kiri-'));
   const permanents = PACKS_PERMANENTS
     .map(id => packs.find(pack => pack.id === id))
     .filter((pack): pack is PackCarriere => Boolean(pack));
   const tournants = packs.filter(pack => !pack.id.startsWith('kiri-') && !PACKS_PERMANENTS.includes(pack.id as typeof PACKS_PERMANENTS[number]));
-  if (tournants.length <= 2) return [...permanents, ...personnalisations, ...tournants];
+  // Les créations Kiri restent dans le catalogue de l'Atelier et dans l'état
+  // des ligues pour les distributions programmées. Les montrer ici dès leur
+  // création les transformait involontairement en packs permanents publics.
+  if (tournants.length <= 2) return [...permanents, ...tournants];
   const depart = ((numeroJour * 2) % tournants.length + tournants.length) % tournants.length;
-  return [...permanents, ...personnalisations, tournants[depart], tournants[(depart + 1) % tournants.length]];
+  return [...permanents, tournants[depart], tournants[(depart + 1) % tournants.length]];
 }
 
 export function rareteCarriere(note: number): RareteCarriere {
