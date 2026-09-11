@@ -92,11 +92,26 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   // d'en-tête minuscule garde la cohérence entre instances sans retransférer
   // les centaines de Ko de la ligue à chaque sondage de direct.
   const liguesChaudes = new Map<string, LigueStockee>();
+  const poidsLigues = new Map<string, number>();
+  let octetsLigues = 0;
+  const oublierLigue = (id: string) => {
+    octetsLigues -= poidsLigues.get(id) ?? 0;
+    poidsLigues.delete(id); liguesChaudes.delete(id);
+  };
   const sessionsChaudes = new Map<string, { compte: CompteStocke; jusqua: number }>();
   const memoriserLigue = (id: string, ligne: LigueStockee) => {
+    octetsLigues -= poidsLigues.get(id) ?? 0;
+    poidsLigues.delete(id);
     liguesChaudes.delete(id);
+    const poids = Buffer.byteLength(JSON.stringify(ligne.etat));
+    if (poids > 32 * 1024 * 1024) return;
     liguesChaudes.set(id, ligne);
-    if (liguesChaudes.size > 32) liguesChaudes.delete(liguesChaudes.keys().next().value as string);
+    poidsLigues.set(id, poids); octetsLigues += poids;
+    while (liguesChaudes.size > 32 || octetsLigues > 32 * 1024 * 1024) {
+      const ancien = liguesChaudes.keys().next().value!;
+      octetsLigues -= poidsLigues.get(ancien) ?? 0;
+      poidsLigues.delete(ancien); liguesChaudes.delete(ancien);
+    }
   };
   async function lireLigue(id: string, connue?: { version: number; comptes: string[]; echeance: number | null }) {
     const cache = liguesChaudes.get(id);
@@ -111,7 +126,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       memoriserLigue(id, ligne); return ligne;
     }
     const ligne = await stockage.ligue(id);
-    if (ligne) memoriserLigue(id, ligne); else liguesChaudes.delete(id);
+    if (ligne) memoriserLigue(id, ligne); else oublierLigue(id);
     return ligne;
   }
   async function avecPresences(etat: EtatCarriereEnLigne, maintenant: number) {
@@ -215,7 +230,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         await notifier(durable);
         return durable;
       }
-      liguesChaudes.delete(id);
+      oublierLigue(id);
     }
     throw new ErreurHttp(409, 'La ligue vient de changer. Réessayez dans un instant.');
   }
@@ -404,7 +419,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         if (!idValide(id)) throw new ErreurHttp(404, 'Ligue introuvable.');
         if (url.searchParams.get('collection') === '1') {
-          const ligne = await stockage.ligue(id);
+          const ligne = await lireLigue(id);
           if (!ligne || !ligne.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
           const { collectionCarriere } = await import('../src/lib/ligue/collectionCarriere.js');
           return res.status(200).json(collectionCarriere(ligne.etat, compte.id, url.searchParams));
@@ -442,7 +457,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
            * L'ajouter pour l'occasion, c'était le premier écart. Vingt octets
            * contre quatre cent mille, le gain est le même.
            */
-          if ((liguesChaudes.get(id)?.etat.catalogueRevision ?? 0) === catalogueAdmin().revision && entete.version === connue && entete.echeance !== null && maintenant < entete.echeance) {
+          if ((entete.catalogueRevision ?? liguesChaudes.get(id)?.etat.catalogueRevision ?? 0) === catalogueAdmin().revision && entete.version === connue && entete.echeance !== null && maintenant < entete.echeance) {
             return res.status(200).json({ inchange: true });
           }
         }

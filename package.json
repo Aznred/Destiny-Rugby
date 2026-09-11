@@ -50,6 +50,9 @@
     "verify:packs-catalogue": "vite-node scripts/verifierNouveauxPacks.ts",
     "verify:direct-push:secours": "node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierDirectPush.ts",
     "verify:db-scale": "node --env-file-if-exists=.env scripts/verifierOptimisationDb.mjs",
+    "verify:db-transfert": "node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierTransfertDb.ts",
+    "verify:db-transfert:integration": "node --env-file=.env --loader ./scripts/chargeurTypeScript.mjs scripts/verifierTransfertDbIntegration.ts",
+    "base:transfert": "node --env-file=.env --loader ./scripts/chargeurTypeScript.mjs scripts/initialiserTransfertDb.ts",
     "verify:calendrier-carriere": "vite-node scripts/verifierCalendrierCarriere.ts"
   },
   "dependencies": {
