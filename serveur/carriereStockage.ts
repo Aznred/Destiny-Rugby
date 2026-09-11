@@ -3,7 +3,8 @@ import { neon } from '@neondatabase/serverless';
 import { pushNeon, type StockagePush } from './pushStockage.js';
 import type { EtatCarriereEnLigne, StatistiquesGlobalesCarriere } from '../src/lib/ligue/typesCarriere.js';
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
-import { assemblerTransfert, decoderBloc, encoderTransfert, type BlocTransfert, type ManifestTransfert } from './transfertCarriere.js';
+import { assemblerTransfert, champsDepuisForme, decoderBloc, encoderTransfert, formeTransfert, type BlocTransfert, type ManifestTransfert } from './transfertCarriere.js';
+import { creerLimiteurReserve } from './limiteurReserve.js';
 
 export interface CompteStocke { id: string; identifiant: string; pseudo: string; empreinte: string }
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
@@ -55,6 +56,13 @@ export interface StockageCarriere {
   ligueParCode(code: string): Promise<LigueStockee | null>;
   creerLigue(ligue: LigueStockee): Promise<boolean>;
   dejaTraitee(ligue: string, compte: string, requete: string): Promise<boolean>;
+  /** Version, membres et reçu dans une seule réponse compacte. */
+  verifierCommande?(ligue: string, compte: string, requete: string, connue?: { version: number; comptes: string[] }): Promise<{
+    version: number; comptes: string[]; echeance: number | null; dejaTraitee: boolean;
+  } | null>;
+  verifierSondage?(ligue: string, compte: string, version: number, catalogue: number, maintenant: number): Promise<
+    { statut: 'absente' | 'inchange' } | { statut: 'lire'; entete: { version: number; comptes: string[]; echeance: number | null; catalogueRevision?: number } }
+  >;
   /** Le nouvel état et, pour une commande utilisateur, son reçu sont écrits indivisiblement. */
   comparerEtEcrire(ligue: LigueStockee, version: number, recu?: { compte: string; requete: string }): Promise<boolean>;
   /** Battement minuscule du direct, séparé du gros JSON de la ligue. `false`/`null` = migration pas encore appliquée. */
@@ -89,6 +97,10 @@ async function sansColonne<T>(complete: () => Promise<T>, repli: () => Promise<T
 
 export function stockageNeon(url: string): StockageCarriere {
   const sql = neon(url);
+  const limiterJeu = creerLimiteurReserve(async (cle, maximum, debut, lot) => {
+    const [r] = await sql`select carriere_reserver_debit(${cle},${maximum},${debut},${lot}) as n`;
+    return Number(r.n);
+  });
   // Cache borné en octets, indépendant du nombre de ligues. Les hashes sont
   // vérifiés en base à chaque lecture : aucun délai de cohérence entre serveurs.
   const blocsChauds = new Map<string, { valeur: unknown; poids: number }>();
@@ -113,7 +125,7 @@ export function stockageNeon(url: string): StockageCarriere {
     comptes: r.comptes as string[], etat: r.donnees as EtatCarriereEnLigne,
     echeance: r.echeance == null ? null : Date.parse(String(r.echeance)),
   });
-  async function lireCompact(valeur: string, parCode = false): Promise<LigueStockee | null> {
+  async function lirePagesLegacy(valeur: string, parCode = false): Promise<LigueStockee | null> {
     const legacy = async () => {
       const r = parCode
         ? await sql`select id,code,version,comptes,donnees,echeance from carriere_ligues where code=${valeur}`
@@ -156,6 +168,37 @@ export function stockageNeon(url: string): StockageCarriere {
       return legacy();
     }
   }
+  async function lireCompact(valeur: string, parCode = false): Promise<LigueStockee | null> {
+    const precedent = parCode ? undefined : manifestsConnus.get(valeur)?.manifest;
+    // Capturer les valeurs avant l'appel : une autre requête peut provoquer
+    // une éviction du cache pendant que cette lecture attend la base.
+    const disponibles = new Map<string, unknown>();
+    const empreintes: Record<string, string> = {};
+    for (const [cle, hash] of Object.entries(precedent?.empreintes ?? {})) {
+      const bloc = blocsChauds.get(hash);
+      if (bloc) { empreintes[cle] = hash; disponibles.set(hash, bloc.valeur); }
+    }
+    const connu = { champs: precedent ? formeTransfert(precedent) : undefined, empreintes };
+    try {
+      const [r] = await sql`select * from carriere_lire_delta(${parCode ? null : valeur}::uuid,${parCode ? valeur : null}::text,${JSON.stringify(connu)}::jsonb)`;
+      if (!r) return null;
+      if (!r.compact) { manifestsConnus.delete(String(r.id)); return ligne(r); }
+      const champs = r.champs ? champsDepuisForme(r.champs) : precedent!.champs;
+      const hashes = { ...empreintes, ...r.empreintes };
+      const manifest: ManifestTransfert = { format: 1, champs, empreintes: {} };
+      for (const cles of Object.values(manifest.champs)) for (const cle of cles) manifest.empreintes[cle] = hashes[cle];
+      for (const b of r.blocs as BlocTransfert[]) {
+        memoriserBloc(b); disponibles.set(b.empreinte, blocsChauds.get(b.empreinte)!.valeur);
+      }
+      if (Object.values(manifest.empreintes).some(hash => !disponibles.has(hash))) throw new Error('Transfert de ligue incomplet');
+      const etat = assemblerTransfert(manifest, (_cle, hash) => disponibles.get(hash));
+      memoriserManifest(String(r.id), Number(r.version), manifest);
+      return ligne({ ...r, donnees: structuredClone(etat) });
+    } catch (erreur) {
+      if (!['42883','42703','42P01'].includes((erreur as { code?: string }).code ?? '')) throw erreur;
+      return lirePagesLegacy(valeur, parCode);
+    }
+  }
   return {
     atelier: atelierNeon(url),
     push: pushNeon(url),
@@ -168,14 +211,18 @@ export function stockageNeon(url: string): StockageCarriere {
       return r.length === 1;
     },
     async session(empreinte, maintenant) {
-      const r = await sql`select c.id,c.identifiant,c.pseudo,c.empreinte from sessions s join comptes c on c.id=s.compte where s.empreinte=${empreinte} and s.expire_le>${new Date(maintenant).toISOString()}`;
-      return (r[0] as CompteStocke) ?? null;
+      const r = await sql`select c.id,c.identifiant,c.pseudo from sessions s join comptes c on c.id=s.compte where s.empreinte=${empreinte} and s.expire_le>${new Date(maintenant).toISOString()}`;
+      return r[0] ? { ...r[0], empreinte: '' } as CompteStocke : null;
     },
     async ouvrirSession(empreinte, compte, expiration) {
       await sql`insert into sessions (empreinte,compte,expire_le) values (${empreinte},${compte},${new Date(expiration).toISOString()})`;
     },
     async fermerSession(empreinte) { await sql`delete from sessions where empreinte=${empreinte}`; },
     async limiter(cle, maximum, fenetre, maintenant) {
+      if (cle.startsWith('jeu:')) {
+        try { return await limiterJeu(cle, maximum, fenetre, maintenant); }
+        catch (erreur) { if ((erreur as { code?: string }).code !== '42883') throw erreur; }
+      }
       const debut = Math.floor(maintenant / fenetre) * fenetre;
       const r = await sql`insert into carriere_debits (cle,debut,nombre) values (${cle},${debut},1) on conflict (cle) do update set debut=excluded.debut,nombre=case when carriere_debits.debut=excluded.debut then carriere_debits.nombre+1 else 1 end returning nombre`;
       return Number(r[0].nombre) <= maximum;
@@ -328,6 +375,24 @@ export function stockageNeon(url: string): StockageCarriere {
     async dejaTraitee(ligue, compte, requete) {
       return (await sql`select 1 from carriere_commandes where ligue=${ligue} and compte=${compte} and requete=${requete}`).length > 0;
     },
+    async verifierCommande(ligue, compte, requete, connue) {
+      const [r] = await sql`select jsonb_build_array(l.etat_version,
+        case when l.etat_version=${connue?.version ?? null} then null else to_jsonb(l.comptes) end,extract(epoch from l.echeance)*1000,
+        exists(select 1 from carriere_commandes c where c.ligue=l.id and c.compte=${compte} and c.requete=${requete})) as r
+        from carriere_ligues l where l.id=${ligue}`;
+      if (!r) return null;
+      return { version: Number(r.r[0]), comptes: r.r[1] ?? connue!.comptes, echeance: r.r[2] == null ? null : Number(r.r[2]), dejaTraitee: Boolean(r.r[3]) };
+    },
+    async verifierSondage(ligue, compte, version, catalogue, maintenant) {
+      const [r] = await sql`select case
+        when not (comptes @> array[${compte}::uuid]) then '[-1]'::jsonb
+        when etat_version=${version} and catalogue_revision=${catalogue} and echeance>to_timestamp(${maintenant / 1000}) then '[1]'::jsonb
+        else jsonb_build_array(0,etat_version,comptes,extract(epoch from echeance)*1000,catalogue_revision)
+        end as r from carriere_ligues where id=${ligue}`;
+      if (!r || r.r[0] === -1) return { statut: 'absente' };
+      if (r.r[0] === 1) return { statut: 'inchange' };
+      return { statut: 'lire', entete: { version: Number(r.r[1]), comptes: r.r[2], echeance: r.r[3] == null ? null : Number(r.r[3]), catalogueRevision: r.r[4] == null ? undefined : Number(r.r[4]) } };
+    },
     async comparerEtEcrire(l, version, recu) {
       // ⚠️ L'ÉCRITURE DOIT PASSER MÊME SANS LA COLONNE. C'est celle qui enregistre
       // tout ce que fait un manager : la faire dépendre d'une migration récente,
@@ -337,10 +402,9 @@ export function stockageNeon(url: string): StockageCarriere {
       const donnees = JSON.stringify(l.etat);
       const resume = JSON.stringify(resumeEtat(l.etat));
       try {
-        const { manifest, blocs } = encoderTransfert(l.etat);
         const precedent = manifestsConnus.get(l.id);
-        const modifies = precedent?.version === version
-          ? blocs.filter(b => precedent.manifest.empreintes[b.cle] !== b.empreinte) : blocs;
+        const { manifest, blocs: modifies } = encoderTransfert(l.etat,
+          precedent?.version === version ? precedent.manifest.empreintes : undefined);
         // Le CAS, le reçu et les pages sont un seul commit. Le CTE ne renvoie
         // que l'identifiant, jamais l'état. Seules les pages modifiées s'écrivent.
         const r = await sql`with modification as (
@@ -363,7 +427,7 @@ export function stockageNeon(url: string): StockageCarriere {
         ), obsoletes as (
           delete from carriere_transfert_blocs b using modification m
           where b.ligue=m.id and not (${JSON.stringify(manifest.empreintes)}::jsonb ? b.cle) returning b.ligue
-        ) select id from modification`;
+        ) select 1 as ok from modification`;
         if (r.length) {
           for (const b of modifies) memoriserBloc(b);
           memoriserManifest(l.id, version + 1, manifest);

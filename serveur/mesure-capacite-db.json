@@ -1,0 +1,57 @@
+{
+  "date": "2026-09-11T15:59:11.322Z",
+  "methode": "Corps HTTP Neon reçus (enveloppes incluses, hors en-têtes/TLS ; pas une mesure de facturation ni un test de débit à 1200 ligues).",
+  "fixture": {
+    "clubs": 4,
+    "transactionsHistoriques": 10000,
+    "commandesMesurees": 12,
+    "commande": "ouvrirPack premium"
+  },
+  "mesures": {
+    "initialisation": {
+      "octets": 1187203,
+      "requetes": 9,
+      "appels": 2,
+      "octetsParAppel": 593602,
+      "requetesParAppel": 4.5
+    },
+    "commande_chaude": {
+      "octets": 7910,
+      "requetes": 39,
+      "appels": 12,
+      "octetsParAppel": 660,
+      "requetesParAppel": 3.25
+    },
+    "lecture_autre_instance": {
+      "octets": 86913,
+      "requetes": 36,
+      "appels": 12,
+      "octetsParAppel": 7243,
+      "requetesParAppel": 3
+    },
+    "sondage_inchange": {
+      "octets": 4680,
+      "requetes": 24,
+      "appels": 12,
+      "octetsParAppel": 390,
+      "requetesParAppel": 2
+    },
+    "demarrage_froid": {
+      "octets": 602978,
+      "requetes": 4,
+      "appels": 1,
+      "octetsParAppel": 602978,
+      "requetesParAppel": 4
+    }
+  },
+  "projection": {
+    "ligues": 1200,
+    "commandesParLigueParJour": 20000,
+    "jours": 30,
+    "plafondGo": 500,
+    "budgetOctetsParCommandeAvantLectures": 694.4444444444445,
+    "commandesChaudesSeulesGo": 475.2,
+    "commandesEtUneLectureAutreInstanceGo": 5690.2,
+    "avertissement": "Ces projections excluent notamment sessions supplémentaires, autres écrans, matchs, réveils, croissance du journal et démarrages à froid."
+  }
+}

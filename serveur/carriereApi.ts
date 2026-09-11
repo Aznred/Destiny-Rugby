@@ -168,11 +168,15 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     autoriserInscription = false, verifierRecu = true,
     enteteConnue?: { version: number; comptes: string[]; echeance: number | null }) {
     for (let tentative = 0; tentative < 8; tentative++) {
-      const ligne = await lireLigue(id, tentative === 0 ? enteteConnue : undefined);
+      const cache = liguesChaudes.get(id);
+      const controle = verifierRecu && stockage.verifierCommande ? await stockage.verifierCommande(id, compte, requete,
+        cache ? { version: cache.etat.version, comptes: cache.comptes } : undefined) : undefined;
+      if (controle === null) throw new ErreurHttp(404, 'Ligue introuvable.');
+      const ligne = await lireLigue(id, controle ?? (tentative === 0 ? enteteConnue : undefined));
       if (!ligne || (!autoriserInscription && compte !== 'horloge' && !ligne.comptes.includes(compte))) {
         throw new ErreurHttp(404, 'Ligue introuvable.');
       }
-      if (verifierRecu && await stockage.dejaTraitee(id, compte, requete)) return ligne.etat;
+      if (verifierRecu && (controle ? controle.dejaTraitee : await stockage.dejaTraitee(id, compte, requete))) return ligne.etat;
       const maintenant = Date.now();
       const presence = await avecPresences(ligne.etat, maintenant);
       const suivant = operation(presence.etat, maintenant, randomBytes(24).toString('hex'));
@@ -445,7 +449,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const connue = Number(url.searchParams.get('v'));
         let enteteConnue: { version: number; comptes: string[]; echeance: number | null } | undefined;
         if (Number.isInteger(connue) && connue > 0) {
-          const entete = await stockage.entete(id);
+          const sondage = stockage.verifierSondage ? await stockage.verifierSondage(id, compte.id, connue, catalogueAdmin().revision, maintenant) : undefined;
+          if (sondage?.statut === 'absente') throw new ErreurHttp(404, 'Ligue introuvable.');
+          if (sondage?.statut === 'inchange') return res.status(200).json({ inchange: true });
+          const entete = sondage?.statut === 'lire' ? sondage.entete : await stockage.entete(id);
           enteteConnue = entete ?? undefined;
           if (!entete || !entete.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
           /**

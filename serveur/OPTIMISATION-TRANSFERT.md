@@ -1,5 +1,9 @@
 # Transferts de la carrière — 11 septembre 2026
 
+Mise à jour : voir [CAPACITE-1200-LIGUES.md](CAPACITE-1200-LIGUES.md) pour les
+mesures du second passage et la cible de 20 000 commandes/jour/ligue.
+Les 500 Go/mois ne sont pas garantis par les corrections présentes.
+
 Diagnostic en lecture seule sur la base configurée : huit ligues, dont une
 ligue active de 4 264 734 octets JSON PostgreSQL. Son journal représentait
 3 509 761 octets. 2 049 commandes enregistrées sur les 24 dernières heures.
@@ -12,9 +16,10 @@ Les colonnes `transfert_version`, `transfert_manifest`, `catalogue_revision`
 et la table `carriere_transfert_blocs` sont additives. Le moteur conserve son
 état complet et tous ses reçus ; aucun historique n'est supprimé.
 
-Chaque tableau est découpé en pages de 128 éléments, compressées avant leur
-envoi et stockées avec leur SHA-256. Le serveur lit le manifeste de la version
-courante puis seulement les pages absentes de son cache. Il vérifie les hashes.
+Les tableaux sont découpés en pages adaptées (1 club/rencontre, 8 cartes,
+16 transactions, 32 autres éléments), compressées et stockées avec leur SHA-256.
+Le serveur lit seulement les différences d'empreintes et les pages absentes de
+son cache dans une même photographie SQL. Il vérifie les hashes.
 Le cache des pages est limité à 48 Mio logiques et celui des ligues à 32 Mio
 logiques (les objets JavaScript ont une surcharge mémoire supplémentaire).
 Les pages inchangées ne sont pas réécrites ; les pages obsolètes sont retirées.
@@ -32,13 +37,13 @@ l'opérateur de contenance correspondant à l'index GIN existant.
 
 ## Mesures et limites
 
-Initialisation réelle : 4 028 403 octets de JSON compact contre 720 283 octets
+Initialisation réelle du premier passage (pages de 128) : 4 028 403 octets de JSON compact contre 720 283 octets
 pour manifeste + pages compressées de la grande ligue, soit 82,1 % de moins.
 L'écart avec le chiffre PostgreSQL vient des espaces de sa représentation texte.
 Ces volumes représentent les corps logiques mesurés, pas une nouvelle mesure
 du tableau de facturation Neon ni les en-têtes du protocole.
 
-Test synthétique de 10 000 transactions : 1 617 886 octets JSON,
+Premier test synthétique avec les pages de 128 : 1 617 886 octets JSON,
 109 653 octets compressés ; ajouter une transaction et modifier le solde/la
 version change trois pages représentant 773 octets. Le manifeste s'ajoute à
 chaque lecture de version modifiée. Un nouveau serveur doit lire les pages
@@ -55,7 +60,7 @@ La compression PostgreSQL sur disque ne suffit pas à réduire les transferts :
 
 ## Mise en service et vérification
 
-1. Appliquer `serveur/schema-transfert.sql` avec `scripts/appliquerSchema.mjs`.
+1. Appliquer `serveur/schema-transfert.sql`, puis `serveur/schema-transfert-delta.sql` avec `scripts/appliquerSchema.mjs`.
 2. Exécuter `npm run base:transfert` pour préparer les ligues existantes. Une
    ligue modifiée pendant cette étape est ignorée sans écraser ses changements.
 3. Déployer le serveur modifié : la migration seule n'active pas les nouveaux
