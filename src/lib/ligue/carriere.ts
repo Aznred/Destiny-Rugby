@@ -783,7 +783,7 @@ function expirerMarche(etat: EtatCarriereEnLigne, maintenant: number) {
  * économie à laquelle personne ne fait confiance.
  *
  * De l'autre, sans rien, une ligue créée avant une mise à jour resterait
- * éternellement avec sept packs alors que le jeu en propose vingt-trois.
+ * éternellement avec sept packs alors que le catalogue s'enrichit au fil des mises à jour.
  *
  * On complète donc, sans écraser : les packs ABSENTS sont ajoutés tels quels,
  * et pour ceux qui existent déjà on ne rafraîchit que la PRÉSENTATION (nom,

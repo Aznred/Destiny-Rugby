@@ -47,6 +47,7 @@
     "verify:atelier": "vite-node scripts/verifierAtelier.ts",
     "verify:direct-push": "vite-node scripts/verifierDirectPush.ts",
     "verify:scenarios-match": "vite-node scripts/verifierScenariosMatch.ts",
+    "verify:packs-catalogue": "vite-node scripts/verifierNouveauxPacks.ts",
     "verify:direct-push:secours": "node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierDirectPush.ts",
     "verify:db-scale": "node --env-file-if-exists=.env scripts/verifierOptimisationDb.mjs",
     "verify:calendrier-carriere": "vite-node scripts/verifierCalendrierCarriere.ts"

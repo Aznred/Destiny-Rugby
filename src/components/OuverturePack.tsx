@@ -3,7 +3,8 @@ import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CarteCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { creerSonsPacks } from '../lib/sonsPacks';
-import { NOMS_PACK, PALIERS_PACK, rangPack } from '../lib/presentationPacks';
+import { nomRaretePack, PALIERS_PACK, rangPack } from '../lib/presentationPacks';
+import { t } from '../lib/i18n';
 import './OuverturePack.css';
 
 // ⚠️ CE `lazy` N'EST PLUS LE PREMIER À DEMANDER LE MODULE. `Pack3D` tire
@@ -102,26 +103,26 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
     if (!dialogue.current?.contains(document.activeElement)) principale.current?.focus();
     return () => window.removeEventListener('keydown', clavier);
   }, [phase, toutes, maximum, ordre.length, onFermer, muet, sons, pret]);
-  const conseil = phase === 'ouverture' ? 'Ouverture…'
+  const conseil = phase === 'ouverture' ? t('online.shop.opening')
     : phase === 'charge' ? 'Ça monte…'
-      : phase === 'evolution' ? NOMS_PACK[rarete]+' !'
-        : impatient ? 'Ouverture…' : 'Touche le pack';
+      : phase === 'evolution' ? nomRaretePack(rarete)+' !'
+        : impatient ? t('online.shop.opening') : t('online.pack.touch');
   return createPortal(<div ref={dialogue} className={`pack-show phase-${phase} palier-${rarete}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
     if (e.key === 'Tab') { const elements = Array.from(dialogue.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []); const premier = elements[0], dernier = elements[elements.length-1]; if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); } }
   }}><main className="pack-show-main cel-panneau">
-    <div className="pack-show-heading"><p className="eyebrow">Pack {pack}{cartes ? ` · ${cartes.length} cartes` : ''}</p><h2 id="pack-show-title" key={`${phase}-${rang}`} aria-live="polite">{phase === 'cartes' ? 'Tes nouvelles recrues' : NOMS_PACK[rarete]}</h2></div>
+    <div className="pack-show-heading"><p className="eyebrow">Pack {pack}{cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : ''}</p><h2 id="pack-show-title" key={`${phase}-${rang}`} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : nomRaretePack(rarete)}</h2></div>
     {phase !== 'cartes' ? <><div className="pack-show-stage">
       <div className="pack-show-beams" aria-hidden="true"/><div className="pack-show-orbit" aria-hidden="true"/>
       <div className="pack-show-particles" key={rang} aria-hidden="true">{Array.from({length:28}, (_,i) => <i key={i} style={{'--x':`${i*37%100}%`, '--delay':`${i%9*-.35}s`, '--duration':`${2+i%4}s`, '--drift':`${(i%2?1:-1)*(20+i*3)}px`} as CSSProperties}/>)}</div>
       <div className="pack-show-model"><Suspense fallback={null}><Pack3D rarete={rarete} ouvert={phase === 'ouverture'} calme={calme} transition={phase}/></Suspense></div>
-      <button ref={principale} className="pack-show-touch" aria-label={`Pack ${NOMS_PACK[rarete]} — toucher pour continuer`} aria-disabled={phase !== 'attente'} onClick={action}/>
+      <button ref={principale} className="pack-show-touch" aria-label={`Pack ${nomRaretePack(rarete)} — ${t('online.pack.touch')}`} aria-disabled={phase !== 'attente'} onClick={action}/>
       {(phase === 'charge' || phase === 'evolution') && <div className="pack-show-upgrade" key={phase} aria-hidden="true"><i/><i/><span/></div>}
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}
     </div><p className="pack-show-hint" aria-live="polite">{conseil}</p></> : <div className="pack-show-results">{ordre.map((carte,i) => <div key={carte.id} className={`pack-show-card ${i<revelees?'visible':''} ${i===ordre.length-1?'meilleure':''}`}>
-      {i === ordre.length-1 && i < revelees && <span className="pack-show-best">★ MEILLEURE CARTE</span>}
+      {i === ordre.length-1 && i < revelees && <span className="pack-show-best">{t('online.pack.best')}</span>}
       <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>DESTINY</small><b>DR</b><span>RUGBY</span><i>✦</i></div><div className="pack-show-front" aria-hidden={i>=revelees}>{i<revelees && rendreCarte(carte)}</div></div>
     </div>)}</div>}
-    {phase === 'cartes' && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={toutes?onFermer:passer}>{toutes?'Rejoindre le vestiaire':'Tout révéler'}</button></footer>}
+    {phase === 'cartes' && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={toutes?onFermer:passer}>{toutes?t('online.pack.clubhouse'):t('online.pack.reveal')}</button></footer>}
     <span className="pack-show-sr" aria-live="polite">{muet?'Son désactivé':'Son activé'}. M pour changer le son. Échap pour passer.</span>
   </main></div>, document.body);
 }

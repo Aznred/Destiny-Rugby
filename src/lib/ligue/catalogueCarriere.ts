@@ -43,6 +43,10 @@ const CHAMPIONNATS_JAPON = ['Japan Rugby League One : D1', 'Japan Rugby League O
 const CHAMPIONNATS_NORD = ['Gallagher Premiership', 'United Rugby Championship', 'RFU Championship', 'Championship Cup'];
 const CHAMPIONNATS_AMATEURS = ['Fédérale 1', 'Fédérale 2', 'Fédérale 3', 'Régionale 1', 'Régionale 2', 'Régionale 3'];
 const NATIONS_ILES = ['Fidji', 'Samoa', 'Tonga'];
+const NATIONS_SIX_NATIONS = ['France', 'Angleterre', 'Irlande', 'Écosse', 'Pays de Galles', 'Italie'];
+const NATIONS_RUGBY_CHAMPIONSHIP = ['Afrique du Sud', 'Nouvelle-Zélande', 'Australie', 'Argentine'];
+const NATIONS_CELTES = ['Irlande', 'Écosse', 'Pays de Galles'];
+const NATIONS_EUROPE_EMERGENTE = ['Géorgie', 'Portugal', 'Roumanie', 'Espagne'];
 
 /** Le tirage courant, celui de la plupart des packs thématiques. */
 const MIXTE = { bronze: 48, argent: 37, or: 14, elite: .95, star: .05 };
@@ -135,6 +139,70 @@ export const PACKS_CARRIERE: PackCarriere[] = [
     // ⚠️ AUCUN OR : les six championnats amateurs ne comptent pas un seul
     // joueur à 65 ou plus. C'est le pack du volume, il l'assume.
     probabilites: { bronze: 82, argent: 18, or: 0, elite: 0, star: 0 } },
+
+  // ── Les ligues ──────────────────────────────────────────────────────────
+  { id: 'nationale', nom: 'Nationale', prix: 1050, cartes: 3, famille: 'monde',
+    filtre: { championnats: ['Nationale', 'Nationale 2'] },
+    promesse: 'Nationale et Nationale 2. Des cadres solides et les futurs noms du rugby français.',
+    probabilites: { bronze: 22, argent: 58, or: 19.5, elite: .5, star: 0 } },
+  { id: 'federales', nom: 'Fédérales', prix: 550, cartes: 5, famille: 'monde',
+    filtre: { championnats: ['Fédérale 1', 'Fédérale 2', 'Fédérale 3'] },
+    promesse: 'Cinq joueurs issus des Fédérales, pour bâtir un groupe avec du caractère.',
+    probabilites: { bronze: 68, argent: 31.5, or: .5, elite: 0, star: 0 } },
+  { id: 'premiership', nom: 'Premiership', prix: 2500, cartes: 3, famille: 'monde',
+    filtre: { championnats: ['Gallagher Premiership'] },
+    promesse: 'Le championnat anglais : rythme, puissance et internationaux à chaque poste.',
+    probabilites: { bronze: 2, argent: 34, or: 59, elite: 4.5, star: .5 } },
+  { id: 'urc', nom: 'United Rugby Championship', prix: 2400, cartes: 3, famille: 'monde',
+    filtre: { championnats: ['United Rugby Championship'] },
+    promesse: 'Irlande, Écosse, Galles, Italie et Afrique du Sud réunies dans un même pack.',
+    probabilites: { bronze: 3, argent: 36, or: 56.5, elite: 4, star: .5 } },
+  { id: 'superRugby', nom: 'Super Rugby Pacific', prix: 2600, cartes: 3, famille: 'monde',
+    filtre: { championnats: ['Super Rugby Pacific'] },
+    promesse: 'Le rugby du Pacifique : vitesse, offloads et joueurs capables de renverser un match.',
+    probabilites: { bronze: 2, argent: 32, or: 60.5, elite: 5, star: .5 } },
+  { id: 'leagueOne', nom: 'Japan League One', prix: 1900, cartes: 3, famille: 'monde',
+    filtre: { championnats: CHAMPIONNATS_JAPON },
+    promesse: 'Les trois divisions japonaises et leurs stars venues du monde entier.',
+    probabilites: { bronze: 10, argent: 42, or: 44, elite: 3.6, star: .4 } },
+
+  // ── Les sélections ──────────────────────────────────────────────────────
+  { id: 'sixNations', nom: 'Six Nations', prix: 2900, cartes: 3, famille: 'monde', garantie: 'or',
+    filtre: { nations: NATIONS_SIX_NATIONS },
+    promesse: 'France, Angleterre, Irlande, Écosse, Galles et Italie. Une carte Or garantie.',
+    probabilites: { bronze: 4, argent: 31, or: 59, elite: 5.4, star: .6 } },
+  { id: 'rugbyChampionship', nom: 'Rugby Championship', prix: 3200, cartes: 3, famille: 'monde', garantie: 'or',
+    filtre: { nations: NATIONS_RUGBY_CHAMPIONSHIP },
+    promesse: 'Springboks, All Blacks, Wallabies et Pumas. Le carré fort de l’hémisphère Sud.',
+    probabilites: { bronze: 3, argent: 28, or: 62, elite: 6.2, star: .8 } },
+  { id: 'franceXV', nom: 'XV de France', prix: 2700, cartes: 3, famille: 'monde',
+    filtre: { nations: ['France'] },
+    promesse: 'Uniquement des joueurs français, quel que soit leur championnat actuel.',
+    probabilites: { bronze: 5, argent: 34, or: 56, elite: 4.6, star: .4 } },
+  { id: 'springboks', nom: 'Springboks', prix: 3000, cartes: 3, famille: 'monde', garantie: 'or',
+    filtre: { nations: ['Afrique du Sud'] },
+    promesse: 'Puissance, conquête et champions sud-africains. Une carte Or garantie.',
+    probabilites: { bronze: 2, argent: 29, or: 62, elite: 6.2, star: .8 } },
+  { id: 'allBlacks', nom: 'All Blacks', prix: 3000, cartes: 3, famille: 'monde', garantie: 'or',
+    filtre: { nations: ['Nouvelle-Zélande'] },
+    promesse: 'Uniquement des Néo-Zélandais : vitesse d’exécution et instinct offensif.',
+    probabilites: { bronze: 2, argent: 28, or: 63, elite: 6.2, star: .8 } },
+  { id: 'wallabies', nom: 'Wallabies', prix: 2400, cartes: 3, famille: 'monde',
+    filtre: { nations: ['Australie'] },
+    promesse: 'Les joueurs australiens du catalogue, des avants mobiles aux finisseurs.',
+    probabilites: { bronze: 4, argent: 35, or: 56, elite: 4.5, star: .5 } },
+  { id: 'pumas', nom: 'Pumas', prix: 2400, cartes: 3, famille: 'monde',
+    filtre: { nations: ['Argentine'] },
+    promesse: 'La grinta argentine, une mêlée féroce et des trois-quarts imprévisibles.',
+    probabilites: { bronze: 4, argent: 35, or: 56, elite: 4.5, star: .5 } },
+  { id: 'nationsCeltes', nom: 'Nations celtes', prix: 2200, cartes: 3, famille: 'monde',
+    filtre: { nations: NATIONS_CELTES },
+    promesse: 'Irlande, Écosse et Pays de Galles réunis dans une même sélection.',
+    probabilites: { bronze: 5, argent: 36, or: 54.5, elite: 4, star: .5 } },
+  { id: 'europeEmergente', nom: 'Europe émergente', prix: 1500, cartes: 3, famille: 'monde',
+    filtre: { nations: NATIONS_EUROPE_EMERGENTE },
+    promesse: 'Géorgie, Portugal, Roumanie et Espagne : les nations qui bousculent la hiérarchie.',
+    probabilites: { bronze: 12, argent: 45, or: 40, elite: 2.8, star: .2 } },
 
   // ── L'âge ────────────────────────────────────────────────────────────────
   { id: 'espoirs', nom: 'Espoirs', prix: 1200, cartes: 3, famille: 'age',
@@ -284,7 +352,7 @@ export function carteDepuisSource(source: SourceCarte, ligueId: string, propriet
 const RAYONS = new Map<string, readonly SourceCarte[]>();
 /**
  * ⚠️ LA CLÉ EST L'IDENTIFIANT DU PACK, PAS SON FILTRE. Le filtre est un objet :
- * l'utiliser comme clé de cache donnerait `[object Object]` pour les vingt-trois
+ * l'utiliser comme clé de cache donnerait `[object Object]` pour tous les
  * packs, qui partageraient alors tous le rayon du premier calculé — un pack
  * Charnière rendrait des piliers. Deux packs qui partagent un filtre calculent
  * donc deux fois le même rayon, et c'est un très petit prix.

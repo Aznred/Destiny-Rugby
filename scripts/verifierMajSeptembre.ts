@@ -12,7 +12,7 @@ assert.ok(ouvertures.length>1,'chaque journée doit avoir sa propre date d’ouv
 const kickoff=Date.parse(e.rencontres[0].ferme);
 e=avancerCarriere(e,kickoff,'test');assert.ok(e.rencontres[0].match);assert.equal(e.rencontres[0].match!.termine,false);
 e=avancerCarriere(e,kickoff+60000,'test');assert.ok(e.rencontres[0].match!.horloge<2);
-const cat=catalogueMondialCarriere();for(const [name,note] of [['Maxime Lucu',93],['Thomas Ramos',93],['Jack Willis',92],['Faf de Klerk',84]] as const){const c=cat.find(c=>c.nom.toLowerCase()===name.toLowerCase());assert.ok(c,name);assert.equal(c.note,note);}
+const cat=catalogueMondialCarriere();for(const [name,noteMin] of [['Maxime Lucu',93],['Thomas Ramos',93],['Jack Willis',92],['Faf de Klerk',84]] as const){const c=cat.find(c=>c.nom.toLowerCase()===name.toLowerCase());assert.ok(c,name);assert.ok(c.note>=noteMin,`${name} ne doit pas repasser sous ${noteMin} GEN après une mise à jour du catalogue`);}
 for(const pack of PACKS_CARRIERE)assert.ok(Math.abs(Object.values(pack.probabilites).reduce((a,b)=>a+b,0)-100)<.001,pack.id);
 const rayon1=packsBoutiqueDuJour(PACKS_CARRIERE,Date.parse('2026-09-09T12:00:00Z'));
 const rayon2=packsBoutiqueDuJour(PACKS_CARRIERE,Date.parse('2026-09-10T12:00:00Z'));
