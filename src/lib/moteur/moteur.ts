@@ -33,7 +33,7 @@ import {
   PHASES_ARRETEES, ajouterCommentaire, disciplineVide,
   type ActionJoueur, type ConsigneJoueur, type DisciplineMatch, type EtatMatch,
   type IntentionPied, type Lancement, type NiveauMatch, type OrdreBagarre,
-  type Phase, type PlanDeScore, type TypeCommentaire,
+  type Phase, type PlanDeScore, type TypeCommentaire, type Vol,
 } from './etat.js';
 import {
   apresGesteIllegal, chauffer, donnerOrdre, frictions, irregularite, refroidir,
@@ -78,31 +78,31 @@ const RAYON_PLAQUAGE = 1.35;
 // 3 secondes du premier réglage, la moitié de l'équipe était encore en route
 // quand le ballon partait — d'où l'impression qu'« il n'y a pas de coup d'envoi
 // et que les joueurs ne sont pas replacés ». Idem pour la touche.
-const ARRETS: Record<string, { visuel: number; horloge: number }> = {
-  melee: { visuel: 7, horloge: 50 },
-  touche: { visuel: 9, horloge: 35 },
-  transformation: { visuel: 4, horloge: 55 },
-  tirAuBut: { visuel: 6, horloge: 60 },
-  coupEnvoi: { visuel: 9, horloge: 22 },
-  renvoi22: { visuel: 7, horloge: 20 },
-  apresEssai: { visuel: 9, horloge: 58 }, // célébration + transformation
-  penalite: { visuel: 2.5, horloge: 12 },
-  miTemps: { visuel: 3, horloge: 0 },
+const ARRETS: Record<string, { visuel: number; horloge: number; direct: number }> = {
+  // Le direct garde assez de temps pour lire les formations, sans reproduire
+  // les longues attentes télévisées où rien ne bouge.
+  melee: { visuel: 7, horloge: 50, direct: 16 },
+  touche: { visuel: 9, horloge: 35, direct: 12 },
+  transformation: { visuel: 4, horloge: 55, direct: 6 },
+  tirAuBut: { visuel: 6, horloge: 60, direct: 10 },
+  coupEnvoi: { visuel: 9, horloge: 22, direct: 9 },
+  renvoi22: { visuel: 7, horloge: 20, direct: 7 },
+  apresEssai: { visuel: 3, horloge: 8, direct: 3 },
+  penalite: { visuel: 2.5, horloge: 12, direct: 3 },
+  miTemps: { visuel: 3, horloge: 0, direct: 3 },
   // ⚠️ L'horloge s'arrête pendant une bagarre : l'arbitre coupe le chrono le
   // temps de séparer et de sortir les cartes. C'est aussi ce qui empêche
   // qu'une pause d'écran, pendant qu'on choisit son ordre, coûte du temps de
   // jeu au joueur.
-  bagarre: { visuel: 6, horloge: 0 },
+  bagarre: { visuel: 6, horloge: 0, direct: 6 },
 };
 
 /**
  * Le rapport entre le chronomètre du match et ce qu'on regarde.
  *
- * ⚠️ EXPORTÉ POUR LE DIRECT EN LIGNE. Là-bas, une minute de jeu vaut une minute
- * réelle : pendant une mêlée, cinquante secondes d'horloge ne montrent que sept
- * secondes de mouvement. L'écran a besoin de ce rapport pour extrapoler les
- * positions entre deux relevés du serveur sans faire courir les joueurs sept
- * fois trop vite.
+ * ⚠️ EXPORTÉ POUR LE DIRECT EN LIGNE. Là-bas, une seconde regardée vaut une
+ * seconde de match, y compris pendant les arrêts raccourcis. L'écran a besoin
+ * de ce rapport pour extrapoler les positions entre deux relevés du serveur.
  */
 export function facteurHorloge(phase: Phase, tempsReel = false): number {
   if (tempsReel) return 1;
@@ -113,14 +113,13 @@ export function facteurHorloge(phase: Phase, tempsReel = false): number {
 /**
  * Ce que dure une phase arrêtée À L'ÉCRAN, en secondes simulées.
  *
- * ⚠️ EN TEMPS RÉEL, CE QU'ON REGARDE DURE CE QUE LE CHRONO AVALE. C'est la
- * seule définition qui donne un match « comme à la télévision » : la mêlée se
- * met en place, se lie et pousse pendant cinquante secondes, la touche prend
- * ses trente-cinq secondes, et le buteur a le temps de son rituel.
+ * En direct, chaque arrêt possède une durée dédiée : assez longue pour lire la
+ * mise en place, mais débarrassée des attentes où rien ne se passe. Son chrono
+ * reste à vitesse 1 afin que les déplacements gardent leur vitesse naturelle.
  */
 function dureeArret(e: EtatMatch, phase: Phase): number {
   const a = ARRETS[phase];
-  const duree = !a ? 3 : e.tempsReel ? a.horloge : a.visuel;
+  const duree = !a ? 3 : e.tempsReel ? a.direct : a.visuel;
   e.dureeArret = duree;
   return duree;
 }
@@ -134,11 +133,9 @@ function avancementArret(e: EtatMatch): number {
 /**
  * LES PHASES ARRÊTÉES QUI SE JOUENT VRAIMENT.
  *
- * ⚠️ EN TEMPS RÉEL, UNE FORMATION FIGÉE DEVIENT UNE PHOTO. Le placement d'une
- * mêlée est calculé une fois puis tenu : à la vitesse de la carrière solo, les
- * huit avants mettent sept secondes à s'y rendre et le ballon sort. Étiré sur
- * les cinquante secondes réelles d'une mêlée, le même placement donne quarante
- * secondes de joueurs immobiles — et c'est ça, « les joueurs sont mal placés ».
+ * ⚠️ EN DIRECT, UNE FORMATION FIGÉE DEVIENT UNE PHOTO. Le placement d'une
+ * mêlée est calculé une fois puis animé en trois temps, afin que les joueurs
+ * ne restent pas immobiles pendant toute la préparation.
  *
  * Une mêlée se joue donc en trois temps, comme sur un terrain : les deux packs
  * se présentent face à face, ils se lient, puis le plus fort pousse. Une touche
@@ -180,7 +177,7 @@ function animerArret(e: EtatMatch): void {
     }
     return;
   }
-  if (e.phase === 'tirAuBut' && e.tir) {
+  if ((e.phase === 'tirAuBut' || e.phase === 'transformation') && e.tir && !e.tir.volLance) {
     // Le rituel du buteur : il recule de sept mètres, souffle, puis s'élance.
     const buteur = e.tir.buteur;
     if (!buteur.surLeTerrain) return;
@@ -342,7 +339,7 @@ export function creerMatch(
     clubA, clubB,
     t: 0, sim: 0, reliquat: 0, minute: 0, periode: 1, sirene: false,
     phase: 'coupEnvoi', minuteur: ARRETS.coupEnvoi.visuel,
-    pions, ballon: { x: MILIEU, y: AXE }, porteur: null, possession, vol: null,
+    pions, ballon: { x: MILIEU, y: AXE }, porteur: null, possession, vol: null, volsRecents: [],
     lancement: null, ouvert: 1, phasesDepuisArret: 0, ligneAvantage: MILIEU,
     origine: { x: MILIEU, y: AXE }, metresGagnesPhase: 0,
     ballonLent: false, derniereTouche: null, dernierPasseur: null,
@@ -558,9 +555,7 @@ function tick(e: EtatMatch): void {
     case 'touche': return phaseTouche(e);
     case 'penalite': return phasePenalite(e);
     case 'tirAuBut': return phaseTirAuBut(e);
-    // ⚠️ Pas de phase `transformation` : la transformation est jouée dans la
-    // foulée de l'essai (`tenterEssai`), et c'est `apresEssai` qui en avale le
-    // temps au chronomètre.
+    case 'transformation': return phaseTransformation(e);
     case 'apresEssai': return phaseApresEssai(e);
     case 'miTemps': return phaseMiTemps(e);
     case 'bagarre': return phaseBagarre(e);
@@ -688,13 +683,13 @@ function dire(
 // secondes pendant l'arrêt.
 function installerPlacement(e: EtatMatch, placement: Record<string, Vec>, seuil = 26): void {
   e.placement = placement;
-  // ⚠️ EN TEMPS RÉEL, PERSONNE NE SE TÉLÉPORTE. Le seuil existe parce qu'un
+  // ⚠️ EN DIRECT, PERSONNE NE SE TÉLÉPORTE. Le seuil existe parce qu'un
   // joueur qui vient d'aplatir dans l'en-but a cent mètres à faire et que la
   // carrière solo ne lui laisse que sept secondes à l'écran. Regardée à la
   // vitesse réelle, la même téléportation se voit — et c'est précisément le
   // « les joueurs sont mal placés » du retour de jeu : ils n'étaient pas mal
-  // placés, ils APPARAISSAIENT à leur place. Une mêlée dure cinquante
-  // secondes : à huit mètres par seconde, il y a tout le temps d'y courir.
+  // placés, ils APPARAISSAIENT à leur place. Les durées directes restent assez
+  // longues pour rejoindre la formation à vitesse normale.
   if (e.tempsReel) seuil = Infinity;
   for (const p of e.pions) {
     if (!p.surLeTerrain || p.sanction > 0) continue;
@@ -802,6 +797,25 @@ function phaseRenvoi22(e: EtatMatch): void {
 // LE BALLON EN L'AIR
 // ---------------------------------------------------------------------------
 
+/**
+ * Mémorise les vols assez longtemps pour que le direct puisse dessiner même
+ * une passe entièrement terminée entre deux relevés du serveur.
+ */
+function memoriserVol(e: EtatMatch, vol: Vol): void {
+  const encoreVisibles = (e.volsRecents ?? []).filter((v) => e.t - v.debut <= 8).slice(-23);
+  encoreVisibles.push({
+    de: { ...vol.de }, vers: { ...vol.vers }, duree: vol.duree,
+    hauteur: vol.hauteur, type: vol.type, intention: vol.intention,
+    auteur: vol.auteur, receveur: vol.receveur, debut: e.t,
+  });
+  e.volsRecents = encoreVisibles;
+}
+
+function poserVol(e: EtatMatch, vol: Vol): void {
+  e.vol = vol;
+  memoriserVol(e, vol);
+}
+
 function lancerVol(
   e: EtatMatch, auteur: Pion, arrivee: Vec, intention: IntentionPied,
   duree: number, hauteur: number, depuis?: Vec,
@@ -832,10 +846,10 @@ function lancerVol(
   // Les adversaires ne sont jamais hors-jeu sur NOTRE coup de pied.
   for (const q of surLeTerrain(e, adverse(auteur.cote))) q.horsJeu = false;
 
-  e.vol = {
+  poserVol(e, {
     de, vers: arrivee, duree, ecoule: 0, hauteur,
     type: 'pied', intention, auteur, receveur: null,
-  };
+  });
   auteur.stats.metresAuPied += Math.abs(arrivee.x - de.x);
   e.porteur = null;
   e.phase = 'ballonEnLAir';
@@ -1409,11 +1423,11 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
 
   if (e.lancement) e.lancement.index += 1;
   e.porteur = null;
-  e.vol = {
+  poserVol(e, {
     de: { x: p.pos.x, y: p.pos.y }, vers: cible,
     duree: Math.max(0.22, d / 18), ecoule: 0, hauteur: 0,
     type: 'passe', intention: 'passe', auteur: p, receveur,
-  };
+  });
 
   // Le receveur arrive dans un trou : le rideau traversé est hors du coup le
   // temps qu'il s'échappe. ⚠️ On n'ANNONCE rien ici — une percée, ce n'est pas
@@ -1465,11 +1479,11 @@ function offloader(e: EtatMatch, porteur: Pion): boolean {
   e.dernierPasseur = porteur;
   if (e.lancement) { e.lancement.chaine = []; e.lancement.index = 0; }
   e.porteur = null;
-  e.vol = {
+  poserVol(e, {
     de: { x: porteur.pos.x, y: porteur.pos.y }, vers: { x: recu.pos.x, y: recu.pos.y },
     duree: 0.28, ecoule: 0, hauteur: 0, type: 'passe', intention: 'offload',
     auteur: porteur, receveur: recu,
-  };
+  });
   return true;
 }
 
@@ -1699,10 +1713,14 @@ function resoudrePlaquage(
   if (e.rng() < 0.055 + porteur.vision / 1600 + (monGeste === 'raffut' ? 0.22 : 0)
     && offloader(e, porteur)) return;
 
-  formerRuck(e, { x: porteur.pos.x, y: porteur.pos.y });
+  formerRuck(e, { x: porteur.pos.x, y: porteur.pos.y }, { porteur, defenseur });
 }
 
-function formerRuck(e: EtatMatch, lieu: Vec): void {
+function formerRuck(
+  e: EtatMatch,
+  lieu: Vec,
+  contact?: { porteur: Pion; defenseur: Pion },
+): void {
   // Le porteur est allé au sol : la passe précédente n'amènera plus rien.
   e.dernierPasseur = null;
   // ⚠️ UN RUCK NE SE FORME JAMAIS DANS L'EN-BUT ni sur la ligne de touche : là
@@ -1724,6 +1742,24 @@ function formerRuck(e: EtatMatch, lieu: Vec): void {
   e.ballonLent = lent;
   e.minuteur = (lent ? 4.5 : 2.8) + e.rng() * 1.6;
   e.placement = placementRuck(e.pions, e.ballon, e.possession);
+  if (contact) {
+    // Au contact, le ballon ET les deux joueurs s'arrêtent ensemble. Avant,
+    // le porteur gardait sa vitesse de course pendant que le ballon restait au
+    // sol : visuellement, il traversait le ruck sans lui.
+    stopper(contact.porteur);
+    stopper(contact.defenseur);
+    contact.porteur.role = 'ruck';
+    contact.defenseur.role = 'ruck';
+    const s = sens(contact.porteur.cote);
+    e.placement[contact.porteur.id] = {
+      x: e.ballon.x - s * 0.25,
+      y: borner(e.ballon.y - 0.35, 1.2, LARGEUR - 1.2),
+    };
+    e.placement[contact.defenseur.id] = {
+      x: e.ballon.x + s * 0.45,
+      y: borner(e.ballon.y + 0.35, 1.2, LARGEUR - 1.2),
+    };
+  }
   // La ligne de hors-jeu se replace au dernier pied.
   const sa = sens(e.possession);
   e.horsJeu = lieu.x + sa * 1.3;
@@ -2103,10 +2139,14 @@ function phasePenalite(e: EtatMatch): void {
   const veutTirer = choix ? choix === 'points' : aPortee && !besoinEssai && e.rng() < chanceTir;
 
   if (veutTirer) {
-    e.tir = { buteur, distance: dist, angle: ecartAxe, valeur: 3, suite: 'coupEnvoi' };
+    e.tir = {
+      buteur, distance: dist, angle: ecartAxe, valeur: 3,
+      suite: 'coupEnvoi', lieu: { ...info.lieu },
+    };
     e.phase = 'tirAuBut';
     e.minuteur = dureeArret(e, 'tirAuBut');
-    e.placement = placementTir(e.pions, info.lieu, cote);
+    e.ballon = { ...info.lieu };
+    e.placement = placementTir(e.pions, info.lieu, cote, buteur.id);
     return;
   }
 
@@ -2138,20 +2178,53 @@ function phasePenalite(e: EtatMatch): void {
   reprendreJeu(e, info.lieu);
 }
 
+type TirEnCours = NonNullable<EtatMatch['tir']>;
+
+/** Lance un vrai ballon vers les poteaux, réussi ou légèrement à côté. */
+function lancerTrajectoireTir(e: EtatMatch, tir: TirEnCours, reussi: boolean): void {
+  const { buteur } = tir;
+  const s = sens(buteur.cote);
+  const ligne = buteur.cote === 'A' ? LIGNE_B : LIGNE_A;
+  const coteRate = e.rng() < 0.5 ? -1 : 1;
+  const decalage = reussi
+    ? (e.rng() - 0.5) * 3.6
+    : coteRate * (4.2 + e.rng() * 5.5);
+  const de = tir.lieu ?? { ...e.ballon };
+  const distance = Math.hypot(ligne + s * 4 - de.x, AXE + decalage - de.y);
+  const duree = borner(1.25 + distance / 42, 1.45, 2.35);
+  tir.reussi = reussi;
+  tir.volLance = true;
+  buteur.stats.coupsDePied += 1;
+  poserVol(e, {
+    de: { ...de }, vers: { x: ligne + s * 4, y: AXE + decalage },
+    duree, ecoule: 0, hauteur: borner(4.8 + distance * 0.09, 5.5, 9),
+    type: 'pied', intention: 'drop', auteur: buteur, receveur: null,
+  });
+  e.porteur = null;
+  e.minuteur = duree;
+}
+
 function phaseTirAuBut(e: EtatMatch): void {
   if (e.minuteur > 0) return;
   const tir = e.tir;
-  e.tir = null;
-  e.placement = null;
   if (!tir) return preparerCoupEnvoi(e, e.possession);
   const { buteur, distance: d, angle } = tir;
   const cote = buteur.cote;
   const plan = planDe(e, cote);
-  buteur.stats.butsTentes += 1;
+  if (!tir.volLance) {
+    buteur.stats.butsTentes += 1;
+    const reussi = e.scoreSurTerrain
+      ? e.rng() < probabilitePenalite(e, buteur, d, angle)
+      : plan.penalites > 0 && e.rng() < Math.max(0.85, probaTir(d, angle, buteur.pied));
+    lancerTrajectoireTir(e, tir, reussi);
+    return;
+  }
+  if (e.vol && e.vol.ecoule < e.vol.duree) return;
 
-  const reussi = e.scoreSurTerrain
-    ? e.rng() < probabilitePenalite(e, buteur, d, angle)
-    : plan.penalites > 0 && e.rng() < Math.max(0.85, probaTir(d, angle, buteur.pied));
+  const reussi = !!tir.reussi;
+  e.vol = null;
+  e.tir = null;
+  e.placement = null;
   if (reussi) {
     plan.penalites = Math.max(0, plan.penalites - 1);
     buteur.stats.butsReussis += 1;
@@ -2170,6 +2243,35 @@ function phaseTirAuBut(e: EtatMatch): void {
   return arret(e, 'renvoi22', adverse(cote), {
     x: adverse(cote) === 'A' ? M22_A : M22_B, y: AXE,
   });
+}
+
+function phaseTransformation(e: EtatMatch): void {
+  if (e.minuteur > 0) return;
+  const tir = e.tir;
+  if (!tir) return preparerCoupEnvoi(e, adverse(e.possession));
+  const cote = tir.buteur.cote;
+  if (!tir.volLance) {
+    lancerTrajectoireTir(e, tir, !!tir.reussi);
+    return;
+  }
+  if (e.vol && e.vol.ecoule < e.vol.duree) return;
+
+  e.vol = null;
+  e.tir = null;
+  e.placement = null;
+  const plan = planDe(e, cote);
+  if (tir.reussi) {
+    plan.essaisTransformes = Math.max(0, plan.essaisTransformes - 1);
+    tir.buteur.stats.butsReussis += 1;
+    marquer(e, cote, 2);
+    tir.buteur.stats.pointsAuPied = (tir.buteur.stats.pointsAuPied ?? 0) + 2;
+    dire(e, 'but', cote, C.phrase(e.rng, C.TRANSFORMATION, { nom: tir.buteur.nom }), 2, tir.buteur.moi);
+  } else {
+    plan.essaisSecs = Math.max(0, plan.essaisSecs - 1);
+    dire(e, 'butRate', cote, C.phrase(e.rng, C.TRANSFORMATION_RATEE, { nom: tir.buteur.nom }), 0, tir.buteur.moi);
+  }
+  if (e.sirene) return clorePeriode(e);
+  preparerCoupEnvoi(e, adverse(cote));
 }
 
 // ---------------------------------------------------------------------------
@@ -2242,25 +2344,26 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   if (plan.essaisTransformes > 0 && plan.essaisSecs > 0) transforme = e.rng() < chance;
   else transforme = plan.essaisTransformes > 0;
 
-  buteur.stats.butsTentes += 1;
-  if (transforme) {
-    plan.essaisTransformes -= 1;
-    buteur.stats.butsReussis += 1;
-    marquer(e, cote, 2);
-    buteur.stats.pointsAuPied = (buteur.stats.pointsAuPied ?? 0) + 2;
-    dire(e, 'but', cote, C.phrase(e.rng, C.TRANSFORMATION, { nom: buteur.nom }), 2, buteur.moi);
-  } else {
-    plan.essaisSecs -= 1;
-    dire(e, 'butRate', cote, C.phrase(e.rng, C.TRANSFORMATION_RATEE, { nom: buteur.nom }), 0, buteur.moi);
-  }
+  // Le marqueur n'est plus le porteur : sinon la boucle de déplacement le
+  // saute indéfiniment et il reste figé dans l'en-but après son essai.
+  stopper(marqueur);
+  e.porteur = null;
+  e.vol = null;
 
-  e.phase = 'apresEssai';
-  e.minuteur = dureeArret(e, 'apresEssai');
-  e.possession = adverse(cote);
-  // ⚠️ Dès l'essai marqué, tout le monde regagne le centre pour le coup
-  // d'envoi. Ils ont la célébration + la transformation pour y arriver.
-  viserLeCoupEnvoi(e, adverse(cote));
-  e.placement = placementCoupEnvoi(e.pions, MILIEU, adverse(cote), e.cibleRenvoi!);
+  const lieu = {
+    x: (cote === 'A' ? LIGNE_B : LIGNE_A) - sens(cote) * 22,
+    y: borner(marqueur.pos.y, 2.5, LARGEUR - 2.5),
+  };
+  e.ballon = { ...lieu };
+  buteur.stats.butsTentes += 1;
+  e.tir = {
+    buteur, distance: 22 + ecartAxe * 0.55, angle: ecartAxe,
+    valeur: 2, suite: 'coupEnvoi', lieu, reussi: transforme,
+  };
+  e.phase = 'transformation';
+  e.minuteur = dureeArret(e, 'transformation');
+  e.possession = cote;
+  e.placement = placementTir(e.pions, lieu, cote, buteur.id);
 }
 
 function phaseApresEssai(e: EtatMatch): void {

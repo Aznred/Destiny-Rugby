@@ -30,6 +30,31 @@ assert.ok(Math.max(...imagesPasse.slice(1).map((b, i) => distance(b, imagesPasse
 assert.ok(imagesPasse.slice(10, -10).some((b) => b.h > 0.5),
   'Une passe manquée par le sondage doit conserver une arche lisible.');
 
+// Quand le serveur possède l'événement court, la passe garde surtout sa VRAIE
+// durée : ballon dans les mains avant, 300 ms de vol, puis dans les mains du
+// receveur. Elle n'est plus étirée artificiellement sur tout l'intervalle.
+const joueursRecentsA = [pion('a', 'domicile', 28, 18), pion('b', 'domicile', 42, 28)];
+const joueursRecentsB = [pion('a', 'domicile', 30, 19), pion('b', 'domicile', 44, 29)];
+const passeRecente = {
+  id: 'passe:a:b:1200.8', de: { x: 29, y: 18.5 }, vers: { x: 43, y: 28.5 },
+  duree: 0.3, ecoule: 1.2, hauteur: 0.8, type: 'passe' as const,
+  intention: 'passe' as const, debut: 1200.8, fin: 1201.1,
+  auteurId: 'a', receveurId: 'b', seed: 8,
+};
+const recentA = {
+  ...terrain(joueursRecentsA), porteurId: 'a', instantJeu: 1200,
+};
+const recentB = {
+  ...terrain(joueursRecentsB), porteurId: 'b', instantJeu: 1202,
+  volsRecents: [passeRecente],
+};
+const avantPasse = interpolerImageDirect(recentA, recentB, 0.2, 2);
+const pendantPasse = interpolerImageDirect(recentA, recentB, 0.45, 2);
+const apresPasse = interpolerImageDirect(recentA, recentB, 0.8, 2);
+assert.ok(Math.abs(avantPasse.ballon.x - avantPasse.pions.get('a')!.x - 0.92) < 0.01);
+assert.ok(pendantPasse.ballon.h > 0.5, 'La passe récente doit être visible pendant son vrai vol.');
+assert.ok(Math.abs(apresPasse.ballon.x - apresPasse.pions.get('b')!.x - 0.92) < 0.01);
+
 // Quand le porteur reste le même, le ballon suit sa position interpolée au
 // centimètre près au lieu d'être recalculé depuis un relevé voisin.
 const courseA = { ...terrain([pion('a', 'domicile', 20, 35, 3, 0)]), porteurId: 'a' };

@@ -416,10 +416,19 @@ function poursuite(p: Pion, porteur: Pion): Vec {
 // ---------------------------------------------------------------------------
 
 export function placerEquipes(e: EtatMatch): void {
+  // Le porteur couché et son plaqueur doivent rester dans le regroupement
+  // jusqu'à la sortie du ballon. La structure générale recalculée ci-dessous
+  // ne doit pas leur rendre un rôle de ligne au milieu du ruck.
+  const engagesRuck = e.phase === 'ruck'
+    ? new Set(e.pions.filter((p) => p.role === 'ruck').map((p) => p.id))
+    : null;
   const attaque = surLeTerrain(e, e.possession);
   const defense = surLeTerrain(e, adverse(e.possession));
   structurerAttaque(e, attaque, e.possession);
   structurerDefense(e, defense, adverse(e.possession));
+  if (engagesRuck) {
+    for (const p of e.pions) if (engagesRuck.has(p.id)) p.role = 'ruck';
+  }
   appliquerConsignePerso(e);
   // L'ENGAGEMENT : on ne sprinte que près du ballon. Un ailier à l'opposé se
   // replace en trottinant, comme dans un vrai match.

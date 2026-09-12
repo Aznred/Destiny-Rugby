@@ -258,6 +258,16 @@ export interface Vol {
   receveur: Pion | null;
 }
 
+/**
+ * Copie légère d'un vol récemment déclenché.
+ *
+ * Le direct ne relève le moteur que quelques fois par seconde : une passe de
+ * 300 ms peut donc commencer et finir entre deux relevés. On garde brièvement
+ * ses extrémités et son instant de départ afin que l'écran puisse néanmoins
+ * la rejouer à sa vraie vitesse.
+ */
+export type VolRecent = Omit<Vol, 'ecoule'> & { debut: number };
+
 // LE LANCEMENT DE JEU : la combinaison décidée pour la phase qui commence.
 // C'est LUI qui fait circuler le ballon — sans plan, chaque porteur cherchait
 // son voisin le plus proche et le ballon tournait sur trois mètres.
@@ -309,6 +319,7 @@ export interface EtatMatch {
   porteur: Pion | null;
   possession: Cote;
   vol: Vol | null;
+  volsRecents?: VolRecent[];
 
   // Structure de jeu
   lancement: Lancement | null;
@@ -401,7 +412,19 @@ export interface EtatMatch {
    */
   dureeArret?: number;
   cibleRenvoi: Vec | null;   // où va tomber le coup d'envoi (sert au placement)
-  tir: { buteur: Pion; distance: number; angle: number; valeur: number; suite: 'renvoi' | 'coupEnvoi' } | null;
+  tir: {
+    buteur: Pion;
+    distance: number;
+    angle: number;
+    valeur: number;
+    suite: 'renvoi' | 'coupEnvoi';
+    /** Point où le ballon est posé. */
+    lieu?: Vec;
+    /** Résultat décidé une seule fois, avant le vol visible du ballon. */
+    reussi?: boolean;
+    /** Le rituel est fini et le ballon est actuellement en vol. */
+    volLance?: boolean;
+  } | null;
   penalite: { pour: Cote; lieu: Vec; motif: string } | null;
 
   remplacementsA: number;
@@ -419,15 +442,12 @@ export interface EtatMatch {
    * ⚠️ LE MATCH SE REGARDE EN TEMPS RÉEL — une seconde de jeu, une seconde à
    * l'écran, et rien n'est ni accéléré ni ralenti.
    *
-   * La carrière solo joue un match en cinq minutes de manette : les phases
-   * arrêtées y sont COMPRESSÉES à l'image (la mêlée se met en place en sept
-   * secondes, le chrono en avale cinquante). C'est le bon choix pour un match
-   * qu'on traverse, et le mauvais pour un match qu'on SUIT : étirées sur les
-   * cinquante secondes réelles de la Carrière en ligne, ces sept secondes
-   * d'animation donnent des joueurs qui marchent au ralenti.
+   * La carrière solo joue un match accéléré : les phases arrêtées y sont
+   * compressées à l'image. En direct, elles avancent à vitesse naturelle mais
+   * disposent d'une durée de présentation raccourcie, sans longue attente.
    *
-   * En temps réel, la mêlée dure ce que dure une mêlée. Le match coûte plus de
-   * ticks (4 800 secondes simulées au lieu de 2 560) et c'est le prix à payer.
+   * Le direct coûte davantage de ticks que le solo, mais les courses restent
+   * ainsi fluides et cohérentes avec l'horloge affichée.
    */
   tempsReel?: boolean;
   /** Options serveur : aucune incidence sur les carrières locales existantes. */

@@ -130,6 +130,60 @@ function memeVol(a?: VolDirect, b?: VolDirect): a is VolDirect {
     && proche(a.duree, b.duree) && a.type === b.type && a.intention === b.intention;
 }
 
+function ballonSurJoueur(
+  id: string,
+  a: TerrainDirect,
+  b: TerrainDirect,
+  pions: Map<string, Vec>,
+): BallonAfficheDirect | null {
+  const p = pions.get(id);
+  if (!p) return null;
+  const donnees = b.pions.find((joueur) => joueur.id === id)
+    ?? a.pions.find((joueur) => joueur.id === id);
+  const sens = donnees?.cote === 'exterieur' ? -1 : 1;
+  return { x: p.x + sens * 0.92, y: p.y + 0.42, h: 0.18 };
+}
+
+/**
+ * Rejoue les actions très courtes conservées par le serveur. Entre deux
+ * passes, le ballon reste dans les mains du bon joueur au lieu de parcourir
+ * lentement en deux secondes un trajet qui n'en a pris que trois dixièmes.
+ */
+function ballonDepuisVolsRecents(
+  a: TerrainDirect,
+  b: TerrainDirect,
+  pions: Map<string, Vec>,
+  u: number,
+): BallonAfficheDirect | null {
+  const debutImage = a.instantJeu ?? a.horloge * 60;
+  const finImage = b.instantJeu ?? b.horloge * 60;
+  if (finImage <= debutImage) return null;
+  const instant = melanger(debutImage, finImage, borner01(u));
+  const uniques = new Map<string, VolDirect>();
+  for (const vol of [...(a.volsRecents ?? []), ...(b.volsRecents ?? [])]) {
+    if (vol.debut === undefined || vol.fin === undefined) continue;
+    const id = vol.id ?? `${vol.debut}:${vol.auteurId ?? '-'}:${vol.receveurId ?? '-'}`;
+    uniques.set(id, vol);
+  }
+  const vols = [...uniques.values()]
+    .filter((vol) => (vol.fin ?? -Infinity) >= debutImage && (vol.debut ?? Infinity) <= finImage)
+    .sort((x, y) => (x.debut ?? 0) - (y.debut ?? 0));
+  if (!vols.length) return null;
+
+  const actif = vols.find((vol) => instant >= (vol.debut ?? Infinity) && instant <= (vol.fin ?? -Infinity));
+  if (actif) return positionVol(actif, (instant - actif.debut!) / Math.max(0.01, actif.duree));
+
+  const passes = vols.filter((vol) => vol.type === 'passe');
+  const terminees = passes.filter((vol) => (vol.fin ?? Infinity) < instant && vol.receveurId);
+  const derniere = terminees[terminees.length - 1];
+  if (derniere?.receveurId) {
+    const tenu = ballonSurJoueur(derniere.receveurId, a, b, pions);
+    if (tenu) return tenu;
+  }
+  const suivante = passes.find((vol) => (vol.debut ?? -Infinity) > instant && vol.auteurId);
+  return suivante?.auteurId ? ballonSurJoueur(suivante.auteurId, a, b, pions) : null;
+}
+
 /**
  * Ballon continu entre deux relevés.
  *
@@ -146,6 +200,8 @@ export function interpolerBallonDirect(
   u: number,
 ): BallonAfficheDirect {
   const t = borner01(u);
+  const recent = ballonDepuisVolsRecents(a, b, pions, t);
+  if (recent) return recent;
   if (memeVol(a.vol, b.vol)) {
     const vol: TerrainDirect = {
       ...a,

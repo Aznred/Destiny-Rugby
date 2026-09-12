@@ -69,7 +69,7 @@ import {
   appliquerTactiqueEquipe, avancer, bilan, choisirPenalite, creerMatch,
   demanderRemplacement, facteurHorloge, infoPenalite, type PenaliteEnCours,
 } from '../moteur/moteur.js';
-import type { EtatMatch, IntentionPied, Phase, TypeLancement } from '../moteur/etat.js';
+import type { EtatMatch, IntentionPied, Phase, TypeLancement, Vol, VolRecent } from '../moteur/etat.js';
 import type { Cote } from '../moteur/terrain.js';
 import { scorePossible } from '../championnat.js';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../compositionManager.js';
@@ -285,10 +285,9 @@ export interface LigneFil {
 // par seconde entre deux vérités du moteur. Une passe entière manquée par le
 // sondage est elle aussi reliée entre ses deux positions, jamais téléportée.
 //
-// ⚠️ ET LA CADENCE EST INDISPENSABLE. Une seconde réelle ne vaut pas une
-// seconde de mouvement : pendant une mêlée, l'horloge avale cinquante secondes
-// pour sept secondes de jeu. Extrapoler sans elle ferait traverser le terrain
-// aux joueurs pendant une touche.
+// ⚠️ ET LA CADENCE EST INDISPENSABLE. Elle indique explicitement le rapport
+// entre horloge et mouvement, afin qu'une phase accélérée ne fasse pas
+// traverser le terrain aux joueurs pendant une touche.
 
 export interface PionDirect {
   id: string; numero: number; nom: string; poste: PosteId; cote: CoteEnLigne;
@@ -332,6 +331,10 @@ export interface TerrainDirect {
   cadence: number;
   /** Minutes de jeu au centième au moment du relevé. */
   horloge: number;
+  /** Même instant en secondes, assez précis pour rejouer une passe de 250 ms. */
+  instantJeu?: number;
+  /** Vols terminés récemment, conservés car ils peuvent tenir entre deux relevés. */
+  volsRecents?: VolDirect[];
   /** Instant serveur d'émission : le client absorbe le jitter avec cette horloge. */
   emisLe?: number;
   /** Numéro monotone du relevé dans la simulation autoritaire. */
@@ -753,12 +756,8 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
     etat.cibles.domicile, etat.cibles.exterieur, etat.cle, undefined,
     {
       rng: graine(`match#${etat.cle}`),
-      // ⚠️ LE CŒUR DU DIRECT. Sans lui, les cinquante secondes d'une mêlée
-      // montrent sept secondes d'animation étirées cinq fois : des joueurs qui
-      // marchent au ralenti pendant plus de la moitié du match. Retour de jeu,
-      // mot pour mot : « c'est lent, les joueurs sont mal placés, prends le
-      // même moteur que sur le mode carrière solo ». C'est bien le même moteur
-      // — c'est son horloge qui était étirée.
+      // ⚠️ LE CŒUR DU DIRECT. Les déplacements restent à vitesse naturelle et
+      // chaque arrêt utilise sa durée directe, courte mais lisible.
       tempsReel: true,
       scoreSurTerrain: true,
       compositionA: equipes.domicile.feuille, compositionB: equipes.exterieur.feuille,
@@ -822,7 +821,9 @@ const TYPES_FIL = new Set([
   // Le fil conserve leurs moments significatifs, sans ajouter chaque plaquage.
   'melee', 'touche', 'maul', 'ruck', 'faute',
 ]);
-const FIL_MAX = 240;
+// Les arrêts plus courts produisent davantage de séquences jouées. On garde un
+// fil dense mais borné, sans atteindre le plafond historique de 240 lignes.
+const FIL_MAX = 220;
 
 function extraireFil(e: EtatMatch): LigneFil[] {
   const lignes: LigneFil[] = [];
@@ -906,6 +907,23 @@ function graineVisuelle(id: string): number {
   return h >>> 0;
 }
 
+function extraireVolDirect(vol: Vol | VolRecent, debut: number, ecoule: number): VolDirect {
+  const actionId = [
+    vol.type, vol.intention, vol.auteur.id, vol.receveur?.id ?? '-',
+    r2(debut), r2(vol.de.x), r2(vol.de.y), r2(vol.vers.x), r2(vol.vers.y),
+  ].join(':');
+  return {
+    id: actionId,
+    de: { x: r2(vol.de.x), y: r2(vol.de.y) },
+    vers: { x: r2(vol.vers.x), y: r2(vol.vers.y) },
+    duree: r2(vol.duree), ecoule: r2(ecoule), hauteur: r2(vol.hauteur),
+    type: vol.type, intention: vol.intention,
+    debut: r2(debut), fin: r2(debut + vol.duree),
+    auteurId: vol.auteur.id, receveurId: vol.receveur?.id,
+    seed: graineVisuelle(actionId),
+  };
+}
+
 function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
   const terrain: TerrainDirect = {
     pions: e.pions.filter((p) => p.surLeTerrain).map((p) => ({
@@ -925,6 +943,7 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
     ouvert: e.ouvert === 1 ? 'droite' : 'gauche',
     cadence: r2(1 / facteurHorloge(e.phase, e.tempsReel)),
     horloge: r2(minuteExacte(e)),
+    instantJeu: r2(e.t),
     emisLe,
     snapshot: Math.max(0, Math.round(e.t / 0.6)),
   };
@@ -933,22 +952,13 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
     if (e.lancement.intention) terrain.lancement.intention = e.lancement.intention;
   }
   if (e.porteur) terrain.porteurId = e.porteur.id;
+  const recents = (e.volsRecents ?? [])
+    .filter((vol) => e.t - vol.debut <= 8)
+    .map((vol) => extraireVolDirect(vol, vol.debut, e.t - vol.debut));
+  if (recents.length) terrain.volsRecents = recents;
   if (e.vol) {
     const debut = Math.max(0, e.t - e.vol.ecoule);
-    const actionId = [
-      e.vol.type, e.vol.intention, e.vol.auteur.id, e.vol.receveur?.id ?? '-',
-      r2(debut), r2(e.vol.de.x), r2(e.vol.de.y), r2(e.vol.vers.x), r2(e.vol.vers.y),
-    ].join(':');
-    terrain.vol = {
-      id: actionId,
-      de: { x: r2(e.vol.de.x), y: r2(e.vol.de.y) },
-      vers: { x: r2(e.vol.vers.x), y: r2(e.vol.vers.y) },
-      duree: r2(e.vol.duree), ecoule: r2(e.vol.ecoule), hauteur: r2(e.vol.hauteur),
-      type: e.vol.type, intention: e.vol.intention,
-      debut: r2(debut), fin: r2(debut + e.vol.duree),
-      auteurId: e.vol.auteur.id, receveurId: e.vol.receveur?.id,
-      seed: graineVisuelle(actionId),
-    };
+    terrain.vol = extraireVolDirect(e.vol, debut, e.vol.ecoule);
   }
   if (e.sifflet) {
     terrain.sifflet = {

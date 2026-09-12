@@ -233,14 +233,15 @@ export function placementCoupEnvoi(
 // ---------------------------------------------------------------------------
 // LE TIR AU BUT — les coéquipiers derrière le botteur, l'adversaire sous ses poteaux
 // ---------------------------------------------------------------------------
-export function placementTir(pions: Pion[], lieu: Vec, botteur: Cote): Placement {
+export function placementTir(pions: Pion[], lieu: Vec, botteur: Cote, buteurId?: string): Placement {
   const pl: Placement = {};
   for (const cote of ['A', 'B'] as Cote[]) {
     const s = sens(cote);
     const liste = parCote(pions, cote);
     liste.forEach((p, i) => {
       if (cote === botteur) {
-        pl[p.id] = i === 0
+        const estButeur = buteurId ? p.id === buteurId : i === 0;
+        pl[p.id] = estButeur
           ? { x: lieu.x, y: bY(lieu.y) }
           : { x: lieu.x - s * (6 + (i % 4) * 2.5), y: bY(lieu.y + ((i % 7) - 3) * 5) };
       } else {
