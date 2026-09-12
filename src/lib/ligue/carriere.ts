@@ -17,6 +17,22 @@ const HEURE = 3_600_000;
 const JOUR = 24 * HEURE;
 const SEMAINE = 7 * JOUR;
 export const PACKS_GRATUITS_PAR_JOUR = 10;
+
+/**
+ * Une saison accélérée ne doit pas transformer chaque match en dette physique.
+ * La base reste exigeante à un rendez-vous hebdomadaire ; chaque cran de rythme
+ * rend trois points de fatigue supplémentaires entre deux rencontres.
+ */
+export function recuperationFatigueSelonRythme(rythme: number): number {
+  const cadence = Math.max(1, Math.min(7, Math.round(rythme)));
+  return 22 + (cadence - 1) * 3;
+}
+
+/** Les indisponibilités suivent le temps de la ligue, pas le calendrier réel. */
+export function dureeBlessureSelonRythme(jours: number, rythme: number): number {
+  const cadence = Math.max(1, Math.min(7, Math.round(rythme)));
+  return Math.max(12 * HEURE, Math.round(jours * JOUR / cadence));
+}
 const copier = <T>(x: T): T => structuredClone(x);
 let catalogueSources: ReturnType<typeof catalogueMondialCarriere> | undefined;
 let sourcesParId: Map<string, ReturnType<typeof catalogueMondialCarriere>[number]> | undefined;
@@ -422,6 +438,48 @@ function calendrierCompetition(etat: EtatCarriereEnLigne, competition: Competiti
 }
 
 /**
+ * Recale toutes les affiches encore intactes quand le commissaire change la
+ * cadence. Les résultats et les directs en cours ne bougent jamais. Chaque
+ * compétition est reprise depuis son dernier tour joué ; les tours suivants,
+ * y compris ceux des coupes, utilisent immédiatement le nouveau rythme.
+ */
+export function replanifierCalendrier(etat: EtatCarriereEnLigne, maintenant: number): number {
+  let modifiees = 0;
+  for (const competition of etat.competitions.filter(c => c.etat === 'enCours')) {
+    const matchs = etat.rencontres.filter(r => r.competitionId === competition.id);
+    const verrouilles = matchs.filter(r => r.resultat || r.match);
+    const futurs = matchs.filter(r => !r.resultat && !r.match);
+    if (!futurs.length) continue;
+
+    const groupes = [...new Set(futurs.map(r => r.journee))]
+      .map(journee => futurs.filter(r => r.journee === journee)
+        .sort((a, b) => Date.parse(a.ferme) - Date.parse(b.ferme) || a.id.localeCompare(b.id)))
+      .sort((a, b) => Date.parse(a[0].ferme) - Date.parse(b[0].ferme) || a[0].journee - b[0].journee);
+    const derniereCloture = verrouilles.length
+      ? Math.max(...verrouilles.map(r => Date.parse(r.ferme)).filter(Number.isFinite))
+      : Number.NEGATIVE_INFINITY;
+    const debutCompetition = Date.parse(competition.debut);
+    const base = Math.max(maintenant, Number.isFinite(debutCompetition) ? debutCompetition : maintenant,
+      Number.isFinite(derniereCloture) ? derniereCloture : maintenant);
+    let ouverture = base;
+    const decalage = verrouilles.length ? 1 : 0;
+
+    groupes.forEach((groupe, index) => {
+      const horaires = horairesChampionnat(base, etat.rythme, index + decalage, groupe.length);
+      const ouvre = dateServeur(ouverture);
+      groupe.forEach((rencontre, position) => {
+        const ferme = dateServeur(horaires[position]);
+        if (rencontre.ouvre !== ouvre || rencontre.ferme !== ferme) modifiees++;
+        rencontre.ouvre = ouvre;
+        rencontre.ferme = ferme;
+      });
+      ouverture = Math.max(...horaires);
+    });
+  }
+  return modifiees;
+}
+
+/**
  * Répare l'ancien calendrier qui donnait la date de lancement de saison comme
  * ouverture à TOUTES les journées. Les clôtures étaient déjà correctes : on
  * les conserve, ainsi que chaque résultat, et la journée suivante s'ouvre à
@@ -717,13 +775,16 @@ function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, ma
     // ne serait crédité à personne. Les minutes réelles décident de tout.
     const minutes = new Map((m.feuille ?? []).map(l => [l.carteId, l]));
     for (const c of cartesClub(etat, club.id)) {
-      c.fatigue = Math.max(0, c.fatigue - 22);
+      c.fatigue = Math.max(0, c.fatigue - recuperationFatigueSelonRythme(etat.rythme));
       const ligne = minutes.get(c.id);
       if (!ligne && !titulaires.has(c.id)) continue;
       const jouees = ligne?.minutes ?? 80;
       c.matchs++; c.essais += ligne?.essais ?? 0;
       c.fatigue = Math.min(100, c.fatigue + Math.round(jouees * 0.4));
-      if (rng() < .018 * (jouees / 80)) c.blesseJusqua = dateServeur(maintenant + (3 + Math.floor(rng() * 6)) * JOUR);
+      if (rng() < .018 * (jouees / 80)) {
+        const jours = 3 + Math.floor(rng() * 6);
+        c.blesseJusqua = dateServeur(maintenant + dureeBlessureSelonRythme(jours, etat.rythme));
+      }
     }
   }
   elaguerArchives(etat);
@@ -890,6 +951,13 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
     switch (commande.type) {
       case 'actualiser': break;
       case 'demarrerSaison': exiger(compteId === nouveau.createurId, 'Seul le créateur peut lancer la saison.'); demarrerSaison(nouveau, maintenant); break;
+      case 'modifierRythme': {
+        exiger(compteId === nouveau.createurId, 'Seul le créateur peut modifier la fréquence des matchs.');
+        entier(commande.rythme, 1, 7);
+        nouveau.rythme = commande.rythme;
+        replanifierCalendrier(nouveau, maintenant);
+        break;
+      }
       case 'composition': clubLibre(nouveau, club.id); verifierComposition(nouveau, club, commande.composition, maintenant); club.composition = copier(commande.composition); club.buteurManuel = true; break;
       // ⚠️ On n'enregistre JAMAIS la stratégie telle qu'elle arrive : une valeur
       // inconnue est remplacée par le défaut, jamais refusée. C'est la même

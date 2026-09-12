@@ -173,6 +173,7 @@ export type CommandeCarriere =
   // saison rend le classement et l'historique illisibles.
   | { type: 'rejoindre'; pseudo: string; clubNom: string; embleme?: string }
   | { type: 'demarrerSaison' }
+  | { type: 'modifierRythme'; rythme: number }
   | { type: 'composition'; composition: CompositionManager }
   | { type: 'strategie'; strategie: StrategieEnLigne }
   | { type: 'ouvrirPack'; packId: IdPackCarriere }

@@ -64,49 +64,5 @@ pendant le déploiement du second. L'ancien état JSONB et les reçus sont conse
 
 ## Architecture à mettre en place pour la cible intensive
 
-Les instances Vercel peuvent être réutilisées mais leur nombre augmente avec
-la charge ; la documentation ne garantit pas qu'une ligue revienne toujours
-sur la même instance. Il ne faut donc pas dimensionner la production en
-supposant 100 % de lectures en mémoire.
-[Fonctionnement de Fluid Compute](https://vercel.com/docs/fluid-compute).
-
-Le chemin proposé est un moteur persistant qui attribue une ligue à un seul
-ouvrier, avec état courant en mémoire et écritures durables dans Neon. Il
-nécessite un hébergement persistant ; aucune connexion à un tel hébergement
-n'est actuellement configurée dans le projet.
-
-Conditions de mise en œuvre et de validation :
-
-1. Extraire le journal append-only de l'agrégat. Garder une petite vue récente,
-   des compteurs/records cumulés, un compteur d'identifiants monotone et la
-   provenance des cartes. L'historique complet reste consultable par pages.
-2. Affecter chaque ligue à un ouvrier. Un bail avec numéro de génération en
-   base protège la reprise : un ancien ouvrier ne peut plus écrire après
-   changement de propriétaire, même s'il redémarre tardivement.
-3. Persister l'événement, le reçu idempotent et les ressources modifiées dans
-   une transaction avant d'accuser réception. Aucun achat confirmé ne doit
-   dépendre seulement de la mémoire ni d'une sauvegarde différée.
-4. Diffuser les vues filtrées aux membres depuis le moteur, sans relire Neon
-   à chaque consultation. Les sessions et permissions restent contrôlées.
-5. Reconstituer après panne depuis un instantané compact et les événements
-   suivants. Tester les doubles commandes, crashs avant/après commit,
-   failover concurrent et révocations de membres.
-6. Effectuer un test de charge isolé avec le mélange réel packs/ventes/échanges,
-   des matchs, 1 200 ligues et des pointes au-dessus de la moyenne de 278
-   commandes/s. Vérifier débit, latence, mémoire, WAL, stockage et octets sortants.
-
-Budget d'acceptation proposé, à mesurer et non à annoncer comme acquis :
-
-| Poste | Budget mensuel |
-| --- | ---: |
-| Commandes durables (environ 347 octets/commande au maximum) | 250 Go |
-| Authentification, consultations et matchs | 100 Go |
-| Reprises, chargements d'état et consultations d'archives | 75 Go |
-| Autres requêtes | 25 Go |
-| Marge | 50 Go |
-
-Ce changement d'architecture n'est pas contenu dans les optimisations actuelles.
-Déplacer uniquement le même gros JSON vers un cache ne résout pas sa croissance
-ni le coût des reprises. Ajouter de la compression sur le client après la
-lecture ne réduit pas les octets déjà sortis de Neon.
+c
 [Mesure et réduction du transfert Neon](https://neon.com/docs/introduction/network-transfer).

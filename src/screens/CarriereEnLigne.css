@@ -123,6 +123,13 @@
 .cel-actions { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
 .cel-actions small { color: var(--brume); font-size: 0.82rem; }
 .cel-deux { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.cel-reglage-rythme { display: grid; gap: 1rem; margin-top: 1rem; }
+.cel-reglage-rythme h2 { margin: 0.15rem 0 0.35rem; }
+.cel-reglage-rythme p { margin: 0; color: var(--brume); max-width: 72ch; }
+.cel-choix-rythme { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.45rem; }
+.cel-choix-rythme button { min-height: 42px; border: 1px solid var(--bordure); border-radius: 8px; background: rgba(4, 18, 14, 0.48); color: var(--brume); font: 700 0.78rem var(--police-forte); cursor: pointer; transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease; }
+.cel-choix-rythme button:hover { border-color: var(--or-400); color: var(--craie); transform: translateY(-1px); }
+.cel-choix-rythme button.actif { border-color: var(--or-400); background: linear-gradient(145deg, rgba(183, 135, 47, 0.28), rgba(38, 78, 57, 0.42)); color: var(--or-200); box-shadow: inset 0 0 0 1px rgba(231, 191, 104, 0.12); }
 
 .cel-champ { display: flex; flex-direction: column; gap: 0.35rem; }
 .cel-champ > span {
@@ -1726,6 +1733,7 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel .ct-feuille-fut .ct-fut-indicateurs svg { width: 7px; height: 7px; }
 
 @media (max-width: 700px) {
+  .cel-choix-rythme { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   /* La règle ci-dessus tient déjà le téléphone : la carte suit la largeur du
      terrain, le terrain suit la carte. Rien à forcer ici. */
 }

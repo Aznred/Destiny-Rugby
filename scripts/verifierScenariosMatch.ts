@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { compositionManagerParDefaut } from '../src/lib/compositionManager';
 import { coequipierDepuisCarte, dotationBronzeCarriere } from '../src/lib/ligue/catalogueCarriere';
 import { conclureMatchEnLigne, creerMatchEnLigne, STRATEGIE_EN_LIGNE_DEFAUT } from '../src/lib/ligue/matchCarriere';
+import type { TerrainDirect } from '../src/lib/ligue/matchCarriere';
+import { creerScenarioDirect } from '../src/lib/ligue/scenarioDirect';
 import * as C from '../src/lib/moteur/commentaire';
 import { POOLS_COMMENTAIRES } from '../src/data/commentairesMatch';
 
@@ -33,4 +35,20 @@ const pools=[C.ESSAI,C.ESSAI_PRECISION,C.PENALITE,C.PENALITE_BUT,C.PENALITE_RATE
 assert.ok(pools.reduce((n,p)=>n+p.length,0)>=100,'Le catalogue français doit contenir au moins cent variantes ciblées.');
 for(const langue of Object.values(POOLS_COMMENTAIRES))
   assert.equal(langue.motif.length,C.MOTIFS_PENALITE.length,'Chaque motif de faute doit rester traduit.');
-console.log(`OK — ${textes.size} récits observés, ${types.size} types visibles, fil maximal ${filMax}/240, motifs traduits dans 6 langues.`);
+
+const terrain=(x:number,y:number,type:NonNullable<TerrainDirect['lancement']>['type'],cote:'domicile'|'exterieur'='domicile'):TerrainDirect=>({
+  pions:[],ballon:{x,y},phase:'jeuCourant',systeme:'blitz',possession:cote,
+  sequence:3,metresGagnes:2,ballonLent:false,lancement:{type},cadence:1,horloge:24,
+});
+const variantes=new Set<string>();
+for(const type of ['ras','pod','large','saute','pickAndGo'] as const)
+  for(const x of [5,12,40,61,80,95,108,115])
+    for(const y of [8,35,62]) variantes.add(creerScenarioDirect(terrain(x,y,type)).id);
+assert.ok(variantes.size>=120,`Seulement ${variantes.size} variantes de mise en scène structurées.`);
+const danger=creerScenarioDirect({...terrain(108,8,'large'),metresGagnes:11});
+assert.equal(danger.momentFort,true);
+assert.equal(danger.cadrage,'proche');
+assert.equal(danger.type,'franchissement');
+assert.equal(creerScenarioDirect(terrain(22,35,'ras','exterieur')).zone,'vingtDeuxAdverse','Les zones doivent suivre le sens d’attaque.');
+
+console.log(`OK — ${textes.size} récits observés, ${types.size} types visibles, ${variantes.size} variantes 2D, fil maximal ${filMax}/240, motifs traduits dans 6 langues.`);

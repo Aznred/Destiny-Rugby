@@ -842,6 +842,14 @@ Un onglet dédié : le prochain match avec la date et l'heure d'ouverture de sa
 fenêtre, le compte à rebours, l'agenda des huit prochains rendez-vous du club,
 les six prochaines journées de toute la ligue, et les derniers résultats.
 
+Le créateur peut modifier le rythme de **1 à 7 matchs par semaine** depuis le
+bureau de la ligue. Le palier 7 correspond à **un match par jour**. Le serveur
+reprogramme toutes les affiches futures du championnat et des coupes, mais ne
+touche jamais à un résultat ni à un direct déjà lancé. La récupération de
+fatigue augmente avec le rythme (22 à 40 points entre deux rencontres) et la
+durée réelle des blessures est divisée par la cadence : accélérer une saison ne
+condamne donc pas un joueur à manquer artificiellement sept fois plus de matchs.
+
 > ⚠️ **Ce que les rappels sont, et ce qu'ils ne sont pas.** Ce sont des
 > notifications de NAVIGATEUR, déclenchées par l'onglet ouvert : une journée qui
 > s'ouvre, un match qui commence, le tien qui se termine. Elles ne réveillent

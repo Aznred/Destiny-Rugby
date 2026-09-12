@@ -47,6 +47,7 @@ import { PelouseMemo } from './Pelouse';
 import { Camera, angleDeVue, type Cadrage, type Vue } from '../../lib/moteur/camera';
 import { LARGEUR, LONGUEUR, borner, type Vec } from '../../lib/moteur/terrain';
 import type { CoteEnLigne, TerrainDirect } from '../../lib/ligue/matchCarriere';
+import { creerScenarioDirect, type ScenarioDirect } from '../../lib/ligue/scenarioDirect';
 import { t } from '../../lib/i18n';
 
 /**
@@ -83,6 +84,25 @@ interface Props {
 
 interface Ballon extends Vec { h: number }
 interface Releve { terrain: TerrainDirect; recu: number }
+type ModeCamera = 'auto' | 'large' | 'suivi';
+
+const LIBELLES_SCENARIO: Record<ScenarioDirect['type'], string> = {
+  coupEnvoi: 'Coup d’envoi', renvoi22: 'Renvoi aux 22', ruck: 'Ruck', melee: 'Mêlée',
+  touche: 'Touche', maul: 'Maul', penalite: 'Pénalité', tirAuBut: 'Tentative au but',
+  transformation: 'Transformation', apresEssai: 'Reprise après essai', miTemps: 'Mi-temps',
+  jeuRas: 'Jeu au ras', pod: 'Bloc d’avants', jeuLarge: 'Jeu au large',
+  passeSautee: 'Passe sautée', pickAndGo: 'Pick-and-go', passe: 'Passe', offload: 'Passe après contact',
+  degagement: 'Dégagement', occupation: 'Jeu d’occupation', chandelle: 'Chandelle',
+  cinquanteVingtDeux: 'Tentative de 50:22', rasant: 'Coup de pied rasant',
+  transversale: 'Transversale', drop: 'Drop', penaltouche: 'Pénaltouche', renvoi: 'Renvoi',
+  franchissement: 'Franchissement', ballonLibre: 'Ballon libre', jeuCourant: 'Jeu courant', fini: 'Fin du match',
+};
+
+const LIBELLES_ZONE: Record<ScenarioDirect['zone'], string> = {
+  enButAdverse: 'dans l’en-but', cinqAdverse: 'à 5 m', vingtDeuxAdverse: 'dans les 22 m adverses',
+  campAdverse: 'dans le camp adverse', milieu: 'au milieu', campPropre: 'dans son camp',
+  vingtDeuxPropre: 'dans ses 22 m', enButPropre: 'dans son en-but',
+};
 
 /**
  * La spline d'Hermite entre deux positions et leurs vitesses.
@@ -127,21 +147,23 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const ballon = useRef<Ballon>({ x: LONGUEUR / 2, y: LARGEUR / 2, h: 0 });
   /** Le relevé effectivement montré : c'est lui qui commande le bandeau. */
   const [affiche, setAffiche] = useState<TerrainDirect>(terrain);
-  const [cadrage, setCadrage] = useState<Cadrage>('large');
+  const [modeCamera, setModeCamera] = useState<ModeCamera>('auto');
+  const [scenario, setScenario] = useState(() => creerScenarioDirect(terrain));
   const [, redessiner] = useState(0);
 
   // ⚠️ TOUT CE QUE LA BOUCLE LIT PASSE PAR UNE RÉFÉRENCE. Elle est montée une
   // seule fois pour la vie du composant : la relancer à chaque relevé du serveur
   // remettrait la caméra à zéro toutes les deux secondes.
   const tampon = useRef<Releve[]>([{ terrain, recu: performance.now() / 1000 }]);
-  const reglages = useRef({ cadrage, monCote });
+  const reglages = useRef({ modeCamera, monCote });
+  const scenarioCourant = useRef(scenario);
   useEffect(() => {
     const file = tampon.current;
     if (file[file.length - 1]?.terrain === terrain) return;
     file.push({ terrain, recu: performance.now() / 1000 });
     if (file.length > TAMPON_MAX) file.splice(0, file.length - TAMPON_MAX);
   }, [terrain]);
-  useEffect(() => { reglages.current = { cadrage, monCote }; }, [cadrage, monCote]);
+  useEffect(() => { reglages.current = { modeCamera, monCote }; }, [modeCamera, monCote]);
 
   useEffect(() => {
     const noeud = scene.current;
@@ -218,9 +240,20 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       if (courant !== montre) { montre = courant; setAffiche(courant); }
       ballon.current = ballonDe(courant, positions, courant === a.terrain ? u * dtSim : 0);
 
+      const prochainScenario = creerScenarioDirect(courant);
+      if (prochainScenario.id !== scenarioCourant.current.id) {
+        scenarioCourant.current = prochainScenario;
+        setScenario(prochainScenario);
+      }
+
       const { largeur, hauteur } = boite.current;
+      const mode = reglages.current.modeCamera;
+      const cadrage: Cadrage = mode === 'auto' ? prochainScenario.cadrage : mode;
+      const cible = courant.vol
+        ? { x: (ballon.current.x + courant.vol.vers.x) / 2, y: (ballon.current.y + courant.vol.vers.y) / 2 }
+        : ballon.current;
       vueRef.current = camera.current.suivre(
-        ballon.current, reglages.current.cadrage, largeur / hauteur,
+        cible, cadrage, largeur / hauteur,
         angleDeVue(reglages.current.monCote === 'exterieur' ? 'B' : 'A', hauteur > largeur), dt,
       );
       redessiner((n) => n + 1);
@@ -245,9 +278,16 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     if (!pos) return null;
     const porte = affiche.porteurId === p.id;
     const mien = monCote !== undefined && p.cote === monCote;
+    const vitesse = Math.hypot(p.vx, p.vy);
+    const trace = vitesse > 1.4 ? Math.min(2.7, vitesse * 0.34) : 0;
+    const nomCourt = p.nom.split(' ').at(-1) ?? p.nom;
+    const largeurNom = Math.max(tailleTexte * 3.2, nomCourt.length * tailleTexte * 0.64);
     return (
       <g key={p.id} transform={`translate(${pos.x.toFixed(2)} ${pos.y.toFixed(2)})`}>
         <title>{`${p.numero} · ${p.nom}`}</title>
+        {trace > 0 && (
+          <line className="cel-trace-course" x1={0} y1={0} x2={(-p.vx / vitesse) * trace} y2={(-p.vy / vitesse) * trace} strokeWidth={trait * 1.15} />
+        )}
         <ellipse cx={rayon * 0.14} cy={rayon * 0.35} rx={rayon} ry={rayon * 0.7} fill="rgba(0,0,0,.35)" />
         <circle
           r={rayon}
@@ -264,6 +304,12 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
         >
           {p.numero}
         </text>
+        {porte && (
+          <g className="cel-nom-porteur" transform={vue?.redresser}>
+            <rect x={-largeurNom / 2} y={-rayon * 3.1} width={largeurNom} height={tailleTexte * 1.35} rx={tailleTexte * 0.35} />
+            <text y={-rayon * 2.25} textAnchor="middle" fontSize={tailleTexte * 0.76}>{nomCourt}</text>
+          </g>
+        )}
       </g>
     );
   };
@@ -294,6 +340,13 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       >
         <g transform={vue?.transform}>
           <PelouseMemo />
+          {affiche.vol && (
+            <line
+              className="cel-trajectoire"
+              x1={b.x} y1={b.y} x2={affiche.vol.vers.x} y2={affiche.vol.vers.y}
+              strokeWidth={Math.max(0.28, trait * 0.9)}
+            />
+          )}
           {/* Le porteur passe DEVANT tout le monde : c'est lui qu'on suit. */}
           {affiche.pions.filter((p) => p.cote === 'exterieur' && p.id !== affiche.porteurId).map(dessiner)}
           {affiche.pions.filter((p) => p.cote === 'domicile' && p.id !== affiche.porteurId).map(dessiner)}
@@ -316,6 +369,11 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       </svg>
 
       <div className="cel-hud">
+        <div className={`cel-scenario cel-scenario-${scenario.intensite}`} aria-live="polite">
+          {scenario.momentFort && <b>MOMENT FORT</b>}
+          <span>{LIBELLES_SCENARIO[scenario.type]}</span>
+          <small>{scenario.sequence}<sup>e</sup> phase · {LIBELLES_ZONE[scenario.zone]}</small>
+        </div>
         <div className="cel-hud-haut">
           <span className="cel-tag"><i style={{ background: couleurs.domicile }} />{nomDomicile}{monCote === 'domicile' ? ' · toi' : ''}</span>
           <span className="cel-tag"><i style={{ background: couleurs.exterieur }} />{nomExterieur}{monCote === 'exterieur' ? ' · toi' : ''}</span>
@@ -335,9 +393,10 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
         <button
           type="button"
           className="cel-cadrage"
-          onClick={() => setCadrage(cadrage === 'suivi' ? 'large' : 'suivi')}
+          onClick={() => setModeCamera(modeCamera === 'auto' ? 'large' : modeCamera === 'large' ? 'suivi' : 'auto')}
         >
-          <Icone nom="oeil" taille={15} />{cadrage === 'suivi' ? 'Tout le terrain' : 'Suivre le ballon'}
+          <Icone nom="oeil" taille={15} />
+          {modeCamera === 'auto' ? 'Caméra auto' : modeCamera === 'large' ? 'Vue terrain' : 'Suivre le ballon'}
         </button>
       </div>
     </div>

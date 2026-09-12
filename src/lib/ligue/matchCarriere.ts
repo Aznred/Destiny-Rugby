@@ -69,7 +69,7 @@ import {
   appliquerTactiqueEquipe, avancer, bilan, choisirPenalite, creerMatch,
   demanderRemplacement, facteurHorloge, infoPenalite, type PenaliteEnCours,
 } from '../moteur/moteur.js';
-import type { EtatMatch, Phase } from '../moteur/etat.js';
+import type { EtatMatch, IntentionPied, Phase, TypeLancement } from '../moteur/etat.js';
 import type { Cote } from '../moteur/terrain.js';
 import { scorePossible } from '../championnat.js';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../compositionManager.js';
@@ -299,6 +299,8 @@ export interface PionDirect {
 export interface VolDirect {
   de: { x: number; y: number }; vers: { x: number; y: number };
   duree: number; ecoule: number; hauteur: number;
+  type?: 'passe' | 'pied';
+  intention?: IntentionPied | 'passe' | 'offload';
 }
 
 export interface TerrainDirect {
@@ -310,6 +312,14 @@ export interface TerrainDirect {
   phase: Phase;
   systeme: string;
   possession: CoteEnLigne;
+  /** Contexte structuré de la séquence : le rendu l'interprète, sans rejouer le moteur. */
+  sequence?: number;
+  origine?: { x: number; y: number };
+  ligneAvantage?: number;
+  metresGagnes?: number;
+  ballonLent?: boolean;
+  ouvert?: 'gauche' | 'droite';
+  lancement?: { type: TypeLancement; intention?: IntentionPied };
   /** Secondes SIMULÉES écoulées par seconde réelle dans la phase en cours. */
   cadence: number;
   /** Minutes de jeu au centième au moment du relevé. */
@@ -850,15 +860,26 @@ function extraireTerrain(e: EtatMatch): TerrainDirect {
     phase: e.phase,
     systeme: e.systeme,
     possession: MOTEUR_VERS_COTE[e.possession],
+    sequence: e.phasesDepuisArret + 1,
+    origine: { x: r2(e.origine.x), y: r2(e.origine.y) },
+    ligneAvantage: r2(e.ligneAvantage),
+    metresGagnes: r2(e.metresGagnesPhase),
+    ballonLent: e.ballonLent,
+    ouvert: e.ouvert === 1 ? 'droite' : 'gauche',
     cadence: r2(1 / facteurHorloge(e.phase, e.tempsReel)),
     horloge: r2(minuteExacte(e)),
   };
+  if (e.lancement) {
+    terrain.lancement = { type: e.lancement.type };
+    if (e.lancement.intention) terrain.lancement.intention = e.lancement.intention;
+  }
   if (e.porteur) terrain.porteurId = e.porteur.id;
   if (e.vol) {
     terrain.vol = {
       de: { x: r2(e.vol.de.x), y: r2(e.vol.de.y) },
       vers: { x: r2(e.vol.vers.x), y: r2(e.vol.vers.y) },
       duree: r2(e.vol.duree), ecoule: r2(e.vol.ecoule), hauteur: r2(e.vol.hauteur),
+      type: e.vol.type, intention: e.vol.intention,
     };
   }
   if (e.sifflet) {

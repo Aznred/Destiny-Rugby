@@ -162,6 +162,10 @@ Quatre modules portent le mode :
 | `carriere.ts` | **Toutes les règles** : saison, calendrier, packs, marché, enchères, échanges, objectifs, coupes, classement, récompenses. |
 | `matchCarriere.ts` | **Le match** : stratégies, horloge continue, décisions en direct, remplacements, terrain rejouable, feuille. |
 
+Le créateur d'une ligue peut changer sa cadence de 1 à 7 matchs par semaine.
+La replanification porte sur toutes les rencontres futures, coupes comprises,
+et la récupération physique suit cette cadence sans modifier les matchs joués.
+
 ⚠️ **Neuf autres modules du dossier ne servent plus qu'à leur propre banc**
 (`types`, `rarete`, `identite`, `reglages`, `vivier`, `dotation`, `valeur`,
 `packs`, `ova`, `index`). C'est le socle du premier lot, construit sur un autre
@@ -479,6 +483,8 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   logo et trophée de championnat, phase finale en option,
   championnat, **matchs en direct à la vitesse réelle** (80 minutes de vraie
   vie, terrain animé à 60 images par seconde par interpolation d'Hermite,
+  couche `scenarioDirect.ts` séparée du moteur — type de lancement, zone,
+  couloir, intensité et cadrage automatique, sans séquence vidéo —,
   décision de pénalité dans les 50 mètres adverses, consignes et remplacements
   qui atteignent le moteur), packs, marché, enchères, échanges, coupes maison,
   objectifs, palmarès. Serveur (`serveur/carriereApi.ts` + `api/carriere.ts`),

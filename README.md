@@ -888,6 +888,11 @@ cents matchs complets sans navigateur ni base. Ce qu'il dit :
   deux secondes est de **0,1 minute**, et le terrain change à chaque relevé.
   Avant, il se téléportait une fois par minute : `EtatMatch.minute` est un
   entier, et la rejoue s'arrêtait dessus ;
+- **le direct est mis en scène, jamais précalculé en vidéo** — le moteur livre
+  la phase, le lancement, la zone, la progression et les 30 positions réelles ;
+  une couche de scénarios les classe en plus de 120 variantes vérifiées. La
+  caméra reste large pendant les temps calmes, suit le ballon quand le jeu
+  s'anime et zoome sur les franchissements ou les actions proches de la ligne ;
 - **la pénalité ne réveille le manager que là où le choix existe** — 24,1
   pénalités par match, dont **6,7 par équipe dans les 50 mètres adverses**, les
   seules qui gèlent le chronomètre ;
