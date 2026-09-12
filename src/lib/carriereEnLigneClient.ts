@@ -5,7 +5,7 @@ export interface SessionCarriere {
   compte: CompteCarriere;
   ligues: {
     id: string; nom: string; etat: string; clubNom: string; ovas: number;
-    clubEmbleme?: string; logo?: string;
+    clubEmbleme?: string; logo?: string; laboratoire?: boolean;
   }[];
 }
 export interface MiseAJourDirectCarriere {

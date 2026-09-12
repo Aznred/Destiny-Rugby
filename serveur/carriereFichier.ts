@@ -70,10 +70,11 @@ export function stockageFichier(fichier: string): StockageCarriere {
         return {
           id: l.etat.id, nom: l.etat.nom, phase: l.etat.phase, logo: l.etat.logo,
           clubNom: club?.nom ?? '', ovas: club?.ovas ?? 0, clubEmbleme: club?.embleme,
+          laboratoire: l.etat.laboratoire === true,
         };
       });
     },
-    async nombreLigues(compte) { return base.ligues.filter(l => l.comptes.includes(compte)).length; },
+    async nombreLigues(compte) { return base.ligues.filter(l => l.comptes.includes(compte) && !l.etat.laboratoire).length; },
     async statistiquesGlobales() {
       const vues = base.ligues.flatMap(l => l.etat.clubs[0] ? [{ ligue: l.etat.nom, etat: l.etat, stats: vueCarriere(l.etat, l.etat.clubs[0].compteId).statistiques }] : []);
       const ouvreurs = vues.flatMap(v => v.stats.parClub.map(c => ({ pseudo: c.pseudo, packs: c.packs, ligue: v.ligue }))).sort((a, b) => b.packs - a.packs);

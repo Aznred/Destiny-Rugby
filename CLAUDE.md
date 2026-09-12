@@ -166,6 +166,13 @@ Le créateur d'une ligue peut changer sa cadence de 1 à 7 matchs par semaine.
 La replanification porte sur toutes les rencontres futures, coupes comprises,
 et la récupération physique suit cette cadence sans modifier les matchs joués.
 
+Le compte serveur `kiri` reçoit automatiquement un **Laboratoire Kiri** privé :
+quatre clubs, une saison active et une console pour lancer un match tout de
+suite, avancer son horloge, le terminer, soigner les effectifs, créditer des
+Ovas et remettre le bac à sable à zéro. Ces commandes sont refusées côté
+serveur à tous les autres comptes et le laboratoire n'entame pas le plafond de
+vingt ligues ordinaires. Banc : `npm run verify:laboratoire`.
+
 ⚠️ **Neuf autres modules du dossier ne servent plus qu'à leur propre banc**
 (`types`, `rarete`, `identite`, `reglages`, `vivier`, `dotation`, `valeur`,
 `packs`, `ova`, `index`). C'est le socle du premier lot, construit sur un autre

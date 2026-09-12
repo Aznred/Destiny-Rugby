@@ -3,7 +3,7 @@ import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../sr
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
-import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, empreinteEcriture, vueCarriere, vueRencontreCarriere } from '../src/lib/ligue/carriere.js';
+import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, creerLaboratoireCarriere, empreinteEcriture, vueCarriere, vueRencontreCarriere } from '../src/lib/ligue/carriere.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
@@ -257,6 +257,19 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     await Promise.all(Array.from({ length: Math.min(8, ids.length) }, () => ouvrier()));
     return traitees;
   }
+  async function assurerLaboratoireKiri(compte: CompteStocke, maintenant: number) {
+    let ligues = await stockage.ligues(compte.id);
+    if (compte.identifiant !== 'kiri' || ligues.some(l => l.laboratoire)) return ligues;
+    const empreinte = createHash('sha256').update(`laboratoire-kiri:${compte.id}`).digest('hex');
+    const id = `${empreinte.slice(0, 8)}-${empreinte.slice(8, 12)}-4${empreinte.slice(13, 16)}-8${empreinte.slice(17, 20)}-${empreinte.slice(20, 32)}`;
+    const code = `LAB-${empreinte.slice(0, 10).toUpperCase()}`;
+    const etat = creerLaboratoireCarriere({ id, code, compteId: compte.id, pseudo: compte.pseudo }, maintenant, empreinte);
+    if (await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 })) {
+      memoriserLigue(id, { id, code, etat, comptes: comptesEtat(etat), version: 0 });
+    }
+    ligues = await stockage.ligues(compte.id);
+    return ligues;
+  }
   async function handler(req: RequeteCarriere, res: ReponseCarriere) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -411,14 +424,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         const id = url.searchParams.get('ligue');
         if (!id) {
-          const ligues = await stockage.ligues(compte.id);
+          const ligues = await assurerLaboratoireKiri(compte, maintenant);
           // ⚠️ LE RÉSUMÉ ARRIVE DÉJÀ TAILLÉ. `stockage.ligues` rendait l'état
           // complet de chaque ligue pour qu'on en extraie ces sept champs ici :
           // 400 Ko traversaient le réseau par ligue et par ouverture d'écran.
           // C'est Postgres qui les extrait maintenant.
           return res.status(200).json({ compte: publicCompte(compte), ligues: ligues.map(l => ({
             id: l.id, nom: l.nom, etat: l.phase, clubNom: l.clubNom, ovas: l.ovas,
-            clubEmbleme: l.clubEmbleme, logo: l.logo,
+            clubEmbleme: l.clubEmbleme, logo: l.logo, laboratoire: l.laboratoire,
           })) });
         }
         if (!idValide(id)) throw new ErreurHttp(404, 'Ligue introuvable.');
@@ -522,6 +535,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const requete = texte(corps.requeteId, 16, 100, 'Requête');
         const commande = objet(corps.commande);
         if (commande.type === 'rejoindre') throw new ErreurHttp(400, 'Utilisez le code pour rejoindre la ligue.');
+        if (typeof commande.type === 'string' && commande.type.startsWith('laboratoire') && compte.identifiant !== 'kiri') {
+          throw new ErreurHttp(404, 'Commande introuvable.');
+        }
         // Les anciennes PWA peuvent conserver plusieurs jours l'ancien client,
         // qui envoyait encore la présence comme une commande. On l'allège aussi
         // côté serveur pour qu'elles ne recommencent pas à réécrire le JSONB.

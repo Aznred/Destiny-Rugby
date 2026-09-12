@@ -568,6 +568,13 @@ npm run dev                                # puis se connecter avec colin / motd
 Le script écrit une ligue complète (saison lancée, première rencontre ouverte)
 dans le stockage de développement. Redémarrer le serveur APRÈS l'avoir lancé.
 
+Le compte dont l'identifiant serveur est exactement `kiri` n'a plus besoin de
+ce semis pour tester les évolutions : l'ouverture de « Mes ligues » assure une
+unique ligue **Laboratoire Kiri**. Elle contient trois adversaires automatiques,
+un million d'Ovas et une console pour piloter les matchs et réinitialiser la
+saison. Le serveur vérifie à la fois l'identité `kiri`, le marqueur du
+laboratoire et sa propriété avant chaque commande spéciale.
+
 ---
 
 ### Le classement, la fiche d'un club, et les écussons partout

@@ -40,6 +40,11 @@
 - **Un calendrier** : le prochain match avec l'heure d'ouverture de sa fenêtre,
   le compte à rebours, l'agenda du club, les prochaines journées de toute la
   ligue — et des rappels par notification tant que le jeu est ouvert.
+- **Un laboratoire privé pour `kiri`** : créé automatiquement avec quatre
+  clubs et une saison prête. Son onglet de développement lance n'importe quelle
+  affiche immédiatement, place le direct à 10, 40, 60 ou 79 minutes, siffle la
+  fin, soigne tous les joueurs, ajoute des Ovas de test ou remet toute la saison
+  à zéro. Les commandes restent bloquées côté serveur pour les autres comptes.
 - **Le créateur fixe les Ovas de départ**, de 0 à 100 000. Le plafond n'est pas
   décoratif : c'est le seul robinet d'Ovas qu'il ouvre lui-même.
 - ⚠️ **Les dix packs quotidiens ne tombent qu'au coup d'envoi.** Ils étaient

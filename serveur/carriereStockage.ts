@@ -19,10 +19,10 @@ export interface PresenceMatchStockee { match: string; compte: string; vu: numbe
  */
 export interface ResumeLigue {
   id: string; nom: string; phase: string; logo?: string;
-  clubNom: string; ovas: number; clubEmbleme?: string;
+  clubNom: string; ovas: number; clubEmbleme?: string; laboratoire?: boolean;
 }
 const resumeEtat = (etat: EtatCarriereEnLigne) => ({
-  nom: etat.nom, phase: etat.phase, logo: etat.logo,
+  nom: etat.nom, phase: etat.phase, logo: etat.logo, laboratoire: etat.laboratoire === true,
   clubs: etat.clubs.map(c => ({ compteId: c.compteId, nom: c.nom, ovas: c.ovas, embleme: c.embleme })),
 });
 export interface StockageCarriere {
@@ -236,14 +236,14 @@ export function stockageNeon(url: string): StockageCarriere {
      */
     async ligues(compte) {
       const lire = (resume: boolean) => resume ? sql`
-        select l.id,l.resume->>'nom' as nom,l.phase,l.resume->>'logo' as logo,
+        select l.id,l.resume->>'nom' as nom,l.phase,l.resume->>'logo' as logo,l.resume->>'laboratoire' as laboratoire,
                c.club->>'nom' as club_nom,c.club->>'ovas' as ovas,c.club->>'embleme' as club_embleme
         from carriere_ligues l cross join lateral (
           select club from jsonb_array_elements(l.resume->'clubs') club
           where club->>'compteId'=${compte} limit 1) c
         where l.comptes @> array[${compte}::uuid] order by l.cree_le desc`
         : sql`
-        select l.id,l.donnees->>'nom' as nom,l.donnees->>'phase' as phase,l.donnees->>'logo' as logo,
+        select l.id,l.donnees->>'nom' as nom,l.donnees->>'phase' as phase,l.donnees->>'logo' as logo,l.donnees->>'laboratoire' as laboratoire,
                c.club->>'nom' as club_nom,c.club->>'ovas' as ovas,c.club->>'embleme' as club_embleme
         from carriere_ligues l cross join lateral (
           select club from jsonb_array_elements(l.donnees->'clubs') club
@@ -255,12 +255,14 @@ export function stockageNeon(url: string): StockageCarriere {
         logo: x.logo == null ? undefined : String(x.logo),
         clubNom: String(x.club_nom ?? ''), ovas: Number(x.ovas ?? 0),
         clubEmbleme: x.club_embleme == null ? undefined : String(x.club_embleme),
+        laboratoire: x.laboratoire === true || x.laboratoire === 'true',
       }));
     },
     // ⚠️ COMPTER, C'EST COMPTER. Le plafond de 20 ligues lisait la liste
     //    entière pour en prendre la longueur.
     async nombreLigues(compte) {
-      const r = await sql`select count(*)::int as n from carriere_ligues where comptes @> array[${compte}::uuid]`;
+      const r = await sql`select count(*)::int as n from carriere_ligues where comptes @> array[${compte}::uuid]
+        and coalesce(donnees->>'laboratoire','false')<>'true'`;
       return Number(r[0]?.n ?? 0);
     },
     async statistiquesGlobales() {

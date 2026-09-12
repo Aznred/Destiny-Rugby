@@ -139,6 +139,8 @@ export interface HistoireCarriere {
 export interface EtatCarriereEnLigne {
   catalogueRevision?: number;
   schema: 1; id: string; nom: string; code: string; createurId: string; creeLe: string;
+  /** Espace de développement privé, créé et commandé uniquement par le compte kiri. */
+  laboratoire?: true;
   version: number; saison: number; phase: 'salon' | 'saison' | 'intersaison';
   rythme: number; maxClubs: number; graine: string; debutSaison?: string;
   /** L'identité de la ligue : son logo, son trophée, sa phase finale. */
@@ -196,6 +198,12 @@ export type CommandeCarriere =
   | { type: 'creerCoupe'; nom: string; trophee: string; participants: string[]; format: 'elimination' | 'championnat' | 'poules'; debut: string; recompenseParticipation: number; recompenseVainqueur: number; recompenseFinaliste: number; logo?: string; tropheeId?: string; playoffs?: boolean }
   | { type: 'match'; matchId: string; action: CommandeMatchEnLigne }
   | { type: 'lancerMatch'; matchId: string }
+  | { type: 'laboratoireLancer'; matchId: string }
+  | { type: 'laboratoireMinute'; matchId: string; minute: number }
+  | { type: 'laboratoireTerminer'; matchId: string }
+  | { type: 'laboratoireSoigner' }
+  | { type: 'laboratoireCrediter' }
+  | { type: 'laboratoireReinitialiser' }
   | { type: 'actualiser' };
 
 

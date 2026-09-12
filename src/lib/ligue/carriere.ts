@@ -320,6 +320,30 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
   return etat;
 }
 
+const CLUBS_LABORATOIRE = [
+  { compteId: '00000000-0000-4000-8000-000000000101', pseudo: 'Mêlée', nom: 'Atelier Mêlée' },
+  { compteId: '00000000-0000-4000-8000-000000000102', pseudo: 'Touche', nom: 'Atelier Touche' },
+  { compteId: '00000000-0000-4000-8000-000000000103', pseudo: 'En-but', nom: 'Atelier En-but' },
+] as const;
+
+/**
+ * Fabrique le bac à sable de Kiri avec assez d'adversaires pour éprouver le
+ * championnat, les classements et les matchs sans inviter de vrais comptes.
+ */
+export function creerLaboratoireCarriere(config: Pick<CreationCarriere, 'id' | 'code' | 'compteId' | 'pseudo'>, maintenant: number, graine: string): EtatCarriereEnLigne {
+  const etat = creerCarriere({
+    ...config, nom: 'Laboratoire Kiri', clubNom: 'Kiri XV', rythme: 7,
+    maxClubs: 8, playoffs: true, dotationOvas: 100_000,
+  }, maintenant, graine);
+  etat.laboratoire = true;
+  for (const robot of CLUBS_LABORATOIRE) ajouterClub(etat, robot.compteId, robot.pseudo, robot.nom, maintenant, `${graine}:${robot.compteId}`);
+  demarrerSaison(etat, maintenant);
+  const club = monClub(etat, config.compteId);
+  club.ovas = 1_000_000;
+  for (const carte of etat.cartes) { carte.fatigue = 0; delete carte.blesseJusqua; }
+  return etat;
+}
+
 function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false) {
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
   entier(pack.prix, 1); entier(pack.cartes, 1, 12);
@@ -942,6 +966,14 @@ export function avancerCarriere(etat: EtatCarriereEnLigne, maintenant: number, g
 export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, commande: CommandeCarriere, maintenant: number, graine: string): EtatCarriereEnLigne {
   identifiant(compteId); dateServeur(maintenant);
   exiger(commande && typeof commande === 'object' && typeof commande.type === 'string', 'Commande invalide.');
+  if (commande.type === 'laboratoireReinitialiser') {
+    exiger(etat.laboratoire === true && compteId === etat.createurId, 'Commande réservée au laboratoire Kiri.');
+    const createur = etat.clubs.find(c => c.compteId === compteId);
+    exiger(createur, 'Créateur du laboratoire introuvable.');
+    const neuf = creerLaboratoireCarriere({ id: etat.id, code: etat.code, compteId, pseudo: createur.pseudo }, maintenant, graine);
+    neuf.version = etat.version + 1;
+    return neuf;
+  }
   const nouveau = reprendre(etat, maintenant); const date = dateServeur(maintenant);
   if (commande.type === 'rejoindre') {
     ajouterClub(nouveau, compteId, commande.pseudo, commande.clubNom, maintenant, graine, commande.embleme);
@@ -956,6 +988,48 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         entier(commande.rythme, 1, 7);
         nouveau.rythme = commande.rythme;
         replanifierCalendrier(nouveau, maintenant);
+        break;
+      }
+      case 'laboratoireLancer': {
+        exiger(nouveau.laboratoire === true && compteId === nouveau.createurId, 'Commande réservée au laboratoire Kiri.');
+        identifiant(commande.matchId);
+        const r = nouveau.rencontres.find(r => r.id === commande.matchId);
+        exiger(r && !r.resultat, 'Cette rencontre ne peut pas être lancée.');
+        exiger(!nouveau.rencontres.some(autre => autre.id !== r.id && autre.match && !autre.resultat
+          && [autre.domicile, autre.exterieur].some(id => id === r.domicile || id === r.exterieur)), 'Un de ces clubs joue déjà un match.');
+        r.ouvre = date;
+        r.ferme = dateServeur(maintenant + DUREE_REELLE);
+        lancerRencontre(nouveau, r, maintenant, `${nouveau.graine}:${r.id}:laboratoire`);
+        break;
+      }
+      case 'laboratoireMinute': {
+        exiger(nouveau.laboratoire === true && compteId === nouveau.createurId, 'Commande réservée au laboratoire Kiri.');
+        identifiant(commande.matchId); entier(commande.minute, 1, 79);
+        const r = nouveau.rencontres.find(r => r.id === commande.matchId);
+        exiger(r?.match && !r.resultat && !r.match.termine, 'Lancez d’abord cette rencontre.');
+        exiger(commande.minute > r.match.horloge, 'Choisissez une minute après l’horloge actuelle.');
+        r.match.debut = maintenant - commande.minute * 60_000 - r.match.gel;
+        r.match = avancerMatchEnLigne(r.match, maintenant);
+        break;
+      }
+      case 'laboratoireTerminer': {
+        exiger(nouveau.laboratoire === true && compteId === nouveau.createurId, 'Commande réservée au laboratoire Kiri.');
+        identifiant(commande.matchId);
+        const r = nouveau.rencontres.find(r => r.id === commande.matchId);
+        exiger(r?.match && !r.resultat, 'Lancez d’abord cette rencontre.');
+        r.match = conclureMatchEnLigne(r.match);
+        enregistrerResultat(nouveau, r, maintenant, graine);
+        avancerCompetitions(nouveau, maintenant);
+        break;
+      }
+      case 'laboratoireSoigner': {
+        exiger(nouveau.laboratoire === true && compteId === nouveau.createurId, 'Commande réservée au laboratoire Kiri.');
+        for (const carte of nouveau.cartes) { carte.fatigue = 0; delete carte.blesseJusqua; }
+        break;
+      }
+      case 'laboratoireCrediter': {
+        exiger(nouveau.laboratoire === true && compteId === nouveau.createurId, 'Commande réservée au laboratoire Kiri.');
+        journal(nouveau, club, 'dotation', 100_000, [], 'Crédit de test du laboratoire', date);
         break;
       }
       case 'composition': clubLibre(nouveau, club.id); verifierComposition(nouveau, club, commande.composition, maintenant); club.composition = copier(commande.composition); club.buteurManuel = true; break;
