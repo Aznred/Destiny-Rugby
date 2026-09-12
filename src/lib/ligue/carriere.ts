@@ -471,8 +471,14 @@ export function replanifierCalendrier(etat: EtatCarriereEnLigne, maintenant: num
   let modifiees = 0;
   for (const competition of etat.competitions.filter(c => c.etat === 'enCours')) {
     const matchs = etat.rencontres.filter(r => r.competitionId === competition.id);
-    const verrouilles = matchs.filter(r => r.resultat || r.match);
-    const futurs = matchs.filter(r => !r.resultat && !r.match);
+    // Une journée est un bloc. Dès qu'une de ses affiches a commencé, la
+    // cadence ne doit plus la rouvrir ni déplacer les autres matchs du même
+    // tour : à l'écran cela ressemblait à une première journée rejouée. On
+    // conserve donc toute la journée telle quelle et on ne recale que les
+    // tours entièrement vierges qui viennent après.
+    const journeesCommencees = new Set(matchs.filter(r => r.resultat || r.match).map(r => r.journee));
+    const verrouilles = matchs.filter(r => journeesCommencees.has(r.journee));
+    const futurs = matchs.filter(r => !journeesCommencees.has(r.journee) && !r.resultat && !r.match);
     if (!futurs.length) continue;
 
     const groupes = [...new Set(futurs.map(r => r.journee))]

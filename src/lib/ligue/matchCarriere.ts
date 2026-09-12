@@ -281,10 +281,9 @@ export interface LigneFil {
 // ═══════════════════════════════════════════════════════════════════════════
 // ⚠️ ON ENVOIE LES VITESSES, PAS SEULEMENT LES POSITIONS. Le serveur ne parle
 // que toutes les deux secondes ; sans vecteur vitesse, l'écran n'aurait qu'un
-// diaporama à deux images par seconde de retard. Avec, il extrapole à soixante
-// images par seconde entre deux relevés — `position + vitesse × temps` — et
-// recale en douceur quand la vérité arrive. C'est exactement ce que fait le
-// match de carrière, à ceci près que là-bas le moteur tourne dans l'onglet.
+// diaporama. Le rendu garde un relevé de retard et reconstruit soixante images
+// par seconde entre deux vérités du moteur. Une passe entière manquée par le
+// sondage est elle aussi reliée entre ses deux positions, jamais téléportée.
 //
 // ⚠️ ET LA CADENCE EST INDISPENSABLE. Une seconde réelle ne vaut pas une
 // seconde de mouvement : pendant une mêlée, l'horloge avale cinquante secondes
@@ -297,10 +296,19 @@ export interface PionDirect {
 }
 
 export interface VolDirect {
+  /** Identifiant déterministe de l'action : identique pour tous les spectateurs. */
+  id?: string;
   de: { x: number; y: number }; vers: { x: number; y: number };
   duree: number; ecoule: number; hauteur: number;
   type?: 'passe' | 'pied';
   intention?: IntentionPied | 'passe' | 'offload';
+  /** Horodatage de l'action sur l'horloge du moteur, en secondes. */
+  debut?: number;
+  fin?: number;
+  auteurId?: string;
+  receveurId?: string;
+  /** Graine visuelle stable, sans exposer la graine du match. */
+  seed?: number;
 }
 
 export interface TerrainDirect {
@@ -324,6 +332,10 @@ export interface TerrainDirect {
   cadence: number;
   /** Minutes de jeu au centième au moment du relevé. */
   horloge: number;
+  /** Instant serveur d'émission : le client absorbe le jitter avec cette horloge. */
+  emisLe?: number;
+  /** Numéro monotone du relevé dans la simulation autoritaire. */
+  snapshot?: number;
   /** La décision de l'arbitre, tant qu'elle est fraîche (secondes simulées). */
   sifflet?: { cle: string; club: string; fautif: string; restant: number };
 }
@@ -595,17 +607,52 @@ export function cibleDeScore(forceD: number, forceE: number, cle: string): Paire
  * froid le retrouve à l'identique en rejouant — le cache n'est donc jamais une
  * source de vérité, seulement un raccourci.
  */
-const CACHE = new Map<string, { moteur: EtatMatch; minute: number }>();
+interface EntreeCacheMoteur { moteur: EtatMatch; minute: number; octets: number }
+const CACHE = new Map<string, EntreeCacheMoteur>();
 const MOTEUR_VERS_COTE: Record<Cote, CoteEnLigne> = { A: 'domicile', B: 'exterieur' };
-const CACHE_MAX = 16;
+/**
+ * 16 entrées obligeaient 384 matchs sur 400 à repartir du coup d'envoi à la
+ * requête suivante. Le cache est désormais dimensionné pour la charge cible,
+ * mais aussi borné en mémoire : une fonction chaude ne grossit jamais sans
+ * limite si les commentaires d'un match deviennent exceptionnellement longs.
+ */
+const CACHE_MAX = 512;
+const CACHE_OCTETS_MAX = 96 * 1024 * 1024;
+let cacheOctets = 0;
 const cleCache = (etat: EtatMatchEnLigne) => `${etat.cle}#${etat.journal.length}`;
 
+function supprimerCache(cle: string): void {
+  cacheOctets -= CACHE.get(cle)?.octets ?? 0;
+  CACHE.delete(cle);
+}
+
+function poidsMoteur(moteur: EtatMatch): number {
+  // Estimation volontairement prudente et O(1), pour ne pas sérialiser trente
+  // joueurs à chacun des ticks du direct. Les fermetures et références du RNG
+  // ne sont de toute façon pas mesurables par JSON.stringify.
+  return 48 * 1024 + moteur.pions.length * 2_048 + moteur.commentaires.length * 320;
+}
+
 function ranger(cle: string, moteur: EtatMatch): void {
-  if (CACHE.size >= CACHE_MAX && !CACHE.has(cle)) {
-    const plusAncienne = CACHE.keys().next().value;
-    if (plusAncienne !== undefined) CACHE.delete(plusAncienne);
+  const precedente = CACHE.get(cle);
+  if (precedente) {
+    supprimerCache(cle);
   }
-  CACHE.set(cle, { moteur, minute: minuteExacte(moteur) });
+  const entree: EntreeCacheMoteur = {
+    moteur, minute: minuteExacte(moteur), octets: poidsMoteur(moteur),
+  };
+  CACHE.set(cle, entree);
+  cacheOctets += entree.octets;
+  while (CACHE.size > CACHE_MAX || cacheOctets > CACHE_OCTETS_MAX) {
+    const plusAncienne = CACHE.keys().next().value;
+    if (plusAncienne === undefined) break;
+    supprimerCache(plusAncienne);
+  }
+}
+
+/** Mesure légère utilisée par le banc de charge, jamais envoyée aux joueurs. */
+export function diagnosticCacheMatchEnLigne() {
+  return { matchs: CACHE.size, octetsEstimes: cacheOctets, maximumMatchs: CACHE_MAX, maximumOctets: CACHE_OCTETS_MAX };
 }
 
 /**
@@ -735,6 +782,10 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
     // Le match est déjà calculé jusqu'ici : on repart de là, sans rien rejouer.
     e = garde.moteur;
     depart = etat.journal.length;
+    // Un vrai LRU : un match regardé reste chaud, contrairement au FIFO qui
+    // éjectait aussi les directs actifs dès que 16 autres matchs passaient.
+    CACHE.delete(cle);
+    CACHE.set(cle, garde);
   } else {
     e = monter(etat);
   }
@@ -757,7 +808,7 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
  * quinze rejoues de 80 minutes pour rien.
  */
 function adopterCache(avant: EtatMatchEnLigne, apres: EtatMatchEnLigne, moteur: EtatMatch): void {
-  CACHE.delete(cleCache(avant));
+  supprimerCache(cleCache(avant));
   ranger(cleCache(apres), moteur);
 }
 
@@ -849,7 +900,13 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
  * Le terrain tel que l'écran va le redessiner : trente pions avec leur vecteur
  * vitesse, le ballon (porté, en vol ou au sol), la phase et la cadence.
  */
-function extraireTerrain(e: EtatMatch): TerrainDirect {
+function graineVisuelle(id: string): number {
+  let h = 2_166_136_261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16_777_619);
+  return h >>> 0;
+}
+
+function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
   const terrain: TerrainDirect = {
     pions: e.pions.filter((p) => p.surLeTerrain).map((p) => ({
       id: p.id, numero: p.numero, nom: p.nom, poste: p.poste,
@@ -868,6 +925,8 @@ function extraireTerrain(e: EtatMatch): TerrainDirect {
     ouvert: e.ouvert === 1 ? 'droite' : 'gauche',
     cadence: r2(1 / facteurHorloge(e.phase, e.tempsReel)),
     horloge: r2(minuteExacte(e)),
+    emisLe,
+    snapshot: Math.max(0, Math.round(e.t / 0.6)),
   };
   if (e.lancement) {
     terrain.lancement = { type: e.lancement.type };
@@ -875,11 +934,20 @@ function extraireTerrain(e: EtatMatch): TerrainDirect {
   }
   if (e.porteur) terrain.porteurId = e.porteur.id;
   if (e.vol) {
+    const debut = Math.max(0, e.t - e.vol.ecoule);
+    const actionId = [
+      e.vol.type, e.vol.intention, e.vol.auteur.id, e.vol.receveur?.id ?? '-',
+      r2(debut), r2(e.vol.de.x), r2(e.vol.de.y), r2(e.vol.vers.x), r2(e.vol.vers.y),
+    ].join(':');
     terrain.vol = {
+      id: actionId,
       de: { x: r2(e.vol.de.x), y: r2(e.vol.de.y) },
       vers: { x: r2(e.vol.vers.x), y: r2(e.vol.vers.y) },
       duree: r2(e.vol.duree), ecoule: r2(e.vol.ecoule), hauteur: r2(e.vol.hauteur),
       type: e.vol.type, intention: e.vol.intention,
+      debut: r2(debut), fin: r2(debut + e.vol.duree),
+      auteurId: e.vol.auteur.id, receveurId: e.vol.receveur?.id,
+      seed: graineVisuelle(actionId),
     };
   }
   if (e.sifflet) {
@@ -902,6 +970,7 @@ function relever(etat: EtatMatchEnLigne, e: EtatMatch): void {
 
 /** Le coup de sifflet final : on relève tout, puis on archive. */
 function clore(etat: EtatMatchEnLigne, e: EtatMatch): void {
+  const ancienneCle = cleCache(etat);
   relever(etat, e);
   etat.horloge = 80;
   etat.termine = true;
@@ -909,7 +978,7 @@ function clore(etat: EtatMatchEnLigne, e: EtatMatch): void {
   delete etat.decision;
   delete etat.equipes;
   etat.journal = [];
-  CACHE.delete(cleCache(etat));
+  supprimerCache(ancienneCle);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1155,7 +1224,7 @@ function mesOrdres(etat: EtatMatchEnLigne, monCote: CoteEnLigne): LigneFil[] {
   return lignes;
 }
 
-export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string): VueMatchEnLigne {
+export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string, emisLe = Date.now()): VueMatchEnLigne {
   const monCote = etat.equipes ? COTES.find((c) => etat.equipes![c].clubId === clubId) : undefined;
   const vue: VueMatchEnLigne = {
     id: etat.id, minute: Math.floor(etat.horloge), horloge: r2(etat.horloge), termine: etat.termine,
@@ -1171,7 +1240,7 @@ export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string): VueMatc
   // image — et, sur un démarrage à froid où le cache est vide, deux rejoues
   // complètes du match à chaque sondage.
   const e = rejouer(etat, etat.horloge, []);
-  vue.terrain = extraireTerrain(e);
+  vue.terrain = extraireTerrain(e, emisLe);
   if (!monCote) return vue;
 
   vue.monCote = monCote;

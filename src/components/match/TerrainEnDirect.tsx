@@ -48,6 +48,9 @@ import { Camera, angleDeVue, type Cadrage, type Vue } from '../../lib/moteur/cam
 import { LARGEUR, LONGUEUR, borner, type Vec } from '../../lib/moteur/terrain';
 import type { CoteEnLigne, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import { creerScenarioDirect, type ScenarioDirect } from '../../lib/ligue/scenarioDirect';
+import {
+  interpolerImageDirect, projeterImageDirect, type BallonAfficheDirect,
+} from '../../lib/ligue/interpolationDirect';
 import { t } from '../../lib/i18n';
 
 /**
@@ -57,11 +60,11 @@ import { t } from '../../lib/i18n';
  * qui ferme l'interpolation n'est pas encore arrivé et on retombe sur de la
  * prédiction. Une marge de 20 % absorbe la latence du réseau.
  */
-const RETARD = 2.4;
+const RETARD = 2.25;
 /** Au-delà du dernier relevé, on ne prolonge pas plus longtemps que ça. */
-const PREDICTION_MAX = 1.2;
-/** Nombre de relevés gardés : deux pour interpoler, un pour la marge. */
-const TAMPON_MAX = 4;
+const PREDICTION_MAX = 0.35;
+/** Deux images utiles, plus assez de marge pour un paquet retardé/réordonné. */
+const TAMPON_MAX = 6;
 
 const CLE_PHASE: Record<string, string> = {
   coupEnvoi: 'ml.phase.coupEnvoi', renvoi22: 'ml.phase.renvoi22', ruck: 'ml.phase.ruck',
@@ -82,8 +85,13 @@ interface Props {
   monCote?: CoteEnLigne;
 }
 
-interface Ballon extends Vec { h: number }
-interface Releve { terrain: TerrainDirect; recu: number }
+interface Releve {
+  terrain: TerrainDirect;
+  /** Horloge monotone locale à la réception. */
+  recu: number;
+  /** Horloge murale du serveur à l'émission, en secondes. */
+  instant: number;
+}
 type ModeCamera = 'auto' | 'large' | 'suivi';
 
 const LIBELLES_SCENARIO: Record<ScenarioDirect['type'], string> = {
@@ -104,39 +112,6 @@ const LIBELLES_ZONE: Record<ScenarioDirect['zone'], string> = {
   vingtDeuxPropre: 'dans ses 22 m', enButPropre: 'dans son en-but',
 };
 
-/**
- * La spline d'Hermite entre deux positions et leurs vitesses.
- *
- * `u` va de 0 à 1 ; `dt` est le temps SIMULÉ qui sépare les deux relevés, sans
- * quoi les tangentes n'auraient pas la bonne échelle et la courbe partirait en
- * boucle.
- */
-function hermite(p0: number, v0: number, p1: number, v1: number, u: number, dt: number): number {
-  const u2 = u * u;
-  const u3 = u2 * u;
-  return (2 * u3 - 3 * u2 + 1) * p0
-    + (u3 - 2 * u2 + u) * dt * v0
-    + (-2 * u3 + 3 * u2) * p1
-    + (u3 - u2) * dt * v1;
-}
-
-/** Le ballon d'un relevé : porté, en vol, ou au sol. */
-function ballonDe(T: TerrainDirect, pions: Map<string, Vec>, sim: number): Ballon {
-  if (T.vol) {
-    const k = Math.min(1, (T.vol.ecoule + sim) / Math.max(0.01, T.vol.duree));
-    return {
-      x: T.vol.de.x + (T.vol.vers.x - T.vol.de.x) * k,
-      y: T.vol.de.y + (T.vol.vers.y - T.vol.de.y) * k,
-      h: T.vol.hauteur * Math.sin(Math.PI * k),
-    };
-  }
-  if (T.porteurId) {
-    const p = pions.get(T.porteurId);
-    if (p) return { x: p.x + 1.25, y: p.y + 0.7, h: 0 };
-  }
-  return { x: T.ballon.x, y: T.ballon.y, h: 0 };
-}
-
 function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote }: Props) {
   const scene = useRef<HTMLDivElement>(null);
   const boite = useRef({ largeur: 1, hauteur: 1 });
@@ -144,7 +119,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const vueRef = useRef<Vue | null>(null);
   /** Les positions affichées à cette image, reconstruites entre deux relevés. */
   const pions = useRef(new Map<string, Vec>());
-  const ballon = useRef<Ballon>({ x: LONGUEUR / 2, y: LARGEUR / 2, h: 0 });
+  const ballon = useRef<BallonAfficheDirect>({ x: LONGUEUR / 2, y: LARGEUR / 2, h: 0 });
   /** Le relevé effectivement montré : c'est lui qui commande le bandeau. */
   const [affiche, setAffiche] = useState<TerrainDirect>(terrain);
   const [modeCamera, setModeCamera] = useState<ModeCamera>('auto');
@@ -154,13 +129,27 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   // ⚠️ TOUT CE QUE LA BOUCLE LIT PASSE PAR UNE RÉFÉRENCE. Elle est montée une
   // seule fois pour la vie du composant : la relancer à chaque relevé du serveur
   // remettrait la caméra à zéro toutes les deux secondes.
-  const tampon = useRef<Releve[]>([{ terrain, recu: performance.now() / 1000 }]);
+  const premierRecu = performance.now() / 1000;
+  const premierInstant = (terrain.emisLe ?? Date.now()) / 1000;
+  const tampon = useRef<Releve[]>([{ terrain, recu: premierRecu, instant: premierInstant }]);
+  /** performance.now() - horloge serveur ; filtré pour ne pas suivre le jitter. */
+  const decalageServeur = useRef(premierRecu - premierInstant);
   const reglages = useRef({ modeCamera, monCote });
   const scenarioCourant = useRef(scenario);
   useEffect(() => {
     const file = tampon.current;
     if (file[file.length - 1]?.terrain === terrain) return;
-    file.push({ terrain, recu: performance.now() / 1000 });
+    const recu = performance.now() / 1000;
+    const instant = (terrain.emisLe ?? Date.now()) / 1000;
+    // Une réponse lente arrivée après la suivante ne doit jamais faire reculer
+    // le film. Elle est simplement obsolète : le prochain relevé fait foi.
+    if (instant + 0.001 < (file[file.length - 1]?.instant ?? -Infinity)) return;
+    const observation = recu - instant;
+    const ancien = decalageServeur.current;
+    // On suit vite une meilleure mesure (moins de latence), très lentement une
+    // mesure plus mauvaise. Ainsi un seul paquet lent n'étire pas les courses.
+    decalageServeur.current += (observation - ancien) * (observation < ancien ? 0.35 : 0.04);
+    file.push({ terrain, recu, instant });
     if (file.length > TAMPON_MAX) file.splice(0, file.length - TAMPON_MAX);
   }, [terrain]);
   useEffect(() => { reglages.current = { modeCamera, monCote }; }, [modeCamera, monCote]);
@@ -187,19 +176,19 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       precedent = maintenant;
 
       const file = tampon.current;
-      const instant = maintenant - RETARD;
+      const instant = maintenant - decalageServeur.current - RETARD;
       // Les deux relevés qui encadrent l'instant rendu. Tant que le tampon n'a
       // pas pris d'avance (les deux premières secondes), on tient la première
       // image : mieux vaut un terrain immobile qu'un terrain inventé.
       let i = 0;
-      while (i < file.length - 2 && file[i + 1].recu <= instant) i++;
+      while (i < file.length - 2 && file[i + 1].instant <= instant) i++;
       const a = file[i];
       const b = file[i + 1];
       let u = 0;
       let dtSim = 0;
       if (b) {
-        const span = Math.max(0.001, b.recu - a.recu);
-        u = borner((instant - a.recu) / span, 0, 1);
+        const span = Math.max(0.001, b.instant - a.instant);
+        u = borner((instant - a.instant) / span, 0, 1);
         // ⚠️ LE TEMPS SIMULÉ VIENT DE L'HORLOGE DU MATCH, PAS DE LA MONTRE. Une
         // décision de pénalité gèle le chrono du serveur : les deux relevés
         // portent alors la même minute, les tangentes s'annulent, et le terrain
@@ -207,38 +196,23 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
         dtSim = Math.max(0, (b.terrain.horloge - a.terrain.horloge) * 60);
       } else {
         // Rien derrière : on prolonge brièvement le dernier relevé connu.
-        dtSim = borner(instant - a.recu, 0, PREDICTION_MAX) * a.terrain.cadence;
+        dtSim = borner(instant - a.instant, 0, PREDICTION_MAX) * a.terrain.cadence;
       }
 
-      const positions = pions.current;
-      positions.clear();
+      let imageDirecte;
       if (b) {
-        const parId = new Map(b.terrain.pions.map((p) => [p.id, p]));
-        for (const p0 of a.terrain.pions) {
-          const p1 = parId.get(p0.id);
-          if (!p1) continue;
-          positions.set(p0.id, {
-            x: borner(hermite(p0.x, p0.vx, p1.x, p1.vx, u, dtSim), 0, LONGUEUR),
-            y: borner(hermite(p0.y, p0.vy, p1.y, p1.vy, u, dtSim), 0, LARGEUR),
-          });
-        }
-        // Un entrant apparaît dans le relevé le plus récent seulement.
-        for (const p1 of b.terrain.pions) {
-          if (!positions.has(p1.id)) positions.set(p1.id, { x: p1.x, y: p1.y });
-        }
+        imageDirecte = interpolerImageDirect(a.terrain, b.terrain, u, dtSim);
       } else {
-        for (const p of a.terrain.pions) {
-          positions.set(p.id, {
-            x: borner(p.x + p.vx * dtSim, 0, LONGUEUR),
-            y: borner(p.y + p.vy * dtSim, 0, LARGEUR),
-          });
-        }
+        imageDirecte = projeterImageDirect(a.terrain, dtSim / Math.max(0.01, a.terrain.cadence));
       }
+      pions.current = imageDirecte.pions;
+      ballon.current = imageDirecte.ballon;
 
-      // Le relevé qui commande le bandeau : le plus proche de l'instant rendu.
-      const courant = b && u > 0.5 ? b.terrain : a.terrain;
+      // Le bandeau et le porteur ne changent qu'au terme de la trajectoire.
+      // Avant, ils basculaient à u=0,5 : le ballon quittait alors une position
+      // interpolée pour apparaître d'un coup dans les mains du relevé suivant.
+      const courant = b && u >= 1 ? b.terrain : a.terrain;
       if (courant !== montre) { montre = courant; setAffiche(courant); }
-      ballon.current = ballonDe(courant, positions, courant === a.terrain ? u * dtSim : 0);
 
       const prochainScenario = creerScenarioDirect(courant);
       if (prochainScenario.id !== scenarioCourant.current.id) {
@@ -249,9 +223,10 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       const { largeur, hauteur } = boite.current;
       const mode = reglages.current.modeCamera;
       const cadrage: Cadrage = mode === 'auto' ? prochainScenario.cadrage : mode;
-      const cible = courant.vol
-        ? { x: (ballon.current.x + courant.vol.vers.x) / 2, y: (ballon.current.y + courant.vol.vers.y) / 2 }
-        : ballon.current;
+      // La caméra suit la position effectivement dessinée. Viser soudain le
+      // milieu entre le ballon et sa destination provoquait un second saut,
+      // même quand la trajectoire du ballon était correcte.
+      const cible = ballon.current;
       vueRef.current = camera.current.suivre(
         cible, cadrage, largeur / hauteur,
         angleDeVue(reglages.current.monCote === 'exterieur' ? 'B' : 'A', hauteur > largeur), dt,

@@ -93,6 +93,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   // les centaines de Ko de la ligue à chaque sondage de direct.
   const liguesChaudes = new Map<string, LigueStockee>();
   const poidsLigues = new Map<string, number>();
+  /**
+   * Tous les spectateurs arrivés dans la même tranche de 200 ms partagent UNE
+   * avance du moteur. La vue reste personnalisée après (camp, banc, décision),
+   * mais le calcul autoritaire n'est jamais répété pour chaque connexion.
+   */
+  const ticksDirects = new Map<string, { tick: number; etat: Promise<EtatCarriereEnLigne> }>();
+  const PAS_DIRECT_MS = 200; // 5 Hz serveur ; le navigateur, lui, dessine à 60 Hz.
   let octetsLigues = 0;
   const oublierLigue = (id: string) => {
     octetsLigues -= poidsLigues.get(id) ?? 0;
@@ -237,6 +244,23 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       oublierLigue(id);
     }
     throw new ErreurHttp(409, 'La ligue vient de changer. Réessayez dans un instant.');
+  }
+  function actualiserDirect(id: string, maintenant: number,
+    enteteConnue?: { version: number; comptes: string[]; echeance: number | null }) {
+    const tick = Math.floor(maintenant / PAS_DIRECT_MS);
+    const existant = ticksDirects.get(id);
+    if (existant?.tick === tick) return existant.etat;
+    if (existant) ticksDirects.delete(id);
+    const etat = appliquer(
+      id, 'horloge', `direct-${tick}`,
+      (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue,
+    );
+    ticksDirects.set(id, { tick, etat });
+    while (ticksDirects.size > 512) ticksDirects.delete(ticksDirects.keys().next().value!);
+    void etat.catch(() => {
+      if (ticksDirects.get(id)?.etat === etat) ticksDirects.delete(id);
+    });
+    return etat;
   }
   async function avancerLigues() {
     await stockage.nettoyerPresences(Date.now() - 24 * 60 * 60_000).catch(() => {});
@@ -483,12 +507,17 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         const direct = url.searchParams.get('direct');
         if (direct && (direct.length > 250 || /[\p{Cc}]/u.test(direct))) throw new ErreurHttp(400, 'Match invalide.');
-        const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue);
         if (direct) {
+          // Le calcul partagé utilise l'identité « horloge ». L'autorisation du
+          // spectateur est donc vérifiée AVANT, sur l'en-tête minuscule.
+          const autorisation = enteteConnue ?? await stockage.entete(id);
+          if (!autorisation || !autorisation.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+          const e = await actualiserDirect(id, maintenant, autorisation);
           const rencontre = vueRencontreCarriere(e, compte.id, direct);
           if (!rencontre) throw new ErreurHttp(404, 'Match introuvable.');
           return res.status(200).json({ id: e.id, version: e.version, rencontre });
         }
+        const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue);
         return res.status(200).json(vueCarriere(e, compte.id));
       }
       if (action === 'creer') {

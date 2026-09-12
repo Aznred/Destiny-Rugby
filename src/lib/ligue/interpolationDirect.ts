@@ -1,0 +1,198 @@
+import { LARGEUR, LONGUEUR, borner, type Vec } from '../moteur/terrain.js';
+import type { PionDirect, TerrainDirect, VolDirect } from './matchCarriere.js';
+
+/** Position dessinée du ballon, hauteur comprise. */
+export interface BallonAfficheDirect extends Vec { h: number }
+
+/** Une image reconstruite entre deux relevés du serveur. */
+export interface ImageDirect {
+  pions: Map<string, Vec>;
+  ballon: BallonAfficheDirect;
+}
+
+const borner01 = (n: number): number => borner(n, 0, 1);
+const melanger = (a: number, b: number, u: number): number => a + (b - a) * u;
+
+/** Courbe sans à-coup, mais qui reste strictement entre son départ et son arrivée. */
+export function adoucirDirect(u: number): number {
+  const t = borner01(u);
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * Spline d'Hermite entre deux positions et leurs vitesses.
+ *
+ * Elle n'est employée que pour un mouvement continu et plausible. Une reprise,
+ * un changement de phase ou un onglet revenu de l'arrière-plan passe par une
+ * transition bornée : une tangente vieille de plusieurs secondes ne peut donc
+ * plus envoyer un joueur faire une boucle ou traverser le terrain.
+ */
+function hermite(p0: number, v0: number, p1: number, v1: number, u: number, dt: number): number {
+  const u2 = u * u;
+  const u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * p0
+    + (u3 - 2 * u2 + u) * dt * v0
+    + (-2 * u3 + 3 * u2) * p1
+    + (u3 - u2) * dt * v1;
+}
+
+function positionPion(a: PionDirect, b: PionDirect, u: number, dtSim: number): Vec {
+  const t = borner01(u);
+  const doux = adoucirDirect(t);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const distance = Math.hypot(dx, dy);
+  const vitesseA = Math.hypot(a.vx, a.vy);
+  const vitesseB = Math.hypot(b.vx, b.vy);
+  const continu = dtSim > 0 && dtSim <= 6
+    && distance <= Math.max(5, dtSim * 12 + 2)
+    && vitesseA <= 13 && vitesseB <= 13;
+
+  if (!continu) {
+    return {
+      x: borner(melanger(a.x, b.x, doux), 0, LONGUEUR),
+      y: borner(melanger(a.y, b.y, doux), 0, LARGEUR),
+    };
+  }
+
+  const x = hermite(a.x, a.vx, b.x, b.vx, t, dtSim);
+  const y = hermite(a.y, a.vy, b.y, b.vy, t, dtSim);
+  // Une relance peut inverser les deux vitesses dans le même intervalle. La
+  // marge garde un vrai arrondi de course, sans autoriser une boucle visible.
+  const marge = Math.min(2.5, 0.6 + distance * 0.12);
+  return {
+    x: borner(x, Math.max(0, Math.min(a.x, b.x) - marge), Math.min(LONGUEUR, Math.max(a.x, b.x) + marge)),
+    y: borner(y, Math.max(0, Math.min(a.y, b.y) - marge), Math.min(LARGEUR, Math.max(a.y, b.y) + marge)),
+  };
+}
+
+/**
+ * Trajectoire purement visuelle d'un ballon. Le serveur fixe toujours les deux
+ * extrémités et la durée ; la graine ne choisit qu'une légère courbure stable.
+ * Deux spectateurs dessinent donc exactement la même passe.
+ */
+function positionVol(vol: VolDirect, kBrut: number): BallonAfficheDirect {
+  const k = borner01(kBrut);
+  const dx = vol.vers.x - vol.de.x;
+  const dy = vol.vers.y - vol.de.y;
+  const distance = Math.hypot(dx, dy);
+  const signe = ((vol.seed ?? 0) & 1) === 0 ? 1 : -1;
+  const amplitude = vol.seed === undefined ? 0 : vol.type === 'pied'
+    ? Math.min(1.8, distance * 0.018)
+    : Math.min(1.15, distance * 0.065);
+  const courbe = distance > 0.01 ? Math.sin(Math.PI * k) * amplitude * signe : 0;
+  return {
+    x: melanger(vol.de.x, vol.vers.x, k) - (dy / Math.max(0.01, distance)) * courbe,
+    y: melanger(vol.de.y, vol.vers.y, k) + (dx / Math.max(0.01, distance)) * courbe,
+    h: Math.max(0, vol.hauteur * Math.sin(Math.PI * k)),
+  };
+}
+
+/** Positions continues des joueurs, identifiées par leur identifiant stable. */
+export function interpolerPionsDirect(a: TerrainDirect, b: TerrainDirect, u: number, dtSim: number): Map<string, Vec> {
+  const resultat = new Map<string, Vec>();
+  const parId = new Map(b.pions.map((p) => [p.id, p]));
+  for (const p0 of a.pions) {
+    const p1 = parId.get(p0.id);
+    resultat.set(p0.id, p1 ? positionPion(p0, p1, u, dtSim) : { x: p0.x, y: p0.y });
+  }
+  // Un remplaçant n'apparaît qu'au terme de la transition. Le composant le
+  // dessine avec le second relevé, jamais au milieu de l'action précédente.
+  if (u >= 1) {
+    for (const p1 of b.pions) if (!resultat.has(p1.id)) resultat.set(p1.id, { x: p1.x, y: p1.y });
+  }
+  return resultat;
+}
+
+/** Position exacte du ballon dans un relevé isolé. */
+function ballonAuReleve(t: TerrainDirect, pions: Map<string, Vec>, avance = 0): BallonAfficheDirect {
+  if (t.vol) {
+    const k = borner01((t.vol.ecoule + avance) / Math.max(0.01, t.vol.duree));
+    return positionVol(t.vol, k);
+  }
+  if (t.porteurId) {
+    const p = pions.get(t.porteurId);
+    const donnees = t.pions.find((joueur) => joueur.id === t.porteurId);
+    if (p) {
+      const sens = donnees?.cote === 'exterieur' ? -1 : 1;
+      return { x: p.x + sens * 0.92, y: p.y + 0.42, h: 0.18 };
+    }
+  }
+  return { x: t.ballon.x, y: t.ballon.y, h: 0 };
+}
+
+function memeVol(a?: VolDirect, b?: VolDirect): a is VolDirect {
+  if (!a || !b) return false;
+  if (a.id && b.id) return a.id === b.id;
+  const proche = (x: number, y: number) => Math.abs(x - y) < 0.08;
+  return proche(a.de.x, b.de.x) && proche(a.de.y, b.de.y)
+    && proche(a.vers.x, b.vers.x) && proche(a.vers.y, b.vers.y)
+    && proche(a.duree, b.duree) && a.type === b.type && a.intention === b.intention;
+}
+
+/**
+ * Ballon continu entre deux relevés.
+ *
+ * Une passe dure souvent moins que les deux secondes séparant deux réponses du
+ * serveur. Si les deux relevés ne contiennent pas le même vol, on reconstruit
+ * ce trajet entre leurs positions exactes au lieu de changer de porteur à
+ * mi-chemin. Les deux extrémités coïncident donc toujours avec la vérité du
+ * moteur et le ballon ne peut plus se téléporter.
+ */
+export function interpolerBallonDirect(
+  a: TerrainDirect,
+  b: TerrainDirect,
+  pions: Map<string, Vec>,
+  u: number,
+): BallonAfficheDirect {
+  const t = borner01(u);
+  if (memeVol(a.vol, b.vol)) {
+    const vol: TerrainDirect = {
+      ...a,
+      vol: { ...a.vol, ecoule: melanger(a.vol.ecoule, b.vol!.ecoule, t) },
+    };
+    return ballonAuReleve(vol, pions);
+  }
+  if (a.porteurId && a.porteurId === b.porteurId) return ballonAuReleve(a, pions);
+
+  const depart = ballonAuReleve(a, new Map(a.pions.map((p) => [p.id, { x: p.x, y: p.y }])));
+  const arrivee = ballonAuReleve(b, new Map(b.pions.map((p) => [p.id, { x: p.x, y: p.y }])));
+  const doux = adoucirDirect(t);
+  const distance = Math.hypot(arrivee.x - depart.x, arrivee.y - depart.y);
+  const volManque = !a.vol || !b.vol;
+  const arche = volManque && distance > 2
+    ? Math.min(3.8, distance * 0.11) * Math.sin(Math.PI * t)
+    : 0;
+  // Même si une passe entière a eu lieu entre deux relevés, elle garde une
+  // courbe cohérente en vue de dessus au lieu de couper le terrain au cordeau.
+  const dx = arrivee.x - depart.x;
+  const dy = arrivee.y - depart.y;
+  const signe = ((a.snapshot ?? 0) + (b.snapshot ?? 0)) % 2 === 0 ? 1 : -1;
+  const courbe = volManque && distance > 2
+    ? Math.min(1.15, distance * 0.06) * Math.sin(Math.PI * t) * signe
+    : 0;
+  return {
+    x: melanger(depart.x, arrivee.x, doux) - (dy / Math.max(0.01, distance)) * courbe,
+    y: melanger(depart.y, arrivee.y, doux) + (dx / Math.max(0.01, distance)) * courbe,
+    h: Math.max(0, melanger(depart.h, arrivee.h, doux) + arche),
+  };
+}
+
+/** Une image complète entre deux réponses du serveur. */
+export function interpolerImageDirect(a: TerrainDirect, b: TerrainDirect, u: number, dtSim: number): ImageDirect {
+  const pions = interpolerPionsDirect(a, b, u, dtSim);
+  return { pions, ballon: interpolerBallonDirect(a, b, pions, u) };
+}
+
+/** Courte projection de secours lorsque le prochain relevé n'est pas encore arrivé. */
+export function projeterImageDirect(t: TerrainDirect, secondesReelles: number): ImageDirect {
+  const avance = borner(secondesReelles, 0, 1.2) * t.cadence;
+  const pions = new Map<string, Vec>();
+  for (const p of t.pions) {
+    pions.set(p.id, {
+      x: borner(p.x + p.vx * avance, 0, LONGUEUR),
+      y: borner(p.y + p.vy * avance, 0, LARGEUR),
+    });
+  }
+  return { pions, ballon: ballonAuReleve(t, pions, avance) };
+}

@@ -327,13 +327,26 @@ suivant. **C'est faux, et ça se voit.** Un joueur ne court pas deux secondes en
 ligne droite ; à neuf mètres par seconde, deux secondes de prédiction sont
 dix-huit mètres d'erreur possible.
 
-Le match se rend donc avec **un relevé de retard** (2,4 s), en interpolant entre
+Le match se rend donc avec **un relevé de retard** (2,25 s), en interpolant entre
 les deux relevés qui encadrent l'instant — non pas par un `lerp` (une droite
 entre deux points distants de deux secondes coupe les courbes et fait patiner les
 appuis) mais par une **spline d'Hermite** dont les tangentes sont les vecteurs
 vitesse des deux bouts. La trajectoire passe exactement par les deux positions
 vraies et repart dans la bonne direction. Le retard ne se voit pas : il n'y a
 rien à côté pour le comparer.
+
+Chaque relevé porte aussi **l'instant d'émission du serveur** et un numéro de
+simulation monotone. Le tampon se cale sur cette horloge, pas sur l'heure
+d'arrivée du paquet : un accès mobile qui met soudain 300 ms de plus n'étire
+donc ni les courses ni la passe en cours. Une réponse arrivée dans le désordre
+est ignorée.
+
+Le ballon suit un autre contrat que les joueurs. Une passe ou un coup de pied
+porte un identifiant, son début, sa fin, son auteur, son receveur et une petite
+graine visuelle. Le client anime localement une trajectoire courbe déterministe,
+dont les deux extrémités restent celles décidées par le serveur. Si une passe
+entière tombe entre deux relevés, elle est reconstruite entre les deux porteurs
+au lieu de téléporter le ballon.
 
 ⚠️ **LE TEMPS SIMULÉ VIENT DE L'HORLOGE DU MATCH, PAS DE LA MONTRE.** Une
 décision de pénalité gèle le chrono du serveur : les deux relevés portent alors
@@ -345,6 +358,21 @@ tous les membres de la ligue, c'était 2 400 lectures complètes de l'état par
 rencontre et par onglet ouvert. Le match avance de toute façon à chaque lecture,
 d'où qu'elle vienne : un direct sans spectateur ne se bloque pas, il coûte cinq
 fois moins cher.
+
+### Charge cible : 300 à 400 matchs
+
+Le serveur regroupe les demandes reçues dans la même tranche de **200 ms** :
+cinquante spectateurs d'une même ligue partagent une seule avance autoritaire à
+5 Hz, puis chacun reçoit sa vue privée. Le rendu 60 FPS reste entièrement dans
+le navigateur.
+
+Le cache moteur est un LRU de **512 matchs**, borné aussi à **96 Mio**. Il peut
+donc garder les 400 directs ciblés sans laisser la mémoire croître indéfiniment.
+Le banc `npm run verify:scale-direct` crée réellement 400 moteurs et effectue un
+second cycle chaud ; mesure locale du 12 septembre 2026 : **52 ms pour les 400
+matchs (0,13 ms/match), 54,8 Mio de cache**. Neon ne reçoit toujours ni les
+positions ni les ticks : uniquement la graine, les feuilles, les ordres et les
+résultats durables.
 
 **Aucune absence ne bloque la ligue.** À la fermeture de la fenêtre d'une
 journée, les rencontres non jouées se jouent toutes seules avec les compositions

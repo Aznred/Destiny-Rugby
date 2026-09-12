@@ -39,7 +39,9 @@
   déjà fait le travail.
 - **Un calendrier** : le prochain match avec l'heure d'ouverture de sa fenêtre,
   le compte à rebours, l'agenda du club, les prochaines journées de toute la
-  ligue — et des rappels par notification tant que le jeu est ouvert.
+  ligue — et des rappels par notification tant que le jeu est ouvert. Modifier
+  la cadence fige toute journée déjà commencée et ne recale que les journées
+  encore entièrement vierges.
 - **Un laboratoire privé pour `kiri`** : créé automatiquement avec quatre
   clubs et une saison prête. Son onglet de développement lance n'importe quelle
   affiche immédiatement, place le direct à 10, 40, 60 ou 79 minutes, siffle la
@@ -892,7 +894,11 @@ cents matchs complets sans navigateur ni base. Ce qu'il dit :
 - **le direct avance en continu** — le plus grand bond entre deux sondages de
   deux secondes est de **0,1 minute**, et le terrain change à chaque relevé.
   Avant, il se téléportait une fois par minute : `EtatMatch.minute` est un
-  entier, et la rejoue s'arrêtait dessus ;
+  entier, et la rejoue s'arrêtait dessus. À l'écran, le ballon et les trente
+  joueurs sont maintenant raccordés jusqu'au prochain relevé : une passe trop
+  courte pour être vue par le sondage reçoit tout de même une trajectoire, un
+  changement de porteur ne coupe plus l'image et une tangente contradictoire ne
+  peut plus faire décrire une boucle à un joueur ;
 - **le direct est mis en scène, jamais précalculé en vidéo** — le moteur livre
   la phase, le lancement, la zone, la progression et les 30 positions réelles ;
   une couche de scénarios les classe en plus de 120 variantes vérifiées. La
@@ -1049,7 +1055,7 @@ src/
   lib/moteur/camera.ts  # la caméra du direct : cadrage en mètres, quart de tour en portrait
   lib/moteur/moments.ts # « c'est à toi » : le match ralentit en temps réel sur tes actions
   components/match/     # la scène du direct : pelouse, feuille de match,
-  #                       TerrainEnDirect.tsx (le direct EN LIGNE : interpolation d'Hermite)
+  #                       TerrainEnDirect.tsx (direct EN LIGNE : interpolation continue et bornée)
   lib/moteur/bagarre.ts # tension, provocations, bagarres, cartons et commission de discipline
   lib/mj.ts             # prompt système du Maître du Jeu, parsing JSON et GARDE-FOUS
   lib/iaSociale.ts      # publications, commentaires et messages privés écrits par l'IA
@@ -1087,6 +1093,7 @@ scripts/
   verifMarche.ts        # marché : variété des clubs, saut d'étage interdit, salaires par âge
   verifClassement.ts    # joue le tricheur : chaque attaque du classement doit être refusée
   verifCarriere.ts      # la Carrière en ligne : scores, direct, packs, économie, marché, refus (208 contrôles)
+  verifierFluiditeDirect.ts # ballon, passes intermédiaires, courses bornées et reprises sans téléportation
   verifLigue.ts         # ⚠️ le socle du 1er lot — plus branché au jeu
   verifLogosSelections.ts # signatures des images et couverture du classement World Rugby
 sources/                # matières premières rangées : data, logos, compétitions, modèles 3D

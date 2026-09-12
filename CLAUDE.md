@@ -165,6 +165,8 @@ Quatre modules portent le mode :
 Le créateur d'une ligue peut changer sa cadence de 1 à 7 matchs par semaine.
 La replanification porte sur toutes les rencontres futures, coupes comprises,
 et la récupération physique suit cette cadence sans modifier les matchs joués.
+Dès qu'une affiche d'une journée a commencé, toute cette journée est figée :
+le changement de rythme ne recale que les journées encore entièrement vierges.
 
 Le compte serveur `kiri` reçoit automatiquement un **Laboratoire Kiri** privé :
 quatre clubs, une saison active et une console pour lancer un match tout de
@@ -489,14 +491,16 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   écusson d’un vrai club (choisi À L’INSCRIPTION, jamais modifiable ensuite),
   logo et trophée de championnat, phase finale en option,
   championnat, **matchs en direct à la vitesse réelle** (80 minutes de vraie
-  vie, terrain animé à 60 images par seconde par interpolation d'Hermite,
+  vie, terrain animé à 60 images par seconde par interpolation bornée : les
+  passes manquées entre deux relevés sont reconstruites, le ballon ne change
+  jamais de porteur à mi-image et les tangentes ne font plus boucler les joueurs,
   couche `scenarioDirect.ts` séparée du moteur — type de lancement, zone,
   couloir, intensité et cadrage automatique, sans séquence vidéo —,
   décision de pénalité dans les 50 mètres adverses, consignes et remplacements
   qui atteignent le moteur), packs, marché, enchères, échanges, coupes maison,
   objectifs, palmarès. Serveur (`serveur/carriereApi.ts` + `api/carriere.ts`),
   écran (`screens/CarriereEnLigne.tsx`) et banc (`npm run verify:carriere`,
-  208 contrôles). Les 19 tables sont posées sur la base Neon du site (mesuré le
+  208 contrôles, plus `npm run verify:fluidite-direct`). Les 19 tables sont posées sur la base Neon du site (mesuré le
   6 septembre 2026 : inscription en production → HTTP 200). Marche à suivre
   complète dans `serveur/MISE-EN-LIGNE.md`.
 
