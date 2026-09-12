@@ -8,6 +8,7 @@ import {
 } from '../data/nouvellesLigues.js';
 import { mercatoReel, type RecrueReelle } from './mercato.js';
 import { generationDuClub } from './generations.js';
+import { noteJoueurRevalorisee } from './evaluationJoueurReel.js';
 
 // Génération DÉTERMINISTE de l'effectif d'un club : même club + même saison
 // => même équipe. Les joueurs vieillissent d'un an par saison ; passé leur âge
@@ -373,6 +374,8 @@ function effectifReel(nomClub: string, saison: number, niveau: number): Coequipi
     const retraite = Math.max(reel.age, 33 + Math.floor(rngRetraite() * 5));
     const vitesseDeclin = rngRetraite();
     const age = reel.age + (saison - 1);
+    const noteReference = noteJoueurRevalorisee(reel.nom, reel.note);
+    const potentielReference = Math.max(noteReference, reel.potentiel);
 
     if (age <= retraite) {
       return {
@@ -382,8 +385,8 @@ function effectifReel(nomClub: string, saison: number, niveau: number): Coequipi
         age,
         // La note de l'export est celle de 2025-26 : le joueur progresse vers
         // son potentiel jusqu'à 27 ans, puis décline.
-        note: noteALAge(reel.note, reel.age, reel.potentiel, age, vitesseDeclin),
-        potentiel: reel.potentiel,
+        note: noteALAge(noteReference, reel.age, potentielReference, age, vitesseDeclin),
+        potentiel: potentielReference,
         nation: reel.nation,
         regen: false,
       };

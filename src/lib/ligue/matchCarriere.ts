@@ -327,6 +327,12 @@ export interface TerrainDirect {
   ballonLent?: boolean;
   ouvert?: 'gauche' | 'droite';
   lancement?: { type: TypeLancement; intention?: IntentionPied };
+  /** Lecture visuelle de la conquête en cours : appel de touche ou poussée. */
+  conquete?: {
+    type: 'melee' | 'touche'; progression: number;
+    combinaison?: 'premierBloc' | 'milieu' | 'fond' | 'leurreDevant';
+    cibleId?: string; pousseVers?: CoteEnLigne;
+  };
   /** Secondes SIMULÉES écoulées par seconde réelle dans la phase en cours. */
   cadence: number;
   /** Minutes de jeu au centième au moment du relevé. */
@@ -950,6 +956,15 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
   if (e.lancement) {
     terrain.lancement = { type: e.lancement.type };
     if (e.lancement.intention) terrain.lancement.intention = e.lancement.intention;
+  }
+  if (e.conquete) {
+    terrain.conquete = {
+      type: e.conquete.type,
+      progression: r2(e.conquete.progression),
+      combinaison: e.conquete.combinaison,
+      cibleId: e.conquete.cibleId,
+      pousseVers: e.conquete.pousseVers ? MOTEUR_VERS_COTE[e.conquete.pousseVers] : undefined,
+    };
   }
   if (e.porteur) terrain.porteurId = e.porteur.id;
   const recents = (e.volsRecents ?? [])

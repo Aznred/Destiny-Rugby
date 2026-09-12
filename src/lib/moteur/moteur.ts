@@ -148,14 +148,20 @@ function avancementArret(e: EtatMatch): number {
  */
 function animerArret(e: EtatMatch): void {
   const p = avancementArret(e);
+  if (e.conquete) e.conquete.progression = p;
   if (e.phase === 'melee') {
     // Avant la liaison, chaque pack recule d'un mètre sept de SON côté ; une
     // fois lié, l'ensemble dérive dans le sens du pack le plus fort.
     const ecart = Math.max(0, 1 - p / 0.45) * 1.7;
     const avants = (cote: Cote) => surLeTerrain(e, cote).filter((q) => q.avant);
     const moy = (l: Pion[]) => (l.length ? l.reduce((a, b) => a + b.puissance, 0) / l.length : 50);
-    const dom = borner((moy(avants(e.possession)) - moy(avants(adverse(e.possession)))) / 18, -1, 1);
-    const derive = Math.max(0, p - 0.5) / 0.5 * dom * 1.6 * sens(e.possession);
+    const ecartPacks = moy(avants(e.possession)) - moy(avants(adverse(e.possession)));
+    const domBrut = borner(ecartPacks / 10, -1, 1);
+    // Même une domination légère doit se LIRE. Le pack gagnant avance de 1,4
+    // à 4 mètres pendant la poussée, au lieu d'un frémissement invisible.
+    const dom = Math.abs(domBrut) < 0.35 ? (domBrut < 0 ? -0.35 : 0.35) : domBrut;
+    const derive = Math.max(0, p - 0.48) / 0.52 * dom * 4 * sens(e.possession);
+    if (e.conquete) e.conquete.pousseVers = dom >= 0 ? e.possession : adverse(e.possession);
     for (const pion of e.pions) {
       if (!pion.surLeTerrain || pion.role !== 'melee') continue;
       pion.cible = { x: pion.cible.x - sens(pion.cote) * ecart + derive, y: pion.cible.y };
@@ -174,6 +180,24 @@ function animerArret(e: EtatMatch): void {
         x: pion.cible.x - sens(pion.cote) * large * 1.6,
         y: borner(bord + vers * (profondeur * (1 + large * 0.35)), 2.5, LARGEUR - 2.5),
       };
+    }
+    const conquete = e.conquete;
+    if (conquete?.type === 'touche') {
+      const alignes = surLeTerrain(e, e.possession)
+        .filter((q) => q.role === 'alignement')
+        .sort((a, b) => Math.abs(a.cible.y - bord) - Math.abs(b.cible.y - bord));
+      const cible = alignes.find((q) => q.id === conquete.cibleId);
+      const leurre = conquete.combinaison === 'leurreDevant'
+        ? alignes.find((q) => q !== cible)
+        : undefined;
+      // L'appel se déroule avant le saut : un leurre attaque le premier bloc,
+      // puis le sauteur choisi se décale dans son intervalle.
+      const appel = Math.sin(Math.PI * borner((p - 0.30) / 0.48, 0, 1));
+      if (leurre) leurre.cible.y = borner(leurre.cible.y + vers * 2.2 * appel, 2.5, LARGEUR - 2.5);
+      if (cible) {
+        cible.cible.y = borner(cible.cible.y - vers * 1.25 * appel, 2.5, LARGEUR - 2.5);
+        cible.cible.x += sens(cible.cote) * 0.55 * Math.sin(Math.PI * borner((p - 0.62) / 0.34, 0, 1));
+      }
     }
     return;
   }
@@ -339,7 +363,7 @@ export function creerMatch(
     clubA, clubB,
     t: 0, sim: 0, reliquat: 0, minute: 0, periode: 1, sirene: false,
     phase: 'coupEnvoi', minuteur: ARRETS.coupEnvoi.visuel,
-    pions, ballon: { x: MILIEU, y: AXE }, porteur: null, possession, vol: null, volsRecents: [],
+    pions, ballon: { x: MILIEU, y: AXE }, porteur: null, possession, vol: null, volsRecents: [], conquete: null,
     lancement: null, ouvert: 1, phasesDepuisArret: 0, ligneAvantage: MILIEU,
     origine: { x: MILIEU, y: AXE }, metresGagnesPhase: 0,
     ballonLent: false, derniereTouche: null, dernierPasseur: null,
@@ -737,6 +761,7 @@ function preparerCoupEnvoi(e: EtatMatch, pour: Cote): void {
   e.porteur = null;
   e.vol = null;
   e.lancement = null;
+  e.conquete = null;
   e.phasesDepuisArret = 0;
   e.ballon = { x: MILIEU, y: AXE };
   e.phase = 'coupEnvoi';
@@ -1874,6 +1899,7 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec): void {
   e.porteur = null;
   e.vol = null;
   e.lancement = null;
+  e.conquete = null;
   // ⚠️ ET LE HORS-JEU DU PIED S’EFFACE. Une phase arrêtée remet tout le monde
   //    en jeu : garder le drapeau ferait chasser un joueur au ralenti trois
   //    phases après le coup de pied qui l’avait mis hors-jeu.
@@ -1893,11 +1919,25 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec): void {
     e.ballon.x = borner(e.ballon.x, LIGNE_A + 5, LIGNE_B - 5);
     const nb = e.rng() < 0.32 ? 4 : e.rng() < 0.6 ? 5 : 7;
     installerPlacement(e, placementTouche(e.pions, e.ballon, pour, nb), 34);
+    const alignes = surLeTerrain(e, pour)
+      .filter((p) => p.role === 'alignement')
+      .sort((a, b) => Math.abs(a.cible.y - e.ballon.y) - Math.abs(b.cible.y - e.ballon.y));
+    const combinaisons = ['premierBloc', 'milieu', 'fond', 'leurreDevant'] as const;
+    const combinaison = combinaisons[Math.abs(Math.round(e.t / DT) + Math.round(e.ballon.x)) % combinaisons.length];
+    const indexCible = combinaison === 'premierBloc' ? 0
+      : combinaison === 'fond' ? alignes.length - 1
+        : combinaison === 'leurreDevant' ? Math.min(alignes.length - 1, Math.max(1, Math.floor(alignes.length * 0.68)))
+          : Math.floor(alignes.length / 2);
+    e.conquete = {
+      type: 'touche', progression: 0, combinaison,
+      cibleId: alignes[Math.max(0, indexCible)]?.id,
+    };
     e.compteurs.touches += 1;
   } else if (quoi === 'melee') {
     e.ballon.y = borner(e.ballon.y, 12, LARGEUR - 12);
     e.ballon.x = borner(e.ballon.x, LIGNE_A + 6, LIGNE_B - 6);
     installerPlacement(e, placementMelee(e.pions, e.ballon, pour), 22);
+    e.conquete = { type: 'melee', progression: 0, pousseVers: pour };
     e.compteurs.melees += 1;
   } else if (quoi === 'renvoi22') {
     installerPlacement(e, placementRenvoi22(e.pions, pour === 'A' ? M22_A : M22_B, pour));
@@ -1911,6 +1951,7 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec): void {
 
 function phaseMelee(e: EtatMatch): void {
   if (e.minuteur > 0) return;
+  e.conquete = null;
   const cote = e.possession;
   const mien = surLeTerrain(e, cote).filter((p) => p.avant);
   const adv = surLeTerrain(e, adverse(cote)).filter((p) => p.avant);
@@ -1950,7 +1991,13 @@ function phaseTouche(e: EtatMatch): void {
   const cote = e.possession;
   const liste = surLeTerrain(e, cote);
   const avants = liste.filter((p) => p.avant);
-  const sauteur = [...avants].sort((a, b) => b.detente - a.detente)[0] ?? liste[0];
+  // La combinaison annoncée n'est pas décorative : le lanceur cherche bien le
+  // joueur mis en évidence pendant l'alignement. En l'absence de cible valide,
+  // on revient au meilleur sauteur comme auparavant.
+  const cibleAnnoncee = e.conquete?.cibleId;
+  const sauteur = avants.find((p) => p.id === cibleAnnoncee)
+    ?? [...avants].sort((a, b) => b.detente - a.detente)[0] ?? liste[0];
+  e.conquete = null;
   if (!sauteur) return clorePeriode(e);
 
   // ~86 % des touches sont gagnées par l'équipe qui lance.
@@ -2396,6 +2443,7 @@ function reprendreJeu(e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?
   e.ouvert = choisirCoteOuvert(e);
   e.systeme = choisirSysteme(e, adverse(cote));
   e.phase = 'jeuCourant';
+  e.conquete = null;
   e.placement = null;
   // ⚠️ NE PAS forcer ici un recalcul immédiat du placement (`e.compteur = 0`).
   // Testé : la défense se remettait aussitôt sur sa ligne théorique — lue sur le

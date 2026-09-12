@@ -268,6 +268,15 @@ export interface Vol {
  */
 export type VolRecent = Omit<Vol, 'ecoule'> & { debut: number };
 
+/** Animation et appel annoncés pendant une phase de conquête. */
+export interface ConqueteAnimee {
+  type: 'melee' | 'touche';
+  progression: number;
+  combinaison?: 'premierBloc' | 'milieu' | 'fond' | 'leurreDevant';
+  cibleId?: string;
+  pousseVers?: Cote;
+}
+
 // LE LANCEMENT DE JEU : la combinaison décidée pour la phase qui commence.
 // C'est LUI qui fait circuler le ballon — sans plan, chaque porteur cherchait
 // son voisin le plus proche et le ballon tournait sur trois mètres.
@@ -320,6 +329,7 @@ export interface EtatMatch {
   possession: Cote;
   vol: Vol | null;
   volsRecents?: VolRecent[];
+  conquete?: ConqueteAnimee | null;
 
   // Structure de jeu
   lancement: Lancement | null;

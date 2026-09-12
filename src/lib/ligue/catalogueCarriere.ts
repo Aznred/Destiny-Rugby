@@ -6,8 +6,8 @@ import { LNR_MAJ } from '../../data/lnrMaj.js';
 import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
 import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/amateurs.js';
 import { PHOTO_JOUEUR } from '../../data/photosJoueurs.js';
-import { EVALUATION_JOUEUR_MAJ } from '../../data/evaluationsJoueursMaj.js';
 import { photoReelle } from '../avatars.js';
+import { noteJoueurRevalorisee } from '../evaluationJoueurReel.js';
 import { COMPETITIONS } from '../../data/clubs.js';
 import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
 import { LOGO_COMPETITION_NOUVEAU } from '../../data/nouvellesLigues.js';
@@ -289,9 +289,10 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
       const sourceId = `reel:${normaliser(j.nom)}`;
       const lnr = LNR_MAJ[normaliser(j.nom)];
       const maj = JOUEURS_NEW_MAJ[normaliser(j.nom)];
-      const evaluation = EVALUATION_JOUEUR_MAJ[normaliser(j.nom)];
-      const classementMagazine = evaluation && /^(RugbyPass|FloRugby|We Talk Rugby|Ajustement jeu)/.test(evaluation.source);
-      const note = classementMagazine ? evaluation.note : Math.max(30, j.note, evaluation?.note ?? 0);
+      // Chaque source est un PLANCHER : une saison pleine et productive peut
+      // enfin revaloriser un joueur oublié, sans faire baisser une vedette déjà
+      // calibrée par un classement éditorial.
+      const note = noteJoueurRevalorisee(j.nom, j.note);
       ajouter({ sourceId, nom: j.nom, famille: j.poste, poste: posteDepuisFamille(j.poste, 0), note,
         potentiel: Math.max(note, j.potentiel), age: j.age, nation: nationLisible(j.nation),
         clubReel: maj?.club ?? lnr?.club ?? club, championnat: maj ? 'Gallagher Premiership' : lnr?.championnat ?? competition?.nom ?? 'Championnat professionnel', pays: competition?.pays ?? 'France',

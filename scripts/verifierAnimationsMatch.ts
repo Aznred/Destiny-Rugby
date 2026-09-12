@@ -14,6 +14,8 @@ let transformationPreparee = false;
 let transformationEnVol = false;
 let ruckSynchronise = false;
 let passeMemorisee = false;
+let pousseeMeleeVisible = false;
+let combinaisonToucheVisible = false;
 let meleeLaPlusLongue = 0;
 let toucheLaPlusLongue = 0;
 let phasePrecedente = match.phase;
@@ -39,6 +41,15 @@ for (let garde = 0; !match.fini && garde < 80_000; garde++) {
       Math.hypot(p.cible.x - match.ballon.x, p.cible.y - match.ballon.y) < 1.5);
   }
   passeMemorisee ||= (match.volsRecents ?? []).some((v) => v.type === 'passe');
+  pousseeMeleeVisible ||= match.phase === 'melee'
+    && match.conquete?.type === 'melee'
+    && match.conquete.progression > 0.55
+    && !!match.conquete.pousseVers;
+  combinaisonToucheVisible ||= match.phase === 'touche'
+    && match.conquete?.type === 'touche'
+    && match.conquete.progression > 0.3
+    && !!match.conquete.combinaison
+    && !!match.conquete.cibleId;
 }
 
 assert.ok(match.fini, 'Le match direct doit arriver à son terme.');
@@ -47,7 +58,9 @@ assert.ok(transformationEnVol, 'La transformation doit montrer la trajectoire du
 assert.ok(ruckSynchronise, 'Le joueur plaqué et le ballon doivent finir ensemble au ruck.');
 assert.ok(passeMemorisee,
   'Les passes courtes doivent rester dans la mémoire visuelle du direct.');
+assert.ok(pousseeMeleeVisible, 'La poussée d’une mêlée doit être visible pendant le direct.');
+assert.ok(combinaisonToucheVisible, 'La combinaison et sa cible doivent être visibles en touche.');
 assert.ok(meleeLaPlusLongue <= 16.01, `Mêlée directe trop longue : ${meleeLaPlusLongue.toFixed(1)} s.`);
 assert.ok(toucheLaPlusLongue <= 12.01, `Touche directe trop longue : ${toucheLaPlusLongue.toFixed(1)} s.`);
 
-console.log('OK — arrêts raccourcis, contact synchronisé, passes mémorisées et transformations visibles.');
+console.log('OK — arrêts raccourcis, conquêtes animées, contact synchronisé, passes mémorisées et transformations visibles.');

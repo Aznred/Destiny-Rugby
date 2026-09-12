@@ -11,8 +11,8 @@
 // changé pour le direct tient en deux endroits, et aucun n'est ici :
 //   • `EtatMatch.tempsReel` — une seconde de jeu vaut une seconde à l'écran,
 //     donc plus aucun étirement des phases arrêtées ;
-//   • `animerArret` — la mêlée se présente, se lie et pousse pendant ses
-//     cinquante secondes au lieu de tenir une pose.
+//   • `animerArret` — la mêlée se présente, se lie et pousse, tandis que la
+//     touche montre son appel et son sauteur au lieu de tenir une pose.
 //
 // ⚠️ LE MOTEUR N'EST PAS DANS LE NAVIGATEUR, ET IL NE DOIT PAS Y ÊTRE. Le
 // rejouer ici demanderait la GRAINE, les deux feuilles et les cibles de score —
@@ -111,6 +111,13 @@ const LIBELLES_ZONE: Record<ScenarioDirect['zone'], string> = {
   campAdverse: 'dans le camp adverse', milieu: 'au milieu', campPropre: 'dans son camp',
   vingtDeuxPropre: 'dans ses 22 m', enButPropre: 'dans son en-but',
 };
+
+const LIBELLES_COMBINAISON = {
+  premierBloc: 'Appel au premier bloc',
+  milieu: 'Prise au milieu',
+  fond: 'Saut au fond',
+  leurreDevant: 'Leurre devant · saut au fond',
+} as const;
 
 function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote }: Props) {
   const scene = useRef<HTMLDivElement>(null);
@@ -303,6 +310,14 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const porteur = affiche.porteurId
     ? affiche.pions.find((p) => p.id === affiche.porteurId)
     : undefined;
+  const conquete = affiche.conquete;
+  const cibleConquete = conquete?.cibleId
+    ? pions.current.get(conquete.cibleId)
+    : undefined;
+  const poussee = conquete?.type === 'melee'
+    ? borner((conquete.progression - 0.45) / 0.55, 0, 1)
+    : 0;
+  const sensPoussee = conquete?.pousseVers === 'exterieur' ? -1 : 1;
 
   return (
     <div className="cel-scene" ref={scene}>
@@ -315,6 +330,22 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       >
         <g transform={vue?.transform}>
           <PelouseMemo />
+          {conquete?.type === 'melee' && (
+            <g className="cel-conquete-dessin">
+              <line
+                x1={b.x - sensPoussee * 1.2} y1={b.y - 4.2}
+                x2={b.x + sensPoussee * (2.2 + poussee * 4.8)} y2={b.y - 4.2}
+                strokeWidth={Math.max(0.45, trait * 1.5)}
+              />
+              <path transform={`translate(${b.x + sensPoussee * (2.2 + poussee * 4.8)} ${b.y - 4.2}) scale(${sensPoussee} 1)`} d="M 0 0 L -2 -1.15 L -2 1.15 Z" />
+            </g>
+          )}
+          {conquete?.type === 'touche' && cibleConquete && (
+            <g className="cel-appel-touche" transform={`translate(${cibleConquete.x} ${cibleConquete.y})`}>
+              <circle r={rayon * (1.65 + Math.sin(Math.PI * conquete.progression) * 0.45)} strokeWidth={trait * 1.35} />
+              <path d={`M ${-rayon * 2.8} 0 Q 0 ${-rayon * 2.2} ${rayon * 2.8} 0`} strokeWidth={trait} />
+            </g>
+          )}
           {affiche.vol && (
             <line
               className="cel-trajectoire"
@@ -344,6 +375,15 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       </svg>
 
       <div className="cel-hud">
+        {conquete && (
+          <div className={`cel-conquete cel-conquete-${conquete.type}`} role="status">
+            <strong>{conquete.type === 'melee' ? 'MÊLÉE · POUSSÉE' : 'TOUCHE · COMBINAISON'}</strong>
+            <span>{conquete.type === 'melee'
+              ? conquete.progression < 0.32 ? 'Les packs se placent' : conquete.progression < 0.52 ? 'Liaison' : 'Le pack avance'
+              : LIBELLES_COMBINAISON[conquete.combinaison ?? 'milieu']}</span>
+            <i><b style={{ width: `${Math.round(conquete.progression * 100)}%` }} /></i>
+          </div>
+        )}
         <div className={`cel-scenario cel-scenario-${scenario.intensite}`} aria-live="polite">
           {scenario.momentFort && <b>MOMENT FORT</b>}
           <span>{LIBELLES_SCENARIO[scenario.type]}</span>
