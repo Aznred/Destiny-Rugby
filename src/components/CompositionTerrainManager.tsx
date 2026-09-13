@@ -199,7 +199,7 @@ function CarteJoueur({
   surDrop: (e: DragEvent<HTMLButtonElement>) => void;
 }) {
   const adequation: Adequation = joueur
-    ? adequationAuPoste(joueur.poste, posteSlot) : 'naturel';
+    ? adequationAuPoste(joueur.poste, posteSlot, joueur.postesSecondaires) : 'naturel';
   const statut: StatutCarte | undefined = joueur ? statutDe(joueur) : undefined;
   // ⚠️ LA RARETÉ ET LE STATUT COHABITENT, ils ne disent pas la même chose : la
   // rareté est le MÉTAL de la carte (ce qu'elle vaut), le statut reste la bande
@@ -333,7 +333,8 @@ function PanneauJoueur({
 }) {
   const attributs = attributsDe(joueur);
   const rarete = rareteDe(joueur);
-  const adequation = posteSlot ? adequationAuPoste(joueur.poste, posteSlot) : 'naturel';
+  const adequation = posteSlot
+    ? adequationAuPoste(joueur.poste, posteSlot, joueur.postesSecondaires) : 'naturel';
   const liaisons = (PARTENAIRES[joueur.poste] ?? [])
     .map((p) => ({ poste: p, joueur: coequipiers.get(p) }))
     .filter((l): l is { poste: PosteId; joueur: Coequipier } => !!l.joueur);

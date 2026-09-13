@@ -46,6 +46,10 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
   const stats = Object.entries(carte.statistiques).slice(0, 6);
   const Balise = onClick ? 'button' : 'div';
   const poste = nomPoste(carte.poste).replace(/\s*\(\d+\)\s*$/, '');
+  const seconds = (carte.postesSecondaires ?? [])
+    .filter((p) => p !== carte.poste)
+    .map((p) => ({ numero: POSTE_PAR_ID[p]?.numero, nom: nomPoste(p).replace(/\s*\(\d+\)\s*$/, '') }))
+    .filter((p) => p.numero !== undefined);
   return <Balise type={onClick ? 'button' : undefined} className={`cel-carte dr-player ${carte.rarete}${compacte ? ' compacte' : ''}${etatCollection ? ` collection-${etatCollection}` : ''}`} onClick={onClick}>
     <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
       <defs>
@@ -68,7 +72,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
         n'affiche RIEN quand le championnat n'a pas de logo — le repli en ballon
         générique de `LogoCompet` se lirait ici comme un blason de compétition
         que personne ne reconnaîtrait. */}
-    <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</em><Drapeau nation={carte.nation} taille={1.15} />{blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</span>
+    <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}><span>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</span>{seconds.length > 0 && <small title={`Seconds postes : ${seconds.map((p) => p.nom).join(', ')}`}>2e : {seconds.map((p) => p.numero).join(' / ')}</small>}</em><Drapeau nation={carte.nation} taille={1.15} />{blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</span>
     <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src={SANS_PHOTO} alt="Portrait par défaut" />}</span>
     <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{carte.clubReel}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>

@@ -7,7 +7,7 @@ import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
 import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/amateurs.js';
 import { PHOTO_JOUEUR } from '../../data/photosJoueurs.js';
 import { photoReelle } from '../avatars.js';
-import { noteJoueurRevalorisee } from '../evaluationJoueurReel.js';
+import { noteJoueurRevalorisee, postesJoueurReel } from '../evaluationJoueurReel.js';
 import { COMPETITIONS } from '../../data/clubs.js';
 import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
 import { LOGO_COMPETITION_NOUVEAU } from '../../data/nouvellesLigues.js';
@@ -293,13 +293,16 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
       // enfin revaloriser un joueur oublié, sans faire baisser une vedette déjà
       // calibrée par un classement éditorial.
       const note = noteJoueurRevalorisee(j.nom, j.note);
-      ajouter({ sourceId, nom: j.nom, famille: j.poste, poste: posteDepuisFamille(j.poste, 0), note,
+      const profilPostes = postesJoueurReel(j.nom, j.poste);
+      const famille = POSTE_PAR_ID[profilPostes.poste].famille;
+      ajouter({ sourceId, nom: j.nom, famille, poste: profilPostes.poste,
+        postesSecondaires: profilPostes.postesSecondaires, note,
         potentiel: Math.max(note, j.potentiel), age: j.age, nation: nationLisible(j.nation),
         clubReel: maj?.club ?? lnr?.club ?? club, championnat: maj ? 'Gallagher Premiership' : lnr?.championnat ?? competition?.nom ?? 'Championnat professionnel', pays: competition?.pays ?? 'France',
         // L'index consolidé corrige aussi les variantes de prénom et les URL
         // LNR devenues obsolètes ; l'URL brute ne sert qu'en dernier recours.
         photo: photoReelle(j.nom) ?? lnr?.photo, origine: 'professionnel', rarete: rareteCarriere(note),
-        statistiques: statistiquesCarte(note, j.poste, sourceId) });
+        statistiques: statistiquesCarte(note, famille, sourceId) });
     }
   }
   // ⚠️ LES CLÉS SONT CELLES DE `CLUBS_AMATEURS`, PAS CELLES QU'ON CROIRAIT.
@@ -585,6 +588,7 @@ export function dotationBronzeCarriere(
 
 export function coequipierDepuisCarte(c: CarteCarriere): Coequipier {
   return { id: c.id, nom: c.nom, poste: c.poste, age: c.age, note: c.note, potentiel: c.potentiel,
+    postesSecondaires: c.postesSecondaires ? [...c.postesSecondaires] : undefined,
     jeuAuPied: c.statistiques.JDP, nation: c.nation, regen: c.origine === 'formation', horsGeneration: true };
 }
 /**

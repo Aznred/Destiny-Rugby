@@ -66,6 +66,7 @@ let compte: string | null='compte-a';
 const stockage = {
  limiter: async()=>true,
  session:async()=>compte?{id:compte,identifiant:'secret',pseudo:'Test',empreinte:'secret'}:null,
+ entete:async()=>({version:e.version,comptes:['compte-a','compte-b'],echeance:null}),
  ligues:async()=>[{id:e.id,nom:e.nom,phase:e.phase,clubNom:e.clubs[0].nom,ovas:e.clubs[0].ovas,clubEmbleme:e.clubs[0].embleme,logo:e.logo}],
  ligue:async()=>({id:e.id,code:e.code,version:e.version,comptes:['compte-a','compte-b'],etat:e}),
 } as unknown as StockageCarriere;
@@ -87,7 +88,9 @@ const session = await (async () => {
 })();
 assert.equal(session.ligues[0].clubEmbleme, e.clubs[0].embleme);
 assert.equal(session.ligues[0].logo, e.logo);
-compte='intrus'; assert.equal((await get()).statut,404);
+compte='intrus'; {
+ const intrus = await get(); assert.equal(intrus.statut,404,JSON.stringify(intrus.resultat));
+}
 compte=null; assert.equal((await get()).statut,401);
 if (process.env.COLLECTION_FIXTURE) writeFileSync(process.env.COLLECTION_FIXTURE,JSON.stringify({page:page('statut=distribue'),vue:{id:e.id,saison:1,cartes:e.cartes,clubs:e.clubs.map(({compteId: _compteId,...c})=>c),monClubId:e.clubs[0].id}}));
 console.log(`OK collection : ${page().catalogueTotal} joueurs, pagination, filtres, origine après transfert, dotation distincte, API 200/401/404, aucune donnée privée.`);

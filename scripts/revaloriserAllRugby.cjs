@@ -35,6 +35,51 @@ function profil(header) {
   return { essai: 0.04, nom: 'pilier' };
 }
 
+const POSTES_DETAILLES = [
+  ['pilier_gauche', /pilier gauche\s+(\d+)(?:\s|$)/g],
+  ['pilier_droit', /pilier droit\s+(\d+)(?:\s|$)/g],
+  ['talonneur', /talonneur\s+(\d+)(?:\s|$)/g],
+  ['deuxieme_ligne_g', /numero 4\s+(\d+)(?:\s|$)/g],
+  ['deuxieme_ligne_d', /numero 5\s+(\d+)(?:\s|$)/g],
+  ['troisieme_aile_g', /numero 6\s+(\d+)(?:\s|$)/g],
+  ['troisieme_aile_d', /numero 7\s+(\d+)(?:\s|$)/g],
+  ['numero_8', /troisieme ligne centre\s+(\d+)(?:\s|$)/g],
+  ['demi_melee', /demi de melee\s+(\d+)(?:\s|$)/g],
+  ['demi_ouverture', /demi d ouverture\s+(\d+)(?:\s|$)/g],
+  ['ailier_gauche', /ailier gauche\s+(\d+)(?:\s|$)/g],
+  ['ailier_droit', /ailier droit\s+(\d+)(?:\s|$)/g],
+  ['premier_centre', /premier centre\s+(\d+)(?:\s|$)/g],
+  ['deuxieme_centre', /second centre\s+(\d+)(?:\s|$)/g],
+  ['arriere', /arriere\s+(\d+)(?:\s|$)/g],
+];
+
+/** Lit les postes exacts et leur part d'utilisation dans `positions_jouees`. */
+function profilPostes(joueur) {
+  const scores = new Map();
+  let echantillon = 0;
+  for (const brut of joueur.positions_jouees ?? []) {
+    const texte = normaliser(brut);
+    echantillon += nombre(texte.match(/:\s*(\d+)\s*fois/)?.[1] ?? texte.match(/\s(\d+)\s+fois/)?.[1]);
+    for (const [poste, motif] of POSTES_DETAILLES) {
+      motif.lastIndex = 0;
+      const trouves = [...texte.matchAll(motif)];
+      // Pour « Talonneur : 8 fois (Talonneur 100 %) », le dernier résultat
+      // est le pourcentage détaillé, le premier est l'effectif du groupe.
+      const part = nombre(trouves.at(-1)?.[1]);
+      if (part > 0) scores.set(poste, (scores.get(poste) ?? 0) + part);
+    }
+  }
+  const classes = [...scores].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (!classes.length) return null;
+  const postePrincipal = classes[0][0];
+  const postesSecondaires = classes.slice(1)
+    // Un dépannage isolé à 3 % n'est pas un second poste. Dix pour cent, ou
+    // environ trois titularisations sur un gros échantillon, prouvent un rôle.
+    .filter(([, part]) => part >= 10 || echantillon * part / 100 >= 3)
+    .slice(0, 3).map(([poste]) => poste);
+  return { postePrincipal, postesSecondaires, echantillon };
+}
+
 function niveauCompetition(competition, club) {
   const c = normaliser(competition);
   const equipe = normaliser(club);
@@ -130,7 +175,17 @@ const joueurs = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));
 if (!Array.isArray(joueurs)) throw new Error('Le fichier AllRugby doit contenir un tableau de joueurs.');
 
 const evaluations = new Map();
+const profilsPostes = new Map();
 for (const joueur of joueurs) {
+  const nom = identite(joueur);
+  const profilJoueur = nom ? profilPostes(joueur) : null;
+  if (profilJoueur) {
+    const cleProfil = normaliser(nom);
+    const precedentProfil = profilsPostes.get(cleProfil);
+    if (!precedentProfil || profilJoueur.echantillon > precedentProfil.echantillon) {
+      profilsPostes.set(cleProfil, profilJoueur);
+    }
+  }
   const resultat = evaluation(joueur);
   if (!resultat) continue;
   const [cle, valeur] = resultat;
@@ -140,10 +195,15 @@ for (const joueur of joueurs) {
 
 const lignes = [...evaluations].sort(([a], [b]) => a.localeCompare(b)).map(([nom, v]) =>
   `  ${JSON.stringify(nom)}: ${JSON.stringify(v)},`);
+const lignesPostes = [...profilsPostes].sort(([a], [b]) => a.localeCompare(b)).map(([nom, v]) =>
+  `  ${JSON.stringify(nom)}: ${JSON.stringify(v)},`);
 fs.writeFileSync(SORTIE, `// Fichier généré par scripts/revaloriserAllRugby.cjs depuis le relevé statistique AllRugby fourni.\n`
+  + `import type { PosteId } from '../types.js';\n`
   + `export interface EvaluationAllRugby { note: number; source: string; matchs: number; minutes: number; competition: string; poste: string }\n`
-  + `export const EVALUATION_ALLRUGBY: Record<string, EvaluationAllRugby> = {\n${lignes.join('\n')}\n};\n`);
+  + `export interface ProfilPostesAllRugby { postePrincipal: PosteId; postesSecondaires: PosteId[]; echantillon: number }\n`
+  + `export const EVALUATION_ALLRUGBY: Record<string, EvaluationAllRugby> = {\n${lignes.join('\n')}\n};\n`
+  + `export const PROFIL_POSTES_ALLRUGBY: Record<string, ProfilPostesAllRugby> = {\n${lignesPostes.join('\n')}\n};\n`);
 
 const notes = [...evaluations.values()].map((v) => v.note);
 const repartition = [50, 60, 70, 80, 88].map((seuil) => `${seuil}+: ${notes.filter((n) => n >= seuil).length}`).join(' · ');
-console.log(`${joueurs.length} fiches lues · ${evaluations.size} évaluations fiables · ${repartition}`);
+console.log(`${joueurs.length} fiches lues · ${evaluations.size} évaluations fiables · ${profilsPostes.size} profils de poste · ${repartition}`);

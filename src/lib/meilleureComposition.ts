@@ -11,8 +11,9 @@ export function meilleureComposition(cartes: CarteCarriere[], maintenant = Date.
   if (joueurs.length < 23) return null;
   const postes = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER];
   const couts = postes.map((poste, i) => joueurs.map(c => {
-    if ((i < 3 || (i >= 15 && i < 18)) && POSTE_PAR_ID[c.poste].famille !== POSTE_PAR_ID[poste].famille) return 1e9;
-    const note = c.note * facteurDePerformance(adequationAuPoste(c.poste, poste));
+    if ((i < 3 || (i >= 15 && i < 18)) && ![c.poste, ...(c.postesSecondaires ?? [])]
+      .some(p => POSTE_PAR_ID[p].famille === POSTE_PAR_ID[poste].famille)) return 1e9;
+    const note = c.note * facteurDePerformance(adequationAuPoste(c.poste, poste, c.postesSecondaires));
     return -(note * (i < 15 ? 100 : 1) - c.fatigue * .001);
   }));
   // Algorithme hongrois rectangulaire : aucun doublon et optimum global du score.
@@ -43,11 +44,11 @@ export function meilleureComposition(cartes: CarteCarriere[], maintenant = Date.
     const collectif = collectifCarriere(titulaires, composition);
     const scoreXV = titulaires.reduce((total, carte, i) => {
       const bonus = bonusCollectif(collectif.parCarte[carte.id]?.points ?? 0);
-      return total + (carte.note + bonus) * facteurDePerformance(adequationAuPoste(carte.poste, postes[i]));
+      return total + (carte.note + bonus) * facteurDePerformance(adequationAuPoste(carte.poste, postes[i], carte.postesSecondaires));
     }, 0);
     const scoreBanc = selection.slice(15).reduce((total, index, i) => {
       const carte = joueurs[index];
-      return total + carte.note * facteurDePerformance(adequationAuPoste(carte.poste, postes[i + 15]));
+      return total + carte.note * facteurDePerformance(adequationAuPoste(carte.poste, postes[i + 15], carte.postesSecondaires));
     }, 0);
     return scoreXV * 100 + scoreBanc;
   };

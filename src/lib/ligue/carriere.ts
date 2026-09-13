@@ -48,6 +48,9 @@ function actualiserCartesProfessionnelles(cartes: CarteCarriere[]): void {
     // carrière restent ceux de cette carte déjà distribuée.
     carte.nom = source.nom;
     carte.note = source.note;
+    carte.poste = source.poste;
+    carte.famille = source.famille;
+    carte.postesSecondaires = source.postesSecondaires ? [...source.postesSecondaires] : undefined;
     carte.potentiel = catalogueAdmin().joueurs[carte.sourceId] ? source.potentiel : Math.max(carte.potentiel, source.potentiel);
     carte.rarete = source.rarete;
     carte.photo = source.photo;
@@ -178,7 +181,9 @@ function verifierDepart(etat: EtatCarriereEnLigne, clubId: string, sortants: str
   exiger(composition.titulaires.length === 15 && composition.remplacants.length === 8, 'Le transfert empêcherait de composer une équipe.');
   for (const famille of ['pilier', 'talonneur', 'deuxieme_ligne', 'troisieme_ligne', 'demi_melee', 'demi_ouverture', 'centre', 'ailier', 'arriere']) {
     const minimum = famille === 'pilier' ? 4 : famille === 'talonneur' ? 2 : famille === 'troisieme_ligne' ? 3 : ['deuxieme_ligne', 'centre', 'ailier'].includes(famille) ? 2 : 1;
-    exiger(restants.filter(j => POSTE_PAR_ID[j.poste].famille === famille).length >= minimum, 'Ce transfert laisse un poste sans profondeur suffisante.');
+    exiger(restants.filter(j => [j.poste, ...(j.postesSecondaires ?? [])]
+      .some(poste => POSTE_PAR_ID[poste].famille === famille)).length >= minimum,
+    'Ce transfert laisse un poste sans profondeur suffisante.');
   }
 }
 function verifierComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, valeur: CompositionManager, maintenant: number) {
@@ -211,7 +216,10 @@ function verifierComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, vale
     // et ce n'est pas une question d'équilibrage : une mêlée avec un ailier au
     // pilier, c'est un arbitre qui ordonne des mêlées simulées. Le règlement
     // du rugby l'exige, le jeu aussi.
-    if (i < 3 || (i >= 15 && i < 18)) exiger(c.famille === POSTE_PAR_ID[poste].famille, 'La première ligne nécessite des spécialistes : pilier, talonneur, pilier.');
+    if (i < 3 || (i >= 15 && i < 18)) exiger(
+      [c.poste, ...(c.postesSecondaires ?? [])].some(p => POSTE_PAR_ID[p].famille === POSTE_PAR_ID[poste].famille),
+      'La première ligne nécessite des spécialistes : pilier, talonneur, pilier.',
+    );
   });
 }
 

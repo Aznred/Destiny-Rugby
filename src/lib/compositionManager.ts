@@ -37,6 +37,8 @@ function prendre(
   const libres = effectif.filter((j) => !pris.has(j.id)).sort((a, b) => b.note - a.note);
   const joueur = libres.find((j) => j.poste === poste)
     ?? libres.find((j) => memeFamille(j.poste, poste))
+    ?? libres.find((j) => j.postesSecondaires?.includes(poste))
+    ?? libres.find((j) => j.postesSecondaires?.some((p) => memeFamille(p, poste)))
     ?? libres.find((j) => memeCategorie(j.poste, poste))
     ?? libres[0];
   if (joueur) pris.add(joueur.id);
@@ -132,7 +134,9 @@ export function noteCompositionManager(effectif: Coequipier[], composition: Comp
 }
 
 export function joueurCompatibleManager(joueur: Coequipier, poste: PosteId): boolean {
-  return joueur.poste === poste || memeFamille(joueur.poste, poste) || memeCategorie(joueur.poste, poste);
+  return joueur.poste === poste || memeFamille(joueur.poste, poste)
+    || joueur.postesSecondaires?.some((p) => p === poste || memeFamille(p, poste))
+    || memeCategorie(joueur.poste, poste);
 }
 
 /**

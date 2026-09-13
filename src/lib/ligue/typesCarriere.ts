@@ -27,6 +27,8 @@ export interface FiltrePack {
 }
 export interface CarteCarriere {
   id: string; sourceId: string; nom: string; poste: PosteId; famille: FamillePoste;
+  /** Postes réellement occupés, d'après les compositions recensées. */
+  postesSecondaires?: PosteId[];
   note: number; potentiel: number; age: number; nation: string;
   clubReel: string; championnat: string; pays: string; photo?: string;
   origine: 'formation' | 'professionnel' | 'ffr'; rarete: RareteCarriere;

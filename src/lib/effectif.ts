@@ -8,7 +8,7 @@ import {
 } from '../data/nouvellesLigues.js';
 import { mercatoReel, type RecrueReelle } from './mercato.js';
 import { generationDuClub } from './generations.js';
-import { noteJoueurRevalorisee } from './evaluationJoueurReel.js';
+import { noteJoueurRevalorisee, postesJoueurReel } from './evaluationJoueurReel.js';
 
 // Génération DÉTERMINISTE de l'effectif d'un club : même club + même saison
 // => même équipe. Les joueurs vieillissent d'un an par saison ; passé leur âge
@@ -36,6 +36,8 @@ export interface Coequipier {
   id: string;
   nom: string;
   poste: PosteId;
+  /** Rôles réellement pratiqués, distincts du poste principal affiché. */
+  postesSecondaires?: PosteId[];
   age: number;
   note: number; // note générale À CET ÂGE
   potentiel: number; // note visée au pic de carrière (27 ans)
@@ -376,12 +378,14 @@ function effectifReel(nomClub: string, saison: number, niveau: number): Coequipi
     const age = reel.age + (saison - 1);
     const noteReference = noteJoueurRevalorisee(reel.nom, reel.note);
     const potentielReference = Math.max(noteReference, reel.potentiel);
+    const profilPostes = postesJoueurReel(reel.nom, reel.poste);
 
     if (age <= retraite) {
       return {
         id: `${nomClub}-reel-${i}`,
         nom: reel.nom,
-        poste: posteConcret(reel.poste, nomClub + reel.nom),
+        poste: profilPostes.poste,
+        postesSecondaires: profilPostes.postesSecondaires,
         age,
         // La note de l'export est celle de 2025-26 : le joueur progresse vers
         // son potentiel jusqu'à 27 ans, puis décline.

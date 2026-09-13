@@ -125,6 +125,7 @@ function legendeAffinite(a: AffiniteCarte): string {
  */
 const carteEnJoueur = (c: CarteCarriere): Coequipier => ({
   id: c.id, nom: c.nom, poste: c.poste, age: c.age, note: c.note,
+  postesSecondaires: c.postesSecondaires ? [...c.postesSecondaires] : undefined,
   potentiel: c.potentiel, jeuAuPied: c.statistiques.JDP,
   nation: c.nation, regen: c.origine === 'formation', horsGeneration: true,
 });

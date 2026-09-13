@@ -215,11 +215,18 @@ const VOISINS: Record<FamillePoste, FamillePoste[]> = {
   arriere: ['ailier', 'demi_ouverture'],
 };
 
-export function adequationAuPoste(joueur: PosteId, slot: PosteId): Adequation {
+export function adequationAuPoste(
+  joueur: PosteId, slot: PosteId, postesSecondaires: readonly PosteId[] = [],
+): Adequation {
   if (joueur === slot) return 'naturel';
   const fj = familleDePoste(joueur);
   const fs = familleDePoste(slot);
   if (fj === fs) return 'naturel';
+  // Un vrai second poste reste un rôle de dépannage : il est reconnu et ne
+  // subit que le petit malus « secondaire », jamais le hors-poste à 82 %.
+  if (postesSecondaires.some((poste) => poste === slot || familleDePoste(poste) === fs)) {
+    return 'secondaire';
+  }
   if (VOISINS[fj]?.includes(fs)) return 'secondaire';
   return 'horsPoste';
 }
@@ -360,7 +367,8 @@ export function alertesDeComposition(
 ): Alerte[] {
   const alertes: Alerte[] = [];
   const estPremiereLigne = (j?: Coequipier) => !!j
-    && ['pilier', 'talonneur'].includes(familleDePoste(j.poste));
+    && [j.poste, ...(j.postesSecondaires ?? [])]
+      .some((poste) => ['pilier', 'talonneur'].includes(familleDePoste(poste)));
 
   const pl = remplacants.filter(estPremiereLigne).length;
   if (pl < 2) {
@@ -384,7 +392,7 @@ export function alertesDeComposition(
   }
 
   const malPlaces = titulaires
-    .map((j, i) => (j ? adequationAuPoste(j.poste, slotsTitulaires[i]) : 'naturel'))
+    .map((j, i) => (j ? adequationAuPoste(j.poste, slotsTitulaires[i], j.postesSecondaires) : 'naturel'))
     .filter((a) => a === 'horsPoste').length;
   if (malPlaces) {
     alertes.push({ gravite: 'attention', cle: 'compo.alerte.horsPoste', valeur: String(malPlaces) });

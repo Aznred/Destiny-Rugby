@@ -573,7 +573,7 @@ export function feuilleGeleeEnLigne(
     const joueur = parId.get(id);
     if (!joueur) return null;
     const poste = POSTES_FEUILLE[i] ?? joueur.poste;
-    const facteur = facteurDePerformance(adequationAuPoste(joueur.poste, poste));
+    const facteur = facteurDePerformance(adequationAuPoste(joueur.poste, poste, joueur.postesSecondaires));
     // Le numéro dans le dos devient celui du poste occupé — c'est déjà ce que
     // faisait `feuilleDepuisComposition`, et le moteur en a besoin pour la
     // mêlée, la touche et les remplacements.
