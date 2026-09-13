@@ -51,11 +51,13 @@ const { PAGES, SITE } = require('./contenuPages.cjs');
 // AdSense : sans lui, on ne génère AUCUN code publicitaire. Pas de balise
 // fantôme sur une page qui n'a rien à afficher.
 const CLIENT_ADSENSE = 'ca-pub-6166322317354663';
+// Coupe-circuit produit : aucune annonce n'est generee tant que la pub est en attente.
+const PUBLICITE_ACTIVEE = false;
 
 // Le conteneur Google Tag Manager. Public par construction, comme le `ca-pub-…`
 // d’AdSense : Google exige qu’il figure en clair dans la page.
 const GTM = 'GTM-KF48DSQ9';
-const SLOT = (process.env.PUB_SLOT || '').trim();
+const SLOT = PUBLICITE_ACTIVEE ? (process.env.PUB_SLOT || '').trim() : '';
 
 const SORTIE = 'public';
 

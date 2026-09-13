@@ -301,7 +301,7 @@ export const CLES_COMPTE = [
   'pubConsentement', 'pubs',
   // La boutique et ce qu'on a payé — en Ovas ou en temps.
   'coins', 'inventaire', 'skinActif', 'equipements', 'equipementActif',
-  'traitsDebloques',
+  'traitsDebloques', 'collectionSolo',
   // Le palmarès qui TRAVERSE les carrières, par construction.
   'succesDebloques', 'pantheon',
   // L'accueil et la manette ne s'expliquent qu'une fois.

@@ -1,9 +1,12 @@
 .solo-collection { width: min(1320px, 94vw); margin: 1.4rem auto 5rem; display: grid; gap: 1.4rem; }
-.solo-entete { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 1.2rem; padding: 1.3rem 0 .4rem; }
+.solo-entete { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 1.2rem; padding: 1.3rem 0 .4rem; }
 .solo-entete h1, .solo-titre-ligne h2 { margin: .2rem 0; font-family: var(--police-titre); text-transform: uppercase; }
 .solo-entete h1 { font-size: clamp(2.3rem, 6vw, 4.8rem); line-height: .95; }
 .solo-entete p, .solo-titre-ligne > span { color: var(--craie-dim); line-height: 1.55; }
 .solo-retour { transform: rotate(180deg); }
+.solo-solde { display: grid; grid-template-columns: auto auto; align-items: center; justify-items: end; gap: 0 .45rem; padding: .7rem .9rem; border: 1px solid #ffffff1f; border-radius: 12px; background: #08150fd1; color: var(--or-400); }
+.solo-solde strong { font-family: var(--police-titre); font-size: 1.35rem; }
+.solo-solde span { grid-column: 1 / -1; color: var(--craie-dim); font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .solo-progression { padding: 1.25rem 1.4rem; display: grid; grid-template-columns: auto minmax(220px, 1fr) auto; align-items: center; gap: 1.4rem; }
 .solo-progression > div:first-child { display: grid; gap: .2rem; }
 .solo-progression > div:first-child > span { color: var(--craie-dim); font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; }
@@ -47,6 +50,9 @@
 .solo-resultats { margin: 0; color: var(--craie-dim); font-size: .84rem; }
 .solo-cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 1rem; }
 .solo-cartes .dr-player { max-width: 210px; justify-self: center; }
+.solo-carte-conteneur { position: relative; display: grid; justify-items: center; }
+.solo-quantite { position: absolute; z-index: 4; top: -.45rem; right: max(.1rem, calc(50% - 105px)); min-width: 2.15rem; padding: .28rem .48rem; border: 1px solid #fff3a8; border-radius: 99px; background: #171006; color: #ffe783; box-shadow: 0 5px 15px #0009; font-size: .78rem; font-weight: 950; text-align: center; }
+.solo-pub-desactivee { width: 100%; margin-top: .7rem; justify-content: center; opacity: .62; }
 .solo-vide { min-height: 180px; display: grid; place-items: center; align-content: center; gap: .8rem; color: var(--craie-dim); }
 .solo-pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; }
 .solo-pagination span { color: var(--craie-dim); font-size: .85rem; }
@@ -59,7 +65,8 @@
 }
 @media (max-width: 620px) {
   .solo-collection { width: min(94vw, 520px); }
-  .solo-entete { grid-template-columns: 1fr; }
+  .solo-entete { grid-template-columns: 1fr auto; }
+  .solo-entete > div:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
   .solo-entete .btn { justify-self: start; }
   .solo-titre-ligne { align-items: start; }
   .solo-titre-ligne > span { display: none; }

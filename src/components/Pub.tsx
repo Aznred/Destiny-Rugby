@@ -14,7 +14,7 @@ import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { t } from '../lib/i18n';
 import {
-  CLIENT_PUB, SLOT_PUB, DUREE_PUB_MAISON_S, OVAS_PAR_PUB, PUBS_PAR_JOUR,
+  CLIENT_PUB, SLOT_PUB, DUREE_PUB_MAISON_S, OVAS_PAR_PUB, PUBS_PAR_JOUR, PUBLICITE_ACTIVEE,
   attenteLisible, chargerRegie, pubDisponible,
 } from '../lib/pub';
 import { Icone } from './Icone';
@@ -164,7 +164,9 @@ export function CartePubRecompensee() {
         <div className="article-detail" style={{ color: 'var(--craie-dim)' }}>
           {t('pub.restantes', { n: String(dispo.restantes), total: String(PUBS_PAR_JOUR) })}
         </div>
-        {consentement === 'non' ? (
+        {!PUBLICITE_ACTIVEE ? (
+          <button type="button" className="btn fantome petit" disabled>Publicités bientôt disponibles</button>
+        ) : consentement === 'non' ? (
           <button type="button" className="btn fantome petit" onClick={() => setConsentement('oui')}>
             {t('pub.reactiver')}
           </button>
@@ -223,6 +225,8 @@ export function BoutonDeblocageParPub({ id, onDebloque }: { id: string; onDebloq
   }, []);
 
   const dispo = pubDisponible(pubs);
+
+  if (!PUBLICITE_ACTIVEE) return <button type="button" className="btn fantome petit" disabled>Publicités bientôt disponibles</button>;
 
   if (consentement === 'non') {
     return (

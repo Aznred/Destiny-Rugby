@@ -51,11 +51,13 @@ import { t } from './i18n.js';
  *
  * Fourni par l'utilisateur avec le script officiel de sa console AdSense.
  */
-const CLIENT_PAR_DEFAUT = 'ca-pub-6166322317354663';
+/** Coupe-circuit produit : aucune regie ni fausse pub maison tant qu'il est faux. */
+export const PUBLICITE_ACTIVEE = false;
 
 /** Identifiant de la régie (AdSense : `ca-pub-…`). Vide = aucune bannière. */
-export const CLIENT_PUB: string =
-  (import.meta.env?.VITE_PUB_CLIENT as string | undefined)?.trim() || CLIENT_PAR_DEFAUT;
+export const CLIENT_PUB: string = PUBLICITE_ACTIVEE
+  ? (import.meta.env?.VITE_PUB_CLIENT as string | undefined)?.trim() || ''
+  : '';
 /**
  * Emplacement AdSense pour la bannière de bas de page.
  *
@@ -146,6 +148,7 @@ export interface DisponibilitePub {
 }
 
 export function pubDisponible(etat: EtatPubs, maintenant = Date.now()): DisponibilitePub {
+  if (!PUBLICITE_ACTIVEE) return { possible: false, restantes: 0, attente: 0 };
   const jour = etatDuJour(etat, maintenant);
   const restantes = Math.max(0, PUBS_PAR_JOUR - jour.vues);
   const attente = Math.max(0, jour.derniere + ATTENTE_ENTRE_PUBS_MS - maintenant);

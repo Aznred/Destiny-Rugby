@@ -63,6 +63,10 @@ import {
 } from '../lib/international';
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
 import { appliquerCompte, ecrireCompte, stockageParEmplacement } from '../lib/sauvegardes';
+import {
+  chargerAncienneCollectionSolo, normaliserCollectionSolo,
+  type EtatCollectionSolo, type ResultatPackSolo,
+} from '../lib/collectionSolo';
 
 // Les journées complètes utilisent le moteur lourd chargé à la demande. Une
 // file unique empêche plusieurs clics rapides (ou une avance calendrier) de
@@ -743,6 +747,8 @@ interface GameState {
   joueur: Joueur | null;
   journal: EntreeJournal[];
   coins: number;
+  /** Collection de cartes commune au compte local, independante des carrieres. */
+  collectionSolo: EtatCollectionSolo;
   inventaire: string[];
   skinActif: string;
   /** Articles du vestiaire possédés (cosmétique pur). */
@@ -1213,6 +1219,8 @@ interface GameState {
   simulerStatsJournee: (semaineJouee?: number) => Promise<void>;
   // boutique
   acheterSkin: (id: string) => boolean;
+  /** Debite les Ovas du compte et valide un tirage de collection en une operation. */
+  acheterPackCollectionSolo: (prix: number, tirer: (etat: EtatCollectionSolo) => ResultatPackSolo) => ResultatPackSolo | null;
   choisirSkin: (id: string) => void;
   acheterEquipement: (id: string) => boolean;
   /** Débloque un archétype de caractère contre des Ovas. */
@@ -1284,6 +1292,7 @@ export const useGame = create<GameState>()(
       joueur: null,
       journal: [],
       coins: 0,
+      collectionSolo: chargerAncienneCollectionSolo(),
       inventaire: ['classique'],
       skinActif: 'classique',
       equipements: [],
@@ -6764,6 +6773,15 @@ export const useGame = create<GameState>()(
         return true;
       },
 
+      acheterPackCollectionSolo: (prix, tirer) => {
+        const { coins, collectionSolo } = get();
+        if (!Number.isSafeInteger(prix) || prix < 0 || coins < prix) return null;
+        const resultat = tirer(collectionSolo);
+        if (!resultat.indices.length) return null;
+        set({ coins: coins - prix, collectionSolo: resultat.etat });
+        return resultat;
+      },
+
       choisirSkin: (id) => {
         if (get().inventaire.includes(id)) set({ skinActif: id });
       },
@@ -6879,7 +6897,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 28,
+      version: 29,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -6929,8 +6947,12 @@ export const useGame = create<GameState>()(
           rythme?: unknown;
           manager?: Manager | null;
           mouvementsClubs?: Record<string, string>;
+          collectionSolo?: EtatCollectionSolo;
         };
         if (!s) return s;
+        s.collectionSolo = s.collectionSolo
+          ? normaliserCollectionSolo(s.collectionSolo)
+          : chargerAncienneCollectionSolo();
         // ⚠️ VERSION 27 — LES ANCIENS AVATARS EXTERNES SONT RÉÉCRITS EN LOCAL.
         // `photoDe` pointait sur `randomuser.me`, un service qui ne répond plus :
         // chaque compte sans portrait officiel tombait donc sur le monogramme de
@@ -7341,6 +7363,7 @@ export const useGame = create<GameState>()(
         manager: s.manager,
         journal: s.journal.slice(-160),
         coins: s.coins,
+        collectionSolo: s.collectionSolo,
         inventaire: s.inventaire,
         skinActif: s.skinActif,
         equipements: s.equipements,

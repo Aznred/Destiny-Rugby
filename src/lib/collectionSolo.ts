@@ -1,20 +1,10 @@
-import type { RareteCarriere } from './ligue/typesCarriere';
+import type { PackCarriere, RareteCarriere } from './ligue/typesCarriere';
 import type { SourceCarte } from './ligue/catalogueCarriere';
 
-export type IdPackSolo = 'bronze' | 'argent' | 'or';
-
-export interface PackSolo {
-  id: IdPackSolo;
-  nom: string;
-  cartes: number;
-  promesse: string;
-  garantie?: RareteCarriere;
-  probabilites: Record<RareteCarriere, number>;
-}
-
 export interface EtatCollectionSolo {
-  possedees: Set<string>;
-  packsOuverts: Record<IdPackSolo, number>;
+  /** Nombre d'exemplaires possedes, indexe par l'empreinte stable du joueur. */
+  quantites: Record<string, number>;
+  packsOuverts: Record<string, number>;
   doublons: number;
 }
 
@@ -24,41 +14,16 @@ export interface ResultatPackSolo {
   nouvelles: number;
 }
 
-export const PACKS_SOLO: readonly PackSolo[] = [
-  {
-    id: 'bronze', nom: 'Bronze', cartes: 10,
-    promesse: 'Dix cartes gratuites, surtout Bronze. Idéal pour remplir les divisions de base.',
-    probabilites: { bronze: 90, argent: 9.5, or: .5, elite: 0, star: 0 },
-  },
-  {
-    id: 'argent', nom: 'Argent', cartes: 10, garantie: 'argent',
-    promesse: 'Dix cartes gratuites avec davantage de joueurs confirmés et une chance d’Or.',
-    probabilites: { bronze: 48, argent: 37.97, or: 14, elite: 0.02, star: .002 },
-  },
-  {
-    id: 'or', nom: 'Or', cartes: 10, garantie: 'or',
-    promesse: 'Dix cartes gratuites, dont au moins une Or ou mieux.',
-    probabilites: { bronze: 20, argent: 42, or: 37.89, elite: 0.1, star: .01 },
-  },
-] as const;
-
-const CLE_SAUVEGARDE = 'destiny-rugby:collection-solo:v1';
+const CLE_SAUVEGARDE_HISTORIQUE = 'destiny-rugby:collection-solo:v1';
 const RARETES: RareteCarriere[] = ['bronze', 'argent', 'or', 'elite', 'star'];
-interface RayonsSolo { parRarete: Record<RareteCarriere, number[]>; toutes: number[] }
-const RAYONS = new WeakMap<object, RayonsSolo>();
-
-interface SauvegardeCollectionSolo {
-  version: 1;
-  possedees: string[];
-  packsOuverts: Record<IdPackSolo, number>;
-  doublons: number;
-}
+const FAMILLES_AVANTS = new Set(['pilier', 'talonneur', 'deuxieme_ligne', 'troisieme_ligne']);
+const RAYONS = new WeakMap<object, Map<string, Record<RareteCarriere, number[]>>>();
 
 export function etatCollectionSoloVide(): EtatCollectionSolo {
-  return { possedees: new Set(), packsOuverts: { bronze: 0, argent: 0, or: 0 }, doublons: 0 };
+  return { quantites: {}, packsOuverts: {}, doublons: 0 };
 }
 
-/** Une empreinte stable sur 64 bits : la collection survit aux réordonnancements du catalogue. */
+/** Une empreinte stable sur 64 bits : la collection survit aux reordonnancements du catalogue. */
 export function cleCarteSolo(sourceId: string): string {
   let fnv = 0x811c9dc5;
   let djb = 5381;
@@ -70,45 +35,40 @@ export function cleCarteSolo(sourceId: string): string {
   return `${(fnv >>> 0).toString(36)}-${(djb >>> 0).toString(36)}`;
 }
 
-export function chargerCollectionSolo(): EtatCollectionSolo {
+/** Assainit un etat venant d'une ancienne sauvegarde ou du stockage du compte. */
+export function normaliserCollectionSolo(valeur: unknown): EtatCollectionSolo {
+  if (!valeur || typeof valeur !== 'object') return etatCollectionSoloVide();
+  const brut = valeur as { quantites?: unknown; possedees?: unknown; packsOuverts?: unknown; doublons?: unknown };
+  const quantites: Record<string, number> = {};
+  if (brut.quantites && typeof brut.quantites === 'object' && !Array.isArray(brut.quantites)) {
+    for (const [cle, nombre] of Object.entries(brut.quantites as Record<string, unknown>)) {
+      if (typeof nombre === 'number' && Number.isFinite(nombre) && nombre > 0) quantites[cle] = Math.floor(nombre);
+    }
+  } else if (Array.isArray(brut.possedees)) {
+    for (const cle of brut.possedees) if (typeof cle === 'string') quantites[cle] = 1;
+  }
+  const packsOuverts: Record<string, number> = {};
+  if (brut.packsOuverts && typeof brut.packsOuverts === 'object' && !Array.isArray(brut.packsOuverts)) {
+    for (const [id, nombre] of Object.entries(brut.packsOuverts as Record<string, unknown>)) {
+      if (typeof nombre === 'number' && Number.isFinite(nombre) && nombre > 0) packsOuverts[id] = Math.floor(nombre);
+    }
+  }
+  return {
+    quantites,
+    packsOuverts,
+    doublons: typeof brut.doublons === 'number' && Number.isFinite(brut.doublons) ? Math.max(0, Math.floor(brut.doublons)) : 0,
+  };
+}
+
+/** Importe la collection gratuite qui precedait le compte commun. */
+export function chargerAncienneCollectionSolo(): EtatCollectionSolo {
   if (typeof localStorage === 'undefined') return etatCollectionSoloVide();
   try {
-    const brute = localStorage.getItem(CLE_SAUVEGARDE);
-    if (!brute) return etatCollectionSoloVide();
-    const lue = JSON.parse(brute) as Partial<SauvegardeCollectionSolo>;
-    if (lue.version !== 1 || !Array.isArray(lue.possedees)) return etatCollectionSoloVide();
-    return {
-      possedees: new Set(lue.possedees.filter((cle): cle is string => typeof cle === 'string')),
-      packsOuverts: {
-        bronze: Math.max(0, Math.floor(lue.packsOuverts?.bronze ?? 0)),
-        argent: Math.max(0, Math.floor(lue.packsOuverts?.argent ?? 0)),
-        or: Math.max(0, Math.floor(lue.packsOuverts?.or ?? 0)),
-      },
-      doublons: Math.max(0, Math.floor(lue.doublons ?? 0)),
-    };
+    const brute = localStorage.getItem(CLE_SAUVEGARDE_HISTORIQUE);
+    return brute ? normaliserCollectionSolo(JSON.parse(brute)) : etatCollectionSoloVide();
   } catch {
     return etatCollectionSoloVide();
   }
-}
-
-export function sauvegarderCollectionSolo(etat: EtatCollectionSolo): boolean {
-  if (typeof localStorage === 'undefined') return false;
-  try {
-    const valeur: SauvegardeCollectionSolo = {
-      version: 1,
-      possedees: [...etat.possedees],
-      packsOuverts: etat.packsOuverts,
-      doublons: etat.doublons,
-    };
-    localStorage.setItem(CLE_SAUVEGARDE, JSON.stringify(valeur));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function effacerCollectionSolo(): void {
-  if (typeof localStorage !== 'undefined') localStorage.removeItem(CLE_SAUVEGARDE);
 }
 
 function hasard(): number {
@@ -120,86 +80,85 @@ function hasard(): number {
   return Math.random();
 }
 
-function rareteTiree(probabilites: Record<RareteCarriere, number>, rng: () => number): RareteCarriere {
-  const total = RARETES.reduce((somme, rarete) => somme + probabilites[rarete], 0);
+function carteDansPack(carte: SourceCarte, pack: Pick<PackCarriere, 'filtre'>): boolean {
+  const filtre = pack.filtre;
+  if (!filtre) return true;
+  if (filtre.categorie) {
+    const avant = FAMILLES_AVANTS.has(carte.famille);
+    if (avant !== (filtre.categorie === 'avant')) return false;
+  }
+  if (filtre.familles && !filtre.familles.includes(carte.famille)) return false;
+  if (filtre.championnats && !filtre.championnats.includes(carte.championnat)) return false;
+  if (filtre.pays && !filtre.pays.includes(carte.pays)) return false;
+  if (filtre.nations && !filtre.nations.includes(carte.nation)) return false;
+  if (filtre.horsFrance && carte.pays === 'France') return false;
+  if (filtre.ageMax !== undefined && carte.age > filtre.ageMax) return false;
+  if (filtre.ageMin !== undefined && carte.age < filtre.ageMin) return false;
+  return true;
+}
+
+function rareteTiree(probabilites: Record<RareteCarriere, number>, disponibles: ReadonlySet<RareteCarriere>, rng: () => number): RareteCarriere | undefined {
+  const total = RARETES.reduce((somme, rarete) => somme + (disponibles.has(rarete) ? probabilites[rarete] : 0), 0);
+  if (total <= 0) return undefined;
   let cible = rng() * total;
   for (const rarete of RARETES) {
+    if (!disponibles.has(rarete)) continue;
     cible -= probabilites[rarete];
     if (cible <= 0) return rarete;
   }
-  return 'bronze';
+  return [...disponibles][0];
 }
 
-function indiceDisponible(
-  candidats: readonly number[],
-  catalogue: readonly SourceCarte[],
-  possedees: Set<string>,
-  exclus: Set<number>,
-  rng: () => number,
-): number | undefined {
-  if (!candidats.length) return undefined;
-  const depart = Math.floor(rng() * candidats.length);
-  // On cherche d'abord une carte nouvelle. Ce filet anti-doublon rend les
-  // 100 % réellement atteignables, y compris quand il ne reste qu'un joueur.
-  for (let pas = 0; pas < candidats.length; pas++) {
-    const indice = candidats[(depart + pas) % candidats.length];
-    if (!exclus.has(indice) && !possedees.has(cleCarteSolo(catalogue[indice].sourceId))) return indice;
-  }
-  for (let pas = 0; pas < candidats.length; pas++) {
-    const indice = candidats[(depart + pas) % candidats.length];
-    if (!exclus.has(indice)) return indice;
-  }
-  return undefined;
-}
-
-function rayonsSolo(catalogue: readonly SourceCarte[]): RayonsSolo {
-  const connu = RAYONS.get(catalogue);
-  if (connu) return connu;
-  const parRarete: Record<RareteCarriere, number[]> = { bronze: [], argent: [], or: [], elite: [], star: [] };
-  const toutes: number[] = [];
-  catalogue.forEach((carte, indice) => { parRarete[carte.rarete].push(indice); toutes.push(indice); });
-  const rayons = { parRarete, toutes };
-  RAYONS.set(catalogue, rayons);
+function rayonsDuPack(pack: PackCarriere, catalogue: readonly SourceCarte[]): Record<RareteCarriere, number[]> {
+  let parPack = RAYONS.get(catalogue);
+  if (!parPack) { parPack = new Map(); RAYONS.set(catalogue, parPack); }
+  const cle = `${pack.id}#${JSON.stringify(pack.filtre)}`;
+  const connus = parPack.get(cle);
+  if (connus) return connus;
+  const rayons: Record<RareteCarriere, number[]> = { bronze: [], argent: [], or: [], elite: [], star: [] };
+  catalogue.forEach((carte, indice) => { if (carteDansPack(carte, pack)) rayons[carte.rarete].push(indice); });
+  parPack.set(cle, rayons);
   return rayons;
 }
 
+/** Tirage avec remise : une carte possedee peut ressortir, meme dans le meme pack. */
 export function ouvrirPackSolo(
-  pack: PackSolo,
+  pack: PackCarriere,
   catalogue: readonly SourceCarte[],
   precedent: EtatCollectionSolo,
   rng: () => number = hasard,
 ): ResultatPackSolo {
-  const { parRarete, toutes } = rayonsSolo(catalogue);
-  const possedees = new Set(precedent.possedees);
-  const exclus = new Set<number>();
+  const quantites = { ...precedent.quantites };
+  const rayons = rayonsDuPack(pack, catalogue);
+  const disponibles = new Set(RARETES.filter(rarete => rayons[rarete].length > 0 && pack.probabilites[rarete] > 0));
+  if (!disponibles.size) return { etat: precedent, indices: [], nouvelles: 0 };
+
   const indices: number[] = [];
   let nouvelles = 0;
-
+  const garanties = pack.garantie ? RARETES.slice(RARETES.indexOf(pack.garantie)) : [];
   for (let position = 0; position < pack.cartes; position++) {
-    const probabilites = position === 0 && pack.garantie
-      ? Object.fromEntries(RARETES.map(rarete => [rarete, RARETES.indexOf(rarete) >= RARETES.indexOf(pack.garantie!) ? pack.probabilites[rarete] : 0])) as Record<RareteCarriere, number>
-      : pack.probabilites;
-    const rarete = rareteTiree(probabilites, rng);
-    let indice = indiceDisponible(parRarete[rarete], catalogue, possedees, exclus, rng);
-    // Une bande déjà terminée ne bloque jamais la progression : le tirage va
-    // chercher une carte encore inconnue dans le catalogue complet.
-    if (indice === undefined || possedees.has(cleCarteSolo(catalogue[indice].sourceId))) {
-      const nouvelleAilleurs = indiceDisponible(toutes, catalogue, possedees, exclus, rng);
-      if (nouvelleAilleurs !== undefined && !possedees.has(cleCarteSolo(catalogue[nouvelleAilleurs].sourceId))) indice = nouvelleAilleurs;
-    }
-    if (indice === undefined) break;
-    exclus.add(indice);
+    const derniere = position === pack.cartes - 1;
+    const dejaGarantie = indices.some(indice => garanties.includes(catalogue[indice].rarete));
+    const doitGarantir = derniere && garanties.length > 0 && !dejaGarantie;
+    const autorisees = doitGarantir
+      ? new Set([...disponibles].filter(rarete => garanties.includes(rarete)))
+      : disponibles;
+    const rarete = rareteTiree(pack.probabilites, autorisees.size ? autorisees : disponibles, rng);
+    if (!rarete) break;
+    const rayon = rayons[rarete];
+    const indice = rayon[Math.min(rayon.length - 1, Math.floor(rng() * rayon.length))];
     indices.push(indice);
     const cle = cleCarteSolo(catalogue[indice].sourceId);
-    if (!possedees.has(cle)) { possedees.add(cle); nouvelles++; }
+    if (!quantites[cle]) nouvelles++;
+    quantites[cle] = (quantites[cle] ?? 0) + 1;
   }
 
   return {
     indices,
     nouvelles,
     etat: {
-      possedees,
-      packsOuverts: { ...precedent.packsOuverts, [pack.id]: precedent.packsOuverts[pack.id] + 1 },
+      quantites,
+      packsOuverts: { ...precedent.packsOuverts, [pack.id]: (precedent.packsOuverts[pack.id] ?? 0) + 1 },
       doublons: precedent.doublons + indices.length - nouvelles,
     },
   };

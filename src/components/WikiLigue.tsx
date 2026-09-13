@@ -48,6 +48,6 @@ export function WikiLigue() {
         <ul>{rubrique.points.map(point => <li key={point}>{point}</li>)}</ul>
       </article>)}
     </div>
-    <aside className="cel-panneau wiki-ligue-note"><Icone nom="alerte" taille={21} /><div><b>En ligne et collection solo sont séparés</b><p>La ligue utilise ton compte et son état partagé. La collection solo gratuite reste uniquement sur ton appareil : elle ne donne ni cartes ni Ovas dans une ligue.</p></div></aside>
+    <aside className="cel-panneau wiki-ligue-note"><Icone nom="alerte" taille={21} /><div><b>La collection appartient à ton compte</b><p>Elle partage les Ovas de la carrière solo et de la boutique entre toutes tes sauvegardes. Les cartes d’une ligue privée restent séparées pour préserver son marché.</p></div></aside>
   </section>;
 }
