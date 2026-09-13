@@ -8169,3 +8169,18 @@ select:focus {
   font-size: 0.88rem; color: var(--craie-dim);
 }
 .manager-avance-bilan button { margin-left: auto; min-height: 32px; padding: 0 0.5rem; }
+
+/* Informations éditoriales et légales accessibles depuis chaque écran. */
+.pied-application {
+  display: flex;
+  justify-content: center;
+  gap: 0.9rem 1.2rem;
+  flex-wrap: wrap;
+  padding: 1.2rem 1rem calc(1.2rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--bordure);
+  color: var(--craie-dim);
+  font-size: 0.78rem;
+}
+.pied-application a { color: inherit; text-decoration: none; }
+.pied-application a:hover,
+.pied-application a:focus-visible { color: var(--or-300); text-decoration: underline; }

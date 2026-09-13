@@ -13,7 +13,10 @@
 
 const SITE = {
   nom: 'Destiny Rugby',
-  origine: 'https://destiny-rugby.fr',
+  origine: 'https://www.destiny-rugby.fr',
+  auteur: 'Colin Gomez',
+  contact: 'destiny.rugby.fr@gmail.com',
+  modificationAccueil: '2026-09-13',
 };
 
 const PAGES = [
@@ -641,4 +644,6 @@ const PAGES = [
   },
 ];
 
-module.exports = { PAGES, SITE };
+const { PAGES_ADDITIONNELLES } = require('./contenuAdditionnel.cjs');
+
+module.exports = { PAGES: [...PAGES, ...PAGES_ADDITIONNELLES], SITE };

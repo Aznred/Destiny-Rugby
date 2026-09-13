@@ -3,6 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Consent Mode : refus par défaut avant tout chargement Google -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("consent", "default", {
+      ad_storage: "denied", ad_user_data: "denied",
+      ad_personalization: "denied", analytics_storage: "denied",
+      wait_for_update: 500
+    });
+  </script>
   <!-- Google Tag Manager -->
   <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({"gtm.start":
   new Date().getTime(),event:"gtm.js"});var f=d.getElementsByTagName(s)[0],
@@ -12,14 +22,14 @@
 
   <title>Carrière entraîneur : bâtir un club, gagner et durer · Destiny Rugby</title>
   <meta name="description" content="Wiki illustré du mode entraîneur de Destiny Rugby : prestige, direction, composition, tactiques, recrutement, vestiaire, staff et histoire du club." />
-  <link rel="canonical" href="https://destiny-rugby.fr/wiki/carriere-entraineur/" />
+  <link rel="canonical" href="https://www.destiny-rugby.fr/wiki/carriere-entraineur/" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="Destiny Rugby" />
   <meta property="og:title" content="Carrière entraîneur : bâtir un club, gagner et durer" />
   <meta property="og:description" content="Wiki illustré du mode entraîneur de Destiny Rugby : prestige, direction, composition, tactiques, recrutement, vestiaire, staff et histoire du club." />
-  <meta property="og:url" content="https://destiny-rugby.fr/wiki/carriere-entraineur/" />
-  <meta property="og:image" content="https://destiny-rugby.fr/images/wiki/carriere-entraineur.png" />
+  <meta property="og:url" content="https://www.destiny-rugby.fr/wiki/carriere-entraineur/" />
+  <meta property="og:image" content="https://www.destiny-rugby.fr/images/wiki/carriere-entraineur.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/contenu.css" />
@@ -30,10 +40,11 @@
   "headline": "Carrière entraîneur : bâtir un club, gagner et durer",
   "description": "Wiki illustré du mode entraîneur de Destiny Rugby : prestige, direction, composition, tactiques, recrutement, vestiaire, staff et histoire du club.",
   "inLanguage": "fr",
-  "mainEntityOfPage": "https://destiny-rugby.fr/wiki/carriere-entraineur/",
+  "mainEntityOfPage": "https://www.destiny-rugby.fr/wiki/carriere-entraineur/",
+  "dateModified": "2026-09-13",
   "author": {
     "@type": "Organization",
-    "name": "Destiny Rugby"
+    "name": "Colin Gomez"
   },
   "publisher": {
     "@type": "Organization",
@@ -58,6 +69,10 @@
       <a href="/pyramide/">La pyramide</a>
       <a href="/moteur/">Le moteur</a>
       <a href="/journal/">Journal</a>
+      <a href="/postes-rugby/">Les postes</a>
+      <a href="/saison-rugby/">Une saison</a>
+      <a href="/transferts-contrats/">Transferts</a>
+      <a href="/blessures-recuperation/">Blessures</a>
     </nav>
     <a class="jouer" href="/">Jouer</a>
   </header>
@@ -66,6 +81,7 @@
     <article>
       <p class="fil"><a href="/">Accueil</a> › <a href="/wiki/">Wiki</a> › Carrière entraîneur</p>
       <h1>Carrière entraîneur : bâtir un club, gagner et durer</h1>
+      <p class="signature">Par Colin Gomez · Mis à jour le 13 septembre 2026</p>
       <p class="chapo">Tu ne joues plus un homme : tu réponds de <strong>tout le club</strong>. Choisir les vingt-trois, protéger un blessé, tenir une promesse, recruter dans le budget et gagner le dimanche composent une seule carrière.</p>
       <figure class="figure-wiki">
         <img src="/images/wiki/carriere-entraineur.png" alt="Un entraîneur de rugby déplace les pions de son tableau tactique au bord d’un terrain sous la pluie." width="1672" height="941" loading="eager" fetchpriority="high" />
@@ -250,6 +266,7 @@
 
   <footer class="pied">
     <p><a href="/">Destiny Rugby</a> : jeu de rôle de carrière de rugby, gratuit et en français.</p>
+    <nav aria-label="Informations légales"><a href="/a-propos/">À propos</a> · <a href="/confidentialite/">Confidentialité</a> · <a href="/mentions-legales/">Mentions légales</a> · <a href="/contact/">Contact</a></nav>
     <p class="pied-note">Les noms de clubs, de compétitions et de joueurs appartiennent à leurs détenteurs respectifs. Ce site n'est affilié à aucune ligue ni fédération.</p>
   </footer>
 </body>

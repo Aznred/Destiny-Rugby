@@ -1,48 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://destiny-rugby.fr/</loc>
+    <loc>https://www.destiny-rugby.fr/</loc>
     <lastmod>2026-09-13</lastmod>
-    <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://destiny-rugby.fr/wiki/</loc>
+    <loc>https://www.destiny-rugby.fr/wiki/</loc>
     <lastmod>2026-09-13</lastmod>
-    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://destiny-rugby.fr/wiki/ligue-en-ligne/</loc>
+    <loc>https://www.destiny-rugby.fr/wiki/ligue-en-ligne/</loc>
     <lastmod>2026-09-13</lastmod>
-    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://destiny-rugby.fr/wiki/carriere-joueur/</loc>
+    <loc>https://www.destiny-rugby.fr/wiki/carriere-joueur/</loc>
     <lastmod>2026-09-13</lastmod>
-    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://destiny-rugby.fr/wiki/carriere-entraineur/</loc>
+    <loc>https://www.destiny-rugby.fr/wiki/carriere-entraineur/</loc>
     <lastmod>2026-09-13</lastmod>
-    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://destiny-rugby.fr/guide/</loc>
+    <loc>https://www.destiny-rugby.fr/guide/</loc>
     <lastmod>2026-09-13</lastmod>
-    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://destiny-rugby.fr/pyramide/</loc>
+    <loc>https://www.destiny-rugby.fr/pyramide/</loc>
     <lastmod>2026-09-13</lastmod>
-    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://destiny-rugby.fr/moteur/</loc>
+    <loc>https://www.destiny-rugby.fr/moteur/</loc>
     <lastmod>2026-09-13</lastmod>
-    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://destiny-rugby.fr/journal/</loc>
+    <loc>https://www.destiny-rugby.fr/journal/</loc>
     <lastmod>2026-09-13</lastmod>
-    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.destiny-rugby.fr/postes-rugby/</loc>
+    <lastmod>2026-09-13</lastmod>
+  </url>
+  <url>
+    <loc>https://www.destiny-rugby.fr/saison-rugby/</loc>
+    <lastmod>2026-09-13</lastmod>
+  </url>
+  <url>
+    <loc>https://www.destiny-rugby.fr/transferts-contrats/</loc>
+    <lastmod>2026-09-13</lastmod>
+  </url>
+  <url>
+    <loc>https://www.destiny-rugby.fr/blessures-recuperation/</loc>
+    <lastmod>2026-09-13</lastmod>
+  </url>
+  <url>
+    <loc>https://www.destiny-rugby.fr/a-propos/</loc>
+    <lastmod>2026-09-13</lastmod>
+  </url>
+  <url>
+    <loc>https://www.destiny-rugby.fr/confidentialite/</loc>
+    <lastmod>2026-09-13</lastmod>
+  </url>
+  <url>
+    <loc>https://www.destiny-rugby.fr/mentions-legales/</loc>
+    <lastmod>2026-09-13</lastmod>
+  </url>
+  <url>
+    <loc>https://www.destiny-rugby.fr/contact/</loc>
+    <lastmod>2026-09-13</lastmod>
   </url>
 </urlset>

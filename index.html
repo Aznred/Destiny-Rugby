@@ -7,6 +7,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
+    <!-- Le consentement est refusé par défaut avant le chargement de GTM.
+         Une CMP certifiée pourra ensuite envoyer une commande `update`. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('consent', 'default', {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        wait_for_update: 500
+      });
+    </script>
+
     <!-- ═══ GOOGLE TAG MANAGER ═══════════════════════════════════════════
          ⚠️ LE PLUS HAUT POSSIBLE DANS LE <head>, C'EST LA CONSIGNE DE GOOGLE,
          et elle a une raison : le conteneur doit exister avant que la page ne
@@ -41,7 +55,7 @@
     />
     <!-- Le canonique évite que destiny-rugby.fr, www.destiny-rugby.fr et l'URL
          .vercel.app soient indexés comme trois sites concurrents. -->
-    <link rel="canonical" href="https://destiny-rugby.fr/" />
+    <link rel="canonical" href="https://www.destiny-rugby.fr/" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="theme-color" content="#08160f" />
     <meta name="color-scheme" content="dark" />
@@ -57,13 +71,13 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Destiny Rugby" />
     <meta property="og:locale" content="fr_FR" />
-    <meta property="og:url" content="https://destiny-rugby.fr/" />
+    <meta property="og:url" content="https://www.destiny-rugby.fr/" />
     <meta property="og:title" content="Destiny Rugby, écris ta légende de l’ovalie" />
     <meta
       property="og:description"
       content="Des espoirs au sommet : crée ton rugbyman, signe dans un vrai club, joue tes matchs en direct et vis ta carrière. Gratuit, en français, dans le navigateur."
     />
-    <meta property="og:image" content="https://destiny-rugby.fr/og.png" />
+    <meta property="og:image" content="https://www.destiny-rugby.fr/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Un ballon de rugby en cuir sur la pelouse d’un stade nocturne" />
@@ -73,7 +87,7 @@
       name="twitter:description"
       content="RPG de carrière de rugby : 655 clubs français réels, des matchs joués en direct, un Maître du Jeu IA. Gratuit, dans le navigateur."
     />
-    <meta name="twitter:image" content="https://destiny-rugby.fr/og.png" />
+    <meta name="twitter:image" content="https://www.destiny-rugby.fr/og.png" />
 
     <!-- ===== PERFORMANCE ===== -->
     <!-- Les avatars de L'Ovale et les images des publications partent vers ces
@@ -89,8 +103,8 @@
         "@context": "https://schema.org",
         "@type": "VideoGame",
         "name": "Destiny Rugby",
-        "url": "https://destiny-rugby.fr/",
-        "image": "https://destiny-rugby.fr/og.png",
+        "url": "https://www.destiny-rugby.fr/",
+        "image": "https://www.destiny-rugby.fr/og.png",
         "description": "RPG de carrière de rugby en français : crée ton joueur, signe dans un club réel, joue tes matchs en direct et écris ta légende.",
         "inLanguage": "fr",
         "genre": ["Jeu de rôle", "Simulation sportive", "Gestion de carrière"],
@@ -138,6 +152,13 @@
         <li><a href="/pyramide/">La pyramide du rugby français, de la Régionale 3 au Top 14</a></li>
         <li><a href="/moteur/">Comment un match est simulé, joueur par joueur</a></li>
         <li><a href="/journal/">Journal de développement</a></li>
+      </ul>
+      <h2>Informations</h2>
+      <ul>
+        <li><a href="/a-propos/">À propos de Destiny Rugby</a></li>
+        <li><a href="/confidentialite/">Politique de confidentialité et cookies</a></li>
+        <li><a href="/mentions-legales/">Mentions légales</a></li>
+        <li><a href="/contact/">Contact</a></li>
       </ul>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>

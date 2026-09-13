@@ -65,10 +65,11 @@ export const CLIENT_PUB: string =
  * RIEN — la bannière n'existe pas. La pub RÉCOMPENSÉE de la boutique, elle, n'a
  * pas besoin de slot : elle ne dépend que de `CLIENT_PUB`.
  */
-export const SLOT_PUB: string = (import.meta.env?.VITE_PUB_SLOT as string | undefined)?.trim() ?? '';
-
-/** Les écrans qui ont le droit d'afficher une bannière. La liste est courte. */
-export const ECRANS_AVEC_PUB = ['boutique', 'pantheon', 'classement', 'championnats'] as const;
+// Les blocs display AdSense sont volontairement désactivés dans toute
+// l'application. Les éventuels emplacements vivent uniquement dans les pages
+// éditoriales statiques générées par `scripts/genPages.cjs`. Une interface de
+// jeu, une boutique ou une modale récompensée n'est pas un emplacement display.
+export const SLOT_PUB: string = '';
 
 // ---------------------------------------------------------------------------
 // LA PUB RÉCOMPENSÉE

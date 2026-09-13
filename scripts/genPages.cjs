@@ -64,6 +64,14 @@ function echapper(s) {
     .replace(/"/g, '&quot;');
 }
 
+function dateLisible(iso) {
+  const [annee, mois, jour] = String(iso).split('-').map(Number);
+  if (!annee || !mois || !jour) return String(iso);
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  }).format(new Date(Date.UTC(annee, mois - 1, jour)));
+}
+
 /**
  * Le gras et les liens dans un paragraphe, sans moteur de rendu Markdown.
  * ⚠️ L'ÉCHAPPEMENT PASSE AVANT LE BALISAGE : l'inverse laisserait un `<` du
@@ -179,6 +187,16 @@ function encartPub() {
  */
 function gtmTete() {
   return [
+  '  <!-- Consent Mode : refus par défaut avant tout chargement Google -->',
+  '  <script>',
+  '    window.dataLayer = window.dataLayer || [];',
+  '    function gtag(){dataLayer.push(arguments);}',
+  '    gtag("consent", "default", {',
+  '      ad_storage: "denied", ad_user_data: "denied",',
+  '      ad_personalization: "denied", analytics_storage: "denied",',
+  '      wait_for_update: 500',
+  '    });',
+  '  </script>',
   '  <!-- Google Tag Manager -->',
   '  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({"gtm.start":',
   '  new Date().getTime(),event:"gtm.js"});var f=d.getElementsByTagName(s)[0],',
@@ -228,11 +246,12 @@ function rendre(page, toutes) {
   const coupe = Math.max(3, Math.floor(blocsCorps.length / 3));
   const corps = [
     ...blocsCorps.slice(0, coupe).map(bloc),
-    encartPub(),
+    page.noAds ? '' : encartPub(),
     ...blocsCorps.slice(coupe).map(bloc),
   ].filter(Boolean).join('\n');
 
-  const autres = (page.suite || toutes.map((p) => p.slug))
+  const editoriales = toutes.filter((p) => !p.legal);
+  const autres = (page.suite || editoriales.map((p) => p.slug))
     .filter((slug) => slug !== page.slug)
     .map((slug) => toutes.find((p) => p.slug === slug))
     .filter(Boolean);
@@ -247,7 +266,7 @@ ${gtmTete()}
   <meta name="description" content="${echapper(page.description)}" />
   <link rel="canonical" href="${url}" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
-  <meta property="og:type" content="article" />
+  <meta property="og:type" content="${page.legal ? 'website' : 'article'}" />
   <meta property="og:site_name" content="${echapper(SITE.nom)}" />
   <meta property="og:title" content="${echapper(page.titre)}" />
   <meta property="og:description" content="${echapper(page.description)}" />
@@ -259,22 +278,25 @@ ${gtmTete()}
   <script type="application/ld+json">
 ${JSON.stringify({
     '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: page.titre,
+    '@type': page.legal ? 'WebPage' : 'Article',
+    ...(page.legal ? { name: page.titre } : { headline: page.titre }),
     description: page.description,
     inLanguage: 'fr',
     mainEntityOfPage: url,
-    author: { '@type': 'Organization', name: SITE.nom },
-    publisher: { '@type': 'Organization', name: SITE.nom },
+    ...(!page.legal ? {
+      dateModified: page.modifiee || SITE.modificationAccueil,
+      author: { '@type': 'Organization', name: SITE.auteur },
+      publisher: { '@type': 'Organization', name: SITE.nom },
+    } : {}),
   }, null, 2)}
   </script>
-${scriptAdsense()}</head>
+${page.noAds ? '' : scriptAdsense()}</head>
 <body class="${echapper(page.classe || '')}">
 ${gtmCorps()}
   <header class="entete">
     <a class="marque" href="/">🏉 ${echapper(SITE.nom)}</a>
     <nav aria-label="Pages du guide">
-${toutes.map((p) => `      <a href="/${p.slug}/"${p.slug === page.slug ? ' aria-current="page"' : ''}>${echapper(p.court)}</a>`).join('\n')}
+${editoriales.map((p) => `      <a href="/${p.slug}/"${p.slug === page.slug ? ' aria-current="page"' : ''}>${echapper(p.court)}</a>`).join('\n')}
     </nav>
     <a class="jouer" href="/">Jouer</a>
   </header>
@@ -283,22 +305,24 @@ ${toutes.map((p) => `      <a href="/${p.slug}/"${p.slug === page.slug ? ' aria-
     <article>
       <p class="fil"><a href="/">Accueil</a>${page.slug.startsWith('wiki/') ? ' › <a href="/wiki/">Wiki</a>' : ''} › ${echapper(page.court)}</p>
       <h1>${echapper(page.titre)}</h1>
+      ${page.legal ? '' : `<p class="signature">Par ${echapper(SITE.auteur)} · Mis à jour le ${echapper(dateLisible(page.modifiee || SITE.modificationAccueil))}</p>`}
       <p class="chapo">${riche(page.chapo)}</p>
 ${imagePrioritaire ? bloc(imagePrioritaire) : ''}
 ${sommaire(page)}
 ${corps}
     </article>
 
-    <nav class="suite" aria-label="Continuer la lecture">
+    ${autres.length ? `<nav class="suite" aria-label="Continuer la lecture">
       <p class="suite-titre">Continuer</p>
       <ul>
 ${autres.map((p) => `        <li><a href="/${p.slug}/"><strong>${echapper(p.titre)}</strong><span>${echapper(p.description)}</span></a></li>`).join('\n')}
       </ul>
-    </nav>
+    </nav>` : ''}
   </main>
 
   <footer class="pied">
     <p><a href="/">${echapper(SITE.nom)}</a> : jeu de rôle de carrière de rugby, gratuit et en français.</p>
+    <nav aria-label="Informations légales"><a href="/a-propos/">À propos</a> · <a href="/confidentialite/">Confidentialité</a> · <a href="/mentions-legales/">Mentions légales</a> · <a href="/contact/">Contact</a></nav>
     <p class="pied-note">Les noms de clubs, de compétitions et de joueurs appartiennent à leurs détenteurs respectifs. Ce site n'est affilié à aucune ligue ni fédération.</p>
   </footer>
 </body>
@@ -318,10 +342,9 @@ for (const page of PAGES) {
 // --- Le plan du site suit ------------------------------------------------------
 // ⚠️ IL EST RÉGÉNÉRÉ ICI, pas maintenu à la main : une page ajoutée sans son
 // entrée de sitemap est une page que personne ne trouvera jamais.
-const aujourdHui = new Date().toISOString().slice(0, 10);
 const urls = [
-  { loc: `${SITE.origine}/`, priorite: '1.0' },
-  ...PAGES.map((p) => ({ loc: `${SITE.origine}/${p.slug}/`, priorite: '0.8' })),
+  { loc: `${SITE.origine}/`, modifiee: SITE.modificationAccueil },
+  ...PAGES.map((p) => ({ loc: `${SITE.origine}/${p.slug}/`, modifiee: p.modifiee || SITE.modificationAccueil })),
 ];
 const sitemap = [
   '<?xml version="1.0" encoding="UTF-8"?>',
@@ -329,8 +352,7 @@ const sitemap = [
   ...urls.map((u) => [
     '  <url>',
     `    <loc>${u.loc}</loc>`,
-    `    <lastmod>${aujourdHui}</lastmod>`,
-    `    <priority>${u.priorite}</priority>`,
+    `    <lastmod>${u.modifiee}</lastmod>`,
     '  </url>',
   ].join('\n')),
   '</urlset>',

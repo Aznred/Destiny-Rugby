@@ -265,10 +265,9 @@ export function BoutonDeblocageParPub({ id, onDebloque }: { id: string; onDebloq
  * L'identifiant AdSense du site est en dur (`CLIENT_PUB`, voir `lib/pub.ts`),
  * mais un bloc d'annonce a besoin EN PLUS d'un « slot » créé à la main dans la
  * console AdSense. Donc :
- *   • `VITE_PUB_SLOT` renseigné → une VRAIE annonce s'affiche ici pendant le
- *     compte à rebours, et le joueur encaisse ses Ovas au bout ;
- *   • sinon → l'encart MAISON, un compte à rebours du jeu. La mécanique reste
- *     jouable et testable, mais elle ne rapporte évidemment rien à personne.
+ * Cette modale reste toujours un encart MAISON. Une annonce display AdSense
+ * ne doit pas être transformée en publicité récompensée. Un futur format
+ * récompensé devra passer par l'API officielle pour jeux H5.
  *
  * ⚠️ ADSENSE NE FAIT PAS DE VIDÉO RÉCOMPENSÉE SUR UN SITE ORDINAIRE — c'est
  * AdMob / Ad Manager (« H5 games ») qui expose ce SDK. Ce qu'on fait ici est
@@ -309,20 +308,8 @@ function PubRecompensee({
         transition={{ duration: 0.2 }}
       >
         <div className="eyebrow">{t('pub.etiquette')}</div>
-        {/* ⚠️ DEUX CAS, ET PLUS TROIS. Le premier était Monetag : l'annonce
-            s'ouvrait dans un AUTRE onglet, il n'y avait donc rien à montrer
-            ici — une modale qui décompte devant un joueur pendant que la
-            publicité vit ailleurs. C'est parti avec le reste de la régie.
-            Reste : AdSense si un slot est configuré (l'annonce s'affiche DANS
-            la modale, là où le joueur regarde), sinon l'encart maison. */}
-        {SLOT_PUB ? (
-          <div className="pub-annonce"><BlocAnnonce format="rectangle" /></div>
-        ) : (
-          <>
-            <h2>{t('pub.maisonTitre')}</h2>
-            <p className="aide">{texteMaison}</p>
-          </>
-        )}
+        <h2>{t('pub.maisonTitre')}</h2>
+        <p className="aide">{texteMaison}</p>
         <div className="pub-compte" aria-live="polite">
           <div className="pub-compte-piste">
             <span style={{ width: `${((DUREE_PUB_MAISON_S - reste) / DUREE_PUB_MAISON_S) * 100}%` }} />

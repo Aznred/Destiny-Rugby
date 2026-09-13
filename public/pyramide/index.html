@@ -3,6 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Consent Mode : refus par défaut avant tout chargement Google -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("consent", "default", {
+      ad_storage: "denied", ad_user_data: "denied",
+      ad_personalization: "denied", analytics_storage: "denied",
+      wait_for_update: 500
+    });
+  </script>
   <!-- Google Tag Manager -->
   <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({"gtm.start":
   new Date().getTime(),event:"gtm.js"});var f=d.getElementsByTagName(s)[0],
@@ -12,14 +22,14 @@
 
   <title>La pyramide du rugby français, de la Régionale 3 au Top 14 · Destiny Rugby</title>
   <meta name="description" content="Les dix divisions françaises du jeu, 655 clubs réels : ce que représente chaque étage, comment on monte, et pourquoi le bas de la pyramide n'est pas un décor." />
-  <link rel="canonical" href="https://destiny-rugby.fr/pyramide/" />
+  <link rel="canonical" href="https://www.destiny-rugby.fr/pyramide/" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="Destiny Rugby" />
   <meta property="og:title" content="La pyramide du rugby français, de la Régionale 3 au Top 14" />
   <meta property="og:description" content="Les dix divisions françaises du jeu, 655 clubs réels : ce que représente chaque étage, comment on monte, et pourquoi le bas de la pyramide n'est pas un décor." />
-  <meta property="og:url" content="https://destiny-rugby.fr/pyramide/" />
-  <meta property="og:image" content="https://destiny-rugby.fr/og.png" />
+  <meta property="og:url" content="https://www.destiny-rugby.fr/pyramide/" />
+  <meta property="og:image" content="https://www.destiny-rugby.fr/og.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/contenu.css" />
@@ -30,10 +40,11 @@
   "headline": "La pyramide du rugby français, de la Régionale 3 au Top 14",
   "description": "Les dix divisions françaises du jeu, 655 clubs réels : ce que représente chaque étage, comment on monte, et pourquoi le bas de la pyramide n'est pas un décor.",
   "inLanguage": "fr",
-  "mainEntityOfPage": "https://destiny-rugby.fr/pyramide/",
+  "mainEntityOfPage": "https://www.destiny-rugby.fr/pyramide/",
+  "dateModified": "2026-09-13",
   "author": {
     "@type": "Organization",
-    "name": "Destiny Rugby"
+    "name": "Colin Gomez"
   },
   "publisher": {
     "@type": "Organization",
@@ -58,6 +69,10 @@
       <a href="/pyramide/" aria-current="page">La pyramide</a>
       <a href="/moteur/">Le moteur</a>
       <a href="/journal/">Journal</a>
+      <a href="/postes-rugby/">Les postes</a>
+      <a href="/saison-rugby/">Une saison</a>
+      <a href="/transferts-contrats/">Transferts</a>
+      <a href="/blessures-recuperation/">Blessures</a>
     </nav>
     <a class="jouer" href="/">Jouer</a>
   </header>
@@ -66,6 +81,7 @@
     <article>
       <p class="fil"><a href="/">Accueil</a> › La pyramide</p>
       <h1>La pyramide du rugby français, de la Régionale 3 au Top 14</h1>
+      <p class="signature">Par Colin Gomez · Mis à jour le 13 septembre 2026</p>
       <p class="chapo">Destiny Rugby couvre <strong>dix divisions françaises et 655 clubs réels</strong>, du Top 14 à la Régionale 3. Ce n'est pas une toile de fond : chaque étage a ses effectifs, son calendrier, son niveau de jeu et ses règles de discipline propres.</p>
 
       <nav class="sommaire" aria-label="Sommaire">
@@ -149,12 +165,17 @@
         <li><a href="/guide/"><strong>Guide de Destiny Rugby : mener une carrière de rugbyman</strong><span>Comment jouer : créer son joueur, traverser une saison de 44 semaines, jouer ses matchs, négocier ses contrats et raccrocher au bon moment.</span></a></li>
         <li><a href="/moteur/"><strong>Comment un match de rugby est simulé, joueur par joueur</strong><span>Trente joueurs, sept pas de simulation par seconde, en mètres réels : le fonctionnement du moteur de match de Destiny Rugby et son étalonnage chiffré.</span></a></li>
         <li><a href="/journal/"><strong>Journal de développement : ce qui a été corrigé, et pourquoi</strong><span>Les grands chantiers du jeu, les bugs trouvés en mesurant plutôt qu'en regardant, et les décisions de conception qui ont été renversées.</span></a></li>
+        <li><a href="/postes-rugby/"><strong>Les 15 postes du rugby : rôle, qualités et choix de carrière</strong><span>Comprendre les quinze postes du rugby et choisir un profil cohérent pour commencer une carrière dans Destiny Rugby.</span></a></li>
+        <li><a href="/saison-rugby/"><strong>Comment se déroule une saison dans Destiny Rugby</strong><span>Calendrier, semaines de match, entraînement, forme, classement et intersaison : le déroulement complet d’une saison.</span></a></li>
+        <li><a href="/transferts-contrats/"><strong>Transferts et contrats : construire une carrière cohérente</strong><span>Comprendre les offres, la concurrence, la durée des contrats et les choix de club dans le RPG Destiny Rugby.</span></a></li>
+        <li><a href="/blessures-recuperation/"><strong>Blessures, fatigue et récupération au fil d’une carrière</strong><span>Gérer la forme, les charges d’entraînement, les blessures et le retour au jeu dans Destiny Rugby.</span></a></li>
       </ul>
     </nav>
   </main>
 
   <footer class="pied">
     <p><a href="/">Destiny Rugby</a> : jeu de rôle de carrière de rugby, gratuit et en français.</p>
+    <nav aria-label="Informations légales"><a href="/a-propos/">À propos</a> · <a href="/confidentialite/">Confidentialité</a> · <a href="/mentions-legales/">Mentions légales</a> · <a href="/contact/">Contact</a></nav>
     <p class="pied-note">Les noms de clubs, de compétitions et de joueurs appartiennent à leurs détenteurs respectifs. Ce site n'est affilié à aucune ligue ni fédération.</p>
   </footer>
 </body>

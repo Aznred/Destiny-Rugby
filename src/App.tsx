@@ -212,6 +212,13 @@ export default function App() {
         {reglagesOuverts && <Reglages onFermer={() => setReglagesOuverts(false)} />}
       </AnimatePresence>
 
+      <footer className="pied-application">
+        <a href="/a-propos/">À propos</a>
+        <a href="/confidentialite/">Confidentialité</a>
+        <a href="/mentions-legales/">Mentions légales</a>
+        <a href="/contact/">Contact</a>
+      </footer>
+
       {/* Cérémonie : le trophée gagné s'affiche en 3D, un par un */}
       <AnimatePresence>
         {tropheesEnAttente.length > 0 && (
