@@ -1311,26 +1311,43 @@ function statistiquesLigue(etat: EtatCarriereEnLigne) {
     meilleurPack: candidats[0], plusGrosAchat: achats[0] };
 }
 
-export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCarriereEnLigne {
-  const club = monClub(etat, compteId);
+function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere): VueCarriereEnLigne {
   const { graine: _secret, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
-  return copier({ ...publics, monClubId: club.id,
+  return copier({ ...publics, monClubId: club?.id ?? '', observateur: club ? undefined : true,
     competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
       ? { ...c, classementsPoules: c.poules.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres)) }
       : c),
-    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, packsGratuits, packsGratuitsProgrammes: _programmes, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club.id ? { ...reste, composition, strategie, packsGratuits, dernierLotPacksGratuits } : reste; }),
+    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, packsGratuits, packsGratuitsProgrammes: _programmes, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club?.id ? { ...reste, composition, strategie, packsGratuits, dernierLotPacksGratuits } : reste; }),
     cartes: etat.cartes.filter(c => c.proprietaire !== null),
-    rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: vueMatchEnLigne(match, club.id) } : reste; }),
-    objectifs: etat.objectifs.filter(o => o.clubId === club.id), transactions: etat.transactions.filter(t => t.clubId === club.id),
-    echanges: etat.echanges.filter(e => e.de === club.id || e.vers === club.id), classement: classementCarriere(etat), statistiques: statistiquesLigue(etat),
+    rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: vueMatchEnLigne(match, club?.id ?? '') } : reste; }),
+    objectifs: club ? etat.objectifs.filter(o => o.clubId === club.id) : [],
+    transactions: club ? etat.transactions.filter(t => t.clubId === club.id) : [],
+    echanges: club ? etat.echanges.filter(e => e.de === club.id || e.vers === club.id) : [],
+    classement: classementCarriere(etat), statistiques: statistiquesLigue(etat),
     vivierDisponible: vivierRestant(new Set(etat.cartes.map(c => c.sourceId))) });
+}
+
+export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCarriereEnLigne {
+  return construireVueCarriere(etat, monClub(etat, compteId));
+}
+
+/** Vue publique d'administration : aucune composition, stratégie ou économie privée. */
+export function vueCarriereObservateur(etat: EtatCarriereEnLigne): VueCarriereEnLigne {
+  return construireVueCarriere(etat);
 }
 
 /** Vue minimale d'un direct : quelques dizaines de Ko au lieu de toute la ligue. */
 export function vueRencontreCarriere(etat: EtatCarriereEnLigne, compteId: string, matchId: string): VueCarriereEnLigne['rencontres'][number] | null {
-  const club = monClub(etat, compteId);
+  return vueRencontreInterne(etat, matchId, monClub(etat, compteId).id);
+}
+
+function vueRencontreInterne(etat: EtatCarriereEnLigne, matchId: string, clubId: string): VueCarriereEnLigne['rencontres'][number] | null {
   const rencontre = etat.rencontres.find(r => r.id === matchId);
   if (!rencontre) return null;
   const { match, ...publics } = rencontre;
-  return copier(match ? { ...publics, match: vueMatchEnLigne(match, club.id) } : publics);
+  return copier(match ? { ...publics, match: vueMatchEnLigne(match, clubId) } : publics);
+}
+
+export function vueRencontreCarriereObservateur(etat: EtatCarriereEnLigne, matchId: string): VueCarriereEnLigne['rencontres'][number] | null {
+  return vueRencontreInterne(etat, matchId, '');
 }

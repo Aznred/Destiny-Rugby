@@ -23,7 +23,7 @@ const fil:LigneFil[]=[
 ];
 const e={id:'ligue',clubs:[{id:'A',compteId:'a',nom:'Club A'},{id:'B',compteId:'b',nom:'Club B'},{id:'C',compteId:'c',nom:'Club C'}],rencontres:[{id:'match',domicile:'A',exterieur:'B',ouvre:new Date(now-10000000).toISOString(),ferme:new Date(now-90000).toISOString(),match:{id:'match',debut:now-90000,gel:0,horloge:1.5,fil,score:{domicile:7,exterieur:3},termine:false}}]} as unknown as EtatCarriereEnLigne;
 e.phase='saison';
-assert.equal(prochainReveilMatch(e,now),now+5000);
+assert.equal(prochainReveilMatch(e,now),Math.ceil((now+15000)/15000)*15000);
 assert.equal(prochainReveilMatch({...e,phase:'salon'},now),null);
 const futur=structuredClone(e);delete futur.rencontres[0].match;futur.rencontres[0].ouvre=new Date(now+600000).toISOString();futur.rencontres[0].ferme=new Date(now+1200000).toISOString();
 assert.equal(prochainReveilMatch(futur,now),now+600000);

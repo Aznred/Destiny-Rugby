@@ -567,10 +567,10 @@ export function CarriereEnLigne() {
 
 
   const ouvrir = (suivante: VueCarriereEnLigne) => {
-    versionRequete.current++; setVue(suivante); setLigueId(suivante.id); setOnglet('club'); setMatchId(null); setErreur('');
+    versionRequete.current++; setVue(suivante); setLigueId(suivante.id); setOnglet(suivante.observateur ? 'calendrier' : 'club'); setMatchId(null); setErreur('');
   };
   const agir: Agir = async commande => {
-    if (!ligueId || occupe) return;
+    if (!ligueId || occupe || vue?.observateur) return;
     setOccupe(true); setErreur(''); versionRequete.current++;
     try {
       const suivante = await commanderCarriere(ligueId, commande, crypto.randomUUID());
@@ -593,6 +593,7 @@ export function CarriereEnLigne() {
   };
   const club = vue?.clubs.find(c => c.id === vue.monClubId);
   const rencontre = vue?.rencontres.find(r => r.id === matchId);
+  const navigation = onglets().filter(o => !vue?.observateur || ['calendrier', 'competitions', 'histoire', 'wiki'].includes(o.id));
 
   return <section className="cel" aria-label="Carrière en ligne">
     <div className="cel-fil">
@@ -619,8 +620,8 @@ export function CarriereEnLigne() {
             défiler la page à chaque phase. Ni l'un ni l'autre ne servent
             pendant une rencontre — le direct a son propre bouton « Fermer »,
             qui ramène exactement là d'où l'on vient. */}
-        {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / {t('online.season', { n: vue.saison })}</span></div><h1>{club?.nom}</h1><p>{vue.rythme === 7 ? t('online.clubsDaily', { clubs: vue.clubs.length }) : t('online.clubsRate', { clubs: vue.clubs.length, matches: vue.rythme })} · {t(`online.phase.${vue.phase === 'salon' ? 'lobby' : vue.phase === 'saison' ? 'season' : 'break'}`)}</p></div><div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>{t('online.balance')}</span></div></header>}
-        {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')}>{[...onglets(), ...(session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }, { id: 'administration' as const, label: 'Comptes & ligues', icone: 'profil' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
+        {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme ?? vue.logo} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / {t('online.season', { n: vue.saison })}</span></div><h1>{vue.observateur ? 'Mode observateur' : club?.nom}</h1><p>{vue.rythme === 7 ? t('online.clubsDaily', { clubs: vue.clubs.length }) : t('online.clubsRate', { clubs: vue.clubs.length, matches: vue.rythme })} · {t(`online.phase.${vue.phase === 'salon' ? 'lobby' : vue.phase === 'saison' ? 'season' : 'break'}`)}</p></div>{vue.observateur ? <div className="cel-portefeuille"><Icone nom="oeil" taille={26} /><strong>Observer</strong><span>Lecture seule</span></div> : <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>{t('online.balance')}</span></div>}</header>}
+        {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')}>{[...navigation, ...(!vue.observateur && session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }, { id: 'administration' as const, label: 'Comptes & ligues', icone: 'profil' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} proprietaire={session.compte.id === vue.createurId} notifier={setNotification} />}
@@ -634,7 +635,7 @@ export function CarriereEnLigne() {
           {onglet === 'wiki' && <WikiLigue />}
           {onglet === 'laboratoire' && session.compte.administrateur && vue.laboratoire && <LaboratoireLigue vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'secret' && session.compte.administrateur && <StatistiquesSecretes />}
-          {onglet === 'administration' && session.compte.administrateur && <AdministrationKiri />}
+          {onglet === 'administration' && session.compte.administrateur && <AdministrationKiri observer={ouvrirLigue} occupe={occupe} />}
           {onglet === 'atelier' && session.compte.administrateur && <AtelierKiri />}
         </>}
       </>}
@@ -1064,7 +1065,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     </div>
 
     <DirectCinema match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs} />
-    <details><summary>{t('online.match.alerts')}</summary><NotificationsMatch ligue={vue.id} /></details>
+    {!vue.observateur && <details><summary>{t('online.match.alerts')}</summary><NotificationsMatch ligue={vue.id} /></details>}
 
     {/* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).
         Le serveur ne propose plus une décision sur chacune des vingt-quatre
@@ -1625,7 +1626,9 @@ function delai(iso: string, maintenant = Date.now()): string {
 function Calendrier({ vue, agir, occupe, suivre, proprietaire, notifier }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; suivre: (id: string) => void; proprietaire: boolean; notifier: (message: string) => void }) {
 
   const maintenant = maintenantISO();
-  const miennes = vue.rencontres.filter(r => r.domicile === vue.monClubId || r.exterieur === vue.monClubId);
+  const miennes = vue.observateur
+    ? vue.rencontres
+    : vue.rencontres.filter(r => r.domicile === vue.monClubId || r.exterieur === vue.monClubId);
   const aVenir = miennes.filter(r => !r.resultat).sort((a, b) => Date.parse(a.ferme) - Date.parse(b.ferme));
   const jouees = miennes.filter(r => r.resultat).slice(-8).reverse();
   const prochaine = aVenir[0];
@@ -1666,7 +1669,7 @@ function Calendrier({ vue, agir, occupe, suivre, proprietaire, notifier }: { vue
       <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande />
     </section>}
 
-    <NotificationsMatch ligue={vue.id} />
+    {!vue.observateur && <NotificationsMatch ligue={vue.id} />}
 
     {aVenir.length > 1 && <section className="cel-panneau">
       <div className="cel-titre-ligne"><h2>{t('online.calendar.mine')}</h2><small>{aVenir.length} {t('online.common.matches')}</small></div>
@@ -1927,7 +1930,7 @@ function StatistiquesSecretes() {
   </section>;
 }
 
-function AdministrationKiri() {
+function AdministrationKiri({ observer, occupe }: { observer: (id: string) => Promise<void>; occupe: boolean }) {
   const [vue, setVue] = useState<AdministrationCarriere | null>(null);
   const [erreur, setErreur] = useState('');
   const [recherche, setRecherche] = useState('');
@@ -1957,8 +1960,8 @@ function AdministrationKiri() {
     {section === 'comptes' ? <div className="cel-table-scroll"><table className="cel-table cel-admin-table"><thead><tr><th>Compte</th><th>Créé</th><th>Dernière connexion</th><th>Ligues</th><th>ID technique</th></tr></thead><tbody>
       {comptes.map(c => <tr key={c.id}><th>{c.pseudo}</th><td>{c.creeLe ? dateHeure(c.creeLe) : '—'}</td><td>{c.vuLe ? dateHeure(c.vuLe) : '—'}</td><td><b>{c.ligues}</b></td><td><code title={c.id}>{c.id.slice(0, 8)}…</code></td></tr>)}
     </tbody></table>{!comptes.length && <p className="cel-note">Aucun compte ne correspond à cette recherche.</p>}{vue.comptesTronques && <p className="cel-note">Seuls les {vue.limite} comptes les plus récents sont affichés.</p>}</div>
-      : <div className="cel-table-scroll"><table className="cel-table cel-admin-table"><thead><tr><th>Ligue</th><th>Code</th><th>Créateur</th><th>État</th><th>Saison</th><th>Clubs</th><th>Créée</th></tr></thead><tbody>
-        {ligues.map(l => <tr key={l.id}><th>{l.nom}<small title={l.id}>{l.id.slice(0, 8)}…</small></th><td><code>{l.code}</code></td><td>{l.createur}</td><td>{l.phase || '—'}</td><td>{l.saison}</td><td><b>{l.clubs}</b></td><td>{l.creeLe ? dateHeure(l.creeLe) : '—'}</td></tr>)}
+      : <div className="cel-table-scroll"><table className="cel-table cel-admin-table"><thead><tr><th>Ligue</th><th>Code</th><th>Créateur</th><th>État</th><th>Saison</th><th>Clubs</th><th>Créée</th><th>Accès</th></tr></thead><tbody>
+        {ligues.map(l => <tr key={l.id}><th>{l.nom}<small title={l.id}>{l.id.slice(0, 8)}…</small></th><td><code>{l.code}</code></td><td>{l.createur}</td><td>{l.phase || '—'}</td><td>{l.saison}</td><td><b>{l.clubs}</b></td><td>{l.creeLe ? dateHeure(l.creeLe) : '—'}</td><td><button type="button" className="btn fantome petit" disabled={occupe} onClick={() => { void observer(l.id); }}><Icone nom="oeil" taille={15} /> Observer</button></td></tr>)}
       </tbody></table>{!ligues.length && <p className="cel-note">Aucune ligue ne correspond à cette recherche.</p>}{vue.liguesTronquees && <p className="cel-note">Seules les {vue.limite} ligues les plus récentes sont affichées.</p>}</div>}
   </section>;
 }

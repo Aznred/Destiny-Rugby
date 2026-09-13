@@ -470,6 +470,8 @@ export interface VueMatchEnLigne {
   moments?: import('./momentsForts.js').MomentFort[];
   gele?: boolean;
   id: string;
+  /** Identite du coup d'envoi : distingue une vraie relance d'une vieille reponse. */
+  instance?: number;
   terrain?: TerrainDirect;
   minute: number;
   /** La même, au centième : l'écran fait avancer son chrono entre deux relevés. */
@@ -1280,7 +1282,7 @@ function mesOrdres(etat: EtatMatchEnLigne, monCote: CoteEnLigne): LigneFil[] {
 export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string, emisLe = Date.now()): VueMatchEnLigne {
   const monCote = etat.equipes ? COTES.find((c) => etat.equipes![c].clubId === clubId) : undefined;
   const vue: VueMatchEnLigne = {
-    id: etat.id, minute: Math.floor(etat.horloge), horloge: r2(etat.horloge), termine: etat.termine,
+    id: etat.id, instance: etat.debut, minute: Math.floor(etat.horloge), horloge: r2(etat.horloge), termine: etat.termine,
     score: etat.score, essais: etat.essais, penalites: etat.penalites,
     fil: etat.fil, stats: etat.stats, feuille: etat.feuille,
     moments: momentsDepuisFil(etat.id, etat.fil), gele: Boolean(etat.decision),

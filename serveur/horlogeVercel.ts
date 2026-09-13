@@ -4,11 +4,15 @@ import type {EtatCarriereEnLigne} from '../src/lib/ligue/typesCarriere.js';
 import {prochaineEcheanceMatch} from '../src/lib/ligue/echeanceCarriere.js';
 export const TOPIC_MATCHS='destiny-matchs';
 const dejaProgrammes=new Map<string,number>();
+const PAS_REVEIL_DIRECT=15_000;
 /** Une chaîne durable par ligue ; aucune fonction ne reste ouverte pendant 80 minutes. */
 export function prochainReveilMatch(etat:EtatCarriereEnLigne,n:number):number|null {
   const date=prochaineEcheanceMatch(etat,n);
   if(date===null)return null;
-  if(date<=n)return Math.ceil((n+5000)/5000)*5000;
+  // Le direct vu par un joueur est actualisé par son propre sondage ciblé.
+  // La file durable n'a donc pas à recalculer toute la ligue toutes les cinq
+  // secondes : avec plusieurs matchs, elle monopolisait le moteur et la base.
+  if(date<=n)return Math.ceil((n+PAS_REVEIL_DIRECT)/PAS_REVEIL_DIRECT)*PAS_REVEIL_DIRECT;
   // Une chaîne de réveils reste sous les sept jours de rétention de Vercel.
   return Math.min(date,n+6*86400000);
 }

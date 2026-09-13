@@ -171,6 +171,8 @@ export interface EtatCarriereEnLigne {
 }
 export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' | 'clubs' | 'cartes' | 'rencontres' | 'objectifs' | 'transactions' | 'echanges'> {
   monClubId: string;
+  /** Vue publique sans club, accessible uniquement au compte administrateur kiri. */
+  observateur?: true;
   clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie' | 'packsGratuits' | 'packsGratuitsProgrammes' | 'dernierLotPacksGratuits' | 'buteurManuel'> & { composition?: CompositionManager; strategie?: StrategieEnLigne; packsGratuits?: PackGratuitCarriere[]; dernierLotPacksGratuits?: string })[];
   /** Vue courante : cartes distribuées seulement. Le catalogue public est consulté séparément, par pages. */
   cartes: CarteCarriere[];

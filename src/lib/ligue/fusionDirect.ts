@@ -22,6 +22,13 @@ export function rencontreDirectRegresse(courante: RencontreVue, suivante: Rencon
   return apres.score.domicile < avant.score.domicile || apres.score.exterieur < avant.score.exterieur;
 }
 
+function memeInstance(courante: RencontreVue, suivante: RencontreVue): boolean {
+  const avant = courante.match;
+  const apres = suivante.match;
+  return Boolean(avant && apres && avant.id === apres.id
+    && avant.instance !== undefined && avant.instance === apres.instance);
+}
+
 export function fusionnerDeltaDirect(
   courante: VueCarriereEnLigne,
   delta: DeltaDirect,
@@ -31,7 +38,8 @@ export function fusionnerDeltaDirect(
   // Une version réellement plus récente peut correspondre à une réinitialisation
   // volontaire du laboratoire. À version égale, en revanche, seul le temps a
   // passé et toute régression est nécessairement une réponse périmée.
-  if (delta.version === courante.version && precedente && rencontreDirectRegresse(precedente, delta.rencontre)) return courante;
+  if (precedente && (delta.version === courante.version || memeInstance(precedente, delta.rencontre))
+    && rencontreDirectRegresse(precedente, delta.rencontre)) return courante;
   return {
     ...courante,
     rencontres: courante.rencontres.map(r => r.id === delta.rencontre.id ? delta.rencontre : r),
@@ -44,13 +52,13 @@ export function fusionnerVueLigue(
 ): VueCarriereEnLigne {
   if (!courante || courante.id !== suivante.id) return suivante;
   if (suivante.version < courante.version) return courante;
-  if (suivante.version > courante.version) return suivante;
   const anciennes = new Map(courante.rencontres.map(r => [r.id, r]));
   return {
     ...suivante,
     rencontres: suivante.rencontres.map(r => {
       const avant = anciennes.get(r.id);
-      return avant && rencontreDirectRegresse(avant, r) ? avant : r;
+      const comparable = suivante.version === courante.version || Boolean(avant && memeInstance(avant, r));
+      return avant && comparable && rencontreDirectRegresse(avant, r) ? avant : r;
     }),
   };
 }

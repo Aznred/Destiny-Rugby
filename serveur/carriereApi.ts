@@ -3,7 +3,7 @@ import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../sr
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
-import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerLaboratoireCarriere, empreinteEcriture, vueCarriere, vueRencontreCarriere } from '../src/lib/ligue/carriere.js';
+import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerLaboratoireCarriere, empreinteEcriture, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
@@ -490,13 +490,20 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
          */
         const connue = Number(url.searchParams.get('v'));
         let enteteConnue: { version: number; comptes: string[]; echeance: number | null } | undefined;
+        const accesObservateurKiri = compte.identifiant === 'kiri';
         if (Number.isInteger(connue) && connue > 0) {
-          const sondage = stockage.verifierSondage ? await stockage.verifierSondage(id, compte.id, connue, catalogueAdmin().revision, maintenant) : undefined;
+          // Kiri peut observer une ligue sans en devenir membre. Le sondage SQL
+          // normal confond volontairement « non-membre » et « ligue absente » ;
+          // l'administrateur passe donc par l'en-tête, toujours sans charger le
+          // gros état JSON.
+          const sondage = !accesObservateurKiri && stockage.verifierSondage
+            ? await stockage.verifierSondage(id, compte.id, connue, catalogueAdmin().revision, maintenant)
+            : undefined;
           if (sondage?.statut === 'absente') throw new ErreurHttp(404, 'Ligue introuvable.');
           if (sondage?.statut === 'inchange') return res.status(200).json({ inchange: true });
           const entete = sondage?.statut === 'lire' ? sondage.entete : await stockage.entete(id);
           enteteConnue = entete ?? undefined;
-          if (!entete || !entete.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+          if (!entete || (!accesObservateurKiri && !entete.comptes.includes(compte.id))) throw new ErreurHttp(404, 'Ligue introuvable.');
           /**
            * ⚠️ UN CORPS MINUSCULE PLUTÔT QU'UN VRAI 304. La réponse HTTP 304
            * serait la forme juste, mais elle exige un corps VIDE — donc un
@@ -516,14 +523,20 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           // Le calcul partagé utilise l'identité « horloge ». L'autorisation du
           // spectateur est donc vérifiée AVANT, sur l'en-tête minuscule.
           const autorisation = enteteConnue ?? await stockage.entete(id);
-          if (!autorisation || !autorisation.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+          if (!autorisation || (!accesObservateurKiri && !autorisation.comptes.includes(compte.id))) throw new ErreurHttp(404, 'Ligue introuvable.');
+          const observateur = accesObservateurKiri && !autorisation.comptes.includes(compte.id);
           const e = await actualiserDirect(id, direct, maintenant, autorisation);
-          const rencontre = vueRencontreCarriere(e, compte.id, direct);
+          const rencontre = observateur
+            ? vueRencontreCarriereObservateur(e, direct)
+            : vueRencontreCarriere(e, compte.id, direct);
           if (!rencontre) throw new ErreurHttp(404, 'Match introuvable.');
           return res.status(200).json({ id: e.id, version: e.version, rencontre });
         }
-        const e = await appliquer(id, compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue);
-        return res.status(200).json(vueCarriere(e, compte.id));
+        const autorisationKiri = accesObservateurKiri ? enteteConnue ?? await stockage.entete(id) : undefined;
+        if (accesObservateurKiri && !autorisationKiri) throw new ErreurHttp(404, 'Ligue introuvable.');
+        const observateur = Boolean(autorisationKiri && !autorisationKiri.comptes.includes(compte.id));
+        const e = await appliquer(id, observateur ? 'horloge' : compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue ?? autorisationKiri);
+        return res.status(200).json(observateur ? vueCarriereObservateur(e) : vueCarriere(e, compte.id));
       }
       if (action === 'creer') {
         // ⚠️ COMPTER, C'EST COMPTER. Ce plafond lisait la liste entière — donc,
