@@ -1,7 +1,7 @@
 .pack-show { --pack-color: #d59a64; position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 24px; overflow: auto; color: var(--craie); background: color-mix(in srgb, var(--fond-bas) 78%, transparent); backdrop-filter: blur(5px); font-family: var(--police); isolation: isolate; }
 .pack-show *, .pack-show *::before, .pack-show *::after { box-sizing: border-box; }
 .pack-show button:focus-visible { outline: 2px solid var(--or-400); outline-offset: 5px; }
-.pack-show-main.cel-panneau { position: relative; display: grid; grid-template-rows: 72px minmax(0, 1fr) 72px; width: min(920px, 100%); height: min(730px, calc(100dvh - 48px)); margin: auto; padding: 24px; overflow: hidden; text-align: center; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--pack-color) 9%, transparent), transparent 65%), var(--surface-solid); border: 1px solid var(--bordure-forte); border-radius: var(--rayon); box-shadow: var(--ombre-3), var(--arete); }
+.pack-show-main.cel-panneau { position: relative; display: grid; grid-template-rows: 72px minmax(0, 1fr) 72px; width: min(1320px, 100%); height: min(730px, calc(100dvh - 48px)); margin: auto; padding: 24px; overflow: hidden; text-align: center; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--pack-color) 9%, transparent), transparent 65%), var(--surface-solid); border: 1px solid var(--bordure-forte); border-radius: var(--rayon); box-shadow: var(--ombre-3), var(--arete); }
 .pack-show-heading { align-self: start; }
 .pack-show-heading .eyebrow { margin: 0 0 8px; color: var(--brume); }
 .pack-show .pack-show-heading h2 { margin: 0; font-family: var(--police-titre); font-size: clamp(28px, 4vw, 42px); line-height: 1.1; color: var(--pack-color); text-transform: uppercase; animation: pack-title .35s both; }
@@ -23,12 +23,14 @@
 .pack-show-flash { position: absolute; inset: -20%; z-index: 5; pointer-events: none; background: radial-gradient(ellipse, #fff7df, var(--pack-color) 20%, transparent 65%); animation: pack-flash 1.4s both; }
 .phase-evolution .pack-show-model { animation: pack-arrive .48s both; }
 .phase-ouverture .pack-show-model { animation: pack-release 1.6s both; }
-.pack-show-results { display: flex; justify-content: center; flex-wrap: wrap; gap: 30px 24px; padding: 28px 8px 24px; overflow-y: auto; min-height: 0; align-content: start; }
-.pack-show-card { position: relative; width: 210px; min-height: 320px; }
-.pack-show-card.visible { animation: pack-card .65s both; }
+.pack-show-results { display: flex; justify-content: safe center; align-items: center; flex-wrap: nowrap; gap: 0; padding: 34px 22px 28px; overflow-x: auto; overflow-y: hidden; min-width: 0; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--pack-color) transparent; }
+.pack-show-card { position: relative; flex: 0 0 clamp(118px, 12vw, 158px); width: clamp(118px, 12vw, 158px); min-height: 0; aspect-ratio: 2 / 3; transform-origin: 50% 85%; animation: pack-deal .58s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: calc(var(--slot, 0) * 55ms); }
+.pack-show-card + .pack-show-card { margin-left: clamp(-42px, -3.1vw, -28px); }
+.pack-show-card.meilleure { flex-basis: clamp(154px, 16vw, 214px); width: clamp(154px, 16vw, 214px); margin-right: clamp(8px, 1.2vw, 18px); }
+.pack-show-card.visible { animation-name: pack-deal; }
 .pack-show-card .cel-carte { min-height: 320px; height: 100%; width: 100%; }
 .pack-show-best { position: absolute; top: -21px; left: 0; right: 0; font-size: 9px; font-weight: 700; letter-spacing: .18em; color: var(--pack-color); }
-.pack-show-card.meilleure.visible { filter: drop-shadow(0 0 20px color-mix(in srgb, var(--pack-color) 25%, transparent)); }
+.pack-show-card.meilleure.visible { filter: drop-shadow(0 0 22px color-mix(in srgb, var(--pack-color) 42%, transparent)); }
 .pack-show-cardback { min-height: 320px; height: 100%; border: 1px solid #79756d55; border-radius: 18px 18px 45px 45px; background: repeating-linear-gradient(45deg, #ffffff03 0 1px, transparent 1px 12px), linear-gradient(120deg, #292a2d, #101118); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; }
 .pack-show-cardback b { font: italic 65px Georgia, serif; color: #77766e; }
 .pack-show-cardback span { font-size: 9px; letter-spacing: .23em; color: #77766e; }
@@ -47,14 +49,16 @@
 @keyframes pack-flash { 0%, 100% { opacity: 0; } 28% { opacity: .85; } }
 @keyframes pack-release { 0% { opacity: 1; } 30% { filter: brightness(1.8); } 100% { opacity: 0; } }
 @keyframes pack-card { from { opacity: 0; transform: perspective(800px) rotateY(85deg) translateY(25px); } to { opacity: 1; transform: perspective(800px) rotateY(0) translateY(0); } }
+@keyframes pack-deal { from { opacity: 0; transform: translateX(-70px) translateY(34px) scale(.82); } to { opacity: 1; transform: translateX(0) translateY(0) scale(1); } }
 .pack-show.calme *, .pack-show.calme *::before { animation: none !important; transition: none !important; }
 .pack-show.calme .pack-show-flash { display: none; }
 @media (prefers-reduced-motion: reduce) { .pack-show *, .pack-show *::before { animation: none !important; transition: none !important; } .pack-show-flash { display: none; } }
 @media (max-width: 600px) {
   .pack-show { padding: 12px; }
   .pack-show-main.cel-panneau { height: calc(100dvh - 24px); padding: 20px 12px; grid-template-rows: 64px minmax(0, 1fr) 64px; }
-  .pack-show-results { gap: 30px 12px; }
-  .pack-show-card { width: min(210px, calc(50% - 6px)); min-height: 290px; }
+  .pack-show-results { justify-content: flex-start; padding-inline: 14px; }
+  .pack-show-card { flex-basis: 118px; width: 118px; min-height: 0; }
+  .pack-show-card.meilleure { flex-basis: 158px; width: 158px; }
   .pack-show-card .cel-carte, .pack-show-cardback { min-height: 290px; }
   .pack-show-card .cel-carte-stats { grid-template-columns: repeat(2, 1fr); }
   .pack-show-best { font-size: 7px; letter-spacing: .08em; }
@@ -79,8 +83,7 @@
 
 .pack-show.instant .pack-show-card, .pack-show.instant .pack-show-heading h2 { animation: none; }
 /* Chaque face existe dans le même volume : aucun remplacement de carte au milieu du retournement. */
-.pack-show-card, .pack-show-card:has(.dr-player) { width: 210px; min-height: 0; aspect-ratio: 2 / 3; perspective: 1100px; align-self: start; }
-.pack-show-card.visible { animation: none; }
+.pack-show-card, .pack-show-card:has(.dr-player) { min-height: 0; aspect-ratio: 2 / 3; perspective: 1100px; align-self: center; }
 .pack-show-flipper { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .85s cubic-bezier(.2,.7,.15,1); }
 .pack-show-card.visible .pack-show-flipper { transform: rotateY(180deg); }
 .pack-show-front, .pack-show-cardback { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
@@ -99,7 +102,7 @@
 .pack-show-flash { background: radial-gradient(ellipse,#fff8e4 0%,color-mix(in srgb,var(--pack-color) 65%,transparent) 12%,transparent 60%); animation: pack-soft-light 1.6s both; }
 @keyframes pack-soft-light { 0%,100% {opacity:0} 38% {opacity:.18} 65% {opacity:.55} }
 @keyframes pack-release { 0%,45% {opacity:1;filter:brightness(1)} 65% {opacity:1;filter:brightness(1.4)} 100% {opacity:0;filter:brightness(1.1)} }
-@media(max-width:600px) { .pack-show-card,.pack-show-card:has(.dr-player) {width:calc(50% - 6px);min-height:0} .pack-show-cardback b {font-size:48px} }
+@media(max-width:600px) { .pack-show-card,.pack-show-card:has(.dr-player) {width:118px;min-height:0} .pack-show-card.meilleure,.pack-show-card.meilleure:has(.dr-player) {width:158px} .pack-show-cardback b {font-size:42px} }
 .cel-pack-slider { min-width:0; }
 .cel-slider-navigation { display:flex;align-items:center;justify-content:center;gap:24px;margin:22px 0 10px; }
 .cel-slider-navigation span { min-width:180px;text-align:center;color:var(--craie-dim); }

@@ -27,7 +27,11 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
   cartes: CarteCarriere[] | null; pack: string; garantie?: RareteCarriere; onFermer: () => void; rendreCarte: (carte: CarteCarriere) => ReactNode;
 }) {
   const pret = cartes !== null;
-  const ordre = useMemo(() => cartes ? [...cartes].sort((a,b) => rangPack(a)-rangPack(b) || a.note-b.note) : [], [cartes]);
+  // L'écran final reprend la lecture d'un pack de football : la tête d'affiche
+  // est à gauche, puis toutes les autres cartes se rangent par niveau. Pour
+  // conserver le suspense, la cascade les retourne dans l'autre sens et finit
+  // donc toujours par la meilleure.
+  const ordre = useMemo(() => cartes ? [...cartes].sort((a,b) => rangPack(b)-rangPack(a) || b.note-a.note) : [], [cartes]);
   const plancher = Math.max(0, PALIERS_PACK.indexOf(garantie ?? 'bronze'));
   // Tant que les cartes ne sont pas là, le sommet EST le plancher : la pochette
   // s'affiche à la couleur promise, et la montée en palier attend de savoir.
@@ -58,7 +62,11 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
     if (phase === 'charge') timer = window.setTimeout(() => { setRang(n => n+1); setPhase('evolution'); }, calme ? 120 : 440);
     if (phase === 'evolution') timer = window.setTimeout(() => { verrou.current = false; setPhase('attente'); }, calme ? 120 : 660);
     if (phase === 'ouverture') timer = window.setTimeout(() => setPhase('cartes'), calme ? 250 : 1600);
-    if (phase === 'cartes' && !toutes) timer = window.setTimeout(() => { sons.carte(rangPack(ordre[revelees])); setRevelees(n => n+1); }, calme ? 100 : revelees === ordre.length-1 ? 1250 : 850);
+    if (phase === 'cartes' && !toutes) timer = window.setTimeout(() => {
+      const index = ordre.length - 1 - revelees;
+      sons.carte(rangPack(ordre[index]));
+      setRevelees(n => n+1);
+    }, calme ? 100 : revelees === ordre.length-1 ? 1250 : 720);
     return () => clearTimeout(timer);
   }, [phase, calme, sons, revelees, toutes, ordre]);
 
@@ -118,10 +126,14 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
       <button ref={principale} className="pack-show-touch" aria-label={`Pack ${nomRaretePack(rarete)} — ${t('online.pack.touch')}`} aria-disabled={phase !== 'attente'} onClick={action}/>
       {(phase === 'charge' || phase === 'evolution') && <div className="pack-show-upgrade" key={phase} aria-hidden="true"><i/><i/><span/></div>}
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}
-    </div><p className="pack-show-hint" aria-live="polite">{conseil}</p></> : <div className="pack-show-results">{ordre.map((carte,i) => <div key={carte.id} className={`pack-show-card ${i<revelees?'visible':''} ${i===ordre.length-1?'meilleure':''}`}>
-      {i === ordre.length-1 && i < revelees && <span className="pack-show-best">{t('online.pack.best')}</span>}
-      <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>DESTINY</small><b>DR</b><span>RUGBY</span><i>✦</i></div><div className="pack-show-front" aria-hidden={i>=revelees}>{i<revelees && rendreCarte(carte)}</div></div>
-    </div>)}</div>}
+    </div><p className="pack-show-hint" aria-live="polite">{conseil}</p></> : <div className="pack-show-results" style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
+      const visible = i >= ordre.length - revelees;
+      const meilleure = i === 0;
+      return <div key={carte.id} className={`pack-show-card ${visible?'visible':''} ${meilleure?'meilleure':''}`} style={{ '--slot': i, zIndex: ordre.length - i } as CSSProperties}>
+        {meilleure && visible && <span className="pack-show-best">{t('online.pack.best')}</span>}
+        <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>DESTINY</small><b>DR</b><span>RUGBY</span><i>✦</i></div><div className="pack-show-front" aria-hidden={!visible}>{visible && rendreCarte(carte)}</div></div>
+      </div>;
+    })}</div>}
     {phase === 'cartes' && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={toutes?onFermer:passer}>{toutes?t('online.pack.clubhouse'):t('online.pack.reveal')}</button></footer>}
     <span className="pack-show-sr" aria-live="polite">{muet?'Son désactivé':'Son activé'}. M pour changer le son. Échap pour passer.</span>
   </main></div>, document.body);
