@@ -47,13 +47,19 @@ export function stockageFichier(fichier: string): StockageCarriere {
     async compteParIdentifiant(i) { return copie(base.comptes.find(c => c.identifiant === i) ?? null); },
     async creerCompte(c) {
       if (base.comptes.some(x => x.identifiant === c.identifiant)) return false;
-      base.comptes.push(copie(c)); sauver(); return true;
+      const maintenant = new Date().toISOString();
+      base.comptes.push({ ...copie(c), creeLe: maintenant, vuLe: maintenant }); sauver(); return true;
     },
     async session(e, maintenant) {
       const s = base.sessions[e];
       return copie(s && s.expiration > maintenant ? base.comptes.find(c => c.id === s.compte) ?? null : null);
     },
-    async ouvrirSession(e, compte, expiration) { base.sessions[e] = { compte, expiration }; sauver(); },
+    async ouvrirSession(e, compte, expiration) {
+      base.sessions[e] = { compte, expiration };
+      const cible = base.comptes.find(c => c.id === compte);
+      if (cible) cible.vuLe = new Date().toISOString();
+      sauver();
+    },
     async fermerSession(e) { delete base.sessions[e]; sauver(); },
     async limiter(cle, maximum, fenetre, maintenant) {
       const debut = Math.floor(maintenant / fenetre) * fenetre;
@@ -89,6 +95,21 @@ export function stockageFichier(fichier: string): StockageCarriere {
         ovasDepensesPacks: transactions.filter(t => t.nature === 'pack' && t.ovas < 0).reduce((n, t) => n - t.ovas, 0),
         volumeMarche: base.ligues.flatMap(l => l.etat.ventes).filter(v => v.etat === 'vendue').reduce((n, v) => n + (v.type === 'enchere' ? v.enchere?.montant ?? v.prix : v.prix), 0),
         meilleurOuvreur: ouvreurs[0], meilleurPack: meilleurs[0], plusGrosAchat: achats[0],
+      };
+    },
+    async administration() {
+      const limite = 500;
+      return {
+        comptes: base.comptes.slice(-limite).reverse().map(c => ({
+          id: c.id, pseudo: c.pseudo, creeLe: c.creeLe, vuLe: c.vuLe,
+          ligues: base.ligues.filter(l => l.comptes.includes(c.id)).length,
+        })),
+        ligues: base.ligues.slice(-limite).reverse().map(l => ({
+          id: l.id, code: l.code, nom: l.etat.nom, phase: l.etat.phase, saison: l.etat.saison,
+          clubs: l.etat.clubs.length,
+          createur: base.comptes.find(c => c.id === l.etat.createurId)?.pseudo ?? 'Compte supprime',
+        })),
+        limite, comptesTronques: base.comptes.length > limite, liguesTronquees: base.ligues.length > limite,
       };
     },
     async ligue(id) {

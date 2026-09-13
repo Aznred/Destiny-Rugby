@@ -1,12 +1,15 @@
 import { atelierNeon, type StockageAtelier } from './atelierStockage.js';
 import { neon } from '@neondatabase/serverless';
 import { pushNeon, type StockagePush } from './pushStockage.js';
-import type { EtatCarriereEnLigne, StatistiquesGlobalesCarriere } from '../src/lib/ligue/typesCarriere.js';
+import type { AdministrationCarriere, EtatCarriereEnLigne, StatistiquesGlobalesCarriere } from '../src/lib/ligue/typesCarriere.js';
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
 import { assemblerTransfert, champsDepuisForme, decoderBloc, encoderTransfert, formeTransfert, type BlocTransfert, type ManifestTransfert } from './transfertCarriere.js';
 import { creerLimiteurReserve } from './limiteurReserve.js';
 
-export interface CompteStocke { id: string; identifiant: string; pseudo: string; empreinte: string }
+export interface CompteStocke {
+  id: string; identifiant: string; pseudo: string; empreinte: string;
+  creeLe?: string; vuLe?: string;
+}
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
 export interface PresenceMatchStockee { match: string; compte: string; vu: number }
 /**
@@ -52,6 +55,8 @@ export interface StockageCarriere {
   nombreLigues(compte: string): Promise<number>;
   /** Agrégats administrateur calculés dans Postgres : aucun état JSON ne traverse le réseau. */
   statistiquesGlobales(): Promise<StatistiquesGlobalesCarriere>;
+  /** Repertoire prive du compte kiri, sans empreintes ni jetons de session. */
+  administration(): Promise<AdministrationCarriere>;
   ligue(id: string): Promise<LigueStockee | null>;
   ligueParCode(code: string): Promise<LigueStockee | null>;
   creerLigue(ligue: LigueStockee): Promise<boolean>;
@@ -215,7 +220,10 @@ export function stockageNeon(url: string): StockageCarriere {
       return r[0] ? { ...r[0], empreinte: '' } as CompteStocke : null;
     },
     async ouvrirSession(empreinte, compte, expiration) {
-      await sql`insert into sessions (empreinte,compte,expire_le) values (${empreinte},${compte},${new Date(expiration).toISOString()})`;
+      await sql`with nouvelle_session as (
+        insert into sessions (empreinte,compte,expire_le)
+        values (${empreinte},${compte},${new Date(expiration).toISOString()})
+      ) update comptes set vu_le=now() where id=${compte}`;
     },
     async fermerSession(empreinte) { await sql`delete from sessions where empreinte=${empreinte}`; },
     async limiter(cle, maximum, fenetre, maintenant) {
@@ -327,6 +335,33 @@ export function stockageNeon(url: string): StockageCarriere {
         meilleurOuvreur: x.meilleur_ouvreur as StatistiquesGlobalesCarriere['meilleurOuvreur'],
         meilleurPack: x.meilleur_pack as StatistiquesGlobalesCarriere['meilleurPack'],
         plusGrosAchat: x.plus_gros_achat as StatistiquesGlobalesCarriere['plusGrosAchat'],
+      };
+    },
+    async administration() {
+      const limite = 500;
+      const [comptes, ligues] = await Promise.all([
+        sql`select c.id,c.pseudo,c.cree_le,c.vu_le,count(l.id)::int as ligues
+            from comptes c left join carriere_ligues l on l.comptes @> array[c.id]
+            group by c.id,c.pseudo,c.cree_le,c.vu_le order by c.cree_le desc limit ${limite + 1}`,
+        sql`select l.id,l.code,l.cree_le,l.donnees->>'nom' as nom,l.donnees->>'phase' as phase,
+                   coalesce((l.donnees->>'saison')::int,1) as saison,
+                   jsonb_array_length(coalesce(l.donnees->'clubs','[]'::jsonb))::int as clubs,
+                   coalesce(c.pseudo,'Compte supprime') as createur
+            from carriere_ligues l left join comptes c on c.id::text=l.donnees->>'createurId'
+            order by l.cree_le desc limit ${limite + 1}`,
+      ]);
+      return {
+        comptes: comptes.slice(0, limite).map(x => ({
+          id: String(x.id), pseudo: String(x.pseudo), ligues: Number(x.ligues ?? 0),
+          creeLe: x.cree_le ? new Date(String(x.cree_le)).toISOString() : undefined,
+          vuLe: x.vu_le ? new Date(String(x.vu_le)).toISOString() : undefined,
+        })),
+        ligues: ligues.slice(0, limite).map(x => ({
+          id: String(x.id), code: String(x.code), nom: String(x.nom ?? ''), phase: String(x.phase ?? ''),
+          saison: Number(x.saison ?? 1), clubs: Number(x.clubs ?? 0), createur: String(x.createur),
+          creeLe: x.cree_le ? new Date(String(x.cree_le)).toISOString() : undefined,
+        })),
+        limite, comptesTronques: comptes.length > limite, liguesTronquees: ligues.length > limite,
       };
     },
     async ligue(id) { return lireCompact(id); },

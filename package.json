@@ -54,6 +54,8 @@
     "verify:scale-direct": "vite-node scripts/verifierChargeDirect.ts",
     "verify:packs-catalogue": "vite-node scripts/verifierNouveauxPacks.ts",
     "verify:collection-solo": "vite-node scripts/verifierCollectionSolo.ts",
+    "verify:administration-kiri": "vite-node scripts/verifierAdministrationKiri.ts",
+    "verify:reprise-direct": "vite-node scripts/verifierRepriseDirect.ts",
     "verify:direct-push:secours": "node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierDirectPush.ts",
     "verify:db-scale": "node --env-file-if-exists=.env scripts/verifierOptimisationDb.mjs",
     "verify:db-transfert": "node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierTransfertDb.ts",

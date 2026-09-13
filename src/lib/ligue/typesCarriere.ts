@@ -125,6 +125,19 @@ export interface StatistiquesGlobalesCarriere {
   meilleurPack?: { pseudo: string; pack: string; apparence: RareteCarriere; note: number; joueur: string; portrait?: string; ligue: string };
   plusGrosAchat?: { pseudo: string; joueur: string; montant: number; ligue: string };
 }
+export interface AdministrationCarriere {
+  comptes: {
+    id: string; pseudo: string; creeLe?: string; vuLe?: string; ligues: number;
+  }[];
+  ligues: {
+    id: string; code: string; nom: string; phase: string; saison: number; clubs: number;
+    createur: string; creeLe?: string;
+  }[];
+  /** Une liste bornee protege le panneau si la base grossit fortement. */
+  limite: number;
+  comptesTronques: boolean;
+  liguesTronquees: boolean;
+}
 export interface ObjectifCarriere {
   id: string; clubId: string; libelle: string; type: 'participer' | 'gagner' | 'essais' | 'formation' | 'penalites' | 'serie';
   cible: number; progression: number; recompense: number; debut: string; fin: string; reclame: boolean;

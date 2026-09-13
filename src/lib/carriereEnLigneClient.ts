@@ -1,4 +1,4 @@
-import type { CommandeCarriere, VueCarriereEnLigne, PageCollection, StatistiquesGlobalesCarriere } from './ligue/typesCarriere.js';
+import type { AdministrationCarriere, CommandeCarriere, VueCarriereEnLigne, PageCollection, StatistiquesGlobalesCarriere } from './ligue/typesCarriere.js';
 
 export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean }
 export interface SessionCarriere {
@@ -69,6 +69,8 @@ export const chargerEmblemesCarriere = () =>
 export const chargerSessionCarriere = (signal?: AbortSignal) => requete<SessionCarriere>(undefined, undefined, signal);
 export const chargerStatistiquesGlobales = (signal?: AbortSignal) =>
   requete<StatistiquesGlobalesCarriere>(undefined, undefined, signal, '?statistiques=globales');
+export const chargerAdministrationCarriere = (signal?: AbortSignal) =>
+  requete<AdministrationCarriere>(undefined, undefined, signal, '?administration=1');
 /**
  * ⚠️ ON ANNONCE LA VERSION QU'ON DÉTIENT. Deux octets dans l'URL, et le
  * serveur répond 304 sans lire les 300 à 400 Ko de l'état quand rien n'a

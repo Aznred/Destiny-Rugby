@@ -37,14 +37,14 @@ import { EFFECTIF_MINIMUM, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import type { CompositionManager } from '../types';
 import type { Coequipier } from '../lib/effectif';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
-import type { CarteCarriere, CommandeCarriere, StatistiquesGlobalesCarriere, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
+import type { AdministrationCarriere, CarteCarriere, CommandeCarriere, StatistiquesGlobalesCarriere, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
 import type { OrdreFil, StrategieEnLigne } from '../lib/ligue/matchCarriere';
 import type { CouleursDirect } from '../components/match/TerrainEnDirect';
 import { NotificationsMatch } from '../components/NotificationsMatch';
 import { DirectCinema } from '../components/match/DirectCinema';
 import {
   chargerSessionCarriere, chargerLigueCarriere, chargerDirectCarriere, identifierCarriere, deconnecterCarriere, INCHANGE,
-  creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, signalerPresenceCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, ErreurCarriere,
+  creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, signalerPresenceCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, chargerAdministrationCarriere, ErreurCarriere,
 } from '../lib/carriereEnLigneClient';
 import type { IdentiteLigue } from '../lib/carriereEnLigneClient';
 import type { CataloguesIdentite, GroupeEmblemes, SessionCarriere, TropheeLigue } from '../lib/carriereEnLigneClient';
@@ -64,8 +64,9 @@ import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 import { packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
 import { locale, nombre, t } from '../lib/i18n';
+import { fusionnerDeltaDirect, fusionnerVueLigue } from '../lib/ligue/fusionDirect';
 
-type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'atelier';
+type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'administration' | 'atelier';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
 type VueRencontre = VueCarriereEnLigne['rencontres'][number];
 const onglets = (): { id: Onglet; label: string; icone: NomIcone }[] => [
@@ -523,13 +524,11 @@ export function CarriereEnLigne() {
         const directActif = suivi && derniereVue.current?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine);
         if (directActif) {
           const delta = await chargerDirectCarriere(ligueId, suivi, controleur.signal, connue);
-          if (actif && version === versionRequete.current) setVue(avant => avant && avant.id === delta.id && delta.version >= avant.version ? {
-            // La version de la vue complète reste celle réellement chargée.
-            // Sinon une vente faite pendant le direct pourrait faire monter la
-            // version du delta, puis masquer la vue complète qui la contient.
-            ...avant,
-            rencontres: avant.rencontres.map(r => r.id === delta.rencontre.id ? delta.rencontre : r),
-          } : avant);
+          if (actif && version === versionRequete.current) {
+            // La fusion refuse aussi une réponse de direct plus ancienne ayant
+            // la même version : chrono, score et fil ne peuvent plus reculer.
+            setVue(avant => avant ? fusionnerDeltaDirect(avant, delta) : avant);
+          }
           programmer();
           return;
         }
@@ -543,7 +542,7 @@ export function CarriereEnLigne() {
             if (avant && avant.id === suivante.id && avant.version === suivante.version) inchanges++;
             else inchanges = 0;
 
-            return suivante;
+            return fusionnerVueLigue(avant, suivante);
           });
         }
       } catch (e) { if (actif) setErreur(messageErreur(e)); }
@@ -621,7 +620,7 @@ export function CarriereEnLigne() {
             pendant une rencontre — le direct a son propre bouton « Fermer »,
             qui ramène exactement là d'où l'on vient. */}
         {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / {t('online.season', { n: vue.saison })}</span></div><h1>{club?.nom}</h1><p>{vue.rythme === 7 ? t('online.clubsDaily', { clubs: vue.clubs.length }) : t('online.clubsRate', { clubs: vue.clubs.length, matches: vue.rythme })} · {t(`online.phase.${vue.phase === 'salon' ? 'lobby' : vue.phase === 'saison' ? 'season' : 'break'}`)}</p></div><div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>{t('online.balance')}</span></div></header>}
-        {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')}>{[...onglets(), ...(session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
+        {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')}>{[...onglets(), ...(session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }, { id: 'administration' as const, label: 'Comptes & ligues', icone: 'profil' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} proprietaire={session.compte.id === vue.createurId} notifier={setNotification} />}
@@ -635,6 +634,7 @@ export function CarriereEnLigne() {
           {onglet === 'wiki' && <WikiLigue />}
           {onglet === 'laboratoire' && session.compte.administrateur && vue.laboratoire && <LaboratoireLigue vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'secret' && session.compte.administrateur && <StatistiquesSecretes />}
+          {onglet === 'administration' && session.compte.administrateur && <AdministrationKiri />}
           {onglet === 'atelier' && session.compte.administrateur && <AtelierKiri />}
         </>}
       </>}
@@ -1924,6 +1924,42 @@ function StatistiquesSecretes() {
       <article>{stats.meilleurPack && <PochetteRecord rarete={stats.meilleurPack.apparence} />}<div><small>Meilleur pack</small><b>{stats.meilleurPack?.joueur ?? 'Pas encore de record'}</b><span>{stats.meilleurPack ? `${stats.meilleurPack.note} GEN · ${stats.meilleurPack.pseudo} · ${stats.meilleurPack.ligue}` : '—'}</span></div></article>
       <article><Icone nom="poignee" taille={24} /><div><small>Plus gros achat</small><b>{stats.plusGrosAchat?.joueur || 'Pas encore de vente'}</b><span>{stats.plusGrosAchat ? `${montant(stats.plusGrosAchat.montant)} Ovas · ${stats.plusGrosAchat.pseudo} · ${stats.plusGrosAchat.ligue}` : '—'}</span></div></article>
     </div>
+  </section>;
+}
+
+function AdministrationKiri() {
+  const [vue, setVue] = useState<AdministrationCarriere | null>(null);
+  const [erreur, setErreur] = useState('');
+  const [recherche, setRecherche] = useState('');
+  const [section, setSection] = useState<'comptes' | 'ligues'>('comptes');
+  const normalisee = recherche.trim().toLocaleLowerCase('fr');
+  useEffect(() => {
+    const controleur = new AbortController();
+    void chargerAdministrationCarriere(controleur.signal).then(setVue).catch(e => {
+      if (!controleur.signal.aborted) setErreur(messageErreur(e));
+    });
+    return () => controleur.abort();
+  }, []);
+  if (erreur) return <Vide icone="alerte" titre="Répertoire indisponible">{erreur}</Vide>;
+  if (!vue) return <Vide icone="chrono" titre="Chargement du répertoire">La base prépare les comptes et les ligues.</Vide>;
+  const comptes = vue.comptes.filter(c => `${c.pseudo} ${c.id}`.toLocaleLowerCase('fr').includes(normalisee));
+  const ligues = vue.ligues.filter(l => `${l.nom} ${l.code} ${l.createur} ${l.id}`.toLocaleLowerCase('fr').includes(normalisee));
+  return <section className="cel-panneau cel-admin-kiri">
+    <div className="cel-titre-ligne"><div><div className="eyebrow">Réservé au compte kiri</div><h2>Comptes et ligues créés</h2></div><Icone nom="profil" taille={28} /></div>
+    <p className="cel-note">Ce panneau ne transmet ni identifiant de connexion, ni mot de passe, ni jeton de session.</p>
+    <div className="cel-admin-outils">
+      <nav className="cel-onglets secondaires" aria-label="Contenu du répertoire">
+        <button className={section === 'comptes' ? 'actif' : ''} onClick={() => setSection('comptes')}>Comptes ({montant(vue.comptes.length)})</button>
+        <button className={section === 'ligues' ? 'actif' : ''} onClick={() => setSection('ligues')}>Ligues ({montant(vue.ligues.length)})</button>
+      </nav>
+      <label className="cel-champ"><span>Rechercher</span><input type="search" value={recherche} onChange={e => setRecherche(e.target.value)} placeholder={section === 'comptes' ? 'Pseudo ou identifiant technique…' : 'Nom, code, créateur…'} /></label>
+    </div>
+    {section === 'comptes' ? <div className="cel-table-scroll"><table className="cel-table cel-admin-table"><thead><tr><th>Compte</th><th>Créé</th><th>Dernière connexion</th><th>Ligues</th><th>ID technique</th></tr></thead><tbody>
+      {comptes.map(c => <tr key={c.id}><th>{c.pseudo}</th><td>{c.creeLe ? dateHeure(c.creeLe) : '—'}</td><td>{c.vuLe ? dateHeure(c.vuLe) : '—'}</td><td><b>{c.ligues}</b></td><td><code title={c.id}>{c.id.slice(0, 8)}…</code></td></tr>)}
+    </tbody></table>{!comptes.length && <p className="cel-note">Aucun compte ne correspond à cette recherche.</p>}{vue.comptesTronques && <p className="cel-note">Seuls les {vue.limite} comptes les plus récents sont affichés.</p>}</div>
+      : <div className="cel-table-scroll"><table className="cel-table cel-admin-table"><thead><tr><th>Ligue</th><th>Code</th><th>Créateur</th><th>État</th><th>Saison</th><th>Clubs</th><th>Créée</th></tr></thead><tbody>
+        {ligues.map(l => <tr key={l.id}><th>{l.nom}<small title={l.id}>{l.id.slice(0, 8)}…</small></th><td><code>{l.code}</code></td><td>{l.createur}</td><td>{l.phase || '—'}</td><td>{l.saison}</td><td><b>{l.clubs}</b></td><td>{l.creeLe ? dateHeure(l.creeLe) : '—'}</td></tr>)}
+      </tbody></table>{!ligues.length && <p className="cel-note">Aucune ligue ne correspond à cette recherche.</p>}{vue.liguesTronquees && <p className="cel-note">Seules les {vue.limite} ligues les plus récentes sont affichées.</p>}</div>}
   </section>;
 }
 

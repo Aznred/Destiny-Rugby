@@ -1836,6 +1836,11 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-stats-compteurs article { padding: .85rem; border-left: 2px solid var(--or-400); background: rgba(232, 178, 58, .055); }
 .cel-stats-compteurs strong { display: block; font-family: var(--police-titre); font-size: 1.55rem; color: var(--or-200); }
 .cel-stats-compteurs span { color: var(--brume); font-size: .76rem; }
+.cel-admin-outils { display: grid; grid-template-columns: 1fr minmax(16rem, 24rem); align-items: end; gap: 1rem; margin: 1rem 0; }
+.cel-admin-outils .cel-onglets { margin: 0; }
+.cel-admin-table th:first-child { text-align: left; }
+.cel-admin-table code { padding: .2rem .4rem; border-radius: .3rem; background: rgba(255,255,255,.06); color: var(--or-200); font-size: .75rem; }
+@media (max-width: 720px) { .cel-admin-outils { grid-template-columns: 1fr; } }
 .cel-erreur-champ { margin: -.35rem 0 .25rem; color: var(--danger); font-size: .78rem; }
 .cel-palmares article {
   display: flex;

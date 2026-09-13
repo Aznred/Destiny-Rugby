@@ -442,6 +442,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         return res.status(200).json({ok:true});
       }
       if (req.method === 'GET') {
+        if (url.searchParams.has('administration')) {
+          if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
+          return res.status(200).json(await stockage.administration());
+        }
         if (url.searchParams.get('statistiques') === 'globales') {
           if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
           return res.status(200).json(await stockage.statistiquesGlobales());
