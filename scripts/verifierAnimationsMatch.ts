@@ -16,6 +16,9 @@ let ruckSynchronise = false;
 let passeMemorisee = false;
 let pousseeMeleeVisible = false;
 let combinaisonToucheVisible = false;
+let ballonLibreVisible = false;
+let rebondVisible = false;
+let aplatissageVisible = false;
 let meleeLaPlusLongue = 0;
 let toucheLaPlusLongue = 0;
 let phasePrecedente = match.phase;
@@ -40,6 +43,13 @@ for (let garde = 0; !match.fini && garde < 80_000; garde++) {
     ruckSynchronise ||= engages.length >= 2 && engages.some((p) =>
       Math.hypot(p.cible.x - match.ballon.x, p.cible.y - match.ballon.y) < 1.5);
   }
+  if (match.phase === 'ballonLibre' && match.ballonLibre) {
+    ballonLibreVisible = true;
+    rebondVisible ||= match.ballonLibre.rebonds > 0 || match.ballonLibre.hauteur > 0.05;
+  }
+  aplatissageVisible ||= match.phase === 'aplatissage'
+    && !!match.aplatissage
+    && match.porteur === match.aplatissage.marqueur;
   passeMemorisee ||= (match.volsRecents ?? []).some((v) => v.type === 'passe');
   pousseeMeleeVisible ||= match.phase === 'melee'
     && match.conquete?.type === 'melee'
@@ -60,7 +70,9 @@ assert.ok(passeMemorisee,
   'Les passes courtes doivent rester dans la mémoire visuelle du direct.');
 assert.ok(pousseeMeleeVisible, 'La poussée d’une mêlée doit être visible pendant le direct.');
 assert.ok(combinaisonToucheVisible, 'La combinaison et sa cible doivent être visibles en touche.');
-assert.ok(meleeLaPlusLongue <= 16.01, `Mêlée directe trop longue : ${meleeLaPlusLongue.toFixed(1)} s.`);
-assert.ok(toucheLaPlusLongue <= 12.01, `Touche directe trop longue : ${toucheLaPlusLongue.toFixed(1)} s.`);
+assert.ok(ballonLibreVisible && rebondVisible, 'Un coup de pied dans l’espace doit rebondir sans attribuer le ballon à distance.');
+assert.ok(aplatissageVisible, 'Le marqueur doit conserver et aplatir visiblement le ballon avant les cinq points.');
+assert.ok(meleeLaPlusLongue <= 9.51, `Mêlée directe trop longue : ${meleeLaPlusLongue.toFixed(1)} s.`);
+assert.ok(toucheLaPlusLongue <= 8.51, `Touche directe trop longue : ${toucheLaPlusLongue.toFixed(1)} s.`);
 
-console.log('OK — arrêts raccourcis, conquêtes animées, contact synchronisé, passes mémorisées et transformations visibles.');
+console.log('OK — arrêts raccourcis, conquêtes animées, ballon libre avec rebonds, contact synchronisé et aplatissages visibles.');

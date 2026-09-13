@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { Icone } from '../components/Icone';
 import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import OuverturePack from '../components/OuverturePack';
+import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { useGame } from '../store/useGame';
 import { carteDepuisSource, catalogueBaseCarriere } from '../lib/ligue/catalogueCarriere';
-import type { RareteCarriere } from '../lib/ligue/typesCarriere';
+import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import {
   chargerCollectionSolo, cleCarteSolo, effacerCollectionSolo, etatCollectionSoloVide,
   ouvrirPackSolo, PACKS_SOLO, sauvegarderCollectionSolo, type PackSolo,
@@ -20,6 +21,9 @@ const normaliser = (texte: string) => texte.normalize('NFD').replace(/[\u0300-\u
 export function CollectionSolo() {
   const setEcran = useGame(s => s.setEcran);
   const catalogue = useMemo(() => catalogueBaseCarriere(), []);
+  const packsRoue = useMemo<PackCarriere[]>(() => PACKS_SOLO.map(pack => ({
+    ...pack, prix: 0, garantie: pack.garantie ?? pack.id,
+  })), []);
   const [etat, setEtat] = useState(chargerCollectionSolo);
   const [recherche, setRecherche] = useState('');
   const [rarete, setRarete] = useState<RareteCarriere | 'toutes'>('toutes');
@@ -50,6 +54,11 @@ export function CollectionSolo() {
     setBilan(`${resultat.nouvelles} nouvelle${resultat.nouvelles > 1 ? 's' : ''} carte${resultat.nouvelles > 1 ? 's' : ''} ajoutée${resultat.nouvelles > 1 ? 's' : ''} à ta collection.`);
     setOuverture({ pack, indices: resultat.indices });
   };
+  const ouvrirDepuisRoue = (id: string) => {
+    const pack = PACKS_SOLO.find(candidat => candidat.id === id);
+    if (pack) ouvrir(pack);
+    return Promise.resolve();
+  };
 
   const reinitialiser = () => {
     if (!window.confirm('Effacer toute la collection solo et les statistiques de packs sur cet appareil ?')) return;
@@ -76,12 +85,9 @@ export function CollectionSolo() {
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
       <div className="solo-titre-ligne"><div><div className="eyebrow">Gratuits et illimités</div><h2 id="solo-packs-titre">Choisis un pack</h2></div><span>Une nouvelle carte est recherchée à chaque tirage jusqu’aux 100 %.</span></div>
-      <div className="solo-packs">
-        {PACKS_SOLO.map(pack => <article key={pack.id} className={`solo-pack solo-pack-${pack.id}`}>
-          <div className="solo-pack-visuel" aria-hidden="true"><small>DESTINY</small><b>DR</b><span>{pack.nom}</span></div>
-          <div><span className="solo-gratuit">GRATUIT</span><h3>Pack {pack.nom}</h3><p>{pack.promesse}</p><small>{pack.cartes} cartes · {etat.packsOuverts[pack.id]} ouvert{etat.packsOuverts[pack.id] > 1 ? 's' : ''}</small></div>
-          <button type="button" className="btn primaire" onClick={() => ouvrir(pack)}><Icone nom="cadeau" taille={17} /> Ouvrir gratuitement</button>
-        </article>)}
+      <BoutiquePacks3D packs={packsRoue} solde={0} occupe={ouverture !== null} gratuit onOuvrir={ouvrirDepuisRoue} />
+      <div className="solo-compteurs-packs" aria-label="Packs ouverts par catégorie">
+        {PACKS_SOLO.map(pack => <span key={pack.id}><b>{nombre(etat.packsOuverts[pack.id])}</b> {pack.nom} ouvert{etat.packsOuverts[pack.id] > 1 ? 's' : ''}</span>)}
       </div>
     </section>
 

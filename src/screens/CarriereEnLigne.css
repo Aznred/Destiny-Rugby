@@ -621,7 +621,17 @@
 .cel-conquete-dessin line { stroke: rgba(255, 218, 112, .94); stroke-linecap: round; filter: drop-shadow(0 0 2px rgba(0,0,0,.7)); }
 .cel-conquete-dessin path { fill: #ffda70; filter: drop-shadow(0 0 2px rgba(0,0,0,.7)); }
 .cel-appel-touche circle { fill: rgba(255,218,112,.1); stroke: #ffda70; }
-.cel-appel-touche path { fill: none; stroke: rgba(255,255,255,.88); stroke-dasharray: 1.2 1; }
+.cel-appel-touche path { fill: none; stroke: rgba(255,255,255,.72); }
+.cel-joueur-aplatit circle { animation: cel-aplatir .55s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes cel-aplatir { from { transform: scale(1); } to { transform: scale(1.22,.76); filter: drop-shadow(0 0 1.8px #fff8); } }
+.cel-aplatissage {
+  position: absolute; left: 50%; bottom: .7rem; z-index: 4; display: grid;
+  min-width: min(280px, 68%); padding: .5rem .8rem; border: 1px solid rgba(255,255,255,.6);
+  border-radius: 10px; background: rgba(9,27,17,.9); color: #fff; text-align: center;
+  transform: translateX(-50%); box-shadow: 0 8px 24px #0006;
+}
+.cel-aplatissage strong { color: #ffe08a; font-size: .72rem; letter-spacing: .12em; }
+.cel-aplatissage span { margin-top: .1rem; font-size: .75rem; font-weight: 700; }
 
 /* ⚠️ « pointer-events: none » sur la couche, « auto » sur ce qui se touche :
    sinon le bandeau couvre tout le terrain et le bouton de cadrage n'est plus

@@ -312,7 +312,7 @@ export interface VolDirect {
 
 export interface TerrainDirect {
   pions: PionDirect[];
-  ballon: { x: number; y: number };
+  ballon: { x: number; y: number; hauteur?: number };
   /** Le pion qui porte le ballon : l'écran le colle à sa main. */
   porteurId?: string;
   vol?: VolDirect;
@@ -333,6 +333,8 @@ export interface TerrainDirect {
     combinaison?: 'premierBloc' | 'milieu' | 'fond' | 'leurreDevant';
     cibleId?: string; pousseVers?: CoteEnLigne;
   };
+  /** Aplatissage en cours, assez long pour être reconstruit entre deux relevés. */
+  aplatissage?: { marqueurId: string; progression: number };
   /** Secondes SIMULÉES écoulées par seconde réelle dans la phase en cours. */
   cadence: number;
   /** Minutes de jeu au centième au moment du relevé. */
@@ -951,7 +953,10 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
       cote: MOTEUR_VERS_COTE[p.cote],
       x: r2(p.pos.x), y: r2(p.pos.y), vx: r2(p.vitesse.x), vy: r2(p.vitesse.y),
     })),
-    ballon: { x: r2(e.ballon.x), y: r2(e.ballon.y) },
+    ballon: {
+      x: r2(e.ballon.x), y: r2(e.ballon.y),
+      hauteur: e.ballonLibre ? r2(e.ballonLibre.hauteur) : undefined,
+    },
     phase: e.phase,
     systeme: e.systeme,
     possession: MOTEUR_VERS_COTE[e.possession],
@@ -978,6 +983,12 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
       combinaison: e.conquete.combinaison,
       cibleId: e.conquete.cibleId,
       pousseVers: e.conquete.pousseVers ? MOTEUR_VERS_COTE[e.conquete.pousseVers] : undefined,
+    };
+  }
+  if (e.aplatissage) {
+    terrain.aplatissage = {
+      marqueurId: e.aplatissage.marqueur.id,
+      progression: r2(Math.max(0, Math.min(1, 1 - e.minuteur / 1.35))),
     };
   }
   if (e.porteur) terrain.porteurId = e.porteur.id;

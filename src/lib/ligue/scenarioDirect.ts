@@ -4,7 +4,7 @@ import type { CoteEnLigne, TerrainDirect } from './matchCarriere.js';
 
 export type TypeScenarioDirect =
   | 'coupEnvoi' | 'renvoi22' | 'ruck' | 'melee' | 'touche' | 'maul'
-  | 'penalite' | 'tirAuBut' | 'transformation' | 'apresEssai' | 'miTemps'
+  | 'penalite' | 'tirAuBut' | 'transformation' | 'aplatissage' | 'apresEssai' | 'miTemps'
   | 'jeuRas' | 'pod' | 'jeuLarge' | 'passeSautee' | 'pickAndGo'
   | 'passe' | 'offload' | 'degagement' | 'occupation' | 'chandelle'
   | 'cinquanteVingtDeux' | 'rasant' | 'transversale' | 'drop' | 'penaltouche'

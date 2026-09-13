@@ -27,17 +27,17 @@ export interface ResultatPackSolo {
 export const PACKS_SOLO: readonly PackSolo[] = [
   {
     id: 'bronze', nom: 'Bronze', cartes: 10,
-    promesse: 'Trois cartes gratuites, surtout Bronze. Idéal pour remplir les divisions de base.',
+    promesse: 'Dix cartes gratuites, surtout Bronze. Idéal pour remplir les divisions de base.',
     probabilites: { bronze: 90, argent: 9.5, or: .5, elite: 0, star: 0 },
   },
   {
-    id: 'argent', nom: 'Argent', cartes: 10,
-    promesse: 'Trois cartes gratuites avec davantage de joueurs confirmés et une chance d’Or.',
+    id: 'argent', nom: 'Argent', cartes: 10, garantie: 'argent',
+    promesse: 'Dix cartes gratuites avec davantage de joueurs confirmés et une chance d’Or.',
     probabilites: { bronze: 48, argent: 37.97, or: 14, elite: 0.02, star: .002 },
   },
   {
     id: 'or', nom: 'Or', cartes: 10, garantie: 'or',
-    promesse: 'Trois cartes gratuites, dont au moins une Or ou mieux.',
+    promesse: 'Dix cartes gratuites, dont au moins une Or ou mieux.',
     probabilites: { bronze: 20, argent: 42, or: 37.89, elite: 0.1, star: .01 },
   },
 ] as const;

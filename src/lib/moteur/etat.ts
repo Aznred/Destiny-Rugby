@@ -13,6 +13,7 @@ export type Phase =
   | 'renvoi22'       // renvoi aux 22
   | 'jeuCourant'     // ballon vivant, en main
   | 'ballonEnLAir'   // un coup de pied est en cours
+  | 'ballonLibre'    // ballon au sol : rebonds, roule et course à la récupération
   | 'ruck'
   | 'maul'
   | 'melee'
@@ -20,6 +21,7 @@ export type Phase =
   | 'penalite'       // la faute vient d'être sifflée, l'équipe choisit
   | 'tirAuBut'
   | 'transformation'
+  | 'aplatissage'    // le marqueur contrôle puis pose réellement le ballon
   | 'apresEssai'
   | 'miTemps'
   | 'bagarre'        // ça a dégénéré : le jeu attend l'ordre du joueur
@@ -277,6 +279,34 @@ export interface ConqueteAnimee {
   pousseVers?: Cote;
 }
 
+/** Ballon vivant après un rebond : personne ne le possède encore. */
+export interface BallonLibre {
+  vitesse: Vec;
+  hauteur: number;
+  vitesseVerticale: number;
+  intention: IntentionPied | 'touche';
+  auteurCote: Cote;
+  auteur?: Pion;
+  age: number;
+  rebonds: number;
+}
+
+/** Contexte du duel au sol, conservé entre le plaquage et la sortie. */
+export interface RuckEnCours {
+  porteurId?: string;
+  plaqueurId?: string;
+  attaque: Cote;
+  vitesseAttaque: number;
+  vitesseDefense: number;
+}
+
+/** Bref temps de contrôle du ballon dans l'en-but avant validation de l'essai. */
+export interface Aplatissage {
+  marqueur: Pion;
+  origine: 'jeu' | 'maul';
+  lieu: Vec;
+}
+
 // LE LANCEMENT DE JEU : la combinaison décidée pour la phase qui commence.
 // C'est LUI qui fait circuler le ballon — sans plan, chaque porteur cherchait
 // son voisin le plus proche et le ballon tournait sur trois mètres.
@@ -330,6 +360,9 @@ export interface EtatMatch {
   vol: Vol | null;
   volsRecents?: VolRecent[];
   conquete?: ConqueteAnimee | null;
+  ballonLibre?: BallonLibre | null;
+  ruck?: RuckEnCours | null;
+  aplatissage?: Aplatissage | null;
 
   // Structure de jeu
   lancement: Lancement | null;

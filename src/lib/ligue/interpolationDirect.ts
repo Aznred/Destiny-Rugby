@@ -118,7 +118,7 @@ function ballonAuReleve(t: TerrainDirect, pions: Map<string, Vec>, avance = 0): 
       return { x: p.x + sens * 0.92, y: p.y + 0.42, h: 0.18 };
     }
   }
-  return { x: t.ballon.x, y: t.ballon.y, h: 0 };
+  return { x: t.ballon.x, y: t.ballon.y, h: Math.max(0, t.ballon.hauteur ?? 0) };
 }
 
 function memeVol(a?: VolDirect, b?: VolDirect): boolean {

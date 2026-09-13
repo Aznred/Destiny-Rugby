@@ -10,8 +10,10 @@ const cles = catalogue.map(carte => cleCarteSolo(carte.sourceId));
 assert.equal(new Set(cles).size, catalogue.length, 'Les empreintes locales des joueurs doivent rester uniques.');
 
 let etat = etatCollectionSoloVide();
+let cartesAttendues = 0;
 for (let ouverture = 0; ouverture < 20; ouverture++) {
   const pack = PACKS_SOLO[ouverture % PACKS_SOLO.length];
+  cartesAttendues += pack.cartes;
   const resultat = ouvrirPackSolo(pack, catalogue, etat, () => .37);
   assert.equal(resultat.indices.length, pack.cartes, 'Chaque pack doit livrer le nombre de cartes annoncé.');
   assert.equal(new Set(resultat.indices).size, resultat.indices.length, 'Un même pack ne doit pas contenir deux fois la même carte.');
@@ -20,6 +22,6 @@ for (let ouverture = 0; ouverture < 20; ouverture++) {
   etat = resultat.etat;
 }
 
-assert.equal(etat.possedees.size, 60, 'Vingt packs de trois cartes doivent débloquer soixante joueurs distincts.');
+assert.equal(etat.possedees.size, cartesAttendues, 'Les packs doivent débloquer toutes les cartes annoncées sans doublon tant que le catalogue est incomplet.');
 assert.equal(Object.values(etat.packsOuverts).reduce((somme, valeur) => somme + valeur, 0), 20);
-console.log(`OK — collection solo vérifiée sur ${catalogue.length} joueurs, 3 packs gratuits et 60 tirages protégés.`);
+console.log(`OK — collection solo vérifiée sur ${catalogue.length} joueurs, 3 packs gratuits et ${cartesAttendues} tirages protégés.`);

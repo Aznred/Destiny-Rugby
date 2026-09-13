@@ -70,9 +70,9 @@ const TAMPON_MAX = 6;
 const CLE_PHASE: Record<string, string> = {
   coupEnvoi: 'ml.phase.coupEnvoi', renvoi22: 'ml.phase.renvoi22', ruck: 'ml.phase.ruck',
   melee: 'ml.phase.melee', touche: 'ml.phase.touche', maul: 'ml.phase.maul',
-  ballonEnLAir: 'ml.phase.ballonEnLAir', tirAuBut: 'ml.phase.tirAuBut',
+  ballonEnLAir: 'ml.phase.ballonEnLAir', ballonLibre: 'ml.phase.ballonEnLAir', tirAuBut: 'ml.phase.tirAuBut',
   transformation: 'ml.phase.transformation', penalite: 'ml.phase.penalite',
-  apresEssai: 'ml.phase.apresEssai', miTemps: 'ml.phase.miTemps',
+  aplatissage: 'ml.phase.apresEssai', apresEssai: 'ml.phase.apresEssai', miTemps: 'ml.phase.miTemps',
 };
 
 export interface CouleursDirect { domicile: string; exterieur: string }
@@ -99,6 +99,7 @@ const LIBELLES_SCENARIO: Record<ScenarioDirect['type'], string> = {
   coupEnvoi: 'Coup d’envoi', renvoi22: 'Renvoi aux 22', ruck: 'Ruck', melee: 'Mêlée',
   touche: 'Touche', maul: 'Maul', penalite: 'Pénalité', tirAuBut: 'Tentative au but',
   transformation: 'Transformation', apresEssai: 'Reprise après essai', miTemps: 'Mi-temps',
+  aplatissage: 'Aplatissage',
   jeuRas: 'Jeu au ras', pod: 'Bloc d’avants', jeuLarge: 'Jeu au large',
   passeSautee: 'Passe sautée', pickAndGo: 'Pick-and-go', passe: 'Passe', offload: 'Passe après contact',
   degagement: 'Dégagement', occupation: 'Jeu d’occupation', chandelle: 'Chandelle',
@@ -266,7 +267,11 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     const nomCourt = p.nom.split(' ').at(-1) ?? p.nom;
     const largeurNom = Math.max(tailleTexte * 3.2, nomCourt.length * tailleTexte * 0.64);
     return (
-      <g key={p.id} transform={`translate(${pos.x.toFixed(2)} ${pos.y.toFixed(2)})`}>
+      <g
+        key={p.id}
+        className={affiche.aplatissage?.marqueurId === p.id ? 'cel-joueur-aplatit' : undefined}
+        transform={`translate(${pos.x.toFixed(2)} ${pos.y.toFixed(2)})`}
+      >
         <title>{`${p.numero} · ${p.nom}`}</title>
         <ellipse cx={rayon * 0.14} cy={rayon * 0.35} rx={rayon} ry={rayon * 0.7} fill="rgba(0,0,0,.35)" />
         <circle
@@ -328,7 +333,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       >
         <g transform={vue?.transform}>
           <PelouseMemo />
-          {conquete?.type === 'melee' && (
+          {conquete?.type === 'melee' && conquete.pousseVers && (
             <g className="cel-conquete-dessin">
               <line
                 x1={b.x - sensPoussee * 1.2} y1={b.y - 4.2}
@@ -370,9 +375,15 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
           <div className={`cel-conquete cel-conquete-${conquete.type}`} role="status">
             <strong>{conquete.type === 'melee' ? 'MÊLÉE · POUSSÉE' : 'TOUCHE · COMBINAISON'}</strong>
             <span>{conquete.type === 'melee'
-              ? conquete.progression < 0.32 ? 'Les packs se placent' : conquete.progression < 0.52 ? 'Liaison' : 'Le pack avance'
+              ? conquete.progression < 0.32 ? 'Les packs se placent' : conquete.progression < 0.52 ? 'Liaison' : conquete.pousseVers ? 'Un pack prend l’ascendant' : 'Mêlée stable au centre'
               : LIBELLES_COMBINAISON[conquete.combinaison ?? 'milieu']}</span>
             <i><b style={{ width: `${Math.round(conquete.progression * 100)}%` }} /></i>
+          </div>
+        )}
+        {affiche.aplatissage && (
+          <div className="cel-aplatissage" role="status">
+            <strong>ESSAI EN COURS</strong>
+            <span>Contrôle et aplatissage du ballon</span>
           </div>
         )}
         <div className={`cel-scenario cel-scenario-${scenario.intensite}`} aria-live="polite">
