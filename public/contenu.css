@@ -214,7 +214,7 @@ tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
   font-size: 0.8rem;
 }
 
-.wiki-choix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1.2rem 0 2.4rem; }
+.wiki-choix { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 1rem; margin: 1.2rem 0 2.4rem; }
 .wiki-carte {
   position: relative;
   min-height: 29rem;

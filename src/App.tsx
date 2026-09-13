@@ -40,6 +40,7 @@ const Social = lazy(() => import('./screens/Social').then((m) => ({ default: m.S
 const CreationManager = lazy(() => import('./screens/CreationManager').then((m) => ({ default: m.CreationManager })));
 const Manager = lazy(() => import('./screens/Manager').then((m) => ({ default: m.Manager })));
 const CarriereEnLigne = lazy(() => import('./screens/CarriereEnLigne').then((m) => ({ default: m.CarriereEnLigne })));
+const CollectionSolo = lazy(() => import('./screens/CollectionSolo').then((m) => ({ default: m.CollectionSolo })));
 // La cérémonie 3D tire tout Three.js derrière elle : on ne la charge qu'au
 // moment où un trophée est remporté (sinon elle alourdit le chunk principal).
 const TropheeGagne = lazy(() =>
@@ -179,6 +180,7 @@ export default function App() {
               {ecran === 'creationManager' && managerVisible && <CreationManager />}
               {ecran === 'manager' && Boolean(managerActif) && <Manager />}
               {ecran === 'carriereEnLigne' && <CarriereEnLigne />}
+              {ecran === 'collectionSolo' && <CollectionSolo />}
             </Suspense>
           </motion.div>
         </AnimatePresence>

@@ -23,10 +23,10 @@ const PAGES = [
     court: 'Wiki',
     classe: 'page-wiki',
     sansSommaire: true,
-    titre: 'Wiki Destiny Rugby : deux carrières, deux façons de vivre le rugby',
-    description: 'Le centre d’aide illustré de Destiny Rugby : guides complets de la carrière joueur et de la carrière entraîneur, mécaniques, écrans et conseils.',
-    chapo: 'Entre sur le terrain comme **joueur**, ou dirige tout un club comme **entraîneur**. Ce wiki explique les deux boucles de jeu écran par écran, ce que chaque décision change réellement, et les erreurs à éviter pendant une longue carrière.',
-    suite: ['wiki/carriere-joueur', 'wiki/carriere-entraineur', 'guide', 'moteur'],
+    titre: 'Wiki Destiny Rugby : tous les modes de jeu expliqués',
+    description: 'Le centre d’aide illustré de Destiny Rugby : carrière joueur, carrière entraîneur, ligue privée en ligne, mécaniques, écrans et conseils.',
+    chapo: 'Entre sur le terrain comme **joueur**, dirige tout un club comme **entraîneur**, ou affronte tes amis dans une **ligue privée en ligne**. Ce wiki explique chaque boucle de jeu, ce que les décisions changent réellement et les erreurs à éviter.',
+    suite: ['wiki/carriere-joueur', 'wiki/carriere-entraineur', 'wiki/ligue-en-ligne', 'guide', 'moteur'],
     blocs: [
       { h2: 'Choisis ton parcours', id: 'parcours' },
       'Les deux carrières partagent le même monde, le même calendrier et le même moteur de match. Ce qui change, c’est ton pouvoir : un joueur ne décide que pour lui-même ; un entraîneur porte les résultats, les contrats et l’avenir du club entier.',
@@ -46,6 +46,14 @@ const PAGES = [
           titre: 'Carrière entraîneur',
           texte: 'Compose ton XV, entraîne, recrute, gère le vestiaire et réponds aux objectifs de la direction saison après saison.',
           action: 'Ouvrir le guide entraîneur',
+        },
+        {
+          href: '/wiki/ligue-en-ligne/',
+          image: '/images/wiki/ligue-en-ligne.svg',
+          surtitre: 'Une ligue privée entre amis',
+          titre: 'Ligue en ligne',
+          texte: 'Crée ton club, collectionne des cartes, compose ton XV et dispute des saisons partagées avec tes amis.',
+          action: 'Ouvrir le guide en ligne',
         },
       ] },
 
@@ -69,6 +77,97 @@ const PAGES = [
         { titre: 'Construire', texte: 'Reviens aux conseils de long terme avant l’intersaison et les changements de club.' },
       ] },
       { encadre: 'La carrière entraîneur est ouverte à tous. Choisis « Commencer une carrière », puis « Entraîneur », ou poursuis après la retraite d’un joueur en choisissant cette reconversion.' },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    slug: 'wiki/ligue-en-ligne',
+    court: 'Ligue en ligne',
+    classe: 'page-wiki',
+    imageSociale: '/images/wiki/ligue-en-ligne.svg',
+    titre: 'Ligue en ligne : créer son club et jouer entre amis',
+    description: 'Wiki de la ligue en ligne de Destiny Rugby : invitation, cartes, packs, composition, collectif, marché, matchs en direct et compétitions.',
+    chapo: 'La ligue en ligne est un championnat privé où chaque participant dirige son propre club. Les cartes sont uniques dans la ligue, les décisions sont partagées et les matchs peuvent être suivis en direct.',
+    suite: ['wiki', 'wiki/carriere-joueur', 'wiki/carriere-entraineur', 'moteur', 'guide'],
+    blocs: [
+      {
+        image: '/images/wiki/ligue-en-ligne.svg',
+        alt: 'Deux équipes de rugby s’affrontent sur un terrain vu du dessus, entouré de cartes de joueurs.',
+        legende: 'Une ligue privée réunit plusieurs clubs dans le même univers : calendrier, cartes, marché et trophées sont partagés.',
+        prioritaire: true,
+      },
+
+      { h2: 'La boucle complète en un regard', id: 'boucle-en-ligne' },
+      { parcours: [
+        { titre: 'Rejoindre', texte: 'Crée un compte, ouvre une ligue ou utilise le code reçu d’un ami.' },
+        { titre: 'Bâtir', texte: 'Pars avec trente joueurs Bronze, ouvre des packs et travaille ton collectif.' },
+        { titre: 'Jouer', texte: 'Compose un groupe de vingt-trois et suis les rencontres en direct.' },
+        { titre: 'Durer', texte: 'Négocie sur le marché, dispute les compétitions et construis l’histoire du club.' },
+      ] },
+      { encadre: 'La collection solo gratuite est volontairement séparée. Elle reste sur ton appareil et n’ajoute aucune carte ni monnaie dans une ligue en ligne.' },
+
+      { h2: '1. Créer un compte et rejoindre ses amis', id: 'rejoindre' },
+      'La ligue en ligne possède sa propre sauvegarde partagée. Un compte est donc nécessaire pour retrouver ton club sur un autre appareil et pour empêcher qu’un participant modifie lui-même ses cartes ou son solde.',
+      { liste: [
+        '**Créer une ligue** : choisis son nom, ton club, son écusson, le nombre maximal de participants et le rythme des rencontres.',
+        '**Rejoindre une ligue** : saisis le code d’invitation ou ouvre directement le lien transmis par le créateur.',
+        '**Plusieurs ligues** : un même compte peut gérer un club différent dans plusieurs univers indépendants.',
+      ] },
+      'Le créateur tient le rôle de commissaire. Il lance la saison lorsque deux clubs au minimum sont présents et peut régler son rythme. Chaque membre garde cependant le contrôle exclusif de son propre effectif.',
+
+      { h2: '2. Le départ : trente cartes Bronze', id: 'depart' },
+      'Chaque club reçoit un effectif initial de **trente joueurs Bronze**. Ce groupe permet de couvrir les quinze postes et le banc, mais il ne suffit pas de ranger les meilleures notes : les postes secondaires, la fatigue et les affinités changent la valeur réelle d’une composition.',
+      { tableau: [
+        ['Élément', 'Règle utile'],
+        ['Titulaires', '15 joueurs, un pour chaque rôle du terrain'],
+        ['Remplaçants', '8 joueurs pour couvrir la première ligne, les avants et les lignes arrière'],
+        ['Poste secondaire', 'Autorisé quand il figure sur la carte, avec un malus plus faible qu’un vrai hors-poste'],
+        ['Capitaine', 'Choisi dans la feuille de match'],
+        ['Buteur', 'Choisi manuellement ou laissé au moteur'],
+      ] },
+
+      { h2: '3. Packs, raretés et collection', id: 'packs' },
+      'La boutique conserve toujours les packs **Bronze, Argent et Or**. Seul l’administrateur peut activer la rotation des packs spéciaux depuis l’Atelier ; tant qu’elle est désactivée, aucun pack thématique ne se glisse dans la boutique publique.',
+      'Les probabilités sont visibles avant l’ouverture. Une carte Bronze correspond aux notes les plus basses, puis viennent Argent, Or, Élite et Star. La collection montre le catalogue mondial et distingue ce que ton club a déjà découvert de ce qui lui manque encore.',
+      { encadre: 'Les packs gratuits de la collection solo sont illimités et hors ligne. Les packs d’une ligue en ligne appartiennent à son économie partagée : les deux progressions ne se mélangent jamais.' },
+
+      { h2: '4. Composer un XV cohérent', id: 'composition' },
+      'La feuille de match place quinze titulaires et huit remplaçants. Une carte utilisée à son poste principal donne tout son rendement. Un poste secondaire reste viable mais applique un malus ; un poste sans rapport coûte nettement plus cher en efficacité.',
+      'Le **collectif** mesure la cohérence de l’équipe. Les habitudes de club, les proximités de poste, les nations et l’équilibre des associations produisent des affinités. Ce bonus ne remplace pas le talent, mais il permet à un groupe bien construit de renverser une équipe dont le GEN moyen est supérieur.',
+      { liste: [
+        'Construis d’abord une première ligne complète et un axe 2–8–9–10–15 fiable.',
+        'Garde sur le banc de quoi remplacer les postes spécialisés.',
+        'Regarde le malus affiché avant de valider un joueur hors de son poste principal.',
+        'Compare le collectif total, la forme et la qualité du banc, pas seulement la meilleure carte.',
+      ] },
+
+      { h2: '5. Préparer et suivre un match', id: 'match' },
+      'Le calendrier indique l’heure d’ouverture de chaque rencontre. Quand le direct commence, le match se déroule sur quatre-vingts minutes avec les déplacements, passes, jeux au pied, phases de conquête et duels représentés sur le terrain.',
+      'Le domicile donne un avantage mesuré, jamais une victoire automatique. La force des joueurs compte, mais aussi le collectif, la tactique, la fatigue, la forme du jour et la variance propre au sport. Une équipe moins cotée peut donc créer une surprise sans que le résultat devienne arbitraire.',
+      { liste: [
+        '**Largeur et rythme** modifient la façon d’attaquer et le coût physique.',
+        '**Occupation et pression** changent la prise de risque territoriale et défensive.',
+        '**Le banc** devient décisif quand la fatigue s’installe.',
+        '**Le direct** permet de modifier les consignes sans recalculer soi-même le score.',
+      ] },
+
+      { h2: '6. Acheter, vendre et échanger', id: 'marche' },
+      'Une carte n’existe qu’en un seul exemplaire dans une ligue. Le marché permet une vente directe, une enchère ou un échange entre clubs. Quand une transaction aboutit, la carte change réellement de propriétaire et son historique de clubs est conservé.',
+      'Les **Ovas** financent ces opérations et l’ouverture des packs en ligne. Ils sont propres à la ligue : aucun achat, aucune carte et aucun solde ne sont transférés vers une autre ligue ou vers la collection solo.',
+
+      { h2: '7. Saisons, compétitions et histoire', id: 'competitions' },
+      'Le championnat attribue les points de victoire, de nul et les bonus. Le créateur peut aussi organiser des compétitions avec phase à élimination ou poules, choisir leur identité et leur récompense. Une fois terminés, champions et finalistes rejoignent l’onglet Histoire.',
+      'Le but n’est donc pas seulement d’empiler les cartes les mieux notées. Il faut tenir une saison, anticiper les absences, faire vivre le marché et adapter le groupe aux adversaires. C’est cette continuité qui transforme une suite de matchs en histoire de ligue.',
+
+      { h2: 'Les cinq réflexes du nouveau manager', id: 'conseils' },
+      { liste: [
+        '**Complète les vingt-trois postes avant de viser une vedette.** Une faiblesse spécialisée se paie pendant tout le match.',
+        '**Ouvre la fiche des cartes.** Les postes secondaires et leurs malus évitent les mauvaises surprises.',
+        '**Travaille le collectif.** Deux ou trois associations cohérentes peuvent compter davantage qu’un point de GEN moyen.',
+        '**Protège ton solde.** Une enchère remportée trop cher peut bloquer plusieurs besoins urgents.',
+        '**Regarde le calendrier.** Une équipe forte mais fatiguée devient vulnérable, surtout à l’extérieur.',
+      ] },
     ],
   },
 

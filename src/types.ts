@@ -522,6 +522,7 @@ export type Ecran =
   // ── Le mode manager ─────────────────────────────────────────────────
   | 'creationManager'
   | 'carriereEnLigne'
+  | 'collectionSolo'
   | 'manager';
 
 // ---------------------------------------------------------------------------

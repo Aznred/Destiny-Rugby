@@ -52,6 +52,7 @@ import './CarriereEnLigne.css';
 import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 export { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import { CollectionLigue } from '../components/CollectionLigue';
+import { WikiLigue } from '../components/WikiLigue';
 import OuverturePack from '../components/OuverturePack';
 import { prechargerOuverturePack } from '../lib/prechargementPacks';
 import { NOMS_PACK, apparencePack, nomPackCarriere } from '../lib/presentationPacks';
@@ -64,7 +65,7 @@ import { ModaleMarche } from '../components/ModaleMarche';
 import { packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
 import { locale, nombre, t } from '../lib/i18n';
 
-type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'laboratoire' | 'secret' | 'atelier';
+type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'atelier';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
 type VueRencontre = VueCarriereEnLigne['rencontres'][number];
 const onglets = (): { id: Onglet; label: string; icone: NomIcone }[] => [
@@ -73,6 +74,7 @@ const onglets = (): { id: Onglet; label: string; icone: NomIcone }[] => [
   { id: 'effectif', label: t('online.nav.squad'), icone: 'equipe' }, { id: 'collection', label: t('online.nav.collection'), icone: 'journal' }, { id: 'packs', label: t('online.nav.packs'), icone: 'cadeau' },
   { id: 'marche', label: t('online.nav.market'), icone: 'poignee' }, { id: 'competitions', label: t('online.nav.competitions'), icone: 'trophee' },
   { id: 'histoire', label: t('online.nav.history'), icone: 'journal' },
+  { id: 'wiki', label: 'Wiki', icone: 'livre' },
 ];
 const RARETES = NOMS_PACK;
 const montant = (n: number) => nombre(n);
@@ -630,6 +632,7 @@ export function CarriereEnLigne() {
           {onglet === 'marche' && <Marche vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'competitions' && <Competitions vue={vue} agir={agir} occupe={occupe} proprietaire={session.compte.id === vue.createurId} suivre={setMatchId} />}
           {onglet === 'histoire' && <Histoire vue={vue} />}
+          {onglet === 'wiki' && <WikiLigue />}
           {onglet === 'laboratoire' && session.compte.administrateur && vue.laboratoire && <LaboratoireLigue vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'secret' && session.compte.administrateur && <StatistiquesSecretes />}
           {onglet === 'atelier' && session.compte.administrateur && <AtelierKiri />}

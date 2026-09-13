@@ -1,0 +1,17 @@
+.wiki-ligue { display: grid; gap: 1rem; }
+.wiki-ligue-hero { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; padding: 1.5rem; background: radial-gradient(circle at 85% 20%, #d8ac3c20, transparent 34%), linear-gradient(135deg, #10281e, #08140f); }
+.wiki-ligue-hero h2 { margin: .25rem 0 .45rem; font-family: var(--police-titre); font-size: clamp(1.8rem, 4vw, 3rem); text-transform: uppercase; }
+.wiki-ligue-hero p, .wiki-ligue-carte p, .wiki-ligue-note p { margin: 0; color: var(--craie-dim); line-height: 1.55; }
+.wiki-ligue-hero .btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: .55rem; text-decoration: none; }
+.wiki-ligue-grille { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.wiki-ligue-carte { position: relative; padding: 1.25rem; overflow: hidden; }
+.wiki-ligue-carte::after { content: ''; position: absolute; width: 110px; height: 110px; right: -48px; top: -48px; border-radius: 50%; background: #dcb74512; }
+.wiki-ligue-icone { width: 45px; height: 45px; display: grid; place-items: center; border: 1px solid #e6bd5250; border-radius: 12px; background: #dcb74513; color: var(--or-400); }
+.wiki-ligue-carte h3 { margin: .85rem 0 .45rem; }
+.wiki-ligue-carte ul { margin: .85rem 0 0; padding-left: 1.1rem; color: var(--brume); font-size: .86rem; line-height: 1.65; }
+.wiki-ligue-carte li::marker { color: var(--or-400); }
+.wiki-ligue-note { display: flex; align-items: flex-start; gap: .8rem; padding: 1rem 1.2rem; border-color: #dcb7453b; }
+.wiki-ligue-note > svg { flex: 0 0 auto; color: var(--or-400); }
+.wiki-ligue-note b { display: block; margin-bottom: .25rem; }
+@media (max-width: 900px) { .wiki-ligue-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .wiki-ligue-hero { align-items: flex-start; flex-direction: column; } .wiki-ligue-grille { grid-template-columns: 1fr; } }

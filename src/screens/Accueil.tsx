@@ -121,11 +121,14 @@ export function Accueil() {
               </>
             )}
           </motion.div>
-          <motion.button custom={4} variants={apparait} initial="hidden" animate="show"
-            className="btn fantome accueil-en-ligne" onClick={() => setEcran('carriereEnLigne')}
-            style={{ marginTop: '1rem' }}>
-            <Icone nom="equipe" taille={19} /> Carrière en ligne · Ma ligue privée
-          </motion.button>
+          <motion.div custom={4} variants={apparait} initial="hidden" animate="show" className="accueil-modes-secondaires">
+            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('carriereEnLigne')}>
+              <Icone nom="equipe" taille={19} /> Carrière en ligne · Ma ligue privée
+            </button>
+            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('collectionSolo')}>
+              <Icone nom="cadeau" taille={19} /> Collection solo · Packs gratuits
+            </button>
+          </motion.div>
           <motion.div custom={4} variants={apparait} initial="hidden" animate="show" className="stats-bandeau">
             <div className="stat"><b>15</b><span>{t('accueil.postes')}</span></div>
             <div className="stat"><b>∞</b><span>{t('accueil.scenarios')}</span></div>

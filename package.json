@@ -53,6 +53,7 @@
     "verify:notes-allrugby": "vite-node scripts/verifierRevalorisationAllRugby.ts",
     "verify:scale-direct": "vite-node scripts/verifierChargeDirect.ts",
     "verify:packs-catalogue": "vite-node scripts/verifierNouveauxPacks.ts",
+    "verify:collection-solo": "vite-node scripts/verifierCollectionSolo.ts",
     "verify:direct-push:secours": "node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierDirectPush.ts",
     "verify:db-scale": "node --env-file-if-exists=.env scripts/verifierOptimisationDb.mjs",
     "verify:db-transfert": "node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierTransfertDb.ts",

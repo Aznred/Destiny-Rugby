@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1672 941" role="img" aria-labelledby="title desc">
+  <title id="title">Ligue en ligne Destiny Rugby</title>
+  <desc id="desc">Un terrain de rugby nocturne relie deux équipes et trois cartes de joueurs.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#06120d"/><stop offset="1" stop-color="#173c2b"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0a8"/><stop offset=".5" stop-color="#d7a937"/><stop offset="1" stop-color="#6e4f14"/></linearGradient>
+    <radialGradient id="light"><stop stop-color="#e6bb4c" stop-opacity=".3"/><stop offset="1" stop-color="#e6bb4c" stop-opacity="0"/></radialGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="18" stdDeviation="18" flood-opacity=".55"/></filter>
+  </defs>
+  <rect width="1672" height="941" fill="url(#bg)"/>
+  <circle cx="836" cy="440" r="460" fill="url(#light)"/>
+  <g opacity=".38" fill="none" stroke="#e8f5e9" stroke-width="4">
+    <rect x="255" y="115" width="1162" height="710" rx="32"/>
+    <path d="M836 115v710M255 470h1162"/><circle cx="836" cy="470" r="95"/>
+    <path d="M255 305h135v330H255M1417 305h-135v330h135"/>
+  </g>
+  <g fill="#f5e4a2" opacity=".9">
+    <circle cx="515" cy="305" r="18"/><circle cx="610" cy="420" r="18"/><circle cx="500" cy="560" r="18"/><circle cx="660" cy="650" r="18"/>
+  </g>
+  <g fill="#74c9a2" opacity=".9">
+    <circle cx="1157" cy="305" r="18"/><circle cx="1062" cy="420" r="18"/><circle cx="1172" cy="560" r="18"/><circle cx="1012" cy="650" r="18"/>
+  </g>
+  <g filter="url(#shadow)">
+    <g transform="translate(80 180) rotate(-8 150 250)"><rect width="300" height="450" rx="28" fill="#352117" stroke="#c78653" stroke-width="8"/><rect x="18" y="18" width="264" height="414" rx="18" fill="none" stroke="#ffd1a4" stroke-opacity=".45" stroke-width="3"/><text x="150" y="205" text-anchor="middle" fill="#fff6e3" font-family="sans-serif" font-size="104" font-weight="900">DR</text><text x="150" y="265" text-anchor="middle" fill="#e4aa73" font-family="sans-serif" font-size="28" font-weight="800">BRONZE</text></g>
+    <g transform="translate(1292 180) rotate(8 150 250)"><rect width="300" height="450" rx="28" fill="#253145" stroke="#bdcbdc" stroke-width="8"/><rect x="18" y="18" width="264" height="414" rx="18" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="3"/><text x="150" y="205" text-anchor="middle" fill="#fff" font-family="sans-serif" font-size="104" font-weight="900">DR</text><text x="150" y="265" text-anchor="middle" fill="#dce8f5" font-family="sans-serif" font-size="28" font-weight="800">ARGENT</text></g>
+    <g transform="translate(686 245)"><rect width="300" height="450" rx="28" fill="#342b12" stroke="url(#gold)" stroke-width="9"/><rect x="18" y="18" width="264" height="414" rx="18" fill="none" stroke="#fff1a4" stroke-opacity=".6" stroke-width="3"/><path d="M150 78l25 51 56 8-41 39 10 56-50-27-50 27 10-56-41-39 56-8z" fill="url(#gold)"/><text x="150" y="300" text-anchor="middle" fill="#fff7ce" font-family="sans-serif" font-size="104" font-weight="900">DR</text><text x="150" y="360" text-anchor="middle" fill="#f1cf65" font-family="sans-serif" font-size="28" font-weight="800">LIGUE</text></g>
+  </g>
+  <text x="836" y="865" text-anchor="middle" fill="#fff7dc" font-family="sans-serif" font-size="48" font-weight="900" letter-spacing="12">DESTINY RUGBY</text>
+</svg>

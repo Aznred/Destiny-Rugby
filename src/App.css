@@ -927,6 +927,8 @@
   line-height: 1.6;
 }
 .hero .cta-groupe { display: flex; gap: 0.8rem; margin-top: 1.8rem; flex-wrap: wrap; }
+.accueil-modes-secondaires { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1rem; }
+.accueil-modes-secondaires .btn { display: inline-flex; align-items: center; justify-content: center; gap: .55rem; }
 .hero .stats-bandeau {
   display: flex; gap: 2rem; margin-top: 2.4rem; flex-wrap: wrap;
 }
