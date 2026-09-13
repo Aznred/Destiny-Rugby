@@ -1,8 +1,9 @@
 // LES PHASES ARRÊTÉES — mêlée, touche, ruck, coup d'envoi, tir au but.
 //
-// ⚠️ Chaque formation est calculée UNE SEULE FOIS à l'entrée dans la phase, puis
-// figée : les joueurs COURENT s'y placer. Recalculer le placement à chaque tick,
-// avec du hasard dedans, faisait vibrer les pions sur place.
+// Chaque formation est calculée UNE SEULE FOIS à l'entrée dans la phase, puis
+// figée. Mêlées et touches y sont installées immédiatement avant leur animation ;
+// les autres phases peuvent encore la rejoindre en courant. Recalculer le
+// placement à chaque tick, avec du hasard dedans, faisait vibrer les pions.
 //
 // ⚠️⚠️ UNE SEULE CONVENTION DE SIGNE, ET ELLE EST VITALE.
 // Pour une équipe de sens `s` (+1 pour A, −1 pour B) :

@@ -21,13 +21,36 @@ let rebondVisible = false;
 let aplatissageVisible = false;
 let meleeLaPlusLongue = 0;
 let toucheLaPlusLongue = 0;
+let coupEnvoiLePlusLong = 0;
+let meleePlaceeInstantanement = false;
+let touchePlaceeInstantanement = false;
+let pireEcartAvantEngagement = 0;
 let phasePrecedente = match.phase;
 
 for (let garde = 0; !match.fini && garde < 80_000; garde++) {
+  const phaseAvant = match.phase;
+  const ecartEngagementAvant = phaseAvant === 'coupEnvoi' && match.placement
+    ? Math.max(0, ...match.pions.filter(p => p.surLeTerrain && match.placement?.[p.id])
+      .map(p => Math.hypot(p.pos.x - match.placement![p.id].x, p.pos.y - match.placement![p.id].y)))
+    : 0;
   avancer(match, 0.15);
+  if (phaseAvant === 'coupEnvoi' && match.phase === 'ballonEnLAir') {
+    pireEcartAvantEngagement = Math.max(pireEcartAvantEngagement, ecartEngagementAvant);
+  }
   if (match.phase !== phasePrecedente) {
-    if (match.phase === 'melee') meleeLaPlusLongue = Math.max(meleeLaPlusLongue, match.minuteur);
-    if (match.phase === 'touche') toucheLaPlusLongue = Math.max(toucheLaPlusLongue, match.minuteur);
+    if (match.phase === 'melee') {
+      meleeLaPlusLongue = Math.max(meleeLaPlusLongue, match.minuteur);
+      meleePlaceeInstantanement ||= !!match.placement && match.pions
+        .filter(p => p.surLeTerrain && match.placement?.[p.id])
+        .every(p => Math.hypot(p.pos.x - match.placement![p.id].x, p.pos.y - match.placement![p.id].y) < .01);
+    }
+    if (match.phase === 'touche') {
+      toucheLaPlusLongue = Math.max(toucheLaPlusLongue, match.minuteur);
+      touchePlaceeInstantanement ||= !!match.placement && match.pions
+        .filter(p => p.surLeTerrain && match.placement?.[p.id])
+        .every(p => Math.hypot(p.pos.x - match.placement![p.id].x, p.pos.y - match.placement![p.id].y) < .01);
+    }
+    if (match.phase === 'coupEnvoi') coupEnvoiLePlusLong = Math.max(coupEnvoiLePlusLong, match.minuteur);
     phasePrecedente = match.phase;
   }
   if (match.phase === 'transformation') {
@@ -72,7 +95,14 @@ assert.ok(pousseeMeleeVisible, 'La poussée d’une mêlée doit être visible p
 assert.ok(combinaisonToucheVisible, 'La combinaison et sa cible doivent être visibles en touche.');
 assert.ok(ballonLibreVisible && rebondVisible, 'Un coup de pied dans l’espace doit rebondir sans attribuer le ballon à distance.');
 assert.ok(aplatissageVisible, 'Le marqueur doit conserver et aplatir visiblement le ballon avant les cinq points.');
+assert.ok(meleePlaceeInstantanement && touchePlaceeInstantanement,
+  'Les joueurs doivent être placés immédiatement au début des mêlées et touches.');
 assert.ok(meleeLaPlusLongue <= 9.51, `Mêlée directe trop longue : ${meleeLaPlusLongue.toFixed(1)} s.`);
 assert.ok(toucheLaPlusLongue <= 8.51, `Touche directe trop longue : ${toucheLaPlusLongue.toFixed(1)} s.`);
+assert.ok(coupEnvoiLePlusLong <= 5.01, `Engagement direct trop long : ${coupEnvoiLePlusLong.toFixed(1)} s.`);
+// Mesuré avant le dernier pas de mouvement (jusqu'à ~1,2 m en 150 ms) ; au
+// moment exact du coup de pied le moteur exige 1,1 m ou moins.
+assert.ok(pireEcartAvantEngagement <= 2.41,
+  `L'engagement est parti avec un joueur à ${pireEcartAvantEngagement.toFixed(1)} m de sa place.`);
 
 console.log('OK — arrêts raccourcis, conquêtes animées, ballon libre avec rebonds, contact synchronisé et aplatissages visibles.');

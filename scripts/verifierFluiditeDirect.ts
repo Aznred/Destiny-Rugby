@@ -104,6 +104,18 @@ assert.deepEqual(reprise.at(-1), { x: 112, y: 60 });
 assert.ok(Math.max(...reprise.slice(1).map((p, i) => distance(p, reprise[i]))) < 2,
   'Une reprise lointaine doit rester continue à l’écran.');
 
+// À l'entrée d'une mêlée, d'une touche ou d'un engagement, la formation doit
+// être déjà en place lorsque la nouvelle phase devient visible. Le ballon ne
+// doit pas pour autant dessiner un faux jeu au pied à travers le terrain.
+const placementA = { ...terrain([pion('a', 'domicile', 102, 12)]), phase: 'apresEssai' as const, ballon: { x: 108, y: 18 } };
+const placementB = { ...terrain([pion('a', 'domicile', 49, 35)]), phase: 'coupEnvoi' as const, ballon: { x: 60, y: 35 } };
+assert.ok(interpolerPionsDirect(placementA, placementB, 0.71, 2).get('a')!.x > 49);
+assert.deepEqual(interpolerPionsDirect(placementA, placementB, 0.72, 2).get('a'), { x: 49, y: 35 });
+const ballonAvantPlacement = interpolerBallonDirect(placementA, placementB, new Map(), 0.7);
+const ballonApresPlacement = interpolerBallonDirect(placementA, placementB, new Map(), 1);
+assert.deepEqual(ballonAvantPlacement, { x: 108, y: 18, h: 0 });
+assert.deepEqual(ballonApresPlacement, { x: 60, y: 35, h: 0 });
+
 // Si le couple de paquets change soudainement, la couche d'affichage rejoint
 // la nouvelle vérité sur plusieurs images au lieu de l'appliquer d'un coup.
 let amortie = { pions: new Map([['a', { x: 10, y: 10 }]]), ballon: { x: 10, y: 10, h: 0 } };
@@ -115,4 +127,4 @@ for (let i = 0; i < 45; i++) amortie = amortirImageDirect(amortie, cible, 1 / 60
 assert.ok(distance(amortie.pions.get('a')!, cible.pions.get('a')!) < 0.01,
   'La correction doit converger sans figer le joueur.');
 
-console.log('OK — ballon continu, passes basses, corrections amorties, courses bornées et reprises sans téléportation.');
+console.log('OK — ballon continu, passes basses, corrections amorties et replacements de phase contrôlés.');

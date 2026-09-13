@@ -85,7 +85,7 @@ const ARRETS: Record<string, { visuel: number; horloge: number; direct: number }
   touche: { visuel: 6.5, horloge: 35, direct: 8.5 },
   transformation: { visuel: 4, horloge: 55, direct: 6 },
   tirAuBut: { visuel: 6, horloge: 60, direct: 10 },
-  coupEnvoi: { visuel: 9, horloge: 22, direct: 9 },
+  coupEnvoi: { visuel: 4.5, horloge: 22, direct: 5 },
   renvoi22: { visuel: 7, horloge: 20, direct: 7 },
   apresEssai: { visuel: 3, horloge: 8, direct: 3 },
   penalite: { visuel: 2.5, horloge: 12, direct: 3 },
@@ -133,18 +133,18 @@ function avancementArret(e: EtatMatch): number {
 /**
  * LES PHASES ARRÊTÉES QUI SE JOUENT VRAIMENT.
  *
- * ⚠️ EN DIRECT, UNE FORMATION FIGÉE DEVIENT UNE PHOTO. Le placement d'une
- * mêlée est calculé une fois puis animé en trois temps, afin que les joueurs
- * ne restent pas immobiles pendant toute la préparation.
+ * Le placement initial d'une mêlée ou d'une touche est installé immédiatement
+ * pour que l'arbitre ne lance jamais la conquête avec des joueurs encore en
+ * chemin. La poussée, la liaison et la combinaison restent ensuite animées.
  *
  * Une mêlée se joue donc en trois temps, comme sur un terrain : les deux packs
  * se présentent face à face, ils se lient, puis le plus fort pousse. Une touche
  * se forme : l'alignement se resserre à mesure que le lanceur se prépare. Un
  * tir au but a son rituel : le buteur recule, prend son temps, et s'élance.
  *
- * ⚠️ ON DÉPLACE LA CIBLE, PAS LE PION. Les joueurs gardent leur inertie et
- * courent vers leur nouvelle marque — c'est ce qui rend la liaison d'une mêlée
- * lisible plutôt que saccadée.
+ * Pendant la conquête, on déplace la cible et non le pion : une fois la
+ * formation prête, les joueurs gardent leur inertie pendant la liaison, la
+ * poussée et le saut.
  */
 function animerArret(e: EtatMatch): void {
   const p = avancementArret(e);
@@ -566,12 +566,9 @@ function tick(e: EtatMatch): void {
   for (const p of e.pions) {
     if (!p.surLeTerrain || p.sanction > 0) continue;
     if (p === e.porteur) continue; // le porteur est piloté par sa course
-    // Une touche ou une mêlée raccourcie reste lisible parce que les joueurs
-    // rejoignent la formation d'un trot soutenu, sans saut instantané.
-    const replacement = e.phase === 'melee' || e.phase === 'touche'
-      ? e.tempsReel ? 1.35 : 1.8
-      : 1;
-    deplacer(p, dt * replacement);
+    // Une fois la formation installée, les cibles mobiles de la poussée, du
+    // saut ou des autres rituels restent parcourues avec l'inertie normale.
+    deplacer(p, dt);
   }
 
   e.minuteur -= dt;
@@ -707,33 +704,22 @@ function dire(
   ajouterCommentaire(e, type, cote, texte, points, moi);
 }
 
-// ⚠️ INSTALLER UNE FORMATION. Les joueurs COURENT s'y placer — c'est ce qui
-// rend les phases arrêtées vivantes. Mais un joueur peut avoir cent mètres à
-// parcourir (il vient d'aplatir dans l'en-but et le coup d'envoi se joue au
-// centre) : à 8 m/s, aucune durée raisonnable ne suffit, et le ballon repartait
-// avec la moitié de l'équipe encore en chemin. Au-delà de `seuil` mètres, on
-// replace donc directement — le chronomètre a de toute façon avalé 20 à 60
-// secondes pendant l'arrêt.
+// INSTALLER UNE FORMATION. Mêlées et touches sont placées immédiatement : la
+// conquête ne doit jamais commencer avec un pack ou un alignement incomplet.
+// Pour l'engagement, seuls les longs replacements sont instantanés ; les autres
+// restent visibles, et la remise en jeu attend ensuite que tout le monde soit
+// réellement arrivé. Les autres arrêts directs conservent un replacement
+// naturel à vitesse de course.
 function installerPlacement(e: EtatMatch, placement: Record<string, Vec>, seuil = 26): void {
   e.placement = placement;
-  // ⚠️ EN DIRECT, PERSONNE NE SE TÉLÉPORTE. Le seuil existe parce qu'un
-  // joueur qui vient d'aplatir dans l'en-but a cent mètres à faire et que la
-  // carrière solo ne lui laisse que sept secondes à l'écran. Regardée à la
-  // vitesse réelle, la même téléportation se voit — et c'est précisément le
-  // « les joueurs sont mal placés » du retour de jeu : ils n'étaient pas mal
-  // placés, ils APPARAISSAIENT à leur place. Les durées directes restent assez
-  // longues pour rejoindre la formation à vitesse normale.
-  // Les deux conquêtes se regardent : même en solo accéléré, leur mise en
-  // place doit être une course courte et continue, jamais un changement de
-  // coordonnées. Les reprises lointaines gardent leur seuil afin de ne pas
-  // démarrer avec quinze joueurs encore dans l'en-but précédent.
-  if (e.tempsReel || e.phase === 'melee' || e.phase === 'touche') seuil = Infinity;
+  const instantane = e.phase === 'melee' || e.phase === 'touche';
+  if (e.tempsReel && !instantane && e.phase !== 'coupEnvoi') seuil = Infinity;
   for (const p of e.pions) {
     if (!p.surLeTerrain || p.sanction > 0) continue;
     const c = placement[p.id];
     if (!c) continue;
     p.cible = c;
-    if (distance(p.pos, c) > seuil) {
+    if (instantane || distance(p.pos, c) > seuil) {
       p.pos = { x: c.x, y: c.y };
       stopper(p);
     }
@@ -802,6 +788,14 @@ function viserLeCoupEnvoi(e: EtatMatch, pour: Cote): void {
 
 function phaseCoupEnvoi(e: EtatMatch): void {
   if (e.minuteur > 0) return;
+  // Le coup d'envoi ne part jamais pendant que des joueurs rejoignent encore
+  // leur ligne. L'attente se fait par petits pas et ne dure que si quelqu'un
+  // est réellement hors de sa place.
+  if (e.placement) {
+    const pasPrets = e.pions.some((p) => p.surLeTerrain && p.sanction <= 0
+      && e.placement?.[p.id] && distance(p.pos, e.placement[p.id]) > 1.1);
+    if (pasPrets) { e.minuteur = 0.3; return; }
+  }
   const camp = e.possession;
   const liste = surLeTerrain(e, camp);
   const botteur = liste.find((p) => p.buteur) ?? maillot(liste, 10) ?? liste[0];

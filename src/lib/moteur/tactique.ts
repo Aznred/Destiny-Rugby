@@ -107,7 +107,7 @@ function repartirY(pions: Pion[], ecartMin: number): void {
 // Profondeur (en mètres derrière la ligne d'avantage) de chaque poste de la
 // ligne de trois-quarts. Ce sont les distances réelles d'une attaque lancée.
 const PROFONDEUR: Record<number, number> = {
-  9: 1.2, 10: 9.5, 12: 11.5, 13: 12.5, 11: 13, 14: 13, 15: 17,
+  9: 1.2, 10: 5.5, 12: 6.8, 13: 8, 11: 9.2, 14: 9.2, 15: 12.5,
 };
 
 function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
@@ -122,7 +122,10 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
   // lancement et il tient sa position. Sans ça, les huit avants suivaient le
   // porteur d'un bord à l'autre et les trente joueurs finissaient en paquet
   // (mesuré : 11 joueurs en moyenne dans un cercle de 8 m, jusqu'à 23).
-  const largeur = e.origine ? e.origine.y : ancre.y;
+  // La structure conserve la largeur du lancement, mais elle accompagne aussi
+  // le porteur. Un ancrage entièrement figé laissait les soutiens quarante
+  // mètres à l'opposé après un changement de couloir.
+  const largeur = e.origine ? melanger(e.origine.y, ancre.y, 0.48) : ancre.y;
   const lancement = e.lancement;
 
   // ── Qui est déjà dans la chaîne de passes ? Ceux-là courent une ligne de
@@ -227,6 +230,17 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
   // La ligne de trois-quarts s'étage vraiment : cinq mètres au minimum entre
   // deux joueurs, même quand le ballon sort d'un ruck collé à la touche.
   repartirY(ligneTroisQuarts, 5);
+
+  // Dernier garde-fou collectif : hors porteur, chaque cible offensive reste
+  // en retrait de la ligne du ballon. Les répartitions de largeur et les
+  // appels continuent d'exister, mais personne ne dérive devant le porteur à
+  // cause d'un changement brutal de couloir ou d'une cible héritée.
+  for (const p of liste) {
+    if (p === porteur) continue;
+    if ((p.cible.x - ancre.x) * s > -0.6) {
+      p.cible.x = bornerX(ancre.x - s * 0.6);
+    }
+  }
 }
 
 // La ligne de soutien d'un receveur : en dehors et légèrement en retrait du
@@ -324,9 +338,13 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
     const rang = Math.abs(i - (nFerme - 0.5));
     // Parapluie : en blitz les extérieurs montent plus vite, en glissée ils
     // restent légèrement en retrait pour ne pas se faire prendre à l'intérieur.
-    const forme = systeme === 'blitz' ? -sa * rang * 0.32
-      : systeme === 'glissee' ? sa * rang * 0.42
-      : sa * rang * 0.2;
+    // Le système change la vitesse et la glissée, pas l'existence de la ligne.
+    // Le léger parapluie est borné à moins d'un mètre afin que le rideau reste
+    // immédiatement lisible et que les défenseurs montent ensemble.
+    const formeBrute = systeme === 'blitz' ? -sa * rang * 0.12
+      : systeme === 'glissee' ? sa * rang * 0.14
+      : sa * rang * 0.08;
+    const forme = borner(formeBrute, -0.85, 0.85);
     p.cible = {
       x: bornerX(e.ligneDef + forme),
       y: (cibles[i] ?? ancre.y) + ouvert * glisse,
@@ -346,7 +364,7 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   if (!porteur || porteur.cote === cote) return;
   const candidats = ligne.filter((p) => p.battu <= 0);
   candidats.sort((a, b) => distance2(a.pos, porteur.pos) - distance2(b.pos, porteur.pos));
-  const chasseurs = candidats.filter((p) => (p.pos.x - porteur.pos.x) * sa >= -1.5).slice(0, 3);
+  const chasseurs = candidats.filter((p) => (p.pos.x - porteur.pos.x) * sa >= -1.5).slice(0, 2);
   // ⚠️ LE PREMIER CHASSEUR VISE LE PORTEUR, PAS À CÔTÉ. Testé : décaler ces
   // trois-là d'un mètre six suffisait à faire chuter les plaquages réussis de
   // 250 à 190 et grimper les percées de 20 à 28 — le rayon de plaquage n'est
@@ -464,7 +482,10 @@ export function placerEquipes(e: EtatMatch): void {
     }
     if (arret || p.role === 'chasseur') { p.effort = 1; continue; }
     const d2 = distance2(p.pos, e.ballon);
-    p.effort = d2 < 400 ? 1 : d2 < 1600 ? 0.76 : 0.5;
+    p.effort = d2 < 400 ? 1 : d2 < 1600 ? 0.8 : 0.64;
+    // Un joueur en retard sur sa ligne accélère pour reprendre sa place, même
+    // s'il est loin du ballon. C'est la priorité collective qui manquait.
+    if (distance2(p.pos, p.cible) > 100) p.effort = Math.max(p.effort, 0.86);
     const rythme = e.tactiques[p.cote]?.rythme;
     p.effort *= rythme === 'intense' ? 1.08 : rythme === 'gestion' ? 0.92 : 1;
   }

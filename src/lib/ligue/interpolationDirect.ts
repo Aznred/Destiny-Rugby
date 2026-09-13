@@ -12,6 +12,9 @@ export interface ImageDirect {
 
 const borner01 = (n: number): number => borner(n, 0, 1);
 const melanger = (a: number, b: number, u: number): number => a + (b - a) * u;
+const PHASES_REPLACEMENT_BALLON = new Set([
+  'melee', 'touche', 'coupEnvoi', 'renvoi22', 'tirAuBut', 'transformation',
+]);
 
 /** Courbe sans à-coup, mais qui reste strictement entre son départ et son arrivée. */
 export function adoucirDirect(u: number): number {
@@ -92,9 +95,13 @@ function positionVol(vol: VolDirect, kBrut: number): BallonAfficheDirect {
 export function interpolerPionsDirect(a: TerrainDirect, b: TerrainDirect, u: number, dtSim: number): Map<string, Vec> {
   const resultat = new Map<string, Vec>();
   const parId = new Map(b.pions.map((p) => [p.id, p]));
+  const formationInstantanee = a.phase !== b.phase
+    && (b.phase === 'melee' || b.phase === 'touche' || b.phase === 'coupEnvoi');
   for (const p0 of a.pions) {
     const p1 = parId.get(p0.id);
-    resultat.set(p0.id, p1 ? positionPion(p0, p1, u, dtSim) : { x: p0.x, y: p0.y });
+    resultat.set(p0.id, p1
+      ? formationInstantanee && u >= 0.72 ? { x: p1.x, y: p1.y } : positionPion(p0, p1, u, dtSim)
+      : { x: p0.x, y: p0.y });
   }
   // Un remplaçant n'apparaît qu'au terme de la transition. Le composant le
   // dessine avec le second relevé, jamais au milieu de l'action précédente.
@@ -200,6 +207,17 @@ export function interpolerBallonDirect(
   u: number,
 ): BallonAfficheDirect {
   const t = borner01(u);
+  // Quand l'arbitre replace le ballon pour une conquête, une transformation
+  // ou un engagement, on ne dessine pas un faux coup de pied lent à travers le
+  // terrain. La balle reste au lieu de l'action, puis rejoint son nouveau point
+  // au sol pendant la fin de transition, en quelques images fluides.
+  const replacement = a.phase !== b.phase && !b.vol && PHASES_REPLACEMENT_BALLON.has(b.phase);
+  if (replacement) {
+    const debut = ballonAuReleve(a, new Map(a.pions.map((p) => [p.id, { x: p.x, y: p.y }])));
+    const fin = ballonAuReleve(b, new Map(b.pions.map((p) => [p.id, { x: p.x, y: p.y }])));
+    const k = adoucirDirect(borner01((t - 0.72) / 0.28));
+    return { x: melanger(debut.x, fin.x, k), y: melanger(debut.y, fin.y, k), h: melanger(debut.h, fin.h, k) };
+  }
   const recent = ballonDepuisVolsRecents(a, b, pions, t);
   if (recent) return recent;
   if (a.vol && b.vol && memeVol(a.vol, b.vol)) {
