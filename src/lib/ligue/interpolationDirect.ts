@@ -79,7 +79,7 @@ function positionVol(vol: VolDirect, kBrut: number): BallonAfficheDirect {
   const signe = ((vol.seed ?? 0) & 1) === 0 ? 1 : -1;
   const amplitude = vol.seed === undefined ? 0 : vol.type === 'pied'
     ? Math.min(1.8, distance * 0.018)
-    : Math.min(1.15, distance * 0.065);
+    : Math.min(0.42, distance * 0.022);
   const courbe = distance > 0.01 ? Math.sin(Math.PI * k) * amplitude * signe : 0;
   return {
     x: melanger(vol.de.x, vol.vers.x, k) - (dy / Math.max(0.01, distance)) * courbe,
@@ -121,7 +121,7 @@ function ballonAuReleve(t: TerrainDirect, pions: Map<string, Vec>, avance = 0): 
   return { x: t.ballon.x, y: t.ballon.y, h: 0 };
 }
 
-function memeVol(a?: VolDirect, b?: VolDirect): a is VolDirect {
+function memeVol(a?: VolDirect, b?: VolDirect): boolean {
   if (!a || !b) return false;
   if (a.id && b.id) return a.id === b.id;
   const proche = (x: number, y: number) => Math.abs(x - y) < 0.08;
@@ -202,7 +202,7 @@ export function interpolerBallonDirect(
   const t = borner01(u);
   const recent = ballonDepuisVolsRecents(a, b, pions, t);
   if (recent) return recent;
-  if (memeVol(a.vol, b.vol)) {
+  if (a.vol && b.vol && memeVol(a.vol, b.vol)) {
     const vol: TerrainDirect = {
       ...a,
       vol: { ...a.vol, ecoule: melanger(a.vol.ecoule, b.vol!.ecoule, t) },
@@ -216,8 +216,9 @@ export function interpolerBallonDirect(
   const doux = adoucirDirect(t);
   const distance = Math.hypot(arrivee.x - depart.x, arrivee.y - depart.y);
   const volManque = !a.vol || !b.vol;
+  const coupDePied = a.vol?.type === 'pied' || b.vol?.type === 'pied';
   const arche = volManque && distance > 2
-    ? Math.min(3.8, distance * 0.11) * Math.sin(Math.PI * t)
+    ? (coupDePied ? Math.min(3.8, distance * 0.11) : Math.min(0.12, distance * 0.006)) * Math.sin(Math.PI * t)
     : 0;
   // Même si une passe entière a eu lieu entre deux relevés, elle garde une
   // courbe cohérente en vue de dessus au lieu de couper le terrain au cordeau.
@@ -225,7 +226,7 @@ export function interpolerBallonDirect(
   const dy = arrivee.y - depart.y;
   const signe = ((a.snapshot ?? 0) + (b.snapshot ?? 0)) % 2 === 0 ? 1 : -1;
   const courbe = volManque && distance > 2
-    ? Math.min(1.15, distance * 0.06) * Math.sin(Math.PI * t) * signe
+    ? (coupDePied ? Math.min(1.8, distance * 0.025) : Math.min(0.4, distance * 0.02)) * Math.sin(Math.PI * t) * signe
     : 0;
   return {
     x: melanger(depart.x, arrivee.x, doux) - (dy / Math.max(0.01, distance)) * courbe,
@@ -240,7 +241,37 @@ export function interpolerImageDirect(a: TerrainDirect, b: TerrainDirect, u: num
   return { pions, ballon: interpolerBallonDirect(a, b, pions, u) };
 }
 
-/** Courte projection de secours lorsque le prochain relevé n'est pas encore arrivé. */
+/**
+ * Absorbe la correction entre la position déjà dessinée et la nouvelle cible.
+ *
+ * L'interpolation serveur reconstruit le bon film, mais un paquet retardé peut
+ * changer soudainement le couple de relevés utilisé. Cette dernière couche ne
+ * modifie jamais la simulation : elle fait simplement rejoindre la nouvelle
+ * vérité sur plusieurs images, à 60 FPS, plutôt que de téléporter les pions.
+ */
+export function amortirImageDirect(courante: ImageDirect | null, cible: ImageDirect, dt: number): ImageDirect {
+  if (!courante || courante.pions.size === 0 || dt <= 0) return cible;
+  const alphaPion = 1 - Math.exp(-14 * Math.min(dt, 0.1));
+  const alphaBallon = 1 - Math.exp(-30 * Math.min(dt, 0.1));
+  const pions = new Map<string, Vec>();
+  for (const [id, destination] of cible.pions) {
+    const depart = courante.pions.get(id);
+    pions.set(id, depart ? {
+      x: melanger(depart.x, destination.x, alphaPion),
+      y: melanger(depart.y, destination.y, alphaPion),
+    } : destination);
+  }
+  return {
+    pions,
+    ballon: {
+      x: melanger(courante.ballon.x, cible.ballon.x, alphaBallon),
+      y: melanger(courante.ballon.y, cible.ballon.y, alphaBallon),
+      h: melanger(courante.ballon.h, cible.ballon.h, alphaBallon),
+    },
+  };
+}
+
+/** Projection de secours bornée lorsque le prochain relevé n'est pas encore arrivé. */
 export function projeterImageDirect(t: TerrainDirect, secondesReelles: number): ImageDirect {
   const avance = borner(secondesReelles, 0, 1.2) * t.cadence;
   const pions = new Map<string, Vec>();

@@ -7210,28 +7210,51 @@ select:focus {
 
 .ct-panneau {
   position: relative;
-  padding: 14px;
-  background: linear-gradient(165deg, var(--pelouse-700), var(--pelouse-800));
+  padding: 16px;
+  background:
+    radial-gradient(circle at 12% 0, color-mix(in srgb, var(--or-400) 13%, transparent), transparent 29%),
+    linear-gradient(165deg, color-mix(in srgb, var(--pelouse-700) 88%, #17304f), var(--pelouse-800));
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--rayon);
+  border-top: 2px solid color-mix(in srgb, var(--or-400) 70%, transparent);
+  border-radius: 14px;
   box-shadow: var(--ombre-2), inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 .ct-panneau header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.ct-panneau header b { font: 700 16px/1.2 'Archivo', sans-serif; }
-.ct-panneau header strong { font: 800 28px/1 'Anton', sans-serif; color: var(--or-400); }
-.ct-ident { margin: 2px 0 10px; font-size: 12px; color: var(--craie-dim); }
+.ct-panneau header b { font: 750 17px/1.18 'Archivo', sans-serif; overflow-wrap:anywhere; }
+.ct-panneau header strong { font: 800 31px/1 'Anton', sans-serif; color: var(--or-400); }
+.ct-ident { display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; margin: 4px 0 13px; font-size: 11.5px; color: var(--craie-dim); }
 .ct-adq-txt { display: block; margin-top: 4px; font-style: normal; }
 .ct-fermer {
   position: absolute; top: 8px; right: 8px; width: 32px; height: 32px;
   border-radius: var(--rayon-pilule); border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(0, 0, 0, 0.24); color: var(--craie); cursor: pointer;
 }
-.ct-jauges label { display: grid; grid-template-columns: 74px 1fr 44px; align-items: center; gap: 6px; font-size: 11.5px; margin-bottom: 4px; }
-.ct-jauges progress { width: 100%; height: 8px; }
+.ct-roles-joueur { margin:0 0 11px; padding:10px; border:1px solid rgba(255,255,255,.1); border-radius:10px; background:rgba(0,0,0,.16); }
+.ct-roles-joueur > b { display:block; margin-bottom:7px; color:var(--craie-dim); font:800 9.5px/1 'Archivo',sans-serif; letter-spacing:.12em; }
+.ct-roles-joueur > div { display:flex; flex-wrap:wrap; gap:6px; }
+.ct-poste-principal,.ct-poste-secondaire { display:flex; align-items:center; gap:7px; min-width:0; padding:6px 8px 6px 6px; border:1px solid rgba(255,255,255,.11); border-radius:8px; background:rgba(255,255,255,.055); font:700 10.5px/1.15 'Archivo',sans-serif; }
+.ct-poste-principal { border-color:color-mix(in srgb,#6fd08c 48%,transparent); background:color-mix(in srgb,#245f3b 27%,transparent); }
+.ct-poste-principal i,.ct-poste-secondaire i { display:grid; place-items:center; width:25px; height:25px; border-radius:7px; background:rgba(0,0,0,.28); color:var(--or-200); font:800 13px/1 'Archivo',sans-serif; font-style:normal; }
+.ct-poste-principal span span,.ct-poste-secondaire span span { display:block; }
+.ct-poste-principal small,.ct-poste-secondaire small { display:block; margin-bottom:2px; color:var(--craie-dim); font:600 8px/1 'Archivo',sans-serif; text-transform:uppercase; letter-spacing:.07em; }
+.ct-sans-secondaire { display:block; margin-top:6px; color:var(--craie-dim); font-size:10px; }
+.ct-impact-poste { margin:0 0 12px; padding:10px 11px; border:1px solid; border-radius:10px; background:rgba(0,0,0,.17); }
+.ct-impact-poste > div { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.ct-impact-poste > div span { display:inline-flex; align-items:center; gap:6px; font:750 12px/1.2 'Archivo',sans-serif; }
+.ct-impact-poste > div strong { font:800 18px/1 'Archivo',sans-serif; }
+.ct-impact-poste p { margin:5px 0 3px; font-size:11px; }
+.ct-impact-poste small { display:block; color:var(--craie-dim); font-size:10px; line-height:1.35; }
+.ct-impact-naturel { border-color:rgba(111,208,140,.4); }
+.ct-impact-secondaire { border-color:rgba(232,193,90,.52); background:rgba(96,72,19,.17); }
+.ct-impact-horsPoste { border-color:rgba(227,112,95,.55); background:rgba(104,39,31,.2); }
+.ct-jauges { margin:0 0 11px; padding:9px 10px 5px; border-radius:9px; background:rgba(255,255,255,.035); }
+.ct-jauges label { display: grid; grid-template-columns: 72px 1fr 38px; align-items: center; gap: 7px; font-size: 11.5px; margin-bottom: 5px; }
+.ct-jauges progress { width: 100%; height: 7px; }
 .ct-jauges i { font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
-.ct-attributs { list-style: none; margin: 10px 0; padding: 0; }
-.ct-attributs li { display: grid; grid-template-columns: 38px 1fr 30px; align-items: center; gap: 6px; font-size: 11.5px; margin-bottom: 3px; }
-.ct-attributs progress { width: 100%; height: 8px; }
+.ct-attributs { list-style: none; margin: 10px 0; padding: 10px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(0,0,0,.12); }
+.ct-attributs li { display: grid; grid-template-columns: 38px 1fr 30px; align-items: center; gap: 7px; font-size: 11.5px; margin-bottom: 5px; }
+.ct-attributs li:last-child { margin-bottom:0; }
+.ct-attributs progress { width: 100%; height: 7px; }
 .ct-attributs b { text-align: right; font-variant-numeric: tabular-nums; }
 .ct-brut summary { cursor: pointer; font-size: 11.5px; color: var(--craie-dim); }
 .ct-brut ul { list-style: none; margin: 6px 0 0; padding: 0; }

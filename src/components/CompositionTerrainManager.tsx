@@ -24,7 +24,7 @@ import { useGlisserDeposer } from './GlisserDeposer';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, RefObject, ReactNode } from 'react';
-import { nomPoste } from '../data/rugby';
+import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { t } from '../lib/i18n';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import {
@@ -335,6 +335,10 @@ function PanneauJoueur({
   const rarete = rareteDe(joueur);
   const adequation = posteSlot
     ? adequationAuPoste(joueur.poste, posteSlot, joueur.postesSecondaires) : 'naturel';
+  const rendement = facteurDePerformance(adequation);
+  const noteEffective = Math.round(joueur.note * rendement);
+  const postesSecondaires = [...new Set(joueur.postesSecondaires ?? [])]
+    .filter((poste) => poste !== joueur.poste);
   const liaisons = (PARTENAIRES[joueur.poste] ?? [])
     .map((p) => ({ poste: p, joueur: coequipiers.get(p) }))
     .filter((l): l is { poste: PosteId; joueur: Coequipier } => !!l.joueur);
@@ -350,18 +354,44 @@ function PanneauJoueur({
         <strong>{joueur.note}</strong>
       </header>
       <p className="ct-ident">
-        {nomPoste(joueur.poste)} · {joueur.nation} · {joueur.age} {t('compo.ans')}
+        <span>{joueur.nation} · {joueur.age} {t('compo.ans')}</span>
         <em className={`ct-rarete ct-r-txt-${rarete}`}>
           <Icone nom="etoile" taille={12} /> {NOM_RARETE[rarete]}
           {estPepite(joueur) && <b className="ct-pepite-txt"> · {t('compo.badge.espoir')}</b>}
         </em>
-        {posteSlot && adequation !== 'naturel' && (
-          <em className={`ct-adq-txt ct-adq-${adequation}`}>
-            <PastilleAdequation adequation={adequation} /> {t(`compo.adq.${adequation}`)}
-            {' '}({Math.round((1 - facteurDePerformance(adequation)) * 100)} %)
-          </em>
-        )}
       </p>
+
+      <section className="ct-roles-joueur" aria-label="Postes possibles">
+        <b>POSTES POSSIBLES</b>
+        <div>
+          <span className="ct-poste-principal">
+            <i>{POSTE_PAR_ID[joueur.poste]?.numero}</i>
+            <span><small>Principal</small>{nomPoste(joueur.poste)}</span>
+          </span>
+          {postesSecondaires.map((poste) => (
+            <span className="ct-poste-secondaire" key={poste}>
+              <i>{POSTE_PAR_ID[poste]?.numero}</i>
+              <span><small>Secondaire</small>{nomPoste(poste)}</span>
+            </span>
+          ))}
+        </div>
+        {!postesSecondaires.length && <small className="ct-sans-secondaire">Aucun poste secondaire recensé</small>}
+      </section>
+
+      {posteSlot && (
+        <section className={`ct-impact-poste ct-impact-${adequation}`} aria-label="Impact du poste choisi">
+          <div>
+            <span><PastilleAdequation adequation={adequation} /> {adequation === 'naturel' ? 'Poste naturel' : adequation === 'secondaire' ? 'Poste secondaire' : 'Hors poste'}</span>
+            <strong>{Math.round(rendement * 100)} %</strong>
+          </div>
+          <p>Aligné n°{POSTE_PAR_ID[posteSlot]?.numero} · {nomPoste(posteSlot)}</p>
+          <small>
+            {adequation === 'naturel'
+              ? `Aucun malus : GEN ${joueur.note} conservé en match.`
+              : `Malus de ${Math.round((1 - rendement) * 100)} % : GEN ${joueur.note} → ${noteEffective} en match.`}
+          </small>
+        </section>
+      )}
 
       {etat && (etat.condition !== undefined || etat.forme !== undefined) && (
         <div className="ct-jauges">

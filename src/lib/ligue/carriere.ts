@@ -308,6 +308,7 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
   entier(config.rythme, 1, 7);
   texte(graine, 200);
   const etat: EtatCarriereEnLigne = { schema: 1, id: config.id, nom: config.nom.trim(), code: config.code, createurId: config.compteId, creeLe: dateServeur(maintenant), version: 1, saison: 1, phase: 'salon', rythme: config.rythme, maxClubs: config.maxClubs, graine,
+    rotationPacks: catalogueAdmin().rotationPacks === true,
     // ⚠️ LE VIVIER NE SE COPIE PAS DANS LA LIGUE. Le catalogue mondial compte
     // 78 083 joueurs, soit 26 Mo de JSON : les recopier ici, ce serait réécrire
     // 26 Mo dans la base à chaque lecture de la ligue. Une carte n'existe qu'à
@@ -967,6 +968,7 @@ function reprendre(etat: EtatCarriereEnLigne, maintenant: number): EtatCarriereE
   }
   actualiserCartesProfessionnelles(nouveau.cartes);
   nouveau.catalogueRevision = catalogueAdmin().revision;
+  nouveau.rotationPacks = catalogueAdmin().rotationPacks === true;
   for (const club of nouveau.clubs) ajusterComposition(nouveau, club, maintenant);
   reparerCalendriers(nouveau);
   return nouveau;

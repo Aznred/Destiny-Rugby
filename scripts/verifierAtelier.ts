@@ -7,7 +7,7 @@ import { stockageFichier } from '../serveur/carriereFichier';
 import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereApi';
 import { contexteAtelier, validerPhoto } from '../serveur/atelierAdmin';
 import { CATALOGUE_ADMIN_VIDE } from '../src/lib/ligue/atelierCatalogue';
-import { catalogueMondialCarriere, rayonDePack, packsBoutiqueDuJour, packsCatalogueAdmin } from '../src/lib/ligue/catalogueCarriere';
+import { catalogueMondialCarriere, rayonDePack, packsBoutiqueDuJour, packsCatalogueAdmin, PACKS_CARRIERE } from '../src/lib/ligue/catalogueCarriere';
 import { creerCarriere, avancerCarriere, agirCarriere } from '../src/lib/ligue/carriere';
 import { collectionCarriere } from '../src/lib/ligue/collectionCarriere';
 
@@ -29,7 +29,7 @@ try {
   assert.equal((await appel(autre)).statut,404,'Le pseudo Kiri ne donne pas accès');
   assert.equal((await appel(autre,{action:'atelier',operation:'pack'})).statut,404);
   assert.equal((await appel(kiri,{action:'atelier'},'https://evil.example')).statut,403);
-  const initial=await appel(kiri);assert.equal(initial.statut,200);assert.ok(initial.donnees.joueurs.length<=40);assert.ok(initial.donnees.nations.includes('France'));
+  const initial=await appel(kiri);assert.equal(initial.statut,200);assert.ok(initial.donnees.joueurs.length<=40);assert.ok(initial.donnees.nations.includes('France'));assert.equal(initial.donnees.rotationPacks,false);
   const now=Date.now();
   const ligue=()=>creerCarriere({id:randomUUID(),nom:'Test atelier',code:'TEST',compteId:kiri,pseudo:'Kiri',clubNom:'Kiri RFC',rythme:1,maxClubs:2},now,'atelier');
   const l1=ligue(),l2=ligue(),joueur=l1.cartes[0];
@@ -98,6 +98,16 @@ try {
   assert.equal(apresSuppression.revision,4);
   assert.ok(!apresSuppression.packs[pack.id],'Le pack personnalisé est supprimé du stockage');
   contexteAtelier.run(apresSuppression,()=>assert.ok(!packsCatalogueAdmin().some(p=>p.id===pack.id),'Le pack supprimé quitte la liste de l’Atelier'));
-  console.log('OK — accès Kiri, validations, persistance, joueurs, filtres, suppression, liste privée des packs et garantie.');
+  assert.deepEqual(packsBoutiqueDuJour(PACKS_CARRIERE).map(p=>p.id),['bronze','standard','or'],'Trois packs seulement par défaut');
+  assert.equal((await appel(kiri,{action:'atelier',operation:'rotationPacks',revision:4,active:true})).statut,200);
+  const avecRotation=await db.atelier!.lire();assert.equal(avecRotation.rotationPacks,true);
+  contexteAtelier.run(avecRotation,()=>{
+    const actualisee=avancerCarriere(l1,now,'rotation');
+    assert.equal(actualisee.rotationPacks,true,'Le réglage Kiri est propagé aux ligues');
+    assert.ok(packsBoutiqueDuJour(actualisee.packs,now,actualisee.rotationPacks).length>3,'La rotation active publie les packs spéciaux');
+  });
+  assert.equal((await appel(kiri,{action:'atelier',operation:'rotationPacks',revision:5,active:false})).statut,200);
+  assert.equal((await db.atelier!.lire()).rotationPacks,false);
+  console.log('OK — accès Kiri, validations, persistance, joueurs, filtres, suppression et rotation des packs contrôlée.');
 } finally { rmSync(dossier,{recursive:true,force:true}); }
 process.exit(0);

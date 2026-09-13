@@ -6,7 +6,7 @@ import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
 import './AtelierKiri.css';
 
-interface Atelier { revision:number; packs:PackCarriere[]; joueurs:SourceCarte[]; total:number; championnats:string[]; nations:string[]; clubs:{nom:string;championnat:string}[] }
+interface Atelier { revision:number; rotationPacks:boolean; packs:PackCarriere[]; joueurs:SourceCarte[]; total:number; championnats:string[]; nations:string[]; clubs:{nom:string;championnat:string}[] }
 const RARETES:RareteCarriere[]=['bronze','argent','or','elite','star'];
 const nouveauPack=():PackCarriere=>({id:`kiri-${crypto.randomUUID().slice(0,8)}`,nom:'Mon nouveau pack',prix:1000,cartes:3,promesse:'',probabilites:{bronze:50,argent:35,or:14,elite:.9,star:.1},famille:'general'});
 async function requete(q:string,corps?:unknown,signal?:AbortSignal) {
@@ -42,6 +42,16 @@ export function AtelierKiri() {
       setMessage('Pack supprimé de l’Atelier et du catalogue des prochaines ligues.');
     }catch(e){setErreur((e as Error).message);}finally{setOccupe(false);}
   };
+  const reglerRotation=async(active:boolean)=>{
+    if(!donnees)return;setOccupe(true);setErreur('');setMessage('');
+    try {
+      const retour=await requete(q,{action:'atelier',operation:'rotationPacks',revision:donnees.revision,active});
+      setDonnees(d=>d?{...d,revision:retour.revision,rotationPacks:active}:d);
+      setRevisionPack(retour.revision);setRevisionJoueur(retour.revision);
+      setMessage(active?'Rotation spéciale activée dans les boutiques des ligues.':'Rotation coupée : seules les pochettes Bronze, Argent et Or restent visibles.');
+      setActualisation(n=>n+1);
+    }catch(e){setErreur((e as Error).message);}finally{setOccupe(false);}
+  };
   const photo=async(fichier:File|undefined)=>{
     if(!fichier||!joueur)return;setErreur('');setOccupe(true);
     try {
@@ -60,6 +70,7 @@ export function AtelierKiri() {
     <header className="ak-entete"><div><div className="eyebrow">Administration · Kiri uniquement</div><h2>Atelier des packs & joueurs</h2><p>Un catalogue commun à toutes les ligues. Les matchs déjà commencés gardent leurs effectifs.</p></div><span className="ak-badge">GLOBAL</span></header>
     <nav className="ak-onglets" aria-label="Atelier Kiri"><button className={onglet==='packs'?'actif':''} onClick={()=>setOnglet('packs')}>Créer et modifier les packs</button><button className={onglet==='joueurs'?'actif':''} onClick={()=>setOnglet('joueurs')}>Joueurs · GEN & photos</button></nav>
     {erreur&&<p role="alert" className="ak-erreur">{erreur} <button onClick={()=>setActualisation(n=>n+1)}>Recharger l’atelier</button></p>}{message&&<p role="status" className="ak-succes">{message}</p>}
+    {donnees&&onglet==='packs'&&<section className={`ak-rotation ${donnees.rotationPacks?'active':''}`}><div><span>RAYON DES LIGUES</span><b>{donnees.rotationPacks?'Rotation spéciale active':'Bronze · Argent · Or uniquement'}</b><small>{donnees.rotationPacks?'Les packs spéciaux du jour sont publiés avec les trois packs permanents.':'Aucun pack spécial ne peut apparaître tant que tu ne l’actives pas ici.'}</small></div><button type="button" disabled={occupe} aria-pressed={donnees.rotationPacks} onClick={()=>void reglerRotation(!donnees.rotationPacks)}><i />{donnees.rotationPacks?'Désactiver la rotation':'Activer la rotation'}</button></section>}
     {!donnees?<p>Chargement du catalogue…</p>:onglet==='packs'?<div className="ak-grille"><aside className="ak-liste"><button className="btn principal" disabled={occupe} onClick={()=>{setPack(nouveauPack());setRevisionPack(donnees.revision);setMessage('');}}>+ Créer un pack</button>{donnees.packs.map(p=><button key={p.id} disabled={occupe} className={pack.id===p.id?'selectionne':''} onClick={()=>{setPack(structuredClone(p));setRevisionPack(donnees.revision);setMessage('');}}><b>{p.nom}</b><small>{p.cartes} cartes · {p.prix.toLocaleString('fr-FR')} OVA</small></button>)}</aside>
       <form onSubmit={soumettre('pack')}><fieldset disabled={occupe}><legend>Réglages du pack</legend><label>Nom<input required maxLength={60} value={pack.nom} onChange={e=>setPack({...pack,nom:e.target.value})}/></label><label>Description<textarea maxLength={180} value={pack.promesse??''} onChange={e=>setPack({...pack,promesse:e.target.value})}/></label><div className="ak-champs"><label>Prix en OVA<input required type="number" min={1} max={1000000} value={pack.prix} onChange={e=>setPack({...pack,prix:Number(e.target.value)})}/></label><label>Nombre de cartes<input required type="number" min={1} max={12} value={pack.cartes} onChange={e=>setPack({...pack,cartes:Number(e.target.value)})}/></label></div>
       <h3>Probabilités de rareté</h3><div className="ak-poids">{RARETES.map(r=><label key={r}>{r}<input required type="number" min={0} max={100} step="0.01" value={pack.probabilites[r]} onChange={e=>setPack({...pack,probabilites:{...pack.probabilites,[r]:Number(e.target.value)}})}/></label>)}</div><p className={Math.abs(total-100)>.001?'ak-erreur':'ak-note'}>Total : {Number(total.toFixed(2))} % / 100 %</p>

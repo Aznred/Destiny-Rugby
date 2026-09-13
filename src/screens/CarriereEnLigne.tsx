@@ -1421,7 +1421,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
  */
 export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
-  const packsDuJour = packsBoutiqueDuJour(vue.packs);
+  const packsDuJour = packsBoutiqueDuJour(vue.packs, Date.now(), vue.rotationPacks === true);
   const [ouverture, setOuverture] = useState<{ cartes: CarteCarriere[] | null; pack: string; garantie?: VueCarriereEnLigne['packs'][number]['garantie'] } | null>(null);
   /**
    * ⚠️ LE MODULE 3D ARRIVE PENDANT QU'ON REGARDE LE PRÉSENTOIR. Il pesait

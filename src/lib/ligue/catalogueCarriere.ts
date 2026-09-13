@@ -225,6 +225,7 @@ const PACKS_MIS_EN_AVANT_PAR_JOUR: Readonly<Record<string, readonly string[]>> =
 export function packsBoutiqueDuJour(
   packs: readonly PackCarriere[],
   maintenant: number | Date = Date.now(),
+  rotationActive = false,
 ): PackCarriere[] {
   const instant = maintenant instanceof Date ? maintenant.getTime() : maintenant;
   const cleParis = new Intl.DateTimeFormat('en-CA', {
@@ -234,6 +235,7 @@ export function packsBoutiqueDuJour(
   const permanents = PACKS_PERMANENTS
     .map(id => packs.find(pack => pack.id === id))
     .filter((pack): pack is PackCarriere => Boolean(pack));
+  if (!rotationActive) return permanents;
   const misEnAvant = (PACKS_MIS_EN_AVANT_PAR_JOUR[cleParis] ?? [])
     .map(id => packs.find(pack => pack.id === id))
     .filter((pack): pack is PackCarriere => Boolean(pack));

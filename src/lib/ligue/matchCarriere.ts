@@ -590,18 +590,32 @@ export function forceFeuille(feuille: readonly Coequipier[]): number {
 }
 
 /**
- * Le score visé par chaque équipe — LA MÊME FORMULE que le championnat solo
- * (`jouerRencontre`), avec l'avantage du terrain et le même bruit de ±10.
- * C'est elle qui garantit qu'une ligue de Bronze à 35 GEN produit des 17-13 et
- * pas des 120-95 : deux effectifs faibles ont un petit écart, donc de petits
- * scores, et un effectif écrasant ne dépasse pas non plus le réalisme du rugby.
+ * Le score visé par chaque équipe. Le GEN donne un avantage, pas un verdict :
+ * son écart est comprimé, le collectif intervient séparément, le domicile vaut
+ * environ quatre points et la performance du jour autorise de vraies surprises.
  */
-export function cibleDeScore(forceD: number, forceE: number, cle: string): Paire {
+export function cibleDeScore(
+  forceD: number, forceE: number, cle: string,
+  collectifD = 50, collectifE = 50,
+): Paire {
   const rng = graine(`cible#${cle}`);
-  const ecart = (forceD + 2.5) - forceE;
+  const ecartForce = forceD - forceE;
+  const influenceForce = Math.sign(ecartForce) * Math.pow(Math.abs(ecartForce), 0.75) * 2;
+  const influenceCollectif = (Math.max(0, Math.min(100, collectifD)) - Math.max(0, Math.min(100, collectifE))) * 0.075;
+  const avantageDomicile = 3.8;
+  // Une forme indépendante par équipe (météo, confiance, réussite, cartons…).
+  // Elle change le match sans gommer la construction de l'effectif.
+  const formeD = rng() * 22 - 11;
+  const formeE = rng() * 22 - 11;
+  // Dans environ un match déséquilibré sur dix, l'outsider surperforme : une
+  // surprise reste rare, mais elle n'est plus mathématiquement étouffée.
+  const surprise = Math.abs(ecartForce) >= 3 && rng() < 0.10
+    ? -Math.sign(ecartForce) * (3 + rng() * 4)
+    : 0;
+  const ecart = avantageDomicile + influenceForce + influenceCollectif + surprise;
   return {
-    domicile: scorePossible(21 + ecart * 1.1 + (rng() * 20 - 10)),
-    exterieur: scorePossible(21 - ecart * 1.1 + (rng() * 20 - 10)),
+    domicile: scorePossible(21 + ecart / 2 + formeD),
+    exterieur: scorePossible(21 - ecart / 2 + formeE),
   };
 }
 
@@ -1021,7 +1035,10 @@ export function creerMatchEnLigne(p: ParametresCreationMatch): EtatMatchEnLigne 
   const cle = `${p.id}#${p.graine >>> 0}`;
   return {
     id: p.id, cle, debut: p.debut, gel: 0, horloge: 0,
-    cibles: cibleDeScore(forceFeuille(equipes.domicile.feuille), forceFeuille(equipes.exterieur.feuille), cle),
+    cibles: cibleDeScore(
+      forceFeuille(equipes.domicile.feuille), forceFeuille(equipes.exterieur.feuille), cle,
+      equipes.domicile.collectif ?? 50, equipes.exterieur.collectif ?? 50,
+    ),
     equipes,
     strategies: {
       domicile: strategieValide(p.domicile.strategie),

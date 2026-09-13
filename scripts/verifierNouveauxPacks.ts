@@ -18,7 +18,9 @@ for (const [cle, traduction] of Object.entries(TEXTES_EN_LIGNE)) {
     assert.ok(traduction[langue]?.trim(), `${cle} n'est pas traduit en ${langue}.`);
   }
 }
-const aujourdHui = packsBoutiqueDuJour(PACKS_CARRIERE, Date.parse('2026-09-11T12:00:00+02:00'));
+const rayonPermanent = packsBoutiqueDuJour(PACKS_CARRIERE, Date.parse('2026-09-11T12:00:00+02:00'));
+assert.deepEqual(rayonPermanent.map(pack => pack.id), ['bronze', 'standard', 'or'], 'La boutique doit rester limitée aux trois packs permanents par défaut.');
+const aujourdHui = packsBoutiqueDuJour(PACKS_CARRIERE, Date.parse('2026-09-11T12:00:00+02:00'), true);
 assert.deepEqual(aujourdHui.slice(3).map(pack => pack.id), ['springboks', 'premiership', 'top14'], 'La sélection du 11 septembre doit contenir les trois packs annoncés.');
 console.log(`OK — ${ids.length} nouveaux packs, ${catalogue.length} joueurs et ${Object.keys(TEXTES_EN_LIGNE).length} textes en 7 langues contrôlés.`);
 

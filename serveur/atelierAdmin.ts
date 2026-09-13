@@ -65,6 +65,7 @@ export function vueAtelier(q: string) {
   const clubs=[...new Map(catalogueBaseCarriere().map(c=>[c.clubReel,{nom:c.clubReel,championnat:c.championnat}])).values()].sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
   return {
     revision:catalogueAdmin().revision,
+    rotationPacks:catalogueAdmin().rotationPacks === true,
     packs:packsCatalogueAdmin(),
     joueurs:joueurs.slice(0,40),
     total:joueurs.length,
@@ -84,6 +85,9 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
     const id=texte(corps.packId,80);
     if(!id.startsWith('kiri-') || !suivant.packs[id]) refuser('Seuls les packs créés dans l’Atelier peuvent être supprimés.');
     delete suivant.packs[id];
+  } else if(corps.operation === 'rotationPacks') {
+    if(typeof corps.active !== 'boolean') refuser('Réglage de rotation invalide.');
+    suivant.rotationPacks=corps.active;
   } else if(corps.operation === 'joueur') {
     const id=texte(corps.sourceId,250), source=catalogueMondialCarriere().find(c=>c.sourceId===id);
     if(!source) refuser('Joueur introuvable.');

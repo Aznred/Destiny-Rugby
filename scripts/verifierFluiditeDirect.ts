@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  interpolerBallonDirect, interpolerImageDirect, interpolerPionsDirect,
+  amortirImageDirect, interpolerBallonDirect, interpolerImageDirect, interpolerPionsDirect,
 } from '../src/lib/ligue/interpolationDirect';
 import type { PionDirect, TerrainDirect } from '../src/lib/ligue/matchCarriere';
 
@@ -27,8 +27,8 @@ const imagesPasse = Array.from({ length: 101 }, (_, i) =>
 assert.ok(imagesPasse.every((b) => Number.isFinite(b.x) && Number.isFinite(b.y) && b.h >= 0));
 assert.ok(Math.max(...imagesPasse.slice(1).map((b, i) => distance(b, imagesPasse[i]))) < 0.6,
   'Le ballon ne doit jamais sauter au changement de porteur.');
-assert.ok(imagesPasse.slice(10, -10).some((b) => b.h > 0.5),
-  'Une passe manquée par le sondage doit conserver une arche lisible.');
+assert.ok(Math.max(...imagesPasse.map((b) => b.h)) <= 0.31,
+  'Une passe manquée par le sondage doit rester basse, contrairement à un jeu au pied.');
 
 // Quand le serveur possède l'événement court, la passe garde surtout sa VRAIE
 // durée : ballon dans les mains avant, 300 ms de vol, puis dans les mains du
@@ -104,4 +104,15 @@ assert.deepEqual(reprise.at(-1), { x: 112, y: 60 });
 assert.ok(Math.max(...reprise.slice(1).map((p, i) => distance(p, reprise[i]))) < 2,
   'Une reprise lointaine doit rester continue à l’écran.');
 
-console.log('OK — ballon continu, passes intermédiaires reconstruites, courses bornées et reprises sans téléportation.');
+// Si le couple de paquets change soudainement, la couche d'affichage rejoint
+// la nouvelle vérité sur plusieurs images au lieu de l'appliquer d'un coup.
+let amortie = { pions: new Map([['a', { x: 10, y: 10 }]]), ballon: { x: 10, y: 10, h: 0 } };
+const cible = { pions: new Map([['a', { x: 22, y: 16 }]]), ballon: { x: 25, y: 18, h: 4 } };
+const premiere = amortirImageDirect(amortie, cible, 1 / 60);
+assert.ok(premiere.pions.get('a')!.x > 10 && premiere.pions.get('a')!.x < 22);
+assert.ok(premiere.ballon.x > 10 && premiere.ballon.x < 25);
+for (let i = 0; i < 45; i++) amortie = amortirImageDirect(amortie, cible, 1 / 60);
+assert.ok(distance(amortie.pions.get('a')!, cible.pions.get('a')!) < 0.01,
+  'La correction doit converger sans figer le joueur.');
+
+console.log('OK — ballon continu, passes basses, corrections amorties, courses bornées et reprises sans téléportation.');

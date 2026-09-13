@@ -140,6 +140,8 @@ export interface HistoireCarriere {
 /** État exclusivement serveur. Écriture atomique avec comparaison de version en base. */
 export interface EtatCarriereEnLigne {
   catalogueRevision?: number;
+  /** Réglage global Kiri recopié dans la ligue pour que la boutique puisse l'afficher. */
+  rotationPacks?: boolean;
   schema: 1; id: string; nom: string; code: string; createurId: string; creeLe: string;
   /** Espace de développement privé, créé et commandé uniquement par le compte kiri. */
   laboratoire?: true;

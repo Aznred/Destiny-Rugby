@@ -139,13 +139,13 @@ export function collectifCarriere(
 }
 
 /**
- * Ce que le collectif change à la note d'un joueur, de −1 à +3.
+ * Ce que le collectif change à la note d'un joueur, de −2 à +4.
  *
  * ⚠️ IL Y A UNE PÉNALITÉ, ET ELLE EST PETITE. Sans elle, le collectif n'est
  * qu'un bonus qu'on prend quand il tombe — jamais une contrainte qui fait
  * hésiter entre le meilleur joueur et celui qui parle la même langue que sa
- * charnière. Elle reste à −1 parce que le mode distribue des cartes au hasard :
- * on ne punit pas un manager pour ce que les packs lui ont donné.
+ * charnière. Le collectif doit pouvoir compenser plusieurs points de GEN sans
+ * pour autant transformer une équipe moyenne en sélection mondiale.
  *
  * ⚠️ ELLE NE S'APPLIQUE PAS AU BANC. Un remplaçant n'a pas d'entrée dans
  * `parCarte` : l'appelant doit alors laisser sa note tranquille, et surtout pas
@@ -153,7 +153,7 @@ export function collectifCarriere(
  */
 export function bonusCollectif(points: number): number {
   const borne = Math.max(0, Math.min(COLLECTIF_MAX, points));
-  return Math.round((-1 + (borne / COLLECTIF_MAX) * 4) * 10) / 10;
+  return Math.round((-2 + (borne / COLLECTIF_MAX) * 6) * 10) / 10;
 }
 
 /** Les cinq paliers d'affichage, du groupe neuf à l'équipe qui se connaît. */

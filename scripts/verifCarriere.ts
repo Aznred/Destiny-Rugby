@@ -215,7 +215,7 @@ titre('2. LES SCORES — « surtout pas 200-150 »');
   // La cible de score suit bien l'écart de force, avantage du terrain compris.
   const faible = cibleDeScore(35, 35, 'egal');
   const ecrase = cibleDeScore(78, 35, 'ecart');
-  dire(ecrase.domicile > faible.domicile + 25, 'un effectif à 78 vise beaucoup plus haut qu’un effectif à 35',
+  dire(ecrase.domicile > faible.domicile + 15, 'un effectif à 78 reste largement favori sans rendre le verdict automatique',
     `${faible.domicile}-${faible.exterieur} contre ${ecrase.domicile}-${ecrase.exterieur}`);
   dire(ecrase.domicile < 110, 'sans jamais viser un score de basket', `${ecrase.domicile}`);
   dire(forceFeuille([]) === 35, 'une feuille vide vaut 35 par défaut, jamais NaN');
@@ -1191,9 +1191,9 @@ titre('12. LE COLLECTIF');
     `${collectifCarriere(melange, compoMelange).total}/100`);
 
   // Le barème de note, et ses deux bouts.
-  dire(bonusCollectif(0) === -1 && bonusCollectif(10) === 3, 'le bonus de note va de −1 à +3',
+  dire(bonusCollectif(0) === -2 && bonusCollectif(10) === 4, 'le bonus de note va de −2 à +4',
     `${bonusCollectif(0)} → +${bonusCollectif(10)}`);
-  dire(bonusCollectif(-50) === -1 && bonusCollectif(9999) === 3, 'et il reste borné hors de l’échelle');
+  dire(bonusCollectif(-50) === -2 && bonusCollectif(9999) === 4, 'et il reste borné hors de l’échelle');
 
   // ⚠️ L’ÉCRAN ET LE SERVEUR PARTAGENT LA FORMULE. Le collectif affiché à la
   // composition doit être celui qui entre sur le terrain : c’est la raison

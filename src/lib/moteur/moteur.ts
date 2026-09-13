@@ -1450,7 +1450,10 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
   e.porteur = null;
   poserVol(e, {
     de: { x: p.pos.x, y: p.pos.y }, vers: cible,
-    duree: Math.max(0.22, d / 18), ecoule: 0, hauteur: 0,
+    // Une passe de rugby claque : environ 20/100 s à courte portée, jamais
+    // plus d'une demi-seconde. Un coup de pied garde une arche bien plus haute.
+    duree: borner(0.14 + d / 42, 0.18, 0.50), ecoule: 0,
+    hauteur: Math.min(0.28, 0.08 + d * 0.008),
     type: 'passe', intention: 'passe', auteur: p, receveur,
   });
 
@@ -1529,7 +1532,7 @@ function offloader(e: EtatMatch, porteur: Pion): boolean {
  */
 export function probaPlaquage(
   e: EtatMatch, porteur: Pion, defenseur: Pion,
-  geste: ActionJoueur | null, monPlaquage: boolean,
+  geste: ActionJoueur | null, monPlaquage: boolean, efficaciteGeste = 1,
 ): number {
   const fatigueD = 0.72 + defenseur.endurance / 360;
   // ⚠️ LE GESTE DU JOUEUR PÈSE VRAIMENT SUR LE DUEL — sinon la carte ne serait
@@ -1582,7 +1585,7 @@ export function probaPlaquage(
   // indexé sur l’attribut qui le porte : un ailier rapide sprinte, un pilier
   // raffute, et aucun des deux ne fait le métier de l’autre.
   return borner(
-    0.90 + (force - resistance) / 400 - aide + elan - bonusDuGeste(porteur, geste),
+    0.90 + (force - resistance) / 400 - aide + elan - bonusDuGeste(porteur, geste) * efficaciteGeste,
     0.36, 0.99,
   );
 }
@@ -1626,6 +1629,35 @@ function bonusDuGeste(porteur: Pion, geste: ActionJoueur | null): number {
   }
 }
 
+/** Le geste naturel que choisit un porteur non piloté selon son profil. */
+function gesteAutomatique(e: EtatMatch, porteur: Pion, defenseur: Pion): ActionJoueur | null {
+  // Cette variation ne consomme pas le RNG : le direct et le calcul en arrière-
+  // plan gardent exactement la même rejoue, contact après contact.
+  const variation = Math.abs(Math.sin(porteur.numero * 17.13 + defenseur.numero * 7.71 + e.t * 0.37));
+  const profilPuissant = porteur.puissance - porteur.evitement;
+  if (porteur.puissance >= 70 && profilPuissant >= 7 && variation > 0.14) return 'raffut';
+  if (porteur.evitement >= 66 && variation > 0.18) return 'crochet';
+  if (porteur.vitesseMax >= 8.45 && variation > 0.28) return 'sprint';
+  if (porteur.puissance >= 82 && variation > 0.48) return 'raffut';
+  return null;
+}
+
+/** Amorce un appui, pas un saut de position : le déplacement reste continu. */
+function amorcerGeste(e: EtatMatch, porteur: Pion, defenseur: Pion, geste: ActionJoueur | null): number {
+  const alternance = ((porteur.numero + defenseur.numero + Math.floor(e.t)) & 1) === 0 ? 1 : -1;
+  if (geste === 'crochet') {
+    const direction = porteur.pos.y < 4 ? 1 : porteur.pos.y > LARGEUR - 4 ? -1 : alternance;
+    porteur.cible.y = borner(porteur.pos.y + direction * 2.6, 1, LARGEUR - 1);
+    porteur.vitesse.y += direction * 1.5;
+    return direction;
+  }
+  if (geste === 'sprint') {
+    porteur.effort = 1;
+    porteur.vitesse.x += sens(porteur.cote) * 1.1;
+  }
+  return alternance;
+}
+
 /**
  * @param abouti  issue IMPOSÉE du duel, quand le joueur vient de choisir son
  *   geste sur une carte de décision : `resoudreChoix` a déjà tiré le dé (avec
@@ -1653,8 +1685,11 @@ function resoudrePlaquage(
   }
 
   const monGeste = porteur.moi && e.controle && e.intention ? e.intention.type : null;
+  const gesteAuto = monGeste ? null : gesteAutomatique(e, porteur, defenseur);
+  const geste = monGeste ?? gesteAuto;
+  const directionGeste = amorcerGeste(e, porteur, defenseur, geste);
   const monPlaquage = defenseur.moi && intentionEst(e, 'plaquage');
-  const proba = probaPlaquage(e, porteur, defenseur, monGeste, monPlaquage);
+  const proba = probaPlaquage(e, porteur, defenseur, geste, monPlaquage, monGeste ? 1 : 0.42);
 
   if (abouti === undefined ? e.rng() >= proba : !abouti) {
     defenseur.stats.plaquagesManques += 1;
@@ -1664,6 +1699,14 @@ function resoudrePlaquage(
     // pas deux. C'est le risque qui rend l'action intéressante à jouer.
     defenseur.battu = monPlaquage ? 3.0 : 2.0;
     porteur.battu = 0.4; // il ne peut pas être re-plaqué dans la même seconde
+    if (geste === 'raffut') {
+      defenseur.vitesse.x += sens(porteur.cote) * 2.8;
+      defenseur.vitesse.y += directionGeste * 0.8;
+      defenseur.cible.y = borner(defenseur.pos.y + directionGeste * 1.6, 0, LARGEUR);
+    } else if (geste === 'crochet') {
+      // Le plaqueur part une fraction de seconde sur le mauvais appui.
+      defenseur.vitesse.y -= directionGeste * 1.7;
+    }
     // ⚠️ C'EST ICI, ET NULLE PART AILLEURS, QU'UNE PERCÉE EXISTE. Que le geste
     // ait été joué sur-le-champ ou qu'il soit resté armé jusqu'au contact, le
     // moteur passe par cette ligne — donc l'enchaînement s'ouvre dans les deux
@@ -1676,12 +1719,12 @@ function resoudrePlaquage(
     // dans le jeu ». Une percée dans un rideau OUVERT lance une échappée.
     if (porteur.moi && intervalle(e, porteur) >= 7) lancerEchappee(e, porteur);
     else pousserElan(e, porteur.cote, POUSSEES.percee * 0.5);
-    if (monGeste === 'crochet' || monGeste === 'raffut') {
-      consommerIntention(e);
+    if (geste === 'crochet' || geste === 'raffut') {
+      if (monGeste) consommerIntention(e);
       dire(e, 'franchissement', porteur.cote, C.texteMatch(
-        monGeste === 'crochet' ? 'crochetReussi' : 'raffutReussi',
+        geste === 'crochet' ? 'crochetReussi' : 'raffutReussi',
         { nom: porteur.nom, cible: defenseur.nom },
-      ), 0, true);
+      ), 0, Boolean(monGeste));
     } else if (monPlaquage) {
       consommerIntention(e);
       dire(e, 'plaquage', porteur.cote, C.texteMatch('plaquageRateJoueur', {

@@ -2150,7 +2150,7 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
   .cel-compo .manager-reserves > summary { position: sticky; top: -.7rem; z-index: 2; padding: .5rem 0; background: #0d2428; font-size: .85rem; }
   .cel-compo .ct-feuille-fut .manager-reserves > div { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .cel-compo .ct-feuille-fut .ct-reserve-fut { max-width: none; }
-  .cel-compo .ct-plateau > .ct-panneau { position: absolute; right: 0; top: 0; bottom: 0; width: 300px; z-index: 15; overflow-y: auto; box-shadow: -12px 0 35px #0008; }
+  .cel-compo .ct-plateau > .ct-panneau { position: absolute; right: 0; top: 0; bottom: 0; width: min(340px, 38vw); z-index: 15; overflow-y: auto; box-shadow: -12px 0 35px #0008; }
   .cel-compo > .cel-consignes-repliables { flex: none; padding: .45rem .85rem; }
   .cel-compo .cel-consignes-repliables h2 { font-size: 1rem; margin: 0; }
   .cel-compo .cel-consignes-repliables > summary > span { display: flex; align-items: baseline; gap: .7rem; }
@@ -2310,7 +2310,7 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-compo .ct-feuille-fut .ct-reserve-fut .dr-player :is(b, small) { white-space: nowrap; }
 .cel-compo .ct-reserve-fut .dr-player-stats small, .cel-compo .ct-reserve-fut .dr-player-identity small { font-size: 3.8cqw; color: inherit; }
 .cel-compo .ct-reserve-fut .dr-player-status { font-size: 2.8cqw; color: inherit; }
-.cel-compo .ct-plateau > .ct-panneau { position: absolute; right: 0; top: 0; bottom: 0; width: 280px; z-index: 15; overflow: auto; }
+.cel-compo .ct-plateau > .ct-panneau { position: absolute; right: 0; top: 0; bottom: 0; width: min(340px, 42vw); z-index: 15; overflow: auto; }
 .cel-compo :is(button, summary):focus-visible { outline: 3px solid #ffe08a; outline-offset: 3px; }
 .cel-compo .manager-position:hover, .cel-compo .manager-position:has(:focus-visible) { z-index: 5; }
 @media (min-height: 950px) {
@@ -2337,6 +2337,7 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
   .cel-compo .ct-selection-actions b { flex: 1 1 100%; }
   .cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut,
   .cel-compo .ct-feuille-fut .manager-reserve-carte.ct-reserve-fut { flex-basis: 76px; width: 76px; min-width: 76px; max-width: 76px; }
+  .cel-compo .ct-plateau > .ct-panneau { left: 6px; right: 6px; width: auto; }
 }
 .cel-compo .ct-entete > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .cel-compo .ct-entete .ct-secteurs { flex-wrap: wrap; gap: 8px; }

@@ -49,7 +49,8 @@ import { LARGEUR, LONGUEUR, borner, type Vec } from '../../lib/moteur/terrain';
 import type { CoteEnLigne, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import { creerScenarioDirect, type ScenarioDirect } from '../../lib/ligue/scenarioDirect';
 import {
-  interpolerImageDirect, projeterImageDirect, type BallonAfficheDirect,
+  amortirImageDirect, interpolerImageDirect, projeterImageDirect, type BallonAfficheDirect,
+  type ImageDirect,
 } from '../../lib/ligue/interpolationDirect';
 import { t } from '../../lib/i18n';
 
@@ -62,7 +63,7 @@ import { t } from '../../lib/i18n';
  */
 const RETARD = 2.25;
 /** Au-delà du dernier relevé, on ne prolonge pas plus longtemps que ça. */
-const PREDICTION_MAX = 0.35;
+const PREDICTION_MAX = 1.15;
 /** Deux images utiles, plus assez de marge pour un paquet retardé/réordonné. */
 const TAMPON_MAX = 6;
 
@@ -176,6 +177,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     let precedent = performance.now() / 1000;
     let actif = true;
     let montre: TerrainDirect | null = null;
+    let imageAffichee: ImageDirect | null = null;
     const avancer = (brut: number) => {
       if (!actif) return;
       const maintenant = brut / 1000;
@@ -212,8 +214,9 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       } else {
         imageDirecte = projeterImageDirect(a.terrain, dtSim / Math.max(0.01, a.terrain.cadence));
       }
-      pions.current = imageDirecte.pions;
-      ballon.current = imageDirecte.ballon;
+      imageAffichee = amortirImageDirect(imageAffichee, imageDirecte, dt);
+      pions.current = imageAffichee.pions;
+      ballon.current = imageAffichee.ballon;
 
       // Le bandeau et le porteur ne changent qu'au terme de la trajectoire.
       // Avant, ils basculaient à u=0,5 : le ballon quittait alors une position
@@ -260,16 +263,11 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     if (!pos) return null;
     const porte = affiche.porteurId === p.id;
     const mien = monCote !== undefined && p.cote === monCote;
-    const vitesse = Math.hypot(p.vx, p.vy);
-    const trace = vitesse > 1.4 ? Math.min(2.7, vitesse * 0.34) : 0;
     const nomCourt = p.nom.split(' ').at(-1) ?? p.nom;
     const largeurNom = Math.max(tailleTexte * 3.2, nomCourt.length * tailleTexte * 0.64);
     return (
       <g key={p.id} transform={`translate(${pos.x.toFixed(2)} ${pos.y.toFixed(2)})`}>
         <title>{`${p.numero} · ${p.nom}`}</title>
-        {trace > 0 && (
-          <line className="cel-trace-course" x1={0} y1={0} x2={(-p.vx / vitesse) * trace} y2={(-p.vy / vitesse) * trace} strokeWidth={trait * 1.15} />
-        )}
         <ellipse cx={rayon * 0.14} cy={rayon * 0.35} rx={rayon} ry={rayon * 0.7} fill="rgba(0,0,0,.35)" />
         <circle
           r={rayon}
@@ -345,13 +343,6 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
               <circle r={rayon * (1.65 + Math.sin(Math.PI * conquete.progression) * 0.45)} strokeWidth={trait * 1.35} />
               <path d={`M ${-rayon * 2.8} 0 Q 0 ${-rayon * 2.2} ${rayon * 2.8} 0`} strokeWidth={trait} />
             </g>
-          )}
-          {affiche.vol && (
-            <line
-              className="cel-trajectoire"
-              x1={b.x} y1={b.y} x2={affiche.vol.vers.x} y2={affiche.vol.vers.y}
-              strokeWidth={Math.max(0.28, trait * 0.9)}
-            />
           )}
           {/* Le porteur passe DEVANT tout le monde : c'est lui qu'on suit. */}
           {affiche.pions.filter((p) => p.cote === 'exterieur' && p.id !== affiche.porteurId).map(dessiner)}

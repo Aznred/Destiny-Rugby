@@ -14,8 +14,9 @@ e=avancerCarriere(e,kickoff,'test');assert.ok(e.rencontres[0].match);assert.equa
 e=avancerCarriere(e,kickoff+60000,'test');assert.ok(e.rencontres[0].match!.horloge<2);
 const cat=catalogueMondialCarriere();for(const [name,noteMin] of [['Maxime Lucu',93],['Thomas Ramos',93],['Jack Willis',92],['Faf de Klerk',84]] as const){const c=cat.find(c=>c.nom.toLowerCase()===name.toLowerCase());assert.ok(c,name);assert.ok(c.note>=noteMin,`${name} ne doit pas repasser sous ${noteMin} GEN après une mise à jour du catalogue`);}
 for(const pack of PACKS_CARRIERE)assert.ok(Math.abs(Object.values(pack.probabilites).reduce((a,b)=>a+b,0)-100)<.001,pack.id);
-const rayon1=packsBoutiqueDuJour(PACKS_CARRIERE,Date.parse('2026-09-09T12:00:00Z'));
-const rayon2=packsBoutiqueDuJour(PACKS_CARRIERE,Date.parse('2026-09-10T12:00:00Z'));
+assert.deepEqual(packsBoutiqueDuJour(PACKS_CARRIERE).map(p=>p.id),['bronze','standard','or']);
+const rayon1=packsBoutiqueDuJour(PACKS_CARRIERE,Date.parse('2026-09-09T12:00:00Z'),true);
+const rayon2=packsBoutiqueDuJour(PACKS_CARRIERE,Date.parse('2026-09-10T12:00:00Z'),true);
 assert.deepEqual(rayon1.slice(0,3).map(p=>p.nom),['Bronze','Argent','Or garanti']);
 assert.equal(rayon1.length,5);assert.notDeepEqual(rayon1.slice(3).map(p=>p.id),rayon2.slice(3).map(p=>p.id));
-console.log('OK : calendrier daté, Faf de Klerk, horloge réelle et rotation quotidienne de cinq packs.');
+console.log('OK : calendrier daté, Faf de Klerk, horloge réelle, rayon permanent et rotation contrôlée.');

@@ -30,6 +30,17 @@
 .ak-entete h2 { margin: .25rem 0; font: 700 clamp(1.35rem, 3vw, 1.8rem)/1.12 var(--police-titre); }
 .ak-entete p, .ak-note { color: var(--brume); font-size: .8rem; line-height: 1.55; }
 .ak-badge { padding: .45rem .65rem; border: 1px solid var(--or-400); border-radius: 999px; color: var(--or-400); font: 800 .65rem/1 var(--police-forte); letter-spacing: .14em; }
+.ak-rotation { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.1rem; border:1px solid var(--bordure); border-radius:var(--rayon); background:linear-gradient(120deg,color-mix(in srgb,var(--surface) 92%,#000),var(--surface)); }
+.ak-rotation.active { border-color:color-mix(in srgb,#65d58a 52%,var(--bordure)); background:linear-gradient(120deg,color-mix(in srgb,#26623a 22%,var(--surface)),var(--surface)); }
+.ak-rotation > div { display:grid; gap:.25rem; }
+.ak-rotation span { color:var(--or-400); font:800 .62rem/1 var(--police-forte); letter-spacing:.13em; }
+.ak-rotation b { font:700 .95rem/1.2 var(--police-titre); }
+.ak-rotation small { color:var(--brume); font-size:.72rem; line-height:1.4; }
+.ak-rotation button { display:flex; align-items:center; gap:.55rem; flex:0 0 auto; min-height:2.65rem; padding:.65rem .85rem; border:1px solid var(--bordure); border-radius:999px; background:color-mix(in srgb,var(--surface) 78%,#000); color:var(--craie); font:700 .72rem/1 var(--police-forte); cursor:pointer; }
+.ak-rotation button i { position:relative; width:32px; height:18px; border-radius:99px; background:#69747a; }
+.ak-rotation button i::after { content:''; position:absolute; top:3px; left:3px; width:12px; height:12px; border-radius:50%; background:white; transition:transform .18s ease; }
+.ak-rotation button[aria-pressed='true'] i { background:#4caf6c; }
+.ak-rotation button[aria-pressed='true'] i::after { transform:translateX(14px); }
 
 .ak-onglets { display: flex; gap: .4rem; padding: .35rem; border: 1px solid var(--bordure); border-radius: var(--rayon-controle); background: color-mix(in srgb, var(--surface) 82%, #000); }
 .ak-onglets button { flex: 1; min-height: 2.75rem; padding: .65rem 1rem; border: 1px solid transparent; border-radius: calc(var(--rayon-controle) - 3px); background: transparent; color: var(--brume); font: 700 .78rem/1.2 var(--police-forte); cursor: pointer; }
@@ -81,4 +92,6 @@
   .ak-onglets { flex-direction: column; }
   .ak-poids { grid-template-columns: repeat(3, 1fr); }
   .ak-badge { display: none; }
+  .ak-rotation { align-items:stretch; flex-direction:column; }
+  .ak-rotation button { justify-content:center; }
 }
