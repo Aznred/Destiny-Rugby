@@ -75,8 +75,25 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
     // La carte qui vient de se retourner passe devant les autres. Comme la
     // révélation remonte du fond du pack vers la tête d'affiche, la meilleure
     // finit naturellement sélectionnée.
-    if (phase === 'cartes' && revelees > 0) setCarteActive(Math.max(0, ordre.length - revelees));
-  }, [phase, revelees, ordre.length]);
+    if (phase !== 'cartes' || revelees <= 0) return;
+
+    const index = Math.max(0, ordre.length - revelees);
+    setCarteActive(index);
+
+    // Sur téléphone, on suit automatiquement la carte en cours de révélation.
+    // Le petit délai laisse React rendre la carte retournée avant de la centrer.
+    if (window.matchMedia('(max-width: 600px)').matches) {
+      const timer = window.setTimeout(() => {
+        cartesRefs.current[index]?.scrollIntoView({
+          behavior: calme ? 'auto' : 'smooth',
+          block: 'nearest',
+          inline: 'center',
+        });
+      }, calme ? 0 : 80);
+
+      return () => window.clearTimeout(timer);
+    }
+  }, [phase, revelees, ordre.length, calme]);
 
   /**
    * ⚠️ LE GESTE EST MÉMORISÉ, IL N'EST PAS PERDU. Si le manager touche la
