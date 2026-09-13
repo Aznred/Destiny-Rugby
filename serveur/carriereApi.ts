@@ -3,7 +3,7 @@ import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../sr
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
-import { agirCarriere, avancerCarriere as actualiserCarriere, creerCarriere, creerLaboratoireCarriere, empreinteEcriture, vueCarriere, vueRencontreCarriere } from '../src/lib/ligue/carriere.js';
+import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerLaboratoireCarriere, empreinteEcriture, vueCarriere, vueRencontreCarriere } from '../src/lib/ligue/carriere.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
@@ -245,20 +245,21 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     }
     throw new ErreurHttp(409, 'La ligue vient de changer. Réessayez dans un instant.');
   }
-  function actualiserDirect(id: string, maintenant: number,
+  function actualiserDirect(id: string, matchId: string, maintenant: number,
     enteteConnue?: { version: number; comptes: string[]; echeance: number | null }) {
     const tick = Math.floor(maintenant / PAS_DIRECT_MS);
-    const existant = ticksDirects.get(id);
+    const cleDirect = `${id}:${matchId}`;
+    const existant = ticksDirects.get(cleDirect);
     if (existant?.tick === tick) return existant.etat;
-    if (existant) ticksDirects.delete(id);
+    if (existant) ticksDirects.delete(cleDirect);
     const etat = appliquer(
       id, 'horloge', `direct-${tick}`,
-      (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue,
+      (e, n, g) => avancerCarrierePourDirect(e, matchId, n, g), false, false, enteteConnue,
     );
-    ticksDirects.set(id, { tick, etat });
+    ticksDirects.set(cleDirect, { tick, etat });
     while (ticksDirects.size > 512) ticksDirects.delete(ticksDirects.keys().next().value!);
     void etat.catch(() => {
-      if (ticksDirects.get(id)?.etat === etat) ticksDirects.delete(id);
+      if (ticksDirects.get(cleDirect)?.etat === etat) ticksDirects.delete(cleDirect);
     });
     return etat;
   }
@@ -516,7 +517,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           // spectateur est donc vérifiée AVANT, sur l'en-tête minuscule.
           const autorisation = enteteConnue ?? await stockage.entete(id);
           if (!autorisation || !autorisation.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
-          const e = await actualiserDirect(id, maintenant, autorisation);
+          const e = await actualiserDirect(id, direct, maintenant, autorisation);
           const rencontre = vueRencontreCarriere(e, compte.id, direct);
           if (!rencontre) throw new ErreurHttp(404, 'Match introuvable.');
           return res.status(200).json({ id: e.id, version: e.version, rencontre });

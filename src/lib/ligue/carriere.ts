@@ -979,6 +979,39 @@ export function avancerCarriere(etat: EtatCarriereEnLigne, maintenant: number, g
   nouveau.version = etat.version + 1; return nouveau;
 }
 
+/**
+ * Lecture rapide d'un direct : seul le match demandé passe dans le moteur.
+ *
+ * Une journée peut lancer dix rencontres à la même heure. Faire avancer les
+ * dix à chaque sondage d'un seul spectateur multipliait le calcul par le nombre
+ * de matchs, puis encore par le nombre de spectateurs. Les autres rencontres
+ * sont prises en charge par leur propre direct et par l'horloge générale.
+ * La fin du match repasse par l'avancée complète afin d'enregistrer résultat,
+ * récompenses, fatigue et compétitions de façon atomique.
+ */
+export function avancerCarrierePourDirect(
+  etat: EtatCarriereEnLigne,
+  matchId: string,
+  maintenant: number,
+  graine: string,
+): EtatCarriereEnLigne {
+  dateServeur(maintenant);
+  const cible = etat.rencontres.find(r => r.id === matchId);
+  if (!cible || cible.resultat || cible.match?.termine) return { ...etat, version: etat.version + 1 };
+  if (!cible.match) {
+    return Date.parse(cible.ferme) <= maintenant
+      ? avancerCarriere(etat, maintenant, graine)
+      : { ...etat, version: etat.version + 1 };
+  }
+  const match = avancerMatchEnLigne(cible.match, maintenant);
+  if (match.termine) return avancerCarriere(etat, maintenant, graine);
+  return {
+    ...etat,
+    version: etat.version + 1,
+    rencontres: etat.rencontres.map(r => r.id === matchId ? { ...r, match } : r),
+  };
+}
+
 export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, commande: CommandeCarriere, maintenant: number, graine: string): EtatCarriereEnLigne {
   identifiant(compteId); dateServeur(maintenant);
   exiger(commande && typeof commande === 'object' && typeof commande.type === 'string', 'Commande invalide.');

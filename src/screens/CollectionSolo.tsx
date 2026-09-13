@@ -6,7 +6,7 @@ import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { useGame } from '../store/useGame';
 import { carteDepuisSource, catalogueBaseCarriere, PACKS_CARRIERE } from '../lib/ligue/catalogueCarriere';
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
-import { cleCarteSolo, ouvrirPackSolo } from '../lib/collectionSolo';
+import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, prixPackSolo } from '../lib/collectionSolo';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import { nombre } from '../lib/i18n';
 import './CollectionSolo.css';
@@ -54,9 +54,10 @@ export function CollectionSolo() {
   const ouvrirDepuisRoue = async (id: string) => {
     const pack = PACKS_CARRIERE.find(candidat => candidat.id === id);
     if (!pack) return;
-    const resultat = acheterPack(pack.prix, precedent => ouvrirPackSolo(pack, catalogue, precedent));
+    const prix = prixPackSolo(pack);
+    const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogue, precedent));
     if (!resultat) {
-      setBilan(coins < pack.prix ? `Il te manque ${nombre(pack.prix - coins)} Ovas pour ouvrir ce pack.` : 'Ce pack ne contient aucun joueur disponible.');
+      setBilan(coins < prix ? `Il te manque ${nombre(prix - coins)} Ovas pour ouvrir ce pack.` : 'Ce pack ne contient aucun joueur disponible.');
       return;
     }
     const doublons = resultat.indices.length - resultat.nouvelles;
@@ -80,12 +81,13 @@ export function CollectionSolo() {
     {bilan && <p className="solo-bilan" role="status"><Icone nom="ok" taille={17} /> {bilan}</p>}
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
-      <div className="solo-titre-ligne"><div><div className="eyebrow">Tous les packs du jeu</div><h2 id="solo-packs-titre">Choisis un pack</h2></div><span>Le prix est débité de tes Ovas de carrière et de boutique. Chaque tirage peut contenir des doublons.</span></div>
+      <div className="solo-titre-ligne"><div><div className="eyebrow">Tous les packs du jeu</div><h2 id="solo-packs-titre">Choisis un pack</h2></div><span>Bronze, Argent et Or sont gratuits. Les autres packs sont débités de tes Ovas. Chaque tirage peut contenir des doublons.</span></div>
       <BoutiquePacks3D
         packs={packsRoue}
         solde={coins}
         occupe={ouverture !== null}
         onOuvrir={ouvrirDepuisRoue}
+        packsGratuits={IDS_PACKS_SOLO_GRATUITS}
         paiementAlternatif={<button type="button" className="btn fantome petit solo-pub-desactivee" disabled title="Les publicités ne sont pas encore activées"><Icone nom="video" taille={15} /> Ouvrir avec une pub · bientôt</button>}
       />
     </section>

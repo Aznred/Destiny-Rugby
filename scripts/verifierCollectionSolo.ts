@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
 import { catalogueBaseCarriere, PACKS_CARRIERE } from '../src/lib/ligue/catalogueCarriere';
-import { cleCarteSolo, etatCollectionSoloVide, normaliserCollectionSolo, ouvrirPackSolo } from '../src/lib/collectionSolo';
+import { cleCarteSolo, etatCollectionSoloVide, IDS_PACKS_SOLO_GRATUITS, normaliserCollectionSolo, ouvrirPackSolo, prixPackSolo } from '../src/lib/collectionSolo';
 
 const catalogue = catalogueBaseCarriere();
 assert.ok(PACKS_CARRIERE.length >= 30, 'Tous les packs du jeu doivent etre proposes dans la roue solo.');
 assert.equal(new Set(PACKS_CARRIERE.map(pack => pack.id)).size, PACKS_CARRIERE.length, 'Chaque pack doit avoir un identifiant unique.');
 assert.ok(catalogue.length > 10_000, 'Le catalogue mondial complet doit etre disponible hors ligne.');
+assert.deepEqual([...IDS_PACKS_SOLO_GRATUITS], ['bronze', 'standard', 'or']);
+for (const id of IDS_PACKS_SOLO_GRATUITS) {
+  const pack = PACKS_CARRIERE.find(candidat => candidat.id === id);
+  assert.ok(pack, `Le pack gratuit ${id} doit exister.`);
+  assert.equal(prixPackSolo(pack), 0, `Le pack ${id} doit etre gratuit dans la collection solo.`);
+}
+const premierPayant = PACKS_CARRIERE.find(pack => !IDS_PACKS_SOLO_GRATUITS.includes(pack.id as typeof IDS_PACKS_SOLO_GRATUITS[number]))!;
+assert.equal(prixPackSolo(premierPayant), premierPayant.prix, 'Les autres packs doivent conserver leur prix.');
 
 const cles = catalogue.map(carte => cleCarteSolo(carte.sourceId));
 assert.equal(new Set(cles).size, catalogue.length, 'Les empreintes des joueurs doivent rester uniques.');
@@ -32,4 +40,4 @@ const cleDouble = cleCarteSolo(catalogue[premier.indices[0]].sourceId);
 assert.ok(premier.etat.quantites[cleDouble] > 1, 'La quantite possedee doit conserver les doublons.');
 
 assert.equal(Object.values(etat.packsOuverts).reduce((somme, valeur) => somme + valeur, 0), PACKS_CARRIERE.length);
-console.log(`OK — collection de compte verifiee sur ${catalogue.length} joueurs et ${PACKS_CARRIERE.length} packs payants, doublons actifs.`);
+console.log(`OK — collection de compte verifiee sur ${catalogue.length} joueurs, trois packs gratuits et doublons actifs.`);

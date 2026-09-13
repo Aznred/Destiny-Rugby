@@ -16,11 +16,18 @@ export interface ResultatPackSolo {
 
 const CLE_SAUVEGARDE_HISTORIQUE = 'destiny-rugby:collection-solo:v1';
 const RARETES: RareteCarriere[] = ['bronze', 'argent', 'or', 'elite', 'star'];
+export const IDS_PACKS_SOLO_GRATUITS = ['bronze', 'standard', 'or'] as const;
+const PACKS_SOLO_GRATUITS = new Set<string>(IDS_PACKS_SOLO_GRATUITS);
 const FAMILLES_AVANTS = new Set(['pilier', 'talonneur', 'deuxieme_ligne', 'troisieme_ligne']);
 const RAYONS = new WeakMap<object, Map<string, Record<RareteCarriere, number[]>>>();
 
 export function etatCollectionSoloVide(): EtatCollectionSolo {
   return { quantites: {}, packsOuverts: {}, doublons: 0 };
+}
+
+/** La gratuite concerne seulement la collection solo, jamais les ligues. */
+export function prixPackSolo(pack: Pick<PackCarriere, 'id' | 'prix'>): number {
+  return PACKS_SOLO_GRATUITS.has(pack.id) ? 0 : pack.prix;
 }
 
 /** Une empreinte stable sur 64 bits : la collection survit aux reordonnancements du catalogue. */
