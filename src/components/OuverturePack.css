@@ -24,9 +24,13 @@
 .phase-evolution .pack-show-model { animation: pack-arrive .48s both; }
 .phase-ouverture .pack-show-model { animation: pack-release 1.6s both; }
 .pack-show-results { display: flex; justify-content: safe center; align-items: center; flex-wrap: nowrap; gap: 0; padding: 34px 22px 28px; overflow-x: auto; overflow-y: hidden; min-width: 0; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--pack-color) transparent; }
-.pack-show-card { position: relative; flex: 0 0 clamp(118px, 12vw, 158px); width: clamp(118px, 12vw, 158px); min-height: 0; aspect-ratio: 2 / 3; transform-origin: 50% 85%; animation: pack-deal .58s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: calc(var(--slot, 0) * 55ms); }
+.pack-show-card { position: relative; flex: 0 0 clamp(118px, 12vw, 158px); width: clamp(118px, 12vw, 158px); min-height: 0; aspect-ratio: 2 / 3; transform-origin: 50% 85%; outline: none; transition: transform .24s cubic-bezier(.2,.8,.2,1), filter .24s ease; animation: pack-deal .58s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: calc(var(--slot, 0) * 55ms); }
 .pack-show-card + .pack-show-card { margin-left: clamp(-42px, -3.1vw, -28px); }
 .pack-show-card.meilleure { flex-basis: clamp(154px, 16vw, 214px); width: clamp(154px, 16vw, 214px); margin-right: clamp(8px, 1.2vw, 18px); }
+.pack-show-card.visible { cursor: pointer; }
+.pack-show-card.visible.active { transform: translateY(-14px) scale(1.065); filter: drop-shadow(0 16px 24px rgba(0,0,0,.55)); }
+.pack-show-card.visible.active.meilleure { filter: drop-shadow(0 0 24px color-mix(in srgb, var(--pack-color) 52%, transparent)) drop-shadow(0 16px 24px rgba(0,0,0,.5)); }
+.pack-show-card.visible:focus-visible::before { content: ''; position: absolute; inset: -7px; z-index: -1; border: 2px solid var(--pack-color); border-radius: 18px; box-shadow: 0 0 16px color-mix(in srgb, var(--pack-color) 45%, transparent); }
 .pack-show-card.visible { animation-name: pack-deal; }
 .pack-show-card .cel-carte { min-height: 320px; height: 100%; width: 100%; }
 .pack-show-best { position: absolute; top: -21px; left: 0; right: 0; font-size: 9px; font-weight: 700; letter-spacing: .18em; color: var(--pack-color); }

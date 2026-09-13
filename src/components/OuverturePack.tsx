@@ -39,6 +39,7 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
   const [rang, setRang] = useState(plancher);
   const [phase, setPhase] = useState<'attente'|'charge'|'evolution'|'ouverture'|'cartes'>('attente');
   const [revelees, setRevelees] = useState(0);
+  const [carteActive, setCarteActive] = useState(0);
   const [impatient, setImpatient] = useState(false);
   const [instant, setInstant] = useState(false);
   const [muet, setMuet] = useState(false);
@@ -46,6 +47,7 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
   const sons = useMemo(creerSonsPacks, []);
   const dialogue = useRef<HTMLDivElement>(null);
   const principale = useRef<HTMLButtonElement>(null);
+  const cartesRefs = useRef<(HTMLDivElement | null)[]>([]);
   const verrou = useRef(false);
   const toutes = pret && revelees >= ordre.length;
   const rarete = PALIERS_PACK[rang];
@@ -69,6 +71,12 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
     }, calme ? 100 : revelees === ordre.length-1 ? 1250 : 720);
     return () => clearTimeout(timer);
   }, [phase, calme, sons, revelees, toutes, ordre]);
+  useEffect(() => {
+    // La carte qui vient de se retourner passe devant les autres. Comme la
+    // révélation remonte du fond du pack vers la tête d'affiche, la meilleure
+    // finit naturellement sélectionnée.
+    if (phase === 'cartes' && revelees > 0) setCarteActive(Math.max(0, ordre.length - revelees));
+  }, [phase, revelees, ordre.length]);
 
   /**
    * ⚠️ LE GESTE EST MÉMORISÉ, IL N'EST PAS PERDU. Si le manager touche la
@@ -97,6 +105,15 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
     if (!pret) { setImpatient(true); return; }
     setInstant(true); sons.arreter(); setRang(maximum); setPhase('cartes'); setRevelees(ordre.length);
   }
+  function selectionnerCarte(index: number, focus = false) {
+    const debut = Math.max(0, ordre.length - revelees);
+    const cible = Math.max(debut, Math.min(ordre.length - 1, index));
+    setCarteActive(cible);
+    if (focus) window.requestAnimationFrame(() => {
+      cartesRefs.current[cible]?.focus();
+      cartesRefs.current[cible]?.scrollIntoView({ behavior: calme ? 'auto' : 'smooth', block: 'nearest', inline: 'center' });
+    });
+  }
   useEffect(() => {
     const clavier = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 'm') { sons.couper(!muet); setMuet(!muet); }
@@ -116,7 +133,7 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
       : phase === 'evolution' ? nomRaretePack(rarete)+' !'
         : impatient ? t('online.shop.opening') : t('online.pack.touch');
   return createPortal(<div ref={dialogue} className={`pack-show phase-${phase} palier-${rarete}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
-    if (e.key === 'Tab') { const elements = Array.from(dialogue.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []); const premier = elements[0], dernier = elements[elements.length-1]; if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); } }
+    if (e.key === 'Tab') { const elements = Array.from(dialogue.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') ?? []); const premier = elements[0], dernier = elements[elements.length-1]; if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); } }
   }}><main className="pack-show-main cel-panneau">
     <div className="pack-show-heading"><p className="eyebrow">Pack {pack}{cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : ''}</p><h2 id="pack-show-title" key={`${phase}-${rang}`} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : nomRaretePack(rarete)}</h2></div>
     {phase !== 'cartes' ? <><div className="pack-show-stage">
@@ -126,10 +143,18 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
       <button ref={principale} className="pack-show-touch" aria-label={`Pack ${nomRaretePack(rarete)} — ${t('online.pack.touch')}`} aria-disabled={phase !== 'attente'} onClick={action}/>
       {(phase === 'charge' || phase === 'evolution') && <div className="pack-show-upgrade" key={phase} aria-hidden="true"><i/><i/><span/></div>}
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}
-    </div><p className="pack-show-hint" aria-live="polite">{conseil}</p></> : <div className="pack-show-results" style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
+    </div><p className="pack-show-hint" aria-live="polite">{conseil}</p></> : <div className="pack-show-results" role="list" aria-label="Cartes obtenues" style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
       const visible = i >= ordre.length - revelees;
       const meilleure = i === 0;
-      return <div key={carte.id} className={`pack-show-card ${visible?'visible':''} ${meilleure?'meilleure':''}`} style={{ '--slot': i, zIndex: ordre.length - i } as CSSProperties}>
+      const active = i === carteActive;
+      return <div ref={element => { cartesRefs.current[i] = element; }} key={carte.id} role="listitem" aria-label={visible ? `${carte.nom}, note ${carte.note}` : undefined} tabIndex={visible && active ? 0 : -1} className={`pack-show-card ${visible?'visible':''} ${meilleure?'meilleure':''} ${active?'active':''}`} style={{ '--slot': i, zIndex: active ? ordre.length + 2 : ordre.length - i } as CSSProperties} onPointerEnter={() => visible && setCarteActive(i)} onPointerDown={() => visible && setCarteActive(i)} onFocus={() => visible && setCarteActive(i)} onKeyDown={e => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') {
+          e.preventDefault();
+          const debut = Math.max(0, ordre.length - revelees);
+          const suivant = e.key === 'Home' ? debut : e.key === 'End' ? ordre.length - 1 : i + (e.key === 'ArrowLeft' ? -1 : 1);
+          selectionnerCarte(suivant, true);
+        }
+      }}>
         {meilleure && visible && <span className="pack-show-best">{t('online.pack.best')}</span>}
         <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>DESTINY</small><b>DR</b><span>RUGBY</span><i>✦</i></div><div className="pack-show-front" aria-hidden={!visible}>{visible && rendreCarte(carte)}</div></div>
       </div>;
