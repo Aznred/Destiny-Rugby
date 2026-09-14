@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import YouTube from 'react-youtube';
 import './App.css';
 import { Analytics } from '@vercel/analytics/react'
 import { useGame } from './store/useGame';
@@ -16,6 +17,7 @@ import { Accueil } from './screens/Accueil';
 import { Creation } from './screens/Creation';
 import { Carriere } from './screens/Carriere';
 import { Profil } from './screens/Profil';
+import { Icone } from './components/Icone';
 
 // ---------------------------------------------------------------------------
 // ⚠️ CE QUI N'EST PAS SUR LE CHEMIN D'ARRIVÉE EST CHARGÉ À LA DEMANDE
@@ -55,6 +57,67 @@ function EcranEnRoute() {
     <div className="ecran-en-route" role="status" aria-live="polite">
       <span className="ballon-attente" aria-hidden="true" />
       <span>{t('app.chargement')}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 🎵 LE LECTEUR MUSICAL GLOBAL
+// ---------------------------------------------------------------------------
+function LecteurMusical() {
+  const [player, setPlayer] = useState<any>(null);
+  const [enLecture, setEnLecture] = useState(false);
+  const [playlistId, setPlaylistId] = useState('PLm90DCMQmtlkBigTzyX97RPgTL90ZYELs');
+
+  const onReady = (event: any) => {
+    setPlayer(event.target);
+  };
+
+  const basculerLecture = () => {
+    if (!player) return;
+    if (enLecture) {
+      player.pauseVideo();
+    } else {
+      player.playVideo();
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999, background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(8px)', padding: '12px 20px', borderRadius: '50px', display: 'flex', gap: '15px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+      
+      {/* Lecteur YouTube CACHÉ (1x1 pixel) */}
+      <div style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0 }}>
+        <YouTube 
+          opts={{ playerVars: { listType: 'playlist', list: playlistId, autoplay: 0 } }}
+          onReady={onReady}
+          onStateChange={(e) => setEnLecture(e.data === 1)} // 1 = en cours de lecture
+        />
+      </div>
+
+      {/* INTERFACE PERSONNALISÉE */}
+      <button onClick={basculerLecture} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, display: 'flex' }}>
+        {enLecture ? <Icone nom="pause" taille={20} /> : <Icone nom="play" taille={20} />}
+      </button>
+      
+      <button onClick={() => player?.nextVideo()} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, display: 'flex' }}>
+        <Icone nom="fleche-droite" taille={20} />
+      </button>
+      
+      {/* Champ pour que le joueur mette sa propre playlist */}
+      <input 
+        type="text" 
+        placeholder="Lien playlist YouTube..." 
+        style={{ padding: '6px 12px', borderRadius: '20px', border: 'none', outline: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: '12px', width: '160px' }}
+        onBlur={(e) => {
+          const match = e.target.value.match(/list=([a-zA-Z0-9_-]+)/);
+          if (match) {
+            setPlaylistId(match[1]);
+            if (player) {
+              player.loadPlaylist({ list: match[1], listType: 'playlist' });
+            }
+          }
+        }}
+      />
     </div>
   );
 }
@@ -190,27 +253,6 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
         </Garde>
-
-        {/* ⚠️ LA PUB N'EXISTE QUE SUR LES ÉCRANS OÙ L'ON FLÂNE — Boutique, Hall,
-            Classement, Clubs. C'était une erreur, et elle a coûté le compte
-            AdSense : « Annonces Google diffusées sur des pages ou écrans sans
-            contenu d'éditeur ».
-
-            ⚠️ LE DIAGNOSTIC, POUR QUE PERSONNE NE LES REMETTE. Le règlement
-            interdit les annonces sur les écrans « qui servent aux alertes, à la
-            NAVIGATION ou à d'autres fins comportementales ». Or ces quatre-là
-            sont exactement ça : une boutique, deux tableaux de scores et un
-            annuaire d'écussons. S'y ajoutait un défaut plus profond — le jeu
-            n'a qu'UNE URL (l'écran vit dans le store, pas dans l'adresse) et
-            son HTML est vide avant hydratation : pour un examinateur, tout le
-            site tenait dans quatre phrases de `<noscript>`.
-
-            La publicité vit désormais sur de VRAIES pages de contenu, en HTML
-            statique, à de vraies adresses : /wiki/ et ses deux dossiers,
-            /guide/, /pyramide/, /moteur/ et /journal/ (voir
-            `scripts/genPages.cjs`). Le jeu, lui, n'en porte plus une seule — et
-            c'est très bien ainsi : une bannière au milieu d'une décision de
-            carrière est une pub qui nuit au jeu. */}
       </main>
 
       <AnimatePresence>
@@ -238,6 +280,10 @@ export default function App() {
           </Suspense>
         )}
       </AnimatePresence>
+
+      {/* TON NOUVEAU LECTEUR MUSICAL GLOBAL */}
+      <LecteurMusical />
+
       <Analytics/>
     </div>
   );
