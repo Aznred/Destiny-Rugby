@@ -1168,11 +1168,20 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
     const receveur = e.vol.receveur;
     const offload = e.vol.intention === 'offload';
     const longueur = distance(e.vol.de, e.vol.vers);
+    const pointReception = { ...e.vol.vers };
     e.vol = null;
     if (!receveur || !receveur.surLeTerrain || receveur.sanction > 0) return formerRuck(e, e.ballon);
+    // Le receveur prend le ballon à son point d'arrivée, pas à l'endroit où sa
+    // cible tactique l'aurait déjà projeté une demi-seconde plus tard. Sans ce
+    // raccord, une passe partie vers l'arrière se téléportait devant le
+    // passeur au dernier instant — surtout après un jeu au pied, quand la ligne
+    // se reforme vite — et ressemblait exactement à une passe en avant.
+    receveur.pos = pointReception;
+    receveur.cible = { ...pointReception };
+    stopper(receveur);
     // ⚠️ ET IL FAUT ENCORE L'ATTRAPER. Voir `receptionRatee`.
     if (receptionRatee(e, receveur, longueur, offload)) {
-      e.ballon = { x: receveur.pos.x, y: receveur.pos.y };
+      e.ballon = pointReception;
       return enAvant(e, receveur);
     }
     donnerBallon(e, receveur, offload ? 0.5 : 0.35);
@@ -2649,22 +2658,21 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   // une équipe trop en avance sur son rythme est arrêtée sur la ligne. Le
   // ballon est « tenu » dans l'en-but, renvoi aux 22 — c'est une vraie règle du
   // rugby, et ça se raconte.
-  const avance = plan.total > 0
-    ? plan.marques / plan.total - Math.min(1, (e.t / (2 * DUREE_PERIODE)) * 0.95)
-    : 0;
-  if (reste <= 0 || (avance > 0.10 && e.minute < 72)) {
-    dire(e, 'jeu', adverse(cote),
-      C.texteMatch('tenuEnBut', { nom: marqueur.nom, club: nomClub(e, adverse(cote)) }),
-      0, marqueur.moi);
-    return arret(e, 'renvoi22', adverse(cote), {
-      x: adverse(cote) === 'A' ? M22_A : M22_B, y: AXE,
-    });
-  }
-
   // Franchir la ligne ne suffit pas : le joueur contrôle puis pose le ballon.
   // Ce bref état garde porteur et ballon ensemble et rend enfin l'essai visible
   // avant que l'écran bascule sur la transformation.
   if (!e.aplatissage) {
+    const avance = plan.total > 0
+      ? plan.marques / plan.total - Math.min(1, (e.t / (2 * DUREE_PERIODE)) * 0.95)
+      : 0;
+    if (reste <= 0 || (avance > 0.10 && e.minute < 72)) {
+      dire(e, 'jeu', adverse(cote),
+        C.texteMatch('tenuEnBut', { nom: marqueur.nom, club: nomClub(e, adverse(cote)) }),
+        0, marqueur.moi);
+      return arret(e, 'renvoi22', adverse(cote), {
+        x: adverse(cote) === 'A' ? M22_A : M22_B, y: AXE,
+      });
+    }
     const lieu = {
       x: cote === 'A' ? Math.max(marqueur.pos.x, LIGNE_B + 0.55) : Math.min(marqueur.pos.x, LIGNE_A - 0.55),
       y: borner(marqueur.pos.y, 1.5, LARGEUR - 1.5),
