@@ -818,7 +818,31 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
     pousserAvecBascules(e, etat, ev.horloge, []);
     appliquerAuMoteur(e, ev);
   }
-  pousserAvecBascules(e, etat, jusqua, arretSur.map((c) => MOTEUR[c]));
+  // Une présence ne rend jamais le passé interactif. C'était le défaut qui
+  // faisait « revenir au début » un direct lorsqu'un entraîneur l'ouvrait :
+  // sur une instance froide, la rejoue repartait de 0 avec `arretSur` actif et
+  // s'immobilisait à la toute première pénalité du match, parfois quarante
+  // minutes avant le chrono réellement affiché.
+  //
+  // La table de présence conserve le dernier battement, pas l'instant exact
+  // d'ouverture. La fenêtre de validité constitue donc la borne sûre : une
+  // pénalité antérieure à celle-ci n'a pas pu être proposée par ce passage sur
+  // le direct. On active chaque banc à sa borne, sans jamais reculer le moteur.
+  const seuils = arretSur.map((cote) => ({
+    cote: MOTEUR[cote],
+    depuis: Math.max(0, Math.min(jusqua,
+      ((etat.presence[cote] ?? etat.debut) - DELAI_PRESENCE - etat.debut - etat.gel) / MS_PAR_MINUTE)),
+  })).sort((a, b) => a.depuis - b.depuis);
+  const actifs: Cote[] = [];
+  const deja = minuteExacte(e);
+  for (const seuil of seuils) if (seuil.depuis <= deja + 1e-9 && !actifs.includes(seuil.cote)) actifs.push(seuil.cote);
+  for (const seuil of seuils) {
+    if (seuil.depuis <= minuteExacte(e) + 1e-9) continue;
+    pousserAvecBascules(e, etat, Math.min(jusqua, seuil.depuis), actifs);
+    if (minuteExacte(e) + 1e-9 < Math.min(jusqua, seuil.depuis)) break;
+    if (!actifs.includes(seuil.cote)) actifs.push(seuil.cote);
+  }
+  pousserAvecBascules(e, etat, jusqua, actifs);
   ranger(cle, e);
   return e;
 }
