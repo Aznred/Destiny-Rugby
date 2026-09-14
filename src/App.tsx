@@ -121,39 +121,36 @@ function LecteurMusical() {
         />
       </div>
 
-      {/* NOTIFICATION (Coin inférieur gauche) */}
+      {/* NOTIFICATION SUBTILE (Texte seul + Fondu) */}
       <AnimatePresence>
         {notificationVisible && trackInfo && (
           <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8 }} /* Un fondu un peu plus lent et doux */
             style={{
               position: 'fixed',
               bottom: '20px',
               left: '20px',
               zIndex: 9999,
-              background: 'rgba(15, 23, 42, 0.95)',
-              backdropFilter: 'blur(8px)',
-              padding: '12px 20px',
-              borderRadius: '12px',
               display: 'flex',
               alignItems: 'center',
-              gap: '15px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-              color: 'white'
+              gap: '10px',
+              color: 'rgba(255, 255, 255, 0.8)', // Blanc légèrement transparent
+              textShadow: '0 2px 4px rgba(0,0,0,0.8)' // Ombre pour rester lisible sans fond
             }}
           >
-            {/* Icône musique (SVG natif pour éviter les erreurs TypeScript) */}
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" opacity="0.8">
+            {/* Petite icône musicale */}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
             </svg>
             
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <strong style={{ fontSize: '13px', margin: 0, lineHeight: 1.2, maxWidth: '220px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <strong style={{ fontSize: '13px', margin: 0, lineHeight: 1.2, fontWeight: 500, letterSpacing: '0.5px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {trackInfo.titre}
               </strong>
-              <span style={{ fontSize: '11px', opacity: 0.7, maxWidth: '220px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontSize: '10px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '1px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {trackInfo.artiste.replace(' - Topic', '')}
               </span>
             </div>
