@@ -940,6 +940,255 @@
 }
 .hero .stats-bandeau .stat span { font-size: 0.8rem; color: var(--brume); text-transform: uppercase; letter-spacing: 0.12em; }
 
+/* Le hub des modes reprend la lecture immédiate d'un menu de jeu console :
+   une destination dominante, puis trois portes secondaires clairement
+   identifiées. Les surfaces restent celles de Destiny Rugby, sans pasticher
+   les couleurs ou les marques d'un autre jeu. */
+.accueil-hub {
+  position: relative;
+  width: min(1180px, 94vw);
+  min-height: calc(100vh - 92px);
+  margin: 0 auto;
+  padding: clamp(1.4rem, 4vh, 3.6rem) 0 3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.accueil-hub::before {
+  content: '';
+  position: absolute;
+  width: min(680px, 62vw);
+  height: min(680px, 62vw);
+  right: -18vw;
+  top: -24vh;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 178, 58, 0.13), transparent 68%);
+  pointer-events: none;
+}
+.accueil-hub-tete {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.25rem;
+}
+.accueil-hub-tete h1 {
+  margin: 0.3rem 0 0;
+  font-family: var(--police-titre);
+  font-size: clamp(2rem, 5vw, 4.35rem);
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+.accueil-hub-tete h1 em { color: var(--or-400); font-style: normal; }
+.accueil-hub-tete p {
+  width: min(420px, 40vw);
+  margin: 0 0 0.2rem;
+  color: var(--craie-dim);
+  line-height: 1.5;
+  text-align: right;
+}
+.accueil-modes {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.32fr) minmax(380px, 0.9fr);
+  gap: 12px;
+  min-height: 500px;
+}
+.accueil-modes-droite { display: grid; grid-template-rows: 1.08fr 0.92fr; gap: 12px; min-width: 0; }
+.accueil-modes-compacts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
+.accueil-mode {
+  --mode-accent: var(--or-400);
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0;
+  padding: 1.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 5px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018)),
+    rgba(5, 17, 25, 0.86);
+  color: var(--craie);
+  text-align: left;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, filter 180ms ease;
+}
+.accueil-mode::after {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  inset: auto 0 0;
+  height: 4px;
+  background: var(--mode-accent);
+  transform: scaleX(0.16);
+  transform-origin: left;
+  transition: transform 220ms ease;
+}
+.accueil-mode:hover,
+.accueil-mode:focus-visible { transform: translateY(-4px); border-color: color-mix(in srgb, var(--mode-accent) 62%, white 12%); filter: brightness(1.08); }
+.accueil-mode:hover::after,
+.accueil-mode:focus-visible::after { transform: scaleX(1); }
+.accueil-mode:focus-visible { outline: 3px solid rgba(244, 205, 99, 0.36); outline-offset: 2px; }
+.accueil-mode-numero {
+  position: absolute;
+  z-index: 3;
+  top: 1rem;
+  right: 1.1rem;
+  color: rgba(255, 255, 255, 0.34);
+  font: 800 0.72rem/1 var(--police-forte);
+  letter-spacing: 0.15em;
+}
+.accueil-mode-contenu { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.accueil-mode-surtitre {
+  margin-bottom: 0.45rem;
+  color: var(--mode-accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.accueil-mode strong {
+  max-width: 100%;
+  font-family: var(--police-titre);
+  font-size: clamp(1.35rem, 2.4vw, 2.2rem);
+  line-height: 1;
+  text-transform: uppercase;
+}
+.accueil-mode small { max-width: 37ch; margin-top: 0.55rem; color: var(--craie-dim); font-size: 0.82rem; line-height: 1.4; }
+.accueil-mode-fleche {
+  position: absolute;
+  z-index: 3;
+  right: 1rem;
+  bottom: 1rem;
+  width: 37px;
+  height: 37px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--mode-accent);
+  color: #07120c;
+  transition: transform 180ms ease;
+}
+.accueil-mode:hover .accueil-mode-fleche { transform: translateX(4px); }
+.accueil-mode-icone {
+  position: absolute;
+  top: 1.3rem;
+  left: 1.35rem;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: var(--mode-accent);
+  background: color-mix(in srgb, var(--mode-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mode-accent) 28%, transparent);
+}
+.accueil-mode-carriere { padding: clamp(1.5rem, 3vw, 2.25rem); --mode-accent: #f4cd63; background: linear-gradient(155deg, rgba(36, 87, 55, 0.72), rgba(5, 19, 19, 0.94) 62%); }
+.accueil-mode-carriere::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(3, 15, 12, 0.98) 0%, rgba(3, 15, 12, 0.75) 44%, rgba(3, 15, 12, 0.08) 76%);
+}
+.accueil-mode-carriere .accueil-mode-contenu { max-width: 58%; }
+.accueil-mode-carriere strong { font-size: clamp(2rem, 4vw, 3.6rem); }
+.accueil-mode-visuel { position: absolute; z-index: 0; inset: -8% -6% -8% 35%; pointer-events: none; }
+.accueil-mode-visuel canvas { width: 100% !important; height: 100% !important; }
+.accueil-mode-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 1rem; }
+.accueil-mode-badges i {
+  padding: 0.32rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: var(--craie);
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 700;
+}
+.accueil-mode-online { --mode-accent: #63d990; background: linear-gradient(145deg, rgba(21, 76, 53, 0.8), rgba(7, 24, 28, 0.92)); }
+.accueil-mode-online .accueil-mode-contenu { max-width: 78%; }
+.accueil-mode-collection { --mode-accent: #e8b23a; background: linear-gradient(145deg, rgba(108, 69, 20, 0.7), rgba(26, 18, 15, 0.94)); }
+.accueil-mode-parties { --mode-accent: #8fc5ff; background: linear-gradient(145deg, rgba(32, 65, 99, 0.72), rgba(8, 20, 32, 0.94)); }
+.accueil-modes-compacts .accueil-mode { padding: 1.1rem; }
+.accueil-modes-compacts .accueil-mode strong { padding-right: 1.5rem; font-size: clamp(1.05rem, 1.6vw, 1.45rem); }
+.accueil-modes-compacts .accueil-mode small { padding-right: 1.5rem; font-size: 0.72rem; }
+.accueil-modes-compacts .accueil-mode-icone { top: 1rem; left: 1rem; width: 44px; height: 44px; }
+.accueil-modes-compacts .accueil-mode-fleche { width: 31px; height: 31px; }
+.accueil-hub-pied {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-height: 52px;
+  color: var(--brume);
+  font-size: 0.73rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.accueil-hub-pied span { display: inline-flex; align-items: baseline; gap: 0.28rem; }
+.accueil-hub-pied b { color: var(--or-400); font-size: 1.05rem; }
+.accueil-hub-pied button {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  background: transparent;
+  color: var(--craie-dim);
+  font: inherit;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.accueil-hub-pied button:hover { color: var(--or-300); }
+
+@media (max-width: 900px) {
+  .accueil-hub { min-height: auto; padding: 1.4rem 0 2.5rem; }
+  .accueil-hub-tete { align-items: flex-start; }
+  .accueil-hub-tete p { width: min(340px, 46vw); font-size: 0.86rem; }
+  .accueil-modes { grid-template-columns: 1fr; min-height: 0; }
+  .accueil-mode-carriere { min-height: 420px; }
+  .accueil-modes-droite { min-height: 440px; }
+}
+
+@media (max-width: 560px) {
+  .accueil-hub { width: min(680px, 92vw); padding-top: 0.8rem; }
+  .accueil-hub-tete { display: block; margin-bottom: 0.9rem; }
+  .accueil-hub-tete h1 { font-size: clamp(2.1rem, 11vw, 3.3rem); }
+  .accueil-hub-tete p { width: 100%; margin-top: 0.75rem; text-align: left; font-size: 0.82rem; }
+  .accueil-modes { gap: 9px; }
+  .accueil-mode { border-radius: 4px; }
+  .accueil-mode-carriere { min-height: 350px; padding: 1.25rem; }
+  .accueil-mode-carriere .accueil-mode-contenu { max-width: 76%; }
+  .accueil-mode-carriere strong { font-size: clamp(1.75rem, 9vw, 2.6rem); }
+  .accueil-mode-visuel { inset: -2% 0 4% 27%; opacity: 0.82; transform: translateX(18%); }
+  .accueil-mode-carriere::before { background: linear-gradient(90deg, rgba(3, 15, 12, 0.97) 0%, rgba(3, 15, 12, 0.7) 56%, rgba(3, 15, 12, 0.1) 88%); }
+  .accueil-modes-droite { min-height: 0; display: contents; }
+  .accueil-mode-online { min-height: 205px; }
+  .accueil-modes-compacts { grid-template-columns: 1fr; gap: 9px; }
+  .accueil-modes-compacts .accueil-mode { min-height: 165px; }
+  .accueil-mode-online .accueil-mode-contenu { max-width: 82%; }
+  .accueil-mode-fleche { right: 0.85rem; bottom: 0.85rem; }
+  .accueil-hub-pied { flex-wrap: wrap; gap: 0.55rem 1rem; padding-top: 0.45rem; }
+  .accueil-hub-pied button { width: 100%; margin: 0.2rem 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accueil-mode,
+  .accueil-mode::after,
+  .accueil-mode-fleche { transition: none; }
+}
+
 /* Bandeau de fonctionnalités */
 .features {
   display: grid;

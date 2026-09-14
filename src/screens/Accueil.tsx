@@ -62,103 +62,70 @@ export function Accueil() {
   const managerActif = managerVisible ? manager : null;
   const skinActif = useGame((s) => s.skinActif);
   const [partiesOuvertes, setPartiesOuvertes] = useState(false);
+  const destinationCarriere = joueur ? 'carriere' : managerActif ? 'manager' : 'creation';
+  const titreCarriere = joueur
+    ? t('accueil.reprendre')
+    : managerActif ? 'Reprendre mon banc' : (managerVisible ? t('accueil.commencerChoix') : t('accueil.commencer'));
+  const detailCarriere = joueur
+    ? `${joueur.nom} · poursuis ta légende`
+    : managerActif ? `${managerActif.nom} · retrouve ton vestiaire` : 'Joueur ou entraîneur · bâtis ta carrière sur 15 saisons';
 
   return (
     <>
       {/* Il décide lui-même s'il doit s'ouvrir : jamais si une carrière existe,
           jamais deux fois (`tutoVu`, persisté). */}
       <Tutoriel />
-      <section className="hero">
-        <div className="hero-texte">
-          <motion.div custom={0} variants={apparait} initial="hidden" animate="show" className="eyebrow">
-            {t('accueil.eyebrow')}
-          </motion.div>
-          <motion.h1 custom={1} variants={apparait} initial="hidden" animate="show">
-            {t('accueil.titre1')} <span className="surligne">{t('accueil.titre2')}</span> {t('accueil.titre3')}
-          </motion.h1>
-          <motion.p custom={2} variants={apparait} initial="hidden" animate="show" className="accroche">
-            {t('accueil.chapo')}
-          </motion.p>
-          <motion.div custom={3} variants={apparait} initial="hidden" animate="show" className="cta-groupe">
-            {joueur ? (
-              <>
-                <button className="btn primaire grand" onClick={() => setEcran('carriere')}>
-                  {t('accueil.reprendre')}
-                </button>
-                <button className="btn fantome grand" onClick={() => setEcran('profil')}>
-                  {t('accueil.voirProfil')}
-                </button>
-              </>
-            ) : managerActif ? (
-              // ⚠️ UNE CARRIÈRE D’ENTRAÎNEUR OCCUPE LA MÊME PLACE QU’UNE
-              //    CARRIÈRE DE JOUEUR, et jamais les deux en même temps :
-              //    `creerManager` met `joueur` à null. Sans cette branche,
-              //    l’accueil proposait « commencer » à quelqu’un qui a déjà
-              //    un banc, et sa carrière devenait introuvable.
-              <>
-                <button className="btn primaire grand" onClick={() => setEcran('manager')}>
-                  <Icone nom="entraineur" taille={20} /> Reprendre mon banc
-                </button>
-                <button className="btn fantome grand" onClick={() => setEcran('tableau')}>
-                  {t('accueil.voirProfil')}
-                </button>
-              </>
-            ) : (
-              <>
-                {/* ⚠️ LE CHOIX DU MODE A DÉMÉNAGÉ DANS L'ÉCRAN DE CRÉATION.
-                    Deux boutons côte à côte sur l'accueil, ce n'était pas un
-                    choix : c'était deux portes sans description, dont l'une
-                    engageait quinze saisons d'un mode qu'on n'avait jamais vu.
-                    « Commencer » ouvre maintenant une page qui POSE la
-                    question et décrit les deux carrières (`screens/Creation`).
+      <section className="accueil-hub">
+        <motion.header custom={0} variants={apparait} initial="hidden" animate="show" className="accueil-hub-tete">
+          <div><span className="eyebrow">{t('accueil.eyebrow')}</span><h1>Choisis ton <em>terrain</em></h1></div>
+          <p>{t('accueil.chapo')}</p>
+        </motion.header>
 
-                    Le choix entraîneur est maintenant public. Le garde commun
-                    reste là pour pouvoir isoler un futur chantier sans créer
-                    une deuxième logique de navigation. */}
-                <button className="btn primaire grand" onClick={() => setEcran('creation')}>
-                  {managerVisible ? t('accueil.commencerChoix') : t('accueil.commencer')}
-                </button>
-              </>
-            )}
-          </motion.div>
-          <motion.div custom={4} variants={apparait} initial="hidden" animate="show" className="accueil-modes-secondaires">
-            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('carriereEnLigne')}>
-              <Icone nom="equipe" taille={19} /> Carrière en ligne · Ma ligue privée
-            </button>
-            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('collectionSolo')}>
-              <Icone nom="cadeau" taille={19} /> Collection · Packs et doublons
-            </button>
-          </motion.div>
-          <motion.div custom={4} variants={apparait} initial="hidden" animate="show" className="stats-bandeau">
-            <div className="stat"><b>15</b><span>{t('accueil.postes')}</span></div>
-            <div className="stat"><b>∞</b><span>{t('accueil.scenarios')}</span></div>
-            <div className="stat"><b>15</b><span>{t('accueil.saisons')}</span></div>
-          </motion.div>
-
-          {/* ⚠️ LA PORTE DES PARTIES EST SUR L'ACCUEIL, ET NULLE PART AILLEURS.
-              C'est le seul écran qu'on voit avant d'avoir une carrière, donc le
-              seul endroit d'où l'on puisse en ouvrir une autre. La ranger dans
-              ⚙️ Réglages l'aurait mise derrière la partie en cours — c'est-à-dire
-              exactement là où on ne la cherche pas. */}
-          <motion.button
-            custom={5}
-            variants={apparait}
-            initial="hidden"
-            animate="show"
-            type="button"
-            className="btn fantome accueil-parties"
-            onClick={() => setPartiesOuvertes((v) => !v)}
-            aria-expanded={partiesOuvertes}
-          >
-            <Icone nom="disquette" taille={17} /> {t('sv.mesParties')}
+        <div className="accueil-modes" aria-label="Modes de jeu">
+          <motion.button custom={1} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-carriere" onClick={() => setEcran(destinationCarriere)}>
+            <div className="accueil-mode-visuel" aria-hidden="true">
+              <Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense>
+            </div>
+            <span className="accueil-mode-numero">01</span>
+            <span className="accueil-mode-contenu">
+              <span className="accueil-mode-surtitre">Carrière solo</span>
+              <strong>{titreCarriere}</strong>
+              <small>{detailCarriere}</small>
+              <span className="accueil-mode-badges"><i>Joueur</i><i>Entraîneur</i><i>15 saisons</i></span>
+            </span>
+            <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={22} /></span>
           </motion.button>
+
+          <div className="accueil-modes-droite">
+            <motion.button custom={2} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-online" onClick={() => setEcran('carriereEnLigne')}>
+              <span className="accueil-mode-numero">02</span>
+              <span className="accueil-mode-icone"><Icone nom="equipe" taille={31} /></span>
+              <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Multijoueur</span><strong>Carrière en ligne</strong><small>Crée ta ligue privée, invite tes amis et vis les matchs en direct.</small></span>
+              <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={20} /></span>
+            </motion.button>
+
+            <div className="accueil-modes-compacts">
+              <motion.button custom={3} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-collection" onClick={() => setEcran('collectionSolo')}>
+                <span className="accueil-mode-numero">03</span>
+                <span className="accueil-mode-icone"><Icone nom="cadeau" taille={27} /></span>
+                <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Club house</span><strong>Collection</strong><small>Packs, cartes et doublons.</small></span>
+                <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
+              </motion.button>
+              <motion.button custom={4} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}>
+                <span className="accueil-mode-numero">04</span>
+                <span className="accueil-mode-icone"><Icone nom="disquette" taille={27} /></span>
+                <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Profils</span><strong>{t('sv.mesParties')}</strong><small>Retrouve ou change de sauvegarde.</small></span>
+                <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
+              </motion.button>
+            </div>
+          </div>
         </div>
 
-        <div className="hero-canvas">
-          <Suspense fallback={<div className="hero-canvas-skel" />}>
-            <Hero3D skinId={skinActif} />
-          </Suspense>
-        </div>
+        <motion.div custom={5} variants={apparait} initial="hidden" animate="show" className="accueil-hub-pied">
+          <span><b>15</b> postes</span><span><b>∞</b> scénarios</span><span><b>15</b> saisons</span>
+          {joueur && <button type="button" onClick={() => setEcran('profil')}><Icone nom="profil" taille={16} /> {t('accueil.voirProfil')}</button>}
+          {managerActif && <button type="button" onClick={() => setEcran('tableau')}><Icone nom="resultats" taille={16} /> Tableau du club</button>}
+        </motion.div>
       </section>
 
       {partiesOuvertes && (
