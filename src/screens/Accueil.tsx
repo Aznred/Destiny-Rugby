@@ -1,5 +1,5 @@
 import { LIENS_SORTANTS_AUTORISES } from '../lib/cible';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { t } from '../lib/i18n';
@@ -15,6 +15,9 @@ import { Icone } from '../components/Icone';
 // affichage immédiat du texte, puis la scène apparaît en fondu.
 const Hero3D = lazy(() =>
   import('../components/Hero3D').then((m) => ({ default: m.Hero3D })),
+);
+const PacksEventailAccueil = lazy(() =>
+  import('../components/PacksEventailAccueil').then((m) => ({ default: m.PacksEventailAccueil })),
 );
 
 /**
@@ -62,6 +65,13 @@ export function Accueil() {
   const managerActif = managerVisible ? manager : null;
   const skinActif = useGame((s) => s.skinActif);
   const [partiesOuvertes, setPartiesOuvertes] = useState(false);
+  const [interfacePC, setInterfacePC] = useState(() => window.matchMedia('(min-width: 901px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 901px)');
+    const changer = () => setInterfacePC(media.matches);
+    media.addEventListener('change', changer);
+    return () => media.removeEventListener('change', changer);
+  }, []);
   const destinationCarriere = joueur ? 'carriere' : managerActif ? 'manager' : 'creation';
   const titreCarriere = joueur
     ? t('accueil.reprendre')
@@ -75,7 +85,7 @@ export function Accueil() {
       {/* Il décide lui-même s'il doit s'ouvrir : jamais si une carrière existe,
           jamais deux fois (`tutoVu`, persisté). */}
       <Tutoriel />
-      <section className="accueil-hub">
+      {interfacePC ? <section className="accueil-hub">
         <motion.header custom={0} variants={apparait} initial="hidden" animate="show" className="accueil-hub-tete">
           <div><span className="eyebrow">{t('accueil.eyebrow')}</span><h1>Choisis ton <em>terrain</em></h1></div>
           <p>{t('accueil.chapo')}</p>
@@ -98,6 +108,7 @@ export function Accueil() {
 
           <div className="accueil-modes-droite">
             <motion.button custom={2} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-online" onClick={() => setEcran('carriereEnLigne')}>
+              <img className="accueil-mode-illustration" src="/images/menu/carriere-en-ligne.webp" alt="" decoding="async" />
               <span className="accueil-mode-numero">02</span>
               <span className="accueil-mode-icone"><Icone nom="equipe" taille={31} /></span>
               <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Multijoueur</span><strong>Carrière en ligne</strong><small>Crée ta ligue privée, invite tes amis et vis les matchs en direct.</small></span>
@@ -106,12 +117,14 @@ export function Accueil() {
 
             <div className="accueil-modes-compacts">
               <motion.button custom={3} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-collection" onClick={() => setEcran('collectionSolo')}>
+                <span className="accueil-packs-eventail" aria-hidden="true"><Suspense fallback={null}><PacksEventailAccueil /></Suspense></span>
                 <span className="accueil-mode-numero">03</span>
                 <span className="accueil-mode-icone"><Icone nom="cadeau" taille={27} /></span>
                 <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Club house</span><strong>Collection</strong><small>Packs, cartes et doublons.</small></span>
                 <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
               </motion.button>
               <motion.button custom={4} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}>
+                <img className="accueil-mode-illustration" src="/images/menu/sauvegardes.webp" alt="" decoding="async" />
                 <span className="accueil-mode-numero">04</span>
                 <span className="accueil-mode-icone"><Icone nom="disquette" taille={27} /></span>
                 <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Profils</span><strong>{t('sv.mesParties')}</strong><small>Retrouve ou change de sauvegarde.</small></span>
@@ -126,7 +139,25 @@ export function Accueil() {
           {joueur && <button type="button" onClick={() => setEcran('profil')}><Icone nom="profil" taille={16} /> {t('accueil.voirProfil')}</button>}
           {managerActif && <button type="button" onClick={() => setEcran('tableau')}><Icone nom="resultats" taille={16} /> Tableau du club</button>}
         </motion.div>
-      </section>
+      </section> : <section className="hero">
+        <div className="hero-texte">
+          <div className="eyebrow">{t('accueil.eyebrow')}</div>
+          <h1>{t('accueil.titre1')} <span className="surligne">{t('accueil.titre2')}</span> {t('accueil.titre3')}</h1>
+          <p className="accroche">{t('accueil.chapo')}</p>
+          <div className="cta-groupe">
+            <button className="btn primaire grand" onClick={() => setEcran(destinationCarriere)}>{titreCarriere}</button>
+            {joueur && <button className="btn fantome grand" onClick={() => setEcran('profil')}>{t('accueil.voirProfil')}</button>}
+            {managerActif && <button className="btn fantome grand" onClick={() => setEcran('tableau')}>{t('accueil.voirProfil')}</button>}
+          </div>
+          <div className="accueil-modes-secondaires">
+            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('carriereEnLigne')}><Icone nom="equipe" taille={19} /> Carrière en ligne · Ma ligue privée</button>
+            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('collectionSolo')}><Icone nom="cadeau" taille={19} /> Collection · Packs et doublons</button>
+          </div>
+          <div className="stats-bandeau"><div className="stat"><b>15</b><span>{t('accueil.postes')}</span></div><div className="stat"><b>∞</b><span>{t('accueil.scenarios')}</span></div><div className="stat"><b>15</b><span>{t('accueil.saisons')}</span></div></div>
+          <button type="button" className="btn fantome accueil-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}><Icone nom="disquette" taille={17} /> {t('sv.mesParties')}</button>
+        </div>
+        <div className="hero-canvas"><Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense></div>
+      </section>}
 
       {partiesOuvertes && (
         <section className="section accueil-sauvegardes">

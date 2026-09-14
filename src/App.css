@@ -1104,6 +1104,39 @@
 .accueil-mode-carriere strong { font-size: clamp(2rem, 4vw, 3.6rem); }
 .accueil-mode-visuel { position: absolute; z-index: 0; inset: -8% -6% -8% 35%; pointer-events: none; }
 .accueil-mode-visuel canvas { width: 100% !important; height: 100% !important; }
+.accueil-mode-illustration {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 68% center;
+  opacity: 0.82;
+  pointer-events: none;
+  transition: transform 500ms ease, opacity 220ms ease;
+}
+.accueil-mode-online::before,
+.accueil-mode-collection::before,
+.accueil-mode-parties::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(3, 14, 13, 0.98) 0%, rgba(3, 14, 13, 0.62) 48%, rgba(3, 14, 13, 0.08) 100%);
+}
+.accueil-mode-parties::before { background: linear-gradient(0deg, rgba(5, 13, 25, 0.98) 0%, rgba(5, 13, 25, 0.58) 55%, rgba(5, 13, 25, 0.08) 100%); }
+.accueil-mode:hover .accueil-mode-illustration { transform: scale(1.035); opacity: 0.95; }
+.accueil-packs-eventail {
+  position: absolute;
+  z-index: 0;
+  inset: -7% -10% 28%;
+  pointer-events: none;
+  filter: drop-shadow(0 12px 12px rgba(0, 0, 0, 0.55));
+}
+.accueil-packs-eventail canvas { width: 100% !important; height: 100% !important; }
+.accueil-mode-collection::before { background: linear-gradient(0deg, rgba(25, 14, 7, 0.99) 0%, rgba(25, 14, 7, 0.5) 48%, rgba(25, 14, 7, 0.04) 100%); }
 .accueil-mode-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 1rem; }
 .accueil-mode-badges i {
   padding: 0.32rem 0.55rem;

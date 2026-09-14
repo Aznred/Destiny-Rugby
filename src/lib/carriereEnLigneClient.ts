@@ -5,7 +5,7 @@ export interface SessionCarriere {
   compte: CompteCarriere;
   ligues: {
     id: string; nom: string; etat: string; clubNom: string; ovas: number;
-    clubEmbleme?: string; logo?: string; laboratoire?: boolean;
+    clubEmbleme?: string; logo?: string; laboratoire?: boolean; createur?: boolean;
   }[];
 }
 export interface MiseAJourDirectCarriere {
@@ -85,7 +85,10 @@ export const chargerDirectCarriere = (id: string, matchId: string, signal?: Abor
     `?ligue=${encodeURIComponent(id)}&direct=${encodeURIComponent(matchId)}${version ? `&v=${version}` : ''}`);
 export const identifierCarriere = (action: 'inscription' | 'connexion', identifiant: string, motDePasse: string, pseudo: string, confirmationMotDePasse = '') =>
   requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo, confirmationMotDePasse });
+export const configurationCarriere = () => requete<{ googleClientId?: string }>(undefined, undefined, undefined, '?configuration=1');
+export const identifierGoogleCarriere = (credential: string) => requete<CompteCarriere>({ action: 'google', credential });
 export const deconnecterCarriere = () => requete<{ ok: boolean }>({ action: 'deconnexion' });
+export const supprimerLigueCarriere = (ligue: string) => requete<{ ok: boolean }>({ action: 'supprimerLigue', ligue });
 export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number }
 export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number, maxClubs: number, identite: IdentiteLigue = {}) =>
   requete<VueCarriereEnLigne>({ action: 'creer', nom, clubNom, rythme, maxClubs, ...identite });

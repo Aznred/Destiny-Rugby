@@ -45,14 +45,22 @@ export function stockageFichier(fichier: string): StockageCarriere {
     },
     push: pushLocal(base.push, sauver),
     async compteParIdentifiant(i) { return copie(base.comptes.find(c => c.identifiant === i) ?? null); },
+    async compteParGoogle(sujet) { return copie(base.comptes.find(c => c.fournisseur === 'google' && c.sujetExterne === sujet) ?? null); },
+    async lierCompteGoogle(id, sujet, courriel) {
+      if (base.comptes.some(c => c.sujetExterne === sujet || c.courriel === courriel)) return false;
+      const compte = base.comptes.find(c => c.id === id); if (!compte || compte.sujetExterne) return false;
+      compte.fournisseur = 'google'; compte.sujetExterne = sujet; compte.courriel = courriel; sauver(); return true;
+    },
     async creerCompte(c) {
-      if (base.comptes.some(x => x.identifiant === c.identifiant)) return false;
+      if (base.comptes.some(x => x.identifiant === c.identifiant || (c.sujetExterne && x.sujetExterne === c.sujetExterne) || (c.courriel && x.courriel === c.courriel))) return false;
       const maintenant = new Date().toISOString();
       base.comptes.push({ ...copie(c), creeLe: maintenant, vuLe: maintenant }); sauver(); return true;
     },
     async session(e, maintenant) {
       const s = base.sessions[e];
-      return copie(s && s.expiration > maintenant ? base.comptes.find(c => c.id === s.compte) ?? null : null);
+      const compte = s && s.expiration > maintenant ? base.comptes.find(c => c.id === s.compte) ?? null : null;
+      if (compte) { compte.vuLe = new Date(maintenant).toISOString(); sauver(); }
+      return copie(compte);
     },
     async ouvrirSession(e, compte, expiration) {
       base.sessions[e] = { compte, expiration };
@@ -77,6 +85,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
           id: l.etat.id, nom: l.etat.nom, phase: l.etat.phase, logo: l.etat.logo,
           clubNom: club?.nom ?? '', ovas: club?.ovas ?? 0, clubEmbleme: club?.embleme,
           laboratoire: l.etat.laboratoire === true,
+          createurId: l.etat.createurId,
         };
       });
     },
@@ -127,6 +136,23 @@ export function stockageFichier(fichier: string): StockageCarriere {
       if (base.ligues.some(x => x.id === l.id || x.code === l.code)) return false;
       base.ligues.push(copie(l)); sauver(); return true;
     },
+    async supprimerLigue(id, createur) {
+      const index = base.ligues.findIndex(l => l.id === id && l.etat.createurId === createur);
+      if (index < 0) return false;
+      base.ligues.splice(index, 1);
+      for (const cle of Object.keys(base.recus)) if (JSON.parse(cle)[0] === id) delete base.recus[cle];
+      sauver(); return true;
+    },
+    async supprimerLiguesInactives(avant) {
+      const ids = base.ligues.filter(l => !l.etat.laboratoire && l.comptes.every(id => {
+        const vu = Date.parse(base.comptes.find(c => c.id === id)?.vuLe ?? '');
+        return !Number.isFinite(vu) || vu < avant;
+      })).map(l => l.id);
+      if (!ids.length) return [];
+      base.ligues = base.ligues.filter(l => !ids.includes(l.id));
+      for (const cle of Object.keys(base.recus)) if (ids.includes(JSON.parse(cle)[0])) delete base.recus[cle];
+      sauver(); return ids;
+    },
     async dejaTraitee(l, c, r) { return Boolean(base.recus[cleRecu(l, c, r)]); },
     async comparerEtEcrire(l, version, recu) {
       const index = base.ligues.findIndex(x => x.id === l.id);
@@ -157,7 +183,8 @@ export function stockageFichier(fichier: string): StockageCarriere {
       const maintenant = Date.now();
       return base.ligues.filter(l => {
         const reveil = reveilsMatch[l.id] ?? prochaineEcheanceMatch(l.etat, maintenant);
-        return reveil !== null && reveil <= maintenant;
+        const lancement = l.etat.phase === 'salon' ? Date.parse(l.etat.creeLe) + 2 * 24 * 60 * 60_000 : Infinity;
+        return (reveil !== null && reveil <= maintenant) || lancement <= maintenant;
       }).map(l => l.id);
     },
   };

@@ -75,7 +75,13 @@ la mauvaise sans prévenir.
    si tu as suivi [`VERCEL.md`](VERCEL.md).
 2. [`schema-ligues.sql`](schema-ligues.sql) — il crée `comptes` et `sessions`.
 3. [`schema-carriere.sql`](schema-carriere.sql) — il **ajoute une colonne à
-   `comptes`** et crée les trois tables du mode.
+   `comptes`**, dont l’identité Google, et crée les trois tables du mode.
+
+Pour afficher « Continuer avec Google », crée dans Google Cloud un client OAuth
+de type **Application Web**, autorise les origines du site et de développement,
+puis ajoute son identifiant aux variables Vercel sous `GOOGLE_CLIENT_ID`. Le
+même identifiant sert côté navigateur et à la vérification du billet côté
+serveur ; aucun secret Google n’est nécessaire.
 
 > ⚠️ **L'ORDRE N'EST PAS UNE PRÉCAUTION, C'EST UNE DÉPENDANCE.**
 > `schema-carriere.sql` commence par `alter table comptes add column …` : passé

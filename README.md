@@ -816,6 +816,12 @@ semaine, une monnaie (**l'OVA**), des packs tirés du vivier mondial réel, un
 marché et des échanges entre eux, des coupes inventées par le commissaire, et
 une histoire qui traverse les saisons.
 
+Les comptes acceptent désormais l’identifiant classique ou **Google**. Une
+ligue encore au salon démarre automatiquement **48 heures après sa création**
+dès qu’au moins deux managers sont présents. Son créateur peut la supprimer
+depuis « Mes ligues » ; et l’horloge efface automatiquement une ligue lorsque
+aucun de ses membres ne s’est connecté depuis **quatorze jours**.
+
 Ce n'est pas un clone de FUT posé sur du rugby. Le moment visé n'est pas « j'ai
 packé un 90 », c'est *« j'ai packé ce 74 à la première saison, personne n'en
 voulait, Hugo m'a proposé 90 000 OVA pour lui, j'ai refusé, et il nous a fait

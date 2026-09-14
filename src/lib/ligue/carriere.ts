@@ -915,6 +915,12 @@ function completerPacks(etat: EtatCarriereEnLigne) {
 }
 
 function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: string) {
+  // Un salon ne dépend pas d'un onglet laissé ouvert : après 48 heures il
+  // démarre dès que deux managers sont présents. Avec un seul club, le second
+  // inscrit déclenche immédiatement ce même départ.
+  if (etat.phase === 'salon' && etat.clubs.length >= 2 && Date.parse(etat.creeLe) + 2 * JOUR <= maintenant) {
+    demarrerSaison(etat, maintenant);
+  }
   completerPacks(etat);
   attribuerPacksQuotidiens(etat, maintenant);
   renouvelerObjectifs(etat, maintenant);
@@ -1027,6 +1033,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
   if (commande.type === 'rejoindre') {
     ajouterClub(nouveau, compteId, commande.pseudo, commande.clubNom, maintenant, graine, commande.embleme);
     attribuerPacksQuotidiens(nouveau, maintenant);
+    if (nouveau.phase === 'salon' && Date.parse(nouveau.creeLe) + 2 * JOUR <= maintenant) demarrerSaison(nouveau, maintenant);
   } else {
     const club = monClub(nouveau, compteId); avancerInterne(nouveau, maintenant, graine);
     switch (commande.type) {

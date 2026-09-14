@@ -124,5 +124,9 @@ export function echeanceLigue(etat: unknown, maintenant: number): number {
   const prochainRappel = rappels.length ? Math.min(...rappels) : Infinity;
   const dansLEtat = prochaineEcheance(etat, maintenant);
   const jour = prochainJour(maintenant);
-  return Math.min(dansLEtat ?? jour, jour, prochainRappel);
+  const source = etat as { phase?: string; creeLe?: string } | null;
+  const lancementSalon = source?.phase === 'salon' && source.creeLe
+    ? Date.parse(source.creeLe) + 2 * 24 * 60 * 60_000 : Infinity;
+  const lancementFutur = lancementSalon > maintenant ? lancementSalon : Infinity;
+  return Math.min(dansLEtat ?? jour, jour, prochainRappel, lancementFutur);
 }

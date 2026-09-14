@@ -43,7 +43,7 @@ import type { CouleursDirect } from '../components/match/TerrainEnDirect';
 import { NotificationsMatch } from '../components/NotificationsMatch';
 import { DirectCinema } from '../components/match/DirectCinema';
 import {
-  chargerSessionCarriere, chargerLigueCarriere, chargerDirectCarriere, identifierCarriere, deconnecterCarriere, INCHANGE,
+  chargerSessionCarriere, chargerLigueCarriere, chargerDirectCarriere, identifierCarriere, identifierGoogleCarriere, configurationCarriere, deconnecterCarriere, supprimerLigueCarriere, INCHANGE,
   creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, signalerPresenceCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, chargerAdministrationCarriere, ErreurCarriere,
 } from '../lib/carriereEnLigneClient';
 import type { IdentiteLigue } from '../lib/carriereEnLigneClient';
@@ -69,6 +69,15 @@ import { fusionnerDeltaDirect, fusionnerVueLigue } from '../lib/ligue/fusionDire
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'administration' | 'atelier';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
 type VueRencontre = VueCarriereEnLigne['rencontres'][number];
+type ReponseGoogle = { credential: string };
+declare global {
+  interface Window {
+    google?: { accounts: { id: {
+      initialize(options: { client_id: string; callback: (reponse: ReponseGoogle) => void }): void;
+      renderButton(element: HTMLElement, options: Record<string, unknown>): void;
+    } } };
+  }
+}
 const onglets = (): { id: Onglet; label: string; icone: NomIcone }[] => [
   { id: 'club', label: t('online.nav.club'), icone: 'stade' }, { id: 'calendrier', label: t('online.nav.calendar'), icone: 'calendrier' },
   { id: 'composition', label: t('online.nav.lineup'), icone: 'maillot' },
@@ -604,13 +613,23 @@ export function CarriereEnLigne() {
     {erreur && <div className="cel-erreur" role="alert" ref={refErreur}><Icone nom="alerte" taille={22} /><p>{erreur}</p><button className="btn fantome" disabled={occupe} onClick={() => { if (ligueId) void ouvrirLigue(ligueId); else void chargerSession(); }}>{t('online.retry')}</button></div>}
     {notification && <div className="cel-notification" role="status">{notification}<button aria-label="Fermer la notification" onClick={() => setNotification('')}><Icone nom="croix" taille={16} /></button></div>}
     {charge ? <Vide icone="chrono" titre={t('online.loading')}>{t('online.loadingDetail')}</Vide>
-      : !session ? <Connexion occupe={occupe} onConnexion={async (action, identifiant, motDePasse, pseudo, confirmationMotDePasse) => {
+      : !session ? <Connexion occupe={occupe} onGoogle={async credential => {
+        setOccupe(true); setErreur('');
+        try { await identifierGoogleCarriere(credential); await chargerSession(); }
+        catch (e) { setErreur(messageErreur(e)); }
+        finally { setOccupe(false); }
+      }} onConnexion={async (action, identifiant, motDePasse, pseudo, confirmationMotDePasse) => {
         setOccupe(true); setErreur('');
         try { await identifierCarriere(action, identifiant, motDePasse, pseudo, confirmationMotDePasse); await chargerSession(); }
         catch (e) { setErreur(messageErreur(e)); }
         finally { setOccupe(false); }
       }} />
-      : !vue ? <Portail session={session} occupe={occupe} ouvrirLigue={ouvrirLigue} onCreer={async (nom, clubNom, rythme, max, identite) => {
+      : !vue ? <Portail session={session} occupe={occupe} ouvrirLigue={ouvrirLigue} onSupprimer={async id => {
+        setOccupe(true); setErreur('');
+        try { await supprimerLigueCarriere(id); await chargerSession(); setNotification('La ligue a été supprimée.'); }
+        catch (e) { setErreur(messageErreur(e)); }
+        finally { setOccupe(false); }
+      }} onCreer={async (nom, clubNom, rythme, max, identite) => {
         setOccupe(true); setErreur(''); try { ouvrir(await creerLigueCarriere(nom, clubNom, rythme, max, identite)); } catch (e) { setErreur(messageErreur(e)); } finally { setOccupe(false); }
       }} onRejoindre={async (code, clubNom, embleme) => { setOccupe(true); setErreur(''); try { ouvrir(await rejoindreLigueCarriere(code, clubNom, embleme)); oublierInvitation(); } catch (e) { setErreur(messageErreur(e)); } finally { setOccupe(false); } }} />
       : <>
@@ -642,7 +661,7 @@ export function CarriereEnLigne() {
   </section>;
 }
 
-function Connexion({ onConnexion, occupe }: { occupe: boolean; onConnexion: (action: 'connexion' | 'inscription', identifiant: string, motDePasse: string, pseudo: string, confirmationMotDePasse: string) => Promise<void> }) {
+function Connexion({ onConnexion, onGoogle, occupe }: { occupe: boolean; onGoogle: (credential: string) => Promise<void>; onConnexion: (action: 'connexion' | 'inscription', identifiant: string, motDePasse: string, pseudo: string, confirmationMotDePasse: string) => Promise<void> }) {
   // ⚠️ QUELQU’UN QUI ARRIVE PAR UN LIEN N’A PRESQUE JAMAIS DE COMPTE. On lui
   //    ouvre donc « Créer mon compte », et on lui dit pourquoi il est là :
   //    sans ce mot, un formulaire de connexion nu après avoir cliqué sur une
@@ -650,12 +669,36 @@ function Connexion({ onConnexion, occupe }: { occupe: boolean; onConnexion: (act
   const invitation = invitationEnAttente();
   const [inscription, setInscription] = useState(Boolean(invitation));
   const [identifiant, setIdentifiant] = useState(''); const [pseudo, setPseudo] = useState(''); const [motDePasse, setMotDePasse] = useState(''); const [confirmation, setConfirmation] = useState('');
+  const googleRef = useRef<HTMLDivElement | null>(null);
+  const [googleDisponible, setGoogleDisponible] = useState(false);
+  useEffect(() => {
+    let actif = true;
+    const installer = async () => {
+      const { googleClientId } = await configurationCarriere();
+      if (!actif || !googleClientId) return;
+      setGoogleDisponible(true);
+      let script = document.querySelector<HTMLScriptElement>('script[data-destiny-google]');
+      if (!script) {
+        script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true; script.dataset.destinyGoogle = '1';
+        document.head.appendChild(script);
+      }
+      if (!window.google) await new Promise<void>((resolve, reject) => { script!.addEventListener('load', () => resolve(), { once: true }); script!.addEventListener('error', () => reject(new Error('Google indisponible')), { once: true }); });
+      if (!actif || !window.google || !googleRef.current) return;
+      window.google.accounts.id.initialize({ client_id: googleClientId, callback: reponse => { if (reponse.credential) void onGoogle(reponse.credential); } });
+      googleRef.current.replaceChildren();
+      window.google.accounts.id.renderButton(googleRef.current, { theme: 'outline', size: 'large', shape: 'pill', text: inscription ? 'signup_with' : 'signin_with', width: 320, locale: 'fr' });
+    };
+    void installer().catch(() => {});
+    return () => { actif = false; };
+  }, [inscription, onGoogle]);
   const soumettre = (e: FormEvent) => { e.preventDefault(); if (inscription && motDePasse !== confirmation) return; void onConnexion(inscription ? 'inscription' : 'connexion', identifiant, motDePasse, pseudo, confirmation); };
   return <div className="cel-entree">
     <div className="cel-promesse"><div className="eyebrow">{t('online.auth.eyebrow')}</div><h1>{t('online.auth.title')}</h1><p>Trente joueurs Bronze, un maillot à défendre et des mois pour bâtir une équipe qui compte.</p><div className="cel-billet"><b>{t('online.season', { n: '01' })}</b><span>30 joueurs au départ</span><strong>35 <small>GEN</small></strong><p>Championnats privés · Marché entre amis · Matchs en direct</p></div></div>
     <form className="cel-panneau cel-auth" onSubmit={soumettre}>
       {invitation && <p className="cel-invite"><Icone nom="cadeau" taille={18} />Tu es invité à rejoindre une ligue.</p>}
       <div className="eyebrow">{t('online.auth.account')}</div><h2>{inscription ? t('online.auth.create') : t('online.auth.find')}</h2>
+      <div className={`cel-google${occupe ? ' occupe' : ''}${googleDisponible ? '' : ' indisponible'}`} ref={googleRef} />
+      {googleDisponible && <div className="cel-separateur"><span>ou avec un identifiant</span></div>}
       <Champ label={t('online.auth.id')}><input autoComplete="username" required minLength={3} maxLength={60} value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="username" /></Champ>
       {inscription && <Champ label={t('online.auth.manager')}><input required minLength={2} maxLength={32} value={pseudo} onChange={e => setPseudo(e.target.value)} /></Champ>}
       <Champ label={t('online.auth.password')}><input type="password" autoComplete={inscription ? 'new-password' : 'current-password'} required minLength={inscription ? 10 : 1} maxLength={128} value={motDePasse} onChange={e => setMotDePasse(e.target.value)} /></Champ>
@@ -666,7 +709,7 @@ function Connexion({ onConnexion, occupe }: { occupe: boolean; onConnexion: (act
   </div>;
 }
 
-function Portail({ session, occupe, ouvrirLigue, onCreer, onRejoindre }: { session: SessionCarriere; occupe: boolean; ouvrirLigue: (id: string) => Promise<void>; onCreer: (nom: string, club: string, rythme: number, max: number, identite?: IdentiteLigue) => Promise<void>; onRejoindre: (code: string, club: string, embleme?: string) => Promise<void> }) {
+function Portail({ session, occupe, ouvrirLigue, onSupprimer, onCreer, onRejoindre }: { session: SessionCarriere; occupe: boolean; ouvrirLigue: (id: string) => Promise<void>; onSupprimer: (id: string) => Promise<void>; onCreer: (nom: string, club: string, rythme: number, max: number, identite?: IdentiteLigue) => Promise<void>; onRejoindre: (code: string, club: string, embleme?: string) => Promise<void> }) {
   // ⚠️ ARRIVER PAR UN LIEN, C’EST DÉJÀ AVOIR RÉPONDU À LA QUESTION. Sans ça,
   //    l’invité tombe sur « Créer une ligue » avec un formulaire vide, et le
   //    code qu’on vient de lui donner est à ressaisir alors qu’on l’a en main.
@@ -675,7 +718,8 @@ function Portail({ session, occupe, ouvrirLigue, onCreer, onRejoindre }: { sessi
   const [embleme, setEmbleme] = useState<string | undefined>(); const [choixOuvert, setChoixOuvert] = useState(false);
   const [logo, setLogo] = useState<string | undefined>(); const [tropheeId, setTropheeId] = useState<string | undefined>(); const [playoffs, setPlayoffs] = useState(false);
   const [dotation, setDotation] = useState('1000');
-  return <><header className="cel-titre"><div className="eyebrow">{t('online.portal.welcome', { name: session.compte.pseudo })}</div><h1>{t('online.portal.title')}</h1><p>{t('online.portal.description')}</p></header><div className="cel-portail"><div><h2>{t('online.myLeagues')} <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <button className={`cel-ligue${l.laboratoire ? ' cel-ligue-laboratoire' : ''}`} key={l.id} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}{l.laboratoire && <i>Développement</i>}</em><b>{l.clubNom}</b><small>{t(`online.phase.${l.etat === 'salon' ? 'lobby' : l.etat === 'saison' ? 'season' : 'break'}`)} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>)}</div> : <Vide titre={t('online.portal.create')}>{t('online.portal.empty')}</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme), Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>{t('online.portal.create')}</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>{t('online.portal.join')}</button></div><h2>{mode === 'creer' ? t('online.portal.create') : t('online.portal.join')}</h2>{mode === 'creer' ? <Champ label={t('online.portal.leagueName')}><input required minLength={3} maxLength={50} value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label={t('online.portal.inviteCode')}><input required autoCapitalize="characters" maxLength={20} value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label={t('online.portal.clubName')}><input required minLength={3} maxLength={40} value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>{t('online.portal.badge')}</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? t('online.portal.changeBadge') : t('online.portal.chooseBadge')}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Champ label={t('online.portal.matchesPerWeek')}><input type="number" min={1} max={7} required value={rythme} onChange={e => setRythme(e.target.value)} /></Champ><Champ label={t('online.portal.clubCount')}><input type="number" min={2} max={64} required value={max} onChange={e => setMax(e.target.value)} /></Champ></div><Champ label={t('online.portal.startingOvas')}><input type="number" min={0} max={100000} required value={dotation} onChange={e => setDotation(e.target.value)} /></Champ><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>{t('online.competition.knockout')}</b>{t('online.competition.knockoutHelp')}</span></label></>}<p className="cel-note">{t('online.portal.initialSquad')}</p><button className="btn primaire" disabled={occupe}>{occupe ? t('online.auth.connecting') : mode === 'creer' ? t('online.portal.createPrivate') : t('online.portal.joinLeague')}<Icone nom="fleche-droite" taille={18} /></button></form></div></>;
+  const [aSupprimer, setASupprimer] = useState<SessionCarriere['ligues'][number] | null>(null);
+  return <><header className="cel-titre"><div className="eyebrow">{t('online.portal.welcome', { name: session.compte.pseudo })}</div><h1>{t('online.portal.title')}</h1><p>{t('online.portal.description')}</p></header><div className="cel-portail"><div><h2>{t('online.myLeagues')} <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <div className="cel-ligue-ligne" key={l.id}><button className={`cel-ligue${l.laboratoire ? ' cel-ligue-laboratoire' : ''}`} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}{l.laboratoire && <i>Développement</i>}</em><b>{l.clubNom}</b><small>{t(`online.phase.${l.etat === 'salon' ? 'lobby' : l.etat === 'saison' ? 'season' : 'break'}`)} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>{l.createur && !l.laboratoire && <button type="button" className="cel-supprimer-ligue" disabled={occupe} aria-label={`Supprimer la ligue ${l.nom}`} title="Supprimer cette ligue" onClick={() => setASupprimer(l)}><Icone nom="corbeille" taille={18} /></button>}</div>)}</div> : <Vide titre={t('online.portal.create')}>{t('online.portal.empty')}</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme), Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>{t('online.portal.create')}</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>{t('online.portal.join')}</button></div><h2>{mode === 'creer' ? t('online.portal.create') : t('online.portal.join')}</h2>{mode === 'creer' ? <Champ label={t('online.portal.leagueName')}><input required minLength={3} maxLength={50} value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label={t('online.portal.inviteCode')}><input required autoCapitalize="characters" maxLength={20} value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label={t('online.portal.clubName')}><input required minLength={3} maxLength={40} value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>{t('online.portal.badge')}</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? t('online.portal.changeBadge') : t('online.portal.chooseBadge')}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Champ label={t('online.portal.matchesPerWeek')}><input type="number" min={1} max={7} required value={rythme} onChange={e => setRythme(e.target.value)} /></Champ><Champ label={t('online.portal.clubCount')}><input type="number" min={2} max={64} required value={max} onChange={e => setMax(e.target.value)} /></Champ></div><Champ label={t('online.portal.startingOvas')}><input type="number" min={0} max={100000} required value={dotation} onChange={e => setDotation(e.target.value)} /></Champ><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>{t('online.competition.knockout')}</b>{t('online.competition.knockoutHelp')}</span></label></>}<p className="cel-note">{t('online.portal.initialSquad')}</p><button className="btn primaire" disabled={occupe}>{occupe ? t('online.auth.connecting') : mode === 'creer' ? t('online.portal.createPrivate') : t('online.portal.joinLeague')}<Icone nom="fleche-droite" taille={18} /></button></form></div>{aSupprimer && <Confirmation titre={`Supprimer « ${aSupprimer.nom} » ?`} message="Tous les clubs, cartes, résultats et trophées de cette ligue seront définitivement supprimés pour tous ses membres." libelleOui="Supprimer définitivement" onNon={() => setASupprimer(null)} onOui={() => { const id = aSupprimer.id; setASupprimer(null); void onSupprimer(id); }} />}</>;
 }
 
 // ---------------------------------------------------------------------------

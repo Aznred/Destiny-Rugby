@@ -3,6 +3,15 @@
 -- agrégat versionné : débit, propriété, résultat et reçu sont un seul commit.
 alter table comptes add column if not exists identifiant text;
 create unique index if not exists comptes_identifiant_idx on comptes (identifiant);
+-- Connexion fédérée. Le sujet Google est l'identité stable ; le courriel ne
+-- sert qu'à rattacher sans doublon un ancien compte créé avec cette adresse.
+alter table comptes add column if not exists courriel text;
+alter table comptes add column if not exists fournisseur text;
+alter table comptes add column if not exists sujet_externe text;
+create unique index if not exists comptes_externe_idx
+  on comptes (fournisseur, sujet_externe) where sujet_externe is not null;
+create unique index if not exists comptes_courriel_idx
+  on comptes (courriel) where courriel is not null;
 
 create table if not exists carriere_ligues (
   id uuid primary key,
@@ -32,15 +41,16 @@ alter table carriere_ligues add column if not exists reveil_match timestamptz;
 update carriere_ligues
 set etat_version=coalesce((donnees->>'version')::integer,0), phase=donnees->>'phase',
     resume=jsonb_build_object(
-      'nom',donnees->'nom','phase',donnees->'phase','logo',donnees->'logo',
+      'nom',donnees->'nom','phase',donnees->'phase','logo',donnees->'logo','createurId',donnees->'createurId',
       'clubs',coalesce((select jsonb_agg(jsonb_build_object(
         'compteId',c->'compteId','nom',c->'nom','ovas',c->'ovas','embleme',c->'embleme'))
         from jsonb_array_elements(coalesce(donnees->'clubs','[]'::jsonb)) c),'[]'::jsonb))
 where etat_version is distinct from coalesce((donnees->>'version')::integer,0)
-   or phase is distinct from donnees->>'phase' or resume is null;
+   or phase is distinct from donnees->>'phase' or resume is null or not (resume ? 'createurId');
 alter table carriere_ligues alter column etat_version set default 0;
 alter table carriere_ligues alter column etat_version set not null;
 create index if not exists carriere_ligues_echeance_idx on carriere_ligues (echeance,id) where phase='saison';
+create index if not exists carriere_ligues_salon_echeance_idx on carriere_ligues (echeance,id) where phase='salon';
 update carriere_ligues l set reveil_match=case
   when exists (select 1 from jsonb_array_elements(coalesce(l.donnees->'rencontres','[]'::jsonb)) r
                where r ? 'match' and coalesce((r->'match'->>'termine')::boolean,false)=false) then now()

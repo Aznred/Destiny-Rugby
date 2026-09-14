@@ -8,6 +8,7 @@ import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
+import { OAuth2Client } from 'google-auth-library';
 
 export interface RequeteCarriere {
   method?: string; url?: string; body?: unknown;
@@ -28,6 +29,7 @@ export interface ReponseCarriere {
 class ErreurHttp extends Error { constructor(public statut: number, message: string) { super(message); } }
 const COOKIE = 'destiny_carriere';
 const DUREE_SESSION = 30 * 24 * 60 * 60_000;
+const DEUX_SEMAINES = 14 * 24 * 60 * 60_000;
 const chiffrer = promisify(scrypt);
 export const empreinteJeton = (valeur: string) => createHash('sha256').update(valeur).digest('hex');
 const entete = (req: RequeteCarriere, nom: string) => String(req.headers[nom] ?? '');
@@ -78,6 +80,8 @@ const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, adminis
 const comptesEtat = (e: EtatCarriereEnLigne) => e.clubs.map(c => c.compteId);
 
 export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer?: (etat: EtatCarriereEnLigne) => Promise<void>) {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? '';
+  const google = googleClientId ? new OAuth2Client(googleClientId) : null;
   let catalogueCache: CatalogueAdmin = CATALOGUE_ADMIN_VIDE;
   async function avecAtelier<T>(operation: () => Promise<T>): Promise<T> {
     const config = await stockage.atelier?.lire() ?? CATALOGUE_ADMIN_VIDE;
@@ -265,6 +269,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   }
   async function avancerLigues() {
     await stockage.nettoyerPresences(Date.now() - 24 * 60 * 60_000).catch(() => {});
+    const supprimees = await stockage.supprimerLiguesInactives(Date.now() - DEUX_SEMAINES).catch(() => [] as string[]);
+    for (const id of supprimees) oublierLigue(id);
     const ids = await stockage.actives();
     let traitees = 0;
     let index = 0;
@@ -280,7 +286,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, ids.length) }, () => ouvrier()));
-    return traitees;
+    return { actualisees: traitees, supprimees: supprimees.length };
   }
   async function assurerLaboratoireKiri(compte: CompteStocke, maintenant: number) {
     let ligues = await stockage.ligues(compte.id);
@@ -305,7 +311,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (url.searchParams.get('horloge') === '1') {
         const secret = process.env.CRON_SECRET;
         if (!secret || entete(req, 'authorization') !== `Bearer ${secret}`) throw new ErreurHttp(401, 'Connexion requise.');
-        return res.status(200).json({ liguesActualisees: await avancerLigues() });
+        const resultat = await avancerLigues();
+        return res.status(200).json({ liguesActualisees: resultat.actualisees, liguesSupprimees: resultat.supprimees });
+      }
+      if (url.searchParams.get('configuration') === '1') {
+        return res.status(200).json({ googleClientId: googleClientId || undefined });
       }
       // ⚠️ Les écussons se demandent à part, PAS dans la vue de la ligue :
       // 1 353 entrées, soit 80 Ko qui repartiraient toutes les deux secondes
@@ -362,6 +372,39 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
       if (JSON.stringify(corps).length > (corps.action === 'atelier' ? 120_000 : 24_000)) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;
+      if (action === 'google') {
+        if (!google || !googleClientId) throw new ErreurHttp(503, 'La connexion Google attend sa configuration.');
+        const credential = texte(corps.credential, 100, 5000, 'Jeton Google');
+        const billet = await google.verifyIdToken({ idToken: credential, audience: googleClientId }).catch(() => null);
+        const profil = billet?.getPayload();
+        if (!profil?.sub || !profil.email || profil.email_verified !== true) throw new ErreurHttp(401, 'Le compte Google n’a pas pu être vérifié.');
+        const courriel = profil.email.toLocaleLowerCase('fr');
+        let compte = await stockage.compteParGoogle(profil.sub);
+        if (!compte) {
+          // Une adresse déjà utilisée rattache l'identité Google au compte
+          // existant : elle a précisément été vérifiée par Google.
+          const existant = await stockage.compteParIdentifiant(courriel);
+          if (existant) {
+            if (!await stockage.lierCompteGoogle(existant.id, profil.sub, courriel)) {
+              compte = await stockage.compteParGoogle(profil.sub);
+              if (!compte) throw new ErreurHttp(409, 'Cette adresse est déjà rattachée à un autre compte Google.');
+            } else compte = { ...existant, fournisseur: 'google', sujetExterne: profil.sub, courriel };
+          } else {
+            const pseudoBrut = (profil.name || profil.given_name || courriel.split('@')[0]).trim().slice(0, 20);
+            const pseudo = pseudoBrut.length >= 2 ? pseudoBrut : 'Manager';
+            compte = { id: randomUUID(), identifiant: `google:${profil.sub}`, pseudo, fournisseur: 'google', sujetExterne: profil.sub, courriel };
+            if (!await stockage.creerCompte(compte)) {
+              compte = await stockage.compteParGoogle(profil.sub);
+              if (!compte) throw new ErreurHttp(409, 'Ce compte Google est déjà utilisé.');
+            }
+          }
+        }
+        const jeton = randomBytes(32).toString('hex');
+        await stockage.ouvrirSession(empreinteJeton(jeton), compte.id, maintenant + DUREE_SESSION);
+        sessionsChaudes.set(empreinteJeton(jeton), { compte, jusqua: maintenant + 60_000 });
+        cookie(req, res, jeton);
+        return res.status(200).json({ compte: publicCompte(compte) });
+      }
       if (action === 'inscription' || action === 'connexion') {
         const identifiant = texte(corps.identifiant, 3, 100, 'Identifiant').toLocaleLowerCase('fr');
         if (!/^[a-z0-9@._+-]+$/.test(identifiant)) throw new ErreurHttp(400, 'Utilisez un identifiant sans espaces ni accents.');
@@ -381,7 +424,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if (!await stockage.creerCompte(compte)) throw new ErreurHttp(409, 'Cet identifiant est déjà utilisé.');
         } else {
           if (!compte) { await hacherMotDePasse(mot); throw new ErreurHttp(401, 'Identifiant ou mot de passe incorrect.'); }
-          if (!await verifierMotDePasse(mot, compte.empreinte)) throw new ErreurHttp(401, 'Identifiant ou mot de passe incorrect.');
+          if (!compte.empreinte || !await verifierMotDePasse(mot, compte.empreinte)) throw new ErreurHttp(401, 'Identifiant ou mot de passe incorrect.');
         }
         const jeton = randomBytes(32).toString('hex');
         await stockage.ouvrirSession(empreinteJeton(jeton), compte.id, maintenant + DUREE_SESSION);
@@ -407,6 +450,12 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (action === 'deconnexion') {
         await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);
+        return res.status(200).json({ ok: true });
+      }
+      if (action === 'supprimerLigue') {
+        const id = texte(corps.ligue, 36, 36, 'Ligue');
+        if (!idValide(id) || !await stockage.supprimerLigue(id, compte.id)) throw new ErreurHttp(404, 'Ligue introuvable ou suppression non autorisée.');
+        oublierLigue(id);
         return res.status(200).json({ ok: true });
       }
       if (url.searchParams.has('push') || action === 'push') {
@@ -460,7 +509,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           // C'est Postgres qui les extrait maintenant.
           return res.status(200).json({ compte: publicCompte(compte), ligues: ligues.map(l => ({
             id: l.id, nom: l.nom, etat: l.phase, clubNom: l.clubNom, ovas: l.ovas,
-            clubEmbleme: l.clubEmbleme, logo: l.logo, laboratoire: l.laboratoire,
+            clubEmbleme: l.clubEmbleme, logo: l.logo, laboratoire: l.laboratoire, createur: l.createurId === compte.id,
           })) });
         }
         if (!idValide(id)) throw new ErreurHttp(404, 'Ligue introuvable.');

@@ -73,6 +73,7 @@
     "@vercel/queue": "^0.5.1",
     "flag-icons": "^7.5.0",
     "framer-motion": "^12.43.0",
+    "google-auth-library": "^10.9.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "three": "0.182.0",

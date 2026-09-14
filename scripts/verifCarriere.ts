@@ -121,6 +121,18 @@ titre('1. LA LIGUE, ET LES 30 BRONZE DU DÉPART');
     const lancee = agirCarriere(rejoint, 'compte-1', { type: 'demarrerSaison' }, T0 + JOUR, 'g3');
     dire(lancee.clubs.every((c) => c.packsGratuits?.length === PACKS_GRATUITS_PAR_JOUR),
       'et le coup d’envoi les donne à tout le monde le même jour');
+    const automatique = avancerCarriere(rejoint, T0 + 2 * JOUR, 'horloge-auto');
+    dire(automatique.phase === 'saison', '⚠️ le salon démarre automatiquement au bout de 2 jours');
+    dire(automatique.competitions.length === 1 && automatique.rencontres.length > 0,
+      'le départ automatique crée bien championnat et calendrier');
+    const seul = creerCarriere({
+      id: 'ligue-seule', nom: 'Salon seul', code: 'DR-SEUL', compteId: 'compte-1', pseudo: 'Colin',
+      clubNom: 'Colin RFC', rythme: 1, maxClubs: 20,
+    }, T0, 'graine-seule');
+    dire(avancerCarriere(seul, T0 + 2 * JOUR, 'horloge-seule').phase === 'salon',
+      'un salon attend toujours un deuxième manager avant de démarrer');
+    const arriveApresDelai = agirCarriere(seul, 'compte-2', { type: 'rejoindre', pseudo: 'Ami', clubNom: 'Club 2' }, T0 + 3 * JOUR, 'g4');
+    dire(arriveApresDelai.phase === 'saison', 'le deuxième manager arrivé après le délai donne le coup d’envoi');
   }
   const vue = vueCarriere(e, e.clubs[0].compteId);
   dire(vue.clubs.find(c => c.id === e.clubs[0].id)?.packsGratuits?.length === 10

@@ -567,6 +567,13 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   Banc : `verify:carriere`, section 14. Colonne : `carriere_ligues.echeance`
   (migration additive dans `serveur/schema-carriere.sql`).
 
+  Les comptes peuvent aussi passer par **Google Identity Services** : le
+  navigateur ne transmet au serveur que le billet d’identité, vérifié avec
+  `google-auth-library` et `GOOGLE_CLIENT_ID`, puis reçoit le même cookie
+  HttpOnly que la connexion classique. Les salons partent automatiquement à
+  48 h dès qu’ils ont deux clubs. Le créateur peut supprimer sa ligue ; le cron
+  quotidien supprime celles dont aucun membre n’a été vu depuis quatorze jours.
+
   ⚠️ **LE COLLECTIF A UNE SEULE FORMULE**, dans `lib/ligue/collectifCarriere.ts` :
   l'écran de composition et `lancerRencontre` appellent la MÊME fonction. Deux
   formules donneraient un jour deux vérités — un manager qui compose pour 78 et
