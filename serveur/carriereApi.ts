@@ -9,6 +9,7 @@ import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typ
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
 import { OAuth2Client } from 'google-auth-library';
+import { validerEtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 
 export interface RequeteCarriere {
   method?: string; url?: string; body?: unknown;
@@ -370,7 +371,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
 
       const maintenant = Date.now();
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
-      if (JSON.stringify(corps).length > (corps.action === 'atelier' ? 120_000 : 24_000)) throw new ErreurHttp(413, 'Demande trop volumineuse.');
+      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 120_000 : 24_000;
+      if (JSON.stringify(corps).length > tailleMax) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;
       if (action === 'google') {
         if (!google || !googleClientId) throw new ErreurHttp(503, 'La connexion Google attend sa configuration.');
@@ -452,6 +454,12 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);
         return res.status(200).json({ ok: true });
       }
+      if (action === 'sauvegarderBoutique') {
+        const boutique = validerEtatBoutiqueCompte(corps.boutique);
+        if (!boutique) throw new ErreurHttp(400, 'Sauvegarde de boutique invalide.');
+        await stockage.sauvegarderBoutique(compte.id, boutique);
+        return res.status(200).json({ boutique });
+      }
       if (action === 'supprimerLigue') {
         const id = texte(corps.ligue, 36, 36, 'Ligue');
         if (!idValide(id) || !await stockage.supprimerLigue(id, compte.id)) throw new ErreurHttp(404, 'Ligue introuvable ou suppression non autorisée.');
@@ -492,6 +500,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         return res.status(200).json({ok:true});
       }
       if (req.method === 'GET') {
+        if (url.searchParams.has('boutique')) {
+          return res.status(200).json({ boutique: await stockage.boutique(compte.id) });
+        }
         if (url.searchParams.has('administration')) {
           if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
           return res.status(200).json(await stockage.administration());

@@ -8,6 +8,7 @@ import { dirname } from 'node:path';
 import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
 import { vueCarriere } from '../src/lib/ligue/carriere.js';
+import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 
 interface BaseLocale {
   atelier?: CatalogueAdmin;
@@ -17,6 +18,7 @@ interface BaseLocale {
   ligues: LigueStockee[];
   recus: Record<string, boolean>;
   debits: Record<string, { debut: number; nombre: number }>;
+  boutiques?: Record<string, EtatBoutiqueCompte>;
 }
 export function stockageFichier(fichier: string): StockageCarriere {
   mkdirSync(dirname(fichier), { recursive: true });
@@ -29,6 +31,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
   };
   const copie = <T>(v: T): T => structuredClone(v);
   base.push ??= { abonnements: [], envois: {} };
+  base.boutiques ??= {};
   // L'échéance ne vaut que pour ce processus : le serveur de développement
   // redémarre souvent, et une échéance perdue coûte une relecture, rien de plus.
   const echeances: Record<string, number> = {};
@@ -69,6 +72,8 @@ export function stockageFichier(fichier: string): StockageCarriere {
       sauver();
     },
     async fermerSession(e) { delete base.sessions[e]; sauver(); },
+    async boutique(compte) { return base.boutiques?.[compte] ? copie(base.boutiques[compte]) : null; },
+    async sauvegarderBoutique(compte, boutique) { base.boutiques![compte] = copie(boutique); sauver(); },
     async limiter(cle, maximum, fenetre, maintenant) {
       const debut = Math.floor(maintenant / fenetre) * fenetre;
       const ancien = base.debits[cle];

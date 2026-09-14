@@ -573,6 +573,9 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   HttpOnly que la connexion classique. Les salons partent automatiquement à
   48 h dès qu’ils ont deux clubs. Le créateur peut supprimer sa ligue ; le cron
   quotidien supprime celles dont aucun membre n’a été vu depuis quatorze jours.
+  Le même cookie donne accès à `compte_boutique`, coffre JSON validé qui
+  synchronise les Ovas solo, la collection et les achats cosmétiques. Il ne
+  contient jamais les Ovas ni les cartes d’une ligue.
 
   ⚠️ **LE COLLECTIF A UNE SEULE FORMULE**, dans `lib/ligue/collectifCarriere.ts` :
   l'écran de composition et `lancerRencontre` appellent la MÊME fonction. Deux

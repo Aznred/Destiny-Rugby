@@ -7,6 +7,7 @@ import { langueDepuisAdresseIP, t } from './lib/i18n';
 import { pageVue } from './lib/mesure';
 import { chantierVisible } from './lib/modeDev';
 import { capterInvitation } from './lib/invitationLigue';
+import { activerSynchronisationBoutiqueCompte } from './lib/synchronisationBoutiqueCompte';
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
 import { Guide } from './components/Guide';
@@ -99,6 +100,10 @@ export default function App() {
     });
     return () => { actif = false; };
   }, [appliquerLangueAutomatique]);
+
+  // Le coffre reste local hors connexion, puis rejoint automatiquement le
+  // compte reconnu par la Carriere en ligne.
+  useEffect(() => activerSynchronisationBoutiqueCompte(), []);
 
   // ⚠️ PLUS RIEN À PRÉCHARGER. Il y avait ici un préchargement différé du
   // modèle WebLLM : 900 Mo téléchargés en arrière-plan au premier lancement,
