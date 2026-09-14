@@ -17,8 +17,6 @@ import { Accueil } from './screens/Accueil';
 import { Creation } from './screens/Creation';
 import { Carriere } from './screens/Carriere';
 import { Profil } from './screens/Profil';
-import { Icone } from './components/Icone';
-
 // ---------------------------------------------------------------------------
 // ⚠️ CE QUI N'EST PAS SUR LE CHEMIN D'ARRIVÉE EST CHARGÉ À LA DEMANDE
 // ---------------------------------------------------------------------------
@@ -69,7 +67,8 @@ function LecteurMusical() {
   const [aDemarre, setADemarre] = useState(false);
   const [trackInfo, setTrackInfo] = useState<{ titre: string; artiste: string } | null>(null);
   const [notificationVisible, setNotificationVisible] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Correction TypeScript appliquée ici :
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const playlistId = 'PLm90DCMQmtlkBigTzyX97RPgTL90ZYELs';
 
