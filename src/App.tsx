@@ -88,6 +88,7 @@ function LecteurMusical() {
   const onReady = (event: any) => {
     setPlayer(event.target);
     event.target.setShuffle(true); // Prépare le mélange en arrière-plan
+    event.target.setVolume(12);    // <-- AJOUTEZ CETTE LIGNE (15% du volume)
   };
 
   const onStateChange = (event: any) => {
