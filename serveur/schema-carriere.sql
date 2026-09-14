@@ -13,14 +13,6 @@ create unique index if not exists comptes_externe_idx
 create unique index if not exists comptes_courriel_idx
   on comptes (courriel) where courriel is not null;
 
--- Coffre commun a toutes les carrieres solo du compte : Ovas, collection et
--- achats cosmetiques. Il reste separe des economies propres aux ligues.
-create table if not exists compte_boutique (
-  compte uuid primary key references comptes(id) on delete cascade,
-  donnees jsonb not null check (jsonb_typeof(donnees) = 'object'),
-  modifie_le timestamptz not null default now()
-);
-
 create table if not exists carriere_ligues (
   id uuid primary key,
   code text not null unique,

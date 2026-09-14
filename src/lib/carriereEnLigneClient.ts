@@ -1,5 +1,4 @@
 import type { AdministrationCarriere, CommandeCarriere, VueCarriereEnLigne, PageCollection, StatistiquesGlobalesCarriere } from './ligue/typesCarriere.js';
-import type { EtatBoutiqueCompte } from './boutiqueCompte.js';
 
 export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean }
 export interface SessionCarriere {
@@ -28,14 +27,10 @@ export const INCHANGE = Symbol('vue inchangée') as unknown as never;
 async function requete<T>(corps?: unknown, ligue?: string, signal?: AbortSignal, chemin?: string): Promise<T> {
   let reponse: Response;
   try {
-    const contenu = corps ? JSON.stringify(corps) : undefined;
-    const garderEnFermant = contenu !== undefined && contenu.length < 60_000
-      && (corps as { action?: unknown }).action === 'sauvegarderBoutique';
     reponse = await fetch(`/api/carriere${chemin ?? (ligue ? `?ligue=${encodeURIComponent(ligue)}` : '')}`, {
       method: corps ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store',
       headers: corps ? { 'Content-Type': 'application/json' } : undefined,
-      body: contenu,
-      keepalive: garderEnFermant,
+      body: corps ? JSON.stringify(corps) : undefined,
       signal: signal ?? AbortSignal.timeout(25000),
     });
   } catch (erreur) {
@@ -88,29 +83,11 @@ export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?:
 export const chargerDirectCarriere = (id: string, matchId: string, signal?: AbortSignal, version?: number) =>
   requete<MiseAJourDirectCarriere>(undefined, undefined, signal,
     `?ligue=${encodeURIComponent(id)}&direct=${encodeURIComponent(matchId)}${version ? `&v=${version}` : ''}`);
-const notifierCompte = (type: 'connecte' | 'deconnecte') => {
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event(`destiny-compte-${type}`));
-};
-export const identifierCarriere = async (action: 'inscription' | 'connexion', identifiant: string, motDePasse: string, pseudo: string, confirmationMotDePasse = '') => {
-  const compte = await requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo, confirmationMotDePasse });
-  notifierCompte('connecte');
-  return compte;
-};
+export const identifierCarriere = (action: 'inscription' | 'connexion', identifiant: string, motDePasse: string, pseudo: string, confirmationMotDePasse = '') =>
+  requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo, confirmationMotDePasse });
 export const configurationCarriere = () => requete<{ googleClientId?: string }>(undefined, undefined, undefined, '?configuration=1');
-export const identifierGoogleCarriere = async (credential: string) => {
-  const compte = await requete<CompteCarriere>({ action: 'google', credential });
-  notifierCompte('connecte');
-  return compte;
-};
-export const deconnecterCarriere = async () => {
-  const resultat = await requete<{ ok: boolean }>({ action: 'deconnexion' });
-  notifierCompte('deconnecte');
-  return resultat;
-};
-export const chargerBoutiqueCompte = (signal?: AbortSignal) =>
-  requete<{ boutique: EtatBoutiqueCompte | null }>(undefined, undefined, signal, '?boutique=1');
-export const sauvegarderBoutiqueCompte = (boutique: EtatBoutiqueCompte) =>
-  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'sauvegarderBoutique', boutique });
+export const identifierGoogleCarriere = (credential: string) => requete<CompteCarriere>({ action: 'google', credential });
+export const deconnecterCarriere = () => requete<{ ok: boolean }>({ action: 'deconnexion' });
 export const supprimerLigueCarriere = (ligue: string) => requete<{ ok: boolean }>({ action: 'supprimerLigue', ligue });
 export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number }
 export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number, maxClubs: number, identite: IdentiteLigue = {}) =>

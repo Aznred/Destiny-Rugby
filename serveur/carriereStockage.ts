@@ -5,7 +5,6 @@ import type { AdministrationCarriere, EtatCarriereEnLigne, StatistiquesGlobalesC
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
 import { assemblerTransfert, champsDepuisForme, decoderBloc, encoderTransfert, formeTransfert, type BlocTransfert, type ManifestTransfert } from './transfertCarriere.js';
 import { creerLimiteurReserve } from './limiteurReserve.js';
-import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 
 export interface CompteStocke {
   id: string; identifiant: string; pseudo: string; empreinte?: string;
@@ -40,8 +39,6 @@ export interface StockageCarriere {
   session(empreinte: string, maintenant: number): Promise<CompteStocke | null>;
   ouvrirSession(empreinte: string, compte: string, expiration: number): Promise<void>;
   fermerSession(empreinte: string): Promise<void>;
-  boutique(compte: string): Promise<EtatBoutiqueCompte | null>;
-  sauvegarderBoutique(compte: string, boutique: EtatBoutiqueCompte): Promise<void>;
   limiter(cle: string, maximum: number, fenetre: number, maintenant: number): Promise<boolean>;
   /**
    * ⚠️ LA LECTURE QUI NE COÛTE RIEN : version, membres, prochaine échéance.
@@ -254,15 +251,6 @@ export function stockageNeon(url: string): StockageCarriere {
       ) update comptes set vu_le=now() where id=${compte}`;
     },
     async fermerSession(empreinte) { await sql`delete from sessions where empreinte=${empreinte}`; },
-    async boutique(compte) {
-      const r = await sql`select donnees from compte_boutique where compte=${compte}`;
-      return (r[0]?.donnees as EtatBoutiqueCompte | undefined) ?? null;
-    },
-    async sauvegarderBoutique(compte, boutique) {
-      await sql`insert into compte_boutique (compte,donnees,modifie_le)
-        values (${compte},${JSON.stringify(boutique)}::jsonb,now())
-        on conflict (compte) do update set donnees=excluded.donnees,modifie_le=excluded.modifie_le`;
-    },
     async limiter(cle, maximum, fenetre, maintenant) {
       if (cle.startsWith('jeu:')) {
         try { return await limiterJeu(cle, maximum, fenetre, maintenant); }

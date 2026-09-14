@@ -10,7 +10,6 @@ import { Tutoriel } from '../components/Tutoriel';
 import { chantierVisible } from '../lib/modeDev';
 import { Sauvegardes } from '../components/Sauvegardes';
 import { Icone } from '../components/Icone';
-import { EcussonClub } from '../components/EcussonClub';
 
 // La 3D (Three.js) est lourde : on la charge à la demande pour un premier
 // affichage immédiat du texte, puis la scène apparaît en fondu.
@@ -109,13 +108,7 @@ export function Accueil() {
 
           <div className="accueil-modes-droite">
             <motion.button custom={2} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-online" onClick={() => setEcran('carriereEnLigne')}>
-              <span className="accueil-online-montage" aria-hidden="true">
-                <span className="accueil-online-terrain"><i /><i /><i /></span>
-                <span className="accueil-online-club domicile"><EcussonClub logo="/logos/toulouse.png" taille={58} /></span>
-                <span className="accueil-online-score"><i>DIRECT</i><b>17 <em>–</em> 14</b><small>63′</small></span>
-                <span className="accueil-online-club exterieur"><EcussonClub logo="/logos/bordeaux.png" taille={58} /></span>
-                <span className="accueil-online-public"><i /><i /><i /><i /><i /></span>
-              </span>
+              <img className="accueil-mode-illustration" src="/images/menu/carriere-en-ligne.webp" alt="" decoding="async" />
               <span className="accueil-mode-numero">02</span>
               <span className="accueil-mode-icone"><Icone nom="equipe" taille={31} /></span>
               <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Multijoueur</span><strong>Carrière en ligne</strong><small>Crée ta ligue privée, invite tes amis et vis les matchs en direct.</small></span>
@@ -131,11 +124,7 @@ export function Accueil() {
                 <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
               </motion.button>
               <motion.button custom={4} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}>
-                <span className="accueil-saves-montage" aria-hidden="true">
-                  <span className="accueil-save-carte save-arriere"><Icone nom="equipe" taille={15} /><span><small>EN LIGNE</small><b>Ligue privée</b></span><EcussonClub logo="/logos/bayonne.png" taille={27} /></span>
-                  <span className="accueil-save-carte save-milieu"><Icone nom="entraineur" taille={15} /><span><small>ENTRAÎNEUR</small><b>{managerActif?.nom ?? 'Nouveau banc'}</b></span><EcussonClub logo="/logos/bordeaux.png" taille={27} /></span>
-                  <span className="accueil-save-carte save-devant"><Icone nom="joueur" taille={15} /><span><small>JOUEUR · S{joueur?.saison ?? '—'}</small><b>{joueur?.nom ?? 'Nouvelle carrière'}</b></span><EcussonClub logo="/logos/toulouse.png" taille={27} /></span>
-                </span>
+                <img className="accueil-mode-illustration" src="/images/menu/sauvegardes.webp" alt="" decoding="async" />
                 <span className="accueil-mode-numero">04</span>
                 <span className="accueil-mode-icone"><Icone nom="disquette" taille={27} /></span>
                 <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Profils</span><strong>{t('sv.mesParties')}</strong><small>Retrouve ou change de sauvegarde.</small></span>
