@@ -822,6 +822,11 @@ dès qu’au moins deux managers sont présents. Son créateur peut la supprimer
 depuis « Mes ligues » ; et l’horloge efface automatiquement une ligue lorsque
 aucun de ses membres ne s’est connecté depuis **quatorze jours**.
 
+Une fois connecté, le coffre de la Boutique suit aussi le compte : **Ovas
+solo, cartes de collection, ballons, vestiaire et traits débloqués** sont
+retrouvés sur les autres appareils. Ces données restent séparées des Ovas et
+des cartes propres à chaque ligue.
+
 Ce n'est pas un clone de FUT posé sur du rugby. Le moment visé n'est pas « j'ai
 packé un 90 », c'est *« j'ai packé ce 74 à la première saison, personne n'en
 voulait, Hugo m'a proposé 90 000 OVA pour lui, j'ai refusé, et il nous a fait
@@ -1599,10 +1604,11 @@ npx vite-node scripts/verifSituations.ts     # 151 situations, impacts et non-r�
   composée que Windows rend en **deux** glyphes, et 🫵 (« c’est toi », six fois dans l’écran
   Résultats) date d’Unicode 14 — les appareils qui ne l’ont pas affichaient un carré vide, donc
   aucun repère dans un classement de cent lignes. Le récit, lui, garde ses emoji : c’est du texte.
-- **Les réglages, les Ovas et le tutoriel suivent l’APPAREIL, plus la carrière.** Changer de partie
+- **Les réglages et le tutoriel suivent l’APPAREIL ; la Boutique suit aussi le COMPTE connecté.** Changer de partie
   remettait la langue du navigateur, le thème vert, zéro Ova, une boutique vide et le tutoriel du
-  premier lancement. Dix-neuf champs vivent désormais à côté des emplacements et sont partagés par
-  les six ; la ligne de classement mondial, elle, reste propre à chaque carrière.
+  premier lancement. Les données communes vivent à côté des emplacements ; lorsqu’une session en
+  ligne est reconnue, les Ovas solo, la collection et les achats rejoignent `compte_boutique`.
+  La ligne de classement mondial, elle, reste propre à chaque carrière.
 - **L’affiche de la semaine porte les écussons** des deux clubs, comme partout ailleurs dans le jeu.
 
 - **La fin de carrière ouvre le banc.** La reconversion en entraîneur existait,

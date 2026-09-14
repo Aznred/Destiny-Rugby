@@ -74,8 +74,8 @@ la mauvaise sans prévenir.
 1. [`schema-vercel.sql`](schema-vercel.sql) — le classement mondial. Déjà passé
    si tu as suivi [`VERCEL.md`](VERCEL.md).
 2. [`schema-ligues.sql`](schema-ligues.sql) — il crée `comptes` et `sessions`.
-3. [`schema-carriere.sql`](schema-carriere.sql) — il **ajoute une colonne à
-   `comptes`**, dont l’identité Google, et crée les trois tables du mode.
+3. [`schema-carriere.sql`](schema-carriere.sql) — il complète `comptes` avec
+   l’identité Google et crée les tables de la Carrière, dont le coffre Boutique.
 
 Pour afficher « Continuer avec Google », crée dans Google Cloud un client OAuth
 de type **Application Web**, autorise les origines du site et de développement,
@@ -100,7 +100,7 @@ cannot insert multiple commands into a prepared statement
 
 Ce n'est pas un défaut du fichier : le pilote HTTP de Neon passe par des
 *prepared statements*, qui n'acceptent **qu'une instruction à la fois**. Or
-`schema-ligues.sql` en contient 31 et `schema-carriere.sql` 6.
+`schema-ligues.sql` en contient 31 et `schema-carriere.sql` 27.
 
 **La bonne méthode — depuis ta machine, en une commande.** Récupère la chaîne de
 connexion (Storage → la base → **`.env.local`** ou *Connection string*), mets-la

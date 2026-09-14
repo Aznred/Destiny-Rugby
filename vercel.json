@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "env": {
+    "GOOGLE_CLIENT_ID": "517674618288-8qs7nqblv36e6beuhoi7p5egbsakcl6r.apps.googleusercontent.com"
+  },
   "crons": [
     {
       "path": "/api/carriere?horloge=1",
