@@ -67,14 +67,12 @@ export function Accueil() {
   const skinActif = useGame((s) => s.skinActif);
   const [partiesOuvertes, setPartiesOuvertes] = useState(false);
   const [interfacePC, setInterfacePC] = useState(() => window.matchMedia('(min-width: 901px)').matches);
-  
   useEffect(() => {
     const media = window.matchMedia('(min-width: 901px)');
     const changer = () => setInterfacePC(media.matches);
     media.addEventListener('change', changer);
     return () => media.removeEventListener('change', changer);
   }, []);
-  
   const destinationCarriere = joueur ? 'carriere' : managerActif ? 'manager' : 'creation';
   const titreCarriere = joueur
     ? t('accueil.reprendre')
@@ -144,25 +142,10 @@ export function Accueil() {
                 <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
               </motion.button>
             </div>
-            
-            {/* Lecteur Spotify intégré pour PC */}
-            <motion.div custom={5} variants={apparait} initial="hidden" animate="show" style={{ marginTop: '20px' }}>
-              <iframe 
-                data-testid="embed-iframe" 
-                style={{ borderRadius: '12px' }} 
-                src="https://open.spotify.com/embed/playlist/1tKQCDV3CbKVTTaIM2qFok?utm_source=generator&si=c34e37941068497b" 
-                width="100%" 
-                height="352" 
-                frameBorder="0" 
-                allowFullScreen 
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-                loading="lazy"
-              ></iframe>
-            </motion.div>
           </div>
         </div>
 
-        <motion.div custom={6} variants={apparait} initial="hidden" animate="show" className="accueil-hub-pied">
+        <motion.div custom={5} variants={apparait} initial="hidden" animate="show" className="accueil-hub-pied">
           <span><b>15</b> postes</span><span><b>∞</b> scénarios</span><span><b>15</b> saisons</span>
           {joueur && <button type="button" onClick={() => setEcran('profil')}><Icone nom="profil" taille={16} /> {t('accueil.voirProfil')}</button>}
           {managerActif && <button type="button" onClick={() => setEcran('tableau')}><Icone nom="resultats" taille={16} /> Tableau du club</button>}
@@ -183,21 +166,6 @@ export function Accueil() {
           </div>
           <div className="stats-bandeau"><div className="stat"><b>15</b><span>{t('accueil.postes')}</span></div><div className="stat"><b>∞</b><span>{t('accueil.scenarios')}</span></div><div className="stat"><b>15</b><span>{t('accueil.saisons')}</span></div></div>
           <button type="button" className="btn fantome accueil-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}><Icone nom="disquette" taille={17} /> {t('sv.mesParties')}</button>
-          
-          {/* Lecteur Spotify intégré pour Mobile */}
-          <div style={{ marginTop: '20px' }}>
-            <iframe 
-              data-testid="embed-iframe" 
-              style={{ borderRadius: '12px' }} 
-              src="https://open.spotify.com/embed/playlist/1tKQCDV3CbKVTTaIM2qFok?utm_source=generator&si=c34e37941068497b" 
-              width="100%" 
-              height="352" 
-              frameBorder="0" 
-              allowFullScreen 
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-              loading="lazy"
-            ></iframe>
-          </div>
         </div>
         <div className="hero-canvas"><Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense></div>
       </section>}
