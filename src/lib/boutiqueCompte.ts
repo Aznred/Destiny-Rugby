@@ -1,5 +1,5 @@
 import type { CategorieEquipement } from '../data/boutique';
-import { normaliserCollectionSolo, type EtatCollectionSolo } from './collectionSolo';
+import { normaliserCollectionSolo, type EtatCollectionSolo } from './collectionSolo.js';
 
 /** Tout ce qui appartient au compte, et non a une carriere particuliere. */
 export interface EtatBoutiqueCompte {
