@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import YouTube from 'react-youtube';
 import './App.css';
@@ -62,125 +62,105 @@ function EcranEnRoute() {
 }
 
 // ---------------------------------------------------------------------------
-// 🎵 LE LECTEUR MUSICAL GLOBAL (AUTOPLAY & SAUVEGARDE)
+// 🎵 LECTEUR MUSICAL INVISIBLE (AUTOPLAY & NOTIFICATION 5 SECONDES)
 // ---------------------------------------------------------------------------
 function LecteurMusical() {
-  // Vérifie si le joueur a déjà coupé la musique lors d'une précédente visite
-  const [musiqueAutorisee, setMusiqueAutorisee] = useState(() => {
-    return localStorage.getItem('destiny-musique') !== 'non';
-  });
-
   const [player, setPlayer] = useState<any>(null);
-  const [enLecture, setEnLecture] = useState(false);
-  const [playlistId, setPlaylistId] = useState('PLm90DCMQmtlkBigTzyX97RPgTL90ZYELs');
-  const [premierLancement, setPremierLancement] = useState(true);
+  const [aDemarre, setADemarre] = useState(false);
+  const [trackInfo, setTrackInfo] = useState<{ titre: string; artiste: string } | null>(null);
+  const [notificationVisible, setNotificationVisible] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const playlistId = 'PLm90DCMQmtlkBigTzyX97RPgTL90ZYELs';
+
+  // Détecte le tout premier clic du joueur n'importe où sur la page
+  useEffect(() => {
+    const lancerMusique = () => {
+      if (player && !aDemarre) {
+        setADemarre(true);
+        player.nextVideo(); // Sélectionne une piste aléatoire grâce au shuffle
+      }
+    };
+
+    window.addEventListener('click', lancerMusique);
+    return () => window.removeEventListener('click', lancerMusique);
+  }, [player, aDemarre]);
 
   const onReady = (event: any) => {
-    const p = event.target;
-    setPlayer(p);
-    p.setShuffle(true); // Mélange la playlist en arrière-plan
+    setPlayer(event.target);
+    event.target.setShuffle(true); // Prépare le mélange en arrière-plan
   };
 
-  const onStateChange = (e: any) => {
-    setEnLecture(e.data === 1); // 1 = en cours de lecture
-    
-    // Si c'est la toute première fois que la musique se lance (après le 1er clic du joueur sur le site)
-    if (e.data === 1 && premierLancement) {
-      setPremierLancement(false);
-      e.target.nextVideo(); // On saute sur une piste aléatoire
-    }
-  };
+  const onStateChange = (event: any) => {
+    // État 1 = Une musique vient de démarrer
+    if (event.data === 1) {
+      const data = event.target.getVideoData();
+      if (data && data.title) {
+        setTrackInfo({ titre: data.title, artiste: data.author });
+        setNotificationVisible(true);
 
-  const basculerLecture = () => {
-    if (!player) return;
-    if (enLecture) {
-      player.pauseVideo();
-    } else {
-      player.playVideo();
-    }
-  };
+        // Nettoie l'ancien décompte si la musique change vite
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-  const desactiverMusique = () => {
-    setMusiqueAutorisee(false);
-    localStorage.setItem('destiny-musique', 'non'); // Sauvegarde le choix
-    if (player) player.pauseVideo();
-  };
-
-  const activerMusique = () => {
-    setMusiqueAutorisee(true);
-    localStorage.setItem('destiny-musique', 'oui'); // Rétablit le choix
-    if (player) {
-      if (premierLancement) {
-        player.nextVideo();
-        setPremierLancement(false);
-      } else {
-        player.playVideo();
+        // Fait disparaître la notification au bout de 5 secondes
+        timeoutRef.current = setTimeout(() => {
+          setNotificationVisible(false);
+        }, 5000);
       }
     }
   };
 
-  // Si le joueur ne veut pas de musique, on remplace le lecteur par un petit bouton discret
-  if (!musiqueAutorisee) {
-    return (
-      <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999 }}>
-         <button onClick={activerMusique} style={{ background: 'rgba(15, 23, 42, 0.9)', color: 'white', padding: '10px 16px', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', fontSize: '13px' }}>
-           🎵 Activer la musique
-         </button>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999, background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(8px)', padding: '12px 20px', borderRadius: '50px', display: 'flex', gap: '15px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-      
-      {/* Lecteur YouTube CACHÉ (1x1 pixel) avec AUTOPLAY activé */}
+    <>
+      {/* Lecteur YouTube 100% CACHÉ */}
       <div style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0 }}>
         <YouTube 
-          opts={{ 
-            playerVars: { listType: 'playlist', list: playlistId, autoplay: 1 } 
-          }}
+          opts={{ playerVars: { listType: 'playlist', list: playlistId, autoplay: 0 } }}
           onReady={onReady}
           onStateChange={onStateChange}
         />
       </div>
 
-      <button onClick={basculerLecture} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, display: 'flex' }}>
-        {enLecture ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-          </svg>
-        ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z"/>
-          </svg>
+      {/* NOTIFICATION (Coin inférieur gauche) */}
+      <AnimatePresence>
+        {notificationVisible && trackInfo && (
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            style={{
+              position: 'fixed',
+              bottom: '20px',
+              left: '20px',
+              zIndex: 9999,
+              background: 'rgba(15, 23, 42, 0.95)',
+              backdropFilter: 'blur(8px)',
+              padding: '12px 20px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '15px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              color: 'white'
+            }}
+          >
+            {/* Icône musique (SVG natif pour éviter les erreurs TypeScript) */}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" opacity="0.8">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+            </svg>
+            
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <strong style={{ fontSize: '13px', margin: 0, lineHeight: 1.2, maxWidth: '220px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {trackInfo.titre}
+              </strong>
+              <span style={{ fontSize: '11px', opacity: 0.7, maxWidth: '220px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {trackInfo.artiste.replace(' - Topic', '')}
+              </span>
+            </div>
+          </motion.div>
         )}
-      </button>
-      
-      <button onClick={() => player?.nextVideo()} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, display: 'flex' }}>
-        <Icone nom="fleche-droite" taille={20} />
-      </button>
-      
-      <input 
-        type="text" 
-        placeholder="Lien playlist YouTube..." 
-        style={{ padding: '6px 12px', borderRadius: '20px', border: 'none', outline: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: '12px', width: '160px' }}
-        onBlur={(e) => {
-          const match = e.target.value.match(/list=([a-zA-Z0-9_-]+)/);
-          if (match) {
-            setPlaylistId(match[1]);
-            if (player) {
-              player.loadPlaylist({ list: match[1], listType: 'playlist' });
-              setPremierLancement(true);
-              setTimeout(() => player.setShuffle(true), 1000); 
-            }
-          }
-        }}
-      />
-
-      <button onClick={desactiverMusique} title="Désactiver la musique" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 0 0 5px', fontSize: '20px', display: 'flex', lineHeight: '1' }}>
-        ×
-      </button>
-    </div>
+      </AnimatePresence>
+    </>
   );
 }
 
