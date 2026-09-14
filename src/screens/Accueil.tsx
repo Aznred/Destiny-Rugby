@@ -46,6 +46,18 @@ const apparait = {
   }),
 };
 
+// ⚠️ LES TROIS ARGUMENTS MARKETING (« Un MJ qui juge vraiment », « Une
+// progression vivante », « Ta légende sur 15 ans ») ONT ÉTÉ RETIRÉS, à la
+// demande : « comprendre le jeu, ça serait bien de l'avoir à la place du MJ qui
+// juge ». C'est le bon échange sous les deux angles. Pour le joueur, trois
+// promesses valent moins qu'une porte d'entrée qui explique vraiment. Et pour
+// l'examen AdSense, la section « Comprendre le jeu » est la seule de l'accueil
+// qui MÈNE À DU CONTENU — des pages en HTML complet, lisibles sans
+// JavaScript. La remonter, c'est mettre le contenu éditorial au-dessus de la
+// ligne de flottaison plutôt que sous une pile d'arguments.
+// Les clés `acc.f1…f3` restent dans le dictionnaire : elles ne coûtent rien et
+// serviront si l'on veut réintroduire un argumentaire ailleurs.
+
 export function Accueil() {
   const setEcran = useGame((s) => s.setEcran);
   const joueur = useGame((s) => s.joueur);
@@ -73,6 +85,8 @@ export function Accueil() {
 
   return (
     <>
+      {/* Il décide lui-même s'il doit s'ouvrir : jamais si une carrière existe,
+          jamais deux fois (`tutoVu`, persisté). */}
       <Tutoriel />
       {interfacePC ? <section className="accueil-hub">
         <motion.header custom={0} variants={apparait} initial="hidden" animate="show" className="accueil-hub-tete">
@@ -130,6 +144,21 @@ export function Accueil() {
                 <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
               </motion.button>
             </div>
+            
+            {/* Lecteur Spotify intégré pour PC */}
+            <motion.div custom={5} variants={apparait} initial="hidden" animate="show" style={{ marginTop: '20px' }}>
+              <iframe 
+                data-testid="embed-iframe" 
+                style={{ borderRadius: '12px' }} 
+                src="https://open.spotify.com/embed/playlist/1tKQCDV3CbKVTTaIM2qFok?utm_source=generator&si=c34e37941068497b" 
+                width="100%" 
+                height="352" 
+                frameBorder="0" 
+                allowFullScreen 
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                loading="lazy"
+              ></iframe>
+            </motion.div>
           </div>
         </div>
 
@@ -154,6 +183,21 @@ export function Accueil() {
           </div>
           <div className="stats-bandeau"><div className="stat"><b>15</b><span>{t('accueil.postes')}</span></div><div className="stat"><b>∞</b><span>{t('accueil.scenarios')}</span></div><div className="stat"><b>15</b><span>{t('accueil.saisons')}</span></div></div>
           <button type="button" className="btn fantome accueil-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}><Icone nom="disquette" taille={17} /> {t('sv.mesParties')}</button>
+          
+          {/* Lecteur Spotify intégré pour Mobile */}
+          <div style={{ marginTop: '20px' }}>
+            <iframe 
+              data-testid="embed-iframe" 
+              style={{ borderRadius: '12px' }} 
+              src="https://open.spotify.com/embed/playlist/1tKQCDV3CbKVTTaIM2qFok?utm_source=generator&si=c34e37941068497b" 
+              width="100%" 
+              height="352" 
+              frameBorder="0" 
+              allowFullScreen 
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+              loading="lazy"
+            ></iframe>
+          </div>
         </div>
         <div className="hero-canvas"><Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense></div>
       </section>}
@@ -164,6 +208,18 @@ export function Accueil() {
         </section>
       )}
 
+      {/* ⚠️ DE VRAIS LIENS, PAS DES BOUTONS. Ces pages sont du HTML
+          statique servi depuis `public/` (voir `scripts/genPages.cjs`) : elles
+          existent à leur propre adresse, elles se lisent sans JavaScript, et
+          elles portent le contenu éditorial du site. Un `<a href>` est donc
+          indispensable — un `onClick` ne crée aucun lien pour un moteur de
+          recherche, et c'est précisément l'absence de pages indexables qui a
+          fait bloquer le compte AdSense. */}
+      {/* ⚠️ RIEN DE TOUT ÇA SUR LE PORTAIL. « The game should not include
+          cross-promotions for external or internal games/platforms » : dans une
+          iframe, un clic ici REMPLACERAIT le jeu par un article, et l'équipe de
+          QA refuse. Ces pages gardent tout leur sens sur destiny-rugby.fr, où
+          elles portent le référencement — les deux cibles cohabitent. */}
       {LIENS_SORTANTS_AUTORISES && (
       <section className="section lecture">
         <h2>{t('accueil.lecture')}</h2>
@@ -188,19 +244,6 @@ export function Accueil() {
         </div>
       </section>
       )}
-
-      {/* Lecteur Spotify Compact Fixé en bas à droite */}
-      <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 50 }}>
-        <iframe
-          src="https://open.spotify.com/embed/playlist/1tKQCDV3CbKVTTaIM2qFok?utm_source=generator&theme=0"
-          width="300"
-          height="80"
-          frameBorder="0"
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-          loading="lazy"
-          style={{ borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
-        ></iframe>
-      </div>
     </>
   );
 }
