@@ -62,15 +62,33 @@ function EcranEnRoute() {
 }
 
 // ---------------------------------------------------------------------------
-// 🎵 LE LECTEUR MUSICAL GLOBAL
+// 🎵 LE LECTEUR MUSICAL GLOBAL (AUTOPLAY & SAUVEGARDE)
 // ---------------------------------------------------------------------------
 function LecteurMusical() {
+  // Vérifie si le joueur a déjà coupé la musique lors d'une précédente visite
+  const [musiqueAutorisee, setMusiqueAutorisee] = useState(() => {
+    return localStorage.getItem('destiny-musique') !== 'non';
+  });
+
   const [player, setPlayer] = useState<any>(null);
   const [enLecture, setEnLecture] = useState(false);
   const [playlistId, setPlaylistId] = useState('PLm90DCMQmtlkBigTzyX97RPgTL90ZYELs');
+  const [premierLancement, setPremierLancement] = useState(true);
 
   const onReady = (event: any) => {
-    setPlayer(event.target);
+    const p = event.target;
+    setPlayer(p);
+    p.setShuffle(true); // Mélange la playlist en arrière-plan
+  };
+
+  const onStateChange = (e: any) => {
+    setEnLecture(e.data === 1); // 1 = en cours de lecture
+    
+    // Si c'est la toute première fois que la musique se lance (après le 1er clic du joueur sur le site)
+    if (e.data === 1 && premierLancement) {
+      setPremierLancement(false);
+      e.target.nextVideo(); // On saute sur une piste aléatoire
+    }
   };
 
   const basculerLecture = () => {
@@ -82,28 +100,66 @@ function LecteurMusical() {
     }
   };
 
+  const desactiverMusique = () => {
+    setMusiqueAutorisee(false);
+    localStorage.setItem('destiny-musique', 'non'); // Sauvegarde le choix
+    if (player) player.pauseVideo();
+  };
+
+  const activerMusique = () => {
+    setMusiqueAutorisee(true);
+    localStorage.setItem('destiny-musique', 'oui'); // Rétablit le choix
+    if (player) {
+      if (premierLancement) {
+        player.nextVideo();
+        setPremierLancement(false);
+      } else {
+        player.playVideo();
+      }
+    }
+  };
+
+  // Si le joueur ne veut pas de musique, on remplace le lecteur par un petit bouton discret
+  if (!musiqueAutorisee) {
+    return (
+      <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999 }}>
+         <button onClick={activerMusique} style={{ background: 'rgba(15, 23, 42, 0.9)', color: 'white', padding: '10px 16px', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', fontSize: '13px' }}>
+           🎵 Activer la musique
+         </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999, background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(8px)', padding: '12px 20px', borderRadius: '50px', display: 'flex', gap: '15px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
       
-      {/* Lecteur YouTube CACHÉ (1x1 pixel) */}
+      {/* Lecteur YouTube CACHÉ (1x1 pixel) avec AUTOPLAY activé */}
       <div style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0 }}>
         <YouTube 
-          opts={{ playerVars: { listType: 'playlist', list: playlistId, autoplay: 0 } }}
+          opts={{ 
+            playerVars: { listType: 'playlist', list: playlistId, autoplay: 1 } 
+          }}
           onReady={onReady}
-          onStateChange={(e) => setEnLecture(e.data === 1)} // 1 = en cours de lecture
+          onStateChange={onStateChange}
         />
       </div>
 
-      {/* INTERFACE PERSONNALISÉE */}
       <button onClick={basculerLecture} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, display: 'flex' }}>
-        {enLecture ? <Icone nom="pause" taille={20} /> : <Icone nom="play" taille={20} />}
+        {enLecture ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          </svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        )}
       </button>
       
       <button onClick={() => player?.nextVideo()} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, display: 'flex' }}>
         <Icone nom="fleche-droite" taille={20} />
       </button>
       
-      {/* Champ pour que le joueur mette sa propre playlist */}
       <input 
         type="text" 
         placeholder="Lien playlist YouTube..." 
@@ -114,10 +170,16 @@ function LecteurMusical() {
             setPlaylistId(match[1]);
             if (player) {
               player.loadPlaylist({ list: match[1], listType: 'playlist' });
+              setPremierLancement(true);
+              setTimeout(() => player.setShuffle(true), 1000); 
             }
           }
         }}
       />
+
+      <button onClick={desactiverMusique} title="Désactiver la musique" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 0 0 5px', fontSize: '20px', display: 'flex', lineHeight: '1' }}>
+        ×
+      </button>
     </div>
   );
 }
