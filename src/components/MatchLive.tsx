@@ -1094,6 +1094,11 @@ export function MatchLive({
       pousseVers: e.conquete.pousseVers === 'A' ? 'domicile' : e.conquete.pousseVers === 'B' ? 'exterieur' : undefined,
     } : undefined,
     aplatissage: e.aplatissage ? { marqueurId: e.aplatissage.marqueur.id, progression: .55 } : undefined,
+    contact: e.ruck?.porteurId && e.ruck.plaqueurId && e.ruck.debut !== undefined
+      && e.t - e.ruck.debut < 1.35 ? {
+        porteurId: e.ruck.porteurId, plaqueurId: e.ruck.plaqueurId,
+        progression: Math.max(0, Math.min(1, (e.t - e.ruck.debut) / 1.35)),
+      } : undefined,
     cadence: 1, horloge: e.t / 60, instantJeu: e.t,
     sifflet: e.sifflet ? { cle: e.sifflet.cle, club: e.sifflet.club, fautif: e.sifflet.fautif, restant: e.sifflet.restant } : undefined,
   };
@@ -1280,17 +1285,19 @@ export function MatchLive({
                       redresser={vue?.redresser} hauteurMetres={hauteurSprite * .94} temps={tempsAnimation}
                       couleur={(e.clubA.length + e.clubB.length) % 2 ? '#f4c542' : '#35b76d'} carton={cartonArbitre} />
                     {monPion && surLeTerrain.includes(monPion) && pion(monPion)}
-                    {ballon.h > 0.02 && (
-                      <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * 0.8} ry={rayon * 0.5} fill="rgba(0,0,0,.3)" />
-                    )}
-                    <ellipse
-                      className="ml-ballon"
-                      cx={ballon.x}
-                      cy={ballon.y - ballon.h * 2.2}
-                      rx={rayon * 0.95 + ballon.h * 0.35}
-                      ry={rayon * 0.66 + ballon.h * 0.25}
-                      fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayon * 0.3}
-                    />
+                    {!e.porteur && e.conquete?.type !== 'touche' && <>
+                      {ballon.h > 0.02 && (
+                        <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * 0.58} ry={rayon * 0.32} fill="rgba(0,0,0,.3)" />
+                      )}
+                      <ellipse
+                        className="ml-ballon"
+                        cx={ballon.x}
+                        cy={ballon.y - ballon.h * 2.2}
+                        rx={rayon * 0.68 + ballon.h * 0.2}
+                        ry={rayon * 0.43 + ballon.h * 0.14}
+                        fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayon * 0.2}
+                      />
+                    </>}
                     {/* ---------- 💬 CE QU'ILS SE DISENT ----------
                         ⚠️ Demande explicite : « en mode chambrage, petites
                         bulles avec les joueurs qui disent quelque chose ». Le

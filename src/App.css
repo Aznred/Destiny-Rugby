@@ -8507,10 +8507,10 @@ select:focus {
 /* Sur téléphone, L'Ovale est une vraie fenêtre de négociation : le fil se
    contracte et l'offre garde toujours ses boutons accessibles au pouce. */
 @media (max-width: 760px) {
-  .manager-ovale { overflow: hidden; padding-right: 0; }
+  .manager-ovale { overflow-y: auto; padding-right: 0; overscroll-behavior: contain; }
   .x-app.x-manager-embarque {
-    height: max(430px, calc(100dvh - 205px));
-    min-height: 430px;
+    height: clamp(390px, calc(100dvh - 205px), 720px);
+    min-height: 390px;
     max-height: 720px;
     overflow: hidden;
   }

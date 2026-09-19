@@ -178,8 +178,8 @@ function animerArret(e: EtatMatch): void {
       if (!pion.surLeTerrain || pion.role !== 'alignement') continue;
       const profondeur = Math.abs(pion.cible.y - bord);
       pion.cible = {
-        x: pion.cible.x - sens(pion.cote) * large * 1.6,
-        y: borner(bord + vers * (profondeur * (1 + large * 0.35)), 2.5, LARGEUR - 2.5),
+        x: pion.cible.x - sens(pion.cote) * large * 0.8,
+        y: borner(bord + vers * (profondeur * (1 + large * 0.14)), 2.5, LARGEUR - 2.5),
       };
     }
     const conquete = e.conquete;
@@ -198,6 +198,17 @@ function animerArret(e: EtatMatch): void {
       if (cible) {
         cible.cible.y = borner(cible.cible.y - vers * 1.25 * appel, 2.5, LARGEUR - 2.5);
         cible.cible.x += sens(cible.cote) * 0.55 * Math.sin(Math.PI * borner((p - 0.62) / 0.34, 0, 1));
+        // Les deux joueurs voisins deviennent les lifteurs et viennent
+        // réellement sous le sauteur au moment de l'extension.
+        const lifteurs = alignes.filter((q) => q !== cible)
+          .sort((a, b) => Math.abs(a.cible.y - cible.cible.y) - Math.abs(b.cible.y - cible.cible.y))
+          .slice(0, 2);
+        const levage = borner((p - 0.48) / 0.28, 0, 1);
+        lifteurs.forEach((q, i) => {
+          const coteSauteur = i === 0 ? -1 : 1;
+          q.cible.x += (cible.cible.x - q.cible.x) * levage * 0.72;
+          q.cible.y += (cible.cible.y + vers * coteSauteur * 0.62 - q.cible.y) * levage;
+        });
       }
     }
     return;
@@ -570,6 +581,7 @@ function tick(e: EtatMatch): void {
     // saut ou des autres rituels restent parcourues avec l'inertie normale.
     deplacer(p, dt);
   }
+  resoudreContactsPhysiques(e);
 
   e.minuteur -= dt;
   switch (e.phase) {
@@ -751,6 +763,69 @@ function retard(e: EtatMatch, cote: Cote): number {
   return borner(r, -0.6, 1);
 }
 
+/**
+ * Volume physique minimal des joueurs en jeu ouvert.
+ *
+ * Les pions pouvaient jusque-là se traverser entièrement. Cette résolution
+ * garde un coût fixe minuscule (au plus 435 paires pour trente joueurs),
+ * répartit la poussée selon la puissance et conserve une distance de contact
+ * assez courte pour que le plaquage se déclenche normalement.
+ */
+function resoudreContactsPhysiques(e: EtatMatch): void {
+  if (e.phase !== 'jeuCourant' && e.phase !== 'ballonEnLAir' && e.phase !== 'ballonLibre') return;
+  const actifs = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0 && p.battu <= 0);
+  for (let i = 0; i < actifs.length; i++) {
+    const a = actifs[i]!;
+    for (let j = i + 1; j < actifs.length; j++) {
+      const b = actifs[j]!;
+      let dx = b.pos.x - a.pos.x;
+      let dy = b.pos.y - a.pos.y;
+      let d2 = dx * dx + dy * dy;
+      const rayon = a.cote === b.cote ? 0.78 : 0.66;
+      if (d2 >= rayon * rayon) continue;
+      if (d2 < 1e-6) {
+        // Direction stable : pas de hasard ajouté à la simulation autoritaire.
+        dx = ((a.numero * 17 + b.numero * 11) & 1) ? 0.01 : -0.01;
+        dy = ((a.numero * 7 + b.numero * 19) & 1) ? 0.01 : -0.01;
+        d2 = dx * dx + dy * dy;
+      }
+      const d = Math.sqrt(d2);
+      const nx = dx / d;
+      const ny = dy / d;
+      const penetration = rayon - d;
+      const masseA = 0.72 + a.puissance / 100;
+      const masseB = 0.72 + b.puissance / 100;
+      const somme = masseA + masseB;
+      a.pos.x -= nx * penetration * (masseB / somme);
+      a.pos.y -= ny * penetration * (masseB / somme);
+      b.pos.x += nx * penetration * (masseA / somme);
+      b.pos.y += ny * penetration * (masseA / somme);
+
+      const rapprochement = (b.vitesse.x - a.vitesse.x) * nx + (b.vitesse.y - a.vitesse.y) * ny;
+      if (rapprochement < 0) {
+        const choc = -rapprochement * 0.22;
+        a.vitesse.x -= nx * choc * (masseB / somme);
+        a.vitesse.y -= ny * choc * (masseB / somme);
+        b.vitesse.x += nx * choc * (masseA / somme);
+        b.vitesse.y += ny * choc * (masseA / somme);
+      }
+    }
+  }
+}
+
+/** Donne au plaquage réussi un recul et un point d'impact réellement commun. */
+function appliquerImpactPlaquage(porteur: Pion, defenseur: Pion): void {
+  const s = sens(porteur.cote);
+  const recul = borner(0.42 + (defenseur.puissance - porteur.puissance) / 75, 0.18, 1.05);
+  const cote = defenseur.pos.y <= porteur.pos.y ? -1 : 1;
+  porteur.pos.x = borner(porteur.pos.x - s * recul, LIGNE_A + 0.2, LIGNE_B - 0.2);
+  porteur.pos.y = borner(porteur.pos.y + cote * 0.16, 0.6, LARGEUR - 0.6);
+  defenseur.pos.x = porteur.pos.x + s * 0.38;
+  defenseur.pos.y = borner(porteur.pos.y + cote * 0.34, 0.6, LARGEUR - 0.6);
+  porteur.battu = Math.max(porteur.battu, 1.35);
+  defenseur.battu = Math.max(defenseur.battu, 0.85);
+}
+
 // ---------------------------------------------------------------------------
 // PHASE : COUP D'ENVOI ET RENVOIS
 // ---------------------------------------------------------------------------
@@ -802,7 +877,16 @@ function phaseCoupEnvoi(e: EtatMatch): void {
   if (!botteur) return clorePeriode(e);
   const arrivee = e.cibleRenvoi ?? { x: MILIEU + sens(camp) * 30, y: AXE };
   botteur.stats.coupsDePied += 1;
-  e.placement = null;
+  // Après le coup de pied, les receveurs gardent leur dispositif sous le
+  // point de chute. Seuls les chasseurs sont libérés : auparavant les quinze
+  // receveurs recevaient aussitôt une cible offensive et traversaient le
+  // milieu du terrain avant même que le ballon ne retombe.
+  const placementAvantTir = e.placement;
+  e.placement = {};
+  for (const p of surLeTerrain(e, adverse(camp))) {
+    const cible = placementAvantTir?.[p.id];
+    if (cible) e.placement[p.id] = { ...cible };
+  }
   lancerVol(e, botteur, arrivee, 'renvoi', 3.0, 1, { x: MILIEU, y: AXE });
   dire(e, 'pied', camp, C.texteMatch('coupEnvoiJoueur', { nom: botteur.nom }), 0, botteur.moi);
 }
@@ -915,6 +999,7 @@ function phaseBallonEnLAir(e: EtatMatch): void {
   if (!v) return reprendreJeu(e, e.ballon);
   if (v.ecoule < v.duree) return;
   e.vol = null;
+  if (v.intention === 'renvoi') e.placement = null;
   const camp = v.auteur.cote;
   const arrivee = e.ballon;
 
@@ -1922,6 +2007,7 @@ function resoudrePlaquage(
   if (e.rng() < 0.055 + porteur.vision / 1600 + (monGeste === 'raffut' ? 0.22 : 0)
     && offloader(e, porteur)) return;
 
+  appliquerImpactPlaquage(porteur, defenseur);
   formerRuck(e, { x: porteur.pos.x, y: porteur.pos.y }, { porteur, defenseur });
 }
 
@@ -1963,7 +2049,7 @@ function formerRuck(
   e.ruck = {
     porteurId: contact?.porteur.id,
     plaqueurId: contact?.defenseur.id,
-    attaque, vitesseAttaque, vitesseDefense,
+    attaque, vitesseAttaque, vitesseDefense, debut: contact ? e.t : undefined,
   };
   // La vitesse de sortie vient de la course des soutiens et du placement du
   // plaqueur. L'aléatoire ne fait plus que départager deux arrivées proches.
@@ -2098,11 +2184,11 @@ function phaseMaul(e: EtatMatch, dt: number): void {
   e.ballon.x += s * avance * dt;
   mien.forEach((p, i) => {
     p.role = 'maul';
-    p.cible = { x: e.ballon.x - s * (0.7 + Math.floor(i / 3) * 1.1), y: borner(e.ballon.y + ((i % 3) - 1) * 1.3, 3, LARGEUR - 3) };
+    p.cible = { x: e.ballon.x - s * (0.42 + Math.floor(i / 3) * 0.72), y: borner(e.ballon.y + ((i % 3) - 1) * 0.76, 3, LARGEUR - 3) };
   });
   adv.forEach((p, i) => {
     p.role = 'maul';
-    p.cible = { x: e.ballon.x + s * (0.7 + Math.floor(i / 3) * 1.1), y: borner(e.ballon.y + ((i % 3) - 1) * 1.3, 3, LARGEUR - 3) };
+    p.cible = { x: e.ballon.x + s * (0.42 + Math.floor(i / 3) * 0.72), y: borner(e.ballon.y + ((i % 3) - 1) * 0.76, 3, LARGEUR - 3) };
   });
 
   if (franchieLigne(e.ballon, cote)) {

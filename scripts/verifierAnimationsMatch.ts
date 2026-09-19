@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { avancer, creerMatch } from '../src/lib/moteur/moteur';
 import { effectifDuClub } from '../src/lib/effectif';
+import { MILIEU } from '../src/lib/moteur/terrain';
 
 const clubA = 'Stade Toulousain';
 const clubB = 'Stade Rochelais';
@@ -25,6 +26,10 @@ let coupEnvoiLePlusLong = 0;
 let meleePlaceeInstantanement = false;
 let touchePlaceeInstantanement = false;
 let pireEcartAvantEngagement = 0;
+let receveursRestesDansLeurCamp = true;
+let engagementReceveursVerifie = false;
+let lifteursResserres = false;
+let impactPlaquageSynchronise = false;
 let phasePrecedente = match.phase;
 
 for (let garde = 0; !match.fini && garde < 80_000; garde++) {
@@ -65,6 +70,28 @@ for (let garde = 0; !match.fini && garde < 80_000; garde++) {
     const engages = match.pions.filter((p) => p.role === 'ruck');
     ruckSynchronise ||= engages.length >= 2 && engages.some((p) =>
       Math.hypot(p.cible.x - match.ballon.x, p.cible.y - match.ballon.y) < 1.5);
+    impactPlaquageSynchronise ||= !!match.ruck?.porteurId && !!match.ruck?.plaqueurId
+      && match.ruck.debut !== undefined;
+  }
+  if (match.phase === 'ballonEnLAir' && match.vol?.intention === 'renvoi'
+    && Math.abs(match.vol.de.x - MILIEU) < .5) {
+    const receveur = match.vol.auteur.cote === 'A' ? 'B' : 'A';
+    const joueurs = match.pions.filter((p) => p.surLeTerrain && p.cote === receveur);
+    engagementReceveursVerifie ||= joueurs.length >= 14 && joueurs.every((p) => !!match.placement?.[p.id]);
+    receveursRestesDansLeurCamp &&= joueurs.every((p) =>
+      p.cote === 'A' ? p.pos.x <= MILIEU + .35 : p.pos.x >= MILIEU - .35);
+  }
+  if (match.phase === 'touche' && match.conquete?.type === 'touche' && match.conquete.progression > .72) {
+    const cible = match.pions.find((p) => p.id === match.conquete?.cibleId);
+    if (cible) {
+      const proches = match.pions
+        .filter((p) => p.surLeTerrain && p.cote === cible.cote && p.avant && p.numero !== 2 && p !== cible)
+        .sort((a, b) => Math.hypot(a.pos.x - cible.pos.x, a.pos.y - cible.pos.y)
+          - Math.hypot(b.pos.x - cible.pos.x, b.pos.y - cible.pos.y))
+        .slice(0, 2);
+      lifteursResserres ||= proches.length === 2 && proches.every((p) =>
+        Math.hypot(p.pos.x - cible.pos.x, p.pos.y - cible.pos.y) < 1.9);
+    }
   }
   if (match.phase === 'ballonLibre' && match.ballonLibre) {
     ballonLibreVisible = true;
@@ -104,5 +131,9 @@ assert.ok(coupEnvoiLePlusLong <= 5.01, `Engagement direct trop long : ${coupEnvo
 // moment exact du coup de pied le moteur exige 1,1 m ou moins.
 assert.ok(pireEcartAvantEngagement <= 2.41,
   `L'engagement est parti avec un joueur à ${pireEcartAvantEngagement.toFixed(1)} m de sa place.`);
+assert.ok(engagementReceveursVerifie && receveursRestesDansLeurCamp,
+  `À l'engagement, les receveurs doivent garder leur structure dans leur propre moitié.`);
+assert.ok(lifteursResserres, 'Les deux lifteurs doivent venir au contact du sauteur en touche.');
+assert.ok(impactPlaquageSynchronise, 'Le plaquage doit exposer un impact synchronisé pour le plaqueur et le porteur.');
 
 console.log('OK — arrêts raccourcis, conquêtes animées, ballon libre avec rebonds, contact synchronisé et aplatissages visibles.');

@@ -335,6 +335,8 @@ export interface TerrainDirect {
   };
   /** Aplatissage en cours, assez long pour être reconstruit entre deux relevés. */
   aplatissage?: { marqueurId: string; progression: number };
+  /** Contact bref, utilisé pour synchroniser le plaqueur et la chute du porteur. */
+  contact?: { porteurId: string; plaqueurId: string; progression: number };
   /** Secondes SIMULÉES écoulées par seconde réelle dans la phase en cours. */
   cadence: number;
   /** Minutes de jeu au centième au moment du relevé. */
@@ -1015,6 +1017,14 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
     terrain.aplatissage = {
       marqueurId: e.aplatissage.marqueur.id,
       progression: r2(Math.max(0, Math.min(1, 1 - e.minuteur / 1.35))),
+    };
+  }
+  if (e.ruck?.porteurId && e.ruck.plaqueurId && e.ruck.debut !== undefined) {
+    const progression = Math.max(0, Math.min(1, (e.t - e.ruck.debut) / 1.35));
+    if (progression < 1) terrain.contact = {
+      porteurId: e.ruck.porteurId,
+      plaqueurId: e.ruck.plaqueurId,
+      progression: r2(progression),
     };
   }
   if (e.porteur) terrain.porteurId = e.porteur.id;

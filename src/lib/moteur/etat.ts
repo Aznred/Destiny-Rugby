@@ -298,6 +298,8 @@ export interface RuckEnCours {
   attaque: Cote;
   vitesseAttaque: number;
   vitesseDefense: number;
+  /** Instant de l'impact, pour rejouer ensemble le plaquage et la chute. */
+  debut?: number;
 }
 
 /** Bref temps de contrôle du ballon dans l'en-but avant validation de l'essai. */

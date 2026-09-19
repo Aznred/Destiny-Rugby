@@ -365,13 +365,15 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
             redresser={vue?.redresser} hauteurMetres={hauteurSprite * .94} temps={tempsAnimation}
             couleur={(nomDomicile.length + nomExterieur.length) % 2 ? '#f4c542' : '#35b76d'} carton={carton} />
           {porteur ? dessiner(porteur) : null}
-          {b.h > 0.02 && <ellipse cx={b.x} cy={b.y} rx={rayonBallon * 0.9} ry={rayonBallon * 0.48} fill="rgba(0,0,0,.3)" />}
-          <ellipse
-            className="cel-ballon"
-            cx={b.x} cy={b.y - b.h * 2.2}
-            rx={rayonBallon * 1.08 + b.h * 0.08} ry={rayonBallon * 0.62 + b.h * 0.05}
-            fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayonBallon * 0.22}
-          />
+          {!affiche.porteurId && affiche.conquete?.type !== 'touche' && <>
+            {b.h > 0.02 && <ellipse cx={b.x} cy={b.y} rx={rayonBallon * 0.62} ry={rayonBallon * 0.34} fill="rgba(0,0,0,.3)" />}
+            <ellipse
+              className="cel-ballon"
+              cx={b.x} cy={b.y - b.h * 2.2}
+              rx={rayonBallon * 0.72 + b.h * 0.055} ry={rayonBallon * 0.41 + b.h * 0.035}
+              fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayonBallon * 0.16}
+            />
+          </>}
         </g>
         {/* La flèche vit hors du groupe pivoté : elle est posée en coordonnées
             d'écran, comme les pastilles du bandeau. */}

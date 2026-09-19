@@ -113,12 +113,14 @@ export function placementTouche(
         ? { x: mark.x, y: bord === 0 ? 0.7 : LARGEUR - 0.7 }
         : { x: mark.x - s * 2.2, y: bY(bord + vers * 3) };
     }
-    // L'alignement : de 5 m à ~14 m de la touche, un joueur tous les 2 m. Les
+    // L'alignement : de 5 m à ~14 m de la touche. À l'écran, 2,1 m entre
+    // chaque avant donnait une suite de joueurs isolés ; 1,55 m laisse assez
+    // de place pour le saut tout en formant de vrais blocs de trois.
     // deux équipes sont séparées par le mètre réglementaire — chacune 55 cm
     // derrière la ligne de touche, DE SON CÔTÉ.
     alignes.forEach((p, i) => {
       p.role = 'alignement';
-      pl[p.id] = { x: mark.x - s * 0.55, y: bY(bord + vers * (5 + i * 2.1)) };
+      pl[p.id] = { x: mark.x - s * 0.44, y: bY(bord + vers * (5 + i * 1.55)) };
     });
     // Les avants hors alignement remontent dans la ligne, côté ouvert.
     dehors.forEach((p, i) => {
