@@ -51,12 +51,9 @@ export type Cadrage = 'large' | 'suivi' | 'proche';
  * ⚠️ MESURÉ AU DOIGT, PAS CHOISI AU HASARD. Les pions sont dessinés à leur
  * taille réelle (0,86 m de rayon) ; sur un téléphone de 375 px tenu droit, cela
  * donne :
- *   • `large`  (122 m) → disque de 8,5 px — on lit la FORME du jeu, les lignes
- *                        et les intervalles, pas les individus. C'est le mode
- *                        « je regarde le match » ;
- *   • `suivi`  (68 m)  → disque de 15 px  — on distingue les maillots et on voit
- *                        arriver la défense ;
- *   • `proche` (46 m)  → disque de 22 px  — on vise, on décide, on joue.
+ *   • `large`  (98 m) → on lit toute la forme du jeu sans perdre les joueurs ;
+ *   • `suivi`  (56 m) → on distingue nettement maillots et intervalles ;
+ *   • `proche` (40 m)  → les duels et l'aplatissage restent parfaitement lisibles.
  *
  * En dessous de 40 m on perdrait la lecture du hors-jeu et du soutien : le
  * joueur ne verrait plus arriver la défense, et le jeu deviendrait injuste
@@ -69,9 +66,9 @@ export type Cadrage = 'large' | 'suivi' | 'proche';
  * (on voit toujours toute la largeur du terrain) et rendent les maillots nets.
  */
 export const COUVERTURE: Record<Cadrage, number> = {
-  large: LONGUEUR,
-  suivi: 68,
-  proche: 46,
+  large: 98,
+  suivi: 56,
+  proche: 40,
 };
 
 /**

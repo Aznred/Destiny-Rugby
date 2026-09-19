@@ -42,6 +42,7 @@ import type { OrdreFil, StrategieEnLigne } from '../lib/ligue/matchCarriere';
 import type { CouleursDirect } from '../components/match/TerrainEnDirect';
 import { NotificationsMatch } from '../components/NotificationsMatch';
 import { DirectCinema } from '../components/match/DirectCinema';
+import { maillotDeSecours, maillotDepuisBlason } from '../lib/moteur/apparenceMatch';
 import {
   chargerSessionCarriere, chargerLigueCarriere, chargerDirectCarriere, identifierCarriere, identifierGoogleCarriere, configurationCarriere, deconnecterCarriere, supprimerLigueCarriere, INCHANGE,
   creerLigueCarriere, rejoindreLigueCarriere, commanderCarriere, signalerPresenceCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, chargerAdministrationCarriere, ErreurCarriere,
@@ -490,9 +491,9 @@ export function CarriereEnLigne() {
    *   • RIEN NE BOUGE, ON ESPACE. Après une minute sans le moindre changement
    *     de version, on passe à trente secondes. La première réponse différente
    *     ramène aussitôt à dix.
-   *   • LE DIRECT NE CHANGE PAS. Deux secondes pendant un match, dix secondes
-   *     dès qu'une rencontre s'ouvre dans les cinq minutes : ce sont les seuls
-   *     moments où la fraîcheur se voit, et ils ne sont pas touchés.
+   *   • LE DIRECT RESTE CIBLÉ. Une seconde pendant le match effectivement
+   *     regardé, dix secondes dès qu'une rencontre approche : la base ne porte
+   *     le coût supplémentaire que lorsque la fluidité est visible.
    */
   useEffect(() => {
     if (!ligueId) return;
@@ -503,7 +504,7 @@ export function CarriereEnLigne() {
 
     const prochainPas = () => {
       const vue = derniereVue.current;
-      // ⚠️ LES DEUX SECONDES SONT RÉSERVÉES À CELUI QUI REGARDE. Un match dure
+      // ⚠️ LA SECONDE EST RÉSERVÉE À CELUI QUI REGARDE. Un match dure
       // quatre-vingts minutes réelles : sonder toutes les deux secondes pour
       // TOUS les membres de la ligue, c'était deux mille quatre cents lectures
       // complètes de l'état par match et par onglet ouvert. Le match avance de
@@ -511,7 +512,7 @@ export function CarriereEnLigne() {
       // sans spectateur ne se bloque donc pas, il coûte simplement cinq fois
       // moins cher.
       const suivi = directOuvert.current;
-      if (suivi && vue?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine)) return 2000;
+      if (suivi && vue?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine)) return 1000;
       if (vue?.rencontres.some(r => r.match && !r.match.termine)) return 10_000;
       const bientot = Date.now() + 5 * 60_000;
       if (vue?.rencontres.some(r => !r.resultat && Date.parse(r.ouvre) <= bientot && Date.parse(r.ferme) >= Date.now())) return 10_000;
@@ -583,7 +584,9 @@ export function CarriereEnLigne() {
     setOccupe(true); setErreur(''); versionRequete.current++;
     try {
       const suivante = await commanderCarriere(ligueId, commande, crypto.randomUUID());
-      setVue(suivante); return suivante;
+      // Une commande peut revenir après un rafraîchissement temps réel plus
+      // récent. La fusion monotone empêche score, horloge et fil de reculer.
+      setVue((avant) => fusionnerVueLigue(avant, suivante)); return suivante;
     } catch (e) { setErreur(messageErreur(e)); }
     finally { versionRequete.current++; setOccupe(false); }
   };
@@ -1021,7 +1024,7 @@ const ORDRES_FIL: Record<OrdreFil, [moi: string, adjoint: string]> = {
  * vertes sur un terrain vert, invisibles. Le vert (95° à 165°) est donc absent
  * de la liste, comme il l'est des maillots dans un vrai stade à pelouse.
  */
-const TEINTES_MAILLOT = [355, 25, 45, 195, 220, 262, 300, 330];
+const COULEURS_MAILLOT = ['#d94155', '#df733c', '#d6a832', '#2f8fc1', '#365fbe', '#7955bd', '#b64eaa', '#d34b82'];
 
 /**
  * Les deux couleurs de maillot du direct.
@@ -1036,16 +1039,17 @@ function couleursDirect(idDomicile: string, idExterieur: string): CouleursDirect
   const rang = (id: string) => {
     let h = 2166136261;
     for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
-    return (h >>> 0) % TEINTES_MAILLOT.length;
+    return (h >>> 0) % COULEURS_MAILLOT.length;
   };
   const a = rang(idDomicile);
   let b = rang(idExterieur);
   const ecart = Math.abs(a - b);
-  if (Math.min(ecart, TEINTES_MAILLOT.length - ecart) < 2) b = (a + 4) % TEINTES_MAILLOT.length;
-  return {
-    domicile: `hsl(${TEINTES_MAILLOT[a]} 72% 55%)`,
-    exterieur: `hsl(${TEINTES_MAILLOT[b]} 72% 55%)`,
-  };
+  if (Math.min(ecart, COULEURS_MAILLOT.length - ecart) < 2) b = (a + 4) % COULEURS_MAILLOT.length;
+  const domicile = COULEURS_MAILLOT[a], exterieur = COULEURS_MAILLOT[b];
+  return { domicile, exterieur, maillots: {
+    domicile: maillotDeSecours(domicile, idDomicile),
+    exterieur: maillotDeSecours(exterieur, idExterieur),
+  } };
 }
 
 function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereEnLigne; rencontre: VueRencontre; agir: Agir; occupe: boolean; fermer: () => void }) {
@@ -1078,7 +1082,22 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   const horlogeServeur = m?.horloge ?? 0;
   const ancre = useRef({ horloge: horlogeServeur, recu: Date.now() });
   useEffect(() => { ancre.current = { horloge: horlogeServeur, recu: Date.now() }; }, [horlogeServeur]);
-  const couleurs = useMemo(() => couleursDirect(r.domicile, r.exterieur), [r.domicile, r.exterieur]);
+  const couleursSecours = useMemo(() => couleursDirect(r.domicile, r.exterieur), [r.domicile, r.exterieur]);
+  const emblemeDomicile = vue.clubs.find(c => c.id === r.domicile)?.embleme;
+  const emblemeExterieur = vue.clubs.find(c => c.id === r.exterieur)?.embleme;
+  const [couleurs, setCouleurs] = useState(couleursSecours);
+  useEffect(() => {
+    let actif = true;
+    setCouleurs(couleursSecours);
+    const baseD = couleursSecours.maillots!.domicile, baseE = couleursSecours.maillots!.exterieur;
+    void Promise.all([
+      maillotDepuisBlason(emblemeDomicile, baseD, r.domicile),
+      maillotDepuisBlason(emblemeExterieur, baseE, r.exterieur),
+    ]).then(([domicile, exterieur]) => {
+      if (actif) setCouleurs({ domicile: domicile.principal, exterieur: exterieur.principal, maillots: { domicile, exterieur } });
+    });
+    return () => { actif = false; };
+  }, [couleursSecours, emblemeDomicile, emblemeExterieur, r.domicile, r.exterieur]);
 
   if (!m) return <><button className="btn fantome" onClick={fermer}>{t('online.common.close')}</button><Vide icone="chrono" titre={t('online.match.teamsEntering')}>{t('online.match.kickoffAt', { date: dateHeure(r.ferme) })}</Vide></>;
   const strategie = m.maStrategie ?? STRATEGIE_VIDE;
@@ -1108,7 +1127,8 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
       {m.signalAdverse && SIGNAUX[m.signalAdverse] && <p className="cel-signal"><Icone nom="oeil" taille={17} />{SIGNAUX[m.signalAdverse]}</p>}
     </div>
 
-    <DirectCinema match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs} />
+    <DirectCinema match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs}
+      emblemes={{ domicile: emblemeDomicile, exterieur: emblemeExterieur }} />
     {!vue.observateur && <details><summary>{t('online.match.alerts')}</summary><NotificationsMatch ligue={vue.id} /></details>}
 
     {/* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).

@@ -24,7 +24,7 @@
 import type { Pion } from './entites.js';
 import { PHASES_ARRETEES, type EtatMatch, type SystemeDefensif } from './etat.js';
 import {
-  AXE, LARGEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, distance, distance2,
+  AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, distance, distance2,
   ligneDefendue, melanger, metresAvantLaLigne, sens, type Cote, type Vec,
 } from './terrain.js';
 
@@ -467,7 +467,9 @@ export function placerEquipes(e: EtatMatch): void {
     if (p.horsJeu && e.phase === 'ballonEnLAir') {
       const botteur = e.vol?.type === 'pied' ? e.vol.auteur : null;
       if (botteur && botteur.cote === p.cote) {
-        p.cible.x = bornerX(botteur.pos.x - sens(p.cote) * 1.5);
+        // Le botteur peut être dans son propre en-but (notamment lors d'un
+        // renvoi). La cible doit rester derrière lui, même hors de l'aire de jeu.
+        p.cible.x = borner(botteur.pos.x - sens(p.cote) * 3, 0.5, LONGUEUR - 0.5);
         p.cible.y = borner(p.cible.y, 4, LARGEUR - 4);
       }
       p.effort = 0.92;

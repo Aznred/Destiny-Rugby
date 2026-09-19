@@ -53,6 +53,8 @@ import {
   type ImageDirect,
 } from '../../lib/ligue/interpolationDirect';
 import { t } from '../../lib/i18n';
+import { maillotDeSecours, type MaillotMatch } from '../../lib/moteur/apparenceMatch';
+import { SpriteArbitre, SpriteRugbymanMemo } from './SpriteRugbyman';
 
 /**
  * Le retard de rendu, en secondes réelles.
@@ -61,9 +63,9 @@ import { t } from '../../lib/i18n';
  * qui ferme l'interpolation n'est pas encore arrivé et on retombe sur de la
  * prédiction. Une marge de 20 % absorbe la latence du réseau.
  */
-const RETARD = 2.25;
+const RETARD = 1.2;
 /** Au-delà du dernier relevé, on ne prolonge pas plus longtemps que ça. */
-const PREDICTION_MAX = 1.15;
+const PREDICTION_MAX = 0.7;
 /** Deux images utiles, plus assez de marge pour un paquet retardé/réordonné. */
 const TAMPON_MAX = 6;
 
@@ -75,15 +77,21 @@ const CLE_PHASE: Record<string, string> = {
   aplatissage: 'ml.phase.apresEssai', apresEssai: 'ml.phase.apresEssai', miTemps: 'ml.phase.miTemps',
 };
 
-export interface CouleursDirect { domicile: string; exterieur: string }
+export interface CouleursDirect {
+  domicile: string;
+  exterieur: string;
+  maillots?: Record<CoteEnLigne, MaillotMatch>;
+}
 
 interface Props {
   terrain: TerrainDirect;
   nomDomicile: string;
   nomExterieur: string;
   couleurs: CouleursDirect;
+  emblemes?: Partial<Record<CoteEnLigne, string>>;
   /** Le camp qu'on entraîne : c'est vers son en-but qu'on attaque à l'écran. */
   monCote?: CoteEnLigne;
+  carton?: 'jaune' | 'rouge';
 }
 
 interface Releve {
@@ -121,7 +129,7 @@ const LIBELLES_COMBINAISON = {
   leurreDevant: 'Leurre devant · saut au fond',
 } as const;
 
-function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote }: Props) {
+function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote, carton }: Props) {
   const scene = useRef<HTMLDivElement>(null);
   const boite = useRef({ largeur: 1, hauteur: 1 });
   const camera = useRef(new Camera());
@@ -257,7 +265,22 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const rayon = Math.max(0.86, 5.5 / pxParMetre);
   const tailleTexte = Math.max(rayon * 1.16, 7.6 / pxParMetre);
   const trait = Math.max(rayon * 0.18, 1.5 / pxParMetre);
+  // Le ballon des pastilles faisait presque la taille d'un joueur. Avec des
+  // silhouettes à l'échelle, il reste volontairement un peu agrandi pour être
+  // suivi à la télévision, mais ne dépasse plus 45 cm à l'écran.
+  const rayonBallon = Math.max(0.24, 2.7 / pxParMetre);
+  // Les références fournies grossissent volontairement les personnages : ils
+  // font environ 24 à 34 px même lorsque la caméra montre la moitié du terrain.
+  const hauteurSprite = Math.min(5.2, Math.max(3.35, 25 / pxParMetre));
+  // Le générateur travaille à 16 i/s : caler les dessins dessus évite de
+  // recalculer trente sprites 60 fois par seconde sans perdre une image utile.
+  const tempsAnimation = Math.floor((performance.now() / 1000) * 16) / 16;
   const b = ballon.current;
+  const maillots: Record<CoteEnLigne, MaillotMatch> = couleurs.maillots ?? {
+    domicile: maillotDeSecours(couleurs.domicile, nomDomicile),
+    exterieur: maillotDeSecours(couleurs.exterieur, nomExterieur),
+  };
+  const porteurPosition = affiche.porteurId ? pions.current.get(affiche.porteurId) : undefined;
 
   const dessiner = (p: TerrainDirect['pions'][number]) => {
     const pos = pions.current.get(p.id);
@@ -266,37 +289,19 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     const mien = monCote !== undefined && p.cote === monCote;
     const nomCourt = p.nom.split(' ').at(-1) ?? p.nom;
     const largeurNom = Math.max(tailleTexte * 3.2, nomCourt.length * tailleTexte * 0.64);
-    return (
-      <g
-        key={p.id}
-        className={affiche.aplatissage?.marqueurId === p.id ? 'cel-joueur-aplatit' : undefined}
-        transform={`translate(${pos.x.toFixed(2)} ${pos.y.toFixed(2)})`}
-      >
-        <title>{`${p.numero} · ${p.nom}`}</title>
-        <ellipse cx={rayon * 0.14} cy={rayon * 0.35} rx={rayon} ry={rayon * 0.7} fill="rgba(0,0,0,.35)" />
-        <circle
-          r={rayon}
-          fill={couleurs[p.cote]}
-          stroke={porte ? '#fff6d8' : mien ? 'rgba(255,255,255,.85)' : 'rgba(0,0,0,.5)'}
-          strokeWidth={porte ? Math.max(rayon * 0.34, trait * 1.8) : trait}
-        />
-        {/* Les numéros reçoivent la rotation INVERSE de la caméra : sans elle
-            ils se lisent de travers dès que le terrain pivote en portrait. */}
-        <text
-          transform={vue?.redresser}
-          y={tailleTexte * 0.36} textAnchor="middle" fontSize={tailleTexte} fill="#fff" fontWeight="700"
-          style={{ paintOrder: 'stroke', stroke: 'rgba(0,0,0,.6)', strokeWidth: tailleTexte * 0.26 }}
-        >
-          {p.numero}
-        </text>
-        {porte && (
+    return <g key={p.id} className={mien ? 'rg-joueur-moi' : undefined}>
+      <SpriteRugbymanMemo pion={p} position={pos} terrain={affiche} maillot={maillots[p.cote]}
+        porteur={porte} positionPorteur={porteurPosition} redresser={vue?.redresser}
+        hauteurMetres={hauteurSprite} temps={tempsAnimation} />
+      {porte && (
+        <g transform={`translate(${pos.x.toFixed(2)} ${pos.y.toFixed(2)})`}>
           <g className="cel-nom-porteur" transform={vue?.redresser}>
-            <rect x={-largeurNom / 2} y={-rayon * 3.1} width={largeurNom} height={tailleTexte * 1.35} rx={tailleTexte * 0.35} />
-            <text y={-rayon * 2.25} textAnchor="middle" fontSize={tailleTexte * 0.76}>{nomCourt}</text>
+            <rect x={-largeurNom / 2} y={-hauteurSprite * .98} width={largeurNom} height={tailleTexte * 1.35} rx={tailleTexte * 0.35} />
+            <text y={-hauteurSprite * .98 + tailleTexte * .86} textAnchor="middle" fontSize={tailleTexte * 0.76}>{nomCourt}</text>
           </g>
-        )}
-      </g>
-    );
+        </g>
+      )}
+    </g>;
   };
 
   // La flèche de bord quand le ballon sort du cadre : sans elle, on le perd de
@@ -321,6 +326,10 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     ? borner((conquete.progression - 0.45) / 0.55, 0, 1)
     : 0;
   const sensPoussee = conquete?.pousseVers === 'exterieur' ? -1 : 1;
+  const arbitre = {
+    x: borner(b.x + (affiche.possession === 'domicile' ? -4.4 : 4.4), 7, LONGUEUR - 7),
+    y: borner(b.y + (affiche.ouvert === 'droite' ? -4.2 : 4.2), 4, LARGEUR - 4),
+  };
 
   return (
     <div className="cel-scene" ref={scene}>
@@ -352,13 +361,16 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
           {/* Le porteur passe DEVANT tout le monde : c'est lui qu'on suit. */}
           {affiche.pions.filter((p) => p.cote === 'exterieur' && p.id !== affiche.porteurId).map(dessiner)}
           {affiche.pions.filter((p) => p.cote === 'domicile' && p.id !== affiche.porteurId).map(dessiner)}
+          <SpriteArbitre position={arbitre} phase={affiche.phase} sifflet={affiche.sifflet}
+            redresser={vue?.redresser} hauteurMetres={hauteurSprite * .94} temps={tempsAnimation}
+            couleur={(nomDomicile.length + nomExterieur.length) % 2 ? '#f4c542' : '#35b76d'} carton={carton} />
           {porteur ? dessiner(porteur) : null}
-          {b.h > 0.02 && <ellipse cx={b.x} cy={b.y} rx={rayon * 0.8} ry={rayon * 0.5} fill="rgba(0,0,0,.3)" />}
+          {b.h > 0.02 && <ellipse cx={b.x} cy={b.y} rx={rayonBallon * 0.9} ry={rayonBallon * 0.48} fill="rgba(0,0,0,.3)" />}
           <ellipse
             className="cel-ballon"
             cx={b.x} cy={b.y - b.h * 2.2}
-            rx={rayon * 0.95 + b.h * 0.35} ry={rayon * 0.66 + b.h * 0.25}
-            fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayon * 0.3}
+            rx={rayonBallon * 1.08 + b.h * 0.08} ry={rayonBallon * 0.62 + b.h * 0.05}
+            fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayonBallon * 0.22}
           />
         </g>
         {/* La flèche vit hors du groupe pivoté : elle est posée en coordonnées

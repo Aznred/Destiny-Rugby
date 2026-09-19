@@ -9,6 +9,8 @@
     "lint": "oxlint",
     "data:ffr": "node scripts/importEffectifsFfr.cjs",
     "data:photos-monde": "node scripts/importerPhotosMondiales.cjs",
+    "data:apparences-match": "node scripts/genererApparencesMatch.mjs",
+    "data:sprites-match": "node scripts/synchroniserSpritesMatch.mjs",
     "data:notes-allrugby": "node scripts/revaloriserAllRugby.cjs",
     "base:appliquer": "node scripts/appliquerSchema.mjs serveur/schema-ligues.sql serveur/schema-carriere.sql",
     "preview": "vite preview",

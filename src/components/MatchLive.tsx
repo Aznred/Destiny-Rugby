@@ -120,6 +120,10 @@ import { clubParNom } from '../data/clubs';
 import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
 import { PelouseMemo } from './match/Pelouse';
+import { SpriteArbitre, SpriteRugbymanMemo } from './match/SpriteRugbyman';
+import type { PionDirect, TerrainDirect } from '../lib/ligue/matchCarriere';
+import { maillotDeSecours } from '../lib/moteur/apparenceMatch';
+import './match/DirectCinema.css';
 import { FeuilleMatch } from './match/FeuilleMatch';
 import type { CompositionManager, Joueur, TactiqueManager } from '../types';
 import {
@@ -942,8 +946,8 @@ export function MatchLive({
     setEnvoiConsigne(false);
   };
 
-  const [couleurA] = couleursDe(e.clubA);
-  const [couleurB] = couleursDe(e.clubB);
+  const [couleurA, couleurA2] = couleursDe(e.clubA);
+  const [couleurB, couleurB2] = couleursDe(e.clubB);
   const clubA = clubParNom(e.clubA);
   const clubB = clubParNom(e.clubB);
 
@@ -1056,7 +1060,48 @@ export function MatchLive({
   // ⚠️ ET LE CONTOUR NE DESCEND JAMAIS SOUS UN PIXEL ET DEMI. Sans numéro, le
   // liseré clair (camp A) ou sombre (camp B) devient le SEUL moyen de séparer
   // deux équipes aux couleurs voisines — et à 0,8 px il ne se voyait plus.
-  const trait = Math.max(rayon * 0.18, 1.5 / pxParMetre);
+  const hauteurSprite = Math.min(5.2, Math.max(3.35, 25 / pxParMetre));
+  const tempsAnimation = Math.floor((performance.now() / 1000) * 16) / 16;
+  const maillotA = useMemo(() => ({ ...maillotDeSecours(couleurA, e.clubA), secondaire: couleurA2 }), [couleurA, couleurA2, e.clubA]);
+  const maillotB = useMemo(() => ({ ...maillotDeSecours(couleurB, e.clubB), secondaire: couleurB2 }), [couleurB, couleurB2, e.clubB]);
+
+  // Le solo expose la même photographie légère que le direct en ligne au
+  // générateur de sprites. Le moteur reste inchangé et demeure autoritaire.
+  const pionsDirects: PionDirect[] = surLeTerrain.map((p) => ({
+    id: p.id, numero: p.numero, nom: p.nom, poste: p.poste,
+    cote: p.cote === 'A' ? 'domicile' : 'exterieur',
+    x: p.pos.x, y: p.pos.y, vx: p.vitesse.x, vy: p.vitesse.y,
+  }));
+  const ballon = positionBallonInterpolee(e, r);
+  const terrainSprites: TerrainDirect = {
+    pions: pionsDirects,
+    ballon: { x: ballon.x, y: ballon.y, hauteur: ballon.h },
+    porteurId: e.porteur?.id,
+    vol: e.vol ? {
+      de: e.vol.de, vers: e.vol.vers, duree: e.vol.duree, ecoule: e.vol.ecoule,
+      hauteur: e.vol.hauteur, type: e.vol.type, intention: e.vol.intention,
+      auteurId: e.vol.auteur.id, receveurId: e.vol.receveur?.id,
+    } : undefined,
+    phase: e.phase, systeme: e.systeme,
+    possession: e.possession === 'A' ? 'domicile' : 'exterieur',
+    sequence: e.phasesDepuisArret + 1, origine: e.origine,
+    ligneAvantage: e.ligneAvantage, metresGagnes: e.metresGagnesPhase,
+    ballonLent: e.ballonLent, ouvert: e.ouvert === 1 ? 'droite' : 'gauche',
+    lancement: e.lancement ? { type: e.lancement.type, intention: e.lancement.intention } : undefined,
+    conquete: e.conquete ? {
+      type: e.conquete.type, progression: e.conquete.progression,
+      combinaison: e.conquete.combinaison, cibleId: e.conquete.cibleId,
+      pousseVers: e.conquete.pousseVers === 'A' ? 'domicile' : e.conquete.pousseVers === 'B' ? 'exterieur' : undefined,
+    } : undefined,
+    aplatissage: e.aplatissage ? { marqueurId: e.aplatissage.marqueur.id, progression: .55 } : undefined,
+    cadence: 1, horloge: e.t / 60, instantJeu: e.t,
+    sifflet: e.sifflet ? { cle: e.sifflet.cle, club: e.sifflet.club, fautif: e.sifflet.fautif, restant: e.sifflet.restant } : undefined,
+  };
+  const pionsDirectsParId = new Map(pionsDirects.map((p) => [p.id, p]));
+  const positionPorteur = e.porteur ? {
+    x: e.porteur.pos.x + e.porteur.vitesse.x * r,
+    y: e.porteur.pos.y + e.porteur.vitesse.y * r,
+  } : undefined;
 
   // ⚠️ OÙ EST MON PION À L'ÉCRAN, EN PIXELS. C'est là que se pose la bulle du
   // verdict. `versEcran` rend des unités de viewBox ; `pxParMetre` les convertit
@@ -1075,38 +1120,26 @@ export function MatchLive({
     const x = p.pos.x + p.vitesse.x * r;
     const y = p.pos.y + p.vitesse.y * r;
     const porte = e.porteur === p;
+    const direct = pionsDirectsParId.get(p.id)!;
     return (
-      <g key={p.id} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})`}>
-        {p.moi && <circle r={rayon * 2.1} className="ml-aura" />}
-        <ellipse cx={rayon * 0.14} cy={rayon * 0.35} rx={rayon} ry={rayon * 0.7} fill="rgba(0,0,0,.35)" />
-        <circle
-          r={rayon}
-          fill={p.cote === 'A' ? couleurA : couleurB}
-          stroke={p.moi ? '#ffd45e' : porte ? '#fff6d8' : p.cote === 'A' ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)'}
-          strokeWidth={p.moi || porte ? Math.max(rayon * 0.34, trait * 1.8) : trait}
-        />
-        {/* ⚠️ Les numéros reçoivent la rotation INVERSE de la caméra : sans ça
-            ils se lisent de travers dès que le terrain pivote en portrait. */}
-        <text
-          transform={vue?.redresser}
-          y={tailleTexte * 0.36} textAnchor="middle" fontSize={tailleTexte} fill="#fff" fontWeight="700"
-          style={{ paintOrder: 'stroke', stroke: 'rgba(0,0,0,.6)', strokeWidth: tailleTexte * 0.26 }}
-        >
-          {p.numero}
-        </text>
+      <g key={p.id} className={p.moi ? 'rg-joueur-moi' : undefined}>
+        {p.moi && <circle cx={x} cy={y} r={rayon * 2.1} className="ml-aura" />}
+        <SpriteRugbymanMemo pion={direct} position={{ x, y }} terrain={terrainSprites}
+          maillot={p.cote === 'A' ? maillotA : maillotB} porteur={porte}
+          positionPorteur={positionPorteur} redresser={vue?.redresser}
+          hauteurMetres={hauteurSprite} temps={tempsAnimation} />
         {/* Le chevron : c'est LUI qui répond à « où est mon joueur ». */}
         {p.moi && (
-          <g transform={vue?.redresser}>
-            <path
-              className="ml-chevron"
-              d={`M ${-rayon * 0.9} ${-rayon * 2.7} L ${rayon * 0.9} ${-rayon * 2.7} L 0 ${-rayon * 1.5} Z`}
-            />
+          <g transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})`}>
+            <g transform={vue?.redresser}><path className="ml-chevron"
+              d={`M ${-rayon * 0.9} ${-hauteurSprite * .98} L ${rayon * 0.9} ${-hauteurSprite * .98} L 0 ${-hauteurSprite * .73} Z`} />
             {/* ⚠️ L'ÉTIQUETTE DU GESTE ÉTAIT ICI, EN SVG. Elle est devenue une
                 BULLE HTML posée aux coordonnées écran du pion (.ml-perso, plus
                 bas) : le verdict d'un duel est une PHRASE — « Crochet de Baille !
                 Bertin plaque dans le vide. » — et une phrase, ça se met en forme
                 avec une pastille, un retour à la ligne et une largeur maximale.
                 Le SVG ne sait rien faire de tout ça sans qu'on le recode. */}
+            </g>
           </g>
         )}
       </g>
@@ -1115,11 +1148,21 @@ export function MatchLive({
 
   // Le ballon : porté, en vol, ou au sol. En vol on l'agrandit et on garde son
   // ombre au sol — c'est ce qui donne la sensation de hauteur.
-  const ballon = positionBallonInterpolee(e, r);
   const possession = e.compteurs.tempsA + e.compteurs.tempsB > 0
     ? Math.round((e.compteurs.tempsA / (e.compteurs.tempsA + e.compteurs.tempsB)) * 100)
     : 50;
   const derniere = e.commentaires[e.commentaires.length - 1];
+  const actionImportante = [...e.commentaires].reverse().find((c) => {
+    const age = e.t - (c.seconde ?? c.minute * 60);
+    return age >= 0 && age <= 45 && ['essai', 'but', 'butRate', 'penalite', 'faute', 'carton', 'remplacement'].includes(c.type);
+  });
+  const cartonArbitre = actionImportante?.type === 'carton'
+    ? (/rouge/i.test(actionImportante.texte) ? 'rouge' : 'jaune') as 'rouge' | 'jaune'
+    : undefined;
+  const arbitre = {
+    x: borner(ballon.x + (e.possession === 'A' ? -4.4 : 4.4), 7, LONGUEUR - 7),
+    y: borner(ballon.y + (e.ouvert === 1 ? -4.2 : 4.2), 4, LARGEUR - 4),
+  };
 
   // La flèche de bord quand le ballon sort du cadre : sans elle, on perd le
   // ballon de vue dès qu'un dégagement part à l'opposé.
@@ -1233,6 +1276,9 @@ export function MatchLive({
                         DOIT le voir est aussi le seul où il était masqué. */}
                     {surLeTerrain.filter((p) => p.cote === 'B' && !p.moi).map(pion)}
                     {surLeTerrain.filter((p) => p.cote === 'A' && !p.moi).map(pion)}
+                    <SpriteArbitre position={arbitre} phase={terrainSprites.phase} sifflet={terrainSprites.sifflet}
+                      redresser={vue?.redresser} hauteurMetres={hauteurSprite * .94} temps={tempsAnimation}
+                      couleur={(e.clubA.length + e.clubB.length) % 2 ? '#f4c542' : '#35b76d'} carton={cartonArbitre} />
                     {monPion && surLeTerrain.includes(monPion) && pion(monPion)}
                     {ballon.h > 0.02 && (
                       <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * 0.8} ry={rayon * 0.5} fill="rgba(0,0,0,.3)" />
@@ -1286,6 +1332,15 @@ export function MatchLive({
 
                 {/* ---------- LE HUD ---------- */}
                 <div className="ml-hud">
+                  {actionImportante && (
+                    <div className={`ml-evenement-terrain ml-evenement-${actionImportante.type}`} role="status">
+                      <b>{EMOJI[actionImportante.type] ?? '⚡'} {actionImportante.type === 'essai' ? 'ESSAI'
+                        : actionImportante.type === 'carton' ? (/rouge/i.test(actionImportante.texte) ? 'CARTON ROUGE' : 'CARTON JAUNE')
+                          : actionImportante.type === 'penalite' || actionImportante.type === 'faute' ? 'PÉNALITÉ'
+                            : actionImportante.type === 'but' ? 'TIR RÉUSSI' : actionImportante.type === 'butRate' ? 'TIR MANQUÉ' : 'ACTION IMPORTANTE'}</b>
+                      <span>{actionImportante.texte}</span>
+                    </div>
+                  )}
                   <div className="ml-hud-haut">
                     <span className="ml-tag" style={{ borderColor: e.possession === 'A' ? couleurA : couleurB }}>
                       <Icone nom="ballon" taille={13} /> {e.possession === 'A' ? e.clubA : e.clubB} · {possession}%

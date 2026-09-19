@@ -4,3 +4,76 @@
 @keyframes cel-pulse-fort{0%{box-shadow:0 0 0 0 #f0b84b99}65%{box-shadow:0 0 0 12px #f0b84b00}100%{box-shadow:0 8px 22px #0004}}
 @media(prefers-reduced-motion:reduce){.cel-scenario-forte{animation:none}}
 @media(max-width:650px){.dc-entete{flex-wrap:wrap;padding:12px}.dc-score{gap:8px;padding:10px;font-size:11px}.dc-score strong{font-size:21px}.dc .cel-scene{aspect-ratio:3/4;max-height:65vh;min-height:350px}.dc-chiffres b{font-size:15px}.dc-moments{padding:12px}.dc-liste button{gap:10px}.dc-commentaire p{font-size:12px}.cel-scenario{left:.45rem;top:.45rem;max-width:72%;padding:.42rem .56rem}.cel-scenario span{font-size:.69rem}.dc .cel-cadrage{right:.4rem;bottom:.4rem;font-size:10px;padding:.3rem .55rem}}
+
+/* Les pastilles du premier prototype sont désormais de vrais sprites articulés.
+   Toutes les mesures restent dans le repère métrique du moteur : une mêlée ne
+   grossit donc pas quand la caméra zoome, et les trente joueurs restent placés
+   sur leurs positions autoritaires. */
+.dc-ecran{padding:clamp(5px,1vw,13px);background:linear-gradient(180deg,#202a26 0 7%,#121a17 7% 93%,#202a26 93%);box-shadow:inset 0 0 30px #0008}
+.dc .cel-scene{aspect-ratio:122/70;border:1px solid #6f8175;border-radius:3px;box-shadow:0 4px 18px #0008}
+.rg-sprite{pointer-events:none;filter:drop-shadow(0 .08px .08px rgba(0,0,0,.65))}
+.rg-ombre{fill:rgba(0,0,0,.3);stroke:transparent;transition:stroke .2s}
+.rg-corps,.rg-bras,.rg-jambe{transform-box:fill-box;transform-origin:center}
+.rg-jambe path,.rg-bras path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.rg-jambe path:last-child{stroke:#11171a;stroke-width:.14}
+.rg-maillot{stroke:rgba(10,12,14,.72);stroke-width:.045}
+.rg-short{stroke:rgba(10,12,14,.62);stroke-width:.035}
+.rg-numero{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:900;paint-order:stroke;stroke:rgba(0,0,0,.7);stroke-width:.045}
+.rg-ecusson{filter:drop-shadow(0 .015px .015px #0008)}
+.rg-porteur .rg-ombre{fill:rgba(255,224,120,.22);stroke:#ffe08a;stroke-width:.1}
+.rg-joueur-moi .rg-maillot{stroke:rgba(255,255,255,.92);stroke-width:.065}
+.rg-arbitre{filter:drop-shadow(0 .1px .1px #0009)}
+.rg-arbitre path{fill:none;stroke:#15191b;stroke-width:.13;stroke-linecap:round}
+.rg-arbitre-label{font-size:.22px;font-weight:900;fill:#fff;paint-order:stroke;stroke:#000;stroke-width:.06px;letter-spacing:.03px}
+
+.rg-jog .rg-jambe-g,.rg-run .rg-jambe-g,.rg-sprint .rg-jambe-g,.rg-run-ball .rg-jambe-g{animation:rg-jambe-a .64s ease-in-out infinite;animation-delay:var(--rg-delay)}
+.rg-jog .rg-jambe-d,.rg-run .rg-jambe-d,.rg-sprint .rg-jambe-d,.rg-run-ball .rg-jambe-d{animation:rg-jambe-b .64s ease-in-out infinite;animation-delay:var(--rg-delay)}
+.rg-jog .rg-bras-g,.rg-run .rg-bras-g,.rg-sprint .rg-bras-g{animation:rg-bras-a .64s ease-in-out infinite;animation-delay:var(--rg-delay)}
+.rg-jog .rg-bras-d,.rg-run .rg-bras-d,.rg-sprint .rg-bras-d{animation:rg-bras-b .64s ease-in-out infinite;animation-delay:var(--rg-delay)}
+.rg-sprint .rg-jambe-g,.rg-sprint .rg-jambe-d{animation-duration:.4s}.rg-sprint .rg-bras-g,.rg-sprint .rg-bras-d{animation-duration:.4s}
+.rg-idle .rg-corps{animation:rg-respire 1.8s ease-in-out infinite;animation-delay:var(--rg-delay)}
+.rg-run-ball .rg-bras-g{transform:translate(.18px,.12px) rotate(-24deg)}.rg-run-ball .rg-bras-d{transform:translate(.18px,-.12px) rotate(24deg)}
+.rg-pass .rg-bras-g,.rg-pass .rg-bras-d{animation:rg-passe .65s ease-out infinite}
+.rg-catch .rg-bras-g,.rg-catch .rg-bras-d{animation:rg-reception .7s ease-out infinite}
+.rg-kick .rg-jambe-g{animation:rg-frappe .8s ease-in-out infinite}
+.rg-tackle .rg-corps{animation:rg-plaquage .55s ease-in-out infinite alternate}
+.rg-ruck .rg-corps,.rg-jackal .rg-corps{animation:rg-ruck .75s ease-in-out infinite alternate}
+.rg-maul .rg-corps,.rg-scrum .rg-corps{animation:rg-poussee .55s ease-in-out infinite alternate}
+.rg-lineout .rg-corps{animation:rg-saut-touche 1.05s ease-in-out infinite}
+.rg-try .rg-corps{animation:rg-aplatir .7s ease-in forwards}.rg-celebrate .rg-bras-g{transform:rotate(105deg) translate(.2px,-.1px)}.rg-celebrate .rg-bras-d{transform:rotate(-105deg) translate(.2px,.1px)}
+.rg-celebrate .rg-corps{animation:rg-celebre .8s ease-in-out infinite alternate}
+.rg-arbitre-course .rg-jambe-g{animation:rg-jambe-a .8s ease-in-out infinite}.rg-arbitre-course .rg-jambe-d{animation:rg-jambe-b .8s ease-in-out infinite}
+.rg-arbitre-sifflet .rg-bras-d{transform:rotate(-75deg) translate(0,-.25px)}
+.rg-arbitre-melee .rg-bras-g,.rg-arbitre-melee .rg-bras-d{transform:rotate(90deg)}
+.rg-arbitre-essai .rg-bras-g{transform:rotate(115deg)}.rg-arbitre-avantage .rg-bras-d{transform:rotate(-120deg)}
+
+@keyframes rg-jambe-a{0%,100%{transform:rotate(-22deg)}50%{transform:rotate(25deg)}}
+@keyframes rg-jambe-b{0%,100%{transform:rotate(25deg)}50%{transform:rotate(-22deg)}}
+@keyframes rg-bras-a{0%,100%{transform:rotate(18deg)}50%{transform:rotate(-20deg)}}
+@keyframes rg-bras-b{0%,100%{transform:rotate(-20deg)}50%{transform:rotate(18deg)}}
+@keyframes rg-respire{0%,100%{transform:scale(1)}50%{transform:scale(1.025,.975)}}
+@keyframes rg-passe{0%,25%{transform:rotate(0)}65%,100%{transform:rotate(-58deg) translate(.18px,0)}}
+@keyframes rg-reception{0%{transform:rotate(-60deg) translate(.2px,0)}70%,100%{transform:rotate(0)}}
+@keyframes rg-frappe{0%,25%{transform:rotate(-15deg)}60%{transform:rotate(65deg)}100%{transform:rotate(15deg)}}
+@keyframes rg-plaquage{from{transform:translate(0,0) scale(1)}to{transform:translate(.28px,0) scale(1.15,.82)}}
+@keyframes rg-ruck{from{transform:rotate(-5deg) scale(1,.86)}to{transform:rotate(5deg) scale(1.08,.78)}}
+@keyframes rg-poussee{from{transform:translate(-.12px,0) scale(1,.88)}to{transform:translate(.16px,0) scale(1.06,.82)}}
+@keyframes rg-saut-touche{0%,100%{transform:translateY(0)}45%,60%{transform:translateY(-.55px) scale(1.05)}}
+@keyframes rg-aplatir{to{transform:translate(.45px,0) scale(1.25,.62)}}
+@keyframes rg-celebre{from{transform:translateY(0)}to{transform:translateY(-.3px)}}
+
+@media(max-width:650px){.dc-ecran{padding:5px}.dc .cel-scene{aspect-ratio:3/4}}
+@media(prefers-reduced-motion:reduce){.rg-sprite *{animation:none!important}.rg-corps,.rg-bras,.rg-jambe{transition:none!important}}
+
+/* Rendu final : le canvas est dessiné par le CharacterRenderer du générateur,
+   avec son pixel art, ses proportions et ses poses — ce n'est plus une
+   approximation SVG du personnage. */
+.rg-canvas{display:block;width:100%;height:100%;overflow:visible;contain:strict;image-rendering:pixelated;filter:drop-shadow(0 2px 1px rgba(0,0,0,.42))}
+.rg-canvas-groupe.rg-porteur{filter:drop-shadow(0 0 .28px #ffe98a) drop-shadow(0 0 .55px #ffe98a)}
+.rg-canvas-groupe.rg-arbitre{filter:drop-shadow(0 1px 1px rgba(0,0,0,.48))}
+
+/* Les décisions d'arbitrage doivent être visibles sur l'action, pas seulement
+   perdues dans le fil sous le terrain. */
+.dc-alerte-terrain{position:absolute;z-index:6;left:50%;top:12%;width:min(86%,430px);transform:translateX(-50%);display:grid;gap:5px;padding:10px 14px;border:1px solid #f5cb67;border-left:5px solid #f5cb67;border-radius:5px;background:rgba(19,25,22,.94);color:#fff;box-shadow:0 10px 30px #0008;pointer-events:none;animation:dc-alerte-entree .24s ease-out}
+.dc-alerte-terrain b{font-size:12px;letter-spacing:.12em;color:#ffd878}.dc-alerte-terrain span{font-size:11px;line-height:1.35}.dc-alerte-carton{border-color:#ffd83d;border-left-color:#ffd83d}.dc-alerte-carton b{color:#ffe56d}.dc-alerte-essai{border-color:#70e29a;border-left-color:#70e29a}.dc-alerte-essai b{color:#93f2b3}.dc-alerte-blessure{border-color:#f06464;border-left-color:#f06464}.dc-alerte-blessure b{color:#ff9292}
+@keyframes dc-alerte-entree{from{opacity:0;transform:translate(-50%,-8px) scale(.96)}to{opacity:1;transform:translate(-50%,0) scale(1)}}

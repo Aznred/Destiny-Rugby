@@ -2653,26 +2653,12 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   const plan = planDe(e, cote);
   const reste = plan.essaisTransformes + plan.essaisSecs;
 
-  // ⚠️ LE SEUL GARDE-FOU DUR — et il sert à deux choses. D'abord ne jamais
-  // dépasser le score de la ligue. Ensuite ne pas le boucler à la 25ᵉ minute :
-  // une équipe trop en avance sur son rythme est arrêtée sur la ligne. Le
-  // ballon est « tenu » dans l'en-but, renvoi aux 22 — c'est une vraie règle du
-  // rugby, et ça se raconte.
   // Franchir la ligne ne suffit pas : le joueur contrôle puis pose le ballon.
   // Ce bref état garde porteur et ballon ensemble et rend enfin l'essai visible
   // avant que l'écran bascule sur la transformation.
+  // Le plan de score n'est qu'une aide de rythme invisible : il ne doit jamais
+  // annuler un essai que le joueur vient réellement de voir être aplati.
   if (!e.aplatissage) {
-    const avance = plan.total > 0
-      ? plan.marques / plan.total - Math.min(1, (e.t / (2 * DUREE_PERIODE)) * 0.95)
-      : 0;
-    if (reste <= 0 || (avance > 0.10 && e.minute < 72)) {
-      dire(e, 'jeu', adverse(cote),
-        C.texteMatch('tenuEnBut', { nom: marqueur.nom, club: nomClub(e, adverse(cote)) }),
-        0, marqueur.moi);
-      return arret(e, 'renvoi22', adverse(cote), {
-        x: adverse(cote) === 'A' ? M22_A : M22_B, y: AXE,
-      });
-    }
     const lieu = {
       x: cote === 'A' ? Math.max(marqueur.pos.x, LIGNE_B + 0.55) : Math.min(marqueur.pos.x, LIGNE_A - 0.55),
       y: borner(marqueur.pos.y, 1.5, LARGEUR - 1.5),
@@ -2733,7 +2719,8 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   const chance = probaTir(22 + ecartAxe * 0.55, ecartAxe, buteur.pied);
 
   let transforme: boolean;
-  if (plan.essaisTransformes > 0 && plan.essaisSecs > 0) transforme = e.rng() < chance;
+  if (reste <= 0) transforme = e.rng() < chance;
+  else if (plan.essaisTransformes > 0 && plan.essaisSecs > 0) transforme = e.rng() < chance;
   else transforme = plan.essaisTransformes > 0;
 
   // Le marqueur n'est plus le porteur : sinon la boucle de déplacement le
