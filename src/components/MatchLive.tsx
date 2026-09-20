@@ -1071,7 +1071,7 @@ export function MatchLive({
     id: p.id, numero: p.numeroMaillot ?? p.numero, numeroRole: p.numero, nom: p.nom, poste: p.poste,
     cote: p.cote === 'A' ? 'domicile' : 'exterieur',
     x: p.pos.x, y: p.pos.y, vx: p.vitesse.x, vy: p.vitesse.y,
-    corps: p.corps ? { age: p.corps.age + r, duree: p.corps.duree, direction: p.corps.direction, intensite: p.corps.intensite } : undefined,
+    corps: corpsPourAffichage(p, r),
   }));
   const ballon = positionBallonInterpolee(e, r);
   const terrainSprites: TerrainDirect = {
