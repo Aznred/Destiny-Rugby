@@ -1,7 +1,7 @@
-import type { EtatMatch } from './etat';
-import type { Pion } from './entites';
-import { declencherChute, jouerGeste } from './dynamique';
-import { borner, distance, sens, LARGEUR, LIGNE_A, LIGNE_B, type Vec } from './terrain';
+import type { EtatMatch } from './etat.js';
+import type { Pion } from './entites.js';
+import { declencherChute, jouerGeste } from './dynamique.js';
+import { borner, distance, sens, LARGEUR, LIGNE_A, LIGNE_B, type Vec } from './terrain.js';
 
 export interface OrganisationRuck {
   debut: number;
