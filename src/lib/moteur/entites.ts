@@ -74,6 +74,10 @@ export type Role =
   | 'chasseur' | 'maul' | 'melee' | 'alignement' | 'hors';
 
 export interface Pion {
+  /** Numéro affiché lorsque le poste tactique est repris par un remplaçant. */
+  numeroMaillot?: number;
+  remplace?: boolean;
+  corps?: import('./dynamique.js').CorpsMatch;
   id: string;
   /** Identifiant stable dans l'effectif, utilisé par la composition manager. */
   sourceId: string;
@@ -233,6 +237,7 @@ export function vitesseDisponible(p: Pion): number {
 
 // DÉPLACEMENT À INERTIE. Renvoie les mètres parcourus pendant ce pas.
 export function deplacer(p: Pion, dt: number): number {
+  if (p.corps) return 0;
   const dx = p.cible.x - p.pos.x;
   const dy = p.cible.y - p.pos.y;
   const d = Math.sqrt(dx * dx + dy * dy);

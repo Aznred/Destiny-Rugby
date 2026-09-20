@@ -340,6 +340,11 @@ export interface PlanDeScore {
 }
 
 export interface EtatMatch {
+  arbitre?: import('./dynamique.js').ArbitreMatch;
+  gestes?: import('./dynamique.js').GesteMatch[];
+  incidentApres?: number;
+  fautesVues?: Record<string, boolean>;
+  piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number };
   clubA: string;
   clubB: string;
 

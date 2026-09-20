@@ -53,6 +53,7 @@ import {
   placementRuck, placementTir, placementTouche,
 } from './phasesArretees.js';
 import { decomposer } from './plan.js';
+import { avancerArbitre, avancerCorps, declencherChute, incidentDeContact, jouerGeste, visibiliteFaute } from './dynamique.js';
 import * as C from './commentaire.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
@@ -83,8 +84,8 @@ const ARRETS: Record<string, { visuel: number; horloge: number; direct: number }
   // les longues attentes télévisées où rien ne bouge.
   melee: { visuel: 6.2, horloge: 50, direct: 9.5 },
   touche: { visuel: 6.5, horloge: 35, direct: 8.5 },
-  transformation: { visuel: 4, horloge: 55, direct: 6 },
-  tirAuBut: { visuel: 6, horloge: 60, direct: 10 },
+  transformation: { visuel: 45, horloge: 45, direct: 45 },
+  tirAuBut: { visuel: 45, horloge: 45, direct: 45 },
   coupEnvoi: { visuel: 4.5, horloge: 22, direct: 5 },
   renvoi22: { visuel: 7, horloge: 20, direct: 7 },
   apresEssai: { visuel: 3, horloge: 8, direct: 3 },
@@ -217,7 +218,7 @@ function animerArret(e: EtatMatch): void {
     // Le rituel du buteur : il recule de sept mètres, souffle, puis s'élance.
     const buteur = e.tir.buteur;
     if (!buteur.surLeTerrain) return;
-    const recul = p < 0.72 ? Math.min(1, p / 0.25) * 7 : Math.max(0, (1 - p) / 0.28) * 7;
+    const recul = p < .3 ? 0 : p < .5 ? (p - .3) / .2 * 7 : p < .85 ? 7 : Math.max(0, (1 - p) / .15) * 7;
     buteur.cible = { x: e.ballon.x - sens(buteur.cote) * recul, y: e.ballon.y };
   }
 }
@@ -449,6 +450,8 @@ export function avancer(e: EtatMatch, secondesSimulees: number): void {
 function tick(e: EtatMatch): void {
   const dt = DT;
   e.sim += dt;
+  avancerArbitre(e, dt);
+  avancerCorps(e, dt);
   if (e.sifflet) {
     e.sifflet.restant -= dt;
     if (e.sifflet.restant <= 0) e.sifflet = null;
@@ -478,6 +481,12 @@ function tick(e: EtatMatch): void {
 
   // ── Compteurs des joueurs ────────────────────────────────────────────────
   for (const p of e.pions) {
+    // Migration des matchs déjà commencés : le numéro de banc ne sert jamais
+    // de poste dans les combinaisons ni dans le placement.
+    if (p.surLeTerrain && p.numero > 15) {
+      p.numeroMaillot ??= p.numero;
+      p.numero = ORDRE_MAILLOTS.indexOf(p.poste) + 1;
+    }
     if (p.battu > 0) p.battu = Math.max(0, p.battu - dt);
     if (p.sanction > 0) {
       p.sanction = Math.max(0, p.sanction - dtHorloge);
@@ -582,6 +591,30 @@ function tick(e: EtatMatch): void {
     deplacer(p, dt);
   }
   resoudreContactsPhysiques(e);
+  const incident = incidentDeContact(e);
+  if (incident) {
+    chauffer(e, 12);
+    if (incident.vu) return siffler(e, incident.victime.cote, incident.victime.pos, incident.motif, incident.fautif, incident.rouge ? 'rouge' : 'jaune');
+    dire(e, 'jeu', null, `Un ${incident.motif} échappe au regard de l’arbitre, le jeu continue.`);
+  }
+
+  if (e.piedPrepare) {
+    const attente = e.piedPrepare;
+    const auteur = e.pions.find((p) => p.id === attente.auteurId && p.surLeTerrain);
+    if (!auteur) { delete e.piedPrepare; return; }
+    auteur.cible = { ...attente.depuis };
+    if (distance(auteur.pos, attente.depuis) > .75) return;
+    if (attente.pretDepuis === undefined) {
+      attente.pretDepuis = e.sim;
+      jouerGeste(e, auteur, attente.intention === 'renvoi' ? 'restart' : attente.intention === 'rasant' ? 'grubber'
+        : attente.intention === 'drop' ? 'drop' : attente.intention === 'chandelle' ? 'chip'
+          : auteur.numero === 9 ? 'box_kick' : 'punt', 1.4);
+    }
+    if (e.sim - attente.pretDepuis < .65) return;
+    delete e.piedPrepare;
+    lancerVol(e, auteur, attente.arrivee, attente.intention, attente.duree, attente.hauteur, attente.depuis, true);
+    return;
+  }
 
   e.minuteur -= dt;
   switch (e.phase) {
@@ -699,6 +732,10 @@ function phaseBagarre(e: EtatMatch): void {
   const suite = resoudreBagarre(e);
   e.bagarre = null;
   e.intention = null;
+  if (suite.fauteVue === false) {
+    reprendreJeu(e, suite.lieu);
+    return;
+  }
   arret(e, 'penalite', suite.pour, suite.lieu);
   e.penalite = { pour: suite.pour, lieu: { x: suite.lieu.x, y: suite.lieu.y }, motif: suite.motif };
 }
@@ -725,13 +762,14 @@ function dire(
 function installerPlacement(e: EtatMatch, placement: Record<string, Vec>, seuil = 26): void {
   e.placement = placement;
   const instantane = e.phase === 'melee' || e.phase === 'touche';
-  if (e.tempsReel && !instantane && e.phase !== 'coupEnvoi') seuil = Infinity;
+  if (!instantane) seuil = Infinity;
   for (const p of e.pions) {
     if (!p.surLeTerrain || p.sanction > 0) continue;
     const c = placement[p.id];
     if (!c) continue;
     p.cible = c;
     if (instantane || distance(p.pos, c) > seuil) {
+      delete p.corps;
       p.pos = { x: c.x, y: c.y };
       stopper(p);
     }
@@ -815,15 +853,13 @@ function resoudreContactsPhysiques(e: EtatMatch): void {
 
 /** Donne au plaquage réussi un recul et un point d'impact réellement commun. */
 function appliquerImpactPlaquage(porteur: Pion, defenseur: Pion): void {
-  const s = sens(porteur.cote);
-  const recul = borner(0.42 + (defenseur.puissance - porteur.puissance) / 75, 0.18, 1.05);
-  const cote = defenseur.pos.y <= porteur.pos.y ? -1 : 1;
-  porteur.pos.x = borner(porteur.pos.x - s * recul, LIGNE_A + 0.2, LIGNE_B - 0.2);
-  porteur.pos.y = borner(porteur.pos.y + cote * 0.16, 0.6, LARGEUR - 0.6);
-  defenseur.pos.x = porteur.pos.x + s * 0.38;
-  defenseur.pos.y = borner(porteur.pos.y + cote * 0.34, 0.6, LARGEUR - 0.6);
-  porteur.battu = Math.max(porteur.battu, 1.35);
-  defenseur.battu = Math.max(defenseur.battu, 0.85);
+  const dx = porteur.pos.x - defenseur.pos.x, dy = porteur.pos.y - defenseur.pos.y;
+  const d = Math.max(.01, Math.hypot(dx, dy));
+  const force = borner(1.4 + (defenseur.puissance - porteur.puissance) / 45
+    + Math.hypot(defenseur.vitesse.x - porteur.vitesse.x, defenseur.vitesse.y - porteur.vitesse.y) * .2, .8, 4.5);
+  const impulsion = { x: dx / d * force, y: dy / d * force };
+  declencherChute(porteur, impulsion, 2.1);
+  declencherChute(defenseur, { x: impulsion.x * .75, y: impulsion.y * .75 }, 1.6);
 }
 
 // ---------------------------------------------------------------------------
@@ -928,15 +964,28 @@ function memoriserVol(e: EtatMatch, vol: Vol): void {
 }
 
 function poserVol(e: EtatMatch, vol: Vol): void {
+  if (vol.type === 'passe') {
+    jouerGeste(e, vol.auteur, vol.intention === 'offload' ? 'offload' : vol.vers.y < vol.de.y ? 'pass_left' : 'pass', Math.max(.65, vol.duree));
+    if (vol.receveur) jouerGeste(e, vol.receveur, 'catch', Math.max(.65, vol.duree));
+  }
   e.vol = vol;
   memoriserVol(e, vol);
 }
 
 function lancerVol(
   e: EtatMatch, auteur: Pion, arrivee: Vec, intention: IntentionPied,
-  duree: number, hauteur: number, depuis?: Vec,
+  duree: number, hauteur: number, depuis?: Vec, pret = false,
 ): void {
+  if (!pret) {
+    depuis ??= { ...auteur.pos };
+    e.piedPrepare = { auteurId: auteur.id, arrivee: { ...arrivee }, intention, duree, hauteur, depuis: { ...depuis } };
+    auteur.cible = { ...depuis };
+    (e.placement ??= {})[auteur.id] = { ...depuis };
+    return;
+  }
   const de = depuis ?? { x: auteur.pos.x, y: auteur.pos.y };
+  // La frappe termine le geste commencé pendant la préparation ; pas de
+  // deuxième animation qui recommence après le départ du ballon.
 
   // ═══ LE HORS-JEU SUR COUP DE PIED ══════════════════════════════════════
   //
@@ -1492,6 +1541,7 @@ function poserSifflet(e: EtatMatch, cle: string, pour: Cote, fautif?: Pion): voi
  * perte de la possession. C'est ça, la répercussion.
  */
 function enAvant(e: EtatMatch, p: Pion): void {
+  jouerGeste(e, p, 'foul_knockon', 1.9);
   p.stats.passesRatees += 1;
   e.compteurs.enAvants += 1;
   dire(e, 'faute', p.cote, C.phrase(e.rng, C.EN_AVANT, {
@@ -1518,6 +1568,7 @@ function enAvant(e: EtatMatch, p: Pion): void {
  * rendrait toute envolée de trois-quarts impossible.
  */
 function passeEnAvant(e: EtatMatch, p: Pion): void {
+  jouerGeste(e, p, 'foul_forwardpass', 1.2);
   p.stats.passes -= 1;
   p.stats.passesRatees += 1;
   e.compteurs.enAvants += 1;
@@ -1859,17 +1910,19 @@ function bonusDuGeste(porteur: Pion, geste: ActionJoueur | null): number {
 function gesteAutomatique(e: EtatMatch, porteur: Pion, defenseur: Pion): ActionJoueur | null {
   // Cette variation ne consomme pas le RNG : le direct et le calcul en arrière-
   // plan gardent exactement la même rejoue, contact après contact.
-  const variation = Math.abs(Math.sin(porteur.numero * 17.13 + defenseur.numero * 7.71 + e.t * 0.37));
+  const espace = intervalle(e, porteur);
+  const frontal = Math.abs(defenseur.pos.y - porteur.pos.y) < .9;
   const profilPuissant = porteur.puissance - porteur.evitement;
-  if (porteur.puissance >= 70 && profilPuissant >= 7 && variation > 0.14) return 'raffut';
-  if (porteur.evitement >= 66 && variation > 0.18) return 'crochet';
-  if (porteur.vitesseMax >= 8.45 && variation > 0.28) return 'sprint';
-  if (porteur.puissance >= 82 && variation > 0.48) return 'raffut';
+  if (frontal && porteur.puissance >= 70 && profilPuissant >= 7) return 'raffut';
+  if (porteur.evitement >= 66 && espace > 2 && porteur.pos.y > 3 && porteur.pos.y < LARGEUR - 3) return 'crochet';
+  if (!frontal && espace > 4 && porteur.vitesseMax > defenseur.vitesseMax) return 'sprint';
+  if (porteur.puissance > defenseur.puissance + 5) return 'raffut';
   return null;
 }
 
 /** Amorce un appui, pas un saut de position : le déplacement reste continu. */
 function amorcerGeste(e: EtatMatch, porteur: Pion, defenseur: Pion, geste: ActionJoueur | null): number {
+  if (geste) jouerGeste(e, porteur, geste === 'raffut' ? 'handoff' : geste === 'crochet' ? 'dodge' : 'sprint_ball', 1.1);
   const alternance = ((porteur.numero + defenseur.numero + Math.floor(e.t)) & 1) === 0 ? 1 : -1;
   if (geste === 'crochet') {
     const direction = porteur.pos.y < 4 ? 1 : porteur.pos.y > LARGEUR - 4 ? -1 : alternance;
@@ -1902,10 +1955,14 @@ function resoudrePlaquage(
   // (`bagarre.ts` → `irregularite` et `apresGesteIllegal`).
   const irreg = irregularite(e, defenseur);
   if (irreg) {
+    jouerGeste(e, defenseur, irreg.haut ? 'foul_high' : 'foul_late', 1.3);
+    jouerGeste(e, porteur, irreg.haut ? 'reaction_high' : 'reaction_hit', 1.4);
     e.compteurs.irregularites += 1;
     defenseur.stats.plaquagesManques += 1;
     porteur.battu = 0.6;
-    siffler(e, porteur.cote, { x: porteur.pos.x, y: porteur.pos.y }, irreg.motif, defenseur);
+    if (e.rng() < visibiliteFaute(e, porteur.pos)) {
+      siffler(e, porteur.cote, { x: porteur.pos.x, y: porteur.pos.y }, irreg.motif, defenseur);
+    }
     apresGesteIllegal(e, defenseur, porteur, irreg);
     return;
   }
@@ -1926,6 +1983,8 @@ function resoudrePlaquage(
     defenseur.battu = monPlaquage ? 3.0 : 2.0;
     porteur.battu = 0.4; // il ne peut pas être re-plaqué dans la même seconde
     if (geste === 'raffut') {
+      declencherChute(defenseur, { x: sens(porteur.cote) * 3, y: directionGeste * 1.2 }, 1.65);
+      jouerGeste(e, defenseur, 'reaction_hit', 1.2);
       defenseur.vitesse.x += sens(porteur.cote) * 2.8;
       defenseur.vitesse.y += directionGeste * 0.8;
       defenseur.cible.y = borner(defenseur.pos.y + directionGeste * 1.6, 0, LARGEUR);
@@ -1988,7 +2047,11 @@ function resoudrePlaquage(
   // du bonus au plaquage, et ce qui rend le bouton « je plaque » un choix.
   if (e.rng() < 0.020 * (1.6 - defenseur.discipline / 130) * (monPlaquage ? 2.2 : 1)) {
     if (monPlaquage) chauffer(e, 8);
-    return siffler(e, porteur.cote, porteur.pos, 'plaquage haut', defenseur);
+    jouerGeste(e, defenseur, 'foul_high', 1.3);
+    jouerGeste(e, porteur, 'reaction_high', 1.4);
+    if (e.rng() < visibiliteFaute(e, porteur.pos, defenseur.id)) {
+      return siffler(e, porteur.cote, porteur.pos, 'plaquage haut', defenseur);
+    }
   }
 
   // ⚠️ UN CROCHET RATÉ, C'EST UN BALLON EN DANGER. Chercher l'exploit et se
@@ -2008,6 +2071,8 @@ function resoudrePlaquage(
     && offloader(e, porteur)) return;
 
   appliquerImpactPlaquage(porteur, defenseur);
+  jouerGeste(e, porteur, 'tackled', 1.4);
+  jouerGeste(e, defenseur, Math.hypot(defenseur.vitesse.x, defenseur.vitesse.y) > 3 ? 'tackle_low' : 'tackle', 1.35);
   formerRuck(e, { x: porteur.pos.x, y: porteur.pos.y }, { porteur, defenseur });
 }
 
@@ -2446,7 +2511,7 @@ function phaseTouche(e: EtatMatch): void {
 // FAUTES, PÉNALITÉS, CARTONS
 // ---------------------------------------------------------------------------
 
-function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pion): void {
+function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pion, cartonForce?: 'jaune' | 'rouge'): void {
   dire(e, 'penalite', pour, C.phrase(e.rng, C.PENALITE, { club: nomClub(e, pour), motif }));
   poserSifflet(e, 'ml.sifflet.penalite', pour, fautif);
   // ⚠️ `pour` EST LE CAMP QUI OBTIENT LA PÉNALITÉ : c’est l’AUTRE qui perd sa
@@ -2475,7 +2540,7 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
   // `bagarre.ts` → `sanctionApresMatch`).
   const pres = metresAvantLaLigne(lieu, pour) < 22;
   const severite = e.niveau === 'amateur' ? 1.7 : 1;
-  if (coupable && e.rng() < (pres ? 0.16 : 0.05) * severite) {
+  if (coupable && (cartonForce || e.rng() < (pres ? 0.16 : 0.05) * severite)) {
     const fautif = coupable;
     // ⚠️ LE CARTON ROUGE EXISTE ENFIN. Le moteur n'en donnait aucun : la
     // discipline se résumait à un compteur de jaunes, et un joueur ne risquait
@@ -2483,7 +2548,7 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
     // match — l'ordre de grandeur du rugby professionnel. Un rouge, c'est le
     // match terminé : `sanction` couvre les 80 minutes et le joueur ne revient
     // pas (la relève est gérée par les remplacements, comme dans la réalité).
-    const rouge = e.rng() < 0.07;
+    const rouge = cartonForce === 'rouge' || fautif.stats.cartonsJaunes > 0 || (!cartonForce && e.rng() < 0.07);
     fautif.surLeTerrain = false;
     fautif.sanction = rouge ? 99_999 : 600; // dix minutes, ou le reste du match
     if (rouge) fautif.stats.cartonsRouges += 1; else fautif.stats.cartonsJaunes += 1;
@@ -2632,6 +2697,7 @@ function phasePenalite(e: EtatMatch): void {
   e.gardeRuck = 0.7;
   dire(e, 'jeu', cote, C.texteMatch('penaliteRapide', { club: nomClub(e, cote) }));
   reprendreJeu(e, info.lieu);
+  if (e.porteur) jouerGeste(e, e.porteur, 'tap', 1.1);
 }
 
 type TirEnCours = NonNullable<EtatMatch['tir']>;
@@ -2639,6 +2705,9 @@ type TirEnCours = NonNullable<EtatMatch['tir']>;
 /** Lance un vrai ballon vers les poteaux, réussi ou légèrement à côté. */
 function lancerTrajectoireTir(e: EtatMatch, tir: TirEnCours, reussi: boolean): void {
   const { buteur } = tir;
+  jouerGeste(e, buteur, tir.valeur === 2 ? 'conversion' : 'penalty', 1.5);
+  // La course d'élan a déjà joué la première moitié du clip.
+  e.gestes!.at(-1)!.debut -= .8;
   const s = sens(buteur.cote);
   const ligne = buteur.cote === 'A' ? LIGNE_B : LIGNE_A;
   const coteRate = e.rng() < 0.5 ? -1 : 1;
@@ -2668,6 +2737,11 @@ function phaseTirAuBut(e: EtatMatch): void {
   const cote = buteur.cote;
   const plan = planDe(e, cote);
   if (!tir.volLance) {
+    if (distance(buteur.pos, tir.lieu ?? e.ballon) > .8) {
+      buteur.cible = { ...(tir.lieu ?? e.ballon) };
+      e.minuteur = .15;
+      return;
+    }
     buteur.stats.butsTentes += 1;
     const reussi = e.scoreSurTerrain
       ? e.rng() < probabilitePenalite(e, buteur, d, angle)
@@ -2707,6 +2781,11 @@ function phaseTransformation(e: EtatMatch): void {
   if (!tir) return preparerCoupEnvoi(e, adverse(e.possession));
   const cote = tir.buteur.cote;
   if (!tir.volLance) {
+    if (distance(tir.buteur.pos, tir.lieu ?? e.ballon) > .8) {
+      tir.buteur.cible = { ...(tir.lieu ?? e.ballon) };
+      e.minuteur = .15;
+      return;
+    }
     lancerTrajectoireTir(e, tir, !!tir.reussi);
     return;
   }
@@ -2749,10 +2828,19 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
       x: cote === 'A' ? Math.max(marqueur.pos.x, LIGNE_B + 0.55) : Math.min(marqueur.pos.x, LIGNE_A - 0.55),
       y: borner(marqueur.pos.y, 1.5, LARGEUR - 1.5),
     };
-    marqueur.pos = { ...lieu };
     marqueur.cible = { ...lieu };
-    stopper(marqueur);
-    e.ballon = { ...lieu };
+    const defenseur = surLeTerrain(e, adverse(cote)).find((p) => distance(p.pos, marqueur.pos) < 2.1 && p.battu <= 0);
+    const plonge = !!defenseur || Math.hypot(marqueur.vitesse.x, marqueur.vitesse.y) > 4;
+    jouerGeste(e, marqueur, plonge ? 'dive_try' : 'try', 1.35);
+    if (plonge) {
+      const lateral = marqueur.pos.y < 5 ? 1 : marqueur.pos.y > LARGEUR - 5 ? -1 : 0;
+      declencherChute(marqueur, { x: sens(cote) * 2.6, y: lateral * 1.4 }, 1.35);
+      if (defenseur) {
+        declencherChute(defenseur, { x: sens(cote) * 2, y: lateral }, 1.35);
+        jouerGeste(e, defenseur, 'tackle_low', 1.35);
+      }
+    } else stopper(marqueur);
+    e.ballon = { ...marqueur.pos };
     e.porteur = marqueur;
     e.vol = null;
     e.ballonLibre = null;
@@ -2835,6 +2923,7 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
 }
 
 function phaseAplatissage(e: EtatMatch): void {
+  if (e.aplatissage) e.ballon = { ...e.aplatissage.marqueur.pos };
   if (e.minuteur > 0) return;
   const action = e.aplatissage;
   if (!action) return arret(e, 'renvoi22', adverse(e.possession), {
@@ -3317,8 +3406,26 @@ function faireRemplacement(e: EtatMatch, cote: Cote, entrant: Pion, sortant: Pio
   entrant.surLeTerrain = true;
   entrant.poste = sortant.poste;
   entrant.avant = sortant.avant;
+  entrant.numeroMaillot ??= entrant.numero;
+  entrant.numero = sortant.numero;
+  sortant.remplace = true;
+  entrant.role = sortant.role;
+  entrant.buteur = sortant.buteur;
+  entrant.capitaine = sortant.capitaine;
+  entrant.battu = 0;
+  entrant.horsJeu = false;
+  if (e.placement?.[sortant.id]) {
+    e.placement[entrant.id] = { ...e.placement[sortant.id] };
+    delete e.placement[sortant.id];
+  }
+  if (e.conquete?.cibleId === sortant.id) e.conquete.cibleId = entrant.id;
+  if (e.tir?.buteur === sortant) e.tir.buteur = entrant;
+  if (e.piedPrepare?.auteurId === sortant.id) e.piedPrepare.auteurId = entrant.id;
+  if (e.lancement) e.lancement.chaine = e.lancement.chaine.map((p) => p === sortant ? entrant : p);
+  if (e.porteur === sortant) e.porteur = entrant;
+  jouerGeste(e, entrant, 'substitution', 1.8);
   entrant.pos = { x: sortant.pos.x, y: sortant.pos.y };
-  entrant.cible = { x: sortant.pos.x, y: sortant.pos.y };
+  entrant.cible = { ...sortant.cible };
   stopper(entrant);
   if (cote === 'A') e.remplacementsA += 1; else e.remplacementsB += 1;
   dire(e, 'remplacement', cote, C.phrase(e.rng, C.REMPLACEMENT, {
@@ -3335,7 +3442,7 @@ function gererRemplacements(e: EtatMatch): void {
     const faits = cote === 'A' ? e.remplacementsA : e.remplacementsB;
     if (faits >= 8) continue;
     const sur = surLeTerrain(e, cote);
-    const banc = e.pions.filter((p) => p.cote === cote && !p.surLeTerrain && p.sanction <= 0 && p.minutes === 0);
+    const banc = e.pions.filter((p) => p.cote === cote && !p.surLeTerrain && !p.remplace && p.sanction <= 0 && p.minutes === 0);
     if (!banc.length) continue;
 
     // Le manager peut préparer un changement à n'importe quel moment. Il est
@@ -3353,7 +3460,7 @@ function gererRemplacements(e: EtatMatch): void {
     // premier venu » : un arrière est déjà entré pilier. Seuls les TITULAIRES
     // sortent — on ne remplace pas un remplaçant. L'avatar n'est sorti qu'à
     // partir de la 62ᵉ.
-    const remplacable = (p: Pion) => p.numero <= 15 && (!p.moi || e.minute >= 62);
+    const remplacable = (p: Pion) => !p.numeroMaillot && (!p.moi || e.minute >= 62);
     const chercherSortant = (entrant: Pion): Pion | undefined => {
       const exact = sur.filter((p) => remplacable(p) && p.poste === entrant.poste);
       const proche = sur.filter((p) => remplacable(p) && famille(p) === famille(entrant));
@@ -3601,7 +3708,7 @@ export function bilan(e: EtatMatch): BilanMatch {
     parJoueur: e.pions
       .filter((p) => p.minutes > 0.3)
       .map((p) => ({
-        nom: p.nom, club: nomClub(e, p.cote), numero: p.numero, poste: p.poste,
+        nom: p.nom, club: nomClub(e, p.cote), numero: p.numeroMaillot ?? p.numero, poste: p.poste,
         stats: p.stats, minutes: Math.min(80, Math.round(p.minutes)), moi: p.moi,
       })),
   };
@@ -4290,6 +4397,7 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issu
         return tranche(false, 'duelInterceptionKo');
       }
       // Le ballon est cueilli en pleine course, et il n’y a plus personne.
+      jouerGeste(e, p, 'intercept', 1.2);
       e.vol = null;
       e.lancement = null;
       e.phasesDepuisArret = 0;

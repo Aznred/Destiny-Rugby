@@ -104,13 +104,13 @@ assert.deepEqual(reprise.at(-1), { x: 112, y: 60 });
 assert.ok(Math.max(...reprise.slice(1).map((p, i) => distance(p, reprise[i]))) < 2,
   'Une reprise lointaine doit rester continue à l’écran.');
 
-// À l'entrée d'une mêlée, d'une touche ou d'un engagement, la formation doit
-// être déjà en place lorsque la nouvelle phase devient visible. Le ballon ne
-// doit pas pour autant dessiner un faux jeu au pied à travers le terrain.
+// Le replacement reste continu jusqu'au nouveau relevé, sans saut à 72 %.
+// Le ballon ne doit pas dessiner un faux coup de pied à travers le terrain.
 const placementA = { ...terrain([pion('a', 'domicile', 102, 12)]), phase: 'apresEssai' as const, ballon: { x: 108, y: 18 } };
 const placementB = { ...terrain([pion('a', 'domicile', 49, 35)]), phase: 'coupEnvoi' as const, ballon: { x: 60, y: 35 } };
 assert.ok(interpolerPionsDirect(placementA, placementB, 0.71, 2).get('a')!.x > 49);
-assert.deepEqual(interpolerPionsDirect(placementA, placementB, 0.72, 2).get('a'), { x: 49, y: 35 });
+assert.ok(interpolerPionsDirect(placementA, placementB, 0.72, 2).get('a')!.x > 49);
+assert.deepEqual(interpolerPionsDirect(placementA, placementB, 1, 2).get('a'), { x: 49, y: 35 });
 const ballonAvantPlacement = interpolerBallonDirect(placementA, placementB, new Map(), 0.7);
 const ballonApresPlacement = interpolerBallonDirect(placementA, placementB, new Map(), 1);
 assert.deepEqual(ballonAvantPlacement, { x: 108, y: 18, h: 0 });

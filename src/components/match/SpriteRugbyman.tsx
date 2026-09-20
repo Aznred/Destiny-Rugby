@@ -5,12 +5,10 @@ import { apparenceJoueurMatch, graineVisuelleMatch, type MaillotMatch } from '..
 import { CharacterRenderer } from '../../lib/spritesGenerateur/renderer';
 import { mirrorPose, poseAtTime } from '../../lib/spritesGenerateur/engine';
 import { rugbyAnimations } from '../../lib/spritesGenerateur/rugbyAnimations';
-import type { AnimationClip, BodyType, Character, KitPattern } from '../../lib/spritesGenerateur/models';
+import type { AnimationClip, BodyType, Character, KitPattern, Orientation } from '../../lib/spritesGenerateur/models';
+import { orientationSprite } from '../../lib/moteur/orientationSprite';
 
-export type AnimationRugby =
-  | 'idle' | 'jog' | 'run' | 'sprint' | 'run_ball' | 'sprint_ball' | 'pass' | 'catch' | 'punt'
-  | 'tackle' | 'tackled' | 'clearout' | 'jackal' | 'maul' | 'scrum' | 'lineout_jump'
-  | 'lineout_lift' | 'lineout_throw' | 'try' | 'celebrate';
+export type AnimationRugby = string;
 
 const CLIPS = new Map(rugbyAnimations.map(clip => [clip.id.replace(/^rugby_/, ''), clip]));
 // Le générateur produit du pixel art : une surface Retina de 190×290 par joueur
@@ -29,6 +27,7 @@ interface Props {
   redresser?: string;
   hauteurMetres: number;
   temps: number;
+  angleVue?: number;
 }
 
 const MOTIFS: Record<MaillotMatch['motif'], KitPattern> = {
@@ -41,19 +40,29 @@ const TYPES: Record<ReturnType<typeof apparenceJoueurMatch>['morphologie'], Body
 };
 
 function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: boolean, positionPorteur?: Vec): AnimationRugby {
+  const instant = terrain.simulation ?? 0;
+  const geste = terrain.gestes?.filter((g) => g.joueurId === p.id && instant >= g.debut && instant < g.debut + g.duree).at(-1);
+  if (geste && CLIPS.has(geste.clip)) return geste.clip;
+  if (p.corps && p.corps.age < p.corps.duree) return p.corps.age > p.corps.duree - .5 ? 'getup' : 'tackled';
+  if (terrain.preparationTir?.buteurId === p.id) {
+    const k = terrain.preparationTir.progression;
+    return k > .85 ? terrain.preparationTir.transformation ? 'conversion' : 'penalty'
+      : k > .3 && k < .5 ? 'walk' : k < .3 && Math.hypot(p.vx, p.vy) > .5 ? 'jog' : 'ready';
+  }
   if (terrain.aplatissage?.marqueurId === p.id) return terrain.aplatissage.progression > .78 ? 'celebrate' : 'try';
-  if (terrain.contact?.porteurId === p.id) return 'tackled';
-  if (terrain.contact?.plaqueurId === p.id) return 'tackle';
+  if (terrain.contact && terrain.contact.progression < 1 && terrain.contact.porteurId === p.id) return 'tackled';
+  if (terrain.contact && terrain.contact.progression < 1 && terrain.contact.plaqueurId === p.id) return 'tackle';
   const vitesse = Math.hypot(p.vx, p.vy);
   const distanceBallon = Math.hypot(pos.x - terrain.ballon.x, pos.y - terrain.ballon.y);
-  if (terrain.conquete?.type === 'melee' && p.numero <= 8 && distanceBallon < 8) return 'scrum';
+  const role = p.numeroRole ?? p.numero;
+  if (terrain.conquete?.type === 'melee' && role <= 8 && distanceBallon < 8) return terrain.conquete.progression < .4 ? 'scrum_bind' : role === 2 ? 'scrum_hook' : 'scrum';
   if (terrain.conquete?.type === 'touche') {
     const cible = terrain.pions.find((q) => q.id === terrain.conquete?.cibleId);
     if (p.id === cible?.id) return 'lineout_jump';
-    if (p.cote === terrain.possession && p.numero === 2) return 'lineout_throw';
-    if (cible && p.cote === cible.cote && p.numero <= 8 && p.numero !== 2) {
+    if (p.cote === terrain.possession && role === 2) return 'lineout_throw';
+    if (cible && p.cote === cible.cote && role <= 8 && role !== 2) {
       const lifteurs = terrain.pions
-        .filter((q) => q.cote === cible.cote && q.numero <= 8 && q.numero !== 2 && q.id !== cible.id)
+        .filter((q) => q.cote === cible.cote && (q.numeroRole ?? q.numero) <= 8 && (q.numeroRole ?? q.numero) !== 2 && q.id !== cible.id)
         .sort((a, b) => Math.hypot(a.x - cible.x, a.y - cible.y) - Math.hypot(b.x - cible.x, b.y - cible.y))
         .slice(0, 2);
       if (lifteurs.some((q) => q.id === p.id)) return 'lineout_lift';
@@ -62,11 +71,16 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   }
   if (terrain.phase === 'maul' && distanceBallon < 5) return 'maul';
   if (terrain.phase === 'ruck' && distanceBallon < 4.2) return p.cote === terrain.possession ? 'clearout' : 'jackal';
-  if (terrain.vol?.auteurId === p.id) return terrain.vol.type === 'pied' ? 'punt' : 'pass';
+  if (terrain.vol?.auteurId === p.id && terrain.vol.ecoule < 1.4) return terrain.vol.type === 'pied'
+    ? terrain.vol.intention === 'renvoi' ? 'restart' : terrain.vol.intention === 'rasant' ? 'grubber'
+      : terrain.vol.intention === 'chandelle' ? 'chip' : terrain.vol.intention === 'drop' ? 'drop' : role === 9 ? 'box_kick' : 'punt'
+    : terrain.vol.intention === 'offload' ? 'offload' : terrain.vol.vers.y < terrain.vol.de.y ? 'pass_left' : 'pass';
   if (terrain.vol?.receveurId === p.id) return 'catch';
   if (positionPorteur && p.cote !== terrain.possession && Math.hypot(pos.x - positionPorteur.x, pos.y - positionPorteur.y) < 2.2) return 'tackle';
-  if (porteur) return vitesse > 7.2 ? 'sprint_ball' : vitesse > .7 ? 'run_ball' : 'idle';
-  return vitesse > 7.2 ? 'sprint' : vitesse > 3.5 ? 'run' : vitesse > .55 ? 'jog' : 'idle';
+  if (terrain.phase === 'ballonLibre' && distanceBallon < 1.8) return 'pickup';
+  if (porteur) return vitesse > 7.2 ? 'sprint_ball' : vitesse > .7 ? 'run_ball' : 'ready';
+  if (p.cote !== terrain.possession && Math.abs(p.vy) > Math.abs(p.vx) * 1.5 && vitesse > .7) return 'sidestep';
+  return vitesse > 7.2 ? 'sprint' : vitesse > 3.5 ? 'run' : vitesse > 1.5 ? 'jog' : vitesse > .55 ? 'walk' : 'idle';
 }
 
 function personnage(pion: PionDirect, maillot: MaillotMatch): Character {
@@ -97,8 +111,8 @@ function personnage(pion: PionDirect, maillot: MaillotMatch): Character {
 
 function dessinerSprite(
   canvas: HTMLCanvasElement, renderer: CharacterRenderer, character: Character,
-  clip: AnimationClip, temps: number, graine: number, versGauche: boolean, afficherBallon: boolean,
-  progression?: number,
+  clip: AnimationClip, temps: number, graine: number, orientation: Orientation, afficherBallon: boolean,
+  progression?: number, corps?: PionDirect['corps'],
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -108,8 +122,17 @@ function dessinerSprite(
     ? (temps + (graine % 997) / 997 * duree) % Math.max(.01, duree)
     : Math.max(0, Math.min(.999, progression)) * duree;
   let pose = poseAtTime(clip, local * clip.fps);
-  if (versGauche) pose = mirrorPose(pose);
-  pose.orientation = versGauche ? 'left' : 'right';
+  if (orientation === 'left') pose = mirrorPose(pose);
+  pose.orientation = orientation;
+  // Le déplacement appartient au moteur. Le root du clip ne fait pas glisser
+  // un joueur de plusieurs mètres en plus de sa trajectoire physique.
+  pose.root.x = 0;
+  if (corps && corps.age < corps.duree - .5) {
+    const impact = Math.sin(Math.min(1, corps.age / .6) * Math.PI) * corps.intensite;
+    pose.bones.leftForearm.rotation += impact * 22;
+    pose.bones.rightShin.rotation -= impact * 28;
+    pose.root.rotation += Math.sin(corps.direction) * impact * 12;
+  }
   // Le ballon du terrain disparaît dès qu'un joueur le porte : c'est alors
   // celui du générateur qui vit dans ses mains et suit réellement la pose.
   if (!afficherBallon) pose.ball.attachment = 'HIDDEN';
@@ -127,31 +150,41 @@ function dessinerSprite(
   });
 }
 
-function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, positionPorteur, redresser, hauteurMetres, temps }: Props) {
+function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, positionPorteur, redresser, hauteurMetres, temps, angleVue = 0 }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useMemo(() => new CharacterRenderer(), []);
   const character = useMemo(() => personnage(pion, maillot), [pion.id, pion.nom, pion.numero, pion.poste, maillot]);
   const animation = animationDe(pion, position, terrain, porteur, positionPorteur);
   const clip = CLIPS.get(animation) ?? CLIPS.get('idle')!;
-  const sensAffichage = useRef(pion.cote === 'exterieur' ? -1 : 1);
+  const sensAffichage = useRef({ x: pion.cote === 'exterieur' ? -1 : 1, y: 0 });
   // On conserve le dernier vrai sens de course pendant le freinage. Le joueur
   // qui se replie ne fait donc plus quelques pas en marche arrière.
-  if (Math.abs(pion.vx) > .08) sensAffichage.current = pion.vx < 0 ? -1 : 1;
-  const versGauche = sensAffichage.current < 0;
-  const progression = terrain.contact && (terrain.contact.porteurId === pion.id || terrain.contact.plaqueurId === pion.id)
+  if (Math.hypot(pion.vx, pion.vy) > .15) sensAffichage.current = { x: pion.vx, y: pion.vy };
+  const direction = sensAffichage.current;
+  const orientation = orientationSprite(direction, angleVue);
+  const instant = terrain.simulation ?? temps;
+  const geste = terrain.gestes?.filter((g) => g.joueurId === pion.id && instant >= g.debut && instant < g.debut + g.duree).at(-1);
+  const progression = geste ? (instant - geste.debut) / geste.duree
+    : pion.corps ? animation === 'getup' ? (pion.corps.age - pion.corps.duree + .5) / .5 : Math.min(1, pion.corps.age / 1.2)
+    : terrain.preparationTir?.buteurId === pion.id && terrain.preparationTir.progression > .85 ? (terrain.preparationTir.progression - .85) / .15 * .55
+    : terrain.contact && (terrain.contact.porteurId === pion.id || terrain.contact.plaqueurId === pion.id)
     ? terrain.contact.progression
     : terrain.conquete?.type === 'touche' && animation.startsWith('lineout_')
       ? terrain.conquete.progression
       : undefined;
   const ballonTouche = terrain.conquete?.type === 'touche'
     && (terrain.conquete.progression < .58
-      ? pion.cote === terrain.possession && pion.numero === 2
+      ? pion.cote === terrain.possession && (pion.numeroRole ?? pion.numero) === 2
       : pion.id === terrain.conquete.cibleId);
   const ballonAnime = porteur || ballonTouche;
   const graine = graineVisuelleMatch(pion.id);
+  const derniereImage = useRef('');
   useLayoutEffect(() => {
-    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, graine, versGauche, ballonAnime, progression);
-  }, [renderer, character, clip, temps, graine, versGauche, ballonAnime, progression]);
+    const cle = `${character.id}:${maillot.principal}:${maillot.secondaire}:${maillot.motif}:${clip.id}:${orientation}:${ballonAnime}:${Math.floor((progression ?? temps) * 24)}:${Math.floor((pion.corps?.age ?? 0) * 24)}`;
+    if (cle === derniereImage.current) return;
+    derniereImage.current = cle;
+    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps);
+  }, [renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, maillot]);
 
   const largeurMetres = hauteurMetres * (LARGEUR_CANVAS / HAUTEUR_CANVAS);
   return <g transform={`translate(${position.x.toFixed(2)} ${position.y.toFixed(2)})`} className={`rg-canvas-groupe${porteur ? ' rg-porteur' : ''}`}>
@@ -178,19 +211,25 @@ function personnageArbitre(couleur: '#f4c542' | '#35b76d'): Character {
   };
 }
 
-export function SpriteArbitre({ position, phase, sifflet, redresser, hauteurMetres, temps, couleur, carton }: {
+export function SpriteArbitre({ position, phase, sifflet, redresser, hauteurMetres, temps, couleur, carton, regard = 0, vitesse = 0, angleVue = 0 }: {
   position: Vec; phase: TerrainDirect['phase']; sifflet?: TerrainDirect['sifflet']; redresser?: string;
   hauteurMetres: number; temps: number; couleur: '#f4c542' | '#35b76d'; carton?: 'jaune' | 'rouge';
+  regard?: number; vitesse?: number; angleVue?: number;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useMemo(() => new CharacterRenderer(), []);
   const character = useMemo(() => personnageArbitre(couleur), [couleur]);
   const animation = carton === 'rouge' ? 'ref_red' : carton === 'jaune' ? 'ref_yellow'
-    : sifflet ? 'ref_whistle' : phase === 'melee' ? 'ref_scrum' : phase === 'aplatissage' ? 'ref_try' : 'jog';
+    : sifflet?.cle.includes('enAvant') ? 'ref_knockon' : phase === 'penalite' ? 'ref_penalty'
+      : phase === 'miTemps' || phase === 'bagarre' ? 'ref_timeoff' : phase === 'fini' ? 'ref_end'
+        : sifflet ? 'ref_whistle' : phase === 'melee' ? 'ref_scrum' : phase === 'aplatissage' ? 'ref_try'
+          : vitesse > 4 ? 'run' : vitesse > .6 ? 'jog' : 'idle';
+  const angle = regard + angleVue * Math.PI / 180;
+  const orientation: Orientation = Math.abs(Math.sin(angle)) > .72 ? Math.sin(angle) < 0 ? 'back' : 'front' : Math.cos(angle) < 0 ? 'left' : 'right';
   const clip = CLIPS.get(animation) ?? CLIPS.get('idle')!;
   useLayoutEffect(() => {
-    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, 41, false, false);
-  }, [renderer, character, clip, temps]);
+    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, 41, orientation, false);
+  }, [renderer, character, clip, temps, orientation]);
   const largeurMetres = hauteurMetres * (LARGEUR_CANVAS / HAUTEUR_CANVAS);
   return <g transform={`translate(${position.x.toFixed(2)} ${position.y.toFixed(2)})`} className="rg-canvas-groupe rg-arbitre">
     <g transform={redresser}><foreignObject x={-largeurMetres / 2} y={-hauteurMetres * .78} width={largeurMetres} height={hauteurMetres} overflow="visible">

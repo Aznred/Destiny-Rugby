@@ -41,7 +41,7 @@
 // Le prix est un retard de deux secondes sur le direct. Personne ne le voit :
 // il n'y a rien à côté pour le comparer.
 
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Icone } from '../Icone';
 import { PelouseMemo } from './Pelouse';
 import { Camera, angleDeVue, type Cadrage, type Vue } from '../../lib/moteur/camera';
@@ -49,7 +49,7 @@ import { LARGEUR, LONGUEUR, borner, type Vec } from '../../lib/moteur/terrain';
 import type { CoteEnLigne, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import { creerScenarioDirect, type ScenarioDirect } from '../../lib/ligue/scenarioDirect';
 import {
-  amortirImageDirect, interpolerImageDirect, projeterImageDirect, type BallonAfficheDirect,
+  amortirImageDirect, interpolerImageDirect, interpolerEtatDirect, projeterImageDirect, type BallonAfficheDirect,
   type ImageDirect,
 } from '../../lib/ligue/interpolationDirect';
 import { t } from '../../lib/i18n';
@@ -138,7 +138,8 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const pions = useRef(new Map<string, Vec>());
   const ballon = useRef<BallonAfficheDirect>({ x: LONGUEUR / 2, y: LARGEUR / 2, h: 0 });
   /** Le relevé effectivement montré : c'est lui qui commande le bandeau. */
-  const [affiche, setAffiche] = useState<TerrainDirect>(terrain);
+  const afficheRef = useRef<TerrainDirect>(terrain);
+  const affiche = afficheRef.current;
   const [modeCamera, setModeCamera] = useState<ModeCamera>('auto');
   const [scenario, setScenario] = useState(() => creerScenarioDirect(terrain));
   const [, redessiner] = useState(0);
@@ -151,6 +152,9 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const tampon = useRef<Releve[]>([{ terrain, recu: premierRecu, instant: premierInstant }]);
   /** performance.now() - horloge serveur ; filtré pour ne pas suivre le jitter. */
   const decalageServeur = useRef(premierRecu - premierInstant);
+  const retardCible = useRef(RETARD);
+  const retardRendu = useRef(RETARD);
+  const dernierInstantAffiche = useRef(-Infinity);
   const reglages = useRef({ modeCamera, monCote });
   const scenarioCourant = useRef(scenario);
   useEffect(() => {
@@ -162,6 +166,12 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     // le film. Elle est simplement obsolète : le prochain relevé fait foi.
     if (instant + 0.001 < (file[file.length - 1]?.instant ?? -Infinity)) return;
     const observation = recu - instant;
+    const precedentReleve = file.at(-1);
+    if (precedentReleve && instant > precedentReleve.instant) {
+      const intervalle = instant - precedentReleve.instant;
+      const variation = Math.abs((recu - precedentReleve.recu) - intervalle);
+      retardCible.current += (borner(intervalle + .2 + variation * 2, RETARD, 2.5) - retardCible.current) * .2;
+    }
     const ancien = decalageServeur.current;
     // On suit vite une meilleure mesure (moins de latence), très lentement une
     // mesure plus mauvaise. Ainsi un seul paquet lent n'étire pas les courses.
@@ -185,7 +195,6 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     let image = 0;
     let precedent = performance.now() / 1000;
     let actif = true;
-    let montre: TerrainDirect | null = null;
     let imageAffichee: ImageDirect | null = null;
     const avancer = (brut: number) => {
       if (!actif) return;
@@ -194,14 +203,17 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       precedent = maintenant;
 
       const file = tampon.current;
-      const instant = maintenant - decalageServeur.current - RETARD;
+      retardRendu.current += borner(retardCible.current - retardRendu.current, -dt * .08, dt * .08);
+      const instant = Math.max(dernierInstantAffiche.current, maintenant - decalageServeur.current - retardRendu.current);
+      dernierInstantAffiche.current = instant;
       // Les deux relevés qui encadrent l'instant rendu. Tant que le tampon n'a
       // pas pris d'avance (les deux premières secondes), on tient la première
       // image : mieux vaut un terrain immobile qu'un terrain inventé.
       let i = 0;
       while (i < file.length - 2 && file[i + 1].instant <= instant) i++;
-      const a = file[i];
-      const b = file[i + 1];
+      let a = file[i];
+      let b = file[i + 1];
+      if (b && instant > b.instant && i + 1 === file.length - 1) { a = b; b = undefined!; }
       let u = 0;
       let dtSim = 0;
       if (b) {
@@ -211,7 +223,8 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
         // décision de pénalité gèle le chrono du serveur : les deux relevés
         // portent alors la même minute, les tangentes s'annulent, et le terrain
         // s'immobilise exactement comme le jeu.
-        dtSim = Math.max(0, (b.terrain.horloge - a.terrain.horloge) * 60);
+        dtSim = Math.max(0, a.terrain.simulation !== undefined && b.terrain.simulation !== undefined
+          ? b.terrain.simulation - a.terrain.simulation : (b.terrain.horloge - a.terrain.horloge) * 60);
       } else {
         // Rien derrière : on prolonge brièvement le dernier relevé connu.
         dtSim = borner(instant - a.instant, 0, PREDICTION_MAX) * a.terrain.cadence;
@@ -230,8 +243,9 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       // Le bandeau et le porteur ne changent qu'au terme de la trajectoire.
       // Avant, ils basculaient à u=0,5 : le ballon quittait alors une position
       // interpolée pour apparaître d'un coup dans les mains du relevé suivant.
-      const courant = b && u >= 1 ? b.terrain : a.terrain;
-      if (courant !== montre) { montre = courant; setAffiche(courant); }
+      const courant = b ? interpolerEtatDirect(a.terrain, b.terrain, u)
+        : { ...a.terrain, simulation: (a.terrain.simulation ?? a.terrain.instantJeu ?? 0) + dtSim };
+      afficheRef.current = courant;
 
       const prochainScenario = creerScenarioDirect(courant);
       if (prochainScenario.id !== scenarioCourant.current.id) {
@@ -274,12 +288,12 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const hauteurSprite = Math.min(5.2, Math.max(3.35, 25 / pxParMetre));
   // Le générateur travaille à 16 i/s : caler les dessins dessus évite de
   // recalculer trente sprites 60 fois par seconde sans perdre une image utile.
-  const tempsAnimation = Math.floor((performance.now() / 1000) * 16) / 16;
+  const tempsAnimation = Math.floor((affiche.simulation ?? affiche.instantJeu ?? 0) * 24) / 24;
   const b = ballon.current;
-  const maillots: Record<CoteEnLigne, MaillotMatch> = couleurs.maillots ?? {
+  const maillots: Record<CoteEnLigne, MaillotMatch> = useMemo(() => couleurs.maillots ?? ({
     domicile: maillotDeSecours(couleurs.domicile, nomDomicile),
     exterieur: maillotDeSecours(couleurs.exterieur, nomExterieur),
-  };
+  }), [couleurs.maillots, couleurs.domicile, couleurs.exterieur, nomDomicile, nomExterieur]);
   const porteurPosition = affiche.porteurId ? pions.current.get(affiche.porteurId) : undefined;
 
   const dessiner = (p: TerrainDirect['pions'][number]) => {
@@ -292,7 +306,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     return <g key={p.id} className={mien ? 'rg-joueur-moi' : undefined}>
       <SpriteRugbymanMemo pion={p} position={pos} terrain={affiche} maillot={maillots[p.cote]}
         porteur={porte} positionPorteur={porteurPosition} redresser={vue?.redresser}
-        hauteurMetres={hauteurSprite} temps={tempsAnimation} />
+        hauteurMetres={hauteurSprite} temps={tempsAnimation} angleVue={vue?.angle ?? 0} />
       {porte && (
         <g transform={`translate(${pos.x.toFixed(2)} ${pos.y.toFixed(2)})`}>
           <g className="cel-nom-porteur" transform={vue?.redresser}>
@@ -326,14 +340,11 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     ? borner((conquete.progression - 0.45) / 0.55, 0, 1)
     : 0;
   const sensPoussee = conquete?.pousseVers === 'exterieur' ? -1 : 1;
-  const arbitre = {
-    x: borner(b.x + (affiche.possession === 'domicile' ? -4.4 : 4.4), 7, LONGUEUR - 7),
-    y: borner(b.y + (affiche.ouvert === 'droite' ? -4.2 : 4.2), 4, LARGEUR - 4),
-  };
+  const arbitre = affiche.arbitre ?? { x: LONGUEUR / 2 - 7, y: LARGEUR / 2 - 9 };
   // Une passe tourne peu ; un dégagement part en rotation bout par bout et le
   // rebond la ralentit. La couture rend ce mouvement lisible même de loin.
-  const rotationBallon = (tempsAnimation * (affiche.vol?.type === 'pied'
-    || affiche.phase === 'ballonEnLAir' ? 760 : affiche.phase === 'ballonLibre' ? 390 : 470)) % 360;
+  const rotationBallon = affiche.vol ? (affiche.vol.ecoule * (affiche.vol.type === 'pied' ? 760 : 180)) % 360
+    : affiche.phase === 'ballonLibre' ? (tempsAnimation * 390) % 360 : -18;
 
   return (
     <div className="cel-scene" ref={scene}>
@@ -366,6 +377,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
           {affiche.pions.filter((p) => p.cote === 'exterieur' && p.id !== affiche.porteurId).map(dessiner)}
           {affiche.pions.filter((p) => p.cote === 'domicile' && p.id !== affiche.porteurId).map(dessiner)}
           <SpriteArbitre position={arbitre} phase={affiche.phase} sifflet={affiche.sifflet}
+            regard={affiche.arbitre?.regard} vitesse={Math.hypot(affiche.arbitre?.vx ?? 0, affiche.arbitre?.vy ?? 0)} angleVue={vue?.angle ?? 0}
             redresser={vue?.redresser} hauteurMetres={hauteurSprite * .94} temps={tempsAnimation}
             couleur={(nomDomicile.length + nomExterieur.length) % 2 ? '#f4c542' : '#35b76d'} carton={carton} />
           {porteur ? dessiner(porteur) : null}

@@ -95,12 +95,10 @@ function positionVol(vol: VolDirect, kBrut: number): BallonAfficheDirect {
 export function interpolerPionsDirect(a: TerrainDirect, b: TerrainDirect, u: number, dtSim: number): Map<string, Vec> {
   const resultat = new Map<string, Vec>();
   const parId = new Map(b.pions.map((p) => [p.id, p]));
-  const formationInstantanee = a.phase !== b.phase
-    && (b.phase === 'melee' || b.phase === 'touche' || b.phase === 'coupEnvoi');
   for (const p0 of a.pions) {
     const p1 = parId.get(p0.id);
     resultat.set(p0.id, p1
-      ? formationInstantanee && u >= 0.72 ? { x: p1.x, y: p1.y } : positionPion(p0, p1, u, dtSim)
+      ? positionPion(p0, p1, u, dtSim)
       : { x: p0.x, y: p0.y });
   }
   // Un remplaçant n'apparaît qu'au terme de la transition. Le composant le
@@ -291,7 +289,8 @@ export function amortirImageDirect(courante: ImageDirect | null, cible: ImageDir
 
 /** Projection de secours bornée lorsque le prochain relevé n'est pas encore arrivé. */
 export function projeterImageDirect(t: TerrainDirect, secondesReelles: number): ImageDirect {
-  const avance = borner(secondesReelles, 0, 1.2) * t.cadence;
+  const temps = borner(secondesReelles, 0, .7) * t.cadence;
+  const avance = .45 * (1 - Math.exp(-temps / .45));
   const pions = new Map<string, Vec>();
   for (const p of t.pions) {
     pions.set(p.id, {
@@ -300,4 +299,45 @@ export function projeterImageDirect(t: TerrainDirect, secondesReelles: number): 
     });
   }
   return { pions, ballon: ballonAuReleve(t, pions, avance) };
+}
+
+/** Métadonnées, gestes et possesseur sur LA MÊME horloge que la trajectoire. */
+export function interpolerEtatDirect(a: TerrainDirect, b: TerrainDirect, u: number): TerrainDirect {
+  const t = borner01(u);
+  const courant = t < 1 ? a : b;
+  const simulation = melanger(a.simulation ?? a.instantJeu ?? a.horloge * 60, b.simulation ?? b.instantJeu ?? b.horloge * 60, t);
+  const instantJeu = melanger(a.instantJeu ?? a.horloge * 60, b.instantJeu ?? b.horloge * 60, t);
+  const gestes = [...new Map([...(a.gestes ?? []), ...(b.gestes ?? [])].map((g) => [g.id, g])).values()]
+    .filter((g) => simulation >= g.debut && simulation < g.debut + g.duree);
+  const suivants = new Map(b.pions.map((p) => [p.id, p]));
+  const pions = courant.pions.map((p) => {
+    const fin = suivants.get(p.id) ?? p;
+    return { ...p, vx: melanger(p.vx, fin.vx, t), vy: melanger(p.vy, fin.vy, t),
+      corps: p.corps ? { ...p.corps, age: p.corps.age + Math.max(0, simulation - (courant.simulation ?? simulation)) } : undefined };
+  });
+  let porteurId = courant.porteurId;
+  const vols = [...(a.volsRecents ?? []), ...(b.volsRecents ?? []), ...(a.vol ? [a.vol] : []), ...(b.vol ? [b.vol] : [])];
+  const actif = vols.find((v) => v.debut !== undefined && v.fin !== undefined && instantJeu >= v.debut && instantJeu < v.fin);
+  if (actif) porteurId = undefined;
+  else {
+    const dernier = vols.filter((v) => v.type === 'passe' && v.fin !== undefined && v.fin <= instantJeu)
+      .sort((x, y) => y.fin! - x.fin!)[0];
+    if (dernier && dernier.fin! >= (a.instantJeu ?? a.horloge * 60) && courant.phase === 'jeuCourant') porteurId = dernier.receveurId;
+  }
+  let arbitre = courant.arbitre;
+  if (a.arbitre && b.arbitre) {
+    const debut = a.arbitre, fin = b.arbitre;
+    const delta = Math.atan2(Math.sin(fin.regard - debut.regard), Math.cos(fin.regard - debut.regard));
+    arbitre = { x: melanger(debut.x, fin.x, t), y: melanger(debut.y, fin.y, t),
+      vx: melanger(debut.vx, fin.vx, t), vy: melanger(debut.vy, fin.vy, t), regard: debut.regard + delta * t };
+  }
+  return { ...courant, pions, porteurId, gestes, simulation, instantJeu, arbitre,
+    vol: actif ? { ...actif, ecoule: instantJeu - actif.debut! }
+      : courant.vol?.fin !== undefined && courant.vol.fin <= instantJeu ? undefined : courant.vol,
+    contact: a.contact ? { ...a.contact, progression: Math.min(1, a.contact.progression + Math.max(0, simulation - (a.simulation ?? simulation)) / 1.35) } : courant.contact,
+    conquete: a.conquete && b.conquete?.type === a.conquete.type
+      ? { ...a.conquete, progression: melanger(a.conquete.progression, b.conquete.progression, t) } : courant.conquete,
+    preparationTir: a.preparationTir && b.preparationTir?.buteurId === a.preparationTir.buteurId
+      ? { ...a.preparationTir, progression: melanger(a.preparationTir.progression, b.preparationTir.progression, t) } : courant.preparationTir,
+  };
 }

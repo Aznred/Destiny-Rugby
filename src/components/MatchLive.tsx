@@ -1061,16 +1061,17 @@ export function MatchLive({
   // liseré clair (camp A) ou sombre (camp B) devient le SEUL moyen de séparer
   // deux équipes aux couleurs voisines — et à 0,8 px il ne se voyait plus.
   const hauteurSprite = Math.min(5.2, Math.max(3.35, 25 / pxParMetre));
-  const tempsAnimation = Math.floor((performance.now() / 1000) * 16) / 16;
+  const tempsAnimation = Math.floor((e.sim + r) * 24) / 24;
   const maillotA = useMemo(() => ({ ...maillotDeSecours(couleurA, e.clubA), secondaire: couleurA2 }), [couleurA, couleurA2, e.clubA]);
   const maillotB = useMemo(() => ({ ...maillotDeSecours(couleurB, e.clubB), secondaire: couleurB2 }), [couleurB, couleurB2, e.clubB]);
 
   // Le solo expose la même photographie légère que le direct en ligne au
   // générateur de sprites. Le moteur reste inchangé et demeure autoritaire.
   const pionsDirects: PionDirect[] = surLeTerrain.map((p) => ({
-    id: p.id, numero: p.numero, nom: p.nom, poste: p.poste,
+    id: p.id, numero: p.numeroMaillot ?? p.numero, numeroRole: p.numero, nom: p.nom, poste: p.poste,
     cote: p.cote === 'A' ? 'domicile' : 'exterieur',
     x: p.pos.x, y: p.pos.y, vx: p.vitesse.x, vy: p.vitesse.y,
+    corps: p.corps ? { age: p.corps.age + r, duree: p.corps.duree, direction: p.corps.direction, intensite: p.corps.intensite } : undefined,
   }));
   const ballon = positionBallonInterpolee(e, r);
   const terrainSprites: TerrainDirect = {
@@ -1100,6 +1101,10 @@ export function MatchLive({
         progression: Math.max(0, Math.min(1, (e.t - e.ruck.debut) / 1.35)),
       } : undefined,
     cadence: 1, horloge: e.t / 60, instantJeu: e.t,
+    simulation: e.sim + r, gestes: e.gestes,
+    preparationTir: e.tir && !e.tir.volLance ? {
+      buteurId: e.tir.buteur.id, progression: Math.max(0, Math.min(1, 1 - e.minuteur / (e.dureeArret ?? 45))), transformation: e.tir.valeur === 2,
+    } : undefined,
     sifflet: e.sifflet ? { cle: e.sifflet.cle, club: e.sifflet.club, fautif: e.sifflet.fautif, restant: e.sifflet.restant } : undefined,
   };
   const pionsDirectsParId = new Map(pionsDirects.map((p) => [p.id, p]));
@@ -1132,7 +1137,7 @@ export function MatchLive({
         <SpriteRugbymanMemo pion={direct} position={{ x, y }} terrain={terrainSprites}
           maillot={p.cote === 'A' ? maillotA : maillotB} porteur={porte}
           positionPorteur={positionPorteur} redresser={vue?.redresser}
-          hauteurMetres={hauteurSprite} temps={tempsAnimation} />
+          hauteurMetres={hauteurSprite} temps={tempsAnimation} angleVue={vue?.angle ?? 0} />
         {/* Le chevron : c'est LUI qui répond à « où est mon joueur ». */}
         {p.moi && (
           <g transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})`}>
@@ -1164,12 +1169,10 @@ export function MatchLive({
   const cartonArbitre = actionImportante?.type === 'carton'
     ? (/rouge/i.test(actionImportante.texte) ? 'rouge' : 'jaune') as 'rouge' | 'jaune'
     : undefined;
-  const arbitre = {
-    x: borner(ballon.x + (e.possession === 'A' ? -4.4 : 4.4), 7, LONGUEUR - 7),
-    y: borner(ballon.y + (e.ouvert === 1 ? -4.2 : 4.2), 4, LARGEUR - 4),
-  };
-  const rotationBallon = (tempsAnimation * (e.vol?.type === 'pied'
-    || e.phase === 'ballonEnLAir' ? 760 : e.phase === 'ballonLibre' ? 390 : 470)) % 360;
+  const arbitre = e.arbitre ? { x: e.arbitre.pos.x + e.arbitre.vitesse.x * r, y: e.arbitre.pos.y + e.arbitre.vitesse.y * r }
+    : { x: LONGUEUR / 2 - 7, y: LARGEUR / 2 - 9 };
+  const rotationBallon = e.vol ? ((e.vol.ecoule + r) * (e.vol.type === 'pied' ? 760 : 180)) % 360
+    : e.phase === 'ballonLibre' ? (tempsAnimation * 390) % 360 : -18;
 
   // La flèche de bord quand le ballon sort du cadre : sans elle, on perd le
   // ballon de vue dès qu'un dégagement part à l'opposé.
@@ -1284,6 +1287,7 @@ export function MatchLive({
                     {surLeTerrain.filter((p) => p.cote === 'B' && !p.moi).map(pion)}
                     {surLeTerrain.filter((p) => p.cote === 'A' && !p.moi).map(pion)}
                     <SpriteArbitre position={arbitre} phase={terrainSprites.phase} sifflet={terrainSprites.sifflet}
+                      regard={e.arbitre?.regard} vitesse={Math.hypot(e.arbitre?.vitesse.x ?? 0, e.arbitre?.vitesse.y ?? 0)} angleVue={vue?.angle ?? 0}
                       redresser={vue?.redresser} hauteurMetres={hauteurSprite * .94} temps={tempsAnimation}
                       couleur={(e.clubA.length + e.clubB.length) % 2 ? '#f4c542' : '#35b76d'} carton={cartonArbitre} />
                     {monPion && surLeTerrain.includes(monPion) && pion(monPion)}

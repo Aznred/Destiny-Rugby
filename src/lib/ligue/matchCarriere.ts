@@ -292,6 +292,8 @@ export interface LigneFil {
 export interface PionDirect {
   id: string; numero: number; nom: string; poste: PosteId; cote: CoteEnLigne;
   x: number; y: number; vx: number; vy: number;
+  numeroRole?: number;
+  corps?: { age: number; duree: number; direction: number; intensite: number; appuis?: number[] };
 }
 
 export interface VolDirect {
@@ -311,6 +313,10 @@ export interface VolDirect {
 }
 
 export interface TerrainDirect {
+  simulation?: number;
+  gestes?: import('../moteur/dynamique.js').GesteMatch[];
+  arbitre?: { x: number; y: number; vx: number; vy: number; regard: number };
+  preparationTir?: { buteurId: string; progression: number; transformation: boolean };
   pions: PionDirect[];
   ballon: { x: number; y: number; hauteur?: number };
   /** Le pion qui porte le ballon : l'écran le colle à sa main. */
@@ -931,7 +937,7 @@ function extrairePenalites(e: EtatMatch): Paire {
 }
 
 function extraireFeuille(e: EtatMatch): LigneFeuilleMatch[] {
-  const parNom = new Map(e.pions.map((p) => [`${p.cote}${p.numero}`, p]));
+  const parNom = new Map(e.pions.map((p) => [`${p.cote}${p.numeroMaillot ?? p.numero}`, p]));
   return bilan(e).parJoueur.map((l) => {
     const pion = parNom.get(`A${l.numero}`)?.nom === l.nom ? parNom.get(`A${l.numero}`) : parNom.get(`B${l.numero}`);
     return {
@@ -977,9 +983,10 @@ function extraireVolDirect(vol: Vol | VolRecent, debut: number, ecoule: number):
 function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
   const terrain: TerrainDirect = {
     pions: e.pions.filter((p) => p.surLeTerrain).map((p) => ({
-      id: p.id, numero: p.numero, nom: p.nom, poste: p.poste,
+      id: p.id, numero: p.numeroMaillot ?? p.numero, numeroRole: p.numero, nom: p.nom, poste: p.poste,
       cote: MOTEUR_VERS_COTE[p.cote],
       x: r2(p.pos.x), y: r2(p.pos.y), vx: r2(p.vitesse.x), vy: r2(p.vitesse.y),
+      corps: corpsPourAffichage(p),
     })),
     ballon: {
       x: r2(e.ballon.x), y: r2(e.ballon.y),
@@ -997,6 +1004,15 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
     cadence: r2(1 / facteurHorloge(e.phase, e.tempsReel)),
     horloge: r2(minuteExacte(e)),
     instantJeu: r2(e.t),
+    simulation: r2(e.sim),
+    gestes: e.gestes?.filter((g) => e.sim - g.debut < 8),
+    arbitre: e.arbitre ? {
+      x: r2(e.arbitre.pos.x), y: r2(e.arbitre.pos.y),
+      vx: r2(e.arbitre.vitesse.x), vy: r2(e.arbitre.vitesse.y), regard: r2(e.arbitre.regard),
+    } : undefined,
+    preparationTir: e.tir && !e.tir.volLance ? {
+      buteurId: e.tir.buteur.id, progression: Math.max(0, Math.min(1, 1 - e.minuteur / (e.dureeArret ?? 45))), transformation: e.tir.valeur === 2,
+    } : undefined,
     emisLe,
     snapshot: Math.max(0, Math.round(e.t / 0.6)),
   };
@@ -1346,7 +1362,7 @@ export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string, emisLe =
   vue.remplacementsFaits = cible === 'A' ? e.remplacementsA : e.remplacementsB;
   for (const p of e.pions) {
     if (p.cote !== cible) continue;
-    const ligne = { carteId: p.sourceId, nom: p.nom, numero: p.numero, poste: p.poste };
+    const ligne = { carteId: p.sourceId, nom: p.nom, numero: p.numeroMaillot ?? p.numero, poste: p.poste };
     if (p.surLeTerrain && p.numero <= 15) vue.surLeTerrain.push(ligne);
     else if (!p.surLeTerrain && p.minutes === 0 && p.numero > 15) vue.surLeBanc.push(ligne);
   }

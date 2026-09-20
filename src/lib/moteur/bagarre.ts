@@ -23,6 +23,7 @@
 //    devrait importer `moteur.ts`, qui l'importe déjà — un cycle.
 
 import { CARTON, CHAMBRAGE, phrase, texteMatch } from './commentaire.js';
+import { jouerGeste, visibiliteFaute, declencherChute } from './dynamique.js';
 import type { Pion } from './entites.js';
 import { stopper } from './entites.js';
 import {
@@ -333,10 +334,14 @@ export function provoquer(e: EtatMatch): void {
 export function frapper(e: EtatMatch): void {
   const p = monPion(e);
   if (!p || e.bagarre || e.fini) return;
-  const cible = adversaireProche(e, p, 22);
+  const cible = adversaireProche(e, p, 2);
   // Passé trois altercations, plus personne ne rentre dans le jeu : les deux
   // capitaines ont été prévenus, et le coup partirait dans le vide.
   if (!cible || e.discipline.bagarres >= BAGARRES_MAX) return;
+  jouerGeste(e, p, 'foul_punch', 1.4);
+  jouerGeste(e, cible, 'reaction_hit', 1.6);
+  (e.fautesVues ??= {})[p.id] = e.rng() < visibiliteFaute(e, p.pos, p.id);
+  declencherChute(cible, { x: (cible.pos.x - p.pos.x) * 2, y: (cible.pos.y - p.pos.y) * 2 });
   ajouterCommentaire(e, 'carton', p.cote,
     texteMatch('coupPorte', { nom: p.nom, cible: cible.nom }), 0, true);
   declencherBagarre(e, 'moi', true, cible);
@@ -392,6 +397,7 @@ export function donnerOrdre(e: EtatMatch, ordre: OrdreBagarre): void {
 }
 
 export interface SuiteBagarre {
+  fauteVue?: boolean;
   /** À qui l'arbitre donne la pénalité, et où. */
   pour: Cote;
   lieu: Vec;
@@ -425,7 +431,10 @@ export function resoudreBagarre(e: EtatMatch): SuiteBagarre {
   // ── 2. LES CARTONS ───────────────────────────────────────────────────────
   const amateur = e.niveau === 'amateur';
   const motif = b.coupPorte ? 'coup de poing' : generale ? 'bagarre générale' : 'antijeu';
-  const carte = carteMeritee(e, culpabilite, amateur);
+  const vu = e.fautesVues?.[p.id] ?? e.rng() < visibiliteFaute(e, p.pos, p.id);
+  const adverseVu = (b.origine === 'adversaire' || generale)
+    && (e.fautesVues?.[b.adversaire.id] ?? e.rng() < visibiliteFaute(e, b.adversaire.pos, b.adversaire.id));
+  const carte = vu ? carteMeritee(e, culpabilite, amateur) : null;
   if (carte) sanctionner(e, p, carte === 'rouge', motif, b.resume);
 
   // L'adversaire prend aussi, et plus volontiers en amateur : quand deux
@@ -433,17 +442,9 @@ export function resoudreBagarre(e: EtatMatch): SuiteBagarre {
   const carteAdverse = b.origine === 'adversaire'
     ? carteMeritee(e, 2.4 + ORDRE_CULPABILITE.reculer, amateur)
     : carteMeritee(e, generale ? 1.6 : 0.9, amateur);
-  if (carteAdverse) sanctionner(e, b.adversaire, carteAdverse === 'rouge', motif, b.resume);
+  if (adverseVu && carteAdverse) sanctionner(e, b.adversaire, carteAdverse === 'rouge', motif, b.resume);
 
-  // ⚠️ EN AMATEUR, IL Y A TOUJOURS UN INNOCENT QUI PAIE. Sur une générale, un
-  // troisième larron prend la carte — c'est le rugby du dimanche, et c'est ce
-  // qui rend ces divisions vraiment plus hachées que le professionnalisme.
-  if (amateur && generale && e.rng() < 0.5) {
-    const camp = e.rng() < 0.5 ? p.cote : b.adversaire.cote;
-    const autres = surLeTerrain(e, camp).filter((q) => q !== p && q !== b.adversaire && q.sanction <= 0);
-    const malchanceux = autres[Math.floor(e.rng() * autres.length)];
-    if (malchanceux) sanctionner(e, malchanceux, false, 'bagarre générale', b.resume);
-  }
+  // Pas de carton attribué à un joueur innocent choisi au hasard.
 
   // ── 3. LES CORPS ─────────────────────────────────────────────────────────
   blesserPeutEtre(e, b, ordre);
@@ -454,7 +455,8 @@ export function resoudreBagarre(e: EtatMatch): SuiteBagarre {
   const pour: Cote = culpabilite >= 2 ? adverse(p.cote)
     : b.origine === 'adversaire' && culpabilite <= 0.5 ? p.cote
       : e.possession;
-  return { pour, lieu, motif };
+  if (e.fautesVues) { delete e.fautesVues[p.id]; delete e.fautesVues[b.adversaire.id]; }
+  return { pour, lieu, motif, fauteVue: vu || adverseVu };
 }
 
 /** Ce que chaque ordre ajoute (ou retire) à la culpabilité du joueur. */
@@ -475,8 +477,7 @@ function carteMeritee(
   e: EtatMatch, culpabilite: number, amateur: boolean,
 ): 'jaune' | 'rouge' | null {
   if (culpabilite <= 0) {
-    // Le chaos amateur : même en reculant, on peut se retrouver sur la feuille.
-    return amateur && e.rng() < 0.14 ? 'jaune' : null;
+    return null;
   }
   const r = e.rng();
   if (culpabilite < 1.5) {
@@ -496,6 +497,7 @@ function carteMeritee(
 function sanctionner(
   e: EtatMatch, p: Pion, rouge: boolean, motif: string, resume: string[],
 ): void {
+  rouge ||= p.stats.cartonsJaunes > 0;
   p.surLeTerrain = false;
   p.sanction = rouge ? 99_999 : 600; // dix minutes d'horloge, ou le reste du match
   if (rouge) p.stats.cartonsRouges += 1; else p.stats.cartonsJaunes += 1;
