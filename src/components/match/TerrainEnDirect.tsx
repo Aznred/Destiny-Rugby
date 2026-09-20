@@ -330,6 +330,10 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     x: borner(b.x + (affiche.possession === 'domicile' ? -4.4 : 4.4), 7, LONGUEUR - 7),
     y: borner(b.y + (affiche.ouvert === 'droite' ? -4.2 : 4.2), 4, LARGEUR - 4),
   };
+  // Une passe tourne peu ; un dégagement part en rotation bout par bout et le
+  // rebond la ralentit. La couture rend ce mouvement lisible même de loin.
+  const rotationBallon = (tempsAnimation * (affiche.vol?.type === 'pied'
+    || affiche.phase === 'ballonEnLAir' ? 760 : affiche.phase === 'ballonLibre' ? 390 : 470)) % 360;
 
   return (
     <div className="cel-scene" ref={scene}>
@@ -367,12 +371,16 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
           {porteur ? dessiner(porteur) : null}
           {!affiche.porteurId && affiche.conquete?.type !== 'touche' && <>
             {b.h > 0.02 && <ellipse cx={b.x} cy={b.y} rx={rayonBallon * 0.62} ry={rayonBallon * 0.34} fill="rgba(0,0,0,.3)" />}
-            <ellipse
-              className="cel-ballon"
-              cx={b.x} cy={b.y - b.h * 2.2}
-              rx={rayonBallon * 0.72 + b.h * 0.055} ry={rayonBallon * 0.41 + b.h * 0.035}
-              fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayonBallon * 0.16}
-            />
+            <g transform={`rotate(${rotationBallon.toFixed(1)} ${b.x} ${b.y - b.h * 2.2})`}>
+              <ellipse
+                className="cel-ballon"
+                cx={b.x} cy={b.y - b.h * 2.2}
+                rx={rayonBallon * 0.72 + b.h * 0.055} ry={rayonBallon * 0.41 + b.h * 0.035}
+                fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayonBallon * 0.16}
+              />
+              <path d={`M ${b.x - rayonBallon * .22} ${b.y - b.h * 2.2} L ${b.x + rayonBallon * .22} ${b.y - b.h * 2.2}`}
+                stroke="#80552d" strokeWidth={rayonBallon * .09} strokeLinecap="round" />
+            </g>
           </>}
         </g>
         {/* La flèche vit hors du groupe pivoté : elle est posée en coordonnées

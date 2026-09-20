@@ -1168,6 +1168,8 @@ export function MatchLive({
     x: borner(ballon.x + (e.possession === 'A' ? -4.4 : 4.4), 7, LONGUEUR - 7),
     y: borner(ballon.y + (e.ouvert === 1 ? -4.2 : 4.2), 4, LARGEUR - 4),
   };
+  const rotationBallon = (tempsAnimation * (e.vol?.type === 'pied'
+    || e.phase === 'ballonEnLAir' ? 760 : e.phase === 'ballonLibre' ? 390 : 470)) % 360;
 
   // La flèche de bord quand le ballon sort du cadre : sans elle, on perd le
   // ballon de vue dès qu'un dégagement part à l'opposé.
@@ -1289,14 +1291,18 @@ export function MatchLive({
                       {ballon.h > 0.02 && (
                         <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * 0.58} ry={rayon * 0.32} fill="rgba(0,0,0,.3)" />
                       )}
-                      <ellipse
-                        className="ml-ballon"
-                        cx={ballon.x}
-                        cy={ballon.y - ballon.h * 2.2}
-                        rx={rayon * 0.68 + ballon.h * 0.2}
-                        ry={rayon * 0.43 + ballon.h * 0.14}
-                        fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayon * 0.2}
-                      />
+                      <g transform={`rotate(${rotationBallon.toFixed(1)} ${ballon.x} ${ballon.y - ballon.h * 2.2})`}>
+                        <ellipse
+                          className="ml-ballon"
+                          cx={ballon.x}
+                          cy={ballon.y - ballon.h * 2.2}
+                          rx={rayon * 0.68 + ballon.h * 0.2}
+                          ry={rayon * 0.43 + ballon.h * 0.14}
+                          fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayon * 0.2}
+                        />
+                        <path d={`M ${ballon.x - rayon * .2} ${ballon.y - ballon.h * 2.2} L ${ballon.x + rayon * .2} ${ballon.y - ballon.h * 2.2}`}
+                          stroke="#80552d" strokeWidth={rayon * .08} strokeLinecap="round" />
+                      </g>
                     </>}
                     {/* ---------- 💬 CE QU'ILS SE DISENT ----------
                         ⚠️ Demande explicite : « en mode chambrage, petites
