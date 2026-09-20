@@ -54,6 +54,7 @@ import {
 } from './phasesArretees.js';
 import { decomposer } from './plan.js';
 import { avancerArbitre, avancerCorps, declencherChute, incidentDeContact, jouerGeste, visibiliteFaute } from './dynamique.js';
+import { organiserRuck, placerRegroupement, animerRegroupement, preparerChenille } from './regroupements.js';
 import * as C from './commentaire.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
@@ -583,6 +584,7 @@ function tick(e: EtatMatch): void {
   }
 
   // ── Déplacements ─────────────────────────────────────────────────────────
+  placerRegroupement(e);
   for (const p of e.pions) {
     if (!p.surLeTerrain || p.sanction > 0) continue;
     if (p === e.porteur) continue; // le porteur est piloté par sa course
@@ -591,6 +593,7 @@ function tick(e: EtatMatch): void {
     deplacer(p, dt);
   }
   resoudreContactsPhysiques(e);
+  animerRegroupement(e, dt);
   const incident = incidentDeContact(e);
   if (incident) {
     chauffer(e, 12);
@@ -600,10 +603,23 @@ function tick(e: EtatMatch): void {
 
   if (e.piedPrepare) {
     const attente = e.piedPrepare;
-    const auteur = e.pions.find((p) => p.id === attente.auteurId && p.surLeTerrain);
-    if (!auteur) { delete e.piedPrepare; return; }
+    const auteur = e.pions.find((p) => p.id === attente.auteurId && p.surLeTerrain && p.sanction <= 0);
+    if (!auteur) {
+      if (e.placement) delete e.placement[attente.auteurId];
+      delete e.piedPrepare;
+      return;
+    }
     auteur.cible = { ...attente.depuis };
-    if (distance(auteur.pos, attente.depuis) > .75) return;
+    // Le porteur est exclu de la boucle de déplacement normale. Lorsqu'un
+    // contact le décalait de son appui, attendre ici figeait toute la phase.
+    if (auteur === e.porteur) {
+      deplacer(auteur, dt);
+      e.ballon = { ...auteur.pos };
+    }
+    if (distance(auteur.pos, attente.depuis) > .75 || auteur.corps) {
+      delete attente.pretDepuis;
+      return;
+    }
     if (attente.pretDepuis === undefined) {
       attente.pretDepuis = e.sim;
       jouerGeste(e, auteur, attente.intention === 'renvoi' ? 'restart' : attente.intention === 'rasant' ? 'grubber'
@@ -2081,7 +2097,7 @@ function resoudrePlaquage(
     && offloader(e, porteur)) return;
 
   appliquerImpactPlaquage(porteur, defenseur);
-  jouerGeste(e, porteur, 'tackled', 1.4);
+  jouerGeste(e, porteur, Math.abs(porteur.corps?.direction ?? 0) < Math.PI / 2 ? 'fall_forward' : 'fall_back', 1.4);
   jouerGeste(e, defenseur, Math.hypot(defenseur.vitesse.x, defenseur.vitesse.y) > 3 ? 'tackle_low' : 'tackle', 1.35);
   formerRuck(e, { x: porteur.pos.x, y: porteur.pos.y }, { porteur, defenseur });
 }
@@ -2154,9 +2170,28 @@ function formerRuck(
   const sa = sens(e.possession);
   e.horsJeu = lieu.x + sa * 1.3;
   e.ligneDef = e.horsJeu;
+  organiserRuck(e);
 }
 
 function phaseRuck(e: EtatMatch): void {
+  const organisation = e.ruck?.organisation;
+  const chenille = organisation?.chenille;
+  if (chenille) {
+    const neuf = e.pions.find(p => p.id === chenille.neufId && p.surLeTerrain && p.sanction <= 0);
+    const pret = chenille.pretDepuis !== undefined && e.sim - chenille.pretDepuis >= 1.5;
+    if (neuf && pret) {
+      e.ruck = null; e.placement = null;
+      taperAuPied(e, neuf, 'chandelle');
+      return;
+    }
+    if (neuf && e.sim - chenille.debut < 10) { e.minuteur = Math.max(e.minuteur, .15); return; }
+    delete organisation!.chenille; // Liaison impossible : sortie normale, jamais blocage.
+  }
+  if (organisation && !organisation.chenilleEssayee && !chenille && e.minuteur <= 0 && e.ballonLent
+    && (e.ballon.x - MILIEU) * sens(e.possession) < -5) {
+    const neuf = e.pions.find(p => p.surLeTerrain && p.cote === e.possession && p.numero === 9);
+    if (neuf && preparerChenille(e, neuf)) return;
+  }
   if (e.minuteur > 0) return;
   const attaque = e.possession;
   const defense = adverse(attaque);
@@ -4257,7 +4292,7 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issu
       e.possession = p.cote;
       e.gardeRuck = 0.9;
       dire(e, 'ruck', p.cote, C.texteMatch('duelChenilleOk', { nom }), 0, true);
-      taperAuPied(e, p, 'chandelle');
+      preparerChenille(e, p);
       return tranche(true, 'choixArme');
     }
     case 'percussion': {

@@ -4,6 +4,7 @@ import YouTube from 'react-youtube';
 import './App.css';
 import { Analytics } from '@vercel/analytics/react'
 import { useGame } from './store/useGame';
+import { usePreferencesInterface } from './store/preferencesInterface';
 import { langueDepuisAdresseIP, t } from './lib/i18n';
 import { pageVue } from './lib/mesure';
 import { chantierVisible } from './lib/modeDev';
@@ -71,6 +72,13 @@ function LecteurMusical() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const playlistId = 'PLm90DCMQmtlkBigTzyX97RPgTL90ZYELs';
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
+  useEffect(() => {
+    if (!player) return;
+    const visibilite = () => { if (document.hidden) player.pauseVideo(); else if (aDemarre) player.playVideo(); };
+    document.addEventListener('visibilitychange', visibilite);
+    return () => document.removeEventListener('visibilitychange', visibilite);
+  }, [player, aDemarre]);
 
   // Détecte le tout premier clic du joueur n'importe où sur la page
   useEffect(() => {
@@ -134,6 +142,7 @@ function LecteurMusical() {
               bottom: '20px',
               left: '20px',
               zIndex: 9999,
+              pointerEvents: 'none',
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
@@ -162,6 +171,9 @@ function LecteurMusical() {
 }
 
 export default function App() {
+  const musique = usePreferencesInterface(s => s.musique);
+  const animationsMenus = usePreferencesInterface(s => s.animationsMenus);
+  useEffect(() => { document.documentElement.classList.toggle('interface-fluide', !animationsMenus); }, [animationsMenus]);
   const ecran = useGame((s) => s.ecran);
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
@@ -263,13 +275,11 @@ export default function App() {
       <main id="contenu-principal" tabIndex={-1}>
         {/* Un écran qui plante ne doit JAMAIS emporter la navigation avec lui. */}
         <Garde key={ecran} onRetour={() => setEcran('accueil')}>
-        <AnimatePresence mode="wait">
           <motion.div
             key={ecran}
-            initial={{ opacity: 0 }}
+            initial={animationsMenus ? { opacity: 0 } : false}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: animationsMenus ? 0.12 : 0 }}
           >
             {ecran === 'accueil' && <Accueil />}
             {ecran === 'creation' && <Creation />}
@@ -290,7 +300,6 @@ export default function App() {
               {ecran === 'collectionSolo' && <CollectionSolo />}
             </Suspense>
           </motion.div>
-        </AnimatePresence>
         </Garde>
       </main>
 
@@ -321,7 +330,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* TON NOUVEAU LECTEUR MUSICAL GLOBAL */}
-      <LecteurMusical />
+      {musique && <LecteurMusical />}
 
       <Analytics/>
     </div>

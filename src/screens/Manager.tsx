@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { t, nombre } from '../lib/i18n';
@@ -164,6 +164,8 @@ export function Manager() {
   const [divisionMarche, setDivisionMarche] = useState(manager?.division ?? 'top14');
   const [clubMarche, setClubMarche] = useState('');
   const [recherche, setRecherche] = useState('');
+  const rechercheDifferee = useDeferredValue(recherche);
+  const [limiteMarche, setLimiteMarche] = useState(24);
   const [poste, setPoste] = useState('');
   // Le vivier des jeunes : poste, âge et recherche. Vide = le rapport annuel.
   const [posteJeune, setPosteJeune] = useState('');
@@ -172,6 +174,7 @@ export function Manager() {
   const [vivierOuvert, setVivierOuvert] = useState(false);
   // Le marché mondial gagne le même filtre d'âge que le vivier.
   const [ageMarche, setAgeMarche] = useState('');
+  useEffect(() => setLimiteMarche(24), [divisionMarche, clubMarche, rechercheDifferee, poste, ageMarche]);
   const [matchOuvert, setMatchOuvert] = useState<AfficheComplete | null>(null);
   const [matchSelectionOuvert, setMatchSelectionOuvert] = useState(false);
   const [jeuneALiberer, setJeuneALiberer] = useState<string | null>(null);
@@ -207,11 +210,14 @@ export function Manager() {
     const debut = Math.max(0, Math.min(lignes.length - 5, rang - 2));
     return lignes.slice(debut, debut + 5);
   }, [classement, manager?.club]);
-  const cibles = useMemo(() => {
-    if (!manager?.club) return [];
+  const vivierMarche = useMemo(() => {
+    if (!manager?.club || vue !== 'marche') return [];
     const dejaRecrutees = new Set(manager.recrues.map((r) => r.joueur.id));
     return ciblesDuMarche(divisionMarche, manager.saison, manager.club, clubMarche)
-      .filter((c) => !dejaRecrutees.has(c.id))
+      .filter((c) => !dejaRecrutees.has(c.id));
+  }, [manager?.club, manager?.saison, manager?.recrues, divisionMarche, clubMarche, vue]);
+  const cibles = useMemo(() => {
+    return vivierMarche
       .filter((c) => !poste || c.poste === poste)
       // ⚠️ L'ÂGE EST UNE TRANCHE, PAS UN NOMBRE. Personne ne cherche « un
       //    joueur de 27 ans » : on cherche un espoir, un joueur dans ses
@@ -224,9 +230,9 @@ export function Manager() {
         if (ageMarche === 'pleine') return c.age >= 23 && c.age <= 29;
         return c.age >= 30;
       })
-      .filter((c) => !recherche.trim()
-        || `${c.nom} ${c.club} ${c.nation}`.toLowerCase().includes(recherche.trim().toLowerCase()));
-  }, [manager?.club, manager?.saison, manager?.recrues, divisionMarche, clubMarche, poste, recherche, ageMarche]);
+      .filter((c) => !rechercheDifferee.trim()
+        || `${c.nom} ${c.club} ${c.nation}`.toLowerCase().includes(rechercheDifferee.trim().toLowerCase()));
+  }, [vivierMarche, poste, rechercheDifferee, ageMarche]);
   const effectifBrut = useMemo(
     () => manager?.club ? effectifDuClub(manager.club, manager.saison) : [],
     [manager],
@@ -290,8 +296,8 @@ export function Manager() {
     [effectif, manager?.composition],
   );
   const detectionJeunes = useMemo(
-    () => manager?.club ? tableauDetectionManager(manager) : null,
-    [manager],
+    () => manager?.club && (vue === 'formation' || vue === 'recruteurs') ? tableauDetectionManager(manager) : null,
+    [manager, vue],
   );
   // Les âges réellement présents dans le vivier : on ne propose pas un filtre
   // « 19 ans » si le rayon n'en contient aucun.
@@ -1502,7 +1508,7 @@ export function Manager() {
               </div>
               <p className="manager-resultats-marche">{t('mgr.marche.resultats', { n: cibles.length })}</p>
               <div className="manager-cibles">
-                {cibles.map((cible) => {
+                {cibles.slice(0, limiteMarche).map((cible) => {
                   const connaissance = rapportConnaissance(avancee ?? undefined, cible, murs.recrutement);
                   // ⚠️ LE PRESTIGE ENTRE DANS LA PORTÉE : c'est la jauge centrale
                   // du mode, elle n'ouvrait que des BANCS et n'aidait jamais à
@@ -1631,6 +1637,9 @@ export function Manager() {
                 })}
                 {!cibles.length && <div className="carte manager-vide">{t('mgr.marche.aucun')}</div>}
               </div>
+              {cibles.length > limiteMarche && <button className="btn secondaire" onClick={() => setLimiteMarche(n => n + 24)}>
+                Afficher 24 joueurs de plus ({Math.min(limiteMarche, cibles.length)}/{cibles.length})
+              </button>}
             </div>
           )}
 

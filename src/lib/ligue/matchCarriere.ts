@@ -294,7 +294,7 @@ export interface PionDirect {
   id: string; numero: number; nom: string; poste: PosteId; cote: CoteEnLigne;
   x: number; y: number; vx: number; vy: number;
   numeroRole?: number;
-  corps?: { age: number; duree: number; direction: number; intensite: number; appuis?: number[] };
+  corps?: { age: number; duree: number; direction: number; intensite: number; appuis?: number[]; bras?: number[] };
 }
 
 export interface VolDirect {

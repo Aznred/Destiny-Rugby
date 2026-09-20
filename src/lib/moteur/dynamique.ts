@@ -8,7 +8,7 @@ export interface GesteMatch {
 export interface ArbitreMatch { pos: Vec; vitesse: Vec; regard: number }
 export interface CorpsMatch {
   age: number; duree: number; direction: number; intensite: number;
-  /** Bassin, épaules et deux appuis : masses contraintes dans le plan du terrain. */
+  /** Bassin, épaules, deux appuis et deux mains, contraints dans le plan. */
   points: Array<{ x: number; y: number; vx: number; vy: number }>;
 }
 
@@ -21,7 +21,12 @@ export function corpsPourAffichage(p: Pion, avance = 0) {
     const angle = Math.atan2(pied.y - bassin.y, pied.x - bassin.x) - c.direction - Math.atan2(i === 2 ? .22 : -.22, -.35);
     return Math.round(borner(Math.atan2(Math.sin(angle), Math.cos(angle)) * 180 / Math.PI, -40, 40));
   });
-  return { age: c.age + avance, duree: c.duree, direction: c.direction, intensite: c.intensite, appuis };
+  const bras = c.points.slice(4, 6).map((main, i) => {
+    const epaule = c.points[1]!;
+    const angle = Math.atan2(main.y - epaule.y, main.x - epaule.x) - c.direction - (i === 0 ? Math.PI / 2 : -Math.PI / 2);
+    return Math.round(borner(Math.atan2(Math.sin(angle), Math.cos(angle)) * 180 / Math.PI, -50, 50));
+  });
+  return { age: c.age + avance, duree: c.duree, direction: c.direction, intensite: c.intensite, appuis, bras };
 }
 
 export function jouerGeste(e: EtatMatch, p: Pion, clip: string, duree = 1.2): void {
@@ -89,9 +94,9 @@ export function declencherChute(p: Pion, impulsion: Vec, duree = 1.5): void {
   const nx = impulsion.x / n, ny = impulsion.y / n;
   p.corps = {
     age: 0, duree, direction: Math.atan2(ny, nx), intensite: Math.min(1, n / 5),
-    points: [0, .48, -.35, -.35].map((long, i) => ({
-      x: p.pos.x + nx * long - ny * (i === 2 ? .22 : i === 3 ? -.22 : 0),
-      y: p.pos.y + ny * long + nx * (i === 2 ? .22 : i === 3 ? -.22 : 0),
+    points: [0, .48, -.35, -.35, .48, .48].map((long, i) => ({
+      x: p.pos.x + nx * long - ny * (i === 2 ? .22 : i === 3 ? -.22 : i === 4 ? .42 : i === 5 ? -.42 : 0),
+      y: p.pos.y + ny * long + nx * (i === 2 ? .22 : i === 3 ? -.22 : i === 4 ? .42 : i === 5 ? -.42 : 0),
       vx: impulsion.x * (i === 1 ? 1 : .7), vy: impulsion.y * (i === 1 ? 1 : .7),
     })),
   };
@@ -106,13 +111,15 @@ export function avancerCorps(e: EtatMatch, dt: number): void {
     c.age += dt;
     if (c.age >= c.duree) { delete p.corps; continue; }
     const avant = { ...p.pos };
+    const voisins = e.pions.filter(q => q !== p && q.surLeTerrain && q.sanction <= 0
+      && Math.abs(q.pos.x - p.pos.x) < 4 && Math.abs(q.pos.y - p.pos.y) < 4);
     const pas = dt / 5;
     for (let k = 0; k < 5; k++) {
       for (const q of c.points) {
-        q.vx *= Math.exp(-4 * pas); q.vy *= Math.exp(-4 * pas);
+        q.vx *= Math.exp(-2.8 * pas); q.vy *= Math.exp(-2.8 * pas);
         q.x = borner(q.x + q.vx * pas, .2, LONGUEUR - .2);
         q.y = borner(q.y + q.vy * pas, .2, LARGEUR - .2);
-        for (const voisin of e.pions) {
+        for (const voisin of voisins) {
           if (voisin === p || !voisin.surLeTerrain || voisin.sanction > 0) continue;
           const dx = q.x - voisin.pos.x, dy = q.y - voisin.pos.y;
           const d = Math.hypot(dx, dy);
@@ -125,7 +132,8 @@ export function avancerCorps(e: EtatMatch, dt: number): void {
         }
       }
       for (let it = 0; it < 3; it++) {
-        for (const [i, j, longueur] of [[0, 1, .48], [0, 2, .414], [0, 3, .414], [2, 3, .44]]) {
+        for (const [i, j, longueur] of [[0, 1, .48], [0, 2, .414], [0, 3, .414], [2, 3, .44], [1, 4, .42], [1, 5, .42]]) {
+          if (!c.points[i] || !c.points[j]) continue; // anciennes sauvegardes à quatre masses
           const a = c.points[i]!, b = c.points[j]!;
           const dx = b.x - a.x, dy = b.y - a.y, d = Math.max(.001, Math.hypot(dx, dy));
           const correction = (d - longueur) / d * .5;

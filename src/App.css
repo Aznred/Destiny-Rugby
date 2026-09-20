@@ -8509,14 +8509,18 @@ select:focus {
 @media (max-width: 760px) {
   .manager-ovale { overflow-y: auto; padding-right: 0; overscroll-behavior: contain; }
   .x-app.x-manager-embarque {
-    height: clamp(390px, calc(100dvh - 205px), 720px);
-    min-height: 390px;
-    max-height: 720px;
-    overflow: hidden;
+    display: block;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
   }
-  .x-manager-embarque .x-centre { height: 100%; min-height: 0; overflow: hidden; }
+  .x-manager-embarque .x-rail { height: auto; }
+  .x-manager-embarque .x-centre { height: auto; min-height: 0; overflow: visible; }
   .x-manager-embarque .x-messagerie {
-    height: calc(100% - 54px);
+    display: flex;
+    flex-direction: column;
+    height: auto;
     min-height: 0;
     grid-template-rows: auto minmax(0, 1fr);
   }
@@ -8526,19 +8530,20 @@ select:focus {
     min-height: 66px;
     max-height: 66px;
   }
-  .x-manager-embarque .x-fil-messages { height: 100%; min-height: 0; overflow: hidden; }
+  .x-manager-embarque .x-fil-messages { height: auto; min-height: 0; overflow: visible; }
   .x-manager-embarque .x-conv-tete { flex: 0 0 auto; padding-block: .5rem; }
   .x-manager-embarque .x-bulles {
-    flex: 1 1 80px;
-    min-height: 64px;
-    max-height: none;
+    flex: 0 0 auto;
+    min-height: 0;
+    max-height: 24dvh;
+    overflow-y: auto;
     padding: .65rem;
     overscroll-behavior: contain;
   }
   .x-manager-embarque .x-nego {
-    flex: 0 1 auto;
-    max-height: 55%;
-    overflow-y: auto;
+    flex: 0 0 auto;
+    max-height: none;
+    overflow: visible;
     padding: .65rem .7rem calc(.7rem + env(safe-area-inset-bottom, 0px));
     overscroll-behavior: contain;
   }
@@ -8553,4 +8558,16 @@ select:focus {
   .x-manager-embarque .x-nego-leviers button,
   .x-manager-embarque .x-nego-oui,
   .x-manager-embarque .x-nego-non { min-height: 46px; touch-action: manipulation; }
+  .x-manager .x-conv-tete { flex-wrap: wrap; overflow-wrap: anywhere; }
+  .x-manager .x-conv-tete button { min-width: 0; max-width: 100%; text-align: left; }
+  .x-manager .manager-x-termes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .x-manager .x-nego-leviers { grid-template-columns: minmax(0, 1fr); }
+  .x-manager .x-nego button { white-space: normal; overflow-wrap: anywhere; }
 }
+
+.reglages-confort label { display: flex; gap: .7rem; align-items: center; min-height: 44px; }
+.reglages-confort input { width: 20px; height: 20px; flex: none; }
+.interface-fluide :is(.carte, .nav, .x-tetes, .manager-onglets, .overlay) { backdrop-filter: none; }
+.interface-fluide :is(.ballon-attente, .accueil-online-public i, .hero-canvas-skel) { animation: none; }
+.interface-fluide :is(.btn, .nav button, .manager-onglets button) { transition: color .1s, background-color .1s; }
+.interface-fluide :is(.manager-marche .carte, .manager-x-timeline .x-post) { content-visibility: auto; contain-intrinsic-size: auto 180px; }

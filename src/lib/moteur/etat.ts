@@ -293,6 +293,7 @@ export interface BallonLibre {
 
 /** Contexte du duel au sol, conservé entre le plaquage et la sortie. */
 export interface RuckEnCours {
+  organisation?: import('./regroupements').OrganisationRuck;
   porteurId?: string;
   plaqueurId?: string;
   attaque: Cote;

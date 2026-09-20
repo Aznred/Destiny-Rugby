@@ -13,6 +13,7 @@ import type { Theme } from '../types';
 import { LANGUES, nombre, t, tn } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
 import { Icone } from './Icone';
+import { usePreferencesInterface } from '../store/preferencesInterface';
 
 // Les huit ambiances. `apercu` est le dégradé montré sur la pastille — il
 // reprend exactement les deux extrémités de la rampe de fond du thème.
@@ -41,6 +42,10 @@ function delaiLisible(reprise: number | undefined): string {
 }
 
 export function Reglages({ onFermer }: Props) {
+  const musique = usePreferencesInterface(s => s.musique);
+  const setMusique = usePreferencesInterface(s => s.setMusique);
+  const animationsMenus = usePreferencesInterface(s => s.animationsMenus);
+  const setAnimationsMenus = usePreferencesInterface(s => s.setAnimationsMenus);
   const iaActivee = useGame((s) => s.iaActivee);
   const theme = useGame((s) => s.theme);
   const langue = useGame((s) => s.langue);
@@ -100,6 +105,12 @@ export function Reglages({ onFermer }: Props) {
       >
         <div className="eyebrow">{t('reg.eyebrow')}</div>
         <h2 id="reglages-titre">{t('reg.titre')}</h2>
+        <div className="champ reglages-confort">
+          <label><input type="checkbox" checked={musique} onChange={e => setMusique(e.target.checked)} /> Musique d’ambiance</label>
+          <p className="aide">Désactiver arrête le lecteur immédiatement. Ton choix est conservé.</p>
+          <label><input type="checkbox" checked={animationsMenus} onChange={e => setAnimationsMenus(e.target.checked)} /> Effets décoratifs des menus</label>
+          <p className="aide">Désactivés par défaut pour une navigation plus réactive. Les animations du match restent actives.</p>
+        </div>
         <p className="aide">{t('reg.iaAide')}</p>
 
         {/* ⚠️ LE QUOTA N'EST PAS UNE PANNE. C'est le SEUL endroit du jeu où

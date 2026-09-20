@@ -70,7 +70,8 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
     if (distanceBallon < 10) return 'idle';
   }
   if (terrain.phase === 'maul' && distanceBallon < 5) return 'maul';
-  if (terrain.phase === 'ruck' && distanceBallon < 4.2) return p.cote === terrain.possession ? 'clearout' : 'jackal';
+  // Les rôles du ruck viennent du moteur : la proximité seule ne déclenche
+  // plus un déblayage à vide chez tous les joueurs du regroupement.
   if (terrain.vol?.auteurId === p.id && terrain.vol.ecoule < 1.4) return terrain.vol.type === 'pied'
     ? terrain.vol.intention === 'renvoi' ? 'restart' : terrain.vol.intention === 'rasant' ? 'grubber'
       : terrain.vol.intention === 'chandelle' ? 'chip' : terrain.vol.intention === 'drop' ? 'drop' : role === 9 ? 'box_kick' : 'punt'
@@ -132,6 +133,8 @@ function dessinerSprite(
     pose.bones.rightShin.rotation -= impact * 28;
     pose.bones.leftThigh.rotation += corps.appuis?.[0] ?? 0;
     pose.bones.rightThigh.rotation += corps.appuis?.[1] ?? 0;
+    pose.bones.leftForearm.rotation += corps.bras?.[0] ?? 0;
+    pose.bones.rightForearm.rotation += corps.bras?.[1] ?? 0;
     pose.root.rotation += Math.sin(corps.direction) * impact * 12;
   }
   // Le ballon du terrain disparaît dès qu'un joueur le porte : c'est alors

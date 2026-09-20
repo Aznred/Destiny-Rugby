@@ -245,7 +245,8 @@ export function deplacer(p: Pion, dt: number): number {
   const vMax = vitesseDisponible(p) * p.effort;
   // On freine à l'approche de la cible : sans ça les pions oscillent autour
   // (et un replacement d'un mètre ne mérite pas un sprint).
-  const vVoulue = d < 0.7 ? 0 : Math.min(vMax, (d - 0.4) / 0.35);
+  const precision = p.role === 'ruck' ? .18 : .7;
+  const vVoulue = d < precision ? 0 : Math.min(vMax, Math.max(0, d - precision * .55) / .35);
   const cibleVx = d < 1e-6 ? 0 : (dx / d) * vVoulue;
   const cibleVy = d < 1e-6 ? 0 : (dy / d) * vVoulue;
 

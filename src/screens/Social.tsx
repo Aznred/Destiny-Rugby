@@ -1511,7 +1511,12 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
   );
 
   useEffect(() => { vivreSemaine(); }, [vivreSemaine]);
-  useEffect(() => { bas.current?.scrollIntoView({ block: 'end' }); }, [messagesActifs.length]);
+  useEffect(() => {
+    // Ne jamais déplacer la page entière jusqu'au dernier message : cela
+    // cachait l'offre et ses boutons sous le clavier/la navigation mobile.
+    const fil = bas.current?.parentElement;
+    if (fil) fil.scrollTop = fil.scrollHeight;
+  }, [messagesActifs.length, actif]);
   useEffect(() => { if (!actif && dossiers[0]) setActif(dossiers[0].pseudo); }, [actif, dossiers]);
   useEffect(() => { if (actif) lireConversation(actif); }, [actif, lireConversation]);
   useEffect(() => {
