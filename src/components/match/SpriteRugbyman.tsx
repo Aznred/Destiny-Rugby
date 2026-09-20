@@ -13,7 +13,7 @@ export type AnimationRugby = string;
 const CLIPS = new Map(rugbyAnimations.map(clip => [clip.id.replace(/^rugby_/, ''), clip]));
 // Le générateur produit du pixel art : une surface Retina de 190×290 par joueur
 // gaspillait quatre fois plus de pixels sans ajouter de détail visible. Trente
-// joueurs + l'arbitre restent ainsi nettement sous le budget d'une image 60 Hz.
+// joueurs + l'arbitre demandent ainsi moins de travail à chaque image.
 const LARGEUR_CANVAS = 96;
 const HAUTEUR_CANVAS = 146;
 
@@ -39,7 +39,7 @@ const TYPES: Record<ReturnType<typeof apparenceJoueurMatch>['morphologie'], Body
   pilier: 'prop', avant: 'forward', athletique: 'athletic', arriere: 'back', ailier: 'winger',
 };
 
-function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: boolean, positionPorteur?: Vec): AnimationRugby {
+function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: boolean): AnimationRugby {
   const instant = terrain.simulation ?? 0;
   const geste = terrain.gestes?.filter((g) => g.joueurId === p.id && instant >= g.debut && instant < g.debut + g.duree).at(-1);
   if (geste && CLIPS.has(geste.clip)) return geste.clip;
@@ -47,7 +47,7 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   if (terrain.preparationTir?.buteurId === p.id) {
     const k = terrain.preparationTir.progression;
     return k > .85 ? terrain.preparationTir.transformation ? 'conversion' : 'penalty'
-      : k > .3 && k < .5 ? 'walk' : k < .3 && Math.hypot(p.vx, p.vy) > .5 ? 'jog' : 'ready';
+      : k > .3 && k < .5 ? 'walk' : k < .3 ? Math.hypot(p.vx, p.vy) > .5 ? 'jog' : k < .15 ? 'pickup' : 'ready' : 'ready';
   }
   if (terrain.aplatissage?.marqueurId === p.id) return terrain.aplatissage.progression > .78 ? 'celebrate' : 'try';
   if (terrain.contact && terrain.contact.progression < 1 && terrain.contact.porteurId === p.id) return 'tackled';
@@ -76,7 +76,6 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
       : terrain.vol.intention === 'chandelle' ? 'chip' : terrain.vol.intention === 'drop' ? 'drop' : role === 9 ? 'box_kick' : 'punt'
     : terrain.vol.intention === 'offload' ? 'offload' : terrain.vol.vers.y < terrain.vol.de.y ? 'pass_left' : 'pass';
   if (terrain.vol?.receveurId === p.id) return 'catch';
-  if (positionPorteur && p.cote !== terrain.possession && Math.hypot(pos.x - positionPorteur.x, pos.y - positionPorteur.y) < 2.2) return 'tackle';
   if (terrain.phase === 'ballonLibre' && distanceBallon < 1.8) return 'pickup';
   if (porteur) return vitesse > 7.2 ? 'sprint_ball' : vitesse > .7 ? 'run_ball' : 'ready';
   if (p.cote !== terrain.possession && Math.abs(p.vy) > Math.abs(p.vx) * 1.5 && vitesse > .7) return 'sidestep';
@@ -131,6 +130,8 @@ function dessinerSprite(
     const impact = Math.sin(Math.min(1, corps.age / .6) * Math.PI) * corps.intensite;
     pose.bones.leftForearm.rotation += impact * 22;
     pose.bones.rightShin.rotation -= impact * 28;
+    pose.bones.leftThigh.rotation += corps.appuis?.[0] ?? 0;
+    pose.bones.rightThigh.rotation += corps.appuis?.[1] ?? 0;
     pose.root.rotation += Math.sin(corps.direction) * impact * 12;
   }
   // Le ballon du terrain disparaît dès qu'un joueur le porte : c'est alors
@@ -150,11 +151,11 @@ function dessinerSprite(
   });
 }
 
-function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, positionPorteur, redresser, hauteurMetres, temps, angleVue = 0 }: Props) {
+function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, redresser, hauteurMetres, temps, angleVue = 0 }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useMemo(() => new CharacterRenderer(), []);
   const character = useMemo(() => personnage(pion, maillot), [pion.id, pion.nom, pion.numero, pion.poste, maillot]);
-  const animation = animationDe(pion, position, terrain, porteur, positionPorteur);
+  const animation = animationDe(pion, position, terrain, porteur);
   const clip = CLIPS.get(animation) ?? CLIPS.get('idle')!;
   const sensAffichage = useRef({ x: pion.cote === 'exterieur' ? -1 : 1, y: 0 });
   // On conserve le dernier vrai sens de course pendant le freinage. Le joueur
@@ -180,7 +181,8 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, pos
   const graine = graineVisuelleMatch(pion.id);
   const derniereImage = useRef('');
   useLayoutEffect(() => {
-    const cle = `${character.id}:${maillot.principal}:${maillot.secondaire}:${maillot.motif}:${clip.id}:${orientation}:${ballonAnime}:${Math.floor((progression ?? temps) * 24)}:${Math.floor((pion.corps?.age ?? 0) * 24)}`;
+    const instantClip = progression === undefined ? temps : progression * clip.frames.length / clip.fps;
+    const cle = `${character.id}:${maillot.principal}:${maillot.secondaire}:${maillot.motif}:${clip.id}:${orientation}:${ballonAnime}:${Math.floor(instantClip * 24)}:${Math.floor((pion.corps?.age ?? 0) * 24)}`;
     if (cle === derniereImage.current) return;
     derniereImage.current = cle;
     if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps);

@@ -74,6 +74,7 @@ assert.equal(entrant.numeroMaillot, maillot);
 assert.equal(entrant.poste, sortant.poste);
 assert.ok(entrant.buteur && entrant.capitaine);
 assert.equal(new Set(changement.pions.filter(q => q.cote === 'A' && q.surLeTerrain).map(q => q.numero)).size, 15);
+avancer(changement, .15);
 assert.equal(bilan(changement).parJoueur.find(q => q.nom === entrant.nom)?.numero, maillot, 'La feuille conserve le numéro porté.');
 
 const a: TerrainDirect = {
