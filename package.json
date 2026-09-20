@@ -51,6 +51,7 @@
     "verify:scenarios-match": "vite-node scripts/verifierScenariosMatch.ts",
     "verify:fluidite-direct": "vite-node scripts/verifierFluiditeDirect.ts",
     "verify:animations-match": "vite-node scripts/verifierAnimationsMatch.ts",
+    "verify:dynamique-match": "vite-node scripts/verifierDynamiqueMatch.ts",
     "verify:equilibre-match": "vite-node scripts/verifierEquilibreMatch.ts",
     "verify:notes-allrugby": "vite-node scripts/verifierRevalorisationAllRugby.ts",
     "verify:scale-direct": "vite-node scripts/verifierChargeDirect.ts",

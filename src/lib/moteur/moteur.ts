@@ -612,6 +612,10 @@ function tick(e: EtatMatch): void {
     }
     if (e.sim - attente.pretDepuis < .65) return;
     delete e.piedPrepare;
+    if (e.placement) {
+      delete e.placement[auteur.id];
+      if (Object.keys(e.placement).length === 0) e.placement = null;
+    }
     lancerVol(e, auteur, attente.arrivee, attente.intention, attente.duree, attente.hauteur, attente.depuis, true);
     return;
   }
@@ -1948,6 +1952,12 @@ function amorcerGeste(e: EtatMatch, porteur: Pion, defenseur: Pion, geste: Actio
 function resoudrePlaquage(
   e: EtatMatch, porteur: Pion, defenseur: Pion, abouti?: boolean,
 ): void {
+  // Une décision peut être prise avant l'arrivée du défenseur. Aucun choc ni
+  // chute à distance : l'intention reste armée jusqu'au contact réel.
+  if (distance2(porteur.pos, defenseur.pos) > 1.6 ** 2) {
+    defenseur.cible = { ...porteur.pos };
+    return;
+  }
   // ⚠️ LE GESTE ILLÉGAL SE JOUE AVANT LE DUEL, ET IL LE REMPLACE. Un plaquage
   // haut n'est pas un plaquage raté : l'arbitre siffle, le ballon change de
   // camp, et la température monte d'un cran. Ça vaut pour les TRENTE pions —
@@ -3496,6 +3506,7 @@ function gererRemplacements(e: EtatMatch): void {
 }
 
 function clorePeriode(e: EtatMatch): void {
+  delete e.piedPrepare;
   if (e.periode === 1) {
     e.periode = 2;
     e.sirene = false;
@@ -4124,11 +4135,7 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issu
       // `resoudrePlaquage` que ce plaquage est LANCÉ (bonus de force, mais
       // risque de plaquage haut doublé). L’issue, elle, est imposée.
       demanderAction(e, action);
-      if (reussi && action === 'monter') {
-        // Monter et réussir, c’est plaquer AVANT la ligne d’avantage : on le
-        // matérialise en ramenant le porteur d’un mètre et demi.
-        porteur.pos.x -= sens(porteur.cote) * 1.5;
-      }
+      if (distance2(porteur.pos, p.pos) > 1.6 ** 2) return arme();
       resoudrePlaquage(e, porteur, p, reussi);
       return tranche(reussi, reussi ? 'choixArme' : 'duelContactKo');
     }
@@ -4161,7 +4168,7 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issu
       // trancher — le geste reste armé, et `resoudrePlaquage` le jouera au
       // contact, avec la même formule. On le dit (`joue: false`) au lieu de
       // faire semblant d’avoir gagné.
-      if (e.porteur !== p || !adv) return arme();
+      if (e.porteur !== p || !adv || distance2(p.pos, adv.pos) > 1.6 ** 2) return arme();
       // ⚠️ MON SUCCÈS EST L’ÉCHEC DU PLAQUEUR. Le duel est le même objet vu des
       // deux côtés : on impose donc `abouti = !reussi`.
       resoudrePlaquage(e, p, adv, !reussi);

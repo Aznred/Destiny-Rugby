@@ -71,6 +71,7 @@ import {
 } from '../moteur/moteur.js';
 import type { EtatMatch, IntentionPied, Phase, TypeLancement, Vol, VolRecent } from '../moteur/etat.js';
 import type { Cote } from '../moteur/terrain.js';
+import { corpsPourAffichage } from '../moteur/dynamique.js';
 import { scorePossible } from '../championnat.js';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../compositionManager.js';
 import { adequationAuPoste, facteurDePerformance } from '../carteJoueur.js';

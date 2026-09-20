@@ -212,8 +212,8 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       let i = 0;
       while (i < file.length - 2 && file[i + 1].instant <= instant) i++;
       let a = file[i];
-      let b = file[i + 1];
-      if (b && instant > b.instant && i + 1 === file.length - 1) { a = b; b = undefined!; }
+      let b: Releve | undefined = file[i + 1];
+      if (b && instant > b.instant && i + 1 === file.length - 1) { a = b; b = undefined; }
       let u = 0;
       let dtSim = 0;
       if (b) {

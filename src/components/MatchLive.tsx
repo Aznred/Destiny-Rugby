@@ -98,6 +98,7 @@ import { ORDRES } from '../lib/moteur/bagarre';
 import { ajouterCommentaire, type ActionJoueur, type Commentaire, type NiveauMatch, type TypeCommentaire } from '../lib/moteur/etat';
 import { competitionEffective } from '../lib/divisions';
 import { LARGEUR, LONGUEUR, borner, type Vec } from '../lib/moteur/terrain';
+import { corpsPourAffichage } from '../lib/moteur/dynamique';
 import { Camera, COUVERTURE, angleDeVue, type Cadrage, type Vue } from '../lib/moteur/camera';
 import {
   facteurTempo, momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
