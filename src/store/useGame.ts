@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { projectionMemoisee, stockageCarriereOptimise } from '../lib/persistanceNavigation';
 import type {
   Attributs,
   Ecran,
@@ -62,7 +63,7 @@ import {
   internationalEnDirect,
 } from '../lib/international';
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
-import { appliquerCompte, ecrireCompte, stockageParEmplacement } from '../lib/sauvegardes';
+import { appliquerCompte, ecrireCompte } from '../lib/sauvegardes';
 import {
   chargerAncienneCollectionSolo, normaliserCollectionSolo,
   type EtatCollectionSolo, type ResultatPackSolo,
@@ -82,7 +83,7 @@ let fileStatsReelles: Promise<void> = Promise.resolve();
 //
 // Il gère aussi le cas des scripts de vérification et du rendu serveur, qui
 // n'ont pas de `localStorage` : le repli mémoire vit dans l'adaptateur.
-const stockageJeu = createJSONStorage(() => stockageParEmplacement());
+const stockageJeu = stockageCarriereOptimise<Partial<GameState>>();
 
 // Combien de week-ends de ce type se sont écoulés AVANT cette semaine.
 function passeesDuType(numeroSemaine: number, type: string): number {
@@ -7352,7 +7353,7 @@ export const useGame = create<GameState>()(
         // peut pas lire le store sans créer un cycle d'imports).
         definirCleGroqJoueur(etat?.groqKey ?? '');
       },
-      partialize: (s) => ({
+      partialize: projectionMemoisee((s: GameState) => ({
         joueur: s.joueur,
         // ⚠️ SANS CETTE LIGNE, UNE CARRIÈRE D’ENTRAÎNEUR DISPARAÎT AU
         //    RECHARGEMENT. Attrapé en jouant : un rechargement de page, et le
@@ -7416,7 +7417,7 @@ export const useGame = create<GameState>()(
         tenorKey: s.tenorKey,
         groqKey: s.groqKey,
         modele: s.modele,
-      }),
+      })),
 
       /**
        * ⚠️ CE QUI APPARTIENT À L'APPAREIL SE POSE PAR-DESSUS LA PARTIE.

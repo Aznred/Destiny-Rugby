@@ -47,6 +47,8 @@ function gait(id:string,name:string,amplitude:number,seconds:number,ball=false):
 
 function buildLibrary():AnimationClip[]{
   const clips:AnimationClip[]=[
+    action('bump','Percussion — raffut puissant','Contact','Ballon protégé, appui fort et extension du bras au contact.',[ready(),stance({lean:32,y:8,arms:[15,75,100,-115],legs:[45,85,130,-35],ball:'RIGHT_HAND'}),stance({lean:22,y:12,arms:[0,0,100,-115],legs:[110,-25,55,75],ball:'RIGHT_HAND'}),ready()],1.1),
+    action('tackle_drive','Plaquage offensif — recul imposé','Contact','Épaule basse, bras fermés et poussée avant la chute commune.',[stance({lean:28,arms:[40,-30,45,-35]}),stance({lean:68,y:28,arms:[0,85,5,90],legs:[45,85,130,-55]}),stance({lean:76,y:35,arms:[0,100,5,100],legs:[115,-40,50,80]}),stance({lean:88,y:86,arms:[0,70,5,70],legs:[165,-10,175,-20]})],1.35),
     action('support_arrive','Soutien — arrivée basse','Ruck','Derniers appuis, mains prêtes et entrée dans la porte.',[stance({lean:20,legs:[48,65,122,-35],arms:[50,-40,70,-55]}),stance({lean:38,y:18,legs:[115,-30,52,70],arms:[25,-25,35,-35]}),crouch()],.75),
     action('ruck_bind','Ruck — liaison et protection','Ruck','Liaison aux épaules, dos bas et appuis alternés.',[stance({lean:65,y:22,arms:[10,80,15,85],legs:[45,85,120,-50]}),stance({lean:70,y:25,arms:[8,85,12,90],legs:[65,60,110,-35]}),stance({lean:64,y:22,arms:[10,80,15,85],legs:[45,85,120,-50]})],1.1,true),
     action('clearout_drive','Déblayage — impact et poussée','Ruck','Épaule engagée, fermeture des bras puis trois appuis vers l’avant.',[crouch(),stance({lean:70,y:28,arms:[0,60,5,75],legs:[45,90,135,-60]}),stance({lean:76,y:24,arms:[0,90,5,95],legs:[115,-45,50,80]}),stance({lean:68,y:20,arms:[10,80,15,85],legs:[50,80,115,-45]})],1.25),
@@ -140,7 +142,7 @@ function buildLibrary():AnimationClip[]{
 }
 
 export const rugbyAnimations=buildLibrary()
-export const RUGBY_LIBRARY_VERSION=3
+export const RUGBY_LIBRARY_VERSION=4
 export function installRugbyLibrary(project:ProjectData,force=false):number {
   if(!force&&(project.rugbyLibraryVersion??0)>=RUGBY_LIBRARY_VERSION)return 0
   const existing=new Set(project.animations.map(c=>c.id)),missing=rugbyAnimations.filter(c=>!existing.has(c.id))

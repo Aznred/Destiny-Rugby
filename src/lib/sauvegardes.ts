@@ -334,10 +334,13 @@ export function lireCompte(): Record<string, unknown> {
  * `set()` du store, une comparaison de références écrirait à chaque frappe.
  */
 let dernierCompte = '';
+let dernierExtrait: Record<string, unknown> | undefined;
 export function ecrireCompte(etat: Record<string, unknown>): void {
+  if (dernierExtrait && CLES_COMPTE.every(cle => etat[cle] === dernierExtrait![cle])) return;
   const extrait: Record<string, unknown> = {};
   for (const cle of CLES_COMPTE) if (etat[cle] !== undefined) extrait[cle] = etat[cle];
   const json = JSON.stringify(extrait);
+  dernierExtrait = extrait;
   if (json === dernierCompte) return;
   dernierCompte = json;
   try { stockage().setItem(CLE_COMPTE, json); } catch { /* stockage plein */ }

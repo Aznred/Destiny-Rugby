@@ -341,6 +341,7 @@ export interface PlanDeScore {
 }
 
 export interface EtatMatch {
+  dropEnCours?: { auteurId: string; reussi: boolean };
   arbitre?: import('./dynamique.js').ArbitreMatch;
   gestes?: import('./dynamique.js').GesteMatch[];
   incidentApres?: number;

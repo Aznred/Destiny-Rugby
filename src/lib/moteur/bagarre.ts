@@ -214,6 +214,7 @@ export function chambrer(e: EtatMatch, auteur: Pion, cible: Pion): void {
 
 /** Ce qu'un plaquage irrégulier vaut à l'arbitre. */
 export interface Irregularite {
+  cathedrale?: boolean;
   /** Le motif tel que l'arbitre l'annonce (traduit par `motifLocalise`). */
   motif: string;
   /** Le geste a-t-il visé la tête ? Le carton n'est pas le même. */
@@ -242,9 +243,11 @@ export function irregularite(e: EtatMatch, plaqueur: Pion): Irregularite | null 
   if (e.rng() >= p) return null;
   // Deux tiers de plaquages hauts, un tiers de plaquages en retard : c'est la
   // répartition des cartons du rugby moderne, où la tête est la priorité.
-  const haut = e.rng() < 0.66;
+  const cathedrale = plaqueur.puissance > 65 && e.rng() < .15;
+  const haut = cathedrale || e.rng() < 0.66;
   return {
-    motif: haut ? 'plaquage haut' : 'plaquage en retard',
+    cathedrale,
+    motif: cathedrale ? 'plaquage cathédrale' : haut ? 'plaquage haut' : 'plaquage en retard',
     haut,
   };
 }

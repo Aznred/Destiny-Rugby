@@ -39,6 +39,15 @@ export function creerArbitre(): ArbitreMatch {
   return { pos: { x: MILIEU - 7, y: AXE - 9 }, vitesse: { x: 0, y: 0 }, regard: 0 };
 }
 
+/** Le botteur porte visuellement le ballon durant l'armé, même sur un renvoi. */
+export function porteurPourAffichage(e: EtatMatch): string | undefined {
+  if (e.porteur) return e.porteur.id;
+  if (!e.piedPrepare || e.vol) return undefined;
+  const p = e.pions.find(q => q.id === e.piedPrepare!.auteurId && q.surLeTerrain && q.sanction <= 0);
+  return p && !p.corps && Math.hypot(p.pos.x - e.piedPrepare.depuis.x, p.pos.y - e.piedPrepare.depuis.y) < 1
+    ? p.id : undefined;
+}
+
 export function avancerArbitre(e: EtatMatch, dt: number): void {
   const a = e.arbitre ??= creerArbitre();
   const v = e.porteur?.vitesse ?? { x: 0, y: 0 };
@@ -152,16 +161,16 @@ export function avancerCorps(e: EtatMatch, dt: number): void {
 
 /** Les mauvais gestes naissent d'un duel proche, tendu et indiscipliné. */
 export function incidentDeContact(e: EtatMatch): { fautif: Pion; victime: Pion; motif: string; rouge: boolean; vu: boolean } | null {
-  if (e.phase !== 'jeuCourant' || e.tension < 45 || e.sim < (e.incidentApres ?? 0)) return null;
+  if (e.phase !== 'jeuCourant' || e.tension < 35 || e.sim < (e.incidentApres ?? 0)) return null;
   e.incidentApres = e.sim + 2;
-  const actifs = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0 && !p.corps);
+  const actifs = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0);
   for (const fautif of actifs) {
-    if (fautif.discipline > 68 || fautif === e.porteur) continue;
+    if (fautif.corps || fautif.discipline > 68 || fautif === e.porteur) continue;
     const victime = actifs.find((q) => q.cote !== fautif.cote && Math.hypot(q.pos.x - fautif.pos.x, q.pos.y - fautif.pos.y) < 1.25);
-    if (!victime || e.rng() > .004 * e.tension / 80) continue;
+    if (!victime || e.rng() > .012 * e.tension / 80 * (1.4 - fautif.discipline / 100)) continue;
     const poursuite = Math.hypot(victime.vitesse.x, victime.vitesse.y) > 3;
-    const auSol = victime.battu > 0;
-    const clip = poursuite ? 'foul_trip' : auSol ? 'foul_kick' : 'foul_punch';
+    const auSol = !!victime.corps;
+    const clip = auSol ? 'foul_kick' : poursuite ? 'foul_trip' : 'foul_punch';
     jouerGeste(e, fautif, clip, 1.2);
     jouerGeste(e, victime, poursuite ? 'reaction_trip' : 'reaction_hit', 1.4);
     declencherChute(victime, { x: (victime.pos.x - fautif.pos.x) * 2, y: (victime.pos.y - fautif.pos.y) * 2 }, 1.7);

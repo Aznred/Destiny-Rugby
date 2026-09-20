@@ -98,7 +98,7 @@ import { ORDRES } from '../lib/moteur/bagarre';
 import { ajouterCommentaire, type ActionJoueur, type Commentaire, type NiveauMatch, type TypeCommentaire } from '../lib/moteur/etat';
 import { competitionEffective } from '../lib/divisions';
 import { LARGEUR, LONGUEUR, borner, type Vec } from '../lib/moteur/terrain';
-import { corpsPourAffichage } from '../lib/moteur/dynamique';
+import { corpsPourAffichage, porteurPourAffichage } from '../lib/moteur/dynamique';
 import { Camera, COUVERTURE, angleDeVue, type Cadrage, type Vue } from '../lib/moteur/camera';
 import {
   facteurTempo, momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
@@ -1073,12 +1073,13 @@ export function MatchLive({
     cote: p.cote === 'A' ? 'domicile' : 'exterieur',
     x: p.pos.x, y: p.pos.y, vx: p.vitesse.x, vy: p.vitesse.y,
     corps: corpsPourAffichage(p, r),
+    force: p.puissance, tailleCm: p.tailleCm, poidsKg: p.poidsKg,
   }));
   const ballon = positionBallonInterpolee(e, r);
   const terrainSprites: TerrainDirect = {
     pions: pionsDirects,
     ballon: { x: ballon.x, y: ballon.y, hauteur: ballon.h },
-    porteurId: e.porteur?.id,
+    porteurId: porteurPourAffichage(e),
     vol: e.vol ? {
       de: e.vol.de, vers: e.vol.vers, duree: e.vol.duree, ecoule: e.vol.ecoule,
       hauteur: e.vol.hauteur, type: e.vol.type, intention: e.vol.intention,
@@ -1130,7 +1131,7 @@ export function MatchLive({
   const pion = (p: Pion) => {
     const x = p.pos.x + p.vitesse.x * r;
     const y = p.pos.y + p.vitesse.y * r;
-    const porte = e.porteur === p;
+    const porte = terrainSprites.porteurId === p.id;
     const direct = pionsDirectsParId.get(p.id)!;
     return (
       <g key={p.id} className={p.moi ? 'rg-joueur-moi' : undefined}>
@@ -1292,7 +1293,7 @@ export function MatchLive({
                       redresser={vue?.redresser} hauteurMetres={hauteurSprite * .94} temps={tempsAnimation}
                       couleur={(e.clubA.length + e.clubB.length) % 2 ? '#f4c542' : '#35b76d'} carton={cartonArbitre} />
                     {monPion && surLeTerrain.includes(monPion) && pion(monPion)}
-                    {!e.porteur && e.conquete?.type !== 'touche' && <>
+                    {!terrainSprites.porteurId && e.conquete?.type !== 'touche' && <>
                       {ballon.h > 0.02 && (
                         <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * 0.58} ry={rayon * 0.32} fill="rgba(0,0,0,.3)" />
                       )}

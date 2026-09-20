@@ -71,7 +71,7 @@ import {
 } from '../moteur/moteur.js';
 import type { EtatMatch, IntentionPied, Phase, TypeLancement, Vol, VolRecent } from '../moteur/etat.js';
 import type { Cote } from '../moteur/terrain.js';
-import { corpsPourAffichage } from '../moteur/dynamique.js';
+import { corpsPourAffichage, porteurPourAffichage } from '../moteur/dynamique.js';
 import { scorePossible } from '../championnat.js';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../compositionManager.js';
 import { adequationAuPoste, facteurDePerformance } from '../carteJoueur.js';
@@ -294,6 +294,9 @@ export interface PionDirect {
   id: string; numero: number; nom: string; poste: PosteId; cote: CoteEnLigne;
   x: number; y: number; vx: number; vy: number;
   numeroRole?: number;
+  force?: number;
+  tailleCm?: number;
+  poidsKg?: number;
   corps?: { age: number; duree: number; direction: number; intensite: number; appuis?: number[]; bras?: number[] };
 }
 
@@ -988,6 +991,7 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
       cote: MOTEUR_VERS_COTE[p.cote],
       x: r2(p.pos.x), y: r2(p.pos.y), vx: r2(p.vitesse.x), vy: r2(p.vitesse.y),
       corps: corpsPourAffichage(p),
+      force: p.puissance, tailleCm: p.tailleCm, poidsKg: p.poidsKg,
     })),
     ballon: {
       x: r2(e.ballon.x), y: r2(e.ballon.y),
@@ -1044,7 +1048,7 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
       progression: r2(progression),
     };
   }
-  if (e.porteur) terrain.porteurId = e.porteur.id;
+  terrain.porteurId = porteurPourAffichage(e);
   const recents = (e.volsRecents ?? [])
     .filter((vol) => e.t - vol.debut <= 8)
     .map((vol) => extraireVolDirect(vol, vol.debut, e.t - vol.debut));

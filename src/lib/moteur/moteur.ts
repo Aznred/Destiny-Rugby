@@ -596,6 +596,7 @@ function tick(e: EtatMatch): void {
   animerRegroupement(e, dt);
   const incident = incidentDeContact(e);
   if (incident) {
+    e.compteurs.irregularites += 1;
     chauffer(e, 12);
     if (incident.vu) return siffler(e, incident.victime.cote, incident.victime.pos, incident.motif, incident.fautif, incident.rouge ? 'rouge' : 'jaune');
     dire(e, 'jeu', null, `Un ${incident.motif} échappe au regard de l’arbitre, le jeu continue.`);
@@ -623,10 +624,12 @@ function tick(e: EtatMatch): void {
     if (attente.pretDepuis === undefined) {
       attente.pretDepuis = e.sim;
       jouerGeste(e, auteur, attente.intention === 'renvoi' ? 'restart' : attente.intention === 'rasant' ? 'grubber'
-        : attente.intention === 'drop' ? 'drop' : attente.intention === 'chandelle' ? 'chip'
-          : auteur.numero === 9 ? 'box_kick' : 'punt', 1.4);
+        : attente.intention === 'drop' ? 'drop' : auteur.numero === 9 ? 'box_kick'
+          : attente.intention === 'chandelle' ? 'chip' : 'punt', 1.4);
     }
-    if (e.sim - attente.pretDepuis < .65) return;
+    const frappe = attente.intention === 'drop' ? 1.12 : attente.intention === 'renvoi' ? 1.05
+      : auteur.numero === 9 ? .84 : .7;
+    if (e.sim - attente.pretDepuis < frappe) return;
     delete e.piedPrepare;
     if (e.placement) {
       delete e.placement[auteur.id];
@@ -851,8 +854,8 @@ function resoudreContactsPhysiques(e: EtatMatch): void {
       const nx = dx / d;
       const ny = dy / d;
       const penetration = rayon - d;
-      const masseA = 0.72 + a.puissance / 100;
-      const masseB = 0.72 + b.puissance / 100;
+      const masseA = (a.poidsKg ?? 95) * (0.8 + a.puissance / 250);
+      const masseB = (b.poidsKg ?? 95) * (0.8 + b.puissance / 250);
       const somme = masseA + masseB;
       a.pos.x -= nx * penetration * (masseB / somme);
       a.pos.y -= ny * penetration * (masseB / somme);
@@ -875,8 +878,9 @@ function resoudreContactsPhysiques(e: EtatMatch): void {
 function appliquerImpactPlaquage(porteur: Pion, defenseur: Pion): void {
   const dx = porteur.pos.x - defenseur.pos.x, dy = porteur.pos.y - defenseur.pos.y;
   const d = Math.max(.01, Math.hypot(dx, dy));
-  const force = borner(1.4 + (defenseur.puissance - porteur.puissance) / 45
-    + Math.hypot(defenseur.vitesse.x - porteur.vitesse.x, defenseur.vitesse.y - porteur.vitesse.y) * .2, .8, 4.5);
+  const force = borner(1.7 + (defenseur.puissance - porteur.puissance) / 24
+    + ((defenseur.poidsKg ?? 95) - (porteur.poidsKg ?? 95)) / 45
+    + Math.hypot(defenseur.vitesse.x - porteur.vitesse.x, defenseur.vitesse.y - porteur.vitesse.y) * .35, .8, 6);
   const impulsion = { x: dx / d * force, y: dy / d * force };
   declencherChute(porteur, impulsion, 2.1);
   declencherChute(defenseur, { x: impulsion.x * .75, y: impulsion.y * .75 }, 1.6);
@@ -1071,6 +1075,23 @@ function phaseBallonEnLAir(e: EtatMatch): void {
   if (v.intention === 'renvoi') e.placement = null;
   const camp = v.auteur.cote;
   const arrivee = e.ballon;
+
+  if (v.intention === 'drop') {
+    const reussi = e.dropEnCours?.auteurId === v.auteur.id && e.dropEnCours.reussi;
+    delete e.dropEnCours;
+    if (reussi) {
+      const plan = planDe(e, camp);
+      plan.penalites = Math.max(0, plan.penalites - 1);
+      v.auteur.stats.butsReussis += 1;
+      v.auteur.stats.pointsAuPied = (v.auteur.stats.pointsAuPied ?? 0) + 3;
+      marquer(e, camp, 3);
+      dire(e, 'but', camp, C.phrase(e.rng, C.DROP, { nom: v.auteur.nom }), 3, v.auteur.moi);
+      if (e.sirene) return clorePeriode(e);
+      return preparerCoupEnvoi(e, adverse(camp));
+    }
+    dire(e, 'butRate', camp, C.texteMatch('dropRate', { nom: v.auteur.nom }), 0, v.auteur.moi);
+    return arret(e, 'renvoi22', adverse(camp), { x: adverse(camp) === 'A' ? M22_A : M22_B, y: AXE });
+  }
 
   // ── Sortie en touche ─────────────────────────────────────────────────────
   //
@@ -1643,7 +1664,7 @@ function receptionRatee(e: EtatMatch, receveur: Pion, longueur: number, offload:
     plusProche = Math.min(plusProche, distance(d.pos, receveur.pos));
   }
   const mains = 0.55 + receveur.passe / 200 + receveur.endurance / 900;
-  const risque = ((offload ? 0.020 : 0.0045)
+  const risque = ((offload ? 0.028 : 0.009)
     + Math.max(0, 4 - plusProche) * 0.006
     + Math.max(0, longueur - 9) / 600) * erreurDeLiaison(e, receveur.cote);
   return e.rng() < Math.max(0, risque / mains);
@@ -1680,7 +1701,7 @@ function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   // Le drop : trois points quand la défense tient bon. Le 10 le tente s'il lui
   // reste des points « au pied » à inscrire et que le temps presse.
   if (p.numero === 10 && metresAvantLaLigne(p.pos, p.cote) < 34
-    && planDe(e, p.cote).penalites > 0 && pression > 4
+    && (e.scoreSurTerrain || planDe(e, p.cote).penalites > 0) && p.pied > 50 && pression > 4
     && e.rng() < (e.minute >= 62 ? 0.12 : 0.03)) {
     return taperAuPied(e, p, 'drop');
   }
@@ -1749,7 +1770,7 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
     de: { x: p.pos.x, y: p.pos.y }, vers: cible,
     // Une passe de rugby claque : environ 20/100 s à courte portée, jamais
     // plus d'une demi-seconde. Un coup de pied garde une arche bien plus haute.
-    duree: borner(0.14 + d / 42, 0.18, 0.50), ecoule: 0,
+    duree: borner(.08 + d / (12 + p.passe * .32), .18, .95), ecoule: 0,
     hauteur: Math.min(0.28, 0.08 + d * 0.008),
     type: 'passe', intention: 'passe', auteur: p, receveur,
   });
@@ -1981,13 +2002,15 @@ function resoudrePlaquage(
   // (`bagarre.ts` → `irregularite` et `apresGesteIllegal`).
   const irreg = irregularite(e, defenseur);
   if (irreg) {
-    jouerGeste(e, defenseur, irreg.haut ? 'foul_high' : 'foul_late', 1.3);
-    jouerGeste(e, porteur, irreg.haut ? 'reaction_high' : 'reaction_hit', 1.4);
+    jouerGeste(e, defenseur, irreg.cathedrale ? 'foul_tip' : irreg.haut ? 'foul_high' : 'foul_late', irreg.cathedrale ? 2 : 1.3);
+    jouerGeste(e, porteur, irreg.cathedrale ? 'reaction_tip' : irreg.haut ? 'reaction_high' : 'reaction_hit', irreg.cathedrale ? 2 : 1.4);
+    if (irreg.cathedrale) declencherChute(porteur, { x: sens(defenseur.cote) * 3.4, y: 0 }, 2.3);
     e.compteurs.irregularites += 1;
     defenseur.stats.plaquagesManques += 1;
     porteur.battu = 0.6;
     if (e.rng() < visibiliteFaute(e, porteur.pos)) {
-      siffler(e, porteur.cote, { x: porteur.pos.x, y: porteur.pos.y }, irreg.motif, defenseur);
+      siffler(e, porteur.cote, { x: porteur.pos.x, y: porteur.pos.y }, irreg.motif, defenseur,
+        irreg.cathedrale ? 'rouge' : irreg.haut && e.rng() < .4 ? 'jaune' : undefined);
     }
     apresGesteIllegal(e, defenseur, porteur, irreg);
     return;
@@ -2009,7 +2032,10 @@ function resoudrePlaquage(
     defenseur.battu = monPlaquage ? 3.0 : 2.0;
     porteur.battu = 0.4; // il ne peut pas être re-plaqué dans la même seconde
     if (geste === 'raffut') {
-      declencherChute(defenseur, { x: sens(porteur.cote) * 3, y: directionGeste * 1.2 }, 1.65);
+      const percussion = borner(2.8 + (porteur.puissance - defenseur.puissance) / 20
+        + ((porteur.poidsKg ?? 95) - (defenseur.poidsKg ?? 95)) / 50, 2, 5.8);
+      declencherChute(defenseur, { x: sens(porteur.cote) * percussion, y: directionGeste * 1.2 }, 1.85);
+      jouerGeste(e, porteur, 'bump', 1.1);
       jouerGeste(e, defenseur, 'reaction_hit', 1.2);
       defenseur.vitesse.x += sens(porteur.cote) * 2.8;
       defenseur.vitesse.y += directionGeste * 0.8;
@@ -2098,7 +2124,7 @@ function resoudrePlaquage(
 
   appliquerImpactPlaquage(porteur, defenseur);
   jouerGeste(e, porteur, Math.abs(porteur.corps?.direction ?? 0) < Math.PI / 2 ? 'fall_forward' : 'fall_back', 1.4);
-  jouerGeste(e, defenseur, Math.hypot(defenseur.vitesse.x, defenseur.vitesse.y) > 3 ? 'tackle_low' : 'tackle', 1.35);
+  jouerGeste(e, defenseur, (porteur.corps?.intensite ?? 0) > .75 ? 'tackle_drive' : 'tackle_low', 1.35);
   formerRuck(e, { x: porteur.pos.x, y: porteur.pos.y }, { porteur, defenseur });
 }
 
@@ -2248,7 +2274,7 @@ function phaseRuck(e: EtatMatch): void {
     return siffler(e, defense, e.ballon, 'ballon gardé au sol');
   }
 
-  const chanceGrattage = borner(0.035 + equilibre / 230 + (jeGratte ? 0.06 : 0), 0.015, 0.24);
+  const chanceGrattage = borner(0.065 + equilibre / 170 + (jeGratte ? 0.06 : 0), 0.015, 0.34);
   if (gratteur && !malPlace && e.rng() < chanceGrattage) {
     gratteur.stats.grattages += 1;
     dire(e, 'ruck', defense, C.phrase(e.rng, C.RUCK_GRATTAGE, { nom: gratteur.nom }), 0, gratteur.moi);
@@ -2539,8 +2565,8 @@ function phaseTouche(e: EtatMatch): void {
   e.placement = null;
 
   // Ballon porté près de la ligne : l'arme n°1 des avants.
-  const pres = metresAvantLaLigne(e.ballon, cote) < 12;
-  if (pres && e.rng() < 0.55) {
+  const pres = metresAvantLaLigne(e.ballon, cote) < 25;
+  if (e.rng() < (pres ? .62 : .18)) {
     e.phase = 'maul';
     e.minuteur = 6 + e.rng() * 3;
     e.porteur = null;
@@ -3357,19 +3383,12 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
       const plan = planDe(e, p.cote);
       p.stats.butsTentes += 1;
       const d = metresAvantLaLigne(p.pos, p.cote) + 11;
-      if (plan.penalites > 0 && e.rng() < probaTir(d, Math.abs(p.pos.y - AXE), p.pied)) {
-        plan.penalites -= 1;
-        p.stats.butsReussis += 1;
-        marquer(e, p.cote, 3);
-        p.stats.pointsAuPied = (p.stats.pointsAuPied ?? 0) + 3;
-        dire(e, 'but', p.cote, C.phrase(e.rng, C.DROP, { nom: p.nom }), 3, p.moi);
-        if (e.sirene) return clorePeriode(e);
-        return preparerCoupEnvoi(e, adverse(p.cote));
-      }
-      dire(e, 'butRate', p.cote, C.texteMatch('dropRate', { nom: p.nom }), 0, p.moi);
-      return arret(e, 'renvoi22', adverse(p.cote), {
-        x: adverse(p.cote) === 'A' ? M22_A : M22_B, y: AXE,
-      });
+      const reussi = !!(e.scoreSurTerrain || plan.penalites > 0)
+        && e.rng() < probaTir(d, Math.abs(p.pos.y - AXE), p.pied);
+      e.dropEnCours = { auteurId: p.id, reussi };
+      // Le score attend la traversée des poteaux, après le lâcher/rebond/frappe.
+      return lancerVol(e, p, { x: p.cote === 'A' ? LIGNE_B + 2 : LIGNE_A - 2,
+        y: AXE + (reussi ? 0 : (e.rng() < .5 ? -6 : 6)) }, 'drop', 2.1, .7);
     }
     case 'degagement': {
       // Un dégagement ne trouve pas toujours la touche : trois fois sur quatre.

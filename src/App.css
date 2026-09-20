@@ -8525,6 +8525,9 @@ select:focus {
     grid-template-rows: auto minmax(0, 1fr);
   }
   .x-manager-embarque .x-conversations {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
     flex: 0 0 auto;
     height: 66px;
     min-height: 66px;
@@ -8566,6 +8569,7 @@ select:focus {
 }
 
 .reglages-confort label { display: flex; gap: .7rem; align-items: center; min-height: 44px; }
+.accueil-visuel-leger { display: grid; place-items: center; height: 100%; min-height: 180px; color: var(--or-500); }
 .reglages-confort input { width: 20px; height: 20px; flex: none; }
 .interface-fluide :is(.carte, .nav, .x-tetes, .manager-onglets, .overlay) { backdrop-filter: none; }
 .interface-fluide :is(.ballon-attente, .accueil-online-public i, .hero-canvas-skel) { animation: none; }

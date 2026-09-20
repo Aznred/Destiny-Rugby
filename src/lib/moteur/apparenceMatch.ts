@@ -10,6 +10,7 @@ export interface ApparenceMatch {
   peau: string;
   cheveux: string;
   coiffure: CoiffureMatch;
+  barbe: 'none' | 'moustache' | 'goatee' | 'short_beard' | 'full_beard';
   morphologie: MorphologieMatch;
 }
 
@@ -57,6 +58,7 @@ export function apparenceJoueurMatch(nom: string, poste: PosteId): ApparenceMatc
     peau: generee?.peau ?? PEAUX[(h >>> 8) % PEAUX.length],
     cheveux: generee?.cheveux ?? CHEVEUX[(h >>> 12) % CHEVEUX.length],
     coiffure: generee?.coiffure ?? COIFFURES[(h >>> 16) % COIFFURES.length],
+    barbe: generee?.barbe ?? 'none',
     morphologie,
   };
 }

@@ -118,7 +118,8 @@ const cache = new Map<string, AttributsDerives>();
  * comparer deux cartes.
  */
 export function attributsDe(j: Pick<Coequipier, 'id' | 'note' | 'poste'>): AttributsDerives {
-  const memo = cache.get(j.id);
+  const cle = `${j.id}:${j.poste}:${j.note}`;
+  const memo = cache.get(cle);
   if (memo) return memo;
   const profil = PROFIL[familleDePoste(j.poste)];
   const rng = graine(`attributs#${j.id}`);
@@ -127,7 +128,8 @@ export function attributsDe(j: Pick<Coequipier, 'id' | 'note' | 'poste'>): Attri
     const perso = (rng() * 2 - 1) * 9;
     out[a] = Math.max(5, Math.min(99, Math.round(j.note + (profil[a] ?? 0) + perso)));
   }
-  cache.set(j.id, out);
+  if (cache.size > 20000) cache.clear();
+  cache.set(cle, out);
   return out;
 }
 

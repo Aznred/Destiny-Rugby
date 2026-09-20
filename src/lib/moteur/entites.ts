@@ -9,6 +9,8 @@
 // mettre en route. Le rendu n'a plus besoin d'aucune transition CSS.
 
 import type { Coequipier } from '../effectif.js';
+import { attributsDe } from '../carteJoueur.js';
+import { apparenceJoueurMatch } from './apparenceMatch.js';
 import type { PosteId } from '../../types.js';
 import { AXE, LARGEUR, LONGUEUR, borner, type Cote, type Vec } from './terrain.js';
 
@@ -78,6 +80,8 @@ export interface Pion {
   numeroMaillot?: number;
   remplace?: boolean;
   corps?: import('./dynamique.js').CorpsMatch;
+  poidsKg?: number;
+  tailleCm?: number;
   id: string;
   /** Identifiant stable dans l'effectif, utilisé par la composition manager. */
   sourceId: string;
@@ -185,7 +189,9 @@ export function creerPion(
   const poste = index < 15 ? (ORDRE_MAILLOTS[index] ?? c.poste) : c.poste;
   const avant = index < 15 ? index < 8 : AVANTS.has(poste);
   const g = borner(c.note, 20, 99);
-  const a = attributs ?? {};
+  // Le terrain utilise exactement les huit notes montrées sur la fiche.
+  const a = attributs ?? { ...attributsDe(c), jeuAuPied: c.jeuAuPied ?? attributsDe(c).jeuAuPied };
+  const physique = apparenceJoueurMatch(c.nom, c.poste);
 
   const vitesseNote = n(a.vitesse, avant ? g - 7 : g + 5);
   const enduranceNote = n(a.endurance, g);
@@ -200,12 +206,14 @@ export function creerPion(
     avant,
     moi,
     capitaine: false,
+    poidsKg: physique.poidsKg,
+    tailleCm: physique.tailleCm,
     buteur: false,
     pos: { x: 0, y: AXE },
     vitesse: { x: 0, y: 0 },
     cible: { x: 0, y: AXE },
-    vitesseMax: (VITESSE_POSTE[poste] ?? 8) * (0.9 + vitesseNote / 700),
-    acceleration: (ACCEL_POSTE[poste] ?? 4) * (0.9 + vitesseNote / 800),
+    vitesseMax: (VITESSE_POSTE[poste] ?? 8) * (0.61 + borner(vitesseNote, 5, 99) / 190),
+    acceleration: (ACCEL_POSTE[poste] ?? 4) * (0.55 + borner(vitesseNote, 5, 99) / 145),
     endurance: 100,
     battu: 0,
     horsJeu: false,

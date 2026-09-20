@@ -74,7 +74,7 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   // plus un déblayage à vide chez tous les joueurs du regroupement.
   if (terrain.vol?.auteurId === p.id && terrain.vol.ecoule < 1.4) return terrain.vol.type === 'pied'
     ? terrain.vol.intention === 'renvoi' ? 'restart' : terrain.vol.intention === 'rasant' ? 'grubber'
-      : terrain.vol.intention === 'chandelle' ? 'chip' : terrain.vol.intention === 'drop' ? 'drop' : role === 9 ? 'box_kick' : 'punt'
+      : terrain.vol.intention === 'drop' ? 'drop' : role === 9 ? 'box_kick' : terrain.vol.intention === 'chandelle' ? 'chip' : 'punt'
     : terrain.vol.intention === 'offload' ? 'offload' : terrain.vol.vers.y < terrain.vol.de.y ? 'pass_left' : 'pass';
   if (terrain.vol?.receveurId === p.id) return 'catch';
   if (terrain.phase === 'ballonLibre' && distanceBallon < 1.8) return 'pickup';
@@ -85,19 +85,21 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
 
 function personnage(pion: PionDirect, maillot: MaillotMatch): Character {
   const a = apparenceJoueurMatch(pion.nom, pion.poste);
-  const taille = Math.max(.88, Math.min(1.12, a.tailleCm / 184));
-  const largeur = Math.max(.82, Math.min(1.28, a.poidsKg / (a.tailleCm - 87)));
+  const tailleCm = pion.tailleCm ?? a.tailleCm, poidsKg = pion.poidsKg ?? a.poidsKg;
+  const taille = Math.max(.84, Math.min(1.18, tailleCm / 184));
+  const largeur = Math.max(.70, Math.min(1.48, poidsKg / (tailleCm - 87)));
+  const muscle = .86 + (pion.force ?? 60) / 330;
   return {
     id: pion.id, name: pion.nom, position: pion.poste,
     appearance: {
       skin: a.peau, bodyType: TYPES[a.morphologie],
       hair: { style: a.coiffure, color: a.cheveux },
-      facialHair: { style: graineVisuelleMatch(pion.nom) % 5 === 0 ? 'short_beard' : 'none', color: a.cheveux },
+      facialHair: { style: a.barbe, color: a.cheveux },
       body: {
-        height: taille, torsoLength: taille, torsoWidth: largeur,
-        shoulderWidth: Math.max(.9, largeur), armLength: taille,
-        armThickness: Math.sqrt(largeur), legLength: taille,
-        legThickness: Math.sqrt(largeur), headScale: Math.max(.92, Math.min(1.08, 1 / taille)),
+        height: taille, torsoLength: 1, torsoWidth: largeur,
+        shoulderWidth: Math.max(.8, largeur * muscle), armLength: 1,
+        armThickness: Math.sqrt(largeur) * muscle, legLength: 1,
+        legThickness: Math.sqrt(largeur) * muscle, headScale: Math.max(.92, Math.min(1.08, 1 / taille)),
       },
       kit: {
         primary: maillot.principal, secondary: maillot.secondaire, accent: maillot.accent,
@@ -157,7 +159,7 @@ function dessinerSprite(
 function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, redresser, hauteurMetres, temps, angleVue = 0 }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useMemo(() => new CharacterRenderer(), []);
-  const character = useMemo(() => personnage(pion, maillot), [pion.id, pion.nom, pion.numero, pion.poste, maillot]);
+  const character = useMemo(() => personnage(pion, maillot), [pion.id, pion.nom, pion.numero, pion.poste, pion.force, pion.tailleCm, pion.poidsKg, maillot]);
   const animation = animationDe(pion, position, terrain, porteur);
   const clip = CLIPS.get(animation) ?? CLIPS.get('idle')!;
   const sensAffichage = useRef({ x: pion.cote === 'exterieur' ? -1 : 1, y: 0 });
