@@ -1,5 +1,5 @@
-import type { PosteId } from '../../types';
-import { APPARENCES_JOUEURS_MATCH, type CoiffureMatch } from '../../data/apparencesMatch.generated';
+import type { PosteId } from '../../types.js';
+import { APPARENCES_JOUEURS_MATCH, type CoiffureMatch } from '../../data/apparencesMatch.generated.js';
 
 export type MorphologieMatch = 'pilier' | 'avant' | 'athletique' | 'arriere' | 'ailier';
 export type MotifMaillot = 'uni' | 'cerceaux' | 'rayures' | 'epaules' | 'bande' | 'diagonale';
