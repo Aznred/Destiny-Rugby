@@ -172,12 +172,12 @@ export function incidentDeContact(e: EtatMatch): { fautif: Pion; victime: Pion; 
     const auSol = !!victime.corps;
     const clip = auSol ? 'foul_kick' : poursuite ? 'foul_trip' : 'foul_punch';
     jouerGeste(e, fautif, clip, 1.2);
-    jouerGeste(e, victime, poursuite ? 'reaction_trip' : 'reaction_hit', 1.4);
+    jouerGeste(e, victime, !auSol && poursuite ? 'reaction_trip' : 'reaction_hit', 1.4);
     declencherChute(victime, { x: (victime.pos.x - fautif.pos.x) * 2, y: (victime.pos.y - fautif.pos.y) * 2 }, 1.7);
     e.incidentApres = e.sim + 75;
     const vu = e.rng() < visibiliteFaute(e, victime.pos);
     (e.fautesVues ??= {})[fautif.id] = vu;
-    return { fautif, victime, motif: poursuite ? 'croche-pied' : auSol ? 'coup de pied' : 'coup de poing', rouge: !poursuite, vu };
+    return { fautif, victime, motif: auSol ? 'coup de pied' : poursuite ? 'croche-pied' : 'coup de poing', rouge: auSol || !poursuite, vu };
   }
   return null;
 }

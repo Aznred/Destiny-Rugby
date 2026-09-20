@@ -8517,6 +8517,7 @@ select:focus {
   }
   .x-manager-embarque .x-rail { height: auto; }
   .x-manager-embarque .x-centre { height: auto; min-height: 0; overflow: visible; }
+  .x-manager-embarque .x-tetes { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; }
   .x-manager-embarque .x-messagerie {
     display: flex;
     flex-direction: column;
