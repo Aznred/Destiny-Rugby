@@ -58,6 +58,7 @@ import OuverturePack from '../components/OuverturePack';
 import { prechargerOuverturePack } from '../lib/prechargementPacks';
 import { NOMS_PACK, apparencePack, nomPackCarriere } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
+import { BancDessaiSituations } from '../components/BancDessaiSituations';
 import Pack3D from '../components/Pack3D';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from '../lib/ligue/venteRapideCarriere';
 import { collectifCarriere, paliersCollectif, bonusCollectif, COLLECTIF_MAX } from '../lib/ligue/collectifCarriere';
@@ -818,6 +819,7 @@ function LaboratoireLigue({ vue, agir, occupe, suivre, notifier }: { vue: VueCar
       </div>
     </section>
     <ReglageRythme vue={vue} agir={agir} occupe={occupe} notifier={notifier} />
+    <BancDessaiSituations />
     <section className="cel-panneau">
       <div className="cel-titre-ligne"><div><div className="eyebrow">Pilotage en direct</div><h2>Matchs de la saison</h2></div><small>{vue.rencontres.filter(r => r.resultat).length} joué(s)</small></div>
       <div className="cel-laboratoire-matchs">{rencontres.map(r => {

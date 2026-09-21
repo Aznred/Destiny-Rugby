@@ -761,29 +761,40 @@ export function MatchLive({
       const ballon = positionBallon(e);
       let cadrage: Cadrage = 'large';
       let cible: Vec = ballon;
-      if (enJeu && moi && moi.surLeTerrain && moi.sanction <= 0) {
+      const tmoActif = e.phase === 'tmo' && !!e.tmo?.actif;
+      const replayActif = !!e.dernierReplayEssai && e.dernierReplayEssai.restant > 0;
+      const impactActif = !!e.grosImpact && e.grosImpact.restant > 0;
+
+      if (tmoActif && e.tmo) {
+        cadrage = 'tmo';
+        cible = e.tmo.cible;
+      } else if (replayActif && e.dernierReplayEssai) {
+        cadrage = 'proche';
+        cible = e.dernierReplayEssai.lieu;
+      } else if (impactActif && e.grosImpact) {
+        cadrage = 'proche';
+        cible = e.grosImpact.lieu;
+      } else if (enJeu && moi && moi.surLeTerrain && moi.sanction <= 0) {
         cadrage = enMoment ? 'proche' : 'suivi';
         // ⚠️ PENDANT LE RALENTI QUI SUIT UN CHOIX, LA CAMÉRA NE REGARDE QUE LUI.
-        // Le reste du temps on cadre un compromis entre le ballon et son pion,
-        // et c'est la bonne lecture — on doit voir venir ce qui arrive. Mais
-        // trois secondes après « je plaque », le sujet du plan N'EST PAS le
-        // ballon : c'est le joueur qui va au contact. À 0,5 de pondération, un
-        // plaquage à douze mètres du ballon se jouait au bord du cadre, et la
-        // demande « qu'on voie vraiment notre joueur effectuer le choix »
-        // restait lettre morte.
         const poids = rejeu.current.plan > 0 ? 1 : enMoment ? 0.5 : 0.38;
         cible = {
           x: ballon.x + (moi.pos.x - ballon.x) * poids,
           y: ballon.y + (moi.pos.y - ballon.y) * poids,
         };
-        // ⚠️ ET SON PION RESTE DANS LE CADRE, quoi qu'il arrive. Sans cette
-        // borne, un dégagement de soixante mètres emmène la caméra sur le
-        // ballon et le joueur se retrouve à piloter un pion invisible.
         const marge = Math.max(8, COUVERTURE[cadrage] / 2 - 7);
         cible = {
           x: borner(cible.x, moi.pos.x - marge, moi.pos.x + marge),
           y: borner(cible.y, moi.pos.y - marge, moi.pos.y + marge),
         };
+      } else {
+        if (e.phase === 'aplatissage' || e.phase === 'tirAuBut' || e.phase === 'transformation') {
+          cadrage = 'proche';
+        } else if (e.phase === 'jeuCourant' && e.porteur && Math.hypot(e.porteur.vitesse.x, e.porteur.vitesse.y) > 4) {
+          cadrage = 'suivi';
+        } else {
+          cadrage = 'large';
+        }
       }
       vueRef.current = camera.current.suivre(cible, cadrage, ratio, angle, dtReel);
 
@@ -1492,6 +1503,51 @@ export function MatchLive({
                         {t('ml.sifflet.pour', { club: e.sifflet.club })}
                         {e.sifflet.maFaute ? ` · ${t('ml.sifflet.maFaute')}` : ''}
                       </span>
+                    </div>
+                  )}
+
+                  {/* ---------- 📺 TMO : ARBITRAGE VIDÉO ---------- */}
+                  {e.phase === 'tmo' && e.tmo && (
+                    <div className="ml-tmo-overlay" role="alert">
+                      <div className="ml-tmo-entete">
+                        <span className="ml-tmo-badge"><Icone nom="video" taille={14} /> TMO · ARBITRAGE VIDÉO</span>
+                        <span className="ml-tmo-rec"><span className="ml-tmo-dot" /> LIVE REPLAY</span>
+                      </div>
+                      <div className="ml-tmo-corps">
+                        <div className="ml-tmo-motif">
+                          <b>Vérification vidéo :</b> {e.tmo.libelleMotif}
+                        </div>
+                        <div className="ml-tmo-statut">
+                          {e.tmo.decision === 'en_cours' ? (
+                            <span className="ml-tmo-scanning">Analyse des angles vidéo en cours...</span>
+                          ) : e.tmo.decision === 'essai_accorde' ? (
+                            <span className="ml-tmo-accorde">DÉCISION : ESSAI ACCORDÉ</span>
+                          ) : e.tmo.decision === 'essai_refuse' ? (
+                            <span className="ml-tmo-refuse">DÉCISION : ESSAI REFUSÉ</span>
+                          ) : (
+                            <span className="ml-tmo-sanction">DÉCISION : SANCTION DISCIPLINAIRE</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ---------- 📺 REPLAY ESSAI (PENDANT LA PRÉPARATION DU BOTTEUR) ---------- */}
+                  {e.dernierReplayEssai && e.dernierReplayEssai.restant > 0 && e.phase === 'transformation' && (
+                    <div className="ml-replay-overlay" role="status">
+                      <div className="ml-replay-badge">
+                        <span className="ml-replay-dot" /> REPLAY ACTION DU MATCH · ESSAI
+                      </div>
+                      <div className="ml-replay-nom">
+                        {e.dernierReplayEssai.marqueurNom}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ---------- ⚡ GROS IMPACT ("SUR LES FESSES") ---------- */}
+                  {e.grosImpact && e.grosImpact.restant > 0 && (
+                    <div className="ml-gros-impact-flash" role="status">
+                      <Icone nom="eclair" taille={16} /> GROS IMPACT PHYSIQUE
                     </div>
                   )}
 

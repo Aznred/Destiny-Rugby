@@ -43,7 +43,7 @@
 import { LARGEUR, LONGUEUR, borner, type Cote, type Vec } from './terrain.js';
 
 /** À quelle distance on regarde le jeu. */
-export type Cadrage = 'large' | 'suivi' | 'proche';
+export type Cadrage = 'large' | 'suivi' | 'proche' | 'tmo';
 
 /**
  * Mètres de LONGUEUR DE TERRAIN visibles à l'écran, par cadrage.
@@ -53,22 +53,14 @@ export type Cadrage = 'large' | 'suivi' | 'proche';
  * donne :
  *   • `large`  (98 m) → on lit toute la forme du jeu sans perdre les joueurs ;
  *   • `suivi`  (56 m) → on distingue nettement maillots et intervalles ;
- *   • `proche` (40 m)  → les duels et l'aplatissage restent parfaitement lisibles.
- *
- * En dessous de 40 m on perdrait la lecture du hors-jeu et du soutien : le
- * joueur ne verrait plus arriver la défense, et le jeu deviendrait injuste
- * plutôt que dur.
- *
- * ⚠️ `suivi` EST PASSÉ DE 78 À 68 m APRÈS MESURE. À 78, le pion tombait à 13 px
- * sur un téléphone : lisible de justesse, mais c'est le cadrage dans lequel on
- * passe les trois quarts du temps de pilotage — celui où l'on se replace et où
- * l'on lit le jeu qui vient. Huit mètres de moins ne coûtent aucun contexte
- * (on voit toujours toute la largeur du terrain) et rendent les maillots nets.
+ *   • `proche` (40 m)  → les duels et l'aplatissage restent parfaitement lisibles ;
+ *   • `tmo`    (22 m)  → plan télé très serré pour l'arbitrage vidéo et les ralentis.
  */
 export const COUVERTURE: Record<Cadrage, number> = {
   large: 98,
   suivi: 56,
   proche: 40,
+  tmo: 22,
 };
 
 /**

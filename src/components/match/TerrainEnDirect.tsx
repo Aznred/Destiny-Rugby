@@ -107,7 +107,7 @@ const LIBELLES_SCENARIO: Record<ScenarioDirect['type'], string> = {
   coupEnvoi: 'Coup d’envoi', renvoi22: 'Renvoi aux 22', ruck: 'Ruck', melee: 'Mêlée',
   touche: 'Touche', maul: 'Maul', penalite: 'Pénalité', tirAuBut: 'Tentative au but',
   transformation: 'Transformation', apresEssai: 'Reprise après essai', miTemps: 'Mi-temps',
-  aplatissage: 'Aplatissage',
+  aplatissage: 'Aplatissage', tmo: 'Arbitrage vidéo (TMO)',
   jeuRas: 'Jeu au ras', pod: 'Bloc d’avants', jeuLarge: 'Jeu au large',
   passeSautee: 'Passe sautée', pickAndGo: 'Pick-and-go', passe: 'Passe', offload: 'Passe après contact',
   degagement: 'Dégagement', occupation: 'Jeu d’occupation', chandelle: 'Chandelle',

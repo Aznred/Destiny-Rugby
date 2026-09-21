@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { chargerEmblemesCarriere } from './carriereEnLigneClient';
+import { clubParNom } from '../data/clubs';
 const cle = (nom: string) => nom.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /**
@@ -77,5 +78,6 @@ export function useBlasonCarte(club: string, explicite?: string) {
     void demande.then(t => { if (actif) setTable(t); }).catch(() => {});
     return () => { actif = false; };
   }, [explicite]);
-  return explicite ?? (table && blasonDuClub(table, club));
+  const duJeu = clubParNom(club)?.logo;
+  return explicite ?? (table && blasonDuClub(table, club)) ?? duJeu;
 }

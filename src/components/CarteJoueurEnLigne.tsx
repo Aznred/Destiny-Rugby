@@ -6,6 +6,8 @@ import { photoReelle } from '../lib/avatars';
 import { Drapeau } from './Drapeau';
 import { useBlasonCarte } from '../lib/useBlasonCarte';
 import { EcussonClub } from './EcussonClub';
+import { Blason } from './Blason';
+import { clubParNom } from '../data/clubs';
 import { logoChampionnat } from '../lib/logoChampionnat';
 import './CarteJoueurEnLigne.css';
 
@@ -72,7 +74,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
         n'affiche RIEN quand le championnat n'a pas de logo — le repli en ballon
         générique de `LogoCompet` se lirait ici comme un blason de compétition
         que personne ne reconnaîtrait. */}
-    <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}><span>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</span>{seconds.length > 0 && <small title={`Seconds postes : ${seconds.map((p) => p.nom).join(', ')}`}>2e : {seconds.map((p) => p.numero).join(' / ')}</small>}</em><Drapeau nation={carte.nation} taille={1.15} />{blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</span>
+    <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}><span>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</span>{seconds.length > 0 && <small title={`Seconds postes : ${seconds.map((p) => p.nom).join(', ')}`}>2e : {seconds.map((p) => p.numero).join(' / ')}</small>}</em><Drapeau nation={carte.nation} taille={1.15} />{blason ? <EcussonClub logo={blason} nom={carte.clubReel} taille={25} /> : <span className="dr-player-blason-fallback"><Blason club={clubParNom(carte.clubReel) ?? { nom: carte.clubReel, c1: '#0a2a6b', c2: '#c1121f' }} taille={25} /></span>}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</span>
     <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src={SANS_PHOTO} alt="Portrait par défaut" />}</span>
     <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{carte.clubReel}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>

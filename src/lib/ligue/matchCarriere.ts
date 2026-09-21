@@ -361,6 +361,8 @@ export interface TerrainDirect {
   snapshot?: number;
   /** La décision de l'arbitre, tant qu'elle est fraîche (secondes simulées). */
   sifflet?: { cle: string; club: string; fautif: string; restant: number };
+  /** Données de l'arbitrage vidéo TMO pour l'affichage broadcast TV */
+  tmo?: { actif: boolean; action: string; tempsRestant: number; decision: string; explication?: string; cadreCamera?: string };
 }
 
 /**
@@ -840,11 +842,17 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
   // d'ouverture. La fenêtre de validité constitue donc la borne sûre : une
   // pénalité antérieure à celle-ci n'a pas pu être proposée par ce passage sur
   // le direct. On active chaque banc à sa borne, sans jamais reculer le moteur.
-  const seuils = arretSur.map((cote) => ({
-    cote: MOTEUR[cote],
-    depuis: Math.max(0, Math.min(jusqua,
-      ((etat.presence[cote] ?? etat.debut) - DELAI_PRESENCE - etat.debut - etat.gel) / MS_PAR_MINUTE)),
-  })).sort((a, b) => a.depuis - b.depuis);
+  const seuils = arretSur.map((cote) => {
+    const vu = etat.presence[cote];
+    const minutePresence = vu !== undefined
+      ? Math.max(0, (vu - etat.debut - etat.gel) / MS_PAR_MINUTE)
+      : jusqua;
+    const debutArret = Math.max(etat.horloge, minutePresence);
+    return {
+      cote: MOTEUR[cote],
+      depuis: Math.max(0, Math.min(jusqua, debutArret)),
+    };
+  }).sort((a, b) => a.depuis - b.depuis);
   const actifs: Cote[] = [];
   const deja = minuteExacte(e);
   for (const seuil of seuils) if (seuil.depuis <= deja + 1e-9 && !actifs.includes(seuil.cote)) actifs.push(seuil.cote);

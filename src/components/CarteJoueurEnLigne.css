@@ -40,6 +40,8 @@ button.cel-carte.dr-player:hover { box-shadow: none; filter: drop-shadow(0 9px 1
 .dr-player-rating { gap: 1.8cqw; }
 .dr-player-rating .fi { font-size: 8cqw !important; }
 .dr-player-rating .ecusson-club { width: 11cqw !important; height: 11cqw !important; object-fit: contain; }
+.dr-player-blason-fallback { display: inline-flex; align-items: center; justify-content: center; width: 11cqw; height: 11cqw; }
+.dr-player-blason-fallback svg { width: 100%; height: 100%; }
 /* Les interactions du terrain restent sur le bouton qui enveloppe la carte. */
 .ct-feuille-fut .ct-carte.ct-fut, .ct-feuille-fut .manager-reserve-carte.ct-reserve-fut { display: block; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
 .ct-feuille-fut .ct-carte.ct-fut::before, .ct-feuille-fut .ct-carte.ct-fut::after, .ct-feuille-fut .ct-reserve-fut::before, .ct-feuille-fut .ct-reserve-fut::after { display: none; }
@@ -60,6 +62,103 @@ button.cel-carte.dr-player:hover { box-shadow: none; filter: drop-shadow(0 9px 1
 .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut { width:100%;max-width:104px;min-width:0; }
 .ct-feuille-fut .manager-reserves > div { grid-template-columns:repeat(auto-fill,minmax(84px,104px));justify-content:center;gap:12px; }
 .ct-feuille-fut .ct-reserve-fut { max-width:104px; }
+
+/* ── Layout FUT Squad Builder avec onglets Banc / Réserves et défilement horizontal ── */
+.ct-feuille-fut[data-groupe="banc"] > .manager-reserves,
+.ct-feuille-fut[data-groupe="reserves"] > .manager-banc-visuel { display: none !important; }
+.ct-feuille-fut :is(.manager-banc-visuel > .comp-tete, .manager-reserves > summary, .manager-reserves > p) { display: none !important; }
+
+.ct-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #071922;
+  border: 1px solid #a9bdc333;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #c4dadc;
+  margin: 8px 0;
+}
+.ct-selection-actions b { color: #f6d476; }
+.ct-selection-actions span { flex: 1; }
+:is(.ct-selection-actions, .ct-groupes) button {
+  border: 1px solid #a9bdc34d;
+  background: #132c38;
+  color: white;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  min-height: 32px;
+}
+:is(.ct-selection-actions, .ct-groupes) button:hover {
+  background: #1a3c4c;
+}
+.ct-groupes {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0 10px 0;
+}
+.ct-groupes button[aria-pressed="true"] {
+  background: #efd06a;
+  color: #071922;
+  font-weight: 800;
+  border-color: #efd06a;
+}
+.ct-groupes span {
+  margin-left: auto;
+  color: #c4dadc;
+  font-size: 11px;
+}
+
+.ct-feuille-fut :is(.manager-banc-cartes, .manager-reserves > div) {
+  --gd-axe: pan-x pan-y;
+  container-type: normal;
+  contain: inline-size;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 14px !important;
+  width: 100%;
+  min-width: 0;
+  max-height: none;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  scrollbar-color: #efd06a #142b35;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut,
+.ct-feuille-fut .manager-reserve-carte.ct-reserve-fut {
+  flex: 0 0 92px !important;
+  width: 92px !important;
+  min-width: 92px !important;
+  max-width: 92px !important;
+  scroll-snap-align: start;
+  padding: 0;
+  text-align: center;
+}
+.ct-feuille-fut .ct-reserve-fut > small { display: none; }
+.ct-feuille-fut .ct-reserve-fut .dr-player :is(b, small) { white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .ct-groupes span { display: none; }
+  .ct-selection-actions { flex-wrap: wrap; gap: 4px 8px; padding: 6px; font-size: 11px; }
+  .ct-selection-actions b { flex: 1 1 100%; }
+  .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut,
+  .ct-feuille-fut .manager-reserve-carte.ct-reserve-fut {
+    flex: 0 0 78px !important;
+    width: 78px !important;
+    min-width: 78px !important;
+    max-width: 78px !important;
+  }
+}
 
 /* ⚠️ SOUS 66 PX, UNE CARTE NE MONTRE PLUS SES SIX STATISTIQUES. Les tailles
    sont en `cqw` : à 51 px de large, le nom tombe à 3 px et les stats à 2 px —

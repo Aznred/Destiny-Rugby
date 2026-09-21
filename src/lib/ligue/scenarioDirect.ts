@@ -4,7 +4,7 @@ import type { CoteEnLigne, TerrainDirect } from './matchCarriere.js';
 
 export type TypeScenarioDirect =
   | 'coupEnvoi' | 'renvoi22' | 'ruck' | 'melee' | 'touche' | 'maul'
-  | 'penalite' | 'tirAuBut' | 'transformation' | 'aplatissage' | 'apresEssai' | 'miTemps'
+  | 'penalite' | 'tirAuBut' | 'transformation' | 'aplatissage' | 'tmo' | 'apresEssai' | 'miTemps'
   | 'jeuRas' | 'pod' | 'jeuLarge' | 'passeSautee' | 'pickAndGo'
   | 'passe' | 'offload' | 'degagement' | 'occupation' | 'chandelle'
   | 'cinquanteVingtDeux' | 'rasant' | 'transversale' | 'drop' | 'penaltouche'
@@ -100,9 +100,9 @@ export function creerScenarioDirect(t: TerrainDirect): ScenarioDirect {
   const zoneDangereuse = zone === 'enButAdverse' || zone === 'cinqAdverse' || zone === 'vingtDeuxAdverse';
   const phaseArretee = new Set<TypeScenarioDirect>([
     'coupEnvoi', 'renvoi22', 'melee', 'touche', 'penalite', 'tirAuBut',
-    'transformation', 'apresEssai', 'miTemps', 'fini',
+    'transformation', 'tmo', 'apresEssai', 'miTemps', 'fini',
   ]).has(type);
-  const forte = type === 'tirAuBut' || type === 'transformation'
+  const forte = type === 'tmo' || type === 'tirAuBut' || type === 'transformation'
     || (!phaseArretee && (zone === 'enButAdverse' || zone === 'cinqAdverse'
       || progression >= 8 || vitessePorteur >= 7 || actionTranchante));
   const active = forte || zoneDangereuse || Boolean(t.vol) || (!phaseArretee && type !== 'jeuCourant');
@@ -116,6 +116,6 @@ export function creerScenarioDirect(t: TerrainDirect): ScenarioDirect {
     id: [type, zone, couloir, intensite, sequence].join(':'),
     type, zone, couloir, intensite, possession: t.possession, sequence,
     progression, ballonLent: Boolean(t.ballonLent), momentFort: forte,
-    cadrage: forte ? 'proche' : active ? 'suivi' : 'large', cibleCamera,
+    cadrage: type === 'tmo' ? 'tmo' : forte ? 'proche' : active ? 'suivi' : 'large', cibleCamera,
   };
 }

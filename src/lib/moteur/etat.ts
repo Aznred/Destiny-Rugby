@@ -16,12 +16,14 @@ export type Phase =
   | 'ballonLibre'    // ballon au sol : rebonds, roule et course à la récupération
   | 'ruck'
   | 'maul'
+  | 'maul'
   | 'melee'
   | 'touche'
   | 'penalite'       // la faute vient d'être sifflée, l'équipe choisit
   | 'tirAuBut'
   | 'transformation'
   | 'aplatissage'    // le marqueur contrôle puis pose réellement le ballon
+  | 'tmo'            // arbitrage vidéo (TMO) : vérification sur écran TV
   | 'apresEssai'
   | 'miTemps'
   | 'bagarre'        // ça a dégénéré : le jeu attend l'ordre du joueur
@@ -31,8 +33,33 @@ export type Phase =
 // il n'y a rien à regarder. L'horloge du match avance alors par bonds.
 export const PHASES_ARRETEES: Set<Phase> = new Set<Phase>([
   'coupEnvoi', 'renvoi22', 'melee', 'touche', 'penalite', 'tirAuBut',
-  'transformation', 'apresEssai', 'miTemps',
+  'transformation', 'tmo', 'apresEssai', 'miTemps',
 ]);
+
+export type TMOMotif =
+  | 'en_avant' | 'plaquage_haut' | 'jeu_deloyal' | 'aplatissage'
+  | 'en_avant_volontaire' | 'coup_de_poing' | 'pied_en_touche';
+export type TMODecision =
+  | 'en_cours' | 'essai_accorde' | 'essai_refuse' | 'carton_jaune' | 'carton_rouge' | 'penalite';
+
+export interface TMOEtat {
+  actif: boolean;
+  type: 'essai' | 'faute_grave';
+  motif: TMOMotif;
+  libelleMotif: string;
+  cible: Vec;
+  lieuFaute?: Vec;
+  auteur?: Pion;
+  fautif?: { id: string; nom: string; cote: Cote };
+  victime?: Pion;
+  carton?: 'jaune' | 'rouge';
+  decision: TMODecision;
+  duree: number;
+  restant: number;
+  etape: 'appel' | 'visionnage' | 'decision';
+  origineEssai?: Aplatissage;
+  essaiEnJeu?: { marqueur: Pion; origine: 'jeu' | 'maul'; lieu: Vec };
+}
 
 export type TypeCommentaire =
   | 'essai' | 'but' | 'butRate' | 'plaquage' | 'franchissement' | 'ruck'
@@ -346,7 +373,7 @@ export interface EtatMatch {
   gestes?: import('./dynamique.js').GesteMatch[];
   incidentApres?: number;
   fautesVues?: Record<string, boolean>;
-  piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number };
+  piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number; debut?: number };
   clubA: string;
   clubB: string;
 
@@ -372,6 +399,9 @@ export interface EtatMatch {
   ballonLibre?: BallonLibre | null;
   ruck?: RuckEnCours | null;
   aplatissage?: Aplatissage | null;
+  tmo?: TMOEtat | null;
+  dernierReplayEssai?: { marqueurNom: string; lieu: Vec; restant: number } | null;
+  grosImpact?: { lieu: Vec; type: 'tampon' | 'raffut'; restant: number } | null;
 
   // Structure de jeu
   lancement: Lancement | null;

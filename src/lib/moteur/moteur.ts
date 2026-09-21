@@ -31,9 +31,9 @@ import {
 } from './entites.js';
 import {
   PHASES_ARRETEES, ajouterCommentaire, disciplineVide,
-  type ActionJoueur, type ConsigneJoueur, type DisciplineMatch, type EtatMatch,
+  type ActionJoueur, type Aplatissage, type ConsigneJoueur, type DisciplineMatch, type EtatMatch,
   type IntentionPied, type Lancement, type NiveauMatch, type OrdreBagarre,
-  type Phase, type PlanDeScore, type TypeCommentaire, type Vol,
+  type Phase, type PlanDeScore, type TMODecision, type TMOEtat, type TMOMotif, type TypeCommentaire, type Vol,
 } from './etat.js';
 import {
   apresGesteIllegal, chauffer, donnerOrdre, frictions, irregularite, refroidir,
@@ -91,6 +91,7 @@ const ARRETS: Record<string, { visuel: number; horloge: number; direct: number }
   renvoi22: { visuel: 7, horloge: 20, direct: 7 },
   apresEssai: { visuel: 3, horloge: 8, direct: 3 },
   penalite: { visuel: 2.5, horloge: 12, direct: 3 },
+  tmo: { visuel: 3.6, horloge: 0, direct: 3.6 },
   miTemps: { visuel: 3, horloge: 0, direct: 3 },
   // ⚠️ L'horloge s'arrête pendant une bagarre : l'arbitre coupe le chrono le
   // temps de séparer et de sortir les cartes. C'est aussi ce qui empêche
@@ -457,6 +458,14 @@ function tick(e: EtatMatch): void {
     e.sifflet.restant -= dt;
     if (e.sifflet.restant <= 0) e.sifflet = null;
   }
+  if (e.grosImpact) {
+    e.grosImpact.restant -= dt;
+    if (e.grosImpact.restant <= 0) e.grosImpact = null;
+  }
+  if (e.dernierReplayEssai) {
+    e.dernierReplayEssai.restant -= dt;
+    if (e.dernierReplayEssai.restant <= 0) e.dernierReplayEssai = null;
+  }
   // ⚠️ LA DYNAMIQUE S’ÉTEINT TOUTE SEULE. Un ballon volé à la 12ᵉ minute ne
   // porte pas l’équipe jusqu’à la sirène : sans cette fonte, l’élan devient
   // une seconde note d’équipe, et le match se décide au premier turnover.
@@ -597,7 +606,12 @@ function tick(e: EtatMatch): void {
   const incident = incidentDeContact(e);
   if (incident) {
     e.compteurs.irregularites += 1;
-    chauffer(e, 12);
+    chauffer(e, 14);
+    const appelTMO = incident.motif.includes('coup de') || incident.rouge || e.rng() < 0.60;
+    if (appelTMO) {
+      declencherTMOFaute(e, incident.fautif, incident.victime, incident.motif, incident.rouge ? 'carton_rouge' : 'carton_jaune');
+      return;
+    }
     if (incident.vu) return siffler(e, incident.victime.cote, incident.victime.pos, incident.motif, incident.fautif, incident.rouge ? 'rouge' : 'jaune');
     dire(e, 'jeu', null, `Un ${incident.motif} échappe au regard de l’arbitre, le jeu continue.`);
   }
@@ -605,11 +619,13 @@ function tick(e: EtatMatch): void {
   if (e.piedPrepare) {
     const attente = e.piedPrepare;
     const auteur = e.pions.find((p) => p.id === attente.auteurId && p.surLeTerrain && p.sanction <= 0);
-    if (!auteur) {
+    if (!auteur || auteur.battu > 0) {
       if (e.placement) delete e.placement[attente.auteurId];
       delete e.piedPrepare;
       return;
     }
+    attente.debut ??= e.sim;
+    const forceFrappe = e.sim - attente.debut >= 1.2;
     auteur.cible = { ...attente.depuis };
     // Le porteur est exclu de la boucle de déplacement normale. Lorsqu'un
     // contact le décalait de son appui, attendre ici figeait toute la phase.
@@ -617,7 +633,7 @@ function tick(e: EtatMatch): void {
       deplacer(auteur, dt);
       e.ballon = { ...auteur.pos };
     }
-    if (distance(auteur.pos, attente.depuis) > .75 || auteur.corps) {
+    if (!forceFrappe && (distance(auteur.pos, attente.depuis) > .75 || auteur.corps)) {
       delete attente.pretDepuis;
       return;
     }
@@ -629,13 +645,13 @@ function tick(e: EtatMatch): void {
     }
     const frappe = attente.intention === 'drop' ? 1.12 : attente.intention === 'renvoi' ? 1.05
       : auteur.numero === 9 ? .84 : .7;
-    if (e.sim - attente.pretDepuis < frappe) return;
+    if (!forceFrappe && e.sim - attente.pretDepuis < frappe) return;
     delete e.piedPrepare;
     if (e.placement) {
       delete e.placement[auteur.id];
       if (Object.keys(e.placement).length === 0) e.placement = null;
     }
-    lancerVol(e, auteur, attente.arrivee, attente.intention, attente.duree, attente.hauteur, attente.depuis, true);
+    lancerVol(e, auteur, attente.arrivee, attente.intention, attente.duree, attente.hauteur, auteur.pos, true);
     return;
   }
 
@@ -654,6 +670,7 @@ function tick(e: EtatMatch): void {
     case 'tirAuBut': return phaseTirAuBut(e);
     case 'transformation': return phaseTransformation(e);
     case 'aplatissage': return phaseAplatissage(e);
+    case 'tmo': return phaseTMO(e);
     case 'apresEssai': return phaseApresEssai(e);
     case 'miTemps': return phaseMiTemps(e);
     case 'bagarre': return phaseBagarre(e);
@@ -1002,7 +1019,7 @@ function lancerVol(
 ): void {
   if (!pret) {
     depuis ??= { ...auteur.pos };
-    e.piedPrepare = { auteurId: auteur.id, arrivee: { ...arrivee }, intention, duree, hauteur, depuis: { ...depuis } };
+    e.piedPrepare = { auteurId: auteur.id, arrivee: { ...arrivee }, intention, duree, hauteur, depuis: { ...depuis }, debut: e.sim };
     auteur.cible = { ...depuis };
     (e.placement ??= {})[auteur.id] = { ...depuis };
     return;
@@ -1257,6 +1274,13 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
   if (!libre) return reprendreJeu(e, e.ballon);
   libre.age += dt;
 
+  if (libre.auteur && libre.auteur.surLeTerrain && libre.auteur.sanction <= 0) {
+    remettreEnJeu(e, libre.auteur);
+  }
+  if (libre.age > 4.5) {
+    libererHorsJeu(e);
+  }
+
   e.ballon.x += libre.vitesse.x * dt;
   e.ballon.y += libre.vitesse.y * dt;
   libre.hauteur += libre.vitesseVerticale * dt;
@@ -1289,6 +1313,22 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
     return arret(e, 'renvoi22', defenseur, { x: defenseur === 'A' ? M22_A : M22_B, y: AXE });
   }
 
+  // Si le ballon traîne trop longtemps ou s'il est injouable, on ne fige jamais le match.
+  if (e.minuteur <= 0 || libre.age >= 8) {
+    e.ballonLibre = null;
+    libererHorsJeu(e);
+    const tous = e.pions
+      .filter((p) => p.surLeTerrain && p.sanction <= 0)
+      .sort((a, b) => distance2(a.pos, e.ballon) - distance2(b.pos, e.ballon));
+    const plusProche = tous[0];
+    if (plusProche && distance(plusProche.pos, e.ballon) < 5) {
+      e.possession = plusProche.cote;
+      dire(e, 'pied', plusProche.cote, `Le ballon vivant est récupéré par ${plusProche.nom}.`, 0, plusProche.moi);
+      return reprendreJeu(e, plusProche.pos, plusProche);
+    }
+    return arret(e, 'melee', adverse(libre.auteurCote), e.ballon);
+  }
+
   // Seuls les joueurs en jeu chassent. Les autres gardent la structure de la
   // ligne, ce qui évite de reformer une boule de trente pions autour du ballon.
   const candidats = e.pions
@@ -1304,7 +1344,8 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
   }
 
   const premier = candidats[0];
-  const rayon = libre.hauteur > 1.5 ? 0.8 : libre.hauteur > 0.45 ? 1.25 : 1.65;
+  const immobile = Math.hypot(libre.vitesse.x, libre.vitesse.y) < 0.25 && libre.hauteur <= 0.15;
+  const rayon = libre.hauteur > 1.5 ? 0.8 : libre.hauteur > 0.45 ? 1.25 : immobile ? 2.5 : 1.65;
   if (!premier || distance(premier.pos, e.ballon) > rayon) return;
 
   // Un rebond haut ou contrarié reste délicat, mais une mauvaise prise ne
@@ -1991,7 +2032,7 @@ function resoudrePlaquage(
 ): void {
   // Une décision peut être prise avant l'arrivée du défenseur. Aucun choc ni
   // chute à distance : l'intention reste armée jusqu'au contact réel.
-  if (distance2(porteur.pos, defenseur.pos) > 1.6 ** 2) {
+  if (distance2(porteur.pos, defenseur.pos) > 1.85 ** 2) {
     defenseur.cible = { ...porteur.pos };
     return;
   }
@@ -2034,9 +2075,17 @@ function resoudrePlaquage(
     if (geste === 'raffut') {
       const percussion = borner(2.8 + (porteur.puissance - defenseur.puissance) / 20
         + ((porteur.poidsKg ?? 95) - (defenseur.poidsKg ?? 95)) / 50, 2, 5.8);
-      declencherChute(defenseur, { x: sens(porteur.cote) * percussion, y: directionGeste * 1.2 }, 1.85);
+      const surLesFesses = percussion > 3.6 || porteur.puissance - defenseur.puissance > 6 || e.rng() < 0.42;
+      if (surLesFesses) {
+        jouerGeste(e, defenseur, 'fall_back', 1.8);
+        declencherChute(defenseur, { x: sens(porteur.cote) * (percussion + 1.2), y: directionGeste * 0.6 }, 2.2);
+        e.grosImpact = { lieu: { ...defenseur.pos }, type: 'raffut', restant: 2.2 };
+        dire(e, 'franchissement', porteur.cote, `GROS IMPACT ! ${porteur.nom} envoie ${defenseur.nom} sur les fesses d’un raffut destructeur !`, 0, porteur.moi || defenseur.moi);
+      } else {
+        declencherChute(defenseur, { x: sens(porteur.cote) * percussion, y: directionGeste * 1.2 }, 1.85);
+        jouerGeste(e, defenseur, 'reaction_hit', 1.2);
+      }
       jouerGeste(e, porteur, 'bump', 1.1);
-      jouerGeste(e, defenseur, 'reaction_hit', 1.2);
       defenseur.vitesse.x += sens(porteur.cote) * 2.8;
       defenseur.vitesse.y += directionGeste * 0.8;
       defenseur.cible.y = borner(defenseur.pos.y + directionGeste * 1.6, 0, LARGEUR);
@@ -2122,9 +2171,21 @@ function resoudrePlaquage(
   if (e.rng() < 0.055 + porteur.vision / 1600 + (monGeste === 'raffut' ? 0.22 : 0)
     && offloader(e, porteur)) return;
 
-  appliquerImpactPlaquage(porteur, defenseur);
-  jouerGeste(e, porteur, Math.abs(porteur.corps?.direction ?? 0) < Math.PI / 2 ? 'fall_forward' : 'fall_back', 1.4);
-  jouerGeste(e, defenseur, (porteur.corps?.intensite ?? 0) > .75 ? 'tackle_drive' : 'tackle_low', 1.35);
+  const diffPuissance = (defenseur.plaquage + defenseur.puissance) - (porteur.evitement + porteur.puissance);
+  const grosTampon = diffPuissance > 6 || (monPlaquage && e.rng() < 0.45) || e.rng() < 0.20;
+  if (grosTampon) {
+    jouerGeste(e, porteur, 'fall_back', 1.8);
+    jouerGeste(e, defenseur, 'tackle_drive', 1.6);
+    declencherChute(porteur, { x: -sens(porteur.cote) * 4.4, y: (e.rng() - 0.5) * 1.6 }, 2.4);
+    declencherChute(defenseur, { x: -sens(porteur.cote) * 2.2, y: 0 }, 1.8);
+    e.grosImpact = { lieu: { ...porteur.pos }, type: 'tampon', restant: 2.2 };
+    chauffer(e, 8);
+    dire(e, 'plaquage', defenseur.cote, `ÉNORME TAMPON de ${defenseur.nom} ! ${porteur.nom} est séché net et envoyé sur les fesses !`, 0, defenseur.moi || porteur.moi);
+  } else {
+    appliquerImpactPlaquage(porteur, defenseur);
+    jouerGeste(e, porteur, Math.abs(porteur.corps?.direction ?? 0) < Math.PI / 2 ? 'fall_forward' : 'fall_back', 1.4);
+    jouerGeste(e, defenseur, (porteur.corps?.intensite ?? 0) > .75 ? 'tackle_drive' : 'tackle_low', 1.35);
+  }
   formerRuck(e, { x: porteur.pos.x, y: porteur.pos.y }, { porteur, defenseur });
 }
 
@@ -2611,27 +2672,36 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
   // `bagarre.ts` → `sanctionApresMatch`).
   const pres = metresAvantLaLigne(lieu, pour) < 22;
   const severite = e.niveau === 'amateur' ? 1.7 : 1;
-  if (coupable && (cartonForce || e.rng() < (pres ? 0.16 : 0.05) * severite)) {
+  const motifLower = motif.toLowerCase();
+  const estCoupDePoing = motifLower.includes('coup de poing') || motifLower.includes('brutalité');
+  const estCathedrale = motifLower.includes('cathédrale');
+  const estPlaquageHaut = motifLower.includes('plaquage haut');
+  const estVolontaire = motifLower.includes('volontaire') || motifLower.includes('antijeu');
+
+  const chanceCarton = cartonForce ? 1
+    : estCoupDePoing ? 1
+    : estCathedrale ? 0.92
+    : estPlaquageHaut ? 0.52
+    : estVolontaire ? 0.65
+    : (pres ? 0.22 : 0.08) * severite;
+
+  if (coupable && (cartonForce || e.rng() < chanceCarton)) {
     const fautif = coupable;
-    // ⚠️ LE CARTON ROUGE EXISTE ENFIN. Le moteur n'en donnait aucun : la
-    // discipline se résumait à un compteur de jaunes, et un joueur ne risquait
-    // jamais rien de grave. Un jaune sur quatorze devient rouge, soit ~0,09 par
-    // match — l'ordre de grandeur du rugby professionnel. Un rouge, c'est le
-    // match terminé : `sanction` couvre les 80 minutes et le joueur ne revient
-    // pas (la relève est gérée par les remplacements, comme dans la réalité).
-    const rouge = cartonForce === 'rouge' || fautif.stats.cartonsJaunes > 0 || (!cartonForce && e.rng() < 0.07);
+    const rouge = cartonForce === 'rouge'
+      || estCoupDePoing
+      || (estCathedrale && e.rng() < 0.70)
+      || (cartonForce !== 'jaune' && fautif.stats.cartonsJaunes > 0)
+      || (!cartonForce && (estPlaquageHaut ? e.rng() < 0.25 : e.rng() < 0.12));
+
     fautif.surLeTerrain = false;
     fautif.sanction = rouge ? 99_999 : 600; // dix minutes, ou le reste du match
     if (rouge) fautif.stats.cartonsRouges += 1; else fautif.stats.cartonsJaunes += 1;
-    // ⚠️ LE CARTON DU JOUEUR INCARNÉ SUIT JUSQU'À LA CARRIÈRE. Il était jusqu'ici
-    // une simple ligne de statistique : un rouge coûtait dix minutes de jeu et
-    // rien d'autre. C'est lui qui déclenche maintenant la commission de
-    // discipline après le match (`sanctionApresMatch`).
     if (fautif.moi) {
       if (rouge) e.discipline.rouges += 1; else e.discipline.jaunes += 1;
       e.discipline.motif = motif;
     }
-    if (rouge) chauffer(e, 12);
+    if (rouge) chauffer(e, 14);
+
     dire(e, 'carton', fautif.cote, rouge
       ? C.texteMatch('cartonRouge', { nom: fautif.nom, motif, club: nomClub(e, fautif.cote) })
       : C.phrase(e.rng, C.CARTON, {
@@ -2886,14 +2956,10 @@ function phaseTransformation(e: EtatMatch): void {
 
 function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'jeu'): void {
   const cote = marqueur.cote;
-  const plan = planDe(e, cote);
-  const reste = plan.essaisTransformes + plan.essaisSecs;
 
   // Franchir la ligne ne suffit pas : le joueur contrôle puis pose le ballon.
   // Ce bref état garde porteur et ballon ensemble et rend enfin l'essai visible
   // avant que l'écran bascule sur la transformation.
-  // Le plan de score n'est qu'une aide de rythme invisible : il ne doit jamais
-  // annuler un essai que le joueur vient réellement de voir être aplati.
   if (!e.aplatissage) {
     const lieu = {
       x: cote === 'A' ? Math.max(marqueur.pos.x, LIGNE_B + 0.55) : Math.min(marqueur.pos.x, LIGNE_A - 0.55),
@@ -2921,26 +2987,110 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
     e.minuteur = 1.35;
     return;
   }
+
+  const action = e.aplatissage;
   e.aplatissage = null;
 
+  // Possibilité de VAR / TMO sur l'essai (~18% de chances)
+  const conteste = action && (e.rng() < 0.18 || Math.abs(action.lieu.y - AXE) > LARGEUR / 2 - 4);
+  if (conteste && action) {
+    declencherTMOEssai(e, action);
+    return;
+  }
+
+  validerEssai(e, marqueur, origine);
+}
+
+function declencherTMOFaute(
+  e: EtatMatch,
+  fautif: Pion,
+  victime: Pion,
+  motif: string,
+  sanctionAttendue: 'carton_jaune' | 'carton_rouge',
+): void {
+  const lieu = { ...victime.pos };
+  e.ballon = { ...lieu };
+  stopper(fautif);
+  stopper(victime);
+  const motifTMO: TMOMotif = motif.includes('coup de') || motif.includes('brutalité')
+    ? 'coup_de_poing'
+    : motif.includes('plaquage haut')
+      ? 'plaquage_haut'
+      : motif.includes('en avant')
+        ? 'en_avant'
+        : 'jeu_deloyal';
+
+  const tmo: TMOEtat = {
+    actif: true,
+    type: 'faute_grave',
+    motif: motifTMO,
+    libelleMotif: motif,
+    cible: lieu,
+    duree: 3.6,
+    restant: 3.6,
+    etape: 'visionnage',
+    decision: 'en_cours',
+    auteur: fautif,
+    fautif: { id: fautif.id, nom: fautif.nom, cote: fautif.cote },
+    victime,
+    carton: sanctionAttendue === 'carton_rouge' ? 'rouge' : 'jaune',
+  };
+  e.tmo = tmo;
+  e.phase = 'tmo';
+  e.minuteur = dureeArret(e, 'tmo');
+  dire(e, 'jalon', null, `📺 ARBITRAGE VIDÉO : L'arbitre fait appel au TMO pour un soupçon de ${motif} de ${fautif.nom} !`);
+}
+
+function declencherTMOEssai(e: EtatMatch, action: Aplatissage): void {
+  const marqueur = action.marqueur;
+  const lieu = { ...action.lieu };
+  e.ballon = { ...lieu };
+  stopper(marqueur);
+
+  const r = e.rng();
+  const motif: TMOMotif = r < 0.35 ? 'aplatissage'
+    : r < 0.65 ? 'en_avant'
+    : r < 0.85 ? 'pied_en_touche'
+    : 'jeu_deloyal';
+
+  const libelle = motif === 'aplatissage' ? "le contrôle du ballon sur l'aplatissage"
+    : motif === 'en_avant' ? "un possible en-avant de passe dans la construction"
+    : motif === 'pied_en_touche' ? "un éventuel pied en touche avant l'en-but"
+    : "un plaquage haut ou obstruction préalable";
+
+  const tmo: TMOEtat = {
+    actif: true,
+    type: 'essai',
+    motif,
+    libelleMotif: libelle,
+    cible: lieu,
+    duree: 3.8,
+    restant: 3.8,
+    etape: 'visionnage',
+    decision: 'en_cours',
+    auteur: marqueur,
+    origineEssai: action,
+    essaiEnJeu: { marqueur, origine: action.origine, lieu },
+  };
+  e.tmo = tmo;
+  e.phase = 'tmo';
+  e.minuteur = dureeArret(e, 'tmo');
+  dire(e, 'jalon', null, `📺 TMO DEMANDÉ ! L'arbitre interrompt la validation pour vérifier à la vidéo : ${libelle}.`);
+}
+
+function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul'): void {
+  const cote = marqueur.cote;
+  const plan = planDe(e, cote);
+  const reste = plan.essaisTransformes + plan.essaisSecs;
+
   marqueur.stats.essais += 1;
-  // ⚠️ LA PASSE DÉCISIVE — et le garde-fou qui va avec : on ne se crédite pas
-  // soi-même. Un joueur qui passe, récupère son propre coup de pied et aplatit
-  // n'a pas fait de passe décisive ; sans ce test, il en aurait une.
   if (e.dernierPasseur && e.dernierPasseur !== marqueur && e.dernierPasseur.cote === cote) {
     e.dernierPasseur.stats.passesDecisives += 1;
-    // ⚠️ ON LE DIT TOUT DE SUITE. La statistique existait déjà, mais elle
-    // n’apparaissait qu’à la feuille de match, une heure plus tard : le geste
-    // et sa récompense étaient séparés par tout un match. C’est exactement ce
-    // qui donne le sentiment que « nos actions n’ont aucun impact ».
     if (e.dernierPasseur.moi) {
       e.echos.push({ cle: 'ml.echo.passeDecisive', nom: e.dernierPasseur.nom, cible: marqueur.nom });
     }
   }
   e.dernierPasseur = null;
-  // ⚠️ LE BALLON VOLÉ QUI AMÈNE L’ESSAI QUARANTE SECONDES PLUS TARD : personne
-  // ne fait le lien, le fil a défilé et la carte est refermée depuis
-  // longtemps. C’est ce chaînon qui permet de revenir dessus.
   const vol = e.dernierTurnover;
   if (vol && vol.pion.moi && vol.pion.cote === cote && e.t - vol.t < 40) {
     e.echos.push({ cle: 'ml.echo.turnoverEssai', nom: vol.pion.nom, cible: marqueur.nom });
@@ -2957,7 +3107,13 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
     ? C.phrase(e.rng, C.MAUL_ESSAI, { nom: marqueur.nom })
     : C.phrase(e.rng, C.ESSAI, { nom: marqueur.nom, precision }), 5, marqueur.moi);
 
-  // ── La transformation : le PLAN décide, la position décide qui du 7 ou du 5
+  // 📺 Replay télé de l'essai pendant la préparation du botteur
+  e.dernierReplayEssai = {
+    marqueurNom: marqueur.nom,
+    lieu: { ...marqueur.pos },
+    restant: 4.2,
+  };
+
   const liste = surLeTerrain(e, cote);
   const buteur = liste.find((p) => p.buteur) ?? [...liste].sort((a, b) => b.pied - a.pied)[0] ?? marqueur;
   const ecartAxe = Math.abs(marqueur.pos.y - AXE);
@@ -2968,8 +3124,6 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   else if (plan.essaisTransformes > 0 && plan.essaisSecs > 0) transforme = e.rng() < chance;
   else transforme = plan.essaisTransformes > 0;
 
-  // Le marqueur n'est plus le porteur : sinon la boucle de déplacement le
-  // saute indéfiniment et il reste figé dans l'en-but après son essai.
   stopper(marqueur);
   e.porteur = null;
   e.vol = null;
@@ -2991,6 +3145,75 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   e.minuteur = dureeArret(e, 'transformation');
   e.possession = cote;
   e.placement = placementTir(e.pions, lieu, cote, buteur.id);
+}
+
+function phaseTMO(e: EtatMatch): void {
+  if (e.minuteur > 0) return;
+  const tmo = e.tmo;
+  if (!tmo) {
+    e.phase = 'jeuCourant';
+    return;
+  }
+
+  if (tmo.origineEssai) {
+    const action = tmo.origineEssai;
+    const coteAttaque = action.marqueur.cote;
+    const coteDefense = adverse(coteAttaque);
+
+    const refuse = e.rng() < 0.28;
+    if (refuse) {
+      tmo.decision = 'essai_refuse';
+      e.tmo = null;
+      if (tmo.motif === 'en_avant') {
+        dire(e, 'jalon', null, `❌ TMO DÉCISION : En-avant confirmé à la vidéo sur la passe ! L’essai de ${action.marqueur.nom} est REFUSÉ.`);
+        return arret(e, 'melee', coteDefense, {
+          x: borner(action.lieu.x - sens(coteAttaque) * 5, LIGNE_A + 5, LIGNE_B - 5),
+          y: borner(action.lieu.y, 5, LARGEUR - 5),
+        });
+      }
+      if (tmo.motif === 'pied_en_touche') {
+        dire(e, 'jalon', null, `❌ TMO DÉCISION : Pied en touche sur le plongeon ! L’essai de ${action.marqueur.nom} est REFUSÉ.`);
+        return arret(e, 'touche', coteDefense, {
+          x: borner(action.lieu.x - sens(coteAttaque) * 5, LIGNE_A + 5, LIGNE_B - 5),
+          y: action.lieu.y < AXE ? 0 : LARGEUR,
+        });
+      }
+      if (tmo.motif === 'jeu_deloyal' || tmo.motif === 'plaquage_haut') {
+        dire(e, 'jalon', null, `❌ TMO DÉCISION : Faute préalable de l'attaque constatée au ralenti ! L’essai est REFUSÉ.`);
+        return siffler(e, coteDefense, action.lieu, 'jeu déloyal au départ de l’action');
+      }
+      dire(e, 'jalon', null, `❌ TMO DÉCISION : Ballon non aplati et tenu en-but ! L’essai est REFUSÉ.`);
+      return arret(e, 'renvoi22', coteDefense, {
+        x: coteDefense === 'A' ? M22_A : M22_B,
+        y: AXE,
+      });
+    }
+
+    tmo.decision = 'essai_accorde';
+    dire(e, 'jalon', null, `✅ TMO DÉCISION : Aucune irrégularité constatée après visionnage des angles vidéo ! ESSAI ACCORDÉ !`);
+    e.tmo = null;
+    validerEssai(e, action.marqueur, action.origine);
+    return;
+  }
+
+  const fautif = tmo.auteur;
+  if (!fautif) {
+    e.tmo = null;
+    e.phase = 'jeuCourant';
+    return;
+  }
+  const victime = tmo.victime;
+  const motif = tmo.motif === 'coup_de_poing' ? 'coup de poing caractérisé'
+    : tmo.motif === 'plaquage_haut' ? 'plaquage haut avec contact à la tête'
+    : 'brutalité / jeu déloyal flagrant';
+
+  const carton = tmo.carton ?? (tmo.motif === 'coup_de_poing' ? 'rouge' : 'jaune');
+  const decision: TMODecision = carton === 'rouge' ? 'carton_rouge' : 'carton_jaune';
+  tmo.decision = decision;
+  dire(e, 'jalon', null, `📺 TMO DÉCISION : Le ralenti confirme l'agression ! ${carton === 'rouge' ? 'Carton ROUGE direct' : 'Carton JAUNE'} pour ${fautif.nom}.`);
+  const lieuSanction = tmo.cible;
+  e.tmo = null;
+  siffler(e, victime ? victime.cote : adverse(fautif.cote), lieuSanction, motif, fautif, carton);
 }
 
 function phaseAplatissage(e: EtatMatch): void {

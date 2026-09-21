@@ -161,23 +161,23 @@ export function avancerCorps(e: EtatMatch, dt: number): void {
 
 /** Les mauvais gestes naissent d'un duel proche, tendu et indiscipliné. */
 export function incidentDeContact(e: EtatMatch): { fautif: Pion; victime: Pion; motif: string; rouge: boolean; vu: boolean } | null {
-  if (e.phase !== 'jeuCourant' || e.tension < 35 || e.sim < (e.incidentApres ?? 0)) return null;
+  if (e.phase !== 'jeuCourant' || e.tension < 28 || e.sim < (e.incidentApres ?? 0)) return null;
   e.incidentApres = e.sim + 2;
   const actifs = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0);
   for (const fautif of actifs) {
-    if (fautif.corps || fautif.discipline > 68 || fautif === e.porteur) continue;
-    const victime = actifs.find((q) => q.cote !== fautif.cote && Math.hypot(q.pos.x - fautif.pos.x, q.pos.y - fautif.pos.y) < 1.25);
-    if (!victime || e.rng() > .012 * e.tension / 80 * (1.4 - fautif.discipline / 100)) continue;
-    const poursuite = Math.hypot(victime.vitesse.x, victime.vitesse.y) > 3;
+    if (fautif.corps || fautif.discipline > 78 || fautif === e.porteur) continue;
+    const victime = actifs.find((q) => q.cote !== fautif.cote && Math.hypot(q.pos.x - fautif.pos.x, q.pos.y - fautif.pos.y) < 1.35);
+    if (!victime || e.rng() > .016 * e.tension / 75 * (1.5 - fautif.discipline / 100)) continue;
+    const poursuite = Math.hypot(victime.vitesse.x, victime.vitesse.y) > 2.8;
     const auSol = !!victime.corps;
     const clip = auSol ? 'foul_kick' : poursuite ? 'foul_trip' : 'foul_punch';
     jouerGeste(e, fautif, clip, 1.2);
     jouerGeste(e, victime, !auSol && poursuite ? 'reaction_trip' : 'reaction_hit', 1.4);
     declencherChute(victime, { x: (victime.pos.x - fautif.pos.x) * 2, y: (victime.pos.y - fautif.pos.y) * 2 }, 1.7);
-    e.incidentApres = e.sim + 75;
+    e.incidentApres = e.sim + 60;
     const vu = e.rng() < visibiliteFaute(e, victime.pos);
     (e.fautesVues ??= {})[fautif.id] = vu;
-    return { fautif, victime, motif: auSol ? 'coup de pied' : poursuite ? 'croche-pied' : 'coup de poing', rouge: auSol || !poursuite, vu };
+    return { fautif, victime, motif: auSol ? 'coup de pied au sol' : poursuite ? 'croche-pied' : 'coup de poing', rouge: auSol || !poursuite, vu };
   }
   return null;
 }

@@ -5281,6 +5281,166 @@
 }
 @media (prefers-reduced-motion: reduce) { .ml-sifflet { animation: none; } }
 
+/* --- 📺 TMO : ARBITRAGE VIDÉO TV & REPLAY ------------------------------- */
+.ml-tmo-overlay {
+  position: absolute;
+  top: 9%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: clamp(280px, 86%, 420px);
+  background: linear-gradient(145deg, rgba(7, 14, 30, 0.96), rgba(13, 24, 52, 0.94));
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.7), 0 0 22px rgba(59, 130, 246, 0.4);
+  overflow: hidden;
+  z-index: 60;
+  animation: tmo-enter 0.28s ease-out;
+}
+.ml-tmo-entete {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0.85rem;
+  background: rgba(59, 130, 246, 0.22);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.35);
+}
+.ml-tmo-badge {
+  font-family: 'Anton', system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  color: #93c5fd;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ml-tmo-rec {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #f87171;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.ml-tmo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: tmo-blink 0.9s infinite;
+}
+.ml-tmo-corps {
+  padding: 0.65rem 0.9rem 0.75rem;
+  text-align: center;
+}
+.ml-tmo-motif {
+  font-size: 0.8rem;
+  color: var(--craie);
+  margin-bottom: 0.4rem;
+}
+.ml-tmo-motif b { color: #93c5fd; }
+.ml-tmo-statut {
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.ml-tmo-scanning {
+  color: #fbbf24;
+  display: inline-block;
+  animation: tmo-pulse 1.3s infinite ease-in-out;
+}
+.ml-tmo-accorde {
+  color: #34d399;
+  text-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+}
+.ml-tmo-refuse {
+  color: #f87171;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+}
+.ml-tmo-sanction {
+  color: #fca5a5;
+}
+
+/* --- 📺 REPLAY ESSAI (TRANSFORMATION) ----------------------------------- */
+.ml-replay-overlay {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: rgba(10, 16, 28, 0.92);
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem 0.45rem;
+  z-index: 55;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
+  animation: tmo-enter 0.25s ease-out;
+}
+.ml-replay-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fcd34d;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.ml-replay-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: tmo-blink 0.8s infinite;
+}
+.ml-replay-nom {
+  font-family: 'Anton', system-ui, sans-serif;
+  font-size: 1.1rem;
+  color: var(--craie);
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  margin-top: 0.1rem;
+}
+
+/* --- ⚡ GROS IMPACT FLASH ------------------------------------------------ */
+.ml-gros-impact-flash {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.94), rgba(185, 28, 28, 0.96));
+  color: #ffffff;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  font-family: 'Anton', system-ui, sans-serif;
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 0 0 28px rgba(239, 68, 68, 0.75);
+  z-index: 65;
+  pointer-events: none;
+  animation: impact-pop 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes tmo-enter {
+  from { transform: translateX(-50%) translateY(-12px) scale(0.94); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+@keyframes tmo-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@keyframes tmo-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes impact-pop {
+  0% { transform: translateX(-50%) scale(0.6); opacity: 0; }
+  50% { transform: translateX(-50%) scale(1.12); }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+
 /* --- LA SANCTION D'APRÈS-MATCH ------------------------------------------ */
 .ml-sanction {
   margin-bottom: 0.5rem;

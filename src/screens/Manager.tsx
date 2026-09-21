@@ -16,9 +16,13 @@ import { TresorerieManager } from '../components/TresorerieManager';
 import { evaluerObjectif } from '../lib/objectifsManager';
 import { competitionEffective } from '../lib/divisions';
 import { TROPHEES } from '../data/trophees';
-import { nomPoste, POSTES } from '../data/rugby';
+import { nomPoste, POSTES, POSTE_PAR_ID } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
 import { CompositionTerrainManager } from '../components/CompositionTerrainManager';
+import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
+import { rareteCarriere } from '../lib/ligue/catalogueCarriere';
+import { statistiquesCarte } from '../lib/ligue/statistiquesCarte';
+import type { CarteCarriere } from '../lib/ligue/typesCarriere';
 import { Icone } from '../components/Icone';
 import { FicheJoueur } from '../components/FicheJoueur';
 import { rareteDe } from '../lib/carteJoueur';
@@ -291,6 +295,39 @@ export function Manager() {
     () => effectifComplet.filter((j) => !indisponiblesSet.has(j.id)),
     [effectifComplet, indisponiblesSet],
   );
+  const cartesManagerCache = useMemo(() => {
+    const map = new Map<string, CarteCarriere>();
+    if (!manager) return map;
+    const comp = competitionEffective(manager.club, manager.division);
+    const ch = comp?.nom || manager.divisionNom || manager.division || 'Top 14';
+    for (const j of effectifComplet) {
+      const famille = POSTE_PAR_ID[j.poste]?.famille ?? 'troisieme_ligne';
+      map.set(j.id, {
+        id: j.id,
+        sourceId: j.id,
+        nom: j.nom,
+        poste: j.poste,
+        famille,
+        postesSecondaires: j.postesSecondaires,
+        note: j.note,
+        potentiel: j.potentiel,
+        age: j.age,
+        nation: j.nation,
+        clubReel: manager.club,
+        championnat: ch,
+        pays: 'France',
+        origine: j.duCentre ? 'formation' : 'professionnel',
+        rarete: rareteCarriere(j.note),
+        statistiques: statistiquesCarte(j.note, famille, j.id),
+        proprietaire: manager.nom,
+        fatigue: 0,
+        matchs: 0,
+        essais: 0,
+        clubs: [{ clubId: manager.club, saison: manager.saison }],
+      });
+    }
+    return map;
+  }, [effectifComplet, manager]);
   const compositionMemo = useMemo(
     () => reconcilerCompositionManager(effectif, manager?.composition),
     [effectif, manager?.composition],
@@ -991,6 +1028,11 @@ export function Manager() {
               </section>
 
               <CompositionTerrainManager
+                rendreCarte={(j) => {
+                  const c = cartesManagerCache.get(j.id);
+                  const logoClubCourant = manager?.club ? clubParNom(manager.club)?.logo : undefined;
+                  return c ? <CarteJoueurEnLigne carte={c} logoClub={logoClubCourant} compacte /> : null;
+                }}
                 effectif={effectif}
                 effectifComplet={effectifComplet}
                 composition={composition}

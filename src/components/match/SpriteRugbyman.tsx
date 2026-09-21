@@ -228,7 +228,7 @@ export function SpriteArbitre({ position, phase, sifflet, redresser, hauteurMetr
   const character = useMemo(() => personnageArbitre(couleur), [couleur]);
   const animation = carton === 'rouge' ? 'ref_red' : carton === 'jaune' ? 'ref_yellow'
     : sifflet?.cle.includes('enAvant') ? 'ref_knockon' : phase === 'penalite' ? 'ref_penalty'
-      : phase === 'miTemps' || phase === 'bagarre' ? 'ref_timeoff' : phase === 'fini' ? 'ref_end'
+      : phase === 'miTemps' || phase === 'bagarre' || phase === 'tmo' ? 'ref_timeoff' : phase === 'fini' ? 'ref_end'
         : sifflet ? 'ref_whistle' : phase === 'melee' ? 'ref_scrum' : phase === 'aplatissage' ? 'ref_try'
           : vitesse > 4 ? 'run' : vitesse > .6 ? 'jog' : 'idle';
   const angle = regard + angleVue * Math.PI / 180;
