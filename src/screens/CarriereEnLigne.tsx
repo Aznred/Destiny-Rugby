@@ -804,7 +804,7 @@ function LaboratoireLigue({ vue, agir, occupe, suivre, notifier }: { vue: VueCar
     const suivante = await agir(commande);
     if (suivante) notifier(message);
   };
-  const rencontres = [...vue.rencontres].sort((a, b) => {
+  const rencontres = [...(vue.rencontres ?? [])].sort((a, b) => {
     const etatA = a.match && !a.resultat ? 0 : a.resultat ? 2 : 1;
     const etatB = b.match && !b.resultat ? 0 : b.resultat ? 2 : 1;
     return etatA - etatB || (etatA === 2 ? Date.parse(b.ferme) - Date.parse(a.ferme) : Date.parse(a.ferme) - Date.parse(b.ferme));
@@ -821,7 +821,7 @@ function LaboratoireLigue({ vue, agir, occupe, suivre, notifier }: { vue: VueCar
     <ReglageRythme vue={vue} agir={agir} occupe={occupe} notifier={notifier} />
     <BancDessaiSituations />
     <section className="cel-panneau">
-      <div className="cel-titre-ligne"><div><div className="eyebrow">Pilotage en direct</div><h2>Matchs de la saison</h2></div><small>{vue.rencontres.filter(r => r.resultat).length} joué(s)</small></div>
+      <div className="cel-titre-ligne"><div><div className="eyebrow">Pilotage en direct</div><h2>Matchs de la saison</h2></div><small>{(vue.rencontres ?? []).filter(r => r.resultat).length} joué(s)</small></div>
       <div className="cel-laboratoire-matchs">{rencontres.map(r => {
         const enDirect = Boolean(r.match && !r.resultat && !r.match.termine);
         const minute = r.match?.horloge ?? 0;

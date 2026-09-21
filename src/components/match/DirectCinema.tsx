@@ -10,7 +10,7 @@ export function DirectCinema({match:m,domicile,exterieur,couleurs,emblemes}:{mat
  const moments=m.moments??[];
  const momentSelectionne=moments.find(v=>v.id===selection);
  const secondeCourante=(m.terrain?.horloge??m.horloge)*60;
- const ligneDirect=[...m.fil].reverse().find(v=>!v.ordre&&v.texte&&(v.seconde??v.minute*60)<=secondeCourante+2);
+ const ligneDirect=[...(m.fil ?? [])].reverse().find(v=>!v.ordre&&v.texte&&(v.seconde??v.minute*60)<=secondeCourante+2);
  const dernierMoment=moments.at(-1);
  const ageMoment=dernierMoment?secondeCourante-dernierMoment.seconde:Infinity;
  const momentVif=dernierMoment&&ageMoment>=-2&&ageMoment<=15?dernierMoment:undefined;

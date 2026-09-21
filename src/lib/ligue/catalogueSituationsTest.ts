@@ -9,6 +9,7 @@ import type { TypeScenarioDirect } from './scenarioDirect.js';
 import type { Phase } from '../moteur/etat.js';
 import type { GesteMatch } from '../moteur/dynamique.js';
 import type { NomIcone } from '../../components/Icone.js';
+import type { PosteId } from '../../types.js';
 import { AXE, LIGNE_B, MILIEU, M22_A } from '../moteur/terrain.js';
 
 export interface CategorieSituation {
@@ -42,10 +43,17 @@ export const CATEGORIES_SITUATIONS: CategorieSituation[] = [
   { id: 'impacts', nom: 'Impacts & Discipline', icone: 'flamme', description: 'Gros tampons dominants, raffuts dévastateurs et cartons' },
 ];
 
+const POSTES_XV: PosteId[] = [
+  'pilier_gauche', 'talonneur', 'pilier_droit',
+  'deuxieme_ligne_g', 'deuxieme_ligne_d',
+  'troisieme_aile_g', 'troisieme_aile_d', 'numero_8',
+  'demi_melee', 'demi_ouverture',
+  'ailier_gauche', 'premier_centre', 'deuxieme_centre', 'ailier_droit', 'arriere',
+];
+
 function pionsStandard(decalageX = 0, decalageY = 0) {
   const pions = [];
   // 15 joueurs Domicile (Toulouse - Rouge et Noir)
-  const postesDom = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15'];
   for (let i = 1; i <= 15; i++) {
     const x = 50 + (i <= 8 ? (i - 1) * 1.5 : (i - 8) * 3) + decalageX;
     const y = 20 + (i % 5) * 6 + decalageY;
@@ -54,7 +62,7 @@ function pionsStandard(decalageX = 0, decalageY = 0) {
       numero: i,
       numeroRole: i,
       nom: `Toulousain ${i}`,
-      poste: (postesDom[i - 1] ?? '15') as any,
+      poste: POSTES_XV[i - 1] ?? 'arriere',
       cote: 'domicile' as CoteEnLigne,
       x, y,
       vx: 0, vy: 0,
@@ -70,7 +78,7 @@ function pionsStandard(decalageX = 0, decalageY = 0) {
       numero: i,
       numeroRole: i,
       nom: `Rochelais ${i}`,
-      poste: (postesDom[i - 1] ?? '15') as any,
+      poste: POSTES_XV[i - 1] ?? 'arriere',
       cote: 'exterieur' as CoteEnLigne,
       x, y,
       vx: 0, vy: 0,

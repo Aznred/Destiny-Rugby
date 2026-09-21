@@ -51,7 +51,7 @@ export function apparenceJoueurMatch(nom: string, poste: PosteId): ApparenceMatc
   const cle = normaliserNomMatch(nom);
   const generee = APPARENCES_JOUEURS_MATCH[cle];
   const h = graineVisuelleMatch(`${cle}:${poste}`);
-  const [taille, poids, morphologie] = PROFIL_POSTE[poste];
+  const [taille, poids, morphologie] = PROFIL_POSTE[poste] ?? PROFIL_POSTE.arriere;
   return {
     tailleCm: generee?.tailleCm ?? taille + (h % 7) - 3,
     poidsKg: generee?.poidsKg ?? poids + ((h >>> 4) % 9) - 4,
