@@ -15,6 +15,8 @@ export function BancDessaiSituations({ className }: Props) {
   const [categorieActive, setCategorieActive] = useState<string>('toutes');
   const [situationId, setSituationId] = useState<string>(SITUATIONS_LABORATOIRE[0]?.id ?? 'tmo_essai_valide');
   const [cleRejouer, setCleRejouer] = useState<number>(0);
+  const [enLecture, setEnLecture] = useState<boolean>(true);
+  const [vitesse, setVitesse] = useState<number>(1);
 
   // Filtrage des situations selon la catégorie choisie
   const situationsFiltrees = useMemo(() => {
@@ -92,11 +94,29 @@ export function BancDessaiSituations({ className }: Props) {
           </button>
           <button
             type="button"
-            className="btn primaire"
-            onClick={rejouer}
-            title="Relancer l'action et réinitialiser les animations"
+            className={`btn ${enLecture ? 'fantome' : 'primaire'}`}
+            onClick={() => setEnLecture((l) => !l)}
+            title={enLecture ? 'Mettre l’animation en pause' : 'Reprendre la lecture'}
+          >
+            <Icone nom={enLecture ? 'stop' : 'chrono'} taille={16} />
+            {enLecture ? 'Pause' : 'Lecture'}
+          </button>
+          <button
+            type="button"
+            className={`btn ${vitesse === 0.5 ? 'secondaire' : 'fantome'}`}
+            onClick={() => setVitesse((v) => (v === 1 ? 0.5 : 1))}
+            title={vitesse === 0.5 ? 'Revenir à vitesse normale (1x)' : 'Activer le ralenti (0.5x)'}
           >
             <Icone nom="chrono" taille={16} />
+            {vitesse === 0.5 ? 'Ralenti 0.5x' : 'Vitesse 1x'}
+          </button>
+          <button
+            type="button"
+            className="btn primaire"
+            onClick={rejouer}
+            title="Relancer l'action et réinitialiser les animations à zéro"
+          >
+            <Icone nom="bouclier" taille={16} />
             Rejouer l'action
           </button>
         </div>
@@ -207,6 +227,9 @@ export function BancDessaiSituations({ className }: Props) {
             domicile: '#c1121f',
             exterieur: '#eab308',
           }}
+          modeDemo={true}
+          pause={!enLecture}
+          vitesseDemo={vitesse}
         />
       </div>
 

@@ -46,6 +46,12 @@
   flex-wrap: wrap;
 }
 
+.banc-situations-actions-rapides .btn.secondaire {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+  color: #fef08a;
+}
+
 /* Onglets Catégories */
 .banc-situations-categories {
   display: flex;

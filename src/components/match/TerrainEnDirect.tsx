@@ -49,7 +49,7 @@ import { LARGEUR, LONGUEUR, borner, type Vec } from '../../lib/moteur/terrain';
 import type { CoteEnLigne, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import { creerScenarioDirect, type ScenarioDirect } from '../../lib/ligue/scenarioDirect';
 import {
-  amortirImageDirect, interpolerImageDirect, interpolerEtatDirect, projeterImageDirect, type BallonAfficheDirect,
+  amortirImageDirect, interpolerImageDirect, interpolerEtatDirect, projeterImageDirect, ballonAuReleve, type BallonAfficheDirect,
   type ImageDirect,
 } from '../../lib/ligue/interpolationDirect';
 import { t } from '../../lib/i18n';
@@ -92,6 +92,9 @@ interface Props {
   /** Le camp qu'on entraîne : c'est vers son en-but qu'on attaque à l'écran. */
   monCote?: CoteEnLigne;
   carton?: 'jaune' | 'rouge';
+  modeDemo?: boolean;
+  pause?: boolean;
+  vitesseDemo?: number;
 }
 
 interface Releve {
@@ -129,7 +132,7 @@ const LIBELLES_COMBINAISON = {
   leurreDevant: 'Leurre devant · saut au fond',
 } as const;
 
-function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote, carton }: Props) {
+function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote, carton, modeDemo, pause, vitesseDemo }: Props) {
   const scene = useRef<HTMLDivElement>(null);
   const boite = useRef({ largeur: 1, hauteur: 1 });
   const camera = useRef(new Camera());
@@ -144,6 +147,12 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const [scenario, setScenario] = useState(() => creerScenarioDirect(terrain));
   const [, redessiner] = useState(0);
 
+  const tempsSimulationDemo = useRef(0);
+  const demoOptions = useRef({ modeDemo, pause, vitesseDemo });
+  useEffect(() => {
+    demoOptions.current = { modeDemo, pause, vitesseDemo };
+  }, [modeDemo, pause, vitesseDemo]);
+
   // ⚠️ TOUT CE QUE LA BOUCLE LIT PASSE PAR UNE RÉFÉRENCE. Elle est montée une
   // seule fois pour la vie du composant : la relancer à chaque relevé du serveur
   // remettrait la caméra à zéro toutes les deux secondes.
@@ -152,8 +161,8 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const tampon = useRef<Releve[]>([{ terrain, recu: premierRecu, instant: premierInstant }]);
   /** performance.now() - horloge serveur ; filtré pour ne pas suivre le jitter. */
   const decalageServeur = useRef(premierRecu - premierInstant);
-  const retardCible = useRef(RETARD);
-  const retardRendu = useRef(RETARD);
+  const retardCible = useRef(modeDemo ? 0 : RETARD);
+  const retardRendu = useRef(modeDemo ? 0 : RETARD);
   const dernierInstantAffiche = useRef(-Infinity);
   const reglages = useRef({ modeCamera, monCote });
   const scenarioCourant = useRef(scenario);
@@ -162,6 +171,11 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     if (file[file.length - 1]?.terrain === terrain) return;
     const recu = performance.now() / 1000;
     const instant = (terrain.emisLe ?? Date.now()) / 1000;
+    if (demoOptions.current.modeDemo) {
+      retardCible.current = 0;
+      retardRendu.current = 0;
+      decalageServeur.current = recu - instant;
+    }
     // Une réponse lente arrivée après la suivante ne doit jamais faire reculer
     // le film. Elle est simplement obsolète : le prochain relevé fait foi.
     if (instant + 0.001 < (file[file.length - 1]?.instant ?? -Infinity)) return;
@@ -199,11 +213,25 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     const avancer = (brut: number) => {
       if (!actif) return;
       const maintenant = brut / 1000;
-      const dt = Math.min(0.1, Math.max(0, maintenant - precedent));
+      const dtReel = Math.min(0.1, Math.max(0, maintenant - precedent));
       precedent = maintenant;
 
+      const isDemo = demoOptions.current.modeDemo;
+      const isPause = isDemo && demoOptions.current.pause;
+      const vit = isDemo ? (demoOptions.current.vitesseDemo ?? 1) : 1;
+      const dt = isPause ? 0 : dtReel * vit;
+
+      if (isDemo && !isPause) {
+        tempsSimulationDemo.current += dt;
+      }
+
       const file = tampon.current;
-      retardRendu.current += borner(retardCible.current - retardRendu.current, -dt * .08, dt * .08);
+      if (isDemo) {
+        retardRendu.current = 0;
+        retardCible.current = 0;
+      } else {
+        retardRendu.current += borner(retardCible.current - retardRendu.current, -dt * .08, dt * .08);
+      }
       const instant = Math.max(dernierInstantAffiche.current, maintenant - decalageServeur.current - retardRendu.current);
       dernierInstantAffiche.current = instant;
       // Les deux relevés qui encadrent l'instant rendu. Tant que le tampon n'a
@@ -225,25 +253,80 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
         // s'immobilise exactement comme le jeu.
         dtSim = Math.max(0, a.terrain.simulation !== undefined && b.terrain.simulation !== undefined
           ? b.terrain.simulation - a.terrain.simulation : (b.terrain.horloge - a.terrain.horloge) * 60);
+      } else if (isDemo) {
+        // En mode démo / labo, on avance le temps de simulation sans le brider à 0.7s
+        const DUREE_CYCLE = 4.0;
+        const tCycle = tempsSimulationDemo.current % DUREE_CYCLE;
+        dtSim = tCycle * Math.max(1, a.terrain.cadence);
       } else {
         // Rien derrière : on prolonge brièvement le dernier relevé connu.
         dtSim = borner(instant - a.instant, 0, PREDICTION_MAX) * a.terrain.cadence;
       }
 
-      let imageDirecte;
+      let imageDirecte: ImageDirect;
       if (b) {
         imageDirecte = interpolerImageDirect(a.terrain, b.terrain, u, dtSim);
+      } else if (isDemo) {
+        const DUREE_CYCLE = 4.0;
+        const tCycle = tempsSimulationDemo.current % DUREE_CYCLE;
+        const pionsMap = new Map<string, Vec>();
+        for (const p of a.terrain.pions) {
+          pionsMap.set(p.id, {
+            x: borner(p.x + p.vx * tCycle, 0, LONGUEUR),
+            y: borner(p.y + p.vy * tCycle, 0, LARGEUR),
+          });
+        }
+        const volActif = a.terrain.vol ? {
+          ...a.terrain.vol,
+          ecoule: (a.terrain.vol.ecoule + tCycle) % Math.max(0.1, a.terrain.vol.duree),
+        } : undefined;
+        const terrainActif: TerrainDirect = {
+          ...a.terrain,
+          vol: volActif,
+          pions: a.terrain.pions.map((p) => {
+            const pos = pionsMap.get(p.id);
+            return pos ? { ...p, x: pos.x, y: pos.y } : p;
+          }),
+        };
+        const ballonAffiche = ballonAuReleve(terrainActif, pionsMap, 0);
+        imageDirecte = { pions: pionsMap, ballon: ballonAffiche };
       } else {
         imageDirecte = projeterImageDirect(a.terrain, dtSim / Math.max(0.01, a.terrain.cadence));
       }
-      imageAffichee = amortirImageDirect(imageAffichee, imageDirecte, dt);
+
+      const tCycle = tempsSimulationDemo.current % 4.0;
+      if (isDemo && tCycle < 0.08) {
+        imageAffichee = imageDirecte;
+      } else {
+        imageAffichee = amortirImageDirect(imageAffichee, imageDirecte, dtReel);
+      }
       pions.current = imageAffichee.pions;
       ballon.current = imageAffichee.ballon;
 
       // Le bandeau et le porteur ne changent qu'au terme de la trajectoire.
-      // Avant, ils basculaient à u=0,5 : le ballon quittait alors une position
-      // interpolée pour apparaître d'un coup dans les mains du relevé suivant.
       const courant = b ? interpolerEtatDirect(a.terrain, b.terrain, u)
+        : isDemo
+        ? {
+            ...a.terrain,
+            simulation: tCycle,
+            instantJeu: tCycle,
+            vol: a.terrain.vol ? {
+              ...a.terrain.vol,
+              ecoule: (a.terrain.vol.ecoule + tCycle) % Math.max(0.1, a.terrain.vol.duree),
+            } : undefined,
+            conquete: a.terrain.conquete ? {
+              ...a.terrain.conquete,
+              progression: ((a.terrain.conquete.progression + tCycle * 0.35) % 1),
+            } : undefined,
+            aplatissage: a.terrain.aplatissage ? {
+              ...a.terrain.aplatissage,
+              progression: Math.min(1, (a.terrain.aplatissage.progression + tCycle * 0.45) % 1.2),
+            } : undefined,
+            preparationTir: a.terrain.preparationTir ? {
+              ...a.terrain.preparationTir,
+              progression: ((a.terrain.preparationTir.progression + tCycle * 0.3) % 1),
+            } : undefined,
+          }
         : { ...a.terrain, simulation: (a.terrain.simulation ?? a.terrain.instantJeu ?? 0) + dtSim };
       afficheRef.current = courant;
 
@@ -262,7 +345,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       const cible = ballon.current;
       vueRef.current = camera.current.suivre(
         cible, cadrage, largeur / hauteur,
-        angleDeVue(reglages.current.monCote === 'exterieur' ? 'B' : 'A', hauteur > largeur), dt,
+        angleDeVue(reglages.current.monCote === 'exterieur' ? 'B' : 'A', hauteur > largeur), dtReel,
       );
       redessiner((n) => n + 1);
       image = requestAnimationFrame(avancer);

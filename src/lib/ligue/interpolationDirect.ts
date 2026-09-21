@@ -74,7 +74,7 @@ function positionPion(a: PionDirect, b: PionDirect, u: number, dtSim: number): V
  * extrémités et la durée ; la graine ne choisit qu'une légère courbure stable.
  * Deux spectateurs dessinent donc exactement la même passe.
  */
-function positionVol(vol: VolDirect, kBrut: number): BallonAfficheDirect {
+export function positionVol(vol: VolDirect, kBrut: number): BallonAfficheDirect {
   const k = borner01(kBrut);
   const dx = vol.vers.x - vol.de.x;
   const dy = vol.vers.y - vol.de.y;
@@ -110,7 +110,7 @@ export function interpolerPionsDirect(a: TerrainDirect, b: TerrainDirect, u: num
 }
 
 /** Position exacte du ballon dans un relevé isolé. */
-function ballonAuReleve(t: TerrainDirect, pions: Map<string, Vec>, avance = 0): BallonAfficheDirect {
+export function ballonAuReleve(t: TerrainDirect, pions: Map<string, Vec>, avance = 0): BallonAfficheDirect {
   if (t.vol) {
     const k = borner01((t.vol.ecoule + avance) / Math.max(0.01, t.vol.duree));
     return positionVol(t.vol, k);
