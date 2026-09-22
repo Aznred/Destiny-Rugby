@@ -56,7 +56,7 @@ import { decomposer } from './plan.js';
 import { avancerArbitre, avancerCorps, declencherChute, incidentDeContact, jouerGeste, visibiliteFaute } from './dynamique.js';
 import { organiserRuck, placerRegroupement, animerRegroupement, preparerChenille } from './regroupements.js';
 import * as C from './commentaire.js';
-import { routineDuJoueur, phraseRoutine } from './routinesButeur.js';
+import { routineDuJoueur } from './routinesButeur.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
   dansLes22Adverses, dansSes22, dansSonCamp, distance, distance2, franchieLigne,
@@ -2865,7 +2865,6 @@ function phasePenalite(e: EtatMatch): void {
     e.minuteur = dureeArret(e, 'tirAuBut');
     e.ballon = { ...info.lieu };
     e.placement = placementTir(e.pions, info.lieu, cote, buteur.id);
-    dire(e, 'franchissement', buteur.cote, phraseRoutine(e.rng, routine, buteur.nom), 0, buteur.moi);
     return;
   }
 
@@ -3254,7 +3253,6 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul'): vo
   e.minuteur = dureeArret(e, 'transformation');
   e.possession = cote;
   e.placement = placementTir(e.pions, lieu, cote, buteur.id);
-  dire(e, 'franchissement', buteur.cote, phraseRoutine(e.rng, routine, buteur.nom), 0, buteur.moi);
 }
 
 function phaseTMO(e: EtatMatch): void {

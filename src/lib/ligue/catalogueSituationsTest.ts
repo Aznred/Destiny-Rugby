@@ -38,7 +38,7 @@ export interface SituationTestInfo {
 
 export const CATEGORIES_SITUATIONS: CategorieSituation[] = [
   { id: 'tmo', nom: 'Arbitrage Vidéo (TMO)', icone: 'video', description: 'Vérifications vidéo en direct, angles de caméra et décisions arbitrales' },
-  { id: 'routines', nom: 'Rituels Buteur (20)', icone: 'cible', description: 'Visualisation des 20 routines complètes au tee (Wilkinson, Farrell, Biggar, Crabe, Chaman...)' },
+  { id: 'routines', nom: 'Courses d’élan Buteur (20)', icone: 'cible', description: 'Visualisation des 20 variations de courses d’élan, angles et postures au tee' },
   { id: 'essais', nom: 'Essais & Marque', icone: 'trophee', description: 'Plongeons, mauls d’avants, transformations et replays télé' },
   { id: 'conquete', nom: 'Conquête & Arrêts', icone: 'pousse', description: 'Mêlées fermées, touches, mauls structurés et rucks contestés' },
   { id: 'lancements', nom: 'Lancements & Large', icone: 'eclair', description: 'Attaques au ras, blocs d’avants, passes sautées et franchissements' },

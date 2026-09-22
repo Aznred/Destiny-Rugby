@@ -59,7 +59,7 @@ export function DirectCinema({
     momentVif?.texte ??
     ligneDirect?.texte ??
     (prep
-      ? `${prep.emojiRoutine ?? '🎯'} ${prep.nomRoutine ?? 'Rituel du buteur'} : concentration maximale avant la frappe.`
+      ? 'Concentration maximale du buteur face aux poteaux.'
       : scenario?.ballonLent
         ? 'La sortie est ralentie. La défense a le temps de se replacer.'
         : scenario?.intensite === 'forte'
@@ -142,10 +142,8 @@ export function DirectCinema({
 
         {prep && !m.decision && (!momentVif || ageMoment > 6) && (
           <div className="dc-alerte-terrain dc-alerte-penalite" role="status">
-            <b>{prep.transformation ? 'TRANSFORMATION · RITUEL DU BUTEUR' : 'PÉNALITÉ · RITUEL DU BUTEUR'}</b>
-            <span>
-              {prep.emojiRoutine ?? '🎯'} {prep.nomRoutine ?? 'Installation au tee'}
-            </span>
+            <b>{prep.transformation ? 'TRANSFORMATION' : 'TIR AU BUT'}</b>
+            <span>Prise d’élan et concentration face aux poteaux…</span>
           </div>
         )}
       </div>
