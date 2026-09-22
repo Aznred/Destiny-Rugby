@@ -85,6 +85,7 @@ import { situationInternationale } from '../lib/rassemblements';
 
 import { Icone } from './Icone';
 import { Selecteur } from './Selecteur';
+import { CadreTmoReplay } from './match/CadreTmoReplay';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
@@ -1506,30 +1507,21 @@ export function MatchLive({
                     </div>
                   )}
 
-                  {/* ---------- 📺 TMO : ARBITRAGE VIDÉO ---------- */}
+                  {/* ---------- 📺 TMO : ARBITRAGE VIDÉO BROADCAST (L'ACTION RESTE VISIBLE AU CENTRE) ---------- */}
                   {e.phase === 'tmo' && e.tmo && (
-                    <div className="ml-tmo-overlay" role="alert">
-                      <div className="ml-tmo-entete">
-                        <span className="ml-tmo-badge"><Icone nom="video" taille={14} /> TMO · ARBITRAGE VIDÉO</span>
-                        <span className="ml-tmo-rec"><span className="ml-tmo-dot" /> LIVE REPLAY</span>
-                      </div>
-                      <div className="ml-tmo-corps">
-                        <div className="ml-tmo-motif">
-                          <b>Vérification vidéo :</b> {e.tmo.libelleMotif}
-                        </div>
-                        <div className="ml-tmo-statut">
-                          {e.tmo.decision === 'en_cours' ? (
-                            <span className="ml-tmo-scanning">Analyse des angles vidéo en cours...</span>
-                          ) : e.tmo.decision === 'essai_accorde' ? (
-                            <span className="ml-tmo-accorde">DÉCISION : ESSAI ACCORDÉ</span>
-                          ) : e.tmo.decision === 'essai_refuse' ? (
-                            <span className="ml-tmo-refuse">DÉCISION : ESSAI REFUSÉ</span>
-                          ) : (
-                            <span className="ml-tmo-sanction">DÉCISION : SANCTION DISCIPLINAIRE</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    <CadreTmoReplay
+                      action={e.tmo.libelleMotif}
+                      decision={
+                        e.tmo.decision === 'en_cours'
+                          ? 'Analyse des angles vidéo en cours...'
+                          : e.tmo.decision === 'essai_accorde'
+                          ? 'Essai accordé'
+                          : e.tmo.decision === 'essai_refuse'
+                          ? 'Essai refusé'
+                          : 'Sanction disciplinaire'
+                      }
+                      horloge={`${Math.floor(e.minute)}:${String(Math.floor(e.t % 60)).padStart(2, '0')}`}
+                    />
                   )}
 
                   {/* ---------- 📺 REPLAY ESSAI (PENDANT LA PRÉPARATION DU BOTTEUR) ---------- */}

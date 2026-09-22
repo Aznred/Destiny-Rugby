@@ -218,7 +218,8 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
 
       const isDemo = demoOptions.current.modeDemo;
       const isPause = isDemo && demoOptions.current.pause;
-      const vit = isDemo ? (demoOptions.current.vitesseDemo ?? 1) : 1;
+      const isTmo = afficheRef.current?.phase === 'tmo' || Boolean(afficheRef.current?.tmo?.actif);
+      const vit = (isDemo ? (demoOptions.current.vitesseDemo ?? 1) : 1) * (isTmo ? 0.5 : 1);
       const dt = isPause ? 0 : dtReel * vit;
 
       if (isDemo && !isPause) {
@@ -353,7 +354,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
 
       const { largeur, hauteur } = boite.current;
       const mode = reglages.current.modeCamera;
-      const cadrage: Cadrage = mode === 'auto' ? prochainScenario.cadrage : mode;
+      const cadrage: Cadrage = isTmo ? 'tmo' : mode === 'auto' ? prochainScenario.cadrage : mode;
       // La caméra suit la position effectivement dessinée. Viser soudain le
       // milieu entre le ballon et sa destination provoquait un second saut,
       // même quand la trajectoire du ballon était correcte.
@@ -518,11 +519,13 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
             <span>Contrôle et aplatissage du ballon</span>
           </div>
         )}
-        <div className={`cel-scenario cel-scenario-${scenario.intensite}`} aria-live="polite">
-          {scenario.momentFort && <b>MOMENT FORT</b>}
-          <span>{LIBELLES_SCENARIO[scenario.type]}</span>
-          <small>{scenario.sequence}<sup>e</sup> phase · {LIBELLES_ZONE[scenario.zone]}</small>
-        </div>
+        {!affiche.tmo?.actif && affiche.phase !== 'tmo' && (
+          <div className={`cel-scenario cel-scenario-${scenario.intensite}`} aria-live="polite">
+            {scenario.momentFort && <b>MOMENT FORT</b>}
+            <span>{LIBELLES_SCENARIO[scenario.type]}</span>
+            <small>{scenario.sequence}<sup>e</sup> phase · {LIBELLES_ZONE[scenario.zone]}</small>
+          </div>
+        )}
         <div className="cel-hud-haut">
           <span className="cel-tag"><i style={{ background: couleurs.domicile }} />{nomDomicile}{monCote === 'domicile' ? ' · toi' : ''}</span>
           <span className="cel-tag"><i style={{ background: couleurs.exterieur }} />{nomExterieur}{monCote === 'exterieur' ? ' · toi' : ''}</span>
@@ -539,14 +542,16 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
             <span>{t('ml.sifflet.pour', { club: affiche.sifflet.club })}{affiche.sifflet.fautif ? ` · ${affiche.sifflet.fautif}` : ''}</span>
           </div>
         )}
-        <button
-          type="button"
-          className="cel-cadrage"
-          onClick={() => setModeCamera(modeCamera === 'auto' ? 'large' : modeCamera === 'large' ? 'suivi' : 'auto')}
-        >
-          <Icone nom="oeil" taille={15} />
-          {modeCamera === 'auto' ? 'Caméra auto' : modeCamera === 'large' ? 'Vue terrain' : 'Suivre le ballon'}
-        </button>
+        {!affiche.tmo?.actif && affiche.phase !== 'tmo' && (
+          <button
+            type="button"
+            className="cel-cadrage"
+            onClick={() => setModeCamera(modeCamera === 'auto' ? 'large' : modeCamera === 'large' ? 'suivi' : 'auto')}
+          >
+            <Icone nom="oeil" taille={15} />
+            {modeCamera === 'auto' ? 'Caméra auto' : modeCamera === 'large' ? 'Vue terrain' : 'Suivre le ballon'}
+          </button>
+        )}
       </div>
     </div>
   );

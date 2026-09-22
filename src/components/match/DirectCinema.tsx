@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { VueMatchEnLigne } from '../../lib/ligue/matchCarriere';
 import { creerScenarioDirect } from '../../lib/ligue/scenarioDirect';
-import { Icone } from '../Icone';
 import TerrainEnDirect, { type CouleursDirect } from './TerrainEnDirect';
+import { CadreTmoReplay } from './CadreTmoReplay';
 import './DirectCinema.css';
 
 const heure = (s: number) =>
@@ -72,8 +72,10 @@ export function DirectCinema({
         ? 'MOMENT FORT'
         : 'COMMENTAIRE EN DIRECT';
 
+  const isTmo = Boolean((m.terrain?.phase === 'tmo' || m.terrain?.tmo?.actif) && m.terrain?.tmo);
+
   return (
-    <section className="dc" aria-label="Direct du match animé">
+    <section className="dc" aria-label="Direct vidéo du match">
       <header className="dc-entete">
         <span>
           <i />
@@ -89,7 +91,7 @@ export function DirectCinema({
         </strong>
         <span style={{ borderColor: couleurs.exterieur }}>{exterieur}</span>
       </div>
-      <div className="dc-ecran">
+      <div className={`dc-ecran ${isTmo ? 'dc-ecran-tmo' : ''}`}>
         {m.terrain ? (
           <TerrainEnDirect
             key={m.id}
@@ -111,38 +113,15 @@ export function DirectCinema({
               : 'Les équipes prennent place…'}
           </p>
         )}
-        {/* ---------- 📺 TMO : ARBITRAGE VIDÉO TV & REPLAY ---------- */}
-        {(m.terrain?.phase === 'tmo' || m.terrain?.tmo?.actif) && m.terrain?.tmo && (
-          <div className="ml-tmo-overlay" role="alert">
-            <div className="ml-tmo-entete">
-              <span className="ml-tmo-badge">
-                <Icone nom="video" taille={14} /> TMO · ARBITRAGE VIDÉO
-              </span>
-              <span className="ml-tmo-rec">
-                <span className="ml-tmo-dot" /> LIVE REPLAY {m.terrain.tmo.cadreCamera ? `· ${m.terrain.tmo.cadreCamera}` : ''}
-              </span>
-            </div>
-            <div className="ml-tmo-corps">
-              <div className="ml-tmo-motif">
-                <b>Vérification vidéo :</b> {m.terrain.tmo.action}
-              </div>
-              <div className="ml-tmo-statut">
-                <span className={
-                  m.terrain.tmo.decision.toLowerCase().includes('accordé') ? 'ml-tmo-accorde'
-                    : m.terrain.tmo.decision.toLowerCase().includes('refusé') || m.terrain.tmo.decision.toLowerCase().includes('touche') ? 'ml-tmo-refuse'
-                    : m.terrain.tmo.decision.toLowerCase().includes('carton') ? 'ml-tmo-sanction'
-                    : 'ml-tmo-scanning'
-                }>
-                  DÉCISION : {m.terrain.tmo.decision}
-                </span>
-              </div>
-              {m.terrain.tmo.explication && (
-                <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '0.35rem', fontStyle: 'italic' }}>
-                  {m.terrain.tmo.explication}
-                </div>
-              )}
-            </div>
-          </div>
+        {/* ---------- 📺 TMO : CADRE TÉLÉ REPLAY BROADCAST (L'ACTION RESTE VISIBLE AU CENTRE) ---------- */}
+        {isTmo && m.terrain?.tmo && (
+          <CadreTmoReplay
+            action={m.terrain.tmo.action}
+            decision={m.terrain.tmo.decision}
+            explication={m.terrain.tmo.explication}
+            cadreCamera={m.terrain.tmo.cadreCamera}
+            horloge={heure(m.horloge * 60)}
+          />
         )}
 
         {(m.decision || (momentVif && !m.terrain?.tmo?.actif && m.terrain?.phase !== 'tmo')) && (

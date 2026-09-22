@@ -4,6 +4,7 @@
 @keyframes cel-pulse-fort{0%{box-shadow:0 0 0 0 #f0b84b99}65%{box-shadow:0 0 0 12px #f0b84b00}100%{box-shadow:0 8px 22px #0004}}
 @media(prefers-reduced-motion:reduce){.cel-scenario-forte{animation:none}}
 @media(max-width:650px){.dc-entete{flex-wrap:wrap;padding:12px}.dc-score{gap:8px;padding:10px;font-size:11px}.dc-score strong{font-size:21px}.dc .cel-scene{aspect-ratio:3/4;max-height:65vh;min-height:350px}.dc-chiffres b{font-size:15px}.dc-moments{padding:12px}.dc-liste button{gap:10px}.dc-commentaire p{font-size:12px}.cel-scenario{left:.45rem;top:.45rem;max-width:72%;padding:.42rem .56rem}.cel-scenario span{font-size:.69rem}.dc .cel-cadrage{right:.4rem;bottom:.4rem;font-size:10px;padding:.3rem .55rem}}
+.dc-ecran-tmo .cel-cadrage, .dc-ecran-tmo .cel-scenario { display: none !important; }
 
 /* Les pastilles du premier prototype sont désormais de vrais sprites articulés.
    Toutes les mesures restent dans le repère métrique du moteur : une mêlée ne
