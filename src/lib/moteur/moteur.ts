@@ -640,7 +640,7 @@ function tick(e: EtatMatch): void {
   if (incident) {
     e.compteurs.irregularites += 1;
     chauffer(e, 14);
-    const appelTMO = incident.motif.includes('coup de') || incident.rouge || e.rng() < 0.35;
+    const appelTMO = incident.motif.includes('coup de') || incident.rouge || e.rng() < 0.20;
     if (appelTMO) {
       declencherTMOFaute(e, incident.fautif, incident.victime, incident.motif, incident.rouge ? 'carton_rouge' : 'carton_jaune');
       return;
@@ -2114,7 +2114,7 @@ function resoudrePlaquage(
     porteur.battu = 0.6;
     if (e.rng() < visibiliteFaute(e, porteur.pos)) {
       siffler(e, porteur.cote, { x: porteur.pos.x, y: porteur.pos.y }, irreg.motif, defenseur,
-        irreg.cathedrale ? 'rouge' : irreg.haut && e.rng() < .25 ? 'jaune' : undefined);
+        irreg.cathedrale ? (e.rng() < 0.35 ? 'rouge' : 'jaune') : irreg.haut && e.rng() < .22 ? 'jaune' : undefined);
     }
     apresGesteIllegal(e, defenseur, porteur, irreg);
     return;
@@ -2802,11 +2802,12 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
 
   if (coupable && (cartonForce || e.rng() < chanceCarton)) {
     const fautif = coupable;
+    const deuxiemeJaune = fautif.stats.cartonsJaunes > 0;
     const rouge = cartonForce === 'rouge'
-      || estCoupDePoing
-      || (estCathedrale && e.rng() < 0.70)
-      || (cartonForce !== 'jaune' && fautif.stats.cartonsJaunes > 0)
-      || (!cartonForce && (estPlaquageHaut ? e.rng() < 0.25 : e.rng() < 0.12));
+      || (deuxiemeJaune && cartonForce !== 'jaune')
+      || (estCoupDePoing && e.rng() < 0.40)
+      || (estCathedrale && e.rng() < 0.35)
+      || (!cartonForce && estPlaquageHaut && e.rng() < 0.05);
 
     fautif.surLeTerrain = false;
     fautif.sanction = rouge ? 99_999 : 600; // dix minutes, ou le reste du match
@@ -3392,8 +3393,12 @@ function phaseTMO(e: EtatMatch): void {
     : tmo.motif === 'plaquage_haut' ? 'plaquage haut avec contact à la tête'
     : 'brutalité / jeu déloyal flagrant';
 
-  const estGrave = tmo.motif === 'coup_de_poing' || tmo.carton === 'rouge' || (tmo.motif === 'plaquage_haut' && e.rng() < 0.60);
-  const donneCarton = estGrave || (tmo.carton === 'jaune' && e.rng() < 0.35);
+  // Le TMO vérifie s'il y a un degré élevé de dangerosité sans circonstance atténuante.
+  // Au rugby moderne, la majorité des fautes révisées sont des jaunes (atténuation), le rouge étant réservé à la brutalité avérée.
+  const estGrave = (tmo.motif === 'coup_de_poing' && e.rng() < 0.40)
+    || (tmo.carton === 'rouge' && e.rng() < 0.40)
+    || (tmo.motif === 'plaquage_haut' && e.rng() < 0.10);
+  const donneCarton = estGrave || (tmo.carton === 'jaune' && e.rng() < 0.80) || e.rng() < 0.65;
 
   if (!donneCarton) {
     tmo.decision = 'essai_refuse';
@@ -3404,7 +3409,7 @@ function phaseTMO(e: EtatMatch): void {
     return;
   }
 
-  const carton = tmo.carton ?? (tmo.motif === 'coup_de_poing' ? 'rouge' : 'jaune');
+  const carton: 'jaune' | 'rouge' = estGrave ? 'rouge' : 'jaune';
   const decision: TMODecision = carton === 'rouge' ? 'carton_rouge' : 'carton_jaune';
   tmo.decision = decision;
   dire(e, 'jalon', null, `📺 TMO DÉCISION : Le ralenti confirme l'agression ! ${carton === 'rouge' ? 'Carton ROUGE direct' : 'Carton JAUNE'} pour ${fautif.nom}.`);

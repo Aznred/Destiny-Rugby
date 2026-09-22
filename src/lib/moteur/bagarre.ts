@@ -241,9 +241,9 @@ export function irregularite(e: EtatMatch, plaqueur: Pion): Irregularite | null 
   const base = e.niveau === 'amateur' ? 0.011 : 0.006;
   const p = base * (0.5 + fatigue) * (0.6 + e.tension / 70) * (1.4 - plaqueur.discipline / 150);
   if (e.rng() >= p) return null;
-  // Deux tiers de plaquages hauts, un tiers de plaquages en retard : c'est la
-  // répartition des cartons du rugby moderne, où la tête est la priorité.
-  const cathedrale = plaqueur.puissance > 65 && e.rng() < .15;
+  // Deux tiers de plaquages hauts, un tiers de plaquages en retard.
+  // Le plaquage cathédrale est un geste exceptionnel et dangereux (1,5 % au lieu de 15 %).
+  const cathedrale = plaqueur.puissance > 75 && e.rng() < 0.015;
   const haut = cathedrale || e.rng() < 0.66;
   return {
     cathedrale,
@@ -488,12 +488,12 @@ function carteMeritee(
     return r < 0.30 ? 'jaune' : null;
   }
   if (culpabilite < 2.8) {
-    if (amateur) return r < 0.14 ? 'rouge' : r < 0.86 ? 'jaune' : null;
-    return r < 0.34 ? 'rouge' : r < 0.80 ? 'jaune' : null;
+    if (amateur) return r < 0.04 ? 'rouge' : r < 0.70 ? 'jaune' : null;
+    return r < 0.06 ? 'rouge' : r < 0.65 ? 'jaune' : null;
   }
   // Un coup de poing assumé.
-  if (amateur) return r < 0.58 ? 'rouge' : 'jaune';
-  return r < 0.92 ? 'rouge' : 'jaune';
+  if (amateur) return r < 0.15 ? 'rouge' : 'jaune';
+  return r < 0.20 ? 'rouge' : 'jaune';
 }
 
 /** Sort la carte, met le joueur dehors, et l'écrit partout où il faut. */

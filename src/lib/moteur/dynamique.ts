@@ -161,23 +161,41 @@ export function avancerCorps(e: EtatMatch, dt: number): void {
 
 /** Les mauvais gestes naissent d'un duel proche, tendu et indiscipliné. */
 export function incidentDeContact(e: EtatMatch): { fautif: Pion; victime: Pion; motif: string; rouge: boolean; vu: boolean } | null {
-  if (e.phase !== 'jeuCourant' || e.tension < 28 || e.sim < (e.incidentApres ?? 0)) return null;
+  if (e.phase !== 'jeuCourant' || e.tension < 40 || e.sim < (e.incidentApres ?? 0)) return null;
   e.incidentApres = e.sim + 2;
   const actifs = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0);
   for (const fautif of actifs) {
     if (fautif.corps || fautif.discipline > 78 || fautif === e.porteur) continue;
     const victime = actifs.find((q) => q.cote !== fautif.cote && Math.hypot(q.pos.x - fautif.pos.x, q.pos.y - fautif.pos.y) < 1.35);
-    if (!victime || e.rng() > .016 * e.tension / 75 * (1.5 - fautif.discipline / 100)) continue;
+    if (!victime || e.rng() > .009 * (e.tension / 80) * (1.35 - fautif.discipline / 100)) continue;
     const poursuite = Math.hypot(victime.vitesse.x, victime.vitesse.y) > 2.8;
     const auSol = !!victime.corps;
+
+    // Seuls les gestes d'une extrême gravité sous forte tension valent un carton rouge direct.
+    // L'immense majorité des frictions au rugby sont des bousculades, accrochages ou croche-pieds (jaune ou pénalité).
+    const coupDePiedGrave = auSol && e.rng() < 0.06 && e.tension > 65 && fautif.discipline < 40;
+    const coupDePoingGrave = !auSol && !poursuite && e.rng() < 0.05 && e.tension > 65 && fautif.discipline < 40;
+
+    const motif = coupDePiedGrave
+      ? 'coup de pied au sol'
+      : auSol
+        ? 'geste dangereux au sol'
+        : coupDePoingGrave
+          ? 'coup de poing'
+          : poursuite
+            ? 'croche-pied'
+            : 'bousculade sans ballon';
+
+    const rouge = (coupDePiedGrave && e.rng() < 0.40) || (coupDePoingGrave && e.rng() < 0.35);
+
     const clip = auSol ? 'foul_kick' : poursuite ? 'foul_trip' : 'foul_punch';
     jouerGeste(e, fautif, clip, 1.2);
     jouerGeste(e, victime, !auSol && poursuite ? 'reaction_trip' : 'reaction_hit', 1.4);
     declencherChute(victime, { x: (victime.pos.x - fautif.pos.x) * 2, y: (victime.pos.y - fautif.pos.y) * 2 }, 1.7);
-    e.incidentApres = e.sim + 60;
+    e.incidentApres = e.sim + 90;
     const vu = e.rng() < visibiliteFaute(e, victime.pos);
     (e.fautesVues ??= {})[fautif.id] = vu;
-    return { fautif, victime, motif: auSol ? 'coup de pied au sol' : poursuite ? 'croche-pied' : 'coup de poing', rouge: auSol || !poursuite, vu };
+    return { fautif, victime, motif, rouge, vu };
   }
   return null;
 }
