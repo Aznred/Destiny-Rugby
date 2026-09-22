@@ -447,6 +447,42 @@ export function placerEquipes(e: EtatMatch): void {
   if (engagesRuck) {
     for (const p of e.pions) if (engagesRuck.has(p.id)) p.role = 'ruck';
   }
+  if (e.phase === 'ballonEnLAir' && e.vol?.type === 'pied') {
+    const v = e.vol;
+    const chute = v.vers;
+    const botteur = v.auteur;
+
+    // Le botteur sprinte vers le point de chute
+    if (botteur && botteur.surLeTerrain && botteur.sanction <= 0) {
+      botteur.role = 'chasseur';
+      botteur.cible = { ...chute };
+      botteur.effort = 1.1;
+    }
+
+    // Les partenaires loyaux (non hors-jeu) les plus proches chassent aussi
+    const chasseursMeneurs = surLeTerrain(e, botteur.cote)
+      .filter((p) => p !== botteur && !p.horsJeu && p.sanction <= 0)
+      .sort((a, b) => distance2(a.pos, chute) - distance2(b.pos, chute))
+      .slice(0, 2);
+
+    for (const ch of chasseursMeneurs) {
+      ch.role = 'chasseur';
+      ch.cible = { ...chute };
+      ch.effort = 1.1;
+    }
+
+    // Les défenseurs au fond (les plus proches du point de chute) sprintent pour réceptionner
+    const receveursDef = surLeTerrain(e, adverse(botteur.cote))
+      .filter((p) => p.sanction <= 0)
+      .sort((a, b) => distance2(a.pos, chute) - distance2(b.pos, chute))
+      .slice(0, 2);
+
+    for (const rec of receveursDef) {
+      rec.role = 'chasseur';
+      rec.cible = { ...chute };
+      rec.effort = 1.1;
+    }
+  }
   appliquerConsignePerso(e);
   // L'ENGAGEMENT : on ne sprinte que près du ballon. Un ailier à l'opposé se
   // replace en trottinant, comme dans un vrai match.
@@ -467,12 +503,11 @@ export function placerEquipes(e: EtatMatch): void {
     if (p.horsJeu && e.phase === 'ballonEnLAir') {
       const botteur = e.vol?.type === 'pied' ? e.vol.auteur : null;
       if (botteur && botteur.cote === p.cote) {
-        // Le botteur peut être dans son propre en-but (notamment lors d'un
-        // renvoi). La cible doit rester derrière lui, même hors de l'aire de jeu.
-        p.cible.x = borner(botteur.pos.x - sens(p.cote) * 3, 0.5, LONGUEUR - 0.5);
+        // Le joueur temporise et trottine en arrière pour se replacer sans fuir à l'autre bout du terrain
+        p.cible.x = borner(botteur.pos.x - sens(p.cote) * 2, 0.5, LONGUEUR - 0.5);
         p.cible.y = borner(p.cible.y, 4, LARGEUR - 4);
       }
-      p.effort = 0.92;
+      p.effort = 0.55;
       continue;
     }
     if (arret || p.role === 'chasseur') { p.effort = 1; continue; }
@@ -484,7 +519,7 @@ export function placerEquipes(e: EtatMatch): void {
     const rythme = e.tactiques[p.cote]?.rythme;
     p.effort *= rythme === 'intense' ? 1.08 : rythme === 'gestion' ? 0.92 : 1;
   }
-  if (e.porteur) e.porteur.effort = 1;
+  if (e.porteur) e.porteur.effort = e.echappee?.pion === e.porteur ? 1.15 : 1;
   separer(e, arret);
 }
 

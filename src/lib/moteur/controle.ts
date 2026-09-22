@@ -283,10 +283,10 @@ export function actionsDisponibles(e: EtatMatch): DefinitionAction[] {
 export function receveurPour(e: EtatMatch, p: Pion): Pion | undefined {
   const l = e.lancement;
   const suivant = l && l.index + 1 < l.chaine.length ? l.chaine[l.index + 1] : null;
-  if (suivant && suivant.surLeTerrain && suivant.sanction <= 0) return suivant;
+  if (suivant && suivant.surLeTerrain && suivant.sanction <= 0 && distance2(p.pos, suivant.pos) <= 14 * 14) return suivant;
   const s = p.cote === 'A' ? 1 : -1;
   return surLeTerrain(e, p.cote)
-    .filter((q) => q !== p && q.sanction <= 0 && (q.pos.x - p.pos.x) * s <= 0.6)
+    .filter((q) => q !== p && q.sanction <= 0 && (q.pos.x - p.pos.x) * s <= 0.6 && distance2(q.pos, p.pos) <= 14 * 14)
     .sort((a, b) => distance2(a.pos, p.pos) - distance2(b.pos, p.pos))[0];
 }
 
@@ -311,7 +311,8 @@ export function receveurCote(e: EtatMatch, p: Pion, cote: -1 | 1 | number): Pion
       && (q.pos.x - p.pos.x) * s <= 0.6
       // Et bien du bon côté, avec une marge d'un mètre pour ne pas exiger
       // l'alignement parfait.
-      && (q.pos.y - p.pos.y) * versY > 1)
+      && (q.pos.y - p.pos.y) * versY > 1
+      && distance2(q.pos, p.pos) <= 14 * 14)
     .sort((a, b) => distance2(a.pos, p.pos) - distance2(b.pos, p.pos))[0];
 }
 
@@ -432,7 +433,7 @@ export function pressionDevant(e: EtatMatch, p: Pion): number {
   let d2 = Infinity;
   for (const q of surLeTerrain(e, adverse(p.cote))) {
     if (q.sanction > 0 || q.battu > 0) continue;
-    if ((q.pos.x - p.pos.x) * s < -1) continue;
+    if ((q.pos.x - p.pos.x) * s < -0.2) continue;
     d2 = Math.min(d2, distance2(q.pos, p.pos));
   }
   return d2 === Infinity ? 99 : Math.sqrt(d2);

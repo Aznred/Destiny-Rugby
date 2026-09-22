@@ -1074,8 +1074,13 @@ function lancerVol(
  */
 function remettreEnJeu(e: EtatMatch, botteur: Pion): void {
   const s = sens(botteur.cote);
+  const onsides = surLeTerrain(e, botteur.cote).filter((p) => !p.horsJeu && p.sanction <= 0);
   for (const q of surLeTerrain(e, botteur.cote)) {
-    if (q.horsJeu && (botteur.pos.x - q.pos.x) * s >= 0) q.horsJeu = false;
+    if (q.horsJeu) {
+      if (onsides.some((p) => (p.pos.x - q.pos.x) * s >= 0)) {
+        q.horsJeu = false;
+      }
+    }
   }
 }
 
@@ -1087,6 +1092,9 @@ function libererHorsJeu(e: EtatMatch): void {
 function phaseBallonEnLAir(e: EtatMatch): void {
   const v = e.vol;
   if (!v) return reprendreJeu(e, e.ballon);
+  if (v.auteur && v.auteur.surLeTerrain) {
+    remettreEnJeu(e, v.auteur);
+  }
   if (v.ecoule < v.duree) return;
   e.vol = null;
   if (v.intention === 'renvoi') e.placement = null;
@@ -1205,7 +1213,7 @@ function phaseBallonEnLAir(e: EtatMatch): void {
   const contestable = v.intention === 'chandelle' || v.intention === 'rasant'
     || v.intention === 'transversale' || v.intention === 'renvoi';
   const chanceChasseur = contestable ? 0.42 : 0.12;
-  const rayonPrise = v.hauteur > 0.7 ? 3.1 : v.intention === 'rasant' ? 1.55 : 2.15;
+  const rayonPrise = v.hauteur > 0.7 ? 3.5 : v.intention === 'rasant' ? 2.2 : 2.8;
   const chasseurPlace = chasseur && distance(chasseur.pos, arrivee) <= rayonPrise ? chasseur : null;
   const receveurPlace = receveur && distance(receveur.pos, arrivee) <= rayonPrise ? receveur : null;
 
@@ -1239,6 +1247,7 @@ function demarrerBallonLibre(
   vol: Vol,
   intention: IntentionPied | 'touche' = vol.type === 'pied' ? vol.intention as IntentionPied : 'touche',
 ): void {
+  libererHorsJeu(e);
   const dx = vol.vers.x - vol.de.x;
   const dy = vol.vers.y - vol.de.y;
   const norme = Math.max(0.01, Math.hypot(dx, dy));
@@ -1334,9 +1343,9 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
   const candidats = e.pions
     .filter((p) => p.surLeTerrain && p.sanction <= 0 && !p.horsJeu)
     .sort((a, b) => distance2(a.pos, e.ballon) - distance2(b.pos, e.ballon));
-  for (const p of candidats.slice(0, 5)) {
+  for (const p of candidats.slice(0, 6)) {
     p.role = 'chasseur';
-    p.effort = distance2(p.pos, e.ballon) < 225 ? 1.08 : 1;
+    p.effort = 1.1;
     p.cible = {
       x: borner(e.ballon.x + libre.vitesse.x * 0.16, 0.5, LONGUEUR - 0.5),
       y: borner(e.ballon.y + libre.vitesse.y * 0.16, 0.5, LARGEUR - 0.5),
@@ -1345,20 +1354,20 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
 
   const premier = candidats[0];
   const immobile = Math.hypot(libre.vitesse.x, libre.vitesse.y) < 0.25 && libre.hauteur <= 0.15;
-  const rayon = libre.hauteur > 1.5 ? 0.8 : libre.hauteur > 0.45 ? 1.25 : immobile ? 2.5 : 1.65;
+  const rayon = libre.hauteur > 1.5 ? 1.2 : libre.hauteur > 0.45 ? 1.8 : immobile ? 3.2 : 2.4;
   if (!premier || distance(premier.pos, e.ballon) > rayon) return;
 
   // Un rebond haut ou contrarié reste délicat, mais une mauvaise prise ne
   // fige pas le ballon : elle le repousse devant le joueur et la lutte continue.
   const difficulte = libre.hauteur * 7 + Math.hypot(libre.vitesse.x, libre.vitesse.y) * 0.55;
   const securite = premier.vision * 0.45 + premier.detente * 0.35 + premier.passe * 0.20;
-  if (libre.age < 0.35 || e.rng() < borner((difficulte + 20 - securite) / 150, 0.015, 0.20)) {
+  if (libre.age < 0.2 || e.rng() < borner((difficulte + 10 - securite) / 180, 0.01, 0.12)) {
     const s = sens(premier.cote);
-    libre.vitesse.x += s * 1.8;
-    libre.vitesse.y += (e.rng() - 0.5) * 2.2;
-    libre.vitesseVerticale = Math.max(libre.vitesseVerticale, 1.4);
+    libre.vitesse.x += s * 1.5;
+    libre.vitesse.y += (e.rng() - 0.5) * 1.8;
+    libre.vitesseVerticale = Math.max(libre.vitesseVerticale, 1.2);
     libre.hauteur = Math.max(libre.hauteur, 0.12);
-    premier.battu = Math.max(premier.battu, 0.35);
+    premier.battu = Math.max(premier.battu, 0.25);
     return;
   }
 
@@ -1456,7 +1465,7 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
     if (d.battu <= 0) {
       const dd = distance(d.pos, porteur.pos);
       if (dd <= RAYON_PLAQUAGE && !plaqueur) plaqueur = d;
-      if (dd < pression && devant > -1.2) pression = dd;
+      if (dd < pression && devant > -0.2) pression = dd;
     }
   }
   const prioriteAplatir = metresAvantLaLigne(porteur.pos, porteur.cote) < 3.5 && pression > 2.1;
@@ -1527,13 +1536,22 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const lancement = e.lancement;
   const suivant = lancement && lancement.index + 1 < lancement.chaine.length
     ? lancement.chaine[lancement.index + 1] : null;
-  // ⚠️ ET ON NE DONNE PAS LE BALLON QUAND ON EST DANS L’ESPACE. « Fixer et
-  // donner » est la bonne règle face à un défenseur ; à quarante mètres de la
-  // ligne avec le rideau battu, c’est ce qui annulait la percée qu’on venait
-  // de réussir. Le joueur peut toujours servir son soutien : la carte de
-  // l’espace le lui propose, et un choix passe toujours devant l’automatisme.
-  if (!prioriteAplatir && !enEchappee && suivant && suivant.surLeTerrain
-    && pression <= (porteur.avant ? 3.4 : 3.7)) {
+
+  const pDevant = pressionDevant(e, porteur);
+  const inter = intervalle(e, porteur);
+  const distSuivant = suivant ? distance(porteur.pos, suivant.pos) : 99;
+  const aDeLEspaceDevant = pDevant > 5.0 || inter >= 5.5 || (depasses >= 7 && pDevant > 3.8);
+
+  // Si le porteur a ouvert un intervalle ou laissé le rideau derrière, il file à l'essai !
+  if (!enEchappee && (inter >= 6.0 || (depasses >= 8 && pDevant > 6.0))) {
+    lancerEchappee(e, porteur);
+  }
+
+  // ⚠️ ET ON NE DONNE PAS LE BALLON QUAND ON EST DANS L’ESPACE ou quand le soutien est trop loin (> 13 m) !
+  // « Fixer et donner » est la bonne règle face à un défenseur qui monte ; mais si le porteur a de l'espace
+  // devant lui ou si le partenaire est trop loin (> 13 m), il garde le ballon et file vers l'en-but.
+  if (!prioriteAplatir && !enEchappee && !aDeLEspaceDevant && suivant && suivant.surLeTerrain
+    && distSuivant <= 13 && pression <= (porteur.avant ? 3.2 : 3.6)) {
     return passerLeBallon(e, porteur, suivant, pression);
   }
 
@@ -2103,8 +2121,11 @@ function resoudrePlaquage(
     // donner » : deux foulées plus loin, le pion refaisait une passe de
     // routine. Retour de jeu, mot pour mot : « nos actions n’ont aucun impact
     // dans le jeu ». Une percée dans un rideau OUVERT lance une échappée.
-    if (porteur.moi && intervalle(e, porteur) >= 7) lancerEchappee(e, porteur);
-    else pousserElan(e, porteur.cote, POUSSEES.percee * 0.5);
+    if (intervalle(e, porteur) >= 5.5 || pressionDevant(e, porteur) >= 6.0) {
+      lancerEchappee(e, porteur);
+    } else {
+      pousserElan(e, porteur.cote, POUSSEES.percee * 0.5);
+    }
     if (geste === 'crochet' || geste === 'raffut') {
       if (monGeste) consommerIntention(e);
       dire(e, 'franchissement', porteur.cote, C.texteMatch(
@@ -4203,6 +4224,7 @@ const DUREE_ECHAPPEE = 4.5;
  */
 function lancerEchappee(e: EtatMatch, p: Pion): void {
   e.echappee = { pion: p, restant: DUREE_ECHAPPEE };
+  e.lancement = null;
   // ⚠️ ET ON ROUVRE UNE CARTE TOUT DE SUITE. Être dans l’espace sans qu’on
   // vous demande rien, c’est regarder le moteur finir l’action à votre place :
   // le drapeau d’enchaînement est ce qui transforme la percée en question.
