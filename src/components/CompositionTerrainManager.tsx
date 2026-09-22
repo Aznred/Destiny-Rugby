@@ -28,7 +28,7 @@ import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { t } from '../lib/i18n';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import {
-  adequationAuPoste, alertesDeComposition, badgesDe, familleDePoste,
+  adequationAuPoste, alertesDeComposition, badgesDe,
   facteurDePerformance, notesDeLEquipe, statsDeCarte, statutDe, valeurAxe,
   attributsDe, ABREVIATION, axesDe, rareteDe, estPepite, NOM_RARETE,
 } from '../lib/carteJoueur';
@@ -383,11 +383,9 @@ function PanneauJoueur({
           <div>
             <span><PastilleAdequation adequation={adequation} /> {
               adequation === 'naturel'
-                ? (joueur.poste === posteSlot || familleDePoste(joueur.poste) === familleDePoste(posteSlot)
-                    ? 'Poste naturel'
-                    : 'Poste de la fiche (100 %)')
+                ? 'Poste naturel'
                 : adequation === 'secondaire'
-                  ? 'Dépannage voisin'
+                  ? 'Poste secondaire'
                   : 'Hors poste'
             }</span>
             <strong>{Math.round(rendement * 100)} %</strong>

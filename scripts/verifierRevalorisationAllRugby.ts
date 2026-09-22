@@ -77,8 +77,8 @@ if (carteGreen) {
   });
   assert.deepEqual(joueurGreen.postesSecondaires, ['deuxieme_ligne_d']);
 }
-assert.equal(adequationAuPoste('ailier_droit', 'deuxieme_centre', ['deuxieme_centre']), 'naturel');
-assert.equal(adequationAuPoste('ailier_droit', 'deuxieme_centre', []), 'secondaire');
+assert.equal(adequationAuPoste('ailier_droit', 'deuxieme_centre', ['deuxieme_centre']), 'secondaire');
+assert.equal(adequationAuPoste('ailier_droit', 'deuxieme_centre', []), 'horsPoste');
 
 console.log(`${correspondances} joueurs du jeu reconnus · ${lignes.length} revalorisés · hausse moyenne +${hausseMoyenne.toFixed(1)}.`);
 console.log(lignes.slice(0, 18).map((l) => `  ${l.nom}: ${l.avant} → ${l.apres} · ${l.source}`).join('\n'));

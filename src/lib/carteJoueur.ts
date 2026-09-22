@@ -200,37 +200,17 @@ export function statutDe(j: Pick<Coequipier, 'note' | 'potentiel' | 'age'>): Sta
 export type Adequation = 'naturel' | 'secondaire' | 'horsPoste';
 
 /**
- * ⚠️ TROIS NIVEAUX, PAS DEUX. L'écran ne disait que « hors poste » ou rien :
- * un deuxième ligne aligné en troisième ligne était signalé comme une faute
- * aussi grave qu'un ailier en pilier. Or l'un dépanne et l'autre est un
- * accident. C'est ce qui rend le drag & drop lisible.
+ * L'adéquation au poste repose STRICTEMENT sur les postes déclarés sur la fiche du joueur :
+ * - Poste naturel : le poste principal exact du joueur (100 % de performance, pastille verte 🟢).
+ * - Poste secondaire : un des postes secondaires exacts inscrits sur sa fiche (100 % de performance, pastille dorée 🟡).
+ * - Hors poste : tout autre poste non inscrit sur sa fiche (82 % de performance, pastille rouge 🔴).
+ * Aucune assimilation par famille de poste ni voisins génériques.
  */
-const VOISINS: Record<FamillePoste, FamillePoste[]> = {
-  pilier: ['talonneur'],
-  talonneur: ['pilier'],
-  deuxieme_ligne: ['troisieme_ligne'],
-  troisieme_ligne: ['deuxieme_ligne'],
-  demi_melee: ['demi_ouverture'],
-  demi_ouverture: ['demi_melee', 'centre', 'arriere'],
-  centre: ['ailier', 'demi_ouverture'],
-  ailier: ['arriere', 'centre'],
-  arriere: ['ailier', 'demi_ouverture'],
-};
-
 export function adequationAuPoste(
   joueur: PosteId, slot: PosteId, postesSecondaires: readonly PosteId[] = [],
 ): Adequation {
   if (joueur === slot) return 'naturel';
-  const fj = familleDePoste(joueur);
-  const fs = familleDePoste(slot);
-  if (fj === fs) return 'naturel';
-  // Tous les postes inscrits sur la fiche du joueur (poste principal ET postes
-  // secondaires recensés) sont ses postes de prédilection à 100 % (naturel / bon).
-  if (postesSecondaires.some((poste) => poste === slot || familleDePoste(poste) === fs)) {
-    return 'naturel';
-  }
-  // Les postes voisins non inscrits sur sa fiche restent du dépannage d'urgence (secondaire).
-  if (VOISINS[fj]?.includes(fs)) return 'secondaire';
+  if (postesSecondaires.includes(slot)) return 'secondaire';
   return 'horsPoste';
 }
 

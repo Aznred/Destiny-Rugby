@@ -169,18 +169,19 @@ ligne('… et le très haut niveau se distingue',
 console.log('\n=== 5. ⚠️ TROIS NIVEAUX D\'ADÉQUATION, PAS DEUX ===');
 // ---------------------------------------------------------------------------
 console.log('');
-const PAIRES: [PosteId, PosteId, string][] = [
-  ['pilier_gauche', 'pilier_droit', 'naturel'],
-  ['pilier_gauche', 'talonneur', 'secondaire'],
-  ['deuxieme_ligne_g', 'troisieme_aile_d', 'secondaire'],
-  ['ailier_gauche', 'arriere', 'secondaire'],
-  ['ailier_gauche', 'pilier_gauche', 'horsPoste'],
-  ['demi_melee', 'deuxieme_ligne_g', 'horsPoste'],
-  ['demi_ouverture', 'premier_centre', 'secondaire'],
+const PAIRES: [PosteId, PosteId, PosteId[], string][] = [
+  ['pilier_gauche', 'pilier_gauche', [], 'naturel'],
+  ['pilier_gauche', 'talonneur', ['talonneur'], 'secondaire'],
+  ['deuxieme_ligne_g', 'troisieme_aile_d', ['troisieme_aile_d'], 'secondaire'],
+  ['ailier_gauche', 'arriere', ['arriere'], 'secondaire'],
+  ['ailier_gauche', 'pilier_gauche', [], 'horsPoste'],
+  ['demi_melee', 'deuxieme_ligne_g', [], 'horsPoste'],
+  ['demi_ouverture', 'premier_centre', ['premier_centre'], 'secondaire'],
+  ['demi_ouverture', 'premier_centre', [], 'horsPoste'],
 ];
 let bonnes = 0;
-for (const [j, slot, attendu] of PAIRES) {
-  const r = adequationAuPoste(j, slot);
+for (const [j, slot, secondaires, attendu] of PAIRES) {
+  const r = adequationAuPoste(j, slot, secondaires);
   if (r === attendu) bonnes++;
   console.log(`  ${r === attendu ? '✅' : '❌'} ${j} → ${slot.padEnd(18)} ${r} (attendu ${attendu})`);
 }
