@@ -2894,6 +2894,9 @@ function phasePenalite(e: EtatMatch): void {
     e.phase = 'tirAuBut';
     e.minuteur = dureeArret(e, 'tirAuBut');
     e.ballon = { ...info.lieu };
+    buteur.pos = { ...info.lieu };
+    buteur.vitesse = { x: 0, y: 0 };
+    buteur.cible = { ...info.lieu };
     e.placement = placementTir(e.pions, info.lieu, cote, buteur.id);
     return;
   }
@@ -3272,6 +3275,9 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul'): vo
     y: borner(marqueur.pos.y, 2.5, LARGEUR - 2.5),
   };
   e.ballon = { ...lieu };
+  buteur.pos = { ...lieu };
+  buteur.vitesse = { x: 0, y: 0 };
+  buteur.cible = { ...lieu };
   buteur.stats.butsTentes += 1;
   const routine = routineDuJoueur(buteur);
   e.tir = {

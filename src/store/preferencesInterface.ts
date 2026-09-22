@@ -9,7 +9,14 @@ export const usePreferencesInterface = create<{
   setAnimationsMenus: (active: boolean) => void;
 }>()(persist((set) => ({
   musique: true,
-  animationsMenus: false,
+  animationsMenus: true,
   setMusique: (musique) => set({ musique }),
   setAnimationsMenus: (animationsMenus) => set({ animationsMenus }),
-}), { name: 'destiny-preferences-interface' }));
+}), {
+  name: 'destiny-preferences-interface',
+  version: 2,
+  migrate: (persistedState: any) => ({
+    ...(persistedState ?? {}),
+    animationsMenus: true,
+  }),
+}));

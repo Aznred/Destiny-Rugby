@@ -2,7 +2,6 @@ import { LIENS_SORTANTS_AUTORISES } from '../lib/cible';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
-import { usePreferencesInterface } from '../store/preferencesInterface';
 import { t } from '../lib/i18n';
 // ⚠️ PAS DE `lazy` ICI. Le tutoriel doit être là au premier rendu de l'accueil :
 // il existe pour retenir quelqu'un qui hésite à rester, une seconde d'attente
@@ -60,7 +59,6 @@ const apparait = {
 // serviront si l'on veut réintroduire un argumentaire ailleurs.
 
 export function Accueil() {
-  const animations = usePreferencesInterface(s => s.animationsMenus);
   const setEcran = useGame((s) => s.setEcran);
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
@@ -97,8 +95,7 @@ export function Accueil() {
         <div className="accueil-modes" aria-label="Modes de jeu">
           <motion.button custom={1} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-carriere" onClick={() => setEcran(destinationCarriere)}>
             <div className="accueil-mode-visuel" aria-hidden="true">
-              {animations ? <Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense>
-                : <div className="accueil-visuel-leger"><Icone nom="ballon" taille={130} /></div>}
+              <Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense>
             </div>
             <span className="accueil-mode-numero">01</span>
             <span className="accueil-mode-contenu">
@@ -127,7 +124,7 @@ export function Accueil() {
 
             <div className="accueil-modes-compacts">
               <motion.button custom={3} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-collection" onClick={() => setEcran('collectionSolo')}>
-                <span className="accueil-packs-eventail" aria-hidden="true">{animations ? <Suspense fallback={null}><PacksEventailAccueil /></Suspense> : <Icone nom="cadeau" taille={100} />}</span>
+                <span className="accueil-packs-eventail" aria-hidden="true"><Suspense fallback={null}><PacksEventailAccueil /></Suspense></span>
                 <span className="accueil-mode-numero">03</span>
                 <span className="accueil-mode-icone"><Icone nom="cadeau" taille={27} /></span>
                 <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Club house</span><strong>Collection</strong><small>Packs, cartes et doublons.</small></span>
@@ -170,8 +167,7 @@ export function Accueil() {
           <div className="stats-bandeau"><div className="stat"><b>15</b><span>{t('accueil.postes')}</span></div><div className="stat"><b>∞</b><span>{t('accueil.scenarios')}</span></div><div className="stat"><b>15</b><span>{t('accueil.saisons')}</span></div></div>
           <button type="button" className="btn fantome accueil-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}><Icone nom="disquette" taille={17} /> {t('sv.mesParties')}</button>
         </div>
-        <div className="hero-canvas">{animations ? <Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense>
-          : <div className="accueil-visuel-leger"><Icone nom="ballon" taille={130} /></div>}</div>
+        <div className="hero-canvas"><Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense></div>
       </section>}
 
       {partiesOuvertes && (

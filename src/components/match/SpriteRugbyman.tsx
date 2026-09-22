@@ -198,12 +198,6 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
   const animation = animationDe(pion, position, terrain, porteur);
   const clip = CLIPS.get(animation) ?? CLIPS.get('idle')!;
   const sensAffichage = useRef({ x: pion.cote === 'exterieur' ? -1 : 1, y: 0 });
-  // On conserve le dernier vrai sens de course pendant le freinage. Le joueur
-  // qui se replie ne fait donc plus quelques pas en marche arrière.
-  if (Math.hypot(pion.vx, pion.vy) > .15) sensAffichage.current = { x: pion.vx, y: pion.vy };
-  // ⚠️ EN MÊLÉE, RUCK OU MAUL, l'avant regarde VERS l'en-but adverse. Sans ce
-  // forçage, le dernier vecteur de repositionnement (souvent latéral ou en
-  // recul) bloquait le sprite tourné vers l'extérieur du pack.
   const role = pion.numeroRole ?? pion.numero;
   const distanceBallon = Math.hypot(position.x - terrain.ballon.x, position.y - terrain.ballon.y);
   const ANIMS_STATIQUES = ['scrum', 'scrum_bind', 'scrum_hook', 'ruck_bind', 'counter_ruck',
@@ -212,9 +206,20 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
     ((terrain.phase === 'melee' || terrain.conquete?.type === 'melee') && role <= 8 && distanceBallon < 14) ||
     (terrain.phase === 'maul' && distanceBallon < 8.5) ||
     (terrain.phase === 'ruck' && role <= 8 && distanceBallon < 1.8);
-  if (enPack) {
+
+  const estButeur = terrain.preparationTir?.buteurId === pion.id;
+  if (estButeur) {
+    // ⚠️ LE BUTEUR REGARDE TOUJOURS VERS LES POTEAUX ADVERSES ET LE BALLON.
+    // Sans ce forçage, quand le buteur reculait pour prendre sa course d'élan,
+    // son vecteur vitesse (vx opposé au sens d'attaque) le retournait à 180°
+    // dos au ballon et dos aux perches pendant toute sa routine.
     const estExterieur = pion.cote === 'exterieur' || (pion.cote as string) === 'B';
     sensAffichage.current = { x: estExterieur ? -1 : 1, y: 0 };
+  } else if (enPack) {
+    const estExterieur = pion.cote === 'exterieur' || (pion.cote as string) === 'B';
+    sensAffichage.current = { x: estExterieur ? -1 : 1, y: 0 };
+  } else if (Math.hypot(pion.vx, pion.vy) > .15) {
+    sensAffichage.current = { x: pion.vx, y: pion.vy };
   }
   const direction = sensAffichage.current;
   const orientation = orientationSprite(direction, angleVue);
