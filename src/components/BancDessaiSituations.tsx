@@ -11,6 +11,54 @@ interface Props {
   className?: string;
 }
 
+const LIBELLES_PHASE: Record<string, string> = {
+  tmo: 'Arbitrage vidéo (TMO)',
+  ruck: 'Ruck contesté',
+  maul: 'Ballon porté (Maul)',
+  melee: 'Mêlée fermée',
+  touche: 'Alignement touche',
+  penalite: 'Pénalité',
+  aplatissage: 'Essai & Aplatissage',
+  tirAuBut: 'Tentative au but',
+  transformation: 'Transformation',
+  bagarre: 'Échauffourée générale',
+  jeuCourant: 'Jeu courant',
+  ballonLibre: 'Ballon libre',
+  coupEnvoi: 'Coup d’envoi',
+  renvoi22: 'Renvoi aux 22',
+};
+
+const LIBELLES_GESTES_ARBITRE: Record<string, string> = {
+  ref_red: 'Carton rouge direct',
+  ref_yellow: 'Carton jaune (10 min)',
+  ref_penalty: 'Pénalité sifflée',
+  ref_try: 'Essai accordé',
+  ref_knockon: 'En-avant signalé',
+  ref_timeoff: 'Arrêt de jeu TMO',
+  ref_scrum: 'Mêlée ordonnée',
+  ref_whistle: 'Coup de sifflet',
+  ref_tmo: 'Signal TMO officiel',
+};
+
+const LIBELLES_CADRAGE: Record<string, string> = {
+  tmo: 'Replay vidéo broadcast',
+  proche: 'Plan serré dynamique',
+  suivi: 'Caméra travelling',
+  large: 'Plan large tactique',
+};
+
+const LIBELLES_SCENARIO: Record<string, string> = {
+  tmo: 'Vérification vidéo',
+  ruck: 'Combat au sol & sortie',
+  maul: 'Avancée collective',
+  melee: 'Poussée du pack',
+  touche: 'Prise de balle aérienne',
+  aplatissage: 'Finition en coin',
+  penalite: 'Sanction arbitrale',
+  jeuCourant: 'Attaque en mouvement',
+  ballonLibre: 'Bataille pour la possession',
+};
+
 export function BancDessaiSituations({ className }: Props) {
   const [categorieActive, setCategorieActive] = useState<string>('toutes');
   const [situationId, setSituationId] = useState<string>(SITUATIONS_LABORATOIRE[0]?.id ?? 'tmo_essai_valide');
@@ -179,7 +227,7 @@ export function BancDessaiSituations({ className }: Props) {
                     {cat.nom.split(' ')[0]}
                   </span>
                 )}
-                <span className="banc-sit-phase-tag">phase: {s.phase}</span>
+                <span className="banc-sit-phase-tag">{LIBELLES_PHASE[s.phase] ?? s.phase}</span>
               </div>
             </button>
           );
@@ -252,21 +300,21 @@ export function BancDessaiSituations({ className }: Props) {
         <div className="banc-inspecteur-grille-details">
           <div className="banc-detail-card">
             <span className="banc-detail-label">Phase moteur</span>
-            <strong className="banc-detail-valeur">{situationActive.phase}</strong>
+            <strong className="banc-detail-valeur">{LIBELLES_PHASE[situationActive.phase] ?? situationActive.phase}</strong>
           </div>
           <div className="banc-detail-card">
             <span className="banc-detail-label">Cadrage caméra</span>
-            <strong className="banc-detail-valeur">{situationActive.cadrage}</strong>
+            <strong className="banc-detail-valeur">{LIBELLES_CADRAGE[situationActive.cadrage] ?? situationActive.cadrage}</strong>
           </div>
           <div className="banc-detail-card">
             <span className="banc-detail-label">Geste arbitre</span>
             <strong className="banc-detail-valeur">
-              {situationActive.gesteArbitre ?? 'aucun'}
+              {situationActive.gesteArbitre ? (LIBELLES_GESTES_ARBITRE[situationActive.gesteArbitre] ?? situationActive.gesteArbitre) : 'Aucun'}
             </strong>
           </div>
           <div className="banc-detail-card">
             <span className="banc-detail-label">Scénario dynamique</span>
-            <strong className="banc-detail-valeur">{situationActive.scenarioType}</strong>
+            <strong className="banc-detail-valeur">{LIBELLES_SCENARIO[situationActive.scenarioType] ?? situationActive.scenarioType}</strong>
           </div>
         </div>
 

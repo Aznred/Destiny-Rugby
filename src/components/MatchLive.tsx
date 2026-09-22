@@ -154,6 +154,7 @@ const CLE_PHASE: Record<string, string> = {
   ballonEnLAir: 'ml.phase.ballonEnLAir', tirAuBut: 'ml.phase.tirAuBut',
   transformation: 'ml.phase.transformation', penalite: 'ml.phase.penalite',
   apresEssai: 'ml.phase.apresEssai', miTemps: 'ml.phase.miTemps',
+  tmo: 'ml.phase.tmo',
 };
 
 const CLE_SYSTEME: Record<string, string> = {

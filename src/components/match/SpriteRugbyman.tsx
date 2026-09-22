@@ -74,14 +74,20 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   if (terrain.phase === 'maul' && (role <= 8 || distanceBallon < 5.5) && distanceBallon < 8.5) {
     return 'maul';
   }
-  if (terrain.phase === 'ruck' && distanceBallon < 4) {
+  if (terrain.phase === 'ruck') {
     if (terrain.contact?.porteurId === p.id) return 'present';
     if (terrain.contact?.plaqueurId === p.id) return 'roll_away';
-    if (p.cote === terrain.possession) {
-      if (role === 9) return 'ready';
-      return 'ruck_bind';
+    // Seuls les avants directement engagés au cœur du contest (< 1.8m) se lient au ruck
+    if (distanceBallon < 1.8 && role <= 8 && role !== 9) {
+      return p.cote === terrain.possession ? 'ruck_bind' : 'counter_ruck';
     }
-    return 'counter_ruck';
+    // Demi de mêlée et joueurs à proximité immédiate du ruck : posture d'attente vigilante ou replacement
+    if (distanceBallon < 4.5 || role === 9) {
+      if (vitesse > 0.55) {
+        return vitesse > 3.5 ? 'run' : vitesse > 1.5 ? 'jog' : 'walk';
+      }
+      return 'ready';
+    }
   }
   // Les rôles du ruck viennent du moteur : la proximité seule ne déclenche
   // plus un déblayage à vide chez tous les joueurs du regroupement.
@@ -196,7 +202,7 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
   const enPack = ANIMS_STATIQUES.includes(animation) ||
     ((terrain.phase === 'melee' || terrain.conquete?.type === 'melee') && role <= 8 && distanceBallon < 14) ||
     (terrain.phase === 'maul' && distanceBallon < 8.5) ||
-    (terrain.phase === 'ruck' && distanceBallon < 4.5);
+    (terrain.phase === 'ruck' && role <= 8 && distanceBallon < 1.8);
   if (enPack) {
     const estExterieur = pion.cote === 'exterieur' || (pion.cote as string) === 'B';
     sensAffichage.current = { x: estExterieur ? -1 : 1, y: 0 };

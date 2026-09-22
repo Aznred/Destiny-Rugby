@@ -176,7 +176,9 @@ export function chargerTextes(textes: Record<string, Traduction>): void {
  * en développement, et ça reste lisible en production plutôt que d'être vide.
  */
 export function t(cle: string, vars?: Record<string, string | number>): string {
-  const entree = dictionnaire[cle];
+  const entree = dictionnaire[cle]
+    ?? (cle.startsWith('sifflet.') ? dictionnaire[`ml.${cle}`] : undefined)
+    ?? (cle.startsWith('ml.sifflet.') ? dictionnaire[cle.replace(/^ml\./, '')] : undefined);
   if (!entree) return cle;
   let texte = entree[courante] ?? entree.fr;
   if (vars) {

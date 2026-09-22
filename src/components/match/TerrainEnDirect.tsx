@@ -75,6 +75,7 @@ const CLE_PHASE: Record<string, string> = {
   ballonEnLAir: 'ml.phase.ballonEnLAir', ballonLibre: 'ml.phase.ballonEnLAir', tirAuBut: 'ml.phase.tirAuBut',
   transformation: 'ml.phase.transformation', penalite: 'ml.phase.penalite',
   aplatissage: 'ml.phase.apresEssai', apresEssai: 'ml.phase.apresEssai', miTemps: 'ml.phase.miTemps',
+  tmo: 'ml.phase.tmo',
 };
 
 export interface CouleursDirect {
@@ -536,7 +537,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
             <span className="cel-tag">{t(CLE_PHASE[affiche.phase])}</span>
           )}
         </div>
-        {affiche.sifflet && (
+        {affiche.sifflet && !affiche.tmo?.actif && (
           <div className="cel-sifflet" role="status">
             <b>{t(affiche.sifflet.cle)}</b>
             <span>{t('ml.sifflet.pour', { club: affiche.sifflet.club })}{affiche.sifflet.fautif ? ` · ${affiche.sifflet.fautif}` : ''}</span>

@@ -246,7 +246,7 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
         phase: 'tmo', systeme: '1-3-3-1', possession: 'exterieur', sequence: 6, cadence: 1, horloge: 22.4,
         simulation: t, instantJeu: t, pions, ballon: { x: LIGNE_B - 5, y: AXE - 2, hauteur: 0 }, gestes,
         arbitre: { x: LIGNE_B - 4, y: AXE + 1, vx: 0, vy: 0, regard: 0 },
-        sifflet: { cle: 'sifflet.enAvant', club: 'La Rochelle', fautif: '', restant: 3.5 },
+        sifflet: { cle: 'ml.sifflet.enAvant', club: 'La Rochelle', fautif: '', restant: 3.5 },
         tmo: { actif: true, tempsRestant: 4.0, action: 'Passe suspecte sur les 5m', decision: 'Essai refusé (en-avant confirmé)', cadreCamera: 'Caméra travelling 50fps', explication: 'Les mains projettent le ballon vers l’en-but adverse.' },
       };
       return matchDeBase('tmo_essai_en_avant', '❌ TMO : En-avant confirmé à la vidéo. Essai refusé, mêlée pour la défense !', terrain);
@@ -275,7 +275,7 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
         phase: 'tmo', systeme: '1-3-3-1', possession: 'exterieur', sequence: 8, cadence: 1, horloge: 58.1,
         simulation: t, instantJeu: t, pions, ballon: { x: LIGNE_B + 0.5, y: 0.8, hauteur: 0 }, gestes,
         arbitre: { x: LIGNE_B - 3, y: 3.5, vx: 0, vy: 0, regard: 0 },
-        sifflet: { cle: 'sifflet.touche', club: 'La Rochelle', fautif: '', restant: 3.5 },
+        sifflet: { cle: 'ml.sifflet.touche', club: 'La Rochelle', fautif: '', restant: 3.5 },
         tmo: { actif: true, tempsRestant: 4.0, action: 'Pied sur la ligne de touche', decision: 'Touche avant aplatissage', cadreCamera: 'Zoom gros plan crampon', explication: 'La pointe du pied gauche touche la ligne blanche 0.1s avant la pose du cuir.' },
       };
       return matchDeBase('tmo_essai_touche', '❌ TMO : Pied en touche sur le plongeon. Essai refusé, touche pour la défense !', terrain);
@@ -307,7 +307,7 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
         phase: 'tmo', systeme: '1-3-3-1', possession: 'domicile', sequence: 2, cadence: 1, horloge: 45.0,
         simulation: t, instantJeu: t, pions, ballon: { x: MILIEU, y: AXE, hauteur: 0 }, gestes,
         arbitre: { x: MILIEU - 2.5, y: AXE - 1.5, vx: 0, vy: 0, regard: 0 },
-        sifflet: { cle: 'sifflet.cartonRouge', club: 'Toulouse', fautif: fautif.nom, restant: 4.0 },
+        sifflet: { cle: 'ml.sifflet.cartonRouge', club: 'Toulouse', fautif: fautif.nom, restant: 4.0 },
         tmo: { actif: true, tempsRestant: 4.0, action: 'Brutalité caractérisée dans le regroupement', decision: 'Carton rouge direct', cadreCamera: 'Caméra loupe super-ralenti', explication: 'Coup de poing fermé porté délibérément au visage.' },
       };
       return matchDeBase('tmo_carton_rouge', `TMO : Geste de brutalité flagrant confirmé ! Carton ROUGE direct pour ${fautif.nom}.`, terrain);
@@ -339,7 +339,7 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
         phase: 'tmo', systeme: '1-3-3-1', possession: 'domicile', sequence: 3, cadence: 1, horloge: 62.1,
         simulation: t, instantJeu: t, pions, ballon: { x: MILIEU + 5, y: AXE + 2, hauteur: 0 }, gestes,
         arbitre: { x: MILIEU + 3, y: AXE, vx: 0, vy: 0, regard: 0 },
-        sifflet: { cle: 'sifflet.cartonJaune', club: 'Toulouse', fautif: fautif.nom, restant: 4.0 },
+        sifflet: { cle: 'ml.sifflet.cartonJaune', club: 'Toulouse', fautif: fautif.nom, restant: 4.0 },
         tmo: { actif: true, tempsRestant: 4.0, action: 'Contact tête/cou sur le porteur', decision: 'Carton jaune (degré de force moyen)', cadreCamera: 'Angle latéral 3/4', explication: 'Départ sur l’épaule qui glisse au cou, degré de danger moyen justifiant l’exclusion temporaire.' },
       };
       return matchDeBase('tmo_carton_jaune', `TMO : Plaquage haut confirmé ! Carton JAUNE pour ${fautif.nom} (10 minutes d’exclusion).`, terrain);
@@ -688,6 +688,33 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
       contreur1.x = MILIEU + 0.7; contreur1.y = AXE - 0.2; contreur1.vx = -0.4; contreur1.vy = 0;
       contreur2.x = MILIEU + 0.9; contreur2.y = AXE + 0.2; contreur2.vx = -0.4; contreur2.vy = 0;
       demiMelee.x = MILIEU - 1.8; demiMelee.y = AXE - 0.9; demiMelee.vx = 0; demiMelee.vy = 0;
+
+      // Positionnement réaliste de la ligne d'attaque toulousaine derrière le ruck
+      pions[0]!.x = MILIEU - 3.8; pions[0]!.y = AXE + 3.2; pions[0]!.vx = 0.1; pions[0]!.vy = 0;
+      pions[2]!.x = MILIEU - 4.5; pions[2]!.y = AXE + 5.5; pions[2]!.vx = 0.1; pions[2]!.vy = 0;
+      pions[5]!.x = MILIEU - 3.5; pions[5]!.y = AXE - 4.0; pions[5]!.vx = 0.1; pions[5]!.vy = 0;
+      pions[6]!.x = MILIEU - 5.2; pions[6]!.y = AXE - 6.5; pions[6]!.vx = 0.1; pions[6]!.vy = 0;
+      pions[7]!.x = MILIEU - 3.2; pions[7]!.y = AXE + 1.2; pions[7]!.vx = 0.1; pions[7]!.vy = 0;
+      pions[9]!.x = MILIEU - 6.5; pions[9]!.y = AXE - 2.5; pions[9]!.vx = 0.1; pions[9]!.vy = 0;
+      pions[10]!.x = MILIEU - 12.0; pions[10]!.y = 10; pions[10]!.vx = 0.1; pions[10]!.vy = 0;
+      pions[11]!.x = MILIEU - 9.5; pions[11]!.y = AXE - 7.0; pions[11]!.vx = 0.1; pions[11]!.vy = 0;
+      pions[12]!.x = MILIEU - 12.5; pions[12]!.y = AXE - 12.0; pions[12]!.vx = 0.1; pions[12]!.vy = 0;
+      pions[13]!.x = MILIEU - 8.0; pions[13]!.y = AXE + 18.0; pions[13]!.vx = 0.1; pions[13]!.vy = 0;
+      pions[14]!.x = MILIEU - 16.0; pions[14]!.y = AXE - 3.0; pions[14]!.vx = 0.1; pions[14]!.vy = 0;
+
+      // Positionnement réaliste du rideau défensif rochelais sur la ligne de hors-jeu
+      pions[15]!.x = MILIEU + 2.2; pions[15]!.y = AXE - 1.8; pions[15]!.vx = -0.1; pions[15]!.vy = 0;
+      pions[17]!.x = MILIEU + 2.2; pions[17]!.y = AXE + 2.0; pions[17]!.vx = -0.1; pions[17]!.vy = 0;
+      pions[20]!.x = MILIEU + 3.8; pions[20]!.y = AXE - 4.5; pions[20]!.vx = -0.1; pions[20]!.vy = 0;
+      pions[21]!.x = MILIEU + 4.0; pions[21]!.y = AXE + 4.8; pions[21]!.vx = -0.1; pions[21]!.vy = 0;
+      pions[22]!.x = MILIEU + 4.5; pions[22]!.y = AXE - 8.5; pions[22]!.vx = -0.1; pions[22]!.vy = 0;
+      pions[23]!.x = MILIEU + 3.5; pions[23]!.y = AXE + 0.2; pions[23]!.vx = -0.1; pions[23]!.vy = 0;
+      pions[24]!.x = MILIEU + 5.5; pions[24]!.y = AXE - 12.5; pions[24]!.vx = -0.1; pions[24]!.vy = 0;
+      pions[25]!.x = MILIEU + 7.5; pions[25]!.y = 8.0; pions[25]!.vx = -0.1; pions[25]!.vy = 0;
+      pions[26]!.x = MILIEU + 6.0; pions[26]!.y = AXE - 16.5; pions[26]!.vx = -0.1; pions[26]!.vy = 0;
+      pions[27]!.x = MILIEU + 5.0; pions[27]!.y = AXE + 12.0; pions[27]!.vx = -0.1; pions[27]!.vy = 0;
+      pions[28]!.x = MILIEU + 6.5; pions[28]!.y = AXE + 20.0; pions[28]!.vx = -0.1; pions[28]!.vy = 0;
+      pions[29]!.x = MILIEU + 18.0; pions[29]!.y = AXE; pions[29]!.vx = -0.1; pions[29]!.vy = 0;
 
       const gestes: GesteMatch[] = [
         { id: 'g_present', joueurId: porteurAuSol.id, clip: 'present', debut: 0, duree: 4.0 },
@@ -1124,7 +1151,15 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
         phase: 'tmo', systeme: '1-3-3-1', possession: 'domicile', sequence: 3, cadence: 1, horloge: 49.0,
         simulation: t, instantJeu: t, pions, ballon: { x: porteur.x, y: porteur.y, hauteur: 0 }, gestes,
         arbitre: { x: MILIEU - 2.5, y: AXE - 2, vx: 0, vy: 0, regard: 0 },
-        sifflet: { cle: 'sifflet.cartonRouge', club: 'Toulouse', fautif: plaqueur.nom, restant: 4.5 },
+        sifflet: { cle: 'ml.sifflet.cartonRouge', club: 'Toulouse', fautif: plaqueur.nom, restant: 4.5 },
+        tmo: {
+          actif: true,
+          tempsRestant: 4.5,
+          action: 'Plaquage retourné dangereux (cathédrale)',
+          decision: 'Carton rouge direct',
+          cadreCamera: 'Zoom plan serré sur le plaquage',
+          explication: 'Porteur retourné au-delà de l’horizontale, retombée dangereuse tête/cou sans contrôle au sol.',
+        },
       };
       return matchDeBase('plaquage_cathedrale', `Plaquage cathédrale gravissime ! Carton ROUGE direct pour ${plaqueur.nom}.`, terrain);
     },
@@ -1155,7 +1190,7 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
         phase: 'penalite', systeme: '1-3-3-1', possession: 'exterieur', sequence: 2, cadence: 1, horloge: 36.8,
         simulation: t, instantJeu: t, pions, ballon: { x: MILIEU + 2.2, y: AXE, hauteur: 0 }, gestes,
         arbitre: { x: MILIEU - 1, y: AXE - 3, vx: 0, vy: 0, regard: 0 },
-        sifflet: { cle: 'sifflet.penalite', club: 'La Rochelle', fautif: porteurAuSol.nom, restant: 4.0 },
+        sifflet: { cle: 'ml.sifflet.penalite', club: 'La Rochelle', fautif: porteurAuSol.nom, restant: 4.0 },
       };
       return matchDeBase('grattage_jackal', 'Grattage magistral au sol ! Pénalité sifflée pour La Rochelle.', terrain);
     },
@@ -1190,7 +1225,7 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
         phase: 'bagarre', systeme: '1-3-3-1', possession: 'domicile', sequence: 5, cadence: 0, horloge: 71.0,
         simulation: t, instantJeu: t, pions, ballon: { x: MILIEU, y: AXE, hauteur: 0 }, gestes,
         arbitre: { x: MILIEU - 3, y: AXE - 1, vx: 0, vy: 0, regard: 0 },
-        sifflet: { cle: 'sifflet.penalite', club: 'Toulouse', fautif: '', restant: 5.0 },
+        sifflet: { cle: 'ml.sifflet.penalite', club: 'Toulouse', fautif: '', restant: 5.0 },
       };
       return matchDeBase('bagarre_generale', 'Échauffourée générale au centre du terrain ! L’arbitre interrompt la rencontre.', terrain);
     },
