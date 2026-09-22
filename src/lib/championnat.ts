@@ -319,8 +319,8 @@ export function jouerRencontre(
   if (apportJoueur?.club === domicile) ecart += apportJoueur.bonus;
   if (apportJoueur?.club === exterieur) ecart -= apportJoueur.bonus;
 
-  const baseD = 21 + ecart * 1.1 + (rng() * 20 - 10);
-  const baseE = 21 - ecart * 1.1 + (rng() * 20 - 10);
+  const baseD = 23 + ecart * 0.85 + (rng() * 12 - 6);
+  const baseE = 23 - ecart * 0.85 + (rng() * 12 - 6);
   const scoreD = scorePossible(baseD);
   const scoreE = scorePossible(baseE);
   return {

@@ -55,7 +55,9 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   const vitesse = Math.hypot(p.vx, p.vy);
   const distanceBallon = Math.hypot(pos.x - terrain.ballon.x, pos.y - terrain.ballon.y);
   const role = p.numeroRole ?? p.numero;
-  if (terrain.conquete?.type === 'melee' && role <= 8 && distanceBallon < 8) return terrain.conquete.progression < .4 ? 'scrum_bind' : role === 2 ? 'scrum_hook' : 'scrum';
+  if ((terrain.conquete?.type === 'melee' || terrain.phase === 'melee') && role <= 8 && distanceBallon < 14) {
+    return (terrain.conquete?.progression ?? 0.5) < .4 ? 'scrum_bind' : role === 2 ? 'scrum_hook' : 'scrum';
+  }
   if (terrain.conquete?.type === 'touche') {
     const cible = terrain.pions.find((q) => q.id === terrain.conquete?.cibleId);
     if (p.id === cible?.id) return 'lineout_jump';
@@ -69,7 +71,18 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
     }
     if (distanceBallon < 10) return 'idle';
   }
-  if (terrain.phase === 'maul' && distanceBallon < 5) return 'maul';
+  if (terrain.phase === 'maul' && (role <= 8 || distanceBallon < 5.5) && distanceBallon < 8.5) {
+    return 'maul';
+  }
+  if (terrain.phase === 'ruck' && distanceBallon < 4) {
+    if (terrain.contact?.porteurId === p.id) return 'present';
+    if (terrain.contact?.plaqueurId === p.id) return 'roll_away';
+    if (p.cote === terrain.possession) {
+      if (role === 9) return 'ready';
+      return 'ruck_bind';
+    }
+    return 'counter_ruck';
+  }
   // Les rôles du ruck viennent du moteur : la proximité seule ne déclenche
   // plus un déblayage à vide chez tous les joueurs du regroupement.
   if (terrain.vol?.auteurId === p.id && terrain.vol.ecoule < 1.4) return terrain.vol.type === 'pied'
@@ -114,7 +127,7 @@ function personnage(pion: PionDirect, maillot: MaillotMatch): Character {
 function dessinerSprite(
   canvas: HTMLCanvasElement, renderer: CharacterRenderer, character: Character,
   clip: AnimationClip, temps: number, graine: number, orientation: Orientation, afficherBallon: boolean,
-  progression?: number, corps?: PionDirect['corps'],
+  progression?: number, corps?: PionDirect['corps'], direction?: Vec | null,
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -124,7 +137,14 @@ function dessinerSprite(
     ? (temps + (graine % 997) / 997 * duree) % Math.max(.01, duree)
     : Math.max(0, Math.min(.999, progression)) * duree;
   let pose = poseAtTime(clip, local * clip.fps);
-  if (orientation === 'left') pose = mirrorPose(pose);
+  // ⚠️ Les clips « pass_left » sont déjà pré-mirroités dans rugbyAnimations.ts.
+  // Ré-appliquer mirrorPose quand orientation === 'left' les dé-miroitait et la
+  // passe repartait à droite. On saute le mirror pour ces clips.
+  const dejaInverse = clip.id.includes('pass_left');
+  if (orientation === 'left' && !dejaInverse) pose = mirrorPose(pose);
+  // ⚠️ Course en diagonale haut-gauche : orientationSprite renvoie 'back' mais
+  // le sprite de profil regarde toujours à droite. On le retourne.
+  if (orientation === 'back' && direction && direction.x < -0.1) pose = mirrorPose(pose);
   pose.orientation = orientation;
   // Le déplacement appartient au moteur. Le root du clip ne fait pas glisser
   // un joueur de plusieurs mètres en plus de sa trajectoire physique.
@@ -166,6 +186,21 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
   // On conserve le dernier vrai sens de course pendant le freinage. Le joueur
   // qui se replie ne fait donc plus quelques pas en marche arrière.
   if (Math.hypot(pion.vx, pion.vy) > .15) sensAffichage.current = { x: pion.vx, y: pion.vy };
+  // ⚠️ EN MÊLÉE, RUCK OU MAUL, l'avant regarde VERS l'en-but adverse. Sans ce
+  // forçage, le dernier vecteur de repositionnement (souvent latéral ou en
+  // recul) bloquait le sprite tourné vers l'extérieur du pack.
+  const role = pion.numeroRole ?? pion.numero;
+  const distanceBallon = Math.hypot(position.x - terrain.ballon.x, position.y - terrain.ballon.y);
+  const ANIMS_STATIQUES = ['scrum', 'scrum_bind', 'scrum_hook', 'ruck_bind', 'counter_ruck',
+    'clearout_drive', 'contact_brace', 'maul', 'caterpillar_bind'];
+  const enPack = ANIMS_STATIQUES.includes(animation) ||
+    ((terrain.phase === 'melee' || terrain.conquete?.type === 'melee') && role <= 8 && distanceBallon < 14) ||
+    (terrain.phase === 'maul' && distanceBallon < 8.5) ||
+    (terrain.phase === 'ruck' && distanceBallon < 4.5);
+  if (enPack) {
+    const estExterieur = pion.cote === 'exterieur' || (pion.cote as string) === 'B';
+    sensAffichage.current = { x: estExterieur ? -1 : 1, y: 0 };
+  }
   const direction = sensAffichage.current;
   const orientation = orientationSprite(direction, angleVue);
   const instant = terrain.simulation ?? temps;
@@ -190,7 +225,7 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
     const cle = `${character.id}:${maillot.principal}:${maillot.secondaire}:${maillot.motif}:${clip.id}:${orientation}:${ballonAnime}:${Math.floor(instantClip * 24)}:${Math.floor((pion.corps?.age ?? 0) * 24)}`;
     if (cle === derniereImage.current) return;
     derniereImage.current = cle;
-    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps);
+    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, direction);
   }, [renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, maillot]);
 
   const largeurMetres = hauteurMetres * (LARGEUR_CANVAS / HAUTEUR_CANVAS);

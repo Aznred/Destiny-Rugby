@@ -88,6 +88,37 @@ function pionsStandard(decalageX = 0, decalageY = 0) {
   return pions;
 }
 
+function pionsMelee(markX = MILIEU, markY = AXE) {
+  const pions = pionsStandard(0, 0);
+  const MELEE_OFFSET: [number, number][] = [
+    [0.5, -0.85], // 1 pilier G
+    [0.4, 0],     // 2 talonneur
+    [0.5, 0.85],  // 3 pilier D
+    [1.6, -0.45], // 4 2e ligne
+    [1.6, 0.45],  // 5 2e ligne
+    [1.8, -1.55], // 6 3e ligne aile
+    [1.8, 1.55],  // 7 3e ligne aile
+    [2.8, 0],     // 8 numéro 8
+  ];
+  for (let i = 0; i < 8; i++) {
+    const [dx, dy] = MELEE_OFFSET[i]!;
+    pions[i]!.x = markX - dx;
+    pions[i]!.y = markY + dy;
+    pions[i]!.vx = 0.05;
+    pions[i]!.vy = 0;
+  }
+  for (let i = 0; i < 8; i++) {
+    const [dx, dy] = MELEE_OFFSET[i]!;
+    pions[15 + i]!.x = markX + dx;
+    pions[15 + i]!.y = markY + dy;
+    pions[15 + i]!.vx = -0.05;
+    pions[15 + i]!.vy = 0;
+  }
+  pions[8]!.x = markX - 0.5; pions[8]!.y = markY - 1.5; pions[8]!.vx = 0;
+  pions[23]!.x = markX + 2.6; pions[23]!.y = markY + 1.8; pions[23]!.vx = 0;
+  return pions;
+}
+
 function matchDeBase(id: string, titre: string, terrain: TerrainDirect): VueMatchEnLigne {
   return {
     id: `test_${id}`,
@@ -440,19 +471,31 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
     gesteArbitre: 'ref_scrum',
     badge: 'ÉPREUVE DE FORCE',
     fabriquer: (t = 0) => {
-      const pions = pionsStandard(0, 0);
-      const gestes: GesteMatch[] = [
-        { id: 'g_scrum_1', joueurId: pions[0]!.id, clip: 'scrum', debut: 0.1, duree: 3.8 },
-        { id: 'g_scrum_2', joueurId: pions[1]!.id, clip: 'scrum_hook', debut: 0.2, duree: 3.5 },
-        { id: 'g_scrum_3', joueurId: pions[2]!.id, clip: 'scrum', debut: 0.1, duree: 3.8 },
-      ];
+      const pions = pionsMelee(MILIEU, AXE);
+      const gestes: GesteMatch[] = [];
+      for (let i = 0; i < 8; i++) {
+        gestes.push({
+          id: `g_dom_scrum_${i}`,
+          joueurId: pions[i]!.id,
+          clip: i === 1 ? 'scrum_hook' : 'scrum',
+          debut: 0,
+          duree: 4.0,
+        });
+        gestes.push({
+          id: `g_ext_scrum_${i}`,
+          joueurId: pions[15 + i]!.id,
+          clip: i === 1 ? 'scrum_hook' : 'scrum',
+          debut: 0,
+          duree: 4.0,
+        });
+      }
       const terrain: TerrainDirect = {
         phase: 'melee', systeme: '1-3-3-1', possession: 'domicile', sequence: 1, cadence: 1, horloge: 18.0,
         simulation: t, instantJeu: t, pions, ballon: { x: MILIEU, y: AXE, hauteur: 0 }, gestes,
         conquete: { type: 'melee', progression: 0.55, combinaison: 'premierBloc', pousseVers: 'domicile' },
         arbitre: { x: MILIEU - 3, y: AXE - 4, vx: 0, vy: 0, regard: 0 },
       };
-      return matchDeBase('melee_fermee', 'Mêlée ordonnée ! Grosse poussée du pack toulousain.', terrain);
+      return matchDeBase('melee_fermee', 'Mêlée ordonnée ! Grosse poussée des deux packs liés au centre.', terrain);
     },
   },
   {
@@ -467,11 +510,24 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
     cadrage: 'proche',
     badge: 'TALONNAGE RAPIDE',
     fabriquer: (t = 0) => {
-      const pions = pionsStandard(0, 0);
-      const gestes: GesteMatch[] = [
-        { id: 'g_hooker', joueurId: pions[1]!.id, clip: 'scrum_hook', debut: 0.2, duree: 2.8 },
-        { id: 'g_n8_ready', joueurId: pions[7]!.id, clip: 'ready', debut: 1.5, duree: 2.0 },
-      ];
+      const pions = pionsMelee(MILIEU, AXE);
+      const gestes: GesteMatch[] = [];
+      for (let i = 0; i < 8; i++) {
+        gestes.push({
+          id: `g_dom_scrum_${i}`,
+          joueurId: pions[i]!.id,
+          clip: i === 1 ? 'scrum_hook' : i === 7 ? 'ready' : 'scrum',
+          debut: 0,
+          duree: 4.0,
+        });
+        gestes.push({
+          id: `g_ext_scrum_${i}`,
+          joueurId: pions[15 + i]!.id,
+          clip: i === 1 ? 'scrum_hook' : 'scrum',
+          debut: 0,
+          duree: 4.0,
+        });
+      }
       const terrain: TerrainDirect = {
         phase: 'melee', systeme: '1-3-3-1', possession: 'domicile', sequence: 2, cadence: 1, horloge: 31.0,
         simulation: t, instantJeu: t, pions, ballon: { x: MILIEU - 2, y: AXE, hauteur: 0 }, gestes,
@@ -531,20 +587,34 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
     badge: 'BALLON PORTÉ',
     fabriquer: (t = 0) => {
       const pions = pionsStandard(5, -12);
+      const mx = LIGNE_B - 8;
+      const my = 15;
+      // Avants Domicile formant le maul
       for (let i = 0; i < 6; i++) {
-        pions[i]!.vx = 2.2;
+        pions[i]!.x = mx - 0.4 - (i % 3) * 0.7;
+        pions[i]!.y = my + ((i % 2) - 0.5) * 0.8;
+        pions[i]!.vx = 1.0;
+        pions[i]!.vy = 0;
       }
-      const gestes: GesteMatch[] = [
-        { id: 'g_maul_1', joueurId: pions[0]!.id, clip: 'maul', debut: 0.1, duree: 3.8 },
-        { id: 'g_maul_2', joueurId: pions[1]!.id, clip: 'maul', debut: 0.1, duree: 3.8 },
-        { id: 'g_maul_3', joueurId: pions[2]!.id, clip: 'maul', debut: 0.1, duree: 3.8 },
-      ];
+      // Avants Exterieur résistant au maul
+      for (let i = 0; i < 5; i++) {
+        pions[15 + i]!.x = mx + 0.4 + (i % 2) * 0.7;
+        pions[15 + i]!.y = my + ((i % 2) - 0.5) * 0.8;
+        pions[15 + i]!.vx = -0.5;
+        pions[15 + i]!.vy = 0;
+      }
+      const gestes: GesteMatch[] = [];
+      for (let i = 0; i < 6; i++) {
+        gestes.push({ id: `g_dom_maul_${i}`, joueurId: pions[i]!.id, clip: 'maul', debut: 0, duree: 4.0 });
+      }
+      for (let i = 0; i < 5; i++) {
+        gestes.push({ id: `g_ext_maul_${i}`, joueurId: pions[15 + i]!.id, clip: 'maul', debut: 0, duree: 4.0 });
+      }
       const terrain: TerrainDirect = {
         phase: 'maul', systeme: '1-3-3-1', possession: 'domicile', sequence: 3, cadence: 1, horloge: 48.2,
-        simulation: t, instantJeu: t, pions, ballon: { x: LIGNE_B - 8, y: 15, hauteur: 1.1 },
+        simulation: t, instantJeu: t, pions, ballon: { x: mx, y: my, hauteur: 1.1 },
         porteurId: pions[1]!.id, metresGagnes: 6.4, gestes,
-        conquete: { type: 'melee', progression: 0.6, combinaison: 'premierBloc', pousseVers: 'domicile' },
-        arbitre: { x: LIGNE_B - 10, y: 18, vx: 1.8, vy: 0, regard: 0 },
+        arbitre: { x: mx - 2, y: my + 3, vx: 0.8, vy: 0, regard: 0 },
       };
       return matchDeBase('maul_porte', 'Ballon porté destructeur ! Le paquet d’avants avance sur 8 mètres.', terrain);
     },
@@ -562,16 +632,30 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
     badge: 'CONTEST AU SOL',
     fabriquer: (t = 0) => {
       const pions = pionsStandard(0, 0);
-      const porteurAuSol = pions[8]!;
-      const deblayeur = pions[6]!;
-      const contreur = pions[21]!;
-      porteurAuSol.x = MILIEU; porteurAuSol.y = AXE;
-      deblayeur.x = MILIEU - 1.5; deblayeur.y = AXE; deblayeur.vx = 3.0;
-      contreur.x = MILIEU + 1.2; contreur.y = AXE; contreur.vx = -1.5;
+      const porteurAuSol = pions[1]!;
+      const plaqueurAuSol = pions[16]!;
+      const deblayeur1 = pions[3]!;
+      const deblayeur2 = pions[4]!;
+      const contreur1 = pions[18]!;
+      const contreur2 = pions[19]!;
+      const demiMelee = pions[8]!;
+
+      porteurAuSol.x = MILIEU; porteurAuSol.y = AXE; porteurAuSol.vx = 0; porteurAuSol.vy = 0;
+      plaqueurAuSol.x = MILIEU + 0.3; plaqueurAuSol.y = AXE + 0.8; plaqueurAuSol.vx = 0.2; plaqueurAuSol.vy = 0.5;
+      deblayeur1.x = MILIEU - 0.7; deblayeur1.y = AXE - 0.3; deblayeur1.vx = 0.6; deblayeur1.vy = 0;
+      deblayeur2.x = MILIEU - 0.9; deblayeur2.y = AXE + 0.3; deblayeur2.vx = 0.6; deblayeur2.vy = 0;
+      contreur1.x = MILIEU + 0.7; contreur1.y = AXE - 0.2; contreur1.vx = -0.4; contreur1.vy = 0;
+      contreur2.x = MILIEU + 0.9; contreur2.y = AXE + 0.2; contreur2.vx = -0.4; contreur2.vy = 0;
+      demiMelee.x = MILIEU - 1.8; demiMelee.y = AXE - 0.9; demiMelee.vx = 0; demiMelee.vy = 0;
+
       const gestes: GesteMatch[] = [
-        { id: 'g_present', joueurId: porteurAuSol.id, clip: 'present', debut: 0.1, duree: 3.0 },
-        { id: 'g_clear', joueurId: deblayeur.id, clip: 'clearout_drive', debut: 0.3, duree: 2.2 },
-        { id: 'g_cruck', joueurId: contreur.id, clip: 'counter_ruck', debut: 0.2, duree: 2.5 },
+        { id: 'g_present', joueurId: porteurAuSol.id, clip: 'present', debut: 0, duree: 4.0 },
+        { id: 'g_roll', joueurId: plaqueurAuSol.id, clip: 'roll_away', debut: 0.1, duree: 3.0 },
+        { id: 'g_clear1', joueurId: deblayeur1.id, clip: 'clearout_drive', debut: 0.1, duree: 3.8 },
+        { id: 'g_bind2', joueurId: deblayeur2.id, clip: 'ruck_bind', debut: 0.1, duree: 3.8 },
+        { id: 'g_cruck1', joueurId: contreur1.id, clip: 'counter_ruck', debut: 0.1, duree: 3.8 },
+        { id: 'g_brace2', joueurId: contreur2.id, clip: 'contact_brace', debut: 0.1, duree: 3.8 },
+        { id: 'g_nine', joueurId: demiMelee.id, clip: 'ready', debut: 0, duree: 4.0 },
       ];
       const terrain: TerrainDirect = {
         phase: 'ruck', systeme: '1-3-3-1', possession: 'domicile', sequence: 4, cadence: 1, horloge: 50.5,

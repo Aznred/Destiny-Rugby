@@ -364,7 +364,7 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   if (!porteur || porteur.cote === cote) return;
   const candidats = ligne.filter((p) => p.battu <= 0);
   candidats.sort((a, b) => distance2(a.pos, porteur.pos) - distance2(b.pos, porteur.pos));
-  const chasseurs = candidats.filter((p) => (p.pos.x - porteur.pos.x) * sa >= -1.5).slice(0, 2);
+  const chasseurs = candidats.filter((p) => (p.pos.x - porteur.pos.x) * sa >= -1.5).slice(0, 3);
   // ⚠️ LE PREMIER CHASSEUR VISE LE PORTEUR, PAS À CÔTÉ. Testé : décaler ces
   // trois-là d'un mètre six suffisait à faire chuter les plaquages réussis de
   // 250 à 190 et grimper les percées de 20 à 28 — le rayon de plaquage n'est
@@ -498,7 +498,7 @@ export function placerEquipes(e: EtatMatch): void {
 // tiennent encore dans un mouchoir de poche, et l'écran affichait un « nuage ».
 // 2,6 m, en DEUX passes (une seule laisse les chaînes de trois joueurs
 // enchevêtrées), donne un terrain lisible sans dénaturer le placement.
-const SERRE = 2.6;
+const SERRE = 2.2;
 function separer(e: EtatMatch, arret: boolean): void {
   const libres: Pion[] = [];
   for (const p of e.pions) {
@@ -572,7 +572,7 @@ export function choisirSysteme(e: EtatMatch, defenseur: Cote): SystemeDefensif {
 // score trouve une défense un peu moins pressante. C'est le réglage invisible
 // qui fait tomber le score juste sans jamais refuser un essai à l'écran.
 export function vitesseMontee(e: EtatMatch, defenseur: Cote): number {
-  const base = e.systeme === 'blitz' ? 4.4 : e.systeme === 'glissee' ? 3.0 : 1.7;
+  const base = e.systeme === 'blitz' ? 4.8 : e.systeme === 'glissee' ? 3.4 : 2.0;
   const liste = surLeTerrain(e, defenseur);
   if (!liste.length) return base;
   let endurance = 0;

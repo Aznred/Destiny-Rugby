@@ -79,7 +79,7 @@ export function animerRegroupement(e: EtatMatch, dt: number): void {
   if (!o.chenille) for (const id of o.attaque) {
     const a = actif(id);
     if (!a || a.corps) continue;
-    const b = o.defense.map(actif).find(q => q && !q.corps && distance(a.pos, q.pos) < 1.2);
+    const b = o.defense.map(actif).find(q => q && !q.corps && distance(a.pos, q.pos) < 0.95);
     if (!b) continue;
     const cle = `${a.id}:${b.id}`;
     if (o.contacts.includes(cle)) continue;

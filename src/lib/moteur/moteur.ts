@@ -69,7 +69,7 @@ export type { Pion } from './entites.js';
 // interpoler entre deux pas (voir `MatchLive.tsx`).
 export const DT = 0.15;
 const DUREE_PERIODE = 40 * 60;
-const RAYON_PLAQUAGE = 1.35;
+const RAYON_PLAQUAGE = 1.60;
 
 // Durée de chaque phase arrêtée : ce qu'on REGARDE (secondes simulées) et ce que
 // l'horloge du match AVALE (secondes de jeu). C'est cette dissociation qui rend
@@ -607,7 +607,7 @@ function tick(e: EtatMatch): void {
   if (incident) {
     e.compteurs.irregularites += 1;
     chauffer(e, 14);
-    const appelTMO = incident.motif.includes('coup de') || incident.rouge || e.rng() < 0.60;
+    const appelTMO = incident.motif.includes('coup de') || incident.rouge || e.rng() < 0.35;
     if (appelTMO) {
       declencherTMOFaute(e, incident.fautif, incident.victime, incident.motif, incident.rouge ? 'carton_rouge' : 'carton_jaune');
       return;
@@ -1743,7 +1743,7 @@ function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   // reste des points « au pied » à inscrire et que le temps presse.
   if (p.numero === 10 && metresAvantLaLigne(p.pos, p.cote) < 34
     && (e.scoreSurTerrain || planDe(e, p.cote).penalites > 0) && p.pied > 50 && pression > 4
-    && e.rng() < (e.minute >= 62 ? 0.12 : 0.03)) {
+    && e.rng() < (e.minute >= 62 ? 0.07 : 0.02)) {
     return taperAuPied(e, p, 'drop');
   }
   // Rasant derrière une défense montée, tout près de la ligne.
@@ -1910,8 +1910,8 @@ export function probaPlaquage(
   // versant, tout le score tombait dans le premier quart d'heure et la fin de
   // match était stérile (mesuré : 16 points avant la 20ᵉ, 5 après la 60ᵉ).
   const aide = r >= 0
-    ? r * 0.20 + (pres < 25 ? r * 0.22 : 0) + (pres < 8 ? r * 0.22 : 0)
-    : r * 0.45;
+    ? r * 0.12 + (pres < 25 ? r * 0.13 : 0) + (pres < 8 ? r * 0.13 : 0)
+    : r * 0.55;
   // ⚠️ LA DYNAMIQUE PÈSE SUR LE CONTACT, ET ELLE SE VOIT SUR LA CARTE.
   // Retour de jeu : « un turnover relance la dynamique de l’équipe ». Une
   // jauge qui ne changerait que la couleur d’une barre serait un décor ; ici,
@@ -1944,7 +1944,7 @@ export function probaPlaquage(
   // indexé sur l’attribut qui le porte : un ailier rapide sprinte, un pilier
   // raffute, et aucun des deux ne fait le métier de l’autre.
   return borner(
-    0.90 + (force - resistance) / 400 - aide + elan - bonusDuGeste(porteur, geste) * efficaciteGeste,
+    0.93 + (force - resistance) / 400 - aide + elan - bonusDuGeste(porteur, geste) * efficaciteGeste,
     0.36, 0.99,
   );
 }
@@ -2051,7 +2051,7 @@ function resoudrePlaquage(
     porteur.battu = 0.6;
     if (e.rng() < visibiliteFaute(e, porteur.pos)) {
       siffler(e, porteur.cote, { x: porteur.pos.x, y: porteur.pos.y }, irreg.motif, defenseur,
-        irreg.cathedrale ? 'rouge' : irreg.haut && e.rng() < .4 ? 'jaune' : undefined);
+        irreg.cathedrale ? 'rouge' : irreg.haut && e.rng() < .25 ? 'jaune' : undefined);
     }
     apresGesteIllegal(e, defenseur, porteur, irreg);
     return;
@@ -2062,7 +2062,7 @@ function resoudrePlaquage(
   const geste = monGeste ?? gesteAuto;
   const directionGeste = amorcerGeste(e, porteur, defenseur, geste);
   const monPlaquage = defenseur.moi && intentionEst(e, 'plaquage');
-  const proba = probaPlaquage(e, porteur, defenseur, geste, monPlaquage, monGeste ? 1 : 0.42);
+  const proba = probaPlaquage(e, porteur, defenseur, geste, monPlaquage, monGeste ? 1 : 0.30);
 
   if (abouti === undefined ? e.rng() >= proba : !abouti) {
     defenseur.stats.plaquagesManques += 1;
@@ -2680,10 +2680,10 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
 
   const chanceCarton = cartonForce ? 1
     : estCoupDePoing ? 1
-    : estCathedrale ? 0.92
-    : estPlaquageHaut ? 0.52
-    : estVolontaire ? 0.65
-    : (pres ? 0.22 : 0.08) * severite;
+    : estCathedrale ? 0.80
+    : estPlaquageHaut ? 0.25
+    : estVolontaire && pres ? 0.35 * severite
+    : 0;
 
   if (coupable && (cartonForce || e.rng() < chanceCarton)) {
     const fautif = coupable;
@@ -3179,8 +3179,11 @@ function phaseTMO(e: EtatMatch): void {
         });
       }
       if (tmo.motif === 'jeu_deloyal' || tmo.motif === 'plaquage_haut') {
-        dire(e, 'jalon', null, `❌ TMO DÉCISION : Faute préalable de l'attaque constatée au ralenti ! L’essai est REFUSÉ.`);
-        return siffler(e, coteDefense, action.lieu, 'jeu déloyal au départ de l’action');
+        dire(e, 'jalon', null, `❌ TMO DÉCISION : Faute préalable de l'attaque constatée au ralenti ! L'essai est REFUSÉ.`);
+        // ⚠️ Pénalité simple, sans carton automatique : une obstruction ou un
+        // en-avant de passe n'est pas une brutalité. L'arbitre siffle mais ne
+        // sort pas de carton pour une faute de jeu ordinaire.
+        return siffler(e, coteDefense, action.lieu, 'jeu déloyal au départ de l\'action');
       }
       dire(e, 'jalon', null, `❌ TMO DÉCISION : Ballon non aplati et tenu en-but ! L’essai est REFUSÉ.`);
       return arret(e, 'renvoi22', coteDefense, {
@@ -3206,6 +3209,18 @@ function phaseTMO(e: EtatMatch): void {
   const motif = tmo.motif === 'coup_de_poing' ? 'coup de poing caractérisé'
     : tmo.motif === 'plaquage_haut' ? 'plaquage haut avec contact à la tête'
     : 'brutalité / jeu déloyal flagrant';
+
+  const estGrave = tmo.motif === 'coup_de_poing' || tmo.carton === 'rouge' || (tmo.motif === 'plaquage_haut' && e.rng() < 0.60);
+  const donneCarton = estGrave || (tmo.carton === 'jaune' && e.rng() < 0.35);
+
+  if (!donneCarton) {
+    tmo.decision = 'essai_refuse';
+    dire(e, 'jalon', null, `📺 TMO DÉCISION : L'arbitre visionne les ralentis : contact non dangereux constaté. Simple pénalité contre ${fautif.nom}, aucun carton décerné.`);
+    const lieuSanction = tmo.cible;
+    e.tmo = null;
+    siffler(e, victime ? victime.cote : adverse(fautif.cote), lieuSanction, motif, fautif);
+    return;
+  }
 
   const carton = tmo.carton ?? (tmo.motif === 'coup_de_poing' ? 'rouge' : 'jaune');
   const decision: TMODecision = carton === 'rouge' ? 'carton_rouge' : 'carton_jaune';
@@ -4175,7 +4190,7 @@ function probaAppel(e: EtatMatch, p: Pion): number {
  * de revenir, et un jeu où une percée vaut un essai à tous les coups n’a plus
  * de duel à jouer. Elle s’éteint aussi dès que le ballon quitte les mains.
  */
-const DUREE_ECHAPPEE = 7;
+const DUREE_ECHAPPEE = 4.5;
 
 /**
  * ⚠️ LE PION EST DANS L’ESPACE — le chaînon qui manquait entre le duel gagné

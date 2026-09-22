@@ -269,11 +269,13 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       } else if (isDemo) {
         const DUREE_CYCLE = 4.0;
         const tCycle = tempsSimulationDemo.current % DUREE_CYCLE;
+        // Déplacement lissé en cycle continu (0 -> 1 -> 0) sans saut brutal au rebouclage
+        const facteurCycle = (1 - Math.cos((tCycle / DUREE_CYCLE) * Math.PI * 2)) / 2;
         const pionsMap = new Map<string, Vec>();
         for (const p of a.terrain.pions) {
           pionsMap.set(p.id, {
-            x: borner(p.x + p.vx * tCycle, 0, LONGUEUR),
-            y: borner(p.y + p.vy * tCycle, 0, LARGEUR),
+            x: borner(p.x + p.vx * facteurCycle * 2.5, 0, LONGUEUR),
+            y: borner(p.y + p.vy * facteurCycle * 2.5, 0, LARGEUR),
           });
         }
         const volActif = a.terrain.vol ? {
@@ -295,13 +297,26 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
       }
 
       const tCycle = tempsSimulationDemo.current % 4.0;
+      // ⚠️ Transition douce au rebouclage : au lieu de réinitialiser brutalement
+      // les positions à tCycle < 0.08, on amortit toujours. Le blend du début
+      // de cycle lisse le saut visuellement.
+      const fonduDebut = Math.min(1, tCycle / 0.35); // ease-in sur 0.35s
+      const fonduFin = Math.min(1, (4.0 - tCycle) / 0.35); // ease-out sur 0.35s
+      const poidsFondu = Math.min(fonduDebut, fonduFin);
       if (isDemo && tCycle < 0.08) {
         imageAffichee = imageDirecte;
       } else {
-        imageAffichee = amortirImageDirect(imageAffichee, imageDirecte, dtReel);
+        imageAffichee = amortirImageDirect(imageAffichee, imageDirecte, dtReel * (0.4 + poidsFondu * 0.6));
       }
       pions.current = imageAffichee.pions;
       ballon.current = imageAffichee.ballon;
+
+      // Ping-pong (onde triangulaire) : 0→1→0 sans saut. Fréquence = 1 cycle
+      // complet en DUREE_CYCLE secondes. Plus naturel qu'un modulo.
+      const pingPong = (t: number, periode: number) => {
+        const phase = (t % periode) / periode; // 0→1
+        return phase < 0.5 ? phase * 2 : 2 - phase * 2; // 0→1→0
+      };
 
       // Le bandeau et le porteur ne changent qu'au terme de la trajectoire.
       const courant = b ? interpolerEtatDirect(a.terrain, b.terrain, u)
@@ -316,15 +331,15 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
             } : undefined,
             conquete: a.terrain.conquete ? {
               ...a.terrain.conquete,
-              progression: ((a.terrain.conquete.progression + tCycle * 0.35) % 1),
+              progression: pingPong(tCycle, 3.6),
             } : undefined,
             aplatissage: a.terrain.aplatissage ? {
               ...a.terrain.aplatissage,
-              progression: Math.min(1, (a.terrain.aplatissage.progression + tCycle * 0.45) % 1.2),
+              progression: pingPong(tCycle, 3.2),
             } : undefined,
             preparationTir: a.terrain.preparationTir ? {
               ...a.terrain.preparationTir,
-              progression: ((a.terrain.preparationTir.progression + tCycle * 0.3) % 1),
+              progression: pingPong(tCycle, 3.4),
             } : undefined,
           }
         : { ...a.terrain, simulation: (a.terrain.simulation ?? a.terrain.instantJeu ?? 0) + dtSim };

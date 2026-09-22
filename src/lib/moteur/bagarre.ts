@@ -238,7 +238,7 @@ export function irregularite(e: EtatMatch, plaqueur: Pion): Irregularite | null 
   // Un plaqueur discipliné et frais ne monte pas haut. Un joueur à bout de
   // souffle dans un match tendu, si.
   const fatigue = 1 - plaqueur.endurance / 100;
-  const base = e.niveau === 'amateur' ? 0.016 : 0.009;
+  const base = e.niveau === 'amateur' ? 0.011 : 0.006;
   const p = base * (0.5 + fatigue) * (0.6 + e.tension / 70) * (1.4 - plaqueur.discipline / 150);
   if (e.rng() >= p) return null;
   // Deux tiers de plaquages hauts, un tiers de plaquages en retard : c'est la
