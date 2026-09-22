@@ -341,7 +341,9 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
             } : undefined,
             preparationTir: a.terrain.preparationTir ? {
               ...a.terrain.preparationTir,
-              progression: pingPong(tCycle, 3.4),
+              progression: a.terrain.preparationTir.clipRoutine
+                ? 0.70
+                : pingPong(tCycle, 3.4),
             } : undefined,
           }
         : { ...a.terrain, simulation: (a.terrain.simulation ?? a.terrain.instantJeu ?? 0) + dtSim };

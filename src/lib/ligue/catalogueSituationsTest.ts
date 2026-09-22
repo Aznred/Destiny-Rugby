@@ -12,6 +12,7 @@ import type { GesteMatch } from '../moteur/dynamique.js';
 import type { NomIcone } from '../../components/Icone.js';
 import type { PosteId } from '../../types.js';
 import { AXE, LIGNE_B, MILIEU, M22_A } from '../moteur/terrain.js';
+import { ROUTINES_BUTEUR } from '../moteur/routinesButeur.js';
 
 export interface CategorieSituation {
   id: string;
@@ -37,6 +38,7 @@ export interface SituationTestInfo {
 
 export const CATEGORIES_SITUATIONS: CategorieSituation[] = [
   { id: 'tmo', nom: 'Arbitrage Vidéo (TMO)', icone: 'video', description: 'Vérifications vidéo en direct, angles de caméra et décisions arbitrales' },
+  { id: 'routines', nom: 'Rituels Buteur (20)', icone: 'cible', description: 'Visualisation des 20 routines complètes au tee (Wilkinson, Farrell, Biggar, Crabe, Chaman...)' },
   { id: 'essais', nom: 'Essais & Marque', icone: 'trophee', description: 'Plongeons, mauls d’avants, transformations et replays télé' },
   { id: 'conquete', nom: 'Conquête & Arrêts', icone: 'pousse', description: 'Mêlées fermées, touches, mauls structurés et rucks contestés' },
   { id: 'lancements', nom: 'Lancements & Large', icone: 'eclair', description: 'Attaques au ras, blocs d’avants, passes sautées et franchissements' },
@@ -1234,6 +1236,57 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
       return matchDeBase('bagarre_generale', 'Échauffourée générale au centre du terrain ! L’arbitre interrompt la rencontre.', terrain);
     },
   },
+  // ── Les 20 Rituels et Routines des Buteurs au Tee ─────────────────────────
+  ...ROUTINES_BUTEUR.map((r): SituationTestInfo => ({
+    id: `routine_${r.id}`,
+    categorie: 'routines',
+    titre: `${r.emoji} ${r.nom}`,
+    sousTitre: `Rituel au tee (${r.categorie})`,
+    description: `${r.description} — Ex : « ${r.commentaires[0]} »`,
+    regle: `Recul : ${r.reculMetres} m | Décalage : ${r.decalageLateral >= 0 ? '+' : ''}${r.decalageLateral} m | Animation : ${r.clip}`,
+    phase: 'transformation',
+    scenarioType: 'transformation',
+    cadrage: 'proche',
+    gesteArbitre: 'ref_timeoff',
+    badge: `${r.emoji} ${r.categorie.toUpperCase()}`,
+    fabriquer: (t = 0) => {
+      const pions = pionsStandard(0, 0);
+      const buteur = pions[9]!;
+      const teeX = LIGNE_B - 22;
+      const teeY = AXE;
+      buteur.x = teeX - r.reculMetres;
+      buteur.y = teeY + r.decalageLateral;
+      buteur.vx = 0;
+      buteur.vy = 0;
+      const terrain: TerrainDirect = {
+        phase: 'transformation',
+        systeme: '1-3-3-1',
+        possession: 'domicile',
+        sequence: 1,
+        cadence: 1,
+        horloge: 22.0,
+        simulation: t,
+        instantJeu: t,
+        pions,
+        ballon: { x: teeX, y: teeY, hauteur: 0 },
+        preparationTir: {
+          buteurId: buteur.id,
+          progression: 0.70, // Phase de rituel pour observation continue dans le labo
+          transformation: true,
+          routine: r.id,
+          clipRoutine: r.clip,
+          nomRoutine: r.nom,
+          emojiRoutine: r.emoji,
+        },
+        arbitre: { x: teeX - 5, y: AXE - 6, vx: 0, vy: 0, regard: 0 },
+      };
+      return matchDeBase(
+        `routine_${r.id}`,
+        `${r.emoji} ${r.nom} · ${r.commentaires[0].replace(/\{nom\}/g, 'Thomas Ramos')}`,
+        terrain,
+      );
+    },
+  })),
 ];
 
 export function trouverSituation(id: string): SituationTestInfo | undefined {

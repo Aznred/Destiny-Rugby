@@ -57,6 +57,7 @@ const LIBELLES_SCENARIO: Record<string, string> = {
   penalite: 'Sanction arbitrale',
   jeuCourant: 'Attaque en mouvement',
   ballonLibre: 'Bataille pour la possession',
+  transformation: 'Transformation & Rituel',
 };
 
 export function BancDessaiSituations({ className }: Props) {
