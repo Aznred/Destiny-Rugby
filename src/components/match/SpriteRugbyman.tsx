@@ -43,6 +43,30 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   const instant = terrain.simulation ?? 0;
   const geste = terrain.gestes?.filter((g) => g.joueurId === p.id && instant >= g.debut && instant < g.debut + g.duree).at(-1);
   if (geste && CLIPS.has(geste.clip)) return geste.clip;
+  if (terrain.phase === 'ruck') {
+    // 🏉 AU RUCK : le joueur plaqué et le plaqueur restent au sol pendant tout le regroupement
+    if (terrain.contact?.porteurId === p.id) {
+      return (terrain.contact.progression < 0.65) ? 'tackled' : 'present';
+    }
+    if (terrain.contact?.plaqueurId === p.id) {
+      return (terrain.contact.progression < 0.4) ? 'tackle' : 'roll_away';
+    }
+    const distanceBallon = Math.hypot(pos.x - terrain.ballon.x, pos.y - terrain.ballon.y);
+    const role = p.numeroRole ?? p.numero;
+    // Seuls les avants directement engagés au cœur du contest (< 1.8m) se lient au ruck
+    if (distanceBallon < 1.8 && role <= 8 && role !== 9) {
+      return p.cote === terrain.possession ? 'ruck_bind' : 'counter_ruck';
+    }
+    // Demi de mêlée et joueurs à proximité immédiate du ruck : posture d'attente vigilante ou replacement
+    if (distanceBallon < 4.5 || role === 9) {
+      const vitesse = Math.hypot(p.vx, p.vy);
+      if (vitesse > 0.55) {
+        return vitesse > 3.5 ? 'run' : vitesse > 1.5 ? 'jog' : 'walk';
+      }
+      return 'ready';
+    }
+  }
+
   if (p.corps && p.corps.age < p.corps.duree) return p.corps.age > p.corps.duree - .5 ? 'getup' : 'tackled';
   if (terrain.preparationTir?.buteurId === p.id) {
     const k = terrain.preparationTir.progression;
@@ -78,21 +102,6 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   }
   if (terrain.phase === 'maul' && (role <= 8 || distanceBallon < 5.5) && distanceBallon < 8.5) {
     return 'maul';
-  }
-  if (terrain.phase === 'ruck') {
-    if (terrain.contact?.porteurId === p.id) return 'present';
-    if (terrain.contact?.plaqueurId === p.id) return 'roll_away';
-    // Seuls les avants directement engagés au cœur du contest (< 1.8m) se lient au ruck
-    if (distanceBallon < 1.8 && role <= 8 && role !== 9) {
-      return p.cote === terrain.possession ? 'ruck_bind' : 'counter_ruck';
-    }
-    // Demi de mêlée et joueurs à proximité immédiate du ruck : posture d'attente vigilante ou replacement
-    if (distanceBallon < 4.5 || role === 9) {
-      if (vitesse > 0.55) {
-        return vitesse > 3.5 ? 'run' : vitesse > 1.5 ? 'jog' : 'walk';
-      }
-      return 'ready';
-    }
   }
   // Les rôles du ruck viennent du moteur : la proximité seule ne déclenche
   // plus un déblayage à vide chez tous les joueurs du regroupement.

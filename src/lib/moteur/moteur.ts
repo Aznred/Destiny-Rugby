@@ -1588,14 +1588,14 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // ⚠️ ET ON NE DONNE PAS LE BALLON QUAND ON EST DANS L’ESPACE ou quand le soutien est trop loin (> 13 m) !
   // « Fixer et donner » est la bonne règle face à un défenseur qui monte ; mais si le porteur a de l'espace
   // devant lui ou si le partenaire est trop loin (> 13 m), il garde le ballon et file vers l'en-but.
-  // ⚠️ EN SORTIE DE RUCK (gardeRuck > 0), le 9 doit pouvoir servir librement son
+  // ⚠️ EN SORTIE DE RUCK (gardeRuck > 0), le distributeur doit pouvoir servir librement son
   // ouvreur sans condition de pression ni de distance restrictive : c'est le
   // geste fondamental de la distribution. Sans cette exception, la combinaison
   // mourait au ras parce que le 10 était à 14 m ou que la pression était "basse".
-  const enSortieDeRuck = e.gardeRuck > 0 && porteur.numero === 9;
+  const enSortieDeRuck = e.gardeRuck > 0 && (porteur.numero === 9 || porteur.numero === 10 || porteur.role === 'demi');
   const distMax = enSortieDeRuck ? 20 : 13;
   const pressionMax = enSortieDeRuck ? 99 : (porteur.avant ? 3.2 : 3.6);
-  if (!prioriteAplatir && !enEchappee && !aDeLEspaceDevant && suivant && suivant.surLeTerrain
+  if (!prioriteAplatir && !enEchappee && (enSortieDeRuck || !aDeLEspaceDevant) && suivant && suivant.surLeTerrain
     && distSuivant <= distMax && pression <= pressionMax) {
     return passerLeBallon(e, porteur, suivant, pression);
   }
@@ -2471,15 +2471,17 @@ function phaseRuck(e: EtatMatch): void {
   // Au rugby, les joueurs engagés dans le regroupement doivent se remettre sur
   // leurs appuis avant de pouvoir défendre. Sans cette récupération, les flankers
   // et le talonneur adverse (à 0.5 m du ballon) plaquaient le 9 au premier tick.
+  const plaqueAuSolId = e.ruck?.porteurId;
   for (const p of e.pions) {
     if (p.role === 'ruck' && p.surLeTerrain && p.sanction <= 0) {
       p.battu = Math.max(p.battu, 0.9);
+      p.role = 'ligne';
     }
   }
 
   e.ruck = null;
   e.placement = null;
-  reprendreJeu(e, e.ballon, undefined, 3.0);
+  reprendreJeu(e, e.ballon, undefined, 3.0, plaqueAuSolId);
 }
 
 function phaseMaul(e: EtatMatch, dt: number): void {
@@ -3437,7 +3439,9 @@ function marquer(e: EtatMatch, cote: Cote, points: number): void {
 // LA REPRISE DU JEU : c'est ici qu'on CHOISIT LA COMBINAISON
 // ---------------------------------------------------------------------------
 
-function reprendreJeu(e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?: number): void {
+function reprendreJeu(
+  e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?: number, excluPremierId?: string,
+): void {
   // Après la sirène, l'équipe qui mène met le ballon en touche : le match est
   // terminé. Celle qui est menée continue de jouer.
   if (e.sirene && ecart(e, e.possession) >= 0) return clorePeriode(e);
@@ -3485,10 +3489,19 @@ function reprendreJeu(e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?
   }
   e.horsJeu = e.ligneDef;
 
-  const lancement = choisirLancement(e, cote, liste, porteurImpose);
+  const lancement = choisirLancement(e, cote, liste, porteurImpose, excluPremierId);
   // Le premier maillon : celui qui a déjà le ballon (sauteur en touche,
   // réceptionneur d'un coup de pied), sinon le premier de la combinaison.
-  const premier = porteurImpose ?? lancement.chaine[0] ?? liste[0];
+  // ⚠️ Le joueur qui vient d'être plaqué au sol et se relève du ruck ne peut pas
+  // ramasser immédiatement son propre ballon pour repartir au carton.
+  let candidats = lancement.chaine;
+  if (excluPremierId && candidats[0]?.id === excluPremierId) {
+    candidats = candidats.filter((p) => p.id !== excluPremierId);
+  }
+  const premier = (porteurImpose && porteurImpose.id !== excluPremierId ? porteurImpose : null)
+    ?? candidats[0]
+    ?? liste.find((p) => p.id !== excluPremierId && p.surLeTerrain && p.sanction <= 0)
+    ?? liste[0];
   lancement.chaine = raccourcir(dedoublonner([premier, ...lancement.chaine]), 5);
   lancement.index = 0;
   reclamerLeBallon(e, lancement, cote);
@@ -3554,10 +3567,17 @@ function dedoublonner(liste: Pion[]): Pion[] {
 // surnombre, le nombre de temps de jeu, le score et le chrono, on choisit la
 // combinaison — et donc la chaîne de passes qui va porter le ballon.
 function choisirLancement(
-  e: EtatMatch, cote: Cote, liste: Pion[], porteurImpose?: Pion,
+  e: EtatMatch, cote: Cote, liste: Pion[], porteurImpose?: Pion, excluPremierId?: string,
 ): Lancement {
-  const neuf = maillot(liste, 9);
-  const dix = maillot(liste, 10);
+  const neufReel = maillot(liste, 9);
+  // Si le 9 a été plaqué au sol et est exclu, ou n'est pas disponible, le 10 ou un avant assure le relais à la mêlée
+  const neufDispo = neufReel && neufReel.id !== excluPremierId && neufReel.role !== 'ruck';
+  const distributeur = (neufDispo ? neufReel : undefined)
+    ?? maillot(liste, 10) ?? maillot(liste, 8)
+    ?? liste.find((p) => p.id !== excluPremierId && p.surLeTerrain && p.sanction <= 0)
+    ?? liste[0];
+  const dixReel = maillot(liste, 10);
+  const dix = (distributeur === dixReel ? maillot(liste, 12) : dixReel) ?? liste[0];
   const douze = maillot(liste, 12);
   const treize = maillot(liste, 13);
   const quinze = maillot(liste, 15);
@@ -3565,7 +3585,7 @@ function choisirLancement(
     ? (maillot(liste, 14) ?? maillot(liste, 11))
     : (maillot(liste, 11) ?? maillot(liste, 14));
 
-  const percuteur = choisirPercuteur(e, liste);
+  const percuteur = choisirPercuteur(e, liste, excluPremierId);
 
   const distLigne = metresAvantLaLigne(e.ballon, cote);
   const chezSoi = dansSes22(e.ballon, cote);
@@ -3581,9 +3601,9 @@ function choisirLancement(
   // Trois longueurs de chaîne : au ras (1 passe), au premier centre (2-3), et
   // le grand large (4-5). Une attaque de rugby n'écarte pas à chaque temps de
   // jeu — sinon on compterait 470 passes par match au lieu de 280.
-  const chaineLarge = [neuf, dix, douze, treize, ailierOuvert].filter(Boolean) as Pion[];
-  const chaineSaute = [neuf, dix, treize, ailierOuvert].filter(Boolean) as Pion[];
-  const chaineCourte = [neuf, dix, douze].filter(Boolean) as Pion[];
+  const chaineLarge = [distributeur, dix, douze, treize, ailierOuvert].filter(Boolean) as Pion[];
+  const chaineSaute = [distributeur, dix, treize, ailierOuvert].filter(Boolean) as Pion[];
+  const chaineCourte = [distributeur, dix, douze].filter(Boolean) as Pion[];
 
   // ── 1. DANS SES 22 : on dégage, sauf urgence ────────────────────────────
   // C'EST LE JEU D'OCCUPATION : on rend le ballon mais on gagne 45 mètres.
@@ -3593,13 +3613,13 @@ function choisirLancement(
   // camp devenait un réflexe et le match comptait près de 60 coups de pied.
   // 58 % laisse le jeu d'occupation lisible tout en autorisant les relances.
   if (chezSoi && pousse < 0.32 && !(diff < 0 && restantes < 8)) {
-    const botteur = (dix && dix.pied > 55 ? dix : neuf) ?? liste[0];
+    const botteur = (dix && dix.pied > 55 ? dix : distributeur) ?? liste[0];
     const chanceDegagement = tactique?.attaque === 'occupation' ? 0.88
       : tactique?.attaque === 'large' ? 0.42 : tactique?.attaque === 'avants' ? 0.5 : 0.60;
     if (r < chanceDegagement) {
       return {
-        type: 'pied', chaine: [neuf, botteur].filter(Boolean) as Pion[], index: 0,
-        intention: botteur === neuf ? 'chandelle' : 'degagement', botteur,
+        type: 'pied', chaine: [distributeur, botteur].filter(Boolean) as Pion[], index: 0,
+        intention: botteur === distributeur ? 'chandelle' : 'degagement', botteur,
         libelle: 'sortir de ses 22',
       };
     }
@@ -3607,12 +3627,12 @@ function choisirLancement(
 
   // ── 2. DANS SON CAMP : occupation, 50/22, ou on avance ──────────────────
   if (sonCamp && !chezSoi) {
-    const botteur = dix ?? neuf ?? liste[0];
+    const botteur = dix ?? distributeur ?? liste[0];
     // Le 50/22 : geste RARE, et seulement si les ailiers adverses sont montés.
     if (botteur && botteur.pied > 65 && phases >= 1
       && arriereGardeMontee(e, adverse(cote)) && r < 0.014) {
       return {
-        type: 'pied', chaine: [neuf, botteur].filter(Boolean) as Pion[], index: 0,
+        type: 'pied', chaine: [distributeur, botteur].filter(Boolean) as Pion[], index: 0,
         intention: 'cinquanteVingtDeux', botteur, libelle: '50/22',
       };
     }
@@ -3621,7 +3641,7 @@ function choisirLancement(
       : tactique?.attaque === 'large' ? 0.07 : 0.13;
     if (phases >= 2 && r < occupation - pousse * 0.08) {
       return {
-        type: 'pied', chaine: [neuf, botteur].filter(Boolean) as Pion[], index: 0,
+        type: 'pied', chaine: [distributeur, botteur].filter(Boolean) as Pion[], index: 0,
         intention: e.ballonLent ? 'chandelle' : 'occupation', botteur,
         libelle: 'occupation au pied',
       };
@@ -3639,12 +3659,12 @@ function choisirLancement(
       : tactique?.attaque === 'large' ? 0.34 : 0.55;
     if (distLigne < 8 && r < chanceRas) {
       return {
-        type: 'pickAndGo', chaine: [neuf, percuteur].filter(Boolean) as Pion[], index: 0,
+        type: 'pickAndGo', chaine: [distributeur, percuteur].filter(Boolean) as Pion[], index: 0,
         libelle: 'pick and go',
       };
     }
     return {
-      type: 'pod', chaine: [neuf, dix, percuteur].filter(Boolean) as Pion[], index: 0,
+      type: 'pod', chaine: [distributeur, dix, percuteur].filter(Boolean) as Pion[], index: 0,
       libelle: 'bloc d’avants',
     };
   }
@@ -3661,7 +3681,7 @@ function choisirLancement(
   // ── 5. GESTION DE FIN DE MATCH ──────────────────────────────────────────
   if (restantes <= 6 && diff > 7) {
     return {
-      type: 'ras', chaine: [neuf, percuteur].filter(Boolean) as Pion[], index: 0,
+      type: 'ras', chaine: [distributeur, percuteur].filter(Boolean) as Pion[], index: 0,
       libelle: 'garder le ballon',
     };
   }
@@ -3680,7 +3700,7 @@ function choisirLancement(
   // jouent, la défense n'est pas encore réorganisée.
   if (phases === 0) {
     if (envie < 0.34) {
-      return { type: 'pod', chaine: [neuf, dix, percuteur].filter(Boolean) as Pion[], index: 0, libelle: 'premier temps' };
+      return { type: 'pod', chaine: [distributeur, dix, percuteur].filter(Boolean) as Pion[], index: 0, libelle: 'premier temps' };
     }
     if (envie < 0.62) return { type: 'large', chaine: chaineCourte, index: 0, libelle: 'lancement sur la ligne' };
     return { type: 'large', chaine: chaineLarge, index: 0, libelle: 'lancement au large' };
@@ -3696,13 +3716,13 @@ function choisirLancement(
     const pick = e.rng() < 0.34;
     return {
       type: pick ? 'pickAndGo' : 'ras',
-      chaine: relais(e, pick ? [percuteur] : [neuf, percuteur], liste),
+      chaine: relais(e, pick ? [percuteur] : [distributeur, percuteur], liste),
       index: 0, libelle: pick ? 'le ballon repart au ras' : 'percussion au ras',
     };
   }
   if (envie < 0.72) {
     return {
-      type: 'pod', chaine: relais(e, [neuf, dix, percuteur], liste), index: 0,
+      type: 'pod', chaine: relais(e, [distributeur, dix, percuteur], liste), index: 0,
       libelle: 'bloc d’avants',
     };
   }
@@ -3712,7 +3732,7 @@ function choisirLancement(
   if (envie > 0.92 && quinze && treize) {
     // L'arrière s'intercale : la combinaison qui crée le surnombre au large.
     return {
-      type: 'large', chaine: [neuf, dix, douze, quinze, ailierOuvert].filter(Boolean) as Pion[],
+      type: 'large', chaine: [distributeur, dix, douze, quinze, ailierOuvert].filter(Boolean) as Pion[],
       index: 0, libelle: 'l’arrière s’intercale',
     };
   }
@@ -3742,9 +3762,9 @@ function relais(e: EtatMatch, chaine: (Pion | undefined)[], liste: Pion[]): Pion
 // joué. On prend donc, PARMI LES QUATRE avants les plus proches et hors du
 // ruck, celui qui a le moins porté — c'est exactement ce que fait un pack :
 // on percute avec des hommes frais.
-function choisirPercuteur(e: EtatMatch, liste: Pion[]): Pion | undefined {
-  const dispo = liste.filter((p) => p.avant && p.role !== 'ruck');
-  const pool = dispo.length ? dispo : liste.filter((p) => p.avant);
+function choisirPercuteur(e: EtatMatch, liste: Pion[], excluId?: string): Pion | undefined {
+  const dispo = liste.filter((p) => p.avant && p.role !== 'ruck' && p.id !== excluId);
+  const pool = dispo.length ? dispo : liste.filter((p) => p.avant && p.id !== excluId);
   if (!pool.length) return undefined;
   return [...pool]
     .sort((a, b) => distance2(a.pos, e.ballon) - distance2(b.pos, e.ballon))

@@ -1062,9 +1062,11 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
       progression: r2(Math.max(0, Math.min(1, 1 - e.minuteur / 1.35))),
     };
   }
-  if (e.ruck?.porteurId && e.ruck.plaqueurId && e.ruck.debut !== undefined) {
-    const progression = Math.max(0, Math.min(1, (e.t - e.ruck.debut) / 1.35));
-    if (progression < 1) terrain.contact = {
+  if (e.ruck?.porteurId && e.ruck.plaqueurId) {
+    const progression = e.ruck.debut !== undefined
+      ? Math.max(0, Math.min(1, (e.t - e.ruck.debut) / 1.35))
+      : 1;
+    terrain.contact = {
       porteurId: e.ruck.porteurId,
       plaqueurId: e.ruck.plaqueurId,
       progression: r2(progression),

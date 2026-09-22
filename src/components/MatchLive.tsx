@@ -1110,11 +1110,10 @@ export function MatchLive({
       pousseVers: e.conquete.pousseVers === 'A' ? 'domicile' : e.conquete.pousseVers === 'B' ? 'exterieur' : undefined,
     } : undefined,
     aplatissage: e.aplatissage ? { marqueurId: e.aplatissage.marqueur.id, progression: .55 } : undefined,
-    contact: e.ruck?.porteurId && e.ruck.plaqueurId && e.ruck.debut !== undefined
-      && e.t - e.ruck.debut < 1.35 ? {
-        porteurId: e.ruck.porteurId, plaqueurId: e.ruck.plaqueurId,
-        progression: Math.max(0, Math.min(1, (e.t - e.ruck.debut) / 1.35)),
-      } : undefined,
+    contact: e.ruck?.porteurId && e.ruck.plaqueurId ? {
+      porteurId: e.ruck.porteurId, plaqueurId: e.ruck.plaqueurId,
+      progression: e.ruck.debut !== undefined ? Math.max(0, Math.min(1, (e.t - e.ruck.debut) / 1.35)) : 1,
+    } : undefined,
     cadence: 1, horloge: e.t / 60, instantJeu: e.t,
     simulation: e.sim + r, gestes: e.gestes,
     preparationTir: e.tir && !e.tir.volLance ? {
