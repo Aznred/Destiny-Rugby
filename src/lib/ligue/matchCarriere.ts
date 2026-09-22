@@ -1085,6 +1085,50 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
       restant: r2(e.sifflet.restant),
     };
   }
+
+  // ⚠️ TMO / REPLAY TV : sans cette extraction, `terrain.tmo` restait toujours
+  // `undefined` et `CadreTmoReplay` ne s'affichait JAMAIS en mode Carrière
+  // (DirectCinema). On le peuple dans trois situations :
+  // 1. TMO actif (arbitrage vidéo en cours)
+  // 2. Replay d'essai pendant la transformation (le cadre TV montre l'action)
+  // 3. Carton jaune ou rouge (sanction disciplinaire à l'écran)
+  if (e.tmo && e.tmo.actif) {
+    terrain.tmo = {
+      actif: true,
+      action: e.tmo.libelleMotif,
+      decision: e.tmo.decision === 'en_cours'
+        ? 'Analyse des angles vidéo en cours...'
+        : e.tmo.decision === 'essai_accorde'
+          ? 'Essai accordé'
+          : e.tmo.decision === 'essai_refuse'
+            ? 'Essai refusé'
+            : e.tmo.decision === 'carton_jaune'
+              ? 'Carton jaune'
+              : e.tmo.decision === 'carton_rouge'
+                ? 'Carton rouge'
+                : 'Sanction disciplinaire',
+      tempsRestant: r2(e.tmo.restant),
+      cadreCamera: e.tmo.type === 'essai' ? 'CAM 1 · LIGNE D\'EN-BUT' : 'CAM 3 · VUE LATÉRALE',
+    };
+  } else if (e.dernierReplayEssai && e.dernierReplayEssai.restant > 0 && e.phase === 'transformation') {
+    terrain.tmo = {
+      actif: true,
+      action: `Essai de ${e.dernierReplayEssai.marqueurNom}`,
+      decision: 'Essai accordé',
+      tempsRestant: r2(e.dernierReplayEssai.restant),
+      cadreCamera: 'CAM 1 · LIGNE D\'EN-BUT',
+    };
+  } else if (e.sifflet && (e.sifflet.cle.includes('cartonJaune') || e.sifflet.cle.includes('cartonRouge'))) {
+    const rouge = e.sifflet.cle.includes('cartonRouge');
+    terrain.tmo = {
+      actif: true,
+      action: `Sanction disciplinaire contre ${e.sifflet.fautif}`,
+      decision: rouge ? 'Carton rouge' : 'Carton jaune',
+      tempsRestant: r2(e.sifflet.restant),
+      cadreCamera: 'CAM 2 · GROS PLAN',
+    };
+  }
+
   return terrain;
 }
 

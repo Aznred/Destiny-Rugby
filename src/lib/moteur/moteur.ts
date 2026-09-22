@@ -1501,6 +1501,11 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
       if (dd < pression && devant > -0.2) pression = dd;
     }
   }
+  // ⚠️ PENDANT LA GARDE DU RUCK, LE PORTEUR NE PEUT PAS ÊTRE PLAQUÉ.
+  // Il est en train de ramasser le ballon et de servir son ouvreur : les
+  // défenseurs doivent respecter la ligne de hors-jeu. Sans cette protection,
+  // les flankers à 0.5 m plaquaient le 9 au premier tick de sortie de ruck.
+  if (e.gardeRuck > 0) plaqueur = null;
   const prioriteAplatir = metresAvantLaLigne(porteur.pos, porteur.cote) < 3.5 && pression > 2.1;
   if (prioriteAplatir) {
     porteur.cible = {
@@ -1583,8 +1588,15 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // ⚠️ ET ON NE DONNE PAS LE BALLON QUAND ON EST DANS L’ESPACE ou quand le soutien est trop loin (> 13 m) !
   // « Fixer et donner » est la bonne règle face à un défenseur qui monte ; mais si le porteur a de l'espace
   // devant lui ou si le partenaire est trop loin (> 13 m), il garde le ballon et file vers l'en-but.
+  // ⚠️ EN SORTIE DE RUCK (gardeRuck > 0), le 9 doit pouvoir servir librement son
+  // ouvreur sans condition de pression ni de distance restrictive : c'est le
+  // geste fondamental de la distribution. Sans cette exception, la combinaison
+  // mourait au ras parce que le 10 était à 14 m ou que la pression était "basse".
+  const enSortieDeRuck = e.gardeRuck > 0 && porteur.numero === 9;
+  const distMax = enSortieDeRuck ? 20 : 13;
+  const pressionMax = enSortieDeRuck ? 99 : (porteur.avant ? 3.2 : 3.6);
   if (!prioriteAplatir && !enEchappee && !aDeLEspaceDevant && suivant && suivant.surLeTerrain
-    && distSuivant <= 13 && pression <= (porteur.avant ? 3.2 : 3.6)) {
+    && distSuivant <= distMax && pression <= pressionMax) {
     return passerLeBallon(e, porteur, suivant, pression);
   }
 
@@ -2417,10 +2429,21 @@ function phaseRuck(e: EtatMatch): void {
 
   // ⚠️ LA LIGNE DE HORS-JEU. Sans elle, les défenseurs étaient déjà sur le 9 à
   // la sortie du ruck et chaque temps de jeu finissait au sol.
-  e.gardeRuck = e.ballonLent ? 0.25 : 0.55;
+  e.gardeRuck = e.ballonLent ? 0.75 : 1.1;
+
+  // ⚠️ LES AVANTS QUI ÉTAIENT DANS LE RUCK NE PEUVENT PAS PLAQUER IMMÉDIATEMENT.
+  // Au rugby, les joueurs engagés dans le regroupement doivent se remettre sur
+  // leurs appuis avant de pouvoir défendre. Sans cette récupération, les flankers
+  // et le talonneur adverse (à 0.5 m du ballon) plaquaient le 9 au premier tick.
+  for (const p of e.pions) {
+    if (p.role === 'ruck' && p.surLeTerrain && p.sanction <= 0) {
+      p.battu = Math.max(p.battu, 0.9);
+    }
+  }
+
   e.ruck = null;
   e.placement = null;
-  reprendreJeu(e, e.ballon, undefined, 1.3);
+  reprendreJeu(e, e.ballon, undefined, 3.0);
 }
 
 function phaseMaul(e: EtatMatch, dt: number): void {
@@ -2761,6 +2784,13 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
       : C.phrase(e.rng, C.CARTON, {
         nom: fautif.nom, motif, club: nomClub(e, fautif.cote),
       }), 0, fautif.moi);
+
+    // ⚠️ LE SIFFLET DOIT PORTER LA CLÉ DU CARTON, PAS DE LA PÉNALITÉ.
+    // `poserSifflet` a posé 'ml.sifflet.penalite' ; quand un carton suit, il
+    // faut basculer la clé pour que `extraireTerrain` et `DirectCinema` sachent
+    // afficher le cadre TV replay. Sans ça, le sifflet disait toujours
+    // « pénalité » et le CadreTmoReplay ne s'affichait jamais sur les cartons.
+    if (e.sifflet) e.sifflet.cle = rouge ? 'ml.sifflet.cartonRouge' : 'ml.sifflet.cartonJaune';
   }
   arret(e, 'penalite', pour, lieu);
   e.penalite = { pour, lieu: { x: lieu.x, y: lieu.y }, motif };

@@ -1533,14 +1533,22 @@ export function MatchLive({
 
                   {/* ---------- 📺 REPLAY ESSAI (PENDANT LA PRÉPARATION DU BOTTEUR) ---------- */}
                   {e.dernierReplayEssai && e.dernierReplayEssai.restant > 0 && e.phase === 'transformation' && (
-                    <div className="ml-replay-overlay" role="status">
-                      <div className="ml-replay-badge">
-                        <span className="ml-replay-dot" /> REPLAY ACTION DU MATCH · ESSAI
-                      </div>
-                      <div className="ml-replay-nom">
-                        {e.dernierReplayEssai.marqueurNom}
-                      </div>
-                    </div>
+                    <CadreTmoReplay
+                      action={`Essai de ${e.dernierReplayEssai.marqueurNom}`}
+                      decision="Essai accordé"
+                      cadreCamera="CAM 1 · LIGNE D'EN-BUT"
+                      horloge={`${Math.floor(e.minute)}:${String(Math.floor(e.t % 60)).padStart(2, '0')}`}
+                    />
+                  )}
+
+                  {/* ---------- 📺 CARTON JAUNE / ROUGE : CADRE TV BROADCAST ---------- */}
+                  {e.sifflet && !e.tmo && (e.sifflet.cle.includes('cartonJaune') || e.sifflet.cle.includes('cartonRouge')) && (
+                    <CadreTmoReplay
+                      action={`Sanction disciplinaire contre ${e.sifflet.fautif}`}
+                      decision={e.sifflet.cle.includes('cartonRouge') ? 'Carton rouge' : 'Carton jaune'}
+                      cadreCamera="CAM 2 · GROS PLAN"
+                      horloge={`${Math.floor(e.minute)}:${String(Math.floor(e.t % 60)).padStart(2, '0')}`}
+                    />
                   )}
 
                   {/* ---------- ⚡ GROS IMPACT ("SUR LES FESSES") ---------- */}
