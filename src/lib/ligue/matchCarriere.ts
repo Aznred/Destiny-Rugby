@@ -581,7 +581,7 @@ const POSTES_FEUILLE = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER];
  * déterminisme.
  *
  * Le barème est celui du jeu entier (`facteurDePerformance`) : 100 % à son
- * poste ou dans sa famille, 94 % dans une famille voisine, 82 % ailleurs.
+ * poste, dans sa famille ou à son poste secondaire, 82 % ailleurs.
  */
 export function feuilleGeleeEnLigne(
   effectif: readonly Coequipier[], composition: CompositionManager,

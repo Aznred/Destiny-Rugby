@@ -386,7 +386,7 @@ function PanneauJoueur({
           </div>
           <p>Aligné n°{POSTE_PAR_ID[posteSlot]?.numero} · {nomPoste(posteSlot)}</p>
           <small>
-            {adequation === 'naturel'
+            {rendement >= 1
               ? `Aucun malus : GEN ${joueur.note} conservé en match.`
               : `Malus de ${Math.round((1 - rendement) * 100)} % : GEN ${joueur.note} → ${noteEffective} en match.`}
           </small>

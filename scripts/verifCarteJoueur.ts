@@ -197,7 +197,7 @@ ligne('⚠️ la note affichée ne bouge pas quand on déplace un joueur',
 ligne('… mais la performance, si',
   `−${Math.round((1 - facteurDePerformance('horsPoste')) * 100)} % hors poste`,
   facteurDePerformance('horsPoste') < facteurDePerformance('secondaire')
-  && facteurDePerformance('secondaire') < facteurDePerformance('naturel'));
+  && facteurDePerformance('secondaire') <= facteurDePerformance('naturel'));
 
 // ---------------------------------------------------------------------------
 console.log('\n=== 6. L\'EN-TÊTE : NOTE, ATTAQUE, DÉFENSE, CONQUÊTE ===');

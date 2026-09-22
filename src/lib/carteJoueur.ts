@@ -225,7 +225,7 @@ export function adequationAuPoste(
   const fs = familleDePoste(slot);
   if (fj === fs) return 'naturel';
   // Un vrai second poste reste un rôle de dépannage : il est reconnu et ne
-  // subit que le petit malus « secondaire », jamais le hors-poste à 82 %.
+  // subit aucun malus (100 %), seul le vrai hors-poste à 82 % s'applique.
   if (postesSecondaires.some((poste) => poste === slot || familleDePoste(poste) === fs)) {
     return 'secondaire';
   }
@@ -240,9 +240,10 @@ export function adequationAuPoste(
  * littéralement la demande : « pas de malus FIFA artificiel du genre −5 général,
  * mais […] ses performances en match sont affectées ». Un joueur reste ce qu'il
  * est ; c'est le manager qui l'a mal placé, et ça se voit dimanche.
+ * Les postes naturels et secondaires conservent 100 % de leur rendement (aucun malus).
  */
 export function facteurDePerformance(a: Adequation): number {
-  return a === 'naturel' ? 1 : a === 'secondaire' ? 0.94 : 0.82;
+  return a === 'naturel' || a === 'secondaire' ? 1 : 0.82;
 }
 
 // ---------------------------------------------------------------------------
