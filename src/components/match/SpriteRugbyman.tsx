@@ -46,7 +46,7 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   if (p.corps && p.corps.age < p.corps.duree) return p.corps.age > p.corps.duree - .5 ? 'getup' : 'tackled';
   if (terrain.preparationTir?.buteurId === p.id) {
     const k = terrain.preparationTir.progression;
-    return k > .85 ? terrain.preparationTir.transformation ? 'conversion' : 'penalty'
+    return k > .92 ? terrain.preparationTir.transformation ? 'conversion' : 'penalty'
       : k > .3 && k < .5 ? 'walk' : k < .3 ? Math.hypot(p.vx, p.vy) > .5 ? 'jog' : k < .15 ? 'pickup' : 'ready' : 'ready';
   }
   if (terrain.aplatissage?.marqueurId === p.id) return terrain.aplatissage.progression > .78 ? 'celebrate' : 'try';
@@ -96,6 +96,10 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
       : terrain.vol.intention === 'drop' ? 'drop' : role === 9 ? 'box_kick' : terrain.vol.intention === 'chandelle' ? 'chip' : 'punt'
     : terrain.vol.intention === 'offload' ? 'offload' : terrain.vol.vers.y < terrain.vol.de.y ? 'pass_left' : 'pass';
   if (terrain.vol?.receveurId === p.id) return 'catch';
+  if (terrain.preparationTir?.transformation && terrain.preparationTir.progression >= 0.92 && p.cote !== terrain.possession) {
+    if (distanceBallon < 4.0) return 'charge_down';
+    if (vitesse > 1.8) return 'sprint';
+  }
   if (terrain.phase === 'ballonLibre' && distanceBallon < 1.8) return 'pickup';
   if (porteur) return vitesse > 7.2 ? 'sprint_ball' : vitesse > .7 ? 'run_ball' : 'ready';
   if (p.cote !== terrain.possession && Math.abs(p.vy) > Math.abs(p.vx) * 1.5 && vitesse > .7) return 'sidestep';

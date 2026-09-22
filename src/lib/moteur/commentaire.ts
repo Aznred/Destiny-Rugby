@@ -62,6 +62,12 @@ export const TRANSFORMATION_RATEE = [
   '{nom} bute contre le poteau ! Elle est manquée.',
 ];
 
+export const TRANSFORMATION_CONTREE = [
+  '💥 CONTRE ! {contreur} a jailli dès la course d’élan et contre la transformation de {nom} !',
+  'Incroyable contre de {contreur} ! La transformation de {nom} est déviée au sol.',
+  '{contreur} a surgi à pleine vitesse et contre le tir de {nom} au tee !',
+];
+
 export const PENALITE_BUT = [
   'Pénalité de {nom}, trois points de plus.',
   '{nom} l’ajuste depuis {distance} mètres, c’est bon.',

@@ -220,8 +220,32 @@ function animerArret(e: EtatMatch): void {
     // Le rituel du buteur : il recule de sept mètres, souffle, puis s'élance.
     const buteur = e.tir.buteur;
     if (!buteur.surLeTerrain) return;
-    const recul = p < .3 ? 0 : p < .5 ? (p - .3) / .2 * 7 : p < .85 ? 7 : Math.max(0, (1 - p) / .15) * 7;
+    const recul = p < .3 ? 0 : p < .5 ? (p - .3) / .2 * 7 : p < .92 ? 7 : Math.max(0, (1 - p) / .08) * 7;
     buteur.cible = { x: e.ballon.x - sens(buteur.cote) * recul, y: e.ballon.y };
+    if (p >= .92) buteur.effort = 1.1;
+
+    // 🏉 CHARGE DU CONTRE SUR TRANSFORMATION (Règle World Rugby 8.14)
+    // Dès que le botteur commence sa course d'élan (p >= 0.92), les défenseurs peuvent charger
+    // depuis leur ligne de but pour tenter de contrer le coup de pied.
+    // ⚠️ Strictement interdit en revanche sur pénalité (tirAuBut).
+    if (e.phase === 'transformation' && p >= .92) {
+      const defenseurs = surLeTerrain(e, adverse(buteur.cote))
+        .filter((q) => q.sanction <= 0)
+        .sort((a, b) => distance2(a.pos, e.ballon) - distance2(b.pos, e.ballon));
+
+      // Les 3 défenseurs les plus proches sprintent à fond vers le tee pour contrer
+      for (const ch of defenseurs.slice(0, 3)) {
+        ch.role = 'chasseur';
+        ch.cible = { x: e.ballon.x, y: e.ballon.y };
+        ch.effort = 1.3;
+      }
+      // Les défenseurs suivants avancent en ligne de couverture
+      for (const d of defenseurs.slice(3, 8)) {
+        d.role = 'chasseur';
+        d.cible = { x: e.ballon.x, y: d.pos.y };
+        d.effort = 0.9;
+      }
+    }
   }
 }
 
@@ -2871,12 +2895,33 @@ function lancerTrajectoireTir(e: EtatMatch, tir: TirEnCours, reussi: boolean): v
   // La course d'élan a déjà joué la première moitié du clip.
   e.gestes!.at(-1)!.debut -= .8;
   const s = sens(buteur.cote);
+  const de = tir.lieu ?? { ...e.ballon };
+
+  if (tir.contre) {
+    // 💥 Le ballon est contré au tee : il est dévié par le contreur et retombe au sol
+    const sContre = sens(tir.contre.cote);
+    const vers = {
+      x: borner(de.x + sContre * (2.5 + e.rng() * 3), 1, LONGUEUR - 1),
+      y: borner(de.y + (e.rng() - 0.5) * 4, 1, LARGEUR - 1),
+    };
+    tir.reussi = false;
+    tir.volLance = true;
+    buteur.stats.coupsDePied += 1;
+    poserVol(e, {
+      de: { ...de }, vers,
+      duree: 0.8, ecoule: 0, hauteur: 0.6,
+      type: 'pied', intention: 'drop', auteur: buteur, receveur: null,
+    });
+    e.porteur = null;
+    e.minuteur = 1.0;
+    return;
+  }
+
   const ligne = buteur.cote === 'A' ? LIGNE_B : LIGNE_A;
   const coteRate = e.rng() < 0.5 ? -1 : 1;
   const decalage = reussi
     ? (e.rng() - 0.5) * 3.6
     : coteRate * (4.2 + e.rng() * 5.5);
-  const de = tir.lieu ?? { ...e.ballon };
   const distance = Math.hypot(ligne + s * 4 - de.x, AXE + decalage - de.y);
   const duree = borner(1.25 + distance / 42, 1.45, 2.35);
   tir.reussi = reussi;
@@ -2948,6 +2993,31 @@ function phaseTransformation(e: EtatMatch): void {
       e.minuteur = .15;
       return;
     }
+
+    // 🏉 CONTRE SUR TRANSFORMATION
+    // Si un défenseur qui a chargé arrive à proximité immédiate du tee au moment de la frappe
+    const chargeurs = surLeTerrain(e, adverse(cote))
+      .filter((q) => q.sanction <= 0)
+      .map((q) => ({ pion: q, d: distance(q.pos, tir.lieu ?? e.ballon) }))
+      .filter(({ d }) => d <= 3.4)
+      .sort((a, b) => a.d - b.d);
+
+    const plusProche = chargeurs[0];
+    if (plusProche) {
+      const chanceContre = plusProche.d <= 1.5 ? 0.85
+        : plusProche.d <= 2.4 ? 0.55
+        : 0.25;
+
+      if (e.rng() < chanceContre) {
+        tir.reussi = false;
+        tir.contre = plusProche.pion;
+        jouerGeste(e, plusProche.pion, 'charge_down', 1.4);
+        dire(e, 'franchissement', plusProche.pion.cote,
+          C.phrase(e.rng, C.TRANSFORMATION_CONTREE, { nom: tir.buteur.nom, contreur: plusProche.pion.nom }),
+          0, plusProche.pion.moi || tir.buteur.moi);
+      }
+    }
+
     lancerTrajectoireTir(e, tir, !!tir.reussi);
     return;
   }
@@ -2965,7 +3035,11 @@ function phaseTransformation(e: EtatMatch): void {
     dire(e, 'but', cote, C.phrase(e.rng, C.TRANSFORMATION, { nom: tir.buteur.nom }), 2, tir.buteur.moi);
   } else {
     plan.essaisSecs = Math.max(0, plan.essaisSecs - 1);
-    dire(e, 'butRate', cote, C.phrase(e.rng, C.TRANSFORMATION_RATEE, { nom: tir.buteur.nom }), 0, tir.buteur.moi);
+    if (tir.contre) {
+      dire(e, 'butRate', cote, `Transformation contrée par ${tir.contre.nom} ! Pas de points pour ${nomClub(e, cote)}.`, 0, tir.buteur.moi || tir.contre.moi);
+    } else {
+      dire(e, 'butRate', cote, C.phrase(e.rng, C.TRANSFORMATION_RATEE, { nom: tir.buteur.nom }), 0, tir.buteur.moi);
+    }
   }
   if (e.sirene) return clorePeriode(e);
   preparerCoupEnvoi(e, adverse(cote));

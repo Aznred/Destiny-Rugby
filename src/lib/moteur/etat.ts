@@ -506,6 +506,8 @@ export interface EtatMatch {
     reussi?: boolean;
     /** Le rituel est fini et le ballon est actuellement en vol. */
     volLance?: boolean;
+    /** Joueur ayant contré la transformation lors de sa charge. */
+    contre?: Pion | null;
   } | null;
   penalite: { pour: Cote; lieu: Vec; motif: string } | null;
 

@@ -510,7 +510,7 @@ export function placerEquipes(e: EtatMatch): void {
       p.effort = 0.55;
       continue;
     }
-    if (arret || p.role === 'chasseur') { p.effort = 1; continue; }
+    if (arret || p.role === 'chasseur') { p.effort = Math.max(p.effort, 1); continue; }
     const d2 = distance2(p.pos, e.ballon);
     p.effort = d2 < 400 ? 1 : d2 < 1600 ? 0.8 : 0.64;
     // Un joueur en retard sur sa ligne accélère pour reprendre sa place, même
