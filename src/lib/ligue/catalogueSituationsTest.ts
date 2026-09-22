@@ -5,6 +5,7 @@
 // gros impacts "sur les fesses", discipline et cartons).
 
 import type { TerrainDirect, VueMatchEnLigne, CoteEnLigne } from './matchCarriere.js';
+import type { MomentFort } from './momentsForts.js';
 import type { TypeScenarioDirect } from './scenarioDirect.js';
 import type { Phase } from '../moteur/etat.js';
 import type { GesteMatch } from '../moteur/dynamique.js';
@@ -130,16 +131,56 @@ function matchDeBase(id: string, titre: string, terrain: TerrainDirect): VueMatc
     penalites: { domicile: 3, exterieur: 1 },
     stats: {
       domicile: { possession: 55, metres: 340, plaquages: 52, essais: 2, penalitesTentees: 3, penalitesReussies: 3, turnovers: 4, cartons: 0 },
-      exterieur: { possession: 45, metres: 280, plaquages: 58, essais: 2, penalitesTentees: 1, penalitesReussies: 1, turnovers: 5, cartons: 1 },
+      exterieur: {
+        possession: 45, metres: 280, plaquages: 58, essais: 2, penalitesTentees: 1, penalitesReussies: 1, turnovers: 5,
+        cartons: (id.includes('carton') || id.includes('cathedrale') || terrain.sifflet?.cle?.includes('carton')) ? 1 : 0,
+      },
     },
     fil: [
       { id: '1', minute: Math.floor(terrain.horloge), seconde: Math.floor(terrain.horloge * 60), type: 'action', texte: titre },
     ],
-    moments: [
-      { id: 'm1', seconde: 1080, type: 'essai', cote: 'domicile', texte: 'Essai de Thomas Ramos', points: 5, score: { domicile: 7, exterieur: 0 } },
-      { id: 'm2', seconde: 1560, type: 'essai', cote: 'exterieur', texte: 'Essai de Grégory Alldritt', points: 5, score: { domicile: 7, exterieur: 7 } },
-      { id: 'm3', seconde: Math.floor(terrain.horloge * 60), type: 'carton', cote: 'exterieur', texte: titre, points: 0, score: { domicile: 19, exterieur: 14 } },
-    ],
+    moments: (() => {
+      const ms: MomentFort[] = [
+        { id: 'm1', seconde: 1080, type: 'essai', cote: 'domicile', texte: 'Essai de Thomas Ramos', points: 5, score: { domicile: 7, exterieur: 0 } },
+        { id: 'm2', seconde: 1560, type: 'essai', cote: 'exterieur', texte: 'Essai de Grégory Alldritt', points: 5, score: { domicile: 7, exterieur: 7 } },
+      ];
+      const estCarton = id.includes('carton') || id.includes('cathedrale') || Boolean(terrain.sifflet?.cle?.includes('carton'));
+      const estEssai = (id.includes('essai') && !id.includes('tmo')) || terrain.phase === 'aplatissage';
+      const estTir = id.includes('drop') || id.includes('transformation');
+
+      if (estCarton) {
+        ms.push({
+          id: 'm3',
+          seconde: Math.floor(terrain.horloge * 60),
+          type: 'carton' as const,
+          cote: 'exterieur' as const,
+          texte: titre,
+          points: 0,
+          score: { domicile: 19, exterieur: 14 },
+        });
+      } else if (estEssai) {
+        ms.push({
+          id: 'm3',
+          seconde: Math.floor(terrain.horloge * 60),
+          type: 'essai' as const,
+          cote: 'domicile' as const,
+          texte: titre,
+          points: 5,
+          score: { domicile: 24, exterieur: 14 },
+        });
+      } else if (estTir) {
+        ms.push({
+          id: 'm3',
+          seconde: Math.floor(terrain.horloge * 60),
+          type: 'but' as const,
+          cote: 'domicile' as const,
+          texte: titre,
+          points: 3,
+          score: { domicile: 22, exterieur: 14 },
+        });
+      }
+      return ms;
+    })(),
     monCote: 'domicile',
     remplacementsFaits: 2,
     surLeTerrain: [],
