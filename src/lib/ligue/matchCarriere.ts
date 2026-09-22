@@ -320,7 +320,15 @@ export interface TerrainDirect {
   simulation?: number;
   gestes?: import('../moteur/dynamique.js').GesteMatch[];
   arbitre?: { x: number; y: number; vx: number; vy: number; regard: number };
-  preparationTir?: { buteurId: string; progression: number; transformation: boolean };
+  preparationTir?: {
+    buteurId: string;
+    progression: number;
+    transformation: boolean;
+    routine?: string;
+    clipRoutine?: string;
+    nomRoutine?: string;
+    emojiRoutine?: string;
+  };
   pions: PionDirect[];
   ballon: { x: number; y: number; hauteur?: number };
   /** Le pion qui porte le ballon : l'écran le colle à sa main. */
@@ -1024,7 +1032,13 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
       vx: r2(e.arbitre.vitesse.x), vy: r2(e.arbitre.vitesse.y), regard: r2(e.arbitre.regard),
     } : undefined,
     preparationTir: e.tir && !e.tir.volLance ? {
-      buteurId: e.tir.buteur.id, progression: Math.max(0, Math.min(1, 1 - e.minuteur / (e.dureeArret ?? 45))), transformation: e.tir.valeur === 2,
+      buteurId: e.tir.buteur.id,
+      progression: Math.max(0, Math.min(1, 1 - e.minuteur / (e.dureeArret ?? 45))),
+      transformation: e.tir.valeur === 2,
+      routine: e.tir.routine?.id,
+      clipRoutine: e.tir.routine?.clip,
+      nomRoutine: e.tir.routine?.nom,
+      emojiRoutine: e.tir.routine?.emoji,
     } : undefined,
     emisLe,
     snapshot: Math.max(0, Math.round(e.t / 0.6)),

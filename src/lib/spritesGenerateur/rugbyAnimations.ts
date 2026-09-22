@@ -130,6 +130,114 @@ function buildLibrary():AnimationClip[]{
     action('reaction_trip','Réaction — chute en avant','Réactions','Déséquilibre vers l’avant et réception sur les mains.',[stance({lean:15,legs:[50,70,120,10]}),stance({lean:55,y:10,arms:[10,0,15,0],legs:[125,-45,150,-70]}),stance({lean:88,y:75,arms:[70,0,75,0],legs:[170,-10,165,-25]}),{...ground(),ball:{...ground().ball,attachment:'HIDDEN'}}],1.4),
     action('reaction_tip','Réaction — chute renversée','Réactions','Joueur soulevé, retourné puis réception stylisée au sol.',[ready(),stance({y:-40,lean:-35,arms:carry,legs:[30,65,150,-65],ball:'RIGHT_HAND'}),(()=>{const p=stance({y:-35,arms:[15,40,165,-40],legs:[70,25,110,-25],ball:'RIGHT_HAND'});p.root.rotation=150;return p})(),(()=>{const p=stance({y:40,arms:[25,45,155,-45],legs:[60,25,120,-25],ball:'RIGHT_HAND'});p.root.rotation=100;return p})(),ground()],2)
   )
+  // ── Rituels et routines spécifiques des buteurs ───────────────────────────
+  clips.push(
+    action('routine_wilkinson','Rituel — La Prière de Jonny','Rituels buteur','Mains jointes, coudes serrés, buste fléchi et concentration chirurgicale.',[
+      stance({lean:26,y:12,arms:[45,60,45,60],legs:[60,50,110,-20],head:8}),
+      stance({lean:30,y:15,arms:[42,65,42,65],legs:[55,60,115,-25],head:4}),
+      stance({lean:26,y:12,arms:[45,60,45,60],legs:[60,50,110,-20],head:8}),
+    ],1.6,true),
+    action('routine_farrell','Rituel — Le Regard du Loup','Rituels buteur','Regard fixe alternant entre le ballon et le centre des perches.',[
+      stance({lean:5,arms:[95,-20,95,20],legs:[92,0,88,0],head:-18}),
+      stance({lean:4,arms:[95,-20,95,20],legs:[92,0,88,0],head:0}),
+      stance({lean:5,arms:[95,-20,95,20],legs:[92,0,88,0],head:18}),
+      stance({lean:4,arms:[95,-20,95,20],legs:[92,0,88,0],head:0}),
+    ],1.8,true),
+    action('routine_biggar','Rituel — La Macarena de Dan Biggar','Rituels buteur','Touche épaules, hanches, short et visage en cycle rapide.',[
+      stance({lean:10,arms:[30,-110,95,20],legs:[90,0,90,0]}),
+      stance({lean:12,arms:[95,-20,30,110],legs:[88,10,92,-10]}),
+      stance({lean:15,arms:[80,10,80,-10],legs:[90,0,90,0]}),
+      stance({lean:8,arms:[-30,-120,95,20],head:-10}),
+    ],1.4,true),
+    action('routine_crabe','Rituel — Le Crabe de Rob Cook','Rituels buteur','Posture très accroupie avec écartement maximal des appuis.',[
+      stance({lean:48,y:30,arms:[85,0,85,0],legs:[35,95,135,-65],head:-15}),
+      stance({lean:52,y:34,arms:[88,0,88,0],legs:[30,105,140,-70],head:-18}),
+      stance({lean:48,y:30,arms:[85,0,85,0],legs:[35,95,135,-65],head:-15}),
+    ],1.5,true),
+    action('routine_chaman','Rituel — L’Appel du Chaman','Rituels buteur','Jette des brins d’herbe en l’air et invoque le vent.',[
+      stance({lean:60,y:28,arms:[85,10,85,-10],legs:[50,75,115,-30]}),
+      stance({lean:15,y:4,arms:[100,-20,-75,15],legs:[90,0,90,0],head:-25}),
+      stance({lean:0,arms:[95,-20,-90,0],head:-30}),
+      stance({lean:10,arms:[95,-20,95,20],head:0}),
+    ],2.0,true),
+    action('routine_sniper','Rituel — Le Tireur d’Élite','Rituels buteur','Vise la barre transversale avec les doigts en pistolet.',[
+      stance({lean:5,arms:[50,60,5,0],head:-10}),
+      stance({lean:6,arms:[52,60,2,0],head:-12}),
+      stance({lean:5,arms:[50,60,5,0],head:-10}),
+    ],1.4,true),
+    action('routine_robot','Rituel — Le Cyborg T-800','Rituels buteur','Mouvements robotiques saccadés et balayage mécanique.',[
+      stance({lean:0,arms:[90,-90,0,90],head:-20}),
+      stance({lean:0,arms:[0,90,90,-90],head:20}),
+      stance({lean:12,arms:[90,0,90,0],head:0}),
+      stance({lean:0,arms:[90,-90,0,90],head:-20}),
+    ],1.4,true),
+    action('routine_flamant','Rituel — Le Flamant Rose','Rituels buteur','Équilibre sur une patte avec bras déployés.',[
+      stance({lean:-5,y:-4,arms:[-30,20,-30,-20],legs:[90,0,40,110]}),
+      stance({lean:5,y:-2,arms:[-45,15,-45,-15],legs:[90,0,45,115]}),
+      stance({lean:-5,y:-4,arms:[-30,20,-30,-20],legs:[90,0,40,110]}),
+    ],1.6,true),
+    action('routine_zen','Rituel — Le Moine Shaolin','Rituels buteur','Méditation profonde paumes ouvertes vers le ciel.',[
+      stance({lean:0,arms:[65,-40,65,40],head:-10}),
+      stance({lean:4,arms:[60,-35,60,35],head:0}),
+      stance({lean:0,arms:[65,-40,65,40],head:-10}),
+    ],2.2,true),
+    action('routine_respiration','Rituel — Le Souffle Glacial','Rituels buteur','Mains sur les hanches, inspiration profonde et souffle long.',[
+      stance({lean:-8,arms:[80,-90,80,90],head:-15}),
+      stance({lean:8,arms:[85,-80,85,80],head:5}),
+      stance({lean:-8,arms:[80,-90,80,90],head:-15}),
+    ],1.8,true),
+    action('routine_cowboy','Rituel — Le Cowboy du Crépuscule','Rituels buteur','Mains en alerte au-dessus de la ceinture prêtes à dégainer.',[
+      stance({lean:12,arms:[70,-45,70,45],legs:[75,20,105,-20]}),
+      stance({lean:15,arms:[65,-50,65,50],legs:[70,25,110,-25]}),
+      stance({lean:12,arms:[70,-45,70,45],legs:[75,20,105,-20]}),
+    ],1.2,true),
+    action('routine_penseur','Rituel — Le Penseur de Rodin','Rituels buteur','Accroupi au ras du sol avec le menton sur le poing.',[
+      stance({lean:55,y:38,arms:[90,0,20,-120],legs:[40,100,125,-60],head:-25}),
+      stance({lean:56,y:39,arms:[90,0,20,-120],legs:[40,100,125,-60],head:-25}),
+    ],2.0,true),
+    action('routine_horloger','Rituel — L’Horloger Suisse','Rituels buteur','Tape les crampons et ajuste ses chaussettes au millimètre.',[
+      stance({lean:10,arms:[95,-20,95,20],legs:[90,0,65,50]}),
+      stance({lean:55,y:32,arms:[85,5,85,-5],legs:[50,75,115,-30]}),
+      stance({lean:10,arms:[95,-20,95,20],legs:[90,0,90,0]}),
+    ],1.8,true),
+    action('routine_taureau','Rituel — Le Taureau Furieux','Rituels buteur','Racle le sol du crampon et baisse la tête avant la charge.',[
+      stance({lean:25,arms:[85,-25,85,25],legs:[75,25,130,30],head:25}),
+      stance({lean:28,arms:[80,-25,80,25],legs:[80,15,145,10],head:30}),
+      stance({lean:25,arms:[85,-25,85,25],legs:[75,25,130,30],head:25}),
+    ],1.3,true),
+    action('routine_danseur','Rituel — Le Danseur Étoile','Rituels buteur','Demi-pointes et port de bras gracieux.',[
+      stance({lean:0,y:-12,arms:[-65,-30,-115,30],legs:[90,-10,90,-10]}),
+      stance({lean:5,y:-14,arms:[-75,-20,-105,20],legs:[88,-12,92,-12]}),
+      stance({lean:0,y:-12,arms:[-65,-30,-115,30],legs:[90,-10,90,-10]}),
+    ],1.6,true),
+    action('routine_claques','Rituel — Les Baffes du Guerrier','Rituels buteur','Claques sur les cuisses et le visage pour stimuler l’adrénaline.',[
+      stance({lean:15,arms:[85,10,85,-10],legs:[85,15,95,-15]}),
+      stance({lean:-5,arms:[15,-120,15,120],head:15}),
+      stance({lean:-5,arms:[15,-120,15,120],head:-15}),
+      stance({lean:15,arms:[85,10,85,-10]}),
+    ],1.4,true),
+    action('routine_grand_recul','Rituel — Le Missile des 15m','Rituels buteur','Stature massive et pas de géant vers l’arrière.',[
+      stance({lean:-12,arms:[110,-25,105,25],legs:[75,30,115,-20],head:-5}),
+      stance({lean:-10,arms:[105,-25,110,25],legs:[115,-20,75,30],head:-5}),
+      stance({lean:-12,arms:[110,-25,105,25],legs:[75,30,115,-20],head:-5}),
+    ],1.6,true),
+    action('routine_hypnose','Rituel — L’Hypnotiseur','Rituels buteur','Balancement pendulaire continu du buste.',[
+      stance({lean:-16,x:-14,arms:[90,-35,90,35]}),
+      stance({lean:0,x:0,arms:[92,-20,92,20]}),
+      stance({lean:16,x:14,arms:[90,-35,90,35]}),
+      stance({lean:0,x:0,arms:[92,-20,92,20]}),
+    ],2.0,true),
+    action('routine_caresse','Rituel — L’Amoureux du Tee','Rituels buteur','Ajuste minutieusement l’ogive sur son socle.',[
+      stance({lean:58,y:26,arms:[70,-20,75,20],legs:[50,75,115,-30],head:15}),
+      stance({lean:62,y:28,arms:[75,-15,80,15],legs:[45,85,120,-35],head:18}),
+      stance({lean:58,y:26,arms:[70,-20,75,20],legs:[50,75,115,-30],head:15}),
+    ],1.8,true),
+    action('routine_ninja','Rituel — Le Salut Martial','Rituels buteur','Salut solennel des perches et garde d’arts martiaux.',[
+      stance({lean:10,arms:[35,-90,35,90],head:15}),
+      stance({lean:18,arms:[15,-60,75,-40],legs:[65,45,115,-25],head:-10}),
+      stance({lean:18,arms:[15,-60,75,-40],legs:[65,45,115,-25],head:-10}),
+    ],1.6,true)
+  )
   // Keep angles unwrapped: a 720° flight must visibly complete two revolutions.
   for(const clip of clips.filter(c=>c.category==='Coups de pied')){
     let start=-1
@@ -142,9 +250,10 @@ function buildLibrary():AnimationClip[]{
 }
 
 export const rugbyAnimations=buildLibrary()
-export const RUGBY_LIBRARY_VERSION=4
+export const RUGBY_LIBRARY_VERSION=5
 export function installRugbyLibrary(project:ProjectData,force=false):number {
   if(!force&&(project.rugbyLibraryVersion??0)>=RUGBY_LIBRARY_VERSION)return 0
   const existing=new Set(project.animations.map(c=>c.id)),missing=rugbyAnimations.filter(c=>!existing.has(c.id))
   project.animations.push(...clone(missing));project.rugbyLibraryVersion=RUGBY_LIBRARY_VERSION;return missing.length
 }
+

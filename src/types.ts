@@ -175,6 +175,7 @@ export interface Joueur {
   mentorat?: boolean; // a pris un jeune sous son aile (30 ans et +)
   traits?: string[]; // traits de caractère choisis à la création
   capitaine?: boolean; // porte le brassard
+  routineButeur?: string; // identifiant de la routine au tee (ex : 'wilkinson', 'farrell', 'crabe_cook'...)
   relations?: Relation[]; // amitiés et rivalités du vestiaire
   entrainementSemaine?: number; // dernière semaine où l'on s'est entraîné
   // ⚠️ LE SECTEUR TRAVAILLÉ EN PERMANENCE. On le choisit une fois, la séance

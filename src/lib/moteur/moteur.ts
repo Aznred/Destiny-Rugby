@@ -56,6 +56,7 @@ import { decomposer } from './plan.js';
 import { avancerArbitre, avancerCorps, declencherChute, incidentDeContact, jouerGeste, visibiliteFaute } from './dynamique.js';
 import { organiserRuck, placerRegroupement, animerRegroupement, preparerChenille } from './regroupements.js';
 import * as C from './commentaire.js';
+import { routineDuJoueur, phraseRoutine } from './routinesButeur.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
   dansLes22Adverses, dansSes22, dansSonCamp, distance, distance2, franchieLigne,
@@ -217,11 +218,18 @@ function animerArret(e: EtatMatch): void {
     return;
   }
   if ((e.phase === 'tirAuBut' || e.phase === 'transformation') && e.tir && !e.tir.volLance) {
-    // Le rituel du buteur : il recule de sept mètres, souffle, puis s'élance.
+    // Le rituel du buteur : recul et décalage latéral personnalisés selon sa routine.
     const buteur = e.tir.buteur;
     if (!buteur.surLeTerrain) return;
-    const recul = p < .3 ? 0 : p < .5 ? (p - .3) / .2 * 7 : p < .92 ? 7 : Math.max(0, (1 - p) / .08) * 7;
-    buteur.cible = { x: e.ballon.x - sens(buteur.cote) * recul, y: e.ballon.y };
+    const routine = e.tir.routine ?? routineDuJoueur(buteur);
+    const reculMax = routine.reculMetres;
+    const decalageLat = routine.decalageLateral;
+    const recul = p < .3 ? 0 : p < .5 ? (p - .3) / .2 * reculMax : p < .92 ? reculMax : Math.max(0, (1 - p) / .08) * reculMax;
+    const decY = p < .3 ? 0 : p < .5 ? (p - .3) / .2 * decalageLat : p < .92 ? decalageLat : Math.max(0, (1 - p) / .08) * decalageLat;
+    buteur.cible = {
+      x: e.ballon.x - sens(buteur.cote) * recul,
+      y: borner(e.ballon.y + decY, 2.5, LARGEUR - 2.5),
+    };
     if (p >= .92) buteur.effort = 1.1;
 
     // 🏉 CHARGE DU CONTRE SUR TRANSFORMATION (Règle World Rugby 8.14)
@@ -383,6 +391,7 @@ export function creerMatch(
       const buteurId = cote === 'A' ? options.buteurAId : options.buteurBId;
       pion.capitaine = !!capitaineId && pion.sourceId === capitaineId;
       pion.buteur = !!buteurId && pion.sourceId === buteurId;
+      pion.routineButeur = (c as any).routineButeur;
       if (pion.capitaine) pion.discipline += 4;
       pions.push(pion);
     });
@@ -2846,14 +2855,17 @@ function phasePenalite(e: EtatMatch): void {
   const veutTirer = choix ? choix === 'points' : aPortee && !besoinEssai && e.rng() < chanceTir;
 
   if (veutTirer) {
+    const routine = routineDuJoueur(buteur);
     e.tir = {
       buteur, distance: dist, angle: ecartAxe, valeur: 3,
       suite: 'coupEnvoi', lieu: { ...info.lieu },
+      routine,
     };
     e.phase = 'tirAuBut';
     e.minuteur = dureeArret(e, 'tirAuBut');
     e.ballon = { ...info.lieu };
     e.placement = placementTir(e.pions, info.lieu, cote, buteur.id);
+    dire(e, 'franchissement', buteur.cote, phraseRoutine(e.rng, routine, buteur.nom), 0, buteur.moi);
     return;
   }
 
@@ -3232,14 +3244,17 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul'): vo
   };
   e.ballon = { ...lieu };
   buteur.stats.butsTentes += 1;
+  const routine = routineDuJoueur(buteur);
   e.tir = {
     buteur, distance: 22 + ecartAxe * 0.55, angle: ecartAxe,
     valeur: 2, suite: 'coupEnvoi', lieu, reussi: transforme,
+    routine,
   };
   e.phase = 'transformation';
   e.minuteur = dureeArret(e, 'transformation');
   e.possession = cote;
   e.placement = placementTir(e.pions, lieu, cote, buteur.id);
+  dire(e, 'franchissement', buteur.cote, phraseRoutine(e.rng, routine, buteur.nom), 0, buteur.moi);
 }
 
 function phaseTMO(e: EtatMatch): void {
@@ -3816,7 +3831,10 @@ function faireRemplacement(e: EtatMatch, cote: Cote, entrant: Pion, sortant: Pio
     delete e.placement[sortant.id];
   }
   if (e.conquete?.cibleId === sortant.id) e.conquete.cibleId = entrant.id;
-  if (e.tir?.buteur === sortant) e.tir.buteur = entrant;
+  if (e.tir?.buteur === sortant) {
+    e.tir.buteur = entrant;
+    e.tir.routine = routineDuJoueur(entrant);
+  }
   if (e.piedPrepare?.auteurId === sortant.id) e.piedPrepare.auteurId = entrant.id;
   if (e.lancement) e.lancement.chaine = e.lancement.chaine.map((p) => p === sortant ? entrant : p);
   if (e.porteur === sortant) e.porteur = entrant;

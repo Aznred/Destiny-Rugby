@@ -1118,7 +1118,13 @@ export function MatchLive({
     cadence: 1, horloge: e.t / 60, instantJeu: e.t,
     simulation: e.sim + r, gestes: e.gestes,
     preparationTir: e.tir && !e.tir.volLance ? {
-      buteurId: e.tir.buteur.id, progression: Math.max(0, Math.min(1, 1 - e.minuteur / (e.dureeArret ?? 45))), transformation: e.tir.valeur === 2,
+      buteurId: e.tir.buteur.id,
+      progression: Math.max(0, Math.min(1, 1 - e.minuteur / (e.dureeArret ?? 45))),
+      transformation: e.tir.valeur === 2,
+      routine: e.tir.routine?.id,
+      clipRoutine: e.tir.routine?.clip,
+      nomRoutine: e.tir.routine?.nom,
+      emojiRoutine: e.tir.routine?.emoji,
     } : undefined,
     sifflet: e.sifflet ? { cle: e.sifflet.cle, club: e.sifflet.club, fautif: e.sifflet.fautif, restant: e.sifflet.restant } : undefined,
   };

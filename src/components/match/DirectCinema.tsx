@@ -53,24 +53,29 @@ export function DirectCinema({
     : momentVif?.type === 'carton' ? (/rouge/i.test(momentVif.texte) ? 'rouge' : 'jaune')
     : undefined;
   const scenario = m.terrain ? creerScenarioDirect(m.terrain) : undefined;
+  const prep = m.terrain?.preparationTir;
   const commentaire =
     momentSelectionne?.texte ??
     momentVif?.texte ??
     ligneDirect?.texte ??
-    (scenario?.ballonLent
-      ? 'La sortie est ralentie. La défense a le temps de se replacer.'
-      : scenario?.intensite === 'forte'
-        ? 'La défense recule, l’action peut basculer à tout instant.'
-        : scenario?.intensite === 'active'
-          ? 'Le ballon circule et l’attaque cherche l’intervalle.'
-          : 'Les deux équipes se replacent et construisent la séquence suivante.');
+    (prep
+      ? `${prep.emojiRoutine ?? '🎯'} ${prep.nomRoutine ?? 'Rituel du buteur'} : concentration maximale avant la frappe.`
+      : scenario?.ballonLent
+        ? 'La sortie est ralentie. La défense a le temps de se replacer.'
+        : scenario?.intensite === 'forte'
+          ? 'La défense recule, l’action peut basculer à tout instant.'
+          : scenario?.intensite === 'active'
+            ? 'Le ballon circule et l’attaque cherche l’intervalle.'
+            : 'Les deux équipes se replacent et construisent la séquence suivante.');
   const bandeau = m.decision
     ? 'DÉCISION DU MANAGER'
     : momentSelectionne
       ? 'ACTION DU MATCH'
-      : momentVif || scenario?.momentFort
-        ? 'MOMENT FORT'
-        : 'COMMENTAIRE EN DIRECT';
+      : prep
+        ? (prep.transformation ? 'TRANSFORMATION' : 'TIR AU BUT')
+        : momentVif || scenario?.momentFort
+          ? 'MOMENT FORT'
+          : 'COMMENTAIRE EN DIRECT';
 
   const isTmo = Boolean((m.terrain?.phase === 'tmo' || m.terrain?.tmo?.actif) && m.terrain?.tmo);
 
@@ -131,6 +136,15 @@ export function DirectCinema({
               {m.decision
                 ? 'Choisis entre les poteaux, la touche ou le jeu à la main.'
                 : momentVif!.texte}
+            </span>
+          </div>
+        )}
+
+        {prep && !m.decision && (!momentVif || ageMoment > 6) && (
+          <div className="dc-alerte-terrain dc-alerte-penalite" role="status">
+            <b>{prep.transformation ? 'TRANSFORMATION · RITUEL DU BUTEUR' : 'PÉNALITÉ · RITUEL DU BUTEUR'}</b>
+            <span>
+              {prep.emojiRoutine ?? '🎯'} {prep.nomRoutine ?? 'Installation au tee'}
             </span>
           </div>
         )}

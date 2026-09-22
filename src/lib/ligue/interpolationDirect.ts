@@ -338,6 +338,6 @@ export function interpolerEtatDirect(a: TerrainDirect, b: TerrainDirect, u: numb
     conquete: a.conquete && b.conquete?.type === a.conquete.type
       ? { ...a.conquete, progression: melanger(a.conquete.progression, b.conquete.progression, t) } : courant.conquete,
     preparationTir: a.preparationTir && b.preparationTir?.buteurId === a.preparationTir.buteurId
-      ? { ...a.preparationTir, progression: melanger(a.preparationTir.progression, b.preparationTir.progression, t) } : courant.preparationTir,
+      ? { ...a.preparationTir, ...b.preparationTir, progression: melanger(a.preparationTir.progression, b.preparationTir.progression, t) } : courant.preparationTir,
   };
 }

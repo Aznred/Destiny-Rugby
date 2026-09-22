@@ -93,6 +93,7 @@ export interface Pion {
   moi: boolean;
   capitaine: boolean;
   buteur: boolean;
+  routineButeur?: string;
 
   pos: Vec;
   vitesse: Vec;         // vecteur vitesse courant (m/s)

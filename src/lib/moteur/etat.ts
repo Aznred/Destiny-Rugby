@@ -508,6 +508,8 @@ export interface EtatMatch {
     volLance?: boolean;
     /** Joueur ayant contré la transformation lors de sa charge. */
     contre?: Pion | null;
+    /** Routine / rituel de préparation au tee du buteur. */
+    routine?: import('./routinesButeur').RoutineButeur;
   } | null;
   penalite: { pour: Cote; lieu: Vec; motif: string } | null;
 

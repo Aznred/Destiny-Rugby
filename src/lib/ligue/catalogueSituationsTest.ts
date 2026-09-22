@@ -400,7 +400,11 @@ export const SITUATIONS_LABORATOIRE: SituationTestInfo[] = [
       const terrain: TerrainDirect = {
         phase: 'transformation', systeme: '1-3-3-1', possession: 'domicile', sequence: 6, cadence: 1, horloge: 14.1,
         simulation: t, instantJeu: t, pions, ballon: { x: LIGNE_B - 22, y: AXE, hauteur: 0 },
-        preparationTir: { buteurId: buteur.id, progression: 0.45, transformation: true },
+        preparationTir: {
+          buteurId: buteur.id, progression: 0.45, transformation: true,
+          routine: 'souffle_ramos', clipRoutine: 'routine_respiration',
+          nomRoutine: 'Le Souffle Glacial', emojiRoutine: '💨',
+        },
         arbitre: { x: LIGNE_B - 18, y: AXE - 6, vx: 0, vy: 0, regard: 0 },
       };
       return matchDeBase('transformation_replay', 'REPLAY ESSAI · Thomas Ramos installe son tee à 22 mètres.', terrain);

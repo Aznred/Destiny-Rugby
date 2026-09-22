@@ -44,6 +44,7 @@ import type { Automatismes } from '../lib/cohesion';
 import type { Coequipier } from '../lib/effectif';
 import type { CompositionManager, PosteId } from '../types';
 import { photoReelle } from '../lib/avatars';
+import { routineDuJoueur } from '../lib/moteur/routinesButeur';
 
 type ZoneComposition = 'titulaires' | 'remplacants';
 
@@ -393,7 +394,7 @@ function PanneauJoueur({
         </section>
       )}
 
-      {etat && (etat.condition !== undefined || etat.forme !== undefined) && (
+      {etat && (etat.condition !== undefined || etat.forme !== undefined || etat.fatigue !== undefined) && (
         <div className="ct-jauges">
           {etat.condition !== undefined && (
             <label><span>{t('compo.condition')}</span>
@@ -445,6 +446,18 @@ function PanneauJoueur({
               </span>
             );
           })}
+        </div>
+      )}
+
+      {buteur && (
+        <div style={{ margin: '10px 0 6px', padding: '8px 10px', background: 'rgba(241,196,15,0.12)', border: '1px solid rgba(241,196,15,0.3)', borderRadius: 6, fontSize: '0.8rem' }}>
+          <div style={{ fontWeight: 600, color: 'var(--or, #f1c40f)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <span>{routineDuJoueur(joueur).emoji}</span>
+            <span>Routine : {routineDuJoueur(joueur).nom}</span>
+          </div>
+          <div style={{ opacity: 0.85, fontSize: '0.74rem', lineHeight: 1.3 }}>
+            {routineDuJoueur(joueur).description}
+          </div>
         </div>
       )}
 

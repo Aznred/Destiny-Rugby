@@ -46,8 +46,13 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   if (p.corps && p.corps.age < p.corps.duree) return p.corps.age > p.corps.duree - .5 ? 'getup' : 'tackled';
   if (terrain.preparationTir?.buteurId === p.id) {
     const k = terrain.preparationTir.progression;
+    const clipRoutine = terrain.preparationTir.clipRoutine && CLIPS.has(terrain.preparationTir.clipRoutine)
+      ? terrain.preparationTir.clipRoutine
+      : 'ready';
     return k > .92 ? terrain.preparationTir.transformation ? 'conversion' : 'penalty'
-      : k > .3 && k < .5 ? 'walk' : k < .3 ? Math.hypot(p.vx, p.vy) > .5 ? 'jog' : k < .15 ? 'pickup' : 'ready' : 'ready';
+      : k > .3 && k < .5 ? 'walk'
+      : k < .3 ? Math.hypot(p.vx, p.vy) > .5 ? 'jog' : k < .15 ? 'pickup' : 'ready'
+      : clipRoutine;
   }
   if (terrain.aplatissage?.marqueurId === p.id) return terrain.aplatissage.progression > .78 ? 'celebrate' : 'try';
   if (terrain.contact && terrain.contact.progression < 1 && terrain.contact.porteurId === p.id) return 'tackled';
