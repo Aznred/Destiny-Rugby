@@ -11,11 +11,11 @@ import { orientationSprite } from '../../lib/moteur/orientationSprite';
 export type AnimationRugby = string;
 
 const CLIPS = new Map(rugbyAnimations.map(clip => [clip.id.replace(/^rugby_/, ''), clip]));
-// Le générateur produit du pixel art : une surface Retina de 190×290 par joueur
-// gaspillait quatre fois plus de pixels sans ajouter de détail visible. Trente
-// joueurs + l'arbitre demandent ainsi moins de travail à chaque image.
-const LARGEUR_CANVAS = 96;
-const HAUTEUR_CANVAS = 146;
+// Le générateur produit du pixel art : une surface carrée de 160×160 permet
+// d'accueillir les animations horizontales étendues (plaquages, plongeons à l'essai,
+// mêlées, relèvements) sans aucun rognage de la tête ou des crampons.
+const LARGEUR_CANVAS = 160;
+const HAUTEUR_CANVAS = 160;
 
 interface Props {
   pion: PionDirect;
@@ -187,7 +187,7 @@ function dessinerSprite(
   }
   renderer.draw(ctx, character, pose, {
     width: LARGEUR_CANVAS, height: HAUTEUR_CANVAS, zoom: .36,
-    pan: { x: 0, y: -1 }, showField: false, showSkeleton: false,
+    pan: { x: 0, y: 2 }, showField: false, showSkeleton: false,
   });
 }
 

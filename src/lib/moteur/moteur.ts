@@ -233,25 +233,25 @@ function animerArret(e: EtatMatch): void {
     if (p >= .92) buteur.effort = 1.1;
 
     // 🏉 CHARGE DU CONTRE SUR TRANSFORMATION (Règle World Rugby 8.14)
-    // Dès que le botteur commence sa course d'élan (p >= 0.92), les défenseurs peuvent charger
+    // Dès que le botteur commence sa course d'élan (p >= 0.96), les défenseurs peuvent charger
     // depuis leur ligne de but pour tenter de contrer le coup de pied.
     // ⚠️ Strictement interdit en revanche sur pénalité (tirAuBut).
-    if (e.phase === 'transformation' && p >= .92) {
+    if (e.phase === 'transformation' && p >= .96) {
       const defenseurs = surLeTerrain(e, adverse(buteur.cote))
         .filter((q) => q.sanction <= 0)
         .sort((a, b) => distance2(a.pos, e.ballon) - distance2(b.pos, e.ballon));
 
-      // Les 3 défenseurs les plus proches sprintent à fond vers le tee pour contrer
+      // Les 3 défenseurs les plus proches sprintent vers le tee pour contrer
       for (const ch of defenseurs.slice(0, 3)) {
         ch.role = 'chasseur';
         ch.cible = { x: e.ballon.x, y: e.ballon.y };
-        ch.effort = 1.3;
+        ch.effort = 1.05;
       }
       // Les défenseurs suivants avancent en ligne de couverture
       for (const d of defenseurs.slice(3, 8)) {
         d.role = 'chasseur';
         d.cible = { x: e.ballon.x, y: d.pos.y };
-        d.effort = 0.9;
+        d.effort = 0.85;
       }
     }
   }
@@ -2334,6 +2334,42 @@ function phaseRuck(e: EtatMatch): void {
     const pret = chenille.pretDepuis !== undefined && e.sim - chenille.pretDepuis >= 1.5;
     if (neuf && pret) {
       e.ruck = null; e.placement = null;
+
+      // 🏉 CONTRE SUR LA CHENILLE (1 chance sur 12 ~ 8.3%, calibré entre 1/10 et 1/15)
+      // Un défenseur monte en flèche et contre la boîte au pied du 9 au bout de la chenille
+      const defenseurs = surLeTerrain(e, adverse(neuf.cote))
+        .filter((q) => q.sanction <= 0)
+        .sort((a, b) => distance2(a.pos, neuf.pos) - distance2(b.pos, neuf.pos));
+      const contreur = defenseurs[0];
+
+      if (contreur && e.rng() < 1 / 12) {
+        jouerGeste(e, contreur, 'charge_down', 1.4);
+        jouerGeste(e, neuf, 'kick', 0.8);
+        contreur.effort = 1.15;
+        contreur.cible = { ...neuf.pos };
+        neuf.stats.coupsDePied += 1;
+
+        const sDef = sens(contreur.cote);
+        const vers = {
+          x: borner(neuf.pos.x + sDef * (3 + e.rng() * 4), 2, LONGUEUR - 2),
+          y: borner(neuf.pos.y + (e.rng() - 0.5) * 5, 2, LARGEUR - 2),
+        };
+        dire(e, 'franchissement', contreur.cote,
+          `💥 CONTRE SUR LA CHENILLE ! ${contreur.nom} monte en flèche et contre la boîte de ${neuf.nom} ! Ballon libre !`,
+          0, contreur.moi || neuf.moi);
+
+        poserVol(e, {
+          de: { ...neuf.pos }, vers,
+          duree: 0.7, ecoule: 0, hauteur: 0.35,
+          type: 'pied', intention: 'chandelle', auteur: neuf, receveur: null,
+        });
+        e.porteur = null;
+        e.phase = 'ballonEnLAir';
+        e.minuteur = 0.9;
+        e.derniereTouche = contreur;
+        return;
+      }
+
       taperAuPied(e, neuf, 'chandelle');
       return;
     }
@@ -3043,14 +3079,14 @@ function phaseTransformation(e: EtatMatch): void {
     const chargeurs = surLeTerrain(e, adverse(cote))
       .filter((q) => q.sanction <= 0)
       .map((q) => ({ pion: q, d: distance(q.pos, tir.lieu ?? e.ballon) }))
-      .filter(({ d }) => d <= 3.4)
+      .filter(({ d }) => d <= 1.8)
       .sort((a, b) => a.d - b.d);
 
     const plusProche = chargeurs[0];
     if (plusProche) {
-      const chanceContre = plusProche.d <= 1.5 ? 0.85
-        : plusProche.d <= 2.4 ? 0.55
-        : 0.25;
+      const chanceContre = plusProche.d <= 0.9 ? 0.75
+        : plusProche.d <= 1.4 ? 0.40
+        : 0.15;
 
       if (e.rng() < chanceContre) {
         tir.reussi = false;

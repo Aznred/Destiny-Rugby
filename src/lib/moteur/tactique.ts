@@ -144,46 +144,73 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
     (p.avant ? avants : arrieres).push(p);
   }
 
-  // ── LES PODS D'AVANTS ────────────────────────────────────────────────────
-  // Les plus proches du ballon percutent au ras, les autres s'étagent au large.
+  const largeOuvert = ouvert === 1 ? LARGEUR - largeur : largeur; // espace jusqu'à la touche ouverte
+  const compression = borner(largeOuvert / 42, 0.45, 1); // ballon près de la touche = structure resserrée
+
+  // ── LES CELLULES D'AVANTS (PODS DE 3) ────────────────────────────────────
+  // En rugby moderne (ex. 1-3-3-1), les avants s'organisent en cellules de 3 :
+  // 1 pointe/chargeur qui attaque la ligne, flanqué de 2 lieurs/soutiens au ras
+  // (intérieur et extérieur à ±1.8 m) pour propulser au contact ou déblayer au ruck.
   avants.sort((a, b) => distance2(ancre, a.pos) - distance2(ancre, b.pos));
-  // 2 au ras côté fermé · 2 au ras côté ouvert · 3 au premier temps · 1 au large
-  // ⚠️ Les pods sont ÉCARTÉS. Un bloc à six mètres du ruck, ça fait un tas :
-  // avec les cinq joueurs du regroupement, les deux gardiens adverses et le 9,
-  // on comptait onze joueurs dans un cercle de huit mètres. Le premier bloc est
-  // donc à dix mètres, le deuxième à vingt-deux, le troisième au large.
-  const GABARIT: { dy: number; dx: number; role: Pion['role'] }[] = [
-    { dy: 10, dx: 2.4, role: 'podRas' },
-    { dy: 14, dx: 3.0, role: 'podRas' },
-    { dy: -10, dx: 2.4, role: 'aileFerme' },
-    { dy: -15, dx: 3.4, role: 'aileFerme' },
-    { dy: 22, dx: 4.6, role: 'podMilieu' },
-    { dy: 26, dx: 5.2, role: 'podMilieu' },
-    { dy: 30, dx: 5.8, role: 'podMilieu' },
-    { dy: 38, dx: 6.6, role: 'podLarge' },
+
+  // Si le porteur est lui-même un avant qui percute, les 2 avants les plus proches
+  // se lient immédiatement en soutiens directs de contact (cellule de percussion).
+  let avantsAStructurer = avants;
+  if (porteur && porteur.avant) {
+    const soutiensDirects = avants.filter(p => !rangDansChaine.has(p)).slice(0, 2);
+    if (soutiensDirects[0]) {
+      soutiensDirects[0].role = 'podRas';
+      soutiensDirects[0].cible = {
+        x: bornerX(porteur.pos.x - s * 1.2),
+        y: bornerY(porteur.pos.y - ouvert * 1.8),
+      };
+    }
+    if (soutiensDirects[1]) {
+      soutiensDirects[1].role = 'podRas';
+      soutiensDirects[1].cible = {
+        x: bornerX(porteur.pos.x - s * 1.2),
+        y: bornerY(porteur.pos.y + ouvert * 1.8),
+      };
+    }
+    avantsAStructurer = avants.filter(p => !soutiensDirects.includes(p));
+  }
+
+  // Structure des 8 avants en 2 cellules de 3 + 2 sentinelles :
+  // Pod 1 (axe / ras)     : 1 chargeur + 2 soutiens immédiats (±1.8m)
+  // Pod 2 (milieu / large): 1 chargeur + 2 soutiens immédiats (±1.8m)
+  // Sentinelles           : 1 côté fermé (dy = -10m) + 1 grand large (dy = 36m)
+  const ecartSoutien = Math.max(1.4, 1.8 * compression);
+  const centrePod1 = 12 * compression;
+  const centrePod2 = 24 * compression;
+
+  const GABARIT_CELLULES: { dy: number; dx: number; role: Pion['role'] }[] = [
+    // Cellule 1 (Pod 1 - ras / milieu) : 1 chargeur + 2 soutiens
+    { dy: centrePod1, dx: 2.6, role: 'podRas' },                  // Pointe / Chargeur
+    { dy: centrePod1 - ecartSoutien, dx: 3.4, role: 'podRas' },   // Soutien intérieur
+    { dy: centrePod1 + ecartSoutien, dx: 3.4, role: 'podRas' },   // Soutien extérieur
+    // Sentinelle côté fermé
+    { dy: -10, dx: 2.8, role: 'aileFerme' },
+    // Cellule 2 (Pod 2 - milieu / large) : 1 chargeur + 2 soutiens
+    { dy: centrePod2, dx: 4.4, role: 'podMilieu' },               // Pointe / Chargeur
+    { dy: centrePod2 - ecartSoutien, dx: 5.2, role: 'podMilieu' },// Soutien intérieur
+    { dy: centrePod2 + ecartSoutien, dx: 5.2, role: 'podMilieu' },// Soutien extérieur
+    // Sentinelle grand large
+    { dy: 36 * compression, dx: 6.2, role: 'podLarge' },
   ];
-  // Les avants qui tiennent une position de structure (les autres courent une
-  // ligne de soutien) : on les répartit ENSEMBLE sur la largeur, pour que deux
-  // pods ne se retrouvent jamais au même endroit quand le ballon est près d'une
-  // touche.
-  const podsStructures: Pion[] = [];
-  for (let i = 0; i < avants.length; i++) {
-    const p = avants[i];
+
+  for (let i = 0; i < avantsAStructurer.length; i++) {
+    const p = avantsAStructurer[i];
     const r = rangDansChaine.get(p);
     if (r != null) { ligneDeSoutien(p, ancre, s, ouvert, r); continue; }
-    const g = GABARIT[i] ?? GABARIT[GABARIT.length - 1];
+    const g = GABARIT_CELLULES[i] ?? GABARIT_CELLULES[GABARIT_CELLULES.length - 1];
     p.role = g.role;
     p.cible = {
       x: bornerX(ancre.x - s * g.dx),
-      y: largeur + ouvert * g.dy,
+      y: bornerY(largeur + ouvert * g.dy),
     };
-    podsStructures.push(p);
   }
-  repartirY(podsStructures, 6);
 
   // ── LA LIGNE DE TROIS-QUARTS ─────────────────────────────────────────────
-  const largeOuvert = ouvert === 1 ? LARGEUR - largeur : largeur; // espace jusqu'à la touche ouverte
-  const compression = borner(largeOuvert / 42, 0.45, 1); // ballon près de la touche = ligne resserrée
   const quinzeIntercale = !!lancement && (lancement.type === 'large' || lancement.type === 'saute');
 
   const ligneTroisQuarts: Pion[] = [];
