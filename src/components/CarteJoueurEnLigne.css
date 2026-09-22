@@ -5,7 +5,7 @@
 .dr-player-rating { position: absolute; top: 16%; left: 11%; width: 28%; display: flex; flex-direction: column; align-items: center; gap: 5px; color: #201814; }
 .dr-player-rating > b { font-family: var(--police-titre); font-size: 19cqw; line-height: .95; }
 .dr-player-rating > em { display: flex; flex-direction: column; align-items: center; font-style: normal; font-size: 4.2cqw; line-height: 1.15; text-transform: uppercase; font-weight: 800; }
-.dr-player-rating > em > small { margin-top: 1.1cqw; padding: .7cqw 1.5cqw; border-radius: 99px; background: #0002; font-size: 3.25cqw; line-height: 1; white-space: nowrap; }
+.dr-player-rating > em > small { margin-top: 1.1cqw; padding: .7cqw 1.5cqw; border-radius: 99px; background: rgba(16, 185, 129, 0.22); border: 1px solid rgba(16, 185, 129, 0.45); font-size: 3.4cqw; line-height: 1; white-space: nowrap; }
 /* ⚠️ LE LOGO DU CHAMPIONNAT SE MESURE EN `cqw`, PAS EN PIXELS. L'écusson du
    club au-dessus est posé à 25 px fixes : sur les cartes réduites du terrain,
    il occupe déjà plus que sa colonne. Un second badge en pixels aurait poussé

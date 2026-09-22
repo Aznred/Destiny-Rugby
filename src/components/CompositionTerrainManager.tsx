@@ -28,7 +28,7 @@ import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { t } from '../lib/i18n';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import {
-  adequationAuPoste, alertesDeComposition, badgesDe,
+  adequationAuPoste, alertesDeComposition, badgesDe, familleDePoste,
   facteurDePerformance, notesDeLEquipe, statsDeCarte, statutDe, valeurAxe,
   attributsDe, ABREVIATION, axesDe, rareteDe, estPepite, NOM_RARETE,
 } from '../lib/carteJoueur';
@@ -367,12 +367,12 @@ function PanneauJoueur({
         <div>
           <span className="ct-poste-principal">
             <i>{POSTE_PAR_ID[joueur.poste]?.numero}</i>
-            <span><small>Principal</small>{nomPoste(joueur.poste)}</span>
+            <span><small>Principal · 100 %</small>{nomPoste(joueur.poste)}</span>
           </span>
           {postesSecondaires.map((poste) => (
             <span className="ct-poste-secondaire" key={poste}>
               <i>{POSTE_PAR_ID[poste]?.numero}</i>
-              <span><small>Secondaire</small>{nomPoste(poste)}</span>
+              <span><small>Secondaire · 100 %</small>{nomPoste(poste)}</span>
             </span>
           ))}
         </div>
@@ -382,7 +382,15 @@ function PanneauJoueur({
       {posteSlot && (
         <section className={`ct-impact-poste ct-impact-${adequation}`} aria-label="Impact du poste choisi">
           <div>
-            <span><PastilleAdequation adequation={adequation} /> {adequation === 'naturel' ? 'Poste naturel' : adequation === 'secondaire' ? 'Poste secondaire' : 'Hors poste'}</span>
+            <span><PastilleAdequation adequation={adequation} /> {
+              adequation === 'naturel'
+                ? (joueur.poste === posteSlot || familleDePoste(joueur.poste) === familleDePoste(posteSlot)
+                    ? 'Poste naturel'
+                    : 'Poste de la fiche (100 %)')
+                : adequation === 'secondaire'
+                  ? 'Dépannage voisin'
+                  : 'Hors poste'
+            }</span>
             <strong>{Math.round(rendement * 100)} %</strong>
           </div>
           <p>Aligné n°{POSTE_PAR_ID[posteSlot]?.numero} · {nomPoste(posteSlot)}</p>

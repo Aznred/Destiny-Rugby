@@ -224,11 +224,12 @@ export function adequationAuPoste(
   const fj = familleDePoste(joueur);
   const fs = familleDePoste(slot);
   if (fj === fs) return 'naturel';
-  // Un vrai second poste reste un rôle de dépannage : il est reconnu et ne
-  // subit aucun malus (100 %), seul le vrai hors-poste à 82 % s'applique.
+  // Tous les postes inscrits sur la fiche du joueur (poste principal ET postes
+  // secondaires recensés) sont ses postes de prédilection à 100 % (naturel / bon).
   if (postesSecondaires.some((poste) => poste === slot || familleDePoste(poste) === fs)) {
-    return 'secondaire';
+    return 'naturel';
   }
+  // Les postes voisins non inscrits sur sa fiche restent du dépannage d'urgence (secondaire).
   if (VOISINS[fj]?.includes(fs)) return 'secondaire';
   return 'horsPoste';
 }
