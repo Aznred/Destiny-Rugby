@@ -3,6 +3,7 @@ import type { CarteCarriere } from '../lib/ligue/typesCarriere';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { photoReelle } from '../lib/avatars';
+import { formatTempsBlessure, formatTempsBlessureDetaille } from '../lib/carteJoueur';
 import { Drapeau } from './Drapeau';
 import { useBlasonCarte } from '../lib/useBlasonCarte';
 import { EcussonClub } from './EcussonClub';
@@ -79,6 +80,19 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
     <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{carte.clubReel}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>
     <span className="dr-player-rarity">{NOMS_PACK[carte.rarete]}<i> · {carte.age} ans</i></span>
-    <span className="dr-player-status">{carte.blesseJusqua && carte.blesseJusqua > new Date().toISOString() ? 'Blessé' : carte.fatigue > 55 ? 'Fatigué' : proprietaire ?? 'DESTINY RUGBY'}</span>
+    {(() => {
+      const estBlesse = Boolean(carte.blesseJusqua && carte.blesseJusqua > new Date().toISOString());
+      const tempsRestant = estBlesse && carte.blesseJusqua ? formatTempsBlessure(carte.blesseJusqua) : '';
+      const dateFin = estBlesse && carte.blesseJusqua ? new Date(carte.blesseJusqua).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+      const bulle = estBlesse && carte.blesseJusqua ? `Blessé jusqu'au ${dateFin} (encore ${formatTempsBlessureDetaille(carte.blesseJusqua)})` : undefined;
+      return (
+        <span
+          className={`dr-player-status${estBlesse ? ' dr-player-status-blesse' : ''}`}
+          title={bulle}
+        >
+          {estBlesse ? `🚑 Blessé (${tempsRestant})` : carte.fatigue > 55 ? 'Fatigué' : proprietaire ?? 'DESTINY RUGBY'}
+        </span>
+      );
+    })()}
   </Balise>;
 }

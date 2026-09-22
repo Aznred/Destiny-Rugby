@@ -51,7 +51,7 @@ import {
   tableauDetectionManager, motifObservationJeune, vivierFiltre,
 } from '../lib/formationManager';
 import {
-  compositionManagerParDefaut, noteCompositionManager, POSTES_XV_MANAGER,
+  compositionManagerParDefaut, meilleureCompositionManager, noteCompositionManager, POSTES_XV_MANAGER,
   reconcilerCompositionManager,
 } from '../lib/compositionManager';
 import {
@@ -417,6 +417,7 @@ export function Manager() {
     etatsComposition.set(dossier.joueurId, {
       condition: dossier.disponibilite,
       blesse: dossier.semaines > 0,
+      tempsBlessure: dossier.semaines > 0 ? `${dossier.semaines} sem.` : undefined,
     });
   }
   for (const convocation of convocationsActives) {
@@ -1024,7 +1025,20 @@ export function Manager() {
                   <h2><Icone nom="equipe" taille={20} /> Ton XV, ton banc, tes rôles</h2>
                   <p>Chaque choix est transmis au moteur. Un joueur hors de son poste perd la cohérence collective ; le buteur et le capitaine influencent réellement les pénalités et la discipline.</p>
                 </div>
-                <div className="manager-note-compo"><b>{noteCompositionManager(effectif, composition).toFixed(1)}</b><span>note du XV</span></div>
+                <div className="manager-compo-droite">
+                  <button
+                    type="button"
+                    className="btn btn-meilleure-equipe"
+                    onClick={() => {
+                      const comp = meilleureCompositionManager(effectif, indisponiblesSet, etatsComposition);
+                      definirComposition(comp);
+                    }}
+                    title={t('compo.meilleureEquipeAide')}
+                  >
+                    <Icone nom="eclair" taille={15} /> {t('compo.meilleureEquipe')}
+                  </button>
+                  <div className="manager-note-compo"><b>{noteCompositionManager(effectif, composition).toFixed(1)}</b><span>note du XV</span></div>
+                </div>
               </section>
 
               <CompositionTerrainManager
@@ -1042,6 +1056,10 @@ export function Manager() {
                 automatismes={automatismesComposition}
                 onCapitaine={(id) => definirComposition({ ...composition, capitaineId: id })}
                 onButeur={(id) => definirComposition({ ...composition, buteurId: id })}
+                onMeilleureEquipe={() => {
+                  const comp = meilleureCompositionManager(effectif, indisponiblesSet, etatsComposition);
+                  definirComposition(comp);
+                }}
               />
 
               <section className="carte manager-roles-visuels">

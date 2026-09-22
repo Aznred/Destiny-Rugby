@@ -251,6 +251,58 @@ export interface EtatDuJoueur {
   blesse?: boolean;
   suspendu?: boolean;
   enSelection?: boolean;
+  tempsBlessure?: string;
+}
+
+/**
+ * Formate le temps restant d'une indisponibilité de manière concise pour les badges et cartes.
+ * Ex : "45 min", "14 h", "3 j", "2 sem."
+ */
+export function formatTempsBlessure(isoDate?: string, maintenant = Date.now()): string {
+  if (!isoDate) return '';
+  const fin = Date.parse(isoDate);
+  if (isNaN(fin)) return '';
+  const diffMs = fin - maintenant;
+  if (diffMs <= 0) return 'rétabli';
+  const minutes = Math.ceil(diffMs / 60_000);
+  if (minutes < 60) return `${Math.max(1, minutes)} min`;
+  const heures = Math.ceil(diffMs / 3_600_000);
+  if (heures < 24) return `${heures} h`;
+  const jours = Math.ceil(diffMs / 86_400_000);
+  if (jours < 7) return `${jours} j`;
+  const semaines = Math.ceil(jours / 7);
+  return `${semaines} sem.`;
+}
+
+/**
+ * Formate le temps restant d'une indisponibilité de manière explicite et détaillée.
+ * Ex : "encore 2 j et 4 h", "encore 1 semaine", "encore 45 minutes"
+ */
+export function formatTempsBlessureDetaille(isoDate?: string, maintenant = Date.now()): string {
+  if (!isoDate) return '';
+  const fin = Date.parse(isoDate);
+  if (isNaN(fin)) return 'durée indéterminée';
+  const diffMs = fin - maintenant;
+  if (diffMs <= 0) return 'rétablissement imminent';
+  const jours = Math.floor(diffMs / 86_400_000);
+  const heures = Math.floor((diffMs % 86_400_000) / 3_600_000);
+  const minutes = Math.ceil((diffMs % 3_600_000) / 60_000);
+  if (jours >= 14) {
+    const semaines = Math.floor(jours / 7);
+    const resteJours = jours % 7;
+    return resteJours > 0 ? `${semaines} sem. et ${resteJours} j` : `${semaines} semaines`;
+  }
+  if (jours >= 7) {
+    const resteJours = jours % 7;
+    return resteJours > 0 ? `1 sem. et ${resteJours} j` : `1 semaine`;
+  }
+  if (jours > 0) {
+    return heures > 0 ? `${jours} j et ${heures} h` : `${jours} jour${jours > 1 ? 's' : ''}`;
+  }
+  if (heures > 0) {
+    return minutes > 0 ? `${heures} h et ${minutes} min` : `${heures} heure${heures > 1 ? 's' : ''}`;
+  }
+  return `${minutes} minute${minutes > 1 ? 's' : ''}`;
 }
 
 /**

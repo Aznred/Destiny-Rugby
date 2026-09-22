@@ -132,6 +132,21 @@
 .manager-note-compo { display:grid; place-items:center; min-width:112px; padding:.85rem; border:1px solid rgba(224,176,72,.35); border-radius:14px; background:rgba(224,176,72,.08); }
 .manager-note-compo b { color:var(--or); font-size:1.7rem; line-height:1; }
 .manager-note-compo span { margin-top:.25rem; color:var(--craie-dim); font-size:.72rem; }
+.manager-compo-droite { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+.btn-meilleure-equipe {
+  display:inline-flex; align-items:center; gap:.5rem;
+  padding:.65rem 1.15rem; font-weight:700; font-size:.92rem;
+  background:linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color:#ffffff; border:1px solid rgba(255,255,255,.25);
+  border-radius:10px; cursor:pointer; transition:all .2s ease;
+  box-shadow:0 4px 12px rgba(16,185,129,.28); white-space:nowrap;
+}
+.btn-meilleure-equipe:hover {
+  background:linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform:translateY(-1px); box-shadow:0 6px 16px rgba(16,185,129,.38);
+}
+.btn-meilleure-equipe:active { transform:translateY(0); }
+.ct-btn-meilleure-equipe { margin-left:.5rem; padding:.4rem .85rem; font-size:.82rem; }
 .manager-composition-grille { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(330px,.8fr); gap:1rem; align-items:start; }
 
 /* Les installations du club : trois structures, un programme, un rapport.

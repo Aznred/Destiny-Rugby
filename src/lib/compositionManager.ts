@@ -3,6 +3,7 @@ import type {
   CompositionManager, PosteId, TactiqueManager,
 } from '../types.js';
 import type { Coequipier } from './effectif.js';
+import { adequationAuPoste, disponible, facteurDePerformance, type EtatDuJoueur } from './carteJoueur.js';
 
 export const POSTES_XV_MANAGER: PosteId[] = [
   'pilier_gauche', 'talonneur', 'pilier_droit', 'deuxieme_ligne_g', 'deuxieme_ligne_d',
@@ -73,6 +74,137 @@ export function compositionManagerParDefaut(
     remplacants,
     capitaineId: capitaine?.id ?? titulaires[0] ?? '',
     buteurId: buteur?.id ?? titulaires[9] ?? titulaires[0] ?? '',
+  };
+}
+
+/**
+ * Sélectionne la composition optimale pour le mode entraîneur :
+ * - XV de départ (15) et banc équilibré (8) choisis parmi les joueurs disponibles.
+ * - Respect strict des postes déclarés (naturel et secondaires exacts à 100% de rendement, hors-poste à 82%).
+ * - Règle de rugby pour la 1ère ligne remplaçante : présence obligatoire de piliers et talonneur.
+ * - Choix du meilleur buteur selon son adresse réelle au pied et du capitaine selon l'expérience et l'autorité.
+ * - Prise en compte de la forme et fatigue si fournies dans `etats`.
+ */
+export function meilleureCompositionManager(
+  effectif: Coequipier[],
+  indisponibles: ReadonlySet<string> = new Set(),
+  etats?: ReadonlyMap<string, EtatDuJoueur>,
+): CompositionManager {
+  const dispo = effectif
+    .filter((j) => !indisponibles.has(j.id) && disponible(etats?.get(j.id) ?? {}))
+    .sort((a, b) => b.note - a.note);
+
+  // Si l'effectif disponible compte moins de 23 joueurs, repli par défaut
+  if (dispo.length < 23) {
+    return compositionManagerParDefaut(dispo, new Set());
+  }
+
+  const postes = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER];
+  const n = 23;
+  const m = dispo.length;
+
+  const couts = postes.map((poste, i) =>
+    dispo.map((j) => {
+      // Postes 1..3 et 16..18 : 1ère ligne impérative (piliers / talonneurs)
+      const estSlotPremiereLigne = i < 3 || (i >= 15 && i < 18);
+      const familleDuSlot = POSTE_PAR_ID[poste]?.famille;
+      if (estSlotPremiereLigne) {
+        const peutJouerPremiereLigne = [j.poste, ...(j.postesSecondaires ?? [])].some(
+          (p) => POSTE_PAR_ID[p]?.famille === familleDuSlot,
+        );
+        if (!peutJouerPremiereLigne) return 1e9;
+      }
+
+      const adq = adequationAuPoste(j.poste, poste, j.postesSecondaires);
+      const facteur = facteurDePerformance(adq);
+      const etat = etats?.get(j.id);
+      const fatigue = etat?.fatigue ?? 0;
+      const forme = etat?.forme ?? 50;
+
+      // Légère modulation : la fraîcheur départage les notes proches
+      const bonusForme = (forme - 50) * 0.04;
+      const malusFatigue = fatigue > 70 ? (fatigue - 70) * 0.25 : 0;
+      const noteAjustee = (j.note + bonusForme - malusFatigue) * facteur;
+
+      // Titulaires prioritaires (facteur 100) par rapport au banc
+      return -(noteAjustee * (i < 15 ? 100 : 1) - fatigue * 0.001);
+    }),
+  );
+
+  // Algorithme hongrois (Kuhn-Munkres) rectangulaire
+  const u = Array(n + 1).fill(0);
+  const v = Array(m + 1).fill(0);
+  const p = Array(m + 1).fill(0);
+  const way = Array(m + 1).fill(0);
+
+  for (let i = 1; i <= n; i++) {
+    p[0] = i;
+    let j0 = 0;
+    const minv = Array(m + 1).fill(Infinity);
+    const used = Array(m + 1).fill(false);
+    do {
+      used[j0] = true;
+      const i0 = p[j0];
+      let delta = Infinity;
+      let j1 = 0;
+      for (let j = 1; j <= m; j++) {
+        if (!used[j]) {
+          const cur = couts[i0 - 1][j - 1] - u[i0] - v[j];
+          if (cur < minv[j]) {
+            minv[j] = cur;
+            way[j] = j0;
+          }
+          if (minv[j] < delta) {
+            delta = minv[j];
+            j1 = j;
+          }
+        }
+      }
+      for (let j = 0; j <= m; j++) {
+        if (used[j]) {
+          u[p[j]] += delta;
+          v[j] -= delta;
+        } else {
+          minv[j] -= delta;
+        }
+      }
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do {
+      const j1 = way[j0];
+      p[j0] = p[j1];
+      j0 = j1;
+    } while (j0 !== 0);
+  }
+
+  const choix = Array<number>(23).fill(-1);
+  for (let j = 1; j <= m; j++) {
+    if (p[j]) choix[p[j] - 1] = j - 1;
+  }
+
+  // Si l'affectation stricte a échoué (pénurie de joueurs spécialisés en première ligne), repli par défaut
+  if (choix.some((j, i) => j < 0 || couts[i][j] >= 1e9)) {
+    return compositionManagerParDefaut(dispo, new Set());
+  }
+
+  const titulairesIds = choix.slice(0, 15).map((idx) => dispo[idx].id);
+  const remplacantsIds = choix.slice(15, 23).map((idx) => dispo[idx].id);
+
+  const titulaires = titulairesIds.map((id) => dispo.find((j) => j.id === id)!);
+  const capitaine = [...titulaires].sort(
+    (a, b) => (b.age * 1.4 + b.note) - (a.age * 1.4 + a.note),
+  )[0];
+
+  const tousAlignes = [...titulairesIds, ...remplacantsIds].map((id) => dispo.find((j) => j.id === id)!);
+  const buteur = [...tousAlignes].sort(
+    (a, b) => (b.jeuAuPied ?? b.note) - (a.jeuAuPied ?? a.note),
+  )[0];
+
+  return {
+    titulaires: titulairesIds,
+    remplacants: remplacantsIds,
+    capitaineId: capitaine?.id ?? titulairesIds[0] ?? '',
+    buteurId: buteur?.id ?? titulairesIds[9] ?? titulairesIds[0] ?? '',
   };
 }
 

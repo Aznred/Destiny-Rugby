@@ -69,6 +69,7 @@ interface Props {
   automatismes?: Automatismes;
   onCapitaine?: (joueurId: string) => void;
   onButeur?: (joueurId: string) => void;
+  onMeilleureEquipe?: () => void;
 }
 
 /** Placement visuel d'un XV de rugby, du pack (bas) vers l'en-but adverse. */
@@ -473,7 +474,7 @@ function PanneauJoueur({
 
 export function CompositionTerrainManager({
   effectif, effectifComplet = effectif, composition, onPlacer, etats, indisponibles,
-  automatismes, onCapitaine, onButeur, rendreCarte, rendreSousCarte,
+  automatismes, onCapitaine, onButeur, onMeilleureEquipe, rendreCarte, rendreSousCarte,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
   const [ficheMasquee, setFicheMasquee] = useState<string | null>(null);
@@ -647,6 +648,18 @@ export function CompositionTerrainManager({
         {rendreCarte && <div className="ct-apercu-selection">
           {joueurSelectionne ? <>{rendreCarte(joueurSelectionne)}<b>{joueurSelectionne.nom}</b><span>{nomPoste(joueurSelectionne.poste)} · {joueurSelectionne.note} GEN</span></> : <p>Choisis une carte pour voir le joueur et le remplacer.</p>}
         </div>}
+        {onMeilleureEquipe && (
+          <div className="ct-action-auto">
+            <button
+              type="button"
+              className="btn btn-meilleure-equipe ct-btn-meilleure-equipe"
+              onClick={onMeilleureEquipe}
+              title={t('compo.meilleureEquipeAide')}
+            >
+              <Icone nom="eclair" taille={14} /> {t('compo.meilleureEquipe')}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ⚠️ LES DEUX AIDES ONT PERDU LEURS EMOJI DANS LE DICTIONNAIRE (↕️ et 📱),
@@ -796,7 +809,9 @@ export function CompositionTerrainManager({
               ? t('compo.badge.international')
               : etat.suspendu
                 ? t('compo.badge.suspendu')
-                : etat.blesse ? t('compo.badge.blesse') : '';
+                : etat.blesse
+                  ? (etat.tempsBlessure ? `${t('compo.badge.blesse')} (${etat.tempsBlessure})` : t('compo.badge.blesse'))
+                  : '';
             return (
               <button
                 type="button"
@@ -829,7 +844,7 @@ export function CompositionTerrainManager({
                 </span>
                 {badgesDe(joueur, etat).slice(0, 1)
                   .map((b) => (
-                    <i key={b} className={`ct-badge ct-badge-${b}`} title={t(`compo.badge.${b}`)}>
+                    <i key={b} className={`ct-badge ct-badge-${b}`} title={b === 'blesse' && etat.tempsBlessure ? `${t('compo.badge.blesse')} (${etat.tempsBlessure})` : t(`compo.badge.${b}`)}>
                       <Icone nom={ICONE_BADGE[b]} taille={13} />
                     </i>
                   ))}

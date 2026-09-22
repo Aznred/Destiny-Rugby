@@ -25,6 +25,7 @@
 .dr-player-rarity { position: absolute; top: 89.5%; left: 12%; width: 76%; text-transform: uppercase; font-size: 3.5cqw; font-weight: 800; letter-spacing: .08em; }
 .dr-player-rarity i { font-style: normal; font-weight: 500; }
 .dr-player-status { position: absolute; top: 93%; left: 23%; width: 54%; font-size: 2.8cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .8; }
+.dr-player-status.dr-player-status-blesse { color: #ff8585; font-weight: 800; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95); opacity: 1; }
 .dr-player.star .dr-player-rating, .dr-player.elite .dr-player-rating { color: #fff6e6; text-shadow: 0 1px 4px #0007; }
 .pack-show-card .cel-carte.dr-player { min-height: 0; height: auto; }
 .pack-show-card:has(.dr-player) { min-height: 0; align-self: center; }
