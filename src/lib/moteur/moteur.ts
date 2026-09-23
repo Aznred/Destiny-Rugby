@@ -70,7 +70,7 @@ export type { Pion } from './entites.js';
 // interpoler entre deux pas (voir `MatchLive.tsx`).
 export const DT = 0.15;
 const DUREE_PERIODE = 40 * 60;
-const RAYON_PLAQUAGE = 1.60;
+const RAYON_PLAQUAGE = 1.75;
 
 // Durée de chaque phase arrêtée : ce qu'on REGARDE (secondes simulées) et ce que
 // l'horloge du match AVALE (secondes de jeu). C'est cette dissociation qui rend
@@ -430,7 +430,7 @@ export function creerMatch(
     remplacementsA: 0, remplacementsB: 0, remplacementsDemandes: {}, prochaineDecision: 1, compteur: 0,
     commentaires: [], fini: false, rng,
     tempsReel: options.tempsReel,
-    scoreSurTerrain: options.scoreSurTerrain, meteoTir: options.meteoTir,
+    scoreSurTerrain: options.scoreSurTerrain ?? true, meteoTir: options.meteoTir,
     niveau: options.niveau ?? 'pro',
     controle: options.controle ?? false,
     intention: null,
@@ -589,8 +589,8 @@ function tick(e: EtatMatch): void {
   // « hésiterait » au lieu de foncer.
   if (e.controle) piloterMonJoueur(e);
 
-  // ── Le rythme de marque, relu par la tactique ────────────────────────────
-  e.aide = retard(e, e.possession);
+  // ── Jeu 100% organique, sans aide artificielle ni plan forcé ──────────
+  e.aide = 0;
   if (e.phase === 'jeuCourant' || e.phase === 'ruck' || e.phase === 'maul') {
     if (e.possession === 'A') e.compteurs.tempsA += dt; else e.compteurs.tempsB += dt;
   }
@@ -1808,11 +1808,9 @@ function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   }
   if (suivant) return;
 
-  // Le drop : trois points quand la défense tient bon. Le 10 le tente s'il lui
-  // reste des points « au pied » à inscrire et que le temps presse.
-  if (p.numero === 10 && metresAvantLaLigne(p.pos, p.cote) < 34
-    && (e.scoreSurTerrain || planDe(e, p.cote).penalites > 0) && p.pied > 50 && pression > 4
-    && e.rng() < (e.minute >= 62 ? 0.07 : 0.02)) {
+  // Le drop : trois points quand la défense tient bon et que le 10 est bien placé.
+  if (p.numero === 10 && metresAvantLaLigne(p.pos, p.cote) < 32 && Math.abs(p.pos.y - AXE) < 14
+    && p.pied > 55 && pression > 4.5 && e.rng() < (e.minute >= 65 ? 0.04 : 0.015)) {
     return taperAuPied(e, p, 'drop');
   }
   // Rasant derrière une défense montée, tout près de la ligne.
@@ -1969,22 +1967,10 @@ export function probaPlaquage(
   const force = defenseur.plaquage * fatigueD * (monPlaquage ? 1.16 : 1);
   const fatigueA = 0.76 + porteur.endurance / 420;
   const resistance = (porteur.evitement * 0.55 + porteur.puissance * 0.45) * fatigueA;
-  // ⚠️ Le taux de réussite au plaquage du rugby professionnel est de ~88 %.
-  // Le rythme de l'équipe qui court après son plan de marque l'infléchit :
-  // c'est le seul endroit où le score « aide » l'attaque, et c'est ce réglage
-  // invisible qui évite d'avoir à refuser un essai à l'écran.
-  const r = retard(e, porteur.cote);
   const pres = metresAvantLaLigne(porteur.pos, porteur.cote);
-  // ⚠️ Le réglage est ASYMÉTRIQUE. Une équipe en retard sur son plan trouve un
-  // peu d'espace ; une équipe en avance se heurte à un mur. Sans ce second
-  // versant, tout le score tombait dans le premier quart d'heure et la fin de
-  // match était stérile (mesuré : 16 points avant la 20ᵉ, 5 après la 60ᵉ).
-  // ⚠️ Sur la ligne des 5 mètres, la défense se resserre héroïquement pour
-  // empêcher les percées gratuites d'aller systématiquement au bout.
-  const aide = r >= 0
-    ? r * 0.12 + (pres < 25 ? r * 0.08 : 0)
-    : r * 0.55;
-  const bonusLigne = pres < 6 ? 0.08 : pres < 10 ? 0.04 : 0;
+  // 🛡️ DÉFENSE SUR LA LIGNE : la défense se resserre héroïquement pour interdire
+  // l'en-but (bonus d'intensité sur les 6 et 12 mètres).
+  const bonusLigne = pres < 6 ? 0.09 : pres < 12 ? 0.05 : 0;
   const elan = bonusElan(e, defenseur.cote);
 
   // ═══ LE GESTE CHOISI : UN BONUS DIRECT, PAS UN TERME DE RÉSISTANCE ══════
@@ -2012,8 +1998,8 @@ export function probaPlaquage(
   // indexé sur l’attribut qui le porte : un ailier rapide sprinte, un pilier
   // raffute, et aucun des deux ne fait le métier de l’autre.
   return borner(
-    0.94 + (force - resistance) / 380 - aide + elan + bonusLigne - bonusDuGeste(porteur, geste) * efficaciteGeste,
-    0.40, 0.99,
+    0.93 + (force - resistance) / 380 + elan + bonusLigne - bonusDuGeste(porteur, geste) * efficaciteGeste,
+    0.45, 0.99,
   );
 }
 
@@ -2912,7 +2898,6 @@ function phasePenalite(e: EtatMatch): void {
   delete e.choixPenalite;
   if (!info) return reprendreJeu(e, e.ballon);
   const cote = info.pour;
-  const plan = planDe(e, cote);
   const liste = surLeTerrain(e, cote);
   if (!liste.length) return clorePeriode(e);
   const buteurDesigne = liste.find((p) => p.buteur);
@@ -2923,22 +2908,14 @@ function phasePenalite(e: EtatMatch): void {
   const restantes = 80 - e.minute;
   const diff = ecart(e, cote);
 
-  // ── Le choix : tir au but, pénaltouche, ou jeu à la main ────────────────
-  // Un buteur professionnel tente jusqu'à 52 mètres, et jusqu'à 30 m de l'axe.
-  const aPortee = dist < 52 && ecartAxe < 30;
-  const besoinEssai = diff < -3 && restantes < 12 && plan.essaisTransformes + plan.essaisSecs > 0;
-  // ⚠️ Le taux de réussite au pied du rugby pro est de ~78 %. On l'obtient en
-  // laissant l'équipe tenter quelques pénalités qu'elle n'a PAS au plan : ce
-  // sont les tirs manqués. Sans elles, tous les tirs seraient bons.
-  // ⚠️ Moins de coups de pied de sortie = plus de temps de jeu, donc plus de
-  // pénalités à portée : à 11 % de tentatives « hors plan », le pourcentage de
-  // réussite au pied du match tombait sous les 68 %. 7 % le remet à ~72 %.
+  const aPortee = dist < 50 && ecartAxe < 26;
+  const besoinEssai = diff < -7 && restantes < 10;
   const ordrePenalite = e.tactiques[cote]?.penalites ?? 'mixte';
   const chanceTir = ordrePenalite === 'points'
-    ? (plan.penalites > 0 ? 0.995 : 0.16)
+    ? 0.95
     : ordrePenalite === 'touche'
-      ? (plan.penalites > 0 ? 0.28 : 0.015)
-      : (plan.penalites > 0 ? 0.93 : 0.07);
+      ? (diff < 0 && restantes < 5 ? 0.35 : 0.08)
+      : (dist < 40 && ecartAxe < 18 ? 0.82 : 0.40);
   const veutTirer = choix ? choix === 'points' : aPortee && !besoinEssai && e.rng() < chanceTir;
 
   if (veutTirer) {
@@ -3051,9 +3028,7 @@ function phaseTirAuBut(e: EtatMatch): void {
       return;
     }
     buteur.stats.butsTentes += 1;
-    const reussi = e.scoreSurTerrain
-      ? e.rng() < probabilitePenalite(e, buteur, d, angle)
-      : plan.penalites > 0 && e.rng() < Math.max(0.85, probaTir(d, angle, buteur.pied));
+    const reussi = e.rng() < probabilitePenalite(e, buteur, d, angle);
     lancerTrajectoireTir(e, tir, reussi);
     return;
   }
@@ -3187,17 +3162,12 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   const action = e.aplatissage;
   e.aplatissage = null;
 
-  // 🛡️ DÉFENSE SUR LA LIGNE : Ballon tenu en-but si des défenseurs contestent l'aplatissage !
-  const plan = planDe(e, cote);
-  const resteEssais = plan.essaisTransformes + plan.essaisSecs;
-  const rayonContest = resteEssais <= 0 ? 3.4 : 2.5;
-  const defenseursEnBut = surLeTerrain(e, adverse(cote)).filter((p) => distance(p.pos, marqueur.pos) < rayonContest && p.battu <= 0);
+  // 🛡️ DÉFENSE SUR LA LIGNE : Ballon tenu en-but uniquement si des défenseurs sont au contact direct (< 2.0 m)
+  const defenseursEnBut = surLeTerrain(e, adverse(cote)).filter((p) => distance(p.pos, marqueur.pos) < 2.0 && p.battu <= 0);
   if (defenseursEnBut.length > 0) {
-    const rTenu = retard(e, cote);
-    const forceDef = defenseursEnBut.reduce((acc, d) => acc + d.plaquage * 0.6 + d.puissance * 0.4, 0) / defenseursEnBut.length;
-    const forceAtt = (marqueur.puissance * 0.6 + marqueur.evitement * 0.4) * (0.75 + marqueur.endurance / 400);
-    const baseTenu = resteEssais <= 0 ? 0.60 : 0.35;
-    const probaTenu = borner(baseTenu + (forceDef - forceAtt) / 220 + (defenseursEnBut.length > 1 ? 0.16 : 0) - rTenu * 0.30, 0.14, 0.88);
+    const forceDef = defenseursEnBut.reduce((acc, d) => acc + d.plaquage * 0.55 + d.puissance * 0.45, 0) / defenseursEnBut.length;
+    const forceAtt = (marqueur.puissance * 0.55 + marqueur.evitement * 0.45) * (0.75 + marqueur.endurance / 400);
+    const probaTenu = borner(0.28 + (forceDef - forceAtt) / 240 + (defenseursEnBut.length > 1 ? 0.15 : 0), 0.08, 0.55);
     if (e.rng() < probaTenu) {
       const defSauveur = defenseursEnBut[0];
       dire(e, 'jalon', adverse(cote), `🛑 SAUVETAGE HÉROÏQUE SUR LA LIGNE ! ${defSauveur.nom} et la défense se glissent sous le ballon : BALLON TENU EN-BUT !`, 0, true);
@@ -3298,8 +3268,6 @@ function declencherTMOEssai(e: EtatMatch, action: Aplatissage): void {
 
 function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul'): void {
   const cote = marqueur.cote;
-  const plan = planDe(e, cote);
-  const reste = plan.essaisTransformes + plan.essaisSecs;
 
   marqueur.stats.essais += 1;
   if (e.dernierPasseur && e.dernierPasseur !== marqueur && e.dernierPasseur.cote === cote) {
@@ -3337,10 +3305,7 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul'): vo
   const ecartAxe = Math.abs(marqueur.pos.y - AXE);
   const chance = probaTir(22 + ecartAxe * 0.55, ecartAxe, buteur.pied);
 
-  let transforme: boolean;
-  if (reste <= 0) transforme = e.rng() < chance;
-  else if (plan.essaisTransformes > 0 && plan.essaisSecs > 0) transforme = e.rng() < chance;
-  else transforme = plan.essaisTransformes > 0;
+  const transforme = e.rng() < chance;
 
   stopper(marqueur);
   e.porteur = null;
@@ -3657,7 +3622,7 @@ function choisirLancement(
   // On dégageait de ses 22 trois fois sur quatre : à ce rythme, la sortie de
   // camp devenait un réflexe et le match comptait près de 60 coups de pied.
   // 58 % laisse le jeu d'occupation lisible tout en autorisant les relances.
-  if (chezSoi && pousse < 0.40 && !(diff < 0 && restantes < 8)) {
+  if (chezSoi && !(diff < -7 && restantes < 10)) {
     const botteur = (dix && dix.pied > 55 ? dix : distributeur) ?? liste[0];
     const chanceDegagement = tactique?.attaque === 'occupation' ? 0.92
       : tactique?.attaque === 'large' ? 0.55 : tactique?.attaque === 'avants' ? 0.65 : 0.74;
@@ -3684,7 +3649,7 @@ function choisirLancement(
     // Occupation depuis son camp : jeu au pied territorial typique du Top 14
     const occupation = tactique?.attaque === 'occupation' ? 0.42
       : tactique?.attaque === 'large' ? 0.14 : 0.26;
-    if (phases >= 2 && r < occupation - pousse * 0.08) {
+    if (phases >= 2 && r < occupation) {
       return {
         type: 'pied', chaine: [distributeur, botteur].filter(Boolean) as Pion[], index: 0,
         intention: e.ballonLent ? 'chandelle' : 'occupation', botteur,
@@ -3922,7 +3887,7 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
       return lancerVol(e, p, arrivee, 'transversale', 2.6, 0.9);
     }
     default: {
-      const versTouche = e.rng() < 0.44;
+      const versTouche = e.rng() < 0.65;
       const arrivee = {
         x: borner(p.pos.x + s * portee, LIGNE_A + 2, LIGNE_B - 2),
         y: versTouche

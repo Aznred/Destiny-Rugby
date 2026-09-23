@@ -644,12 +644,9 @@ export function choisirSysteme(e: EtatMatch, defenseur: Cote): SystemeDefensif {
   return e.rng() < 0.62 ? 'blitz' : 'glissee';
 }
 
-// Vitesse de montée du rideau (m/s), selon le système, la fatigue — et le
-// rythme de marque de l'attaque (`e.aide`) : une équipe qui court après son
-// score trouve une défense un peu moins pressante. C'est le réglage invisible
-// qui fait tomber le score juste sans jamais refuser un essai à l'écran.
+// Vitesse de montée du rideau (m/s), selon le système tactique et l'endurance.
 export function vitesseMontee(e: EtatMatch, defenseur: Cote): number {
-  const base = e.systeme === 'blitz' ? 4.8 : e.systeme === 'glissee' ? 3.4 : 2.0;
+  const base = e.systeme === 'blitz' ? 5.2 : e.systeme === 'glissee' ? 3.8 : 2.6;
   const liste = surLeTerrain(e, defenseur);
   if (!liste.length) return base;
   let endurance = 0;
@@ -657,7 +654,7 @@ export function vitesseMontee(e: EtatMatch, defenseur: Cote): number {
   endurance /= liste.length;
   const rythme = e.tactiques[defenseur]?.rythme;
   const multiplicateur = rythme === 'intense' ? 1.08 : rythme === 'gestion' ? 0.92 : 1;
-  return base * multiplicateur * (0.72 + endurance / 360) * borner(1 - e.aide * 0.3, 0.7, 1.2);
+  return base * multiplicateur * (0.72 + endurance / 360);
 }
 
 // ---------------------------------------------------------------------------
