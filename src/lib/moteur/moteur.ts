@@ -519,8 +519,8 @@ function tick(e: EtatMatch): void {
     e.sirene = true;
     dire(e, 'jalon', null, C.texteMatch(e.periode === 1 ? 'sirenePremiere' : 'sireneFinale'));
   }
-  // Garde-fou : on ne joue pas trois minutes de plus.
-  if (e.sirene && e.t > finPeriode + 150) return clorePeriode(e);
+  // Garde-fou : temps additionnel maximum (6 minutes après la sirène).
+  if (e.sirene && e.t > finPeriode + 360) return clorePeriode(e);
 
   // ── Compteurs des joueurs ────────────────────────────────────────────────
   for (const p of e.pions) {
@@ -832,10 +832,10 @@ function dire(
 // restent visibles, et la remise en jeu attend ensuite que tout le monde soit
 // réellement arrivé. Les autres arrêts directs conservent un replacement
 // naturel à vitesse de course.
-function installerPlacement(e: EtatMatch, placement: Record<string, Vec>, seuil = 26): void {
+function installerPlacement(e: EtatMatch, placement: Record<string, Vec>, seuil = 20): void {
   e.placement = placement;
   const instantane = e.phase === 'melee' || e.phase === 'touche';
-  if (!instantane) seuil = Infinity;
+  if (!instantane && e.phase !== 'coupEnvoi') seuil = Infinity;
   for (const p of e.pions) {
     if (!p.surLeTerrain || p.sanction > 0) continue;
     const c = placement[p.id];
@@ -973,18 +973,25 @@ function viserLeCoupEnvoi(e: EtatMatch, pour: Cote): void {
 
 function phaseCoupEnvoi(e: EtatMatch): void {
   if (e.minuteur > 0) return;
-  // Le coup d'envoi ne part jamais pendant que des joueurs rejoignent encore
-  // leur ligne. L'attente se fait par petits pas et ne dure que si quelqu'un
-  // est réellement hors de sa place.
+  // Si certains joueurs courent encore vers leur marque (> 2.0 m), on attend au maximum 1 seconde supplémentaire
   if (e.placement) {
-    const pasPrets = e.pions.some((p) => p.surLeTerrain && p.sanction <= 0
-      && e.placement?.[p.id] && distance(p.pos, e.placement[p.id]) > 1.1);
-    if (pasPrets) { e.minuteur = 0.3; return; }
+    const essaisAttente = (e as unknown as { attenteCoupEnvoi?: number }).attenteCoupEnvoi ?? 0;
+    const pasPrets = essaisAttente < 4 && e.pions.some((p) => p.surLeTerrain && p.sanction <= 0
+      && e.placement?.[p.id] && distance(p.pos, e.placement[p.id]) > 2.0);
+    if (pasPrets) {
+      (e as unknown as { attenteCoupEnvoi?: number }).attenteCoupEnvoi = essaisAttente + 1;
+      e.minuteur = 0.25;
+      return;
+    }
+    delete (e as unknown as { attenteCoupEnvoi?: number }).attenteCoupEnvoi;
   }
   const camp = e.possession;
   const liste = surLeTerrain(e, camp);
   const botteur = liste.find((p) => p.buteur) ?? maillot(liste, 10) ?? liste[0];
   if (!botteur) return clorePeriode(e);
+  // Le botteur est positionné au centre pour frapper
+  botteur.pos = { x: MILIEU, y: AXE };
+  botteur.vitesse = { x: 0, y: 0 };
   const arrivee = e.cibleRenvoi ?? { x: MILIEU + sens(camp) * 30, y: AXE };
   botteur.stats.coupsDePied += 1;
   // Après le coup de pied, les receveurs gardent leur dispositif sous le
@@ -1801,6 +1808,11 @@ function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   const lancement = e.lancement;
   const suivant = lancement && lancement.index + 1 < lancement.chaine.length;
 
+  // Après la sirène, si on mène, on tape en touche pour sceller la victoire !
+  if (e.sirene && ecart(e, p.cote) > 0 && pression > 1.8) {
+    return taperAuPied(e, p, 'degagement');
+  }
+
   // Coup de pied prévu par le lancement (occupation, chandelle, dégagement) :
   // le botteur tape dès qu'il a le ballon et un peu d'air.
   if (lancement && lancement.type === 'pied' && lancement.botteur === p && pression > 2.4) {
@@ -2529,7 +2541,9 @@ function phaseMaul(e: EtatMatch, dt: number): void {
 // ---------------------------------------------------------------------------
 
 function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec): void {
-  if (e.sirene) return clorePeriode(e);
+  // Une période se termine sur ballon mort (touche, mêlée/en-avant, renvoi 22),
+  // mais JAMAIS sur une pénalité qui doit toujours pouvoir être disputée.
+  if (e.sirene && quoi !== 'penalite') return clorePeriode(e);
   e.possession = pour;
   e.porteur = null;
   e.vol = null;
@@ -3452,10 +3466,6 @@ function marquer(e: EtatMatch, cote: Cote, points: number): void {
 function reprendreJeu(
   e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?: number, excluPremierId?: string,
 ): void {
-  // Après la sirène, l'équipe qui mène met le ballon en touche : le match est
-  // terminé. Celle qui est menée continue de jouer.
-  if (e.sirene && ecart(e, e.possession) >= 0) return clorePeriode(e);
-
   // Le ballon est joué : le hors-jeu du coup de pied précédent est éteint.
   libererHorsJeu(e);
   const cote = e.possession;
@@ -3688,7 +3698,26 @@ function choisirLancement(
     };
   }
 
-  // ── 5. GESTION DE FIN DE MATCH ──────────────────────────────────────────
+  // ── 5. APRÈS LA SIRÈNE : botter en touche si on mène, ou tout donner si on perd ──
+  if (e.sirene) {
+    if (diff > 0) {
+      const botteur = dix ?? distributeur ?? liste[0];
+      return {
+        type: 'pied', chaine: [distributeur, botteur].filter(Boolean) as Pion[], index: 0,
+        intention: 'degagement', botteur,
+        libelle: 'botter en touche pour clore le match',
+      };
+    }
+    if (surnombre >= 1) {
+      return { type: 'large', chaine: chaineLarge, index: 0, libelle: 'dernière attaque au large' };
+    }
+    return {
+      type: 'pod', chaine: [distributeur, dix, percuteur].filter(Boolean) as Pion[], index: 0,
+      libelle: 'dernière charge désespérée',
+    };
+  }
+
+  // ── 5 bis. GESTION DE FIN DE MATCH ORDINAIRE ─────────────────────────────
   if (restantes <= 6 && diff > 7) {
     return {
       type: 'ras', chaine: [distributeur, percuteur].filter(Boolean) as Pion[], index: 0,
