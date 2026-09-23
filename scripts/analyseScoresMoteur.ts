@@ -7,11 +7,18 @@ const B = 'Stade Rochelais';
 const effA = effectifDuClub(A, 1);
 const effB = effectifDuClub(B, 1);
 
-function jouer(cle: string): { scoreA: number; scoreB: number; total: number; essaisA: number; essaisB: number; essaisTotal: number; cibleA: number; cibleB: number; cibleTotal: number } {
+function jouer(cle: string) {
   const m = jouerRencontre(A, B, 1, cle, null);
   const e = creerMatch(A, B, effA, effB, m.scoreD, m.scoreE, cle);
   let garde = 0;
   while (!e.fini && garde++ < 4000) avancer(e, 8);
+
+  const butsA = e.pions.filter(p => p.cote === 'A').reduce((s, p) => s + (p.stats.butsReussis || 0), 0);
+  const butsB = e.pions.filter(p => p.cote === 'B').reduce((s, p) => s + (p.stats.butsReussis || 0), 0);
+  const plaquagesA = e.pions.filter(p => p.cote === 'A').reduce((s, p) => s + (p.stats.plaquages || 0), 0);
+  const plaquagesB = e.pions.filter(p => p.cote === 'B').reduce((s, p) => s + (p.stats.plaquages || 0), 0);
+  const plaquagesManquesA = e.pions.filter(p => p.cote === 'A').reduce((s, p) => s + (p.stats.plaquagesManques || 0), 0);
+  const plaquagesManquesB = e.pions.filter(p => p.cote === 'B').reduce((s, p) => s + (p.stats.plaquagesManques || 0), 0);
 
   return {
     scoreA: e.scoreA,
@@ -23,11 +30,19 @@ function jouer(cle: string): { scoreA: number; scoreB: number; total: number; es
     cibleA: m.scoreD,
     cibleB: m.scoreE,
     cibleTotal: m.scoreD + m.scoreE,
+    butsTotal: butsA + butsB,
+    rucks: e.compteurs.rucks,
+    melees: e.compteurs.melees,
+    touches: e.compteurs.touches,
+    percees: e.compteurs.percees,
+    enAvants: e.compteurs.enAvants,
+    plaquages: plaquagesA + plaquagesB,
+    plaquagesManques: plaquagesManquesA + plaquagesManquesB,
   };
 }
 
-console.log('Simulation de 100 matchs en cours...');
-const N = 100;
+console.log('Simulation de 50 matchs en cours...');
+const N = 50;
 const resultats = [];
 for (let i = 0; i < N; i++) {
   resultats.push(jouer(`analyse#${i}`));
@@ -92,6 +107,25 @@ console.log(`  Moyenne cible : ${stCible.mean.toFixed(2)} pts (Médiane cible : 
 
 console.log('\nÉCART MOTEUR vs CIBLE :');
 console.log(`  Surplus moyen de points : +${(stTotal.mean - stCible.mean).toFixed(2)} pts (+${((stTotal.mean / stCible.mean - 1) * 100).toFixed(1)} %)`);
+
+console.log('\nINDICATEURS DE JEU TOP 14 (Moyennes par match) :');
+const stRucks = stats(resultats.map(r => r.rucks));
+const stMelees = stats(resultats.map(r => r.melees));
+const stTouches = stats(resultats.map(r => r.touches));
+const stPercees = stats(resultats.map(r => r.percees));
+const stEnAvants = stats(resultats.map(r => r.enAvants));
+const stPlaquages = stats(resultats.map(r => r.plaquages));
+const stPlaquagesM = stats(resultats.map(r => r.plaquagesManques));
+const stButs = stats(resultats.map(r => r.butsTotal));
+
+const tauxPlaquage = (stPlaquages.mean / (stPlaquages.mean + stPlaquagesM.mean) * 100);
+console.log(`  Rucks disputés       : ${stRucks.mean.toFixed(1)} / match (Cible Top 14: ~140-170)`);
+console.log(`  Mêlées ordonnées     : ${stMelees.mean.toFixed(1)} / match (Cible Top 14: ~12-16)`);
+console.log(`  Touches              : ${stTouches.mean.toFixed(1)} / match (Cible Top 14: ~22-28)`);
+console.log(`  Franchissements nets : ${stPercees.mean.toFixed(1)} / match (Cible Top 14: ~7-10)`);
+console.log(`  En-avants commis     : ${stEnAvants.mean.toFixed(1)} / match (Cible Top 14: ~8-14)`);
+console.log(`  Plaquages réussis    : ${stPlaquages.mean.toFixed(1)} / match (Taux réussite: ${tauxPlaquage.toFixed(1)} % | Cible Top 14: ~88-92 %)`);
+console.log(`  Pénalités réussies   : ${stButs.mean.toFixed(1)} / match (Cible Top 14: ~3.5-5.0)`);
 
 console.log('\nÉCHANTILLON DE 10 SCORES RÉELS DU MOTEUR :');
 resultats.slice(0, 10).forEach((r, idx) => {

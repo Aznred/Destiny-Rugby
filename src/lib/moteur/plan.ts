@@ -18,8 +18,8 @@ export interface Decomposition {
 
 // Proportions du rugby professionnel : ~6,6 points par essai marqué (essais
 // transformés à ~72 %), et 3 à 4 pénalités par équipe et par match.
-const POINTS_PAR_ESSAI = 6.6;
-const PART_PENALITES = 0.22;
+const POINTS_PAR_ESSAI = 6.7;
+const PART_PENALITES = 0.30;
 
 export function decomposer(total: number, rng: () => number): Decomposition {
   if (total <= 0) return { essaisTransformes: 0, essaisSecs: 0, penalites: 0 };
@@ -40,13 +40,10 @@ export function decomposer(total: number, rng: () => number): Decomposition {
       let cout = Math.abs(essais - essaisAttendus) * 1.15
         + Math.abs(c - penalitesAttendues) * 1.0;
       // Un essai sur quatre n'est pas transformé : au-delà, ça sonne faux.
-      if (essais > 0) cout += Math.abs(b / essais - 0.20) * 3.6;
-      // ⚠️ Trois pénalités par match, c'est déjà beaucoup — et surtout, au-delà
-      // le moteur n'obtient pas assez de fautes À PORTÉE pour les inscrire, et
-      // les points finissaient soldés à la sirène. Mesuré : 45 pénalités non
-      // tentées sur 30 matchs avant ce garde-fou.
-      if (c > 3) cout += (c - 3) * 2.6;
-      if (c > 5) cout += (c - 5) * 4;
+      if (essais > 0) cout += Math.abs(b / essais - 0.22) * 3.6;
+      // En Top 14, 2 à 4 pénalités par équipe est le standard professionnel.
+      if (c > 4) cout += (c - 4) * 2.2;
+      if (c > 6) cout += (c - 6) * 4;
       // Un match sans le moindre essai au-delà de 15 points est très rare.
       if (essais === 0 && total >= 15) cout += 6;
 

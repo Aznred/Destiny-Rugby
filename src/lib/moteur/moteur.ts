@@ -1522,7 +1522,7 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // défenseurs laissés derrière — dix sur quinze — ET au terrain réellement
   // gagné sur la phase : sans cette seconde condition, le simple retard du
   // rideau à la sortie du ruck comptait pour une percée.
-  if (!e.perceeSignalee && depasses >= 13 && pression > 10 && e.metresGagnesPhase > 8) {
+  if (!e.perceeSignalee && depasses >= 13 && pression > 11 && e.metresGagnesPhase > 16 && porteur.battu <= 0) {
     e.perceeSignalee = true;
     e.compteurs.percees += 1;
     porteur.stats.franchissements += 1;
@@ -1582,10 +1582,10 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const pDevant = pressionDevant(e, porteur);
   const inter = intervalle(e, porteur);
   const distSuivant = suivant ? distance(porteur.pos, suivant.pos) : 99;
-  const aDeLEspaceDevant = pDevant > 5.0 || inter >= 5.5 || (depasses >= 7 && pDevant > 3.8);
+  const aDeLEspaceDevant = (pDevant > 7.0 && depasses >= 9) || (inter >= 8.5 && pDevant > 6.0);
 
-  // Si le porteur a ouvert un intervalle ou laissé le rideau derrière, il file à l'essai !
-  if (!enEchappee && (inter >= 6.0 || (depasses >= 8 && pDevant > 6.0))) {
+  // Si le porteur a réellement percé le rideau avec du champ libre, il file à l'essai !
+  if (!enEchappee && ((depasses >= 9 && pDevant > 7.5) || (inter >= 8.5 && pDevant > 7.0))) {
     lancerEchappee(e, porteur);
   }
 
@@ -2171,7 +2171,7 @@ function resoudrePlaquage(
     // donner » : deux foulées plus loin, le pion refaisait une passe de
     // routine. Retour de jeu, mot pour mot : « nos actions n’ont aucun impact
     // dans le jeu ». Une percée dans un rideau OUVERT lance une échappée.
-    if (intervalle(e, porteur) >= 5.5 || pressionDevant(e, porteur) >= 6.0) {
+    if (pressionDevant(e, porteur) >= 7.5 && intervalle(e, porteur) >= 7.0) {
       lancerEchappee(e, porteur);
     } else {
       pousserElan(e, porteur.cote, POUSSEES.percee * 0.5);
@@ -3188,12 +3188,16 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   e.aplatissage = null;
 
   // 🛡️ DÉFENSE SUR LA LIGNE : Ballon tenu en-but si des défenseurs contestent l'aplatissage !
-  const defenseursEnBut = surLeTerrain(e, adverse(cote)).filter((p) => distance(p.pos, marqueur.pos) < 2.5 && p.battu <= 0);
+  const plan = planDe(e, cote);
+  const resteEssais = plan.essaisTransformes + plan.essaisSecs;
+  const rayonContest = resteEssais <= 0 ? 3.4 : 2.5;
+  const defenseursEnBut = surLeTerrain(e, adverse(cote)).filter((p) => distance(p.pos, marqueur.pos) < rayonContest && p.battu <= 0);
   if (defenseursEnBut.length > 0) {
     const rTenu = retard(e, cote);
     const forceDef = defenseursEnBut.reduce((acc, d) => acc + d.plaquage * 0.6 + d.puissance * 0.4, 0) / defenseursEnBut.length;
     const forceAtt = (marqueur.puissance * 0.6 + marqueur.evitement * 0.4) * (0.75 + marqueur.endurance / 400);
-    const probaTenu = borner(0.35 + (forceDef - forceAtt) / 220 + (defenseursEnBut.length > 1 ? 0.16 : 0) - rTenu * 0.30, 0.14, 0.72);
+    const baseTenu = resteEssais <= 0 ? 0.60 : 0.35;
+    const probaTenu = borner(baseTenu + (forceDef - forceAtt) / 220 + (defenseursEnBut.length > 1 ? 0.16 : 0) - rTenu * 0.30, 0.14, 0.88);
     if (e.rng() < probaTenu) {
       const defSauveur = defenseursEnBut[0];
       dire(e, 'jalon', adverse(cote), `🛑 SAUVETAGE HÉROÏQUE SUR LA LIGNE ! ${defSauveur.nom} et la défense se glissent sous le ballon : BALLON TENU EN-BUT !`, 0, true);
@@ -3653,10 +3657,10 @@ function choisirLancement(
   // On dégageait de ses 22 trois fois sur quatre : à ce rythme, la sortie de
   // camp devenait un réflexe et le match comptait près de 60 coups de pied.
   // 58 % laisse le jeu d'occupation lisible tout en autorisant les relances.
-  if (chezSoi && pousse < 0.32 && !(diff < 0 && restantes < 8)) {
+  if (chezSoi && pousse < 0.40 && !(diff < 0 && restantes < 8)) {
     const botteur = (dix && dix.pied > 55 ? dix : distributeur) ?? liste[0];
-    const chanceDegagement = tactique?.attaque === 'occupation' ? 0.88
-      : tactique?.attaque === 'large' ? 0.42 : tactique?.attaque === 'avants' ? 0.5 : 0.60;
+    const chanceDegagement = tactique?.attaque === 'occupation' ? 0.92
+      : tactique?.attaque === 'large' ? 0.55 : tactique?.attaque === 'avants' ? 0.65 : 0.74;
     if (r < chanceDegagement) {
       return {
         type: 'pied', chaine: [distributeur, botteur].filter(Boolean) as Pion[], index: 0,
@@ -3677,9 +3681,9 @@ function choisirLancement(
         intention: 'cinquanteVingtDeux', botteur, libelle: '50/22',
       };
     }
-    // Occupation depuis son camp : une phase sur huit, plus une sur cinq.
-    const occupation = tactique?.attaque === 'occupation' ? 0.29
-      : tactique?.attaque === 'large' ? 0.07 : 0.13;
+    // Occupation depuis son camp : jeu au pied territorial typique du Top 14
+    const occupation = tactique?.attaque === 'occupation' ? 0.42
+      : tactique?.attaque === 'large' ? 0.14 : 0.26;
     if (phases >= 2 && r < occupation - pousse * 0.08) {
       return {
         type: 'pied', chaine: [distributeur, botteur].filter(Boolean) as Pion[], index: 0,
@@ -3870,8 +3874,8 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
         y: AXE + (reussi ? 0 : (e.rng() < .5 ? -6 : 6)) }, 'drop', 2.1, .7);
     }
     case 'degagement': {
-      // Un dégagement ne trouve pas toujours la touche : trois fois sur quatre.
-      const trouve = e.rng() < 0.62 + p.pied / 400;
+      // Un dégagement trouve généralement la touche : ~85-90 % chez les pros.
+      const trouve = e.rng() < 0.85 + p.pied / 500;
       const arrivee = trouve
         ? { x: borner(p.pos.x + s * portee, LIGNE_A - 3, LIGNE_B + 3), y: p.pos.y < AXE ? -1 : LARGEUR + 1 }
         : {
@@ -3918,12 +3922,15 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
       return lancerVol(e, p, arrivee, 'transversale', 2.6, 0.9);
     }
     default: {
+      const versTouche = e.rng() < 0.44;
       const arrivee = {
-        x: borner(p.pos.x + s * portee, LIGNE_A + 2, LIGNE_B + 2),
-        y: borner(p.pos.y + (e.rng() * 22 - 11), 3, LARGEUR - 3),
+        x: borner(p.pos.x + s * portee, LIGNE_A + 2, LIGNE_B - 2),
+        y: versTouche
+          ? (p.pos.y < AXE ? -1 : LARGEUR + 1)
+          : borner(p.pos.y + (e.rng() * 22 - 11), 3, LARGEUR - 3),
       };
       dire(e, 'pied', p.cote, C.phrase(e.rng, C.PIED_OCCUPATION, { nom: p.nom }), 0, p.moi);
-      return lancerVol(e, p, arrivee, 'occupation', 3.0, 0.8);
+      return lancerVol(e, p, arrivee, versTouche ? 'degagement' : 'occupation', 3.0, 0.8);
     }
   }
 }
