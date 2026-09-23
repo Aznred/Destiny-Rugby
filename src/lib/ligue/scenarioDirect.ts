@@ -102,7 +102,8 @@ export function creerScenarioDirect(t: TerrainDirect): ScenarioDirect {
     'coupEnvoi', 'renvoi22', 'melee', 'touche', 'penalite', 'tirAuBut',
     'transformation', 'tmo', 'apresEssai', 'miTemps', 'fini',
   ]).has(type);
-  const forte = type === 'tmo' || type === 'tirAuBut' || type === 'transformation'
+  const forte = type === 'tmo'
+    || ((type === 'tirAuBut' || type === 'transformation') && !t.vol)
     || (!phaseArretee && (zone === 'enButAdverse' || zone === 'cinqAdverse'
       || progression >= 8 || vitessePorteur >= 7 || actionTranchante));
   const active = forte || zoneDangereuse || Boolean(t.vol) || (!phaseArretee && type !== 'jeuCourant');

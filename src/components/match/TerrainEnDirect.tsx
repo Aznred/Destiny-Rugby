@@ -133,6 +133,35 @@ const LIBELLES_COMBINAISON = {
   leurreDevant: 'Leurre devant · saut au fond',
 } as const;
 
+function tracerTrajectoires(vol: NonNullable<TerrainDirect['vol']>) {
+  const k = Math.min(1, Math.max(0, vol.ecoule / Math.max(0.01, vol.duree)));
+  const nbPoints = Math.max(4, Math.round(k * 20));
+  const pointsVol: string[] = [];
+  const pointsOmbre: string[] = [];
+  for (let i = 0; i <= nbPoints; i++) {
+    const u = (i / nbPoints) * k;
+    const x = vol.de.x + (vol.vers.x - vol.de.x) * u;
+    const y = vol.de.y + (vol.vers.y - vol.de.y) * u;
+    const h = vol.hauteur * Math.sin(Math.PI * u);
+    pointsVol.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${(y - h * 2.2).toFixed(2)}`);
+    pointsOmbre.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`);
+  }
+  let cheminAnticipe = '';
+  if (k < 0.98 && (vol.type === 'pied' || vol.intention === 'drop')) {
+    const nbAnticipe = Math.max(4, Math.round((1 - k) * 16));
+    const pointsAnticipe: string[] = [];
+    for (let i = 0; i <= nbAnticipe; i++) {
+      const u = k + (i / nbAnticipe) * (1 - k);
+      const x = vol.de.x + (vol.vers.x - vol.de.x) * u;
+      const y = vol.de.y + (vol.vers.y - vol.de.y) * u;
+      const h = vol.hauteur * Math.sin(Math.PI * u);
+      pointsAnticipe.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${(y - h * 2.2).toFixed(2)}`);
+    }
+    cheminAnticipe = pointsAnticipe.join(' ');
+  }
+  return { vol: pointsVol.join(' '), ombre: pointsOmbre.join(' '), anticipe: cheminAnticipe };
+}
+
 function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote, carton, modeDemo, pause, vitesseDemo }: Props) {
   const scene = useRef<HTMLDivElement>(null);
   const boite = useRef({ largeur: 1, hauteur: 1 });
@@ -483,13 +512,30 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
             redresser={vue?.redresser} hauteurMetres={hauteurSprite * .94} temps={tempsAnimation}
             couleur={(nomDomicile.length + nomExterieur.length) % 2 ? '#f4c542' : '#35b76d'} carton={carton} />
           {porteur ? dessiner(porteur) : null}
+          {affiche.vol && (() => {
+            const chemins = tracerTrajectoires(affiche.vol);
+            return (
+              <g className="cel-trajectoire-vol">
+                {chemins.ombre && (
+                  <path d={chemins.ombre} stroke="rgba(0,0,0,.24)" strokeWidth={Math.max(0.18, trait * 0.9)} fill="none" strokeDasharray="0.6 0.4" strokeLinecap="round" />
+                )}
+                {chemins.anticipe && (
+                  <path d={chemins.anticipe} stroke="rgba(255,235,140,.35)" strokeWidth={Math.max(0.2, trait * 1.0)} fill="none" strokeDasharray="0.9 0.9" />
+                )}
+                {chemins.vol && (
+                  <path d={chemins.vol} stroke="rgba(255,225,90,.85)" strokeWidth={Math.max(0.32, trait * 1.4)} fill="none" strokeLinecap="round" />
+                )}
+              </g>
+            );
+          })()}
           {!affiche.porteurId && affiche.conquete?.type !== 'touche' && <>
-            {b.h > 0.02 && <ellipse cx={b.x} cy={b.y} rx={rayonBallon * 0.62} ry={rayonBallon * 0.34} fill="rgba(0,0,0,.3)" />}
+            {b.h > 0.02 && <ellipse cx={b.x} cy={b.y} rx={rayonBallon * (0.62 + b.h * 0.04)} ry={rayonBallon * (0.34 + b.h * 0.02)} fill="rgba(0,0,0,.32)" />}
+            {b.h > 1.2 && <ellipse cx={b.x} cy={b.y - b.h * 2.2} rx={rayonBallon * (1.2 + b.h * 0.12)} ry={rayonBallon * (0.8 + b.h * 0.08)} fill="rgba(255,245,180,.25)" />}
             <g transform={`rotate(${rotationBallon.toFixed(1)} ${b.x} ${b.y - b.h * 2.2})`}>
               <ellipse
                 className="cel-ballon"
                 cx={b.x} cy={b.y - b.h * 2.2}
-                rx={rayonBallon * 0.72 + b.h * 0.055} ry={rayonBallon * 0.41 + b.h * 0.035}
+                rx={rayonBallon * 0.72 + b.h * 0.13} ry={rayonBallon * 0.41 + b.h * 0.08}
                 fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayonBallon * 0.16}
               />
               <path d={`M ${b.x - rayonBallon * .22} ${b.y - b.h * 2.2} L ${b.x + rayonBallon * .22} ${b.y - b.h * 2.2}`}

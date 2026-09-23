@@ -205,13 +205,24 @@ export function interpolerBallonDirect(
   u: number,
 ): BallonAfficheDirect {
   const t = borner01(u);
+  // Si le vol du relevé précédent n'avait pas encore touché le sol, on poursuit sa descente
+  if (a.vol && !b.vol && a.vol.ecoule < a.vol.duree) {
+    const reste = a.vol.duree - a.vol.ecoule;
+    const ecoule = a.vol.ecoule + t * (reste + 0.15);
+    if (ecoule <= a.vol.duree) {
+      return positionVol(a.vol, borner01(ecoule / a.vol.duree));
+    }
+  }
+
   // Quand l'arbitre replace le ballon pour une conquête, une transformation
   // ou un engagement, on ne dessine pas un faux coup de pied lent à travers le
   // terrain. La balle reste au lieu de l'action, puis rejoint son nouveau point
   // au sol pendant la fin de transition, en quelques images fluides.
   const replacement = a.phase !== b.phase && !b.vol && PHASES_REPLACEMENT_BALLON.has(b.phase);
   if (replacement) {
-    const debut = ballonAuReleve(a, new Map(a.pions.map((p) => [p.id, { x: p.x, y: p.y }])));
+    const debut = a.vol
+      ? { x: a.vol.vers.x, y: a.vol.vers.y, h: 0 }
+      : ballonAuReleve(a, new Map(a.pions.map((p) => [p.id, { x: p.x, y: p.y }])));
     const fin = ballonAuReleve(b, new Map(b.pions.map((p) => [p.id, { x: p.x, y: p.y }])));
     const k = adoucirDirect(borner01((t - 0.72) / 0.28));
     return { x: melanger(debut.x, fin.x, k), y: melanger(debut.y, fin.y, k), h: melanger(debut.h, fin.h, k) };

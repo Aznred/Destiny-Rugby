@@ -3012,16 +3012,22 @@ function lancerTrajectoireTir(e: EtatMatch, tir: TirEnCours, reussi: boolean): v
   const ligne = buteur.cote === 'A' ? LIGNE_B : LIGNE_A;
   const coteRate = e.rng() < 0.5 ? -1 : 1;
   const decalage = reussi
-    ? (e.rng() - 0.5) * 3.6
-    : coteRate * (4.2 + e.rng() * 5.5);
-  const distance = Math.hypot(ligne + s * 4 - de.x, AXE + decalage - de.y);
-  const duree = borner(1.25 + distance / 42, 1.45, 2.35);
+    ? (e.rng() - 0.5) * 3.2
+    : coteRate * (4.2 + e.rng() * 4.5);
+  // Point de chute dans l'en-but derrière les poteaux (12 à 15 m de recul) pour voir le ballon retomber au sol
+  const reculEnBut = 13 + e.rng() * 2.5;
+  const versX = borner(ligne + s * reculEnBut, 1.5, LONGUEUR - 1.5);
+  const vers = { x: versX, y: borner(AXE + decalage, 2, LARGEUR - 2) };
+  const distance = Math.hypot(vers.x - de.x, vers.y - de.y);
+  const duree = borner(1.35 + distance / 34, 1.65, 2.55);
+  // Hauteur calibrée pour franchir les barres à 4.5-6.5m du sol avant de redescendre
+  const hauteur = borner(5.8 + distance * 0.08, 6.8, 9.5);
   tir.reussi = reussi;
   tir.volLance = true;
   buteur.stats.coupsDePied += 1;
   poserVol(e, {
-    de: { ...de }, vers: { x: ligne + s * 4, y: AXE + decalage },
-    duree, ecoule: 0, hauteur: borner(4.8 + distance * 0.09, 5.5, 9),
+    de: { ...de }, vers,
+    duree, ecoule: 0, hauteur,
     type: 'pied', intention: 'drop', auteur: buteur, receveur: null,
   });
   e.porteur = null;
@@ -3046,26 +3052,39 @@ function phaseTirAuBut(e: EtatMatch): void {
     lancerTrajectoireTir(e, tir, reussi);
     return;
   }
-  if (e.vol && e.vol.ecoule < e.vol.duree) return;
+  // Le ballon est en vol : on attend qu'il termine son vol et retombe au sol
+  if (!tir.retombe) {
+    if (e.vol && e.vol.ecoule < e.vol.duree) return;
+    tir.retombe = true;
+    if (e.vol) e.ballon = { ...e.vol.vers };
+    e.vol = null;
+    const reussi = !!tir.reussi;
+    if (reussi) {
+      plan.penalites = Math.max(0, plan.penalites - 1);
+      buteur.stats.butsReussis += 1;
+      marquer(e, cote, 3);
+      buteur.stats.pointsAuPied = (buteur.stats.pointsAuPied ?? 0) + 3;
+      dire(e, 'but', cote, C.phrase(e.rng, C.PENALITE_BUT, {
+        nom: buteur.nom, distance: Math.round(d),
+      }), 3, buteur.moi);
+    } else {
+      dire(e, 'butRate', cote, C.phrase(e.rng, C.PENALITE_RATEE, {
+        nom: buteur.nom, distance: Math.round(d),
+      }), 0, buteur.moi);
+    }
+    // Pause visuelle : on voit le ballon retombé au sol derrière les poteaux
+    e.minuteur = 1.4;
+    return;
+  }
 
+  // Fin de la contemplation du ballon retombé : reprise du jeu
   const reussi = !!tir.reussi;
-  e.vol = null;
   e.tir = null;
   e.placement = null;
   if (reussi) {
-    plan.penalites = Math.max(0, plan.penalites - 1);
-    buteur.stats.butsReussis += 1;
-    marquer(e, cote, 3);
-    buteur.stats.pointsAuPied = (buteur.stats.pointsAuPied ?? 0) + 3;
-    dire(e, 'but', cote, C.phrase(e.rng, C.PENALITE_BUT, {
-      nom: buteur.nom, distance: Math.round(d),
-    }), 3, buteur.moi);
     if (e.sirene) return clorePeriode(e);
     return preparerCoupEnvoi(e, adverse(cote));
   }
-  dire(e, 'butRate', cote, C.phrase(e.rng, C.PENALITE_RATEE, {
-    nom: buteur.nom, distance: Math.round(d),
-  }), 0, buteur.moi);
   if (e.sirene) return clorePeriode(e);
   return arret(e, 'renvoi22', adverse(cote), {
     x: adverse(cote) === 'A' ? M22_A : M22_B, y: AXE,
@@ -3111,26 +3130,35 @@ function phaseTransformation(e: EtatMatch): void {
     lancerTrajectoireTir(e, tir, !!tir.reussi);
     return;
   }
-  if (e.vol && e.vol.ecoule < e.vol.duree) return;
+  // Le ballon est en vol : on attend qu'il termine son vol et retombe au sol
+  if (!tir.retombe) {
+    if (e.vol && e.vol.ecoule < e.vol.duree) return;
+    tir.retombe = true;
+    if (e.vol) e.ballon = { ...e.vol.vers };
+    e.vol = null;
+    const plan = planDe(e, cote);
+    if (tir.reussi) {
+      plan.essaisTransformes = Math.max(0, plan.essaisTransformes - 1);
+      tir.buteur.stats.butsReussis += 1;
+      marquer(e, cote, 2);
+      tir.buteur.stats.pointsAuPied = (tir.buteur.stats.pointsAuPied ?? 0) + 2;
+      dire(e, 'but', cote, C.phrase(e.rng, C.TRANSFORMATION, { nom: tir.buteur.nom }), 2, tir.buteur.moi);
+    } else {
+      plan.essaisSecs = Math.max(0, plan.essaisSecs - 1);
+      if (tir.contre) {
+        dire(e, 'butRate', cote, `Transformation contrée par ${tir.contre.nom} ! Pas de points pour ${nomClub(e, cote)}.`, 0, tir.buteur.moi || tir.contre.moi);
+      } else {
+        dire(e, 'butRate', cote, C.phrase(e.rng, C.TRANSFORMATION_RATEE, { nom: tir.buteur.nom }), 0, tir.buteur.moi);
+      }
+    }
+    // Pause visuelle : on voit le ballon retombé au sol derrière les poteaux
+    e.minuteur = 1.4;
+    return;
+  }
 
-  e.vol = null;
+  // Fin de la contemplation du ballon retombé : remise en jeu
   e.tir = null;
   e.placement = null;
-  const plan = planDe(e, cote);
-  if (tir.reussi) {
-    plan.essaisTransformes = Math.max(0, plan.essaisTransformes - 1);
-    tir.buteur.stats.butsReussis += 1;
-    marquer(e, cote, 2);
-    tir.buteur.stats.pointsAuPied = (tir.buteur.stats.pointsAuPied ?? 0) + 2;
-    dire(e, 'but', cote, C.phrase(e.rng, C.TRANSFORMATION, { nom: tir.buteur.nom }), 2, tir.buteur.moi);
-  } else {
-    plan.essaisSecs = Math.max(0, plan.essaisSecs - 1);
-    if (tir.contre) {
-      dire(e, 'butRate', cote, `Transformation contrée par ${tir.contre.nom} ! Pas de points pour ${nomClub(e, cote)}.`, 0, tir.buteur.moi || tir.contre.moi);
-    } else {
-      dire(e, 'butRate', cote, C.phrase(e.rng, C.TRANSFORMATION_RATEE, { nom: tir.buteur.nom }), 0, tir.buteur.moi);
-    }
-  }
   if (e.sirene) return clorePeriode(e);
   preparerCoupEnvoi(e, adverse(cote));
 }

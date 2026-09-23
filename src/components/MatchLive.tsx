@@ -790,8 +790,10 @@ export function MatchLive({
           y: borner(cible.y, moi.pos.y - marge, moi.pos.y + marge),
         };
       } else {
-        if (e.phase === 'aplatissage' || e.phase === 'tirAuBut' || e.phase === 'transformation') {
+        if (e.phase === 'aplatissage' || ((e.phase === 'tirAuBut' || e.phase === 'transformation') && !e.vol)) {
           cadrage = 'proche';
+        } else if ((e.phase === 'tirAuBut' || e.phase === 'transformation') && e.vol) {
+          cadrage = 'suivi';
         } else if (e.phase === 'jeuCourant' && e.porteur && Math.hypot(e.porteur.vitesse.x, e.porteur.vitesse.y) > 4) {
           cadrage = 'suivi';
         } else {
@@ -1311,9 +1313,28 @@ export function MatchLive({
                       redresser={vue?.redresser} hauteurMetres={hauteurSprite * .94} temps={tempsAnimation}
                       couleur={(e.clubA.length + e.clubB.length) % 2 ? '#f4c542' : '#35b76d'} carton={cartonArbitre} />
                     {monPion && surLeTerrain.includes(monPion) && pion(monPion)}
+                    {e.vol && (() => {
+                      const chemins = tracerTrajectoiresMatchLive(e.vol, r);
+                      return (
+                        <g className="ml-trajectoire-vol">
+                          {chemins.ombre && (
+                            <path d={chemins.ombre} stroke="rgba(0,0,0,.24)" strokeWidth={Math.max(0.18, rayon * 0.35)} fill="none" strokeDasharray="0.6 0.4" strokeLinecap="round" />
+                          )}
+                          {chemins.anticipe && (
+                            <path d={chemins.anticipe} stroke="rgba(255,235,140,.35)" strokeWidth={Math.max(0.2, rayon * 0.4)} fill="none" strokeDasharray="0.9 0.9" />
+                          )}
+                          {chemins.vol && (
+                            <path d={chemins.vol} stroke="rgba(255,225,90,.85)" strokeWidth={Math.max(0.32, rayon * 0.5)} fill="none" strokeLinecap="round" />
+                          )}
+                        </g>
+                      );
+                    })()}
                     {!terrainSprites.porteurId && e.conquete?.type !== 'touche' && <>
                       {ballon.h > 0.02 && (
-                        <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * 0.58} ry={rayon * 0.32} fill="rgba(0,0,0,.3)" />
+                        <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * (0.58 + ballon.h * 0.04)} ry={rayon * (0.32 + ballon.h * 0.02)} fill="rgba(0,0,0,.32)" />
+                      )}
+                      {ballon.h > 1.2 && (
+                        <ellipse cx={ballon.x} cy={ballon.y - ballon.h * 2.2} rx={rayon * (1.2 + ballon.h * 0.12)} ry={rayon * (0.8 + ballon.h * 0.08)} fill="rgba(255,245,180,.25)" />
                       )}
                       <g transform={`rotate(${rotationBallon.toFixed(1)} ${ballon.x} ${ballon.y - ballon.h * 2.2})`}>
                         <ellipse
@@ -2011,4 +2032,33 @@ function positionBallonInterpolee(e: EtatMatch, r: number): { x: number; y: numb
     };
   }
   return { x: e.ballon.x, y: e.ballon.y, h: 0 };
+}
+
+function tracerTrajectoiresMatchLive(vol: { de: Vec; vers: Vec; hauteur: number; ecoule: number; duree: number; type: string; intention?: string }, r: number) {
+  const k = Math.min(1, Math.max(0, (vol.ecoule + r) / Math.max(0.01, vol.duree)));
+  const nbPoints = Math.max(4, Math.round(k * 20));
+  const pointsVol: string[] = [];
+  const pointsOmbre: string[] = [];
+  for (let i = 0; i <= nbPoints; i++) {
+    const u = (i / nbPoints) * k;
+    const x = vol.de.x + (vol.vers.x - vol.de.x) * u;
+    const y = vol.de.y + (vol.vers.y - vol.de.y) * u;
+    const h = vol.hauteur * Math.sin(Math.PI * u);
+    pointsVol.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${(y - h * 2.2).toFixed(2)}`);
+    pointsOmbre.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`);
+  }
+  let cheminAnticipe = '';
+  if (k < 0.98 && (vol.type === 'pied' || vol.intention === 'drop')) {
+    const nbAnticipe = Math.max(4, Math.round((1 - k) * 16));
+    const pointsAnticipe: string[] = [];
+    for (let i = 0; i <= nbAnticipe; i++) {
+      const u = k + (i / nbAnticipe) * (1 - k);
+      const x = vol.de.x + (vol.vers.x - vol.de.x) * u;
+      const y = vol.de.y + (vol.vers.y - vol.de.y) * u;
+      const h = vol.hauteur * Math.sin(Math.PI * u);
+      pointsAnticipe.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${(y - h * 2.2).toFixed(2)}`);
+    }
+    cheminAnticipe = pointsAnticipe.join(' ');
+  }
+  return { vol: pointsVol.join(' '), ombre: pointsOmbre.join(' '), anticipe: cheminAnticipe };
 }

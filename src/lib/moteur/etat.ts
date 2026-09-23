@@ -510,6 +510,8 @@ export interface EtatMatch {
     contre?: Pion | null;
     /** Routine / rituel de préparation au tee du buteur. */
     routine?: import('./routinesButeur').RoutineButeur;
+    /** Le ballon a terminé son vol et a atterri au sol derrière les poteaux. */
+    retombe?: boolean;
   } | null;
   penalite: { pour: Cote; lieu: Vec; motif: string } | null;
 
