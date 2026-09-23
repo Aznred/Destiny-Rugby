@@ -1,6 +1,16 @@
+import type { PosteId } from '../../types.js';
 import type { PackCarriere } from './typesCarriere.js';
 
-export interface EditionJoueur { note: number; potentiel: number; photo?: string; nation?: string; clubReel?: string; championnat?: string }
+export interface EditionJoueur {
+  note: number;
+  potentiel: number;
+  photo?: string;
+  nation?: string;
+  clubReel?: string;
+  championnat?: string;
+  poste?: PosteId;
+  postesSecondaires?: PosteId[];
+}
 export interface CatalogueAdmin {
   revision: number;
   /** Les packs spéciaux ne tournent dans les boutiques que si Kiri l'active. */

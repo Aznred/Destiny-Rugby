@@ -266,7 +266,22 @@ export function catalogueMondialCarriere(): readonly SourceCarte[] {
   const connu = cataloguesAdmin.get(config); if (connu) return connu;
   const resultat = catalogueBaseCarriere().map(source => {
     const edition = config.joueurs[source.sourceId];
-    return edition ? { ...source, ...edition, rarete: rareteCarriere(edition.note), statistiques: statistiquesCarte(edition.note, source.famille, source.sourceId) } : source;
+    if (!edition) return source;
+    const poste = edition.poste ?? source.poste;
+    const famille = edition.poste ? POSTE_PAR_ID[edition.poste].famille : source.famille;
+    const note = edition.note;
+    const postesSecondaires = edition.postesSecondaires !== undefined
+      ? [...edition.postesSecondaires]
+      : source.postesSecondaires ? [...source.postesSecondaires] : undefined;
+    return {
+      ...source,
+      ...edition,
+      poste,
+      famille,
+      postesSecondaires,
+      rarete: rareteCarriere(note),
+      statistiques: statistiquesCarte(note, famille, source.sourceId),
+    };
   });
   cataloguesAdmin.set(config, resultat); return resultat;
 }

@@ -84,6 +84,102 @@
 .atelier-kiri button:focus-visible { outline: 2px solid var(--or-400); outline-offset: 2px; }
 .ak-recherche { max-width: 35rem; padding: .8rem; }
 
+.ak-postes-secondaires {
+  margin-bottom: .95rem;
+  padding: .75rem;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon-controle);
+  background: color-mix(in srgb, var(--surface) 86%, #000);
+}
+.ak-postes-titre {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: .25rem;
+}
+.ak-postes-titre label {
+  margin-bottom: 0;
+}
+.ak-postes-titre em {
+  font-style: normal;
+  color: var(--or-400);
+  margin-left: .35rem;
+}
+.ak-btn-texte {
+  background: transparent;
+  border: 0;
+  color: var(--brume);
+  font-size: .68rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+.ak-btn-texte:hover {
+  color: #ff9b91;
+}
+.ak-note-sec {
+  display: block;
+  margin-bottom: .55rem;
+  color: var(--brume);
+  font-size: .68rem;
+}
+.ak-chips-postes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+.ak-chip-poste {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .32rem .55rem;
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon-controle);
+  background: color-mix(in srgb, var(--surface) 72%, #000);
+  color: var(--brume);
+  font: 700 .7rem/1.2 var(--police-forte);
+  cursor: pointer;
+  transition: all .15s ease;
+  user-select: none;
+}
+.ak-chip-poste b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 48%, #000);
+  color: var(--craie);
+  font-size: .62rem;
+  flex-shrink: 0;
+}
+.ak-chip-poste span {
+  white-space: nowrap;
+}
+.ak-chip-poste .ak-check {
+  font-style: normal;
+  font-size: .65rem;
+  color: var(--or-400);
+  font-weight: 900;
+}
+.ak-chip-poste:hover {
+  border-color: color-mix(in srgb, var(--or-400) 45%, var(--bordure));
+  color: var(--craie);
+  background: color-mix(in srgb, var(--surface) 85%, #000);
+}
+.ak-chip-poste.actif {
+  border-color: var(--or-400);
+  background: color-mix(in srgb, var(--or-500) 18%, var(--surface));
+  color: var(--or-400);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--or-400) 30%, transparent);
+}
+.ak-chip-poste.actif b {
+  background: var(--or-400);
+  color: #1a160d;
+  font-weight: 900;
+}
+
 @media (max-width: 760px) {
   .ak-grille { grid-template-columns: 1fr; }
   .ak-liste { max-height: 16rem; }

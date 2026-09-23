@@ -3,6 +3,8 @@ import { CATALOGUE_ADMIN_VIDE, catalogueAdmin, fournirCatalogueAdmin, type Catal
 import { bandesGaranties, carteDansPack, catalogueBaseCarriere, catalogueMondialCarriere, packsCatalogueAdmin, RARETES_CARRIERE } from '../src/lib/ligue/catalogueCarriere.js';
 import type { PackCarriere, RareteCarriere } from '../src/lib/ligue/typesCarriere.js';
 import type { StockageAtelier } from './atelierStockage.js';
+import { POSTES } from '../src/data/rugby.js';
+import type { PosteId } from '../src/types.js';
 
 export const contexteAtelier = new AsyncLocalStorage<CatalogueAdmin>();
 fournirCatalogueAdmin(() => contexteAtelier.getStore() ?? CATALOGUE_ADMIN_VIDE);
@@ -97,7 +99,31 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
     const clubDemande=j.clubReel===undefined?source.clubReel:texte(j.clubReel,100);
     const club=catalogueBaseCarriere().find(c=>c.clubReel===clubDemande);
     if(!club) refuser('Club inconnu dans le catalogue.');
-    const edition: EditionJoueur={note:entier(j.note,20,99),potentiel:entier(j.potentiel,20,99),photo:validerPhoto(j.photo),nation,clubReel:club.clubReel,championnat:club.championnat};
+    let poste: PosteId | undefined = undefined;
+    if (j.poste !== undefined) {
+      const pStr = String(j.poste);
+      if (!POSTES.some(p => p.id === pStr)) refuser('Poste invalide.');
+      poste = pStr as PosteId;
+    }
+    const posteActuel = poste ?? source.poste;
+    let postesSecondaires: PosteId[] | undefined = undefined;
+    if (j.postesSecondaires !== undefined) {
+      if (!Array.isArray(j.postesSecondaires)) refuser('Postes secondaires invalides.');
+      const tousPostes = new Set<string>(POSTES.map(p => p.id));
+      const nettoyes = [...new Set(j.postesSecondaires.map(p => String(p)).filter(p => tousPostes.has(p) && p !== posteActuel))] as PosteId[];
+      if (nettoyes.length > 14) refuser('Trop de postes secondaires.');
+      postesSecondaires = nettoyes;
+    }
+    const edition: EditionJoueur = {
+      note: entier(j.note, 20, 99),
+      potentiel: entier(j.potentiel, 20, 99),
+      photo: validerPhoto(j.photo),
+      nation,
+      clubReel: club.clubReel,
+      championnat: club.championnat,
+      ...(poste ? { poste } : {}),
+      ...(postesSecondaires !== undefined ? { postesSecondaires } : {}),
+    };
     if(edition.potentiel<edition.note) refuser('Le potentiel doit être au moins égal au GEN.');
     suivant.joueurs[id]=edition;
     if(Object.keys(suivant.joueurs).length>2000) refuser('Maximum de 2 000 joueurs personnalisés.');

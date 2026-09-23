@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
+import type { PosteId } from '../types';
+import { nomPoste, POSTES, POSTE_PAR_ID } from '../data/rugby';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
 import './AtelierKiri.css';
 
@@ -26,7 +28,7 @@ export function AtelierKiri() {
   const sauver=async(operation:'pack'|'joueur')=>{
     if(!donnees)return;setOccupe(true);setErreur('');setMessage('');
     try {
-      const retour=await requete(q,{action:'atelier',operation,revision:(operation==='pack'?revisionPack:revisionJoueur)??donnees.revision,...(operation==='pack'?{pack}:{sourceId:joueur?.sourceId,joueur:{note:joueur?.note,potentiel:joueur?.potentiel,photo:joueur?.photo,nation:joueur?.nation,clubReel:joueur?.clubReel}})});
+      const retour=await requete(q,{action:'atelier',operation,revision:(operation==='pack'?revisionPack:revisionJoueur)??donnees.revision,...(operation==='pack'?{pack}:{sourceId:joueur?.sourceId,joueur:{note:joueur?.note,potentiel:joueur?.potentiel,photo:joueur?.photo,nation:joueur?.nation,clubReel:joueur?.clubReel,poste:joueur?.poste,postesSecondaires:joueur?.postesSecondaires??[]}})});
       if(operation==='pack')setRevisionPack(retour.revision);else setRevisionJoueur(retour.revision);
       setDonnees(d=>d?{...d,revision:retour.revision}:d);setActualisation(n=>n+1);
       setMessage('Enregistré pour toutes les ligues. Les changements apparaissent à leur prochaine actualisation.');
@@ -80,7 +82,214 @@ export function AtelierKiri() {
       {pack.filtre&&Object.keys(pack.filtre).length>0&&<p className="ak-note">Filtres : {[pack.filtre.categorie, ...(pack.filtre.championnats??[]), ...(pack.filtre.pays??[]), ...(pack.filtre.nations??[]), ...(pack.filtre.familles??[]).map(f=>f.replaceAll('_',' ')), pack.filtre.ageMin?`À partir de ${pack.filtre.ageMin} ans`:null, pack.filtre.ageMax?`Jusqu’à ${pack.filtre.ageMax} ans`:null, pack.filtre.horsFrance?'Hors France':null].filter(Boolean).join(' · ')||'Tous les joueurs'} <button type="button" onClick={()=>setPack({...pack,filtre:undefined})}>Retirer les filtres</button></p>}
       <div className="ak-resume"><b>{pack.nom}</b><span>{pack.cartes} cartes · {pack.prix.toLocaleString('fr-FR')} OVA</span><p>{pack.promesse}</p></div><div className="ak-actions-pack"><button className="btn principal" disabled={Math.abs(total-100)>.001}>{occupe?'Enregistrement…':'Enregistrer pour toutes les ligues'}</button>{pack.id.startsWith('kiri-')&&donnees.packs.some(p=>p.id===pack.id)&&<button type="button" className="btn ak-supprimer" disabled={occupe} onClick={()=>void supprimerPack()}>Supprimer ce pack</button>}</div><p className="ak-note">Les nouveaux packs Kiri restent dans la liste de l’Atelier jusqu’à leur suppression.</p></fieldset></form></div>:<>
       <label className="ak-recherche">Rechercher un joueur ou un club<input type="search" value={q} placeholder="Nom du joueur, club…" onChange={e=>setQ(e.target.value)}/></label><p className="ak-note">{donnees.total.toLocaleString('fr-FR')} résultats · 40 affichés maximum, précise la recherche.</p>
-      <div className="ak-grille"><aside className="ak-liste">{donnees.joueurs.map(j=><button key={j.sourceId} disabled={occupe} className={joueur?.sourceId===j.sourceId?'selectionne':''} onClick={()=>{setJoueur(structuredClone(j));setRevisionJoueur(donnees.revision);setMessage('');}}><b>{j.nom} <em>{j.note}</em></b><small>{j.clubReel} · {j.championnat}</small></button>)}{!donnees.joueurs.length&&<p>Aucun joueur trouvé.</p>}</aside>{joueur?<form onSubmit={soumettre('joueur')}><fieldset disabled={occupe}><legend>{joueur.nom}</legend><div className="ak-joueur"><div><label>GEN du joueur<input required type="number" min={20} max={99} value={joueur.note} onChange={e=>{const note=Number(e.target.value);setJoueur({...joueur,note,potentiel:Math.max(note,joueur.potentiel)});}}/></label><label>Potentiel<input required type="number" min={joueur.note} max={99} value={joueur.potentiel} onChange={e=>setJoueur({...joueur,potentiel:Number(e.target.value)})}/></label><label>Nation du joueur<select required value={joueur.nation} onChange={e=>setJoueur({...joueur,nation:e.target.value})}>{donnees.nations.map(n=><option key={n}>{n}</option>)}</select></label><label>Club du joueur<select required value={joueur.clubReel} onChange={e=>{const club=donnees.clubs.find(c=>c.nom===e.target.value);setJoueur({...joueur,clubReel:e.target.value,championnat:club?.championnat??joueur.championnat});}}>{donnees.clubs.map(c=><option key={c.nom} value={c.nom}>{c.nom} · {c.championnat}</option>)}</select></label><label>Importer une photo<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>void photo(e.target.files?.[0])}/></label><label>Ou adresse HTTPS de la photo<input value={joueur.photo?.startsWith('data:')?'':joueur.photo??''} placeholder={joueur.photo?.startsWith('data:')?'Photo importée':'https://…'} onChange={e=>setJoueur({...joueur,photo:e.target.value})}/></label></div><div className="ak-apercu"><CarteJoueurEnLigne key={`${joueur.sourceId}:${joueur.photo}:${joueur.clubReel}`} carte={{...joueur,statistiques:statistiquesCarte(joueur.note,joueur.famille,joueur.sourceId),rarete:rarete(joueur.note),id:'apercu-admin',proprietaire:null,fatigue:0,matchs:0,essais:0,clubs:[]}}/><small>Aperçu · club, nation et rareté mis à jour</small></div></div><button className="btn principal">{occupe?'Enregistrement…':'Enregistrer ce joueur dans toutes les ligues'}</button></fieldset></form>:<div className="ak-vide">Sélectionne un joueur pour modifier sa carte.</div>}</div>
+      <div className="ak-grille">
+        <aside className="ak-liste">
+          {donnees.joueurs.map((j) => (
+            <button
+              key={j.sourceId}
+              disabled={occupe}
+              className={joueur?.sourceId === j.sourceId ? 'selectionne' : ''}
+              onClick={() => {
+                setJoueur(structuredClone(j));
+                setRevisionJoueur(donnees.revision);
+                setMessage('');
+              }}
+            >
+              <b>
+                {j.nom} <em>{j.note}</em>
+              </b>
+              <small>
+                N° {POSTE_PAR_ID[j.poste]?.numero ?? ''} · {nomPoste(j.poste)} · {j.clubReel}
+                {j.postesSecondaires && j.postesSecondaires.length > 0 && (
+                  <> · 2e : {j.postesSecondaires.map((p) => POSTE_PAR_ID[p]?.numero ?? p).join('/')}</>
+                )}
+              </small>
+            </button>
+          ))}
+          {!donnees.joueurs.length && <p>Aucun joueur trouvé.</p>}
+        </aside>
+        {joueur ? (
+          <form onSubmit={soumettre('joueur')}>
+            <fieldset disabled={occupe}>
+              <legend>{joueur.nom}</legend>
+              <div className="ak-joueur">
+                <div>
+                  <div className="ak-champs">
+                    <label>
+                      GEN du joueur
+                      <input
+                        required
+                        type="number"
+                        min={20}
+                        max={99}
+                        value={joueur.note}
+                        onChange={(e) => {
+                          const note = Number(e.target.value);
+                          setJoueur({ ...joueur, note, potentiel: Math.max(note, joueur.potentiel) });
+                        }}
+                      />
+                    </label>
+                    <label>
+                      Potentiel
+                      <input
+                        required
+                        type="number"
+                        min={joueur.note}
+                        max={99}
+                        value={joueur.potentiel}
+                        onChange={(e) => setJoueur({ ...joueur, potentiel: Number(e.target.value) })}
+                      />
+                    </label>
+                  </div>
+                  <div className="ak-champs">
+                    <label>
+                      Nation du joueur
+                      <select
+                        required
+                        value={joueur.nation}
+                        onChange={(e) => setJoueur({ ...joueur, nation: e.target.value })}
+                      >
+                        {donnees.nations.map((n) => (
+                          <option key={n}>{n}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Club du joueur
+                      <select
+                        required
+                        value={joueur.clubReel}
+                        onChange={(e) => {
+                          const club = donnees.clubs.find((c) => c.nom === e.target.value);
+                          setJoueur({
+                            ...joueur,
+                            clubReel: e.target.value,
+                            championnat: club?.championnat ?? joueur.championnat,
+                          });
+                        }}
+                      >
+                        {donnees.clubs.map((c) => (
+                          <option key={c.nom} value={c.nom}>
+                            {c.nom} · {c.championnat}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    Poste principal
+                    <select
+                      value={joueur.poste}
+                      onChange={(e) => {
+                        const p = e.target.value as PosteId;
+                        const sec = (joueur.postesSecondaires ?? []).filter((s) => s !== p);
+                        setJoueur({
+                          ...joueur,
+                          poste: p,
+                          famille: POSTE_PAR_ID[p]?.famille ?? joueur.famille,
+                          postesSecondaires: sec,
+                        });
+                      }}
+                    >
+                      {POSTES.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          N° {p.numero} · {p.nom} ({p.categorie})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="ak-postes-secondaires">
+                    <div className="ak-postes-titre">
+                      <label>
+                        Postes secondaires{' '}
+                        <em>
+                          ({(joueur.postesSecondaires ?? []).length} sélectionné{(joueur.postesSecondaires ?? []).length > 1 ? 's' : ''})
+                        </em>
+                      </label>
+                      {(joueur.postesSecondaires ?? []).length > 0 && (
+                        <button
+                          type="button"
+                          className="ak-btn-texte"
+                          onClick={() => setJoueur({ ...joueur, postesSecondaires: [] })}
+                        >
+                          Tout décocher
+                        </button>
+                      )}
+                    </div>
+                    <small className="ak-note-sec">
+                      Clique sur un poste pour l'ajouter ou le retirer des postes secondaires :
+                    </small>
+                    <div className="ak-chips-postes">
+                      {POSTES.filter((p) => p.id !== joueur.poste).map((p) => {
+                        const actif = (joueur.postesSecondaires ?? []).includes(p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className={`ak-chip-poste ${actif ? 'actif' : ''}`}
+                            title={actif ? `Retirer ${p.nom} des postes secondaires` : `Ajouter ${p.nom} comme poste secondaire`}
+                            onClick={() => {
+                              const actuels = joueur.postesSecondaires ?? [];
+                              const nouveaux = actif
+                                ? actuels.filter((id) => id !== p.id)
+                                : [...actuels, p.id];
+                              setJoueur({ ...joueur, postesSecondaires: nouveaux });
+                            }}
+                          >
+                            <b>{p.numero}</b>
+                            <span>{p.nom}</span>
+                            {actif && <i className="ak-check">✓</i>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="ak-champs">
+                    <label>
+                      Importer une photo
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => void photo(e.target.files?.[0])}
+                      />
+                    </label>
+                    <label>
+                      Adresse HTTPS de la photo
+                      <input
+                        value={joueur.photo?.startsWith('data:') ? '' : (joueur.photo ?? '')}
+                        placeholder={joueur.photo?.startsWith('data:') ? 'Photo importée' : 'https://…'}
+                        onChange={(e) => setJoueur({ ...joueur, photo: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                </div>
+                <div className="ak-apercu">
+                  <CarteJoueurEnLigne
+                    key={`${joueur.sourceId}:${joueur.photo}:${joueur.clubReel}:${joueur.poste}:${(joueur.postesSecondaires ?? []).join(',')}`}
+                    carte={{
+                      ...joueur,
+                      statistiques: statistiquesCarte(joueur.note, joueur.famille, joueur.sourceId),
+                      rarete: rarete(joueur.note),
+                      id: 'apercu-admin',
+                      proprietaire: null,
+                      fatigue: 0,
+                      matchs: 0,
+                      essais: 0,
+                      clubs: [],
+                    }}
+                  />
+                  <small>Aperçu · carte FUT mise à jour en direct</small>
+                </div>
+              </div>
+              <button className="btn principal">
+                {occupe ? 'Enregistrement…' : 'Enregistrer ce joueur dans toutes les ligues'}
+              </button>
+            </fieldset>
+          </form>
+        ) : (
+          <div className="ak-vide">Sélectionne un joueur pour modifier sa carte.</div>
+        )}
+      </div>
     </>}
   </section>;
 }

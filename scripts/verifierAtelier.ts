@@ -43,9 +43,12 @@ try {
   const avant=structuredClone(joueur);
   const nationInitiale=joueur.nation,nationCible=initial.donnees.nations.find((n:string)=>n!==nationInitiale) as string;
   const clubCible=initial.donnees.clubs.find((c:{nom:string})=>c.nom!==joueur.clubReel) as {nom:string;championnat:string};
-  const edition={action:'atelier',operation:'joueur',revision:0,sourceId:joueur.sourceId,joueur:{note:94,potentiel:96,photo:'https://example.org/photo.webp',nation:nationCible,clubReel:clubCible.nom}};
+  const posteSec1 = joueur.poste === 'arriere' ? 'ailier_gauche' : 'arriere';
+  const posteSec2 = joueur.poste === 'demi_ouverture' ? 'premier_centre' : 'demi_ouverture';
+  const edition={action:'atelier',operation:'joueur',revision:0,sourceId:joueur.sourceId,joueur:{note:94,potentiel:96,photo:'https://example.org/photo.webp',nation:nationCible,clubReel:clubCible.nom,postesSecondaires:[posteSec1,posteSec2]}};
   assert.equal((await appel(kiri,{...edition,joueur:{...edition.joueur,note:101}})).statut,400);
   assert.equal((await appel(kiri,{...edition,joueur:{...edition.joueur,clubReel:'Club inventé'}})).statut,400);
+  assert.equal((await appel(kiri,{...edition,joueur:{...edition.joueur,postesSecondaires:'non-tableau'}})).statut,400);
   assert.equal((await appel(kiri,edition)).statut,200);
   assert.equal((await appel(kiri,edition)).statut,400,'Révision périmée refusée');
   assert.throws(()=>validerPhoto('javascript:alert(1)'));
@@ -53,15 +56,19 @@ try {
   assert.throws(()=>validerPhoto('/photos/../../.env'));
   const miseAJour=await lireLigue(l1.id,chaude.version);
   assert.equal(miseAJour.cartes.find((c:any)=>c.sourceId===joueur.sourceId).note,94,'La lecture conditionnelle ne masque pas une édition globale');
+  assert.deepEqual(miseAJour.cartes.find((c:any)=>c.sourceId===joueur.sourceId).postesSecondaires,[posteSec1,posteSec2],'Postes secondaires propagés à la ligue chaude');
   assert.equal((await lireLigue(l2.id)).cartes.find((c:any)=>c.sourceId===joueur.sourceId).note,94);
+  assert.deepEqual((await lireLigue(l2.id)).cartes.find((c:any)=>c.sourceId===joueur.sourceId).postesSecondaires,[posteSec1,posteSec2]);
   const config=await db.atelier!.lire();
   assert.equal(stockageFichier(fichier) && (await stockageFichier(fichier).atelier!.lire()).revision,1,'Persistance après redémarrage');
   contexteAtelier.run(config,()=>{
     const nouveau=catalogueMondialCarriere().find(c=>c.sourceId===joueur.sourceId)!;
     assert.equal(nouveau.note,94);assert.equal(nouveau.rarete,'star');assert.equal(nouveau.clubReel,clubCible.nom);assert.equal(nouveau.championnat,clubCible.championnat);
+    assert.deepEqual(nouveau.postesSecondaires,[posteSec1,posteSec2]);
     for(const l of [l1,l2]) {
       const resultat=avancerCarriere(l,now,'test');const carte=resultat.cartes.find(c=>c.sourceId===joueur.sourceId)!;
       assert.equal(carte.note,94);assert.equal(carte.photo,edition.joueur.photo);assert.equal(carte.nation,nationCible);assert.equal(carte.clubReel,clubCible.nom);assert.equal(carte.championnat,clubCible.championnat);assert.equal(carte.proprietaire,l.clubs[0].id);assert.equal(carte.matchs,avant.matchs);
+      assert.deepEqual(carte.postesSecondaires,[posteSec1,posteSec2]);
       assert.equal(resultat.catalogueRevision,1);
     }
     assert.ok(rayonDePack('star',{id:'test'}).some(c=>c.sourceId===joueur.sourceId));
