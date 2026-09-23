@@ -6185,6 +6185,38 @@ img, svg, canvas { max-width: 100%; }
 .ml-evenement-essai { border-color: #70e29a; }.ml-evenement-essai b { color: #93f2b3; }
 .ml-evenement-carton { border-color: #ffe05c; }.ml-evenement-carton b { color: #ffe56d; }
 
+@media (max-width: 650px) {
+  .ml-evenement-terrain {
+    top: 7px;
+    width: auto;
+    max-width: calc(100% - 14px);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 16px;
+    border-width: 1px;
+    border-left-width: 4px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.65);
+    white-space: nowrap;
+  }
+  .ml-evenement-terrain b {
+    font-size: 10.5px;
+    letter-spacing: .05em;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .ml-evenement-terrain span {
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 175px;
+  }
+}
+
 .ml-hud-haut {
   position: absolute;
   top: 0.45rem;

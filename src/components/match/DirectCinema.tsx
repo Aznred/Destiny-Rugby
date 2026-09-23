@@ -9,15 +9,15 @@ const heure = (s: number) =>
   `${Math.floor(s / 60).toString().padStart(2, '0')}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
 const libelleMoment = (type: string, texte: string) =>
-  type === 'essai' ? 'ESSAI'
-    : type === 'carton' ? (/rouge/i.test(texte) ? 'CARTON ROUGE' : 'CARTON JAUNE')
-      : type === 'penalite' || type === 'faute' ? 'PÉNALITÉ'
-        : type === 'but' ? 'TIR RÉUSSI'
-          : type === 'butRate' ? 'TIR MANQUÉ'
-            : type === 'blessure' ? 'BLESSURE'
-              : type === 'remplacement' ? 'REMPLACEMENT'
-                : type === 'franchissement' ? 'FRANCHISSEMENT'
-                  : 'ACTION IMPORTANTE';
+  type === 'essai' ? '🏉 ESSAI'
+    : type === 'carton' ? (/rouge/i.test(texte) ? '🟥 CARTON ROUGE' : '🟨 CARTON JAUNE')
+      : type === 'penalite' || type === 'faute' ? '⚖️ PÉNALITÉ'
+        : type === 'but' ? '🎯 TIR RÉUSSI'
+          : type === 'butRate' ? '❌ TIR MANQUÉ'
+            : type === 'blessure' ? '🚑 BLESSURE'
+              : type === 'remplacement' ? '🔄 REMPLACEMENT'
+                : type === 'franchissement' ? '⚡ FRANCHISSEMENT'
+                  : '⚡ ACTION IMPORTANTE';
 
 export function DirectCinema({
   match: m,
@@ -78,6 +78,9 @@ export function DirectCinema({
           : 'COMMENTAIRE EN DIRECT';
 
   const isTmo = Boolean((m.terrain?.phase === 'tmo' || m.terrain?.tmo?.actif) && m.terrain?.tmo);
+  const alerteVif = Boolean(momentVif && ageMoment <= 6.5 && !isTmo);
+  const alertePrep = Boolean(prep && !m.decision && (!momentVif || ageMoment > 6.5));
+  const hasAlerte = Boolean(m.decision || alerteVif || alertePrep);
 
   return (
     <section className="dc" aria-label="Direct vidéo du match">
@@ -96,7 +99,7 @@ export function DirectCinema({
         </strong>
         <span style={{ borderColor: couleurs.exterieur }}>{exterieur}</span>
       </div>
-      <div className={`dc-ecran ${isTmo ? 'dc-ecran-tmo' : ''}`}>
+      <div className={`dc-ecran ${isTmo ? 'dc-ecran-tmo' : ''} ${hasAlerte ? 'dc-ecran-alerte' : ''}`}>
         {m.terrain ? (
           <TerrainEnDirect
             key={m.id}
@@ -129,20 +132,20 @@ export function DirectCinema({
           />
         )}
 
-        {(m.decision || (momentVif && !m.terrain?.tmo?.actif && m.terrain?.phase !== 'tmo')) && (
+        {(m.decision || alerteVif) && (
           <div className={`dc-alerte-terrain dc-alerte-${m.decision ? 'penalite' : momentVif?.type}`} role="status">
-            <b>{m.decision ? 'PÉNALITÉ · DÉCISION' : libelleMoment(momentVif!.type, momentVif!.texte)}</b>
+            <b>{m.decision ? '⚖️ PÉNALITÉ · DÉCISION' : libelleMoment(momentVif!.type, momentVif!.texte)}</b>
             <span>
               {m.decision
-                ? 'Choisis entre les poteaux, la touche ou le jeu à la main.'
+                ? 'Choisis ton option ci-dessous'
                 : momentVif!.texte}
             </span>
           </div>
         )}
 
-        {prep && !m.decision && (!momentVif || ageMoment > 6) && (
+        {alertePrep && (
           <div className="dc-alerte-terrain dc-alerte-penalite" role="status">
-            <b>{prep.transformation ? 'TRANSFORMATION' : 'TIR AU BUT'}</b>
+            <b>{prep?.transformation ? '🎯 TRANSFORMATION' : '🎯 TIR AU BUT'}</b>
             <span>Prise d’élan et concentration face aux poteaux…</span>
           </div>
         )}

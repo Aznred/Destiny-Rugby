@@ -3,8 +3,9 @@
 .cel-scenario{position:absolute;left:.65rem;top:.65rem;display:grid;gap:2px;max-width:min(68%,260px);padding:.5rem .72rem;border:1px solid rgba(255,255,255,.2);border-radius:7px;background:rgba(8,20,13,.82);color:#f1f4ed;box-shadow:0 8px 22px #0004;backdrop-filter:blur(5px)}.cel-scenario span{font-family:var(--police-forte);font-size:.78rem;letter-spacing:.03em}.cel-scenario small{font-size:.61rem;color:#bdc9bf}.cel-scenario b{width:max-content;margin-bottom:2px;padding:2px 6px;border-radius:3px;background:#f0b84b;color:#1d1a12;font-size:.55rem;letter-spacing:.12em}.cel-scenario-forte{border-color:#efc05f;animation:cel-pulse-fort 1.25s ease-out}.cel-nom-porteur rect{fill:rgba(8,15,11,.86);stroke:rgba(255,255,255,.3);stroke-width:.12}.cel-nom-porteur text{fill:#fff;font-weight:700;paint-order:stroke;stroke:#0008;stroke-width:.18}.cel-scenario sup{font-size:.66em}
 @keyframes cel-pulse-fort{0%{box-shadow:0 0 0 0 #f0b84b99}65%{box-shadow:0 0 0 12px #f0b84b00}100%{box-shadow:0 8px 22px #0004}}
 @media(prefers-reduced-motion:reduce){.cel-scenario-forte{animation:none}}
-@media(max-width:650px){.dc-entete{flex-wrap:wrap;padding:12px}.dc-score{gap:8px;padding:10px;font-size:11px}.dc-score strong{font-size:21px}.dc .cel-scene{aspect-ratio:3/4;max-height:65vh;min-height:350px}.dc-chiffres b{font-size:15px}.dc-moments{padding:12px}.dc-liste button{gap:10px}.dc-commentaire p{font-size:12px}.cel-scenario{left:.45rem;top:.45rem;max-width:72%;padding:.42rem .56rem}.cel-scenario span{font-size:.69rem}.dc .cel-cadrage{right:.4rem;bottom:.4rem;font-size:10px;padding:.3rem .55rem}}
+@media(max-width:650px){.dc-entete{flex-wrap:wrap;padding:12px}.dc-score{gap:8px;padding:10px;font-size:11px}.dc-score strong{font-size:21px}.dc .cel-scene{aspect-ratio:3/4;max-height:65vh;min-height:350px}.dc-chiffres b{font-size:15px}.dc-moments{padding:12px}.dc-liste button{gap:10px}.dc-commentaire p{font-size:12px}.cel-scenario{left:.45rem;top:.45rem;max-width:min(58%,200px);padding:.32rem .5rem}.cel-scenario span{font-size:.69rem}.cel-scenario small{font-size:.58rem}.dc .cel-cadrage{right:.4rem;bottom:.4rem;font-size:10px;padding:.3rem .55rem}}
 .dc-ecran-tmo .cel-cadrage, .dc-ecran-tmo .cel-scenario { display: none !important; }
+.dc-ecran-alerte .cel-scenario, .dc-ecran-alerte .cel-sifflet { display: none !important; }
 
 /* Les pastilles du premier prototype sont désormais de vrais sprites articulés.
    Toutes les mesures restent dans le repère métrique du moteur : une mêlée ne
@@ -73,8 +74,24 @@
 .rg-canvas-groupe.rg-porteur{filter:drop-shadow(0 0 .28px #ffe98a) drop-shadow(0 0 .55px #ffe98a)}
 .rg-canvas-groupe.rg-arbitre{filter:drop-shadow(0 1px 1px rgba(0,0,0,.48))}
 
-/* Les décisions d'arbitrage doivent être visibles sur l'action, pas seulement
-   perdues dans le fil sous le terrain. */
-.dc-alerte-terrain{position:absolute;z-index:6;left:50%;top:12%;width:min(86%,430px);transform:translateX(-50%);display:grid;gap:5px;padding:10px 14px;border:1px solid #f5cb67;border-left:5px solid #f5cb67;border-radius:5px;background:rgba(19,25,22,.94);color:#fff;box-shadow:0 10px 30px #0008;pointer-events:none;animation:dc-alerte-entree .24s ease-out}
-.dc-alerte-terrain b{font-size:12px;letter-spacing:.12em;color:#ffd878}.dc-alerte-terrain span{font-size:11px;line-height:1.35}.dc-alerte-carton{border-color:#ffd83d;border-left-color:#ffd83d}.dc-alerte-carton b{color:#ffe56d}.dc-alerte-essai{border-color:#70e29a;border-left-color:#70e29a}.dc-alerte-essai b{color:#93f2b3}.dc-alerte-blessure{border-color:#f06464;border-left-color:#f06464}.dc-alerte-blessure b{color:#ff9292}
+/* Les alertes broadcast et décisions du direct : compactes, élégantes, non intrusives */
+.dc-alerte-terrain{position:absolute;z-index:6;left:50%;top:10px;width:auto;max-width:min(90%,460px);transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:6px 14px;border:1px solid #f5cb67;border-left:4px solid #f5cb67;border-radius:20px;background:rgba(14,22,17,.94);color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.6);pointer-events:none;backdrop-filter:blur(6px);animation:dc-alerte-entree .24s ease-out}
+.dc-alerte-terrain b{font-size:11.5px;letter-spacing:.08em;color:#ffd878;white-space:nowrap;flex-shrink:0}
+.dc-alerte-terrain span{font-size:11px;line-height:1.25;color:#e2ebe4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.dc-alerte-carton{border-color:#ffd83d;border-left-color:#ffd83d}.dc-alerte-carton b{color:#ffe56d}
+.dc-alerte-essai{border-color:#70e29a;border-left-color:#70e29a}.dc-alerte-essai b{color:#93f2b3}
+.dc-alerte-but{border-color:#70e29a;border-left-color:#70e29a}.dc-alerte-but b{color:#93f2b3}
+.dc-alerte-butRate{border-color:#f06464;border-left-color:#f06464}.dc-alerte-butRate b{color:#ff9292}
+.dc-alerte-blessure{border-color:#f06464;border-left-color:#f06464}.dc-alerte-blessure b{color:#ff9292}
+.dc-alerte-penalite{border-color:#f5cb67;border-left-color:#f5cb67}.dc-alerte-penalite b{color:#ffd878}
 @keyframes dc-alerte-entree{from{opacity:0;transform:translate(-50%,-8px) scale(.96)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+
+@media(max-width:650px){
+  .dc-alerte-terrain{top:7px;width:auto;max-width:calc(100% - 14px);padding:4px 10px;border-radius:16px;gap:6px;box-shadow:0 4px 14px rgba(0,0,0,.65)}
+  .dc-alerte-terrain b{font-size:10.5px;letter-spacing:.05em}
+  .dc-alerte-terrain span{font-size:10px;max-width:170px}
+  .cel-sifflet{top:12%;max-width:85%;padding:.3rem .8rem}
+}
+@media(max-width:400px){
+  .dc-alerte-terrain span{max-width:115px}
+}
