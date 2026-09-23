@@ -382,7 +382,9 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   // `bornerY` les ramenait TOUTES sur la même valeur et douze défenseurs se
   // superposaient au bord. On garde l'ordre et on impose 4,2 m entre voisins —
   // l'écart se resserre tout seul si la largeur ne suffit pas.
-  repartirY(ordre, 4.2);
+  const distLigneDef = Math.abs(e.ballon.x - ligneDefendue(cote));
+  const espacement = distLigneDef < 8 ? 2.3 : distLigneDef < 16 ? 3.2 : 4.2;
+  repartirY(ordre, espacement);
 
   // ── LES CHASSEURS ────────────────────────────────────────────────────────
   // ⚠️ DEUX défenseurs seulement montent sur le porteur, et ils sortent du
@@ -391,7 +393,8 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   if (!porteur || porteur.cote === cote) return;
   const candidats = ligne.filter((p) => p.battu <= 0);
   candidats.sort((a, b) => distance2(a.pos, porteur.pos) - distance2(b.pos, porteur.pos));
-  const chasseurs = candidats.filter((p) => (p.pos.x - porteur.pos.x) * sa >= -1.5).slice(0, 3);
+  const nbChasseursMax = distLigneDef < 8 ? 5 : distLigneDef < 16 ? 4 : 3;
+  const chasseurs = candidats.filter((p) => (p.pos.x - porteur.pos.x) * sa >= -1.5).slice(0, nbChasseursMax);
   // ⚠️ LE PREMIER CHASSEUR VISE LE PORTEUR, PAS À CÔTÉ. Testé : décaler ces
   // trois-là d'un mètre six suffisait à faire chuter les plaquages réussis de
   // 250 à 190 et grimper les percées de 20 à 28 — le rayon de plaquage n'est
@@ -409,7 +412,8 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   // couverture arrière ne se serait jamais déclenchée.
   let depasses = 0;
   for (const p of ligne) if ((p.pos.x - porteur.pos.x) * sa < -0.5) depasses++;
-  const perce = depasses >= Math.ceil(ligne.length * 0.55);
+  const zoneDanger = distLigneDef < 8;
+  const perce = zoneDanger || depasses >= Math.ceil(ligne.length * 0.55);
   if (!perce) return;
 
   // Ligne franchie : la couverture arrière prend le relais, et les défenseurs
@@ -545,8 +549,11 @@ export function placerEquipes(e: EtatMatch): void {
     if (distance2(p.pos, p.cible) > 100) p.effort = Math.max(p.effort, 0.86);
     const rythme = e.tactiques[p.cote]?.rythme;
     p.effort *= rythme === 'intense' ? 1.08 : rythme === 'gestion' ? 0.92 : 1;
+    if (p.effort > 1 && p.endurance < 50) {
+      p.effort = 1 + (p.effort - 1) * (p.endurance / 50);
+    }
   }
-  if (e.porteur) e.porteur.effort = e.echappee?.pion === e.porteur ? 1.15 : 1;
+  if (e.porteur) e.porteur.effort = e.echappee?.pion === e.porteur ? (e.porteur.endurance < 30 ? 1.04 : e.porteur.endurance < 50 ? 1.09 : 1.15) : 1;
   separer(e, arret);
 }
 

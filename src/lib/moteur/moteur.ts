@@ -60,7 +60,7 @@ import { routineDuJoueur } from './routinesButeur.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
   dansLes22Adverses, dansSes22, dansSonCamp, distance, distance2, franchieLigne,
-  horsDuTerrain, melanger, metresAvantLaLigne, sens, type Cote, type Vec,
+  horsDuTerrain, ligneDefendue, melanger, metresAvantLaLigne, sens, type Cote, type Vec,
 } from './terrain.js';
 
 export type { EtatMatch, Commentaire } from './etat.js';
@@ -742,7 +742,7 @@ function piloterMonJoueur(e: EtatMatch): void {
 
   switch (e.intention.type) {
     case 'sprint':
-      p.effort = 1.12;
+      p.effort = p.endurance < 25 ? 1.02 : p.endurance < 45 ? 1.07 : 1.12;
       // ⚠️ LE SPRINT SE PAIE, SINON ON LE CHOISIT À CHAQUE CARTE. La dépense
       // s'ajoute à celle que `deplacer()` calcule déjà sur l'intensité de la
       // course : trois relances à fond dans la même mi-temps se sentent.
@@ -1480,13 +1480,6 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   }
   e.ballon = { x: porteur.pos.x, y: porteur.pos.y };
 
-  // ── Ligne d'essai, touche ────────────────────────────────────────────────
-  if (franchieLigne(porteur.pos, porteur.cote)) return tenterEssai(e, porteur);
-  if (horsDuTerrain(porteur.pos)) {
-    dire(e, 'touche', adverse(porteur.cote), C.texteMatch('pousseTouche', { nom: porteur.nom }), 0, porteur.moi);
-    return arret(e, 'touche', adverse(porteur.cote), porteur.pos);
-  }
-
   // ── Pression, collision et franchissement, en un seul balayage ───────────
   let pression = 99;
   let plaqueur: Pion | null = null;
@@ -1506,6 +1499,17 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // défenseurs doivent respecter la ligne de hors-jeu. Sans cette protection,
   // les flankers à 0.5 m plaquaient le 9 au premier tick de sortie de ruck.
   if (e.gardeRuck > 0) plaqueur = null;
+
+  // ── Ligne d'essai, touche ────────────────────────────────────────────────
+  // Si le porteur franchit la ligne mais qu'un défenseur est au contact, le plaquage prime !
+  if (franchieLigne(porteur.pos, porteur.cote)) {
+    if (plaqueur && porteur.battu <= 0) return resoudrePlaquage(e, porteur, plaqueur);
+    return tenterEssai(e, porteur);
+  }
+  if (horsDuTerrain(porteur.pos)) {
+    dire(e, 'touche', adverse(porteur.cote), C.texteMatch('pousseTouche', { nom: porteur.nom }), 0, porteur.moi);
+    return arret(e, 'touche', adverse(porteur.cote), porteur.pos);
+  }
   const prioriteAplatir = metresAvantLaLigne(porteur.pos, porteur.cote) < 3.5 && pression > 2.1;
   if (prioriteAplatir) {
     porteur.cible = {
@@ -1767,10 +1771,12 @@ function receptionRatee(e: EtatMatch, receveur: Pion, longueur: number, offload:
     if (d.sanction > 0 || d.battu > 0) continue;
     plusProche = Math.min(plusProche, distance(d.pos, receveur.pos));
   }
-  const mains = 0.55 + receveur.passe / 200 + receveur.endurance / 900;
-  const risque = ((offload ? 0.028 : 0.009)
-    + Math.max(0, 4 - plusProche) * 0.006
-    + Math.max(0, longueur - 9) / 600) * erreurDeLiaison(e, receveur.cote);
+  const mains = 0.60 + receveur.passe / 220;
+  const fatigueMains = Math.max(0, (55 - receveur.endurance) / 150);
+  const risque = ((offload ? 0.030 : 0.010)
+    + fatigueMains * 0.032
+    + Math.max(0, 4 - plusProche) * 0.007
+    + Math.max(0, longueur - 9) / 500) * erreurDeLiaison(e, receveur.cote);
   return e.rng() < Math.max(0, risque / mains);
 }
 
@@ -1961,7 +1967,8 @@ export function probaPlaquage(
   // qu'un habillage. Il ne le décide pas pour autant : il déplace le curseur
   // d'un contact qui reste arbitré par les attributs des deux hommes.
   const force = defenseur.plaquage * fatigueD * (monPlaquage ? 1.16 : 1);
-  const resistance = porteur.evitement * 0.55 + porteur.puissance * 0.45;
+  const fatigueA = 0.76 + porteur.endurance / 420;
+  const resistance = (porteur.evitement * 0.55 + porteur.puissance * 0.45) * fatigueA;
   // ⚠️ Le taux de réussite au plaquage du rugby professionnel est de ~88 %.
   // Le rythme de l'équipe qui court après son plan de marque l'infléchit :
   // c'est le seul endroit où le score « aide » l'attaque, et c'est ce réglage
@@ -1972,14 +1979,12 @@ export function probaPlaquage(
   // peu d'espace ; une équipe en avance se heurte à un mur. Sans ce second
   // versant, tout le score tombait dans le premier quart d'heure et la fin de
   // match était stérile (mesuré : 16 points avant la 20ᵉ, 5 après la 60ᵉ).
+  // ⚠️ Sur la ligne des 5 mètres, la défense se resserre héroïquement pour
+  // empêcher les percées gratuites d'aller systématiquement au bout.
   const aide = r >= 0
-    ? r * 0.12 + (pres < 25 ? r * 0.13 : 0) + (pres < 8 ? r * 0.13 : 0)
+    ? r * 0.12 + (pres < 25 ? r * 0.08 : 0)
     : r * 0.55;
-  // ⚠️ LA DYNAMIQUE PÈSE SUR LE CONTACT, ET ELLE SE VOIT SUR LA CARTE.
-  // Retour de jeu : « un turnover relance la dynamique de l’équipe ». Une
-  // jauge qui ne changerait que la couleur d’une barre serait un décor ; ici,
-  // l’élan entre dans la formule que `enjeuDe` affiche ET que `resoudreChoix`
-  // tire. Un plaquage à 88 % passe à 94 % quand l’équipe est portée.
+  const bonusLigne = pres < 6 ? 0.08 : pres < 10 ? 0.04 : 0;
   const elan = bonusElan(e, defenseur.cote);
 
   // ═══ LE GESTE CHOISI : UN BONUS DIRECT, PAS UN TERME DE RÉSISTANCE ══════
@@ -2007,8 +2012,8 @@ export function probaPlaquage(
   // indexé sur l’attribut qui le porte : un ailier rapide sprinte, un pilier
   // raffute, et aucun des deux ne fait le métier de l’autre.
   return borner(
-    0.93 + (force - resistance) / 400 - aide + elan - bonusDuGeste(porteur, geste) * efficaciteGeste,
-    0.36, 0.99,
+    0.94 + (force - resistance) / 380 - aide + elan + bonusLigne - bonusDuGeste(porteur, geste) * efficaciteGeste,
+    0.40, 0.99,
   );
 }
 
@@ -2237,6 +2242,13 @@ function resoudrePlaquage(
   if (e.rng() < 0.055 + porteur.vision / 1600 + (monGeste === 'raffut' ? 0.22 : 0)
     && offloader(e, porteur)) return;
 
+  // ⚠️ BALLON PERDU AU CONTACT PAR FATIGUE. En fin de match, un joueur épuisé
+  // qui prend un contact rugueux a un risque réaliste d'échapper le ballon.
+  if (porteur.endurance < 30 && e.rng() < borner((30 - porteur.endurance) / 250, 0.02, 0.08)) {
+    dire(e, 'plaquage', defenseur.cote, `Sous le choc et la fatigue, ${porteur.nom} commet un en-avant au contact !`, 0, porteur.moi || defenseur.moi);
+    return enAvant(e, porteur);
+  }
+
   const diffPuissance = (defenseur.plaquage + defenseur.puissance) - (porteur.evitement + porteur.puissance);
   const grosTampon = diffPuissance > 6 || (monPlaquage && e.rng() < 0.45) || e.rng() < 0.20;
   if (grosTampon) {
@@ -2402,6 +2414,12 @@ function phaseRuck(e: EtatMatch): void {
   const scoreNettoyage = (contexte?.vitesseAttaque ?? 45) * 0.45
     + nettoyeurs.reduce((n, p) => n + valeurRuck(p), 0) / Math.max(1, nettoyeurs.length) * 0.55;
   let avantageDefense = scoreGrattage - scoreNettoyage + (e.ballonLent ? 6 : -4);
+  const distLigneDef = Math.abs(e.ballon.x - ligneDefendue(defense));
+  if (distLigneDef < 8) {
+    avantageDefense += 6.5; // contest acharné sur la ligne des 5m (pilonnage au ras, défense héroïque)
+  } else if (distLigneDef < 15) {
+    avantageDefense += 3;
+  }
 
   // ⚠️ LE GRATTAGE DU JOUEUR — et son revers. S'il a demandé à gratter ET
   // qu'il est vraiment sur le ballon (huit mètres, pas trente), c'est LUI qui
@@ -3168,6 +3186,24 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
 
   const action = e.aplatissage;
   e.aplatissage = null;
+
+  // 🛡️ DÉFENSE SUR LA LIGNE : Ballon tenu en-but si des défenseurs contestent l'aplatissage !
+  const defenseursEnBut = surLeTerrain(e, adverse(cote)).filter((p) => distance(p.pos, marqueur.pos) < 2.5 && p.battu <= 0);
+  if (defenseursEnBut.length > 0) {
+    const rTenu = retard(e, cote);
+    const forceDef = defenseursEnBut.reduce((acc, d) => acc + d.plaquage * 0.6 + d.puissance * 0.4, 0) / defenseursEnBut.length;
+    const forceAtt = (marqueur.puissance * 0.6 + marqueur.evitement * 0.4) * (0.75 + marqueur.endurance / 400);
+    const probaTenu = borner(0.35 + (forceDef - forceAtt) / 220 + (defenseursEnBut.length > 1 ? 0.16 : 0) - rTenu * 0.30, 0.14, 0.72);
+    if (e.rng() < probaTenu) {
+      const defSauveur = defenseursEnBut[0];
+      dire(e, 'jalon', adverse(cote), `🛑 SAUVETAGE HÉROÏQUE SUR LA LIGNE ! ${defSauveur.nom} et la défense se glissent sous le ballon : BALLON TENU EN-BUT !`, 0, true);
+      pousserElan(e, adverse(cote), POUSSEES.turnover);
+      return arret(e, 'renvoi22', adverse(cote), {
+        x: adverse(cote) === 'A' ? M22_A : M22_B,
+        y: AXE,
+      });
+    }
+  }
 
   // Possibilité de VAR / TMO sur l'essai (~18% de chances)
   const conteste = action && (e.rng() < 0.18 || Math.abs(action.lieu.y - AXE) > LARGEUR / 2 - 4);

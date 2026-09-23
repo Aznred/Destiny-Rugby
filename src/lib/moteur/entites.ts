@@ -241,7 +241,7 @@ export function creerPion(
 
 export function vitesseDisponible(p: Pion): number {
   // À plat, on court encore, mais 25 % moins vite.
-  return p.vitesseMax * (0.75 + 0.25 * (p.endurance / 100));
+  return p.vitesseMax * (0.58 + 0.42 * (p.endurance / 100));
 }
 
 // DÉPLACEMENT À INERTIE. Renvoie les mètres parcourus pendant ce pas.
@@ -262,7 +262,8 @@ export function deplacer(p: Pion, dt: number): number {
   let ax = cibleVx - p.vitesse.x;
   let ay = cibleVy - p.vitesse.y;
   const norme = Math.sqrt(ax * ax + ay * ay);
-  const maxDv = p.acceleration * dt;
+  const vivacite = 0.65 + 0.35 * (p.endurance / 100);
+  const maxDv = p.acceleration * vivacite * dt;
   if (norme > maxDv && norme > 1e-6) { ax = (ax / norme) * maxDv; ay = (ay / norme) * maxDv; }
   p.vitesse.x += ax;
   p.vitesse.y += ay;
