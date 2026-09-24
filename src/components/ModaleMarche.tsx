@@ -198,7 +198,8 @@ function MiseEnVente({ carte, occupe, surLaFeuille, effectif, onAgir, onEchanger
       <div><dt>Statut</dt><dd>{surLaFeuille}</dd></div>
       <div><dt>Valeur en vente rapide</dt><dd className="mm-prix">{montant(rapide)} <small>Ovas</small></dd></div>
     </dl>
-    <p className="mm-note">Un joueur aligné ne quitte pas le club : il tiendrait son poste dimanche. Sors-le du XV ou du banc dans l’onglet <b>Composition</b>, et il redevient vendable, échangeable et revendable au club.</p>
+    <p className="mm-note">Tu peux proposer un échange avec ce joueur. Il devra sortir du XV ou du banc avant que l’échange puisse être accepté. La vente reste bloquée tant qu’il est aligné.</p>
+    <button type="button" className="btn primaire" disabled={occupe} onClick={onEchanger}>Préparer l’échange</button>
   </>;
 
   return <>

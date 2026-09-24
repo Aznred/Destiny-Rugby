@@ -59,6 +59,8 @@ interface Props {
   effectif: Coequipier[];
   /** Tout le groupe sous contrat, indisponibles compris. */
   effectifComplet?: Coequipier[];
+  /** Filtre d'affichage des réservistes ; le terrain garde toujours tout l'effectif. */
+  reservesVisibles?: ReadonlySet<string>;
   composition: CompositionManager;
   onPlacer: (zone: ZoneComposition, index: number, joueurId: string) => void;
   /** Facultatif : condition, forme, blessure, suspension, sélection. */
@@ -473,7 +475,7 @@ function PanneauJoueur({
 }
 
 export function CompositionTerrainManager({
-  effectif, effectifComplet = effectif, composition, onPlacer, etats, indisponibles,
+  effectif, effectifComplet = effectif, reservesVisibles, composition, onPlacer, etats, indisponibles,
   automatismes, onCapitaine, onButeur, onMeilleureEquipe, rendreCarte, rendreSousCarte,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
@@ -493,8 +495,8 @@ export function CompositionTerrainManager({
     [composition.titulaires, composition.remplacants],
   );
   const reserves = useMemo(
-    () => effectifComplet.filter((j) => !surFeuille.has(j.id)).sort((a, b) => b.note - a.note),
-    [effectifComplet, surFeuille],
+    () => effectifComplet.filter((j) => !surFeuille.has(j.id) && (!reservesVisibles || reservesVisibles.has(j.id))).sort((a, b) => b.note - a.note),
+    [effectifComplet, surFeuille, reservesVisibles],
   );
 
   const titulaires = useMemo(
