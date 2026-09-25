@@ -6,7 +6,7 @@ import { adequationAuPoste, facteurDePerformance } from './carteJoueur';
 import { bonusCollectif, collectifCarriere } from './ligue/collectifCarriere';
 
 /** Affectation globale des 23 places, avec priorité au XV et première ligne spécialisée. */
-export function meilleureComposition(cartes: CarteCarriere[], maintenant = Date.now()): CompositionManager | null {
+export function meilleureComposition(cartes: CarteCarriere[], maintenant = Date.now(), priorite: 'performance' | 'collectif' = 'performance'): CompositionManager | null {
   const joueurs = cartes.filter(c => !c.blesseJusqua || Date.parse(c.blesseJusqua) <= maintenant).sort((a,b) => a.id.localeCompare(b.id));
   if (joueurs.length < 23) return null;
   const postes = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER];
@@ -50,7 +50,9 @@ export function meilleureComposition(cartes: CarteCarriere[], maintenant = Date.
       const carte = joueurs[index];
       return total + carte.note * facteurDePerformance(adequationAuPoste(carte.poste, postes[i + 15], carte.postesSecondaires));
     }, 0);
-    return scoreXV * 100 + scoreBanc;
+    // La priorité collectif compense une partie de la note individuelle :
+    // dix points de collectif valent environ un point de GEN par titulaire.
+    return (scoreXV + (priorite === 'collectif' ? collectif.total * 1.5 : 0)) * 100 + scoreBanc;
   };
   let meilleurScore = score(choix);
   // Échanges et remplacements successifs : chaque mouvement doit augmenter le

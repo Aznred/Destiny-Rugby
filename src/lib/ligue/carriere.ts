@@ -159,7 +159,7 @@ function transferer(carte: CarteCarriere, destinataire: ClubCarriere, saison: nu
 }
 /**
  * ⚠️ UN JOUEUR ALIGNÉ NE QUITTE PAS LE CLUB. Vendre, vendre rapidement ou
- * échanger un titulaire ou un remplaçant était permis : la feuille se
+ * conclure l'échange d'un titulaire ou d'un remplaçant était permis : la feuille se
  * réparait toute seule derrière (`ajusterComposition`), et on découvrait le
  * dimanche que le numéro 10 avait été remplacé par le premier venu du même
  * poste. On refuse maintenant le départ tant que la carte est sur la feuille —
@@ -169,9 +169,21 @@ function transferer(carte: CarteCarriere, destinataire: ClubCarriere, saison: nu
  * (blessure, carte achetée par un autre club, expiration d'enchère), pas ceux
  * qu'on décide.
  */
-function verifierHorsFeuille(club: ClubCarriere, sortants: string[]) {
+function verifierHorsFeuille(etat: EtatCarriereEnLigne, club: ClubCarriere, sortants: string[], action = 'échange') {
   const feuille = new Set([...(club.composition?.titulaires ?? []), ...(club.composition?.remplacants ?? [])]);
-  exiger(!sortants.some(id => feuille.has(id)), 'Ce joueur est sur ta feuille de match. Sors-le du XV ou du banc avant de le laisser partir.');
+  const aligne = sortants.find(id => feuille.has(id));
+  exiger(!aligne, `${club.pseudo} a ${aligne ? carteParId(etat, aligne).nom : 'ce joueur'} sur sa feuille de match : ${action === 'échange' ? 'l’échange ne peut pas aboutir' : 'la vente ne peut pas aboutir'}. Il faut d’abord le retirer du XV ou du banc.`);
+}
+function blocageFeuilleEchange(etat: EtatCarriereEnLigne, e: EtatCarriereEnLigne['echanges'][number]): string | undefined {
+  for (const [clubId, ids] of [[e.de, e.cartesDonnees], [e.vers, e.cartesDemandees]] as const) {
+    const club = clubParId(etat, clubId);
+    const indisponible = ids.find(id => etat.cartes.find(c => c.id === id)?.proprietaire !== clubId);
+    if (indisponible) return 'Une carte de cet échange n’est plus disponible dans son club : l’échange ne peut pas aboutir.';
+    const feuille = new Set([...club.composition.titulaires, ...club.composition.remplacants]);
+    const aligne = ids.find(id => feuille.has(id));
+    if (aligne) return `${club.pseudo} a ${etat.cartes.find(c => c.id === aligne)?.nom ?? 'ce joueur'} sur sa feuille de match : l’échange ne peut pas aboutir. Il faut d’abord le retirer du XV ou du banc.`;
+  }
+  return undefined;
 }
 function verifierDepart(etat: EtatCarriereEnLigne, clubId: string, sortants: string[], entrants: string[] = []) {
   const restants = cartesClub(etat, clubId).filter(c => !sortants.includes(c.id) && !c.verrou).map(coequipierDepuisCarte);
@@ -195,7 +207,7 @@ function verifierComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, vale
   ids.forEach((id, i) => {
     const c = carteParId(etat, id);
     exiger(c.proprietaire === club.id, 'Cette carte appartient à un autre club.');
-    exiger(!c.blesseJusqua || Date.parse(c.blesseJusqua) <= maintenant, 'Un joueur blessé ne peut pas être aligné.');
+    exiger(!c.blesseJusqua || Date.parse(c.blesseJusqua) <= maintenant, `${c.nom} est blessé : retire-le de la feuille avant de l’enregistrer.`);
     const poste = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER][i];
     // ⚠️ UN JOUEUR HORS DE SON POSTE EST AUTORISÉ, ET IL COÛTE.
     //
@@ -218,7 +230,7 @@ function verifierComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, vale
     // du rugby l'exige, le jeu aussi.
     if (i < 3 || (i >= 15 && i < 18)) exiger(
       [c.poste, ...(c.postesSecondaires ?? [])].some(p => POSTE_PAR_ID[p].famille === POSTE_PAR_ID[poste].famille),
-      'La première ligne nécessite des spécialistes : pilier, talonneur, pilier.',
+      `${c.nom} ne peut pas jouer au poste ${i + 1} : la première ligne exige un pilier ou un talonneur du bon poste.`,
     );
   });
 }
@@ -1249,6 +1261,21 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         break;
       }
       case 'composition': clubLibre(nouveau, club.id); verifierComposition(nouveau, club, commande.composition, maintenant); club.composition = copier(commande.composition); club.buteurManuel = true; break;
+      case 'sauvegarderComposition': {
+        texte(commande.nom, 40);
+        verifierComposition(nouveau, club, commande.composition, maintenant);
+        club.compositionsSauvegardees ??= [];
+        exiger(club.compositionsSauvegardees.length < 15, 'Tu as déjà 15 équipes sauvegardées. Supprime une équipe avant d’en créer une autre.');
+        club.compositionsSauvegardees.push({ id: `${club.id}:composition:${nouveau.version + 1}`, nom: commande.nom.trim(), composition: copier(commande.composition) });
+        break;
+      }
+      case 'supprimerComposition': {
+        identifiant(commande.id);
+        const avant = club.compositionsSauvegardees?.length ?? 0;
+        club.compositionsSauvegardees = club.compositionsSauvegardees?.filter(c => c.id !== commande.id) ?? [];
+        exiger(club.compositionsSauvegardees.length < avant, 'Équipe sauvegardée introuvable.');
+        break;
+      }
       // ⚠️ On n'enregistre JAMAIS la stratégie telle qu'elle arrive : une valeur
       // inconnue est remplacée par le défaut, jamais refusée. C'est la même
       // fonction que le match en direct, donc un seul endroit décide.
@@ -1276,7 +1303,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         listeIds(ids, LOT_VENTE_RAPIDE_MAX);
         const lot = ids.map(id => carteParId(nouveau, id));
         for (const carte of lot) exiger(carte.proprietaire === club.id && !carte.verrou, `${carte.nom} ne peut pas être vendu rapidement.`);
-        verifierHorsFeuille(club, ids); verifierDepart(nouveau, club.id, ids);
+        verifierHorsFeuille(nouveau, club, ids, 'vente'); verifierDepart(nouveau, club.id, ids);
         const valeur = lot.reduce((total, carte) => total + valeurVenteRapide(carte), 0);
         const libelle = lot.length === 1 ? `Vente rapide : ${lot[0].nom}` : `Vente rapide : ${lot.length} joueurs`;
         journal(nouveau, club, 'venteRapide', valeur, ids, libelle, date);
@@ -1289,7 +1316,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         clubLibre(nouveau, club.id); identifiant(commande.carteId); entier(commande.prix, 1); entier(commande.dureeHeures, 1, 168);
         exiger(commande.mode === 'directe' || commande.mode === 'enchere', 'Type de vente invalide.');
         const carte = carteParId(nouveau, commande.carteId); exiger(carte.proprietaire === club.id && !carte.verrou, 'Cette carte ne peut pas être mise en vente.');
-        verifierHorsFeuille(club, [carte.id]); verifierDepart(nouveau, club.id, [carte.id]); const id = prochainId(nouveau, 'vente', nouveau.ventes.length); carte.verrou = id;
+        verifierHorsFeuille(nouveau, club, [carte.id], 'vente'); verifierDepart(nouveau, club.id, [carte.id]); const id = prochainId(nouveau, 'vente', nouveau.ventes.length); carte.verrou = id;
         nouveau.ventes.push({ id, carteId: carte.id, vendeurId: club.id, type: commande.mode, prix: commande.prix, expireLe: dateServeur(maintenant + commande.dureeHeures * HEURE), etat: 'ouverte' }); break;
       }
       case 'acheter': {
@@ -1319,7 +1346,6 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         exiger(nouveau.echanges.filter(e => e.de === club.id && e.etat === 'propose').length < 10, 'Vous avez déjà dix offres en cours.');
         for (const id of commande.cartesDonnees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === club.id && !c.verrou, 'Une carte proposée est indisponible.'); }
         for (const id of commande.cartesDemandees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === destinataire.id && !c.verrou, 'Une carte demandée est indisponible.'); }
-        verifierHorsFeuille(club, commande.cartesDonnees);
         verifierDepart(nouveau, club.id, commande.cartesDonnees, commande.cartesDemandees); verifierDepart(nouveau, destinataire.id, commande.cartesDemandees, commande.cartesDonnees);
         const id = prochainId(nouveau, 'echange', nouveau.echanges.length);
         nouveau.echanges.push({ id, de: club.id, vers: destinataire.id, cartesDonnees: [...commande.cartesDonnees], cartesDemandees: [...commande.cartesDemandees], ovasDonnes: commande.ovasDonnes, ovasDemandes: commande.ovasDemandes, expireLe: dateServeur(maintenant + 48 * HEURE), etat: 'propose' });
@@ -1335,7 +1361,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
           clubLibre(nouveau, e.de); clubLibre(nouveau, e.vers);
           for (const id of e.cartesDonnees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === e.de && c.verrou === e.id, 'Une carte proposée n’est plus disponible.'); }
           for (const id of e.cartesDemandees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === e.vers && !c.verrou, 'Une carte demandée n’est plus disponible.'); }
-          verifierHorsFeuille(emetteur, e.cartesDonnees); verifierHorsFeuille(destinataire, e.cartesDemandees);
+          verifierHorsFeuille(nouveau, emetteur, e.cartesDonnees); verifierHorsFeuille(nouveau, destinataire, e.cartesDemandees);
           verifierDepart(nouveau, e.de, e.cartesDonnees, e.cartesDemandees); verifierDepart(nouveau, e.vers, e.cartesDemandees, e.cartesDonnees);
           // Les Ovas entrants ne servent pas à garantir les Ovas promis : le solde doit exister.
           exiger(destinataire.ovas >= e.ovasDemandes, 'Le destinataire ne dispose plus des Ovas nécessaires.');
@@ -1484,12 +1510,12 @@ function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere): 
     competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
       ? { ...c, classementsPoules: c.poules.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres)) }
       : c),
-    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, packsGratuits, packsGratuitsProgrammes: _programmes, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club?.id ? { ...reste, composition, strategie, packsGratuits, dernierLotPacksGratuits } : reste; }),
+    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, compositionsSauvegardees, packsGratuits, packsGratuitsProgrammes: _programmes, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club?.id ? { ...reste, composition, strategie, compositionsSauvegardees, packsGratuits, dernierLotPacksGratuits } : reste; }),
     cartes: etat.cartes.filter(c => c.proprietaire !== null),
     rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: vueMatchEnLigne(match, club?.id ?? '') } : reste; }),
     objectifs: club ? etat.objectifs.filter(o => o.clubId === club.id) : [],
     transactions: club ? etat.transactions.filter(t => t.clubId === club.id) : [],
-    echanges: club ? etat.echanges.filter(e => e.de === club.id || e.vers === club.id) : [],
+    echanges: club ? etat.echanges.filter(e => e.de === club.id || e.vers === club.id).map(e => ({ ...e, blocage: e.etat === 'propose' ? blocageFeuilleEchange(etat, e) : undefined })) : [],
     classement: classementCarriere(etat), statistiques: statistiquesLigue(etat),
     vivierDisponible: vivierRestant(new Set(etat.cartes.map(c => c.sourceId))) });
 }

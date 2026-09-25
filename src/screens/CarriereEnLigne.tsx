@@ -446,7 +446,7 @@ export function CarriereEnLigne() {
   //    et il en concluait que le jeu n’enregistrait pas.
   const refErreur = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (erreur) refErreur.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (erreur && !document.querySelector('.cel-compo-etendue')) refErreur.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [erreur]);
   const [occupe, setOccupe] = useState(false);
   const [ligueId, setLigueId] = useState<string | null>(() => new URLSearchParams(location.search).get('directLigue'));
@@ -648,7 +648,7 @@ export function CarriereEnLigne() {
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} proprietaire={session.compte.id === vue.createurId} notifier={setNotification} />}
-          {onglet === 'composition' && <Composition key={vue.id} vue={vue} agir={agir} occupe={occupe} />}
+          {onglet === 'composition' && <Composition key={vue.id} vue={vue} agir={agir} occupe={occupe} erreur={erreur} />}
           {onglet === 'effectif' && <Effectif vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'collection' && <CollectionLigue vue={vue} />}
           {onglet === 'packs' && <Packs vue={vue} agir={agir} occupe={occupe} />}
@@ -1313,9 +1313,15 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
 // du mode en ligne, c'est d'où vient l'effectif — les cartes possédées dans
 // CETTE ligue — et le fait que la feuille part au serveur au lieu du store.
 
-export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
+export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; erreur?: string }) {
   const [vueEtendue, setVueEtendue] = useState(true);
   const [consignesOuvertes, setConsignesOuvertes] = useState(false);
+  const [priorite, setPriorite] = useState<'performance' | 'collectif'>('performance');
+  const [nomEquipe, setNomEquipe] = useState('');
+  const [filtreChampionnat, setFiltreChampionnat] = useState('');
+  const [filtreClub, setFiltreClub] = useState('');
+  const [filtrePays, setFiltrePays] = useState('');
+  const [filtrePoste, setFiltrePoste] = useState('');
   const club = vue.clubs.find(c => c.id === vue.monClubId);
   const cartes = useMemo(() => vue.cartes.filter(c => c.proprietaire === vue.monClubId), [vue.cartes, vue.monClubId]);
   const effectifComplet = useMemo(() => cartes.map(carteEnJoueur), [cartes]);
@@ -1336,7 +1342,13 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
   );
   const strategie = club?.strategie ?? STRATEGIE_VIDE;
   const modifie = brouillon !== null;
-  const optimale = useMemo(() => meilleureComposition(cartes), [cartes]);
+  const optimale = useMemo(() => meilleureComposition(cartes, Date.now(), priorite), [cartes, priorite]);
+  const optionsFiltre = (cle: 'championnat' | 'clubReel' | 'pays') => [...new Set(cartes.map(c => c[cle]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const reservesVisibles = useMemo(() => new Set(cartes.filter(c =>
+    (!filtreChampionnat || c.championnat === filtreChampionnat) && (!filtreClub || c.clubReel === filtreClub)
+    && (!filtrePays || c.pays === filtrePays) && (!filtrePoste || c.poste === filtrePoste),
+  ).map(c => c.id)), [cartes, filtreChampionnat, filtreClub, filtrePays, filtrePoste]);
+  const sauvegardees = club?.compositionsSauvegardees ?? [];
 
   const changerJoueur = (zone: 'titulaires' | 'remplacants', index: number, joueurId: string) => {
     const suivante: CompositionManager = { ...composition, titulaires: [...composition.titulaires], remplacants: [...composition.remplacants] };
@@ -1394,6 +1406,26 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
       <button className="btn" disabled={occupe || !optimale} onClick={() => { if (optimale) setBrouillon(optimale); }}>{t('online.lineup.best')}</button>
       <button className="btn primaire" disabled={occupe || !modifie} onClick={async () => { const v = await agir({ type: 'composition', composition }); if (v) setBrouillon(null); }}>{modifie ? 'Enregistrer la feuille' : 'Feuille enregistrée'}</button>
     </section>
+    {vueEtendue && erreur && <div className="cel-erreur cel-erreur-compo" role="alert"><Icone nom="alerte" taille={20} /><p>{erreur}</p></div>}
+    <div className="cel-outils-compo">
+      <Choix label="Meilleure équipe selon" valeur={priorite} options={[["performance", "Performance du XV"], ["collectif", "Collectif du XV"]]} onChange={v => setPriorite(v as 'performance' | 'collectif')} />
+      <details><summary>Équipes sauvegardées ({sauvegardees.length}/15)</summary>
+        <div className="cel-outils-contenu">
+          <p className="cel-note">Charger une équipe prépare la feuille. Clique ensuite sur « Enregistrer la feuille » pour l’utiliser en match.</p>
+          <div className="cel-actions"><input aria-label="Nom de l’équipe" maxLength={40} placeholder="Nom de l’équipe" value={nomEquipe} onChange={e => setNomEquipe(e.target.value)} />
+            <button type="button" className="btn" disabled={occupe || nomEquipe.trim().length < 2 || sauvegardees.length >= 15} onClick={async () => { const v = await agir({ type: 'sauvegarderComposition', nom: nomEquipe.trim(), composition }); if (v) setNomEquipe(''); }}>Sauvegarder cette équipe</button></div>
+          {sauvegardees.map(equipe => <div className="cel-equipe-sauvegardee" key={equipe.id}><span>{equipe.nom}</span>
+            <button type="button" className="btn" disabled={occupe} onClick={() => setBrouillon(structuredClone(equipe.composition))}>Charger</button>
+            <button type="button" className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'supprimerComposition', id: equipe.id }); }} aria-label={`Supprimer ${equipe.nom}`}>Supprimer</button></div>)}
+        </div>
+      </details>
+      <details><summary>Filtrer les réserves</summary><div className="cel-outils-contenu cel-filtres-reserves">
+        <Choix label="Compétition" valeur={filtreChampionnat} options={[["", "Toutes"], ...optionsFiltre('championnat').map(v => [v, v] as [string, string])]} onChange={v => { setFiltreChampionnat(v); setFiltreClub(''); }} />
+        <Choix label="Club" valeur={filtreClub} options={[["", "Tous"], ...optionsFiltre('clubReel').filter(v => !filtreChampionnat || cartes.some(c => c.clubReel === v && c.championnat === filtreChampionnat)).map(v => [v, v] as [string, string])]} onChange={setFiltreClub} />
+        <Choix label="Pays" valeur={filtrePays} options={[["", "Tous"], ...optionsFiltre('pays').map(v => [v, v] as [string, string])]} onChange={setFiltrePays} />
+        <Choix label="Poste" valeur={filtrePoste} options={[["", "Tous"], ...[...new Set(cartes.map(c => c.poste))].sort((a, b) => (POSTE_PAR_ID[a]?.numero ?? 0) - (POSTE_PAR_ID[b]?.numero ?? 0)).map(v => [v, nomPoste(v)] as [string, string])]} onChange={setFiltrePoste} />
+      </div></details>
+    </div>
 
     <CompositionTerrainManager
       rendreCarte={joueur => {
@@ -1420,7 +1452,7 @@ export function Composition({ vue, agir, occupe }: { vue: VueCarriereEnLigne; ag
           <i style={{ width: `${affinite.points * (100 / COLLECTIF_MAX)}%` }} />
         </span>;
       }}
-      effectif={effectif} effectifComplet={effectifComplet} composition={composition}
+      effectif={effectif} effectifComplet={effectifComplet} reservesVisibles={reservesVisibles} composition={composition}
       onPlacer={changerJoueur} etats={etats} indisponibles={indisponibles}
       onCapitaine={id => setBrouillon({ ...composition, capitaineId: id })}
       onButeur={id => setBrouillon({ ...composition, buteurId: id })}
@@ -1768,9 +1800,10 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
             <Icone nom="repost" taille={26} />
             <div><h3>{nomClub(vue, e.vers)} donne</h3><div className="cel-grille-cartes petites">{e.cartesDemandees.map(id => carte(id)).filter(Boolean).map(c => <CarteJoueurEnLigne key={c!.id} carte={c!} compacte />)}</div>{e.ovasDemandes > 0 && <b className="cel-ovas-echange">+ {montant(e.ovasDemandes)} Ovas</b>}</div>
           </div>
+          {e.blocage && <p className="cel-note cel-alerte-echange" role="status">{e.blocage}</p>}
           <div className="cel-actions">
             {recu ? <>
-              <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'repondreEchange', echangeId: e.id, accepter: true }); }}>Accepter</button>
+              <button className="btn primaire" disabled={occupe || Boolean(e.blocage)} onClick={() => { void agir({ type: 'repondreEchange', echangeId: e.id, accepter: true }); }}>Accepter</button>
               <button className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'repondreEchange', echangeId: e.id, accepter: false }); }}>Refuser</button>
             </> : <button className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'annulerEchange', echangeId: e.id }); }}>Annuler mon offre</button>}
           </div>
@@ -1781,9 +1814,9 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
         <p className="cel-note">« Je te donne mon 8 contre ton ailier + 15 000 Ovas. » Les deux doivent accepter ; le serveur valide ensuite la transaction d’un bloc.</p>
         <Choix label="Avec qui ?" valeur={cible} options={[['', 'Choisis un club'], ...vue.clubs.filter(c => c.id !== vue.monClubId).map(c => [c.id, c.nom] as [string, string])]} onChange={v => { setCible(v); setDemandees([]); }} />
         {cible && <div>
-          <p className="cel-note">Fais tourner les roues et clique sur les joueurs à échanger. Clique à nouveau pour les retirer. Tes joueurs sur la feuille de match ne sont pas disponibles.</p>
+          <p className="cel-note">Choisis les joueurs à échanger, même s’ils sont sur une feuille de match. L’offre pourra être envoyée, mais les deux clubs devront retirer ces joueurs de leur feuille avant l’acceptation.</p>
 
-          <RoueCartes titre={"Je donne"} cartes={vendables.filter(c => !feuille.has(c.id)).filter(correspond).sort((a, b) => b.note - a.note)} selections={donnees} onChoisir={id => basculer(donnees, setDonnees, id)} vide="Aucun joueur disponible avec ces filtres." />
+          <RoueCartes titre={"Je donne"} cartes={vendables.filter(correspond).sort((a, b) => b.note - a.note)} selections={donnees} onChoisir={id => basculer(donnees, setDonnees, id)} vide="Aucun joueur disponible avec ces filtres." />
           <p className="cel-note" aria-live="polite">{donnees.length} joueur(s) sélectionné(s)</p>
           <div className="cel-actions">{donnees.map(id => <button type="button" className="btn fantome" key={id} onClick={() => basculer(donnees, setDonnees, id)} aria-label={`Retirer ${carte(id)?.nom} de l’échange`}>{carte(id)?.nom} ×</button>)}</div>
           <Champ label="+ Ovas de ma part"><input type="number" min={0} step={100} value={ovasDonnes} onChange={e => setOvaDonnes(e.target.value)} /></Champ>

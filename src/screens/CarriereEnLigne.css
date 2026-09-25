@@ -2297,6 +2297,19 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel:has(> .cel-compo) { height: auto; grid-template-rows: auto auto auto; }
 .cel > .cel-compo { min-height: 720px; height: calc(100dvh - 200px); }
 .cel > .cel-compo.cel-compo-etendue { position: fixed; inset: 0; z-index: 100; height: 100dvh; min-height: 0; padding: 10px 16px; box-sizing: border-box; background: radial-gradient(ellipse at 55% 35%, #173b37, #07141d 80%); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.cel:has(> .cel-compo-etendue) > .cel-erreur { display: none; }
+.cel-outils-compo { display: flex; flex: none; flex-wrap: wrap; gap: 8px; position: relative; z-index: 25; }
+.cel-outils-compo > .cel-champ { flex-direction: row; align-items: center; }
+.cel-outils-compo > .cel-champ .selecteur { min-width: 180px; }
+.cel-outils-compo details { position: relative; }
+.cel-outils-compo summary { cursor: pointer; padding: 7px 12px; border: 1px solid #ffffff35; border-radius: 8px; background: #102a31; font-size: 12px; }
+.cel-outils-contenu { position: absolute; top: 100%; left: 0; width: min(540px, calc(100vw - 24px)); max-height: min(55dvh, 420px); overflow: auto; padding: 12px; border: 1px solid #ffffff35; border-radius: 8px; background: #102a31; box-shadow: 0 12px 32px #0009; box-sizing: border-box; }
+.cel-outils-contenu input { min-width: 0; flex: 1; }
+.cel-equipe-sauvegardee { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.cel-equipe-sauvegardee span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.cel-filtres-reserves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cel-erreur-compo { flex: none; margin: 0; padding: 8px 12px; font-size: 13px; }
+.cel-alerte-echange { color: #ffd9d4; border-left: 3px solid var(--danger); padding-left: 10px; }
 .cel-compo > .cel-tete-compo { display: flex; align-items: center; flex-wrap: wrap; flex: none; min-height: 48px; margin: 0; padding: 6px 12px; gap: 12px; }
 .cel-compo > .cel-tete-compo p, .cel-compo > .cel-tete-compo .eyebrow { display: none; }
 .cel-compo > .cel-tete-compo h2 { font-size: 17px; }
