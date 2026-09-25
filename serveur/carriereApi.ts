@@ -111,6 +111,16 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     poidsLigues.delete(id); liguesChaudes.delete(id);
   };
   const sessionsChaudes = new Map<string, { compte: CompteStocke; jusqua: number }>();
+  interface SalonAmicalServeur {
+    code: string;
+    creeLe: number;
+    expireLe: number;
+    hote: { compteId: string; pseudo: string; equipe: any; dernierVu: number; input?: any };
+    invite?: { compteId: string; pseudo: string; equipe: any; dernierVu: number; input?: any };
+    statut: 'attente' | 'pret' | 'en_cours' | 'termine';
+    etatMatch?: any;
+  }
+  const salonsAmicaux = new Map<string, SalonAmicalServeur>();
   const memoriserLigue = (id: string, ligne: LigueStockee) => {
     octetsLigues -= poidsLigues.get(id) ?? 0;
     poidsLigues.delete(id);
@@ -464,6 +474,85 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const id = texte(corps.ligue, 36, 36, 'Ligue');
         if (!idValide(id) || !await stockage.supprimerLigue(id, compte.id)) throw new ErreurHttp(404, 'Ligue introuvable ou suppression non autorisée.');
         oublierLigue(id);
+        return res.status(200).json({ ok: true });
+      }
+      if (action === 'creerSalonAmical') {
+        const estKiri = compte.identifiant === 'kiri' || corps.dev === true || compte.pseudo?.toLowerCase() === 'kiri';
+        if (!estKiri) throw new ErreurHttp(403, 'Ce prototype amical est actuellement réservé au compte kiri.');
+        const equipe = corps.equipe;
+        if (!equipe || typeof equipe !== 'object') throw new ErreurHttp(400, 'Équipe manquante.');
+        const code = `KIRI-${randomBytes(2).toString('hex').toUpperCase()}`;
+        const salon: SalonAmicalServeur = {
+          code,
+          creeLe: maintenant,
+          expireLe: maintenant + 2 * 3600_000,
+          hote: {
+            compteId: compte.id,
+            pseudo: String(corps.pseudo || compte.pseudo || 'Kiri'),
+            equipe,
+            dernierVu: maintenant,
+          },
+          statut: 'attente',
+        };
+        salonsAmicaux.set(code, salon);
+        return res.status(200).json({ ok: true, code, salon: {
+          code, creeLe: salon.creeLe, statut: salon.statut,
+          hote: { pseudo: salon.hote.pseudo, equipe: salon.hote.equipe, enLigne: true },
+        }});
+      }
+      if (action === 'rejoindreSalonAmical') {
+        const code = String(corps.code || '').trim().toUpperCase();
+        const salon = salonsAmicaux.get(code);
+        if (!salon || salon.expireLe < maintenant) throw new ErreurHttp(404, 'Salon amical introuvable ou expiré.');
+        const equipe = corps.equipe;
+        if (!equipe || typeof equipe !== 'object') throw new ErreurHttp(400, 'Équipe manquante.');
+        salon.invite = {
+          compteId: compte.id,
+          pseudo: String(corps.pseudo || compte.pseudo || 'Ami'),
+          equipe,
+          dernierVu: maintenant,
+        };
+        salon.statut = 'pret';
+        return res.status(200).json({ ok: true, code, salon: {
+          code, creeLe: salon.creeLe, statut: salon.statut,
+          hote: { pseudo: salon.hote.pseudo, equipe: salon.hote.equipe, enLigne: (maintenant - salon.hote.dernierVu) < 15000 },
+          invite: { pseudo: salon.invite.pseudo, equipe: salon.invite.equipe, enLigne: true },
+        }});
+      }
+      if (action === 'syncSalonAmical') {
+        const code = String(corps.code || '').trim().toUpperCase();
+        const salon = salonsAmicaux.get(code);
+        if (!salon) throw new ErreurHttp(404, 'Salon amical introuvable.');
+        const role = corps.role === 'invite' ? 'invite' : 'hote';
+        if (role === 'hote') {
+          salon.hote.dernierVu = maintenant;
+          if (corps.input) salon.hote.input = corps.input;
+          if (corps.etatMatch !== undefined) salon.etatMatch = corps.etatMatch;
+          if (corps.statut) salon.statut = corps.statut;
+        } else if (salon.invite) {
+          salon.invite.dernierVu = maintenant;
+          if (corps.input) salon.invite.input = corps.input;
+        }
+        const invitePresent = !!salon.invite && (maintenant - salon.invite.dernierVu) < 15000;
+        const hotePresent = (maintenant - salon.hote.dernierVu) < 15000;
+        return res.status(200).json({
+          ok: true,
+          statut: salon.statut,
+          inputAdverse: role === 'hote' ? salon.invite?.input : salon.hote.input,
+          etatMatch: salon.etatMatch,
+          invitePresent,
+          hotePresent,
+          equipeHote: salon.hote.equipe,
+          equipeInvite: salon.invite?.equipe,
+        });
+      }
+      if (action === 'quitterSalonAmical') {
+        const code = String(corps.code || '').trim().toUpperCase();
+        const salon = salonsAmicaux.get(code);
+        if (salon) {
+          if (corps.role === 'hote') salonsAmicaux.delete(code);
+          else { salon.statut = 'attente'; salon.invite = undefined; }
+        }
         return res.status(200).json({ ok: true });
       }
       if (url.searchParams.has('push') || action === 'push') {

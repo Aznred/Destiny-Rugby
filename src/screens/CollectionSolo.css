@@ -21,6 +21,10 @@
 .solo-alerte, .solo-bilan { margin: 0; padding: .8rem 1rem; border-radius: 10px; }
 .solo-alerte { border: 1px solid #ef835455; background: #4e1d153d; color: #ffc1a8; }
 .solo-bilan { display: flex; align-items: center; gap: .55rem; border: 1px solid #55c97a44; background: #123c243d; color: #bdf5c9; }
+.solo-banniere-amical { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: 1.2rem 1.6rem; border: 1px solid rgba(250, 204, 21, 0.4); border-radius: 16px; background: linear-gradient(135deg, rgba(20, 30, 50, 0.95), rgba(10, 15, 30, 0.9)); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4); }
+.solo-amical-texte { display: flex; flex-direction: column; gap: 0.3rem; }
+.solo-amical-texte h3 { margin: 0; font-size: 1.3rem; color: #f8fafc; }
+.solo-amical-texte p { margin: 0; color: #94a3b8; font-size: 0.88rem; max-width: 65ch; }
 .solo-rayon, .solo-catalogue { display: grid; gap: 1rem; }
 .solo-titre-ligne { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
 .solo-titre-ligne > span { max-width: 48ch; text-align: right; font-size: .9rem; }

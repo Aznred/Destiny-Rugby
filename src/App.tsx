@@ -238,7 +238,13 @@ export default function App() {
     window.addEventListener('destiny-ouvrir-match',ouvrir);
     return () => window.removeEventListener('destiny-ouvrir-match',ouvrir);
   },[setEcran]);
-  useEffect(() => { if (capterInvitation() || new URLSearchParams(location.search).has('directLigue')) setEcran('carriereEnLigne'); }, [setEcran]);
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has('amical')) {
+      setEcran('collectionSolo');
+    } else if (capterInvitation() || new URLSearchParams(location.search).has('directLigue')) {
+      setEcran('carriereEnLigne');
+    }
+  }, [setEcran]);
   // ⚠️ UN ÉCRAN VAUT UNE PAGE VUE. Le jeu n'a qu'une adresse : sans cette
   // ligne, toute une session ne compte qu'une page et l'on ne peut pas voir
   // où les joueurs décrochent. C'est le SEUL endroit qui voit tous les

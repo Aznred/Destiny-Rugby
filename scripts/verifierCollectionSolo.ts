@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { catalogueBaseCarriere, PACKS_CARRIERE } from '../src/lib/ligue/catalogueCarriere';
-import { cleCarteSolo, etatCollectionSoloVide, IDS_PACKS_SOLO_GRATUITS, normaliserCollectionSolo, ouvrirPackSolo, prixPackSolo } from '../src/lib/collectionSolo';
+import { cleCarteSolo, etatCollectionSoloVide, IDS_PACKS_SOLO_GRATUITS, normaliserCollectionSolo, ouvrirPackSolo, packCollectionSolo, prixPackSolo } from '../src/lib/collectionSolo';
 
 const catalogue = catalogueBaseCarriere();
 assert.ok(PACKS_CARRIERE.length >= 30, 'Tous les packs du jeu doivent etre proposes dans la roue solo.');
@@ -13,7 +13,8 @@ for (const id of IDS_PACKS_SOLO_GRATUITS) {
   assert.equal(prixPackSolo(pack), 0, `Le pack ${id} doit etre gratuit dans la collection solo.`);
 }
 const premierPayant = PACKS_CARRIERE.find(pack => !IDS_PACKS_SOLO_GRATUITS.includes(pack.id as typeof IDS_PACKS_SOLO_GRATUITS[number]))!;
-assert.equal(prixPackSolo(premierPayant), premierPayant.prix, 'Les autres packs doivent conserver leur prix.');
+assert.ok(prixPackSolo(premierPayant) > 0 && prixPackSolo(premierPayant) <= 350, 'Les packs payants en solo doivent avoir des tarifs calibres (25-350 Ovas).');
+assert.ok(premierPayant.prix >= 400, 'Les prix de base pour le jeu en ligne doivent rester intacts.');
 
 const cles = catalogue.map(carte => cleCarteSolo(carte.sourceId));
 assert.equal(new Set(cles).size, catalogue.length, 'Les empreintes des joueurs doivent rester uniques.');
@@ -22,7 +23,10 @@ const ancienne = normaliserCollectionSolo({ possedees: cles.slice(0, 2), packsOu
 assert.equal(Object.keys(ancienne.quantites).length, 2, 'L ancienne collection gratuite doit etre conservee sur le compte.');
 
 let etat = etatCollectionSoloVide();
-for (const pack of PACKS_CARRIERE) {
+for (const packBase of PACKS_CARRIERE) {
+  const pack = packCollectionSolo(packBase);
+  assert.ok(pack.cartes >= 10, `Le pack ${pack.id} doit contenir au moins 10 cartes en solo.`);
+  assert.ok(pack.cartes > packBase.cartes, `Le pack ${pack.id} doit avoir plus de cartes en solo que le pack en ligne (${pack.cartes} vs ${packBase.cartes}).`);
   const resultat = ouvrirPackSolo(pack, catalogue, etat, () => .37);
   assert.equal(resultat.indices.length, pack.cartes, `Le pack ${pack.id} doit livrer le nombre de cartes annonce.`);
   if (pack.garantie) {

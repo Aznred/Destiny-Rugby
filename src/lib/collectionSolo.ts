@@ -21,13 +21,81 @@ const PACKS_SOLO_GRATUITS = new Set<string>(IDS_PACKS_SOLO_GRATUITS);
 const FAMILLES_AVANTS = new Set(['pilier', 'talonneur', 'deuxieme_ligne', 'troisieme_ligne']);
 const RAYONS = new WeakMap<object, Map<string, Record<RareteCarriere, number[]>>>();
 
+/**
+ * Grille de prix équilibrée spécifiquement pour la carrière solo, où une carrière
+ * complète rapporte ~500 Ovas (contre plusieurs milliers en carrière en ligne).
+ * Ne modifie EN AUCUN CAS les prix de la carrière en ligne.
+ */
+const PRIX_PACKS_SOLO: Record<string, number> = {
+  bronze: 0,
+  standard: 0,
+  or: 0,
+  terroir: 25,
+  federales: 35,
+  avants: 45,
+  arrieres: 45,
+  france: 50,
+  troisiemeLigne: 50,
+  premiereLigne: 55,
+  finisseurs: 55,
+  international: 60,
+  nationale: 60,
+  charniere: 65,
+  espoirs: 70,
+  japon: 75,
+  prod2: 80,
+  europeEmergente: 80,
+  confirmes: 85,
+  iles: 90,
+  premium: 100,
+  leagueOne: 105,
+  nord: 110,
+  sud: 120,
+  nationsCeltes: 120,
+  wallabies: 130,
+  pumas: 130,
+  urc: 135,
+  premiership: 140,
+  superRugby: 150,
+  franceXV: 160,
+  sixNations: 180,
+  springboks: 190,
+  allBlacks: 190,
+  rugbyChampionship: 200,
+  top14: 210,
+  grand: 220,
+  elite: 300,
+};
+
 export function etatCollectionSoloVide(): EtatCollectionSolo {
   return { quantites: {}, packsOuverts: {}, doublons: 0 };
 }
 
-/** La gratuite concerne seulement la collection solo, jamais les ligues. */
+/** La gratuité ou le prix solo adapté concerne seulement la collection solo, jamais les ligues. */
 export function prixPackSolo(pack: Pick<PackCarriere, 'id' | 'prix'>): number {
-  return PACKS_SOLO_GRATUITS.has(pack.id) ? 0 : pack.prix;
+  if (PACKS_SOLO_GRATUITS.has(pack.id)) return 0;
+  if (pack.id in PRIX_PACKS_SOLO) return PRIX_PACKS_SOLO[pack.id];
+  return Math.max(25, Math.min(350, Math.round(pack.prix * 0.05)));
+}
+
+/** Volume de cartes par pack en solo : 10 minimum (doublons fréquents), et jusqu'à 20 pour les grands packs. */
+export function cartesPackSolo(pack: Pick<PackCarriere, 'id' | 'cartes'>): number {
+  if (pack.id === 'grand') return 20;
+  if (pack.id === 'terroir') return 15;
+  if (pack.id === 'federales') return 12;
+  return Math.max(10, pack.cartes);
+}
+
+export function packCollectionSolo(pack: PackCarriere): PackCarriere {
+  return {
+    ...pack,
+    prix: prixPackSolo(pack),
+    cartes: cartesPackSolo(pack),
+  };
+}
+
+export function packsCollectionSolo(packs: readonly PackCarriere[]): PackCarriere[] {
+  return packs.map(packCollectionSolo);
 }
 
 /** Une empreinte stable sur 64 bits : la collection survit aux reordonnancements du catalogue. */

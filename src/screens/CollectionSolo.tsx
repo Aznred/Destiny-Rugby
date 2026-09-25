@@ -6,7 +6,9 @@ import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { useGame } from '../store/useGame';
 import { carteDepuisSource, catalogueBaseCarriere, PACKS_CARRIERE } from '../lib/ligue/catalogueCarriere';
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
-import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, prixPackSolo } from '../lib/collectionSolo';
+import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo } from '../lib/collectionSolo';
+import { SalonAmicalModal } from '../components/SalonAmicalModal';
+import { estCompteKiriAutorise } from '../lib/amicalCollection';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import { nombre } from '../lib/i18n';
 import './CollectionSolo.css';
@@ -23,13 +25,17 @@ export function CollectionSolo() {
   const joueur = useGame(s => s.joueur);
   const manager = useGame(s => s.manager);
   const catalogue = useMemo(() => catalogueBaseCarriere(), []);
-  const packsRoue = useMemo<PackCarriere[]>(() => [...PACKS_CARRIERE], []);
+  const packsRoue = useMemo<PackCarriere[]>(() => packsCollectionSolo(PACKS_CARRIERE), []);
   const [recherche, setRecherche] = useState('');
   const [rarete, setRarete] = useState<RareteCarriere | 'toutes'>('toutes');
   const [statut, setStatut] = useState<'toutes' | 'trouvees' | 'manquantes'>('trouvees');
   const [page, setPage] = useState(0);
   const [ouverture, setOuverture] = useState<{ pack: PackCarriere; indices: number[] } | null>(null);
   const [bilan, setBilan] = useState('');
+  const nomCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Compte joueur';
+  const estKiri = useMemo(() => estCompteKiriAutorise(null, nomCompte), [nomCompte]);
+  const [amicalOuvert, setAmicalOuvert] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('amical'));
+  const codeAmicalUrl = useMemo(() => typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('amical') ?? undefined : undefined, []);
 
   const cartesFiltrees = useMemo(() => {
     const terme = normaliser(recherche.trim());
@@ -49,12 +55,11 @@ export function CollectionSolo() {
   const trouvees = catalogue.reduce((somme, carte) => somme + (etat.quantites[cleCarteSolo(carte.sourceId)] ? 1 : 0), 0);
   const exemplaires = Object.values(etat.quantites).reduce((somme, quantite) => somme + quantite, 0);
   const progression = total ? Math.round(trouvees / total * 1000) / 10 : 0;
-  const nomCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Compte joueur';
 
   const ouvrirDepuisRoue = async (id: string) => {
-    const pack = PACKS_CARRIERE.find(candidat => candidat.id === id);
+    const pack = packsRoue.find(candidat => candidat.id === id);
     if (!pack) return;
-    const prix = prixPackSolo(pack);
+    const prix = pack.prix;
     const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogue, precedent));
     if (!resultat) {
       setBilan(coins < prix ? `Il te manque ${nombre(prix - coins)} Ovas pour ouvrir ce pack.` : 'Ce pack ne contient aucun joueur disponible.');
@@ -78,10 +83,23 @@ export function CollectionSolo() {
       <div className="solo-stats"><span><b>{nombre(Object.values(etat.packsOuverts).reduce((s, n) => s + n, 0))}</b> packs ouverts</span><span><b>{nombre(etat.doublons)}</b> doublons</span><span><b>{nombre(exemplaires)}</b> cartes au total</span></div>
     </section>
 
+    {estKiri && (
+      <section className="solo-banniere-amical carte">
+        <div className="solo-amical-texte">
+          <span className="amical-badge-kiri">🧪 PROTOTYPE KIRI ACTIF</span>
+          <h3>Match Amical 1v1 Collection</h3>
+          <p>Compose ton XV de départ à partir de tes cartes de collection et affronte tes potes avec contrôle direct à la manette / joystick !</p>
+        </div>
+        <button type="button" className="btn primaire" onClick={() => setAmicalOuvert(true)}>
+          <Icone nom="eclair" taille={18} /> Lancer le prototype amical
+        </button>
+      </section>
+    )}
+
     {bilan && <p className="solo-bilan" role="status"><Icone nom="ok" taille={17} /> {bilan}</p>}
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
-      <div className="solo-titre-ligne"><div><div className="eyebrow">Tous les packs du jeu</div><h2 id="solo-packs-titre">Choisis un pack</h2></div><span>Bronze, Argent et Or sont gratuits. Les autres packs sont débités de tes Ovas. Chaque tirage peut contenir des doublons.</span></div>
+      <div className="solo-titre-ligne"><div><div className="eyebrow">Tous les packs du jeu</div><h2 id="solo-packs-titre">Choisis un pack</h2></div><span>Bronze, Argent et Or sont gratuits. Les autres packs sont débités de tes Ovas (10 à 20 cartes par tirage, tarifs adaptés à la carrière solo). Chaque tirage peut contenir des doublons.</span></div>
       <BoutiquePacks3D
         packs={packsRoue}
         solde={coins}
@@ -114,5 +132,12 @@ export function CollectionSolo() {
       onFermer={() => setOuverture(null)}
       rendreCarte={carte => <CarteJoueurEnLigne carte={carte} compacte proprietaire="Ma collection" />}
     />}
+
+    {amicalOuvert && (
+      <SalonAmicalModal
+        codeInitial={codeAmicalUrl}
+        onFermer={() => setAmicalOuvert(false)}
+      />
+    )}
   </section>;
 }
