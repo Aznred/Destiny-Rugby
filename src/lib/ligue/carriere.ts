@@ -7,7 +7,7 @@ import { affichesToutesRondes } from './calendrier.js';
 import { horairesChampionnat } from './horaires.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { packsCatalogueAdmin, bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
-import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
+import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, forceFeuille, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
@@ -573,6 +573,56 @@ function reparerCalendriers(etat: EtatCarriereEnLigne) {
     competition.journeesRegulieres = Math.max(...etat.rencontres.filter(r => r.competitionId === competition.id).map(r => r.journee));
   }
 }
+
+/**
+ * Répare les phases finales d'anciennes versions :
+ * 1. Résout définitivement tout match d'élimination terminé sur égalité sans vainqueur.
+ * 2. Purge les affiches fantômes créées après la finale.
+ * 3. Clôture les compétitions dont la finale est déjà jouée.
+ */
+function reparerPhasesFinales(etat: EtatCarriereEnLigne) {
+  for (const c of etat.competitions) {
+    const matchs = etat.rencontres.filter(r => r.competitionId === c.id);
+    for (const r of matchs) {
+      if (estMatchElimination(etat, r) && r.resultat) {
+        if (!r.vainqueurId && !r.resultat.vainqueurId) {
+          if (r.resultat.pointsD !== r.resultat.pointsE) {
+            r.resultat.vainqueurId = r.resultat.pointsD > r.resultat.pointsE ? r.domicile : r.exterieur;
+            r.vainqueurId = r.resultat.vainqueurId;
+          } else {
+            resoudreEgaliteElimination(r, `${etat.graine}:reparer:${r.id}`);
+          }
+        } else if (r.resultat.vainqueurId && !r.vainqueurId) {
+          r.vainqueurId = r.resultat.vainqueurId;
+        }
+      }
+    }
+
+    if (c.format === 'elimination' || c.format === 'poules' || (c.format === 'championnat' && c.playoffs)) {
+      const debutKnockout = c.format === 'poules' || c.format === 'championnat'
+        ? (c.journeesRegulieres ?? 0) + 1
+        : 1;
+      const journeesKnockout = [...new Set(matchs.filter(r => r.journee >= debutKnockout).map(r => r.journee))].sort((a, b) => a - b);
+      for (const j of journeesKnockout) {
+        const affiches = matchs.filter(r => r.journee === j);
+        if (affiches.length === 1 && affiches[0].resultat) {
+          const finale = affiches[0];
+          const champion = finale.vainqueurId ?? finale.resultat?.vainqueurId ?? (finale.resultat && finale.resultat.pointsD > finale.resultat.pointsE ? finale.domicile : finale.exterieur);
+          const finaliste = finale.domicile === champion ? finale.exterieur : finale.domicile;
+          const aSupprimer = matchs.filter(r => r.journee > j);
+          if (aSupprimer.length) {
+            const idsASupprimer = new Set(aSupprimer.map(r => r.id));
+            etat.rencontres = etat.rencontres.filter(r => !idsASupprimer.has(r.id));
+          }
+          if (c.etat !== 'terminee') {
+            cloturerCompetition(etat, c, champion, finaliste, Date.now());
+          }
+          break;
+        }
+      }
+    }
+  }
+}
 function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
   exiger(etat.phase !== 'saison', 'La saison est déjà en cours.');
   exiger(etat.clubs.length >= 2, 'Invitez au moins un autre manager pour commencer.');
@@ -673,6 +723,104 @@ function cloturerCompetition(etat: EtatCarriereEnLigne, c: CompetitionCarriere, 
   etat.histoire.push({ competitionId: c.id, nom: c.nom, trophee: c.trophee, logo: c.logo, tropheeId: c.tropheeId, saison: c.saison, vainqueur, finaliste, date });
 }
 
+/** Indique si une rencontre fait partie d'une phase à élimination directe (coupe, phase finale ou play-offs). */
+export function estMatchElimination(etat: EtatCarriereEnLigne, r: RencontreCarriere): boolean {
+  const comp = etat.competitions.find(c => c.id === r.competitionId);
+  if (!comp) return false;
+  if (comp.format === 'elimination') return true;
+  if (comp.format === 'poules') return r.journee > (comp.journeesRegulieres ?? 0);
+  if (comp.format === 'championnat') return Boolean(comp.playoffs && comp.journeesRegulieres && r.journee > comp.journeesRegulieres);
+  return false;
+}
+
+/**
+ * Tranche une égalité en match à élimination directe selon les règles officielles du rugby :
+ * 1. Prolongations (2 x 10 minutes) où des points peuvent être marqués.
+ * 2. Si l'égalité persiste : séance de tirs au but (5 tirs puis mort subite) pour désigner un UNIQUE vainqueur.
+ */
+export function resoudreEgaliteElimination(
+  r: RencontreCarriere,
+  graineRng: string,
+  forceD = 50,
+  forceE = 50,
+): void {
+  if (!r.resultat) return;
+  const rng = hasard(graineRng);
+  const ecartForce = (forceD - forceE) / 50;
+
+  // 1. Prolongations (20 min)
+  const probaD = Math.max(0.15, Math.min(0.65, 0.35 + ecartForce * 0.15));
+  const probaE = Math.max(0.15, Math.min(0.65, 0.35 - ecartForce * 0.15));
+  const gain = () => (rng() < 0.25 ? 7 : rng() < 0.6 ? 3 : 5);
+  const ptsD = rng() < probaD ? gain() : 0;
+  const ptsE = rng() < probaE ? gain() : 0;
+
+  r.resultat.ap = true;
+  r.resultat.prolongations = { pointsD: ptsD, pointsE: ptsE };
+  r.resultat.pointsD += ptsD;
+  r.resultat.pointsE += ptsE;
+
+  if (r.resultat.pointsD !== r.resultat.pointsE) {
+    r.resultat.vainqueurId = r.resultat.pointsD > r.resultat.pointsE ? r.domicile : r.exterieur;
+    r.vainqueurId = r.resultat.vainqueurId;
+    return;
+  }
+
+  // 2. Tirs au but si toujours égalité après prolongations
+  r.resultat.tab = true;
+  let tirsD = 0;
+  let tirsE = 0;
+  const reussiteD = Math.max(0.55, Math.min(0.9, 0.75 + ecartForce * 0.08));
+  const reussiteE = Math.max(0.55, Math.min(0.9, 0.75 - ecartForce * 0.08));
+
+  for (let t = 0; t < 5; t++) {
+    if (rng() < reussiteD) tirsD++;
+    if (rng() < reussiteE) tirsE++;
+  }
+
+  let mortSubite = 0;
+  while (tirsD === tirsE && mortSubite < 10) {
+    mortSubite++;
+    const butD = rng() < reussiteD;
+    const butE = rng() < reussiteE;
+    if (butD) tirsD++;
+    if (butE) tirsE++;
+    if (butD !== butE) break;
+  }
+  if (tirsD === tirsE) {
+    if (rng() < 0.5) tirsD++; else tirsE++;
+  }
+
+  r.resultat.tirsAuBut = { tirsD, tirsE };
+  r.resultat.vainqueurId = tirsD > tirsE ? r.domicile : r.exterieur;
+  r.vainqueurId = r.resultat.vainqueurId;
+}
+
+/**
+ * Renvoie le vainqueur certain d'une rencontre à élimination directe.
+ * En cas de match d'élimination ancien non résolu terminé sur égalité, tranche
+ * immédiatement et persiste le résultat.
+ */
+export function vainqueurRencontre(r: RencontreCarriere, etat?: EtatCarriereEnLigne): string {
+  if (r.vainqueurId) return r.vainqueurId;
+  if (r.resultat?.vainqueurId) {
+    r.vainqueurId = r.resultat.vainqueurId;
+    return r.vainqueurId;
+  }
+  if (!r.resultat) return r.domicile;
+  if (r.resultat.pointsD !== r.resultat.pointsE) {
+    const v = r.resultat.pointsD > r.resultat.pointsE ? r.domicile : r.exterieur;
+    r.resultat.vainqueurId = v;
+    r.vainqueurId = v;
+    return v;
+  }
+  const graine = etat ? `${etat.graine}:tiebreak:${r.id}` : `tiebreak:${r.id}`;
+  resoudreEgaliteElimination(r, graine);
+  const vainqueur = r.resultat.vainqueurId ?? r.domicile;
+  r.vainqueurId = vainqueur;
+  return vainqueur;
+}
+
 function avancerCompetitions(etat: EtatCarriereEnLigne, maintenant: number) {
   for (const c of etat.competitions.filter(c => c.etat === 'enCours')) {
     const matchs = etat.rencontres.filter(r => r.competitionId === c.id);
@@ -690,11 +838,7 @@ function avancerCompetitions(etat: EtatCarriereEnLigne, maintenant: number) {
         continue;
       }
       const derniere = Math.max(...matchs.map(r => r.journee));
-      const gagnantDe = (r: RencontreCarriere) => r.resultat!.pointsD !== r.resultat!.pointsE
-        ? (r.resultat!.pointsD > r.resultat!.pointsE ? r.domicile : r.exterieur)
-        // À égalité, le mieux classé de la saison régulière passe : c'est
-        // l'avantage qu'on a gagné en vingt journées.
-        : rangs.indexOf(r.domicile) <= rangs.indexOf(r.exterieur) ? r.domicile : r.exterieur;
+      const gagnantDe = (r: RencontreCarriere) => vainqueurRencontre(r, etat);
       const debut = Math.max(...matchs.map(r => Date.parse(r.ferme)));
       if (derniere === c.journeesRegulieres) {
         const nombre = Math.min(rangs.length, Math.max(4, 2 ** Math.floor(Math.log2(rangs.length / 2))));
@@ -711,11 +855,7 @@ function avancerCompetitions(etat: EtatCarriereEnLigne, maintenant: number) {
     } else if (c.format === 'poules') {
       const derniere = Math.max(...matchs.map(r => r.journee));
       const classementReference = c.phaseFinaleSeed ?? c.participants;
-      const gagnant = (r: RencontreCarriere) => r.resultat!.pointsD !== r.resultat!.pointsE
-        ? (r.resultat!.pointsD > r.resultat!.pointsE ? r.domicile : r.exterieur)
-        : r.resultat!.essaisD !== r.resultat!.essaisE
-          ? (r.resultat!.essaisD > r.resultat!.essaisE ? r.domicile : r.exterieur)
-          : classementReference.indexOf(r.domicile) <= classementReference.indexOf(r.exterieur) ? r.domicile : r.exterieur;
+      const gagnant = (r: RencontreCarriere) => vainqueurRencontre(r, etat);
       const debut = Math.max(...matchs.map(r => Date.parse(r.ferme)));
       if (derniere === c.journeesRegulieres) {
         const qualification = qualificationsPoules(etat,c);
@@ -732,19 +872,25 @@ function avancerCompetitions(etat: EtatCarriereEnLigne, maintenant: number) {
         }
       }
     } else {
-      // La prolongation virtuelle est déterministe : essais, puis meilleur rang de championnat.
-      const classement = classementCarriere(etat);
-      const gagnant = (r: RencontreCarriere) => r.resultat!.pointsD !== r.resultat!.pointsE ? (r.resultat!.pointsD > r.resultat!.pointsE ? r.domicile : r.exterieur)
-        : r.resultat!.essaisD !== r.resultat!.essaisE ? (r.resultat!.essaisD > r.resultat!.essaisE ? r.domicile : r.exterieur)
-          : classement.findIndex(l => l.clubId === r.domicile) <= classement.findIndex(l => l.clubId === r.exterieur) ? r.domicile : r.exterieur;
-      const perdants = new Set(matchs.map(r => gagnant(r) === r.domicile ? r.exterieur : r.domicile));
-      const restants = c.participants.filter(id => !perdants.has(id));
-      if (restants.length === 1) {
-        const finale = matchs[matchs.length - 1]; cloturerCompetition(etat, c, restants[0], finale.domicile === restants[0] ? finale.exterieur : finale.domicile, maintenant);
-      } else {
-        const journee = Math.max(...matchs.map(r => r.journee)) + 1;
+      const derniere = Math.max(...matchs.map(r => r.journee));
+      const tour = matchs.filter(r => r.journee === derniere);
+      if (tour.length > 1) {
+        const vainqueurs = tour.map(r => vainqueurRencontre(r, etat));
         const debut = Math.max(...matchs.map(r => Date.parse(r.ferme)));
-        ajouterRencontres(etat, c, journee, Array.from({ length: Math.floor(restants.length / 2) }, (_, i) => ({ domicile: restants[i * 2], exterieur: restants[i * 2 + 1] })), debut);
+        const paires: { domicile: string; exterieur: string }[] = [];
+        for (let i = 0; i < vainqueurs.length; i += 2) {
+          if (vainqueurs[i] && vainqueurs[i + 1]) {
+            paires.push({ domicile: vainqueurs[i], exterieur: vainqueurs[i + 1] });
+          }
+        }
+        if (paires.length > 0) {
+          ajouterRencontres(etat, c, derniere + 1, paires, debut);
+        }
+      } else if (tour.length === 1) {
+        const finale = tour[0];
+        const champion = vainqueurRencontre(finale, etat);
+        const finaliste = finale.domicile === champion ? finale.exterieur : finale.domicile;
+        cloturerCompetition(etat, c, champion, finaliste, maintenant);
       }
     }
   }
@@ -785,10 +931,23 @@ function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, ma
   if (r.resultat || !r.match?.termine) return;
   const m = r.match;
   r.resultat = { pointsD: m.score.domicile, pointsE: m.score.exterieur, essaisD: m.essais.domicile, essaisE: m.essais.exterieur, penalitesD: m.penalites.domicile, penalitesE: m.penalites.exterieur, joueLe: dateServeur(maintenant), origine: m.debut >= Date.parse(r.ferme) ? 'absence' : 'direct' };
+
+  if (estMatchElimination(etat, r)) {
+    if (r.resultat.pointsD === r.resultat.pointsE) {
+      const forceD = forceFeuille(r.match.equipes?.domicile.feuille ?? []);
+      const forceE = forceFeuille(r.match.equipes?.exterieur.feuille ?? []);
+      resoudreEgaliteElimination(r, `${graine}:elimination:${r.id}`, forceD || 50, forceE || 50);
+    } else {
+      r.resultat.vainqueurId = r.resultat.pointsD > r.resultat.pointsE ? r.domicile : r.exterieur;
+      r.vainqueurId = r.resultat.vainqueurId;
+    }
+  }
+
   const rng = hasard(`${graine}:sante:${r.id}`);
   for (const cote of ['domicile', 'exterieur'] as const) {
     const autre = cote === 'domicile' ? 'exterieur' : 'domicile'; const club = clubParId(etat, r[cote]);
-    const victoire = m.score[cote] > m.score[autre], nul = m.score[cote] === m.score[autre];
+    const victoire = r.resultat.vainqueurId ? r.resultat.vainqueurId === r[cote] : m.score[cote] > m.score[autre];
+    const nul = !r.resultat.vainqueurId && m.score[cote] === m.score[autre];
     // ⚠️ LE RAPPORT VICTOIRE / DÉFAITE EST LE VRAI RÉGLAGE ANTI-BOULE-DE-NEIGE,
     // pas le montant. Une grosse victoire rapporte 2 050 Ovas, une défaite sèche
     // 600 : trois fois et demie sur le meilleur des cas, deux fois sur le cas
@@ -798,7 +957,7 @@ function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, ma
     const performance = (m.essais[cote] >= 4 ? 150 : 0) + (victoire && m.essais[autre] === 0 ? 200 : 0)
       + (victoire && cote === 'exterieur' ? 100 : 0) + (m.score[cote] >= 30 ? 100 : 0);
     const bonus = (m.essais[cote] - m.essais[autre] >= 3 ? 150 : 0) + (!victoire && !nul && m.score[autre] - m.score[cote] <= 7 ? 100 : 0);
-    journal(etat, club, 'match', 500 + (victoire ? 750 : nul ? 350 : 100) + bonus + performance, [], `${clubParId(etat, r.domicile).nom} ${m.score.domicile} – ${m.score.exterieur} ${clubParId(etat, r.exterieur).nom}`, dateServeur(maintenant));
+    journal(etat, club, 'match', 500 + (victoire ? 750 : nul ? 350 : 100) + bonus + performance, [], `${clubParId(etat, r.domicile).nom} ${r.resultat.pointsD} – ${r.resultat.pointsE} ${clubParId(etat, r.exterieur).nom}${r.resultat.tab ? ' (t.a.b.)' : r.resultat.ap ? ' (a.p.)' : ''}`, dateServeur(maintenant));
     const titulaires = new Set(club.composition.titulaires);
     for (const objectif of etat.objectifs.filter(o => o.clubId === club.id && Date.parse(o.debut) <= maintenant && maintenant < Date.parse(o.fin))) {
       if (objectif.type === 'participer') objectif.progression++;
@@ -977,6 +1136,7 @@ function reprendre(etat: EtatCarriereEnLigne, maintenant: number): EtatCarriereE
   nouveau.rotationPacks = catalogueAdmin().rotationPacks === true;
   for (const club of nouveau.clubs) ajusterComposition(nouveau, club, maintenant);
   reparerCalendriers(nouveau);
+  reparerPhasesFinales(nouveau);
   return nouveau;
 }
 

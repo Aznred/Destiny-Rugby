@@ -74,10 +74,22 @@ export interface ClubCarriere {
 export interface ResultatCarriere {
   pointsD: number; pointsE: number; essaisD: number; essaisE: number;
   penalitesD?: number; penalitesE?: number; joueLe: string; origine: 'direct' | 'absence';
+  /** Club victorieux, garanti même après prolongations ou tirs au but. */
+  vainqueurId?: string;
+  /** Points marqués pendant les prolongations (2 x 10 min). */
+  prolongations?: { pointsD: number; pointsE: number };
+  /** Score de la séance de tirs au but si l'égalité a persisté après prolongations. */
+  tirsAuBut?: { tirsD: number; tirsE: number };
+  /** Indique que le match s'est joué après 80 min (prolongations). */
+  ap?: boolean;
+  /** Indique que le match a été tranché aux tirs au but. */
+  tab?: boolean;
 }
 export interface RencontreCarriere {
   id: string; competitionId: string; journee: number; domicile: string; exterieur: string;
   ouvre: string; ferme: string; match?: EtatMatchEnLigne; resultat?: ResultatCarriere;
+  /** Club qualifié ou champion après résolution définitive. */
+  vainqueurId?: string;
 }
 export interface CompetitionCarriere {
   id: string; nom: string; trophee: string; format: 'championnat' | 'elimination' | 'poules';

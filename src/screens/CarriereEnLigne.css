@@ -581,7 +581,21 @@
   background: rgba(0, 0, 0, 0.24);
 }
 .cel-rencontre.grande { border-color: var(--bordure-forte); background: rgba(0, 0, 0, 0.3); padding: 1.1rem 1.2rem; }
-.cel-rencontre-date { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brume); }
+.cel-rencontre-date { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brume); }
+.cel-badge-etape { display: inline-block; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; padding: 0.15rem 0.45rem; border-radius: 4px; background: rgba(255, 255, 255, 0.08); color: var(--craie); }
+.cel-badge-etape.elimination { background: rgba(210, 174, 74, 0.18); color: var(--or-300); border: 1px solid rgba(210, 174, 74, 0.35); }
+.cel-badge-etape.playoff { background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.15)); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); }
+.cel-date-point { opacity: 0.5; }
+.cel-score-principal { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
+.cel-mention-score { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.cel-mention-score.tab { color: #38bdf8; }
+.cel-mention-score.ap { color: var(--or-400); }
+.cel-rencontre.playoff { border-color: rgba(245, 158, 11, 0.35); background: linear-gradient(180deg, rgba(245, 158, 11, 0.04), rgba(0, 0, 0, 0.28)); }
+.cel-panneau-playoff { border-color: rgba(245, 158, 11, 0.4); }
+.cel-eyebrow-playoff { color: #fbbf24 !important; font-weight: 800; }
+.cel-eyebrow-elimination { color: var(--or-400) !important; font-weight: 800; }
+.cel-statut-qualif.playoff { background: #f59e0b; color: #000; font-weight: 800; }
+.cel-table tr.qualifie-playoff th button span { color: #fbbf24; }
 .cel-direct-label { color: var(--danger); animation: cel-pouls 1.8s ease-in-out infinite; }
 .cel-affiche { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0.7rem; }
 .cel-equipe-affiche { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: .4rem; }
@@ -2015,20 +2029,33 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-composition-poules .cel-ecusson, .cel-composition-poules .cel-ecusson-logo { width: 30px; height: 30px; flex: 0 0 30px; }
 .cel-club-poule { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; }
 .cel-club-poule .cel-ecusson, .cel-club-poule .cel-ecusson-logo { width: 25px; height: 25px; flex: 0 0 25px; }
-.cel-tour-coupe { display: flex; flex-direction: column; justify-content: space-around; gap: 0.7rem; min-width: 0; }
-.cel-tour-coupe > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; color: var(--or-400); text-transform: uppercase; letter-spacing: 0.08em; }
-.cel-tour-coupe > div:first-child small { color: var(--brume); letter-spacing: 0; text-transform: none; }
-.cel-match-tableau { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 0.45rem; min-height: 78px; padding: 0.65rem; border: 1px solid rgba(210, 174, 74, 0.3); border-radius: 12px; background: rgba(4, 18, 30, 0.72); color: var(--blanc); text-align: left; }
+.cel-tableau-coupe { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); gap: 1rem; overflow-x: auto; padding: 0.8rem 0 0.35rem; }
+.cel-tour-coupe { display: flex; flex-direction: column; justify-content: flex-start; gap: 0.85rem; min-width: 0; }
+.cel-entete-tour { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; color: var(--or-400); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.78rem; padding-bottom: 0.25rem; border-bottom: 1px solid rgba(210, 174, 74, 0.2); }
+.cel-entete-tour small { color: var(--brume); letter-spacing: 0; text-transform: none; }
+.cel-match-tableau { display: flex; flex-direction: column; justify-content: center; min-height: 84px; padding: 0.6rem 0.75rem; border: 1px solid rgba(210, 174, 74, 0.3); border-radius: 12px; background: rgba(4, 18, 30, 0.88); color: var(--blanc); text-align: left; gap: 0.35rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); transition: border-color 0.15s ease, transform 0.15s ease; width: 100%; box-sizing: border-box; }
 .cel-match-tableau:not(:disabled) { cursor: pointer; }
 .cel-match-tableau:not(:disabled):hover { border-color: var(--or-400); transform: translateY(-1px); }
-.cel-match-tableau > span { display: flex; align-items: center; gap: 0.35rem; min-width: 0; font-weight: 700; }
-.cel-match-tableau > span:last-child { flex-direction: row-reverse; text-align: right; }
-.cel-match-tableau .cel-ecusson { width: 26px; height: 26px; flex: 0 0 26px; }
-.cel-match-tableau strong { margin-left: auto; color: var(--or-300); font-size: 1.15rem; }
-.cel-match-tableau > span:last-child strong { margin: 0 auto 0 0; }
-.cel-match-tableau > em { color: var(--or-400); font-family: var(--police-titre); font-style: normal; }
+.cel-match-tableau.direct { border-color: #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.25); }
+.cel-ligne-equipe { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-width: 0; width: 100%; }
+.cel-equipe-nom-wrap { display: flex; align-items: center; gap: 0.45rem; min-width: 0; flex: 1; }
+.cel-match-tableau .cel-ecusson { width: 24px; height: 24px; flex: 0 0 24px; }
+.cel-equipe-nom { font-size: 0.86rem; font-weight: 700; color: var(--craie); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cel-ligne-equipe.vainqueur .cel-equipe-nom { color: #fff; font-weight: 800; }
+.cel-ligne-equipe.perdant .cel-equipe-nom { color: var(--brume); opacity: 0.72; }
+.cel-score-wrap { display: flex; align-items: center; gap: 0.25rem; flex: 0 0 auto; }
+.cel-score-valeur { font-size: 1.15rem; font-weight: 800; font-family: var(--police-titre); color: var(--or-300); min-width: 24px; text-align: right; line-height: 1; }
+.cel-ligne-equipe.vainqueur .cel-score-valeur { color: #fbbf24; text-shadow: 0 0 8px rgba(251, 191, 36, 0.4); }
+.cel-ligne-equipe.perdant .cel-score-valeur { color: var(--brume); opacity: 0.7; }
+.cel-score-vide { font-size: 0.95rem; color: var(--brume); min-width: 24px; text-align: right; }
+.cel-tirs-tab { font-size: 0.72rem; font-weight: 700; color: #38bdf8; line-height: 1; }
+.cel-separateur-equipes { position: relative; width: 100%; height: 1px; background: rgba(255, 255, 255, 0.08); margin: 0.15rem 0; display: flex; align-items: center; justify-content: center; }
+.cel-tag-fin { position: absolute; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.05em; padding: 0.1rem 0.35rem; border-radius: 4px; text-transform: uppercase; background: rgba(4, 18, 30, 0.95); border: 1px solid rgba(255, 255, 255, 0.15); line-height: 1; }
+.cel-tag-fin.tab { color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); }
+.cel-tag-fin.ap { color: var(--or-400); border-color: rgba(251, 191, 36, 0.4); }
+.cel-tag-fin.live { color: #ef4444; border-color: rgba(239, 68, 68, 0.5); }
 .cel-match-tableau.attente { opacity: 0.52; border-style: dashed; }
-.cel-match-tableau.attente i { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.08); }
+.cel-match-tableau.attente i { width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE — dans les deux sens
