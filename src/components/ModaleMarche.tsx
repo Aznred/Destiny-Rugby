@@ -22,6 +22,7 @@ import { useModalDialog } from '../lib/useModalDialog';
 import { valeurVenteRapide, plafondVenteRapide } from '../lib/ligue/venteRapideCarriere';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import type { CarteCarriere, CommandeCarriere, VenteCarriere } from '../lib/ligue/typesCarriere';
+import { t } from '../lib/i18n';
 import './ModaleMarche.css';
 
 const nombres = new Intl.NumberFormat('fr-FR');
@@ -58,7 +59,7 @@ function useCompteARebours(echeance: string): { jours: number; heures: number; m
 
 function CompteARebours({ echeance }: { echeance: string }) {
   const reste = useCompteARebours(echeance);
-  if (!reste) return <b className="mm-fini">Clôturée</b>;
+  if (!reste) return <b className="mm-fini">{t('online.market.closed')}</b>;
   return <b className="mm-rebours" aria-label={`Temps restant : ${reste.jours ? `${reste.jours} jours ` : ''}${reste.heures} heures ${reste.minutes} minutes ${reste.secondes} secondes`}>
     {reste.jours > 0 && <span>{reste.jours} j</span>}
     <span>{deuxChiffres(reste.heures)}</span><i>:</i><span>{deuxChiffres(reste.minutes)}</span><i>:</i><span>{deuxChiffres(reste.secondes)}</span>
@@ -100,7 +101,7 @@ export function ModaleMarche({ carte, vente, monClubId, ovas, logoClub, nomDe, o
         ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, y: 14, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.2 }}
       >
-        <button type="button" className="btn fantome petit mm-fermer" onClick={onFermer} aria-label="Fermer"><Icone nom="croix" taille={17} /></button>
+        <button type="button" className="btn fantome petit mm-fermer" onClick={onFermer} aria-label={t('online.common.close')}><Icone nom="croix" taille={17} /></button>
         <div className="mm-corps">
           <div className="mm-carte"><CarteJoueurEnLigne carte={carte} logoClub={logoClub} proprietaire={carte.proprietaire ? nomDe(carte.proprietaire) : undefined} /></div>
           <div className="mm-details">
@@ -134,32 +135,32 @@ function Annonce({ carte, vente, monClubId, ovas, nomDe, occupe, onAgir }: {
 
   return <>
     <div className="mm-entete">
-      <div className="eyebrow">{enchere ? 'Aux enchères' : 'Vente directe'} · {NOMS_PACK[carte.rarete]}</div>
+      <div className="eyebrow">{enchere ? t('online.market.bestOffer') : t('online.market.price')} · {NOMS_PACK[carte.rarete]}</div>
       <h2>{carte.nom}</h2>
     </div>
     <dl className="mm-lignes">
-      <div><dt>Vendeur</dt><dd>{nomDe(vente.vendeurId)}{mienne && <i> · toi</i>}</dd></div>
-      <div><dt>{enchere ? 'Meilleure offre' : 'Prix'}</dt><dd className="mm-prix">{montant(vente.enchere?.montant ?? vente.prix)} <small>Ovas</small></dd></div>
-      {enchere && <div><dt>Dernier enchérisseur</dt><dd>{vente.enchere ? nomDe(vente.enchere.clubId) : <i>aucune offre pour l’instant</i>}</dd></div>}
-      <div><dt>Temps restant</dt><dd><CompteARebours echeance={vente.expireLe} /><small className="mm-echeance">clôture {dateHeure(vente.expireLe)}</small></dd></div>
-      <div><dt>Ton solde</dt><dd>{montant(ovas)} <small>Ovas</small></dd></div>
+      <div><dt>{t('online.market.seller')}</dt><dd>{nomDe(vente.vendeurId)}{mienne && <i>{t('online.market.you')}</i>}</dd></div>
+      <div><dt>{enchere ? t('online.market.bestOffer') : t('online.market.price')}</dt><dd className="mm-prix">{montant(vente.enchere?.montant ?? vente.prix)} <small>Ovas</small></dd></div>
+      {enchere && <div><dt>{t('online.market.lastBidder')}</dt><dd>{vente.enchere ? nomDe(vente.enchere.clubId) : <i>{t('online.market.noBids')}</i>}</dd></div>}
+      <div><dt>{t('online.market.timeLeft')}</dt><dd><CompteARebours echeance={vente.expireLe} /><small className="mm-echeance">{t('online.market.closesAt', { time: dateHeure(vente.expireLe) })}</small></dd></div>
+      <div><dt>{t('online.market.yourBalance')}</dt><dd>{montant(ovas)} <small>Ovas</small></dd></div>
     </dl>
 
     {mienne
       ? (!enchere || !vente.enchere
-        ? <button type="button" className="btn fantome" disabled={occupe} onClick={() => onAgir({ type: 'annulerVente', venteId: vente.id })}>Retirer de la vente</button>
-        : <p className="mm-note">Une enchère est en cours : la vente ira à son terme.</p>)
+        ? <button type="button" className="btn fantome" disabled={occupe} onClick={() => onAgir({ type: 'annulerVente', venteId: vente.id })}>{t('online.market.withdrawListing')}</button>
+        : <p className="mm-note">{t('online.market.activeBidOngoing')}</p>)
       : enchere
         ? <form className="mm-actions" onSubmit={(e) => { e.preventDefault(); onAgir({ type: 'encherir', venteId: vente.id, montant: Number(offre) }); }}>
-          <label className="cel-champ"><span>Ton offre (minimum {montant(minimum)})</span>
+          <label className="cel-champ"><span>{t('online.market.yourBidMin', { min: montant(minimum) })}</span>
             <input type="number" min={minimum} step={25} value={offre} onChange={(e) => setOffre(e.target.value)} required />
           </label>
-          <button className="btn primaire" disabled={occupe || tropCher || Number(offre) < minimum}>Enchérir</button>
-          {tropCher && <p className="mm-note alerte">Il te manque {montant(aPayer - ovas)} Ovas.</p>}
+          <button className="btn primaire" disabled={occupe || tropCher || Number(offre) < minimum}>{t('online.market.placeBid')}</button>
+          {tropCher && <p className="mm-note alerte">{t('online.market.missingOvas', { amount: montant(aPayer - ovas) })}</p>}
         </form>
         : <div className="mm-actions">
-          <button type="button" className="btn primaire" disabled={occupe || tropCher} onClick={() => onAgir({ type: 'acheter', venteId: vente.id })}>Acheter pour {montant(vente.prix)} Ovas</button>
-          {tropCher && <p className="mm-note alerte">Il te manque {montant(vente.prix - ovas)} Ovas.</p>}
+          <button type="button" className="btn primaire" disabled={occupe || tropCher} onClick={() => onAgir({ type: 'acheter', venteId: vente.id })}>{t('online.market.buyFor', { price: montant(vente.prix) })}</button>
+          {tropCher && <p className="mm-note alerte">{t('online.market.missingOvas', { amount: montant(vente.prix - ovas) })}</p>}
         </div>}
   </>;
 }
@@ -168,8 +169,18 @@ function Annonce({ carte, vente, monClubId, ovas, nomDe, occupe, onAgir }: {
 
 /** Le pas des prix du marché : 50 Ovas, la plus petite vente rapide. */
 const PRIX_PAS = 50;
-const DUREES: [string, string][] = [['2', '2 heures'], ['6', '6 heures'], ['24', '24 heures'], ['72', '3 jours'], ['168', '7 jours']];
-const TYPES: [string, string][] = [['directe', 'Vente directe'], ['enchere', 'Aux enchères'], ['echange', 'Échange contre une carte']];
+const obtenirDurees = (): [string, string][] => [
+  ['2', t('online.market.duration.2h')],
+  ['6', t('online.market.duration.6h')],
+  ['24', t('online.market.duration.24h')],
+  ['72', t('online.market.duration.3d')],
+  ['168', t('online.market.duration.7d')],
+];
+const obtenirTypes = (): [string, string][] => [
+  ['directe', t('online.market.type.direct')],
+  ['enchere', t('online.market.type.auction')],
+  ['echange', t('online.market.type.trade')],
+];
 
 function MiseEnVente({ carte, occupe, surLaFeuille, effectif, onAgir, onEchanger }: {
   carte: CarteCarriere; occupe: boolean; surLaFeuille?: string;
@@ -180,6 +191,8 @@ function MiseEnVente({ carte, occupe, surLaFeuille, effectif, onAgir, onEchanger
   const [prix, setPrix] = useState('5000');
   const [duree, setDuree] = useState('24');
   const [confirmeRapide, setConfirmeRapide] = useState(false);
+  const DUREES = obtenirDurees();
+  const TYPES = obtenirTypes();
   const rapide = valeurVenteRapide(carte);
   const echange = mode === 'echange';
   // Un départ de plus passerait sous le plancher : le serveur refuserait, et
@@ -191,20 +204,20 @@ function MiseEnVente({ carte, occupe, surLaFeuille, effectif, onAgir, onEchanger
   // un prix et une durée pour une vente impossible n'a aucun sens.
   if (surLaFeuille) return <>
     <div className="mm-entete">
-      <div className="eyebrow">Sur la feuille de match · {NOMS_PACK[carte.rarete]}</div>
+      <div className="eyebrow">{t('online.market.onMatchSheet', { rarity: NOMS_PACK[carte.rarete] })}</div>
       <h2>{carte.nom}</h2>
     </div>
     <dl className="mm-lignes">
-      <div><dt>Statut</dt><dd>{surLaFeuille}</dd></div>
-      <div><dt>Valeur en vente rapide</dt><dd className="mm-prix">{montant(rapide)} <small>Ovas</small></dd></div>
+      <div><dt>{t('online.market.status')}</dt><dd>{surLaFeuille}</dd></div>
+      <div><dt>{t('online.market.quickSellValue')}</dt><dd className="mm-prix">{montant(rapide)} <small>Ovas</small></dd></div>
     </dl>
-    <p className="mm-note">Tu peux proposer un échange avec ce joueur. Il devra sortir du XV ou du banc avant que l’échange puisse être accepté. La vente reste bloquée tant qu’il est aligné.</p>
-    <button type="button" className="btn primaire" disabled={occupe} onClick={onEchanger}>Préparer l’échange</button>
+    <p className="mm-note">{t('online.market.onMatchSheetExchangeHelp')}</p>
+    <button type="button" className="btn primaire" disabled={occupe} onClick={onEchanger}>{t('online.market.prepareExchange')}</button>
   </>;
 
   return <>
     <div className="mm-entete">
-      <div className="eyebrow">Mettre sur le marché · {NOMS_PACK[carte.rarete]}</div>
+      <div className="eyebrow">{t('online.market.putOnMarket', { rarity: NOMS_PACK[carte.rarete] })}</div>
       <h2>{carte.nom}</h2>
     </div>
 
@@ -213,7 +226,7 @@ function MiseEnVente({ carte, occupe, surLaFeuille, effectif, onAgir, onEchanger
       if (echange) return onEchanger();
       onAgir({ type: 'vendre', carteId: carte.id, prix: Number(prix), mode: mode as 'directe' | 'enchere', dureeHeures: Number(duree) });
     }}>
-      <div className="cel-champ"><span>Type de vente</span><Selecteur valeur={mode} onChange={setMode} options={TYPES.map(([valeur, label]) => ({ valeur, label }))} /></div>
+      <div className="cel-champ"><span>{t('online.market.saleType')}</span><Selecteur valeur={mode} onChange={setMode} options={TYPES.map(([valeur, label]) => ({ valeur, label }))} /></div>
       {!echange && <>
         {/* ⚠️ LE PAS ET LE MINIMUM DOIVENT S'ACCORDER, sinon le navigateur
             refuse le formulaire sans que personne comprenne pourquoi. Le champ
@@ -221,16 +234,16 @@ function MiseEnVente({ carte, occupe, surLaFeuille, effectif, onAgir, onEchanger
             acceptées étaient 1, 101, 201… et publier une annonce au prix
             proposé par défaut affichait « les deux valeurs valides les plus
             proches sont 4901 et 5001 ». */}
-        <label className="cel-champ"><span>{mode === 'enchere' ? 'Mise à prix (Ovas)' : 'Prix (Ovas)'}</span>
+        <label className="cel-champ"><span>{mode === 'enchere' ? t('online.market.startingPrice') : t('online.market.priceOvas')}</span>
           <input type="number" min={PRIX_PAS} step={PRIX_PAS} value={prix} onChange={(e) => setPrix(e.target.value)} required />
         </label>
-        <div className="cel-champ"><span>Durée</span><Selecteur valeur={duree} onChange={setDuree} options={DUREES.map(([valeur, label]) => ({ valeur, label }))} /></div>
+        <div className="cel-champ"><span>{t('online.market.duration')}</span><Selecteur valeur={duree} onChange={setDuree} options={DUREES.map(([valeur, label]) => ({ valeur, label }))} /></div>
       </>}
       <p className="mm-note">{echange
-        ? 'Tu choisis ensuite le club et ce que tu demandes en face. Les deux doivent accepter.'
-        : 'Ton effectif doit conserver au moins 26 joueurs et les postes nécessaires.'}</p>
-      <button className="btn primaire" disabled={occupe || (plancher && !echange)}>{echange ? 'Préparer l’échange' : 'Publier l’annonce'}</button>
-      {plancher && !echange && <p className="mm-note alerte">Ton effectif tomberait à {effectif!.restants} joueurs disponibles ; il en faut {effectif!.minimum}.</p>}
+        ? t('online.market.tradeHelp')
+        : t('online.market.squadLimitHelp')}</p>
+      <button className="btn primaire" disabled={occupe || (plancher && !echange)}>{echange ? t('online.market.prepareExchange') : t('online.market.publishListing')}</button>
+      {plancher && !echange && <p className="mm-note alerte">{t('online.market.squadWillDrop', { count: effectif!.restants, min: effectif!.minimum })}</p>}
     </form>
 
     {/* ⚠️ LA VENTE RAPIDE EST IRRÉVERSIBLE, ELLE SE CONFIRME DONC EN DEUX TEMPS.
@@ -238,18 +251,18 @@ function MiseEnVente({ carte, occupe, surLaFeuille, effectif, onAgir, onEchanger
         place du bouton, là où le regard est déjà posé. */}
     <div className="mm-rapide">
       <div>
-        <div className="eyebrow">Vente rapide</div>
-        <p className="mm-note">Le club rachète la carte immédiatement. Plafond {NOMS_PACK[carte.rarete]} : {montant(plafondVenteRapide(carte.rarete))} Ovas.</p>
+        <div className="eyebrow">{t('online.market.quickSell')}</div>
+        <p className="mm-note">{t('online.market.quickSellClubHelp', { rarity: NOMS_PACK[carte.rarete], cap: montant(plafondVenteRapide(carte.rarete)) })}</p>
       </div>
       {confirmeRapide
         ? <div className="mm-actions">
-          <p className="mm-note alerte">{carte.nom} quitte définitivement ton effectif contre {montant(rapide)} Ovas.</p>
+          <p className="mm-note alerte">{t('online.market.quickSellConfirm', { name: carte.nom, val: montant(rapide) })}</p>
           <div className="mm-boutons">
-            <button type="button" className="btn fantome" onClick={() => setConfirmeRapide(false)}>Annuler</button>
-            <button type="button" className="btn primaire" disabled={occupe} onClick={() => onAgir({ type: 'venteRapide', carteId: carte.id })}>Vendre pour {montant(rapide)} Ovas</button>
+            <button type="button" className="btn fantome" onClick={() => setConfirmeRapide(false)}>{t('online.common.cancel')}</button>
+            <button type="button" className="btn primaire" disabled={occupe} onClick={() => onAgir({ type: 'venteRapide', carteId: carte.id })}>{t('online.market.quickSellBtn', { val: montant(rapide) })}</button>
           </div>
         </div>
-        : <button type="button" className="btn fantome" disabled={occupe || plancher} onClick={() => setConfirmeRapide(true)}>{plancher ? `Garde au moins ${effectif!.minimum} joueurs` : `Vendre tout de suite · ${montant(rapide)} Ovas`}</button>}
+        : <button type="button" className="btn fantome" disabled={occupe || plancher} onClick={() => setConfirmeRapide(true)}>{plancher ? t('online.market.keepMinPlayers', { min: effectif!.minimum }) : t('online.market.quickSellAction', { val: montant(rapide) })}</button>}
     </div>
   </>;
 }

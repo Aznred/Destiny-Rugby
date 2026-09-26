@@ -146,7 +146,7 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
     return () => window.removeEventListener('keydown', clavier);
   }, [phase, toutes, maximum, ordre.length, onFermer, muet, sons, pret]);
   const conseil = phase === 'ouverture' ? t('online.shop.opening')
-    : phase === 'charge' ? 'Ça monte…'
+    : phase === 'charge' ? t('online.pack.upgrading')
       : phase === 'evolution' ? nomRaretePack(rarete)+' !'
         : impatient ? t('online.shop.opening') : t('online.pack.touch');
   return createPortal(<div ref={dialogue} className={`pack-show phase-${phase} palier-${rarete}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
@@ -160,7 +160,7 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
       <button ref={principale} className="pack-show-touch" aria-label={`Pack ${nomRaretePack(rarete)} — ${t('online.pack.touch')}`} aria-disabled={phase !== 'attente'} onClick={action}/>
       {(phase === 'charge' || phase === 'evolution') && <div className="pack-show-upgrade" key={phase} aria-hidden="true"><i/><i/><span/></div>}
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}
-    </div><p className="pack-show-hint" aria-live="polite">{conseil}</p></> : <div className="pack-show-results" role="list" aria-label="Cartes obtenues" style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
+    </div><p className="pack-show-hint" aria-live="polite">{conseil}</p></> : <div className="pack-show-results" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
       const visible = i >= ordre.length - revelees;
       const meilleure = i === 0;
       const active = i === carteActive;
@@ -177,6 +177,6 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
       </div>;
     })}</div>}
     {phase === 'cartes' && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={toutes?onFermer:passer}>{toutes?t('online.pack.clubhouse'):t('online.pack.reveal')}</button></footer>}
-    <span className="pack-show-sr" aria-live="polite">{muet?'Son désactivé':'Son activé'}. M pour changer le son. Échap pour passer.</span>
+    <span className="pack-show-sr" aria-live="polite">{muet?t('online.pack.soundMuted'):t('online.pack.soundActive')}</span>
   </main></div>, document.body);
 }

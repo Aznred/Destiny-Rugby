@@ -3,6 +3,7 @@ import { Icone } from './Icone';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
 import { Selecteur } from './Selecteur';
 import { CompositionTerrainManager } from './CompositionTerrainManager';
+import { t } from '../lib/i18n';
 import type { CarteCarriere } from '../lib/ligue/typesCarriere';
 import type { CompositionManager } from '../types';
 import type { Coequipier } from '../lib/effectif';
@@ -35,21 +36,21 @@ interface EquipeSauvegardee {
   composition: CompositionManager;
 }
 
-const NOM_AFFINITE: Record<Affinite, string> = {
-  club: 'du même club réel',
-  nation: 'de la même nation',
-  championnat: 'du même championnat',
-};
+const nomAffinite = (aff: Affinite): string => t(`online.affinity.${aff === 'championnat' ? 'league' : aff}`);
 
 function legendeAffinite(a: AffiniteCarte): string {
   const bonus = bonusCollectif(a.points);
-  const entete = `Collectif ${a.points}/${COLLECTIF_MAX} · ${bonus >= 0 ? '+' : ''}${bonus} de note`;
-  const detail = `${a.club} du même club · ${a.nation} de la même nation · ${a.championnat} du même championnat`;
-  if (!a.meilleure) return `${entete}\naucune affinité sur cette feuille\n${detail}`;
+  const entete = t('online.affinity.header', { points: String(a.points), max: String(COLLECTIF_MAX), sign: bonus >= 0 ? '+' : '', bonus: String(bonus) });
+  const detail = t('online.affinity.detail', {
+    club: String(a.club), clubAff: nomAffinite('club'),
+    nation: String(a.nation), natAff: nomAffinite('nation'),
+    league: String(a.championnat), leagueAff: nomAffinite('championnat'),
+  });
+  if (!a.meilleure) return `${entete}\n${t('online.affinity.none')}\n${detail}`;
   const tailles: Record<Affinite, number> = { club: a.club, nation: a.nation, championnat: a.championnat };
-  const compte = `${tailles[a.meilleure]} titulaires ${NOM_AFFINITE[a.meilleure]}`;
+  const compte = t('online.affinity.startersCount', { count: String(tailles[a.meilleure]), affinity: nomAffinite(a.meilleure) });
   const manque = a.points < COLLECTIF_MAX && a.club > 0 && a.club < 4
-    ? `\nIl manque ${4 - a.club} joueur${4 - a.club > 1 ? 's' : ''} de son club pour le maximum.` : '';
+    ? `\n${t('online.affinity.missingForMax', { count: String(4 - a.club) })}` : '';
   return `${entete}\n${compte}${manque}\n${detail}`;
 }
 
@@ -208,11 +209,11 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
     try {
       localStorage.setItem(CLE_COMPO_SOLO, JSON.stringify(composition));
       setBrouillon(null);
-      setNotification('Feuille de match enregistrée avec succès !');
+      setNotification(t('compoSolo.toastSaved'));
       onEnregistrer?.(composition);
       setTimeout(() => setNotification(''), 3000);
     } catch {
-      setNotification('Erreur lors de la sauvegarde locale.');
+      setNotification(t('compoSolo.toastError'));
     }
   };
 
@@ -228,7 +229,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
     try {
       localStorage.setItem(CLE_SAUVEGARDES_SOLO, JSON.stringify(liste));
       setNomEquipe('');
-      setNotification(`Équipe « ${nouvelle.nom} » sauvegardée !`);
+      setNotification(t('compoSolo.teamSavedNotice', { nom: nouvelle.nom }));
       setTimeout(() => setNotification(''), 3000);
     } catch {}
   };
@@ -245,20 +246,17 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
     return (
       <div className="cel-compo cel-compo-etendue collection-solo-compo" role="dialog" aria-modal="true">
         <header className="cel-panneau cel-tete-compo">
-          <h2>Feuille de match de la Collection Solo</h2>
+          <h2>{t('compoSolo.title')}</h2>
           <button type="button" className="btn fantome solo-compo-fermer" onClick={onFermer}>
-            <Icone nom="croix" taille={18} /> Fermer
+            <Icone nom="croix" taille={18} /> {t('online.common.close')}
           </button>
         </header>
         <div className="cel-vide" style={{ padding: '3rem', textAlign: 'center' }}>
           <Icone nom="equipe" taille={48} />
-          <h3>Effectif insuffisant ({cartes.length} / 23 cartes)</h3>
-          <p>
-            Il te faut au moins 23 cartes dans ta collection solo pour aligner un XV titulaire et 8 remplaçants.
-            Ouvre des packs gratuits (Bronze, Argent, Or) dans la boutique pour compléter ton effectif !
-          </p>
+          <h3>{t('compoSolo.shortSquadTitle', { n: cartes.length })}</h3>
+          <p>{t('compoSolo.shortSquadHelp')}</p>
           <button type="button" className="btn primaire" onClick={onFermer} style={{ marginTop: '1rem' }}>
-            Retour à la boutique et aux packs
+            {t('compoSolo.backToShop')}
           </button>
         </div>
       </div>
@@ -274,19 +272,19 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
           aria-pressed={vueEtendue}
           onClick={() => setVueEtendue(!vueEtendue)}
         >
-          {vueEtendue ? 'Réduire la vue' : 'Vue équipe entière'}
+          {vueEtendue ? t('compoSolo.reduceView') : t('compoSolo.expandView')}
         </button>
 
         <div className="cel-chiffres-compo">
           <div className="cel-note-compo">
             <b>{noteXV.toFixed(1)}</b>
-            <span>note du XV</span>
+            <span>{t('compoSolo.ratingXV')}</span>
           </div>
           <div
             className={`cel-collectif cel-collectif-${paliersCollectif(collectif.total)}`}
-            title={`Collectif ${collectif.total}/100 — Quatre joueurs d’un même club réel les mettent tous au maximum ; à défaut la nation ou le championnat. Le banc ne compte pas.`}
+            title={t('online.lineup.chemistryTooltip', { points: String(collectif.total) })}
           >
-            <span>collectif</span>
+            <span>{t('compoSolo.chemistry')}</span>
             <div className="cel-collectif-jauge">
               <i style={{ width: `${collectif.total}%` }} />
             </div>
@@ -296,10 +294,10 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
 
         <div>
           <div className="eyebrow">
-            {composition.titulaires.length + composition.remplacants.length} / {cartes.length} cartes
+            {t('compoSolo.cardsCount', { onField: composition.titulaires.length + composition.remplacants.length, total: cartes.length })}
           </div>
-          <h2>Feuille de Match Collection Solo</h2>
-          <p>Le capitaine tient la discipline, le buteur tire les pénalités.</p>
+          <h2>{t('compoSolo.sheetTitle')}</h2>
+          <p>{t('compoSolo.sheetSubtitle')}</p>
         </div>
 
         <button
@@ -308,11 +306,11 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
           disabled={!modifie}
           onClick={enregistrerFeuille}
         >
-          {modifie ? 'Enregistrer la feuille' : 'Feuille enregistrée'}
+          {modifie ? t('compoSolo.saveBtn') : t('compoSolo.savedBtn')}
         </button>
 
         <button type="button" className="btn fantome solo-compo-fermer" onClick={onFermer}>
-          <Icone nom="croix" taille={18} /> Fermer
+          <Icone nom="croix" taille={18} /> {t('online.common.close')}
         </button>
       </section>
 
@@ -330,27 +328,27 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
           onClick={() => {
             if (optimale) setBrouillon(optimale);
           }}
-          title="Assemble automatiquement la meilleure équipe combinant note et collectif sans aucun malus de poste"
+          title={t('compoSolo.buildBestHelp')}
         >
           <Icone nom="eclair" taille={16} />
-          <span>Assembler la meilleure équipe</span>
+          <span>{t('compoSolo.buildBest')}</span>
         </button>
 
         <details className="cel-details-outils">
           <summary className="btn cel-btn-outil">
             <Icone nom="disquette" taille={15} />
-            <span>Équipes sauvegardées ({sauvegardees.length}/15)</span>
+            <span>{t('compoSolo.savedTeams', { n: sauvegardees.length })}</span>
             <Icone nom="chevron" taille={13} className="cel-outil-chevron" />
           </summary>
           <div className="cel-outils-contenu">
             <p className="cel-note">
-              Sauvegarde tes compositions favorites créées avec ta collection personnelle.
+              {t('compoSolo.savedTeamsHelp')}
             </p>
             <div className="cel-actions">
               <input
-                aria-label="Nom de l’équipe"
+                aria-label={t('online.portal.leagueName')}
                 maxLength={40}
-                placeholder="Nom de l’équipe (ex: Mon XV Top 14)"
+                placeholder={t('compoSolo.teamPlaceholder')}
                 value={nomEquipe}
                 onChange={(e) => setNomEquipe(e.target.value)}
               />
@@ -360,7 +358,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
                 disabled={nomEquipe.trim().length < 2 || sauvegardees.length >= 15}
                 onClick={sauvegarderNouvelleEquipe}
               >
-                Sauvegarder
+                {t('compoSolo.saveTeamBtn')}
               </button>
             </div>
             {sauvegardees.map((eq) => (
@@ -371,7 +369,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
                   className="btn"
                   onClick={() => setBrouillon(structuredClone(eq.composition))}
                 >
-                  Charger
+                  {t('compoSolo.loadTeamBtn')}
                 </button>
                 <button
                   type="button"
@@ -379,7 +377,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
                   onClick={() => supprimerEquipeSauvegardee(eq.id)}
                   aria-label={`Supprimer ${eq.nom}`}
                 >
-                  Supprimer
+                  {t('compoSolo.deleteTeamBtn')}
                 </button>
               </div>
             ))}
@@ -389,24 +387,24 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
         <details className="cel-details-outils">
           <summary className="btn cel-btn-outil">
             <Icone nom="loupe" taille={15} />
-            <span>Filtrer les réserves</span>
+            <span>{t('compoSolo.filterReserves')}</span>
             <Icone nom="chevron" taille={13} className="cel-outil-chevron" />
           </summary>
           <div className="cel-outils-contenu cel-filtres-reserves">
             <Choix
-              label="Compétition"
+              label={t('compoSolo.competition')}
               valeur={filtreChampionnat}
-              options={[['', 'Toutes'], ...optionsFiltre('championnat').map((v) => [v, v] as [string, string])]}
+              options={[['', t('compoSolo.allFeminine')], ...optionsFiltre('championnat').map((v) => [v, v] as [string, string])]}
               onChange={(v) => {
                 setFiltreChampionnat(v);
                 setFiltreClub('');
               }}
             />
             <Choix
-              label="Club"
+              label={t('compoSolo.club')}
               valeur={filtreClub}
               options={[
-                ['', 'Tous'],
+                ['', t('compoSolo.allMasculine')],
                 ...optionsFiltre('clubReel')
                   .filter((v) => !filtreChampionnat || cartes.some((c) => c.clubReel === v && c.championnat === filtreChampionnat))
                   .map((v) => [v, v] as [string, string]),
@@ -414,16 +412,16 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
               onChange={setFiltreClub}
             />
             <Choix
-              label="Pays"
+              label={t('compoSolo.nation')}
               valeur={filtrePays}
-              options={[['', 'Tous'], ...optionsFiltre('pays').map((v) => [v, v] as [string, string])]}
+              options={[['', t('compoSolo.allMasculine')], ...optionsFiltre('pays').map((v) => [v, v] as [string, string])]}
               onChange={setFiltrePays}
             />
             <Choix
-              label="Poste"
+              label={t('compoSolo.position')}
               valeur={filtrePoste}
               options={[
-                ['', 'Tous'],
+                ['', t('compoSolo.allMasculine')],
                 ...[...new Set(cartes.map((c) => c.poste))]
                   .sort((a, b) => (POSTE_PAR_ID[a]?.numero ?? 0) - (POSTE_PAR_ID[b]?.numero ?? 0))
                   .map((v) => [v, nomPoste(v)] as [string, string]),
@@ -438,7 +436,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
         rendreCarte={(joueur: Coequipier) => {
           const carte = cartes.find((c) => c.id === joueur.id);
           if (!carte) return null;
-          return <CarteJoueurEnLigne carte={carte} compacte proprietaire="Ma collection" />;
+          return <CarteJoueurEnLigne carte={carte} compacte proprietaire={t('compoSolo.myCollection')} />;
         }}
         rendreSousCarte={(joueur: Coequipier) => {
           const affinite = collectif.parCarte[joueur.id];

@@ -56,7 +56,7 @@ import { CollectionLigue } from '../components/CollectionLigue';
 import { WikiLigue } from '../components/WikiLigue';
 import OuverturePack from '../components/OuverturePack';
 import { prechargerOuverturePack } from '../lib/prechargementPacks';
-import { NOMS_PACK, apparencePack, nomPackCarriere } from '../lib/presentationPacks';
+import { NOMS_PACK, apparencePack, nomPackCarriere, nomRaretePack } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { BancDessaiSituations } from '../components/BancDessaiSituations';
 import Pack3D from '../components/Pack3D';
@@ -102,32 +102,24 @@ const COMPOSITION_VIDE: CompositionManager = { titulaires: [], remplacants: [], 
  * rien dire tant qu'on ne sait pas si c'est bien ou mal ; « groupe fragile »
  * se comprend sans mode d'emploi, et donne envie de le rendre solide.
  */
-const PALIERS_COLLECTIF: Record<ReturnType<typeof paliersCollectif>, string> = {
-  neuf: 'inconnus les uns des autres',
-  fragile: 'groupe fragile',
-  correct: 'ça commence à se connaître',
-  solide: 'groupe solide',
-  fusionnel: 'ils jouent ensemble depuis toujours',
-};
+const libellePalierCollectif = (palier: ReturnType<typeof paliersCollectif>): string => t(`online.chemistry.${palier}`);
+const nomAffinite = (aff: Affinite): string => t(`online.affinity.${aff === 'championnat' ? 'league' : aff}`);
 
-/**
- * ⚠️ L'INFOBULLE DIT CE QU'IL FAUT CHANGER, PAS SEULEMENT CE QUI EST. Le chiffre
- * seul laisse le manager deviner : il doit lire « 3 du même club, il en faut 4 »
- * pour savoir quelle carte poser. On nomme donc l'affinité qui COMPTE (la
- * meilleure des trois), sa taille de groupe, et le palier suivant s'il existe.
- */
-const NOM_AFFINITE: Record<Affinite, string> = { club: 'du même club réel', nation: 'de la même nation', championnat: 'du même championnat' };
 function legendeAffinite(a: AffiniteCarte): string {
   const bonus = bonusCollectif(a.points);
-  const entete = `Collectif ${a.points}/${COLLECTIF_MAX} · ${bonus >= 0 ? '+' : ''}${bonus} de note`;
-  const detail = `${a.club} du même club · ${a.nation} de la même nation · ${a.championnat} du même championnat`;
-  if (!a.meilleure) return `${entete}\naucune affinité sur cette feuille\n${detail}`;
+  const entete = t('online.affinity.header', { points: String(a.points), max: String(COLLECTIF_MAX), sign: bonus >= 0 ? '+' : '', bonus: String(bonus) });
+  const detail = t('online.affinity.detail', {
+    club: String(a.club), clubAff: nomAffinite('club'),
+    nation: String(a.nation), natAff: nomAffinite('nation'),
+    league: String(a.championnat), leagueAff: nomAffinite('championnat'),
+  });
+  if (!a.meilleure) return `${entete}\n${t('online.affinity.none')}\n${detail}`;
   const tailles: Record<Affinite, number> = { club: a.club, nation: a.nation, championnat: a.championnat };
-  const compte = `${tailles[a.meilleure]} titulaires ${NOM_AFFINITE[a.meilleure]}`;
+  const compte = t('online.affinity.startersCount', { count: String(tailles[a.meilleure]), affinity: nomAffinite(a.meilleure) });
   // ⚠️ ON NE PROPOSE PAS DE PROGRÈS À QUI EST DÉJÀ AU MAXIMUM. « Il manque 3
   // joueurs de son club » sous un 10/10 se lit comme un reproche absurde.
   const manque = a.points < COLLECTIF_MAX && a.club > 0 && a.club < 4
-    ? `\nIl manque ${4 - a.club} joueur${4 - a.club > 1 ? 's' : ''} de son club pour le maximum.` : '';
+    ? `\n${t('online.affinity.missingForMax', { count: String(4 - a.club) })}` : '';
   return `${entete}\n${compte}${manque}\n${detail}`;
 }
 
@@ -145,33 +137,71 @@ const carteEnJoueur = (c: CarteCarriere): Coequipier => ({
   clubReel: c.clubReel, championnat: c.championnat,
 });
 
-// Les libellés français des consignes. Le serveur ne connaît que les codes.
-const MENTALITES: [string, string][] = [['tresDefensive', 'Très défensive'], ['defensive', 'Défensive'], ['equilibree', 'Équilibrée'], ['offensive', 'Offensive'], ['tresOffensive', 'Très offensive']];
-const JEUX: [string, string][] = [['occupation', 'Occupation'], ['possession', 'Possession'], ['jeuAuPied', 'Jeu au pied'], ['large', 'Jeu au large'], ['axe', 'Jeu dans l’axe'], ['rapide', 'Jeu rapide'], ['conservation', 'Conservation']];
-const RYTHMES: [string, string][] = [['ralentir', 'Ralentir'], ['normal', 'Normal'], ['accelerer', 'Accélérer']];
-const DEFENSES: [string, string][] = [['conservatrice', 'Conservatrice'], ['normale', 'Normale'], ['agressive', 'Agressive']];
-const RUCKS: [string, string][] = [['faible', 'Faible engagement'], ['normal', 'Normal'], ['forte', 'Forte contestation']];
-const PENALITES: [string, string][] = [['points', 'Prendre les points'], ['touche', 'Chercher la touche'], ['rapide', 'Jouer rapidement'], ['melee', 'Demander la mêlée']];
-const TIMINGS: [string, string][] = [['precoces', 'Précoces'], ['standard', 'Standard'], ['tardifs', 'Tardifs']];
-const RISQUES: [string, string][] = [['prudent', 'Prudent'], ['mesure', 'Mesuré'], ['audacieux', 'Audacieux']];
-const FREQUENCES_PIED: [string, string][] = [['rare', 'Rare'], ['equilibree', 'Équilibrée'], ['frequente', 'Fréquente']];
-const GESTION_AVANCE: [string, string][] = [['defensive', 'Fermer le match'], ['equilibree', 'Rester équilibré'], ['offensive', 'Continuer d’attaquer']];
+// Les options de consignes traduites dynamiquement.
+const obtenirMentalites = (): [string, string][] => [
+  ['tresDefensive', t('online.mentality.tresDefensive')],
+  ['defensive', t('online.mentality.defensive')],
+  ['equilibree', t('online.mentality.equilibree')],
+  ['offensive', t('online.mentality.offensive')],
+  ['tresOffensive', t('online.mentality.tresOffensive')],
+];
+const obtenirJeux = (): [string, string][] => [
+  ['occupation', t('online.game.occupation')],
+  ['possession', t('online.game.possession')],
+  ['jeuAuPied', t('online.game.jeuAuPied')],
+  ['large', t('online.game.large')],
+  ['axe', t('online.game.axe')],
+  ['rapide', t('online.game.rapide')],
+  ['conservation', t('online.game.conservation')],
+];
+const obtenirRythmes = (): [string, string][] => [
+  ['ralentir', t('online.rhythm.ralentir')],
+  ['normal', t('online.rhythm.normal')],
+  ['accelerer', t('online.rhythm.accelerer')],
+];
+const obtenirDefenses = (): [string, string][] => [
+  ['conservatrice', t('online.defense.conservatrice')],
+  ['normale', t('online.defense.normale')],
+  ['agressive', t('online.defense.agressive')],
+];
+const obtenirRucks = (): [string, string][] => [
+  ['faible', t('online.rucks.faible')],
+  ['normal', t('online.rucks.normal')],
+  ['forte', t('online.rucks.forte')],
+];
+const obtenirPenalites = (): [string, string][] => [
+  ['points', t('online.penalties.points')],
+  ['touche', t('online.penalties.touche')],
+  ['rapide', t('online.penalties.rapide')],
+  ['melee', t('online.penalties.melee')],
+];
+const obtenirTimings = (): [string, string][] => [
+  ['precoces', t('online.timings.precoces')],
+  ['standard', t('online.timings.standard')],
+  ['tardifs', t('online.timings.tardifs')],
+];
+const obtenirRisques = (): [string, string][] => [
+  ['prudent', t('online.risks.prudent')],
+  ['mesure', t('online.risks.mesure')],
+  ['audacieux', t('online.risks.audacieux')],
+];
+const obtenirFrequencesPied = (): [string, string][] => [
+  ['rare', t('online.kicking.rare')],
+  ['equilibree', t('online.kicking.equilibree')],
+  ['frequente', t('online.kicking.frequente')],
+];
+const obtenirGestionAvance = (): [string, string][] => [
+  ['defensive', t('online.lead.defensive')],
+  ['equilibree', t('online.lead.equilibree')],
+  ['offensive', t('online.lead.offensive')],
+];
 const STRATEGIE_VIDE: StrategieEnLigne = {
   mentalite: 'equilibree', jeu: 'possession', rythme: 'normal', defense: 'normale', rucks: 'normal',
   penaliteCourte: 'points', penaliteLongue: 'touche', bascule60: 'offensive', bascule70: 'tresOffensive',
   remplacements: 'standard',
   risqueOffensif: 'mesure', frequencePied: 'equilibree', gestionAvance: 'defensive',
 };
-const SIGNAUX: Record<string, string> = {
-  'ligue.match.signal.beaucoupPlusOffensif': 'L’adversaire semble jouer beaucoup plus offensivement.',
-  'ligue.match.signal.plusOffensif': 'L’adversaire prend un peu plus de risques.',
-  'ligue.match.signal.beaucoupPlusDefensif': 'L’adversaire se referme complètement.',
-  'ligue.match.signal.plusDefensif': 'L’adversaire recule son point de départ.',
-  'ligue.match.signal.acceleration': 'L’adversaire cherche visiblement à accélérer le jeu.',
-  'ligue.match.signal.ralentissement': 'L’adversaire ralentit et gère le temps.',
-  'ligue.match.signal.defenseAgressive': 'Leur défense monte beaucoup plus vite.',
-  'ligue.match.signal.defenseBasse': 'Leur défense recule et attend.',
-};
+const signalTexte = (cle: string): string => t(cle) || cle;
 
 /**
  * Le blason du club RÉEL d'un joueur, par son nom.
@@ -362,14 +392,14 @@ function ChoixTrophee({ trophees, valeur, onChoisir, onFermer }: {
 }) {
   const [survole, setSurvole] = useState<string | undefined>(valeur);
   const trophee = trophees.find(t => t.id === survole);
-  return <GrilleChoix titre="Le trophée de la compétition" sousTitre="Ce qu’on soulève au bout de la saison."
-    compte={`${trophees.length} trophées`} onFermer={onFermer}
-    onEffacer={valeur ? () => onChoisir(undefined) : undefined} libelleEffacer="Trophée de la ligue"
+  return <GrilleChoix titre={t('online.trophy.title')} sousTitre={t('online.trophy.subtitle')}
+    compte={t('online.trophy.count', { n: trophees.length })} onFermer={onFermer}
+    onEffacer={valeur ? () => onChoisir(undefined) : undefined} libelleEffacer={t('online.trophy.leagueDefault')}
     entete={<div className="cel-apercu-trophee" style={{ ['--teinte' as string]: trophee?.couleur ?? 'var(--or-500)' }}>
       <VignetteTrophee tropheeId={survole} trophees={trophees} taille={116} />
       <div>
-        <b>{trophee?.nom ?? 'Aucun trophée choisi'}</b>
-        <p>{trophee?.desc ?? 'Choisis-en un dans la liste : son image apparaîtra ici.'}</p>
+        <b>{trophee?.nom ?? t('online.trophy.noneChosen')}</b>
+        <p>{trophee?.desc ?? t('online.trophy.chooseHelp')}</p>
       </div>
     </div>}>
     <div className="cel-grille-trophees">{trophees.map(t =>
@@ -406,13 +436,13 @@ function ChoixEmbleme({ valeur, onChoisir, onFermer }: { valeur?: string; onChoi
       .filter(g => g.emblemes.length);
   }, [groupes, recherche]);
 
-  return <div className="cel-ouverture" role="dialog" aria-label="Choisir un écusson" onClick={e => { if (e.target === e.currentTarget) onFermer(); }}>
+  return <div className="cel-ouverture" role="dialog" aria-label={t('online.portal.chooseBadge')} onClick={e => { if (e.target === e.currentTarget) onFermer(); }}>
     <div className="cel-ouverture-contenu cel-emblemes">
-      <div className="eyebrow">L’écusson de ton club</div>
-      <h2>Prends les couleurs d’un vrai club.</h2>
-      <Champ label="Chercher un club"><input autoFocus value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Toulouse, Leinster, Crusaders…" /></Champ>
+      <div className="eyebrow">{t('online.badge.clubBadge')}</div>
+      <h2>{t('online.badge.takeRealColors')}</h2>
+      <Champ label={t('online.badge.searchClub')}><input autoFocus value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Toulouse, Leinster, Crusaders…" /></Champ>
       {erreur && <p className="cel-note">{erreur}</p>}
-      {!groupes && !erreur && <p className="cel-note">Chargement des écussons…</p>}
+      {!groupes && !erreur && <p className="cel-note">{t('online.badge.loadingBadges')}</p>}
       <div className="cel-emblemes-liste">
         {filtres.map(g => <section key={g.groupe}>
           <h3>{g.groupe} <small>{g.pays}</small></h3>
@@ -425,8 +455,8 @@ function ChoixEmbleme({ valeur, onChoisir, onFermer }: { valeur?: string; onChoi
       </div>
       <div className="cel-actions">
         <button className="btn primaire" onClick={onFermer}>{t('online.common.close')}</button>
-        {valeur && <button className="btn fantome" onClick={() => { onChoisir(undefined); onFermer(); }}>Revenir aux initiales</button>}
-        <small>{filtres.reduce((n, g) => n + g.emblemes.length, 0)} écussons dans {filtres.length} championnats.</small>
+        {valeur && <button className="btn fantome" onClick={() => { onChoisir(undefined); onFermer(); }}>{t('online.badge.revertToInitials')}</button>}
+        <small>{t('online.badge.countInfo', { count: filtres.reduce((n, g) => n + g.emblemes.length, 0), leagues: filtres.length })}</small>
       </div>
     </div>
   </div>;
@@ -631,7 +661,7 @@ export function CarriereEnLigne() {
       }} />
       : !vue ? <Portail session={session} occupe={occupe} ouvrirLigue={ouvrirLigue} onSupprimer={async id => {
         setOccupe(true); setErreur('');
-        try { await supprimerLigueCarriere(id); await chargerSession(); setNotification('La ligue a été supprimée.'); }
+        try { await supprimerLigueCarriere(id); await chargerSession(); setNotification(t('online.league.deleted')); }
         catch (e) { setErreur(messageErreur(e)); }
         finally { setOccupe(false); }
       }} onCreer={async (nom, clubNom, rythme, max, identite) => {
@@ -644,7 +674,7 @@ export function CarriereEnLigne() {
             défiler la page à chaque phase. Ni l'un ni l'autre ne servent
             pendant une rencontre — le direct a son propre bouton « Fermer »,
             qui ramène exactement là d'où l'on vient. */}
-        {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme ?? vue.logo} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / {t('online.season', { n: vue.saison })}</span></div><h1>{vue.observateur ? 'Mode observateur' : club?.nom}</h1><p>{vue.rythme === 7 ? t('online.clubsDaily', { clubs: vue.clubs.length }) : t('online.clubsRate', { clubs: vue.clubs.length, matches: vue.rythme })} · {t(`online.phase.${vue.phase === 'salon' ? 'lobby' : vue.phase === 'saison' ? 'season' : 'break'}`)}</p></div>{vue.observateur ? <div className="cel-portefeuille"><Icone nom="oeil" taille={26} /><strong>Observer</strong><span>Lecture seule</span></div> : <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>{t('online.balance')}</span></div>}</header>}
+        {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme ?? vue.logo} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / {t('online.season', { n: vue.saison })}</span></div><h1>{vue.observateur ? t('online.spectator.mode') : club?.nom}</h1><p>{vue.rythme === 7 ? t('online.clubsDaily', { clubs: vue.clubs.length }) : t('online.clubsRate', { clubs: vue.clubs.length, matches: vue.rythme })} · {t(`online.phase.${vue.phase === 'salon' ? 'lobby' : vue.phase === 'saison' ? 'season' : 'break'}`)}</p></div>{vue.observateur ? <div className="cel-portefeuille"><Icone nom="oeil" taille={26} /><strong>{t('online.spectator.mode')}</strong><span>{t('online.spectator.readOnly')}</span></div> : <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>{t('online.balance')}</span></div>}</header>}
         {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')}>{[...navigation, ...(!vue.observateur && session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }, { id: 'administration' as const, label: 'Comptes & ligues', icone: 'profil' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
@@ -698,16 +728,16 @@ function Connexion({ onConnexion, onGoogle, occupe }: { occupe: boolean; onGoogl
   }, [inscription, onGoogle]);
   const soumettre = (e: FormEvent) => { e.preventDefault(); if (inscription && motDePasse !== confirmation) return; void onConnexion(inscription ? 'inscription' : 'connexion', identifiant, motDePasse, pseudo, confirmation); };
   return <div className="cel-entree">
-    <div className="cel-promesse"><div className="eyebrow">{t('online.auth.eyebrow')}</div><h1>{t('online.auth.title')}</h1><p>Trente joueurs Bronze, un maillot à défendre et des mois pour bâtir une équipe qui compte.</p><div className="cel-billet"><b>{t('online.season', { n: '01' })}</b><span>30 joueurs au départ</span><strong>35 <small>GEN</small></strong><p>Championnats privés · Marché entre amis · Matchs en direct</p></div></div>
+    <div className="cel-promesse"><div className="eyebrow">{t('online.auth.eyebrow')}</div><h1>{t('online.auth.title')}</h1><p>{t('online.auth.starterPackDesc')}</p><div className="cel-billet"><b>{t('online.season', { n: '01' })}</b><span>{t('online.portal.initialSquad')}</span><strong>35 <small>GEN</small></strong><p>{t('online.auth.features')}</p></div></div>
     <form className="cel-panneau cel-auth" onSubmit={soumettre}>
-      {invitation && <p className="cel-invite"><Icone nom="cadeau" taille={18} />Tu es invité à rejoindre une ligue.</p>}
+      {invitation && <p className="cel-invite"><Icone nom="cadeau" taille={18} />{t('online.auth.invited')}</p>}
       <div className="eyebrow">{t('online.auth.account')}</div><h2>{inscription ? t('online.auth.create') : t('online.auth.find')}</h2>
       <div className={`cel-google${occupe ? ' occupe' : ''}${googleDisponible ? '' : ' indisponible'}`} ref={googleRef} />
-      {googleDisponible && <div className="cel-separateur"><span>ou avec un identifiant</span></div>}
+      {googleDisponible && <div className="cel-separateur"><span>{t('online.auth.orWithId')}</span></div>}
       <Champ label={t('online.auth.id')}><input autoComplete="username" required minLength={3} maxLength={60} value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="username" /></Champ>
       {inscription && <Champ label={t('online.auth.manager')}><input required minLength={2} maxLength={32} value={pseudo} onChange={e => setPseudo(e.target.value)} /></Champ>}
       <Champ label={t('online.auth.password')}><input type="password" autoComplete={inscription ? 'new-password' : 'current-password'} required minLength={inscription ? 10 : 1} maxLength={128} value={motDePasse} onChange={e => setMotDePasse(e.target.value)} /></Champ>
-      {inscription && <><Champ label={t('online.auth.password')}><input type="password" autoComplete="new-password" required minLength={10} maxLength={128} value={confirmation} onChange={e => setConfirmation(e.target.value)} /></Champ>{confirmation && confirmation !== motDePasse && <p className="cel-erreur-champ">Les deux mots de passe ne correspondent pas.</p>}</>}
+      {inscription && <><Champ label={t('online.auth.password')}><input type="password" autoComplete="new-password" required minLength={10} maxLength={128} value={confirmation} onChange={e => setConfirmation(e.target.value)} /></Champ>{confirmation && confirmation !== motDePasse && <p className="cel-erreur-champ">{t('online.auth.passwordMismatch')}</p>}</>}
       <button className="btn primaire" disabled={occupe || Boolean(inscription && motDePasse !== confirmation)}>{occupe ? t('online.auth.connecting') : inscription ? t('online.auth.create') : t('online.auth.signin')}<Icone nom="fleche-droite" taille={17} /></button>
       <button className="btn fantome" type="button" onClick={() => setInscription(!inscription)}>{inscription ? t('online.auth.existing') : t('online.auth.new')}</button>
     </form>
@@ -724,7 +754,7 @@ function Portail({ session, occupe, ouvrirLigue, onSupprimer, onCreer, onRejoind
   const [logo, setLogo] = useState<string | undefined>(); const [tropheeId, setTropheeId] = useState<string | undefined>(); const [playoffs, setPlayoffs] = useState(false);
   const [dotation, setDotation] = useState('1000');
   const [aSupprimer, setASupprimer] = useState<SessionCarriere['ligues'][number] | null>(null);
-  return <><header className="cel-titre"><div className="eyebrow">{t('online.portal.welcome', { name: session.compte.pseudo })}</div><h1>{t('online.portal.title')}</h1><p>{t('online.portal.description')}</p></header><div className="cel-portail"><div><h2>{t('online.myLeagues')} <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <div className="cel-ligue-ligne" key={l.id}><button className={`cel-ligue${l.laboratoire ? ' cel-ligue-laboratoire' : ''}`} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}{l.laboratoire && <i>Développement</i>}</em><b>{l.clubNom}</b><small>{t(`online.phase.${l.etat === 'salon' ? 'lobby' : l.etat === 'saison' ? 'season' : 'break'}`)} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>{l.createur && !l.laboratoire && <button type="button" className="cel-supprimer-ligue" disabled={occupe} aria-label={`Supprimer la ligue ${l.nom}`} title="Supprimer cette ligue" onClick={() => setASupprimer(l)}><Icone nom="corbeille" taille={18} /></button>}</div>)}</div> : <Vide titre={t('online.portal.create')}>{t('online.portal.empty')}</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme), Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>{t('online.portal.create')}</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>{t('online.portal.join')}</button></div><h2>{mode === 'creer' ? t('online.portal.create') : t('online.portal.join')}</h2>{mode === 'creer' ? <Champ label={t('online.portal.leagueName')}><input required minLength={3} maxLength={50} value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label={t('online.portal.inviteCode')}><input required autoCapitalize="characters" maxLength={20} value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label={t('online.portal.clubName')}><input required minLength={3} maxLength={40} value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>{t('online.portal.badge')}</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? t('online.portal.changeBadge') : t('online.portal.chooseBadge')}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Champ label={t('online.portal.matchesPerWeek')}><input type="number" min={1} max={7} required value={rythme} onChange={e => setRythme(e.target.value)} /></Champ><Champ label={t('online.portal.clubCount')}><input type="number" min={2} max={64} required value={max} onChange={e => setMax(e.target.value)} /></Champ></div><Champ label={t('online.portal.startingOvas')}><input type="number" min={0} max={100000} required value={dotation} onChange={e => setDotation(e.target.value)} /></Champ><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>{t('online.competition.knockout')}</b>{t('online.competition.knockoutHelp')}</span></label></>}<p className="cel-note">{t('online.portal.initialSquad')}</p><button className="btn primaire" disabled={occupe}>{occupe ? t('online.auth.connecting') : mode === 'creer' ? t('online.portal.createPrivate') : t('online.portal.joinLeague')}<Icone nom="fleche-droite" taille={18} /></button></form></div>{aSupprimer && <Confirmation titre={`Supprimer « ${aSupprimer.nom} » ?`} message="Tous les clubs, cartes, résultats et trophées de cette ligue seront définitivement supprimés pour tous ses membres." libelleOui="Supprimer définitivement" onNon={() => setASupprimer(null)} onOui={() => { const id = aSupprimer.id; setASupprimer(null); void onSupprimer(id); }} />}</>;
+  return <><header className="cel-titre"><div className="eyebrow">{t('online.portal.welcome', { name: session.compte.pseudo })}</div><h1>{t('online.portal.title')}</h1><p>{t('online.portal.description')}</p></header><div className="cel-portail"><div><h2>{t('online.myLeagues')} <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues">{session.ligues.map(l => <div className="cel-ligue-ligne" key={l.id}><button className={`cel-ligue${l.laboratoire ? ' cel-ligue-laboratoire' : ''}`} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}{l.laboratoire && <i>Développement</i>}</em><b>{l.clubNom}</b><small>{t(`online.phase.${l.etat === 'salon' ? 'lobby' : l.etat === 'saison' ? 'season' : 'break'}`)} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>{l.createur && !l.laboratoire && <button type="button" className="cel-supprimer-ligue" disabled={occupe} aria-label={t('online.league.deleteConfirmTitle', { name: l.nom })} title={t('online.league.deleteTitle')} onClick={() => setASupprimer(l)}><Icone nom="corbeille" taille={18} /></button>}</div>)}</div> : <Vide titre={t('online.portal.create')}>{t('online.portal.empty')}</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme), Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation) }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>{t('online.portal.create')}</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>{t('online.portal.join')}</button></div><h2>{mode === 'creer' ? t('online.portal.create') : t('online.portal.join')}</h2>{mode === 'creer' ? <Champ label={t('online.portal.leagueName')}><input required minLength={3} maxLength={50} value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label={t('online.portal.inviteCode')}><input required autoCapitalize="characters" maxLength={20} value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ label={t('online.portal.clubName')}><input required minLength={3} maxLength={40} value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ"><span>{t('online.portal.badge')}</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? t('online.portal.changeBadge') : t('online.portal.chooseBadge')}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux"><Champ label={t('online.portal.matchesPerWeek')}><input type="number" min={1} max={7} required value={rythme} onChange={e => setRythme(e.target.value)} /></Champ><Champ label={t('online.portal.clubCount')}><input type="number" min={2} max={64} required value={max} onChange={e => setMax(e.target.value)} /></Champ></div><Champ label={t('online.portal.startingOvas')}><input type="number" min={0} max={100000} required value={dotation} onChange={e => setDotation(e.target.value)} /></Champ><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>{t('online.competition.knockout')}</b>{t('online.competition.knockoutHelp')}</span></label></>}<p className="cel-note">{t('online.portal.initialSquad')}</p><button className="btn primaire" disabled={occupe}>{occupe ? t('online.auth.connecting') : mode === 'creer' ? t('online.portal.createPrivate') : t('online.portal.joinLeague')}<Icone nom="fleche-droite" taille={18} /></button></form></div>{aSupprimer && <Confirmation titre={t('online.league.deleteConfirmTitle', { name: aSupprimer.nom })} message={t('online.league.deleteConfirmMessage')} libelleOui={t('online.league.deleteDefinitive')} onNon={() => setASupprimer(null)} onOui={() => { const id = aSupprimer.id; setASupprimer(null); void onSupprimer(id); }} />}</>;
 }
 
 // ---------------------------------------------------------------------------
@@ -748,21 +778,21 @@ function Invitation({ code, notifier }: { code: string; notifier: (message: stri
     catch { notifier(repli); }
   };
   return <div className="cel-invitation">
-    <span>Invite tes amis</span>
+    <span>{t('online.invite.title')}</span>
     <b>{code}</b>
     <em>{lien}</em>
     <div className="cel-invitation-actions">
-      <button type="button" className="btn primaire" onClick={() => { void copier(lien, 'Lien d’invitation copié. Colle-le dans votre groupe.', lien); }}>
-        <Icone nom="lien" taille={16} />Copier le lien
+      <button type="button" className="btn primaire" onClick={() => { void copier(lien, t('online.invite.linkCopied'), lien); }}>
+        <Icone nom="lien" taille={16} />{t('online.invite.copyLink')}
       </button>
-      <button type="button" className="btn fantome" onClick={() => { void copier(code, 'Code d’invitation copié.', `Code d’invitation : ${code}`); }}>
-        <Icone nom="dossier" taille={16} />Copier le code
+      <button type="button" className="btn fantome" onClick={() => { void copier(code, t('online.invite.codeCopied'), t('online.invite.codeFallback', { code })); }}>
+        <Icone nom="dossier" taille={16} />{t('online.invite.copyCode')}
       </button>
       {partageable && <button type="button" className="btn fantome" onClick={() => {
         // Un partage annulé n'est pas une erreur : l'utilisateur a fermé la feuille.
-        void navigator.share({ title: 'Destiny Rugby', text: 'Rejoins ma ligue privée sur Destiny Rugby.', url: lien }).catch(() => {});
+        void navigator.share({ title: 'Destiny Rugby', text: t('online.invite.shareText'), url: lien }).catch(() => {});
       }}>
-        <Icone nom="partage" taille={16} />Partager
+        <Icone nom="partage" taille={16} />{t('online.invite.share')}
       </button>}
     </div>
   </div>;
@@ -781,7 +811,7 @@ function Bureau({ vue, proprietaire, agir, occupe, suivre, notifier }: { vue: Vu
   // le cacher derrière un onglet, c'est le réserver à ceux qui savent déjà
   // qu'il existe.
   const collectif = collectifCarriere(mesCartes, monClub?.composition ?? COMPOSITION_VIDE);
-  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? t('online.dashboard.beforeKickoff') : t('online.dashboard.next')}</div>{vue.phase === 'salon' ? <><h2>{t('online.dashboard.gather')}</h2><p>{t('online.dashboard.lobbyHelp')}</p><Invitation code={vue.code} notifier={notifier} /><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>{t('online.dashboard.startSeason')}</button>}<small>{t('online.dashboard.registered', { count: vue.clubs.length, max: vue.maxClubs })}{vue.clubs.length < 2 ? ` · ${t('online.dashboard.minimum')}` : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : arriveeEnCoursDeSaison ? <><h2>{t('online.dashboard.joinedBreak')}</h2><p>{t('online.dashboard.joinedBreakHelp')}</p></> : <><h2>{t('online.dashboard.seasonOver')}</h2><p>{t('online.dashboard.seasonOverHelp')}</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>{t('online.dashboard.startNextSeason')}</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>{t('online.dashboard.clubhouse')}</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>{t('online.dashboard.average')}</span></div><div><b>{mesCartes.length}</b><span>{t('online.common.players')}</span></div><div><b>{cartesBlesses.length}</b><span>{t('online.common.injured')}</span></div><div className={`cel-chiffre-collectif cel-collectif-${paliersCollectif(collectif.total)}`} title={`${PALIERS_COLLECTIF[paliersCollectif(collectif.total)]}`}><b>{collectif.total}</b><span>{t('online.dashboard.chemistry')}</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>{t('online.dashboard.badgeLocked')}</small></span></div><p className="cel-note">{t('online.dashboard.growClub')}</p></div></div>{cartesBlesses.length > 0 && <div className="cel-panneau cel-infirmerie"><div className="cel-titre-ligne"><h2><Icone nom="coeur" taille={18} /> Infirmerie du club ({cartesBlesses.length})</h2><span className="cel-badge-blessure-compte">{cartesBlesses.length} joueur{cartesBlesses.length > 1 ? 's' : ''} indisponible{cartesBlesses.length > 1 ? 's' : ''}</span></div><div className="cel-grille-infirmerie">{cartesBlesses.map(c => <article key={c.id} className="cel-carte-infirmerie"><div className="cel-infirmerie-portrait"><span className="cel-infirmerie-icone"><Icone nom="coeur" taille={16} /></span><div><b>{c.nom}</b><small>{nomPoste(c.poste)} · {c.note} GEN · {c.clubReel}</small></div></div><div className="cel-infirmerie-delai"><strong>Encore {formatTempsBlessureDetaille(c.blesseJusqua!)}</strong><small>Retour estimé : {dateHeure(c.blesseJusqua!)}</small></div></article>)}</div></div>}{proprietaire && <ReglageRythme vue={vue} agir={agir} occupe={occupe} notifier={notifier} />}<div className="cel-grille-bureau"><div className="cel-panneau"><h2>{t('online.dashboard.league')}</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>{t('online.dashboard.objectives')}</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>{date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} Ovas</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? t('online.dashboard.rewardReceived') : t('online.dashboard.claim')}</button></div>) : <p className="cel-note">{t('online.dashboard.objectivesSoon')}</p>}</div></div></>;
+  return <><div className="cel-grille-bureau"><div className="cel-panneau cel-rendezvous"><div className="eyebrow">{vue.phase === 'salon' ? t('online.dashboard.beforeKickoff') : t('online.dashboard.next')}</div>{vue.phase === 'salon' ? <><h2>{t('online.dashboard.gather')}</h2><p>{t('online.dashboard.lobbyHelp')}</p><Invitation code={vue.code} notifier={notifier} /><div className="cel-actions">{proprietaire && <button className="btn primaire" disabled={occupe || vue.clubs.length < 2} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>{t('online.dashboard.startSeason')}</button>}<small>{t('online.dashboard.registered', { count: vue.clubs.length, max: vue.maxClubs })}{vue.clubs.length < 2 ? ` · ${t('online.dashboard.minimum')}` : ''}</small></div></> : prochaine ? <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande /> : arriveeEnCoursDeSaison ? <><h2>{t('online.dashboard.joinedBreak')}</h2><p>{t('online.dashboard.joinedBreakHelp')}</p></> : <><h2>{t('online.dashboard.seasonOver')}</h2><p>{t('online.dashboard.seasonOverHelp')}</p>{proprietaire && vue.phase === 'intersaison' && <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'demarrerSaison' }); }}>{t('online.dashboard.startNextSeason')}</button>}</>}</div><div className="cel-panneau cel-vestiaire"><h2>{t('online.dashboard.clubhouse')}</h2><div className="cel-chiffres"><div><b>{moyenne}</b><span>{t('online.dashboard.average')}</span></div><div><b>{mesCartes.length}</b><span>{t('online.common.players')}</span></div><div><b>{cartesBlesses.length}</b><span>{t('online.common.injured')}</span></div><div className={`cel-chiffre-collectif cel-collectif-${paliersCollectif(collectif.total)}`} title={`${libellePalierCollectif(paliersCollectif(collectif.total))}`}><b>{collectif.total}</b><span>{t('online.dashboard.chemistry')}</span></div></div><div className="cel-raretés">{Object.entries(RARETES).map(([id, label]) => <span key={id} className={`cel-rarete ${id}`}><i />{label}<b>{mesCartes.filter(c => c.rarete === id).length}</b></span>)}</div><div className="cel-identite-club"><Ecusson nom={monClub?.nom ?? ''} logo={monClub?.embleme} /><span><b>{monClub?.nom}</b><small>{t('online.dashboard.badgeLocked')}</small></span></div><p className="cel-note">{t('online.dashboard.growClub')}</p></div></div>{cartesBlesses.length > 0 && <div className="cel-panneau cel-infirmerie"><div className="cel-titre-ligne"><h2><Icone nom="coeur" taille={18} /> {t('online.infirmary.title', { count: cartesBlesses.length })}</h2><span className="cel-badge-blessure-compte">{t('online.infirmary.unavailableCount', { count: cartesBlesses.length })}</span></div><div className="cel-grille-infirmerie">{cartesBlesses.map(c => <article key={c.id} className="cel-carte-infirmerie"><div className="cel-infirmerie-portrait"><span className="cel-infirmerie-icone"><Icone nom="coeur" taille={16} /></span><div><b>{c.nom}</b><small>{nomPoste(c.poste)} · {c.note} GEN · {c.clubReel}</small></div></div><div className="cel-infirmerie-delai"><strong>{t('online.infirmary.timeRemaining', { time: formatTempsBlessureDetaille(c.blesseJusqua!) })}</strong><small>{t('online.infirmary.estimatedReturn', { date: dateHeure(c.blesseJusqua!) })}</small></div></article>)}</div></div>}{proprietaire && <ReglageRythme vue={vue} agir={agir} occupe={occupe} notifier={notifier} />}<div className="cel-grille-bureau"><div className="cel-panneau"><h2>{t('online.dashboard.league')}</h2><Classement vue={vue} onClub={setFicheClub} />{ficheClub && <FicheClubEnLigne vue={vue} clubId={ficheClub} onFermer={() => setFicheClub(null)} />}</div><div className="cel-panneau"><div className="cel-titre-ligne"><h2>{t('online.dashboard.objectives')}</h2><Icone nom="cible" /></div>{vue.objectifs.length ? vue.objectifs.map(o => <div className="cel-objectif" key={o.id}><div><b>{o.libelle}</b><small>{date(o.fin)} · {Math.min(o.progression, o.cible)} / {o.cible}</small></div><span>+{montant(o.recompense)} Ovas</span><progress max={o.cible} value={Math.min(o.progression, o.cible)} /><button className="btn fantome" disabled={occupe || o.reclame || o.progression < o.cible} onClick={() => { void agir({ type: 'reclamerObjectif', objectifId: o.id }); }}>{o.reclame ? t('online.dashboard.rewardReceived') : t('online.dashboard.claim')}</button></div>) : <p className="cel-note">{t('online.dashboard.objectivesSoon')}</p>}</div></div></>;
 }
 
 function ReglageRythme({ vue, agir, occupe, notifier }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; notifier: (message: string) => void }) {
@@ -975,13 +1005,13 @@ function FicheClubEnLigne({ vue, clubId, onFermer }: { vue: VueCarriereEnLigne; 
 }
 
 function nomTour(index: number, total: number, taillePremier = 2 ** Math.max(0, total - 1)): string {
-  if (index === 0 && taillePremier !== 2 ** Math.max(0, total - 1)) return 'Tour préliminaire';
+  if (index === 0 && taillePremier !== 2 ** Math.max(0, total - 1)) return t('online.cup.preliminary');
   const restant = total - index;
-  if (restant === 1) return 'Finale';
-  if (restant === 2) return 'Demi-finales';
-  if (restant === 3) return 'Quarts de finale';
-  if (restant === 4) return 'Huitièmes de finale';
-  return index === 0 ? 'Tour préliminaire' : `Tour ${index + 1}`;
+  if (restant === 1) return t('online.cup.final');
+  if (restant === 2) return t('online.cup.semiFinals');
+  if (restant === 3) return t('online.cup.quarterFinals');
+  if (restant === 4) return t('online.cup.roundOf16');
+  return index === 0 ? t('online.cup.preliminary') : t('online.cup.round', { n: index + 1 });
 }
 
 function matchsParTour(nombreParticipants: number): number[] {
@@ -1000,7 +1030,7 @@ function nomEtapeCompetition(
   journee: number,
 ): { titreCourt: string; titreComplet: string; estPlayoff: boolean; estElimination: boolean } {
   if (!competition) {
-    return { titreCourt: `J${journee}`, titreComplet: `Journée ${journee}`, estPlayoff: false, estElimination: false };
+    return { titreCourt: `J${journee}`, titreComplet: t('online.cup.matchday', { n: journee }), estPlayoff: false, estElimination: false };
   }
 
   if (competition.format === 'elimination') {
@@ -1015,7 +1045,7 @@ function nomEtapeCompetition(
     if (journee < debutTableau) {
       return {
         titreCourt: `Poule · J${journee}`,
-        titreComplet: `Poules · Journée ${journee}`,
+        titreComplet: t('online.cup.groupsMatchday', { n: journee }),
         estPlayoff: false,
         estElimination: false,
       };
@@ -1025,7 +1055,7 @@ function nomEtapeCompetition(
     const nom = nomTour(index, totalTours);
     return {
       titreCourt: nom,
-      titreComplet: `Phase finale · ${nom}`,
+      titreComplet: t('online.cup.knockoutStage', { name: nom }),
       estPlayoff: false,
       estElimination: true,
     };
@@ -1040,15 +1070,15 @@ function nomEtapeCompetition(
     const nom = nomTour(index, totalTours);
     return {
       titreCourt: `Play-offs · ${nom}`,
-      titreComplet: `🏆 Play-offs · ${nom}`,
+      titreComplet: `🏆 ${t('online.cup.playoffsTitle', { name: nom })}`,
       estPlayoff: true,
       estElimination: true,
     };
   }
 
   return {
-    titreCourt: `Journée ${journee}`,
-    titreComplet: `Journée ${journee}`,
+    titreCourt: t('online.cup.matchday', { n: journee }),
+    titreComplet: t('online.cup.matchday', { n: journee }),
     estPlayoff: false,
     estElimination: false,
   };
@@ -1124,13 +1154,9 @@ const chrono = (minutes: number) => {
  * a besoin. Écrire « Tu prends les trois points » à un manager parti chercher un
  * café lui apprendrait qu'il a fait un choix qu'il n'a pas fait.
  */
-const ORDRES_FIL: Record<OrdreFil, [moi: string, adjoint: string]> = {
-  consignes: ['Tes consignes partent au terrain.', 'Consignes appliquées depuis le banc.'],
-  remplacement: ['Tu lances un changement.', 'Ton adjoint lance un changement.'],
-  points: ['Tu prends les trois points.', 'Ton adjoint prend les trois points.'],
-  touche: ['Tu vas chercher la touche.', 'Ton adjoint va chercher la touche.'],
-  rapide: ['Tu fais jouer la pénalité à la main.', 'Ton adjoint fait jouer vite.'],
-  melee: ['Tu demandes la mêlée.', 'Ton adjoint demande la mêlée.'],
+const libelleOrdreFil = (ordre: OrdreFil, auto: boolean): string => {
+  const cle = `online.order.${ordre}.${auto ? 'auto' : 'user'}`;
+  return t(cle);
 };
 
 /**
@@ -1235,14 +1261,14 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
 
   return <div className="cel-direct cel-direct-cinema">
     <div className="cel-tableau-bord">
-      <button className="btn fantome cel-quitter" onClick={fermer}><Icone nom="croix" taille={15} /> Fermer</button>
+      <button className="btn fantome cel-quitter" onClick={fermer}><Icone nom="croix" taille={15} /> {t('online.common.close')}</button>
       <div className="cel-score-direct">
-        <div className={`cel-camp${m.monCote === 'domicile' ? ' moi' : ''}`}><Ecusson nom={nomClub(vue, r.domicile)} logo={vue.clubs.find(c => c.id === r.domicile)?.embleme} /><b>{nomClub(vue, r.domicile)}</b><small>{m.essais.domicile} essai{m.essais.domicile > 1 ? 's' : ''}</small></div>
-        <div className="cel-chrono"><strong>{m.score.domicile} <em>–</em> {m.score.exterieur}</strong><span className={m.termine ? '' : gele ? 'gele' : 'bat'}>{m.termine ? 'TERMINÉ' : chrono(minuteVive)}</span></div>
-        <div className={`cel-camp${m.monCote === 'exterieur' ? ' moi' : ''}`}><Ecusson nom={nomClub(vue, r.exterieur)} logo={vue.clubs.find(c => c.id === r.exterieur)?.embleme} /><b>{nomClub(vue, r.exterieur)}</b><small>{m.essais.exterieur} essai{m.essais.exterieur > 1 ? 's' : ''}</small></div>
+        <div className={`cel-camp${m.monCote === 'domicile' ? ' moi' : ''}`}><Ecusson nom={nomClub(vue, r.domicile)} logo={vue.clubs.find(c => c.id === r.domicile)?.embleme} /><b>{nomClub(vue, r.domicile)}</b><small>{m.essais.domicile} {t('ml.essais')}</small></div>
+        <div className="cel-chrono"><strong>{m.score.domicile} <em>–</em> {m.score.exterieur}</strong><span className={m.termine ? '' : gele ? 'gele' : 'bat'}>{m.termine ? t('online.match.finished') : chrono(minuteVive)}</span></div>
+        <div className={`cel-camp${m.monCote === 'exterieur' ? ' moi' : ''}`}><Ecusson nom={nomClub(vue, r.exterieur)} logo={vue.clubs.find(c => c.id === r.exterieur)?.embleme} /><b>{nomClub(vue, r.exterieur)}</b><small>{m.essais.exterieur} {t('ml.essais')}</small></div>
       </div>
-      <div className="cel-jauge-possession" title="Possession"><i style={{ width: `${m.stats.domicile.possession}%` }} /><span>{m.stats.domicile.possession}% possession {m.stats.exterieur.possession}%</span></div>
-      {m.signalAdverse && SIGNAUX[m.signalAdverse] && <p className="cel-signal"><Icone nom="oeil" taille={17} />{SIGNAUX[m.signalAdverse]}</p>}
+      <div className="cel-jauge-possession" title={t('online.stats.possession')}><i style={{ width: `${m.stats.domicile.possession}%` }} /><span>{m.stats.domicile.possession}% {t('online.stats.possession').toLowerCase()} {m.stats.exterieur.possession}%</span></div>
+      {m.signalAdverse && <p className="cel-signal"><Icone nom="oeil" taille={17} />{signalTexte(m.signalAdverse)}</p>}
     </div>
 
     <DirectCinema match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs}
@@ -1254,53 +1280,62 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
         pénalités d'un match — à soixante-dix mètres des poteaux, « je prends
         les points ? » n'est pas une question — mais sur les six ou sept qui se
         jouent dans la zone où le choix compte vraiment. */}
-    {m.decision && <div className="cel-decision" role="alertdialog" aria-label="Décision de pénalité">
-      <div className="eyebrow">{m.decision.horloge >= 1 ? `${Math.floor(m.decision.horloge)}ᵉ minute` : 'Pénalité'} · {m.score.domicile} – {m.score.exterieur} · le chrono est arrêté</div>
-      <h2>Pénalité à {m.decision.distance} mètres de leur ligne.</h2>
-      <p>{m.decision.buteur} au pied. Le moteur lui donne <b>{m.decision.probabilite} %</b> de réussite depuis cette position{m.decision.aPortee ? '' : ' — c’est au-delà de sa portée raisonnable'}.</p>
+    {m.decision && <div className="cel-decision" role="alertdialog" aria-label={t('online.match.penaltyDecision')}>
+      <div className="eyebrow">{m.decision.horloge >= 1 ? `${Math.floor(m.decision.horloge)}ᵉ minute` : 'Pénalité'} · {m.score.domicile} – {m.score.exterieur} · {t('online.decision.clockStopped')}</div>
+      <h2>{t('online.decision.penaltyAtMeters', { dist: m.decision.distance })}</h2>
+      <p>{t('online.decision.kickerStats', { name: m.decision.buteur, pct: m.decision.probabilite })}{m.decision.aPortee ? '' : t('online.decision.beyondRange')}</p>
       <div className="cel-decision-choix">
-        <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'points' } }); }}><Icone nom="cible" taille={19} />Prendre les 3 points</button>
-        <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'touche' } }); }}><Icone nom="drapeau" taille={19} />Chercher la touche</button>
-        <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'rapide' } }); }}><Icone nom="eclair" taille={19} />Jouer vite</button>
-        <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'melee' } }); }}><Icone nom="pousse" taille={19} />Mêlée</button>
+        <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'points' } }); }}><Icone nom="cible" taille={19} />{t('online.penalties.points')}</button>
+        <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'touche' } }); }}><Icone nom="drapeau" taille={19} />{t('online.penalties.touche')}</button>
+        <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'rapide' } }); }}><Icone nom="eclair" taille={19} />{t('online.penalties.rapide')}</button>
+        <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'melee' } }); }}><Icone nom="pousse" taille={19} />{t('online.penalties.melee')}</button>
       </div>
       <div className="cel-sablier" aria-hidden><i style={{ width: `${(resteDecision / 20) * 100}%` }} /></div>
-      <small>{resteDecision} seconde{resteDecision > 1 ? 's' : ''} — sans réponse, ton adjoint tranchera selon tes consignes enregistrées.</small>
+      <small>{t('online.decision.secondsLeft', { sec: resteDecision })}</small>
     </div>}
 
-    <nav className="cel-onglets secondaires">{([['fil', 'Journal du match'], ['consignes', 'Consignes'], ['banc', 'Le banc'], ['stats', 'Statistiques']] as const).map(([id, label]) =>
+    <nav className="cel-onglets secondaires">{([['fil', t('online.match.log')], ['consignes', t('online.lineup.instructions')], ['banc', t('online.match.bench')], ['stats', t('online.match.stats')]] as const).map(([id, label]) =>
       <button key={id} className={ongletDirect === id ? 'actif' : ''} onClick={() => setOngletDirect(id)}>{label}</button>)}</nav>
 
-    {ongletDirect === 'fil' && <div className="cel-panneau cel-fil-match">{m.fil.length ? [...m.fil].reverse().map((l, i) => <p key={`${l.minute}-${i}`} className={`cel-ligne-fil ${l.type}${l.cote === mien ? ' moi' : ''}`}><b>{l.minute}′</b><span>{l.ordre ? ORDRES_FIL[l.ordre][l.auto ? 1 : 0] : l.texte}</span>{l.points ? <em>+{l.points}</em> : null}</p>) : <p className="cel-note">{t('online.match.started')}</p>}</div>}
+    {ongletDirect === 'fil' && <div className="cel-panneau cel-fil-match">{m.fil.length ? [...m.fil].reverse().map((l, i) => <p key={`${l.minute}-${i}`} className={`cel-ligne-fil ${l.type}${l.cote === mien ? ' moi' : ''}`}><b>{l.minute}′</b><span>{l.ordre ? libelleOrdreFil(l.ordre, Boolean(l.auto)) : l.texte}</span>{l.points ? <em>+{l.points}</em> : null}</p>) : <p className="cel-note">{t('online.match.started')}</p>}</div>}
 
     {ongletDirect === 'consignes' && (m.monCote ? <div className="cel-panneau cel-consignes">
-      <p className="cel-note">Chaque changement atteint réellement le moteur : la mentalité et la contestation des rucks déplacent le potentiel de marque, le jeu et la défense changent les duels.</p>
+      <p className="cel-note">{t('online.tactics.engineImpactNote')}</p>
       <div className="cel-grille-consignes">
-        <Choix label="Mentalité" valeur={strategie.mentalite} options={MENTALITES} onChange={v => changer('mentalite', v)} />
-        <Choix label="Jeu" valeur={strategie.jeu} options={JEUX} onChange={v => changer('jeu', v)} />
-        <Choix label="Rythme" valeur={strategie.rythme} options={RYTHMES} onChange={v => changer('rythme', v)} />
-        <Choix label="Défense" valeur={strategie.defense} options={DEFENSES} onChange={v => changer('defense', v)} />
-          <Choix label="Rucks" valeur={strategie.rucks} options={RUCKS} onChange={v => changer('rucks', v)} />
-          <Choix label="Risque offensif" valeur={strategie.risqueOffensif} options={RISQUES} onChange={v => changer('risqueOffensif', v)} />
-          <Choix label="Fréquence du jeu au pied" valeur={strategie.frequencePied} options={FREQUENCES_PIED} onChange={v => changer('frequencePied', v)} />
-          <Choix label="Avec 8+ points d’avance après la 65ᵉ" valeur={strategie.gestionAvance} options={GESTION_AVANCE} onChange={v => changer('gestionAvance', v)} />
+        <Choix label={t('online.tactics.mentality')} valeur={strategie.mentalite} options={obtenirMentalites()} onChange={v => changer('mentalite', v)} />
+        <Choix label={t('online.tactics.game')} valeur={strategie.jeu} options={obtenirJeux()} onChange={v => changer('jeu', v)} />
+        <Choix label={t('online.tactics.rhythm')} valeur={strategie.rythme} options={obtenirRythmes()} onChange={v => changer('rythme', v)} />
+        <Choix label={t('online.tactics.defense')} valeur={strategie.defense} options={obtenirDefenses()} onChange={v => changer('defense', v)} />
+        <Choix label={t('online.tactics.rucks')} valeur={strategie.rucks} options={obtenirRucks()} onChange={v => changer('rucks', v)} />
+        <Choix label={t('online.tactics.risk')} valeur={strategie.risqueOffensif} options={obtenirRisques()} onChange={v => changer('risqueOffensif', v)} />
+        <Choix label={t('online.tactics.kicking')} valeur={strategie.frequencePied} options={obtenirFrequencesPied()} onChange={v => changer('frequencePied', v)} />
+        <Choix label={t('online.tactics.lead65')} valeur={strategie.gestionAvance} options={obtenirGestionAvance()} onChange={v => changer('gestionAvance', v)} />
       </div>
-    </div> : <div className="cel-panneau"><p className="cel-note">Tu n’es pas sur le banc de cette rencontre : tu la regardes comme un spectateur.</p></div>)}
+    </div> : <div className="cel-panneau"><p className="cel-note">{t('online.tactics.spectatorNote')}</p></div>)}
 
     {ongletDirect === 'banc' && (m.monCote ? <div className="cel-panneau cel-banc">
       <div className="cel-titre-ligne"><h2>{t('online.match.substitutions')}</h2><small>{restants}</small></div>
-      <p className="cel-note">{sortant ? 'Choisis maintenant le joueur qui entre.' : 'Choisis d’abord le joueur qui sort.'}</p>
+      <p className="cel-note">{sortant ? t('online.match.subIn') : t('online.match.subOut')}</p>
       <div className="cel-deux">
         <div><h3>{t('online.match.pitch')}</h3><div className="cel-liste-pions">{m.surLeTerrain.map(p => <button key={p.carteId} className={sortant === p.carteId ? 'actif' : ''} onClick={() => setSortant(sortant === p.carteId ? '' : p.carteId)}><b>{p.numero}</b>{p.nom}<small>{nomPoste(p.poste)}</small></button>)}</div></div>
         <div><h3>{t('online.match.bench')}</h3><div className="cel-liste-pions">{m.surLeBanc.length ? m.surLeBanc.map(p => <button key={p.carteId} disabled={!sortant || occupe || restants <= 0} onClick={async () => { await agir({ type: 'match', matchId, action: { type: 'remplacement', sortantId: sortant, entrantId: p.carteId } }); setSortant(''); }}><b>{p.numero}</b>{p.nom}<small>{nomPoste(p.poste)}</small></button>) : <p className="cel-note">—</p>}</div></div>
       </div>
-    </div> : <div className="cel-panneau"><p className="cel-note">Seul l’entraîneur de l’équipe peut faire entrer un remplaçant.</p></div>)}
+    </div> : <div className="cel-panneau"><p className="cel-note">{t('online.match.onlyCoachCanSub')}</p></div>)}
 
-    {ongletDirect === 'stats' && <div className="cel-panneau"><div className="cel-table-scroll"><table className="cel-table"><thead><tr><th>Statistique</th><th>{nomClub(vue, r.domicile)}</th><th>{nomClub(vue, r.exterieur)}</th></tr></thead><tbody>
-      {([['Possession', `${m.stats.domicile.possession} %`, `${m.stats.exterieur.possession} %`], ['Essais', m.essais.domicile, m.essais.exterieur], ['Pénalités passées', m.penalites.domicile, m.penalites.exterieur], ['Tirs au but tentés', m.stats.domicile.penalitesTentees, m.stats.exterieur.penalitesTentees], ['Plaquages', m.stats.domicile.plaquages, m.stats.exterieur.plaquages], ['Mètres gagnés', m.stats.domicile.metres, m.stats.exterieur.metres], ['Ballons grattés', m.stats.domicile.turnovers, m.stats.exterieur.turnovers], ['Cartons', m.stats.domicile.cartons, m.stats.exterieur.cartons]] as const)
+    {ongletDirect === 'stats' && <div className="cel-panneau"><div className="cel-table-scroll"><table className="cel-table"><thead><tr><th>{t('online.stats.statistic')}</th><th>{nomClub(vue, r.domicile)}</th><th>{nomClub(vue, r.exterieur)}</th></tr></thead><tbody>
+      {([
+        [t('online.stats.possession'), `${m.stats.domicile.possession} %`, `${m.stats.exterieur.possession} %`],
+        [t('online.stats.tries'), m.essais.domicile, m.essais.exterieur],
+        [t('online.stats.penaltiesScored'), m.penalites.domicile, m.penalites.exterieur],
+        [t('online.stats.kicksAttempted'), m.stats.domicile.penalitesTentees, m.stats.exterieur.penalitesTentees],
+        [t('online.stats.tackles'), m.stats.domicile.plaquages, m.stats.exterieur.plaquages],
+        [t('online.stats.metersGained'), m.stats.domicile.metres, m.stats.exterieur.metres],
+        [t('online.stats.turnoversWon'), m.stats.domicile.turnovers, m.stats.exterieur.turnovers],
+        [t('online.stats.cards'), m.stats.domicile.cartons, m.stats.exterieur.cartons],
+      ] as const)
         .map(([label, a, b]) => <tr key={label}><th>{label}</th><td>{a}</td><td>{b}</td></tr>)}
     </tbody></table></div>
-      {m.feuille && <><h3 className="cel-sous-titre">Feuille de match</h3><div className="cel-table-scroll"><table className="cel-table"><thead><tr><th>#</th><th>Joueur</th><th>Min.</th><th>Essais</th><th>Plaq.</th><th>Mètres</th></tr></thead><tbody>{m.feuille.map(l => <tr key={`${l.cote}-${l.numero}-${l.nom}`}><td>{l.numero}</td><th>{l.nom} <small>{l.cote === 'domicile' ? nomClub(vue, r.domicile) : nomClub(vue, r.exterieur)}</small></th><td>{l.minutes}</td><td>{l.essais}</td><td>{l.plaquages}</td><td>{l.metres}</td></tr>)}</tbody></table></div></>}
+      {m.feuille && <><h3 className="cel-sous-titre">{t('online.stats.matchSheet')}</h3><div className="cel-table-scroll"><table className="cel-table"><thead><tr><th>#</th><th>{t('online.stats.player')}</th><th>{t('online.stats.minutes')}</th><th>{t('online.stats.tries')}</th><th>{t('online.stats.tackles')}</th><th>{t('online.stats.metersGained')}</th></tr></thead><tbody>{m.feuille.map(l => <tr key={`${l.cote}-${l.numero}-${l.nom}`}><td>{l.numero}</td><th>{l.nom} <small>{l.cote === 'domicile' ? nomClub(vue, r.domicile) : nomClub(vue, r.exterieur)}</small></th><td>{l.minutes}</td><td>{l.essais}</td><td>{l.plaquages}</td><td>{l.metres}</td></tr>)}</tbody></table></div></>}
     </div>}
   </div>;
 }
@@ -1372,7 +1407,7 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
   // entrera sur le terrain, et il n'y a qu'une formule à faire évoluer.
   const collectif = useMemo(() => collectifCarriere(cartes, composition), [cartes, composition]);
 
-  if (cartes.length < 23) return <Vide icone="equipe" titre="Ton effectif est trop court">Il faut au moins 23 joueurs disponibles pour composer une feuille de match.</Vide>;
+  if (cartes.length < 23) return <Vide icone="equipe" titre={t('online.squad.tooShortTitle')}>{t('online.squad.tooShortHelp')}</Vide>;
 
   // ⚠️ UN SEUL BLOC, PAS UN FRAGMENT. Les trois morceaux de l’onglet (la barre
   // du haut, la feuille, les consignes) étaient trois enfants directs de `.cel` :
@@ -1380,14 +1415,14 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
   // Regroupés ici, ils forment la colonne qui tient dans l’écran.
   return <section className={`cel-compo${vueEtendue ? ' cel-compo-etendue' : ''}`}>
     <section className="cel-panneau cel-tete-compo">
-      <button className="btn" aria-pressed={vueEtendue} onClick={() => setVueEtendue(!vueEtendue)}>{vueEtendue ? 'Réduire la vue' : 'Vue équipe entière'}</button>
-      <button className="btn" aria-expanded={consignesOuvertes} onClick={() => setConsignesOuvertes(!consignesOuvertes)}>Consignes</button>
+      <button className="btn" aria-pressed={vueEtendue} onClick={() => setVueEtendue(!vueEtendue)}>{vueEtendue ? t('online.lineup.viewCompact') : t('online.lineup.viewFull')}</button>
+      <button className="btn" aria-expanded={consignesOuvertes} onClick={() => setConsignesOuvertes(!consignesOuvertes)}>{t('online.lineup.instructionsBtn')}</button>
       {/* ⚠️ LES DEUX CHIFFRES D’ABORD, LA PHRASE ENSUITE. Sur téléphone,
           l’en-tête se lit de haut en bas : la note du XV et le collectif
           se retrouvaient sous trois lignes d’explication, donc hors écran.
           Ce sont pourtant les deux seules valeurs qu’on vient voir. */}
       <div className="cel-chiffres-compo">
-        <div className="cel-note-compo"><b>{noteXV.toFixed(1)}</b><span>note du XV</span></div>
+        <div className="cel-note-compo"><b>{noteXV.toFixed(1)}</b><span>{t('online.lineup.xvRating')}</span></div>
         {/* ⚠️ UNE BARRE, ET RIEN AUTOUR. Trois versions ont été nécessaires : un
             pavé encadré avec le palier écrit et trois lignes de règle, puis la
             même chose sans le texte, puis ceci. Demandé en jeu, dans l’ordre —
@@ -1396,15 +1431,15 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
             avec un rectangle autour ». Le chiffre reste, en petit ; le palier et
             la règle vivent dans le `title`. */}
         <div className={`cel-collectif cel-collectif-${paliersCollectif(collectif.total)}`}
-          title={`Collectif ${collectif.total}/100 — ${PALIERS_COLLECTIF[paliersCollectif(collectif.total)]}. Quatre joueurs d’un même club réel les mettent tous les quatre au maximum ; à défaut la nation, puis le championnat, qui demandent la moitié du XV. Le banc ne compte pas.`}>
-          <span>collectif</span>
+          title={`Collectif ${collectif.total}/100 — ${libellePalierCollectif(paliersCollectif(collectif.total))}.`}>
+          <span>{t('online.lineup.chemistry')}</span>
           <div className="cel-collectif-jauge"><i style={{ width: `${collectif.total}%` }} /></div>
           <b>{collectif.total}</b>
         </div>
       </div>
-      <div><div className="eyebrow">{composition.titulaires.length + composition.remplacants.length} / {cartes.length}</div><h2>{t('online.lineup.title')}</h2><p>Le capitaine tient la discipline, le buteur tire les pénalités.</p></div>
+      <div><div className="eyebrow">{composition.titulaires.length + composition.remplacants.length} / {cartes.length}</div><h2>{t('online.lineup.title')}</h2><p>{t('online.lineup.captainKickerHelp')}</p></div>
       <button className="btn" disabled={occupe || !optimale} onClick={() => { if (optimale) setBrouillon(optimale); }}>{t('online.lineup.best')}</button>
-      <button className="btn primaire" disabled={occupe || !modifie} onClick={async () => { const v = await agir({ type: 'composition', composition }); if (v) setBrouillon(null); }}>{modifie ? 'Enregistrer la feuille' : 'Feuille enregistrée'}</button>
+      <button className="btn primaire" disabled={occupe || !modifie} onClick={async () => { const v = await agir({ type: 'composition', composition }); if (v) setBrouillon(null); }}>{modifie ? t('compoSolo.saveBtn') : t('compoSolo.savedBtn')}</button>
     </section>
     {vueEtendue && erreur && <div className="cel-erreur cel-erreur-compo" role="alert"><Icone nom="alerte" taille={20} /><p>{erreur}</p></div>}
     <div className="cel-outils-compo">
@@ -1413,39 +1448,39 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
         className="btn primaire cel-btn-assembler"
         disabled={occupe || !optimale}
         onClick={() => { if (optimale) setBrouillon(optimale); }}
-        title="Assemble automatiquement la meilleure équipe combinant note et collectif sans aucun malus de poste"
+        title={t('compoSolo.buildBestHelp')}
       >
         <Icone nom="eclair" taille={16} />
-        <span>Assembler la meilleure équipe</span>
+        <span>{t('compoSolo.buildBest')}</span>
       </button>
 
       <details className="cel-details-outils">
         <summary className="btn cel-btn-outil">
           <Icone nom="disquette" taille={15} />
-          <span>Équipes sauvegardées ({sauvegardees.length}/15)</span>
+          <span>{t('compoSolo.savedTeams', { n: sauvegardees.length })}</span>
           <Icone nom="chevron" taille={13} className="cel-outil-chevron" />
         </summary>
         <div className="cel-outils-contenu">
-          <p className="cel-note">Charger une équipe prépare la feuille. Clique ensuite sur « Enregistrer la feuille » pour l’utiliser en match.</p>
-          <div className="cel-actions"><input aria-label="Nom de l’équipe" maxLength={40} placeholder="Nom de l’équipe" value={nomEquipe} onChange={e => setNomEquipe(e.target.value)} />
-            <button type="button" className="btn" disabled={occupe || nomEquipe.trim().length < 2 || sauvegardees.length >= 15} onClick={async () => { const v = await agir({ type: 'sauvegarderComposition', nom: nomEquipe.trim(), composition }); if (v) setNomEquipe(''); }}>Sauvegarder cette équipe</button></div>
+          <p className="cel-note">{t('online.lineup.loadTeamHelp')}</p>
+          <div className="cel-actions"><input aria-label={t('compoSolo.teamPlaceholder')} maxLength={40} placeholder={t('compoSolo.teamPlaceholder')} value={nomEquipe} onChange={e => setNomEquipe(e.target.value)} />
+            <button type="button" className="btn" disabled={occupe || nomEquipe.trim().length < 2 || sauvegardees.length >= 15} onClick={async () => { const v = await agir({ type: 'sauvegarderComposition', nom: nomEquipe.trim(), composition }); if (v) setNomEquipe(''); }}>{t('compoSolo.saveTeamBtn')}</button></div>
           {sauvegardees.map(equipe => <div className="cel-equipe-sauvegardee" key={equipe.id}><span>{equipe.nom}</span>
-            <button type="button" className="btn" disabled={occupe} onClick={() => setBrouillon(structuredClone(equipe.composition))}>Charger</button>
-            <button type="button" className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'supprimerComposition', id: equipe.id }); }} aria-label={`Supprimer ${equipe.nom}`}>Supprimer</button></div>)}
+            <button type="button" className="btn" disabled={occupe} onClick={() => setBrouillon(structuredClone(equipe.composition))}>{t('compoSolo.loadTeamBtn')}</button>
+            <button type="button" className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'supprimerComposition', id: equipe.id }); }} aria-label={`Supprimer ${equipe.nom}`}>{t('compoSolo.deleteTeamBtn')}</button></div>)}
         </div>
       </details>
 
       <details className="cel-details-outils">
         <summary className="btn cel-btn-outil">
           <Icone nom="loupe" taille={15} />
-          <span>Filtrer les réserves</span>
+          <span>{t('compoSolo.filterReserves')}</span>
           <Icone nom="chevron" taille={13} className="cel-outil-chevron" />
         </summary>
         <div className="cel-outils-contenu cel-filtres-reserves">
-          <Choix label="Compétition" valeur={filtreChampionnat} options={[["", "Toutes"], ...optionsFiltre('championnat').map(v => [v, v] as [string, string])]} onChange={v => { setFiltreChampionnat(v); setFiltreClub(''); }} />
-          <Choix label="Club" valeur={filtreClub} options={[["", "Tous"], ...optionsFiltre('clubReel').filter(v => !filtreChampionnat || cartes.some(c => c.clubReel === v && c.championnat === filtreChampionnat)).map(v => [v, v] as [string, string])]} onChange={setFiltreClub} />
-          <Choix label="Pays" valeur={filtrePays} options={[["", "Tous"], ...optionsFiltre('pays').map(v => [v, v] as [string, string])]} onChange={setFiltrePays} />
-          <Choix label="Poste" valeur={filtrePoste} options={[["", "Tous"], ...[...new Set(cartes.map(c => c.poste))].sort((a, b) => (POSTE_PAR_ID[a]?.numero ?? 0) - (POSTE_PAR_ID[b]?.numero ?? 0)).map(v => [v, nomPoste(v)] as [string, string])]} onChange={setFiltrePoste} />
+          <Choix label={t('compoSolo.competition')} valeur={filtreChampionnat} options={[["", t('compoSolo.allFeminine')], ...optionsFiltre('championnat').map(v => [v, v] as [string, string])]} onChange={v => { setFiltreChampionnat(v); setFiltreClub(''); }} />
+          <Choix label={t('compoSolo.club')} valeur={filtreClub} options={[["", t('compoSolo.allMasculine')], ...optionsFiltre('clubReel').filter(v => !filtreChampionnat || cartes.some(c => c.clubReel === v && c.championnat === filtreChampionnat)).map(v => [v, v] as [string, string])]} onChange={setFiltreClub} />
+          <Choix label={t('compoSolo.nation')} valeur={filtrePays} options={[["", t('compoSolo.allMasculine')], ...optionsFiltre('pays').map(v => [v, v] as [string, string])]} onChange={setFiltrePays} />
+          <Choix label={t('compoSolo.position')} valeur={filtrePoste} options={[["", t('compoSolo.allMasculine')], ...[...new Set(cartes.map(c => c.poste))].sort((a, b) => (POSTE_PAR_ID[a]?.numero ?? 0) - (POSTE_PAR_ID[b]?.numero ?? 0)).map(v => [v, nomPoste(v)] as [string, string])]} onChange={setFiltrePoste} />
         </div>
       </details>
     </div>
@@ -1484,21 +1519,21 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
     <details className="cel-panneau cel-consignes-repliables" open={consignesOuvertes} onToggle={e => setConsignesOuvertes(e.currentTarget.open)}>
       <summary><span><h2>{t('online.lineup.instructions')}</h2><small>{t('online.common.save')}</small></span><Icone nom="sifflet" /></summary>
       <div className="cel-consignes-contenu">
-        <p className="cel-note">⚠️ Ce sont elles qui entraînent ton équipe <b>quand tu n’es pas là</b> — et elles servent de point de départ quand tu l’es. Un match ne s’annule jamais faute de manager.</p>
+        <p className="cel-note">⚠️ {t('online.tactics.drawerHelp')}</p>
         <div className="cel-grille-consignes">
-          <Choix label="Mentalité" valeur={strategie.mentalite} options={MENTALITES} onChange={v => majStrategie('mentalite', v)} />
-          <Choix label="Jeu" valeur={strategie.jeu} options={JEUX} onChange={v => majStrategie('jeu', v)} />
-          <Choix label="Rythme" valeur={strategie.rythme} options={RYTHMES} onChange={v => majStrategie('rythme', v)} />
-          <Choix label="Défense" valeur={strategie.defense} options={DEFENSES} onChange={v => majStrategie('defense', v)} />
-          <Choix label="Rucks" valeur={strategie.rucks} options={RUCKS} onChange={v => majStrategie('rucks', v)} />
-          <Choix label="Risque offensif" valeur={strategie.risqueOffensif} options={RISQUES} onChange={v => majStrategie('risqueOffensif', v)} />
-          <Choix label="Fréquence du jeu au pied" valeur={strategie.frequencePied} options={FREQUENCES_PIED} onChange={v => majStrategie('frequencePied', v)} />
-          <Choix label="Remplacements" valeur={strategie.remplacements} options={TIMINGS} onChange={v => majStrategie('remplacements', v)} />
-          <Choix label="Pénalité à moins de 35 m" valeur={strategie.penaliteCourte} options={PENALITES} onChange={v => majStrategie('penaliteCourte', v)} />
-          <Choix label="Pénalité au-delà de 35 m" valeur={strategie.penaliteLongue} options={PENALITES} onChange={v => majStrategie('penaliteLongue', v)} />
-          <Choix label="Si mené après la 60ᵉ" valeur={strategie.bascule60} options={MENTALITES} onChange={v => majStrategie('bascule60', v)} />
-          <Choix label="Si mené de 8+ après la 70ᵉ" valeur={strategie.bascule70} options={MENTALITES} onChange={v => majStrategie('bascule70', v)} />
-          <Choix label="Avec 8+ points d’avance après la 65ᵉ" valeur={strategie.gestionAvance} options={GESTION_AVANCE} onChange={v => majStrategie('gestionAvance', v)} />
+          <Choix label={t('online.tactics.mentality')} valeur={strategie.mentalite} options={obtenirMentalites()} onChange={v => majStrategie('mentalite', v)} />
+          <Choix label={t('online.tactics.game')} valeur={strategie.jeu} options={obtenirJeux()} onChange={v => majStrategie('jeu', v)} />
+          <Choix label={t('online.tactics.rhythm')} valeur={strategie.rythme} options={obtenirRythmes()} onChange={v => majStrategie('rythme', v)} />
+          <Choix label={t('online.tactics.defense')} valeur={strategie.defense} options={obtenirDefenses()} onChange={v => majStrategie('defense', v)} />
+          <Choix label={t('online.tactics.rucks')} valeur={strategie.rucks} options={obtenirRucks()} onChange={v => majStrategie('rucks', v)} />
+          <Choix label={t('online.tactics.risk')} valeur={strategie.risqueOffensif} options={obtenirRisques()} onChange={v => majStrategie('risqueOffensif', v)} />
+          <Choix label={t('online.tactics.kicking')} valeur={strategie.frequencePied} options={obtenirFrequencesPied()} onChange={v => majStrategie('frequencePied', v)} />
+          <Choix label={t('online.tactics.subs')} valeur={strategie.remplacements} options={obtenirTimings()} onChange={v => majStrategie('remplacements', v)} />
+          <Choix label={t('online.tactics.penShort')} valeur={strategie.penaliteCourte} options={obtenirPenalites()} onChange={v => majStrategie('penaliteCourte', v)} />
+          <Choix label={t('online.tactics.penLong')} valeur={strategie.penaliteLongue} options={obtenirPenalites()} onChange={v => majStrategie('penaliteLongue', v)} />
+          <Choix label={t('online.tactics.behind60')} valeur={strategie.bascule60} options={obtenirMentalites()} onChange={v => majStrategie('bascule60', v)} />
+          <Choix label={t('online.tactics.behind70')} valeur={strategie.bascule70} options={obtenirMentalites()} onChange={v => majStrategie('bascule70', v)} />
+          <Choix label={t('online.tactics.lead65')} valeur={strategie.gestionAvance} options={obtenirGestionAvance()} onChange={v => majStrategie('gestionAvance', v)} />
         </div>
       </div>
     </details>
@@ -1575,17 +1610,17 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
   return <>
     <section className="cel-panneau cel-filtres">
       <div><div className="eyebrow">{cartes.length} {t('online.common.players')}</div><h2>{t('online.squad.title')}</h2></div>
-      <Choix label="Trier par" valeur={tri} options={[['note', 'Note (GEN)'], ['poste', 'Numéro de maillot'], ['age', 'Âge'], ['nom', 'Nom']]} onChange={setTri} />
-      <Choix label="Poste" valeur={famille} options={[['', 'Tous les postes'], ...familles.map(f => [f, nomPoste(POSTES_XV_MANAGER.find(p => POSTE_PAR_ID[p].famille === f) ?? 'arriere')] as [string, string])]} onChange={setFamille} />
+      <Choix label={t('online.squad.sort')} valeur={tri} options={[['note', 'GEN'], ['poste', t('online.squad.position')], ['age', t('compo.ans')], ['nom', t('solo.search')]]} onChange={setTri} />
+      <Choix label={t('online.squad.position')} valeur={famille} options={[['', t('online.squad.allPositions')], ...familles.map(f => [f, nomPoste(POSTES_XV_MANAGER.find(p => POSTE_PAR_ID[p].famille === f) ?? 'arriere')] as [string, string])]} onChange={setFamille} />
       <button type="button" className="btn fantome petit" disabled={!cartes.some(groupable)}
         title={favoris ? `${favoris} favori${favoris > 1 ? 's' : ''} rest${favoris > 1 ? 'ent' : 'e'} hors du lot.` : undefined}
         onClick={() => setSelection(liste => cartes.filter(groupable).every(c => liste.includes(c.id)) ? [] : [...new Set([...liste, ...cartes.filter(groupable).map(c => c.id)])].slice(0, maximumVendable))}>
-        {cartes.filter(groupable).every(c => selection.includes(c.id)) && cartes.some(groupable) ? 'Tout décocher' : 'Tout cocher'}
+        {cartes.filter(groupable).every(c => selection.includes(c.id)) && cartes.some(groupable) ? t('online.squad.uncheckAll') : t('online.squad.checkAll')}
       </button>
       {favoris > 0 && <small className="cel-note-favoris"><Icone nom="etoile" taille={13} /> {favoris} favori{favoris > 1 ? 's' : ''} écarté{favoris > 1 ? 's' : ''} de « Tout cocher »</small>}
       {cartes.some(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()) && (
         <small className="cel-note-blesses">
-          <Icone nom="coeur" taille={13} /> {cartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length} blessé(s) à l'infirmerie
+          <Icone nom="coeur" taille={13} /> {t('online.infirmary.unavailableCount', { count: cartes.filter(c => c.blesseJusqua && c.blesseJusqua > maintenantISO()).length })}
         </small>
       )}
     </section>
@@ -1596,37 +1631,37 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
       const libre = cessible(c);
       const choisie = libre && selection.includes(c.id);
       return <div className={`cel-carte-quick${choisie ? ' choisie' : ''}${c.favori ? ' favorite' : ''}${estBlesse ? ' cel-carte-blessee' : ''}`} key={c.id}>
-        {libre && <button type="button" className="cel-coche" aria-pressed={choisie} aria-label={`Sélectionner ${c.nom}`} onClick={() => basculer(c.id)}><Icone nom="check" taille={13} /></button>}
+        {libre && <button type="button" className="cel-coche" aria-pressed={choisie} aria-label={choisie ? t('online.squad.deselectPlayer', { name: c.nom }) : t('online.squad.selectPlayer', { name: c.nom })} onClick={() => basculer(c.id)}><Icone nom="check" taille={13} /></button>}
         {estBlesse && (
-          <span className="cel-badge-blessure-flottant" title={`Blessé jusqu'au ${dateHeure(c.blesseJusqua!)} (encore ${formatTempsBlessureDetaille(c.blesseJusqua!)})`}>
-            <Icone nom="coeur" taille={12} /> Blessé · {formatTempsBlessure(c.blesseJusqua!)}
+          <span className="cel-badge-blessure-flottant" title={t('online.infirmary.injuredUntilTooltip', { date: dateHeure(c.blesseJusqua!), time: formatTempsBlessureDetaille(c.blesseJusqua!) })}>
+            <Icone nom="coeur" taille={12} /> {t('compo.badge.blesse')} · {formatTempsBlessure(c.blesseJusqua!)}
           </span>
         )}
         {/* ⚠️ L'ÉTOILE RESTE CLIQUABLE SUR UN JOUEUR ALIGNÉ. On marque son
             capitaine PENDANT qu'il est titulaire, pas après l'avoir sorti :
             c'est exactement le moment où l'on sait qu'il compte. */}
         <button type="button" className="cel-favori" aria-pressed={Boolean(c.favori)} disabled={occupe}
-          aria-label={c.favori ? `Retirer ${c.nom} des favoris` : `Garder ${c.nom} - il sortira de « Tout cocher »`}
-          title={c.favori ? 'Favori : écarté de « Tout cocher ». Il reste vendable à l’unité.' : 'Marquer comme favori : il ne sera plus pris par « Tout cocher ».'}
+          aria-label={c.favori ? t('online.market.removeFavorite', { name: c.nom }) : t('online.market.addFavorite', { name: c.nom })}
+          title={c.favori ? t('online.market.favoriteHelp') : t('online.market.markFavoriteHelp')}
           onClick={() => { void agir({ type: 'favori', carteId: c.id, valeur: !c.favori }); }}>
           <Icone nom="etoile" taille={14} />
         </button>
         <CarteJoueurEnLigne carte={c} logoClub={logos.get(c.clubReel)} onClick={libre ? () => basculer(c.id) : undefined} />
         <button className="cel-vente-rapide" type="button" disabled={occupe || !libre}
-          title={maillot ? `Sur la feuille de match (${maillot}) : sors-le du XV ou du banc pour le vendre.` : estBlesse ? `Blessé jusqu'au ${dateHeure(c.blesseJusqua!)} (encore ${formatTempsBlessureDetaille(c.blesseJusqua!)})` : undefined}
+          title={maillot ? t('online.market.onMatchSheetHelp', { sheet: maillot }) : estBlesse ? t('online.infirmary.injuredUntilTooltip', { date: dateHeure(c.blesseJusqua!), time: formatTempsBlessureDetaille(c.blesseJusqua!) }) : undefined}
           onClick={() => setDemande([c])}>
-          {maillot ? `Sur la feuille · ${maillot}` : c.verrou ? 'Déjà sur le marché' : estBlesse ? `Blessé · encore ${formatTempsBlessure(c.blesseJusqua!)}` : `Vente rapide · ${montant(valeurVenteRapide(c))} Ovas`}
+          {maillot ? `${t('online.market.onMatchSheet', { rarity: maillot })}` : c.verrou ? t('online.market.activeBidOngoing') : estBlesse ? `${t('compo.badge.blesse')} · ${formatTempsBlessure(c.blesseJusqua!)}` : `${t('online.market.quickSell')} · ${montant(valeurVenteRapide(c))} Ovas`}
         </button>
       </div>;
     })}</div>
-    {!cartes.length && <Vide icone="equipe" titre="Aucun joueur à ce poste">Ouvre un pack ou passe par le marché pour renforcer ta ligne.</Vide>}
+    {!cartes.length && <Vide icone="equipe" titre={t('online.squad.emptyPositionTitle')}>{t('online.squad.emptyPositionHelp')}</Vide>}
 
     {/* La barre ne s'affiche qu'une fois quelque chose de coché : tant qu'on
         regarde son effectif, rien ne doit recouvrir la dernière rangée. */}
     {choisies.length > 0 && <div className="cel-barre-selection" role="region" aria-label="Sélection à vendre">
       <div>
-        <b>{choisies.length} joueur{choisies.length > 1 ? 's' : ''} sélectionné{choisies.length > 1 ? 's' : ''}</b>
-        <small>{montant(total)} Ovas · il resterait {restants} joueurs disponibles
+        <b>{t('online.squad.selectedCount', { count: choisies.length })}</b>
+        <small>{t('online.squad.selectedHelp', { val: montant(total), rem: restants })}
           {choisies.length >= maximumVendable && (maximumVendable === LOT_VENTE_RAPIDE_MAX
             ? ` · maximum ${LOT_VENTE_RAPIDE_MAX} par lot`
             : ` · c’est tout ce que le plancher de ${EFFECTIF_MINIMUM} joueurs autorise`)}</small>
@@ -1634,17 +1669,17 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
       <div className="cel-barre-actions">
         <button type="button" className="btn fantome" onClick={() => setSelection([])}>{t('online.common.cancel')}</button>
         <button type="button" className="btn primaire" disabled={occupe || restants < EFFECTIF_MINIMUM} onClick={() => setDemande(choisies)}>
-          {restants < EFFECTIF_MINIMUM ? `Garde au moins ${EFFECTIF_MINIMUM} joueurs` : `Tout vendre · ${montant(total)} Ovas`}
+          {restants < EFFECTIF_MINIMUM ? t('online.market.keepMinPlayers', { min: EFFECTIF_MINIMUM }) : t('online.squad.sellAllBtn', { val: montant(total) })}
         </button>
       </div>
     </div>}
 
     {demande && <Confirmation
-      titre={demande.length === 1 ? 'Vendre cette carte ?' : `Vendre ces ${demande.length} cartes ?`}
+      titre={demande.length === 1 ? t('online.squad.sellSelectedPrompt') : t('online.squad.sellSelectedPromptPlural', { count: demande.length })}
       message={demande.length === 1
-        ? `${demande[0].nom} sera retiré définitivement de ton effectif contre ${montant(valeurVenteRapide(demande[0]))} Ovas. Cette action est irréversible.`
-        : `${demande.map(c => c.nom).join(', ')} quitteront définitivement ton effectif contre ${montant(demande.reduce((s, c) => s + valeurVenteRapide(c), 0))} Ovas au total. Cette action est irréversible.`}
-      libelleOui={`Vendre pour ${montant(demande.reduce((s, c) => s + valeurVenteRapide(c), 0))} Ovas`}
+        ? t('online.squad.sellConfirmMsgSingle', { name: demande[0].nom, val: montant(valeurVenteRapide(demande[0])) })
+        : t('online.squad.sellConfirmMsgPlural', { names: demande.map(c => c.nom).join(', '), val: montant(demande.reduce((s, c) => s + valeurVenteRapide(c), 0)) })}
+      libelleOui={t('online.squad.sellConfirmBtn', { val: montant(demande.reduce((s, c) => s + valeurVenteRapide(c), 0)) })}
       onNon={() => setDemande(null)}
       onOui={() => vendre(demande)}
     />}
@@ -1720,21 +1755,21 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
   return <>
     <section className="cel-boutique-tete">
       <div>
-        <div className="eyebrow">{montant(vue.vivierDisponible)} joueurs encore libres</div>
+        <div className="eyebrow">{t('online.shop.poolAvailable', { count: montant(vue.vivierDisponible) })}</div>
         <h2>{t('online.shop.title')}</h2>
-        <p>Du Top 14 à la Régionale 3, et tous les championnats étrangers.
-          <b> Un joueur déjà pris dans la ligue ne sort plus d’un pack</b> — pour l’avoir, il faut aller voir celui qui l’a.</p>
+        <p>{t('online.shop.desc')}
+          <b>{t('online.shop.uniqueNote')}</b>{t('online.shop.uniqueNoteEnd')}</p>
       </div>
       <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(solde)}</strong><span>{t('online.shop.available')}</span></div>
     </section>
 
     <section className="cel-packs-quotidiens">
-      <div className="cel-packs-quotidiens-tete"><div><div className="eyebrow">Coup de pouce quotidien</div><h3>{packsGratuits.length} pack{packsGratuits.length > 1 ? 's' : ''} gratuit{packsGratuits.length > 1 ? 's' : ''} à ouvrir</h3><p>{vue.phase === 'salon' ? 'Le premier lot tombe au coup d’envoi de la saison, pour tout le monde le même jour. Ensuite, dix nouveaux packs chaque jour.' : 'Dix nouveaux packs arrivent chaque jour. Plus ton club descend au classement, plus ses chances de recevoir les packs rares augmentent.'}</p></div><strong>10 / jour</strong></div>
-      {packsGratuits.length ? <div className="cel-packs-gratuits-liste">{packsGratuits.slice(0, 20).map(attribution => { const pack = vue.packs.find(p => p.id === attribution.packId); return pack ? <button key={attribution.id} disabled={occupe || ouverture !== null} onPointerEnter={() => prechargerOuverturePack(apparencePack(pack))} onFocus={() => prechargerOuverturePack(apparencePack(pack))} onClick={() => { void ouvrirGratuit(attribution.id, pack.id, nomPackCarriere(pack)); }}><span className={`cel-pack-gratuit-sceau ${pack.garantie ?? 'bronze'}`}><Icone nom="cadeau" taille={17} /></span><b>{nomPackCarriere(pack)}</b><small>Offert</small></button> : null; })}</div> : <p className="cel-note">{vue.phase === 'salon' ? 'La saison n’est pas lancée : les packs quotidiens attendent le coup d’envoi.' : 'Les dix packs du jour ont été ouverts. Le prochain lot arrivera demain.'}</p>}
-      {packsGratuits.length > 20 && <small className="cel-note">Ouvre quelques packs pour afficher les {packsGratuits.length - 20} suivants.</small>}
+      <div className="cel-packs-quotidiens-tete"><div><div className="eyebrow">{t('online.shop.dailyBoost')}</div><h3>{t('online.shop.freePacksCount', { count: packsGratuits.length })}</h3><p>{vue.phase === 'salon' ? t('online.shop.dailyLobbyHelp') : t('online.shop.dailySeasonHelp')}</p></div><strong>{t('online.shop.dailyRate')}</strong></div>
+      {packsGratuits.length ? <div className="cel-packs-gratuits-liste">{packsGratuits.slice(0, 20).map(attribution => { const pack = vue.packs.find(p => p.id === attribution.packId); return pack ? <button key={attribution.id} disabled={occupe || ouverture !== null} onPointerEnter={() => prechargerOuverturePack(apparencePack(pack))} onFocus={() => prechargerOuverturePack(apparencePack(pack))} onClick={() => { void ouvrirGratuit(attribution.id, pack.id, nomPackCarriere(pack)); }}><span className={`cel-pack-gratuit-sceau ${pack.garantie ?? 'bronze'}`}><Icone nom="cadeau" taille={17} /></span><b>{nomPackCarriere(pack)}</b><small>{t('online.shop.freePackLabel')}</small></button> : null; })}</div> : <p className="cel-note">{vue.phase === 'salon' ? t('online.shop.emptyLobby') : t('online.shop.emptySeason')}</p>}
+      {packsGratuits.length > 20 && <small className="cel-note">{t('online.shop.morePacksNote', { count: packsGratuits.length - 20 })}</small>}
     </section>
 
-    <div className="cel-note">Bronze, Argent et Or sont toujours disponibles. Les deux autres packs changent chaque jour.</div>
+    <div className="cel-note">{t('online.shop.basePacksNote')}</div>
     <BoutiquePacks3D packs={packsDuJour} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={ouvrir} />
 
     {ouverture && <OuverturePack cartes={ouverture.cartes} pack={ouverture.pack} garantie={ouverture.garantie} rendreCarte={carte => <CarteJoueurEnLigne carte={carte} />} onFermer={() => setOuverture(null)} />}
@@ -1791,18 +1826,18 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
   };
 
   return <>
-    <nav className="cel-onglets secondaires">{([['encours', `À vendre (${ouvertes.length})`], ['vendre', 'Mettre en vente'], ['echanges', `Échanges (${vue.echanges.filter(e => e.etat === 'propose').length})`]] as const).map(([id, label]) =>
+    <nav className="cel-onglets secondaires">{([['encours', t('online.market.tab.forSale', { count: ouvertes.length })], ['vendre', t('online.market.tab.sell')], ['echanges', t('online.market.tab.trades', { count: vue.echanges.filter(e => e.etat === 'propose').length })]] as const).map(([id, label]) =>
       <button key={id} className={sousOnglet === id ? 'actif' : ''} onClick={() => setSousOnglet(id)}>{label}</button>)}</nav>
 
-    <div className="cel-deux"><Champ label={t('online.market.search')}><input type="search" value={rechercheMarche} onChange={e => setRechercheMarche(e.target.value)} /></Champ><Choix label={t('online.collection.rarity')} valeur={rareteMarche} onChange={setRareteMarche} options={[["", t('online.collection.all')], ["bronze", "Bronze"], ["argent", "Argent"], ["or", "Or"], ["elite", "Élite"], ["star", "Mythique"]]} /></div>
+    <div className="cel-deux"><Champ label={t('online.market.search')}><input type="search" value={rechercheMarche} onChange={e => setRechercheMarche(e.target.value)} /></Champ><Choix label={t('online.collection.rarity')} valeur={rareteMarche} onChange={setRareteMarche} options={[["", t('online.collection.all')], ["bronze", t('online.rarity.bronze')], ["argent", t('online.rarity.argent')], ["or", t('online.rarity.or')], ["elite", t('online.rarity.elite')], ["star", t('online.rarity.star')]]} /></div>
     {/* ⚠️ LA ROUE OUVRE LA FICHE, ELLE NE DÉROULE PLUS UN PANNEAU EN DESSOUS.
         L'annonce s'affichait sous la roue : il fallait cliquer une carte, puis
         descendre la page pour lire le prix et le vendeur, et la carte qu'on
         venait de choisir sortait de l'écran. Tout tient maintenant dans une
         fiche — la carte à gauche, l'annonce et ses boutons à droite. */}
-    {sousOnglet === 'encours' && <RoueCartes titre="Les joueurs sur le marché" cartes={ouvertes.map(v=>carte(v.carteId)!).filter(Boolean)} selection={venteSelectionnee} onChoisir={id => { setVenteSelectionnee(id); setApercu(id); }} vide={rechercheMarche || rareteMarche ? 'Aucun joueur ne correspond à ces filtres.' : 'Aucun joueur en vente pour le moment.'} />}
+    {sousOnglet === 'encours' && <RoueCartes titre={t('online.market.players')} cartes={ouvertes.map(v=>carte(v.carteId)!).filter(Boolean)} selection={venteSelectionnee} onChoisir={id => { setVenteSelectionnee(id); setApercu(id); }} vide={rechercheMarche || rareteMarche ? t('online.market.emptyFilter') : t('online.market.emptyList')} />}
 
-    {sousOnglet === 'vendre' && <RoueCartes titre="Choisis ta carte à vendre ou échanger" cartes={vendables.filter(correspond).sort((a,b)=>b.note-a.note)} selection={carteId} onChoisir={id => { setCarteId(id); setApercu(id); }} vide={mesCartes.length ? 'Aucune carte disponible avec ces filtres. Les cartes verrouillées ne peuvent pas être vendues.' : 'Ton effectif ne contient encore aucune carte.'} />}
+    {sousOnglet === 'vendre' && <RoueCartes titre={t('online.market.chooseCardToSellOrTrade')} cartes={vendables.filter(correspond).sort((a,b)=>b.note-a.note)} selection={carteId} onChoisir={id => { setCarteId(id); setApercu(id); }} vide={mesCartes.length ? t('online.market.emptyFilterLocked') : t('online.market.emptySquad')} />}
 
     {carteApercue && <ModaleMarche
       carte={carteApercue} vente={venteApercue} monClubId={vue.monClubId} ovas={club?.ovas ?? 0}
@@ -1817,37 +1852,37 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
       {vue.echanges.filter(e => e.etat === 'propose').map(e => {
         const recu = e.vers === vue.monClubId;
         return <article key={e.id} className="cel-panneau cel-echange">
-          <div className="eyebrow">{recu ? `Offre de ${nomClub(vue, e.de)}` : `Ton offre à ${nomClub(vue, e.vers)}`} · expire {dateHeure(e.expireLe)}</div>
+          <div className="eyebrow">{recu ? t('online.trade.offerFrom', { club: nomClub(vue, e.de) }) : t('online.trade.offerTo', { club: nomClub(vue, e.vers) })} · {t('online.market.closesAt', { time: dateHeure(e.expireLe) })}</div>
           <div className="cel-echange-cotes">
-            <div><h3>{nomClub(vue, e.de)} donne</h3><div className="cel-grille-cartes petites">{e.cartesDonnees.map(id => carte(id)).filter(Boolean).map(c => <CarteJoueurEnLigne key={c!.id} carte={c!} compacte />)}</div>{e.ovasDonnes > 0 && <b className="cel-ovas-echange">+ {montant(e.ovasDonnes)} Ovas</b>}</div>
+            <div><h3>{t('online.trade.gives', { club: nomClub(vue, e.de) })}</h3><div className="cel-grille-cartes petites">{e.cartesDonnees.map(id => carte(id)).filter(Boolean).map(c => <CarteJoueurEnLigne key={c!.id} carte={c!} compacte />)}</div>{e.ovasDonnes > 0 && <b className="cel-ovas-echange">+ {montant(e.ovasDonnes)} Ovas</b>}</div>
             <Icone nom="repost" taille={26} />
-            <div><h3>{nomClub(vue, e.vers)} donne</h3><div className="cel-grille-cartes petites">{e.cartesDemandees.map(id => carte(id)).filter(Boolean).map(c => <CarteJoueurEnLigne key={c!.id} carte={c!} compacte />)}</div>{e.ovasDemandes > 0 && <b className="cel-ovas-echange">+ {montant(e.ovasDemandes)} Ovas</b>}</div>
+            <div><h3>{t('online.trade.gives', { club: nomClub(vue, e.vers) })}</h3><div className="cel-grille-cartes petites">{e.cartesDemandees.map(id => carte(id)).filter(Boolean).map(c => <CarteJoueurEnLigne key={c!.id} carte={c!} compacte />)}</div>{e.ovasDemandes > 0 && <b className="cel-ovas-echange">+ {montant(e.ovasDemandes)} Ovas</b>}</div>
           </div>
           {e.blocage && <p className="cel-note cel-alerte-echange" role="status">{e.blocage}</p>}
           <div className="cel-actions">
             {recu ? <>
-              <button className="btn primaire" disabled={occupe || Boolean(e.blocage)} onClick={() => { void agir({ type: 'repondreEchange', echangeId: e.id, accepter: true }); }}>Accepter</button>
-              <button className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'repondreEchange', echangeId: e.id, accepter: false }); }}>Refuser</button>
-            </> : <button className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'annulerEchange', echangeId: e.id }); }}>Annuler mon offre</button>}
+              <button className="btn primaire" disabled={occupe || Boolean(e.blocage)} onClick={() => { void agir({ type: 'repondreEchange', echangeId: e.id, accepter: true }); }}>{t('online.common.accept')}</button>
+              <button className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'repondreEchange', echangeId: e.id, accepter: false }); }}>{t('online.common.refuse')}</button>
+            </> : <button className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'annulerEchange', echangeId: e.id }); }}>{t('online.trade.cancelOffer')}</button>}
           </div>
         </article>;
       })}
       <form className="cel-panneau" onSubmit={async ev => { ev.preventDefault(); const v = await agir({ type: 'proposerEchange', vers: cible, cartesDonnees: donnees, cartesDemandees: demandees, ovasDonnes: Number(ovasDonnes), ovasDemandes: Number(ovasDemandes) }); if (v) { setDonnees([]); setDemandees([]); } }}>
         <h2>{t('online.market.trade')}</h2>
-        <p className="cel-note">« Je te donne mon 8 contre ton ailier + 15 000 Ovas. » Les deux doivent accepter ; le serveur valide ensuite la transaction d’un bloc.</p>
-        <Choix label="Avec qui ?" valeur={cible} options={[['', 'Choisis un club'], ...vue.clubs.filter(c => c.id !== vue.monClubId).map(c => [c.id, c.nom] as [string, string])]} onChange={v => { setCible(v); setDemandees([]); }} />
+        <p className="cel-note">{t('online.trade.help')}</p>
+        <Choix label={t('online.trade.withWhom')} valeur={cible} options={[['', t('online.trade.chooseClub')], ...vue.clubs.filter(c => c.id !== vue.monClubId).map(c => [c.id, c.nom] as [string, string])]} onChange={v => { setCible(v); setDemandees([]); }} />
         {cible && <div>
-          <p className="cel-note">Choisis les joueurs à échanger, même s’ils sont sur une feuille de match. L’offre pourra être envoyée, mais les deux clubs devront retirer ces joueurs de leur feuille avant l’acceptation.</p>
+          <p className="cel-note">{t('online.trade.rulesHelp')}</p>
 
-          <RoueCartes titre={"Je donne"} cartes={vendables.filter(correspond).sort((a, b) => b.note - a.note)} selections={donnees} onChoisir={id => basculer(donnees, setDonnees, id)} vide="Aucun joueur disponible avec ces filtres." />
-          <p className="cel-note" aria-live="polite">{donnees.length} joueur(s) sélectionné(s)</p>
-          <div className="cel-actions">{donnees.map(id => <button type="button" className="btn fantome" key={id} onClick={() => basculer(donnees, setDonnees, id)} aria-label={`Retirer ${carte(id)?.nom} de l’échange`}>{carte(id)?.nom} ×</button>)}</div>
-          <Champ label="+ Ovas de ma part"><input type="number" min={0} step={100} value={ovasDonnes} onChange={e => setOvaDonnes(e.target.value)} /></Champ>
+          <RoueCartes titre={t('online.trade.iGive')} cartes={vendables.filter(correspond).sort((a, b) => b.note - a.note)} selections={donnees} onChoisir={id => basculer(donnees, setDonnees, id)} vide={t('online.trade.emptyFiltered')} />
+          <p className="cel-note" aria-live="polite">{t('online.trade.playersSelected', { count: donnees.length })}</p>
+          <div className="cel-actions">{donnees.map(id => <button type="button" className="btn fantome" key={id} onClick={() => basculer(donnees, setDonnees, id)} aria-label={t('online.trade.removePlayer', { name: carte(id)?.nom ?? '' })}>{carte(id)?.nom} ×</button>)}</div>
+          <Champ label={t('online.trade.ovasFromMe')}><input type="number" min={0} step={100} value={ovasDonnes} onChange={e => setOvaDonnes(e.target.value)} /></Champ>
 
-          <RoueCartes titre={`Je demande · ${nomClub(vue, cible)}`} cartes={siennes.filter(c => !c.verrou).filter(correspond).sort((a, b) => b.note - a.note)} selections={demandees} onChoisir={id => basculer(demandees, setDemandees, id)} vide="Aucun joueur disponible avec ces filtres." />
-          <p className="cel-note" aria-live="polite">{demandees.length} joueur(s) sélectionné(s)</p>
-          <div className="cel-actions">{demandees.map(id => <button type="button" className="btn fantome" key={id} onClick={() => basculer(demandees, setDemandees, id)} aria-label={`Retirer ${carte(id)?.nom} de l’échange`}>{carte(id)?.nom} ×</button>)}</div>
-          <Champ label="+ Ovas de sa part"><input type="number" min={0} step={100} value={ovasDemandes} onChange={e => setOvaDemandes(e.target.value)} /></Champ>
+          <RoueCartes titre={t('online.trade.iRequest', { club: nomClub(vue, cible) })} cartes={siennes.filter(c => !c.verrou).filter(correspond).sort((a, b) => b.note - a.note)} selections={demandees} onChoisir={id => basculer(demandees, setDemandees, id)} vide={t('online.trade.emptyFiltered')} />
+          <p className="cel-note" aria-live="polite">{t('online.trade.playersSelected', { count: demandees.length })}</p>
+          <div className="cel-actions">{demandees.map(id => <button type="button" className="btn fantome" key={id} onClick={() => basculer(demandees, setDemandees, id)} aria-label={t('online.trade.removePlayer', { name: carte(id)?.nom ?? '' })}>{carte(id)?.nom} ×</button>)}</div>
+          <Champ label={t('online.trade.ovasFromThem')}><input type="number" min={0} step={100} value={ovasDemandes} onChange={e => setOvaDemandes(e.target.value)} /></Champ>
         </div>}
         <button className="btn primaire" disabled={occupe || !cible || (!donnees.length && !demandees.length)}>{t('online.market.send')}</button>
       </form>
@@ -1860,7 +1895,7 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
 // ═══════════════════════════════════════════════════════════════════════════
 
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-const dateLongue = (iso: string) => new Date(iso).toLocaleString('fr-FR', {
+const dateLongue = (iso: string) => new Date(iso).toLocaleString(locale(), {
   weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
 });
 /** « dans 2 j », « dans 4 h », « il y a 20 min » — l'échelle qui compte ici. */
@@ -1900,7 +1935,7 @@ function Calendrier({ vue, agir, occupe, suivre, proprietaire, notifier }: { vue
         <div className="eyebrow">{t('online.calendar.next', { day: prochaine.journee })}</div>
         <h2 className="cel-nom-ligue">
           <Ecusson nom={nomClub(vue, prochaine.domicile)} logo={vue.clubs.find(c => c.id === prochaine.domicile)?.embleme} />
-          {nomClub(vue, prochaine.domicile)} <em>reçoit</em> {nomClub(vue, prochaine.exterieur)}
+          {nomClub(vue, prochaine.domicile)} <em>{t('online.match.hosts')}</em> {nomClub(vue, prochaine.exterieur)}
           <Ecusson nom={nomClub(vue, prochaine.exterieur)} logo={vue.clubs.find(c => c.id === prochaine.exterieur)?.embleme} />
         </h2>
         {/* ⚠️ LA PHRASE TIENT DANS UN SEUL ÉLÉMENT. Le `p` est un flex : chaque
@@ -1910,10 +1945,10 @@ function Calendrier({ vue, agir, occupe, suivre, proprietaire, notifier }: { vue
         <p className="cel-fenetre">
           <Icone nom="chrono" taille={16} />
           <span>{prochaine.ouvre > maintenant
-            ? <>Fenêtre ouverte le <b>{dateLongue(prochaine.ouvre)}</b> — {delai(prochaine.ouvre)}</>
-            : <>À jouer avant le <b>{dateLongue(prochaine.ferme)}</b> — {delai(prochaine.ferme)}</>}</span>
+            ? t('online.calendar.windowOpensOn', { date: dateLongue(prochaine.ouvre), delay: delai(prochaine.ouvre) })
+            : t('online.calendar.playBefore', { date: dateLongue(prochaine.ferme), delay: delai(prochaine.ferme) })}</span>
         </p>
-        <small className="cel-note">Coup d’envoi automatique à la date de clôture indiquée. Le direct est accessible deux minutes avant, avec vos compositions enregistrées.</small>
+        <small className="cel-note">{t('online.calendar.autoKickoffNote')}</small>
       </div>
       <Rencontre vue={vue} rencontre={prochaine} agir={agir} occupe={occupe} suivre={suivre} grande />
     </section>}
@@ -2158,19 +2193,19 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
       const v = await agir({ type: 'creerCoupe', nom, trophee, participants, format: format as 'elimination' | 'championnat' | 'poules', debut: new Date(`${debut}T12:00:00.000Z`).toISOString(), recompenseParticipation: Number(participation), recompenseVainqueur: Number(vainqueur), recompenseFinaliste: Number(finaliste), logo: logoCoupe, tropheeId: tropheeCoupe, playoffs: playoffsCoupe });
       if (v) setNouvelle(false);
     }}>
-      <h2>Ta coupe, tes traditions</h2>
-      <p className="cel-note">Deux coupes par saison au maximum : au-delà, la dotation en Ovas déséquilibrerait l’économie de la ligue.</p>
+      <h2>{t('online.competition.customTitle')}</h2>
+      <p className="cel-note">{t('online.competition.maxTwoCups')}</p>
       <div className="cel-grille-consignes">
         <Champ label={t('online.competition.name')}><input required minLength={2} maxLength={40} value={nom} onChange={e => setNom(e.target.value)} /></Champ>
         <Champ label={t('online.competition.trophyName')}><input required minLength={2} maxLength={40} value={trophee} onChange={e => setTrophee(e.target.value)} /></Champ>
-        <Choix label="Format" valeur={format} options={[['poules', 'Poules puis phase finale'], ['elimination', 'Élimination directe'], ['championnat', 'Championnat aller-retour']]} onChange={setFormat} />
+        <Choix label={t('online.competition.format')} valeur={format} options={[['poules', t('online.competition.format.poules')], ['elimination', t('online.competition.format.elimination')], ['championnat', t('online.competition.format.championnat')]]} onChange={setFormat} />
         <Champ label={t('online.competition.start')}><input type="date" required value={debut} onChange={e => setDebut(e.target.value)} /></Champ>
-        <Champ label="Vainqueur (Ovas)"><input type="number" min={0} step={1} value={vainqueur} onChange={e => setVainqueur(e.target.value)} /></Champ>
-        <Champ label="Finaliste (Ovas)"><input type="number" min={0} step={1} value={finaliste} onChange={e => setFinaliste(e.target.value)} /></Champ>
-        <Champ label="Chaque participant (Ovas)"><input type="number" min={0} step={1} value={participation} onChange={e => setParticipation(e.target.value)} /></Champ>
+        <Champ label={t('online.competition.winnerOvas')}><input type="number" min={0} step={1} value={vainqueur} onChange={e => setVainqueur(e.target.value)} /></Champ>
+        <Champ label={t('online.competition.runnerUpOvas')}><input type="number" min={0} step={1} value={finaliste} onChange={e => setFinaliste(e.target.value)} /></Champ>
+        <Champ label={t('online.competition.participantOvas')}><input type="number" min={0} step={1} value={participation} onChange={e => setParticipation(e.target.value)} /></Champ>
       </div>
       <ChoixCompetition logo={logoCoupe} tropheeId={tropheeCoupe} onLogo={setLogoCoupe} onTrophee={setTropheeCoupe} />
-      {format === 'championnat' && <label className="cel-bascule"><input type="checkbox" checked={playoffsCoupe} onChange={e => setPlayoffsCoupe(e.target.checked)} /><span><b>Phase finale</b>Les qualifiés, dont le nombre dépend du nombre de clubs, se disputent le trophée après les journées de poule.</span></label>}
+      {format === 'championnat' && <label className="cel-bascule"><input type="checkbox" checked={playoffsCoupe} onChange={e => setPlayoffsCoupe(e.target.checked)} /><span><b>{t('online.competition.playoffsTitle')}</b>{t('online.competition.playoffsDesc')}</span></label>}
       <h3 className="cel-sous-titre">{t('online.competition.participants')}</h3>
       <div className="cel-choix-cartes">{vue.clubs.map(c => <button type="button" key={c.id} className={participants.includes(c.id) ? 'actif' : ''} onClick={() => setParticipants(participants.includes(c.id) ? participants.filter(x => x !== c.id) : [...participants, c.id])}>{c.nom}</button>)}</div>
       {apercuPoules.length > 0 && <><div className="cel-apercu-format"><Icone nom="trophee" taille={20} /><div><b>{apercuPoules.length} poules de {apercuPoules.map(p => p.length).join(' · ')} clubs</b><span>Les {qualifiesApercu} meilleurs vont en {qualifiesApercu === 8 ? 'quarts de finale' : qualifiesApercu === 4 ? 'demi-finales' : 'finale'}. Les places restantes repêchent les meilleurs au même rang.</span></div></div>
@@ -2190,11 +2225,11 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
       return <section key={j} className={`cel-panneau${etape.estPlayoff ? ' cel-panneau-playoff' : ''}`}>
         <div className="cel-titre-ligne">
           <div>
-            {etape.estPlayoff && <div className="eyebrow cel-eyebrow-playoff">Play-offs · Trophée</div>}
-            {etape.estElimination && !etape.estPlayoff && <div className="eyebrow cel-eyebrow-elimination">Élimination directe</div>}
+            {etape.estPlayoff && <div className="eyebrow cel-eyebrow-playoff">{t('online.competition.playoffsTrophy')}</div>}
+            {etape.estElimination && !etape.estPlayoff && <div className="eyebrow cel-eyebrow-elimination">{t('online.competition.straightKnockout')}</div>}
             <h2>{etape.titreComplet}</h2>
           </div>
-          <small>{date(affiches[0]?.ouvre)} au {date(affiches[0]?.ferme)}</small>
+          <small>{t('online.calendar.fromTo', { from: date(affiches[0]?.ouvre), to: date(affiches[0]?.ferme) })}</small>
         </div>
         <div className="cel-grille-rencontres">{affiches.map(r => <Rencontre key={r.id} vue={vue} rencontre={r} agir={agir} occupe={occupe} suivre={suivre} />)}</div>
       </section>;
@@ -2215,8 +2250,14 @@ const NATURES: Record<string, { label: string; icone: NomIcone }> = {
   objectif: { label: 'Objectif', icone: 'cible' }, competition: { label: 'Compétition', icone: 'trophee' },
 };
 
+const nomNature = (nature: string): string => {
+  const cle = `online.nature.${nature}`;
+  const traduit = t(cle);
+  return traduit === cle ? (NATURES[nature]?.label ?? nature) : traduit;
+};
+
 function PochetteRecord({ rarete }: { rarete: CarteCarriere['rarete'] }) {
-  return <div className={`cel-pochette-record ${rarete}`} aria-label={`Pochette ${RARETES[rarete]}`}>
+  return <div className={`cel-pochette-record ${rarete}`} aria-label={t('online.history.packAriaLabel', { name: nomRaretePack(rarete) })}>
     <Pack3D rarete={rarete} ouvert={false} calme transition="record" />
   </div>;
 }
@@ -2293,17 +2334,17 @@ function Histoire({ vue }: { vue: VueCarriereEnLigne }) {
     <section className="cel-panneau">
       <div className="cel-titre-ligne"><div><div className="eyebrow">{t('online.title')}</div><h2>{t('online.history.records')}</h2></div><Icone nom="medaille" /></div>
       <div className="cel-records">
-        <article><Icone nom="cadeau" taille={24} /><div><small>Plus grand ouvreur</small><b>{vue.statistiques.meilleurOuvreur?.pseudo ?? 'Pas encore de pack'}</b><span>{vue.statistiques.meilleurOuvreur ? `${montant(vue.statistiques.meilleurOuvreur.packs)} packs ouverts` : 'Le record attend son premier nom.'}</span></div></article>
-        <article>{vue.statistiques.meilleurPack && <PochetteRecord rarete={vue.statistiques.meilleurPack.apparence} />}<div><small>Meilleur pack</small><b>{vue.statistiques.meilleurPack?.joueur ?? 'Pas encore de record'}</b><span>{vue.statistiques.meilleurPack ? `${vue.statistiques.meilleurPack.note} GEN · ${vue.statistiques.meilleurPack.pseudo} · ${vue.statistiques.meilleurPack.pack}` : '—'}</span></div></article>
-        <article><Icone nom="poignee" taille={24} /><div><small>Plus gros achat</small><b>{vue.statistiques.plusGrosAchat?.joueur ?? 'Pas encore de vente'}</b><span>{vue.statistiques.plusGrosAchat ? `${montant(vue.statistiques.plusGrosAchat.montant)} Ovas · ${vue.statistiques.plusGrosAchat.pseudo}` : '—'}</span></div></article>
+        <article><Icone nom="cadeau" taille={24} /><div><small>{t('online.history.biggestOpener')}</small><b>{vue.statistiques.meilleurOuvreur?.pseudo ?? t('online.history.noPacksYet')}</b><span>{vue.statistiques.meilleurOuvreur ? t('online.history.openedPacksCount', { count: montant(vue.statistiques.meilleurOuvreur.packs) }) : t('online.history.recordAwaits')}</span></div></article>
+        <article>{vue.statistiques.meilleurPack && <PochetteRecord rarete={vue.statistiques.meilleurPack.apparence} />}<div><small>{t('online.history.bestPack')}</small><b>{vue.statistiques.meilleurPack?.joueur ?? t('online.history.noRecordYet')}</b><span>{vue.statistiques.meilleurPack ? `${vue.statistiques.meilleurPack.note} GEN · ${vue.statistiques.meilleurPack.pseudo} · ${vue.statistiques.meilleurPack.pack}` : '—'}</span></div></article>
+        <article><Icone nom="poignee" taille={24} /><div><small>{t('online.history.biggestBuy')}</small><b>{vue.statistiques.plusGrosAchat?.joueur ?? t('online.history.noSalesYet')}</b><span>{vue.statistiques.plusGrosAchat ? `${montant(vue.statistiques.plusGrosAchat.montant)} Ovas · ${vue.statistiques.plusGrosAchat.pseudo}` : '—'}</span></div></article>
       </div>
-      <div className="cel-packs-clubs">{vue.statistiques.parClub.map(c => <span key={c.clubId}><b>{c.pseudo}</b><em>{montant(c.packs)} pack{c.packs > 1 ? 's' : ''}</em></span>)}</div>
+      <div className="cel-packs-clubs">{vue.statistiques.parClub.map(c => <span key={c.clubId}><b>{c.pseudo}</b><em>{montant(c.packs)} {t('online.history.clubPackCount', { count: c.packs })}</em></span>)}</div>
     </section>
     <section className="cel-panneau">
       <div className="cel-titre-ligne"><h2>{t('online.history.honours')}</h2><Icone nom="medaille" /></div>
       {vue.histoire.length ? <div className="cel-palmares">{[...vue.histoire].reverse().map((h, i) => <article key={`${h.competitionId}-${i}`} className={h.vainqueur === vue.monClubId ? 'moi' : ''}>
         {h.logo ? <img className="cel-logo-ligue grand" src={h.logo} alt="" /> : <Icone nom="trophee" taille={30} />}
-        <div><b>{h.trophee}</b><small>{h.nom} · saison {h.saison}</small></div>
+        <div><b>{h.trophee}</b><small>{h.nom} · {t('online.history.seasonNum', { n: h.saison })}</small></div>
         <span>{nomClub(vue, h.vainqueur)}</span>
       </article>)}</div> : <p className="cel-note">{t('online.history.empty')}</p>}
     </section>
@@ -2311,11 +2352,11 @@ function Histoire({ vue }: { vue: VueCarriereEnLigne }) {
       <div className="cel-titre-ligne"><h2>{t('online.history.journal')}</h2><Icone nom="journal" /></div>
       <div className="cel-journal">{[...vue.transactions].reverse().slice(0, 60).map(t => <p key={t.id} className={t.ovas >= 0 ? 'credit' : 'debit'}>
         <Icone nom={NATURES[t.nature]?.icone ?? 'journal'} taille={16} />
-        <span><b>{NATURES[t.nature]?.label ?? t.nature}</b>{t.libelle}</span>
+        <span><b>{nomNature(t.nature)}</b>{t.libelle}</span>
         <em>{t.ovas > 0 ? '+' : ''}{montant(t.ovas)}</em>
         <small>{dateHeure(t.date)}</small>
       </p>)}</div>
-      {!vue.transactions.length && <p className="cel-note">Rien ne s’est encore passé.</p>}
+      {!vue.transactions.length && <p className="cel-note">{t('online.history.nothingYet')}</p>}
     </section>
   </>;
 }

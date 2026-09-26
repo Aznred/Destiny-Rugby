@@ -11,8 +11,7 @@ import { SalonAmicalModal } from '../components/SalonAmicalModal';
 import { CompositionCollectionSolo } from '../components/CompositionCollectionSolo';
 import { estCompteKiriAutorise } from '../lib/amicalCollection';
 import { chargerSessionCarriere, type CompteCarriere } from '../lib/carriereEnLigneClient';
-import { NOMS_PACK } from '../lib/presentationPacks';
-import { nombre } from '../lib/i18n';
+import { nombre, t } from '../lib/i18n';
 import './CollectionSolo.css';
 
 const PAR_PAGE = 40;
@@ -96,45 +95,47 @@ export function CollectionSolo() {
     const prix = pack.prix;
     const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogue, precedent));
     if (!resultat) {
-      setBilan(coins < prix ? `Il te manque ${nombre(prix - coins)} Ovas pour ouvrir ce pack.` : 'Ce pack ne contient aucun joueur disponible.');
+      setBilan(coins < prix ? t('solo.missingOvas', { n: nombre(prix - coins) }) : t('solo.noPlayerInPack'));
       return;
     }
     const doublons = resultat.indices.length - resultat.nouvelles;
-    setBilan(`${resultat.nouvelles} nouvelle${resultat.nouvelles > 1 ? 's' : ''} carte${resultat.nouvelles > 1 ? 's' : ''}, ${doublons} doublon${doublons > 1 ? 's' : ''}.`);
+    const texteNouvelles = resultat.nouvelles > 1 ? t('solo.summaryNewPlural', { n: resultat.nouvelles }) : t('solo.summaryNew', { n: resultat.nouvelles });
+    const texteDoublons = doublons > 1 ? t('solo.summaryDupPlural', { n: doublons }) : t('solo.summaryDup', { n: doublons });
+    setBilan(`${texteNouvelles}, ${texteDoublons}.`);
     setOuverture({ pack, indices: resultat.indices });
   };
 
   return <section className="solo-collection">
     <header className="solo-entete">
-      <button type="button" className="btn fantome" onClick={() => setEcran('accueil')}><Icone nom="fleche-droite" className="solo-retour" taille={16} /> Accueil</button>
-      <div><div className="eyebrow">Collection du compte · {nomCompte}</div><h1>Ma collection</h1><p>Ta collection, tes doublons et tes Ovas sont partagés entre toutes tes carrières sur ce compte.</p></div>
+      <button type="button" className="btn fantome" onClick={() => setEcran('accueil')}><Icone nom="fleche-droite" className="solo-retour" taille={16} /> {t('online.home')}</button>
+      <div><div className="eyebrow">{t('solo.account', { name: nomCompte })}</div><h1>{t('solo.title')}</h1><p>{t('solo.description')}</p></div>
       <div className="solo-entete-droite">
         <button type="button" className="btn primaire solo-btn-compo" onClick={() => setCompoPleineOuverte(true)}>
-          <Icone nom="equipe" taille={18} /> Feuille de match XV ({cartesPossedees.length})
+          <Icone nom="equipe" taille={18} /> {t('solo.lineupBtn', { n: cartesPossedees.length })}
         </button>
         <div className="solo-solde"><Icone nom="ova" taille={18} /><strong>{nombre(coins)}</strong><span>Ovas</span></div>
       </div>
     </header>
 
     <section className="solo-progression carte">
-      <div><span>Joueurs trouvés</span><strong>{nombre(trouvees)} <small>/ {nombre(total)}</small></strong></div>
+      <div><span>{t('solo.found')}</span><strong>{nombre(trouvees)} <small>/ {nombre(total)}</small></strong></div>
       <div className="solo-jauge"><i style={{ width: `${progression}%` }} /><span>{progression} %</span></div>
-      <div className="solo-stats"><span><b>{nombre(Object.values(etat.packsOuverts).reduce((s, n) => s + n, 0))}</b> packs ouverts</span><span><b>{nombre(etat.doublons)}</b> doublons</span><span><b>{nombre(exemplaires)}</b> cartes au total</span></div>
+      <div className="solo-stats"><span><b>{nombre(Object.values(etat.packsOuverts).reduce((s, n) => s + n, 0))}</b> {t('solo.packsOpened')}</span><span><b>{nombre(etat.doublons)}</b> {t('solo.duplicates')}</span><span><b>{nombre(exemplaires)}</b> {t('solo.totalCards')}</span></div>
     </section>
 
     {estKiri && (
       <section className="solo-banniere-amical carte">
         <div className="solo-amical-texte">
-          <span className="amical-badge-kiri">🧪 PROTOTYPE KIRI ACTIF</span>
-          <h3>Match Amical 1v1 Collection</h3>
-          <p>Compose ton XV de départ sur le grand terrain avec tes cartes et affronte tes potes avec contrôle direct à la manette / joystick !</p>
+          <span className="amical-badge-kiri">{t('solo.amical.activeBadge')}</span>
+          <h3>{t('solo.amical.title')}</h3>
+          <p>{t('solo.amical.desc')}</p>
         </div>
         <div className="solo-amical-actions">
           <button type="button" className="btn solo-btn-terrain" onClick={() => setCompoPleineOuverte(true)}>
-            <Icone nom="equipe" taille={18} /> Feuille de match (Terrain)
+            <Icone nom="equipe" taille={18} /> {t('solo.amical.lineupBtn')}
           </button>
           <button type="button" className="btn primaire" onClick={() => setAmicalOuvert(true)}>
-            <Icone nom="eclair" taille={18} /> Lancer le prototype amical
+            <Icone nom="eclair" taille={18} /> {t('solo.amical.launchBtn')}
           </button>
         </div>
       </section>
@@ -143,30 +144,30 @@ export function CollectionSolo() {
     {bilan && <p className="solo-bilan" role="status"><Icone nom="ok" taille={17} /> {bilan}</p>}
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
-      <div className="solo-titre-ligne"><div><div className="eyebrow">Tous les packs du jeu</div><h2 id="solo-packs-titre">Choisis un pack</h2></div><span>Bronze, Argent et Or sont gratuits. Les autres packs sont débités de tes Ovas (10 à 20 cartes par tirage, tarifs adaptés à la carrière solo). Chaque tirage peut contenir des doublons.</span></div>
+      <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.allPacks')}</div><h2 id="solo-packs-titre">{t('solo.choosePack')}</h2></div><span>{t('solo.packsHelp')}</span></div>
       <BoutiquePacks3D
         packs={packsRoue}
         solde={coins}
         occupe={ouverture !== null}
         onOuvrir={ouvrirDepuisRoue}
         packsGratuits={IDS_PACKS_SOLO_GRATUITS}
-        paiementAlternatif={<button type="button" className="btn fantome petit solo-pub-desactivee" disabled title="Les publicités ne sont pas encore activées"><Icone nom="video" taille={15} /> Ouvrir avec une pub · bientôt</button>}
+        paiementAlternatif={<button type="button" className="btn fantome petit solo-pub-desactivee" disabled title={t('solo.adTitle')}><Icone nom="video" taille={15} /> {t('solo.adDisabled')}</button>}
       />
     </section>
 
     <section className="solo-catalogue">
-      <div className="solo-titre-ligne"><div><div className="eyebrow">Du meilleur au moins bien noté</div><h2>Mes joueurs</h2></div><span>Un badge ×2, ×3… indique le nombre d’exemplaires possédés.</span></div>
+      <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.playersSubtitle')}</div><h2>{t('solo.playersTitle')}</h2></div><span>{t('solo.badgeNotice')}</span></div>
       <div className="solo-filtres">
-        <label><span>Rechercher</span><input value={recherche} onChange={e => { setRecherche(e.target.value); setPage(0); }} placeholder="Joueur, club, nation…" /></label>
-        <label><span>Rareté</span><select value={rarete} onChange={e => { setRarete(e.target.value as RareteCarriere | 'toutes'); setPage(0); }}><option value="toutes">Toutes</option>{RARETES.map(r => <option value={r} key={r}>{NOMS_PACK[r]}</option>)}</select></label>
-        <label><span>Collection</span><select value={statut} onChange={e => { setStatut(e.target.value as typeof statut); setPage(0); }}><option value="trouvees">Possédées</option><option value="toutes">Toutes</option><option value="manquantes">Manquantes</option></select></label>
+        <label><span>{t('solo.search')}</span><input value={recherche} onChange={e => { setRecherche(e.target.value); setPage(0); }} placeholder={t('solo.searchPlaceholder')} /></label>
+        <label><span>{t('solo.rarity')}</span><select value={rarete} onChange={e => { setRarete(e.target.value as RareteCarriere | 'toutes'); setPage(0); }}><option value="toutes">{t('solo.rarity.all')}</option>{RARETES.map(r => <option value={r} key={r}>{t(`online.rarity.${r}`)}</option>)}</select></label>
+        <label><span>{t('solo.status')}</span><select value={statut} onChange={e => { setStatut(e.target.value as typeof statut); setPage(0); }}><option value="trouvees">{t('solo.status.owned')}</option><option value="toutes">{t('solo.status.all')}</option><option value="manquantes">{t('solo.status.missing')}</option></select></label>
       </div>
-      <p className="solo-resultats">{nombre(cartesFiltrees.length)} joueur{cartesFiltrees.length > 1 ? 's' : ''}</p>
+      <p className="solo-resultats">{nombre(cartesFiltrees.length)} {t('online.common.players')}</p>
       <div className="solo-cartes">
-        {visibles.map(({ carte, trouvee, quantite }) => <div className="solo-carte-conteneur" key={carte.sourceId}>{quantite > 1 && <span className="solo-quantite" aria-label={`${quantite} exemplaires`}>×{quantite}</span>}<CarteJoueurEnLigne carte={carteDepuisSource(carte, 'solo', 'collection', 1)} compacte etatCollection={trouvee ? 'decouverte' : 'inconnue'} /></div>)}
+        {visibles.map(({ carte, trouvee, quantite }) => <div className="solo-carte-conteneur" key={carte.sourceId}>{quantite > 1 && <span className="solo-quantite" aria-label={t('solo.copiesCount', { count: quantite })}>×{quantite}</span>}<CarteJoueurEnLigne carte={carteDepuisSource(carte, 'solo', 'collection', 1)} compacte etatCollection={trouvee ? 'decouverte' : 'inconnue'} /></div>)}
       </div>
-      {!visibles.length && <div className="solo-vide"><Icone nom="cadeau" taille={28} /><b>{statut === 'trouvees' ? 'Ouvre ton premier pack pour commencer ta collection.' : 'Aucun joueur ne correspond à ces filtres.'}</b></div>}
-      {pages > 1 && <nav className="solo-pagination" aria-label="Pages du catalogue"><button type="button" className="btn fantome" disabled={pageSure === 0} onClick={() => setPage(Math.max(0, pageSure - 1))}>Précédent</button><span>Page {pageSure + 1} / {pages}</span><button type="button" className="btn fantome" disabled={pageSure >= pages - 1} onClick={() => setPage(Math.min(pages - 1, pageSure + 1))}>Suivant</button></nav>}
+      {!visibles.length && <div className="solo-vide"><Icone nom="cadeau" taille={28} /><b>{statut === 'trouvees' ? t('solo.emptyOwned') : t('solo.emptyFiltered')}</b></div>}
+      {pages > 1 && <nav className="solo-pagination" aria-label="Pages du catalogue"><button type="button" className="btn fantome" disabled={pageSure === 0} onClick={() => setPage(Math.max(0, pageSure - 1))}>{t('solo.pagination.prev')}</button><span>{t('solo.pagination.page', { page: pageSure + 1, pages })}</span><button type="button" className="btn fantome" disabled={pageSure >= pages - 1} onClick={() => setPage(Math.min(pages - 1, pageSure + 1))}>{t('solo.pagination.next')}</button></nav>}
     </section>
 
     {ouverture && <OuverturePack

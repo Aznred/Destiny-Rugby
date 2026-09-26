@@ -13,6 +13,7 @@ import {
   type InputAmical,
   synchroniserSalonAmicalApi,
 } from '../../lib/amicalCollection';
+import { t } from '../../lib/i18n';
 import './MatchAmicalManette.css';
 
 interface Props {
@@ -42,7 +43,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
   const [tempsSimule, setTempsSimule] = useState(0);
-  const [messageAction, setMessageAction] = useState<string>('Coup d’envoi !');
+  const [messageAction, setMessageAction] = useState<string>(() => t('amical.match.kickoff'));
   const [finDeMatch, setFinDeMatch] = useState(false);
   const [pionControleId, setPionControleId] = useState<string | null>(null);
   const [sprintActif, setSprintActif] = useState(false);
@@ -345,7 +346,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       {/* Tableau d'affichage / Scoreboard */}
       <header className="amical-entete">
         <button type="button" className="btn fantome amical-btn-retour" onClick={onQuitter}>
-          <Icone nom="fleche-droite" taille={16} /> Quitter
+          <Icone nom="fleche-droite" taille={16} /> {t('online.common.close')}
         </button>
 
         <div className="amical-scoreboard">
@@ -355,7 +356,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
           </div>
           <div className="amical-centre-chrono">
             <span className="amical-badge-chrono">{Math.floor(tempsSimule / 60)}:{(tempsSimule % 60).toString().padStart(2, '0')}</span>
-            <span className="amical-mode-label">{mode === 'reseau' ? `Salon ${salonCode}` : 'Mode Local 1v1'}</span>
+            <span className="amical-mode-label">{mode === 'reseau' ? t('amical.match.roomLabel', { code: salonCode ?? '' }) : t('amical.match.localMode')}</span>
           </div>
           <div className={`amical-equipe exterieur ${monCamp === 'B' ? 'mon-camp' : ''}`}>
             <span className="amical-score">{scoreB}</span>
@@ -441,7 +442,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
-          aria-label="Joystick de déplacement"
+          aria-label={t('amical.match.joystick')}
         >
           <div className="amical-joystick-base">
             <div
@@ -451,7 +452,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
               }}
             />
           </div>
-          <span className="amical-joystick-guide">Glisser pour courir</span>
+          <span className="amical-joystick-guide">{t('amical.match.dragToRun')}</span>
         </div>
 
         {/* Boutons d'action droite */}
@@ -463,7 +464,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
               onClick={() => declencherAction('passeGauche')}
               title="Passe vers l'aile gauche (Touche Q)"
             >
-              👈 Passe G
+              {t('amical.match.passLeft')}
             </button>
             <button
               type="button"
@@ -471,7 +472,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
               onClick={() => declencherAction('passeDroite')}
               title="Passe vers l'aile droite (Touche E)"
             >
-              Passe D 👉
+              {t('amical.match.passRight')}
             </button>
           </div>
 
@@ -482,7 +483,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
               onClick={() => declencherAction('pied')}
               title="Coup de pied d'occupation (Touche C)"
             >
-              👟 Pied
+              {t('amical.match.kick')}
             </button>
             <button
               type="button"
@@ -493,7 +494,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
               }}
               title="Sprint / Plaquage (Espace ou Shift)"
             >
-              💥 Plaquage / Sprint
+              {t('amical.match.tackleSprint')}
             </button>
           </div>
         </div>
@@ -503,7 +504,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       {finDeMatch && (
         <div className="amical-modale-fin" role="dialog" aria-modal="true">
           <div className="amical-modale-contenu carte">
-            <h2>Fin du match amical !</h2>
+            <h2>{t('amical.match.fullTime')}</h2>
             <div className="amical-score-final">
               <span>{equipeA.nom} <b>{scoreA}</b></span>
               <span>-</span>
@@ -511,13 +512,13 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
             </div>
             <p className="amical-message-vainqueur">
               {scoreA > scoreB
-                ? `🏆 Victoire de ${equipeA.nom} !`
+                ? t('amical.match.victory', { name: equipeA.nom })
                 : scoreB > scoreA
-                  ? `🏆 Victoire de ${equipeB.nom} !`
-                  : '🤝 Match nul entre les deux équipes !'}
+                  ? t('amical.match.victory', { name: equipeB.nom })
+                  : t('amical.match.draw')}
             </p>
             <button type="button" className="btn primaire" onClick={onQuitter}>
-              Retourner à la collection
+              {t('amical.match.backToCollection')}
             </button>
           </div>
         </div>

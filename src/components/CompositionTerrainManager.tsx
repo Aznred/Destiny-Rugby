@@ -364,40 +364,40 @@ function PanneauJoueur({
         </em>
       </p>
 
-      <section className="ct-roles-joueur" aria-label="Postes possibles">
-        <b>POSTES POSSIBLES</b>
+      <section className="ct-roles-joueur" aria-label={t('compo.roles.postesPossibles')}>
+        <b>{t('compo.roles.postesPossiblesMaj')}</b>
         <div>
           <span className="ct-poste-principal">
             <i>{POSTE_PAR_ID[joueur.poste]?.numero}</i>
-            <span><small>Principal · 100 %</small>{nomPoste(joueur.poste)}</span>
+            <span><small>{t('compo.roles.principal')}</small>{nomPoste(joueur.poste)}</span>
           </span>
           {postesSecondaires.map((poste) => (
             <span className="ct-poste-secondaire" key={poste}>
               <i>{POSTE_PAR_ID[poste]?.numero}</i>
-              <span><small>Secondaire · 100 %</small>{nomPoste(poste)}</span>
+              <span><small>{t('compo.roles.secondaire')}</small>{nomPoste(poste)}</span>
             </span>
           ))}
         </div>
-        {!postesSecondaires.length && <small className="ct-sans-secondaire">Aucun poste secondaire recensé</small>}
+        {!postesSecondaires.length && <small className="ct-sans-secondaire">{t('compo.roles.aucunSecondaire')}</small>}
       </section>
 
       {posteSlot && (
-        <section className={`ct-impact-poste ct-impact-${adequation}`} aria-label="Impact du poste choisi">
+        <section className={`ct-impact-poste ct-impact-${adequation}`} aria-label={t('compo.impact.titre')}>
           <div>
             <span><PastilleAdequation adequation={adequation} /> {
               adequation === 'naturel'
-                ? 'Poste naturel'
+                ? t('compo.adq.naturel')
                 : adequation === 'secondaire'
-                  ? 'Poste secondaire'
-                  : 'Hors poste'
+                  ? t('compo.adq.secondaire')
+                  : t('compo.adq.horsPoste')
             }</span>
             <strong>{Math.round(rendement * 100)} %</strong>
           </div>
-          <p>Aligné n°{POSTE_PAR_ID[posteSlot]?.numero} · {nomPoste(posteSlot)}</p>
+          <p>{t('compo.impact.aligne', { num: POSTE_PAR_ID[posteSlot]?.numero, poste: nomPoste(posteSlot) })}</p>
           <small>
             {rendement >= 1
-              ? `Aucun malus : GEN ${joueur.note} conservé en match.`
-              : `Malus de ${Math.round((1 - rendement) * 100)} % : GEN ${joueur.note} → ${noteEffective} en match.`}
+              ? t('compo.impact.aucunMalus', { note: joueur.note })
+              : t('compo.impact.malus', { pct: Math.round((1 - rendement) * 100), note: joueur.note, effective: noteEffective })}
           </small>
         </section>
       )}
@@ -661,7 +661,7 @@ export function CompositionTerrainManager({
               )}
             </>
           ) : (
-            <p>Choisis une carte pour voir le joueur et le remplacer.</p>
+            <p>{t('compo.aide.selectionnerCarte')}</p>
           )}
         </div>}
         {onMeilleureEquipe && (
@@ -746,15 +746,15 @@ export function CompositionTerrainManager({
         <div className="ct-selection-actions" aria-live="polite">
           {joueurSelectionne ? <>
             <b>{joueurSelectionne.nom} · {joueurSelectionne.note} GEN · {nomPoste(joueurSelectionne.poste)}</b>
-            <span>Choisis un autre joueur pour les permuter.</span>
-            <button type="button" onClick={() => { setFicheMasquee(null); setDetailsSelection(true); }}>Fiche et rôles</button>
-            <button type="button" onClick={() => setSelection(null)}>Annuler la sélection</button>
-          </> : <span>Sélectionne un joueur du XV, du banc ou des réserves, puis son remplaçant.</span>}
+            <span>{t('compo.selection.permuter')}</span>
+            <button type="button" onClick={() => { setFicheMasquee(null); setDetailsSelection(true); }}>{t('compo.selection.fiche')}</button>
+            <button type="button" onClick={() => setSelection(null)}>{t('compo.selection.annuler')}</button>
+          </> : <span>{t('compo.selection.guide')}</span>}
         </div>
-        <nav className="ct-groupes" aria-label="Joueurs hors du terrain">
-          <button type="button" aria-pressed={groupe === 'banc'} onClick={() => setGroupe('banc')}>Remplaçants · {remplacants.filter(Boolean).length} / 8</button>
-          <button type="button" aria-pressed={groupe === 'reserves'} onClick={() => setGroupe('reserves')}>Réserves · {reserves.length}</button>
-          <span>Fais défiler les cartes horizontalement</span>
+        <nav className="ct-groupes" aria-label={t('compo.groupes.label')}>
+          <button type="button" aria-pressed={groupe === 'banc'} onClick={() => setGroupe('banc')}>{t('compo.groupes.remplacants', { count: remplacants.filter(Boolean).length })}</button>
+          <button type="button" aria-pressed={groupe === 'reserves'} onClick={() => setGroupe('reserves')}>{t('compo.groupes.reserves', { count: reserves.length })}</button>
+          <span>{t('compo.groupes.defilement')}</span>
         </nav>
       </>}
 

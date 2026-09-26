@@ -4,6 +4,7 @@ import { useGame } from '../store/useGame';
 import { catalogueBaseCarriere, carteDepuisSource } from '../lib/ligue/catalogueCarriere';
 import { cleCarteSolo } from '../lib/collectionSolo';
 import { CompositionCollectionSolo } from './CompositionCollectionSolo';
+import { t } from '../lib/i18n';
 import {
   composerEquipeDepuisCollection,
   creerSalonAmicalApi,
@@ -190,11 +191,11 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
       <div className="amical-modale-cadre carte">
         <header className="amical-modale-entete">
           <div className="amical-titre-group">
-            <span className="amical-badge-kiri">🧪 PROTOTYPE KIRI</span>
-            <h2>Match Amical Collection (1v1)</h2>
-            <p>Contrôle direct en temps réel à la manette ou au joystick tactile avec tes cartes de collection.</p>
+            <span className="amical-badge-kiri">{t('amical.badge')}</span>
+            <h2>{t('amical.title')}</h2>
+            <p>{t('amical.desc')}</p>
           </div>
-          <button type="button" className="btn fantome amical-fermer" onClick={onFermer}>
+          <button type="button" className="btn fantome amical-fermer" onClick={onFermer} aria-label={t('online.common.close')}>
             <Icone nom="croix" taille={20} />
           </button>
         </header>
@@ -207,14 +208,14 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             className={onglet === 'compo' ? 'actif' : ''}
             onClick={() => setOnglet('compo')}
           >
-            🏉 Mon XV de Collection
+            {t('amical.tab.squad')}
           </button>
           <button
             type="button"
             className={onglet === 'enLigne' ? 'actif' : ''}
             onClick={() => setOnglet('enLigne')}
           >
-            🌐 Salon Privé en Ligne {codeSalonActif && `(${codeSalonActif})`}
+            {t('amical.tab.online')} {codeSalonActif && `(${codeSalonActif})`}
           </button>
         </nav>
 
@@ -222,28 +223,28 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
           <section className="amical-section-compo">
             <div className="amical-ligne-parametres">
               <label>
-                <span>Nom de ton équipe</span>
+                <span>{t('amical.teamName')}</span>
                 <input value={nomEquipe} onChange={(e) => setNomEquipe(e.target.value)} maxLength={25} />
               </label>
               <label>
-                <span>Couleur de maillot</span>
+                <span>{t('amical.jerseyColor')}</span>
                 <input type="color" value={couleurEquipe} onChange={(e) => setCouleurEquipe(e.target.value)} />
               </label>
               <div className="amical-note-globale">
-                <span>Note globale</span>
+                <span>{t('amical.overallRating')}</span>
                 <strong>{monEquipe.noteMoyenne}</strong>
               </div>
             </div>
 
             <div className="amical-apercu-xv">
               <div className="amical-apercu-xv-entete">
-                <div className="eyebrow">Titulaires 1 à 15 ({monEquipe.joueurs.length} joueurs)</div>
+                <div className="eyebrow">{t('amical.starters', { n: String(monEquipe.joueurs.length) })}</div>
                 <button
                   type="button"
                   className="btn petit amical-btn-terrain"
                   onClick={() => setCompoOuverte(true)}
                 >
-                  <Icone nom="equipe" taille={15} /> Modifier sur le grand terrain (comme en ligne)
+                  <Icone nom="equipe" taille={15} /> {t('amical.editPitch')}
                 </button>
               </div>
               <div className="amical-grille-joueurs">
@@ -252,7 +253,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
                     <span className="amical-joueur-numero">{j.numero}</span>
                     <div className="amical-joueur-info">
                       <b>{j.nom}</b>
-                      <small>{j.clubReel || 'Sans club'}</small>
+                      <small>{j.clubReel || t('amical.noClub')}</small>
                     </div>
                     <span className="amical-joueur-note">{j.note}</span>
                   </div>
@@ -262,10 +263,10 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
 
             <div className="amical-actions-depart">
               <button type="button" className="btn primaire amical-btn-lancer-solo" onClick={lancerTestLocal}>
-                <Icone nom="eclair" taille={18} /> Tester immédiatement en Local (Manette)
+                <Icone nom="eclair" taille={18} /> {t('amical.testLocal')}
               </button>
               <button type="button" className="btn amical-btn-aller-online" onClick={() => setOnglet('enLigne')}>
-                <Icone nom="profil" taille={18} /> Jouer avec un ami en ligne 👉
+                <Icone nom="profil" taille={18} /> {t('amical.playOnline')}
               </button>
             </div>
           </section>
@@ -276,18 +277,18 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             {!codeSalonActif ? (
               <div className="amical-choix-salon">
                 <div className="amical-box-creer">
-                  <h3>Créer une partie privée</h3>
-                  <p>Génère un code de salon unique pour inviter un ami à affronter ton XV de collection.</p>
+                  <h3>{t('amical.createPrivate')}</h3>
+                  <p>{t('amical.createPrivateHelp')}</p>
                   <button type="button" className="btn primaire" disabled={chargement} onClick={creerSalon}>
-                    {chargement ? 'Génération du salon…' : 'Créer un salon privé'}
+                    {chargement ? t('amical.creating') : t('amical.createBtn')}
                   </button>
                 </div>
 
-                <div className="amical-separateur"><span>OU</span></div>
+                <div className="amical-separateur"><span>{t('amical.or')}</span></div>
 
                 <div className="amical-box-rejoindre">
-                  <h3>Rejoindre un ami</h3>
-                  <p>Entre le code de salon que ton ami t’a partagé.</p>
+                  <h3>{t('amical.joinFriend')}</h3>
+                  <p>{t('amical.joinFriendHelp')}</p>
                   <div className="amical-champ-rejoindre">
                     <input
                       placeholder="Ex: KIRI-9B"
@@ -296,7 +297,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
                       maxLength={12}
                     />
                     <button type="button" className="btn" disabled={chargement || !codeSaisi.trim()} onClick={rejoindreSalon}>
-                      Rejoindre
+                      {t('amical.joinBtn')}
                     </button>
                   </div>
                 </div>
@@ -304,10 +305,10 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             ) : (
               <div className="amical-salon-attente">
                 <div className="amical-salon-code-box">
-                  <span className="amical-label-code">Code du salon privé :</span>
+                  <span className="amical-label-code">{t('amical.roomCode')}</span>
                   <strong className="amical-valeur-code">{codeSalonActif}</strong>
                   <button type="button" className="btn petit" onClick={copierLienInvitation}>
-                    <Icone nom="cadeau" taille={15} /> {lienCopie ? 'Lien copié !' : 'Copier le lien d’invitation'}
+                    <Icone nom="cadeau" taille={15} /> {lienCopie ? t('amical.copied') : t('amical.copyInvite')}
                   </button>
                 </div>
 
@@ -316,14 +317,14 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
                     <div className="amical-adversaire-pret">
                       <span className="amical-pastille-verte" />
                       <div>
-                        <b>{salon.invite.pseudo} a rejoint le salon !</b>
-                        <p>Son équipe : {salon.invite.equipe.nom} (Note {salon.invite.equipe.noteMoyenne})</p>
+                        <b>{t('amical.opponentJoined', { pseudo: salon.invite.pseudo })}</b>
+                        <p>{t('amical.opponentTeam', { nom: salon.invite.equipe.nom, note: String(salon.invite.equipe.noteMoyenne) })}</p>
                       </div>
                     </div>
                   ) : (
                     <div className="amical-en-attente">
                       <span className="ballon-attente" />
-                      <p>En attente que ton pote rejoigne le salon avec le code <b>{codeSalonActif}</b>…</p>
+                      <p>{t('amical.waitingFriendWithCode', { code: codeSalonActif })}</p>
                     </div>
                   )}
                 </div>
@@ -336,12 +337,12 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
                       disabled={!salon?.invite}
                       onClick={lancerMatchReseauHote}
                     >
-                      🏉 Lancer le match contre {salon?.invite?.pseudo ?? 'ton ami'} !
+                      {t('amical.startMatchAgainst', { pseudo: salon?.invite?.pseudo ?? 'Ami' })}
                     </button>
                   )}
                   {role === 'invite' && (
                     <p className="amical-indication-invite">
-                      ⏳ En attente que l'hôte ({salon?.hote.pseudo}) donne le coup d'envoi…
+                      {t('amical.waitingHostKickoff', { pseudo: salon?.hote.pseudo ?? 'Hôte' })}
                     </p>
                   )}
                   <button
@@ -352,7 +353,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
                       setSalon(null);
                     }}
                   >
-                    Quitter le salon
+                    {t('amical.leaveRoom')}
                   </button>
                 </div>
               </div>

@@ -26,6 +26,7 @@ import { TEXTES_SOCIAUX } from './textesSociaux.js';
 import { TEXTES_MATCH } from './textesMatch.js';
 import { TEXTES_MANAGER } from './textesManager.js';
 import { TEXTES_EN_LIGNE } from './textesEnLigne.js';
+import { TEXTES_SOLO_AMICAL } from './textesSoloEtAmical.js';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -66,6 +67,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_SOCIAUX,
   ...TEXTES_MANAGER,
   ...TEXTES_EN_LIGNE,
+  ...TEXTES_SOLO_AMICAL,
 
   // --- NAVIGATION ---------------------------------------------------------
   'nav.accueil': { fr: 'Accueil', en: 'Home', es: 'Inicio', it: 'Home', de: 'Start', pt: 'Início', ja: 'ホーム' },
