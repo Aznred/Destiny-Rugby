@@ -610,3 +610,17 @@
  .cel-compo.manager-compo-partagee { height:auto; min-height:0; }
  .manager-equipe .manager-composition-tete p { display:none; }
 }
+
+/* Réserve mobile : le panneau reste dans son emplacement, avec défilement horizontal. */
+@media (max-width:700px) {
+ .cel-compo .ct-feuille-fut[data-groupe="reserves"] > .manager-reserves[open],
+ .cel-compo .ct-feuille-fut[data-groupe="banc"] > .manager-banc-visuel {
+   position:static !important; inset:auto !important; width:100% !important; height:100% !important;
+   min-width:0 !important; max-height:none !important; grid-column:1 !important; grid-row:4 !important;
+   overflow:hidden !important; display:block !important;
+ }
+ .cel-compo .ct-feuille-fut[data-groupe="banc"] > .manager-reserves,
+ .cel-compo .ct-feuille-fut[data-groupe="reserves"] > .manager-banc-visuel { display:none !important; }
+ .cel-compo .ct-feuille-fut .manager-reserves > div { display:flex !important; flex-flow:row nowrap !important; overflow-x:auto !important; overflow-y:hidden !important; -webkit-overflow-scrolling:touch; }
+ .cel-compo .ct-feuille-fut .manager-reserves .manager-reserve-carte { flex:0 0 76px !important; width:76px !important; min-width:76px !important; }
+}

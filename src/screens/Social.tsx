@@ -1425,7 +1425,7 @@ function VentesManager({ recherche = '' }: { recherche?: string }) {
 type DossierManagerSocial = {
   id: string;
   pseudo: string;
-  type: 'club' | 'joueur' | 'demande' | 'approche';
+  type: 'club' | 'joueur' | 'demande' | 'approche' | 'libre';
   nom: string;
   sous: string;
   avatar: string;
@@ -1460,6 +1460,11 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
   const consommerCible = useGame((s) => s.consommerConversationSocialeCible);
   const consommerOuverture = useGame((s) => s.consommerOuvertureSociale);
   const [recherche, setRecherche] = useState('');
+  const [contactLibre,setContactLibre] = useState<string | null>(conversationCible);
+  const [texteLibre,setTexteLibre] = useState('');
+  const envoyerLibre = useGame(s => s.envoyerMessage);
+  const suivisManager = useGame(s => s.comptesSuivis);
+  const suivreManager = useGame(s => s.suivreCompte);
   const dossiers = useMemo(() => {
     const parPseudo = new Map<string, DossierManagerSocial>();
     for (const n of manager.negociationsClubs) parPseudo.set(n.pseudo, {
@@ -1485,11 +1490,16 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
       id: a.id, pseudo: a.pseudo, type: 'approche', nom: a.club,
       sous: `Offre pour ${a.nom} · ${a.etat}`, avatar: `club:${a.club}`,
     });
+    for (const pseudo of [...Object.keys(conversations), ...(contactLibre ? [contactLibre] : [])]) {
+      if (parPseudo.has(pseudo)) continue;
+      const compte = suivisManager.find(c => c.pseudo === pseudo) ?? annuaire({club:manager.club,saison:manager.saison,division:manager.division}).find(c => c.pseudo === pseudo);
+      if (compte) parPseudo.set(pseudo,{id:pseudo,pseudo,type:'libre',nom:compte.nom,sous:'Message privé',avatar:compte.avatar});
+    }
     return [...parPseudo.values()].sort((a, b) => {
       const date = (p: string) => conversations[p]?.at(-1)?.creeLe ?? 0;
       return date(b.pseudo) - date(a.pseudo);
     });
-  }, [manager.negociationsClubs, manager.negociations, manager.demandes, manager.avancee?.approches, conversations]);
+  }, [manager.negociationsClubs, manager.negociations, manager.demandes, manager.avancee?.approches, conversations, contactLibre, suivisManager, manager.club, manager.saison, manager.division]);
   const [onglet, setOnglet] = useState<OngletManagerSocial>(
     conversationCible || ouvrirSocialSur === 'messages' ? 'messages' : 'timeline',
   );
@@ -1526,7 +1536,7 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
   useEffect(() => {
     if (!conversationCible) return;
     setOnglet('messages');
-    setActif(conversationCible);
+    setContactLibre(conversationCible); setActif(conversationCible);
     consommerCible();
   }, [conversationCible, consommerCible]);
   const dossier = dossiers.find((n) => n.pseudo === actif);
@@ -1671,9 +1681,13 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
               {actif && dossier?.type === 'joueur' && <NegociationRecrueManager pseudo={actif} />}
               {actif && dossier?.type === 'demande' && <DemandeVestiaireManager pseudo={actif} />}
               {actif && dossier?.type === 'approche' && <ApprocheClubCarte pseudo={actif} />}
+              {actif && dossier?.type === 'libre' && <form className="x-envoi" onSubmit={e=>{e.preventDefault();if(texteLibre.trim()){void envoyerLibre(actif,texteLibre);setTexteLibre('');}}}>
+                <input aria-label="Écrire un message" value={texteLibre} maxLength={400} onChange={e=>setTexteLibre(e.target.value)} placeholder="Écrire un message" />
+                <button className="x-poster" disabled={!texteLibre.trim()}>Envoyer</button>
+              </form>}
             </div>
           </div>
-        ) : <div className="x-vide manager-x-vide"><b>Aucune discussion en cours</b><p>Explore le marché mondial pour contacter un club ou place un joueur sur la liste des départs.</p><button className="x-poster" onClick={() => setOnglet('explorer')}>Explorer le mercato</button></div>)}
+        ) : <div className="x-vide manager-x-vide"><b>Aucune discussion en cours</b><p>Recherche un compte ou un joueur pour lui écrire.</p><button className="x-poster" onClick={() => setOnglet('explorer')}>Chercher un destinataire</button></div>)}
 
         {onglet === 'notifs' && <div className="x-fil">
           {notifs.length === 0 && <p className="x-vide">Les résultats, offres et demandes du vestiaire apparaîtront ici.</p>}
@@ -1697,12 +1711,8 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
           <Profil
             compte={compteVu}
             onFermer={() => { setProfilVu(null); setOnglet('timeline'); }}
-            // ⚠️ PAS DE MESSAGERIE DEPUIS UN PROFIL EN MODE ENTRAÎNEUR. Les
-            // conversations d'un manager sont des DOSSIERS (une négociation,
-            // une demande du vestiaire) créés par le store : ouvrir un fil vide
-            // avec un supporter croisé dans le fil donnerait une conversation
-            // que rien ne peut faire avancer. On le renvoie à ses dossiers.
-            onMessage={() => setOnglet('messages')}
+            // Un profil ouvre aussi un fil privé libre en carrière entraîneur.
+            onMessage={() => { suivreManager(compteVu); setContactLibre(compteVu.pseudo); setActif(compteVu.pseudo); setOnglet('messages'); }}
             onProfil={ouvrirProfil}
             onRecherche={(mot) => { setRecherche(mot); setOnglet('timeline'); }}
           />

@@ -84,6 +84,7 @@ import { situationInternationale } from '../lib/rassemblements';
 // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
 
 import { Icone } from './Icone';
+import { IconeEmoji, TexteIcones } from './TexteIcones';
 import { Selecteur } from './Selecteur';
 import { CadreTmoReplay } from './match/CadreTmoReplay';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -176,8 +177,8 @@ const Fil = memo(function Fil({ lignes }: { lignes: Commentaire[]; n: number }) 
           data-moi={c.moi ? 'oui' : undefined}
         >
           <span className="ml-minute">{c.minute}′</span>
-          <span className="ml-emoji">{EMOJI[c.type] ?? '•'}</span>
-          <span className="ml-texte">{c.texte}</span>
+          <span className="ml-emoji"><IconeEmoji emoji={EMOJI[c.type] ?? '🏉'} /></span>
+          <span className="ml-texte"><TexteIcones texte={c.texte} /></span>
           {c.points > 0 && <b className="ml-points">+{c.points}</b>}
         </div>
       ))}
@@ -866,7 +867,7 @@ export function MatchLive({
       }
 
       e.carriereDixMinutes = true;
-      avancer(e, dtReel);
+      avancer(e, dtReel * (tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1));
       // Une blessure du groupe du manager se produit pendant le match : le
       // joueur reste au sol, le banc est appelé et le premier diagnostic ne
       // sera connu qu'après la sirène. Le tirage est séparé du RNG sportif afin
@@ -1393,11 +1394,11 @@ export function MatchLive({
                 <div className="ml-hud">
                   {actionImportante && (
                     <div className={`ml-evenement-terrain ml-evenement-${actionImportante.type}`} role="status">
-                      <b>{EMOJI[actionImportante.type] ?? '⚡'} {actionImportante.type === 'essai' ? 'ESSAI'
+                      <b><IconeEmoji emoji={EMOJI[actionImportante.type] ?? '⚡'} /> {actionImportante.type === 'essai' ? 'ESSAI'
                         : actionImportante.type === 'carton' ? (/rouge/i.test(actionImportante.texte) ? 'CARTON ROUGE' : 'CARTON JAUNE')
                           : actionImportante.type === 'penalite' || actionImportante.type === 'faute' ? 'PÉNALITÉ'
                             : actionImportante.type === 'but' ? 'TIR RÉUSSI' : actionImportante.type === 'butRate' ? 'TIR MANQUÉ' : 'ACTION IMPORTANTE'}</b>
-                      <span>{actionImportante.texte}</span>
+                      <span><TexteIcones texte={actionImportante.texte} /></span>
                     </div>
                   )}
                   <div className="ml-hud-haut">
@@ -1435,7 +1436,7 @@ export function MatchLive({
                       saccade. */}
                   {moment && (
                     <div className="ml-banniere" key={moment.type}>
-                      <b>{moment.emoji} {t(moment.cle)}</b>
+                      <b><IconeEmoji emoji={moment.emoji} /> {t(moment.cle)}</b>
                     </div>
                   )}
 
@@ -1447,7 +1448,7 @@ export function MatchLive({
                       qu’on est en train de jouer. */}
                   {echo && (
                     <div className="ml-retombee" role="status">
-                      <b><Icone nom="cadeau" taille={14} /> {echo.texte}</b>
+                      <b><Icone nom="cadeau" taille={14} /> <TexteIcones texte={echo.texte} /></b>
                     </div>
                   )}
 
@@ -1456,8 +1457,8 @@ export function MatchLive({
                   {derniere && (
                     <button type="button" className="ml-ticker" onClick={() => setTiroir('fil')}>
                       <span className="ml-minute">{derniere.minute}′</span>
-                      <span className="ml-emoji">{EMOJI[derniere.type] ?? '•'}</span>
-                      <span className="ml-texte">{derniere.texte}</span>
+                      <span className="ml-emoji"><IconeEmoji emoji={EMOJI[derniere.type] ?? '🏉'} /></span>
+                      <span className="ml-texte"><TexteIcones texte={derniere.texte} /></span>
                     </button>
                   )}
 
@@ -1482,9 +1483,9 @@ export function MatchLive({
                   {montrerTuto && (
                     <div className="ml-tuto" onClick={() => setTutoMatchVu(true)}>
                       <div className="ml-tuto-carte">
-                        <b>⏸️ {t('ml.tuto.titre')}</b>
+                        <b><Icone nom="stop" taille={16} /> {t('ml.tuto.titre')}</b>
                         <p><Icone nom="ballon" taille={14} /> {t('ml.tuto.file')}</p>
-                        <p>⏱️ {t('ml.tuto.carte')}</p>
+                        <p><Icone nom="chrono" taille={14} /> {t('ml.tuto.carte')}</p>
                         <p><Icone nom="video" taille={14} /> {t('ml.tuto.ralenti')}</p>
                         <button type="button" className="btn vert"
                           onClick={(ev) => { ev.stopPropagation(); setTutoMatchVu(true); }}>
@@ -1510,7 +1511,7 @@ export function MatchLive({
                             className="ml-ordre"
                             onClick={() => { ordonner(e, o.id); setEnPause(false); }}
                           >
-                            <b>{o.emoji} {t(o.cle)}</b>
+                            <b><IconeEmoji emoji={o.emoji} /> {t(o.cle)}</b>
                             <span>{t(o.aide)}</span>
                           </button>
                         ))}
@@ -1617,7 +1618,7 @@ export function MatchLive({
                       }}
                     >
                       <b className="ml-perso-geste">
-                        {verdict ? (verdict.reussi ? '✅' : '❌') : '▶️'} {geste.emoji} {t(geste.cle)}
+                        <IconeEmoji emoji={verdict ? (verdict.reussi ? '✅' : '❌') : '▶️'} /> <IconeEmoji emoji={geste.emoji} /> {t(geste.cle)}
                         <em>{Math.round(rejeu.current.chance * 100)} %</em>
                       </b>
                       {/* ⚠️ LA PHRASE DU MOTEUR PASSE DEVANT CELLE DU DUEL : elle
@@ -1628,7 +1629,7 @@ export function MatchLive({
                       {(resultat || verdict?.texte) && (
                         <span className="ml-perso-phrase">
                           {resultat
-                            ? `${EMOJI[resultat.type] ?? '•'} ${resultat.texte}`
+                            ? <><IconeEmoji emoji={EMOJI[resultat.type] ?? '🏉'} /> <TexteIcones texte={resultat.texte} /></>
                             : verdict?.texte}
                         </span>
                       )}
@@ -1668,7 +1669,7 @@ export function MatchLive({
                             ça ressemble à une répétition. */}
                         {decision.enchaine
                           ? t('ml.dec.enchaine')
-                          : `${decision.emoji} ${t(decision.cle)}`}
+                          : <><IconeEmoji emoji={decision.emoji} /> {t(decision.cle)}</>}
                       </b>
                       <div className="ml-dec-options">
                         {decision.options.map((o, i) => (
@@ -1682,7 +1683,7 @@ export function MatchLive({
                           >
                             <span className="ml-dec-touche">{i + 1}</span>
                             <b>
-                              {o.emoji} {t(o.cle)}
+                              <IconeEmoji emoji={o.emoji} /> {t(o.cle)}
                               {/* ⚠️ LE POURCENTAGE EST CELUI QUI SERA TIRÉ, pas une
                                   estimation d'ambiance : il vient de `enjeuDe`, que
                                   `resoudreChoix` rappelle juste avant de lancer le
@@ -1701,7 +1702,7 @@ export function MatchLive({
                           className="ml-dec-option laisser"
                           onClick={() => fermerDecision(false)}
                         >
-                          <b>⏭️ {t('ml.dec.laisser')}</b>
+                          <b><Icone nom="fleche-droite" taille={16} /> {t('ml.dec.laisser')}</b>
                           <span className="ml-dec-aide">{t('ml.dec.laisserAide')}</span>
                         </button>
                       </div>
@@ -1710,7 +1711,7 @@ export function MatchLive({
 
                   {enPause && !decision && !e.bagarre && (
                     <button type="button" className="ml-voile-pause" onClick={() => setEnPause(false)}>
-                      <b>▶️ {t('ml.reprendre')}</b>
+                      <b><Icone nom="fleche-droite" taille={16} /> {t('ml.reprendre')}</b>
                     </button>
                   )}
                 </div>
@@ -1735,16 +1736,16 @@ export function MatchLive({
               )}
               {!e.fini && (
                 <div className="ml-tempos">
-                  {TEMPOS.filter((v) => v.id === 'suivre' || (v.id === 'decisions' && !!monPion)).map((v) => (
+                  {TEMPOS.filter((v) => v.id !== 'decisions' || !!monPion).map((v) => (
                     <button
                       key={v.id}
                       type="button"
                       className={`ml-tempo${tempo === v.id ? ' actif' : ''}`}
-                      title={v.id === 'suivre' ? 'Environ dix minutes, à vitesse naturelle' : t(v.aide)}
-                      aria-label={v.id === 'suivre' ? 'Temps réel' : t(v.cle)}
+                      title={v.id === 'suivre' ? 'Environ dix minutes, à vitesse naturelle' : v.id === 'accelere' ? 'Deux fois plus rapide' : v.id === 'fin' ? 'Quatre fois plus rapide' : t(v.aide)}
+                      aria-label={v.id === 'suivre' ? 'Temps réel' : v.id === 'accelere' ? '×2' : v.id === 'fin' ? '×4' : t(v.cle)}
                       onClick={() => setTempo(v.id)}
                     >
-                      <b>{v.emoji}</b><span>{v.id === 'suivre' ? 'Temps réel' : t(v.cle)}</span>
+                      <b><Icone nom={v.id === 'suivre' ? 'oeil' : v.id === 'accelere' ? 'eclair' : v.id === 'fin' ? 'fleche-droite' : 'chrono'} taille={17} /></b><span>{v.id === 'suivre' ? 'Temps réel' : t(v.cle)}</span>
                     </button>
                   ))}
                   <button
@@ -1754,7 +1755,7 @@ export function MatchLive({
                     title={enPause ? t('ml.reprendre') : t('ml.pause')}
                     onClick={() => setEnPause((p) => !p)}
                   >
-                    <b>{enPause ? '▶️' : '⏸️'}</b><span>{enPause ? t('ml.reprendre') : t('ml.pause')}</span>
+                    <b><Icone nom={enPause ? 'fleche-droite' : 'stop'} taille={17} /></b><span>{enPause ? t('ml.reprendre') : t('ml.pause')}</span>
                   </button>
                 </div>
               )}
@@ -1835,7 +1836,7 @@ export function MatchLive({
                     censé faire ? ». */}
                 <div className="ml-commandes-liste">
                   <span><Icone nom="ballon" taille={13} /> {t('ml.commandes.file')}</span>
-                  <span>⏸️ {t('ml.commandes.carte')}</span>
+                  <span><Icone nom="stop" taille={14} /> {t('ml.commandes.carte')}</span>
                   <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> : {t('ml.commandes.chiffres')}</span>
                   <span>⏭️ {t('ml.commandes.laisser')}</span>
                   <span><Icone nom="video" taille={13} /> {t('ml.commandes.ralenti')}</span>
@@ -1917,7 +1918,7 @@ function CoachingManager({
           <div>
             <label><span>Sortir</span><Selecteur options={terrain.map((p) => ({ valeur: p.sourceId, label: `n° ${p.numero} · ${p.nom}`, sous: `${Math.round(p.endurance)} % d'endurance` }))} valeur={sortantActif} onChange={setSortant} /></label>
             <label><span>Faire entrer</span><Selecteur options={banc.map((p) => ({ valeur: p.sourceId, label: `n° ${p.numero} · ${p.nom}` }))} valeur={entrantActif} onChange={setEntrant} /></label>
-            <button type="button" disabled={!sortantActif || !entrantActif || !!demande} onClick={() => demanderRemplacement(e, cote, entrantActif, sortantActif)}>{demande ? '⏳ Prévu au prochain arrêt' : '🔄 Programmer le changement'}</button>
+            <button type="button" disabled={!sortantActif || !entrantActif || !!demande} onClick={() => demanderRemplacement(e, cote, entrantActif, sortantActif)}><Icone nom={demande ? 'chrono' : 'repost'} taille={14} /> {demande ? 'Prévu au prochain arrêt' : 'Programmer le changement'}</button>
           </div>
         ) : <span className="ml-banc-vide">Les huit remplaçants sont entrés.</span>}
       </fieldset>
@@ -1994,10 +1995,10 @@ const GAINS: [keyof StatsMatch, string, string][] = [
 function ecartsDeFeuille(avant: StatsMatch | null, apres: StatsMatch): string[] {
   if (!avant) return [];
   const sortie: string[] = [];
-  for (const [cle, emoji, cle2] of GAINS) {
+  for (const [cle, , cle2] of GAINS) {
     const d = (apres[cle] as number) - (avant[cle] as number);
     if (d > 0 && sortie.length < 3) {
-      const nom = `${emoji} ${t(cle2)}`;
+      const nom = t(cle2);
       sortie.push(d > 1 ? `${nom} ×${d}` : nom);
     }
   }

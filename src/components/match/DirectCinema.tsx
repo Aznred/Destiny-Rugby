@@ -3,21 +3,27 @@ import type { VueMatchEnLigne } from '../../lib/ligue/matchCarriere';
 import { creerScenarioDirect } from '../../lib/ligue/scenarioDirect';
 import TerrainEnDirect, { type CouleursDirect } from './TerrainEnDirect';
 import { CadreTmoReplay } from './CadreTmoReplay';
+import { Icone, type NomIcone } from '../Icone';
+import { TexteIcones } from '../TexteIcones';
 import './DirectCinema.css';
 
 const heure = (s: number) =>
   `${Math.floor(s / 60).toString().padStart(2, '0')}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
 const libelleMoment = (type: string, texte: string) =>
-  type === 'essai' ? '🏉 ESSAI'
-    : type === 'carton' ? (/rouge/i.test(texte) ? '🟥 CARTON ROUGE' : '🟨 CARTON JAUNE')
-      : type === 'penalite' || type === 'faute' ? '⚖️ PÉNALITÉ'
-        : type === 'but' ? '🎯 TIR RÉUSSI'
-          : type === 'butRate' ? '❌ TIR MANQUÉ'
-            : type === 'blessure' ? '🚑 BLESSURE'
-              : type === 'remplacement' ? '🔄 REMPLACEMENT'
-                : type === 'franchissement' ? '⚡ FRANCHISSEMENT'
-                  : '⚡ ACTION IMPORTANTE';
+  type === 'essai' ? 'ESSAI'
+    : type === 'carton' ? (/rouge/i.test(texte) ? 'CARTON ROUGE' : 'CARTON JAUNE')
+      : type === 'penalite' || type === 'faute' ? 'PÉNALITÉ'
+        : type === 'but' ? 'TIR RÉUSSI'
+          : type === 'butRate' ? 'TIR MANQUÉ'
+            : type === 'blessure' ? 'BLESSURE'
+              : type === 'remplacement' ? 'REMPLACEMENT'
+                : type === 'franchissement' ? 'FRANCHISSEMENT'
+                  : 'ACTION IMPORTANTE';
+
+const iconeMoment = (type: string): NomIcone => type === 'essai' ? 'ballon' : type === 'carton' ? 'carton'
+  : type === 'penalite' || type === 'faute' ? 'sifflet' : type === 'but' ? 'cible'
+    : type === 'butRate' ? 'croix' : type === 'blessure' ? 'soin' : type === 'remplacement' ? 'repost' : 'eclair';
 
 export function DirectCinema({
   match: m,
@@ -134,18 +140,18 @@ export function DirectCinema({
 
         {(m.decision || alerteVif) && (
           <div className={`dc-alerte-terrain dc-alerte-${m.decision ? 'penalite' : momentVif?.type}`} role="status">
-            <b>{m.decision ? '⚖️ PÉNALITÉ · DÉCISION' : libelleMoment(momentVif!.type, momentVif!.texte)}</b>
+            <b><Icone nom={m.decision ? 'sifflet' : iconeMoment(momentVif!.type)} taille={16} /> {m.decision ? 'PÉNALITÉ · DÉCISION' : libelleMoment(momentVif!.type, momentVif!.texte)}</b>
             <span>
               {m.decision
                 ? 'Choisis ton option ci-dessous'
-                : momentVif!.texte}
+                : <TexteIcones texte={momentVif!.texte} />}
             </span>
           </div>
         )}
 
         {alertePrep && (
           <div className="dc-alerte-terrain dc-alerte-penalite" role="status">
-            <b>{prep?.transformation ? '🎯 TRANSFORMATION' : '🎯 TIR AU BUT'}</b>
+            <b><Icone nom="cible" taille={16} /> {prep?.transformation ? 'TRANSFORMATION' : 'TIR AU BUT'}</b>
             <span>Prise d’élan et concentration face aux poteaux…</span>
           </div>
         )}
@@ -162,7 +168,7 @@ export function DirectCinema({
         <p>
           {m.decision
             ? 'Une pénalité à jouer : choisis ton option dans le panneau de décision.'
-            : commentaire}
+            : <TexteIcones texte={commentaire} />}
         </p>
         {selection && <button onClick={() => setSelection(null)}>Revenir au direct</button>}
       </div>
@@ -194,7 +200,7 @@ export function DirectCinema({
                   {v.cote === 'domicile' ? domicile : v.cote === 'exterieur' ? exterieur : 'Le match'}
                   {v.points ? ` · +${v.points} pts` : ''}
                 </b>
-                <small>{v.texte}</small>
+                <small><TexteIcones texte={v.texte} /></small>
               </span>
               <strong>
                 {v.score.domicile}–{v.score.exterieur}

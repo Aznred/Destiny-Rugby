@@ -6099,7 +6099,20 @@ export const useGame = create<GameState>()(
       // ---- MESSAGES PRIVÉS ----
       // L'IA locale répond à la place du compte, en gardant son caractère.
       envoyerMessage: async (pseudo, texte) => {
-        const { joueur, comptesSuivis, conversations, modele, relationsSociales } = get();
+        const { joueur, manager, comptesSuivis, conversations, modele, relationsSociales } = get();
+        if (manager && !joueur) {
+          const compte = comptesSuivis.find(c => c.pseudo === pseudo)
+            ?? annuaire({club: manager.club, saison: manager.saison, division: manager.division}).find(c => c.pseudo === pseudo);
+          if (!compte || !texte.trim()) return;
+          const contenu = texte.trim().slice(0,400);
+          const relation = effetSurRelation(contenu, relationsSociales[pseudo] ?? 0);
+          const maintenant = Date.now();
+          const mien: MessageDM = { id:idUnique(), pseudo, de:'moi', texte:contenu, saison:manager.saison, semaine:manager.semaine ?? 1, creeLe:maintenant, lu:true };
+          set(etat => ({ conversations:{...etat.conversations,[pseudo]:[...(etat.conversations[pseudo] ?? []),mien]}, relationsSociales:{...etat.relationsSociales,[pseudo]:relation} }));
+          const reponse = reponseLocale(compte,relation,contenu);
+          set(etat => ({ conversations:{...etat.conversations,[pseudo]:[...(etat.conversations[pseudo] ?? []),{id:idUnique(),pseudo,de:'lui',texte:reponse,saison:manager.saison,semaine:manager.semaine ?? 1,creeLe:maintenant+1,lu:false}]}}));
+          return;
+        }
         // On peut écrire à n'importe quel compte du monde, pas seulement aux
         // comptes suivis (on ouvre une conversation depuis un profil).
         const compte = comptesSuivis.find((c) => c.pseudo === pseudo)

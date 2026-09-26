@@ -13,7 +13,7 @@ import type { Group } from 'three';
 // là qu'on inspecte un article sous toutes ses faces.
 export function ModeleBallon({ url = '/ballon.glb', tourne = true }: { url?: string; tourne?: boolean }) {
   // 2e argument : active le décodeur Draco (le .glb est compressé, 40 Mo → 0,45 Mo)
-  const { scene } = useGLTF(url, true);
+  const { scene } = useGLTF(url, '/draco/');
   const spin = useRef<Group>(null);
   const bob = useRef<Group>(null);
 

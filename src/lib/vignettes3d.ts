@@ -24,7 +24,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 // Le même décodeur que celui utilisé par `useGLTF(url, true)` (drei) : les
 // modèles du jeu sont tous compressés Draco.
-const DECODEUR_DRACO = 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/';
+const DECODEUR_DRACO = '/draco/';
 
 const TAILLE = 192; // px — assez pour une vignette nette en écran Retina
 

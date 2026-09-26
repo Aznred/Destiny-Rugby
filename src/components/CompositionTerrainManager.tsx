@@ -813,7 +813,7 @@ export function CompositionTerrainManager({
       <details
         className="manager-reserves"
         open={Boolean(rendreCarte) || reservesOuvertes}
-        onToggle={(e) => setReservesOuvertes(e.currentTarget.open)}
+        onToggle={(e) => { if (!rendreCarte) setReservesOuvertes(e.currentTarget.open); }}
       >
         <summary>{t('compo.effectifDispo')} <span>{reserves.length}</span></summary>
         <p>{t('compo.aideReserve')}</p>

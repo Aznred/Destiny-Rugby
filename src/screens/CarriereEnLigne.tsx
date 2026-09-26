@@ -1072,7 +1072,7 @@ function nomEtapeCompetition(
     const nom = nomTour(index, totalTours);
     return {
       titreCourt: `Play-offs · ${nom}`,
-      titreComplet: `🏆 ${t('online.cup.playoffsTitle', { name: nom })}`,
+      titreComplet: t('online.cup.playoffsTitle', { name: nom }),
       estPlayoff: true,
       estElimination: true,
     };
@@ -2227,7 +2227,7 @@ function Competitions({ vue, agir, occupe, proprietaire, suivre }: { vue: VueCar
           <div>
             {etape.estPlayoff && <div className="eyebrow cel-eyebrow-playoff">{t('online.competition.playoffsTrophy')}</div>}
             {etape.estElimination && !etape.estPlayoff && <div className="eyebrow cel-eyebrow-elimination">{t('online.competition.straightKnockout')}</div>}
-            <h2>{etape.titreComplet}</h2>
+            <h2>{etape.estPlayoff && <Icone nom="trophee" taille={21} />} {etape.titreComplet}</h2>
           </div>
           <small>{t('online.calendar.fromTo', { from: date(affiches[0]?.ouvre), to: date(affiches[0]?.ferme) })}</small>
         </div>

@@ -82,7 +82,7 @@ export function PastilleEquipement({
 }
 
 function Objet({ url, teinte }: { url: string; teinte?: string }) {
-  const { scene } = useGLTF(url, true);
+  const { scene } = useGLTF(url, '/draco/');
   const spin = useRef<Group>(null);
 
   const modele = useMemo(() => {

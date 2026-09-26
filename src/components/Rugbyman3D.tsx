@@ -152,7 +152,7 @@ function PieceChargee({
   url: string; teinte?: string; hauteur: number;
   position: [number, number, number]; rotation: [number, number, number];
 }) {
-  const { scene } = useGLTF(url, true);
+  const { scene } = useGLTF(url, '/draco/');
   // ⚠️ 'true' passé ici en 4ème argument pour dire que cet objet est prioritaire (un calque)
   const objet = useMemo(() => normaliser(scene, hauteur, teinte, true), [scene, hauteur, teinte]);
   return <primitive object={objet} position={position} rotation={rotation} />;
@@ -160,7 +160,7 @@ function PieceChargee({
 
 /** Le personnage seul, sans rien dessus. */
 function Corps({ teinte }: { teinte?: string }) {
-  const { scene } = useGLTF(MODELE_JOUEUR, true);
+  const { scene } = useGLTF(MODELE_JOUEUR, '/draco/');
   // Le corps n'est pas prioritaire, on garde false (le défaut)
   const objet = useMemo(() => normaliser(scene, TAILLE, teinte), [scene, teinte]);
   return <primitive object={objet} />;

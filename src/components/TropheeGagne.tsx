@@ -11,7 +11,7 @@ import { Icone } from './Icone';
 
 // Modèle du trophée : recentré, normalisé, en rotation continue sur lui-même.
 function ModeleTrophee({ url }: { url: string }) {
-  const { scene } = useGLTF(url, true);
+  const { scene } = useGLTF(url, '/draco/');
   const pivot = useRef<Group>(null);
 
   const modele = useMemo(() => {
@@ -143,7 +143,7 @@ export function TropheeGagne({ tropheeId, tropheePersonnalise, index, total, onF
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.75 }}
         >
-          {reste > 0 ? `${tn('trophee.suivant', reste)} →` : t('trophee.soulever')}
+          <Icone nom="trophee" taille={17} /> {reste > 0 ? `${tn('trophee.suivant', reste)} →` : t('trophee.soulever')}
         </motion.button>
       </motion.div>
     </div>

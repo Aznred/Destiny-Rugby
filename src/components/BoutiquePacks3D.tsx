@@ -15,7 +15,7 @@ class Protection extends Component<{children:ReactNode; secours:ReactNode},{erre
   render(){return this.state.erreur ? this.props.secours : this.props.children;}
 }
 function Pochette({pack,slot,mouvement,achat,surToucher,gratuit}: {pack:PackCarriere;slot:number;mouvement:MutableRefObject<Mouvement>;achat:string|null;surToucher:(slot:number)=>void;gratuit:boolean}) {
-  const {scene}=useGLTF(modelePack(apparencePack(pack)));
+  const {scene}=useGLTF(modelePack(apparencePack(pack)), '/draco/');
   const ref=useRef<Group>(null);
   const etiquette=useRef<HTMLSpanElement>(null);
   const clone=useMemo(()=>{const obj=scene.clone(true);const box=new Box3().setFromObject(obj,true);const size=box.getSize(new Vector3());const center=box.getCenter(new Vector3());const scale=2.8/Math.max(size.x,size.y,size.z);const g=new Group();g.add(obj);g.scale.setScalar(scale);g.position.copy(center.multiplyScalar(-scale));return g;},[scene]);

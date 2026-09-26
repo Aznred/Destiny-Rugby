@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type { PionDirect, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import type { Vec } from '../../lib/moteur/terrain';
 import { apparenceJoueurMatch, graineVisuelleMatch, type MaillotMatch } from '../../lib/moteur/apparenceMatch';
@@ -7,6 +7,7 @@ import { mirrorPose, poseAtTime } from '../../lib/spritesGenerateur/engine';
 import { rugbyAnimations } from '../../lib/spritesGenerateur/rugbyAnimations';
 import type { AnimationClip, BodyType, Character, KitPattern, Orientation } from '../../lib/spritesGenerateur/models';
 import { orientationSprite } from '../../lib/moteur/orientationSprite';
+import type { PosteId } from '../../types';
 
 export type AnimationRugby = string;
 
@@ -198,6 +199,36 @@ function dessinerSprite(
     width: LARGEUR_CANVAS, height: HAUTEUR_CANVAS, zoom: .36,
     pan: { x: 0, y: 2 }, showField: false, showSkeleton: false,
   });
+}
+
+/** Le même générateur et les mêmes silhouettes que sur le terrain, pour la remise de coupe. */
+export function SpriteCelebration({ nom, poste, numero, couleur, capitaine = false }: {
+  nom: string; poste: PosteId; numero: number; couleur: string; capitaine?: boolean;
+}) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const renderer = useMemo(() => new CharacterRenderer(), []);
+  const character = useMemo(() => personnage({ id: `celebration-${numero}-${nom}`, nom, poste, numero } as PionDirect,
+    maillotDeCelebration(couleur)), [nom, poste, numero, couleur]);
+  const clip = CLIPS.get(capitaine ? 'trophy_lift' : 'celebrate')!;
+  useEffect(() => {
+    let frame = 0;
+    let dernier = 0;
+    const debut = performance.now();
+    const dessiner = (instant: number) => {
+      if (instant - dernier > 65 && canvas.current) {
+        dessinerSprite(canvas.current, renderer, character, clip, (instant - debut) / 1000, numero * 37, 'front', false);
+        dernier = instant;
+      }
+      frame = requestAnimationFrame(dessiner);
+    };
+    frame = requestAnimationFrame(dessiner);
+    return () => cancelAnimationFrame(frame);
+  }, [renderer, character, clip, numero]);
+  return <canvas ref={canvas} width={LARGEUR_CANVAS} height={HAUTEUR_CANVAS} className="celebration-sprite" aria-hidden="true" />;
+}
+
+function maillotDeCelebration(principal: string): MaillotMatch {
+  return { principal, secondaire: '#f3ead1', accent: '#f5d575', short: '#172c29', chaussettes: principal, motif: 'epaules' };
 }
 
 function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, redresser, hauteurMetres, temps, angleVue = 0 }: Props) {

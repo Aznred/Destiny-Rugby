@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Icone } from '../Icone';
+import { TexteIcones } from '../TexteIcones';
 import { PelouseMemo } from './Pelouse';
 import { Camera, type Cadrage } from '../../lib/moteur/camera';
 import { LARGEUR, LONGUEUR, borner, type Vec } from '../../lib/moteur/terrain';
@@ -374,7 +375,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
 
       {/* Récit / Bandeau d'action contextuelle */}
       <div className="amical-bandeau-action" role="status">
-        <span>{messageAction}</span>
+        <span><TexteIcones texte={messageAction} /></span>
       </div>
 
       {/* Rendu 2D immersif du terrain de rugby */}

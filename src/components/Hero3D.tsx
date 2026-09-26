@@ -200,7 +200,7 @@ function DecorSol({
 function DecorCharge({
   url, hauteur, position, rotationY,
 }: { url: string; hauteur: number; position: [number, number, number]; rotationY: number }) {
-  const { scene } = useGLTF(url, true);
+  const { scene } = useGLTF(url, '/draco/');
 
   const { objet, demiHauteur } = useMemo(() => {
     const clone = scene.clone(true);

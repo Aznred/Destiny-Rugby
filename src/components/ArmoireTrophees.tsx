@@ -166,9 +166,9 @@ function Scene({
   setActif: (i: number | null) => void;
 }) {
   // Le meuble ET tous les trophées, en une seule suspension.
-  const armoireGltf = useGLTF(MODELE_ARMOIRE, true);
+  const armoireGltf = useGLTF(MODELE_ARMOIRE, '/draco/');
   const urls = pieces.map((p) => p.trophee.modele);
-  const gltfs = useGLTF(urls, true) as { scene: THREE.Group }[];
+  const gltfs = useGLTF(urls, '/draco/') as { scene: THREE.Group }[];
 
   const { meuble, dims, objets, places, etageres, boites } = useMemo(() => {
     // Le meuble : recentré horizontalement, POSÉ SUR LE SOL (y = 0). On veut
