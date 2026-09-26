@@ -45,6 +45,8 @@ export interface Coequipier {
   jeuAuPied?: number;
   nation: string; // drapeau + nom (ex. « 🇫🇯 Fidji »)
   regen: boolean; // true si ce joueur a remplacé un retraité
+  clubReel?: string;
+  championnat?: string;
 }
 
 // Un joueur est un « espoir » tant qu'il lui reste au moins 3 points de marge.

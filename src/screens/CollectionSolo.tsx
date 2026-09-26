@@ -8,6 +8,7 @@ import { carteDepuisSource, catalogueBaseCarriere, PACKS_CARRIERE } from '../lib
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo } from '../lib/collectionSolo';
 import { SalonAmicalModal } from '../components/SalonAmicalModal';
+import { CompositionCollectionSolo } from '../components/CompositionCollectionSolo';
 import { estCompteKiriAutorise } from '../lib/amicalCollection';
 import { chargerSessionCarriere, type CompteCarriere } from '../lib/carriereEnLigneClient';
 import { NOMS_PACK } from '../lib/presentationPacks';
@@ -62,6 +63,13 @@ export function CollectionSolo() {
   const estKiri = useMemo(() => estCompteKiriAutorise(sessionCompte, nomCompte), [sessionCompte, nomCompte]);
   const [amicalOuvert, setAmicalOuvert] = useState(() => typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('amical') || new URLSearchParams(window.location.search).get('amicalOuvert') === '1'));
   const codeAmicalUrl = useMemo(() => typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('amical') ?? undefined : undefined, []);
+  const [compoPleineOuverte, setCompoPleineOuverte] = useState(false);
+
+  const cartesPossedees = useMemo(() => {
+    return catalogue
+      .filter((carte) => (etat.quantites[cleCarteSolo(carte.sourceId)] ?? 0) > 0)
+      .map((carte) => carteDepuisSource(carte, 'solo', 'collection', 1));
+  }, [catalogue, etat.quantites]);
 
   const cartesFiltrees = useMemo(() => {
     const terme = normaliser(recherche.trim());
@@ -100,7 +108,12 @@ export function CollectionSolo() {
     <header className="solo-entete">
       <button type="button" className="btn fantome" onClick={() => setEcran('accueil')}><Icone nom="fleche-droite" className="solo-retour" taille={16} /> Accueil</button>
       <div><div className="eyebrow">Collection du compte · {nomCompte}</div><h1>Ma collection</h1><p>Ta collection, tes doublons et tes Ovas sont partagés entre toutes tes carrières sur ce compte.</p></div>
-      <div className="solo-solde"><Icone nom="ova" taille={18} /><strong>{nombre(coins)}</strong><span>Ovas</span></div>
+      <div className="solo-entete-droite">
+        <button type="button" className="btn primaire solo-btn-compo" onClick={() => setCompoPleineOuverte(true)}>
+          <Icone nom="equipe" taille={18} /> Feuille de match XV ({cartesPossedees.length})
+        </button>
+        <div className="solo-solde"><Icone nom="ova" taille={18} /><strong>{nombre(coins)}</strong><span>Ovas</span></div>
+      </div>
     </header>
 
     <section className="solo-progression carte">
@@ -114,11 +127,16 @@ export function CollectionSolo() {
         <div className="solo-amical-texte">
           <span className="amical-badge-kiri">🧪 PROTOTYPE KIRI ACTIF</span>
           <h3>Match Amical 1v1 Collection</h3>
-          <p>Compose ton XV de départ à partir de tes cartes de collection et affronte tes potes avec contrôle direct à la manette / joystick !</p>
+          <p>Compose ton XV de départ sur le grand terrain avec tes cartes et affronte tes potes avec contrôle direct à la manette / joystick !</p>
         </div>
-        <button type="button" className="btn primaire" onClick={() => setAmicalOuvert(true)}>
-          <Icone nom="eclair" taille={18} /> Lancer le prototype amical
-        </button>
+        <div className="solo-amical-actions">
+          <button type="button" className="btn solo-btn-terrain" onClick={() => setCompoPleineOuverte(true)}>
+            <Icone nom="equipe" taille={18} /> Feuille de match (Terrain)
+          </button>
+          <button type="button" className="btn primaire" onClick={() => setAmicalOuvert(true)}>
+            <Icone nom="eclair" taille={18} /> Lancer le prototype amical
+          </button>
+        </div>
       </section>
     )}
 
@@ -163,6 +181,13 @@ export function CollectionSolo() {
       <SalonAmicalModal
         codeInitial={codeAmicalUrl}
         onFermer={() => setAmicalOuvert(false)}
+      />
+    )}
+
+    {compoPleineOuverte && (
+      <CompositionCollectionSolo
+        cartes={cartesPossedees}
+        onFermer={() => setCompoPleineOuverte(false)}
       />
     )}
   </section>;

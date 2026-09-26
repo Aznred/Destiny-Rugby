@@ -648,7 +648,21 @@ export function CompositionTerrainManager({
           ))}
         </ul>
         {rendreCarte && <div className="ct-apercu-selection">
-          {joueurSelectionne ? <>{rendreCarte(joueurSelectionne)}<b>{joueurSelectionne.nom}</b><span>{nomPoste(joueurSelectionne.poste)} · {joueurSelectionne.note} GEN</span></> : <p>Choisis une carte pour voir le joueur et le remplacer.</p>}
+          {joueurSelectionne ? (
+            <>
+              {rendreCarte(joueurSelectionne)}
+              <b className="ct-selection-nom">{joueurSelectionne.nom}</b>
+              <span className="ct-selection-poste-gen">{nomPoste(joueurSelectionne.poste)} · {joueurSelectionne.note} GEN</span>
+              {(joueurSelectionne.clubReel || joueurSelectionne.championnat) && (
+                <div className="ct-selection-club-ligue">
+                  {joueurSelectionne.clubReel && <span className="ct-badge-club">{joueurSelectionne.clubReel}</span>}
+                  {joueurSelectionne.championnat && <span className="ct-badge-ligue">{joueurSelectionne.championnat}</span>}
+                </div>
+              )}
+            </>
+          ) : (
+            <p>Choisis une carte pour voir le joueur et le remplacer.</p>
+          )}
         </div>}
         {onMeilleureEquipe && (
           <div className="ct-action-auto">

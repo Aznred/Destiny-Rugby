@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icone } from './Icone';
 import { useGame } from '../store/useGame';
-import { catalogueBaseCarriere } from '../lib/ligue/catalogueCarriere';
+import { catalogueBaseCarriere, carteDepuisSource } from '../lib/ligue/catalogueCarriere';
+import { cleCarteSolo } from '../lib/collectionSolo';
+import { CompositionCollectionSolo } from './CompositionCollectionSolo';
 import {
   composerEquipeDepuisCollection,
   creerSalonAmicalApi,
@@ -30,6 +32,16 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
   const [couleurEquipe, setCouleurEquipe] = useState('#1e40af');
   const [onglet, setOnglet] = useState<'compo' | 'enLigne'>('compo');
 
+  // Composition interactive sur terrain
+  const [compoOuverte, setCompoOuverte] = useState(false);
+  const [versionCompo, setVersionCompo] = useState(0);
+
+  const cartesPossedees = useMemo(() => {
+    return catalogue
+      .filter((c) => (collection.quantites[cleCarteSolo(c.sourceId)] ?? 0) > 0)
+      .map((c) => carteDepuisSource(c, 'solo', 'collection', 1));
+  }, [catalogue, collection.quantites]);
+
   // Salon en ligne
   const [codeSaisi, setCodeSaisi] = useState(codeInitial ?? '');
   const [codeSalonActif, setCodeSalonActif] = useState<string | null>(null);
@@ -39,10 +51,10 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
   const [erreur, setErreur] = useState<string | null>(null);
   const [lienCopie, setLienCopie] = useState(false);
 
-  // Équipe locale composée depuis la collection
+  // Équipe locale composée depuis la collection (rechargée à chaque sauvegarde)
   const monEquipe = useMemo<EquipeAmical>(() => {
     return composerEquipeDepuisCollection(nomEquipe, couleurEquipe, collection, catalogue);
-  }, [nomEquipe, couleurEquipe, collection, catalogue]);
+  }, [nomEquipe, couleurEquipe, collection, catalogue, versionCompo]);
 
   // Équipe adverse en mode local
   const equipeAdverseLocale = useMemo<EquipeAmical>(() => {
@@ -224,7 +236,16 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             </div>
 
             <div className="amical-apercu-xv">
-              <div className="eyebrow">Titulaires 1 à 15 (meilleures cartes automatiques)</div>
+              <div className="amical-apercu-xv-entete">
+                <div className="eyebrow">Titulaires 1 à 15 ({monEquipe.joueurs.length} joueurs)</div>
+                <button
+                  type="button"
+                  className="btn petit amical-btn-terrain"
+                  onClick={() => setCompoOuverte(true)}
+                >
+                  <Icone nom="equipe" taille={15} /> Modifier sur le grand terrain (comme en ligne)
+                </button>
+              </div>
               <div className="amical-grille-joueurs">
                 {monEquipe.joueurs.map((j) => (
                   <div key={j.id} className="amical-carte-joueur-mini">
@@ -339,6 +360,19 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
           </section>
         )}
       </div>
+
+      {compoOuverte && (
+        <CompositionCollectionSolo
+          cartes={cartesPossedees}
+          onFermer={() => {
+            setCompoOuverte(false);
+            setVersionCompo((v) => v + 1);
+          }}
+          onEnregistrer={() => {
+            setVersionCompo((v) => v + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

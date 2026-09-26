@@ -142,6 +142,7 @@ const carteEnJoueur = (c: CarteCarriere): Coequipier => ({
   postesSecondaires: c.postesSecondaires ? [...c.postesSecondaires] : undefined,
   potentiel: c.potentiel, jeuAuPied: c.statistiques.JDP,
   nation: c.nation, regen: c.origine === 'formation', horsGeneration: true,
+  clubReel: c.clubReel, championnat: c.championnat,
 });
 
 // Les libellés français des consignes. Le serveur ne connaît que les codes.

@@ -2376,6 +2376,38 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-compo .ct-apercu-selection { display: flex; flex-direction: column; gap: 8px; font-size: 12px; text-align: center; }
 .cel-compo .ct-apercu-selection > .dr-player { width: 140px; max-width: 100%; align-self: center; }
 .cel-compo .ct-apercu-selection p { color: #b7cbd1; line-height: 1.5; }
+.cel-compo .ct-selection-club-ligue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.cel-compo .ct-badge-club,
+.cel-compo .ct-badge-ligue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cel-compo .ct-badge-club {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+}
+.cel-compo .ct-badge-ligue {
+  background: rgba(250, 204, 21, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  color: #fef08a;
+  font-size: 10.5px;
+}
 .cel-compo .manager-feuille-visuelle > .manager-compo-aide { display: none; }
 .cel-compo .manager-feuille-visuelle > .ct-plateau { grid-column: 2; grid-row: 1; display: block; height: 100%; min-height: 0; overflow: visible; position: relative; }
 .cel-compo .ct-plateau > .manager-terrain-cadre { display: block; height: 100%; min-height: 0; padding: 0; border: 0; background: transparent; box-sizing: border-box; }

@@ -7,6 +7,8 @@
 .solo-solde { display: grid; grid-template-columns: auto auto; align-items: center; justify-items: end; gap: 0 .45rem; padding: .7rem .9rem; border: 1px solid #ffffff1f; border-radius: 12px; background: #08150fd1; color: var(--or-400); }
 .solo-solde strong { font-family: var(--police-titre); font-size: 1.35rem; }
 .solo-solde span { grid-column: 1 / -1; color: var(--craie-dim); font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+.solo-entete-droite { display: flex; align-items: center; gap: .8rem; }
+.solo-btn-compo { display: inline-flex; align-items: center; gap: .5rem; white-space: nowrap; }
 .solo-progression { padding: 1.25rem 1.4rem; display: grid; grid-template-columns: auto minmax(220px, 1fr) auto; align-items: center; gap: 1.4rem; }
 .solo-progression > div:first-child { display: grid; gap: .2rem; }
 .solo-progression > div:first-child > span { color: var(--craie-dim); font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; }
@@ -25,6 +27,9 @@
 .solo-amical-texte { display: flex; flex-direction: column; gap: 0.3rem; }
 .solo-amical-texte h3 { margin: 0; font-size: 1.3rem; color: #f8fafc; }
 .solo-amical-texte p { margin: 0; color: #94a3b8; font-size: 0.88rem; max-width: 65ch; }
+.solo-amical-actions { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+.solo-btn-terrain { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); color: #f1f5f9; display: inline-flex; align-items: center; gap: 0.45rem; }
+.solo-btn-terrain:hover { background: rgba(255, 255, 255, 0.16); color: #ffffff; }
 .solo-rayon, .solo-catalogue { display: grid; gap: 1rem; }
 .solo-titre-ligne { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
 .solo-titre-ligne > span { max-width: 48ch; text-align: right; font-size: .9rem; }

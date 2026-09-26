@@ -144,6 +144,31 @@
   font-weight: 800;
 }
 
+.amical-apercu-xv-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.amical-btn-terrain {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.75rem;
+}
+
+.amical-btn-terrain:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
 .amical-grille-joueurs {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));

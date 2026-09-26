@@ -2,7 +2,7 @@ import type { SourceCarte } from './ligue/catalogueCarriere.js';
 import { cleCarteSolo, type EtatCollectionSolo } from './collectionSolo.js';
 import { POSTES } from '../data/rugby.js';
 import type { Coequipier } from './effectif.js';
-import type { PosteId } from '../types.js';
+import type { PosteId, CompositionManager } from '../types.js';
 
 export interface JoueurCollectionAmical {
   id: string;
@@ -65,7 +65,63 @@ export function composerEquipeDepuisCollection(
   collection: EtatCollectionSolo,
   catalogue: readonly SourceCarte[],
   embleme?: string,
+  compositionSauvegardee?: CompositionManager | null,
 ): EquipeAmical {
+  let compo: CompositionManager | null = compositionSauvegardee ?? null;
+  if (!compo && typeof window !== 'undefined') {
+    try {
+      const brut = localStorage.getItem('destiny-rugby:composition-collection-solo:v1');
+      if (brut) compo = JSON.parse(brut);
+    } catch {}
+  }
+
+  // Si une composition personnalisée de 15 titulaires est trouvée et valide
+  if (compo && Array.isArray(compo.titulaires) && compo.titulaires.length === 15) {
+    const joueursPersos: JoueurCollectionAmical[] = [];
+    let complete = true;
+
+    for (let i = 0; i < 15; i++) {
+      const id = compo.titulaires[i];
+      const sourceId = id?.startsWith('solo:') ? id.slice(5) : id;
+      const carte = catalogue.find((c) => c.sourceId === sourceId);
+      const possedee = carte && (collection.quantites[cleCarteSolo(carte.sourceId)] ?? 0) > 0;
+      if (!carte || !possedee) {
+        complete = false;
+        break;
+      }
+      const posteInfo = POSTES[i];
+      const stats = carte.statistiques;
+      joueursPersos.push({
+        id: `amical-${posteInfo.numero}-${carte.sourceId}`,
+        sourceId: carte.sourceId,
+        nom: carte.nom,
+        numero: posteInfo.numero,
+        poste: posteInfo.id,
+        note: carte.note,
+        vitesse: Math.round(stats.VIT),
+        force: Math.round(stats.FRC),
+        passe: Math.round(stats.PAS),
+        plaquage: Math.round(stats.PLQ),
+        endurance: Math.round(stats.END),
+        jeuAuPied: Math.round(stats.JDP),
+        photo: carte.photo,
+        clubReel: carte.clubReel,
+        nation: carte.nation,
+      });
+    }
+
+    if (complete && joueursPersos.length === 15) {
+      const noteMoyenne = Math.round(joueursPersos.reduce((acc, j) => acc + j.note, 0) / joueursPersos.length);
+      return {
+        nom: nomEquipe || 'XV de la Collection',
+        couleur: couleur || '#1a56db',
+        embleme,
+        joueurs: joueursPersos,
+        noteMoyenne,
+      };
+    }
+  }
+
   const possedees = catalogue.filter((c) => (collection.quantites[cleCarteSolo(c.sourceId)] ?? 0) > 0)
     .sort((a, b) => b.note - a.note);
 
