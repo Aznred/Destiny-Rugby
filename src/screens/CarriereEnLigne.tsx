@@ -1316,7 +1316,6 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
 export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; erreur?: string }) {
   const [vueEtendue, setVueEtendue] = useState(true);
   const [consignesOuvertes, setConsignesOuvertes] = useState(false);
-  const [priorite, setPriorite] = useState<'performance' | 'collectif'>('performance');
   const [nomEquipe, setNomEquipe] = useState('');
   const [filtreChampionnat, setFiltreChampionnat] = useState('');
   const [filtreClub, setFiltreClub] = useState('');
@@ -1342,7 +1341,7 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
   );
   const strategie = club?.strategie ?? STRATEGIE_VIDE;
   const modifie = brouillon !== null;
-  const optimale = useMemo(() => meilleureComposition(cartes, Date.now(), priorite), [cartes, priorite]);
+  const optimale = useMemo(() => meilleureComposition(cartes, Date.now()), [cartes]);
   const optionsFiltre = (cle: 'championnat' | 'clubReel' | 'pays') => [...new Set(cartes.map(c => c[cle]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
   const reservesVisibles = useMemo(() => new Set(cartes.filter(c =>
     (!filtreChampionnat || c.championnat === filtreChampionnat) && (!filtreClub || c.clubReel === filtreClub)
@@ -1408,8 +1407,23 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
     </section>
     {vueEtendue && erreur && <div className="cel-erreur cel-erreur-compo" role="alert"><Icone nom="alerte" taille={20} /><p>{erreur}</p></div>}
     <div className="cel-outils-compo">
-      <Choix label="Meilleure équipe selon" valeur={priorite} options={[["performance", "Performance du XV"], ["collectif", "Collectif du XV"]]} onChange={v => setPriorite(v as 'performance' | 'collectif')} />
-      <details><summary>Équipes sauvegardées ({sauvegardees.length}/15)</summary>
+      <button
+        type="button"
+        className="btn primaire cel-btn-assembler"
+        disabled={occupe || !optimale}
+        onClick={() => { if (optimale) setBrouillon(optimale); }}
+        title="Assemble automatiquement la meilleure équipe combinant note et collectif sans aucun malus de poste"
+      >
+        <Icone nom="eclair" taille={16} />
+        <span>Assembler la meilleure équipe</span>
+      </button>
+
+      <details className="cel-details-outils">
+        <summary className="btn cel-btn-outil">
+          <Icone nom="disquette" taille={15} />
+          <span>Équipes sauvegardées ({sauvegardees.length}/15)</span>
+          <Icone nom="chevron" taille={13} className="cel-outil-chevron" />
+        </summary>
         <div className="cel-outils-contenu">
           <p className="cel-note">Charger une équipe prépare la feuille. Clique ensuite sur « Enregistrer la feuille » pour l’utiliser en match.</p>
           <div className="cel-actions"><input aria-label="Nom de l’équipe" maxLength={40} placeholder="Nom de l’équipe" value={nomEquipe} onChange={e => setNomEquipe(e.target.value)} />
@@ -1419,12 +1433,20 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
             <button type="button" className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'supprimerComposition', id: equipe.id }); }} aria-label={`Supprimer ${equipe.nom}`}>Supprimer</button></div>)}
         </div>
       </details>
-      <details><summary>Filtrer les réserves</summary><div className="cel-outils-contenu cel-filtres-reserves">
-        <Choix label="Compétition" valeur={filtreChampionnat} options={[["", "Toutes"], ...optionsFiltre('championnat').map(v => [v, v] as [string, string])]} onChange={v => { setFiltreChampionnat(v); setFiltreClub(''); }} />
-        <Choix label="Club" valeur={filtreClub} options={[["", "Tous"], ...optionsFiltre('clubReel').filter(v => !filtreChampionnat || cartes.some(c => c.clubReel === v && c.championnat === filtreChampionnat)).map(v => [v, v] as [string, string])]} onChange={setFiltreClub} />
-        <Choix label="Pays" valeur={filtrePays} options={[["", "Tous"], ...optionsFiltre('pays').map(v => [v, v] as [string, string])]} onChange={setFiltrePays} />
-        <Choix label="Poste" valeur={filtrePoste} options={[["", "Tous"], ...[...new Set(cartes.map(c => c.poste))].sort((a, b) => (POSTE_PAR_ID[a]?.numero ?? 0) - (POSTE_PAR_ID[b]?.numero ?? 0)).map(v => [v, nomPoste(v)] as [string, string])]} onChange={setFiltrePoste} />
-      </div></details>
+
+      <details className="cel-details-outils">
+        <summary className="btn cel-btn-outil">
+          <Icone nom="loupe" taille={15} />
+          <span>Filtrer les réserves</span>
+          <Icone nom="chevron" taille={13} className="cel-outil-chevron" />
+        </summary>
+        <div className="cel-outils-contenu cel-filtres-reserves">
+          <Choix label="Compétition" valeur={filtreChampionnat} options={[["", "Toutes"], ...optionsFiltre('championnat').map(v => [v, v] as [string, string])]} onChange={v => { setFiltreChampionnat(v); setFiltreClub(''); }} />
+          <Choix label="Club" valeur={filtreClub} options={[["", "Tous"], ...optionsFiltre('clubReel').filter(v => !filtreChampionnat || cartes.some(c => c.clubReel === v && c.championnat === filtreChampionnat)).map(v => [v, v] as [string, string])]} onChange={setFiltreClub} />
+          <Choix label="Pays" valeur={filtrePays} options={[["", "Tous"], ...optionsFiltre('pays').map(v => [v, v] as [string, string])]} onChange={setFiltrePays} />
+          <Choix label="Poste" valeur={filtrePoste} options={[["", "Tous"], ...[...new Set(cartes.map(c => c.poste))].sort((a, b) => (POSTE_PAR_ID[a]?.numero ?? 0) - (POSTE_PAR_ID[b]?.numero ?? 0)).map(v => [v, nomPoste(v)] as [string, string])]} onChange={setFiltrePoste} />
+        </div>
+      </details>
     </div>
 
     <CompositionTerrainManager

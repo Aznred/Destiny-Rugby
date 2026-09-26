@@ -71,7 +71,26 @@ export const chargerEmblemesCarriere = () =>
   (emblemesEnCache ??= requete<CataloguesIdentite>(undefined, undefined, undefined, '?emblemes=1')
     .catch((e) => { emblemesEnCache = undefined; throw e; }));
 
-export const chargerSessionCarriere = (signal?: AbortSignal) => requete<SessionCarriere>(undefined, undefined, signal);
+function synchroniserStockageCompte(compte?: CompteCarriere | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (compte) {
+      if (compte.pseudo) localStorage.setItem('destiny-compte-pseudo', compte.pseudo);
+      if (compte.administrateur || compte.pseudo?.trim().toLowerCase() === 'kiri') {
+        localStorage.setItem('destiny-compte-kiri', '1');
+      }
+    } else {
+      localStorage.removeItem('destiny-compte-kiri');
+      localStorage.removeItem('destiny-compte-pseudo');
+    }
+  } catch {}
+}
+
+export const chargerSessionCarriere = async (signal?: AbortSignal) => {
+  const session = await requete<SessionCarriere>(undefined, undefined, signal);
+  if (session?.compte) synchroniserStockageCompte(session.compte);
+  return session;
+};
 export const chargerStatistiquesGlobales = (signal?: AbortSignal) =>
   requete<StatistiquesGlobalesCarriere>(undefined, undefined, signal, '?statistiques=globales');
 export const chargerAdministrationCarriere = (signal?: AbortSignal) =>
@@ -93,17 +112,20 @@ const notifierCompte = (type: 'connecte' | 'deconnecte') => {
 };
 export const identifierCarriere = async (action: 'inscription' | 'connexion', identifiant: string, motDePasse: string, pseudo: string, confirmationMotDePasse = '') => {
   const compte = await requete<CompteCarriere>({ action, identifiant, motDePasse, pseudo, confirmationMotDePasse });
+  synchroniserStockageCompte(compte);
   notifierCompte('connecte');
   return compte;
 };
 export const configurationCarriere = () => requete<{ googleClientId?: string }>(undefined, undefined, undefined, '?configuration=1');
 export const identifierGoogleCarriere = async (credential: string) => {
   const compte = await requete<CompteCarriere>({ action: 'google', credential });
+  synchroniserStockageCompte(compte);
   notifierCompte('connecte');
   return compte;
 };
 export const deconnecterCarriere = async () => {
   const resultat = await requete<{ ok: boolean }>({ action: 'deconnexion' });
+  synchroniserStockageCompte(null);
   notifierCompte('deconnecte');
   return resultat;
 };

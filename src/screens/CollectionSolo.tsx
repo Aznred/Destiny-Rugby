@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icone } from '../components/Icone';
 import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import OuverturePack from '../components/OuverturePack';
@@ -9,6 +9,7 @@ import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo } from '../lib/collectionSolo';
 import { SalonAmicalModal } from '../components/SalonAmicalModal';
 import { estCompteKiriAutorise } from '../lib/amicalCollection';
+import { chargerSessionCarriere, type CompteCarriere } from '../lib/carriereEnLigneClient';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import { nombre } from '../lib/i18n';
 import './CollectionSolo.css';
@@ -32,9 +33,34 @@ export function CollectionSolo() {
   const [page, setPage] = useState(0);
   const [ouverture, setOuverture] = useState<{ pack: PackCarriere; indices: number[] } | null>(null);
   const [bilan, setBilan] = useState('');
+  const [sessionCompte, setSessionCompte] = useState<CompteCarriere | null>(() => {
+    if (typeof window !== 'undefined') {
+      const pseudo = localStorage.getItem('destiny-compte-pseudo');
+      const estAdmin = localStorage.getItem('destiny-compte-kiri') === '1';
+      if (pseudo || estAdmin) return { id: 'cache', pseudo: pseudo ?? '', administrateur: estAdmin };
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    chargerSessionCarriere()
+      .then((session) => {
+        if (session?.compte) {
+          setSessionCompte(session.compte);
+          if (session.compte.administrateur || session.compte.pseudo?.trim().toLowerCase() === 'kiri') {
+            try { localStorage.setItem('destiny-compte-kiri', '1'); } catch {}
+          }
+          if (session.compte.pseudo) {
+            try { localStorage.setItem('destiny-compte-pseudo', session.compte.pseudo); } catch {}
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const nomCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Compte joueur';
-  const estKiri = useMemo(() => estCompteKiriAutorise(null, nomCompte), [nomCompte]);
-  const [amicalOuvert, setAmicalOuvert] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('amical'));
+  const estKiri = useMemo(() => estCompteKiriAutorise(sessionCompte, nomCompte), [sessionCompte, nomCompte]);
+  const [amicalOuvert, setAmicalOuvert] = useState(() => typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('amical') || new URLSearchParams(window.location.search).get('amicalOuvert') === '1'));
   const codeAmicalUrl = useMemo(() => typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('amical') ?? undefined : undefined, []);
 
   const cartesFiltrees = useMemo(() => {

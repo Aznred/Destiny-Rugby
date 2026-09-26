@@ -157,8 +157,13 @@ export function estCompteKiriAutorise(
   if (pseudoActuel?.trim().toLowerCase() === 'kiri') return true;
   if (typeof window !== 'undefined') {
     if (localStorage.getItem('destiny-compte-kiri') === '1') return true;
+    const pseudoStocke = localStorage.getItem('destiny-compte-pseudo')?.trim().toLowerCase();
+    if (pseudoStocke === 'kiri') return true;
     const url = new URLSearchParams(window.location.search);
-    if (url.get('kiri') === '1' || url.has('amical')) return true;
+    if (url.get('kiri') === '1' || url.has('amical')) {
+      try { localStorage.setItem('destiny-compte-kiri', '1'); } catch {}
+      return true;
+    }
   }
   return false;
 }

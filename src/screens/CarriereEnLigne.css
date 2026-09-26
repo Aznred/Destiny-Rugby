@@ -2298,12 +2298,61 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel > .cel-compo { min-height: 720px; height: calc(100dvh - 200px); }
 .cel > .cel-compo.cel-compo-etendue { position: fixed; inset: 0; z-index: 100; height: 100dvh; min-height: 0; padding: 10px 16px; box-sizing: border-box; background: radial-gradient(ellipse at 55% 35%, #173b37, #07141d 80%); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
 .cel:has(> .cel-compo-etendue) > .cel-erreur { display: none; }
-.cel-outils-compo { display: flex; flex: none; flex-wrap: wrap; gap: 8px; position: relative; z-index: 25; }
-.cel-outils-compo > .cel-champ { flex-direction: row; align-items: center; }
-.cel-outils-compo > .cel-champ .selecteur { min-width: 180px; }
-.cel-outils-compo details { position: relative; }
-.cel-outils-compo summary { cursor: pointer; padding: 7px 12px; border: 1px solid #ffffff35; border-radius: 8px; background: #102a31; font-size: 12px; }
-.cel-outils-contenu { position: absolute; top: 100%; left: 0; width: min(540px, calc(100vw - 24px)); max-height: min(55dvh, 420px); overflow: auto; padding: 12px; border: 1px solid #ffffff35; border-radius: 8px; background: #102a31; box-shadow: 0 12px 32px #0009; box-sizing: border-box; }
+.cel-outils-compo { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px; position: relative; z-index: 25; margin: 2px 0 4px 0; }
+.cel-outils-compo .cel-btn-assembler {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cel-outils-compo details.cel-details-outils { position: relative; }
+.cel-outils-compo summary.cel-btn-outil {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--rayon-controle, 8px);
+  background: #102a31;
+  color: #e2e8f0;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+.cel-outils-compo summary.cel-btn-outil::-webkit-details-marker,
+.cel-outils-compo summary.cel-btn-outil::marker {
+  display: none;
+}
+.cel-outils-compo summary.cel-btn-outil:hover:not(:disabled) {
+  background: #173d47;
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+.cel-outils-compo details.cel-details-outils[open] > summary.cel-btn-outil {
+  background: #1a4854;
+  border-color: var(--or-400, #f8d67f);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(248, 214, 127, 0.22);
+}
+.cel-outils-compo .cel-outil-chevron {
+  transition: transform 0.2s ease;
+  opacity: 0.75;
+}
+.cel-outils-compo details.cel-details-outils[open] .cel-outil-chevron {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+.cel-outils-contenu { position: absolute; top: calc(100% + 6px); left: 0; width: min(540px, calc(100vw - 24px)); max-height: min(55dvh, 420px); overflow: auto; padding: 14px; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 10px; background: #0e242a; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65); box-sizing: border-box; z-index: 30; }
 .cel-outils-contenu input { min-width: 0; flex: 1; }
 .cel-equipe-sauvegardee { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .cel-equipe-sauvegardee span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
