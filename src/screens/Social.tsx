@@ -1681,8 +1681,8 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
               {actif && dossier?.type === 'joueur' && <NegociationRecrueManager pseudo={actif} />}
               {actif && dossier?.type === 'demande' && <DemandeVestiaireManager pseudo={actif} />}
               {actif && dossier?.type === 'approche' && <ApprocheClubCarte pseudo={actif} />}
-              {actif && dossier?.type === 'libre' && <form className="x-envoi" onSubmit={e=>{e.preventDefault();if(texteLibre.trim()){void envoyerLibre(actif,texteLibre);setTexteLibre('');}}}>
-                <input aria-label="Écrire un message" value={texteLibre} maxLength={400} onChange={e=>setTexteLibre(e.target.value)} placeholder="Écrire un message" />
+              {actif && (dossier?.type === 'libre' || dossier?.type === 'club' || dossier?.type === 'joueur') && <form className="x-envoi" onSubmit={e=>{e.preventDefault();if(texteLibre.trim()){void envoyerLibre(actif,texteLibre);setTexteLibre('');}}}>
+                <input aria-label="Écrire un message" value={texteLibre} maxLength={400} onChange={e=>setTexteLibre(e.target.value)} placeholder={dossier.type === 'libre' ? 'Écrire un message' : 'Écrire à ton interlocuteur · ajuste l’offre avec les boutons ci-dessus'} />
                 <button className="x-poster" disabled={!texteLibre.trim()}>Envoyer</button>
               </form>}
             </div>

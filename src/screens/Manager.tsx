@@ -260,6 +260,18 @@ export function Manager() {
     () => manager ? afficheDuClub(manager) : null,
     [manager],
   );
+  const prochainesAffiches = useMemo(() => {
+    if (!manager?.club) return [];
+    const suite: { semaine: number; affiche: AfficheComplete }[] = [];
+    for (let numero = manager.semaine; numero <= SEMAINES_PAR_SAISON; numero++) {
+      const affiche = afficheDuClub({ ...manager, semaine: numero });
+      if (affiche && !manager.resultats[affiche.cle]) suite.push({ semaine: numero, affiche });
+    }
+    const visibles = suite.slice(0, 4);
+    const prochaineCoupe = suite.find(({ affiche }) => affiche.nature === 'coupe');
+    if (prochaineCoupe && !visibles.some(({ affiche }) => affiche.cle === prochaineCoupe.affiche.cle)) visibles.push(prochaineCoupe);
+    return visibles;
+  }, [manager]);
   /**
    * ⚠️ ON AVANCE JUSQU'AU PROCHAIN RENDEZ-VOUS, PAS D'UN NOMBRE DE SEMAINES.
    * Un « +4 semaines » forcerait à compter soi-même où tombe le prochain match,
@@ -755,6 +767,12 @@ export function Manager() {
                       </span>
                     </div>
                   ) : <p>Aucun match cette semaine : récupération et préparation.</p>}
+                  {prochainesAffiches.length > 0 && <div className="manager-prochain-calendrier" aria-label="Prochains matchs du club">
+                    {prochainesAffiches.map(({ semaine: numero, affiche }) => <div key={affiche.cle}>
+                      <span>S{numero} · {libelleAfficheManager(affiche, manager.divisionNom)}</span>
+                      <b>{affiche.match.domicile} — {affiche.match.exterieur}</b>
+                    </div>)}
+                  </div>}
                 </article>
                 <article className="carte manager-journal">
                   <div className="comp-tete"><b><Icone nom="journal" taille={16} /> {t('mgr.journal')}</b></div>

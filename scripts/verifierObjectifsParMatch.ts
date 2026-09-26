@@ -1,0 +1,20 @@
+import { agirCarriere, avancerCarriere, creerCarriere } from '../src/lib/ligue/carriere';
+
+const depart = Date.parse('2026-09-07T10:00:00.000Z');
+let etat = creerCarriere({ id: 'objectifs-par-match', nom: 'Ligue test', code: 'DR-TEST', compteId: 'a', pseudo: 'Alice', clubNom: 'Club Alice', rythme: 1, maxClubs: 4 }, depart, 'test');
+etat = agirCarriere(etat, 'b', { type: 'rejoindre', pseudo: 'Benoit', clubNom: 'Club Benoit' }, depart, 'rejoindre');
+etat = agirCarriere(etat, 'a', { type: 'demarrerSaison' }, depart, 'demarrer');
+const club = etat.clubs[0];
+const avant = etat.objectifs.filter(o => o.clubId === club.id);
+if (avant.length !== 3 || !avant.some(o => o.type === 'participer')) throw new Error('Objectifs du premier match absents');
+const premiere = etat.rencontres.find(r => r.domicile === club.id || r.exterieur === club.id)!;
+etat = avancerCarriere(etat, Date.parse(premiere.ferme) + 2 * 3600_000, 'premier-match');
+const apres = etat.objectifs.filter(o => o.clubId === club.id);
+if (!premiere || !etat.rencontres.some(r => r.id === premiere.id && r.resultat)) throw new Error('Premier match non joué');
+if (apres.length !== 3 || apres.some(o => avant.some(a => a.id === o.id))) throw new Error('Objectifs non renouvelés après le match');
+const primes = etat.transactions.filter(j => j.clubId === club.id && j.nature === 'objectif');
+if (!primes.some(j => j.ovas === 200)) throw new Error('Prime de participation non versée automatiquement');
+const montant = etat.clubs[0].ovas;
+etat = avancerCarriere(etat, Date.parse(premiere.ferme) + 2 * 3600_000, 'relecture');
+if (etat.clubs[0].ovas !== montant) throw new Error('Prime versée deux fois');
+console.log('OK — objectifs renouvelés par match, prime versée automatiquement une seule fois.');

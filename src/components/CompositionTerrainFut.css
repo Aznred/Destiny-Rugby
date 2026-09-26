@@ -624,3 +624,53 @@
  .cel-compo .ct-feuille-fut .manager-reserves > div { display:flex !important; flex-flow:row nowrap !important; overflow-x:auto !important; overflow-y:hidden !important; -webkit-overflow-scrolling:touch; }
  .cel-compo .ct-feuille-fut .manager-reserves .manager-reserve-carte { flex:0 0 76px !important; width:76px !important; min-width:76px !important; }
 }
+
+/* Le constructeur solo et la carrière entraîneur gardent quatre zones stables
+   sur PC. Les règles de la carrière en ligne ne doivent pas déplacer le banc
+   sur le terrain ou agrandir l'aperçu quand une carte est sélectionnée. */
+@media (min-width:701px) {
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) > .manager-feuille-visuelle.ct-feuille-fut {
+    display:grid;
+    flex:1;
+    min-height:0;
+    grid-template-columns:190px minmax(0,1fr) !important;
+    grid-template-rows:minmax(0,1fr) 42px 42px 165px !important;
+    gap:6px 12px;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .manager-feuille-visuelle > .ct-entete {
+    grid-column:1 !important; grid-row:1 !important; min-height:0; overflow-y:auto;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .manager-feuille-visuelle > .ct-plateau {
+    grid-column:2 !important; grid-row:1 !important; min-height:0; height:100%; overflow-y:auto; overflow-x:hidden;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .ct-plateau > .manager-terrain-cadre {
+    height:max(100%, 620px); min-height:620px;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .ct-feuille-fut .manager-terrain-xv {
+    height:100% !important; min-height:620px !important; --ct-carte:clamp(50px,3.5vw,66px);
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .ct-feuille-fut .manager-position {
+    width:var(--ct-carte) !important;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .ct-feuille-fut > .ct-selection-actions {
+    grid-column:1/-1 !important; grid-row:2 !important; min-height:0; margin:0;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .ct-feuille-fut > .ct-groupes {
+    grid-column:1/-1 !important; grid-row:3 !important; min-height:0; margin:0;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .manager-feuille-visuelle > :is(.manager-banc-visuel, .manager-reserves, .manager-reserves[open]) {
+    grid-column:1/-1 !important; grid-row:4 !important; position:static !important; inset:auto !important;
+    width:100% !important; height:100% !important; min-height:0; max-height:none !important;
+    overflow:hidden !important; align-self:stretch; margin:0; box-sizing:border-box;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .ct-feuille-fut :is(.manager-banc-cartes, .manager-reserves > div) {
+    display:flex !important; flex-flow:row nowrap !important; overflow-x:auto !important; overflow-y:hidden !important;
+    width:100%; height:100%; max-height:none; box-sizing:border-box;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .ct-feuille-fut .manager-reserve-carte {
+    flex:0 0 88px !important; width:88px !important; min-width:88px !important;
+  }
+  :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .ct-plateau > .ct-panneau {
+    position:absolute; top:0; bottom:0; right:0; width:min(320px,35%); max-height:100%; overflow-y:auto; z-index:15;
+  }
+}

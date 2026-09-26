@@ -42,6 +42,7 @@ import {
 } from '../lib/disciplineSociale';
 import { sanctionEmbrouilleSociale } from '../data/socialLocalise';
 import { filIA, reponsesIA, messageIA } from '../lib/iaSociale';
+import { reponseNegociationManagerIA, type ContexteNegociationIA } from '../lib/iaNegociationManager';
 import {
   abonnesCible, annuaire, bassinSocial, pseudoStable, rapprocherAbonnes,
 } from '../lib/comptes';
@@ -1285,6 +1286,20 @@ function retenirMaLigne(poser: (p: Partial<GameState>) => void) {
   return (r: { id?: number }) => {
     if (typeof r?.id === 'number' && Number.isFinite(r.id)) poser({ rangMondialId: r.id });
   };
+}
+
+async function personnaliserReponseNegociation(pseudo: string, id: string, contexte: ContexteNegociationIA) {
+  if (!useGame.getState().iaActivee || !iaDisponible()) return;
+  try {
+    const texte = await reponseNegociationManagerIA(contexte);
+    if (!texte) return;
+    useGame.setState(s => ({ conversations: {
+      ...s.conversations,
+      [pseudo]: (s.conversations[pseudo] ?? []).map(message => message.id === id ? { ...message, texte } : message),
+    } }));
+  } catch {
+    // La réponse locale déjà affichée reste disponible hors ligne ou sans quota.
+  }
 }
 
 export const useGame = create<GameState>()(
@@ -4642,6 +4657,7 @@ export const useGame = create<GameState>()(
           : resultat.negociation.etat === 'rompue'
             ? t('mgr.x.clubRupture')
             : t('mgr.x.clubRefus', { n: resultat.negociation.patience });
+        const reponseId = idUnique();
         set((s) => ({
           manager: {
             ...m,
@@ -4661,13 +4677,19 @@ export const useGame = create<GameState>()(
                 saison: m.saison, semaine: m.semaine, creeLe: Date.now(), lu: true,
               },
               {
-                id: idUnique(), pseudo: actuelle.pseudo, de: 'lui' as const,
+                id: reponseId, pseudo: actuelle.pseudo, de: 'lui' as const,
                 texte: reponse, saison: m.saison, semaine: m.semaine,
                 creeLe: Date.now() + 1, lu: false,
               },
             ],
           },
         }));
+        void personnaliserReponseNegociation(actuelle.pseudo, reponseId, {
+          role: 'club', nom: actuelle.club, sujet: `Transfert de ${actuelle.cible.nom}`,
+          proposition: `${resultat.negociation.offre} € et ${resultat.negociation.bonus ?? 0} € de bonus`,
+          verdict: resultat.negociation.etat, messageManager: t(`mgr.x.clubLevier.${levier}`, { montant: nombre(resultat.negociation.offre) }),
+          historique: (get().conversations[actuelle.pseudo] ?? []).slice(-4).map(message => message.texte),
+        });
       },
 
       contacterJoueurManager: (cible) => {
@@ -4781,6 +4803,7 @@ export const useGame = create<GameState>()(
           : resultat.negociation.etat === 'rompue'
             ? t('mgr.dm.rupturePatience')
             : t('mgr.dm.contreProposition', { n: resultat.negociation.patience });
+        const reponseId = idUnique();
         set((s) => ({
           manager: {
             ...m,
@@ -4796,13 +4819,19 @@ export const useGame = create<GameState>()(
                 semaine: m.semaine, creeLe: Date.now(), lu: true,
               },
               {
-                id: idUnique(), pseudo: actuelle.pseudo, de: 'lui' as const,
+                id: reponseId, pseudo: actuelle.pseudo, de: 'lui' as const,
                 texte: reponse, saison: m.saison, semaine: m.semaine,
                 creeLe: Date.now() + 1, lu: false,
               },
             ],
           },
         }));
+        void personnaliserReponseNegociation(actuelle.pseudo, reponseId, {
+          role: 'joueur', nom: actuelle.joueur.nom, sujet: `Contrat avec ${m.club}`,
+          proposition: `${resultat.negociation.offre.salaire} € de salaire, ${resultat.negociation.offre.prime} € de prime, ${resultat.negociation.offre.duree} saisons`,
+          verdict: resultat.negociation.etat, messageManager: t(`mgr.dm.levier.${levier}`),
+          historique: (get().conversations[actuelle.pseudo] ?? []).slice(-4).map(message => message.texte),
+        });
       },
 
       accepterDemandesJoueurManager: (id) => {
@@ -6101,16 +6130,32 @@ export const useGame = create<GameState>()(
       envoyerMessage: async (pseudo, texte) => {
         const { joueur, manager, comptesSuivis, conversations, modele, relationsSociales } = get();
         if (manager && !joueur) {
-          const compte = comptesSuivis.find(c => c.pseudo === pseudo)
-            ?? annuaire({club: manager.club, saison: manager.saison, division: manager.division}).find(c => c.pseudo === pseudo);
+          const negociationClub = [...manager.negociationsClubs].reverse().find(n => n.pseudo === pseudo);
+          const negociationJoueur = [...manager.negociations].reverse().find(n => n.pseudo === pseudo);
+          const compte: CompteSuivi | undefined = comptesSuivis.find(c => c.pseudo === pseudo)
+            ?? annuaire({club: manager.club, saison: manager.saison, division: manager.division}).find(c => c.pseudo === pseudo)
+            ?? (negociationClub ? { pseudo, nom: negociationClub.club, avatar: `club:${negociationClub.club}`, type: 'club', abonnes: 0 }
+              : negociationJoueur ? { pseudo, nom: negociationJoueur.joueur.nom, avatar: `initiales:${negociationJoueur.joueur.nom}`, type: 'joueur', abonnes: 0 } : undefined);
           if (!compte || !texte.trim()) return;
           const contenu = texte.trim().slice(0,400);
           const relation = effetSurRelation(contenu, relationsSociales[pseudo] ?? 0);
           const maintenant = Date.now();
           const mien: MessageDM = { id:idUnique(), pseudo, de:'moi', texte:contenu, saison:manager.saison, semaine:manager.semaine ?? 1, creeLe:maintenant, lu:true };
           set(etat => ({ conversations:{...etat.conversations,[pseudo]:[...(etat.conversations[pseudo] ?? []),mien]}, relationsSociales:{...etat.relationsSociales,[pseudo]:relation} }));
-          const reponse = reponseLocale(compte,relation,contenu);
-          set(etat => ({ conversations:{...etat.conversations,[pseudo]:[...(etat.conversations[pseudo] ?? []),{id:idUnique(),pseudo,de:'lui',texte:reponse,saison:manager.saison,semaine:manager.semaine ?? 1,creeLe:maintenant+1,lu:false}]}}));
+          const reponse = negociationClub ? `Nous avons lu ton message. Notre offre actuelle reste de ${nombre(negociationClub.offre)} € ; les conditions se discutent ci-dessus.`
+            : negociationJoueur ? `J'ai bien reçu ton message. Mon contrat se joue aussi sur le salaire, le rôle et la durée proposés.`
+              : reponseLocale(compte,relation,contenu);
+          const reponseId = idUnique();
+          set(etat => ({ conversations:{...etat.conversations,[pseudo]:[...(etat.conversations[pseudo] ?? []),{id:reponseId,pseudo,de:'lui',texte:reponse,saison:manager.saison,semaine:manager.semaine ?? 1,creeLe:maintenant+1,lu:false}]}}));
+          if (negociationClub || negociationJoueur) void personnaliserReponseNegociation(pseudo, reponseId, negociationClub ? {
+            role: 'club', nom: negociationClub.club, sujet: `Transfert de ${negociationClub.cible.nom}`,
+            proposition: `${negociationClub.offre} €`, verdict: negociationClub.etat, messageManager: contenu,
+            historique: (get().conversations[pseudo] ?? []).slice(-4).map(message => message.texte),
+          } : {
+            role: 'joueur', nom: negociationJoueur!.joueur.nom, sujet: `Contrat avec ${manager.club}`,
+            proposition: `${negociationJoueur!.offre.salaire} € de salaire`, verdict: negociationJoueur!.etat,
+            messageManager: contenu, historique: (get().conversations[pseudo] ?? []).slice(-4).map(message => message.texte),
+          });
           return;
         }
         // On peut écrire à n'importe quel compte du monde, pas seulement aux

@@ -40,6 +40,7 @@
     "verify:paliers": "vite-node scripts/verifPaliersStructures.ts",
     "verify:ligue": "vite-node scripts/verifLigue.ts",
     "verify:carriere": "vite-node scripts/verifCarriere.ts",
+    "verify:objectifs-match": "vite-node scripts/verifierObjectifsParMatch.ts",
     "verify:equipes-echanges": "vite-node scripts/verifierEquipesEtEchanges.ts",
     "verify:collection": "vite-node scripts/verifierCollection.ts",
     "verify:photos": "vite-node scripts/verifPhotosCartes.ts",

@@ -415,15 +415,27 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
 }
 
 function renouvelerObjectifs(etat: EtatCarriereEnLigne, maintenant: number) {
-  const periode = Math.max(0, Math.floor((maintenant - Date.parse(etat.creeLe)) / SEMAINE));
-  const debut = Date.parse(etat.creeLe) + periode * SEMAINE;
   const modeles: [ObjectifCarriere['type'], string, number, number][] = [
-    ['participer', 'Terminer un match', 1, 200], ['gagner', 'Remporter un match', 1, 150], ['essais', 'Marquer 6 essais', 6, 180],
-    ['formation', 'Aligner un titulaire de moins de 60 GEN', 1, 150], ['penalites', 'Réussir 5 pénalités', 5, 120], ['serie', 'Gagner deux matchs de suite', 2, 150],
+    ['participer', 'Terminer un match', 1, 200], ['gagner', 'Remporter un match', 1, 150], ['essais', 'Marquer 2 essais', 2, 180],
+    ['formation', 'Aligner un titulaire de moins de 60 GEN', 1, 150], ['penalites', 'Réussir 2 pénalités', 2, 120], ['essais', 'Marquer un essai', 1, 150],
   ];
-  for (const club of etat.clubs) for (const [type, libelle, cible, recompense] of modeles) {
-    const id = `${etat.id}:objectif:${club.id}:${periode}:${type}`;
-    if (!etat.objectifs.some(o => o.id === id)) etat.objectifs.push({ id, clubId: club.id, libelle, type, cible, progression: 0, recompense, debut: dateServeur(debut), fin: dateServeur(debut + SEMAINE), reclame: false });
+  for (const club of etat.clubs) {
+    const periode = etat.rencontres.filter(r => r.resultat && (r.domicile === club.id || r.exterieur === club.id)).length;
+    const prefixe = `${etat.id}:objectif:${club.id}:${periode}:`;
+    // Les objectifs terminés des anciennes sauvegardes sont crédités avant
+    // d'être retirés ; un retour après plusieurs semaines ne fait rien perdre.
+    for (const objectif of etat.objectifs.filter(o => o.clubId === club.id && !o.reclame && o.progression >= o.cible)) {
+      objectif.reclame = true;
+      journal(etat, club, 'objectif', objectif.recompense, [], objectif.libelle, dateServeur(maintenant));
+    }
+    etat.objectifs = etat.objectifs.filter(o => o.clubId !== club.id || o.id.startsWith(prefixe));
+    const prochaine = etat.rencontres.filter(r => !r.resultat && (r.domicile === club.id || r.exterieur === club.id))
+      .sort((a, b) => Date.parse(a.ouvre) - Date.parse(b.ouvre))[0];
+    if (!prochaine) continue;
+    for (const [type, libelle, cible, recompense] of modeles.filter((_, index) => (index + periode) % 2 === 0)) {
+      const id = `${prefixe}${type}`;
+      if (!etat.objectifs.some(o => o.id === id)) etat.objectifs.push({ id, clubId: club.id, libelle, type, cible, progression: 0, recompense, debut: prochaine.ouvre, fin: prochaine.ferme, reclame: false });
+    }
   }
 }
 
@@ -657,6 +669,7 @@ function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
   };
   etat.competitions.push(competition); calendrierCompetition(etat, competition);
   competition.journeesRegulieres = Math.max(...etat.rencontres.filter(r => r.competitionId === competition.id).map(r => r.journee));
+  renouvelerObjectifs(etat, maintenant);
 }
 
 export function classementCarriere(etat: EtatCarriereEnLigne, competitionId?: string): LigneClassementCarriere[] {
@@ -971,7 +984,7 @@ function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, ma
     const bonus = (m.essais[cote] - m.essais[autre] >= 3 ? 150 : 0) + (!victoire && !nul && m.score[autre] - m.score[cote] <= 7 ? 100 : 0);
     journal(etat, club, 'match', 500 + (victoire ? 750 : nul ? 350 : 100) + bonus + performance, [], `${clubParId(etat, r.domicile).nom} ${r.resultat.pointsD} – ${r.resultat.pointsE} ${clubParId(etat, r.exterieur).nom}${r.resultat.tab ? ' (t.a.b.)' : r.resultat.ap ? ' (a.p.)' : ''}`, dateServeur(maintenant));
     const titulaires = new Set(club.composition.titulaires);
-    for (const objectif of etat.objectifs.filter(o => o.clubId === club.id && Date.parse(o.debut) <= maintenant && maintenant < Date.parse(o.fin))) {
+    for (const objectif of etat.objectifs.filter(o => o.clubId === club.id)) {
       if (objectif.type === 'participer') objectif.progression++;
       if (objectif.type === 'gagner') objectif.progression += +victoire;
       if (objectif.type === 'essais') objectif.progression += m.essais[cote];
@@ -1114,6 +1127,7 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
         : avancerMatchEnLigne(r.match, maintenant);
     }
     enregistrerResultat(etat, r, maintenant, graine);
+    if (r.resultat) renouvelerObjectifs(etat, maintenant);
   }
   expirerMarche(etat, maintenant); avancerCompetitions(etat, maintenant);
 }
