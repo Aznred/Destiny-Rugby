@@ -509,7 +509,7 @@ function tick(e: EtatMatch): void {
     e.echappee.restant -= dt;
     if (e.echappee.restant <= 0 || e.porteur !== e.echappee.pion) e.echappee = null;
   }
-  const dtHorloge = dt * facteurHorloge(e.phase, e.tempsReel);
+  const dtHorloge = dt * (e.carriereDixMinutes ? 8 : facteurHorloge(e.phase, e.tempsReel));
   e.t += dtHorloge;
   e.minute = Math.min(80, Math.floor(e.t / 60));
 
@@ -3206,7 +3206,7 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
 
   // 🛡️ DÉFENSE SUR LA LIGNE : Ballon tenu en-but uniquement si des défenseurs sont au contact direct (< 2.0 m)
   const defenseursEnBut = surLeTerrain(e, adverse(cote)).filter((p) => distance(p.pos, marqueur.pos) < 2.0 && p.battu <= 0);
-  if (defenseursEnBut.length > 0) {
+  if (!e.carriereDixMinutes && defenseursEnBut.length > 0) {
     const forceDef = defenseursEnBut.reduce((acc, d) => acc + d.plaquage * 0.55 + d.puissance * 0.45, 0) / defenseursEnBut.length;
     const forceAtt = (marqueur.puissance * 0.55 + marqueur.evitement * 0.45) * (0.75 + marqueur.endurance / 400);
     const probaTenu = borner(0.28 + (forceDef - forceAtt) / 240 + (defenseursEnBut.length > 1 ? 0.15 : 0), 0.08, 0.55);
@@ -3390,7 +3390,7 @@ function phaseTMO(e: EtatMatch): void {
     const coteAttaque = action.marqueur.cote;
     const coteDefense = adverse(coteAttaque);
 
-    const refuse = e.rng() < 0.28;
+    const refuse = e.rng() < 0.28 && !(e.carriereDixMinutes && tmo.motif === 'aplatissage');
     if (refuse) {
       tmo.decision = 'essai_refuse';
       e.tmo = null;

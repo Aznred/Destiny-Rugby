@@ -40,6 +40,8 @@ export interface StockageCarriere {
   session(empreinte: string, maintenant: number): Promise<CompteStocke | null>;
   ouvrirSession(empreinte: string, compte: string, expiration: number): Promise<void>;
   fermerSession(empreinte: string): Promise<void>;
+  achatCredite?(session: string, compte: string): Promise<boolean>;
+  crediterAchat?(session: string, compte: string, ovas: number): Promise<void>;
   boutique(compte: string): Promise<EtatBoutiqueCompte | null>;
   sauvegarderBoutique(compte: string, boutique: EtatBoutiqueCompte): Promise<void>;
   limiter(cle: string, maximum: number, fenetre: number, maintenant: number): Promise<boolean>;
@@ -254,6 +256,19 @@ export function stockageNeon(url: string): StockageCarriere {
       ) update comptes set vu_le=now() where id=${compte}`;
     },
     async fermerSession(empreinte) { await sql`delete from sessions where empreinte=${empreinte}`; },
+    async achatCredite(session, compte) {
+      const lignes = await sql`select 1 from achats_stripe where session=${session} and compte=${compte}`;
+      return lignes.length > 0;
+    },
+    async crediterAchat(session, compte, ovas) {
+      await sql`with achat as (
+        insert into achats_stripe(session,compte,ovas) values (${session},${compte},${ovas})
+        on conflict (session) do nothing returning ovas
+      ) update compte_boutique set donnees = donnees || jsonb_build_object(
+        'ovas', (donnees->>'ovas')::bigint + (select ovas from achat),
+        'achatsOvas', coalesce((donnees->>'achatsOvas')::bigint,0) + (select ovas from achat)
+      ), modifie_le=now() where compte=${compte} and exists(select 1 from achat)`;
+    },
     async boutique(compte) {
       const r = await sql`select donnees from compte_boutique where compte=${compte}`;
       return (r[0]?.donnees as EtatBoutiqueCompte | undefined) ?? null;
@@ -261,7 +276,10 @@ export function stockageNeon(url: string): StockageCarriere {
     async sauvegarderBoutique(compte, boutique) {
       await sql`insert into compte_boutique (compte,donnees,modifie_le)
         values (${compte},${JSON.stringify(boutique)}::jsonb,now())
-        on conflict (compte) do update set donnees=excluded.donnees,modifie_le=excluded.modifie_le`;
+        on conflict (compte) do update set donnees=excluded.donnees || jsonb_build_object(
+          'ovas', (excluded.donnees->>'ovas')::bigint + greatest(0, coalesce((compte_boutique.donnees->>'achatsOvas')::bigint,0) - coalesce((excluded.donnees->>'achatsOvas')::bigint,0)),
+          'achatsOvas', coalesce((compte_boutique.donnees->>'achatsOvas')::bigint,0)
+        ),modifie_le=excluded.modifie_le`;
     },
     async limiter(cle, maximum, fenetre, maintenant) {
       if (cle.startsWith('jeu:')) {

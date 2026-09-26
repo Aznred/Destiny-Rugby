@@ -69,7 +69,9 @@
     "base:transfert": "node --env-file=.env --loader ./scripts/chargeurTypeScript.mjs scripts/initialiserTransfertDb.ts",
     "mesure:capacite-db": "node --env-file=.env --loader ./scripts/chargeurTypeScript.mjs scripts/mesurerCapaciteDb.ts",
     "verify:calendrier-carriere": "vite-node scripts/verifierCalendrierCarriere.ts",
-    "verify:laboratoire": "vite-node scripts/verifierLaboratoireLigue.ts"
+    "verify:laboratoire": "vite-node scripts/verifierLaboratoireLigue.ts",
+    "verify:mobile-carriere": "vite-node scripts/verifierCorrectifsMobile.ts",
+    "verify:paiements": "vite-node scripts/verifierPaiementsStripe.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -83,6 +85,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-youtube": "^10.1.0",
+    "stripe": "^22.6.2",
     "three": "0.182.0",
     "web-push": "^3.6.7",
     "zustand": "^5.0.14"

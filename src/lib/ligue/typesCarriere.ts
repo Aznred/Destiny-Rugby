@@ -58,6 +58,7 @@ export interface PackGratuitCarriere {
   id: string; packId: IdPackCarriere; recuLe: string;
 }
 export interface ClubCarriere {
+  tropheesVus?: string[];
   id: string; compteId: string; pseudo: string; nom: string; ovas: number;
   /** Chemin d'un vrai écusson de club (`emblemeValide` fait foi). */
   embleme?: string;
@@ -209,6 +210,7 @@ export type CommandeCarriere =
   // reconnaît le club de chacun à son écusson, et le voir changer en cours de
   // saison rend le classement et l'historique illisibles.
   | { type: 'rejoindre'; pseudo: string; clubNom: string; embleme?: string }
+  | { type: 'celebrationVue'; competitionId: string; saison: number }
   | { type: 'demarrerSaison' }
   | { type: 'modifierRythme'; rythme: number }
   | { type: 'composition'; composition: CompositionManager }

@@ -1,0 +1,23 @@
+const { chromium } = await import('file:///C:/Users/Utilisateur/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs');
+const browser = await chromium.launch({headless:true, channel:'chrome'});
+const page = await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+page.on('pageerror',e=>console.log('PAGEERROR',e.message));
+await page.goto('http://127.0.0.1:5173/',{waitUntil:'networkidle'});
+await page.evaluate(async()=>{ const {useGame}=await import('/src/store/useGame.ts');useGame.getState().creerManager({nom:'Coach Mobile',nation:'France',club:'Stade Toulousain',age:42,libre:true}); });
+await page.getByRole('button',{name:'Composition',exact:true}).click();
+await page.locator('.cel-fullscreen-compo').waitFor();
+await page.screenshot({path:'verification-manager-mobile.png'});
+console.log(await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,plateau:document.querySelector('.manager-terrain-cadre')?.getBoundingClientRect().toJSON(),cartes:[...document.querySelectorAll('.manager-position')].slice(0,3).map(e=>e.getBoundingClientRect().toJSON()), buttons:[...document.querySelectorAll('.ct-selection-actions button')].map(e=>e.textContent)})));
+await page.locator('.manager-position .ct-carte').first().click();
+console.log('selection',await page.locator('.ct-selection-actions').innerText());
+await page.locator('.manager-banc-cartes .ct-carte').first().click();
+console.log('echange effectué');
+await page.getByRole('button',{name:'Retour',exact:true}).click();
+await page.evaluate(async()=>{ const {useGame}=await import('/src/store/useGame.ts');useGame.getState().ouvrirMessagesOvale(); });
+await page.locator('.x-app').waitFor();
+await page.screenshot({path:'verification-social-mobile.png',fullPage:true});
+console.log('social',await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,bodyOverflow:getComputedStyle(document.body).overflow,centre:getComputedStyle(document.querySelector('.x-centre')).overflow})));
+await page.evaluate(()=>window.scrollBy(0,500));
+console.log('scrollY',await page.evaluate(()=>scrollY));
+await browser.close();
+

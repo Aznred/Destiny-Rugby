@@ -4,6 +4,7 @@ import { normaliserCollectionSolo, type EtatCollectionSolo } from './collectionS
 /** Tout ce qui appartient au compte, et non a une carriere particuliere. */
 export interface EtatBoutiqueCompte {
   ovas: number;
+  achatsOvas?: number;
   collectionSolo: EtatCollectionSolo;
   inventaire: string[];
   skinActif: string;
@@ -51,5 +52,5 @@ export function validerEtatBoutiqueCompte(valeur: unknown): EtatBoutiqueCompte |
     if (!CATEGORIES.has(categorie as CategorieEquipement) || typeof id !== 'string' || !equipements.includes(id)) return null;
     equipementActif[categorie as CategorieEquipement] = id;
   }
-  return { ovas: brut.ovas as number, collectionSolo, inventaire, skinActif: brut.skinActif, equipements, equipementActif, traitsDebloques };
+  return { achatsOvas: Number.isSafeInteger(brut.achatsOvas) && Number(brut.achatsOvas) >= 0 ? Number(brut.achatsOvas) : 0, ovas: brut.ovas as number, collectionSolo, inventaire, skinActif: brut.skinActif, equipements, equipementActif, traitsDebloques };
 }

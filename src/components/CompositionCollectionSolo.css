@@ -1,18 +1,4 @@
-.collection-solo-compo {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  width: 100vw;
-  height: 100dvh;
-  min-height: 0;
-  padding: 10px 16px;
-  box-sizing: border-box;
-  background: radial-gradient(ellipse at 55% 35%, #173b37, #07141d 80%);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow: hidden;
-}
+@import './CompositionTerrainFut.css';
 
 .collection-solo-compo .solo-compo-fermer {
   margin-left: auto;

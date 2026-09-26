@@ -368,6 +368,8 @@ export interface PlanDeScore {
 }
 
 export interface EtatMatch {
+  /** Solo : mouvements naturels, horloge sportive sur dix minutes. */
+  carriereDixMinutes?: boolean;
   dropEnCours?: { auteurId: string; reussi: boolean };
   arbitre?: import('./dynamique.js').ArbitreMatch;
   gestes?: import('./dynamique.js').GesteMatch[];

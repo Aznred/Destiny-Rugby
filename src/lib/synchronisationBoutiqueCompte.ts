@@ -5,7 +5,7 @@ import { chargerBoutiqueCompte, ErreurCarriere, sauvegarderBoutiqueCompte } from
 function instantane(): EtatBoutiqueCompte {
   const s = useGame.getState();
   return {
-    ovas: s.coins, collectionSolo: s.collectionSolo,
+    ovas: s.coins, achatsOvas: s.achatsOvas ?? 0, collectionSolo: s.collectionSolo,
     inventaire: s.inventaire, skinActif: s.skinActif,
     equipements: s.equipements, equipementActif: s.equipementActif,
     traitsDebloques: s.traitsDebloques,
@@ -32,7 +32,7 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
       if (reponse.boutique) {
         const distante = reponse.boutique;
         useGame.setState({
-          coins: distante.ovas, collectionSolo: distante.collectionSolo,
+          coins: distante.ovas, achatsOvas: distante.achatsOvas ?? 0, collectionSolo: distante.collectionSolo,
           inventaire: distante.inventaire, skinActif: distante.skinActif,
           equipements: distante.equipements, equipementActif: distante.equipementActif,
           traitsDebloques: distante.traitsDebloques,

@@ -1,0 +1,17 @@
+const { chromium } = await import('file:///C:/Users/Utilisateur/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs');
+const browser=await chromium.launch({headless:true,channel:'chrome'});
+const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+page.on('pageerror',e=>console.log('ERROR',e.stack));
+await page.goto('http://127.0.0.1:5173/scripts/apercuCorrections.html');
+await page.getByRole('button',{name:'Soulever la coupe',exact:true}).waitFor();
+await page.screenshot({path:'verification-celebration-mobile.png'});
+await page.getByRole('button',{name:'Soulever la coupe',exact:true}).click();
+await page.locator('.trophee-canvas canvas').waitFor();
+await page.waitForTimeout(4000);
+await page.screenshot({path:'verification-coupe-mobile.png'});
+console.log('Coupe 3D affichée');
+await page.goto('http://127.0.0.1:5173/scripts/apercuCorrections.html?match');
+await page.locator('.match-live').waitFor();
+await page.screenshot({path:'verification-match-mobile.png'});
+console.log('Match',await page.locator('.match-live').boundingBox(),await page.locator('.ml-tempos').innerText());
+await browser.close();

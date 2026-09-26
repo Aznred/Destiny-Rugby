@@ -1,0 +1,8 @@
+.celebration-ligue { position:fixed; inset:0; z-index:250; overflow-y:auto; display:grid; place-items:center; background:radial-gradient(ellipse at top,#205940,#03120f 75%); padding:20px; box-sizing:border-box; color:white; text-align:center; }
+.celebration-ligue > div { width:min(760px,100%); }
+.celebration-ligue h2 { margin:8px 0; font-size:clamp(24px,5vw,48px); }
+.celebration-ligue svg { width:100%; max-height:66dvh; }
+.celebration-ligue .overlay-trophee { z-index:251; }
+.celebration-joueur { animation:celebration-saut .65s ease-in-out infinite alternate; }
+@keyframes celebration-saut { to { transform:translateY(-12px) rotate(3deg); } }
+@media (prefers-reduced-motion:reduce) { .celebration-joueur { animation:none; } }

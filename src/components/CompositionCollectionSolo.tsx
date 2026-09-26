@@ -49,8 +49,8 @@ function legendeAffinite(a: AffiniteCarte): string {
   if (!a.meilleure) return `${entete}\n${t('online.affinity.none')}\n${detail}`;
   const tailles: Record<Affinite, number> = { club: a.club, nation: a.nation, championnat: a.championnat };
   const compte = t('online.affinity.startersCount', { count: String(tailles[a.meilleure]), affinity: nomAffinite(a.meilleure) });
-  const manque = a.points < COLLECTIF_MAX && a.club > 0 && a.club < 4
-    ? `\n${t('online.affinity.missingForMax', { count: String(4 - a.club) })}` : '';
+  const manque = a.points < COLLECTIF_MAX && a.club > 0 && a.club < 3
+    ? `\n${t('online.affinity.missingForMax', { count: String(3 - a.club) })}` : '';
   return `${entete}\n${compte}${manque}\n${detail}`;
 }
 
@@ -244,7 +244,8 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
 
   if (cartes.length < 23) {
     return (
-      <div className="cel-compo cel-compo-etendue collection-solo-compo" role="dialog" aria-modal="true">
+      <div className="cel-fullscreen-compo collection-solo-compo" role="dialog" aria-modal="true">
+      <div className="cel-compo cel-compo-etendue">
         <header className="cel-panneau cel-tete-compo">
           <h2>{t('compoSolo.title')}</h2>
           <button type="button" className="btn fantome solo-compo-fermer" onClick={onFermer}>
@@ -259,12 +260,14 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
             {t('compoSolo.backToShop')}
           </button>
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`cel-compo${vueEtendue ? ' cel-compo-etendue' : ''} collection-solo-compo`} role="dialog" aria-modal="true">
+    <div className="cel-fullscreen-compo collection-solo-compo" role="dialog" aria-modal="true">
+    <div className={`cel-compo${vueEtendue ? ' cel-compo-etendue' : ''}`}>
       <section className="cel-panneau cel-tete-compo">
         <button
           type="button"
@@ -463,6 +466,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
           if (optimale) setBrouillon(optimale);
         }}
       />
+    </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { CadreCompositionManager } from '../components/CadreCompositionManager';
 import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
@@ -1041,6 +1042,7 @@ export function Manager() {
                 </div>
               </section>
 
+              <CadreCompositionManager>
               <CompositionTerrainManager
                 rendreCarte={(j) => {
                   const c = cartesManagerCache.get(j.id);
@@ -1062,6 +1064,7 @@ export function Manager() {
                 }}
               />
 
+              </CadreCompositionManager>
               <section className="carte manager-roles-visuels">
                 <div><b><Icone nom="profil" taille={16} /> Rôles du groupe</b><span>Le brassard et la cible apparaissent directement sur les cartes.</span></div>
                 <label>

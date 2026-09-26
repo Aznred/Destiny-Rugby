@@ -4,7 +4,7 @@ import { useGLTF, Sparkles, ContactShadows, Float } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import type { Group } from 'three';
-import { TROPHEES } from '../data/trophees';
+import { TROPHEES, type Trophee } from '../data/trophees';
 import { t, tn } from '../lib/i18n';
 import { descriptionTrophee, nomTrophee } from '../lib/tropheesI18n';
 import { Icone } from './Icone';
@@ -45,6 +45,7 @@ function ModeleTrophee({ url }: { url: string }) {
 
 interface Props {
   tropheeId: string;
+  tropheePersonnalise?: Trophee;
   index: number; // position dans la file (1-based)
   total: number;
   onFermer: () => void;
@@ -58,8 +59,8 @@ function modeAllege(): boolean {
   return (navigator.hardwareConcurrency ?? 8) <= 4;
 }
 
-export function TropheeGagne({ tropheeId, index, total, onFermer }: Props) {
-  const trophee = TROPHEES[tropheeId];
+export function TropheeGagne({ tropheeId, tropheePersonnalise, index, total, onFermer }: Props) {
+  const trophee = tropheePersonnalise ?? TROPHEES[tropheeId];
   const allege = useMemo(modeAllege, []);
   if (!trophee) return null;
   const reste = total - index;

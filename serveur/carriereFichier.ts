@@ -11,6 +11,7 @@ import { vueCarriere } from '../src/lib/ligue/carriere.js';
 import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 
 interface BaseLocale {
+  achatsStripe?: Record<string, string>;
   atelier?: CatalogueAdmin;
   push?: BasePush;
   comptes: CompteStocke[];
@@ -32,6 +33,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
   const copie = <T>(v: T): T => structuredClone(v);
   base.push ??= { abonnements: [], envois: {} };
   base.boutiques ??= {};
+  base.achatsStripe ??= {};
   // L'échéance ne vaut que pour ce processus : le serveur de développement
   // redémarre souvent, et une échéance perdue coûte une relecture, rien de plus.
   const echeances: Record<string, number> = {};
@@ -72,8 +74,17 @@ export function stockageFichier(fichier: string): StockageCarriere {
       sauver();
     },
     async fermerSession(e) { delete base.sessions[e]; sauver(); },
+    async achatCredite(session, compte) { return base.achatsStripe![session] === compte; },
+    async crediterAchat(session, compte, ovas) {
+      if (base.achatsStripe![session]) return;
+      const boutique = base.boutiques![compte];
+      if (!boutique) throw new Error('Boutique introuvable.');
+      boutique.ovas += ovas; boutique.achatsOvas = (boutique.achatsOvas ?? 0) + ovas;
+      base.achatsStripe![session] = compte; sauver();
+    },
     async boutique(compte) { return base.boutiques?.[compte] ? copie(base.boutiques[compte]) : null; },
-    async sauvegarderBoutique(compte, boutique) { base.boutiques![compte] = copie(boutique); sauver(); },
+    async sauvegarderBoutique(compte, boutique) { const acquis = base.boutiques![compte]?.achatsOvas ?? 0;
+      base.boutiques![compte] = { ...copie(boutique), achatsOvas: acquis, ovas: boutique.ovas + Math.max(0, acquis - (boutique.achatsOvas ?? 0)) }; sauver(); },
     async limiter(cle, maximum, fenetre, maintenant) {
       const debut = Math.floor(maintenant / fenetre) * fenetre;
       const ancien = base.debits[cle];

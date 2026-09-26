@@ -8932,3 +8932,14 @@ select:focus {
 .interface-fluide :is(.ballon-attente, .accueil-online-public i, .hero-canvas-skel) { animation: none; }
 .interface-fluide :is(.btn, .nav button, .manager-onglets button) { transition: color .1s, background-color .1s; }
 .interface-fluide :is(.manager-marche .carte, .manager-x-timeline .x-post) { content-visibility: auto; contain-intrinsic-size: auto 180px; }
+
+.overlay-match { padding:0; place-items:stretch; }
+.overlay-match .match-live { width:100%; height:100dvh; max-height:100dvh; border:0; border-radius:0; box-sizing:border-box; padding-bottom:env(safe-area-inset-bottom); }
+@media (max-width:850px) {
+ .x-app, .x-app.x-manager-embarque { width:100%; max-width:100%; height:auto; min-height:0; overflow:visible; }
+ .x-app .x-centre, .x-app .x-messagerie, .x-app .x-fil-messages { height:auto; min-height:0; overflow:visible; touch-action:pan-y; }
+ .x-app .x-tetes, .x-app .x-conversations { max-width:100%; min-width:0; overflow-x:auto; touch-action:pan-x pan-y; }
+ .x-app .x-conv { flex-shrink:0; }
+ .x-app .x-corps, .x-app .x-texte { min-width:0; overflow-wrap:anywhere; }
+ .manager-ovale { height:auto; min-height:0; overflow:visible; }
+}

@@ -1,3 +1,4 @@
+import { CelebrationLigue } from '../components/CelebrationLigue';
 import { AtelierKiri } from '../components/AtelierKiri';
 import { RoueCartes } from '../components/RoueCartes';
 // ═══════════════════════════════════════════════════════════════════════════
@@ -118,8 +119,8 @@ function legendeAffinite(a: AffiniteCarte): string {
   const compte = t('online.affinity.startersCount', { count: String(tailles[a.meilleure]), affinity: nomAffinite(a.meilleure) });
   // ⚠️ ON NE PROPOSE PAS DE PROGRÈS À QUI EST DÉJÀ AU MAXIMUM. « Il manque 3
   // joueurs de son club » sous un 10/10 se lit comme un reproche absurde.
-  const manque = a.points < COLLECTIF_MAX && a.club > 0 && a.club < 4
-    ? `\n${t('online.affinity.missingForMax', { count: String(4 - a.club) })}` : '';
+  const manque = a.points < COLLECTIF_MAX && a.club > 0 && a.club < 3
+    ? `\n${t('online.affinity.missingForMax', { count: String(3 - a.club) })}` : '';
   return `${entete}\n${compte}${manque}\n${detail}`;
 }
 
@@ -677,6 +678,7 @@ export function CarriereEnLigne() {
         {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme ?? vue.logo} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / {t('online.season', { n: vue.saison })}</span></div><h1>{vue.observateur ? t('online.spectator.mode') : club?.nom}</h1><p>{vue.rythme === 7 ? t('online.clubsDaily', { clubs: vue.clubs.length }) : t('online.clubsRate', { clubs: vue.clubs.length, matches: vue.rythme })} · {t(`online.phase.${vue.phase === 'salon' ? 'lobby' : vue.phase === 'saison' ? 'season' : 'break'}`)}</p></div>{vue.observateur ? <div className="cel-portefeuille"><Icone nom="oeil" taille={26} /><strong>{t('online.spectator.mode')}</strong><span>{t('online.spectator.readOnly')}</span></div> : <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>{t('online.balance')}</span></div>}</header>}
         {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')}>{[...navigation, ...(!vue.observateur && session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }, { id: 'administration' as const, label: 'Comptes & ligues', icone: 'profil' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
+          <CelebrationLigue key={vue.id} vue={vue} agir={agir} />
           {onglet === 'club' && <Bureau vue={vue} proprietaire={session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} proprietaire={session.compte.id === vue.createurId} notifier={setNotification} />}
           {onglet === 'composition' && <Composition key={vue.id} vue={vue} agir={agir} occupe={occupe} erreur={erreur} />}
@@ -1944,9 +1946,7 @@ function Calendrier({ vue, agir, occupe, suivre, proprietaire, notifier }: { vue
             colonnes au lieu de se lire comme une ligne. */}
         <p className="cel-fenetre">
           <Icone nom="chrono" taille={16} />
-          <span>{prochaine.ouvre > maintenant
-            ? t('online.calendar.windowOpensOn', { date: dateLongue(prochaine.ouvre), delay: delai(prochaine.ouvre) })
-            : t('online.calendar.playBefore', { date: dateLongue(prochaine.ferme), delay: delai(prochaine.ferme) })}</span>
+          <span>Coup d’envoi : {dateLongue(prochaine.ferme)}</span>
         </p>
         <small className="cel-note">{t('online.calendar.autoKickoffNote')}</small>
       </div>

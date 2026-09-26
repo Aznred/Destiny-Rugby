@@ -1,4 +1,5 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useState, useEffect } from 'react';
+import { acheterOvasStripe, etatPaiementsStripe } from '../lib/carriereEnLigneClient';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import {
@@ -32,6 +33,41 @@ const Objet3D = lazy(() =>
 );
 
 export function Boutique() {
+  const [paiement, setPaiement] = useState('');
+  const [achatEnCours, setAchatEnCours] = useState(false);
+  const [verification, setVerification] = useState(0);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('paiement') === 'annule') { setPaiement('Paiement annulé. Aucun achat effectué.'); return; }
+    const session = params.get('session_id');
+    if (params.get('paiement') !== 'retour' || !session) return;
+    let actif = true; let timer: ReturnType<typeof setTimeout>; let essais = 0;
+    setPaiement('Confirmation du paiement en cours…');
+    const verifier = async () => {
+      try {
+        const resultat = await etatPaiementsStripe(session);
+        if (!actif) return;
+        if (resultat.credite) {
+          window.dispatchEvent(new Event('destiny-compte-connecte'));
+          setPaiement('Paiement de test confirmé. Vos Ovas ont été ajoutés à votre compte.');
+          history.replaceState(null, '', location.pathname + location.hash);
+          return;
+        }
+        if (++essais < 40) timer = setTimeout(() => void verifier(), 3000);
+        else setPaiement('La confirmation prend plus de temps. Vous pouvez revenir ou vérifier à nouveau.');
+      } catch (e) { if (actif) setPaiement(e instanceof Error ? e.message : 'Vérification indisponible.'); }
+    };
+    void verifier();
+    return () => { actif = false; clearTimeout(timer); };
+  }, [verification]);
+  const acheter = async (pack: string) => {
+    if (achatEnCours) return;
+    setAchatEnCours(true); setPaiement('Ouverture du paiement sécurisé…');
+    try {
+      const resultat = await acheterOvasStripe(pack, crypto.randomUUID());
+      location.assign(resultat.url);
+    } catch (e) { setPaiement(e instanceof Error ? e.message : 'Paiement indisponible.'); setAchatEnCours(false); }
+  };
   const coins = useGame((s) => s.coins);
   const inventaire = useGame((s) => s.inventaire);
   const skinActif = useGame((s) => s.skinActif);
@@ -313,15 +349,16 @@ export function Boutique() {
       </div>
 
       <div className="eyebrow section-titre">{t('bo.recharges')}</div>
+      {paiement && <p role="status">{paiement} {new URLSearchParams(location.search).has('session_id') && <button className="btn fantome petit" onClick={() => setVerification(v => v + 1)}>Vérifier à nouveau</button>}</p>}
       <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
-        {t('bo.demoAide')}
+        Paiements en environnement de test Stripe : aucun débit réel.
       </p>
       <div className="grille-boutique">
         {PACKS.map((p) => (
           <div key={p.id} className="carte article pack">
             <div className="pack-ovas"><Icone nom="ova" taille={16} /> {p.ovas}</div>
             {p.bonus && <div className="pack-bonus">{p.bonus}</div>}
-            <button className="btn fantome petit" disabled title={t('bout.paiementDemo')}>
+            <button className="btn fantome petit" disabled={achatEnCours} onClick={() => void acheter(p.id)}>
               {p.prix}
             </button>
           </div>

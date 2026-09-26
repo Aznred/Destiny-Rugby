@@ -148,3 +148,6 @@ export function chargerCollectionCarriere(ligue: string, filtres: Record<string,
   const params = new URLSearchParams({ ...filtres, ligue, collection: '1' });
   return requete<PageCollection>(undefined, undefined, signal, `?${params}`);
 }
+
+export const acheterOvasStripe = (pack: string, tentative: string) => requete<{ url: string }>({ action: 'paiementOvas', pack, tentative });
+export const etatPaiementsStripe = (session: string) => requete<{ achatsOvas: number; credite: boolean }>(undefined, undefined, undefined, '?paiementEtat=1&session=' + encodeURIComponent(session));

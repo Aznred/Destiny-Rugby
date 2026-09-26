@@ -1,3 +1,4 @@
+import { creerPaiement } from './paiementsStripe.js';
 import { contexteAtelier, enregistrerAtelier, vueAtelier } from './atelierAdmin.js';
 import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
@@ -463,6 +464,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (action === 'deconnexion') {
         await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);
         return res.status(200).json({ ok: true });
+      }
+      if (action === 'paiementOvas') {
+        try { return res.status(200).json(await creerPaiement(compte.id, corps.pack, corps.tentative, stockage)); }
+        catch (e) { throw new ErreurHttp(400, e instanceof Error && !('type' in e) ? e.message : 'Stripe est temporairement indisponible. Réessayez plus tard.'); }
+      }
+      if (url.searchParams.has('paiementEtat')) {
+        const boutique = await stockage.boutique(compte.id);
+        return res.status(200).json({ achatsOvas: boutique?.achatsOvas ?? 0, credite: await stockage.achatCredite?.(url.searchParams.get('session') ?? '', compte.id) ?? false });
       }
       if (action === 'sauvegarderBoutique') {
         const boutique = validerEtatBoutiqueCompte(corps.boutique);

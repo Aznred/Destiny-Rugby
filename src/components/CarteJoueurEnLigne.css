@@ -52,17 +52,7 @@ button.cel-carte.dr-player:hover { box-shadow: none; filter: drop-shadow(0 9px 1
 .ct-fut-indicateurs { display: flex; justify-content: center; gap: 4px; align-items: center; font-size: 10px; color: var(--craie); background: #08160fd9; border-radius: 8px; padding: 2px; }
 .ct-fut-indicateurs svg { width: 9px; height: 9px; }
 .ct-fut-indicateurs i { font-style: normal; color: var(--or-400); }
-.ct-feuille-fut .manager-position { width: clamp(82px, 8vw, 104px); }
-.ct-feuille-fut .manager-terrain-xv { min-height: 1000px; }
-.ct-feuille-fut .manager-reserves > div { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; }
-.ct-feuille-fut .ct-reserve-fut { max-width: 180px; width: 100%; justify-self: center; }
-.ct-feuille-fut .ct-reserve-fut b, .ct-feuille-fut .ct-reserve-fut small { white-space: normal; }
 .ct-fut-raison { display: block; text-align: center; color: var(--danger); }
-@media(max-width: 650px) { .ct-feuille-fut .manager-position { width: clamp(56px, 17vw, 78px); } .ct-feuille-fut .manager-terrain-xv { min-height: 860px; } }
-.ct-feuille-fut .manager-banc-cartes { display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,104px));justify-content:center;gap:12px; }
-.ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut { width:100%;max-width:104px;min-width:0; }
-.ct-feuille-fut .manager-reserves > div { grid-template-columns:repeat(auto-fill,minmax(84px,104px));justify-content:center;gap:12px; }
-.ct-feuille-fut .ct-reserve-fut { max-width:104px; }
 
 /* ── Layout FUT Squad Builder avec onglets Banc / Réserves et défilement horizontal ── */
 .ct-feuille-fut[data-groupe="banc"] > .manager-reserves,

@@ -60,6 +60,7 @@ function EcranEnRoute() {
 }
 
 export default function App() {
+  useEffect(() => { if (new URLSearchParams(location.search).has('paiement')) useGame.getState().setEcran('boutique'); }, []);
   const animationsMenus = usePreferencesInterface(s => s.animationsMenus);
   useEffect(() => { document.documentElement.classList.toggle('interface-fluide', !animationsMenus); }, [animationsMenus]);
   const ecran = useGame((s) => s.ecran);

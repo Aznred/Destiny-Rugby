@@ -748,6 +748,7 @@ interface GameState {
   joueur: Joueur | null;
   journal: EntreeJournal[];
   coins: number;
+  achatsOvas: number;
   /** Collection de cartes commune au compte local, independante des carrieres. */
   collectionSolo: EtatCollectionSolo;
   inventaire: string[];
@@ -1293,6 +1294,7 @@ export const useGame = create<GameState>()(
       joueur: null,
       journal: [],
       coins: 0,
+      achatsOvas: 0,
       collectionSolo: chargerAncienneCollectionSolo(),
       inventaire: ['classique'],
       skinActif: 'classique',
@@ -7354,6 +7356,7 @@ export const useGame = create<GameState>()(
         definirCleGroqJoueur(etat?.groqKey ?? '');
       },
       partialize: projectionMemoisee((s: GameState) => ({
+        achatsOvas: s.achatsOvas,
         joueur: s.joueur,
         // ⚠️ SANS CETTE LIGNE, UNE CARRIÈRE D’ENTRAÎNEUR DISPARAÎT AU
         //    RECHARGEMENT. Attrapé en jouant : un rechargement de page, et le

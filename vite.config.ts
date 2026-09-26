@@ -22,6 +22,24 @@ function carriereEnDeveloppement(): Plugin {
     name: 'destiny-carriere-dev',
     apply: 'serve',
     configureServer(serveur) {
+      serveur.middlewares.use('/api/stripe-webhook', (req, res) => {
+        void (async () => {
+          if (req.method !== 'POST') { res.statusCode=405; res.end(); return; }
+          try {
+            const { stockageFichier } = await serveur.ssrLoadModule('/serveur/carriereFichier.ts');
+            const { recevoirWebhookStripe } = await serveur.ssrLoadModule('/serveur/paiementsStripe.ts');
+            stockage ??= stockageFichier('node_modules/.destiny/carriere.json');
+            const morceaux: Buffer[] = []; let taille=0;
+            for await (const morceau of req) {
+              const b=Buffer.from(morceau); taille+=b.length;
+              if(taille>1_048_576) { res.statusCode=413; res.end(); return; }
+              morceaux.push(b);
+            }
+            await recevoirWebhookStripe(Buffer.concat(morceaux), String(req.headers['stripe-signature'] ?? ''), stockage);
+            res.end('ok');
+          } catch (e) { res.statusCode=(e as {type?:string}).type === 'StripeSignatureVerificationError' ? 400 : 500; res.end('Notification non traitée'); }
+        })();
+      });
       serveur.middlewares.use('/api/carriere', (req, res, suite) => {
         void (async () => {
           try {

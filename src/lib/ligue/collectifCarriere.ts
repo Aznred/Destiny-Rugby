@@ -19,10 +19,10 @@
 //   • un joueur regarde COMBIEN DE COÉQUIPIERS DU XV il retrouve, pour chacune
 //     des trois affinités — même CLUB RÉEL, même NATION, même CHAMPIONNAT ;
 //   • il garde sa MEILLEURE des trois, jamais la somme ;
-//   • le club monte beaucoup plus vite : QUATRE JOUEURS DU MÊME CLUB SUFFISENT
-//     À METTRE CES QUATRE-LÀ AU MAXIMUM. C'est ce qui rend une équipe HYBRIDE
+//   • le club monte beaucoup plus vite : TROIS JOUEURS DU MÊME CLUB SUFFISENT
+//     À METTRE CES TROIS-LÀ AU MAXIMUM. C'est ce qui rend une équipe HYBRIDE
 //     jouable — un bloc toulousain au milieu d'un XV cosmopolite reste payant ;
-//   • une nation ou un championnat partagés par tout le XV donnent 100.
+//   • cinq joueurs de même nation ou sept de même championnat ont 10/10.
 //
 // ⚠️ LE BANC NE COMPTE PAS. Ni comme bénéficiaire, ni comme partenaire. Un
 // remplaçant ne joue pas les 80 minutes et n'a pas à gonfler le total parce
@@ -40,18 +40,16 @@ export type Affinite = 'club' | 'nation' | 'championnat';
 /**
  * ⚠️ LES PALIERS, ET ILS SE LISENT DE HAUT EN BAS. Chaque ligne est
  * `[taille du groupe, points]`, la première atteinte gagne. La taille COMPTE LE
- * JOUEUR LUI-MÊME : « club 4 » veut dire quatre joueurs du même club sur la
+ * JOUEUR LUI-MÊME : « club 3 » veut dire trois joueurs du même club sur la
  * feuille, lui compris — la formulation demandée en jeu.
  *
- * Le club grimpe en trois marches parce qu'il est rare et cher à réunir ; la
- * nation et le championnat demandent la moitié du XV pour valoir autant, et
- * les trois quarts pour valoir le maximum. Le championnat démarre plus bas que
- * la nation : partager le Top 14 à deux ne veut pas dire grand-chose.
+ * Le club grimpe vite : TROIS joueurs du même club suffisent au maximum.
+ * La nation demande CINQ joueurs pour le maximum, et le championnat SEPT.
  */
 const PALIERS: Readonly<Record<Affinite, readonly (readonly [number, number])[]>> = {
-  club: [[4, 10], [3, 8], [2, 5]],
-  nation: [[11, 10], [8, 8], [6, 6], [4, 4], [2, 2]],
-  championnat: [[11, 10], [8, 8], [6, 6], [4, 4], [2, 1]],
+  club: [[3, 10], [2, 6]],
+  nation: [[5, 10], [4, 7], [3, 4], [2, 2]],
+  championnat: [[7, 10], [5, 7], [4, 4], [3, 2], [2, 1]],
 };
 
 export interface AffiniteCarte {

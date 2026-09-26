@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+let modalesOuvertes = 0;
+let ancienDebordement = '';
+
 const SELECTEUR_FOCUS = [
   'button:not([disabled])',
   'a[href]',
@@ -20,6 +23,7 @@ export function useModalDialog(onFermer: () => void) {
     const overlay = overlayRef.current;
     const dialogue = dialogRef.current;
     if (!overlay || !dialogue) return;
+    if (modalesOuvertes++ === 0) { ancienDebordement = document.body.style.overflow; document.body.style.overflow = 'hidden'; }
 
     const precedent = document.activeElement instanceof HTMLElement
       ? document.activeElement
@@ -68,6 +72,7 @@ export function useModalDialog(onFermer: () => void) {
 
     return () => {
       document.removeEventListener('keydown', clavier, true);
+      if (--modalesOuvertes === 0) document.body.style.overflow = ancienDebordement;
       for (const { element, inert, ariaHidden } of autres) {
         element.inert = inert;
         if (ariaHidden == null) element.removeAttribute('aria-hidden');

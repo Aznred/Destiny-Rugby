@@ -102,7 +102,7 @@ import { LARGEUR, LONGUEUR, borner, type Vec } from '../lib/moteur/terrain';
 import { corpsPourAffichage, porteurPourAffichage } from '../lib/moteur/dynamique';
 import { Camera, COUVERTURE, angleDeVue, type Cadrage, type Vue } from '../lib/moteur/camera';
 import {
-  facteurTempo, momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
+  momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
 } from '../lib/moteur/moments';
 import {
   DELAI_DECISION, REJEU, REPOS_DECISION, decisionPour, delaiDeCarte,
@@ -865,7 +865,8 @@ export function MatchLive({
         return;
       }
 
-      avancer(e, dtReel * facteurTempo(tempo, enMoment));
+      e.carriereDixMinutes = true;
+      avancer(e, dtReel);
       // Une blessure du groupe du manager se produit pendant le match : le
       // joueur reste au sol, le banc est appelé et le premier diagnostic ne
       // sera connu qu'après la sirène. Le tirage est séparé du RNG sportif afin
@@ -1334,19 +1335,19 @@ export function MatchLive({
                         <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * (0.58 + ballon.h * 0.04)} ry={rayon * (0.32 + ballon.h * 0.02)} fill="rgba(0,0,0,.32)" />
                       )}
                       {ballon.h > 1.2 && (
-                        <ellipse cx={ballon.x} cy={ballon.y - ballon.h * 2.2} rx={rayon * (1.2 + ballon.h * 0.12)} ry={rayon * (0.8 + ballon.h * 0.08)} fill="rgba(255,245,180,.25)" />
+                        <ellipse cx={ballon.x} cy={ballon.y - ballon.h * 2.2} rx={(0.5 + Math.min(ballon.h, 8) * 0.03)} ry={(0.3 + Math.min(ballon.h, 8) * 0.02)} fill="rgba(255,245,180,.25)" />
                       )}
                       <g transform={`rotate(${rotationBallon.toFixed(1)} ${ballon.x} ${ballon.y - ballon.h * 2.2})`}>
                         <ellipse
                           className="ml-ballon"
                           cx={ballon.x}
                           cy={ballon.y - ballon.h * 2.2}
-                          rx={rayon * 0.68 + ballon.h * 0.2}
-                          ry={rayon * 0.43 + ballon.h * 0.14}
-                          fill="#f4e3c0" stroke="#3a2410" strokeWidth={rayon * 0.2}
+                          rx={0.3 + Math.min(ballon.h, 8) * 0.025}
+                          ry={0.18 + Math.min(ballon.h, 8) * 0.015}
+                          fill="#f4e3c0" stroke="#3a2410" strokeWidth={0.05}
                         />
                         <path d={`M ${ballon.x - rayon * .2} ${ballon.y - ballon.h * 2.2} L ${ballon.x + rayon * .2} ${ballon.y - ballon.h * 2.2}`}
-                          stroke="#80552d" strokeWidth={rayon * .08} strokeLinecap="round" />
+                          stroke="#80552d" strokeWidth={0.025} strokeLinecap="round" />
                       </g>
                     </>}
                     {/* ---------- 💬 CE QU'ILS SE DISENT ----------
@@ -1734,16 +1735,16 @@ export function MatchLive({
               )}
               {!e.fini && (
                 <div className="ml-tempos">
-                  {TEMPOS.filter((v) => v.id !== 'decisions' || !!monPion).map((v) => (
+                  {TEMPOS.filter((v) => v.id === 'suivre' || (v.id === 'decisions' && !!monPion)).map((v) => (
                     <button
                       key={v.id}
                       type="button"
                       className={`ml-tempo${tempo === v.id ? ' actif' : ''}`}
-                      title={t(v.aide)}
-                      aria-label={t(v.cle)}
+                      title={v.id === 'suivre' ? 'Environ dix minutes, à vitesse naturelle' : t(v.aide)}
+                      aria-label={v.id === 'suivre' ? 'Temps réel' : t(v.cle)}
                       onClick={() => setTempo(v.id)}
                     >
-                      <b>{v.emoji}</b><span>{t(v.cle)}</span>
+                      <b>{v.emoji}</b><span>{v.id === 'suivre' ? 'Temps réel' : t(v.cle)}</span>
                     </button>
                   ))}
                   <button
