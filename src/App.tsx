@@ -1,6 +1,5 @@
-import { lazy, Suspense, useEffect, useState, useRef } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import YouTube from 'react-youtube';
 import './App.css';
 import { Analytics } from '@vercel/analytics/react'
 import { useGame } from './store/useGame';
@@ -60,118 +59,7 @@ function EcranEnRoute() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// 🎵 LECTEUR MUSICAL INVISIBLE (AUTOPLAY & NOTIFICATION 5 SECONDES)
-// ---------------------------------------------------------------------------
-function LecteurMusical() {
-  const [player, setPlayer] = useState<any>(null);
-  const [aDemarre, setADemarre] = useState(false);
-  const [trackInfo, setTrackInfo] = useState<{ titre: string; artiste: string } | null>(null);
-  const [notificationVisible, setNotificationVisible] = useState(false);
-  // Correction TypeScript appliquée ici :
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const playlistId = 'PLm90DCMQmtlkBigTzyX97RPgTL90ZYELs';
-  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
-  useEffect(() => {
-    if (!player) return;
-    const visibilite = () => { if (document.hidden) player.pauseVideo(); else if (aDemarre) player.playVideo(); };
-    document.addEventListener('visibilitychange', visibilite);
-    return () => document.removeEventListener('visibilitychange', visibilite);
-  }, [player, aDemarre]);
-
-  // Détecte le tout premier clic du joueur n'importe où sur la page
-  useEffect(() => {
-    const lancerMusique = () => {
-      if (player && !aDemarre) {
-        setADemarre(true);
-        player.nextVideo(); // Sélectionne une piste aléatoire grâce au shuffle
-      }
-    };
-
-    window.addEventListener('click', lancerMusique);
-    return () => window.removeEventListener('click', lancerMusique);
-  }, [player, aDemarre]);
-
-  const onReady = (event: any) => {
-    setPlayer(event.target);
-    event.target.setShuffle(true); // Prépare le mélange en arrière-plan
-    event.target.setVolume(12);    // <-- AJOUTEZ CETTE LIGNE (15% du volume)
-  };
-
-  const onStateChange = (event: any) => {
-    // État 1 = Une musique vient de démarrer
-    if (event.data === 1) {
-      const data = event.target.getVideoData();
-      if (data && data.title) {
-        setTrackInfo({ titre: data.title, artiste: data.author });
-        setNotificationVisible(true);
-
-        // Nettoie l'ancien décompte si la musique change vite
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-        // Fait disparaître la notification au bout de 5 secondes
-        timeoutRef.current = setTimeout(() => {
-          setNotificationVisible(false);
-        }, 5000);
-      }
-    }
-  };
-
-  return (
-    <>
-      {/* Lecteur YouTube 100% CACHÉ */}
-      <div style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0 }}>
-        <YouTube 
-          opts={{ playerVars: { listType: 'playlist', list: playlistId, autoplay: 0 } }}
-          onReady={onReady}
-          onStateChange={onStateChange}
-        />
-      </div>
-
-      {/* NOTIFICATION SUBTILE (Texte seul + Fondu) */}
-      <AnimatePresence>
-        {notificationVisible && trackInfo && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }} /* Un fondu un peu plus lent et doux */
-            style={{
-              position: 'fixed',
-              bottom: '20px',
-              left: '20px',
-              zIndex: 9999,
-              pointerEvents: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              color: 'rgba(255, 255, 255, 0.8)', // Blanc légèrement transparent
-              textShadow: '0 2px 4px rgba(0,0,0,0.8)' // Ombre pour rester lisible sans fond
-            }}
-          >
-            {/* Petite icône musicale */}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-            </svg>
-            
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <strong style={{ fontSize: '13px', margin: 0, lineHeight: 1.2, fontWeight: 500, letterSpacing: '0.5px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {trackInfo.titre}
-              </strong>
-              <span style={{ fontSize: '10px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '1px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {trackInfo.artiste.replace(' - Topic', '')}
-              </span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
-  );
-}
-
 export default function App() {
-  const musique = usePreferencesInterface(s => s.musique);
   const animationsMenus = usePreferencesInterface(s => s.animationsMenus);
   useEffect(() => { document.documentElement.classList.toggle('interface-fluide', !animationsMenus); }, [animationsMenus]);
   const ecran = useGame((s) => s.ecran);
@@ -335,8 +223,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* TON NOUVEAU LECTEUR MUSICAL GLOBAL */}
-      {musique && <LecteurMusical />}
 
       <Analytics/>
     </div>
