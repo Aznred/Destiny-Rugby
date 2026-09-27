@@ -8,6 +8,7 @@ export interface ApparenceMatch {
   tailleCm: number;
   poidsKg: number;
   peau: string;
+  yeux: string;
   cheveux: string;
   coiffure: CoiffureMatch;
   barbe: 'none' | 'moustache' | 'goatee' | 'short_beard' | 'full_beard';
@@ -34,7 +35,9 @@ const PROFIL_POSTE: Record<PosteId, [number, number, MorphologieMatch]> = {
 
 const PEAUX = ['#efc19d', '#d99b72', '#b87550', '#8f573b', '#633d2f', '#4a3028'];
 const CHEVEUX = ['#171311', '#2c1d17', '#4c2f20', '#72503a', '#b07d4f'];
-const COIFFURES: CoiffureMatch[] = ['buzz', 'short', 'fade', 'curly', 'afro', 'messy'];
+const YEUX = ['#49301f', '#654530', '#3e5361', '#4f6247', '#6c5435'];
+const COIFFURES: CoiffureMatch[] = ['bald', 'buzz', 'short', 'fade', 'curly', 'afro', 'mullet', 'mohawk', 'messy', 'long', 'dreadlocks'];
+const BARBES: ApparenceMatch['barbe'][] = ['none', 'none', 'none', 'none', 'moustache', 'goatee', 'short_beard', 'full_beard'];
 
 export function normaliserNomMatch(texte: string): string {
   return texte.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -53,12 +56,13 @@ export function apparenceJoueurMatch(nom: string, poste: PosteId): ApparenceMatc
   const h = graineVisuelleMatch(`${cle}:${poste}`);
   const [taille, poids, morphologie] = PROFIL_POSTE[poste] ?? PROFIL_POSTE.arriere;
   return {
-    tailleCm: generee?.tailleCm ?? taille + (h % 7) - 3,
-    poidsKg: generee?.poidsKg ?? poids + ((h >>> 4) % 9) - 4,
+    tailleCm: generee?.tailleCm ?? taille + (h % 15) - 7,
+    poidsKg: generee?.poidsKg ?? poids + ((h >>> 4) % 19) - 9,
     peau: generee?.peau ?? PEAUX[(h >>> 8) % PEAUX.length],
+    yeux: generee?.yeux ?? YEUX[(h >>> 6) % YEUX.length],
     cheveux: generee?.cheveux ?? CHEVEUX[(h >>> 12) % CHEVEUX.length],
     coiffure: generee?.coiffure ?? COIFFURES[(h >>> 16) % COIFFURES.length],
-    barbe: generee?.barbe ?? 'none',
+    barbe: generee?.barbe ?? BARBES[(h >>> 20) % BARBES.length],
     morphologie,
   };
 }

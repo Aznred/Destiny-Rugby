@@ -1,1 +1,6 @@
-{}
+{
+  "antoine dupont": { "coiffure": "messy", "barbe": "short_beard", "yeux": "#624633" },
+  "tadhg furlong": { "peau": "#b77669", "coiffure": "short", "barbe": "none", "yeux": "#577283" },
+  "eben etzebeth": { "peau": "#ba8579", "coiffure": "messy", "barbe": "full_beard", "yeux": "#624633" },
+  "sevu reece": { "coiffure": "buzz", "barbe": "none", "yeux": "#624633" }
+}

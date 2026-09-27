@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 const projet = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.resolve(projet, '..', 'sprite et sprite generator', 'src');
 const destination = path.join(projet, 'src', 'lib', 'spritesGenerateur');
-const fichiers = ['models.ts', 'engine.ts', 'renderer.ts', 'rugbyAnimations.ts'];
+// Les animations du jeu contiennent des séquences supplémentaires absentes de
+// l'atelier autonome : la synchronisation ne doit pas les effacer.
+const fichiers = ['models.ts', 'engine.ts', 'renderer.ts'];
 
 await fs.mkdir(destination, { recursive: true });
 for (const fichier of fichiers) {
@@ -28,12 +30,6 @@ for (const fichier of fichiers) {
     contenu = contenu
       .replace("import { Character, JointId, SkeletonPose, Vec2 } from './models'", "import type { Character, JointId, SkeletonPose, Vec2 } from './models'")
       .replace("import { SkeletonResult, computeSkeleton } from './engine'", "import { computeSkeleton } from './engine'\nimport type { SkeletonResult } from './engine'");
-  }
-  if (fichier === 'rugbyAnimations.ts') {
-    contenu = contenu.replace(
-      "import { AnimationClip, BallAttachment, Character, ProjectData, SkeletonPose, clone, createFrame, createRestPose } from './models'",
-      "import { clone, createFrame, createRestPose } from './models'\nimport type { AnimationClip, BallAttachment, Character, ProjectData, SkeletonPose } from './models'",
-    );
   }
   await fs.writeFile(path.join(destination, fichier), contenu);
 }

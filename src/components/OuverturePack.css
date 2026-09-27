@@ -105,7 +105,7 @@
 .pack-show-beams { opacity:.45; }
 .pack-show-flash { background: radial-gradient(ellipse,#fff8e4 0%,color-mix(in srgb,var(--pack-color) 65%,transparent) 12%,transparent 60%); animation: pack-soft-light 1.6s both; }
 @keyframes pack-soft-light { 0%,100% {opacity:0} 38% {opacity:.18} 65% {opacity:.55} }
-@keyframes pack-release { 0%,45% {opacity:1;filter:brightness(1)} 65% {opacity:1;filter:brightness(1.4)} 100% {opacity:0;filter:brightness(1.1)} }
+@keyframes pack-release { 0%,45% {opacity:1;filter:brightness(1)} 65% {opacity:1;filter:brightness(1.4)} 100% {opacity:.75;filter:brightness(1.1)} }
 @media(max-width:600px) { .pack-show-card,.pack-show-card:has(.dr-player) {width:118px;min-height:0} .pack-show-card.meilleure,.pack-show-card.meilleure:has(.dr-player) {width:158px} .pack-show-cardback b {font-size:42px} }
 .cel-pack-slider { min-width:0; }
 .cel-slider-navigation { display:flex;align-items:center;justify-content:center;gap:24px;margin:22px 0 10px; }

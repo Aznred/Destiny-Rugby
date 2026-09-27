@@ -4,7 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import { Box3, Group, Vector3 } from 'three';
 import type { RareteCarriere } from '../lib/ligue/typesCarriere';
-import { modelePack, PALIERS_PACK } from '../lib/presentationPacks';
+import { modelePack } from '../lib/presentationPacks';
 
 class Repli3D extends Component<{ children: ReactNode }, { erreur: boolean }> {
   state = { erreur: false };
@@ -69,7 +69,7 @@ function Modele({ url, calme, transition }: { url: string; calme: boolean; trans
 
 // ⚠️ Le préchargement des pochettes NE VIT PAS ICI : il partirait avec le
 // module 3D qu'il est justement censé devancer. Voir `lib/prechargementPacks.ts`.
-export default function Pack3D({ rarete, ouvert, calme, transition }: { rarete: RareteCarriere; ouvert: boolean; calme: boolean; transition: string }) {
+export default function Pack3D({ rarete, modele, ouvert, calme, transition }: { rarete: RareteCarriere; modele?: string; ouvert: boolean; calme: boolean; transition: string }) {
   const [deplie, setDeplie] = useState(false);
   useEffect(() => {
     if (!ouvert) { setDeplie(false); return; }
@@ -77,14 +77,12 @@ export default function Pack3D({ rarete, ouvert, calme, transition }: { rarete: 
     return () => clearTimeout(timer);
   }, [ouvert, calme]);
   useEffect(() => {
-    useGLTF.preload(modelePack(rarete, true));
-    const suivante = PALIERS_PACK[PALIERS_PACK.indexOf(rarete) + 1];
-    if (suivante) useGLTF.preload(modelePack(suivante));
-  }, [rarete]);
+    if (!modele) useGLTF.preload(modelePack(rarete, true));
+  }, [rarete, modele]);
   return <Repli3D><Canvas camera={{ position: [0, 0, 5.5], fov: 43 }} dpr={[1, 1.5]} frameloop={calme ? 'demand' : 'always'} gl={{ alpha: true, antialias: true }}>
     <ambientLight intensity={1.8} />
     <directionalLight position={[3, 4, 5]} intensity={3.5} />
     <directionalLight position={[-3, 1, 2]} intensity={2} color="#b7dfff" />
-    <Suspense fallback={null}><Modele url={modelePack(rarete, ouvert && deplie)} calme={calme} transition={transition} /></Suspense>
+    <Suspense fallback={null}><Modele url={modele ?? modelePack(rarete, ouvert && deplie)} calme={calme} transition={transition} /></Suspense>
   </Canvas></Repli3D>;
 }

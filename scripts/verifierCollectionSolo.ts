@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { catalogueBaseCarriere, PACKS_CARRIERE } from '../src/lib/ligue/catalogueCarriere';
-import { cleCarteSolo, etatCollectionSoloVide, IDS_PACKS_SOLO_GRATUITS, normaliserCollectionSolo, ouvrirPackSolo, packCollectionSolo, prixPackSolo } from '../src/lib/collectionSolo';
-import { apparencePack } from '../src/lib/presentationPacks';
+import { cleCarteSolo, etatCollectionSoloVide, IDS_PACKS_SOLO_GRATUITS, normaliserCollectionSolo, ouvrirPackSolo, packCollectionSolo, packsCollectionSolo, prixPackSolo } from '../src/lib/collectionSolo';
+import { apparencePack, IDS_PACKS_AVEC_SKIN, modelePackParNom } from '../src/lib/presentationPacks';
 import { clubsProfessionnelsAmicaux, composerEquipeClubProfessionnel, convertirEnCoequipiers } from '../src/lib/amicalCollection';
 import { creerMatch } from '../src/lib/moteur/moteur';
 import {
@@ -10,7 +10,12 @@ import {
 } from '../src/lib/moteur/arcade';
 
 const catalogue = catalogueBaseCarriere();
-assert.ok(PACKS_CARRIERE.length >= 30, 'Tous les packs du jeu doivent etre proposes dans la roue solo.');
+assert.ok(PACKS_CARRIERE.length >= 30, 'Le catalogue complet des packs doit rester disponible pour la ligue.');
+const packsSolo = packsCollectionSolo(PACKS_CARRIERE);
+assert.deepEqual(packsSolo.map(pack => pack.id), PACKS_CARRIERE.filter(pack => IDS_PACKS_AVEC_SKIN.includes(pack.id as typeof IDS_PACKS_AVEC_SKIN[number])).map(pack => pack.id), 'La collection solo ne propose que les packs avec skin spécial.');
+assert.ok(packsSolo.every(pack => modelePackParNom(pack).includes('/packs-speciaux/')), 'Chaque pack solo doit afficher sa propre pochette.');
+assert.ok(!packsSolo.some(pack => ['bronze', 'or'].includes(pack.id)), 'Les packs génériques sans skin sortent de la roue solo.');
+assert.deepEqual(packsSolo.filter(pack => IDS_PACKS_SOLO_GRATUITS.includes(pack.id as typeof IDS_PACKS_SOLO_GRATUITS[number])).map(pack => pack.id), ['standard'], 'Seul le pack Argent avec skin reste gratuit dans la roue solo.');
 assert.equal(new Set(PACKS_CARRIERE.map(pack => pack.id)).size, PACKS_CARRIERE.length, 'Chaque pack doit avoir un identifiant unique.');
 assert.ok(catalogue.length > 10_000, 'Le catalogue mondial complet doit etre disponible hors ligne.');
 assert.deepEqual([...IDS_PACKS_SOLO_GRATUITS], ['bronze', 'standard', 'or']);
@@ -103,4 +108,4 @@ const cleDouble = cleCarteSolo(catalogue[premier.indices[0]].sourceId);
 assert.ok(premier.etat.quantites[cleDouble] > 1, 'La quantite possedee doit conserver les doublons.');
 
 assert.equal(Object.values(etat.packsOuverts).reduce((somme, valeur) => somme + valeur, 0), PACKS_CARRIERE.length);
-console.log(`OK — collection de compte verifiee sur ${catalogue.length} joueurs, trois packs gratuits et doublons actifs.`);
+console.log(`OK — collection de compte verifiee sur ${catalogue.length} joueurs, packs avec skin et doublons actifs.`);

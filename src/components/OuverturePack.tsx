@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CarteCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { creerSonsPacks } from '../lib/sonsPacks';
-import { nomRaretePack, PALIERS_PACK, rangPack } from '../lib/presentationPacks';
+import { PALIERS_PACK, rangPack } from '../lib/presentationPacks';
 import { t } from '../lib/i18n';
 import './OuverturePack.css';
 
@@ -15,16 +15,16 @@ import './OuverturePack.css';
 const Pack3D = lazy(() => import('./Pack3D'));
 
 const COULEURS = ['#d59a64', '#d7e6f2', '#ffd15b', '#54e4ff', '#ff4057'];
-export default function OuverturePack({ cartes, pack, garantie, onFermer, rendreCarte }: {
+export default function OuverturePack({ cartes, pack, modele, garantie, onFermer, rendreCarte }: {
   /**
    * ⚠️ `null` VEUT DIRE « LE SERVEUR N'A PAS ENCORE RÉPONDU », et c'est un état
    * normal, pas une erreur. La pochette s'affiche AVANT que les cartes soient
    * connues : sans ça, le clic restait sans effet pendant tout l'aller-retour —
    * une seconde et demie sur un téléphone en 5G, plus au réveil de la fonction
-   * serverless — et le jeu paraissait figé. Le manager touche la pochette
-   * pendant ce temps ; les cartes arrivent avant qu'il ait fini son geste.
+   * serverless — et le jeu paraissait figé. L'animation démarre au clic d'achat ;
+   * les cartes rejoignent l'écran dès que le serveur les a tirées.
    */
-  cartes: CarteCarriere[] | null; pack: string; garantie?: RareteCarriere; onFermer: () => void; rendreCarte: (carte: CarteCarriere) => ReactNode;
+  cartes: CarteCarriere[] | null; pack: string; modele?: string; garantie?: RareteCarriere; onFermer: () => void; rendreCarte: (carte: CarteCarriere) => ReactNode;
 }) {
   const pret = cartes !== null;
   // L'écran final reprend la lecture d'un pack de football : la tête d'affiche
@@ -32,15 +32,12 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
   // conserver le suspense, la cascade les retourne dans l'autre sens et finit
   // donc toujours par la meilleure.
   const ordre = useMemo(() => cartes ? [...cartes].sort((a,b) => rangPack(b)-rangPack(a) || b.note-a.note) : [], [cartes]);
-  const plancher = Math.max(0, PALIERS_PACK.indexOf(garantie ?? 'bronze'));
-  // Tant que les cartes ne sont pas là, le sommet EST le plancher : la pochette
-  // s'affiche à la couleur promise, et la montée en palier attend de savoir.
-  const maximum = cartes ? Math.max(plancher, ...cartes.map(rangPack)) : plancher;
-  const [rang, setRang] = useState(plancher);
-  const [phase, setPhase] = useState<'attente'|'charge'|'evolution'|'ouverture'|'cartes'>('attente');
+  // La rareté du contenu reste cachée jusqu'aux cartes. La pochette garde son skin.
+  const rang = Math.max(0, PALIERS_PACK.indexOf(garantie ?? 'bronze'));
+  const [phase, setPhase] = useState<'ouverture'|'cartes'>('ouverture');
+  const [animationFinie, setAnimationFinie] = useState(false);
   const [revelees, setRevelees] = useState(0);
   const [carteActive, setCarteActive] = useState(0);
-  const [impatient, setImpatient] = useState(false);
   const [instant, setInstant] = useState(false);
   const [muet, setMuet] = useState(false);
   const [calme, setCalme] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -48,23 +45,24 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
   const dialogue = useRef<HTMLDivElement>(null);
   const principale = useRef<HTMLButtonElement>(null);
   const cartesRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const verrou = useRef(false);
   const toutes = pret && revelees >= ordre.length;
   const rarete = PALIERS_PACK[rang];
   useEffect(() => {
     const precedent = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden'; principale.current?.focus();
+    document.body.style.overflow = 'hidden'; dialogue.current?.focus();
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
     const changer = () => setCalme(media.matches); media.addEventListener('change', changer);
     return () => { document.body.style.overflow = overflow; precedent?.focus(); sons.detruire(); media.removeEventListener('change', changer); };
   }, [sons]);
   useEffect(() => {
-    let timer: number | undefined;
-    if (phase === 'charge') timer = window.setTimeout(() => { setRang(n => n+1); setPhase('evolution'); }, calme ? 120 : 440);
-    if (phase === 'evolution') timer = window.setTimeout(() => { verrou.current = false; setPhase('attente'); }, calme ? 120 : 660);
-    if (phase === 'ouverture') timer = window.setTimeout(() => setPhase('cartes'), calme ? 250 : 1600);
-    if (phase === 'cartes' && !toutes) timer = window.setTimeout(() => {
+    if (phase !== 'ouverture' || animationFinie) return;
+    const timer = window.setTimeout(() => setAnimationFinie(true), calme ? 250 : 1600);
+    return () => clearTimeout(timer);
+  }, [phase, calme, animationFinie]);
+  useEffect(() => {
+    if (phase !== 'cartes' || toutes) return;
+    const timer = window.setTimeout(() => {
       const index = ordre.length - 1 - revelees;
       sons.carte(rangPack(ordre[index]));
       setRevelees(n => n+1);
@@ -95,32 +93,16 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
     }
   }, [phase, revelees, ordre.length, calme]);
 
-  /**
-   * ⚠️ LE GESTE EST MÉMORISÉ, IL N'EST PAS PERDU. Si le manager touche la
-   * pochette avant que le serveur ait répondu, on ne refuse pas le clic et on
-   * n'affiche pas d'attente : on retient l'intention et on la rejoue dès que
-   * les cartes arrivent. Refuser aurait obligé à toucher deux fois, sans
-   * jamais dire pourquoi la première n'avait rien fait.
-   */
-  const demarrer = useRef<() => void>(() => {});
-  demarrer.current = () => {
-    verrou.current = true;
-    if (rang < maximum) { sons.palier(rang+1); setPhase('charge'); }
-    else { sons.ouvrir(rang); setPhase('ouverture'); }
-  };
   useEffect(() => {
-    if (pret && impatient && phase === 'attente' && !verrou.current) { setImpatient(false); demarrer.current(); }
-  }, [pret, impatient, phase]);
-
-  function action() {
-    if (verrou.current || phase !== 'attente') return;
-    sons.activer();
-    if (!pret) { setImpatient(true); return; }
-    demarrer.current();
-  }
+    sons.ouvrir(rang);
+  }, [sons, rang]);
+  useEffect(() => {
+    if (pret && animationFinie) setPhase('cartes');
+  }, [pret, animationFinie]);
+  useEffect(() => { if (phase === 'cartes') principale.current?.focus(); }, [phase]);
   function passer() {
-    if (!pret) { setImpatient(true); return; }
-    setInstant(true); sons.arreter(); setRang(maximum); setPhase('cartes'); setRevelees(ordre.length);
+    if (!pret) return;
+    setInstant(true); sons.arreter(); setPhase('cartes'); setRevelees(ordre.length);
   }
   function selectionnerCarte(index: number, focus = false) {
     const debut = Math.max(0, ordre.length - revelees);
@@ -137,30 +119,23 @@ export default function OuverturePack({ cartes, pack, garantie, onFermer, rendre
       if (e.key === 'Escape') {
         e.preventDefault();
         if (phase === 'cartes' && toutes) onFermer();
-        else if (!pret) setImpatient(true);
-        else { setInstant(true); sons.arreter(); setRang(maximum); setPhase('cartes'); setRevelees(ordre.length); }
+        else if (pret) { setInstant(true); sons.arreter(); setPhase('cartes'); setRevelees(ordre.length); }
       }
     };
     window.addEventListener('keydown', clavier);
-    if (!dialogue.current?.contains(document.activeElement)) principale.current?.focus();
+    if (!dialogue.current?.contains(document.activeElement)) (principale.current ?? dialogue.current)?.focus();
     return () => window.removeEventListener('keydown', clavier);
-  }, [phase, toutes, maximum, ordre.length, onFermer, muet, sons, pret]);
-  const conseil = phase === 'ouverture' ? t('online.shop.opening')
-    : phase === 'charge' ? t('online.pack.upgrading')
-      : phase === 'evolution' ? nomRaretePack(rarete)+' !'
-        : impatient ? t('online.shop.opening') : t('online.pack.touch');
-  return createPortal(<div ref={dialogue} className={`pack-show phase-${phase} palier-${rarete}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
+  }, [phase, toutes, ordre.length, onFermer, muet, sons, pret]);
+  return createPortal(<div ref={dialogue} tabIndex={-1} className={`pack-show phase-${phase} palier-${rarete}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
     if (e.key === 'Tab') { const elements = Array.from(dialogue.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') ?? []); const premier = elements[0], dernier = elements[elements.length-1]; if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); } }
   }}><main className="pack-show-main cel-panneau">
-    <div className="pack-show-heading"><p className="eyebrow">Pack {pack}{cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : ''}</p><h2 id="pack-show-title" key={`${phase}-${rang}`} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : nomRaretePack(rarete)}</h2></div>
+    <div className="pack-show-heading"><p className="eyebrow">Pack {pack}{cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : ''}</p><h2 id="pack-show-title" key={phase} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : pack}</h2></div>
     {phase !== 'cartes' ? <><div className="pack-show-stage">
       <div className="pack-show-beams" aria-hidden="true"/><div className="pack-show-orbit" aria-hidden="true"/>
       <div className="pack-show-particles" key={rang} aria-hidden="true">{Array.from({length:28}, (_,i) => <i key={i} style={{'--x':`${i*37%100}%`, '--delay':`${i%9*-.35}s`, '--duration':`${2+i%4}s`, '--drift':`${(i%2?1:-1)*(20+i*3)}px`} as CSSProperties}/>)}</div>
-      <div className="pack-show-model"><Suspense fallback={null}><Pack3D rarete={rarete} ouvert={phase === 'ouverture'} calme={calme} transition={phase}/></Suspense></div>
-      <button ref={principale} className="pack-show-touch" aria-label={`Pack ${nomRaretePack(rarete)} — ${t('online.pack.touch')}`} aria-disabled={phase !== 'attente'} onClick={action}/>
-      {(phase === 'charge' || phase === 'evolution') && <div className="pack-show-upgrade" key={phase} aria-hidden="true"><i/><i/><span/></div>}
+      <div className="pack-show-model"><Suspense fallback={null}><Pack3D rarete={rarete} modele={modele} ouvert={phase === 'ouverture'} calme={calme} transition={phase}/></Suspense></div>
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}
-    </div><p className="pack-show-hint" aria-live="polite">{conseil}</p></> : <div className="pack-show-results" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
+    </div><p className="pack-show-hint" aria-live="polite">{t('online.shop.opening')}</p></> : <div className="pack-show-results" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
       const visible = i >= ordre.length - revelees;
       const meilleure = i === 0;
       const active = i === carteActive;

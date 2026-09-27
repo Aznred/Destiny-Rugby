@@ -57,7 +57,7 @@ import { CollectionLigue } from '../components/CollectionLigue';
 import { WikiLigue } from '../components/WikiLigue';
 import OuverturePack from '../components/OuverturePack';
 import { prechargerOuverturePack } from '../lib/prechargementPacks';
-import { NOMS_PACK, apparencePack, nomPackCarriere, nomRaretePack } from '../lib/presentationPacks';
+import { NOMS_PACK, modelePackParNom, packAvecSkin, nomPackCarriere, nomRaretePack } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { BancDessaiSituations } from '../components/BancDessaiSituations';
 import Pack3D from '../components/Pack3D';
@@ -1711,7 +1711,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
 export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
   const packsDuJour = packsBoutiqueDuJour(vue.packs, Date.now(), vue.rotationPacks === true);
-  const [ouverture, setOuverture] = useState<{ cartes: CarteCarriere[] | null; pack: string; garantie?: VueCarriereEnLigne['packs'][number]['garantie'] } | null>(null);
+  const [ouverture, setOuverture] = useState<{ cartes: CarteCarriere[] | null; pack: string; modele?: string; garantie?: VueCarriereEnLigne['packs'][number]['garantie'] } | null>(null);
   /**
    * ⚠️ LE MODULE 3D ARRIVE PENDANT QU'ON REGARDE LE PRÉSENTOIR. Il pesait
    * son import dynamique EN PLUS de l'aller-retour serveur, l'un après
@@ -1736,8 +1736,8 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
     if (achatEnCours.current || ouverture) return;
     achatEnCours.current = true;
     const pack = vue.packs.find(p => p.id === packId);
-    if (pack) prechargerOuverturePack(apparencePack(pack));
-    setOuverture({ cartes: null, pack: `${nomPack}${suffixe}`, garantie: pack?.garantie });
+    if (pack) prechargerOuverturePack(pack);
+    setOuverture({ cartes: null, pack: `${nomPack}${suffixe}`, modele: pack && packAvecSkin(pack.id) ? modelePackParNom(pack) : undefined, garantie: pack?.garantie });
     try {
       const avant = new Set(vue.transactions.map(t => t.id));
       const suivante = await agir(commande);
@@ -1767,14 +1767,14 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
 
     <section className="cel-packs-quotidiens">
       <div className="cel-packs-quotidiens-tete"><div><div className="eyebrow">{t('online.shop.dailyBoost')}</div><h3>{t('online.shop.freePacksCount', { count: packsGratuits.length })}</h3><p>{vue.phase === 'salon' ? t('online.shop.dailyLobbyHelp') : t('online.shop.dailySeasonHelp')}</p></div><strong>{t('online.shop.dailyRate')}</strong></div>
-      {packsGratuits.length ? <div className="cel-packs-gratuits-liste">{packsGratuits.slice(0, 20).map(attribution => { const pack = vue.packs.find(p => p.id === attribution.packId); return pack ? <button key={attribution.id} disabled={occupe || ouverture !== null} onPointerEnter={() => prechargerOuverturePack(apparencePack(pack))} onFocus={() => prechargerOuverturePack(apparencePack(pack))} onClick={() => { void ouvrirGratuit(attribution.id, pack.id, nomPackCarriere(pack)); }}><span className={`cel-pack-gratuit-sceau ${pack.garantie ?? 'bronze'}`}><Icone nom="cadeau" taille={17} /></span><b>{nomPackCarriere(pack)}</b><small>{t('online.shop.freePackLabel')}</small></button> : null; })}</div> : <p className="cel-note">{vue.phase === 'salon' ? t('online.shop.emptyLobby') : t('online.shop.emptySeason')}</p>}
+      {packsGratuits.length ? <div className="cel-packs-gratuits-liste">{packsGratuits.slice(0, 20).map(attribution => { const pack = vue.packs.find(p => p.id === attribution.packId); return pack ? <button key={attribution.id} disabled={occupe || ouverture !== null} onPointerEnter={() => prechargerOuverturePack(pack)} onFocus={() => prechargerOuverturePack(pack)} onClick={() => { void ouvrirGratuit(attribution.id, pack.id, nomPackCarriere(pack)); }}><span className={`cel-pack-gratuit-sceau ${pack.garantie ?? 'bronze'}`}><Icone nom="cadeau" taille={17} /></span><b>{nomPackCarriere(pack)}</b><small>{t('online.shop.freePackLabel')}</small></button> : null; })}</div> : <p className="cel-note">{vue.phase === 'salon' ? t('online.shop.emptyLobby') : t('online.shop.emptySeason')}</p>}
       {packsGratuits.length > 20 && <small className="cel-note">{t('online.shop.morePacksNote', { count: packsGratuits.length - 20 })}</small>}
     </section>
 
     <div className="cel-note">{t('online.shop.basePacksNote')}</div>
     <BoutiquePacks3D packs={packsDuJour} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={ouvrir} />
 
-    {ouverture && <OuverturePack cartes={ouverture.cartes} pack={ouverture.pack} garantie={ouverture.garantie} rendreCarte={carte => <CarteJoueurEnLigne carte={carte} />} onFermer={() => setOuverture(null)} />}
+    {ouverture && <OuverturePack cartes={ouverture.cartes} pack={ouverture.pack} modele={ouverture.modele} garantie={ouverture.garantie} rendreCarte={carte => <CarteJoueurEnLigne carte={carte} />} onFermer={() => setOuverture(null)} />}
   </>;
 }
 

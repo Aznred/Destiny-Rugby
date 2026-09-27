@@ -56,6 +56,11 @@ const ellipseAt = (ctx: CanvasRenderingContext2D, center: Vec2, rx: number, ry: 
 }
 
 const midpoint = (a: Vec2, b: Vec2, amount = .5): Vec2 => ({ x: a.x + (b.x-a.x)*amount, y: a.y + (b.y-a.y)*amount })
+const darken = (hex: string, factor: number) => {
+  const value = Number.parseInt(hex.replace('#', ''), 16)
+  if (!Number.isFinite(value)) return '#554137'
+  return `#${[16, 8, 0].map(shift => Math.round(((value >> shift) & 255) * factor).toString(16).padStart(2, '0')).join('')}`
+}
 
 export class CharacterRenderer {
   draw(ctx: CanvasRenderingContext2D, character: Character, pose: SkeletonPose, options: RenderOptions): SkeletonResult {
@@ -90,13 +95,14 @@ export class CharacterRenderer {
     const a = character.appearance, j = s.joints, d=spriteDimensions(character)
     ctx.save();ctx.shadowColor='transparent';ellipseAt(ctx,{x:j.pelvis.x,y:s.rig.thigh+s.rig.shin+9},17*SPRITE_SCALE,4*SPRITE_SCALE,0,'rgba(0,0,0,.18)','');ctx.restore()
     const far: 'left' | 'right' = pose.orientation === 'back' || pose.orientation === 'right' ? 'right' : 'left'
+    const near = far === 'left' ? 'right' : 'left'
     this.drawLeg(ctx, far, j, d, a)
-    this.drawArm(ctx, far, j, d, a)
-    this.drawLeg(ctx, far === 'left' ? 'right' : 'left', j, d, a)
+    this.drawLeg(ctx, near, j, d, a)
     line(ctx,{x:j.neck.x,y:j.neck.y-4*SPRITE_SCALE},midpoint(j.leftShoulder,j.rightShoulder,.5),d.neckW,d.neckW+SPRITE_SCALE,a.skin,5*SPRITE_SCALE)
     this.drawTorso(ctx, j, d, character)
     this.drawShorts(ctx,j,d,a)
-    this.drawArm(ctx, far === 'left' ? 'right' : 'left', j, d, a)
+    this.drawArm(ctx, far, j, d, a)
+    this.drawArm(ctx, near, j, d, a)
     this.drawHead(ctx, j, s, d, character, pose)
     this.drawBall(ctx, pose, j)
     if(pose.refereeCard){const hand=pose.refereeCardHand==='left'?'leftHand':'rightHand';ctx.save();ctx.translate(j[hand].x,j[hand].y);ctx.rotate((s.angles[hand]??0)+Math.PI/2);ctx.fillStyle=pose.refereeCard==='red'?'#f53536':'#ffdf25';ctx.fillRect(-10,-25,20,29);ctx.strokeStyle='#392a16';ctx.lineWidth=1.5;ctx.strokeRect(-10,-25,20,29);ctx.restore()}
@@ -108,8 +114,28 @@ export class CharacterRenderer {
     const sockStart=midpoint(knee,ankle,.48)
     line(ctx,knee,sockStart,d.legL,d.legL-SPRITE_SCALE,a.skin,5*SPRITE_SCALE)
     line(ctx,sockStart,ankle,d.legL+SPRITE_SCALE,d.legL,a.kit.socks,5*SPRITE_SCALE);flatJoint(ctx,sockStart,d.legL,a.kit.socks)
-    const dx=foot.x-ankle.x,dy=foot.y-ankle.y,length=Math.hypot(dx,dy)||1,bootEnd={x:ankle.x+dx/length*(d.footSize+3*SPRITE_SCALE),y:ankle.y+dy/length*(d.footSize+3*SPRITE_SCALE)}
-    line(ctx,ankle,bootEnd,d.footSize+SPRITE_SCALE,4*SPRITE_SCALE,a.kit.boots,SPRITE_SCALE);flatJoint(ctx,ankle,d.footSize,a.kit.boots)
+    this.drawBoot(ctx, ankle, foot, d, a)
+  }
+
+  private drawBoot(ctx: CanvasRenderingContext2D, ankle: Vec2, foot: Vec2, d: SpriteDimensions, a: Character['appearance']) {
+    const length=Math.max(20,Math.hypot(foot.x-ankle.x,foot.y-ankle.y)+4*SPRITE_SCALE)
+    const height=d.footSize*.72
+    const accent=a.kit.accent
+    ctx.save();ctx.translate(ankle.x,ankle.y);ctx.rotate(Math.atan2(foot.y-ankle.y,foot.x-ankle.x))
+    // La semelle et ses crampons restent lisibles même à l'échelle du terrain.
+    polygon(ctx,[{x:-4,y:height*.42},{x:length+3,y:height*.42},{x:length+6,y:height*.76},{x:length+3,y:height*.94},{x:-4,y:height*.94}], '#090d10')
+    ctx.fillStyle='#b5b9b4'
+    ctx.fillRect(length*.16,height*.9,4*SPRITE_SCALE,3*SPRITE_SCALE)
+    ctx.fillRect(length*.72,height*.9,4*SPRITE_SCALE,3*SPRITE_SCALE)
+    polygon(ctx,[{x:-5,y:height*.36},{x:-3,y:-height*.34},{x:length*.27,y:-height*.72},{x:length*.58,y:-height*.57},{x:length+3,y:-height*.12},{x:length+6,y:height*.39},{x:length+2,y:height*.62},{x:0,y:height*.62}],a.kit.boots)
+    polygon(ctx,[{x:length*.62,y:-height*.45},{x:length+3,y:-height*.12},{x:length+6,y:height*.38},{x:length*.81,y:height*.34}],darken(a.kit.boots,.72))
+    ctx.fillStyle=accent
+    ctx.fillRect(length*.12,-height*.43,length*.26,2*SPRITE_SCALE)
+    ctx.fillRect(-4,-height*.23,3*SPRITE_SCALE,height*.48)
+    ctx.fillStyle='#e9e9de'
+    for(let i=0;i<3;i++)ctx.fillRect(length*(.28+i*.105),-height*(.46-i*.07),3*SPRITE_SCALE,1.5*SPRITE_SCALE)
+    ctx.fillStyle='#58616a';ctx.fillRect(length*.73,height*.42,length*.18,1.4*SPRITE_SCALE)
+    ctx.restore()
   }
 
   private drawArm(ctx: CanvasRenderingContext2D, side: 'left'|'right', j: SkeletonResult['joints'], d:SpriteDimensions, a: Character['appearance']) {
@@ -127,8 +153,11 @@ export class CharacterRenderer {
 
   private drawTorso(ctx: CanvasRenderingContext2D, j: SkeletonResult['joints'], d:SpriteDimensions, character: Character) {
     const kit=character.appearance.kit,{length,side,down}=this.bodyBasis(j),t=-length-5*SPRITE_SCALE,b=4*SPRITE_SCALE,lt=-d.torsoTop/2,rt=d.torsoTop/2,lb=-d.torsoBottom/2,rb=d.torsoBottom/2
-    ctx.save();ctx.transform(side.x,side.y,down.x,down.y,j.pelvis.x,j.pelvis.y);polygon(ctx,[{x:lt,y:t},{x:rt,y:t},{x:rb,y:b},{x:lb,y:b}],kit.primary)
-    ctx.beginPath();ctx.moveTo(lt,t);ctx.lineTo(rt,t);ctx.lineTo(rb,b);ctx.lineTo(lb,b);ctx.closePath();ctx.clip();ctx.fillStyle=kit.secondary
+    const belly=Math.max(0,Math.min(1.5,character.appearance.body.belly??0))*12*SPRITE_SCALE
+    const waistY=t+(b-t)*.64
+    const outline=[{x:lt,y:t},{x:rt,y:t},{x:rb+belly,y:waistY},{x:rb+belly*.52,y:b},{x:lb-belly*.52,y:b},{x:lb-belly,y:waistY}]
+    ctx.save();ctx.transform(side.x,side.y,down.x,down.y,j.pelvis.x,j.pelvis.y);polygon(ctx,outline,kit.primary)
+    ctx.beginPath();ctx.moveTo(outline[0].x,outline[0].y);for(const point of outline.slice(1))ctx.lineTo(point.x,point.y);ctx.closePath();ctx.clip();ctx.fillStyle=kit.secondary
     switch(kit.pattern){
       case 'HOOPS':case 'HORIZONTAL_STRIPES':for(let y=t+7*SPRITE_SCALE;y<b;y+=9*SPRITE_SCALE)ctx.fillRect(lt,y,rt-lt,4*SPRITE_SCALE);break
       case 'VERTICAL_STRIPES':ctx.fillRect(-4*SPRITE_SCALE,t,8*SPRITE_SCALE,b-t);break
@@ -142,24 +171,45 @@ export class CharacterRenderer {
 
   private drawShorts(ctx:CanvasRenderingContext2D,j:SkeletonResult['joints'],d:SpriteDimensions,a:Character['appearance']) {
     const {side,down}=this.bodyBasis(j),hip=midpoint(j.leftHip,j.rightHip),offsetX=(hip.x-j.pelvis.x)*side.x+(hip.y-j.pelvis.y)*side.y,offsetY=(hip.x-j.pelvis.x)*down.x+(hip.y-j.pelvis.y)*down.y,t=offsetY-3*SPRITE_SCALE,b=offsetY+d.shortsH*.7
-    const waist=d.torsoBottom/2+SPRITE_SCALE,hem=waist+SPRITE_SCALE
+    const waist=d.torsoBottom/2+SPRITE_SCALE+(a.body.belly??0)*6*SPRITE_SCALE,hem=waist+SPRITE_SCALE
     ctx.save();ctx.transform(side.x,side.y,down.x,down.y,j.pelvis.x,j.pelvis.y);polygon(ctx,[{x:offsetX-waist,y:t},{x:offsetX+waist,y:t},{x:offsetX+hem,y:b},{x:offsetX+2*SPRITE_SCALE,y:b},{x:offsetX,y:b-4*SPRITE_SCALE},{x:offsetX-2*SPRITE_SCALE,y:b},{x:offsetX-hem,y:b}],a.kit.shorts);ctx.restore()
   }
 
   private drawHead(ctx: CanvasRenderingContext2D, j: SkeletonResult['joints'], s: SkeletonResult, d:SpriteDimensions, character: Character, pose: SkeletonPose) {
     const a=character.appearance,angle=(s.angles.head ?? 0)+Math.PI/2,u=d.headH/18,w=d.headW,h=d.headH
-    ctx.save();ctx.translate(Math.round(j.head.x),Math.round(j.head.y));ctx.rotate(angle);ctx.fillStyle=a.skin;ctx.fillRect(-w/2,-h/2,w,h);ctx.fillStyle=a.hair.color
-    const hair=a.hair.style
-    if(hair==='buzz')ctx.fillRect(-w/2,-10*u,w,4*u)
-    else if(hair==='short'){ctx.fillRect(-w/2-u,-11*u,w+2*u,6*u);ctx.fillRect(-w/2-u,-7*u,4*u,6*u)}
-    else if(hair==='fade'){ctx.fillRect(-w/2,-10*u,w,4*u);ctx.fillRect(-w/4,-13*u,w/2,4*u)}
-    else if(hair==='curly'){for(let x=-6*u;x<=6*u;x+=4*u)ctx.fillRect(x,-12*u-Math.round(Math.abs(x/u)/5)*u,5*u,5*u)}
-    else if(hair==='afro'){ctx.beginPath();ctx.arc(0,-6*u,w*.72,Math.PI,Math.PI*2);ctx.fill()}
-    else if(hair==='mullet'){ctx.fillRect(-w/2,-11*u,w,6*u);ctx.fillRect(-w/2,-6*u,4*u,13*u)}
-    else if(hair!=='bald'){ctx.fillRect(-w/2-u,-11*u,w+2*u,6*u);ctx.fillRect(-w/2-u,-7*u,4*u,6*u)}
+    ctx.save();ctx.translate(Math.round(j.head.x),Math.round(j.head.y));ctx.rotate(angle)
+    ctx.fillStyle=a.skin;ctx.fillRect(-w/2,-h/2,w,h)
+    const hair=a.hair.style, hairColor=a.hair.color, hairShade=darken(hairColor,.72)
+    ctx.fillStyle=hairColor
+    if(hair==='buzz') ctx.fillRect(-w/2,-10*u,w,3*u)
+    else if(hair==='short'){ctx.fillRect(-w/2-u,-11*u,w+2*u,5*u);ctx.fillRect(-w/2-u,-7*u,3*u,5*u)}
+    else if(hair==='fade'){ctx.fillRect(-w/2,-10*u,w,2*u);ctx.fillRect(-w*.32,-13*u,w*.64,6*u);ctx.fillStyle=hairShade;ctx.fillRect(-w/2,-7*u,2*u,4*u);ctx.fillRect(w/2-2*u,-7*u,2*u,4*u)}
+    else if(hair==='curly'){for(let x=-w/2;x<w/2;x+=3*u){ctx.beginPath();ctx.arc(x+2*u,-8*u-(Math.round(x/u)%2)*u,3*u,0,Math.PI*2);ctx.fill()}}
+    else if(hair==='afro'){ctx.beginPath();ctx.ellipse(0,-8*u,w*.69,h*.39,0,Math.PI,Math.PI*2);ctx.fill();ctx.fillRect(-w*.58,-8*u,w*1.16,4*u)}
+    else if(hair==='mullet'){ctx.fillRect(-w/2-u,-11*u,w+2*u,5*u);ctx.fillRect(-w/2-u,-6*u,3*u,14*u);ctx.fillRect(w/2-2*u,-6*u,3*u,14*u)}
+    else if(hair==='mohawk'){ctx.fillRect(-w*.2,-15*u,w*.4,9*u);ctx.fillRect(-w*.34,-10*u,w*.68,3*u)}
+    else if(hair==='messy'){ctx.fillRect(-w/2,-10*u,w,4*u);for(let x=-w/2;x<w/2;x+=4*u)ctx.fillRect(x,-13*u-(Math.round(x/u)%3)*u,4*u,6*u)}
+    else if(hair==='long'){ctx.fillRect(-w/2-u,-11*u,w+2*u,5*u);ctx.fillRect(-w/2-2*u,-8*u,4*u,17*u);ctx.fillRect(w/2-2*u,-8*u,4*u,17*u)}
+    else if(hair==='dreadlocks'){ctx.fillRect(-w/2-u,-11*u,w+2*u,5*u);for(let x=-w/2-2*u;x<=w/2;x+=4*u)ctx.fillRect(x,-7*u,2*u,12*u+(Math.round(x/u)%2)*3*u)}
     if(pose.orientation!=='back'){
-      const facingLeft=pose.orientation==='left';ctx.fillStyle=a.skin;ctx.fillRect(facingLeft?-w/2-3*u:w/2-u,-u,4*u,4*u);ctx.fillStyle='#1D1714';ctx.fillRect(facingLeft?-4*u:2*u,-3*u,2*u,2*u)
-      if(a.facialHair.style!=='none'){ctx.fillStyle=a.facialHair.color;ctx.fillRect(-4*u,3*u,8*u,3*u);if(a.facialHair.style!=='moustache'){ctx.fillRect(-5*u,5*u,10*u,5*u);ctx.fillRect(-3*u,9*u,6*u,3*u)}}
+      const side=pose.orientation==='left'||pose.orientation==='right', facingLeft=pose.orientation==='left'
+      ctx.fillStyle=a.skin;ctx.fillRect(facingLeft?-w/2-2*u:w/2-u,-u,3*u,4*u)
+      const eyeColor=a.eyes??'#60412d', eyeY=-2*u
+      for(const x of side?[facingLeft?-3*u:2*u]:[-4*u,2*u]){
+        ctx.fillStyle=hairShade;ctx.fillRect(x-u,eyeY-3*u,4*u,u)
+        ctx.fillStyle='#f5eee4';ctx.fillRect(x,eyeY,3*u,2*u)
+        ctx.fillStyle=eyeColor;ctx.fillRect(x+u,eyeY,2*u,2*u)
+        ctx.fillStyle='#171412';ctx.fillRect(x+u,eyeY,u,u)
+      }
+      ctx.fillStyle=darken(a.skin,.83);ctx.fillRect(side?(facingLeft?-w*.36:w*.28):-u,u,2*u,2*u)
+      ctx.fillStyle=darken(a.skin,.67);ctx.fillRect(-2*u,5*u,4*u,u)
+      ctx.fillStyle=a.facialHair.color
+      if(a.facialHair.style==='moustache'||a.facialHair.style==='goatee'||a.facialHair.style==='short_beard'||a.facialHair.style==='full_beard'){
+        ctx.fillRect(-5*u,3*u,4*u,2*u);ctx.fillRect(u,3*u,4*u,2*u)
+      }
+      if(a.facialHair.style==='goatee')ctx.fillRect(-3*u,6*u,6*u,5*u)
+      if(a.facialHair.style==='short_beard'){ctx.fillRect(-w*.45,5*u,3*u,4*u);ctx.fillRect(w*.45-3*u,5*u,3*u,4*u);ctx.fillRect(-w*.4,8*u,w*.8,2*u)}
+      if(a.facialHair.style==='full_beard'){ctx.fillRect(-w*.48,4*u,4*u,7*u);ctx.fillRect(w*.48-4*u,4*u,4*u,7*u);ctx.fillRect(-w*.48,8*u,w*.96,5*u)}
     }
     ctx.restore()
   }

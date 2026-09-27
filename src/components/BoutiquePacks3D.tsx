@@ -4,7 +4,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { Html, useGLTF } from '@react-three/drei';
 import { Box3, Group, Vector3 } from 'three';
 import type { PackCarriere } from '../lib/ligue/typesCarriere';
-import { modelePack, nomPackCarriere, nomRaretePack, apparencePack } from '../lib/presentationPacks';
+import { modelePack, modelePackParNom, packAvecSkin, nomPackCarriere, nomRaretePack, apparencePack } from '../lib/presentationPacks';
 import { nombre, t } from '../lib/i18n';
 import './BoutiquePacks3D.css';
 const modulo = (n:number, max:number) => ((n % max) + max) % max;
@@ -15,7 +15,7 @@ class Protection extends Component<{children:ReactNode; secours:ReactNode},{erre
   render(){return this.state.erreur ? this.props.secours : this.props.children;}
 }
 function Pochette({pack,slot,mouvement,achat,surToucher,gratuit}: {pack:PackCarriere;slot:number;mouvement:MutableRefObject<Mouvement>;achat:string|null;surToucher:(slot:number)=>void;gratuit:boolean}) {
-  const {scene}=useGLTF(modelePack(apparencePack(pack)), '/draco/');
+  const {scene}=useGLTF(modelePackParNom(pack), '/draco/');
   const ref=useRef<Group>(null);
   const etiquette=useRef<HTMLSpanElement>(null);
   const clone=useMemo(()=>{const obj=scene.clone(true);const box=new Box3().setFromObject(obj,true);const size=box.getSize(new Vector3());const center=box.getCenter(new Vector3());const scale=2.8/Math.max(size.x,size.y,size.z);const g=new Group();g.add(obj);g.scale.setScalar(scale);g.position.copy(center.multiplyScalar(-scale));return g;},[scene]);
@@ -42,14 +42,9 @@ export default function BoutiquePacks3D({packs,solde,occupe,onOuvrir,gratuit=fal
   const pack=packs[selection % packs.length];
   const idsGratuits=useMemo(()=>new Set(packsGratuits),[packsGratuits]);
   const packGratuit=gratuit||idsGratuits.has(pack?.id);
-  /**
-   * ⚠️ LA POCHETTE OUVERTE ARRIVE PENDANT QU'ON HÉSITE. Les cinq pochettes
-   * FERMÉES sont déjà en mémoire — c'est ce présentoir qui les affiche. La
-   * variante OUVERTE, elle, n'était demandée qu'à la révélation : 1,2 Mo au
-   * pire moment. On la prend pour le pack qui est SOUS LES YEUX, jamais pour
-   * les dix — ce serait douze mégaoctets pour une seule pochette vue.
-   */
-  useEffect(()=>{if(pack)useGLTF.preload(modelePack(apparencePack(pack),true));},[pack]);
+  // Les skins dédiés sont déjà chargés par le présentoir. Les packs génériques
+  // préchargent aussi leur variante ouverte avant le clic.
+  useEffect(()=>{if(pack && !packAvecSkin(pack.id))useGLTF.preload(modelePack(apparencePack(pack),true));},[pack]);
   /**
    * ⚠️ PLUS DE PAUSE AVANT D'APPELER LE SERVEUR. Un `setTimeout` de 380 ms
    * s'exécutait AVANT `onOuvrir`, pour laisser le présentoir zoomer sur la

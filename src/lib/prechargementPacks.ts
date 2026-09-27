@@ -6,8 +6,8 @@
 //
 //   1. une pause décorative de 380 ms avant même d'appeler le serveur ;
 //   2. l'aller-retour serveur, pendant lequel RIEN ne s'affichait ;
-//   3. l'import dynamique du module 3D, puis le téléchargement de la pochette
-//      OUVERTE — 1,2 Mo demandés une fois la modale déjà à l'écran.
+//   3. l'import dynamique du module 3D, puis le téléchargement du modèle
+//      nécessaire à la révélation.
 //
 // La pause a disparu, la modale s'ouvre au clic sans attendre la réponse, et ce
 // module s'occupe du troisième point : il réchauffe le morceau 3D et les
@@ -19,24 +19,26 @@
 // dans le bundle principal. Les deux imports sont donc DYNAMIQUES : rien n'est
 // téléchargé tant que personne n'entre dans la boutique.
 
-import { modelePack } from './presentationPacks';
-import type { RareteCarriere } from './ligue/typesCarriere';
+import { apparencePack, modelePack, modelePackParNom, packAvecSkin } from './presentationPacks';
+import type { PackCarriere } from './ligue/typesCarriere';
 
 /**
- * Réchauffe ce qu'il faut pour montrer une pochette.
+ * Réchauffe ce qu'il faut pour montrer la pochette du pack choisi.
  *
- * ⚠️ UNE RARETÉ, PAS LES CINQ. Sans précision on ne prend que le bronze :
- * télécharger les dix variantes ferait douze mégaoctets pour une pochette dont
- * une seule sera vue — et sur un forfait mobile, c'est le manager qui paie.
+ * Sans pack précis on ne prend que le bronze générique : télécharger tout le
+ * catalogue ferait dépenser des données pour des pochettes non consultées.
  * Appelé sans risque plusieurs fois : `useGLTF.preload` et l'import dynamique
  * sont tous deux idempotents.
  */
-export function prechargerOuverturePack(rarete?: RareteCarriere): void {
+export function prechargerOuverturePack(pack?: PackCarriere): void {
   void import('../components/Pack3D').catch(() => {});
   void import('@react-three/drei').then(({ useGLTF }) => {
-    for (const r of rarete ? [rarete] : (['bronze'] as RareteCarriere[])) {
-      useGLTF.preload(modelePack(r));
-      useGLTF.preload(modelePack(r, true));
+    if (pack) {
+      useGLTF.preload(modelePackParNom(pack));
+      if (!packAvecSkin(pack.id)) useGLTF.preload(modelePack(apparencePack(pack), true));
+    } else {
+      useGLTF.preload(modelePack('bronze'));
+      useGLTF.preload(modelePack('bronze', true));
     }
   }).catch(() => {});
 }

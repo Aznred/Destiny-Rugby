@@ -22,3 +22,14 @@ export function nomPackCarriere(pack: Pick<PackCarriere, 'id' | 'nom'>): string 
 }
 export const rangPack = (carte: CarteCarriere) => PALIERS_PACK.indexOf(carte.rarete);
 export const modelePack = (rarete: RareteCarriere, ouvert = false) => `/m3d/packs/${rarete}-${ouvert ? 'ouvert' : 'ferme'}.glb`;
+/** Une pochette dédiée reste identique quelle que soit la rareté des cartes tirées. */
+export const IDS_PACKS_AVEC_SKIN = [
+  'allBlacks', 'nationsCeltes', 'rugbyChampionship', 'international', 'pumas',
+  'iles', 'premium', 'europeEmergente', 'wallabies', 'top14', 'franceXV',
+  'grand', 'standard', 'sixNations',
+] as const;
+const idsAvecSkin = new Set<string>(IDS_PACKS_AVEC_SKIN);
+export const packAvecSkin = (id: string): boolean => idsAvecSkin.has(id);
+export function modelePackParNom(pack: PackCarriere): string {
+  return packAvecSkin(pack.id) ? `/m3d/packs-speciaux/${pack.id}.glb` : modelePack(apparencePack(pack));
+}

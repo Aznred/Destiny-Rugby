@@ -1,5 +1,6 @@
 import type { PackCarriere, RareteCarriere } from './ligue/typesCarriere';
 import type { SourceCarte } from './ligue/catalogueCarriere';
+import { packAvecSkin } from './presentationPacks';
 
 export interface EtatCollectionSolo {
   /** Nombre d'exemplaires possedes, indexe par l'empreinte stable du joueur. */
@@ -114,7 +115,7 @@ export function packCollectionSolo(pack: PackCarriere): PackCarriere {
 }
 
 export function packsCollectionSolo(packs: readonly PackCarriere[]): PackCarriere[] {
-  return packs.map(packCollectionSolo);
+  return packs.filter(pack => packAvecSkin(pack.id)).map(packCollectionSolo);
 }
 
 /** Une empreinte stable sur 64 bits : la collection survit aux reordonnancements du catalogue. */

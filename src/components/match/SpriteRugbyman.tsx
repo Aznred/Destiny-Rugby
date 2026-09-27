@@ -5,7 +5,8 @@ import { apparenceJoueurMatch, graineVisuelleMatch, type MaillotMatch } from '..
 import { CharacterRenderer } from '../../lib/spritesGenerateur/renderer';
 import { mirrorPose, poseAtTime } from '../../lib/spritesGenerateur/engine';
 import { rugbyAnimations } from '../../lib/spritesGenerateur/rugbyAnimations';
-import type { AnimationClip, BodyType, Character, KitPattern, Orientation } from '../../lib/spritesGenerateur/models';
+import type { AnimationClip, Character, KitPattern, Orientation } from '../../lib/spritesGenerateur/models';
+import { morphologieSprite } from '../../lib/moteur/morphologieSprite';
 import { orientationSprite } from '../../lib/moteur/orientationSprite';
 import type { PosteId } from '../../types';
 
@@ -34,10 +35,6 @@ interface Props {
 const MOTIFS: Record<MaillotMatch['motif'], KitPattern> = {
   uni: 'SOLID', cerceaux: 'HOOPS', rayures: 'VERTICAL_STRIPES',
   epaules: 'SHOULDERS', bande: 'CHEST_STRIPE', diagonale: 'DIAGONAL',
-};
-
-const TYPES: Record<ReturnType<typeof apparenceJoueurMatch>['morphologie'], BodyType> = {
-  pilier: 'prop', avant: 'forward', athletique: 'athletic', arriere: 'back', ailier: 'winger',
 };
 
 function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: boolean): AnimationRugby {
@@ -124,21 +121,14 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
 function personnage(pion: PionDirect, maillot: MaillotMatch): Character {
   const a = apparenceJoueurMatch(pion.nom, pion.poste);
   const tailleCm = pion.tailleCm ?? a.tailleCm, poidsKg = pion.poidsKg ?? a.poidsKg;
-  const taille = Math.max(.84, Math.min(1.18, tailleCm / 184));
-  const largeur = Math.max(.70, Math.min(1.48, poidsKg / (tailleCm - 87)));
-  const muscle = .86 + (pion.force ?? 60) / 330;
+  const morphologie = morphologieSprite(tailleCm, poidsKg, pion.force ?? 60, a.morphologie);
   return {
     id: pion.id, name: pion.nom, position: pion.poste,
     appearance: {
-      skin: a.peau, bodyType: TYPES[a.morphologie],
+      skin: a.peau, eyes: a.yeux, bodyType: morphologie.type,
       hair: { style: a.coiffure, color: a.cheveux },
       facialHair: { style: a.barbe, color: a.cheveux },
-      body: {
-        height: taille, torsoLength: 1, torsoWidth: largeur,
-        shoulderWidth: Math.max(.8, largeur * muscle), armLength: 1,
-        armThickness: Math.sqrt(largeur) * muscle, legLength: 1,
-        legThickness: Math.sqrt(largeur) * muscle, headScale: Math.max(.92, Math.min(1.08, 1 / taille)),
-      },
+      body: morphologie.corps,
       kit: {
         primary: maillot.principal, secondary: maillot.secondaire, accent: maillot.accent,
         pattern: MOTIFS[maillot.motif], shorts: maillot.short,
@@ -197,7 +187,7 @@ function dessinerSprite(
   }
   renderer.draw(ctx, character, pose, {
     width: LARGEUR_CANVAS, height: HAUTEUR_CANVAS, zoom,
-    pan: { x: 0, y: 2 }, showField: false, showSkeleton: false,
+    pan: { x: 0, y: 2 - (character.appearance.body.height - 1) * 35 }, showField: false, showSkeleton: false,
   });
 }
 

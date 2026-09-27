@@ -64,10 +64,13 @@ export interface BodyProportions {
   legLength: number
   legThickness: number
   headScale: number
+  /** Ventre arrondi, indépendant de la largeur des épaules. */
+  belly?: number
 }
 
 export interface CharacterAppearance {
   skin: string
+  eyes?: string
   bodyType: BodyType
   hair: { style: HairStyle; color: string }
   facialHair: { style: FacialHair; color: string }
