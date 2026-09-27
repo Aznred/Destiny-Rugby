@@ -543,7 +543,9 @@ export function CompositionTerrainManager({
 
   // Une carte sélectionnée doit ouvrir sa fiche immédiatement, y compris sur
   // ordinateur où le bouton « Fiche » pouvait se retrouver hors du plateau.
-  useEffect(() => setDetailsSelection(Boolean(selection)), [selection]);
+  // La première pression choisit seulement la carte pour la permutation.
+  // La fiche s'ouvre ensuite à la demande, sans recouvrir immédiatement le XV.
+  useEffect(() => setDetailsSelection(false), [selection]);
 
   const choisirReserve = (joueurId: string) => {
     if (indisponibles?.has(joueurId)) return;
