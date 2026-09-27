@@ -398,6 +398,8 @@ export interface EtatMatch {
   vol: Vol | null;
   volsRecents?: VolRecent[];
   conquete?: ConqueteAnimee | null;
+  /** Bonus de timing du duel arcade, consommé une seule fois par la conquête. */
+  bonusConqueteArcade?: { type: 'melee' | 'touche'; scores: Partial<Record<Cote, number>> } | null;
   ballonLibre?: BallonLibre | null;
   ruck?: RuckEnCours | null;
   aplatissage?: Aplatissage | null;

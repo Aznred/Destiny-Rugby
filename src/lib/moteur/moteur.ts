@@ -2608,7 +2608,10 @@ function phaseMelee(e: EtatMatch): void {
   const mien = surLeTerrain(e, cote).filter((p) => p.avant);
   const adv = surLeTerrain(e, adverse(cote)).filter((p) => p.avant);
   const oppose = adverse(cote);
-  const dom = scoreMelee(e, mien, cote) - scoreMelee(e, adv, oppose);
+  const qte = e.bonusConqueteArcade?.type === 'melee' ? e.bonusConqueteArcade.scores : undefined;
+  const bonusArcade = ((qte?.[cote] ?? 0) - (qte?.[oppose] ?? 0)) * 8;
+  e.bonusConqueteArcade = null;
+  const dom = scoreMelee(e, mien, cote) - scoreMelee(e, adv, oppose) + bonusArcade;
   const duel = dom + (e.rng() - 0.5) * 18;
   const gagnant = duel >= 0 ? cote : oppose;
   const packGagnant = gagnant === cote ? mien : adv;
@@ -2697,12 +2700,16 @@ function phaseTouche(e: EtatMatch): void {
     ? (lanceur.passe * 0.55 + lanceur.vision * 0.30 + lanceur.discipline * 0.15) * fraicheur(lanceur)
     : 45;
   const scoreLevage = moyenne(lifteurs, (p) => (p.puissance * 0.58 + p.detente * 0.24 + p.vision * 0.18) * fraicheur(p));
+  const qte = e.bonusConqueteArcade?.type === 'touche' ? e.bonusConqueteArcade.scores : undefined;
+  const bonusAttaqueArcade = (qte?.[cote] ?? 0) * 7;
+  const bonusDefenseArcade = (qte?.[adverse(cote)] ?? 0) * 7;
+  e.bonusConqueteArcade = null;
   const scoreAttaque = scoreLance * 0.38 + sauteur.detente * fraicheur(sauteur) * 0.34
     + scoreLevage * 0.20 + (e.cohesion?.[cote] ?? 50) * 0.08
-    + (combinaison === 'leurreDevant' ? 2.5 : 0);
+    + (combinaison === 'leurreDevant' ? 2.5 : 0) + bonusAttaqueArcade;
   const scoreDefense = contre
     ? (contre.detente * 0.50 + contre.vision * 0.30 + contre.puissance * 0.12
-      + (e.cohesion?.[contre.cote] ?? 50) * 0.08) * fraicheur(contre)
+      + (e.cohesion?.[contre.cote] ?? 50) * 0.08) * fraicheur(contre) + bonusDefenseArcade
     : 45;
   const qualiteLancer = scoreLance + (e.cohesion?.[cote] ?? 50) * 0.08;
   const tirageLancer = e.rng();
@@ -4659,7 +4666,7 @@ function phraseDepuis(e: EtatMatch, depuis: number): string | null {
  * conséquences appliquées dans la foulée — pas à un tick futur, pas « quand le
  * moteur en aura envie ».
  */
-export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issue {
+export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur, bonusChanceArcade = 0): Issue {
   const nom = p.nom;
   const depuis = e.commentaires.length;
   const adv = visAVis(e, p);
@@ -4689,7 +4696,7 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur): Issu
   }
 
   const enjeu = enjeuDe(e, p, action);
-  const reussi = e.rng() < enjeu.chance;
+  const reussi = e.rng() < borner(enjeu.chance + bonusChanceArcade, .03, .98);
 
   switch (action) {
     // ── EN DÉFENSE ───────────────────────────────────────────────────────

@@ -3,6 +3,8 @@ import { cleCarteSolo, type EtatCollectionSolo } from './collectionSolo.js';
 import { POSTES } from '../data/rugby.js';
 import type { Coequipier } from './effectif.js';
 import type { PosteId, CompositionManager } from '../types.js';
+import { clubParNom } from '../data/clubs.js';
+import type { QteArcade, TrameInputArcade } from './moteur/arcade.js';
 
 export interface JoueurCollectionAmical {
   id: string;
@@ -30,12 +32,42 @@ export interface EquipeAmical {
   noteMoyenne: number;
 }
 
-export interface InputAmical {
-  dx: number;
-  dy: number;
-  sprint: boolean;
-  action?: 'passeGauche' | 'passeDroite' | 'passe' | 'plaquage' | 'pied' | 'changer';
-  temps: number;
+export type InputAmical = TrameInputArcade;
+
+export interface EtatMatchAmicalReseau {
+  revision: number;
+  simulation: number;
+  minute: number;
+  scoreA: number;
+  scoreB: number;
+  phase: string;
+  fini: boolean;
+  possession: 'A' | 'B';
+  ballon: { x: number; y: number };
+  porteurId?: string;
+  qte?: QteArcade | null;
+  acquittements?: Partial<Record<'A' | 'B', number>>;
+  tempsServeur?: number;
+  message?: string;
+  pions: Array<{
+    id: string;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    endurance: number;
+    surLeTerrain: boolean;
+    battu?: number;
+    role?: string;
+  }>;
+}
+
+export interface ClubProfessionnelAmical {
+  nom: string;
+  championnat: string;
+  couleur: string;
+  embleme?: string;
+  noteMoyenne: number;
 }
 
 export interface SalonAmicalVue {
@@ -187,6 +219,76 @@ export function composerEquipeDepuisCollection(
   };
 }
 
+/** Clubs disposant d'un véritable XV dans le catalogue professionnel. */
+export function clubsProfessionnelsAmicaux(catalogue: readonly SourceCarte[]): ClubProfessionnelAmical[] {
+  const groupes = new Map<string, SourceCarte[]>();
+  for (const carte of catalogue) {
+    if (carte.origine !== 'professionnel' || !carte.clubReel) continue;
+    const groupe = groupes.get(carte.clubReel) ?? [];
+    groupe.push(carte);
+    groupes.set(carte.clubReel, groupe);
+  }
+  return [...groupes.entries()]
+    .filter(([, joueurs]) => joueurs.length >= 15)
+    .map(([nom, joueurs]) => {
+      const club = clubParNom(nom);
+      return {
+        nom,
+        championnat: joueurs[0]?.championnat ?? 'Championnat professionnel',
+        couleur: club?.c1 ?? '#b91c1c',
+        embleme: club?.logo,
+        noteMoyenne: Math.round(joueurs.reduce((somme, joueur) => somme + joueur.note, 0) / joueurs.length),
+      };
+    })
+    .sort((a, b) => a.championnat.localeCompare(b.championnat, 'fr') || a.nom.localeCompare(b.nom, 'fr'));
+}
+
+/** Compose le meilleur XV d'un club professionnel choisi pour l'adversaire ordinateur. */
+export function composerEquipeClubProfessionnel(
+  nomClub: string,
+  catalogue: readonly SourceCarte[],
+): EquipeAmical {
+  const effectif = catalogue
+    .filter((carte) => carte.origine === 'professionnel' && carte.clubReel === nomClub)
+    .sort((a, b) => b.note - a.note);
+  if (effectif.length < 15) throw new Error('Ce club ne possède pas encore un effectif complet.');
+
+  const utilisees = new Set<string>();
+  const joueurs = POSTES.map((posteInfo) => {
+    const carte = effectif.find((c) => !utilisees.has(c.sourceId) && c.poste === posteInfo.id)
+      ?? effectif.find((c) => !utilisees.has(c.sourceId) && c.postesSecondaires?.includes(posteInfo.id))
+      ?? effectif.find((c) => !utilisees.has(c.sourceId) && c.famille === posteInfo.famille)
+      ?? effectif.find((c) => !utilisees.has(c.sourceId))!;
+    utilisees.add(carte.sourceId);
+    const stats = carte.statistiques;
+    return {
+      id: `club-${posteInfo.numero}-${carte.sourceId}`,
+      sourceId: carte.sourceId,
+      nom: carte.nom,
+      numero: posteInfo.numero,
+      poste: posteInfo.id,
+      note: carte.note,
+      vitesse: Math.round(stats.VIT),
+      force: Math.round(stats.FRC),
+      passe: Math.round(stats.PAS),
+      plaquage: Math.round(stats.PLQ),
+      endurance: Math.round(stats.END),
+      jeuAuPied: Math.round(stats.JDP),
+      photo: carte.photo,
+      clubReel: carte.clubReel,
+      nation: carte.nation,
+    } satisfies JoueurCollectionAmical;
+  });
+  const club = clubParNom(nomClub);
+  return {
+    nom: nomClub,
+    couleur: club?.c1 ?? '#b91c1c',
+    embleme: club?.logo,
+    joueurs,
+    noteMoyenne: Math.round(joueurs.reduce((somme, joueur) => somme + joueur.note, 0) / joueurs.length),
+  };
+}
+
 /** Convertit une liste de JoueurCollectionAmical en Coequipier pour le moteur de match de Destiny Rugby. */
 export function convertirEnCoequipiers(joueurs: JoueurCollectionAmical[]): Coequipier[] {
   return joueurs.map((j) => ({
@@ -232,7 +334,7 @@ export async function creerSalonAmicalApi(equipe: EquipeAmical, pseudo: string):
   const res = await fetch('/api/carriere', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'creerSalonAmical', equipe, pseudo, dev: true }),
+    body: JSON.stringify({ action: 'creerSalonAmical', equipe, pseudo }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.erreur ?? 'Impossible de créer le salon amical.');
@@ -254,17 +356,18 @@ export async function synchroniserSalonAmicalApi(
   code: string,
   role: 'hote' | 'invite',
   input?: InputAmical,
-  etatMatch?: unknown,
+  etatMatch?: EtatMatchAmicalReseau,
   statut?: 'en_cours' | 'termine',
 ): Promise<{
   ok: boolean;
   statut: 'attente' | 'pret' | 'en_cours' | 'termine';
   inputAdverse?: InputAmical;
-  etatMatch?: unknown;
+  etatMatch?: EtatMatchAmicalReseau;
   invitePresent: boolean;
   hotePresent: boolean;
   equipeHote?: EquipeAmical;
   equipeInvite?: EquipeAmical;
+  tempsServeur: number;
 }> {
   const res = await fetch('/api/carriere', {
     method: 'POST',

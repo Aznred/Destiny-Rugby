@@ -245,6 +245,58 @@
   flex: 1;
 }
 
+.amical-section-ordinateur {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1rem 0;
+}
+
+.amical-ordinateur-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.amical-ordinateur-intro h3 { margin: .25rem 0; color: #f8fafc; }
+.amical-ordinateur-intro p { margin: 0; color: #94a3b8; font-size: .86rem; }
+
+.amical-select-club { display: grid; gap: .4rem; color: #94a3b8; font-size: .8rem; }
+.amical-select-club select {
+  width: 100%;
+  padding: .7rem .8rem;
+  border: 1px solid #334155;
+  border-radius: .55rem;
+  background: #172235;
+  color: #fff;
+}
+
+.amical-duel-clubs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+}
+
+.amical-duel-clubs > div {
+  min-height: 125px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: .35rem;
+  padding: 1rem;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--couleur-club) 65%, #fff 10%);
+  border-radius: .9rem;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--couleur-club) 25%, #0f172a), #0f172a);
+}
+
+.amical-duel-clubs img { width: 48px; height: 48px; object-fit: contain; }
+.amical-duel-clubs b { color: #fff; }
+.amical-duel-clubs span { color: #cbd5e1; font-size: .76rem; }
+.amical-duel-clubs > strong { color: #facc15; font-size: 1.4rem; }
+.amical-lancer-ordinateur { justify-self: center; min-width: min(100%, 320px); }
+
 /* Section en ligne */
 .amical-choix-salon {
   display: flex;
@@ -397,4 +449,10 @@
   .amical-actions-depart {
     flex-direction: column;
   }
+  .amical-onglets-nav { overflow-x: auto; }
+  .amical-onglets-nav button { white-space: nowrap; padding-inline: .7rem; }
+  .amical-ordinateur-intro { align-items: flex-start; }
+  .amical-duel-clubs { gap: .45rem; }
+  .amical-duel-clubs > div { min-height: 110px; padding: .65rem .4rem; }
+  .amical-duel-clubs b { font-size: .78rem; }
 }

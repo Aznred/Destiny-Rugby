@@ -1,529 +1,536 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Icone } from '../Icone';
-import { TexteIcones } from '../TexteIcones';
 import { PelouseMemo } from './Pelouse';
-import { Camera, type Cadrage } from '../../lib/moteur/camera';
-import { LARGEUR, LONGUEUR, borner, type Vec } from '../../lib/moteur/terrain';
-import {
-  creerMatch, avancer, type EtatMatch,
-} from '../../lib/moteur/moteur';
+import { SpriteRugbymanMemo } from './SpriteRugbyman';
+import { Camera, angleDeVue, type Cadrage } from '../../lib/moteur/camera';
+import { LONGUEUR, distance2, type Cote, type Vec } from '../../lib/moteur/terrain';
+import { avancer, creerMatch, resoudreChoix, type EtatMatch } from '../../lib/moteur/moteur';
+import type { ActionJoueur } from '../../lib/moteur/etat';
 import type { Pion } from '../../lib/moteur/entites';
+import type { MaillotMatch } from '../../lib/moteur/apparenceMatch';
+import type { PionDirect, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import {
-  convertirEnCoequipiers,
-  type EquipeAmical,
-  type InputAmical,
-  synchroniserSalonAmicalApi,
+  actionContextuelleArcade, creerQteArcade, deplacerJoueurArcade, etatGlobalArcade,
+  evaluerQteArcade, InputManagerArcade, interpolerPosition, MachineEtatsJoueurs,
+  progressionQte, selectionnerJoueurPertinent, type EvenementInputArcade,
+  type InputActionArcade, type QteArcade, type TrameInputArcade,
+} from '../../lib/moteur/arcade';
+import {
+  convertirEnCoequipiers, synchroniserSalonAmicalApi, type EquipeAmical,
+  type EtatMatchAmicalReseau, type InputAmical,
 } from '../../lib/amicalCollection';
-import { t } from '../../lib/i18n';
 import './MatchAmicalManette.css';
 
 interface Props {
   equipeA: EquipeAmical;
   equipeB: EquipeAmical;
-  monCamp: 'A' | 'B';
-  mode: 'local' | 'reseau';
+  monCamp: Cote;
+  mode: 'ordinateur' | 'reseau';
   salonCode?: string;
   onQuitter: () => void;
+}
+
+const DUREE_MATCH = 10 * 60;
+const TRAME_VIDE: TrameInputArcade = {
+  sequence: 0, dx: 0, dy: 0, sprint: false, evenements: [], tempsClient: 0,
+};
+
+function maillot(couleur: string, secondaire: string): MaillotMatch {
+  return {
+    principal: couleur, secondaire, accent: '#f8fafc', short: '#101827',
+    chaussettes: couleur, motif: 'epaules',
+  };
+}
+
+function terrainSprites(m: EtatMatch): TerrainDirect {
+  const pions: PionDirect[] = m.pions.map((p) => ({
+    id: p.id, numero: p.numeroMaillot ?? p.numero, numeroRole: p.numero,
+    nom: p.nom, poste: p.poste, cote: p.cote === 'A' ? 'domicile' : 'exterieur',
+    x: p.pos.x, y: p.pos.y, vx: p.vitesse.x, vy: p.vitesse.y,
+    force: p.puissance, tailleCm: p.tailleCm, poidsKg: p.poidsKg, corps: p.corps,
+  }));
+  return {
+    simulation: m.sim, pions, ballon: { ...m.ballon }, porteurId: m.porteur?.id,
+    vol: m.vol ? {
+      de: { ...m.vol.de }, vers: { ...m.vol.vers }, duree: m.vol.duree,
+      ecoule: m.vol.ecoule, hauteur: m.vol.hauteur, type: m.vol.type,
+      intention: m.vol.intention, auteurId: m.vol.auteur?.id, receveurId: m.vol.receveur?.id,
+    } : undefined,
+    phase: m.phase, systeme: 'collection-arcade',
+    possession: m.possession === 'A' ? 'domicile' : 'exterieur', cadence: 1, horloge: m.minute,
+  };
+}
+
+function serialiserMatch(
+  m: EtatMatch, revision: number, qte: QteArcade | null,
+  acquittements: Partial<Record<Cote, number>>, message: string,
+): EtatMatchAmicalReseau {
+  return {
+    revision, simulation: m.sim, minute: m.minute, scoreA: m.scoreA, scoreB: m.scoreB,
+    phase: m.phase, fini: m.fini, possession: m.possession, ballon: { ...m.ballon },
+    porteurId: m.porteur?.id, qte, acquittements, tempsServeur: Date.now(), message,
+    pions: m.pions.map((p) => ({
+      id: p.id, x: p.pos.x, y: p.pos.y, vx: p.vitesse.x, vy: p.vitesse.y,
+      endurance: p.endurance, surLeTerrain: p.surLeTerrain, battu: p.battu, role: p.role,
+    })),
+  };
+}
+
+function appliquerSnapshot(m: EtatMatch, snapshot: EtatMatchAmicalReseau, campLocal: Cote): void {
+  const etats = new Map(snapshot.pions.map((p) => [p.id, p]));
+  for (const pion of m.pions) {
+    const recu = etats.get(pion.id);
+    if (!recu) continue;
+    const position = pion.cote === campLocal
+      ? interpolerPosition(pion.pos, { x: recu.x, y: recu.y })
+      : { x: recu.x, y: recu.y };
+    pion.pos.x = position.x; pion.pos.y = position.y;
+    pion.vitesse.x = recu.vx; pion.vitesse.y = recu.vy;
+    pion.endurance = recu.endurance; pion.surLeTerrain = recu.surLeTerrain;
+    if (typeof recu.battu === 'number') pion.battu = recu.battu;
+    if (recu.role) pion.role = recu.role as Pion['role'];
+  }
+  m.sim = snapshot.simulation; m.minute = snapshot.minute;
+  m.scoreA = snapshot.scoreA; m.scoreB = snapshot.scoreB;
+  m.phase = snapshot.phase as EtatMatch['phase']; m.fini = snapshot.fini;
+  m.possession = snapshot.possession; m.ballon = { ...snapshot.ballon };
+  m.porteur = snapshot.porteurId ? m.pions.find((p) => p.id === snapshot.porteurId) ?? null : null;
+  m.vol = null;
+}
+
+/** Donne brièvement au moteur le pion qui exécute le geste, puis nettoie cet état. */
+function jouerGesteMoteur(m: EtatMatch, pion: Pion, action: ActionJoueur, bonusChance = 0) {
+  const anciensMoi = m.pions.filter((p) => p.moi);
+  const ancienControle = m.controle;
+  const ancienneIntention = m.intention;
+  for (const p of m.pions) p.moi = false;
+  pion.moi = true; m.controle = true; m.intention = null;
+  delete m.recharges[action];
+  try {
+    return resoudreChoix(m, pion, action, bonusChance);
+  } finally {
+    delete m.recharges[action];
+    m.intention = ancienneIntention; m.controle = ancienControle; pion.moi = false;
+    for (const p of anciensMoi) p.moi = true;
+  }
+}
+
+function libellePhase(m: EtatMatch): string {
+  const etat = etatGlobalArcade(m.phase, m.minuteur);
+  const libelles: Record<typeof etat, string> = {
+    OPEN_PLAY: 'Jeu courant', RUCK: 'Ruck', SCRUM_SETUP: 'Mise en place de la mêlée',
+    SCRUM: 'Mêlée', LINEOUT_SETUP: 'Mise en place de la touche', LINEOUT: 'Touche',
+    PENALTY: 'Pénalité', CONVERSION: 'Transformation', KICKOFF: 'Renvoi',
+    HALF_TIME: 'Mi-temps', FULL_TIME: 'Terminé',
+  };
+  return libelles[etat];
 }
 
 export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode, onQuitter }: Props) {
   const conteneurRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef(new Camera());
   const matchRef = useRef<EtatMatch | null>(null);
+  const inputRef = useRef(new InputManagerArcade());
+  const inputAdverseRef = useRef<InputAmical>(TRAME_VIDE);
+  const machineRef = useRef(new MachineEtatsJoueurs());
+  const selectionRef = useRef<Partial<Record<Cote, string>>>({});
+  const derniereSequenceTraitee = useRef<Partial<Record<Cote, number>>>({ A: 0, B: 0 });
+  const revisionRef = useRef(0);
+  const qteRef = useRef<QteArcade | null>(null);
+  const qtePhaseRef = useRef('');
+  const preparationRef = useRef<Partial<Record<Cote, { action: 'plaquage' | 'raffut' | 'crochet'; pionId: string; expire: number }>>>({});
+  const decalageServeurRef = useRef(0);
+  const gesteRef = useRef<{ x: number; y: number; id: number } | null>(null);
+  const joystickRef = useRef({ actif: false, departX: 0, departY: 0, dx: 0, dy: 0 });
+  const pressionActionRef = useRef(0);
+  const pressionPiedRef = useRef(0);
+  const dernierRenduRef = useRef(0);
 
-  // Entrées utilisateur locales
-  const touchesRef = useRef<Record<string, boolean>>({});
-  const joystickRef = useRef<{ actif: boolean; departX: number; departY: number; dx: number; dy: number }>({
-    actif: false, departX: 0, departY: 0, dx: 0, dy: 0,
-  });
-  const inputRef = useRef<InputAmical>({ dx: 0, dy: 0, sprint: false, temps: 0 });
-  const inputAdverseRef = useRef<InputAmical>({ dx: 0, dy: 0, sprint: false, temps: 0 });
-
-  // Écran et rendu
-  const [vueCamera, setVueCamera] = useState<{ viewBox: string; redresser: string } | null>(null);
+  const [vueCamera, setVueCamera] = useState<{ viewBox: string; transform: string; redresser: string } | null>(null);
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
   const [tempsSimule, setTempsSimule] = useState(0);
-  const [messageAction, setMessageAction] = useState<string>(() => t('amical.match.kickoff'));
+  const [messageAction, setMessageAction] = useState('Coup d’envoi');
   const [finDeMatch, setFinDeMatch] = useState(false);
   const [pionControleId, setPionControleId] = useState<string | null>(null);
-  const [sprintActif, setSprintActif] = useState(false);
   const [enduranceJauge, setEnduranceJauge] = useState(100);
+  const [manetteDetectee, setManetteDetectee] = useState(false);
+  const [sprintActif, setSprintActif] = useState(false);
+  const [qteAffichee, setQteAffichee] = useState<QteArcade | null>(null);
+  const [progressionQteAffichee, setProgressionQteAffichee] = useState(0);
+  const [versionRendu, setVersionRendu] = useState(0);
 
-  // Initialisation du moteur de match
+  const maillotA = useMemo(() => maillot(equipeA.couleur || '#1e40af', equipeB.couleur || '#f8fafc'), [equipeA.couleur, equipeB.couleur]);
+  const maillotB = useMemo(() => maillot(equipeB.couleur || '#dc2626', equipeA.couleur || '#f8fafc'), [equipeA.couleur, equipeB.couleur]);
+
   useEffect(() => {
-    const coeqA = convertirEnCoequipiers(equipeA.joueurs);
-    const coeqB = convertirEnCoequipiers(equipeB.joueurs);
-
     const m = creerMatch(
-      equipeA.nom,
-      equipeB.nom,
-      coeqA,
-      coeqB,
-      20,
-      17,
-      `amical#${salonCode ?? Date.now()}`,
-      undefined,
-      {
-        niveau: 'pro',
-        tempsReel: true,
-        controle: true,
-      },
+      equipeA.nom, equipeB.nom,
+      convertirEnCoequipiers(equipeA.joueurs), convertirEnCoequipiers(equipeB.joueurs),
+      20, 17, `collection#${salonCode ?? Date.now()}`, undefined,
+      { niveau: 'pro', tempsReel: true, controle: false },
     );
-
+    m.carriereDixMinutes = true;
     matchRef.current = m;
-    cameraRef.current.couper({ x: LONGUEUR / 2, y: LARGEUR / 2 }, 'suivi');
-  }, [equipeA, equipeB]);
+    cameraRef.current.couper({ x: LONGUEUR / 2, y: 35 }, 'suivi');
+    const premier = selectionnerJoueurPertinent(m, monCamp);
+    if (premier) { selectionRef.current[monCamp] = premier.id; inputRef.current.joueurId = premier.id; }
+  }, [equipeA, equipeB, monCamp, salonCode]);
 
-  // Synchronisation réseau avec le salon privé (si mode réseau)
-  useEffect(() => {
-    if (mode !== 'reseau' || !salonCode) return;
-    let actif = true;
-    const interval = setInterval(async () => {
-      try {
-        const role = monCamp === 'A' ? 'hote' : 'invite';
-        const res = await synchroniserSalonAmicalApi(salonCode, role, inputRef.current);
-        if (actif && res.inputAdverse) {
-          inputAdverseRef.current = res.inputAdverse;
-        }
-      } catch {
-        // En cas de micro-coupure réseau, on continue le tick local
-      }
-    }, 150);
-
-    return () => {
-      actif = false;
-      clearInterval(interval);
+  const annoncerIssue = useCallback((pion: Pion, action: ActionJoueur, issue: ReturnType<typeof jouerGesteMoteur>) => {
+    const noms: Partial<Record<ActionJoueur, string>> = {
+      passeGauche: 'Passe à gauche', passeDroite: 'Passe à droite', pied: 'Jeu au pied',
+      plaquage: 'Plaquage', raffut: 'Raffut', crochet: 'Crochet', grattage: 'Grattage',
+      soutien: 'Soutien', monter: 'Montée défensive',
     };
-  }, [mode, salonCode, monCamp]);
-
-  // Gestion des touches clavier
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      touchesRef.current[e.code] = true;
-      if (['Space', 'KeyQ', 'KeyE', 'KeyC', 'Tab'].includes(e.code)) {
-        e.preventDefault();
-      }
-
-      // Actions immédiates
-      if (e.code === 'KeyQ') declencherAction('passeGauche');
-      else if (e.code === 'KeyE') declencherAction('passeDroite');
-      else if (e.code === 'Space') declencherAction('plaquage');
-      else if (e.code === 'KeyC') declencherAction('pied');
-      else if (e.code === 'Tab') declencherAction('changer');
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      touchesRef.current[e.code] = false;
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
+    setMessageAction(`${issue.reussi ? 'Réussi' : issue.joue ? 'Manqué' : 'Préparé'} · ${noms[action] ?? action} de ${pion.nom}`);
+    if (issue.joue && navigator.vibrate) navigator.vibrate(issue.reussi ? [18, 28, 18] : 18);
   }, []);
 
-  const declencherAction = useCallback((action: InputAmical['action']) => {
-    inputRef.current.action = action;
-    inputRef.current.temps = Date.now();
-
-    const m = matchRef.current;
-    if (!m) return;
-
-    const campJoueur = monCamp;
-    const aLeBallon = m.porteur && m.porteur.cote === campJoueur;
-    const porteur = m.porteur;
-
-    if (aLeBallon && porteur) {
-      if (action === 'passeGauche' || action === 'passeDroite' || action === 'passe') {
-        // Trouve un coéquipier démarqué sur l'aile visée
-        const coequipiers = m.pions.filter((p) => p.cote === campJoueur && p.id !== porteur.id && p.surLeTerrain);
-        const receveur = coequipiers.find((p) => (action === 'passeGauche' ? p.pos.y < porteur.pos.y : p.pos.y > porteur.pos.y))
-          ?? coequipiers[0];
-
-        if (receveur) {
-          m.porteur = null;
-          m.vol = {
-            de: { ...porteur.pos },
-            vers: { ...receveur.pos },
-            hauteur: 0.15,
-            duree: 0.45,
-            ecoule: 0,
-            type: 'passe',
-            auteur: porteur,
-            receveur,
-            intention: 'passe',
-          };
-          setMessageAction(`⚡ Passe de ${porteur.nom} vers ${receveur.nom}`);
-        }
-      } else if (action === 'pied') {
-        const cibleX = campJoueur === 'A' ? Math.min(LONGUEUR - 5, porteur.pos.x + 35) : Math.max(5, porteur.pos.x - 35);
-        m.porteur = null;
-        m.vol = {
-          de: { ...porteur.pos },
-          vers: { x: cibleX, y: porteur.pos.y },
-          hauteur: 0.75,
-          duree: 1.2,
-          ecoule: 0,
-          type: 'pied',
-          auteur: porteur,
-          receveur: null,
-          intention: 'occupation',
-        };
-        setMessageAction(`👟 Coup de pied d’occupation de ${porteur.nom}`);
-      }
-    } else if (m.porteur && m.porteur.cote !== campJoueur) {
-      if (action === 'plaquage') {
-        const defenseurs = m.pions.filter((p) => p.cote === campJoueur && p.surLeTerrain);
-        const plusProche = defenseurs.sort((a, b) =>
-          Math.hypot(a.pos.x - m.porteur!.pos.x, a.pos.y - m.porteur!.pos.y) -
-          Math.hypot(b.pos.x - m.porteur!.pos.x, b.pos.y - m.porteur!.pos.y),
-        )[0];
-
-        if (plusProche) {
-          const dist = Math.hypot(plusProche.pos.x - m.porteur.pos.x, plusProche.pos.y - m.porteur.pos.y);
-          if (dist < 3.2) {
-            // Impact de plaquage réussi !
-            const nomPorteur = m.porteur.nom;
-            m.porteur = null;
-            m.phase = 'ruck';
-            setMessageAction(`💥 GROS PLAQUAGE de ${plusProche.nom} sur ${nomPorteur} !`);
-          } else {
-            setMessageAction(`⚡ ${plusProche.nom} plonge mais manque le plaquage !`);
-          }
-        }
-      }
+  const choisirJoueur = useCallback((m: EtatMatch, camp: Cote, direction?: Vec, changer = false) => {
+    const pion = selectionnerJoueurPertinent(m, camp, selectionRef.current[camp], direction, changer);
+    if (pion) {
+      selectionRef.current[camp] = pion.id;
+      if (camp === monCamp) { inputRef.current.joueurId = pion.id; setPionControleId(pion.id); }
     }
+    return pion;
   }, [monCamp]);
 
-  // Boucle de simulation 60 FPS avec contrôles en temps réel
+  const lancerQteRuck = useCallback((m: EtatMatch, camp: Cote) => {
+    if (qteRef.current) return;
+    const qte = creerQteArcade('ruck', `${m.sim.toFixed(2)}-${camp}`, Date.now() + decalageServeurRef.current + 260);
+    qte.initiateur = camp;
+    qteRef.current = qte;
+    setQteAffichee({ ...qte });
+    setMessageAction('Relâche dans la zone lumineuse pour gratter');
+  }, []);
+
+  const traiterEvenement = useCallback((m: EtatMatch, camp: Cote, evenement: EvenementInputArcade) => {
+    if (evenement.sequence <= (derniereSequenceTraitee.current[camp] ?? 0)) return;
+    derniereSequenceTraitee.current[camp] = evenement.sequence;
+
+    const qte = qteRef.current;
+    if (qte) {
+      if (qte.type === 'touche' && evenement.option) {
+        qte.choix ??= {}; qte.choix[camp] = evenement.option;
+        setQteAffichee({ ...qte, choix: { ...qte.choix } });
+        return;
+      }
+      if (evenement.action === 'ACTION_PRIMARY' && qte.scores?.[camp] === undefined) {
+        const resultat = evaluerQteArcade(qte, evenement.tempsServeurEstime);
+        qte.scores ??= {}; qte.scores[camp] = resultat.score;
+        setQteAffichee({ ...qte, scores: { ...qte.scores } });
+        setMessageAction(resultat.qualite === 'excellent' ? 'Timing excellent' : resultat.qualite === 'bon' ? 'Bon timing' : 'Timing manqué');
+        if (navigator.vibrate) navigator.vibrate(resultat.qualite === 'excellent' ? [16, 25, 16] : 12);
+      }
+      return;
+    }
+
+    const direction = evenement.direction ?? { x: 0, y: 0 };
+    if (evenement.action === 'SWITCH_PLAYER') {
+      const suivant = choisirJoueur(m, camp, direction, true);
+      if (suivant && camp === monCamp) setMessageAction(`Tu contrôles ${suivant.nom}`);
+      return;
+    }
+
+    const pion = choisirJoueur(m, camp, direction);
+    if (!pion || !machineRef.current.autorise(pion.id, evenement.action)) return;
+    const contexte = actionContextuelleArcade(m, pion);
+    let action: ActionJoueur;
+    if (evenement.action === 'PASS_LEFT') action = 'passeGauche';
+    else if (evenement.action === 'PASS_RIGHT') action = 'passeDroite';
+    else if (evenement.action === 'KICK') action = 'pied';
+    else if (evenement.action === 'ACTION_SECONDARY') action = contexte.secondaire;
+    else action = contexte.principale;
+
+    if (action === 'grattage') { lancerQteRuck(m, camp); return; }
+
+    const issue = jouerGesteMoteur(m, pion, action);
+    annoncerIssue(pion, action, issue);
+    if (!issue.joue && (action === 'plaquage' || action === 'raffut' || action === 'crochet')) {
+      preparationRef.current[camp] = { action, pionId: pion.id, expire: performance.now() + 1050 };
+      machineRef.current.transition(pion.id, action === 'plaquage' ? 'TACKLING' : 'RUNNING', true);
+    }
+  }, [annoncerIssue, choisirJoueur, lancerQteRuck, monCamp]);
+
+  const emettreAction = useCallback((action: Exclude<InputActionArcade, 'MOVE' | 'SPRINT'>, options: { dureeMs?: number; option?: 'court' | 'milieu' | 'long' } = {}) => {
+    const trame = inputRef.current.trame(navigator.getGamepads?.()[0], true);
+    inputRef.current.emettre(action, { ...options, direction: { x: trame.dx, y: trame.dy } });
+  }, []);
+
   useEffect(() => {
-    let animId: number;
-    let dernierTemps = performance.now();
+    const down = (event: KeyboardEvent) => {
+      const action = inputRef.current.enfoncer(event.code);
+      if (action && action !== 'SPRINT' && action !== 'MOVE') event.preventDefault();
+      if (event.repeat || !action || action === 'SPRINT' || action === 'MOVE') return;
+      emettreAction(action);
+    };
+    const up = (event: KeyboardEvent) => { inputRef.current.relacher(event.code); };
+    window.addEventListener('keydown', down); window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+  }, [emettreAction]);
 
+  useEffect(() => {
+    if (mode !== 'reseau' || !salonCode) return;
+    let actif = true; let occupe = false;
+    const synchroniser = async () => {
+      if (occupe) return;
+      occupe = true;
+      const debut = Date.now();
+      try {
+        const m = matchRef.current;
+        const hote = monCamp === 'A';
+        const trame = inputRef.current.trame(navigator.getGamepads?.()[0], true);
+        const snapshot = hote && m
+          ? serialiserMatch(m, ++revisionRef.current, qteRef.current, derniereSequenceTraitee.current, messageAction)
+          : undefined;
+        const res = await synchroniserSalonAmicalApi(
+          salonCode, hote ? 'hote' : 'invite', trame, snapshot,
+          m?.fini ? 'termine' : 'en_cours',
+        );
+        if (!actif) return;
+        const milieu = (debut + Date.now()) / 2;
+        const decalage = res.tempsServeur - milieu;
+        decalageServeurRef.current = decalageServeurRef.current * .8 + decalage * .2;
+        inputRef.current.reglerDecalageServeur(decalage);
+        if (res.inputAdverse) inputAdverseRef.current = res.inputAdverse;
+        if (!hote && res.etatMatch && m && res.etatMatch.revision > revisionRef.current) {
+          revisionRef.current = res.etatMatch.revision;
+          appliquerSnapshot(m, res.etatMatch, monCamp);
+          qteRef.current = res.etatMatch.qte ?? null;
+          setQteAffichee(qteRef.current ? { ...qteRef.current } : null);
+          inputRef.current.acquitter(res.etatMatch.acquittements?.[monCamp] ?? 0);
+          if (res.etatMatch.message) setMessageAction(res.etatMatch.message);
+        }
+      } catch {
+        setMessageAction('Reconnexion au match…');
+      } finally { occupe = false; }
+    };
+    void synchroniser();
+    const interval = window.setInterval(synchroniser, 100);
+    return () => { actif = false; window.clearInterval(interval); };
+  }, [messageAction, mode, monCamp, salonCode]);
+
+  useEffect(() => {
+    let animation = 0;
+    let precedent = performance.now();
     const tick = (maintenant: number) => {
-      const dtReel = Math.min((maintenant - dernierTemps) / 1000, 0.05);
-      dernierTemps = maintenant;
-
+      const dt = Math.min((maintenant - precedent) / 1000, .05);
+      precedent = maintenant;
       const m = matchRef.current;
       if (m && !m.fini) {
-        // 1. Lire entrées clavier / joystick
-        let dx = 0;
-        let dy = 0;
-        if (touchesRef.current['ArrowLeft'] || touchesRef.current['KeyA']) dx -= 1;
-        if (touchesRef.current['ArrowRight'] || touchesRef.current['KeyD']) dx += 1;
-        if (touchesRef.current['ArrowUp'] || touchesRef.current['KeyW'] || touchesRef.current['KeyZ']) dy -= 1;
-        if (touchesRef.current['ArrowDown'] || touchesRef.current['KeyS']) dy += 1;
+        const autoritaire = mode === 'ordinateur' || monCamp === 'A';
+        const gamepad = navigator.getGamepads?.()[0] ?? null;
+        const trameLocale = inputRef.current.trame(gamepad, true);
+        if (gamepad) setManetteDetectee(true);
 
-        if (joystickRef.current.actif) {
-          dx = joystickRef.current.dx;
-          dy = joystickRef.current.dy;
-        }
+        if (autoritaire) {
+          for (const evenement of trameLocale.evenements) traiterEvenement(m, monCamp, evenement);
+          inputRef.current.acquitter(derniereSequenceTraitee.current[monCamp] ?? 0);
 
-        const longueur = Math.hypot(dx, dy);
-        if (longueur > 1) {
-          dx /= longueur;
-          dy /= longueur;
-        }
+          if (mode === 'reseau') {
+            const campAdverse: Cote = monCamp === 'A' ? 'B' : 'A';
+            const trameAdverse = inputAdverseRef.current;
+            if (trameAdverse.joueurId) selectionRef.current[campAdverse] = trameAdverse.joueurId;
+            for (const evenement of trameAdverse.evenements ?? []) traiterEvenement(m, campAdverse, evenement);
+          }
 
-        const sprint = Boolean(touchesRef.current['ShiftLeft'] || touchesRef.current['ShiftRight'] || sprintActif);
-        inputRef.current.dx = dx;
-        inputRef.current.dy = dy;
-        inputRef.current.sprint = sprint;
+          const pionLocal = choisirJoueur(m, monCamp, { x: trameLocale.dx, y: trameLocale.dy });
+          if (pionLocal) deplacerJoueurArcade(m, pionLocal, trameLocale, dt);
+          if (mode === 'reseau') {
+            const campAdverse: Cote = monCamp === 'A' ? 'B' : 'A';
+            const trameAdverse = inputAdverseRef.current;
+            const pionAdverse = choisirJoueur(m, campAdverse, { x: trameAdverse.dx, y: trameAdverse.dy });
+            if (pionAdverse) deplacerJoueurArcade(m, pionAdverse, trameAdverse, dt);
+          }
 
-        // 2. Déterminer quel pion le joueur pilote
-        const mesPions = m.pions.filter((p) => p.cote === monCamp && p.surLeTerrain);
-        let pionPilote: Pion | undefined;
-
-        if (m.porteur && m.porteur.cote === monCamp) {
-          pionPilote = m.porteur;
-        } else if (m.porteur) {
-          pionPilote = mesPions.sort((a, b) =>
-            Math.hypot(a.pos.x - m.porteur!.pos.x, a.pos.y - m.porteur!.pos.y) -
-            Math.hypot(b.pos.x - m.porteur!.pos.x, b.pos.y - m.porteur!.pos.y),
-          )[0];
-        } else {
-          pionPilote = mesPions[0];
-        }
-
-        if (pionPilote) {
-          setPionControleId(pionPilote.id);
-          setEnduranceJauge(Math.round(pionPilote.endurance));
-
-          // Appliquer le déplacement joystick directement
-          if (dx !== 0 || dy !== 0) {
-            const facteurSprint = sprint && pionPilote.endurance > 15 ? 1.35 : 0.95;
-            const vitesseMoyenne = (pionPilote.vitesseMax || 7.5) * facteurSprint;
-
-            // Déplacement orienté selon le sens d'attaque
-            const sensX = monCamp === 'A' ? 1 : -1;
-            pionPilote.pos.x = borner(pionPilote.pos.x + dx * vitesseMoyenne * sensX * dtReel, 3, LONGUEUR - 3);
-            pionPilote.pos.y = borner(pionPilote.pos.y + dy * vitesseMoyenne * dtReel, 3, LARGEUR - 3);
-
-            if (sprint) {
-              pionPilote.endurance = Math.max(5, pionPilote.endurance - 6 * dtReel);
+          for (const camp of ['A', 'B'] as const) {
+            const prep = preparationRef.current[camp];
+            if (!prep) continue;
+            const pion = m.pions.find((p) => p.id === prep.pionId);
+            const cible = prep.action === 'plaquage'
+              ? (m.porteur?.cote !== camp ? m.porteur : null)
+              : m.pions.filter((p) => p.cote !== camp && p.surLeTerrain).sort((a, b) => distance2(a.pos, pion?.pos ?? m.ballon) - distance2(b.pos, pion?.pos ?? m.ballon))[0];
+            if (!pion || !cible || maintenant > prep.expire) { delete preparationRef.current[camp]; continue; }
+            const distance = Math.sqrt(distance2(pion.pos, cible.pos));
+            if (distance < 3.4 && distance > 1.45 && prep.action === 'plaquage') {
+              const aide = Math.min(.22, dt * 1.8);
+              pion.pos.x += (cible.pos.x - pion.pos.x) / distance * aide;
+              pion.pos.y += (cible.pos.y - pion.pos.y) / distance * aide;
+            }
+            if (distance <= 1.65) {
+              const issue = jouerGesteMoteur(m, pion, prep.action);
+              annoncerIssue(pion, prep.action, issue);
+              delete preparationRef.current[camp];
             }
           }
-        }
 
-        // 3. Avancer la simulation
-        avancer(m, dtReel * 1.5);
-
-        setScoreA(m.scoreA);
-        setScoreB(m.scoreB);
-        setTempsSimule(Math.floor(m.sim));
-
-        // Détection essai dans l'en-but
-        if (m.porteur) {
-          if (m.porteur.cote === 'A' && m.porteur.pos.x >= LONGUEUR - 10) {
-            m.scoreA += 5;
-            m.porteur = null;
-            m.phase = 'coupEnvoi';
-            m.ballon = { x: LONGUEUR / 2, y: LARGEUR / 2 };
-            setMessageAction(`🏉 ESSAI pour ${equipeA.nom} !! (+5 pts)`);
-          } else if (m.porteur.cote === 'B' && m.porteur.pos.x <= 10) {
-            m.scoreB += 5;
-            m.porteur = null;
-            m.phase = 'coupEnvoi';
-            m.ballon = { x: LONGUEUR / 2, y: LARGEUR / 2 };
-            setMessageAction(`🏉 ESSAI pour ${equipeB.nom} !! (+5 pts)`);
+          const phaseQte = m.phase === 'melee' || m.phase === 'touche' ? m.phase : null;
+          if (phaseQte) {
+            const numero = phaseQte === 'melee' ? m.compteurs.melees : m.compteurs.touches;
+            const cle = `${phaseQte}-${numero}`;
+            if (!qteRef.current && qtePhaseRef.current !== cle) {
+              qtePhaseRef.current = cle;
+              qteRef.current = creerQteArcade(phaseQte, `${salonCode ?? 'solo'}-${numero}`, Date.now() + decalageServeurRef.current + 350);
+              setQteAffichee({ ...qteRef.current });
+              setMessageAction(phaseQte === 'melee' ? 'Mêlée · pousse au bon moment' : 'Touche · choisis la zone puis vise le bon timing');
+            }
           }
+
+          const qte = qteRef.current;
+          const tempsServeur = Date.now() + decalageServeurRef.current;
+          if (qte && tempsServeur >= qte.debutServeur + qte.dureeMs + 180) {
+            qte.scores ??= {};
+            const autreCamp: Cote = monCamp === 'A' ? 'B' : 'A';
+            qte.scores[monCamp] ??= -.2;
+            qte.scores[autreCamp] ??= mode === 'ordinateur' ? .35 : -.2;
+            if (qte.type === 'ruck' && qte.initiateur) {
+              const pion = choisirJoueur(m, qte.initiateur);
+              if (pion) annoncerIssue(pion, 'grattage', jouerGesteMoteur(m, pion, 'grattage', (qte.scores[qte.initiateur] ?? -.2) * .22));
+            } else if (qte.type === 'melee' || qte.type === 'touche') {
+              m.bonusConqueteArcade = { type: qte.type, scores: { ...qte.scores } };
+              if (qte.type === 'touche') {
+                const choix = qte.choix?.[m.possession] ?? 'milieu';
+                if (m.conquete) m.conquete.combinaison = choix === 'court' ? 'premierBloc' : choix === 'long' ? 'fond' : 'milieu';
+              }
+              m.minuteur = Math.min(m.minuteur, 2.2);
+            }
+            qteRef.current = null; setQteAffichee(null);
+          }
+
+          if (!qteRef.current) avancer(m, dt);
+          machineRef.current.synchroniser(m);
+        } else {
+          const pionLocal = choisirJoueur(m, monCamp, { x: trameLocale.dx, y: trameLocale.dy });
+          if (pionLocal) deplacerJoueurArcade(m, pionLocal, trameLocale, dt);
         }
 
-        // 4. Mettre à jour la caméra sur le ballon ou joueur actif
-        const cibleCamera: Vec = m.porteur ? m.porteur.pos : m.ballon;
+        const controle = choisirJoueur(m, monCamp);
+        if (controle) { setPionControleId(controle.id); setEnduranceJauge(Math.round(controle.endurance)); }
+        setScoreA(m.scoreA); setScoreB(m.scoreB); setTempsSimule(Math.min(DUREE_MATCH, Math.floor(m.sim)));
+        if (m.fini || m.sim >= DUREE_MATCH) { m.fini = true; m.phase = 'fini'; setFinDeMatch(true); }
+
+        const cible: Vec = controle?.pos ?? m.porteur?.pos ?? m.ballon;
         const rect = conteneurRef.current?.getBoundingClientRect();
         const ratio = rect ? rect.width / Math.max(1, rect.height) : 16 / 9;
-        const vue = cameraRef.current.suivre(cibleCamera, 'suivi' as Cadrage, ratio, 0, dtReel);
-        setVueCamera({ viewBox: vue.viewBox, redresser: vue.redresser });
+        const angle = angleDeVue(monCamp, Boolean(rect && rect.height > rect.width));
+        const vue = cameraRef.current.suivre(cible, 'suivi' as Cadrage, ratio, angle, dt);
+        setVueCamera({ viewBox: vue.viewBox, transform: vue.transform, redresser: vue.redresser });
 
-        if (m.fini || m.minute >= 80) {
-          setFinDeMatch(true);
+        if (qteRef.current) setProgressionQteAffichee(progressionQte(qteRef.current, Date.now() + decalageServeurRef.current));
+        if (maintenant - dernierRenduRef.current > 42) {
+          dernierRenduRef.current = maintenant; setVersionRendu((v) => v + 1);
         }
       }
-
-      animId = requestAnimationFrame(tick);
+      animation = requestAnimationFrame(tick);
     };
+    animation = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animation);
+  }, [annoncerIssue, choisirJoueur, mode, monCamp, salonCode, traiterEvenement]);
 
-    animId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animId);
-  }, [monCamp, sprintActif, equipeA.nom, equipeB.nom]);
-
-  // Touch handlers pour joystick mobile
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    const touch = e.touches[0];
-    joystickRef.current = {
-      actif: true,
-      departX: touch.clientX,
-      departY: touch.clientY,
-      dx: 0,
-      dy: 0,
-    };
+  const debutJoystick = (event: React.TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    joystickRef.current = { actif: true, departX: touch.clientX, departY: touch.clientY, dx: 0, dy: 0 };
   };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+  const bougerJoystick = (event: React.TouchEvent<HTMLDivElement>) => {
     if (!joystickRef.current.actif) return;
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - joystickRef.current.departX;
-    const deltaY = touch.clientY - joystickRef.current.departY;
-    const distance = Math.hypot(deltaX, deltaY);
-    const maxRayon = 45;
-    const facteur = Math.min(1, distance / maxRayon);
-    const angle = Math.atan2(deltaY, deltaX);
-    joystickRef.current.dx = Math.cos(angle) * facteur;
-    joystickRef.current.dy = Math.sin(angle) * facteur;
+    const touch = event.touches[0];
+    const x = touch.clientX - joystickRef.current.departX;
+    const y = touch.clientY - joystickRef.current.departY;
+    const distance = Math.hypot(x, y); const force = Math.min(1, distance / 45); const angle = Math.atan2(y, x);
+    joystickRef.current.dx = Math.cos(angle) * force; joystickRef.current.dy = Math.sin(angle) * force;
+    inputRef.current.definirTactile(joystickRef.current.dx, joystickRef.current.dy);
+  };
+  const finirJoystick = () => {
+    joystickRef.current = { actif: false, departX: 0, departY: 0, dx: 0, dy: 0 };
+    inputRef.current.definirTactile(0, 0);
   };
 
-  const handleTouchEnd = () => {
-    joystickRef.current = { actif: false, departX: 0, departY: 0, dx: 0, dy: 0 };
+  const debutGeste = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'mouse') return;
+    gesteRef.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+  };
+  const finGeste = (event: React.PointerEvent<HTMLDivElement>) => {
+    const debut = gesteRef.current;
+    if (!debut || debut.id !== event.pointerId) return;
+    const dx = event.clientX - debut.x; const dy = event.clientY - debut.y;
+    gesteRef.current = null;
+    if (Math.abs(dx) > 58 && Math.abs(dx) > Math.abs(dy)) emettreAction(dx < 0 ? 'PASS_LEFT' : 'PASS_RIGHT');
+    else if (dy < -70) emettreAction('KICK');
   };
 
   const m = matchRef.current;
+  void versionRendu;
+  const terrain = m ? terrainSprites(m) : null;
+  const pionControle = m?.pions.find((p) => p.id === pionControleId);
+  const contexte = m ? actionContextuelleArcade(m, pionControle) : null;
+  const qteLocaleDejaJouee = qteAffichee?.scores?.[monCamp] !== undefined;
+  const styleQte = qteAffichee ? {
+    '--qte-progression': `${progressionQteAffichee * 100}%`,
+    '--qte-cible': `${qteAffichee.cible * 100}%`,
+    '--qte-largeur': `${qteAffichee.largeurBonne * 200}%`,
+  } as CSSProperties : undefined;
 
-  return (
-    <div className="amical-manette-racine" ref={conteneurRef}>
-      {/* Tableau d'affichage / Scoreboard */}
-      <header className="amical-entete">
-        <button type="button" className="btn fantome amical-btn-retour" onClick={onQuitter}>
-          <Icone nom="fleche-droite" taille={16} /> {t('online.common.close')}
-        </button>
-
-        <div className="amical-scoreboard">
-          <div className={`amical-equipe domicile ${monCamp === 'A' ? 'mon-camp' : ''}`}>
-            <span className="amical-nom-equipe">{equipeA.nom}</span>
-            <span className="amical-score">{scoreA}</span>
-          </div>
-          <div className="amical-centre-chrono">
-            <span className="amical-badge-chrono">{Math.floor(tempsSimule / 60)}:{(tempsSimule % 60).toString().padStart(2, '0')}</span>
-            <span className="amical-mode-label">{mode === 'reseau' ? t('amical.match.roomLabel', { code: salonCode ?? '' }) : t('amical.match.localMode')}</span>
-          </div>
-          <div className={`amical-equipe exterieur ${monCamp === 'B' ? 'mon-camp' : ''}`}>
-            <span className="amical-score">{scoreB}</span>
-            <span className="amical-nom-equipe">{equipeB.nom}</span>
-          </div>
-        </div>
-
-        <div className="amical-endurance-badge">
-          <Icone nom="eclair" taille={14} />
-          <div className="amical-jauge-endurance">
-            <div style={{ width: `${enduranceJauge}%`, backgroundColor: enduranceJauge > 40 ? '#10b981' : '#f59e0b' }} />
-          </div>
-        </div>
-      </header>
-
-      {/* Récit / Bandeau d'action contextuelle */}
-      <div className="amical-bandeau-action" role="status">
-        <span><TexteIcones texte={messageAction} /></span>
+  return <div className="amical-manette-racine" ref={conteneurRef}>
+    <header className="amical-entete">
+      <button type="button" className="btn fantome amical-btn-retour" onClick={onQuitter}><Icone nom="fleche-droite" taille={16} /> Quitter</button>
+      <div className="amical-scoreboard">
+        <div className={`amical-equipe domicile ${monCamp === 'A' ? 'mon-camp' : ''}`}><span className="amical-nom-equipe">{equipeA.nom}</span><span className="amical-score">{scoreA}</span></div>
+        <div className="amical-centre-chrono"><span className="amical-badge-chrono">{Math.floor(tempsSimule / 60)}:{(tempsSimule % 60).toString().padStart(2, '0')} / 10:00</span><span className="amical-mode-label">{m ? libellePhase(m) : 'Chargement'}</span></div>
+        <div className={`amical-equipe exterieur ${monCamp === 'B' ? 'mon-camp' : ''}`}><span className="amical-score">{scoreB}</span><span className="amical-nom-equipe">{equipeB.nom}</span></div>
       </div>
+      <div className="amical-endurance-badge"><Icone nom="eclair" taille={14} /><div className="amical-jauge-endurance"><div style={{ width: `${enduranceJauge}%`, backgroundColor: enduranceJauge > 40 ? '#10b981' : '#f59e0b' }} /></div></div>
+    </header>
 
-      {/* Rendu 2D immersif du terrain de rugby */}
-      <div className="amical-terrain-viewport">
-        {vueCamera && (
-          <svg className="amical-terrain-svg" viewBox={vueCamera.viewBox} preserveAspectRatio="xMidYMid meet">
-            <PelouseMemo />
+    <div className="amical-bandeau-action" role="status">{messageAction}{manetteDetectee ? ' · Manette connectée' : ''}</div>
 
-            {/* Joueurs de l'équipe A */}
-            {m?.pions.filter((p) => p.cote === 'A' && p.surLeTerrain).map((p) => {
-              const estControle = p.id === pionControleId;
-              const estPorteur = m.porteur?.id === p.id;
-              return (
-                <g key={p.id} transform={`translate(${p.pos.x}, ${p.pos.y})`}>
-                  {estControle && (
-                    <circle r={2.2} fill="none" stroke="#ffd700" strokeWidth={0.35} strokeDasharray="0.8,0.4" className="halo-controle" />
-                  )}
-                  <circle r={1.25} fill={equipeA.couleur || '#1e40af'} stroke={estControle ? '#ffd700' : '#ffffff'} strokeWidth={estControle ? 0.35 : 0.15} />
-                  <text textAnchor="middle" dy={0.4} fontSize={0.8} fill="#ffffff" fontWeight="bold">
-                    {p.numero}
-                  </text>
-                  {estPorteur && (
-                    <circle cx={0.9} cy={-0.9} r={0.5} fill="#78350f" stroke="#ffffff" strokeWidth={0.1} />
-                  )}
-                </g>
-              );
-            })}
+    <div className="amical-terrain-viewport" onPointerDown={debutGeste} onPointerUp={finGeste} onPointerCancel={() => { gesteRef.current = null; }}>
+      {vueCamera && m && terrain && <svg className="amical-terrain-svg" viewBox={vueCamera.viewBox} preserveAspectRatio="xMidYMid meet">
+        <g transform={vueCamera.transform}>
+          <PelouseMemo />
+          {m.pions.filter((p) => p.surLeTerrain).map((p) => {
+            const direct = terrain.pions.find((candidat) => candidat.id === p.id)!;
+            const controle = p.id === pionControleId;
+            return <g key={p.id}>
+              {controle && <circle cx={p.pos.x} cy={p.pos.y} r={2.45} fill="none" stroke="#ffd700" strokeWidth={.34} strokeDasharray=".8,.35" className="halo-controle" />}
+              <SpriteRugbymanMemo pion={direct} position={p.pos} terrain={terrain} maillot={p.cote === 'A' ? maillotA : maillotB} porteur={m.porteur?.id === p.id} positionPorteur={m.porteur?.pos} redresser={vueCamera.redresser} hauteurMetres={5.3} temps={m.sim} />
+            </g>;
+          })}
+          {!m.porteur && <g transform={`translate(${m.ballon.x}, ${m.ballon.y})`}><ellipse rx={.7} ry={.42} fill="#854d0e" stroke="#fef08a" strokeWidth={.12} /></g>}
+        </g>
+      </svg>}
 
-            {/* Joueurs de l'équipe B */}
-            {m?.pions.filter((p) => p.cote === 'B' && p.surLeTerrain).map((p) => {
-              const estControle = p.id === pionControleId;
-              const estPorteur = m.porteur?.id === p.id;
-              return (
-                <g key={p.id} transform={`translate(${p.pos.x}, ${p.pos.y})`}>
-                  {estControle && (
-                    <circle r={2.2} fill="none" stroke="#ffd700" strokeWidth={0.35} strokeDasharray="0.8,0.4" className="halo-controle" />
-                  )}
-                  <circle r={1.25} fill={equipeB.couleur || '#dc2626'} stroke={estControle ? '#ffd700' : '#ffffff'} strokeWidth={estControle ? 0.35 : 0.15} />
-                  <text textAnchor="middle" dy={0.4} fontSize={0.8} fill="#ffffff" fontWeight="bold">
-                    {p.numero}
-                  </text>
-                  {estPorteur && (
-                    <circle cx={0.9} cy={-0.9} r={0.5} fill="#78350f" stroke="#ffffff" strokeWidth={0.1} />
-                  )}
-                </g>
-              );
-            })}
-
-            {/* Ballon libre ou en vol */}
-            {m && !m.porteur && (
-              <g transform={`translate(${m.ballon.x}, ${m.ballon.y})`}>
-                <ellipse rx={0.7} ry={0.45} fill="#854d0e" stroke="#fef08a" strokeWidth={0.12} />
-              </g>
-            )}
-          </svg>
-        )}
-      </div>
-
-      {/* HUD des contrôles (Joystick virtuel tactile + Boutons d'action) */}
-      <footer className="amical-hud">
-        {/* Joystick flottant gauche */}
-        <div
-          className="amical-joystick-zone"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={handleTouchEnd}
-          aria-label={t('amical.match.joystick')}
-        >
-          <div className="amical-joystick-base">
-            <div
-              className="amical-joystick-manche"
-              style={{
-                transform: `translate(${joystickRef.current.dx * 35}px, ${joystickRef.current.dy * 35}px)`,
-              }}
-            />
-          </div>
-          <span className="amical-joystick-guide">{t('amical.match.dragToRun')}</span>
-        </div>
-
-        {/* Boutons d'action droite */}
-        <div className="amical-actions-zone">
-          <div className="amical-boutons-ligne">
-            <button
-              type="button"
-              className="amical-btn-action secondaire"
-              onClick={() => declencherAction('passeGauche')}
-              title="Passe vers l'aile gauche (Touche Q)"
-            >
-              {t('amical.match.passLeft')}
-            </button>
-            <button
-              type="button"
-              className="amical-btn-action secondaire"
-              onClick={() => declencherAction('passeDroite')}
-              title="Passe vers l'aile droite (Touche E)"
-            >
-              {t('amical.match.passRight')}
-            </button>
-          </div>
-
-          <div className="amical-boutons-ligne">
-            <button
-              type="button"
-              className="amical-btn-action secondaire pied"
-              onClick={() => declencherAction('pied')}
-              title="Coup de pied d'occupation (Touche C)"
-            >
-              {t('amical.match.kick')}
-            </button>
-            <button
-              type="button"
-              className={`amical-btn-action principal ${sprintActif ? 'actif' : ''}`}
-              onClick={() => {
-                setSprintActif((s) => !s);
-                declencherAction('plaquage');
-              }}
-              title="Sprint / Plaquage (Espace ou Shift)"
-            >
-              {t('amical.match.tackleSprint')}
-            </button>
-          </div>
-        </div>
-      </footer>
-
-      {/* Modale de fin de match */}
-      {finDeMatch && (
-        <div className="amical-modale-fin" role="dialog" aria-modal="true">
-          <div className="amical-modale-contenu carte">
-            <h2>{t('amical.match.fullTime')}</h2>
-            <div className="amical-score-final">
-              <span>{equipeA.nom} <b>{scoreA}</b></span>
-              <span>-</span>
-              <span><b>{scoreB}</b> {equipeB.nom}</span>
-            </div>
-            <p className="amical-message-vainqueur">
-              {scoreA > scoreB
-                ? t('amical.match.victory', { name: equipeA.nom })
-                : scoreB > scoreA
-                  ? t('amical.match.victory', { name: equipeB.nom })
-                  : t('amical.match.draw')}
-            </p>
-            <button type="button" className="btn primaire" onClick={onQuitter}>
-              {t('amical.match.backToCollection')}
-            </button>
-          </div>
-        </div>
-      )}
+      {qteAffichee && <div className={`amical-qte amical-qte-${qteAffichee.type}`} style={styleQte}>
+        <strong>{qteAffichee.type === 'melee' ? 'Poussée en mêlée' : qteAffichee.type === 'touche' ? 'Duel en touche' : 'Grattage'}</strong>
+        {qteAffichee.type === 'touche' && <div className="amical-qte-choix">
+          {(['court', 'milieu', 'long'] as const).map((option) => <button type="button" key={option} className={qteAffichee.choix?.[monCamp] === option ? 'actif' : ''} onClick={() => emettreAction('ACTION_SECONDARY', { option })}>{option === 'court' ? 'Court' : option === 'milieu' ? 'Milieu' : 'Long'}</button>)}
+        </div>}
+        <div className="amical-qte-jauge"><i /><span /></div>
+        <button type="button" disabled={qteLocaleDejaJouee} onClick={() => emettreAction('ACTION_PRIMARY')}>{qteLocaleDejaJouee ? 'Timing envoyé' : qteAffichee.type === 'ruck' ? 'Relâcher' : 'Maintenant'}</button>
+      </div>}
+      <div className="amical-geste-indication">Glisse horizontalement pour passer · vers le haut pour jouer au pied</div>
     </div>
-  );
+
+    <footer className="amical-hud">
+      <div className="amical-joystick-zone" onTouchStart={debutJoystick} onTouchMove={bougerJoystick} onTouchEnd={finirJoystick} onTouchCancel={finirJoystick} aria-label="Joystick de déplacement">
+        <div className="amical-joystick-base"><div className="amical-joystick-manche" style={{ transform: `translate(${joystickRef.current.dx * 35}px, ${joystickRef.current.dy * 35}px)` }} /></div><span className="amical-joystick-guide">Déplacement</span>
+      </div>
+      <div className="amical-actions-zone">
+        <button type="button" className="amical-btn-action passe gauche" onClick={() => emettreAction('PASS_LEFT')}><span>‹</span> Passe</button>
+        <button type="button" className={`amical-btn-action sprint ${sprintActif ? 'actif' : ''}`} onPointerDown={() => { setSprintActif(true); inputRef.current.definirSprintTactile(true); }} onPointerUp={() => { setSprintActif(false); inputRef.current.definirSprintTactile(false); }} onPointerCancel={() => { setSprintActif(false); inputRef.current.definirSprintTactile(false); }}>Sprint</button>
+        <button type="button" className="amical-btn-action principal action-contextuelle" onPointerDown={() => { pressionActionRef.current = performance.now(); }} onPointerUp={() => { const duree = performance.now() - pressionActionRef.current; emettreAction(duree > 420 ? 'ACTION_SECONDARY' : 'ACTION_PRIMARY', { dureeMs: duree }); }}><b>{contexte?.libellePrincipal ?? 'Action'}</b><small>maintenir : {contexte?.libelleSecondaire ?? 'action 2'}</small></button>
+        <button type="button" className="amical-btn-action passe droite" onClick={() => emettreAction('PASS_RIGHT')}>Passe <span>›</span></button>
+        {contexte?.piedVisible && <button type="button" className="amical-btn-pied-contextuel" onPointerDown={() => { pressionPiedRef.current = performance.now(); }} onPointerUp={() => emettreAction('KICK', { dureeMs: performance.now() - pressionPiedRef.current })}>Jeu au pied</button>}
+      </div>
+      <button type="button" className="amical-btn-changer" onClick={() => emettreAction('SWITCH_PLAYER')} aria-label="Changer de joueur">Changer</button>
+    </footer>
+
+    <div className="amical-aide-pc">WASD · Maj sprint · Q/E passes · Espace action · F action 2 · C pied · Tab changer</div>
+
+    {finDeMatch && <div className="amical-modale-fin" role="dialog" aria-modal="true"><div className="amical-modale-contenu carte">
+      <h2>Fin du match</h2><div className="amical-score-final"><span>{equipeA.nom} <b>{scoreA}</b></span><span>–</span><span><b>{scoreB}</b> {equipeB.nom}</span></div>
+      <p className="amical-message-vainqueur">{scoreA > scoreB ? `Victoire de ${equipeA.nom}` : scoreB > scoreA ? `Victoire de ${equipeB.nom}` : 'Match nul'}</p>
+      <button type="button" className="btn primaire" onClick={onQuitter}>Retour à la collection</button>
+    </div></div>}
+  </div>;
 }

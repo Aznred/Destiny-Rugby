@@ -7,7 +7,10 @@ import { CompositionCollectionSolo } from './CompositionCollectionSolo';
 import { t } from '../lib/i18n';
 import {
   composerEquipeDepuisCollection,
+  composerEquipeClubProfessionnel,
+  clubsProfessionnelsAmicaux,
   creerSalonAmicalApi,
+  quitterSalonAmicalApi,
   rejoindreSalonAmicalApi,
   synchroniserSalonAmicalApi,
   type EquipeAmical,
@@ -25,13 +28,13 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
   const collection = useGame((s) => s.collectionSolo);
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
-  const pseudoCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Kiri';
+  const pseudoCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Manager';
 
   const catalogue = useMemo(() => catalogueBaseCarriere(), []);
 
   const [nomEquipe, setNomEquipe] = useState(`XV de ${pseudoCompte}`);
   const [couleurEquipe, setCouleurEquipe] = useState('#1e40af');
-  const [onglet, setOnglet] = useState<'compo' | 'enLigne'>('compo');
+  const [onglet, setOnglet] = useState<'compo' | 'ordinateur' | 'enLigne'>('compo');
 
   // Composition interactive sur terrain
   const [compoOuverte, setCompoOuverte] = useState(false);
@@ -42,6 +45,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
       .filter((c) => (collection.quantites[cleCarteSolo(c.sourceId)] ?? 0) > 0)
       .map((c) => carteDepuisSource(c, 'solo', 'collection', 1));
   }, [catalogue, collection.quantites]);
+  const effectifPret = cartesPossedees.length >= 15;
 
   // Salon en ligne
   const [codeSaisi, setCodeSaisi] = useState(codeInitial ?? '');
@@ -54,25 +58,23 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
 
   // Équipe locale composée depuis la collection (rechargée à chaque sauvegarde)
   const monEquipe = useMemo<EquipeAmical>(() => {
+    void versionCompo;
     return composerEquipeDepuisCollection(nomEquipe, couleurEquipe, collection, catalogue);
   }, [nomEquipe, couleurEquipe, collection, catalogue, versionCompo]);
 
-  // Équipe adverse en mode local
-  const equipeAdverseLocale = useMemo<EquipeAmical>(() => {
-    const equipe = composerEquipeDepuisCollection('Régionale All-Stars', '#dc2626', collection, catalogue);
-    return {
-      ...equipe,
-      nom: 'XV des Invités',
-      couleur: '#dc2626',
-    };
-  }, [collection, catalogue]);
+  const clubsProfessionnels = useMemo(() => clubsProfessionnelsAmicaux(catalogue), [catalogue]);
+  const [clubOrdinateur, setClubOrdinateur] = useState(() => clubsProfessionnels[0]?.nom ?? '');
+  const equipeAdverseOrdinateur = useMemo<EquipeAmical>(() => {
+    if (!clubOrdinateur) return monEquipe;
+    return composerEquipeClubProfessionnel(clubOrdinateur, catalogue);
+  }, [clubOrdinateur, catalogue, monEquipe]);
 
   // Démarrage du match
   const [matchEnCours, setMatchEnCours] = useState<boolean>(false);
   const [equipeA, setEquipeA] = useState<EquipeAmical>(monEquipe);
-  const [equipeB, setEquipeB] = useState<EquipeAmical>(equipeAdverseLocale);
+  const [equipeB, setEquipeB] = useState<EquipeAmical>(equipeAdverseOrdinateur);
   const [monCamp, setMonCamp] = useState<'A' | 'B'>('A');
-  const [modeMatch, setModeMatch] = useState<'local' | 'reseau'>('local');
+  const [modeMatch, setModeMatch] = useState<'ordinateur' | 'reseau'>('ordinateur');
 
   // Sondage du salon en ligne
   useEffect(() => {
@@ -109,6 +111,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
   }, [codeSalonActif, role, matchEnCours]);
 
   const creerSalon = async () => {
+    if (!effectifPret) return;
     setChargement(true);
     setErreur(null);
     try {
@@ -124,7 +127,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
   };
 
   const rejoindreSalon = async () => {
-    if (!codeSaisi.trim()) return;
+    if (!codeSaisi.trim() || !effectifPret) return;
     setChargement(true);
     setErreur(null);
     try {
@@ -153,11 +156,12 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
     }
   };
 
-  const lancerTestLocal = () => {
+  const lancerMatchOrdinateur = () => {
+    if (!effectifPret) return;
     setEquipeA(monEquipe);
-    setEquipeB(equipeAdverseLocale);
+    setEquipeB(equipeAdverseOrdinateur);
     setMonCamp('A');
-    setModeMatch('local');
+    setModeMatch('ordinateur');
     setMatchEnCours(true);
   };
 
@@ -170,6 +174,13 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
     });
   };
 
+  const quitterSalon = () => {
+    if (codeSalonActif) void quitterSalonAmicalApi(codeSalonActif, role);
+    setMatchEnCours(false);
+    setCodeSalonActif(null);
+    setSalon(null);
+  };
+
   if (matchEnCours) {
     return (
       <MatchAmicalManette
@@ -178,10 +189,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
         monCamp={monCamp}
         mode={modeMatch}
         salonCode={codeSalonActif ?? undefined}
-        onQuitter={() => {
-          setMatchEnCours(false);
-          setCodeSalonActif(null);
-        }}
+        onQuitter={quitterSalon}
       />
     );
   }
@@ -195,12 +203,13 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             <h2>{t('amical.title')}</h2>
             <p>{t('amical.desc')}</p>
           </div>
-          <button type="button" className="btn fantome amical-fermer" onClick={onFermer} aria-label={t('online.common.close')}>
+          <button type="button" className="btn fantome amical-fermer" onClick={() => { quitterSalon(); onFermer(); }} aria-label={t('online.common.close')}>
             <Icone nom="croix" taille={20} />
           </button>
         </header>
 
         {erreur && <p className="amical-erreur-alerte" role="alert">{erreur}</p>}
+        {!effectifPret && <p className="amical-erreur-alerte" role="alert">Il faut au moins 15 joueurs différents dans ta collection pour lancer un match.</p>}
 
         <nav className="amical-onglets-nav">
           <button
@@ -209,6 +218,13 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             onClick={() => setOnglet('compo')}
           >
             {t('amical.tab.squad')}
+          </button>
+          <button
+            type="button"
+            className={onglet === 'ordinateur' ? 'actif' : ''}
+            onClick={() => setOnglet('ordinateur')}
+          >
+            <Icone nom="equipe" taille={15} /> Ordinateur
           </button>
           <button
             type="button"
@@ -262,13 +278,53 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             </div>
 
             <div className="amical-actions-depart">
-              <button type="button" className="btn primaire amical-btn-lancer-solo" onClick={lancerTestLocal}>
-                <Icone nom="eclair" taille={18} /> {t('amical.testLocal')}
+              <button type="button" className="btn primaire amical-btn-lancer-solo" onClick={() => setOnglet('ordinateur')}>
+                <Icone nom="eclair" taille={18} /> Jouer contre l’ordinateur
               </button>
               <button type="button" className="btn amical-btn-aller-online" onClick={() => setOnglet('enLigne')}>
                 <Icone nom="profil" taille={18} /> {t('amical.playOnline')}
               </button>
             </div>
+          </section>
+        )}
+
+        {onglet === 'ordinateur' && (
+          <section className="amical-section-ordinateur">
+            <div className="amical-ordinateur-intro">
+              <div>
+                <div className="eyebrow">Match de collection</div>
+                <h3>Choisis le club professionnel adverse</h3>
+                <p>Ton XV de collection affronte l’effectif réel du club. Le moteur contrôle l’adversaire.</p>
+              </div>
+              <div className="amical-note-globale">
+                <span>Ton XV</span>
+                <strong>{monEquipe.noteMoyenne}</strong>
+              </div>
+            </div>
+            <label className="amical-select-club">
+              <span>Club professionnel</span>
+              <select value={clubOrdinateur} onChange={(event) => setClubOrdinateur(event.target.value)}>
+                {clubsProfessionnels.map((club) => (
+                  <option key={club.nom} value={club.nom}>
+                    {club.championnat} — {club.nom} ({club.noteMoyenne})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="amical-duel-clubs">
+              <div style={{ '--couleur-club': monEquipe.couleur } as React.CSSProperties}>
+                {monEquipe.embleme ? <img src={monEquipe.embleme} alt="" /> : <Icone nom="equipe" taille={32} />}
+                <b>{monEquipe.nom}</b><span>Note {monEquipe.noteMoyenne}</span>
+              </div>
+              <strong>VS</strong>
+              <div style={{ '--couleur-club': equipeAdverseOrdinateur.couleur } as React.CSSProperties}>
+                {equipeAdverseOrdinateur.embleme ? <img src={equipeAdverseOrdinateur.embleme} alt="" /> : <Icone nom="equipe" taille={32} />}
+                <b>{equipeAdverseOrdinateur.nom}</b><span>Note {equipeAdverseOrdinateur.noteMoyenne}</span>
+              </div>
+            </div>
+            <button type="button" className="btn primaire amical-lancer-ordinateur" onClick={lancerMatchOrdinateur} disabled={!clubOrdinateur || !effectifPret}>
+              <Icone nom="eclair" taille={18} /> Lancer le match
+            </button>
           </section>
         )}
 
@@ -279,7 +335,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
                 <div className="amical-box-creer">
                   <h3>{t('amical.createPrivate')}</h3>
                   <p>{t('amical.createPrivateHelp')}</p>
-                  <button type="button" className="btn primaire" disabled={chargement} onClick={creerSalon}>
+                  <button type="button" className="btn primaire" disabled={chargement || !effectifPret} onClick={creerSalon}>
                     {chargement ? t('amical.creating') : t('amical.createBtn')}
                   </button>
                 </div>
@@ -291,12 +347,12 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
                   <p>{t('amical.joinFriendHelp')}</p>
                   <div className="amical-champ-rejoindre">
                     <input
-                      placeholder="Ex: KIRI-9B"
+                      placeholder="Ex : XV-A1B2C3"
                       value={codeSaisi}
                       onChange={(e) => setCodeSaisi(e.target.value.toUpperCase())}
                       maxLength={12}
                     />
-                    <button type="button" className="btn" disabled={chargement || !codeSaisi.trim()} onClick={rejoindreSalon}>
+                    <button type="button" className="btn" disabled={chargement || !codeSaisi.trim() || !effectifPret} onClick={rejoindreSalon}>
                       {t('amical.joinBtn')}
                     </button>
                   </div>
@@ -348,10 +404,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
                   <button
                     type="button"
                     className="btn fantome"
-                    onClick={() => {
-                      setCodeSalonActif(null);
-                      setSalon(null);
-                    }}
+                    onClick={quitterSalon}
                   >
                     {t('amical.leaveRoom')}
                   </button>

@@ -148,6 +148,29 @@
   display: block;
 }
 
+.amical-terrain-svg .rg-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.amical-geste-indication {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 12;
+  max-width: min(520px, 76vw);
+  padding: .4rem .75rem;
+  border-radius: 999px;
+  background: rgba(5, 12, 24, .72);
+  color: rgba(255, 255, 255, .82);
+  font-size: .72rem;
+  text-align: center;
+  pointer-events: none;
+}
+
 .halo-controle {
   animation: pulsationControle 1.2s infinite ease-in-out;
 }
@@ -214,15 +237,11 @@
 /* Actions à droite */
 .amical-actions-zone {
   pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  align-items: flex-end;
-}
-
-.amical-boutons-ligne {
-  display: flex;
-  gap: 0.6rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(74px, auto));
+  gap: .55rem;
+  align-items: end;
 }
 
 .amical-btn-action {
@@ -238,31 +257,152 @@
   transform: scale(0.92);
 }
 
-.amical-btn-action.secondaire {
-  background: rgba(30, 41, 59, 0.85);
+.amical-btn-action.passe,
+.amical-btn-action.sprint {
+  min-height: 52px;
+  background: rgba(15, 23, 42, 0.9);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 0.55rem 0.9rem;
+  padding: 0.55rem 0.8rem;
   font-size: 0.85rem;
 }
 
-.amical-btn-action.secondaire.pied {
-  background: rgba(180, 83, 9, 0.85);
-  border-color: #f59e0b;
+.amical-btn-action.passe span {
+  color: #7dd3fc;
+  font-size: 1.3rem;
+  vertical-align: -.08rem;
 }
 
 .amical-btn-action.principal {
+  min-width: 110px;
+  min-height: 68px;
   background: linear-gradient(135deg, #e11d48 0%, #9f1239 100%);
   color: #ffffff;
   border: 2px solid #fecdd3;
-  padding: 0.7rem 1.2rem;
+  padding: 0.55rem 1rem;
   font-size: 0.95rem;
 }
 
-.amical-btn-action.principal.actif {
+.amical-btn-action.principal b,
+.amical-btn-action.principal small {
+  display: block;
+}
+
+.amical-btn-action.principal small {
+  margin-top: .2rem;
+  color: rgba(255,255,255,.72);
+  font-size: .58rem;
+  font-weight: 600;
+}
+
+.amical-btn-action.sprint.actif {
   background: linear-gradient(135deg, #10b981 0%, #047857 100%);
   border-color: #a7f3d0;
 }
+
+.amical-btn-pied-contextuel,
+.amical-btn-changer {
+  pointer-events: auto;
+  border: 1px solid rgba(255,255,255,.38);
+  border-radius: 999px;
+  background: rgba(120,53,15,.92);
+  color: #fff;
+  min-height: 38px;
+  padding: .45rem .8rem;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+}
+
+.amical-btn-pied-contextuel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + .55rem);
+}
+
+.amical-btn-changer {
+  margin-left: .6rem;
+  background: rgba(15,23,42,.88);
+}
+
+.amical-aide-pc {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  z-index: 14;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  padding: .28rem .65rem;
+  background: rgba(2,6,23,.66);
+  color: rgba(255,255,255,.72);
+  font-size: .64rem;
+  pointer-events: none;
+}
+
+/* Duel de timing commun au tactile, clavier et manette. */
+.amical-qte {
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  top: 50%;
+  width: min(430px, 88vw);
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: .7rem;
+  padding: 1rem;
+  border: 1px solid rgba(253,224,71,.72);
+  border-radius: 18px;
+  background: rgba(2, 10, 22, .94);
+  box-shadow: 0 18px 60px rgba(0,0,0,.62);
+  text-align: center;
+  color: #fff;
+}
+
+.amical-qte > strong { font-size: 1.05rem; }
+
+.amical-qte-jauge {
+  position: relative;
+  height: 22px;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,.72);
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7f1d1d, #a16207 35%, #14532d 50%, #a16207 65%, #7f1d1d);
+}
+
+.amical-qte-jauge i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--qte-cible) - var(--qte-largeur) / 2);
+  width: var(--qte-largeur);
+  background: rgba(74,222,128,.48);
+  border-inline: 1px solid rgba(187,247,208,.9);
+}
+
+.amical-qte-jauge span {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: var(--qte-progression);
+  width: 4px;
+  transform: translateX(-2px);
+  background: #fff;
+  box-shadow: 0 0 10px #fff;
+}
+
+.amical-qte > button,
+.amical-qte-choix button {
+  min-height: 44px;
+  border: 1px solid rgba(255,255,255,.32);
+  border-radius: 12px;
+  background: #1d4ed8;
+  color: #fff;
+  font-weight: 900;
+}
+
+.amical-qte > button:disabled { background: #334155; color: #cbd5e1; }
+.amical-qte-choix { display: grid; grid-template-columns: repeat(3, 1fr); gap: .45rem; }
+.amical-qte-choix button { background: #172033; }
+.amical-qte-choix button.actif { background: #b45309; border-color: #fde68a; }
 
 /* Modale de fin de match */
 .amical-modale-fin {
@@ -311,9 +451,13 @@
 }
 
 @media (max-width: 600px) {
+  .amical-entete { height: 54px; padding: 0 .45rem; }
+  .amical-btn-retour { width: 34px; height: 34px; overflow: hidden; padding: .35rem; color: transparent; gap: 0; }
+  .amical-btn-retour svg { color: #fff; flex: 0 0 auto; }
+  .amical-scoreboard { gap: .35rem; padding: .25rem .55rem; }
   .amical-nom-equipe {
-    max-width: 80px;
-    font-size: 0.75rem;
+    max-width: 58px;
+    font-size: 0.66rem;
   }
   .amical-score {
     font-size: 1.1rem;
@@ -322,4 +466,23 @@
     padding: 0.6rem 0.9rem;
     font-size: 0.85rem;
   }
+  .amical-endurance-badge { display: none; }
+  .amical-centre-chrono { padding-inline: .3rem; }
+  .amical-badge-chrono { font-size: .76rem; }
+  .amical-mode-label { max-width: 82px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .amical-bandeau-action { top: 58px; max-width: 84vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .72rem; }
+  .amical-hud { bottom: 6px; left: 5px; right: 5px; }
+  .amical-joystick-zone { width: 104px; height: 104px; }
+  .amical-joystick-base { width: 78px; height: 78px; }
+  .amical-joystick-manche { width: 38px; height: 38px; }
+  .amical-actions-zone { grid-template-columns: repeat(2, 70px); gap: .32rem; }
+  .amical-btn-action.passe,
+  .amical-btn-action.sprint { min-height: 46px; padding: .38rem .45rem; font-size: .69rem; }
+  .amical-btn-action.principal { min-width: 70px; min-height: 54px; padding: .4rem .38rem; font-size: .71rem; }
+  .amical-btn-action.principal small { font-size: .49rem; }
+  .amical-btn-pied-contextuel { min-height: 34px; padding: .34rem .58rem; font-size: .66rem; }
+  .amical-btn-changer { position: absolute; right: 0; bottom: 116px; min-height: 32px; padding: .3rem .52rem; font-size: .62rem; }
+  .amical-geste-indication { bottom: 116px; font-size: .62rem; }
+  .amical-aide-pc { display: none; }
+  .amical-qte { top: 45%; width: min(340px, 91vw); padding: .75rem; }
 }

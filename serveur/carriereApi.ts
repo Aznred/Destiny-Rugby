@@ -8,7 +8,7 @@ import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePou
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
-import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
+import type { CompteStocke, LigueStockee, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { OAuth2Client } from 'google-auth-library';
 import { validerEtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 
@@ -46,6 +46,20 @@ const texte = (x: unknown, min: number, max: number, nom: string): string => {
   return x.trim();
 };
 const idValide = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+interface SalonAmicalServeur {
+  code: string;
+  creeLe: number;
+  expireLe: number;
+  hote: { compteId: string; pseudo: string; equipe: any; dernierVu: number; input?: any };
+  invite?: { compteId: string; pseudo: string; equipe: any; dernierVu: number; input?: any };
+  statut: 'attente' | 'pret' | 'en_cours' | 'termine';
+  etatMatch?: any;
+}
+
+// Le gestionnaire HTTP est recréé à chaud en développement. Les salons doivent
+// donc vivre au niveau du module, sinon chaque requête oublie la précédente.
+const salonsAmicaux = new Map<string, SalonAmicalServeur>();
 
 export async function hacherMotDePasse(mot: string): Promise<string> {
   const sel = randomBytes(16).toString('hex');
@@ -112,16 +126,40 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     poidsLigues.delete(id); liguesChaudes.delete(id);
   };
   const sessionsChaudes = new Map<string, { compte: CompteStocke; jusqua: number }>();
-  interface SalonAmicalServeur {
-    code: string;
-    creeLe: number;
-    expireLe: number;
-    hote: { compteId: string; pseudo: string; equipe: any; dernierVu: number; input?: any };
-    invite?: { compteId: string; pseudo: string; equipe: any; dernierVu: number; input?: any };
-    statut: 'attente' | 'pret' | 'en_cours' | 'termine';
-    etatMatch?: any;
-  }
-  const salonsAmicaux = new Map<string, SalonAmicalServeur>();
+  const lireSalonAmical = async (code: string): Promise<SalonAmicalServeur | null> => {
+    const durable = await stockage.salonAmical?.(code);
+    if (durable?.donnees) return structuredClone(durable.donnees) as SalonAmicalServeur;
+    const memoire = salonsAmicaux.get(code);
+    if (!memoire || memoire.expireLe < Date.now()) { salonsAmicaux.delete(code); return null; }
+    return structuredClone(memoire);
+  };
+  const creerSalonPersistant = async (salon: SalonAmicalServeur): Promise<boolean> => {
+    const ligne: SalonAmicalStocke = { code: salon.code, revision: 0, expireLe: salon.expireLe, donnees: salon };
+    if (await stockage.creerSalonAmical?.(ligne)) return true;
+    // Compatibilité immédiate tant que la migration SQL n'est pas encore appliquée.
+    if (await stockage.salonAmical?.(salon.code)) return false;
+    if (salonsAmicaux.has(salon.code)) return false;
+    salonsAmicaux.set(salon.code, structuredClone(salon));
+    return true;
+  };
+  const modifierSalonPersistant = async (
+    code: string, modifier: (salon: SalonAmicalServeur) => void,
+  ): Promise<SalonAmicalServeur | null> => {
+    if (stockage.salonAmical && stockage.comparerEtEcrireSalonAmical) {
+      for (let tentative = 0; tentative < 5; tentative++) {
+        const ligne = await stockage.salonAmical(code);
+        if (!ligne) break;
+        const salon = structuredClone(ligne.donnees) as SalonAmicalServeur;
+        modifier(salon);
+        const suivante: SalonAmicalStocke = { code, revision: ligne.revision + 1, expireLe: salon.expireLe, donnees: salon };
+        if (await stockage.comparerEtEcrireSalonAmical(suivante, ligne.revision)) return salon;
+      }
+    }
+    const salon = salonsAmicaux.get(code);
+    if (!salon || salon.expireLe < Date.now()) { salonsAmicaux.delete(code); return null; }
+    modifier(salon);
+    return structuredClone(salon);
+  };
   const memoriserLigue = (id: string, recue: LigueStockee): LigueStockee => {
     const precedente = liguesChaudes.get(id);
     if (precedente && precedente.etat.version > recue.etat.version) return precedente;
@@ -519,24 +557,24 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         return res.status(200).json({ ok: true });
       }
       if (action === 'creerSalonAmical') {
-        const estKiri = compte.identifiant === 'kiri' || corps.dev === true || compte.pseudo?.toLowerCase() === 'kiri';
-        if (!estKiri) throw new ErreurHttp(403, 'Ce prototype amical est actuellement réservé au compte kiri.');
         const equipe = corps.equipe;
-        if (!equipe || typeof equipe !== 'object') throw new ErreurHttp(400, 'Équipe manquante.');
-        const code = `KIRI-${randomBytes(2).toString('hex').toUpperCase()}`;
+        if (!equipe || typeof equipe !== 'object' || !Array.isArray(equipe.joueurs) || equipe.joueurs.length !== 15) {
+          throw new ErreurHttp(400, 'Un XV complet de 15 joueurs est requis.');
+        }
+        const code = `XV-${randomBytes(3).toString('hex').toUpperCase()}`;
         const salon: SalonAmicalServeur = {
           code,
           creeLe: maintenant,
           expireLe: maintenant + 2 * 3600_000,
           hote: {
             compteId: compte.id,
-            pseudo: String(corps.pseudo || compte.pseudo || 'Kiri'),
+            pseudo: String(corps.pseudo || compte.pseudo || 'Manager'),
             equipe,
             dernierVu: maintenant,
           },
           statut: 'attente',
         };
-        salonsAmicaux.set(code, salon);
+        if (!await creerSalonPersistant(salon)) throw new ErreurHttp(409, 'Le code du salon est déjà utilisé. Réessaie.');
         return res.status(200).json({ ok: true, code, salon: {
           code, creeLe: salon.creeLe, statut: salon.statut,
           hote: { pseudo: salon.hote.pseudo, equipe: salon.hote.equipe, enLigne: true },
@@ -544,17 +582,23 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (action === 'rejoindreSalonAmical') {
         const code = String(corps.code || '').trim().toUpperCase();
-        const salon = salonsAmicaux.get(code);
-        if (!salon || salon.expireLe < maintenant) throw new ErreurHttp(404, 'Salon amical introuvable ou expiré.');
         const equipe = corps.equipe;
-        if (!equipe || typeof equipe !== 'object') throw new ErreurHttp(400, 'Équipe manquante.');
-        salon.invite = {
-          compteId: compte.id,
-          pseudo: String(corps.pseudo || compte.pseudo || 'Ami'),
-          equipe,
-          dernierVu: maintenant,
-        };
-        salon.statut = 'pret';
+        if (!equipe || typeof equipe !== 'object' || !Array.isArray(equipe.joueurs) || equipe.joueurs.length !== 15) {
+          throw new ErreurHttp(400, 'Un XV complet de 15 joueurs est requis.');
+        }
+        const salon = await modifierSalonPersistant(code, (courant) => {
+          if (courant.expireLe < maintenant) throw new ErreurHttp(404, 'Salon amical introuvable ou expiré.');
+          if (courant.hote.compteId === compte.id) throw new ErreurHttp(400, 'Tu es déjà l’hôte de ce salon.');
+          if (courant.invite && courant.invite.compteId !== compte.id && maintenant - courant.invite.dernierVu < 15000) {
+            throw new ErreurHttp(409, 'Ce salon a déjà un adversaire.');
+          }
+          courant.invite = {
+            compteId: compte.id, pseudo: String(corps.pseudo || compte.pseudo || 'Ami'),
+            equipe, dernierVu: maintenant,
+          };
+          courant.statut = 'pret';
+        });
+        if (!salon) throw new ErreurHttp(404, 'Salon amical introuvable ou expiré.');
         return res.status(200).json({ ok: true, code, salon: {
           code, creeLe: salon.creeLe, statut: salon.statut,
           hote: { pseudo: salon.hote.pseudo, equipe: salon.hote.equipe, enLigne: (maintenant - salon.hote.dernierVu) < 15000 },
@@ -563,18 +607,34 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (action === 'syncSalonAmical') {
         const code = String(corps.code || '').trim().toUpperCase();
-        const salon = salonsAmicaux.get(code);
-        if (!salon) throw new ErreurHttp(404, 'Salon amical introuvable.');
         const role = corps.role === 'invite' ? 'invite' : 'hote';
-        if (role === 'hote') {
-          salon.hote.dernierVu = maintenant;
-          if (corps.input) salon.hote.input = corps.input;
-          if (corps.etatMatch !== undefined) salon.etatMatch = corps.etatMatch;
-          if (corps.statut) salon.statut = corps.statut;
-        } else if (salon.invite) {
-          salon.invite.dernierVu = maintenant;
-          if (corps.input) salon.invite.input = corps.input;
+        const input = corps.input && typeof corps.input === 'object' ? corps.input as Record<string, unknown> : undefined;
+        if (input) {
+          const evenements = Array.isArray(input.evenements) ? input.evenements : [];
+          if (evenements.length > 16 || !Number.isFinite(input.dx) || !Number.isFinite(input.dy)
+            || Math.abs(Number(input.dx)) > 1.1 || Math.abs(Number(input.dy)) > 1.1) {
+            throw new ErreurHttp(400, 'Commandes de match invalides.');
+          }
         }
+        const etatMatch = corps.etatMatch && typeof corps.etatMatch === 'object' ? corps.etatMatch as Record<string, unknown> : undefined;
+        if (etatMatch && (!Array.isArray(etatMatch.pions) || etatMatch.pions.length !== 30 || JSON.stringify(etatMatch).length > 64_000)) {
+          throw new ErreurHttp(400, 'État de match invalide.');
+        }
+        const salon = await modifierSalonPersistant(code, (courant) => {
+          if (role === 'hote' && courant.hote.compteId !== compte.id) throw new ErreurHttp(403, 'Tu n’es pas l’hôte de ce salon.');
+          if (role === 'invite' && courant.invite?.compteId !== compte.id) throw new ErreurHttp(403, 'Tu n’es pas l’adversaire de ce salon.');
+          if (role === 'hote') {
+            courant.hote.dernierVu = maintenant;
+            if (input) courant.hote.input = input;
+            if (etatMatch !== undefined) courant.etatMatch = etatMatch;
+            if (corps.statut === 'en_cours' || corps.statut === 'termine') courant.statut = corps.statut;
+          } else if (courant.invite) {
+            courant.invite.dernierVu = maintenant;
+            if (input) courant.invite.input = input;
+          }
+          courant.expireLe = maintenant + 2 * 3600_000;
+        });
+        if (!salon) throw new ErreurHttp(404, 'Salon amical introuvable.');
         const invitePresent = !!salon.invite && (maintenant - salon.invite.dernierVu) < 15000;
         const hotePresent = (maintenant - salon.hote.dernierVu) < 15000;
         return res.status(200).json({
@@ -586,14 +646,22 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           hotePresent,
           equipeHote: salon.hote.equipe,
           equipeInvite: salon.invite?.equipe,
+          tempsServeur: maintenant,
         });
       }
       if (action === 'quitterSalonAmical') {
         const code = String(corps.code || '').trim().toUpperCase();
-        const salon = salonsAmicaux.get(code);
+        const salon = await lireSalonAmical(code);
         if (salon) {
-          if (corps.role === 'hote') salonsAmicaux.delete(code);
-          else { salon.statut = 'attente'; salon.invite = undefined; }
+          if (corps.role === 'hote' && salon.hote.compteId === compte.id) {
+            salonsAmicaux.delete(code);
+            await stockage.supprimerSalonAmical?.(code);
+          }
+          else if (corps.role === 'invite' && salon.invite?.compteId === compte.id) {
+            await modifierSalonPersistant(code, (courant) => {
+              courant.statut = 'attente'; courant.invite = undefined; courant.etatMatch = undefined;
+            });
+          } else throw new ErreurHttp(403, 'Tu ne fais pas partie de ce salon.');
         }
         return res.status(200).json({ ok: true });
       }

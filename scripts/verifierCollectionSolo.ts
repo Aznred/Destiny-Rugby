@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { catalogueBaseCarriere, PACKS_CARRIERE } from '../src/lib/ligue/catalogueCarriere';
 import { cleCarteSolo, etatCollectionSoloVide, IDS_PACKS_SOLO_GRATUITS, normaliserCollectionSolo, ouvrirPackSolo, packCollectionSolo, prixPackSolo } from '../src/lib/collectionSolo';
+import { apparencePack } from '../src/lib/presentationPacks';
+import { clubsProfessionnelsAmicaux, composerEquipeClubProfessionnel, convertirEnCoequipiers } from '../src/lib/amicalCollection';
+import { creerMatch } from '../src/lib/moteur/moteur';
+import {
+  actionContextuelleArcade, creerQteArcade, evaluerQteArcade, InputManagerArcade,
+  MachineEtatsJoueurs, selectionnerJoueurPertinent,
+} from '../src/lib/moteur/arcade';
 
 const catalogue = catalogueBaseCarriere();
 assert.ok(PACKS_CARRIERE.length >= 30, 'Tous les packs du jeu doivent etre proposes dans la roue solo.');
@@ -28,6 +35,45 @@ const packOrGratuit = gratuitsSolo.find(pack => pack.id === 'or')!;
 const chanceBleueOr = chanceDansUnPack(packOrGratuit.probabilites.elite, packOrGratuit.cartes);
 assert.ok(chanceBleueOr >= 0.009 && chanceBleueOr <= 0.011, 'Le pack Or gratuit doit donner environ une bleue sur 100 packs.');
 assert.deepEqual(packCollectionSolo(premierPayant).probabilites, premierPayant.probabilites, 'Les probabilites des packs payants doivent rester intactes.');
+assert.equal(apparencePack(gratuitsSolo.find(pack => pack.id === 'standard')!), 'argent', 'Le pack Argent doit utiliser le modele 3D argent meme si le Bronze reste le tirage le plus courant.');
+
+const clubsProfessionnels = clubsProfessionnelsAmicaux(catalogue);
+assert.ok(clubsProfessionnels.length >= 20, 'Le mode contre ordinateur doit proposer plusieurs championnats professionnels.');
+const equipeOrdinateur = composerEquipeClubProfessionnel(clubsProfessionnels[0].nom, catalogue);
+assert.equal(equipeOrdinateur.joueurs.length, 15, 'Le club professionnel adverse doit aligner un XV complet.');
+assert.ok(equipeOrdinateur.joueurs.every(joueur => joueur.clubReel === clubsProfessionnels[0].nom), 'Le XV ordinateur doit uniquement contenir les joueurs du club choisi.');
+
+const autreEquipe = composerEquipeClubProfessionnel(clubsProfessionnels.find(club => club.nom !== clubsProfessionnels[0].nom)!.nom, catalogue);
+const matchArcade = creerMatch(
+  equipeOrdinateur.nom, autreEquipe.nom,
+  convertirEnCoequipiers(equipeOrdinateur.joueurs), convertirEnCoequipiers(autreEquipe.joueurs),
+  20, 17, 'verification-arcade', undefined, { niveau: 'pro', tempsReel: true, controle: false },
+);
+matchArcade.phase = 'jeuCourant';
+matchArcade.porteur = matchArcade.pions.find(pion => pion.cote === 'A')!;
+matchArcade.possession = 'A';
+assert.equal(selectionnerJoueurPertinent(matchArcade, 'A')?.id, matchArcade.porteur.id, 'Le porteur doit devenir automatiquement le joueur controle en attaque.');
+const defenseur = selectionnerJoueurPertinent(matchArcade, 'B');
+assert.ok(defenseur && defenseur.cote === 'B', 'Le changement defensif doit choisir un joueur capable d intervenir.');
+assert.equal(actionContextuelleArcade(matchArcade, matchArcade.porteur).principale, 'raffut', 'L action principale du porteur doit devenir un raffut.');
+assert.equal(actionContextuelleArcade(matchArcade, defenseur).principale, 'plaquage', 'L action principale du defenseur doit devenir un plaquage.');
+
+const commandes = new InputManagerArcade();
+assert.equal(commandes.enfoncer('KeyQ'), 'PASS_LEFT', 'Le clavier doit etre traduit en action logique.');
+commandes.emettre('PASS_LEFT');
+assert.equal(commandes.trame(null).evenements[0]?.action, 'PASS_LEFT', 'La trame reseau doit transporter l intention, pas la touche physique.');
+commandes.acquitter(1);
+assert.equal(commandes.trame(null).evenements.length, 0, 'Une commande acquittee ne doit jamais etre rejouee en double.');
+
+const machine = new MachineEtatsJoueurs();
+assert.ok(machine.transition('A1', 'SCRUM'));
+assert.equal(machine.transition('A1', 'TACKLING'), false, 'Un joueur en melee ne doit pas pouvoir lancer un plaquage.');
+assert.equal(machine.autorise('A1', 'ACTION_PRIMARY'), true, 'La QTE de melee doit rester utilisable.');
+
+const qte = creerQteArcade('melee', 'meme-graine', 10_000);
+const qteBis = creerQteArcade('melee', 'meme-graine', 10_000);
+assert.deepEqual(qte, qteBis, 'La fenetre QTE doit etre deterministe sur tous les clients.');
+assert.equal(evaluerQteArcade(qte, qte.debutServeur + qte.cible * qte.dureeMs).qualite, 'excellent', 'Un input dans la zone centrale doit etre excellent, independamment du framerate.');
 
 const cles = catalogue.map(carte => cleCarteSolo(carte.sourceId));
 assert.equal(new Set(cles).size, catalogue.length, 'Les empreintes des joueurs doivent rester uniques.');

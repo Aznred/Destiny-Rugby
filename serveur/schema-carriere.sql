@@ -96,5 +96,16 @@ create table if not exists carriere_presences (
 );
 create index if not exists carriere_presences_vu_idx on carriere_presences (ligue,vu_le);
 create index if not exists carriere_presences_nettoyage_idx on carriere_presences (vu_le);
+
+-- Salons privés de collection. Le JSON reste petit (deux XV, inputs et un
+-- instantané compact) et le CAS empêche deux requêtes simultanées de s'écraser.
+create table if not exists carriere_salons_amicaux (
+  code text primary key,
+  revision integer not null default 0 check (revision >= 0),
+  expire_le timestamptz not null,
+  donnees jsonb not null check (jsonb_typeof(donnees) = 'object'),
+  modifie_le timestamptz not null default now()
+);
+create index if not exists carriere_salons_amicaux_expire_idx on carriere_salons_amicaux (expire_le);
 -- Ne pas purger carriere_commandes pendant la vie d'une ligue : ses reçus
 -- interdisent qu'une ancienne requête rejouée rachète un pack ou un joueur.

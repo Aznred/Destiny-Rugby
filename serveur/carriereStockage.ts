@@ -21,6 +21,12 @@ export interface RecompensesAchat {
 }
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
 export interface PresenceMatchStockee { match: string; compte: string; vu: number }
+export interface SalonAmicalStocke {
+  code: string;
+  revision: number;
+  expireLe: number;
+  donnees: unknown;
+}
 /**
  * ⚠️ L'ÉCRAN « MES LIGUES » N'A BESOIN QUE DE ÇA, et il téléchargeait tout.
  * `ligues()` faisait `select *` : pour afficher sept champs par ligue, il
@@ -92,6 +98,11 @@ export interface StockageCarriere {
   presencesActives(ligue: string, depuis: number): Promise<PresenceMatchStockee[] | null>;
   /** Purge les données temporaires : présences, sessions expirées et compteurs de débit. */
   nettoyerPresences(avant: number): Promise<void>;
+  /** Petit état temps réel, séparé des lourdes sauvegardes de carrière. */
+  salonAmical?(code: string): Promise<SalonAmicalStocke | null>;
+  creerSalonAmical?(salon: SalonAmicalStocke): Promise<boolean>;
+  comparerEtEcrireSalonAmical?(salon: SalonAmicalStocke, revision: number): Promise<boolean>;
+  supprimerSalonAmical?(code: string): Promise<void>;
   actives(): Promise<string[]>;
 }
 
@@ -616,6 +627,44 @@ export function stockageNeon(url: string): StockageCarriere {
       catch (erreur) { if ((erreur as { code?: string }).code !== '42P01') throw erreur; }
       await sql`delete from sessions where expire_le<now()`;
       await sql`delete from carriere_debits where debut<${avant}`;
+    },
+    async salonAmical(code) {
+      try {
+        const r = await sql`select code,revision,extract(epoch from expire_le)*1000 as expire_le,donnees
+          from carriere_salons_amicaux where code=${code} and expire_le>now()`;
+        if (!r[0]) return null;
+        return { code: String(r[0].code), revision: Number(r[0].revision), expireLe: Number(r[0].expire_le), donnees: r[0].donnees };
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return null;
+        throw erreur;
+      }
+    },
+    async creerSalonAmical(salon) {
+      try {
+        const r = await sql`insert into carriere_salons_amicaux (code,revision,expire_le,donnees)
+          values (${salon.code},${salon.revision},to_timestamp(${salon.expireLe / 1000}),${JSON.stringify(salon.donnees)}::jsonb)
+          on conflict do nothing returning code`;
+        return r.length === 1;
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return false;
+        throw erreur;
+      }
+    },
+    async comparerEtEcrireSalonAmical(salon, revision) {
+      try {
+        const r = await sql`update carriere_salons_amicaux
+          set donnees=${JSON.stringify(salon.donnees)}::jsonb,revision=revision+1,
+              expire_le=to_timestamp(${salon.expireLe / 1000}),modifie_le=now()
+          where code=${salon.code} and revision=${revision} and expire_le>now() returning code`;
+        return r.length === 1;
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return false;
+        throw erreur;
+      }
+    },
+    async supprimerSalonAmical(code) {
+      try { await sql`delete from carriere_salons_amicaux where code=${code}`; }
+      catch (erreur) { if ((erreur as { code?: string }).code !== '42P01') throw erreur; }
     },
     async actives() { return (await sansColonne(
       () => sql`select id from carriere_ligues where (phase='saison' and reveil_match<=now()) or (phase='salon' and echeance<=now()) order by coalesce(reveil_match,echeance)`,

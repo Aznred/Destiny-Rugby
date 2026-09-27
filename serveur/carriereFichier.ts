@@ -5,7 +5,7 @@ import { CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atel
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { pushLocal, type BasePush } from './pushStockage.js';
 import { dirname } from 'node:path';
-import type { CompteStocke, LigueStockee, StockageCarriere } from './carriereStockage.js';
+import type { CompteStocke, LigueStockee, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
 import { vueCarriere } from '../src/lib/ligue/carriere.js';
 import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
@@ -20,6 +20,7 @@ interface BaseLocale {
   recus: Record<string, boolean>;
   debits: Record<string, { debut: number; nombre: number }>;
   boutiques?: Record<string, EtatBoutiqueCompte>;
+  salonsAmicaux?: SalonAmicalStocke[];
 }
 export function stockageFichier(fichier: string): StockageCarriere {
   mkdirSync(dirname(fichier), { recursive: true });
@@ -34,6 +35,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
   base.push ??= { abonnements: [], envois: {} };
   base.boutiques ??= {};
   base.achatsStripe ??= {};
+  base.salonsAmicaux ??= [];
   // L'échéance ne vaut que pour ce processus : le serveur de développement
   // redémarre souvent, et une échéance perdue coûte une relecture, rien de plus.
   const echeances: Record<string, number> = {};
@@ -114,6 +116,27 @@ export function stockageFichier(fichier: string): StockageCarriere {
       base.debits[cle] = { debut, nombre: ancien?.debut === debut ? ancien.nombre + 1 : 1 };
       // Le quota est un frein opérationnel local ; les données du jeu sont persistées.
       return base.debits[cle].nombre <= maximum;
+    },
+    async salonAmical(code) {
+      const index = base.salonsAmicaux!.findIndex((salon) => salon.code === code);
+      if (index < 0) return null;
+      if (base.salonsAmicaux![index].expireLe < Date.now()) {
+        base.salonsAmicaux!.splice(index, 1); sauver(); return null;
+      }
+      return copie(base.salonsAmicaux![index]);
+    },
+    async creerSalonAmical(salon) {
+      if (base.salonsAmicaux!.some((existant) => existant.code === salon.code)) return false;
+      base.salonsAmicaux!.push(copie(salon)); sauver(); return true;
+    },
+    async comparerEtEcrireSalonAmical(salon, revision) {
+      const index = base.salonsAmicaux!.findIndex((existant) => existant.code === salon.code && existant.revision === revision);
+      if (index < 0) return false;
+      base.salonsAmicaux![index] = copie({ ...salon, revision: revision + 1 }); sauver(); return true;
+    },
+    async supprimerSalonAmical(code) {
+      const index = base.salonsAmicaux!.findIndex((salon) => salon.code === code);
+      if (index >= 0) { base.salonsAmicaux!.splice(index, 1); sauver(); }
     },
     // Le serveur de développement rend le MÊME résumé que Neon : sans ça, un
     // champ manquant ne se verrait qu'en production.

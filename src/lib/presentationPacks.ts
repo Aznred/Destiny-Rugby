@@ -4,6 +4,11 @@ import { t } from './i18n';
 /** L'apparence reflète le palier dominant, sans inventer de garantie. */
 export function apparencePack(pack: PackCarriere): RareteCarriere {
   if (pack.garantie) return pack.garantie;
+  // Les packs de base gardent la couleur annoncée par leur nom. Le pack
+  // Argent contient volontairement davantage de Bronze pour son équilibrage,
+  // mais ne doit pas être présenté comme un pack Bronze dans la boutique.
+  if (pack.id === 'bronze') return 'bronze';
+  if (pack.id === 'standard') return 'argent';
   return PALIERS_PACK.reduce((a, b) => pack.probabilites[b] > pack.probabilites[a] ? b : a, 'bronze');
 }
 
