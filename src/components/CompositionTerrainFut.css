@@ -625,6 +625,66 @@
  .cel-compo .ct-feuille-fut .manager-reserves .manager-reserve-carte { flex:0 0 76px !important; width:76px !important; min-width:76px !important; }
 }
 
+/* Sur téléphone, les postes ont besoin d'une vraie hauteur : le terrain et
+   sa réserve défilent avec la feuille au lieu de comprimer les quinze cartes
+   dans les quelques pixels laissés par les barres du haut et du bas. */
+@media (max-width:700px) {
+  :is(.cel, .cel-fullscreen-compo) > .cel-compo.cel-compo-etendue {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cel-compo > .manager-feuille-visuelle.ct-feuille-fut {
+    flex: none;
+    height: auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: clamp(850px, 250vw, 1050px) 48px 34px 132px;
+  }
+  .cel-compo .manager-feuille-visuelle > .ct-plateau,
+  .cel-compo .ct-plateau > .manager-terrain-cadre {
+    height: 100%;
+    min-height: 0;
+  }
+  .cel-compo:not(.cel-compo-etendue) .ct-plateau > .manager-terrain-cadre {
+    height: 100%;
+    min-height: 0;
+  }
+  :is(.cel, .cel-fullscreen-compo) .cel-compo .ct-feuille-fut .manager-terrain-xv {
+    --ct-carte: min(10cqw, 44px);
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+  .cel-compo .ct-feuille-fut .manager-position { width: var(--ct-carte) !important; }
+  .cel-compo .ct-feuille-fut :is(.manager-banc-cartes, .manager-reserves > div) {
+    gap: 12px !important;
+    padding: 7px 10px;
+  }
+  .cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut,
+  .cel-compo .ct-feuille-fut .manager-reserve-carte.ct-reserve-fut,
+  .cel-compo .ct-feuille-fut .manager-reserves .manager-reserve-carte {
+    flex: 0 0 66px !important;
+    width: 66px !important;
+    min-width: 66px !important;
+    max-width: 66px !important;
+  }
+  .cel-compo .ct-plateau > .ct-panneau {
+    position: fixed;
+    inset: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    height: auto;
+    max-height: none;
+    z-index: 130;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #b9d3d880;
+    border-radius: 14px;
+    box-shadow: 0 0 0 100vmax #00131db5, 0 20px 50px #0009;
+  }
+}
+
 /* Le constructeur solo et la carrière entraîneur gardent quatre zones stables
    sur PC. Les règles de la carrière en ligne ne doivent pas déplacer le banc
    sur le terrain ou agrandir l'aperçu quand une carte est sélectionnée. */
