@@ -1,5 +1,5 @@
-import type { CarteCarriere, RareteCarriere, PackCarriere } from './ligue/typesCarriere';
-import { t } from './i18n';
+import type { CarteCarriere, RareteCarriere, PackCarriere } from './ligue/typesCarriere.js';
+import { t } from './i18n.js';
 
 /** L'apparence reflète le palier dominant, sans inventer de garantie. */
 export function apparencePack(pack: PackCarriere): RareteCarriere {
