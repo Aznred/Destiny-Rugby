@@ -17,7 +17,7 @@
 // ⚠️ LE MOTEUR N'EST PAS DANS LE NAVIGATEUR, ET IL NE DOIT PAS Y ÊTRE. Le
 // rejouer ici demanderait la GRAINE, les deux feuilles et les cibles de score —
 // c'est-à-dire livrer au client le plan de l'adversaire. Le serveur reste seul
-// juge : il envoie trente positions toutes les deux secondes, et cet écran en
+// juge : il envoie trente positions à chaque sondage, et cet écran en
 // fait soixante images par seconde.
 //
 // ═══ ON INTERPOLE, ON N'EXTRAPOLE PAS ════════════════════════════════════════
@@ -38,7 +38,7 @@
 //     vraies ET repart dans la bonne direction. C'est la courbe que le moteur a
 //     réellement parcourue, à quelques centimètres près.
 //
-// Le prix est un retard de deux secondes sur le direct. Personne ne le voit :
+// Le prix est un léger retard sur le direct. Personne ne le voit :
 // il n'y a rien à côté pour le comparer.
 
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
@@ -59,7 +59,7 @@ import { SpriteArbitre, SpriteRugbymanMemo } from './SpriteRugbyman';
 /**
  * Le retard de rendu, en secondes réelles.
  *
- * ⚠️ IL DOIT DÉPASSER L'INTERVALLE DE SONDAGE (deux secondes), sinon le relevé
+ * ⚠️ IL DOIT DÉPASSER L'INTERVALLE DE SONDAGE (une seconde), sinon le relevé
  * qui ferme l'interpolation n'est pas encore arrivé et on retombe sur de la
  * prédiction. Une marge de 20 % absorbe la latence du réseau.
  */
@@ -164,6 +164,10 @@ function tracerTrajectoires(vol: NonNullable<TerrainDirect['vol']>) {
 
 function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote, carton, modeDemo, pause, vitesseDemo }: Props) {
   const scene = useRef<HTMLDivElement>(null);
+  const svg = useRef<SVGSVGElement>(null);
+  const groupeTerrain = useRef<SVGGElement>(null);
+  const noeudsPions = useRef(new Map<string, { noeud: SVGGElement; origine: Vec }>());
+  const noeudBallon = useRef<{ noeud: SVGGElement; origine: Vec } | null>(null);
   const boite = useRef({ largeur: 1, hauteur: 1 });
   const camera = useRef(new Camera());
   const vueRef = useRef<Vue | null>(null);
@@ -238,6 +242,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
 
     let image = 0;
     let precedent = performance.now() / 1000;
+    let prochainRenduReact = precedent;
     let actif = true;
     let imageAffichee: ImageDirect | null = null;
     const avancer = (brut: number) => {
@@ -395,7 +400,23 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
         cible, cadrage, largeur / hauteur,
         angleDeVue(reglages.current.monCote === 'exterieur' ? 'B' : 'A', hauteur > largeur), dtReel,
       );
-      redessiner((n) => n + 1);
+      // Positions et caméra suivent chaque image de l'écran. React ne redessine
+      // les 30 sprites et le bandeau qu'à leur cadence utile (24 i/s) : cela
+      // évite de reconstruire tout le DOM SVG soixante fois par seconde.
+      const vueCourante = vueRef.current;
+      svg.current?.setAttribute('viewBox', vueCourante.viewBox);
+      groupeTerrain.current?.setAttribute('transform', vueCourante.transform);
+      for (const [id, { noeud, origine }] of noeudsPions.current) {
+        const pos = pions.current.get(id);
+        if (pos) noeud.setAttribute('transform', `translate(${(pos.x - origine.x).toFixed(2)} ${(pos.y - origine.y).toFixed(2)})`);
+      }
+      const ballonDessine = noeudBallon.current;
+      if (ballonDessine) ballonDessine.noeud.setAttribute('transform',
+        `translate(${(ballon.current.x - ballonDessine.origine.x).toFixed(2)} ${(ballon.current.y - ballonDessine.origine.y).toFixed(2)})`);
+      if (maintenant >= prochainRenduReact) {
+        redessiner((n) => n + 1);
+        prochainRenduReact = Math.max(prochainRenduReact + 1 / 24, maintenant + 1 / 120);
+      }
       image = requestAnimationFrame(avancer);
     };
     image = requestAnimationFrame(avancer);
@@ -434,7 +455,11 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     const mien = monCote !== undefined && p.cote === monCote;
     const nomCourt = p.nom.split(' ').at(-1) ?? p.nom;
     const largeurNom = Math.max(tailleTexte * 3.2, nomCourt.length * tailleTexte * 0.64);
-    return <g key={p.id} className={mien ? 'rg-joueur-moi' : undefined}>
+    return <g key={p.id} className={mien ? 'rg-joueur-moi' : undefined}
+      ref={noeud => {
+        if (noeud) noeudsPions.current.set(p.id, { noeud, origine: pos });
+        else noeudsPions.current.delete(p.id);
+      }}>
       <SpriteRugbymanMemo pion={p} position={pos} terrain={affiche} maillot={maillots[p.cote]}
         porteur={porte} positionPorteur={porteurPosition} redresser={vue?.redresser}
         hauteurMetres={hauteurSprite} temps={tempsAnimation} angleVue={vue?.angle ?? 0} />
@@ -480,13 +505,14 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   return (
     <div className="cel-scene" ref={scene}>
       <svg
+        ref={svg}
         className="cel-pelouse"
         viewBox={vue?.viewBox ?? `0 0 ${LONGUEUR} ${LARGEUR}`}
         preserveAspectRatio="xMidYMid slice"
         role="img"
         aria-label={`${nomDomicile} contre ${nomExterieur} : positions réelles des joueurs et du ballon`}
       >
-        <g transform={vue?.transform}>
+        <g ref={groupeTerrain} transform={vue?.transform}>
           <PelouseMemo />
           {conquete?.type === 'melee' && conquete.pousseVers && (
             <g className="cel-conquete-dessin">
@@ -528,7 +554,9 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
               </g>
             );
           })()}
-          {!affiche.porteurId && affiche.conquete?.type !== 'touche' && <>
+          {!affiche.porteurId && affiche.conquete?.type !== 'touche' && <g ref={noeud => {
+            noeudBallon.current = noeud ? { noeud, origine: { x: b.x, y: b.y } } : null;
+          }}>
             {b.h > 0.02 && <ellipse cx={b.x} cy={b.y} rx={rayonBallon * (0.62 + b.h * 0.04)} ry={rayonBallon * (0.34 + b.h * 0.02)} fill="rgba(0,0,0,.32)" />}
             {b.h > 1.2 && <ellipse cx={b.x} cy={b.y - b.h * 2.2} rx={rayonBallon * (1.2 + b.h * 0.12)} ry={rayonBallon * (0.8 + b.h * 0.08)} fill="rgba(255,245,180,.25)" />}
             <g transform={`rotate(${rotationBallon.toFixed(1)} ${b.x} ${b.y - b.h * 2.2})`}>
@@ -541,7 +569,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
               <path d={`M ${b.x - rayonBallon * .22} ${b.y - b.h * 2.2} L ${b.x + rayonBallon * .22} ${b.y - b.h * 2.2}`}
                 stroke="#80552d" strokeWidth={rayonBallon * .09} strokeLinecap="round" />
             </g>
-          </>}
+          </g>}
         </g>
         {/* La flèche vit hors du groupe pivoté : elle est posée en coordonnées
             d'écran, comme les pastilles du bandeau. */}

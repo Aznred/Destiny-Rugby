@@ -122,12 +122,37 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     etatMatch?: any;
   }
   const salonsAmicaux = new Map<string, SalonAmicalServeur>();
-  const memoriserLigue = (id: string, ligne: LigueStockee) => {
+  const memoriserLigue = (id: string, recue: LigueStockee): LigueStockee => {
+    const precedente = liguesChaudes.get(id);
+    if (precedente && precedente.etat.version > recue.etat.version) return precedente;
+    // Deux sondages peuvent finir dans le désordre tout en portant la même
+    // version durable. Le cache ne doit jamais remplacer un direct plus avancé
+    // par l'ancien score d'une réponse réseau plus lente.
+    const matchsPrecedents = precedente && precedente.etat.version === recue.etat.version
+      ? new Map(precedente.etat.rencontres.map(r => [r.id, r.match])) : null;
+    const ligne = matchsPrecedents
+      ? {
+          ...recue,
+          etat: {
+            ...recue.etat,
+            rencontres: recue.etat.rencontres.map(r => {
+              const avant = matchsPrecedents.get(r.id);
+              const apres = r.match;
+              if (!avant || !apres || avant.id !== apres.id || avant.debut !== apres.debut) return r;
+              const regresse = avant.termine && !apres.termine
+                || apres.horloge + 1e-6 < avant.horloge
+                || apres.score.domicile < avant.score.domicile
+                || apres.score.exterieur < avant.score.exterieur;
+              return regresse ? { ...r, match: avant } : r;
+            }),
+          },
+        }
+      : recue;
     octetsLigues -= poidsLigues.get(id) ?? 0;
     poidsLigues.delete(id);
     liguesChaudes.delete(id);
     const poids = Buffer.byteLength(JSON.stringify(ligne.etat));
-    if (poids > 32 * 1024 * 1024) return;
+    if (poids > 32 * 1024 * 1024) return ligne;
     liguesChaudes.set(id, ligne);
     poidsLigues.set(id, poids); octetsLigues += poids;
     while (liguesChaudes.size > 32 || octetsLigues > 32 * 1024 * 1024) {
@@ -135,21 +160,22 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       octetsLigues -= poidsLigues.get(ancien) ?? 0;
       poidsLigues.delete(ancien); liguesChaudes.delete(ancien);
     }
+    return ligne;
   };
   async function lireLigue(id: string, connue?: { version: number; comptes: string[]; echeance: number | null }) {
     const cache = liguesChaudes.get(id);
     if (!cache) {
       const ligne = await stockage.ligue(id);
-      if (ligne) memoriserLigue(id, ligne);
-      return ligne;
+      return ligne ? memoriserLigue(id, ligne) : ligne;
     }
     const entete = connue ?? await stockage.entete(id);
     if (entete && entete.version === cache.etat.version) {
       const ligne = { ...cache, comptes: entete.comptes, echeance: entete.echeance };
-      memoriserLigue(id, ligne); return ligne;
+      return memoriserLigue(id, ligne);
     }
     const ligne = await stockage.ligue(id);
-    if (ligne) memoriserLigue(id, ligne); else oublierLigue(id);
+    if (ligne) return memoriserLigue(id, ligne);
+    oublierLigue(id);
     return ligne;
   }
   async function avecPresences(etat: EtatCarriereEnLigne, maintenant: number) {
@@ -247,9 +273,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // reviendrait avec une version PLUS PETITE — que l'écran ignore, parce
         // qu'il refuse par principe de revenir en arrière.
         const avance = { ...suivant, version: ligne.etat.version };
-        memoriserLigue(id, { ...ligne, etat: avance, echeance });
-        await notifier(avance);
-        return avance;
+        const stable = memoriserLigue(id, { ...ligne, etat: avance, echeance }).etat;
+        await notifier(stable);
+        return stable;
       }
       const maj: LigueStockee = { ...ligne, etat: durable, comptes: comptesEtat(durable) };
       if (await stockage.comparerEtEcrire(maj, ligne.version, verifierRecu ? { compte, requete } : undefined)) {

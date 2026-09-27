@@ -479,7 +479,6 @@ export function CompositionTerrainManager({
   automatismes, onCapitaine, onButeur, onMeilleureEquipe, rendreCarte, rendreSousCarte,
 }: Props) {
   const [selection, setSelection] = useState<string | null>(null);
-  const [ficheMasquee, setFicheMasquee] = useState<string | null>(null);
   const [joueurGlisse, setJoueurGlisse] = useState<string | null>(null);
   const [cibleDepot, setCibleDepot] = useState<string | null>(null);
   const [reservesOuvertes, setReservesOuvertes] = useState(!rendreCarte);
@@ -542,7 +541,9 @@ export function CompositionTerrainManager({
     };
   }, [selection]);
 
-  useEffect(() => setDetailsSelection(false), [selection]);
+  // Une carte sélectionnée doit ouvrir sa fiche immédiatement, y compris sur
+  // ordinateur où le bouton « Fiche » pouvait se retrouver hors du plateau.
+  useEffect(() => setDetailsSelection(Boolean(selection)), [selection]);
 
   const choisirReserve = (joueurId: string) => {
     if (indisponibles?.has(joueurId)) return;
@@ -725,7 +726,7 @@ export function CompositionTerrainManager({
           </div>
         </div>
 
-        {joueurSelectionne && (!rendreCarte || (detailsSelection && ficheMasquee !== selection)) && (
+        {joueurSelectionne && (!rendreCarte || detailsSelection) && (
           <PanneauJoueur
             joueur={joueurSelectionne}
             posteSlot={slotDuSelectionne}
@@ -737,7 +738,7 @@ export function CompositionTerrainManager({
             panneauRef={panneauRef}
             onCapitaine={indisponibles?.has(joueurSelectionne.id) ? undefined : onCapitaine}
             onButeur={indisponibles?.has(joueurSelectionne.id) ? undefined : onButeur}
-            onFermer={() => { if (rendreCarte) setFicheMasquee(selection); else setSelection(null); }}
+            onFermer={() => { if (rendreCarte) setDetailsSelection(false); else setSelection(null); }}
           />
         )}
       </div>
@@ -747,7 +748,7 @@ export function CompositionTerrainManager({
           {joueurSelectionne ? <>
             <b>{joueurSelectionne.nom} · {joueurSelectionne.note} GEN · {nomPoste(joueurSelectionne.poste)}</b>
             <span>{t('compo.selection.permuter')}</span>
-            <button type="button" onClick={() => { setFicheMasquee(null); setDetailsSelection(true); }}>{t('compo.selection.fiche')}</button>
+            <button type="button" onClick={() => setDetailsSelection(true)}>{t('compo.selection.fiche')}</button>
             <button type="button" onClick={() => setSelection(null)}>{t('compo.selection.annuler')}</button>
           </> : <span>{t('compo.selection.guide')}</span>}
         </div>
