@@ -7,6 +7,61 @@ export const OFFRES_OVAS = {
   p3: { ovas: 1200, centimes: 999 },
 } as const;
 
+type ErreurStripe = {
+  type?: unknown;
+  code?: unknown;
+  requestId?: unknown;
+};
+
+/**
+ * La réponse ne révèle ni la clé, ni le message brut de Stripe. En revanche,
+ * elle distingue les réglages que l'administrateur peut réellement corriger
+ * d'une indisponibilité passagère. Sans cela, une clé restreinte sans le droit
+ * Checkout produisait le même message qu'une panne réseau.
+ */
+export function diagnosticErreurStripe(erreur: unknown): { statut: 400 | 503; message: string } | null {
+  if (!erreur || typeof erreur !== 'object') return null;
+  const { type, code } = erreur as ErreurStripe;
+  if (typeof type !== 'string' || !type.startsWith('Stripe')) return null;
+  if (type === 'StripePermissionError') {
+    return {
+      statut: 400,
+      message: 'La clé Stripe n’a pas le droit de créer une session Checkout. Dans Stripe en mode test, autorise « Checkout Sessions : Write » pour STRIPE_SECRET_KEY, puis redéploie.',
+    };
+  }
+  if (type === 'StripeAuthenticationError') {
+    return {
+      statut: 400,
+      message: 'Stripe a refusé la clé de test. Vérifie que STRIPE_SECRET_KEY commence par rk_test_ ou sk_test_, appartient bien au mode test, puis redéploie la Production.',
+    };
+  }
+  if (type === 'StripeInvalidRequestError') {
+    const suffixe = typeof code === 'string' ? ` (code Stripe : ${code})` : '';
+    return {
+      statut: 400,
+      message: `Stripe a refusé la demande Checkout${suffixe}. Vérifie dans Workbench → Request logs que la clé de test est active et qu’elle autorise « Checkout Sessions : Write ».`,
+    };
+  }
+  if (type === 'StripeRateLimitError') {
+    return { statut: 503, message: 'Stripe limite momentanément les demandes. Attends une minute puis réessaie.' };
+  }
+  if (type === 'StripeConnectionError' || type === 'StripeAPIError') {
+    return { statut: 503, message: 'Stripe est momentanément inaccessible depuis le serveur. Réessaie dans un instant.' };
+  }
+  return { statut: 503, message: 'Stripe a refusé la demande. Vérifie Workbench → Request logs avec l’heure de cet essai.' };
+}
+
+/** Les journaux Vercel gardent une piste de diagnostic sans jamais écrire de secret. */
+export function journalErreurStripe(erreur: unknown) {
+  const { type, code, requestId } = (erreur && typeof erreur === 'object' ? erreur : {}) as ErreurStripe;
+  if (typeof type !== 'string' || !type.startsWith('Stripe')) return;
+  console.error('Échec Stripe Checkout', {
+    type,
+    code: typeof code === 'string' ? code : undefined,
+    requestId: typeof requestId === 'string' ? requestId : undefined,
+  });
+}
+
 export function clientStripe() {
   const cle = process.env.STRIPE_SECRET_KEY?.trim();
   if (!cle || !/^[sr]k_test_/.test(cle)) throw new Error('Les paiements Stripe de test attendent leur configuration serveur.');

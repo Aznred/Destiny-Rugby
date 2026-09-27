@@ -1,4 +1,4 @@
-import { creerPaiement } from './paiementsStripe.js';
+import { creerPaiement, diagnosticErreurStripe, journalErreurStripe } from './paiementsStripe.js';
 import { contexteAtelier, enregistrerAtelier, vueAtelier } from './atelierAdmin.js';
 import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
@@ -493,7 +493,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (action === 'paiementOvas') {
         try { return res.status(200).json(await creerPaiement(compte.id, corps.pack, corps.tentative, stockage)); }
-        catch (e) { throw new ErreurHttp(400, e instanceof Error && !('type' in e) ? e.message : 'Stripe est temporairement indisponible. Réessayez plus tard.'); }
+        catch (e) {
+          const diagnostic = diagnosticErreurStripe(e);
+          if (diagnostic) {
+            journalErreurStripe(e);
+            throw new ErreurHttp(diagnostic.statut, diagnostic.message);
+          }
+          throw new ErreurHttp(400, e instanceof Error ? e.message : 'La création du paiement a échoué.');
+        }
       }
       if (url.searchParams.has('paiementEtat')) {
         const boutique = await stockage.boutique(compte.id);

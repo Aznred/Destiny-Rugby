@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import Stripe from 'stripe';
 import { stockageFichier } from '../serveur/carriereFichier';
-import { traiterEvenementStripe, recevoirWebhookStripe } from '../serveur/paiementsStripe';
+import { diagnosticErreurStripe, traiterEvenementStripe, recevoirWebhookStripe } from '../serveur/paiementsStripe';
 import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte';
 
 const dossier=mkdtempSync(join(tmpdir(),'destiny-paiements-'));
@@ -36,6 +36,10 @@ try {
   const signature=stripe.webhooks.generateTestHeaderString({payload:brut.toString(),secret:process.env.STRIPE_WEBHOOK_SECRET});
   await recevoirWebhookStripe(brut,signature,stockage);
   await assert.rejects(recevoirWebhookStripe(Buffer.from('{}'),signature,stockage));
+  const permission=diagnosticErreurStripe(new Stripe.errors.StripePermissionError({message:'permission refusée'}));
+  assert.match(permission?.message ?? '', /Checkout Sessions : Write/);
+  const authentification=diagnosticErreurStripe(new Stripe.errors.StripeAuthenticationError({message:'clé refusée'}));
+  assert.match(authentification?.message ?? '', /rk_test_/);
   const relu=stockageFichier(join(dossier,'test.json'));
   assert.equal(await relu.achatCredite!('cs_test_fixture','compte-test'),true);
   console.log('OK — webhook signé, paiement différé, doublons, refus des montants faux et conservation des Ovas.');
