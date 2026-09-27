@@ -1,5 +1,6 @@
 import { LIENS_SORTANTS_AUTORISES } from '../lib/cible';
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { t } from '../lib/i18n';
@@ -12,6 +13,7 @@ import { Sauvegardes } from '../components/Sauvegardes';
 import { Icone } from '../components/Icone';
 import { EcussonClub } from '../components/EcussonClub';
 import { PieceOvas } from '../components/PieceOvas';
+import { useModalDialog } from '../lib/useModalDialog';
 
 // La 3D (Three.js) est lourde : on la charge à la demande pour un premier
 // affichage immédiat du texte, puis la scène apparaît en fondu.
@@ -46,6 +48,27 @@ const apparait = {
     transition: { delay: 0.1 + i * 0.1, duration: 0.6, ease: [0.2, 0.8, 0.2, 1] as const },
   }),
 };
+
+function FenetreParties({ onFermer }: { onFermer: () => void }) {
+  const { overlayRef, dialogRef } = useModalDialog(onFermer);
+
+  return createPortal(
+    <div className="overlay sv-overlay" ref={overlayRef} onClick={onFermer}>
+      <div
+        className="sv-modale"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('sv.titre')}
+        tabIndex={-1}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Sauvegardes onFermer={onFermer} />
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 // ⚠️ LES TROIS ARGUMENTS MARKETING (« Un MJ qui juge vraiment », « Une
 // progression vivante », « Ta légende sur 15 ans ») ONT ÉTÉ RETIRÉS, à la
@@ -179,11 +202,7 @@ export function Accueil() {
         <div className="hero-canvas"><Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense></div>
       </section>}
 
-      {partiesOuvertes && (
-        <section className="section accueil-sauvegardes">
-          <Sauvegardes onFermer={() => setPartiesOuvertes(false)} />
-        </section>
-      )}
+      {partiesOuvertes && <FenetreParties onFermer={() => setPartiesOuvertes(false)} />}
 
       {/* ⚠️ DE VRAIS LIENS, PAS DES BOUTONS. Ces pages sont du HTML
           statique servi depuis `public/` (voir `scripts/genPages.cjs`) : elles

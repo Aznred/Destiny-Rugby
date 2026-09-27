@@ -8,7 +8,6 @@ import type { CarteCarriere } from '../lib/ligue/typesCarriere';
 import type { CompositionManager } from '../types';
 import type { Coequipier } from '../lib/effectif';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
-import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import {
   collectifCarriere,
   bonusCollectif,
@@ -104,10 +103,9 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
   const [brouillon, setBrouillon] = useState<CompositionManager | null>(null);
   const [nomEquipe, setNomEquipe] = useState('');
   const [notification, setNotification] = useState('');
+  const [rechercheReserve, setRechercheReserve] = useState('');
   const [filtreChampionnat, setFiltreChampionnat] = useState('');
   const [filtreClub, setFiltreClub] = useState('');
-  const [filtrePays, setFiltrePays] = useState('');
-  const [filtrePoste, setFiltrePoste] = useState('');
 
   const [sauvegardees, setSauvegardees] = useState<EquipeSauvegardee[]>(() => {
     if (typeof window === 'undefined') return [];
@@ -162,8 +160,14 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
     [cartes],
   );
 
-  const optionsFiltre = (cle: 'championnat' | 'clubReel' | 'pays') =>
+  const optionsFiltre = (cle: 'championnat' | 'clubReel') =>
     [...new Set(cartes.map((c) => c[cle]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+
+  const rechercheNormalisee = rechercheReserve
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLocaleLowerCase('fr');
 
   const reservesVisibles = useMemo(
     () =>
@@ -171,15 +175,28 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
         cartes
           .filter(
             (c) =>
+              (!rechercheNormalisee || c.nom
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLocaleLowerCase('fr')
+                .includes(rechercheNormalisee)) &&
               (!filtreChampionnat || c.championnat === filtreChampionnat) &&
-              (!filtreClub || c.clubReel === filtreClub) &&
-              (!filtrePays || c.pays === filtrePays) &&
-              (!filtrePoste || c.poste === filtrePoste),
+              (!filtreClub || c.clubReel === filtreClub),
           )
           .map((c) => c.id),
       ),
-    [cartes, filtreChampionnat, filtreClub, filtrePays, filtrePoste],
+    [cartes, rechercheNormalisee, filtreChampionnat, filtreClub],
   );
+
+  const idsSurFeuille = useMemo(
+    () => new Set([...composition.titulaires, ...composition.remplacants]),
+    [composition.titulaires, composition.remplacants],
+  );
+  const nbReservesTotal = cartes.filter((carte) => !idsSurFeuille.has(carte.id)).length;
+  const nbReservesVisibles = cartes.filter(
+    (carte) => !idsSurFeuille.has(carte.id) && reservesVisibles.has(carte.id),
+  ).length;
+  const filtresReserveActifs = Boolean(rechercheReserve || filtreChampionnat || filtreClub);
 
   const changerJoueur = (zone: 'titulaires' | 'remplacants', index: number, joueurId: string) => {
     const suivante: CompositionManager = {
@@ -387,15 +404,22 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
           </div>
         </details>
 
-        <details className="cel-details-outils">
-          <summary className="btn cel-btn-outil">
-            <Icone nom="loupe" taille={15} />
-            <span>{t('compoSolo.filterReserves')}</span>
-            <Icone nom="chevron" taille={13} className="cel-outil-chevron" />
-          </summary>
-          <div className="cel-outils-contenu cel-filtres-reserves">
+        <section className="solo-filtres-reserves" aria-label={t('compoSolo.filterReserves')}>
+          <label className="solo-recherche-reserve">
+            <span>{t('compoSolo.searchPlayer')}</span>
+            <span className="solo-recherche-champ">
+              <Icone nom="loupe" taille={15} />
+              <input
+                type="search"
+                value={rechercheReserve}
+                placeholder={t('compoSolo.searchPlaceholder')}
+                onChange={(event) => setRechercheReserve(event.target.value)}
+              />
+            </span>
+          </label>
+          <div className="solo-filtre-selecteur">
             <Choix
-              label={t('compoSolo.competition')}
+              label={t('compoSolo.league')}
               valeur={filtreChampionnat}
               options={[['', t('compoSolo.allFeminine')], ...optionsFiltre('championnat').map((v) => [v, v] as [string, string])]}
               onChange={(v) => {
@@ -414,25 +438,24 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
               ]}
               onChange={setFiltreClub}
             />
-            <Choix
-              label={t('compoSolo.nation')}
-              valeur={filtrePays}
-              options={[['', t('compoSolo.allMasculine')], ...optionsFiltre('pays').map((v) => [v, v] as [string, string])]}
-              onChange={setFiltrePays}
-            />
-            <Choix
-              label={t('compoSolo.position')}
-              valeur={filtrePoste}
-              options={[
-                ['', t('compoSolo.allMasculine')],
-                ...[...new Set(cartes.map((c) => c.poste))]
-                  .sort((a, b) => (POSTE_PAR_ID[a]?.numero ?? 0) - (POSTE_PAR_ID[b]?.numero ?? 0))
-                  .map((v) => [v, nomPoste(v)] as [string, string]),
-              ]}
-              onChange={setFiltrePoste}
-            />
           </div>
-        </details>
+          <span className="solo-resultats-reserve" aria-live="polite">
+            {t('compoSolo.reserveResults', { visible: nbReservesVisibles, total: nbReservesTotal })}
+          </span>
+          {filtresReserveActifs && (
+            <button
+              type="button"
+              className="btn fantome solo-reinitialiser-filtres"
+              onClick={() => {
+                setRechercheReserve('');
+                setFiltreChampionnat('');
+                setFiltreClub('');
+              }}
+            >
+              <Icone nom="croix" taille={13} /> {t('compoSolo.resetFilters')}
+            </button>
+          )}
+        </section>
       </div>
 
       <CompositionTerrainManager
