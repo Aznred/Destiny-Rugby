@@ -75,16 +75,39 @@ export function stockageFichier(fichier: string): StockageCarriere {
     },
     async fermerSession(e) { delete base.sessions[e]; sauver(); },
     async achatCredite(session, compte) { return base.achatsStripe![session] === compte; },
-    async crediterAchat(session, compte, ovas) {
+    async crediterAchat(session, compte, recompenses) {
       if (base.achatsStripe![session]) return;
       const boutique = base.boutiques![compte];
       if (!boutique) throw new Error('Boutique introuvable.');
-      boutique.ovas += ovas; boutique.achatsOvas = (boutique.achatsOvas ?? 0) + ovas;
+      const reunir = (a: string[] | undefined, b: string[]) => [...new Set([...(a ?? []), ...b])];
+      boutique.ovas += recompenses.ovas;
+      boutique.achatsOvas = (boutique.achatsOvas ?? 0) + recompenses.ovas;
+      boutique.inventaire = reunir(boutique.inventaire, recompenses.inventaire);
+      boutique.equipements = reunir(boutique.equipements, recompenses.equipements);
+      boutique.traitsDebloques = reunir(boutique.traitsDebloques, recompenses.traitsDebloques);
+      boutique.achatsInventaire = reunir(boutique.achatsInventaire, recompenses.inventaire);
+      boutique.achatsEquipements = reunir(boutique.achatsEquipements, recompenses.equipements);
+      boutique.achatsTraits = reunir(boutique.achatsTraits, recompenses.traitsDebloques);
       base.achatsStripe![session] = compte; sauver();
     },
     async boutique(compte) { return base.boutiques?.[compte] ? copie(base.boutiques[compte]) : null; },
-    async sauvegarderBoutique(compte, boutique) { const acquis = base.boutiques![compte]?.achatsOvas ?? 0;
-      base.boutiques![compte] = { ...copie(boutique), achatsOvas: acquis, ovas: boutique.ovas + Math.max(0, acquis - (boutique.achatsOvas ?? 0)) }; sauver(); },
+    async sauvegarderBoutique(compte, boutique) {
+      const ancienne = base.boutiques![compte];
+      const acquis = ancienne?.achatsOvas ?? 0;
+      const reunir = (a: string[] | undefined, b: string[] | undefined) => [...new Set([...(a ?? []), ...(b ?? [])])];
+      const achatsInventaire = reunir(ancienne?.achatsInventaire, boutique.achatsInventaire);
+      const achatsEquipements = reunir(ancienne?.achatsEquipements, boutique.achatsEquipements);
+      const achatsTraits = reunir(ancienne?.achatsTraits, boutique.achatsTraits);
+      base.boutiques![compte] = {
+        ...copie(boutique), achatsOvas: acquis,
+        ovas: boutique.ovas + Math.max(0, acquis - (boutique.achatsOvas ?? 0)),
+        inventaire: reunir(boutique.inventaire, achatsInventaire),
+        equipements: reunir(boutique.equipements, achatsEquipements),
+        traitsDebloques: reunir(boutique.traitsDebloques, achatsTraits),
+        achatsInventaire, achatsEquipements, achatsTraits,
+      };
+      sauver();
+    },
     async limiter(cle, maximum, fenetre, maintenant) {
       const debut = Math.floor(maintenant / fenetre) * fenetre;
       const ancien = base.debits[cle];

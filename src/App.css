@@ -1014,9 +1014,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1.32fr) minmax(380px, 0.9fr);
   gap: 12px;
-  min-height: 500px;
+  min-height: 610px;
 }
-.accueil-modes-droite { display: grid; grid-template-rows: 1.08fr 0.92fr; gap: 12px; min-width: 0; }
+.accueil-modes-droite { display: grid; grid-template-rows: minmax(260px, 1fr) auto; gap: 12px; min-width: 0; }
 .accueil-modes-compacts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
 .accueil-mode {
   --mode-accent: var(--or-400);
@@ -1124,6 +1124,7 @@
 .accueil-mode-visuel { position: absolute; z-index: 0; inset: -8% -6% -8% 35%; pointer-events: none; }
 .accueil-mode-visuel canvas { width: 100% !important; height: 100% !important; }
 .accueil-mode-online::before,
+.accueil-mode-boutique::before,
 .accueil-mode-collection::before,
 .accueil-mode-parties::before {
   content: '';
@@ -1183,6 +1184,17 @@
 }
 .accueil-mode-online { --mode-accent: #63d990; background: linear-gradient(145deg, rgba(21, 76, 53, 0.8), rgba(7, 24, 28, 0.92)); }
 .accueil-mode-online .accueil-mode-contenu { max-width: 78%; }
+.accueil-mode-boutique {
+  grid-column: 1 / -1; min-height: 125px; --mode-accent: #f0c96a;
+  background: linear-gradient(145deg, rgba(107, 70, 20, 0.78), rgba(28, 20, 12, 0.96));
+}
+.accueil-mode-boutique::before { background: linear-gradient(90deg, rgba(25, 14, 7, 0.99) 0%, rgba(25, 14, 7, 0.7) 60%, rgba(25, 14, 7, 0.12) 100%); }
+.accueil-boutique-montage { position: absolute; z-index: 0; right: 11%; top: 19%; width: 116px; height: 76px; pointer-events: none; }
+.accueil-boutique-montage .piece-ovas { position: absolute; filter: drop-shadow(0 8px 8px rgba(0,0,0,.42)); }
+.accueil-boutique-montage .piece-ovas:nth-child(1) { right: 24px; top: 2px; transform: rotate(8deg); }
+.accueil-boutique-montage .piece-ovas:nth-child(2) { right: 0; top: 32px; transform: rotate(-8deg); }
+.accueil-boutique-montage .piece-ovas:nth-child(3) { right: 62px; top: 42px; transform: rotate(16deg); }
+.accueil-mode-boutique .accueil-mode-contenu { max-width: 62%; }
 .accueil-mode-collection { --mode-accent: #e8b23a; background: linear-gradient(145deg, rgba(108, 69, 20, 0.7), rgba(26, 18, 15, 0.94)); }
 .accueil-mode-parties { --mode-accent: #8fc5ff; background: linear-gradient(145deg, rgba(32, 65, 99, 0.72), rgba(8, 20, 32, 0.94)); }
 .accueil-modes-compacts .accueil-mode { padding: 1.1rem; }
@@ -1838,8 +1850,49 @@
   display: block; height: 100%; background: linear-gradient(90deg, var(--or-400), var(--or-500, #d8a94a));
   transition: width 1s linear;
 }
+.grille-recharges { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.article.pack {
+  position: relative; cursor: default; justify-content: center;
+  overflow: hidden; background:
+    radial-gradient(circle at 50% 22%, rgba(232, 178, 58, 0.16), transparent 42%),
+    var(--surface);
+}
+.article.pack.recharge-ovas { min-height: 215px; }
+.article.pack.bundle { min-height: 290px; }
+.grille-bundles { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.article.pack.populaire { border-color: rgba(232, 178, 58, 0.72); }
+.article.pack > .piece-ovas { filter: drop-shadow(0 7px 9px rgba(0, 0, 0, 0.35)); }
+.pack-nom {
+  font: 700 0.7rem/1 var(--police-forte); letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--brume);
+}
 .pack-ovas { font-family: var(--police-titre); font-size: 1.5rem; color: var(--or-400); }
-.pack-bonus { font-size: 0.75rem; color: var(--succes); font-weight: 700; }
+.pack-bonus {
+  padding: 0.25rem 0.55rem; border-radius: var(--rayon-pilule);
+  background: rgba(72, 196, 122, 0.12); color: var(--succes);
+  font-size: 0.75rem; font-weight: 700;
+}
+.pack-populaire {
+  position: absolute; inset: 0 0 auto; padding: 0.35rem;
+  background: linear-gradient(90deg, #bb8122, #f0c96a, #bb8122);
+  color: #172014; font: 800 0.66rem/1 var(--police-forte);
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.pack-contenu {
+  width: 100%; min-height: 57px; display: flex; flex-wrap: wrap;
+  align-content: flex-start; justify-content: center; gap: 0.3rem 0.45rem;
+}
+.pack-contenu span {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  color: var(--craie); font-size: 0.7rem; font-weight: 700;
+}
+.pack-contenu span svg { color: var(--or-400); flex: 0 0 auto; }
+.pack-contenu small {
+  flex: 1 0 100%; display: -webkit-box; overflow: hidden;
+  -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  color: var(--brume); font-size: 0.64rem; line-height: 1.35;
+}
+.article.pack .btn { min-width: 92px; }
 
 /* ====== HALL DES LÉGENDES ====== */
 .fin-carriere {

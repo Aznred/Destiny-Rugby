@@ -12,6 +12,13 @@ export interface CompteStocke {
   fournisseur?: 'google'; sujetExterne?: string; courriel?: string;
   creeLe?: string; vuLe?: string;
 }
+
+export interface RecompensesAchat {
+  ovas: number;
+  inventaire: string[];
+  equipements: string[];
+  traitsDebloques: string[];
+}
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
 export interface PresenceMatchStockee { match: string; compte: string; vu: number }
 /**
@@ -41,7 +48,7 @@ export interface StockageCarriere {
   ouvrirSession(empreinte: string, compte: string, expiration: number): Promise<void>;
   fermerSession(empreinte: string): Promise<void>;
   achatCredite?(session: string, compte: string): Promise<boolean>;
-  crediterAchat?(session: string, compte: string, ovas: number): Promise<void>;
+  crediterAchat?(session: string, compte: string, recompenses: RecompensesAchat): Promise<void>;
   boutique(compte: string): Promise<EtatBoutiqueCompte | null>;
   sauvegarderBoutique(compte: string, boutique: EtatBoutiqueCompte): Promise<void>;
   limiter(cle: string, maximum: number, fenetre: number, maintenant: number): Promise<boolean>;
@@ -260,13 +267,22 @@ export function stockageNeon(url: string): StockageCarriere {
       const lignes = await sql`select 1 from achats_stripe where session=${session} and compte=${compte}`;
       return lignes.length > 0;
     },
-    async crediterAchat(session, compte, ovas) {
+    async crediterAchat(session, compte, recompenses) {
+      const inventaire = JSON.stringify(recompenses.inventaire);
+      const equipements = JSON.stringify(recompenses.equipements);
+      const traits = JSON.stringify(recompenses.traitsDebloques);
       await sql`with achat as (
-        insert into achats_stripe(session,compte,ovas) values (${session},${compte},${ovas})
+        insert into achats_stripe(session,compte,ovas) values (${session},${compte},${recompenses.ovas})
         on conflict (session) do nothing returning ovas
       ) update compte_boutique set donnees = donnees || jsonb_build_object(
         'ovas', (donnees->>'ovas')::bigint + (select ovas from achat),
-        'achatsOvas', coalesce((donnees->>'achatsOvas')::bigint,0) + (select ovas from achat)
+        'achatsOvas', coalesce((donnees->>'achatsOvas')::bigint,0) + (select ovas from achat),
+        'inventaire', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'inventaire','[]'::jsonb) || ${inventaire}::jsonb) as elements(valeur))),
+        'equipements', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'equipements','[]'::jsonb) || ${equipements}::jsonb) as elements(valeur))),
+        'traitsDebloques', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'traitsDebloques','[]'::jsonb) || ${traits}::jsonb) as elements(valeur))),
+        'achatsInventaire', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'achatsInventaire','[]'::jsonb) || ${inventaire}::jsonb) as elements(valeur))),
+        'achatsEquipements', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'achatsEquipements','[]'::jsonb) || ${equipements}::jsonb) as elements(valeur))),
+        'achatsTraits', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'achatsTraits','[]'::jsonb) || ${traits}::jsonb) as elements(valeur)))
       ), modifie_le=now() where compte=${compte} and exists(select 1 from achat)`;
     },
     async boutique(compte) {
@@ -278,7 +294,13 @@ export function stockageNeon(url: string): StockageCarriere {
         values (${compte},${JSON.stringify(boutique)}::jsonb,now())
         on conflict (compte) do update set donnees=excluded.donnees || jsonb_build_object(
           'ovas', (excluded.donnees->>'ovas')::bigint + greatest(0, coalesce((compte_boutique.donnees->>'achatsOvas')::bigint,0) - coalesce((excluded.donnees->>'achatsOvas')::bigint,0)),
-          'achatsOvas', coalesce((compte_boutique.donnees->>'achatsOvas')::bigint,0)
+          'achatsOvas', coalesce((compte_boutique.donnees->>'achatsOvas')::bigint,0),
+          'inventaire', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(excluded.donnees->'inventaire','[]'::jsonb) || coalesce(compte_boutique.donnees->'achatsInventaire','[]'::jsonb)) as elements(valeur))),
+          'equipements', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(excluded.donnees->'equipements','[]'::jsonb) || coalesce(compte_boutique.donnees->'achatsEquipements','[]'::jsonb)) as elements(valeur))),
+          'traitsDebloques', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(excluded.donnees->'traitsDebloques','[]'::jsonb) || coalesce(compte_boutique.donnees->'achatsTraits','[]'::jsonb)) as elements(valeur))),
+          'achatsInventaire', coalesce(compte_boutique.donnees->'achatsInventaire','[]'::jsonb),
+          'achatsEquipements', coalesce(compte_boutique.donnees->'achatsEquipements','[]'::jsonb),
+          'achatsTraits', coalesce(compte_boutique.donnees->'achatsTraits','[]'::jsonb)
         ),modifie_le=excluded.modifie_le`;
     },
     async limiter(cle, maximum, fenetre, maintenant) {

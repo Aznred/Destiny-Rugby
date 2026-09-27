@@ -3,14 +3,15 @@ import { acheterOvasStripe, etatPaiementsStripe } from '../lib/carriereEnLigneCl
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import {
-  SKINS, PACKS, EQUIPEMENTS, EQUIPEMENT_PAR_ID, CATEGORIES_EQUIPEMENT,
+  SKINS, SKIN_PAR_ID, PACKS, BUNDLES, EQUIPEMENTS, EQUIPEMENT_PAR_ID, CATEGORIES_EQUIPEMENT,
 } from '../data/boutique';
 import {
-  TRAITS_A_DEBLOQUER, descriptionTrait, nomTrait,
+  TRAITS_A_DEBLOQUER, TRAIT_PAR_ID, descriptionTrait, nomTrait,
 } from '../data/traits';
 import { t } from '../lib/i18n';
 import { CartePubRecompensee, BoutonDeblocageParPub } from '../components/Pub';
 import { IconeArticle } from '../components/ModeleObjet';
+import { PieceOvas } from '../components/PieceOvas';
 
 // ⚠️ `ApercuBallon`, PAS `Hero3D` : depuis que le hero affiche le rugbyman dès
 // qu'une carrière existe, ce cadre montrait le JOUEUR à la place du ballon
@@ -49,7 +50,7 @@ export function Boutique() {
         if (!actif) return;
         if (resultat.credite) {
           window.dispatchEvent(new Event('destiny-compte-connecte'));
-          setPaiement('Paiement de test confirmé. Vos Ovas ont été ajoutés à votre compte.');
+          setPaiement('Paiement confirmé. Les Ovas et le contenu du bundle ont été ajoutés à votre compte.');
           history.replaceState(null, '', location.pathname + location.hash);
           return;
         }
@@ -105,7 +106,7 @@ export function Boutique() {
           <div className="eyebrow">{t('bo.titre')}</div>
           <h1>{t('bo.chapo')}</h1>
         </div>
-        <div className="solde"><Icone nom="ova" taille={17} /> <b>{coins}</b> Ovas</div>
+        <div className="solde"><PieceOvas taille={20} /> <b>{coins}</b> Ovas</div>
       </div>
 
       {flash && <div className="flash-boutique">{flash}</div>}
@@ -172,7 +173,7 @@ export function Boutique() {
                     else message(t('bo.pasAssez'));
                   }}
                 >
-                  <Icone nom="ova" taille={15} /> {articleVu.prix}
+                  <PieceOvas taille={17} /> {articleVu.prix}
                 </button>
               )}
             </>
@@ -215,7 +216,7 @@ export function Boutique() {
                     else message(t('bo.pasAssez'));
                   }}
                 >
-                  <Icone nom="ova" taille={14} /> {s.prix}
+                  <PieceOvas taille={16} /> {s.prix}
                 </button>
               )}
             </div>
@@ -287,7 +288,7 @@ export function Boutique() {
                         else message(t('bo.pasAssez'));
                       }}
                     >
-                      <Icone nom="ova" taille={14} /> {e.prix}
+                      <PieceOvas taille={16} /> {e.prix}
                     </button>
                   )}
                 </div>
@@ -331,7 +332,7 @@ export function Boutique() {
                     else message(t('bo.pasAssez'));
                   }}
                 >
-                  <Icone nom="ova" taille={14} /> {prix}
+                  <PieceOvas taille={16} /> {prix}
                 </button>
               )}
             </div>
@@ -351,18 +352,55 @@ export function Boutique() {
       <div className="eyebrow section-titre">{t('bo.recharges')}</div>
       {paiement && <p role="status">{paiement} {new URLSearchParams(location.search).has('session_id') && <button className="btn fantome petit" onClick={() => setVerification(v => v + 1)}>Vérifier à nouveau</button>}</p>}
       <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
-        Paiements en environnement de test Stripe : aucun débit réel.
+        Paiement sécurisé par Stripe. Le contenu est ajouté au compte après confirmation du paiement.
       </p>
-      <div className="grille-boutique">
+      <div className="grille-boutique grille-recharges">
         {PACKS.map((p) => (
-          <div key={p.id} className="carte article pack">
-            <div className="pack-ovas"><Icone nom="ova" taille={16} /> {p.ovas}</div>
-            {p.bonus && <div className="pack-bonus">{p.bonus}</div>}
+          <div key={p.id} className={`carte article pack recharge-ovas${p.populaire ? ' populaire' : ''}`}>
+            {p.populaire && <div className="pack-populaire">Le plus choisi</div>}
+            <PieceOvas taille={42} />
+            <div className="pack-nom">Recharge {p.nom}</div>
+            <div className="pack-ovas">{p.ovas.toLocaleString('fr-FR')} Ovas</div>
+            {p.bonus && <div className="pack-bonus">Bonus {p.bonus}</div>}
             <button className="btn fantome petit" disabled={achatEnCours} onClick={() => void acheter(p.id)}>
               {p.prix}
             </button>
           </div>
         ))}
+      </div>
+
+      <div className="eyebrow section-titre">Bundles cosmétiques et traits</div>
+      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
+        Des offres séparées avec un contenu fixe : les objets et traits indiqués sont débloqués directement sur le compte.
+      </p>
+      <div className="grille-boutique grille-bundles">
+        {BUNDLES.map((p) => {
+          const cosmetiques = [
+            ...(p.ballons ?? []).map(id => SKIN_PAR_ID[id]?.nom ?? id),
+            ...(p.equipements ?? []).map(id => EQUIPEMENT_PAR_ID[id]?.nom ?? id),
+          ];
+          const traits = (p.traits ?? []).map(id => TRAIT_PAR_ID[id]?.nom ?? id);
+          const detail = [...cosmetiques, ...traits].join(' · ');
+          return (
+            <div key={p.id} className={`carte article pack bundle${p.populaire ? ' populaire' : ''}`}>
+              {p.populaire && <div className="pack-populaire">Le plus choisi</div>}
+              <PieceOvas taille={42} />
+              <div className="pack-nom">Bundle {p.nom}</div>
+              <div className="pack-ovas">{p.ovas.toLocaleString('fr-FR')} Ovas</div>
+              {p.bonus && <div className="pack-bonus">Bonus {p.bonus}</div>}
+              {(cosmetiques.length > 0 || traits.length > 0) && (
+                <div className="pack-contenu" title={detail}>
+                  {cosmetiques.length > 0 && <span><Icone nom="cadeau" taille={14} /> {cosmetiques.length} cosmétique{cosmetiques.length > 1 ? 's' : ''}</span>}
+                  {traits.length > 0 && <span><Icone nom="joueur" taille={14} /> {traits.length === TRAITS_A_DEBLOQUER.length ? 'Tous les traits' : `${traits.length} trait${traits.length > 1 ? 's' : ''}`}</span>}
+                  <small>{detail}</small>
+                </div>
+              )}
+              <button className="btn fantome petit" disabled={achatEnCours} onClick={() => void acheter(p.id)}>
+                {p.prix}
+              </button>
+            </div>
+          );
+        })}
       </div>
     </motion.section>
   );

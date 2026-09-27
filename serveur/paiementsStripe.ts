@@ -2,10 +2,27 @@ import Stripe from 'stripe';
 import type { StockageCarriere } from './carriereStockage.js';
 
 export const OFFRES_OVAS = {
-  p1: { ovas: 100, centimes: 99 },
-  p2: { ovas: 550, centimes: 499 },
-  p3: { ovas: 1200, centimes: 999 },
+  p1: { nom: 'Essentiel', ovas: 500, centimes: 99 },
+  p2: { nom: 'Réserve', ovas: 3000, centimes: 499 },
+  p3: { nom: 'Coffre', ovas: 7000, centimes: 999 },
+  p4: { nom: 'Club', ovas: 20000, centimes: 2499 },
+  p5: { nom: 'Stade', ovas: 45000, centimes: 4999 },
+  p6: { nom: 'Fortune', ovas: 100000, centimes: 9999 },
 } as const;
+
+export const OFFRES_BUNDLES = {
+  b1: { nom: 'Vestiaire', ovas: 1000, centimes: 499, inventaire: ['tricolore'], equipements: ['crampons-cuir', 'maillot-bleu'] },
+  b2: { nom: 'Archétypes', ovas: 2500, centimes: 999, traitsDebloques: ['roc', 'cerveau', 'discipline', 'chouchou', 'cadre', 'zen'] },
+  b3: { nom: 'Club', ovas: 5000, centimes: 1999, inventaire: ['ocean', 'or'], equipements: ['maillot-toulousain', 'crampons-dupont', 'casque-or'], traitsDebloques: ['precoce', 'tete_brulee', 'cadre', 'cerveau'] },
+  b4: {
+    nom: 'Légende', ovas: 15000, centimes: 4999,
+    inventaire: ['tricolore', 'cuir', 'ocean', 'or'],
+    equipements: ['crampons-or', 'crampons-dupont', 'maillot-legende', 'casque-or', 'maillot-toulousain'],
+    traitsDebloques: ['roc', 'cerveau', 'discipline', 'chouchou', 'tete_brulee', 'cadre', 'precoce', 'vieux_lion', 'electron', 'muraille', 'zen', 'increvable'],
+  },
+} as const;
+
+const OFFRES_STRIPE = { ...OFFRES_OVAS, ...OFFRES_BUNDLES } as const;
 
 type ModeStripe = 'test' | 'live';
 type ConfigurationStripe = { mode: ModeStripe; cle: string; codeFiscal?: string };
@@ -91,13 +108,13 @@ export function clientStripe() {
 }
 
 export async function creerPaiement(compte: string, pack: unknown, tentative: unknown, stockage: StockageCarriere) {
-  if (typeof pack !== 'string' || !Object.hasOwn(OFFRES_OVAS, pack)) throw new Error('Recharge inconnue.');
+  if (typeof pack !== 'string' || !Object.hasOwn(OFFRES_STRIPE, pack)) throw new Error('Offre inconnue.');
   if (typeof tentative !== 'string' || !/^[a-f0-9-]{36}$/i.test(tentative)) throw new Error('Identifiant d’achat invalide.');
   if (!stockage.crediterAchat || !await stockage.boutique(compte)) throw new Error('Synchronisez votre boutique avec votre compte avant de payer.');
   if (process.env.VERCEL && !process.env.APP_URL) throw new Error('Adresse publique de la boutique non configurée.');
   const origine = new URL(process.env.APP_URL || 'http://localhost:5173');
   if (origine.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(origine.hostname)) throw new Error('Adresse publique de la boutique invalide.');
-  const offre = OFFRES_OVAS[pack as keyof typeof OFFRES_OVAS];
+  const offre = OFFRES_STRIPE[pack as keyof typeof OFFRES_STRIPE];
   const configuration = configurationStripe();
   const session = await clientStripe().checkout.sessions.create({
     mode: 'payment',
@@ -108,7 +125,7 @@ export async function creerPaiement(compte: string, pack: unknown, tentative: un
     metadata: { compte, pack, ovas: String(offre.ovas), application: 'destiny-rugby' },
     line_items: [{ quantity: 1, price_data: { currency: 'eur', unit_amount: offre.centimes,
       product_data: {
-        name: `${offre.ovas} Ovas — Destiny Rugby${configuration.mode === 'test' ? ' (test)' : ''}`,
+        name: `${pack.startsWith('b') ? 'Bundle' : 'Recharge'} ${offre.nom} — ${offre.ovas} Ovas${configuration.mode === 'test' ? ' (test)' : ''}`,
         ...(configuration.codeFiscal ? { tax_code: configuration.codeFiscal } : {}),
       } } }],
     success_url: `${origine.origin}/?paiement=retour&session_id={CHECKOUT_SESSION_ID}`,
@@ -128,12 +145,17 @@ export async function traiterEvenementStripe(event: Stripe.Event, stockage: Stoc
   if (session.payment_status !== 'paid') return;
   const pack = session.metadata?.pack;
   const compte = session.metadata?.compte;
-  const offre = pack && Object.hasOwn(OFFRES_OVAS, pack) ? OFFRES_OVAS[pack as keyof typeof OFFRES_OVAS] : null;
+  const offre = pack && Object.hasOwn(OFFRES_STRIPE, pack) ? OFFRES_STRIPE[pack as keyof typeof OFFRES_STRIPE] : null;
   if (!offre || !compte || session.client_reference_id !== compte || session.metadata?.application !== 'destiny-rugby'
     || session.amount_total !== offre.centimes || session.currency !== 'eur' || session.mode !== 'payment'
     || session.metadata?.ovas !== String(offre.ovas)) throw new Error('Paiement ne correspondant pas à une recharge.');
   if (!stockage.crediterAchat) throw new Error('Stockage des paiements indisponible.');
-  await stockage.crediterAchat(session.id, compte, offre.ovas);
+  await stockage.crediterAchat(session.id, compte, {
+    ovas: offre.ovas,
+    inventaire: 'inventaire' in offre ? [...offre.inventaire] : [],
+    equipements: 'equipements' in offre ? [...offre.equipements] : [],
+    traitsDebloques: 'traitsDebloques' in offre ? [...offre.traitsDebloques] : [],
+  });
 }
 
 export async function recevoirWebhookStripe(brut: Buffer, signature: string, stockage: StockageCarriere) {

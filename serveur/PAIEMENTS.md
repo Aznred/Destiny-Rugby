@@ -1,6 +1,8 @@
 # Paiements Stripe
 
-La boutique utilise Stripe Checkout pour ses recharges : 100 Ovas à 0,99 €, 550 à 4,99 € et 1 200 à 9,99 €. Les prix et les quantités sont déterminés par le serveur.
+La boutique utilise Stripe Checkout pour six recharges composées uniquement d’Ovas : 500 à 0,99 €, 3 000 à 4,99 €, 7 000 à 9,99 €, 20 000 à 24,99 €, 45 000 à 49,99 € et 100 000 à 99,99 €.
+
+Un rayon séparé propose quatre bundles : Vestiaire à 4,99 €, Archétypes à 9,99 €, Club à 19,99 € et Légende à 49,99 €. Ils contiennent des cosmétiques, des traits ou les deux, ainsi qu’un complément d’Ovas. Les prix, les quantités et les objets débloqués sont déterminés par le serveur.
 
 Les sessions de test désactivent explicitement **Managed Payments**. En production, il est activé et le serveur exige `STRIPE_PRODUCT_TAX_CODE` : ce code doit être choisi par l’éditeur selon le produit réellement vendu, jamais deviné dans le code.
 
@@ -32,7 +34,7 @@ Le schéma `serveur/schema-paiements.sql` crée la table `achats_stripe`. Il a �
 node scripts/appliquerSchema.mjs serveur/schema-paiements.sql
 ```
 
-Le crédit et l’enregistrement du reçu sont atomiques. La session Stripe est unique : un événement répété ne double pas le solde. Le compteur `achatsOvas` évite qu’une sauvegarde locale antérieure au paiement efface les Ovas achetés. Le crédit concerne la boutique du compte, pas les portefeuilles distincts des ligues privées.
+Le crédit et l’enregistrement du reçu sont atomiques. La session Stripe est unique : un événement répété ne double ni le solde, ni les objets du bundle. Les compteurs d’achats évitent qu’une sauvegarde locale antérieure au paiement efface les Ovas, cosmétiques ou traits achetés. Le crédit concerne la boutique du compte, pas les portefeuilles distincts des ligues privées.
 
 ## Vérification
 

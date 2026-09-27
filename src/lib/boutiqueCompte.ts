@@ -5,6 +5,10 @@ import { normaliserCollectionSolo, type EtatCollectionSolo } from './collectionS
 export interface EtatBoutiqueCompte {
   ovas: number;
   achatsOvas?: number;
+  /** Récompenses Stripe conservées même si une ancienne sauvegarde locale revient. */
+  achatsInventaire?: string[];
+  achatsEquipements?: string[];
+  achatsTraits?: string[];
   collectionSolo: EtatCollectionSolo;
   inventaire: string[];
   skinActif: string;
@@ -42,9 +46,12 @@ export function validerEtatBoutiqueCompte(valeur: unknown): EtatBoutiqueCompte |
   const inventaire = liste(brut.inventaire);
   const equipements = liste(brut.equipements);
   const traitsDebloques = liste(brut.traitsDebloques);
+  const achatsInventaire = brut.achatsInventaire == null ? [] : liste(brut.achatsInventaire);
+  const achatsEquipements = brut.achatsEquipements == null ? [] : liste(brut.achatsEquipements);
+  const achatsTraits = brut.achatsTraits == null ? [] : liste(brut.achatsTraits);
   const collectionSolo = collectionValide(brut.collectionSolo);
   if (!Number.isSafeInteger(brut.ovas) || (brut.ovas as number) < 0 || (brut.ovas as number) > 1_000_000_000) return null;
-  if (!inventaire || !equipements || !traitsDebloques || !collectionSolo) return null;
+  if (!inventaire || !equipements || !traitsDebloques || !achatsInventaire || !achatsEquipements || !achatsTraits || !collectionSolo) return null;
   if (typeof brut.skinActif !== 'string' || !IDENTIFIANT.test(brut.skinActif) || !inventaire.includes(brut.skinActif)) return null;
   if (!brut.equipementActif || typeof brut.equipementActif !== 'object' || Array.isArray(brut.equipementActif)) return null;
   const equipementActif: Partial<Record<CategorieEquipement, string>> = {};
@@ -52,5 +59,10 @@ export function validerEtatBoutiqueCompte(valeur: unknown): EtatBoutiqueCompte |
     if (!CATEGORIES.has(categorie as CategorieEquipement) || typeof id !== 'string' || !equipements.includes(id)) return null;
     equipementActif[categorie as CategorieEquipement] = id;
   }
-  return { achatsOvas: Number.isSafeInteger(brut.achatsOvas) && Number(brut.achatsOvas) >= 0 ? Number(brut.achatsOvas) : 0, ovas: brut.ovas as number, collectionSolo, inventaire, skinActif: brut.skinActif, equipements, equipementActif, traitsDebloques };
+  return {
+    achatsOvas: Number.isSafeInteger(brut.achatsOvas) && Number(brut.achatsOvas) >= 0 ? Number(brut.achatsOvas) : 0,
+    achatsInventaire, achatsEquipements, achatsTraits,
+    ovas: brut.ovas as number, collectionSolo, inventaire, skinActif: brut.skinActif,
+    equipements, equipementActif, traitsDebloques,
+  };
 }

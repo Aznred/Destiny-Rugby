@@ -251,16 +251,39 @@ export const CATEGORIES_EQUIPEMENT: { id: CategorieEquipement; cle: string; emoj
 // des ballons — du cosmétique, et rien qui touche à la progression.
 // Ne pas les réintroduire sans relancer `npx vite-node scripts/verifDifficulte.ts`.
 
-// Packs d'Ovas (achat en argent réel — NON branché, purement indicatif).
+// Recharges d'Ovas achetées avec Stripe. Les mêmes identifiants, quantités et
+// montants vivent côté serveur dans `serveur/paiementsStripe.ts` : le serveur
+// reste l'autorité au moment de facturer et de créditer le compte.
 export interface PackOvas {
   id: string;
+  nom: string;
   ovas: number;
   prix: string;
   bonus?: string;
+  populaire?: boolean;
+  ballons?: string[];
+  equipements?: string[];
+  traits?: string[];
 }
 
 export const PACKS: PackOvas[] = [
-  { id: 'p1', ovas: 100, prix: '0,99 €' },
-  { id: 'p2', ovas: 550, prix: '4,99 €', bonus: '+10 %' },
-  { id: 'p3', ovas: 1200, prix: '9,99 €', bonus: '+20 %' },
+  { id: 'p1', nom: 'Essentiel', ovas: 500, prix: '0,99 €' },
+  { id: 'p2', nom: 'Réserve', ovas: 3000, prix: '4,99 €', bonus: '+20 %' },
+  { id: 'p3', nom: 'Coffre', ovas: 7000, prix: '9,99 €', bonus: '+40 %' },
+  { id: 'p4', nom: 'Club', ovas: 20000, prix: '24,99 €', bonus: '+60 %' },
+  { id: 'p5', nom: 'Stade', ovas: 45000, prix: '49,99 €', bonus: '+80 %', populaire: true },
+  { id: 'p6', nom: 'Fortune', ovas: 100000, prix: '99,99 €', bonus: '+100 %' },
+];
+
+/** Produits séparés des recharges : leur prix paie un contenu précis. */
+export const BUNDLES: PackOvas[] = [
+  { id: 'b1', nom: 'Vestiaire', ovas: 1000, prix: '4,99 €', ballons: ['tricolore'], equipements: ['crampons-cuir', 'maillot-bleu'] },
+  { id: 'b2', nom: 'Archétypes', ovas: 2500, prix: '9,99 €', traits: ['roc', 'cerveau', 'discipline', 'chouchou', 'cadre', 'zen'] },
+  { id: 'b3', nom: 'Club', ovas: 5000, prix: '19,99 €', populaire: true, ballons: ['ocean', 'or'], equipements: ['maillot-toulousain', 'crampons-dupont', 'casque-or'], traits: ['precoce', 'tete_brulee', 'cadre', 'cerveau'] },
+  {
+    id: 'b4', nom: 'Légende', ovas: 15000, prix: '49,99 €',
+    ballons: ['tricolore', 'cuir', 'ocean', 'or'],
+    equipements: ['crampons-or', 'crampons-dupont', 'maillot-legende', 'casque-or', 'maillot-toulousain'],
+    traits: ['roc', 'cerveau', 'discipline', 'chouchou', 'tete_brulee', 'cadre', 'precoce', 'vieux_lion', 'electron', 'muraille', 'zen', 'increvable'],
+  },
 ];

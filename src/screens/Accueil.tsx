@@ -11,6 +11,7 @@ import { chantierVisible } from '../lib/modeDev';
 import { Sauvegardes } from '../components/Sauvegardes';
 import { Icone } from '../components/Icone';
 import { EcussonClub } from '../components/EcussonClub';
+import { PieceOvas } from '../components/PieceOvas';
 
 // La 3D (Three.js) est lourde : on la charge à la demande pour un premier
 // affichage immédiat du texte, puis la scène apparaît en fondu.
@@ -123,20 +124,27 @@ export function Accueil() {
             </motion.button>
 
             <div className="accueil-modes-compacts">
-              <motion.button custom={3} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-collection" onClick={() => setEcran('collectionSolo')}>
-                <span className="accueil-packs-eventail" aria-hidden="true"><Suspense fallback={null}><PacksEventailAccueil /></Suspense></span>
+              <motion.button custom={3} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-boutique" onClick={() => setEcran('boutique')}>
+                <span className="accueil-boutique-montage" aria-hidden="true"><PieceOvas taille={54} /><PieceOvas taille={38} /><PieceOvas taille={28} /></span>
                 <span className="accueil-mode-numero">03</span>
+                <span className="accueil-mode-icone"><Icone nom="boutique" taille={27} /></span>
+                <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Boutique</span><strong>Ovas et bundles</strong><small>Recharges, cosmétiques et nouveaux traits.</small></span>
+                <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
+              </motion.button>
+              <motion.button custom={4} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-collection" onClick={() => setEcran('collectionSolo')}>
+                <span className="accueil-packs-eventail" aria-hidden="true"><Suspense fallback={null}><PacksEventailAccueil /></Suspense></span>
+                <span className="accueil-mode-numero">04</span>
                 <span className="accueil-mode-icone"><Icone nom="cadeau" taille={27} /></span>
                 <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Club house</span><strong>Collection</strong><small>Packs, cartes et doublons.</small></span>
                 <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
               </motion.button>
-              <motion.button custom={4} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}>
+              <motion.button custom={5} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}>
                 <span className="accueil-saves-montage" aria-hidden="true">
                   <span className="accueil-save-carte save-arriere"><Icone nom="equipe" taille={15} /><span><small>EN LIGNE</small><b>Ligue privée</b></span><EcussonClub logo="/logos/bayonne.png" taille={27} /></span>
                   <span className="accueil-save-carte save-milieu"><Icone nom="entraineur" taille={15} /><span><small>ENTRAÎNEUR</small><b>{managerActif?.nom ?? 'Nouveau banc'}</b></span><EcussonClub logo="/logos/bordeaux.png" taille={27} /></span>
                   <span className="accueil-save-carte save-devant"><Icone nom="joueur" taille={15} /><span><small>JOUEUR · S{joueur?.saison ?? '—'}</small><b>{joueur?.nom ?? 'Nouvelle carrière'}</b></span><EcussonClub logo="/logos/toulouse.png" taille={27} /></span>
                 </span>
-                <span className="accueil-mode-numero">04</span>
+                <span className="accueil-mode-numero">05</span>
                 <span className="accueil-mode-icone"><Icone nom="disquette" taille={27} /></span>
                 <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Profils</span><strong>{t('sv.mesParties')}</strong><small>Retrouve ou change de sauvegarde.</small></span>
                 <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
@@ -145,7 +153,7 @@ export function Accueil() {
           </div>
         </div>
 
-        <motion.div custom={5} variants={apparait} initial="hidden" animate="show" className="accueil-hub-pied">
+        <motion.div custom={6} variants={apparait} initial="hidden" animate="show" className="accueil-hub-pied">
           <span><b>15</b> postes</span><span><b>∞</b> scénarios</span><span><b>15</b> saisons</span>
           {joueur && <button type="button" onClick={() => setEcran('profil')}><Icone nom="profil" taille={16} /> {t('accueil.voirProfil')}</button>}
           {managerActif && <button type="button" onClick={() => setEcran('tableau')}><Icone nom="resultats" taille={16} /> Tableau du club</button>}
@@ -163,6 +171,7 @@ export function Accueil() {
           <div className="accueil-modes-secondaires">
             <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('carriereEnLigne')}><Icone nom="equipe" taille={19} /> Carrière en ligne · Ma ligue privée</button>
             <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('collectionSolo')}><Icone nom="cadeau" taille={19} /> Collection · Packs et doublons</button>
+            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('boutique')}><Icone nom="boutique" taille={19} /> Boutique · Ovas, cosmétiques et traits</button>
           </div>
           <div className="stats-bandeau"><div className="stat"><b>15</b><span>{t('accueil.postes')}</span></div><div className="stat"><b>∞</b><span>{t('accueil.scenarios')}</span></div><div className="stat"><b>15</b><span>{t('accueil.saisons')}</span></div></div>
           <button type="button" className="btn fantome accueil-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}><Icone nom="disquette" taille={17} /> {t('sv.mesParties')}</button>
