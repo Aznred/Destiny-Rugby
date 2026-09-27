@@ -1,26 +1,28 @@
-# Paiements Stripe — environnement de test
+# Paiements Stripe
 
-La boutique utilise Stripe Checkout pour ses recharges : 100 Ovas à 0,99 €, 550 à 4,99 € et 1 200 à 9,99 €. Les prix et les quantités sont déterminés par le serveur. Aucun paiement réel n’est accepté par cette version.
+La boutique utilise Stripe Checkout pour ses recharges : 100 Ovas à 0,99 €, 550 à 4,99 € et 1 200 à 9,99 €. Les prix et les quantités sont déterminés par le serveur.
 
-Les sessions de test désactivent explicitement **Managed Payments**. Certains comptes l’ont activé par défaut, ce qui impose un code fiscal produit. Le jeu ne doit pas choisir ce code à la place de l’éditeur ; cette configuration devra être revue avec le bon code fiscal et les obligations applicables avant toute activation des paiements réels.
+Les sessions de test désactivent explicitement **Managed Payments**. En production, il est activé et le serveur exige `STRIPE_PRODUCT_TAX_CODE` : ce code doit être choisi par l’éditeur selon le produit réellement vendu, jamais deviné dans le code.
 
 ## Configuration de l’hébergement
 
 Ajouter les variables sensibles côté serveur (jamais avec le préfixe VITE_) :
 
-- `STRIPE_SECRET_KEY` : clé restreinte `rk_test_…` du compte de test Destiny Rugby, autorisée à créer des sessions Checkout ; une clé secrète de test fonctionne également.
+- `STRIPE_MODE` : `test` pour les essais, `live` pour les paiements réels.
+- `STRIPE_SECRET_KEY` : clé restreinte `rk_test_…` ou `rk_live_…` du même mode, autorisée à créer des sessions Checkout. Une clé secrète équivalente fonctionne, mais une clé restreinte est préférable.
 - `STRIPE_WEBHOOK_SECRET` : secret de signature `whsec_…` fourni par le point de terminaison Stripe.
 - `APP_URL` : origine HTTPS du jeu, sans chemin, par exemple `https://destiny-rugby.fr` si c’est le domaine utilisé.
+- `STRIPE_PRODUCT_TAX_CODE` : code `txcd_…` du produit, obligatoire en mode `live` avec Managed Payments.
 - `DATABASE_URL` : connexion existante à la base du jeu.
 
 La connexion Stripe de Codex ne transmet pas de clé API à l’application. Ne pas envoyer ces secrets dans une conversation ou les enregistrer dans Git.
 
-Déployer les nouveaux fichiers, puis configurer dans Stripe **en mode test** le point de terminaison `APP_URL/api/stripe-webhook` pour :
+Déployer les nouveaux fichiers, puis configurer dans Stripe un point de terminaison **pour chaque mode** vers `APP_URL/api/stripe-webhook` pour :
 
 - `checkout.session.completed`
 - `checkout.session.async_payment_succeeded`
 
-Copier son secret de signature dans la variable serveur correspondante et redéployer pour prendre en compte les variables.
+Copier le secret de signature du point de terminaison du mode actif dans `STRIPE_WEBHOOK_SECRET`, puis redéployer pour prendre en compte les variables. Le secret de test et le secret live sont différents.
 
 ## Base de données
 

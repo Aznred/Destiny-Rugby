@@ -4,11 +4,15 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import Stripe from 'stripe';
 import { stockageFichier } from '../serveur/carriereFichier';
-import { diagnosticErreurStripe, traiterEvenementStripe, recevoirWebhookStripe } from '../serveur/paiementsStripe';
+import { configurationStripe, diagnosticErreurStripe, traiterEvenementStripe, recevoirWebhookStripe } from '../serveur/paiementsStripe';
 import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte';
 
 const dossier=mkdtempSync(join(tmpdir(),'destiny-paiements-'));
 try {
+  process.env.STRIPE_MODE='test';
+  process.env.STRIPE_SECRET_KEY='sk_test_fixture_sans_acces_reseau';
+  process.env.STRIPE_WEBHOOK_SECRET='whsec_fixture_locale';
+  delete process.env.STRIPE_PRODUCT_TAX_CODE;
   const stockage=stockageFichier(join(dossier,'test.json'));
   const boutique={ovas:25,achatsOvas:0} as EtatBoutiqueCompte;
   await stockage.sauvegarderBoutique('compte-test',boutique);
@@ -29,8 +33,6 @@ try {
   const impaye=structuredClone(evenement); Object.assign(impaye.data.object,{id:'cs_impaye',payment_status:'unpaid'});
   await traiterEvenementStripe(impaye,stockage);
   assert.equal(await stockage.achatCredite!('cs_impaye','compte-test'),false);
-  process.env.STRIPE_SECRET_KEY='sk_test_fixture_sans_acces_reseau';
-  process.env.STRIPE_WEBHOOK_SECRET='whsec_fixture_locale';
   const brut=Buffer.from(JSON.stringify(evenement));
   const stripe=new Stripe(process.env.STRIPE_SECRET_KEY);
   const signature=stripe.webhooks.generateTestHeaderString({payload:brut.toString(),secret:process.env.STRIPE_WEBHOOK_SECRET});
@@ -39,7 +41,13 @@ try {
   const permission=diagnosticErreurStripe(new Stripe.errors.StripePermissionError({message:'permission refusée'}));
   assert.match(permission?.message ?? '', /Checkout Sessions : Write/);
   const authentification=diagnosticErreurStripe(new Stripe.errors.StripeAuthenticationError({message:'clé refusée'}));
-  assert.match(authentification?.message ?? '', /rk_test_/);
+  assert.match(authentification?.message ?? '', /rk_live_/);
+  assert.equal(configurationStripe().mode,'test');
+  process.env.STRIPE_MODE='live'; process.env.STRIPE_SECRET_KEY='rk_live_fixture_sans_acces_reseau';
+  delete process.env.STRIPE_PRODUCT_TAX_CODE;
+  assert.throws(configurationStripe,/STRIPE_PRODUCT_TAX_CODE/);
+  process.env.STRIPE_PRODUCT_TAX_CODE='txcd_10201003';
+  assert.equal(configurationStripe().mode,'live');
   const relu=stockageFichier(join(dossier,'test.json'));
   assert.equal(await relu.achatCredite!('cs_test_fixture','compte-test'),true);
   console.log('OK — webhook signé, paiement différé, doublons, refus des montants faux et conservation des Ovas.');

@@ -7,6 +7,30 @@ export const OFFRES_OVAS = {
   p3: { ovas: 1200, centimes: 999 },
 } as const;
 
+type ModeStripe = 'test' | 'live';
+type ConfigurationStripe = { mode: ModeStripe; cle: string; codeFiscal?: string };
+
+/**
+ * Le passage aux paiements réels est volontairement explicite. Une clé live ne
+ * suffit pas : le compte actif utilise Managed Payments, qui demande un code
+ * fiscal produit confirmé par l'éditeur avant la première vente.
+ */
+export function configurationStripe(): ConfigurationStripe {
+  const valeurMode = process.env.STRIPE_MODE?.trim() || 'test';
+  if (valeurMode !== 'test' && valeurMode !== 'live') throw new Error('STRIPE_MODE doit être « test » ou « live ».');
+  const mode = valeurMode as ModeStripe;
+  const cle = process.env.STRIPE_SECRET_KEY?.trim();
+  const prefixe = mode === 'live' ? /^[sr]k_live_/ : /^[sr]k_test_/;
+  if (!cle || !prefixe.test(cle)) {
+    throw new Error(`La clé Stripe ${mode === 'live' ? 'live' : 'de test'} attendue n’est pas configurée côté serveur.`);
+  }
+  const codeFiscal = process.env.STRIPE_PRODUCT_TAX_CODE?.trim();
+  if (mode === 'live' && !/^txcd_[A-Za-z0-9]+$/.test(codeFiscal ?? '')) {
+    throw new Error('STRIPE_PRODUCT_TAX_CODE est requis pour les paiements réels avec Managed Payments.');
+  }
+  return { mode, cle, codeFiscal };
+}
+
 type ErreurStripe = {
   type?: unknown;
   code?: unknown;
@@ -26,20 +50,20 @@ export function diagnosticErreurStripe(erreur: unknown): { statut: 400 | 503; me
   if (type === 'StripePermissionError') {
     return {
       statut: 400,
-      message: 'La clé Stripe n’a pas le droit de créer une session Checkout. Dans Stripe en mode test, autorise « Checkout Sessions : Write » pour STRIPE_SECRET_KEY, puis redéploie.',
+      message: 'La clé Stripe n’a pas le droit de créer une session Checkout. Dans Stripe, autorise « Checkout Sessions : Write » pour STRIPE_SECRET_KEY, puis redéploie.',
     };
   }
   if (type === 'StripeAuthenticationError') {
     return {
       statut: 400,
-      message: 'Stripe a refusé la clé de test. Vérifie que STRIPE_SECRET_KEY commence par rk_test_ ou sk_test_, appartient bien au mode test, puis redéploie la Production.',
+      message: 'Stripe a refusé la clé. Vérifie que STRIPE_MODE et le préfixe de STRIPE_SECRET_KEY correspondent (rk_test_/sk_test_ ou rk_live_/sk_live_), puis redéploie la Production.',
     };
   }
   if (type === 'StripeInvalidRequestError') {
     const suffixe = typeof code === 'string' ? ` (code Stripe : ${code})` : '';
     return {
       statut: 400,
-      message: `Stripe a refusé la demande Checkout${suffixe}. Vérifie dans Workbench → Request logs que la clé de test est active et qu’elle autorise « Checkout Sessions : Write ».`,
+      message: `Stripe a refusé la demande Checkout${suffixe}. Vérifie dans Workbench → Request logs que la clé du mode actif est valide et autorise « Checkout Sessions : Write ».`,
     };
   }
   if (type === 'StripeRateLimitError') {
@@ -63,9 +87,7 @@ export function journalErreurStripe(erreur: unknown) {
 }
 
 export function clientStripe() {
-  const cle = process.env.STRIPE_SECRET_KEY?.trim();
-  if (!cle || !/^[sr]k_test_/.test(cle)) throw new Error('Les paiements Stripe de test attendent leur configuration serveur.');
-  return new Stripe(cle);
+  return new Stripe(configurationStripe().cle);
 }
 
 export async function creerPaiement(compte: string, pack: unknown, tentative: unknown, stockage: StockageCarriere) {
@@ -76,16 +98,19 @@ export async function creerPaiement(compte: string, pack: unknown, tentative: un
   const origine = new URL(process.env.APP_URL || 'http://localhost:5173');
   if (origine.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(origine.hostname)) throw new Error('Adresse publique de la boutique invalide.');
   const offre = OFFRES_OVAS[pack as keyof typeof OFFRES_OVAS];
+  const configuration = configurationStripe();
   const session = await clientStripe().checkout.sessions.create({
     mode: 'payment',
-    // Le jeu n'accepte pour l'instant que les clés de test. Managed Payments
-    // est activé par défaut sur certains comptes et impose alors un code fiscal
-    // produit : ne pas en inventer un pour une recharge de test.
-    managed_payments: { enabled: false },
+    // En test, ne pas inventer un code fiscal. En production, le code fiscal
+    // fourni par l'éditeur est obligatoire avant d'activer Managed Payments.
+    managed_payments: { enabled: configuration.mode === 'live' },
     client_reference_id: compte,
     metadata: { compte, pack, ovas: String(offre.ovas), application: 'destiny-rugby' },
     line_items: [{ quantity: 1, price_data: { currency: 'eur', unit_amount: offre.centimes,
-      product_data: { name: `${offre.ovas} Ovas — Destiny Rugby (test)` } } }],
+      product_data: {
+        name: `${offre.ovas} Ovas — Destiny Rugby${configuration.mode === 'test' ? ' (test)' : ''}`,
+        ...(configuration.codeFiscal ? { tax_code: configuration.codeFiscal } : {}),
+      } } }],
     success_url: `${origine.origin}/?paiement=retour&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origine.origin}/?paiement=annule`,
     integration_identifier: 'destiny_rugby_ovas_qmzptvka',
@@ -96,7 +121,8 @@ export async function creerPaiement(compte: string, pack: unknown, tentative: un
 
 /** Seul un événement signé et payé peut créditer le compte. Le retour navigateur ne crédite rien. */
 export async function traiterEvenementStripe(event: Stripe.Event, stockage: StockageCarriere) {
-  if (event.livemode) throw new Error('Ce serveur accepte uniquement les paiements de test.');
+  const estLive = configurationStripe().mode === 'live';
+  if (event.livemode !== estLive) throw new Error(`Ce serveur attend uniquement les paiements Stripe ${estLive ? 'réels' : 'de test'}.`);
   if (!['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) return;
   const session = event.data.object as Stripe.Checkout.Session;
   if (session.payment_status !== 'paid') return;
