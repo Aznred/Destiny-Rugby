@@ -1,6 +1,6 @@
-import type { PackCarriere, RareteCarriere } from './ligue/typesCarriere';
-import type { SourceCarte } from './ligue/catalogueCarriere';
-import { packAvecSkin } from './presentationPacks';
+import type { PackCarriere, RareteCarriere } from './ligue/typesCarriere.js';
+import type { SourceCarte } from './ligue/catalogueCarriere.js';
+import { packAvecSkin } from './presentationPacks.js';
 
 export interface EtatCollectionSolo {
   /** Nombre d'exemplaires possedes, indexe par l'empreinte stable du joueur. */
