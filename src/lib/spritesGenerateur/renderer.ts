@@ -113,7 +113,9 @@ export class CharacterRenderer {
     line(ctx,hip,knee,d.legU,d.legU-SPRITE_SCALE,a.skin,5*SPRITE_SCALE);flatJoint(ctx,hip,d.legU,a.skin);flatJoint(ctx,knee,d.legU,a.skin)
     const sockStart=midpoint(knee,ankle,.48)
     line(ctx,knee,sockStart,d.legL,d.legL-SPRITE_SCALE,a.skin,5*SPRITE_SCALE)
-    line(ctx,sockStart,ankle,d.legL+SPRITE_SCALE,d.legL,a.kit.socks,5*SPRITE_SCALE);flatJoint(ctx,sockStart,d.legL,a.kit.socks)
+    // Le bas de la chaussette s'arrête à la cheville : l'ancien chevauchement
+    // dépassait sous le talon et restait visible derrière le crampon.
+    line(ctx,sockStart,midpoint(sockStart,ankle,.88),d.legL+SPRITE_SCALE,d.legL,a.kit.socks,0);flatJoint(ctx,sockStart,d.legL,a.kit.socks)
     this.drawBoot(ctx, ankle, foot, d, a)
   }
 
@@ -127,6 +129,8 @@ export class CharacterRenderer {
     ctx.fillStyle='#b5b9b4'
     ctx.fillRect(length*.16,height*.9,4*SPRITE_SCALE,3*SPRITE_SCALE)
     ctx.fillRect(length*.72,height*.9,4*SPRITE_SCALE,3*SPRITE_SCALE)
+    ctx.fillStyle=a.kit.boots
+    ctx.fillRect(-d.legL*.48,-height*.58,d.legL*.96,height*1.2)
     polygon(ctx,[{x:-5,y:height*.36},{x:-3,y:-height*.34},{x:length*.27,y:-height*.72},{x:length*.58,y:-height*.57},{x:length+3,y:-height*.12},{x:length+6,y:height*.39},{x:length+2,y:height*.62},{x:0,y:height*.62}],a.kit.boots)
     polygon(ctx,[{x:length*.62,y:-height*.45},{x:length+3,y:-height*.12},{x:length+6,y:height*.38},{x:length*.81,y:height*.34}],darken(a.kit.boots,.72))
     ctx.fillStyle=accent

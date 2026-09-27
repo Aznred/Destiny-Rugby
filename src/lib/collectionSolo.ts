@@ -115,7 +115,7 @@ export function packCollectionSolo(pack: PackCarriere): PackCarriere {
 }
 
 export function packsCollectionSolo(packs: readonly PackCarriere[]): PackCarriere[] {
-  return packs.filter(pack => packAvecSkin(pack.id)).map(packCollectionSolo);
+  return packs.filter(pack => packAvecSkin(pack.id) || PACKS_SOLO_GRATUITS.has(pack.id)).map(packCollectionSolo);
 }
 
 /** Une empreinte stable sur 64 bits : la collection survit aux reordonnancements du catalogue. */

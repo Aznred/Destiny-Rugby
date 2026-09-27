@@ -18,6 +18,7 @@ const CLIPS = new Map(rugbyAnimations.map(clip => [clip.id.replace(/^rugby_/, ''
 // mêlées, relèvements) sans aucun rognage de la tête ou des crampons.
 const LARGEUR_CANVAS = 160;
 const HAUTEUR_CANVAS = 160;
+const TAILLE_CANVAS_COMPACT = 112;
 
 interface Props {
   pion: PionDirect;
@@ -30,6 +31,7 @@ interface Props {
   hauteurMetres: number;
   temps: number;
   angleVue?: number;
+  compact?: boolean;
 }
 
 const MOTIFS: Record<MaillotMatch['motif'], KitPattern> = {
@@ -142,11 +144,11 @@ function personnage(pion: PionDirect, maillot: MaillotMatch): Character {
 function dessinerSprite(
   canvas: HTMLCanvasElement, renderer: CharacterRenderer, character: Character,
   clip: AnimationClip, temps: number, graine: number, orientation: Orientation, afficherBallon: boolean,
-  progression?: number, corps?: PionDirect['corps'], direction?: Vec | null, zoom = .36,
+  progression?: number, corps?: PionDirect['corps'], direction?: Vec | null, zoom = .36, tailleCanvas = LARGEUR_CANVAS,
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  ctx.clearRect(0, 0, LARGEUR_CANVAS, HAUTEUR_CANVAS);
+  ctx.clearRect(0, 0, tailleCanvas, tailleCanvas);
   const duree = clip.frames.length / clip.fps;
   const local = progression === undefined
     ? (temps + (graine % 997) / 997 * duree) % Math.max(.01, duree)
@@ -186,8 +188,9 @@ function dessinerSprite(
     pose.ball.scale = (pose.ball.scale || 1) * .56;
   }
   renderer.draw(ctx, character, pose, {
-    width: LARGEUR_CANVAS, height: HAUTEUR_CANVAS, zoom,
-    pan: { x: 0, y: 2 - (character.appearance.body.height - 1) * 35 }, showField: false, showSkeleton: false,
+    width: tailleCanvas, height: tailleCanvas, zoom: zoom * tailleCanvas / LARGEUR_CANVAS,
+    pan: { x: 0, y: (37 - (character.appearance.body.height - 1) * 35) * tailleCanvas / LARGEUR_CANVAS - 35 },
+    showField: false, showSkeleton: false,
   });
 }
 
@@ -221,7 +224,7 @@ function maillotDeCelebration(principal: string): MaillotMatch {
   return { principal, secondaire: '#f3ead1', accent: '#f5d575', short: '#172c29', chaussettes: principal, motif: 'epaules' };
 }
 
-function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, redresser, hauteurMetres, temps, angleVue = 0 }: Props) {
+function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, redresser, hauteurMetres, temps, angleVue = 0, compact = false }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const renderer = useMemo(() => new CharacterRenderer(), []);
   const character = useMemo(() => personnage(pion, maillot), [pion.id, pion.nom, pion.numero, pion.poste, pion.force, pion.tailleCm, pion.poidsKg, maillot]);
@@ -270,19 +273,20 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
   const ballonAnime = porteur || ballonTouche;
   const graine = graineVisuelleMatch(pion.id);
   const derniereImage = useRef('');
+  const tailleCanvas = compact ? TAILLE_CANVAS_COMPACT : LARGEUR_CANVAS;
   useLayoutEffect(() => {
     const instantClip = progression === undefined ? temps : progression * clip.frames.length / clip.fps;
-    const cle = `${character.id}:${maillot.principal}:${maillot.secondaire}:${maillot.motif}:${clip.id}:${orientation}:${ballonAnime}:${Math.floor(instantClip * 24)}:${Math.floor((pion.corps?.age ?? 0) * 24)}`;
+    const cle = `${character.id}:${tailleCanvas}:${maillot.principal}:${maillot.secondaire}:${maillot.motif}:${clip.id}:${orientation}:${ballonAnime}:${Math.floor(instantClip * 24)}:${Math.floor((pion.corps?.age ?? 0) * 24)}`;
     if (cle === derniereImage.current) return;
     derniereImage.current = cle;
-    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, direction);
-  }, [renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, maillot]);
+    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, direction, .36, tailleCanvas);
+  }, [renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, maillot, tailleCanvas]);
 
   const largeurMetres = hauteurMetres * (LARGEUR_CANVAS / HAUTEUR_CANVAS);
   return <g transform={`translate(${position.x.toFixed(2)} ${position.y.toFixed(2)})`} className={`rg-canvas-groupe${porteur ? ' rg-porteur' : ''}`}>
     <g transform={redresser}>
       <foreignObject x={-largeurMetres / 2} y={-hauteurMetres * .78} width={largeurMetres} height={hauteurMetres} overflow="visible">
-        <canvas ref={canvas} width={LARGEUR_CANVAS} height={HAUTEUR_CANVAS} className="rg-canvas" aria-hidden="true" />
+        <canvas ref={canvas} width={tailleCanvas} height={tailleCanvas} className="rg-canvas" aria-hidden="true" />
       </foreignObject>
     </g>
   </g>;

@@ -14,18 +14,18 @@ const saisons = new URL('../assets/packs-saisonniers/', import.meta.url);
 const correspondances = {
   allBlacks: 'All_Blacks_',
   nationsCeltes: 'Celtic_Nations_',
-  rugbyChampionship: 'Rugby_Champio_',
+  leagueOne: 'Rugby_Champio_',
   international: 'Rugby_Interna_',
   pumas: 'Rugby_Los_Pum_',
   iles: 'Rugby_Pacific_',
-  premium: 'Rugby_Premium_',
+  urc: 'Rugby_Premium_',
   europeEmergente: 'EmergingNationsPack3D_',
   wallabies: 'Golden_Wallabies_',
   top14: 'Top14BoosterPack3D_',
   franceXV: 'Rugby_Pack_0927153822_',
-  grand: 'Rugby_Pack_0927154535_',
-  standard: 'Rugby_Trading_0927153610_',
-  sixNations: 'Rugby_Trading_0927153639_',
+  sixNations: 'Rugby_Pack_0927154535_',
+  prod2: 'Rugby_Trading_0927153610_',
+  premiership: 'Rugby_Trading_0927153639_',
   halloween: 'Rugby_Hallowe_',
   noel: 'Holiday_Rugby_Gold_',
   paques: 'Rugby_Blossom_',
@@ -34,7 +34,9 @@ const correspondances = {
 await fs.mkdir(destination, { recursive: true });
 await fs.mkdir(saisons, { recursive: true });
 const fichiers = await fs.readdir(sources);
+const selection = new Set(process.argv.slice(2));
 for (const [id, fragment] of Object.entries(correspondances)) {
+  if (selection.size && !selection.has(id)) continue;
   const nom = fichiers.find(fichier => fichier.includes(fragment) && fichier.endsWith('.glb'));
   if (!nom) throw new Error(`Modèle introuvable : ${id} (${fragment})`);
   const input = await fs.readFile(new URL(nom, sources));

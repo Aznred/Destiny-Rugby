@@ -153,7 +153,10 @@
   height: 100%;
   display: block;
   image-rendering: pixelated;
+  filter: none;
 }
+
+.amical-terrain-svg .rg-canvas-groupe.rg-porteur { filter: none; }
 
 .amical-geste-indication {
   position: absolute;
@@ -169,16 +172,6 @@
   font-size: .72rem;
   text-align: center;
   pointer-events: none;
-}
-
-.halo-controle {
-  animation: pulsationControle 1.2s infinite ease-in-out;
-}
-
-@keyframes pulsationControle {
-  0% { transform: scale(1); opacity: 0.9; }
-  50% { transform: scale(1.15); opacity: 0.4; }
-  100% { transform: scale(1); opacity: 0.9; }
 }
 
 /* HUD manette en bas */
@@ -450,7 +443,58 @@
   margin-bottom: 1.5rem;
 }
 
-@media (max-width: 600px) {
+@media (hover: hover) and (pointer: fine) {
+  .amical-hud,
+  .amical-geste-indication { display: none; }
+  .amical-aide-pc { bottom: 14px; }
+}
+
+.amical-paysage-requis {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: #0b1329;
+  color: #f8fafc;
+  text-align: center;
+}
+.amical-paysage-requis strong { font-size: 1.35rem; }
+.amical-paysage-requis p { max-width: 22rem; margin: 0; color: #cbd5e1; }
+.amical-paysage-requis button {
+  min-height: 44px;
+  padding: .6rem 1.2rem;
+  border: 1px solid #7dd3fc;
+  border-radius: 12px;
+  background: #0369a1;
+  color: white;
+  font-weight: 750;
+}
+.amical-paysage-requis .amical-paysage-quitter { background: transparent; border-color: #64748b; }
+
+@media (pointer: coarse) and (orientation: landscape) {
+  .amical-entete { height: 44px; padding: 0 .45rem; backdrop-filter: none; }
+  .amical-bandeau-action { top: 47px; padding: .2rem .65rem; font-size: .68rem; }
+  .amical-hud { bottom: 5px; left: 8px; right: 8px; }
+  .amical-joystick-zone { width: 92px; height: 92px; }
+  .amical-joystick-base { width: 72px; height: 72px; }
+  .amical-joystick-manche { width: 34px; height: 34px; }
+  .amical-actions-zone { gap: .3rem; grid-template-columns: repeat(4, minmax(58px, auto)); }
+  .amical-btn-action.passe,
+  .amical-btn-action.sprint { min-height: 42px; padding: .35rem .5rem; font-size: .7rem; }
+  .amical-btn-action.principal { min-width: 76px; min-height: 52px; padding: .3rem .5rem; font-size: .75rem; }
+  .amical-btn-action.principal small { font-size: .48rem; }
+  .amical-btn-changer { min-height: 34px; padding: .35rem .55rem; font-size: .68rem; }
+  .amical-geste-indication { bottom: 8px; font-size: .58rem; }
+  .amical-aide-pc { display: none; }
+  .amical-qte { max-height: calc(100dvh - 16px); overflow: auto; }
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
   .amical-entete { height: 54px; padding: 0 .45rem; }
   .amical-btn-retour { width: 34px; height: 34px; overflow: hidden; padding: .35rem; color: transparent; gap: 0; }
   .amical-btn-retour svg { color: #fff; flex: 0 0 auto; }

@@ -145,12 +145,16 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const pressionActionRef = useRef(0);
   const pressionPiedRef = useRef(0);
   const dernierRenduRef = useRef(0);
+  const appareilTactileRef = useRef(typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
+  const pleinEcranMatchRef = useRef(false);
+  const orientationVerrouilleeRef = useRef(false);
 
   const [vueCamera, setVueCamera] = useState<{ viewBox: string; transform: string; redresser: string } | null>(null);
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
   const [tempsSimule, setTempsSimule] = useState(0);
   const [messageAction, setMessageAction] = useState('Coup d’envoi');
+  const messageActionRef = useRef(messageAction);
   const [finDeMatch, setFinDeMatch] = useState(false);
   const [pionControleId, setPionControleId] = useState<string | null>(null);
   const [enduranceJauge, setEnduranceJauge] = useState(100);
@@ -158,10 +162,44 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const [sprintActif, setSprintActif] = useState(false);
   const [qteAffichee, setQteAffichee] = useState<QteArcade | null>(null);
   const [progressionQteAffichee, setProgressionQteAffichee] = useState(0);
-  const [versionRendu, setVersionRendu] = useState(0);
+  const [portraitMobile, setPortraitMobile] = useState(false);
 
   const maillotA = useMemo(() => maillot(equipeA.couleur || '#1e40af', equipeB.couleur || '#f8fafc'), [equipeA.couleur, equipeB.couleur]);
   const maillotB = useMemo(() => maillot(equipeB.couleur || '#dc2626', equipeA.couleur || '#f8fafc'), [equipeA.couleur, equipeB.couleur]);
+  useEffect(() => { messageActionRef.current = messageAction; }, [messageAction]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(pointer: coarse) and (orientation: portrait)');
+    let actif = true;
+    const actualiser = () => setPortraitMobile(media.matches);
+    actualiser();
+    media.addEventListener('change', actualiser);
+    if (appareilTactileRef.current && typeof screen.orientation?.lock === 'function') {
+      void screen.orientation.lock('landscape').then(() => {
+        if (actif) orientationVerrouilleeRef.current = true;
+        else screen.orientation.unlock();
+      }).catch(() => {});
+    }
+    return () => {
+      actif = false;
+      media.removeEventListener('change', actualiser);
+      if (orientationVerrouilleeRef.current) screen.orientation.unlock();
+      if (pleinEcranMatchRef.current && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    };
+  }, []);
+
+  const activerPaysage = async () => {
+    try {
+      if (!document.fullscreenElement && conteneurRef.current?.requestFullscreen) {
+        await conteneurRef.current.requestFullscreen();
+        pleinEcranMatchRef.current = true;
+      }
+      if (typeof screen.orientation?.lock === 'function') {
+        await screen.orientation.lock('landscape');
+        orientationVerrouilleeRef.current = true;
+      }
+    } catch { /* Le navigateur peut imposer une rotation manuelle. */ }
+  };
 
   useEffect(() => {
     const m = creerMatch(
@@ -282,7 +320,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         const hote = monCamp === 'A';
         const trame = inputRef.current.trame(navigator.getGamepads?.()[0], true);
         const snapshot = hote && m
-          ? serialiserMatch(m, ++revisionRef.current, qteRef.current, derniereSequenceTraitee.current, messageAction)
+          ? serialiserMatch(m, ++revisionRef.current, qteRef.current, derniereSequenceTraitee.current, messageActionRef.current)
           : undefined;
         const res = await synchroniserSalonAmicalApi(
           salonCode, hote ? 'hote' : 'invite', trame, snapshot,
@@ -309,11 +347,12 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
     void synchroniser();
     const interval = window.setInterval(synchroniser, 100);
     return () => { actif = false; window.clearInterval(interval); };
-  }, [messageAction, mode, monCamp, salonCode]);
+  }, [mode, monCamp, salonCode]);
 
   useEffect(() => {
     let animation = 0;
     let precedent = performance.now();
+    const intervalleRendu = appareilTactileRef.current ? 50 : 33;
     const tick = (maintenant: number) => {
       const dt = Math.min((maintenant - precedent) / 1000, .05);
       precedent = maintenant;
@@ -406,20 +445,21 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         }
 
         const controle = choisirJoueur(m, monCamp);
-        if (controle) { setPionControleId(controle.id); setEnduranceJauge(Math.round(controle.endurance)); }
-        setScoreA(m.scoreA); setScoreB(m.scoreB); setTempsSimule(Math.min(DUREE_MATCH, Math.floor(m.sim)));
         if (m.fini || m.sim >= DUREE_MATCH) { m.fini = true; m.phase = 'fini'; setFinDeMatch(true); }
 
-        const cible: Vec = controle?.pos ?? m.porteur?.pos ?? m.ballon;
-        const rect = conteneurRef.current?.getBoundingClientRect();
-        const ratio = rect ? rect.width / Math.max(1, rect.height) : 16 / 9;
-        const angle = angleDeVue(monCamp, Boolean(rect && rect.height > rect.width));
-        const vue = cameraRef.current.suivre(cible, 'suivi' as Cadrage, ratio, angle, dt);
-        setVueCamera({ viewBox: vue.viewBox, transform: vue.transform, redresser: vue.redresser });
-
-        if (qteRef.current) setProgressionQteAffichee(progressionQte(qteRef.current, Date.now() + decalageServeurRef.current));
-        if (maintenant - dernierRenduRef.current > 42) {
-          dernierRenduRef.current = maintenant; setVersionRendu((v) => v + 1);
+        const depuisRendu = maintenant - dernierRenduRef.current;
+        if (depuisRendu >= intervalleRendu) {
+          dernierRenduRef.current = maintenant;
+          const cible: Vec = controle?.pos ?? m.porteur?.pos ?? m.ballon;
+          const rect = conteneurRef.current?.getBoundingClientRect();
+          const ratio = rect ? rect.width / Math.max(1, rect.height) : 16 / 9;
+          const angle = angleDeVue(monCamp, Boolean(rect && rect.height > rect.width));
+          const vue = cameraRef.current.suivre(cible, 'suivi' as Cadrage, ratio, angle, Math.min(depuisRendu / 1000, .08));
+          setVueCamera({ viewBox: vue.viewBox, transform: vue.transform, redresser: vue.redresser });
+          if (controle) setEnduranceJauge(Math.round(controle.endurance));
+          setScoreA(m.scoreA); setScoreB(m.scoreB);
+          setTempsSimule(Math.min(DUREE_MATCH, Math.floor(m.sim)));
+          if (qteRef.current) setProgressionQteAffichee(progressionQte(qteRef.current, Date.now() + decalageServeurRef.current));
         }
       }
       animation = requestAnimationFrame(tick);
@@ -460,8 +500,9 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   };
 
   const m = matchRef.current;
-  void versionRendu;
   const terrain = m ? terrainSprites(m) : null;
+  const pionsDirects = new Map(terrain?.pions.map((p) => [p.id, p]));
+  const tempsSprite = m ? appareilTactileRef.current ? Math.floor(m.sim * 12) / 12 : m.sim : 0;
   const pionControle = m?.pions.find((p) => p.id === pionControleId);
   const contexte = m ? actionContextuelleArcade(m, pionControle) : null;
   const qteLocaleDejaJouee = qteAffichee?.scores?.[monCamp] !== undefined;
@@ -489,14 +530,13 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         <g transform={vueCamera.transform}>
           <PelouseMemo />
           {m.pions.filter((p) => p.surLeTerrain).map((p) => {
-            const direct = terrain.pions.find((candidat) => candidat.id === p.id)!;
-            const controle = p.id === pionControleId;
+            const direct = pionsDirects.get(p.id);
+            if (!direct) return null;
             return <g key={p.id}>
-              {controle && <circle cx={p.pos.x} cy={p.pos.y} r={2.45} fill="none" stroke="#ffd700" strokeWidth={.34} strokeDasharray=".8,.35" className="halo-controle" />}
-              <SpriteRugbymanMemo pion={direct} position={p.pos} terrain={terrain} maillot={p.cote === 'A' ? maillotA : maillotB} porteur={m.porteur?.id === p.id} positionPorteur={m.porteur?.pos} redresser={vueCamera.redresser} hauteurMetres={5.3} temps={m.sim} />
+              <SpriteRugbymanMemo pion={direct} position={p.pos} terrain={terrain} maillot={p.cote === 'A' ? maillotA : maillotB} porteur={m.porteur?.id === p.id} positionPorteur={m.porteur?.pos} redresser={vueCamera.redresser} hauteurMetres={5.3} temps={tempsSprite} compact={appareilTactileRef.current} />
             </g>;
           })}
-          {!m.porteur && <g transform={`translate(${m.ballon.x}, ${m.ballon.y})`}><ellipse rx={.7} ry={.42} fill="#854d0e" stroke="#fef08a" strokeWidth={.12} /></g>}
+          {!m.porteur && <g transform={`translate(${m.ballon.x}, ${m.ballon.y})`}><ellipse rx={.7} ry={.42} fill="#f4eee1" stroke="#503e32" strokeWidth={.12} /></g>}
         </g>
       </svg>}
 
@@ -532,5 +572,11 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       <p className="amical-message-vainqueur">{scoreA > scoreB ? `Victoire de ${equipeA.nom}` : scoreB > scoreA ? `Victoire de ${equipeB.nom}` : 'Match nul'}</p>
       <button type="button" className="btn primaire" onClick={onQuitter}>Retour à la collection</button>
     </div></div>}
+    {portraitMobile && <div className="amical-paysage-requis" role="dialog" aria-modal="true" aria-label="Mode paysage requis">
+      <strong>Tourne ton téléphone en mode paysage</strong>
+      <p>Le terrain et les commandes sont prévus pour un écran horizontal.</p>
+      <button type="button" onClick={() => { void activerPaysage(); }}>Passer en plein écran</button>
+      <button type="button" className="amical-paysage-quitter" onClick={onQuitter}>Quitter le match</button>
+    </div>}
   </div>;
 }
