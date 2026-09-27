@@ -2158,9 +2158,11 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
   .cel-compo > .manager-feuille-visuelle {
     flex: 1; min-height: 0; position: relative;
     grid-template-columns: minmax(0, 1fr) clamp(310px, 25vw, 410px);
-    grid-template-rows: auto minmax(0, 1fr) auto; gap: .5rem;
+    grid-template-rows: auto auto minmax(0, 1fr); gap: .5rem;
   }
   .cel-compo .manager-feuille-visuelle > .ct-entete { grid-column: 1; grid-row: 1; margin: 0; padding: .35rem .7rem; align-items: center; }
+  .cel-compo .ct-feuille-fut > .ct-selection-actions { grid-column: 2; grid-row: 1; min-height: 0; margin: 0; padding: .35rem .6rem; }
+  .cel-compo .ct-feuille-fut > .ct-groupes { grid-column: 2; grid-row: 2; min-height: 0; margin: 0; }
   .cel-compo .ct-note-equipe strong { font-size: 1.7rem; }
   .cel-compo .manager-feuille-visuelle > .manager-compo-aide { grid-column: 2; grid-row: 1; margin: 0; padding: .4rem .6rem; font-size: .7rem; }
   .cel-compo .manager-feuille-visuelle > .ct-plateau { grid-column: 1; grid-row: 2 / 4; min-height: 0; align-items: stretch; position: relative; grid-template-columns: minmax(0, 1fr); }
@@ -2194,11 +2196,11 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
      sonne faux quand on regarde la feuille. */
   .cel-compo .ct-feuille-fut .ct-fut-indicateurs { font-size: 10px; min-height: 16px; gap: 4px; padding: 1px 4px; border: 1px solid #ffffff20; }
   .cel-compo .ct-feuille-fut .ct-fut-indicateurs svg { width: 9px; height: 9px; }
-  .cel-compo .manager-feuille-visuelle > .manager-banc-visuel { grid-column: 2; grid-row: 2; align-self: stretch; min-height: 0; padding: .7rem; display: flex; flex-direction: column; background: linear-gradient(145deg, #132c30, #091b21); border-color: #b7dcd329; }
+  .cel-compo .manager-feuille-visuelle.ct-feuille-fut > .manager-banc-visuel { grid-column: 2; grid-row: 3; align-self: stretch; min-height: 0; padding: .7rem; display: flex; flex-direction: column; background: linear-gradient(145deg, #132c30, #091b21); border-color: #b7dcd329; }
   .cel-compo .ct-feuille-fut .manager-banc-cartes { flex: 1; min-height: 0; container-type: size; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); align-items: center; gap: 6px; }
   .cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut { width: min(100%, 24cqh); max-width: 108px; justify-self: center; }
-  .cel-compo .manager-feuille-visuelle > .manager-reserves { grid-column: 2; grid-row: 3; min-height: 0; margin: 0; padding: .7rem; }
-  .cel-compo .manager-feuille-visuelle > .manager-reserves[open] { max-height: none; grid-area: auto; position: absolute; inset: 0 0 0 auto; width: clamp(310px, 25vw, 410px); z-index: 12; overflow-y: auto; background: #0d2428; box-shadow: -12px 0 36px #0006; }
+  .cel-compo .manager-feuille-visuelle > .manager-reserves,
+  .cel-compo .manager-feuille-visuelle > .manager-reserves[open] { grid-column: 2; grid-row: 3; position: static; inset: auto; width: 100%; height: 100%; min-height: 0; max-height: none; margin: 0; padding: .7rem; overflow: hidden; background: #0d2428; box-shadow: none; }
   .cel-compo .manager-reserves > summary { position: sticky; top: -.7rem; z-index: 2; padding: .5rem 0; background: #0d2428; font-size: .85rem; }
   .cel-compo .ct-feuille-fut .manager-reserves > div { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .cel-compo .ct-feuille-fut .ct-reserve-fut { max-width: none; }

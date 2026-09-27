@@ -1466,13 +1466,15 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
  * lecture recalcule.
  *
  * ⚠️ SANS ELLE, REGARDER UN MATCH RÉÉCRIT LA LIGUE TOUTES LES DEUX SECONDES.
- * Un direct fait bouger l'horloge, le score, le fil et les statistiques à chaque
+ * Un direct fait bouger l'horloge, le fil et les statistiques à chaque
  * sondage : l'état produit n'est jamais identique au précédent, donc les 300 à
  * 400 Ko de la ligue repartaient vers la base deux mille quatre cents fois par
- * rencontre. Or ces six champs ne sont PAS de l'information : ils se
+ * rencontre. Or ces champs dérivés ne sont PAS de l'information : ils se
  * reconstruisent intégralement de la graine, des feuilles gelées et du journal
  * — c'est tout le principe de `matchCarriere.ts`, « on ne stocke pas un match,
- * on stocke de quoi le rejouer ».
+ * on stocke de quoi le rejouer ». Le score fait exception : chaque changement
+ * est enregistré pour que toutes les instances serveur partagent le même
+ * résultat après une actualisation ou une reconnexion.
  *
  * ⚠️ ET CE QUI EST VRAIMENT NOUVEAU DÉCLENCHE TOUJOURS UNE ÉCRITURE : un ordre
  * au journal, une décision en attente avec sa date limite, le gel du chrono, la
@@ -1480,7 +1482,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
  * Un match TERMINÉ garde donc tous ses champs comparés : son fil et sa feuille
  * sont, eux, la seule trace qui restera.
  */
-const DERIVES_DU_DIRECT = ['horloge', 'score', 'essais', 'penalites', 'fil', 'stats'] as const;
+const DERIVES_DU_DIRECT = ['horloge', 'essais', 'penalites', 'fil', 'stats'] as const;
 
 export function empreinteEcriture(etat: EtatCarriereEnLigne, version: number): string {
   return JSON.stringify({
