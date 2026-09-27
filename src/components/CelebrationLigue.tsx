@@ -23,7 +23,7 @@ export function CelebrationLigue({ vue, agir }: {
   const joueurs = (club.composition?.titulaires ?? []).map(id => vue.cartes.find(c => c.id === id)).filter(c => !!c);
   const competition = vue.competitions?.find(c => c.id === titre.competitionId);
   const modele = TROPHEES[titre.tropheeId ?? competition?.tropheeId ?? ''] ?? Object.values(TROPHEES).find(t => !t.individuel)!;
-  return <Ceremonie key={cle} joueurs={joueurs.map(j => ({ nom: j.nom, poste: j.poste }))} club={club.nom} couleur={clubParNom(club.nom)?.c1 ?? '#d3a448'}
+  return <Ceremonie key={cle} joueurs={joueurs.map(j => ({ nom: j.nom, poste: j.poste }))} club={club.nom} competition={titre.nom} saison={titre.saison} couleur={clubParNom(club.nom)?.c1 ?? '#d3a448'}
     trophee={{ ...modele, id: `ligue-${cle}`, nom: titre.trophee, desc: `${titre.nom} · Saison ${titre.saison}` }}
     fermer={async () => {
       const suivante = await agir({ type: 'celebrationVue', competitionId: titre.competitionId, saison: titre.saison });
@@ -31,8 +31,8 @@ export function CelebrationLigue({ vue, agir }: {
     }} />;
 }
 
-function Ceremonie({ joueurs, club, couleur, trophee, fermer }: {
-  joueurs: { nom: string; poste: PosteId }[]; club: string; couleur: string;
+function Ceremonie({ joueurs, club, competition, saison, couleur, trophee, fermer }: {
+  joueurs: { nom: string; poste: PosteId }[]; club: string; competition: string; saison: number; couleur: string;
   trophee: typeof TROPHEES[string]; fermer: () => Promise<void>;
 }) {
   const [etape, setEtape] = useState<'terrain' | 'coupe'>('terrain');
@@ -41,7 +41,6 @@ function Ceremonie({ joueurs, club, couleur, trophee, fermer }: {
   const fermerCoupe = async () => { if (occupe) return; setOccupe(true); try { await fermer(); } finally { setOccupe(false); } };
   const suivant = () => setEtape('coupe');
   const { overlayRef, dialogRef } = useModalDialog(() => { if (etape === 'terrain') suivant(); else void fermerCoupe(); });
-  useEffect(() => { const timer = window.setTimeout(suivant, 7000); return () => window.clearTimeout(timer); }, []);
   useEffect(() => {
     let actif = true;
     void vignetteModele(trophee.modele, trophee.couleur).then(image => { if (actif) setImageCoupe(image); });
@@ -50,15 +49,23 @@ function Ceremonie({ joueurs, club, couleur, trophee, fermer }: {
   return createPortal(<div ref={overlayRef} className="celebration-ligue">
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Champion : ${club}`} tabIndex={-1}>
       {etape === 'coupe' ? <TropheeGagne tropheeId={trophee.id} tropheePersonnalise={trophee} index={1} total={1} onFermer={() => void fermerCoupe()} /> : <>
-        <p className="eyebrow">CHAMPIONS</p><h2>{club}</h2><p>{trophee.nom}</p>
-        <div className="celebration-terrain" role="img" aria-label="Votre XV célèbre son titre sur le terrain avec la coupe gagnée">
-          {joueurs.slice(0, 15).map((joueur, i) => <div key={`${joueur.nom}-${i}`} className="celebration-emplacement">
-            <SpriteCelebration nom={joueur.nom} poste={joueur.poste} numero={i + 1} couleur={couleur} capitaine={i === 7} />
-            {i === 7 && imageCoupe && <img className="celebration-coupe" src={imageCoupe} alt="" />}
-            <span>{joueur.nom.split(' ').at(-1)}</span>
-          </div>)}
+        <p className="eyebrow">LA VICTOIRE EST À VOUS</p><h2>{club}</h2>
+        <div className="celebration-terrain" role="img" aria-label={`Les joueurs de ${club} célèbrent ensemble la victoire en ${competition} avec la coupe`}>
+          <div className="celebration-tribunes" />
+          <div className="celebration-joueurs celebration-joueurs-arriere">
+            {joueurs.slice(0, 7).map((joueur, i) => <SpriteCelebration key={`${joueur.nom}-${i}`} nom={joueur.nom} poste={joueur.poste} numero={i + 1} couleur={couleur} />)}
+          </div>
+          <div className="celebration-joueurs celebration-joueurs-avant">
+            {joueurs.slice(8, 15).map((joueur, i) => <SpriteCelebration key={`${joueur.nom}-${i + 8}`} nom={joueur.nom} poste={joueur.poste} numero={i + 9} couleur={couleur} />)}
+          </div>
+          <div className="celebration-capitaine">
+            {joueurs[7] && <SpriteCelebration nom={joueurs[7].nom} poste={joueurs[7].poste} numero={8} couleur={couleur} capitaine />}
+            {imageCoupe && <img className="celebration-coupe" src={imageCoupe} alt="" />}
+          </div>
+          <div className="celebration-panneau"><small>{competition}</small><strong>CHAMPIONS · SAISON {saison}</strong></div>
+          <div className="celebration-confettis" aria-hidden="true" />
         </div>
-        <button className="btn primaire" onClick={suivant}>Soulever la coupe</button>
+        <button className="btn primaire" onClick={suivant}>Voir la coupe en 3D</button>
       </>}
     </div>
   </div>, document.body);

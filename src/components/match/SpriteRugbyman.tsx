@@ -152,7 +152,7 @@ function personnage(pion: PionDirect, maillot: MaillotMatch): Character {
 function dessinerSprite(
   canvas: HTMLCanvasElement, renderer: CharacterRenderer, character: Character,
   clip: AnimationClip, temps: number, graine: number, orientation: Orientation, afficherBallon: boolean,
-  progression?: number, corps?: PionDirect['corps'], direction?: Vec | null,
+  progression?: number, corps?: PionDirect['corps'], direction?: Vec | null, zoom = .36,
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -196,7 +196,7 @@ function dessinerSprite(
     pose.ball.scale = (pose.ball.scale || 1) * .56;
   }
   renderer.draw(ctx, character, pose, {
-    width: LARGEUR_CANVAS, height: HAUTEUR_CANVAS, zoom: .36,
+    width: LARGEUR_CANVAS, height: HAUTEUR_CANVAS, zoom,
     pan: { x: 0, y: 2 }, showField: false, showSkeleton: false,
   });
 }
@@ -216,7 +216,7 @@ export function SpriteCelebration({ nom, poste, numero, couleur, capitaine = fal
     const debut = performance.now();
     const dessiner = (instant: number) => {
       if (instant - dernier > 65 && canvas.current) {
-        dessinerSprite(canvas.current, renderer, character, clip, (instant - debut) / 1000, numero * 37, 'front', false);
+        dessinerSprite(canvas.current, renderer, character, clip, (instant - debut) / 1000, numero * 37, 'front', false, undefined, undefined, undefined, .55);
         dernier = instant;
       }
       frame = requestAnimationFrame(dessiner);

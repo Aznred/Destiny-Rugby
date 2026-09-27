@@ -156,7 +156,7 @@ export interface AdministrationCarriere {
   liguesTronquees: boolean;
 }
 export interface ObjectifCarriere {
-  id: string; clubId: string; libelle: string; type: 'participer' | 'gagner' | 'essais' | 'formation' | 'penalites' | 'serie';
+  id: string; clubId: string; libelle: string; type: 'participer' | 'gagner' | 'essais' | 'formation' | 'penalites' | 'serie' | 'packs' | 'packGratuit';
   cible: number; progression: number; recompense: number; debut: string; fin: string; reclame: boolean;
 }
 export interface LigneClassementCarriere {

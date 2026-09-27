@@ -1,12 +1,76 @@
-.celebration-ligue { position:fixed; inset:0; z-index:250; overflow-y:auto; display:grid; place-items:center; background:radial-gradient(ellipse at top,#205940,#03120f 75%); padding:20px; box-sizing:border-box; color:white; text-align:center; }
-.celebration-ligue > div { width:min(760px,100%); }
-.celebration-ligue h2 { margin:8px 0; font-size:clamp(24px,5vw,48px); }
-.celebration-terrain { position:relative; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); grid-template-rows:repeat(3,minmax(0,1fr)); height:min(58dvh,440px); min-height:290px; overflow:hidden; border:3px solid #e8f5e7a8; border-radius:16px; background:repeating-linear-gradient(0deg,#165c42 0 60px,#1c6848 60px 120px); box-shadow:inset 0 0 36px #052515,0 20px 50px #0007; margin:18px 0; }
-.celebration-terrain::before { content:''; position:absolute; inset:8% 4%; pointer-events:none; border:2px solid #ffffff83; background:repeating-linear-gradient(90deg,transparent 0 calc(20% - 2px),#ffffff73 calc(20% - 2px) 20%); }
-.celebration-emplacement { position:relative; display:flex; align-items:center; justify-content:end; flex-direction:column; min-width:0; z-index:1; }
-.celebration-emplacement span { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 3px 5px; text-shadow:0 2px 4px #001; font-size:clamp(9px,1.6vw,13px); font-weight:700; }
-.celebration-sprite { display:block; width:min(100%,128px); height:calc(100% - 16px); object-fit:contain; image-rendering:pixelated; filter:drop-shadow(0 6px 4px #001a10b8); }
-.celebration-coupe { position:absolute; z-index:2; width:44%; max-width:54px; height:48%; object-fit:contain; top:-6%; left:28%; filter:drop-shadow(0 0 10px #ffe697); animation:coupe-levee 1.8s ease-in-out infinite; }
-@keyframes coupe-levee { 50% { transform:translateY(-9px) rotate(4deg); } }
-@media(max-width:540px) { .celebration-ligue { padding:8px; } .celebration-terrain { height:min(52dvh,350px); min-height:240px; } .celebration-coupe { width:60%; left:20%; } }
-@media(prefers-reduced-motion:reduce) { .celebration-coupe { animation:none; } }
+.celebration-ligue {
+  position:fixed; inset:0; z-index:250; overflow-y:auto; display:grid; place-items:center;
+  padding:20px; box-sizing:border-box; color:white; text-align:center;
+  background:radial-gradient(ellipse at 50% 12%,#173758 0%,#071725 56%,#03100d 100%);
+}
+.celebration-ligue > div { width:min(1080px,100%); }
+.celebration-ligue h2 { margin:8px 0 12px; font-size:clamp(24px,5vw,48px); }
+.celebration-terrain {
+  position:relative; height:min(62dvh,530px); min-height:330px; overflow:hidden; isolation:isolate;
+  border:2px solid #d9e4e6a8; border-radius:14px;
+  background:linear-gradient(180deg,#0c2037 0%,#173452 31%,#142f2b 48%,#18543d 72%,#23714c 100%);
+  box-shadow:inset 0 0 60px #03161c,0 20px 60px #0009; margin:18px 0;
+}
+.celebration-terrain::before {
+  content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+  background:radial-gradient(ellipse at 50% 0%,#e1f4ff4a,transparent 42%),
+    linear-gradient(90deg,transparent 11%,#f1fff93b 11.2%,transparent 11.4%,transparent 88.6%,#f1fff93b 88.8%,transparent 89%);
+}
+.celebration-terrain::after {
+  content:''; position:absolute; left:-5%; right:-5%; bottom:0; height:40%; z-index:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,#1d6c49 0 35px,#266c4b 35px 70px);
+  transform:perspective(400px) rotateX(25deg); transform-origin:bottom;
+}
+.celebration-tribunes {
+  position:absolute; inset:9% 0 47%; z-index:0; opacity:.85;
+  background:repeating-linear-gradient(0deg,#091627 0 18px,#142238 18px 21px);
+  box-shadow:inset 0 -16px 30px #071a25;
+}
+.celebration-joueurs {
+  position:absolute; left:2%; right:2%; display:flex; justify-content:center; align-items:end;
+  pointer-events:none;
+}
+.celebration-joueurs-arriere { top:17%; bottom:20%; z-index:2; }
+.celebration-joueurs-avant { left:8%; right:-4%; top:34%; bottom:12%; z-index:4; }
+.celebration-sprite {
+  display:block; flex:0 1 15%; width:15%; min-width:0; height:100%; object-fit:contain;
+  margin-inline:-1%;
+  image-rendering:pixelated; filter:drop-shadow(0 8px 5px #001a10c7);
+}
+.celebration-joueurs .celebration-sprite:nth-child(even) { transform:translateY(3%) rotate(-2deg); }
+.celebration-joueurs .celebration-sprite:nth-child(3n) { transform:translateY(-3%) rotate(2deg); }
+.celebration-capitaine {
+  position:absolute; left:40%; width:20%; top:10%; bottom:17%; z-index:5; pointer-events:none;
+  filter:drop-shadow(0 6px 8px #001b1f);
+}
+.celebration-capitaine .celebration-sprite { width:100%; height:100%; }
+.celebration-coupe {
+  position:absolute; z-index:6; left:5%; top:-4%; width:90%; height:50%; object-fit:contain;
+  filter:drop-shadow(0 0 12px #ffe596); animation:coupe-levee 1.8s ease-in-out infinite;
+}
+.celebration-panneau {
+  position:absolute; z-index:7; left:20%; right:20%; bottom:3%; min-height:70px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  padding:8px 16px; box-sizing:border-box; border:2px solid #d3c79f;
+  background:linear-gradient(115deg,#101d42,#1d3364 52%,#101d42); box-shadow:0 9px 30px #0008;
+  text-transform:uppercase;
+}
+.celebration-panneau small { font-size:clamp(10px,1.5vw,18px); letter-spacing:.12em; font-weight:700; }
+.celebration-panneau strong { font-size:clamp(20px,3.2vw,38px); line-height:1; letter-spacing:.04em; }
+.celebration-confettis {
+  position:absolute; inset:0; z-index:8; pointer-events:none; opacity:.65;
+  background-image:radial-gradient(circle,#fff 1px,transparent 2px),radial-gradient(circle,#f5d784 1px,transparent 2px);
+  background-size:39px 48px,53px 42px; background-position:0 0,20px 12px;
+  mask-image:linear-gradient(#000 0%,transparent 74%); animation:confettis 9s linear infinite;
+}
+@keyframes coupe-levee { 50% { transform:translateY(-10px) rotate(4deg); } }
+@keyframes confettis { to { background-position:0 96px,20px 96px; } }
+@media(max-width:600px) {
+  .celebration-ligue { padding:8px; }
+  .celebration-terrain { height:min(54dvh,390px); min-height:270px; }
+  .celebration-joueurs-arriere { left:-5%; right:-5%; top:20%; }
+  .celebration-joueurs-avant { left:4%; right:-14%; top:38%; }
+  .celebration-capitaine { left:36%; width:28%; }
+  .celebration-panneau { left:5%; right:5%; bottom:2%; min-height:58px; }
+}
+@media(prefers-reduced-motion:reduce) { .celebration-coupe,.celebration-confettis { animation:none; } }

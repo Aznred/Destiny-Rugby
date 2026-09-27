@@ -412,22 +412,31 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
     packId: pack.id, packNom: pack.nom, packApparence: meilleure.rarete,
     meilleureNote: meilleure.note, meilleurJoueur: meilleure.nom, meilleurPortrait: meilleure.photo,
   });
+  for (const objectif of etat.objectifs.filter(o => o.clubId === club.id && !o.reclame)) {
+    if (objectif.type === 'packs' || (objectif.type === 'packGratuit' && gratuit)) objectif.progression++;
+  }
+  verserObjectifsAtteints(etat, club, maintenant);
+}
+
+function verserObjectifsAtteints(etat: EtatCarriereEnLigne, club: ClubCarriere, maintenant: number) {
+  for (const objectif of etat.objectifs.filter(o => o.clubId === club.id && !o.reclame && o.progression >= o.cible)) {
+    objectif.reclame = true;
+    journal(etat, club, 'objectif', objectif.recompense, [], objectif.libelle, dateServeur(maintenant));
+  }
 }
 
 function renouvelerObjectifs(etat: EtatCarriereEnLigne, maintenant: number) {
   const modeles: [ObjectifCarriere['type'], string, number, number][] = [
     ['participer', 'Terminer un match', 1, 200], ['gagner', 'Remporter un match', 1, 150], ['essais', 'Marquer 2 essais', 2, 180],
     ['formation', 'Aligner un titulaire de moins de 60 GEN', 1, 150], ['penalites', 'Réussir 2 pénalités', 2, 120], ['essais', 'Marquer un essai', 1, 150],
+    ['packs', 'Ouvrir un pack', 1, 100], ['packGratuit', 'Ouvrir un pack quotidien', 1, 100],
   ];
   for (const club of etat.clubs) {
     const periode = etat.rencontres.filter(r => r.resultat && (r.domicile === club.id || r.exterieur === club.id)).length;
     const prefixe = `${etat.id}:objectif:${club.id}:${periode}:`;
     // Les objectifs terminés des anciennes sauvegardes sont crédités avant
     // d'être retirés ; un retour après plusieurs semaines ne fait rien perdre.
-    for (const objectif of etat.objectifs.filter(o => o.clubId === club.id && !o.reclame && o.progression >= o.cible)) {
-      objectif.reclame = true;
-      journal(etat, club, 'objectif', objectif.recompense, [], objectif.libelle, dateServeur(maintenant));
-    }
+    verserObjectifsAtteints(etat, club, maintenant);
     etat.objectifs = etat.objectifs.filter(o => o.clubId !== club.id || o.id.startsWith(prefixe));
     const prochaine = etat.rencontres.filter(r => !r.resultat && (r.domicile === club.id || r.exterieur === club.id))
       .sort((a, b) => Date.parse(a.ouvre) - Date.parse(b.ouvre))[0];
