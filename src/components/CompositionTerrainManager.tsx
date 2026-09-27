@@ -44,6 +44,11 @@ import type { Automatismes } from '../lib/cohesion';
 import type { Coequipier } from '../lib/effectif';
 import type { CompositionManager, PosteId } from '../types';
 import { photoReelle } from '../lib/avatars';
+import { useBlasonCarte } from '../lib/useBlasonCarte';
+import { logoChampionnat } from '../lib/logoChampionnat';
+import { clubParNom } from '../data/clubs';
+import { EcussonClub } from './EcussonClub';
+import { Blason } from './Blason';
 
 type ZoneComposition = 'titulaires' | 'remplacants';
 
@@ -335,6 +340,8 @@ function PanneauJoueur({
   onFermer: () => void;
 }) {
   const attributs = attributsDe(joueur);
+  const blasonClub = useBlasonCarte(joueur.clubReel ?? '');
+  const logoLigue = logoChampionnat(joueur.championnat);
   const rarete = rareteDe(joueur);
   const adequation = posteSlot
     ? adequationAuPoste(joueur.poste, posteSlot, joueur.postesSecondaires) : 'naturel';
@@ -431,6 +438,22 @@ function PanneauJoueur({
           </li>
         ))}
       </ul>
+      {(joueur.clubReel || joueur.championnat) && <section className="ct-origines-joueur" aria-label="Club et ligue du joueur">
+        {joueur.clubReel && <div className="ct-origine-joueur">
+          <span className="ct-origine-logo">
+            {blasonClub
+              ? <EcussonClub logo={blasonClub} nom={joueur.clubReel} taille={34} />
+              : <Blason club={clubParNom(joueur.clubReel) ?? { nom: joueur.clubReel, c1: '#0a2a6b', c2: '#c1121f' }} taille={34} />}
+          </span>
+          <span><small>Club</small><b>{joueur.clubReel}</b></span>
+        </div>}
+        {joueur.championnat && <div className="ct-origine-joueur">
+          <span className="ct-origine-logo">{logoLigue
+            ? <img src={logoLigue} alt="" width={34} height={34} loading="lazy" decoding="async" />
+            : <Icone nom="trophee" taille={22} />}</span>
+          <span><small>Ligue</small><b>{joueur.championnat}</b></span>
+        </div>}
+      </section>}
       <details className="ct-brut">
         <summary>{t('compo.attributsBruts')}</summary>
         <ul>
