@@ -78,6 +78,10 @@ export async function creerPaiement(compte: string, pack: unknown, tentative: un
   const offre = OFFRES_OVAS[pack as keyof typeof OFFRES_OVAS];
   const session = await clientStripe().checkout.sessions.create({
     mode: 'payment',
+    // Le jeu n'accepte pour l'instant que les clés de test. Managed Payments
+    // est activé par défaut sur certains comptes et impose alors un code fiscal
+    // produit : ne pas en inventer un pour une recharge de test.
+    managed_payments: { enabled: false },
     client_reference_id: compte,
     metadata: { compte, pack, ovas: String(offre.ovas), application: 'destiny-rugby' },
     line_items: [{ quantity: 1, price_data: { currency: 'eur', unit_amount: offre.centimes,

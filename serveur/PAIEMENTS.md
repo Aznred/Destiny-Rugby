@@ -2,6 +2,8 @@
 
 La boutique utilise Stripe Checkout pour ses recharges : 100 Ovas à 0,99 €, 550 à 4,99 € et 1 200 à 9,99 €. Les prix et les quantités sont déterminés par le serveur. Aucun paiement réel n’est accepté par cette version.
 
+Les sessions de test désactivent explicitement **Managed Payments**. Certains comptes l’ont activé par défaut, ce qui impose un code fiscal produit. Le jeu ne doit pas choisir ce code à la place de l’éditeur ; cette configuration devra être revue avec le bon code fiscal et les obligations applicables avant toute activation des paiements réels.
+
 ## Configuration de l’hébergement
 
 Ajouter les variables sensibles côté serveur (jamais avec le préfixe VITE_) :
