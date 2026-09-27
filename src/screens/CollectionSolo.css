@@ -33,6 +33,49 @@
 .solo-rayon, .solo-catalogue { display: grid; gap: 1rem; }
 .solo-titre-ligne { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
 .solo-titre-ligne > span { max-width: 48ch; text-align: right; font-size: .9rem; }
+.solo-categories-packs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .8rem;
+  padding: .55rem;
+  border: 1px solid #ffffff1f;
+  border-radius: 16px;
+  background: #07130ed6;
+}
+.solo-categories-packs button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: .15rem .7rem;
+  padding: .85rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--craie);
+  text-align: left;
+  cursor: pointer;
+}
+.solo-categories-packs button > span {
+  grid-row: 1 / -1;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #ffffff0f;
+  color: var(--or-300);
+}
+.solo-categories-packs button b { font-size: .94rem; }
+.solo-categories-packs button small { min-width: 0; overflow: hidden; color: var(--craie-dim); text-overflow: ellipsis; white-space: nowrap; }
+.solo-categories-packs button[aria-selected="true"] {
+  border-color: #f0c95f99;
+  background: linear-gradient(135deg, #4b37148c, #163425b8);
+  box-shadow: inset 0 1px 0 #ffffff14;
+}
+.solo-categories-packs button[aria-selected="true"] > span { background: #f0c95f1f; color: #ffe08a; }
+.solo-categories-packs button:focus-visible { outline: 2px solid var(--or-300); outline-offset: 2px; }
 .solo-packs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
 .solo-compteurs-packs { display: flex; flex-wrap: wrap; justify-content: center; gap: .55rem; margin-top: -.35rem; }
 .solo-compteurs-packs span { padding: .4rem .7rem; border: 1px solid #ffffff17; border-radius: 99px; background: #08150fc9; color: var(--craie-dim); font-size: .74rem; }
@@ -79,6 +122,7 @@
   .solo-entete .btn { justify-self: start; }
   .solo-titre-ligne { align-items: start; }
   .solo-titre-ligne > span { display: none; }
+  .solo-categories-packs { grid-template-columns: 1fr; gap: .4rem; }
   .solo-filtres { grid-template-columns: 1fr; }
   .solo-cartes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
   .solo-stats { gap: .45rem; }

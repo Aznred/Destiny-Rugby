@@ -18,6 +18,17 @@ const CLE_SAUVEGARDE_HISTORIQUE = 'destiny-rugby:collection-solo:v1';
 const RARETES: RareteCarriere[] = ['bronze', 'argent', 'or', 'elite', 'star'];
 export const IDS_PACKS_SOLO_GRATUITS = ['bronze', 'standard', 'or'] as const;
 const PACKS_SOLO_GRATUITS = new Set<string>(IDS_PACKS_SOLO_GRATUITS);
+/**
+ * Probabilites PAR CARTE des trois packs gratuits. Comme ils contiennent dix
+ * cartes en solo, 0,01 % donne environ une chance sur 1 000 par pack d'obtenir
+ * une Star rouge. Le pack Or ajoute 0,1 % d'Elite bleue par carte, soit environ
+ * une chance sur 100 par pack. Les packs payants gardent leurs taux d'origine.
+ */
+const PROBABILITES_PACKS_SOLO_GRATUITS: Record<string, Record<RareteCarriere, number>> = {
+  bronze: { bronze: 90, argent: 9.49, or: 0.5, elite: 0, star: 0.01 },
+  standard: { bronze: 48.99, argent: 37, or: 14, elite: 0, star: 0.01 },
+  or: { bronze: 20, argent: 44.89, or: 35, elite: 0.1, star: 0.01 },
+};
 const FAMILLES_AVANTS = new Set(['pilier', 'talonneur', 'deuxieme_ligne', 'troisieme_ligne']);
 const RAYONS = new WeakMap<object, Map<string, Record<RareteCarriere, number[]>>>();
 
@@ -87,10 +98,18 @@ export function cartesPackSolo(pack: Pick<PackCarriere, 'id' | 'cartes'>): numbe
 }
 
 export function packCollectionSolo(pack: PackCarriere): PackCarriere {
+  const probabilitesSolo = PROBABILITES_PACKS_SOLO_GRATUITS[pack.id];
+  const precisionGratuite = pack.id === 'or'
+    ? 'Pack gratuit : environ 1 chance sur 100 d’obtenir une carte Élite bleue et 1 sur 1 000 une Star rouge.'
+    : PACKS_SOLO_GRATUITS.has(pack.id)
+      ? 'Pack gratuit : environ 1 chance sur 1 000 d’obtenir une carte Star rouge.'
+      : '';
   return {
     ...pack,
     prix: prixPackSolo(pack),
     cartes: cartesPackSolo(pack),
+    probabilites: probabilitesSolo ?? pack.probabilites,
+    promesse: precisionGratuite || pack.promesse,
   };
 }
 

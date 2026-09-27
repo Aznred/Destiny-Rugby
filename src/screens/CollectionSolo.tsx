@@ -27,6 +27,10 @@ export function CollectionSolo() {
   const manager = useGame(s => s.manager);
   const catalogue = useMemo(() => catalogueBaseCarriere(), []);
   const packsRoue = useMemo<PackCarriere[]>(() => packsCollectionSolo(PACKS_CARRIERE), []);
+  const idsPacksGratuits = useMemo(() => new Set<string>(IDS_PACKS_SOLO_GRATUITS), []);
+  const packsGratuits = useMemo(() => packsRoue.filter((pack) => idsPacksGratuits.has(pack.id)), [packsRoue, idsPacksGratuits]);
+  const packsPayants = useMemo(() => packsRoue.filter((pack) => !idsPacksGratuits.has(pack.id)), [packsRoue, idsPacksGratuits]);
+  const [categoriePacks, setCategoriePacks] = useState<'gratuits' | 'payants'>('gratuits');
   const [recherche, setRecherche] = useState('');
   const [rarete, setRarete] = useState<RareteCarriere | 'toutes'>('toutes');
   const [statut, setStatut] = useState<'toutes' | 'trouvees' | 'manquantes'>('trouvees');
@@ -144,14 +148,37 @@ export function CollectionSolo() {
     {bilan && <p className="solo-bilan" role="status"><Icone nom="ok" taille={17} /> {bilan}</p>}
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
-      <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.allPacks')}</div><h2 id="solo-packs-titre">{t('solo.choosePack')}</h2></div><span>{t('solo.packsHelp')}</span></div>
+      <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.allPacks')}</div><h2 id="solo-packs-titre">{t('solo.choosePack')}</h2></div><span>{categoriePacks === 'gratuits' ? t('solo.freePacksHelp') : t('solo.paidPacksHelp')}</span></div>
+      <div className="solo-categories-packs" role="tablist" aria-label={t('solo.packCategories')}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={categoriePacks === 'gratuits'}
+          onClick={() => setCategoriePacks('gratuits')}
+        >
+          <span><Icone nom="cadeau" taille={20} /></span>
+          <b>{t('solo.freePacks')}</b>
+          <small>{t('solo.freePacksDetail')}</small>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={categoriePacks === 'payants'}
+          onClick={() => setCategoriePacks('payants')}
+        >
+          <span><Icone nom="ova" taille={20} /></span>
+          <b>{t('solo.paidPacks')}</b>
+          <small>{t('solo.paidPacksDetail', { n: packsPayants.length })}</small>
+        </button>
+      </div>
       <BoutiquePacks3D
-        packs={packsRoue}
+        key={categoriePacks}
+        packs={categoriePacks === 'gratuits' ? packsGratuits : packsPayants}
         solde={coins}
         occupe={ouverture !== null}
         onOuvrir={ouvrirDepuisRoue}
-        packsGratuits={IDS_PACKS_SOLO_GRATUITS}
-        paiementAlternatif={<button type="button" className="btn fantome petit solo-pub-desactivee" disabled title={t('solo.adTitle')}><Icone nom="video" taille={15} /> {t('solo.adDisabled')}</button>}
+        gratuit={categoriePacks === 'gratuits'}
+        paiementAlternatif={categoriePacks === 'gratuits' ? <button type="button" className="btn fantome petit solo-pub-desactivee" disabled title={t('solo.adTitle')}><Icone nom="video" taille={15} /> {t('solo.adDisabled')}</button> : undefined}
       />
     </section>
 

@@ -16,6 +16,19 @@ const premierPayant = PACKS_CARRIERE.find(pack => !IDS_PACKS_SOLO_GRATUITS.inclu
 assert.ok(prixPackSolo(premierPayant) > 0 && prixPackSolo(premierPayant) <= 350, 'Les packs payants en solo doivent avoir des tarifs calibres (25-350 Ovas).');
 assert.ok(premierPayant.prix >= 400, 'Les prix de base pour le jeu en ligne doivent rester intacts.');
 
+const chanceDansUnPack = (probabiliteParCarte: number, cartes: number) => 1 - (1 - probabiliteParCarte / 100) ** cartes;
+const gratuitsSolo = IDS_PACKS_SOLO_GRATUITS.map(id => packCollectionSolo(PACKS_CARRIERE.find(pack => pack.id === id)!));
+for (const pack of gratuitsSolo) {
+  const chanceRouge = chanceDansUnPack(pack.probabilites.star, pack.cartes);
+  assert.ok(chanceRouge >= 0.0009 && chanceRouge <= 0.0011, `Le pack gratuit ${pack.id} doit donner environ une rouge sur 1 000 packs.`);
+}
+assert.equal(gratuitsSolo.find(pack => pack.id === 'bronze')!.probabilites.elite, 0, 'Le pack Bronze gratuit ne doit pas distribuer de bleue.');
+assert.equal(gratuitsSolo.find(pack => pack.id === 'standard')!.probabilites.elite, 0, 'Le pack Argent gratuit ne doit pas distribuer de bleue.');
+const packOrGratuit = gratuitsSolo.find(pack => pack.id === 'or')!;
+const chanceBleueOr = chanceDansUnPack(packOrGratuit.probabilites.elite, packOrGratuit.cartes);
+assert.ok(chanceBleueOr >= 0.009 && chanceBleueOr <= 0.011, 'Le pack Or gratuit doit donner environ une bleue sur 100 packs.');
+assert.deepEqual(packCollectionSolo(premierPayant).probabilites, premierPayant.probabilites, 'Les probabilites des packs payants doivent rester intactes.');
+
 const cles = catalogue.map(carte => cleCarteSolo(carte.sourceId));
 assert.equal(new Set(cles).size, catalogue.length, 'Les empreintes des joueurs doivent rester uniques.');
 
