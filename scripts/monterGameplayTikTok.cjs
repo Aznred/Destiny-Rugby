@@ -16,7 +16,7 @@ const plan = [
   ['06-match', 33, 41],
   ['07-collection', 0.4, 3.6],
   ['08-ouverture-pack', 0.4, 10.2],
-  ['09-en-ligne', 0.4, 3.9],
+  ['09-en-ligne', 0.4, 5.4],
 ];
 
 const images = [];

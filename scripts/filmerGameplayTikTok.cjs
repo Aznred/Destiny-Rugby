@@ -13,7 +13,7 @@ fs.mkdirSync(out, { recursive: true });
 async function main() {
   const chrome = spawn(chromePath, [
     '--headless=new', '--remote-debugging-port=9233',
-    `--user-data-dir=${path.join(out, 'chrome-profile-run3')}`,
+    `--user-data-dir=${path.join(out, 'chrome-profile-run5')}`,
     '--use-gl=angle', '--use-angle=d3d11', '--no-sandbox', '--disable-gpu-sandbox',
     '--no-first-run', '--hide-scrollbars', '--window-size=540,960',
     'http://127.0.0.1:5188/',
@@ -140,8 +140,22 @@ async function main() {
     }
     await sleep(5300); end(clip);
 
-    await state(`m.useGame.getState().setEcran('carriereEnLigne')`); await sleep(700);
-    clip = await screen('09-en-ligne'); await sleep(4200); end(clip);
+    // Compte de démonstration local : le trailer montre le vestiaire en ligne,
+    // sans utiliser le compte ou les cartes d'un vrai joueur.
+    const suffixe = Date.now().toString(36);
+    const inscription = await evaluate(`(async()=>{const r=await fetch('/api/carriere',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'inscription',identifiant:'trailer-${suffixe}',motDePasse:'DemoTrailer!2026',confirmationMotDePasse:'DemoTrailer!2026',pseudo:'XV Démo'})});return r.status})()`);
+    if (inscription !== 200) throw new Error(`Compte de démonstration indisponible (${inscription})`);
+    await state(`m.useGame.getState().setEcran('accueil')`); await sleep(200);
+    await state(`m.useGame.getState().setEcran('carriereEnLigne')`); await sleep(3000);
+    const formulairePublic = await evaluate(`Boolean(document.querySelector('.cel-public-club input'))`);
+    if (!formulairePublic) throw new Error('Portail de la ligue publique introuvable');
+    await evaluate(`(() => { const input=document.querySelector('.cel-public-club input'); const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set; setter.call(input,'XV Démo ${suffixe}');input.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await sleep(250);
+    if (!await click('Rejoindre Destiny Rugby')) throw new Error('Inscription à la ligue publique indisponible');
+    await sleep(2700);
+    if (!String(await evaluate('document.body.innerText')).includes('Division 1')) throw new Error('La division publique ne s’affiche pas');
+    clip = await screen('09-en-ligne'); await sleep(2500);
+    await click('Composition'); await sleep(3000); end(clip);
 
     await send('Page.stopScreencast');
     ws.close();
