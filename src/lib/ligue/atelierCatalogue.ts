@@ -20,7 +20,8 @@ export interface CatalogueAdmin {
 }
 export const CATALOGUE_ADMIN_VIDE: CatalogueAdmin = { revision: 0, rotationPacks: false, packs: {}, joueurs: {} };
 // Le serveur fournit un contexte par requête ; aucun réglage mutable partagé
-// entre deux requêtes concurrentes. Le navigateur garde le catalogue de base.
+// entre deux requêtes concurrentes. La collection solo reçoit les éditions
+// publiques et les applique explicitement au même catalogue de base.
 let contexte = () => CATALOGUE_ADMIN_VIDE;
 export function fournirCatalogueAdmin(fournisseur: () => CatalogueAdmin) { contexte = fournisseur; }
 export function catalogueAdmin() { return contexte(); }

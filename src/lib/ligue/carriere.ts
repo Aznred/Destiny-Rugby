@@ -357,12 +357,12 @@ export function creerDivisionPublique(config: Pick<CreationCarriere, 'id' | 'cod
   const etat = creerCarriere({ ...config, nom: `Destiny Rugby · Division ${division}`, rythme: 7, maxClubs: 16,
     dotationOvas: 5000, packsGratuitsParJour: 0, doublonsAutorises: true,
     packsActifs: ['bronze', 'standard', 'premium', 'or', 'grand', 'elite'], playoffs: false }, maintenant, graine);
-  etat.publique = { cycle, division, finLe: dateServeur(maintenant + 30 * JOUR) };
+  etat.publique = { cycle, division };
   if (herites.length) {
     etat.clubs = herites.map(({ club }) => ({ ...copier(club), packsGratuits: [], dernierLotPacksGratuits: undefined }));
     etat.cartes = herites.flatMap(({ cartes }) => copier(cartes));
     etat.transactions = []; etat.objectifs = [];
-    if (herites.length >= 2) demarrerSaison(etat, maintenant);
+    if (herites.length === etat.maxClubs) demarrerSaison(etat, maintenant);
   }
   return etat;
 }
@@ -686,14 +686,15 @@ function reparerPhasesFinales(etat: EtatCarriereEnLigne) {
 function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
   exiger(etat.phase !== 'saison', 'La saison est déjà en cours.');
   exiger(etat.clubs.length >= 2, 'Invitez au moins un autre manager pour commencer.');
+  exiger(!etat.publique || etat.clubs.length === etat.maxClubs, 'La division publique démarre à 16 clubs.');
   if (etat.phase === 'intersaison') etat.saison++;
   etat.phase = 'saison'; etat.debutSaison = dateServeur(maintenant);
+  if (etat.publique) etat.publique.finLe = dateServeur(maintenant + 30 * JOUR);
   // Le coup d'envoi ouvre le robinet des packs quotidiens, pour tout le monde
   // le même jour.
   attribuerPacksQuotidiens(etat, maintenant);
-  // ⚠️ LA PHASE FINALE DEMANDE QUATRE CLUBS. À trois, une demi-finale à deux
-  // n'a pas de sens : le championnat couronne alors son premier, comme si le
-  // réglage n'existait pas. Mieux vaut l'ignorer que produire un tableau bancal.
+  // Deux clubs donnent une finale ; au-delà, le tableau s'étend selon le
+  // nombre réel d'inscrits, jusqu'aux seizièmes de finale.
   const playoffs = Boolean(etat.playoffs) && etat.clubs.length >= 2;
   const competition: CompetitionCarriere = {
     id: prochainId(etat, 'competition', etat.competitions.length),
@@ -722,12 +723,6 @@ function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
     etat.competitions.push(coupe); calendrierCompetition(etat, coupe);
   }
   renouvelerObjectifs(etat, maintenant);
-}
-
-function debutAutomatiquePublic(etat: EtatCarriereEnLigne, maintenant: number) {
-  if (!etat.publique) return maintenant;
-  return Math.min(maintenant, Math.max(Date.parse(etat.creeLe) + 2 * JOUR,
-    ...etat.clubs.map(club => Date.parse(club.rejointLe))));
 }
 
 export function classementCarriere(etat: EtatCarriereEnLigne, competitionId?: string): LigneClassementCarriere[] {
@@ -1157,11 +1152,12 @@ function completerPacks(etat: EtatCarriereEnLigne) {
 }
 
 function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: string) {
-  // Un salon ne dépend pas d'un onglet laissé ouvert : après 48 heures il
-  // démarre dès que deux managers sont présents. Avec un seul club, le second
-  // inscrit déclenche immédiatement ce même départ.
-  if (etat.phase === 'salon' && etat.clubs.length >= 2 && Date.parse(etat.creeLe) + 2 * JOUR <= maintenant) {
-    demarrerSaison(etat, debutAutomatiquePublic(etat, maintenant));
+  // Un salon privé démarre après 48 heures avec au moins deux managers.
+  // Une division publique attend toujours ses 16 clubs, sans limite de temps.
+  if (etat.phase === 'salon' && (etat.publique
+    ? etat.clubs.length === etat.maxClubs
+    : etat.clubs.length >= 2 && Date.parse(etat.creeLe) + 2 * JOUR <= maintenant)) {
+    demarrerSaison(etat, maintenant);
   }
   completerPacks(etat);
   attribuerPacksQuotidiens(etat, maintenant);
@@ -1279,7 +1275,9 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
   if (commande.type === 'rejoindre') {
     ajouterClub(nouveau, compteId, commande.pseudo, commande.clubNom, maintenant, graine, commande.embleme);
     attribuerPacksQuotidiens(nouveau, maintenant);
-    if (nouveau.phase === 'salon' && Date.parse(nouveau.creeLe) + 2 * JOUR <= maintenant) demarrerSaison(nouveau, debutAutomatiquePublic(nouveau, maintenant));
+    if (nouveau.phase === 'salon' && (nouveau.publique
+      ? nouveau.clubs.length === nouveau.maxClubs
+      : Date.parse(nouveau.creeLe) + 2 * JOUR <= maintenant)) demarrerSaison(nouveau, maintenant);
   } else {
     const club = monClub(nouveau, compteId); avancerInterne(nouveau, maintenant, graine);
     switch (commande.type) {

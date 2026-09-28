@@ -252,9 +252,10 @@ export function stockageFichier(fichier: string): StockageCarriere {
     async ligueParCode(code) { return copie(base.ligues.find(l => l.code === code) ?? null); },
     async divisionsPubliques(cycle) { return copie(base.ligues.filter(l => l.etat.publique?.cycle === cycle).sort((a,b) => a.etat.publique!.division - b.etat.publique!.division)); },
     async resumesDivisionsPubliques(cycle) { return copie(base.ligues.filter(l => l.etat.publique?.cycle === cycle)
-      .map(l => ({ id: l.id, code: l.code, comptes: l.comptes, division: l.etat.publique!.division, nombreClubs: l.etat.clubs.length }))
+      .map(l => ({ id: l.id, code: l.code, comptes: l.comptes, division: l.etat.publique!.division, nombreClubs: l.etat.clubs.length,
+        phase: l.etat.phase, finLe: l.etat.publique?.finLe }))
       .sort((a,b) => a.division - b.division)); },
-    async originePublique() { const debut = base.ligues.find(l => l.etat.publique?.cycle === 0 && l.etat.publique.division === 1); return debut ? Date.parse(debut.etat.creeLe) : null; },
+    async dernierCyclePublic() { return base.ligues.reduce<number | null>((cycle,l) => l.etat.publique ? Math.max(cycle ?? 0,l.etat.publique.cycle) : cycle,null); },
     async creerLigue(l) {
       if (base.ligues.some(x => x.id === l.id || x.code === l.code)) return false;
       base.ligues.push(copie(l)); sauver(); return true;

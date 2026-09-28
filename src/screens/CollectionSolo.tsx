@@ -4,7 +4,9 @@ import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import OuverturePack from '../components/OuverturePack';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { useGame } from '../store/useGame';
-import { carteDepuisSource, catalogueBaseCarriere, PACKS_CARRIERE } from '../lib/ligue/catalogueCarriere';
+import { carteDepuisSource, PACKS_CARRIERE } from '../lib/ligue/catalogueCarriere';
+import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
+import { synchroniserCatalogueSolo, useCatalogueSolo } from '../lib/catalogueSoloCommun';
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo } from '../lib/collectionSolo';
 import { CompositionCollectionSolo } from '../components/CompositionCollectionSolo';
@@ -24,7 +26,7 @@ export function CollectionSolo() {
   const acheterPack = useGame(s => s.acheterPackCollectionSolo);
   const joueur = useGame(s => s.joueur);
   const manager = useGame(s => s.manager);
-  const catalogue = useMemo(() => catalogueBaseCarriere(), []);
+  const catalogue = useCatalogueSolo();
   const packsRoue = useMemo<PackCarriere[]>(() => packsCollectionSolo(PACKS_CARRIERE), []);
   const idsPacksGratuits = useMemo(() => new Set<string>(IDS_PACKS_SOLO_GRATUITS), []);
   const packsGratuits = useMemo(() => packsRoue.filter((pack) => idsPacksGratuits.has(pack.id)), [packsRoue, idsPacksGratuits]);
@@ -34,7 +36,7 @@ export function CollectionSolo() {
   const [rarete, setRarete] = useState<RareteCarriere | 'toutes'>('toutes');
   const [statut, setStatut] = useState<'toutes' | 'trouvees' | 'manquantes'>('trouvees');
   const [page, setPage] = useState(0);
-  const [ouverture, setOuverture] = useState<{ pack: PackCarriere; indices: number[] } | null>(null);
+  const [ouverture, setOuverture] = useState<{ pack: PackCarriere; indices: number[]; catalogue: readonly SourceCarte[] } | null>(null);
   const [bilan, setBilan] = useState('');
   const nomCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Compte joueur';
   const [compoPleineOuverte, setCompoPleineOuverte] = useState(false);
@@ -68,8 +70,9 @@ export function CollectionSolo() {
   const ouvrirDepuisRoue = async (id: string) => {
     const pack = packsRoue.find(candidat => candidat.id === id);
     if (!pack) return;
+    const catalogueActuel = await synchroniserCatalogueSolo();
     const prix = pack.prix;
-    const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogue, precedent));
+    const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogueActuel, precedent));
     if (!resultat) {
       setBilan(coins < prix ? t('solo.missingOvas', { n: nombre(prix - coins) }) : t('solo.noPlayerInPack'));
       return;
@@ -78,7 +81,7 @@ export function CollectionSolo() {
     const texteNouvelles = resultat.nouvelles > 1 ? t('solo.summaryNewPlural', { n: resultat.nouvelles }) : t('solo.summaryNew', { n: resultat.nouvelles });
     const texteDoublons = doublons > 1 ? t('solo.summaryDupPlural', { n: doublons }) : t('solo.summaryDup', { n: doublons });
     setBilan(`${texteNouvelles}, ${texteDoublons}.`);
-    setOuverture({ pack, indices: resultat.indices });
+    setOuverture({ pack, indices: resultat.indices, catalogue: catalogueActuel });
   };
 
   return <section className="solo-collection">
@@ -157,7 +160,7 @@ export function CollectionSolo() {
     </section>
 
     {ouverture && <OuverturePack
-      cartes={ouverture.indices.map((indice, position) => ({ ...carteDepuisSource(catalogue[indice], 'solo', 'collection', 1), id: `solo-pack-${position}-${catalogue[indice].sourceId}` }))}
+      cartes={ouverture.indices.map((indice, position) => ({ ...carteDepuisSource(ouverture.catalogue[indice], 'solo', 'collection', 1), id: `solo-pack-${position}-${ouverture.catalogue[indice].sourceId}` }))}
       pack={ouverture.pack.nom}
       modele={packAvecSkin(ouverture.pack.id) ? modelePackParNom(ouverture.pack) : undefined}
       garantie={ouverture.pack.garantie}

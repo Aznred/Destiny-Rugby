@@ -36,7 +36,6 @@ class ErreurHttp extends Error { constructor(public statut: number, message: str
 const COOKIE = 'destiny_carriere';
 const DUREE_SESSION = 30 * 24 * 60 * 60_000;
 const DEUX_SEMAINES = 14 * 24 * 60 * 60_000;
-const CYCLE_PUBLIC = 30 * 24 * 60 * 60_000;
 const chiffrer = promisify(scrypt);
 export const empreinteJeton = (valeur: string) => createHash('sha256').update(valeur).digest('hex');
 const entete = (req: RequeteCarriere, nom: string) => String(req.headers[nom] ?? '');
@@ -386,29 +385,24 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     return ligues;
   }
   async function assurerDivisionsPubliques(maintenant: number) {
-    if (!stockage.originePublique || !stockage.divisionsPubliques || !stockage.resumesDivisionsPubliques) return { cycle: 0, divisions: [] as ResumeDivisionPublique[] };
-    const origine = await stockage.originePublique();
-    if (origine === null) return { cycle: 0, divisions: [] as ResumeDivisionPublique[] };
-    const cycle = Math.max(0, Math.floor((maintenant - origine) / CYCLE_PUBLIC));
-    for (let numero = 1; numero <= cycle; numero++) {
-      const existantes = await stockage.resumesDivisionsPubliques(numero);
-      const precedentesResume = await stockage.resumesDivisionsPubliques(numero - 1);
-      if (!precedentesResume.length) break;
-      if (existantes.length >= precedentesResume.length) continue;
+    if (!stockage.dernierCyclePublic || !stockage.divisionsPubliques || !stockage.resumesDivisionsPubliques) return { cycle: 0, divisions: [] as ResumeDivisionPublique[] };
+    const dernier = await stockage.dernierCyclePublic();
+    if (dernier === null) return { cycle: 0, divisions: [] as ResumeDivisionPublique[] };
+    const materialiser = async (numero: number, precedentesResume: ResumeDivisionPublique[], existantes: ResumeDivisionPublique[]) => {
       const precedentes = await stockage.divisionsPubliques(numero - 1);
-      // Un groupe rempli juste avant la fin du mois peut avoir des journées
-      // programmées après la date de clôture. On les simule à la clôture afin
-      // que la montée et la descente utilisent le classement complet.
-      const clotureSimulee = Math.max(maintenant, origine + (numero + 1) * CYCLE_PUBLIC);
+      // Le dernier groupe plein peut avoir commencé après le premier. Chacun
+      // joue ses 30 jours ; la nouvelle saison attend la fin du dernier groupe.
+      const clotureSimulee = maintenant;
       for (const ligne of precedentes) {
+        let terminee = false;
         for (let tour = 0; tour < 8; tour++) {
           const etat = await appliquer(ligne.id, 'horloge', `fin-cycle-${numero}-${tour}`,
             (courant, _n, g) => actualiserCarriere(courant, clotureSimulee, g), false, false);
-          if (etat.phase === 'intersaison' || etat.phase === 'salon') break;
+          if (etat.phase === 'intersaison' || etat.phase === 'salon') { terminee = true; break; }
         }
+        if (!terminee) return false;
       }
-      const terminees = await stockage.divisionsPubliques(numero - 1);
-      const plans = planifierDivisionsPubliques(terminees, numero);
+      const plans = planifierDivisionsPubliques(await stockage.divisionsPubliques(numero - 1), numero);
       for (const plan of plans) {
         if (existantes.some(l => l.division === plan.division) || !plan.heritiers.length) continue;
         const premier = plan.heritiers[0].club;
@@ -416,15 +410,30 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const code = `DR-PUBLIC-C${numero}-D${plan.division}`;
         const etat = creerDivisionPublique({ id, code, compteId: premier.compteId, pseudo: premier.pseudo, clubNom: premier.nom },
           numero, plan.division, maintenant, randomBytes(24).toString('hex'), plan.heritiers);
-        etat.publique!.finLe = new Date(origine + (numero + 1) * CYCLE_PUBLIC).toISOString();
         if (plan.barrage) etat.publique!.barrage = plan.barrage;
         await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 });
       }
+      return true;
+    };
+    let cycle = dernier;
+    for (let tour = 0; tour < 4; tour++) {
+      const courantes = await stockage.resumesDivisionsPubliques(cycle);
+      if (cycle > 0) {
+        const precedentes = await stockage.resumesDivisionsPubliques(cycle - 1);
+        if (courantes.length < precedentes.length) {
+          if (!await materialiser(cycle, precedentes, courantes)) return { cycle: cycle - 1, divisions: precedentes };
+          continue;
+        }
+      }
+      const commencees = courantes.filter(l => l.phase !== 'salon');
+      if (!commencees.length || commencees.some(l => !l.finLe || Date.parse(l.finLe) > maintenant)) return { cycle, divisions: courantes };
+      if (!await materialiser(cycle + 1, courantes, await stockage.resumesDivisionsPubliques(cycle + 1))) return { cycle, divisions: courantes };
+      cycle++;
     }
     return { cycle, divisions: await stockage.resumesDivisionsPubliques(cycle) };
   }
   async function rejoindreDivisionPublique(compte: CompteStocke, clubNom: string, embleme: string | undefined, maintenant: number) {
-    if (!stockage.divisionsPubliques || !stockage.resumesDivisionsPubliques || !stockage.originePublique) throw new ErreurHttp(503, 'La ligue publique est indisponible sur ce serveur.');
+    if (!stockage.divisionsPubliques || !stockage.resumesDivisionsPubliques || !stockage.dernierCyclePublic) throw new ErreurHttp(503, 'La ligue publique est indisponible sur ce serveur.');
     for (let tentative = 0; tentative < 5; tentative++) {
       const etatPublic = await assurerDivisionsPubliques(maintenant);
       const deja = etatPublic.divisions.find(l => l.comptes.includes(compte.id));
@@ -446,8 +455,6 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       const code = `DR-PUBLIC-C${etatPublic.cycle}-D${division}`;
       const etat = creerDivisionPublique({ id, code, compteId: compte.id, pseudo: compte.pseudo, clubNom, embleme },
         etatPublic.cycle, division, maintenant, randomBytes(24).toString('hex'));
-      const origine = await stockage.originePublique();
-      etat.publique!.finLe = new Date((origine ?? maintenant) + (etatPublic.cycle + 1) * CYCLE_PUBLIC).toISOString();
       if (await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 })) return vueCarriere(etat, compte.id);
     }
     throw new ErreurHttp(409, 'Inscription en cours. Réessaie dans un instant.');
@@ -467,6 +474,15 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (url.searchParams.get('configuration') === '1') {
         return res.status(200).json({ googleClientId: googleClientId || undefined });
+      }
+      if (req.method === 'GET' && url.searchParams.get('catalogueSolo') === '1') {
+        const config = catalogueAdmin();
+        const connue = Number(url.searchParams.get('revision'));
+        // Le gros catalogue de base est déjà dans le jeu. Seules les éditions
+        // de joueurs de la base en ligne traversent le réseau.
+        return res.status(200).json(connue === config.revision
+          ? { revision: config.revision }
+          : { revision: config.revision, joueurs: config.joueurs });
       }
       // ⚠️ Les écussons se demandent à part, PAS dans la vue de la ligue :
       // 1 353 entrées, soit 80 Ko qui repartiraient toutes les deux secondes

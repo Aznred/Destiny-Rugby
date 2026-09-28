@@ -21,7 +21,7 @@ export interface RecompensesAchat {
   traitsDebloques: string[];
 }
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
-export interface ResumeDivisionPublique { id: string; code: string; division: number; comptes: string[]; nombreClubs: number }
+export interface ResumeDivisionPublique { id: string; code: string; division: number; comptes: string[]; nombreClubs: number; phase: string; finLe?: string }
 export interface PresenceMatchStockee { match: string; compte: string; vu: number }
 export interface SalonAmicalStocke {
   code: string;
@@ -93,7 +93,7 @@ export interface StockageCarriere {
   ligueParCode(code: string): Promise<LigueStockee | null>;
   divisionsPubliques(cycle: number): Promise<LigueStockee[]>;
   resumesDivisionsPubliques(cycle: number): Promise<ResumeDivisionPublique[]>;
-  originePublique(): Promise<number | null>;
+  dernierCyclePublic(): Promise<number | null>;
   creerLigue(ligue: LigueStockee): Promise<boolean>;
   supprimerLigue(id: string, createur: string): Promise<boolean>;
   supprimerLiguesInactives(avant: number): Promise<string[]>;
@@ -546,15 +546,15 @@ export function stockageNeon(url: string): StockageCarriere {
     },
     async resumesDivisionsPubliques(cycle) {
       const lignes = await sql`select id,code,comptes,cardinality(comptes) as nombre,
-        (resume->'publique'->>'division')::integer as division from carriere_ligues
+        (resume->'publique'->>'division')::integer as division,phase,resume->'publique'->>'finLe' as fin_le from carriere_ligues
         where resume ? 'publique' and resume->'publique'->>'cycle'=${String(cycle)} order by division`;
       return lignes.map(l => ({ id: String(l.id), code: String(l.code), comptes: l.comptes as string[],
-        division: Number(l.division), nombreClubs: Number(l.nombre) }));
+        division: Number(l.division), nombreClubs: Number(l.nombre), phase: String(l.phase),
+        finLe: l.fin_le == null ? undefined : String(l.fin_le) }));
     },
-    async originePublique() {
-      const r = await sql`select extract(epoch from cree_le)*1000 as debut from carriere_ligues
-        where resume ? 'publique' and resume->'publique'->>'cycle'='0' and resume->'publique'->>'division'='1' limit 1`;
-      return r.length ? Number(r[0].debut) : null;
+    async dernierCyclePublic() {
+      const r = await sql`select max((resume->'publique'->>'cycle')::integer) as cycle from carriere_ligues where resume ? 'publique'`;
+      return r[0]?.cycle == null ? null : Number(r[0].cycle);
     },
     async creerLigue(l) {
       const resume = JSON.stringify(resumeEtat(l.etat));

@@ -260,8 +260,7 @@ const nationLisible = (s: string) => s.replace(/[^\p{L}\p{M}\s'-]/gu, '').trim()
 export type SourceCarte = Omit<CarteCarriere, 'id' | 'proprietaire' | 'fatigue' | 'matchs' | 'essais' | 'clubs'>;
 let catalogue: SourceCarte[] | undefined;
 const cataloguesAdmin = new WeakMap<CatalogueAdmin, readonly SourceCarte[]>();
-export function catalogueMondialCarriere(): readonly SourceCarte[] {
-  const config = catalogueAdmin();
+export function catalogueMondialCarriere(config: CatalogueAdmin = catalogueAdmin()): readonly SourceCarte[] {
   if (!Object.keys(config.joueurs).length) return catalogueBaseCarriere();
   const connu = cataloguesAdmin.get(config); if (connu) return connu;
   const resultat = catalogueBaseCarriere().map(source => {

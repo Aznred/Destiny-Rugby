@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useGame } from '../store/useGame';
-import { catalogueBaseCarriere } from '../lib/ligue/catalogueCarriere';
+import { useCatalogueSolo } from '../lib/catalogueSoloCommun';
 import { cleCarteSolo } from '../lib/collectionSolo';
 import type { LotCartesSolo, OffreSolo, PageOffresSolo } from '../lib/echangesSolo';
 import { possedeDoublons } from '../lib/echangesSolo';
@@ -26,7 +26,7 @@ export function EchangesCollectionSolo() {
   const [proposition, setProposition] = useState<{ offre: string; cartes: LotCartesSolo } | null>(null);
   const [occupe, setOccupe] = useState(false);
   const [erreur, setErreur] = useState('');
-  const catalogue = useMemo(() => catalogueBaseCarriere(), []);
+  const catalogue = useCatalogueSolo();
   const parCle = useMemo(() => new Map(catalogue.map(c => [cleCarteSolo(c.sourceId), c])), [catalogue]);
   const doublons = useMemo(() => catalogue.filter(c => (collection.quantites[cleCarteSolo(c.sourceId)] ?? 0) > 1)
     .sort((a, b) => b.note - a.note || a.nom.localeCompare(b.nom, 'fr')), [catalogue, collection.quantites]);
