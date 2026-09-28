@@ -25,3 +25,8 @@ export function repartirPoules(participants: readonly string[]): string[][] {
 export function estPuissanceDeDeux(nombre: number): boolean {
   return nombre >= 2 && (nombre & (nombre - 1)) === 0;
 }
+/** Tableau de phase finale : de la finale directe jusqu'aux seizièmes (32 clubs). */
+export function nombreQualifiesPlayoffs(clubs: number): number {
+  if (!Number.isFinite(clubs) || clubs < 2) return 0;
+  return 2 ** Math.floor(Math.log2(Math.min(32, Math.floor(clubs))));
+}

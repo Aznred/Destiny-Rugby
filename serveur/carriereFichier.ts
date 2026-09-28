@@ -9,6 +9,8 @@ import type { CompteStocke, LigueStockee, SalonAmicalStocke, StockageCarriere } 
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
 import { vueCarriere } from '../src/lib/ligue/carriere.js';
 import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
+import type { OffreSolo } from '../src/lib/echangesSolo.js';
+import { modifierCollectionSolo, possedeDoublons } from '../src/lib/echangesSolo.js';
 
 interface BaseLocale {
   achatsStripe?: Record<string, string>;
@@ -20,6 +22,7 @@ interface BaseLocale {
   recus: Record<string, boolean>;
   debits: Record<string, { debut: number; nombre: number }>;
   boutiques?: Record<string, EtatBoutiqueCompte>;
+  offresSolo?: OffreSolo[];
   salonsAmicaux?: SalonAmicalStocke[];
 }
 export function stockageFichier(fichier: string): StockageCarriere {
@@ -34,6 +37,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
   const copie = <T>(v: T): T => structuredClone(v);
   base.push ??= { abonnements: [], envois: {} };
   base.boutiques ??= {};
+  base.offresSolo ??= [];
   base.achatsStripe ??= {};
   base.salonsAmicaux ??= [];
   // L'échéance ne vaut que pour ce processus : le serveur de développement
@@ -43,6 +47,54 @@ export function stockageFichier(fichier: string): StockageCarriere {
   const presences = new Map<string, { match: string; compte: string; vu: number }>();
   const cleRecu = (l: string, c: string, r: string) => JSON.stringify([l, c, r]);
   return {
+    echangesSolo: {
+      async lister(compte, offset) {
+        const offres = base.offresSolo!.filter(o => o.statut === 'ouverte' || o.compteId === compte)
+          .sort((a, b) => b.creeLe.localeCompare(a.creeLe));
+        return { offres: copie(offres.slice(offset, offset + 30).map(o => ({ ...o,
+          propositions: o.propositions.filter(p => o.compteId === compte || p.compteId === compte) }))), total: offres.length };
+      },
+      async creer(id, compte, pseudo, offertes, souhaitees) {
+        const boutique = base.boutiques![compte];
+        if (!boutique || !possedeDoublons(boutique.collectionSolo, offertes)
+          || base.offresSolo!.filter(o => o.compteId === compte && o.statut === 'ouverte').length >= 10) throw new Error('Doublons insuffisants ou dix offres déjà ouvertes.');
+        boutique.collectionSolo = modifierCollectionSolo(boutique.collectionSolo, offertes, -1);
+        base.offresSolo!.push({ id, compteId: compte, pseudo, offertes, souhaitees, propositions: [], creeLe: new Date().toISOString(), statut: 'ouverte' });
+        sauver();
+      },
+      async proposer(id, offre, compte, pseudo, cartes) {
+        const cible = base.offresSolo!.find(o => o.id === offre && o.statut === 'ouverte');
+        const boutique = base.boutiques![compte];
+        if (!cible || cible.compteId === compte || !boutique || !possedeDoublons(boutique.collectionSolo, cartes)
+          || cible.propositions.length >= 30 || cible.propositions.some(p => p.compteId === compte)) throw new Error('Proposition indisponible ou doublons insuffisants.');
+        cible.propositions.push({ id, compteId: compte, pseudo, cartes, creeLe: new Date().toISOString() }); sauver();
+      },
+      async accepter(offre, compte, proposition) {
+        const cible = base.offresSolo!.find(o => o.id === offre && o.statut === 'ouverte');
+        const choix = proposition ? cible?.propositions.find(p => p.id === proposition) : null;
+        if (!cible || (proposition && (!choix || cible.compteId !== compte)) || (!proposition && (cible.compteId === compte || !Object.keys(cible.souhaitees).length))) throw new Error('Offre indisponible.');
+        const acheteur = choix?.compteId ?? compte;
+        const cartes = choix?.cartes ?? cible.souhaitees;
+        const sonBoutique = base.boutiques![acheteur];
+        const vendeur = base.boutiques![cible.compteId];
+        if (!sonBoutique || !vendeur || !possedeDoublons(sonBoutique.collectionSolo, cartes)) throw new Error('Le joueur ne possède plus les doublons proposés.');
+        sonBoutique.collectionSolo = modifierCollectionSolo(modifierCollectionSolo(sonBoutique.collectionSolo, cartes, -1), cible.offertes, 1);
+        vendeur.collectionSolo = modifierCollectionSolo(vendeur.collectionSolo, cartes, 1);
+        cible.statut = 'acceptee'; sauver();
+      },
+      async refuser(offre, compte, proposition) {
+        const cible = base.offresSolo!.find(o => o.id === offre && o.statut === 'ouverte' && o.compteId === compte);
+        if (!cible || !cible.propositions.some(p => p.id === proposition)) throw new Error('Proposition indisponible.');
+        cible.propositions = cible.propositions.filter(p => p.id !== proposition); sauver();
+      },
+      async annuler(offre, compte) {
+        const cible = base.offresSolo!.find(o => o.id === offre && o.statut === 'ouverte' && o.compteId === compte);
+        const boutique = base.boutiques![compte];
+        if (!cible || !boutique) throw new Error('Offre indisponible.');
+        boutique.collectionSolo = modifierCollectionSolo(boutique.collectionSolo, cible.offertes, 1);
+        cible.statut = 'annulee'; sauver();
+      },
+    },
     atelier: {
       async lire() { return copie(base.atelier ?? CATALOGUE_ADMIN_VIDE); },
       async ecrire(configuration, revision) {
@@ -102,6 +154,8 @@ export function stockageFichier(fichier: string): StockageCarriere {
       const achatsTraits = reunir(ancienne?.achatsTraits, boutique.achatsTraits);
       base.boutiques![compte] = {
         ...copie(boutique), achatsOvas: acquis,
+        collectionSolo: (ancienne?.collectionSolo?.revision ?? 0) > (boutique.collectionSolo.revision ?? 0)
+          ? copie(ancienne!.collectionSolo) : copie(boutique.collectionSolo),
         ovas: boutique.ovas + Math.max(0, acquis - (boutique.achatsOvas ?? 0)),
         inventaire: reunir(boutique.inventaire, achatsInventaire),
         equipements: reunir(boutique.equipements, achatsEquipements),
@@ -109,6 +163,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
         achatsInventaire, achatsEquipements, achatsTraits,
       };
       sauver();
+      return copie(base.boutiques![compte]);
     },
     async limiter(cle, maximum, fenetre, maintenant) {
       const debut = Math.floor(maintenant / fenetre) * fenetre;
@@ -148,10 +203,11 @@ export function stockageFichier(fichier: string): StockageCarriere {
           clubNom: club?.nom ?? '', ovas: club?.ovas ?? 0, clubEmbleme: club?.embleme,
           laboratoire: l.etat.laboratoire === true,
           createurId: l.etat.createurId,
+          publique: l.etat.publique,
         };
       });
     },
-    async nombreLigues(compte) { return base.ligues.filter(l => l.comptes.includes(compte) && !l.etat.laboratoire).length; },
+    async nombreLigues(compte) { return base.ligues.filter(l => l.comptes.includes(compte) && !l.etat.laboratoire && !l.etat.publique).length; },
     async statistiquesGlobales() {
       const vues = base.ligues.flatMap(l => l.etat.clubs[0] ? [{ ligue: l.etat.nom, etat: l.etat, stats: vueCarriere(l.etat, l.etat.clubs[0].compteId).statistiques }] : []);
       const ouvreurs = vues.flatMap(v => v.stats.parClub.map(c => ({ pseudo: c.pseudo, packs: c.packs, ligue: v.ligue }))).sort((a, b) => b.packs - a.packs);
@@ -194,19 +250,24 @@ export function stockageFichier(fichier: string): StockageCarriere {
     },
     async rafraichirEcheance(id, echeance) { echeances[id] = echeance; },
     async ligueParCode(code) { return copie(base.ligues.find(l => l.code === code) ?? null); },
+    async divisionsPubliques(cycle) { return copie(base.ligues.filter(l => l.etat.publique?.cycle === cycle).sort((a,b) => a.etat.publique!.division - b.etat.publique!.division)); },
+    async resumesDivisionsPubliques(cycle) { return copie(base.ligues.filter(l => l.etat.publique?.cycle === cycle)
+      .map(l => ({ id: l.id, code: l.code, comptes: l.comptes, division: l.etat.publique!.division, nombreClubs: l.etat.clubs.length }))
+      .sort((a,b) => a.division - b.division)); },
+    async originePublique() { const debut = base.ligues.find(l => l.etat.publique?.cycle === 0 && l.etat.publique.division === 1); return debut ? Date.parse(debut.etat.creeLe) : null; },
     async creerLigue(l) {
       if (base.ligues.some(x => x.id === l.id || x.code === l.code)) return false;
       base.ligues.push(copie(l)); sauver(); return true;
     },
     async supprimerLigue(id, createur) {
-      const index = base.ligues.findIndex(l => l.id === id && l.etat.createurId === createur);
+      const index = base.ligues.findIndex(l => l.id === id && l.etat.createurId === createur && !l.etat.publique);
       if (index < 0) return false;
       base.ligues.splice(index, 1);
       for (const cle of Object.keys(base.recus)) if (JSON.parse(cle)[0] === id) delete base.recus[cle];
       sauver(); return true;
     },
     async supprimerLiguesInactives(avant) {
-      const ids = base.ligues.filter(l => !l.etat.laboratoire && l.comptes.every(id => {
+      const ids = base.ligues.filter(l => !l.etat.laboratoire && !l.etat.publique && l.comptes.every(id => {
         const vu = Date.parse(base.comptes.find(c => c.id === id)?.vuLe ?? '');
         return !Number.isFinite(vu) || vu < avant;
       })).map(l => l.id);

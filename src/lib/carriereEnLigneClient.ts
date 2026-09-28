@@ -1,5 +1,6 @@
 import type { AdministrationCarriere, CommandeCarriere, VueCarriereEnLigne, PageCollection, StatistiquesGlobalesCarriere } from './ligue/typesCarriere.js';
 import type { EtatBoutiqueCompte } from './boutiqueCompte.js';
+import type { LotCartesSolo, PageOffresSolo } from './echangesSolo.js';
 
 export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean }
 export interface SessionCarriere {
@@ -7,6 +8,7 @@ export interface SessionCarriere {
   ligues: {
     id: string; nom: string; etat: string; clubNom: string; ovas: number;
     clubEmbleme?: string; logo?: string; laboratoire?: boolean; createur?: boolean;
+    publique?: { cycle: number; division: number };
   }[];
 }
 export interface MiseAJourDirectCarriere {
@@ -133,11 +135,25 @@ export const chargerBoutiqueCompte = (signal?: AbortSignal) =>
   requete<{ boutique: EtatBoutiqueCompte | null }>(undefined, undefined, signal, '?boutique=1');
 export const sauvegarderBoutiqueCompte = (boutique: EtatBoutiqueCompte) =>
   requete<{ boutique: EtatBoutiqueCompte }>({ action: 'sauvegarderBoutique', boutique });
+export const listerEchangesSolo = (offset = 0) =>
+  requete<PageOffresSolo>(undefined, undefined, undefined, `?echangesSolo=1&offset=${offset}`);
+export const creerOffreSolo = (offertes: LotCartesSolo, souhaitees: LotCartesSolo) =>
+  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'creerOffreSolo', offertes, souhaitees });
+export const proposerOffreSolo = (offre: string, cartes: LotCartesSolo) =>
+  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'proposerOffreSolo', offre, cartes });
+export const accepterOffreSolo = (offre: string, proposition?: string) =>
+  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'accepterOffreSolo', offre, proposition });
+export const refuserOffreSolo = (offre: string, proposition: string) =>
+  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'refuserOffreSolo', offre, proposition });
+export const annulerOffreSolo = (offre: string) =>
+  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'annulerOffreSolo', offre });
 export const supprimerLigueCarriere = (ligue: string) => requete<{ ok: boolean }>({ action: 'supprimerLigue', ligue });
-export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number }
+export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number; packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean }
 export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number, maxClubs: number, identite: IdentiteLigue = {}) =>
   requete<VueCarriereEnLigne>({ action: 'creer', nom, clubNom, rythme, maxClubs, ...identite });
 export const rejoindreLigueCarriere = (code: string, clubNom: string, embleme?: string) => requete<VueCarriereEnLigne>({ action: 'rejoindre', code, clubNom, embleme });
+export const rejoindreDivisionPublique = (clubNom: string, embleme?: string) =>
+  requete<VueCarriereEnLigne>({ action: 'rejoindreDivisionPublique', clubNom, embleme });
 export const commanderCarriere = (ligue: string, commande: CommandeCarriere, requeteId: string) =>
   requete<VueCarriereEnLigne>({ action: 'commande', ligue, commande, requeteId });
 /** Battement léger : le serveur répond seulement `{ok:true}` et ne renvoie pas la ligue. */

@@ -11,7 +11,7 @@ import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creer
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
-import { estPuissanceDeDeux, nombreQualifiesPoules, repartirPoules } from './poulesCarriere.js';
+import { estPuissanceDeDeux, nombreQualifiesPlayoffs, nombreQualifiesPoules, repartirPoules } from './poulesCarriere.js';
 
 const HEURE = 3_600_000;
 const JOUR = 24 * HEURE;
@@ -118,15 +118,16 @@ function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number)
     // faible de la ligue. Le rattrapage doit jouer POUR lui.
     const place = classement.findIndex(ligne => ligne.clubId === club.id);
     const rang = place >= 0 ? place : Math.max(0, etat.clubs.length - 1);
-    const poids = etat.packs.map(pack => poidsPackQuotidien(pack, rang, etat.clubs.length, classementActif));
+    const disponibles = etat.packs.filter(pack => !etat.packsActifs || etat.packsActifs.includes(pack.id));
+    const poids = disponibles.map(pack => poidsPackQuotidien(pack, rang, etat.clubs.length, classementActif));
     const rng = hasard(`${etat.graine}:packs-quotidiens:${jour}:${club.id}`);
     const programmes = club.packsGratuitsProgrammes?.[jour] ?? [];
-    for (let i = 0; i < PACKS_GRATUITS_PAR_JOUR; i++) {
+    for (let i = 0; i < (etat.packsGratuitsParJour ?? PACKS_GRATUITS_PAR_JOUR); i++) {
       const force = programmes[i];
-      const indexForce = force ? etat.packs.findIndex(pack => pack.id === force) : -1;
+      const indexForce = force ? disponibles.findIndex(pack => pack.id === force) : -1;
       const index = indexForce >= 0 ? indexForce : tirerPondere(poids, rng);
       exiger(index >= 0, 'Aucun pack quotidien disponible.');
-      club.packsGratuits.push({ id: `${club.id}:quotidien:${jour}:${i}`, packId: etat.packs[index].id, recuLe: dateServeur(maintenant) });
+      club.packsGratuits.push({ id: `${club.id}:quotidien:${jour}:${i}`, packId: disponibles[index].id, recuLe: dateServeur(maintenant) });
     }
     if (club.packsGratuitsProgrammes?.[jour]) {
       delete club.packsGratuitsProgrammes[jour];
@@ -279,7 +280,7 @@ function integrerAuChampionnat(etat: EtatCarriereEnLigne, clubId: string) {
   championnat.participants.push(clubId);
   etat.rencontres = etat.rencontres.filter(r => r.competitionId !== championnat.id);
   // La phase finale se rouvre si l'arrivant fait passer la ligue à quatre.
-  championnat.playoffs = Boolean(etat.playoffs) && championnat.participants.length >= 4;
+  championnat.playoffs = Boolean(etat.playoffs) && championnat.participants.length >= 2;
   calendrierCompetition(etat, championnat);
   championnat.journeesRegulieres = Math.max(...etat.rencontres.filter(r => r.competitionId === championnat.id).map(r => r.journee));
 }
@@ -298,26 +299,28 @@ function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string
   // classement d'un championnat où les clubs n'ont pas joué le même nombre de
   // matchs ne veut plus rien dire, et la dotation de fin de saison, distribuée
   // par rang, serait reprise à ceux qui étaient là depuis le début.
-  exiger(avantLaPremiereJournee(etat, maintenant), 'Les inscriptions sont closes : la première journée est jouée.');
+  exiger(etat.publique || avantLaPremiereJournee(etat, maintenant), 'Les inscriptions sont closes : la première journée est jouée.');
   exiger(etat.clubs.length < etat.maxClubs, 'Cette ligue est complète.');
   exiger(!etat.clubs.some(c => c.compteId === compteId), 'Ce compte possède déjà un club dans cette ligue.');
   exiger(!etat.clubs.some(c => c.nom.toLocaleLowerCase('fr') === nom.trim().toLocaleLowerCase('fr')), 'Ce nom de club est déjà pris.');
   const id = prochainId(etat, 'club', etat.clubs.length);
   // ⚠️ L'unicité par ligue commence ICI, pas au premier pack : deux amis
   // inscrits le même jour ne peuvent pas recevoir le même licencié.
-  const cartes = dotationBronzeCarriere(etat.id, id, graine, new Set(etat.cartes.map(c => c.sourceId)), etat.saison);
+  const cartes = dotationBronzeCarriere(etat.id, id, graine, new Set(etat.doublonsAutorises ? [] : etat.cartes.map(c => c.sourceId)), etat.saison);
   exiger(cartes.length === 30, 'Le vivier de départ est épuisé pour cette ligue.');
   const club: ClubCarriere = { id, compteId, pseudo: pseudo.trim(), nom: nom.trim(), ovas: 0, composition: compositionManagerParDefaut(cartes.map(coequipierDepuisCarte)), strategie: copier(STRATEGIE_EN_LIGNE_DEFAUT), rejointLe: dateServeur(maintenant), embleme: emblemeValide(embleme) ? embleme : undefined };
   etat.clubs.push(club); etat.cartes.push(...cartes);
   journal(etat, club, 'dotation', etat.dotationOvas, cartes.map(c => c.id), `Dotation de départ : 30 licenciés de Régionale 3 et ${etat.dotationOvas.toLocaleString('fr-FR')} Ovas`, dateServeur(maintenant));
   renouvelerObjectifs(etat, maintenant);
-  if (etat.phase === 'saison') integrerAuChampionnat(etat, club.id);
+  if (etat.phase === 'saison' && (!etat.publique || avantLaPremiereJournee(etat, maintenant))) integrerAuChampionnat(etat, club.id);
 }
 
 export function creerCarriere(config: CreationCarriere, maintenant: number, graine: string): EtatCarriereEnLigne {
   exiger(config && typeof config === 'object', 'Paramètres invalides.');
   identifiant(config.id); texte(config.nom, 60); texte(config.code, 32); entier(config.maxClubs, 2, 64);
   entier(config.rythme, 1, 7);
+  exiger(!Array.isArray(config.packsActifs) || config.packsActifs.length > 0 || config.packsGratuitsParJour === 0,
+    'Choisissez au moins un pack pour les distributions quotidiennes.');
   texte(graine, 200);
   const etat: EtatCarriereEnLigne = { schema: 1, id: config.id, nom: config.nom.trim(), code: config.code, createurId: config.compteId, creeLe: dateServeur(maintenant), version: 1, saison: 1, phase: 'salon', rythme: config.rythme, maxClubs: config.maxClubs, graine,
     rotationPacks: catalogueAdmin().rotationPacks === true,
@@ -330,6 +333,12 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
     logo: logoCompetitionValide(config.logo) ? config.logo : undefined,
     tropheeId: tropheeValide(config.tropheeId) ? config.tropheeId : undefined,
     playoffs: config.playoffs === true,
+    packsActifs: Array.isArray(config.packsActifs)
+      ? [...new Set(config.packsActifs.filter(id => typeof id === 'string' && packsCatalogueAdmin().some(pack => pack.id === id)))]
+      : undefined,
+    packsGratuitsParJour: Number.isInteger(config.packsGratuitsParJour)
+      ? Math.max(0, Math.min(20, config.packsGratuitsParJour!)) : PACKS_GRATUITS_PAR_JOUR,
+    doublonsAutorises: config.doublonsAutorises === true,
     // ⚠️ BORNÉE, ET C'EST TOUTE LA DIFFÉRENCE ENTRE UN RÉGLAGE ET UNE FAILLE.
     // La dotation de départ est le seul robinet d'Ovas que le créateur ouvre
     // lui-même : sans plafond, il se donne dix millions et le marché de la
@@ -338,6 +347,23 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
     clubs: [], cartes: [], packs: copier(packsCatalogueAdmin()), competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
   ajouterClub(etat, config.compteId, config.pseudo, config.clubNom, maintenant, graine, config.embleme);
   attribuerPacksQuotidiens(etat, maintenant);
+  return etat;
+}
+
+/** Nouveau groupe mensuel : les clubs gardent leur effectif et leur solde. */
+export function creerDivisionPublique(config: Pick<CreationCarriere, 'id' | 'code' | 'compteId' | 'pseudo' | 'clubNom' | 'embleme'>,
+  cycle: number, division: number, maintenant: number, graine: string,
+  herites: { club: ClubCarriere; cartes: CarteCarriere[] }[] = []): EtatCarriereEnLigne {
+  const etat = creerCarriere({ ...config, nom: `Destiny Rugby · Division ${division}`, rythme: 7, maxClubs: 16,
+    dotationOvas: 5000, packsGratuitsParJour: 0, doublonsAutorises: true,
+    packsActifs: ['bronze', 'standard', 'premium', 'or', 'grand', 'elite'], playoffs: false }, maintenant, graine);
+  etat.publique = { cycle, division, finLe: dateServeur(maintenant + 30 * JOUR) };
+  if (herites.length) {
+    etat.clubs = herites.map(({ club }) => ({ ...copier(club), packsGratuits: [], dernierLotPacksGratuits: undefined }));
+    etat.cartes = herites.flatMap(({ cartes }) => copier(cartes));
+    etat.transactions = []; etat.objectifs = [];
+    if (herites.length >= 2) demarrerSaison(etat, maintenant);
+  }
   return etat;
 }
 
@@ -367,6 +393,7 @@ export function creerLaboratoireCarriere(config: Pick<CreationCarriere, 'id' | '
 
 function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false) {
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
+  if (!gratuit) exiger(!etat.packsActifs || etat.packsActifs.includes(packId), 'Ce pack est désactivé dans cette ligue.');
   entier(pack.prix, 1); entier(pack.cartes, 1, 12);
   exiger(RARETES_CARRIERE.every(r => Number.isFinite(pack.probabilites[r]) && pack.probabilites[r] >= 0), 'Probabilités de pack invalides.');
   if (!gratuit) exiger(club.ovas >= pack.prix, 'Ovas insuffisants pour ce pack.');
@@ -374,7 +401,7 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
   // quel club de CETTE ligue — ne peut plus sortir d'un pack : c'est ce qui
   // oblige à aller parler à celui qui l'a. Il reste évidemment disponible dans
   // toutes les autres ligues.
-  const pris = new Set(etat.cartes.map(c => c.sourceId));
+  const pris = new Set(etat.doublonsAutorises ? [] : etat.cartes.map(c => c.sourceId));
   const rayons = RARETES_CARRIERE.map(r => rayonDePack(r, pack).filter(c => !pris.has(c.sourceId)));
   exiger(rayons.some((rayon, i) => pack.probabilites[RARETES_CARRIERE[i]] > 0 && rayon.length > 0), 'Ce pack est épuisé dans votre ligue.');
   const rng = hasard(`${graine}:${etat.version}:${club.id}`); const tirees: CarteCarriere[] = [];
@@ -474,7 +501,7 @@ function calendrierCompetition(etat: EtatCarriereEnLigne, competition: Competiti
     const aller = affichesToutesRondes(competition.participants);
     const retour = aller.map(j => j.map(r => ({ domicile: r.exterieur, exterieur: r.domicile })));
     let ouverture = debut;
-    [...aller, ...retour].forEach((paires, i) => {
+    (etat.publique ? aller : [...aller, ...retour]).forEach((paires, i) => {
       const horaires = horairesChampionnat(debut, etat.rythme, i, paires.length);
       paires.forEach((paire, index) => etat.rencontres.push({
         id: prochainIdRencontre(etat), competitionId: competition.id,
@@ -667,7 +694,7 @@ function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
   // ⚠️ LA PHASE FINALE DEMANDE QUATRE CLUBS. À trois, une demi-finale à deux
   // n'a pas de sens : le championnat couronne alors son premier, comme si le
   // réglage n'existait pas. Mieux vaut l'ignorer que produire un tableau bancal.
-  const playoffs = Boolean(etat.playoffs) && etat.clubs.length >= 4;
+  const playoffs = Boolean(etat.playoffs) && etat.clubs.length >= 2;
   const competition: CompetitionCarriere = {
     id: prochainId(etat, 'competition', etat.competitions.length),
     nom: `Championnat · saison ${etat.saison}`, trophee: nomTrophee(etat.tropheeId),
@@ -678,7 +705,29 @@ function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
   };
   etat.competitions.push(competition); calendrierCompetition(etat, competition);
   competition.journeesRegulieres = Math.max(...etat.rencontres.filter(r => r.competitionId === competition.id).map(r => r.journee));
+  if (etat.publique) {
+    const participants = etat.clubs.map(c => c.id);
+    const rng = hasard(`${etat.graine}:coupe:${etat.saison}`);
+    for (let i = participants.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [participants[i], participants[j]] = [participants[j], participants[i]];
+    }
+    const coupe: CompetitionCarriere = {
+      id: prochainId(etat, 'competition', etat.competitions.length),
+      nom: `Coupe Destiny Rugby · Division ${etat.publique.division}`, trophee: 'Coupe Destiny Rugby',
+      format: estPuissanceDeDeux(participants.length) ? 'elimination' : 'poules',
+      participants, saison: etat.saison, debut: dateServeur(maintenant), etat: 'enCours',
+      recompenseParticipation: 250, recompenseVainqueur: 2000, recompenseFinaliste: 1000,
+    };
+    etat.competitions.push(coupe); calendrierCompetition(etat, coupe);
+  }
   renouvelerObjectifs(etat, maintenant);
+}
+
+function debutAutomatiquePublic(etat: EtatCarriereEnLigne, maintenant: number) {
+  if (!etat.publique) return maintenant;
+  return Math.min(maintenant, Math.max(Date.parse(etat.creeLe) + 2 * JOUR,
+    ...etat.clubs.map(club => Date.parse(club.rejointLe))));
 }
 
 export function classementCarriere(etat: EtatCarriereEnLigne, competitionId?: string): LigneClassementCarriere[] {
@@ -875,7 +924,7 @@ function avancerCompetitions(etat: EtatCarriereEnLigne, maintenant: number) {
       const gagnantDe = (r: RencontreCarriere) => vainqueurRencontre(r, etat);
       const debut = Math.max(...matchs.map(r => Date.parse(r.ferme)));
       if (derniere === c.journeesRegulieres) {
-        const nombre = Math.min(rangs.length, Math.max(4, 2 ** Math.floor(Math.log2(rangs.length / 2))));
+        const nombre = nombreQualifiesPlayoffs(rangs.length);
         ajouterRencontres(etat, c, derniere + 1, Array.from({length: nombre / 2}, (_, i) => ({domicile: rangs[i], exterieur: rangs[nombre - 1 - i]})), debut);
       } else if (matchs.filter(r => r.journee === derniere).length > 1) {
         const qualifies = matchs.filter(r => r.journee === derniere).map(gagnantDe).sort((a,b) => rangs.indexOf(a)-rangs.indexOf(b));
@@ -1112,7 +1161,7 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
   // démarre dès que deux managers sont présents. Avec un seul club, le second
   // inscrit déclenche immédiatement ce même départ.
   if (etat.phase === 'salon' && etat.clubs.length >= 2 && Date.parse(etat.creeLe) + 2 * JOUR <= maintenant) {
-    demarrerSaison(etat, maintenant);
+    demarrerSaison(etat, debutAutomatiquePublic(etat, maintenant));
   }
   completerPacks(etat);
   attribuerPacksQuotidiens(etat, maintenant);
@@ -1216,6 +1265,8 @@ export function avancerCarrierePourDirect(
 export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, commande: CommandeCarriere, maintenant: number, graine: string): EtatCarriereEnLigne {
   identifiant(compteId); dateServeur(maintenant);
   exiger(commande && typeof commande === 'object' && typeof commande.type === 'string', 'Commande invalide.');
+  exiger(!etat.publique?.finLe || maintenant < Date.parse(etat.publique.finLe) || commande.type === 'actualiser',
+    'Cette saison publique est terminée. Retrouve ta nouvelle division dans le portail.');
   if (commande.type === 'laboratoireReinitialiser') {
     exiger(etat.laboratoire === true && compteId === etat.createurId, 'Commande réservée au laboratoire Kiri.');
     const createur = etat.clubs.find(c => c.compteId === compteId);
@@ -1228,7 +1279,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
   if (commande.type === 'rejoindre') {
     ajouterClub(nouveau, compteId, commande.pseudo, commande.clubNom, maintenant, graine, commande.embleme);
     attribuerPacksQuotidiens(nouveau, maintenant);
-    if (nouveau.phase === 'salon' && Date.parse(nouveau.creeLe) + 2 * JOUR <= maintenant) demarrerSaison(nouveau, maintenant);
+    if (nouveau.phase === 'salon' && Date.parse(nouveau.creeLe) + 2 * JOUR <= maintenant) demarrerSaison(nouveau, debutAutomatiquePublic(nouveau, maintenant));
   } else {
     const club = monClub(nouveau, compteId); avancerInterne(nouveau, maintenant, graine);
     switch (commande.type) {
@@ -1238,9 +1289,9 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         break;
       }
       case 'actualiser': break;
-      case 'demarrerSaison': exiger(compteId === nouveau.createurId, 'Seul le créateur peut lancer la saison.'); demarrerSaison(nouveau, maintenant); break;
+      case 'demarrerSaison': exiger(!nouveau.publique && compteId === nouveau.createurId, 'La saison publique démarre automatiquement.'); demarrerSaison(nouveau, maintenant); break;
       case 'modifierRythme': {
-        exiger(compteId === nouveau.createurId, 'Seul le créateur peut modifier la fréquence des matchs.');
+        exiger(!nouveau.publique && compteId === nouveau.createurId, 'La fréquence de la division publique est fixe.');
         entier(commande.rythme, 1, 7);
         nouveau.rythme = commande.rythme;
         replanifierCalendrier(nouveau, maintenant);
@@ -1427,7 +1478,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         o.reclame = true; journal(nouveau, club, 'objectif', o.recompense, [], o.libelle, date); break;
       }
       case 'creerCoupe': {
-        exiger(compteId === nouveau.createurId, 'Seul le créateur peut créer une coupe.'); exiger(nouveau.phase === 'saison', 'Lancez une saison avant de créer une coupe.');
+        exiger(!nouveau.publique && compteId === nouveau.createurId, 'La coupe de division est créée automatiquement.'); exiger(nouveau.phase === 'saison', 'Lancez une saison avant de créer une coupe.');
         texte(commande.nom); texte(commande.trophee); listeIds(commande.participants); exiger(commande.participants.length >= 2, 'Une coupe nécessite au moins deux clubs.'); commande.participants.forEach(id => clubParId(nouveau, id));
         exiger(commande.format === 'elimination' || commande.format === 'championnat' || commande.format === 'poules', 'Format de coupe invalide.');
         if (commande.format === 'poules') exiger(commande.participants.length >= 3, 'Une phase de poules nécessite au moins trois clubs.');
@@ -1449,7 +1500,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         const c: CompetitionCarriere = { id: prochainId(nouveau, 'competition', nouveau.competitions.length), nom: commande.nom.trim(), trophee: commande.trophee.trim(), format, participants, saison: nouveau.saison, debut: new Date(commande.debut).toISOString(), etat: 'enCours', recompenseParticipation: commande.recompenseParticipation, recompenseVainqueur: commande.recompenseVainqueur, recompenseFinaliste: commande.recompenseFinaliste,
           logo: logoCompetitionValide(commande.logo) ? commande.logo : undefined,
           tropheeId: tropheeValide(commande.tropheeId) ? commande.tropheeId : undefined,
-          playoffs: format === 'championnat' && commande.playoffs === true && commande.participants.length >= 4,
+          playoffs: format === 'championnat' && commande.playoffs === true && commande.participants.length >= 2,
           poules: format === 'poules' ? repartirPoules(participants) : undefined,
           qualifies: format === 'poules' ? nombreQualifiesPoules(commande.participants.length) : undefined };
         nouveau.competitions.push(c); calendrierCompetition(nouveau, c);

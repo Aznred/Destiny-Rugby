@@ -76,6 +76,8 @@ la mauvaise sans prévenir.
 2. [`schema-ligues.sql`](schema-ligues.sql) — il crée `comptes` et `sessions`.
 3. [`schema-carriere.sql`](schema-carriere.sql) — il complète `comptes` avec
    l’identité Google et crée les tables de la Carrière, dont le coffre Boutique.
+4. [`schema-echanges-solo.sql`](schema-echanges-solo.sql) — il ajoute les offres
+   publiques de la collection solo et leurs opérations atomiques.
 
 Pour afficher « Continuer avec Google », crée dans Google Cloud un client OAuth
 de type **Application Web**, autorise les origines du site et de développement,
@@ -86,7 +88,7 @@ serveur ; aucun secret Google n’est nécessaire.
 > ⚠️ **L'ORDRE N'EST PAS UNE PRÉCAUTION, C'EST UNE DÉPENDANCE.**
 > `schema-carriere.sql` commence par `alter table comptes add column …` : passé
 > avant `schema-ligues.sql`, il échoue parce que la table `comptes` n'existe pas
-> encore. Les trois fichiers sont écrits en `if not exists` — on peut donc les
+> encore. Les migrations additives peuvent être rejouées sans effacer les données.
 > rejouer sans rien casser si on s'est trompé.
 
 ### Comment les exécuter
@@ -116,7 +118,7 @@ puis :
 npm run base:appliquer
 ```
 
-`scripts/appliquerSchema.mjs` fait ce que ferait `psql` : il découpe les deux
+`scripts/appliquerSchema.mjs` fait ce que ferait `psql` : il découpe les trois
 fichiers en instructions (en respectant les commentaires et les chaînes) et les
 envoie **une par une**, dans l'ordre. Avant d'écrire quoi que ce soit il affiche
 l'hôte visé, les tables déjà présentes et le nombre de lignes de `classement` —

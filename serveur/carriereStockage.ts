@@ -6,6 +6,7 @@ import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeance
 import { assemblerTransfert, champsDepuisForme, decoderBloc, encoderTransfert, formeTransfert, type BlocTransfert, type ManifestTransfert } from './transfertCarriere.js';
 import { creerLimiteurReserve } from './limiteurReserve.js';
 import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
+import type { PageOffresSolo, LotCartesSolo } from '../src/lib/echangesSolo.js';
 
 export interface CompteStocke {
   id: string; identifiant: string; pseudo: string; empreinte?: string;
@@ -20,6 +21,7 @@ export interface RecompensesAchat {
   traitsDebloques: string[];
 }
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
+export interface ResumeDivisionPublique { id: string; code: string; division: number; comptes: string[]; nombreClubs: number }
 export interface PresenceMatchStockee { match: string; compte: string; vu: number }
 export interface SalonAmicalStocke {
   code: string;
@@ -38,12 +40,21 @@ export interface SalonAmicalStocke {
 export interface ResumeLigue {
   id: string; nom: string; phase: string; logo?: string;
   clubNom: string; ovas: number; clubEmbleme?: string; laboratoire?: boolean; createurId?: string;
+  publique?: { cycle: number; division: number };
 }
 const resumeEtat = (etat: EtatCarriereEnLigne) => ({
-  nom: etat.nom, phase: etat.phase, logo: etat.logo, laboratoire: etat.laboratoire === true, createurId: etat.createurId,
+  nom: etat.nom, phase: etat.phase, logo: etat.logo, laboratoire: etat.laboratoire === true, createurId: etat.createurId, publique: etat.publique,
   clubs: etat.clubs.map(c => ({ compteId: c.compteId, nom: c.nom, ovas: c.ovas, embleme: c.embleme })),
 });
 export interface StockageCarriere {
+  echangesSolo?: {
+    lister(compte: string, offset: number): Promise<PageOffresSolo>;
+    creer(id: string, compte: string, pseudo: string, offertes: LotCartesSolo, souhaitees: LotCartesSolo): Promise<void>;
+    proposer(id: string, offre: string, compte: string, pseudo: string, cartes: LotCartesSolo): Promise<void>;
+    accepter(offre: string, compte: string, proposition?: string): Promise<void>;
+    refuser(offre: string, compte: string, proposition: string): Promise<void>;
+    annuler(offre: string, compte: string): Promise<void>;
+  };
   atelier?: StockageAtelier;
   push?: StockagePush;
   compteParIdentifiant(identifiant: string): Promise<CompteStocke | null>;
@@ -56,7 +67,7 @@ export interface StockageCarriere {
   achatCredite?(session: string, compte: string): Promise<boolean>;
   crediterAchat?(session: string, compte: string, recompenses: RecompensesAchat): Promise<void>;
   boutique(compte: string): Promise<EtatBoutiqueCompte | null>;
-  sauvegarderBoutique(compte: string, boutique: EtatBoutiqueCompte): Promise<void>;
+  sauvegarderBoutique(compte: string, boutique: EtatBoutiqueCompte): Promise<EtatBoutiqueCompte>;
   limiter(cle: string, maximum: number, fenetre: number, maintenant: number): Promise<boolean>;
   /**
    * ⚠️ LA LECTURE QUI NE COÛTE RIEN : version, membres, prochaine échéance.
@@ -80,6 +91,9 @@ export interface StockageCarriere {
   administration(): Promise<AdministrationCarriere>;
   ligue(id: string): Promise<LigueStockee | null>;
   ligueParCode(code: string): Promise<LigueStockee | null>;
+  divisionsPubliques(cycle: number): Promise<LigueStockee[]>;
+  resumesDivisionsPubliques(cycle: number): Promise<ResumeDivisionPublique[]>;
+  originePublique(): Promise<number | null>;
   creerLigue(ligue: LigueStockee): Promise<boolean>;
   supprimerLigue(id: string, createur: string): Promise<boolean>;
   supprimerLiguesInactives(avant: number): Promise<string[]>;
@@ -130,6 +144,9 @@ async function sansColonne<T>(complete: () => Promise<T>, repli: () => Promise<T
 
 export function stockageNeon(url: string): StockageCarriere {
   const sql = neon(url);
+  const confirmerEchange = (lignes: Record<string, unknown>[]) => {
+    if (!Object.values(lignes[0] ?? {})[0]) throw new Error('Échange impossible : l’offre a changé ou les doublons ne sont plus disponibles.');
+  };
   const limiterJeu = creerLimiteurReserve(async (cle, maximum, debut, lot) => {
     const [r] = await sql`select carriere_reserver_debit(${cle},${maximum},${debut},${lot}) as n`;
     return Number(r.n);
@@ -233,6 +250,36 @@ export function stockageNeon(url: string): StockageCarriere {
     }
   }
   return {
+    echangesSolo: {
+      async lister(compte, offset) {
+        const lignes = await sql`select id, compte, pseudo, offertes, souhaitees, propositions, cree_le, statut
+          from collection_offres where statut='ouverte' or compte=${compte}::uuid
+          order by cree_le desc limit 30 offset ${offset}`;
+        const total = await sql`select count(*)::integer as n from collection_offres where statut='ouverte' or compte=${compte}::uuid`;
+        return { total: Number(total[0].n), offres: lignes.map(ligne => ({
+          id: String(ligne.id), compteId: String(ligne.compte), pseudo: String(ligne.pseudo),
+          offertes: ligne.offertes as LotCartesSolo, souhaitees: ligne.souhaitees as LotCartesSolo,
+          propositions: (ligne.propositions as PageOffresSolo['offres'][number]['propositions'])
+            .filter(p => String(ligne.compte) === compte || p.compteId === compte),
+          creeLe: new Date(ligne.cree_le as string).toISOString(), statut: ligne.statut as 'ouverte' | 'acceptee' | 'annulee',
+        })) };
+      },
+      async creer(id, compte, pseudo, offertes, souhaitees) {
+        confirmerEchange(await sql`select collection_creer_offre(${id}::uuid,${compte}::uuid,${pseudo},${JSON.stringify(offertes)}::jsonb,${JSON.stringify(souhaitees)}::jsonb) as ok`);
+      },
+      async proposer(id, offre, compte, pseudo, cartes) {
+        confirmerEchange(await sql`select collection_proposer(${id}::uuid,${offre}::uuid,${compte}::uuid,${pseudo},${JSON.stringify(cartes)}::jsonb) as ok`);
+      },
+      async accepter(offre, compte, proposition) {
+        confirmerEchange(await sql`select collection_accepter(${offre}::uuid,${compte}::uuid,${proposition ?? null}::uuid) as ok`);
+      },
+      async refuser(offre, compte, proposition) {
+        confirmerEchange(await sql`select collection_refuser(${offre}::uuid,${compte}::uuid,${proposition}::uuid) as ok`);
+      },
+      async annuler(offre, compte) {
+        confirmerEchange(await sql`select collection_annuler(${offre}::uuid,${compte}::uuid) as ok`);
+      },
+    },
     atelier: atelierNeon(url),
     push: pushNeon(url),
     async compteParIdentifiant(identifiant) {
@@ -301,9 +348,11 @@ export function stockageNeon(url: string): StockageCarriere {
       return (r[0]?.donnees as EtatBoutiqueCompte | undefined) ?? null;
     },
     async sauvegarderBoutique(compte, boutique) {
-      await sql`insert into compte_boutique (compte,donnees,modifie_le)
+      const lignes = await sql`insert into compte_boutique (compte,donnees,modifie_le)
         values (${compte},${JSON.stringify(boutique)}::jsonb,now())
         on conflict (compte) do update set donnees=excluded.donnees || jsonb_build_object(
+          'collectionSolo', case when coalesce((compte_boutique.donnees->'collectionSolo'->>'revision')::bigint,0) > coalesce((excluded.donnees->'collectionSolo'->>'revision')::bigint,0)
+            then compte_boutique.donnees->'collectionSolo' else excluded.donnees->'collectionSolo' end,
           'ovas', (excluded.donnees->>'ovas')::bigint + greatest(0, coalesce((compte_boutique.donnees->>'achatsOvas')::bigint,0) - coalesce((excluded.donnees->>'achatsOvas')::bigint,0)),
           'achatsOvas', coalesce((compte_boutique.donnees->>'achatsOvas')::bigint,0),
           'inventaire', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(excluded.donnees->'inventaire','[]'::jsonb) || coalesce(compte_boutique.donnees->'achatsInventaire','[]'::jsonb)) as elements(valeur))),
@@ -312,7 +361,8 @@ export function stockageNeon(url: string): StockageCarriere {
           'achatsInventaire', coalesce(compte_boutique.donnees->'achatsInventaire','[]'::jsonb),
           'achatsEquipements', coalesce(compte_boutique.donnees->'achatsEquipements','[]'::jsonb),
           'achatsTraits', coalesce(compte_boutique.donnees->'achatsTraits','[]'::jsonb)
-        ),modifie_le=excluded.modifie_le`;
+        ),modifie_le=excluded.modifie_le returning donnees`;
+      return lignes[0].donnees as EtatBoutiqueCompte;
     },
     async limiter(cle, maximum, fenetre, maintenant) {
       if (cle.startsWith('jeu:')) {
@@ -332,14 +382,14 @@ export function stockageNeon(url: string): StockageCarriere {
      */
     async ligues(compte) {
       const lire = (resume: boolean) => resume ? sql`
-        select l.id,l.resume->>'nom' as nom,l.phase,l.resume->>'logo' as logo,l.resume->>'laboratoire' as laboratoire,l.resume->>'createurId' as createur_id,
+        select l.id,l.resume->>'nom' as nom,l.phase,l.resume->>'logo' as logo,l.resume->>'laboratoire' as laboratoire,l.resume->>'createurId' as createur_id,l.resume->'publique' as publique,
                c.club->>'nom' as club_nom,c.club->>'ovas' as ovas,c.club->>'embleme' as club_embleme
         from carriere_ligues l cross join lateral (
           select club from jsonb_array_elements(l.resume->'clubs') club
           where club->>'compteId'=${compte} limit 1) c
         where l.comptes @> array[${compte}::uuid] order by l.cree_le desc`
         : sql`
-        select l.id,l.donnees->>'nom' as nom,l.donnees->>'phase' as phase,l.donnees->>'logo' as logo,l.donnees->>'laboratoire' as laboratoire,l.donnees->>'createurId' as createur_id,
+        select l.id,l.donnees->>'nom' as nom,l.donnees->>'phase' as phase,l.donnees->>'logo' as logo,l.donnees->>'laboratoire' as laboratoire,l.donnees->>'createurId' as createur_id,l.donnees->'publique' as publique,
                c.club->>'nom' as club_nom,c.club->>'ovas' as ovas,c.club->>'embleme' as club_embleme
         from carriere_ligues l cross join lateral (
           select club from jsonb_array_elements(l.donnees->'clubs') club
@@ -353,13 +403,14 @@ export function stockageNeon(url: string): StockageCarriere {
         clubEmbleme: x.club_embleme == null ? undefined : String(x.club_embleme),
         laboratoire: x.laboratoire === true || x.laboratoire === 'true',
         createurId: x.createur_id == null ? undefined : String(x.createur_id),
+        publique: x.publique && typeof x.publique === 'object' ? x.publique as ResumeLigue['publique'] : undefined,
       }));
     },
     // ⚠️ COMPTER, C'EST COMPTER. Le plafond de 20 ligues lisait la liste
     //    entière pour en prendre la longueur.
     async nombreLigues(compte) {
       const r = await sql`select count(*)::int as n from carriere_ligues where comptes @> array[${compte}::uuid]
-        and coalesce(donnees->>'laboratoire','false')<>'true'`;
+        and coalesce(donnees->>'laboratoire','false')<>'true' and not (donnees ? 'publique')`;
       return Number(r[0]?.n ?? 0);
     },
     async statistiquesGlobales() {
@@ -488,6 +539,23 @@ export function stockageNeon(url: string): StockageCarriere {
       );
     },
     async ligueParCode(code) { return lireCompact(code, true); },
+    async divisionsPubliques(cycle) {
+      const ids = await sql`select id from carriere_ligues where resume ? 'publique' and resume->'publique'->>'cycle'=${String(cycle)}
+        order by (resume->'publique'->>'division')::integer`;
+      return (await Promise.all(ids.map(l => lireCompact(String(l.id))))).filter((l): l is LigueStockee => Boolean(l));
+    },
+    async resumesDivisionsPubliques(cycle) {
+      const lignes = await sql`select id,code,comptes,cardinality(comptes) as nombre,
+        (resume->'publique'->>'division')::integer as division from carriere_ligues
+        where resume ? 'publique' and resume->'publique'->>'cycle'=${String(cycle)} order by division`;
+      return lignes.map(l => ({ id: String(l.id), code: String(l.code), comptes: l.comptes as string[],
+        division: Number(l.division), nombreClubs: Number(l.nombre) }));
+    },
+    async originePublique() {
+      const r = await sql`select extract(epoch from cree_le)*1000 as debut from carriere_ligues
+        where resume ? 'publique' and resume->'publique'->>'cycle'='0' and resume->'publique'->>'division'='1' limit 1`;
+      return r.length ? Number(r[0].debut) : null;
+    },
     async creerLigue(l) {
       const resume = JSON.stringify(resumeEtat(l.etat));
       const maintenant = Date.now();
@@ -500,7 +568,7 @@ export function stockageNeon(url: string): StockageCarriere {
     },
     async supprimerLigue(id, createur) {
       const r = await sql`with cible as (
-          select id from carriere_ligues where id=${id} and donnees->>'createurId'=${createur}
+          select id from carriere_ligues where id=${id} and donnees->>'createurId'=${createur} and not (donnees ? 'publique')
         ), commandes as (
           delete from carriere_commandes where ligue in (select id from cible)
         )
@@ -511,7 +579,7 @@ export function stockageNeon(url: string): StockageCarriere {
       const limite = new Date(avant).toISOString();
       const r = await sql`with cibles as (
           select l.id from carriere_ligues l
-          where not coalesce((l.donnees->>'laboratoire')::boolean,false)
+          where not coalesce((l.donnees->>'laboratoire')::boolean,false) and not (l.donnees ? 'publique')
             and not exists (
               select 1 from unnest(l.comptes) membre
               join comptes c on c.id=membre

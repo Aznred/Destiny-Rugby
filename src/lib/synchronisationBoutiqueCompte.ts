@@ -56,8 +56,11 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
       const cible = attente;
       attente = null;
       try {
-        await sauvegarderBoutiqueCompte(cible.etat);
-        derniere = cible.empreinte;
+        const reponse = await sauvegarderBoutiqueCompte(cible.etat);
+        if ((reponse.boutique.collectionSolo.revision ?? 0) > (cible.etat.collectionSolo.revision ?? 0)) {
+          useGame.setState({ collectionSolo: reponse.boutique.collectionSolo });
+          derniere = empreinte(instantane());
+        } else derniere = cible.empreinte;
       } catch (erreur) {
         if (erreur instanceof ErreurCarriere && erreur.statut === 401) compteConnecte = false;
         break;

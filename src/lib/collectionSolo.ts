@@ -7,6 +7,8 @@ export interface EtatCollectionSolo {
   quantites: Record<string, number>;
   packsOuverts: Record<string, number>;
   doublons: number;
+  /** Incrémenté par les échanges du compte afin d'écarter les sauvegardes périmées. */
+  revision?: number;
 }
 
 export interface ResultatPackSolo {
@@ -133,7 +135,7 @@ export function cleCarteSolo(sourceId: string): string {
 /** Assainit un etat venant d'une ancienne sauvegarde ou du stockage du compte. */
 export function normaliserCollectionSolo(valeur: unknown): EtatCollectionSolo {
   if (!valeur || typeof valeur !== 'object') return etatCollectionSoloVide();
-  const brut = valeur as { quantites?: unknown; possedees?: unknown; packsOuverts?: unknown; doublons?: unknown };
+  const brut = valeur as { quantites?: unknown; possedees?: unknown; packsOuverts?: unknown; doublons?: unknown; revision?: unknown };
   const quantites: Record<string, number> = {};
   if (brut.quantites && typeof brut.quantites === 'object' && !Array.isArray(brut.quantites)) {
     for (const [cle, nombre] of Object.entries(brut.quantites as Record<string, unknown>)) {
@@ -152,6 +154,7 @@ export function normaliserCollectionSolo(valeur: unknown): EtatCollectionSolo {
     quantites,
     packsOuverts,
     doublons: typeof brut.doublons === 'number' && Number.isFinite(brut.doublons) ? Math.max(0, Math.floor(brut.doublons)) : 0,
+    revision: Number.isSafeInteger(brut.revision) && Number(brut.revision) >= 0 ? Number(brut.revision) : 0,
   };
 }
 
@@ -255,6 +258,7 @@ export function ouvrirPackSolo(
       quantites,
       packsOuverts: { ...precedent.packsOuverts, [pack.id]: (precedent.packsOuverts[pack.id] ?? 0) + 1 },
       doublons: precedent.doublons + indices.length - nouvelles,
+      revision: precedent.revision ?? 0,
     },
   };
 }

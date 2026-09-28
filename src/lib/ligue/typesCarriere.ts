@@ -98,7 +98,7 @@ export interface CompetitionCarriere {
   id: string; nom: string; trophee: string; format: 'championnat' | 'elimination' | 'poules';
   /** Logo de la compétition et identifiant du trophée soulevé. */
   logo?: string; tropheeId?: string;
-  /** Championnat : une phase finale à quatre couronne le champion. */
+  /** Championnat : phase finale de 2 à 32 clubs selon les inscrits. */
   playoffs?: boolean; journeesRegulieres?: number;
   /** Coupe avec poules : groupes, taille du tableau, ordre des qualifiés et repêchés. */
   poules?: string[][]; qualifies?: number; phaseFinaleSeed?: string[]; repeches?: string[];
@@ -175,10 +175,14 @@ export interface EtatCarriereEnLigne {
   schema: 1; id: string; nom: string; code: string; createurId: string; creeLe: string;
   /** Espace de développement privé, créé et commandé uniquement par le compte kiri. */
   laboratoire?: true;
+  /** Championnat public ouvert, renouvelé par cycles de trente jours. */
+  publique?: { cycle: number; division: number; barrage?: string; finLe?: string };
   version: number; saison: number; phase: 'salon' | 'saison' | 'intersaison';
   rythme: number; maxClubs: number; graine: string; debutSaison?: string;
   /** L'identité de la ligue : son logo, son trophée, sa phase finale. */
   logo?: string; tropheeId?: string; playoffs?: boolean;
+  /** Réglages du marché et des récompenses, fixés à la création. */
+  packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean;
   /** Ce que chaque club reçoit en arrivant. Fixé à la création, jamais après. */
   dotationOvas: number;
   clubs: ClubCarriere[]; cartes: CarteCarriere[]; packs: PackCarriere[];
@@ -203,6 +207,7 @@ export interface CreationCarriere {
   id: string; nom: string; code: string; compteId: string; pseudo: string; clubNom: string;
   rythme: number; maxClubs: number; embleme?: string;
   logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number;
+  packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean;
 }
 export type CommandeCarriere =
   // ⚠️ L'ÉCUSSON SE CHOISIT À L'INSCRIPTION, ET PLUS JAMAIS APRÈS. Il n'y a

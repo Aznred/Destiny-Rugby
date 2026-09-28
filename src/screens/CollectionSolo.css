@@ -142,3 +142,4 @@
   .solo-stats span { font-size: .6rem; }
   .solo-pack { grid-template-columns: 82px 1fr; }
 }
+.solo-bouton-echanges{width:100%;margin:18px 0;text-align:center;border-color:rgba(239,202,111,.5)}

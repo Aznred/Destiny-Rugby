@@ -4,13 +4,17 @@ import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../sr
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
-import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerLaboratoireCarriere, empreinteEcriture, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
+import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerDivisionPublique, creerLaboratoireCarriere, empreinteEcriture, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
+import { planifierDivisionsPubliques } from './divisionsPubliques.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
-import type { CompteStocke, LigueStockee, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
+import type { CompteStocke, LigueStockee, ResumeDivisionPublique, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { OAuth2Client } from 'google-auth-library';
 import { validerEtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
+import { catalogueBaseCarriere } from '../src/lib/ligue/catalogueCarriere.js';
+import { cleCarteSolo } from '../src/lib/collectionSolo.js';
+import { lotCartesSolo } from '../src/lib/echangesSolo.js';
 
 export interface RequeteCarriere {
   method?: string; url?: string; body?: unknown;
@@ -32,6 +36,7 @@ class ErreurHttp extends Error { constructor(public statut: number, message: str
 const COOKIE = 'destiny_carriere';
 const DUREE_SESSION = 30 * 24 * 60 * 60_000;
 const DEUX_SEMAINES = 14 * 24 * 60 * 60_000;
+const CYCLE_PUBLIC = 30 * 24 * 60 * 60_000;
 const chiffrer = promisify(scrypt);
 export const empreinteJeton = (valeur: string) => createHash('sha256').update(valeur).digest('hex');
 const entete = (req: RequeteCarriere, nom: string) => String(req.headers[nom] ?? '');
@@ -46,6 +51,8 @@ const texte = (x: unknown, min: number, max: number, nom: string): string => {
   return x.trim();
 };
 const idValide = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+let clesCartesSolo: Set<string> | undefined;
+const cartesEchangeables = () => (clesCartesSolo ??= new Set(catalogueBaseCarriere().map(c => cleCarteSolo(c.sourceId))));
 
 interface SalonAmicalServeur {
   code: string;
@@ -362,6 +369,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, ids.length) }, () => ouvrier()));
+    await assurerDivisionsPubliques(Date.now());
     return { actualisees: traitees, supprimees: supprimees.length };
   }
   async function assurerLaboratoireKiri(compte: CompteStocke, maintenant: number) {
@@ -376,6 +384,73 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     }
     ligues = await stockage.ligues(compte.id);
     return ligues;
+  }
+  async function assurerDivisionsPubliques(maintenant: number) {
+    if (!stockage.originePublique || !stockage.divisionsPubliques || !stockage.resumesDivisionsPubliques) return { cycle: 0, divisions: [] as ResumeDivisionPublique[] };
+    const origine = await stockage.originePublique();
+    if (origine === null) return { cycle: 0, divisions: [] as ResumeDivisionPublique[] };
+    const cycle = Math.max(0, Math.floor((maintenant - origine) / CYCLE_PUBLIC));
+    for (let numero = 1; numero <= cycle; numero++) {
+      const existantes = await stockage.resumesDivisionsPubliques(numero);
+      const precedentesResume = await stockage.resumesDivisionsPubliques(numero - 1);
+      if (!precedentesResume.length) break;
+      if (existantes.length >= precedentesResume.length) continue;
+      const precedentes = await stockage.divisionsPubliques(numero - 1);
+      // Un groupe rempli juste avant la fin du mois peut avoir des journées
+      // programmées après la date de clôture. On les simule à la clôture afin
+      // que la montée et la descente utilisent le classement complet.
+      const clotureSimulee = Math.max(maintenant, origine + (numero + 1) * CYCLE_PUBLIC);
+      for (const ligne of precedentes) {
+        for (let tour = 0; tour < 8; tour++) {
+          const etat = await appliquer(ligne.id, 'horloge', `fin-cycle-${numero}-${tour}`,
+            (courant, _n, g) => actualiserCarriere(courant, clotureSimulee, g), false, false);
+          if (etat.phase === 'intersaison' || etat.phase === 'salon') break;
+        }
+      }
+      const terminees = await stockage.divisionsPubliques(numero - 1);
+      const plans = planifierDivisionsPubliques(terminees, numero);
+      for (const plan of plans) {
+        if (existantes.some(l => l.division === plan.division) || !plan.heritiers.length) continue;
+        const premier = plan.heritiers[0].club;
+        const id = randomUUID();
+        const code = `DR-PUBLIC-C${numero}-D${plan.division}`;
+        const etat = creerDivisionPublique({ id, code, compteId: premier.compteId, pseudo: premier.pseudo, clubNom: premier.nom },
+          numero, plan.division, maintenant, randomBytes(24).toString('hex'), plan.heritiers);
+        etat.publique!.finLe = new Date(origine + (numero + 1) * CYCLE_PUBLIC).toISOString();
+        if (plan.barrage) etat.publique!.barrage = plan.barrage;
+        await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 });
+      }
+    }
+    return { cycle, divisions: await stockage.resumesDivisionsPubliques(cycle) };
+  }
+  async function rejoindreDivisionPublique(compte: CompteStocke, clubNom: string, embleme: string | undefined, maintenant: number) {
+    if (!stockage.divisionsPubliques || !stockage.resumesDivisionsPubliques || !stockage.originePublique) throw new ErreurHttp(503, 'La ligue publique est indisponible sur ce serveur.');
+    for (let tentative = 0; tentative < 5; tentative++) {
+      const etatPublic = await assurerDivisionsPubliques(maintenant);
+      const deja = etatPublic.divisions.find(l => l.comptes.includes(compte.id));
+      if (deja) return vueCarriere((await appliquer(deja.id, compte.id, `lecture-publique-${Math.floor(maintenant / 2000)}`,
+        (e, n, g) => actualiserCarriere(e, n, g), false, false)), compte.id);
+      const ouverte = etatPublic.divisions.find(l => l.nombreClubs < 16);
+      if (ouverte) {
+        try {
+          const etat = await appliquer(ouverte.id, compte.id, `adhesion-publique-${compte.id}`,
+            (e, n, g) => agirCarriere(e, compte.id, { type: 'rejoindre', pseudo: compte.pseudo, clubNom, embleme }, n, g), true);
+          return vueCarriere(etat, compte.id);
+        } catch (erreur) {
+          if (tentative === 4) throw erreur;
+          continue;
+        }
+      }
+      const division = Math.max(0, ...etatPublic.divisions.map(l => l.division)) + 1;
+      const id = randomUUID();
+      const code = `DR-PUBLIC-C${etatPublic.cycle}-D${division}`;
+      const etat = creerDivisionPublique({ id, code, compteId: compte.id, pseudo: compte.pseudo, clubNom, embleme },
+        etatPublic.cycle, division, maintenant, randomBytes(24).toString('hex'));
+      const origine = await stockage.originePublique();
+      etat.publique!.finLe = new Date((origine ?? maintenant) + (etatPublic.cycle + 1) * CYCLE_PUBLIC).toISOString();
+      if (await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 })) return vueCarriere(etat, compte.id);
+    }
+    throw new ErreurHttp(409, 'Inscription en cours. Réessaie dans un instant.');
   }
   async function handler(req: RequeteCarriere, res: ReponseCarriere) {
     res.setHeader('Cache-Control', 'no-store');
@@ -550,8 +625,38 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (action === 'sauvegarderBoutique') {
         const boutique = validerEtatBoutiqueCompte(corps.boutique);
         if (!boutique) throw new ErreurHttp(400, 'Sauvegarde de boutique invalide.');
-        await stockage.sauvegarderBoutique(compte.id, boutique);
-        return res.status(200).json({ boutique });
+        return res.status(200).json({ boutique: await stockage.sauvegarderBoutique(compte.id, boutique) });
+      }
+      if (action === 'creerOffreSolo' || action === 'proposerOffreSolo' || action === 'accepterOffreSolo'
+        || action === 'refuserOffreSolo' || action === 'annulerOffreSolo') {
+        if (!stockage.echangesSolo) throw new ErreurHttp(503, 'Les échanges ne sont pas disponibles sur ce serveur.');
+        const marche = stockage.echangesSolo;
+        const id = action === 'creerOffreSolo' ? '' : texte(corps.offre, 36, 36, 'Offre');
+        if (id && !idValide(id)) throw new ErreurHttp(400, 'Offre invalide.');
+        try {
+          if (action === 'creerOffreSolo') {
+            const offertes = lotCartesSolo(corps.offertes, cartesEchangeables());
+            const souhaitees = lotCartesSolo(corps.souhaitees, cartesEchangeables(), true);
+            await marche.creer(randomUUID(), compte.id, compte.pseudo, offertes, souhaitees);
+          } else if (action === 'proposerOffreSolo') {
+            const cartes = lotCartesSolo(corps.cartes, cartesEchangeables());
+            await marche.proposer(randomUUID(), id, compte.id, compte.pseudo, cartes);
+          } else if (action === 'accepterOffreSolo') {
+            const proposition = corps.proposition == null ? undefined : texte(corps.proposition, 36, 36, 'Proposition');
+            if (proposition && !idValide(proposition)) throw new Error('Proposition invalide.');
+            await marche.accepter(id, compte.id, proposition);
+          } else if (action === 'refuserOffreSolo') {
+            const proposition = texte(corps.proposition, 36, 36, 'Proposition');
+            if (!idValide(proposition)) throw new Error('Proposition invalide.');
+            await marche.refuser(id, compte.id, proposition);
+          } else await marche.annuler(id, compte.id);
+        } catch (erreur) {
+          if (erreur instanceof ErreurHttp) throw erreur;
+          if (erreur instanceof Error && ((erreur as { code?: string }).code === 'P0001' || !('code' in erreur)))
+            throw new ErreurHttp(409, erreur.message);
+          throw erreur;
+        }
+        return res.status(200).json({ ok: true, boutique: await stockage.boutique(compte.id) });
       }
       if (action === 'supprimerLigue') {
         const id = texte(corps.ligue, 36, 36, 'Ligue');
@@ -702,6 +807,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         return res.status(200).json({ok:true});
       }
       if (req.method === 'GET') {
+        if (url.searchParams.has('echangesSolo')) {
+          if (!stockage.echangesSolo) throw new ErreurHttp(503, 'Les échanges ne sont pas disponibles sur ce serveur.');
+          const offset = Math.max(0, Math.min(10000, Number(url.searchParams.get('offset')) || 0));
+          return res.status(200).json(await stockage.echangesSolo.lister(compte.id, offset));
+        }
         if (url.searchParams.has('boutique')) {
           return res.status(200).json({ boutique: await stockage.boutique(compte.id) });
         }
@@ -715,14 +825,17 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         const id = url.searchParams.get('ligue');
         if (!id) {
-          const ligues = await assurerLaboratoireKiri(compte, maintenant);
+          const publicCourant = await assurerDivisionsPubliques(maintenant);
+          const ligues = (await assurerLaboratoireKiri(compte, maintenant))
+            .filter(l => !l.publique || l.publique.cycle === publicCourant.cycle);
           // ⚠️ LE RÉSUMÉ ARRIVE DÉJÀ TAILLÉ. `stockage.ligues` rendait l'état
           // complet de chaque ligue pour qu'on en extraie ces sept champs ici :
           // 400 Ko traversaient le réseau par ligue et par ouverture d'écran.
           // C'est Postgres qui les extrait maintenant.
           return res.status(200).json({ compte: publicCompte(compte), ligues: ligues.map(l => ({
             id: l.id, nom: l.nom, etat: l.phase, clubNom: l.clubNom, ovas: l.ovas,
-            clubEmbleme: l.clubEmbleme, logo: l.logo, laboratoire: l.laboratoire, createur: l.createurId === compte.id,
+            clubEmbleme: l.clubEmbleme, logo: l.logo, laboratoire: l.laboratoire,
+            createur: l.createurId === compte.id && !l.publique, publique: l.publique,
           })) });
         }
         if (!idValide(id)) throw new ErreurHttp(404, 'Ligue introuvable.');
@@ -815,6 +928,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             embleme: typeof corps.embleme === 'string' ? corps.embleme : undefined,
             logo: typeof corps.logo === 'string' ? corps.logo : undefined, tropheeId: typeof corps.tropheeId === 'string' ? corps.tropheeId : undefined, playoffs: corps.playoffs === true,
             dotationOvas: typeof corps.dotationOvas === 'number' ? corps.dotationOvas : undefined,
+            packsActifs: Array.isArray(corps.packsActifs) ? corps.packsActifs : undefined,
+            packsGratuitsParJour: typeof corps.packsGratuitsParJour === 'number' ? corps.packsGratuitsParJour : undefined,
+            doublonsAutorises: corps.doublonsAutorises === true,
           }, maintenant, randomBytes(24).toString('hex'));
           if (await stockage.creerLigue({ id, code, etat: e, comptes: comptesEtat(e), version: 0 })) return res.status(201).json(vueCarriere(e, compte.id));
         }
@@ -822,6 +938,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (action === 'rejoindre') {
         const code = texte(corps.code, 5, 30, 'Code').toUpperCase();
+        if (code.startsWith('DR-PUBLIC-')) return res.status(200).json(await rejoindreDivisionPublique(compte,
+          texte(corps.clubNom, 3, 40, 'Nom du club'), typeof corps.embleme === 'string' ? corps.embleme : undefined, maintenant));
         const ligne = await stockage.ligueParCode(code);
         if (!ligne) throw new ErreurHttp(404, 'Code de ligue introuvable.');
         // ⚠️ UN LIEN D'INVITATION SE CLIQUE DEUX FOIS. On le range dans une
@@ -837,6 +955,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const e = await appliquer(ligne.id, compte.id, `adhesion-${compte.id}`, (e, n, g) => agirCarriere(e, compte.id,
           { type: 'rejoindre', pseudo: compte.pseudo, clubNom: texte(corps.clubNom, 3, 40, 'Nom du club'), embleme: corps.embleme as string | undefined }, n, g), true);
         return res.status(200).json(vueCarriere(e, compte.id));
+      }
+      if (action === 'rejoindreDivisionPublique') {
+        return res.status(200).json(await rejoindreDivisionPublique(compte,
+          texte(corps.clubNom, 3, 40, 'Nom du club'), typeof corps.embleme === 'string' ? corps.embleme : undefined, maintenant));
       }
       if (action === 'commande') {
         const id = texte(corps.ligue, 36, 36, 'Ligue');

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Icone } from '../components/Icone';
 import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import OuverturePack from '../components/OuverturePack';
@@ -13,6 +13,7 @@ import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentati
 import './CollectionSolo.css';
 
 const PAR_PAGE = 40;
+const EchangesCollectionSolo = lazy(() => import('../components/EchangesCollectionSolo').then(module => ({ default: module.EchangesCollectionSolo })));
 const RARETES: RareteCarriere[] = ['bronze', 'argent', 'or', 'elite', 'star'];
 const normaliser = (texte: string) => texte.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
@@ -37,6 +38,7 @@ export function CollectionSolo() {
   const [bilan, setBilan] = useState('');
   const nomCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Compte joueur';
   const [compoPleineOuverte, setCompoPleineOuverte] = useState(false);
+  const [echangesOuverts, setEchangesOuverts] = useState(false);
 
   const cartesPossedees = useMemo(() => {
     return catalogue
@@ -98,6 +100,11 @@ export function CollectionSolo() {
     </section>
 
     {bilan && <p className="solo-bilan" role="status"><Icone nom="ok" taille={17} /> {bilan}</p>}
+
+    <button type="button" className="btn fantome solo-bouton-echanges" onClick={() => setEchangesOuverts(ouvert => !ouvert)}>
+      {echangesOuverts ? 'Masquer les échanges' : 'Échanger mes doublons avec les autres joueurs'}
+    </button>
+    {echangesOuverts && <Suspense fallback={<p>Chargement des échanges…</p>}><EchangesCollectionSolo /></Suspense>}
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
       <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.allPacks')}</div><h2 id="solo-packs-titre">{t('solo.choosePack')}</h2></div><span>{categoriePacks === 'gratuits' ? t('solo.freePacksHelp') : t('solo.paidPacksHelp')}</span></div>
