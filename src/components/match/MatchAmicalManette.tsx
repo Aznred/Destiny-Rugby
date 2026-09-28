@@ -132,6 +132,13 @@ function libellePhase(m: EtatMatch): string {
 
 export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode, onQuitter }: Props) {
   const conteneurRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const groupeTerrainRef = useRef<SVGGElement>(null);
+  const noeudsPionsRef = useRef(new Map<string, { noeud: SVGGElement; origine: Vec }>());
+  const noeudBallonRef = useRef<{ noeud: SVGGElement; origine: Vec } | null>(null);
+  const positionsAfficheesRef = useRef(new Map<string, Vec>());
+  const ballonAfficheRef = useRef<Vec | null>(null);
+  const dimensionsRef = useRef({ largeur: 1280, hauteur: 720 });
   const cameraRef = useRef(new Camera());
   const matchRef = useRef<EtatMatch | null>(null);
   const inputRef = useRef(new InputManagerArcade());
@@ -172,6 +179,22 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const maillotA = useMemo(() => maillot(equipeA.couleur || '#1e40af', equipeB.couleur || '#f8fafc'), [equipeA.couleur, equipeB.couleur]);
   const maillotB = useMemo(() => maillot(equipeB.couleur || '#dc2626', equipeA.couleur || '#f8fafc'), [equipeA.couleur, equipeB.couleur]);
   useEffect(() => { messageActionRef.current = messageAction; }, [messageAction]);
+  useEffect(() => {
+    const conteneur = conteneurRef.current;
+    if (!conteneur) return;
+    const mesurer = () => {
+      const rect = conteneur.getBoundingClientRect();
+      dimensionsRef.current = { largeur: Math.max(1, rect.width), hauteur: Math.max(1, rect.height) };
+    };
+    mesurer();
+    if (typeof ResizeObserver !== 'undefined') {
+      const observateur = new ResizeObserver(mesurer);
+      observateur.observe(conteneur);
+      return () => observateur.disconnect();
+    }
+    window.addEventListener('resize', mesurer);
+    return () => window.removeEventListener('resize', mesurer);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia('(pointer: coarse) and (orientation: portrait)');
@@ -216,6 +239,8 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
     m.carriereDixMinutes = true;
     m.dureeReelleArcade = DUREE_MATCH_REELLE;
     m.finSurSortieOuEnAvant = true;
+    m.controleArcadeCamps = mode === 'reseau' ? ['A', 'B'] : [monCamp];
+    m.defenseArcadeCote = mode === 'ordinateur' ? (monCamp === 'A' ? 'B' : 'A') : undefined;
     matchRef.current = m;
     cameraRef.current.couper({ x: LONGUEUR / 2, y: 35 }, 'suivi');
     const premier = selectionnerJoueurPertinent(m, monCamp);
@@ -343,7 +368,12 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         if (!hote && res.etatMatch && m && res.etatMatch.revision > revisionRef.current) {
           revisionRef.current = res.etatMatch.revision;
           appliquerSnapshot(m, res.etatMatch, monCamp);
-          if (m.fini) setFinDeMatch(true);
+          if (m.fini) {
+            setScoreA(m.scoreA);
+            setScoreB(m.scoreB);
+            setTempsSimule(Math.min(DUREE_MATCH_JEU, Math.floor(m.t)));
+            setFinDeMatch(true);
+          }
           qteRef.current = res.etatMatch.qte ?? null;
           setQteAffichee(qteRef.current ? { ...qteRef.current } : null);
           inputRef.current.acquitter(res.etatMatch.acquittements?.[monCamp] ?? 0);
@@ -361,17 +391,16 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   useEffect(() => {
     let animation = 0;
     let precedent = performance.now();
-    const intervalleSimulation = appareilTactileRef.current ? 50 : 33;
-    const intervalleRendu = appareilTactileRef.current ? 83 : 50;
+    let precedenteImage = precedent;
+    const intervalleSimulation = 1000 / 60;
+    const intervalleRendu = appareilTactileRef.current ? 1000 / 18 : 1000 / 24;
     const tick = (maintenant: number) => {
-      if (maintenant - precedent < intervalleSimulation) {
-        animation = requestAnimationFrame(tick);
-        return;
-      }
-      const dt = Math.min((maintenant - precedent) / 1000, .1);
-      precedent = maintenant;
+      const dtImage = Math.min((maintenant - precedenteImage) / 1000, .05);
+      precedenteImage = maintenant;
       const m = matchRef.current;
-      if (m && !m.fini) {
+      if (m && !m.fini && maintenant - precedent >= intervalleSimulation) {
+        const dt = Math.min((maintenant - precedent) / 1000, .1);
+        precedent = maintenant;
         const autoritaire = mode === 'ordinateur' || monCamp === 'A';
         const gamepad = navigator.getGamepads?.()[0] ?? null;
         const trameLocale = inputRef.current.trame(gamepad, true);
@@ -490,17 +519,48 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
           if (pionLocal) deplacerJoueurArcade(m, pionLocal, trameLocale, dt);
         }
 
-        const controle = choisirJoueur(m, monCamp);
-        if (m.fini) setFinDeMatch(true);
+        choisirJoueur(m, monCamp);
+        if (m.fini) {
+          setScoreA(m.scoreA);
+          setScoreB(m.scoreB);
+          setTempsSimule(Math.min(DUREE_MATCH_JEU, Math.floor(m.t)));
+          setFinDeMatch(true);
+        }
+      }
+      if (m && !m.fini) {
+        // Même principe qu'en carrière : les positions et la caméra suivent
+        // chaque image, React ne redessine les pixels des sprites qu'à 18/24 Hz.
+        const interpolation = 1 - Math.exp(-dtImage * 18);
+        for (const pion of m.pions) {
+          const affiche = positionsAfficheesRef.current.get(pion.id);
+          if (affiche) {
+            affiche.x += (pion.pos.x - affiche.x) * interpolation;
+            affiche.y += (pion.pos.y - affiche.y) * interpolation;
+          } else positionsAfficheesRef.current.set(pion.id, { ...pion.pos });
+        }
+        const ballonAffiche = ballonAfficheRef.current ?? { ...m.ballon };
+        ballonAffiche.x += (m.ballon.x - ballonAffiche.x) * interpolation;
+        ballonAffiche.y += (m.ballon.y - ballonAffiche.y) * interpolation;
+        ballonAfficheRef.current = ballonAffiche;
 
-        const depuisRendu = maintenant - dernierRenduRef.current;
-        if (depuisRendu >= intervalleRendu) {
+        const controle = m.porteur?.cote === monCamp
+          ? m.porteur : m.pions.find((p) => p.id === selectionRef.current[monCamp]);
+        const cible = (controle && positionsAfficheesRef.current.get(controle.id)) ?? ballonAffiche;
+        const { largeur, hauteur } = dimensionsRef.current;
+        const ratio = largeur / hauteur;
+        const vue = cameraRef.current.suivre(cible, 'suivi' as Cadrage, ratio, angleDeVue(monCamp, hauteur > largeur), dtImage);
+        svgRef.current?.setAttribute('viewBox', vue.viewBox);
+        groupeTerrainRef.current?.setAttribute('transform', vue.transform);
+        for (const [id, { noeud, origine }] of noeudsPionsRef.current) {
+          const pos = positionsAfficheesRef.current.get(id);
+          if (pos) noeud.setAttribute('transform', `translate(${(pos.x - origine.x).toFixed(2)} ${(pos.y - origine.y).toFixed(2)})`);
+        }
+        const ballonNoeud = noeudBallonRef.current;
+        if (ballonNoeud) ballonNoeud.noeud.setAttribute('transform',
+          `translate(${(ballonAffiche.x - ballonNoeud.origine.x).toFixed(2)} ${(ballonAffiche.y - ballonNoeud.origine.y).toFixed(2)})`);
+
+        if (maintenant - dernierRenduRef.current >= intervalleRendu) {
           dernierRenduRef.current = maintenant;
-          const cible: Vec = controle?.pos ?? m.porteur?.pos ?? m.ballon;
-          const rect = conteneurRef.current?.getBoundingClientRect();
-          const ratio = rect ? rect.width / Math.max(1, rect.height) : 16 / 9;
-          const angle = angleDeVue(monCamp, Boolean(rect && rect.height > rect.width));
-          const vue = cameraRef.current.suivre(cible, 'suivi' as Cadrage, ratio, angle, Math.min(depuisRendu / 1000, .08));
           setVueCamera({ viewBox: vue.viewBox, transform: vue.transform, redresser: vue.redresser, cadre: vue.cadre });
           if (controle) setEnduranceJauge(Math.round(controle.endurance));
           setScoreA(m.scoreA); setScoreB(m.scoreB);
@@ -572,19 +632,36 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
     <div className="amical-bandeau-action" role="status">{messageAction}{manetteDetectee ? ' · Manette connectée' : ''}</div>
 
     <div className="amical-terrain-viewport" onPointerDown={debutGeste} onPointerUp={finGeste} onPointerCancel={() => { gesteRef.current = null; }}>
-      {vueCamera && m && terrain && <svg className="amical-terrain-svg" viewBox={vueCamera.viewBox} preserveAspectRatio="xMidYMid meet">
-        <g transform={vueCamera.transform}>
+      {vueCamera && m && terrain && <svg ref={svgRef} className="amical-terrain-svg" viewBox={vueCamera.viewBox} preserveAspectRatio="xMidYMid meet">
+        <g ref={groupeTerrainRef} transform={vueCamera.transform}>
           <PelouseMemo />
           {m.pions.filter((p) => p.surLeTerrain
             && Math.abs(p.pos.x - vueCamera.cadre.cx) <= vueCamera.cadre.w / 2 + 5.3
             && Math.abs(p.pos.y - vueCamera.cadre.cy) <= vueCamera.cadre.h / 2 + 5.3).map((p) => {
             const direct = pionsDirects.get(p.id);
             if (!direct) return null;
-            return <g key={p.id}>
+            return <g key={p.id} ref={(noeud) => {
+              if (!noeud) { noeudsPionsRef.current.delete(p.id); return; }
+              const origine = { ...p.pos };
+              noeudsPionsRef.current.set(p.id, { noeud, origine });
+              const affiche = positionsAfficheesRef.current.get(p.id) ?? origine;
+              noeud.setAttribute('transform', `translate(${(affiche.x - origine.x).toFixed(2)} ${(affiche.y - origine.y).toFixed(2)})`);
+            }}>
               <SpriteRugbymanMemo pion={direct} position={p.pos} terrain={terrain} maillot={p.cote === 'A' ? maillotA : maillotB} porteur={m.porteur?.id === p.id} positionPorteur={m.porteur?.pos} redresser={vueCamera.redresser} hauteurMetres={5.3} temps={tempsSprite} compact={appareilTactileRef.current} />
+              {p.id === pionControleId && <g transform={`translate(${p.pos.x} ${p.pos.y})`} aria-label="Joueur contrôlé">
+                <g transform={vueCamera.redresser} className="amical-fleche-controle">
+                  <path d="M0 -4.15 L-.68 -5.25 L.68 -5.25 Z" fill="#ffe181" stroke="#211906" strokeWidth={.16} strokeLinejoin="round" />
+                </g>
+              </g>}
             </g>;
           })}
-          {!m.porteur && <g transform={`translate(${m.ballon.x}, ${m.ballon.y})`}><ellipse rx={.24} ry={.15} fill="#f4eee1" stroke="#503e32" strokeWidth={.045} /></g>}
+          {!m.porteur && <g ref={(noeud) => {
+            if (!noeud) { noeudBallonRef.current = null; return; }
+            const origine = { ...m.ballon };
+            noeudBallonRef.current = { noeud, origine };
+            const affiche = ballonAfficheRef.current ?? origine;
+            noeud.setAttribute('transform', `translate(${(affiche.x - origine.x).toFixed(2)} ${(affiche.y - origine.y).toFixed(2)})`);
+          }}><g transform={`translate(${m.ballon.x}, ${m.ballon.y})`}><ellipse rx={.24} ry={.15} fill="#f4eee1" stroke="#503e32" strokeWidth={.045} /></g></g>}
         </g>
       </svg>}
 

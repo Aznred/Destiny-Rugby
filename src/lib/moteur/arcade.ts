@@ -267,6 +267,15 @@ export function deplacerJoueurArcade(match: EtatMatch, pion: Pion, trame: TrameI
   const avant = { ...pion.pos };
   pion.pos.x = borner(pion.pos.x + direction.x * orientationX * vitesse * dt, -1, LONGUEUR + 1);
   pion.pos.y = borner(pion.pos.y + direction.y * vitesse * dt, 1, LARGEUR - 1);
+  if (match.porteur === pion && match.phase === 'jeuCourant' && match.controleArcadeCamps?.includes(pion.cote)) {
+    const s = sens(pion.cote);
+    const auDela = (x: number) => Math.max(0, (x - match.ligneAvantage) * s);
+    const metres = auDela(pion.pos.x) - auDela(avant.x);
+    if (metres > 0) {
+      pion.stats.metres += metres;
+      match.metresGagnesPhase = Math.max(match.metresGagnesPhase, auDela(pion.pos.x));
+    }
+  }
   pion.cible = { ...pion.pos };
   pion.vitesse.x = (pion.pos.x - avant.x) / Math.max(.001, dt);
   pion.vitesse.y = (pion.pos.y - avant.y) / Math.max(.001, dt);

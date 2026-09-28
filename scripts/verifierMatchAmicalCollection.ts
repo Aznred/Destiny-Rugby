@@ -6,8 +6,8 @@ import {
   estCompteKiriAutorise,
 } from '../src/lib/amicalCollection';
 import { cleCarteSolo, etatCollectionSoloVide } from '../src/lib/collectionSolo';
-import { creerMatch, avancer } from '../src/lib/moteur/moteur';
-import { creerQteArcade, evaluerQteArcade, transformationArcadeReussie } from '../src/lib/moteur/arcade';
+import { creerMatch, avancer, probaPlaquage } from '../src/lib/moteur/moteur';
+import { creerQteArcade, deplacerJoueurArcade, evaluerQteArcade, selectionnerJoueurPertinent, transformationArcadeReussie } from '../src/lib/moteur/arcade';
 
 console.log('Testing Collection Friendly Match & Realtime Controller Prototype...');
 
@@ -97,6 +97,29 @@ assert.equal(transformationArcadeReussie(.55, .55, 10, 25), true, 'Deux bons ges
 assert.equal(transformationArcadeReussie(1, -.2, 10, 25), false, 'Un tir sans puissance doit échouer.');
 assert.equal(transformationArcadeReussie(.55, 1, 30, 25), false, 'Un angle difficile exige une direction parfaite.');
 assert.equal(transformationArcadeReussie(1, .55, 10, 42), false, 'Un tir lointain exige une puissance parfaite.');
+
+const matchPilote = creerMatch(equipe.nom, equipeB.nom, coequipiersA, coequipiersB, 20, 17, 'test-porteur-arcade', undefined, {
+  niveau: 'pro', tempsReel: true, controle: false,
+});
+matchPilote.phase = 'jeuCourant';
+matchPilote.controleArcadeCamps = ['A'];
+matchPilote.defenseArcadeCote = 'B';
+const porteur = matchPilote.pions.find((p) => p.cote === 'A')!;
+const defenseur = matchPilote.pions.find((p) => p.cote === 'B')!;
+matchPilote.porteur = porteur;
+matchPilote.possession = 'A';
+porteur.pos = { x: 60, y: 35 };
+matchPilote.ballon = { ...porteur.pos };
+for (const pion of matchPilote.pions) if (pion !== porteur) pion.pos = { x: pion.cote === 'A' ? 22 : 108, y: pion.numero * 3 };
+assert.equal(selectionnerJoueurPertinent(matchPilote, 'A', 'ancien-joueur'), porteur, 'Le contrôle suit toujours le porteur de notre équipe.');
+deplacerJoueurArcade(matchPilote, porteur, { sequence: 1, dx: 1, dy: 0, sprint: false, evenements: [], tempsClient: 0 }, .15);
+const positionPilote = { ...porteur.pos };
+avancer(matchPilote, .15);
+assert.ok(Math.abs(porteur.pos.x - positionPilote.x) < .1, 'Le moteur ne doit pas annuler le déplacement manuel du porteur.');
+matchPilote.defenseArcadeCote = undefined;
+const chanceStandard = probaPlaquage(matchPilote, porteur, defenseur, null, false);
+matchPilote.defenseArcadeCote = 'B';
+assert.ok(probaPlaquage(matchPilote, porteur, defenseur, null, false) > chanceStandard, 'Le bot de collection doit mieux défendre à attributs égaux.');
 
 // 4. Tester la détection du compte Kiri
 assert.equal(estCompteKiriAutorise({ pseudo: 'kiri' }), true, 'Pseudo kiri doit être autorisé');

@@ -1,5 +1,6 @@
 .solo-collection { width: min(1320px, 94vw); margin: 1.4rem auto 5rem; display: grid; gap: 1.4rem; }
-.solo-entete { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 1.2rem; padding: 1.3rem 0 .4rem; }
+.solo-entete { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 1.2rem; padding: 1.3rem 0 .4rem; min-width: 0; }
+.solo-entete > *, .solo-entete-droite, .solo-progression, .solo-banniere-amical { min-width: 0; }
 .solo-entete h1, .solo-titre-ligne h2 { margin: .2rem 0; font-family: var(--police-titre); text-transform: uppercase; }
 .solo-entete h1 { font-size: clamp(2.3rem, 6vw, 4.8rem); line-height: .95; }
 .solo-entete p, .solo-titre-ligne > span { color: var(--craie-dim); line-height: 1.55; }
@@ -116,10 +117,22 @@
   .solo-pack { min-height: 0; }
 }
 @media (max-width: 620px) {
-  .solo-collection { width: min(94vw, 520px); }
-  .solo-entete { grid-template-columns: 1fr auto; }
-  .solo-entete > div:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .solo-collection { width: min(calc(100% - 28px), 520px); margin-top: .8rem; gap: 1rem; }
+  .solo-entete { grid-template-columns: minmax(0, 1fr); gap: .7rem; padding-top: .5rem; }
+  .solo-entete > div:nth-child(2) { grid-column: 1; grid-row: auto; }
   .solo-entete .btn { justify-self: start; }
+  .solo-entete h1 { font-size: clamp(2.3rem, 11vw, 3.4rem); }
+  .solo-entete p { margin-bottom: 0; font-size: .88rem; }
+  .solo-entete-droite { display: grid; grid-template-columns: minmax(0, 1fr) auto; width: 100%; gap: .55rem; }
+  .solo-btn-compo { min-width: 0; width: 100%; white-space: normal; line-height: 1.15; text-align: center; justify-content: center; }
+  .solo-solde { min-width: 80px; padding: .55rem .65rem; }
+  .solo-progression { padding: .9rem; gap: .8rem; }
+  .solo-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .45rem; }
+  .solo-stats span { overflow-wrap: anywhere; }
+  .solo-banniere-amical { flex-direction: column; align-items: stretch; padding: 1rem; gap: .9rem; }
+  .solo-amical-actions { display: grid; grid-template-columns: 1fr; width: 100%; gap: .55rem; }
+  .solo-amical-actions .btn { width: 100%; min-width: 0; justify-content: center; white-space: normal; text-align: center; }
+  .solo-amical-texte p { font-size: .83rem; }
   .solo-titre-ligne { align-items: start; }
   .solo-titre-ligne > span { display: none; }
   .solo-categories-packs { grid-template-columns: 1fr; gap: .4rem; }

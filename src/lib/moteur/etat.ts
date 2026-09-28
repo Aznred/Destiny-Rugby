@@ -374,6 +374,10 @@ export interface EtatMatch {
   dureeReelleArcade?: number;
   /** Après la sirène, le jeu se poursuit jusqu'à une touche ou un en-avant. */
   finSurSortieOuEnAvant?: boolean;
+  /** Les équipes dont le porteur est piloté directement dans le match de collection. */
+  controleArcadeCamps?: Cote[];
+  /** Défense du bot renforcée uniquement pour le match de collection. */
+  defenseArcadeCote?: Cote;
   dropEnCours?: { auteurId: string; reussi: boolean };
   arbitre?: import('./dynamique.js').ArbitreMatch;
   gestes?: import('./dynamique.js').GesteMatch[];

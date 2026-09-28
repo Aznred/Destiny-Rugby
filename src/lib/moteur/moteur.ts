@@ -1469,11 +1469,12 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // bonne lecture face à un rideau en place et la mauvaise quand il est déjà
   // dans le dos.
   const enEchappee = e.echappee?.pion === porteur;
-  porteur.cible = enEchappee
+  const piloteArcade = e.controleArcadeCamps?.includes(porteur.cote) ?? false;
+  if (!piloteArcade) porteur.cible = enEchappee
     ? { x: porteur.cote === 'A' ? LIGNE_B + 2 : LIGNE_A - 2, y: borner(porteur.pos.y, 3, LARGEUR - 3) }
     : ligneDeCourse(e, porteur);
   const avant = porteur.pos.x;
-  deplacer(porteur, dt);
+  if (!piloteArcade) deplacer(porteur, dt);
   // ⚠️ LES MÈTRES SE COMPTENT AU-DELÀ DE LA LIGNE D'AVANTAGE, comme dans les
   // statistiques officielles. Un ouvreur qui reçoit dix mètres derrière le ruck
   // et court cinq mètres vers l'avant n'a pas « gagné cinq mètres » : il n'a
@@ -1564,6 +1565,13 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
       consommerIntention(e);
       return taperAuPied(e, porteur, intentionDePied(e, porteur));
     }
+  }
+
+  // Les déplacements et les choix offensifs du porteur arcade appartiennent
+  // au joueur. Le contact avec un défenseur reste arbitré par le moteur.
+  if (piloteArcade) {
+    if (plaqueur && porteur.battu <= 0) return resoudrePlaquage(e, porteur, plaqueur);
+    return;
   }
 
   // ⚠️ « FIXER ET DONNER » — ÉVALUÉ À CHAQUE TICK, avant le plaquage.
@@ -1984,6 +1992,7 @@ export function probaPlaquage(
   // l'en-but (bonus d'intensité sur les 6 et 12 mètres).
   const bonusLigne = pres < 6 ? 0.09 : pres < 12 ? 0.05 : 0;
   const elan = bonusElan(e, defenseur.cote);
+  const bonusBotArcade = e.defenseArcadeCote === defenseur.cote ? .055 : 0;
 
   // ═══ LE GESTE CHOISI : UN BONUS DIRECT, PAS UN TERME DE RÉSISTANCE ══════
   //
@@ -2010,7 +2019,7 @@ export function probaPlaquage(
   // indexé sur l’attribut qui le porte : un ailier rapide sprinte, un pilier
   // raffute, et aucun des deux ne fait le métier de l’autre.
   return borner(
-    0.93 + (force - resistance) / 380 + elan + bonusLigne - bonusDuGeste(porteur, geste) * efficaciteGeste,
+    0.93 + (force - resistance) / 380 + elan + bonusLigne + bonusBotArcade - bonusDuGeste(porteur, geste) * efficaciteGeste,
     0.45, 0.99,
   );
 }

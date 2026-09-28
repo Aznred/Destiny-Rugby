@@ -34,7 +34,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
 
   const [nomEquipe, setNomEquipe] = useState(`XV de ${pseudoCompte}`);
   const [couleurEquipe, setCouleurEquipe] = useState('#1e40af');
-  const [onglet, setOnglet] = useState<'compo' | 'ordinateur' | 'enLigne'>('compo');
+  const [onglet, setOnglet] = useState<'compo' | 'ordinateur' | 'enLigne'>('ordinateur');
 
   // Composition interactive sur terrain
   const [compoOuverte, setCompoOuverte] = useState(false);
@@ -64,6 +64,15 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
 
   const clubsProfessionnels = useMemo(() => clubsProfessionnelsAmicaux(catalogue), [catalogue]);
   const [clubOrdinateur, setClubOrdinateur] = useState(() => clubsProfessionnels[0]?.nom ?? '');
+  const [rechercheClub, setRechercheClub] = useState('');
+  const [listeClubsOuverte, setListeClubsOuverte] = useState(false);
+  const clubsFiltres = useMemo(() => {
+    const normaliser = (texte: string) => texte.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const filtre = normaliser(rechercheClub.trim());
+    return clubsProfessionnels
+      .filter((club) => !filtre || normaliser(`${club.championnat} ${club.nom}`).includes(filtre))
+      .slice(0, 8);
+  }, [clubsProfessionnels, rechercheClub]);
   const equipeAdverseOrdinateur = useMemo<EquipeAmical>(() => {
     if (!clubOrdinateur) return monEquipe;
     return composerEquipeClubProfessionnel(clubOrdinateur, catalogue);
@@ -253,28 +262,21 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             </div>
 
             <div className="amical-apercu-xv">
-              <div className="amical-apercu-xv-entete">
-                <div className="eyebrow">{t('amical.starters', { n: String(monEquipe.joueurs.length) })}</div>
-                <button
-                  type="button"
-                  className="btn petit amical-btn-terrain"
-                  onClick={() => setCompoOuverte(true)}
-                >
-                  <Icone nom="equipe" taille={15} /> {t('amical.editPitch')}
-                </button>
-              </div>
-              <div className="amical-grille-joueurs">
-                {monEquipe.joueurs.map((j) => (
-                  <div key={j.id} className="amical-carte-joueur-mini">
-                    <span className="amical-joueur-numero">{j.numero}</span>
-                    <div className="amical-joueur-info">
-                      <b>{j.nom}</b>
-                      <small>{j.clubReel || t('amical.noClub')}</small>
+              <button type="button" className="btn amical-btn-terrain" onClick={() => setCompoOuverte(true)}>
+                <Icone nom="equipe" taille={17} /> {t('amical.editPitch')}
+              </button>
+              <details className="amical-effectif-details">
+                <summary>{t('amical.starters', { n: String(monEquipe.joueurs.length) })}</summary>
+                <div className="amical-grille-joueurs">
+                  {monEquipe.joueurs.map((j) => (
+                    <div key={j.id} className="amical-carte-joueur-mini">
+                      <span className="amical-joueur-numero">{j.numero}</span>
+                      <div className="amical-joueur-info"><b>{j.nom}</b><small>{j.clubReel || t('amical.noClub')}</small></div>
+                      <span className="amical-joueur-note">{j.note}</span>
                     </div>
-                    <span className="amical-joueur-note">{j.note}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </details>
             </div>
 
             <div className="amical-actions-depart">
@@ -292,25 +294,31 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
           <section className="amical-section-ordinateur">
             <div className="amical-ordinateur-intro">
               <div>
-                <div className="eyebrow">Match de collection</div>
-                <h3>Choisis le club professionnel adverse</h3>
-                <p>Ton XV de collection affronte l’effectif réel du club. Le moteur contrôle l’adversaire.</p>
+                <div className="eyebrow">{t('amical.badge')}</div>
+                <h3>Choisis ton adversaire</h3>
+                <p>Ton XV face à un club professionnel. Coup d’envoi dès que tu es prêt.</p>
               </div>
               <div className="amical-note-globale">
                 <span>Ton XV</span>
                 <strong>{monEquipe.noteMoyenne}</strong>
               </div>
             </div>
-            <label className="amical-select-club">
-              <span>Club professionnel</span>
-              <select value={clubOrdinateur} onChange={(event) => setClubOrdinateur(event.target.value)}>
-                {clubsProfessionnels.map((club) => (
-                  <option key={club.nom} value={club.nom}>
-                    {club.championnat} — {club.nom} ({club.noteMoyenne})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="amical-choix-club">
+              <button type="button" className="amical-club-actuel" aria-expanded={listeClubsOuverte} onClick={() => setListeClubsOuverte((ouvert) => !ouvert)}>
+                <span><small>Adversaire sélectionné</small><b>{clubOrdinateur || 'Choisir un club'}</b></span>
+                <span>Changer <Icone nom="fleche-droite" taille={15} /></span>
+              </button>
+              {listeClubsOuverte && <div className="amical-cherche-club">
+                <label htmlFor="amical-recherche-club">Rechercher un club ou un championnat</label>
+                <input id="amical-recherche-club" type="search" value={rechercheClub} onChange={(event) => setRechercheClub(event.target.value)} placeholder="Ex : Toulouse, Top 14…" autoComplete="off" />
+                <div className="amical-liste-clubs" aria-label="Clubs professionnels">
+                  {clubsFiltres.map((club) => <button type="button" aria-pressed={club.nom === clubOrdinateur} key={club.nom} onClick={() => {
+                    setClubOrdinateur(club.nom); setListeClubsOuverte(false); setRechercheClub('');
+                  }}><span><b>{club.nom}</b><small>{club.championnat}</small></span><strong>{club.noteMoyenne}</strong></button>)}
+                  {clubsFiltres.length === 0 && <p>Aucun club trouvé.</p>}
+                </div>
+              </div>}
+            </div>
             <div className="amical-duel-clubs">
               <div style={{ '--couleur-club': monEquipe.couleur } as React.CSSProperties}>
                 {monEquipe.embleme ? <img src={monEquipe.embleme} alt="" /> : <Icone nom="equipe" taille={32} />}

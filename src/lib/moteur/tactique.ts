@@ -393,7 +393,8 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   if (!porteur || porteur.cote === cote) return;
   const candidats = ligne.filter((p) => p.battu <= 0);
   candidats.sort((a, b) => distance2(a.pos, porteur.pos) - distance2(b.pos, porteur.pos));
-  const nbChasseursMax = distLigneDef < 8 ? 5 : distLigneDef < 16 ? 4 : 3;
+  const defenseArcade = e.defenseArcadeCote === cote;
+  const nbChasseursMax = (distLigneDef < 8 ? 5 : distLigneDef < 16 ? 4 : 3) + (defenseArcade ? 1 : 0);
   const chasseurs = candidats.filter((p) => (p.pos.x - porteur.pos.x) * sa >= -1.5).slice(0, nbChasseursMax);
   // ⚠️ LE PREMIER CHASSEUR VISE LE PORTEUR, PAS À CÔTÉ. Testé : décaler ces
   // trois-là d'un mètre six suffisait à faire chuter les plaquages réussis de
@@ -544,7 +545,7 @@ export function placerEquipes(e: EtatMatch): void {
     if (arret) { p.effort = Math.max(p.effort, 1); continue; }
     if (p.role === 'chasseur') {
       const enPoursuiteEchappee = !!e.echappee;
-      p.effort = enPoursuiteEchappee ? 1.15 : 1.06;
+      p.effort = enPoursuiteEchappee ? 1.15 : e.defenseArcadeCote === p.cote ? 1.14 : 1.06;
       if (p.effort > 1 && p.endurance < 50) {
         p.effort = 1 + (p.effort - 1) * (p.endurance / 50);
       }
