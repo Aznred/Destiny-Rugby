@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Destiny Rugby — packs</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#06110c;color:#f5f4e9;font-family:Bahnschrift,'Segoe UI',sans-serif}
+    body{background:radial-gradient(circle at 50% 110%,#164931 0,#0b291c 34%,#07170f 68%,#040b08 100%)}
+    body:before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 156px,#e7c66709 157px 158px);pointer-events:none}
+    canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .header{position:absolute;left:5%;top:6%;z-index:2}.eyebrow{font-size:23px;font-weight:800;letter-spacing:.28em;color:#f2c957}.title{margin:12px 0 0;font-family:Impact,sans-serif;font-size:112px;line-height:.96;letter-spacing:.01em;text-transform:uppercase}.subtitle{margin-top:17px;font-size:27px;color:#b9d0c0}
+    .labels{position:absolute;bottom:7%;left:5%;right:5%;z-index:2;display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:3%}
+    .label{padding:15px 10px 12px;border-top:2px solid #e8c65d77;background:linear-gradient(#e8c65d0c,transparent)}
+    .label b{display:block;font-family:Impact,sans-serif;font-size:39px;letter-spacing:.04em;text-transform:uppercase}.label span{display:block;margin-top:4px;font-size:19px;letter-spacing:.1em;color:#d7b95e;text-transform:uppercase}
+    .loading{position:absolute;right:5%;top:8%;font-size:17px;color:#c2d6c4}
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div class="header"><div class="eyebrow">COLLECTION DE CARTES</div><h1 class="title">OUVRE TON PACK.</h1><div class="subtitle">Chaque ouverture réserve une surprise.</div></div>
+  <div class="labels"><div class="label"><b>TOP 14</b><span>Édition spéciale</span></div><div class="label"><b>6 NATIONS</b><span>Édition spéciale</span></div><div class="label"><b>PACK OR</b><span>Collection</span></div></div>
+  <div class="loading" id="loading">Chargement des packs…</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    const canvas=document.querySelector('#scene');
+    const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,preserveDrawingBuffer:true});
+    renderer.setPixelRatio(1);renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
+    renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.55;
+    const scene=new THREE.Scene();
+    const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,.1,100);camera.position.set(0,1.1,13);camera.lookAt(0,.1,0);
+    scene.add(new THREE.AmbientLight('#ffffff',2.2));
+    for(const [color,intensity,x,y,z] of [['#fff0ca',4,3,7,8],['#9bddff',2.7,-6,3,5],['#ffe296',2,-4,0,-1]]){const l=new THREE.DirectionalLight(color,intensity);l.position.set(x,y,z);scene.add(l)}
+    const loader=new GLTFLoader();
+    const sets=[
+      [['top14','TOP 14','Édition spéciale'],['sixNations','6 NATIONS','Édition spéciale'],['or-ferme','PACK OR','Collection']],
+      [['premiership','PREMIERSHIP','Édition spéciale'],['urc','URC','Édition spéciale'],['allBlacks','ALL BLACKS','Édition spéciale']],
+    ];
+    const set=sets[new URLSearchParams(location.search).get('set')==='2'?1:0];
+    const files=set.map(([id])=>id==='or-ferme'?`/m3d/packs/${id}.glb`:`/m3d/packs-speciaux/${id}.glb`);
+    document.querySelectorAll('.label').forEach((label,i)=>{label.querySelector('b').textContent=set[i][1];label.querySelector('span').textContent=set[i][2]});
+    const positions=[-4.2,0,4.2];let charges=0;
+    for(let i=0;i<files.length;i++){
+      loader.load(files[i],gltf=>{
+        const obj=gltf.scene;const box=new THREE.Box3().setFromObject(obj,true);const size=box.getSize(new THREE.Vector3());const center=box.getCenter(new THREE.Vector3());
+        const scale=4.1/Math.max(size.x,size.y,size.z);obj.scale.setScalar(scale);obj.position.sub(center.multiplyScalar(scale));
+        const group=new THREE.Group();group.add(obj);group.position.set(positions[i],-.05,0);group.rotation.y=i===0?.12:i===2?-.12:0;scene.add(group);
+        if(++charges===files.length)document.querySelector('#loading').remove();renderer.render(scene,camera);
+      },undefined,error=>{document.querySelector('#loading').textContent='Pack indisponible';console.error(error)});
+    }
+    renderer.render(scene,camera);
+  </script>
+</body>
+</html>

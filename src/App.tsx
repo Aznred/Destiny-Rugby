@@ -128,9 +128,7 @@ export default function App() {
     return () => window.removeEventListener('destiny-ouvrir-match',ouvrir);
   },[setEcran]);
   useEffect(() => {
-    if (new URLSearchParams(location.search).has('amical')) {
-      setEcran('collectionSolo');
-    } else if (capterInvitation() || new URLSearchParams(location.search).has('directLigue')) {
+    if (capterInvitation() || new URLSearchParams(location.search).has('directLigue')) {
       setEcran('carriereEnLigne');
     }
   }, [setEcran]);

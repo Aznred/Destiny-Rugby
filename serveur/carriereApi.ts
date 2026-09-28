@@ -516,6 +516,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         : empreinteSession ? await stockage.session(empreinteSession, maintenant) : null;
       if (compte && (!sessionChaude || sessionChaude.jusqua <= maintenant)) sessionsChaudes.set(empreinteSession, { compte, jusqua: maintenant + 60_000 });
       if (!compte) throw new ErreurHttp(401, 'Connectez-vous pour retrouver vos ligues.');
+      if (['creerSalonAmical', 'rejoindreSalonAmical', 'syncSalonAmical', 'quitterSalonAmical'].includes(action)) {
+        throw new ErreurHttp(410, 'Les matchs amicaux sont désactivés.');
+      }
       // Un GET de sondage est une lecture sûre. Le limiter SQL écrivait une
       // ligne à chaque consultation et gonflait à lui seul le WAL / l'historique.
       if (req.method === 'POST' && !await stockage.limiter(`jeu:${compte.id}`, 240, 60_000, maintenant)) throw new ErreurHttp(429, 'Trop de demandes. Patientez quelques secondes.');

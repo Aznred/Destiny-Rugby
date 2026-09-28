@@ -7,7 +7,6 @@ import { useGame } from '../store/useGame';
 import { carteDepuisSource, catalogueBaseCarriere, PACKS_CARRIERE } from '../lib/ligue/catalogueCarriere';
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo } from '../lib/collectionSolo';
-import { SalonAmicalModal } from '../components/SalonAmicalModal';
 import { CompositionCollectionSolo } from '../components/CompositionCollectionSolo';
 import { nombre, t } from '../lib/i18n';
 import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentationPacks';
@@ -37,8 +36,6 @@ export function CollectionSolo() {
   const [ouverture, setOuverture] = useState<{ pack: PackCarriere; indices: number[] } | null>(null);
   const [bilan, setBilan] = useState('');
   const nomCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Compte joueur';
-  const [amicalOuvert, setAmicalOuvert] = useState(() => typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('amical') || new URLSearchParams(window.location.search).get('amicalOuvert') === '1'));
-  const codeAmicalUrl = useMemo(() => typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('amical') ?? undefined : undefined, []);
   const [compoPleineOuverte, setCompoPleineOuverte] = useState(false);
 
   const cartesPossedees = useMemo(() => {
@@ -100,22 +97,6 @@ export function CollectionSolo() {
       <div className="solo-stats"><span><b>{nombre(Object.values(etat.packsOuverts).reduce((s, n) => s + n, 0))}</b> {t('solo.packsOpened')}</span><span><b>{nombre(etat.doublons)}</b> {t('solo.duplicates')}</span><span><b>{nombre(exemplaires)}</b> {t('solo.totalCards')}</span></div>
     </section>
 
-    <section className="solo-banniere-amical carte">
-        <div className="solo-amical-texte">
-          <span className="amical-badge-kiri">{t('solo.amical.activeBadge')}</span>
-          <h3>{t('solo.amical.title')}</h3>
-          <p>{t('solo.amical.desc')}</p>
-        </div>
-        <div className="solo-amical-actions">
-          <button type="button" className="btn solo-btn-terrain" onClick={() => setCompoPleineOuverte(true)}>
-            <Icone nom="equipe" taille={18} /> {t('solo.amical.lineupBtn')}
-          </button>
-          <button type="button" className="btn primaire" onClick={() => setAmicalOuvert(true)}>
-            <Icone nom="eclair" taille={18} /> {t('solo.amical.launchBtn')}
-          </button>
-        </div>
-    </section>
-
     {bilan && <p className="solo-bilan" role="status"><Icone nom="ok" taille={17} /> {bilan}</p>}
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
@@ -142,7 +123,7 @@ export function CollectionSolo() {
           <small>{t('solo.paidPacksDetail', { n: packsPayants.length })}</small>
         </button>
       </div>
-      {!amicalOuvert && <BoutiquePacks3D
+      <BoutiquePacks3D
         key={categoriePacks}
         packs={categoriePacks === 'gratuits' ? packsGratuits : packsPayants}
         solde={coins}
@@ -150,7 +131,7 @@ export function CollectionSolo() {
         onOuvrir={ouvrirDepuisRoue}
         gratuit={categoriePacks === 'gratuits'}
         paiementAlternatif={categoriePacks === 'gratuits' ? <button type="button" className="btn fantome petit solo-pub-desactivee" disabled title={t('solo.adTitle')}><Icone nom="video" taille={15} /> {t('solo.adDisabled')}</button> : undefined}
-      />}
+      />
     </section>
 
     <section className="solo-catalogue">
@@ -177,13 +158,6 @@ export function CollectionSolo() {
       onFermer={() => setOuverture(null)}
       rendreCarte={carte => <CarteJoueurEnLigne carte={carte} compacte proprietaire="Ma collection" />}
     />}
-
-    {amicalOuvert && (
-      <SalonAmicalModal
-        codeInitial={codeAmicalUrl}
-        onFermer={() => setAmicalOuvert(false)}
-      />
-    )}
 
     {compoPleineOuverte && (
       <CompositionCollectionSolo
