@@ -1,18 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="titre">
+  <title id="titre">Destiny Rugby</title>
   <defs>
-    <linearGradient id="cuir" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#b3653a"/>
-      <stop offset="1" stop-color="#6d3a1f"/>
+    <radialGradient id="fond" cx=".35" cy=".25" r=".9">
+      <stop offset="0" stop-color="#17473a"/>
+      <stop offset=".58" stop-color="#0c3029"/>
+      <stop offset="1" stop-color="#061c1d"/>
+    </radialGradient>
+    <linearGradient id="or" x1=".14" y1=".08" x2=".88" y2=".92">
+      <stop offset="0" stop-color="#ffecaa"/>
+      <stop offset=".42" stop-color="#e9c76e"/>
+      <stop offset="1" stop-color="#b87c2f"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="14" fill="#0c2418"/>
-  <g transform="rotate(-35 32 32)">
-    <ellipse cx="32" cy="32" rx="22" ry="13" fill="url(#cuir)" stroke="#3a1d0e" stroke-width="1.5"/>
-    <path d="M12 32 H52" stroke="#f2f0e6" stroke-width="2" opacity="0.85"/>
-    <g stroke="#f2f0e6" stroke-width="2" stroke-linecap="round" opacity="0.95">
-      <path d="M26 32 v-4 M30 32 v-4 M34 32 v-4 M38 32 v-4"/>
-    </g>
-    <path d="M17 25 Q17 32 17 39" stroke="#f2f0e6" stroke-width="1.6" fill="none" opacity="0.7"/>
-    <path d="M47 25 Q47 32 47 39" stroke="#f2f0e6" stroke-width="1.6" fill="none" opacity="0.7"/>
+  <rect width="512" height="512" fill="url(#fond)"/>
+  <circle cx="256" cy="256" r="198" fill="none" stroke="#d6b568" stroke-width="8" opacity=".33"/>
+  <circle cx="256" cy="256" r="183" fill="#071f1e" opacity=".42"/>
+  <g transform="translate(256 256) rotate(-35) scale(1.2) translate(-256 -256)">
+    <path d="M111 256C162 160 350 160 401 256C350 352 162 352 111 256Z" fill="url(#or)" stroke="#f8e4a0" stroke-width="5"/>
+    <path d="M151 224C207 189 310 192 359 223" fill="none" stroke="#fff3c8" stroke-width="7" stroke-linecap="round" opacity=".5"/>
+    <path d="M152 256H360" stroke="#12382f" stroke-width="15" stroke-linecap="round"/>
+    <path d="M190 225Q180 256 190 287M322 225Q332 256 322 287" fill="none" stroke="#12382f" stroke-width="11" stroke-linecap="round"/>
+    <path d="M226 237V275M246 235V277M266 235V277M286 237V275" stroke="#12382f" stroke-width="11" stroke-linecap="round"/>
   </g>
 </svg>
