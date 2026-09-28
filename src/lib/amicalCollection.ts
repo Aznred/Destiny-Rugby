@@ -48,6 +48,8 @@ export interface EtatMatchAmicalReseau {
   possession: 'A' | 'B';
   ballon: { x: number; y: number };
   porteurId?: string;
+  gestes?: import('./moteur/dynamique').GesteMatch[];
+  contact?: { porteurId: string; plaqueurId: string; progression: number };
   qte?: QteArcade | null;
   acquittements?: Partial<Record<'A' | 'B', number>>;
   tempsServeur?: number;
@@ -62,6 +64,7 @@ export interface EtatMatchAmicalReseau {
     surLeTerrain: boolean;
     battu?: number;
     role?: string;
+    corps?: { age: number; duree: number; direction: number; intensite: number; appuis?: number[]; bras?: number[] };
   }>;
 }
 

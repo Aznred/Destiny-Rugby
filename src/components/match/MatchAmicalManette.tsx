@@ -5,12 +5,13 @@ import { SpriteRugbymanMemo } from './SpriteRugbyman';
 import { Camera, angleDeVue, type Cadre, type Cadrage, type Vue } from '../../lib/moteur/camera';
 import { LONGUEUR, distance2, type Cote, type Vec } from '../../lib/moteur/terrain';
 import { avancer, creerMatch, resoudreChoix, type EtatMatch } from '../../lib/moteur/moteur';
+import { corpsPourAffichage, porteurPourAffichage } from '../../lib/moteur/dynamique';
 import type { ActionJoueur } from '../../lib/moteur/etat';
 import type { Pion } from '../../lib/moteur/entites';
 import type { MaillotMatch } from '../../lib/moteur/apparenceMatch';
 import type { PionDirect, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import {
-  actionContextuelleArcade, actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, etatGlobalArcade,
+  actionContextuelleArcade, actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, engagerJoueurRuckArcade, etatGlobalArcade,
   evaluerQteArcade, InputManagerArcade, interpolerPosition, MachineEtatsJoueurs,
   progressionQte, scorePuissanceGesteArcade, selectionnerJoueurPertinent, transformationArcadeReussie, type EvenementInputArcade,
   type InputActionArcade, type QteArcade, type TrameInputArcade,
@@ -43,15 +44,28 @@ function maillot(couleur: string, secondaire: string): MaillotMatch {
   };
 }
 
-function terrainSprites(m: EtatMatch): TerrainDirect {
+export function terrainSprites(m: EtatMatch, reseau?: EtatMatchAmicalReseau | null): TerrainDirect {
+  const corpsDistants = reseau ? new Map(reseau.pions.map((p) => [p.id, p.corps])) : null;
   const pions: PionDirect[] = m.pions.map((p) => ({
     id: p.id, numero: p.numeroMaillot ?? p.numero, numeroRole: p.numero,
     nom: p.nom, poste: p.poste, cote: p.cote === 'A' ? 'domicile' : 'exterieur',
     x: p.pos.x, y: p.pos.y, vx: p.vitesse.x, vy: p.vitesse.y,
-    force: p.puissance, tailleCm: p.tailleCm, poidsKg: p.poidsKg, corps: p.corps,
+    force: p.puissance, tailleCm: p.tailleCm, poidsKg: p.poidsKg,
+    corps: corpsDistants ? corpsDistants.get(p.id) : corpsPourAffichage(p),
   }));
+  const ruck = m.ruck;
+  const contact = reseau?.contact ?? (ruck?.porteurId && ruck.plaqueurId ? {
+    porteurId: ruck.porteurId, plaqueurId: ruck.plaqueurId,
+    progression: ruck.debut === undefined ? 1 : Math.max(0, Math.min(1, (m.t - ruck.debut) / 1.35)),
+  } : undefined);
   return {
-    simulation: m.sim, pions, ballon: { ...m.ballon }, porteurId: m.porteur?.id,
+    simulation: m.sim, gestes: m.gestes, contact, pions, ballon: { ...m.ballon }, porteurId: porteurPourAffichage(m),
+    conquete: m.conquete ? { ...m.conquete, pousseVers: m.conquete.pousseVers === 'A' ? 'domicile' : m.conquete.pousseVers === 'B' ? 'exterieur' : undefined } : undefined,
+    aplatissage: m.aplatissage ? { marqueurId: m.aplatissage.marqueur.id,
+      progression: Math.max(0, Math.min(1, 1 - m.minuteur / 1.35)) } : undefined,
+    preparationTir: m.tir && !m.tir.volLance ? { buteurId: m.tir.buteur.id,
+      progression: Math.max(0, Math.min(1, 1 - m.minuteur / (m.dureeArret ?? 45))),
+      transformation: m.tir.valeur === 2, clipRoutine: m.tir.routine?.clip } : undefined,
     vol: m.vol ? {
       de: { ...m.vol.de }, vers: { ...m.vol.vers }, duree: m.vol.duree,
       ecoule: m.vol.ecoule, hauteur: m.vol.hauteur, type: m.vol.type,
@@ -66,13 +80,18 @@ function serialiserMatch(
   m: EtatMatch, revision: number, qte: QteArcade | null,
   acquittements: Partial<Record<Cote, number>>, message: string,
 ): EtatMatchAmicalReseau {
+  const ruck = m.ruck;
   return {
     revision, simulation: m.sim, minute: m.minute, tempsJeu: m.t, periode: m.periode, sirene: m.sirene, scoreA: m.scoreA, scoreB: m.scoreB,
     phase: m.phase, fini: m.fini, possession: m.possession, ballon: { ...m.ballon },
     porteurId: m.porteur?.id, qte, acquittements, tempsServeur: Date.now(), message,
+    gestes: m.gestes?.filter((g) => m.sim < g.debut + g.duree),
+    contact: ruck?.porteurId && ruck.plaqueurId ? { porteurId: ruck.porteurId, plaqueurId: ruck.plaqueurId,
+      progression: ruck.debut === undefined ? 1 : Math.max(0, Math.min(1, (m.t - ruck.debut) / 1.35)) } : undefined,
     pions: m.pions.map((p) => ({
       id: p.id, x: p.pos.x, y: p.pos.y, vx: p.vitesse.x, vy: p.vitesse.y,
       endurance: p.endurance, surLeTerrain: p.surLeTerrain, battu: p.battu, role: p.role,
+      corps: corpsPourAffichage(p),
     })),
   };
 }
@@ -92,6 +111,7 @@ function appliquerSnapshot(m: EtatMatch, snapshot: EtatMatchAmicalReseau, campLo
     if (recu.role) pion.role = recu.role as Pion['role'];
   }
   m.sim = snapshot.simulation; m.minute = snapshot.minute;
+  m.gestes = snapshot.gestes;
   m.t = snapshot.tempsJeu ?? snapshot.minute * 60;
   m.periode = snapshot.periode ?? m.periode;
   m.sirene = snapshot.sirene ?? false;
@@ -147,6 +167,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const dimensionsRef = useRef({ largeur: 1280, hauteur: 720 });
   const cameraRef = useRef(new Camera());
   const matchRef = useRef<EtatMatch | null>(null);
+  const visuelsReseauRef = useRef<EtatMatchAmicalReseau | null>(null);
   const inputRef = useRef(new InputManagerArcade());
   const inputAdverseRef = useRef<InputAmical>(TRAME_VIDE);
   const machineRef = useRef(new MachineEtatsJoueurs());
@@ -270,10 +291,11 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
     return pion;
   }, [monCamp]);
 
-  const lancerQteRuck = useCallback((m: EtatMatch, camp: Cote) => {
+  const lancerQteRuck = useCallback((m: EtatMatch, camp: Cote, joueurId: string) => {
     if (qteRef.current) return;
     const qte = creerQteArcade('ruck', `${m.sim.toFixed(2)}-${camp}`, Date.now() + decalageServeurRef.current + 260);
     qte.initiateur = camp;
+    qte.joueurId = joueurId;
     qteRef.current = qte;
     setQteAffichee({ ...qte });
     setMessageAction('Relâche dans la zone lumineuse pour gratter');
@@ -335,7 +357,15 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       if (norme > 1.6 && (versPorteur.x * direction.x + versPorteur.y * direction.y) / norme < .35) return;
     }
 
-    if (action === 'grattage') { lancerQteRuck(m, camp); return; }
+    if ((action === 'grattage' || action === 'soutien') && m.phase === 'ruck') {
+      if (!engagerJoueurRuckArcade(m, pion)) {
+        if (camp === monCamp) setMessageAction(`${pion.nom} est trop loin du ruck`);
+        return;
+      }
+      if (action === 'grattage') lancerQteRuck(m, camp, pion.id);
+      else setMessageAction(`${pion.nom} entre en soutien dans le ruck`);
+      return;
+    }
 
     const issue = jouerGesteMoteur(m, pion, action, 0, {
       directionPied: evenement.gesteTactile && action === 'pied' ? evenement.direction : undefined,
@@ -393,6 +423,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         if (res.inputAdverse) inputAdverseRef.current = res.inputAdverse;
         if (!hote && res.etatMatch && m && res.etatMatch.revision > revisionRef.current) {
           revisionRef.current = res.etatMatch.revision;
+          visuelsReseauRef.current = res.etatMatch;
           appliquerSnapshot(m, res.etatMatch, monCamp);
           if (m.fini) {
             setScoreA(m.scoreA);
@@ -543,7 +574,8 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
               qte.scores[monCamp] ??= -.2;
               qte.scores[autreCamp] ??= mode === 'ordinateur' ? .35 : -.2;
               if (qte.type === 'ruck' && qte.initiateur) {
-                const pion = choisirJoueur(m, qte.initiateur);
+                const pion = m.pions.find((p) => p.id === qte.joueurId && p.cote === qte.initiateur)
+                  ?? choisirJoueur(m, qte.initiateur);
                 if (pion) annoncerIssue(pion, 'grattage', jouerGesteMoteur(m, pion, 'grattage', (qte.scores[qte.initiateur] ?? -.2) * .22));
               } else if (qte.type === 'melee' || qte.type === 'touche') {
                 m.bonusConqueteArcade = { type: qte.type, scores: { ...qte.scores } };
@@ -742,6 +774,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       if ((m.phase === 'ruck' || m.phase === 'maul') && ballon
         && Math.hypot(event.clientX - ballon.x, event.clientY - ballon.y) <= 52) {
         const soutien = m.pions.filter((p) => p.cote === monCamp && p.surLeTerrain && !p.corps && p.sanction <= 0
+          && p.role !== 'ruck'
           && distance2(p.pos, m.ballon) < 9 * 9)
           .sort((a, b) => distance2(a.pos, m.ballon) - distance2(b.pos, m.ballon))[0];
         if (soutien) emettreAction('ACTION_PRIMARY', { joueurId: soutien.id, gesteTactile: true });
@@ -769,7 +802,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   };
 
   const m = matchRef.current;
-  const terrain = m ? terrainSprites(m) : null;
+  const terrain = m ? terrainSprites(m, mode === 'reseau' && monCamp !== 'A' ? visuelsReseauRef.current : null) : null;
   const pionsDirects = new Map(terrain?.pions.map((p) => [p.id, p]));
   const tempsSprite = m ? Math.floor(m.sim * (appareilTactileRef.current ? 8 : 12)) / (appareilTactileRef.current ? 8 : 12) : 0;
   const qteLocaleDejaJouee = qteAffichee?.scores?.[monCamp] !== undefined;

@@ -7,7 +7,8 @@ import {
 } from '../src/lib/amicalCollection';
 import { cleCarteSolo, etatCollectionSoloVide } from '../src/lib/collectionSolo';
 import { creerMatch, avancer, probaPlaquage, resoudreChoix } from '../src/lib/moteur/moteur';
-import { actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, evaluerQteArcade, scorePuissanceGesteArcade, selectionnerJoueurPertinent, transformationArcadeReussie } from '../src/lib/moteur/arcade';
+import { actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, engagerJoueurRuckArcade, evaluerQteArcade, scorePuissanceGesteArcade, selectionnerJoueurPertinent, transformationArcadeReussie } from '../src/lib/moteur/arcade';
+import { terrainSprites } from '../src/components/match/MatchAmicalManette';
 
 console.log('Testing Collection Friendly Match & Realtime Controller Prototype...');
 
@@ -140,10 +141,41 @@ for (const phase of ['melee', 'touche'] as const) {
   assert.deepEqual(porteur.pos, positionArretee, `Le joystick ne doit pas déplacer le joueur pendant la ${phase}.`);
 }
 matchPilote.phase = 'jeuCourant';
+const soutienRuck = matchPilote.pions.find((p) => p.cote === 'A' && p !== porteur)!;
+soutienRuck.pos = { x: 62, y: 35 };
+soutienRuck.role = 'ligne';
+matchPilote.phase = 'ruck';
+matchPilote.porteur = null;
+matchPilote.ruck = { attaque: 'A', vitesseAttaque: 50, vitesseDefense: 50,
+  organisation: { debut: matchPilote.sim, origine: { ...matchPilote.ballon }, attaque: [], defense: [], contacts: [], animations: {} } };
+matchPilote.ruck.porteurId = porteur.id;
+matchPilote.ruck.plaqueurId = defenseur.id;
+matchPilote.gestes = [{ id: 'test-plaquage', joueurId: defenseur.id, clip: 'tackle_low', debut: matchPilote.sim, duree: 1.2 }];
+const terrainPlaquage = terrainSprites(matchPilote);
+assert.equal(terrainPlaquage.gestes?.[0]?.clip, 'tackle_low', 'Le geste de plaquage doit parvenir aux sprites.');
+assert.equal(terrainPlaquage.contact?.porteurId, porteur.id, 'La chute du porteur doit parvenir aux sprites.');
+assert.equal(engagerJoueurRuckArcade(matchPilote, soutienRuck), true, 'Le soutien rejoint le ruck proche.');
+assert.ok(matchPilote.ruck.organisation?.attaque.includes(soutienRuck.id));
+const positionSoutien = { ...soutienRuck.pos };
+deplacerJoueurArcade(matchPilote, soutienRuck, { sequence: 3, dx: 1, dy: 0, sprint: true, evenements: [], tempsClient: 0 }, .3);
+assert.deepEqual(soutienRuck.pos, positionSoutien, 'Le joueur engagé ne doit pas sortir du ruck au joystick.');
+const gratteurRuck = matchPilote.pions.find((p) => p.cote === 'B' && p !== defenseur)!;
+gratteurRuck.pos = { x: 61, y: 35 };
+gratteurRuck.role = 'ligne';
+assert.equal(engagerJoueurRuckArcade(matchPilote, gratteurRuck), true, 'Le gratteur rejoint lui aussi le regroupement.');
+assert.ok(matchPilote.ruck.organisation?.defense.includes(gratteurRuck.id));
+const positionGratteur = { ...gratteurRuck.pos };
+deplacerJoueurArcade(matchPilote, gratteurRuck, { sequence: 4, dx: 1, dy: 0, sprint: false, evenements: [], tempsClient: 0 }, .3);
+assert.deepEqual(gratteurRuck.pos, positionGratteur, 'Le gratteur reste engagé pendant le ruck.');
+matchPilote.phase = 'jeuCourant';
+soutienRuck.role = 'ligne';
+deplacerJoueurArcade(matchPilote, soutienRuck, { sequence: 4, dx: 1, dy: 0, sprint: false, evenements: [], tempsClient: 0 }, .3);
+assert.ok(soutienRuck.pos.x > positionSoutien.x, 'Le contrôle revient une fois le ruck terminé.');
 assert.equal(actionGesteTactileArcade(0, -85, true), 'PASS_LEFT');
 assert.equal(actionGesteTactileArcade(0, 85, true), 'PASS_RIGHT');
 assert.equal(actionGesteTactileArcade(85, -45, true), 'KICK');
 assert.equal(actionGesteTactileArcade(85, 45, true), 'KICK');
+assert.equal(actionGesteTactileArcade(34, 0, true), 'KICK', 'Un glissement court doit déjà déclencher le pied.');
 assert.equal(actionGesteTactileArcade(0, -85, true, true), 'KICK', 'En portrait le pied part vers le haut.');
 assert.equal(actionGesteTactileArcade(0, 0, true), null, 'Un appui simple est réservé au raffut ciblé.');
 assert.equal(actionGesteTactileArcade(70, 0, false), 'ACTION_PRIMARY');
@@ -153,6 +185,8 @@ const matchPied = creerMatch(equipe.nom, equipeB.nom, coequipiersA, coequipiersB
 });
 const buteur = matchPied.pions.find((p) => p.cote === 'A')!;
 matchPied.phase = 'jeuCourant';
+matchPied.controleArcadeCamps = ['A'];
+buteur.moi = true;
 matchPied.porteur = buteur;
 matchPied.possession = 'A';
 buteur.pos = { x: 60, y: 35 };
@@ -163,6 +197,11 @@ assert.equal(piedDirige.joue, true, 'Le coup de pied dirigé doit être effectiv
 assert.ok(matchPied.piedPrepare && matchPied.piedPrepare.arrivee.x > buteur.pos.x
   && matchPied.piedPrepare.arrivee.y < buteur.pos.y,
   'La frappe préparée doit suivre le glissement diagonal vers l’avant.');
+assert.equal(matchPied.piedPrepare?.rapideArcade, true, 'Le tir dirigé du joueur doit être armé rapidement.');
+for (const pion of matchPied.pions) if (pion !== buteur) pion.pos = { x: pion.cote === 'A' ? 20 : 110, y: pion.numero * 3 };
+avancer(matchPied, .45);
+assert.equal(matchPied.piedPrepare, undefined, 'Le pied arcade doit partir sans longue attente après le geste.');
+assert.equal(matchPied.vol?.type, 'pied');
 assert.equal(deflexionJoystickArcade(20, 0).sprint, false, 'La première moitié du joystick conserve la course normale.');
 assert.equal(deflexionJoystickArcade(45, 0).sprint, true, 'Le bord du joystick active le sprint.');
 assert.equal(deflexionJoystickArcade(90, 0).dx, 1, 'La course du joystick reste bornée.');

@@ -383,7 +383,7 @@ export interface EtatMatch {
   gestes?: import('./dynamique.js').GesteMatch[];
   incidentApres?: number;
   fautesVues?: Record<string, boolean>;
-  piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number; debut?: number };
+  piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number; debut?: number; rapideArcade?: boolean };
   clubA: string;
   clubB: string;
 

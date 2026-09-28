@@ -660,7 +660,7 @@ function tick(e: EtatMatch): void {
       return;
     }
     attente.debut ??= e.sim;
-    const forceFrappe = e.sim - attente.debut >= 1.2;
+    const forceFrappe = e.sim - attente.debut >= (attente.rapideArcade ? .55 : 1.2);
     auteur.cible = { ...attente.depuis };
     // Le porteur est exclu de la boucle de déplacement normale. Lorsqu'un
     // contact le décalait de son appui, attendre ici figeait toute la phase.
@@ -678,7 +678,7 @@ function tick(e: EtatMatch): void {
         : attente.intention === 'drop' ? 'drop' : auteur.numero === 9 ? 'box_kick'
           : attente.intention === 'chandelle' ? 'chip' : 'punt', 1.4);
     }
-    const frappe = attente.intention === 'drop' ? 1.12 : attente.intention === 'renvoi' ? 1.05
+    const frappe = attente.rapideArcade ? .28 : attente.intention === 'drop' ? 1.12 : attente.intention === 'renvoi' ? 1.05
       : auteur.numero === 9 ? .84 : .7;
     if (!forceFrappe && e.sim - attente.pretDepuis < frappe) return;
     delete e.piedPrepare;
@@ -1061,7 +1061,8 @@ function lancerVol(
 ): void {
   if (!pret) {
     depuis ??= { ...auteur.pos };
-    e.piedPrepare = { auteurId: auteur.id, arrivee: { ...arrivee }, intention, duree, hauteur, depuis: { ...depuis }, debut: e.sim };
+    e.piedPrepare = { auteurId: auteur.id, arrivee: { ...arrivee }, intention, duree, hauteur, depuis: { ...depuis }, debut: e.sim,
+      rapideArcade: !!auteur.moi && !!e.controleArcadeCamps?.includes(auteur.cote) };
     auteur.cible = { ...depuis };
     (e.placement ??= {})[auteur.id] = { ...depuis };
     return;
@@ -2144,6 +2145,7 @@ function resoudrePlaquage(
   if (abouti === undefined ? e.rng() >= proba : !abouti) {
     defenseur.stats.plaquagesManques += 1;
     porteur.stats.franchissements += 1;
+    jouerGeste(e, defenseur, 'tackle_low', 1.05);
     // ⚠️ UN PLAQUAGE LANCÉ ET MANQUÉ COÛTE PLUS CHER. On part en cathédrale :
     // si le porteur crochète, on met trois secondes à revenir dans le match,
     // pas deux. C'est le risque qui rend l'action intéressante à jouer.

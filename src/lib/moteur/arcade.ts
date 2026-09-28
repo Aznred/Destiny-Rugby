@@ -266,10 +266,10 @@ export function actionContextuelleArcade(match: EtatMatch, pion?: Pion): ActionC
 export function actionGesteTactileArcade(dx: number, dy: number, porteurControle: boolean, portrait = false): EvenementInputArcade['action'] | null {
   const distance = Math.hypot(dx, dy);
   if (!porteurControle) return distance >= 38 ? 'ACTION_PRIMARY' : null;
-  if (distance < 38) return null;
+  if (distance < 30) return null;
   const avant = portrait ? -dy : dx;
   const lateral = portrait ? dx : dy;
-  if (avant >= 42 && avant >= Math.abs(lateral) * .62) return 'KICK';
+  if (avant >= 32 && avant >= Math.abs(lateral) * .55) return 'KICK';
   if (lateral <= -42 && Math.abs(lateral) >= Math.abs(avant) * .8) return 'PASS_LEFT';
   if (lateral >= 42 && lateral >= Math.abs(avant) * .8) return 'PASS_RIGHT';
   return null;
@@ -285,6 +285,7 @@ export function deflexionJoystickArcade(x: number, y: number): { dx: number; dy:
 
 export function deplacerJoueurArcade(match: EtatMatch, pion: Pion, trame: TrameInputArcade, dt: number): void {
   if (match.phase === 'melee' || match.phase === 'touche'
+    || ((match.phase === 'ruck' || match.phase === 'maul') && (pion.role === 'ruck' || pion.role === 'maul'))
     || (!trame.dx && !trame.dy) || pion.corps || pion.sanction > 0) return;
   const direction = directionNormalisee(trame.dx, trame.dy);
   const orientationX = pion.cote === 'A' ? 1 : -1;
@@ -310,10 +311,25 @@ export function deplacerJoueurArcade(match: EtatMatch, pion: Pion, trame: TrameI
   if (match.porteur === pion) match.ballon = { ...pion.pos };
 }
 
+/** Le joueur rejoint réellement le regroupement et reste engagé jusqu'à la sortie du ballon. */
+export function engagerJoueurRuckArcade(match: EtatMatch, pion: Pion): boolean {
+  if (match.phase !== 'ruck' || !match.ruck || !pion.surLeTerrain || pion.sanction > 0 || pion.corps
+    || distance2(pion.pos, match.ballon) >= 9 * 9) return false;
+  if (pion.role === 'ruck') return true;
+  const groupe = match.ruck.organisation;
+  if (!groupe) return false;
+  const liste = pion.cote === match.possession ? groupe.attaque : groupe.defense;
+  if (!liste.includes(pion.id)) liste.push(pion.id);
+  pion.role = 'ruck';
+  pion.effort = 1.08;
+  return true;
+}
+
 export type TypeQteArcade = 'ruck' | 'melee' | 'touche' | 'tir';
 export interface QteArcade {
   id: string;
   type: TypeQteArcade;
+  joueurId?: string;
   debutServeur: number;
   dureeMs: number;
   cible: number;
