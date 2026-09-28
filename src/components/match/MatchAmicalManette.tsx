@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { Icone } from '../Icone';
 import { PelouseMemo } from './Pelouse';
 import { SpriteRugbymanMemo } from './SpriteRugbyman';
-import { Camera, angleDeVue, type Cadre, type Cadrage } from '../../lib/moteur/camera';
+import { Camera, angleDeVue, type Cadre, type Cadrage, type Vue } from '../../lib/moteur/camera';
 import { LONGUEUR, distance2, type Cote, type Vec } from '../../lib/moteur/terrain';
 import { avancer, creerMatch, resoudreChoix, type EtatMatch } from '../../lib/moteur/moteur';
 import type { ActionJoueur } from '../../lib/moteur/etat';
@@ -103,7 +103,8 @@ function appliquerSnapshot(m: EtatMatch, snapshot: EtatMatchAmicalReseau, campLo
 }
 
 /** Donne brièvement au moteur le pion qui exécute le geste, puis nettoie cet état. */
-function jouerGesteMoteur(m: EtatMatch, pion: Pion, action: ActionJoueur, bonusChance = 0) {
+function jouerGesteMoteur(m: EtatMatch, pion: Pion, action: ActionJoueur, bonusChance = 0,
+  visee?: { directionPied?: Vec; cibleDuelId?: string }) {
   const anciensMoi = m.pions.filter((p) => p.moi);
   const ancienControle = m.controle;
   const ancienneIntention = m.intention;
@@ -111,7 +112,7 @@ function jouerGesteMoteur(m: EtatMatch, pion: Pion, action: ActionJoueur, bonusC
   pion.moi = true; m.controle = true; m.intention = null;
   delete m.recharges[action];
   try {
-    return resoudreChoix(m, pion, action, bonusChance);
+    return resoudreChoix(m, pion, action, bonusChance, visee);
   } finally {
     delete m.recharges[action];
     m.intention = ancienneIntention; m.controle = ancienControle; pion.moi = false;
@@ -134,7 +135,9 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const conteneurRef = useRef<HTMLDivElement>(null);
   const joystickMancheRef = useRef<HTMLDivElement>(null);
   const joystickBaseRef = useRef<HTMLDivElement>(null);
+  const viseeGesteRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const vueRef = useRef<Vue | null>(null);
   const groupeTerrainRef = useRef<SVGGElement>(null);
   const noeudsPionsRef = useRef(new Map<string, { noeud: SVGGElement; origine: Vec }>());
   const noeudBallonRef = useRef<{ noeud: SVGGElement; origine: Vec } | null>(null);
@@ -152,7 +155,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const qteRef = useRef<QteArcade | null>(null);
   const qtePhaseRef = useRef('');
   const tirQteTraiteRef = useRef<EtatMatch['tir'] | null>(null);
-  const preparationRef = useRef<Partial<Record<Cote, { action: 'plaquage' | 'raffut' | 'crochet'; pionId: string; expire: number }>>>({});
+  const preparationRef = useRef<Partial<Record<Cote, { action: 'plaquage' | 'raffut' | 'crochet'; pionId: string; cibleId?: string; direction?: Vec; expire: number }>>>({});
   const decalageServeurRef = useRef(0);
   const gesteRef = useRef<{ x: number; y: number; id: number; debut: number } | null>(null);
   const joystickRef = useRef({ actif: false, id: -1, departX: 0, departY: 0 });
@@ -303,7 +306,14 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       return;
     }
 
-    const pion = choisirJoueur(m, camp, direction);
+    const pionImpose = evenement.joueurId
+      ? m.pions.find((p) => p.id === evenement.joueurId && p.cote === camp && p.surLeTerrain && p.sanction <= 0 && !p.corps)
+      : null;
+    const pion = pionImpose ?? choisirJoueur(m, camp, direction);
+    if (pionImpose) {
+      selectionRef.current[camp] = pionImpose.id;
+      if (camp === monCamp) { inputRef.current.joueurId = pionImpose.id; setPionControleId(pionImpose.id); }
+    }
     if (!pion || !machineRef.current.autorise(pion.id, evenement.action)) return;
     const contexte = actionContextuelleArcade(m, pion);
     let action: ActionJoueur;
@@ -313,19 +323,30 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
     else if (evenement.action === 'ACTION_SECONDARY') action = contexte.secondaire;
     else action = contexte.principale;
 
+    if (evenement.gesteTactile && action === 'plaquage' && m.porteur && m.porteur.cote !== camp) {
+      const versPorteur = { x: m.porteur.pos.x - pion.pos.x, y: m.porteur.pos.y - pion.pos.y };
+      const norme = Math.hypot(versPorteur.x, versPorteur.y);
+      if (norme > 1.6 && (versPorteur.x * direction.x + versPorteur.y * direction.y) / norme < .35) return;
+    }
+
     if (action === 'grattage') { lancerQteRuck(m, camp); return; }
 
-    const issue = jouerGesteMoteur(m, pion, action);
+    const issue = jouerGesteMoteur(m, pion, action, 0, {
+      directionPied: evenement.gesteTactile && action === 'pied' ? evenement.direction : undefined,
+      cibleDuelId: evenement.gesteTactile && action === 'raffut' ? evenement.cibleId : undefined,
+    });
     annoncerIssue(pion, action, issue);
     if (!issue.joue && (action === 'plaquage' || action === 'raffut' || action === 'crochet')) {
-      preparationRef.current[camp] = { action, pionId: pion.id, expire: performance.now() + 1050 };
+      preparationRef.current[camp] = { action, pionId: pion.id, cibleId: evenement.cibleId,
+        direction: evenement.gesteTactile ? evenement.direction : undefined, expire: performance.now() + 1050 };
       machineRef.current.transition(pion.id, action === 'plaquage' ? 'TACKLING' : 'RUNNING', true);
     }
   }, [annoncerIssue, choisirJoueur, lancerQteRuck, monCamp]);
 
-  const emettreAction = useCallback((action: Exclude<InputActionArcade, 'MOVE' | 'SPRINT'>, options: { dureeMs?: number; option?: 'court' | 'milieu' | 'long' } = {}) => {
+  const emettreAction = useCallback((action: Exclude<InputActionArcade, 'MOVE' | 'SPRINT'>,
+    options: { dureeMs?: number; option?: 'court' | 'milieu' | 'long'; direction?: Vec; cibleId?: string; joueurId?: string; gesteTactile?: boolean } = {}) => {
     const trame = inputRef.current.trame(navigator.getGamepads?.()[0], true);
-    inputRef.current.emettre(action, { ...options, direction: { x: trame.dx, y: trame.dy } });
+    inputRef.current.emettre(action, { direction: { x: trame.dx, y: trame.dy }, ...options });
   }, []);
 
   useEffect(() => {
@@ -438,16 +459,22 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
             const pion = m.pions.find((p) => p.id === prep.pionId);
             const cible = prep.action === 'plaquage'
               ? (m.porteur?.cote !== camp ? m.porteur : null)
-              : m.pions.filter((p) => p.cote !== camp && p.surLeTerrain).sort((a, b) => distance2(a.pos, pion?.pos ?? m.ballon) - distance2(b.pos, pion?.pos ?? m.ballon))[0];
+              : prep.cibleId
+                ? m.pions.find((p) => p.id === prep.cibleId && p.cote !== camp && p.surLeTerrain)
+                : m.pions.filter((p) => p.cote !== camp && p.surLeTerrain).sort((a, b) => distance2(a.pos, pion?.pos ?? m.ballon) - distance2(b.pos, pion?.pos ?? m.ballon))[0];
             if (!pion || !cible || maintenant > prep.expire) { delete preparationRef.current[camp]; continue; }
             const distance = Math.sqrt(distance2(pion.pos, cible.pos));
+            if (prep.direction && distance > 1.65) {
+              const vers = { x: (cible.pos.x - pion.pos.x) / distance, y: (cible.pos.y - pion.pos.y) / distance };
+              if (vers.x * prep.direction.x + vers.y * prep.direction.y < .35) { delete preparationRef.current[camp]; continue; }
+            }
             if (distance < 3.4 && distance > 1.45 && prep.action === 'plaquage') {
               const aide = Math.min(.22, dt * 1.8);
               pion.pos.x += (cible.pos.x - pion.pos.x) / distance * aide;
               pion.pos.y += (cible.pos.y - pion.pos.y) / distance * aide;
             }
             if (distance <= 1.65) {
-              const issue = jouerGesteMoteur(m, pion, prep.action);
+              const issue = jouerGesteMoteur(m, pion, prep.action, 0, { cibleDuelId: prep.cibleId });
               annoncerIssue(pion, prep.action, issue);
               delete preparationRef.current[camp];
             }
@@ -555,6 +582,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         const { largeur, hauteur } = dimensionsRef.current;
         const ratio = largeur / hauteur;
         const vue = cameraRef.current.suivre(cible, 'suivi' as Cadrage, ratio, angleDeVue(monCamp, hauteur > largeur), dtImage);
+        vueRef.current = vue;
         svgRef.current?.setAttribute('viewBox', vue.viewBox);
         groupeTerrainRef.current?.setAttribute('transform', vue.transform);
         for (const [id, { noeud, origine }] of noeudsPionsRef.current) {
@@ -613,11 +641,26 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
     gesteRef.current = { x: event.clientX, y: event.clientY, id: event.pointerId, debut: performance.now() };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
+  const bougerGeste = (event: React.PointerEvent<HTMLDivElement>) => {
+    const debut = gesteRef.current;
+    const ligne = viseeGesteRef.current;
+    if (!debut || !ligne || debut.id !== event.pointerId || matchRef.current?.porteur?.cote !== monCamp) return;
+    const dx = event.clientX - debut.x; const dy = event.clientY - debut.y;
+    const portrait = dimensionsRef.current.hauteur > dimensionsRef.current.largeur;
+    if (actionGesteTactileArcade(dx, dy, true, portrait) !== 'KICK') { ligne.style.display = 'none'; return; }
+    const rect = event.currentTarget.getBoundingClientRect();
+    ligne.style.display = 'block';
+    ligne.style.left = `${debut.x - rect.left}px`;
+    ligne.style.top = `${debut.y - rect.top}px`;
+    ligne.style.width = `${Math.hypot(dx, dy)}px`;
+    ligne.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+  };
   const finGeste = (event: React.PointerEvent<HTMLDivElement>) => {
     const debut = gesteRef.current;
     if (!debut || debut.id !== event.pointerId) return;
     const dx = event.clientX - debut.x; const dy = event.clientY - debut.y;
     gesteRef.current = null;
+    if (viseeGesteRef.current) viseeGesteRef.current.style.display = 'none';
     const qte = qteRef.current;
     if (qte) {
       if (qte.type === 'touche' && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
@@ -629,8 +672,42 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
     }
     const m = matchRef.current;
     if (!m || m.phase === 'melee' || m.phase === 'touche') return;
-    const action = actionGesteTactileArcade(dx, dy, m.porteur?.cote === monCamp);
-    if (action) emettreAction(action, { dureeMs: performance.now() - debut.debut });
+    const vue = vueRef.current;
+    const rect = svgRef.current?.getBoundingClientRect();
+    const positionEcran = (point: Vec) => {
+      if (!vue || !rect) return null;
+      const position = vue.versEcran(point);
+      return { x: rect.left + position.x / vue.W * rect.width, y: rect.top + position.y / vue.H * rect.height };
+    };
+    if (Math.hypot(dx, dy) < 30) {
+      const ballon = positionEcran(m.ballon);
+      if ((m.phase === 'ruck' || m.phase === 'maul') && ballon
+        && Math.hypot(event.clientX - ballon.x, event.clientY - ballon.y) <= 52) {
+        const soutien = m.pions.filter((p) => p.cote === monCamp && p.surLeTerrain && !p.corps && p.sanction <= 0
+          && distance2(p.pos, m.ballon) < 9 * 9)
+          .sort((a, b) => distance2(a.pos, m.ballon) - distance2(b.pos, m.ballon))[0];
+        if (soutien) emettreAction('ACTION_PRIMARY', { joueurId: soutien.id, gesteTactile: true });
+        return;
+      }
+      if (m.porteur?.cote === monCamp) {
+        const adversaire = m.pions.filter((p) => p.cote !== monCamp && p.surLeTerrain && p.sanction <= 0
+          && distance2(p.pos, m.porteur!.pos) <= 5 * 5)
+          .map((p) => ({ pion: p, position: positionEcran(p.pos) }))
+          .filter((p) => p.position && Math.hypot(event.clientX - p.position.x, event.clientY - p.position.y) <= 46)
+          .sort((a, b) => Math.hypot(event.clientX - a.position!.x, event.clientY - a.position!.y)
+            - Math.hypot(event.clientX - b.position!.x, event.clientY - b.position!.y))[0];
+        if (adversaire) emettreAction('ACTION_PRIMARY', { cibleId: adversaire.pion.id, gesteTactile: true });
+      } else emettreAction('SWITCH_PLAYER');
+      return;
+    }
+    const portrait = dimensionsRef.current.hauteur > dimensionsRef.current.largeur;
+    if (!m.porteur) return;
+    const action = actionGesteTactileArcade(dx, dy, m.porteur?.cote === monCamp, portrait);
+    if (!action) return;
+    const directionEcran = action === 'KICK' ? { x: dx / 120, y: dy / 120 } : { x: dx / Math.hypot(dx, dy), y: dy / Math.hypot(dx, dy) };
+    const directionMonde = vue?.directionMonde(directionEcran.x, directionEcran.y);
+    emettreAction(action, { dureeMs: performance.now() - debut.debut,
+      direction: directionMonde ? { x: directionMonde.dx, y: directionMonde.dy } : undefined, gesteTactile: true });
   };
 
   const m = matchRef.current;
@@ -657,7 +734,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
 
     <div className="amical-bandeau-action" role="status">{messageAction}{manetteDetectee ? ' · Manette connectée' : ''}</div>
 
-    <div className="amical-terrain-viewport" onPointerDown={debutGeste} onPointerUp={finGeste} onPointerCancel={() => { gesteRef.current = null; }}>
+    <div className="amical-terrain-viewport" onPointerDown={debutGeste} onPointerMove={bougerGeste} onPointerUp={finGeste} onPointerCancel={() => { gesteRef.current = null; if (viseeGesteRef.current) viseeGesteRef.current.style.display = 'none'; }}>
       {vueCamera && m && terrain && <svg ref={svgRef} className="amical-terrain-svg" viewBox={vueCamera.viewBox} preserveAspectRatio="xMidYMid meet">
         <g ref={groupeTerrainRef} transform={vueCamera.transform}>
           <PelouseMemo />
@@ -690,6 +767,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
           }}><g transform={`translate(${m.ballon.x}, ${m.ballon.y})`}><ellipse rx={.24} ry={.15} fill="#f4eee1" stroke="#503e32" strokeWidth={.045} /></g></g>}
         </g>
       </svg>}
+      <div className="amical-visee-tactile" ref={viseeGesteRef} aria-hidden="true" />
 
       {qteAffichee && <div className={`amical-qte amical-qte-${qteAffichee.type}`} style={styleQte}>
         <strong>{qteAffichee.type === 'melee' ? 'Poussée en mêlée' : qteAffichee.type === 'touche' ? 'Duel en touche' : qteAffichee.type === 'tir' ? qteAffichee.etapeTir === 'direction' ? 'Transformation · direction' : 'Transformation · puissance' : 'Grattage'}</strong>
@@ -703,7 +781,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         <button type="button" disabled={qteLocaleDejaJouee || (qteAffichee.type === 'tir' && qteAffichee.initiateur !== monCamp)} onClick={() => emettreAction('ACTION_PRIMARY')}>{qteLocaleDejaJouee ? 'Timing envoyé' : qteAffichee.type === 'ruck' ? 'Relâcher' : qteAffichee.type === 'tir' ? 'Frapper' : 'Maintenant'}</button>
         <p className="amical-qte-aide-tactile">{qteAffichee.type === 'touche' ? 'Glisse pour choisir · touche la jauge au bon moment' : 'Touche la jauge au bon moment'}</p>
       </div>}
-      <div className="amical-geste-indication"><span>{m?.porteur?.cote === monCamp ? '←/→ Passe · ↑ Pied · ↓ Raffut · ↘ Crochet' : 'Glisse pour plaquer · ↑ Changer de joueur'}</span><small>Joystick au bord : sprint automatique</small></div>
+      <div className="amical-geste-indication"><span>{m?.phase === 'ruck' || m?.phase === 'maul' ? 'Touche le ruck : soutien ou grattage' : m?.porteur?.cote === monCamp ? '↑ Passe gauche · ↓ Passe droite · → Pied dirigé · touche un rival : raffut' : 'Glisse vers le porteur : plaquage · touche le terrain : changer'}</span><small>Joystick au bord : sprint automatique</small></div>
     </div>
 
     <footer className="amical-hud">

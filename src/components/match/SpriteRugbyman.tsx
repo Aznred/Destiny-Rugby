@@ -20,6 +20,18 @@ const LARGEUR_CANVAS = 160;
 const HAUTEUR_CANVAS = 160;
 const TAILLE_CANVAS_MATCH = 112;
 const TAILLE_CANVAS_COMPACT = 80;
+// WebKit peut ignorer un canvas HTML placé dans un foreignObject SVG.
+// Sur iPhone/iPad, on affiche la même image dessinée par le générateur via un élément SVG natif.
+const IMAGE_SVG_IOS = typeof navigator !== 'undefined'
+  && (/iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+function copierCanvasDansImage(canvas: HTMLCanvasElement, image: SVGImageElement | null): void {
+  if (!image) return;
+  const source = canvas.toDataURL('image/png');
+  image.setAttribute('href', source);
+  image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', source);
+}
 
 interface Props {
   pion: PionDirect;
@@ -42,7 +54,8 @@ const MOTIFS: Record<MaillotMatch['motif'], KitPattern> = {
 
 function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: boolean): AnimationRugby {
   const instant = terrain.simulation ?? 0;
-  const geste = terrain.gestes?.filter((g) => g.joueurId === p.id && instant >= g.debut && instant < g.debut + g.duree).at(-1);
+  const gestes = terrain.gestes?.filter((g) => g.joueurId === p.id && instant >= g.debut && instant < g.debut + g.duree);
+  const geste = gestes?.[gestes.length - 1];
   if (geste && CLIPS.has(geste.clip)) return geste.clip;
   if (terrain.phase === 'ruck') {
     // 🏉 AU RUCK : le joueur plaqué et le plaqueur restent au sol pendant tout le regroupement
@@ -227,6 +240,9 @@ function maillotDeCelebration(principal: string): MaillotMatch {
 
 function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, redresser, hauteurMetres, temps, angleVue = 0, compact = false }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const image = useRef<SVGImageElement>(null);
+  const silhouette = useRef<SVGGElement>(null);
+  const canvasIOS = useMemo(() => IMAGE_SVG_IOS ? document.createElement('canvas') : null, []);
   const renderer = useMemo(() => new CharacterRenderer(), []);
   const character = useMemo(() => personnage(pion, maillot), [pion.id, pion.nom, pion.numero, pion.poste, pion.force, pion.tailleCm, pion.poidsKg, maillot]);
   const animation = animationDe(pion, position, terrain, porteur);
@@ -258,7 +274,8 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
   const direction = sensAffichage.current;
   const orientation = orientationSprite(direction, angleVue);
   const instant = terrain.simulation ?? temps;
-  const geste = terrain.gestes?.filter((g) => g.joueurId === pion.id && instant >= g.debut && instant < g.debut + g.duree).at(-1);
+  const gestes = terrain.gestes?.filter((g) => g.joueurId === pion.id && instant >= g.debut && instant < g.debut + g.duree);
+  const geste = gestes?.[gestes.length - 1];
   const progression = geste ? (instant - geste.debut) / geste.duree
     : pion.corps ? animation === 'getup' ? (pion.corps.age - pion.corps.duree + .5) / .5 : Math.min(1, pion.corps.age / 1.2)
     : terrain.preparationTir?.buteurId === pion.id && terrain.preparationTir.progression > .85 ? (terrain.preparationTir.progression - .85) / .15 * .55
@@ -277,18 +294,36 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
   const tailleCanvas = compact ? TAILLE_CANVAS_COMPACT : TAILLE_CANVAS_MATCH;
   useLayoutEffect(() => {
     const instantClip = progression === undefined ? temps : progression * clip.frames.length / clip.fps;
-    const cle = `${character.id}:${tailleCanvas}:${maillot.principal}:${maillot.secondaire}:${maillot.motif}:${clip.id}:${orientation}:${ballonAnime}:${Math.floor(instantClip * 24)}:${Math.floor((pion.corps?.age ?? 0) * 24)}`;
+    const cadence = IMAGE_SVG_IOS ? 8 : 24;
+    const cle = `${character.id}:${tailleCanvas}:${maillot.principal}:${maillot.secondaire}:${maillot.motif}:${clip.id}:${orientation}:${ballonAnime}:${Math.floor(instantClip * cadence)}:${Math.floor((pion.corps?.age ?? 0) * cadence)}`;
     if (cle === derniereImage.current) return;
     derniereImage.current = cle;
-    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, direction, .36, tailleCanvas);
-  }, [renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, maillot, tailleCanvas]);
+    const cible = canvasIOS ?? canvas.current;
+    if (cible) {
+      if (canvasIOS && (cible.width !== tailleCanvas || cible.height !== tailleCanvas)) {
+        cible.width = tailleCanvas; cible.height = tailleCanvas;
+      }
+      dessinerSprite(cible, renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, direction, .36, tailleCanvas);
+      if (canvasIOS) copierCanvasDansImage(cible, image.current);
+    }
+  }, [renderer, character, clip, temps, graine, orientation, ballonAnime, progression, pion.corps, maillot, tailleCanvas, canvasIOS]);
 
   const largeurMetres = hauteurMetres * (LARGEUR_CANVAS / HAUTEUR_CANVAS);
   return <g transform={`translate(${position.x.toFixed(2)} ${position.y.toFixed(2)})`} className={`rg-canvas-groupe${porteur ? ' rg-porteur' : ''}`}>
     <g transform={redresser}>
-      <foreignObject x={-largeurMetres / 2} y={-hauteurMetres * .78} width={largeurMetres} height={hauteurMetres} overflow="visible">
-        <canvas ref={canvas} width={tailleCanvas} height={tailleCanvas} className="rg-canvas" aria-hidden="true" />
-      </foreignObject>
+      {IMAGE_SVG_IOS
+        ? <>
+          <g ref={silhouette} aria-hidden="true">
+            <ellipse cy={.3} rx={.78} ry={.28} fill="#071522" opacity={.38} />
+            <path d="M-.42 -1.5 L-.4 -.12 M.42 -1.5 L.4 -.12 M-.58 -2.45 L-.94 -1.3 M.58 -2.45 L.94 -1.3" stroke={maillot.short} strokeWidth={.42} strokeLinecap="round" />
+            <rect x={-.65} y={-2.8} width={1.3} height={1.55} rx={.38} fill={maillot.principal} stroke={maillot.secondaire} strokeWidth={.16} />
+            <circle cy={-3.22} r={.47} fill={character.appearance.skin} />
+          </g>
+          <image ref={image} x={-largeurMetres / 2} y={-hauteurMetres * .78} width={largeurMetres} height={hauteurMetres} className="rg-image-ios" aria-hidden="true" onLoad={() => { if (silhouette.current) silhouette.current.style.display = 'none'; }} />
+        </>
+        : <foreignObject x={-largeurMetres / 2} y={-hauteurMetres * .78} width={largeurMetres} height={hauteurMetres} overflow="visible">
+          <canvas ref={canvas} width={tailleCanvas} height={tailleCanvas} className="rg-canvas" aria-hidden="true" />
+        </foreignObject>}
     </g>
   </g>;
 }
@@ -314,6 +349,8 @@ export function SpriteArbitre({ position, phase, sifflet, redresser, hauteurMetr
   regard?: number; vitesse?: number; angleVue?: number;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const image = useRef<SVGImageElement>(null);
+  const canvasIOS = useMemo(() => IMAGE_SVG_IOS ? document.createElement('canvas') : null, []);
   const renderer = useMemo(() => new CharacterRenderer(), []);
   const character = useMemo(() => personnageArbitre(couleur), [couleur]);
   const animation = carton === 'rouge' ? 'ref_red' : carton === 'jaune' ? 'ref_yellow'
@@ -325,12 +362,18 @@ export function SpriteArbitre({ position, phase, sifflet, redresser, hauteurMetr
   const orientation: Orientation = Math.abs(Math.sin(angle)) > .72 ? Math.sin(angle) < 0 ? 'back' : 'front' : Math.cos(angle) < 0 ? 'left' : 'right';
   const clip = CLIPS.get(animation) ?? CLIPS.get('idle')!;
   useLayoutEffect(() => {
-    if (canvas.current) dessinerSprite(canvas.current, renderer, character, clip, temps, 41, orientation, false);
-  }, [renderer, character, clip, temps, orientation]);
+    const cible = canvasIOS ?? canvas.current;
+    if (!cible) return;
+    if (canvasIOS && cible.width !== LARGEUR_CANVAS) { cible.width = LARGEUR_CANVAS; cible.height = HAUTEUR_CANVAS; }
+    dessinerSprite(cible, renderer, character, clip, temps, 41, orientation, false);
+    if (canvasIOS) copierCanvasDansImage(cible, image.current);
+  }, [renderer, character, clip, temps, orientation, canvasIOS]);
   const largeurMetres = hauteurMetres * (LARGEUR_CANVAS / HAUTEUR_CANVAS);
   return <g transform={`translate(${position.x.toFixed(2)} ${position.y.toFixed(2)})`} className="rg-canvas-groupe rg-arbitre">
-    <g transform={redresser}><foreignObject x={-largeurMetres / 2} y={-hauteurMetres * .78} width={largeurMetres} height={hauteurMetres} overflow="visible">
-      <canvas ref={canvas} width={LARGEUR_CANVAS} height={HAUTEUR_CANVAS} className="rg-canvas" aria-hidden="true" />
-    </foreignObject></g>
+    <g transform={redresser}>{IMAGE_SVG_IOS
+      ? <image ref={image} x={-largeurMetres / 2} y={-hauteurMetres * .78} width={largeurMetres} height={hauteurMetres} className="rg-image-ios" aria-hidden="true" />
+      : <foreignObject x={-largeurMetres / 2} y={-hauteurMetres * .78} width={largeurMetres} height={hauteurMetres} overflow="visible">
+        <canvas ref={canvas} width={LARGEUR_CANVAS} height={HAUTEUR_CANVAS} className="rg-canvas" aria-hidden="true" />
+      </foreignObject>}</g>
   </g>;
 }

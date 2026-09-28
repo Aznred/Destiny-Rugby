@@ -27,6 +27,9 @@ export interface EvenementInputArcade {
   tempsServeurEstime: number;
   dureeMs?: number;
   direction?: { x: number; y: number };
+  cibleId?: string;
+  joueurId?: string;
+  gesteTactile?: boolean;
   option?: 'court' | 'milieu' | 'long';
 }
 
@@ -259,18 +262,15 @@ export function actionContextuelleArcade(match: EtatMatch, pion?: Pion): ActionC
 }
 
 /** Un geste sur le terrain remplace les boutons tactiles sans gêner le joystick. */
-export function actionGesteTactileArcade(dx: number, dy: number, porteurControle: boolean): EvenementInputArcade['action'] | null {
-  const horizontal = Math.abs(dx);
-  const vertical = Math.abs(dy);
-  if (Math.hypot(dx, dy) < 25) return porteurControle ? null : 'SWITCH_PLAYER';
-  if (!porteurControle) {
-    if (dy < -52 && vertical > horizontal * 1.1) return 'SWITCH_PLAYER';
-    return Math.hypot(dx, dy) >= 45 ? 'ACTION_PRIMARY' : null;
-  }
-  if (dy > 52 && horizontal > 38 && horizontal < vertical * 1.45) return 'ACTION_SECONDARY';
-  if (horizontal >= 55 && horizontal > vertical * 1.1) return dx < 0 ? 'PASS_LEFT' : 'PASS_RIGHT';
-  if (dy <= -55 && vertical > horizontal * .8) return 'KICK';
-  if (dy >= 48 && vertical > horizontal * .8) return 'ACTION_PRIMARY';
+export function actionGesteTactileArcade(dx: number, dy: number, porteurControle: boolean, portrait = false): EvenementInputArcade['action'] | null {
+  const distance = Math.hypot(dx, dy);
+  if (!porteurControle) return distance >= 38 ? 'ACTION_PRIMARY' : null;
+  if (distance < 38) return null;
+  const avant = portrait ? -dy : dx;
+  const lateral = portrait ? dx : dy;
+  if (avant >= 42 && avant >= Math.abs(lateral) * .62) return 'KICK';
+  if (lateral <= -42 && Math.abs(lateral) >= Math.abs(avant) * .8) return 'PASS_LEFT';
+  if (lateral >= 42 && lateral >= Math.abs(avant) * .8) return 'PASS_RIGHT';
   return null;
 }
 

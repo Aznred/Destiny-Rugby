@@ -6,7 +6,7 @@ import {
   estCompteKiriAutorise,
 } from '../src/lib/amicalCollection';
 import { cleCarteSolo, etatCollectionSoloVide } from '../src/lib/collectionSolo';
-import { creerMatch, avancer, probaPlaquage } from '../src/lib/moteur/moteur';
+import { creerMatch, avancer, probaPlaquage, resoudreChoix } from '../src/lib/moteur/moteur';
 import { actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, evaluerQteArcade, selectionnerJoueurPertinent, transformationArcadeReussie } from '../src/lib/moteur/arcade';
 
 console.log('Testing Collection Friendly Match & Realtime Controller Prototype...');
@@ -123,13 +123,29 @@ for (const phase of ['melee', 'touche'] as const) {
   assert.deepEqual(porteur.pos, positionArretee, `Le joystick ne doit pas déplacer le joueur pendant la ${phase}.`);
 }
 matchPilote.phase = 'jeuCourant';
-assert.equal(actionGesteTactileArcade(-85, 0, true), 'PASS_LEFT');
-assert.equal(actionGesteTactileArcade(85, 0, true), 'PASS_RIGHT');
-assert.equal(actionGesteTactileArcade(0, -85, true), 'KICK');
-assert.equal(actionGesteTactileArcade(0, 85, true), 'ACTION_PRIMARY');
-assert.equal(actionGesteTactileArcade(55, 75, true), 'ACTION_SECONDARY');
+assert.equal(actionGesteTactileArcade(0, -85, true), 'PASS_LEFT');
+assert.equal(actionGesteTactileArcade(0, 85, true), 'PASS_RIGHT');
+assert.equal(actionGesteTactileArcade(85, -45, true), 'KICK');
+assert.equal(actionGesteTactileArcade(85, 45, true), 'KICK');
+assert.equal(actionGesteTactileArcade(0, -85, true, true), 'KICK', 'En portrait le pied part vers le haut.');
+assert.equal(actionGesteTactileArcade(0, 0, true), null, 'Un appui simple est réservé au raffut ciblé.');
 assert.equal(actionGesteTactileArcade(70, 0, false), 'ACTION_PRIMARY');
-assert.equal(actionGesteTactileArcade(0, -85, false), 'SWITCH_PLAYER');
+assert.equal(actionGesteTactileArcade(0, -85, false), 'ACTION_PRIMARY');
+const matchPied = creerMatch(equipe.nom, equipeB.nom, coequipiersA, coequipiersB, 20, 17, 'test-pied-dirige', undefined, {
+  niveau: 'pro', tempsReel: true, controle: true,
+});
+const buteur = matchPied.pions.find((p) => p.cote === 'A')!;
+matchPied.phase = 'jeuCourant';
+matchPied.porteur = buteur;
+matchPied.possession = 'A';
+buteur.pos = { x: 60, y: 35 };
+matchPied.ballon = { ...buteur.pos };
+matchPied.rng = () => 0;
+const piedDirige = resoudreChoix(matchPied, buteur, 'pied', 0, { directionPied: { x: .8, y: -.6 } });
+assert.equal(piedDirige.joue, true, 'Le coup de pied dirigé doit être effectivement joué.');
+assert.ok(matchPied.piedPrepare && matchPied.piedPrepare.arrivee.x > buteur.pos.x
+  && matchPied.piedPrepare.arrivee.y < buteur.pos.y,
+  'La frappe préparée doit suivre le glissement diagonal vers l’avant.');
 assert.equal(deflexionJoystickArcade(20, 0).sprint, false, 'La première moitié du joystick conserve la course normale.');
 assert.equal(deflexionJoystickArcade(45, 0).sprint, true, 'Le bord du joystick active le sprint.');
 assert.equal(deflexionJoystickArcade(90, 0).dx, 1, 'La course du joystick reste bornée.');

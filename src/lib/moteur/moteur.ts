@@ -4675,10 +4675,15 @@ function phraseDepuis(e: EtatMatch, depuis: number): string | null {
  * conséquences appliquées dans la foulée — pas à un tick futur, pas « quand le
  * moteur en aura envie ».
  */
-export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur, bonusChanceArcade = 0): Issue {
+export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur, bonusChanceArcade = 0,
+  viseeArcade?: { directionPied?: Vec; cibleDuelId?: string }): Issue {
   const nom = p.nom;
   const depuis = e.commentaires.length;
-  const adv = visAVis(e, p);
+  const cibleVisee = viseeArcade?.cibleDuelId
+    ? e.pions.find((q) => q.id === viseeArcade.cibleDuelId && q.surLeTerrain && q.cote !== p.cote && q.sanction <= 0 && q.battu <= 0)
+    : null;
+  const adv = action === 'raffut' && cibleVisee && distance2(cibleVisee.pos, p.pos) <= 20 ** 2
+    ? cibleVisee : visAVis(e, p);
   const cible = adv ? adv.nom : nom;
   /** Ce que le moteur a raconté, ou la phrase de repli. */
   const dit = (repli: CleDuel): string =>
@@ -4790,7 +4795,20 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur, bonus
         arret(e, 'melee', adverse(p.cote), { x: p.pos.x, y: p.pos.y });
         return tranche(false, 'duelPiedContre');
       }
-      taperAuPied(e, p, intentionDePied(e, p));
+      if (viseeArcade?.directionPied && viseeArcade.directionPied.x * sens(p.cote) > .15) {
+        const direction = viseeArcade.directionPied;
+        const amplitude = Math.min(1, Math.hypot(direction.x, direction.y));
+        const normalisee = Math.hypot(direction.x, direction.y);
+        const portee = (24 + p.pied / 3.2) * (.45 + .55 * amplitude);
+        const arrivee = {
+          x: borner(p.pos.x + direction.x / normalisee * portee, LIGNE_A + 1, LIGNE_B - 1),
+          y: borner(p.pos.y + direction.y / normalisee * portee, 2, LARGEUR - 2),
+        };
+        p.stats.coupsDePied += 1;
+        e.dernierPasseur = null;
+        dire(e, 'pied', p.cote, C.phrase(e.rng, C.PIED_OCCUPATION, { nom: p.nom }), 0, p.moi);
+        lancerVol(e, p, arrivee, 'occupation', 2.4, .7);
+      } else taperAuPied(e, p, intentionDePied(e, p));
       return tranche(true, 'choixArme');
     }
 

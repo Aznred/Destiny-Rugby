@@ -148,7 +148,7 @@ export function uid(prefix: string): string {
 }
 
 export function clone<T>(value: T): T {
-  return structuredClone(value)
+  return typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)) as T
 }
 
 export function createRestPose(): SkeletonPose {
