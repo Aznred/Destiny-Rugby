@@ -57,7 +57,7 @@ import { CollectionLigue } from '../components/CollectionLigue';
 import { WikiLigue } from '../components/WikiLigue';
 import OuverturePack from '../components/OuverturePack';
 import { prechargerOuverturePack } from '../lib/prechargementPacks';
-import { NOMS_PACK, modelePackParNom, packAvecSkin, nomPackCarriere, nomRaretePack } from '../lib/presentationPacks';
+import { NOMS_PACK, apparencePack, modelePackParNom, packAvecSkin, nomPackCarriere, nomRaretePack } from '../lib/presentationPacks';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { BancDessaiSituations } from '../components/BancDessaiSituations';
 import Pack3D from '../components/Pack3D';
@@ -1711,7 +1711,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
 export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
   const packsDuJour = packsBoutiqueDuJour(vue.packs, Date.now(), vue.rotationPacks === true);
-  const [ouverture, setOuverture] = useState<{ cartes: CarteCarriere[] | null; pack: string; modele?: string; garantie?: VueCarriereEnLigne['packs'][number]['garantie'] } | null>(null);
+  const [ouverture, setOuverture] = useState<{ cartes: CarteCarriere[] | null; pack: string; modele?: string; garantie?: VueCarriereEnLigne['packs'][number]['garantie']; apparenceInitiale?: VueCarriereEnLigne['packs'][number]['garantie'] } | null>(null);
   /**
    * ⚠️ LE MODULE 3D ARRIVE PENDANT QU'ON REGARDE LE PRÉSENTOIR. Il pesait
    * son import dynamique EN PLUS de l'aller-retour serveur, l'un après
@@ -1737,7 +1737,7 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
     achatEnCours.current = true;
     const pack = vue.packs.find(p => p.id === packId);
     if (pack) prechargerOuverturePack(pack);
-    setOuverture({ cartes: null, pack: `${nomPack}${suffixe}`, modele: pack && packAvecSkin(pack.id) ? modelePackParNom(pack) : undefined, garantie: pack?.garantie });
+    setOuverture({ cartes: null, pack: `${nomPack}${suffixe}`, modele: pack && packAvecSkin(pack.id) ? modelePackParNom(pack) : undefined, garantie: pack?.garantie, apparenceInitiale: pack && apparencePack(pack) });
     try {
       const avant = new Set(vue.transactions.map(t => t.id));
       const suivante = await agir(commande);
@@ -1774,7 +1774,7 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
     <div className="cel-note">{t('online.shop.basePacksNote')}</div>
     <BoutiquePacks3D packs={packsDuJour} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={ouvrir} />
 
-    {ouverture && <OuverturePack cartes={ouverture.cartes} pack={ouverture.pack} modele={ouverture.modele} garantie={ouverture.garantie} rendreCarte={carte => <CarteJoueurEnLigne carte={carte} />} onFermer={() => setOuverture(null)} />}
+    {ouverture && <OuverturePack cartes={ouverture.cartes} pack={ouverture.pack} modele={ouverture.modele} garantie={ouverture.garantie} apparenceInitiale={ouverture.apparenceInitiale} rendreCarte={carte => <CarteJoueurEnLigne carte={carte} />} onFermer={() => setOuverture(null)} />}
   </>;
 }
 

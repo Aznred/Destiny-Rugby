@@ -15,26 +15,37 @@ const { chromium } = require(process.argv[2] || 'playwright');
     const raretes = ['bronze', 'argent', 'or', 'elite', 'star'];
     for (let rang = 0; rang < raretes.length; rang++) {
       await page.goto(`http://127.0.0.1:5173/scripts/apercuPacks.html?rang=${rang}`);
+      await page.locator('.pack-show.phase-attente.palier-bronze').waitFor();
+      for (let palier = 1; palier <= rang; palier++) {
+        await page.getByRole('button', { name: 'Améliorer le pack' }).last().click();
+        await page.locator('.pack-show-upgrade').waitFor();
+        await page.locator(`.pack-show.phase-attente.palier-${raretes[palier]}`).waitFor();
+      }
+      await page.getByRole('button', { name: 'Ouvrir le pack' }).last().click();
       await page.locator('.pack-show.phase-ouverture').waitFor();
-      assert.equal(await page.locator('.pack-show-upgrade').count(), 0, 'Aucune montée en palier.');
-      assert.equal(await page.locator('.pack-show-touch').count(), 0, 'Aucun second clic nécessaire.');
       await page.locator('canvas[data-ready=true]').waitFor();
       await page.getByRole('button', { name: 'Rejoindre le vestiaire' }).waitFor({ timeout: 20000 });
       assert.equal(await page.locator('.pack-show-card.visible').count(), 3);
       assert.equal(await page.locator(`.pack-show-card.meilleure .cel-carte.${raretes[rang]}`).count(), 1);
       await page.keyboard.press('Escape');
       await page.getByRole('button', { name: 'Rejouer l’ouverture' }).waitFor();
-      console.log(`OK ${raretes[rang]} : ouverture directe, 3 cartes, fermeture`);
+      console.log(`OK ${raretes[rang]} : ${rang} montée(s), ouverture manuelle, 3 cartes, fermeture`);
     }
     for (let rang = 1; rang < raretes.length; rang++) {
-      await page.goto(`http://127.0.0.1:5173/scripts/apercuPacks.html?rang=${rang}&garantie=${rang}`);
-      await page.locator('.pack-show.phase-ouverture').waitFor();
+      await page.goto(`http://127.0.0.1:5173/scripts/apercuPacks.html?rang=${rang}&base=${rang}`);
       assert.equal(await page.locator(`.pack-show.palier-${raretes[rang]}`).count(), 1);
+      assert.equal(await page.getByRole('button', { name: 'Améliorer le pack' }).count(), 0);
+      await page.getByRole('button', { name: 'Ouvrir le pack' }).last().click();
       await page.getByRole('button', { name: 'Rejoindre le vestiaire' }).waitFor({ timeout: 20000 });
     }
+    await page.goto('http://127.0.0.1:5173/scripts/apercuPacks.html?rang=4&skin=1');
+    assert.equal(await page.getByRole('button', { name: 'Améliorer le pack' }).count(), 0, 'Une pochette dédiée ne change pas de texture.');
+    await page.getByRole('button', { name: 'Ouvrir le pack' }).last().click();
+    await page.getByRole('button', { name: 'Rejoindre le vestiaire' }).waitFor({ timeout: 20000 });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('http://127.0.0.1:5173/scripts/apercuPacks.html?rang=4&cartes=8');
+    await page.goto('http://127.0.0.1:5173/scripts/apercuPacks.html?rang=4&base=4&cartes=8');
+    await page.getByRole('button', { name: 'Ouvrir le pack' }).last().click();
     await page.locator('.pack-show.phase-ouverture').waitFor();
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('.pack-show-card.visible').count(), 8);
@@ -42,6 +53,7 @@ const { chromium } = require(process.argv[2] || 'playwright');
     console.log('OK mobile : 8 cartes, animation réduite, aucun débordement');
     await page.route('**/m3d/packs/**', route => route.abort());
     await page.goto('http://127.0.0.1:5173/scripts/apercuPacks.html?rang=0&cartes=1');
+    await page.getByRole('button', { name: 'Ouvrir le pack' }).last().click();
     await page.locator('.pack-show.phase-ouverture').waitFor();
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('.pack-show-card.visible').count(), 1);

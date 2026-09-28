@@ -69,7 +69,7 @@ function Modele({ url, calme, transition }: { url: string; calme: boolean; trans
 
 // ⚠️ Le préchargement des pochettes NE VIT PAS ICI : il partirait avec le
 // module 3D qu'il est justement censé devancer. Voir `lib/prechargementPacks.ts`.
-export default function Pack3D({ rarete, modele, ouvert, calme, transition }: { rarete: RareteCarriere; modele?: string; ouvert: boolean; calme: boolean; transition: string }) {
+export default function Pack3D({ rarete, rareteSuivante, modele, ouvert, calme, transition }: { rarete: RareteCarriere; rareteSuivante?: RareteCarriere; modele?: string; ouvert: boolean; calme: boolean; transition: string }) {
   const [deplie, setDeplie] = useState(false);
   useEffect(() => {
     if (!ouvert) { setDeplie(false); return; }
@@ -77,8 +77,11 @@ export default function Pack3D({ rarete, modele, ouvert, calme, transition }: { 
     return () => clearTimeout(timer);
   }, [ouvert, calme]);
   useEffect(() => {
-    if (!modele) useGLTF.preload(modelePack(rarete, true));
-  }, [rarete, modele]);
+    if (!modele && !rareteSuivante) useGLTF.preload(modelePack(rarete, true));
+  }, [rarete, rareteSuivante, modele]);
+  useEffect(() => {
+    if (rareteSuivante && !modele) useGLTF.preload(modelePack(rareteSuivante));
+  }, [rareteSuivante, modele]);
   return <Repli3D><Canvas camera={{ position: [0, 0, 5.5], fov: 43 }} dpr={[1, 1.5]} frameloop={calme ? 'demand' : 'always'} gl={{ alpha: true, antialias: true }}>
     <ambientLight intensity={1.8} />
     <directionalLight position={[3, 4, 5]} intensity={3.5} />

@@ -1,6 +1,6 @@
 # Ouverture des packs de ligue
 
-L’animation présente exclusivement les cartes renvoyées par le serveur. Elle démarre en bronze, monte d’un seul palier à chaque clic sur le modèle jusqu’au maximum réellement obtenu, puis s’ouvre au clic suivant, puis révèle les cartes par rareté et note croissantes. La rareté technique `star` porte le nom visible « Mythique » et la couleur rouge.
+L’animation présente exclusivement les cartes renvoyées par le serveur. Les packs aux textures de rareté démarrent à leur couleur de boutique, montent d’un palier par clic jusqu’à la meilleure rareté réellement obtenue, puis s’ouvrent au clic suivant. Les packs à skin dédié gardent leur pochette et s’ouvrent directement au clic. Les cartes se révèlent ensuite par rareté et note croissantes. La rareté technique `star` porte le nom visible « Mythique » et la couleur rouge.
 
 - Modèles : `public/m3d/packs/`, environ 20 000 triangles par modèle et textures JPEG 1K. Les fichiers originaux dans `../pack/` restent intacts.
 - Le fichier original « pack  mythique ouvert.glb » est identique au bronze fermé. Sa version optimisée utilise la géométrie bronze ouverte avec une finition rouge.
@@ -43,7 +43,7 @@ Vérification du catalogue, des filtres, des transferts et des permissions : `np
 
 ## Boutique et composition
 
-La boutique utilise un carrousel tactile avec flèches, clavier et sélection directe. La garantie du pack détermine sa couleur en boutique et au début de l’ouverture, bornée par la meilleure récompense réelle. Aucun faux pack n’est affiché pendant le chargement 3D. Les cartes utilisent deux faces et un retournement CSS avec prise en charge des animations réduites.
+La boutique utilise un carrousel tactile avec flèches, clavier et sélection directe. L’apparence du pack détermine sa couleur en boutique et au début de l’ouverture. Les montées de palier reflètent uniquement les cartes obtenues. Aucun faux pack n’est affiché pendant le chargement 3D. Les cartes utilisent deux faces et un retournement CSS avec prise en charge des animations réduites.
 
 Le portrait de repli est `/photos/alexandre_langlois.webp`. Le banc et les réserves sont limités à 104 px. Le bouton « Assembler la meilleure équipe » calcule une affectation globale des 23 places par note et adéquation au poste, avec priorité au XV, exclusion des blessés et première ligne spécialisée. La feuille obtenue peut être ajustée puis enregistrée. `scripts/verifierMeilleureComposition.ts` couvre les contraintes et les rôles.
 

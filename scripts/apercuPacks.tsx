@@ -1,5 +1,5 @@
 // Aperçu local uniquement, absent du build. Aucune connexion ni dépense d'Ovas.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../src/index.css';
 import 'flag-icons/css/flag-icons.min.css';
@@ -7,11 +7,20 @@ import '../src/App.css';
 import { CarteJoueurEnLigne } from '../src/screens/CarriereEnLigne';
 import OuverturePack from '../src/components/OuverturePack';
 import { PALIERS_PACK } from '../src/lib/presentationPacks';
+import { TEXTES } from '../src/data/textes';
+import { chargerTextes } from '../src/lib/i18n';
 import type { CarteCarriere } from '../src/lib/ligue/typesCarriere';
 
 export function Apercu() {
   const [ouvert, setOuvert] = useState(true);
+  const [tiragePret, setTiragePret] = useState(false);
   const params = new URLSearchParams(location.search);
+  const attente = params.has('attente');
+  useEffect(() => {
+    if (!attente) return;
+    const timer = window.setTimeout(() => setTiragePret(true), 1500);
+    return () => window.clearTimeout(timer);
+  }, [attente]);
   const rang = Math.min(4, Math.max(0, Number(params.get('rang') ?? 4)));
   const nombre = Math.min(8, Math.max(1, Number(params.get('cartes') ?? 3)));
   const cartes: CarteCarriere[] = Array.from({ length: nombre }, (_, i) => ({
@@ -21,6 +30,8 @@ export function Apercu() {
     origine: 'professionnel', rarete: PALIERS_PACK[i === nombre - 1 ? rang : Math.min(rang, i % 3)],
     statistiques: { VIT: 88, PAS: 94, DEF: 81, PHY: 85, PIED: 87, TEC: 96 }, proprietaire: 'demo', fatigue: 0, matchs: 0, essais: 0, clubs: [],
   }));
-  return ouvert ? <OuverturePack cartes={cartes} pack="Prestige" garantie={params.has('garantie') ? PALIERS_PACK[Math.min(rang, Math.max(0, Number(params.get('garantie'))))] : undefined} rendreCarte={carte => <CarteJoueurEnLigne carte={carte} />} onFermer={() => setOuvert(false)} /> : <button onClick={() => setOuvert(true)}>Rejouer l’ouverture</button>;
+  const base = Math.min(4, Math.max(0, Number(params.get('base') ?? params.get('garantie') ?? 0)));
+  return ouvert ? <OuverturePack cartes={attente && !tiragePret ? null : cartes} pack="Prestige" modele={params.has('skin') ? '/m3d/packs-speciaux/top14.glb' : undefined} apparenceInitiale={PALIERS_PACK[base]} rendreCarte={carte => <CarteJoueurEnLigne carte={carte} />} onFermer={() => setOuvert(false)} /> : <button onClick={() => setOuvert(true)}>Rejouer l’ouverture</button>;
 }
+chargerTextes(TEXTES);
 createRoot(document.getElementById('root')!).render(<Apercu />);

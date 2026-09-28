@@ -10,7 +10,7 @@ import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionS
 import { SalonAmicalModal } from '../components/SalonAmicalModal';
 import { CompositionCollectionSolo } from '../components/CompositionCollectionSolo';
 import { nombre, t } from '../lib/i18n';
-import { modelePackParNom, packAvecSkin } from '../lib/presentationPacks';
+import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentationPacks';
 import './CollectionSolo.css';
 
 const PAR_PAGE = 40;
@@ -173,6 +173,7 @@ export function CollectionSolo() {
       pack={ouverture.pack.nom}
       modele={packAvecSkin(ouverture.pack.id) ? modelePackParNom(ouverture.pack) : undefined}
       garantie={ouverture.pack.garantie}
+      apparenceInitiale={apparencePack(ouverture.pack)}
       onFermer={() => setOuverture(null)}
       rendreCarte={carte => <CarteJoueurEnLigne carte={carte} compacte proprietaire="Ma collection" />}
     />}
