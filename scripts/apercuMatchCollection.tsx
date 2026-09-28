@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { POSTES } from '../src/data/rugby';
 import type { EquipeAmical, JoueurCollectionAmical } from '../src/lib/amicalCollection';
 import { MatchAmicalManette } from '../src/components/match/MatchAmicalManette';
+import './apercuMatchCollection.css';
 
 function equipe(nom: string, couleur: string, prefixe: string): EquipeAmical {
   const joueurs: JoueurCollectionAmical[] = POSTES.map((poste, index) => ({

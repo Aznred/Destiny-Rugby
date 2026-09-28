@@ -1,0 +1,6 @@
+/* L'aperçu du terrain montre les commandes tactiles même avec une souris. */
+@media (max-width: 950px) and (orientation: landscape) {
+  .amical-manette-racine .amical-hud { display: flex; }
+  .amical-manette-racine .amical-geste-indication { display: grid; }
+  .amical-manette-racine .amical-aide-pc { display: none; }
+}

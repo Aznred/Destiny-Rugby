@@ -7,7 +7,7 @@ import {
 } from '../src/lib/amicalCollection';
 import { cleCarteSolo, etatCollectionSoloVide } from '../src/lib/collectionSolo';
 import { creerMatch, avancer, probaPlaquage } from '../src/lib/moteur/moteur';
-import { creerQteArcade, deplacerJoueurArcade, evaluerQteArcade, selectionnerJoueurPertinent, transformationArcadeReussie } from '../src/lib/moteur/arcade';
+import { actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, evaluerQteArcade, selectionnerJoueurPertinent, transformationArcadeReussie } from '../src/lib/moteur/arcade';
 
 console.log('Testing Collection Friendly Match & Realtime Controller Prototype...');
 
@@ -116,6 +116,23 @@ deplacerJoueurArcade(matchPilote, porteur, { sequence: 1, dx: 1, dy: 0, sprint: 
 const positionPilote = { ...porteur.pos };
 avancer(matchPilote, .15);
 assert.ok(Math.abs(porteur.pos.x - positionPilote.x) < .1, 'Le moteur ne doit pas annuler le déplacement manuel du porteur.');
+for (const phase of ['melee', 'touche'] as const) {
+  matchPilote.phase = phase;
+  const positionArretee = { ...porteur.pos };
+  deplacerJoueurArcade(matchPilote, porteur, { sequence: 2, dx: 1, dy: 0, sprint: true, evenements: [], tempsClient: 0 }, .3);
+  assert.deepEqual(porteur.pos, positionArretee, `Le joystick ne doit pas déplacer le joueur pendant la ${phase}.`);
+}
+matchPilote.phase = 'jeuCourant';
+assert.equal(actionGesteTactileArcade(-85, 0, true), 'PASS_LEFT');
+assert.equal(actionGesteTactileArcade(85, 0, true), 'PASS_RIGHT');
+assert.equal(actionGesteTactileArcade(0, -85, true), 'KICK');
+assert.equal(actionGesteTactileArcade(0, 85, true), 'ACTION_PRIMARY');
+assert.equal(actionGesteTactileArcade(55, 75, true), 'ACTION_SECONDARY');
+assert.equal(actionGesteTactileArcade(70, 0, false), 'ACTION_PRIMARY');
+assert.equal(actionGesteTactileArcade(0, -85, false), 'SWITCH_PLAYER');
+assert.equal(deflexionJoystickArcade(20, 0).sprint, false, 'La première moitié du joystick conserve la course normale.');
+assert.equal(deflexionJoystickArcade(45, 0).sprint, true, 'Le bord du joystick active le sprint.');
+assert.equal(deflexionJoystickArcade(90, 0).dx, 1, 'La course du joystick reste bornée.');
 matchPilote.defenseArcadeCote = undefined;
 const chanceStandard = probaPlaquage(matchPilote, porteur, defenseur, null, false);
 matchPilote.defenseArcadeCote = 'B';

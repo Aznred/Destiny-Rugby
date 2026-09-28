@@ -10,7 +10,7 @@ import type { Pion } from '../../lib/moteur/entites';
 import type { MaillotMatch } from '../../lib/moteur/apparenceMatch';
 import type { PionDirect, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import {
-  actionContextuelleArcade, creerQteArcade, deplacerJoueurArcade, etatGlobalArcade,
+  actionContextuelleArcade, actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, etatGlobalArcade,
   evaluerQteArcade, InputManagerArcade, interpolerPosition, MachineEtatsJoueurs,
   progressionQte, selectionnerJoueurPertinent, transformationArcadeReussie, type EvenementInputArcade,
   type InputActionArcade, type QteArcade, type TrameInputArcade,
@@ -132,6 +132,8 @@ function libellePhase(m: EtatMatch): string {
 
 export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode, onQuitter }: Props) {
   const conteneurRef = useRef<HTMLDivElement>(null);
+  const joystickMancheRef = useRef<HTMLDivElement>(null);
+  const joystickBaseRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const groupeTerrainRef = useRef<SVGGElement>(null);
   const noeudsPionsRef = useRef(new Map<string, { noeud: SVGGElement; origine: Vec }>());
@@ -152,10 +154,8 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const tirQteTraiteRef = useRef<EtatMatch['tir'] | null>(null);
   const preparationRef = useRef<Partial<Record<Cote, { action: 'plaquage' | 'raffut' | 'crochet'; pionId: string; expire: number }>>>({});
   const decalageServeurRef = useRef(0);
-  const gesteRef = useRef<{ x: number; y: number; id: number } | null>(null);
-  const joystickRef = useRef({ actif: false, departX: 0, departY: 0, dx: 0, dy: 0 });
-  const pressionActionRef = useRef(0);
-  const pressionPiedRef = useRef(0);
+  const gesteRef = useRef<{ x: number; y: number; id: number; debut: number } | null>(null);
+  const joystickRef = useRef({ actif: false, id: -1, departX: 0, departY: 0 });
   const dernierRenduRef = useRef(0);
   const appareilTactileRef = useRef(typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
   const pleinEcranMatchRef = useRef(false);
@@ -171,7 +171,6 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const [pionControleId, setPionControleId] = useState<string | null>(null);
   const [enduranceJauge, setEnduranceJauge] = useState(100);
   const [manetteDetectee, setManetteDetectee] = useState(false);
-  const [sprintActif, setSprintActif] = useState(false);
   const [qteAffichee, setQteAffichee] = useState<QteArcade | null>(null);
   const [progressionQteAffichee, setProgressionQteAffichee] = useState(0);
   const [portraitMobile, setPortraitMobile] = useState(false);
@@ -401,6 +400,13 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       if (m && !m.fini && maintenant - precedent >= intervalleSimulation) {
         const dt = Math.min((maintenant - precedent) / 1000, .1);
         precedent = maintenant;
+        if ((m.phase === 'melee' || m.phase === 'touche') && joystickRef.current.actif) {
+          joystickRef.current.actif = false;
+          inputRef.current.definirTactile(0, 0);
+          inputRef.current.definirSprintTactile(false);
+          if (joystickMancheRef.current) joystickMancheRef.current.style.transform = '';
+          joystickBaseRef.current?.classList.remove('sprint');
+        }
         const autoritaire = mode === 'ordinateur' || monCamp === 'A';
         const gamepad = navigator.getGamepads?.()[0] ?? null;
         const trameLocale = inputRef.current.trame(gamepad, true);
@@ -574,43 +580,63 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
     return () => cancelAnimationFrame(animation);
   }, [annoncerIssue, choisirJoueur, mode, monCamp, salonCode, traiterEvenement]);
 
-  const debutJoystick = (event: React.TouchEvent<HTMLDivElement>) => {
-    const touch = event.touches[0];
-    joystickRef.current = { actif: true, departX: touch.clientX, departY: touch.clientY, dx: 0, dy: 0 };
-  };
-  const bougerJoystick = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (!joystickRef.current.actif) return;
-    const touch = event.touches[0];
-    const x = touch.clientX - joystickRef.current.departX;
-    const y = touch.clientY - joystickRef.current.departY;
-    const distance = Math.hypot(x, y); const force = Math.min(1, distance / 45); const angle = Math.atan2(y, x);
-    joystickRef.current.dx = Math.cos(angle) * force; joystickRef.current.dy = Math.sin(angle) * force;
-    inputRef.current.definirTactile(joystickRef.current.dx, joystickRef.current.dy);
-  };
-  const finirJoystick = () => {
-    joystickRef.current = { actif: false, departX: 0, departY: 0, dx: 0, dy: 0 };
+  const debutJoystick = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (matchRef.current?.phase === 'melee' || matchRef.current?.phase === 'touche') return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    joystickRef.current = { actif: true, id: event.pointerId, departX: event.clientX, departY: event.clientY };
     inputRef.current.definirTactile(0, 0);
+    inputRef.current.definirSprintTactile(false);
+  };
+  const bougerJoystick = (event: React.PointerEvent<HTMLDivElement>) => {
+    const joystick = joystickRef.current;
+    if (!joystick.actif || joystick.id !== event.pointerId) return;
+    const x = event.clientX - joystick.departX;
+    const y = event.clientY - joystick.departY;
+    const { dx, dy, sprint, px, py } = deflexionJoystickArcade(x, y);
+    inputRef.current.definirTactile(dx, dy);
+    inputRef.current.definirSprintTactile(sprint);
+    if (joystickMancheRef.current) joystickMancheRef.current.style.transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px)`;
+    joystickBaseRef.current?.classList.toggle('sprint', sprint);
+  };
+  const finirJoystick = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (joystickRef.current.id !== event.pointerId) return;
+    joystickRef.current = { actif: false, id: -1, departX: 0, departY: 0 };
+    inputRef.current.definirTactile(0, 0);
+    inputRef.current.definirSprintTactile(false);
+    if (joystickMancheRef.current) joystickMancheRef.current.style.transform = '';
+    joystickBaseRef.current?.classList.remove('sprint');
   };
 
   const debutGeste = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse') return;
-    gesteRef.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+    gesteRef.current = { x: event.clientX, y: event.clientY, id: event.pointerId, debut: performance.now() };
+    event.currentTarget.setPointerCapture(event.pointerId);
   };
   const finGeste = (event: React.PointerEvent<HTMLDivElement>) => {
     const debut = gesteRef.current;
     if (!debut || debut.id !== event.pointerId) return;
     const dx = event.clientX - debut.x; const dy = event.clientY - debut.y;
     gesteRef.current = null;
-    if (Math.abs(dx) > 58 && Math.abs(dx) > Math.abs(dy)) emettreAction(dx < 0 ? 'PASS_LEFT' : 'PASS_RIGHT');
-    else if (dy < -70) emettreAction('KICK');
+    const qte = qteRef.current;
+    if (qte) {
+      if (qte.type === 'touche' && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+        emettreAction('ACTION_SECONDARY', { option: dx < 0 ? 'court' : 'long' });
+      } else if (qte.type === 'touche' && dy > 45 && Math.abs(dy) > Math.abs(dx)) {
+        emettreAction('ACTION_SECONDARY', { option: 'milieu' });
+      } else emettreAction('ACTION_PRIMARY');
+      return;
+    }
+    const m = matchRef.current;
+    if (!m || m.phase === 'melee' || m.phase === 'touche') return;
+    const action = actionGesteTactileArcade(dx, dy, m.porteur?.cote === monCamp);
+    if (action) emettreAction(action, { dureeMs: performance.now() - debut.debut });
   };
 
   const m = matchRef.current;
   const terrain = m ? terrainSprites(m) : null;
   const pionsDirects = new Map(terrain?.pions.map((p) => [p.id, p]));
   const tempsSprite = m ? Math.floor(m.sim * (appareilTactileRef.current ? 8 : 12)) / (appareilTactileRef.current ? 8 : 12) : 0;
-  const pionControle = m?.pions.find((p) => p.id === pionControleId);
-  const contexte = m ? actionContextuelleArcade(m, pionControle) : null;
   const qteLocaleDejaJouee = qteAffichee?.scores?.[monCamp] !== undefined;
   const styleQte = qteAffichee ? {
     '--qte-progression': `${progressionQteAffichee * 100}%`,
@@ -670,24 +696,20 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         {qteAffichee.type === 'touche' && <div className="amical-qte-choix">
           {(['court', 'milieu', 'long'] as const).map((option) => <button type="button" key={option} className={qteAffichee.choix?.[monCamp] === option ? 'actif' : ''} onClick={() => emettreAction('ACTION_SECONDARY', { option })}>{option === 'court' ? 'Court' : option === 'milieu' ? 'Milieu' : 'Long'}</button>)}
         </div>}
+        {qteAffichee.type === 'touche' && <div className="amical-qte-choix-tactile" aria-label="Zone de lancer">
+          {(['court', 'milieu', 'long'] as const).map((option) => <span key={option} className={(qteAffichee.choix?.[monCamp] ?? 'milieu') === option ? 'actif' : ''}>{option === 'court' ? '← Court' : option === 'milieu' ? '↓ Milieu' : 'Long →'}</span>)}
+        </div>}
         <div className="amical-qte-jauge"><i /><span /></div>
         <button type="button" disabled={qteLocaleDejaJouee || (qteAffichee.type === 'tir' && qteAffichee.initiateur !== monCamp)} onClick={() => emettreAction('ACTION_PRIMARY')}>{qteLocaleDejaJouee ? 'Timing envoyé' : qteAffichee.type === 'ruck' ? 'Relâcher' : qteAffichee.type === 'tir' ? 'Frapper' : 'Maintenant'}</button>
+        <p className="amical-qte-aide-tactile">{qteAffichee.type === 'touche' ? 'Glisse pour choisir · touche la jauge au bon moment' : 'Touche la jauge au bon moment'}</p>
       </div>}
-      <div className="amical-geste-indication">Glisse horizontalement pour passer · vers le haut pour jouer au pied</div>
+      <div className="amical-geste-indication"><span>{m?.porteur?.cote === monCamp ? '←/→ Passe · ↑ Pied · ↓ Raffut · ↘ Crochet' : 'Glisse pour plaquer · ↑ Changer de joueur'}</span><small>Joystick au bord : sprint automatique</small></div>
     </div>
 
     <footer className="amical-hud">
-      <div className="amical-joystick-zone" onTouchStart={debutJoystick} onTouchMove={bougerJoystick} onTouchEnd={finirJoystick} onTouchCancel={finirJoystick} aria-label="Joystick de déplacement">
-        <div className="amical-joystick-base"><div className="amical-joystick-manche" style={{ transform: `translate(${joystickRef.current.dx * 35}px, ${joystickRef.current.dy * 35}px)` }} /></div><span className="amical-joystick-guide">Déplacement</span>
+      <div className="amical-joystick-zone" onPointerDown={debutJoystick} onPointerMove={bougerJoystick} onPointerUp={finirJoystick} onPointerCancel={finirJoystick} aria-label="Joystick de déplacement, bord extérieur pour sprinter" aria-disabled={m?.phase === 'melee' || m?.phase === 'touche'}>
+        <div className="amical-joystick-base" ref={joystickBaseRef}><div className="amical-joystick-manche" ref={joystickMancheRef} /></div><span className="amical-joystick-guide">{m?.phase === 'melee' || m?.phase === 'touche' ? 'Placement verrouillé' : 'Bord extérieur : sprint'}</span>
       </div>
-      <div className="amical-actions-zone">
-        <button type="button" className="amical-btn-action passe gauche" onClick={() => emettreAction('PASS_LEFT')}><span>‹</span> Passe</button>
-        <button type="button" className={`amical-btn-action sprint ${sprintActif ? 'actif' : ''}`} onPointerDown={() => { setSprintActif(true); inputRef.current.definirSprintTactile(true); }} onPointerUp={() => { setSprintActif(false); inputRef.current.definirSprintTactile(false); }} onPointerCancel={() => { setSprintActif(false); inputRef.current.definirSprintTactile(false); }}>Sprint</button>
-        <button type="button" className="amical-btn-action principal action-contextuelle" onPointerDown={() => { pressionActionRef.current = performance.now(); }} onPointerUp={() => { const duree = performance.now() - pressionActionRef.current; emettreAction(duree > 420 ? 'ACTION_SECONDARY' : 'ACTION_PRIMARY', { dureeMs: duree }); }}><b>{contexte?.libellePrincipal ?? 'Action'}</b><small>maintenir : {contexte?.libelleSecondaire ?? 'action 2'}</small></button>
-        <button type="button" className="amical-btn-action passe droite" onClick={() => emettreAction('PASS_RIGHT')}>Passe <span>›</span></button>
-        {contexte?.piedVisible && <button type="button" className="amical-btn-pied-contextuel" onPointerDown={() => { pressionPiedRef.current = performance.now(); }} onPointerUp={() => emettreAction('KICK', { dureeMs: performance.now() - pressionPiedRef.current })}>Jeu au pied</button>}
-      </div>
-      <button type="button" className="amical-btn-changer" onClick={() => emettreAction('SWITCH_PLAYER')} aria-label="Changer de joueur">Changer</button>
     </footer>
 
     <div className="amical-aide-pc">WASD · Maj sprint · Q/E passes · Espace action · F action 2 · C pied · Tab changer</div>

@@ -258,8 +258,33 @@ export function actionContextuelleArcade(match: EtatMatch, pion?: Pion): ActionC
   return { principale: 'soutien', secondaire: 'monter', libellePrincipal: 'Soutien', libelleSecondaire: 'Se replacer', piedVisible: false };
 }
 
+/** Un geste sur le terrain remplace les boutons tactiles sans gêner le joystick. */
+export function actionGesteTactileArcade(dx: number, dy: number, porteurControle: boolean): EvenementInputArcade['action'] | null {
+  const horizontal = Math.abs(dx);
+  const vertical = Math.abs(dy);
+  if (Math.hypot(dx, dy) < 25) return porteurControle ? null : 'SWITCH_PLAYER';
+  if (!porteurControle) {
+    if (dy < -52 && vertical > horizontal * 1.1) return 'SWITCH_PLAYER';
+    return Math.hypot(dx, dy) >= 45 ? 'ACTION_PRIMARY' : null;
+  }
+  if (dy > 52 && horizontal > 38 && horizontal < vertical * 1.45) return 'ACTION_SECONDARY';
+  if (horizontal >= 55 && horizontal > vertical * 1.1) return dx < 0 ? 'PASS_LEFT' : 'PASS_RIGHT';
+  if (dy <= -55 && vertical > horizontal * .8) return 'KICK';
+  if (dy >= 48 && vertical > horizontal * .8) return 'ACTION_PRIMARY';
+  return null;
+}
+
+export function deflexionJoystickArcade(x: number, y: number): { dx: number; dy: number; sprint: boolean; px: number; py: number } {
+  const distance = Math.hypot(x, y);
+  const force = Math.min(1, distance / 48);
+  const dx = distance ? x / distance * force : 0;
+  const dy = distance ? y / distance * force : 0;
+  return { dx, dy, sprint: force >= .82, px: dx * 48, py: dy * 48 };
+}
+
 export function deplacerJoueurArcade(match: EtatMatch, pion: Pion, trame: TrameInputArcade, dt: number): void {
-  if ((!trame.dx && !trame.dy) || pion.corps || pion.sanction > 0) return;
+  if (match.phase === 'melee' || match.phase === 'touche'
+    || (!trame.dx && !trame.dy) || pion.corps || pion.sanction > 0) return;
   const direction = directionNormalisee(trame.dx, trame.dy);
   const orientationX = pion.cote === 'A' ? 1 : -1;
   const sprint = trame.sprint && pion.endurance > 12;
