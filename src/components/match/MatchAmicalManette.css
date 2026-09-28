@@ -286,6 +286,14 @@
 }
 
 .amical-qte > strong { font-size: 1.05rem; }
+.amical-qte-melee, .amical-qte-touche, .amical-qte-ruck {
+  width: min(290px, 78vw);
+  gap: .4rem;
+  padding: .65rem .8rem;
+  background: rgba(3, 19, 25, .88);
+  box-shadow: 0 8px 22px rgba(0,0,0,.4);
+}
+.amical-qte-melee > strong { font-size: .85rem; }
 
 .amical-qte-jauge {
   position: relative;
@@ -316,6 +324,70 @@
   background: #fff;
   box-shadow: 0 0 10px #fff;
 }
+.amical-qte-direction { height: 34px; }
+.amical-qte-direction span {
+  top: -2px;
+  bottom: auto;
+  width: 16px;
+  height: 28px;
+  transform: translateX(-8px);
+  background: #ffcf57;
+  clip-path: polygon(32% 0, 68% 0, 68% 55%, 100% 55%, 50% 100%, 0 55%, 32% 55%);
+  box-shadow: none;
+}
+.amical-qte-puissance-vertical {
+  --qte-puissance: 0%;
+  position: relative;
+  width: 66px;
+  height: min(155px, 37vh);
+  margin: auto;
+  overflow: hidden;
+  border: 3px solid #dbeafe;
+  border-radius: 13px;
+  background: linear-gradient(0deg, #842020, #b77216 52%, #176c44);
+}
+.amical-qte-puissance-vertical i {
+  position: absolute;
+  inset: auto 0 0;
+  height: var(--qte-puissance);
+  background: linear-gradient(0deg, #ffc648, #ffe486);
+  box-shadow: 0 -4px 12px #ffe486;
+}
+.amical-qte-puissance-vertical span {
+  position: absolute;
+  inset: 14px 0 auto;
+  color: #fff;
+  font-size: 1.7rem;
+  font-weight: 900;
+  text-shadow: 0 2px 5px #06120b;
+}
+.amical-qte-poussee {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: .35rem;
+  align-items: center;
+  color: #dce8e2;
+  font-size: .67rem;
+  font-weight: 700;
+}
+.amical-qte-poussee > div {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #cc4949, #56675b 50%, #4ade80);
+}
+.amical-qte-poussee i {
+  position: absolute;
+  top: -4px;
+  left: calc(50% + var(--qte-avantage));
+  width: 5px;
+  height: 17px;
+  border-radius: 3px;
+  background: white;
+  box-shadow: 0 0 7px white;
+  transition: left .32s ease-out;
+}
+.amical-qte-resultat-pack { color: #ffe08a; font-size: .7rem; }
 
 .amical-qte > button,
 .amical-qte-choix button {
@@ -333,6 +405,7 @@
 .amical-qte-choix button.actif { background: #b45309; border-color: #fde68a; }
 .amical-qte-choix-tactile, .amical-qte-aide-tactile { display: none; }
 @media (pointer: coarse) {
+  .amical-qte { pointer-events: none; }
   .amical-qte-choix, .amical-qte > button { display: none; }
   .amical-qte-choix-tactile { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
   .amical-qte-choix-tactile span { min-width: 0; padding: .6rem .3rem; border: 1px solid #ffffff48; border-radius: 9px; background: #142235; font-size: .78rem; }

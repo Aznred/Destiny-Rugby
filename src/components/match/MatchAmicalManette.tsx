@@ -12,7 +12,7 @@ import type { PionDirect, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import {
   actionContextuelleArcade, actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, etatGlobalArcade,
   evaluerQteArcade, InputManagerArcade, interpolerPosition, MachineEtatsJoueurs,
-  progressionQte, selectionnerJoueurPertinent, transformationArcadeReussie, type EvenementInputArcade,
+  progressionQte, scorePuissanceGesteArcade, selectionnerJoueurPertinent, transformationArcadeReussie, type EvenementInputArcade,
   type InputActionArcade, type QteArcade, type TrameInputArcade,
 } from '../../lib/moteur/arcade';
 import {
@@ -136,6 +136,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const joystickMancheRef = useRef<HTMLDivElement>(null);
   const joystickBaseRef = useRef<HTMLDivElement>(null);
   const viseeGesteRef = useRef<HTMLDivElement>(null);
+  const puissanceBarreRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const vueRef = useRef<Vue | null>(null);
   const groupeTerrainRef = useRef<SVGGElement>(null);
@@ -158,6 +159,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const preparationRef = useRef<Partial<Record<Cote, { action: 'plaquage' | 'raffut' | 'crochet'; pionId: string; cibleId?: string; direction?: Vec; expire: number }>>>({});
   const decalageServeurRef = useRef(0);
   const gesteRef = useRef<{ x: number; y: number; id: number; debut: number } | null>(null);
+  const qteGesteRef = useRef<{ id: number; x: number; y: number; qteId: string; force: number } | null>(null);
   const joystickRef = useRef({ actif: false, id: -1, departX: 0, departY: 0 });
   const dernierRenduRef = useRef(0);
   const appareilTactileRef = useRef(typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
@@ -290,7 +292,11 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         return;
       }
       if (evenement.action === 'ACTION_PRIMARY' && qte.scores?.[camp] === undefined) {
-        const resultat = evaluerQteArcade(qte, evenement.tempsServeurEstime);
+        const scoreGeste = Number.isFinite(evenement.scoreTactile) ? evenement.scoreTactile! : -.2;
+        const resultat = qte.type === 'tir' && qte.etapeTir === 'puissance' && evenement.scoreTactile !== undefined
+          ? { score: scoreGeste >= 1 ? 1 : scoreGeste >= .55 ? .55 : -.2,
+            qualite: scoreGeste >= 1 ? 'excellent' as const : scoreGeste >= .55 ? 'bon' as const : 'rate' as const }
+          : evaluerQteArcade(qte, evenement.tempsServeurEstime);
         qte.scores ??= {}; qte.scores[camp] = resultat.score;
         setQteAffichee({ ...qte, scores: { ...qte.scores } });
         setMessageAction(resultat.qualite === 'excellent' ? 'Timing excellent' : resultat.qualite === 'bon' ? 'Bon timing' : 'Timing manqué');
@@ -344,7 +350,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   }, [annoncerIssue, choisirJoueur, lancerQteRuck, monCamp]);
 
   const emettreAction = useCallback((action: Exclude<InputActionArcade, 'MOVE' | 'SPRINT'>,
-    options: { dureeMs?: number; option?: 'court' | 'milieu' | 'long'; direction?: Vec; cibleId?: string; joueurId?: string; gesteTactile?: boolean } = {}) => {
+    options: { dureeMs?: number; option?: 'court' | 'milieu' | 'long'; direction?: Vec; cibleId?: string; joueurId?: string; gesteTactile?: boolean; scoreTactile?: number } = {}) => {
     const trame = inputRef.current.trame(navigator.getGamepads?.()[0], true);
     inputRef.current.emettre(action, { direction: { x: trame.dx, y: trame.dy }, ...options });
   }, []);
@@ -480,15 +486,19 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
             }
           }
 
-          if (m.phase === 'transformation' && m.tir && !m.tir.volLance && m.tir !== tirQteTraiteRef.current && !qteRef.current) {
+          if ((m.phase === 'transformation' || m.phase === 'tirAuBut') && m.tir
+            && !m.tir.volLance && m.tir !== tirQteTraiteRef.current && !qteRef.current) {
             tirQteTraiteRef.current = m.tir;
             if (mode === 'reseau' || m.tir.buteur.cote === monCamp) {
               const tir = creerQteArcade('tir', `${salonCode ?? 'solo'}-${m.essaisA + m.essaisB}-${m.sim.toFixed(1)}`, Date.now() + decalageServeurRef.current + 350);
               tir.initiateur = m.tir.buteur.cote;
               tir.etapeTir = 'direction';
+              tir.valeurTir = m.tir.valeur;
+              tir.cible = .5;
+              tir.dureeMs = 3000;
               qteRef.current = tir;
               setQteAffichee({ ...tir });
-              setMessageAction('Transformation · vise la direction avec la première jauge');
+              setMessageAction(`${m.tir.valeur === 3 ? 'Pénalité' : 'Transformation'} · touche l’écran quand la flèche vise juste`);
             }
           }
 
@@ -513,17 +523,19 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
                 const puissance = creerQteArcade('tir', `${qte.id}-puissance`, tempsServeur + 350);
                 puissance.initiateur = qte.initiateur;
                 puissance.etapeTir = 'puissance';
+                puissance.valeurTir = qte.valeurTir;
                 puissance.directionScore = score;
+                puissance.dureeMs = 4500;
                 qteRef.current = puissance;
                 setQteAffichee({ ...puissance });
-                setMessageAction('Transformation · dose la puissance avec la deuxième jauge');
+                setMessageAction('Tir · glisse ton doigt vers le haut pour remplir la barre de puissance');
               } else {
                 const tir = m.tir;
                 const reussi = Boolean(tir && transformationArcadeReussie(qte.directionScore ?? -.2, score, tir.angle, tir.distance));
                 if (tir) { tir.reussi = reussi; m.minuteur = Math.min(m.minuteur, .45); }
                 qteRef.current = null;
                 setQteAffichee(null);
-                setMessageAction(reussi ? 'Transformation bien frappée !' : 'Transformation manquée · ajuste les deux jauges au prochain essai');
+                setMessageAction(reussi ? 'Tir réussi !' : 'Tir manqué · vise puis glisse plus haut pour la puissance');
               }
             } else {
               qte.scores ??= {};
@@ -636,6 +648,52 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
     joystickBaseRef.current?.classList.remove('sprint');
   };
 
+  const debutQteGlobal = (event: React.PointerEvent<HTMLDivElement>) => {
+    const qte = qteRef.current;
+    if (!qte || event.pointerType === 'mouse'
+      || (event.target instanceof Element && event.target.closest('.amical-btn-retour, .amical-modale-fin, .amical-paysage-requis'))) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    qteGesteRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, qteId: qte.id, force: 0 };
+    if (qte.type === 'tir' && qte.etapeTir === 'puissance') {
+      puissanceBarreRef.current?.style.setProperty('--qte-puissance', '0%');
+    } else if (!(qte.type === 'tir' && qte.initiateur !== monCamp)) {
+      emettreAction('ACTION_PRIMARY');
+    }
+  };
+  const bougerQteGlobal = (event: React.PointerEvent<HTMLDivElement>) => {
+    const geste = qteGesteRef.current;
+    const qte = qteRef.current;
+    if (!geste || geste.id !== event.pointerId || !qte || qte.id !== geste.qteId) return;
+    event.stopPropagation();
+    if (qte.type !== 'tir' || qte.etapeTir !== 'puissance') return;
+    const force = scorePuissanceGesteArcade(event.clientY - geste.y, event.currentTarget.clientHeight).force;
+    geste.force = Math.max(geste.force, force);
+    puissanceBarreRef.current?.style.setProperty('--qte-puissance', `${Math.round(geste.force * 100)}%`);
+  };
+  const finQteGlobal = (event: React.PointerEvent<HTMLDivElement>) => {
+    const geste = qteGesteRef.current;
+    if (!geste || geste.id !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    qteGesteRef.current = null;
+    const qte = qteRef.current;
+    if (!qte || qte.id !== geste.qteId || (qte.type === 'tir' && qte.initiateur !== monCamp)) return;
+    const dx = event.clientX - geste.x; const dy = event.clientY - geste.y;
+    if (qte.type === 'tir' && qte.etapeTir === 'puissance') {
+      const forceFin = scorePuissanceGesteArcade(dy, event.currentTarget.clientHeight).force;
+      const force = Math.max(geste.force, forceFin);
+      const score = force >= .85 ? 1 : force >= .55 ? .55 : -.2;
+      puissanceBarreRef.current?.style.setProperty('--qte-puissance', `${Math.round(force * 100)}%`);
+      emettreAction('ACTION_PRIMARY', { scoreTactile: score });
+    } else if (qte.type === 'touche' && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+      emettreAction('ACTION_SECONDARY', { option: dx < 0 ? 'court' : 'long' });
+    } else if (qte.type === 'touche' && dy > 45 && Math.abs(dy) > Math.abs(dx)) {
+      emettreAction('ACTION_SECONDARY', { option: 'milieu' });
+    }
+  };
+
   const debutGeste = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse') return;
     gesteRef.current = { x: event.clientX, y: event.clientY, id: event.pointerId, debut: performance.now() };
@@ -715,13 +773,30 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const pionsDirects = new Map(terrain?.pions.map((p) => [p.id, p]));
   const tempsSprite = m ? Math.floor(m.sim * (appareilTactileRef.current ? 8 : 12)) / (appareilTactileRef.current ? 8 : 12) : 0;
   const qteLocaleDejaJouee = qteAffichee?.scores?.[monCamp] !== undefined;
+  const scorePoussee = qteAffichee?.type === 'melee' ? qteAffichee.scores?.[monCamp] : undefined;
+  const avantagePoussee = scorePoussee === undefined ? 0 : scorePoussee >= 1 ? .85 : scorePoussee >= .55 ? .4 : -.72;
   const styleQte = qteAffichee ? {
     '--qte-progression': `${progressionQteAffichee * 100}%`,
     '--qte-cible': `${qteAffichee.cible * 100}%`,
     '--qte-largeur': `${qteAffichee.largeurBonne * 200}%`,
+    '--qte-avantage': `${avantagePoussee * 40}%`,
   } as CSSProperties : undefined;
+  const vueQte = vueRef.current;
+  const pointQte = qteAffichee && qteAffichee.type !== 'tir' && m && vueQte
+    ? vueQte.versEcran(m.ballon) : null;
+  const positionQte: CSSProperties | undefined = pointQte && vueQte ? {
+    left: Math.max(140, Math.min(dimensionsRef.current.largeur - 140,
+      pointQte.x / vueQte.W * dimensionsRef.current.largeur)),
+    top: Math.max(145, Math.min(dimensionsRef.current.hauteur - 30,
+      pointQte.y / vueQte.H * dimensionsRef.current.hauteur - 25)),
+    transform: 'translate(-50%, -100%)',
+  } : undefined;
 
-  return <div className="amical-manette-racine" ref={conteneurRef}>
+  return <div className="amical-manette-racine" ref={conteneurRef}
+    onPointerDownCapture={debutQteGlobal} onPointerMoveCapture={bougerQteGlobal}
+    onPointerUpCapture={finQteGlobal} onPointerCancelCapture={(event) => {
+      if (qteGesteRef.current?.id === event.pointerId) qteGesteRef.current = null;
+    }}>
     <header className="amical-entete">
       <button type="button" className="btn fantome amical-btn-retour" onClick={onQuitter}><Icone nom="fleche-droite" taille={16} /> Quitter</button>
       <div className="amical-scoreboard">
@@ -769,17 +844,25 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       </svg>}
       <div className="amical-visee-tactile" ref={viseeGesteRef} aria-hidden="true" />
 
-      {qteAffichee && <div className={`amical-qte amical-qte-${qteAffichee.type}`} style={styleQte}>
-        <strong>{qteAffichee.type === 'melee' ? 'Poussée en mêlée' : qteAffichee.type === 'touche' ? 'Duel en touche' : qteAffichee.type === 'tir' ? qteAffichee.etapeTir === 'direction' ? 'Transformation · direction' : 'Transformation · puissance' : 'Grattage'}</strong>
+      {qteAffichee && <div className={`amical-qte amical-qte-${qteAffichee.type} amical-qte-${qteAffichee.etapeTir ?? 'timing'}`} style={{ ...styleQte, ...positionQte }}>
+        <strong>{qteAffichee.type === 'melee' ? 'Poussée en mêlée' : qteAffichee.type === 'touche' ? 'Duel en touche' : qteAffichee.type === 'tir' ? `${qteAffichee.valeurTir === 3 ? 'Pénalité' : 'Transformation'} · ${qteAffichee.etapeTir === 'direction' ? 'visée' : 'puissance'}` : 'Grattage'}</strong>
         {qteAffichee.type === 'touche' && <div className="amical-qte-choix">
           {(['court', 'milieu', 'long'] as const).map((option) => <button type="button" key={option} className={qteAffichee.choix?.[monCamp] === option ? 'actif' : ''} onClick={() => emettreAction('ACTION_SECONDARY', { option })}>{option === 'court' ? 'Court' : option === 'milieu' ? 'Milieu' : 'Long'}</button>)}
         </div>}
         {qteAffichee.type === 'touche' && <div className="amical-qte-choix-tactile" aria-label="Zone de lancer">
           {(['court', 'milieu', 'long'] as const).map((option) => <span key={option} className={(qteAffichee.choix?.[monCamp] ?? 'milieu') === option ? 'actif' : ''}>{option === 'court' ? '← Court' : option === 'milieu' ? '↓ Milieu' : 'Long →'}</span>)}
         </div>}
-        <div className="amical-qte-jauge"><i /><span /></div>
+        {qteAffichee.type === 'tir' && qteAffichee.etapeTir === 'puissance'
+          ? <div className="amical-qte-puissance-vertical" ref={puissanceBarreRef} style={{ '--qte-puissance': '0%' } as CSSProperties}><i /><span>↑</span></div>
+          : <div className={`amical-qte-jauge${qteAffichee.type === 'tir' ? ' amical-qte-direction' : ''}`}><i /><span /></div>}
+        {qteAffichee.type === 'melee' && <><div className="amical-qte-poussee"><span>Recul</span><div><i /></div><span>Avance</span></div>
+          <small className="amical-qte-resultat-pack">{scorePoussee === undefined ? 'Touche au bon moment pour pousser' : scorePoussee >= .55 ? 'Ton pack avance !' : 'Ton pack recule'}</small></>}
         <button type="button" disabled={qteLocaleDejaJouee || (qteAffichee.type === 'tir' && qteAffichee.initiateur !== monCamp)} onClick={() => emettreAction('ACTION_PRIMARY')}>{qteLocaleDejaJouee ? 'Timing envoyé' : qteAffichee.type === 'ruck' ? 'Relâcher' : qteAffichee.type === 'tir' ? 'Frapper' : 'Maintenant'}</button>
-        <p className="amical-qte-aide-tactile">{qteAffichee.type === 'touche' ? 'Glisse pour choisir · touche la jauge au bon moment' : 'Touche la jauge au bon moment'}</p>
+        <p className="amical-qte-aide-tactile">{qteAffichee.type === 'tir' && qteAffichee.etapeTir === 'puissance'
+          ? 'Pose le doigt en bas et glisse le plus haut possible'
+          : qteAffichee.type === 'tir' ? 'Touche l’écran quand la flèche vise le centre'
+            : qteAffichee.type === 'touche' ? 'Touche l’écran au bon moment · glisse pour choisir'
+              : 'Touche n’importe où au bon moment'}</p>
       </div>}
       <div className="amical-geste-indication"><span>{m?.phase === 'ruck' || m?.phase === 'maul' ? 'Touche le ruck : soutien ou grattage' : m?.porteur?.cote === monCamp ? '↑ Passe gauche · ↓ Passe droite · → Pied dirigé · touche un rival : raffut' : 'Glisse vers le porteur : plaquage · touche le terrain : changer'}</span><small>Joystick au bord : sprint automatique</small></div>
     </div>

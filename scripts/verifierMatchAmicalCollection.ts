@@ -7,7 +7,7 @@ import {
 } from '../src/lib/amicalCollection';
 import { cleCarteSolo, etatCollectionSoloVide } from '../src/lib/collectionSolo';
 import { creerMatch, avancer, probaPlaquage, resoudreChoix } from '../src/lib/moteur/moteur';
-import { actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, evaluerQteArcade, selectionnerJoueurPertinent, transformationArcadeReussie } from '../src/lib/moteur/arcade';
+import { actionGesteTactileArcade, creerQteArcade, deflexionJoystickArcade, deplacerJoueurArcade, evaluerQteArcade, scorePuissanceGesteArcade, selectionnerJoueurPertinent, transformationArcadeReussie } from '../src/lib/moteur/arcade';
 
 console.log('Testing Collection Friendly Match & Realtime Controller Prototype...');
 
@@ -97,6 +97,23 @@ assert.equal(transformationArcadeReussie(.55, .55, 10, 25), true, 'Deux bons ges
 assert.equal(transformationArcadeReussie(1, -.2, 10, 25), false, 'Un tir sans puissance doit échouer.');
 assert.equal(transformationArcadeReussie(.55, 1, 30, 25), false, 'Un angle difficile exige une direction parfaite.');
 assert.equal(transformationArcadeReussie(1, .55, 10, 42), false, 'Un tir lointain exige une puissance parfaite.');
+assert.equal(scorePuissanceGesteArcade(-180, 390).score, 1, 'Un grand glissement vers le haut donne la pleine puissance.');
+assert.equal(scorePuissanceGesteArcade(-35, 390).score, -.2, 'Un petit glissement ne suffit pas.');
+assert.equal(scorePuissanceGesteArcade(90, 390).score, -.2, 'Glisser vers le bas ne donne pas de puissance.');
+
+const matchPenalite = creerMatch(equipe.nom, equipeB.nom, coequipiersA, coequipiersB, 20, 17, 'test-penalite-qte', undefined, {
+  niveau: 'pro', tempsReel: true, controle: true,
+});
+const buteurPenalite = matchPenalite.pions.find((p) => p.cote === 'A')!;
+buteurPenalite.pos = { x: 70, y: 35 };
+matchPenalite.phase = 'tirAuBut';
+matchPenalite.minuteur = 0;
+matchPenalite.tir = { buteur: buteurPenalite, distance: 30, angle: 0, valeur: 3,
+  suite: 'renvoi', lieu: { ...buteurPenalite.pos }, reussi: false };
+matchPenalite.rng = () => 0;
+avancer(matchPenalite, .15);
+assert.equal(matchPenalite.tir?.volLance, true, 'Le tir de pénalité doit partir pendant le test.');
+assert.equal(matchPenalite.tir?.reussi, false, 'La pénalité doit respecter le résultat du geste même avec un tirage moteur favorable.');
 
 const matchPilote = creerMatch(equipe.nom, equipeB.nom, coequipiersA, coequipiersB, 20, 17, 'test-porteur-arcade', undefined, {
   niveau: 'pro', tempsReel: true, controle: false,

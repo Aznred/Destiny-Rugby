@@ -30,6 +30,7 @@ export interface EvenementInputArcade {
   cibleId?: string;
   joueurId?: string;
   gesteTactile?: boolean;
+  scoreTactile?: number;
   option?: 'court' | 'milieu' | 'long';
 }
 
@@ -322,6 +323,7 @@ export interface QteArcade {
   choix?: Partial<Record<Cote, 'court' | 'milieu' | 'long'>>;
   scores?: Partial<Record<Cote, number>>;
   etapeTir?: 'direction' | 'puissance';
+  valeurTir?: number;
   directionScore?: number;
 }
 
@@ -355,6 +357,12 @@ export function evaluerQteArcade(qte: QteArcade, tempsServeur: number): Resultat
 
 export function progressionQte(qte: QteArcade, tempsServeur: number): number {
   return borner((tempsServeur - qte.debutServeur) / qte.dureeMs, 0, 1);
+}
+
+/** La puissance du tir dépend de la distance réellement parcourue par le doigt vers le haut. */
+export function scorePuissanceGesteArcade(deplacementY: number, hauteurEcran: number): { force: number; score: number } {
+  const force = borner(-deplacementY / Math.max(120, hauteurEcran * .45), 0, 1);
+  return { force, score: force >= .85 ? 1 : force >= .55 ? .55 : -.2 };
 }
 
 /** Les deux gestes du joueur déterminent réellement la transformation. */

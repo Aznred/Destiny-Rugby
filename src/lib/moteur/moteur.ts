@@ -160,7 +160,9 @@ function animerArret(e: EtatMatch): void {
     const avants = (cote: Cote) => surLeTerrain(e, cote).filter((q) => q.avant);
     const ecartPacks = scoreMelee(e, avants(e.possession), e.possession)
       - scoreMelee(e, avants(adverse(e.possession)), adverse(e.possession));
-    const domBrut = borner(ecartPacks / 10, -1, 1);
+    const qte = e.bonusConqueteArcade?.type === 'melee' ? e.bonusConqueteArcade.scores : undefined;
+    const bonusGeste = ((qte?.[e.possession] ?? 0) - (qte?.[adverse(e.possession)] ?? 0)) * 8;
+    const domBrut = borner((ecartPacks + bonusGeste) / 10, -1, 1);
     // Même une domination légère doit se LIRE. Le pack gagnant avance de 1,4
     // à 4 mètres pendant la poussée, au lieu d'un frémissement invisible.
     const dom = Math.abs(domBrut) < 0.16 ? 0
@@ -3064,7 +3066,7 @@ function phaseTirAuBut(e: EtatMatch): void {
       return;
     }
     buteur.stats.butsTentes += 1;
-    const reussi = e.rng() < probabilitePenalite(e, buteur, d, angle);
+    const reussi = tir.reussi ?? e.rng() < probabilitePenalite(e, buteur, d, angle);
     lancerTrajectoireTir(e, tir, reussi);
     return;
   }
