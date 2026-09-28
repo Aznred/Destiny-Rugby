@@ -287,6 +287,8 @@ export interface QteArcade {
   initiateur?: Cote;
   choix?: Partial<Record<Cote, 'court' | 'milieu' | 'long'>>;
   scores?: Partial<Record<Cote, number>>;
+  etapeTir?: 'direction' | 'puissance';
+  directionScore?: number;
 }
 
 function hacherGraine(graine: string): number {
@@ -319,6 +321,11 @@ export function evaluerQteArcade(qte: QteArcade, tempsServeur: number): Resultat
 
 export function progressionQte(qte: QteArcade, tempsServeur: number): number {
   return borner((tempsServeur - qte.debutServeur) / qte.dureeMs, 0, 1);
+}
+
+/** Les deux gestes du joueur déterminent réellement la transformation. */
+export function transformationArcadeReussie(direction: number, puissance: number, angle: number, distance: number): boolean {
+  return direction >= (angle > 25 ? 1 : .55) && puissance >= (distance > 40 ? 1 : .55);
 }
 
 export function interpolerPosition(actuelle: Vec, cible: Vec, facteur = .28): Vec {

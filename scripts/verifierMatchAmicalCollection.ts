@@ -7,6 +7,7 @@ import {
 } from '../src/lib/amicalCollection';
 import { cleCarteSolo, etatCollectionSoloVide } from '../src/lib/collectionSolo';
 import { creerMatch, avancer } from '../src/lib/moteur/moteur';
+import { creerQteArcade, evaluerQteArcade, transformationArcadeReussie } from '../src/lib/moteur/arcade';
 
 console.log('Testing Collection Friendly Match & Realtime Controller Prototype...');
 
@@ -56,10 +57,46 @@ const match = creerMatch(
 
 assert.ok(match, 'Le match amical doit être initialisé');
 assert.equal(match.pions.length, 30, '30 joueurs doivent être sur la feuille de match');
+match.carriereDixMinutes = true;
+match.dureeReelleArcade = 8 * 60;
+match.finSurSortieOuEnAvant = true;
 
 // Faire avancer de quelques secondes
 avancer(match, 1.0);
 assert.ok(match.sim > 0, 'Le chrono du match doit progresser');
+assert.ok(match.t >= 9 && match.t <= 11, 'Une seconde réelle doit représenter dix secondes du match de 80 minutes.');
+match.t = 2399;
+match.minute = Math.floor(match.t / 60);
+avancer(match, .3);
+assert.equal(match.sirene, true, 'La sirène doit sonner au bout des 40 premières minutes affichées.');
+assert.equal(match.periode, 1, 'La sirène seule ne doit pas terminer la première mi-temps.');
+assert.equal(match.fini, false, 'Le jeu continue après la sirène tant que le ballon reste en jeu.');
+match.porteur = null;
+match.vol = null;
+match.phase = 'ballonLibre';
+match.minuteur = 10;
+match.ballon = { x: 60, y: .3 };
+match.ballonLibre = { vitesse: { x: 0, y: -5 }, hauteur: 0, vitesseVerticale: 0, intention: 'touche', auteurCote: 'A', age: 0, rebonds: 0 };
+avancer(match, .15);
+assert.equal(match.periode, 2, 'La touche après la sirène doit lancer la mi-temps.');
+assert.equal(match.phase, 'miTemps');
+
+match.t = 4799;
+match.minute = Math.floor(match.t / 60);
+match.sirene = false;
+match.phase = 'ballonLibre';
+match.minuteur = 10;
+match.ballon = { x: 60, y: .3 };
+match.ballonLibre = { vitesse: { x: 0, y: -5 }, hauteur: 0, vitesseVerticale: 0, intention: 'touche', auteurCote: 'A', age: 0, rebonds: 0 };
+avancer(match, .15);
+assert.equal(match.fini, true, 'La touche après 80 minutes affichées doit terminer le match.');
+const direction = creerQteArcade('tir', 'test-direction', 1_000);
+const parfait = evaluerQteArcade(direction, 1_000 + direction.cible * direction.dureeMs);
+assert.equal(parfait.score, 1, 'Le QTE de direction possède une zone parfaite.');
+assert.equal(transformationArcadeReussie(.55, .55, 10, 25), true, 'Deux bons gestes transforment un essai facile.');
+assert.equal(transformationArcadeReussie(1, -.2, 10, 25), false, 'Un tir sans puissance doit échouer.');
+assert.equal(transformationArcadeReussie(.55, 1, 30, 25), false, 'Un angle difficile exige une direction parfaite.');
+assert.equal(transformationArcadeReussie(1, .55, 10, 42), false, 'Un tir lointain exige une puissance parfaite.');
 
 // 4. Tester la détection du compte Kiri
 assert.equal(estCompteKiriAutorise({ pseudo: 'kiri' }), true, 'Pseudo kiri doit être autorisé');

@@ -370,6 +370,10 @@ export interface PlanDeScore {
 export interface EtatMatch {
   /** Solo : mouvements naturels, horloge sportive sur dix minutes. */
   carriereDixMinutes?: boolean;
+  /** Durée réelle d'un match arcade complet, en secondes. */
+  dureeReelleArcade?: number;
+  /** Après la sirène, le jeu se poursuit jusqu'à une touche ou un en-avant. */
+  finSurSortieOuEnAvant?: boolean;
   dropEnCours?: { auteurId: string; reussi: boolean };
   arbitre?: import('./dynamique.js').ArbitreMatch;
   gestes?: import('./dynamique.js').GesteMatch[];

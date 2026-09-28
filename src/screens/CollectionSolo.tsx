@@ -142,7 +142,7 @@ export function CollectionSolo() {
           <small>{t('solo.paidPacksDetail', { n: packsPayants.length })}</small>
         </button>
       </div>
-      <BoutiquePacks3D
+      {!amicalOuvert && <BoutiquePacks3D
         key={categoriePacks}
         packs={categoriePacks === 'gratuits' ? packsGratuits : packsPayants}
         solde={coins}
@@ -150,7 +150,7 @@ export function CollectionSolo() {
         onOuvrir={ouvrirDepuisRoue}
         gratuit={categoriePacks === 'gratuits'}
         paiementAlternatif={categoriePacks === 'gratuits' ? <button type="button" className="btn fantome petit solo-pub-desactivee" disabled title={t('solo.adTitle')}><Icone nom="video" taille={15} /> {t('solo.adDisabled')}</button> : undefined}
-      />
+      />}
     </section>
 
     <section className="solo-catalogue">

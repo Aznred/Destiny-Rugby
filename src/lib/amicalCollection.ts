@@ -38,6 +38,9 @@ export interface EtatMatchAmicalReseau {
   revision: number;
   simulation: number;
   minute: number;
+  tempsJeu?: number;
+  periode?: 1 | 2;
+  sirene?: boolean;
   scoreA: number;
   scoreB: number;
   phase: string;

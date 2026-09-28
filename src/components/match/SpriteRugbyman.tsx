@@ -18,7 +18,8 @@ const CLIPS = new Map(rugbyAnimations.map(clip => [clip.id.replace(/^rugby_/, ''
 // mêlées, relèvements) sans aucun rognage de la tête ou des crampons.
 const LARGEUR_CANVAS = 160;
 const HAUTEUR_CANVAS = 160;
-const TAILLE_CANVAS_COMPACT = 112;
+const TAILLE_CANVAS_MATCH = 112;
+const TAILLE_CANVAS_COMPACT = 80;
 
 interface Props {
   pion: PionDirect;
@@ -273,7 +274,7 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
   const ballonAnime = porteur || ballonTouche;
   const graine = graineVisuelleMatch(pion.id);
   const derniereImage = useRef('');
-  const tailleCanvas = compact ? TAILLE_CANVAS_COMPACT : LARGEUR_CANVAS;
+  const tailleCanvas = compact ? TAILLE_CANVAS_COMPACT : TAILLE_CANVAS_MATCH;
   useLayoutEffect(() => {
     const instantClip = progression === undefined ? temps : progression * clip.frames.length / clip.fps;
     const cle = `${character.id}:${tailleCanvas}:${maillot.principal}:${maillot.secondaire}:${maillot.motif}:${clip.id}:${orientation}:${ballonAnime}:${Math.floor(instantClip * 24)}:${Math.floor((pion.corps?.age ?? 0) * 24)}`;

@@ -21,8 +21,8 @@ export default function OuverturePack({ cartes, pack, modele, garantie, onFermer
    * normal, pas une erreur. La pochette s'affiche AVANT que les cartes soient
    * connues : sans ça, le clic restait sans effet pendant tout l'aller-retour —
    * une seconde et demie sur un téléphone en 5G, plus au réveil de la fonction
-   * serverless — et le jeu paraissait figé. L'animation démarre au clic d'achat ;
-   * les cartes rejoignent l'écran dès que le serveur les a tirées.
+   * serverless — et le jeu paraissait figé. La pochette attend ensuite que le
+   * joueur l'ouvre ; les cartes rejoignent l'écran quand le serveur les a tirées.
    */
   cartes: CarteCarriere[] | null; pack: string; modele?: string; garantie?: RareteCarriere; onFermer: () => void; rendreCarte: (carte: CarteCarriere) => ReactNode;
 }) {
@@ -34,7 +34,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, onFermer
   const ordre = useMemo(() => cartes ? [...cartes].sort((a,b) => rangPack(b)-rangPack(a) || b.note-a.note) : [], [cartes]);
   // La rareté du contenu reste cachée jusqu'aux cartes. La pochette garde son skin.
   const rang = Math.max(0, PALIERS_PACK.indexOf(garantie ?? 'bronze'));
-  const [phase, setPhase] = useState<'ouverture'|'cartes'>('ouverture');
+  const [phase, setPhase] = useState<'attente'|'ouverture'|'cartes'>('attente');
   const [animationFinie, setAnimationFinie] = useState(false);
   const [revelees, setRevelees] = useState(0);
   const [carteActive, setCarteActive] = useState(0);
@@ -94,12 +94,15 @@ export default function OuverturePack({ cartes, pack, modele, garantie, onFermer
   }, [phase, revelees, ordre.length, calme]);
 
   useEffect(() => {
-    sons.ouvrir(rang);
-  }, [sons, rang]);
-  useEffect(() => {
     if (pret && animationFinie) setPhase('cartes');
   }, [pret, animationFinie]);
-  useEffect(() => { if (phase === 'cartes') principale.current?.focus(); }, [phase]);
+  useEffect(() => { principale.current?.focus(); }, [phase]);
+  function ouvrir() {
+    if (phase !== 'attente') return;
+    sons.activer();
+    sons.ouvrir(rang);
+    setPhase('ouverture');
+  }
   function passer() {
     if (!pret) return;
     setInstant(true); sons.arreter(); setPhase('cartes'); setRevelees(ordre.length);
@@ -119,7 +122,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, onFermer
       if (e.key === 'Escape') {
         e.preventDefault();
         if (phase === 'cartes' && toutes) onFermer();
-        else if (pret) { setInstant(true); sons.arreter(); setPhase('cartes'); setRevelees(ordre.length); }
+        else if (pret && phase === 'ouverture') { setInstant(true); sons.arreter(); setPhase('cartes'); setRevelees(ordre.length); }
       }
     };
     window.addEventListener('keydown', clavier);
@@ -134,8 +137,9 @@ export default function OuverturePack({ cartes, pack, modele, garantie, onFermer
       <div className="pack-show-beams" aria-hidden="true"/><div className="pack-show-orbit" aria-hidden="true"/>
       <div className="pack-show-particles" key={rang} aria-hidden="true">{Array.from({length:28}, (_,i) => <i key={i} style={{'--x':`${i*37%100}%`, '--delay':`${i%9*-.35}s`, '--duration':`${2+i%4}s`, '--drift':`${(i%2?1:-1)*(20+i*3)}px`} as CSSProperties}/>)}</div>
       <div className="pack-show-model"><Suspense fallback={null}><Pack3D rarete={rarete} modele={modele} ouvert={phase === 'ouverture'} calme={calme} transition={phase}/></Suspense></div>
+      {phase === 'attente' && <button type="button" className="pack-show-touch" onClick={ouvrir} aria-label={t('online.pack.openNow')} />}
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}
-    </div><p className="pack-show-hint" aria-live="polite">{t('online.shop.opening')}</p></> : <div className="pack-show-results" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
+    </div><p className="pack-show-hint" aria-live="polite">{phase === 'attente' ? t('online.pack.openHint') : t('online.shop.opening')}</p></> : <div className="pack-show-results" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
       const visible = i >= ordre.length - revelees;
       const meilleure = i === 0;
       const active = i === carteActive;
@@ -151,7 +155,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, onFermer
         <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>DESTINY</small><b>DR</b><span>RUGBY</span><i>✦</i></div><div className="pack-show-front" aria-hidden={!visible}>{visible && rendreCarte(carte)}</div></div>
       </div>;
     })}</div>}
-    {phase === 'cartes' && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={toutes?onFermer:passer}>{toutes?t('online.pack.clubhouse'):t('online.pack.reveal')}</button></footer>}
+    {(phase === 'attente' || phase === 'cartes') && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={phase === 'attente' ? ouvrir : toutes ? onFermer : passer}>{phase === 'attente' ? t('online.pack.openNow') : toutes ? t('online.pack.clubhouse') : t('online.pack.reveal')}</button></footer>}
     <span className="pack-show-sr" aria-live="polite">{muet?t('online.pack.soundMuted'):t('online.pack.soundActive')}</span>
   </main></div>, document.body);
 }

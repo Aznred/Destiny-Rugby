@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { Icone } from '../Icone';
 import { PelouseMemo } from './Pelouse';
 import { SpriteRugbymanMemo } from './SpriteRugbyman';
-import { Camera, angleDeVue, type Cadrage } from '../../lib/moteur/camera';
+import { Camera, angleDeVue, type Cadre, type Cadrage } from '../../lib/moteur/camera';
 import { LONGUEUR, distance2, type Cote, type Vec } from '../../lib/moteur/terrain';
 import { avancer, creerMatch, resoudreChoix, type EtatMatch } from '../../lib/moteur/moteur';
 import type { ActionJoueur } from '../../lib/moteur/etat';
@@ -12,7 +12,7 @@ import type { PionDirect, TerrainDirect } from '../../lib/ligue/matchCarriere';
 import {
   actionContextuelleArcade, creerQteArcade, deplacerJoueurArcade, etatGlobalArcade,
   evaluerQteArcade, InputManagerArcade, interpolerPosition, MachineEtatsJoueurs,
-  progressionQte, selectionnerJoueurPertinent, type EvenementInputArcade,
+  progressionQte, selectionnerJoueurPertinent, transformationArcadeReussie, type EvenementInputArcade,
   type InputActionArcade, type QteArcade, type TrameInputArcade,
 } from '../../lib/moteur/arcade';
 import {
@@ -30,7 +30,8 @@ interface Props {
   onQuitter: () => void;
 }
 
-const DUREE_MATCH = 10 * 60;
+const DUREE_MATCH_REELLE = 8 * 60;
+const DUREE_MATCH_JEU = 80 * 60;
 const TRAME_VIDE: TrameInputArcade = {
   sequence: 0, dx: 0, dy: 0, sprint: false, evenements: [], tempsClient: 0,
 };
@@ -66,7 +67,7 @@ function serialiserMatch(
   acquittements: Partial<Record<Cote, number>>, message: string,
 ): EtatMatchAmicalReseau {
   return {
-    revision, simulation: m.sim, minute: m.minute, scoreA: m.scoreA, scoreB: m.scoreB,
+    revision, simulation: m.sim, minute: m.minute, tempsJeu: m.t, periode: m.periode, sirene: m.sirene, scoreA: m.scoreA, scoreB: m.scoreB,
     phase: m.phase, fini: m.fini, possession: m.possession, ballon: { ...m.ballon },
     porteurId: m.porteur?.id, qte, acquittements, tempsServeur: Date.now(), message,
     pions: m.pions.map((p) => ({
@@ -82,7 +83,7 @@ function appliquerSnapshot(m: EtatMatch, snapshot: EtatMatchAmicalReseau, campLo
     const recu = etats.get(pion.id);
     if (!recu) continue;
     const position = pion.cote === campLocal
-      ? interpolerPosition(pion.pos, { x: recu.x, y: recu.y })
+      ? interpolerPosition(pion.pos, { x: recu.x, y: recu.y }, .45)
       : { x: recu.x, y: recu.y };
     pion.pos.x = position.x; pion.pos.y = position.y;
     pion.vitesse.x = recu.vx; pion.vitesse.y = recu.vy;
@@ -91,6 +92,9 @@ function appliquerSnapshot(m: EtatMatch, snapshot: EtatMatchAmicalReseau, campLo
     if (recu.role) pion.role = recu.role as Pion['role'];
   }
   m.sim = snapshot.simulation; m.minute = snapshot.minute;
+  m.t = snapshot.tempsJeu ?? snapshot.minute * 60;
+  m.periode = snapshot.periode ?? m.periode;
+  m.sirene = snapshot.sirene ?? false;
   m.scoreA = snapshot.scoreA; m.scoreB = snapshot.scoreB;
   m.phase = snapshot.phase as EtatMatch['phase']; m.fini = snapshot.fini;
   m.possession = snapshot.possession; m.ballon = { ...snapshot.ballon };
@@ -138,6 +142,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const revisionRef = useRef(0);
   const qteRef = useRef<QteArcade | null>(null);
   const qtePhaseRef = useRef('');
+  const tirQteTraiteRef = useRef<EtatMatch['tir'] | null>(null);
   const preparationRef = useRef<Partial<Record<Cote, { action: 'plaquage' | 'raffut' | 'crochet'; pionId: string; expire: number }>>>({});
   const decalageServeurRef = useRef(0);
   const gesteRef = useRef<{ x: number; y: number; id: number } | null>(null);
@@ -149,7 +154,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const pleinEcranMatchRef = useRef(false);
   const orientationVerrouilleeRef = useRef(false);
 
-  const [vueCamera, setVueCamera] = useState<{ viewBox: string; transform: string; redresser: string } | null>(null);
+  const [vueCamera, setVueCamera] = useState<{ viewBox: string; transform: string; redresser: string; cadre: Cadre } | null>(null);
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
   const [tempsSimule, setTempsSimule] = useState(0);
@@ -209,6 +214,8 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       { niveau: 'pro', tempsReel: true, controle: false },
     );
     m.carriereDixMinutes = true;
+    m.dureeReelleArcade = DUREE_MATCH_REELLE;
+    m.finSurSortieOuEnAvant = true;
     matchRef.current = m;
     cameraRef.current.couper({ x: LONGUEUR / 2, y: 35 }, 'suivi');
     const premier = selectionnerJoueurPertinent(m, monCamp);
@@ -249,6 +256,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
 
     const qte = qteRef.current;
     if (qte) {
+      if (qte.type === 'tir' && camp !== qte.initiateur) return;
       if (qte.type === 'touche' && evenement.option) {
         qte.choix ??= {}; qte.choix[camp] = evenement.option;
         setQteAffichee({ ...qte, choix: { ...qte.choix } });
@@ -335,6 +343,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         if (!hote && res.etatMatch && m && res.etatMatch.revision > revisionRef.current) {
           revisionRef.current = res.etatMatch.revision;
           appliquerSnapshot(m, res.etatMatch, monCamp);
+          if (m.fini) setFinDeMatch(true);
           qteRef.current = res.etatMatch.qte ?? null;
           setQteAffichee(qteRef.current ? { ...qteRef.current } : null);
           inputRef.current.acquitter(res.etatMatch.acquittements?.[monCamp] ?? 0);
@@ -345,16 +354,21 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       } finally { occupe = false; }
     };
     void synchroniser();
-    const interval = window.setInterval(synchroniser, 100);
+    const interval = window.setInterval(synchroniser, 150);
     return () => { actif = false; window.clearInterval(interval); };
   }, [mode, monCamp, salonCode]);
 
   useEffect(() => {
     let animation = 0;
     let precedent = performance.now();
-    const intervalleRendu = appareilTactileRef.current ? 50 : 33;
+    const intervalleSimulation = appareilTactileRef.current ? 50 : 33;
+    const intervalleRendu = appareilTactileRef.current ? 83 : 50;
     const tick = (maintenant: number) => {
-      const dt = Math.min((maintenant - precedent) / 1000, .05);
+      if (maintenant - precedent < intervalleSimulation) {
+        animation = requestAnimationFrame(tick);
+        return;
+      }
+      const dt = Math.min((maintenant - precedent) / 1000, .1);
       precedent = maintenant;
       const m = matchRef.current;
       if (m && !m.fini) {
@@ -404,6 +418,18 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
             }
           }
 
+          if (m.phase === 'transformation' && m.tir && !m.tir.volLance && m.tir !== tirQteTraiteRef.current && !qteRef.current) {
+            tirQteTraiteRef.current = m.tir;
+            if (mode === 'reseau' || m.tir.buteur.cote === monCamp) {
+              const tir = creerQteArcade('tir', `${salonCode ?? 'solo'}-${m.essaisA + m.essaisB}-${m.sim.toFixed(1)}`, Date.now() + decalageServeurRef.current + 350);
+              tir.initiateur = m.tir.buteur.cote;
+              tir.etapeTir = 'direction';
+              qteRef.current = tir;
+              setQteAffichee({ ...tir });
+              setMessageAction('Transformation · vise la direction avec la première jauge');
+            }
+          }
+
           const phaseQte = m.phase === 'melee' || m.phase === 'touche' ? m.phase : null;
           if (phaseQte) {
             const numero = phaseQte === 'melee' ? m.compteurs.melees : m.compteurs.touches;
@@ -419,22 +445,42 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
           const qte = qteRef.current;
           const tempsServeur = Date.now() + decalageServeurRef.current;
           if (qte && tempsServeur >= qte.debutServeur + qte.dureeMs + 180) {
-            qte.scores ??= {};
-            const autreCamp: Cote = monCamp === 'A' ? 'B' : 'A';
-            qte.scores[monCamp] ??= -.2;
-            qte.scores[autreCamp] ??= mode === 'ordinateur' ? .35 : -.2;
-            if (qte.type === 'ruck' && qte.initiateur) {
-              const pion = choisirJoueur(m, qte.initiateur);
-              if (pion) annoncerIssue(pion, 'grattage', jouerGesteMoteur(m, pion, 'grattage', (qte.scores[qte.initiateur] ?? -.2) * .22));
-            } else if (qte.type === 'melee' || qte.type === 'touche') {
-              m.bonusConqueteArcade = { type: qte.type, scores: { ...qte.scores } };
-              if (qte.type === 'touche') {
-                const choix = qte.choix?.[m.possession] ?? 'milieu';
-                if (m.conquete) m.conquete.combinaison = choix === 'court' ? 'premierBloc' : choix === 'long' ? 'fond' : 'milieu';
+            if (qte.type === 'tir') {
+              const score = qte.scores?.[qte.initiateur ?? monCamp] ?? -.2;
+              if (qte.etapeTir === 'direction') {
+                const puissance = creerQteArcade('tir', `${qte.id}-puissance`, tempsServeur + 350);
+                puissance.initiateur = qte.initiateur;
+                puissance.etapeTir = 'puissance';
+                puissance.directionScore = score;
+                qteRef.current = puissance;
+                setQteAffichee({ ...puissance });
+                setMessageAction('Transformation · dose la puissance avec la deuxième jauge');
+              } else {
+                const tir = m.tir;
+                const reussi = Boolean(tir && transformationArcadeReussie(qte.directionScore ?? -.2, score, tir.angle, tir.distance));
+                if (tir) { tir.reussi = reussi; m.minuteur = Math.min(m.minuteur, .45); }
+                qteRef.current = null;
+                setQteAffichee(null);
+                setMessageAction(reussi ? 'Transformation bien frappée !' : 'Transformation manquée · ajuste les deux jauges au prochain essai');
               }
-              m.minuteur = Math.min(m.minuteur, 2.2);
+            } else {
+              qte.scores ??= {};
+              const autreCamp: Cote = monCamp === 'A' ? 'B' : 'A';
+              qte.scores[monCamp] ??= -.2;
+              qte.scores[autreCamp] ??= mode === 'ordinateur' ? .35 : -.2;
+              if (qte.type === 'ruck' && qte.initiateur) {
+                const pion = choisirJoueur(m, qte.initiateur);
+                if (pion) annoncerIssue(pion, 'grattage', jouerGesteMoteur(m, pion, 'grattage', (qte.scores[qte.initiateur] ?? -.2) * .22));
+              } else if (qte.type === 'melee' || qte.type === 'touche') {
+                m.bonusConqueteArcade = { type: qte.type, scores: { ...qte.scores } };
+                if (qte.type === 'touche') {
+                  const choix = qte.choix?.[m.possession] ?? 'milieu';
+                  if (m.conquete) m.conquete.combinaison = choix === 'court' ? 'premierBloc' : choix === 'long' ? 'fond' : 'milieu';
+                }
+                m.minuteur = Math.min(m.minuteur, 2.2);
+              }
+              qteRef.current = null; setQteAffichee(null);
             }
-            qteRef.current = null; setQteAffichee(null);
           }
 
           if (!qteRef.current) avancer(m, dt);
@@ -445,7 +491,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
         }
 
         const controle = choisirJoueur(m, monCamp);
-        if (m.fini || m.sim >= DUREE_MATCH) { m.fini = true; m.phase = 'fini'; setFinDeMatch(true); }
+        if (m.fini) setFinDeMatch(true);
 
         const depuisRendu = maintenant - dernierRenduRef.current;
         if (depuisRendu >= intervalleRendu) {
@@ -455,10 +501,10 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
           const ratio = rect ? rect.width / Math.max(1, rect.height) : 16 / 9;
           const angle = angleDeVue(monCamp, Boolean(rect && rect.height > rect.width));
           const vue = cameraRef.current.suivre(cible, 'suivi' as Cadrage, ratio, angle, Math.min(depuisRendu / 1000, .08));
-          setVueCamera({ viewBox: vue.viewBox, transform: vue.transform, redresser: vue.redresser });
+          setVueCamera({ viewBox: vue.viewBox, transform: vue.transform, redresser: vue.redresser, cadre: vue.cadre });
           if (controle) setEnduranceJauge(Math.round(controle.endurance));
           setScoreA(m.scoreA); setScoreB(m.scoreB);
-          setTempsSimule(Math.min(DUREE_MATCH, Math.floor(m.sim)));
+          setTempsSimule(Math.min(DUREE_MATCH_JEU, Math.floor(m.t)));
           if (qteRef.current) setProgressionQteAffichee(progressionQte(qteRef.current, Date.now() + decalageServeurRef.current));
         }
       }
@@ -502,7 +548,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
   const m = matchRef.current;
   const terrain = m ? terrainSprites(m) : null;
   const pionsDirects = new Map(terrain?.pions.map((p) => [p.id, p]));
-  const tempsSprite = m ? appareilTactileRef.current ? Math.floor(m.sim * 12) / 12 : m.sim : 0;
+  const tempsSprite = m ? Math.floor(m.sim * (appareilTactileRef.current ? 8 : 12)) / (appareilTactileRef.current ? 8 : 12) : 0;
   const pionControle = m?.pions.find((p) => p.id === pionControleId);
   const contexte = m ? actionContextuelleArcade(m, pionControle) : null;
   const qteLocaleDejaJouee = qteAffichee?.scores?.[monCamp] !== undefined;
@@ -517,7 +563,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       <button type="button" className="btn fantome amical-btn-retour" onClick={onQuitter}><Icone nom="fleche-droite" taille={16} /> Quitter</button>
       <div className="amical-scoreboard">
         <div className={`amical-equipe domicile ${monCamp === 'A' ? 'mon-camp' : ''}`}><span className="amical-nom-equipe">{equipeA.nom}</span><span className="amical-score">{scoreA}</span></div>
-        <div className="amical-centre-chrono"><span className="amical-badge-chrono">{Math.floor(tempsSimule / 60)}:{(tempsSimule % 60).toString().padStart(2, '0')} / 10:00</span><span className="amical-mode-label">{m ? libellePhase(m) : 'Chargement'}</span></div>
+        <div className="amical-centre-chrono"><span className="amical-badge-chrono">{Math.floor(tempsSimule / 60)}:{(tempsSimule % 60).toString().padStart(2, '0')}{m?.sirene ? '+' : ''} / 80:00</span><span className="amical-mode-label">{m ? libellePhase(m) : 'Chargement'}</span></div>
         <div className={`amical-equipe exterieur ${monCamp === 'B' ? 'mon-camp' : ''}`}><span className="amical-score">{scoreB}</span><span className="amical-nom-equipe">{equipeB.nom}</span></div>
       </div>
       <div className="amical-endurance-badge"><Icone nom="eclair" taille={14} /><div className="amical-jauge-endurance"><div style={{ width: `${enduranceJauge}%`, backgroundColor: enduranceJauge > 40 ? '#10b981' : '#f59e0b' }} /></div></div>
@@ -529,24 +575,26 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       {vueCamera && m && terrain && <svg className="amical-terrain-svg" viewBox={vueCamera.viewBox} preserveAspectRatio="xMidYMid meet">
         <g transform={vueCamera.transform}>
           <PelouseMemo />
-          {m.pions.filter((p) => p.surLeTerrain).map((p) => {
+          {m.pions.filter((p) => p.surLeTerrain
+            && Math.abs(p.pos.x - vueCamera.cadre.cx) <= vueCamera.cadre.w / 2 + 5.3
+            && Math.abs(p.pos.y - vueCamera.cadre.cy) <= vueCamera.cadre.h / 2 + 5.3).map((p) => {
             const direct = pionsDirects.get(p.id);
             if (!direct) return null;
             return <g key={p.id}>
               <SpriteRugbymanMemo pion={direct} position={p.pos} terrain={terrain} maillot={p.cote === 'A' ? maillotA : maillotB} porteur={m.porteur?.id === p.id} positionPorteur={m.porteur?.pos} redresser={vueCamera.redresser} hauteurMetres={5.3} temps={tempsSprite} compact={appareilTactileRef.current} />
             </g>;
           })}
-          {!m.porteur && <g transform={`translate(${m.ballon.x}, ${m.ballon.y})`}><ellipse rx={.7} ry={.42} fill="#f4eee1" stroke="#503e32" strokeWidth={.12} /></g>}
+          {!m.porteur && <g transform={`translate(${m.ballon.x}, ${m.ballon.y})`}><ellipse rx={.24} ry={.15} fill="#f4eee1" stroke="#503e32" strokeWidth={.045} /></g>}
         </g>
       </svg>}
 
       {qteAffichee && <div className={`amical-qte amical-qte-${qteAffichee.type}`} style={styleQte}>
-        <strong>{qteAffichee.type === 'melee' ? 'Poussée en mêlée' : qteAffichee.type === 'touche' ? 'Duel en touche' : 'Grattage'}</strong>
+        <strong>{qteAffichee.type === 'melee' ? 'Poussée en mêlée' : qteAffichee.type === 'touche' ? 'Duel en touche' : qteAffichee.type === 'tir' ? qteAffichee.etapeTir === 'direction' ? 'Transformation · direction' : 'Transformation · puissance' : 'Grattage'}</strong>
         {qteAffichee.type === 'touche' && <div className="amical-qte-choix">
           {(['court', 'milieu', 'long'] as const).map((option) => <button type="button" key={option} className={qteAffichee.choix?.[monCamp] === option ? 'actif' : ''} onClick={() => emettreAction('ACTION_SECONDARY', { option })}>{option === 'court' ? 'Court' : option === 'milieu' ? 'Milieu' : 'Long'}</button>)}
         </div>}
         <div className="amical-qte-jauge"><i /><span /></div>
-        <button type="button" disabled={qteLocaleDejaJouee} onClick={() => emettreAction('ACTION_PRIMARY')}>{qteLocaleDejaJouee ? 'Timing envoyé' : qteAffichee.type === 'ruck' ? 'Relâcher' : 'Maintenant'}</button>
+        <button type="button" disabled={qteLocaleDejaJouee || (qteAffichee.type === 'tir' && qteAffichee.initiateur !== monCamp)} onClick={() => emettreAction('ACTION_PRIMARY')}>{qteLocaleDejaJouee ? 'Timing envoyé' : qteAffichee.type === 'ruck' ? 'Relâcher' : qteAffichee.type === 'tir' ? 'Frapper' : 'Maintenant'}</button>
       </div>}
       <div className="amical-geste-indication">Glisse horizontalement pour passer · vers le haut pour jouer au pied</div>
     </div>

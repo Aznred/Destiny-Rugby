@@ -66,6 +66,8 @@ export const TEXTES_EN_LIGNE: Record<string, Traduction> = {
   'online.pack.recruits': tr('Tes nouvelles recrues', 'Your new signings', 'Tus nuevos fichajes', 'I tuoi nuovi acquisti', 'Deine Neuzugänge', 'Os teus novos reforços', '新加入選手'),
   'online.pack.best': tr('★ MEILLEURE CARTE', '★ BEST CARD', '★ MEJOR CARTA', '★ CARTA MIGLIORE', '★ BESTE KARTE', '★ MELHOR CARTA', '★ ベストカード'),
   'online.pack.reveal': tr('Tout révéler', 'Reveal all', 'Revelar todo', 'Rivela tutto', 'Alle aufdecken', 'Revelar tudo', 'すべて公開'),
+  'online.pack.openNow': tr('Ouvrir le pack', 'Open the pack', 'Abrir el pack', 'Apri il pacchetto', 'Pack öffnen', 'Abrir o pack', 'パックを開封'),
+  'online.pack.openHint': tr('Clique sur le pack ou sur le bouton pour l’ouvrir.', 'Click the pack or the button to open it.', 'Haz clic en el pack o en el botón para abrirlo.', 'Clicca sul pacchetto o sul pulsante per aprirlo.', 'Klicke auf das Pack oder den Knopf, um es zu öffnen.', 'Clica no pack ou no botão para o abrir.', 'パックかボタンを押して開封してください。'),
   'online.pack.clubhouse': tr('Rejoindre le vestiaire', 'Go to the clubhouse', 'Ir al vestuario', 'Vai allo spogliatoio', 'Zur Kabine', 'Ir para o balneário', 'クラブハウスへ'),
   'online.rarity.bronze': tr('Bronze', 'Bronze', 'Bronce', 'Bronzo', 'Bronze', 'Bronze', 'ブロンズ'),
   'online.rarity.argent': tr('Argent', 'Silver', 'Plata', 'Argento', 'Silber', 'Prata', 'シルバー'),

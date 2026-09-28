@@ -509,7 +509,7 @@ function tick(e: EtatMatch): void {
     e.echappee.restant -= dt;
     if (e.echappee.restant <= 0 || e.porteur !== e.echappee.pion) e.echappee = null;
   }
-  const dtHorloge = dt * (e.carriereDixMinutes ? 8 : facteurHorloge(e.phase, e.tempsReel));
+  const dtHorloge = dt * (e.dureeReelleArcade ? e.phase === 'miTemps' ? 0 : 4800 / e.dureeReelleArcade : e.carriereDixMinutes ? 8 : facteurHorloge(e.phase, e.tempsReel));
   e.t += dtHorloge;
   e.minute = Math.min(80, Math.floor(e.t / 60));
 
@@ -520,7 +520,7 @@ function tick(e: EtatMatch): void {
     dire(e, 'jalon', null, C.texteMatch(e.periode === 1 ? 'sirenePremiere' : 'sireneFinale'));
   }
   // Garde-fou : temps additionnel maximum (6 minutes après la sirène).
-  if (e.sirene && e.t > finPeriode + 360) return clorePeriode(e);
+  if (e.sirene && !e.finSurSortieOuEnAvant && e.t > finPeriode + 360) return clorePeriode(e);
 
   // ── Compteurs des joueurs ────────────────────────────────────────────────
   for (const p of e.pions) {
@@ -1151,7 +1151,7 @@ function phaseBallonEnLAir(e: EtatMatch): void {
       v.auteur.stats.pointsAuPied = (v.auteur.stats.pointsAuPied ?? 0) + 3;
       marquer(e, camp, 3);
       dire(e, 'but', camp, C.phrase(e.rng, C.DROP, { nom: v.auteur.nom }), 3, v.auteur.moi);
-      if (e.sirene) return clorePeriode(e);
+      if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
       return preparerCoupEnvoi(e, adverse(camp));
     }
     dire(e, 'butRate', camp, C.texteMatch('dropRate', { nom: v.auteur.nom }), 0, v.auteur.moi);
@@ -1706,7 +1706,7 @@ function enAvant(e: EtatMatch, p: Pion): void {
   poserSifflet(e, 'ml.sifflet.enAvant', adverse(p.cote), p);
   // Perdre le ballon de ses propres mains, ça casse un élan.
   pousserElan(e, p.cote, POUSSEES.enAvant);
-  arret(e, 'melee', adverse(p.cote), p.pos);
+  arret(e, 'melee', adverse(p.cote), p.pos, true);
 }
 
 /**
@@ -1732,7 +1732,7 @@ function passeEnAvant(e: EtatMatch, p: Pion): void {
     nom: p.nom, club: nomClub(e, adverse(p.cote)),
   }), 0, p.moi);
   poserSifflet(e, 'ml.sifflet.passeAvant', adverse(p.cote), p);
-  arret(e, 'melee', adverse(p.cote), p.pos);
+  arret(e, 'melee', adverse(p.cote), p.pos, true);
 }
 
 /**
@@ -2540,10 +2540,10 @@ function phaseMaul(e: EtatMatch, dt: number): void {
 // PHASES ARRÊTÉES
 // ---------------------------------------------------------------------------
 
-function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec): void {
+function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false): void {
   // Une période se termine sur ballon mort (touche, mêlée/en-avant, renvoi 22),
   // mais JAMAIS sur une pénalité qui doit toujours pouvoir être disputée.
-  if (e.sirene && quoi !== 'penalite') return clorePeriode(e);
+  if (e.sirene && (e.finSurSortieOuEnAvant ? quoi === 'touche' || enAvant : quoi !== 'penalite')) return clorePeriode(e);
   e.possession = pour;
   e.porteur = null;
   e.vol = null;
@@ -3089,10 +3089,10 @@ function phaseTirAuBut(e: EtatMatch): void {
   e.tir = null;
   e.placement = null;
   if (reussi) {
-    if (e.sirene) return clorePeriode(e);
+    if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
     return preparerCoupEnvoi(e, adverse(cote));
   }
-  if (e.sirene) return clorePeriode(e);
+  if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
   return arret(e, 'renvoi22', adverse(cote), {
     x: adverse(cote) === 'A' ? M22_A : M22_B, y: AXE,
   });
@@ -3166,7 +3166,7 @@ function phaseTransformation(e: EtatMatch): void {
   // Fin de la contemplation du ballon retombé : remise en jeu
   e.tir = null;
   e.placement = null;
-  if (e.sirene) return clorePeriode(e);
+  if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
   preparerCoupEnvoi(e, adverse(cote));
 }
 
@@ -3406,7 +3406,7 @@ function phaseTMO(e: EtatMatch): void {
         return arret(e, 'melee', coteDefense, {
           x: borner(action.lieu.x - sens(coteAttaque) * 5, LIGNE_A + 5, LIGNE_B - 5),
           y: borner(action.lieu.y, 5, LARGEUR - 5),
-        });
+        }, true);
       }
       if (tmo.motif === 'pied_en_touche') {
         dire(e, 'jalon', null, `❌ TMO DÉCISION : Pied en touche sur le plongeon ! L’essai de ${action.marqueur.nom} est REFUSÉ.`);
@@ -3485,7 +3485,7 @@ function phaseAplatissage(e: EtatMatch): void {
 function phaseApresEssai(e: EtatMatch): void {
   if (e.minuteur > 0) return;
   e.placement = null;
-  if (e.sirene) return clorePeriode(e);
+  if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
   preparerCoupEnvoi(e, e.possession);
 }
 
