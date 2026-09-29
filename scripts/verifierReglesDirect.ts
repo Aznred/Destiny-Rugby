@@ -57,7 +57,11 @@ for (let i = 0; i < 10; i++) {
 
     if (phaseAvant === 'aplatissage' && e.phase !== 'aplatissage') {
       aplatissements++;
-      if (e.phase === 'renvoi22' && e.scoreA + e.scoreB === scoreAvant) retours22++;
+      if (e.phase === 'renvoi22' && e.scoreA + e.scoreB === scoreAvant) {
+        retours22++;
+        assert.match(e.commentaires.at(-1)?.texte ?? '', /BALLON TENU/,
+          'Un renvoi aux 22 après aplatissement exige un ballon tenu en-but annoncé.');
+      }
     }
     if (volAvant && !e.vol && e.porteur === volAvant.receveur) {
       passesControlees++;
@@ -69,19 +73,21 @@ for (let i = 0; i < 10; i++) {
       for (const p of e.pions.filter(p => p.surLeTerrain && p.horsJeu && p.cote === botteur.cote)) {
         // Le placement n'est recalculé qu'une image sur trois : on ne contrôle
         // que la cible de repli une fois qu'elle a effectivement été posée.
-        if (Math.abs(p.effort - 0.92) > 1e-6) continue;
+        if (Math.abs(p.effort - 0.55) > 1e-6) continue;
         replisControles++;
         assert.ok((p.cible.x - botteur.pos.x) * sens(p.cote) < 0,
-          'Un joueur hors-jeu doit viser une position derrière son botteur.');
+          `Un joueur hors-jeu doit viser une position derrière son botteur : `
+          + `${e.phase}/${e.vol?.intention}, joueur ${p.numero} cible ${p.cible.x.toFixed(1)}, `
+          + `botteur ${botteur.pos.x.toFixed(1)}, placement ${!!e.placement}.`);
       }
     }
   }
 }
 
 assert.ok(aplatissements > 5, 'Le banc doit observer plusieurs aplatissements.');
-assert.equal(retours22, 0, 'Un aplatissement validé ne doit jamais redevenir un renvoi aux 22.');
 assert.ok(passesControlees > 100, 'Le raccord des passes doit être contrôlé sur un échantillon significatif.');
 assert.ok(replisControles > 20, 'Le repli après jeu au pied doit être réellement observé.');
 
-console.log(`OK — présence sans retour arrière, ${aplatissements} aplatissements cohérents, `
-  + `${passesControlees} passes raccordées et ${replisControles} replis hors-jeu contrôlés.`);
+console.log(`OK — présence sans retour arrière, ${aplatissements} aplatissements cohérents `
+  + `dont ${retours22} ballons tenus, ${passesControlees} passes raccordées `
+  + `et ${replisControles} replis hors-jeu contrôlés.`);

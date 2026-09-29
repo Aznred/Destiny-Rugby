@@ -842,6 +842,14 @@ Un match, ce sont **80 minutes de rugby** jouées par le moteur du jeu, à raiso
 de quatre secondes de vraie vie par minute — **5 min 20** en tout. Pendant ce
 temps, le manager n'est pas spectateur :
 
+Les lancements au large alternent chaîne classique, passe sautée et arrière
+intercalé. Les ailiers gardent leur couloir, les receveurs suivent réellement
+les passes et les engagements pendant le vol du ballon. Une passe que personne
+ne peut atteindre reste libre au sol ; aucun joueur ne rejoint artificiellement
+le point de réception.
+En défense, un joueur libre surveille la sortie du ruck, le rideau réagit à la
+passe et l'arrière couvre le couloir de la percée avant la ligne d'essai.
+
 - il change sa **mentalité**, son **jeu**, son **rythme**, sa **défense** et sa
   **contestation des rucks**, et ça atteint réellement le moteur ;
 - il fait ses **remplacements** ;

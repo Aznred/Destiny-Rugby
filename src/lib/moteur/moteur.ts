@@ -70,7 +70,7 @@ export type { Pion } from './entites.js';
 // interpoler entre deux pas (voir `MatchLive.tsx`).
 export const DT = 0.15;
 const DUREE_PERIODE = 40 * 60;
-const RAYON_PLAQUAGE = 1.75;
+const RAYON_PLAQUAGE = 2.1;
 
 // Durée de chaque phase arrêtée : ce qu'on REGARDE (secondes simulées) et ce que
 // l'horloge du match AVALE (secondes de jeu). C'est cette dissociation qui rend
@@ -481,6 +481,18 @@ export function avancer(e: EtatMatch, secondesSimulees: number): void {
   while (e.reliquat >= DT && !e.fini && garde++ < 40000) {
     e.reliquat -= DT;
     tick(e);
+    // Le botteur peut encore reculer pendant le vol. Réajuster le repli à sa
+    // position actuelle à chaque image empêche un partenaire hors-jeu de se
+    // retrouver devant lui entre deux recalculs de formation.
+    const vol = e.vol;
+    if (e.phase === 'ballonEnLAir' && vol?.type === 'pied') {
+      for (const p of e.pions) {
+        if (!p.surLeTerrain || !p.horsJeu || p.cote !== vol.auteur.cote) continue;
+        p.cible.x = borner(vol.auteur.pos.x - sens(p.cote) * 2, 0.5, LONGUEUR - 0.5);
+        p.cible.y = borner(p.cible.y, 4, LARGEUR - 4);
+        p.effort = 0.55;
+      }
+    }
   }
 }
 
@@ -578,7 +590,11 @@ function tick(e: EtatMatch): void {
     if (e.placement) {
       for (const p of e.pions) {
         const c = e.placement[p.id];
-        if (c && p.surLeTerrain) p.cible = c;
+        // Le repli hors-jeu posé par la tactique prime sur une position
+        // d'arrêt héritée du coup d'envoi. Sinon certains chasseurs restent
+        // devant leur botteur jusqu'à la réception.
+        if (c && p.surLeTerrain
+          && !(p.horsJeu && e.phase === 'ballonEnLAir' && e.vol?.type === 'pied')) p.cible = c;
       }
     }
     // ⚠️ APRÈS LE PLACEMENT, JAMAIS AVANT : la formation repose les cibles de
@@ -590,6 +606,50 @@ function tick(e: EtatMatch): void {
   // consigne du joueur serait écrasée deux images sur trois et son pion
   // « hésiterait » au lieu de foncer.
   if (e.controle) piloterMonJoueur(e);
+
+  // La formation est recalculée toutes les trois images. Pendant un vol, le
+  // receveur doit pourtant suivre le point d'arrivée à chaque image : sinon il
+  // s'en écarte, puis se téléporte sous le ballon à la fin de la passe.
+  if (e.vol?.type === 'passe' && e.vol.receveur?.surLeTerrain) {
+    const passe = e.vol;
+    const receveur = passe.receveur!;
+    receveur.cible = { ...passe.vers };
+    receveur.effort = Math.max(receveur.effort, 1.04);
+    // Le rideau lit aussi la passe : les deux défenseurs en face du receveur
+    // montent pendant son trajet, au lieu d'attendre qu'il ait déjà accéléré.
+    const sa = sens(receveur.cote);
+    const opposants = surLeTerrain(e, adverse(receveur.cote))
+      .filter((p) => p.sanction <= 0 && p.battu <= 0 && (p.pos.x - passe.vers.x) * sa > -2)
+      .sort((a, b) => distance2(a.pos, passe.vers) - distance2(b.pos, passe.vers))
+      .slice(0, 2);
+    for (const defenseur of opposants) {
+      defenseur.cible = { x: passe.vers.x + sa * 1.1, y: passe.vers.y };
+      defenseur.role = 'chasseur';
+      defenseur.effort = Math.max(defenseur.effort, 1.1);
+    }
+  }
+  if (e.phase === 'ballonEnLAir' && e.vol?.type === 'pied') {
+    const chute = e.vol.vers;
+    const receveurs = surLeTerrain(e, adverse(e.vol.auteur.cote))
+      .filter((p) => p.sanction <= 0)
+      .sort((a, b) => (distance2(a.pos, chute) - a.detente * 0.035)
+        - (distance2(b.pos, chute) - b.detente * 0.035));
+    const premier = receveurs[0];
+    const couverture = receveurs[1];
+    if (premier) {
+      premier.cible = { ...chute };
+      premier.role = 'chasseur';
+      premier.effort = Math.max(premier.effort, 1.12);
+    }
+    if (couverture) {
+      couverture.cible = {
+        x: borner(chute.x - sens(couverture.cote) * 3.5, 1, LONGUEUR - 1),
+        y: borner(chute.y + (couverture.pos.y < chute.y ? -3 : 3), 2, LARGEUR - 2),
+      };
+      couverture.role = 'chasseur';
+      couverture.effort = Math.max(couverture.effort, 1.04);
+    }
+  }
 
   // ── Jeu 100% organique, sans aide artificielle ni plan forcé ──────────
   e.aide = 0;
@@ -1423,12 +1483,19 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // Une passe est en l'air.
   if (e.vol && e.vol.type === 'passe') {
     if (e.vol.ecoule < e.vol.duree) return;
+    const volPasse = e.vol;
     const receveur = e.vol.receveur;
     const offload = e.vol.intention === 'offload';
     const longueur = distance(e.vol.de, e.vol.vers);
     const pointReception = { ...e.vol.vers };
     e.vol = null;
     if (!receveur || !receveur.surLeTerrain || receveur.sanction > 0) return formerRuck(e, e.ballon);
+    // Le ballon ne se colle plus à un joueur qui a été repoussé ou qui n'a pas
+    // atteint le point d'arrivée. Une passe manquée reste vivante au sol.
+    if (distance(receveur.pos, pointReception) > 1.8) {
+      e.ballon = pointReception;
+      return demarrerBallonLibre(e, volPasse, 'touche');
+    }
     // Le receveur prend le ballon à son point d'arrivée, pas à l'endroit où sa
     // cible tactique l'aurait déjà projeté une demi-seconde plus tard. Sans ce
     // raccord, une passe partie vers l'arrière se téléportait devant le
@@ -1495,11 +1562,11 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
       if (dd < pression && devant > -0.2) pression = dd;
     }
   }
-  // ⚠️ PENDANT LA GARDE DU RUCK, LE PORTEUR NE PEUT PAS ÊTRE PLAQUÉ.
-  // Il est en train de ramasser le ballon et de servir son ouvreur : les
-  // défenseurs doivent respecter la ligne de hors-jeu. Sans cette protection,
-  // les flankers à 0.5 m plaquaient le 9 au premier tick de sortie de ruck.
-  if (e.gardeRuck > 0) plaqueur = null;
+  // La protection du demi ne vaut qu'au pied du regroupement. Dès qu'il
+  // s'écarte pour jouer lui-même, les défenseurs déjà en jeu peuvent le prendre.
+  // Une immunité chronométrée sur toute sa course créait des essais du 9 sans
+  // opposition, alors que la ligne défensive était bien placée.
+  if (e.gardeRuck > 0 && distance2(porteur.pos, e.origine) < 2.5 * 2.5) plaqueur = null;
 
   // ── Ligne d'essai, touche ────────────────────────────────────────────────
   // Si le porteur franchit la ligne mais qu'un défenseur est au contact, le plaquage prime !
@@ -1551,7 +1618,8 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
         : (receveurCote(e, porteur, cote) ?? receveurPour(e, porteur));
       if (receveur) {
         consommerIntention(e);
-        return passerLeBallon(e, porteur, receveur, pression);
+        passerLeBallon(e, porteur, receveur, pression);
+        return;
       }
     }
     if (e.intention.type === 'pied') {
@@ -1590,26 +1658,33 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const pDevant = pressionDevant(e, porteur);
   const inter = intervalle(e, porteur);
   const distSuivant = suivant ? distance(porteur.pos, suivant.pos) : 99;
+  const suivantEnRetrait = suivant ? (suivant.pos.x - porteur.pos.x) * s <= 0.4 : false;
   const aDeLEspaceDevant = (pDevant > 7.0 && depasses >= 9) || (inter >= 8.5 && pDevant > 6.0);
 
   // Si le porteur a réellement percé le rideau avec du champ libre, il file à l'essai !
-  if (!enEchappee && ((depasses >= 9 && pDevant > 7.5) || (inter >= 8.5 && pDevant > 7.0))) {
+  // Les joueurs encore au sol après un ruck ne comptent pas comme un rideau
+  // définitivement battu. Le demi doit réellement gagner du terrain avant
+  // qu'on le traite comme une échappée en plein champ.
+  const sortieDuRegroupement = distance2(porteur.pos, e.origine) > 7 * 7;
+  if (!enEchappee && sortieDuRegroupement
+    && ((depasses >= 9 && pDevant > 7.5) || (inter >= 8.5 && pDevant > 7.0))) {
     lancerEchappee(e, porteur);
   }
 
-  // ⚠️ ET ON NE DONNE PAS LE BALLON QUAND ON EST DANS L’ESPACE ou quand le soutien est trop loin (> 13 m) !
-  // « Fixer et donner » est la bonne règle face à un défenseur qui monte ; mais si le porteur a de l'espace
-  // devant lui ou si le partenaire est trop loin (> 13 m), il garde le ballon et file vers l'en-but.
+  // On ne sert pas un partenaire déjà devant le porteur : rabattre la cible
+  // derrière le passeur faisait ensuite téléporter ce partenaire sous le ballon.
   // ⚠️ EN SORTIE DE RUCK (gardeRuck > 0), le distributeur doit pouvoir servir librement son
   // ouvreur sans condition de pression ni de distance restrictive : c'est le
   // geste fondamental de la distribution. Sans cette exception, la combinaison
   // mourait au ras parce que le 10 était à 14 m ou que la pression était "basse".
   const enSortieDeRuck = e.gardeRuck > 0 && (porteur.numero === 9 || porteur.numero === 10 || porteur.role === 'demi');
-  const distMax = enSortieDeRuck ? 20 : 13;
+  const distMax = enSortieDeRuck ? 20 : porteur.avant ? 12 : 18;
   const pressionMax = enSortieDeRuck ? 99 : (porteur.avant ? 3.2 : 3.6);
   if (!prioriteAplatir && !enEchappee && (enSortieDeRuck || !aDeLEspaceDevant) && suivant && suivant.surLeTerrain
+    && suivantEnRetrait
     && distSuivant <= distMax && pression <= pressionMax) {
-    return passerLeBallon(e, porteur, suivant, pression);
+    passerLeBallon(e, porteur, suivant, pression);
+    return;
   }
 
   if (plaqueur && porteur.battu <= 0) return resoudrePlaquage(e, porteur, plaqueur);
@@ -1833,11 +1908,10 @@ function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   }
 }
 
-function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number): void {
+function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number): boolean {
   const s = sens(p.cote);
-  // ⚠️ RÈGLE DU RUGBY : la passe ne part JAMAIS vers l'avant. On vise le
-  // receveur, mais si celui-ci a pris de l'avance on ramène le point d'arrivée
-  // derrière le passeur.
+  // La passe vise le receveur derrière le porteur. Une petite avance peut être
+  // corrigée par la trajectoire ; au-delà, c'est une passe en avant sifflée.
   const cible: Vec = { x: receveur.pos.x, y: receveur.pos.y };
   const d = distance(p.pos, cible);
   p.stats.passes += 1;
@@ -1850,8 +1924,11 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
   const liaison = erreurDeLiaison(e, p.cote);
   const avance = (cible.x - p.pos.x) * s;
   if (avance > 0.4) {
+    // Un joueur plusieurs mètres devant ne peut pas saisir une passe arrière
+    // sans se téléporter. Le geste est réellement en avant et l'arbitre le voit.
+    if (avance > 1.8) { passeEnAvant(e, p); return false; }
     const risque = Math.min(0.22, Math.max(0, avance - 1.4) * 0.038) * (1.3 - p.vision / 200) * liaison;
-    if (e.rng() < risque) return passeEnAvant(e, p);
+    if (e.rng() < risque) { passeEnAvant(e, p); return false; }
     cible.x = p.pos.x - s * 0.4;
   }
 
@@ -1859,19 +1936,25 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
   const risque = (0.010 + Math.max(0, 3 - pression) * 0.007 + d / 1800) * liaison;
   if (e.rng() < risque * (1.35 - p.passe / 220)) {
     p.stats.passes -= 1;
-    return enAvant(e, p);
+    enAvant(e, p);
+    return false;
   }
 
   // La passe est partie et elle est bonne : si un essai tombe avant le
   // prochain regroupement, elle sera la passe décisive.
   e.dernierPasseur = p;
 
-  // Les défenseurs engagés sur le passeur sont battus : c'est le décalage.
+  // Seul un défenseur réellement fixé au contact du passeur perd un temps
+  // d'appui. Les voisins gardent leur course de glissée vers le receveur :
+  // les neutraliser tous à chaque passe vidait le premier rideau.
   const marqueurs = surLeTerrain(e, adverse(p.cote));
   let engages = 0;
   for (const d2 of marqueurs) {
     if (d2.battu > 0) continue;
-    if (distance2(d2.pos, p.pos) < 30) { d2.battu = 1.1; engages++; }
+    if (d2.role === 'chasseur' && distance2(d2.pos, p.pos) < 2.3 * 2.3) {
+      d2.battu = 0.25;
+      engages++;
+    }
   }
 
   // ⚠️ UNE PERCÉE, C'EST UN DÉFENSEUR PASSÉ — pas juste un peu d'espace. On ne
@@ -1886,6 +1969,9 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
   }
 
   if (e.lancement) e.lancement.index += 1;
+  // La protection du demi au pied du ruck s'arrête au lâcher du ballon : le
+  // receveur est dans le jeu courant et peut être plaqué normalement.
+  e.gardeRuck = 0;
   e.porteur = null;
   poserVol(e, {
     de: { x: p.pos.x, y: p.pos.y }, vers: cible,
@@ -1910,6 +1996,7 @@ function passerLeBallon(e: EtatMatch, p: Pion, receveur: Pion, pression: number)
     && !receveur.avant && receveur.numero >= 11 && e.rng() < 0.45) {
     dire(e, 'jeu', p.cote, C.phrase(e.rng, C.ECARTEMENT, { nom: receveur.nom }), 0, receveur.moi);
   }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -2486,7 +2573,7 @@ function phaseRuck(e: EtatMatch): void {
 
   // ⚠️ LA LIGNE DE HORS-JEU. Sans elle, les défenseurs étaient déjà sur le 9 à
   // la sortie du ruck et chaque temps de jeu finissait au sol.
-  e.gardeRuck = e.ballonLent ? 0.75 : 1.1;
+  e.gardeRuck = e.ballonLent ? 0.45 : 0.6;
 
   // ⚠️ LES AVANTS QUI ÉTAIENT DANS LE RUCK NE PEUVENT PAS PLAQUER IMMÉDIATEMENT.
   // Au rugby, les joueurs engagés dans le regroupement doivent se remettre sur
@@ -3663,7 +3750,14 @@ function choisirLancement(
   // jeu — sinon on compterait 470 passes par match au lieu de 280.
   const chaineLarge = [distributeur, dix, douze, treize, ailierOuvert].filter(Boolean) as Pion[];
   const chaineSaute = [distributeur, dix, treize, ailierOuvert].filter(Boolean) as Pion[];
+  const chaineArriere = [distributeur, dix, douze, quinze, ailierOuvert].filter(Boolean) as Pion[];
   const chaineCourte = [distributeur, dix, douze].filter(Boolean) as Pion[];
+  const combinaisonLarge = () => {
+    const variante = e.rng();
+    if (variante < 0.26 && treize) return { type: 'saute' as const, chaine: chaineSaute, libelle: 'passe sautée vers l’aile' };
+    if (variante < 0.52 && quinze) return { type: 'large' as const, chaine: chaineArriere, libelle: 'l’arrière s’intercale' };
+    return { type: 'large' as const, chaine: chaineLarge, libelle: 'jeu déployé jusqu’à l’aile' };
+  };
 
   // ── 1. DANS SES 22 : on dégage, sauf urgence ────────────────────────────
   // C'EST LE JEU D'OCCUPATION : on rend le ballon mais on gagne 45 mètres.
@@ -3713,7 +3807,7 @@ function choisirLancement(
     const chanceLarge = tactique?.attaque === 'large' ? 0.82
       : tactique?.attaque === 'avants' ? 0.28 : 0.55;
     if (surnombre >= 1 && r < chanceLarge) {
-      return { type: 'large', chaine: chaineLarge, index: 0, libelle: 'écarter au large' };
+      return { ...combinaisonLarge(), index: 0 };
     }
     const chanceRas = tactique?.attaque === 'avants' ? 0.78
       : tactique?.attaque === 'large' ? 0.34 : 0.55;
@@ -3731,11 +3825,7 @@ function choisirLancement(
 
   // ── 4. SURNOMBRE AU LARGE : on écarte tout de suite ─────────────────────
   if (surnombre >= 2 || (surnombre >= 1 && phases >= 1)) {
-    return {
-      type: r < 0.25 ? 'saute' : 'large',
-      chaine: r < 0.25 ? chaineSaute : chaineLarge, index: 0,
-      libelle: 'exploiter le surnombre',
-    };
+    return { ...combinaisonLarge(), index: 0 };
   }
 
   // ── 5. APRÈS LA SIRÈNE : botter en touche si on mène, ou tout donner si on perd ──
@@ -3749,7 +3839,7 @@ function choisirLancement(
       };
     }
     if (surnombre >= 1) {
-      return { type: 'large', chaine: chaineLarge, index: 0, libelle: 'dernière attaque au large' };
+      return { ...combinaisonLarge(), index: 0 };
     }
     return {
       type: 'pod', chaine: [distributeur, dix, percuteur].filter(Boolean) as Pion[], index: 0,
@@ -3782,7 +3872,7 @@ function choisirLancement(
       return { type: 'pod', chaine: [distributeur, dix, percuteur].filter(Boolean) as Pion[], index: 0, libelle: 'premier temps' };
     }
     if (envie < 0.62) return { type: 'large', chaine: chaineCourte, index: 0, libelle: 'lancement sur la ligne' };
-    return { type: 'large', chaine: chaineLarge, index: 0, libelle: 'lancement au large' };
+    return { ...combinaisonLarge(), index: 0 };
   }
 
   // Temps de jeu suivants : les deux tiers se jouent au ras ou au premier
@@ -3809,16 +3899,12 @@ function choisirLancement(
     return { type: 'large', chaine: chaineCourte, index: 0, libelle: 'un temps sur les centres' };
   }
   if (envie > 0.92 && quinze && treize) {
-    // L'arrière s'intercale : la combinaison qui crée le surnombre au large.
-    return {
-      type: 'large', chaine: [distributeur, dix, douze, quinze, ailierOuvert].filter(Boolean) as Pion[],
-      index: 0, libelle: 'l’arrière s’intercale',
-    };
+    return { ...combinaisonLarge(), index: 0 };
   }
   if (porteurImpose && porteurImpose.avant && envie < 0.8) {
     return { type: 'ras', chaine: [porteurImpose], index: 0, libelle: 'percussion' };
   }
-  return { type: 'large', chaine: chaineLarge, index: 0, libelle: 'écarter à l’aile' };
+  return { ...combinaisonLarge(), index: 0 };
 }
 
 // LA PASSE AU RAS ENTRE AVANTS (« tip-on »). Deux fois sur cinq, le porteur du
@@ -4771,7 +4857,7 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur, bonus
         passeEnAvant(e, p);
         return tranche(false, 'duelPasseKo');
       }
-      passerLeBallon(e, p, receveur, pressionSur(e, p));
+      if (!passerLeBallon(e, p, receveur, pressionSur(e, p))) return tranche(false, 'duelPasseKo');
       return {
         joue: true,
         reussi: true,

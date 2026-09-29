@@ -145,7 +145,7 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
   }
 
   const largeOuvert = ouvert === 1 ? LARGEUR - largeur : largeur; // espace jusqu'à la touche ouverte
-  const compression = borner(largeOuvert / 42, 0.45, 1); // ballon près de la touche = structure resserrée
+  const compression = borner(largeOuvert / 42, 0.7, 1); // même près de la touche, conserver plusieurs couloirs de passe
 
   // ── LES CELLULES D'AVANTS (PODS DE 3) ────────────────────────────────────
   // En rugby moderne (ex. 1-3-3-1), les avants s'organisent en cellules de 3 :
@@ -215,9 +215,6 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
 
   const ligneTroisQuarts: Pion[] = [];
   for (const p of arrieres) {
-    const r = rangDansChaine.get(p);
-    if (r != null) { ligneDeSoutien(p, ancre, s, ouvert, r); continue; }
-
     const prof = PROFONDEUR[p.numero] ?? 12;
     let dy: number;
     switch (p.numero) {
@@ -226,8 +223,8 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
         p.cible = { x: bornerX(ancre.x - s * 1.4), y: bornerY(ancre.y - ouvert * 1.6) };
         continue;
       case 10: p.role = 'ouvreur'; dy = 11 * compression; break;
-      case 12: p.role = 'ligne'; dy = 22 * compression; break;
-      case 13: p.role = 'ligne'; dy = 32 * compression; break;
+      case 12: p.role = 'ligne'; dy = 21 * compression; break;
+      case 13: p.role = 'ligne'; dy = 30 * compression; break;
       case 15:
         // L'arrière s'intercale dans la ligne quand on écarte, sinon il reste
         // en soutien de profondeur (et prêt à relancer un coup de pied).
@@ -241,7 +238,7 @@ function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
         const ouvertBord = ouvert === 1 ? LARGEUR : 0;
         if (sonBord === ouvertBord) {
           p.role = 'ligne';
-          p.cible = { x: bornerX(ancre.x - s * prof), y: bornerY(ouvertBord + (ouvert === 1 ? -6 : 6)) };
+          p.cible = { x: bornerX(ancre.x - s * prof), y: bornerY(ouvertBord + (ouvert === 1 ? -5 : 5)) };
         } else {
           p.role = 'aileFerme';
           p.cible = { x: bornerX(ancre.x - s * (prof + 6)), y: bornerY(sonBord + (sonBord === 0 ? 9 : -9)) };
@@ -298,18 +295,25 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   // Profondeur adaptée à la menace : très bas quand l'attaque est loin (le
   // coup de pied est probable), remonté quand elle arrive près de la ligne.
   const distLigne = metresAvantLaLigne(ancre, adverse(cote));
-  const profondeurFond = distLigne > 55 ? 30 : distLigne > 30 ? 24 : distLigne > 18 ? 17 : 11;
+  const profondeurFond = distLigne > 55 ? 30 : distLigne > 30 ? 21 : distLigne > 18 ? 15 : 9;
 
   const arriere = numero(dispo, 15);
   const ailierFerme = ouvert === 1 ? numero(dispo, 11) : numero(dispo, 14);
-  const sentinelle = numero(dispo, 9);
+  const demiDefenseur = numero(dispo, 9);
+  // Après un ruck, le 9 peut encore être au sol. Il faut alors un joueur
+  // libre pour fermer le petit côté et la course du demi adverse.
+  const sentinelle = demiDefenseur && demiDefenseur.battu <= 0 ? demiDefenseur
+    : [...dispo]
+      .filter((p) => p !== arriere && p !== ailierFerme && p.battu <= 0)
+      .sort((a, b) => distance2(a.pos, ancre) - distance2(b.pos, ancre))[0];
 
   const rideau2 = new Set<Pion>();
   if (arriere) {
     arriere.role = 'rideau2';
+    const couloirExterieur = distLigne < 55 && Math.abs(ancre.y - AXE) > 12;
     arriere.cible = {
       x: bornerX(ancre.x + sa * profondeurFond),
-      y: bornerY(melanger(ancre.y, AXE, 0.55)),
+      y: bornerY(melanger(ancre.y, AXE, couloirExterieur ? 0.16 : 0.55)),
     };
     rideau2.add(arriere);
   }
@@ -324,10 +328,12 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   }
   if (sentinelle) {
     // La sentinelle garde le couloir du ruck : chandelle, rasant, percée du 9.
-    sentinelle.role = 'sentinelle';
-    sentinelle.cible = {
-      x: bornerX(ancre.x + sa * 8.5),
-      y: bornerY(ancre.y - ouvert * 4),
+    const sortieDuNeuf = porteur?.numero === 9 && distance2(porteur.pos, e.origine) < 15 * 15;
+    const presDuRuck = e.phase === 'ruck' || sortieDuNeuf;
+    sentinelle.role = sortieDuNeuf ? 'chasseur' : 'sentinelle';
+    sentinelle.cible = sortieDuNeuf && porteur ? poursuite(sentinelle, porteur) : {
+      x: bornerX(ancre.x + sa * (presDuRuck ? 1.8 : 8.5)),
+      y: bornerY(ancre.y - ouvert * (presDuRuck ? 1.6 : 4)),
     };
     rideau2.add(sentinelle);
   }
@@ -347,10 +353,10 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
 
   // Les cibles, du côté fermé vers le large, dans l'ordre.
   const cibles: number[] = [];
-  for (let i = nFerme - 1; i >= 0; i--) cibles.push(ancre.y - ouvert * (3.4 + i * 5.2));
+  for (let i = nFerme - 1; i >= 0; i--) cibles.push(ancre.y - ouvert * (2.2 + i * 5.2));
   const largeurUtile = Math.max(10, espaceOuvert - 7);
   const pas = Math.min(5.4, largeurUtile / Math.max(1, nOuvert - 0.5));
-  for (let i = 0; i < nOuvert; i++) cibles.push(ancre.y + ouvert * (3.4 + i * pas));
+  for (let i = 0; i < nOuvert; i++) cibles.push(ancre.y + ouvert * (2.2 + i * pas));
 
   // La glissée décale tout le rideau vers la touche : c'est ce qui étouffe
   // l'attaque au large en la poussant dehors.
@@ -414,7 +420,13 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   let depasses = 0;
   for (const p of ligne) if ((p.pos.x - porteur.pos.x) * sa < -0.5) depasses++;
   const zoneDanger = distLigneDef < 8;
-  const perce = zoneDanger || depasses >= Math.ceil(ligne.length * 0.55);
+  const menaceExterieure = !!porteur && (porteur.numero === 11 || porteur.numero === 14)
+    && Math.abs(porteur.pos.y - AXE) > 18;
+  // L'arrière et les couvertures réagissent dès que plusieurs défenseurs sont
+  // dépassés : attendre la majorité du rideau les lançait trop tard pour
+  // fermer la course intérieure du demi ou de l'ouvreur.
+  const perce = zoneDanger || depasses >= Math.ceil(ligne.length * 0.35)
+    || (menaceExterieure && !!arriere && distance2(arriere.pos, porteur.pos) < 900);
   if (!perce) return;
 
   // Ligne franchie : la couverture arrière prend le relais, et les défenseurs

@@ -235,6 +235,14 @@ pas son avatar : **il choisit**, et regarde le geste se jouer. Un choix est un
 duel avec pourcentage annoncé. Les vraies statistiques du match alimentent la
 saison — rien n'est estimé.
 
+La ligne arrière conserve ses couloirs pendant les combinaisons. Une passe
+automatique exige un receveur derrière le porteur ; pendant le vol, sa cible
+reste le point d'arrivée. Si le joueur n'y est pas, le ballon devient libre au
+sol. Sur engagement ou autre jeu au pied, les receveurs courent vers la chute
+dès que le ballon est en l'air, même si le placement arrêté était figé.
+En défense, la sentinelle du ruck doit être un joueur encore debout ; les
+voisins du passeur conservent leur glissée et l'arrière ferme le couloir menacé.
+
 Les autres rencontres de la poule sont rejouées sans rendu, dans une **file
 sérialisée** : une avance calendrier ne peut pas écraser un cumul concurrent.
 
