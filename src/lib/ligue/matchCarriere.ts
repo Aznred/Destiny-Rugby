@@ -331,6 +331,7 @@ export interface TerrainDirect {
   };
   pions: PionDirect[];
   ballon: { x: number; y: number; hauteur?: number };
+  ballonLibre?: { orientation: number; vitesseRotation: number; dernierRebondSim: number };
   /** Le pion qui porte le ballon : l'écran le colle à sa main. */
   porteurId?: string;
   vol?: VolDirect;
@@ -1013,6 +1014,11 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
       x: r2(e.ballon.x), y: r2(e.ballon.y),
       hauteur: e.ballonLibre ? r2(e.ballonLibre.hauteur) : undefined,
     },
+    ballonLibre: e.ballonLibre ? {
+      orientation: r2(e.ballonLibre.orientation ?? 0),
+      vitesseRotation: r2(e.ballonLibre.vitesseRotation ?? 0),
+      dernierRebondSim: r2(e.ballonLibre.dernierRebondSim ?? -10),
+    } : undefined,
     phase: e.phase,
     systeme: e.systeme,
     possession: MOTEUR_VERS_COTE[e.possession],

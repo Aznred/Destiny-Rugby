@@ -1096,6 +1096,11 @@ export function MatchLive({
   const terrainSprites: TerrainDirect = {
     pions: pionsDirects,
     ballon: { x: ballon.x, y: ballon.y, hauteur: ballon.h },
+    ballonLibre: e.ballonLibre ? {
+      orientation: e.ballonLibre.orientation ?? 0,
+      vitesseRotation: e.ballonLibre.vitesseRotation ?? 0,
+      dernierRebondSim: e.ballonLibre.dernierRebondSim ?? -10,
+    } : undefined,
     porteurId: porteurPourAffichage(e),
     vol: e.vol ? {
       de: e.vol.de, vers: e.vol.vers, duree: e.vol.duree, ecoule: e.vol.ecoule,
@@ -1196,7 +1201,8 @@ export function MatchLive({
   const arbitre = e.arbitre ? { x: e.arbitre.pos.x + e.arbitre.vitesse.x * r, y: e.arbitre.pos.y + e.arbitre.vitesse.y * r }
     : { x: LONGUEUR / 2 - 7, y: LARGEUR / 2 - 9 };
   const rotationBallon = e.vol ? ((e.vol.ecoule + r) * (e.vol.type === 'pied' ? 760 : 180)) % 360
-    : e.phase === 'ballonLibre' ? (tempsAnimation * 390) % 360 : -18;
+    : e.ballonLibre ? ((e.ballonLibre.orientation ?? 0) + (e.ballonLibre.vitesseRotation ?? 0) * r) * 180 / Math.PI : -18;
+  const ageRebond = e.ballonLibre ? e.sim + r - (e.ballonLibre.dernierRebondSim ?? -10) : Infinity;
 
   // La flèche de bord quand le ballon sort du cadre : sans elle, on perd le
   // ballon de vue dès qu'un dégagement part à l'opposé.
@@ -1332,6 +1338,11 @@ export function MatchLive({
                       );
                     })()}
                     {!terrainSprites.porteurId && e.conquete?.type !== 'touche' && <>
+                      {ageRebond >= 0 && ageRebond < .3 && (
+                        <ellipse cx={ballon.x} cy={ballon.y} rx={.38 + ageRebond * 3.2} ry={.22 + ageRebond * 1.7}
+                          fill="none" stroke="rgba(232,216,153,.6)" strokeWidth={.08}
+                          opacity={1 - ageRebond / .3} />
+                      )}
                       {ballon.h > 0.02 && (
                         <ellipse cx={ballon.x} cy={ballon.y} rx={rayon * (0.58 + ballon.h * 0.04)} ry={rayon * (0.32 + ballon.h * 0.02)} fill="rgba(0,0,0,.32)" />
                       )}
@@ -2031,6 +2042,14 @@ function positionBallonInterpolee(e: EtatMatch, r: number): { x: number; y: numb
       x: e.vol.de.x + (e.vol.vers.x - e.vol.de.x) * k,
       y: e.vol.de.y + (e.vol.vers.y - e.vol.de.y) * k,
       h: e.vol.hauteur * Math.sin(Math.PI * k),
+    };
+  }
+  if (e.ballonLibre) {
+    const libre = e.ballonLibre;
+    return {
+      x: e.ballon.x + libre.vitesse.x * r,
+      y: e.ballon.y + libre.vitesse.y * r,
+      h: Math.max(0, libre.hauteur + libre.vitesseVerticale * r - 4.905 * r * r),
     };
   }
   return { x: e.ballon.x, y: e.ballon.y, h: 0 };

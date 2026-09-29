@@ -70,7 +70,7 @@ export type { Pion } from './entites.js';
 // interpoler entre deux pas (voir `MatchLive.tsx`).
 export const DT = 0.15;
 const DUREE_PERIODE = 40 * 60;
-const RAYON_PLAQUAGE = 2.1;
+const RAYON_PLAQUAGE = 1.6;
 
 // Durée de chaque phase arrêtée : ce qu'on REGARDE (secondes simulées) et ce que
 // l'horloge du match AVALE (secondes de jeu). C'est cette dissociation qui rend
@@ -696,7 +696,10 @@ function tick(e: EtatMatch): void {
     // saut ou des autres rituels restent parcourues avec l'inertie normale.
     deplacer(p, dt);
   }
-  resoudreContactsPhysiques(e);
+  // Avec ballon porté, la collision est résolue APRÈS la course du porteur.
+  // La résoudre ici utilisait sa position de l'image précédente : il pouvait
+  // traverser le rideau avant le prochain contrôle de contact.
+  if (e.phase !== 'jeuCourant' || !e.porteur) resoudreContactsPhysiques(e);
   animerRegroupement(e, dt);
   const incident = incidentDeContact(e);
   if (incident) {
@@ -937,65 +940,105 @@ function retard(e: EtatMatch, cote: Cote): number {
 }
 
 /**
- * Volume physique minimal des joueurs en jeu ouvert.
- *
- * Les pions pouvaient jusque-là se traverser entièrement. Cette résolution
- * garde un coût fixe minuscule (au plus 435 paires pour trente joueurs),
- * répartit la poussée selon la puissance et conserve une distance de contact
- * assez courte pour que le plaquage se déclenche normalement.
+ * Résolution des corps debout, après leurs déplacements. Deux petits passages
+ * suffisent pour dénouer un groupe sans faire exploser le coût des 30 joueurs.
+ * Le trajet relatif du dernier pas ferme aussi le cas où deux joueurs rapides
+ * échangeaient leur place entre deux images sans jamais se toucher à l'écran.
  */
-function resoudreContactsPhysiques(e: EtatMatch): void {
+function resoudreContactsPhysiques(e: EtatMatch, balayage = true, passages = 3): void {
   if (e.phase !== 'jeuCourant' && e.phase !== 'ballonEnLAir' && e.phase !== 'ballonLibre') return;
-  const actifs = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0 && p.battu <= 0);
-  for (let i = 0; i < actifs.length; i++) {
-    const a = actifs[i]!;
-    for (let j = i + 1; j < actifs.length; j++) {
-      const b = actifs[j]!;
-      let dx = b.pos.x - a.pos.x;
-      let dy = b.pos.y - a.pos.y;
-      let d2 = dx * dx + dy * dy;
-      const rayon = a.cote === b.cote ? 0.78 : 0.66;
-      if (d2 >= rayon * rayon) continue;
-      if (d2 < 1e-6) {
-        // Direction stable : pas de hasard ajouté à la simulation autoritaire.
-        dx = ((a.numero * 17 + b.numero * 11) & 1) ? 0.01 : -0.01;
-        dy = ((a.numero * 7 + b.numero * 19) & 1) ? 0.01 : -0.01;
-        d2 = dx * dx + dy * dy;
-      }
-      const d = Math.sqrt(d2);
-      const nx = dx / d;
-      const ny = dy / d;
-      const penetration = rayon - d;
-      const masseA = (a.poidsKg ?? 95) * (0.8 + a.puissance / 250);
-      const masseB = (b.poidsKg ?? 95) * (0.8 + b.puissance / 250);
-      const somme = masseA + masseB;
-      a.pos.x -= nx * penetration * (masseB / somme);
-      a.pos.y -= ny * penetration * (masseB / somme);
-      b.pos.x += nx * penetration * (masseA / somme);
-      b.pos.y += ny * penetration * (masseA / somme);
-
-      const rapprochement = (b.vitesse.x - a.vitesse.x) * nx + (b.vitesse.y - a.vitesse.y) * ny;
-      if (rapprochement < 0) {
-        const choc = -rapprochement * 0.22;
-        a.vitesse.x -= nx * choc * (masseB / somme);
-        a.vitesse.y -= ny * choc * (masseB / somme);
-        b.vitesse.x += nx * choc * (masseA / somme);
-        b.vitesse.y += ny * choc * (masseA / somme);
+  const actifs = e.pions.filter((p) => p.surLeTerrain && p.sanction <= 0 && !p.corps);
+  for (let passage = 0; passage < passages; passage++) {
+    for (let i = 0; i < actifs.length; i++) {
+      const a = actifs[i]!;
+      for (let j = i + 1; j < actifs.length; j++) {
+        const b = actifs[j]!;
+        const opposants = a.cote !== b.cote;
+        const rayon = opposants ? 1.18 : 0.94;
+        let dx = b.pos.x - a.pos.x;
+        let dy = b.pos.y - a.pos.y;
+        let d2 = dx * dx + dy * dy;
+        if (passage === 0 && balayage && opposants && d2 >= rayon * rayon) {
+          const debutX = dx - (b.vitesse.x - a.vitesse.x) * DT;
+          const debutY = dy - (b.vitesse.y - a.vitesse.y) * DT;
+          const trajetX = dx - debutX;
+          const trajetY = dy - debutY;
+          const trajet2 = trajetX * trajetX + trajetY * trajetY;
+          if (trajet2 > 0.25) {
+            const t = borner(-(debutX * trajetX + debutY * trajetY) / trajet2, 0, 1);
+            const procheX = debutX + trajetX * t;
+            const procheY = debutY + trajetY * t;
+            if (t > 0 && t < 1 && procheX * procheX + procheY * procheY < rayon * rayon) {
+              a.pos.x -= a.vitesse.x * DT * (1 - t);
+              a.pos.y -= a.vitesse.y * DT * (1 - t);
+              b.pos.x -= b.vitesse.x * DT * (1 - t);
+              b.pos.y -= b.vitesse.y * DT * (1 - t);
+              dx = b.pos.x - a.pos.x;
+              dy = b.pos.y - a.pos.y;
+              d2 = dx * dx + dy * dy;
+            }
+          }
+        }
+        if (d2 >= rayon * rayon) continue;
+        if (d2 < 1e-6) {
+          // Direction stable : aucun hasard dans le calcul autoritaire.
+          dx = ((a.numero * 17 + b.numero * 11) & 1) ? 0.01 : -0.01;
+          dy = ((a.numero * 7 + b.numero * 19) & 1) ? 0.01 : -0.01;
+          d2 = dx * dx + dy * dy;
+        }
+        const d = Math.sqrt(d2);
+        const nx = dx / d;
+        const ny = dy / d;
+        const masseA = (a.poidsKg ?? 95) * (0.8 + a.puissance / 250);
+        const masseB = (b.poidsKg ?? 95) * (0.8 + b.puissance / 250);
+        const somme = masseA + masseB;
+        const penetration = rayon - d;
+        a.pos.x -= nx * penetration * (masseB / somme);
+        a.pos.y -= ny * penetration * (masseB / somme);
+        b.pos.x += nx * penetration * (masseA / somme);
+        b.pos.y += ny * penetration * (masseA / somme);
+        if (passage === 0) {
+          const rapprochement = (b.vitesse.x - a.vitesse.x) * nx + (b.vitesse.y - a.vitesse.y) * ny;
+          if (rapprochement < 0) {
+            const choc = -rapprochement * 0.38;
+            a.vitesse.x -= nx * choc * (masseB / somme);
+            a.vitesse.y -= ny * choc * (masseB / somme);
+            b.vitesse.x += nx * choc * (masseA / somme);
+            b.vitesse.y += ny * choc * (masseA / somme);
+          }
+        }
       }
     }
   }
 }
 
-/** Donne au plaquage réussi un recul et un point d'impact réellement commun. */
-function appliquerImpactPlaquage(porteur: Pion, defenseur: Pion): void {
+/** Place les épaules au même point de contact avant toute animation du duel. */
+function rapprocherContact(porteur: Pion, defenseur: Pion): void {
   const dx = porteur.pos.x - defenseur.pos.x, dy = porteur.pos.y - defenseur.pos.y;
   const d = Math.max(.01, Math.hypot(dx, dy));
-  const force = borner(1.7 + (defenseur.puissance - porteur.puissance) / 24
+  if (d <= 1.02) return;
+  const rapprochement = d - 1.02;
+  defenseur.pos.x += dx / d * rapprochement * .78;
+  defenseur.pos.y += dy / d * rapprochement * .78;
+  porteur.pos.x -= dx / d * rapprochement * .22;
+  porteur.pos.y -= dy / d * rapprochement * .22;
+}
+
+/** L'élan des deux joueurs décide de la direction et du recul de la chute. */
+function appliquerImpactPlaquage(porteur: Pion, defenseur: Pion, puissant = false): void {
+  const dx = porteur.pos.x - defenseur.pos.x, dy = porteur.pos.y - defenseur.pos.y;
+  const d = Math.max(.01, Math.hypot(dx, dy));
+  const course = Math.max(.01, Math.hypot(porteur.vitesse.x, porteur.vitesse.y));
+  const poidsCourse = puissant ? .2 : .47;
+  const avantX = dx / d * (1 - poidsCourse) + porteur.vitesse.x / course * poidsCourse;
+  const avantY = dy / d * (1 - poidsCourse) + porteur.vitesse.y / course * poidsCourse;
+  const norme = Math.max(.01, Math.hypot(avantX, avantY));
+  const force = borner((puissant ? 3.1 : 1.7) + (defenseur.puissance - porteur.puissance) / 24
     + ((defenseur.poidsKg ?? 95) - (porteur.poidsKg ?? 95)) / 45
-    + Math.hypot(defenseur.vitesse.x - porteur.vitesse.x, defenseur.vitesse.y - porteur.vitesse.y) * .35, .8, 6);
-  const impulsion = { x: dx / d * force, y: dy / d * force };
-  declencherChute(porteur, impulsion, 2.1);
-  declencherChute(defenseur, { x: impulsion.x * .75, y: impulsion.y * .75 }, 1.6);
+    + Math.hypot(defenseur.vitesse.x - porteur.vitesse.x, defenseur.vitesse.y - porteur.vitesse.y) * .35, .8, puissant ? 7.2 : 6);
+  const impulsion = { x: avantX / norme * force, y: avantY / norme * force };
+  declencherChute(porteur, impulsion, puissant ? 2.4 : 2.1);
+  declencherChute(defenseur, { x: impulsion.x * .7, y: impulsion.y * .7 }, puissant ? 1.8 : 1.6);
 }
 
 // ---------------------------------------------------------------------------
@@ -1003,6 +1046,9 @@ function appliquerImpactPlaquage(porteur: Pion, defenseur: Pion): void {
 // ---------------------------------------------------------------------------
 
 function preparerCoupEnvoi(e: EtatMatch, pour: Cote): void {
+  // La phase arrêtée donne à tous le temps de se relever. Un joueur encore
+  // contraint par une chute ancienne ne doit pas rater son replacement.
+  for (const p of e.pions) if (p.surLeTerrain) delete p.corps;
   e.possession = pour;
   e.porteur = null;
   e.vol = null;
@@ -1018,7 +1064,10 @@ function preparerCoupEnvoi(e: EtatMatch, pour: Cote): void {
   // (les joueurs regagnent le centre pendant la transformation), on le GARDE :
   // sinon ils changeraient de destination à mi-parcours.
   if (!e.cibleRenvoi) viserLeCoupEnvoi(e, pour);
-  installerPlacement(e, placementCoupEnvoi(e.pions, MILIEU, pour, e.cibleRenvoi!));
+  // Un joueur à presque vingt mètres de sa marque au changement de période
+  // manquerait encore le coup de pied cinq secondes plus tard. Les grands
+  // replacements se font durant la coupure, les proches finissent en courant.
+  installerPlacement(e, placementCoupEnvoi(e.pions, MILIEU, pour, e.cibleRenvoi!), 18);
 }
 
 // Fixe le point de chute du coup d'envoi et renvoie tout le monde au centre.
@@ -1358,6 +1407,9 @@ function demarrerBallonLibre(
     vitesse: { x: dx / norme * vitesse, y: dy / norme * vitesse },
     hauteur: haut ? 0.7 : rasant ? 0.12 : 0.28,
     vitesseVerticale: haut ? 4.8 : rasant ? 1.1 : 2.4,
+    orientation: Math.atan2(dy, dx) + (e.rng() - .5) * .8,
+    vitesseRotation: (e.rng() < .5 ? -1 : 1) * (3.5 + vitesse * .55),
+    dernierRebondSim: -10,
     intention,
     auteurCote: vol.auteur.cote,
     auteur: vol.auteur,
@@ -1385,24 +1437,45 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
 
   e.ballon.x += libre.vitesse.x * dt;
   e.ballon.y += libre.vitesse.y * dt;
-  libre.hauteur += libre.vitesseVerticale * dt;
-  libre.vitesseVerticale -= 9.81 * dt;
+  libre.orientation = (libre.orientation ?? Math.atan2(libre.vitesse.y, libre.vitesse.x))
+    + (libre.vitesseRotation ?? 0) * dt;
+  const encoreEnVol = libre.hauteur > 0 || libre.vitesseVerticale > 0;
+  if (encoreEnVol) {
+    libre.hauteur += libre.vitesseVerticale * dt;
+    libre.vitesseVerticale -= 9.81 * dt;
+  }
 
-  if (libre.hauteur <= 0 && libre.vitesseVerticale < 0) {
+  if (encoreEnVol && libre.hauteur <= 0 && libre.vitesseVerticale < 0) {
     libre.hauteur = 0;
-    const coefficient = libre.intention === 'rasant' ? 0.34 : libre.rebonds === 0 ? 0.54 : 0.31;
+    const axeVitesse = Math.atan2(libre.vitesse.y, libre.vitesse.x);
+    const biaisOvale = Math.sin((libre.orientation ?? 0) - axeVitesse);
+    const pointe = Math.abs(Math.cos((libre.orientation ?? 0) - axeVitesse));
+    const coefficient = libre.intention === 'rasant' ? .24
+      : libre.rebonds === 0 ? .42 + pointe * .18 : .23 + pointe * .12;
     libre.vitesseVerticale = -libre.vitesseVerticale * coefficient;
-    const deviation = (e.rng() - 0.5) * (libre.intention === 'rasant' ? 0.11 : 0.28);
+    // La pointe de l'ovale mord la pelouse et écarte la trajectoire. Une petite
+    // variation de terrain garde des rebonds vivants sans tirer au hasard pur.
+    const deviation = biaisOvale * (libre.rebonds === 0 ? .44 : .26)
+      + (e.rng() - .5) * (libre.intention === 'rasant' ? .15 : .23);
     const vx = libre.vitesse.x;
     const vy = libre.vitesse.y;
-    libre.vitesse.x = (vx - vy * deviation) * 0.72;
-    libre.vitesse.y = (vy + vx * deviation) * 0.72;
+    const amortissement = libre.rebonds === 0 ? .81 : .68;
+    libre.vitesse.x = (vx * Math.cos(deviation) - vy * Math.sin(deviation)) * amortissement;
+    libre.vitesse.y = (vy * Math.cos(deviation) + vx * Math.sin(deviation)) * amortissement;
+    libre.vitesseRotation = -(libre.vitesseRotation ?? 0) * (.48 + pointe * .16)
+      + biaisOvale * 2.2;
     libre.rebonds += 1;
-    if (Math.abs(libre.vitesseVerticale) < 0.75) libre.vitesseVerticale = 0;
+    libre.dernierRebondSim = e.sim;
+    if (Math.abs(libre.vitesseVerticale) < .82) libre.vitesseVerticale = 0;
   }
-  const frein = Math.exp(-(libre.intention === 'rasant' ? 0.34 : 0.48) * dt);
+  const frein = Math.exp(-(libre.hauteur > .03 ? .16 : 1.15) * dt);
   libre.vitesse.x *= frein;
   libre.vitesse.y *= frein;
+  libre.vitesseRotation = (libre.vitesseRotation ?? 0) * Math.exp(-(libre.hauteur > .03 ? .28 : 1.6) * dt);
+  if (libre.hauteur === 0 && Math.hypot(libre.vitesse.x, libre.vitesse.y) < .18) {
+    libre.vitesse = { x: 0, y: 0 };
+    libre.vitesseRotation = 0;
+  }
 
   if (e.ballon.y <= 0 || e.ballon.y >= LARGEUR) {
     const lieu = { x: e.ballon.x, y: e.ballon.y <= 0 ? 0 : LARGEUR };
@@ -1535,6 +1608,9 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
     : ligneDeCourse(e, porteur);
   const avant = porteur.pos.x;
   if (!piloteArcade) deplacer(porteur, dt);
+  // Tous les corps ont maintenant bougé sur cette image. Le porteur ne peut
+  // plus couper à travers un défenseur entre l'ancienne et la nouvelle pose.
+  resoudreContactsPhysiques(e);
   // ⚠️ LES MÈTRES SE COMPTENT AU-DELÀ DE LA LIGNE D'AVANTAGE, comme dans les
   // statistiques officielles. Un ouvreur qui reçoit dix mètres derrière le ruck
   // et court cinq mètres vers l'avant n'a pas « gagné cinq mètres » : il n'a
@@ -1551,6 +1627,7 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // ── Pression, collision et franchissement, en un seul balayage ───────────
   let pression = 99;
   let plaqueur: Pion | null = null;
+  let distancePlaqueur = Infinity;
   let depasses = 0;
   for (const d of surLeTerrain(e, adverse(porteur.cote))) {
     if (d.sanction > 0) continue;
@@ -1558,7 +1635,10 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
     if (devant < -0.5) depasses++;
     if (d.battu <= 0) {
       const dd = distance(d.pos, porteur.pos);
-      if (dd <= RAYON_PLAQUAGE && !plaqueur) plaqueur = d;
+      if (dd <= RAYON_PLAQUAGE && dd < distancePlaqueur) {
+        plaqueur = d;
+        distancePlaqueur = dd;
+      }
       if (dd < pression && devant > -0.2) pression = dd;
     }
   }
@@ -2187,10 +2267,12 @@ function resoudrePlaquage(
 ): void {
   // Une décision peut être prise avant l'arrivée du défenseur. Aucun choc ni
   // chute à distance : l'intention reste armée jusqu'au contact réel.
-  if (distance2(porteur.pos, defenseur.pos) > 1.85 ** 2) {
+  if (distance2(porteur.pos, defenseur.pos) > RAYON_PLAQUAGE ** 2) {
     defenseur.cible = { ...porteur.pos };
     return;
   }
+  rapprocherContact(porteur, defenseur);
+  e.ballon = { ...porteur.pos };
   // ⚠️ LE GESTE ILLÉGAL SE JOUE AVANT LE DUEL, ET IL LE REMPLACE. Un plaquage
   // haut n'est pas un plaquage raté : l'arbitre siffle, le ballon change de
   // camp, et la température monte d'un cran. Ça vaut pour les TRENTE pions —
@@ -2248,6 +2330,13 @@ function resoudrePlaquage(
     } else if (geste === 'crochet') {
       // Le plaqueur part une fraction de seconde sur le mauvais appui.
       defenseur.vitesse.y -= directionGeste * 1.7;
+    }
+    if (!defenseur.corps) {
+      const vitesse = porteur.vitesse;
+      declencherChute(defenseur, {
+        x: vitesse.x * .55 + sens(porteur.cote) * .8,
+        y: vitesse.y * .55 - directionGeste * 1.3,
+      }, 1.15);
     }
     // ⚠️ C'EST ICI, ET NULLE PART AILLEURS, QU'UNE PERCÉE EXISTE. Que le geste
     // ait été joué sur-le-champ ou qu'il soit resté armé jusqu'au contact, le
@@ -2342,8 +2431,7 @@ function resoudrePlaquage(
   if (grosTampon) {
     jouerGeste(e, porteur, 'fall_back', 1.8);
     jouerGeste(e, defenseur, 'tackle_drive', 1.6);
-    declencherChute(porteur, { x: -sens(porteur.cote) * 4.4, y: (e.rng() - 0.5) * 1.6 }, 2.4);
-    declencherChute(defenseur, { x: -sens(porteur.cote) * 2.2, y: 0 }, 1.8);
+    appliquerImpactPlaquage(porteur, defenseur, true);
     e.grosImpact = { lieu: { ...porteur.pos }, type: 'tampon', restant: 2.2 };
     chauffer(e, 8);
     dire(e, 'plaquage', defenseur.cote, `ÉNORME TAMPON de ${defenseur.nom} ! ${porteur.nom} est séché net et envoyé sur les fesses !`, 0, defenseur.moi || porteur.moi);
@@ -3656,6 +3744,11 @@ function reprendreJeu(
 
   e.ballon = { x: lieu.x, y: lieu.y };
   donnerBallon(e, premier, 0.3);
+  // À la sortie du ruck, les joueurs qui étaient liés se redressent parfois
+  // au même endroit. Les séparer avant la première image de jeu ouvert évite
+  // une image entière de silhouettes superposées.
+  resoudreContactsPhysiques(e, false, 4);
+  e.ballon = { ...premier.pos };
 }
 
 /**

@@ -342,7 +342,14 @@ export function interpolerEtatDirect(a: TerrainDirect, b: TerrainDirect, u: numb
     arbitre = { x: melanger(debut.x, fin.x, t), y: melanger(debut.y, fin.y, t),
       vx: melanger(debut.vx, fin.vx, t), vy: melanger(debut.vy, fin.vy, t), regard: debut.regard + delta * t };
   }
-  return { ...courant, pions, porteurId, gestes, simulation, instantJeu, arbitre,
+  const ballonLibre = a.ballonLibre && b.ballonLibre && a.phase === 'ballonLibre' && b.phase === 'ballonLibre'
+    ? {
+      orientation: melanger(a.ballonLibre.orientation, b.ballonLibre.orientation, t),
+      vitesseRotation: melanger(a.ballonLibre.vitesseRotation, b.ballonLibre.vitesseRotation, t),
+      dernierRebondSim: simulation >= b.ballonLibre.dernierRebondSim
+        ? b.ballonLibre.dernierRebondSim : a.ballonLibre.dernierRebondSim,
+    } : courant.ballonLibre;
+  return { ...courant, pions, porteurId, gestes, simulation, instantJeu, arbitre, ballonLibre,
     vol: actif ? { ...actif, ecoule: instantJeu - actif.debut! }
       : courant.vol?.fin !== undefined && courant.vol.fin <= instantJeu ? undefined : courant.vol,
     contact: a.contact ? { ...a.contact, progression: Math.min(1, a.contact.progression + Math.max(0, simulation - (a.simulation ?? simulation)) / 1.35) } : courant.contact,

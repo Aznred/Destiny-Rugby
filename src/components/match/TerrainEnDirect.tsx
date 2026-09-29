@@ -500,7 +500,9 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   // Une passe tourne peu ; un dégagement part en rotation bout par bout et le
   // rebond la ralentit. La couture rend ce mouvement lisible même de loin.
   const rotationBallon = affiche.vol ? (affiche.vol.ecoule * (affiche.vol.type === 'pied' ? 760 : 180)) % 360
-    : affiche.phase === 'ballonLibre' ? (tempsAnimation * 390) % 360 : -18;
+    : affiche.ballonLibre ? affiche.ballonLibre.orientation * 180 / Math.PI : -18;
+  const ageRebond = affiche.ballonLibre
+    ? (affiche.simulation ?? 0) - affiche.ballonLibre.dernierRebondSim : Infinity;
 
   return (
     <div className="cel-scene" ref={scene}>
@@ -557,6 +559,11 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
           {!affiche.porteurId && affiche.conquete?.type !== 'touche' && <g ref={noeud => {
             noeudBallon.current = noeud ? { noeud, origine: { x: b.x, y: b.y } } : null;
           }}>
+            {ageRebond >= 0 && ageRebond < .3 && (
+              <ellipse cx={b.x} cy={b.y} rx={rayonBallon * (.8 + ageRebond * 5)} ry={rayonBallon * (.45 + ageRebond * 2.5)}
+                fill="none" stroke="rgba(232,216,153,.6)" strokeWidth={trait * .8}
+                opacity={1 - ageRebond / .3} />
+            )}
             {b.h > 0.02 && <ellipse cx={b.x} cy={b.y} rx={rayonBallon * (0.62 + b.h * 0.04)} ry={rayonBallon * (0.34 + b.h * 0.02)} fill="rgba(0,0,0,.32)" />}
             {b.h > 1.2 && <ellipse cx={b.x} cy={b.y - b.h * 2.2} rx={rayonBallon * (1.2 + b.h * 0.12)} ry={rayonBallon * (0.8 + b.h * 0.08)} fill="rgba(255,245,180,.25)" />}
             <g transform={`rotate(${rotationBallon.toFixed(1)} ${b.x} ${b.y - b.h * 2.2})`}>

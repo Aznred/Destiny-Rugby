@@ -311,6 +311,10 @@ export interface BallonLibre {
   vitesse: Vec;
   hauteur: number;
   vitesseVerticale: number;
+  /** Axe du ballon ovale et rotation en radians, liés à ses vrais rebonds. */
+  orientation?: number;
+  vitesseRotation?: number;
+  dernierRebondSim?: number;
   intention: IntentionPied | 'touche';
   auteurCote: Cote;
   auteur?: Pion;
