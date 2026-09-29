@@ -547,6 +547,10 @@ export function CompositionTerrainManager({
   useEffect(() => {
     if (!selection) return;
     const fermerHorsPanneau = (e: PointerEvent) => {
+      // Sur téléphone, poser le doigt sur le terrain pour remonter la feuille
+      // est un défilement. La sélection reste verrouillée jusqu'au placement,
+      // à une nouvelle sélection ou au bouton Annuler.
+      if (e.pointerType !== 'mouse') return;
       const cible = e.target;
       if (!(cible instanceof Element)) return;
       if (panneauRef.current?.contains(cible)) return;
