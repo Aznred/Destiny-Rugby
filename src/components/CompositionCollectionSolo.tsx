@@ -3,6 +3,8 @@ import { Icone } from './Icone';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
 import { Selecteur } from './Selecteur';
 import { CompositionTerrainManager } from './CompositionTerrainManager';
+import { nomPoste } from '../data/rugby';
+import { POSTES_XV_MANAGER } from '../lib/compositionManager';
 import { t } from '../lib/i18n';
 import type { CarteCarriere } from '../lib/ligue/typesCarriere';
 import type { CompositionManager } from '../types';
@@ -106,6 +108,10 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
   const [rechercheReserve, setRechercheReserve] = useState('');
   const [filtreChampionnat, setFiltreChampionnat] = useState('');
   const [filtreClub, setFiltreClub] = useState('');
+  const [emplacementMobile, setEmplacementMobile] = useState<{ zone: 'titulaires' | 'remplacants'; index: number } | null>(null);
+  const [rechercheMobile, setRechercheMobile] = useState('');
+  const [reserveMobile, setReserveMobile] = useState<string | null>(null);
+  const [groupeMobile, setGroupeMobile] = useState<'titulaires' | 'remplacants' | 'reserves'>('titulaires');
 
   const [sauvegardees, setSauvegardees] = useState<EquipeSauvegardee[]>(() => {
     if (typeof window === 'undefined') return [];
@@ -199,6 +205,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
   const filtresReserveActifs = Boolean(rechercheReserve || filtreChampionnat || filtreClub);
 
   const changerJoueur = (zone: 'titulaires' | 'remplacants', index: number, joueurId: string) => {
+    if (!cartes.some(c => c.id === joueurId)) return;
     const suivante: CompositionManager = {
       ...composition,
       titulaires: [...composition.titulaires],
@@ -207,7 +214,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
     const ancien = suivante[zone][index];
     for (const autreZone of ['titulaires', 'remplacants'] as const) {
       const autreIndex = suivante[autreZone].indexOf(joueurId);
-      if (autreIndex >= 0) suivante[autreZone][autreIndex] = ancien;
+      if (autreIndex >= 0 && (autreZone !== zone || autreIndex !== index)) suivante[autreZone][autreIndex] = ancien;
     }
     suivante[zone][index] = joueurId;
     if (suivante.capitaineId === ancien && zone === 'titulaires') suivante.capitaineId = joueurId;
@@ -221,6 +228,12 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
     : 0;
 
   const collectif = useMemo(() => collectifCarriere(cartes, composition), [cartes, composition]);
+  const cartesParId = useMemo(() => new Map(cartes.map(c => [c.id, c])), [cartes]);
+  const candidatesMobile = useMemo(() => {
+    const q = rechercheMobile.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    return cartes.filter(c => !q || `${c.nom} ${c.clubReel} ${nomPoste(c.poste)}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(q))
+      .sort((a, b) => b.note - a.note).slice(0, q ? 80 : 32);
+  }, [cartes, rechercheMobile]);
 
   const enregistrerFeuille = () => {
     try {
@@ -457,6 +470,37 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
           )}
         </section>
       </div>
+
+      <section className="solo-compo-mobile" aria-label="Composition tactile">
+        <nav className="solo-compo-mobile-onglets" aria-label="Groupes de joueurs">
+          {(['titulaires', 'remplacants', 'reserves'] as const).map(groupe => <button type="button" key={groupe} aria-pressed={groupeMobile === groupe} onClick={() => { setGroupeMobile(groupe); setEmplacementMobile(null); }}>
+            {groupe === 'titulaires' ? `Titulaires · ${composition.titulaires.filter(Boolean).length}/15` : groupe === 'remplacants' ? `Remplaçants · ${composition.remplacants.filter(Boolean).length}/8` : `Réserves · ${nbReservesTotal}`}
+          </button>)}
+        </nav>
+        {groupeMobile !== 'reserves' ? <div className="solo-compo-mobile-emplacements">
+          {Array.from({ length: groupeMobile === 'titulaires' ? 15 : 8 }, (_, index) => {
+            const zone = groupeMobile;
+            const carte = cartesParId.get(composition[zone][index]);
+            return <button type="button" key={`${zone}-${index}`} className="solo-compo-mobile-emplacement" onClick={() => { setEmplacementMobile({ zone, index }); setRechercheMobile(''); }}>
+              <span className="solo-compo-mobile-numero">{index + (zone === 'titulaires' ? 1 : 16)}</span>
+              {carte ? <><span className="solo-compo-mobile-carte"><CarteJoueurEnLigne carte={carte} compacte /></span><span className="solo-compo-mobile-identite"><b>{carte.nom}</b><small>{nomPoste(carte.poste)} · {carte.clubReel}</small></span></> : <span className="solo-compo-mobile-identite"><b>Emplacement libre</b><small>{zone === 'titulaires' ? nomPoste(POSTES_XV_MANAGER[index]) : 'Banc'}</small></span>}
+              <span className="solo-compo-mobile-modifier">Changer</span>
+            </button>;
+          })}
+        </div> : <div className="solo-compo-mobile-reserves">
+          <p>Choisis une carte, puis sa place dans le XV ou sur le banc.</p>
+          <input type="search" value={rechercheMobile} onChange={e => setRechercheMobile(e.target.value)} placeholder="Rechercher une réserve" aria-label="Rechercher une réserve" />
+          <div className="solo-compo-mobile-grille">{candidatesMobile.filter(c => !idsSurFeuille.has(c.id) && reservesVisibles.has(c.id)).map(c => <button type="button" key={c.id} onClick={() => setReserveMobile(c.id)}><CarteJoueurEnLigne carte={c} compacte /><span>{c.nom}</span></button>)}</div>
+          {nbReservesTotal > 32 && <p>Recherche par nom pour voir toutes les cartes de ta collection.</p>}
+        </div>}
+        {reserveMobile && <div className="solo-compo-mobile-choix" role="dialog" aria-modal="true" aria-label="Placer une réserve"><div className="solo-compo-mobile-choix-tete"><h3>Placer {cartesParId.get(reserveMobile)?.nom}</h3><button type="button" className="btn fantome" onClick={() => setReserveMobile(null)}>Fermer</button></div><div className="solo-compo-mobile-destinations">{(['titulaires', 'remplacants'] as const).map(zone => <section key={zone}><h4>{zone === 'titulaires' ? 'Titulaires' : 'Remplaçants'}</h4>{Array.from({ length: zone === 'titulaires' ? 15 : 8 }, (_, index) => <button type="button" key={index} onClick={() => { changerJoueur(zone, index, reserveMobile); setReserveMobile(null); setGroupeMobile(zone); }}>{index + (zone === 'titulaires' ? 1 : 16)} · {cartesParId.get(composition[zone][index])?.nom ?? 'Emplacement libre'}</button>)}</section>)}</div></div>}
+        {emplacementMobile && <div className="solo-compo-mobile-choix" role="dialog" aria-modal="true" aria-label="Choisir un joueur">
+          <div className="solo-compo-mobile-choix-tete"><div><small>EMPLACEMENT {emplacementMobile.index + (emplacementMobile.zone === 'titulaires' ? 1 : 16)}</small><h3>Choisir un joueur</h3></div><button type="button" className="btn fantome" onClick={() => setEmplacementMobile(null)}>Fermer</button></div>
+          <input type="search" autoFocus value={rechercheMobile} onChange={e => setRechercheMobile(e.target.value)} placeholder="Nom, club ou poste" aria-label="Rechercher un joueur" />
+          <div className="solo-compo-mobile-grille">{candidatesMobile.map(c => <button type="button" key={c.id} onClick={() => { changerJoueur(emplacementMobile.zone, emplacementMobile.index, c.id); setEmplacementMobile(null); }}><CarteJoueurEnLigne carte={c} compacte /><span>{c.nom}</span><small>{c.clubReel}</small></button>)}</div>
+          {cartes.length > candidatesMobile.length && <p>Recherche un joueur par son nom pour voir le reste de ta collection.</p>}
+        </div>}
+      </section>
 
       <CompositionTerrainManager
         rendreCarte={(joueur: Coequipier) => {

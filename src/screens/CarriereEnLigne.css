@@ -2369,6 +2369,12 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-public small{color:#b4c8b8}
 .cel-public-club{display:grid;gap:7px;max-width:380px;color:#e9ddb0;font-weight:700}
 .cel-public-club input{width:100%;min-height:44px;padding:10px 12px;border:1px solid rgba(244,199,97,.5);border-radius:9px;background:#0a2019;color:#fff;font:inherit}
+.cel-public-choix-embleme{max-width:390px;min-height:56px}
+.cel-logo-public{display:flex;align-items:center;gap:14px;margin-bottom:12px;border-color:rgba(244,199,97,.38);background:linear-gradient(110deg,#14382d,#102831)}
+.cel-logo-public>div{display:grid;gap:3px;flex:1;min-width:0}
+.cel-logo-public b{font-size:1.1rem}
+.cel-logo-public small{color:#bcd2ca}
+@media(max-width:640px){.cel-logo-public{flex-wrap:wrap}.cel-logo-public>.btn{width:100%}}
 @media(max-width:640px){.cel-portail{display:flex;flex-direction:column;align-items:stretch}.cel-public{order:-1;padding:16px}.cel-public .btn{width:100%;justify-self:stretch}.cel-public-club{max-width:none}}
 .cel-public-bandeau{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:12px 0;padding:12px 16px;background:#143c2c;border:1px solid #9f884d;border-radius:11px;color:#f2e6b6}
 .cel-public-bandeau span{color:#d7e4d7}

@@ -62,6 +62,8 @@ export interface ClubCarriere {
   id: string; compteId: string; pseudo: string; nom: string; ovas: number;
   /** Chemin d'un vrai écusson de club (`emblemeValide` fait foi). */
   embleme?: string;
+  /** Affectation initiale du logo demandé pour le compte Kiri, appliquée une seule fois. */
+  emblemeKiriInitialise?: boolean;
   composition: CompositionManager; strategie: StrategieEnLigne;
   /** Compositions privées du manager, conservées même après une modification de la feuille. */
   compositionsSauvegardees?: { id: string; nom: string; composition: CompositionManager }[];
@@ -210,11 +212,10 @@ export interface CreationCarriere {
   packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean;
 }
 export type CommandeCarriere =
-  // ⚠️ L'ÉCUSSON SE CHOISIT À L'INSCRIPTION, ET PLUS JAMAIS APRÈS. Il n'y a
-  // donc pas de commande pour le changer : dans une ligue entre potes, on
-  // reconnaît le club de chacun à son écusson, et le voir changer en cours de
-  // saison rend le classement et l'historique illisibles.
+  // Les ligues privées gardent leur écusson initial ; seule la division
+  // publique permet de le changer depuis le vestiaire.
   | { type: 'rejoindre'; pseudo: string; clubNom: string; embleme?: string }
+  | { type: 'changerEmblemePublic'; embleme?: string }
   | { type: 'celebrationVue'; competitionId: string; saison: number }
   | { type: 'demarrerSaison' }
   | { type: 'modifierRythme'; rythme: number }

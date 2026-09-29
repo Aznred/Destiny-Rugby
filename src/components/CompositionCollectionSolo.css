@@ -130,3 +130,63 @@
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+.solo-compo-mobile { display: none; }
+
+@media (max-width: 900px) {
+  .collection-solo-compo > .cel-compo,
+  .collection-solo-compo > .cel-compo.cel-compo-etendue {
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .collection-solo-compo .manager-feuille-visuelle { display: none !important; }
+  .collection-solo-compo .cel-tete-compo { display: flex; flex-wrap: wrap; gap: 8px; }
+  .collection-solo-compo .cel-tete-compo > button:first-child { display: none; }
+  .collection-solo-compo .cel-tete-compo .cel-chiffres-compo { order: 0; width: 100%; justify-content: center; }
+  .collection-solo-compo .cel-tete-compo > button:not(:first-child) { flex: 1 1 145px; }
+  .collection-solo-compo .cel-tete-compo > div:nth-child(3) { display: none; }
+  .collection-solo-compo .cel-tete-compo .btn { min-height: 42px; }
+  .collection-solo-compo .cel-outils-compo { display: none; }
+  .solo-compo-mobile { display: block; min-width: 0; padding-bottom: 20px; }
+  .solo-compo-mobile-onglets { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; padding: 8px 0; background: #081c24; overflow-x: auto; }
+  .solo-compo-mobile-onglets button { flex: 1 0 auto; min-height: 44px; padding: 9px 12px; border: 1px solid #668077; border-radius: 9px; color: #e8efea; background: #18313a; font-weight: 700; }
+  .solo-compo-mobile-onglets button[aria-pressed="true"] { color: #14231d; background: #f0cb64; border-color: #f0cb64; }
+  .solo-compo-mobile-emplacements { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .solo-compo-mobile-emplacement { position: relative; display: flex; min-width: 0; min-height: 156px; align-items: center; gap: 10px; padding: 12px; border: 1px solid #66807788; border-radius: 12px; background: #132a33; color: #f6f4e8; text-align: left; }
+  .solo-compo-mobile-emplacement:focus-visible, .solo-compo-mobile-grille button:focus-visible { outline: 3px solid #f8d67f; outline-offset: 2px; }
+  .solo-compo-mobile-numero { position: absolute; top: 6px; left: 8px; color: #f0cb64; font-weight: 800; }
+  .solo-compo-mobile-carte { flex: 0 0 90px; width: 90px; margin-top: 10px; pointer-events: none; }
+  .solo-compo-mobile-carte .dr-player { width: 100%; }
+  .solo-compo-mobile-identite { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+  .solo-compo-mobile-identite b { line-height: 1.2; }
+  .solo-compo-mobile-identite small { color: #aec6c5; line-height: 1.3; }
+  .solo-compo-mobile-modifier { position: absolute; right: 9px; bottom: 8px; color: #f0cb64; font-size: 11px; font-weight: 700; }
+  .solo-compo-mobile-reserves p { color: #c7dad7; }
+  .solo-compo-mobile-reserves>input { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #9aab9c; border-radius: 9px; background: #14303a; color: white; font: inherit; }
+  .solo-compo-mobile-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 10px; padding: 8px 0; }
+  .solo-compo-mobile-grille button { display: grid; justify-items: center; align-content: start; gap: 5px; min-width: 0; padding: 9px; border: 1px solid #66807788; border-radius: 10px; background: #17313a; color: #f4f0de; text-align: center; }
+  .solo-compo-mobile-grille .dr-player { width: min(100%, 100px); pointer-events: none; }
+  .solo-compo-mobile-grille button > span, .solo-compo-mobile-grille button > small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .solo-compo-mobile-grille button > small { color: #b8c8c4; }
+  .solo-compo-mobile-choix { position: fixed; inset: 0; z-index: 130; display: flex; flex-direction: column; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); background: #071b23; overflow-y: auto; }
+  .solo-compo-mobile-choix-tete { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; background: #071b23; }
+  .solo-compo-mobile-choix-tete small { color: #f0cb64; letter-spacing: .1em; }
+  .solo-compo-mobile-choix-tete h3 { margin: 2px 0; }
+  .solo-compo-mobile-choix > input { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #9aab9c; border-radius: 9px; background: #14303a; color: white; font: inherit; }
+  .solo-compo-mobile-choix > p { color: #b8cbc8; }
+  .solo-compo-mobile-destinations { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; overflow-y: auto; }
+  .solo-compo-mobile-destinations section { display: grid; align-content: start; gap: 7px; }
+  .solo-compo-mobile-destinations h4 { margin: 12px 0 4px; color: #f0cb64; }
+  .solo-compo-mobile-destinations button { min-height: 46px; padding: 8px 10px; border: 1px solid #66807788; border-radius: 8px; background: #17313a; color: #f6f4e8; text-align: left; }
+}
+
+@media (max-width: 560px) {
+  .solo-compo-mobile-emplacements { grid-template-columns: minmax(0, 1fr); }
+  .solo-compo-mobile-emplacement { min-height: 144px; }
+  .collection-solo-compo .solo-compo-fermer { margin: 0; }
+  .solo-compo-mobile-destinations { grid-template-columns: minmax(0,1fr); }
+}

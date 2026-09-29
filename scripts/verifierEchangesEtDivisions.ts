@@ -7,7 +7,7 @@ import { agirCarriere, avancerCarriere, creerCarriere, creerDivisionPublique } f
 import { nombreQualifiesPlayoffs } from '../src/lib/ligue/poulesCarriere';
 import { planifierDivisionsPubliques } from '../serveur/divisionsPubliques';
 import { compositionManagerParDefaut } from '../src/lib/compositionManager';
-import { catalogueBaseCarriere, catalogueMondialCarriere, coequipierDepuisCarte } from '../src/lib/ligue/catalogueCarriere';
+import { catalogueBaseCarriere, catalogueMondialCarriere, coequipierDepuisCarte, FC_MEZE_EMBLEME } from '../src/lib/ligue/catalogueCarriere';
 import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereApi';
 import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte';
 import type { LigueStockee } from '../serveur/carriereStockage';
@@ -23,10 +23,14 @@ const ligue = creerCarriere({ id: identifiants[0], code: 'TEST-OPTIONS', compteI
 assert.deepEqual(ligue.packsActifs, ['bronze','top14']);
 assert.equal(ligue.clubs[0].packsGratuits?.length ?? 0, 0);
 assert.equal(ligue.doublonsAutorises, true);
+assert.throws(() => agirCarriere(ligue, identifiants[0], { type: 'changerEmblemePublic', embleme: FC_MEZE_EMBLEME }, maintenant, 'logo-prive'), /ligue publique/);
 
 const publique = [0,1].map((division) => creerDivisionPublique({ id: identifiants[division],
   code: `DR-PUBLIC-C0-D${division+1}`, compteId: identifiants[division*2],
   pseudo: `Joueur ${division}`, clubNom: `Club ${division}` }, 0, division+1, maintenant, `graine-${division}`));
+const nouveauLogo = agirCarriere(publique[0], identifiants[0], { type: 'changerEmblemePublic', embleme: FC_MEZE_EMBLEME }, maintenant, 'logo-public');
+assert.equal(nouveauLogo.clubs[0].embleme, FC_MEZE_EMBLEME);
+assert.throws(() => agirCarriere(nouveauLogo, identifiants[0], { type: 'changerEmblemePublic', embleme: 'https://example.com/inconnu.png' }, maintenant, 'logo-inconnu'), /Logo inconnu/);
 for (let i = 0; i < 2; i++) {
   const premiere = publique[i].clubs[0];
   const seconde = structuredClone(premiere);

@@ -26,3 +26,38 @@
 .solo-echanges-erreur{color:#ffb8a2!important}
 .solo-echanges-pages{justify-content:center}
 @media(max-width:640px){.solo-echanges{padding:15px}.solo-echanges-titre{flex-direction:column}.solo-echanges-actions>.btn{width:100%}}
+
+/* La même lecture en deux côtés et les mêmes cartes que les échanges en ligne. */
+.solo-echanges { width:100%; max-width:100%; min-width:0; box-sizing:border-box; overflow:hidden; border-color: rgba(226,185,80,.3); background: radial-gradient(circle at 95% 0,rgba(193,145,50,.12),transparent 34%),#10252e; }
+.solo-echanges :is(.solo-echanges-titre,.solo-echanges-creation,.solo-echanges-liste,.solo-echanges-offre) { min-width:0; }
+.solo-echanges-titre .eyebrow, .solo-echanges-liste>h3 small { color: #efcf79; }
+.solo-echanges-creation { background: #102a2f; border-color: rgba(223,187,92,.38); }
+.solo-echanges-creation>h3 { color: #f2d17a; }
+.solo-echanges-cotes { display:grid; grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr); align-items:start; gap:14px; }
+.solo-echanges-cotes>svg { margin-top:45px; color:#eac665; }
+.solo-echanges-cote { min-width:0; padding:12px; border:1px solid rgba(255,255,255,.13); border-radius:12px; background:rgba(4,22,29,.38); }
+.solo-echanges-cote h4 { margin:0 0 12px; color:#f3d584; font-size:.9rem; }
+.solo-echanges-cartes, .solo-echanges-resultats { display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px; min-width:0; max-width:100%; min-height:78px; }
+.solo-echanges-carte { position:relative; width:clamp(82px,10vw,118px); flex:none; }
+.solo-echanges-carte .dr-player, .solo-echanges-resultats .dr-player { width:100%; }
+.solo-echanges-carte>button { width:100%; min-height:30px; margin-top:5px; padding:4px; border:1px solid #987d43; border-radius:7px; background:#263831; color:#f6df9c; cursor:pointer; font-size:.72rem; }
+.solo-echanges-quantite { position:absolute; top:6px; right:6px; padding:3px 6px; border-radius:20px; background:#0b1b21; color:#ffdf81; }
+.solo-echanges-vide, .solo-echanges-carte-inconnue { display:grid; place-items:center; min-height:72px; padding:9px; border:1px dashed #71867b; border-radius:9px; color:#bccbc5; }
+.solo-echanges-resultats { flex-wrap:nowrap; max-height:none; overflow-x:auto; padding:6px 0; }
+.solo-echanges-resultats button { display:grid; gap:5px; justify-items:center; flex:0 0 96px; width:96px; padding:6px; background:#1a3336; text-align:center; }
+.solo-echanges-resultats button>span { display:none; }
+.solo-echanges-offre { padding:18px; border-color:rgba(238,210,135,.2); background:#122b34; }
+.solo-echanges-offre>div:first-child { align-items:center; padding-bottom:8px; border-bottom:1px solid #ffffff24; }
+.solo-echanges-offre>div:first-child b { color:#f1d37f; }
+.solo-echanges-offre .solo-echanges-cotes { margin:5px 0; }
+.solo-echanges-actions { justify-content:flex-end; }
+.solo-echanges-proposition { display:grid; gap:8px; padding:12px; border:1px solid #71846c66; border-radius:10px; background:#1b3435; }
+.solo-echanges-proposition>strong { color:#efd17d; }
+.solo-echanges-pages button { min-height:38px; }
+@media(max-width:680px) {
+  .solo-echanges-cotes { grid-template-columns:minmax(0,1fr); gap:6px; }
+  .solo-echanges-cotes>svg { margin:0 auto; transform:rotate(90deg); }
+  .solo-echanges-offre { padding:12px; }
+  .solo-echanges-carte { width:96px; }
+  .solo-echanges-actions .btn { flex:1 1 150px; }
+}

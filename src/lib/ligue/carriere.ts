@@ -1281,6 +1281,12 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
   } else {
     const club = monClub(nouveau, compteId); avancerInterne(nouveau, maintenant, graine);
     switch (commande.type) {
+      case 'changerEmblemePublic': {
+        exiger(Boolean(nouveau.publique), 'Le logo ne peut être modifié que dans la ligue publique.');
+        exiger(commande.embleme === undefined || emblemeValide(commande.embleme), 'Logo inconnu.');
+        club.embleme = commande.embleme;
+        break;
+      }
       case 'celebrationVue': {
         exiger(nouveau.histoire.some(h => h.competitionId === commande.competitionId && h.saison === commande.saison && h.vainqueur === club.id), 'Trophée introuvable.');
         club.tropheesVus = [...new Set([...(club.tropheesVus ?? []), commande.competitionId + ':' + commande.saison])];
