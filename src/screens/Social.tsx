@@ -1600,6 +1600,7 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
       </aside>
 
       <div className="x-centre">
+        <div className="x-mobile-marque"><LogoOvale /><strong>L’Ovale</strong></div>
         <header className="x-tetes x-tetes-six">
           <button className={onglet === 'timeline' ? 'actif' : ''} onClick={() => ouvrirOnglet('timeline')}>{t('ov.pourVous')}</button>
           <button className={onglet === 'explorer' ? 'actif' : ''} onClick={() => ouvrirOnglet('explorer')}>{t('ov.explorer')}</button>
@@ -1919,6 +1920,7 @@ function SocialJoueur() {
       </aside>
 
       <div className="x-centre">
+        <div className="x-mobile-marque"><LogoOvale /><strong>L’Ovale</strong></div>
         <header className="x-tetes">
           <button className={onglet === 'timeline' ? 'actif' : ''} onClick={() => setOnglet('timeline')}>
             {t('ov.pourVous')}

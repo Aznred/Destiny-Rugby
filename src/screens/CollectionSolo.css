@@ -9,7 +9,6 @@
 .solo-solde strong { font-family: var(--police-titre); font-size: 1.35rem; }
 .solo-solde span { grid-column: 1 / -1; color: var(--craie-dim); font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .solo-entete-droite { display: flex; align-items: center; gap: .8rem; }
-.solo-btn-compo { display: inline-flex; align-items: center; gap: .5rem; white-space: nowrap; }
 .solo-progression { padding: 1.25rem 1.4rem; display: grid; grid-template-columns: auto minmax(220px, 1fr) auto; align-items: center; gap: 1.4rem; }
 .solo-progression > div:first-child { display: grid; gap: .2rem; }
 .solo-progression > div:first-child > span { color: var(--craie-dim); font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; }
@@ -37,45 +36,49 @@
 .solo-categories-packs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .8rem;
-  padding: .55rem;
-  border: 1px solid #ffffff1f;
-  border-radius: 16px;
-  background: #07130ed6;
+  gap: .75rem;
 }
 .solo-categories-packs button {
+  position: relative;
+  overflow: hidden;
   min-width: 0;
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-rows: auto auto;
   align-items: center;
-  gap: .15rem .7rem;
-  padding: .85rem 1rem;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: transparent;
+  gap: .2rem .95rem;
+  min-height: 96px;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid #e9c66d38;
+  border-radius: 18px;
+  background: linear-gradient(130deg, #20382be8, #0b1c18f5);
   color: var(--craie);
   text-align: left;
   cursor: pointer;
+  box-shadow: inset 0 1px #ffffff15, 0 12px 28px #0003;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
+.solo-categories-packs button::after { content: ''; position: absolute; inset: auto 0 0; height: 3px; background: linear-gradient(90deg, var(--or-400), #f7e3a3); transform: scaleX(0); transform-origin: left; transition: transform .18s ease; }
+.solo-categories-packs button:hover { transform: translateY(-2px); border-color: #f0c95f99; }
 .solo-categories-packs button > span {
   grid-row: 1 / -1;
-  width: 38px;
-  height: 38px;
+  width: 54px;
+  height: 54px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: #ffffff0f;
-  color: var(--or-300);
+  border-radius: 15px;
+  background: linear-gradient(145deg, #e7ba55, #a97224);
+  color: #122117;
+  box-shadow: 0 7px 18px #0004;
 }
-.solo-categories-packs button b { font-size: .94rem; }
-.solo-categories-packs button small { min-width: 0; overflow: hidden; color: var(--craie-dim); text-overflow: ellipsis; white-space: nowrap; }
+.solo-categories-packs button b { font-family: var(--police-forte); font-size: 1.05rem; }
+.solo-categories-packs button small { min-width: 0; color: var(--craie-dim); line-height: 1.35; }
 .solo-categories-packs button[aria-selected="true"] {
-  border-color: #f0c95f99;
-  background: linear-gradient(135deg, #4b37148c, #163425b8);
-  box-shadow: inset 0 1px 0 #ffffff14;
+  border-color: #f0c95f;
+  background: linear-gradient(125deg, #584019, #193626 76%);
+  box-shadow: inset 0 1px 0 #ffffff24, 0 16px 34px #0006;
 }
-.solo-categories-packs button[aria-selected="true"] > span { background: #f0c95f1f; color: #ffe08a; }
+.solo-categories-packs button[aria-selected="true"]::after { transform: scaleX(1); }
 .solo-categories-packs button:focus-visible { outline: 2px solid var(--or-300); outline-offset: 2px; }
 .solo-packs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
 .solo-compteurs-packs { display: flex; flex-wrap: wrap; justify-content: center; gap: .55rem; margin-top: -.35rem; }
@@ -123,8 +126,7 @@
   .solo-entete .btn { justify-self: start; }
   .solo-entete h1 { font-size: clamp(2.3rem, 11vw, 3.4rem); }
   .solo-entete p { margin-bottom: 0; font-size: .88rem; }
-  .solo-entete-droite { display: grid; grid-template-columns: minmax(0, 1fr) auto; width: 100%; gap: .55rem; }
-  .solo-btn-compo { min-width: 0; width: 100%; white-space: normal; line-height: 1.15; text-align: center; justify-content: center; }
+  .solo-entete-droite { justify-content: flex-start; width: 100%; }
   .solo-solde { min-width: 80px; padding: .55rem .65rem; }
   .solo-progression { padding: .9rem; gap: .8rem; }
   .solo-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .45rem; }
@@ -135,7 +137,11 @@
   .solo-amical-texte p { font-size: .83rem; }
   .solo-titre-ligne { align-items: start; }
   .solo-titre-ligne > span { display: none; }
-  .solo-categories-packs { grid-template-columns: 1fr; gap: .4rem; }
+  .solo-categories-packs { grid-template-columns: 1fr 1fr; gap: .5rem; }
+  .solo-categories-packs button { grid-template-columns: 1fr; min-height: 110px; gap: .4rem; padding: .75rem; }
+  .solo-categories-packs button > span { grid-row: auto; width: 38px; height: 38px; border-radius: 10px; }
+  .solo-categories-packs button b { font-size: .88rem; }
+  .solo-categories-packs button small { font-size: .7rem; }
   .solo-filtres { grid-template-columns: 1fr; }
   .solo-cartes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
   .solo-stats { gap: .45rem; }

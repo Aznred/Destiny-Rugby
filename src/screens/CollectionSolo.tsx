@@ -9,7 +9,6 @@ import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
 import { synchroniserCatalogueSolo, useCatalogueSolo } from '../lib/catalogueSoloCommun';
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo } from '../lib/collectionSolo';
-import { CompositionCollectionSolo } from '../components/CompositionCollectionSolo';
 import { nombre, t } from '../lib/i18n';
 import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentationPacks';
 import './CollectionSolo.css';
@@ -39,14 +38,7 @@ export function CollectionSolo() {
   const [ouverture, setOuverture] = useState<{ pack: PackCarriere; indices: number[]; catalogue: readonly SourceCarte[] } | null>(null);
   const [bilan, setBilan] = useState('');
   const nomCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Compte joueur';
-  const [compoPleineOuverte, setCompoPleineOuverte] = useState(false);
   const [echangesOuverts, setEchangesOuverts] = useState(false);
-
-  const cartesPossedees = useMemo(() => {
-    return catalogue
-      .filter((carte) => (etat.quantites[cleCarteSolo(carte.sourceId)] ?? 0) > 0)
-      .map((carte) => carteDepuisSource(carte, 'solo', 'collection', 1));
-  }, [catalogue, etat.quantites]);
 
   const cartesFiltrees = useMemo(() => {
     const terme = normaliser(recherche.trim());
@@ -89,9 +81,6 @@ export function CollectionSolo() {
       <button type="button" className="btn fantome" onClick={() => setEcran('accueil')}><Icone nom="fleche-droite" className="solo-retour" taille={16} /> {t('online.home')}</button>
       <div><div className="eyebrow">{t('solo.account', { name: nomCompte })}</div><h1>{t('solo.title')}</h1><p>{t('solo.description')}</p></div>
       <div className="solo-entete-droite">
-        <button type="button" className="btn primaire solo-btn-compo" onClick={() => setCompoPleineOuverte(true)}>
-          <Icone nom="equipe" taille={18} /> {t('solo.lineupBtn', { n: cartesPossedees.length })}
-        </button>
         <div className="solo-solde"><Icone nom="ova" taille={18} /><strong>{nombre(coins)}</strong><span>Ovas</span></div>
       </div>
     </header>
@@ -169,11 +158,5 @@ export function CollectionSolo() {
       rendreCarte={carte => <CarteJoueurEnLigne carte={carte} compacte proprietaire="Ma collection" />}
     />}
 
-    {compoPleineOuverte && (
-      <CompositionCollectionSolo
-        cartes={cartesPossedees}
-        onFermer={() => setCompoPleineOuverte(false)}
-      />
-    )}
   </section>;
 }

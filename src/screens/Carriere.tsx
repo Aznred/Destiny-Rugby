@@ -209,10 +209,18 @@ export function Carriere({ onReglages }: Props) {
   const suggestions = choix.length ? choix : IDEE_CLES.map((cle) => t(cle));
 
   return (
-    // ⚠️ Trois colonnes qui tiennent DANS l'écran : la page elle-même ne
-    // défile jamais, chaque colonne défile de son côté (voir App.css).
     <section className="carriere" data-mobile-vue={vueMobile}>
-      <div className="carriere-mobile-vues" role="group" aria-label={t('car.navigationMobile')}>
+      <header className="carriere-entete manager-entete">
+        <div>
+          <div className="eyebrow">Carrière joueur · Saison {joueur.saison} · {libelleDate(semaine(joueur.semaine ?? 1))}</div>
+          <h1><Icone nom="joueur" taille={26} /> {joueur.nom}</h1>
+        </div>
+        <div className="carriere-identite-club manager-identite-club">
+          <Icone nom="stade" taille={30} />
+          <span><b>{joueur.club}</b><small>{nomPoste(joueur.poste)}</small></span>
+        </div>
+      </header>
+      <nav className="carriere-mobile-vues manager-onglets" aria-label={t('car.navigationMobile')}>
         <button
           type="button"
           onClick={() => setVueMobile('jeu')}
@@ -237,7 +245,7 @@ export function Carriere({ onReglages }: Props) {
         >
           <Icone nom="trophee" taille={17} />{t('nav.classement')}
         </button>
-      </div>
+      </nav>
       <PanneauJoueur joueur={joueur} />
 
       <div id="carriere-jeu" className="carte jeu">

@@ -117,32 +117,26 @@ export function Accueil() {
         </motion.header>
 
         <div className="accueil-modes" aria-label="Modes de jeu">
-          <motion.button custom={1} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-carriere" onClick={() => setEcran(destinationCarriere)}>
-            <div className="accueil-mode-visuel" aria-hidden="true">
-              <Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense>
-            </div>
-            <span className="accueil-mode-numero">01</span>
-            <span className="accueil-mode-contenu">
-              <span className="accueil-mode-surtitre">Carrière solo</span>
-              <strong>{titreCarriere}</strong>
-              <small>{detailCarriere}</small>
-              <span className="accueil-mode-badges"><i>Joueur</i><i>Entraîneur</i><i>15 saisons</i></span>
+          <motion.button custom={1} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-online" onClick={() => setEcran('carriereEnLigne')}>
+            <span className="accueil-online-montage" aria-hidden="true">
+              <span className="accueil-online-terrain"><i /><i /><i /></span>
+              <span className="accueil-online-club domicile"><EcussonClub logo="/logos/toulouse.png" taille={58} /></span>
+              <span className="accueil-online-score"><i>DIRECT</i><b>17 <em>–</em> 14</b><small>63′</small></span>
+              <span className="accueil-online-club exterieur"><EcussonClub logo="/logos/bordeaux.png" taille={58} /></span>
+              <span className="accueil-online-public"><i /><i /><i /><i /><i /></span>
             </span>
+            <span className="accueil-mode-numero">01</span>
+            <span className="accueil-mode-icone"><Icone nom="equipe" taille={31} /></span>
+            <span className="accueil-online-enseigne" aria-hidden="true">Carrière en ligne</span>
+            <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Multijoueur</span><strong>Carrière en ligne</strong><small>Crée ta ligue privée, invite tes amis et vis les matchs en direct.</small></span>
             <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={22} /></span>
           </motion.button>
 
           <div className="accueil-modes-droite">
-            <motion.button custom={2} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-online" onClick={() => setEcran('carriereEnLigne')}>
-              <span className="accueil-online-montage" aria-hidden="true">
-                <span className="accueil-online-terrain"><i /><i /><i /></span>
-                <span className="accueil-online-club domicile"><EcussonClub logo="/logos/toulouse.png" taille={58} /></span>
-                <span className="accueil-online-score"><i>DIRECT</i><b>17 <em>–</em> 14</b><small>63′</small></span>
-                <span className="accueil-online-club exterieur"><EcussonClub logo="/logos/bordeaux.png" taille={58} /></span>
-                <span className="accueil-online-public"><i /><i /><i /><i /><i /></span>
-              </span>
+            <motion.button custom={2} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-carriere" onClick={() => setEcran(destinationCarriere)}>
+              <span className="accueil-mode-visuel" aria-hidden="true"><Suspense fallback={<span className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense></span>
               <span className="accueil-mode-numero">02</span>
-              <span className="accueil-mode-icone"><Icone nom="equipe" taille={31} /></span>
-              <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Multijoueur</span><strong>Carrière en ligne</strong><small>Crée ta ligue privée, invite tes amis et vis les matchs en direct.</small></span>
+              <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Carrière solo</span><strong>{titreCarriere}</strong><small>{detailCarriere}</small><span className="accueil-mode-badges"><i>Joueur</i><i>Entraîneur</i><i>15 saisons</i></span></span>
               <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={20} /></span>
             </motion.button>
 
@@ -187,12 +181,12 @@ export function Accueil() {
           <h1>{t('accueil.titre1')} <span className="surligne">{t('accueil.titre2')}</span> {t('accueil.titre3')}</h1>
           <p className="accroche">{t('accueil.chapo')}</p>
           <div className="cta-groupe">
-            <button className="btn primaire grand" onClick={() => setEcran(destinationCarriere)}>{titreCarriere}</button>
+            <button className="btn primaire grand" onClick={() => setEcran('carriereEnLigne')}><Icone nom="equipe" taille={19} /> Carrière en ligne</button>
             {joueur && <button className="btn fantome grand" onClick={() => setEcran('profil')}>{t('accueil.voirProfil')}</button>}
             {managerActif && <button className="btn fantome grand" onClick={() => setEcran('tableau')}>{t('accueil.voirProfil')}</button>}
           </div>
           <div className="accueil-modes-secondaires">
-            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('carriereEnLigne')}><Icone nom="equipe" taille={19} /> Carrière en ligne · Ma ligue privée</button>
+            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran(destinationCarriere)}><Icone nom="joueur" taille={19} /> Carrière solo · {titreCarriere}</button>
             <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('collectionSolo')}><Icone nom="cadeau" taille={19} /> Collection · Packs et doublons</button>
             <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('boutique')}><Icone nom="boutique" taille={19} /> Boutique · Ovas, cosmétiques et traits</button>
           </div>

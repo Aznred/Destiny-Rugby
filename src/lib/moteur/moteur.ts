@@ -1163,29 +1163,19 @@ function phaseBallonEnLAir(e: EtatMatch): void {
 
   // ── Sortie en touche ─────────────────────────────────────────────────────
   //
-  // ⚠️ LES TROIS RÈGLES DE LA TOUCHE SUR COUP DE PIED, ET ELLES SONT
-  // GÉOMÉTRIQUES — pas déclaratives. Le moteur ne regardait que l'INTENTION du
-  // botteur : un dégagement d'occupation qui finissait en touche dans les 22
-  // adverses rendait le ballon à l'adversaire, alors que c'est exactement la
-  // définition du 50/22. À l'inverse, un « 50/22 » raté mais annoncé aurait été
-  // récompensé. On lit donc le terrain, comme un arbitre.
+  // Une sortie directe depuis ses 22 rend la touche à l'adversaire au point
+  // de sortie. Le 50/22 exige un rebond avant la touche ; dans ce moteur, seul
+  // le vol « cinquanteVingtDeux » modélise cette trajectoire indirecte.
   if (horsDuTerrain(arrivee)) {
     if (v.intention === 'penaltouche') {
       dire(e, 'touche', camp, C.texteMatch('toucheASuivre', { club: nomClub(e, camp) }));
       return arret(e, 'touche', camp, arrivee);
     }
-    // 1. LE 50/22 — le coup de pied part de SON CAMP (les 50 ou en deçà) et
-    //    sort en touche DANS LES 22 ADVERSES : la touche est pour l'équipe qui
-    //    a botté. C'est la seule façon de gagner le ballon en le rendant.
+    // 1. Le 50/22 : trajectoire indirecte depuis son camp, dans leurs 22.
     const deSonCamp = dansSonCamp(v.de, camp) || Math.abs(v.de.x - MILIEU) < 0.5;
     const sortDansLes22 = dansLes22Adverses(arrivee, camp) && !franchieLigne(arrivee, camp);
-    if (deSonCamp && sortDansLes22) {
+    if (v.intention === 'cinquanteVingtDeux' && deSonCamp && sortDansLes22) {
       dire(e, 'pied', camp, C.phrase(e.rng, C.PIED_5022, { nom: v.auteur.nom }), 0, v.auteur.moi);
-      // ⚠️ ON COMPTE LE 50/22 SUR LA GÉOMÉTRIE, PAS SUR L'INTENTION. Un
-      // dégagement d'occupation qui finit en touche dans les 22 adverses EST un
-      // 50/22 : c'est le règlement, et c'est déjà ainsi que le moteur en tire
-      // la conséquence deux lignes plus bas. Compter l'intention aurait donné
-      // un classement des « 50/22 » où manquent la moitié des vrais.
       v.auteur.stats.cinquanteVingtDeux += 1;
       return arret(e, 'touche', camp, arrivee);
     }
@@ -2393,7 +2383,9 @@ function phaseRuck(e: EtatMatch): void {
         return;
       }
 
-      taperAuPied(e, neuf, 'chandelle');
+      // Derrière ses 22, la chenille sert à dégager en touche et à remonter
+      // le terrain ; ailleurs, le 9 conserve sa boîte au pied dans le champ.
+      taperAuPied(e, neuf, dansSes22(neuf.pos, neuf.cote) ? 'degagement' : 'chandelle');
       return;
     }
     if (neuf && e.sim - chenille.debut < 10) { e.minuteur = Math.max(e.minuteur, .15); return; }

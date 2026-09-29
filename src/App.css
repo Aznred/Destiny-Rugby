@@ -1121,6 +1121,14 @@
 }
 .accueil-mode-carriere .accueil-mode-contenu { max-width: 58%; }
 .accueil-mode-carriere strong { font-size: clamp(2rem, 4vw, 3.6rem); }
+.accueil-modes > .accueil-mode-online { min-height: 610px; padding: clamp(1.5rem, 3vw, 2.25rem); }
+.accueil-modes > .accueil-mode-online .accueil-mode-contenu { max-width: 72%; }
+.accueil-modes > .accueil-mode-online strong { font-size: clamp(2.2rem, 4vw, 3.8rem); }
+.accueil-online-enseigne { position: absolute; z-index: 2; top: 1.65rem; left: 5.25rem; color: #e5ffeb; font-family: var(--police-titre); font-size: clamp(1.2rem, 2vw, 1.75rem); line-height: 1; text-transform: uppercase; text-shadow: 0 2px 10px #0009; }
+.accueil-modes-droite > .accueil-mode-carriere { min-height: 260px; padding: 1.45rem; }
+.accueil-modes-droite > .accueil-mode-carriere strong { font-size: clamp(1.35rem, 2.4vw, 2.2rem); }
+.accueil-modes-droite > .accueil-mode-carriere .accueil-mode-contenu { max-width: 72%; }
+.accueil-modes-droite > .accueil-mode-carriere .accueil-mode-visuel { opacity: .55; }
 .accueil-mode-visuel { position: absolute; z-index: 0; inset: -8% -6% -8% 35%; pointer-events: none; }
 .accueil-mode-visuel canvas { width: 100% !important; height: 100% !important; }
 .accueil-mode-online::before,
@@ -1235,7 +1243,8 @@
   .accueil-hub-tete { align-items: flex-start; }
   .accueil-hub-tete p { width: min(340px, 46vw); font-size: 0.86rem; }
   .accueil-modes { grid-template-columns: 1fr; min-height: 0; }
-  .accueil-mode-carriere { min-height: 420px; }
+  .accueil-modes > .accueil-mode-online { min-height: 420px; }
+  .accueil-modes-droite > .accueil-mode-carriere { min-height: 260px; }
   .accueil-modes-droite { min-height: 440px; }
 }
 
@@ -1246,13 +1255,15 @@
   .accueil-hub-tete p { width: 100%; margin-top: 0.75rem; text-align: left; font-size: 0.82rem; }
   .accueil-modes { gap: 9px; }
   .accueil-mode { border-radius: 4px; }
-  .accueil-mode-carriere { min-height: 350px; padding: 1.25rem; }
-  .accueil-mode-carriere .accueil-mode-contenu { max-width: 76%; }
-  .accueil-mode-carriere strong { font-size: clamp(1.75rem, 9vw, 2.6rem); }
+  .accueil-modes > .accueil-mode-online { min-height: 350px; padding: 1.25rem; }
+  .accueil-modes > .accueil-mode-online .accueil-mode-contenu { max-width: 82%; }
+  .accueil-modes > .accueil-mode-online strong { font-size: clamp(1.75rem, 9vw, 2.6rem); }
+  .accueil-online-enseigne { top: 1.8rem; left: 5rem; font-size: 1.25rem; }
+  .accueil-modes-droite > .accueil-mode-carriere { min-height: 205px; }
+  .accueil-modes-droite > .accueil-mode-carriere strong { font-size: 1.55rem; }
   .accueil-mode-visuel { inset: -2% 0 4% 27%; opacity: 0.82; transform: translateX(18%); }
   .accueil-mode-carriere::before { background: linear-gradient(90deg, rgba(3, 15, 12, 0.97) 0%, rgba(3, 15, 12, 0.7) 56%, rgba(3, 15, 12, 0.1) 88%); }
   .accueil-modes-droite { min-height: 0; display: contents; }
-  .accueil-mode-online { min-height: 205px; }
   .accueil-modes-compacts { grid-template-columns: 1fr; gap: 9px; }
   .accueil-modes-compacts .accueil-mode { min-height: 165px; }
   .accueil-mode-online .accueil-mode-contenu { max-width: 82%; }
@@ -9029,4 +9040,42 @@ select:focus {
  .x-app .x-conv { flex-shrink:0; }
  .x-app .x-corps, .x-app .x-texte { min-width:0; overflow-wrap:anywhere; }
  .manager-ovale { height:auto; min-height:0; overflow:visible; }
+}
+
+/* La carrière joueur reprend l'en-tête du bureau entraîneur. */
+.carriere { grid-template-rows: auto minmax(0, 1fr); }
+.carriere-entete { grid-column: 1 / -1; min-width: 0; margin-bottom: 0; padding: .2rem .3rem; }
+.carriere-entete h1 { display: flex; align-items: center; gap: .55rem; font-size: clamp(1.55rem, 2.5vw, 2.3rem); }
+.carriere-identite-club { min-width: 0; max-width: 40%; }
+.carriere-identite-club > svg { flex: none; color: var(--or-400); }
+.carriere-identite-club b, .carriere-identite-club small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 900px) {
+  .carriere { grid-template-rows: auto auto auto; }
+  .carriere-entete { align-items: flex-start; gap: .6rem; padding: .45rem .3rem 0; }
+  .carriere-entete .eyebrow { font-size: .7rem; }
+  .carriere-entete h1 { margin: .3rem 0 0; font-size: clamp(1.5rem, 6vw, 2rem); }
+  .carriere-identite-club { max-width: 42%; padding: .5rem; font-size: .76rem; }
+  .carriere-identite-club > svg { width: 22px; }
+  .carriere-mobile-vues { margin-bottom: 0; border-color: rgba(224,176,72,.35); }
+  .carriere-mobile-vues button { font-size: .85rem; font-weight: 700; }
+  .carriere[data-mobile-vue='jeu'] > .jeu { height: calc(100dvh - 350px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 350px; }
+}
+@media (max-width: 540px) {
+  .carriere-entete { flex-direction: column; }
+  .carriere-identite-club { width: 100%; max-width: 100%; }
+}
+
+/* L'Ovale garde un bandeau lisible et son emblème sur téléphone. */
+.x-app { --x-fond: #07150f; --x-texte: #f4f8f5; --x-gris: #b0c1b7; --x-trait: #284638; --x-survol: #183025; }
+.x-tetes { background: rgba(10, 30, 21, .97); }
+.x-tetes button { color: #c6d5cb; }
+.x-tetes button.actif { color: #fff; }
+.x-tetes button.actif::after { background: var(--or-400); }
+.x-mobile-marque { display: none; }
+@media (max-width: 850px) {
+  .x-mobile-marque { display: flex; align-items: center; gap: .1rem; min-height: 48px; padding: .25rem .8rem; border-bottom: 1px solid var(--x-trait); background: #0b2117; color: #fff; }
+  .x-mobile-marque .x-logo { padding: .4rem; color: var(--or-400); }
+  .x-mobile-marque .x-logo b { display: none; }
+  .x-mobile-marque strong { font-family: var(--police-forte); font-size: .95rem; }
+  .x-app .x-tetes { top: calc(58px + env(safe-area-inset-top, 0px)); }
 }
