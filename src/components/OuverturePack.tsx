@@ -173,7 +173,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
         <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>DESTINY</small><b>DR</b><span>RUGBY</span><i>✦</i></div><div className="pack-show-front" aria-hidden={!visible}>{visible && rendreCarte(carte)}</div></div>
       </div>;
     })}</div>}
-    {(phase === 'attente' || phase === 'cartes') && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" disabled={phase === 'attente' && attenteTirage} onClick={phase === 'attente' ? avancerPack : toutes ? onFermer : passer}>{phase === 'attente' ? libelleAction : toutes ? t('online.pack.clubhouse') : t('online.pack.reveal')}</button></footer>}
+    {((phase === 'attente' && prochainPalier) || phase === 'cartes') && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={phase === 'attente' ? avancerPack : toutes ? onFermer : passer}>{phase === 'attente' ? libelleAction : toutes ? t('online.pack.clubhouse') : t('online.pack.reveal')}</button></footer>}
     <span className="pack-show-sr" aria-live="polite">{muet?t('online.pack.soundMuted'):t('online.pack.soundActive')}</span>
   </main></div>, document.body);
 }
