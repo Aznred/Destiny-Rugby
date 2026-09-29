@@ -2376,6 +2376,62 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-logo-public small{color:#bcd2ca}
 @media(max-width:640px){.cel-logo-public{flex-wrap:wrap}.cel-logo-public>.btn{width:100%}}
 @media(max-width:640px){.cel-portail{display:flex;flex-direction:column;align-items:stretch}.cel-public{order:-1;padding:16px}.cel-public .btn{width:100%;justify-self:stretch}.cel-public-club{max-width:none}}
+
+/* La ligue conserve le terrain interactif sur téléphone. Les cartes suivent la
+   largeur du terrain et le banc reprend une grille, comme sur ordinateur. */
+@media (max-width: 700px) {
+  .cel > .cel-compo.cel-compo-etendue { padding: 8px 10px max(12px, env(safe-area-inset-bottom)); }
+  .cel > .cel-compo > .manager-feuille-visuelle.ct-feuille-fut {
+    grid-template-rows: 940px minmax(52px, auto) 50px auto;
+    gap: 9px;
+    padding-bottom: 18px;
+  }
+  .cel > .cel-compo .ct-plateau > .manager-terrain-cadre { padding: 6px; }
+  .cel > .cel-compo .ct-feuille-fut .manager-terrain-xv {
+    --ct-carte: clamp(52px, 16vw, 68px);
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+  .cel > .cel-compo .ct-feuille-fut .manager-position { width: var(--ct-carte) !important; }
+  .cel > .cel-compo .ct-feuille-fut .ct-fut-nom { font-size: 10px; line-height: 14px; }
+  .cel > .cel-compo .ct-feuille-fut .ct-fut-indicateurs { min-height: 17px; font-size: 10px; }
+  .cel > .cel-compo .ct-selection-actions { min-height: 52px; }
+  .cel > .cel-compo .ct-groupes { min-height: 48px; }
+  .cel > .cel-compo .ct-groupes button { min-height: 44px; flex: 1; font-size: 13px; }
+  .cel > .cel-compo .manager-feuille-visuelle > :is(.manager-banc-visuel, .manager-reserves, .manager-reserves[open]) {
+    height: auto !important;
+    min-height: 0;
+    padding: 10px;
+    overflow: hidden;
+  }
+  .cel > .cel-compo .ct-feuille-fut .manager-banc-cartes,
+  .cel > .cel-compo .ct-feuille-fut .manager-reserves > div {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    align-items: start;
+    gap: 10px !important;
+    height: auto;
+    padding: 4px;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    contain: none;
+    scroll-snap-type: none;
+  }
+  .cel > .cel-compo .ct-feuille-fut .manager-reserves > div {
+    max-height: min(55dvh, 540px);
+    overflow-y: auto !important;
+  }
+  .cel > .cel-compo .ct-feuille-fut .manager-banc-cartes .ct-carte.ct-fut,
+  .cel > .cel-compo .ct-feuille-fut .manager-reserves .manager-reserve-carte.ct-reserve-fut {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 110px !important;
+    flex: none !important;
+    justify-self: center;
+  }
+  .cel > .cel-compo .ct-feuille-fut .ct-reserve-fut > small { display: block; }
+}
 .cel-public-bandeau{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:12px 0;padding:12px 16px;background:#143c2c;border:1px solid #9f884d;border-radius:11px;color:#f2e6b6}
 .cel-public-bandeau span{color:#d7e4d7}
 .cel-public-bandeau strong{width:100%;color:#f4d377}
