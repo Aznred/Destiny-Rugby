@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, rmdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { stockageFichier } from '../serveur/carriereFichier';
-import { agirCarriere, avancerCarriere, creerCarriere, creerDivisionPublique } from '../src/lib/ligue/carriere';
+import { agirCarriere, avancerCarriere, creerCarriere, creerDivisionPublique, vueCarriere } from '../src/lib/ligue/carriere';
 import { nombreQualifiesPlayoffs } from '../src/lib/ligue/poulesCarriere';
 import { planifierDivisionsPubliques } from '../serveur/divisionsPubliques';
 import { compositionManagerParDefaut } from '../src/lib/compositionManager';
@@ -28,6 +28,10 @@ assert.throws(() => agirCarriere(ligue, identifiants[0], { type: 'changerEmbleme
 const publique = [0,1].map((division) => creerDivisionPublique({ id: identifiants[division],
   code: `DR-PUBLIC-C0-D${division+1}`, compteId: identifiants[division*2],
   pseudo: `Joueur ${division}`, clubNom: `Club ${division}` }, 0, division+1, maintenant, `graine-${division}`));
+assert.deepEqual(publique[0].packsActifs, ['bronze', 'standard', 'or']);
+const divisionAncienne = { ...publique[0], packsActifs: ['bronze', 'standard', 'premium', 'or', 'grand', 'elite'] };
+assert.deepEqual(vueCarriere(divisionAncienne, identifiants[0]).packsActifs, ['bronze', 'standard', 'or']);
+assert.throws(() => agirCarriere(divisionAncienne, identifiants[0], { type: 'ouvrirPack', packId: 'premium' }, maintenant, 'pack-public-interdit'), /désactivé/);
 const nouveauLogo = agirCarriere(publique[0], identifiants[0], { type: 'changerEmblemePublic', embleme: MEZE_RUGBY_EMBLEME }, maintenant, 'logo-public');
 assert.equal(nouveauLogo.clubs[0].embleme, MEZE_RUGBY_EMBLEME);
 assert.throws(() => agirCarriere(nouveauLogo, identifiants[0], { type: 'changerEmblemePublic', embleme: 'https://example.com/inconnu.png' }, maintenant, 'logo-inconnu'), /Logo inconnu/);

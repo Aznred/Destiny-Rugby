@@ -17,6 +17,9 @@ const HEURE = 3_600_000;
 const JOUR = 24 * HEURE;
 const SEMAINE = 7 * JOUR;
 export const PACKS_GRATUITS_PAR_JOUR = 10;
+export const PACKS_DIVISION_PUBLIQUE = ['bronze', 'standard', 'or'] as const;
+const packsActifsLigue = (etat: EtatCarriereEnLigne): string[] | undefined =>
+  etat.publique ? [...PACKS_DIVISION_PUBLIQUE] : etat.packsActifs;
 
 /**
  * Une saison accélérée ne doit pas transformer chaque match en dette physique.
@@ -118,7 +121,8 @@ function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number)
     // faible de la ligue. Le rattrapage doit jouer POUR lui.
     const place = classement.findIndex(ligne => ligne.clubId === club.id);
     const rang = place >= 0 ? place : Math.max(0, etat.clubs.length - 1);
-    const disponibles = etat.packs.filter(pack => !etat.packsActifs || etat.packsActifs.includes(pack.id));
+    const actifs = packsActifsLigue(etat);
+    const disponibles = etat.packs.filter(pack => !actifs || actifs.includes(pack.id));
     const poids = disponibles.map(pack => poidsPackQuotidien(pack, rang, etat.clubs.length, classementActif));
     const rng = hasard(`${etat.graine}:packs-quotidiens:${jour}:${club.id}`);
     const programmes = club.packsGratuitsProgrammes?.[jour] ?? [];
@@ -356,7 +360,7 @@ export function creerDivisionPublique(config: Pick<CreationCarriere, 'id' | 'cod
   herites: { club: ClubCarriere; cartes: CarteCarriere[] }[] = []): EtatCarriereEnLigne {
   const etat = creerCarriere({ ...config, nom: `Destiny Rugby · Division ${division}`, rythme: 7, maxClubs: 16,
     dotationOvas: 5000, packsGratuitsParJour: 0, doublonsAutorises: true,
-    packsActifs: ['bronze', 'standard', 'premium', 'or', 'grand', 'elite'], playoffs: false }, maintenant, graine);
+    packsActifs: [...PACKS_DIVISION_PUBLIQUE], playoffs: false }, maintenant, graine);
   etat.publique = { cycle, division };
   if (herites.length) {
     etat.clubs = herites.map(({ club }) => ({ ...copier(club), packsGratuits: [], dernierLotPacksGratuits: undefined }));
@@ -393,7 +397,10 @@ export function creerLaboratoireCarriere(config: Pick<CreationCarriere, 'id' | '
 
 function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false) {
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
-  if (!gratuit) exiger(!etat.packsActifs || etat.packsActifs.includes(packId), 'Ce pack est désactivé dans cette ligue.');
+  if (etat.publique || !gratuit) {
+    const actifs = packsActifsLigue(etat);
+    exiger(!actifs || actifs.includes(packId), 'Ce pack est désactivé dans cette ligue.');
+  }
   entier(pack.prix, 1); entier(pack.cartes, 1, 12);
   exiger(RARETES_CARRIERE.every(r => Number.isFinite(pack.probabilites[r]) && pack.probabilites[r] >= 0), 'Probabilités de pack invalides.');
   if (!gratuit) exiger(club.ovas >= pack.prix, 'Ovas insuffisants pour ce pack.');
@@ -1591,7 +1598,7 @@ function statistiquesLigue(etat: EtatCarriereEnLigne) {
 
 function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere): VueCarriereEnLigne {
   const { graine: _secret, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
-  return copier({ ...publics, monClubId: club?.id ?? '', observateur: club ? undefined : true,
+  return copier({ ...publics, packsActifs: packsActifsLigue(etat), monClubId: club?.id ?? '', observateur: club ? undefined : true,
     competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
       ? { ...c, classementsPoules: c.poules.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres)) }
       : c),
