@@ -685,6 +685,59 @@
   }
 }
 
+/* La composition plein écran de la carrière entraîneur utilise les mêmes
+   dimensions de cartes et de banc que la ligue en ligne sur téléphone. */
+@media (max-width:700px) {
+  .cel-fullscreen-compo > .cel-compo.manager-compo-partagee.cel-compo-etendue {
+    padding: 8px 10px max(12px, env(safe-area-inset-bottom));
+  }
+  .cel-fullscreen-compo > .cel-compo.manager-compo-partagee > .manager-feuille-visuelle.ct-feuille-fut {
+    grid-template-rows: 940px minmax(52px, auto) 50px auto;
+    gap: 9px;
+    padding-bottom: 18px;
+  }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-plateau > .manager-terrain-cadre { padding: 6px; }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-feuille-fut .manager-terrain-xv {
+    --ct-carte: clamp(52px, 16vw, 68px);
+  }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-feuille-fut .ct-fut-nom { font-size: 10px; line-height: 14px; }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-feuille-fut .ct-fut-indicateurs { min-height: 17px; font-size: 10px; }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-selection-actions { min-height: 52px; }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-groupes { min-height: 48px; }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-groupes button { min-height: 44px; flex: 1; font-size: 13px; }
+  .cel-fullscreen-compo .manager-compo-partagee .manager-feuille-visuelle > :is(.manager-banc-visuel, .manager-reserves, .manager-reserves[open]) {
+    height: auto !important;
+    min-height: 0;
+    padding: 10px;
+    overflow: hidden;
+  }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-feuille-fut :is(.manager-banc-cartes, .manager-reserves > div) {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    align-items: start;
+    gap: 10px !important;
+    height: auto;
+    padding: 4px;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    contain: none;
+    scroll-snap-type: none;
+  }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-feuille-fut .manager-reserves > div {
+    max-height: min(55dvh, 540px);
+    overflow-y: auto !important;
+  }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-feuille-fut :is(.manager-banc-cartes .ct-carte.ct-fut, .manager-reserves .manager-reserve-carte.ct-reserve-fut) {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 110px !important;
+    flex: none !important;
+    justify-self: center;
+  }
+  .cel-fullscreen-compo .manager-compo-partagee .ct-feuille-fut .ct-reserve-fut > small { display: block; }
+}
+
 /* Le constructeur solo et la carrière entraîneur gardent quatre zones stables
    sur PC. Les règles de la carrière en ligne ne doivent pas déplacer le banc
    sur le terrain ou agrandir l'aperçu quand une carte est sélectionnée. */
