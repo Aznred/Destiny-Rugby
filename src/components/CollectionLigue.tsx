@@ -64,7 +64,7 @@ export function CollectionLigue({ vue }: { vue: VueCarriereEnLigne }) {
       {!charge && donnees?.joueurs.map(({ carte, obtenuPar, obtention, obtenuLe }) => {
         const clubDetenteur = carte.proprietaire ? vue.clubs.find(c => c.id === carte.proprietaire) : undefined;
         const decouverte = Boolean(clubDetenteur);
-        return <article key={carte.sourceId} className={`cel-collection-entry${decouverte ? ' est-decouverte' : ' est-inconnue'}`}>
+        return <article key={carte.id} className={`cel-collection-entry${decouverte ? ' est-decouverte' : ' est-inconnue'}`}>
         <CarteJoueurEnLigne carte={carte} logoClub={logos.get(carte.clubReel)} etatCollection={decouverte ? 'decouverte' : 'inconnue'} />
         {clubDetenteur && <div className="cel-collection-club" title={t('online.collection.heldByClub', { name: clubDetenteur.nom })}>
           <EcussonClub logo={clubDetenteur.embleme ?? logos.get(clubDetenteur.nom)} nom={clubDetenteur.nom} taille={42} />

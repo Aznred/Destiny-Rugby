@@ -62,6 +62,12 @@ assert.ok(page('rarete=elite').joueurs.every(j=>j.carte.rarete==='elite'));
 assert.ok(page('poste=pilier').joueurs.every(j=>j.carte.famille==='pilier'));
 assert.equal(page('q=zzzintrouvablezz').total,0);
 assert.throws(()=>collectionCarriere(e,'inconnu',new URLSearchParams()));
+e.doublonsAutorises = true;
+e.cartes.push({ ...cartes[4], id: `${cartes[4].id}:second`, proprietaire: e.clubs[0].id });
+assert.equal(page('statut=distribue&rarete=star').total, 2, 'Chaque exemplaire apparaît dans la collection.');
+assert.equal(page('club=club-b&rarete=star').total, 1);
+assert.equal(page('club='+e.clubs[0].id+'&rarete=star').total, 1);
+assert.equal(page().distribues, 6);
 let compte: string | null='compte-a';
 const stockage = {
  limiter: async()=>true,

@@ -23,6 +23,30 @@ const ligue = creerCarriere({ id: identifiants[0], code: 'TEST-OPTIONS', compteI
 assert.deepEqual(ligue.packsActifs, ['bronze','top14']);
 assert.equal(ligue.clubs[0].packsGratuits?.length ?? 0, 0);
 assert.equal(ligue.doublonsAutorises, true);
+const avecDoublons = agirCarriere(ligue, identifiants[1],
+  { type: 'rejoindre', pseudo: 'Deux', clubNom: 'Club deux' }, maintenant, 'test-options');
+const cartesUn = avecDoublons.cartes.filter(c => c.proprietaire === avecDoublons.clubs[0].id);
+const cartesDeux = avecDoublons.cartes.filter(c => c.proprietaire === avecDoublons.clubs[1].id);
+assert.deepEqual(cartesDeux.map(c => c.sourceId), cartesUn.map(c => c.sourceId), 'Les mêmes joueurs peuvent appartenir à deux clubs.');
+assert.equal(new Set(avecDoublons.cartes.map(c => c.id)).size, avecDoublons.cartes.length, 'Chaque exemplaire a son propre identifiant.');
+const compoDeux = avecDoublons.clubs[1].composition;
+const avecCompo = agirCarriere(avecDoublons, identifiants[1], { type: 'composition', composition: compoDeux }, maintenant, 'compo-doublon');
+assert.deepEqual(avecCompo.clubs[1].composition.titulaires, compoDeux.titulaires);
+// Les anciennes ligues ont déjà pu enregistrer deux exemplaires avec le même ID.
+const ancienneLigue = structuredClone(avecDoublons);
+const anciensIds = new Map(cartesDeux.map((c, i) => [c.id, cartesUn[i].id]));
+for (const carte of ancienneLigue.cartes.filter(c => c.proprietaire === ancienneLigue.clubs[1].id)) carte.id = anciensIds.get(carte.id)!;
+const ancienneCompo = ancienneLigue.clubs[1].composition;
+ancienneCompo.titulaires = ancienneCompo.titulaires.map(id => anciensIds.get(id) ?? id);
+ancienneCompo.remplacants = ancienneCompo.remplacants.map(id => anciensIds.get(id) ?? id);
+ancienneCompo.capitaineId = anciensIds.get(ancienneCompo.capitaineId) ?? ancienneCompo.capitaineId;
+ancienneCompo.buteurId = anciensIds.get(ancienneCompo.buteurId) ?? ancienneCompo.buteurId;
+const reparee = agirCarriere(ancienneLigue, identifiants[1], { type: 'actualiser' }, maintenant, 'reparer-doublons');
+assert.equal(new Set(reparee.cartes.map(c => c.id)).size, reparee.cartes.length, 'Les anciens doublons sont réparés.');
+assert.ok(reparee.clubs[1].composition.titulaires.every(id => reparee.cartes.some(c => c.id === id && c.proprietaire === reparee.clubs[1].id)));
+const packDoublons = agirCarriere({ ...avecDoublons, clubs: avecDoublons.clubs.map(c => ({ ...c, ovas: 100_000 })) },
+  identifiants[1], { type: 'ouvrirPack', packId: 'bronze' }, maintenant, 'pack-doublons');
+assert.equal(new Set(packDoublons.cartes.map(c => c.id)).size, packDoublons.cartes.length, 'Les cartes des packs gardent des ID distincts.');
 assert.throws(() => agirCarriere(ligue, identifiants[0], { type: 'changerEmblemePublic', embleme: MEZE_RUGBY_EMBLEME }, maintenant, 'logo-prive'), /ligue publique/);
 
 const publique = [0,1].map((division) => creerDivisionPublique({ id: identifiants[division],

@@ -81,10 +81,78 @@ function identifiant(s: unknown): asserts s is string { exiger(typeof s === 'str
 function listeIds(ids: unknown, max = 20): asserts ids is string[] { exiger(Array.isArray(ids) && ids.length <= max, 'Liste invalide.'); ids.forEach(identifiant); exiger(new Set(ids).size === ids.length, 'Une carte ne peut pas apparaître deux fois.'); }
 function dateServeur(maintenant: number): string { exiger(Number.isFinite(maintenant), 'Horloge serveur invalide.'); return new Date(maintenant).toISOString(); }
 const prochainId = (etat: EtatCarriereEnLigne, nature: string, longueur: number) => `${etat.id}:${nature}:${longueur + 1}`;
+// En ligue avec doublons, l'identité d'une carte est celle de son exemplaire,
+// pas celle du joueur du catalogue. La version évite de réutiliser un ID après
+// une vente rapide, même si le tableau des cartes a rétréci.
+const idNouvelExemplaire = (etat: EtatCarriereEnLigne, index: number) => `${etat.id}:carte:${etat.version}:${index + 1}`;
 const cartesClub = (etat: EtatCarriereEnLigne, clubId: string) => etat.cartes.filter(c => c.proprietaire === clubId);
 const clubParId = (etat: EtatCarriereEnLigne, id: string) => { const club = etat.clubs.find(c => c.id === id); exiger(club, 'Club introuvable dans cette ligue.'); return club; };
 const monClub = (etat: EtatCarriereEnLigne, compteId: string) => { const club = etat.clubs.find(c => c.compteId === compteId); exiger(club, 'Vous ne faites pas partie de cette ligue.'); return club; };
 const carteParId = (etat: EtatCarriereEnLigne, id: string) => { const carte = etat.cartes.find(c => c.id === id); exiger(carte, 'Carte introuvable dans cette ligue.'); return carte; };
+function reparerIdentifiantsDoublons(etat: EtatCarriereEnLigne): void {
+  if (!etat.doublonsAutorises) return;
+  const occupes = new Set(etat.cartes.map(c => c.id));
+  const vus = new Set<string>();
+  const parClub = new Map<string, Map<string, string>>();
+  const premierProprietaire = new Map<string, string | null>();
+  for (let i = 0; i < etat.cartes.length; i++) {
+    const carte = etat.cartes[i];
+    const ancien = carte.id;
+    if (!vus.has(ancien)) { vus.add(ancien); premierProprietaire.set(ancien, carte.proprietaire); continue; }
+    let nouvel = `${etat.id}:carte:ancienne:${i + 1}`;
+    while (occupes.has(nouvel)) nouvel += ':copie';
+    carte.id = nouvel;
+    occupes.add(nouvel);
+    if (carte.proprietaire) {
+      let correspondance = parClub.get(carte.proprietaire);
+      if (!correspondance) { correspondance = new Map(); parClub.set(carte.proprietaire, correspondance); }
+      if (!correspondance.has(ancien) && premierProprietaire.get(ancien) !== carte.proprietaire)
+        correspondance.set(ancien, nouvel);
+    }
+  }
+  if (!parClub.size) return;
+  const remplacer = (clubId: string, id: string) => parClub.get(clubId)?.get(id) ?? id;
+  const composition = (clubId: string, valeur: CompositionManager) => {
+    valeur.titulaires = valeur.titulaires.map(id => remplacer(clubId, id));
+    valeur.remplacants = valeur.remplacants.map(id => remplacer(clubId, id));
+    valeur.capitaineId = remplacer(clubId, valeur.capitaineId);
+    valeur.buteurId = remplacer(clubId, valeur.buteurId);
+  };
+  for (const club of etat.clubs) {
+    composition(club.id, club.composition);
+    for (const sauvee of club.compositionsSauvegardees ?? []) composition(club.id, sauvee.composition);
+  }
+  for (const vente of etat.ventes) vente.carteId = remplacer(vente.vendeurId, vente.carteId);
+  for (const echange of etat.echanges) {
+    echange.cartesDonnees = echange.cartesDonnees.map(id => remplacer(echange.de, id));
+    echange.cartesDemandees = echange.cartesDemandees.map(id => remplacer(echange.vers, id));
+  }
+  for (const transaction of etat.transactions) {
+    if (transaction.nature === 'pack' || transaction.nature === 'dotation')
+      transaction.cartes = transaction.cartes.map(id => remplacer(transaction.clubId, id));
+  }
+  for (const rencontre of etat.rencontres) {
+    if (!rencontre.match) continue;
+    for (const cote of ['domicile', 'exterieur'] as const) {
+      const clubId = rencontre[cote];
+      const equipe = rencontre.match.equipes?.[cote];
+      if (equipe) {
+        equipe.feuille = equipe.feuille.map(j => ({ ...j, id: remplacer(clubId, j.id) }));
+        equipe.capitaineId = remplacer(clubId, equipe.capitaineId);
+        equipe.buteurId = remplacer(clubId, equipe.buteurId);
+      }
+      for (const evenement of rencontre.match.journal) {
+        if (evenement.cote === cote && evenement.commande.type === 'remplacement') {
+          evenement.commande.sortantId = remplacer(clubId, evenement.commande.sortantId);
+          evenement.commande.entrantId = remplacer(clubId, evenement.commande.entrantId);
+        }
+      }
+      for (const ligne of rencontre.match.feuille ?? []) {
+        if (ligne.cote === cote) ligne.carteId = remplacer(clubId, ligne.carteId);
+      }
+    }
+  }
+}
 function journal(etat: EtatCarriereEnLigne, club: ClubCarriere, nature: TransactionCarriere['nature'], ovas: number, cartes: string[], libelle: string, date: string, meta?: TransactionCarriere['meta']) {
   exiger(Number.isSafeInteger(club.ovas + ovas) && club.ovas + ovas >= 0, 'Ovas insuffisants.');
   club.ovas += ovas;
@@ -311,6 +379,7 @@ function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string
   // ⚠️ L'unicité par ligue commence ICI, pas au premier pack : deux amis
   // inscrits le même jour ne peuvent pas recevoir le même licencié.
   const cartes = dotationBronzeCarriere(etat.id, id, graine, new Set(etat.doublonsAutorises ? [] : etat.cartes.map(c => c.sourceId)), etat.saison);
+  if (etat.doublonsAutorises) cartes.forEach((carte, i) => { carte.id = idNouvelExemplaire(etat, etat.cartes.length + i); });
   exiger(cartes.length === 30, 'Le vivier de départ est épuisé pour cette ligue.');
   const club: ClubCarriere = { id, compteId, pseudo: pseudo.trim(), nom: nom.trim(), ovas: 0, composition: compositionManagerParDefaut(cartes.map(coequipierDepuisCarte)), strategie: copier(STRATEGIE_EN_LIGNE_DEFAUT), rejointLe: dateServeur(maintenant), embleme: emblemeValide(embleme) ? embleme : undefined };
   etat.clubs.push(club); etat.cartes.push(...cartes);
@@ -438,6 +507,7 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
     const source = tirerDuRayon(rayons[i], pris, rng);
     exiger(source, 'Ce pack ne contient plus de joueurs disponibles.');
     const carte = carteDepuisSource(source, etat.id, club.id, etat.saison);
+    if (etat.doublonsAutorises) carte.id = idNouvelExemplaire(etat, etat.cartes.length);
     rayons[i] = rayons[i].filter(c => c.sourceId !== source.sourceId);
     pris.add(carte.sourceId); etat.cartes.push(carte); tirees.push(carte);
   }
@@ -1214,6 +1284,7 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
 function reprendre(etat: EtatCarriereEnLigne, maintenant: number): EtatCarriereEnLigne {
   const nouveau = copier(etat);
   if (!Number.isFinite(nouveau.dotationOvas)) nouveau.dotationOvas = DOTATION_DEFAUT;
+  reparerIdentifiantsDoublons(nouveau);
   for (const club of nouveau.clubs) {
     if (!Number.isFinite(club.ovas)) club.ovas = 0;
     club.strategie = strategieValide(club.strategie);
