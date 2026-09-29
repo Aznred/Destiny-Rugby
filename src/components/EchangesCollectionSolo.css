@@ -61,3 +61,19 @@
   .solo-echanges-carte { width:96px; }
   .solo-echanges-actions .btn { flex:1 1 150px; }
 }
+
+.solo-echanges .rc { width:100%; min-width:0; margin:4px 0 10px; border-color:#e4bf6559; }
+.solo-echanges .rc header h3 { color:#f7d57b; }
+.solo-echanges .rc footer button { flex:none; min-width:44px; min-height:44px; }
+.solo-echanges .rc footer span { text-align:center; }
+.solo-echanges-recherche-roue { max-width:480px; }
+.solo-echanges .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:46px; padding:10px 16px; border:1px solid #dbba6b; border-radius:10px; background:#203941; color:#fff0c6; font-weight:800; line-height:1.2; text-align:center; cursor:pointer; }
+.solo-echanges .btn:hover:not(:disabled) { border-color:#ffe3a0; background:#2d4b51; }
+.solo-echanges .btn.primaire { border-color:#e9c26d; background:linear-gradient(#ffe18d,#edb949); color:#18251f; box-shadow:0 3px 0 #a27321; }
+.solo-echanges .btn.primaire:hover:not(:disabled) { background:linear-gradient(#ffeaa6,#f5c75e); }
+.solo-echanges .btn.fantome { background:#142d35; color:#f4d885; }
+.solo-echanges .btn:disabled { opacity:.52; box-shadow:none; }
+.solo-echanges-creation>.btn.primaire { width:100%; margin-top:3px; font-size:1rem; }
+.solo-echanges-actions .btn { flex:1 1 180px; }
+.solo-echanges-carte>button { min-height:36px; }
+@media(max-width:680px){.solo-echanges .rc-scene{height:245px}.solo-echanges .rc footer{padding:10px 8px}.solo-echanges-actions{display:grid;grid-template-columns:minmax(0,1fr)}.solo-echanges-actions .btn{width:100%}}

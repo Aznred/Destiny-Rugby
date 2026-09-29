@@ -190,3 +190,20 @@
   .collection-solo-compo .solo-compo-fermer { margin: 0; }
   .solo-compo-mobile-destinations { grid-template-columns: minmax(0,1fr); }
 }
+
+@media (max-width: 900px) {
+  .cel > .cel-compo { min-width: 0; width: 100%; overflow: visible; }
+  .cel > .cel-compo > .manager-feuille-visuelle { display: none !important; }
+  .cel > .cel-compo > .cel-compo-mobile { display: block; min-width: 0; width: 100%; padding-bottom: 80px; }
+  .cel-compo-mobile .cel-compo-mobile-ligne { min-width: 0; }
+  .cel-compo-mobile .solo-compo-mobile-emplacement { width: 100%; }
+  .cel-compo-mobile .cel-compo-mobile-roles { display: flex; gap: 6px; padding: 5px 2px 10px; }
+  .cel-compo-mobile .cel-compo-mobile-roles button { min-height: 38px; flex: 1; border: 1px solid #6b817b; border-radius: 8px; background: #193239; color: #d5e3dd; font-weight: 700; }
+  .cel-compo-mobile .cel-compo-mobile-roles button[aria-pressed="true"] { border-color: #f0cb64; background: #e9c669; color: #17251f; }
+  .cel-compo-mobile .cel-compo-mobile-sauver { position: sticky; bottom: calc(70px + env(safe-area-inset-bottom)); z-index: 8; display: flex; justify-content: center; width: 100%; min-height: 48px; margin-top: 12px; box-shadow: 0 8px 28px #0009; }
+  .cel-compo-mobile .solo-compo-mobile-onglets { top: 70px; }
+  .cel-compo-mobile .solo-compo-mobile-choix { z-index: 200; }
+  .cel-compo-mobile .solo-compo-mobile-choix-tete { top: 0; }
+  .cel-compo-mobile .solo-compo-mobile-grille button { min-height: 160px; }
+  .cel > .cel-compo .cel-tete-compo > button:first-child { display: none; }
+}

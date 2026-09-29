@@ -448,7 +448,7 @@ export function vivierRestant(pris: ReadonlySet<string>): number {
  * en ligne. Le serveur, lui, les a déjà chargés pour le catalogue.
  */
 export interface GroupeEmblemes { groupe: string; pays: string; emblemes: { nom: string; logo: string }[] }
-export const FC_MEZE_EMBLEME = '/logos/fc-meze.jpg';
+export const MEZE_RUGBY_EMBLEME = '/logos/meze-rugby.jpg';
 let emblemes: GroupeEmblemes[] | undefined;
 export function emblemesCarriere(): readonly GroupeEmblemes[] {
   if (emblemes) return emblemes;
@@ -460,7 +460,7 @@ export function emblemesCarriere(): readonly GroupeEmblemes[] {
   // dont on veut porter les couleurs quand on joue avec ses potes. Le jeu les
   // affiche déjà ainsi partout ailleurs (`components/Blason.tsx`) : une image
   // manquante y est un carré vide, pas une panne.
-  emblemes = [{ groupe: 'Clubs de Mèze', pays: 'France', emblemes: [{ nom: 'Mèze Stade Football Club', logo: FC_MEZE_EMBLEME }] }, ...COMPETITIONS
+  emblemes = [{ groupe: 'Clubs de Mèze', pays: 'France', emblemes: [{ nom: 'Rugby Club Mézois', logo: MEZE_RUGBY_EMBLEME }] }, ...COMPETITIONS
     .map((c) => ({
       groupe: c.nom, pays: c.pays,
       emblemes: c.clubs.filter((club) => club.logo).map((club) => ({ nom: club.nom, logo: club.logo! })),

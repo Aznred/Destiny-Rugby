@@ -9,6 +9,7 @@ import type { EtatBoutiqueCompte } from '../lib/boutiqueCompte';
 import { carteDepuisSource, type SourceCarte } from '../lib/ligue/catalogueCarriere';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
 import { Icone } from './Icone';
+import { RoueCartes } from './RoueCartes';
 import './EchangesCollectionSolo.css';
 
 const ajout = (lot: LotCartesSolo, cle: string): LotCartesSolo => ({ ...lot, [cle]: (lot[cle] ?? 0) + 1 });
@@ -38,6 +39,7 @@ export function EchangesCollectionSolo() {
   const [souhait, setSouhait] = useState<LotCartesSolo>({});
   const [libre, setLibre] = useState(false);
   const [recherche, setRecherche] = useState('');
+  const [rechercheDoublon, setRechercheDoublon] = useState('');
   const [proposition, setProposition] = useState<{ offre: string; cartes: LotCartesSolo } | null>(null);
   const [occupe, setOccupe] = useState(false);
   const [erreur, setErreur] = useState('');
@@ -45,6 +47,13 @@ export function EchangesCollectionSolo() {
   const parCle = useMemo(() => new Map(catalogue.map(c => [cleCarteSolo(c.sourceId), c])), [catalogue]);
   const doublons = useMemo(() => catalogue.filter(c => (collection.quantites[cleCarteSolo(c.sourceId)] ?? 0) > 1)
     .sort((a, b) => b.note - a.note || a.nom.localeCompare(b.nom, 'fr')), [catalogue, collection.quantites]);
+  const cartesDoublons = useMemo(() => doublons.filter(c => normaliser(`${c.nom} ${c.clubReel} ${c.poste}`).includes(normaliser(rechercheDoublon.trim())))
+    .map(c => carteDepuisSource(c, 'solo', 'collection', 1)), [doublons, rechercheDoublon]);
+  const idRoue = (cle: string) => {
+    const source = parCle.get(cle);
+    return source ? `solo:${source.sourceId}` : '';
+  };
+  const cleRoue = (id: string) => cleCarteSolo(id.slice('solo:'.length));
   const trouvailles = useMemo(() => {
     const terme = normaliser(recherche.trim());
     if (terme.length < 2) return [];
@@ -97,11 +106,8 @@ export function EchangesCollectionSolo() {
     {!compte ? <p className="solo-echanges-info">Connecte-toi à ton compte depuis la Carrière en ligne pour publier et voir les offres.</p> : <>
       <div className="solo-echanges-creation">
         <h3>Publier une offre</h3>
-        <div className="solo-echanges-resultats solo-echanges-doublons" aria-label="Choisir mes doublons">{doublons.slice(0, 24).map(c => <button type="button" key={c.sourceId} onClick={() => choisirDoublon(cleCarteSolo(c.sourceId))}><CarteJoueurEnLigne carte={carteDepuisSource(c, 'solo', 'collection', 1)} compacte /><span>{c.nom} · ×{collection.quantites[cleCarteSolo(c.sourceId)]}</span></button>)}{!doublons.length && <span className="solo-echanges-vide">Aucun doublon disponible.</span>}</div>
-        <label>Mes doublons
-          <select defaultValue="" onChange={e => { choisirDoublon(e.target.value); e.target.value = ''; }}><option value="">Ajouter une carte…</option>
-            {doublons.map(c => <option key={c.sourceId} value={cleCarteSolo(c.sourceId)}>{c.nom} · {c.clubReel} · ×{collection.quantites[cleCarteSolo(c.sourceId)]}</option>)}</select>
-        </label>
+        <label className="solo-echanges-recherche-roue">Chercher dans mes doublons<input type="search" value={rechercheDoublon} onChange={e => setRechercheDoublon(e.target.value)} placeholder="Nom, club ou poste" /></label>
+        <RoueCartes titre={`Mes doublons · ${doublons.length}`} cartes={cartesDoublons} selections={Object.keys(don).map(idRoue)} onChoisir={id => choisirDoublon(cleRoue(id))} vide="Aucun doublon ne correspond à cette recherche." />
         <div className="solo-echanges-cote"><h4>Je donne</h4><LotVisuel lot={don} parCle={parCle} vide="Choisis au moins un doublon." onRetirer={cle => setDon(retrait(don, cle))} /></div>
         <label className="solo-echanges-libre"><input type="checkbox" checked={libre} onChange={e => setLibre(e.target.checked)} /> Libre à toutes les propositions</label>
         {!libre && <><label>Cartes recherchées<input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Chercher un joueur ou son club" /></label>
@@ -119,8 +125,8 @@ export function EchangesCollectionSolo() {
                 {offre.propositions.map(p => <div className="solo-echanges-proposition" key={p.id}><strong>Proposition de {p.pseudo}</strong><LotVisuel lot={p.cartes} parCle={parCle} vide="Aucune carte" /><div className="solo-echanges-actions"><button type="button" className="btn primaire" disabled={occupe} onClick={() => void agir(() => accepterOffreSolo(offre.id, p.id))}>Accepter</button><button type="button" className="btn fantome" disabled={occupe} onClick={() => void agir(() => refuserOffreSolo(offre.id, p.id))}>Refuser</button></div></div>)}</>
             : <div className="solo-echanges-actions">{Object.keys(offre.souhaitees).length > 0 && <button type="button" className="btn primaire" disabled={occupe || !possedeDoublons(collection, offre.souhaitees)} onClick={() => void agir(() => accepterOffreSolo(offre.id))}>Échanger maintenant</button>}
                 <button type="button" className="btn fantome" onClick={() => setProposition({ offre: offre.id, cartes: {} })}>Faire une proposition</button></div>)}
-          {proposition?.offre === offre.id && <div className="solo-echanges-creation"><label>Mes doublons proposés<select defaultValue="" onChange={e => { choisirDoublon(e.target.value, true); e.target.value = ''; }}><option value="">Ajouter une carte…</option>{doublons.map(c => <option key={c.sourceId} value={cleCarteSolo(c.sourceId)}>{c.nom} · ×{collection.quantites[cleCarteSolo(c.sourceId)]}</option>)}</select></label>
-            <div className="solo-echanges-resultats solo-echanges-doublons">{doublons.slice(0, 24).map(c => <button type="button" key={c.sourceId} onClick={() => choisirDoublon(cleCarteSolo(c.sourceId), true)}><CarteJoueurEnLigne carte={carteDepuisSource(c, 'solo', 'collection', 1)} compacte /><span>{c.nom}</span></button>)}</div>
+          {proposition?.offre === offre.id && <div className="solo-echanges-creation"><label className="solo-echanges-recherche-roue">Chercher dans mes doublons<input type="search" value={rechercheDoublon} onChange={e => setRechercheDoublon(e.target.value)} placeholder="Nom, club ou poste" /></label>
+            <RoueCartes titre={`Mes doublons · ${doublons.length}`} cartes={cartesDoublons} selections={Object.keys(proposition.cartes).map(idRoue)} onChoisir={id => choisirDoublon(cleRoue(id), true)} vide="Aucun doublon ne correspond à cette recherche." />
             <LotVisuel lot={proposition.cartes} parCle={parCle} vide="Ajoute une ou plusieurs cartes." onRetirer={cle => setProposition({ ...proposition, cartes: retrait(proposition.cartes, cle) })} />
             <button type="button" className="btn primaire" disabled={occupe || !Object.keys(proposition.cartes).length} onClick={() => void agir(async () => { const r = await proposerOffreSolo(offre.id, proposition.cartes); setProposition(null); return r; })}>Envoyer la proposition</button></div>}
         </article>)}

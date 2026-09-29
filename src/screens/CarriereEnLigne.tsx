@@ -51,6 +51,7 @@ import {
 import type { IdentiteLigue } from '../lib/carriereEnLigneClient';
 import type { CataloguesIdentite, GroupeEmblemes, SessionCarriere, TropheeLigue } from '../lib/carriereEnLigneClient';
 import './CarriereEnLigne.css';
+import '../components/CompositionCollectionSolo.css';
 import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 export { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import { CollectionLigue } from '../components/CollectionLigue';
@@ -1395,6 +1396,10 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
   const [filtreClub, setFiltreClub] = useState('');
   const [filtrePays, setFiltrePays] = useState('');
   const [filtrePoste, setFiltrePoste] = useState('');
+  const [groupeMobile, setGroupeMobile] = useState<'titulaires' | 'remplacants' | 'reserves'>('titulaires');
+  const [emplacementMobile, setEmplacementMobile] = useState<{ zone: 'titulaires' | 'remplacants'; index: number } | null>(null);
+  const [reserveMobile, setReserveMobile] = useState<string | null>(null);
+  const [rechercheMobile, setRechercheMobile] = useState('');
   const club = vue.clubs.find(c => c.id === vue.monClubId);
   const cartes = useMemo(() => vue.cartes.filter(c => c.proprietaire === vue.monClubId), [vue.cartes, vue.monClubId]);
   const effectifComplet = useMemo(() => cartes.map(carteEnJoueur), [cartes]);
@@ -1422,6 +1427,14 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
     && (!filtrePays || c.pays === filtrePays) && (!filtrePoste || c.poste === filtrePoste),
   ).map(c => c.id)), [cartes, filtreChampionnat, filtreClub, filtrePays, filtrePoste]);
   const sauvegardees = club?.compositionsSauvegardees ?? [];
+  const cartesParId = useMemo(() => new Map(cartes.map(c => [c.id, c])), [cartes]);
+  const idsSurFeuille = useMemo(() => new Set([...composition.titulaires, ...composition.remplacants].filter(Boolean)), [composition]);
+  const reservesTotal = cartes.filter(c => !idsSurFeuille.has(c.id)).length;
+  const candidatsMobile = useMemo(() => {
+    const terme = rechercheMobile.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return cartes.filter(c => !indisponibles.has(c.id) && (!terme || `${c.nom} ${c.clubReel} ${c.poste}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(terme)))
+      .sort((a, b) => b.note - a.note);
+  }, [cartes, indisponibles, rechercheMobile]);
 
   const changerJoueur = (zone: 'titulaires' | 'remplacants', index: number, joueurId: string) => {
     const suivante: CompositionManager = { ...composition, titulaires: [...composition.titulaires], remplacants: [...composition.remplacants] };
@@ -1522,6 +1535,36 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
         </div>
       </details>
     </div>
+
+    <section className="solo-compo-mobile cel-compo-mobile" aria-label="Composition tactile de la ligue">
+      <nav className="solo-compo-mobile-onglets" aria-label="Groupes de joueurs">
+        {(['titulaires', 'remplacants', 'reserves'] as const).map(groupe => <button type="button" key={groupe} aria-pressed={groupeMobile === groupe} onClick={() => { setGroupeMobile(groupe); setEmplacementMobile(null); setReserveMobile(null); setRechercheMobile(''); }}>
+          {groupe === 'titulaires' ? `Titulaires · ${composition.titulaires.filter(Boolean).length}/15` : groupe === 'remplacants' ? `Remplaçants · ${composition.remplacants.filter(Boolean).length}/8` : `Réserves · ${reservesTotal}`}
+        </button>)}
+      </nav>
+      {groupeMobile !== 'reserves' ? <div className="solo-compo-mobile-emplacements">
+        {Array.from({ length: groupeMobile === 'titulaires' ? 15 : 8 }, (_, index) => {
+          const zone = groupeMobile;
+          const carte = cartesParId.get(composition[zone][index]);
+          return <div key={`${zone}-${index}`} className="cel-compo-mobile-ligne">
+            <button type="button" className="solo-compo-mobile-emplacement" onClick={() => { setEmplacementMobile({ zone, index }); setRechercheMobile(''); }}>
+              <span className="solo-compo-mobile-numero">{index + (zone === 'titulaires' ? 1 : 16)}</span>
+              {carte ? <><span className="solo-compo-mobile-carte"><CarteJoueurEnLigne carte={carte} compacte /></span><span className="solo-compo-mobile-identite"><b>{carte.nom}</b><small>{nomPoste(carte.poste)} · {carte.clubReel}</small></span></> : <span className="solo-compo-mobile-identite"><b>Emplacement libre</b><small>{zone === 'titulaires' ? nomPoste(POSTES_XV_MANAGER[index]) : 'Banc'}</small></span>}
+              <span className="solo-compo-mobile-modifier">Changer</span>
+            </button>
+            {carte && zone === 'titulaires' && <div className="cel-compo-mobile-roles"><button type="button" aria-pressed={composition.capitaineId === carte.id} onClick={() => setBrouillon({ ...composition, capitaineId: carte.id })}>Capitaine</button><button type="button" aria-pressed={composition.buteurId === carte.id} onClick={() => setBrouillon({ ...composition, buteurId: carte.id })}>Buteur</button></div>}
+          </div>;
+        })}
+      </div> : <div className="solo-compo-mobile-reserves">
+        <p>Choisis une réserve, puis sa place dans le XV ou sur le banc.</p>
+        <input type="search" value={rechercheMobile} onChange={e => setRechercheMobile(e.target.value)} placeholder="Rechercher une réserve" aria-label="Rechercher une réserve" />
+        <div className="solo-compo-mobile-grille">{candidatsMobile.filter(c => !idsSurFeuille.has(c.id) && reservesVisibles.has(c.id)).slice(0, 48).map(c => <button type="button" key={c.id} onClick={() => setReserveMobile(c.id)}><CarteJoueurEnLigne carte={c} compacte /><span>{c.nom}</span><small>{c.clubReel}</small></button>)}</div>
+        {reservesTotal > 48 && <p>Recherche par nom pour voir toutes les réserves.</p>}
+      </div>}
+      {reserveMobile && <div className="solo-compo-mobile-choix" role="dialog" aria-modal="true" aria-label="Placer une réserve"><div className="solo-compo-mobile-choix-tete"><h3>Placer {cartesParId.get(reserveMobile)?.nom}</h3><button type="button" className="btn fantome" onClick={() => setReserveMobile(null)}>Fermer</button></div><div className="solo-compo-mobile-destinations">{(['titulaires', 'remplacants'] as const).map(zone => <section key={zone}><h4>{zone === 'titulaires' ? 'Titulaires' : 'Remplaçants'}</h4>{Array.from({ length: zone === 'titulaires' ? 15 : 8 }, (_, index) => <button type="button" key={index} onClick={() => { changerJoueur(zone, index, reserveMobile); setReserveMobile(null); setGroupeMobile(zone); }}>{index + (zone === 'titulaires' ? 1 : 16)} · {cartesParId.get(composition[zone][index])?.nom ?? 'Emplacement libre'}</button>)}</section>)}</div></div>}
+      {emplacementMobile && <div className="solo-compo-mobile-choix" role="dialog" aria-modal="true" aria-label="Choisir un joueur"><div className="solo-compo-mobile-choix-tete"><div><small>EMPLACEMENT {emplacementMobile.index + (emplacementMobile.zone === 'titulaires' ? 1 : 16)}</small><h3>Choisir un joueur</h3></div><button type="button" className="btn fantome" onClick={() => setEmplacementMobile(null)}>Fermer</button></div><input type="search" autoFocus value={rechercheMobile} onChange={e => setRechercheMobile(e.target.value)} placeholder="Nom, club ou poste" aria-label="Rechercher un joueur" /><div className="solo-compo-mobile-grille">{candidatsMobile.slice(0, 48).map(c => <button type="button" key={c.id} onClick={() => { changerJoueur(emplacementMobile.zone, emplacementMobile.index, c.id); setEmplacementMobile(null); }}><CarteJoueurEnLigne carte={c} compacte /><span>{c.nom}</span><small>{c.clubReel}</small></button>)}</div>{candidatsMobile.length > 48 && <p>Recherche un joueur par son nom pour voir le reste de ton effectif.</p>}</div>}
+      <button type="button" className="btn primaire cel-compo-mobile-sauver" disabled={occupe || !modifie} onClick={async () => { const v = await agir({ type: 'composition', composition }); if (v) setBrouillon(null); }}>{modifie ? t('compoSolo.saveBtn') : t('compoSolo.savedBtn')}</button>
+    </section>
 
     <CompositionTerrainManager
       rendreCarte={joueur => {

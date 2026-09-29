@@ -12,7 +12,7 @@ import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
 import type { CompteStocke, LigueStockee, ResumeDivisionPublique, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { OAuth2Client } from 'google-auth-library';
 import { validerEtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
-import { catalogueBaseCarriere, FC_MEZE_EMBLEME } from '../src/lib/ligue/catalogueCarriere.js';
+import { catalogueBaseCarriere, MEZE_RUGBY_EMBLEME } from '../src/lib/ligue/catalogueCarriere.js';
 import { cleCarteSolo } from '../src/lib/collectionSolo.js';
 import { lotCartesSolo } from '../src/lib/echangesSolo.js';
 
@@ -375,16 +375,16 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     let ligues = await stockage.ligues(compte.id);
     if (compte.identifiant === 'kiri') {
       const ligue = ligues.filter(l => l.publique).sort((a, b) => (b.publique?.cycle ?? 0) - (a.publique?.cycle ?? 0))[0];
-      if (ligue && ligue.clubEmbleme !== FC_MEZE_EMBLEME) {
-        await appliquer(ligue.id, compte.id, 'logo-fc-meze-kiri-v1', (etat, n, graine) => {
+      if (ligue && (!ligue.clubEmbleme || ligue.clubEmbleme === '/logos/fc-meze.jpg')) {
+        await appliquer(ligue.id, compte.id, 'logo-meze-rugby-kiri-v2', (etat, n, graine) => {
           const club = etat.clubs.find(c => c.compteId === compte.id);
-          if (!club || club.emblemeKiriInitialise) return etat;
-          const suivant = agirCarriere(etat, compte.id, { type: 'changerEmblemePublic', embleme: FC_MEZE_EMBLEME }, n, graine);
+          if (!club || (club.embleme && club.embleme !== '/logos/fc-meze.jpg')) return etat;
+          const suivant = agirCarriere(etat, compte.id, { type: 'changerEmblemePublic', embleme: MEZE_RUGBY_EMBLEME }, n, graine);
           suivant.clubs.find(c => c.compteId === compte.id)!.emblemeKiriInitialise = true;
           return suivant;
         }, false, false);
       }
-      if (ligue && ligue.clubEmbleme !== FC_MEZE_EMBLEME) ligues = await stockage.ligues(compte.id);
+      if (ligue && (!ligue.clubEmbleme || ligue.clubEmbleme === '/logos/fc-meze.jpg')) ligues = await stockage.ligues(compte.id);
     }
     if (compte.identifiant !== 'kiri' || ligues.some(l => l.laboratoire)) return ligues;
     const empreinte = createHash('sha256').update(`laboratoire-kiri:${compte.id}`).digest('hex');
