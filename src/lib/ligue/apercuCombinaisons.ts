@@ -145,3 +145,13 @@ export function imageApercu(c: Combinaison, v: VarianteCombinaison, temps: numbe
   if (porteur !== null) ballon = { ...positions[porteur] };
   return { positions, mouvements, ballon, porteur, hauteurBallon, traces };
 }
+
+/** Pose de préparation : tous les gestes précédents sont terminés, ceux de
+ * cette étape n'ont pas commencé. Le lancer est déjà reçu en touche. */
+export function imageDebutEtape(c: Combinaison, v: VarianteCombinaison, etapeIndex: number) {
+  const premiereAction = etapesCombinaison(v.actions)[etapeIndex]?.actions[0];
+  if (!premiereAction) return undefined;
+  const debut = tracesApercu(c, v).find(t => t.indexAction === premiereAction.index)?.debut;
+  if (debut === undefined) return undefined;
+  return { ...imageApercu(c, v, debut), mouvements: {}, hauteurBallon: 0, debut };
+}

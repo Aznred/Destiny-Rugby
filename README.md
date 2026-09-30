@@ -20,6 +20,10 @@
   Dans chaque étape, un geste du porteur peut démarrer avec plusieurs appels :
   « Ajouter un déplacement simultané » choisit le joueur et sa destination sur
   le terrain. Réorganisation par étape et séparation des gestes possibles.
+  La préparation d’une étape reprend les positions et le ballon à la fin de
+  la précédente, y compris les déplacements simultanés. Choisis l’étape sur
+  le terrain ou dans la liste ; « Naviguer » conserve cette avancée, et
+  « Placement initial » revient aux positions de départ.
   Le mode « Avec opposition » teste le cahier en 15 contre 15 : ton XV face à
   une défense d’entraînement de niveau 65, glissée, blitz ou repli. Les placements,
   conquêtes disputées, passes et plaquages viennent du moteur du match ; lecture,

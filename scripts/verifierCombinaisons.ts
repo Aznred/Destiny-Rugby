@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { alignementCombinaison, choisirCombinaison, choisirVariante, combinaisonsValides, creerCombinaison, erreursVariante, etapesCombinaison, MAX_COMBINAISONS, origineApercu, placementsPersonnalises, receptionTouche, toucheValide } from '../src/lib/ligue/combinaisons';
-import { dureeApercu, imageApercu, positionsApercu, tracesApercu } from '../src/lib/ligue/apercuCombinaisons';
+import { dureeApercu, imageApercu, imageDebutEtape, positionsApercu, tracesApercu } from '../src/lib/ligue/apercuCombinaisons';
 import { imageOppositionCombinaison, simulerOppositionCombinaison } from '../src/lib/ligue/oppositionCombinaisons';
 import { terrainSimulationCombinaison } from '../src/lib/ligue/simulationCombinaisons';
 import { bornerVueCombinaison, commencerNavigation, poursuivreNavigation } from '../src/lib/ligue/navigationCombinaisons';
@@ -94,6 +94,50 @@ for (const n of [9, 12, 13]) {
   assert.ok(Math.hypot(milieuParallele.mouvements[n].x, milieuParallele.mouvements[n].y) > 0);
 }
 assert.deepEqual(imageApercu(parallele, pv, .5), milieuParallele, 'Retour en arrière fidèle des appels simultanés');
+// Préparer la suite conserve la fin de toutes les courses, la possession et
+// les placements d'origine, sans lancer les gestes de l'étape sélectionnée.
+const avantPreparation = structuredClone(parallele);
+const suite = imageDebutEtape(parallele, pv, 1)!;
+assert.equal(suite.debut, 1);
+assert.deepEqual(suite.positions[9], { x: 62, y: 35 });
+assert.deepEqual(suite.positions[12], { x: 58, y: 23 });
+assert.deepEqual(suite.positions[13], { x: 56, y: 15 });
+assert.equal(suite.porteur, 9);
+assert.deepEqual(suite.ballon, suite.positions[9]);
+assert.deepEqual(suite.mouvements, {}, 'La pose de préparation reste fixe');
+assert.equal(terrainSimulationCombinaison(parallele, pv, suite, null, {}, true).phase, 'jeuCourant');
+const premiere = imageDebutEtape(parallele, pv, 0)!;
+assert.deepEqual(premiere.positions, positionsApercu(parallele, pv), 'Revenir à la première étape restaure son départ');
+const passeEtAppel = structuredClone(pv);
+passeEtAppel.actions.push({ type: 'leurre', numero: 10, destination: { x: 20, y: -8 }, simultanee: true }, { type: 'course', destination: { x: 24, y: -8 } });
+const apresPasse = imageDebutEtape(parallele, passeEtAppel, 2)!;
+assert.equal(apresPasse.porteur, 10, 'La passe précédente donne le ballon au receveur');
+assert.deepEqual(apresPasse.positions[10], { x: 70, y: 27 }, 'Le receveur termine aussi son appel simultané');
+assert.deepEqual(apresPasse.ballon, apresPasse.positions[10]);
+const autreDestination = structuredClone(passeEtAppel);
+autreDestination.actions[5] = { type: 'course', destination: { x: 30, y: 10 } };
+const autreDepart = imageDebutEtape(parallele, autreDestination, 2)!;
+assert.deepEqual(autreDepart.positions, apresPasse.positions, 'Modifier la destination de la suite ne déplace pas son départ');
+assert.deepEqual(autreDepart.ballon, apresPasse.ballon);
+assert.equal(autreDepart.porteur, apresPasse.porteur);
+assert.deepEqual(parallele, avantPreparation, 'La préparation ne modifie pas le cahier');
+assert.equal(imageDebutEtape(parallele, pv, -1), undefined);
+assert.equal(imageDebutEtape(parallele, pv, 2), undefined);
+for (const distance of [8, 20]) for (const feinte of [false, true]) {
+  const c = creerCombinaison(`preparation-touche-${distance}-${feinte}`, 'touche');
+  const v = c.variantes[0]; v.touche = { alignes: 5, distance, feinte };
+  if (distance > 15) v.sauteur = 12;
+  v.actions = [{ type: 'course', destination: { x: 8, y: 12 } }, { type: 'passe', destinataire: 9 }];
+  const depart = imageDebutEtape(c, v, 0)!;
+  assert.equal(depart.debut, 1 + Number(feinte));
+  assert.equal(depart.porteur, v.sauteur, 'La première étape de touche commence après la réception');
+  assert.deepEqual(depart.ballon, depart.positions[v.sauteur]);
+  assert.deepEqual(depart.ballon, receptionTouche(origineApercu(c), v), 'La réception choisie est conservée au départ de la première course');
+  assert.deepEqual(depart.positions, imageApercu(c, v, depart.debut).positions, 'Les avants restent dans la continuité de la prise');
+  assert.deepEqual(depart.mouvements, {});
+  const suivante = imageDebutEtape(c, v, 1)!;
+  assert.deepEqual(suivante.positions[v.sauteur], { x: origineApercu(c).x + 8, y: origineApercu(c).y + 12 });
+}
 const impossible = structuredClone(parallele);
 impossible.variantes[0].actions[1] = { type: 'passe', destinataire: 12, simultanee: true };
 assert.ok(erreursVariante('melee', impossible.variantes[0]).some(e => e.type === 'ballonsMultiples'));

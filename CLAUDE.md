@@ -169,6 +169,15 @@ Limites : dix étapes, 80 gestes ; un seul geste du ballon et un ordre par joueu
 dans chaque groupe. Le bouton « Ajouter un déplacement simultané » ajoute les
 appels ; déplacer/supprimer une étape ou son premier geste conserve les frontières
 des autres groupes. Les destinations se dessinent aussi sur le terrain.
+`imageDebutEtape` fournit une pose fixe au début de l’étape choisie, après tous
+les gestes précédents et le lancer en touche, avec la possession correspondante.
+L’étape sélectionnée reste distincte de l’action : changer de geste ou naviguer
+conserve cette avancée. Le sélecteur de préparation, ses flèches et les titres
+des étapes montrent cette pose ; ajouter une étape prépare directement sa suite.
+L’édition d’une destination part de cette position ; les placements initiaux
+restent accessibles avec « Placement initial ». La lecture démarre à l’étape
+préparée et « Rejouer » reprend toute la combinaison. Les coordonnées enregistrées
+restent relatives à la conquête, sans changement du cahier ni du moteur serveur.
 Les appels démarrent avant le déplacement du premier tick et continuent pendant
 le vol d'une passe ; la prochaine étape attend sa réception. Le receveur conserve
 la priorité pour rejoindre le ballon. La durée du tracé dépend des étapes et du
