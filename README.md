@@ -4,7 +4,10 @@
 
 - **Cahier de combinaisons, en bêta privée Kiri** : onglet « Combinaisons · bêta »,
   éditeur libre sur terrain 2D agrandissable, zoom sur le jeu ou sur le lancer,
-  joueurs animés et maillots du club comme dans le direct, lecture avec pause,
+  navigation sans joueur sélectionné, déplacement avec un doigt et pincement
+  avec deux doigts, y compris pendant l’animation. Un tap sélectionne un joueur ;
+  « Naviguer » ou « Aucun · navigation » désélectionne, « Recentrer » retrouve la vue.
+  Joueurs animés et maillots du club comme dans le direct, lecture avec pause,
   ralenti, progression et étapes, tracés affichables à volonté. Boutons regroupés
   par usage et commandes adaptées au téléphone. Mêlées en 3-4-1, sortie du 9 au
   ruck et ligne arrière reprises des placements du moteur des matchs, vues

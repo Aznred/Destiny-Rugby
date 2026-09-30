@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { alignementCombinaison, choisirCombinaison, choisirVariante, combinaisonsValides, creerCombinaison, MAX_COMBINAISONS, origineApercu, placementsPersonnalises, receptionTouche, toucheValide } from '../src/lib/ligue/combinaisons';
 import { imageApercu, positionsApercu, tracesApercu } from '../src/lib/ligue/apercuCombinaisons';
 import { terrainSimulationCombinaison } from '../src/lib/ligue/simulationCombinaisons';
+import { bornerVueCombinaison, commencerNavigation, poursuivreNavigation } from '../src/lib/ligue/navigationCombinaisons';
 import { rugbyAnimations } from '../src/lib/spritesGenerateur/rugbyAnimations';
 import { strategieValide, STRATEGIE_EN_LIGNE_DEFAUT, avancerMatchEnLigne, creerMatchEnLigne } from '../src/lib/ligue/matchCarriere';
 import { preparerCombinaison, demarrerCombinaison, pointSurTerrain, placerCombinaison } from '../src/lib/moteur/combinaisons';
@@ -19,6 +20,29 @@ import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereAp
 import { stockageFichier } from '../serveur/carriereFichier';
 
 const base = creerCombinaison('base');
+// 10 pixels par mètre : un glissement de 50 px déplace la vue de 5 m,
+// sans dépendre d'un joueur. Le pincement conserve le point sous les doigts.
+const cadre = { x: 0, y: 0, largeur: 560, hauteur: 430 };
+const vue = { zoom: 2, centre: { x: 50, y: 35 } };
+const glissement = commencerNavigation(vue, [{ x: 300, y: 200 }], 100, cadre);
+assert.deepEqual(poursuivreNavigation(glissement, [{ x: 350, y: 180 }], 100, cadre), { zoom: 2, centre: { x: 45, y: 37 } });
+for (const largeurBase of [40, 65, 100]) for (const cadre of [{ x: 14, y: 120, largeur: 352, hauteur: 246 }, { x: 24, y: 170, largeur: 920, hauteur: 300 }]) {
+  const milieu = { x: cadre.x + cadre.largeur * .6, y: cadre.y + cadre.hauteur * .6 };
+  const contacts = [{ x: milieu.x - 40, y: milieu.y }, { x: milieu.x + 40, y: milieu.y }];
+  const pincement = commencerNavigation(vue, contacts, largeurBase, cadre);
+  const elargis = [{ x: milieu.x - 56, y: milieu.y }, { x: milieu.x + 56, y: milieu.y }];
+  const zoomee = poursuivreNavigation(pincement, elargis, largeurBase, cadre);
+  assert.equal(zoomee.zoom, 2.8);
+  const sousLesDoigts = commencerNavigation(zoomee, elargis, largeurBase, cadre).ancre;
+  assert.ok(Math.hypot(sousLesDoigts.x - pincement.ancre.x, sousLesDoigts.y - pincement.ancre.y) < 1e-10, 'Le point pincé reste sous les doigts, même avec les marges du SVG');
+  const unDoigt = commencerNavigation(zoomee, [elargis[0]], largeurBase, cadre);
+  assert.deepEqual(poursuivreNavigation(unDoigt, [elargis[0]], largeurBase, cadre), zoomee, 'Lever un doigt ne fait pas sauter la caméra');
+  const limite = poursuivreNavigation(unDoigt, [{ x: 10_000, y: -10_000 }], largeurBase, cadre);
+  assert.equal(limite.centre.x, largeurBase / limite.zoom / 2);
+  assert.equal(limite.centre.y, 70 - largeurBase / limite.zoom * .7 / 2);
+}
+assert.deepEqual(bornerVueCombinaison({ zoom: .5, centre: { x: 10, y: 10 } }, 100), { zoom: 1, centre: { x: 50, y: 35 } });
+assert.equal(bornerVueCombinaison({ ...vue, zoom: 10 }, 100).zoom, 3);
 const precise = { ...structuredClone(base), id: 'precise', zone: 'leurs22' as const, couloir: 'gauche' as const };
 assert.equal(choisirCombinaison([base, precise], 'melee', 85, 14)?.id, 'precise');
 assert.equal(choisirCombinaison([base, precise], 'melee', 50, 35)?.id, 'base');
@@ -332,4 +356,4 @@ try {
 } finally {
   rmSync(dossier, { recursive: true, force: true });
 }
-console.log('Combinaisons : placements du match, animation, lancers 5–25 m vers avants/demis/arrière A/B sur les deux touches, passes, moteur en ligne, sauvegarde et bêta Kiri vérifiés.');
+console.log('Combinaisons : navigation et pincement, placements du match, animation, lancers 5–25 m vers avants/demis/arrière A/B sur les deux touches, passes, moteur en ligne, sauvegarde et bêta Kiri vérifiés.');

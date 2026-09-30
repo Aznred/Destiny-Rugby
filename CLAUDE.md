@@ -162,6 +162,16 @@ adapte ces images à `TerrainDirect` et aux gestes du `SpriteRugbymanMemo` des
 matchs : lancer, saut, lift, passe, réception, course et pied. Le club fournit
 son maillot tiré de l’écusson. Les tracés peuvent être masqués ; la pose et le
 ballon restent pilotés par la progression, même en pause.
+La navigation est active par défaut (`joueur: null`). « Naviguer » et
+« Aucun · navigation » effacent la sélection du joueur et de l'action. Un tap
+sélectionne/désélectionne ; un glissement du fond déplace la carte. Deux
+pointeurs zooment autour de leur milieu, même pendant la relecture ou avec un
+joueur sélectionné. `navigationCombinaisons.ts` calcule la caméra bornée et
+l'ancre du pincement avec les marges et le cadrage du SVG. Les captures
+pointeur suivent le geste hors du terrain ; lever un doigt reprend la
+navigation sans saut. Un joueur glissé a un placement fantôme local, enregistré
+au relâchement seulement ; le second doigt ou l'annulation l'abandonne.
+« Recentrer », zoom et flèches restent disponibles au clavier.
 `placementsCombinaisons.ts` reprend `placementMelee`, `placementRuck`,
 `placementTouche` et `structurerAttaque` du moteur : mêlée en 3-4-1 avec le 9
 au tunnel, trois avants au ruck et le 9 à sa sortie, pods et ligne arrière.
