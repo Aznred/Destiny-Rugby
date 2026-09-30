@@ -2,6 +2,17 @@
 
 ### Carrière en ligne — le troisième mode, jouable de bout en bout
 
+- **Cahier de combinaisons, en bêta privée Kiri** : onglet « Combinaisons · bêta »,
+  éditeur libre sur terrain 2D, placement du XV, passes vers les numéros choisis,
+  courses, appels/leurres et sept intentions au pied. Jusqu’à 12 combinaisons,
+  chacune avec trois variantes pondérées et dix actions. Déclenchement sur mêlée,
+  touche ou ruck, selon les 22 et le côté du terrain. En mode « Mes combinaisons »,
+  le serveur exécute le cahier enregistré ; les situations non couvertes suivent
+  le plan habituel. L’aperçu anime le tracé, la réussite dépend du match.
+  L’accès est contrôlé sur l’identifiant authentifié `kiri`, y compris pour les
+  ordres en direct. Vérification : `npm run verify:combinaisons` ; aperçu local :
+  `/scripts/apercuCombinaisons.html`.
+
 - **Une ligue privée entre potes** : 2 à 20 clubs, code d'invitation,
   championnat aller-retour, coupes inventées par le créateur, palmarès. Écran
   dédié à sept onglets + le direct.

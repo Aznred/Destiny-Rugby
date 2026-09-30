@@ -1,5 +1,6 @@
 import { CelebrationLigue } from '../components/CelebrationLigue';
 import { AtelierKiri } from '../components/AtelierKiri';
+import { EditeurCombinaisons } from '../components/EditeurCombinaisons';
 import { RoueCartes } from '../components/RoueCartes';
 // ═══════════════════════════════════════════════════════════════════════════
 // LA CARRIÈRE EN LIGNE — le troisième mode
@@ -69,7 +70,7 @@ import { PACKS_CARRIERE, packsBoutiqueDuJour } from '../lib/ligue/catalogueCarri
 import { locale, nombre, t } from '../lib/i18n';
 import { fusionnerDeltaDirect, fusionnerVueLigue } from '../lib/ligue/fusionDirect';
 
-type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'administration' | 'atelier';
+type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'administration' | 'atelier' | 'combinaisons';
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
 type VueRencontre = VueCarriereEnLigne['rencontres'][number];
 type ReponseGoogle = { credential: string };
@@ -714,12 +715,13 @@ export function CarriereEnLigne() {
             qui ramène exactement là d'où l'on vient. */}
         {!rencontre && <header className="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme ?? vue.logo} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / {t('online.season', { n: vue.saison })}</span></div><h1>{vue.observateur ? t('online.spectator.mode') : club?.nom}</h1><p>{vue.rythme === 7 ? t('online.clubsDaily', { clubs: vue.clubs.length }) : t('online.clubsRate', { clubs: vue.clubs.length, matches: vue.rythme })} · {t(`online.phase.${vue.phase === 'salon' ? 'lobby' : vue.phase === 'saison' ? 'season' : 'break'}`)}</p></div>{vue.observateur ? <div className="cel-portefeuille"><Icone nom="oeil" taille={26} /><strong>{t('online.spectator.mode')}</strong><span>{t('online.spectator.readOnly')}</span></div> : <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>{t('online.balance')}</span></div>}</header>}
         {!rencontre && vue.publique && <div className="cel-public-bandeau"><b>Division {vue.publique.division} · {vue.phase === 'salon' ? `${vue.clubs.length}/16 clubs inscrits` : 'Saison de 30 jours'}</b><span>{vue.phase === 'salon' ? 'Coup d’envoi automatique dès que 16 clubs sont inscrits.' : 'Top 1 : montée · Dernier : descente · Avant-dernier : barrage contre le finaliste de la division inférieure'}</span>{vue.publique.barrage && <strong>{vue.publique.barrage}</strong>}</div>}
-        {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')}>{[...navigation, ...(!vue.observateur && session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }, { id: 'administration' as const, label: 'Comptes & ligues', icone: 'profil' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
+        {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')}>{[...navigation, ...(!vue.observateur && session.compte.administrateur ? [{ id: 'combinaisons' as const, label: 'Combinaisons · bêta', icone: 'sifflet' as NomIcone }] : []), ...(!vue.observateur && session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }, { id: 'administration' as const, label: 'Comptes & ligues', icone: 'profil' as NomIcone }] : [])].map(o => <button key={o.id} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{o.label}</button>)}</nav>}
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           <CelebrationLigue key={vue.id} vue={vue} agir={agir} />
           {onglet === 'club' && <Bureau vue={vue} proprietaire={!vue.publique && session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} proprietaire={!vue.publique && session.compte.id === vue.createurId} notifier={setNotification} />}
           {onglet === 'composition' && <Composition key={vue.id} vue={vue} agir={agir} occupe={occupe} erreur={erreur} />}
+          {onglet === 'combinaisons' && session.compte.administrateur && !vue.observateur && <CombinaisonsLigue key={vue.id} vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'effectif' && <Effectif vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'collection' && <CollectionLigue vue={vue} />}
           {onglet === 'packs' && <Packs vue={vue} agir={agir} occupe={occupe} />}
@@ -1399,6 +1401,15 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
 // l'adéquation au poste, le brassard et la cible du buteur. La seule différence
 // du mode en ligne, c'est d'où vient l'effectif — les cartes possédées dans
 // CETTE ligue — et le fait que la feuille part au serveur au lieu du store.
+
+function CombinaisonsLigue({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
+  const club = vue.clubs.find(c => c.id === vue.monClubId);
+  if (!club?.strategie || !club.composition) return null;
+  const strategie = club.strategie;
+  const joueurs = Object.fromEntries(club.composition.titulaires.map((id, i) => [i + 1, vue.cartes.find(c => c.id === id)?.nom ?? `N° ${i + 1}`]));
+  return <EditeurCombinaisons combinaisons={strategie.combinaisons} mode={strategie.modeCombinaisons} joueurs={joueurs} occupe={occupe}
+    enregistrer={async (combinaisons, modeCombinaisons) => Boolean(await agir({ type: 'strategie', strategie: { ...strategie, combinaisons, modeCombinaisons } }))} />;
+}
 
 export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; erreur?: string }) {
   const [vueEtendue, setVueEtendue] = useState(true);

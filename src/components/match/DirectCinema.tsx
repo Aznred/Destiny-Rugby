@@ -159,6 +159,7 @@ export function DirectCinema({
       <div className={`dc-commentaire ${momentVif || scenario?.momentFort ? 'fort' : ''}`} aria-live="polite">
         <span>
           {bandeau}
+          {m.terrain?.lancement?.combinaison && ` · ${m.terrain.lancement.combinaison}`}
           {momentSelectionne
             ? ` · ${heure(momentSelectionne.seconde)} · ${momentSelectionne.score.domicile}–${momentSelectionne.score.exterieur}`
             : scenario

@@ -149,6 +149,20 @@ navigateur. Les plus structurants :
 
 ### `src/lib/ligue/` — la Carrière en ligne
 
+Le cahier de combinaisons est une **bêta privée du compte authentifié `kiri`**.
+`combinaisons.ts` valide les plans, sélectionne les situations (phase, zone,
+côté) et tire les variantes pondérées. `components/EditeurCombinaisons.tsx`
+offre un bac à sable 2D : placements, passes par numéro, courses, leurres et
+jeu au pied. Le cahier vit dans `StrategieEnLigne` (`modeCombinaisons`,
+`combinaisons`) et dans les feuilles gelées des matchs, sans migration SQL.
+`moteur/combinaisons.ts` pilote les cibles ; `moteur.ts` exécute les gestes
+avec les contacts et les erreurs ordinaires. La conquête reste disputée :
+une touche ou mêlée perdue annule le lancement préparé. Sans situation
+correspondante ou joueur disponible, le moteur reprend son jeu habituel.
+`carriereApi.ts` transmet l’autorisation vérifiée à `agirCarriere` ; jamais
+depuis un pseudo ou un drapeau envoyé par le client. Le cahier adverse reste
+privé dans la vue de ligue. Banc : `npm run verify:combinaisons`.
+
 **Ces fichiers tournent des deux côtés** — navigateur ET fonctions serverless —
 comme `classementMondial.ts` : aucun import du store, aucun DOM, aucune horloge
 implicite (`Date.now()` se passe en paramètre), aucun texte affichable.

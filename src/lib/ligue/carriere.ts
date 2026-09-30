@@ -1336,9 +1336,15 @@ export function avancerCarrierePourDirect(
   };
 }
 
-export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, commande: CommandeCarriere, maintenant: number, graine: string): EtatCarriereEnLigne {
+export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, commande: CommandeCarriere, maintenant: number, graine: string, accesCombinaisonsBeta = false): EtatCarriereEnLigne {
   identifiant(compteId); dateServeur(maintenant);
   exiger(commande && typeof commande === 'object' && typeof commande.type === 'string', 'Commande invalide.');
+  const strategieDemandee = commande.type === 'strategie' ? commande.strategie
+    : commande.type === 'match' && commande.action?.type === 'strategie' ? commande.action.strategie : undefined;
+  if (strategieDemandee) {
+    const s = strategieValide(strategieDemandee);
+    exiger(accesCombinaisonsBeta || (s.modeCombinaisons !== 'configure' && !s.combinaisons?.length), 'L’éditeur de combinaisons est en bêta privée sur le compte Kiri.');
+  }
   exiger(!etat.publique?.finLe || maintenant < Date.parse(etat.publique.finLe) || commande.type === 'actualiser',
     'Cette saison publique est terminée. Retrouve ta nouvelle division dans le portail.');
   if (commande.type === 'laboratoireReinitialiser') {

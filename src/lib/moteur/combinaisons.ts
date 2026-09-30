@@ -1,0 +1,90 @@
+import { choisirCombinaison, choisirVariante, type Combinaison, type PhaseCombinaison, type PointCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
+import type { EtatMatch } from './etat.js';
+import type { Pion } from './entites.js';
+import { borner, LIGNE_A, LIGNE_B, sens, type Cote, type Vec } from './terrain.js';
+
+export interface CombinaisonPreparee { cote: Cote; plan: Combinaison; variante: VarianteCombinaison }
+export interface CombinaisonEnCours extends CombinaisonPreparee {
+  origine: Vec;
+  miroir: number;
+  index: number;
+  depuis: number;
+  debut: number;
+  courses: Record<number, PointCombinaison>;
+}
+export function joueurCombinaison(e: EtatMatch, cote: Cote, numero: number): Pion | undefined {
+  return e.pions.find(p => p.cote === cote && p.numero === numero && p.surLeTerrain && p.sanction <= 0);
+}
+export function preparerCombinaison(e: EtatMatch, phase: PhaseCombinaison): void {
+  e.combinaisonEnCours = undefined;
+  e.combinaisonPreparee = undefined;
+  const cote = e.possession;
+  const s = sens(cote);
+  const plan = choisirCombinaison(e.plansCombinaisons?.[cote] ?? [], phase,
+    cote === 'A' ? e.ballon.x - LIGNE_A : LIGNE_B - e.ballon.x, s === 1 ? e.ballon.y : 70 - e.ballon.y);
+  if (!plan) return;
+  const variante = choisirVariante(plan, e.rng);
+  const depart = phase === 'touche' ? variante.sauteur : variante.depart;
+  if (!joueurCombinaison(e, cote, depart) || variante.actions.some(a => a.type === 'passe' && !joueurCombinaison(e, cote, a.destinataire))) return;
+  e.combinaisonPreparee = { cote, plan, variante };
+  if (phase === 'touche' && e.conquete) {
+    // Le sauteur et ses lifteurs restent dans l'alignement réglementaire.
+    const sauteur = joueurCombinaison(e, cote, variante.sauteur)!;
+    const aligne = e.pions.find(p => p.cote === cote && p.surLeTerrain && p.role === 'alignement');
+    if (sauteur.role !== 'alignement' && aligne) {
+      const pos = { ...sauteur.pos }; const cible = { ...sauteur.cible }; const role = sauteur.role;
+      sauteur.pos = { ...aligne.pos }; sauteur.cible = { ...aligne.cible }; sauteur.role = 'alignement';
+      aligne.pos = pos; aligne.cible = cible; aligne.role = role;
+    }
+    e.conquete.cibleId = sauteur.id;
+  }
+}
+
+export function demarrerCombinaison(e: EtatMatch, lieu: Vec, porteurImpose?: Pion): boolean {
+  const preparee = e.combinaisonPreparee;
+  e.combinaisonPreparee = undefined;
+  e.combinaisonEnCours = undefined;
+  if (!preparee || preparee.cote !== e.possession) return false;
+  const premier = porteurImpose ?? joueurCombinaison(e, preparee.cote, preparee.variante.depart);
+  if (!premier) return false;
+  const localY = sens(preparee.cote) === 1 ? lieu.y : 70 - lieu.y;
+  const enCours: CombinaisonEnCours = { ...preparee, origine: { ...lieu },
+    miroir: preparee.plan.couloir === 'tous' && localY > 35 ? -1 : 1,
+    index: 0, depuis: e.sim, debut: e.sim, courses: {} };
+  e.combinaisonEnCours = enCours;
+  const chaine = [premier, ...preparee.variante.actions.flatMap(a => a.type === 'passe' ? [joueurCombinaison(e, preparee.cote, a.destinataire)!] : [])];
+  e.lancement = { type: 'large', chaine, index: 0, libelle: `${preparee.plan.nom} · ${preparee.variante.nom}` };
+  e.porteur = premier;
+  return true;
+}
+
+export function pointSurTerrain(c: CombinaisonEnCours, p: PointCombinaison): Vec {
+  const s = sens(c.cote);
+  return { x: borner(c.origine.x + s * p.x, LIGNE_A - 2, LIGNE_B + 2),
+    y: borner(c.origine.y + s * c.miroir * p.y, 1.5, 68.5) };
+}
+export function placerCombinaison(e: EtatMatch): void {
+  const c = e.combinaisonEnCours;
+  if (!c || c.cote !== e.possession || e.phase !== 'jeuCourant') return;
+  for (const placement of c.variante.placements) {
+    const p = joueurCombinaison(e, c.cote, placement.numero);
+    if (!p || p === e.porteur || e.vol?.receveur === p) continue;
+    const cible = pointSurTerrain(c, c.courses[p.numero] ?? placement);
+    // Le destinataire se présente toujours derrière le ballon. La passe
+    // elle-même conserve les risques et l'arbitrage du moteur habituel.
+    if (!c.courses[p.numero]) {
+      const s = sens(c.cote);
+      if ((cible.x - e.ballon.x) * s > -.7) cible.x = e.ballon.x - s * .7;
+    }
+    p.cible = cible;
+  }
+  for (const [numero, destination] of Object.entries(c.courses)) {
+    const p = joueurCombinaison(e, c.cote, Number(numero));
+    if (p && p !== e.porteur && e.vol?.receveur !== p) p.cible = pointSurTerrain(c, destination);
+  }
+}
+export function cibleCourseCombinaison(e: EtatMatch): Vec | undefined {
+  const c = e.combinaisonEnCours;
+  const action = c?.variante.actions[c.index];
+  return c && c.cote === e.porteur?.cote && action?.type === 'course' ? pointSurTerrain(c, action.destination) : undefined;
+}

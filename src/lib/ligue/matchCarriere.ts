@@ -70,6 +70,7 @@ import {
   demanderRemplacement, facteurHorloge, infoPenalite, type PenaliteEnCours,
 } from '../moteur/moteur.js';
 import type { EtatMatch, IntentionPied, Phase, TypeLancement, Vol, VolRecent } from '../moteur/etat.js';
+import { combinaisonsValides, type Combinaison } from './combinaisons.js';
 import type { Cote } from '../moteur/terrain.js';
 import { corpsPourAffichage, porteurPourAffichage } from '../moteur/dynamique.js';
 import { scorePossible } from '../championnat.js';
@@ -105,6 +106,9 @@ export type ChoixPenaliteEnLigne = 'points' | 'touche' | 'rapide' | 'melee';
  * complet, pas seulement une humeur — d'où les deux bascules de fin de match.
  */
 export interface StrategieEnLigne {
+  /** Cahier personnel ; les anciennes stratégies restent en mode automatique. */
+  modeCombinaisons?: 'automatique' | 'configure';
+  combinaisons?: Combinaison[];
   mentalite: MentaliteEnLigne;
   jeu: JeuEnLigne;
   rythme: RythmeEnLigne;
@@ -128,6 +132,7 @@ export interface StrategieEnLigne {
 }
 
 export const STRATEGIE_EN_LIGNE_DEFAUT: StrategieEnLigne = {
+  modeCombinaisons: 'automatique', combinaisons: [],
   mentalite: 'equilibree', jeu: 'possession', rythme: 'normal', defense: 'normale',
   rucks: 'normal', penaliteCourte: 'points', penaliteLongue: 'touche',
   bascule60: 'offensive', bascule70: 'tresOffensive', remplacements: 'standard',
@@ -154,6 +159,8 @@ export function strategieValide(brut: unknown): StrategieEnLigne {
   const dans = <T extends string>(valeur: unknown, options: readonly T[], defaut: T): T =>
     options.includes(valeur as T) ? valeur as T : defaut;
   return {
+    modeCombinaisons: s.modeCombinaisons === 'configure' ? 'configure' : 'automatique',
+    combinaisons: combinaisonsValides(s.combinaisons),
     mentalite: dans(s.mentalite, MENTALITES, 'equilibree'),
     jeu: dans(s.jeu, JEUX, 'possession'),
     rythme: dans(s.rythme, RYTHMES, 'normal'),
@@ -345,7 +352,7 @@ export interface TerrainDirect {
   metresGagnes?: number;
   ballonLent?: boolean;
   ouvert?: 'gauche' | 'droite';
-  lancement?: { type: TypeLancement; intention?: IntentionPied };
+  lancement?: { type: TypeLancement; intention?: IntentionPied; combinaison?: string };
   /** Lecture visuelle de la conquête en cours : appel de touche ou poussée. */
   conquete?: {
     type: 'melee' | 'touche'; progression: number;
@@ -785,6 +792,10 @@ function appliquerAuMoteur(e: EtatMatch, ev: EvenementMatchEnLigne): void {
     const ecart = cote === 'A' ? e.scoreA - e.scoreB : e.scoreB - e.scoreA;
     const effective: StrategieEnLigne = { ...c.strategie, mentalite: mentaliteAppliquee(c.strategie, e.minute, ecart) };
     appliquerTactiqueEquipe(e, cote, tactiqueDepuisStrategie(effective), true, impactStrategie(effective));
+    e.plansCombinaisons ??= {};
+    e.plansCombinaisons[cote] = effective.modeCombinaisons === 'configure' ? effective.combinaisons ?? [] : [];
+    // Un ordre en direct prend effet à la prochaine phase de jeu.
+    if (e.combinaisonPreparee?.cote === cote) e.combinaisonPreparee = undefined;
   } else if (c.type === 'remplacement') {
     demanderRemplacement(e, cote, c.entrantId, c.sortantId);
   } else if (c.type === 'decision') {
@@ -815,6 +826,10 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
     },
   );
   e.impactBanc = { A: impactStrategie(strategieD), B: impactStrategie(strategieE) };
+  e.plansCombinaisons = {
+    A: strategieD.modeCombinaisons === 'configure' ? strategieD.combinaisons ?? [] : [],
+    B: strategieE.modeCombinaisons === 'configure' ? strategieE.combinaisons ?? [] : [],
+  };
   return e;
 }
 
@@ -905,7 +920,7 @@ const FIL_MAX = 220;
 function extraireFil(e: EtatMatch): LigneFil[] {
   const lignes: LigneFil[] = [];
   for (const [index, c] of e.commentaires.entries()) {
-    if (!TYPES_FIL.has(c.type)) continue;
+    if (!TYPES_FIL.has(c.type) && !(c.type === 'jeu' && c.texte.startsWith('Combinaison :'))) continue;
     lignes.push({
       id: `evenement-${index}`, seconde: c.seconde ?? c.minute * 60,
       score: { domicile: c.scoreA, exterieur: c.scoreB },
@@ -1051,6 +1066,7 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
   };
   if (e.lancement) {
     terrain.lancement = { type: e.lancement.type };
+    if (e.combinaisonEnCours) terrain.lancement.combinaison = e.lancement.libelle;
     if (e.lancement.intention) terrain.lancement.intention = e.lancement.intention;
   }
   if (e.conquete) {

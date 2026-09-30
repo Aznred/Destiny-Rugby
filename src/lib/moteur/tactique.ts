@@ -22,6 +22,7 @@
 // couvrent le jeu au pied — sans ce rideau, la moindre chandelle valait un essai.
 
 import type { Pion } from './entites.js';
+import { placerCombinaison } from './combinaisons.js';
 import { PHASES_ARRETEES, type EtatMatch, type SystemeDefensif } from './etat.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, distance, distance2,
@@ -488,6 +489,7 @@ export function placerEquipes(e: EtatMatch): void {
   const defense = surLeTerrain(e, adverse(e.possession));
   structurerAttaque(e, attaque, e.possession);
   structurerDefense(e, defense, adverse(e.possession));
+  placerCombinaison(e);
   if (engagesRuck) {
     for (const p of e.pions) if (engagesRuck.has(p.id)) p.role = 'ruck';
   }

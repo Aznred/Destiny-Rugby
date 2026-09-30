@@ -372,6 +372,9 @@ export interface PlanDeScore {
 }
 
 export interface EtatMatch {
+  plansCombinaisons?: Partial<Record<Cote, import('../ligue/combinaisons.js').Combinaison[]>>;
+  combinaisonPreparee?: import('./combinaisons.js').CombinaisonPreparee;
+  combinaisonEnCours?: import('./combinaisons.js').CombinaisonEnCours;
   /** Solo : mouvements naturels, horloge sportive sur dix minutes. */
   carriereDixMinutes?: boolean;
   /** Durée réelle d'un match arcade complet, en secondes. */

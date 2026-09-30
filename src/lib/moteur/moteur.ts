@@ -23,6 +23,7 @@
 
 import { graine, scorePossible } from '../championnat.js';
 import type { Coequipier } from '../effectif.js';
+import { cibleCourseCombinaison, demarrerCombinaison, joueurCombinaison, pointSurTerrain, preparerCombinaison } from './combinaisons.js';
 import type { PosteId, TactiqueManager } from '../../types.js';
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import {
@@ -1605,7 +1606,7 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const piloteArcade = e.controleArcadeCamps?.includes(porteur.cote) ?? false;
   if (!piloteArcade) porteur.cible = enEchappee
     ? { x: porteur.cote === 'A' ? LIGNE_B + 2 : LIGNE_A - 2, y: borner(porteur.pos.y, 3, LARGEUR - 3) }
-    : ligneDeCourse(e, porteur);
+    : cibleCourseCombinaison(e) ?? ligneDeCourse(e, porteur);
   const avant = porteur.pos.x;
   if (!piloteArcade) deplacer(porteur, dt);
   // Tous les corps ont maintenant bougé sur cette image. Le porteur ne peut
@@ -1712,6 +1713,12 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   // au joueur. Le contact avec un défenseur reste arbitré par le moteur.
   if (piloteArcade) {
     if (plaqueur && porteur.battu <= 0) return resoudrePlaquage(e, porteur, plaqueur);
+    return;
+  }
+
+  // Le cahier dirige les gestes ; les défenseurs et les fautes restent actifs.
+  if (executerCombinaison(e, porteur, pression)) {
+    if (plaqueur && porteur.battu <= 0 && e.porteur === porteur && e.phase === 'jeuCourant') resoudrePlaquage(e, porteur, plaqueur);
     return;
   }
 
@@ -1960,6 +1967,47 @@ function donnerBallon(e: EtatMatch, p: Pion, delai: number): void {
 
 // LES DÉCISIONS DE SECOND PLAN : le jeu au pied et le drop. La passe, elle, est
 // arbitrée à chaque tick dans `phaseJeuCourant`.
+function executerCombinaison(e: EtatMatch, porteur: Pion, pression: number): boolean {
+  const c = e.combinaisonEnCours;
+  if (!c) return false;
+  if (c.cote !== porteur.cote || e.sim - c.debut > 45) {
+    e.combinaisonEnCours = undefined;
+    e.lancement = null;
+    return false;
+  }
+  const action = c.variante.actions[c.index];
+  if (!action) { e.combinaisonEnCours = undefined; e.lancement = null; return false; }
+  const suivante = () => { c.index++; c.depuis = e.sim; };
+  if (action.type === 'leurre') {
+    c.courses[action.numero] = action.destination;
+    suivante();
+    return true;
+  }
+  if (action.type === 'course') {
+    if (distance(porteur.pos, pointSurTerrain(c, action.destination)) < 1.5 || e.sim - c.depuis > 4) suivante();
+    return true;
+  }
+  if (action.type === 'pied') {
+    if (pression > 1.6 && e.sim - c.depuis >= .25) {
+      e.combinaisonEnCours = undefined;
+      taperAuPied(e, porteur, action.intention);
+    }
+    return true;
+  }
+  const receveur = joueurCombinaison(e, c.cote, action.destinataire);
+  if (!receveur || receveur === porteur || e.sim - c.depuis > 4) {
+    e.combinaisonEnCours = undefined;
+    e.lancement = null;
+    return false;
+  }
+  const enRetrait = (receveur.pos.x - porteur.pos.x) * sens(porteur.cote) <= .4;
+  if (enRetrait && distance(porteur.pos, receveur.pos) <= 28 && e.sim - c.depuis >= .3) {
+    suivante();
+    passerLeBallon(e, porteur, receveur, pression);
+  }
+  return true;
+}
+
 function deciderAvecLeBallon(e: EtatMatch, p: Pion, pression: number): void {
   const lancement = e.lancement;
   const suivant = lancement && lancement.index + 1 < lancement.chaine.length;
@@ -2448,6 +2496,8 @@ function formerRuck(
   lieu: Vec,
   contact?: { porteur: Pion; defenseur: Pion },
 ): void {
+  e.combinaisonEnCours = undefined;
+  e.combinaisonPreparee = undefined;
   // Le porteur est allé au sol : la passe précédente n'amènera plus rien.
   e.dernierPasseur = null;
   // ⚠️ UN RUCK NE SE FORME JAMAIS DANS L'EN-BUT ni sur la ligne de touche : là
@@ -2732,6 +2782,8 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
   e.aplatissage = null;
   e.lancement = null;
   e.conquete = null;
+  e.combinaisonPreparee = undefined;
+  e.combinaisonEnCours = undefined;
   // ⚠️ ET LE HORS-JEU DU PIED S’EFFACE. Une phase arrêtée remet tout le monde
   //    en jeu : garder le drapeau ferait chasser un joueur au ralenti trois
   //    phases après le coup de pied qui l’avait mis hors-jeu.
@@ -2779,6 +2831,7 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
   const sa = sens(pour);
   e.ligneDef = e.ballon.x + sa * (quoi === 'touche' ? 10 : quoi === 'melee' ? 5 : 10);
   e.horsJeu = e.ligneDef;
+  if (quoi === 'melee' || quoi === 'touche') preparerCombinaison(e, quoi);
 }
 
 function phaseMelee(e: EtatMatch): void {
@@ -2831,7 +2884,7 @@ function phaseMelee(e: EtatMatch): void {
   e.gardeRuck = 0.4;
   // Départ du 8 quand la mêlée avance.
   const huit = surLeTerrain(e, e.possession).find((p) => p.numero === 8);
-  if (huit && e.possession === cote && duel > 5 && e.rng() < 0.32) {
+  if (!e.combinaisonPreparee && huit && e.possession === cote && duel > 5 && e.rng() < 0.32) {
     e.lancement = {
       type: 'pickAndGo', chaine: [huit], index: 0, libelle: 'départ du 8',
     };
@@ -2947,7 +3000,7 @@ function phaseTouche(e: EtatMatch): void {
 
   // Ballon porté près de la ligne : l'arme n°1 des avants.
   const pres = metresAvantLaLigne(e.ballon, cote) < 25;
-  if (e.rng() < (pres ? .62 : .18)) {
+  if (!e.combinaisonPreparee && e.rng() < (pres ? .62 : .18)) {
     e.phase = 'maul';
     e.minuteur = 6 + e.rng() * 3;
     e.porteur = null;
@@ -3681,6 +3734,7 @@ function marquer(e: EtatMatch, cote: Cote, points: number): void {
 function reprendreJeu(
   e: EtatMatch, lieu: Vec, porteurImpose?: Pion, deltaLigne?: number, excluPremierId?: string,
 ): void {
+  if (e.phase === 'ruck') preparerCombinaison(e, 'ruck');
   // Le ballon est joué : le hors-jeu du coup de pied précédent est éteint.
   libererHorsJeu(e);
   const cote = e.possession;
@@ -3724,6 +3778,13 @@ function reprendreJeu(
   }
   e.horsJeu = e.ligneDef;
 
+  if (e.combinaisonPreparee && joueurCombinaison(e, cote, e.combinaisonPreparee.variante.depart)?.id === excluPremierId) e.combinaisonPreparee = undefined;
+  if (demarrerCombinaison(e, lieu, porteurImpose)) {
+    const premier = e.porteur!;
+    donnerBallon(e, premier, .3);
+    dire(e, 'jeu', cote, `Combinaison : ${e.lancement!.libelle}.`);
+    return;
+  }
   const lancement = choisirLancement(e, cote, liste, porteurImpose, excluPremierId);
   // Le premier maillon : celui qui a déjà le ballon (sauteur en touche,
   // réceptionneur d'un coup de pied), sinon le premier de la combinaison.

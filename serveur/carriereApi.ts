@@ -1030,7 +1030,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             }
           }
         }
-        const e = await appliquer(id, compte.id, requete, (e, n, g) => agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g));
+        const e = await appliquer(id, compte.id, requete, (e, n, g) => agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, compte.identifiant === 'kiri'));
         return res.status(200).json(vueCarriere(e, compte.id));
       }
       if (action === 'presence') {
