@@ -59,11 +59,11 @@ import { SpriteArbitre, SpriteRugbymanMemo } from './SpriteRugbyman';
 /**
  * Le retard de rendu, en secondes réelles.
  *
- * ⚠️ IL DOIT DÉPASSER L'INTERVALLE DE SONDAGE (une seconde), sinon le relevé
+ * ⚠️ IL DOIT DÉPASSER L'INTERVALLE DE SONDAGE (deux secondes), sinon le relevé
  * qui ferme l'interpolation n'est pas encore arrivé et on retombe sur de la
  * prédiction. Une marge de 20 % absorbe la latence du réseau.
  */
-const RETARD = 1.2;
+const RETARD = 2.4;
 /** Au-delà du dernier relevé, on ne prolonge pas plus longtemps que ça. */
 const PREDICTION_MAX = 0.7;
 /** Deux images utiles, plus assez de marge pour un paquet retardé/réordonné. */

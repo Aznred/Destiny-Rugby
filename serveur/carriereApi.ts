@@ -2,7 +2,7 @@ import { creerPaiement, diagnosticErreurStripe, journalErreurStripe } from './pa
 import { contexteAtelier, enregistrerAtelier, vueAtelier } from './atelierAdmin.js';
 import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
+import { isDeepStrictEqual, promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
 import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerDivisionPublique, creerLaboratoireCarriere, empreinteEcriture, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
 import { planifierDivisionsPubliques } from './divisionsPubliques.js';
@@ -318,7 +318,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // qu'il refuse par principe de revenir en arrière.
         const avance = { ...suivant, version: ligne.etat.version };
         const stable = memoriserLigue(id, { ...ligne, etat: avance, echeance }).etat;
-        await notifier(stable);
+        // Un sondage du direct n'est qu'une lecture : le notifier ici lançait
+        // une programmation de file et une recherche d'alertes à chaque GET.
+        // Seul le réveil durable entretient la chaîne et diffuse les alertes.
+        if (requete.startsWith('queue-') || requete.startsWith('tick-')) await notifier(stable);
         return stable;
       }
       const maj: LigueStockee = { ...ligne, etat: durable, comptes: comptesEtat(durable) };
@@ -654,7 +657,17 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (action === 'sauvegarderBoutique') {
         const boutique = validerEtatBoutiqueCompte(corps.boutique);
         if (!boutique) throw new ErreurHttp(400, 'Sauvegarde de boutique invalide.');
-        return res.status(200).json({ boutique: await stockage.sauvegarderBoutique(compte.id, boutique) });
+        const enregistree = await stockage.sauvegarderBoutique(compte.id, boutique);
+        const visible = (coffre: typeof boutique) => ({
+          ovas: coffre.ovas, achatsOvas: coffre.achatsOvas ?? 0, collectionSolo: coffre.collectionSolo,
+          inventaire: [...coffre.inventaire].sort(), skinActif: coffre.skinActif,
+          equipements: [...coffre.equipements].sort(), equipementActif: coffre.equipementActif,
+          traitsDebloques: [...coffre.traitsDebloques].sort(),
+        });
+        // Un accusé minuscule remplace l'écho du coffre entier. Une fusion
+        // serveur (trade ou achat intervenu entre-temps) renvoie encore l'état.
+        return res.status(200).json({ boutique: corps.compact === true
+          && isDeepStrictEqual(visible(enregistree), visible(boutique)) ? null : enregistree });
       }
       if (action === 'creerOffreSolo' || action === 'proposerOffreSolo' || action === 'accepterOffreSolo'
         || action === 'refuserOffreSolo' || action === 'annulerOffreSolo') {

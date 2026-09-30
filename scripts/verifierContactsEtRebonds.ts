@@ -38,8 +38,6 @@ for (let matchNumero = 0; matchNumero < 3; matchNumero++) {
         for (let j = i + 1; j < joueurs.length; j++) {
           if (joueurs[i]!.cote !== joueurs[j]!.cote && distance(joueurs[i]!.pos, joueurs[j]!.pos) < .4) {
             penetrationsGraves++;
-            if (penetrationsGraves <= 5) console.log('penetration', joueurs[i]!.numero, joueurs[j]!.numero,
-              distance(joueurs[i]!.pos, joueurs[j]!.pos).toFixed(2), e.porteur?.numero, e.vol?.type, e.gardeRuck);
           }
         }
       }

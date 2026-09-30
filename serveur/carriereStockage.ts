@@ -252,7 +252,12 @@ export function stockageNeon(url: string): StockageCarriere {
   return {
     echangesSolo: {
       async lister(compte, offset) {
-        const lignes = await sql`select id, compte, pseudo, offertes, souhaitees, propositions, cree_le, statut
+        // Les propositions des autres comptes ne quittent plus Postgres :
+        // filtrer après le SELECT transférait jusqu'à 900 propositions inutiles.
+        const lignes = await sql`select id, compte, pseudo, offertes, souhaitees,
+          case when compte=${compte}::uuid then propositions else coalesce(
+            (select jsonb_agg(p) from jsonb_array_elements(propositions) p where p->>'compteId'=${compte}),
+            '[]'::jsonb) end as propositions, cree_le, statut
           from collection_offres where statut='ouverte' or compte=${compte}::uuid
           order by cree_le desc limit 30 offset ${offset}`;
         const total = await sql`select count(*)::integer as n from collection_offres where statut='ouverte' or compte=${compte}::uuid`;
@@ -348,8 +353,9 @@ export function stockageNeon(url: string): StockageCarriere {
       return (r[0]?.donnees as EtatBoutiqueCompte | undefined) ?? null;
     },
     async sauvegarderBoutique(compte, boutique) {
-      const lignes = await sql`insert into compte_boutique (compte,donnees,modifie_le)
-        values (${compte},${JSON.stringify(boutique)}::jsonb,now())
+      const lignes = await sql`with entree as (select ${JSON.stringify(boutique)}::jsonb as donnees)
+        insert into compte_boutique (compte,donnees,modifie_le)
+        select ${compte},donnees,now() from entree where true
         on conflict (compte) do update set donnees=excluded.donnees || jsonb_build_object(
           'collectionSolo', case when coalesce((compte_boutique.donnees->'collectionSolo'->>'revision')::bigint,0) > coalesce((excluded.donnees->'collectionSolo'->>'revision')::bigint,0)
             then compte_boutique.donnees->'collectionSolo' else excluded.donnees->'collectionSolo' end,
@@ -361,8 +367,13 @@ export function stockageNeon(url: string): StockageCarriere {
           'achatsInventaire', coalesce(compte_boutique.donnees->'achatsInventaire','[]'::jsonb),
           'achatsEquipements', coalesce(compte_boutique.donnees->'achatsEquipements','[]'::jsonb),
           'achatsTraits', coalesce(compte_boutique.donnees->'achatsTraits','[]'::jsonb)
-        ),modifie_le=excluded.modifie_le returning donnees`;
-      return lignes[0].donnees as EtatBoutiqueCompte;
+        ),modifie_le=excluded.modifie_le returning case
+          when (compte_boutique.donnees - 'achatsInventaire' - 'achatsEquipements' - 'achatsTraits')
+            is distinct from (select donnees - 'achatsInventaire' - 'achatsEquipements' - 'achatsTraits' from entree)
+          then compte_boutique.donnees else null end as donnees`;
+      // Pas de retransfert de la collection vers Vercel quand la base a
+      // enregistré exactement ce qu'on lui a fourni. Les conflits restent complets.
+      return (lignes[0].donnees as EtatBoutiqueCompte | null) ?? boutique;
     },
     async limiter(cle, maximum, fenetre, maintenant) {
       if (cle.startsWith('jeu:')) {

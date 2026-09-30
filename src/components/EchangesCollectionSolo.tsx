@@ -6,6 +6,7 @@ import type { LotCartesSolo, OffreSolo, PageOffresSolo } from '../lib/echangesSo
 import { possedeDoublons } from '../lib/echangesSolo';
 import { accepterOffreSolo, annulerOffreSolo, chargerSessionCarriere, creerOffreSolo, listerEchangesSolo, proposerOffreSolo, refuserOffreSolo } from '../lib/carriereEnLigneClient';
 import type { EtatBoutiqueCompte } from '../lib/boutiqueCompte';
+import { appliquerCollectionSoloDistante } from '../lib/synchronisationBoutiqueCompte';
 import { carteDepuisSource, type SourceCarte } from '../lib/ligue/catalogueCarriere';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
 import { Icone } from './Icone';
@@ -76,7 +77,7 @@ export function EchangesCollectionSolo() {
     setOccupe(true); setErreur('');
     try {
       const resultat = await action();
-      if (resultat.boutique) useGame.setState({ collectionSolo: resultat.boutique.collectionSolo });
+      if (resultat.boutique) appliquerCollectionSoloDistante(resultat.boutique.collectionSolo);
       await charger();
     } catch (e) { setErreur(e instanceof Error ? e.message : 'Échange indisponible.'); }
     finally { setOccupe(false); }

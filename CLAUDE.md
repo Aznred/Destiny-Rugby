@@ -504,6 +504,9 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   jamais de porteur à mi-image et les tangentes ne font plus boucler les joueurs,
   couche `scenarioDirect.ts` séparée du moteur — type de lancement, zone,
   couloir, intensité et cadrage automatique, sans séquence vidéo —,
+  contacts physiques selon le gabarit et séparation des trajectoires,
+  chutes couplées au plaquage, rebonds ovales avec hauteur et rotation partagées
+  entre les rendus solo et direct ; banc `scripts/verifierContactsEtRebonds.ts`,
   décision de pénalité dans les 50 mètres adverses, consignes et remplacements
   qui atteignent le moteur), packs, marché, enchères, échanges, coupes maison,
   objectifs, palmarès. Serveur (`serveur/carriereApi.ts` + `api/carriere.ts`),
@@ -511,6 +514,16 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   208 contrôles, plus `npm run verify:fluidite-direct`). Les 19 tables sont posées sur la base Neon du site (mesuré le
   6 septembre 2026 : inscription en production → HTTP 200). Marche à suivre
   complète dans `serveur/MISE-EN-LIGNE.md`.
+
+  **Transferts bornés** : relevé direct toutes les 2 s, interpolation avec
+  2,4 s de tampon ; ligue toutes les 20 s puis 60 s après six vues identiques,
+  salon public toutes les 15 s. Pas de sondage ni de présence en arrière-plan ;
+  présence toutes les 25 s, aucune requête concurrente et reprise espacée après
+  erreur. Réveil durable toutes les 60 s, entretenu par la file et les changements
+  persistés, jamais par un simple GET sans changement. La collection et les échanges
+  partagent leur catalogue à 60 s ; sauvegardes du coffre regroupées, comparaison
+  avant écriture et réception d'un trade sans POST en retour. La base filtre les
+  propositions avant transfert. Banc : `scripts/verifierSynchronisationCompte.ts`.
 
   ⚠️ **`DATABASE_URL` NE DÉSIGNE QU'UNE BASE, ET UN PROJET PEUT EN AVOIR
   PLUSIEURS.** Le piège a coûté une soirée : les tables créées dans la base

@@ -134,9 +134,16 @@ export const deconnecterCarriere = async () => {
 export const chargerBoutiqueCompte = (signal?: AbortSignal) =>
   requete<{ boutique: EtatBoutiqueCompte | null }>(undefined, undefined, signal, '?boutique=1');
 export const sauvegarderBoutiqueCompte = (boutique: EtatBoutiqueCompte) =>
-  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'sauvegarderBoutique', boutique });
-export const listerEchangesSolo = (offset = 0) =>
-  requete<PageOffresSolo>(undefined, undefined, undefined, `?echangesSolo=1&offset=${offset}`);
+  requete<{ boutique: EtatBoutiqueCompte | null }>({ action: 'sauvegarderBoutique', boutique, compact: true });
+const lecturesEchanges = new Map<number, Promise<PageOffresSolo>>();
+export const listerEchangesSolo = (offset = 0): Promise<PageOffresSolo> => {
+  const existante = lecturesEchanges.get(offset);
+  if (existante) return existante;
+  const lecture = requete<PageOffresSolo>(undefined, undefined, undefined, `?echangesSolo=1&offset=${offset}`)
+    .finally(() => { if (lecturesEchanges.get(offset) === lecture) lecturesEchanges.delete(offset); });
+  lecturesEchanges.set(offset, lecture);
+  return lecture;
+};
 export const creerOffreSolo = (offertes: LotCartesSolo, souhaitees: LotCartesSolo) =>
   requete<{ boutique: EtatBoutiqueCompte }>({ action: 'creerOffreSolo', offertes, souhaitees });
 export const proposerOffreSolo = (offre: string, cartes: LotCartesSolo) =>

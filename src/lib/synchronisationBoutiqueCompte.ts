@@ -2,6 +2,15 @@ import { useGame } from '../store/useGame';
 import type { EtatBoutiqueCompte } from './boutiqueCompte';
 import { chargerBoutiqueCompte, ErreurCarriere, sauvegarderBoutiqueCompte } from './carriereEnLigneClient';
 
+let collectionDistante = false;
+/** Un échange est déjà enregistré côté serveur : sa réception ne se renvoie pas. */
+export function appliquerCollectionSoloDistante(collection: EtatBoutiqueCompte['collectionSolo']): void {
+  if ((collection.revision ?? 0) < (useGame.getState().collectionSolo.revision ?? 0)) return;
+  collectionDistante = true;
+  try { useGame.setState({ collectionSolo: collection }); }
+  finally { collectionDistante = false; }
+}
+
 function instantane(): EtatBoutiqueCompte {
   const s = useGame.getState();
   return {
@@ -19,9 +28,11 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
   let actif = true;
   let compteConnecte = false;
   let derniere = '';
+  let confirmee: EtatBoutiqueCompte | null = null;
   let ecritureEnCours = false;
   let attente: { etat: EtatBoutiqueCompte; empreinte: string } | null = null;
   let generation = 0;
+  let minuterie: ReturnType<typeof setTimeout> | undefined;
 
   const synchroniser = async () => {
     const numero = ++generation;
@@ -37,10 +48,12 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
           equipements: distante.equipements, equipementActif: distante.equipementActif,
           traitsDebloques: distante.traitsDebloques,
         });
-        derniere = empreinte(distante);
+        confirmee = instantane();
+        derniere = empreinte(confirmee);
       } else {
         await sauvegarderBoutiqueCompte(locale);
         if (!actif || numero !== generation) return;
+        confirmee = locale;
         derniere = empreinte(locale);
       }
       compteConnecte = true;
@@ -55,12 +68,22 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
     while (actif && compteConnecte && attente) {
       const cible = attente;
       attente = null;
+      if (cible.empreinte === derniere) continue;
+      const numero = generation;
       try {
         const reponse = await sauvegarderBoutiqueCompte(cible.etat);
-        if ((reponse.boutique.collectionSolo.revision ?? 0) > (cible.etat.collectionSolo.revision ?? 0)) {
-          useGame.setState({ collectionSolo: reponse.boutique.collectionSolo });
-          derniere = empreinte(instantane());
-        } else derniere = cible.empreinte;
+        if (!actif || numero !== generation) break;
+        const dejaRecue = confirmee?.collectionSolo;
+        confirmee = { ...cible.etat, collectionSolo: dejaRecue
+          && (dejaRecue.revision ?? 0) > (cible.etat.collectionSolo.revision ?? 0)
+          ? dejaRecue : cible.etat.collectionSolo };
+        derniere = empreinte(confirmee);
+        if (reponse.boutique && (reponse.boutique.collectionSolo.revision ?? 0) > (cible.etat.collectionSolo.revision ?? 0)) {
+          appliquerCollectionSoloDistante(reponse.boutique.collectionSolo);
+        }
+        const actuelle = instantane();
+        const cle = empreinte(actuelle);
+        attente = cle === derniere ? null : { etat: actuelle, empreinte: cle };
       } catch (erreur) {
         if (erreur instanceof ErreurCarriere && erreur.statut === 401) compteConnecte = false;
         break;
@@ -69,27 +92,43 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
     ecritureEnCours = false;
   };
 
-  const desabonner = useGame.subscribe(() => {
+  const desabonner = useGame.subscribe((etatStore, precedent) => {
     if (!actif || !compteConnecte) return;
+    // Les changements de navigation, de chrono et de carrière n'affectent
+    // pas le coffre. Ne pas sérialiser la collection sur chaque mise à jour.
+    if (etatStore.coins === precedent.coins && etatStore.achatsOvas === precedent.achatsOvas
+      && etatStore.collectionSolo === precedent.collectionSolo && etatStore.inventaire === precedent.inventaire
+      && etatStore.skinActif === precedent.skinActif && etatStore.equipements === precedent.equipements
+      && etatStore.equipementActif === precedent.equipementActif && etatStore.traitsDebloques === precedent.traitsDebloques) return;
     const etat = instantane();
+    if (collectionDistante && confirmee) {
+      confirmee = { ...confirmee, collectionSolo: etat.collectionSolo };
+      derniere = empreinte(confirmee);
+    }
     const suivante = empreinte(etat);
-    if (suivante === derniere) return;
+    if (suivante === derniere) { attente = null; return; }
     // Une seule ecriture a la fois : si trois gains arrivent pendant la
     // premiere, seule la photo la plus recente attend son tour.
     attente = { etat, empreinte: suivante };
-    void viderAttente();
+    // Regroupe les gains successifs dans une sauvegarde. Un état déjà envoyé
+    // est comparé de nouveau juste avant l'écriture.
+    if (!minuterie) minuterie = setTimeout(() => { minuterie = undefined; void viderAttente(); }, 500);
   });
 
   const reconnecter = () => { compteConnecte = false; void synchroniser(); };
-  const deconnecter = () => { generation++; compteConnecte = false; attente = null; };
+  const deconnecter = () => { generation++; compteConnecte = false; attente = null; clearTimeout(minuterie); minuterie = undefined; };
   window.addEventListener('destiny-compte-connecte', reconnecter);
   window.addEventListener('destiny-compte-deconnecte', deconnecter);
+  const surFermeture = () => { clearTimeout(minuterie); minuterie = undefined; void viderAttente(); };
+  window.addEventListener('pagehide', surFermeture);
   void synchroniser();
   return () => {
     actif = false; generation++;
+    clearTimeout(minuterie);
     attente = null;
     desabonner();
     window.removeEventListener('destiny-compte-connecte', reconnecter);
     window.removeEventListener('destiny-compte-deconnecte', deconnecter);
+    window.removeEventListener('pagehide', surFermeture);
   };
 }

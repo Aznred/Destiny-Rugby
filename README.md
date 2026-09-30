@@ -177,8 +177,16 @@
      échéance n'est passée, le serveur répond « inchangé » **sans avoir lu la
      ligue**. Vingt octets au lieu de quatre cent mille.
   3. La liste des ligues **se calcule dans Postgres**, plus dans la fonction.
-  4. **Onglet caché, aucun sondage** ; et après une minute sans rien, on passe à
-     30 secondes. Le direct reste à 2 secondes, l'approche d'un match à 10.
+  4. **Onglet caché, aucun sondage ni présence**. Direct : 2 secondes,
+     ligue : 20 secondes puis 60 après six réponses identiques, salon public :
+     15 secondes. Une erreur espace les reprises jusqu'à 2 minutes.
+  Les réveils de fond passent toutes les 60 secondes. Une lecture sans changement
+  ne reprogramme plus de réveil et ne relit plus les notifications ; la file
+  durable et les véritables modifications s'en chargent.
+  Les échanges ne renvoient plus leur collection dans une sauvegarde redondante.
+  Les gains rapprochés sont regroupés et les lectures simultanées du marché sont
+  mutualisées. Les propositions privées sont filtrées dans Postgres. Le catalogue
+  solo partage un rafraîchissement par minute, uniquement au premier plan.
   Mesuré dans le navigateur, une minute sur l'écran d'une ligue : **15 sondages,
   1 réponse complète (57 Ko) et 14 à 17 octets** — au lieu de 15 fois 57 Ko en
   lecture ET autant en écriture.
@@ -910,6 +918,12 @@ cents matchs complets sans navigateur ni base. Ce qu'il dit :
 - **le direct est déterministe** — un match suivi minute par minute donne
   exactement le même score et le même fil qu'un match joué d'un bloc. C'est ce
   qui garantit que deux managers voient la même rencontre ;
+- **les contacts et le ballon ont une physique visible** — séparation des joueurs
+  selon leur gabarit, collision sur la trajectoire pour éviter les traversées,
+  plaquage au contact et chute couplée du porteur et du défenseur. Le ballon libre
+  conserve sa hauteur et sa rotation, rebondit selon son orientation ovale puis
+  ralentit sur la pelouse. Vérification : 884 contacts à moins de 1,2 m,
+  aucune traversée grave, 360 rebonds sur trois rencontres.
 - **le direct avance en continu** — le plus grand bond entre deux sondages de
   deux secondes est de **0,1 minute**, et le terrain change à chaque relevé.
   Avant, il se téléportait une fois par minute : `EtatMatch.minute` est un

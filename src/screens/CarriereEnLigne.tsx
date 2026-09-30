@@ -540,9 +540,12 @@ export function CarriereEnLigne() {
     let actif = true;
     let minuterie: ReturnType<typeof setTimeout>;
     let inchanges = 0;
+    let lectureEnCours = false;
+    let echecs = 0;
     const controleur = new AbortController();
 
     const prochainPas = () => {
+      if (echecs) return Math.min(120_000, 5_000 * 2 ** Math.min(echecs - 1, 5));
       const vue = derniereVue.current;
       // ⚠️ LA SECONDE EST RÉSERVÉE À CELUI QUI REGARDE. Un match dure
       // quatre-vingts minutes réelles : sonder toutes les deux secondes pour
@@ -552,12 +555,12 @@ export function CarriereEnLigne() {
       // sans spectateur ne se bloque donc pas, il coûte simplement cinq fois
       // moins cher.
       const suivi = directOuvert.current;
-      if (suivi && vue?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine)) return 1000;
-      if (vue?.publique && vue.phase === 'salon') return 5000;
-      if (vue?.rencontres.some(r => r.match && !r.match.termine)) return 10_000;
+      if (suivi && vue?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine)) return 2_000;
+      if (vue?.publique && vue.phase === 'salon') return 15_000;
+      if (vue?.rencontres.some(r => r.match && !r.match.termine)) return 20_000;
       const bientot = Date.now() + 5 * 60_000;
-      if (vue?.rencontres.some(r => !r.resultat && Date.parse(r.ouvre) <= bientot && Date.parse(r.ferme) >= Date.now())) return 10_000;
-      return inchanges >= 6 ? 30_000 : 10_000;
+      if (vue?.rencontres.some(r => !r.resultat && Date.parse(r.ouvre) <= bientot && Date.parse(r.ferme) >= Date.now())) return 20_000;
+      return inchanges >= 6 ? 60_000 : 20_000;
     };
     const programmer = () => {
       clearTimeout(minuterie);
@@ -566,6 +569,8 @@ export function CarriereEnLigne() {
     };
 
     const actualiser = async () => {
+      if (!actif || document.hidden || lectureEnCours) return;
+      lectureEnCours = true;
       const version = versionRequete.current;
       try {
         // On annonce la version qu'on tient : si elle est encore bonne, le
@@ -575,15 +580,16 @@ export function CarriereEnLigne() {
         const directActif = suivi && derniereVue.current?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine);
         if (directActif) {
           const delta = await chargerDirectCarriere(ligueId, suivi, controleur.signal, connue);
+          echecs = 0;
           if (actif && version === versionRequete.current) {
             // La fusion refuse aussi une réponse de direct plus ancienne ayant
             // la même version : chrono, score et fil ne peuvent plus reculer.
             setVue(avant => avant ? fusionnerDeltaDirect(avant, delta) : avant);
           }
-          programmer();
           return;
         }
         const suivante = await chargerLigueCarriere(ligueId, controleur.signal, connue);
+        echecs = 0;
         if (suivante === INCHANGE) { inchanges++; }
         else if (actif && version === versionRequete.current) {
           setVue(avant => {
@@ -596,8 +602,8 @@ export function CarriereEnLigne() {
             return fusionnerVueLigue(avant, suivante);
           });
         }
-      } catch (e) { if (actif) setErreur(messageErreur(e)); }
-      programmer();
+      } catch (e) { echecs++; if (actif) setErreur(messageErreur(e)); }
+      finally { lectureEnCours = false; programmer(); }
     };
 
     // Au retour sur l'onglet, on ne PROGRAMME pas : on rafraîchit tout de suite,
@@ -1247,10 +1253,17 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   // personne ne tranchera jamais.
   useEffect(() => {
     if (!enCours) return;
-    const signaler = () => { void signalerPresenceCarriere(vue.id, matchId); };
-    const battement = setInterval(signaler, 12_000);
+    let presenceEnCours = false;
+    const signaler = () => {
+      if (document.hidden || presenceEnCours) return;
+      presenceEnCours = true;
+      void signalerPresenceCarriere(vue.id, matchId).catch(() => {}).finally(() => { presenceEnCours = false; });
+    };
+    const battement = setInterval(signaler, 25_000);
+    const surVisibilite = () => { if (!document.hidden) signaler(); };
+    document.addEventListener('visibilitychange', surVisibilite);
     signaler();
-    return () => clearInterval(battement);
+    return () => { clearInterval(battement); document.removeEventListener('visibilitychange', surVisibilite); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, enCours]);
 

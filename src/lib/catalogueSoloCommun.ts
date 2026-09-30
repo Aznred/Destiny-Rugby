@@ -6,14 +6,18 @@ import type { EditionJoueur } from './ligue/atelierCatalogue';
 let revision = -1;
 let courant: readonly SourceCarte[] = catalogueBaseCarriere();
 let attente: Promise<readonly SourceCarte[]> | null = null;
+let dernierChargement = 0;
+const FRAICHEUR_CATALOGUE = 60_000;
 
 /** Le même catalogue de base que la ligue, complété par ses éditions en ligne. */
 export function synchroniserCatalogueSolo(): Promise<readonly SourceCarte[]> {
   if (attente) return attente;
+  if (Date.now() - dernierChargement < FRAICHEUR_CATALOGUE) return Promise.resolve(courant);
   attente = fetch(`/api/carriere?catalogueSolo=1&revision=${revision}`, { cache: 'no-store' })
     .then(async reponse => {
       if (!reponse.ok) throw new Error('Catalogue indisponible');
       const donnees = await reponse.json() as { revision?: number; joueurs?: Record<string, EditionJoueur> };
+      dernierChargement = Date.now();
       if (Number.isInteger(donnees.revision) && donnees.joueurs && typeof donnees.joueurs === 'object') {
         revision = donnees.revision!;
         courant = catalogueMondialCarriere({ revision, joueurs: donnees.joueurs, packs: {}, rotationPacks: false });
@@ -31,13 +35,13 @@ export function useCatalogueSolo(): readonly SourceCarte[] {
   useEffect(() => {
     let actif = true;
     const afficher = () => { if (actif) setCatalogue(courant); };
-    const actualiser = () => { void synchroniserCatalogueSolo().then(afficher); };
+    const actualiser = () => { if (!document.hidden) void synchroniserCatalogueSolo().then(afficher); };
     const surVisibilite = () => { if (!document.hidden) actualiser(); };
     actualiser();
     window.addEventListener('destiny-catalogue-solo-actualise', afficher);
     window.addEventListener('focus', actualiser);
     document.addEventListener('visibilitychange', surVisibilite);
-    const intervalle = window.setInterval(actualiser, 30_000);
+    const intervalle = window.setInterval(actualiser, FRAICHEUR_CATALOGUE);
     return () => {
       actif = false;
       window.clearInterval(intervalle);

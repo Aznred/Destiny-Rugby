@@ -23,7 +23,7 @@ const fil:LigneFil[]=[
 ];
 const e={id:'ligue',clubs:[{id:'A',compteId:'a',nom:'Club A'},{id:'B',compteId:'b',nom:'Club B'},{id:'C',compteId:'c',nom:'Club C'}],rencontres:[{id:'match',domicile:'A',exterieur:'B',ouvre:new Date(now-10000000).toISOString(),ferme:new Date(now-90000).toISOString(),match:{id:'match',debut:now-90000,gel:0,horloge:1.5,fil,score:{domicile:7,exterieur:3},termine:false}}]} as unknown as EtatCarriereEnLigne;
 e.phase='saison';
-assert.equal(prochainReveilMatch(e,now),Math.ceil((now+15000)/15000)*15000);
+assert.equal(prochainReveilMatch(e,now),(Math.floor(now/60000)+1)*60000);
 assert.equal(prochainReveilMatch({...e,phase:'salon'},now),null);
 const futur=structuredClone(e);delete futur.rencontres[0].match;futur.rencontres[0].ouvre=new Date(now+600000).toISOString();futur.rencontres[0].ferme=new Date(now+1200000).toISOString();
 assert.equal(prochainReveilMatch(futur,now),now+600000);
@@ -76,7 +76,8 @@ try{
  etat=agirCarriere(etat,'b0000000-0000-4000-8000-000000000002',{type:'rejoindre',pseudo:'Adversaire',clubNom:'Adversaire RFC'},now,'push-adversaire');
  etat=agirCarriere(etat,compte,{type:'demarrerSaison'},now,'push-saison');
  await db.creerLigue({id,code:'DR-PUSH',version:0,comptes:[compte],etat});
- const api=creerGestionnaireCarriere(db);
+ let programmations=0;
+ const api=creerGestionnaireCarriere(db,async()=>{programmations++;});
  async function appel(body:object,auth=true,origin='http://localhost'){
    let status=200;let donnees:any;
    const res={status(n:number){status=n;return res;},setHeader(){},json(x:unknown){donnees=x;}};
@@ -93,6 +94,21 @@ try{
  assert.equal(delta.status,200);
  assert.equal(delta.donnees.rencontre.id,etat.rencontres[0].id);
  assert.equal(delta.donnees.clubs,undefined,'Le direct ne doit pas renvoyer la ligue complète');
+ const apresLecture=programmations;
+ await lire(`/api/carriere?ligue=${id}&direct=${encodeURIComponent(etat.rencontres[0].id)}`);
+ assert.equal(programmations,apresLecture,'Une simple lecture ne relance pas une file de matchs');
+ await api.actualiserLigue(id);
+ assert.equal(programmations,apresLecture+1,'Un réveil durable entretient la chaîne même sans changement');
+ const coffre={ovas:100,achatsOvas:0,collectionSolo:{quantites:Object.fromEntries(Array.from({length:500},(_,i)=>[`carte:${i}`,2])),packsOuverts:{},doublons:500,revision:0},
+   inventaire:['classique'],skinActif:'classique',equipements:[],equipementActif:{},traitsDebloques:[]};
+ const sauvegarde=await appel({action:'sauvegarderBoutique',boutique:coffre,compact:true});
+ assert.equal(sauvegarde.status,200);
+ assert.equal(sauvegarde.donnees.boutique,null,'Une sauvegarde sans conflit rend seulement un accusé compact');
+ assert.ok(Buffer.byteLength(JSON.stringify(sauvegarde.donnees))<30,'Un coffre de 500 cartes ne doit pas être renvoyé après une sauvegarde réussie');
+ assert.ok((await appel({action:'sauvegarderBoutique',boutique:coffre})).donnees.boutique,'Les anciens clients conservent leur réponse complète');
+ await db.sauvegarderBoutique(compte,{...coffre,collectionSolo:{...coffre.collectionSolo,revision:5}});
+ const conflit=await appel({action:'sauvegarderBoutique',boutique:coffre,compact:true});
+ assert.equal(conflit.donnees.boutique.collectionSolo.revision,5,'Une collection serveur plus récente reste renvoyée');
  assert.equal((await appel({action:'push',operation:'activer',ligue:id,abonnement},false)).status,401);
  assert.equal((await appel({action:'push',operation:'activer',ligue:id,abonnement},true,'https://evil.example')).status,403);
  assert.equal((await appel({action:'push',operation:'activer',ligue:'b0000000-0000-4000-8000-000000000001',abonnement})).status,404);
