@@ -51,6 +51,7 @@
 .ec-terrain:active { cursor: grabbing; }
 .ec-terrain [data-numero] { cursor: pointer; outline: none; }
 .ec-terrain.ec-placement-actif [data-numero] { cursor: grab; }
+.ec-terrain [data-numero][aria-disabled=true] { cursor: grab; }
 .ec-terrain [data-numero]:focus-visible .ec-cible-joueur { stroke: #fff0bc; stroke-width: .3; }
 .ec-terrain.ec-relecture [data-numero], .ec-terrain.ec-navigation-libre [data-numero] { cursor: grab; }
 .ec .rg-canvas-groupe, .ec-badge-joueur, .ec-selection-joueur { pointer-events: none; }
@@ -108,6 +109,10 @@
 .ec-touche > p:first-of-type { color: var(--brume); font-size: 12px; }
 .ec-placement > .ec-info { grid-column: 1/-1; margin: 0; }
 .ec-placement > .btn { grid-column: 1/-1; }
+.ec-joueurs-lies { color: #bacdb9; font-size: 11px; line-height: 1.6; margin: 8px 0 12px; }
+.ec fieldset.ec-sortie-melee { display: grid; gap: 12px; padding: 16px; border: 1px solid #648675; border-radius: 6px; margin: 0 0 18px; background: #112d242f; }
+.ec-sortie-melee legend { color: #ead3a2; font-size: 13px; padding: 0 6px; }
+.ec-sortie-melee p { margin: 0; }
 .ec-etapes { display: grid; gap: 6px; }
 .ec-etapes h3 { font-size: 13px; margin: 4px 0; color: #ead3a2; }
 .ec-etapes .ec-plan { font-size: 11px; padding: 9px; }

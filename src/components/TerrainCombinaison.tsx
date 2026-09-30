@@ -8,6 +8,7 @@ import { terrainSimulationCombinaison } from '../lib/ligue/simulationCombinaison
 import { maillotDeSecours, type MaillotMatch } from '../lib/moteur/apparenceMatch';
 import { SpriteRugbymanMemo } from './match/SpriteRugbyman';
 import { bornerVueCombinaison, commencerNavigation, poursuivreNavigation, type GesteNavigation, type VueCombinaison } from '../lib/ligue/navigationCombinaisons';
+import { joueursEngagesCombinaison } from '../lib/ligue/placementsCombinaisons';
 
 const borner = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -71,6 +72,9 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maill
   const action = actionIndex === null ? undefined : v.actions[actionIndex];
   const destination = action?.type === 'course' || action?.type === 'leurre';
   const etape = temps === null ? -1 : Math.min(Math.floor(temps), traces.length - 1);
+  const engages = useMemo(() => joueursEngagesCombinaison(c, v), [c, v]);
+  const verrouilles = temps === null && !apresConquete ? engages : [];
+  const joueurVerrouille = joueur !== null && verrouilles.includes(joueur);
   const navigationLibre = joueur === null && actionIndex === null || temps !== null || bloque;
 
   useEffect(() => {
@@ -85,6 +89,7 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maill
   useEffect(() => { if (temps !== null && temps >= traces.length) setLecture(false); }, [temps, traces.length]);
   useEffect(() => { setTemps(null); setLecture(false); }, [v, actionIndex, c.phase, c.zone, c.couloir]);
   useEffect(() => { setApresConquete(false); }, [c.phase, c.zone, c.couloir]);
+  useEffect(() => { if (joueurVerrouille) selectionner(null, true); }, [joueurVerrouille, selectionner]);
   useEffect(() => { contacts.current.clear(); geste.current = null; setFantome(null); }, [agrandi, c.id, c.phase, c.zone, c.couloir, vue]);
   useEffect(() => {
     const svg = terrainRef.current;
@@ -126,6 +131,7 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maill
     return { x: Math.round(borner(p.x, .7, 99.3) * 10) / 10, y: Math.round(borner(p.y, .7, 69.3) * 10) / 10 };
   };
   const placerSurTerrain = (numero: number, p: PointCombinaison) => {
+    if (verrouilles.includes(numero)) return;
     if (c.phase === 'touche' && numero === 2) return;
     if (c.phase === 'touche' && numero === v.sauteur) {
       const distance = Math.round(borner(c.couloir === 'droite' ? 70 - p.y : p.y, v.sauteur > 8 ? 15.5 : 5, 25) * 10) / 10;
@@ -149,7 +155,7 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maill
     const numero = Number((e.target as Element).closest('[data-numero]')?.getAttribute('data-numero')) || null;
     const p = pointDuClic(e);
     const decalageJoueur = numero === null ? { x: 0, y: 0 } : { x: positions[numero].x - p.x, y: positions[numero].y - p.y };
-    geste.current = { numero, placement: !navigationLibre && numero !== null && action?.type !== 'passe', decalageJoueur, debut: point, glisse: false, multiple: false, navigation };
+    geste.current = { numero, placement: !navigationLibre && numero !== null && !verrouilles.includes(numero) && action?.type !== 'passe', decalageJoueur, debut: point, glisse: false, multiple: false, navigation };
   };
   const bougerTerrain = (e: PointerEvent<SVGSVGElement>) => {
     const g = geste.current;
@@ -185,6 +191,7 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maill
       return;
     }
     if (g.numero !== null) {
+      if (verrouilles.includes(g.numero)) return;
       selectionner(joueur === g.numero && actionIndex === null ? null : g.numero);
       if (action?.type === 'passe') modifierAction({ type: 'passe', destinataire: g.numero });
     } else if (!navigationLibre) {
@@ -213,6 +220,7 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maill
         </div>
         <div className="ec-navigation"><button className="btn fantome" aria-pressed={navigationLibre} onClick={() => selectionner(null, true)}><Icone nom="plein-ecran" taille={15} />Naviguer</button><span>{navigationLibre ? temps !== null ? 'Navigation pendant l’animation' : bloque ? 'Navigation du terrain' : 'Aucun joueur sélectionné' : actionIndex !== null ? `Modifier l’action ${actionIndex + 1}` : `N° ${joueur} sélectionné`}</span><button className="btn fantome ec-recentrer" onClick={() => choisirVue(vue)}><Icone nom="cible" taille={15} />Recentrer</button></div>
         <div className="ec-moment-touche" role="group" aria-label="Moment du placement"><button className="btn fantome" aria-pressed={!apresConquete} onClick={() => { setApresConquete(false); setTemps(null); setLecture(false); }}>{c.phase === 'touche' ? 'Au lancer' : c.phase === 'melee' ? 'À la mêlée' : 'Au ruck'}</button><button className="btn fantome" aria-pressed={apresConquete} onClick={() => { setApresConquete(true); setTemps(null); setLecture(false); }}>{c.phase === 'touche' ? 'Après réception' : 'Après sortie'}</button></div>
+        {verrouilles.length > 0 && <p className="ec-joueurs-lies">{c.phase === 'melee' ? 'Pack lié' : 'Joueurs liés au ruck'} : {verrouilles.map(n => `n° ${n}`).join(', ')}. Choisis « Après sortie » pour préparer leurs déplacements.</p>}
         <div className="ec-cadre-terrain">
           <svg ref={terrainRef} className={`ec-terrain ${navigationLibre ? 'ec-navigation-libre' : 'ec-placement-actif'} ${temps !== null ? 'ec-relecture' : ''}`} viewBox={`${coin.x - 3} ${coin.y - 5} ${largeur + 6} ${hauteur + 8}`} aria-label="Terrain 2D de création de combinaisons" tabIndex={0} aria-describedby={`${marqueur}-aide`} onPointerDown={toucherTerrain}
             onPointerMove={bougerTerrain} onPointerUp={e => finirTerrain(e)} onPointerCancel={e => finirTerrain(e, true)} onLostPointerCapture={e => finirTerrain(e, true)} onKeyDown={e => {
@@ -237,8 +245,9 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maill
             </g>)}
             {[...simulation.pions].sort((a, b) => a.y - b.y || a.numero - b.numero).map(pion => {
               const n = pion.numero; const p = positions[n];
-              return <g key={n} data-numero={n} role="button" aria-pressed={joueur === n && !navigationLibre} tabIndex={bloque || temps !== null ? -1 : 0} aria-label={`Sélectionner le numéro ${n}${joueurs[n] ? `, ${joueurs[n]}` : ''}`} onKeyDown={e => {
-              if (bloque || temps !== null) return;
+              const lie = verrouilles.includes(n);
+              return <g key={n} data-numero={n} role="button" aria-disabled={lie || bloque || temps !== null} aria-pressed={joueur === n && !navigationLibre && !lie} tabIndex={lie || bloque || temps !== null ? -1 : 0} aria-label={lie ? `Numéro ${n} lié ${c.phase === 'melee' ? 'à la mêlée' : 'au ruck'}` : `Sélectionner le numéro ${n}${joueurs[n] ? `, ${joueurs[n]}` : ''}`} onKeyDown={e => {
+              if (lie || bloque || temps !== null) return;
               if (e.key === 'Escape') { if (!navigationLibre) { e.stopPropagation(); selectionner(null, true); } return; }
               e.stopPropagation();
               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectionner(joueur === n && actionIndex === null ? null : n); if (action?.type === 'passe') modifierAction({ type: 'passe', destinataire: n }); }
@@ -271,6 +280,10 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maill
         <p id={`${marqueur}-aide`} className="ec-aide">{navigationLibre ? `Glisse un doigt pour déplacer la carte, pince avec deux doigts pour zoomer.${temps !== null ? ' Reviens à l’édition pour sélectionner un joueur.' : bloque ? '' : ' Appuie sur un joueur pour le sélectionner.'}` : destination ? 'Appuie sur le terrain pour choisir la destination. Glisse le fond pour déplacer la carte.' : action?.type === 'passe' ? 'Appuie sur le joueur qui doit recevoir cette passe. Glisse pour déplacer la carte.' : 'Glisse un joueur pour le placer, ou appuie sur le terrain. Glisse le fond pour déplacer la carte ; pince avec deux doigts pour zoomer.'}</p>
       </div>
       <aside className="ec-visualiseur-reglages">
+        {c.phase === 'melee' && <fieldset disabled={bloque || temps !== null} className="ec-sortie-melee"><legend>Sortie de mêlée</legend>
+          <label>Départ du ballon<select value={v.depart} onChange={e => modifierVariante({ ...v, depart: Number(e.target.value) })}><option value={9}>Sortie du n° 9{joueurs[9] ? ` · ${joueurs[9]}` : ''}</option><option value={8}>Départ du n° 8{joueurs[8] ? ` · ${joueurs[8]}` : ''}</option></select></label>
+          <p className="ec-info">{v.depart === 8 ? 'Le n° 8 ramasse à l’arrière de la mêlée. Choisis ensuite sa course ou sa passe dans l’enchaînement.' : 'Le n° 9 sort le ballon et lance l’enchaînement.'}</p>
+        </fieldset>}
         {c.phase === 'touche' && <fieldset disabled={bloque} className="ec-touche"><legend>Préparer le lancer</legend><p>Le n° 2 lance depuis la touche.</p>
           <label>{lancerLong ? 'Receveur du lancer' : 'Sauteur'}{numeros(v.sauteur, sauteur => modifierVariante({ ...v, sauteur }), n => n !== 2 && (lancerLong || n <= 8))}</label>
           <label>Joueurs dans l’alignement<select value={touche.alignes} onChange={e => modifierVariante({ ...v, touche: { ...touche, alignes: Number(e.target.value) as 4 | 5 | 7 } })}><option value="4">4 joueurs</option><option value="5">5 joueurs</option><option value="7">7 joueurs</option></select></label>
@@ -282,9 +295,9 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maill
           <label className="ec-case"><input type="checkbox" checked={touche.feinte} onChange={e => modifierVariante({ ...v, touche: { ...touche, feinte: e.target.checked } })} />Feinte au premier bloc</label>
           <p className="ec-info">{lancerLong ? `Le n° ${v.sauteur} part après le lancer et reçoit à ${touche.distance} m, au-delà de l’alignement, sans lift.` : `Lifteurs : ${lifteurs.map(p => `n° ${p.numero}`).join(' et ')}. Le sauteur reçoit à ${touche.distance} m de la touche.`} Ton enchaînement démarre à la réception.</p>
         </fieldset>}
-        <fieldset disabled={bloque || temps !== null} className="ec-placement"><legend>Placer un joueur</legend><label>Joueur à placer<select value={joueur ?? ''} onChange={e => selectionner(e.target.value ? Number(e.target.value) : null, true)}><option value="">Aucun · navigation</option>{Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>N° {n}{joueurs[n] ? ` · ${joueurs[n]}` : ''}</option>)}</select></label>
-          <label>Profondeur (m)<input type="number" disabled={joueur === null || c.phase === 'touche' && (joueur === 2 || joueur === v.sauteur)} min="-35" max="35" step=".5" value={joueur === null ? '' : Math.round((initiales[joueur].x - origine.x) * 10) / 10} onChange={e => { if (joueur !== null) placerSurTerrain(joueur, { ...initiales[joueur], x: origine.x + Number(e.target.value) }); }} /></label>
-          <label>Largeur (m)<input type="number" disabled={joueur === null || c.phase === 'touche' && joueur === 2} min="-65" max="65" step=".5" value={joueur === null ? '' : Math.round((initiales[joueur].y - origine.y) * 10) / 10} onChange={e => { if (joueur !== null) placerSurTerrain(joueur, { ...initiales[joueur], y: origine.y + Number(e.target.value) }); }} /></label>
+        <fieldset disabled={bloque || temps !== null} className="ec-placement"><legend>Placer un joueur</legend><label>Joueur à placer<select value={joueur ?? ''} onChange={e => selectionner(e.target.value ? Number(e.target.value) : null, true)}><option value="">Aucun · navigation</option>{Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n} disabled={verrouilles.includes(n)}>N° {n}{joueurs[n] ? ` · ${joueurs[n]}` : ''}{verrouilles.includes(n) ? ' · Lié' : ''}</option>)}</select></label>
+          <label>Profondeur (m)<input type="number" disabled={joueur === null || joueurVerrouille || c.phase === 'touche' && (joueur === 2 || joueur === v.sauteur)} min="-35" max="35" step=".5" value={joueur === null ? '' : Math.round((initiales[joueur].x - origine.x) * 10) / 10} onChange={e => { if (joueur !== null) placerSurTerrain(joueur, { ...initiales[joueur], x: origine.x + Number(e.target.value) }); }} /></label>
+          <label>Largeur (m)<input type="number" disabled={joueur === null || joueurVerrouille || c.phase === 'touche' && joueur === 2} min="-65" max="65" step=".5" value={joueur === null ? '' : Math.round((initiales[joueur].y - origine.y) * 10) / 10} onChange={e => { if (joueur !== null) placerSurTerrain(joueur, { ...initiales[joueur], y: origine.y + Number(e.target.value) }); }} /></label>
           <p className="ec-info">{joueur === null ? 'Choisis un joueur pour modifier son placement. « Naviguer » désélectionne les joueurs et les actions.' : c.phase === 'touche' && joueur === 2 ? 'Le lanceur reste sur la touche.' : c.phase === 'touche' && joueur === v.sauteur ? 'Choisis la réception avec la distance du lancer, puis ajoute une course pour déplacer le receveur.' : 'Les positions de départ suivent celles des matchs. Tes déplacements s’appliquent à la sortie de la conquête.'}</p>
           <button className="btn fantome" disabled={!v.placements.length} onClick={() => { modifierVariante({ ...v, placements: [] }); setApresConquete(false); setTemps(null); setLecture(false); }}><Icone nom="formation" taille={15} />Reprendre les positions du match</button>
         </fieldset>

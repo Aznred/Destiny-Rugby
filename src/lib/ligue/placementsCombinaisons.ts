@@ -4,14 +4,15 @@ import { structurerAttaque } from '../moteur/tactique';
 import { coteOuvert, LIGNE_A } from '../moteur/terrain';
 import { origineApercu, toucheValide, type Combinaison, type PointCombinaison, type VarianteCombinaison } from './combinaisons';
 
-const cache = new Map<string, Record<number, PointCombinaison>>();
+interface FormationCombinaison { positions: Record<number, PointCombinaison>; engages: number[] }
+const cache = new Map<string, FormationCombinaison>();
 
 /** Les mêmes fonctions de placement que le match, converties vers les 100 m de l'atelier. */
-export function positionsBaseCombinaison(c: Combinaison, v: VarianteCombinaison): Record<number, PointCombinaison> {
+function formationCombinaison(c: Combinaison, v: VarianteCombinaison): FormationCombinaison {
   const origine = origineApercu(c);
   const cle = JSON.stringify([c.phase, origine, c.phase === 'touche' ? [v.sauteur, toucheValide(v.touche)] : null]);
-  let positions = cache.get(cle);
-  if (!positions) {
+  let formation = cache.get(cle);
+  if (!formation) {
     const mark = { x: origine.x + LIGNE_A, y: origine.y };
     const pions = ORDRE_MAILLOTS.map((poste, i) => creerPion({ id: `atelier-${i + 1}`, nom: `Joueur ${i + 1}`, poste, age: 25, note: 50, potentiel: 50, nation: 'France', regen: false }, i, 'A', false));
     const melee = placementMelee(pions, mark, 'A');
@@ -23,9 +24,21 @@ export function positionsBaseCombinaison(c: Combinaison, v: VarianteCombinaison)
       structurerAttaque({ ouvert: coteOuvert(mark), porteur: null, ballon: mark, origine: mark, lancement: null }, pions, 'A');
       placement = { ...Object.fromEntries(pions.map(p => [p.id, p.cible])), ...placementRuck(pions, mark, 'A') };
     } else if (c.phase === 'touche') placement = placementTouche(pions, mark, 'A', toucheValide(v.touche).alignes, v);
-    positions = Object.fromEntries(pions.map(p => [p.numero, { x: Math.max(.7, Math.min(99.3, placement[p.id].x - LIGNE_A)), y: placement[p.id].y }]));
+    formation = {
+      positions: Object.fromEntries(pions.map(p => [p.numero, { x: Math.max(.7, Math.min(99.3, placement[p.id].x - LIGNE_A)), y: placement[p.id].y }])),
+      engages: c.phase === 'touche' ? [] : pions.filter(p => p.role === c.phase).map(p => p.numero),
+    };
     if (cache.size >= 80) cache.delete(cache.keys().next().value!);
-    cache.set(cle, positions);
+    cache.set(cle, formation);
   }
-  return Object.fromEntries(Object.entries(positions).map(([n, p]) => [n, { ...p }]));
+  return formation;
+}
+
+export function positionsBaseCombinaison(c: Combinaison, v: VarianteCombinaison): Record<number, PointCombinaison> {
+  return Object.fromEntries(Object.entries(formationCombinaison(c, v).positions).map(([n, p]) => [n, { ...p }]));
+}
+
+/** Les joueurs liés sont désignés par le moteur, pas par leur proximité visuelle. */
+export function joueursEngagesCombinaison(c: Combinaison, v: VarianteCombinaison): number[] {
+  return [...formationCombinaison(c, v).engages];
 }

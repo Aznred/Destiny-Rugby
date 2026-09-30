@@ -175,6 +175,13 @@ au relâchement seulement ; le second doigt ou l'annulation l'abandonne.
 `placementsCombinaisons.ts` reprend `placementMelee`, `placementRuck`,
 `placementTouche` et `structurerAttaque` du moteur : mêlée en 3-4-1 avec le 9
 au tunnel, trois avants au ruck et le 9 à sa sortie, pods et ligne arrière.
+`joueursEngagesCombinaison` reprend leurs rôles dans cette formation : les huit
+avants en mêlée et les trois nettoyeurs au ruck ne peuvent être sélectionnés
+ni déplacés avant la sortie, au toucher, au clavier ou dans la liste. Glisser
+sur eux continue de déplacer la carte. « Après sortie » libère leurs placements.
+Le panneau « Sortie de mêlée », aussi présent sur le terrain agrandi, choisit
+explicitement sortie du n° 9 ou départ du n° 8. Le premier porteur est partagé
+par les tracés, la validation du cahier et la reprise réelle du moteur.
 L'éditeur distingue avant/après conquête ; déplacer un joueur ouvre la vue de
 sortie. Le bouton « Reprendre les positions du match » efface les placements
 personnalisés. `placementsPersonnalises` reconnaît seulement le gabarit exact

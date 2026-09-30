@@ -7,6 +7,7 @@ import { alignementCombinaison, choisirCombinaison, choisirVariante, combinaison
 import { imageApercu, positionsApercu, tracesApercu } from '../src/lib/ligue/apercuCombinaisons';
 import { terrainSimulationCombinaison } from '../src/lib/ligue/simulationCombinaisons';
 import { bornerVueCombinaison, commencerNavigation, poursuivreNavigation } from '../src/lib/ligue/navigationCombinaisons';
+import { joueursEngagesCombinaison } from '../src/lib/ligue/placementsCombinaisons';
 import { rugbyAnimations } from '../src/lib/spritesGenerateur/rugbyAnimations';
 import { strategieValide, STRATEGIE_EN_LIGNE_DEFAUT, avancerMatchEnLigne, creerMatchEnLigne } from '../src/lib/ligue/matchCarriere';
 import { preparerCombinaison, demarrerCombinaison, pointSurTerrain, placerCombinaison } from '../src/lib/moteur/combinaisons';
@@ -88,11 +89,39 @@ for (const phase of ['melee', 'ruck'] as const) for (const zone of ['nos22', 'mi
     placement = { ...Object.fromEntries(pions.map(p => [p.id, p.cible])), ...placementRuck(pions, e.ballon, 'A') };
   }
   const apercu = positionsApercu(c, v, true);
+  const lies = joueursEngagesCombinaison(c, v);
+  assert.deepEqual(lies, pions.filter(p => p.role === phase).map(p => p.numero), 'Seuls les joueurs réellement liés au regroupement sont verrouillés');
+  assert.equal(lies.length, phase === 'melee' ? 8 : 3);
+  assert.ok(!lies.includes(9), 'Le demi reste disponible pour organiser la sortie');
   for (const p of pions) assert.deepEqual(apercu[p.numero], { x: Math.max(.7, Math.min(99.3, placement[p.id].x - LIGNE_A)), y: placement[p.id].y });
   assert.equal(apercu[9].x - origine.x, phase === 'melee' ? -.5 : -1.5);
   const rendu = terrainSimulationCombinaison(c, v, imageApercu(c, v, null), null, {});
   assert.equal(rendu.phase, phase);
-  if (phase === 'ruck') assert.equal(rendu.gestes?.filter(g => g.clip === 'ruck_bind').length, 3);
+  if (phase === 'ruck') assert.deepEqual(rendu.gestes?.filter(g => g.clip === 'ruck_bind').map(g => Number(g.joueurId.split('-').at(-1))), lies);
+}
+// La sortie choisie survit à la sauvegarde et à une vraie conquête du moteur,
+// puis le premier geste part du 8 lié à l'arrière ou du demi de mêlée.
+for (const cote of ['A', 'B'] as const) for (const depart of [8, 9]) {
+  const c = creerCombinaison(`depart-melee-${cote}-${depart}`);
+  c.variantes[0].depart = depart;
+  c.variantes[0].actions = [{ type: 'course', destination: { x: 8, y: 0 } }, { type: 'passe', destinataire: 10 }];
+  const valide = combinaisonsValides([c])[0]; const v = valide.variantes[0];
+  assert.equal(v.depart, depart);
+  const initiales = positionsApercu(valide, v, true);
+  assert.equal(tracesApercu(valide, v)[0].acteur, depart);
+  assert.deepEqual(tracesApercu(valide, v)[0].de, initiales[depart]);
+  assert.equal(imageApercu(valide, v, .5).porteur, depart);
+  const e = creerMatch('Stade Toulousain', 'RC Toulon', effectifA, effectifB, 27, 24, c.id);
+  e.phase = 'melee'; e.possession = cote; e.porteur = null; e.ballon = { x: 61, y: 35 };
+  e.placement = placementMelee(e.pions, e.ballon, cote);
+  for (const p of e.pions) { p.pos = { ...e.placement[p.id] }; p.cible = { ...p.pos }; p.puissance = p.plaquage = p.endurance = p.cote === cote ? 90 : 40; p.discipline = 99; }
+  e.plansCombinaisons = { [cote]: [valide] }; preparerCombinaison(e, 'melee');
+  e.minuteur = 0; e.rng = () => .99; avancer(e, .15);
+  assert.equal(e.phase, 'jeuCourant');
+  assert.equal(e.combinaisonEnCours?.variante.depart, depart);
+  assert.equal(e.porteur?.numero, depart, `La mêlée ${cote} sort réellement par le n° ${depart}`);
+  assert.deepEqual(e.ballon, e.porteur!.pos);
+  assert.ok(e.porteur!.stats.courses > 0);
 }
 const ancienPlacement = structuredClone(base.variantes[0]);
 ancienPlacement.placements = [9, 10, 12, 13, 14, 15].map((numero, i) => ({ numero, x: -2 - i * 2, y: -12 + i * 6 }));
@@ -356,4 +385,4 @@ try {
 } finally {
   rmSync(dossier, { recursive: true, force: true });
 }
-console.log('Combinaisons : navigation et pincement, placements du match, animation, lancers 5–25 m vers avants/demis/arrière A/B sur les deux touches, passes, moteur en ligne, sauvegarde et bêta Kiri vérifiés.');
+console.log('Combinaisons : joueurs liés et sorties de mêlée 8/9 A/B, navigation et pincement, placements du match, animation, lancers 5–25 m vers avants/demis/arrière A/B sur les deux touches, passes, moteur en ligne, sauvegarde et bêta Kiri vérifiés.');

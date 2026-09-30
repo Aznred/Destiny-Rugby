@@ -1,7 +1,7 @@
 import type { PionDirect, TerrainDirect } from './matchCarriere';
 import type { Combinaison, VarianteCombinaison } from './combinaisons';
-import { alignementCombinaison, lancerApresBloc, origineApercu, toucheValide } from './combinaisons';
-import { positionsBaseCombinaison } from './placementsCombinaisons';
+import { alignementCombinaison, lancerApresBloc, toucheValide } from './combinaisons';
+import { joueursEngagesCombinaison } from './placementsCombinaisons';
 import { ORDRE_MAILLOTS } from '../moteur/entites';
 import type { imageApercu } from './apercuCombinaisons';
 
@@ -19,8 +19,7 @@ export function terrainSimulationCombinaison(c: Combinaison, v: VarianteCombinai
   if (temps === null) {
     if (!apresConquete && c.phase !== 'touche') {
       terrain.phase = c.phase;
-      const base = positionsBaseCombinaison(c, v); const origine = origineApercu(c);
-      if (c.phase === 'ruck') for (const p of pions) if (p.numero <= 8 && Math.hypot(base[p.numero].x - origine.x, base[p.numero].y - origine.y) < 2.1) terrain.gestes!.push({ id: `atelier-ruck-${p.numero}`, joueurId: p.id, clip: 'ruck_bind', debut: 0, duree: 1 });
+      if (c.phase === 'ruck') for (const numero of joueursEngagesCombinaison(c, v)) terrain.gestes!.push({ id: `atelier-ruck-${numero}`, joueurId: id(numero), clip: 'ruck_bind', debut: 0, duree: 1 });
     }
     return terrain;
   }

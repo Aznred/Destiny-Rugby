@@ -11,7 +11,10 @@
   ralenti, progression et étapes, tracés affichables à volonté. Boutons regroupés
   par usage et commandes adaptées au téléphone. Mêlées en 3-4-1, sortie du 9 au
   ruck et ligne arrière reprises des placements du moteur des matchs, vues
-  avant/après conquête et retour aux positions du match. Placement du XV, passes vers les numéros choisis,
+  avant/après conquête et retour aux positions du match. Les avants liés à la
+  mêlée et les nettoyeurs du ruck sont verrouillés jusqu’à la sortie ; le ballon
+  peut partir du n° 9 ou du n° 8 en mêlée, avec sa course ou sa passe programmée.
+  Placement du XV, passes vers les numéros choisis,
   courses, appels/leurres et sept intentions au pied. Jusqu’à 12 combinaisons,
   chacune avec trois variantes pondérées et dix actions. Déclenchement sur mêlée,
   touche ou ruck, selon les 22 et le côté du terrain. En mode « Mes combinaisons »,
