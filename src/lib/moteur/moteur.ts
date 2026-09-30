@@ -23,7 +23,7 @@
 
 import { graine, scorePossible } from '../championnat.js';
 import type { Coequipier } from '../effectif.js';
-import { cibleCourseCombinaison, demarrerCombinaison, joueurCombinaison, pointSurTerrain, preparerCombinaison } from './combinaisons.js';
+import { cibleCourseCombinaison, demarrerCombinaison, joueurCombinaison, lancerAppelsCombinaison, pointSurTerrain, preparerCombinaison } from './combinaisons.js';
 import type { PosteId, TactiqueManager } from '../../types.js';
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import {
@@ -612,6 +612,7 @@ function tick(e: EtatMatch): void {
   // tout le monde toutes les trois images ; si le pilotage passait avant, la
   // consigne du joueur serait écrasée deux images sur trois et son pion
   // « hésiterait » au lieu de foncer.
+  lancerAppelsCombinaison(e);
   if (e.controle) piloterMonJoueur(e);
 
   // La formation est recalculée toutes les trois images. Pendant un vol, le
@@ -1981,7 +1982,9 @@ function executerCombinaison(e: EtatMatch, porteur: Pion, pression: number): boo
     e.lancement = null;
     return false;
   }
-  const action = c.variante.actions[c.index];
+  lancerAppelsCombinaison(e);
+  const etape = c.etapes[c.index];
+  const action = etape?.actions.find(a => a.action.type !== 'leurre')?.action ?? etape?.actions[0]?.action;
   if (!action) { e.combinaisonEnCours = undefined; e.lancement = null; return false; }
   const suivante = () => { c.index++; c.depuis = e.sim; };
   if (action.type === 'leurre') {
@@ -2838,6 +2841,22 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
   e.ligneDef = e.ballon.x + sa * (quoi === 'touche' ? 10 : quoi === 'melee' ? 5 : 10);
   e.horsJeu = e.ligneDef;
   if (quoi === 'melee' || quoi === 'touche') preparerCombinaison(e, quoi);
+}
+
+/** Installe un exercice local avec les conquêtes et les placements du match. */
+export function installerSituationCombinaison(e: EtatMatch, phase: 'melee' | 'touche' | 'ruck', lieu: Vec): void {
+  e.possession = 'A'; e.ballon = { ...lieu }; e.origine = { ...lieu };
+  e.ligneAvantage = lieu.x; e.cibleRenvoi = null;
+  if (phase !== 'ruck') { arret(e, phase, 'A', lieu); return; }
+  // La même base de départ que l'atelier désigne les nettoyeurs du ruck.
+  const base = placementMelee(e.pions, lieu, 'A');
+  for (const p of e.pions) if (base[p.id]) { p.pos = { ...base[p.id] }; p.cible = { ...p.pos }; stopper(p); }
+  formerRuck(e, lieu);
+  placerEquipes(e);
+  for (const p of e.pions) {
+    const cible = e.placement?.[p.id] ?? p.cible;
+    p.pos = { ...cible }; p.cible = { ...cible }; stopper(p);
+  }
 }
 
 function phaseMelee(e: EtatMatch): void {

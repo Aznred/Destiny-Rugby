@@ -1,8 +1,9 @@
-import { alignementCombinaison, lancerApresBloc, origineApercu, placementsPersonnalises, receptionTouche, toucheValide, type ActionCombinaison, type Combinaison, type PointCombinaison, type VarianteCombinaison } from './combinaisons';
+import { alignementCombinaison, etapesCombinaison, lancerApresBloc, origineApercu, placementsPersonnalises, receptionTouche, toucheValide, type ActionCombinaison, type Combinaison, type PointCombinaison, type VarianteCombinaison } from './combinaisons';
 import { positionsBaseCombinaison } from './placementsCombinaisons';
 
 const borner = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 export interface TraceCombinaison {
+  debut: number;
   de: PointCombinaison;
   vers: PointCombinaison;
   acteur: number;
@@ -42,32 +43,46 @@ export function tracesApercu(c: Combinaison, v: VarianteCombinaison): TraceCombi
       const leurre = alignementCombinaison(v).find(f => f.numero !== v.sauteur);
       if (leurre) {
         const de = positionsApercu(c, v, true)[leurre.numero];
-        traces.push({ de, vers: { ...de, y: de.y + (c.couloir === 'droite' ? -2.2 : 2.2) }, acteur: leurre.numero, libelle: `Feinte au premier bloc du n° ${leurre.numero}` });
+        traces.push({ debut: traces.length, de, vers: { ...de, y: de.y + (c.couloir === 'droite' ? -2.2 : 2.2) }, acteur: leurre.numero, libelle: `Feinte au premier bloc du n° ${leurre.numero}` });
       }
     }
-    traces.push({ de: { ...positions[2] }, vers: { ...positions[v.sauteur] }, acteur: 2, libelle: `Lancer du n° 2 vers le n° ${v.sauteur}` });
+    traces.push({ debut: traces.length, de: { ...positions[2] }, vers: { ...positions[v.sauteur] }, acteur: 2, libelle: `Lancer du n° 2 vers le n° ${v.sauteur}` });
   }
-  for (const [i, action] of v.actions.entries()) {
+  const avantSortie = traces.length;
+  for (const [etapeIndex, etape] of etapesCombinaison(v.actions).entries()) {
+    const debut = avantSortie + etapeIndex;
+    const nouvelles: Record<number, PointCombinaison> = {};
+    for (const { action } of etape.actions) if (action.type === 'course' || action.type === 'leurre') {
+      nouvelles[action.type === 'leurre' ? action.numero : porteur] = { x: borner(origine.x + action.destination.x, 1, 99), y: borner(origine.y + action.destination.y, 1, 69) };
+    }
+    for (const { action, index: i } of etape.actions) {
     const acteur = action.type === 'leurre' ? action.numero : porteur;
     // Un avant qui part immédiatement après la prise démarre de l'alignement,
     // sans se téléporter vers son placement de sortie.
-    const departReception = c.phase === 'touche' && i === 0 && acteur <= 8 && (action.type === 'course' || action.type === 'leurre');
+    const departReception = c.phase === 'touche' && etapeIndex === 0 && acteur <= 8 && (action.type === 'course' || action.type === 'leurre');
     const de = { ...(departReception ? positionsReception(c, v)[acteur] : positions[acteur]) };
-    const vers = action.type === 'passe' ? { ...positions[action.destinataire] }
+    const ciblePasse = action.type === 'passe' ? nouvelles[action.destinataire] : undefined;
+    const vers = action.type === 'passe' ? ciblePasse
+      ? { x: positions[action.destinataire].x + (ciblePasse.x - positions[action.destinataire].x) * .88, y: positions[action.destinataire].y + (ciblePasse.y - positions[action.destinataire].y) * .88 }
+      : { ...positions[action.destinataire] }
       : action.type === 'course' || action.type === 'leurre' ? { x: borner(origine.x + action.destination.x, 1, 99), y: borner(origine.y + action.destination.y, 1, 69) }
         : { x: borner(de.x + (action.intention === 'drop' ? 20 : 30), 1, 99), y: action.intention === 'degagement' || action.intention === 'cinquanteVingtDeux' ? c.couloir === 'droite' ? 69 : 1 : de.y };
     const libelle = action.type === 'passe' ? `Passe du n° ${porteur} vers le n° ${action.destinataire}`
       : action.type === 'course' ? `Course du n° ${porteur}` : action.type === 'leurre' ? `Appel du n° ${action.numero}` : `Jeu au pied du n° ${porteur}`;
-    traces.push({ de, vers, acteur, action, indexAction: i, libelle });
-    if (action.type === 'passe') porteur = action.destinataire;
-    if (action.type === 'course' || action.type === 'leurre') positions[acteur] = vers;
+    traces.push({ debut, de, vers, acteur, action, indexAction: i, libelle });
+    }
+    Object.assign(positions, nouvelles);
+    const principale = etape.actions.find(a => a.action.type !== 'leurre')?.action;
+    if (principale?.type === 'passe') porteur = principale.destinataire;
   }
   return traces;
 }
 
+export function dureeApercu(traces: TraceCombinaison[]): number { return Math.max(0, ...traces.map(t => t.debut + 1)); }
+
 export function imageApercu(c: Combinaison, v: VarianteCombinaison, temps: number | null) {
   const traces = tracesApercu(c, v);
-  const debutSortie = traces.findIndex(t => t.action !== undefined);
+  const debutSortie = traces.find(t => t.action !== undefined)?.debut ?? -1;
   const avantSortie = c.phase === 'touche' && (temps === null || temps < (debutSortie < 0 ? traces.length : debutSortie));
   const positions = positionsApercu(c, v, temps === null || avantSortie);
   const mouvements: Record<number, PointCombinaison> = {};
@@ -87,13 +102,13 @@ export function imageApercu(c: Combinaison, v: VarianteCombinaison, temps: numbe
       if (avance < 1) mouvements[n] = { x: (cible.x - de.x) / .65, y: (cible.y - de.y) / .65 };
     }
   }
-  if (temps !== null) for (const [i, trace] of traces.entries()) {
-    if (temps < i) break;
-    const avance = borner(temps - i, 0, 1);
+  if (temps !== null) for (const trace of traces) {
+    if (temps < trace.debut) break;
+    const avance = borner(temps - trace.debut, 0, 1);
     const point = { x: trace.de.x + (trace.vers.x - trace.de.x) * avance, y: trace.de.y + (trace.vers.y - trace.de.y) * avance };
     const feinte = trace.action === undefined && trace.acteur !== 2;
     const lancer = trace.action === undefined && trace.acteur === 2;
-    const enCours = temps < i + 1;
+    const enCours = temps < trace.debut + 1;
     if (trace.action?.type === 'course' || trace.action?.type === 'leurre') {
       positions[trace.acteur] = point;
       if (enCours) mouvements[trace.acteur] = { x: trace.vers.x - trace.de.x, y: trace.vers.y - trace.de.y };

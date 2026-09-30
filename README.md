@@ -16,7 +16,15 @@
   peut partir du n° 9 ou du n° 8 en mêlée, avec sa course ou sa passe programmée.
   Placement du XV, passes vers les numéros choisis,
   courses, appels/leurres et sept intentions au pied. Jusqu’à 12 combinaisons,
-  chacune avec trois variantes pondérées et dix actions. Déclenchement sur mêlée,
+  chacune avec trois variantes pondérées et dix étapes (80 gestes maximum).
+  Dans chaque étape, un geste du porteur peut démarrer avec plusieurs appels :
+  « Ajouter un déplacement simultané » choisit le joueur et sa destination sur
+  le terrain. Réorganisation par étape et séparation des gestes possibles.
+  Le mode « Avec opposition » teste le cahier en 15 contre 15 : ton XV face à
+  une défense d’entraînement de niveau 65, glissée, blitz ou repli. Les placements,
+  conquêtes disputées, passes et plaquages viennent du moteur du match ; lecture,
+  pause, progression, bilan et nouvel essai restent disponibles. Les essais sont
+  locaux et ne modifient pas les résultats de la ligue. Déclenchement sur mêlée,
   touche ou ruck, selon les 22 et le côté du terrain. En mode « Mes combinaisons »,
   le serveur exécute le cahier enregistré ; les situations non couvertes suivent
   le plan habituel. En touche : lanceur n° 2, sauteur choisi, alignement à 4/5/7,

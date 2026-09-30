@@ -1,4 +1,4 @@
-import { choisirCombinaison, choisirVariante, lancerApresBloc, placementsPersonnalises, receptionTouche, toucheValide, type Combinaison, type PhaseCombinaison, type PointCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
+import { choisirCombinaison, choisirVariante, etapesCombinaison, lancerApresBloc, placementsPersonnalises, receptionTouche, toucheValide, type Combinaison, type EtapeCombinaison, type PhaseCombinaison, type PointCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
 import type { EtatMatch } from './etat.js';
 import { stopper, type Pion } from './entites.js';
 import { placementTouche } from './phasesArretees.js';
@@ -12,6 +12,7 @@ export interface CombinaisonEnCours extends CombinaisonPreparee {
   depuis: number;
   debut: number;
   courses: Record<number, PointCombinaison>;
+  etapes: EtapeCombinaison[];
 }
 export function joueurCombinaison(e: EtatMatch, cote: Cote, numero: number): Pion | undefined {
   return e.pions.find(p => p.cote === cote && p.numero === numero && p.surLeTerrain && p.sanction <= 0);
@@ -57,7 +58,7 @@ export function demarrerCombinaison(e: EtatMatch, lieu: Vec, porteurImpose?: Pio
   const localY = sens(preparee.cote) === 1 ? origine.y : 70 - origine.y;
   const enCours: CombinaisonEnCours = { ...preparee, origine: { ...origine },
     miroir: preparee.plan.couloir === 'tous' && localY > 35 ? -1 : 1,
-    index: 0, depuis: e.sim, debut: e.sim, courses: {} };
+    index: 0, depuis: e.sim, debut: e.sim, courses: {}, etapes: etapesCombinaison(preparee.variante.actions) };
   e.combinaisonEnCours = enCours;
   const chaine = [premier, ...preparee.variante.actions.flatMap(a => a.type === 'passe' ? [joueurCombinaison(e, preparee.cote, a.destinataire)!] : [])];
   e.lancement = { type: 'large', chaine, index: 0, libelle: `${preparee.plan.nom} · ${preparee.variante.nom}` };
@@ -73,6 +74,7 @@ export function pointSurTerrain(c: CombinaisonEnCours, p: PointCombinaison): Vec
 export function placerCombinaison(e: EtatMatch): void {
   const c = e.combinaisonEnCours;
   if (!c || c.cote !== e.possession || e.phase !== 'jeuCourant') return;
+  lancerAppelsCombinaison(e);
   for (const placement of placementsPersonnalises(c.variante)) {
     const p = joueurCombinaison(e, c.cote, placement.numero);
     if (!p || p === e.porteur || e.vol?.receveur === p) continue;
@@ -90,8 +92,20 @@ export function placerCombinaison(e: EtatMatch): void {
     if (p && p !== e.porteur && e.vol?.receveur !== p) p.cible = pointSurTerrain(c, destination);
   }
 }
+/** Les appels démarrent au même tick que le geste du porteur. */
+export function lancerAppelsCombinaison(e: EtatMatch): void {
+  const c = e.combinaisonEnCours;
+  if (!c || c.cote !== e.possession || !(e.phase === 'jeuCourant' || e.phase === 'ballonEnLAir' && e.vol?.type === 'passe')) return;
+  // Le geste suivant attend la réception. Les appels déjà lancés continuent
+  // pendant le vol ; le receveur garde la priorité pour rejoindre le ballon.
+  if (e.phase === 'jeuCourant') for (const { action } of c.etapes[c.index]?.actions ?? []) if (action.type === 'leurre') c.courses[action.numero] = action.destination;
+  for (const [numero, destination] of Object.entries(c.courses)) {
+    const p = joueurCombinaison(e, c.cote, Number(numero));
+    if (p && p !== e.porteur && p !== e.vol?.receveur) p.cible = pointSurTerrain(c, destination);
+  }
+}
 export function cibleCourseCombinaison(e: EtatMatch): Vec | undefined {
   const c = e.combinaisonEnCours;
-  const action = c?.variante.actions[c.index];
+  const action = c?.etapes[c.index]?.actions.find(a => a.action.type === 'course')?.action;
   return c && c.cote === e.porteur?.cote && action?.type === 'course' ? pointSurTerrain(c, action.destination) : undefined;
 }

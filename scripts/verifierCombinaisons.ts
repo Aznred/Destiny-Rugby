@@ -3,8 +3,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { alignementCombinaison, choisirCombinaison, choisirVariante, combinaisonsValides, creerCombinaison, MAX_COMBINAISONS, origineApercu, placementsPersonnalises, receptionTouche, toucheValide } from '../src/lib/ligue/combinaisons';
-import { imageApercu, positionsApercu, tracesApercu } from '../src/lib/ligue/apercuCombinaisons';
+import { alignementCombinaison, choisirCombinaison, choisirVariante, combinaisonsValides, creerCombinaison, erreursVariante, etapesCombinaison, MAX_COMBINAISONS, origineApercu, placementsPersonnalises, receptionTouche, toucheValide } from '../src/lib/ligue/combinaisons';
+import { dureeApercu, imageApercu, positionsApercu, tracesApercu } from '../src/lib/ligue/apercuCombinaisons';
+import { imageOppositionCombinaison, simulerOppositionCombinaison } from '../src/lib/ligue/oppositionCombinaisons';
 import { terrainSimulationCombinaison } from '../src/lib/ligue/simulationCombinaisons';
 import { bornerVueCombinaison, commencerNavigation, poursuivreNavigation } from '../src/lib/ligue/navigationCombinaisons';
 import { joueursEngagesCombinaison } from '../src/lib/ligue/placementsCombinaisons';
@@ -73,6 +74,89 @@ assert.ok(combinaisonsValides([ancienneTouche])[0], 'Un cahier ancien reste vali
 
 const effectifA = effectifDuClub('Stade Toulousain', 1);
 const effectifB = effectifDuClub('RC Toulon', 1);
+// Le porteur et deux soutiens se déplacent sur la même étape, pas en trois
+// secondes successives. Les anciennes actions conservent leur propre étape.
+const parallele = creerCombinaison('parallele');
+const pv = parallele.variantes[0];
+pv.actions = [{ type: 'course', destination: { x: 12, y: 0 } },
+  { type: 'leurre', numero: 12, destination: { x: 8, y: -12 }, simultanee: true },
+  { type: 'leurre', numero: 13, destination: { x: 6, y: -20 }, simultanee: true },
+  { type: 'passe', destinataire: 10 }];
+assert.equal(etapesCombinaison(pv.actions).length, 2);
+assert.equal(etapesCombinaison(base.variantes[0].actions).length, base.variantes[0].actions.length);
+assert.deepEqual(combinaisonsValides([parallele])[0], parallele, 'Les gestes simultanés survivent à la validation');
+assert.deepEqual(erreursVariante('melee', pv), []);
+assert.equal(dureeApercu(tracesApercu(parallele, pv)), 2);
+const milieuParallele = imageApercu(parallele, pv, .5);
+for (const n of [9, 12, 13]) {
+  const trace = milieuParallele.traces.find(t => t.acteur === n && t.debut === 0)!;
+  assert.deepEqual(milieuParallele.positions[n], { x: (trace.de.x + trace.vers.x) / 2, y: (trace.de.y + trace.vers.y) / 2 });
+  assert.ok(Math.hypot(milieuParallele.mouvements[n].x, milieuParallele.mouvements[n].y) > 0);
+}
+assert.deepEqual(imageApercu(parallele, pv, .5), milieuParallele, 'Retour en arrière fidèle des appels simultanés');
+const impossible = structuredClone(parallele);
+impossible.variantes[0].actions[1] = { type: 'passe', destinataire: 12, simultanee: true };
+assert.ok(erreursVariante('melee', impossible.variantes[0]).some(e => e.type === 'ballonsMultiples'));
+assert.deepEqual(combinaisonsValides([impossible]), [], 'Deux ordres du ballon dans une même étape sont refusés');
+impossible.variantes[0].actions[1] = { type: 'leurre', numero: 9, destination: { x: 2, y: 0 }, simultanee: true };
+assert.deepEqual(combinaisonsValides([impossible]), [], 'Un porteur ne peut courir vers deux points à la fois');
+const receptionMobile = structuredClone(parallele);
+receptionMobile.variantes[0].actions = [{ type: 'passe', destinataire: 10 }, { type: 'leurre', numero: 10, destination: { x: -3, y: -6 }, simultanee: true }];
+const receptionAnimee = imageApercu(receptionMobile, receptionMobile.variantes[0], .95);
+assert.equal(receptionAnimee.porteur, 10);
+assert.deepEqual(receptionAnimee.ballon, receptionAnimee.positions[10], 'Le ballon accompagne le receveur qui court');
+const piedParallele = structuredClone(parallele);
+piedParallele.variantes[0].actions = [{ type: 'pied', intention: 'chandelle' }, pv.actions[1], { type: 'passe', destinataire: 10 }];
+assert.equal(combinaisonsValides([piedParallele])[0].variantes[0].actions.length, 2, 'Le coup de pied garde ses chasseurs simultanés puis termine la combinaison');
+
+// Un vrai exercice de match reprend les deux XV et les formations de conquête.
+let contactsReels = false;
+let animationContact = false;
+for (const phase of ['melee', 'touche', 'ruck'] as const) {
+  const c = creerCombinaison(`opposition-${phase}`, phase), v = c.variantes[0];
+  v.actions = phase === 'touche' ? [{ type: 'passe', destinataire: 9 }, { type: 'course', destination: { x: 20, y: 15 } }]
+    : [{ type: 'course', destination: { x: 20, y: 0 } }, { type: 'leurre', numero: 12, destination: { x: 10, y: -10 }, simultanee: true }];
+  for (const defense of ['glissee', 'blitz', 'repli'] as const) {
+    const essai = simulerOppositionCombinaison(c, v, {}, defense);
+    assert.equal(essai.images[0].terrain.pions.length, 30);
+    assert.equal(essai.images[0].terrain.pions.filter(p => p.cote === 'exterieur').length, 15);
+    assert.equal(essai.images[0].terrain.phase, phase);
+    if (phase === 'melee') {
+      const e = creerMatch('A', 'B', effectifA, effectifB, 0, 0, 'placement-opposition');
+      const origine = origineApercu(c); const placement = placementMelee(e.pions, { x: origine.x + LIGNE_A, y: origine.y }, 'A');
+      for (const p of e.pions.filter(p => p.surLeTerrain)) {
+        const affichage = essai.images[0].terrain.pions.find(q => q.numero === p.numero && q.cote === (p.cote === 'A' ? 'domicile' : 'exterieur'))!;
+        assert.deepEqual({ x: affichage.x, y: affichage.y }, { x: placement[p.id].x - LIGNE_A, y: placement[p.id].y }, 'Le XV adverse reprend les placements de mêlée du match');
+      }
+    }
+    for (const image of essai.images) {
+      for (const p of image.terrain.pions) assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y));
+      if (image.plaquages > 0) contactsReels = true;
+      if (image.terrain.contact && image.terrain.gestes?.some(g => /tackle|fall/.test(g.clip))) animationContact = true;
+    }
+    assert.deepEqual(imageOppositionCombinaison(essai, 3.27), imageOppositionCombinaison(essai, 3.27));
+    assert.equal(imageOppositionCombinaison(essai, essai.duree)?.passes, essai.images.at(-1)?.passes);
+    if (phase === 'melee' && defense === 'glissee') assert.deepEqual(simulerOppositionCombinaison(c, v, {}, defense), essai, 'Rejouer le même essai conserve les décisions et les contacts');
+  }
+}
+assert.ok(contactsReels, 'Les défenseurs ont réellement plaqué pendant l’opposition');
+assert.ok(animationContact, 'Le contact expose les animations du plaquage et du porteur au sol');
+
+// Le même tick lance le porteur et ses appels, dans les deux sens du terrain.
+for (const cote of ['A', 'B'] as const) {
+  const e = creerMatch('A', 'B', effectifA, effectifB, 0, 0, `appels-${cote}`);
+  e.phase = 'melee'; e.possession = cote; e.ballon = { x: 61, y: 35 };
+  e.plansCombinaisons = { [cote]: [parallele] };
+  preparerCombinaison(e, 'melee'); assert.ok(demarrerCombinaison(e, e.ballon));
+  e.phase = 'jeuCourant'; e.origine = { ...e.ballon }; e.rng = () => .99;
+  for (const p of e.pions.filter(p => p.cote !== cote)) p.pos = { x: cote === 'A' ? 105 : 17, y: 65 };
+  const acteurs = [9, 12, 13].map(numero => e.pions.find(p => p.cote === cote && p.numero === numero)!);
+  const avant = acteurs.map(p => ({ ...p.pos }));
+  avancer(e, .15);
+  for (const [i, p] of acteurs.entries()) assert.ok(Math.hypot(p.pos.x - avant[i].x, p.pos.y - avant[i].y) > .001, `Le n° ${p.numero} ${cote} part dès le premier tick`);
+  assert.deepEqual(e.combinaisonEnCours?.courses[12], pv.actions[1].type === 'leurre' ? pv.actions[1].destination : undefined);
+  assert.deepEqual(acteurs[1].cible, { x: cote === 'A' ? 69 : 53, y: cote === 'A' ? 23 : 47 });
+}
 // L'atelier doit reprendre les formations réellement calculées par le match,
 // dans chaque zone et sur chaque côté, y compris la sortie du 9 au ruck.
 for (const phase of ['melee', 'ruck'] as const) for (const zone of ['nos22', 'milieu', 'leurs22'] as const) for (const couloir of ['gauche', 'centre', 'droite'] as const) {
@@ -365,7 +449,7 @@ try {
   assert.equal(inscription.statut, 200);
   const longue = creerCombinaison('touche-longue', 'touche');
   longue.variantes[0].sauteur = 15; longue.variantes[0].touche = { alignes: 4, distance: 25, feinte: false };
-  const strategie = { ...STRATEGIE_EN_LIGNE_DEFAUT, combinaisons: [base, touche, longue], modeCombinaisons: 'configure' };
+  const strategie = { ...STRATEGIE_EN_LIGNE_DEFAUT, combinaisons: [base, touche, longue, parallele], modeCombinaisons: 'configure' };
   const commande = (jeton: string, action: unknown) => appel(jeton, '/api/carriere', { action: 'commande', ligue, requeteId: randomUUID(), commande: action });
   const refuse = await commande(visiteur, { type: 'strategie', strategie });
   assert.equal(refuse.statut, 400);
@@ -374,15 +458,16 @@ try {
   assert.equal(refuseDirect.statut, 400); assert.match(refuseDirect.donnees.erreur, /bêta privée/);
   const accepte = await commande(kiri, { type: 'strategie', strategie });
   assert.equal(accepte.statut, 200);
-  assert.deepEqual(accepte.donnees.clubs.find((c: any) => c.id === accepte.donnees.monClubId).strategie.combinaisons, [base, touche, longue]);
+  assert.deepEqual(accepte.donnees.clubs.find((c: any) => c.id === accepte.donnees.monClubId).strategie.combinaisons, [base, touche, longue, parallele]);
   const relecture = await appel(kiri, `/api/carriere?ligue=${ligue}`);
   assert.equal(relecture.donnees.clubs.find((c: any) => c.id === relecture.donnees.monClubId).strategie.modeCombinaisons, 'configure');
   assert.deepEqual(relecture.donnees.clubs.find((c: any) => c.id === relecture.donnees.monClubId).strategie.combinaisons[1].variantes[0].touche, touche.variantes[0].touche);
   assert.deepEqual(relecture.donnees.clubs.find((c: any) => c.id === relecture.donnees.monClubId).strategie.combinaisons[2], longue);
+  assert.deepEqual(relecture.donnees.clubs.find((c: any) => c.id === relecture.donnees.monClubId).strategie.combinaisons[3], parallele, 'La sauvegarde et la relecture serveur conservent les étapes simultanées');
   const autreVue = await appel(visiteur, `/api/carriere?ligue=${ligue}`);
   assert.equal(autreVue.donnees.clubs.find((c: any) => c.id === accepte.donnees.monClubId).strategie, undefined, 'Les combinaisons adverses restent privées');
   assert.equal((await commande(visiteur, { type: 'strategie', strategie: STRATEGIE_EN_LIGNE_DEFAUT })).statut, 200);
 } finally {
   rmSync(dossier, { recursive: true, force: true });
 }
-console.log('Combinaisons : joueurs liés et sorties de mêlée 8/9 A/B, navigation et pincement, placements du match, animation, lancers 5–25 m vers avants/demis/arrière A/B sur les deux touches, passes, moteur en ligne, sauvegarde et bêta Kiri vérifiés.');
+console.log('Combinaisons : étapes simultanées et premier tick A/B, opposition 15v15 et vrais plaquages animés, défenses glissée/blitz/repli, joueurs liés, sorties 8/9, navigation, lancers 5–25 m, moteur en ligne, sauvegarde et bêta Kiri vérifiés.');

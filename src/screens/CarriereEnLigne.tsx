@@ -1,6 +1,5 @@
 import { CelebrationLigue } from '../components/CelebrationLigue';
 import { AtelierKiri } from '../components/AtelierKiri';
-import { EditeurCombinaisons } from '../components/EditeurCombinaisons';
 import { RoueCartes } from '../components/RoueCartes';
 // ═══════════════════════════════════════════════════════════════════════════
 // LA CARRIÈRE EN LIGNE — le troisième mode
@@ -21,8 +20,9 @@ import { RoueCartes } from '../components/RoueCartes';
 // moteur dans le paquet du navigateur pour afficher sept mots. Les listes
 // d'options sont donc déclarées ici, avec leurs textes français — c'est
 // d'ailleurs la règle du dossier `lib/ligue/` : aucun texte affichable.
+// L'atelier privé charge son éditeur et son moteur d'entraînement à l'ouverture.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Icone, type NomIcone } from '../components/Icone';
 import { lienInvitation, invitationEnAttente, oublierInvitation } from '../lib/invitationLigue';
@@ -71,6 +71,7 @@ import { locale, nombre, t } from '../lib/i18n';
 import { fusionnerDeltaDirect, fusionnerVueLigue } from '../lib/ligue/fusionDirect';
 
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'administration' | 'atelier' | 'combinaisons';
+const EditeurCombinaisons = lazy(() => import('../components/EditeurCombinaisons').then(m => ({ default: m.EditeurCombinaisons })));
 type Agir = (commande: CommandeCarriere) => Promise<VueCarriereEnLigne | undefined>;
 type VueRencontre = VueCarriereEnLigne['rencontres'][number];
 type ReponseGoogle = { credential: string };
@@ -1415,8 +1416,9 @@ function CombinaisonsLigue({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agi
   if (!club?.strategie || !club.composition) return null;
   const strategie = club.strategie;
   const joueurs = Object.fromEntries(club.composition.titulaires.map((id, i) => [i + 1, vue.cartes.find(c => c.id === id)?.nom ?? `N° ${i + 1}`]));
-  return <EditeurCombinaisons combinaisons={strategie.combinaisons} mode={strategie.modeCombinaisons} joueurs={joueurs} maillot={maillot} occupe={occupe}
-    enregistrer={async (combinaisons, modeCombinaisons) => Boolean(await agir({ type: 'strategie', strategie: { ...strategie, combinaisons, modeCombinaisons } }))} />;
+  const effectif = club.composition.titulaires.map(id => vue.cartes.find(c => c.id === id)).filter((c): c is CarteCarriere => Boolean(c)).map(carteEnJoueur);
+  return <Suspense fallback={<p className="ec-info">Ouverture du cahier de combinaisons…</p>}><EditeurCombinaisons combinaisons={strategie.combinaisons} mode={strategie.modeCombinaisons} joueurs={joueurs} effectif={effectif.length === 15 ? effectif : undefined} maillot={maillot} occupe={occupe}
+    enregistrer={async (combinaisons, modeCombinaisons) => Boolean(await agir({ type: 'strategie', strategie: { ...strategie, combinaisons, modeCombinaisons } }))} /></Suspense>;
 }
 
 export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; erreur?: string }) {

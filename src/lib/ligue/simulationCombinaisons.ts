@@ -23,9 +23,8 @@ export function terrainSimulationCombinaison(c: Combinaison, v: VarianteCombinai
     }
     return terrain;
   }
-  if (temps >= image.traces.length) return terrain;
-  const index = Math.floor(temps); const trace = image.traces[index]; const progression = temps - index;
-  if (!trace) return terrain;
+  for (const trace of image.traces.filter(t => temps >= t.debut && temps < t.debut + 1)) {
+  const index = trace.debut; const progression = temps - index;
   const geste = (numero: number, clip: string, debut = index, duree = 1) => terrain.gestes!.push({ id: `atelier-${index}-${numero}-${clip}`, joueurId: id(numero), clip, debut, duree });
   const orienter = (numero: number, dx: number, dy: number) => {
     const pion = pions.find(p => p.numero === numero)!; const norme = Math.hypot(dx, dy) || 1;
@@ -60,6 +59,7 @@ export function terrainSimulationCombinaison(c: Combinaison, v: VarianteCombinai
     const fin = trace.acteur === 2 && !trace.action ? .9 : .88;
     terrain.vol = { de: trace.de, vers: trace.vers, auteurId: id(trace.acteur), receveurId: trace.action?.type === 'passe' ? id(trace.action.destinataire) : !trace.action ? id(v.sauteur) : undefined,
       type: trace.action?.type === 'pied' ? 'pied' : 'passe', intention: trace.action?.type === 'pied' ? trace.action.intention : 'passe', ecoule: progression - depart, duree: fin - depart, hauteur: image.hauteurBallon };
+  }
   }
   return terrain;
 }

@@ -63,6 +63,19 @@
 .ec-sequence { list-style: none; padding: 0; display: grid; gap: 8px; margin: 10px 0 12px; }
 .ec-sequence li { display: flex; align-items: end; gap: 10px; border: 1px solid #ffffff15; background: #09120f60; padding: 10px; border-radius: 5px; }
 .ec-sequence li.selectionne { border-color: #ba9c61; }
+.ec-sequence li.ec-etape-edition { display: grid; gap: 10px; padding: 14px; border-color: #455548; }
+.ec-entete-etape { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid #ffffff15; }
+.ec-entete-etape > div:first-child { display: grid; gap: 5px; }
+.ec-entete-etape b { font-size: 14px; color: #f0dfb9; }
+.ec-entete-etape small { font-size: 11px; color: #b9cbb5; }
+.ec-geste { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 10px; border: 1px solid #ffffff15; border-radius: 5px; }
+.ec-geste.selectionne { border-color: #ba9c61; background: #b9984915; }
+.ec-geste label { flex: 1 1 120px; }
+.ec .ec-appel { justify-self: start; }
+.ec-choix-simulation { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 12px 0; }
+.ec-choix-simulation label { flex: 1 1 120px; }
+.ec-bilan-opposition { display: flex; flex-wrap: wrap; gap: 10px; color: #b9d9cb; font-size: 12px; border-top: 1px solid #ffffff15; padding-top: 10px; }
+@media (max-width: 560px) { .ec-sequence li.ec-etape-edition { padding: 10px; } .ec-geste { gap: 8px; padding: 8px; } .ec-geste label { flex-basis: calc(50% - 12px); } .ec-entete-etape { align-items: start; gap: 6px; } .ec-entete-etape .ec-ordre { flex-wrap: wrap; justify-content: end; } .ec .ec-appel { width: 100%; } }
 .ec-sequence li label { flex: 1 1 120px; }
 .ec-numero-action { flex: 0 0 30px; height: 36px; background: transparent; border: 1px solid #796744; border-radius: 4px; color: #e5c482; cursor: pointer; font: inherit; }
 .ec-numero-action:hover, .ec-numero-action[aria-pressed=true] { background: #d7b779; color: #16271d; border-color: #d7b779; }
@@ -103,6 +116,8 @@
 .ec-legende .lancer::before { background: #83e4ca; }
 .ec-legende .passe::before { background: #f1d491; }
 .ec-legende .pied::before { background: #b4befa; }
+.ec-legende .attaque::before { background: #b9473d; }
+.ec-legende .defense::before { background: #3889cb; }
 .ec fieldset.ec-touche { padding: 16px; border: 1px solid #648675; border-radius: 6px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0 0 18px; background: #112d242f; }
 .ec-touche legend, .ec-placement legend { color: #ead3a2; font-size: 13px; padding: 0 6px; }
 .ec-touche p, .ec-touche .ec-case { grid-column: 1/-1; margin: 0; }

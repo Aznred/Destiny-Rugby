@@ -162,6 +162,29 @@ adapte ces images à `TerrainDirect` et aux gestes du `SpriteRugbymanMemo` des
 matchs : lancer, saut, lift, passe, réception, course et pied. Le club fournit
 son maillot tiré de l’écusson. Les tracés peuvent être masqués ; la pose et le
 ballon restent pilotés par la progression, même en pause.
+L'enchaînement est regroupé par étapes : `ActionCombinaison.simultanee` rattache
+un geste au groupe précédent, les anciens cahiers gardant une étape par action.
+`etapesCombinaison` partage ce découpage entre validation, tracé et moteur.
+Limites : dix étapes, 80 gestes ; un seul geste du ballon et un ordre par joueur
+dans chaque groupe. Le bouton « Ajouter un déplacement simultané » ajoute les
+appels ; déplacer/supprimer une étape ou son premier geste conserve les frontières
+des autres groupes. Les destinations se dessinent aussi sur le terrain.
+Les appels démarrent avant le déplacement du premier tick et continuent pendant
+le vol d'une passe ; la prochaine étape attend sa réception. Le receveur conserve
+la priorité pour rejoindre le ballon. La durée du tracé dépend des étapes et du
+lancer, pas du nombre de gestes simultanés (`dureeApercu`).
+`ligue/oppositionCombinaisons.ts` crée un exercice local en 15 contre 15, avec le
+XV de la composition et une défense de niveau 65 (glissée, blitz ou repli).
+`installerSituationCombinaison` installe mêlée/touche/ruck avec les formations
+réelles ; `avancer` résout conquête et contacts, `extraireTerrain` fournit les
+gestes et les états du direct. Les coordonnées sont traduites vers le terrain
+100 × 70 m de l'atelier. La lecture interpolée, pause et retour en arrière sont
+déterministes ; « Nouvel essai » change la graine. Arrêt au premier plaquage,
+perte, faute, essai ou après 45 secondes, avec bilan passes/plaquages/mètres.
+Cet exercice n'écrit aucun score ni état dans la ligue. Le cahier enregistré
+reste exécuté par le serveur en mode configuré, uniquement pour la bêta Kiri.
+`CarriereEnLigne` charge l'éditeur avec `lazy`/`Suspense` à l'ouverture du cahier,
+sans imposer le moteur d'entraînement à la navigation courante de la ligue.
 La navigation est active par défaut (`joueur: null`). « Naviguer » et
 « Aucun · navigation » effacent la sélection du joueur et de l'action. Un tap
 sélectionne/désélectionne ; un glissement du fond déplace la carte. Deux

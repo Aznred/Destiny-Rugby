@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Icone } from './Icone';
 import { TerrainCombinaison } from './TerrainCombinaison';
-import { combinaisonsValides, creerCombinaison, erreursVariante, MAX_ACTIONS, MAX_COMBINAISONS, MAX_VARIANTES, origineApercu, placementsPersonnalises } from '../lib/ligue/combinaisons';
+import { combinaisonsValides, creerCombinaison, erreursVariante, etapesCombinaison, MAX_ACTIONS, MAX_ETAPES, MAX_COMBINAISONS, MAX_VARIANTES, origineApercu, placementsPersonnalises } from '../lib/ligue/combinaisons';
+import { imageApercu } from '../lib/ligue/apercuCombinaisons';
+import type { Coequipier } from '../lib/effectif';
 import type { ActionCombinaison, Combinaison, PhaseCombinaison, PiedCombinaison, PointCombinaison, VarianteCombinaison } from '../lib/ligue/combinaisons';
 import type { MaillotMatch } from '../lib/moteur/apparenceMatch';
 import './EditeurCombinaisons.css';
@@ -14,10 +16,11 @@ const borner = (v: number, min: number, max: number) => Math.max(min, Math.min(m
 const uid = () => crypto.randomUUID();
 const choix = (valeurs: Record<string, string>) => Object.entries(valeurs).map(([valeur, nom]) => <option key={valeur} value={valeur}>{nom}</option>);
 
-export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', joueurs = {}, maillot, occupe = false, enregistrer }: {
+export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', joueurs = {}, effectif, maillot, occupe = false, enregistrer }: {
   combinaisons?: Combinaison[];
   mode?: 'automatique' | 'configure';
   joueurs?: Record<number, string>;
+  effectif?: Coequipier[];
   maillot?: MaillotMatch;
   occupe?: boolean;
   enregistrer: (combinaisons: Combinaison[], mode: 'automatique' | 'configure') => Promise<boolean>;
@@ -37,11 +40,35 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
   const origine = c ? origineApercu(c) : { x: 50, y: 35 };
   const bloque = occupe || sauvegarde;
   const erreurs = c && v ? erreursVariante(c.phase, v) : [];
+  const etapes = etapesCombinaison(v?.actions ?? []);
   const cahierIncomplet = plans.some(c => c.variantes.some(v => erreursVariante(c.phase, v).length));
   const modifie = (suivants: Combinaison[], nouveauMode = modeChoisi) => { setBrouillon({ plans: suivants, mode: nouveauMode }); setStatut(''); };
   const modifier = (suite: Combinaison) => modifie(plans.map(p => p.id === suite.id ? suite : p));
   const modifierVariante = (suite: VarianteCombinaison) => { if (c) modifier({ ...c, variantes: c.variantes.map((v, i) => i === Math.min(varianteIndex, c.variantes.length - 1) ? suite : v) }); };
-  const changerAction = (i: number, action: ActionCombinaison) => { if (v) modifierVariante({ ...v, actions: v.actions.map((a, j) => j === i ? action : a) }); };
+  const changerAction = (i: number, action: ActionCombinaison) => { if (v) modifierVariante({ ...v, actions: v.actions.map((a, j) => j === i ? { ...action, simultanee: a.simultanee } : a) }); };
+  const remplacerEtapes = (groupes: ActionCombinaison[][]) => {
+    if (!v) return;
+    const actions = groupes.flatMap(g => g.map((a, i) => { const copie = { ...a }; delete copie.simultanee; return i ? { ...copie, simultanee: true } : copie; }));
+    modifierVariante({ ...v, actions }); setActionIndex(null);
+  };
+  const porteurAvant = (etape: number) => {
+    let porteur = c?.phase === 'touche' ? v?.sauteur ?? 4 : v?.depart ?? 9;
+    etapes.slice(0, etape).forEach(e => e.actions.forEach(({ action }) => { if (action.type === 'passe') porteur = action.destinataire; }));
+    return porteur;
+  };
+  const ajouterAppel = (etape: number) => {
+    if (!v || !c) return;
+    const groupe = etapes[etape];
+    const pris = [porteurAvant(etape), ...groupe.actions.filter(a => a.action.type === 'leurre').map(a => a.action.type === 'leurre' ? a.action.numero : 0)];
+    const numero = [joueurAction, 12, 13, 11, 14, 15, 10, 9, 8, 7, 6, 5, 4, 3, 1, 2].find(n => !pris.includes(n));
+    if (!numero) return;
+    const prefixe = c.phase === 'touche' ? 1 + (v.touche?.feinte ? 1 : 0) : 0;
+    const p = imageApercu(c, v, prefixe + etape).positions[numero];
+    const index = groupe.actions.at(-1)!.index + 1;
+    const appel: ActionCombinaison = { type: 'leurre', numero, destination: { x: borner(p.x - origine.x + 8, -35, 35), y: p.y - origine.y }, simultanee: true };
+    modifierVariante({ ...v, actions: [...v.actions.slice(0, index), appel, ...v.actions.slice(index)] });
+    setJoueur(numero); setActionIndex(index);
+  };
   const ajouter = (phase: PhaseCombinaison, vide = false) => {
     if (plans.length >= MAX_COMBINAISONS) return;
     const nouveau = creerCombinaison(uid(), phase);
@@ -98,21 +125,27 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
         {c.phase === 'ruck' && <label>Premier porteur{numeros(v.depart, n => modifierVariante({ ...v, depart: n }), n => n <= 9)}</label>}
         {c.variantes.length > 1 && <button className="btn fantome" onClick={() => { modifier({ ...c, variantes: c.variantes.filter((_, i) => i !== varianteIndex) }); setVarianteIndex(0); setActionIndex(null); }}>Retirer cette variante</button>}
       </div></fieldset>
-      <TerrainCombinaison key={`${c.id}-${varianteIndex}`} combinaison={c} variante={v} joueurs={joueurs} maillot={maillot} joueur={joueur} actionIndex={actionIndex} bloque={bloque} selectionner={(numero, libre) => { setJoueur(numero); if (libre) setActionIndex(null); }} placer={placer} modifierAction={a => { if (actionIndex !== null) changerAction(actionIndex, a); }} modifierVariante={modifierVariante} />
-      <fieldset disabled={bloque}><div className="ec-titre-liste"><h3>Enchaînement</h3><span>{v.actions.length}/{MAX_ACTIONS} actions</span></div>
-      <ol className="ec-sequence">{v.actions.map((a, i) => <li key={i} className={actionIndex === i ? 'selectionne' : ''}><button className="ec-numero-action" onClick={() => { setActionIndex(actionIndex === i ? null : i); }} aria-label={`Modifier l’action ${i + 1} sur le terrain`} aria-pressed={actionIndex === i}>{i + 1}</button>
+      <TerrainCombinaison key={`${c.id}-${varianteIndex}`} combinaison={c} variante={v} joueurs={joueurs} effectif={effectif} maillot={maillot} joueur={joueur} actionIndex={actionIndex} bloque={bloque} selectionner={(numero, libre) => { setJoueur(numero); if (libre) setActionIndex(null); }} placer={placer} modifierAction={a => { if (actionIndex !== null) changerAction(actionIndex, a); }} modifierVariante={modifierVariante} />
+      <fieldset disabled={bloque}><div className="ec-titre-liste"><h3>Enchaînement par étapes</h3><span>{etapes.length}/{MAX_ETAPES} étapes · {v.actions.length} gestes</span></div>
+      <p className="ec-info">Tous les gestes d’une étape démarrent ensemble. Ajoute des déplacements pour placer les soutiens pendant la course, la passe ou le jeu au pied du porteur.</p>
+      <ol className="ec-sequence">{etapes.map((etape, s) => <li className="ec-etape-edition" key={s}>
+        <header className="ec-entete-etape"><div><b>Étape {s + 1}</b><small>{etape.actions.length > 1 ? `${etape.actions.length} gestes en même temps` : 'Un geste'} · Porteur n° {porteurAvant(s)}</small></div>
+          <div className="ec-ordre"><button className="btn fantome ec-bouton-icone" disabled={s === 0} aria-label={`Monter l’étape ${s + 1}`} onClick={() => { const groupes = etapes.map(e => e.actions.map(a => a.action)); [groupes[s - 1], groupes[s]] = [groupes[s], groupes[s - 1]]; remplacerEtapes(groupes); }}><Icone nom="fleche-droite" taille={15} className="ec-fleche-haut" /></button><button className="btn fantome ec-bouton-icone" disabled={s === etapes.length - 1} aria-label={`Descendre l’étape ${s + 1}`} onClick={() => { const groupes = etapes.map(e => e.actions.map(a => a.action)); [groupes[s + 1], groupes[s]] = [groupes[s], groupes[s + 1]]; remplacerEtapes(groupes); }}><Icone nom="fleche-droite" taille={15} className="ec-fleche-bas" /></button><button className="btn fantome ec-bouton-icone ec-danger" aria-label={`Supprimer l’étape ${s + 1}`} onClick={() => remplacerEtapes(etapes.filter((_, i) => i !== s).map(e => e.actions.map(a => a.action)))}><Icone nom="corbeille" taille={15} /></button></div>
+        </header>
+        {etape.actions.map(({ action: a, index: i }, j) => <div key={i} className={`ec-geste ${actionIndex === i ? 'selectionne' : ''}`}><button className="ec-numero-action" onClick={() => { setActionIndex(actionIndex === i ? null : i); if (a.type === 'leurre') setJoueur(a.numero); }} aria-label={`Modifier l’action ${i + 1} sur le terrain`} aria-pressed={actionIndex === i}>{j + 1}</button>
         <label>Action<select value={a.type} onChange={e => { const type = e.target.value; changerAction(i, type === 'passe' ? { type, destinataire: joueurAction } : type === 'pied' ? { type, intention: 'occupation' } : type === 'leurre' ? { type, numero: joueurAction, destination: { x: 8, y: 0 } } : { type: 'course', destination: { x: 12, y: 0 } }); setActionIndex(i); }}>{choix({ passe: 'Passe', course: 'Course du porteur', leurre: 'Appel / leurre', pied: 'Jeu au pied' })}</select></label>
         {a.type === 'passe' && <label>Destinataire{numeros(a.destinataire, n => changerAction(i, { ...a, destinataire: n }))}</label>}
         {a.type === 'pied' && <label>Coup de pied<select value={a.intention} onChange={e => changerAction(i, { ...a, intention: e.target.value as PiedCombinaison })}>{choix(PIEDS)}</select></label>}
         {a.type === 'leurre' && <label>Joueur{numeros(a.numero, n => changerAction(i, { ...a, numero: n }))}</label>}
         {(a.type === 'course' || a.type === 'leurre') && <><label>Avancée (m)<input type="number" min="-35" max="35" step=".5" value={a.destination.x} onChange={e => changerAction(i, { ...a, destination: { ...a.destination, x: borner(Number(e.target.value), -35, 35) } })} /></label><label>Largeur (m)<input type="number" min="-65" max="65" step=".5" value={a.destination.y} onChange={e => changerAction(i, { ...a, destination: { ...a.destination, y: borner(Number(e.target.value), -65, 65) } })} /></label></>}
-        <div className="ec-ordre"><button className="btn fantome ec-bouton-icone" disabled={i === 0} aria-label={`Monter l’action ${i + 1}`} onClick={() => { const actions = [...v.actions]; [actions[i - 1], actions[i]] = [actions[i], actions[i - 1]]; modifierVariante({ ...v, actions }); setActionIndex(i - 1); }}><Icone nom="fleche-droite" taille={15} className="ec-fleche-haut" /></button><button className="btn fantome ec-bouton-icone" disabled={i === v.actions.length - 1} aria-label={`Descendre l’action ${i + 1}`} onClick={() => { const actions = [...v.actions]; [actions[i + 1], actions[i]] = [actions[i], actions[i + 1]]; modifierVariante({ ...v, actions }); setActionIndex(i + 1); }}><Icone nom="fleche-droite" taille={15} className="ec-fleche-bas" /></button><button className="btn fantome ec-bouton-icone ec-danger" aria-label={`Supprimer l’action ${i + 1}`} onClick={() => { modifierVariante({ ...v, actions: v.actions.filter((_, j) => j !== i) }); setActionIndex(null); }}><Icone nom="corbeille" taille={15} /></button></div>
+        <div className="ec-ordre">{j > 0 && <button className="btn fantome" disabled={etapes.length >= MAX_ETAPES} onClick={() => { const groupes = etapes.map(e => e.actions.map(a => a.action)); const suite = groupes[s].splice(j); groupes.splice(s + 1, 0, suite); remplacerEtapes(groupes); }}>Étape séparée</button>}<button className="btn fantome ec-bouton-icone ec-danger" aria-label={`Supprimer l’action ${i + 1}`} onClick={() => remplacerEtapes(etapes.map(e => e.actions.filter(a => a.index !== i).map(a => a.action)).filter(g => g.length))}><Icone nom="corbeille" taille={15} /></button></div>
+      </div>)}
+      <button className="btn ec-creer ec-appel" disabled={v.actions.length >= MAX_ACTIONS || etape.actions.length >= 15} onClick={() => ajouterAppel(s)}><Icone nom="ajouter" taille={16} />Ajouter un déplacement simultané</button>
       </li>)}</ol>
-      {erreurs.filter(e => e.type === 'passeASoi').map(e => <p className="ec-statut" key={e.action}>Action {e.action} : le porteur ne peut pas se faire une passe à lui-même. Choisis un autre destinataire.</p>)}
-      <button className="btn ec-creer" disabled={v.actions.length >= MAX_ACTIONS || v.actions.at(-1)?.type === 'pied'} onClick={() => { modifierVariante({ ...v, actions: [...v.actions, { type: 'passe', destinataire: joueurAction }] }); setActionIndex(v.actions.length); }}><Icone nom="ajouter" taille={16} />Ajouter une action</button>
-      {v.actions.some((a, i) => a.type === 'pied' && i < v.actions.length - 1) && <p className="ec-statut">Le coup de pied termine la combinaison. Déplace-le à la fin ou retire les actions suivantes.</p>}
+      {erreurs.filter(e => e.type !== 'vide').map((e, i) => <p className="ec-statut" key={i}>Action {e.action} : {e.type === 'passeASoi' ? 'le porteur ne peut pas se faire une passe à lui-même.' : e.type === 'ballonsMultiples' ? 'garde un seul geste du porteur dans cette étape. Les autres joueurs peuvent se déplacer en même temps.' : e.type === 'joueurDouble' ? 'ce joueur a déjà un déplacement dans cette étape. Choisis un autre joueur.' : e.type === 'tropEtapes' ? `limite l’enchaînement à ${MAX_ETAPES} étapes.` : 'le coup de pied termine la combinaison. Retire les étapes suivantes.'}</p>)}
+      <button className="btn ec-creer" disabled={etapes.length >= MAX_ETAPES || v.actions.length >= MAX_ACTIONS || v.actions.some(a => a.type === 'pied')} onClick={() => { const porteur = porteurAvant(etapes.length); modifierVariante({ ...v, actions: [...v.actions, { type: 'passe', destinataire: joueurAction === porteur ? porteur === 10 ? 12 : 10 : joueurAction }] }); setActionIndex(v.actions.length); }}><Icone nom="ajouter" taille={16} />Ajouter une étape</button>
       {!v.actions.length && <p className="ec-info">Ajoute au moins une action pour pouvoir enregistrer cette variante.</p>}
-      <p className="ec-info">Une variante est tirée au départ selon sa fréquence relative. À situation identique, la combinaison la plus précise est prioritaire, puis la première du cahier. Les avants gardent leur formation pendant la conquête ; tes placements s’appliquent au lancement. L’animation montre ton tracé ; la réussite se joue en match.</p>
+      <p className="ec-info">Une variante est tirée au départ selon sa fréquence relative. À situation identique, la combinaison la plus précise est prioritaire, puis la première du cahier. Les avants gardent leur formation pendant la conquête ; tes placements s’appliquent au lancement. « Tracé » montre tes consignes ; « Avec opposition » les teste avec la défense et les contacts du moteur de match.</p>
       </fieldset></div>}
     </div>
   </section>;

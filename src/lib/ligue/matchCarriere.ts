@@ -1017,7 +1017,7 @@ function extraireVolDirect(vol: Vol | VolRecent, debut: number, ecoule: number):
   };
 }
 
-function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
+export function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
   const terrain: TerrainDirect = {
     pions: e.pions.filter((p) => p.surLeTerrain).map((p) => ({
       id: p.id, numero: p.numeroMaillot ?? p.numero, numeroRole: p.numero, nom: p.nom, poste: p.poste,
