@@ -7,7 +7,7 @@ import { affichesToutesRondes } from './calendrier.js';
 import { horairesChampionnat } from './horaires.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { packsCatalogueAdmin, bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
-import { avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, forceFeuille, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
+import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, forceFeuille, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
@@ -1446,7 +1446,16 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       // ⚠️ On n'enregistre JAMAIS la stratégie telle qu'elle arrive : une valeur
       // inconnue est remplacée par le défaut, jamais refusée. C'est la même
       // fonction que le match en direct, donc un seul endroit décide.
-      case 'strategie': club.strategie = strategieValide(commande.strategie); break;
+      case 'strategie': {
+        club.strategie = strategieValide(commande.strategie);
+        if (accesCombinaisonsBeta) for (const r of nouveau.rencontres) {
+          if (!r.match || r.resultat || ![r.domicile, r.exterieur].includes(club.id)) continue;
+          r.match = actualiserCahierMatchEnLigne(r.match, club.id, {
+            modeCombinaisons: club.strategie.modeCombinaisons, combinaisons: club.strategie.combinaisons,
+          }, maintenant);
+        }
+        break;
+      }
 
       case 'ouvrirPack': identifiant(commande.packId); ouvrirPack(nouveau, club, commande.packId, maintenant, graine); break;
       case 'ouvrirPackGratuit': {

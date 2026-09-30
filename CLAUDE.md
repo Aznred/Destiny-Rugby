@@ -192,6 +192,21 @@ déterministes ; « Nouvel essai » change la graine. Arrêt au premier plaquage
 perte, faute, essai ou après 45 secondes, avec bilan passes/plaquages/mètres.
 Cet exercice n'écrit aucun score ni état dans la ligue. Le cahier enregistré
 reste exécuté par le serveur en mode configuré, uniquement pour la bêta Kiri.
+La sauvegarde de stratégie du club synchronise aussi son cahier dans les matchs
+en cours via `actualiserCahierMatchEnLigne` : un ordre daté ne modifie que les deux
+champs du cahier, conserve les consignes du banc et n’ajoute aucune présence.
+Les stratégies du coup d’envoi restent gelées ; `strategieA` reconstruit les
+changements depuis le journal, sans appliquer un nouveau cahier dans le passé.
+Le cache mémorise le nombre d’ordres réellement appliqués : une reprise depuis
+un instant antérieur rejoue aussi les ordres encore à venir.
+Une consigne qui ne change pas le cahier conserve la conquête déjà préparée.
+`combinaisonSituation` vérifie la situation et les variantes disponibles sans
+tirage ; une sortie de ruck programmée prime sur la chenille automatique, même
+si celle-ci avait commencé avant l’activation. La conquête et les contacts
+continuent d’être disputés. Le premier plan créé active le mode configuré ;
+l’éditeur signale clairement le jeu automatique et propose « Enregistrer et
+activer ». `DirectCinema` indique l’état réel du cahier de mon camp et le nom du
+plan en cours. Aperçu local complet : `/scripts/apercuCombinaisonsMatch.html`.
 `CarriereEnLigne` charge l'éditeur avec `lazy`/`Suspense` à l'ouverture du cahier,
 sans imposer le moteur d'entraînement à la navigation courante de la ligue.
 La navigation est active par défaut (`joueur: null`). « Naviguer » et

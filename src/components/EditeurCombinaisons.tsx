@@ -43,6 +43,7 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
   const erreurs = c && v ? erreursVariante(c.phase, v) : [];
   const etapes = etapesCombinaison(v?.actions ?? []);
   const cahierIncomplet = plans.some(c => c.variantes.some(v => erreursVariante(c.phase, v).length));
+  const nombreActives = plans.filter(c => c.active).length;
   const modifie = (suivants: Combinaison[], nouveauMode = modeChoisi) => { setBrouillon({ plans: suivants, mode: nouveauMode }); setStatut(''); };
   const modifier = (suite: Combinaison) => modifie(plans.map(p => p.id === suite.id ? suite : p));
   const modifierVariante = (suite: VarianteCombinaison) => { if (c) modifier({ ...c, variantes: c.variantes.map((v, i) => i === Math.min(varianteIndex, c.variantes.length - 1) ? suite : v) }); };
@@ -79,7 +80,7 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
     if (plans.length >= MAX_COMBINAISONS) return;
     const nouveau = creerCombinaison(uid(), phase);
     if (vide) { nouveau.nom = 'Ma combinaison'; nouveau.variantes[0].nom = 'Variante 1'; nouveau.variantes[0].actions = []; }
-    modifie([...plans, nouveau]); setSelection(nouveau.id); setVarianteIndex(0); choisirEtape(null);
+    modifie([...plans, nouveau], plans.length ? modeChoisi : 'configure'); setSelection(nouveau.id); setVarianteIndex(0); choisirEtape(null);
   };
   const placer = (numero: number, p: PointCombinaison) => {
     if (!v) return;
@@ -87,18 +88,27 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
       { numero, x: borner(p.x - origine.x, -35, 35), y: p.y - origine.y }] });
   };
   const numeros = (valeur: number, onChange: (v: number) => void, filtre = (n: number) => n >= 1) => <select value={valeur} onChange={e => onChange(Number(e.target.value))}>{Array.from({ length: 15 }, (_, i) => i + 1).filter(filtre).map(n => <option key={n} value={n}>N° {n}{joueurs[n] ? ` · ${joueurs[n]}` : ''}</option>)}</select>;
+  const sauvegarderCahier = async (nouveauMode = modeChoisi) => {
+    if (nouveauMode !== modeChoisi) setBrouillon({ plans, mode: nouveauMode });
+    setSauvegarde(true);
+    try {
+      if (await enregistrer(combinaisonsValides(plans), nouveauMode)) {
+        setBrouillon(null);
+        setStatut(nouveauMode === 'configure' && nombreActives
+          ? 'Cahier enregistré et activé. Il rejoint aussi tes matchs en cours à la prochaine situation correspondante.'
+          : nouveauMode === 'automatique' ? 'Cahier enregistré. Le jeu automatique reste utilisé en match.' : 'Cahier enregistré. Active une combinaison pour l’utiliser en match.');
+      } else setStatut('Enregistrement impossible. Ton brouillon est conservé.');
+    } catch { setStatut('Enregistrement impossible. Ton brouillon est conservé.'); }
+    finally { setSauvegarde(false); }
+  };
 
   return <section className="ec cel-panneau">
     <header className="ec-entete"><div><span className="eyebrow">Cahier de jeu <span className="ec-beta">Bêta Kiri</span></span><h2>Crée tes combinaisons</h2><p>Place ton XV, dessine les appels et choisis chaque passe. Ton équipe les joue quand la situation se présente.</p></div>
       <div className="ec-enregistrement"><label>Utilisation en match<select value={modeChoisi} disabled={bloque} onChange={e => modifie(plans, e.target.value as typeof modeChoisi)}><option value="automatique">Jeu automatique</option><option value="configure">Mes combinaisons</option></select></label>
-        <button className="btn primaire" disabled={bloque || !brouillon || cahierIncomplet} onClick={async () => {
-          setSauvegarde(true);
-          try { if (await enregistrer(combinaisonsValides(plans), modeChoisi)) { setBrouillon(null); setStatut('Cahier enregistré. Il sera utilisé lors des prochains matchs.'); } else setStatut('Enregistrement impossible. Ton brouillon est conservé.'); }
-          catch { setStatut('Enregistrement impossible. Ton brouillon est conservé.'); }
-          finally { setSauvegarde(false); }
-        }}><Icone nom="disquette" taille={16} />{sauvegarde ? 'Enregistrement…' : 'Enregistrer le cahier'}</button></div>
+        <button className="btn primaire" disabled={bloque || !brouillon || cahierIncomplet} onClick={() => { void sauvegarderCahier(); }}><Icone nom="disquette" taille={16} />{sauvegarde ? 'Enregistrement…' : 'Enregistrer le cahier'}</button></div>
     </header>
     <p className="ec-info">Les situations sans combinaison active suivent tes consignes habituelles. Le placement s’adapte au sens d’attaque ; les contacts, la conquête et les erreurs de passe restent joués.</p>
+    <div className={`ec-utilisation ${modeChoisi === 'configure' && nombreActives ? 'active' : ''}`}><Icone nom="sifflet" taille={18} /><p>{modeChoisi === 'automatique' ? 'Jeu automatique : tes combinaisons personnelles ne sont pas utilisées en match.' : nombreActives ? `${nombreActives} combinaison${nombreActives > 1 ? 's' : ''} active${nombreActives > 1 ? 's' : ''}${brouillon ? ' à enregistrer' : ' en match'}. Elles démarrent quand la phase, la zone et le côté correspondent.` : 'Aucune combinaison active. Active un plan et enregistre ton cahier.'}</p>{modeChoisi === 'automatique' && nombreActives > 0 && <button className="btn primaire" disabled={bloque || cahierIncomplet} onClick={() => { void sauvegarderCahier('configure'); }}>Enregistrer et activer</button>}</div>
     {statut && <p role="status" className="ec-statut">{statut}</p>}
     {cahierIncomplet && <p className="ec-statut">Complète ou corrige les variantes avant d’enregistrer le cahier.</p>}
     <div className="ec-atelier">

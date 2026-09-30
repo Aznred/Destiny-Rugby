@@ -10,9 +10,11 @@ import { terrainSimulationCombinaison } from '../src/lib/ligue/simulationCombina
 import { bornerVueCombinaison, commencerNavigation, poursuivreNavigation } from '../src/lib/ligue/navigationCombinaisons';
 import { joueursEngagesCombinaison } from '../src/lib/ligue/placementsCombinaisons';
 import { rugbyAnimations } from '../src/lib/spritesGenerateur/rugbyAnimations';
-import { strategieValide, STRATEGIE_EN_LIGNE_DEFAUT, avancerMatchEnLigne, creerMatchEnLigne } from '../src/lib/ligue/matchCarriere';
+import { actualiserCahierMatchEnLigne, strategieValide, STRATEGIE_EN_LIGNE_DEFAUT, avancerMatchEnLigne, creerMatchEnLigne, vueMatchEnLigne } from '../src/lib/ligue/matchCarriere';
+import { agirCarriere, creerLaboratoireCarriere } from '../src/lib/ligue/carriere';
 import { preparerCombinaison, demarrerCombinaison, pointSurTerrain, placerCombinaison } from '../src/lib/moteur/combinaisons';
-import { avancer, creerMatch } from '../src/lib/moteur/moteur';
+import { avancer, creerMatch, installerSituationCombinaison } from '../src/lib/moteur/moteur';
+import { preparerChenille } from '../src/lib/moteur/regroupements';
 import { placementMelee, placementRuck } from '../src/lib/moteur/phasesArretees';
 import { structurerAttaque } from '../src/lib/moteur/tactique';
 import { coteOuvert, LIGNE_A } from '../src/lib/moteur/terrain';
@@ -449,6 +451,23 @@ avancer(eCourse, 5);
 assert.ok(botteur.pos.x > 60, 'Le porteur court vers sa destination');
 assert.ok(botteur.stats.coupsDePied > 0, 'Le dernier geste exécute un vrai coup de pied');
 
+// Un ruck lent dans nos 22 ne doit pas substituer une boîte automatique au
+// cahier, y compris si l'entraîneur l'active pendant une chenille déjà formée.
+for (const chenilleDejaFormee of [false, true]) {
+  const c = creerCombinaison(`ruck-prioritaire-${chenilleDejaFormee}`, 'ruck');
+  c.zone = 'nos22'; c.variantes[0].actions = [{ type: 'course', destination: { x: 8, y: 0 } }];
+  const e = creerMatch('A', 'B', effectifA, effectifB, 0, 0, c.id);
+  installerSituationCombinaison(e, 'ruck', { x: 25, y: 35 });
+  const neuf = e.pions.find(p => p.cote === 'A' && p.numero === 9)!;
+  if (chenilleDejaFormee) assert.ok(preparerChenille(e, neuf));
+  e.minuteur = 0; e.ballonLent = true; e.rng = () => .99;
+  for (const p of e.pions.filter(p => p.cote === 'B')) p.pos = { x: 105, y: 65 };
+  e.plansCombinaisons = { A: [c] };
+  avancer(e, .3);
+  assert.equal(e.combinaisonEnCours?.plan.id, c.id, 'La combinaison de ruck démarre à la sortie, avant une chenille automatique');
+  assert.equal(neuf.stats.coupsDePied, 0);
+}
+
 // Deux rythmes d'appels au serveur doivent produire le même match.
 const plans = (['melee', 'touche', 'ruck'] as const).map(phase => {
   const c = creerCombinaison(`serveur-${phase}`, phase);
@@ -469,6 +488,42 @@ assert.deepEqual(direct.score, progressif.score);
 assert.deepEqual(direct.fil, progressif.fil);
 assert.ok(direct.fil.some(l => l.texte.startsWith('Combinaison :')), 'Les plans sont exécutés dans le moteur en ligne');
 assert.ok(direct.fil.some(l => l.texte.includes('Après le troisième bloc')), 'Le match en ligne exécute aussi la variante longue');
+
+// Le cahier enregistré après le coup d'envoi doit rejoindre le match déjà
+// lancé, en conservant les autres consignes données en direct.
+const compteLaboratoire = randomUUID();
+let laboratoire = creerLaboratoireCarriere({ id: randomUUID(), code: 'DR-COMBO01', compteId: compteLaboratoire, pseudo: 'Kiri' }, debut, 'cahier-en-direct');
+const clubLaboratoire = laboratoire.clubs.find(c => c.compteId === compteLaboratoire)!;
+const rencontreLaboratoire = laboratoire.rencontres.find(r => [r.domicile, r.exterieur].includes(clubLaboratoire.id))!;
+laboratoire = agirCarriere(laboratoire, compteLaboratoire, { type: 'laboratoireLancer', matchId: rencontreLaboratoire.id }, debut, 'lancer', true);
+laboratoire = agirCarriere(laboratoire, compteLaboratoire, { type: 'match', matchId: rencontreLaboratoire.id, action: { type: 'strategie', strategie: { ...STRATEGIE_EN_LIGNE_DEFAUT, mentalite: 'offensive', jeu: 'large' } } }, debut + 2 * 60_000, 'consigne', true);
+laboratoire = agirCarriere(laboratoire, compteLaboratoire, { type: 'strategie', strategie: { ...STRATEGIE_EN_LIGNE_DEFAUT, modeCombinaisons: 'configure', combinaisons: plans } }, debut + 3 * 60_000, 'enregistrer', true);
+const matchLaboratoire = laboratoire.rencontres.find(r => r.id === rencontreLaboratoire.id)!.match!;
+const vueLaboratoire = vueMatchEnLigne(matchLaboratoire, clubLaboratoire.id, debut + 3 * 60_000);
+assert.equal(vueLaboratoire.maStrategie?.modeCombinaisons, 'configure', 'Enregistrer le cahier active les combinaisons dans le match déjà lancé');
+assert.deepEqual(vueLaboratoire.maStrategie?.combinaisons, plans);
+assert.equal(vueLaboratoire.maStrategie?.mentalite, 'offensive', 'Le cahier conserve les autres choix du banc');
+assert.equal(vueLaboratoire.maStrategie?.jeu, 'large');
+
+// Activer le cahier à la cinquième minute ne change aucun événement du début
+// de match, sur les deux camps, avec ou sans cache du moteur.
+for (const cote of ['domicile', 'exterieur'] as const) {
+  const brut = faire(`activation-datee-${cote}`);
+  brut.strategies = { domicile: { ...STRATEGIE_EN_LIGNE_DEFAUT }, exterieur: { ...STRATEGIE_EN_LIGNE_DEFAUT } };
+  const clubId = brut.equipes![cote].clubId;
+  const aCinq = avancerMatchEnLigne(brut, debut + 5 * 60_000);
+  const avecCahier = actualiserCahierMatchEnLigne(aCinq, clubId, { modeCombinaisons: 'configure', combinaisons: plans }, debut + 5 * 60_000);
+  assert.deepEqual(avecCahier.presence, aCinq.presence, 'Enregistrer depuis l’éditeur ne simule pas une présence devant le match');
+  assert.equal(avecCahier.strategies[cote].modeCombinaisons, 'automatique', 'Les consignes au coup d’envoi restent gelées');
+  assert.equal(actualiserCahierMatchEnLigne(avecCahier, clubId, { modeCombinaisons: 'configure', combinaisons: plans }, debut + 5 * 60_000), avecCahier, 'Le même cahier ne crée pas un ordre en double');
+  const chaud = avancerMatchEnLigne(avecCahier, debut + 20 * 60_000);
+  assert.ok(chaud.fil.some(l => l.cote === cote && l.texte.startsWith('Combinaison :')), 'Le camp concerné exécute réellement ses plans après leur activation');
+  const passe = avancerMatchEnLigne({ ...chaud, horloge: 0 }, debut + 60_000);
+  assert.ok(!passe.fil.some(l => l.texte.startsWith('Combinaison :')), 'La sauvegarde n’ajoute pas de combinaison dans le passé');
+  const froid = avancerMatchEnLigne(avecCahier, debut + 20 * 60_000);
+  assert.deepEqual(froid.score, chaud.score);
+  assert.deepEqual(froid.fil, chaud.fil, 'La reconstruction à froid respecte la minute d’activation du cahier');
+}
 
 // L'accès repose sur l'identifiant authentifié, jamais sur le pseudo Kiri.
 const dossier = mkdtempSync(join(tmpdir(), 'destiny-combinaisons-'));

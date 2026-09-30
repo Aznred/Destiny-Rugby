@@ -23,7 +23,7 @@
 
 import { graine, scorePossible } from '../championnat.js';
 import type { Coequipier } from '../effectif.js';
-import { cibleCourseCombinaison, demarrerCombinaison, joueurCombinaison, lancerAppelsCombinaison, pointSurTerrain, preparerCombinaison } from './combinaisons.js';
+import { cibleCourseCombinaison, combinaisonSituation, demarrerCombinaison, joueurCombinaison, lancerAppelsCombinaison, pointSurTerrain, preparerCombinaison } from './combinaisons.js';
 import type { PosteId, TactiqueManager } from '../../types.js';
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import {
@@ -2575,6 +2575,10 @@ function formerRuck(
 
 function phaseRuck(e: EtatMatch): void {
   const organisation = e.ruck?.organisation;
+  const cahier = combinaisonSituation(e, 'ruck');
+  // La sortie programmée prime sur la boîte automatique, même si le cahier
+  // a été enregistré alors que la chenille se préparait déjà.
+  if (cahier && organisation) delete organisation.chenille;
   const chenille = organisation?.chenille;
   if (chenille) {
     const neuf = e.pions.find(p => p.id === chenille.neufId && p.surLeTerrain && p.sanction <= 0);
@@ -2625,7 +2629,7 @@ function phaseRuck(e: EtatMatch): void {
     if (neuf && e.sim - chenille.debut < 10) { e.minuteur = Math.max(e.minuteur, .15); return; }
     delete organisation!.chenille; // Liaison impossible : sortie normale, jamais blocage.
   }
-  if (organisation && !organisation.chenilleEssayee && !chenille && e.minuteur <= 0 && e.ballonLent
+  if (!cahier && organisation && !organisation.chenilleEssayee && !chenille && e.minuteur <= 0 && e.ballonLent
     && (e.ballon.x - MILIEU) * sens(e.possession) < -5) {
     const neuf = e.pions.find(p => p.surLeTerrain && p.cote === e.possession && p.numero === 9);
     if (neuf && preparerChenille(e, neuf)) return;

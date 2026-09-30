@@ -45,6 +45,8 @@ export function DirectCinema({
   vitesseDemo?: number;
 }) {
   const [selection, setSelection] = useState<string | null>(null);
+  const cahier = m.maStrategie;
+  const combinaisonsActives = cahier?.combinaisons?.filter(c => c.active).length ?? 0;
   const moments = m.moments ?? [];
   const momentSelectionne = moments.find((v) => v.id === selection);
   const secondeCourante = (m.terrain?.horloge ?? m.horloge) * 60;
@@ -105,6 +107,7 @@ export function DirectCinema({
         </strong>
         <span style={{ borderColor: couleurs.exterieur }}>{exterieur}</span>
       </div>
+      {m.monCote && cahier && (cahier.modeCombinaisons === 'configure' || !!cahier.combinaisons?.length) && <div className={`dc-cahier ${cahier.modeCombinaisons === 'configure' && combinaisonsActives ? 'actif' : ''}`}><Icone nom="sifflet" taille={16} /><span>{cahier.modeCombinaisons === 'automatique' ? 'Jeu automatique · Tes combinaisons sont désactivées pour ce match' : combinaisonsActives ? `Cahier actif · ${combinaisonsActives} combinaison${combinaisonsActives > 1 ? 's' : ''}` : 'Cahier chargé · Aucune combinaison active'}</span></div>}
       <div className={`dc-ecran ${isTmo ? 'dc-ecran-tmo' : ''} ${hasAlerte ? 'dc-ecran-alerte' : ''}`}>
         {m.terrain ? (
           <TerrainEnDirect

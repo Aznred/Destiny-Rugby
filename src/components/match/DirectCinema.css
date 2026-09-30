@@ -96,3 +96,6 @@
 @media(max-width:400px){
   .dc-alerte-terrain span{max-width:115px}
 }
+.dc-cahier { display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: #e0c68e; background: #46351c40; border-top: 1px solid #8c713b; font-size: 12px; line-height: 1.5; }
+.dc-cahier.actif { background: #25473150; border-color: #5e8062; color: #cce2bd; }
+.dc-cahier svg { flex: 0 0 auto; }

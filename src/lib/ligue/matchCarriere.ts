@@ -481,6 +481,7 @@ export interface EtatMatchEnLigne {
    * score, le fil et la feuille de match suffisent à tout raconter.
    */
   equipes?: Record<CoteEnLigne, FeuilleGelee>;
+  /** Consignes au coup d'envoi ; les changements datés restent au journal. */
   strategies: Record<CoteEnLigne, StrategieEnLigne>;
   journal: EvenementMatchEnLigne[];
   decision?: DecisionEnAttente;
@@ -665,7 +666,7 @@ export function cibleDeScore(
  * froid le retrouve à l'identique en rejouant — le cache n'est donc jamais une
  * source de vérité, seulement un raccourci.
  */
-interface EntreeCacheMoteur { moteur: EtatMatch; minute: number; octets: number }
+interface EntreeCacheMoteur { moteur: EtatMatch; minute: number; octets: number; ordresAppliques: number }
 const CACHE = new Map<string, EntreeCacheMoteur>();
 const MOTEUR_VERS_COTE: Record<Cote, CoteEnLigne> = { A: 'domicile', B: 'exterieur' };
 /**
@@ -691,13 +692,13 @@ function poidsMoteur(moteur: EtatMatch): number {
   return 48 * 1024 + moteur.pions.length * 2_048 + moteur.commentaires.length * 320;
 }
 
-function ranger(cle: string, moteur: EtatMatch): void {
+function ranger(cle: string, moteur: EtatMatch, ordresAppliques: number): void {
   const precedente = CACHE.get(cle);
   if (precedente) {
     supprimerCache(cle);
   }
   const entree: EntreeCacheMoteur = {
-    moteur, minute: minuteExacte(moteur), octets: poidsMoteur(moteur),
+    moteur, minute: minuteExacte(moteur), octets: poidsMoteur(moteur), ordresAppliques,
   };
   CACHE.set(cle, entree);
   cacheOctets += entree.octets;
@@ -794,9 +795,11 @@ function appliquerAuMoteur(e: EtatMatch, ev: EvenementMatchEnLigne): void {
     const effective: StrategieEnLigne = { ...c.strategie, mentalite: mentaliteAppliquee(c.strategie, e.minute, ecart) };
     appliquerTactiqueEquipe(e, cote, tactiqueDepuisStrategie(effective), true, impactStrategie(effective));
     e.plansCombinaisons ??= {};
-    e.plansCombinaisons[cote] = effective.modeCombinaisons === 'configure' ? effective.combinaisons ?? [] : [];
+    const plans = effective.modeCombinaisons === 'configure' ? effective.combinaisons ?? [] : [];
+    const cahierModifie = JSON.stringify(e.plansCombinaisons[cote] ?? []) !== JSON.stringify(plans);
+    e.plansCombinaisons[cote] = plans;
     // Un ordre en direct prend effet à la prochaine phase de jeu.
-    if (e.combinaisonPreparee?.cote === cote) e.combinaisonPreparee = undefined;
+    if (cahierModifie && e.combinaisonPreparee?.cote === cote) e.combinaisonPreparee = undefined;
   } else if (c.type === 'remplacement') {
     demanderRemplacement(e, cote, c.entrantId, c.sortantId);
   } else if (c.type === 'decision') {
@@ -843,7 +846,7 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
   if (garde && garde.minute <= jusqua + 1e-9) {
     // Le match est déjà calculé jusqu'ici : on repart de là, sans rien rejouer.
     e = garde.moteur;
-    depart = etat.journal.length;
+    depart = garde.ordresAppliques;
     // Un vrai LRU : un match regardé reste chaud, contrairement au FIFO qui
     // éjectait aussi les directs actifs dès que 16 autres matchs passaient.
     CACHE.delete(cle);
@@ -856,6 +859,7 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
     if (ev.horloge > jusqua) break;
     pousserAvecBascules(e, etat, ev.horloge, []);
     appliquerAuMoteur(e, ev);
+    depart = i + 1;
   }
   // Une présence ne rend jamais le passé interactif. C'était le défaut qui
   // faisait « revenir au début » un direct lorsqu'un entraîneur l'ouvrait :
@@ -888,7 +892,7 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
     if (!actifs.includes(seuil.cote)) actifs.push(seuil.cote);
   }
   pousserAvecBascules(e, etat, jusqua, actifs);
-  ranger(cle, e);
+  ranger(cle, e, depart);
   return e;
 }
 
@@ -901,7 +905,7 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
  */
 function adopterCache(avant: EtatMatchEnLigne, apres: EtatMatchEnLigne, moteur: EtatMatch): void {
   supprimerCache(cleCache(avant));
-  ranger(cleCache(apres), moteur);
+  ranger(cleCache(apres), moteur, apres.journal.length);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1287,6 +1291,7 @@ export function avancerMatchEnLigne(etat: EtatMatchEnLigne, maintenant: number):
  */
 export function commanderMatchEnLigne(
   etat: EtatMatchEnLigne, clubId: string, action: CommandeMatchEnLigne, maintenant: number,
+  signalerPresence = true,
 ): EtatMatchEnLigne {
   if (etat.termine || !etat.equipes) return etat;
   const cote = COTES.find((c) => etat.equipes![c].clubId === clubId);
@@ -1294,7 +1299,8 @@ export function commanderMatchEnLigne(
   const commande = normaliserCommande(action);
   if (!commande) return etat;
 
-  const marque: EtatMatchEnLigne = { ...etat, presence: { ...etat.presence, [cote]: maintenant } };
+  const marque: EtatMatchEnLigne = signalerPresence
+    ? { ...etat, presence: { ...etat.presence, [cote]: maintenant } } : etat;
   if (commande.type === 'presence') return avancerMatchEnLigne(marque, maintenant);
 
   // La décision se prend à la minute où le jeu est arrêté, pas à celle qu'il
@@ -1320,9 +1326,8 @@ export function commanderMatchEnLigne(
 
   const evenement: EvenementMatchEnLigne = { horloge, cote, commande };
   const suivant: EtatMatchEnLigne = { ...marque, journal: [...marque.journal, evenement] };
-  if (commande.type === 'strategie') {
-    suivant.strategies = { ...marque.strategies, [cote]: commande.strategie };
-  }
+  // La base reste celle du coup d'envoi. La remplacer ici appliquerait les
+  // nouvelles combinaisons dans le passé lors d'une reconstruction à froid.
   if (commande.type === 'decision' && marque.decision) {
     // Le gel s'arrête à l'instant du clic : le manager n'a pas volé de temps.
     suivant.gel = gelJusqua(marque, maintenant);
@@ -1331,6 +1336,22 @@ export function commanderMatchEnLigne(
   appliquerAuMoteur(moteur, evenement);
   adopterCache(marque, suivant, moteur);
   return avancerMatchEnLigne(suivant, maintenant);
+}
+
+/** Le cahier rejoint les rencontres en cours sans remplacer les autres
+ * consignes du banc ni déclarer une présence devant le direct. */
+export function actualiserCahierMatchEnLigne(
+  etat: EtatMatchEnLigne, clubId: string,
+  cahier: Pick<StrategieEnLigne, 'modeCombinaisons' | 'combinaisons'>, maintenant: number,
+): EtatMatchEnLigne {
+  if (etat.termine || !etat.equipes) return etat;
+  const cote = COTES.find(c => etat.equipes![c].clubId === clubId);
+  if (!cote) return etat;
+  const actuelle = strategieA(etat, cote, etat.horloge);
+  const demandee = strategieValide({ ...actuelle, ...cahier });
+  if (actuelle.modeCombinaisons === demandee.modeCombinaisons
+    && JSON.stringify(actuelle.combinaisons) === JSON.stringify(demandee.combinaisons)) return etat;
+  return commanderMatchEnLigne(etat, clubId, { type: 'strategie', strategie: demandee }, maintenant, false);
 }
 
 /** Assainit l'ordre reçu du client. Une commande inconnue est simplement ignorée. */

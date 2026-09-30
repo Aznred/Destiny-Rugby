@@ -17,17 +17,25 @@ export interface CombinaisonEnCours extends CombinaisonPreparee {
 export function joueurCombinaison(e: EtatMatch, cote: Cote, numero: number): Pion | undefined {
   return e.pions.find(p => p.cote === cote && p.numero === numero && p.surLeTerrain && p.sanction <= 0);
 }
+/** Vérifie la situation sans tirer de variante ni consommer l'aléatoire. */
+export function combinaisonSituation(e: EtatMatch, phase: PhaseCombinaison): Combinaison | undefined {
+  const cote = e.possession;
+  const plan = choisirCombinaison(e.plansCombinaisons?.[cote] ?? [], phase,
+    cote === 'A' ? e.ballon.x - LIGNE_A : LIGNE_B - e.ballon.x, sens(cote) === 1 ? e.ballon.y : 70 - e.ballon.y);
+  if (!plan) return undefined;
+  const variantes = plan.variantes.filter(v => joueurCombinaison(e, cote, phase === 'touche' ? v.sauteur : v.depart)
+    && (phase !== 'touche' || joueurCombinaison(e, cote, 2))
+    && v.actions.every(a => a.type !== 'passe' || joueurCombinaison(e, cote, a.destinataire)));
+  return variantes.length ? { ...plan, variantes } : undefined;
+}
 export function preparerCombinaison(e: EtatMatch, phase: PhaseCombinaison): void {
   e.combinaisonEnCours = undefined;
   e.combinaisonPreparee = undefined;
   const cote = e.possession;
   const s = sens(cote);
-  const plan = choisirCombinaison(e.plansCombinaisons?.[cote] ?? [], phase,
-    cote === 'A' ? e.ballon.x - LIGNE_A : LIGNE_B - e.ballon.x, s === 1 ? e.ballon.y : 70 - e.ballon.y);
+  const plan = combinaisonSituation(e, phase);
   if (!plan) return;
   const variante = choisirVariante(plan, e.rng);
-  const depart = phase === 'touche' ? variante.sauteur : variante.depart;
-  if (!joueurCombinaison(e, cote, depart) || variante.actions.some(a => a.type === 'passe' && !joueurCombinaison(e, cote, a.destinataire))) return;
   e.combinaisonPreparee = { cote, plan, variante };
   if (phase === 'touche' && e.conquete) {
     if (!joueurCombinaison(e, cote, 2)) { e.combinaisonPreparee = undefined; return; }

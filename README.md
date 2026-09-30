@@ -24,6 +24,11 @@
   la précédente, y compris les déplacements simultanés. Choisis l’étape sur
   le terrain ou dans la liste ; « Naviguer » conserve cette avancée, et
   « Placement initial » revient aux positions de départ.
+  Créer un premier plan choisit « Mes combinaisons ». En jeu automatique, le
+  cahier affiche clairement qu’il est désactivé, avec « Enregistrer et activer ».
+  La sauvegarde transmet aussi le cahier aux matchs en cours dès leur prochaine
+  situation correspondante, en conservant les autres consignes du banc. Le direct
+  indique « Cahier actif » et le nom de la combinaison pendant son exécution.
   Le mode « Avec opposition » teste le cahier en 15 contre 15 : ton XV face à
   une défense d’entraînement de niveau 65, glissée, blitz ou repli. Les placements,
   conquêtes disputées, passes et plaquages viennent du moteur du match ; lecture,
@@ -39,7 +44,8 @@
   L’aperçu anime le lancer puis la sortie, la réussite dépend du match.
   L’accès est contrôlé sur l’identifiant authentifié `kiri`, y compris pour les
   ordres en direct. Vérification : `npm run verify:combinaisons` ; aperçu local :
-  `/scripts/apercuCombinaisons.html`.
+  `/scripts/apercuCombinaisons.html` ; essai dans un vrai moteur de match local :
+  `/scripts/apercuCombinaisonsMatch.html`.
 
 - **Une ligue privée entre potes** : 2 à 20 clubs, code d'invitation,
   championnat aller-retour, coupes inventées par le créateur, palmarès. Écran
