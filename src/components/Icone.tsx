@@ -44,7 +44,7 @@ export type NomIcone =
   | 'bouclier' | 'eclair' | 'calendrier' | 'image' | 'dossier' | 'cadeau'
   | 'contrat' | 'porte' | 'plein-ecran' | 'mallette' | 'repost' | 'lien' | 'partage'
   // ── Les listes déroulantes ───────────────────────────────────────────────
-  | 'chevron';
+  | 'chevron' | 'lecture' | 'pause' | 'moins';
 
 interface Props {
   nom: NomIcone;
@@ -57,6 +57,9 @@ interface Props {
 // cohérent : c'est ce qui garantit que les épaisseurs de trait et les marges
 // optiques se ressemblent d'une icône à l'autre.
 const TRACES: Record<NomIcone, React.ReactNode> = {
+  lecture: <path d="M8 5v14l11-7z" />,
+  pause: <><path d="M8 5v14M16 5v14" strokeWidth="3" /></>,
+  moins: <path d="M5 12h14" />,
   // Trois silhouettes : le groupe, l'effectif.
   equipe: (
     <>

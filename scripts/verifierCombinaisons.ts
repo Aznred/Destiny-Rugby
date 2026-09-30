@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { alignementCombinaison, choisirCombinaison, choisirVariante, combinaisonsValides, creerCombinaison, MAX_COMBINAISONS, toucheValide } from '../src/lib/ligue/combinaisons';
 import { imageApercu, positionsApercu, tracesApercu } from '../src/lib/ligue/apercuCombinaisons';
+import { terrainSimulationCombinaison } from '../src/lib/ligue/simulationCombinaisons';
+import { rugbyAnimations } from '../src/lib/spritesGenerateur/rugbyAnimations';
 import { strategieValide, STRATEGIE_EN_LIGNE_DEFAUT, avancerMatchEnLigne, creerMatchEnLigne } from '../src/lib/ligue/matchCarriere';
 import { preparerCombinaison, demarrerCombinaison, pointSurTerrain, placerCombinaison } from '../src/lib/moteur/combinaisons';
 import { avancer, creerMatch } from '../src/lib/moteur/moteur';
@@ -43,6 +45,47 @@ assert.ok(combinaisonsValides([ancienneTouche])[0], 'Un cahier ancien reste vali
 
 const effectifA = effectifDuClub('Stade Toulousain', 1);
 const effectifB = effectifDuClub('RC Toulon', 1);
+// Le ballon quitte la main au lancer, passe en vol, puis appartient au receveur.
+// Les gestes demandés sont ceux réellement disponibles dans le direct.
+const clips = new Set(rugbyAnimations.map(a => a.id.replace(/^rugby_/, '')));
+const animation = creerCombinaison('animation', 'touche');
+const av = animation.variantes[0]; av.touche = { alignes: 5, distance: 9, feinte: true };
+av.placements.push({ numero: 1, x: -8, y: 23 });
+av.actions = [{ type: 'passe', destinataire: 9 }, { type: 'course', destination: { x: 8, y: 10 } }, { type: 'leurre', numero: 12, destination: { x: 6, y: 15 } }, { type: 'pied', intention: 'chandelle' }];
+const rendu = (temps: number | null) => {
+  const image = imageApercu(animation, av, temps);
+  return { image, terrain: terrainSimulationCombinaison(animation, av, image, temps, { 2: 'Lanceur', 4: 'Sauteur' }) };
+};
+assert.equal(rendu(null).image.porteur, 2);
+assert.equal(rendu(1.2).image.porteur, 2);
+assert.equal(rendu(1.65).image.porteur, null);
+assert.equal(rendu(1.95).image.porteur, 4);
+const saut = rendu(1.65).terrain;
+assert.equal(saut.pions.length, 15); assert.equal(saut.pions.find(p => p.numero === 2)?.nom, 'Lanceur');
+assert.ok(saut.gestes?.some(g => g.clip === 'lineout_throw'));
+assert.ok(saut.gestes?.some(g => g.clip === 'lineout_jump'));
+assert.equal(saut.gestes?.filter(g => g.clip === 'lineout_lift').length, 2);
+assert.ok(rendu(2.5).terrain.gestes?.some(g => g.clip.startsWith('pass')));
+assert.equal(rendu(2.5).image.porteur, null);
+assert.equal(rendu(2.95).image.porteur, 9);
+assert.ok(Math.hypot(rendu(3.5).terrain.pions.find(p => p.numero === 9)!.vx, rendu(3.5).terrain.pions.find(p => p.numero === 9)!.vy) > 1);
+assert.ok(Math.hypot(rendu(4.5).terrain.pions.find(p => p.numero === 12)!.vx, rendu(4.5).terrain.pions.find(p => p.numero === 12)!.vy) > 1);
+assert.equal(rendu(5.65).image.porteur, null); assert.ok(rendu(5.65).image.hauteurBallon > 3);
+assert.ok(rendu(5.65).terrain.gestes?.some(g => g.clip === 'chip'));
+assert.deepEqual(rendu(3), rendu(3), 'Une pause ou un retour dans le tracé produit la même pose');
+assert.deepEqual(rendu(3).image.positions[1], positionsApercu(animation, av)[1], 'La feinte ne rétablit pas l’ancien alignement après la sortie');
+const departAvant = structuredClone(animation);
+departAvant.variantes[0].actions = [{ type: 'leurre', numero: 1, destination: { x: 6, y: 18 } }];
+const avantPrise = imageApercu(departAvant, departAvant.variantes[0], 1.999).positions[1];
+const apresPrise = imageApercu(departAvant, departAvant.variantes[0], 2).positions[1];
+assert.ok(Math.hypot(avantPrise.x - apresPrise.x, avantPrise.y - apresPrise.y) < .01, 'L’appel immédiat d’un avant reste continu à la réception');
+for (let instant = 0; instant <= 6; instant += .05) {
+  const { image, terrain } = rendu(instant);
+  for (const pion of terrain.pions) for (const n of [pion.x, pion.y, pion.vx, pion.vy]) assert.ok(Number.isFinite(n));
+  for (const geste of terrain.gestes ?? []) assert.ok(clips.has(geste.clip), `Animation absente : ${geste.clip}`);
+  assert.equal(Boolean(terrain.porteurId), image.porteur !== null);
+  assert.ok(image.hauteurBallon >= 0);
+}
 // Le lancer, son sauteur et son alignement concordent avec le tracé, dans
 // les deux sens d'attaque et sur les deux lignes de touche.
 for (const cote of ['A', 'B'] as const) for (const bord of [0, 70]) for (const distance of [5, 9, 15]) {

@@ -4,7 +4,9 @@
 
 - **Cahier de combinaisons, en bêta privée Kiri** : onglet « Combinaisons · bêta »,
   éditeur libre sur terrain 2D agrandissable, zoom sur le jeu ou sur le lancer,
-  lecture avec pause, progression et étapes. Placement du XV, passes vers les numéros choisis,
+  joueurs animés et maillots du club comme dans le direct, lecture avec pause,
+  ralenti, progression et étapes, tracés affichables à volonté. Boutons regroupés
+  par usage et commandes adaptées au téléphone. Placement du XV, passes vers les numéros choisis,
   courses, appels/leurres et sept intentions au pied. Jusqu’à 12 combinaisons,
   chacune avec trois variantes pondérées et dix actions. Déclenchement sur mêlée,
   touche ou ruck, selon les 22 et le côté du terrain. En mode « Mes combinaisons »,
@@ -81,7 +83,9 @@
   première chose qui sonne faux quand on regarde une feuille de match.
 - **Ouvrir un pack est une séquence** : la pochette se déchire, les cartes se
   retournent une à une de la moins bonne à la meilleure, et la lueur du fond
-  annonce la rareté avant le nom.
+  annonce la rareté avant le nom. Chaque clic sur la pochette révèle une montée
+  éventuelle ou l’ouverture : aucun bouton « Améliorer le pack » ni texte ne
+  dévoile le prochain palier. La pochette reste accessible au clavier.
 - **LE COLLECTIF, et il se voit.** Une équipe qui se connaît joue mieux : la
   composition affiche une note de 0 à 100, chaque carte du terrain porte la
   sienne de 0 à 10, et l’infobulle dit POURQUOI. Trois affinités, de la plus

@@ -154,8 +154,14 @@ Le cahier de combinaisons est une **bêta privée du compte authentifié `kiri`*
 côté) et tire les variantes pondérées. `components/EditeurCombinaisons.tsx`
 offre un bac à sable 2D : placements, passes par numéro, courses, leurres et
 jeu au pied. `TerrainCombinaison.tsx` ouvre un terrain agrandi (portal et
-`useModalDialog`), avec zoom, déplacement de la vue, pause et lecture par étape.
-`ligue/apercuCombinaisons.ts` calcule le tracé, y compris le lancer du n° 2.
+`useModalDialog`), avec zoom, déplacement de la vue, pause, ralenti et lecture
+par étape. Ses commandes sont regroupées, avec pictogrammes `Icone` et cibles
+tactiles. `ligue/apercuCombinaisons.ts` calcule le tracé, les mouvements et la
+possession du ballon, y compris le lancer du n° 2. `simulationCombinaisons.ts`
+adapte ces images à `TerrainDirect` et aux gestes du `SpriteRugbymanMemo` des
+matchs : lancer, saut, lift, passe, réception, course et pied. Le club fournit
+son maillot tiré de l’écusson. Les tracés peuvent être masqués ; la pose et le
+ballon restent pilotés par la progression, même en pause.
 Chaque variante de touche peut choisir 4/5/7 alignés, le sauteur, une réception
 entre 5 et 15 m et une feinte au premier bloc. `alignementCombinaison` partage
 la formation entre aperçu et `phasesArretees.ts` ; `preparerCombinaison`
@@ -171,6 +177,12 @@ correspondante ou joueur disponible, le moteur reprend son jeu habituel.
 `carriereApi.ts` transmet l’autorisation vérifiée à `agirCarriere` ; jamais
 depuis un pseudo ou un drapeau envoyé par le client. Le cahier adverse reste
 privé dans la vue de ligue. Banc : `npm run verify:combinaisons`.
+
+`OuverturePack.tsx` ne montre aucun bouton d’amélioration ni indication du
+prochain palier avant le clic. Le bouton transparent sur la pochette porte le
+libellé neutre « Ouvrir le pack » et reçoit le focus au clavier. Les montées
+restent révélées au toucher ; le bouton du bas apparaît à la révélation des
+cartes. Aperçu local : `/scripts/apercuPacks.html`.
 
 **Ces fichiers tournent des deux côtés** — navigateur ET fonctions serverless —
 comme `classementMondial.ts` : aucun import du store, aucun DOM, aucune horloge

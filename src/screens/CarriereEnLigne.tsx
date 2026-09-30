@@ -1404,10 +1404,18 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
 
 function CombinaisonsLigue({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
+  const secours = useMemo(() => couleursDirect(club?.id ?? 'atelier', 'atelier-opposition').maillots!.domicile, [club?.id]);
+  const [maillot, setMaillot] = useState(secours);
+  useEffect(() => {
+    let actif = true;
+    setMaillot(secours);
+    if (club?.embleme) void maillotDepuisBlason(club.embleme, secours, club.id).then(m => { if (actif) setMaillot(m); });
+    return () => { actif = false; };
+  }, [club?.id, club?.embleme, secours]);
   if (!club?.strategie || !club.composition) return null;
   const strategie = club.strategie;
   const joueurs = Object.fromEntries(club.composition.titulaires.map((id, i) => [i + 1, vue.cartes.find(c => c.id === id)?.nom ?? `N° ${i + 1}`]));
-  return <EditeurCombinaisons combinaisons={strategie.combinaisons} mode={strategie.modeCombinaisons} joueurs={joueurs} occupe={occupe}
+  return <EditeurCombinaisons combinaisons={strategie.combinaisons} mode={strategie.modeCombinaisons} joueurs={joueurs} maillot={maillot} occupe={occupe}
     enregistrer={async (combinaisons, modeCombinaisons) => Boolean(await agir({ type: 'strategie', strategie: { ...strategie, combinaisons, modeCombinaisons } }))} />;
 }
 

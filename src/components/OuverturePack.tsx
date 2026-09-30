@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CarteCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { creerSonsPacks } from '../lib/sonsPacks';
-import { nomRaretePack, PALIERS_PACK, rangPack } from '../lib/presentationPacks';
+import { PALIERS_PACK, rangPack } from '../lib/presentationPacks';
 import { t } from '../lib/i18n';
 import './OuverturePack.css';
 
@@ -40,7 +40,8 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   const meilleurRang = cartes?.reduce((meilleur, carte) => Math.max(meilleur, rangPack(carte)), rangInitial) ?? rangInitial;
   const prochainPalier = !modele && pret && rang < meilleurRang;
   const attenteTirage = !modele && !pret;
-  const libelleAction = attenteTirage ? t('online.pack.waitCards') : prochainPalier ? t('online.pack.upgradeNow') : t('online.pack.openNow');
+  // Le libellé ne doit pas annoncer une amélioration avant de toucher le pack.
+  const libelleAction = attenteTirage ? t('online.pack.waitCards') : t('online.pack.openNow');
   const [phase, setPhase] = useState<'attente'|'charge'|'evolution'|'ouverture'|'cartes'>('attente');
   const [animationFinie, setAnimationFinie] = useState(false);
   const [revelees, setRevelees] = useState(0);
@@ -111,7 +112,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   useEffect(() => {
     if (pret && animationFinie) setPhase('cartes');
   }, [pret, animationFinie]);
-  useEffect(() => { principale.current?.focus(); }, [phase]);
+  useEffect(() => { principale.current?.focus(); }, [phase, pret]);
   function avancerPack() {
     if (phase !== 'attente') return;
     if (attenteTirage) return;
@@ -154,10 +155,10 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
       <div className="pack-show-beams" aria-hidden="true"/><div className="pack-show-orbit" aria-hidden="true"/>
       <div className="pack-show-particles" key={rang} aria-hidden="true">{Array.from({length:28}, (_,i) => <i key={i} style={{'--x':`${i*37%100}%`, '--delay':`${i%9*-.35}s`, '--duration':`${2+i%4}s`, '--drift':`${(i%2?1:-1)*(20+i*3)}px`} as CSSProperties}/>)}</div>
       <div className="pack-show-model"><Suspense fallback={null}><Pack3D rarete={rarete} rareteSuivante={prochainPalier ? PALIERS_PACK[rang + 1] : undefined} modele={modele} ouvert={phase === 'ouverture'} calme={calme} transition={phase}/></Suspense></div>
-      {phase === 'attente' && <button type="button" className="pack-show-touch" onClick={avancerPack} disabled={attenteTirage} aria-label={libelleAction} />}
+      {phase === 'attente' && <button ref={principale} type="button" className="pack-show-touch" onClick={avancerPack} disabled={attenteTirage} aria-label={libelleAction} />}
       {(phase === 'charge' || phase === 'evolution') && <div className="pack-show-upgrade" aria-hidden="true"><i/><i/><span/></div>}
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}
-    </div><p className="pack-show-hint" aria-live="polite">{phase === 'attente' ? attenteTirage ? t('online.pack.waitCards') : prochainPalier ? t('online.pack.upgradeHint', { rarity: nomRaretePack(PALIERS_PACK[rang + 1]) }) : t('online.pack.openHint') : phase === 'charge' || phase === 'evolution' ? t('online.pack.upgrading') : t('online.shop.opening')}</p></> : <div className="pack-show-results" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
+    </div><p className="pack-show-hint" aria-live="polite">{phase === 'attente' ? attenteTirage ? t('online.pack.waitCards') : t('online.pack.openHint') : phase === 'charge' || phase === 'evolution' ? t('online.pack.upgrading') : t('online.shop.opening')}</p></> : <div className="pack-show-results" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
       const visible = i >= ordre.length - revelees;
       const meilleure = i === 0;
       const active = i === carteActive;
@@ -173,7 +174,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
         <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>DESTINY</small><b>DR</b><span>RUGBY</span><i>✦</i></div><div className="pack-show-front" aria-hidden={!visible}>{visible && rendreCarte(carte)}</div></div>
       </div>;
     })}</div>}
-    {((phase === 'attente' && prochainPalier) || phase === 'cartes') && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={phase === 'attente' ? avancerPack : toutes ? onFermer : passer}>{phase === 'attente' ? libelleAction : toutes ? t('online.pack.clubhouse') : t('online.pack.reveal')}</button></footer>}
+    {phase === 'cartes' && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={toutes ? onFermer : passer}>{toutes ? t('online.pack.clubhouse') : t('online.pack.reveal')}</button></footer>}
     <span className="pack-show-sr" aria-live="polite">{muet?t('online.pack.soundMuted'):t('online.pack.soundActive')}</span>
   </main></div>, document.body);
 }

@@ -1,9 +1,12 @@
-import { useEffect, useId, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icone } from './Icone';
 import { useModalDialog } from '../lib/useModalDialog';
 import { alignementCombinaison, origineApercu, toucheValide, type ActionCombinaison, type Combinaison, type PointCombinaison, type VarianteCombinaison } from '../lib/ligue/combinaisons';
 import { imageApercu, positionsApercu } from '../lib/ligue/apercuCombinaisons';
+import { terrainSimulationCombinaison } from '../lib/ligue/simulationCombinaisons';
+import { maillotDeSecours, type MaillotMatch } from '../lib/moteur/apparenceMatch';
+import { SpriteRugbymanMemo } from './match/SpriteRugbyman';
 
 const borner = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -14,10 +17,11 @@ function TerrainAgrandi({ children, fermer }: { children: ReactNode; fermer: () 
   </div>, document.body);
 }
 
-export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, joueur, actionIndex, bloque, selectionner, placer, modifierAction, modifierVariante }: {
+export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, maillot, joueur, actionIndex, bloque, selectionner, placer, modifierAction, modifierVariante }: {
   combinaison: Combinaison;
   variante: VarianteCombinaison;
   joueurs: Record<number, string>;
+  maillot?: MaillotMatch;
   joueur: number;
   actionIndex: number | null;
   bloque: boolean;
@@ -29,18 +33,28 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, joueu
   const [agrandi, setAgrandi] = useState(false);
   const [temps, setTemps] = useState<number | null>(null);
   const [lecture, setLecture] = useState(false);
+  const [vitesse, setVitesse] = useState(1);
+  const [tracesVisibles, setTracesVisibles] = useState(true);
   const [vue, setVue] = useState<'terrain' | 'combinaison' | 'touche'>('terrain');
   const [zoom, setZoom] = useState(1);
   const [decalage, setDecalage] = useState({ x: 0, y: 0 });
   const [apresReception, setApresReception] = useState(false);
   const glisse = useRef<number | null>(null);
   const boutonTerrain = useRef<HTMLButtonElement>(null);
+  const terrainRef = useRef<SVGSVGElement>(null);
+  const [tailleTerrain, setTailleTerrain] = useState({ largeur: 700, hauteur: 490 });
   const marqueur = useId().replace(/:/g, '');
   const origine = origineApercu(c);
   const initiales = positionsApercu(c, v);
-  const image = imageApercu(c, v, temps);
-  const positions = c.phase === 'touche' && temps === null && apresReception ? initiales : image.positions;
-  const ballon = c.phase === 'touche' && temps === null && apresReception ? initiales[v.sauteur] : image.ballon;
+  const image = useMemo(() => {
+    const resultat = imageApercu(c, v, temps);
+    return c.phase === 'touche' && temps === null && apresReception
+      ? { ...resultat, positions: positionsApercu(c, v), ballon: positionsApercu(c, v)[v.sauteur], porteur: v.sauteur } : resultat;
+  }, [c, v, temps, apresReception]);
+  const positions = image.positions;
+  const ballon = image.ballon;
+  const simulation = useMemo(() => terrainSimulationCombinaison(c, v, image, temps, joueurs), [c, v, image, temps, joueurs]);
+  const tenue = useMemo(() => maillot ?? maillotDeSecours('#b9473d', 'atelier'), [maillot]);
   const traces = image.traces;
   const touche = toucheValide(v.touche);
   const formation = alignementCombinaison(v);
@@ -51,11 +65,23 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, joueu
 
   useEffect(() => {
     if (!lecture) return;
-    const timer = window.setInterval(() => setTemps(t => Math.min((t ?? 0) + .04, traces.length)), 40);
+    let precedent = performance.now();
+    const timer = window.setInterval(() => {
+      const maintenant = performance.now(); const delta = Math.min((maintenant - precedent) / 1000, .12) * vitesse;
+      precedent = maintenant; setTemps(t => Math.min((t ?? 0) + delta, traces.length));
+    }, 40);
     return () => window.clearInterval(timer);
-  }, [lecture, traces.length]);
+  }, [lecture, traces.length, vitesse]);
   useEffect(() => { if (temps !== null && temps >= traces.length) setLecture(false); }, [temps, traces.length]);
   useEffect(() => { setTemps(null); setLecture(false); }, [v, actionIndex, c.phase, c.zone, c.couloir]);
+  useEffect(() => {
+    const svg = terrainRef.current;
+    if (!svg) return;
+    const observer = new ResizeObserver(() => {
+      const r = svg.getBoundingClientRect(); setTailleTerrain({ largeur: r.width, hauteur: r.height });
+    });
+    observer.observe(svg); return () => observer.disconnect();
+  }, [agrandi]);
 
   const points = traces.flatMap(t => [t.de, t.vers]);
   const minX = Math.min(origine.x, ...points.map(p => p.x));
@@ -68,6 +94,8 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, joueu
   const centre = vue === 'terrain' ? { x: 50, y: 35 } : vue === 'touche' ? { x: origine.x, y: c.couloir === 'droite' ? 60 : 10 }
     : { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
   const coin = { x: borner(centre.x + decalage.x - largeur / 2, 0, 100 - largeur), y: borner(centre.y + decalage.y - hauteur / 2, 0, 70 - hauteur) };
+  const pixelsParMetre = Math.min(tailleTerrain.largeur / (largeur + 6), tailleTerrain.hauteur / (hauteur + 8));
+  const hauteurJoueur = borner(40 / (pixelsParMetre || 1), 4.2, 9);
   const choisirVue = (valeur: typeof vue) => { setVue(valeur); setZoom(1); setDecalage({ x: 0, y: 0 }); };
   const pointDuClic = (e: PointerEvent<SVGSVGElement>) => {
     const point = e.currentTarget.createSVGPoint(); point.x = e.clientX; point.y = e.clientY;
@@ -106,15 +134,17 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, joueu
     </div>
     <div className="ec-visualiseur">
       <div className="ec-visualiseur-principal">
-        <div className="ec-vues" role="group" aria-label="Vue du terrain">
-          <button className={`btn ${vue === 'terrain' ? 'primaire' : 'fantome'}`} aria-pressed={vue === 'terrain'} onClick={() => choisirVue('terrain')}>Terrain entier</button>
-          <button className={`btn ${vue === 'combinaison' ? 'primaire' : 'fantome'}`} aria-pressed={vue === 'combinaison'} onClick={() => choisirVue('combinaison')}>La combinaison</button>
-          {c.phase === 'touche' && <button className={`btn ${vue === 'touche' ? 'primaire' : 'fantome'}`} aria-pressed={vue === 'touche'} onClick={() => choisirVue('touche')}>Le lancer</button>}
-          <div className="ec-zoom"><button className="btn fantome" disabled={zoom <= 1} aria-label="Dézoomer le terrain" onClick={() => setZoom(z => Math.max(1, z - .5))}>−</button><span>{Math.round(zoom * 100)} %</span><button className="btn fantome" disabled={zoom >= 3} aria-label="Zoomer le terrain" onClick={() => setZoom(z => Math.min(3, z + .5))}>+</button></div>
+        <div className="ec-vues">
+          <div className="ec-segments" role="group" aria-label="Vue du terrain">
+            <button className="btn fantome" aria-pressed={vue === 'terrain'} onClick={() => choisirVue('terrain')}>Terrain entier</button>
+            <button className="btn fantome" aria-pressed={vue === 'combinaison'} onClick={() => choisirVue('combinaison')}>La combinaison</button>
+            {c.phase === 'touche' && <button className="btn fantome" aria-pressed={vue === 'touche'} onClick={() => choisirVue('touche')}>Le lancer</button>}
+          </div>
+          <div className="ec-zoom"><button className="btn fantome ec-bouton-icone" disabled={zoom <= 1} aria-label="Dézoomer le terrain" onClick={() => setZoom(z => Math.max(1, z - .5))}><Icone nom="moins" taille={16} /></button><span>{Math.round(zoom * 100)} %</span><button className="btn fantome ec-bouton-icone" disabled={zoom >= 3} aria-label="Zoomer le terrain" onClick={() => setZoom(z => Math.min(3, z + .5))}><Icone nom="ajouter" taille={16} /></button></div>
         </div>
         {c.phase === 'touche' && <div className="ec-moment-touche" role="group" aria-label="Placement de la touche"><button className="btn fantome" aria-pressed={!apresReception} onClick={() => { setApresReception(false); setTemps(null); setLecture(false); }}>Au lancer</button><button className="btn fantome" aria-pressed={apresReception} onClick={() => { setApresReception(true); setTemps(null); setLecture(false); }}>Après réception</button></div>}
         <div className="ec-cadre-terrain">
-          <svg className="ec-terrain" viewBox={`${coin.x} ${coin.y} ${largeur} ${hauteur}`} aria-label="Terrain 2D de création de combinaisons" onPointerDown={toucherTerrain}
+          <svg ref={terrainRef} className={`ec-terrain ${temps !== null ? 'ec-relecture' : ''}`} viewBox={`${coin.x - 3} ${coin.y - 5} ${largeur + 6} ${hauteur + 8}`} aria-label="Terrain 2D de création de combinaisons" onPointerDown={toucherTerrain}
             onPointerMove={e => { if (glisse.current && !bloque) placerSurTerrain(glisse.current, pointDuClic(e)); }}
             onPointerUp={e => { glisse.current = null; if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }} onPointerCancel={() => { glisse.current = null; }}>
             <defs><marker id={`${marqueur}-fleche`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" /></marker></defs>
@@ -126,33 +156,39 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, joueu
               <circle cx={positions[v.sauteur].x} cy={positions[v.sauteur].y} r="1.2" fill="none" stroke="#83e4ca" strokeWidth=".2" />
               <text x={origine.x + 3} y={c.couloir === 'droite' ? 65 : 5} fontSize="1.6" fill="#d0e6d5">5 m</text><text x={origine.x + 3} y={c.couloir === 'droite' ? 55 : 15} fontSize="1.6" fill="#d0e6d5">15 m</text>
             </g>}
-            {traces.map((trace, i) => <g key={i} opacity={temps !== null ? etape === i ? 1 : .3 : actionIndex === null || trace.indexAction === actionIndex || !trace.action ? .95 : .3}>
+            {tracesVisibles && traces.map((trace, i) => <g key={i} opacity={temps !== null ? etape === i ? 1 : .3 : actionIndex === null || trace.indexAction === actionIndex || !trace.action ? .95 : .3}>
               <path d={`M${trace.de.x} ${trace.de.y} L${trace.vers.x} ${trace.vers.y}`} fill="none" stroke={!trace.action ? '#83e4ca' : trace.action.type === 'passe' ? '#f1d491' : trace.action.type === 'pied' ? '#b4befa' : '#9cddbf'} strokeWidth=".45" strokeDasharray={!trace.action || trace.action.type === 'passe' || trace.action.type === 'pied' ? '1.4 1.1' : undefined} markerEnd={`url(#${marqueur}-fleche)`} />
               <text x={(trace.de.x + trace.vers.x) / 2 + 1.5} y={(trace.de.y + trace.vers.y) / 2 - 1} fontSize="1.7" fill="#fff">{trace.indexAction === undefined ? trace.acteur === 2 ? 'L' : 'F' : trace.indexAction + 1}</text>
             </g>)}
-            {Object.entries(positions).map(([n, p]) => {
-              const compact = c.phase === 'touche' && formation.some(f => f.numero === Number(n)) && (temps === null ? !apresReception : !traces[etape]?.action);
-              return <g key={n} data-numero={n} transform={`translate(${p.x} ${p.y})`} role="button" tabIndex={bloque || temps !== null ? -1 : 0} aria-label={`Sélectionner le numéro ${n}${joueurs[Number(n)] ? `, ${joueurs[Number(n)]}` : ''}`} onKeyDown={e => {
+            {[...simulation.pions].sort((a, b) => a.y - b.y || a.numero - b.numero).map(pion => {
+              const n = pion.numero; const p = positions[n];
+              return <g key={n} data-numero={n} role="button" tabIndex={bloque || temps !== null ? -1 : 0} aria-label={`Sélectionner le numéro ${n}${joueurs[n] ? `, ${joueurs[n]}` : ''}`} onKeyDown={e => {
               if (bloque || temps !== null) return;
-              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectionner(Number(n)); }
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectionner(n); if (action?.type === 'passe') modifierAction({ type: 'passe', destinataire: n }); }
               const directions: Record<string, PointCombinaison> = { ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } };
-              const direction = directions[e.key]; if (direction) { e.preventDefault(); placerSurTerrain(Number(n), { x: p.x + direction.x, y: p.y + direction.y }); }
-            }}><title>{joueurs[Number(n)] ?? `N° ${n}`}{c.phase === 'touche' && Number(n) === 2 ? ' · Lanceur' : c.phase === 'touche' && Number(n) === v.sauteur ? ' · Sauteur' : ''}</title>
-              <circle r={compact ? .68 : 1.6} fill={Number(n) === joueur ? '#e6c17e' : '#132d25'} stroke={Number(n) === joueur ? '#fff0bc' : lifteurs.some(p => p.numero === Number(n)) && c.phase === 'touche' ? '#83e4ca' : '#bdcabd'} strokeWidth={compact ? .15 : .3} /><text textAnchor="middle" dominantBaseline="central" fontSize={compact ? 1.05 : 1.65} fontWeight="700" fill={Number(n) === joueur ? '#193c2c' : '#fff'}>{n}</text>
+              const direction = directions[e.key]; if (direction) { e.preventDefault(); placerSurTerrain(n, { x: p.x + direction.x, y: p.y + direction.y }); }
+            }}><title>{joueurs[n] ?? `N° ${n}`}{c.phase === 'touche' && n === 2 ? ' · Lanceur' : c.phase === 'touche' && n === v.sauteur ? ' · Sauteur' : ''}</title>
+              <ellipse className="ec-selection-joueur" cx={p.x} cy={p.y + .15} rx={hauteurJoueur * .23} ry={hauteurJoueur * .1} fill={n === joueur ? '#e6c17e50' : '#091b1760'} stroke={n === joueur ? '#f1d491' : 'none'} strokeWidth=".18" />
+              <SpriteRugbymanMemo pion={pion} position={p} terrain={simulation} maillot={tenue} porteur={image.porteur === n} positionPorteur={image.porteur === null ? undefined : positions[image.porteur]} hauteurMetres={hauteurJoueur} temps={temps ?? 0} compact={tailleTerrain.largeur < 700} />
+              <g className="ec-badge-joueur" transform={`translate(${p.x + hauteurJoueur * .26} ${p.y - hauteurJoueur * .18}) scale(${hauteurJoueur / 3.8})`}><rect x="-.7" y="-.7" width="1.4" height="1.4" rx=".35" fill={n === joueur ? '#e6c17e' : '#132d25'} stroke={lifteurs.some(l => l.numero === n) && c.phase === 'touche' ? '#83e4ca' : '#bdcabd'} strokeWidth=".12" /><text textAnchor="middle" dominantBaseline="central" fontSize=".95" fontWeight="700" fill={n === joueur ? '#193c2c' : '#fff'}>{n}</text></g>
+              <rect className="ec-cible-joueur" x={p.x - hauteurJoueur * .35} y={p.y - hauteurJoueur * .78} width={hauteurJoueur * .9} height={hauteurJoueur} rx=".5" fill="transparent" />
             </g>; })}
-            <ellipse cx={ballon.x + 1.7} cy={ballon.y} rx="1" ry=".6" fill="#faf3dc" stroke="#a78b51" strokeWidth=".2" transform={`rotate(-30 ${ballon.x + 1.7} ${ballon.y})`} />
+            {image.porteur === null && <g className="ec-ballon-vol" pointerEvents="none"><ellipse cx={ballon.x} cy={ballon.y} rx=".65" ry=".3" fill="#08161050" /><ellipse cx={ballon.x} cy={ballon.y - image.hauteurBallon * .8 - .6} rx=".65" ry=".4" fill="#faf3dc" stroke="#a78b51" strokeWidth=".15" /></g>}
           </svg>
         </div>
-        {(zoom > 1 || vue !== 'terrain') && <div className="ec-deplacement" role="group" aria-label="Déplacer la vue"><span>Déplacer la vue</span>{([['Gauche', -8, 0, '←'], ['Droite', 8, 0, '→'], ['Haut', 0, -6, '↑'], ['Bas', 0, 6, '↓']] as const).map(([nom, x, y, fleche]) => <button key={nom} className="btn fantome" aria-label={`Vue vers ${nom.toLowerCase()}`} onClick={() => setDecalage(d => ({ x: borner(centre.x + d.x + x, largeur / 2, 100 - largeur / 2) - centre.x, y: borner(centre.y + d.y + y, hauteur / 2, 70 - hauteur / 2) - centre.y }))}>{fleche}</button>)}</div>}
+        {(zoom > 1 || vue !== 'terrain') && <div className="ec-deplacement" role="group" aria-label="Déplacer la vue"><span>Déplacer la vue</span>{([['Gauche', -8, 0, 'gauche'], ['Droite', 8, 0, 'droite'], ['Haut', 0, -6, 'haut'], ['Bas', 0, 6, 'bas']] as const).map(([nom, x, y, direction]) => <button key={nom} className="btn fantome ec-bouton-icone" aria-label={`Vue vers ${nom.toLowerCase()}`} onClick={() => setDecalage(d => ({ x: borner(centre.x + d.x + x, largeur / 2, 100 - largeur / 2) - centre.x, y: borner(centre.y + d.y + y, hauteur / 2, 70 - hauteur / 2) - centre.y }))}><Icone nom="fleche-droite" taille={15} className={`ec-fleche-${direction}`} /></button>)}</div>}
         <div className="ec-lecture">
-          <div className="ec-commandes-lecture"><button className="btn primaire" disabled={!traces.length || bloque} onClick={() => { if (lecture) setLecture(false); else { if (temps === null || temps >= traces.length) setTemps(0); setLecture(true); } }}><Icone nom="video" taille={15} />{lecture ? 'Pause' : temps !== null && temps > 0 && temps < traces.length ? 'Reprendre' : 'Visualiser'}</button>
-            <button className="btn fantome" disabled={!traces.length} onClick={() => { montrerEtape(0); setLecture(true); }}>Rejouer</button>
-            <button className="btn fantome" disabled={temps === null || temps <= 0} aria-label="Étape précédente" onClick={() => montrerEtape(Math.max(0, Math.ceil(temps ?? 0) - 1))}>←</button>
-            <button className="btn fantome" disabled={!traces.length || temps !== null && temps >= traces.length} aria-label="Étape suivante" onClick={() => montrerEtape(Math.floor(temps ?? 0) + 1)}>→</button>
-            <button className="btn fantome" disabled={temps === null} onClick={() => { setLecture(false); setTemps(null); }}>Revenir à l’édition</button>
+          <div className="ec-commandes-lecture"><button className="btn primaire ec-visualiser" disabled={!traces.length || bloque} onClick={() => { if (lecture) setLecture(false); else { if (temps === null || temps >= traces.length) setTemps(0); setLecture(true); } }}><Icone nom={lecture ? 'pause' : 'lecture'} taille={17} />{lecture ? 'Pause' : temps !== null && temps > 0 && temps < traces.length ? 'Reprendre' : 'Visualiser'}</button>
+            <div className="ec-transport" role="group" aria-label="Parcourir l’animation">
+              <button className="btn fantome ec-bouton-icone" disabled={!traces.length || bloque} aria-label="Rejouer la combinaison" title="Rejouer" onClick={() => { montrerEtape(0); setLecture(true); }}><Icone nom="repost" taille={16} /></button>
+              <button className="btn fantome ec-bouton-icone" disabled={temps === null || temps <= 0} aria-label="Étape précédente" title="Étape précédente" onClick={() => montrerEtape(Math.max(0, Math.ceil(temps ?? 0) - 1))}><Icone nom="fleche-droite" taille={16} className="ec-fleche-gauche" /></button>
+              <button className="btn fantome ec-bouton-icone" disabled={!traces.length || temps !== null && temps >= traces.length} aria-label="Étape suivante" title="Étape suivante" onClick={() => montrerEtape(Math.floor(temps ?? 0) + 1)}><Icone nom="fleche-droite" taille={16} /></button>
+            </div>
+            <label className="ec-vitesse">Vitesse<select value={vitesse} onChange={e => setVitesse(Number(e.target.value))}><option value=".5">× 0,5</option><option value="1">× 1</option><option value="1.5">× 1,5</option></select></label>
+            <button className="btn fantome ec-retour-edition" disabled={temps === null} onClick={() => { setLecture(false); setTemps(null); }}><Icone nom="formation" taille={15} />Revenir à l’édition</button>
           </div>
-          <label className="ec-progression">Progression du tracé<input type="range" min="0" max={traces.length} step=".05" value={temps ?? 0} disabled={!traces.length} onChange={e => montrerEtape(Number(e.target.value))} /></label>
-          <p className="ec-etape" aria-live="off">{temps === null ? 'Placement de départ' : temps >= traces.length ? 'Fin de la combinaison' : traces[etape]?.libelle}</p>
+          <label className="ec-progression"><span>Progression de la combinaison <span>{temps === null ? 'Prêt à jouer' : `${Math.min(Math.floor(temps) + 1, traces.length)} / ${traces.length}`}</span></span><input type="range" min="0" max={traces.length} step=".05" value={temps ?? 0} disabled={!traces.length} onChange={e => montrerEtape(Number(e.target.value))} /></label>
+          <div className="ec-infos-lecture"><p className="ec-etape" aria-live="off">{temps === null ? 'Placement de départ' : temps >= traces.length ? 'Fin de la combinaison' : traces[etape]?.libelle}</p><button className="btn fantome ec-traces" aria-pressed={tracesVisibles} onClick={() => setTracesVisibles(t => !t)}><Icone nom="oeil" taille={15} />Tracés</button></div>
         </div>
         <div className="ec-legende"><span className="lancer">Lancer</span><span className="passe">Passe</span><span className="course">Course / appel</span><span className="pied">Jeu au pied</span></div>
         <p className="ec-aide">{temps !== null ? 'Mets en pause ou avance étape par étape. Reviens à l’édition pour déplacer les joueurs.' : destination ? 'Clique sur le terrain pour choisir la destination de cette action.' : action?.type === 'passe' ? 'Clique sur le joueur qui doit recevoir cette passe.' : 'Glisse un joueur, ou sélectionne son numéro puis clique sur le terrain. Tu peux aussi utiliser les flèches du clavier.'}</p>
@@ -171,7 +207,10 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, joueu
           <label>Largeur (m)<input type="number" disabled={c.phase === 'touche' && joueur === 2} min="-65" max="65" step=".5" value={Math.round((initiales[joueur].y - origine.y) * 10) / 10} onChange={e => placerSurTerrain(joueur, { ...initiales[joueur], y: origine.y + Number(e.target.value) })} /></label>
           {c.phase === 'touche' && joueur <= 8 && <p className="ec-info">Pendant le lancer, les avants gardent leur alignement. {joueur === 2 ? 'Le lanceur reste sur la touche.' : joueur === v.sauteur ? 'Choisis la réception avec la distance du lancer ; une course déplace ensuite le sauteur.' : 'Ce placement s’applique après la réception.'}</p>}
         </fieldset>
-        {agrandi && <div className="ec-etapes"><h3>Voir chaque geste</h3>{traces.map((trace, i) => <button className={`ec-plan ${etape === i ? 'selectionne' : ''}`} key={i} onClick={() => montrerEtape(i + .5)}>{trace.libelle}</button>)}</div>}
+        {agrandi && <div className="ec-etapes"><h3>Voir chaque geste</h3>{traces.map((trace, i) => <button className={`ec-plan ${etape === i ? 'selectionne' : ''}`} key={i} onClick={() => {
+          montrerEtape(i + .5);
+          if (window.matchMedia('(max-width: 760px)').matches) terrainRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' });
+        }}>{trace.libelle}</button>)}</div>}
       </aside>
     </div>
   </>;

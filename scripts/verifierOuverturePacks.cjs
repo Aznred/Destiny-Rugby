@@ -17,7 +17,10 @@ const { chromium } = require(process.argv[2] || 'playwright');
       await page.goto(`http://127.0.0.1:5173/scripts/apercuPacks.html?rang=${rang}`);
       await page.locator('.pack-show.phase-attente.palier-bronze').waitFor();
       for (let palier = 1; palier <= rang; palier++) {
-        await page.getByRole('button', { name: 'Améliorer le pack' }).last().click();
+        assert.equal(await page.getByRole('button', { name: 'Améliorer le pack' }).count(), 0, 'Le prochain palier reste une surprise.');
+        assert.equal(await page.locator('.pack-show-footer').count(), 0, 'Seule la pochette déclenche la révélation.');
+        assert.equal(await page.locator('.pack-show-hint').innerText(), 'Touche le pack pour l’ouvrir.');
+        await page.getByRole('button', { name: 'Ouvrir le pack', exact: true }).press('Enter');
         await page.locator('.pack-show-upgrade').waitFor();
         await page.locator(`.pack-show.phase-attente.palier-${raretes[palier]}`).waitFor();
       }
