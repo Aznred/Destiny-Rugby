@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import type { PointerEvent } from 'react';
+import { useState } from 'react';
 import { Icone } from './Icone';
+import { TerrainCombinaison } from './TerrainCombinaison';
 import { combinaisonsValides, creerCombinaison, erreursVariante, MAX_ACTIONS, MAX_COMBINAISONS, MAX_VARIANTES, origineApercu } from '../lib/ligue/combinaisons';
 import type { ActionCombinaison, Combinaison, PhaseCombinaison, PiedCombinaison, PointCombinaison, VarianteCombinaison } from '../lib/ligue/combinaisons';
 import './EditeurCombinaisons.css';
@@ -12,37 +12,6 @@ const PIEDS: Record<PiedCombinaison, string> = { occupation: 'Occupation', degag
 const borner = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 const uid = () => crypto.randomUUID();
 const choix = (valeurs: Record<string, string>) => Object.entries(valeurs).map(([valeur, nom]) => <option key={valeur} value={valeur}>{nom}</option>);
-
-function positionsInitiales(c: Combinaison, v: VarianteCombinaison): Record<number, PointCombinaison> {
-  const origine = origineApercu(c);
-  const signe = c.couloir === 'droite' ? -1 : 1;
-  const positions: Record<number, PointCombinaison> = {};
-  for (let n = 1; n <= 15; n++) {
-    const p = v.placements.find(p => p.numero === n);
-    const defaut = n <= 8 ? { x: -2 - Math.floor((n - 1) / 3) * 2.8, y: c.phase === 'touche' ? 6 + n * 1.3 : ((n - 1) % 3 - 1) * 3 }
-      : { x: -4 - (n - 9) * 2, y: c.phase === 'touche' ? 14 + (n - 9) * 5 : -18 + (n - 9) * 6 };
-    positions[n] = { x: borner(origine.x + (p?.x ?? defaut.x), 1, 99), y: borner(origine.y + (p?.y ?? defaut.y) * (p ? 1 : signe), 1, 69) };
-  }
-  return positions;
-}
-
-/** L'aperçu montre le tracé choisi ; le match conserve ses contacts et ses fautes. */
-function tracer(c: Combinaison, v: VarianteCombinaison) {
-  const positions = positionsInitiales(c, v);
-  const origine = origineApercu(c);
-  let porteur = c.phase === 'touche' ? v.sauteur : v.depart;
-  return v.actions.map((action, i) => {
-    const de = { ...positions[action.type === 'leurre' ? action.numero : porteur] };
-    const vers = action.type === 'passe' ? { ...positions[action.destinataire] }
-      : action.type === 'course' || action.type === 'leurre' ? { x: borner(origine.x + action.destination.x, 1, 99), y: borner(origine.y + action.destination.y, 1, 69) }
-        : { x: borner(de.x + (action.intention === 'drop' ? 20 : 30), 1, 99), y: action.intention === 'degagement' || action.intention === 'cinquanteVingtDeux' ? 1 : de.y };
-    const acteur = porteur;
-    if (action.type === 'passe') porteur = action.destinataire;
-    if (action.type === 'course') positions[porteur] = vers;
-    if (action.type === 'leurre') positions[action.numero] = vers;
-    return { de, vers, action, i, acteur };
-  });
-}
 
 export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', joueurs = {}, occupe = false, enregistrer }: {
   combinaisons?: Combinaison[];
@@ -58,22 +27,15 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
   const [varianteIndex, setVarianteIndex] = useState(0);
   const [joueur, setJoueur] = useState(10);
   const [actionIndex, setActionIndex] = useState<number | null>(null);
-  const [temps, setTemps] = useState<number | null>(null);
-  const anime = temps !== null;
   const [statut, setStatut] = useState('');
   const [sauvegarde, setSauvegarde] = useState(false);
-  const terrain = useRef<SVGSVGElement>(null);
-  const glisse = useRef<number | null>(null);
-  const marqueur = useId().replace(/:/g, '');
   const c = plans.find(c => c.id === selection) ?? plans[0];
   const v = c?.variantes[Math.min(varianteIndex, c.variantes.length - 1)];
   const origine = c ? origineApercu(c) : { x: 50, y: 35 };
-  const positions = c && v ? positionsInitiales(c, v) : {};
-  const traces = c && v ? tracer(c, v) : [];
   const bloque = occupe || sauvegarde;
   const erreurs = c && v ? erreursVariante(c.phase, v) : [];
   const cahierIncomplet = plans.some(c => c.variantes.some(v => erreursVariante(c.phase, v).length));
-  const modifie = (suivants: Combinaison[], nouveauMode = modeChoisi) => { setBrouillon({ plans: suivants, mode: nouveauMode }); setStatut(''); setTemps(null); };
+  const modifie = (suivants: Combinaison[], nouveauMode = modeChoisi) => { setBrouillon({ plans: suivants, mode: nouveauMode }); setStatut(''); };
   const modifier = (suite: Combinaison) => modifie(plans.map(p => p.id === suite.id ? suite : p));
   const modifierVariante = (suite: VarianteCombinaison) => { if (c) modifier({ ...c, variantes: c.variantes.map((v, i) => i === Math.min(varianteIndex, c.variantes.length - 1) ? suite : v) }); };
   const changerAction = (i: number, action: ActionCombinaison) => { if (v) modifierVariante({ ...v, actions: v.actions.map((a, j) => j === i ? action : a) }); };
@@ -83,50 +45,11 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
     if (vide) { nouveau.nom = 'Ma combinaison'; nouveau.variantes[0].nom = 'Variante 1'; nouveau.variantes[0].actions = []; }
     modifie([...plans, nouveau]); setSelection(nouveau.id); setVarianteIndex(0); setActionIndex(null);
   };
-  useEffect(() => {
-    if (!anime) return;
-    const timer = window.setInterval(() => setTemps(t => t === null ? null : t + .04), 40);
-    return () => window.clearInterval(timer);
-  }, [anime]);
-  useEffect(() => { if (temps !== null && temps > traces.length + .8) setTemps(null); }, [temps, traces.length]);
-
-  const pointDuClic = (e: PointerEvent<SVGSVGElement>): PointCombinaison => {
-    const rect = terrain.current!.getBoundingClientRect();
-    return { x: Math.round(borner((e.clientX - rect.left) / rect.width * 100, 1, 99) * 10) / 10,
-      y: Math.round(borner((e.clientY - rect.top) / rect.height * 70, 1, 69) * 10) / 10 };
-  };
   const placer = (numero: number, p: PointCombinaison) => {
     if (!v) return;
     modifierVariante({ ...v, placements: [...v.placements.filter(p => p.numero !== numero),
       { numero, x: borner(p.x - origine.x, -35, 35), y: p.y - origine.y }] });
   };
-  const actionSelectionnee = actionIndex === null ? undefined : v?.actions[actionIndex];
-  const destinationEnCours = actionSelectionnee?.type === 'course' || actionSelectionnee?.type === 'leurre';
-  const toucherTerrain = (e: PointerEvent<SVGSVGElement>) => {
-    if (bloque || temps !== null) return;
-    const p = pointDuClic(e);
-    const numero = Number((e.target as Element).closest('[data-numero]')?.getAttribute('data-numero'));
-    if (numero) {
-      setJoueur(numero);
-      if (actionSelectionnee?.type === 'passe' && actionIndex !== null) { changerAction(actionIndex, { type: 'passe', destinataire: numero }); return; }
-      glisse.current = numero; e.currentTarget.setPointerCapture(e.pointerId);
-    } else if (destinationEnCours && actionIndex !== null && actionSelectionnee) {
-      changerAction(actionIndex, { ...actionSelectionnee, destination: { x: borner(p.x - origine.x, -35, 35), y: p.y - origine.y } });
-    } else placer(joueur, p);
-  };
-
-  const positionsAnimees = { ...positions };
-  let ballon = v ? positions[c.phase === 'touche' ? v.sauteur : v.depart] : origine;
-  if (temps !== null) {
-    for (const trace of traces) {
-      const avancement = borner(temps - trace.i, 0, 1);
-      if (temps < trace.i) break;
-      const p = { x: trace.de.x + (trace.vers.x - trace.de.x) * avancement, y: trace.de.y + (trace.vers.y - trace.de.y) * avancement };
-      if (trace.action.type === 'course') positionsAnimees[trace.acteur] = p;
-      if (trace.action.type === 'leurre') positionsAnimees[trace.action.numero] = p;
-      else ballon = p;
-    }
-  }
   const numeros = (valeur: number, onChange: (v: number) => void, filtre = (n: number) => n >= 1) => <select value={valeur} onChange={e => onChange(Number(e.target.value))}>{Array.from({ length: 15 }, (_, i) => i + 1).filter(filtre).map(n => <option key={n} value={n}>N° {n}{joueurs[n] ? ` · ${joueurs[n]}` : ''}</option>)}</select>;
 
   return <section className="ec cel-panneau">
@@ -144,7 +67,7 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
     {cahierIncomplet && <p className="ec-statut">Complète ou corrige les variantes avant d’enregistrer le cahier.</p>}
     <div className="ec-atelier">
       <aside className="ec-cahier"><div className="ec-titre-liste"><h3>Mes combinaisons</h3><span>{plans.length}/{MAX_COMBINAISONS}</span></div>
-        {plans.map(p => <button key={p.id} className={`ec-plan ${p.id === c?.id ? 'selectionne' : ''}`} onClick={() => { setSelection(p.id); setVarianteIndex(0); setActionIndex(null); setTemps(null); }}><b>{p.nom}</b><small>{PHASES[p.phase]} · {ZONES[p.zone]}</small><small>{COULOIRS[p.couloir]}{!p.active ? ' · Désactivée' : ''}{p.variantes.some(v => erreursVariante(p.phase, v).length) ? ' · À corriger' : ''}</small></button>)}
+        {plans.map(p => <button key={p.id} className={`ec-plan ${p.id === c?.id ? 'selectionne' : ''}`} onClick={() => { setSelection(p.id); setVarianteIndex(0); setActionIndex(null); }}><b>{p.nom}</b><small>{PHASES[p.phase]} · {ZONES[p.zone]}</small><small>{COULOIRS[p.couloir]}{!p.active ? ' · Désactivée' : ''}{p.variantes.some(v => erreursVariante(p.phase, v).length) ? ' · À corriger' : ''}</small></button>)}
         {!plans.length && <p className="ec-info">Ton cahier est vide. Commence sur un terrain libre ou adapte un exemple.</p>}
         <button className="btn" disabled={bloque || plans.length >= MAX_COMBINAISONS} onClick={() => ajouter('melee', true)}>Créer une combinaison</button>
         <details><summary>Partir d’un exemple</summary><div className="ec-exemples">{(Object.keys(PHASES) as PhaseCombinaison[]).map(phase => <button key={phase} className="btn" disabled={bloque || plans.length >= MAX_COMBINAISONS} onClick={() => ajouter(phase)}>{PHASES[phase]}</button>)}</div></details>
@@ -167,32 +90,14 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
         <button className="btn fantome" disabled={plans.length >= MAX_COMBINAISONS} onClick={() => { const copie = { ...structuredClone(c), id: uid(), nom: `${c.nom.slice(0, 32)} (copie)` }; modifie([...plans, copie]); setSelection(copie.id); }}>Dupliquer</button>
         <button className="btn fantome" onClick={() => { modifie(plans.filter(p => p.id !== c.id)); setSelection(null); setVarianteIndex(0); }}>Supprimer</button>
       </div>
-      <div className="ec-variantes" role="group" aria-label="Variantes">{c.variantes.map((v, i) => <button className={`btn ${i === varianteIndex ? 'primaire' : ''}`} key={i} onClick={() => { setVarianteIndex(i); setActionIndex(null); setTemps(null); }}>{v.nom || `Variante ${i + 1}`}</button>)}<button className="btn" disabled={c.variantes.length >= MAX_VARIANTES} onClick={() => { modifier({ ...c, variantes: [...c.variantes, { ...structuredClone(v), nom: `Variante ${c.variantes.length + 1}` }] }); setVarianteIndex(c.variantes.length); setActionIndex(null); }}>Ajouter une variante</button></div>
+      <div className="ec-variantes" role="group" aria-label="Variantes">{c.variantes.map((v, i) => <button className={`btn ${i === varianteIndex ? 'primaire' : ''}`} key={i} onClick={() => { setVarianteIndex(i); setActionIndex(null); }}>{v.nom || `Variante ${i + 1}`}</button>)}<button className="btn" disabled={c.variantes.length >= MAX_VARIANTES} onClick={() => { modifier({ ...c, variantes: [...c.variantes, { ...structuredClone(v), nom: `Variante ${c.variantes.length + 1}` }] }); setVarianteIndex(c.variantes.length); setActionIndex(null); }}>Ajouter une variante</button></div>
       <div className="ec-reglages ec-variante-reglages"><label>Nom de la variante<input maxLength={40} value={v.nom} onChange={e => modifierVariante({ ...v, nom: e.target.value })} /></label><label>Fréquence relative<input type="number" min="1" max="100" value={v.poids} onChange={e => modifierVariante({ ...v, poids: borner(Number(e.target.value) || 1, 1, 100) })} /></label>
-        <label>{c.phase === 'touche' ? 'Sauteur' : 'Premier porteur'}{numeros(c.phase === 'touche' ? v.sauteur : v.depart, n => modifierVariante({ ...v, [c.phase === 'touche' ? 'sauteur' : 'depart']: n }), n => c.phase === 'touche' ? n <= 8 && n !== 2 : c.phase === 'melee' ? n === 8 || n === 9 : n <= 9)}</label>
+        {c.phase !== 'touche' && <label>Premier porteur{numeros(v.depart, n => modifierVariante({ ...v, depart: n }), n => c.phase === 'melee' ? n === 8 || n === 9 : n <= 9)}</label>}
         {c.variantes.length > 1 && <button className="btn fantome" onClick={() => { modifier({ ...c, variantes: c.variantes.filter((_, i) => i !== varianteIndex) }); setVarianteIndex(0); setActionIndex(null); }}>Retirer cette variante</button>}
       </div></fieldset>
-      <div className="ec-terrain-entete"><span>Terrain de création · Attaque vers la droite</span><button className="btn" disabled={!v.actions.length || bloque} onClick={() => setTemps(temps === null ? 0 : null)}><Icone nom={temps === null ? 'eclair' : 'croix'} taille={14} />{temps === null ? 'Animer le tracé' : 'Arrêter'}</button></div>
-      <svg ref={terrain} className="ec-terrain" viewBox="0 0 100 70" aria-label="Terrain 2D de création de combinaisons" onPointerDown={toucherTerrain} onPointerMove={e => { if (glisse.current && !bloque) placer(glisse.current, pointDuClic(e)); }} onPointerUp={e => { glisse.current = null; if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }} onPointerCancel={() => { glisse.current = null; }}>
-        <defs><marker id={`${marqueur}-fleche`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" /></marker></defs>
-        <rect width="100" height="70" rx="1" fill="#1c513e" />{Array.from({ length: 10 }, (_, i) => <rect key={i} x={i * 10} y="0" width="5" height="70" fill="#fff" opacity=".025" />)}
-        {c.zone !== 'toutes' && <rect x={c.zone === 'nos22' ? 0 : c.zone === 'leurs22' ? 78 : 22} y="0" width={c.zone === 'milieu' ? 56 : 22} height="70" fill="#e2bd71" opacity=".1" />}
-        <g stroke="#ffffff" strokeWidth=".22" opacity=".45" fill="none"><rect x=".5" y=".5" width="99" height="69" />{[5, 22, 40, 50, 60, 78, 95].map(x => <path key={x} d={`M${x} 0 V70`} strokeDasharray={x === 40 || x === 60 || x === 5 || x === 95 ? '1 1' : undefined} />)}<path d="M0 5 H100 M0 15 H100 M0 55 H100 M0 65 H100" strokeDasharray="1 1" /></g>
-        <g fill="#fff" opacity=".55" fontSize="2" textAnchor="middle"><text x="22" y="3">22</text><text x="50" y="3">50</text><text x="78" y="3">22</text></g>
-        <circle cx={origine.x} cy={origine.y} r="2.4" stroke="#e6c17e" fill="none" strokeDasharray=".7 .7" strokeWidth=".4" />
-        {traces.map(({ de, vers, action, i }) => <g key={i} opacity={actionIndex === null || actionIndex === i ? .95 : .3}><path d={`M${de.x} ${de.y} L${vers.x} ${vers.y}`} fill="none" stroke={action.type === 'passe' ? '#f1d491' : action.type === 'pied' ? '#b4befa' : '#9cddbf'} strokeWidth=".55" strokeDasharray={action.type === 'passe' || action.type === 'pied' ? '1.4 1.1' : undefined} markerEnd={`url(#${marqueur}-fleche)`} /><text x={(de.x + vers.x) / 2 + 1} y={(de.y + vers.y) / 2 - 1} fontSize="2" fill="#fff">{i + 1}</text></g>)}
-        {Object.entries(positionsAnimees).map(([n, p]) => <g key={n} data-numero={n} transform={`translate(${p.x} ${p.y})`} role="button" tabIndex={bloque ? -1 : 0} aria-label={`Sélectionner le numéro ${n}${joueurs[Number(n)] ? `, ${joueurs[Number(n)]}` : ''}`} onKeyDown={e => {
-          if (bloque) return;
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setJoueur(Number(n)); }
-          const directions: Record<string, PointCombinaison> = { ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } };
-          const direction = directions[e.key]; if (direction) { e.preventDefault(); placer(Number(n), { x: p.x + direction.x, y: p.y + direction.y }); }
-        }}><title>{joueurs[Number(n)] ?? `N° ${n}`}</title><circle r="1.8" fill={Number(n) === joueur ? '#e6c17e' : '#132d25'} stroke={Number(n) === joueur ? '#fff0bc' : '#bdcabd'} strokeWidth=".3" /><text textAnchor="middle" dominantBaseline="central" fontSize="1.9" fontWeight="700" fill={Number(n) === joueur ? '#193c2c' : '#fff'}>{n}</text></g>)}
-        <ellipse cx={ballon.x + 2} cy={ballon.y} rx="1.15" ry=".65" fill="#faf3dc" stroke="#a78b51" strokeWidth=".2" transform={`rotate(-30 ${ballon.x + 2} ${ballon.y})`} />
-      </svg>
-      <p className="ec-aide">{destinationEnCours ? 'Clique sur le terrain pour choisir la destination de cette action.' : actionSelectionnee?.type === 'passe' ? 'Clique sur le joueur qui doit recevoir cette passe.' : 'Glisse un joueur, ou sélectionne son numéro puis clique sur le terrain. Les flèches du clavier permettent aussi de le placer.'}</p>
-      <fieldset disabled={bloque}><div className="ec-placement"><label>Joueur à placer{numeros(joueur, n => { setJoueur(n); setActionIndex(null); })}</label><label>Profondeur (m)<input type="number" min="-35" max="35" step=".5" value={Math.round((positions[joueur].x - origine.x) * 10) / 10} onChange={e => placer(joueur, { ...positions[joueur], x: origine.x + Number(e.target.value) })} /></label><label>Largeur (m)<input type="number" min="-65" max="65" step=".5" value={Math.round((positions[joueur].y - origine.y) * 10) / 10} onChange={e => placer(joueur, { ...positions[joueur], y: origine.y + Number(e.target.value) })} /></label></div>
-      <div className="ec-titre-liste"><h3>Enchaînement</h3><span>{v.actions.length}/{MAX_ACTIONS} actions</span></div>
-      <ol className="ec-sequence">{v.actions.map((a, i) => <li key={i} className={actionIndex === i ? 'selectionne' : ''}><button className="ec-numero-action" onClick={() => { setActionIndex(actionIndex === i ? null : i); setTemps(null); }} aria-label={`Modifier l’action ${i + 1} sur le terrain`} aria-pressed={actionIndex === i}>{i + 1}</button>
+      <TerrainCombinaison key={`${c.id}-${varianteIndex}`} combinaison={c} variante={v} joueurs={joueurs} joueur={joueur} actionIndex={actionIndex} bloque={bloque} selectionner={(numero, libre) => { setJoueur(numero); if (libre) setActionIndex(null); }} placer={placer} modifierAction={a => { if (actionIndex !== null) changerAction(actionIndex, a); }} modifierVariante={modifierVariante} />
+      <fieldset disabled={bloque}><div className="ec-titre-liste"><h3>Enchaînement</h3><span>{v.actions.length}/{MAX_ACTIONS} actions</span></div>
+      <ol className="ec-sequence">{v.actions.map((a, i) => <li key={i} className={actionIndex === i ? 'selectionne' : ''}><button className="ec-numero-action" onClick={() => { setActionIndex(actionIndex === i ? null : i); }} aria-label={`Modifier l’action ${i + 1} sur le terrain`} aria-pressed={actionIndex === i}>{i + 1}</button>
         <label>Action<select value={a.type} onChange={e => { const type = e.target.value; changerAction(i, type === 'passe' ? { type, destinataire: joueur } : type === 'pied' ? { type, intention: 'occupation' } : type === 'leurre' ? { type, numero: joueur, destination: { x: 8, y: 0 } } : { type: 'course', destination: { x: 12, y: 0 } }); setActionIndex(i); }}>{choix({ passe: 'Passe', course: 'Course du porteur', leurre: 'Appel / leurre', pied: 'Jeu au pied' })}</select></label>
         {a.type === 'passe' && <label>Destinataire{numeros(a.destinataire, n => changerAction(i, { ...a, destinataire: n }))}</label>}
         {a.type === 'pied' && <label>Coup de pied<select value={a.intention} onChange={e => changerAction(i, { ...a, intention: e.target.value as PiedCombinaison })}>{choix(PIEDS)}</select></label>}

@@ -16,6 +16,7 @@
 // l'attaque, et toute la défense était traversée dès la première passe.
 
 import type { Pion } from './entites.js';
+import { alignementCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
 import { AXE, LARGEUR, LONGUEUR, MILIEU, borner, sens, type Cote, type Vec } from './terrain.js';
 
 export type Placement = Record<string, Vec>;
@@ -91,6 +92,7 @@ export function placementMelee(pions: Pion[], mark: Vec, possession: Cote): Plac
 // ---------------------------------------------------------------------------
 export function placementTouche(
   pions: Pion[], mark: Vec, possession: Cote, nbAlignes: number,
+  variante?: Pick<VarianteCombinaison, 'sauteur' | 'touche'>,
 ): Placement {
   const pl: Placement = {};
   const bord = mark.y < AXE ? 0 : LARGEUR;
@@ -103,8 +105,9 @@ export function placementTouche(
 
     const lanceur = numero(liste, 2);
     const avants = liste.filter((p) => p.avant && p !== lanceur);
-    const alignes = avants.slice(0, Math.max(2, nbAlignes));
-    const dehors = avants.slice(alignes.length);
+    const formation = lance && variante ? alignementCombinaison(variante, avants.map(p => p.numero)) : undefined;
+    const alignes = formation ? formation.map(f => avants.find(p => p.numero === f.numero)!) : avants.slice(0, Math.max(2, nbAlignes));
+    const dehors = avants.filter(p => !alignes.includes(p));
 
     // Le talonneur lance depuis la ligne de touche ; en face, il se range dans
     // le couloir des 5 mètres, de son côté de l'alignement.
@@ -120,10 +123,11 @@ export function placementTouche(
     // derrière la ligne de touche, DE SON CÔTÉ.
     alignes.forEach((p, i) => {
       p.role = 'alignement';
-      pl[p.id] = { x: mark.x - s * 0.44, y: bY(bord + vers * (5 + i * 1.55)) };
+      pl[p.id] = { x: mark.x - s * 0.44, y: bY(bord + vers * (formation?.[i].distance ?? 5 + i * 1.55)) };
     });
     // Les avants hors alignement remontent dans la ligne, côté ouvert.
     dehors.forEach((p, i) => {
+      if (p.role === 'alignement') p.role = 'ligne';
       pl[p.id] = { x: mark.x - s * (lance ? 9 : 11), y: bY(bord + vers * (19 + i * 6)) };
     });
 

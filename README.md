@@ -3,12 +3,16 @@
 ### Carrière en ligne — le troisième mode, jouable de bout en bout
 
 - **Cahier de combinaisons, en bêta privée Kiri** : onglet « Combinaisons · bêta »,
-  éditeur libre sur terrain 2D, placement du XV, passes vers les numéros choisis,
+  éditeur libre sur terrain 2D agrandissable, zoom sur le jeu ou sur le lancer,
+  lecture avec pause, progression et étapes. Placement du XV, passes vers les numéros choisis,
   courses, appels/leurres et sept intentions au pied. Jusqu’à 12 combinaisons,
   chacune avec trois variantes pondérées et dix actions. Déclenchement sur mêlée,
   touche ou ruck, selon les 22 et le côté du terrain. En mode « Mes combinaisons »,
   le serveur exécute le cahier enregistré ; les situations non couvertes suivent
-  le plan habituel. L’aperçu anime le tracé, la réussite dépend du match.
+  le plan habituel. En touche : lanceur n° 2, sauteur choisi, alignement à 4/5/7,
+  lancer court/milieu/fond ou distance précise entre 5 et 15 m, feinte au premier
+  bloc et placements après réception. Ces réglages pilotent la conquête en match.
+  L’aperçu anime le lancer puis la sortie, la réussite dépend du match.
   L’accès est contrôlé sur l’identifiant authentifié `kiri`, y compris pour les
   ordres en direct. Vérification : `npm run verify:combinaisons` ; aperçu local :
   `/scripts/apercuCombinaisons.html`.

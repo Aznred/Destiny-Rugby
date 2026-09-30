@@ -1,9 +1,10 @@
-import { choisirCombinaison, choisirVariante, type Combinaison, type PhaseCombinaison, type PointCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
+import { choisirCombinaison, choisirVariante, toucheValide, type Combinaison, type PhaseCombinaison, type PointCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
 import type { EtatMatch } from './etat.js';
-import type { Pion } from './entites.js';
+import { stopper, type Pion } from './entites.js';
+import { placementTouche } from './phasesArretees.js';
 import { borner, LIGNE_A, LIGNE_B, sens, type Cote, type Vec } from './terrain.js';
 
-export interface CombinaisonPreparee { cote: Cote; plan: Combinaison; variante: VarianteCombinaison }
+export interface CombinaisonPreparee { cote: Cote; plan: Combinaison; variante: VarianteCombinaison; origineConquete?: Vec }
 export interface CombinaisonEnCours extends CombinaisonPreparee {
   origine: Vec;
   miroir: number;
@@ -28,14 +29,17 @@ export function preparerCombinaison(e: EtatMatch, phase: PhaseCombinaison): void
   if (!joueurCombinaison(e, cote, depart) || variante.actions.some(a => a.type === 'passe' && !joueurCombinaison(e, cote, a.destinataire))) return;
   e.combinaisonPreparee = { cote, plan, variante };
   if (phase === 'touche' && e.conquete) {
-    // Le sauteur et ses lifteurs restent dans l'alignement réglementaire.
-    const sauteur = joueurCombinaison(e, cote, variante.sauteur)!;
-    const aligne = e.pions.find(p => p.cote === cote && p.surLeTerrain && p.role === 'alignement');
-    if (sauteur.role !== 'alignement' && aligne) {
-      const pos = { ...sauteur.pos }; const cible = { ...sauteur.cible }; const role = sauteur.role;
-      sauteur.pos = { ...aligne.pos }; sauteur.cible = { ...aligne.cible }; sauteur.role = 'alignement';
-      aligne.pos = pos; aligne.cible = cible; aligne.role = role;
+    if (!joueurCombinaison(e, cote, 2)) { e.combinaisonPreparee = undefined; return; }
+    const t = toucheValide(variante.touche);
+    e.combinaisonPreparee.origineConquete = { ...e.ballon };
+    e.placement = placementTouche(e.pions, e.ballon, cote, t.alignes, variante);
+    for (const p of e.pions) {
+      const point = e.placement[p.id];
+      if (!point || !p.surLeTerrain || p.sanction > 0) continue;
+      p.pos = { ...point }; p.cible = { ...point }; delete p.corps; stopper(p);
     }
+    const sauteur = joueurCombinaison(e, cote, variante.sauteur)!;
+    e.conquete.combinaison = t.feinte ? 'leurreDevant' : t.distance <= 7 ? 'premierBloc' : t.distance >= 11 ? 'fond' : 'milieu';
     e.conquete.cibleId = sauteur.id;
   }
 }
@@ -47,8 +51,9 @@ export function demarrerCombinaison(e: EtatMatch, lieu: Vec, porteurImpose?: Pio
   if (!preparee || preparee.cote !== e.possession) return false;
   const premier = porteurImpose ?? joueurCombinaison(e, preparee.cote, preparee.variante.depart);
   if (!premier) return false;
-  const localY = sens(preparee.cote) === 1 ? lieu.y : 70 - lieu.y;
-  const enCours: CombinaisonEnCours = { ...preparee, origine: { ...lieu },
+  const origine = preparee.origineConquete ?? lieu;
+  const localY = sens(preparee.cote) === 1 ? origine.y : 70 - origine.y;
+  const enCours: CombinaisonEnCours = { ...preparee, origine: { ...origine },
     miroir: preparee.plan.couloir === 'tous' && localY > 35 ? -1 : 1,
     index: 0, depuis: e.sim, debut: e.sim, courses: {} };
   e.combinaisonEnCours = enCours;

@@ -6,6 +6,12 @@ export type CouloirCombinaison = 'tous' | 'gauche' | 'centre' | 'droite';
 export type PiedCombinaison = 'occupation' | 'degagement' | 'chandelle' | 'rasant' | 'transversale' | 'cinquanteVingtDeux' | 'drop';
 export interface PointCombinaison { x: number; y: number }
 export interface PlacementCombinaison extends PointCombinaison { numero: number }
+export interface ToucheCombinaison {
+  alignes: 4 | 5 | 7;
+  /** Distance du sauteur depuis la ligne de touche, entre 5 et 15 mètres. */
+  distance: number;
+  feinte: boolean;
+}
 export type ActionCombinaison =
   | { type: 'passe'; destinataire: number }
   | { type: 'course'; destination: PointCombinaison }
@@ -16,6 +22,7 @@ export interface VarianteCombinaison {
   poids: number;
   depart: number;
   sauteur: number;
+  touche?: ToucheCombinaison;
   placements: PlacementCombinaison[];
   actions: ActionCombinaison[];
 }
@@ -54,6 +61,25 @@ const numero = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v
 const texte = (v: unknown, defaut: string) => typeof v === 'string' ? v.replace(/\p{Cc}/gu, '').trim().slice(0, 40) || defaut : defaut;
 const point = (v: unknown): PointCombinaison => ({ x: nombre(objet(v).x, -35, 35, 0), y: nombre(objet(v).y, -65, 65, 0) });
 
+/** Les anciens cahiers sans réglage de touche restent utilisables. */
+export function toucheValide(brut: unknown): ToucheCombinaison {
+  const t = objet(brut);
+  return { alignes: t.alignes === 4 || t.alignes === 7 ? t.alignes : 5,
+    distance: Math.round(nombre(t.distance, 5, 15, 8.1) * 10) / 10, feinte: t.feinte === true };
+}
+
+/** Même ordre et mêmes distances dans l'éditeur et dans le moteur. */
+export function alignementCombinaison(v: Pick<VarianteCombinaison, 'sauteur' | 'touche'>, disponibles = [1, 3, 4, 5, 6, 7, 8]): { numero: number; distance: number }[] {
+  const t = toucheValide(v.touche);
+  const numeros = disponibles.slice(0, t.alignes);
+  if (!numeros.includes(v.sauteur) && disponibles.includes(v.sauteur)) numeros[numeros.length - 1] = v.sauteur;
+  const distances = numeros.map((_, i) => 5 + i * 1.55);
+  const cible = distances.reduce((meilleur, d, i) => Math.abs(d - t.distance) < Math.abs(distances[meilleur] - t.distance) ? i : meilleur, 0);
+  const ancien = numeros.indexOf(v.sauteur);
+  if (ancien >= 0) [numeros[cible], numeros[ancien]] = [numeros[ancien], numeros[cible]];
+  return numeros.map((numero, i) => ({ numero, distance: numero === v.sauteur ? t.distance : distances[i] }));
+}
+
 /** Limites identiques côté client et serveur ; aucun bonus de performance reçu. */
 export function combinaisonsValides(brut: unknown): Combinaison[] {
   if (!Array.isArray(brut)) return [];
@@ -84,6 +110,7 @@ export function combinaisonsValides(brut: unknown): Combinaison[] {
       return [{ nom: texte(v.nom, `Variante ${j + 1}`), poids: Math.round(nombre(v.poids, 1, 100, 1)),
         depart: c.phase === 'melee' ? v.depart === 8 ? 8 : 9 : numero(v.depart) && (v.depart as number) <= 9 ? v.depart as number : 9,
         sauteur: numero(v.sauteur) && v.sauteur !== 2 && (v.sauteur as number) <= 8 ? v.sauteur as number : 4,
+        ...(v.touche !== undefined ? { touche: toucheValide(v.touche) } : {}),
         placements, actions: pied < 0 ? actions : actions.slice(0, pied + 1) }];
     });
     if (!variantes.length) return [];
@@ -123,6 +150,7 @@ export function creerCombinaison(id: string, phase: PhaseCombinaison = 'melee'):
     y: laterale ? 10 + i * 6 : -12 + i * 6 }));
   return { id, nom: phase === 'touche' ? 'Sortie de touche' : 'Lancement au large', active: true, phase, zone: 'toutes', couloir: 'tous',
     variantes: [{ nom: 'Au large', poids: 1, depart: 9, sauteur: 4, placements,
+      ...(laterale ? { touche: toucheValide(undefined) } : {}),
       actions: [...(laterale ? [{ type: 'passe' as const, destinataire: 9 }] : []),
         { type: 'passe', destinataire: 10 }, { type: 'passe', destinataire: 12 }, { type: 'passe', destinataire: 13 },
         { type: 'course', destination: { x: 15, y: laterale ? 34 : 10 } }] }] };

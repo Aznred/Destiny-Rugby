@@ -153,7 +153,16 @@ Le cahier de combinaisons est une **bêta privée du compte authentifié `kiri`*
 `combinaisons.ts` valide les plans, sélectionne les situations (phase, zone,
 côté) et tire les variantes pondérées. `components/EditeurCombinaisons.tsx`
 offre un bac à sable 2D : placements, passes par numéro, courses, leurres et
-jeu au pied. Le cahier vit dans `StrategieEnLigne` (`modeCombinaisons`,
+jeu au pied. `TerrainCombinaison.tsx` ouvre un terrain agrandi (portal et
+`useModalDialog`), avec zoom, déplacement de la vue, pause et lecture par étape.
+`ligue/apercuCombinaisons.ts` calcule le tracé, y compris le lancer du n° 2.
+Chaque variante de touche peut choisir 4/5/7 alignés, le sauteur, une réception
+entre 5 et 15 m et une feinte au premier bloc. `alignementCombinaison` partage
+la formation entre aperçu et `phasesArretees.ts` ; `preparerCombinaison`
+l'installe réellement en match. Les placements de sortie restent relatifs à
+la conquête, même lorsque le ballon est reçu au fond de l'alignement.
+Les anciens cahiers sans champ `touche` reçoivent des valeurs par défaut.
+Le cahier vit dans `StrategieEnLigne` (`modeCombinaisons`,
 `combinaisons`) et dans les feuilles gelées des matchs, sans migration SQL.
 `moteur/combinaisons.ts` pilote les cibles ; `moteur.ts` exécute les gestes
 avec les contacts et les erreurs ordinaires. La conquête reste disputée :

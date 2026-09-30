@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { choisirCombinaison, choisirVariante, combinaisonsValides, creerCombinaison, MAX_COMBINAISONS } from '../src/lib/ligue/combinaisons';
+import { alignementCombinaison, choisirCombinaison, choisirVariante, combinaisonsValides, creerCombinaison, MAX_COMBINAISONS, toucheValide } from '../src/lib/ligue/combinaisons';
+import { imageApercu, positionsApercu, tracesApercu } from '../src/lib/ligue/apercuCombinaisons';
 import { strategieValide, STRATEGIE_EN_LIGNE_DEFAUT, avancerMatchEnLigne, creerMatchEnLigne } from '../src/lib/ligue/matchCarriere';
 import { preparerCombinaison, demarrerCombinaison, pointSurTerrain, placerCombinaison } from '../src/lib/moteur/combinaisons';
 import { avancer, creerMatch } from '../src/lib/moteur/moteur';
@@ -33,9 +34,50 @@ assert.equal(combinaisonsValides(Array.from({ length: 50 }, (_, i) => ({ ...base
 const variantes = { ...base, variantes: [{ ...base.variantes[0], nom: 'A', poids: 1 }, { ...base.variantes[0], nom: 'B', poids: 3 }] };
 assert.equal(choisirVariante(variantes, () => .1).nom, 'A');
 assert.equal(choisirVariante(variantes, () => .9).nom, 'B');
+assert.deepEqual(toucheValide({ alignes: 99, distance: Infinity, feinte: 'oui' }), { alignes: 5, distance: 8.1, feinte: false });
+assert.deepEqual(toucheValide({ alignes: 4, distance: -100, feinte: true }), { alignes: 4, distance: 5, feinte: true });
+assert.equal(toucheValide({ distance: 90 }).distance, 15);
+const ancienneTouche = creerCombinaison('ancienne-touche', 'touche');
+delete ancienneTouche.variantes[0].touche;
+assert.ok(combinaisonsValides([ancienneTouche])[0], 'Un cahier ancien reste valide');
 
 const effectifA = effectifDuClub('Stade Toulousain', 1);
 const effectifB = effectifDuClub('RC Toulon', 1);
+// Le lancer, son sauteur et son alignement concordent avec le tracé, dans
+// les deux sens d'attaque et sur les deux lignes de touche.
+for (const cote of ['A', 'B'] as const) for (const bord of [0, 70]) for (const distance of [5, 9, 15]) {
+  const c = creerCombinaison(`lancer-${cote}-${bord}-${distance}`, 'touche');
+  c.couloir = (cote === 'A' ? bord : 70 - bord) > 35 ? 'droite' : 'gauche';
+  const v = c.variantes[0]; v.sauteur = 8;
+  v.touche = { alignes: distance === 5 ? 4 : distance === 9 ? 5 : 7, distance, feinte: distance === 9 };
+  const formation = alignementCombinaison(v);
+  assert.equal(formation.length, v.touche.alignes);
+  assert.equal(formation.find(p => p.numero === 8)?.distance, distance);
+  assert.equal(new Set(formation.map(p => p.numero)).size, formation.length);
+  const apercu = positionsApercu(c, v, true);
+  const traces = tracesApercu(c, v);
+  const lancer = traces.find(t => t.acteur === 2 && !t.action)!;
+  assert.deepEqual(lancer.de, apercu[2]); assert.deepEqual(lancer.vers, apercu[8]);
+  assert.equal(Math.abs(lancer.vers.y - (c.couloir === 'droite' ? 70 : 0)), distance);
+  assert.deepEqual(imageApercu(c, v, null).ballon, apercu[2]);
+  const finLancer = traces.indexOf(lancer) + 1;
+  assert.deepEqual(imageApercu(c, v, finLancer).ballon, apercu[8]);
+  const e = creerMatch('Stade Toulousain', 'RC Toulon', effectifA, effectifB, 27, 24, c.id);
+  e.phase = 'touche'; e.possession = cote; e.ballon = { x: 90, y: bord === 0 ? .6 : 69.4 };
+  e.conquete = { type: 'touche', progression: 0 }; e.plansCombinaisons = { [cote]: [c] };
+  const origine = { ...e.ballon };
+  preparerCombinaison(e, 'touche');
+  const sauteur = e.pions.find(p => p.id === e.conquete?.cibleId)!;
+  assert.equal(sauteur.numero, 8); assert.equal(Math.abs(sauteur.pos.y - bord), distance);
+  assert.equal(e.pions.filter(p => p.cote === cote && p.role === 'alignement').length, v.touche.alignes);
+  assert.equal(e.conquete.combinaison, v.touche.feinte ? 'leurreDevant' : distance <= 7 ? 'premierBloc' : 'fond');
+  e.minuteur = 0; e.rng = () => .99;
+  for (const p of e.pions) { p.detente = p.cote === cote ? 99 : 10; p.puissance = p.cote === cote ? 99 : 10; p.vision = p.cote === cote ? 99 : 10; p.passe = 99; p.discipline = 99; }
+  avancer(e, .15);
+  assert.equal(sauteur.stats.touchesGagnees, 1, 'Le sauteur choisi capte réellement le lancer');
+  assert.ok(e.combinaisonEnCours, 'La sortie démarre après la conquête gagnée');
+  assert.deepEqual(e.combinaisonEnCours.origine, origine, 'Les placements de sortie sont relatifs à la touche');
+}
 for (const cote of ['A', 'B'] as const) {
   const e = creerMatch('Stade Toulousain', 'RC Toulon', effectifA, effectifB, 27, 24, `atelier-${cote}`);
   const s = cote === 'A' ? 1 : -1;
@@ -63,6 +105,7 @@ for (const cote of ['A', 'B'] as const) {
 // Le sauteur sélectionné est réellement annoncé pendant la conquête.
 const touche = creerCombinaison('touche', 'touche');
 touche.variantes[0].sauteur = 5;
+touche.variantes[0].touche = { alignes: 4, distance: 13, feinte: true };
 const eTouche = creerMatch('Stade Toulousain', 'RC Toulon', effectifA, effectifB, 27, 24, 'atelier-touche');
 eTouche.phase = 'touche'; eTouche.possession = 'A'; eTouche.ballon = { x: 90, y: .6 };
 eTouche.conquete = { type: 'touche', progression: 0 };
@@ -137,7 +180,7 @@ try {
   const ligue = creee.donnees.id;
   const inscription = await appel(visiteur, '/api/carriere', { action: 'rejoindre', code: creee.donnees.code, clubNom: 'Club visiteur' });
   assert.equal(inscription.statut, 200);
-  const strategie = { ...STRATEGIE_EN_LIGNE_DEFAUT, combinaisons: [base], modeCombinaisons: 'configure' };
+  const strategie = { ...STRATEGIE_EN_LIGNE_DEFAUT, combinaisons: [base, touche], modeCombinaisons: 'configure' };
   const commande = (jeton: string, action: unknown) => appel(jeton, '/api/carriere', { action: 'commande', ligue, requeteId: randomUUID(), commande: action });
   const refuse = await commande(visiteur, { type: 'strategie', strategie });
   assert.equal(refuse.statut, 400);
@@ -146,13 +189,14 @@ try {
   assert.equal(refuseDirect.statut, 400); assert.match(refuseDirect.donnees.erreur, /bêta privée/);
   const accepte = await commande(kiri, { type: 'strategie', strategie });
   assert.equal(accepte.statut, 200);
-  assert.deepEqual(accepte.donnees.clubs.find((c: any) => c.id === accepte.donnees.monClubId).strategie.combinaisons, [base]);
+  assert.deepEqual(accepte.donnees.clubs.find((c: any) => c.id === accepte.donnees.monClubId).strategie.combinaisons, [base, touche]);
   const relecture = await appel(kiri, `/api/carriere?ligue=${ligue}`);
   assert.equal(relecture.donnees.clubs.find((c: any) => c.id === relecture.donnees.monClubId).strategie.modeCombinaisons, 'configure');
+  assert.deepEqual(relecture.donnees.clubs.find((c: any) => c.id === relecture.donnees.monClubId).strategie.combinaisons[1].variantes[0].touche, touche.variantes[0].touche);
   const autreVue = await appel(visiteur, `/api/carriere?ligue=${ligue}`);
   assert.equal(autreVue.donnees.clubs.find((c: any) => c.id === accepte.donnees.monClubId).strategie, undefined, 'Les combinaisons adverses restent privées');
   assert.equal((await commande(visiteur, { type: 'strategie', strategie: STRATEGIE_EN_LIGNE_DEFAUT })).statut, 200);
 } finally {
   rmSync(dossier, { recursive: true, force: true });
 }
-console.log('Combinaisons : validation, zones, variantes, passes A/B, touche, moteur en ligne, sauvegarde et bêta Kiri vérifiés.');
+console.log('Combinaisons : validation, aperçu et lancer, alignements et réception A/B sur les deux touches, passes, moteur en ligne, sauvegarde et bêta Kiri vérifiés.');
