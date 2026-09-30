@@ -5,7 +5,7 @@ import type { AdministrationCarriere, EtatCarriereEnLigne, StatistiquesGlobalesC
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
 import { assemblerTransfert, champsDepuisForme, decoderBloc, encoderTransfert, formeTransfert, type BlocTransfert, type ManifestTransfert } from './transfertCarriere.js';
 import { creerLimiteurReserve } from './limiteurReserve.js';
-import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
+import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 import type { PageOffresSolo, LotCartesSolo } from '../src/lib/echangesSolo.js';
 
 export interface CompteStocke {
@@ -68,6 +68,8 @@ export interface StockageCarriere {
   crediterAchat?(session: string, compte: string, recompenses: RecompensesAchat): Promise<void>;
   boutique(compte: string): Promise<EtatBoutiqueCompte | null>;
   sauvegarderBoutique(compte: string, boutique: EtatBoutiqueCompte): Promise<EtatBoutiqueCompte>;
+  /** null = accusé compact ; undefined = coffre absent ou sélection invalide. */
+  modifierBoutique?(compte: string, modifications: ModificationsBoutiqueCompte): Promise<EtatBoutiqueCompte | null | undefined>;
   limiter(cle: string, maximum: number, fenetre: number, maintenant: number): Promise<boolean>;
   /**
    * ⚠️ LA LECTURE QUI NE COÛTE RIEN : version, membres, prochaine échéance.
@@ -374,6 +376,41 @@ export function stockageNeon(url: string): StockageCarriere {
       // Pas de retransfert de la collection vers Vercel quand la base a
       // enregistré exactement ce qu'on lui a fourni. Les conflits restent complets.
       return (lignes[0].donnees as EtatBoutiqueCompte | null) ?? boutique;
+    },
+    async modifierBoutique(compte, modifications) {
+      // L'UPDATE verrouille la ligne : une ouverture et un échange concurrents
+      // ne peuvent pas réintroduire une carte cédée. Seul le delta traverse Neon.
+      const lignes = await sql`with entree as (select ${JSON.stringify(modifications)}::jsonb as donnees)
+        update compte_boutique b set donnees = b.donnees || (e.donnees - 'collectionSolo' - 'ovas' - 'achatsOvas')
+          || jsonb_build_object(
+            'ovas', case when e.donnees ? 'ovas' then (e.donnees->>'ovas')::bigint
+              + greatest(0, coalesce((b.donnees->>'achatsOvas')::bigint,0) - coalesce((e.donnees->>'achatsOvas')::bigint,0))
+              else (b.donnees->>'ovas')::bigint end,
+            'inventaire', to_jsonb(array(select distinct v from jsonb_array_elements_text(
+              coalesce(e.donnees->'inventaire',b.donnees->'inventaire','[]'::jsonb) || coalesce(b.donnees->'achatsInventaire','[]'::jsonb)) as a(v))),
+            'equipements', to_jsonb(array(select distinct v from jsonb_array_elements_text(
+              coalesce(e.donnees->'equipements',b.donnees->'equipements','[]'::jsonb) || coalesce(b.donnees->'achatsEquipements','[]'::jsonb)) as a(v))),
+            'traitsDebloques', to_jsonb(array(select distinct v from jsonb_array_elements_text(
+              coalesce(e.donnees->'traitsDebloques',b.donnees->'traitsDebloques','[]'::jsonb) || coalesce(b.donnees->'achatsTraits','[]'::jsonb)) as a(v))),
+            'collectionSolo', case when not (e.donnees ? 'collectionSolo')
+              or coalesce((b.donnees->'collectionSolo'->>'revision')::bigint,0) > (e.donnees->'collectionSolo'->>'revision')::bigint
+              then b.donnees->'collectionSolo'
+              else (b.donnees->'collectionSolo') || (e.donnees->'collectionSolo') || jsonb_build_object(
+                'quantites', (coalesce(b.donnees->'collectionSolo'->'quantites','{}'::jsonb) || (e.donnees->'collectionSolo'->'quantites'))
+                  - array(select k from jsonb_each(e.donnees->'collectionSolo'->'quantites') as q(k,v) where v='0'::jsonb),
+                'packsOuverts', (coalesce(b.donnees->'collectionSolo'->'packsOuverts','{}'::jsonb) || (e.donnees->'collectionSolo'->'packsOuverts'))
+                  - array(select k from jsonb_each(e.donnees->'collectionSolo'->'packsOuverts') as q(k,v) where v='0'::jsonb)
+              ) end), modifie_le=now()
+        from entree e where b.compte=${compte}
+          and coalesce(e.donnees->'inventaire',b.donnees->'inventaire','[]'::jsonb) || coalesce(b.donnees->'achatsInventaire','[]'::jsonb)
+            ? coalesce(e.donnees->>'skinActif',b.donnees->>'skinActif')
+          and not exists (select 1 from jsonb_each_text(coalesce(e.donnees->'equipementActif',b.donnees->'equipementActif','{}'::jsonb)) as a(k,v)
+            where not (coalesce(e.donnees->'equipements',b.donnees->'equipements','[]'::jsonb) || coalesce(b.donnees->'achatsEquipements','[]'::jsonb)) ? v)
+        returning case when
+          ((e.donnees ? 'collectionSolo') and coalesce((b.donnees->'collectionSolo'->>'revision')::bigint,0) > (e.donnees->'collectionSolo'->>'revision')::bigint)
+          or coalesce((b.donnees->>'achatsOvas')::bigint,0) > coalesce((e.donnees->>'achatsOvas')::bigint,0)
+          then b.donnees else null end as donnees`;
+      return lignes.length ? lignes[0].donnees as EtatBoutiqueCompte | null : undefined;
     },
     async limiter(cle, maximum, fenetre, maintenant) {
       if (cle.startsWith('jeu:')) {

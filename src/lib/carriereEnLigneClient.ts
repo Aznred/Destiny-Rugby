@@ -1,5 +1,5 @@
 import type { AdministrationCarriere, CommandeCarriere, VueCarriereEnLigne, PageCollection, StatistiquesGlobalesCarriere } from './ligue/typesCarriere.js';
-import type { EtatBoutiqueCompte } from './boutiqueCompte.js';
+import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from './boutiqueCompte.js';
 import type { LotCartesSolo, PageOffresSolo } from './echangesSolo.js';
 
 export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean }
@@ -33,7 +33,8 @@ async function requete<T>(corps?: unknown, ligue?: string, signal?: AbortSignal,
     const contenu = corps ? JSON.stringify(corps) : undefined;
     const garderEnFermant = contenu !== undefined && contenu.length < 60_000
       && (corps as { action?: unknown }).action === 'sauvegarderBoutique';
-    reponse = await fetch(`/api/carriere${chemin ?? (ligue ? `?ligue=${encodeURIComponent(ligue)}` : '')}`, {
+    const action = (corps as { action?: string } | undefined)?.action;
+    reponse = await fetch(`/api/carriere${chemin ?? (ligue ? `?ligue=${encodeURIComponent(ligue)}` : action ? `?action=${encodeURIComponent(action)}` : '')}`, {
       method: corps ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store',
       headers: corps ? { 'Content-Type': 'application/json' } : undefined,
       body: contenu,
@@ -135,6 +136,9 @@ export const chargerBoutiqueCompte = (signal?: AbortSignal) =>
   requete<{ boutique: EtatBoutiqueCompte | null }>(undefined, undefined, signal, '?boutique=1');
 export const sauvegarderBoutiqueCompte = (boutique: EtatBoutiqueCompte) =>
   requete<{ boutique: EtatBoutiqueCompte | null }>({ action: 'sauvegarderBoutique', boutique, compact: true });
+export const modifierBoutiqueCompte = (modifications: ModificationsBoutiqueCompte) =>
+  requete<{ boutique: EtatBoutiqueCompte | null }>({ action: 'sauvegarderBoutique', modifications, compact: true },
+    undefined, undefined, '?action=sauvegarderBoutique&format=delta');
 const lecturesEchanges = new Map<number, Promise<PageOffresSolo>>();
 export const listerEchangesSolo = (offset = 0): Promise<PageOffresSolo> => {
   const existante = lecturesEchanges.get(offset);

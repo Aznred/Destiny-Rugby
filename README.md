@@ -850,6 +850,23 @@ solo, cartes de collection, ballons, vestiaire et traits débloqués** sont
 retrouvés sur les autres appareils. Ces données restent séparées des Ovas et
 des cartes propres à chaque ligue.
 
+**Transferts de collection** : après la lecture initiale, les sauvegardes envoient
+uniquement les cartes, compteurs et champs modifiés. Le coffre complet ne repart
+plus à chaque pack ni à chaque gain d'Ovas. La fusion est atomique dans Neon et
+préserve les cartes absentes du delta, les révisions d'échange et les achats crédités.
+Les rafales sont regroupées et les erreurs espacées avant reprise. Sur le banc
+de 69 000 cartes (1,67 Mo), un gain transmet 90 octets et une carte modifiée
+189 octets ; un pack de dix cartes mesuré dans le navigateur transmet environ
+360 octets. Les onglets ouverts avant le déploiement doivent être rechargés.
+
+Vérifications : `scripts/verifierSynchronisationCompte.ts` (store et client réels),
+`scripts/verifierTransfertBoutique.ts` (compte temporaire Neon créé puis supprimé),
+`scripts/apercuTraficCollection.html` (collection réelle dans un aperçu local).
+`scripts/diagnostiquerTraficBoutique.mjs` lit seulement les tailles et compteurs
+de coffres, sans cartes ni identités. Les POST portent leur action dans l'URL
+pour distinguer les envois dans l'observabilité Vercel ; les gros POST sont
+journalisés avec leur action et leur taille.
+
 Ce n'est pas un clone de FUT posé sur du rugby. Le moment visé n'est pas « j'ai
 packé un 90 », c'est *« j'ai packé ce 74 à la première saison, personne n'en
 voulait, Hugo m'a proposé 90 000 OVA pour lui, j'ai refusé, et il nous a fait

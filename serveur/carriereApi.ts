@@ -11,7 +11,7 @@ import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typ
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
 import type { CompteStocke, LigueStockee, ResumeDivisionPublique, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { OAuth2Client } from 'google-auth-library';
-import { validerEtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
+import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, validerModificationsBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 import { catalogueBaseCarriere, MEZE_RUGBY_EMBLEME } from '../src/lib/ligue/catalogueCarriere.js';
 import { cleCarteSolo } from '../src/lib/collectionSolo.js';
 import { lotCartesSolo } from '../src/lib/echangesSolo.js';
@@ -554,8 +554,15 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       const maintenant = Date.now();
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
       const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 120_000 : 24_000;
-      if (JSON.stringify(corps).length > tailleMax) throw new ErreurHttp(413, 'Demande trop volumineuse.');
+      const corpsJson = JSON.stringify(corps);
+      if (corpsJson.length > tailleMax) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;
+      const octets = Buffer.byteLength(corpsJson);
+      if (req.method === 'POST' && octets > 100_000 && (action === 'sauvegarderBoutique' || action === 'atelier')) {
+        // Aucun contenu de compte : permet de retrouver les anciens clients
+        // qui continuent d'envoyer des coffres entiers dans les logs Vercel.
+        console.warn('[carriere-transfert]', JSON.stringify({ action, octets, format: corps.modifications ? 'delta' : 'complet' }));
+      }
       if (action === 'google') {
         if (!google || !googleClientId) throw new ErreurHttp(503, 'La connexion Google attend sa configuration.');
         const credential = texte(corps.credential, 100, 5000, 'Jeton Google');
@@ -655,6 +662,19 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         return res.status(200).json({ achatsOvas: boutique?.achatsOvas ?? 0, credite: await stockage.achatCredite?.(url.searchParams.get('session') ?? '', compte.id) ?? false });
       }
       if (action === 'sauvegarderBoutique') {
+        if ('modifications' in corps) {
+          const modifications = validerModificationsBoutiqueCompte(corps.modifications);
+          if (!modifications) throw new ErreurHttp(400, 'Modification de boutique invalide.');
+          let boutique;
+          if (stockage.modifierBoutique) boutique = await stockage.modifierBoutique(compte.id, modifications);
+          else {
+            const avant = await stockage.boutique(compte.id);
+            const apres = avant && validerEtatBoutiqueCompte(appliquerModificationsBoutiqueCompte(avant, modifications));
+            boutique = apres ? await stockage.sauvegarderBoutique(compte.id, apres) : undefined;
+          }
+          if (boutique === undefined) throw new ErreurHttp(409, 'Recharge la page pour synchroniser ta boutique.');
+          return res.status(200).json({ boutique });
+        }
         const boutique = validerEtatBoutiqueCompte(corps.boutique);
         if (!boutique) throw new ErreurHttp(400, 'Sauvegarde de boutique invalide.');
         const enregistree = await stockage.sauvegarderBoutique(compte.id, boutique);

@@ -8,7 +8,7 @@ import { dirname } from 'node:path';
 import type { CompteStocke, LigueStockee, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
 import { vueCarriere } from '../src/lib/ligue/carriere.js';
-import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
+import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, type EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 import type { OffreSolo } from '../src/lib/echangesSolo.js';
 import { modifierCollectionSolo, possedeDoublons } from '../src/lib/echangesSolo.js';
 
@@ -164,6 +164,15 @@ export function stockageFichier(fichier: string): StockageCarriere {
       };
       sauver();
       return copie(base.boutiques![compte]);
+    },
+    async modifierBoutique(compte, modifications) {
+      const avant = base.boutiques![compte];
+      if (!avant) return undefined;
+      const apres = appliquerModificationsBoutiqueCompte(avant, modifications);
+      if (!validerEtatBoutiqueCompte(apres)) return undefined;
+      base.boutiques![compte] = copie(apres); sauver();
+      return ((modifications.collectionSolo && (avant.collectionSolo.revision ?? 0) > (modifications.collectionSolo.revision ?? 0))
+        || (avant.achatsOvas ?? 0) > (modifications.achatsOvas ?? 0)) ? copie(apres) : null;
     },
     async limiter(cle, maximum, fenetre, maintenant) {
       const debut = Math.floor(maintenant / fenetre) * fenetre;

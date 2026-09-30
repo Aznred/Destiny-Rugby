@@ -1,6 +1,6 @@
 import { useGame } from '../store/useGame';
-import type { EtatBoutiqueCompte } from './boutiqueCompte';
-import { chargerBoutiqueCompte, ErreurCarriere, sauvegarderBoutiqueCompte } from './carriereEnLigneClient';
+import { differencesBoutiqueCompte, type EtatBoutiqueCompte } from './boutiqueCompte';
+import { chargerBoutiqueCompte, ErreurCarriere, modifierBoutiqueCompte, sauvegarderBoutiqueCompte } from './carriereEnLigneClient';
 
 let collectionDistante = false;
 /** Un échange est déjà enregistré côté serveur : sa réception ne se renvoie pas. */
@@ -33,6 +33,13 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
   let attente: { etat: EtatBoutiqueCompte; empreinte: string } | null = null;
   let generation = 0;
   let minuterie: ReturnType<typeof setTimeout> | undefined;
+  let delaiReprise = 500;
+
+  const planifier = () => {
+    if (!minuterie && !ecritureEnCours && actif && compteConnecte) {
+      minuterie = setTimeout(() => { minuterie = undefined; void viderAttente(); }, delaiReprise);
+    }
+  };
 
   const synchroniser = async () => {
     const numero = ++generation;
@@ -71,7 +78,9 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
       if (cible.empreinte === derniere) continue;
       const numero = generation;
       try {
-        const reponse = await sauvegarderBoutiqueCompte(cible.etat);
+        const reponse = confirmee
+          ? await modifierBoutiqueCompte(differencesBoutiqueCompte(confirmee, cible.etat))
+          : await sauvegarderBoutiqueCompte(cible.etat);
         if (!actif || numero !== generation) break;
         const dejaRecue = confirmee?.collectionSolo;
         confirmee = { ...cible.etat, collectionSolo: dejaRecue
@@ -81,15 +90,48 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
         if (reponse.boutique && (reponse.boutique.collectionSolo.revision ?? 0) > (cible.etat.collectionSolo.revision ?? 0)) {
           appliquerCollectionSoloDistante(reponse.boutique.collectionSolo);
         }
+        if (reponse.boutique) {
+          // Une correction Stripe est reconnue une fois ; les modifications
+          // locales arrivées pendant le POST restent en attente.
+          const distante = reponse.boutique;
+          const actuelle = instantane();
+          const changements: Partial<ReturnType<typeof useGame.getState>> = {};
+          const champs = { ovas: 'coins', achatsOvas: 'achatsOvas', inventaire: 'inventaire', skinActif: 'skinActif',
+            equipements: 'equipements', equipementActif: 'equipementActif', traitsDebloques: 'traitsDebloques' } as const;
+          for (const cle of Object.keys(champs) as (keyof typeof champs)[]) {
+            const valeur = cle === 'achatsOvas' ? distante.achatsOvas ?? 0 : distante[cle];
+            Object.assign(confirmee, { [cle]: valeur });
+            if (JSON.stringify(actuelle[cle]) === JSON.stringify(cible.etat[cle])) Object.assign(changements, { [champs[cle]]: valeur });
+          }
+          // Ajouter la correction aux gains/dépenses apparus entre-temps,
+          // sinon la prochaine écriture annulerait le crédit de l'achat.
+          changements.coins = actuelle.ovas + distante.ovas - cible.etat.ovas;
+          for (const cle of ['inventaire', 'equipements', 'traitsDebloques'] as const) {
+            const acquisitions = distante[cle].filter(id => !cible.etat[cle].includes(id));
+            changements[cle] = [...new Set([...actuelle[cle], ...acquisitions])];
+          }
+          derniere = empreinte(confirmee);
+          useGame.setState(changements);
+        }
         const actuelle = instantane();
         const cle = empreinte(actuelle);
         attente = cle === derniere ? null : { etat: actuelle, empreinte: cle };
+        delaiReprise = 500;
+        // Même pendant une rafale de packs, laisser les changements se
+        // regrouper entre deux envois au lieu de vider une boucle sans pause.
+        break;
       } catch (erreur) {
         if (erreur instanceof ErreurCarriere && erreur.statut === 401) compteConnecte = false;
+        if (actif && numero === generation && compteConnecte) {
+          const actuelle = instantane(), cle = empreinte(actuelle);
+          attente = cle === derniere ? null : { etat: actuelle, empreinte: cle };
+          delaiReprise = Math.min(60_000, Math.max(5000, delaiReprise * 2));
+        }
         break;
       }
     }
     ecritureEnCours = false;
+    if (attente) planifier();
   };
 
   const desabonner = useGame.subscribe((etatStore, precedent) => {
@@ -112,7 +154,7 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
     attente = { etat, empreinte: suivante };
     // Regroupe les gains successifs dans une sauvegarde. Un état déjà envoyé
     // est comparé de nouveau juste avant l'écriture.
-    if (!minuterie) minuterie = setTimeout(() => { minuterie = undefined; void viderAttente(); }, 500);
+    planifier();
   });
 
   const reconnecter = () => { compteConnecte = false; void synchroniser(); };

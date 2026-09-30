@@ -545,8 +545,17 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   erreur. Réveil durable toutes les 60 s, entretenu par la file et les changements
   persistés, jamais par un simple GET sans changement. La collection et les échanges
   partagent leur catalogue à 60 s ; sauvegardes du coffre regroupées, comparaison
-  avant écriture et réception d'un trade sans POST en retour. La base filtre les
-  propositions avant transfert. Banc : `scripts/verifierSynchronisationCompte.ts`.
+  avant écriture et réception d'un trade sans POST en retour. Après le chargement
+  initial, le coffre envoie des **deltas** : seuls les cartes, compteurs et champs
+  modifiés traversent le réseau. UPDATE atomique dans Neon, accusé compact,
+  révision d'échange préservée ; pause entre envois et reprise espacée après erreur.
+  Les anciens clients gardent la sauvegarde complète : un onglet déjà ouvert doit
+  être rechargé pour recevoir le nouveau code. Les POST annoncent leur action
+  dans l'URL ; les envois de plus de 100 Ko sont journalisés sans données de compte.
+  La base filtre les propositions avant transfert. Bancs :
+  `scripts/verifierSynchronisationCompte.ts`, `scripts/verifierTransfertBoutique.ts` ;
+  aperçu desktop/mobile `scripts/apercuTraficCollection.html` et diagnostic en
+  lecture seule `scripts/diagnostiquerTraficBoutique.mjs`.
 
   ⚠️ **`DATABASE_URL` NE DÉSIGNE QU'UNE BASE, ET UN PROJET PEUT EN AVOIR
   PLUSIEURS.** Le piège a coûté une soirée : les tables créées dans la base
