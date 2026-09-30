@@ -194,7 +194,7 @@ function animerArret(e: EtatMatch): void {
       const alignes = surLeTerrain(e, e.possession)
         .filter((q) => q.role === 'alignement')
         .sort((a, b) => Math.abs(a.cible.y - bord) - Math.abs(b.cible.y - bord));
-      const cible = alignes.find((q) => q.id === conquete.cibleId);
+      const cible = surLeTerrain(e, e.possession).find((q) => q.id === conquete.cibleId);
       const leurre = conquete.combinaison === 'leurreDevant'
         ? alignes.find((q) => q !== cible)
         : undefined;
@@ -203,6 +203,12 @@ function animerArret(e: EtatMatch): void {
       const appel = Math.sin(Math.PI * borner((p - 0.30) / 0.48, 0, 1));
       if (leurre) leurre.cible.y = borner(leurre.cible.y + vers * 2.2 * appel, 2.5, LARGEUR - 2.5);
       if (cible) {
+        if (conquete.horsAlignement && conquete.reception) {
+          const depart = e.placement?.[cible.id] ?? cible.pos;
+          const avance = borner((p - .52) / .43, 0, 1);
+          cible.cible = { x: depart.x + (conquete.reception.x - depart.x) * avance, y: depart.y + (conquete.reception.y - depart.y) * avance };
+          return;
+        }
         cible.cible.y = borner(cible.cible.y - vers * 1.25 * appel, 2.5, LARGEUR - 2.5);
         cible.cible.x += sens(cible.cote) * 0.55 * Math.sin(Math.PI * borner((p - 0.62) / 0.34, 0, 1));
         // Les deux joueurs voisins deviennent les lifteurs et viennent
@@ -2916,17 +2922,27 @@ function phaseTouche(e: EtatMatch): void {
   // joueur mis en évidence pendant l'alignement. En l'absence de cible valide,
   // on revient au meilleur sauteur comme auparavant.
   const cibleAnnoncee = e.conquete?.cibleId;
-  const sauteur = avants.find((p) => p.id === cibleAnnoncee)
+  const sauteur = liste.find((p) => p.id === cibleAnnoncee)
     ?? [...avants].sort((a, b) => b.detente - a.detente)[0] ?? liste[0];
   if (!sauteur) return clorePeriode(e);
+  const horsAlignement = e.conquete?.horsAlignement;
+  const reception = e.conquete?.reception;
+  // Le receveur du lancer long quitte sa position de départ après le lancer.
+  // La réception attend sa course, au lieu de le téléporter devant la ligne.
+  if (horsAlignement && reception && distance2(sauteur.pos, reception) > .64) {
+    sauteur.cible = { ...reception };
+    if (e.placement) e.placement[sauteur.id] = { ...reception };
+    e.minuteur = .15;
+    return;
+  }
   const combinaison = e.conquete?.combinaison;
   e.conquete = null;
   const adv = surLeTerrain(e, adverse(cote));
-  const contreurs = adv.filter((p) => p.avant);
+  const contreurs = horsAlignement ? adv : adv.filter((p) => p.avant);
   const contre = [...contreurs].sort((a, b) =>
     (b.detente * 0.62 + b.vision * 0.38 - distance(b.pos, sauteur.pos) * 1.8)
     - (a.detente * 0.62 + a.vision * 0.38 - distance(a.pos, sauteur.pos) * 1.8))[0] ?? adv[0];
-  const lifteurs = avants.filter((p) => p !== sauteur && p !== lanceur)
+  const lifteurs = horsAlignement ? [] : avants.filter((p) => p !== sauteur && p !== lanceur)
     .sort((a, b) => distance2(a.pos, sauteur.pos) - distance2(b.pos, sauteur.pos)).slice(0, 2);
   const fraicheur = (p: Pion) => 0.74 + p.endurance / 385;
   const scoreLance = lanceur
@@ -2937,8 +2953,9 @@ function phaseTouche(e: EtatMatch): void {
   const bonusAttaqueArcade = (qte?.[cote] ?? 0) * 7;
   const bonusDefenseArcade = (qte?.[adverse(cote)] ?? 0) * 7;
   e.bonusConqueteArcade = null;
-  const scoreAttaque = scoreLance * 0.38 + sauteur.detente * fraicheur(sauteur) * 0.34
-    + scoreLevage * 0.20 + (e.cohesion?.[cote] ?? 50) * 0.08
+  const scoreReception = horsAlignement ? sauteur.passe * .55 + sauteur.vision * .45 : sauteur.detente;
+  const scoreAttaque = scoreLance * 0.38 + scoreReception * fraicheur(sauteur) * (horsAlignement ? .54 : .34)
+    + scoreLevage * (horsAlignement ? 0 : .20) + (e.cohesion?.[cote] ?? 50) * 0.08
     + (combinaison === 'leurreDevant' ? 2.5 : 0) + bonusAttaqueArcade;
   const scoreDefense = contre
     ? (contre.detente * 0.50 + contre.vision * 0.30 + contre.puissance * 0.12
@@ -2976,7 +2993,7 @@ function phaseTouche(e: EtatMatch): void {
     }), 0, contre?.moi);
     e.possession = adverse(cote);
     e.placement = null;
-    return reprendreJeu(e, e.ballon);
+    return reprendreJeu(e, horsAlignement ? sauteur.pos : e.ballon);
   }
 
   if (duel < 2 && contre && e.rng() < 0.38) {

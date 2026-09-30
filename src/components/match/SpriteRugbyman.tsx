@@ -103,9 +103,9 @@ function animationDe(p: PionDirect, pos: Vec, terrain: TerrainDirect, porteur: b
   }
   if (terrain.conquete?.type === 'touche') {
     const cible = terrain.pions.find((q) => q.id === terrain.conquete?.cibleId);
-    if (p.id === cible?.id) return 'lineout_jump';
+    if (p.id === cible?.id) return terrain.conquete.horsAlignement ? vitesse > .7 ? 'run' : 'catch' : 'lineout_jump';
     if (p.cote === terrain.possession && role === 2) return 'lineout_throw';
-    if (cible && p.cote === cible.cote && role <= 8 && role !== 2) {
+    if (cible && !terrain.conquete.horsAlignement && p.cote === cible.cote && role <= 8 && role !== 2) {
       const lifteurs = terrain.pions
         .filter((q) => q.cote === cible.cote && (q.numeroRole ?? q.numero) <= 8 && (q.numeroRole ?? q.numero) !== 2 && q.id !== cible.id)
         .sort((a, b) => Math.hypot(a.x - cible.x, a.y - cible.y) - Math.hypot(b.x - cible.x, b.y - cible.y))
@@ -285,7 +285,10 @@ function SpriteRugbyman({ pion, position, terrain, maillot, porteur = false, red
       ? terrain.conquete.progression
       : undefined;
   const ballonTouche = terrain.conquete?.type === 'touche'
-    && (terrain.conquete.progression < .58
+    && (terrain.conquete.horsAlignement ? terrain.conquete.progression < .52
+      ? pion.cote === terrain.possession && (pion.numeroRole ?? pion.numero) === 2
+      : terrain.conquete.progression >= .9 && pion.id === terrain.conquete.cibleId
+      : terrain.conquete.progression < .58
       ? pion.cote === terrain.possession && (pion.numeroRole ?? pion.numero) === 2
       : pion.id === terrain.conquete.cibleId);
   const ballonAnime = porteur || ballonTouche;

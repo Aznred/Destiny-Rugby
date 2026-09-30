@@ -7,7 +7,7 @@ import '../src/index.css';
 import '../src/App.css';
 import '../src/screens/CarriereEnLigne.css';
 function Apercu() {
-  const [plans, setPlans] = useState<Combinaison[]>([creerCombinaison('apercu-melee'), creerCombinaison('apercu-touche', 'touche')]);
+  const [plans, setPlans] = useState<Combinaison[]>([creerCombinaison('apercu-melee'), creerCombinaison('apercu-touche', 'touche'), creerCombinaison('apercu-ruck', 'ruck')]);
   const [mode, setMode] = useState<'automatique' | 'configure'>('configure');
   return <main className="cel" style={{ maxWidth: 1440, margin: '24px auto', padding: 12 }}><EditeurCombinaisons combinaisons={plans} mode={mode} enregistrer={async (p, m) => { setPlans(p); setMode(m); return true; }} /></main>;
 }

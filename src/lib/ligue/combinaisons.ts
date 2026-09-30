@@ -8,7 +8,7 @@ export interface PointCombinaison { x: number; y: number }
 export interface PlacementCombinaison extends PointCombinaison { numero: number }
 export interface ToucheCombinaison {
   alignes: 4 | 5 | 7;
-  /** Distance du sauteur depuis la ligne de touche, entre 5 et 15 mètres. */
+  /** Distance de réception depuis la touche : alignement 5–15 m, lancer au-delà jusqu'à 25 m. */
   distance: number;
   feinte: boolean;
 }
@@ -65,7 +65,21 @@ const point = (v: unknown): PointCombinaison => ({ x: nombre(objet(v).x, -35, 35
 export function toucheValide(brut: unknown): ToucheCombinaison {
   const t = objet(brut);
   return { alignes: t.alignes === 4 || t.alignes === 7 ? t.alignes : 5,
-    distance: Math.round(nombre(t.distance, 5, 15, 8.1) * 10) / 10, feinte: t.feinte === true };
+    distance: Math.round(nombre(t.distance, 5, 25, 8.1) * 10) / 10, feinte: t.feinte === true };
+}
+
+export function lancerApresBloc(v: Pick<VarianteCombinaison, 'touche'>): boolean { return toucheValide(v.touche).distance > 15; }
+
+/** Un lancer long traverse l'alignement ; personne ne s'aligne au-delà des 15 m avant le lancer. */
+export function receptionTouche(mark: PointCombinaison, v: Pick<VarianteCombinaison, 'touche'>, sensAttaque = 1): PointCombinaison {
+  return { x: mark.x - sensAttaque * .44, y: mark.y < 35 ? toucheValide(v.touche).distance : 70 - toucheValide(v.touche).distance };
+}
+
+/** Remplace seulement le gabarit erroné des anciens exemples ; les placements dessinés restent libres. */
+export function placementsPersonnalises(v: VarianteCombinaison): PlacementCombinaison[] {
+  const numeros = [9, 10, 12, 13, 14, 15];
+  const ancien = (laterale: boolean) => numeros.every((n, i) => v.placements.some(p => p.numero === n && p.x === -2 - i * 2 && p.y === (laterale ? 10 + i * 6 : -12 + i * 6)));
+  return ancien(false) || ancien(true) ? v.placements.filter(p => !numeros.includes(p.numero)) : v.placements;
 }
 
 /** Même ordre et mêmes distances dans l'éditeur et dans le moteur. */
@@ -74,6 +88,7 @@ export function alignementCombinaison(v: Pick<VarianteCombinaison, 'sauteur' | '
   const numeros = disponibles.slice(0, t.alignes);
   if (!numeros.includes(v.sauteur) && disponibles.includes(v.sauteur)) numeros[numeros.length - 1] = v.sauteur;
   const distances = numeros.map((_, i) => 5 + i * 1.55);
+  if (lancerApresBloc(v)) return numeros.map((numero, i) => ({ numero, distance: distances[i] }));
   const cible = distances.reduce((meilleur, d, i) => Math.abs(d - t.distance) < Math.abs(distances[meilleur] - t.distance) ? i : meilleur, 0);
   const ancien = numeros.indexOf(v.sauteur);
   if (ancien >= 0) [numeros[cible], numeros[ancien]] = [numeros[ancien], numeros[cible]];
@@ -109,7 +124,7 @@ export function combinaisonsValides(brut: unknown): Combinaison[] {
       const pied = actions.findIndex(a => a.type === 'pied');
       return [{ nom: texte(v.nom, `Variante ${j + 1}`), poids: Math.round(nombre(v.poids, 1, 100, 1)),
         depart: c.phase === 'melee' ? v.depart === 8 ? 8 : 9 : numero(v.depart) && (v.depart as number) <= 9 ? v.depart as number : 9,
-        sauteur: numero(v.sauteur) && v.sauteur !== 2 && (v.sauteur as number) <= 8 ? v.sauteur as number : 4,
+        sauteur: numero(v.sauteur) && v.sauteur !== 2 && ((v.sauteur as number) <= 8 || toucheValide(v.touche).distance > 15) ? v.sauteur as number : 4,
         ...(v.touche !== undefined ? { touche: toucheValide(v.touche) } : {}),
         placements, actions: pied < 0 ? actions : actions.slice(0, pied + 1) }];
     });
@@ -146,10 +161,8 @@ export function origineApercu(c: Pick<Combinaison, 'phase' | 'zone' | 'couloir'>
 
 export function creerCombinaison(id: string, phase: PhaseCombinaison = 'melee'): Combinaison {
   const laterale = phase === 'touche';
-  const placements = [9, 10, 12, 13, 14, 15].map((numero, i) => ({ numero, x: -2 - i * 2,
-    y: laterale ? 10 + i * 6 : -12 + i * 6 }));
-  return { id, nom: phase === 'touche' ? 'Sortie de touche' : 'Lancement au large', active: true, phase, zone: 'toutes', couloir: 'tous',
-    variantes: [{ nom: 'Au large', poids: 1, depart: 9, sauteur: 4, placements,
+  return { id, nom: phase === 'touche' ? 'Sortie de touche' : phase === 'ruck' ? 'Sortie de ruck' : 'Lancement au large', active: true, phase, zone: 'toutes', couloir: 'tous',
+    variantes: [{ nom: 'Au large', poids: 1, depart: 9, sauteur: 4, placements: [],
       ...(laterale ? { touche: toucheValide(undefined) } : {}),
       actions: [...(laterale ? [{ type: 'passe' as const, destinataire: 9 }] : []),
         { type: 'passe', destinataire: 10 }, { type: 'passe', destinataire: 12 }, { type: 'passe', destinataire: 13 },

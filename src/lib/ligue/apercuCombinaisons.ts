@@ -1,4 +1,5 @@
-import { alignementCombinaison, origineApercu, toucheValide, type ActionCombinaison, type Combinaison, type PointCombinaison, type VarianteCombinaison } from './combinaisons';
+import { alignementCombinaison, lancerApresBloc, origineApercu, placementsPersonnalises, receptionTouche, toucheValide, type ActionCombinaison, type Combinaison, type PointCombinaison, type VarianteCombinaison } from './combinaisons';
+import { positionsBaseCombinaison } from './placementsCombinaisons';
 
 const borner = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 export interface TraceCombinaison {
@@ -12,33 +13,18 @@ export interface TraceCombinaison {
 
 export function positionsApercu(c: Combinaison, v: VarianteCombinaison, conquete = false): Record<number, PointCombinaison> {
   const origine = origineApercu(c);
-  const signe = c.couloir === 'droite' ? -1 : 1;
-  const bord = signe === 1 ? 0 : 70;
-  const formation = alignementCombinaison(v);
-  const dehors = [1, 3, 4, 5, 6, 7, 8].filter(n => !formation.some(f => f.numero === n));
-  const positions: Record<number, PointCombinaison> = {};
-  for (let n = 1; n <= 15; n++) {
-    const p = v.placements.find(p => p.numero === n);
-    const aligne = formation.find(f => f.numero === n);
-    let defaut = n <= 8 ? { x: origine.x - 2 - Math.floor((n - 1) / 3) * 2.8, y: origine.y + ((n - 1) % 3 - 1) * 3 }
-      : { x: origine.x - 4 - (n - 9) * 2, y: origine.y + (-18 + (n - 9) * 6) * signe };
-    if (c.phase === 'touche') {
-      defaut = n === 2 ? { x: origine.x, y: bord + signe * .7 }
-        : aligne ? { x: origine.x - .44, y: bord + signe * aligne.distance }
-          : n <= 8 ? { x: origine.x - 9, y: bord + signe * (19 + dehors.indexOf(n) * 6) }
-            : { x: origine.x - (n === 9 ? 3 : 12 + (n - 10) * 2), y: bord + signe * (n === 9 ? 8 : 17 + (n - 10) * 6) };
-    }
-    // Au lancer, les avants occupent leur alignement. Le sauteur commence
-    // l'enchaînement à l'endroit où il capte, comme dans le match.
-    const fixe = c.phase === 'touche' && (n === 2 || n === v.sauteur || conquete && n <= 8);
-    positions[n] = { x: borner(p && !fixe ? origine.x + p.x : defaut.x, .7, 99.3),
-      y: borner(p && !fixe ? origine.y + p.y : defaut.y, .7, 69.3) };
+  const positions = positionsBaseCombinaison(c, v);
+  if (!conquete) for (const p of placementsPersonnalises(v)) {
+    if (c.phase === 'touche' && (p.numero === 2 || p.numero === v.sauteur)) continue;
+    positions[p.numero] = { x: borner(origine.x + p.x, .7, 99.3), y: borner(origine.y + p.y, .7, 69.3) };
   }
+  if (c.phase === 'touche' && !conquete && lancerApresBloc(v)) positions[v.sauteur] = receptionTouche(origine, v);
   return positions;
 }
 
 function positionsReception(c: Combinaison, v: VarianteCombinaison) {
   const positions = positionsApercu(c, v, true);
+  if (lancerApresBloc(v)) { positions[v.sauteur] = receptionTouche(origineApercu(c), v); return positions; }
   const t = toucheValide(v.touche);
   const lifteurs = alignementCombinaison(v).filter(p => p.numero !== v.sauteur).sort((a, b) => Math.abs(a.distance - t.distance) - Math.abs(b.distance - t.distance)).slice(0, 2);
   lifteurs.forEach((p, i) => { positions[p.numero] = { x: positions[v.sauteur].x, y: borner(positions[v.sauteur].y + (i === 0 ? -.7 : .7), 5, 65) }; });
@@ -83,7 +69,7 @@ export function imageApercu(c: Combinaison, v: VarianteCombinaison, temps: numbe
   const traces = tracesApercu(c, v);
   const debutSortie = traces.findIndex(t => t.action !== undefined);
   const avantSortie = c.phase === 'touche' && (temps === null || temps < (debutSortie < 0 ? traces.length : debutSortie));
-  const positions = positionsApercu(c, v, avantSortie);
+  const positions = positionsApercu(c, v, temps === null || avantSortie);
   const mouvements: Record<number, PointCombinaison> = {};
   let porteur: number | null = c.phase === 'touche' ? 2 : v.depart;
   let ballon = { ...positions[porteur] };
@@ -116,11 +102,18 @@ export function imageApercu(c: Combinaison, v: VarianteCombinaison, temps: numbe
     if (feinte && avantSortie) positions[trace.acteur] = { x: trace.de.x, y: trace.de.y + (trace.vers.y - trace.de.y) * Math.sin(Math.PI * avance) };
     if (feinte && enCours) mouvements[trace.acteur] = { x: 0, y: (trace.vers.y - trace.de.y) * Math.PI * Math.cos(Math.PI * avance) };
     if (lancer && avantSortie) {
-      const rapprochement = borner(avance / .4, 0, 1);
-      for (const p of lifteurs) {
-        const de = positionsApercu(c, v, true)[p.numero]; const cible = reception[p.numero];
-        positions[p.numero] = { x: de.x + (cible.x - de.x) * rapprochement, y: de.y + (cible.y - de.y) * rapprochement };
-        if (rapprochement < 1 && enCours) mouvements[p.numero] = { x: (cible.x - de.x) / .4, y: (cible.y - de.y) / .4 };
+      if (lancerApresBloc(v)) {
+        const de = positionsApercu(c, v, true)[v.sauteur]; const cible = reception[v.sauteur];
+        const course = borner((avance - .4) / .48, 0, 1);
+        positions[v.sauteur] = { x: de.x + (cible.x - de.x) * course, y: de.y + (cible.y - de.y) * course };
+        if (course < 1 && avance >= .4) mouvements[v.sauteur] = { x: (cible.x - de.x) / .48, y: (cible.y - de.y) / .48 };
+      } else {
+        const rapprochement = borner(avance / .4, 0, 1);
+        for (const p of lifteurs) {
+          const de = positionsApercu(c, v, true)[p.numero]; const cible = reception[p.numero];
+          positions[p.numero] = { x: de.x + (cible.x - de.x) * rapprochement, y: de.y + (cible.y - de.y) * rapprochement };
+          if (rapprochement < 1 && enCours) mouvements[p.numero] = { x: (cible.x - de.x) / .4, y: (cible.y - de.y) / .4 };
+        }
       }
     }
     if (lancer || trace.action?.type === 'passe' || trace.action?.type === 'pied') {

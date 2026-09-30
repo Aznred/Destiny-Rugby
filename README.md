@@ -6,14 +6,18 @@
   éditeur libre sur terrain 2D agrandissable, zoom sur le jeu ou sur le lancer,
   joueurs animés et maillots du club comme dans le direct, lecture avec pause,
   ralenti, progression et étapes, tracés affichables à volonté. Boutons regroupés
-  par usage et commandes adaptées au téléphone. Placement du XV, passes vers les numéros choisis,
+  par usage et commandes adaptées au téléphone. Mêlées en 3-4-1, sortie du 9 au
+  ruck et ligne arrière reprises des placements du moteur des matchs, vues
+  avant/après conquête et retour aux positions du match. Placement du XV, passes vers les numéros choisis,
   courses, appels/leurres et sept intentions au pied. Jusqu’à 12 combinaisons,
   chacune avec trois variantes pondérées et dix actions. Déclenchement sur mêlée,
   touche ou ruck, selon les 22 et le côté du terrain. En mode « Mes combinaisons »,
   le serveur exécute le cahier enregistré ; les situations non couvertes suivent
   le plan habituel. En touche : lanceur n° 2, sauteur choisi, alignement à 4/5/7,
-  lancer court/milieu/fond ou distance précise entre 5 et 15 m, feinte au premier
-  bloc et placements après réception. Ces réglages pilotent la conquête en match.
+  lancer court/milieu/fond (5–15 m), ou après le troisième bloc (jusqu’à 25 m)
+  vers un avant, le 9 ou un arrière choisi, avec course après le lancer et sans
+  lift. Feinte au premier bloc et placements après réception. Ces réglages
+  pilotent la conquête en match.
   L’aperçu anime le lancer puis la sortie, la réussite dépend du match.
   L’accès est contrôlé sur l’identifiant authentifié `kiri`, y compris pour les
   ordres en direct. Vérification : `npm run verify:combinaisons` ; aperçu local :

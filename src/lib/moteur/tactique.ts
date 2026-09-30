@@ -111,7 +111,7 @@ const PROFONDEUR: Record<number, number> = {
   9: 1.2, 10: 5.5, 12: 6.8, 13: 8, 11: 9.2, 14: 9.2, 15: 12.5,
 };
 
-function structurerAttaque(e: EtatMatch, liste: Pion[], cote: Cote): void {
+export function structurerAttaque(e: Pick<EtatMatch, 'ouvert' | 'porteur' | 'ballon' | 'origine' | 'lancement'>, liste: Pion[], cote: Cote): void {
   const s = sens(cote);
   const ouvert = e.ouvert;
   const porteur = e.porteur && e.porteur.cote === cote ? e.porteur : null;

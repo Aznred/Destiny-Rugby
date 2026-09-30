@@ -303,6 +303,8 @@ export interface ConqueteAnimee {
   progression: number;
   combinaison?: 'premierBloc' | 'milieu' | 'fond' | 'leurreDevant';
   cibleId?: string;
+  horsAlignement?: boolean;
+  reception?: Vec;
   pousseVers?: Cote;
 }
 

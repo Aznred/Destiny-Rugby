@@ -358,6 +358,7 @@ export interface TerrainDirect {
     type: 'melee' | 'touche'; progression: number;
     combinaison?: 'premierBloc' | 'milieu' | 'fond' | 'leurreDevant';
     cibleId?: string; pousseVers?: CoteEnLigne;
+    horsAlignement?: boolean; reception?: { x: number; y: number };
   };
   /** Aplatissage en cours, assez long pour être reconstruit entre deux relevés. */
   aplatissage?: { marqueurId: string; progression: number };
@@ -1075,8 +1076,14 @@ function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
       progression: r2(e.conquete.progression),
       combinaison: e.conquete.combinaison,
       cibleId: e.conquete.cibleId,
+      ...(e.conquete.horsAlignement ? { horsAlignement: true, reception: e.conquete.reception } : {}),
       pousseVers: e.conquete.pousseVers ? MOTEUR_VERS_COTE[e.conquete.pousseVers] : undefined,
     };
+    if (e.conquete.horsAlignement && e.conquete.reception) {
+      const lanceur = e.pions.find(p => p.cote === e.possession && p.numero === 2 && p.surLeTerrain);
+      const vol = Math.max(0, Math.min(1, (e.conquete.progression - .52) / .38));
+      if (lanceur) terrain.ballon = { x: r2(lanceur.pos.x + (e.conquete.reception.x - lanceur.pos.x) * vol), y: r2(lanceur.pos.y + (e.conquete.reception.y - lanceur.pos.y) * vol), hauteur: r2(Math.sin(Math.PI * vol) * 2.4) };
+    }
   }
   if (e.aplatissage) {
     terrain.aplatissage = {

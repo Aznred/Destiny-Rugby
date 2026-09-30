@@ -556,7 +556,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
               </g>
             );
           })()}
-          {!affiche.porteurId && affiche.conquete?.type !== 'touche' && <g ref={noeud => {
+          {!affiche.porteurId && (affiche.conquete?.type !== 'touche' || affiche.conquete.horsAlignement && affiche.conquete.progression >= .52 && affiche.conquete.progression < .9) && <g ref={noeud => {
             noeudBallon.current = noeud ? { noeud, origine: { x: b.x, y: b.y } } : null;
           }}>
             {ageRebond >= 0 && ageRebond < .3 && (
@@ -593,7 +593,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
             <strong>{conquete.type === 'melee' ? 'MÊLÉE · POUSSÉE' : 'TOUCHE · COMBINAISON'}</strong>
             <span>{conquete.type === 'melee'
               ? conquete.progression < 0.32 ? 'Les packs se placent' : conquete.progression < 0.52 ? 'Liaison' : conquete.pousseVers ? 'Un pack prend l’ascendant' : 'Mêlée stable au centre'
-              : LIBELLES_COMBINAISON[conquete.combinaison ?? 'milieu']}</span>
+              : conquete.horsAlignement ? 'Lancer après le troisième bloc' : LIBELLES_COMBINAISON[conquete.combinaison ?? 'milieu']}</span>
             <i><b style={{ width: `${Math.round(conquete.progression * 100)}%` }} /></i>
           </div>
         )}

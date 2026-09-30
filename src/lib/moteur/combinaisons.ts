@@ -1,4 +1,4 @@
-import { choisirCombinaison, choisirVariante, toucheValide, type Combinaison, type PhaseCombinaison, type PointCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
+import { choisirCombinaison, choisirVariante, lancerApresBloc, placementsPersonnalises, receptionTouche, toucheValide, type Combinaison, type PhaseCombinaison, type PointCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
 import type { EtatMatch } from './etat.js';
 import { stopper, type Pion } from './entites.js';
 import { placementTouche } from './phasesArretees.js';
@@ -41,6 +41,8 @@ export function preparerCombinaison(e: EtatMatch, phase: PhaseCombinaison): void
     const sauteur = joueurCombinaison(e, cote, variante.sauteur)!;
     e.conquete.combinaison = t.feinte ? 'leurreDevant' : t.distance <= 7 ? 'premierBloc' : t.distance >= 11 ? 'fond' : 'milieu';
     e.conquete.cibleId = sauteur.id;
+    if (lancerApresBloc(variante)) { e.conquete.horsAlignement = true; e.conquete.reception = receptionTouche(e.ballon, variante, s); }
+    else { delete e.conquete.horsAlignement; delete e.conquete.reception; }
   }
 }
 
@@ -71,7 +73,7 @@ export function pointSurTerrain(c: CombinaisonEnCours, p: PointCombinaison): Vec
 export function placerCombinaison(e: EtatMatch): void {
   const c = e.combinaisonEnCours;
   if (!c || c.cote !== e.possession || e.phase !== 'jeuCourant') return;
-  for (const placement of c.variante.placements) {
+  for (const placement of placementsPersonnalises(c.variante)) {
     const p = joueurCombinaison(e, c.cote, placement.numero);
     if (!p || p === e.porteur || e.vol?.receveur === p) continue;
     const cible = pointSurTerrain(c, c.courses[p.numero] ?? placement);

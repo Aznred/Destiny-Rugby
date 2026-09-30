@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Icone } from './Icone';
 import { TerrainCombinaison } from './TerrainCombinaison';
-import { combinaisonsValides, creerCombinaison, erreursVariante, MAX_ACTIONS, MAX_COMBINAISONS, MAX_VARIANTES, origineApercu } from '../lib/ligue/combinaisons';
+import { combinaisonsValides, creerCombinaison, erreursVariante, MAX_ACTIONS, MAX_COMBINAISONS, MAX_VARIANTES, origineApercu, placementsPersonnalises } from '../lib/ligue/combinaisons';
 import type { ActionCombinaison, Combinaison, PhaseCombinaison, PiedCombinaison, PointCombinaison, VarianteCombinaison } from '../lib/ligue/combinaisons';
 import type { MaillotMatch } from '../lib/moteur/apparenceMatch';
 import './EditeurCombinaisons.css';
@@ -49,7 +49,7 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
   };
   const placer = (numero: number, p: PointCombinaison) => {
     if (!v) return;
-    modifierVariante({ ...v, placements: [...v.placements.filter(p => p.numero !== numero),
+    modifierVariante({ ...v, placements: [...placementsPersonnalises(v).filter(p => p.numero !== numero),
       { numero, x: borner(p.x - origine.x, -35, 35), y: p.y - origine.y }] });
   };
   const numeros = (valeur: number, onChange: (v: number) => void, filtre = (n: number) => n >= 1) => <select value={valeur} onChange={e => onChange(Number(e.target.value))}>{Array.from({ length: 15 }, (_, i) => i + 1).filter(filtre).map(n => <option key={n} value={n}>N° {n}{joueurs[n] ? ` · ${joueurs[n]}` : ''}</option>)}</select>;
@@ -80,13 +80,13 @@ export function EditeurCombinaisons({ combinaisons = [], mode = 'automatique', j
           const phase = e.target.value as PhaseCombinaison;
           const ancienne = origineApercu(c); const nouvelle = origineApercu({ ...c, phase });
           // Conserver les joueurs visibles lorsque l'on passe du centre à une touche.
-          modifier({ ...c, phase, couloir: phase === 'touche' && c.couloir === 'centre' ? 'tous' : c.couloir, variantes: c.variantes.map(v => ({ ...v, depart: phase === 'melee' && v.depart !== 8 ? 9 : v.depart, placements: v.placements.map(p => ({ ...p, y: borner(ancienne.y + p.y, 2, 68) - nouvelle.y })) })) }); setActionIndex(null);
+          modifier({ ...c, phase, couloir: phase === 'touche' && c.couloir === 'centre' ? 'tous' : c.couloir, variantes: c.variantes.map(v => ({ ...v, depart: phase === 'melee' && v.depart !== 8 ? 9 : v.depart, placements: placementsPersonnalises(v).map(p => ({ ...p, y: borner(ancienne.y + p.y, 2, 68) - nouvelle.y })) })) }); setActionIndex(null);
         }}>{choix(PHASES)}</select></label>
         <label>Zone<select value={c.zone} onChange={e => modifier({ ...c, zone: e.target.value as Combinaison['zone'] })}>{choix(ZONES)}</select></label>
         <label>Côté<select value={c.couloir} onChange={e => {
           const couloir = e.target.value as Combinaison['couloir'];
           const reflet = (c.couloir === 'droite') !== (couloir === 'droite');
-          modifier({ ...c, couloir, variantes: reflet ? c.variantes.map(v => ({ ...v, placements: v.placements.map(p => ({ ...p, y: -p.y })), actions: v.actions.map(a => a.type === 'course' || a.type === 'leurre' ? { ...a, destination: { ...a.destination, y: -a.destination.y } } : a) })) : c.variantes });
+          modifier({ ...c, couloir, variantes: reflet ? c.variantes.map(v => ({ ...v, placements: placementsPersonnalises(v).map(p => ({ ...p, y: -p.y })), actions: v.actions.map(a => a.type === 'course' || a.type === 'leurre' ? { ...a, destination: { ...a.destination, y: -a.destination.y } } : a) })) : c.variantes });
         }}>{Object.entries(COULOIRS).map(([valeur, nom]) => <option key={valeur} value={valeur} disabled={c.phase === 'touche' && valeur === 'centre'}>{nom}</option>)}</select></label>
       </div><div className="ec-actions-cahier"><label className="ec-case"><input type="checkbox" checked={c.active} onChange={e => modifier({ ...c, active: e.target.checked })} />Active dans les matchs</label>
         <button className="btn fantome" disabled={plans.length >= MAX_COMBINAISONS} onClick={() => { const copie = { ...structuredClone(c), id: uid(), nom: `${c.nom.slice(0, 32)} (copie)` }; modifie([...plans, copie]); setSelection(copie.id); }}><Icone nom="dossier" taille={15} />Dupliquer</button>

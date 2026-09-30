@@ -162,8 +162,21 @@ adapte ces images à `TerrainDirect` et aux gestes du `SpriteRugbymanMemo` des
 matchs : lancer, saut, lift, passe, réception, course et pied. Le club fournit
 son maillot tiré de l’écusson. Les tracés peuvent être masqués ; la pose et le
 ballon restent pilotés par la progression, même en pause.
+`placementsCombinaisons.ts` reprend `placementMelee`, `placementRuck`,
+`placementTouche` et `structurerAttaque` du moteur : mêlée en 3-4-1 avec le 9
+au tunnel, trois avants au ruck et le 9 à sa sortie, pods et ligne arrière.
+L'éditeur distingue avant/après conquête ; déplacer un joueur ouvre la vue de
+sortie. Le bouton « Reprendre les positions du match » efface les placements
+personnalisés. `placementsPersonnalises` reconnaît seulement le gabarit exact
+des anciens exemples pour lui rendre les nouvelles bases, sans effacer les
+placements modifiés par le coach.
 Chaque variante de touche peut choisir 4/5/7 alignés, le sauteur, une réception
-entre 5 et 15 m et une feinte au premier bloc. `alignementCombinaison` partage
+entre 5 et 15 m et une feinte au premier bloc. Après le troisième bloc, le
+lancer peut viser jusqu'à 25 m et choisir un avant, le 9 ou un arrière. Les
+alignés restent entre 5 et 15 m avant le lancer ; le receveur part après le
+lâcher, sans lift, et la réception attend sa course réelle avant l'enchaînement.
+`ConqueteAnimee.horsAlignement/reception` pilote sa course et le ballon en vol
+dans le direct ; la réception utilise passe/vision. `alignementCombinaison` partage
 la formation entre aperçu et `phasesArretees.ts` ; `preparerCombinaison`
 l'installe réellement en match. Les placements de sortie restent relatifs à
 la conquête, même lorsque le ballon est reçu au fond de l'alignement.
