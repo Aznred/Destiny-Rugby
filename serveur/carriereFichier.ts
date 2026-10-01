@@ -237,7 +237,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
       const limite = 500;
       return {
         comptes: base.comptes.slice(-limite).reverse().map(c => ({
-          id: c.id, pseudo: c.pseudo, creeLe: c.creeLe, vuLe: c.vuLe,
+          id: c.id, identifiant: c.identifiant, pseudo: c.pseudo, creeLe: c.creeLe, vuLe: c.vuLe,
           ligues: base.ligues.filter(l => l.comptes.includes(c.id)).length,
         })),
         ligues: base.ligues.slice(-limite).reverse().map(l => ({

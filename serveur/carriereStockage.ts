@@ -528,9 +528,9 @@ export function stockageNeon(url: string): StockageCarriere {
     async administration() {
       const limite = 500;
       const [comptes, ligues] = await Promise.all([
-        sql`select c.id,c.pseudo,c.cree_le,c.vu_le,count(l.id)::int as ligues
+        sql`select c.id,c.identifiant,c.pseudo,c.cree_le,c.vu_le,count(l.id)::int as ligues
             from comptes c left join carriere_ligues l on l.comptes @> array[c.id]
-            group by c.id,c.pseudo,c.cree_le,c.vu_le order by c.cree_le desc limit ${limite + 1}`,
+            group by c.id,c.identifiant,c.pseudo,c.cree_le,c.vu_le order by c.cree_le desc limit ${limite + 1}`,
         sql`select l.id,l.code,l.cree_le,l.donnees->>'nom' as nom,l.donnees->>'phase' as phase,
                    coalesce((l.donnees->>'saison')::int,1) as saison,
                    jsonb_array_length(coalesce(l.donnees->'clubs','[]'::jsonb))::int as clubs,
@@ -540,7 +540,7 @@ export function stockageNeon(url: string): StockageCarriere {
       ]);
       return {
         comptes: comptes.slice(0, limite).map(x => ({
-          id: String(x.id), pseudo: String(x.pseudo), ligues: Number(x.ligues ?? 0),
+          id: String(x.id), identifiant: String(x.identifiant ?? ''), pseudo: String(x.pseudo), ligues: Number(x.ligues ?? 0),
           creeLe: x.cree_le ? new Date(String(x.cree_le)).toISOString() : undefined,
           vuLe: x.vu_le ? new Date(String(x.vu_le)).toISOString() : undefined,
         })),

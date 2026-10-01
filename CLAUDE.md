@@ -287,6 +287,15 @@ Ovas et remettre le bac à sable à zéro. Ces commandes sont refusées côté
 serveur à tous les autres comptes et le laboratoire n'entame pas le plafond de
 vingt ligues ordinaires. Banc : `npm run verify:laboratoire`.
 
+« Comptes & ligues » est réservé à l’identifiant serveur `kiri`. Le répertoire
+affiche et recherche les identifiants de connexion, distincts des pseudos et
+des UUID techniques. Les stockages fichier et Neon exposent explicitement le
+champ `identifiant` dans `AdministrationCarriere`, sans empreintes ni sessions.
+Les vues ordinaires de compte restent limitées à leurs champs publics.
+`AdministrationKiri` utilise par défaut le chargeur API ; l’aperçu local
+`/scripts/apercuAdministration.html` injecte uniquement des comptes fictifs.
+Banc : `npm run verify:administration-kiri`.
+
 ⚠️ **Neuf autres modules du dossier ne servent plus qu'à leur propre banc**
 (`types`, `rarete`, `identite`, `reglages`, `vivier`, `dotation`, `valeur`,
 `packs`, `ova`, `index`). C'est le socle du premier lot, construit sur un autre

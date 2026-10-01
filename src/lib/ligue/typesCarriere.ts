@@ -146,7 +146,7 @@ export interface StatistiquesGlobalesCarriere {
 }
 export interface AdministrationCarriere {
   comptes: {
-    id: string; pseudo: string; creeLe?: string; vuLe?: string; ligues: number;
+    id: string; identifiant: string; pseudo: string; creeLe?: string; vuLe?: string; ligues: number;
   }[];
   ligues: {
     id: string; code: string; nom: string; phase: string; saison: number; clubs: number;

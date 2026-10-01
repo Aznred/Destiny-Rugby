@@ -2365,7 +2365,7 @@ function StatistiquesSecretes() {
   </section>;
 }
 
-function AdministrationKiri({ observer, occupe }: { observer: (id: string) => Promise<void>; occupe: boolean }) {
+export function AdministrationKiri({ observer, occupe, charger = chargerAdministrationCarriere }: { observer: (id: string) => Promise<void>; occupe: boolean; charger?: typeof chargerAdministrationCarriere }) {
   const [vue, setVue] = useState<AdministrationCarriere | null>(null);
   const [erreur, setErreur] = useState('');
   const [recherche, setRecherche] = useState('');
@@ -2373,27 +2373,27 @@ function AdministrationKiri({ observer, occupe }: { observer: (id: string) => Pr
   const normalisee = recherche.trim().toLocaleLowerCase('fr');
   useEffect(() => {
     const controleur = new AbortController();
-    void chargerAdministrationCarriere(controleur.signal).then(setVue).catch(e => {
+    void charger(controleur.signal).then(setVue).catch(e => {
       if (!controleur.signal.aborted) setErreur(messageErreur(e));
     });
     return () => controleur.abort();
-  }, []);
+  }, [charger]);
   if (erreur) return <Vide icone="alerte" titre="Répertoire indisponible">{erreur}</Vide>;
   if (!vue) return <Vide icone="chrono" titre="Chargement du répertoire">La base prépare les comptes et les ligues.</Vide>;
-  const comptes = vue.comptes.filter(c => `${c.pseudo} ${c.id}`.toLocaleLowerCase('fr').includes(normalisee));
+  const comptes = vue.comptes.filter(c => `${c.pseudo} ${c.identifiant ?? ''} ${c.id}`.toLocaleLowerCase('fr').includes(normalisee));
   const ligues = vue.ligues.filter(l => `${l.nom} ${l.code} ${l.createur} ${l.id}`.toLocaleLowerCase('fr').includes(normalisee));
   return <section className="cel-panneau cel-admin-kiri">
     <div className="cel-titre-ligne"><div><div className="eyebrow">Réservé au compte kiri</div><h2>Comptes et ligues créés</h2></div><Icone nom="profil" taille={28} /></div>
-    <p className="cel-note">Ce panneau ne transmet ni identifiant de connexion, ni mot de passe, ni jeton de session.</p>
+    <p className="cel-note">Retrouve un compte par son pseudo ou son identifiant de connexion.</p>
     <div className="cel-admin-outils">
       <nav className="cel-onglets secondaires" aria-label="Contenu du répertoire">
         <button className={section === 'comptes' ? 'actif' : ''} onClick={() => setSection('comptes')}>Comptes ({montant(vue.comptes.length)})</button>
         <button className={section === 'ligues' ? 'actif' : ''} onClick={() => setSection('ligues')}>Ligues ({montant(vue.ligues.length)})</button>
       </nav>
-      <label className="cel-champ"><span>Rechercher</span><input type="search" value={recherche} onChange={e => setRecherche(e.target.value)} placeholder={section === 'comptes' ? 'Pseudo ou identifiant technique…' : 'Nom, code, créateur…'} /></label>
+      <label className="cel-champ"><span>Rechercher</span><input type="search" value={recherche} onChange={e => setRecherche(e.target.value)} placeholder={section === 'comptes' ? 'Pseudo, identifiant ou ID technique…' : 'Nom, code, créateur…'} /></label>
     </div>
-    {section === 'comptes' ? <div className="cel-table-scroll"><table className="cel-table cel-admin-table"><thead><tr><th>Compte</th><th>Créé</th><th>Dernière connexion</th><th>Ligues</th><th>ID technique</th></tr></thead><tbody>
-      {comptes.map(c => <tr key={c.id}><th>{c.pseudo}</th><td>{c.creeLe ? dateHeure(c.creeLe) : '—'}</td><td>{c.vuLe ? dateHeure(c.vuLe) : '—'}</td><td><b>{c.ligues}</b></td><td><code title={c.id}>{c.id.slice(0, 8)}…</code></td></tr>)}
+    {section === 'comptes' ? <div className="cel-table-scroll"><table className="cel-table cel-admin-table"><thead><tr><th>Compte</th><th>Identifiant</th><th>Créé</th><th>Dernière connexion</th><th>Ligues</th><th>ID technique</th></tr></thead><tbody>
+      {comptes.map(c => <tr key={c.id}><th>{c.pseudo}</th><td className="cel-admin-identifiant"><code>{c.identifiant || '—'}</code></td><td>{c.creeLe ? dateHeure(c.creeLe) : '—'}</td><td>{c.vuLe ? dateHeure(c.vuLe) : '—'}</td><td><b>{c.ligues}</b></td><td><code title={c.id}>{c.id.slice(0, 8)}…</code></td></tr>)}
     </tbody></table>{!comptes.length && <p className="cel-note">Aucun compte ne correspond à cette recherche.</p>}{vue.comptesTronques && <p className="cel-note">Seuls les {vue.limite} comptes les plus récents sont affichés.</p>}</div>
       : <div className="cel-table-scroll"><table className="cel-table cel-admin-table"><thead><tr><th>Ligue</th><th>Code</th><th>Créateur</th><th>État</th><th>Saison</th><th>Clubs</th><th>Créée</th><th>Accès</th></tr></thead><tbody>
         {ligues.map(l => <tr key={l.id}><th>{l.nom}<small title={l.id}>{l.id.slice(0, 8)}…</small></th><td><code>{l.code}</code></td><td>{l.createur}</td><td>{l.phase || '—'}</td><td>{l.saison}</td><td><b>{l.clubs}</b></td><td>{l.creeLe ? dateHeure(l.creeLe) : '—'}</td><td><button type="button" className="btn fantome petit" disabled={occupe} onClick={() => { void observer(l.id); }}><Icone nom="oeil" taille={15} /> Observer</button></td></tr>)}

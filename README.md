@@ -50,6 +50,9 @@
 - **Une ligue privée entre potes** : 2 à 20 clubs, code d'invitation,
   championnat aller-retour, coupes inventées par le créateur, palmarès. Écran
   dédié à sept onglets + le direct.
+- **Répertoire privé Kiri** : « Comptes & ligues » affiche le pseudo et
+  l’identifiant de connexion de chaque compte, avec recherche par identifiant.
+  L’accès reste réservé au compte Kiri authentifié.
 - **On démarre avec trente VRAIS licenciés de Régionale 3** (30 à 40 GEN, avec
   leur nom et leur club), tous les clubs exactement à 35 de moyenne — et on
   choisit l'écusson d'un vrai club parmi 1 353, du Stade Toulousain au club du

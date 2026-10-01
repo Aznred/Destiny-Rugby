@@ -17,7 +17,7 @@ try {
 
   await stockage.creerCompte({ id: kiri, identifiant: 'kiri', pseudo: 'Kiri', empreinte: 'test' });
   await stockage.creerCompte({ id: joueur, identifiant: 'joueur', pseudo: 'Camille', empreinte: 'test' });
-  await stockage.creerCompte({ id: intrus, identifiant: 'intrus', pseudo: 'Intrus', empreinte: 'test' });
+  await stockage.creerCompte({ id: intrus, identifiant: 'intrus', pseudo: 'Kiri', empreinte: 'test' });
   await stockage.ouvrirSession(empreinteJeton(kiri), kiri, Date.now() + 60_000);
   await stockage.ouvrirSession(empreinteJeton(joueur), joueur, Date.now() + 60_000);
   await stockage.ouvrirSession(empreinteJeton(intrus), intrus, Date.now() + 60_000);
@@ -52,16 +52,21 @@ try {
   }
 
   assert.equal((await appeler(joueur)).statut, 404, 'Un joueur ordinaire ne doit pas voir le répertoire');
+  assert.equal((await appeler(intrus)).statut, 404, 'Le pseudo Kiri ne donne pas accès aux identifiants');
+  assert.equal((await appeler('session-inconnue')).statut, 401, 'Une session inconnue ne voit pas les identifiants');
   const reponse = await appeler(kiri);
   assert.equal(reponse.statut, 200);
-  assert.deepEqual(reponse.donnees.comptes.map((c: { pseudo: string }) => c.pseudo).sort(), ['Camille', 'Intrus', 'Kiri']);
+  assert.deepEqual(reponse.donnees.comptes.map((c: { pseudo: string }) => c.pseudo).sort(), ['Camille', 'Kiri', 'Kiri']);
   const compteJoueur = reponse.donnees.comptes.find((c: { id: string }) => c.id === joueur);
   assert.equal(compteJoueur.ligues, 1);
+  assert.equal(compteJoueur.identifiant, 'joueur', 'Kiri voit l’identifiant de connexion, distinct du pseudo');
+  assert.deepEqual(reponse.donnees.comptes.map((c: { identifiant: string }) => c.identifiant).sort(), ['intrus', 'joueur', 'kiri']);
   assert.ok(compteJoueur.creeLe && compteJoueur.vuLe, 'Les dates de création et de dernière connexion sont disponibles');
   assert.equal(reponse.donnees.ligues[0].nom, 'Ligue de Camille');
   assert.equal(reponse.donnees.ligues[0].createur, 'Camille');
   assert.equal(JSON.stringify(reponse.donnees).includes('empreinte'), false);
-  assert.equal(JSON.stringify(reponse.donnees).includes('identifiant'), false);
+  assert.ok(reponse.donnees.comptes.every((c: Record<string, unknown>) => Object.keys(c).every(champ => ['id', 'identifiant', 'pseudo', 'creeLe', 'vuLe', 'ligues'].includes(champ))), 'Le répertoire ne transmet que les champs autorisés');
+  assert.equal((await appeler(joueur, '/api/carriere?session=1')).donnees.compte.identifiant, undefined, 'La session ordinaire reste sans identifiant de connexion');
 
   const observation = await appeler(kiri, `/api/carriere?ligue=${ligue.id}`);
   assert.equal(observation.statut, 200, 'Kiri doit pouvoir ouvrir une ligue sans la rejoindre');
@@ -71,7 +76,7 @@ try {
   assert.deepEqual(observation.donnees.transactions, []);
   assert.ok(observation.donnees.clubs.every((c: Record<string, unknown>) => !('composition' in c) && !('strategie' in c)), 'La vue observateur ne doit pas exposer les tactiques privées');
   assert.equal((await appeler(intrus, `/api/carriere?ligue=${ligue.id}`)).statut, 404, 'Un autre non-membre reste refusé');
-  console.log('OK — le répertoire et le mode observateur sont réservés à Kiri, sans données privées.');
+  console.log('OK — identifiants de connexion visibles uniquement par Kiri ; empreintes, sessions et tactiques privées restent protégées.');
 } finally {
   rmSync(dossier, { recursive: true, force: true });
 }
