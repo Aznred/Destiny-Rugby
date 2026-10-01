@@ -163,8 +163,8 @@ const ICONE_BADGE: Record<BadgeCarte, NomIcone> = {
  * calé sur le haut de l'image : c'est la géométrie qui règle le problème, pas
  * un réglage de recadrage.
  */
-function PortraitComposition({ nom, panneau = false }: { nom: string; panneau?: boolean }) {
-  const photo = photoReelle(nom);
+function PortraitComposition({ nom, photo: portrait, panneau = false }: { nom: string; photo?: string; panneau?: boolean }) {
+  const photo = portrait ?? photoReelle(nom);
   const [erreur, setErreur] = useState(false);
   useEffect(() => setErreur(false), [photo, nom]);
 
@@ -277,7 +277,7 @@ function CarteJoueur({
             ambiguïté et en deux caractères. */}
         <em className="ct-numero">{numero}</em>
       </span>
-      {joueur && <PortraitComposition nom={joueur.nom} />}
+      {joueur && <PortraitComposition nom={joueur.nom} photo={joueur.photo} />}
       <b className="ct-nom">{joueur ? nomCarte(joueur.nom) : t('compo.vide')}</b>
       {joueur && (
         <span className="ct-sous">
@@ -359,7 +359,7 @@ function PanneauJoueur({
         <Icone nom="croix" taille={16} />
       </button>
       <header>
-        <PortraitComposition nom={joueur.nom} panneau />
+        <PortraitComposition nom={joueur.nom} photo={joueur.photo} panneau />
         <b>{joueur.nom}</b>
         <strong>{joueur.note}</strong>
       </header>
@@ -881,7 +881,7 @@ export function CompositionTerrainManager({
                 aria-disabled={indisponible}
                 title={`${joueur.nom} · ${NOM_RARETE[rareteDe(joueur)]}${raison ? ` · ${raison}` : ''}`}
               >
-                {!rendreCarte && <PortraitComposition nom={joueur.nom} />}
+                {!rendreCarte && <PortraitComposition nom={joueur.nom} photo={joueur.photo} />}
                 {rendreCarte ? <>{rendreCarte(joueur)}<b className="ct-fut-nom">{joueur.nom}</b><small>{nomPoste(joueur.poste)}</small>{raison && <small className="ct-fut-raison">{raison}</small>}</> : <>
                 <strong>{joueur.note}</strong>
                 <span>

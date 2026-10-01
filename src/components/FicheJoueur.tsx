@@ -49,6 +49,7 @@ export interface JoueurFiche {
   potentiel?: number;
   nation?: string;
   club?: string;
+  photo?: string;
 }
 
 /** Ce que le service de recrutement CROIT savoir. Absent = on sait vraiment. */
@@ -79,8 +80,8 @@ interface Props {
   onFermer: () => void;
 }
 
-function Portrait({ nom }: { nom: string }) {
-  const photo = photoReelle(nom);
+function Portrait({ nom, club, photo: portrait }: { nom: string; club?: string; photo?: string }) {
+  const photo = portrait ?? photoReelle(nom, club);
   const [erreur, setErreur] = useState(false);
   useEffect(() => setErreur(false), [photo, nom]);
   return (
@@ -131,7 +132,7 @@ export function FicheJoueur({ joueur, rapport, marche, onFermer }: Props) {
         </button>
 
         <header className="fj-tete">
-          <Portrait nom={joueur.nom} />
+          <Portrait nom={joueur.nom} club={joueur.club} photo={joueur.photo} />
           <div className="fj-identite">
             <b>{joueur.nom}</b>
             <span>

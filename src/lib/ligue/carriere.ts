@@ -1,4 +1,5 @@
 import { catalogueAdmin } from './atelierCatalogue.js';
+import { statistiquesCarte } from './statistiquesCarte.js';
 /** Règles exécutées exclusivement par le serveur ; chaque commande travaille sur une copie. */
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import type { CompositionManager } from '../../types.js';
@@ -40,12 +41,23 @@ const copier = <T>(x: T): T => structuredClone(x);
 let catalogueSources: ReturnType<typeof catalogueMondialCarriere> | undefined;
 let sourcesParId: Map<string, ReturnType<typeof catalogueMondialCarriere>[number]> | undefined;
 
-function actualiserCartesProfessionnelles(cartes: CarteCarriere[]): void {
+function actualiserCartesCatalogue(cartes: CarteCarriere[]): void {
   const catalogueActuel = catalogueMondialCarriere();
   if (catalogueSources !== catalogueActuel) { catalogueSources = catalogueActuel; sourcesParId = new Map(catalogueActuel.map(source => [source.sourceId, source])); }
   for (const carte of cartes) {
     const source = sourcesParId!.get(carte.sourceId);
-    if (!source || (source.origine !== 'professionnel' && !catalogueAdmin().joueurs[carte.sourceId])) continue;
+    if (!source) continue;
+    if (source.origine === 'ffr' && !catalogueAdmin().joueurs[carte.sourceId]) {
+      // Les corrections FFR portent sur les rôles et le portrait. La progression
+      // et toute l'histoire sportive d'une carte déjà distribuée sont conservées.
+      carte.poste = source.poste;
+      carte.famille = source.famille;
+      carte.postesSecondaires = source.postesSecondaires ? [...source.postesSecondaires] : undefined;
+      carte.photo = source.photo;
+      carte.statistiques = statistiquesCarte(carte.note, source.famille, source.sourceId);
+      continue;
+    }
+    if (source.origine !== 'professionnel' && !catalogueAdmin().joueurs[carte.sourceId]) continue;
     // L'identité de collection et la valeur sportive suivent le catalogue actuel.
     // L'historique de propriété, la fatigue, les blessures et les statistiques de
     // carrière restent ceux de cette carte déjà distribuée.
@@ -1289,7 +1301,7 @@ function reprendre(etat: EtatCarriereEnLigne, maintenant: number): EtatCarriereE
     if (!Number.isFinite(club.ovas)) club.ovas = 0;
     club.strategie = strategieValide(club.strategie);
   }
-  actualiserCartesProfessionnelles(nouveau.cartes);
+  actualiserCartesCatalogue(nouveau.cartes);
   nouveau.catalogueRevision = catalogueAdmin().revision;
   nouveau.rotationPacks = catalogueAdmin().rotationPacks === true;
   for (const club of nouveau.clubs) ajusterComposition(nouveau, club, maintenant);

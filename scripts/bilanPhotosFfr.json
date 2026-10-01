@@ -1,0 +1,195 @@
+{
+  "images": 1466,
+  "lieesParId": 1413,
+  "lieesParNom": 46,
+  "supplementaires": [
+    {
+      "club": "Rugby Club Mediterranee Palavas",
+      "nom": "Alexy OUFFE",
+      "fichier": "Alexy OUFFE.png"
+    },
+    {
+      "club": "Rugby Club Mediterranee Palavas",
+      "nom": "Calvin KOCHANOWSKI",
+      "fichier": "Calvin KOCHANOWSKI.png"
+    },
+    {
+      "club": "Rugby Club Mediterranee Palavas",
+      "nom": "Clément DISTANTI",
+      "fichier": "Clément DISTANTI.png"
+    },
+    {
+      "club": "Rugby Club Mediterranee Palavas",
+      "nom": "Julien CARAMEL",
+      "fichier": "Julien CARAMEL.png"
+    },
+    {
+      "club": "Rugby Club Mediterranee Palavas",
+      "nom": "Marius BEAUFILS",
+      "fichier": "Marius BEAUFILS.png"
+    },
+    {
+      "club": "Rugby Club Mediterranee Palavas",
+      "nom": "Marius BOREL",
+      "fichier": "Marius BOREL.png"
+    },
+    {
+      "club": "Rugby Club Mediterranee Palavas",
+      "nom": "Marius VINCENT",
+      "fichier": "Marius VINCENT.png"
+    }
+  ],
+  "photosAnnonceesAbsentes": [
+    {
+      "id": 1639145,
+      "nom": "GREGORY GARDETTE",
+      "club": "US Pays de Gex Rugby"
+    },
+    {
+      "id": 980991,
+      "nom": "YANN BALLESTER",
+      "club": "AS Succieu Terres Froides"
+    },
+    {
+      "id": 204974,
+      "nom": "TITOUAN PICART",
+      "club": "Chassieu Rugby"
+    },
+    {
+      "id": 1090367,
+      "nom": "LAURENT JAKUBOWSKI",
+      "club": "S O Pont Cheruy Charvieu Chavanoz Tignieu"
+    },
+    {
+      "id": 386368,
+      "nom": "SEBASTIEN DANTAND",
+      "club": "Unieux Firminy Ondaine Rugby"
+    },
+    {
+      "id": 980754,
+      "nom": "ANTHONY NANNI",
+      "club": "Champagnole Rugby"
+    },
+    {
+      "id": 869147,
+      "nom": "BENJAMIN ALEXANDRE",
+      "club": "US Clunisoise"
+    },
+    {
+      "id": 1012904,
+      "nom": "VALERE GRIVAULT",
+      "club": "US Baumoise"
+    },
+    {
+      "id": 1310863,
+      "nom": "NICOLAS TISSERAND",
+      "club": "US Baumoise"
+    },
+    {
+      "id": 1696209,
+      "nom": "JULES COURBET",
+      "club": "US Baumoise"
+    },
+    {
+      "id": 2195219,
+      "nom": "FLORIAN MIKA",
+      "club": "US Baumoise"
+    },
+    {
+      "id": 2282582,
+      "nom": "LOUIS PAUL GIRARD",
+      "club": "US Baumoise"
+    },
+    {
+      "id": 2342556,
+      "nom": "THEO INVERNIZZI",
+      "club": "US Baumoise"
+    },
+    {
+      "id": 2557713,
+      "nom": "TIMEO EHLINGER",
+      "club": "US Baumoise"
+    },
+    {
+      "id": 2558920,
+      "nom": "MARCEAU BONFILS",
+      "club": "US Baumoise"
+    },
+    {
+      "id": 1082682,
+      "nom": "CALVIN MONNOT",
+      "club": "Aviron Gruissanais"
+    },
+    {
+      "id": 1310897,
+      "nom": "JEAN BAPTISTE LAPLACE",
+      "club": "US Mouguerre"
+    },
+    {
+      "id": 1375117,
+      "nom": "MATHYS GALLET",
+      "club": "SC Le Rheu"
+    },
+    {
+      "id": 1550421,
+      "nom": "LEO THOMAS",
+      "club": "Niort Rugby Club"
+    },
+    {
+      "id": 2374400,
+      "nom": "VALENTINO TARDIVEL",
+      "club": "Stade Dijonnais"
+    },
+    {
+      "id": 297859,
+      "nom": "ADRIEN MONTEIL",
+      "club": "Rennes Etudiants Club"
+    },
+    {
+      "id": 8503,
+      "nom": "JACOB BOTICA",
+      "club": "Rugby Club Nimois"
+    },
+    {
+      "id": 958042,
+      "nom": "GUILHEM BOURGOIS",
+      "club": "Rugby Club Nimois"
+    },
+    {
+      "id": 1470969,
+      "nom": "TAVITE VEREDAMU",
+      "club": "Rugby Club Nimois"
+    },
+    {
+      "id": 1034738,
+      "nom": "LORIS VOLLE",
+      "club": "RC Aubenas Vals"
+    },
+    {
+      "id": 1920647,
+      "nom": "FLORIAN JULIEN",
+      "club": "RC Aubenas Vals"
+    },
+    {
+      "id": 27078,
+      "nom": "ENRICO JANUARIE",
+      "club": "CO Villers Les Nancy"
+    },
+    {
+      "id": 43381,
+      "nom": "ERIC CHASTAGNER",
+      "club": "Parisis Rugby Club"
+    },
+    {
+      "id": 1510776,
+      "nom": "SACHA ARTHUR DAVID DUMONT",
+      "club": "Parisis Rugby Club"
+    },
+    {
+      "id": 1760432,
+      "nom": "LEO BUCCELLATO",
+      "club": "Parisis Rugby Club"
+    }
+  ],
+  "octets": 52468748
+}

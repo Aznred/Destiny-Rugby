@@ -3,6 +3,7 @@ import { COMPETITIONS, clubParNom } from '../src/data/clubs';
 import { positionDuClub, distanceKm } from '../src/data/geographie';
 import { effectifDuClub } from '../src/lib/effectif';
 import { poulesDe } from '../src/lib/championnat';
+import { joueursFfrDuClub } from '../src/lib/joueursFfr';
 
 let echecs = 0;
 function verifier(nom: string, ok: boolean, detail = ''): void {
@@ -45,7 +46,7 @@ let completionsAttendues = 0;
 let completionsObservees = 0;
 let taillesExactes = true;
 for (const club of clubs) {
-  const source = EFFECTIFS_AMATEURS[club.nom]?.split('~').filter(Boolean).length ?? 0;
+  const source = joueursFfrDuClub(club.nom).length;
   const jeu = effectifDuClub(club.nom, 1);
   completionsAttendues += Math.max(0, 26 - source);
   completionsObservees += jeu.filter((joueur) => !joueur.id.includes('-am-')).length;

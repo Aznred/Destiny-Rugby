@@ -5,7 +5,7 @@ import { JOUEURS_NEW_MAJ } from '../../data/photosNewMaj.js';
 import { LNR_MAJ } from '../../data/lnrMaj.js';
 import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
 import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/amateurs.js';
-import { PHOTO_JOUEUR } from '../../data/photosJoueurs.js';
+import { joueursFfrDuClub, profilJoueurFfr } from '../joueursFfr.js';
 import { photoReelle } from '../avatars.js';
 import { noteJoueurRevalorisee, postesJoueurReel } from '../evaluationJoueurReel.js';
 import { COMPETITIONS } from '../../data/clubs.js';
@@ -13,7 +13,7 @@ import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
 import { LOGO_COMPETITION_NOUVEAU } from '../../data/nouvellesLigues.js';
 import { TROPHEES } from '../../data/trophees.js';
 import { posteDepuisFamille, POSTE_PAR_ID } from '../../data/rugby.js';
-import type { FamillePoste } from '../../types.js';
+import type { FamillePoste, PosteId } from '../../types.js';
 import type { Coequipier } from '../effectif.js';
 import { graine, melanger } from './aleatoire.js';
 import type { CarteCarriere, FiltrePack, PackCarriere, RareteCarriere } from './typesCarriere.js';
@@ -309,7 +309,8 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
       // enfin revaloriser un joueur oublié, sans faire baisser une vedette déjà
       // calibrée par un classement éditorial.
       const note = noteJoueurRevalorisee(j.nom, j.note);
-      const profilPostes = postesJoueurReel(j.nom, j.poste);
+      const profilFfr = profilJoueurFfr(j.nom, club);
+      const profilPostes = profilFfr?.poste ? { poste: profilFfr.poste, postesSecondaires: [...profilFfr.postesSecondaires] } : postesJoueurReel(j.nom, j.poste);
       const famille = POSTE_PAR_ID[profilPostes.poste].famille;
       ajouter({ sourceId, nom: j.nom, famille, poste: profilPostes.poste,
         postesSecondaires: profilPostes.postesSecondaires, note,
@@ -317,7 +318,7 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
         clubReel: maj?.club ?? lnr?.club ?? club, championnat: maj ? 'Gallagher Premiership' : lnr?.championnat ?? competition?.nom ?? 'Championnat professionnel', pays: competition?.pays ?? 'France',
         // L'index consolidé corrige aussi les variantes de prénom et les URL
         // LNR devenues obsolètes ; l'URL brute ne sert qu'en dernier recours.
-        photo: photoReelle(j.nom) ?? lnr?.photo, origine: 'professionnel', rarete: rareteCarriere(note),
+        photo: profilFfr?.photo ?? photoReelle(j.nom, club) ?? lnr?.photo, origine: 'professionnel', rarete: rareteCarriere(note),
         statistiques: statistiquesCarte(note, famille, sourceId) });
     }
   }
@@ -330,19 +331,20 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
   // pyramide française, et un pilier de Régionale 3 valait un Fédérale 1.
   const notes: Record<string, number> = { nationale: 65, nationale2: 61, fed1: 56, fed2: 51, fed3: 47, reg1: 43, reg2: 39, reg3: 35 };
   const divisions = new Map(Object.entries(CLUBS_AMATEURS).flatMap(([division, liste]) => liste.map(c => [c.nom, division] as const)));
-  for (const [club, effectif] of Object.entries(EFFECTIFS_AMATEURS)) {
+  for (const club of Object.keys(EFFECTIFS_AMATEURS)) {
     const division = divisions.get(club) ?? 'regionale3';
     const competition = clubs.get(club);
-    for (const [index, entree] of effectif.split('~').entries()) {
-      const [nom, codePoste] = entree.split('|');
+    for (const [index, j] of joueursFfrDuClub(club).entries()) {
+      const { nom } = j;
       if (!nom.trim()) continue;
-      const famille = codePoste !== '' && POSTES_AMATEURS[Number(codePoste)] ? POSTES_AMATEURS[Number(codePoste)] : POSTES_AMATEURS[index % POSTES_AMATEURS.length];
+      const poste = j.poste ?? posteDepuisFamille(j.famille ?? POSTES_AMATEURS[index % POSTES_AMATEURS.length], index);
+      const famille = POSTE_PAR_ID[poste].famille;
       const sourceId = `reel:${normaliser(nom)}`;
       const rng = graine(`${club}:${nom}`);
       const note = Math.max(30, Math.min(77, (notes[division] ?? 40) + Math.floor(rng() * 15) - 7));
-      ajouter({ sourceId, nom, famille, poste: posteDepuisFamille(famille, index), note, potentiel: Math.min(82, note + 6), age: 18 + Math.floor(rng() * 17),
+      ajouter({ sourceId, nom, famille, poste, postesSecondaires: [...j.postesSecondaires], note, potentiel: Math.min(82, note + 6), age: 18 + Math.floor(rng() * 17),
         nation: 'France', clubReel: club, championnat: competition?.nom ?? division.replace(/(\d)/, ' $1'), pays: 'France',
-        photo: PHOTO_JOUEUR[normaliser(nom)], origine: 'ffr', rarete: rareteCarriere(note), statistiques: statistiquesCarte(note, famille, sourceId) });
+        photo: j.photo ?? photoReelle(nom, club), origine: 'ffr', rarete: rareteCarriere(note), statistiques: statistiquesCarte(note, famille, sourceId) });
     }
   }
   catalogue = [...joueurs.values()].sort((a, b) => a.sourceId < b.sourceId ? -1 : 1);
@@ -555,12 +557,12 @@ const CHAMPIONNAT_DEPART = 'Régionale 3';
 
 const vestiaires = new Map<string, readonly SourceCarte[]>();
 /** Les licenciés de Régionale 3 d'une famille de poste, rangés par note. */
-function vestiaireDeDepart(famille: FamillePoste, note: number): readonly SourceCarte[] {
+function vestiaireDeDepart(famille: FamillePoste, note: number, poste: PosteId): readonly SourceCarte[] {
   catalogueParRarete();
-  const cle = `${famille}#${note}`;
+  const cle = `${famille}#${note}#${poste}`;
   const connu = vestiaires.get(cle);
   if (connu) return connu;
-  const liste = catalogueMondialCarriere().filter((c) => c.famille === famille && c.note === note
+  const liste = catalogueMondialCarriere().filter((c) => c.famille === famille && c.note === note && c.poste === poste
     && c.championnat === CHAMPIONNAT_DEPART);
   vestiaires.set(cle, liste);
   return liste;
@@ -584,7 +586,7 @@ export function dotationBronzeCarriere(
     for (let ecart = 0; ecart <= NOTE_DEPART_MAX - NOTE_DEPART_MIN && !source; ecart++) {
       for (const note of ecart === 0 ? [vise] : [vise - ecart, vise + ecart]) {
         if (note < NOTE_DEPART_MIN || note > NOTE_DEPART_MAX) continue;
-        source = tirerDuRayon(vestiaireDeDepart(place.famille, note), retenus, rng);
+        source = tirerDuRayon(vestiaireDeDepart(place.famille, note, place.poste), retenus, rng);
         if (source) break;
       }
     }
@@ -595,7 +597,7 @@ export function dotationBronzeCarriere(
     if (!source) return;
     retenus.add(source.sourceId);
     cartes.push({
-      ...source, poste: place.poste, statistiques: { ...source.statistiques },
+      ...source, statistiques: { ...source.statistiques },
       id: `${ligueId}:${source.sourceId}`, proprietaire: clubId,
       fatigue: 0, matchs: 0, essais: 0, clubs: [{ clubId, saison }],
     });
@@ -606,7 +608,7 @@ export function dotationBronzeCarriere(
 export function coequipierDepuisCarte(c: CarteCarriere): Coequipier {
   return { id: c.id, nom: c.nom, poste: c.poste, age: c.age, note: c.note, potentiel: c.potentiel,
     postesSecondaires: c.postesSecondaires ? [...c.postesSecondaires] : undefined,
-    jeuAuPied: c.statistiques.JDP, nation: c.nation, regen: c.origine === 'formation', horsGeneration: true };
+    photo: c.photo, jeuAuPied: c.statistiques.JDP, nation: c.nation, regen: c.origine === 'formation', horsGeneration: true };
 }
 /**
  * Une carte entre-t-elle dans ce pack ? Chaque champ du filtre est un ET ; à

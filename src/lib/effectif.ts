@@ -2,7 +2,8 @@ import type { FamillePoste, JeuneForme, Joueur, PosteId, TransfertAnnonce } from
 import { POSTE_PAR_ID, posteDepuisFamille } from '../data/rugby.js';
 import { COMPETITIONS, competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs.js';
 import { EFFECTIFS_REELS, NOTE_CLUB_REEL } from '../data/effectifsReels.js';
-import { EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../data/amateurs.js';
+import { EFFECTIFS_AMATEURS } from '../data/amateurs.js';
+import { joueursFfrDuClub } from './joueursFfr.js';
 import {
   effectifNouveau, NOTE_CLUB_NOUVEAU, type JoueurNouveau,
 } from '../data/nouvellesLigues.js';
@@ -38,6 +39,8 @@ export interface Coequipier {
   poste: PosteId;
   /** Rôles réellement pratiqués, distincts du poste principal affiché. */
   postesSecondaires?: PosteId[];
+  /** Portrait officiel attaché au licencié, conservé lors des transferts. */
+  photo?: string;
   age: number;
   note: number; // note générale À CET ÂGE
   potentiel: number; // note visée au pic de carrière (27 ans)
@@ -470,25 +473,10 @@ function effectifDesNouvellesLigues(
 // ---------------------------------------------------------------------------
 // EFFECTIFS FFR (Nationale → Régionale 3)
 // La base Mon Club House donne les 73 999 licenciés masculins de rugby
-// compétition. Elle ne fournit ni âge ni poste pour les nouveaux venus : le
-// poste est réparti de façon équilibrée et l'âge est tiré de façon déterministe
-// (seed = club + nom). Les quelques postes déjà connus sont conservés.
+// compétition. L'export enrichi fournit les postes observés et les portraits.
+// L'âge reste estimé ; seuls les postes absents utilisent une rotation.
 // ---------------------------------------------------------------------------
-interface JoueurAmateur { nom: string; poste: FamillePoste | null }
-
-const cacheAmateur = new Map<string, JoueurAmateur[]>();
-
-function listeAmateur(nomClub: string): JoueurAmateur[] {
-  const memo = cacheAmateur.get(nomClub);
-  if (memo) return memo;
-  const liste = EFFECTIFS_AMATEURS[nomClub].split('~').map((entree) => {
-    const [nom, idx] = entree.split('|');
-    const poste = idx === '' || idx === undefined ? null : (POSTES_AMATEURS[Number(idx)] as FamillePoste);
-    return { nom, poste: poste ?? null };
-  });
-  cacheAmateur.set(nomClub, liste);
-  return liste;
-}
+const listeAmateur = joueursFfrDuClub;
 
 // Poste des joueurs dont la source ne dit rien (« N/A ») : réparti de façon
 // déterministe sur la composition type, pour ne pas se retrouver avec un
@@ -503,7 +491,7 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
 
   return source.map((brut, i) => {
     const rng = graine(`amateur#${nomClub}#${brut.nom}#${i}`);
-    const poste = brut.poste ? posteConcret(brut.poste, nomClub + brut.nom) : POSTES_ROTATION[i % POSTES_ROTATION.length];
+    const poste = brut.poste ?? (brut.famille ? posteConcret(brut.famille, nomClub + brut.nom) : POSTES_ROTATION[i % POSTES_ROTATION.length]);
     // Rugby amateur : des seniors de 18 à 35 ans, la masse autour de 24-27.
     const ageRef = 18 + Math.floor((rng() + rng()) * 9);
     const retraite = Math.max(ageRef, 32 + Math.floor(rng() * 6));
@@ -533,6 +521,8 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
         id: `${nomClub}-am-${i}`,
         nom: brut.nom,
         poste,
+        postesSecondaires: [...brut.postesSecondaires],
+        photo: brut.photo,
         age,
         note: noteALAge(noteRef, ageRef, potentiel, age, vitesseDeclin),
         potentiel,

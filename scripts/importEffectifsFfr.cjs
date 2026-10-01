@@ -14,8 +14,12 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const RACINE = path.join(__dirname, '..');
+if (process.argv[2] && !fs.existsSync(path.resolve(process.cwd(), process.argv[2]))) {
+  throw new Error(`Base FFR demandée introuvable : ${process.argv[2]}`);
+}
 const CANDIDATS = [
   process.argv[2] && path.resolve(process.cwd(), process.argv[2]),
+  path.join(RACINE, '..', 'photos', 'effectifs_ffr_enrichis.json'),
   path.join(RACINE, '..', 'effectifs_ffr.json'),
   path.join(RACINE, '..', 'effectifs', '_ffr.json'),
 ].filter(Boolean);
@@ -116,9 +120,7 @@ const positionsAnciennes = new Map();
 for (const [club, chaine] of Object.entries(anciensEffectifs)) {
   const parNom = new Map();
   for (const entree of chaine.split('~')) {
-    const separation = entree.lastIndexOf('|');
-    const nom = separation >= 0 ? entree.slice(0, separation) : entree;
-    const poste = separation >= 0 ? entree.slice(separation + 1) : '';
+    const [nom, poste = ''] = entree.split('|');
     if (nom && poste !== '') parNom.set(cle(nom), poste);
   }
   positionsAnciennes.set(club, parNom);
@@ -205,6 +207,34 @@ function nomJoueur(joueur) {
   return `${prenomPropre(joueur.prenom)} ${decoderHtml(joueur.nom).toLocaleUpperCase('fr-FR')}`.trim();
 }
 
+const POSTES = ['pilier', 'talonneur', 'deuxieme_ligne', 'troisieme_ligne', 'demi_melee', 'demi_ouverture', 'centre', 'ailier', 'arriere'];
+const NUMEROS = {
+  'Pilier gauche': [1], 'Talonneur': [2], 'Pilier droit': [3],
+  'Deuxième ligne': [4, 5], 'Troisième ligne aile': [6, 7],
+  'Troisième ligne centre': [8], 'Demi de mêlée': [9], "Demi d'ouverture": [10],
+  'Ailier': [11, 14], 'Centre': [12, 13], 'Arrière': [15],
+  'Pilier': [1, 3], 'Troisième ligne': [6, 7, 8],
+};
+const FAMILLES_NUMEROS = ['', 'pilier', 'talonneur', 'pilier', 'deuxieme_ligne', 'deuxieme_ligne',
+  'troisieme_ligne', 'troisieme_ligne', 'troisieme_ligne', 'demi_melee', 'demi_ouverture',
+  'ailier', 'centre', 'centre', 'ailier', 'arriere'];
+let postesImportes = 0;
+function profilPostes(joueur) {
+  if (!joueur.poste) return [];
+  const possibles = NUMEROS[joueur.poste];
+  if (!possibles) throw new Error(`Poste FFR inconnu : ${joueur.poste} (${joueur.id})`);
+  const observations = joueur.poste_observations ?? [];
+  const frequences = new Map(possibles.map(numero => [numero, observations.filter(o => o.numero_poste === numero).length]));
+  const principal = [...possibles].sort((a, b) => frequences.get(b) - frequences.get(a))[0];
+  const secondaires = (joueur.postes_observes ?? []).flatMap(libelle => {
+    const numeros = NUMEROS[libelle];
+    if (!numeros) throw new Error(`Poste secondaire FFR inconnu : ${libelle}`);
+    const observes = numeros.filter(numero => observations.some(o => o.numero_poste === numero));
+    return observes.length ? observes : [numeros[0]];
+  });
+  return [...new Set([principal, ...secondaires])];
+}
+
 function chaineEffectif(club, canonique) {
   const postesConnus = positionsAnciennes.get(canonique) ?? new Map();
   const ids = new Set();
@@ -215,7 +245,10 @@ function chaineEffectif(club, canonique) {
     if (joueur.id != null) ids.add(joueur.id);
     const nom = nomJoueur(joueur).replace(/[|~]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!nom) continue;
-    joueurs.push(`${nom}|${postesConnus.get(cle(nom)) ?? ''}`);
+    const numeros = profilPostes(joueur);
+    const famille = numeros.length ? POSTES.indexOf(FAMILLES_NUMEROS[numeros[0]]) : postesConnus.get(cle(nom)) ?? '';
+    if (numeros.length) postesImportes++;
+    joueurs.push(`${nom}|${famille}|${numeros.join(',')}|${joueur.id}`);
   }
   return joueurs.join('~');
 }
@@ -336,7 +369,7 @@ export const LOGO_AMATEUR: Record<string, string> = {
 ${lignesObjet(logos)}
 };
 
-// Encodage compact : « Prénom NOM|indice de poste », séparé par « ~ ».
+// Encodage compact : « Prénom NOM|famille|numéros observés|id FFR », séparé par « ~ ».
 // Un poste absent est distribué sur une composition équilibrée côté jeu.
 export const EFFECTIFS_AMATEURS: Record<string, string> = {
 ${lignesObjet(effectifs)}
@@ -349,5 +382,6 @@ console.log(`Source          : ${SOURCE}`);
 console.log(`Saison FFR      : ${brut.saison ?? 'inconnue'}`);
 for (const { id } of DIVISIONS) console.log(`${id.padEnd(15)}: ${clubsParDivision[id].length} clubs`);
 console.log(`Joueurs réels   : ${joueursReels}`);
+console.log(`Postes observés : ${postesImportes}`);
 console.log(`Clubs sans joueur de compétition : ${clubsSansJoueur}`);
 console.log(`Sortie          : ${SORTIE}`);

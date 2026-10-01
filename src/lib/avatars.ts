@@ -1,4 +1,5 @@
 import { PHOTOS_NEW_MAJ } from '../data/photosNewMaj.js';
+import { photoJoueurFfr } from './joueursFfr.js';
 // LES PHOTOS DE PROFIL DE L’OVALE
 // Portraits officiels locaux en priorité ; portrait stable du catalogue sinon.
 // Les initiales servent de repli local, les clubs gardent leur écusson.
@@ -231,10 +232,11 @@ function amputations(cle: string): string[] {
 // et de post du fil social : on garde le résultat, index compris.
 const memoire = new Map<string, string | undefined>();
 
-export function photoReelle(nom: string): string | undefined {
-  if (memoire.has(nom)) return memoire.get(nom);
-  const trouvee = chercherPhoto(nom);
-  memoire.set(nom, trouvee);
+export function photoReelle(nom: string, club?: string): string | undefined {
+  const cleMemo = `${club ?? ''}|${nom}`;
+  if (memoire.has(cleMemo)) return memoire.get(cleMemo);
+  const trouvee = photoJoueurFfr(nom, club) ?? chercherPhoto(nom);
+  memoire.set(cleMemo, trouvee);
   return trouvee;
 }
 
@@ -293,7 +295,7 @@ export function avatarPourCompte(nom: string, type: TypeAvatar, club?: string): 
   // ⚠️ Un vrai joueur porte SON visage. Les portraits officiels du Top 14 et de
   // la Pro D2 passent avant le portrait générique : voir Dupont avec la tête de
   // Dupont change tout sur un réseau social.
-  const vraie = photoReelle(nom);
+  const vraie = photoReelle(nom, club);
   return `photo:${vraie ?? photoDe(nom)}`;
 }
 

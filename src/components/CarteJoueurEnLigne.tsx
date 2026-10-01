@@ -42,7 +42,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
   const [photosRatees, setPhotosRatees] = useState<Set<string>>(() => new Set());
   const blason = useBlasonCarte(carte.clubReel, logoClub);
   const competition = logoChampionnat(carte.championnat);
-  const photoIndexee = photoReelle(carte.nom);
+  const photoIndexee = photoReelle(carte.nom, carte.clubReel);
   // Les cartes déjà distribuées peuvent conserver une ancienne URL. Si elle
   // échoue, on retente le portrait actuellement indexé avant le repli neutre.
   const photo = [carte.photo, photoIndexee].find((candidate) => candidate && !photosRatees.has(candidate));
