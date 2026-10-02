@@ -1,0 +1,745 @@
+[
+  {
+    "dossier": "as-macon",
+    "club": "AS Mâconnaise",
+    "images": 38,
+    "correspondances": 28,
+    "ajouts": [
+      {
+        "fichier": "Anthony LAVAUX.png",
+        "nom": "Anthony LAVAUX"
+      },
+      {
+        "fichier": "Josh CAMA.png",
+        "nom": "Josh CAMA"
+      },
+      {
+        "fichier": "Loïc MIOCHE.png",
+        "nom": "Loïc MIOCHE"
+      },
+      {
+        "fichier": "Mathéo FORAY.png",
+        "nom": "Mathéo FORAY"
+      },
+      {
+        "fichier": "Maxime VILLAIN.png",
+        "nom": "Maxime VILLAIN"
+      },
+      {
+        "fichier": "Nahel HASNAOUI.png",
+        "nom": "Nahel HASNAOUI"
+      },
+      {
+        "fichier": "Pierre Alexandre DUCLIEU.png",
+        "nom": "Pierre Alexandre DUCLIEU"
+      },
+      {
+        "fichier": "Saveneca TOTOVOSAU.png",
+        "nom": "Saveneca TOTOVOSAU"
+      },
+      {
+        "fichier": "Sione ANGA'AELANGI.png",
+        "nom": "Sione ANGA'AELANGI"
+      },
+      {
+        "fichier": "Yvan DELACRUZ.png",
+        "nom": "Yvan DELACRUZ"
+      }
+    ]
+  },
+  {
+    "dossier": "cm-floirac",
+    "club": "CM Floirac",
+    "images": 38,
+    "correspondances": 33,
+    "ajouts": [
+      {
+        "fichier": "ADRIU NAIVUAI.png",
+        "nom": "ADRIU NAIVUAI"
+      },
+      {
+        "fichier": "MANASA SAULO.png",
+        "nom": "MANASA SAULO"
+      },
+      {
+        "fichier": "MATÉO SAINT GERMAIN.png",
+        "nom": "Matéo SAINT-GERMAIN"
+      },
+      {
+        "fichier": "SIMON VEYRAC.png",
+        "nom": "Simon VEYRAC"
+      },
+      {
+        "fichier": "TIMILAI ROKODURU.png",
+        "nom": "TIMILAI ROKODURU"
+      }
+    ]
+  },
+  {
+    "dossier": "cs-annonay",
+    "club": "CS Annonay",
+    "images": 15,
+    "correspondances": 10,
+    "ajouts": [
+      {
+        "fichier": "Constant RATEL.png",
+        "nom": "Constant RATEL"
+      },
+      {
+        "fichier": "JUNIOR TAAVILI.png",
+        "nom": "Junior TAAVILI"
+      },
+      {
+        "fichier": "JUSTIN PACCARD.png",
+        "nom": "Justin PACCARD"
+      },
+      {
+        "fichier": "MAXIME HOPSPORT.png",
+        "nom": "MAXIME HOPSPORT"
+      },
+      {
+        "fichier": "TRISTAN GANGNARD.png",
+        "nom": "Tristan GANGNARD"
+      }
+    ]
+  },
+  {
+    "dossier": "cs-bourgoin-jallieu",
+    "club": "CS Bourgoin-Jallieu",
+    "images": 40,
+    "correspondances": 39,
+    "ajouts": [
+      {
+        "fichier": "JULES DUCROS.png",
+        "nom": "Jules DUCROS"
+      }
+    ]
+  },
+  {
+    "dossier": "cs-vienne",
+    "club": "CS Vienne Rugby",
+    "images": 31,
+    "correspondances": 18,
+    "ajouts": [
+      {
+        "fichier": "Alex Traynard.png",
+        "nom": "Alex Traynard"
+      },
+      {
+        "fichier": "Antton Ducournau.png",
+        "nom": "Antton DUCOURNAU"
+      },
+      {
+        "fichier": "Clément Garnier Ouvreur.png",
+        "nom": "Clement GARNIER"
+      },
+      {
+        "fichier": "Guram Kavtidze.png",
+        "nom": "Guram KAVTIDZE"
+      },
+      {
+        "fichier": "Jules Tinel.png",
+        "nom": "Jules TINEL"
+      },
+      {
+        "fichier": "Lucas Souquieres.png",
+        "nom": "Lucas SOUQUIERES"
+      },
+      {
+        "fichier": "Lui Luamanu 2eme ligne.png",
+        "nom": "Lui Luamanu"
+      },
+      {
+        "fichier": "Mathys Pastor.png",
+        "nom": "Mathys PASTOR"
+      },
+      {
+        "fichier": "Pierre Segui.png",
+        "nom": "Pierre SEGUI"
+      },
+      {
+        "fichier": "Stanislas Pora.png",
+        "nom": "Stanislas Pora"
+      },
+      {
+        "fichier": "Thomas Crevier Ouvreur.png",
+        "nom": "Thomas CREVIER"
+      },
+      {
+        "fichier": "Yavi Laurent 3eme ligne.png",
+        "nom": "Yavi LAURENT"
+      },
+      {
+        "fichier": "Yoan Vinas.png",
+        "nom": "Yoan VINAS"
+      }
+    ]
+  },
+  {
+    "dossier": "ol-marcquois-rugby",
+    "club": "Olympique Marcquois Rugby",
+    "images": 21,
+    "correspondances": 21,
+    "ajouts": []
+  },
+  {
+    "dossier": "rc-aubenas-vals",
+    "club": "RC Aubenas Vals",
+    "images": 38,
+    "correspondances": 19,
+    "ajouts": [
+      {
+        "fichier": "ADOLPH BOTHMA.png",
+        "nom": "ADOLPH BOTHMA"
+      },
+      {
+        "fichier": "ADRIEN JACQUOT.png",
+        "nom": "ADRIEN JACQUOT"
+      },
+      {
+        "fichier": "ANTONIN GONTARD.png",
+        "nom": "Antonin GONTARD"
+      },
+      {
+        "fichier": "BEKADA BELHAOURI.png",
+        "nom": "BEKADA BELHAOURI"
+      },
+      {
+        "fichier": "DEN BERG GAVIN VAN.png",
+        "nom": "Gavin VAN DEN BERG"
+      },
+      {
+        "fichier": "EREKLE ONIKASHVILI.png",
+        "nom": "EREKLE ONIKASHVILI"
+      },
+      {
+        "fichier": "JOSHUA POTDEVIN.png",
+        "nom": "Joshua POTDEVIN"
+      },
+      {
+        "fichier": "LEAN SANCHS.png",
+        "nom": "LEAN SANCHS"
+      },
+      {
+        "fichier": "LOUIS MAURO.png",
+        "nom": "Louis MAURO"
+      },
+      {
+        "fichier": "Louis Seuzaret.png",
+        "nom": "Louis SEUZARET"
+      },
+      {
+        "fichier": "Luc PLANVETIN.png",
+        "nom": "Luc PLANVETIN"
+      },
+      {
+        "fichier": "MAMOUDOU NIANG.png",
+        "nom": "MAMOUDOU NIANG"
+      },
+      {
+        "fichier": "NICOLAS GOGOLADZE.png",
+        "nom": "NICOLAS GOGOLADZE"
+      },
+      {
+        "fichier": "NIKOLOZ GABEDAVA.png",
+        "nom": "Nikoloz GABEDAVA"
+      },
+      {
+        "fichier": "NOAH LARTOT.png",
+        "nom": "Noah LARTOT"
+      },
+      {
+        "fichier": "SASHA LEPEIGNEUL.png",
+        "nom": "Sasha LEPEIGNEUL"
+      },
+      {
+        "fichier": "TIM TISSANDIER.png",
+        "nom": "Tim TISSANDIER"
+      },
+      {
+        "fichier": "Thibaud Migheli.png",
+        "nom": "Thibaud MIGHELI"
+      },
+      {
+        "fichier": "Tibaud Amblard.png",
+        "nom": "Tibaud AMBLARD"
+      }
+    ]
+  },
+  {
+    "dossier": "rc-auch",
+    "club": "Rugby Club Auch",
+    "images": 27,
+    "correspondances": 12,
+    "ajouts": [
+      {
+        "fichier": "Adrien PORTETS.png",
+        "nom": "Adrien PORTETS"
+      },
+      {
+        "fichier": "Baptiste GUIZOT.png",
+        "nom": "Baptiste GUIZOT"
+      },
+      {
+        "fichier": "Benjamin MAGNOAC.png",
+        "nom": "Benjamin MAGNOAC"
+      },
+      {
+        "fichier": "César BENTAYOU.png",
+        "nom": "Cesar BENTAYOU"
+      },
+      {
+        "fichier": "Frédéric PUJO.png",
+        "nom": "Frédéric PUJO"
+      },
+      {
+        "fichier": "Grégory MENKARSKA.png",
+        "nom": "Grégory MENKARSKA"
+      },
+      {
+        "fichier": "Kilian SATTO.png",
+        "nom": "Kilian SATTO"
+      },
+      {
+        "fichier": "Matias MARTIELO.png",
+        "nom": "Matias MARTIELO"
+      },
+      {
+        "fichier": "Matteo VERVAEKE.png",
+        "nom": "Matteo VERVAEKE"
+      },
+      {
+        "fichier": "Pierre DUPLANTIER.png",
+        "nom": "Pierre DUPLANTIER"
+      },
+      {
+        "fichier": "Raphael LABORDE.png",
+        "nom": "Raphael LABORDE"
+      },
+      {
+        "fichier": "Siegfried VANDEKERKOF.png",
+        "nom": "Siegfried VANDEKERKOF"
+      },
+      {
+        "fichier": "Sylvain ABADIE.png",
+        "nom": "Sylvain ABADIE"
+      },
+      {
+        "fichier": "Thibault MOLEANA.png",
+        "nom": "Thibault MOLÉANA"
+      },
+      {
+        "fichier": "Yassim EL YOUMOURI.png",
+        "nom": "Yassim EL YOUMOURI"
+      }
+    ]
+  },
+  {
+    "dossier": "rc-massy-essonne",
+    "club": "RC Massy Essonne",
+    "images": 47,
+    "correspondances": 41,
+    "ajouts": [
+      {
+        "fichier": "Greg HUTLEY.png",
+        "nom": "Greg HUTLEY"
+      },
+      {
+        "fichier": "JB GERVELAS.png",
+        "nom": "JB GERVELAS"
+      },
+      {
+        "fichier": "Jonah THOMPSON.png",
+        "nom": "Jonah THOMPSON"
+      },
+      {
+        "fichier": "Kylian BAYOT.png",
+        "nom": "Kylian BAYOT"
+      },
+      {
+        "fichier": "Nika LOMIDZE.png",
+        "nom": "Nika LOMIDZE"
+      },
+      {
+        "fichier": "Quentin PREVOST.png",
+        "nom": "Quentin PREVOST"
+      }
+    ]
+  },
+  {
+    "dossier": "rc-suresnes",
+    "club": "RC Suresnes Hauts-de-Seine",
+    "images": 46,
+    "correspondances": 41,
+    "ajouts": [
+      {
+        "fichier": "Abdel FOFANA.png",
+        "nom": "Abdel FOFANA"
+      },
+      {
+        "fichier": "Guiter VICKOS.png",
+        "nom": "Guiter VICKOS"
+      },
+      {
+        "fichier": "Max HENDRICKX.png",
+        "nom": "Max HENDRICKX"
+      },
+      {
+        "fichier": "Méric CHIFFRIN.png",
+        "nom": "Méric CHIFFRIN"
+      },
+      {
+        "fichier": "Oliver MCCREA.png",
+        "nom": "Oliver MCCREA"
+      }
+    ]
+  },
+  {
+    "dossier": "rennes-ec",
+    "club": "Rennes Étudiants Club",
+    "images": 24,
+    "correspondances": 23,
+    "ajouts": [
+      {
+        "fichier": "Abdoul Chérif.png",
+        "nom": "Abdoul Chérif"
+      }
+    ]
+  },
+  {
+    "dossier": "rugby-club-orleans",
+    "club": "RC Orléans",
+    "images": 34,
+    "correspondances": 29,
+    "ajouts": [
+      {
+        "fichier": "Alex Todd.png",
+        "nom": "Alex Todd"
+      },
+      {
+        "fichier": "Augustin Pingot.png",
+        "nom": "Augustin Pingot"
+      },
+      {
+        "fichier": "MIGUEL MATHIEU.png",
+        "nom": "MIGUEL MATHIEU"
+      },
+      {
+        "fichier": "Maka Polutele.png",
+        "nom": "Maka Polutele"
+      },
+      {
+        "fichier": "Pedro Gainnini.png",
+        "nom": "Pedro Gainnini"
+      }
+    ]
+  },
+  {
+    "dossier": "saint-jean-de-luz-olympique",
+    "club": "Saint-Jean-de-Luz Olympique",
+    "images": 38,
+    "correspondances": 36,
+    "ajouts": [
+      {
+        "fichier": "Welcome BLADI.png",
+        "nom": "Welcome BLADI"
+      },
+      {
+        "fichier": "Ximun BESSONART.png",
+        "nom": "Ximun BESSONART"
+      }
+    ]
+  },
+  {
+    "dossier": "sc-albi",
+    "club": "SC Albi",
+    "images": 47,
+    "correspondances": 45,
+    "ajouts": [
+      {
+        "fichier": "Clément BARTHÈS.png",
+        "nom": "Clément BARTHÈS"
+      },
+      {
+        "fichier": "Hugo CAMCACHO.png",
+        "nom": "Hugo CAMCACHO"
+      }
+    ]
+  },
+  {
+    "dossier": "servette-rc",
+    "club": "Servette RC de Genève",
+    "images": 27,
+    "correspondances": 26,
+    "ajouts": [
+      {
+        "fichier": "QuentinBONNET 2ème ligne.png",
+        "nom": "Quentin BONNET"
+      }
+    ]
+  },
+  {
+    "dossier": "so-chambery",
+    "club": "SO Chambérien Rugby",
+    "images": 46,
+    "correspondances": 43,
+    "ajouts": [
+      {
+        "fichier": "Ben NEICERU.png",
+        "nom": "Ben NEICERU"
+      },
+      {
+        "fichier": "Gauthier CESSOT.png",
+        "nom": "Gauthier CESSOT"
+      },
+      {
+        "fichier": "Loic LAFONT.png",
+        "nom": "Loic LAFONT"
+      }
+    ]
+  },
+  {
+    "dossier": "stade-langonnais",
+    "club": "Stade Langonnais",
+    "images": 44,
+    "correspondances": 36,
+    "ajouts": [
+      {
+        "fichier": "Abel Charrier.png",
+        "nom": "Abel CHARRIER"
+      },
+      {
+        "fichier": "Arthur Gonzalez.png",
+        "nom": "Arthur GONZALEZ"
+      },
+      {
+        "fichier": "Baptiste Castanier.png",
+        "nom": "Baptiste Castanier"
+      },
+      {
+        "fichier": "Bastien Beffara.png",
+        "nom": "Bastien Beffara"
+      },
+      {
+        "fichier": "Ismaël Martin.png",
+        "nom": "Ismaël MARTIN"
+      },
+      {
+        "fichier": "Jean Delbecq.png",
+        "nom": "Jean Delbecq"
+      },
+      {
+        "fichier": "Julien Graffouillère.png",
+        "nom": "Julien Graffouillère"
+      },
+      {
+        "fichier": "Quentin Bizac.png",
+        "nom": "Quentin Bizac"
+      }
+    ]
+  },
+  {
+    "dossier": "stade-metropolitain",
+    "club": "Stade Métropolitain",
+    "images": 26,
+    "correspondances": 19,
+    "ajouts": [
+      {
+        "fichier": "Alexis VERE.png",
+        "nom": "Alexis VERE"
+      },
+      {
+        "fichier": "Amaury DUFOULEUR.png",
+        "nom": "Amaury DUFOULEUR"
+      },
+      {
+        "fichier": "Baptiste GUALDA.png",
+        "nom": "Baptiste GUALDA"
+      },
+      {
+        "fichier": "Damien LARUE.png",
+        "nom": "Damien LARUE"
+      },
+      {
+        "fichier": "Hugo ALAMARTINE.png",
+        "nom": "Hugo ALAMARTINE"
+      },
+      {
+        "fichier": "Léo PERICAUDET.png",
+        "nom": "Léo PERICAUDET"
+      },
+      {
+        "fichier": "Vladimir SUSLER.png",
+        "nom": "Vladimir SUSLER"
+      }
+    ]
+  },
+  {
+    "dossier": "stade-montois",
+    "club": "Stade Montois",
+    "images": 44,
+    "correspondances": 42,
+    "ajouts": [
+      {
+        "fichier": "Atu MANU.png",
+        "nom": "Atu MANU"
+      },
+      {
+        "fichier": "Jannes KIRSTEN.png",
+        "nom": "Jannes KIRSTEN"
+      }
+    ]
+  },
+  {
+    "dossier": "stade-nantais",
+    "club": "Stade Nantais",
+    "images": 36,
+    "correspondances": 34,
+    "ajouts": [
+      {
+        "fichier": "Joseph DUONG.png",
+        "nom": "Joseph DUONG"
+      },
+      {
+        "fichier": "Tiko BATIBASAGA.png",
+        "nom": "Tiko BATIBASAGA"
+      }
+    ]
+  },
+  {
+    "dossier": "us-carcassonne",
+    "club": "US Carcassonnaise",
+    "images": 47,
+    "correspondances": 44,
+    "ajouts": [
+      {
+        "fichier": "Ethan Delettre.png",
+        "nom": "Ethan Delettre"
+      },
+      {
+        "fichier": "Niels Chaliès.png",
+        "nom": "Niels Chaliès"
+      },
+      {
+        "fichier": "Thierry Futeu.png",
+        "nom": "Thierry Futeu"
+      }
+    ]
+  },
+  {
+    "dossier": "us-marmande",
+    "club": "US Marmandaise",
+    "images": 34,
+    "correspondances": 30,
+    "ajouts": [
+      {
+        "fichier": "Alban CONDUCHÉ.png",
+        "nom": "Alban CONDUCHÉ"
+      },
+      {
+        "fichier": "Clément LAURENCIN.png",
+        "nom": "Clement LAURENCIN"
+      },
+      {
+        "fichier": "Helano ALBERTO.png",
+        "nom": "Helano ALBERTO"
+      },
+      {
+        "fichier": "Tom QUARRIE.png",
+        "nom": "Tom QUARRIE"
+      }
+    ]
+  },
+  {
+    "dossier": "us-seynoise",
+    "club": "US Seynoise",
+    "images": 47,
+    "correspondances": 26,
+    "ajouts": [
+      {
+        "fichier": "Alexis ESPUNA.png",
+        "nom": "Alexis ESPUNA"
+      },
+      {
+        "fichier": "Andy GARCIA BOUVRET.png",
+        "nom": "Andy GARCIA BOUVRET"
+      },
+      {
+        "fichier": "Axel POTDEVIN.png",
+        "nom": "Axel POTDEVIN"
+      },
+      {
+        "fichier": "Benjamin TROIA.png",
+        "nom": "Benjamin TROIA"
+      },
+      {
+        "fichier": "Caique SILVA SEGURA.png",
+        "nom": "Caique SILVA SEGURA"
+      },
+      {
+        "fichier": "Clément REMANE.png",
+        "nom": "Clément REMANE"
+      },
+      {
+        "fichier": "Gaby VERCELLONI.png",
+        "nom": "Gaby VERCELLONI"
+      },
+      {
+        "fichier": "Hugo ALARCON.png",
+        "nom": "Hugo ALARCON"
+      },
+      {
+        "fichier": "Jeremy LOBONO.png",
+        "nom": "Jeremy LOBONO"
+      },
+      {
+        "fichier": "Jules SALVETAT.png",
+        "nom": "Jules SALVETAT"
+      },
+      {
+        "fichier": "Julien ORY.png",
+        "nom": "Julien ORY"
+      },
+      {
+        "fichier": "Kenji GRAULIER.png",
+        "nom": "Kenji GRAULIER"
+      },
+      {
+        "fichier": "Kylian SIMON.png",
+        "nom": "Kylian SIMON"
+      },
+      {
+        "fichier": "Lucien RUIZ.png",
+        "nom": "Lucien RUIZ"
+      },
+      {
+        "fichier": "Manuel PHILIBERT.png",
+        "nom": "Manuel PHILIBERT"
+      },
+      {
+        "fichier": "Mathis MOUHET.png",
+        "nom": "Mathis MOUHET"
+      },
+      {
+        "fichier": "Matteo MURELLO.png",
+        "nom": "Matteo MURELLO"
+      },
+      {
+        "fichier": "Maxime ELLEINSTEIN.png",
+        "nom": "Maxime ELLEINSTEIN"
+      },
+      {
+        "fichier": "Noa ELLEINSTEIN.png",
+        "nom": "Noa ELLEINSTEIN"
+      },
+      {
+        "fichier": "Rayan HASSANI.png",
+        "nom": "Rayan HASSANI"
+      },
+      {
+        "fichier": "Sylvain CHAMBON.png",
+        "nom": "Sylvain CHAMBON"
+      }
+    ]
+  }
+]

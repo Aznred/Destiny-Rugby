@@ -4,6 +4,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { CLUBS_AMATEURS } from '../src/data/amateurs';
 import { PHOTOS_FFR_PAR_ID, PHOTOS_FFR_SUPPLEMENTAIRES } from '../src/data/photosFfr';
+import { JOUEURS_DETOURES_SUPPLEMENTAIRES } from '../src/data/photosDetourees';
 import { POSTE_PAR_ID } from '../src/data/rugby';
 import { joueursFfrDuClub, photoJoueurFfr, normaliserNomFfr } from '../src/lib/joueursFfr';
 import { effectifDuClub } from '../src/lib/effectif';
@@ -38,7 +39,7 @@ for (const club of Object.values(CLUBS_AMATEURS).flat()) {
   }
 }
 assert.equal(postes, 44_133);
-assert.equal(ajouts, 7);
+assert.equal(ajouts, 7 + Object.values(JOUEURS_DETOURES_SUPPLEMENTAIRES).reduce((n, j) => n + Object.keys(j).length, 0));
 assert.ok(polyvalents > 10_000);
 const liens = [...Object.values(PHOTOS_FFR_PAR_ID), ...Object.values(PHOTOS_FFR_SUPPLEMENTAIRES).flatMap(Object.values)];
 assert.equal(new Set(liens).size, 1466);
@@ -71,7 +72,7 @@ for (const nom of Object.keys(Object.values(PHOTOS_FFR_SUPPLEMENTAIRES)[0])) {
 const pierre = catalogue.find(j => normaliserNomFfr(j.nom) === 'pierre guyenon')!;
 assert.equal(pierre.poste, 'pilier_droit');
 assert.ok(pierre.postesSecondaires?.includes('pilier_gauche'));
-assert.ok(pierre.photo?.includes('/photos/ffr/'));
+assert.ok(pierre.photo?.startsWith('/photos/'));
 assert.equal(coequipierDepuisCarte(carteDepuisSource(pierre, 'test', 'club', 1)).photo, pierre.photo);
 const dotation = dotationBronzeCarriere('test', 'club', 'postes-ffr');
 const parId = new Map(catalogue.map(c => [c.sourceId, c]));

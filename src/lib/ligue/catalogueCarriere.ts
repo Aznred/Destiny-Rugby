@@ -7,6 +7,7 @@ import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
 import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/amateurs.js';
 import { joueursFfrDuClub, profilJoueurFfr } from '../joueursFfr.js';
 import { photoReelle } from '../avatars.js';
+import { photoDetoureeCatalogue } from '../photosDetourees.js';
 import { noteJoueurRevalorisee, postesJoueurReel } from '../evaluationJoueurReel.js';
 import { COMPETITIONS } from '../../data/clubs.js';
 import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
@@ -318,7 +319,7 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
         clubReel: maj?.club ?? lnr?.club ?? club, championnat: maj ? 'Gallagher Premiership' : lnr?.championnat ?? competition?.nom ?? 'Championnat professionnel', pays: competition?.pays ?? 'France',
         // L'index consolidé corrige aussi les variantes de prénom et les URL
         // LNR devenues obsolètes ; l'URL brute ne sert qu'en dernier recours.
-        photo: profilFfr?.photo ?? photoReelle(j.nom, club) ?? lnr?.photo, origine: 'professionnel', rarete: rareteCarriere(note),
+        photo: photoReelle(j.nom, club) ?? profilFfr?.photo ?? lnr?.photo, origine: 'professionnel', rarete: rareteCarriere(note),
         statistiques: statistiquesCarte(note, famille, sourceId) });
     }
   }
@@ -347,7 +348,8 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
         photo: j.photo ?? photoReelle(nom, club), origine: 'ffr', rarete: rareteCarriere(note), statistiques: statistiquesCarte(note, famille, sourceId) });
     }
   }
-  catalogue = [...joueurs.values()].sort((a, b) => a.sourceId < b.sourceId ? -1 : 1);
+  catalogue = [...joueurs.values()].map(j => ({ ...j, photo: photoDetoureeCatalogue(j.nom, j.clubReel) ?? j.photo }))
+    .sort((a, b) => a.sourceId < b.sourceId ? -1 : 1);
   return catalogue;
 }
 

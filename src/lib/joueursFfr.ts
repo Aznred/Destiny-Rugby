@@ -1,5 +1,6 @@
 import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../data/amateurs.js';
 import { PHOTOS_FFR_PAR_ID, PHOTOS_FFR_SUPPLEMENTAIRES } from '../data/photosFfr.js';
+import { PHOTOS_DETOUREES_PAR_CLUB, PHOTOS_DETOUREES_PAR_ID, JOUEURS_DETOURES_SUPPLEMENTAIRES } from '../data/photosDetourees.js';
 import type { FamillePoste, PosteId } from '../types.js';
 
 const POSTES_NUMEROS: PosteId[] = ['pilier_gauche', 'talonneur', 'pilier_droit',
@@ -30,7 +31,7 @@ export function joueursFfrDuClub(club: string): readonly JoueurFfr[] {
     const ffrId = identifiant ? Number(identifiant) : undefined;
     return { nom, famille: famille === '' ? null : POSTES_AMATEURS[Number(famille)] ?? null,
       poste: postes[0], postesSecondaires: postes.slice(1), ffrId,
-      photo: (ffrId ? PHOTOS_FFR_PAR_ID[ffrId] : undefined) ?? supplement[normaliserNomFfr(nom)] };
+      photo: PHOTOS_DETOUREES_PAR_CLUB[club]?.[normaliserNomFfr(nom)] ?? (ffrId ? PHOTOS_DETOUREES_PAR_ID[ffrId] ?? PHOTOS_FFR_PAR_ID[ffrId] : undefined) ?? supplement[normaliserNomFfr(nom)] };
   });
   // Les sept portraits nominatifs de Palavas absents de l'export complètent
   // son effectif. Aucun poste ni identifiant FFR ne leur est attribué ici.
@@ -38,6 +39,12 @@ export function joueursFfrDuClub(club: string): readonly JoueurFfr[] {
   for (const [nom, photo] of Object.entries(supplement).sort(([a], [b]) => a.localeCompare(b))) if (!noms.has(nom)) {
     liste.push({ nom: nom.replace(/(^| )[a-z]/g, lettre => lettre.toUpperCase()),
       famille: null, postesSecondaires: [], photo });
+    noms.add(nom);
+  }
+  // Les portraits nouveaux complètent les effectifs après les identités existantes.
+  for (const [cle, j] of Object.entries(JOUEURS_DETOURES_SUPPLEMENTAIRES[club] ?? {}).sort(([a], [b]) => a.localeCompare(b))) if (!noms.has(cle)) {
+    liste.push({ nom: j.nom, famille: null, postesSecondaires: [], photo: j.photo });
+    noms.add(cle);
   }
   cache.set(club, liste); return liste;
 }
@@ -68,6 +75,8 @@ function ajouter(table: Map<string, string | null>, nom: string, photo?: string)
 }
 /** Recherche exacte : les homonymes restent sans portrait en l'absence de club. */
 export function photoJoueurFfr(nom: string, club?: string): string | undefined {
+  const detouree = club ? PHOTOS_DETOUREES_PAR_CLUB[club]?.[normaliserNomFfr(nom)] : undefined;
+  if (detouree) return detouree;
   if (club && structures.has(club)) {
     let table = photosParClub.get(club);
     if (!table) {

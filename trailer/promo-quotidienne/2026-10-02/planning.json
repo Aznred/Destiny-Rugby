@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-02",
+  "fuseau": "Europe/Paris",
+  "compte": "destiny.rugby2",
+  "posts": [
+    {
+      "ordre": 1,
+      "heureParis": "09:00",
+      "image": "01-post.png",
+      "video": "01-post.mp4",
+      "accroche": "TU CONNAIS LE RUGBY ?",
+      "description": "Les commentaires sont faciles. Gérer un club pendant 30 jours, un peu moins. Tu relèves le défi ? Rejoins la ligue publique sur destiny-rugby.fr (lien en bio). #DestinyRugby #Rugby #JeuDeRugby #LigueEnLigne #RugbyFrancais",
+      "musique": "Choisir au hasard un titre vérifié dans les Sons libres de droits de TikTok Studio.",
+      "statut": "brouillon_local"
+    },
+    {
+      "ordre": 2,
+      "heureParis": "12:00",
+      "image": "02-post.png",
+      "video": "02-post.mp4",
+      "accroche": "LE MEILLEUR COACH ? VIENS LE PROUVER.",
+      "description": "Tu penses faire mieux que les autres managers ? Compose ton XV et viens jouer la ligue publique. Rejoins la ligue publique sur destiny-rugby.fr (lien en bio). #DestinyRugby #RugbyManager #XVDeDepart #JeuDeSport #LiguePublique",
+      "musique": "Choisir au hasard un titre vérifié dans les Sons libres de droits de TikTok Studio.",
+      "statut": "brouillon_local"
+    },
+    {
+      "ordre": 3,
+      "heureParis": "15:00",
+      "image": "03-post.png",
+      "video": "03-post.mp4",
+      "accroche": "LE MATCH EST FACILE DEPUIS TON CANAPÉ.",
+      "description": "Sur le terrain, chaque choix compte. Crée ton club et rejoins les autres joueurs sur Destiny Rugby. Rejoins la ligue publique sur destiny-rugby.fr (lien en bio). #DestinyRugby #RugbyGame #Rugby #GamingFR #JeuDeRugby",
+      "musique": "Choisir au hasard un titre vérifié dans les Sons libres de droits de TikTok Studio.",
+      "statut": "brouillon_local"
+    },
+    {
+      "ordre": 4,
+      "heureParis": "18:00",
+      "image": "04-post.png",
+      "video": "04-post.mp4",
+      "accroche": "LA DESCENTE N’ATTEND PERSONNE.",
+      "description": "Première place : montée. Dernière place : descente. Dans la ligue publique, ton classement parlera pour toi. Rejoins la ligue publique sur destiny-rugby.fr (lien en bio). #DestinyRugby #LiguePublique #Rugby #MonteeDescente #JeuEnLigne",
+      "musique": "Choisir au hasard un titre vérifié dans les Sons libres de droits de TikTok Studio.",
+      "statut": "brouillon_local"
+    },
+    {
+      "ordre": 5,
+      "heureParis": "21:00",
+      "image": "05-post.png",
+      "video": "05-post.mp4",
+      "accroche": "UNE DIVISION. ZÉRO EXCUSE.",
+      "description": "Une division démarre à 16 clubs et dure 30 jours. Crée le tien et viens te mesurer aux autres. Rejoins la ligue publique sur destiny-rugby.fr (lien en bio). #DestinyRugby #LigueEnLigne #RugbyManager #RugbyFR #JeuVideo",
+      "musique": "Choisir au hasard un titre vérifié dans les Sons libres de droits de TikTok Studio.",
+      "statut": "brouillon_local"
+    }
+  ]
+}
