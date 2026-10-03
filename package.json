@@ -11,6 +11,7 @@
     "data:photos-ffr": "node scripts/importerPhotosFfr.cjs",
     "data:photos-detourees": "vite-node scripts/importerPhotosDetourees.ts",
     "verify:photos-detourees": "vite-node scripts/verifierPhotosDetourees.ts",
+    "verify:selection-ffr": "vite-node scripts/verifierSelectionFfr.ts",
     "data:photos-monde": "node scripts/importerPhotosMondiales.cjs",
     "data:apparences-match": "node scripts/genererApparencesMatch.mjs",
     "data:sprites-match": "node scripts/synchroniserSpritesMatch.mjs",

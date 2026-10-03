@@ -24,7 +24,9 @@ for (const club of Object.values(CLUBS_AMATEURS).flat()) {
   const origines = new Map(clubsSource.get(club.structureId)!.joueurs.map(j => [j.id, j]));
   const liste = joueursFfrDuClub(club.nom);
   const effectif = effectifDuClub(club.nom, 1);
-  for (const [i, j] of liste.entries()) {
+  for (const j of liste) {
+    const i = j.indexSource;
+    assert.ok(j.poste || j.photo, `${club.nom}: profil sans poste observé ni portrait retenu`);
     const reel = effectif.find(p => p.id === `${club.nom}-am-${i}`);
     assert.ok(reel, `${club.nom}: identité du licencié ${j.nom} modifiée`);
     if (!j.ffrId) ajouts++;

@@ -335,7 +335,8 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
   for (const club of Object.keys(EFFECTIFS_AMATEURS)) {
     const division = divisions.get(club) ?? 'regionale3';
     const competition = clubs.get(club);
-    for (const [index, j] of joueursFfrDuClub(club).entries()) {
+    for (const j of joueursFfrDuClub(club)) {
+      const index = j.indexSource;
       const { nom } = j;
       if (!nom.trim()) continue;
       const poste = j.poste ?? posteDepuisFamille(j.famille ?? POSTES_AMATEURS[index % POSTES_AMATEURS.length], index);

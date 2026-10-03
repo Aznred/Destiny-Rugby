@@ -489,7 +489,8 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
   const noteBase = noteAmateur(nomClub, niveau);
   const source = listeAmateur(nomClub);
 
-  return source.map((brut, i) => {
+  return source.map(brut => {
+    const i = brut.indexSource;
     const rng = graine(`amateur#${nomClub}#${brut.nom}#${i}`);
     const poste = brut.poste ?? (brut.famille ? posteConcret(brut.famille, nomClub + brut.nom) : POSTES_ROTATION[i % POSTES_ROTATION.length]);
     // Rugby amateur : des seniors de 18 à 35 ans, la masse autour de 24-27.
@@ -654,7 +655,7 @@ function completerEffectif(
       const parrain = source[Math.floor(rng() * source.length)];
       j.nom = `${prenom.nom.split(' ')[0]} ${parrain.nom.split(' ').slice(1).join(' ')}`.trim();
       j.nation = parrain.nation;
-    } else if (EFFECTIFS_AMATEURS[nomClub]) {
+    } else if (listeAmateur(nomClub).length) {
       const source2 = listeAmateur(nomClub);
       const rng = graine(`complementam#${nomClub}#${i}`);
       const prenom = source2[Math.floor(rng() * source2.length)].nom.split(' ')[0];

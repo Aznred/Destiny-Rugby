@@ -39,7 +39,7 @@ verifier('chaque club utilise les coordonnées réelles de sa commune',
 
 const joueurs = Object.values(EFFECTIFS_AMATEURS)
   .reduce((total, effectif) => total + effectif.split('~').filter(Boolean).length, 0);
-verifier('tous les joueurs de rugby compétition sont importés', joueurs === 73_999,
+verifier('l’export complet reste disponible comme source', joueurs === 73_999,
   joueurs.toLocaleString('fr-FR'));
 
 let completionsAttendues = 0;
@@ -56,7 +56,7 @@ verifier('aucun joueur inventé n’est ajouté à un effectif déjà suffisant'
   taillesExactes && completionsObservees === completionsAttendues,
   `${completionsObservees} compléments strictement nécessaires`);
 
-const tyrosse = EFFECTIFS_AMATEURS['US Tyrosse'].split('~').length;
+const tyrosse = joueursFfrDuClub('US Tyrosse').length;
 const tyrosseJeu = effectifDuClub('US Tyrosse', 1);
 verifier('un effectif FFR complet ne reçoit aucun joueur généré',
   tyrosseJeu.length === tyrosse && tyrosseJeu.every((joueur) => !joueur.id.includes('-complement-')),
